@@ -1,24 +1,28 @@
 # HUD & Menu Asset Audit
 
 ## Scope
-This audit compares the Quake Live reference snapshot under `references/original-assets/quakelive/baseq3` against the GPL tree to identify HUD/menu scripts, supporting assets, and metadata required for feature parity.
+This audit compares the Quake Live reference snapshot in `references/original-assets/quakelive/baseq3/ui` against the GPL tree under `src/ui` to identify the scripts, supporting art, and metadata required for UI parity.【4c71d3†L1-L10】【b8670f†L1-L11】 The counts below only consider menu/HUD definitions and text metadata located at the top level of each tree.
 
-## Summary of Findings
-- **Menu scripts largely ported, with a few metadata gaps.** The GPL tree carries 65 menu/HUD files versus 66 in the snapshot, omitting `country.txt`, `hud3.txt`, and `teaminfo.txt` while adding `ingame_quakelive.txt` and `menus_quakelive.txt` for migration tracing.【1c6e30†L13-L16】 These missing scripts provide locale and team configuration data that the Quake Live UI expects when populating dropdowns and spectator panels.
-- **Art asset directories are absent from the active tree.** The reference dump includes `ui/assets` folders for HUD elements, scoreboards, menu chrome, and flag art, but no equivalent directory exists under `src/ui/` today, indicating the GPL build cannot render the Quake Live-specific imagery without repackaging the PNG/TGA set.【14ce7a†L7-L15】
-- **Broader UI asset families remain outside source control.** Fonts, icons, levelshots, and shader definitions reside exclusively under the reference snapshot, so parity requires staging these resources into the build pipeline alongside the menu scripts.【5d67f4†L1-L10】
+## Inventory Snapshot
+### Menu & Metadata Coverage
+Both trees contain 65 top-level `.menu`/`.txt` definitions, but the contents diverge: the reference snapshot still provides `country.txt`, `hud3.txt`, and `teaminfo.txt`, while the GPL tree introduces `credential.menu`, `ingame_quakelive.txt`, and `menus_quakelive.txt` to bootstrap the migration.【a0bfed†L1-L3】【0b75f8†L1-L3】【f8903d†L3-L8】 The missing locale/team tables block dropdown population, spectator overlays, and the legacy HUD preset shipped with Quake Live.
 
-## Detailed Gap Analysis
-| Area | Reference Coverage | GPL Tree Status | Recommended Follow-Up |
-| --- | --- | --- | --- |
-| Menu & HUD scripts | 66 `.menu`/`.txt` files governing competitive HUDs, scoreboards, and flow menus under `baseq3/ui/`. | 65 ported scripts in `src/ui/`, missing `country.txt`, `hud3.txt`, and `teaminfo.txt` metadata required for nationalities and team overlays.【1c6e30†L13-L16】 | Import the missing text definitions; confirm script loader handles locale/team tables before UI regression testing. |
-| HUD/menu art | `ui/assets/` subfolders for `hud`, `statusbar`, `score`, `flags`, `menu`, and `main_menu` imagery.【5d67f4†L1-L6】 | No `src/ui/assets/` directory exists, so builds fall back to Quake III art or placeholders.【14ce7a†L7-L15】 | Stage the PNG/TGA set inside a new asset package (e.g., `pak_uiql.pk3`) and update the data build scripts to bundle it. |
-| Fonts | `baseq3/fonts/` holds Quake Live font TTFs and generated image atlases.【5d67f4†L1-L10】 | Fonts absent from GPL tree, leaving legacy Quake III atlas generation in place. | Introduce a reproducible font bake step that outputs Quake Live-aligned sizes, then update menu definitions to reference the new assets. |
-| Shader definitions | UI shaders captured under `baseq3/scripts/` in the reference dump.【5d67f4†L1-L10】 | No Quake Live-specific shader scripts shipped in source; renderer uses legacy set. | Copy `ui*.shader` files into the build and regenerate lightmaps/material caches so the HUD art renders with intended blending. |
-| Locale data | `country.txt` enumerates country codes, and `teaminfo.txt` drives spectator overlays in the snapshot. | Entries missing from GPL tree, so UI cannot populate those selectors.【1c6e30†L13-L16】 | Import files, verify encoding, and hook into the spectator/team HUD widgets during QA passes. |
+### Support Asset Families
+- **HUD art packages.** The snapshot retains a nested `ui/assets` hierarchy that supplies HUD chrome, scoreboard overlays, menu chrome, and national flag textures (`hud`, `score`, `menu`, `flags`, `main_menu`, `statusbar`).【c79cbb†L3-L9】 No equivalent directory lives under `src/ui`, so the GPL build currently falls back to Quake III visuals for these references.【4d18d4†L1-L2】
+- **Fonts.** Droid Sans, Noto Sans, and Handel Gothic TTFs reside exclusively under `baseq3/fonts`, reflecting Quake Live’s typography choices, but the GPL tree does not stage a font directory or regenerated atlases yet.【60b9f9†L1-L5】【4bab0c†L1-L2】
+- **Broader art/shader dependencies.** Icons, levelshots, and UI shader scripts that back menu gradients and cursors remain in the reference tree and are called out in the global asset audit; none of these resources are tracked in `src/` today.【273dcd†L5-L28】
 
-## Next Steps
-1. **Asset Staging:** Mirror the `ui/assets` folder hierarchy inside the build output and ensure the packaging step includes flags, HUD chrome, and scoreboard art.
-2. **Script Synchronisation:** Bring across `country.txt`, `teaminfo.txt`, and `hud3.txt`, then diff menu scripts against the reference to confirm no additional drift.
-3. **Font/Shader Integration:** Automate font atlas generation from the Quake Live TTFs and deploy the matching shader scripts to preserve intended rendering.
-4. **Verification:** Establish UI regression tests that load competitive HUD presets, spectator views, and vote dialogs to confirm assets resolve without fallback art.
+## Parity Gaps & Recommended Actions
+| Area | Gap | Action |
+| --- | --- | --- |
+| Locale & team metadata | `country.txt` and `teaminfo.txt` are still only present in the reference snapshot, preventing the UI from rendering country pickers and spectator team callouts.【f8903d†L3-L8】 | Import the missing tables, validate encoding, and verify that dropdown owner-drawers resolve after packaging.
+| Legacy HUD preset | `hud3.txt` has not been migrated, so the legacy preset referenced by configuration tools is unavailable.【f8903d†L3-L8】 | Copy the preset into `src/ui`, then surface it through the HUD selector to preserve user workflows.
+| HUD/menu art | Quake Live’s HUD imagery (`ui/assets/*`) is absent from the GPL tree, leaving scoreboxes and menu chrome without the intended gradients and iconography.【c79cbb†L3-L9】【4d18d4†L1-L2】 | Stage the hierarchy inside a reproducible PK3 (e.g., `pak_uiql.pk3`) and update the data build scripts to package it.
+| Fonts & readability | The Quake Live TTF set is not staged, risking fallback to Quake III bitmap fonts that do not match the scripted point sizes in competitive HUDs.【60b9f9†L1-L5】【77ce0a†L9-L22】 | Add a font bake step that emits `fonts/font`, `fonts/smallfont`, and `fonts/bigfont` atlases referenced by the menus before packaging.
+| Shader/material coverage | UI shader scripts referenced by the audit are missing from source control, so gradients and ink overlays degrade when the renderer falls back to legacy definitions.【273dcd†L5-L28】 | Import `ui*.shader` definitions alongside the art bundle and trigger shader cache regeneration in the build pipeline.
+
+## Accessibility Backlog
+1. **Prioritise color-differentiated scoreboxes.** Score widgets currently rely on semi-transparent red/blue fills plus numeric owner-draw values; re-importing the Quake Live art bundle should preserve dual encoding while providing higher-contrast assets for colorblind users.【77ce0a†L27-L93】
+2. **Add textual cues for spectator overlays.** Spectator HUD panels render ink-fade textures without explicit labels; pair reintroduced textures with brief text summaries or tooltips to support screen readers and low-vision players.【ba2fd2†L29-L87】
+3. **Localise country and team lists.** Restoring `country.txt`/`teaminfo.txt` enables locale-aware dropdowns and team rosters, ensuring players relying on textual identification are not excluded.【f8903d†L3-L8】
+4. **Document assetGlobalDef expectations.** The competitive HUD scripts hardcode font and cursor references inside `assetGlobalDef`; adding contributor guidance ensures replacements maintain sizing and contrast guarantees.【77ce0a†L9-L33】

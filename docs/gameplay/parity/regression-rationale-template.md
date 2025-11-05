@@ -1,6 +1,6 @@
 # Regression Rationale Template
 
-Use this template when documenting gameplay regressions or intentional deviations from Quake Live behaviour. Providing a consistent rationale trail ensures code owners can assess risk, schedule reviews, and flag areas that require additional testing before releases.
+Use this template when documenting gameplay regressions or intentional deviations from Quake Live behaviour. Providing a consistent rationale trail ensures code owners can assess risk, schedule reviews, and flag areas that require additional testing before releases. Reference the [Gameplay Parity Documentation Hub](./README.md) to confirm the latest reviewers who must be looped in.
 
 ## 1. Summary
 - **Feature / Behaviour:** <!-- e.g. Weapon respawn timer adjustment -->
