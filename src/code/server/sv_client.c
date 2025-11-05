@@ -480,7 +480,7 @@ void SV_DirectConnect( netadr_t from ) {
 			count = 0;
 			for ( i = startIndex; i < sv_maxclients->integer ; i++ ) {
 				cl = &svs.clients[i];
-				if (cl->netchan.remoteAddress.type == NA_BOT) {
+				if ( cl->state != CS_FREE && cl->netchan.remoteAddress.type == NA_BOT ) {
 					count++;
 				}
 			}
