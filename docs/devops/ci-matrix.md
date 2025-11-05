@@ -3,7 +3,7 @@
 The deterministic harness workflow runs both gameplay targets (QVM bytecode and Windows DLLs) so regressions surface regardless of build flavour. The workflow fans out into two jobs using a `target` matrix:
 
 - **Harnesses (QVM)** runs on `ubuntu-latest`, verifies the legacy toolchain, and executes the harness suite against the bytecode output.
-- **Harnesses (DLL)** runs on `windows-latest`, installs the Visual Studio 2010 components, builds the gameplay DLLs, and executes the same harness suite.
+- **Harnesses (DLL)** runs on `windows-latest`, installs the Visual Studio 2010 components, verifies the `v100` toolset, builds the gameplay DLLs, asserts their export tables against the manifest, and executes the same harness suite.
 
 Each job drives `tests/run_harnesses.py`, which emits deterministic artefacts into `artifacts/tests/<suite>/<target>/`:
 

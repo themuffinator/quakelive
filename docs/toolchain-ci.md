@@ -2,7 +2,7 @@
 
 Two dedicated GitHub Actions workflows cover the legacy QVM toolchain and the Windows-native DLL pipeline so regressions are caught early.【F:.github/workflows/toolchain.yml†L1-L18】【F:.github/workflows/windows-native.yml†L1-L26】 The jobs remain intentionally lightweight, focusing on prerequisite validation and export-surface checks instead of running full gameplay tests.
 
-The deterministic harness workflow complements those guards by building both targets and executing the new regression harnesses with deterministic inputs.【F:.github/workflows/deterministic-harnesses.yml†L1-L64】【F:tests/run_harnesses.py†L1-L88】 It collects JSON timelines, HUD hash captures, and summarised logs that are published as CI artefacts for manual inspection when failures occur.
+The deterministic harness workflow complements those guards by building both targets and executing the new regression harnesses with deterministic inputs.【F:.github/workflows/deterministic-harnesses.yml†L1-L68】【F:tests/run_harnesses.py†L1-L88】 The DLL leg now mirrors the native pipeline by installing and validating the Visual Studio 2010 toolset before building and asserting the export manifest so the harnesses always operate on verified binaries.【F:.github/workflows/deterministic-harnesses.yml†L28-L55】【F:tools/ci/assert-dll-exports.ps1†L1-L152】 It collects JSON timelines, HUD hash captures, and summarised logs that are published as CI artefacts for manual inspection when failures occur.
 
 ## QVM toolchain guard
 
