@@ -40,6 +40,333 @@ int drawTeamOverlayModificationCount = -1;
 //static char teamChat1[256];
 //static char teamChat2[256];
 
+static const score_t *CG_GetScoreForClientNum(int clientNum) {
+int i;
+
+if (clientNum < 0 || clientNum >= cgs.maxclients) {
+return NULL;
+}
+
+for (i = 0; i < cg.numScores; i++) {
+if (cg.scores[i].client == clientNum) {
+return &cg.scores[i];
+}
+}
+
+return NULL;
+}
+
+static void CG_BuildSpectatorClientOrder(void) {
+int i;
+
+cg.spectatorClientCount = 0;
+
+for (i = 0; i < cg.numScores && cg.spectatorClientCount < MAX_CLIENTS; i++) {
+int clientNum = cg.scores[i].client;
+clientInfo_t *ci;
+
+if (clientNum < 0 || clientNum >= cgs.maxclients) {
+continue;
+}
+
+ci = &cgs.clientinfo[clientNum];
+if (!ci->infoValid || ci->team == TEAM_SPECTATOR) {
+continue;
+}
+
+cg.spectatorClientOrder[cg.spectatorClientCount++] = clientNum;
+}
+
+if (cg.spectatorClientCount > 0) {
+return;
+}
+
+for (i = 0; i < cgs.maxclients && cg.spectatorClientCount < MAX_CLIENTS; i++) {
+clientInfo_t *ci = &cgs.clientinfo[i];
+if (!ci->infoValid || ci->team == TEAM_SPECTATOR) {
+continue;
+}
+cg.spectatorClientOrder[cg.spectatorClientCount++] = i;
+}
+}
+
+static void CG_UpdateSpectatorTargets(void) {
+int i;
+int primary = -1;
+int secondary = -1;
+
+if (!cg.snap) {
+cg.spectatorPrimaryClient = -1;
+cg.spectatorSecondaryClient = -1;
+cg.spectatorClientCount = 0;
+return;
+}
+
+CG_BuildSpectatorClientOrder();
+
+if (cg.snap->ps.pm_flags & PMF_FOLLOW) {
+cg.spectatorFollowClient = cg.snap->ps.clientNum;
+} else {
+cg.spectatorFollowClient = cg.snap->ps.clientNum;
+}
+
+if (cg.spectatorFollowClient >= 0 && cg.spectatorFollowClient < cgs.maxclients) {
+clientInfo_t *ci = &cgs.clientinfo[cg.spectatorFollowClient];
+if (ci->infoValid && ci->team != TEAM_SPECTATOR) {
+primary = cg.spectatorFollowClient;
+}
+}
+
+for (i = 0; primary == -1 && i < cg.spectatorClientCount; i++) {
+primary = cg.spectatorClientOrder[i];
+}
+
+for (i = 0; i < cg.spectatorClientCount; i++) {
+int clientNum = cg.spectatorClientOrder[i];
+if (clientNum == primary) {
+continue;
+}
+secondary = clientNum;
+break;
+}
+
+cg.spectatorPrimaryClient = primary;
+cg.spectatorSecondaryClient = secondary;
+cg.spectatorTargetUpdateTime = cg.time;
+}
+
+static const clientInfo_t *CG_SpectatorClientInfo(int slot) {
+int clientNum = -1;
+
+if (slot == 0) {
+clientNum = cg.spectatorPrimaryClient;
+} else if (slot == 1) {
+clientNum = cg.spectatorSecondaryClient;
+}
+
+if (clientNum < 0 || clientNum >= cgs.maxclients) {
+return NULL;
+}
+
+if (!cgs.clientinfo[clientNum].infoValid) {
+return NULL;
+}
+
+return &cgs.clientinfo[clientNum];
+}
+
+static const score_t *CG_SpectatorClientScore(int slot) {
+const clientInfo_t *ci = CG_SpectatorClientInfo(slot);
+if (!ci) {
+return NULL;
+}
+return CG_GetScoreForClientNum(ci->clientNum);
+}
+
+static qboolean CG_SpectatorSlotFollowed(int slot) {
+int clientNum = (slot == 0) ? cg.spectatorPrimaryClient : cg.spectatorSecondaryClient;
+return (clientNum >= 0 && clientNum == cg.spectatorFollowClient);
+}
+
+static void CG_GetArmorTierColor(int armor, vec4_t color) {
+if (armor >= 150) {
+color[0] = 0.9f; color[1] = 0.15f; color[2] = 0.15f; color[3] = 1.0f;
+} else if (armor >= 100) {
+color[0] = 0.95f; color[1] = 0.75f; color[2] = 0.2f; color[3] = 1.0f;
+} else if (armor > 0) {
+color[0] = 0.2f; color[1] = 0.8f; color[2] = 0.2f; color[3] = 1.0f;
+} else {
+color[0] = color[1] = color[2] = 0.4f; color[3] = 0.6f;
+}
+}
+
+void CG_SpectatorFollowCycle(int dir) {
+int i;
+int index = -1;
+int newClient;
+
+CG_UpdateSpectatorTargets();
+
+if (cg.spectatorClientCount <= 0) {
+return;
+}
+
+for (i = 0; i < cg.spectatorClientCount; i++) {
+if (cg.spectatorClientOrder[i] == cg.spectatorFollowClient) {
+index = i;
+break;
+}
+}
+
+if (index == -1) {
+index = 0;
+}
+
+index = (index + dir + cg.spectatorClientCount) % cg.spectatorClientCount;
+newClient = cg.spectatorClientOrder[index];
+
+trap_SendClientCommand(va("follow %d", newClient));
+}
+
+static void CG_DrawSpectatorPlayerName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+const clientInfo_t *ci = CG_SpectatorClientInfo(slot);
+vec4_t drawColor;
+
+if (!ci) {
+return;
+}
+
+Vector4Copy(color, drawColor);
+if (CG_SpectatorSlotFollowed(slot)) {
+drawColor[3] = 1.0f;
+}
+
+CG_Text_Paint(rect->x, rect->y, scale, drawColor, ci->name, 0, 0, textStyle);
+}
+
+static void CG_DrawSpectatorPlayerScore(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+const score_t *score = CG_SpectatorClientScore(slot);
+char buffer[32];
+
+if (!score) {
+return;
+}
+
+Com_sprintf(buffer, sizeof(buffer), "%d", score->score);
+CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);
+}
+
+static void CG_DrawSpectatorHealthArmor(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+const clientInfo_t *ci = CG_SpectatorClientInfo(slot);
+vec4_t healthColor;
+vec4_t armorColor;
+vec4_t baseColor = { 0.0f, 0.0f, 0.0f, 0.45f };
+char buffer[32];
+float healthWidth, armorWidth;
+int health;
+int armor;
+
+if (!ci) {
+return;
+}
+
+(void)color;
+
+health = ci->health;
+armor = ci->armor;
+if (health < 0) {
+health = 0;
+}
+if (armor < 0) {
+armor = 0;
+}
+
+CG_GetColorForHealth(health, armor, healthColor);
+CG_GetArmorTierColor(armor, armorColor);
+
+healthColor[3] = 0.85f;
+armorColor[3] = 0.7f;
+
+healthWidth = rect->w * Com_Clamp(0.0f, 1.0f, (float)health / 200.0f);
+armorWidth = rect->w * Com_Clamp(0.0f, 1.0f, (float)armor / 200.0f);
+
+CG_FillRect(rect->x, rect->y, rect->w, rect->h, baseColor);
+CG_FillRect(rect->x, rect->y, healthWidth, rect->h * 0.65f, healthColor);
+CG_FillRect(rect->x, rect->y + rect->h * 0.65f, armorWidth, rect->h * 0.35f, armorColor);
+
+{
+vec4_t textColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+Com_sprintf(buffer, sizeof(buffer), "%d / %d", health, armor);
+CG_Text_Paint(rect->x + 2, rect->y + rect->h - 2, scale, textColor, buffer, 0, 0, textStyle);
+}
+}
+
+static void CG_DrawHealthColorized(rectDef_t *rect) {
+const clientInfo_t *ci;
+vec4_t color;
+int slot;
+int health;
+int armor;
+
+if (cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW)) {
+slot = (rect->x + rect->w * 0.5f < 320.0f) ? 0 : 1;
+ci = CG_SpectatorClientInfo(slot);
+} else {
+slot = -1;
+ci = NULL;
+}
+
+if (!ci) {
+health = cg.snap->ps.stats[STAT_HEALTH];
+armor = cg.snap->ps.stats[STAT_ARMOR];
+} else {
+health = ci->health;
+armor = ci->armor;
+}
+
+CG_GetColorForHealth(health, armor, color);
+color[3] = 0.5f;
+CG_FillRect(rect->x, rect->y, rect->w, rect->h, color);
+}
+
+static void CG_DrawArmorTieredColorized(rectDef_t *rect) {
+vec4_t color;
+CG_GetArmorTierColor(cg.snap->ps.stats[STAT_ARMOR], color);
+color[3] = 0.5f;
+CG_FillRect(rect->x, rect->y, rect->w, rect->h, color);
+}
+
+static void CG_DrawFollowPlayerNameEx(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+const clientInfo_t *ci = CG_SpectatorClientInfo(0);
+char buffer[64];
+
+if (!ci) {
+return;
+}
+
+Com_sprintf(buffer, sizeof(buffer), "Following %s", ci->name);
+CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);
+}
+
+static void CG_DrawTeamColorized(rectDef_t *rect) {
+vec4_t color;
+CG_GetTeamColor(&color);
+CG_FillRect(rect->x, rect->y, rect->w, rect->h, color);
+}
+
+static void CG_DrawLevelTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+int msec;
+int seconds;
+char buffer[32];
+
+msec = cg.time - cgs.levelStartTime;
+if (msec < 0) {
+msec = 0;
+}
+
+seconds = msec / 1000;
+Com_sprintf(buffer, sizeof(buffer), "%02i:%02i", seconds / 60, seconds % 60);
+CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);
+}
+
+static void CG_DrawRoundTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+CG_DrawLevelTimer(rect, scale, color, textStyle);
+}
+
+static void CG_DrawOvertime(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+if (cg.timelimitWarnings & 4) {
+CG_Text_Paint(rect->x, rect->y, scale, color, "OVERTIME", 0, 0, textStyle);
+}
+}
+
+static void CG_DrawPlayerObituary(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+const char *text = CG_GetKillerText();
+if (!text || !*text) {
+return;
+}
+CG_Text_Paint(rect->x, rect->y, scale, color, text, 0, 0, textStyle);
+}
+
 void CG_InitTeamChat() {
   memset(teamChat1, 0, sizeof(teamChat1));
   memset(teamChat2, 0, sizeof(teamChat2));
@@ -1390,60 +1717,32 @@ void CG_DrawNewTeamInfo(rectDef_t *rect, float text_x, float text_y, float scale
 
 
 void CG_DrawTeamSpectators(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader) {
-	if (cg.spectatorLen) {
-		float maxX;
+const clientInfo_t *primary;
+const clientInfo_t *secondary;
+float y;
+char buffer[128];
 
-		if (cg.spectatorWidth == -1) {
-			cg.spectatorWidth = 0;
-			cg.spectatorPaintX = rect->x + 1;
-			cg.spectatorPaintX2 = -1;
-		}
+CG_UpdateSpectatorTargets();
 
-		if (cg.spectatorOffset > cg.spectatorLen) {
-			cg.spectatorOffset = 0;
-			cg.spectatorPaintX = rect->x + 1;
-			cg.spectatorPaintX2 = -1;
-		}
+primary = CG_SpectatorClientInfo(0);
+secondary = CG_SpectatorClientInfo(1);
 
-		if (cg.time > cg.spectatorTime) {
-			cg.spectatorTime = cg.time + 10;
-			if (cg.spectatorPaintX <= rect->x + 2) {
-				if (cg.spectatorOffset < cg.spectatorLen) {
-					cg.spectatorPaintX += CG_Text_Width(&cg.spectatorList[cg.spectatorOffset], scale, 1) - 1;
-					cg.spectatorOffset++;
-				} else {
-					cg.spectatorOffset = 0;
-					if (cg.spectatorPaintX2 >= 0) {
-						cg.spectatorPaintX = cg.spectatorPaintX2;
-					} else {
-						cg.spectatorPaintX = rect->x + rect->w - 2;
-					}
-					cg.spectatorPaintX2 = -1;
-				}
-			} else {
-				cg.spectatorPaintX--;
-				if (cg.spectatorPaintX2 >= 0) {
-					cg.spectatorPaintX2--;
-				}
-			}
-		}
+if (!primary && !secondary) {
+return;
+}
 
-		maxX = rect->x + rect->w - 2;
-		CG_Text_Paint_Limit(&maxX, cg.spectatorPaintX, rect->y + rect->h - 3, scale, color, &cg.spectatorList[cg.spectatorOffset], 0, 0); 
-		if (cg.spectatorPaintX2 >= 0) {
-			float maxX2 = rect->x + rect->w - 2;
-			CG_Text_Paint_Limit(&maxX2, cg.spectatorPaintX2, rect->y + rect->h - 3, scale, color, cg.spectatorList, 0, cg.spectatorOffset); 
-		}
-		if (cg.spectatorOffset && maxX > 0) {
-			// if we have an offset ( we are skipping the first part of the string ) and we fit the string
-			if (cg.spectatorPaintX2 == -1) {
-						cg.spectatorPaintX2 = rect->x + rect->w - 2;
-			}
-		} else {
-			cg.spectatorPaintX2 = -1;
-		}
+y = rect->y;
 
-	}
+if (primary) {
+Com_sprintf(buffer, sizeof(buffer), "Primary: %s", primary->name);
+CG_Text_Paint(rect->x, y, scale, color, buffer, 0, 0, 0);
+y += scale * 14.0f;
+}
+
+if (secondary) {
+Com_sprintf(buffer, sizeof(buffer), "Secondary: %s", secondary->name);
+CG_Text_Paint(rect->x, y, scale, color, buffer, 0, 0, 0);
+}
 }
 
 
@@ -1692,22 +1991,81 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 		break;
   case CG_1STPLACE:
     CG_Draw1stPlace(&rect, scale, color, shader, textStyle);
-		break;
+                break;
   case CG_2NDPLACE:
     CG_Draw2ndPlace(&rect, scale, color, shader, textStyle);
-		break;
+                break;
+  case CG_1ST_PLACE_SCORE:
+    CG_Draw1stPlace(&rect, scale, color, shader, textStyle);
+                break;
+  case CG_2ND_PLACE_SCORE:
+    CG_Draw2ndPlace(&rect, scale, color, shader, textStyle);
+                break;
+  case CG_PLAYER_OBIT:
+    CG_DrawPlayerObituary(&rect, scale, color, textStyle);
+                break;
+  case CG_LEVELTIMER:
+    CG_DrawLevelTimer(&rect, scale, color, textStyle);
+                break;
+  case CG_ROUNDTIMER:
+    CG_DrawRoundTimer(&rect, scale, color, textStyle);
+                break;
+  case CG_OVERTIME:
+    CG_DrawOvertime(&rect, scale, color, textStyle);
+                break;
+  case CG_1ST_PLYR:
+    CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 0);
+                break;
+  case CG_1ST_PLYR_SCORE:
+    CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 0);
+                break;
+  case CG_1ST_PLYR_HEALTH_ARMOR:
+    CG_DrawSpectatorHealthArmor(&rect, scale, color, textStyle, 0);
+                break;
+  case CG_2ND_PLYR:
+    CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 1);
+                break;
+  case CG_2ND_PLYR_SCORE:
+    CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 1);
+                break;
+  case CG_2ND_PLYR_HEALTH_ARMOR:
+    CG_DrawSpectatorHealthArmor(&rect, scale, color, textStyle, 1);
+                break;
+  case CG_HEALTH_COLORIZED:
+    CG_DrawHealthColorized(&rect);
+                break;
+  case CG_ARMORTIERED_COLORIZED:
+    CG_DrawArmorTieredColorized(&rect);
+                break;
+  case CG_TEAM_COLORIZED:
+    CG_DrawTeamColorized(&rect);
+                break;
+  case CG_FOLLOW_PLAYER_NAME_EX:
+    CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle);
+                break;
+  case CG_MATCH_WINNER:
+    CG_DrawGameStatus(&rect, scale, color, shader, textStyle);
+                break;
+  case CG_RACE_STATUS:
+  case CG_RACE_TIMES:
+  case CG_FLAG_STATUS:
+  case CG_RED_BASESTATUS:
+  case CG_BLUE_BASESTATUS:
+  case CG_PLAYER_HASKEY:
+                break;
   default:
     break;
   }
 }
 
 void CG_MouseEvent(int x, int y) {
-	int n;
+int n;
+qboolean allowSpectatorUi = (cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW));
 
-	if ( (cg.predictedPlayerState.pm_type == PM_NORMAL || cg.predictedPlayerState.pm_type == PM_SPECTATOR) && cg.showScores == qfalse) {
+if ( (cg.predictedPlayerState.pm_type == PM_NORMAL || (cg.predictedPlayerState.pm_type == PM_SPECTATOR && !allowSpectatorUi)) && cg.showScores == qfalse) {
     trap_Key_SetCatcher(0);
-		return;
-	}
+return;
+}
 
 	cgs.cursorX+= x;
 	if (cgs.cursorX < 0)
@@ -1784,16 +2142,17 @@ void CG_EventHandling(int type) {
 
 
 void CG_KeyEvent(int key, qboolean down) {
+qboolean allowSpectatorUi = (cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW));
 
-	if (!down) {
-		return;
-	}
+if (!down) {
+return;
+}
 
-	if ( cg.predictedPlayerState.pm_type == PM_NORMAL || (cg.predictedPlayerState.pm_type == PM_SPECTATOR && cg.showScores == qfalse)) {
-		CG_EventHandling(CGAME_EVENT_NONE);
+if ( cg.predictedPlayerState.pm_type == PM_NORMAL || (cg.predictedPlayerState.pm_type == PM_SPECTATOR && !allowSpectatorUi && cg.showScores == qfalse)) {
+CG_EventHandling(CGAME_EVENT_NONE);
     trap_Key_SetCatcher(0);
-		return;
-	}
+return;
+}
 
   //if (key == trap_Key_GetKey("teamMenu") || !Display_CaptureItem(cgs.cursorX, cgs.cursorY)) {
     // if we see this then we should always be visible
