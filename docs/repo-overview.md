@@ -24,3 +24,4 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
 1. Familiarize yourself with the HLIL dump organization so that Quake Live specific behaviors can be tracked back to decompiled functions.
 2. Compare modules in `src/code/` against their HLIL equivalents to identify divergences that must be ported.
 3. Keep the documentation in this overview updated as the project introduces new directories, tooling, or reverse-engineered components.
+4. Use the living build notes in [`docs/qvmtools.md`](qvmtools.md) and [`docs/windows-native-pipeline.md`](windows-native-pipeline.md) when reproducing the legacy QVM toolchain or the Visual Studio DLL workflow so that outputs stay aligned with the archived Quake Live binaries.

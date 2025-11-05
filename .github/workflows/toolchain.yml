@@ -1,0 +1,26 @@
+name: Toolchain Guards
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  qvm-prereqs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify QVM toolchain prerequisites
+        run: tools/ci/verify-qvm-toolchain.sh
+
+  windows-reference:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Visual Studio v100 toolset
+        shell: pwsh
+        run: tools/ci/verify-vs-toolchain.ps1 -RequireV100
+      - name: Validate Quake Live reference DLL exports
+        shell: pwsh
+        run: tools/ci/verify-dll-exports.ps1

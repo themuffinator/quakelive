@@ -11,6 +11,8 @@ The existing repository retains the Quake III Arena virtual machine pipeline so 
 
 This pipeline remains functional and should keep shipping alongside any new native-focused workflow to preserve bytecode compatibility for legacy mod builds and regression testing.
 
+Additional background on the `code/qvmtools/` staging area—including the binaries copied there, the wrapper scripts that consume them, and platform-specific rebuild prerequisites—is collected in [`docs/qvmtools.md`](qvmtools.md).
+
 ## Native Quake Live Binary Observations
 
 Binary Ninja HLIL exports and the curated tooling documentation already highlight that the shipped Quake Live gameplay DLLs were produced with Microsoft’s Visual Studio 2010 SP1 toolchain and link against the Visual C++ 2010 CRT pair (`MSVCR100`, `MSVCP100`).【F:docs/hlil_comparison.md†L8-L17】 This aligns with the `MinimumVisualStudioVersion = 10.0.40219.1` metadata embedded in the stock Visual Studio solution files, confirming the expectation of the `v100` compiler and linker stack for native targets.【F:src/code/quake3.sln†L1-L4】
@@ -20,6 +22,8 @@ In practice this means that reproducing Quake Live style binaries requires:
 - A 32-bit (Win32) build of the modules so the produced DLLs mirror the shipped `qagamex86.dll` layout documented in the reference material.【F:docs/hlil_comparison.md†L1-L17】
 - Access to the Visual Studio 2010 compiler, linker, and CRT import libraries (either via an actual VS2010 SP1 installation or the “v100 toolset” shipped with newer Visual Studio releases through the “Visual Studio 2010 Tools” components).
 - CRT deployment that links dynamically against `MSVCR100.dll`/`MSVCP100.dll`, mirroring the imports seen in the reference binaries.
+
+For a step-by-step walkthrough of the retargeting process (including the relevant `.vcxproj` files, `.def` exports, and verification commands), refer to [`docs/windows-native-pipeline.md`](windows-native-pipeline.md).
 
 ## Migration Strategy
 
@@ -40,7 +44,7 @@ The goal is to preserve the Quake III VM pipeline while layering in a native DLL
 
 4. **Automate toolchain selection and validation.**
    - Extend the top-level build instructions to include a Windows job that checks for the `v100` toolset and downloads/install instructions when missing.
-   - Add CI targets or local scripts that can build both the `.qvm` set and the native DLLs, verifying symbol exports and CRT dependencies (e.g., via `dumpbin /imports`) against the Quake Live references.
+   - Add CI targets or local scripts that can build both the `.qvm` set and the native DLLs, verifying symbol exports and CRT dependencies (e.g., via `dumpbin /imports`) against the Quake Live references. The initial guardrails for these checks are documented in [`docs/toolchain-ci.md`](toolchain-ci.md).
 
 5. **Gradually transition runtime testing.**
    - Retain `.qvm` builds as the default test vehicle while the native DLL path is under construction, using them for logic regression tests.
