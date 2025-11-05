@@ -94,6 +94,9 @@ class MatchHarness:
         self.config = config
         self.seed = self._resolve_seed(seed, config.seed)
         self.rng = random.Random(self.seed)
+        # Store the resolved seed on the configuration so serialised timelines
+        # reflect the actual deterministic inputs used for the run.
+        self.config.seed = self.seed
 
     @staticmethod
     def _resolve_seed(*seeds: Optional[int]) -> int:
