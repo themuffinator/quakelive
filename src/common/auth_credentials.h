@@ -13,6 +13,7 @@ typedef enum {
 
 #define QL_AUTH_MAX_CREDENTIAL_LENGTH 128
 #define QL_AUTH_MAX_RESPONSE_MESSAGE 128
+#define QL_AUTH_MAX_CREDENTIAL_STORAGE (QL_AUTH_MAX_CREDENTIAL_LENGTH + 32)
 
 typedef struct {
     qlAuthCredentialKind kind;

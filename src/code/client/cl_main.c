@@ -3254,29 +3254,32 @@ void CL_ShowIP_f(void) {
 bool CL_CDKeyValidate
 =================
 */
-qboolean CL_CDKeyValidate( const char *key, const char *checksum ) {
+static qboolean CL_CDKeyValidateLegacyValue( const char *key, const char *checksum ) {
 	char	ch;
 	byte	sum;
 	char	chs[3];
-	int i, len;
+	int	i, len;
 
-	len = strlen(key);
-	if( len != CDKEY_LEN ) {
+	if ( !key ) {
 		return qfalse;
 	}
 
-	if( checksum && strlen( checksum ) != CDCHKSUM_LEN ) {
+	len = strlen( key );
+	if ( len != CDKEY_LEN ) {
+		return qfalse;
+	}
+
+	if ( checksum && strlen( checksum ) != CDCHKSUM_LEN ) {
 		return qfalse;
 	}
 
 	sum = 0;
-	// for loop gets rid of conditional assignment warning
-	for (i = 0; i < len; i++) {
-		ch = *key++;
-		if (ch>='a' && ch<='z') {
+	for ( i = 0; i < len; i++ ) {
+		ch = key[i];
+		if ( ch >= 'a' && ch <= 'z' ) {
 			ch -= 32;
 		}
-		switch( ch ) {
+		switch ( ch ) {
 		case '2':
 		case '3':
 		case '7':
@@ -3294,23 +3297,44 @@ qboolean CL_CDKeyValidate( const char *key, const char *checksum ) {
 		case 'T':
 		case 'W':
 			sum += ch;
-			continue;
+			break;
 		default:
 			return qfalse;
 		}
 	}
 
-	sprintf(chs, "%02x", sum);
-	
-	if (checksum && !Q_stricmp(chs, checksum)) {
+	sprintf( chs, "%02x", sum );
+
+	if ( checksum && !Q_stricmp( chs, checksum ) ) {
 		return qtrue;
 	}
 
-	if (!checksum) {
+	if ( !checksum ) {
 		return qtrue;
 	}
 
 	return qfalse;
 }
 
+qboolean CL_CDKeyValidate( const char *key, const char *checksum ) {
+	ql_auth_credential_t	credential;
+
+	if ( !key ) {
+		return qfalse;
+	}
+
+	if ( !QL_ParseCredentialString( key, &credential ) ) {
+		return qfalse;
+	}
+
+	switch ( credential.kind ) {
+	case QL_AUTH_CREDENTIAL_LEGACY_CDKEY:
+		return CL_CDKeyValidateLegacyValue( credential.value, checksum );
+	case QL_AUTH_CREDENTIAL_STEAM:
+	case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
+		return credential.length > 0 ? qtrue : qfalse;
+	default:
+		return qfalse;
+	}
+}
 

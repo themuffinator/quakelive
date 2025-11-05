@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define _QCOMMON_H_
 
 #include "../qcommon/cm_public.h"
+#include "../../common/auth_credentials.h"
 
 //#define	PRE_RELEASE_DEMO
 
@@ -671,7 +672,8 @@ MISC
 
 // centralizing the declarations for cl_cdkey
 // https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=470
-extern char cl_cdkey[34];
+extern char cl_cdkey[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+extern char cl_cdkey_mod[QL_AUTH_MAX_CREDENTIAL_STORAGE];
 
 // returnbed by Sys_GetProcessorId
 #define CPUID_GENERIC			0			// any unrecognized processor
