@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 level_locals_t	level;
 weaponConfig_t	g_weaponConfig;
 
+weaponReloadConfig_t	g_weaponReloadConfig;
+
 typedef struct {
 	vmCvar_t	*vmCvar;
 	char		*cvarName;
@@ -102,6 +104,21 @@ vmCvar_t	g_damage_rg;
 vmCvar_t	g_damage_bfg;
 vmCvar_t	g_splashDamage_bfg;
 vmCvar_t	g_splashRadius_bfg;
+vmCvar_t	weapon_reload_gauntlet;
+vmCvar_t	weapon_reload_mg;
+vmCvar_t	weapon_reload_sg;
+vmCvar_t	weapon_reload_gl;
+vmCvar_t	weapon_reload_rl;
+vmCvar_t	weapon_reload_lg;
+vmCvar_t	weapon_reload_rg;
+vmCvar_t	weapon_reload_pg;
+vmCvar_t	weapon_reload_bfg;
+vmCvar_t	weapon_reload_gh;
+vmCvar_t	weapon_reload_hook;
+vmCvar_t	weapon_reload_ng;
+vmCvar_t	weapon_reload_prox;
+vmCvar_t	weapon_reload_cg;
+vmCvar_t	weapon_reload_hmg;
 vmCvar_t	g_startingAmmo_bfg;
 vmCvar_t	g_startingAmmo_cg;
 vmCvar_t	g_startingAmmo_g;
@@ -212,6 +229,22 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_splashDamage_bfg, "g_splashDamage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashRadius_bfg, "g_splashRadius_bfg", "120", 0, 0, qtrue },
 
+	{ &weapon_reload_gauntlet, "weapon_reload_gauntlet", "0", 0, 0, qfalse, qfalse, "Gauntlet refire delay override in milliseconds; 0 preserves the compiled behaviour." },
+	{ &weapon_reload_mg, "weapon_reload_mg", "0", 0, 0, qfalse, qfalse, "Machinegun refire delay override in milliseconds; 0 keeps the built-in rate." },
+	{ &weapon_reload_sg, "weapon_reload_sg", "0", 0, 0, qfalse, qfalse, "Shotgun refire delay override in milliseconds; 0 leaves the default timing." },
+	{ &weapon_reload_gl, "weapon_reload_gl", "0", 0, 0, qfalse, qfalse, "Grenade Launcher refire delay override in milliseconds." },
+	{ &weapon_reload_rl, "weapon_reload_rl", "0", 0, 0, qfalse, qfalse, "Rocket Launcher refire delay override in milliseconds." },
+	{ &weapon_reload_lg, "weapon_reload_lg", "0", 0, 0, qfalse, qfalse, "Lightning Gun refire delay override in milliseconds." },
+	{ &weapon_reload_rg, "weapon_reload_rg", "0", 0, 0, qfalse, qfalse, "Railgun refire delay override in milliseconds." },
+	{ &weapon_reload_pg, "weapon_reload_pg", "0", 0, 0, qfalse, qfalse, "Plasma Gun refire delay override in milliseconds." },
+	{ &weapon_reload_bfg, "weapon_reload_bfg", "0", 0, 0, qfalse, qfalse, "BFG refire delay override in milliseconds." },
+	{ &weapon_reload_gh, "weapon_reload_gh", "0", 0, 0, qfalse, qfalse, "Grappling Hook refire delay override in milliseconds." },
+	{ &weapon_reload_hook, "weapon_reload_hook", "0", 0, 0, qfalse, qfalse, "Hook pull refire delay override in milliseconds." },
+	{ &weapon_reload_ng, "weapon_reload_ng", "0", 0, 0, qfalse, qfalse, "Nailgun refire delay override in milliseconds." },
+	{ &weapon_reload_prox, "weapon_reload_prox", "0", 0, 0, qfalse, qfalse, "Proximity Launcher refire delay override in milliseconds." },
+	{ &weapon_reload_cg, "weapon_reload_cg", "0", 0, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
+	{ &weapon_reload_hmg, "weapon_reload_hmg", "0", 0, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
+
 	{ &g_startingAmmo_bfg, "g_startingAmmo_bfg", "10", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the BFG when it is part of the spawn loadout." },
 	{ &g_startingAmmo_cg, "g_startingAmmo_cg", "100", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the Chaingun when players spawn with it." },
 	{ &g_startingAmmo_g, "g_startingAmmo_g", "-1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo for the Gauntlet; -1 keeps the melee swings unlimited." },
@@ -299,6 +332,40 @@ void G_InitWeaponConfig( void ) {
 
 void G_UpdateWeaponConfig( void ) {
 	G_InitWeaponConfig();
+}
+
+static int G_ReadWeaponReloadCvar( const vmCvar_t *cvar, int fallback ) {
+	if ( !cvar ) {
+		return fallback;
+	}
+
+	if ( cvar->integer < 0 ) {
+		return fallback;
+	}
+
+	return cvar->integer;
+}
+
+void G_InitWeaponReloadConfig( void ) {
+	g_weaponReloadConfig.gauntlet = G_ReadWeaponReloadCvar( &weapon_reload_gauntlet, 0 );
+	g_weaponReloadConfig.machinegun = G_ReadWeaponReloadCvar( &weapon_reload_mg, 0 );
+	g_weaponReloadConfig.shotgun = G_ReadWeaponReloadCvar( &weapon_reload_sg, 0 );
+	g_weaponReloadConfig.grenadeLauncher = G_ReadWeaponReloadCvar( &weapon_reload_gl, 0 );
+	g_weaponReloadConfig.rocketLauncher = G_ReadWeaponReloadCvar( &weapon_reload_rl, 0 );
+	g_weaponReloadConfig.lightningGun = G_ReadWeaponReloadCvar( &weapon_reload_lg, 0 );
+	g_weaponReloadConfig.railgun = G_ReadWeaponReloadCvar( &weapon_reload_rg, 0 );
+	g_weaponReloadConfig.plasmagun = G_ReadWeaponReloadCvar( &weapon_reload_pg, 0 );
+	g_weaponReloadConfig.bfg = G_ReadWeaponReloadCvar( &weapon_reload_bfg, 0 );
+	g_weaponReloadConfig.grapplingHook = G_ReadWeaponReloadCvar( &weapon_reload_gh, 0 );
+	g_weaponReloadConfig.hook = G_ReadWeaponReloadCvar( &weapon_reload_hook, 0 );
+	g_weaponReloadConfig.nailgun = G_ReadWeaponReloadCvar( &weapon_reload_ng, 0 );
+	g_weaponReloadConfig.proximityLauncher = G_ReadWeaponReloadCvar( &weapon_reload_prox, 0 );
+	g_weaponReloadConfig.chaingun = G_ReadWeaponReloadCvar( &weapon_reload_cg, 0 );
+	g_weaponReloadConfig.heavyMachinegun = G_ReadWeaponReloadCvar( &weapon_reload_hmg, 0 );
+}
+
+void G_UpdateWeaponReloadConfig( void ) {
+	G_InitWeaponReloadConfig();
 }
 
 static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback ) {
@@ -511,6 +578,7 @@ void G_RegisterCvars( void ) {
 
 	level.warmupModificationCount = g_warmup.modificationCount;
 	G_InitWeaponConfig();
+	G_InitWeaponReloadConfig();
 	G_InitStartingAmmoConfig();
 }
 
@@ -543,6 +611,7 @@ void G_UpdateCvars( void ) {
 	}
 
 	G_UpdateWeaponConfig();
+	G_UpdateWeaponReloadConfig();
 	G_UpdateStartingAmmoConfig();
 }
 

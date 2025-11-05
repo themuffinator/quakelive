@@ -35,7 +35,58 @@ int			cvar_numIndexes;
 #define FILE_HASH_SIZE		256
 static	cvar_t*		hashTable[FILE_HASH_SIZE];
 
+#define ARRAY_LEN(x) (sizeof(x) / sizeof((x)[0]))
+
+static void Cvar_InitExpandedDefaults( void );
+
 cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force);
+
+static void Cvar_InitExpandedDefaults( void ) {
+	static qboolean expandedDefaultsInitialised = qfalse;
+	static const char *const expandedCvarBootstrap[] = {
+		"g_startingAmmo_bfg",
+		"g_startingAmmo_cg",
+		"g_startingAmmo_g",
+		"g_startingAmmo_gh",
+		"g_startingAmmo_gl",
+		"g_startingAmmo_hmg",
+		"g_startingAmmo_lg",
+		"g_startingAmmo_mg",
+		"g_startingAmmo_ng",
+		"g_startingAmmo_pg",
+		"g_startingAmmo_pl",
+		"g_startingAmmo_rg",
+		"g_startingAmmo_rl",
+		"g_startingAmmo_sg",
+		"weapon_reload_gauntlet",
+		"weapon_reload_mg",
+		"weapon_reload_sg",
+		"weapon_reload_gl",
+		"weapon_reload_rl",
+		"weapon_reload_lg",
+		"weapon_reload_rg",
+		"weapon_reload_pg",
+		"weapon_reload_bfg",
+		"weapon_reload_gh",
+		"weapon_reload_hook",
+		"weapon_reload_ng",
+		"weapon_reload_prox",
+		"weapon_reload_cg",
+		"weapon_reload_hmg"
+	};
+
+	int i;
+
+	if ( expandedDefaultsInitialised ) {
+		return;
+	}
+
+	for ( i = 0 ; i < ARRAY_LEN( expandedCvarBootstrap ); i++ ) {
+		Com_StartupVariable( expandedCvarBootstrap[i] );
+	}
+
+	expandedDefaultsInitialised = qtrue;
+}
 
 /*
 ================
@@ -900,6 +951,7 @@ void Cvar_Init (void) {
 	cvar_cheats = NULL;
 	cvar_modifiedFlags = 0;
 
+	Cvar_InitExpandedDefaults();
 	cvar_cheats = Cvar_Get("sv_cheats", "1", CVAR_ROM | CVAR_SYSTEMINFO );
 
 	Cmd_AddCommand ("toggle", Cvar_Toggle_f);

@@ -113,6 +113,28 @@ extern startingAmmoConfig_t g_startingAmmoConfig;
 void G_InitStartingAmmoConfig( void );
 void G_UpdateStartingAmmoConfig( void );
 
+typedef struct weaponReloadConfig_s {
+	int		gauntlet;
+	int		machinegun;
+	int		shotgun;
+	int		grenadeLauncher;
+	int		rocketLauncher;
+	int		lightningGun;
+	int		railgun;
+	int		plasmagun;
+	int		bfg;
+	int		grapplingHook;
+	int		hook;
+	int		nailgun;
+	int		proximityLauncher;
+	int		chaingun;
+	int		heavyMachinegun;
+} weaponReloadConfig_t;
+
+extern weaponReloadConfig_t g_weaponReloadConfig;
+void G_InitWeaponReloadConfig( void );
+void G_UpdateWeaponReloadConfig( void );
+
 struct gentity_s {
 	entityState_t	s;				// communicated by server to clients
 	entityShared_t	r;				// shared by both the server system and game
@@ -825,6 +847,22 @@ extern	vmCvar_t	g_startingAmmo_pl;
 extern	vmCvar_t	g_startingAmmo_rg;
 extern	vmCvar_t	g_startingAmmo_rl;
 extern	vmCvar_t	g_startingAmmo_sg;
+
+extern	vmCvar_t	weapon_reload_gauntlet;
+extern	vmCvar_t	weapon_reload_mg;
+extern	vmCvar_t	weapon_reload_sg;
+extern	vmCvar_t	weapon_reload_gl;
+extern	vmCvar_t	weapon_reload_rl;
+extern	vmCvar_t	weapon_reload_lg;
+extern	vmCvar_t	weapon_reload_rg;
+extern	vmCvar_t	weapon_reload_pg;
+extern	vmCvar_t	weapon_reload_bfg;
+extern	vmCvar_t	weapon_reload_gh;
+extern	vmCvar_t	weapon_reload_hook;
+extern	vmCvar_t	weapon_reload_ng;
+extern	vmCvar_t	weapon_reload_prox;
+extern	vmCvar_t	weapon_reload_cg;
+extern	vmCvar_t	weapon_reload_hmg;
 
 void	trap_Printf( const char *fmt );
 void	trap_Error( const char *fmt );
