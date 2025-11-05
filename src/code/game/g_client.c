@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/auth_credentials.h"
 #include "../../common/platform/platform_config.h"
 
+#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
+#include <limits.h>
+#endif
+
 // g_client.c -- client functions that don't happen every frame
 
 static vec3_t	playerMins = {-15, -15, -24};
@@ -32,6 +36,39 @@ static vec3_t	playerMaxs = {15, 15, 32};
 
 #if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
 static char g_clientAuthDenyMessage[QL_AUTH_MAX_RESPONSE_MESSAGE + 64];
+
+static qboolean G_ParseSteamId( const char *steamId, unsigned long long *outValue ) {
+        unsigned long long value;
+        const char *ch;
+
+        if ( !steamId || !steamId[0] || !outValue ) {
+                return qfalse;
+        }
+
+        value = 0ull;
+
+        for ( ch = steamId; *ch; ++ch ) {
+                if ( *ch < '0' || *ch > '9' ) {
+                        return qfalse;
+                }
+
+                // Detect overflow before multiplying.
+                if ( value > (ULLONG_MAX / 10ull) ) {
+                        return qfalse;
+                }
+
+                value *= 10ull;
+
+                if ( value > (ULLONG_MAX - (unsigned long long)(*ch - '0')) ) {
+                        return qfalse;
+                }
+
+                value += (unsigned long long)(*ch - '0');
+        }
+
+        *outValue = value;
+        return qtrue;
+}
 
 static void G_BuildSteamAuthToken( const char *userinfo, char *buffer, size_t bufferSize ) {
 	const char *auth;
@@ -83,22 +120,24 @@ static char *G_RunPlatformAuthChecks( int clientNum, const char *userinfo, qbool
 
 	QL_InitAuthCredential( &credential );
 
-	if ( !QL_ParsePlatformToken( token, QL_AUTH_CREDENTIAL_STEAM, &credential ) ) {
-		Q_strncpyz( g_clientAuthDenyMessage, "Failed to verify Steam auth token", sizeof( g_clientAuthDenyMessage ) );
-		return g_clientAuthDenyMessage;
-	}
+        if ( !QL_ParsePlatformToken( token, QL_AUTH_CREDENTIAL_STEAM, &credential ) ) {
+                Q_strncpyz( g_clientAuthDenyMessage, "Failed to verify Steam auth token", sizeof( g_clientAuthDenyMessage ) );
+                return g_clientAuthDenyMessage;
+        }
 
-	if ( !QL_RequestExternalAuth( &credential, &response ) ) {
-		const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
-		Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
-		return g_clientAuthDenyMessage;
-	}
+        if ( !QL_RequestExternalAuth( &credential, &response ) ) {
+                const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
+                Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
+                G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
+                return g_clientAuthDenyMessage;
+        }
 
-	if ( response.result != QL_AUTH_RESULT_ACCEPTED ) {
-		const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
-		Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
-		return g_clientAuthDenyMessage;
-	}
+        if ( response.result != QL_AUTH_RESULT_ACCEPTED ) {
+                const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
+                Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
+                G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
+                return g_clientAuthDenyMessage;
+        }
 
 	if ( response.message[0] ) {
 		G_LogPrintf( "SteamAuthAccepted: %i %s\n", clientNum, response.message );
@@ -1068,13 +1107,23 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 		// access immediately after the bot/auth checks.
 	}
 
-	if ( !isBot ) {
-		const char *steamId = Info_ValueForKey( userinfo, "steamid" );
+        if ( !isBot ) {
+                const char *steamId = Info_ValueForKey( userinfo, "steamid" );
 
-		if ( steamId && steamId[0] ) {
-			trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
-		}
-	}
+                if ( steamId && steamId[0] ) {
+#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
+                        unsigned long long parsedId;
+
+                        if ( G_ParseSteamId( steamId, &parsedId ) ) {
+                                trap_Printf( va( "%s connected with Steam ID %llu\n", client->pers.netname, parsedId ) );
+                        } else {
+                                trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
+                        }
+#else
+                        trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
+#endif
+                }
+        }
 
 	if ( g_gametype.integer >= GT_TEAM &&
 		client->sess.sessionTeam != TEAM_SPECTATOR ) {
