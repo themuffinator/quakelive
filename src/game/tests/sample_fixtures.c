@@ -1,4 +1,5 @@
-#include "tests/fixture_runner.h"
+#include "fixture_runner.h"
+#include "../../code/game/bg_public.h"
 
 #include <string.h>
 

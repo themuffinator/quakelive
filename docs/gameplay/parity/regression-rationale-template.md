@@ -24,7 +24,7 @@ Use this template when documenting gameplay regressions or intentional deviation
 - **Planned Fix Version:** <!-- Target milestone or build -->
 - **Mitigation Tasks:**
   - [ ] <!-- Example: Update `bg_pmove.c` to restore Quake Live air control clamp. Owner: @physics-guild -->
-  - [ ] <!-- Example: Add regression unit test to `src/code/game/tests/pmove_parity_test.cpp`. Owner: @qa-automation -->
+  - [ ] <!-- Example: Add regression unit test to `src/game/tests/pmove_parity_test.cpp`. Owner: @qa-automation -->
 
 ## 5. Validation & Sign-off
 - **Test Coverage:** <!-- Manual, automated, map-specific smoke tests -->

@@ -2,8 +2,9 @@
 
 The rules-engine fixtures are compiled twice: once as a QVM module for bytecode
 validation and once as a native DLL that links against `qagame`. The shared
-runner and syscall mocks live under `src/code/game/tests/` so that both build
-paths reuse the exact same entry points and utilities.
+runner and syscall mocks live under `src/game/tests/` so that both build paths
+reuse the exact same entry points and utilities no matter which toolchain is
+active.
 
 ## Harness Layout
 
@@ -18,6 +19,12 @@ paths reuse the exact same entry points and utilities.
 - `sample_fixtures.c` demonstrates how to define a suite and wire it through the
   runner. Treat it as a template when building dedicated fixture translation
   units.
+
+All harness sources live beside one another so that fixture translation units
+can simply include `"fixture_runner.h"` when placed in `src/game/tests/`. When
+referencing the runner from another directory (for example, a bespoke native
+harness), include it via `"game/tests/fixture_runner.h"` or add
+`src/game/tests` to your include path.
 
 The runner automatically calls `GT_ResetSyscallMocks()` before executing a
 suite, ensuring the trampoline defined in `g_syscalls.c` always routes through
@@ -57,7 +64,7 @@ Compile all fixture translation units alongside the runner and expose a thin
 entry point:
 
 ```c
-#include "tests/fixture_runner.h"
+#include "fixture_runner.h"
 
 game_fixture_result_t GT_RunMovementFixtures(void) {
     static const game_fixture_t fixtures[] = { /* ... */ };

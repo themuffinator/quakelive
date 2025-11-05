@@ -1,4 +1,4 @@
-#include "tests/syscall_mocks.h"
+#include "syscall_mocks.h"
 
 #ifndef Q3_VM
 #include <stdio.h>
@@ -23,7 +23,7 @@ static int QDECL GT_Dispatcher(int command, ...) {
 #define GAME_TESTS_WAS_Q3_VM 1
 #undef Q3_VM
 #endif
-#include "../g_syscalls.c"
+#include "../../code/game/g_syscalls.c"
 #ifdef GAME_TESTS_WAS_Q3_VM
 #define Q3_VM 1
 #endif

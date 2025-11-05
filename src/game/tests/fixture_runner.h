@@ -1,7 +1,7 @@
 #ifndef GAME_TESTS_FIXTURE_RUNNER_H
 #define GAME_TESTS_FIXTURE_RUNNER_H
 
-#include "g_local.h"
+#include "../../code/game/g_local.h"
 
 // Basic macro utilities reused in fixtures
 #ifndef GAME_TESTS_ARRAY_LEN

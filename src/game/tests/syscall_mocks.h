@@ -1,7 +1,7 @@
 #ifndef GAME_TESTS_SYSCALL_MOCKS_H
 #define GAME_TESTS_SYSCALL_MOCKS_H
 
-#include "g_local.h"
+#include "../../code/game/g_local.h"
 
 #include <stdarg.h>
 

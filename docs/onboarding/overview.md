@@ -30,7 +30,7 @@ migration-era tooling that now lives alongside the legacy Quake III sources.
   outputs under `build/win32-native/` so the DLL pipeline can evolve without colliding with QVM intermediates.
   Use the MSBuild targets documented in the Windows build guide when reproducing these artifacts locally.【F:docs/build/windows.md†L1-L31】
 - **Deterministic testing harnesses** – Python and C test runners live under `tools/tests/` and
-  `src/code/game/tests/` to keep gameplay validations in sync across QVM and DLL builds. Consult the testing
+  `src/game/tests/` to keep gameplay validations in sync across QVM and DLL builds. Consult the testing
   strategy and harness documentation before extending the suites.【F:docs/testing-strategy.md†L1-L43】【F:docs/testing/match-sim.md†L1-L45】【F:docs/testing/rules-fixtures.md†L1-L33】
 
 ## Documentation map

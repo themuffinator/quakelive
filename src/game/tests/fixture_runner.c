@@ -1,5 +1,5 @@
-#include "tests/fixture_runner.h"
-#include "tests/syscall_mocks.h"
+#include "fixture_runner.h"
+#include "syscall_mocks.h"
 
 #include <stdarg.h>
 
