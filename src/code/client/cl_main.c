@@ -102,6 +102,8 @@ void CL_CheckForResend( void );
 void CL_ShowIP_f(void);
 void CL_ServerStatus_f(void);
 void CL_ServerStatusResponse( netadr_t from, msg_t *msg );
+void CL_Web_ShowBrowser_f( void );
+void CL_Web_ChangeHash_f( void );
 
 /*
 ===============
@@ -2380,6 +2382,8 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
 	Cmd_AddCommand ("model", CL_SetModel_f );
+	Cmd_AddCommand ("web_showBrowser", CL_Web_ShowBrowser_f );
+	Cmd_AddCommand ("web_changeHash", CL_Web_ChangeHash_f );
 	CL_InitRef();
 
 	SCR_Init ();

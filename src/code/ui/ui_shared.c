@@ -51,6 +51,12 @@ displayContextDef_t *DC = NULL;
 static qboolean g_waitingForKey = qfalse;
 static qboolean g_editingField = qfalse;
 
+#ifndef CGAME
+extern void UI_StopMenuRefresh( void );
+extern void UI_CloseInGameMenu( void );
+extern void UI_LeaveGame( void );
+#endif
+
 static itemDef_t *g_bindItem = NULL;
 static itemDef_t *g_editItem = NULL;
 
@@ -1225,12 +1231,35 @@ void Script_Play(itemDef_t *item, char **args) {
 }
 
 void Script_playLooped(itemDef_t *item, char **args) {
-	const char *val;
-	if (String_Parse(args, &val)) {
-		DC->stopBackgroundTrack();
-		DC->startBackgroundTrack(val, val);
-	}
+        const char *val;
+        if (String_Parse(args, &val)) {
+                DC->stopBackgroundTrack();
+                DC->startBackgroundTrack(val, val);
+        }
 }
+
+#ifndef CGAME
+static void Script_StopRefresh(itemDef_t *item, char **args) {
+        UI_StopMenuRefresh();
+}
+
+static void Script_CloseInGame(itemDef_t *item, char **args) {
+        UI_CloseInGameMenu();
+}
+
+static void Script_Leave(itemDef_t *item, char **args) {
+        UI_LeaveGame();
+}
+#else
+static void Script_StopRefresh(itemDef_t *item, char **args) {
+}
+
+static void Script_CloseInGame(itemDef_t *item, char **args) {
+}
+
+static void Script_Leave(itemDef_t *item, char **args) {
+}
+#endif
 
 
 commandDef_t commandList[] =
@@ -1255,6 +1284,9 @@ commandDef_t commandList[] =
   {"exec", &Script_Exec},           // group/name
   {"play", &Script_Play},           // group/name
   {"playlooped", &Script_playLooped},           // group/name
+  {"stoprefresh", &Script_StopRefresh},
+  {"closeingame", &Script_CloseInGame},
+  {"leave", &Script_Leave},
   {"orbit", &Script_Orbit}                      // group/name
 };
 

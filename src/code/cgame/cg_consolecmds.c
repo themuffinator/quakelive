@@ -242,11 +242,19 @@ static void CG_VoiceTellAttacker_f( void ) {
 
 #ifdef MISSIONPACK
 static void CG_NextTeamMember_f( void ) {
-  CG_SelectNextPlayer();
+  if (cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW)) {
+    CG_SpectatorFollowCycle(1);
+  } else {
+    CG_SelectNextPlayer();
+  }
 }
 
 static void CG_PrevTeamMember_f( void ) {
-  CG_SelectPrevPlayer();
+  if (cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW)) {
+    CG_SpectatorFollowCycle(-1);
+  } else {
+    CG_SelectPrevPlayer();
+  }
 }
 
 // ASS U ME's enumeration order as far as task specific orders, OFFENSE is zero, CAMP is last

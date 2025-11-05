@@ -1,0 +1,137 @@
+#include "ui/menudef.h"
+
+{
+\\ score_menu \\
+
+  menuDef {
+    	name "stats_menu"
+    	visible 0
+    	fullscreen 0
+    	rect 0 -30 640 480
+    	focusColor 1 .75 0 1
+    	style WINDOW_STYLE_EMPTY
+    	border 1
+//*****************//*****************
+////BACKGROUND IMAGES
+//*****************//*****************
+//
+//
+
+
+//BACK FRAME
+	//top
+	itemDef {
+		name bgframeTL
+		rect 550 165 40 40 //16,4 -> 62,74
+		background "ui/assets/score/frametl.tga"
+		style WINDOW_STYLE_FILLED 
+		visible 1 
+		decoration 
+		backcolor 1 1 1 0.75
+	}
+	itemDef {
+		name bgframeTR
+		rect 590 165 40 40 //16,4 -> 62,74
+		background "ui/assets/score/frametr.tga"
+		style WINDOW_STYLE_FILLED 
+		visible 1 
+		decoration 
+		backcolor 1 1 1 0.75
+	}
+	itemDef {
+		name bgframeL
+		rect 550 205 40 220
+		background "ui/assets/score/framel.tga"
+		style WINDOW_STYLE_FILLED 
+		visible 1 
+		decoration 
+		backcolor 1 1 1 0.75
+	}
+	itemDef {
+		name bgframeR
+		rect 590 205 40 220
+		background "ui/assets/score/framer.tga"
+		style WINDOW_STYLE_FILLED 
+		visible 1 
+		decoration 
+		backcolor 1 1 1 0.75
+	}
+	itemDef {
+		name bgframeBL
+	    rect 550 425 40 20
+	    background "ui/assets/score/framebl.tga"
+		style WINDOW_STYLE_FILLED 
+	    visible 1 
+	    decoration 
+	    backcolor 1 1 1 0.75
+	}
+	itemDef {
+		name bgframeBR
+	    rect 590 425 40 20
+	    background "ui/assets/score/framebr.tga"
+		style WINDOW_STYLE_FILLED 
+	    visible 1 
+	    decoration 
+	    backcolor 1 1 1 0.75
+	}
+	itemDef {
+		name scoreboard
+		text "ACCURACY"
+		textscale .2
+		style WINDOW_STYLE_EMPTY	
+		rect 562 195 64 30 
+		backcolor 0 0 0 0
+		forecolor 1 1 1 1
+		decoration
+		visible 1
+	}
+	itemDef {
+		name weapon_icons
+		ownerdraw CG_WP_VERTICAL
+		rect 565 200 16 18
+		forecolor 1 1 1 1.0
+		backcolor 1 1 1 1
+		visible 1 
+		decoration 
+		textscale 0.18
+	}
+	itemDef {
+		name acc
+		ownerdraw CG_ACC_VERTICAL
+		rect 595 210 16 18
+		forecolor 1 1 1 1.0
+		visible 1 
+		decoration 
+		textscale 0.18
+	}
+	itemDef {
+		name bgframeM
+	   	rect 560 420 60 2
+	   	background "ui/assets/score/framem.tga"
+		style WINDOW_STYLE_FILLED 
+	   	visible 1 
+	   	decoration 
+	   	backcolor 1 1 1 0.9
+	}
+	itemDef {
+		name overall_acc_text
+		text "OVERALL"
+		textscale .16
+		style WINDOW_STYLE_EMPTY	
+		rect 560 434 64 30 
+		backcolor 0 0 0 0
+		forecolor 1 1 1 1
+		decoration
+		visible 1
+	}
+	itemDef {
+		name overall_acc
+		ownerdraw CG_SELECTED_PLYR_ACCURACY
+		rect 603 434 16 18
+		forecolor 1 1 1 1.0
+		visible 1 
+		align 2
+		decoration 
+		textscale 0.16
+	}
+}
