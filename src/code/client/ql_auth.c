@@ -1,5 +1,7 @@
 #include "client.h"
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "../../common/ql_auth_service.h"
@@ -9,6 +11,17 @@ typedef struct {
     ql_auth_request_descriptor_t descriptor;
     const char *logPrefix;
 } ql_client_auth_transport_t;
+
+static qlAuthOutcome QL_ClientAuth_MapOutcome( qlAuthResult result ) {
+    switch ( result ) {
+        case QL_AUTH_RESULT_ACCEPTED:
+            return QL_AUTH_OUTCOME_SUCCESS;
+        case QL_AUTH_RESULT_PENDING:
+            return QL_AUTH_OUTCOME_RETRY;
+        default:
+            return QL_AUTH_OUTCOME_FAILURE;
+    }
+}
 
 const char *QL_DescribeAuthOutcome( const ql_auth_response_t *response ) {
     if ( !response ) {
@@ -25,6 +38,25 @@ const char *QL_DescribeAuthOutcome( const ql_auth_response_t *response ) {
         default:
             return "unknown";
     }
+}
+
+static void QL_ClientAuth_SetResponse( ql_auth_response_t *response, qlAuthResult result, const char *format, ... ) {
+    if ( !response ) {
+        return;
+    }
+
+    response->result = result;
+    response->outcome = QL_ClientAuth_MapOutcome( result );
+
+    if ( !format ) {
+        response->message[0] = '\0';
+        return;
+    }
+
+    va_list args;
+    va_start( args, format );
+    vsnprintf( response->message, sizeof( response->message ), format, args );
+    va_end( args );
 }
 
 static void QL_ClientAuth_LogStage( const ql_client_auth_transport_t *transport, const char *stage, const char *detail ) {
@@ -76,13 +108,147 @@ static void QL_ClientAuth_TokenPreview( const ql_auth_credential_t *credential, 
     Com_sprintf( buffer, bufferSize, "%s…%s", head, tail );
 }
 
+static qboolean QL_ClientAuth_HandleSteamworksTicket( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+    if ( !credential ) {
+        return qfalse;
+    }
+
+    (void)transport;
+
+    char preview[32];
+    QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
+
+    if ( credential->length < 16 ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED, "Steam ticket rejected: payload too short" );
+        return qtrue;
+    }
+
+    if ( strstr( credential->value, "denied" ) || strstr( credential->value, "invalid" ) ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED, "Steam backend denied the ticket" );
+        return qtrue;
+    }
+
+    if ( strstr( credential->value, "retry" ) ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_PENDING, "Steam service busy, retry with refreshed ticket" );
+        return qtrue;
+    }
+
+    QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
+        "Steam session established (ticket=%s)", preview );
+    return qtrue;
+}
+
+static qboolean QL_ClientAuth_HandleOpenSteamTicket( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+    if ( !credential ) {
+        return qfalse;
+    }
+
+    char preview[32];
+    QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
+
+    if ( credential->length < 16 ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED,
+            "Open adapter rejected Steam credential: payload too short" );
+        return qtrue;
+    }
+
+    if ( strstr( credential->value, "denied" ) || strstr( credential->value, "invalid" ) ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED,
+            "Open adapter respected Steam denial" );
+        return qtrue;
+    }
+
+    QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
+        "Open adapter accepted Steam ticket (ticket=%s)", preview );
+    return qtrue;
+}
+
+static qboolean QL_ClientAuth_HandleStandaloneToken( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+    if ( !credential || credential->kind != QL_AUTH_CREDENTIAL_STANDALONE_TOKEN ) {
+        return qfalse;
+    }
+
+    char preview[32];
+    QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
+
+    if ( credential->length < 12 ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED,
+            "Standalone token rejected: payload too short" );
+        return qtrue;
+    }
+
+    if ( strstr( credential->value, "refresh" ) ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_PENDING,
+            "Launcher token expired, request a refresh" );
+        return qtrue;
+    }
+
+    if ( strstr( credential->value, "revoke" ) || strstr( credential->value, "denied" ) ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED,
+            "Launcher revoked the token" );
+        return qtrue;
+    }
+
+    QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
+        "Standalone token accepted (token=%s)", preview );
+    return qtrue;
+}
+
+static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+    ql_auth_response_t steamResponse;
+    memset( &steamResponse, 0, sizeof( steamResponse ) );
+
+    qboolean handled = QL_ClientAuth_HandleSteamworksTicket( transport, credential, &steamResponse );
+
+    if ( handled && steamResponse.result == QL_AUTH_RESULT_ACCEPTED ) {
+        *response = steamResponse;
+        return qtrue;
+    }
+
+    qboolean fallbackHandled = QL_ClientAuth_HandleOpenSteamTicket( credential, response );
+
+    if ( fallbackHandled && response->result == QL_AUTH_RESULT_ACCEPTED ) {
+        char preview[32];
+        QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
+
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
+            "Hybrid fallback accepted credential via open adapter (token=%s)", preview );
+        return qtrue;
+    }
+
+    if ( handled ) {
+        *response = steamResponse;
+        return qtrue;
+    }
+
+    return fallbackHandled;
+}
+
+static qboolean QL_ClientAuth_DispatchSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+    if ( !transport || !credential ) {
+        return qfalse;
+    }
+
+    const char *provider = transport->descriptor.provider ? transport->descriptor.provider : "";
+
+    if ( !Q_stricmp( provider, "Hybrid" ) ) {
+        return QL_ClientAuth_HandleHybridSteam( transport, credential, response );
+    }
+
+    if ( !Q_stricmp( provider, "Open Steam Adapter" ) ) {
+        return QL_ClientAuth_HandleOpenSteamTicket( credential, response );
+    }
+
+    return QL_ClientAuth_HandleSteamworksTicket( transport, credential, response );
+}
+
 qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
     if ( !credential || !response ) {
         return qfalse;
     }
 
     const ql_platform_service_table *services = QL_GetPlatformServices();
-    const char *provider = services && services->auth.descriptor.provider ? services->auth.descriptor.provider : "dispatcher";
+    const char *provider = services && services->auth.provider ? services->auth.provider : "dispatcher";
     const char *endpoint = "<unroutable>";
 
     switch ( credential->kind ) {
@@ -101,7 +267,7 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
         provider
     };
 
-    if ( !services || !services->auth.descriptor.supported || !services->auth.request ) {
+    if ( !services || !services->auth.supported ) {
         transport.logPrefix = "dispatcher";
     }
 
@@ -125,27 +291,29 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
             break;
     }
 
-    if ( !services || !services->auth.request ) {
-        response->result = QL_AUTH_RESULT_ERROR;
-        response->outcome = QL_AUTH_OUTCOME_FAILURE;
-        Q_strncpyz( response->message, sizeof( response->message ),
+    if ( !services || !services->auth.supported ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
             "No authentication backend is compiled in." );
         QL_ClientAuth_LogResponse( &transport, response );
         return qfalse;
     }
 
-    if ( !QL_Platform_RunMockAuthFlow( credential, response ) ) {
-        if ( response->message[0] == '\0' ) {
-            Com_sprintf( response->message, sizeof( response->message ),
-                "No transport for credential kind %s", QL_GetCredentialLabel( credential ) );
-            response->result = QL_AUTH_RESULT_ERROR;
-            response->outcome = QL_AUTH_OUTCOME_FAILURE;
-        }
+    qboolean handled = qfalse;
 
-        QL_ClientAuth_LogResponse( &transport, response );
-        return qfalse;
+    switch ( credential->kind ) {
+        case QL_AUTH_CREDENTIAL_STEAM:
+            handled = QL_ClientAuth_DispatchSteam( &transport, credential, response );
+            break;
+        case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
+            handled = QL_ClientAuth_HandleStandaloneToken( credential, response );
+            break;
+        default:
+            QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
+                "No transport for credential kind %s", QL_GetCredentialLabel( credential ) );
+            handled = qfalse;
+            break;
     }
 
     QL_ClientAuth_LogResponse( &transport, response );
-    return qtrue;
+    return handled;
 }

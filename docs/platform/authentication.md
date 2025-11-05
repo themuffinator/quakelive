@@ -4,22 +4,22 @@ This document describes how the client dispatches external authentication reques
 
 ## Request Routing
 
-`QL_RequestExternalAuth` clears the response container and invokes `QL_Auth_ExecuteRequest`, which consults the platform service table to discover the active authentication backend.【F:src/common/auth_credentials.c†L119-L151】【F:src/code/client/ql_auth.c†L86-L163】 The descriptor published by `QL_GetPlatformServices` provides the human-readable provider name (for example, “Steamworks”, “Open Steam Adapter”, or “Hybrid”) and the dispatcher derives the request endpoint from the credential kind:
+`QL_RequestExternalAuth` clears the response container and invokes `QL_Auth_ExecuteRequest`, which consults the platform service table to discover the active authentication backend.【F:src/common/auth_credentials.c†L120-L154】【F:src/code/client/ql_auth.c†L245-L318】 The descriptor published by `QL_GetPlatformServices` provides the human-readable provider name (for example, “Steamworks”, “Open Steam Adapter”, or “Hybrid”) and the dispatcher derives the request endpoint from the credential kind:
 
 - **Steam** – `/steam/session/validate`
 - **Standalone launcher** – `/launcher/auth/verify`
 
-Each dispatch prints a log entry with the provider label, summarizes the credential using a masked preview, and writes the final outcome to the shared response object.【F:src/code/client/ql_auth.c†L42-L150】【F:src/common/platform/platform_services.c†L1-L191】 The service table ensures that builds compiled without a given backend still advertise accurate capabilities.【F:src/common/platform/platform_services.c†L120-L191】
+Each dispatch prints a log entry with the provider label, summarizes the credential using a masked preview, and writes the final outcome to the shared response object.【F:src/code/client/ql_auth.c†L43-L318】 The service table ensures that builds compiled without a given backend still advertise accurate capabilities.【F:src/common/platform/platform_services.c†L1-L54】
 
 ## Structured Outcomes
 
 Handlers normalise their decisions into three high-level outcomes so callers can distinguish fatal errors from transient hiccups:
 
 - `success` – the credential was accepted and the legacy code path may continue.
-- `retry` – the backend asked for another attempt (for example, a Steam ticket marked with `retry` or a standalone token containing `refresh`).【F:src/common/platform/platform_services.c†L36-L118】
+- `retry` – the backend asked for another attempt (for example, a Steam ticket marked with `retry` or a standalone token containing `refresh`).【F:src/code/client/ql_auth.c†L141-L225】
 - `failure` – the credential was denied or malformed.
 
-The helper `QL_DescribeAuthOutcome` maps enum values to these human-readable strings, which appear in every lifecycle log.【F:src/code/client/ql_auth.c†L45-L74】
+The helper `QL_DescribeAuthOutcome` maps enum values to these human-readable strings, which appear in every lifecycle log.【F:src/code/client/ql_auth.c†L26-L83】
 
 ## Integration Trace
 
@@ -41,4 +41,4 @@ Provider/token combinations demonstrate success, retry, and failure paths.
 [auth] Steamworks result -> outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
 ```
 
-Use the remaining scenarios from the script to validate retry and failure paths for Steamworks, hybrid fallback, and the standalone launcher. Each log line corresponds to the callbacks issued by the client dispatcher when `QL_RequestExternalAuth` runs during a real handshake.【F:src/code/client/ql_auth.c†L42-L163】【F:tools/integration/auth_flow_trace.py†L1-L113】
+Use the remaining scenarios from the script to validate retry and failure paths for Steamworks, hybrid fallback, and the standalone launcher. Each log line corresponds to the callbacks issued by the client dispatcher when `QL_RequestExternalAuth` runs during a real handshake.【F:src/code/client/ql_auth.c†L43-L318】【F:tools/integration/auth_flow_trace.py†L1-L113】
