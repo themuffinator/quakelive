@@ -1,0 +1,12 @@
+// menu defs
+//
+{
+        loadMenu { "ui/default.menu" }
+        loadMenu { "ui/main.menu" }
+        loadMenu { "ui/main_options.menu" }
+        loadMenu { "ui/connect.menu" }
+        loadMenu { "ui/quit.menu" }
+        loadMenu { "ui/demo.menu" }
+        loadMenu { "ui/ingame_lowernav.menu" }
+        loadMenu { "ui/error.menu" }
+}

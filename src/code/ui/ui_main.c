@@ -158,6 +158,76 @@ vmCvar_t  ui_new;
 vmCvar_t  ui_debug;
 vmCvar_t  ui_initialized;
 vmCvar_t  ui_teamArenaFirstRun;
+vmCvar_t  ui_menuFlow;
+vmCvar_t  ui_browserAwesomium;
+
+#define UI_MENU_FILE_LEGACY             "ui/menus.txt"
+#define UI_MENU_FILE_QUAKELIVE          "ui/menus_quakelive.txt"
+#define UI_INGAME_FILE_LEGACY           "ui/ingame.txt"
+#define UI_INGAME_FILE_QUAKELIVE        "ui/ingame_quakelive.txt"
+
+static uiMenuFlow_t ui_activeMenuFlow = UI_MENU_FLOW_LEGACY;
+
+static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
+        return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
+}
+
+qboolean UI_BrowserOverlayAvailable(void) {
+        return ui_browserAwesomium.integer != 0;
+}
+
+static uiMenuFlow_t UI_RequestedMenuFlow(void) {
+        return (ui_menuFlow.integer > 0) ? UI_MENU_FLOW_QUAKELIVE : UI_MENU_FLOW_LEGACY;
+}
+
+static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {
+        uiMenuFlow_t requested = UI_RequestedMenuFlow();
+        if (requested == UI_MENU_FLOW_QUAKELIVE && !UI_BrowserOverlayAvailable()) {
+                return UI_MENU_FLOW_LEGACY;
+        }
+        return requested;
+}
+
+static void UI_SetActiveMenuFlow(uiMenuFlow_t flow) {
+        ui_activeMenuFlow = flow;
+        ui_new.integer = (flow == UI_MENU_FLOW_QUAKELIVE);
+}
+
+qboolean UI_UsingLegacyMenuFlow(void) {
+        return (ui_activeMenuFlow == UI_MENU_FLOW_LEGACY);
+}
+
+static qboolean UI_ServerBrowserEnabled(void) {
+        return UI_UsingLegacyMenuFlow();
+}
+
+static void UI_UpdateActiveMenuFlowForFile(const char *menuFile) {
+        if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_QUAKELIVE)) {
+                UI_SetActiveMenuFlow(UI_MENU_FLOW_QUAKELIVE);
+        } else if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_LEGACY) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_LEGACY)) {
+                UI_SetActiveMenuFlow(UI_MENU_FLOW_LEGACY);
+        }
+}
+
+const char *UI_DefaultMenuFile(void) {
+        return UI_UsingLegacyMenuFlow() ? UI_MENU_FILE_LEGACY : UI_MENU_FILE_QUAKELIVE;
+}
+
+const char *UI_DefaultIngameFile(void) {
+        return UI_UsingLegacyMenuFlow() ? UI_INGAME_FILE_LEGACY : UI_INGAME_FILE_QUAKELIVE;
+}
+
+static void UI_UpdateActiveMenuFlow(void) {
+        UI_SetActiveMenuFlow(UI_ResolveMenuFlowInternal());
+}
+
+void UI_ApplyMenuFlowChange(uiMenuFlow_t flow, qboolean reload) {
+        trap_Cvar_SetValue("ui_menuFlow", flow);
+        UI_UpdateActiveMenuFlow();
+        if (reload) {
+                UI_Load();
+        }
+}
 
 void _UI_Init( qboolean );
 void _UI_Shutdown( void );
@@ -165,6 +235,7 @@ void _UI_KeyEvent( int key, qboolean down );
 void _UI_MouseEvent( int dx, int dy );
 void _UI_Refresh( int realtime );
 qboolean _UI_IsFullscreen( void );
+void UI_Load( void );
 int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11  ) {
   switch ( command ) {
 	  case UI_GETAPIVERSION:
@@ -935,26 +1006,30 @@ qboolean Load_Menu(int handle) {
 }
 
 void UI_LoadMenus(const char *menuFile, qboolean reset) {
-	pc_token_t token;
-	int handle;
-	int start;
+        pc_token_t token;
+        int handle;
+        int start;
 
-	start = trap_Milliseconds();
+        start = trap_Milliseconds();
 
-	handle = trap_PC_LoadSource( menuFile );
-	if (!handle) {
-		trap_Error( va( S_COLOR_YELLOW "menu file not found: %s, using default\n", menuFile ) );
-		handle = trap_PC_LoadSource( "ui/menus.txt" );
-		if (!handle) {
-			trap_Error( va( S_COLOR_RED "default menu file not found: ui/menus.txt, unable to continue!\n", menuFile ) );
-		}
-	}
+        handle = trap_PC_LoadSource(menuFile);
+        if (!handle) {
+                const char *fallback = UI_MENU_FILE_LEGACY;
+                trap_Error(va(S_COLOR_YELLOW "menu file not found: %s, using default\n", menuFile));
+                if (!UI_MenuFileEquals(menuFile, fallback)) {
+                        menuFile = fallback;
+                        handle = trap_PC_LoadSource(menuFile);
+                }
+                if (!handle) {
+                        trap_Error(va(S_COLOR_RED "default menu file not found: %s, unable to continue!\n", fallback));
+                }
+        }
 
-	ui_new.integer = 1;
+        UI_UpdateActiveMenuFlowForFile(menuFile);
 
-	if (reset) {
-		Menu_Reset();
-	}
+        if (reset) {
+                Menu_Reset();
+        }
 
 	while ( 1 ) {
 		if (!trap_PC_ReadToken(handle, &token))
@@ -982,17 +1057,18 @@ void UI_LoadMenus(const char *menuFile, qboolean reset) {
 }
 
 void UI_Load() {
-	char lastName[1024];
-  menuDef_t *menu = Menu_GetFocused();
-	char *menuSet = UI_Cvar_VariableString("ui_menuFiles");
-	if (menu && menu->window.name) {
-		strcpy(lastName, menu->window.name);
-	}
-	if (menuSet == NULL || menuSet[0] == '\0') {
-		menuSet = "ui/menus.txt";
-	}
+        char lastName[1024];
+        menuDef_t *menu = Menu_GetFocused();
+        const char *menuSet = UI_Cvar_VariableString("ui_menuFiles");
+        if (menu && menu->window.name) {
+                strcpy(lastName, menu->window.name);
+        }
+        UI_UpdateActiveMenuFlow();
+        if (menuSet == NULL || menuSet[0] == '\0') {
+                menuSet = UI_DefaultMenuFile();
+        }
 
-	String_Init();
+        String_Init();
 
 #ifdef PRE_RELEASE_TADEMO
 	UI_ParseGameInfo("demogameinfo.txt");
@@ -1001,9 +1077,10 @@ void UI_Load() {
 	UI_LoadArenas();
 #endif
 
-	UI_LoadMenus(menuSet, qtrue);
-	Menus_CloseAll();
-	Menus_ActivateByName(lastName);
+        UI_LoadMenus(menuSet, qtrue);
+        UI_LoadMenus(UI_DefaultIngameFile(), qfalse);
+        Menus_CloseAll();
+        Menus_ActivateByName(lastName);
 
 }
 
@@ -3318,12 +3395,17 @@ static void UI_RunMenuScript(char **args) {
 				Menus_CloseByName("joinserver");
 				Menus_OpenByName("main");
 			}
-		} else if (Q_stricmp(name, "StopRefresh") == 0) {
-			UI_StopServerRefresh();
-			uiInfo.serverStatus.nextDisplayRefresh = 0;
-			uiInfo.nextServerStatusRefresh = 0;
-			uiInfo.nextFindPlayerRefresh = 0;
-		} else if (Q_stricmp(name, "UpdateFilter") == 0) {
+                } else if (Q_stricmp(name, "StopRefresh") == 0) {
+                        if (!UI_BrowserOverlayAvailable() && !UI_ServerBrowserEnabled()) {
+                                Com_Printf("UI: stopRefresh requires the browser overlay; reverting to legacy menus.\n");
+                                UI_ApplyMenuFlowChange(UI_MENU_FLOW_LEGACY, qtrue);
+                                return;
+                        }
+                        UI_StopServerRefresh();
+                        uiInfo.serverStatus.nextDisplayRefresh = 0;
+                        uiInfo.nextServerStatusRefresh = 0;
+                        uiInfo.nextFindPlayerRefresh = 0;
+                } else if (Q_stricmp(name, "UpdateFilter") == 0) {
 			if (ui_netSource.integer == AS_LOCAL) {
 				UI_StartServerRefresh(qtrue);
 			}
@@ -3734,6 +3816,10 @@ static void UI_BuildServerDisplayList(qboolean force) {
 //	qboolean startRefresh = qtrue; TTimo: unused
 	static int numinvisible;
 
+	if (!UI_ServerBrowserEnabled()) {
+		return;
+	}
+
 	if (!(force || uiInfo.uiDC.realTime > uiInfo.serverStatus.nextDisplayRefresh)) {
 		return;
 	}
@@ -4019,6 +4105,9 @@ UI_BuildFindPlayerList
 ==================
 */
 static void UI_BuildFindPlayerList(qboolean force) {
+	if (!UI_ServerBrowserEnabled()) {
+		return;
+	}
 	static int numFound, numTimeOuts;
 	int i, j, resend;
 	serverStatusInfo_t info;
@@ -4156,6 +4245,10 @@ UI_BuildServerStatus
 */
 static void UI_BuildServerStatus(qboolean force) {
 
+	if (!UI_ServerBrowserEnabled()) {
+		return;
+	}
+
 	if (uiInfo.nextFindPlayerRefresh) {
 		return;
 	}
@@ -4271,6 +4364,9 @@ static int UI_GetIndexFromSelection(int actual) {
 }
 
 static void UI_UpdatePendingPings() { 
+	if (!UI_ServerBrowserEnabled()) {
+		return;
+	}
 	trap_LAN_ResetPings(ui_netSource.integer);
 	uiInfo.serverStatus.refreshActive = qtrue;
 	uiInfo.serverStatus.refreshtime = uiInfo.uiDC.realTime + 1000;
@@ -4295,6 +4391,9 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 		int actual;
 		return UI_SelectedMap(index, &actual);
 	} else if (feederID == FEEDER_SERVERS) {
+		if (!UI_ServerBrowserEnabled()) {
+			return "";
+		}
 		if (index >= 0 && index < uiInfo.serverStatus.numDisplayServers) {
 			int ping, game, punkbuster;
 			if (lastColumn != column || lastTime > uiInfo.uiDC.realTime + 5000) {
@@ -5029,8 +5128,9 @@ void _UI_Init( qboolean inGameLoad ) {
 
 	//uiInfo.inGameLoad = inGameLoad;
 
-	UI_RegisterCvars();
-	UI_InitMemory();
+        UI_RegisterCvars();
+        UI_UpdateCvars();
+        UI_InitMemory();
 
 	// cache redundant calulations
 	trap_GetGlconfig( &uiInfo.uiDC.glconfig );
@@ -5124,10 +5224,11 @@ void _UI_Init( qboolean inGameLoad ) {
 	UI_ParseGameInfo("gameinfo.txt");
 #endif
 
-	menuSet = UI_Cvar_VariableString("ui_menuFiles");
-	if (menuSet == NULL || menuSet[0] == '\0') {
-		menuSet = "ui/menus.txt";
-	}
+        menuSet = UI_Cvar_VariableString("ui_menuFiles");
+        UI_UpdateActiveMenuFlow();
+        if (menuSet == NULL || menuSet[0] == '\0') {
+                menuSet = UI_DefaultMenuFile();
+        }
 
 #if 0
 	if (uiInfo.inGameLoad) {
@@ -5135,8 +5236,8 @@ void _UI_Init( qboolean inGameLoad ) {
 	} else { // bk010222: left this: UI_LoadMenus(menuSet, qtrue);
 	}
 #else 
-	UI_LoadMenus(menuSet, qtrue);
-	UI_LoadMenus("ui/ingame.txt", qfalse);
+        UI_LoadMenus(menuSet, qtrue);
+        UI_LoadMenus(UI_DefaultIngameFile(), qfalse);
 #endif
 	
 	Menus_CloseAll();
@@ -5223,12 +5324,14 @@ void _UI_MouseEvent( int dx, int dy )
 }
 
 void UI_LoadNonIngame() {
-	const char *menuSet = UI_Cvar_VariableString("ui_menuFiles");
-	if (menuSet == NULL || menuSet[0] == '\0') {
-		menuSet = "ui/menus.txt";
-	}
-	UI_LoadMenus(menuSet, qfalse);
-	uiInfo.inGameLoad = qfalse;
+        const char *menuSet = UI_Cvar_VariableString("ui_menuFiles");
+        UI_UpdateActiveMenuFlow();
+        if (menuSet == NULL || menuSet[0] == '\0') {
+                menuSet = UI_DefaultMenuFile();
+        }
+        UI_LoadMenus(menuSet, qfalse);
+        UI_LoadMenus(UI_DefaultIngameFile(), qfalse);
+        uiInfo.inGameLoad = qfalse;
 }
 
 void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
@@ -5779,7 +5882,9 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_blueteam4, "ui_blueteam4", "0", CVAR_ARCHIVE },
 	{ &ui_blueteam5, "ui_blueteam5", "0", CVAR_ARCHIVE },
 	{ &ui_netSource, "ui_netSource", "0", CVAR_ARCHIVE },
-	{ &ui_menuFiles, "ui_menuFiles", "ui/menus.txt", CVAR_ARCHIVE },
+        { &ui_menuFiles, "ui_menuFiles", "ui/menus.txt", CVAR_ARCHIVE },
+        { &ui_menuFlow, "ui_menuFlow", "1", CVAR_ARCHIVE },
+        { &ui_browserAwesomium, "ui_browserAwesomium", "0", CVAR_TEMP },
 	{ &ui_currentTier, "ui_currentTier", "0", CVAR_ARCHIVE },
 	{ &ui_currentMap, "ui_currentMap", "0", CVAR_ARCHIVE },
 	{ &ui_currentNetMap, "ui_currentNetMap", "0", CVAR_ARCHIVE },
@@ -5862,12 +5967,17 @@ ArenaServers_StopRefresh
 */
 static void UI_StopServerRefresh( void )
 {
-	int count;
+        int count;
 
-	if (!uiInfo.serverStatus.refreshActive) {
-		// not currently refreshing
-		return;
-	}
+        if (!UI_ServerBrowserEnabled()) {
+                uiInfo.serverStatus.refreshActive = qfalse;
+                return;
+        }
+
+        if (!uiInfo.serverStatus.refreshActive) {
+                // not currently refreshing
+                return;
+        }
 	uiInfo.serverStatus.refreshActive = qfalse;
 	Com_Printf("%d servers listed in browser with %d players.\n",
 					uiInfo.serverStatus.numDisplayServers,
@@ -5905,11 +6015,16 @@ UI_DoServerRefresh
 */
 static void UI_DoServerRefresh( void )
 {
-	qboolean wait = qfalse;
+        qboolean wait = qfalse;
 
-	if (!uiInfo.serverStatus.refreshActive) {
-		return;
-	}
+        if (!UI_ServerBrowserEnabled()) {
+                uiInfo.serverStatus.refreshActive = qfalse;
+                return;
+        }
+
+        if (!uiInfo.serverStatus.refreshActive) {
+                return;
+        }
 	if (ui_netSource.integer != AS_FAVORITES) {
 		if (ui_netSource.integer == AS_LOCAL) {
 			if (!trap_LAN_GetServerCount(ui_netSource.integer)) {
@@ -5950,6 +6065,11 @@ static void UI_StartServerRefresh(qboolean full)
 {
 	int		i;
 	char	*ptr;
+
+	if (!UI_ServerBrowserEnabled()) {
+		uiInfo.serverStatus.refreshActive = qfalse;
+		return;
+	}
 
 	qtime_t q;
 	trap_RealTime(&q);
