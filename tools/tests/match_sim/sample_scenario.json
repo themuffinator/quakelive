@@ -1,0 +1,54 @@
+{
+  "map": "qztourney6",
+  "duration": 10.0,
+  "tick_rate": 10,
+  "seed": 2024,
+  "metadata": {
+    "description": "Sample scripted duel"
+  },
+  "bots": [
+    {
+      "name": "sarge",
+      "team": "red",
+      "spawn": {
+        "random_positions": [
+          {"position": [0, 0, 80]},
+          {"position": [128, -64, 80]}
+        ]
+      },
+      "initial_state": {
+        "health": 125,
+        "ammo": {"rocket": 10, "machinegun": 50},
+        "inventory": {"armor": 50}
+      },
+      "script": [
+        {"time": 0.0, "action": "look", "params": {"direction": [1, 0, 0]}},
+        {"time": 0.1, "action": "move", "params": {"direction": [1, 0, 0], "speed": 320}},
+        {"time": 1.0, "action": "shoot", "params": {"weapon": "rocket"}},
+        {"time": 2.5, "action": "say", "params": {"message": "Need more rockets!"}},
+        {"time": 5.0, "action": "item", "params": {"name": "megahealth", "count": 1}},
+        {"time": 7.5, "action": "custom", "params": {"stack": 175}}
+      ]
+    },
+    {
+      "name": "anarki",
+      "team": "blue",
+      "spawn": {
+        "position": [-96, 32, 64]
+      },
+      "initial_state": {
+        "health": 100,
+        "ammo": {"rail": 5},
+        "inventory": {"armor": 0}
+      },
+      "script": [
+        {"time": 0.0, "action": "look", "params": {"direction": [0, 1, 0]}},
+        {"time": 0.2, "action": "move", "params": {"direction": {"random": {"mode": "vector", "length": 1.0}}, "speed": 280}},
+        {"time": 0.8, "action": "shoot", "params": {"weapon": "rail", "cost": 1}},
+        {"time": 3.0, "action": "damage", "params": {"amount": 80}},
+        {"time": 3.5, "action": "heal", "params": {"amount": 25}},
+        {"time": 6.0, "action": "teleport", "params": {"position": [32, 64, 120]}}
+      ]
+    }
+  ]
+}
