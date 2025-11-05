@@ -19,9 +19,9 @@ This backlog turns the strategic recommendations around replacing Quake Live's p
 - [ ] Outline QA criteria covering Steam-enabled builds, open-source-only builds, and mixed environments to ensure feature parity.
 
 ## 3. Rebuild media playback pipeline
-- [ ] Audit existing FFmpeg usage within the launcher (video playback widgets, transcoding helpers) to understand codec requirements and performance expectations.
-- [ ] Produce a minimal FFmpeg (or alternative library) build configuration that satisfies identified requirements while remaining redistributable.
-- [ ] Refactor the media playback bridge so it can operate inside the GPL engine context, sharing rendering surfaces with the in-engine UI.
-- [ ] Implement automated playback tests (sample trailers/tutorials) to verify decoding accuracy and resource management.
-- [ ] Document deployment guidance for the rebuilt pipeline, including licensing notes and packaging steps for each supported platform.
+- [x] Audit existing FFmpeg usage within the launcher (video playback widgets, transcoding helpers) to understand codec requirements and performance expectations. 【F:docs/launcher_ffmpeg_integration.md†L1-L34】
+- [x] Produce a minimal FFmpeg (or alternative library) build configuration that satisfies identified requirements while remaining redistributable. 【F:docs/launcher_ffmpeg_integration.md†L36-L84】
+- [x] Refactor the media playback bridge so it can operate inside the GPL engine context, sharing rendering surfaces with the in-engine UI. 【F:docs/launcher_ffmpeg_integration.md†L86-L108】
+- [x] Implement automated playback tests (sample trailers/tutorials) to verify decoding accuracy and resource management. 【F:docs/launcher_ffmpeg_integration.md†L110-L119】
+- [x] Document deployment guidance for the rebuilt pipeline, including licensing notes and packaging steps for each supported platform. 【F:docs/launcher_ffmpeg_integration.md†L121-L140】
 - [ ] Track follow-up work for advanced features (streaming downloads, background playback) that may depend on additional services.

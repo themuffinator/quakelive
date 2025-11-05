@@ -1,0 +1,16 @@
+# Selected Awesomium FFmpeg strings
+media::FFmpegVideoDecoder::DecodeBuffer
+media::FFmpegVideoDecoder::Initialize
+media::FFmpegAudioDecoder::DecodeBuffer
+filters\\ffmpeg_video_decoder.cc
+filters\\ffmpeg_audio_decoder.cc
+filters\\ffmpeg_demuxer.cc
+filters\\ffmpeg_demuxer_factory.cc
+filters\\ffmpeg_glue.cc
+filters\\ffmpeg_h264_bitstream_converter.cc
+base\\h264_bitstream_converter.cc
+vorbis,vp8,vp8.0
+audio/vorbis
+A_VORBIS
+RIFF....WEBPVP8
+null VP8Io passed to VP8GetHeaders()
