@@ -7,7 +7,7 @@
 
 Contributors should review the new parity documentation before merging gameplay-affecting changes and tag the listed owners in their pull requests for verification.
 
-## Process Updates – June 2024
-- Added a mandatory pull request template requiring links to harness runs, baseline diffs, and syscall contract documentation.
-- Published a contributor checklist outlining local validation expectations before opening a PR.
-- Announced these changes internally so feature teams know where to find the new process docs.
+## Process Updates – July 2024
+- Tightened the pull request template to require reviewer-accessible links for harness runs, baseline diffs, and syscall contract updates (with `N/A` allowed only when justified).
+- Expanded the contributor checklist with concrete expectations for documenting local harness executions and link validation before review.
+- Posted an internal announcement and updated these release notes so every team is aware of the new verification requirements.
