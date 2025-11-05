@@ -60,9 +60,9 @@ static const char *const uiCredentialKindNames[UI_CREDENTIAL_KIND_COUNT + 1] = {
 };
 
 static const char *const uiCredentialKindPrompts[UI_CREDENTIAL_KIND_COUNT] = {
-	"Enter the 16-character key from your retail copy.",
-	"Paste the Steam session ticket provided by the platform.",
-	"Paste the launcher-issued standalone token for this device."
+        "Enter the 16-character key from your retail copy.",
+        "Paste the Steam session ticket provided by the platform.",
+        "Paste the launcher-issued standalone token for this device."
 };
 
 static const char *const uiCredentialKindSuccess[UI_CREDENTIAL_KIND_COUNT] = {
@@ -78,9 +78,9 @@ static const char *const uiCredentialKindErrors[UI_CREDENTIAL_KIND_COUNT] = {
 };
 
 static const char *const uiCredentialAutoMessages[UI_CREDENTIAL_KIND_COUNT] = {
-	"This credential is managed manually.",
-	"Steam credentials are provisioned automatically while this build is linked to Steam.",
-	"Standalone launcher tokens are provisioned automatically for this installation."
+        "This credential is managed manually.",
+        "Steam credentials are provisioned automatically while this build is linked to Steam. Manual entry is disabled while the token remains active.",
+        "Standalone launcher tokens are provisioned automatically for this installation. Manual entry is disabled while the token remains active."
 };
 
 static const char *const uiCredentialKindPrefixes[UI_CREDENTIAL_KIND_COUNT] = {
@@ -162,14 +162,30 @@ static void UI_CDKeyMenu_CopyCredentialToField( const char *value, int kind ) {
 	cdkeyMenuInfo.cdkey.field.scroll = 0;
 }
 
+static qboolean UI_CDKeyMenu_ShouldHideManual( void ) {
+        if ( !cdkeyMenuInfo.autoProvisioned ) {
+                return qfalse;
+        }
+
+        if ( cdkeyMenuInfo.credentialKind == UI_CREDENTIAL_KIND_LEGACY ) {
+                return qfalse;
+        }
+
+        return qtrue;
+}
+
 static void UI_CDKeyMenu_UpdateVisibility( void ) {
-	if ( cdkeyMenuInfo.autoProvisioned ) {
-		cdkeyMenuInfo.cdkey.generic.flags |= ( QMF_HIDDEN | QMF_INACTIVE );
-		cdkeyMenuInfo.type.generic.flags |= ( QMF_GRAYED | QMF_INACTIVE );
-	} else {
-		cdkeyMenuInfo.cdkey.generic.flags &= ~( QMF_HIDDEN | QMF_INACTIVE );
-		cdkeyMenuInfo.type.generic.flags &= ~( QMF_GRAYED | QMF_INACTIVE );
-	}
+        if ( UI_CDKeyMenu_ShouldHideManual() ) {
+                cdkeyMenuInfo.cdkey.generic.flags |= ( QMF_HIDDEN | QMF_INACTIVE );
+        } else {
+                cdkeyMenuInfo.cdkey.generic.flags &= ~( QMF_HIDDEN | QMF_INACTIVE );
+        }
+
+        cdkeyMenuInfo.type.generic.flags &= ~( QMF_GRAYED | QMF_INACTIVE );
+
+        trap_Cvar_Set( "ui_credentialAuto", cdkeyMenuInfo.autoProvisioned ? "1" : "0" );
+        trap_Cvar_Set( "ui_credentialManualHidden", UI_CDKeyMenu_ShouldHideManual() ? "1" : "0" );
+        trap_Cvar_SetValue( "ui_credentialKind", (float)cdkeyMenuInfo.credentialKind );
 }
 
 static void UI_CDKeyMenu_FormatCredential( char *out, size_t outSize, const char *sanitized, int kind ) {
@@ -204,11 +220,11 @@ static void UI_CDKeyMenu_Event( void *ptr, int event ) {
 	item = (menucommon_s *)ptr;
 
 	switch ( item->id ) {
-	case ID_ACCEPT:
-		if ( cdkeyMenuInfo.autoProvisioned ) {
-			UI_PopMenu();
-			break;
-		}
+        case ID_ACCEPT:
+                if ( UI_CDKeyMenu_ShouldHideManual() ) {
+                        UI_PopMenu();
+                        break;
+                }
 
 		UI_CDKeyMenu_StripWhitespace( sanitized, sizeof( sanitized ), cdkeyMenuInfo.cdkey.field.buffer );
 		validation = UI_CDKeyMenu_PreValidateKey( sanitized );
@@ -235,12 +251,13 @@ static void UI_CDKeyMenu_Event( void *ptr, int event ) {
 		UI_PopMenu();
 		break;
 
-	case ID_TYPE:
-		cdkeyMenuInfo.credentialKind = cdkeyMenuInfo.type.curvalue;
-		cdkeyMenuInfo.cdkey.field.buffer[0] = '\0';
-		cdkeyMenuInfo.cdkey.field.cursor = 0;
-		cdkeyMenuInfo.cdkey.field.scroll = 0;
-		break;
+        case ID_TYPE:
+                cdkeyMenuInfo.credentialKind = cdkeyMenuInfo.type.curvalue;
+                cdkeyMenuInfo.cdkey.field.buffer[0] = '\0';
+                cdkeyMenuInfo.cdkey.field.cursor = 0;
+                cdkeyMenuInfo.cdkey.field.scroll = 0;
+                UI_CDKeyMenu_UpdateVisibility();
+                break;
 
 	default:
 		break;
@@ -256,9 +273,9 @@ static int UI_CDKeyMenu_PreValidateKey( const char *key ) {
 	int length;
 	int ch;
 
-	if ( cdkeyMenuInfo.autoProvisioned ) {
-		return 0;
-	}
+        if ( UI_CDKeyMenu_ShouldHideManual() ) {
+                return 0;
+        }
 
 	if ( cdkeyMenuInfo.credentialKind != UI_CREDENTIAL_KIND_LEGACY ) {
 		return ( key && key[0] ) ? 0 : 1;
@@ -311,23 +328,29 @@ static void UI_CDKeyMenu_DrawKey( void *self ) {
 	int style;
 	float *color;
 	int x, y;
-	int validation;
-	char sanitized[MAX_EDIT_LINE];
-	const char *status;
-	const char *instructions;
-	int fieldWidth;
+        int validation;
+        char sanitized[MAX_EDIT_LINE];
+        const char *status;
+        const char *instructions;
+        int fieldWidth;
 
-	f = (menufield_s *)self;
+        f = (menufield_s *)self;
 
-	if ( cdkeyMenuInfo.autoProvisioned ) {
-		const char *autoMessage = uiCredentialAutoMessages[cdkeyMenuInfo.credentialKind];
-		if ( !autoMessage || !autoMessage[0] ) {
-			autoMessage = "Credentials are managed automatically by your platform.";
-		}
-		UI_DrawProportionalString( 320, 240, autoMessage, UI_CENTER|UI_SMALLFONT, color_white );
-		UI_DrawProportionalString( 320, 272, "Launch through the linked platform to refresh the credential.", UI_CENTER|UI_SMALLFONT, color_white );
-		return;
-	}
+        trap_Cvar_Set( "ui_credentialAutoMessage", "" );
+        trap_Cvar_Set( "ui_credentialPrompt", "" );
+        trap_Cvar_Set( "ui_credentialStatus", "" );
+
+        if ( UI_CDKeyMenu_ShouldHideManual() ) {
+                const char *autoMessage = uiCredentialAutoMessages[cdkeyMenuInfo.credentialKind];
+                if ( !autoMessage || !autoMessage[0] ) {
+                        autoMessage = "Credentials are managed automatically by your platform.";
+                }
+                trap_Cvar_Set( "ui_credentialAutoMessage", autoMessage );
+                trap_Cvar_Set( "ui_credentialPrompt", "Launch through the linked platform to refresh the credential." );
+                UI_DrawProportionalString( 320, 240, autoMessage, UI_CENTER|UI_SMALLFONT, color_white );
+                UI_DrawProportionalString( 320, 272, "Launch through the linked platform to refresh the credential.", UI_CENTER|UI_SMALLFONT, color_white );
+                return;
+        }
 
 	focus = ( f->generic.parent->cursor == f->generic.menuPosition );
 	style = UI_LEFT | UI_SMALLFONT;
@@ -345,22 +368,24 @@ static void UI_CDKeyMenu_DrawKey( void *self ) {
 	MField_Draw( &f->field, x, y, style, color );
 
 	instructions = uiCredentialKindPrompts[cdkeyMenuInfo.credentialKind];
-	UI_DrawProportionalString( 320, y - 36, instructions, UI_CENTER|UI_SMALLFONT, color_white );
+        UI_DrawProportionalString( 320, y - 36, instructions, UI_CENTER|UI_SMALLFONT, color_white );
+        trap_Cvar_Set( "ui_credentialPrompt", instructions ? instructions : "" );
 
-	UI_CDKeyMenu_StripWhitespace( sanitized, sizeof( sanitized ), f->field.buffer );
-	validation = UI_CDKeyMenu_PreValidateKey( sanitized );
-	if ( validation == 0 ) {
-		status = uiCredentialKindSuccess[cdkeyMenuInfo.credentialKind];
+        UI_CDKeyMenu_StripWhitespace( sanitized, sizeof( sanitized ), f->field.buffer );
+        validation = UI_CDKeyMenu_PreValidateKey( sanitized );
+        if ( validation == 0 ) {
+                status = uiCredentialKindSuccess[cdkeyMenuInfo.credentialKind];
 		color = color_white;
 	} else if ( validation > 0 ) {
 		status = uiCredentialKindPrompts[cdkeyMenuInfo.credentialKind];
 		color = color_yellow;
-	} else {
-		status = uiCredentialKindErrors[cdkeyMenuInfo.credentialKind];
-		color = color_red;
-	}
+        } else {
+                status = uiCredentialKindErrors[cdkeyMenuInfo.credentialKind];
+                color = color_red;
+        }
 
-	UI_DrawProportionalString( 320, y + 32, status, UI_CENTER|UI_SMALLFONT, color );
+        UI_DrawProportionalString( 320, y + 32, status, UI_CENTER|UI_SMALLFONT, color );
+        trap_Cvar_Set( "ui_credentialStatus", status ? status : "" );
 }
 /*
 ===============
@@ -446,7 +471,7 @@ static void UI_CDKeyMenu_Init( void ) {
 	trap_GetCDKey( stored, sizeof( stored ) );
 	cdkeyMenuInfo.credentialKind = UI_CDKeyMenu_ParseCredentialKind( stored );
 	cdkeyMenuInfo.type.curvalue = cdkeyMenuInfo.credentialKind;
-	cdkeyMenuInfo.autoProvisioned = qfalse;
+        cdkeyMenuInfo.autoProvisioned = qfalse;
 
 	if ( cdkeyMenuInfo.credentialKind == UI_CREDENTIAL_KIND_LEGACY && stored[0] ) {
 		if ( trap_VerifyCDKey( stored, NULL ) == qfalse ) {
@@ -458,8 +483,8 @@ static void UI_CDKeyMenu_Init( void ) {
 		if ( cdkeyMenuInfo.credentialKind == UI_CREDENTIAL_KIND_LEGACY ) {
 			UI_CDKeyMenu_CopyCredentialToField( stored, cdkeyMenuInfo.credentialKind );
 		} else {
-			cdkeyMenuInfo.autoProvisioned = qtrue;
-			cdkeyMenuInfo.cdkey.field.buffer[0] = '\\0';
+                        cdkeyMenuInfo.autoProvisioned = qtrue;
+                        cdkeyMenuInfo.cdkey.field.buffer[0] = '\\0';
 		}
 	} else {
 		cdkeyMenuInfo.credentialKind = UI_CREDENTIAL_KIND_LEGACY;

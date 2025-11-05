@@ -3316,6 +3316,22 @@ static qboolean CL_CDKeyValidateLegacyValue( const char *key, const char *checks
 	return qfalse;
 }
 
+static qboolean CL_CDKeyValidateTokenValue( const char *value ) {
+	const unsigned char *cursor;
+
+	if ( !value || !value[0] ) {
+		return qfalse;
+	}
+
+	for ( cursor = (const unsigned char *)value; *cursor; ++cursor ) {
+		if ( *cursor <= ' ' ) {
+			return qfalse;
+		}
+	}
+
+	return qtrue;
+}
+
 qboolean CL_CDKeyValidate( const char *key, const char *checksum ) {
 	ql_auth_credential_t	credential;
 
@@ -3332,7 +3348,7 @@ qboolean CL_CDKeyValidate( const char *key, const char *checksum ) {
 		return CL_CDKeyValidateLegacyValue( credential.value, checksum );
 	case QL_AUTH_CREDENTIAL_STEAM:
 	case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-		return credential.length > 0 ? qtrue : qfalse;
+		return CL_CDKeyValidateTokenValue( credential.value );
 	default:
 		return qfalse;
 	}

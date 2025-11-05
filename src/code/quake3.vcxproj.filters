@@ -66,6 +66,12 @@
     <ClCompile Include="qcommon\cmd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\platform\backends\platform_backend_open_steam.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\platform\backends\platform_backend_steamworks.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\common\platform\platform_services.c">
       <Filter>Source Files</Filter>
     </ClCompile>
