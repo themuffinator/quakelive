@@ -3502,13 +3502,15 @@ static void UI_RunMenuScript(char **args) {
 			Q_strcat(buff, 1024, UI_Cvar_VariableString("cdkey3")); 
 			Q_strcat(buff, 1024, UI_Cvar_VariableString("cdkey4")); 
 			trap_Cvar_Set("cdkey", buff);
-			if (trap_VerifyCDKey(buff, UI_Cvar_VariableString("cdkeychecksum"))) {
-				trap_Cvar_Set("ui_cdkeyvalid", "CD Key Appears to be valid.");
-				trap_SetCDKey(buff);
-			} else {
-				trap_Cvar_Set("ui_cdkeyvalid", "CD Key does not appear to be valid.");
-			}
-		} else if (Q_stricmp(name, "loadArenas") == 0) {
+                        if (trap_VerifyCDKey(buff, UI_Cvar_VariableString("cdkeychecksum"))) {
+                                trap_Cvar_Set("ui_cdkeyvalid", "Credential appears to be valid.");
+                                trap_SetCDKey(buff);
+                        } else {
+                                trap_Cvar_Set("ui_cdkeyvalid", "Credential does not appear to be valid.");
+                        }
+                } else if (Q_stricmp(name, "openCredentials") == 0) {
+                        UI_CDKeyMenu();
+                } else if (Q_stricmp(name, "loadArenas") == 0) {
 			UI_LoadArenas();
 			UI_MapCountByGameType(qfalse);
 			Menu_SetFeederSelection(NULL, FEEDER_ALLMAPS, 0, "createserver");
@@ -5538,7 +5540,7 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 			// no cd check in TA
 			//trap_Key_SetCatcher( KEYCATCH_UI );
       //Menus_ActivateByName("badcd");
-		  //UI_ConfirmMenu( "Bad CD Key", NULL, NeedCDKeyAction );
+//UI_ConfirmMenu( "Credential Error", NULL, NeedCDKeyAction );
 		  return;
 	  case UIMENU_POSTGAME:
 			//trap_Cvar_Set( "sv_killserver", "1" );
@@ -5548,7 +5550,7 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 			}
 			Menus_CloseAll();
 			Menus_ActivateByName("endofgame");
-		  //UI_ConfirmMenu( "Bad CD Key", NULL, NeedCDKeyAction );
+//UI_ConfirmMenu( "Credential Error", NULL, NeedCDKeyAction );
 		  return;
 	  case UIMENU_INGAME:
 		  trap_Cvar_Set( "cl_paused", "1" );
