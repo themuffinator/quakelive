@@ -1,0 +1,28 @@
+name: Native DLL (VS2010)
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  native-dll:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Visual Studio 2010 components
+        shell: pwsh
+        run: tools/ci/install-vs-v100.ps1
+
+      - name: Verify Visual Studio v100 toolset
+        shell: pwsh
+        run: tools/ci/verify-vs-toolchain.ps1 -RequireV100
+
+      - name: Build Win32 gameplay DLLs
+        shell: pwsh
+        run: tools/ci/build-windows-dlls.ps1
+
+      - name: Assert gameplay DLL exports
+        shell: pwsh
+        run: tools/ci/assert-dll-exports.ps1

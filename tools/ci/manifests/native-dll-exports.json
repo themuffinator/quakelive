@@ -1,0 +1,16 @@
+{
+  "modules": [
+    {
+      "name": "qagamex86.dll",
+      "exports": ["dllEntry", "vmMain"]
+    },
+    {
+      "name": "cgamex86.dll",
+      "exports": ["dllEntry", "vmMain"]
+    },
+    {
+      "name": "uix86.dll",
+      "exports": ["dllEntry", "vmMain"]
+    }
+  ]
+}
