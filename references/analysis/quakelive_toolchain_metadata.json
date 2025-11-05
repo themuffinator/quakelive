@@ -1,0 +1,212 @@
+[
+  {
+    "path": "references/original-assets/quakelive/quakelive_steam.exe",
+    "machine": "0x14c",
+    "timestamp": "2016-06-03T21:09:31Z",
+    "linker_version": "10.0",
+    "image_version": "0.1",
+    "subsystem_version": "5.1",
+    "dll_characteristics": "0x8140",
+    "dll_characteristics_flags": [
+      "DYNAMIC_BASE",
+      "NX_COMPAT",
+      "TERMINAL_SERVER_AWARE"
+    ],
+    "debug_entries": [
+      {
+        "type": 2,
+        "format": "RSDS",
+        "guid": "49F1CCC4-92F4-4171-8759-88B6EBFDD7A2",
+        "age": 1,
+        "pdb_path": "W:\\quakelive_clean\\quakelive_steam.pdb"
+      }
+    ],
+    "file_info": {
+      "CompanyName": "id Software Inc.",
+      "FileDescription": "Quake Live",
+      "FileVersion": "0.1.0.739",
+      "InternalName": "Quake Live",
+      "LegalCopyright": "Copyright (C) 2007",
+      "OriginalFilename": "quake3.exe",
+      "ProductName": "quake3",
+      "ProductVersion": "0.1.0.739"
+    }
+  },
+  {
+    "path": "references/original-assets/quakelive/awesomium.dll",
+    "machine": "0x14c",
+    "timestamp": "2014-03-28T18:57:29Z",
+    "linker_version": "10.0",
+    "image_version": "0.0",
+    "subsystem_version": "5.1",
+    "dll_characteristics": "0x140",
+    "dll_characteristics_flags": [
+      "DYNAMIC_BASE",
+      "NX_COMPAT"
+    ],
+    "debug_entries": [
+      {
+        "type": 2,
+        "format": "RSDS",
+        "guid": "A8462C68-713E-4B7F-B02B-2E545467C46D",
+        "age": 26,
+        "pdb_path": "C:\\dev\\chromium2\\chromium\\src\\build\\Release\\awesomium.pdb"
+      }
+    ],
+    "file_info": {
+      "CompanyName": "Awesomium Technologies",
+      "FileDescription": "Awesomium Core",
+      "FileVersion": "1.7.4.2",
+      "InternalName": "awesomium.dll",
+      "LegalCopyright": "Copyright (C) Awesomium Technologies 2014",
+      "OriginalFilename": "awesomium.dll",
+      "ProductName": "Awesomium",
+      "ProductVersion": "1.7.4.2"
+    }
+  },
+  {
+    "path": "references/original-assets/quakelive/awesomium_process.exe",
+    "machine": "0x14c",
+    "timestamp": "2014-03-28T18:12:49Z",
+    "linker_version": "10.0",
+    "image_version": "0.0",
+    "subsystem_version": "5.1",
+    "dll_characteristics": "0x8140",
+    "dll_characteristics_flags": [
+      "DYNAMIC_BASE",
+      "NX_COMPAT",
+      "TERMINAL_SERVER_AWARE"
+    ],
+    "debug_entries": [
+      {
+        "type": 2,
+        "format": "RSDS",
+        "guid": "009A14F8-DD65-40DB-8B64-CADAD0A131F8",
+        "age": 16,
+        "pdb_path": "C:\\dev\\chromium2\\chromium\\src\\build\\Release\\awesomium_process.pdb"
+      }
+    ],
+    "file_info": {
+      "CompanyName": "Awesomium Technologies",
+      "FileDescription": "Awesomium Renderer",
+      "FileVersion": "1.7.4.1",
+      "InternalName": "awesomium_process.exe",
+      "LegalCopyright": "Copyright (C) Awesomium Technologies 2014",
+      "OriginalFilename": "awesomium_process.exe",
+      "ProductName": "Awesomium",
+      "ProductVersion": "1.7.4.1"
+    }
+  },
+  {
+    "path": "references/original-assets/quakelive/libGLESv2.dll",
+    "machine": "0x14c",
+    "timestamp": "2014-02-11T07:49:15Z",
+    "linker_version": "10.0",
+    "image_version": "0.0",
+    "subsystem_version": "5.1",
+    "dll_characteristics": "0x140",
+    "dll_characteristics_flags": [
+      "DYNAMIC_BASE",
+      "NX_COMPAT"
+    ],
+    "debug_entries": [
+      {
+        "type": 2,
+        "format": "RSDS",
+        "guid": "CEC4E419-E0A3-4001-BC28-CD571A30E5BF",
+        "age": 1,
+        "pdb_path": "C:\\dev\\chromium2\\chromium\\src\\build\\Release\\libGLESv2.pdb"
+      }
+    ],
+    "file_info": {
+      "FileDescription": "ANGLE libGLESv2 Dynamic Link Library",
+      "FileVersion": "1.0.0.939",
+      "InternalName": "libGLESv2",
+      "LegalCopyright": "Copyright (C) 2011 Google Inc.",
+      "OriginalFilename": "libGLESv2.dll",
+      "PrivateBuild": "1.0.0.939",
+      "ProductName": "ANGLE libGLESv2 Dynamic Link Library",
+      "ProductVersion": "1.0.0.939"
+    }
+  },
+  {
+    "path": "references/original-assets/quakelive/libEGL.dll",
+    "machine": "0x14c",
+    "timestamp": "2014-02-11T07:59:28Z",
+    "linker_version": "10.0",
+    "image_version": "0.0",
+    "subsystem_version": "5.1",
+    "dll_characteristics": "0x140",
+    "dll_characteristics_flags": [
+      "DYNAMIC_BASE",
+      "NX_COMPAT"
+    ],
+    "debug_entries": [
+      {
+        "type": 2,
+        "format": "RSDS",
+        "guid": "B725F0F9-AD86-4AF5-BC42-ED4AC98C0B29",
+        "age": 1,
+        "pdb_path": "C:\\dev\\chromium2\\chromium\\src\\build\\Release\\libEGL.pdb"
+      }
+    ],
+    "file_info": {
+      "FileDescription": "ANGLE libEGL Dynamic Link Library",
+      "FileVersion": "1.0.0.939",
+      "InternalName": "libEGL",
+      "LegalCopyright": "Copyright (C) 2011 Google Inc.",
+      "OriginalFilename": "libEGL.dll",
+      "PrivateBuild": "1.0.0.939",
+      "ProductName": "ANGLE libEGL Dynamic Link Library",
+      "ProductVersion": "1.0.0.939"
+    }
+  },
+  {
+    "path": "references/original-assets/quakelive/avcodec-53.dll",
+    "machine": "0x14c",
+    "timestamp": "2011-11-29T21:57:02Z",
+    "linker_version": "2.20",
+    "image_version": "1.0",
+    "subsystem_version": "4.0",
+    "dll_characteristics": "0x540",
+    "dll_characteristics_flags": [
+      "DYNAMIC_BASE",
+      "NX_COMPAT",
+      "NO_SEH"
+    ],
+    "debug_entries": [],
+    "file_info": {}
+  },
+  {
+    "path": "references/original-assets/quakelive/avformat-53.dll",
+    "machine": "0x14c",
+    "timestamp": "2011-11-29T21:57:01Z",
+    "linker_version": "2.20",
+    "image_version": "1.0",
+    "subsystem_version": "4.0",
+    "dll_characteristics": "0x540",
+    "dll_characteristics_flags": [
+      "DYNAMIC_BASE",
+      "NX_COMPAT",
+      "NO_SEH"
+    ],
+    "debug_entries": [],
+    "file_info": {}
+  },
+  {
+    "path": "references/original-assets/quakelive/avutil-51.dll",
+    "machine": "0x14c",
+    "timestamp": "2011-11-29T21:56:33Z",
+    "linker_version": "2.20",
+    "image_version": "1.0",
+    "subsystem_version": "4.0",
+    "dll_characteristics": "0x540",
+    "dll_characteristics_flags": [
+      "DYNAMIC_BASE",
+      "NX_COMPAT",
+      "NO_SEH"
+    ],
+    "debug_entries": [],
+    "file_info": {}
+  }
+]
