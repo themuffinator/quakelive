@@ -1,0 +1,42 @@
+# Quake Live Reference Mapping
+
+## Overview
+The `references/` tree preserves reverse-engineering artifacts for Quake III Arena and Quake Live, while `src/` hosts the Quake III GPL codebase that serves as the historical baseline for comparison.【F:references/hlil/quake3/quake3.exe/quake3.exe_hlil.txt†L1-L4】【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L1-L4】【F:src/code/cgame/cg_main.c†L41-L64】 This document catalogues the reference binaries, assets, and dumps, then maps each item to the closest analogue (or gap) inside the Quake III-era source layout under `src/`.
+
+## Reference inventory
+### HLIL exports
+| Reference item | Description | Location | Closest `src/` analogue |
+| --- | --- | --- | --- |
+| `quake3.exe_hlil.txt` | Ghidra HLIL dump of the Quake III Arena engine executable, capturing the legacy VM-driven client/server runtime.【F:references/hlil/quake3/quake3.exe/quake3.exe_hlil.txt†L1-L4】 | `references/hlil/quake3/quake3.exe/` | Engine code in `src/code/client/` and `src/code/server/`, which still implement VM entry points such as `vmMain` and server configstring management.【F:src/code/cgame/cg_main.c†L41-L69】【F:src/code/server/sv_init.c†L40-L74】 |
+| `quakelive_steam.exe_hlil.txt` | HLIL export of the Quake Live standalone launcher/engine executable used by the Steam build.【F:references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil.txt†L1-L4】 | `references/hlil/quakelive/quakelive_steam.exe/` | No direct Quake Live engine code exists in `src/`; comparison relies on the Quake III base engine in `src/code/client/` and `src/code/server/` for structural context.【F:src/code/client/cl_main.c†L41-L68】【F:src/code/server/sv_init.c†L40-L74】 |
+| `qagamex86.dll.bndb_hlil.txt` | Native server-side game logic dump extracted from Quake Live, replacing the VM-based `qagame` module.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L1-L4】 | `references/hlil/quakelive/qagamex86.dll/` | Matches Quake III gameplay sources in `src/code/game/`, which implement the same `g_*.c` systems under VM entry points.【F:src/code/game/g_main.c†L1-L20】【F:src/code/game/g_main.c†L41-L68】 |
+| `cgamex86.dll_hlil.txt` | Client game module dump from Quake Live, providing prediction, rendering hooks, and HUD logic.【F:references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil.txt†L1-L4】 | `references/hlil/quakelive/cgamex86.dll/` | Aligns with Quake III `src/code/cgame/`, where `vmMain` dispatches client events and frame rendering.【F:src/code/cgame/cg_main.c†L41-L69】 |
+| `uix86.dll_hlil.txt` | HLIL export of Quake Live’s native UI module, covering menu and frontend behaviour.【F:references/hlil/quakelive/uix86.all/uix86.dll_hlil.txt†L1-L4】 | `references/hlil/quakelive/uix86.all/` | Corresponds to Quake III menu code in `src/code/ui/` and the menu definition scripts in `src/ui/` (e.g., `menus.txt`).【F:src/code/ui/ui_main.c†L8-L36】【F:src/ui/menus.txt†L1-L18】 |
+
+### Quake Live runtime assets
+| Asset | Purpose | Location | Quake III-era context |
+| --- | --- | --- | --- |
+| `qagamex86.dll`, `qagamei386.so`, `qagamex64.so` | Native game logic libraries for Windows and Linux builds of Quake Live.【9d6ea8†L6-L8】 | `references/original-assets/quakelive/baseq3/` | Quake III shipped VM bytecode instead; the equivalent gameplay sources live in `src/code/game/` and are compiled to `.qvm` in the classic toolchain.【F:src/code/game/g_main.c†L41-L68】 |
+| `cgamex86.dll` | Native client game module for Quake Live.【9d6ea8†L10-L10】 | `references/original-assets/quakelive/baseq3/` | Mirrors `src/code/cgame/` in Quake III, which historically produced `cgame.qvm`.【F:src/code/cgame/cg_main.c†L41-L69】 |
+| `uix86.dll` | Native UI module bundling menus and front-end logic.【9d6ea8†L9-L9】 | `references/original-assets/quakelive/baseq3/` | Maps to `src/code/ui/` plus data-driven menus in `src/ui/`.【F:src/code/ui/ui_main.c†L8-L36】【F:src/ui/menus.txt†L1-L18】 |
+| `default.cfg`, `syncerror.cfg`, and player configs (`tim.cfg`, `sponge.cfg`, `ttimo.cfg`) | Baseline control bindings and generated user profiles for Quake Live.【9d6ea8†L4-L5】【F:references/original-assets/quakelive/baseq3/default.cfg†L1-L18】【F:references/original-assets/quakelive/baseq3/syncerror.cfg†L1-L19】 | `references/original-assets/quakelive/baseq3/` | Quake III shipped similar configs inside `baseq3` pk3s; `src/ui/` contains the menu definitions that surface these bindings.【F:src/ui/menus.txt†L1-L18】 |
+| `quakelive_steam.exe`, `awesomium_process.exe`, supporting DLLs (`awesomium.dll`, `libEGL.dll`, `libGLESv2.dll`, `avcodec-53.dll`, `avformat-53.dll`, `avutil-51.dll`, `steam_api.dll`, `icudt.dll`, `xinput9_1_0.dll`) | Quake Live platform launcher, Chromium-based UI runtime, media codecs, and Steam integration stack.【9d6ea8†L12-L24】 | `references/original-assets/quakelive/` | These components have no counterpart in the Quake III GPL tree; they represent platform-specific services absent from `src/`. |
+| `splash.bmp`, `steam_appid.txt` | Branding assets and Steam metadata required by the live product.【9d6ea8†L11-L19】 | `references/original-assets/quakelive/` | Not represented in `src/`; Quake III expected CD keys and shipped assets via PK3 archives. |
+
+### Quake III GPL source release references
+| Asset | Purpose | Location | Notes |
+| --- | --- | --- | --- |
+| `README.txt`, `COPYING.txt` | Official documentation distributed with the Quake III GPL release.【9d6ea8†L1-L2】【F:references/original-assets/quake3/src/README.txt†L1-L20】 | `references/original-assets/quake3/src/` | Mirrors the documentation already present under `src/` (`README.txt`, `COPYING.txt`), confirming the baseline version for the source tree.【F:src/README.txt†L1-L20】 |
+
+## Alignment and gaps relative to `src/`
+- **Shared gameplay architecture:** `qagame` HLIL and native DLLs map cleanly to `src/code/game/`, where Quake III still defines `g_main`, weapon logic, and bot AI under the VM API. This provides a one-to-one reference for porting gameplay changes from Quake Live into the GPL code or vice versa.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L1-L4】【F:src/code/game/g_main.c†L41-L68】
+- **Client game parity:** The `cgame` dump aligns with `src/code/cgame/`’s `vmMain` dispatcher, reinforcing that most rendering and prediction hooks retain the same entry points even though Quake Live executes natively.【F:references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil.txt†L1-L4】【F:src/code/cgame/cg_main.c†L41-L69】
+- **UI layering:** Quake Live’s `uix86.dll` corresponds to both the C UI code and the script-driven menu files still present in `src/`. This demonstrates that UI logic spans compiled code (`ui_main.c`, `ui_shared.c`) and data (`menus.txt`).【F:references/hlil/quakelive/uix86.all/uix86.dll_hlil.txt†L1-L4】【F:src/code/ui/ui_main.c†L8-L36】【F:src/ui/menus.txt†L1-L18】
+- **Engine divergence:** `quakelive_steam.exe` has no direct analogue in `src/`; the GPL release retains the classic VM loader and lacks Steam, Chromium, or media codec integrations. Any attempt to reproduce Quake Live features must either reimplement these services or hook into new platform layers absent from `src/code/client/` and `src/code/server/`.【F:references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil.txt†L1-L4】【F:src/code/client/cl_main.c†L41-L68】【F:src/code/server/sv_init.c†L40-L74】
+- **Platform services gap:** Support binaries such as `awesomium.dll`, `steam_api.dll`, and the FFmpeg libraries provide functionality outside the scope of the Quake III GPL release, highlighting areas that require reverse-engineered shims or substitutes if those behaviours are desired.【9d6ea8†L12-L24】
+- **Configuration data differences:** Quake Live’s generated configs (`syncerror.cfg`, named player configs) expose additional bindings absent from the vanilla Quake III `baseq3`, indicating live-service defaults that may need manual reproduction when working from the GPL sources.【9d6ea8†L4-L8】【F:references/original-assets/quakelive/baseq3/syncerror.cfg†L1-L19】
+
+## Follow-up opportunities
+- Document behavioural deltas between the Quake Live HLIL dumps and the corresponding Quake III source modules (e.g., new CVars, Steam hooks) to guide porting efforts.
+- Investigate replacements for Quake Live’s proprietary platform stack (Steam, Awesomium, FFmpeg) if recreating the full launcher experience is a goal.
+- Compare Quake Live configuration defaults against the menu scripts in `src/ui/` to determine which bindings or options require updates for parity.
