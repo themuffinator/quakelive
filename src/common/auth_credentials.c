@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../code/qcommon/qcommon.h"
+#include "platform/platform_services.h"
 
 static void QL_CopyString( char *dst, size_t dstSize, const char *src ) {
     size_t i;
@@ -121,17 +122,33 @@ qboolean QL_RequestExternalAuth( const ql_auth_credential_t *credential, ql_auth
         return qfalse;
     }
 
+    QL_CopyString( response->message, sizeof( response->message ), "" );
     response->result = QL_AUTH_RESULT_ERROR;
 
-    if ( credential ) {
-        Com_sprintf( response->message, sizeof( response->message ),
-            "No external auth backend for %s credentials.", QL_GetCredentialLabel( credential ) );
-    } else {
+    if ( !credential ) {
         QL_CopyString( response->message, sizeof( response->message ),
             "No credential provided for external auth." );
+        return qfalse;
     }
 
-    return qfalse;
+    if ( credential->kind == QL_AUTH_CREDENTIAL_LEGACY_CDKEY ) {
+        QL_CopyString( response->message, sizeof( response->message ),
+            "Legacy CD keys are validated locally; no external auth required." );
+        response->result = QL_AUTH_RESULT_ACCEPTED;
+        return qtrue;
+    }
+
+    if ( !QL_Platform_RunMockAuthFlow( credential, response ) ) {
+        if ( response->message[0] == '\0' ) {
+            Com_sprintf( response->message, sizeof( response->message ),
+                "No external auth backend for %s credentials.", QL_GetCredentialLabel( credential ) );
+        }
+
+        response->result = QL_AUTH_RESULT_ERROR;
+        return qfalse;
+    }
+
+    return response->result == QL_AUTH_RESULT_ACCEPTED ? qtrue : qfalse;
 }
 
 char *QL_FormatCredentialForAuthorize( const ql_auth_credential_t *credential, char *buffer, size_t bufferSize ) {
