@@ -16,5 +16,10 @@
 - Highlight styling mirrors existing navigation buttons: the active tab glows (0.964, 0.815, 0) while inactive buttons reset on close.
 - Further visual polish (spacing fine-tuning, iconography) can be captured after we run an in-engine pass.
 
+## Template Reference
+- Added `ui/credential.menu` as a light-weight template that mirrors the runtime layout from `ui_cdkey.c`. The script reacts to `ui_credentialKind`, `ui_credentialManualHidden`, `ui_credentialPrompt`, and related helper cvars so artists can preview the credential experience in the menu compiler without loading the VM.
+- `ui_credentialManualHidden` flips to `1` whenever the engine detects an auto-provisioned Steam or standalone token, hiding the manual entry `itemDef` and revealing the platform guidance copy instead.
+- Prompt and status strings now flow through `ui_credentialPrompt`/`ui_credentialStatus`, enabling localization sweeps to validate the new flows directly inside the template.
+
 ## Screenshot Status
 - No screenshot captured in this environment; verify spacing and palette in a local build before final sign-off.
