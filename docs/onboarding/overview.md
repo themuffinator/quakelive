@@ -36,9 +36,10 @@ migration-era tooling that now lives alongside the legacy Quake III sources.
 ## Documentation map
 - **Reverse-engineering references:** `docs/reference-index.md`, `docs/reference-mapping.md`, and
   `docs/hlil_comparison.md` catalogue how Quake Live artifacts relate to the GPL code and HLIL exports.
-- **Build & toolchain guides:** `docs/qvmtools.md`, `docs/build/windows.md`, `docs/toolchain-ci.md`, and
-  `docs/windows-native-pipeline.md` capture the host prerequisites, project wiring, and CI guardrails for
-  both bytecode and native builds.【F:docs/toolchain-ci.md†L1-L24】【F:docs/build/windows.md†L1-L31】
+- **Build & toolchain guides:** `docs/qvmtools.md`, `docs/build/windows.md`, `docs/toolchain-ci.md`,
+  `docs/windows-native-pipeline.md`, and `docs/platform/toolchain-matrix.md` capture the host prerequisites,
+  project wiring, CI guardrails, and platform-specific runtime expectations for both bytecode and native
+  builds.【F:docs/toolchain-ci.md†L1-L24】【F:docs/build/windows.md†L1-L31】【F:docs/platform/toolchain-matrix.md†L1-L27】
 - **Testing playbooks:** `docs/testing-strategy.md`, `docs/testing/match-sim.md`, and
   `docs/testing/rules-fixtures.md` define the deterministic match simulations, gameplay fixtures, and CI
   expectations. Extend these files when introducing new harnesses or coverage goals.【F:docs/testing-strategy.md†L1-L43】【F:docs/testing/match-sim.md†L1-L45】【F:docs/testing/rules-fixtures.md†L1-L33】
