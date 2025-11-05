@@ -59,12 +59,13 @@ int SV_BotAllocateClient(void) {
 		return -1;
 	}
 
-	cl->gentity = SV_GentityNum( i );
-	cl->gentity->s.number = i;
-	cl->state = CS_ACTIVE;
-	cl->lastPacketTime = svs.time;
-	cl->netchan.remoteAddress.type = NA_BOT;
-	cl->rate = 16384;
+cl->gentity = SV_GentityNum( i );
+cl->gentity->s.number = i;
+cl->state = CS_ACTIVE;
+cl->lastPacketTime = svs.time;
+cl->lastConnectTime = svs.time;
+cl->netchan.remoteAddress.type = NA_BOT;
+cl->rate = 16384;
 
 	return i;
 }
@@ -80,9 +81,10 @@ void SV_BotFreeClient( int clientNum ) {
 	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
 		Com_Error( ERR_DROP, "SV_BotFreeClient: bad clientNum: %i", clientNum );
 	}
-	cl = &svs.clients[clientNum];
-	cl->state = CS_FREE;
-	cl->name[0] = 0;
+cl = &svs.clients[clientNum];
+cl->state = CS_FREE;
+cl->name[0] = 0;
+cl->netchan.remoteAddress.type = NA_BAD;
 	if ( cl->gentity ) {
 		cl->gentity->r.svFlags &= ~SVF_BOT;
 	}
