@@ -20,6 +20,8 @@ jobs:
             os: windows-latest
             label: DLL
     runs-on: ${{ matrix.os }}
+    env:
+      ARTIFACT_ROOT: artifacts/tests
 
     steps:
       - uses: actions/checkout@v4
@@ -56,17 +58,22 @@ jobs:
       - name: Run deterministic harness suites
         if: matrix.target == 'qvm'
         run: |
-          python tests/run_harnesses.py --target ${{ matrix.target }}
+          python tests/run_harnesses.py --target ${{ matrix.target }} --artifact-root "${{ env.ARTIFACT_ROOT }}"
 
       - name: Run deterministic harness suites (Windows)
         if: matrix.target == 'dll'
         shell: pwsh
         run: |
-          python tests/run_harnesses.py --target ${{ matrix.target }}
+          python tests/run_harnesses.py --target ${{ matrix.target }} --artifact-root "${{ env.ARTIFACT_ROOT }}"
 
       - name: Upload harness artefacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: harness-${{ matrix.target }}
-          path: artifacts/tests
+          path: |
+            ${{ env.ARTIFACT_ROOT }}/logs/**/*.log
+            ${{ env.ARTIFACT_ROOT }}/match_sim/**/*.json
+            ${{ env.ARTIFACT_ROOT }}/client_regression/**/*.json
+          if-no-files-found: warn
           retention-days: 7

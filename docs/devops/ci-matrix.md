@@ -5,13 +5,13 @@ The deterministic harness workflow runs both gameplay targets (QVM bytecode and 
 - **Harnesses (QVM)** runs on `ubuntu-latest`, verifies the legacy toolchain, and executes the harness suite against the bytecode output.
 - **Harnesses (DLL)** runs on `windows-latest`, installs the Visual Studio 2010 components, verifies the `v100` toolset, builds the gameplay DLLs, asserts their export tables against the manifest, and executes the same harness suite.
 
-Each job drives `tests/run_harnesses.py`, which emits deterministic artefacts into `artifacts/tests/<suite>/<target>/`:
+Each job drives `tests/run_harnesses.py`, which materialises deterministic artefacts underneath the shared `ARTIFACT_ROOT` (`artifacts/tests/<suite>/<target>/`):
 
 - `match_sim/<target>/timeline.json` – JSON timeline from the scripted match simulation.
 - `client_regression/<target>/hud_hashes.json` – Stable HUD hash captures from the client regression harness.
 - `logs/<target>/*.log` – Text summaries confirming the harness outcomes and runtime metadata.
 
-The artefacts are uploaded via [`actions/upload-artifact`](https://github.com/actions/upload-artifact) for seven days, enabling manual inspection when a regression occurs.【F:.github/workflows/deterministic-harnesses.yml†L41-L64】 The harness driver itself lives alongside the repository tests and can be invoked locally:
+The upload step now runs with `if: always()` so the logs survive failing harness runs, and [`actions/upload-artifact`](https://github.com/actions/upload-artifact) explicitly targets the JSON timelines, HUD hashes, and log outputs for quick discovery.【F:.github/workflows/deterministic-harnesses.yml†L15-L64】 Artefacts are retained for seven days, providing a convenient paper trail for triage. The harness driver itself lives alongside the repository tests and can be invoked locally:
 
 ```bash
 python tests/run_harnesses.py --target qvm
