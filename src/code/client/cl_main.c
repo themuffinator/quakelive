@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "../../common/auth_credentials.h"
 #include <limits.h>
 
 cvar_t	*cl_nodelta;
@@ -883,9 +884,11 @@ in anyway.
 ===================
 */
 void CL_RequestAuthorization( void ) {
-	char	nums[64];
-	int		i, j, l;
+	char	authorizePayload[64];
+	ql_auth_credential_t	credential;
 	cvar_t	*fs;
+
+	authorizePayload[0] = '\0';
 
 	if ( !cls.authorizeServer.port ) {
 		Com_Printf( "Resolving %s\n", AUTHORIZE_SERVER_NAME );
@@ -905,29 +908,14 @@ void CL_RequestAuthorization( void ) {
 	}
 
 	if ( Cvar_VariableValue( "fs_restrict" ) ) {
-		Q_strncpyz( nums, "demota", sizeof( nums ) );
-	} else {
-		// only grab the alphanumeric values from the cdkey, to avoid any dashes or spaces
-		j = 0;
-		l = strlen( cl_cdkey );
-		if ( l > 32 ) {
-			l = 32;
-		}
-		for ( i = 0 ; i < l ; i++ ) {
-			if ( ( cl_cdkey[i] >= '0' && cl_cdkey[i] <= '9' )
-				|| ( cl_cdkey[i] >= 'a' && cl_cdkey[i] <= 'z' )
-				|| ( cl_cdkey[i] >= 'A' && cl_cdkey[i] <= 'Z' )
-				) {
-				nums[j] = cl_cdkey[i];
-				j++;
-			}
-		}
-		nums[j] = 0;
+		Q_strncpyz( authorizePayload, "demota", sizeof( authorizePayload ) );
+	} else if ( QL_ParseCredentialString( cl_cdkey, &credential ) ) {
+		QL_FormatCredentialForAuthorize( &credential, authorizePayload, sizeof( authorizePayload ) );
 	}
 
 	fs = Cvar_Get ("cl_anonymous", "0", CVAR_INIT|CVAR_SYSTEMINFO );
 
-	NET_OutOfBandPrint(NS_CLIENT, cls.authorizeServer, va("getKeyAuthorize %i %s", fs->integer, nums) );
+	NET_OutOfBandPrint(NS_CLIENT, cls.authorizeServer, va("getKeyAuthorize %i %s", fs->integer, authorizePayload) );
 }
 
 /*
