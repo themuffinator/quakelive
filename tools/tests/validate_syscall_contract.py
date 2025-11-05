@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate syscall contract logs against expectations."""
+"""Validate syscall contract logs against the expected baseline."""
 
 from __future__ import annotations
 

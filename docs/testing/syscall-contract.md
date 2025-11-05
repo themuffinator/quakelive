@@ -40,5 +40,7 @@ value. This makes it easy to ignore trailing stack noise or pointer values while
 pinning down the arguments that matter.
 
 If the validator reports a mismatch it prints both the offending tokens and a
-unified diff. Update the expectation file once you have confirmed the new
-contract is intentional.
+unified diff. Lines prefixed with `-` indicate the expected value, while lines
+prefixed with `+` are what the latest log produced. The script exits with a
+non-zero status when mismatches are found so CI can fail fast. Update the
+expectation file once you have confirmed the new contract is intentional.
