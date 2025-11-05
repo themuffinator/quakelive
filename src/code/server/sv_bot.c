@@ -38,6 +38,27 @@ int bot_maxdebugpolys;
 extern botlib_export_t	*botlib_export;
 int	bot_enable;
 
+static void SV_BotApplyEntityBotFlag( client_t *cl, qboolean markBot ) {
+	if ( !cl ) {
+		return;
+	}
+
+	if ( !cl->gentity ) {
+		return;
+	}
+
+	if ( !markBot ) {
+		cl->gentity->r.svFlags &= ~SVF_BOT;
+		return;
+	}
+
+	if ( cl->state >= CS_CONNECTED ) {
+		cl->gentity->r.svFlags |= SVF_BOT;
+	} else {
+		cl->gentity->r.svFlags &= ~SVF_BOT;
+	}
+}
+
 
 /*
 ==================
@@ -59,13 +80,17 @@ int SV_BotAllocateClient(void) {
 		return -1;
 	}
 
-cl->gentity = SV_GentityNum( i );
-cl->gentity->s.number = i;
-cl->state = CS_ACTIVE;
-cl->lastPacketTime = svs.time;
-cl->lastConnectTime = svs.time;
-cl->netchan.remoteAddress.type = NA_BOT;
-cl->rate = 16384;
+	cl->gentity = SV_GentityNum( i );
+	if ( cl->gentity ) {
+		cl->gentity->s.number = i;
+	}
+	cl->state = CS_ACTIVE;
+	cl->lastPacketTime = svs.time;
+	cl->lastConnectTime = svs.time;
+	cl->netchan.remoteAddress.type = NA_BOT;
+	cl->rate = 16384;
+
+	SV_BotApplyEntityBotFlag( cl, qtrue );
 
 	return i;
 }
@@ -81,13 +106,11 @@ void SV_BotFreeClient( int clientNum ) {
 	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
 		Com_Error( ERR_DROP, "SV_BotFreeClient: bad clientNum: %i", clientNum );
 	}
-cl = &svs.clients[clientNum];
-cl->state = CS_FREE;
-cl->name[0] = 0;
-cl->netchan.remoteAddress.type = NA_BAD;
-	if ( cl->gentity ) {
-		cl->gentity->r.svFlags &= ~SVF_BOT;
-	}
+	cl = &svs.clients[clientNum];
+	cl->state = CS_FREE;
+	cl->name[0] = 0;
+	cl->netchan.remoteAddress.type = NA_BAD;
+	SV_BotApplyEntityBotFlag( cl, qfalse );
 }
 
 /*

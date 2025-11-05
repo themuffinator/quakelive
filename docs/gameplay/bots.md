@@ -12,6 +12,11 @@ This page captures the current expectations for server-side bot handling in the 
 * `SV_BotFreeClient` now clears the remote address type back to `NA_BAD` when the slot is released. This keeps bookkeeping consistent for any feature that scans `svs.clients` for bot occupants.
 * Game-side code (e.g. `ClientConnect` in `g_client.c`) still receives the `isBot` hint by checking the `NA_BOT` transport type for clients whose state is at least `CS_CONNECTED`.
 
+## Bot flag masking
+
+* The server marks a bot slot by setting `SVF_BOT` only after the `client_t` reaches `CS_CONNECTED`, ensuring entity flags stay in sync with live clients and mirroring the HLIL flow noted in the ClientConnect analysis.
+* Regression scenario: add a bot, issue `clientkick <botnum>`, then immediately connect as a human. Inspect `g_entities[botnum].r.svFlags` (via `entitylist` or debugging) to confirm the `SVF_BOT` bit clears once the slot returns to `CS_FREE`, preventing stale bot markers from leaking into recycled slots.
+
 ## Known limitations
 
 * Remote players cannot automatically reclaim slots from bots; they must wait for manual kicks or administrative commands.
