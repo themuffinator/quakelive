@@ -1,0 +1,1250 @@
+#include "ui/menudef.h"
+
+{
+\\ score_menu \\
+
+	assetGlobalDef {
+		itemFocusSound "sound/misc/menu2.wav"
+  	}
+	
+	menuDef {
+		name "joingame_menu"
+    	visible 0
+    	fullscreen 0
+    	rect 40 0 560 480
+    	focusColor 0.964 0.815 0 1
+    	style WINDOW_STYLE_EMPTY
+	
+		itemDef {
+			name black_background
+			rect -220 0 1080 480
+			style WINDOW_STYLE_FILLED
+			visible 1 
+			decoration 
+			backcolor 0 0 0 0.125
+		}	
+	
+		itemDef {
+			name logo_background
+			rect 0 0 560 64
+			background "ui/assets/main_menu/header.tga"
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 1 1 1 1
+			border 1
+			borderColor 0 0 0 0.5
+		}
+	
+		itemDef {
+			name logo
+			rect -20 0 256 64
+			background "ui/assets/main_menu/ql_logo.tga"
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 1 1 1 1
+		}
+		
+		itemDef {
+			name menu_bar
+			rect 0 63 560 17
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0 0 0 0.75
+			border 1
+			borderColor 0 0 0 0.5
+		}
+	
+		itemDef {
+			name page_background
+			rect 0 82 560 310
+			background "ui/assets/main_menu/content_background.tga"
+			style WINDOW_STYLE_FILLED
+			visible 1 
+			decoration 
+			forecolor 1 1 1 1
+			backcolor 1 1 1 1
+			border 1
+			borderColor 0 0 0 0.5
+		}				
+		
+		// main menu
+		itemDef {
+			name navbtn5
+			rect 354 64 64 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			action { exec "web_changeHash /"  ; open ingame_about ;
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn6t forecolor 1 1 1 1
+				setitemcolor navbtn5o backcolor 1 1 1 0
+				setitemcolor navbtn6o backcolor 1 1 1 0
+				setitemcolor navbtn7o backcolor 1 1 1 0
+				setitemcolor navbtn5u backcolor 1 1 1 0
+				setitemcolor navbtn6u backcolor 1 1 1 0
+				setitemcolor navbtn7u backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn5t
+			rect 355 64 64 20
+			text "Main Menu"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 32    
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+		}		
+		
+		// settings
+		itemDef {
+			name navbtn6
+			rect 419 64 64 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			action { exec "web_changeHash /settings" ; open ingame_about ;
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn6t forecolor 1 1 1 1
+				setitemcolor navbtn5o backcolor 1 1 1 0
+				setitemcolor navbtn6o backcolor 1 1 1 0
+				setitemcolor navbtn7o backcolor 1 1 1 0
+				setitemcolor navbtn5u backcolor 1 1 1 0
+				setitemcolor navbtn6u backcolor 1 1 1 0
+				setitemcolor navbtn7u backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn6t
+			rect 420 64 64 20
+			text "Settings"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 32    
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+		}
+        
+		// leave match
+		itemDef {
+			name navbtn7
+			rect 487 64 72 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			// joingame_menu menu uses "disconnect", ingame menu users "uiScript leave"
+        	action { exec "disconnect" } 
+		}
+		
+		itemDef {
+			name navbtn7t
+			rect 488 64 64 20
+			text "Leave Match"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 32    
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+		}
+	
+		itemDef {
+			name match_details
+			ownerdraw CG_GAME_TYPE_MAP
+			textscale .28
+			textalign ITEM_ALIGN_LEFT
+			style WINDOW_STYLE_EMPTY	
+			rect 20 100 100 30 
+			forecolor 0.525 0.525 0.525 1
+			decoration
+			visible 1
+		}
+		
+		itemDef {
+			name match_bar
+			rect 20 103 520 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0.525 0.525 0.525 1
+		}
+
+		itemDef {
+			name gametype_icon
+			ownerdraw CG_GAME_TYPE_ICON
+			rect 20 115 45 45
+			decoration
+			visible 1 	  
+		}
+
+		itemDef {
+			name game_limit
+			ownerdraw CG_GAME_LIMIT
+			textscale .22
+			rect 80 125 90 10		 
+			forecolor 0.8 0.8 0.8 1
+			decoration
+			visible 1 	  
+		}
+
+		itemDef {
+			name player_counts
+			ownerdraw CG_PLAYER_COUNTS
+			textscale .22
+			rect 80 140 90 10		 
+			forecolor 0.8 0.8 0.8 1
+			decoration
+			visible 1 	  
+		}
+		
+		itemDef {
+			name game_status
+			ownerdraw CG_MATCH_STATUS
+			textscale .22
+			rect 20 190 90 10	
+			forecolor 0.8 0.8 0.8 1
+			decoration
+			visible 1 	  
+		}
+		
+		itemDef {
+			name join_match_background
+			rect 380 110 160 80
+			textstyle ITEM_TEXTSTYLE_NORMAL
+			style WINDOW_STYLE_FILLED
+			visible 1
+			backcolor 0.375 0.125 0.125 0.8
+			decoration
+			border 1
+			bordersize 2
+			bordercolor 0.964 0.815 0 1
+		}
+		
+		itemDef {
+			name join_match_text
+			rect 460 150 160 80
+			text "JOIN MATCH"
+			textscale .30
+			textalign ITEM_ALIGN_CENTER
+			textaligny 7
+			forecolor .9 .9 .9 1
+			textstyle ITEM_TEXTSTYLE_NORMAL
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+		}
+		
+		itemDef {
+			name join_match_button
+			rect 380 110 160 80
+			textstyle ITEM_TEXTSTYLE_NORMAL
+			style WINDOW_STYLE_FILLED
+			visible 1
+			type ITEM_TYPE_BUTTON
+			action { exec "team a" }
+			mouseenter { setitemcolor  join_match_text forecolor 0.964 0.815 0 1 }
+			mouseexit { setitemcolor  join_match_text forecolor .9 .9 .9 1 }
+		}
+		
+		itemDef {
+			name join_spec_background
+			rect 383 196 156 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			backcolor 0.133 0.133 0.133 0.8
+			cvarTest "cg_gametype"
+			showCvar { "0","1","2","12" }
+		}
+		
+		itemDef {
+			name join_spec_text
+			rect 461 196 156 25
+			text "SPECTATE"
+			textscale .24
+			textalign ITEM_ALIGN_CENTER
+			textaligny 17
+			forecolor 0.525 0.525 0.525 1
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			cvarTest "cg_gametype"
+			showCvar { "0","1","2","12" }
+		}
+		
+		itemDef {
+			name join_spec_button
+			rect 383 196 156 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			type ITEM_TYPE_BUTTON
+			cvarTest "cg_gametype"
+			showCvar { "0","1","2","12" }
+			action { exec "team s" }
+			mouseenter { setitemcolor  join_spec_text forecolor 0.964 0.815 0 1 }
+			mouseexit { setitemcolor  join_spec_text forecolor 0.525 0.525 0.525 1 }
+		}
+		
+		itemDef {
+			name join_spec_background
+			rect 383 196 156 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			backcolor 0.133 0.133 0.133 0.7
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_NOT_WARMUP
+		}
+		
+		itemDef {
+			name join_spec_text
+			rect 461 196 156 25
+			text "SPECTATE"
+			textscale .24
+			textalign ITEM_ALIGN_CENTER
+			textaligny 17
+			forecolor 0.525 0.525 0.525 1
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_NOT_WARMUP
+		}
+		
+		itemDef {
+			name join_spec_button
+			rect 383 196 156 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			type ITEM_TYPE_BUTTON
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_NOT_WARMUP
+			action { exec "team s" }
+			mouseenter { setitemcolor  join_spec_text forecolor 0.964 0.815 0 1 }
+			mouseexit { setitemcolor  join_spec_text forecolor 0.525 0.525 0.525 1 }
+		}
+		
+		itemDef {
+			name join_red_background
+			rect 383 196 77 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			backcolor 0.333 0.133 0.133 0.8
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+		}
+		
+		itemDef {
+			name join_red_text
+			rect 423 196 76 25
+			text "JOIN RED"
+			textscale .24
+			textalign ITEM_ALIGN_CENTER
+			textaligny 17
+			forecolor 0.525 0.525 0.525 1
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+		}
+		
+		itemDef {
+			name join_red_button
+			rect 385 196 76 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			type ITEM_TYPE_BUTTON
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+			action { exec "team r" }
+			mouseenter { setitemcolor  join_red_text forecolor 0.964 0.815 0 1 }
+			mouseexit { setitemcolor  join_red_text forecolor 0.525 0.525 0.525 1 }
+		}
+		
+		itemDef {
+			name join_blue_background
+			rect 462 196 77 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			backcolor 0.133 0.133 0.333 0.8
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+		}
+		
+		itemDef {
+			name join_blue_text
+			rect 501 196 76 25
+			text "JOIN BLUE"
+			textscale .24
+			textalign ITEM_ALIGN_CENTER
+			textaligny 17
+			forecolor 0.525 0.525 0.525 1
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+		}
+		
+		itemDef {
+			name join_blue_button
+			rect 463 196 76 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			type ITEM_TYPE_BUTTON
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+			action { exec "team b" }
+			mouseenter { setitemcolor  join_blue_text forecolor 0.964 0.815 0 1 }
+			mouseexit { setitemcolor  join_blue_text forecolor 0.525 0.525 0.525 1 }
+		}
+		
+		itemDef {
+			name join_spec_background
+			rect 383 223 156 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			backcolor 0.133 0.133 0.133 0.8
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+		}
+		
+		itemDef {
+			name join_spec_text
+			rect 461 223 156 25
+			text "SPECTATE"
+			textscale .24
+			textalign ITEM_ALIGN_CENTER
+			textaligny 17
+			forecolor 0.525 0.525 0.525 1
+			style WINDOW_STYLE_FILLED
+			visible 1
+			decoration
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+		}
+		
+		itemDef {
+			name join_spec_button
+			rect 383 223 156 25
+			style WINDOW_STYLE_FILLED
+			visible 1
+			type ITEM_TYPE_BUTTON
+			cvarTest "cg_gametype"
+			hideCvar { "0","1","2","12" }
+			ownerdrawflag CG_SHOW_IF_WARMUP
+			action { exec "team s" }
+			mouseenter { setitemcolor  join_spec_text forecolor 0.964 0.815 0 1 }
+			mouseexit { setitemcolor  join_spec_text forecolor 0.525 0.525 0.525 1 }
+		}
+
+		itemDef {
+			name status
+			rect 20 250 100 30 
+			text "Starting Weapons"
+			textscale .28
+			textalign ITEM_ALIGN_LEFT
+			style WINDOW_STYLE_EMPTY	
+			forecolor 0.525 0.525 0.525 1
+			decoration
+			visible 1			
+		}		
+		
+		itemDef {
+			name loadout_bar
+			rect 20 253 520 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0.525 0.525 0.525 1			
+		}
+	
+		itemDef {
+			name startingweapons
+			rect 35 263 16 16
+			ownerdraw CG_STARTING_WEAPONS
+			style 0	
+			textscale .18
+			forecolor 1 1 1 1
+			visible 1 
+			decoration	  
+		}
+
+		itemDef {
+			name status
+			rect 35 295 100 30
+			text "+ CHOOSE ONE"
+			textscale .18
+			textalign ITEM_ALIGN_LEFT
+			style WINDOW_STYLE_EMPTY	
+			backcolor 0 0 0 0
+			forecolor 1 1 1 1
+			decoration
+			visible 1
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED			
+		}
+
+		itemDef {
+			name status
+			rect 35 295 100 30
+			text "ADDITIONAL UNAVAILABLE"
+			textscale .18
+			textalign ITEM_ALIGN_LEFT
+			style WINDOW_STYLE_EMPTY	
+			backcolor 0 0 0 0
+			forecolor 1 1 1 0.2
+			decoration
+			visible 1
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_DISABLED			
+		}
+		
+		itemDef {
+			name wp_infobox
+			rect 325 310 205 50
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0.5 0.5 0.5 0.5		
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED			
+		}
+		
+		itemDef {
+			name wp_hmg_disabledimage
+			rect 35 300 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/hmg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 0.125			
+		}
+		
+		itemDef {
+			name wp_hmg_box
+			rect 35 300 72 36
+			style WINDOW_STYLE_FILLED
+			type ITEM_TYPE_BUTTON
+			visible 1 
+			backcolor 1.0 1.0 1.0 0.5
+			cvarTest "cg_disableLoadout_hmg"
+			hideCvar { "1" }
+			action { exec "cg_weaponPrimaryQueued hmg" }		
+			mouseenter { setitemcolor wp_hmg_hover borderColor 0.3 0.3 0.3 1 }
+			mouseexit { setitemcolor wp_hmg_hover borderColor 0.3 0.3 0.3 0 }
+		}
+		
+		itemDef {
+			name wp_hmg_image
+			rect 35 300 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/hmg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 1.0
+			cvarTest "cg_disableLoadout_hmg"
+			hideCvar { "1" }			
+		}
+		
+		itemDef {
+			name wp_hmg_hover
+			style WINDOW_STYLE_FILLED
+			rect 33 298 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.3 0.3 0.3 0
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+		
+		itemDef {
+			name wp_hmg_defaultselected
+			style WINDOW_STYLE_FILLED
+			rect 33 298 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.729 0.439 0.039 1
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			hideCvar { "hmg" ; "rl" ; "lg" ; "rg" ; "sg" ; "pg" }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+		
+		itemDef {
+			name wp_hmg_selected
+			style WINDOW_STYLE_FILLED
+			rect 33 298 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.729 0.439 0.039 1
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { hmg }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+
+		itemDef {
+			name wp_hmg_defaulticon
+			rect 331 319 32 32
+			background "icons/weap_hmg"
+			style WINDOW_STYLE_FILLED
+			backcolor 1.0 1.0 1.0 1.0
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			hideCvar { "hmg" ; "rl" ; "lg" ; "rg" ; "sg" ; "pg" }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED			
+		}
+		
+		itemDef {
+			name wp_hmg_defaulttip_header
+			rect 370 322 164 10
+			text "Heavy Machinegun"
+			textscale .20
+			autowrapped
+			forecolor 1 1 1 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			hideCvar { "hmg" ; "rl" ; "lg" ; "rg" ; "sg" ; "pg" }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED			
+		}
+		
+		itemDef {
+			name wp_hmg_defaulttip
+			rect 370 334 150 45
+			text "Versatile at most ranges, the HMG offers quite a punch with negligible spread."
+			textscale .18
+			autowrapped
+			forecolor 0.8 0.8 0.8 1.0
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			hideCvar { "hmg" ; "rl" ; "lg" ; "rg" ; "sg" ; "pg" }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED				
+		}
+
+		itemDef {
+			name wp_hmg_icon
+			rect 331 319 32 32
+			background "icons/weap_hmg"
+			style WINDOW_STYLE_FILLED
+			backcolor 0.8 0.8 0.8 1.0
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { hmg }	
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name hmg_tooltip_header
+			rect 370 322 164 10
+			text "Heavy Machinegun"
+			textscale .20
+			autowrapped
+			forecolor 1 1 1 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { hmg }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name hmg_tooltip
+			rect 370 334 150 45
+			text "Versatile at most ranges, the HMG offers quite a punch with negligible spread."
+			textscale .18
+			autowrapped
+			forecolor .8 .8 .8 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { hmg }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name wp_sg_disabledimage
+			rect 110 300 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/sg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 0.125			
+		}
+		
+		itemDef {
+			name wp_sg_box
+			rect 110 300 72 36
+			style WINDOW_STYLE_FILLED
+			type ITEM_TYPE_BUTTON
+			visible 1 
+			backcolor 1.0 1.0 1.0 0.5
+			cvarTest "cg_disableLoadout_sg"
+			hideCvar { "1" }
+			action { exec "cg_weaponPrimaryQueued sg" }
+			mouseenter { setitemcolor wp_sg_hover borderColor 0.3 0.3 0.3 1 }
+			mouseexit { setitemcolor wp_sg_hover borderColor 0.3 0.3 0.3 0 }
+		}
+		
+		itemDef {
+			name wp_sg_image
+			rect 110 300 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/sg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 1.0
+			cvarTest "cg_disableLoadout_sg"
+			hideCvar { "1" }			
+		}
+		
+		itemDef {
+			name wp_sg_hover
+			style WINDOW_STYLE_FILLED
+			rect 108 298 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.3 0.3 0.3 0
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+		
+		itemDef {
+			name wp_sg_selected
+			style WINDOW_STYLE_FILLED
+			rect 108 298 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.729 0.439 0.039 1
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { sg }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+
+		itemDef {
+			name wp_sg_icon
+			rect 331 319 32 32
+			background "icons/iconw_shotgun"
+			style WINDOW_STYLE_FILLED
+			backcolor 1.0 1.0 1.0 1.0
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { sg }	
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED	
+		}
+		
+		itemDef {
+			name sg_tooltip_header
+			rect 370 322 164 10
+			text "Shotgun"
+			textscale .20
+			autowrapped
+			forecolor 1 1 1 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { sg }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name sg_tooltip
+			rect 370 334 150 45
+			text "The SG delivers a shower of pellets, dealing unrivaled damage at close range."
+			textscale .18
+			autowrapped
+			forecolor .8 .8 .8 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { sg }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name wp_pg_disabledimage
+			rect 185 300 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/pg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 0.125			
+		}
+		
+		itemDef {
+			name wp_pg_box
+			rect 185 300 72 36
+			style WINDOW_STYLE_FILLED
+			type ITEM_TYPE_BUTTON
+			visible 1 
+			backcolor 1.0 1.0 1.0 0.5
+			cvarTest "cg_disableLoadout_pg"
+			hideCvar { "1" }
+			action { exec "cg_weaponPrimaryQueued pg" }
+			mouseenter { setitemcolor wp_pg_hover borderColor 0.3 0.3 0.3 1 }
+			mouseexit { setitemcolor wp_pg_hover borderColor 0.3 0.3 0.3 0 }
+		}
+		
+		itemDef {
+			name wp_pg_image
+			rect 185 300 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/pg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 1.0
+			cvarTest "cg_disableLoadout_pg"
+			hideCvar { "1" }			
+		}
+		
+		itemDef {
+			name wp_pg_hover
+			style WINDOW_STYLE_FILLED
+			rect 183 298 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.3 0.3 0.3 0
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+		
+		itemDef {
+			name wp_pg_selected
+			style WINDOW_STYLE_FILLED
+			rect 183 298 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.729 0.439 0.039 1
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { pg }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+
+		itemDef {
+			name wp_pg_icon
+			rect 331 319 32 32
+			background "icons/iconw_plasma"
+			style WINDOW_STYLE_FILLED
+			backcolor 1.0 1.0 1.0 1.0
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { pg }	
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED	
+		}
+		
+		itemDef {
+			name pg_tooltip_header
+			rect 370 322 164 10
+			text "Plasma Gun"
+			textscale .20
+			autowrapped
+			forecolor 1 1 1 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { pg }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name pg_tooltip
+			rect 370 334 150 45
+			text "Although difficult to handle, the PG deals the most damage per second of any weapon."
+			textscale .18
+			autowrapped
+			forecolor .8 .8 .8 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { pg }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name wp_rl_disabledimage
+			rect 35 340 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/rl.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 0.125			
+		}
+		
+		itemDef {
+			name wp_rl_box
+			rect 35 340 72 36
+			style WINDOW_STYLE_FILLED
+			type ITEM_TYPE_BUTTON
+			visible 1 
+			backcolor 1.0 1.0 1.0 0.5
+			cvarTest "cg_disableLoadout_rl"
+			hideCvar { "1" }
+			action { exec "cg_weaponPrimaryQueued rl" }
+			mouseenter { setitemcolor wp_rl_hover borderColor 0.3 0.3 0.3 1 }
+			mouseexit { setitemcolor wp_rl_hover borderColor 0.3 0.3 0.3 0 }
+		}
+		
+		itemDef {
+			name wp_rl_image
+			rect 35 340 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/rl.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 1.0
+			cvarTest "cg_disableLoadout_rl"
+			hideCvar { "1" }			
+		}
+		
+		itemDef {
+			name wp_rl_hover
+			style WINDOW_STYLE_FILLED
+			rect 33 338 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.3 0.3 0.3 0
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+		
+		itemDef {
+			name wp_rl_selected
+			style WINDOW_STYLE_FILLED
+			rect 33 338 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.729 0.439 0.039 1
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { rl }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+
+		itemDef {
+			name wp_rl_icon
+			rect 331 319 32 32
+			background "icons/iconw_rocket"
+			style WINDOW_STYLE_FILLED
+			backcolor 1.0 1.0 1.0 1.0
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { rl }	
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED	
+		}
+		
+		itemDef {
+			name rl_tooltip_header
+			rect 370 322 164 10
+			text "Rocket Launcher"
+			textscale .20
+			autowrapped
+			forecolor 1 1 1 1
+			style WINDOW_STYLE_FILLED 
+			visible 1
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { rl }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name rl_tooltip
+			rect 370 334 150 45
+			text "The RL excels at close to mid range combat, with its large explosive area effect."
+			textscale .18
+			autowrapped
+			forecolor .8 .8 .8 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { rl }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name wp_lg_disabledimage
+			rect 110 340 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/lg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 0.125			
+		}
+		
+		itemDef {
+			name wp_lg_box
+			rect 110 340 72 36
+			style WINDOW_STYLE_FILLED
+			type ITEM_TYPE_BUTTON
+			visible 1 
+			backcolor 1.0 1.0 1.0 0.5
+			cvarTest "cg_disableLoadout_lg"
+			hideCvar { "1" }
+			action { exec "cg_weaponPrimaryQueued lg" }
+			mouseenter { setitemcolor wp_lg_hover borderColor 0.3 0.3 0.3 1 }
+			mouseexit { setitemcolor wp_lg_hover borderColor 0.3 0.3 0.3 0 }	
+		}
+		
+		itemDef {
+			name wp_lg_image
+			rect 110 340 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/lg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 1.0
+			cvarTest "cg_disableLoadout_lg"
+			hideCvar { "1" }			
+		}
+		
+		itemDef {
+			name wp_lg_hover
+			style WINDOW_STYLE_FILLED
+			rect 108 338 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.3 0.3 0.3 0
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+		
+		itemDef {
+			name wp_lg_selected
+			style WINDOW_STYLE_FILLED
+			rect 108 338 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.729 0.439 0.039 1
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { lg }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+
+		itemDef {
+			name wp_lg_icon
+			rect 331 319 32 32
+			background "icons/iconw_lightning"
+			style WINDOW_STYLE_FILLED
+			backcolor 1.0 1.0 1.0 1.0
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { lg }	
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED	
+		}
+		
+		itemDef {
+			name lg_tooltip_header
+			rect 370 322 164 10
+			text "Lightning Gun"
+			textscale .20
+			autowrapped
+			forecolor 1 1 1 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { lg }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+		
+		itemDef {
+			name lg_tooltip
+			rect 370 334 150 45
+			text "The LG is the master of the mid-range, but it has a limited reach."
+			textscale .18
+			autowrapped
+			forecolor .8 .8 .8 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { lg }		
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED			
+		}
+		
+		itemDef {
+			name wp_rg_disabledimage
+			rect 185 340 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/rg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 0.125			
+		}
+		
+		itemDef {
+			name wp_rg_box
+			rect 185 340 72 36
+			style WINDOW_STYLE_FILLED
+			type ITEM_TYPE_BUTTON
+			visible 1 
+			backcolor 1.0 1.0 1.0 0.5
+			cvarTest "cg_disableLoadout_rg"
+			hideCvar { "1" }
+			action { exec "cg_weaponPrimaryQueued rg" }
+			mouseenter { setitemcolor wp_rg_hover borderColor 0.3 0.3 0.3 1 }
+			mouseexit { setitemcolor wp_rg_hover borderColor 0.3 0.3 0.3 0 }	
+		}
+		
+		itemDef {
+			name wp_rg_image
+			rect 185 340 72 36
+			style WINDOW_STYLE_FILLED
+			background "ui/assets/main_menu/rg.tga"
+			visible 1 
+			decoration
+			backcolor 1.0 1.0 1.0 1.0
+			cvarTest "cg_disableLoadout_rg"
+			hideCvar { "1" }			
+		}
+		
+		itemDef {
+			name wp_rg_hover
+			style WINDOW_STYLE_FILLED
+			rect 183 338 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.3 0.3 0.3 0
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+		
+		itemDef {
+			name wp_rg_selected
+			style WINDOW_STYLE_FILLED
+			rect 183 338 72 36
+			border 1
+			bordersize 2
+			bordercolor 0.729 0.439 0.039 1
+			textalign ITEM_ALIGN_LEFT
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { rg }
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED					
+		}
+
+		itemDef {
+			name wp_rg_icon
+			rect 331 319 32 32
+			background "icons/iconw_railgun"
+			style WINDOW_STYLE_FILLED
+			backcolor 1.0 1.0 1.0 1.0
+			decoration
+			visible 1
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { rg }	
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED	
+		}
+		
+		itemDef {
+			name rg_tooltip_header
+			rect 370 322 164 10
+			text "Railgun"
+			textscale .20
+			autowrapped
+			forecolor 1 1 1 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { rg }	
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED				
+		}
+		
+		itemDef {
+			name rg_tooltip
+			rect 370 334 150 45
+			text "The RG is the weapon of choice when fighting at long distances."
+			textscale .18
+			autowrapped
+			forecolor .8 .8 .8 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			cvarTest "cg_weaponPrimaryQueued"
+			showCvar { rg }			
+			ownerdrawflag2 CG_SHOW_IF_LOADOUT_ENABLED		
+		}
+	
+		/*
+		itemDef {
+			name chatWindow
+			ownerdraw CG_AREA_NEW_CHAT
+			textscale 0.22
+			rect 5 287 634 120
+			visible 1
+			decoration
+		}
+		*/
+	}
+}

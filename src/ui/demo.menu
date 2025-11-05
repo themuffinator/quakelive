@@ -1,0 +1,222 @@
+#include "ui/menudef.h"
+
+{
+	assetGlobalDef {
+		gradientBar "ui/assets/gradientbar2.tga"	// gradient bar
+  	}
+	  menuDef {
+    	name "demo"
+    	visible 0
+    	fullscreen 0
+    	rect 0 0 640 480
+    	focusColor 1 .67 0 1
+    	border 1
+		onOpen { setitemcolor fadebox backcolor 0 0 0 1 ; 
+		fadeout fadebox ; uiScript LoadDemos ;
+		hide accept_alt ; 
+		show accept ;
+		hide back_alt ;
+		show back ;
+		hide grpmessage }
+		onEsc { close demo ; open main }
+
+  // LEVEL SELECTION BAR	//
+	
+		itemDef {
+			name levelbar
+			style WINDOW_STYLE_GRADIENT
+			text "DEMOS"
+			rect 0 16 640 40 
+			textstyle 6
+			textscale 0.416
+			textalign ITEM_ALIGN_CENTER
+			textalignx 320
+			textaligny 27 
+			forecolor 1 1 1 1       
+			style WINDOW_STYLE_GRADIENT
+			border 4
+			bordercolor 0.5 0.5 0.5 0.5
+			bordersize 2
+			backcolor 0.5 0.1 0 .25
+			visible 1 
+			decoration 
+		} 
+		
+	//BACK FRAME
+	//top
+	itemDef {
+		name bgframeTL
+		rect 62 60 40 40
+	      background "ui/assets/score/frametl.tga"
+		style WINDOW_STYLE_FILLED 
+	      visible 1 
+	      decoration 
+	      backcolor 1 1 1 0.9
+	}
+	itemDef {
+		name bgframeTM
+		rect 102 60 436 40
+	      background "ui/assets/score/framet.tga"
+		style WINDOW_STYLE_FILLED 
+	      visible 1 
+	      decoration 
+	      backcolor 1 1 1 0.9
+	}
+	itemDef {
+		name bgframeTR
+		rect 538 60 40 40
+	      background "ui/assets/score/frametr.tga"
+		style WINDOW_STYLE_FILLED 
+	      visible 1 
+	      decoration 
+	     	backcolor 1 1 1 0.9
+	}
+	
+	//mid
+	itemDef {
+		name bgframeL
+	      	rect 62 100 40 245
+	      	background "ui/assets/score/framel.tga"
+		style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+	}
+	itemDef {
+		name bgframeM
+	      	rect 102 100 436 245
+	      	background "ui/assets/score/framem.tga"
+		style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+	}
+	itemDef {
+		name bgframeR
+	      	rect 538 100 40 245
+	      	background "ui/assets/score/framer.tga"
+		style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+	}
+	//bottom
+	itemDef {
+		name bgframeTL
+	      	rect 62 345 40 20
+	      	background "ui/assets/score/framebl.tga"
+		style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+	}
+	itemDef {
+		name bgframeTM
+	      	rect 102 345 436 20
+	      	background "ui/assets/score/frameb.tga"
+		style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+	}
+	itemDef {
+		name bgframeTR
+	      	rect 538 345 40 20
+	      	background "ui/assets/score/framebr.tga"
+		style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+	}
+
+	itemDef {
+		name demolist
+		rect 75 80 490 280
+		type ITEM_TYPE_LISTBOX
+		style WINDOW_STYLE_FILLED
+		elementwidth 256
+		elementheight 18
+		textscale .18
+		elementtype LISTBOX_TEXT
+		feeder FEEDER_DEMOS
+		textalign 3
+		textaligny 14
+		forecolor 1 1 1 1
+		outlinecolor 0.5 0.1 0 .5
+		visible 1
+		mouseEnter { fadein message_demos ; setitemcolor demolist bordercolor .7 0 0 1 } 
+		mouseExit { fadeout message_demos ; setitemcolor demolist bordercolor .5 .5 .5 .5 } 
+	}
+	
+
+	itemDef {
+		name playdemo
+		text "Play Demo"
+		type 1
+		textscale .2
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/button_back.tga"
+		rect 510 375 60 15
+		textalign ITEM_ALIGN_CENTER
+		textalignx 30
+		textaligny 11
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1 
+		visible 1
+      	action { close demo ; uiScript RunDemo }
+		mouseExit { setcolor backcolor .37 .1 .1 1  ; hide accept_alt ; show accept ; hide message_accept }	 
+		mouseEnter { setcolor backcolor .5 .2 0 1 }
+	}
+
+	//		BACK			//
+
+	itemDef {
+			name quitbar
+			group mainnav
+			style WINDOW_STYLE_GRADIENT
+			rect -155 400 310 30 
+			backcolor 0.5 0.1 0 .25
+			border 4
+			bordercolor 0.5 0.5 0.5 1
+			bordersize 1
+			visible 1 
+			decoration 
+		}
+
+	itemDef {
+			name quit
+			group mainnav
+			text "BACK"
+			style WINDOW_STYLE_EMPTY	
+			type 1
+			textstyle 6
+			rect 0 400 320 30
+			textalignx 10
+			textaligny 24 
+			textscale .416
+			textalign ITEM_ALIGN_LEFT 
+			visible 1 
+			forecolor 1 1 1 1
+			action { close demo ; open main }
+			mouseEnter { setitemcolor backbar backcolor .75 0 0 .25 }
+			mouseExit { setitemcolor backbar backcolor 0.5 0.1 0 .25 }
+			cvarTest "ui_mainmenu"
+			showCvar { "1" }
+		}
+
+//		CREDITS			//
+
+	itemDef {
+      	name fadebox
+      	style WINDOW_STYLE_FILLED
+		background "ui/assets/fadebox.tga"
+		forecolor 0 0 0 1
+		backcolor 0 0 0 1
+		rect 0 0 640 480
+      	visible 1 
+		decoration
+    }
+}
+
+}
+}

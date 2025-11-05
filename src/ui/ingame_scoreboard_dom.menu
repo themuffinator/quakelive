@@ -1,0 +1,1278 @@
+#include "ui/menudef.h"
+{
+//=================================================================================
+	assetGlobalDef {
+		#define bg_shadow 0 0 0 0.6
+		#define black 0 0 0 1
+		#define bg_faint 0.12 0.12 0.12 0.25
+		#define bg_gray 0.12 0.12 0.12 0.8
+		#define gray 0.6 0.6 0.6 0.8
+		#define translucent 1 1 1 0.5
+		#define transparent 0 0 0 0
+		#define white 1 1 1 1
+		#define goldenyellow 1 .75 0 1
+		#define goldenyellowdim 1 .75 0 0.5
+		#define temp 0.5 0.5 0.5 0.5
+  	}
+//=================================================================================
+	menuDef {
+	    	name "teamscore_menu_dom"
+            widescreen WIDESCREEN_CENTER
+	    	visible 0
+	    	fullscreen 0
+	    	rect -25 0 640 480
+	    	focusColor 1 .75 0 1
+	    	style WINDOW_STYLE_FILLED
+	    	border 1
+//=================================================================================
+	// Background art / framework
+		itemDef {
+			name bgframeTL
+	      	rect 60 50 40 40
+	      	background "ui/assets/score/frametl.tga"
+			style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name bgframeTM
+	      	rect 100 50 490 40
+	      	background "ui/assets/score/framet.tga"
+			style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name bgframeTR
+	      	rect 590 50 40 40
+	      	background "ui/assets/score/frametr.tga"
+			style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name bgframeL
+	      	rect 60 90 40 250
+	      	background "ui/assets/score/framel.tga"
+			style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name bgframeM
+	      	rect 100 90 490 250
+	      	background "ui/assets/score/framem.tga"
+			style WINDOW_STYLE_FILLED 
+		     	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name bgframeR
+	      	rect 590 90 40 250
+	      	background "ui/assets/score/framer.tga"
+			style WINDOW_STYLE_FILLED 
+		     	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name bgframeBL
+	      	rect 60 340 40 20
+	      	background "ui/assets/score/framebl.tga"
+			style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name bgframeBM
+	      	rect 100 340 490 20
+	      	background "ui/assets/score/frameb.tga"
+			style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name bgframeBR
+	      	rect 590 340 40 20
+	      	background "ui/assets/score/framebr.tga"
+			style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+	      	backcolor 1 1 1 0.9
+		}
+		itemDef {
+			name adframeL
+	      	rect 96 15 40 80
+	      	background "ui/assets/score/adtl.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1 
+	      	decoration 
+		}
+		itemDef {
+			name adframeM
+	      	rect 136 15 160 80
+	      	background "ui/assets/score/adtm.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1 
+	      	decoration 
+		}
+		itemDef {
+			name adframeR
+	      	rect 296 15 320 80
+	      	background "ui/assets/score/adtr.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1 
+	      	decoration 
+		}
+		itemDef {
+			name adframeR
+	      	rect 296 95 320 20
+	      	background "ui/assets/score/adbr.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1 
+	      	decoration 
+		}	
+		itemDef {
+			name sb_borderstart
+	      	rect 120 105 40 20
+	      	background "ui/assets/score/sb_borderstart.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1 
+	      	decoration 
+		}
+		itemDef {
+			name sb_borderline
+	      	rect 160 105 420 20
+	      	background "ui/assets/score/sb_borderline.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1
+	      	decoration 
+		}
+		itemDef {
+			name sb_borderangle
+	      	rect 580 105 20 20
+	      	background "ui/assets/score/sb_borderangle.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1 
+	      	decoration 
+		}
+		itemDef {
+			name sb_borderend
+	      	rect 600 105 25 20
+	      	background "ui/assets/score/sb_borderend.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1 
+	      	decoration 
+		}
+		itemDef {
+			name scores_redteam_player_bar
+			rect 69 140 205 20
+			group grpScoresMenu 
+			background "ui/assets/score/red_team_player_bar.tga"
+			style WINDOW_STYLE_SHADER
+			decoration
+			visible 1
+		}
+		itemDef {
+			name scores_blueteam_player_bar
+			rect 416 140 205 20
+			group grpScoresMenu 
+			background "ui/assets/score/blue_team_player_bar.tga"
+			style WINDOW_STYLE_SHADER
+			decoration
+			visible 1
+		}
+//=================================================================================
+		// Ad placement w/ cellId
+
+		itemDef {
+			name advert3
+			rect 453 17 160 80
+			ownerdraw UI_ADVERT
+			type ITEM_TYPE_BUTTON
+		   	defaultContent "textures/ad_content/ad2x1.jpg"
+		   	cellId 3
+		 	style WINDOW_STYLE_SHADER
+			forecolor 1 1 1 1.0
+		   	visible 1 
+		}
+//=================================================================================
+		itemDef {
+			name bgframeArrow
+	      	rect 65 56 10 10
+	      	background "ui/assets/score/arrowgray.tga"
+			style WINDOW_STYLE_SHADER 
+	      	visible 1 
+	      	decoration 
+		}
+		//OBITUARY
+		itemDef {
+			name "hudObit"
+			rect 214 17 65 12
+			widescreen WIDESCREEN_LEFT
+			ownerdraw CG_PLAYER_OBIT
+			visible 1
+			decoration
+			textscale .22
+		}
+		//GAME TIME
+		itemDef {
+			name "Timer"
+			textalign ITEM_ALIGN_LEFT
+			style WINDOW_STYLE_EMPTY
+			rect 41 60 50 12
+			widescreen WIDESCREEN_LEFT
+			visible 1
+			textstyle ITEM_TEXTSTYLE_SHADOWED
+			decoration
+			forecolor 1 1 1 1
+			textscale .28
+			ownerdraw CG_LEVELTIMER
+		}
+		itemDef {
+			name "timerIcon"
+			rect 26 48 14 14
+			widescreen WIDESCREEN_LEFT
+			style WINDOW_STYLE_FILLED
+			backcolor 0 0 0 0.7
+			background "icons/icon_time.tga"
+			visible 1
+			decoration
+		}
+		itemDef {
+			name "timerIcon"
+			rect 25 47 14 14
+			widescreen WIDESCREEN_LEFT
+			style WINDOW_STYLE_FILLED
+			backcolor 0.7 0.7 0.7 0.7
+			background "icons/icon_time.tga"
+			visible 1
+			decoration
+		}
+		itemDef {
+			name gametype_location_mapname_text
+			rect 75 64 235 15
+			ownerdraw CG_MATCH_DETAILS
+			textscale 0.16
+			forecolor gray
+			align 0
+			textstyle ITEM_TEXTSTYLE_SHADOWED
+			style WINDOW_STYLE_FILLED
+			decoration
+			visible 1
+		}
+		itemDef {
+			name matchstatus
+			rect 80 77 330 10 
+			ownerdraw CG_GAME_STATUS
+			textscale .22
+			style WINDOW_STYLE_FILLED	
+			textalign ITEM_ALIGN_LEFT		
+			backcolor 0 0 0 0
+			forecolor goldenyellow 
+			visible 1 
+			decoration	  
+		}
+		itemDef {
+	      	name playercount
+	      	rect 405 64 50 10
+	      	ownerdraw CG_PLAYER_COUNTS
+	      	textscale .16
+	      	style WINDOW_STYLE_FILLED	
+	      	align ITEM_ALIGN_CENTER
+	      	backcolor 0 0 0 0
+	      	forecolor 0.6 0.6 0.6 1
+	      	decoration
+	      	visible 1 
+		}
+/*
+//=================================================================================
+		// Scores Tab
+			itemDef {
+				name menuitem_scores
+				rect 120 98 80 15
+				group grpScoresMenu 
+				background "ui/assets/score/bg_tabmenu.tga"
+				backcolor 1 1 1 0.75
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name menuitem_scores_text
+				rect 160 109 80 15
+				text "Scoreboard"
+				textscale 0.20
+				forecolor white
+				textalign ITEM_ALIGN_CENTER
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name menuitem_scores_button
+				rect 120 98 80 15
+				group grpScoresbutton
+				type 1
+				backcolor transparent
+				style WINDOW_STYLE_FILLED
+				visible 1
+				action { show grpScoresMenu ; hide grpStatisticsMenu ;
+					setitemcolor menuitem_scores_text forecolor white
+					setitemcolor menuitem_statistics_text forecolor gray ;
+				}
+				onFocus {
+					transition menuitem_scores_text 161 109 80 15 160 109 80 15 20 10
+				}
+			}
+//=================================================================================
+		// Statistics Tab
+			itemDef {
+				name menuitem_statistics
+				rect 210 98 80 15
+				group grpStatisticsMenu 
+				background "ui/assets/score/bg_tabmenu.tga"
+				backcolor 1 1 1 0.75
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name menuitem_statistics_text
+				rect 250 109 80 15
+				text "Statistics"
+				textscale 0.20
+				forecolor gray
+				textalign ITEM_ALIGN_CENTER
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name menuitem_statistics_button
+				rect 210 98 80 15
+				group grpStatisticsbutton
+				type 1
+				backcolor transparent
+				style WINDOW_STYLE_FILLED
+				visible 1
+				action { show grpStatisticsMenu ; hide grpScoresMenu ;
+					setitemcolor menuitem_scores_text forecolor gray
+					setitemcolor menuitem_statistics_text forecolor white ;
+				}
+				onFocus {
+					transition menuitem_statistics_text 251 109 80 15 250 109 80 15 20 10
+				}
+			}
+//=================================================================================
+*/
+		// Scoreboard Menu
+			itemDef {
+				name scores_contentframe_left
+				group grpScoresMenu 
+				rect 70 160 20 127
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_left.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_mid
+				group grpScoresMenu 
+				rect 90 160 233 127
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_mid.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_right
+				group grpScoresMenu 
+				rect 323 160 20 127
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_right.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_left
+				group grpScoresMenu 
+				rect 347 160 20 127
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_left.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_mid
+				group grpScoresMenu 
+				rect 367 160 233 127
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_mid.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_right
+				group grpScoresMenu 
+				rect 600 160 20 127
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_right.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_bl
+				group grpScoresMenu 
+				rect 70 287 20 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_bl.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_bottom
+				group grpScoresMenu 
+				rect 90 287 233 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_bottom.tga"
+				visible 1
+				decoration
+			}	
+			itemDef {
+				name scores_contentframe_br
+				group grpScoresMenu 
+				rect 323 287 20 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_br.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_bl
+				group grpScoresMenu 
+				rect 347 287 20 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_bl.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_contentframe_bottom
+				group grpScoresMenu 
+				rect 367 287 233 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_bottom.tga"
+				visible 1
+				decoration
+			}	
+			itemDef {
+				name scores_contentframe_br
+				group grpScoresMenu 
+				rect 600 287 20 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.75
+				background "ui/assets/score/frame_br.tga"
+				visible 1
+				decoration
+			}
+			itemDef {
+				name scores_spectator_artworkL
+		      	rect 70 333 80 20
+				group grpScoresMenu 
+		      	background "ui/assets/score/specl.tga"
+				style WINDOW_STYLE_FILLED 
+		      	visible 1
+		      	decoration 
+		      	backcolor 1 1 1 0.4
+			}
+			itemDef {
+				name scores_spectator_artworkM
+			    rect 150 333 460 20
+				group grpScoresMenu 
+			    background "ui/assets/score/specm.tga"
+				style WINDOW_STYLE_FILLED 
+			    visible 1
+			    decoration 
+			    backcolor 1 1 1 0.4
+			}
+			itemDef {
+				name scores_spectator_artworkR
+			    rect 610 333 10 20
+				group grpScoresMenu 
+			    background "ui/assets/score/specr.tga"
+				style WINDOW_STYLE_FILLED 
+			    visible 1
+		      	decoration 
+		      	backcolor 1 1 1 0.4
+			}
+			// Fragged by obituary
+			itemDef {
+				name killer
+				rect 75 100 330 10 
+				ownerdraw CG_KILLER
+				textscale .35
+				style WINDOW_STYLE_EMPTY	
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				align 0
+				backcolor 0 0 0 0
+				forecolor 1 1 1 1
+				visible 1 
+				decoration	  
+			}
+			// Scoreboxes
+			itemDef {
+				name scores_redteam_scorebox
+				rect 274 125 69 35
+				group grpScoresMenu 
+				background "ui/assets/score/scorebox_red.tga"
+				backcolor 1 1 1 1
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name scores_readteam_score
+				rect 308 155 69 40
+				group grpScoresMenu 
+				ownerdraw CG_RED_SCORE
+				style WINDOW_STYLE_FILLED
+				visible 1
+				textscale .6
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				align 1
+				decoration
+			}
+			itemDef {
+				name scores_redteam_name
+				rect 269 140 170 20
+				group grpScoresMenu 
+				ownerdraw CG_RED_NAME
+				textscale 0.24
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				align 2
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}			
+			itemDef {
+				name scores_blueteam_scorebox
+				rect 347 125 69 35
+				group grpScoresMenu 
+				background "ui/assets/score/scorebox_blue.tga"
+				backcolor 1 1 1 1
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name scores_blueteam_score
+				rect 383 155 69 40
+				group grpScoresMenu 
+				ownerdraw CG_BLUE_SCORE
+				style WINDOW_STYLE_FILLED
+				visible 1
+				textscale .6
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				align 1
+				decoration
+			}
+			itemDef {
+				name scores_blueteam_name
+				rect 421 140 170 20
+				group grpScoresMenu 
+				ownerdraw CG_BLUE_NAME
+				textscale 0.24
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				align 0
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+		// Team Headers
+			itemDef {
+				name bgframeM
+				group grpScoresMenu 
+				rect 75 160 263 13
+				background "ui/assets/score/statsfillm.tga"
+				style WINDOW_STYLE_FILLED 
+				visible 1 
+				decoration 
+				backcolor 0.6 0.17 0.07 0.2
+			}
+			itemDef {
+				name scores_redteam_timeoutsR
+				group grpScoresMenu 
+				rect 76 157 40 20 
+				ownerdraw CG_RED_TIMEOUT_COUNT
+				textscale .16
+				style WINDOW_STYLE_EMPTY	
+				backcolor 0 0 0 0
+				forecolor 1 1 1 1
+				decoration
+				align 0
+				visible 1
+			}
+			itemDef {
+				name scores_redteam_player_text
+				rect 80 170 155 35
+				group grpScoresMenu 
+				text "PLAYER" 
+				textscale 0.16
+				textalign ITEM_ALIGN_LEFT
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name scores_redteam_players
+				rect 115 170 155 20
+				group grpScoresMenu 
+				ownerdraw CG_RED_PLAYER_COUNT
+				textscale .15
+				style WINDOW_STYLE_EMPTY	
+				align 0
+				backcolor 0 0 0 0
+				forecolor goldenyellowdim
+				decoration
+				visible 1 	  
+			}
+			itemDef {
+				name scores_redteam_scoretext
+				rect 211 170 155 20
+				group grpScoresMenu 
+				text "SCORE" 
+				textscale 0.16
+				textalign ITEM_ALIGN_CENTER
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name scores_redteam_nettext
+				rect 245 170 155 20
+				group grpScoresMenu 
+				text "K/D" 
+				textscale 0.16
+				textalign ITEM_ALIGN_CENTER
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name scores_redteam_ctfawardtext
+				rect 265 162 10 10
+				group grpScoresMenu 
+				background "ui/assets/score/medal_capture_sm.tga"
+				backcolor 1 .75 0 0.8
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1		
+			}
+			itemDef {
+				name scores_redteam_ctfawardtext
+				rect 280 162 10 10
+				group grpScoresMenu 
+				background "ui/assets/score/medal_assist_sm.tga"
+				backcolor 1 .75 0 0.8
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1		
+			}
+			itemDef {
+				name scores_redteam_ctfawardtext
+				rect 295 162 10 10
+				group grpScoresMenu 
+				background "ui/assets/score/medal_defend_sm.tga"
+				backcolor 1 .75 0 0.8
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1		
+			}
+			itemDef {
+				name scores_redteam_ping_icon
+				rect 328 162 10 10
+				group grpScoresMenu 
+				background "ui/assets/score/ping.tga"
+				backcolor 1 .75 0 0.2
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1		
+			}
+			itemDef {
+				name scores_redteam_avgping
+				rect 317 170 155 20 
+				group grpScoresMenu 
+				ownerdraw CG_RED_AVG_PING
+				textscale .15
+				style WINDOW_STYLE_EMPTY	
+				align 0
+				backcolor 0 0 0 0
+				decoration
+				visible 1 	  
+			}
+			itemDef {
+				name bgframeM
+				group grpScoresMenu 
+				rect 352 160 263 13
+				background "ui/assets/score/statsfillm.tga"
+				style WINDOW_STYLE_FILLED 
+				visible 1 
+				decoration 
+				backcolor 0.1 0.22 0.34 0.2
+			}
+			itemDef {
+				name scores_blueteam_timeoutsR
+				rect 612 157 40 20 
+				group grpScoresMenu 
+				ownerdraw CG_BLUE_TIMEOUT_COUNT
+				textscale .16
+				style WINDOW_STYLE_EMPTY	
+				backcolor 0 0 0 0
+				forecolor 1 1 1 1
+				decoration
+				align 2
+				visible 1
+			}
+			itemDef {
+				name scores_blueteam_player_text
+				rect 357 170 155 35
+				group grpScoresMenu 
+				text "PLAYER" 
+				textscale 0.16
+				textalign ITEM_ALIGN_LEFT
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name scores_blueteam_players
+				rect 392 170 155 20
+				group grpScoresMenu 
+				ownerdraw CG_BLUE_PLAYER_COUNT
+				textscale .15
+				style WINDOW_STYLE_EMPTY
+				align 0
+				backcolor 0 0 0 0
+				forecolor goldenyellowdim
+				decoration
+				visible 1 	  
+			}
+			itemDef {
+				name scores_blueteam_scoretext
+				rect 488 170 155 20
+				group grpScoresMenu 
+				text "SCORE" 
+				textscale 0.16
+				textalign ITEM_ALIGN_CENTER
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name scores_blueteam_nettext
+				rect 522 170 155 20
+				group grpScoresMenu 
+				text "K/D" 
+				textscale 0.16
+				textalign ITEM_ALIGN_CENTER
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+			}
+			itemDef {
+				name scores_blueteam_ctfawardtext
+				rect 542 162 10 10
+				group grpScoresMenu 
+				background "ui/assets/score/medal_capture_sm.tga"
+				backcolor 1 .75 0 0.8
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1		
+			}
+			itemDef {
+				name scores_blueteam_ctfawardtext
+				rect 557 162 10 10
+				group grpScoresMenu 
+				background "ui/assets/score/medal_assist_sm.tga"
+				backcolor 1 .75 0 0.8
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1		
+			}
+			itemDef {
+				name scores_blueteam_ctfawardtext
+				rect 572 162 10 10
+				group grpScoresMenu 
+				background "ui/assets/score/medal_defend_sm.tga"
+				backcolor 1 .75 0 0.8
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1		
+			}
+			itemDef {
+				name scores_blueteam_ping_icon
+				rect 605 162 10 10
+				group grpScoresMenu 
+				background "ui/assets/score/ping.tga"
+				backcolor 1 .75 0 0.2
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1		
+			}
+			itemDef {
+				name scores_blueteam_avgping
+				rect 594 170 155 20 
+				group grpScoresMenu 
+				ownerdraw CG_BLUE_AVG_PING
+				textscale .15
+				style WINDOW_STYLE_EMPTY
+				align 0
+				backcolor 0 0 0 0
+				decoration
+				visible 1 	  
+			}
+		// Spectators
+			itemDef {
+		      	name scores_spectators_headertext
+		      	rect 75 347 54 10 
+				group grpScoresMenu 
+		      	text "SPECTATORS"
+		      	textscale .2
+		      	style WINDOW_STYLE_FILLED	
+		      	forecolor gray
+		      	decoration
+		      	visible 1
+			}
+			itemDef {
+		      	name scores_spectators_playerlist
+		      	rect 150 340 465 10 
+				group grpScoresMenu 
+		      	ownerdraw CG_SPECTATORS
+		      	textscale .2
+		      	style WINDOW_STYLE_FILLED	
+		      	backcolor 0 0 0 0
+		      	forecolor white
+		      	decoration
+		      	visible 1
+			}
+			//	Score Feeder
+			itemDef	 {
+				name playerlistRED // This itemDef MUST be named playerlistRED, due to CG_FeederSelection in cg_main.c
+				rect 73 165 284 130
+				group grpScoresMenu 
+				visible 1 
+				type ITEM_TYPE_LISTBOX
+				elementwidth 16
+				elementheight 16
+				elementcolor 1.0 1.0 1.0 1.0
+				selectedcolor 1.0 1.0 1.0 1.0
+				outlinecolor 1.0 0.17 0.07 0.4
+				altrowcolor 0.6 0.17 0.07 0.3
+				font FONT_SANS
+				textscale .16
+				elementtype LISTBOX_TEXT
+				feeder FEEDER_REDTEAM_LIST
+				notselectable
+				columns 12  1 15 1  1 15 1  1 15 16  17 15 1  32 15 1  48 16 117  120 16 5  159 16 5  189 16 5  204 16 5  219 16 5  242 16 4
+			}
+			itemDef	 {
+				name playerlistBLUE // This itemDef MUST be named playerlistBLUE, due to CG_FeederSelection in cg_main.c
+				rect 350 165 284 130
+				group grpScoresMenu 
+				visible 1 
+				type ITEM_TYPE_LISTBOX
+				elementwidth 16
+				elementheight 16
+				elementcolor 1.0 1.0 1.0 1.0
+				selectedcolor 1.0 1.0 1.0 1.0
+				outlinecolor 0.1 0.22 1.0 0.4
+				altrowcolor 0.1 0.22 0.34 0.3
+				font FONT_SANS
+				textscale .16
+				elementtype LISTBOX_TEXT
+				feeder FEEDER_BLUETEAM_LIST
+				notselectable
+				columns 12  1 15 1  1 15 1  1 15 16  17 15 1  32 15 1  48 16 117  120 16 5  159 16 5  189 16 5  204 16 5  219 16 5  242 16 4
+			}
+			// Team Pickup Fill
+			itemDef {
+				
+				name statframeTL
+				rect 70 308 5 27
+				group grpScoresMenu 
+				background "ui/assets/score/statsfilll.tga"
+				style WINDOW_STYLE_FILLED
+				visible 1
+				decoration 
+				backcolor 0.6 0.17 0.07 0.2
+				forecolor 0.2 0.6 1 0.5
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC
+			}
+			itemDef {
+				name statframeT
+				rect 75 308 265 27
+				group grpScoresMenu 
+				background "ui/assets/score/statsfillm.tga"
+				style WINDOW_STYLE_FILLED
+				visible 1
+				decoration 
+				backcolor 0.6 0.17 0.07 0.2
+				forecolor 0.2 0.6 1 0.5
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC
+			}
+			itemDef {
+				name statframeTR
+				rect 340 308 5 27
+				group grpScoresMenu 
+				background "ui/assets/score/statsfillr.tga"
+				style WINDOW_STYLE_FILLED
+				visible 1 
+				decoration 
+				backcolor 0.6 0.17 0.07 0.2
+				forecolor 0.2 0.6 1 0.5
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC
+			}
+			itemDef {
+				name statframeTL
+				rect 345 308 5 27
+				group grpScoresMenu 
+				background "ui/assets/score/statsfilll.tga"
+				style WINDOW_STYLE_FILLED
+				visible 1
+				decoration 
+				backcolor 0.1 0.22 0.34 0.2
+				forecolor 0.2 0.6 1 0.5
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC
+			}
+			itemDef {
+				name statframeT
+				rect 350 308 265 27
+				group grpScoresMenu 
+				background "ui/assets/score/statsfillm.tga"
+				style WINDOW_STYLE_FILLED
+				visible 1
+				decoration 
+				backcolor 0.1 0.22 0.34 0.2
+				forecolor 0.2 0.6 1 0.5
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC
+			}
+			itemDef {
+				name statframeTR
+				rect 615 308 5 27
+				group grpScoresMenu 
+				background "ui/assets/score/statsfillr.tga"
+				style WINDOW_STYLE_FILLED
+				visible 1 
+				decoration 
+				backcolor 0.1 0.22 0.34 0.2
+				forecolor 0.2 0.6 1 0.5
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC
+			}
+			// Award Details
+			//frame left
+			itemDef {
+				name statframeL
+				rect 70 309 5 25
+				group grpScoresMenu 
+				background "ui/assets/score/statsl.tga"
+				style WINDOW_STYLE_FILLED 
+				visible 1
+				decoration 
+				backcolor 1 1 1 0.4
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC
+			}
+			//frame mid
+			itemDef {
+				name statframeM
+				rect 75 309 264 25
+				group grpScoresMenu 
+				background "ui/assets/score/statsm.tga"
+				style WINDOW_STYLE_FILLED 
+				visible 1
+				decoration 
+				backcolor 1 1 1 0.4
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC
+			}
+			//frame right
+			itemDef {
+				name statframeR
+				rect 339 309 5 25
+				group grpScoresMenu 
+				background "ui/assets/score/statsr.tga"
+				style WINDOW_STYLE_FILLED 
+				visible 1
+				decoration 
+				backcolor 1 1 1 0.4
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC
+			}
+			//frame left
+			itemDef {
+				name statframeL
+				rect 346 309 5 25
+				group grpScoresMenu 
+				background "ui/assets/score/statsl.tga"
+				style WINDOW_STYLE_FILLED 
+				visible 1
+				decoration 
+				backcolor 1 1 1 0.4
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC
+			}
+			//frame mid
+			itemDef {
+				name statframeM
+				rect 351 309 264 25
+				group grpScoresMenu 
+				background "ui/assets/score/statsm.tga"
+				style WINDOW_STYLE_FILLED 
+				visible 1
+				decoration 
+				backcolor 1 1 1 0.4
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC
+			}
+			//frame right
+			itemDef {
+				name statframeR
+				rect 615 309 5 25
+				group grpScoresMenu 
+				background "ui/assets/score/statsr.tga"
+				style WINDOW_STYLE_FILLED 
+				visible 1
+				decoration 
+				backcolor 1 1 1 0.4
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC
+			}
+			itemDef {
+				name scores_blueplayer_awardstext
+				rect 80 317 155 20
+				group grpScoresMenu 
+				text "PLAYER STATS" 
+				textscale 0.16
+				textalign ITEM_ALIGN_LEFT
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC
+			}
+			itemDef {
+				name medal_excellent
+				group grpScoresMenu 
+				ownerdraw CG_EXCELLENT
+				rect 80 317 15 15
+				background "ui/assets/medal_excellent.tga"
+				forecolor 1 1 1 .5
+				visible 1 
+				decoration 
+				textscale 0.16
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC
+			}
+			itemDef {
+				name medal_gauntlet
+				group grpScoresMenu 
+				ownerdraw CG_GAUNTLET
+				rect 110 317 15 15
+				background "ui/assets/medal_gauntlet.tga"
+				forecolor 1 1 1 .5
+				visible 1 
+				decoration 
+				textscale 0.16
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC
+			}
+			itemDef {
+				name medal_impressive
+				group grpScoresMenu 
+				ownerdraw CG_IMPRESSIVE
+				rect 140 317 15 15
+				background "ui/assets/medal_impressive.tga"
+				forecolor 1 1 1 .5
+				visible 1
+				decoration 
+				textscale 0.16
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC
+			}
+			itemDef {
+				name medal_accuracy
+				group grpScoresMenu 
+				ownerdraw CG_ACCURACY
+				rect 170 317 15 15
+				background "ui/assets/medal_accuracy.tga"
+				forecolor 1 1 1 .5
+				visible 1
+				decoration 
+				textscale 0.16
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC
+			}
+			itemDef {
+				name scores_redplayer_awardstext
+				rect 360 317 155 20
+				group grpScoresMenu 
+				text "PLAYER STATS" 
+				textscale 0.16
+				textalign ITEM_ALIGN_LEFT
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC
+			}
+			itemDef {
+				name medal_excellent
+				group grpScoresMenu 
+				ownerdraw CG_EXCELLENT
+				rect 360 317 15 15
+				background "ui/assets/medal_excellent.tga"
+				forecolor 1 1 1 .5
+				visible 1 
+				decoration 
+				textscale 0.16
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC
+			}
+			itemDef {
+				name medal_gauntlet
+				group grpScoresMenu 
+				ownerdraw CG_GAUNTLET
+				rect 390 317 15 15
+				background "ui/assets/medal_gauntlet.tga"
+				forecolor 1 1 1 .5
+				visible 1 
+				decoration 
+				textscale 0.16
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC
+			}
+			itemDef {
+				name medal_impressive
+				group grpScoresMenu 
+				ownerdraw CG_IMPRESSIVE
+				rect 420 317 15 15
+				background "ui/assets/medal_impressive.tga"
+				forecolor 1 1 1 .5
+				visible 1
+				decoration 
+				textscale 0.16
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC
+			}
+			itemDef {
+				name medal_accuracy
+				group grpScoresMenu 
+				ownerdraw CG_ACCURACY
+				rect 450 317 15 15
+				background "ui/assets/medal_accuracy.tga"
+				forecolor 1 1 1 .5
+				visible 1
+				decoration 
+				textscale 0.16
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC
+			}
+		// Pickup Details
+			itemDef {
+				name scores_redteam_pickupstext
+				rect 80 317 155 20
+				group grpScoresMenu 
+				text "RED PICKUPS" 
+				textscale 0.16
+				textalign ITEM_ALIGN_LEFT
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC
+			}
+			itemDef {
+				name scores_redteam_pickups
+				rect 80 317 15 15
+				group grpScoresMenu 
+				ownerdraw CG_RED_TEAM_MAP_PICKUPS
+				textscale 0.16
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				align 0
+				forecolor white 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC
+			}
+			itemDef {
+				name scores_blueteam_pickupstext
+				rect 355 317 155 20
+				group grpScoresMenu 
+				text "BLUE PICKUPS" 
+				textscale 0.16
+				textalign ITEM_ALIGN_LEFT
+				forecolor goldenyellow 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC
+			}
+			itemDef {
+				name scores_blueteam_pickups
+				rect 355 317 15 15
+				group grpScoresMenu 
+				ownerdraw CG_BLUE_TEAM_MAP_PICKUPS
+				textscale 0.16
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				align 0
+				forecolor white 
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				ownerdrawflag2 CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC
+			}
+//=================================================================================
+//	CHAT AREA	//
+		    	itemDef {
+			    name scoreChatWindow
+                widescreen WIDESCREEN_LEFT
+			    ownerdraw CG_AREA_NEW_CHAT
+				textscale 0.22
+		   		rect 30 286 634 120
+		   		visible 1
+				decoration
+			}
+		itemDef {
+			name localtime_text
+			rect 593 367 235 15
+			ownerdraw CG_LOCALTIME
+			textscale 0.16
+			forecolor gray
+			align 2
+			textstyle ITEM_TEXTSTYLE_SHADOWED
+			style WINDOW_STYLE_FILLED
+			decoration
+			visible 1
+		}
+//=================================================================================
+	}
+//=================================================================================
+}

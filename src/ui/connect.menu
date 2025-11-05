@@ -1,0 +1,15 @@
+#include "ui/menudef.h"
+
+
+{
+
+menuDef {
+    	name "Connect"
+		background "ui/assets/backscreen_smoke"
+		backgroundSize 0 0 1920 1080
+    	fullScreen 1				
+		rect 0 0 640 480
+    	visible 1
+  }
+
+}

@@ -77,14 +77,36 @@ UI_StartDemoLoop
 =================
 */
 void UI_StartDemoLoop( void ) {
-	trap_Cmd_ExecuteText( EXEC_APPEND, "d1\n" );
+        trap_Cmd_ExecuteText( EXEC_APPEND, "d1\n" );
+}
+
+
+void UI_StopMenuRefresh( void ) {
+        UI_StopServerRefresh();
+        uiInfo.serverStatus.nextDisplayRefresh = 0;
+        uiInfo.nextServerStatusRefresh = 0;
+        uiInfo.nextFindPlayerRefresh = 0;
+}
+
+void UI_CloseInGameMenu( void ) {
+        trap_Key_SetCatcher( trap_Key_GetCatcher() & ~KEYCATCH_UI );
+        trap_Key_ClearStates();
+        trap_Cvar_Set( "cl_paused", "0" );
+        Menus_CloseAll();
+}
+
+void UI_LeaveGame( void ) {
+        trap_Cmd_ExecuteText( EXEC_APPEND, "disconnect\n" );
+        trap_Key_SetCatcher( KEYCATCH_UI );
+        Menus_CloseAll();
+        Menus_ActivateByName("main");
 }
 
 
 #ifndef MISSIONPACK // bk001206
 static void NeedCDAction( qboolean result ) {
-	if ( !result ) {
-		trap_Cmd_ExecuteText( EXEC_APPEND, "quit\n" );
+        if ( !result ) {
+                trap_Cmd_ExecuteText( EXEC_APPEND, "quit\n" );
 	}
 }
 #endif // MISSIONPACK

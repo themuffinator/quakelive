@@ -129,7 +129,7 @@ static int uitogamecode[] = {4,6,2,3,1,5,7};
 
 
 static void UI_StartServerRefresh(qboolean full);
-static void UI_StopServerRefresh( void );
+void UI_StopServerRefresh( void );
 static void UI_DoServerRefresh( void );
 static void UI_FeederSelection(float feederID, int index);
 static void UI_BuildServerDisplayList(qboolean force);
@@ -213,6 +213,176 @@ int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int a
 
 
 
+static const char *const uiQLTextureNames[] = {
+	"ui/assets/3_cursor3",
+	"ui/assets/backscreen_smoke",
+	"ui/assets/bluechip.tga",
+	"ui/assets/button_back.tga",
+	"ui/assets/fadebox.tga",
+	"ui/assets/framebutton.tga",
+	"ui/assets/gradientbar2.tga",
+	"ui/assets/hud/a100.tga",
+	"ui/assets/hud/a100line.tga",
+	"ui/assets/hud/a200.tga",
+	"ui/assets/hud/a200line.tga",
+	"ui/assets/hud/armor.tga",
+	"ui/assets/hud/bteambgl.tga",
+	"ui/assets/hud/bteambgr.tga",
+	"ui/assets/hud/chatl.tga",
+	"ui/assets/hud/chatm.tga",
+	"ui/assets/hud/chatr.tga",
+	"ui/assets/hud/ctf.tga",
+	"ui/assets/hud/dm.tga",
+	"ui/assets/hud/flag",
+	"ui/assets/hud/h100.tga",
+	"ui/assets/hud/h100line.tga",
+	"ui/assets/hud/h200.tga",
+	"ui/assets/hud/h200line.tga",
+	"ui/assets/hud/health.tga",
+	"ui/assets/hud/healthalert",
+	"ui/assets/hud/roundbox.tga",
+	"ui/assets/hud/rteambgl.tga",
+	"ui/assets/hud/rteambgr.tga",
+	"ui/assets/hud/scoreboxl.tga",
+	"ui/assets/hud/scoreboxl2.tga",
+	"ui/assets/hud/scoreboxl2a.tga",
+	"ui/assets/hud/scoreboxm.tga",
+	"ui/assets/hud/scoreboxm2.tga",
+	"ui/assets/hud/scoreboxr.tga",
+	"ui/assets/hud/scoreboxr2.tga",
+	"ui/assets/hud/shadowl.tga",
+	"ui/assets/hud/shadowr.tga",
+	"ui/assets/hud/tdm.tga",
+	"ui/assets/hud/teamonl.tga",
+	"ui/assets/hud/teamonm.tga",
+	"ui/assets/hud/teamonr.tga",
+	"ui/assets/hud/tourn.tga",
+	"ui/assets/hud/weaplit2.tga",
+	"ui/assets/leftbutton.tga",
+	"ui/assets/main_menu/content_background.tga",
+	"ui/assets/main_menu/header.tga",
+	"ui/assets/main_menu/hmg.tga",
+	"ui/assets/main_menu/lg.tga",
+	"ui/assets/main_menu/pg.tga",
+	"ui/assets/main_menu/ql_logo.tga",
+	"ui/assets/main_menu/rg.tga",
+	"ui/assets/main_menu/rl.tga",
+	"ui/assets/main_menu/sg.tga",
+	"ui/assets/medal_accuracy.tga",
+	"ui/assets/medal_assist.tga",
+	"ui/assets/medal_capture.tga",
+	"ui/assets/medal_defend.tga",
+	"ui/assets/medal_excellent.tga",
+	"ui/assets/medal_gauntlet.tga",
+	"ui/assets/medal_impressive.tga",
+	"ui/assets/menu/boxb.tga",
+	"ui/assets/menu/boxbl.tga",
+	"ui/assets/menu/boxbr.tga",
+	"ui/assets/menu/boxt.tga",
+	"ui/assets/menu/boxtl.tga",
+	"ui/assets/menu/boxtr.tga",
+	"ui/assets/menu/centerbg_fade.tga",
+	"ui/assets/menu/fade.tga",
+	"ui/assets/redchip.tga",
+	"ui/assets/rightbutton.tga",
+	"ui/assets/score/adbr.tga",
+	"ui/assets/score/adtl.tga",
+	"ui/assets/score/adtm.tga",
+	"ui/assets/score/adtr.tga",
+	"ui/assets/score/arrow.tga",
+	"ui/assets/score/arrowgray.tga",
+	"ui/assets/score/bg_tabmenu.tga",
+	"ui/assets/score/bgfill.tga",
+	"ui/assets/score/bgfill_blue.tga",
+	"ui/assets/score/bgfill_red.tga",
+	"ui/assets/score/blue_team_player_bar.tga",
+	"ui/assets/score/btn.tga",
+	"ui/assets/score/ca_score_blu.tga",
+	"ui/assets/score/ca_score_red.tga",
+	"ui/assets/score/dom_score_blu.tga",
+	"ui/assets/score/dom_score_red.tga",
+	"ui/assets/score/flagb.tga",
+	"ui/assets/score/flagr.tga",
+	"ui/assets/score/frame_bl.tga",
+	"ui/assets/score/frame_bottom.tga",
+	"ui/assets/score/frame_br.tga",
+	"ui/assets/score/frame_left.tga",
+	"ui/assets/score/frame_mid.tga",
+	"ui/assets/score/frame_right.tga",
+	"ui/assets/score/frameb.tga",
+	"ui/assets/score/framebl.tga",
+	"ui/assets/score/framebr.tga",
+	"ui/assets/score/framel.tga",
+	"ui/assets/score/framem.tga",
+	"ui/assets/score/framer.tga",
+	"ui/assets/score/framet.tga",
+	"ui/assets/score/frametl.tga",
+	"ui/assets/score/frametr.tga",
+	"ui/assets/score/gradientbar2.tga",
+	"ui/assets/score/gtbox.tga",
+	"ui/assets/score/ink_fade_left.tga",
+	"ui/assets/score/ink_fade_right.tga",
+	"ui/assets/score/logo2.tga",
+	"ui/assets/score/medal_assist_sm.tga",
+	"ui/assets/score/medal_capture_sm.tga",
+	"ui/assets/score/medal_defend_sm.tga",
+	"ui/assets/score/navbarl.tga",
+	"ui/assets/score/navbarm.tga",
+	"ui/assets/score/navbarr.tga",
+	"ui/assets/score/navfriends.tga",
+	"ui/assets/score/navleft.tga",
+	"ui/assets/score/navright.tga",
+	"ui/assets/score/not_ready.tga",
+	"ui/assets/score/ping.tga",
+	"ui/assets/score/red_team_player_bar.tga",
+	"ui/assets/score/rr_remaining_enemy.tga",
+	"ui/assets/score/rr_remaining_team.tga",
+	"ui/assets/score/sb_borderangle.tga",
+	"ui/assets/score/sb_borderend.tga",
+	"ui/assets/score/sb_borderline.tga",
+	"ui/assets/score/sb_borderstart.tga",
+	"ui/assets/score/scoreb.tga",
+	"ui/assets/score/scorebl.tga",
+	"ui/assets/score/scorebox.tga",
+	"ui/assets/score/scorebox_blue.tga",
+	"ui/assets/score/scorebox_follow.tga",
+	"ui/assets/score/scorebox_red.tga",
+	"ui/assets/score/scorebox_spec.tga",
+	"ui/assets/score/scorebr.tga",
+	"ui/assets/score/scorel.tga",
+	"ui/assets/score/scorem.tga",
+	"ui/assets/score/scorer.tga",
+	"ui/assets/score/scoretl.tga",
+	"ui/assets/score/scoretl2.tga",
+	"ui/assets/score/scoretl2_blue.tga",
+	"ui/assets/score/scoretl2_red.tga",
+	"ui/assets/score/scoretl3.tga",
+	"ui/assets/score/scoretl_blue.tga",
+	"ui/assets/score/scoretl_red.tga",
+	"ui/assets/score/scoretm.tga",
+	"ui/assets/score/scoretm3.tga",
+	"ui/assets/score/scoretr.tga",
+	"ui/assets/score/scoretr3.tga",
+	"ui/assets/score/specl.tga",
+	"ui/assets/score/specm.tga",
+	"ui/assets/score/specr.tga",
+	"ui/assets/score/statsfilll.tga",
+	"ui/assets/score/statsfillm.tga",
+	"ui/assets/score/statsfillr.tga",
+	"ui/assets/score/statsl.tga",
+	"ui/assets/score/statsm.tga",
+	"ui/assets/score/statsr.tga",
+	"ui/assets/score/votecast_backlit.tga"
+};
+
+static void UI_RegisterQLMenuAssets( void ) {
+	int i;
+	int count = sizeof( uiQLTextureNames ) / sizeof( uiQLTextureNames[0] );
+
+	for ( i = 0; i < count; i++ ) {
+		trap_R_RegisterShaderNoMip( uiQLTextureNames[i] );
+	}
+}
 void AssetCache() {
 	int n;
 	//if (Assets.textFont == NULL) {
@@ -240,6 +410,8 @@ void AssetCache() {
 	for( n = 0; n < NUM_CROSSHAIRS; n++ ) {
 		uiInfo.uiDC.Assets.crosshairShader[n] = trap_R_RegisterShaderNoMip( va("gfx/2d/crosshair%c", 'a' + n ) );
 	}
+
+	UI_RegisterQLMenuAssets();
 
 	uiInfo.newHighScoreSound = trap_S_RegisterSound("sound/feedback/voc_newhighscore.wav", qfalse);
 }
@@ -3309,20 +3481,14 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart;" );
 		} else if (Q_stricmp(name, "closeJoin") == 0) {
 			if (uiInfo.serverStatus.refreshActive) {
-				UI_StopServerRefresh();
-				uiInfo.serverStatus.nextDisplayRefresh = 0;
-				uiInfo.nextServerStatusRefresh = 0;
-				uiInfo.nextFindPlayerRefresh = 0;
+				UI_StopMenuRefresh();
 				UI_BuildServerDisplayList(qtrue);
 			} else {
 				Menus_CloseByName("joinserver");
 				Menus_OpenByName("main");
 			}
 		} else if (Q_stricmp(name, "StopRefresh") == 0) {
-			UI_StopServerRefresh();
-			uiInfo.serverStatus.nextDisplayRefresh = 0;
-			uiInfo.nextServerStatusRefresh = 0;
-			uiInfo.nextFindPlayerRefresh = 0;
+			UI_StopMenuRefresh();
 		} else if (Q_stricmp(name, "UpdateFilter") == 0) {
 			if (ui_netSource.integer == AS_LOCAL) {
 				UI_StartServerRefresh(qtrue);
@@ -3363,10 +3529,7 @@ static void UI_RunMenuScript(char **args) {
 			Menus_CloseAll();
 			Menus_ActivateByName("setup_menu2");
 		} else if (Q_stricmp(name, "Leave") == 0) {
-			trap_Cmd_ExecuteText( EXEC_APPEND, "disconnect\n" );
-			trap_Key_SetCatcher( KEYCATCH_UI );
-			Menus_CloseAll();
-			Menus_ActivateByName("main");
+			UI_LeaveGame();
 		} else if (Q_stricmp(name, "ServerSort") == 0) {
 			int sortColumn;
 			if (Int_Parse(args, &sortColumn)) {
@@ -3382,10 +3545,7 @@ static void UI_RunMenuScript(char **args) {
 		} else if (Q_stricmp(name, "SkirmishStart") == 0) {
 			UI_StartSkirmish(qfalse);
 		} else if (Q_stricmp(name, "closeingame") == 0) {
-			trap_Key_SetCatcher( trap_Key_GetCatcher() & ~KEYCATCH_UI );
-			trap_Key_ClearStates();
-			trap_Cvar_Set( "cl_paused", "0" );
-			Menus_CloseAll();
+			UI_CloseInGameMenu();
 		} else if (Q_stricmp(name, "voteMap") == 0) {
 			if (ui_currentNetMap.integer >=0 && ui_currentNetMap.integer < uiInfo.mapCount) {
 				trap_Cmd_ExecuteText( EXEC_APPEND, va("callvote map %s\n",uiInfo.mapList[ui_currentNetMap.integer].mapLoadName) );
@@ -5860,7 +6020,7 @@ void UI_UpdateCvars( void ) {
 ArenaServers_StopRefresh
 =================
 */
-static void UI_StopServerRefresh( void )
+void UI_StopServerRefresh( void )
 {
 	int count;
 

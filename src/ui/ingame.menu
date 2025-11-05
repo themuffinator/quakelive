@@ -1,0 +1,487 @@
+#include "ui/menudef.h"
+{
+	assetGlobalDef {
+		font 					"fonts/font" 24						// font
+		smallFont 			"fonts/smallfont" 16				// font
+		bigFont 				"fonts/bigfont" 48					// font
+		cursor 				"ui/assets/3_cursor3"				// cursor	
+		gradientBar 		"ui/assets/gradientbar2.tga"	// gradient bar
+		itemFocusSound "sound/misc/menu2.wav"		// sound for item getting focus (via keyboard or mouse )
+		fadeClamp 		1.0										// sets the fadeup alpha
+		fadeCycle 			1											// how often fade happens in milliseconds
+		fadeAmount 		0.1										// amount to adjust alpha per cycle
+		shadowColor 	0.1 0.1 0.1 0.25						// shadow color
+	}
+							   
+
+\\ INGAME MENU \\
+
+	menuDef {
+		name "ingame"
+		visible 0
+		fullScreen 0
+		backcolor 0 1 0 1
+    	rect 40 0 560 480
+    	focusColor 0.964 0.815 0 1
+		disableColor .5 .5 .5 1
+		style WINDOW_STYLE_EMPTY
+
+		onClose {
+			setitemcolor navbtn1t forecolor 0.964 0.815 0 1
+			setitemcolor navbtn2t forecolor 1 1 1 1
+			setitemcolor navbtn3t forecolor 1 1 1 1
+			setitemcolor navbtn4t forecolor 1 1 1 1
+			setitemcolor navbtn5t forecolor 1 1 1 1
+			setitemcolor navbtn6t forecolor 1 1 1 1
+			setitemcolor navbtn7t forecolor 1 1 1 1
+			setitemcolor navbtn1o backcolor 0 0 0 0.9
+			setitemcolor navbtn2o backcolor 1 1 1 0
+			setitemcolor navbtn3o backcolor 1 1 1 0
+			setitemcolor navbtn4o backcolor 1 1 1 0
+			setitemcolor navbtn5o backcolor 1 1 1 0
+			setitemcolor navbtn6o backcolor 1 1 1 0
+			setitemcolor navbtn7o backcolor 1 1 1 0
+			setitemcolor navbtn1u backcolor 0.964 0.815 0 1
+			setitemcolor navbtn2u backcolor 1 1 1 0
+			setitemcolor navbtn3u backcolor 1 1 1 0
+			setitemcolor navbtn4u backcolor 1 1 1 0
+			setitemcolor navbtn5u backcolor 1 1 1 0
+			setitemcolor navbtn6u backcolor 1 1 1 0
+			setitemcolor navbtn7u backcolor 1 1 1 0
+      	}
+	
+		itemDef {
+			name black_background
+			rect -220 0 1080 480
+			style WINDOW_STYLE_FILLED
+			visible 1 
+			decoration 
+			backcolor 0 0 0 0.125
+		}	
+	
+		itemDef {
+			name logo_background
+			rect 0 0 560 64
+			background "ui/assets/main_menu/header.tga"
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 1 1 1 1
+			border 1
+			borderColor 0 0 0 0.5
+		}
+	
+		itemDef {
+			name logo
+			rect -20 0 256 64
+			background "ui/assets/main_menu/ql_logo.tga"
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 1 1 1 1
+		}
+		
+		itemDef {
+			name menu_bar
+			rect 0 63 560 17
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0 0 0 0.75
+			border 1
+			borderColor 0 0 0 0.5
+		}
+	
+		itemDef {
+			name page_background
+			rect 0 82 560 310
+			background "ui/assets/main_menu/content_background.tga"
+			style WINDOW_STYLE_FILLED
+			visible 1 
+			decoration 
+			forecolor 1 1 1 1
+			backcolor 1 1 1 1
+			border 1
+			borderColor 0 0 0 0.5
+		}		
+
+
+		//TOP NAV
+		// current match
+		itemDef {
+			name navbtn1
+			rect 0 64 90 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			action { open ingame_about
+				setitemcolor navbtn1t forecolor 0.964 0.815 0 1
+				setitemcolor navbtn2t forecolor 1 1 1 1
+				setitemcolor navbtn3t forecolor 1 1 1 1
+				setitemcolor navbtn4t forecolor 1 1 1 1
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn6t forecolor 1 1 1 1
+				setitemcolor navbtn7t forecolor 1 1 1 1
+				setitemcolor navbtn1o backcolor 0 0 0 0.9
+				setitemcolor navbtn2o backcolor 1 1 1 0
+				setitemcolor navbtn3o backcolor 1 1 1 0
+				setitemcolor navbtn4o backcolor 1 1 1 0
+				setitemcolor navbtn5o backcolor 1 1 1 0
+				setitemcolor navbtn6o backcolor 1 1 1 0
+				setitemcolor navbtn7o backcolor 1 1 1 0
+				setitemcolor navbtn1u backcolor 0.964 0.815 0 1
+				setitemcolor navbtn2u backcolor 1 1 1 0
+				setitemcolor navbtn3u backcolor 1 1 1 0
+				setitemcolor navbtn4u backcolor 1 1 1 0
+				setitemcolor navbtn5u backcolor 1 1 1 0
+				setitemcolor navbtn6u backcolor 1 1 1 0
+				setitemcolor navbtn7u backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn1o
+			rect 2 64 86 17
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0 0 0 0.9
+		}
+		
+		itemDef {
+			name navbtn1u
+			rect 2 80 86 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0.964 0.815 0 1
+		}
+		
+		itemDef {
+			name navbtn1t
+			rect 45 64 90 16
+			text "Current Match"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalign ITEM_ALIGN_CENTER
+			textaligny 13
+			forecolor 0.964 0.815 0 1
+			visible 1 
+			decoration
+		}
+	
+		// call vote
+		itemDef {
+			name navbtn2
+			rect 90 64 64 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			cvarTest "ui_voteactive"
+			showCvar { "0" }
+			action { open ingame_callvote
+				setitemcolor navbtn1t forecolor 1 1 1 1
+				setitemcolor navbtn2t forecolor 0.964 0.815 0 1
+				setitemcolor navbtn3t forecolor 1 1 1 1
+				setitemcolor navbtn4t forecolor 1 1 1 1
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn6t forecolor 1 1 1 1
+				setitemcolor navbtn7t forecolor 1 1 1 1
+				setitemcolor navbtn1o backcolor 1 1 1 0
+				setitemcolor navbtn2o backcolor 0 0 0 0.9
+				setitemcolor navbtn3o backcolor 1 1 1 0
+				setitemcolor navbtn4o backcolor 1 1 1 0
+				setitemcolor navbtn5o backcolor 1 1 1 0
+				setitemcolor navbtn6o backcolor 1 1 1 0
+				setitemcolor navbtn7o backcolor 1 1 1 0
+				setitemcolor navbtn1u backcolor 1 1 1 0
+				setitemcolor navbtn2u backcolor 0.964 0.815 0 1
+				setitemcolor navbtn3u backcolor 1 1 1 0
+				setitemcolor navbtn4u backcolor 1 1 1 0
+				setitemcolor navbtn5u backcolor 1 1 1 0
+				setitemcolor navbtn6u backcolor 1 1 1 0
+				setitemcolor navbtn7u backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn2o
+			rect 91 64 63 17
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+		}
+		
+		itemDef {
+			name navbtn2u
+			rect 91 80 63 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration
+		}
+		
+		itemDef {
+			name navbtn2t
+			rect 91 64 60 20
+			text "Call Vote"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 32    
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+			cvarTest "ui_voteactive"
+			showCvar { "0" }
+		}
+		
+		// Admin
+		itemDef {
+			name navbtn3
+			rect 158 64 60 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			action { open ingame_admin
+				setitemcolor navbtn1t forecolor 1 1 1 1
+				setitemcolor navbtn2t forecolor 1 1 1 1
+				setitemcolor navbtn3t forecolor 0.964 0.815 0 1
+				setitemcolor navbtn4t forecolor 1 1 1 1
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn6t forecolor 1 1 1 1
+				setitemcolor navbtn7t forecolor 1 1 1 1
+				setitemcolor navbtn1o backcolor 1 1 1 0
+				setitemcolor navbtn2o backcolor 1 1 1 0
+				setitemcolor navbtn3o backcolor 0 0 0 0.9
+				setitemcolor navbtn4o backcolor 1 1 1 0
+				setitemcolor navbtn5o backcolor 1 1 1 0
+				setitemcolor navbtn6o backcolor 1 1 1 0
+				setitemcolor navbtn7o backcolor 1 1 1 0
+				setitemcolor navbtn1u backcolor 1 1 1 0
+				setitemcolor navbtn2u backcolor 1 1 1 0
+				setitemcolor navbtn3u backcolor 0.964 0.815 0 1
+				setitemcolor navbtn4u backcolor 1 1 1 0
+				setitemcolor navbtn5u backcolor 1 1 1 0
+				setitemcolor navbtn6u backcolor 1 1 1 0
+				setitemcolor navbtn7u backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn3o
+			rect 159 64 59 17
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+		}
+		
+		itemDef {
+			name navbtn3u
+			rect 159 80 59 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration
+		}
+		
+		itemDef {
+			name navbtn3t
+			rect 159 64 80 20
+			text "Admin"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 29   
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+		}
+		
+		// Add Bot
+		itemDef {
+			name navbtn4
+			rect 225 64 60 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			cvarTest "ui_singleplayeractive"
+			showCvar { "1" }
+			action { open ingame_addbot
+				setitemcolor navbtn1t forecolor 1 1 1 1
+				setitemcolor navbtn2t forecolor 1 1 1 1
+				setitemcolor navbtn3t forecolor 1 1 1 1
+				setitemcolor navbtn4t forecolor 0.964 0.815 0 1
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn6t forecolor 1 1 1 1
+				setitemcolor navbtn7t forecolor 1 1 1 1
+				setitemcolor navbtn1o backcolor 1 1 1 0
+				setitemcolor navbtn2o backcolor 1 1 1 0
+				setitemcolor navbtn3o backcolor 1 1 1 0
+				setitemcolor navbtn4o backcolor 0 0 0 0.9
+				setitemcolor navbtn5o backcolor 1 1 1 0
+				setitemcolor navbtn6o backcolor 1 1 1 0
+				setitemcolor navbtn7o backcolor 1 1 1 0
+				setitemcolor navbtn1u backcolor 1 1 1 0
+				setitemcolor navbtn2u backcolor 1 1 1 0
+				setitemcolor navbtn3u backcolor 1 1 1 0
+				setitemcolor navbtn4u backcolor 0.964 0.815 0 1
+				setitemcolor navbtn5u backcolor 1 1 1 0
+				setitemcolor navbtn6u backcolor 1 1 1 0
+				setitemcolor navbtn7u backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn4o
+			rect 226 64 59 17
+			cvarTest "ui_singleplayeractive"
+			showCvar { "1" }
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+		}
+		
+		itemDef {
+			name navbtn4u
+			rect 226 80 59 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration
+		}
+		
+		itemDef {
+			name navbtn4t
+			rect 226 64 80 20
+			text "Add Bot"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 30   
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+			cvarTest "ui_singleplayeractive"
+			hideCvar { "0" }
+		}
+		
+		// main menu
+		itemDef {
+			name navbtn5
+			rect 354 64 64 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			action { exec "web_changeHash /" ; open ingame_about ;
+				setitemcolor navbtn1t forecolor 0.964 0.815 0 1
+				setitemcolor navbtn2t forecolor 1 1 1 1
+				setitemcolor navbtn3t forecolor 1 1 1 1
+				setitemcolor navbtn4t forecolor 1 1 1 1
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn6t forecolor 1 1 1 1
+				setitemcolor navbtn7t forecolor 1 1 1 1
+				setitemcolor navbtn1o backcolor 0 0 0 0.9
+				setitemcolor navbtn2o backcolor 1 1 1 0
+				setitemcolor navbtn3o backcolor 1 1 1 0
+				setitemcolor navbtn4o backcolor 1 1 1 0
+				setitemcolor navbtn5o backcolor 1 1 1 0
+				setitemcolor navbtn6o backcolor 1 1 1 0
+				setitemcolor navbtn7o backcolor 1 1 1 0
+				setitemcolor navbtn1u backcolor 0.964 0.815 0 1
+				setitemcolor navbtn2u backcolor 1 1 1 0
+				setitemcolor navbtn3u backcolor 1 1 1 0
+				setitemcolor navbtn4u backcolor 1 1 1 0
+				setitemcolor navbtn5u backcolor 1 1 1 0
+				setitemcolor navbtn6u backcolor 1 1 1 0
+				setitemcolor navbtn7u backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn5t
+			rect 355 64 64 20
+			text "Main Menu"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 32    
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+		}
+		
+		// settings
+		itemDef {
+			name navbtn6
+			rect 419 64 64 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			action { exec "web_changeHash /settings" ; open ingame_about ;
+				setitemcolor navbtn1t forecolor 0.964 0.815 0 1
+				setitemcolor navbtn2t forecolor 1 1 1 1
+				setitemcolor navbtn3t forecolor 1 1 1 1
+				setitemcolor navbtn4t forecolor 1 1 1 1
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn6t forecolor 1 1 1 1
+				setitemcolor navbtn7t forecolor 1 1 1 1
+				setitemcolor navbtn1o backcolor 0 0 0 0.9
+				setitemcolor navbtn2o backcolor 1 1 1 0
+				setitemcolor navbtn3o backcolor 1 1 1 0
+				setitemcolor navbtn4o backcolor 1 1 1 0
+				setitemcolor navbtn5o backcolor 1 1 1 0
+				setitemcolor navbtn6o backcolor 1 1 1 0
+				setitemcolor navbtn7o backcolor 1 1 1 0
+				setitemcolor navbtn1u backcolor 0.964 0.815 0 1
+				setitemcolor navbtn2u backcolor 1 1 1 0
+				setitemcolor navbtn3u backcolor 1 1 1 0
+				setitemcolor navbtn4u backcolor 1 1 1 0
+				setitemcolor navbtn5u backcolor 1 1 1 0
+				setitemcolor navbtn6u backcolor 1 1 1 0
+				setitemcolor navbtn7u backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn6t
+			rect 420 64 64 20
+			text "Settings"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 32    
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+		}
+        
+		// leave match
+		itemDef {
+			name navbtn7
+			rect 487 64 72 16
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			// joingame_menu menu uses "disconnect", ingame menu users "uiScript leave"
+        	action { uiScript leave } 
+		}
+		
+		itemDef {
+			name navbtn7t
+			rect 488 64 64 20
+			text "Leave Match"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 32    
+			textaligny 13
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+		}
+	}
+}
+}
