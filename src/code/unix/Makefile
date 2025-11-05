@@ -386,6 +386,7 @@ Q3OBJ = \
         $(B)/client/cl_scrn.o \
         $(B)/client/cl_ui.o \
         $(B)/client/ql_auth.o \
+        $(B)/client/platform_services.o \
         \
         $(B)/client/cm_load.o \
 	$(B)/client/cm_patch.o \
@@ -623,6 +624,7 @@ $(B)/client/cl_parse.o : $(CDIR)/cl_parse.c; $(DO_CC)
 $(B)/client/cl_scrn.o : $(CDIR)/cl_scrn.c; $(DO_CC)    
 $(B)/client/cl_ui.o : $(CDIR)/cl_ui.c; $(DO_CC)
 $(B)/client/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC)
+$(B)/client/platform_services.o : $(MOUNT_DIR)/common/platform/platform_services.c; $(DO_CC)
 $(B)/client/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC)   
 $(B)/client/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC)       
 $(B)/client/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC)        
@@ -1489,6 +1491,7 @@ Q3SOBJ = \
         $(B)/q3static/cl_scrn.o \
         $(B)/q3static/cl_ui.o \
         $(B)/q3static/ql_auth.o \
+        $(B)/q3static/platform_services.o \
         \
         $(B)/q3static/cm_load.o \
 	$(B)/q3static/cm_patch.o \
@@ -1659,6 +1662,7 @@ $(B)/q3static/cl_parse.o : $(CDIR)/cl_parse.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_scrn.o : $(CDIR)/cl_scrn.c; $(DO_CC) -DQ3_STATIC    
 $(B)/q3static/cl_ui.o : $(CDIR)/cl_ui.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/platform_services.o : $(MOUNT_DIR)/common/platform/platform_services.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC) -DQ3_STATIC   
 $(B)/q3static/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC) -DQ3_STATIC       
 $(B)/q3static/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC) -DQ3_STATIC        

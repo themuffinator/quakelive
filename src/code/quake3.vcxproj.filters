@@ -45,6 +45,9 @@
     <ClCompile Include="client\cl_ui.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="client\ql_auth.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="qcommon\cm_load.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -61,6 +64,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="qcommon\cmd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\platform\platform_services.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="qcommon\common.c">
