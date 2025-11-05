@@ -92,6 +92,27 @@ extern weaponConfig_t g_weaponConfig;
 void G_InitWeaponConfig( void );
 void G_UpdateWeaponConfig( void );
 
+typedef struct startingAmmoConfig_s {
+	int		bfg;
+	int		chaingun;
+	int		gauntlet;
+	int		grapplingHook;
+	int		grenadeLauncher;
+	int		heavyMachinegun;
+	int		lightningGun;
+	int		machinegun;
+	int		nailgun;
+	int		plasmagun;
+	int		proximityLauncher;
+	int		railgun;
+	int		rocketLauncher;
+	int		shotgun;
+} startingAmmoConfig_t;
+
+extern startingAmmoConfig_t g_startingAmmoConfig;
+void G_InitStartingAmmoConfig( void );
+void G_UpdateStartingAmmoConfig( void );
+
 struct gentity_s {
 	entityState_t	s;				// communicated by server to clients
 	entityShared_t	r;				// shared by both the server system and game

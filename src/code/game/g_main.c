@@ -301,6 +301,35 @@ void G_UpdateWeaponConfig( void ) {
 	G_InitWeaponConfig();
 }
 
+static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback ) {
+	if ( !cvar ) {
+		return fallback;
+	}
+
+	return cvar->integer;
+}
+
+void G_InitStartingAmmoConfig( void ) {
+	g_startingAmmoConfig.bfg = G_ReadStartingAmmoCvar( &g_startingAmmo_bfg, 10 );
+	g_startingAmmoConfig.chaingun = G_ReadStartingAmmoCvar( &g_startingAmmo_cg, 100 );
+	g_startingAmmoConfig.gauntlet = G_ReadStartingAmmoCvar( &g_startingAmmo_g, -1 );
+	g_startingAmmoConfig.grapplingHook = G_ReadStartingAmmoCvar( &g_startingAmmo_gh, -1 );
+	g_startingAmmoConfig.grenadeLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_gl, 10 );
+	g_startingAmmoConfig.heavyMachinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_hmg, 50 );
+	g_startingAmmoConfig.lightningGun = G_ReadStartingAmmoCvar( &g_startingAmmo_lg, 100 );
+	g_startingAmmoConfig.machinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_mg, 100 );
+	g_startingAmmoConfig.nailgun = G_ReadStartingAmmoCvar( &g_startingAmmo_ng, 10 );
+	g_startingAmmoConfig.plasmagun = G_ReadStartingAmmoCvar( &g_startingAmmo_pg, 50 );
+	g_startingAmmoConfig.proximityLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_pl, 5 );
+	g_startingAmmoConfig.railgun = G_ReadStartingAmmoCvar( &g_startingAmmo_rg, 5 );
+	g_startingAmmoConfig.rocketLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_rl, 5 );
+	g_startingAmmoConfig.shotgun = G_ReadStartingAmmoCvar( &g_startingAmmo_sg, 10 );
+}
+
+void G_UpdateStartingAmmoConfig( void ) {
+	G_InitStartingAmmoConfig();
+}
+
 
 void G_InitGame( int levelTime, int randomSeed, int restart );
 void G_RunFrame( int levelTime );
@@ -482,6 +511,7 @@ void G_RegisterCvars( void ) {
 
 	level.warmupModificationCount = g_warmup.modificationCount;
 	G_InitWeaponConfig();
+	G_InitStartingAmmoConfig();
 }
 
 void G_UpdateCvars( void ) {
@@ -513,6 +543,7 @@ void G_UpdateCvars( void ) {
 	}
 
 	G_UpdateWeaponConfig();
+	G_UpdateStartingAmmoConfig();
 }
 
 /*

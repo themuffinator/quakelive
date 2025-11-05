@@ -893,6 +893,13 @@ Reads in all archived cvars
 ============
 */
 void Cvar_Init (void) {
+	Com_Memset( cvar_indexes, 0, sizeof( cvar_indexes ) );
+	Com_Memset( hashTable, 0, sizeof( hashTable ) );
+	cvar_numIndexes = 0;
+	cvar_vars = NULL;
+	cvar_cheats = NULL;
+	cvar_modifiedFlags = 0;
+
 	cvar_cheats = Cvar_Get("sv_cheats", "1", CVAR_ROM | CVAR_SYSTEMINFO );
 
 	Cmd_AddCommand ("toggle", Cvar_Toggle_f);
