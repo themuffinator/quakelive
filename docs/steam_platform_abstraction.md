@@ -39,13 +39,13 @@ Two opt-in compile definitions govern which provider set is compiled:
 
 ## Mocked End-to-End Flow
 
-`QL_Platform_RunMockAuthFlow` (implemented in `platform_services.c`) exercises the new abstraction. It selects the compiled backend, transforms the credential into either a Steam-style ticket (`steamworks_ticket:{...}`) or an open JSON payload, and annotates the response with the provider that accepted it.【F:src/common/platform/platform_services.c†L36-L142】 `QL_RequestExternalAuth` now delegates to this helper, providing a deterministic round-trip for unit and integration tests even without the proprietary SDK.【F:src/common/auth_credentials.c†L103-L147】
+`QL_Auth_ExecuteRequest` (implemented in `src/code/client/ql_auth.c`) now owns the end-to-end flow. Steam tickets and standalone launcher tokens travel through dedicated handlers that emit lifecycle logs and classify the result as success, retry, or failure.【F:src/code/client/ql_auth.c†L33-L147】 `QL_RequestExternalAuth` clears the response, invokes the dispatcher, and reports structured outcomes back to the caller, replacing the earlier mock helper entirely.【F:src/common/auth_credentials.c†L119-L151】
 
 ## QA Matrix
 
 Quality assurance must validate three build flavours:
 
-1. **Steamworks-enabled** (`QL_BUILD_STEAMWORKS=1`, `QL_BUILD_OPEN_STEAM=0`): confirm Steam APIs initialise, callbacks fire, and mock tickets flow through `QL_Platform_RunMockAuthFlow`. Validate matchmaking delegates to Steam-only descriptors.
+1. **Steamworks-enabled** (`QL_BUILD_STEAMWORKS=1`, `QL_BUILD_OPEN_STEAM=0`): confirm Steam APIs initialise, callbacks fire, and tickets trigger the Steam handler inside `QL_Auth_ExecuteRequest`. Validate matchmaking delegates to Steam-only descriptors.
 2. **Open-source-only** (`QL_BUILD_STEAMWORKS=0`, `QL_BUILD_OPEN_STEAM=1`): ensure REST payloads follow the documented schemas, open adapters advertise support for all five features, and overlay commands surface through the JSON RPC bridge.
 3. **Hybrid** (`QL_BUILD_STEAMWORKS=1`, `QL_BUILD_OPEN_STEAM=1`): simulate Steam downtime by forcing `QL_Steamworks_AuthFlow` to reject a ticket and observe the fallback to the open adapter. Cross-check that the service table advertises combined providers (e.g., matchmaking lists “Hybrid: Steamworks + GameNetworkingSockets”).【F:src/common/platform/platform_services.c†L165-L205】
 

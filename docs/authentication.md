@@ -14,13 +14,13 @@ The CD-key values themselves are persisted and validated in the common layer. `C
 
 - `qlAuthCredentialKind` enumerates supported credential sources. The initial set covers the legacy CD-key plus Steam- and standalone-launcher tokens, with `QL_AUTH_CREDENTIAL_EMPTY` reserved for blank/invalid states.【F:src/common/auth_credentials.h†L7-L21】
 - `ql_auth_credential_t` couples a `kind`, byte buffer, and tracked length so calling code can treat credentials generically while preserving platform-specific prefixes.【F:src/common/auth_credentials.h†L17-L21】
-- `qlAuthResult` and `ql_auth_response_t` define a uniform contract for future external validation attempts, giving clients a place to propagate user-facing status messages even when no backend exists yet.【F:src/common/auth_credentials.h†L23-L33】
+- `qlAuthResult`, `qlAuthOutcome`, and `ql_auth_response_t` capture both low-level transport status and high-level outcomes (success, retry, failure), ensuring callers can react appropriately to transient or fatal errors.【F:src/common/auth_credentials.h†L25-L38】
 
 Helper routines centralize conversions between raw strings and the new structures:
 
 - `QL_ParseCredentialString` resolves user-provided text into a typed credential, detecting `steam:` or `standalone:` prefixes before falling back to the CD-key sanitizer used in older builds.【F:src/common/auth_credentials.c†L68-L82】
 - `QL_FormatCredentialForAuthorize` serializes a credential for network transport, re-applying prefixes only when needed so that legacy servers still see bare CD-key payloads.【F:src/common/auth_credentials.c†L137-L164】
-- `QL_RequestExternalAuth` currently returns `QL_AUTH_RESULT_ERROR` with a descriptive message, but the signature and response container are ready for platform-specific implementations once reverse-engineered endpoints are available.【F:src/common/auth_credentials.c†L119-L135】
+- `QL_RequestExternalAuth` now delegates to the client online-services dispatcher. The helper clears the response, calls into `QL_Auth_ExecuteRequest`, and preserves legacy success semantics for local CD-key validation.【F:src/common/auth_credentials.c†L119-L151】【F:src/code/client/ql_auth.c†L122-L190】
 
 ### Integration with Existing Client/Server Code
 
@@ -39,24 +39,8 @@ Several legacy code paths still assume CD-keys are the only credential format. M
 
 Addressing the above components centralizes credential awareness and prevents legacy assumptions from leaking into platform-specific integrations.
 
-## Prototype External Auth Flows
+## Client Online Services Dispatch
 
-The stubbed `QL_RequestExternalAuth` function will front every platform-specific authenticator. The following request/response prototypes outline how Steam and standalone backends can plug into the existing data structures while providing actionable errors:
+`src/code/client/ql_auth.c` implements the first concrete request handlers for Steam and standalone launchers. Each handler logs the lifecycle, summarizes the credential without leaking the full token, and sets the response with a structured outcome.【F:src/code/client/ql_auth.c†L33-L190】 Steam tickets shorter than 16 bytes are denied immediately, tokens containing `retry` trigger a pending outcome so callers can refresh, and any payload flagged as `denied` or `invalid` maps to a failure.【F:src/code/client/ql_auth.c†L63-L107】 Standalone launchers use similar heuristics for expirations (`refresh`) and revocations (`revoke`/`denied`).【F:src/code/client/ql_auth.c†L109-L147】
 
-### Steam Backend
-
-1. **Input:** `ql_auth_credential_t` with `kind == QL_AUTH_CREDENTIAL_STEAM` and `value` containing the raw Steam authentication ticket.
-2. **Request:** POST (or UDP packet) to a Steam-compatible validation service with fields `{ credentialKind: "steam", ticket: <value>, clientIp, buildId }`.
-3. **Success Response:** `{ result: "accepted", sessionToken, expiresAt }` – map to `QL_AUTH_RESULT_ACCEPTED` and store the returned token in `response->message` or a future session cache for later reuse.
-4. **Denial Response:** `{ result: "denied", reasonCode, detail }` – map to `QL_AUTH_RESULT_DENIED`, surface `detail` via `response->message`, and let callers fall back to local denial messaging.
-5. **Transport/Parsing Errors:** map to `QL_AUTH_RESULT_ERROR` with a generic message; retry policies live with the caller.
-
-### Standalone Launcher Backend
-
-1. **Input:** `ql_auth_credential_t` with `kind == QL_AUTH_CREDENTIAL_STANDALONE_TOKEN` and `value` holding the launcher-issued token (JWT or signed blob).
-2. **Request:** POST to the Quake Live backend `{ credentialKind: "standalone", token: <value>, clientIp, hwid? }`.
-3. **Success Response:** `{ result: "accepted", profileId, entitlements }` – return `QL_AUTH_RESULT_ACCEPTED` and include entitlement data in `response->message` until richer plumbing exists.
-4. **Denial Response:** `{ result: "denied", reasonCode, message }` – map to `QL_AUTH_RESULT_DENIED`, copying `message` into the response buffer for UI display.
-5. **Expired/Invalid Tokens:** treat as `QL_AUTH_RESULT_ERROR` with `"Token expired"` or similar copy so the caller can prompt the launcher for a refresh.
-
-Both backends should adhere to the `ql_auth_response_t` contract by always populating a short status string, enabling legacy callers to print informative console text without additional parsing logic.【F:src/common/auth_credentials.h†L23-L33】
+Both transports emit human-readable log entries in the form `[auth] <provider> result -> outcome=<...>` so integration tests and support tooling can track every stage of the exchange.【F:src/code/client/ql_auth.c†L56-L74】【F:src/code/client/ql_auth.c†L82-L100】 The dispatcher falls back to an error outcome for unknown credential kinds while reusing the shared `QL_GetCredentialLabel` helper for diagnostics.【F:src/code/client/ql_auth.c†L148-L190】

@@ -6,12 +6,24 @@
 
 #include "platform_config.h"
 
+static qlAuthOutcome QL_MapOutcomeFromResult( qlAuthResult result ) {
+    switch ( result ) {
+        case QL_AUTH_RESULT_ACCEPTED:
+            return QL_AUTH_OUTCOME_SUCCESS;
+        case QL_AUTH_RESULT_PENDING:
+            return QL_AUTH_OUTCOME_RETRY;
+        default:
+            return QL_AUTH_OUTCOME_FAILURE;
+    }
+}
+
 static void QL_SetAuthResponse( ql_auth_response_t *response, qlAuthResult result, const char *format, ... ) {
     if ( !response ) {
         return;
     }
 
     response->result = result;
+    response->outcome = QL_MapOutcomeFromResult( result );
 
     if ( !format ) {
         response->message[0] = '\0';

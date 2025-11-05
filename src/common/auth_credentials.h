@@ -28,8 +28,15 @@ typedef enum {
     QL_AUTH_RESULT_ERROR
 } qlAuthResult;
 
+typedef enum {
+    QL_AUTH_OUTCOME_SUCCESS = 0,
+    QL_AUTH_OUTCOME_RETRY,
+    QL_AUTH_OUTCOME_FAILURE
+} qlAuthOutcome;
+
 typedef struct {
     qlAuthResult result;
+    qlAuthOutcome outcome;
     char message[QL_AUTH_MAX_RESPONSE_MESSAGE];
 } ql_auth_response_t;
 
