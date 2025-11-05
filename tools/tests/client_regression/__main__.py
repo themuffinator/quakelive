@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -31,14 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.limit is not None:
         snapshots = snapshots[: args.limit]
 
-    for frame in harness.replay(snapshots):
-        payload = {
-            "sequence": frame.sequence,
-            "serverTime": frame.server_time,
-            "hash": frame.hud_hash,
-            "hud": frame.hud.to_dict(),
-        }
-        sys.stdout.write(f"{payload}\n")
+    for payload in harness.replay_to_payloads(snapshots):
+        sys.stdout.write(f"{json.dumps(payload, sort_keys=True)}\n")
 
     return 0
 

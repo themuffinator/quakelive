@@ -108,6 +108,16 @@ class ClientRegressionHarness:
         self.predictor = predictor
         self.hasher = hasher or HUDHasher()
 
+    def frame_to_payload(self, frame: PlaybackFrame) -> Dict[str, Any]:
+        """Convert a :class:`PlaybackFrame` into a serialisable payload."""
+
+        return {
+            "sequence": frame.sequence,
+            "serverTime": frame.server_time,
+            "hash": frame.hud_hash,
+            "hud": frame.hud.to_dict(),
+        }
+
     @staticmethod
     def load_snapshots(path: Path) -> List[Snapshot]:
         """Load snapshots from *path*.
@@ -143,6 +153,11 @@ class ClientRegressionHarness:
                 hud=hud_state,
                 hud_hash=hud_hash,
             )
+
+    def replay_to_payloads(self, snapshots: Iterable[Snapshot]) -> List[Dict[str, Any]]:
+        """Replay *snapshots* and return a list of canonical payload dictionaries."""
+
+        return [self.frame_to_payload(frame) for frame in self.replay(snapshots)]
 
 
 # Import at the end to avoid circular dependencies at type-check time.

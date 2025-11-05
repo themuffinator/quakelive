@@ -42,12 +42,12 @@ Python. The command below replays the bundled sample capture:
 python -m tools.tests.client_regression tools/tests/client_regression/sample_snapshots.json
 ```
 
-The tool prints a dictionary per snapshot containing the original sequence
+The tool prints one JSON document per line containing the original sequence
 number, server time, deterministic HUD payload, and its SHA-256 hash. For
 example, the sample capture yields:
 
-```
-{'sequence': 1, 'serverTime': 1000, 'hash': 'db0c582635b0d000b8d8cc623979b0f556776ff168c4baf9717f6f2802632a11', 'hud': {...}}
+```json
+{"hash": "db0c582635b0d000b8d8cc623979b0f556776ff168c4baf9717f6f2802632a11", "hud": {"ammo": {"rocket_launcher": 10}, "armor": 50, "health": 125, "position": [0.0, 0.0, 0.0], "weapon": "rocket_launcher"}, "sequence": 1, "serverTime": 1000}
 ```
 
 Use the `--limit` flag to restrict playback to the first *N* snapshots. This is
@@ -60,4 +60,6 @@ Re-running the harness against the same snapshot archive is expected to produce
 the exact same hash series. When a change in the client prediction or HUD code
 causes an unexpected difference, a simple diff against the previous hash log will
 highlight the offending snapshot. Inspect the expanded `hud` payload in the CLI
-output to understand which field changed and why.
+output to understand which field changed and why. The JSON lines are already in a
+canonical ordering, making them suitable for direct comparison with previously
+recorded baselines via tools like `diff`.
