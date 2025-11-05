@@ -19,7 +19,24 @@ falls back to the historical "bare string" interpretation if no explicit kind
 is present. This makes the migration transparent: existing installations that
 only contain the legacy 16-byte blob are automatically ingested, formatted with
 an explicit `legacy_cdkey` label on the next save, and continue to work without
-user interaction.
+user interaction. Credentials that contain embedded line breaks are rejected
+so the serialized `<kind> <value>` tuple cannot be corrupted by injected
+comments.
+
+## Storage locations
+
+Each writable game directory maintains its own `q3key`:
+
+* `baseq3/q3key` contains the primary credential and mirrors the value in
+  `cl_cdkey`.
+* `fs_game/q3key` (when present) stores a mod-specific override sourced from
+  `cl_cdkey_mod`. Mods that do not request a unique key simply reuse the base
+  file during save operations.
+
+Both files are rewritten using the `<kind> <value>` layout whenever the client
+updates a credential. Launching a build with these helpers automatically
+migrates older plaintext CD-key blobs because reading still accepts the historic
+format and writing always emits the new typed representation.
 
 Two buffers are maintained internally:
 
