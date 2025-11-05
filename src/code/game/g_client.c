@@ -22,10 +22,100 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 #include "g_local.h"
 
+#include "../../common/auth_credentials.h"
+#include "../../common/platform/platform_config.h"
+
 // g_client.c -- client functions that don't happen every frame
 
 static vec3_t	playerMins = {-15, -15, -24};
 static vec3_t	playerMaxs = {15, 15, 32};
+
+#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
+static char g_clientAuthDenyMessage[QL_AUTH_MAX_RESPONSE_MESSAGE + 64];
+
+static void G_BuildSteamAuthToken( const char *userinfo, char *buffer, size_t bufferSize ) {
+	const char *auth;
+	const char *authPart1;
+	const char *authPart2;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+
+	if ( !userinfo ) {
+		return;
+	}
+
+	auth = Info_ValueForKey( userinfo, "auth" );
+	authPart1 = Info_ValueForKey( userinfo, "author" );
+	authPart2 = Info_ValueForKey( userinfo, "author2" );
+
+	if ( auth && auth[0] ) {
+		Q_strncpyz( buffer, auth, bufferSize );
+		return;
+	}
+
+	if ( authPart1 && authPart1[0] ) {
+		Q_strncpyz( buffer, authPart1, bufferSize );
+	}
+
+	if ( authPart2 && authPart2[0] ) {
+		Q_strcat( buffer, bufferSize, authPart2 );
+	}
+}
+
+static char *G_RunPlatformAuthChecks( int clientNum, const char *userinfo, qboolean firstTime, qboolean isBot, gclient_t *client ) {
+	ql_auth_credential_t credential;
+	ql_auth_response_t response;
+	char token[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+
+	if ( !firstTime || isBot || !userinfo || !client ) {
+		return NULL;
+	}
+
+	G_BuildSteamAuthToken( userinfo, token, sizeof( token ) );
+
+	if ( !token[0] ) {
+		return NULL;
+	}
+
+	QL_InitAuthCredential( &credential );
+
+	if ( !QL_ParsePlatformToken( token, QL_AUTH_CREDENTIAL_STEAM, &credential ) ) {
+		Q_strncpyz( g_clientAuthDenyMessage, "Failed to verify Steam auth token", sizeof( g_clientAuthDenyMessage ) );
+		return g_clientAuthDenyMessage;
+	}
+
+	if ( !QL_RequestExternalAuth( &credential, &response ) ) {
+		const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
+		Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
+		return g_clientAuthDenyMessage;
+	}
+
+	if ( response.result != QL_AUTH_RESULT_ACCEPTED ) {
+		const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
+		Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
+		return g_clientAuthDenyMessage;
+	}
+
+	if ( response.message[0] ) {
+		G_LogPrintf( "SteamAuthAccepted: %i %s\n", clientNum, response.message );
+	}
+
+	return NULL;
+}
+#else
+static char *G_RunPlatformAuthChecks( int clientNum, const char *userinfo, qboolean firstTime, qboolean isBot, gclient_t *client ) {
+	(void)clientNum;
+	(void)userinfo;
+	(void)firstTime;
+	(void)isBot;
+	(void)client;
+	return NULL;
+}
+#endif
 
 /*QUAKED info_player_deathmatch (1 0 1) (-16 -16 -24) (16 16 32) initial
 potential spawning position for deathmatch games.
@@ -948,6 +1038,14 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	}
 	G_ReadSessionData( client );
 
+	{
+		char *authFailure = G_RunPlatformAuthChecks( clientNum, userinfo, firstTime, isBot, client );
+
+		if ( authFailure ) {
+			return authFailure;
+		}
+	}
+
 	if( isBot ) {
 		ent->r.svFlags |= SVF_BOT;
 		ent->inuse = qtrue;
@@ -972,11 +1070,10 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 	if ( !isBot ) {
 		const char *steamId = Info_ValueForKey( userinfo, "steamid" );
+
 		if ( steamId && steamId[0] ) {
 			trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
 		}
-		// TODO: Validate external authentication tokens. The Quake Live binary calls into
-		// sub_1003aec9 to reject invalid Steam tickets.
 	}
 
 	if ( g_gametype.integer >= GT_TEAM &&

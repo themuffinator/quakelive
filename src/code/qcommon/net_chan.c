@@ -446,14 +446,14 @@ qboolean Netchan_Process( netchan_t *chan, msg_t *msg ) {
 		// TTimo
 		// clients were not acking fragmented messages
 		chan->incomingSequence = sequence;
-		
-		return qtrue;
-	}
 
-	//
-	// the message can now be read from the current message pointer
-	//
-	chan->incomingSequence = sequence;
+                return qtrue;
+}
+
+        //
+        // the message can now be read from the current message pointer
+        //
+        chan->incomingSequence = sequence;
 
 	return qtrue;
 }
@@ -740,3 +740,24 @@ qboolean	NET_StringToAdr( const char *s, netadr_t *a ) {
 	return qtrue;
 }
 
+
+void NET_LogAuthTelemetry( netsrc_t source, const netadr_t *adr, const char *steamId, const char *credentialLabel, const char *status ) {
+	const char *direction;
+	const char *address;
+	const char *id;
+	const char *label;
+	const char *state;
+
+	if ( source < NS_CLIENT || source > NS_SERVER ) {
+		direction = "unknown";
+	} else {
+		direction = netsrcString[source];
+	}
+
+	address = ( adr && adr->type != NA_BAD ) ? NET_AdrToString( *adr ) : "<invalid>";
+	id = ( steamId && steamId[0] ) ? steamId : "<missing>";
+	label = ( credentialLabel && credentialLabel[0] ) ? credentialLabel : "<unlabelled>";
+	state = ( status && status[0] ) ? status : "pending";
+
+	Com_Printf( "NET: %s auth %s credential=%s steamid=%s status=%s\n", direction, address, label, id, state );
+}

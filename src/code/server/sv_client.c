@@ -25,6 +25,112 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static void SV_CloseDownload( client_t *cl );
 
+#if SV_HAS_PLATFORM_AUTH
+static void SV_ClearPlatformAuthState( client_t *cl ) {
+        if ( !cl ) {
+                return;
+        }
+
+        cl->platformAuthPending = qfalse;
+        cl->platformAuthSucceeded = qfalse;
+        cl->platformAuthLabel[0] = '\0';
+        cl->platformAuthToken[0] = '\0';
+        cl->platformAuthMessage[0] = '\0';
+        cl->platformSteamId[0] = '\0';
+}
+
+static void SV_CapturePlatformAuthFromUserinfo( client_t *cl, const char *userinfo ) {
+        const char *steamId;
+        const char *auth;
+        const char *authPart1;
+        const char *authPart2;
+        char combined[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+
+        if ( !cl || !userinfo ) {
+                return;
+        }
+
+        SV_ClearPlatformAuthState( cl );
+
+        steamId = Info_ValueForKey( userinfo, "steamid" );
+        auth = Info_ValueForKey( userinfo, "auth" );
+        authPart1 = Info_ValueForKey( userinfo, "author" );
+        authPart2 = Info_ValueForKey( userinfo, "author2" );
+
+        combined[0] = '\0';
+
+        if ( auth && auth[0] ) {
+                Q_strncpyz( combined, auth, sizeof( combined ) );
+        } else {
+                if ( authPart1 && authPart1[0] ) {
+                        Q_strncpyz( combined, authPart1, sizeof( combined ) );
+                }
+
+                if ( authPart2 && authPart2[0] ) {
+                        Q_strcat( combined, sizeof( combined ), authPart2 );
+                }
+        }
+
+        if ( steamId && steamId[0] ) {
+                Q_strncpyz( cl->platformSteamId, steamId, sizeof( cl->platformSteamId ) );
+        }
+
+        if ( combined[0] ) {
+                Q_strncpyz( cl->platformAuthToken, combined, sizeof( cl->platformAuthToken ) );
+                Q_strncpyz( cl->platformAuthLabel, "steam", sizeof( cl->platformAuthLabel ) );
+                cl->platformAuthPending = qtrue;
+        }
+}
+
+static void SV_FinalisePlatformAuthState( client_t *cl, qboolean accepted, const char *detail ) {
+        if ( !cl ) {
+                return;
+        }
+
+        cl->platformAuthPending = qfalse;
+        cl->platformAuthSucceeded = accepted;
+
+        if ( detail && detail[0] ) {
+                Q_strncpyz( cl->platformAuthMessage, detail, sizeof( cl->platformAuthMessage ) );
+        } else {
+                cl->platformAuthMessage[0] = '\0';
+        }
+}
+
+static void SV_LogPlatformAuth( const netadr_t *adr, const client_t *cl, const char *status, const char *detail ) {
+        char summary[QL_AUTH_MAX_RESPONSE_MESSAGE + 32];
+        const char *label;
+        const char *steamId;
+
+        if ( !cl ) {
+                return;
+        }
+
+        summary[0] = '\0';
+
+        if ( status && status[0] ) {
+                Q_strncpyz( summary, status, sizeof( summary ) );
+        }
+
+        if ( detail && detail[0] ) {
+                if ( summary[0] ) {
+                        Q_strcat( summary, sizeof( summary ), ": " );
+                }
+
+                Q_strcat( summary, sizeof( summary ), detail );
+        }
+
+        label = cl->platformAuthLabel[0] ? cl->platformAuthLabel : NULL;
+        steamId = cl->platformSteamId[0] ? cl->platformSteamId : NULL;
+
+        NET_LogAuthTelemetry( NS_SERVER, adr, steamId, label, summary[0] ? summary : status );
+}
+#else
+#define SV_CapturePlatformAuthFromUserinfo(cl, userinfo) ((void)0)
+#define SV_FinalisePlatformAuthState(cl, accepted, detail) ((void)(cl), (void)(accepted), (void)(detail))
+#define SV_LogPlatformAuth(adr, cl, status, detail) ((void)(adr), (void)(cl), (void)(status), (void)(detail))
+#endif
+
 /*
 =================
 SV_GetChallenge
@@ -419,16 +525,40 @@ gotnewcl:
 	// save the userinfo
 	Q_strncpyz( newcl->userinfo, userinfo, sizeof(newcl->userinfo) );
 
+#if SV_HAS_PLATFORM_AUTH
+	{
+		char tokenSummary[64];
+		SV_CapturePlatformAuthFromUserinfo( newcl, userinfo );
+
+		if ( newcl->platformAuthPending && newcl->platformAuthToken[0] ) {
+			Com_sprintf( tokenSummary, sizeof( tokenSummary ), "token_len=%i", (int)strlen( newcl->platformAuthToken ) );
+			SV_LogPlatformAuth( &from, newcl, "connect", tokenSummary );
+		} else {
+			SV_LogPlatformAuth( &from, newcl, "connect", "token_absent" );
+		}
+	}
+#endif
+
 	// get the game a chance to reject this connection or modify the userinfo
 	denied = (char *)VM_Call( gvm, GAME_CLIENT_CONNECT, clientNum, qtrue, qfalse ); // firstTime = qtrue
 	if ( denied ) {
 		// we can't just use VM_ArgPtr, because that is only valid inside a VM_Call
 		denied = VM_ExplicitArgPtr( gvm, (int)denied );
 
+#if SV_HAS_PLATFORM_AUTH
+		SV_FinalisePlatformAuthState( newcl, qfalse, denied );
+		SV_LogPlatformAuth( &from, newcl, "denied", denied );
+#endif
+
 		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", denied );
 		Com_DPrintf ("Game rejected a connection: %s.\n", denied);
 		return;
 	}
+
+#if SV_HAS_PLATFORM_AUTH
+	SV_FinalisePlatformAuthState( newcl, qtrue, "accepted" );
+	SV_LogPlatformAuth( &from, newcl, "accepted", NULL );
+#endif
 
 	SV_UserinfoChanged( newcl );
 

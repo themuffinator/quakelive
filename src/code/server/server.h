@@ -26,6 +26,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/g_public.h"
 #include "../game/bg_public.h"
 
+#include "../../common/platform/platform_config.h"
+#include "../../common/auth_credentials.h"
+
+#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
+#define SV_HAS_PLATFORM_AUTH 1
+#else
+#define SV_HAS_PLATFORM_AUTH 0
+#endif
+
 //=============================================================================
 
 #define	PERS_SCORE				0		// !!! MUST NOT CHANGE, SERVER AND
@@ -131,6 +140,14 @@ typedef struct client_s {
 	char			lastClientCommandString[MAX_STRING_CHARS];
 	sharedEntity_t	*gentity;			// SV_GentityNum(clientnum)
 	char			name[MAX_NAME_LENGTH];			// extracted from userinfo, high bits masked
+#if SV_HAS_PLATFORM_AUTH
+	qboolean		platformAuthPending;
+	qboolean		platformAuthSucceeded;
+	char			platformAuthLabel[32];
+	char			platformAuthToken[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+	char			platformAuthMessage[QL_AUTH_MAX_RESPONSE_MESSAGE];
+	char			platformSteamId[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+#endif
 
 	// downloading
 	char			downloadName[MAX_QPATH]; // if not empty string, we are downloading
