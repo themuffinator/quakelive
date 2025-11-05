@@ -24,7 +24,7 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
 1. Familiarize yourself with the HLIL dump organization so that Quake Live specific behaviors can be tracked back to decompiled functions.
 2. Compare modules in `src/code/` against their HLIL equivalents to identify divergences that must be ported.
 3. Keep the documentation in this overview updated as the project introduces new directories, tooling, or reverse-engineered components.
-4. Use the living build notes in [`docs/qvmtools.md`](qvmtools.md) and [`docs/windows-native-pipeline.md`](windows-native-pipeline.md) when reproducing the legacy QVM toolchain or the Visual Studio DLL workflow so that outputs stay aligned with the archived Quake Live binaries.
+4. Use the living build notes in [`docs/qvmtools.md`](qvmtools.md), [`docs/windows-native-pipeline.md`](windows-native-pipeline.md), and the [`Native Toolchain Support Matrix`](platform/toolchain-matrix.md) when reproducing the legacy QVM toolchain or the Visual Studio DLL workflow so that outputs stay aligned with the archived Quake Live binaries.【F:docs/platform/toolchain-matrix.md†L1-L18】
 
 ## Controls & Configuration Defaults
 - **Reference bindings** – The Quake Live snapshot in `references/original-assets/quakelive/baseq3/default.cfg` captures the modernized control scheme (weapon toggle on `F`, dedicated drop bindings, vote shortcuts, etc.).【68ce2a†L215-L224】【fcaf97†L1-L86】 Ported builds should ship this file—alongside curated training configs such as `tim.cfg` and `sponge.cfg`—so the engine can execute `exec default.cfg` during bootstrap without diverging from retail expectations.【F:src/code/qcommon/common.c†L2389-L2405】【F:src/code/ui/ui_main.c†L3223-L3263】
