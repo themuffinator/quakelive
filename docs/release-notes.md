@@ -1,5 +1,8 @@
 # Release Notes
 
+## Documentation Updates – July 2024
+- Centralised the gameplay parity documentation under `docs/gameplay/parity/README.md`, including owner contact links and a verification checklist for cross-team reviews.
+
 ## Documentation Updates – May 2024
 - Added the **Gameplay Parity Ledger** (`docs/gameplay/parity/parity-ledger.md`) outlining porting status, HLIL references, and code owner contacts for core gameplay systems.
 - Published a **Regression Rationale Template** (`docs/gameplay/parity/regression-rationale-template.md`) to standardise post-mortems and ensure sign-off from gameplay, QA, and release owners.
