@@ -549,6 +549,12 @@ typedef struct {
 	int				spectatorPaintX2;										// current paint x
 	int				spectatorOffset;										// current offset from start
 	int				spectatorPaintLen; 									// current offset from start
+	int				spectatorPrimaryClient;
+	int				spectatorSecondaryClient;
+	int				spectatorFollowClient;
+	int				spectatorClientOrder[MAX_CLIENTS];
+	int				spectatorClientCount;
+	int				spectatorTargetUpdateTime;
 
 	// skull trails
 	skulltrail_t	skulltrails[MAX_CLIENTS];
@@ -1279,6 +1285,7 @@ int CG_Text_Width(const char *text, float scale, int limit);
 int CG_Text_Height(const char *text, float scale, int limit);
 void CG_SelectPrevPlayer();
 void CG_SelectNextPlayer();
+void CG_SpectatorFollowCycle(int dir);
 float CG_GetValue(int ownerDraw);
 qboolean CG_OwnerDrawVisible(int flags);
 void CG_RunMenuScript(char **args);

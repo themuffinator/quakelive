@@ -1,0 +1,226 @@
+#include "ui/menudef.h"
+
+{
+        assetGlobalDef {
+                cursor "ui/assets/3_cursor3"
+                gradientBar "ui/assets/gradientbar2.tga"
+                fadeClamp 1.0
+                fadeCycle 1
+                fadeAmount 0.1
+                shadowX 5
+                shadowY 5
+                shadowColor 0.1 0.1 0.1 0.25
+                font "fonts/font" 24
+                smallFont "fonts/smallfont" 16
+                bigFont "fonts/bigfont" 48
+        }
+
+        menuDef {
+                name "comp_specfollowhud_menu"
+                fullScreen 0
+                visible 0
+                rect 0 0 640 480
+
+                itemDef {
+                        name scores_background_top
+                        rect 0 5 256 32
+                        widescreen WIDESCREEN_LEFT
+                        backcolor 1 1 1 1
+                        background "ui/assets/score/ink_fade_right.tga"
+                        style WINDOW_STYLE_FILLED
+                        visible 1
+                }
+
+                itemDef {
+                        name scores_background_bottom
+                        rect 0 35 256 32
+                        widescreen WIDESCREEN_LEFT
+                        backcolor 1 1 1 1
+                        background "ui/assets/score/ink_fade_right.tga"
+                        style WINDOW_STYLE_FILLED
+                        visible 1
+                }
+
+                itemDef {
+                        name first_place_score
+                        rect 20 25 192 32
+                        widescreen WIDESCREEN_LEFT
+                        ownerdraw CG_1ST_PLACE_SCORE
+                        textscale 0.3
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+
+                itemDef {
+                        name second_place_score
+                        rect 20 55 192 32
+                        widescreen WIDESCREEN_LEFT
+                        ownerdraw CG_2ND_PLACE_SCORE
+                        textscale 0.3
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+
+                itemDef {
+                        name follow_obituary
+                        rect 6 80 65 12
+                        widescreen WIDESCREEN_LEFT
+                        ownerdraw CG_PLAYER_OBIT
+                        textscale 0.22
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+
+                itemDef {
+                        name match_timer
+                        rect 300 15 50 12
+                        widescreen WIDESCREEN_CENTER
+                        align ITEM_ALIGN_LEFT
+                        ownerdraw CG_LEVELTIMER
+                        textscale 0.3
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+
+                itemDef {
+                        name round_timer
+                        rect 320 28 50 12
+                        widescreen WIDESCREEN_CENTER
+                        align ITEM_ALIGN_CENTER
+                        ownerdraw CG_ROUNDTIMER
+                        forecolor 0.73 0.73 0.73 0.7
+                        textscale 0.25
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+
+                itemDef {
+                        name overtime_label
+                        rect 320 35 50 12
+                        widescreen WIDESCREEN_CENTER
+                        align ITEM_ALIGN_CENTER
+                        ownerdraw CG_OVERTIME
+                        forecolor 1 1 1 0.5
+                        textscale 0.18
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+
+                itemDef {
+                        name first_player_highlight
+                        rect 240 26 50 12
+                        widescreen WIDESCREEN_CENTER
+                        ownerdraw CG_HEALTH_COLORIZED
+                        style WINDOW_STYLE_FILLED
+                        backcolor 1 1 1 0.35
+                        visible 1
+                }
+
+                itemDef {
+                        name first_player_scorebox
+                        rect 240 0 50 30
+                        widescreen WIDESCREEN_CENTER
+                        background "ui/assets/score/scorebox_spec.tga"
+                        style WINDOW_STYLE_FILLED
+                        visible 1
+                }
+
+                itemDef {
+                        name first_player_score
+                        rect 265 23 50 25
+                        widescreen WIDESCREEN_CENTER
+                        ownerdraw CG_1ST_PLYR_SCORE
+                        textscale 0.45
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        align ITEM_ALIGN_CENTER
+                        visible 1
+                }
+
+                itemDef {
+                        name first_player_health
+                        rect 90 2 150 12
+                        widescreen WIDESCREEN_CENTER
+                        ownerdraw CG_1ST_PLYR_HEALTH_ARMOR
+                        style WINDOW_STYLE_FILLED
+                        backcolor 0 0 0 0.5
+                        textscale 0.25
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+
+                itemDef {
+                        name first_player_name
+                        rect 235 28 96 20
+                        widescreen WIDESCREEN_CENTER
+                        ownerdraw CG_1ST_PLYR
+                        textscale 0.3
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        align ITEM_ALIGN_RIGHT
+                        visible 1
+                }
+
+                itemDef {
+                        name second_player_highlight
+                        rect 350 26 50 12
+                        widescreen WIDESCREEN_CENTER
+                        ownerdraw CG_HEALTH_COLORIZED
+                        style WINDOW_STYLE_FILLED
+                        backcolor 1 1 1 0.35
+                        visible 1
+                }
+
+                itemDef {
+                        name second_player_scorebox
+                        rect 350 0 50 30
+                        widescreen WIDESCREEN_CENTER
+                        background "ui/assets/score/scorebox_spec.tga"
+                        style WINDOW_STYLE_FILLED
+                        visible 1
+                }
+
+                itemDef {
+                        name second_player_score
+                        rect 375 23 50 25
+                        widescreen WIDESCREEN_CENTER
+                        ownerdraw CG_2ND_PLYR_SCORE
+                        textscale 0.45
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        align ITEM_ALIGN_CENTER
+                        visible 1
+                }
+
+                itemDef {
+                        name second_player_health
+                        rect 400 2 150 12
+                        widescreen WIDESCREEN_CENTER
+                        ownerdraw CG_2ND_PLYR_HEALTH_ARMOR
+                        style WINDOW_STYLE_FILLED
+                        backcolor 0 0 0 0.5
+                        textscale 0.25
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+
+                itemDef {
+                        name second_player_name
+                        rect 405 28 96 20
+                        widescreen WIDESCREEN_CENTER
+                        ownerdraw CG_2ND_PLYR
+                        textscale 0.3
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        align ITEM_ALIGN_LEFT
+                        visible 1
+                }
+
+                itemDef {
+                        name follow_name
+                        rect 320 60 200 20
+                        widescreen WIDESCREEN_CENTER
+                        align ITEM_ALIGN_CENTER
+                        ownerdraw CG_FOLLOW_PLAYER_NAME_EX
+                        textscale 0.25
+                        textstyle ITEM_TEXTSTYLE_SHADOWED
+                        visible 1
+                }
+        }
+}
