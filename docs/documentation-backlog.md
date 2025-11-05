@@ -17,4 +17,9 @@ This backlog tracks upcoming documentation work required to keep contributors al
 - **Menu Scripting Guide:** Expand on how the reconstructed UI scripts map to Quake Live behaviour, noting missing cvars, commands, or localisation entries.
 - **Accessibility and Scalability Tasks:** Track plans for resolution scaling, colourblind modes, and other HUD usability improvements flagged during testing.
 
+## Accessibility Backlog
+1. **Restore metadata-driven widgets.** Import the missing Quake Live text tables (`country.txt`, `teaminfo.txt`, `hud3.txt`) so spectator overlays and locale pickers regain full context before further accessibility work begins.【F:docs/ui/hud-audit.md†L6-L18】
+2. **Package high-contrast HUD art.** Stage and ship the `ui/assets` imagery alongside updated fonts/shaders to preserve dual-encoded color + numeric cues relied on by colorblind players.【F:docs/ui/hud-audit.md†L6-L18】【F:docs/ui/scripting-guide.md†L18-L22】
+3. **Plan scalable layout controls.** Extend HUD scripting to keep widescreen groupings intact while preparing for adjustable UI scale sliders and font reflow, ensuring future options improve readability without breaking layout logic.【F:docs/ui/scripting-guide.md†L12-L22】
+
 Maintainers should review and update this backlog as features land, ensuring newcomers can quickly locate the most pressing documentation gaps.
