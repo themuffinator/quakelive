@@ -25,6 +25,10 @@ In practice this means that reproducing Quake Live style binaries requires:
 
 For a step-by-step walkthrough of the retargeting process (including the relevant `.vcxproj` files, `.def` exports, and verification commands), refer to [`docs/windows-native-pipeline.md`](windows-native-pipeline.md).
 
+## Browser Overlay Runtime Requirements
+
+Quake Live's streamlined menu flow now depends on the embedded browser bridge. Transitional builds must bundle the Awesomium runtime (or a compatible replacement) and expose it to the client so the UI VM can advertise the capability. The `ui_browserAwesomium` cvar gates the new `ui_menuFlow` toggle—if the browser layer is absent the VM automatically falls back to legacy menus and server-browser logic for stability.【F:src/code/ui/ui_main.c†L178-L214】【F:src/code/ui/ui_atoms.c†L329-L368】
+
 ## Migration Strategy
 
 The goal is to preserve the Quake III VM pipeline while layering in a native DLL build suitable for Quake Live parity. The following phased plan keeps the bytecode toolchain intact and introduces the new workflow in parallel:

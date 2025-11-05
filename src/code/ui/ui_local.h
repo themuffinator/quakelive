@@ -101,6 +101,8 @@ extern vmCvar_t	ui_serverFilterType;
 extern vmCvar_t	ui_dedicated;
 extern vmCvar_t	ui_opponentName;
 extern vmCvar_t	ui_menuFiles;
+extern vmCvar_t	ui_menuFlow;
+extern vmCvar_t	ui_browserAwesomium;
 extern vmCvar_t	ui_currentTier;
 extern vmCvar_t	ui_currentMap;
 extern vmCvar_t	ui_currentNetMap;
@@ -136,6 +138,17 @@ extern vmCvar_t ui_serverStatusTimeOut;
 //
 // ui_qmenu.c
 //
+
+typedef enum {
+	UI_MENU_FLOW_LEGACY = 0,
+	UI_MENU_FLOW_QUAKELIVE = 1
+} uiMenuFlow_t;
+
+qboolean UI_BrowserOverlayAvailable(void);
+qboolean UI_UsingLegacyMenuFlow(void);
+void UI_ApplyMenuFlowChange(uiMenuFlow_t flow, qboolean reload);
+const char *UI_DefaultMenuFile(void);
+const char *UI_DefaultIngameFile(void);
 
 #define RCOLUMN_OFFSET			( BIGCHAR_WIDTH )
 #define LCOLUMN_OFFSET			(-BIGCHAR_WIDTH )
