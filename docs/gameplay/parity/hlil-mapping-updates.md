@@ -1,6 +1,6 @@
 # HLIL Mapping Updates
 
-This log captures notable updates to the High Level Intermediate Language (HLIL) mapping used when translating Quake Live gameplay code into the active source tree. Cross-referencing these changes ensures that gameplay engineers, UI maintainers, and QA can rely on the same canonical references when validating behaviour.
+This log captures notable updates to the High Level Intermediate Language (HLIL) mapping used when translating Quake Live gameplay code into the active source tree. Cross-referencing these changes ensures that gameplay engineers, UI maintainers, and QA can rely on the same canonical references when validating behaviour. See the [Gameplay Parity Documentation Hub](./README.md) for owner contacts when coordinating verification passes.
 
 ## Recent Updates
 
