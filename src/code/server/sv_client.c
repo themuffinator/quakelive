@@ -191,25 +191,25 @@ void SV_AuthorizeIpPacket( netadr_t from ) {
 			"challengeResponse %i", svs.challenges[i].challenge );
 		return;
 	}
-	if ( !Q_stricmp( s, "unknown" ) ) {
-		if (!r) {
-			NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, "print\nAwaiting CD key authorization\n" );
-		} else {
-			sprintf(ret, "print\n%s\n", r);
-			NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, ret );
-		}
+        if ( !Q_stricmp( s, "unknown" ) ) {
+                if ( !r ) {
+                        NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, "print\nAwaiting credential authorization\n" );
+                } else {
+                        sprintf(ret, "print\n%s\n", r);
+                        NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, ret );
+                }
 		// clear the challenge record so it won't timeout and let them through
 		Com_Memset( &svs.challenges[i], 0, sizeof( svs.challenges[i] ) );
 		return;
 	}
 
 	// authorization failed
-	if (!r) {
-		NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, "print\nSomeone is using this CD Key\n" );
-	} else {
-		sprintf(ret, "print\n%s\n", r);
-		NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, ret );
-	}
+        if ( !r ) {
+                NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, "print\nSomeone is using this credential\n" );
+        } else {
+                sprintf(ret, "print\n%s\n", r);
+                NET_OutOfBandPrint( NS_SERVER, svs.challenges[i].adr, ret );
+        }
 
 	// clear the challenge record so it won't timeout and let them through
 	Com_Memset( &svs.challenges[i], 0, sizeof( svs.challenges[i] ) );
