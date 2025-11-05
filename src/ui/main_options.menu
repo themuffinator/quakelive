@@ -1,0 +1,220 @@
+#include "ui/menudef.h"
+{
+
+  assetGlobalDef {
+	font "fonts/font" 24				// font
+	smallFont "fonts/smallfont" 16				// font
+	bigFont "fonts/bigfont" 48				// font
+	cursor "ui/assets/3_cursor3"			// cursor	
+	gradientBar "ui/assets/gradientbar2.tga"	// gradient bar
+	itemFocusSound "sound/misc/menu2.wav"		// sound for item getting focus (via keyboard or mouse )
+	fadeClamp 1.0					// sets the fadeup alpha
+	fadeCycle 1					// how often fade happens in milliseconds
+	fadeAmount 0.1					// amount to adjust alpha per cycle
+	shadowColor 0.1 0.1 0.1 0.25			// shadow color
+  }
+							   
+
+\\ INGAME MENU \\
+
+  menuDef {
+	name "main_options"
+	visible 0
+	fullScreen 0
+    rect 40 0 560 480
+	focusColor 1 .75 0 1
+	disableColor .5 .5 .5 1
+
+   	onClose {
+			setitemcolor navbtn2t forecolor 1 1 1 1
+			setitemcolor navbtn3t forecolor 1 1 1 1
+			setitemcolor navbtn2o backcolor 1 1 1 0
+			setitemcolor navbtn3o backcolor 1 1 1 0
+      	}
+
+	itemDef {
+		name "ingameRect"
+		visible 1
+		rect 0 0 640 480
+		style WINDOW_STYLE_FILLED
+		backcolor 0 0 0 .25
+		visible 1
+		decoration
+	}
+	
+		itemDef {
+			name logo_background
+			rect 0 0 560 64
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0.375 0.125 0.125 1.0
+			border 1
+			borderColor 0 0 0 0.5
+		}
+	
+		itemDef {
+			name logo
+			rect -20 0 256 64
+			background "ui/assets/main_menu/ql_logo.tga"
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 1 1 1 1
+		}
+		
+		itemDef {
+			name menu_bar
+			rect 0 63 560 17
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0 0 0 0.75
+			border 1
+			borderColor 0 0 0 0.5
+		}
+	
+		itemDef {
+			name page_background
+			rect 0 82 560 310
+			background "ui/assets/main_menu/content_background.tga"
+			style WINDOW_STYLE_FILLED
+			visible 1 
+			decoration 
+			backcolor 1 1 1 1
+			border 1
+			borderColor 0 0 0 0.5
+		}		
+
+// controls
+		itemDef {
+			name navbtn2
+			rect 88 63 63 16
+			border 1
+			bordercolor 0.196 0.196 0.196 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			type 1
+			action { open ingame_controls
+				setitemcolor navbtn1t forecolor 1 1 1 1
+				setitemcolor navbtn2t forecolor 0.964 0.815 0 1
+				setitemcolor navbtn3t forecolor 1 1 1 1
+				setitemcolor navbtn4t forecolor 1 1 1 1
+				setitemcolor navbtn5t forecolor 1 1 1 1
+				setitemcolor navbtn1o backcolor 1 1 1 0
+				setitemcolor navbtn2o backcolor 0.196 0.196 0.196 1
+				setitemcolor navbtn3o backcolor 1 1 1 0
+				setitemcolor navbtn4o backcolor 1 1 1 0
+				setitemcolor navbtn5o backcolor 1 1 1 0
+			}
+		}
+	
+		itemDef {
+			name navbtn2o
+			rect 88 63 63 16
+			border 1
+			bordercolor 0.196 0.196 0.196 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+		}
+	
+		itemDef {
+			name navbtn2t
+			rect 89 63 63 20
+			text "Controls"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 32      
+			textaligny 14 
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 0.964 0.815 0 1
+			visible 1 		
+			decoration
+		}
+	
+		// game settings
+		itemDef {
+			name navbtn3
+			rect 150 63 91 16
+			border 1
+			bordercolor 0.196 0.196 0.196 1
+			style WINDOW_STYLE_FILLED
+			visible 1 
+			type 1
+			action { open ingame_options
+				setitemcolor navbtn1t forecolor 1 1 1 1
+				setitemcolor navbtn2t forecolor 1 1 1 1
+				setitemcolor navbtn3t forecolor 0.964 0.815 0 1
+				setitemcolor navbtn4t forecolor 1 1 1 1
+				setitemcolor navbtn5t forecolor 1 1 1 1
+			 setitemcolor navbtn1o backcolor 1 1 1 0
+			 setitemcolor navbtn2o backcolor 1 1 1 0
+			 setitemcolor navbtn3o backcolor 0.196 0.196 0.196 1
+			 setitemcolor navbtn4o backcolor 1 1 1 0
+			 setitemcolor navbtn5o backcolor 1 1 1 0
+			}
+		}
+		
+		itemDef {
+			name navbtn3o
+			rect 150 63 91 16
+			border 1
+			bordercolor 0.196 0.196 0.196 1
+			style WINDOW_STYLE_FILLED 
+	      	visible 1 
+	      	decoration 
+		}
+		
+		itemDef {
+			name navbtn3t
+			rect 151 63 91 20
+			text "Game Settings"
+			textscale .18
+			style WINDOW_STYLE_EMPTY	
+			textalignx 46      
+			textaligny 14
+			textalign ITEM_ALIGN_CENTER		
+			forecolor 1 1 1 1
+			visible 1 
+			decoration
+		}
+
+	//		BACK			//
+
+	itemDef {
+			name quitbar
+			group mainnav
+			style WINDOW_STYLE_GRADIENT
+			rect -155 400 310 30 
+			backcolor 0.5 0.1 0 .25
+			border 4
+			bordercolor 0.5 0.5 0.5 1
+			bordersize 1
+			visible 1 
+			decoration 
+		}
+
+	itemDef {
+			name quit
+			group mainnav
+			text "BACK"
+			style WINDOW_STYLE_EMPTY	
+			type 1
+			textstyle 6
+			rect 0 400 320 30
+			textalignx 10
+			textaligny 24 
+			textscale .416
+			textalign ITEM_ALIGN_LEFT 
+			visible 1 
+			forecolor 1 1 1 1
+			action { close main_options ; open main }
+			mouseEnter { setitemcolor backbar backcolor .75 0 0 .25 }
+			mouseExit { setitemcolor backbar backcolor 0.5 0.1 0 .25 }
+			cvarTest "ui_mainmenu"
+			showCvar { "1" }
+		}
+}
+}
+}

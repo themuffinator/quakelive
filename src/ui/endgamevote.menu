@@ -1,0 +1,568 @@
+//=================================================================================
+// Voting
+//=================================================================================
+			itemDef {
+				name voting_contentframe_left
+				rect 300 359 20 96
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.90
+				background "ui/assets/score/frame_left.tga"
+				visible 1
+				decoration
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voting_contentframe_mid
+				rect 320 359 280 96
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.90
+				background "ui/assets/score/frame_mid.tga"
+				visible 1
+				decoration
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voting_contentframe_right
+				rect 600 359 20 96
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.90
+				background "ui/assets/score/frame_right.tga"
+				visible 1
+				decoration
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+
+			itemDef {
+				name voting_contentframe_bl
+				rect 300 455 20 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.90
+				background "ui/assets/score/frame_bl.tga"
+				visible 1
+				decoration
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voting_contentframe_bottom
+				rect 320 455 280 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.90
+				background "ui/assets/score/frame_bottom.tga"
+				visible 1
+				decoration
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}	
+			itemDef {
+				name voting_contentframe_br
+				rect 600 455 20 20
+				style WINDOW_STYLE_FILLED
+				backcolor 1 1 1 0.90
+				background "ui/assets/score/frame_br.tga"
+				visible 1
+				decoration
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+//=================================================================================
+		// Map Voting - Map One
+			itemDef {
+				name mapone_levelshot
+				rect 305 373 100 76
+				backcolor black
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voted_mapone_backlit
+				rect 305 373 100 76
+				group grpVotedMapOne
+				background "ui/assets/score/votecast_backlit.tga"
+				backcolor 1 1 1 1
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 0
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_levelshot_image
+				rect 310 376 88 66
+				backcolor 1 1 1 1
+				//background "levelshots/preview/default"
+				ownerdraw CG_VOTESHOT1
+				style WINDOW_STYLE_FILLED
+				border WINDOW_BORDER_FULL
+				bordersize 1
+				bordercolor black
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_gamtype_bar
+				rect 311 377 88 10
+				backcolor 0.71 0.176 0.09 0.5
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_title_bar
+				rect 311 433 88 10
+				backcolor 0 0 0 0.5
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_mapgametype_text
+				rect 396 392 100 18
+				ownerdraw CG_VOTEGAMETYPE1
+				textscale 0.16
+				forecolor white
+				align 2
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_mapname_text
+				rect 312 440 100 18
+				ownerdraw CG_VOTENAME1
+				textscale 0.16
+				forecolor white
+				align 0
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voting_mapone
+				rect 305 451 60 15
+				group grpVoteMapOneButton
+				background "ui/assets/score/bg_tabmenu.tga"
+				backcolor 1 1 1 0.75
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name voting_mapone_text
+				rect 335 461 60 20
+				group grpVoteMapOneButton
+				text "Vote"
+				textscale 0.20
+				forecolor white
+				textalign ITEM_ALIGN_CENTER
+				textstyle ITEM_TEXTSTYLE_BLINK
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name voting_mapone_button
+				type 1
+				group grpVoteMapOneButton
+				rect 305 374 90 90
+				backcolor transparent
+				style WINDOW_STYLE_FILLED
+				visible 1
+				action { 
+					exec "vote 1" ; 
+					show grpVotedMapOne ;
+					hide grpVotedMapTwo ;
+					hide grpVotedMapThree ;
+				}
+				mouseEnter {
+					transition mapone_levelshot_image 310 376 88 66 306 374 96 72 50 5 ;
+				}
+				mouseExit {
+					transition mapone_levelshot_image 306 374 96 72 310 376 88 66 50 5 ;
+				}
+				onFocus {
+					transition voting_mapone_text 336 461 60 20 335 461 60 20 20 10 ;
+				}
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name votecount_mapone_text
+				rect 402 461 60 20
+				group grpVoteCountMapOne
+				ownerdraw CG_VOTECOUNT1
+				font FONT_SANS
+				textscale 0.16
+				forecolor white
+				align 2
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+//=================================================================================
+		// Map Voting - Map Two
+			itemDef {
+				name maptwo_levelshot
+				rect 410 373 100 76
+				backcolor black
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voted_maptwo_backlit
+				rect 410 373 100 76
+				group grpVotedMapTwo
+				background "ui/assets/score/votecast_backlit.tga"
+				backcolor 1 1 1 1
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 0
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name maptwo_levelshot_image
+				rect 415 376 88 66
+				//background "levelshots/preview/default"
+				ownerdraw CG_VOTESHOT2
+				backcolor 1 1 1 1
+				style WINDOW_STYLE_FILLED
+				border WINDOW_BORDER_FULL
+				bordersize 1
+				bordercolor black
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_gamtype_bar
+				rect 416 377 88 10
+				backcolor 0.71 0.176 0.09 0.5
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_title_bar
+				rect 416 433 88 10
+				backcolor 0 0 0 0.5
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_mapgametype_text
+				rect 501 392 100 18
+				ownerdraw CG_VOTEGAMETYPE2
+				textscale 0.16
+				forecolor white
+				align 2
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name maptwo_mapname_text
+				rect 417 440 100 18
+				ownerdraw CG_VOTENAME2
+				textscale 0.16
+				forecolor white
+				align 0
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voting_maptwo
+				rect 410 451 60 15
+				group grpVoteMapTwoButton
+				background "ui/assets/score/bg_tabmenu.tga"
+				backcolor 1 1 1 0.75
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name voting_maptwo_text
+				rect 440 461 60 20
+				group grpVoteMapTwoButton
+				text "Vote"
+				textscale 0.20
+				forecolor white
+				textalign ITEM_ALIGN_CENTER
+				textstyle ITEM_TEXTSTYLE_BLINK
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name voting_maptwo_button
+				type 1
+				group grpVoteMapTwoButton
+				rect 410 374 90 90
+				backcolor transparent
+				style WINDOW_STYLE_FILLED
+				visible 1
+				action { 
+					exec "vote 2" ; 
+					hide grpVotedMapOne ;
+					show grpVotedMapTwo ;
+					hide grpVotedMapThree ;
+				}
+				mouseEnter {
+					transition maptwo_levelshot_image 415 376 88 66 411 374 96 72 50 5 ;
+				}
+				mouseExit {
+					transition maptwo_levelshot_image 411 374 96 72 415 376 88 66 50 5 ;
+				}
+				onFocus {
+					transition voting_maptwo_text 441 461 60 20 440 461 60 20 20 10 ;
+				}
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name votecount_maptwo_text
+				rect 507 461 60 20
+				group grpVoteCountMapTwo
+				ownerdraw CG_VOTECOUNT2
+				font FONT_SANS
+				textscale 0.16
+				forecolor white
+				align 2
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+//=================================================================================
+		// Map Voting - Map Three
+			itemDef {
+				name mapthree_levelshot
+				rect 515 373 100 76
+				backcolor black
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voted_mapthree_backlit
+				rect 515 373 100 76
+				group grpVotedMapThree
+				background "ui/assets/score/votecast_backlit.tga"
+				backcolor 1 1 1 1
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 0
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapthree_levelshot_image
+				rect 520 376 88 66
+				//background "levelshots/preview/default"
+				ownerdraw CG_VOTESHOT3
+				backcolor 1 1 1 1
+				style WINDOW_STYLE_FILLED
+				border WINDOW_BORDER_FULL
+				bordersize 1
+				bordercolor black
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_gamtype_bar
+				rect 521 377 88 10
+				backcolor 0.71 0.176 0.09 0.5
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_title_bar
+				rect 521 433 88 10
+				backcolor 0 0 0 0.5
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapone_mapgametype_text
+				rect 606 392 100 18
+				ownerdraw CG_VOTEGAMETYPE3
+				textscale 0.16
+				forecolor white
+				align 2
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name mapthree_mapname_text
+				rect 522 440 100 10
+				ownerdraw CG_VOTENAME3
+				textscale 0.16
+				forecolor white
+				align 0
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voting_mapthree
+				rect 515 451 60 15
+				group grpVoteMapThreeButton
+				background "ui/assets/score/bg_tabmenu.tga"
+				backcolor 1 1 1 0.75
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name voting_mapthree_text
+				rect 545 461 60 20
+				group grpVoteMapThreeButton
+				text "Vote"
+				textscale 0.20
+				forecolor white
+				textalign ITEM_ALIGN_CENTER
+				textstyle ITEM_TEXTSTYLE_BLINK
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name voting_mapthree_button
+				type 1
+				group grpVoteMapThreeButton
+				rect 515 374 90 90
+				backcolor transparent
+				style WINDOW_STYLE_FILLED
+				visible 1
+				action { 
+					exec "vote 3" ; 
+					hide grpVotedMapOne ;
+					hide grpVotedMapTwo ;
+					show grpVotedMapThree ;
+				}
+				mouseEnter {
+					transition mapthree_levelshot_image 520 376 88 66 516 374 96 72 50 5;
+					}
+				mouseExit {
+					transition mapthree_levelshot_image 516 374 96 72 520 376 88 66 50 5;
+				}
+				onFocus {
+					transition voting_mapthree_text 546 461 60 20 545 461 60 20 20 10 ;
+				}
+				cvarTest "ui_voteactive"
+				hideCvar { "0" }
+			}
+			itemDef {
+				name votecount_mapthree_text
+				rect 612 461 60 20
+				group grpVoteCountMapThree
+				ownerdraw CG_VOTECOUNT3
+				font FONT_SANS
+				textscale 0.16
+				forecolor white
+				align 2
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+//=================================================================================
+			itemDef {
+				name voting_text
+				rect 310 369 100 15
+				text "Vote for Next Arena"
+				textscale 0.18
+				forecolor white
+				textalign ITEM_ALIGN_LEFT
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}
+			itemDef {
+				name voting_timer_text
+				rect 610 370 150 10
+				ownerdraw CG_VOTETIMER
+				textscale 0.22
+				forecolor white
+				align 2
+				textstyle ITEM_TEXTSTYLE_SHADOWED
+				style WINDOW_STYLE_FILLED
+				decoration
+				visible 1
+				cvarTest "ui_endMapVotingDisabled"
+				hideCvar { "1" }
+			}	
+//=================================================================================

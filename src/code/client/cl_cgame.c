@@ -31,6 +31,25 @@ extern qboolean loadCamera(const char *name);
 extern void startCamera(int time);
 extern qboolean getCameraInfo(int time, vec3_t *origin, vec3_t *angles);
 
+static qboolean cl_webBrowserVisible = qfalse;
+static char cl_webBrowserHash[MAX_STRING_CHARS];
+
+void CL_Web_ShowBrowser_f( void ) {
+	cl_webBrowserVisible = qtrue;
+	if ( Cmd_Argc() > 1 ) {
+		const char *hash = Cmd_ArgsFrom( 1 );
+		Q_strncpyz( cl_webBrowserHash, hash, sizeof( cl_webBrowserHash ) );
+	}
+	Com_DPrintf( "web_showBrowser\n" );
+}
+
+void CL_Web_ChangeHash_f( void ) {
+	const char *hash = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
+	Q_strncpyz( cl_webBrowserHash, hash, sizeof( cl_webBrowserHash ) );
+	cl_webBrowserVisible = qtrue;
+	Com_DPrintf( "web_changeHash %s\n", cl_webBrowserHash );
+}
+
 /*
 ====================
 CL_GetGameState

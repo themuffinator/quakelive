@@ -22,7 +22,7 @@
 //spec hud data
 
 menuDef {
-	name "comp_specfollowhud_menu"
+	name "comp_spechud_menu"
 	fullScreen 0
 	visible 0
 	rect 0 0 640 480
@@ -123,7 +123,7 @@ menuDef {
         widescreen WIDESCREEN_CENTER
 		align ITEM_ALIGN_CENTER
 		style WINDOW_STYLE_EMPTY
-		rect 320 28 50 12
+		rect 320 30 50 12
 		visible 1
 		textstyle ITEM_TEXTSTYLE_SHADOWED
 		decoration
@@ -136,7 +136,7 @@ menuDef {
         widescreen WIDESCREEN_CENTER
 		align ITEM_ALIGN_CENTER
 		style WINDOW_STYLE_EMPTY
-		rect 320 35 50 12
+		rect 320 30 50 12
 		visible 1
 		textstyle ITEM_TEXTSTYLE_SHADOWED
 		decoration
@@ -199,20 +199,6 @@ menuDef {
 	    showCvar { "1" }
 	}
 	
-	itemDef {
-		name scores_firstplyr_followed
-		widescreen WIDESCREEN_CENTER
-		rect 240 26 50 12
-		style WINDOW_STYLE_FILLED
-		ownerdraw CG_HEALTH_COLORIZED
-		ownerdrawflag2 CG_SHOW_IF_1ST_PLYR_FOLLOWED
-		backcolor 1 1 1 0.5
-		background "ui/assets/score/scorebox_follow.tga"
-		visible 1
-	    cvarTest "cg_gametype"
-	    showCvar { "1" }
-	}		
-	
     itemDef {
 	    name scores_firstplyr_score
         widescreen WIDESCREEN_CENTER
@@ -237,21 +223,7 @@ menuDef {
 		style WINDOW_STYLE_FILLED
 	    cvarTest "cg_gametype"
 	    showCvar { "1" }
-	}	
-	
-	itemDef {
-		name scores_secondplyr_followed
-		widescreen WIDESCREEN_CENTER
-		rect 350 26 50 12
-		style WINDOW_STYLE_FILLED
-		ownerdraw CG_HEALTH_COLORIZED
-		ownerdrawflag2 CG_SHOW_IF_2ND_PLYR_FOLLOWED
-		backcolor 1 1 1 0.5
-		background "ui/assets/score/scorebox_follow.tga"
-		visible 1
-	    cvarTest "cg_gametype"
-	    showCvar { "1" }
-	}	
+	}
 
     itemDef {
 	    name scores_secondplyr_score
@@ -278,7 +250,7 @@ menuDef {
 		visible 1
 	    cvarTest "cg_gametype"
 	    showCvar { "1" }
-	}	
+	}
 	
 	itemDef {
 		name scores_secondplyr_name_background
@@ -290,7 +262,7 @@ menuDef {
 		visible 1
 	    cvarTest "cg_gametype"
 	    showCvar { "1" }
-	}	
+	}		
 	
     itemDef {
 	    name scores_secondplyr_name
@@ -307,7 +279,7 @@ menuDef {
 	    showCvar { "1" }
 	}
 
-//=================================================================================
+//*****TEAM SCORES*****//
 	
 	itemDef {
 		name scores_redteam_name_background
@@ -482,7 +454,7 @@ menuDef {
 		name flag_status
 		widescreen WIDESCREEN_CENTER
 		rect 320 26 185 16
-		ownerdraw CG_FLAG_STATUS  
+		ownerdraw CG_FLAG_STATUS   
 		decoration
 		visible 1
 	}
@@ -495,218 +467,328 @@ menuDef {
 		visible 1
 		decoration                      	
 	}
-//=================================================================================
-	itemDef {
-		name "raceBackground1"
-        widescreen WIDESCREEN_LEFT
-		rect 263 23 8 64 
-		visible 1
-		decoration
-		backcolor 1 1 1 0.8
-		style WINDOW_STYLE_FILLED
-		background "ui/assets/hud/scoreboxl2.tga"
-		cvarTest "cg_gametype"
-		showCvar { "2" }
-	}
-	
-	itemDef {
-		name "raceBackground2"
-        widescreen WIDESCREEN_LEFT
-		rect 271 23 100 64 
-		visible 1
-		decoration
-		backcolor 1 1 1 0.8
-		style WINDOW_STYLE_FILLED
-		background "ui/assets/hud/scoreboxm.tga"
-		cvarTest "cg_gametype"
-		showCvar { "2" }
-	}
-	
-	itemDef {
-		name "raceBackground3"
-        widescreen WIDESCREEN_LEFT
-		rect 371 23 8 64 
-		visible 1
-		decoration
-		backcolor 1 1 1 0.8
-		style WINDOW_STYLE_FILLED
-		background "ui/assets/hud/scoreboxr.tga"
-		cvarTest "cg_gametype"
-		showCvar { "2" }
-	}
+		
+}
 
-	itemDef {
-		name "raceStatus"
+/*
+// RED TEAM BAR TOP
+menuDef {
+    	name "comp_specred_top"
         widescreen WIDESCREEN_LEFT
-		rect 321 45 110 15
-		visible 1
-		decoration
-		align ITEM_ALIGN_CENTER
-		textscale 0.25
-		ownerdraw CG_RACE_STATUS
-		cvarTest "cg_gametype"
-		showCvar { "2" }
-	}
-	
+    	fullScreen MENU_FALSE
+    	visible 0	
+    	rect 2 7 32 128
+    	ownerdrawflag CG_SHOW_IF_RED_IS_FIRST_PLACE
+	//red team flag alert
 	itemDef {
-		name "raceTimes"
+     	name "TeamRLeft"
         widescreen WIDESCREEN_LEFT
-		rect 288 57 110 15
+		rect -8 2 256 28 
 		visible 1
 		decoration
-		align ITEM_ALIGN_LEFT
-		textscale 0.25
-		ownerdraw CG_RACE_TIMES
+		backcolor 1 0 0 0.3
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/hud/rteambgl.tga"
+		ownerdrawflag CG_SHOW_RED_TEAM_HAS_BLUEFLAG
+	}
+	//red team flag alert - align to right
+	itemDef {
+     	name "TeamRLeft"
+        widescreen WIDESCREEN_LEFT
+		rect 0 2 256 26 
+		visible 0
+		decoration
+		backcolor 1 0 0 0.3
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/hud/rteambgr.tga"
+	}
+	//red team info
+	
+	//clan arena count
+	itemDef {
+		name "clanArena"
+        widescreen WIDESCREEN_LEFT
+		rect 1 7 35 19
+		visible 1
+		backcolor 1 1 1 1
+		decoration	
+		style WINDOW_STYLE_FILLED
+	    ownerdrawflag CG_SHOW_PLAYERS_REMAINING
+		background "ui/assets/score/ca_score_red.tga"
 		cvarTest "cg_gametype"
-		showCvar { "2" }
+		hideCvar { "12" }  
 	}
-//=================================================================================
-//*****FOLLOWING*****//	
-//=================================================================================
+    	itemDef {
+	    name "redClanPlayers"
+        widescreen WIDESCREEN_LEFT
+	    ownerdrawflag CG_SHOW_PLAYERS_REMAINING
+	    ownerdraw CG_RED_CLAN_PLYRS  
+   	    rect 20 24 136 40
+   	    visible 1
+	    textscale .39
+	    forecolor 1 1 1 0.7
+	    decoration
+		cvarTest "cg_gametype"
+		hideCvar { "12" }  
+	}
 	
-    itemDef {
-      	name following_background_right
-		widescreen WIDESCREEN_CENTER
-      	style WINDOW_STYLE_FILLED	
-      	rect 64 445 512 30
-		backcolor 1 1 1 .5
-		background "ui/assets/menu/centerbg_fade.tga"
+	itemDef {
+		name "domination"
+        widescreen WIDESCREEN_LEFT
+		rect 1 7 35 19
 		visible 1
-    }
-	
-	itemDef {
-      	name scoreboard
-        widescreen WIDESCREEN_CENTER
-      	rect 320 416 300 30 
-      	ownerdraw CG_FOLLOW_PLAYER_NAME_EX
-        textstyle ITEM_TEXTSTYLE_SHADOWED
-		//font FONT_MONO
-	    textscale .28
-      	backcolor 0 0 0 0
-      	forecolor 1 1 1 0.8
-		align ITEM_ALIGN_CENTER
-      	decoration
-      	visible 1
-    }	
-
-//*****HEALTH*****//
-	itemDef {
-     	name "HealthIcon"
-        widescreen WIDESCREEN_CENTER
-	    rect 265 425 12 12
-	    ownerdraw CG_TEAM_COLORIZED
-	    visible 1
-   	    decoration
-	    style WINDOW_STYLE_FILLED
-	    background "ui/assets/hud/health.tga"
-	}
-	
-	itemDef {
-      	name "HealthValue"
-        widescreen WIDESCREEN_CENTER
-        rect 300 420 20 15
-        visible 1
-	    align ITEM_ALIGN_CENTER
-        decoration
-        textstyle ITEM_TEXTSTYLE_SHADOWED
-        forecolor 1 1 1 1
-        textscale 0.4
-        ownerdraw CG_PLAYER_HEALTH
-	}
-	
-//*****ARMOR*****//
-	itemDef {
-     	name "ArmorIcon"
-        widescreen WIDESCREEN_CENTER
-	    ownerdraw CG_TEAM_COLORIZED
-	    rect 325 425 12 12
-	    visible 1
-   	    decoration
-	    style WINDOW_STYLE_FILLED
-	    background "ui/assets/hud/armor.tga"
-		cvarTest "cg_armorTiered"
-		hideCvar { "1" }  
-	}
-	
-	itemDef {
-		name "ArmorIcon"
-        widescreen WIDESCREEN_CENTER
-		ownerdraw CG_ARMORTIERED_COLORIZED
-		rect 325 425 12 12
-		visible 1
-   		decoration
+		backcolor 1 1 1 1
+		decoration	
 		style WINDOW_STYLE_FILLED
-		background "ui/assets/hud/armor.tga"
-		cvarTest "cg_armorTiered"
-		showCvar { "1" }  
+	    ownerdrawflag CG_SHOW_DOMINATION
+		background "ui/assets/score/dom_score_red.tga"
 	}
-
-	itemDef {
-      	name "ArmorValue"
-        widescreen WIDESCREEN_CENTER
-        rect 360 420 20 22
-	    visible 1
+    	itemDef {
+	    name "redDomFlags"
+        widescreen WIDESCREEN_LEFT
+	    ownerdrawflag CG_SHOW_DOMINATION
+	    ownerdraw CG_RED_OWNED_FLAGS
+   	    rect 20 24 136 40
+   	    visible 1
+	    textscale .39
+	    forecolor 1 1 1 0.7
 	    decoration
-	    textstyle ITEM_TEXTSTYLE_SHADOWED	
-	    textscale 0.4
-	    align ITEM_ALIGN_CENTER
-	    ownerdraw CG_PLAYER_ARMOR_VALUE 
-	}
-	//=================================================================================
-	itemDef {
-		name "powerupArea"
-		widescreen WIDESCREEN_RIGHT
-		rect 555 220 35 35
-    	visible 1
-	    decoration
-	    ownerdraw CG_AREA_POWERUP
-	    special 4			// spacing
-	    align HUD_VERTICAL
-	}
-
-//=================================================================================
-	itemDef {
-      	name "playeritem"
-        widescreen WIDESCREEN_RIGHT
-        rect 568 447 24 24
-	    visible 1
-	    decoration
-	    ownerdraw CG_PLAYER_ITEM  
 	}
 	itemDef {
-		name "Key"
-		widescreen WIDESCREEN_RIGHT
-		rect 593 447 24 24
+		name "f"
+        widescreen WIDESCREEN_LEFT
+		rect 1 6 21 21
 		visible 1
 		decoration
-		style WINDOW_STYLE_FILLED
-		ownerdraw CG_PLAYER_HASKEY
-	}
-	itemDef {
-      	name "CTFPOWERUP"
-        widescreen WIDESCREEN_RIGHT
-        rect 535 447 24 24
-	    visible 1
-	    decoration
-	    ownerdraw CG_CTF_POWERUP
-	}
-//=================================================================================
-	itemDef {
-	    name "playerRect"
-        widescreen WIDESCREEN_CENTER
-	    rect 18 422 45 45
-	    style WINDOW_STYLE_SHADER
-	    background "ui/assets/hud/flag"
-	    visible 1
-	    ownerdrawflag CG_SHOW_IF_PLAYER_HAS_FLAG            
-	}
-	itemDef {
-      	name "flag"
-        widescreen WIDESCREEN_CENTER
-        rect 5 408 68 68
-	    visible 1
-	    decoration
-	    style WINDOW_STYLE_FILLED
-	    ownerdraw CG_PLAYER_HASFLAG 
+		ownerdrawflag CG_SHOW_CTF                       
+		ownerdraw CG_RED_FLAGSTATUS
 	}
 }
+// RED TEAM BAR BOTTOM
+menuDef {
+    	name "comp_specred_bottom"
+        widescreen WIDESCREEN_LEFT
+    	fullScreen MENU_FALSE
+    	visible 0	
+    	rect 2 40 32 128
+    	ownerdrawflag CG_SHOW_IF_BLUE_IS_FIRST_PLACE
+	//red team flag alert - align to right
+	itemDef {
+     	name "TeamRLeft"
+		rect -8 2 256 28  
+		visible 1
+		decoration
+		backcolor 1 0 0 0.3
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/hud/rteambgl.tga"
+		ownerdrawflag CG_SHOW_RED_TEAM_HAS_BLUEFLAG
+	}
+	//clan arena count
+	itemDef {
+		name "clanArena"
+        widescreen WIDESCREEN_LEFT
+		rect 1 7 35 19
+		visible 1
+		backcolor 1 1 1 1
+		decoration	
+		style WINDOW_STYLE_FILLED
+	    ownerdrawflag CG_SHOW_PLAYERS_REMAINING
+		background "ui/assets/score/ca_score_red.tga"
+		cvarTest "cg_gametype"
+		hideCvar { "12" }  
+	}
+    	itemDef {
+	    name "redClanPlayers"
+        widescreen WIDESCREEN_LEFT
+	    ownerdrawflag CG_SHOW_PLAYERS_REMAINING
+	    ownerdraw CG_RED_CLAN_PLYRS  
+   	    rect 20 24 136 40
+   	    visible 1
+	    textscale .39
+	    forecolor 1 1 1 0.7
+	    decoration
+		cvarTest "cg_gametype"
+		hideCvar { "12" }  
+	}
+	itemDef {
+		name "domination"
+        widescreen WIDESCREEN_LEFT
+		rect 1 7 35 19
+		visible 1
+		backcolor 1 1 1 1
+		decoration	
+		style WINDOW_STYLE_FILLED
+	    ownerdrawflag CG_SHOW_DOMINATION
+		background "ui/assets/score/dom_score_red.tga"
+	}
+    	itemDef {
+	    name "redDomFlags"
+        widescreen WIDESCREEN_LEFT
+	    ownerdrawflag CG_SHOW_DOMINATION
+	    ownerdraw CG_RED_OWNED_FLAGS
+   	    rect 20 24 136 40
+   	    visible 1
+	    textscale .39
+	    forecolor 1 1 1 0.7
+	    decoration
+	}
+	itemDef {
+		name "f"
+        widescreen WIDESCREEN_LEFT
+		rect 1 6 21 21
+		visible 1
+		decoration
+		ownerdrawflag CG_SHOW_CTF                       
+		ownerdraw CG_RED_FLAGSTATUS
+	}
+}
+
+// BLUE TEAM BAR TOP
+menuDef {
+    	name "comp_specblue_top"
+        widescreen WIDESCREEN_LEFT
+    	fullScreen MENU_FALSE
+    	visible 0	
+    	rect 2 7 32 128
+    	ownerdrawflag CG_SHOW_IF_BLUE_IS_FIRST_PLACE
+	//blue team flag alert - align to left
+	itemDef {
+     	name "TeamBLeft"
+		rect -8 2 256 28 
+		visible 1
+		decoration
+		backcolor 0.25 0.25 1 0.3
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/hud/bteambgl.tga"
+		ownerdrawflag CG_SHOW_BLUE_TEAM_HAS_REDFLAG
+	}
+	//clan arena count
+	itemDef {
+		name "clanArena"
+		rect 1 7 35 19
+		visible 1
+		backcolor 1 1 1 1
+		decoration	
+		style WINDOW_STYLE_FILLED
+	    ownerdrawflag CG_SHOW_PLAYERS_REMAINING
+		background "ui/assets/score/ca_score_blu.tga"
+		cvarTest "cg_gametype"
+		hideCvar { "12" }  
+	}
+    	itemDef {
+	    name "blueClanPlayers"
+	    ownerdrawflag CG_SHOW_PLAYERS_REMAINING
+	    ownerdraw CG_BLUE_CLAN_PLYRS  
+   	    rect 20 24 136 40
+   	    visible 1
+	    textscale .39
+	    forecolor 1 1 1 0.7
+	    decoration
+		cvarTest "cg_gametype"
+		hideCvar { "12" }  
+	}	
+	itemDef {
+		name "domination"
+		rect 1 7 35 19
+		visible 1
+		backcolor 1 1 1 1
+		decoration	
+		style WINDOW_STYLE_FILLED
+	    ownerdrawflag CG_SHOW_DOMINATION
+		background "ui/assets/score/dom_score_blu.tga"
+	}
+    	itemDef {
+	    name "blueDomFlags"
+	    ownerdrawflag CG_SHOW_DOMINATION
+	    ownerdraw CG_BLUE_OWNED_FLAGS
+   	    rect 20 24 136 40
+   	    visible 1
+	    textscale .39
+	    forecolor 1 1 1 0.7
+	    decoration
+	}	
+	itemDef {
+		name "blueflag"
+		rect 2 6 21 21
+		visible 1
+		decoration    
+		ownerdrawflag CG_SHOW_CTF                    	
+		ownerdraw CG_BLUE_FLAGSTATUS
+	}
+}
+// BLUE TEAM BAR BOTTOM
+menuDef {
+    	name "comp_specblue_bottom"
+        widescreen WIDESCREEN_LEFT
+    	fullScreen MENU_FALSE
+    	visible 0	
+    	rect 2 40 32 128
+    	ownerdrawflag CG_SHOW_IF_RED_IS_FIRST_PLACE
+    	
+	//blue team flag alert - align to left
+	itemDef {
+     	name "TeamBLeft"
+		rect -8 2 256 28  
+		visible 1
+		decoration
+		backcolor 0.25 0.25 1 0.3
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/hud/bteambgl.tga"
+		ownerdrawflag CG_SHOW_BLUE_TEAM_HAS_REDFLAG
+	}
+	//clan arena count
+	itemDef {
+		name "clanArena"
+		rect 1 7 35 19
+		visible 1
+		backcolor 1 1 1 1
+		decoration	
+		style WINDOW_STYLE_FILLED
+	    ownerdrawflag CG_SHOW_PLAYERS_REMAINING
+		background "ui/assets/score/ca_score_blu.tga"
+		cvarTest "cg_gametype"
+		hideCvar { "12" }  
+	}
+    	itemDef {
+	    name "blueClanPlayers"
+	    ownerdrawflag CG_SHOW_PLAYERS_REMAINING
+	    ownerdraw CG_BLUE_CLAN_PLYRS  
+   	    rect 20 24 136 40
+   	    visible 1
+	    textscale .39
+	    forecolor 1 1 1 0.7
+	    decoration
+		cvarTest "cg_gametype"
+		hideCvar { "12" }  
+	}
+	itemDef {
+		name "domination"
+		rect 1 7 35 19
+		visible 1
+		backcolor 1 1 1 1
+		decoration	
+		style WINDOW_STYLE_FILLED
+	    ownerdrawflag CG_SHOW_DOMINATION
+		background "ui/assets/score/dom_score_blu.tga"
+	}
+    	itemDef {
+	    name "blueDomFlags"
+        widescreen WIDESCREEN_LEFT
+	    ownerdrawflag CG_SHOW_DOMINATION
+	    ownerdraw CG_BLUE_OWNED_FLAGS
+   	    rect 20 24 136 40
+   	    visible 1
+	    textscale .39
+	    forecolor 1 1 1 0.7
+	    decoration
+	}
+	itemDef {
+		name "blueflag"
+		rect 1 6 21 21
+		visible 1
+		decoration    
+		ownerdrawflag CG_SHOW_CTF                    	
+		ownerdraw CG_BLUE_FLAGSTATUS
+	}
+}
+*/

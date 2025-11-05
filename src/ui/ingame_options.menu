@@ -1,0 +1,225 @@
+display#include "ui/menudef.h"
+
+{
+\\ SETUP MENU \\		
+
+	menuDef {
+		name "ingame_options"
+		visible 0
+		fullscreen 0
+		rect 39 99 560 300
+    	focusColor 0.964 0.815 0 1
+		style WINDOW_STYLE_FILLED
+		border 1
+		disableColor .5 .5 .5 1
+			onopen { hide grpControls ; hide grpControlsAdvMenu ; hide grpControlsTooltip ; hide dlc ; show basic
+			setitemcolor btn1t backcolor 0.8 .8 .8 1.0
+			setitemcolor btn1t forecolor 0.729 0.439 0.039 1
+			setitemcolor btn2t backcolor 0.133 0.133 0.133 1.0
+			setitemcolor btn2t forecolor 0.525 0.525 0.525 1
+			setitemcolor btn3t backcolor 0.133 0.133 0.133 1.0
+			setitemcolor btn3t forecolor 0.525 0.525 0.525 1
+		}
+		
+		onESC { close ingame_options }
+
+		itemDef {
+			name status
+			text "Game Settings"
+			textscale .28
+			textalign ITEM_ALIGN_LEFT
+			style WINDOW_STYLE_EMPTY	
+			rect 20 0 100 30 
+			forecolor 0.525 0.525 0.525 1
+			decoration
+			visible 1
+		}
+		
+		itemDef {
+			name options_bar
+			rect 20 3 520 1
+			style WINDOW_STYLE_FILLED 
+			visible 1 
+			decoration 
+			backcolor 0.525 0.525 0.525 1
+		}
+		
+		//*******
+		///SUBNAV BUTTONS
+		//*******
+		//
+		//	BUTTON TEXT
+
+		itemDef {
+			name btn1t
+			text "BASIC"
+			textscale .20
+			style WINDOW_STYLE_FILLED	
+			rect 20 20 70 15 
+			backcolor 1.0 1.0 1.0 0.375
+			forecolor 0.729 0.439 0.039 1
+			textalign ITEM_ALIGN_CENTER
+			textalignx 35      
+      		textaligny 11
+			decoration
+			visible 1 	
+		}
+
+		itemDef {
+			name btn1
+			type 1
+			group grpControlbutton
+			style WINDOW_STYLE_FILLED
+			rect 20 20 70 15
+			backcolor 0 0 0 0
+			visible 1
+			cvarTest "g_training"
+			hideCvar { "1" }
+			action { hide grpControls ; hide grpControlsAdvMenu ; hide dlc ; show basic ;
+				setitemcolor btn1t backcolor 0.8 .8 .8 1.0
+				setitemcolor btn1t forecolor 0.729 0.439 0.039 1
+				setitemcolor btn2t backcolor 0.133 0.133 0.133 1.0
+				setitemcolor btn2t forecolor 0.525 0.525 0.525 1
+				setitemcolor btn3t backcolor 0.133 0.133 0.133 1.0
+				setitemcolor btn3t forecolor 0.525 0.525 0.525 1
+				setitemcolor advGameText backcolor .3 .3 .3 1
+				setitemcolor advGameText forecolor 0.964 0.815 0 1
+				setitemcolor advHudText backcolor 0.2 0.2 0.2 .2
+				setitemcolor advHudText forecolor 0.525 0.525 0.525 1
+				setitemcolor advTeamText backcolor 0.2 0.2 0.2 .2
+				setitemcolor advTeamText forecolor 0.525 0.525 0.525 1
+				setitemcolor advWeapText backcolor 0.2 0.2 0.2 .2
+				setitemcolor advWeapText forecolor 0.525 0.525 0.525 1
+				setitemcolor advVideoText backcolor 0.2 0.2 0.2 .2
+				setitemcolor advVideoText forecolor 0.525 0.525 0.525 1
+				setitemcolor advShaderText backcolor 0.2 0.2 0.2 .2
+				setitemcolor advShaderText forecolor 0.525 0.525 0.525 1
+				setitemcolor advSoundText backcolor 0.2 0.2 0.2 .2
+				setitemcolor advSoundText forecolor 0.525 0.525 0.525 1
+				setitemcolor advSpectatingText backcolor 0.2 0.2 0.2 .2
+				setitemcolor advSpectatingText forecolor 0.525 0.525 0.525 1
+			}
+			onFocus {
+				transition btn1t 21 20 70 15 20 20 70 15 20 10
+			}
+		}
+
+		itemDef {
+			name btn2t
+			text "ADVANCED"
+			textscale .20
+			style WINDOW_STYLE_FILLED	
+			rect 92 20 70 15 
+			backcolor 0.133 0.133 0.133 1.0
+			forecolor 0.525 0.525 0.525 1
+			textalign ITEM_ALIGN_CENTER
+			textalignx 35       
+      		textaligny 11
+			decoration
+			visible 1 	  
+		}
+
+		itemDef {
+			name btn2
+			type 1
+			group grpControlbutton
+			style WINDOW_STYLE_FILLED
+			rect 92 20 70 15
+			backcolor 0 0 0 0
+			visible 1
+			cvarTest "g_training"
+			hideCvar { "1" }
+			action { hide basic ; hide grpControls ; show grpControlsAdvMenu ; hide dlc ; show advGame ;
+				setitemcolor btn2t backcolor 0.8 .8 .8 1.0
+				setitemcolor btn2t forecolor 0.729 0.439 0.039 1
+				setitemcolor btn1t backcolor 0.133 0.133 0.133 1.0
+				setitemcolor btn1t forecolor 0.525 0.525 0.525 1
+				setitemcolor btn3t backcolor 0.133 0.133 0.133 1.0
+				setitemcolor btn3t forecolor 0.525 0.525 0.525 1
+				setitemcolor advGameText backcolor .3 .3 .3 1
+				setitemcolor advGameText forecolor 0.964 0.815 0 1
+				setitemcolor advHudText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advHudText forecolor 0.525 0.525 0.525 1
+				setitemcolor advTeamText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advTeamText forecolor 0.525 0.525 0.525 1
+				setitemcolor advWeapText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advWeapText forecolor 0.525 0.525 0.525 1
+				setitemcolor advWeapConfigText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advWeapConfigText forecolor 0.525 0.525 0.525 1
+				setitemcolor advVideoText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advVideoText forecolor 0.525 0.525 0.525 1
+				setitemcolor advShaderText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advShaderText forecolor 0.525 0.525 0.525 1
+				setitemcolor advSoundText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advSoundText forecolor 0.525 0.525 0.525 1
+				setitemcolor advSpectatingText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advSpectatingText forecolor 0.525 0.525 0.525 1
+			}
+			onFocus {
+				transition btn2t 93 20 70 15 92 20 70 15 20 10
+			}
+		}
+		/*
+
+		itemDef {
+			name btn3t
+			text "DLC"
+			textscale .20
+			style WINDOW_STYLE_FILLED	
+			rect 164 20 70 15 
+			backcolor 0.133 0.133 0.133 1.0
+			forecolor 0.525 0.525 0.525 1
+			textalign ITEM_ALIGN_CENTER
+			textalignx 32       
+      		textaligny 11
+			decoration
+			visible 1 	  
+		}
+
+		itemDef {
+			name btn3
+			type 1
+			group grpControlbutton
+			style WINDOW_STYLE_FILLED
+			rect 164 20 70 15
+			backcolor 0 0 0 0
+			visible 1
+			cvarTest "g_training"
+			hideCvar { "1" }
+			action { hide basic ; hide grpControls ; hide grpControlsAdvMenu ; hide advGame ; show dlc ;
+				setitemcolor btn3t backcolor 0.8 .8 .8 1.0
+				setitemcolor btn3t forecolor 0.729 0.439 0.039 1
+				setitemcolor btn1t backcolor 0.133 0.133 0.133 1.0
+				setitemcolor btn1t forecolor 0.525 0.525 0.525 1
+				setitemcolor btn2t backcolor 0.133 0.133 0.133 1.0
+				setitemcolor btn2t forecolor 0.525 0.525 0.525 1
+				setitemcolor advGameText backcolor .3 .3 .3 1
+				setitemcolor advGameText forecolor 0.964 0.815 0 1
+				setitemcolor advHudText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advHudText forecolor 0.525 0.525 0.525 1
+				setitemcolor advTeamText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advTeamText forecolor 0.525 0.525 0.525 1
+				setitemcolor advWeapText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advWeapText forecolor 0.525 0.525 0.525 1
+				setitemcolor advWeapConfigText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advWeapConfigText forecolor 0.525 0.525 0.525 1
+				setitemcolor advVideoText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advVideoText forecolor 0.525 0.525 0.525 1
+				setitemcolor advShaderText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advShaderText forecolor 0.525 0.525 0.525 1
+				setitemcolor advSoundText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advSoundText forecolor 0.525 0.525 0.525 1
+				setitemcolor advSpectatingText backcolor 0.133 0.133 0.133 1.0
+				setitemcolor advSpectatingText forecolor 0.525 0.525 0.525 1
+			}
+			onFocus {
+				transition btn3t 165 20 70 15 164 20 70 15 20 10
+			}
+		}
+		*/
+
+	#include "ui/ingame_options_basic.menu"
+	#include "ui/ingame_options_advanced.menu"
+	//#include "ui/ingame_options_dlc.menu"
+	}
+}
