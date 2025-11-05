@@ -205,10 +205,40 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CG_VOICE_NAME 63
 #define CG_PLAYER_HASFLAG2D 64            
 #define CG_HARVESTER_SKULLS2D 65					// only shows in harvester
-#define CG_CAPFRAGLIMIT 66	 
+#define CG_CAPFRAGLIMIT 66
 #define CG_1STPLACE 67
 #define CG_2NDPLACE 68
 #define CG_CAPTURES 69
+
+
+// Quake Live spectator HUD owner-draw identifiers
+#define CG_1ST_PLACE_SCORE 70
+#define CG_2ND_PLACE_SCORE 71
+#define CG_PLAYER_OBIT 72
+#define CG_LEVELTIMER 73
+#define CG_ROUNDTIMER 74
+#define CG_OVERTIME 75
+
+#define CG_HEALTH_COLORIZED 76
+#define CG_ARMORTIERED_COLORIZED 77
+#define CG_TEAM_COLORIZED 78
+
+#define CG_1ST_PLYR 79
+#define CG_1ST_PLYR_SCORE 80
+#define CG_1ST_PLYR_HEALTH_ARMOR 81
+
+#define CG_2ND_PLYR 82
+#define CG_2ND_PLYR_SCORE 83
+#define CG_2ND_PLYR_HEALTH_ARMOR 84
+
+#define CG_FOLLOW_PLAYER_NAME_EX 85
+#define CG_MATCH_WINNER 86
+#define CG_RACE_STATUS 87
+#define CG_RACE_TIMES 88
+#define CG_FLAG_STATUS 89
+#define CG_RED_BASESTATUS 90
+#define CG_BLUE_BASESTATUS 91
+#define CG_PLAYER_HASKEY 92
 
 
 
