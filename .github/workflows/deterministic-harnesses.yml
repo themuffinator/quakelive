@@ -1,0 +1,64 @@
+name: Deterministic Harnesses
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  harnesses:
+    name: Harnesses (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [qvm, dll]
+        include:
+          - target: qvm
+            os: ubuntu-latest
+            label: QVM
+          - target: dll
+            os: windows-latest
+            label: DLL
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify QVM toolchain
+        if: matrix.target == 'qvm'
+        run: tools/ci/verify-qvm-toolchain.sh
+
+      - name: Install Visual Studio 2010 components
+        if: matrix.target == 'dll'
+        shell: pwsh
+        run: tools/ci/install-vs-v100.ps1
+
+      - name: Build Win32 gameplay DLLs
+        if: matrix.target == 'dll'
+        shell: pwsh
+        run: |
+          tools/ci/verify-vs-toolchain.ps1 -RequireV100
+          tools/ci/build-windows-dlls.ps1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run deterministic harness suites
+        if: matrix.target == 'qvm'
+        run: |
+          python tests/run_harnesses.py --target ${{ matrix.target }}
+
+      - name: Run deterministic harness suites (Windows)
+        if: matrix.target == 'dll'
+        shell: pwsh
+        run: |
+          python tests/run_harnesses.py --target ${{ matrix.target }}
+
+      - name: Upload harness artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-${{ matrix.target }}
+          path: artifacts/tests
+          retention-days: 7
