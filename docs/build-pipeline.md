@@ -47,3 +47,24 @@ The goal is to preserve the Quake III VM pipeline while layering in a native DLL
    - Once the native modules reach feature parity, gate new development on running the same test suite against both bytecode and DLL outputs to ensure behaviour stays aligned.
 
 By running the VM and native workflows side by side, the project can continue leveraging the deterministic QVM toolchain for compatibility checks while enabling contributors to move toward the Visual Studio 2010-style DLLs required to truly mirror Quake Live.
+
+## Test Automation and CI Expectations
+
+To support the gameplay testing strategy, CI must offer the following automation:
+
+- **Dual-Target Build Matrix:** Configure workflows with a `target` axis (`qvm`, `dll`). The QVM leg invokes the existing `Construct` scripts, while the DLL leg drives MSBuild or CMake presets configured for the Visual Studio 2010 toolset.
+- **Harness Bootstrapping:** Before running tests, stage the shared harness utilities from `tests/` (Python dependencies, data packs) and compile the native/QVM fixture runners. Package the compiled shims (`tests/bin/qvm/*`, `tests/bin/dll/*`) for reuse across suites.
+- **Test Execution:** For each leg, run `python tests/run_all.py --target <target>` which fans out to the deterministic match, rules engine, client regression, and syscall verification suites. Failures must surface unified diff snippets plus a link to the archived artefacts.
+- **Artefact Publication:** Upload JSON logs, baseline diffs, and syscall traces to the CI job artefacts directory under `tests/<suite>/<target>/latest/`. These provide reviewers with parity evidence without reproducing the run locally.
+- **Status Badges:** Expose separate build badges (e.g., `Tests (QVM)`, `Tests (DLL)`) so contributors can quickly see which target failed.
+
+### Expected Contributor Outputs
+
+When contributors run the suites locally they should capture and attach the following to pull requests:
+
+1. Summary table emitted by `tests/run_all.py` indicating pass/fail per suite for both targets.
+2. Any updated baseline hashes committed alongside the change, with justification in the PR description.
+3. Notes in `docs/behaviour-deltas.md` describing intentional divergences that caused baseline updates.
+4. For syscall contract changes, an updated `tests/syscall_contract.expect` outlining the new interface surface.
+
+This workflow ensures gameplay changes demonstrate target parity and codifies the artefacts maintainers require during reviews.

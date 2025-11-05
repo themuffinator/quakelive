@@ -24,3 +24,6 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
 1. Familiarize yourself with the HLIL dump organization so that Quake Live specific behaviors can be tracked back to decompiled functions.
 2. Compare modules in `src/code/` against their HLIL equivalents to identify divergences that must be ported.
 3. Keep the documentation in this overview updated as the project introduces new directories, tooling, or reverse-engineered components.
+
+## Documentation Backlog
+A curated backlog of in-progress documentation efforts lives in `docs/documentation-backlog.md`. New contributors should review it to understand pending write-ups for behaviour deltas, platform support notes, and HUD/menu follow-ups before starting related work.
