@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/q_shared.h"
 #include "qcommon.h"
 #include <setjmp.h>
+#include <ctype.h>
 #ifdef __linux__
 #include <netinet/in.h>
 #else
@@ -2239,9 +2240,11 @@ static void Com_Crash_f( void ) {
 //   not sure it's necessary to have different defaults for regular and dedicated, but I don't want to risk it
 //   https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=470
 #ifndef DEDICATED
-char	cl_cdkey[34] = "                                ";
+char	cl_cdkey[QL_AUTH_MAX_CREDENTIAL_STORAGE] = "";
+char	cl_cdkey_mod[QL_AUTH_MAX_CREDENTIAL_STORAGE] = "";
 #else
-char	cl_cdkey[34] = "123456789";
+char	cl_cdkey[QL_AUTH_MAX_CREDENTIAL_STORAGE] = "123456789";
+char	cl_cdkey_mod[QL_AUTH_MAX_CREDENTIAL_STORAGE] = "";
 #endif
 
 /*
@@ -2250,28 +2253,195 @@ Com_ReadCDKey
 =================
 */
 qboolean CL_CDKeyValidate( const char *key, const char *checksum );
-void Com_ReadCDKey( const char *filename ) {
-	fileHandle_t	f;
-	char			buffer[33];
-	char			fbuffer[MAX_OSPATH];
+static char *Com_StripLeadingWhitespace( char *text ) {
+	if ( !text ) {
+		return text;
+	}
 
-	sprintf(fbuffer, "%s/q3key", filename);
+	while ( *text && isspace( (unsigned char)*text ) ) {
+		text++;
+	}
 
-	FS_SV_FOpenFileRead( fbuffer, &f );
-	if ( !f ) {
-		Q_strncpyz( cl_cdkey, "                ", 17 );
+	return text;
+}
+
+static void Com_StripTrailingWhitespace( char *text ) {
+	char	*end;
+
+	if ( !text ) {
 		return;
 	}
 
-	Com_Memset( buffer, 0, sizeof(buffer) );
+	end = text + strlen( text );
+	while ( end > text && isspace( (unsigned char)*( end - 1 ) ) ) {
+		*( --end ) = '\0';
+	}
+}
 
-	FS_Read( buffer, 16, f );
+static qlAuthCredentialKind Com_ParseCredentialKindLabel( const char *label ) {
+	if ( !label || !*label ) {
+		return QL_AUTH_CREDENTIAL_EMPTY;
+	}
+
+	if ( !Q_stricmp( label, "legacy_cdkey" ) || !Q_stricmp( label, "legacy" ) || !Q_stricmp( label, "cdkey" ) ) {
+		return QL_AUTH_CREDENTIAL_LEGACY_CDKEY;
+	}
+
+	if ( !Q_stricmp( label, "steam" ) ) {
+		return QL_AUTH_CREDENTIAL_STEAM;
+	}
+
+	if ( !Q_stricmp( label, "standalone" ) || !Q_stricmp( label, "standalone_token" ) ) {
+		return QL_AUTH_CREDENTIAL_STANDALONE_TOKEN;
+	}
+
+	return QL_AUTH_CREDENTIAL_EMPTY;
+}
+
+static qboolean Com_ParseStoredCredentialLine( const char *line, ql_auth_credential_t *credential ) {
+	char	local[QL_AUTH_MAX_CREDENTIAL_STORAGE + 64];
+	char	*cursor;
+	char	*value;
+	qlAuthCredentialKind kind;
+
+	if ( !line || !credential ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( local, line, sizeof( local ) );
+
+	cursor = Com_StripLeadingWhitespace( local );
+	Com_StripTrailingWhitespace( cursor );
+
+	if ( cursor[0] == '\0' ) {
+		return qfalse;
+	}
+
+	if ( cursor[0] == '/' && cursor[1] == '/' ) {
+		return qfalse;
+	}
+
+	value = cursor;
+	while ( *value && !isspace( (unsigned char)*value ) ) {
+		value++;
+	}
+
+	if ( *value ) {
+		*value = '\0';
+		value++;
+		value = Com_StripLeadingWhitespace( value );
+		Com_StripTrailingWhitespace( value );
+
+		if ( value[0] == '\0' ) {
+			return qfalse;
+		}
+
+		kind = Com_ParseCredentialKindLabel( cursor );
+		if ( kind == QL_AUTH_CREDENTIAL_EMPTY ) {
+			return qfalse;
+		}
+
+		if ( kind == QL_AUTH_CREDENTIAL_LEGACY_CDKEY ) {
+			return QL_ParseLegacyCDKey( value, credential );
+		}
+
+		return QL_ParsePlatformToken( value, kind, credential );
+	}
+
+	return QL_ParseCredentialString( cursor, credential );
+}
+
+static qboolean Com_LoadStoredCredential( const char *filename, ql_auth_credential_t *out ) {
+	fileHandle_t	f;
+	char	fbuffer[MAX_OSPATH];
+	int	fileLen;
+	int	readLen;
+	char	contents[QL_AUTH_MAX_CREDENTIAL_STORAGE + 256];
+	char	*cursor;
+	qboolean	parsed = qfalse;
+
+	if ( !filename || !filename[0] || !out ) {
+		return qfalse;
+	}
+
+	QL_InitAuthCredential( out );
+
+	Com_sprintf( fbuffer, sizeof( fbuffer ), "%s/q3key", filename );
+
+	fileLen = FS_SV_FOpenFileRead( fbuffer, &f );
+	if ( !f || fileLen <= 0 ) {
+		if ( f ) {
+			FS_FCloseFile( f );
+		}
+		return qfalse;
+	}
+
+	if ( fileLen >= (int)sizeof( contents ) ) {
+		fileLen = sizeof( contents ) - 1;
+	}
+
+	readLen = FS_Read( contents, fileLen, f );
 	FS_FCloseFile( f );
 
-	if (CL_CDKeyValidate(buffer, NULL)) {
-		Q_strncpyz( cl_cdkey, buffer, 17 );
+	if ( readLen <= 0 ) {
+		return qfalse;
+	}
+
+	contents[readLen] = '\0';
+
+	cursor = contents;
+	while ( cursor && *cursor ) {
+		char	*lineEnd = strchr( cursor, '\n' );
+		size_t	segmentLen = lineEnd ? (size_t)( lineEnd - cursor ) : strlen( cursor );
+		char	line[QL_AUTH_MAX_CREDENTIAL_STORAGE + 64];
+
+		if ( segmentLen >= sizeof( line ) ) {
+			segmentLen = sizeof( line ) - 1;
+		}
+
+		Com_Memcpy( line, cursor, segmentLen );
+		line[segmentLen] = '\0';
+
+		if ( Com_ParseStoredCredentialLine( line, out ) ) {
+			parsed = qtrue;
+			break;
+		}
+
+		if ( lineEnd ) {
+			cursor = lineEnd + 1;
+		} else {
+			break;
+		}
+	}
+
+	if ( !parsed ) {
+		QL_InitAuthCredential( out );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static void Com_CopyCredentialToBuffer( const ql_auth_credential_t *credential, char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	if ( !credential || credential->kind == QL_AUTH_CREDENTIAL_EMPTY || credential->length == 0 ) {
+		buffer[0] = '\0';
+		return;
+	}
+
+	QL_FormatCredentialForAuthorize( credential, buffer, bufferSize );
+}
+
+void Com_ReadCDKey( const char *filename ) {
+	ql_auth_credential_t	credential;
+
+	if ( Com_LoadStoredCredential( filename, &credential ) ) {
+		Com_CopyCredentialToBuffer( &credential, cl_cdkey, sizeof( cl_cdkey ) );
 	} else {
-		Q_strncpyz( cl_cdkey, "                ", 17 );
+		cl_cdkey[0] = '\0';
 	}
 }
 
@@ -2281,27 +2451,12 @@ Com_AppendCDKey
 =================
 */
 void Com_AppendCDKey( const char *filename ) {
-	fileHandle_t	f;
-	char			buffer[33];
-	char			fbuffer[MAX_OSPATH];
+	ql_auth_credential_t	credential;
 
-	sprintf(fbuffer, "%s/q3key", filename);
-
-	FS_SV_FOpenFileRead( fbuffer, &f );
-	if (!f) {
-		Q_strncpyz( &cl_cdkey[16], "                ", 17 );
-		return;
-	}
-
-	Com_Memset( buffer, 0, sizeof(buffer) );
-
-	FS_Read( buffer, 16, f );
-	FS_FCloseFile( f );
-
-	if (CL_CDKeyValidate(buffer, NULL)) {
-		strcat( &cl_cdkey[16], buffer );
+	if ( Com_LoadStoredCredential( filename, &credential ) ) {
+		Com_CopyCredentialToBuffer( &credential, cl_cdkey_mod, sizeof( cl_cdkey_mod ) );
 	} else {
-		Q_strncpyz( &cl_cdkey[16], "                ", 17 );
+		cl_cdkey_mod[0] = '\0';
 	}
 }
 
@@ -2312,19 +2467,45 @@ Com_WriteCDKey
 =================
 */
 static void Com_WriteCDKey( const char *filename, const char *ikey ) {
-	fileHandle_t	f;
-	char			fbuffer[MAX_OSPATH];
-	char			key[17];
+        fileHandle_t    f;
+        char                    fbuffer[MAX_OSPATH];
+        ql_auth_credential_t    credential;
+        const char      *label;
 
+        if ( !filename || !filename[0] || !ikey || !ikey[0] ) {
+                return;
+        }
 
-	sprintf(fbuffer, "%s/q3key", filename);
+        if ( !QL_ParseCredentialString( ikey, &credential ) ) {
+                return;
+        }
 
+        if ( credential.kind == QL_AUTH_CREDENTIAL_LEGACY_CDKEY ) {
+                if ( !CL_CDKeyValidate( credential.value, NULL ) ) {
+                        return;
+                }
+        }
 
-	Q_strncpyz( key, ikey, 17 );
+        label = QL_GetCredentialLabel( &credential );
+        if ( !label || !label[0] ) {
+                return;
+        }
 
-	if(!CL_CDKeyValidate(key, NULL) ) {
-		return;
-	}
+        Com_sprintf( fbuffer, sizeof( fbuffer ), "%s/q3key", filename );
+
+        f = FS_SV_FOpenFileWrite( fbuffer );
+        if ( !f ) {
+                Com_Printf ("Couldn't write %s.\n", filename );
+                return;
+        }
+
+        FS_Printf( f, "%s %s\n", label, credential.value );
+        FS_Printf( f, "// generated by quake, do not modify\r\n" );
+        FS_Printf( f, "// Do not give this file to ANYONE.\r\n" );
+        FS_Printf( f, "// id Software and Activision will NOT ask you to send this file to them.\r\n" );
+
+        FS_FCloseFile( f );
+}
 
 	f = FS_SV_FOpenFileWrite( fbuffer );
 	if ( !f ) {
@@ -2547,7 +2728,11 @@ void Com_WriteConfiguration( void ) {
 #ifndef DEDICATED
 	fs = Cvar_Get ("fs_game", "", CVAR_INIT|CVAR_SYSTEMINFO );
 	if (UI_usesUniqueCDKey() && fs && fs->string[0] != 0) {
-		Com_WriteCDKey( fs->string, &cl_cdkey[16] );
+		if ( cl_cdkey_mod[0] ) {
+			Com_WriteCDKey( fs->string, cl_cdkey_mod );
+		} else {
+			Com_WriteCDKey( fs->string, cl_cdkey );
+		}
 	} else {
 		Com_WriteCDKey( "baseq3", cl_cdkey );
 	}
