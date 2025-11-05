@@ -25,5 +25,9 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
 2. Compare modules in `src/code/` against their HLIL equivalents to identify divergences that must be ported.
 3. Keep the documentation in this overview updated as the project introduces new directories, tooling, or reverse-engineered components.
 
+## Controls & Configuration Defaults
+- **Reference bindings** – The Quake Live snapshot in `references/original-assets/quakelive/baseq3/default.cfg` captures the modernized control scheme (weapon toggle on `F`, dedicated drop bindings, vote shortcuts, etc.).【68ce2a†L215-L224】【fcaf97†L1-L86】 Ported builds should ship this file—alongside curated training configs such as `tim.cfg` and `sponge.cfg`—so the engine can execute `exec default.cfg` during bootstrap without diverging from retail expectations.【F:src/code/qcommon/common.c†L2389-L2405】【F:src/code/ui/ui_main.c†L3223-L3263】
+- **Packaging requirement** – Ensure any PK3 or installer produced from this repo places the Quake Live `default.cfg` at the data root; the filesystem layer treats its absence as a fatal error.【F:src/code/qcommon/files.c†L3260-L3314】 Coordinate asset packaging with the workflow outlined in `docs/quakelive_asset_audit.md` so HUD/menu assets and configuration defaults stay in sync.
+
 ## Documentation Backlog
 A curated backlog of in-progress documentation efforts lives in `docs/documentation-backlog.md`. New contributors should review it to understand pending write-ups for behaviour deltas, platform support notes, and HUD/menu follow-ups before starting related work.
