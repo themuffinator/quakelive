@@ -1,0 +1,139 @@
+module_file,function,string_literal,asset_reference,asset_exists,asset_path,notes
+cgamex86.dll_hlil_part01.txt,0x10006e65 sub_10057940,ui/hud.txt,ui/hud.txt,yes,references/original-assets/quakelive/baseq3/ui/hud.txt,
+cgamex86.dll_hlil_part01.txt,0x100253f0 sub_100253f0,ui/country.txt,ui/country.txt,yes,references/original-assets/quakelive/baseq3/ui/country.txt,
+cgamex86.dll_hlil_part01.txt,0x10025486 sub_100639d9,ui/country.txt,ui/country.txt,yes,references/original-assets/quakelive/baseq3/ui/country.txt,
+cgamex86.dll_hlil_part01.txt,0x10025b54 sub_10025590,ui/testhud.menu,ui/testhud.menu,no,,Asset not present under baseq3 snapshot
+cgamex86.dll_hlil_part01.txt,0x10025ce0 sub_10020a90,ui/hud.txt,ui/hud.txt,yes,references/original-assets/quakelive/baseq3/ui/hud.txt,
+cgamex86.dll_hlil_part01.txt,0x10029120 sub_10029120,ui/hud.txt,ui/hud.txt,yes,references/original-assets/quakelive/baseq3/ui/hud.txt,
+cgamex86.dll_hlil_part01.txt,0x1003d500 sub_10057510,models/players/%s/animation.cfg,models/players/%s/animation.cfg,no,,Patterned asset reference requires runtime substitution
+cgamex86.dll_hlil_part01.txt,0x10048ba9 sub_10057510,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/hud.txt,ui/hud.txt,yes,references/original-assets/quakelive/baseq3/ui/hud.txt,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_rr.menu,ui/end_scoreboard_rr.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_rr.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_ad.menu,ui/end_scoreboard_ad.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_ad.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_dom.menu,ui/end_scoreboard_dom.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_dom.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_ft.menu,ui/end_scoreboard_ft.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_ft.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_har.menu,ui/end_scoreboard_har.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_har.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_1fctf.menu,ui/end_scoreboard_1fctf.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_1fctf.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_ctf.menu,ui/end_scoreboard_ctf.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_ctf.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_ca.menu,ui/end_scoreboard_ca.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_ca.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_tdm.menu,ui/end_scoreboard_tdm.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_tdm.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_race.menu,ui/end_scoreboard_race.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_race.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_duel.menu,ui/end_scoreboard_duel.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_duel.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/end_scoreboard_ffa.menu,ui/end_scoreboard_ffa.menu,yes,references/original-assets/quakelive/baseq3/ui/end_scoreboard_ffa.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_rr.menu,ui/ingame_scoreboard_rr.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_rr.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_ad.menu,ui/ingame_scoreboard_ad.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_ad.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_dom.menu,ui/ingame_scoreboard_dom.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_dom.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_ft.menu,ui/ingame_scoreboard_ft.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_ft.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_har.menu,ui/ingame_scoreboard_har.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_har.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_1fctf.menu,ui/ingame_scoreboard_1fctf.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_1fctf.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_ctf.menu,ui/ingame_scoreboard_ctf.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_ctf.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_ca.menu,ui/ingame_scoreboard_ca.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_ca.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_tdm.menu,ui/ingame_scoreboard_tdm.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_tdm.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_race.menu,ui/ingame_scoreboard_race.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_race.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_duel.menu,ui/ingame_scoreboard_duel.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_duel.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingame_scoreboard_ffa.menu,ui/ingame_scoreboard_ffa.menu,yes,references/original-assets/quakelive/baseq3/ui/ingame_scoreboard_ffa.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingamestats.menu,ui/ingamestats.menu,yes,references/original-assets/quakelive/baseq3/ui/ingamestats.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/comp_spectator_follow.menu,ui/comp_spectator_follow.menu,yes,references/original-assets/quakelive/baseq3/ui/comp_spectator_follow.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/comp_spectator.menu,ui/comp_spectator.menu,yes,references/original-assets/quakelive/baseq3/ui/comp_spectator.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/spectator_follow.menu,ui/spectator_follow.menu,yes,references/original-assets/quakelive/baseq3/ui/spectator_follow.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/spectator.menu,ui/spectator.menu,yes,references/original-assets/quakelive/baseq3/ui/spectator.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/endscorenoteam.menu,ui/endscorenoteam.menu,yes,references/original-assets/quakelive/baseq3/ui/endscorenoteam.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/endscoreteam.menu,ui/endscoreteam.menu,yes,references/original-assets/quakelive/baseq3/ui/endscoreteam.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingamescorenoteam.menu,ui/ingamescorenoteam.menu,yes,references/original-assets/quakelive/baseq3/ui/ingamescorenoteam.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/ingamescoreteam.menu,ui/ingamescoreteam.menu,yes,references/original-assets/quakelive/baseq3/ui/ingamescoreteam.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/intro.menu,ui/intro.menu,yes,references/original-assets/quakelive/baseq3/ui/intro.menu,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/testhud.menu,ui/testhud.menu,no,,Asset not present under baseq3 snapshot
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,"^1default menu file not found: ui/hud.txt, unable to continue!\n",ui/hud.txt,yes,references/original-assets/quakelive/baseq3/ui/hud.txt,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,ui/country.txt,ui/country.txt,yes,references/original-assets/quakelive/baseq3/ui/country.txt,
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,models/players/%s/animation.cfg,models/players/%s/animation.cfg,no,,Patterned asset reference requires runtime substitution
+cgamex86.dll_hlil_part02.txt,0x10064260 sub_10064260,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+qagamex86.dll.bndb_hlil_part01.txt,0x10042af3 sub_10070cb0,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+qagamex86.dll.bndb_hlil_part01.txt,0x10042975 sub_10070be0,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+qagamex86.dll.bndb_hlil_part02.txt,0x1007b9a5 sub_100793a0,scripts/bots.txt,scripts/bots.txt,yes,references/original-assets/quakelive/baseq3/scripts/bots.txt,
+qagamex86.dll.bndb_hlil_part02.txt,0x1007b9a5 sub_100793a0,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+qagamex86.dll.bndb_hlil_part02.txt,0x1007b9a5 sub_100793a0,access.txt,access.txt,no,,Asset not present under baseq3 snapshot
+qagamex86.dll.bndb_hlil_part03.txt,global/data,access.txt,access.txt,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part02.txt,0x0045ecb4 sub_4d2d80,.arena,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part02.txt,0x0045ef23 sub_4d9160,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+quakelive_steam.exe_hlil_part04.txt,0x004b04ff sub_4d9160,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+quakelive_steam.exe_hlil_part04.txt,0x004c8720 sub_4d9a60,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cb470 sub_4cb370,qzconfig.cfg,qzconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004cb470 sub_4cb370,repconfig.cfg,repconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004cb533 sub_4d9a60,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cb5e5 sub_4d9a60,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cb687 sub_4d9a60,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cc19d sub_4c7cf0,exec default.cfg\n,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+quakelive_steam.exe_hlil_part04.txt,0x004cc1c5 sub_4cef10,qzconfig.cfg,qzconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004cc264 sub_4afbf0,exec server.cfg\n,server.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004cc282 sub_4c7cf0,exec qzconfig.cfg\n,qzconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004cc282 sub_4c7cf0,exec repconfig.cfg\n,repconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004cc2a3 sub_4c7cf0,exec autoexec.cfg\n,autoexec.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004cfab2 sub_4d9060,.txt,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cfab2 sub_4d9060,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cfab2 sub_4d9060,.arena,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cfab2 sub_4d9060,.menu,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cf96d sub_4d9060,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cf983 sub_4d9060,.menu,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cfd09 sub_4d9060,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004cfd09 sub_4d9060,.menu,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004d1098 sub_4ecd40,/description.txt,/description.txt,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004d1538 sub_4c9860,example: fdir *q3dm*.bsp\n,*q3dm*.bsp,no,,Patterned asset reference requires runtime substitution
+quakelive_steam.exe_hlil_part04.txt,0x004d2b24 sub_4c9b60,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part04.txt,0x004d3598 sub_4d2af0,default.cfg,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+quakelive_steam.exe_hlil_part04.txt,0x004d35a0 sub_4c9b60,Couldn't load default.cfg,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+quakelive_steam.exe_hlil_part04.txt,0x004d3640 sub_4d2af0,default.cfg,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+quakelive_steam.exe_hlil_part04.txt,0x004d36e9 sub_4c7cf0,exec qzconfig.cfg\n,qzconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part04.txt,0x004d36b8 sub_4c9b60,Couldn't load default.cfg,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+quakelive_steam.exe_hlil_part04.txt,0x004ddd6a sub_4d9160,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+quakelive_steam.exe_hlil_part04.txt,0x004de422 sub_4d9160,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+quakelive_steam.exe_hlil_part05.txt,0x004e3705 sub_4c0580,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+quakelive_steam.exe_hlil_part05.txt,0x004e3b10 sub_4ce0d0,mappool.txt,mappool.txt,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,.arena,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,scripts/arenas.txt,scripts/arenas.txt,yes,references/original-assets/quakelive/baseq3/scripts/arenas.txt,
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,maps/%s.bsp,maps/%s.bsp,no,,Patterned asset reference requires runtime substitution
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,scripts/factories.txt,scripts/factories.txt,yes,references/original-assets/quakelive/baseq3/scripts/factories.txt,
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,.cfg,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,qzconfig.cfg,qzconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,repconfig.cfg,repconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,exec autoexec.cfg\n,autoexec.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,exec server.cfg\n,server.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,exec repconfig.cfg\n,repconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,exec qzconfig.cfg\n,qzconfig.cfg,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,exec default.cfg\n,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,zmqpass.txt,zmqpass.txt,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,.txt,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,.menu,,ambiguous,,String contains extension but no direct path (dynamic)
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,/description.txt,/description.txt,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,example: fdir *q3dm*.bsp\n,*q3dm*.bsp,no,,Patterned asset reference requires runtime substitution
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,Couldn\'t load default.cfg,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,default.cfg,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+quakelive_steam.exe_hlil_part06.txt,0x0052b2e0 sub_52b2e0,mappool.txt,mappool.txt,no,,Asset not present under baseq3 snapshot
+quakelive_steam.exe_hlil_part07.txt,global/data,zmqpass.txt,zmqpass.txt,no,,Asset not present under baseq3 snapshot
+uix86.dll_hlil_part01.txt,0x100031f2 sub_10003070,.arena,,ambiguous,,String contains extension but no direct path (dynamic)
+uix86.dll_hlil_part01.txt,0x10004e6a sub_10001900,ui/menus.txt,ui/menus.txt,yes,references/original-assets/quakelive/baseq3/ui/menus.txt,
+uix86.dll_hlil_part01.txt,0x10004fc0 sub_10004fc0,ui/menus.txt,ui/menus.txt,yes,references/original-assets/quakelive/baseq3/ui/menus.txt,
+uix86.dll_hlil_part01.txt,0x10005680 sub_100053c0,%s.roq,%s.roq,no,,Patterned asset reference requires runtime substitution
+uix86.dll_hlil_part01.txt,0x1000ac8f sub_100016c0,.roq,,ambiguous,,String contains extension but no direct path (dynamic)
+uix86.dll_hlil_part01.txt,0x1000b581 sub_100016c0,exec default.cfg\n,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+uix86.dll_hlil_part01.txt,0x1000bb11 sub_10001900,cinematic %s.roq 2\n,%s.roq,no,,Patterned asset reference requires runtime substitution
+uix86.dll_hlil_part01.txt,0x1000ef3e sub_10001900,%s.roq,%s.roq,no,,Patterned asset reference requires runtime substitution
+uix86.dll_hlil_part01.txt,0x1000ecd9 sub_10001900,%s.roq,%s.roq,no,,Patterned asset reference requires runtime substitution
+uix86.dll_hlil_part01.txt,0x1000fdbe sub_1000f2b0,ui/menus.txt,ui/menus.txt,yes,references/original-assets/quakelive/baseq3/ui/menus.txt,
+uix86.dll_hlil_part01.txt,0x1000fe01 sub_10004e10,ui/ingame.txt,ui/ingame.txt,yes,references/original-assets/quakelive/baseq3/ui/ingame.txt,
+uix86.dll_hlil_part01.txt,0x10010080 sub_10010080,ui/menus.txt,ui/menus.txt,yes,references/original-assets/quakelive/baseq3/ui/menus.txt,
+uix86.dll_hlil_part01.txt,0x100141d3 sub_10001830,models/players/%s/animation.cfg,models/players/%s/animation.cfg,no,,Patterned asset reference requires runtime substitution
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,scripts/arenas.txt,scripts/arenas.txt,yes,references/original-assets/quakelive/baseq3/scripts/arenas.txt,
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,.arena,,ambiguous,,String contains extension but no direct path (dynamic)
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,scripts/bots.txt,scripts/bots.txt,yes,references/original-assets/quakelive/baseq3/scripts/bots.txt,
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,ui/hud.txt,ui/hud.txt,yes,references/original-assets/quakelive/baseq3/ui/hud.txt,
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,ui/menus.txt,ui/menus.txt,yes,references/original-assets/quakelive/baseq3/ui/menus.txt,
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,"^1default menu file not found: ui/menus.txt, unable to continue!\n",ui/menus.txt,yes,references/original-assets/quakelive/baseq3/ui/menus.txt,
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,gameinfo.txt,gameinfo.txt,no,,Asset not present under baseq3 snapshot
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,%s.roq,%s.roq,no,,Patterned asset reference requires runtime substitution
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,.roq,,ambiguous,,String contains extension but no direct path (dynamic)
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,exec default.cfg\n,default.cfg,yes,references/original-assets/quakelive/baseq3/default.cfg,
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,cinematic %s.roq 2\n,%s.roq,no,,Patterned asset reference requires runtime substitution
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,ui/teaminfo.txt,ui/teaminfo.txt,yes,references/original-assets/quakelive/baseq3/ui/teaminfo.txt,
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,ui/ingame.txt,ui/ingame.txt,yes,references/original-assets/quakelive/baseq3/ui/ingame.txt,
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,models/players/%s/animation.cfg,models/players/%s/animation.cfg,no,,Patterned asset reference requires runtime substitution
+uix86.dll_hlil_part01.txt,0x10021270 sub_10021270,models/players/characters/%s/animation.cfg,models/players/characters/%s/animation.cfg,no,,Patterned asset reference requires runtime substitution
