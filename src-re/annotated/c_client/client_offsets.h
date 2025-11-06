@@ -2,40 +2,8 @@
 #define QLR_CLIENT_OFFSETS_H
 
 #include <stddef.h>
-#include <stdint.h>
 
-/*
- * The annotated shims keep small mirrors of key Quake Live data structures so
- * that offsets and field widths can be referenced without pulling in the full
- * GPL headers.  Each typedef mirrors the packed layout that CL_Frame and the
- * snapshot interpolation code touch.
- */
-
-typedef struct {
-    int32_t valid;              /* qboolean in the original engine */
-    int32_t snapFlags;
-    int32_t serverTime;
-    int32_t messageNum;
-    int32_t deltaNum;
-    int32_t ping;
-    uint8_t areamask[32];       /* MAX_MAP_AREA_BYTES in baseq3 */
-    int32_t cmdNum;
-    /* playerState_t is large; we only expose its size for offset tables. */
-    uint8_t playerState[0x16C];
-    int32_t numEntities;
-    int32_t parseEntitiesNum;
-    int32_t serverCommandNum;
-} qlr_cl_snapshot_t; /* sizeof == 0x1D4 (468) with the trimmed playerState */
-
-typedef struct {
-    qlr_cl_snapshot_t latest;
-    int32_t serverTime;
-    int32_t oldServerTime;
-    int32_t oldFrameServerTime;
-    int32_t serverTimeDelta;
-    int32_t extrapolatedSnapshot;    /* qboolean */
-    int32_t newSnapshots;            /* qboolean */
-} qlr_client_timing_window_t;
+#include "../include/ql_types.h"
 
 typedef struct {
     const char *fieldName;

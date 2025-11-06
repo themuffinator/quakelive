@@ -13,32 +13,6 @@
  * reasoned about without pulling in the original headers.
  */
 
-typedef struct {
-    void (*stopAllSounds)(void);                       /* S_StopAllSounds */
-    void (*setActiveMenu)(int menuId);                 /* VM_Call(uivm, UI_SET_ACTIVE_MENU, ...) */
-    void (*writeDemoMessage)(void *msg, int header);   /* CL_WriteDemoMessage */
-    void (*checkTimeout)(qlr_client_connection_shadow_t *clc,
-                         qlr_client_static_shadow_t *cls,
-                         qlr_client_active_shadow_t *cl);
-    void (*checkUserinfo)(void);
-    void (*readPackets)(void);
-    void (*sendCmd)(void);
-    void (*predictMovement)(void);
-    void (*runConsole)(void);
-    void (*updateScreen)(void);
-    void (*setCGameTime)(void);
-    void (*firstSnapshot)(void);
-    void (*beginProfiling)(void);
-} qlr_client_frame_hooks_t;
-
-typedef struct {
-    qlr_client_static_shadow_t *cls;
-    qlr_client_active_shadow_t *cl;
-    qlr_client_connection_shadow_t *clc;
-    qlr_client_frame_cvars_t cvars;
-    qlr_client_frame_hooks_t hooks;
-} qlr_client_frame_context_t;
-
 /*
  * UI enumerants used by the frame bootstrap.  Keeping the values inline makes
  * it obvious to downstream prototype code which stubs need to match the real
