@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
 #include "g_local.h"
+#include "../../../src-re/include/ql_types.h"
 #include <time.h>
 
 level_locals_t	level;
@@ -111,6 +112,29 @@ typedef struct {
 
 gentity_t		g_entities[MAX_GENTITIES];
 gclient_t		g_clients[MAX_CLIENTS];
+
+static qlr_game_frame_context_t *g_qlr_frame_ctx = NULL;
+
+static qlr_game_frame_context_t *G_GetFrameContext( void );
+static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec );
+static void G_StepEntities( qlr_game_frame_context_t *ctx );
+static void G_DispatchEvents( qlr_game_frame_context_t *ctx );
+static void G_FinishClientFrames( qlr_game_frame_context_t *ctx );
+static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued );
+
+void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
+	g_qlr_frame_ctx = ctx;
+
+	if ( g_qlr_frame_ctx ) {
+		g_qlr_frame_ctx->level = ( qlr_level_locals_t * )&level;
+		g_qlr_frame_ctx->entities = ( qlr_gentity_t * )g_entities;
+		g_qlr_frame_ctx->entity_count = level.num_entities;
+	}
+}
+
+void QLR_Game_UnbindFrameContext( void ) {
+	g_qlr_frame_ctx = NULL;
+}
 
 vmCvar_t	g_gametype;
 vmCvar_t	g_dmflags;
@@ -2160,6 +2184,203 @@ void CheckCvars( void ) {
 	}
 }
 
+static qlr_game_frame_context_t *G_GetFrameContext( void ) {
+	if ( !g_qlr_frame_ctx ) {
+		return NULL;
+	}
+
+	g_qlr_frame_ctx->level = ( qlr_level_locals_t * )&level;
+	g_qlr_frame_ctx->entities = ( qlr_gentity_t * )g_entities;
+	g_qlr_frame_ctx->entity_count = level.num_entities;
+
+	return g_qlr_frame_ctx;
+}
+
+static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec ) {
+	gentity_t       *ent;
+	int                     i;
+
+	ent = g_entities;
+	for ( i = 0; i < level.num_entities; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+
+		if ( ent->freeAfterEvent ) {
+			continue;
+		}
+
+		if ( !ent->r.linked && ent->neverFree ) {
+			continue;
+		}
+
+		if ( i < MAX_CLIENTS ) {
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MISSILE ) {
+			continue;
+		}
+
+		if ( ent->s.eType == ET_ITEM || ent->physicsObject ) {
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MOVER ) {
+			continue;
+		}
+
+		G_RunThink( ent );
+	}
+
+	if ( ctx && ctx->hooks.run_scheduled_thinks ) {
+		ctx->hooks.run_scheduled_thinks( msec );
+	}
+}
+
+static void G_StepEntities( qlr_game_frame_context_t *ctx ) {
+	gentity_t       *ent;
+	int                     i;
+
+	ent = g_entities;
+	for ( i = 0; i < level.num_entities; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+
+		if ( ent->freeAfterEvent ) {
+			continue;
+		}
+
+		if ( !ent->r.linked && ent->neverFree ) {
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MISSILE ) {
+			G_RunMissile( ent );
+
+			if ( ctx && ctx->hooks.physics_step && ent->inuse ) {
+				ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+			}
+			continue;
+		}
+
+		if ( ent->s.eType == ET_ITEM || ent->physicsObject ) {
+			G_RunItem( ent );
+
+			if ( ctx && ctx->hooks.physics_step && ent->inuse ) {
+				ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+			}
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MOVER ) {
+			G_RunMover( ent );
+
+			if ( ctx && ctx->hooks.physics_step && ent->inuse ) {
+				ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+			}
+			continue;
+		}
+
+		if ( i < MAX_CLIENTS ) {
+			G_RunClient( ent );
+
+			if ( ctx ) {
+				if ( ctx->hooks.physics_step && ent->inuse ) {
+					ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+				}
+
+				if ( ctx->hooks.client_think && ent->inuse && ent->client ) {
+					ctx->hooks.client_think( ( qlr_gentity_t * )ent );
+				}
+			}
+			continue;
+		}
+
+		if ( ctx && ctx->hooks.physics_step && ent->inuse ) {
+			ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+		}
+	}
+}
+
+static void G_DispatchEvents( qlr_game_frame_context_t *ctx ) {
+	gentity_t       *ent;
+	int                     i;
+
+	ent = g_entities;
+	for ( i = 0; i < level.num_entities; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+
+		if ( ctx && ctx->hooks.fire_event && ent->s.event &&
+			ent->eventTime > level.previousTime && ent->eventTime <= level.time ) {
+			ctx->hooks.fire_event( ( qlr_gentity_t * )ent );
+		}
+
+		if ( level.time - ent->eventTime > EVENT_VALID_MSEC ) {
+			if ( ent->s.event ) {
+				ent->s.event = 0;       // &= EV_EVENT_BITS;
+				if ( ent->client ) {
+					ent->client->ps.externalEvent = 0;
+					// predicted events should never be set to zero
+					//ent->client->ps.events[0] = 0;
+					//ent->client->ps.events[1] = 0;
+				}
+			}
+
+			if ( ent->freeAfterEvent ) {
+				G_FreeEntity( ent );
+				continue;
+			} else if ( ent->unlinkAfterEvent ) {
+				ent->unlinkAfterEvent = qfalse;
+				trap_UnlinkEntity( ent );
+			}
+		}
+	}
+}
+
+static void G_FinishClientFrames( qlr_game_frame_context_t *ctx ) {
+	gentity_t       *ent;
+	int                     i;
+
+	ent = g_entities;
+	for ( i = 0; i < level.maxclients; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+
+		ClientEndFrame( ent );
+
+		if ( ctx && ctx->hooks.client_end_frame && ent->client ) {
+			ctx->hooks.client_end_frame( ( qlr_gentity_t * )ent );
+		}
+	}
+}
+
+static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued ) {
+        CheckTournament();
+        CheckExitRules();
+        CheckTeamStatus();
+        CheckVote();
+        CheckTeamVote( TEAM_RED );
+        CheckTeamVote( TEAM_BLUE );
+        CheckCvars();
+
+        if ( !ctx ) {
+                return;
+        }
+
+        if ( ctx->hooks.begin_match && previousWarmupTime > 0 && level.warmupTime <= 0 ) {
+                ctx->hooks.begin_match();
+        }
+
+        if ( ctx->hooks.begin_intermission && previousIntermissionQueued == 0 && level.intermissionQueued != 0 ) {
+                ctx->hooks.begin_intermission();
+        }
+}
+
 /*
 =============
 G_RunThink
@@ -2193,122 +2414,45 @@ Advances the non-player objects in the world
 ================
 */
 void G_RunFrame( int levelTime ) {
-	int			i;
-	gentity_t	*ent;
-	int			msec;
-int start, end;
+	int		msec;
+	int		previousWarmupTime;
+	int		previousIntermissionQueued;
+	qlr_game_frame_context_t	*ctx;
 
-	// if we are waiting for the level to restart, do nothing
 	if ( level.restarted ) {
 		return;
 	}
 
-	level.framenum++;
+	msec = levelTime - level.time;
+	if ( msec < 0 ) {
+		msec = 0;
+	}
+
+	previousWarmupTime = level.warmupTime;
+	previousIntermissionQueued = level.intermissionQueued;
+
 	level.previousTime = level.time;
 	level.time = levelTime;
-	msec = level.time - level.previousTime;
+	level.msec = msec;
+	level.framenum++;
 
-	// get any cvar changes
+	ctx = G_GetFrameContext();
+
 	G_UpdateCvars();
 
-	//
-	// go through all allocated objects
-	//
-	start = trap_Milliseconds();
-	ent = &g_entities[0];
-	for (i=0 ; i<level.num_entities ; i++, ent++) {
-		if ( !ent->inuse ) {
-			continue;
+	G_DispatchScheduledThinks( ctx, msec );
+	G_StepEntities( ctx );
+	G_DispatchEvents( ctx );
+	G_FinishClientFrames( ctx );
+	G_CheckLevelTimers( ctx, previousWarmupTime, previousIntermissionQueued );
+
+	if ( g_listEntity.integer ) {
+		int		i;
+
+		for ( i = 0; i < MAX_GENTITIES; i++ ) {
+			G_Printf( "%4i: %s\n", i, g_entities[i].classname );
 		}
-
-		// clear events that are too old
-		if ( level.time - ent->eventTime > EVENT_VALID_MSEC ) {
-			if ( ent->s.event ) {
-				ent->s.event = 0;	// &= EV_EVENT_BITS;
-				if ( ent->client ) {
-					ent->client->ps.externalEvent = 0;
-					// predicted events should never be set to zero
-					//ent->client->ps.events[0] = 0;
-					//ent->client->ps.events[1] = 0;
-				}
-			}
-			if ( ent->freeAfterEvent ) {
-				// tempEntities or dropped items completely go away after their event
-				G_FreeEntity( ent );
-				continue;
-			} else if ( ent->unlinkAfterEvent ) {
-				// items that will respawn will hide themselves after their pickup event
-				ent->unlinkAfterEvent = qfalse;
-				trap_UnlinkEntity( ent );
-			}
-		}
-
-		// temporary entities don't think
-		if ( ent->freeAfterEvent ) {
-			continue;
-		}
-
-		if ( !ent->r.linked && ent->neverFree ) {
-			continue;
-		}
-
-		if ( ent->s.eType == ET_MISSILE ) {
-			G_RunMissile( ent );
-			continue;
-		}
-
-		if ( ent->s.eType == ET_ITEM || ent->physicsObject ) {
-			G_RunItem( ent );
-			continue;
-		}
-
-		if ( ent->s.eType == ET_MOVER ) {
-			G_RunMover( ent );
-			continue;
-		}
-
-		if ( i < MAX_CLIENTS ) {
-			G_RunClient( ent );
-			continue;
-		}
-
-		G_RunThink( ent );
-	}
-end = trap_Milliseconds();
-
-start = trap_Milliseconds();
-	// perform final fixups on the players
-	ent = &g_entities[0];
-	for (i=0 ; i < level.maxclients ; i++, ent++ ) {
-		if ( ent->inuse ) {
-			ClientEndFrame( ent );
-		}
-	}
-end = trap_Milliseconds();
-
-	// see if it is time to do a tournement restart
-	CheckTournament();
-
-	// see if it is time to end the level
-	CheckExitRules();
-
-	// update to team status?
-	CheckTeamStatus();
-
-	// cancel vote if timed out
-	CheckVote();
-
-	// check team votes
-	CheckTeamVote( TEAM_RED );
-	CheckTeamVote( TEAM_BLUE );
-
-	// for tracking changes
-	CheckCvars();
-
-	if (g_listEntity.integer) {
-		for (i = 0; i < MAX_GENTITIES; i++) {
-			G_Printf("%4i: %s\n", i, g_entities[i].classname);
-		}
-		trap_Cvar_Set("g_listEntity", "0");
+		trap_Cvar_Set( "g_listEntity", "0" );
 	}
 }
+

@@ -454,6 +454,7 @@ typedef struct {
 	int			framenum;
 	int			time;					// in msec
 	int			previousTime;			// so movers can back up when blocked
+	int			msec;				// time elapsed since previous frame
 
 	int			startTime;				// level.time the map was started
 
