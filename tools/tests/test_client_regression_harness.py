@@ -14,6 +14,11 @@ def sample_snapshots_path() -> Path:
     return Path(__file__).parent / "client_regression" / "sample_snapshots.json"
 
 
+@pytest.fixture()
+def regression_archive_dir() -> Path:
+    return Path(__file__).parent / "client_regression"
+
+
 def test_load_snapshots(sample_snapshots_path: Path) -> None:
     harness = ClientRegressionHarness(ClientPredictor())
     snapshots = harness.load_snapshots(sample_snapshots_path)
@@ -53,3 +58,49 @@ def test_replay_to_payloads_returns_json_ready_structures(sample_snapshots_path:
 
     assert payloads[0]["hud"]["weapon"] == "rocket_launcher"
     assert payloads[-1]["sequence"] == 3
+
+
+@pytest.mark.parametrize(
+    ("archive_name", "expected_hashes"),
+    [
+        (
+            "weapons_and_items_snapshots.json",
+            [
+                "50cc3bf0beb765c921b9cc3975cc611356ead31c522ffa9510963d3468ebf28d",
+                "d50a4ede5b09d25864802265283488288b5227f8f5fa53e32eba76e3f8224ef3",
+                "b0d4bc9d00594d0e65346d309f2cec2733a6d8d80c2801576f836f50378d3af1",
+                "822dc1c14922b22b10010c58e9356d09fc37455599208f1509d5e02cff22db98",
+            ],
+        ),
+        (
+            "server_correction_snapshots.json",
+            [
+                "b8f8c3a4ee5da098cb9742ee0ea7d223031a028a501be204cbf04addfeeaa9ea",
+                "88169c344538663fe617fff5f766e93a9861da1c17189a07d14a868205ee1e6d",
+                "e79954ecd8b60788ba3f29caf923f9a305421434975c9649d031db1dbc931357",
+                "eb79d52ca2a24dd508f66a0a538b68b13e2e5e42df845222c7e66cfc8151d9e5",
+                "b03c5b2c6821be17da30c244636ddc65ed2f4d6b5df0004130a9d768ac7e314f",
+            ],
+        ),
+        (
+            "resource_drain_snapshots.json",
+            [
+                "36e4b60a34bf875d6b457ee4db3cd806be8b9efa5208314ba8d0d4d21cd0d630",
+                "dfe4acd3d186ad813f469da5a267c538289a6faa5c0542766bafa69736004101",
+                "503a6129457b9fae4ae216d262037a6e3b559bdbe5b714180164d26af4b59664",
+                "f50331e421913018229f3c6bbf140f48347162d8a2bac38d24ef00b7d0e1e4eb",
+                "abcf77c69e98c7792800435c09229ea664e912cde7376742e11ddcb4f614b94c",
+            ],
+        ),
+    ],
+)
+def test_reference_archives_produce_expected_hashes(
+    regression_archive_dir: Path, archive_name: str, expected_hashes: list[str]
+) -> None:
+    harness = ClientRegressionHarness(ClientPredictor())
+    archive_path = regression_archive_dir / archive_name
+    snapshots = harness.load_snapshots(archive_path)
+
+    hashes = [frame.hud_hash for frame in harness.replay(snapshots)]
+
+    assert hashes == expected_hashes

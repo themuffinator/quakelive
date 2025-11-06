@@ -1,0 +1,105 @@
+{
+  "metadata": {
+    "description": "Sustained fight with attrition and recovery",
+    "map": "qzpractice1"
+  },
+  "snapshots": [
+    {
+      "sequence": 30,
+      "serverTime": 16000,
+      "playerState": {
+        "origin": [320.0, 64.0, 96.0],
+        "health": 200,
+        "armor": 100,
+        "weapon": "plasma_gun",
+        "ammo": {
+          "plasma_gun": 150,
+          "grenade_launcher": 10
+        }
+      },
+      "commands": []
+    },
+    {
+      "sequence": 31,
+      "serverTime": 16016,
+      "playerState": {
+        "origin": [324.0, 68.0, 96.0],
+        "health": 160,
+        "armor": 80,
+        "weapon": "plasma_gun",
+        "ammo": {
+          "plasma_gun": 130,
+          "grenade_launcher": 9
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [0.25, 0.25, 0.0], "scale": 0.2},
+        {"action": "damage", "amount": 40},
+        {"action": "ammo", "weapon": "plasma_gun", "amount": -20},
+        {"action": "ammo", "weapon": "grenade_launcher", "amount": -1}
+      ]
+    },
+    {
+      "sequence": 32,
+      "serverTime": 16032,
+      "playerState": {
+        "origin": [332.0, 74.0, 92.0],
+        "health": 155,
+        "armor": 70,
+        "weapon": "grenade_launcher",
+        "ammo": {
+          "plasma_gun": 120,
+          "grenade_launcher": 9
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [0.5, 0.3, -0.25], "scale": 0.3},
+        {"action": "weapon", "weapon": "grenade_launcher"},
+        {"action": "heal", "amount": 15},
+        {"action": "ammo", "weapon": "grenade_launcher", "amount": 1}
+      ]
+    },
+    {
+      "sequence": 33,
+      "serverTime": 16048,
+      "playerState": {
+        "origin": [348.0, 90.0, 92.0],
+        "health": 130,
+        "armor": 35,
+        "weapon": "grenade_launcher",
+        "ammo": {
+          "plasma_gun": 110,
+          "grenade_launcher": 7,
+          "rocket_launcher": 2
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [1.0, 1.0, 0.0], "scale": 0.4},
+        {"action": "damage", "amount": 25},
+        {"action": "ammo", "weapon": "rocket_launcher", "amount": 2},
+        {"action": "ammo", "weapon": "grenade_launcher", "amount": -3}
+      ]
+    },
+    {
+      "sequence": 34,
+      "serverTime": 16064,
+      "playerState": {
+        "origin": [360.0, 108.0, 92.0],
+        "health": 180,
+        "armor": 90,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "plasma_gun": 110,
+          "grenade_launcher": 6,
+          "rocket_launcher": 5
+        }
+      },
+      "commands": [
+        {"action": "heal", "amount": 50},
+        {"action": "weapon", "weapon": "rocket_launcher"},
+        {"action": "ammo", "weapon": "rocket_launcher", "amount": 3},
+        {"action": "move", "direction": [0.75, 1.2, 0.0], "scale": 0.4}
+      ]
+    }
+  ]
+}

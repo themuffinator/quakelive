@@ -1,0 +1,85 @@
+{
+  "metadata": {
+    "description": "Weapon cycling with mixed pickups and attrition",
+    "map": "qztourney7"
+  },
+  "snapshots": [
+    {
+      "sequence": 10,
+      "serverTime": 5000,
+      "playerState": {
+        "origin": [128.0, -64.0, 32.0],
+        "health": 125,
+        "armor": 50,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "machinegun": 70,
+          "rocket_launcher": 5
+        }
+      },
+      "commands": []
+    },
+    {
+      "sequence": 11,
+      "serverTime": 5016,
+      "playerState": {
+        "origin": [136.0, -60.0, 32.0],
+        "health": 110,
+        "armor": 35,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "machinegun": 70,
+          "rocket_launcher": 4
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [0.5, 0.25, 0.0], "scale": 0.5},
+        {"action": "damage", "amount": 15},
+        {"action": "ammo", "weapon": "rocket_launcher", "amount": -1}
+      ]
+    },
+    {
+      "sequence": 12,
+      "serverTime": 5032,
+      "playerState": {
+        "origin": [156.0, -44.0, 32.0],
+        "health": 100,
+        "armor": 25,
+        "weapon": "lightning_gun",
+        "ammo": {
+          "machinegun": 70,
+          "rocket_launcher": 3,
+          "lightning_gun": 150
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [1.25, 1.0, 0.0], "scale": 0.6},
+        {"action": "weapon", "weapon": "lightning_gun"},
+        {"action": "ammo", "weapon": "lightning_gun", "amount": 150},
+        {"action": "damage", "amount": 10}
+      ]
+    },
+    {
+      "sequence": 13,
+      "serverTime": 5048,
+      "playerState": {
+        "origin": [160.0, -32.0, 48.0],
+        "health": 120,
+        "armor": 50,
+        "weapon": "railgun",
+        "ammo": {
+          "machinegun": 70,
+          "rocket_launcher": 3,
+          "lightning_gun": 130,
+          "railgun": 5
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [0.25, 0.75, 1.0], "scale": 0.4},
+        {"action": "heal", "amount": 20},
+        {"action": "ammo", "weapon": "lightning_gun", "amount": -20},
+        {"action": "ammo", "weapon": "railgun", "amount": 5}
+      ]
+    }
+  ]
+}

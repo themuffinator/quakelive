@@ -63,26 +63,42 @@ def _run_match_harness(target: str, artifact_root: Path, seed: int) -> None:
 
 def _run_client_harness(target: str, artifact_root: Path) -> None:
     harness = ClientRegressionHarness(ClientPredictor())
-    snapshots = harness.load_snapshots(DEFAULT_SNAPSHOTS)
-    frames = list(harness.replay(snapshots))
 
-    hashes = [
-        {
-            "sequence": frame.sequence,
-            "serverTime": frame.server_time,
-            "hash": frame.hud_hash,
+    manifest: dict[str, dict[str, object]] = {}
+    log_entries: list[dict[str, object]] = []
+
+    for scenario, archive in SNAPSHOT_ARCHIVES.items():
+        archive_payload = json.loads(archive.read_text(encoding="utf-8"))
+        metadata = archive_payload.get("metadata", {})
+        snapshots = harness.load_snapshots(archive)
+        frames = list(harness.replay(snapshots))
+
+        payloads = [harness.frame_to_payload(frame) for frame in frames]
+        manifest[scenario] = {
+            "metadata": metadata,
+            "frames": payloads,
         }
-        for frame in frames
-    ]
+
+        log_entries.append(
+            {
+                "scenario": scenario,
+                "archive": str(archive.relative_to(REPO_ROOT)),
+                "metadata": metadata,
+                "frameCount": len(payloads),
+                "hashes": [frame["hash"] for frame in payloads],
+            }
+        )
 
     hashes_path = artifact_root / "client_regression" / target / "hud_hashes.json"
-    _write_text(hashes_path, json.dumps(hashes, indent=2) + "\n")
+    _write_text(hashes_path, json.dumps(manifest, indent=2) + "\n")
 
     log_path = artifact_root / "logs" / target / "client_regression.log"
-    _write_text(
-        log_path,
-        "Client regression harness generated HUD hashes.\n" + json.dumps(hashes, indent=2) + "\n",
+    log_text = (
+        "Client regression harness generated HUD hashes for captured scenarios.\n"
+        + json.dumps(log_entries, indent=2)
+        + "\n"
     )
+    _write_text(log_path, log_text)
 
 
 def _ensure_reverse_build(target: str, reverse_build_root: Path) -> None:
