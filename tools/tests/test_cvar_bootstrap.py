@@ -29,6 +29,11 @@ class CVarBootstrapTests(unittest.TestCase):
         self.assertIn("typedef struct weaponReloadConfig_s", header)
         self.assertIn("extern weaponReloadConfig_t g_weaponReloadConfig;", header)
 
+    def test_header_declares_knockback_config(self) -> None:
+        header = _read_source("src/code/game/g_local.h")
+        self.assertIn("typedef struct knockbackConfig_s", header)
+        self.assertIn("extern knockbackConfig_t g_knockbackConfig;", header)
+
     def test_header_exposes_weapon_cvar_handles(self) -> None:
         header = _read_source("src/code/game/g_local.h")
         expected_symbols = [
@@ -61,18 +66,22 @@ class CVarBootstrapTests(unittest.TestCase):
         body = _extract_function_body(source, "void G_RegisterCvars( void )")
         weapon_call = body.index("G_InitWeaponConfig();")
         reload_call = body.index("G_InitWeaponReloadConfig();")
+        knockback_call = body.index("G_InitKnockbackConfig();")
         ammo_call = body.index("G_InitStartingAmmoConfig();")
         self.assertLess(weapon_call, reload_call, "weapon config must initialise before reload config")
-        self.assertLess(reload_call, ammo_call, "reload config must initialise before starting ammo")
+        self.assertLess(reload_call, knockback_call, "reload config must initialise before knockback config")
+        self.assertLess(knockback_call, ammo_call, "knockback config must initialise before starting ammo")
 
     def test_update_cvars_refreshes_configs(self) -> None:
         source = _read_source("src/code/game/g_main.c")
         body = _extract_function_body(source, "void G_UpdateCvars( void )")
         weapon_call = body.index("G_UpdateWeaponConfig();")
         reload_call = body.index("G_UpdateWeaponReloadConfig();")
+        knockback_call = body.index("G_UpdateKnockbackConfig();")
         ammo_call = body.index("G_UpdateStartingAmmoConfig();")
         self.assertLess(weapon_call, reload_call, "weapon config refresh must precede reload refresh")
-        self.assertLess(reload_call, ammo_call, "reload refresh must precede starting ammo refresh")
+        self.assertLess(reload_call, knockback_call, "reload refresh must precede knockback refresh")
+        self.assertLess(knockback_call, ammo_call, "knockback refresh must precede starting ammo refresh")
 
     def test_clientspawn_uses_starting_ammo_config(self) -> None:
         source = _read_source("src/code/game/g_client.c")

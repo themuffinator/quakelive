@@ -135,6 +135,33 @@ extern weaponReloadConfig_t g_weaponReloadConfig;
 void G_InitWeaponReloadConfig( void );
 void G_UpdateWeaponReloadConfig( void );
 
+typedef struct knockbackConfig_s {
+        float           gauntlet;
+        float           machinegun;
+        float           shotgun;
+        float           grenadeLauncher;
+        float           rocketLauncher;
+        float           rocketLauncherSelf;
+        float           lightningGun;
+        float           railgun;
+        float           plasmagun;
+        float           plasmagunSelf;
+        float           bfg;
+        float           grapplingHook;
+        float           nailgun;
+        float           proximityLauncher;
+        float           chaingun;
+        float           heavyMachinegun;
+        float           vertical;
+        float           verticalSelf;
+        float           maxKnockback;
+        float           cripple;
+} knockbackConfig_t;
+
+extern knockbackConfig_t g_knockbackConfig;
+void G_InitKnockbackConfig( void );
+void G_UpdateKnockbackConfig( void );
+
 struct gentity_s {
 	entityState_t	s;				// communicated by server to clients
 	entityShared_t	r;				// shared by both the server system and game
@@ -799,6 +826,26 @@ extern	vmCvar_t	g_needpass;
 extern	vmCvar_t	g_gravity;
 extern	vmCvar_t	g_speed;
 extern	vmCvar_t	g_knockback;
+extern	vmCvar_t	g_knockback_g;
+extern	vmCvar_t	g_knockback_mg;
+extern	vmCvar_t	g_knockback_sg;
+extern	vmCvar_t	g_knockback_gl;
+extern	vmCvar_t	g_knockback_rl;
+extern	vmCvar_t	g_knockback_rl_self;
+extern	vmCvar_t	g_knockback_lg;
+extern	vmCvar_t	g_knockback_rg;
+extern	vmCvar_t	g_knockback_pg;
+extern	vmCvar_t	g_knockback_pg_self;
+extern	vmCvar_t	g_knockback_bfg;
+extern	vmCvar_t	g_knockback_gh;
+extern	vmCvar_t	g_knockback_ng;
+extern	vmCvar_t	g_knockback_pl;
+extern	vmCvar_t	g_knockback_cg;
+extern	vmCvar_t	g_knockback_hmg;
+extern	vmCvar_t	g_knockback_z;
+extern	vmCvar_t	g_knockback_z_self;
+extern	vmCvar_t	g_max_knockback;
+extern	vmCvar_t	g_knockback_cripple;
 extern	vmCvar_t	g_quadfactor;
 extern	vmCvar_t	g_forcerespawn;
 extern	vmCvar_t	g_inactivity;

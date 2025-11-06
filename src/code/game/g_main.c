@@ -28,6 +28,8 @@ level_locals_t	level;
 weaponConfig_t	g_weaponConfig;
 
 weaponReloadConfig_t	g_weaponReloadConfig;
+knockbackConfig_t	g_knockbackConfig;
+startingAmmoConfig_t	g_startingAmmoConfig;
 #define STRINGIZE_HELPER( x ) #x
 #define STRINGIZE( x ) STRINGIZE_HELPER( x )
 
@@ -75,6 +77,26 @@ vmCvar_t	g_speed;
 vmCvar_t	g_gravity;
 vmCvar_t	g_cheats;
 vmCvar_t	g_knockback;
+vmCvar_t	g_knockback_g;
+vmCvar_t	g_knockback_mg;
+vmCvar_t	g_knockback_sg;
+vmCvar_t	g_knockback_gl;
+vmCvar_t	g_knockback_rl;
+vmCvar_t	g_knockback_rl_self;
+vmCvar_t	g_knockback_lg;
+vmCvar_t	g_knockback_rg;
+vmCvar_t	g_knockback_pg;
+vmCvar_t	g_knockback_pg_self;
+vmCvar_t	g_knockback_bfg;
+vmCvar_t	g_knockback_gh;
+vmCvar_t	g_knockback_ng;
+vmCvar_t	g_knockback_pl;
+vmCvar_t	g_knockback_cg;
+vmCvar_t	g_knockback_hmg;
+vmCvar_t	g_knockback_z;
+vmCvar_t	g_knockback_z_self;
+vmCvar_t	g_max_knockback;
+vmCvar_t	g_knockback_cripple;
 vmCvar_t	g_quadfactor;
 vmCvar_t	g_forcerespawn;
 vmCvar_t	g_inactivity;
@@ -211,6 +233,26 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_speed, "g_speed", "320", 0, 0, qtrue  },
 	{ &g_gravity, "g_gravity", "800", 0, 0, qtrue  },
 	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue  },
+	{ &g_knockback_g, "g_knockback_g", "1.0", 0, 0, qfalse, qfalse, "Gauntlet knockback scalar applied when striking other players." },
+	{ &g_knockback_mg, "g_knockback_mg", "1.0", 0, 0, qfalse, qfalse, "Machinegun knockback scalar applied to outgoing hits." },
+	{ &g_knockback_sg, "g_knockback_sg", "1.0", 0, 0, qfalse, qfalse, "Shotgun knockback scalar for pellets that land on opponents." },
+	{ &g_knockback_gl, "g_knockback_gl", "1.0", 0, 0, qfalse, qfalse, "Grenade Launcher knockback scalar applied to direct and splash damage." },
+	{ &g_knockback_rl, "g_knockback_rl", "1.0", 0, 0, qfalse, qfalse, "Rocket Launcher knockback scalar for enemies struck by rockets." },
+	{ &g_knockback_rl_self, "g_knockback_rl_self", "1.0", 0, 0, qfalse, qfalse, "Self-inflicted rocket knockback scalar used for rocket jumps." },
+	{ &g_knockback_lg, "g_knockback_lg", "1.0", 0, 0, qfalse, qfalse, "Lightning Gun knockback scalar." },
+	{ &g_knockback_rg, "g_knockback_rg", "1.0", 0, 0, qfalse, qfalse, "Railgun knockback scalar." },
+	{ &g_knockback_pg, "g_knockback_pg", "1.0", 0, 0, qfalse, qfalse, "Plasmagun knockback scalar for opponents." },
+	{ &g_knockback_pg_self, "g_knockback_pg_self", "1.0", 0, 0, qfalse, qfalse, "Self-inflicted plasmagun knockback scalar." },
+	{ &g_knockback_bfg, "g_knockback_bfg", "1.0", 0, 0, qfalse, qfalse, "BFG knockback scalar." },
+	{ &g_knockback_gh, "g_knockback_gh", "1.0", 0, 0, qfalse, qfalse, "Grappling Hook knockback scalar." },
+	{ &g_knockback_ng, "g_knockback_ng", "1.0", 0, 0, qfalse, qfalse, "Nailgun knockback scalar." },
+	{ &g_knockback_pl, "g_knockback_pl", "1.0", 0, 0, qfalse, qfalse, "Proximity Launcher knockback scalar." },
+	{ &g_knockback_cg, "g_knockback_cg", "1.0", 0, 0, qfalse, qfalse, "Chaingun knockback scalar." },
+	{ &g_knockback_hmg, "g_knockback_hmg", "1.0", 0, 0, qfalse, qfalse, "Heavy Machinegun knockback scalar." },
+	{ &g_knockback_z, "g_knockback_z", "0", 0, 0, qfalse, qfalse, "Vertical knockback boost added after weapon scaling." },
+	{ &g_knockback_z_self, "g_knockback_z_self", "0", 0, 0, qfalse, qfalse, "Vertical knockback boost when you knock yourself back." },
+	{ &g_max_knockback, "g_max_knockback", "200", 0, 0, qfalse, qfalse, "Upper clamp applied to computed knockback force." },
+	{ &g_knockback_cripple, "g_knockback_cripple", "1.0", 0, 0, qfalse, qfalse, "Additional knockback scalar consumed by cripple modifiers." },
 	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue  },
 	{ &g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue  },
 	{ &g_weaponTeamRespawn, "g_weaponTeamRespawn", "30", 0, 0, qtrue },
@@ -314,104 +356,161 @@ static void G_RegisterCvarHelp( const cvarTable_t *cv ) {
 	trap_Cvar_Register( NULL, helpName, cv->helpString, CVAR_ROM );
 }
 
-static int G_ReadWeaponCvar( const vmCvar_t *cvar, int fallback ) {
-	if ( !cvar ) {
-		return fallback;
-	}
+static void G_ReportMissingCvar( const char *cvarName ) {
+        if ( !cvarName || !cvarName[0] ) {
+                return;
+        }
 
-	if ( cvar->integer <= 0 ) {
-		return fallback;
-	}
+        G_Printf( "WARNING: gameplay config cvar %s is unavailable; using fallback value\n", cvarName );
+}
 
-	return cvar->integer;
+static int G_ReadWeaponCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+        if ( !cvar ) {
+                G_ReportMissingCvar( cvarName );
+                return fallback;
+        }
+
+        if ( cvar->integer <= 0 ) {
+                return fallback;
+        }
+
+        return cvar->integer;
 }
 
 void G_InitWeaponConfig( void ) {
-	g_weaponConfig.gauntletDamage = G_ReadWeaponCvar( &g_damage_gauntlet, 50 );
-	g_weaponConfig.machinegunDamage = G_ReadWeaponCvar( &g_damage_mg, 7 );
-	g_weaponConfig.machinegunTeamDamage = G_ReadWeaponCvar( &g_damage_mg_team, 5 );
-	g_weaponConfig.shotgunDamage = G_ReadWeaponCvar( &g_damage_sg, 10 );
-	g_weaponConfig.grenadeDamage = G_ReadWeaponCvar( &g_damage_gl, 100 );
-	g_weaponConfig.grenadeSplashDamage = G_ReadWeaponCvar( &g_splashDamage_gl, 100 );
-	g_weaponConfig.grenadeSplashRadius = G_ReadWeaponCvar( &g_splashRadius_gl, 150 );
-	g_weaponConfig.rocketDamage = G_ReadWeaponCvar( &g_damage_rl, 100 );
-	g_weaponConfig.rocketSplashDamage = G_ReadWeaponCvar( &g_splashDamage_rl, 100 );
-	g_weaponConfig.rocketSplashRadius = G_ReadWeaponCvar( &g_splashRadius_rl, 120 );
-	g_weaponConfig.plasmaDamage = G_ReadWeaponCvar( &g_damage_pg, 20 );
-	g_weaponConfig.plasmaSplashDamage = G_ReadWeaponCvar( &g_splashDamage_pg, 15 );
-	g_weaponConfig.plasmaSplashRadius = G_ReadWeaponCvar( &g_splashRadius_pg, 20 );
-	g_weaponConfig.lightningDamage = G_ReadWeaponCvar( &g_damage_lg, 8 );
-	g_weaponConfig.railgunDamage = G_ReadWeaponCvar( &g_damage_rg, 100 );
-	g_weaponConfig.bfgDamage = G_ReadWeaponCvar( &g_damage_bfg, 100 );
-	g_weaponConfig.bfgSplashDamage = G_ReadWeaponCvar( &g_splashDamage_bfg, 100 );
-	g_weaponConfig.bfgSplashRadius = G_ReadWeaponCvar( &g_splashRadius_bfg, 120 );
+	g_weaponConfig.gauntletDamage = G_ReadWeaponCvar( &g_damage_gauntlet, 50, "g_damage_gauntlet" );
+	g_weaponConfig.machinegunDamage = G_ReadWeaponCvar( &g_damage_mg, 7, "g_damage_mg" );
+	g_weaponConfig.machinegunTeamDamage = G_ReadWeaponCvar( &g_damage_mg_team, 5, "g_damage_mg_team" );
+	g_weaponConfig.shotgunDamage = G_ReadWeaponCvar( &g_damage_sg, 10, "g_damage_sg" );
+	g_weaponConfig.grenadeDamage = G_ReadWeaponCvar( &g_damage_gl, 100, "g_damage_gl" );
+	g_weaponConfig.grenadeSplashDamage = G_ReadWeaponCvar( &g_splashDamage_gl, 100, "g_splashDamage_gl" );
+	g_weaponConfig.grenadeSplashRadius = G_ReadWeaponCvar( &g_splashRadius_gl, 150, "g_splashRadius_gl" );
+	g_weaponConfig.rocketDamage = G_ReadWeaponCvar( &g_damage_rl, 100, "g_damage_rl" );
+	g_weaponConfig.rocketSplashDamage = G_ReadWeaponCvar( &g_splashDamage_rl, 100, "g_splashDamage_rl" );
+	g_weaponConfig.rocketSplashRadius = G_ReadWeaponCvar( &g_splashRadius_rl, 120, "g_splashRadius_rl" );
+	g_weaponConfig.plasmaDamage = G_ReadWeaponCvar( &g_damage_pg, 20, "g_damage_pg" );
+	g_weaponConfig.plasmaSplashDamage = G_ReadWeaponCvar( &g_splashDamage_pg, 15, "g_splashDamage_pg" );
+	g_weaponConfig.plasmaSplashRadius = G_ReadWeaponCvar( &g_splashRadius_pg, 20, "g_splashRadius_pg" );
+	g_weaponConfig.lightningDamage = G_ReadWeaponCvar( &g_damage_lg, 8, "g_damage_lg" );
+	g_weaponConfig.railgunDamage = G_ReadWeaponCvar( &g_damage_rg, 100, "g_damage_rg" );
+	g_weaponConfig.bfgDamage = G_ReadWeaponCvar( &g_damage_bfg, 100, "g_damage_bfg" );
+	g_weaponConfig.bfgSplashDamage = G_ReadWeaponCvar( &g_splashDamage_bfg, 100, "g_splashDamage_bfg" );
+	g_weaponConfig.bfgSplashRadius = G_ReadWeaponCvar( &g_splashRadius_bfg, 120, "g_splashRadius_bfg" );
 }
 
 void G_UpdateWeaponConfig( void ) {
 	G_InitWeaponConfig();
 }
 
-static int G_ReadWeaponReloadCvar( const vmCvar_t *cvar, int fallback ) {
-	if ( !cvar ) {
-		return fallback;
-	}
+static int G_ReadWeaponReloadCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+        if ( !cvar ) {
+                G_ReportMissingCvar( cvarName );
+                return fallback;
+        }
 
-	if ( cvar->integer < 0 ) {
-		return fallback;
-	}
+        if ( cvar->integer < 0 ) {
+                return fallback;
+        }
 
-	return cvar->integer;
+        return cvar->integer;
 }
 
 void G_InitWeaponReloadConfig( void ) {
-	g_weaponReloadConfig.gauntlet = G_ReadWeaponReloadCvar( &weapon_reload_gauntlet, 0 );
-	g_weaponReloadConfig.machinegun = G_ReadWeaponReloadCvar( &weapon_reload_mg, 0 );
-	g_weaponReloadConfig.shotgun = G_ReadWeaponReloadCvar( &weapon_reload_sg, 0 );
-	g_weaponReloadConfig.grenadeLauncher = G_ReadWeaponReloadCvar( &weapon_reload_gl, 0 );
-	g_weaponReloadConfig.rocketLauncher = G_ReadWeaponReloadCvar( &weapon_reload_rl, 0 );
-	g_weaponReloadConfig.lightningGun = G_ReadWeaponReloadCvar( &weapon_reload_lg, 0 );
-	g_weaponReloadConfig.railgun = G_ReadWeaponReloadCvar( &weapon_reload_rg, 0 );
-	g_weaponReloadConfig.plasmagun = G_ReadWeaponReloadCvar( &weapon_reload_pg, 0 );
-	g_weaponReloadConfig.bfg = G_ReadWeaponReloadCvar( &weapon_reload_bfg, 0 );
-	g_weaponReloadConfig.grapplingHook = G_ReadWeaponReloadCvar( &weapon_reload_gh, 0 );
-	g_weaponReloadConfig.hook = G_ReadWeaponReloadCvar( &weapon_reload_hook, 0 );
-	g_weaponReloadConfig.nailgun = G_ReadWeaponReloadCvar( &weapon_reload_ng, 0 );
-	g_weaponReloadConfig.proximityLauncher = G_ReadWeaponReloadCvar( &weapon_reload_prox, 0 );
-	g_weaponReloadConfig.chaingun = G_ReadWeaponReloadCvar( &weapon_reload_cg, 0 );
-	g_weaponReloadConfig.heavyMachinegun = G_ReadWeaponReloadCvar( &weapon_reload_hmg, 0 );
+	g_weaponReloadConfig.gauntlet = G_ReadWeaponReloadCvar( &weapon_reload_gauntlet, 0, "weapon_reload_gauntlet" );
+	g_weaponReloadConfig.machinegun = G_ReadWeaponReloadCvar( &weapon_reload_mg, 0, "weapon_reload_mg" );
+	g_weaponReloadConfig.shotgun = G_ReadWeaponReloadCvar( &weapon_reload_sg, 0, "weapon_reload_sg" );
+	g_weaponReloadConfig.grenadeLauncher = G_ReadWeaponReloadCvar( &weapon_reload_gl, 0, "weapon_reload_gl" );
+	g_weaponReloadConfig.rocketLauncher = G_ReadWeaponReloadCvar( &weapon_reload_rl, 0, "weapon_reload_rl" );
+	g_weaponReloadConfig.lightningGun = G_ReadWeaponReloadCvar( &weapon_reload_lg, 0, "weapon_reload_lg" );
+	g_weaponReloadConfig.railgun = G_ReadWeaponReloadCvar( &weapon_reload_rg, 0, "weapon_reload_rg" );
+	g_weaponReloadConfig.plasmagun = G_ReadWeaponReloadCvar( &weapon_reload_pg, 0, "weapon_reload_pg" );
+	g_weaponReloadConfig.bfg = G_ReadWeaponReloadCvar( &weapon_reload_bfg, 0, "weapon_reload_bfg" );
+	g_weaponReloadConfig.grapplingHook = G_ReadWeaponReloadCvar( &weapon_reload_gh, 0, "weapon_reload_gh" );
+	g_weaponReloadConfig.hook = G_ReadWeaponReloadCvar( &weapon_reload_hook, 0, "weapon_reload_hook" );
+	g_weaponReloadConfig.nailgun = G_ReadWeaponReloadCvar( &weapon_reload_ng, 0, "weapon_reload_ng" );
+	g_weaponReloadConfig.proximityLauncher = G_ReadWeaponReloadCvar( &weapon_reload_prox, 0, "weapon_reload_prox" );
+	g_weaponReloadConfig.chaingun = G_ReadWeaponReloadCvar( &weapon_reload_cg, 0, "weapon_reload_cg" );
+	g_weaponReloadConfig.heavyMachinegun = G_ReadWeaponReloadCvar( &weapon_reload_hmg, 0, "weapon_reload_hmg" );
 }
 
 void G_UpdateWeaponReloadConfig( void ) {
 	G_InitWeaponReloadConfig();
 }
 
-static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback ) {
-	if ( !cvar ) {
-		return fallback;
-	}
+static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+        if ( !cvar ) {
+                G_ReportMissingCvar( cvarName );
+                return fallback;
+        }
 
-	return cvar->integer;
+        return cvar->integer;
 }
 
 void G_InitStartingAmmoConfig( void ) {
-	g_startingAmmoConfig.bfg = G_ReadStartingAmmoCvar( &g_startingAmmo_bfg, DEFAULT_STARTING_AMMO_BFG );
-	g_startingAmmoConfig.chaingun = G_ReadStartingAmmoCvar( &g_startingAmmo_cg, DEFAULT_STARTING_AMMO_CG );
-	g_startingAmmoConfig.gauntlet = G_ReadStartingAmmoCvar( &g_startingAmmo_g, DEFAULT_STARTING_AMMO_G );
-	g_startingAmmoConfig.grapplingHook = G_ReadStartingAmmoCvar( &g_startingAmmo_gh, DEFAULT_STARTING_AMMO_GH );
-	g_startingAmmoConfig.grenadeLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_gl, DEFAULT_STARTING_AMMO_GL );
-	g_startingAmmoConfig.heavyMachinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_hmg, DEFAULT_STARTING_AMMO_HMG );
-	g_startingAmmoConfig.lightningGun = G_ReadStartingAmmoCvar( &g_startingAmmo_lg, DEFAULT_STARTING_AMMO_LG );
-	g_startingAmmoConfig.machinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_mg, DEFAULT_STARTING_AMMO_MG );
-	g_startingAmmoConfig.nailgun = G_ReadStartingAmmoCvar( &g_startingAmmo_ng, DEFAULT_STARTING_AMMO_NG );
-	g_startingAmmoConfig.plasmagun = G_ReadStartingAmmoCvar( &g_startingAmmo_pg, DEFAULT_STARTING_AMMO_PG );
-	g_startingAmmoConfig.proximityLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_pl, DEFAULT_STARTING_AMMO_PL );
-	g_startingAmmoConfig.railgun = G_ReadStartingAmmoCvar( &g_startingAmmo_rg, DEFAULT_STARTING_AMMO_RG );
-	g_startingAmmoConfig.rocketLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_rl, DEFAULT_STARTING_AMMO_RL );
-	g_startingAmmoConfig.shotgun = G_ReadStartingAmmoCvar( &g_startingAmmo_sg, DEFAULT_STARTING_AMMO_SG );
+	g_startingAmmoConfig.bfg = G_ReadStartingAmmoCvar( &g_startingAmmo_bfg, DEFAULT_STARTING_AMMO_BFG, "g_startingAmmo_bfg" );
+	g_startingAmmoConfig.chaingun = G_ReadStartingAmmoCvar( &g_startingAmmo_cg, DEFAULT_STARTING_AMMO_CG, "g_startingAmmo_cg" );
+	g_startingAmmoConfig.gauntlet = G_ReadStartingAmmoCvar( &g_startingAmmo_g, DEFAULT_STARTING_AMMO_G, "g_startingAmmo_g" );
+	g_startingAmmoConfig.grapplingHook = G_ReadStartingAmmoCvar( &g_startingAmmo_gh, DEFAULT_STARTING_AMMO_GH, "g_startingAmmo_gh" );
+	g_startingAmmoConfig.grenadeLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_gl, DEFAULT_STARTING_AMMO_GL, "g_startingAmmo_gl" );
+	g_startingAmmoConfig.heavyMachinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_hmg, DEFAULT_STARTING_AMMO_HMG, "g_startingAmmo_hmg" );
+	g_startingAmmoConfig.lightningGun = G_ReadStartingAmmoCvar( &g_startingAmmo_lg, DEFAULT_STARTING_AMMO_LG, "g_startingAmmo_lg" );
+	g_startingAmmoConfig.machinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_mg, DEFAULT_STARTING_AMMO_MG, "g_startingAmmo_mg" );
+	g_startingAmmoConfig.nailgun = G_ReadStartingAmmoCvar( &g_startingAmmo_ng, DEFAULT_STARTING_AMMO_NG, "g_startingAmmo_ng" );
+	g_startingAmmoConfig.plasmagun = G_ReadStartingAmmoCvar( &g_startingAmmo_pg, DEFAULT_STARTING_AMMO_PG, "g_startingAmmo_pg" );
+	g_startingAmmoConfig.proximityLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_pl, DEFAULT_STARTING_AMMO_PL, "g_startingAmmo_pl" );
+	g_startingAmmoConfig.railgun = G_ReadStartingAmmoCvar( &g_startingAmmo_rg, DEFAULT_STARTING_AMMO_RG, "g_startingAmmo_rg" );
+	g_startingAmmoConfig.rocketLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_rl, DEFAULT_STARTING_AMMO_RL, "g_startingAmmo_rl" );
+	g_startingAmmoConfig.shotgun = G_ReadStartingAmmoCvar( &g_startingAmmo_sg, DEFAULT_STARTING_AMMO_SG, "g_startingAmmo_sg" );
 }
 
 void G_UpdateStartingAmmoConfig( void ) {
 	G_InitStartingAmmoConfig();
+}
+
+static float G_ReadKnockbackCvar( const vmCvar_t *cvar, float fallback, const char *cvarName ) {
+        if ( !cvar ) {
+                G_ReportMissingCvar( cvarName );
+                return fallback;
+        }
+
+        return cvar->value;
+}
+
+void G_InitKnockbackConfig( void ) {
+        g_knockbackConfig.gauntlet = G_ReadKnockbackCvar( &g_knockback_g, 1.0f, "g_knockback_g" );
+        g_knockbackConfig.machinegun = G_ReadKnockbackCvar( &g_knockback_mg, 1.0f, "g_knockback_mg" );
+        g_knockbackConfig.shotgun = G_ReadKnockbackCvar( &g_knockback_sg, 1.0f, "g_knockback_sg" );
+        g_knockbackConfig.grenadeLauncher = G_ReadKnockbackCvar( &g_knockback_gl, 1.0f, "g_knockback_gl" );
+        g_knockbackConfig.rocketLauncher = G_ReadKnockbackCvar( &g_knockback_rl, 1.0f, "g_knockback_rl" );
+        g_knockbackConfig.rocketLauncherSelf = G_ReadKnockbackCvar( &g_knockback_rl_self, 1.0f, "g_knockback_rl_self" );
+        g_knockbackConfig.lightningGun = G_ReadKnockbackCvar( &g_knockback_lg, 1.0f, "g_knockback_lg" );
+        g_knockbackConfig.railgun = G_ReadKnockbackCvar( &g_knockback_rg, 1.0f, "g_knockback_rg" );
+        g_knockbackConfig.plasmagun = G_ReadKnockbackCvar( &g_knockback_pg, 1.0f, "g_knockback_pg" );
+        g_knockbackConfig.plasmagunSelf = G_ReadKnockbackCvar( &g_knockback_pg_self, 1.0f, "g_knockback_pg_self" );
+        g_knockbackConfig.bfg = G_ReadKnockbackCvar( &g_knockback_bfg, 1.0f, "g_knockback_bfg" );
+        g_knockbackConfig.grapplingHook = G_ReadKnockbackCvar( &g_knockback_gh, 1.0f, "g_knockback_gh" );
+        g_knockbackConfig.nailgun = G_ReadKnockbackCvar( &g_knockback_ng, 1.0f, "g_knockback_ng" );
+        g_knockbackConfig.proximityLauncher = G_ReadKnockbackCvar( &g_knockback_pl, 1.0f, "g_knockback_pl" );
+        g_knockbackConfig.chaingun = G_ReadKnockbackCvar( &g_knockback_cg, 1.0f, "g_knockback_cg" );
+        g_knockbackConfig.heavyMachinegun = G_ReadKnockbackCvar( &g_knockback_hmg, 1.0f, "g_knockback_hmg" );
+        g_knockbackConfig.vertical = G_ReadKnockbackCvar( &g_knockback_z, 0.0f, "g_knockback_z" );
+        g_knockbackConfig.verticalSelf = G_ReadKnockbackCvar( &g_knockback_z_self, 0.0f, "g_knockback_z_self" );
+
+        {
+                float maxKnockback = G_ReadKnockbackCvar( &g_max_knockback, 200.0f, "g_max_knockback" );
+
+                if ( maxKnockback <= 0.0f ) {
+                        maxKnockback = 200.0f;
+                }
+
+                g_knockbackConfig.maxKnockback = maxKnockback;
+        }
+
+        g_knockbackConfig.cripple = G_ReadKnockbackCvar( &g_knockback_cripple, 1.0f, "g_knockback_cripple" );
+}
+
+void G_UpdateKnockbackConfig( void ) {
+        G_InitKnockbackConfig();
 }
 
 
@@ -596,6 +695,7 @@ void G_RegisterCvars( void ) {
 	level.warmupModificationCount = g_warmup.modificationCount;
 	G_InitWeaponConfig();
 	G_InitWeaponReloadConfig();
+	G_InitKnockbackConfig();
 	G_InitStartingAmmoConfig();
 }
 
@@ -629,6 +729,7 @@ void G_UpdateCvars( void ) {
 
 	G_UpdateWeaponConfig();
 	G_UpdateWeaponReloadConfig();
+	G_UpdateKnockbackConfig();
 	G_UpdateStartingAmmoConfig();
 }
 
