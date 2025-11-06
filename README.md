@@ -1,5 +1,8 @@
 # Quake Live Reverse Engineering Project
 
+[![Native DLL (VS2010)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/windows-native.yml/badge.svg?branch=main)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/windows-native.yml)
+[![QVM Toolchain](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/toolchain.yml/badge.svg?branch=main)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/toolchain.yml)
+
 This repository documents and reconstructs the Quake Live gameplay stack on top of the
 open-source Quake III Arena codebase. Use the documentation under `docs/` to navigate
 build pipelines, testing harnesses, and reverse-engineering references.
