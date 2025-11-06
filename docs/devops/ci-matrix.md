@@ -10,10 +10,11 @@ The **Deterministic Harnesses** workflow executes the regression harnesses again
 
 ## Artefacts
 
-`tests/run_harnesses.py` emits a deterministic match timeline, HUD hash capture, and text summaries for every target, while the reverse leg adds normalised trace logs and diffs.【F:tests/run_harnesses.py†L27-L111】 These artefacts land underneath `artifacts/tests/<suite>/<target>/`, and the workflow uploads them even when a harness fails so the evidence is always available.【F:.github/workflows/deterministic-harnesses.yml†L81-L93】 In particular:
+`tests/run_harnesses.py` emits deterministic match timelines, HUD hash captures, and text summaries for every target, while the reverse leg adds normalised trace logs and diffs.【F:tests/run_harnesses.py†L27-L116】 These artefacts land underneath `artifacts/tests/<suite>/<target>/`, and the workflow uploads them even when a harness fails so the evidence is always available.【F:.github/workflows/deterministic-harnesses.yml†L81-L93】 In particular:
 
 - `logs/<target>/*.log` – Harness summaries for the match, client regression, and trace suites.
-- `match_sim/<target>/timeline.json` – The deterministic bot timeline from the scripted match.
+- `match_sim/<target>/<slug>/timeline.json` – Deterministic bot timelines for each bundled scenario (`duel`, `overtime`, and `loadouts`).
+- `match_sim/<target>/index.json` – Inventory of published match simulations with metadata (frame counts, seeds, etc.).
 - `client_regression/<target>/hud_hashes.json` – Stable HUD hashes replayed from the regression snapshots.
 - `trace/<target>/*` – Reverse-only logs and diffs that compare the clean-room output with the expectation.
 

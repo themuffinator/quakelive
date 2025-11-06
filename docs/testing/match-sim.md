@@ -73,18 +73,43 @@ The harness initialises a dedicated RNG with the scenario seed (or the
 CLI-provided override). This ensures that repeated runs with the same seed yield
 identical timelines, including spawn picks and randomised command parameters.
 
-### Sample scenario
+### Seeding practices
 
-A ready-to-use scenario is provided at
-`tools/tests/match_sim/sample_scenario.json`. Running it via
+Always declare an explicit `seed` in your scenario JSON and override it via the
+`--seed` CLI flag (or the `seed=` argument in `run_from_file()`) when you need to
+reproduce a specific timeline. The harness resolves the effective seed in this
+order:
+
+1. CLI / function override
+2. Scenario `seed`
+3. Deterministic fallback (`1337`)
+
+The resolved value is written back to the exported configuration so archived
+timelines capture exactly which seed produced the output. Pick memorable seeds
+for common workflows (e.g. `2024` in CI) so differences are easy to cross
+reference across runs.
+
+### Bundled scenarios
+
+Three ready-to-use scenarios ship alongside the harness and are exercised by the
+test suite as well as CI artefact generation:
+
+| Slug | File | Description | Suggested seed | Frames | Duration (s) |
+| ---- | ---- | ----------- | -------------- | ------ | ------------- |
+| `duel` | `tools/tests/match_sim/sample_scenario.json` | Baseline two-bot duel showcasing movement, combat, and randomised dodges. | `2024` | 101 | 10.0 |
+| `overtime` | `tools/tests/match_sim/overtime_scenario.json` | Sudden-death duel that flips into overtime with scripted scoreboard metadata. | `3141` | 126 | 12.5 |
+| `loadouts` | `tools/tests/match_sim/complex_loadouts.json` | Free-for-all stress test with stacked inventories, heavy ammo usage, and randomised loadouts. | `9001` | 161 | 8.0 |
+
+Run any scenario via:
 
 ```bash
-python -m tools.tests.match_sim tools/tests/match_sim/sample_scenario.json --seed 2024
+python -m tools.tests.match_sim tools/tests/match_sim/overtime_scenario.json --seed 3141 \
+  --output build/match-timelines/overtime.json
 ```
 
-will produce a `frames` array with 101 entries (10 seconds at 10 Hz). Each frame
-contains per-bot state snapshots as well as any events that occurred during the
-corresponding tick.
+Each command materialises a `frames` array whose length matches the values in the
+table above (frames = duration × tick rate + 1). The CLI writes the resulting
+timeline to the provided output path or prints it to stdout when omitted.
 
 ## Working with the JSON timeline
 

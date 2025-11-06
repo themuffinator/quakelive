@@ -1,0 +1,107 @@
+{
+  "map": "thunderstruck",
+  "duration": 8.0,
+  "tick_rate": 20,
+  "seed": 9001,
+  "metadata": {
+    "description": "Tri-bot loadout stress test",
+    "mode": "ffa"
+  },
+  "bots": [
+    {
+      "name": "slash",
+      "team": null,
+      "spawn": {
+        "position": [0, 0, 64]
+      },
+      "initial_state": {
+        "health": 150,
+        "ammo": {
+          "plasma": 120,
+          "lightning": 150,
+          "nail": {"random": {"mode": "randint", "low": 25, "high": 50}}
+        },
+        "inventory": {
+          "armor": 50,
+          "quad": 1,
+          "cells": 120
+        },
+        "custom": {
+          "role": "aggressor",
+          "powerup": {"random": {"mode": "choice", "options": ["haste", "regen"]}}
+        }
+      },
+      "script": [
+        {"time": 0.0, "action": "set_state", "params": {"facing": [0, 1, 0]}},
+        {"time": 0.2, "action": "move", "params": {"direction": [0, 1, 0], "speed": 360}},
+        {"time": 1.5, "action": "shoot", "params": {"weapon": "plasma", "cost": 12}},
+        {"time": 3.0, "action": "custom", "params": {"combo_ready": true}},
+        {"time": 5.5, "action": "item", "params": {"name": "cells", "count": 30}}
+      ]
+    },
+    {
+      "name": "ranger",
+      "team": null,
+      "spawn": {
+        "random_positions": [
+          [64, -64, 64],
+          [96, 48, 64]
+        ]
+      },
+      "initial_state": {
+        "health": 125,
+        "ammo": {
+          "rocket": 20,
+          "grenade": 10,
+          "rail": 5
+        },
+        "inventory": {
+          "armor": 100,
+          "gauntlet": 1,
+          "stack": 225
+        }
+      },
+      "script": [
+        {"time": 0.0, "action": "look", "params": {"direction": [1, 0, 0]}},
+        {"time": 0.1, "action": "set_state", "params": {"position": [64, -64, 64]}},
+        {"time": 2.2, "action": "shoot", "params": {"weapon": "rocket", "cost": 2}},
+        {"time": 2.8, "action": "shoot", "params": {"weapon": "rocket", "cost": 2}},
+        {"time": 4.0, "action": "damage", "params": {"amount": 60}},
+        {"time": 6.0, "action": "heal", "params": {"amount": 35}},
+        {"time": 7.5, "action": "say", "params": {"message": "stack recovered"}}
+      ]
+    },
+    {
+      "name": "sorlag",
+      "team": null,
+      "spawn": {
+        "position": [-96, 96, 64]
+      },
+      "initial_state": {
+        "health": 200,
+        "ammo": {
+          "shotgun": 30,
+          "nail": 80,
+          "lightning": 90
+        },
+        "inventory": {
+          "armor": 150,
+          "ammo_belts": 2,
+          "heavy_weapons": 3
+        },
+        "custom": {
+          "role": "anchor",
+          "loadout_id": {"random": {"mode": "randint", "low": 1000, "high": 2000}}
+        }
+      },
+      "script": [
+        {"time": 0.0, "action": "set_state", "params": {"facing": [-1, 0, 0]}},
+        {"time": 1.0, "action": "move", "params": {"direction": [-1, 0, 0], "speed": 280}},
+        {"time": 1.2, "action": "shoot", "params": {"weapon": "shotgun", "cost": 6}},
+        {"time": 3.8, "action": "custom", "params": {"defensive_matrix": true}},
+        {"time": 5.0, "action": "item", "params": {"name": "armor_shards", "count": 5}},
+        {"time": 6.5, "action": "teleport", "params": {"position": [-32, 32, 96]}}
+      ]
+    }
+  ]
+}

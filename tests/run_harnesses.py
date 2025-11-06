@@ -15,7 +15,13 @@ if str(REPO_ROOT) not in sys.path:
 from tools.tests.client_regression import ClientPredictor, ClientRegressionHarness
 from tools.tests.match_sim.harness import run_from_file
 from tools.tests.re_trace_harness import run_trace_harness
-DEFAULT_SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "sample_scenario.json"
+SCENARIO_ROOT = REPO_ROOT / "tools" / "tests" / "match_sim"
+SCENARIOS: dict[str, Path] = {
+    "duel": SCENARIO_ROOT / "sample_scenario.json",
+    "overtime": SCENARIO_ROOT / "overtime_scenario.json",
+    "loadouts": SCENARIO_ROOT / "complex_loadouts.json",
+}
+DEFAULT_SCENARIO = SCENARIOS["duel"]
 DEFAULT_SNAPSHOTS = REPO_ROOT / "tools" / "tests" / "client_regression" / "sample_snapshots.json"
 
 
@@ -25,19 +31,33 @@ def _write_text(path: Path, text: str) -> None:
 
 
 def _run_match_harness(target: str, artifact_root: Path, seed: int) -> None:
-    timeline_path = artifact_root / "match_sim" / target / "timeline.json"
-    result = run_from_file(DEFAULT_SCENARIO, seed=seed, output_path=timeline_path)
+    summaries: list[dict[str, object]] = []
+    for slug, scenario_path in SCENARIOS.items():
+        timeline_path = artifact_root / "match_sim" / target / slug / "timeline.json"
+        result = run_from_file(scenario_path, seed=seed, output_path=timeline_path)
 
-    summary = {
-        "target": target,
-        "scenario": str(DEFAULT_SCENARIO.relative_to(REPO_ROOT)),
-        "seed": seed,
-        "frame_count": len(result.frames),
-        "duration_seconds": result.frames[-1].time if result.frames else 0.0,
-        "bots": sorted(result.frames[0].bots.keys()) if result.frames else [],
-    }
+        summaries.append(
+            {
+                "target": target,
+                "slug": slug,
+                "scenario": str(scenario_path.relative_to(REPO_ROOT)),
+                "seed": seed,
+                "frame_count": len(result.frames),
+                "duration_seconds": result.frames[-1].time if result.frames else 0.0,
+                "bots": sorted(result.frames[0].bots.keys()) if result.frames else [],
+            }
+        )
+
+    index_path = artifact_root / "match_sim" / target / "index.json"
+    _write_text(index_path, json.dumps(summaries, indent=2) + "\n")
+
     summary_log = artifact_root / "logs" / target / "match_sim.log"
-    _write_text(summary_log, "Match simulation harness completed successfully.\n" + json.dumps(summary, indent=2) + "\n")
+    _write_text(
+        summary_log,
+        "Match simulation harness completed successfully.\n"
+        + json.dumps(summaries, indent=2)
+        + "\n",
+    )
 
 
 def _run_client_harness(target: str, artifact_root: Path) -> None:
