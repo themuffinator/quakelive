@@ -84,22 +84,28 @@ The `platform_config.h` macros turn the `QL_BUILD_*` definitions into capability
 To capture canonical logs for each scenario and to archive proof of the hybrid fallback behaviour, run the scripted lifecycle trace and persist the output:
 
 ```bash
-python3 tools/integration/auth_flow_trace.py | tee docs/qa/logs/hybrid_auth_flow_validation.log
+python3 tools/integration/auth_flow_trace.py | tee docs/qa/logs/auth_flow_trace.log
 ```
 
-The script reflects the same classification rules implemented by the client dispatcher, making it suitable for regression validation.【F:tools/integration/auth_flow_trace.py†L48-L98】 The resulting log file includes the hybrid fallback confirmation:
+The script reflects the same classification rules implemented by the client dispatcher, making it suitable for regression validation.【F:tools/integration/auth_flow_trace.py†L48-L98】 Each scenario slice of the captured transcript is archived for direct linkage from this matrix:
 
-```text
--- Scenario 2: Hybrid --
-[auth] Hybrid dispatch (/steam/session/validate): submitting credential
-[auth] Hybrid payload summary: ticket=retry:T…FFFF (len=21)
-[auth] Hybrid result -> outcome=success, message="Hybrid fallback accepted credential via open adapter (token=retry:T…FFFF)"
-```
+| Scenario | Log archive |
+| --- | --- |
+| Steam-only | [`steam_only_auth_flow.log`](logs/steam_only_auth_flow.log) |
+| Hybrid | [`hybrid_auth_flow.log`](logs/hybrid_auth_flow.log) |
+| Open-only | [`open_only_auth_flow.log`](logs/open_only_auth_flow.log) |
+| Full trace | [`auth_flow_trace.log`](logs/auth_flow_trace.log) |
 
-The full validation transcript is stored at `docs/qa/logs/hybrid_auth_flow_validation.log` for traceability.【F:docs/qa/logs/hybrid_auth_flow_validation.log†L1-L19】
+These artefacts sit alongside the original hybrid validation log for historical comparison.【F:docs/qa/logs/auth_flow_trace.log†L1-L18】【F:docs/qa/logs/steam_only_auth_flow.log†L1-L5】【F:docs/qa/logs/hybrid_auth_flow.log†L1-L5】【F:docs/qa/logs/open_only_auth_flow.log†L1-L9】【F:docs/qa/logs/hybrid_auth_flow_validation.log†L1-L19】
 
 ## Summary of Findings
 
-- Steam-only builds route exclusively through Steamworks and expose retry guidance whenever the ticket contains the `retry` marker, matching the updated Steam handler semantics.【F:src/code/client/ql_auth.c†L111-L163】
-- Open-only builds rely on the launcher adapter and expose retry guidance for `refresh` tokens while rejecting revoked credentials via the open handler heuristics.【F:src/code/client/ql_auth.c†L166-L195】
-- Hybrid builds honour the Steam result first but automatically replay pending credentials against the open adapter, producing the acceptance message captured in the validation session log.【F:src/code/client/ql_auth.c†L197-L225】【F:docs/qa/logs/hybrid_auth_flow_validation.log†L6-L13】
+- Steam-only builds route exclusively through Steamworks, yielding the expected success message when presented with a valid ticket and no evidence of fallback providers in the lifecycle trace.【F:docs/qa/logs/steam_only_auth_flow.log†L1-L5】
+- Open-only builds exercise both the retry guidance for expired launcher tokens and the success path for valid credentials, matching the open adapter heuristics and confirming that no Steam stages are emitted.【F:docs/qa/logs/open_only_auth_flow.log†L1-L9】
+- Hybrid builds report the Steam dispatch followed by a successful hybrid verdict, demonstrating the fallback acceptance messaging while highlighting that only the Steam dispatch is currently logged in the scripted trace.【F:docs/qa/logs/hybrid_auth_flow.log†L1-L5】
+
+## Open Issues
+
+- The scripted hybrid trace does not emit a second dispatch entry for the open adapter fallback, making it difficult to prove the dual-provider routing from the log alone. Extend `auth_flow_trace.py` to log the open adapter stage after a Steam pending result.【F:docs/qa/logs/hybrid_auth_flow.log†L1-L5】【F:tools/integration/auth_flow_trace.py†L57-L93】
+- Steam-only coverage lacks the negative ticket classifications (`payload too short`, `denied/invalid`) described in the plan; add scripted samples so the archived logs capture those outcomes for regression tracking.【F:docs/qa/logs/steam_only_auth_flow.log†L1-L5】【F:docs/qa/credential-matrix.md†L31-L54】
+- The open-only archive omits a revoked-token failure sample, leaving the matrix without trace evidence for that branch. Add a `revoke` token sample to the integration script and log catalogue.【F:docs/qa/logs/open_only_auth_flow.log†L1-L9】【F:docs/qa/credential-matrix.md†L67-L81】
