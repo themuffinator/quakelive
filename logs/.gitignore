@@ -1,1 +1,2 @@
 *.log
+!syscall_contract.log
