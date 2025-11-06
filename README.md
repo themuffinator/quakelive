@@ -27,6 +27,9 @@ build pipelines, testing harnesses, and reverse-engineering references.
 - Review the slide decks in [`docs/media/`](docs/media/) before your first mentor
   sync so you can ask targeted questions about the harness and reconstruction
   workflow.
+- Consult the [`Native Toolchain Support Matrix`](docs/platform/toolchain-matrix.md)
+  for host requirements, build status, and the 32-bit runtime payloads needed to
+  exercise the native DLLs on each platform.【F:docs/platform/toolchain-matrix.md†L1-L60】
 
 For calendar integration, subscribe to the shared "QL Reverse Mentorship" calendar
 which mirrors this rotation for visibility across time zones.
