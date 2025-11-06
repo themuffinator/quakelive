@@ -1,5 +1,21 @@
 # Gameplay CVar Notes
 
+## Match Timeout Controls
+
+Competitive duel and team modes now expose Quake Live–style match pauses. Players call `timeout` (alias `pause`) to consume one of their team's `g_timeoutCount` allotments, freezing play, logging the owner, and sharing the pause state through `CS_MATCH_STATE` for HUD parity.【F:src/code/game/g_cmds.c†L1593-L1675】【F:src/code/game/g_main.c†L2100-L2149】 The server starts the countdown using `g_timeoutLen` and remembers when the break began so resuming can credit the lost time back to warmup and intermission timers.【F:src/code/game/g_cmds.c†L1657-L1670】【F:src/code/game/g_main.c†L2133-L2149】
+
+`timein` (aliases `resume`, `unpause`) returns the match to live play either on demand or after the configured duration expires. The resume path shifts warmup countdowns, queued exits, and intermission delays by the paused interval so countdowns continue smoothly once action resumes, mirroring Quake Live's behaviour.【F:src/code/game/g_cmds.c†L1678-L1712】【F:src/code/game/g_main.c†L2133-L2149】【F:src/code/game/g_main.c†L2295-L2316】
+
+| Command | Aliases | Notes |
+| --- | --- | --- |
+| `timeout` | `pause` | Pauses the match if the caller's side has timeouts remaining; sets up `timeoutOwner`, `timeoutStartTime`, and an optional auto-expiry from `g_timeoutLen`.【F:src/code/game/g_cmds.c†L1632-L1670】 |
+| `timein` | `resume`, `unpause` | Resumes play for the calling side, reapplies the paused duration to warmup/exit timers, and clears the match state configstring flags.【F:src/code/game/g_cmds.c†L1678-L1712】【F:src/code/game/g_main.c†L2133-L2149】 |
+
+| CVar | Default | Notes |
+| --- | --- | --- |
+| `g_timeoutCount` | `0` | Number of timeouts each team receives per match; initialised into `level.timeoutRemaining` and published via `CS_MATCH_STATE` for client HUDs.【F:src/code/game/g_main.c†L1093-L1121】【F:src/code/game/g_main.c†L2100-L2131】 |
+| `g_timeoutLen` | `60` | Timeout duration in seconds; values ≤0 hold the pause until a manual `timein`, while positive values trigger an automatic resume with broadcast messaging.【F:src/code/game/g_cmds.c†L1657-L1670】【F:src/code/game/g_main.c†L2295-L2316】 |
+
 ## Starting Ammo Controls
 
 The server now registers the full Quake Live `g_startingAmmo_*` family so per-weapon spawn loadouts can be tuned without touching code. Each cvar exposes the amount of ammunition players receive when a weapon is granted through `g_startingWeapons`, factories, or scripted loadouts, and publishes a `helptext_*` mirror for in-console discovery. The defaults are defined once in `g_main.c`, ensuring the archived fallback used by `G_InitStartingAmmoConfig` matches the string advertised to administrators and mirrors the retail Quake Live DLL when no overrides are present.

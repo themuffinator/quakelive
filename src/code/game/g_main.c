@@ -830,7 +830,7 @@ void G_UpdateKnockbackConfig( void ) {
 
 
 static void LevelCheckTimers( void );
-static void G_UpdateMatchStateConfigString( void );
+void G_UpdateMatchStateConfigString( void );
 static void G_StartOrExtendOvertime( void );
 static void G_StopOvertime( void );
 static void G_TrackSuddenDeathAnnouncements( void );
@@ -2097,15 +2097,26 @@ void CheckExitRules( void ) {
 
 
 
-static void G_UpdateMatchStateConfigString( void ) {
+void G_UpdateMatchStateConfigString( void ) {
 	int red = level.timeoutRemaining[TEAM_RED];
 	int blue = level.timeoutRemaining[TEAM_BLUE];
+
+	if ( g_gametype.integer < GT_TEAM ) {
+		int duel = level.timeoutRemaining[TEAM_FREE];
+		if ( duel < 0 ) {
+			duel = 0;
+		}
+		red = duel;
+		blue = duel;
+	}
+
 	if ( red < 0 ) {
 		red = 0;
 	}
 	if ( blue < 0 ) {
 		blue = 0;
 	}
+
 	trap_SetConfigstring( CS_MATCH_STATE, va("%i %i %i %i %i %i %i %i %i %i",
 		level.overtimeActive ? 1 : 0,
 		level.overtimeStartTime,
@@ -2117,6 +2128,25 @@ static void G_UpdateMatchStateConfigString( void ) {
 		level.timeoutOwner,
 		red,
 		blue ) );
+}
+
+void G_ApplyTimeoutPauseDelta( int msec ) {
+	if ( msec <= 0 ) {
+		return;
+	}
+
+	if ( level.warmupTime > 0 ) {
+		level.warmupTime += msec;
+		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+	}
+
+	if ( level.intermissionQueued ) {
+		level.intermissionQueued += msec;
+	}
+
+	if ( level.readyToExit ) {
+		level.exitTime += msec;
+	}
 }
 
 int G_GetSuddenDeathRespawnDelay( void ) {
@@ -2264,12 +2294,25 @@ static void LevelCheckTimers( void ) {
 	}
 	if ( level.timeoutActive ) {
 		if ( level.timeoutExpireTime && level.time >= level.timeoutExpireTime ) {
+			int pausedDuration = 0;
+			team_t team = level.timeoutTeam;
+			int owner = level.timeoutOwner;
+
+			if ( level.timeoutStartTime > 0 && level.time > level.timeoutStartTime ) {
+				pausedDuration = level.time - level.timeoutStartTime;
+			}
+
+			G_ApplyTimeoutPauseDelta( pausedDuration );
+
+			trap_SendServerCommand( -1, "print \"Timeout expired; match resuming.\\n\"" );
+			G_LogPrintf( "match: timeout expired team %i owner %i\n", team, owner );
+
 			level.timeoutActive = qfalse;
 			level.timeoutOwner = -1;
 			level.timeoutTeam = TEAM_FREE;
 			level.timeoutExpireTime = 0;
 			level.timeoutStartTime = 0;
-			G_LogPrintf( "match: timeout complete\n" );
+
 			G_UpdateMatchStateConfigString();
 		}
 		return;
@@ -2318,6 +2361,10 @@ void CheckTournament( void ) {
 	// check because we run 3 game frames before calling Connect and/or ClientBegin
 	// for clients on a map_restart
 	if ( level.numPlayingClients == 0 ) {
+		return;
+	}
+
+	if ( level.timeoutActive ) {
 		return;
 	}
 

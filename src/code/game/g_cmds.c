@@ -1590,6 +1590,128 @@ void Cmd_Stats_f( gentity_t *ent ) {
 */
 }
 
+static qboolean G_ClientCanControlTimeouts( gentity_t *ent, team_t *teamOut ) {
+	team_t team;
+
+	if ( !ent->client ) {
+		return qfalse;
+	}
+
+	team = ent->client->sess.sessionTeam;
+	if ( team == TEAM_SPECTATOR ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Spectators cannot control timeouts.\\n\"" );
+		return qfalse;
+	}
+
+	if ( g_gametype.integer != GT_TOURNAMENT && g_gametype.integer < GT_TEAM ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Timeouts are disabled in this gametype.\\n\"" );
+		return qfalse;
+	}
+
+	if ( g_gametype.integer >= GT_TEAM ) {
+		if ( team != TEAM_RED && team != TEAM_BLUE ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Join a team before calling a timeout.\\n\"" );
+			return qfalse;
+		}
+		*teamOut = team;
+	} else {
+		*teamOut = TEAM_FREE;
+	}
+
+	return qtrue;
+}
+
+static void G_ResetTimeoutState( void ) {
+	level.timeoutActive = qfalse;
+	level.timeoutOwner = -1;
+	level.timeoutTeam = TEAM_FREE;
+	level.timeoutExpireTime = 0;
+	level.timeoutStartTime = 0;
+}
+
+void Cmd_Timeout_f( gentity_t *ent ) {
+	team_t team;
+	int remaining;
+	int timeoutLength;
+
+	if ( level.timeoutActive ) {
+		trap_SendServerCommand( ent-g_entities, "print \"A timeout is already active.\\n\"" );
+		return;
+	}
+
+	if ( !G_ClientCanControlTimeouts( ent, &team ) ) {
+		return;
+	}
+
+	remaining = level.timeoutRemaining[team];
+	if ( remaining <= 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"No timeouts remaining.\\n\"" );
+		return;
+	}
+
+	level.timeoutActive = qtrue;
+	level.timeoutTeam = team;
+	level.timeoutOwner = ent->client->ps.clientNum;
+	level.timeoutStartTime = level.time;
+
+	timeoutLength = g_timeoutLen.integer;
+	if ( timeoutLength < 0 ) {
+		timeoutLength = 0;
+	}
+	if ( timeoutLength > 0 ) {
+		level.timeoutExpireTime = level.time + timeoutLength * 1000;
+	} else {
+		level.timeoutExpireTime = 0;
+	}
+
+	level.timeoutRemaining[team] = remaining - 1;
+	if ( level.timeoutRemaining[team] < 0 ) {
+		level.timeoutRemaining[team] = 0;
+	}
+
+	trap_SendServerCommand( -1, va( "print \"%s called a timeout (%i remaining).\\n\"", ent->client->pers.netname, level.timeoutRemaining[team] ) );
+	G_LogPrintf( "match: timeout called team %i owner %i remaining %i length %i\n", team, level.timeoutOwner, level.timeoutRemaining[team], timeoutLength );
+
+	G_UpdateMatchStateConfigString();
+}
+
+void Cmd_Timein_f( gentity_t *ent ) {
+	int pausedDuration = 0;
+	team_t owningTeam;
+	int owner;
+
+	if ( !level.timeoutActive ) {
+		trap_SendServerCommand( ent-g_entities, "print \"No timeout in progress.\\n\"" );
+		return;
+	}
+
+	owningTeam = level.timeoutTeam;
+	owner = level.timeoutOwner;
+
+	if ( owningTeam == TEAM_FREE ) {
+		if ( ent->client->ps.clientNum != owner ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Only the caller may resume play.\\n\"" );
+			return;
+		}
+	} else if ( ent->client->sess.sessionTeam != owningTeam ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Only the calling team may resume play.\\n\"" );
+		return;
+	}
+
+	if ( level.timeoutStartTime > 0 && level.time > level.timeoutStartTime ) {
+		pausedDuration = level.time - level.timeoutStartTime;
+	}
+
+	G_ApplyTimeoutPauseDelta( pausedDuration );
+
+	trap_SendServerCommand( -1, va( "print \"%s called time in.\\n\"", ent->client->pers.netname ) );
+	G_LogPrintf( "match: timeout resumed team %i owner %i caller %i\n", owningTeam, owner, ent->client->ps.clientNum );
+
+	G_ResetTimeoutState();
+	G_UpdateMatchStateConfigString();
+}
+
+
 /*
 =================
 ClientCommand
@@ -1692,6 +1814,10 @@ void ClientCommand( int clientNum ) {
 		Cmd_TeamVote_f (ent);
 	else if (Q_stricmp (cmd, "gc") == 0)
 		Cmd_GameCommand_f( ent );
+	else if ( !Q_stricmp( cmd, "timeout" ) || !Q_stricmp( cmd, "pause" ) )
+		Cmd_Timeout_f( ent );
+	else if ( !Q_stricmp( cmd, "timein" ) || !Q_stricmp( cmd, "resume" ) || !Q_stricmp( cmd, "unpause" ) )
+		Cmd_Timein_f( ent );
 	else if (Q_stricmp (cmd, "setviewpos") == 0)
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)

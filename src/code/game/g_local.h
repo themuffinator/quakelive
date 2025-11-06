@@ -567,6 +567,8 @@ char *G_NewString( const char *string );
 // g_cmds.c
 //
 void Cmd_Score_f (gentity_t *ent);
+void Cmd_Timeout_f( gentity_t *ent );
+void Cmd_Timein_f( gentity_t *ent );
 void StopFollowing( gentity_t *ent );
 void BroadcastTeamChange( gclient_t *client, int oldTeam );
 void SetTeam( gentity_t *ent, char *s );
@@ -761,6 +763,8 @@ void CheckTeamLeader( int team );
 void G_RunThink (gentity_t *ent);
 void QDECL G_LogPrintf( const char *fmt, ... );
 void SendScoreboardMessageToAllClients( void );
+void G_UpdateMatchStateConfigString( void );
+void G_ApplyTimeoutPauseDelta( int msec );
 void QDECL G_Printf( const char *fmt, ... );
 void QDECL G_Error( const char *fmt, ... );
 
@@ -899,6 +903,8 @@ extern	vmCvar_t	g_synchronousClients;
 extern	vmCvar_t	g_motd;
 extern	vmCvar_t	g_warmup;
 extern	vmCvar_t	g_doWarmup;
+extern	vmCvar_t	g_timeoutLen;
+extern	vmCvar_t	g_timeoutCount;
 extern	vmCvar_t	g_blood;
 extern	vmCvar_t	g_allowVote;
 extern	vmCvar_t	g_teamAutoJoin;
