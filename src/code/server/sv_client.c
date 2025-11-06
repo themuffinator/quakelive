@@ -73,6 +73,10 @@ static void SV_CapturePlatformAuthFromUserinfo( client_t *cl, const char *userin
 
         if ( steamId && steamId[0] ) {
                 Q_strncpyz( cl->platformSteamId, steamId, sizeof( cl->platformSteamId ) );
+
+                if ( !cl->platformAuthLabel[0] ) {
+                        Q_strncpyz( cl->platformAuthLabel, "steam", sizeof( cl->platformAuthLabel ) );
+                }
         }
 
         if ( combined[0] ) {

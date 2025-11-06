@@ -122,6 +122,7 @@ static char *G_RunPlatformAuthChecks( int clientNum, const char *userinfo, qbool
 
         if ( !QL_ParsePlatformToken( token, QL_AUTH_CREDENTIAL_STEAM, &credential ) ) {
                 Q_strncpyz( g_clientAuthDenyMessage, "Failed to verify Steam auth token", sizeof( g_clientAuthDenyMessage ) );
+                G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
                 return g_clientAuthDenyMessage;
         }
 
