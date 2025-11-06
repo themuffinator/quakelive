@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "g_local.h"
 #include <limits.h>
+#include "../../../src-re/include/ql_types.h"
 #include <time.h>
 
 level_locals_t	level;
@@ -31,6 +32,7 @@ weaponConfig_t	g_weaponConfig;
 weaponReloadConfig_t	g_weaponReloadConfig;
 knockbackConfig_t	g_knockbackConfig;
 ammoPackConfig_t	g_ammoPackConfig;
+factoryCvarConfig_t	g_factoryCvarConfig;
 startingAmmoConfig_t	g_startingAmmoConfig;
 #define STRINGIZE_HELPER( x ) #x
 #define STRINGIZE( x ) STRINGIZE_HELPER( x )
@@ -99,6 +101,13 @@ startingAmmoConfig_t	g_startingAmmoConfig;
 #define DEFAULT_AMMOPACK_RL                 5
 #define DEFAULT_AMMOPACK_SG                 10
 
+#define DEFAULT_STARTING_WEAPONS_MASK      ( ( 1 << ( WP_GAUNTLET - 1 ) ) | ( 1 << ( WP_MACHINEGUN - 1 ) ) )
+#define DEFAULT_INFINITE_AMMO              0
+#define DEFAULT_AMMO_PACK_TOGGLE           0
+#define DEFAULT_AMMO_PACK_HACK             0
+#define DEFAULT_AMMO_RESPAWN_SECONDS       40
+#define DEFAULT_SUDDEN_DEATH_RESPAWN       0
+
 typedef struct {
 	vmCvar_t	*vmCvar;
 	char		*cvarName;
@@ -112,6 +121,29 @@ typedef struct {
 
 gentity_t		g_entities[MAX_GENTITIES];
 gclient_t		g_clients[MAX_CLIENTS];
+
+static qlr_game_frame_context_t *g_qlr_frame_ctx = NULL;
+
+static qlr_game_frame_context_t *G_GetFrameContext( void );
+static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec );
+static void G_StepEntities( qlr_game_frame_context_t *ctx );
+static void G_DispatchEvents( qlr_game_frame_context_t *ctx );
+static void G_FinishClientFrames( qlr_game_frame_context_t *ctx );
+static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued );
+
+void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
+	g_qlr_frame_ctx = ctx;
+
+	if ( g_qlr_frame_ctx ) {
+		g_qlr_frame_ctx->level = ( qlr_level_locals_t * )&level;
+		g_qlr_frame_ctx->entities = ( qlr_gentity_t * )g_entities;
+		g_qlr_frame_ctx->entity_count = level.num_entities;
+	}
+}
+
+void QLR_Game_UnbindFrameContext( void ) {
+	g_qlr_frame_ctx = NULL;
+}
 
 vmCvar_t	g_gametype;
 vmCvar_t	g_dmflags;
@@ -218,6 +250,12 @@ vmCvar_t	weapon_reload_ng;
 vmCvar_t	weapon_reload_prox;
 vmCvar_t	weapon_reload_cg;
 vmCvar_t	weapon_reload_hmg;
+vmCvar_t	g_startingWeapons;
+vmCvar_t	g_infiniteAmmo;
+vmCvar_t	g_ammoPack;
+vmCvar_t	g_ammoPackHack;
+vmCvar_t	g_ammoRespawn;
+vmCvar_t	g_suddenDeathRespawn;
 vmCvar_t	g_ammoPack_bfg;
 vmCvar_t	g_ammoPack_cg;
 vmCvar_t	g_ammoPack_gl;
@@ -392,6 +430,12 @@ static cvarTable_t		gameCvarTable[] = {
         { &weapon_reload_cg, "weapon_reload_cg", "0", 0, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
         { &weapon_reload_hmg, "weapon_reload_hmg", "0", 0, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
 
+        { &g_startingWeapons, "g_startingWeapons", STRINGIZE( DEFAULT_STARTING_WEAPONS_MASK ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Bitmask describing which weapons players spawn with; bit (weapon-1) matches the WP_* enum used by Quake Live factories." },
+        { &g_infiniteAmmo, "g_infiniteAmmo", STRINGIZE( DEFAULT_INFINITE_AMMO ), CVAR_ARCHIVE, 0, qfalse, qfalse, "When non-zero, spawn loadouts grant infinite ammunition mirroring Quake Live practice factories." },
+        { &g_ammoPack, "g_ammoPack", STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable Quake Live ammo pack sizing so pickups follow factory scripts instead of compiled defaults." },
+        { &g_ammoPackHack, "g_ammoPackHack", STRINGIZE( DEFAULT_AMMO_PACK_HACK ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Legacy Quake Live ammo pack override used by classic map factories." },
+        { &g_ammoRespawn, "g_ammoRespawn", STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds before ammo entities respawn; Quake Live factories reduce this for faster loops." },
+        { &g_suddenDeathRespawn, "g_suddenDeathRespawn", STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
         { &g_ammoPack_bfg, "g_ammoPack_bfg", STRINGIZE( DEFAULT_AMMOPACK_BFG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Cells granted when picking up a BFG ammo pack, matching Quake Live's default drop." },
         { &g_ammoPack_cg, "g_ammoPack_cg", STRINGIZE( DEFAULT_AMMOPACK_CG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Chaingun bullets restored per ammo belt pickup." },
         { &g_ammoPack_gl, "g_ammoPack_gl", STRINGIZE( DEFAULT_AMMOPACK_GL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grenade Launcher rounds provided by grenade ammo packs." },
@@ -598,6 +642,114 @@ void G_InitAmmoPackConfig( void ) {
 
 void G_UpdateAmmoPackConfig( void ) {
 	G_InitAmmoPackConfig();
+}
+
+static int G_ReadFactoryIntCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+	if ( !cvar ) {
+		G_ReportMissingCvar( cvarName );
+		return fallback;
+	}
+
+	return cvar->integer;
+}
+
+static qboolean G_ReadFactoryBoolCvar( const vmCvar_t *cvar, qboolean fallback, const char *cvarName ) {
+	int value = G_ReadFactoryIntCvar( cvar, fallback ? 1 : 0, cvarName );
+
+	return value ? qtrue : qfalse;
+}
+
+static int G_ReadStartingWeaponsMaskCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+	int mask = G_ReadFactoryIntCvar( cvar, fallback, cvarName );
+
+	if ( mask < 0 ) {
+		mask = 0;
+	}
+
+	return mask;
+}
+
+static unsigned int G_ComputeStartingWeaponsStatMask( int mask ) {
+	unsigned int statMask = 0;
+	weapon_t weapon;
+
+	if ( mask <= 0 ) {
+		return 0;
+	}
+
+	for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; ++weapon ) {
+		int cvarBit = 1 << ( weapon - 1 );
+
+		if ( mask & cvarBit ) {
+			statMask |= 1u << weapon;
+		}
+	}
+
+	return statMask;
+}
+
+static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {
+	factoryCvarConfig_t config;
+
+	config.startingWeaponsMask = G_ReadStartingWeaponsMaskCvar( &g_startingWeapons, DEFAULT_STARTING_WEAPONS_MASK, "g_startingWeapons" );
+	config.startingWeaponsStatMask = G_ComputeStartingWeaponsStatMask( config.startingWeaponsMask );
+	if ( config.startingWeaponsStatMask == 0 ) {
+		config.startingWeaponsMask = DEFAULT_STARTING_WEAPONS_MASK;
+		config.startingWeaponsStatMask = G_ComputeStartingWeaponsStatMask( config.startingWeaponsMask );
+	}
+
+	config.infiniteAmmo = G_ReadFactoryBoolCvar( &g_infiniteAmmo, DEFAULT_INFINITE_AMMO, "g_infiniteAmmo" );
+	config.ammoPackEnabled = G_ReadFactoryBoolCvar( &g_ammoPack, DEFAULT_AMMO_PACK_TOGGLE, "g_ammoPack" );
+	config.ammoPackHackEnabled = G_ReadFactoryBoolCvar( &g_ammoPackHack, DEFAULT_AMMO_PACK_HACK, "g_ammoPackHack" );
+	config.ammoRespawnSeconds = G_ReadFactoryIntCvar( &g_ammoRespawn, DEFAULT_AMMO_RESPAWN_SECONDS, "g_ammoRespawn" );
+	if ( config.ammoRespawnSeconds <= 0 ) {
+		config.ammoRespawnSeconds = DEFAULT_AMMO_RESPAWN_SECONDS;
+	}
+
+	config.suddenDeathRespawn = G_ReadFactoryBoolCvar( &g_suddenDeathRespawn, DEFAULT_SUDDEN_DEATH_RESPAWN, "g_suddenDeathRespawn" );
+
+	return config;
+}
+
+static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfig_t *config ) {
+	if ( !reason || !config ) {
+		return;
+	}
+
+	G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i suddenDeathRespawn=%i\n",
+		reason,
+		config->startingWeaponsMask,
+		config->startingWeaponsStatMask,
+		config->infiniteAmmo,
+		config->ammoPackEnabled,
+		config->ammoPackHackEnabled,
+		config->ammoRespawnSeconds,
+		config->suddenDeathRespawn );
+}
+
+static factoryCvarConfig_t s_reportedFactoryConfig;
+
+void G_InitFactoryCvarConfig( void ) {
+	g_factoryCvarConfig = G_LoadFactoryCvarConfig();
+	s_reportedFactoryConfig = g_factoryCvarConfig;
+	G_LogFactoryLoadoutState( "init", &g_factoryCvarConfig );
+}
+
+void G_UpdateFactoryCvarConfig( void ) {
+	factoryCvarConfig_t config = G_LoadFactoryCvarConfig();
+
+	if ( config.startingWeaponsMask != s_reportedFactoryConfig.startingWeaponsMask
+		|| config.startingWeaponsStatMask != s_reportedFactoryConfig.startingWeaponsStatMask
+		|| config.infiniteAmmo != s_reportedFactoryConfig.infiniteAmmo
+		|| config.ammoPackEnabled != s_reportedFactoryConfig.ammoPackEnabled
+		|| config.ammoPackHackEnabled != s_reportedFactoryConfig.ammoPackHackEnabled
+		|| config.ammoRespawnSeconds != s_reportedFactoryConfig.ammoRespawnSeconds
+		|| config.suddenDeathRespawn != s_reportedFactoryConfig.suddenDeathRespawn ) {
+		G_LogFactoryLoadoutState( "update", &config );
+		s_reportedFactoryConfig = config;
+	}
+
+	g_factoryCvarConfig = config;
 }
 
 static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
@@ -866,6 +1018,7 @@ void G_RegisterCvars( void ) {
 	G_InitKnockbackConfig();
 	G_InitStartingAmmoConfig();
 	G_InitAmmoPackConfig();
+	G_InitFactoryCvarConfig();
 }
 
 void G_UpdateCvars( void ) {
@@ -901,6 +1054,7 @@ void G_UpdateCvars( void ) {
 	G_UpdateKnockbackConfig();
 	G_UpdateStartingAmmoConfig();
 	G_UpdateAmmoPackConfig();
+	G_UpdateFactoryCvarConfig();
 }
 
 /*
@@ -1863,9 +2017,22 @@ void CheckExitRules( void ) {
 	}
 
 	// check for sudden death
-	if ( ScoreIsTied() ) {
-		// always wait for sudden death
-		return;
+	{
+		qboolean suddenDeath = ScoreIsTied();
+
+		if ( level.suddenDeathActive != suddenDeath ) {
+			level.suddenDeathActive = suddenDeath;
+
+			if ( suddenDeath ) {
+				G_Printf( "Sudden death engaged (ammo respawn %s).\n", g_factoryCvarConfig.suddenDeathRespawn ? "active" : "paused" );
+			} else {
+				G_Printf( "Sudden death cleared; ammo respawn resumes.\n" );
+			}
+		}
+
+		if ( suddenDeath ) {
+			return;
+		}
 	}
 
 	if ( g_timelimit.integer && !level.warmupTime ) {
@@ -2429,6 +2596,206 @@ void CheckCvars( void ) {
 	}
 }
 
+static qlr_game_frame_context_t *G_GetFrameContext( void ) {
+	if ( !g_qlr_frame_ctx ) {
+		return NULL;
+	}
+
+	g_qlr_frame_ctx->level = ( qlr_level_locals_t * )&level;
+	g_qlr_frame_ctx->entities = ( qlr_gentity_t * )g_entities;
+	g_qlr_frame_ctx->entity_count = level.num_entities;
+
+	return g_qlr_frame_ctx;
+}
+
+static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec ) {
+	gentity_t       *ent;
+	int                     i;
+
+	ent = g_entities;
+	for ( i = 0; i < level.num_entities; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+
+		if ( ent->freeAfterEvent ) {
+			continue;
+		}
+
+		if ( !ent->r.linked && ent->neverFree ) {
+			continue;
+		}
+
+	// get any cvar changes
+	G_UpdateCvars();
+	LevelCheckTimers();
+		if ( i < MAX_CLIENTS ) {
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MISSILE ) {
+			continue;
+		}
+
+		if ( ent->s.eType == ET_ITEM || ent->physicsObject ) {
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MOVER ) {
+			continue;
+		}
+
+		G_RunThink( ent );
+	}
+
+	if ( ctx && ctx->hooks.run_scheduled_thinks ) {
+		ctx->hooks.run_scheduled_thinks( msec );
+	}
+}
+
+static void G_StepEntities( qlr_game_frame_context_t *ctx ) {
+	gentity_t       *ent;
+	int                     i;
+
+	ent = g_entities;
+	for ( i = 0; i < level.num_entities; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+
+		if ( ent->freeAfterEvent ) {
+			continue;
+		}
+
+		if ( !ent->r.linked && ent->neverFree ) {
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MISSILE ) {
+			G_RunMissile( ent );
+
+			if ( ctx && ctx->hooks.physics_step && ent->inuse ) {
+				ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+			}
+			continue;
+		}
+
+		if ( ent->s.eType == ET_ITEM || ent->physicsObject ) {
+			G_RunItem( ent );
+
+			if ( ctx && ctx->hooks.physics_step && ent->inuse ) {
+				ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+			}
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MOVER ) {
+			G_RunMover( ent );
+
+			if ( ctx && ctx->hooks.physics_step && ent->inuse ) {
+				ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+			}
+			continue;
+		}
+
+		if ( i < MAX_CLIENTS ) {
+			G_RunClient( ent );
+
+			if ( ctx ) {
+				if ( ctx->hooks.physics_step && ent->inuse ) {
+					ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+				}
+
+				if ( ctx->hooks.client_think && ent->inuse && ent->client ) {
+					ctx->hooks.client_think( ( qlr_gentity_t * )ent );
+				}
+			}
+			continue;
+		}
+
+		if ( ctx && ctx->hooks.physics_step && ent->inuse ) {
+			ctx->hooks.physics_step( ( qlr_gentity_t * )ent );
+		}
+	}
+}
+
+static void G_DispatchEvents( qlr_game_frame_context_t *ctx ) {
+	gentity_t       *ent;
+	int                     i;
+
+	ent = g_entities;
+	for ( i = 0; i < level.num_entities; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+
+		if ( ctx && ctx->hooks.fire_event && ent->s.event &&
+			ent->eventTime > level.previousTime && ent->eventTime <= level.time ) {
+			ctx->hooks.fire_event( ( qlr_gentity_t * )ent );
+		}
+
+		if ( level.time - ent->eventTime > EVENT_VALID_MSEC ) {
+			if ( ent->s.event ) {
+				ent->s.event = 0;       // &= EV_EVENT_BITS;
+				if ( ent->client ) {
+					ent->client->ps.externalEvent = 0;
+					// predicted events should never be set to zero
+					//ent->client->ps.events[0] = 0;
+					//ent->client->ps.events[1] = 0;
+				}
+			}
+
+			if ( ent->freeAfterEvent ) {
+				G_FreeEntity( ent );
+				continue;
+			} else if ( ent->unlinkAfterEvent ) {
+				ent->unlinkAfterEvent = qfalse;
+				trap_UnlinkEntity( ent );
+			}
+		}
+	}
+}
+
+static void G_FinishClientFrames( qlr_game_frame_context_t *ctx ) {
+	gentity_t       *ent;
+	int                     i;
+
+	ent = g_entities;
+	for ( i = 0; i < level.maxclients; i++, ent++ ) {
+		if ( !ent->inuse ) {
+			continue;
+		}
+
+		ClientEndFrame( ent );
+
+		if ( ctx && ctx->hooks.client_end_frame && ent->client ) {
+			ctx->hooks.client_end_frame( ( qlr_gentity_t * )ent );
+		}
+	}
+}
+
+static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued ) {
+        CheckTournament();
+        CheckExitRules();
+        CheckTeamStatus();
+        CheckVote();
+        CheckTeamVote( TEAM_RED );
+        CheckTeamVote( TEAM_BLUE );
+        CheckCvars();
+
+        if ( !ctx ) {
+                return;
+        }
+
+        if ( ctx->hooks.begin_match && previousWarmupTime > 0 && level.warmupTime <= 0 ) {
+                ctx->hooks.begin_match();
+        }
+
+        if ( ctx->hooks.begin_intermission && previousIntermissionQueued == 0 && level.intermissionQueued != 0 ) {
+                ctx->hooks.begin_intermission();
+        }
+}
+
 /*
 =============
 G_RunThink
@@ -2462,123 +2829,45 @@ Advances the non-player objects in the world
 ================
 */
 void G_RunFrame( int levelTime ) {
-	int			i;
-	gentity_t	*ent;
-	int			msec;
-int start, end;
+	int		msec;
+	int		previousWarmupTime;
+	int		previousIntermissionQueued;
+	qlr_game_frame_context_t	*ctx;
 
-	// if we are waiting for the level to restart, do nothing
 	if ( level.restarted ) {
 		return;
 	}
 
-	level.framenum++;
+	msec = levelTime - level.time;
+	if ( msec < 0 ) {
+		msec = 0;
+	}
+
+	previousWarmupTime = level.warmupTime;
+	previousIntermissionQueued = level.intermissionQueued;
+
 	level.previousTime = level.time;
 	level.time = levelTime;
-	msec = level.time - level.previousTime;
+	level.msec = msec;
+	level.framenum++;
 
-	// get any cvar changes
+	ctx = G_GetFrameContext();
+
 	G_UpdateCvars();
-	LevelCheckTimers();
 
-	//
-	// go through all allocated objects
-	//
-	start = trap_Milliseconds();
-	ent = &g_entities[0];
-	for (i=0 ; i<level.num_entities ; i++, ent++) {
-		if ( !ent->inuse ) {
-			continue;
+	G_DispatchScheduledThinks( ctx, msec );
+	G_StepEntities( ctx );
+	G_DispatchEvents( ctx );
+	G_FinishClientFrames( ctx );
+	G_CheckLevelTimers( ctx, previousWarmupTime, previousIntermissionQueued );
+
+	if ( g_listEntity.integer ) {
+		int		i;
+
+		for ( i = 0; i < MAX_GENTITIES; i++ ) {
+			G_Printf( "%4i: %s\n", i, g_entities[i].classname );
 		}
-
-		// clear events that are too old
-		if ( level.time - ent->eventTime > EVENT_VALID_MSEC ) {
-			if ( ent->s.event ) {
-				ent->s.event = 0;	// &= EV_EVENT_BITS;
-				if ( ent->client ) {
-					ent->client->ps.externalEvent = 0;
-					// predicted events should never be set to zero
-					//ent->client->ps.events[0] = 0;
-					//ent->client->ps.events[1] = 0;
-				}
-			}
-			if ( ent->freeAfterEvent ) {
-				// tempEntities or dropped items completely go away after their event
-				G_FreeEntity( ent );
-				continue;
-			} else if ( ent->unlinkAfterEvent ) {
-				// items that will respawn will hide themselves after their pickup event
-				ent->unlinkAfterEvent = qfalse;
-				trap_UnlinkEntity( ent );
-			}
-		}
-
-		// temporary entities don't think
-		if ( ent->freeAfterEvent ) {
-			continue;
-		}
-
-		if ( !ent->r.linked && ent->neverFree ) {
-			continue;
-		}
-
-		if ( ent->s.eType == ET_MISSILE ) {
-			G_RunMissile( ent );
-			continue;
-		}
-
-		if ( ent->s.eType == ET_ITEM || ent->physicsObject ) {
-			G_RunItem( ent );
-			continue;
-		}
-
-		if ( ent->s.eType == ET_MOVER ) {
-			G_RunMover( ent );
-			continue;
-		}
-
-		if ( i < MAX_CLIENTS ) {
-			G_RunClient( ent );
-			continue;
-		}
-
-		G_RunThink( ent );
-	}
-end = trap_Milliseconds();
-
-start = trap_Milliseconds();
-	// perform final fixups on the players
-	ent = &g_entities[0];
-	for (i=0 ; i < level.maxclients ; i++, ent++ ) {
-		if ( ent->inuse ) {
-			ClientEndFrame( ent );
-		}
-	}
-end = trap_Milliseconds();
-
-	// see if it is time to do a tournement restart
-	CheckTournament();
-
-	// see if it is time to end the level
-	CheckExitRules();
-
-	// update to team status?
-	CheckTeamStatus();
-
-	// cancel vote if timed out
-	CheckVote();
-
-	// check team votes
-	CheckTeamVote( TEAM_RED );
-	CheckTeamVote( TEAM_BLUE );
-
-	// for tracking changes
-	CheckCvars();
-
-	if (g_listEntity.integer) {
-		for (i = 0; i < MAX_GENTITIES; i++) {
-			G_Printf("%4i: %s\n", i, g_entities[i].classname);
-		}
-		trap_Cvar_Set("g_listEntity", "0");
+		trap_Cvar_Set( "g_listEntity", "0" );
 	}
 }
+

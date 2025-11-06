@@ -103,6 +103,20 @@ void G_InitAmmoPackConfig( void );
 void G_UpdateAmmoPackConfig( void );
 int G_GetSuddenDeathRespawnDelay( void );
 
+typedef struct factoryCvarConfig_s {
+	int		startingWeaponsMask;
+	unsigned int	startingWeaponsStatMask;
+	qboolean	infiniteAmmo;
+	qboolean	ammoPackEnabled;
+	qboolean	ammoPackHackEnabled;
+	int		ammoRespawnSeconds;
+	qboolean	suddenDeathRespawn;
+} factoryCvarConfig_t;
+
+extern factoryCvarConfig_t g_factoryCvarConfig;
+void G_InitFactoryCvarConfig( void );
+void G_UpdateFactoryCvarConfig( void );
+
 typedef struct startingAmmoConfig_s {
 	int		bfg;
 	int		chaingun;
@@ -455,6 +469,7 @@ typedef struct {
 	int			framenum;
 	int			time;					// in msec
 	int			previousTime;			// so movers can back up when blocked
+	int			msec;				// time elapsed since previous frame
 
 	int			startTime;				// level.time the map was started
 

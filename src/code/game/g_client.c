@@ -1327,6 +1327,10 @@ static int G_GetConfiguredSpawnAmmo( weapon_t weapon ) {
                 return 0;
         }
 
+	if ( g_factoryCvarConfig.infiniteAmmo ) {
+		return -1;
+	}
+
         // -1 retains the INFINITE semantics expected by pmove and weapon fire; see g_startingAmmo_* CVars.
         if ( ammo < 0 ) {
                 return -1;
@@ -1343,6 +1347,30 @@ static void G_SeedConfiguredSpawnAmmo( playerState_t *ps, weapon_t weapon ) {
         ps->ammo[weapon] = G_GetConfiguredSpawnAmmo( weapon );
 }
 
+static weapon_t G_SelectFactorySpawnWeapon( unsigned int statMask ) {
+	weapon_t weapon;
+
+	if ( statMask & ( 1u << WP_MACHINEGUN ) ) {
+		return WP_MACHINEGUN;
+	}
+
+	for ( weapon = WP_NUM_WEAPONS - 1; weapon > WP_NONE; --weapon ) {
+		if ( weapon == WP_MACHINEGUN ) {
+			continue;
+		}
+
+		if ( statMask & ( 1u << weapon ) ) {
+			return weapon;
+		}
+	}
+
+	if ( statMask & ( 1u << WP_GAUNTLET ) ) {
+		return WP_GAUNTLET;
+	}
+
+	return WP_MACHINEGUN;
+}
+
 /*
 ===========
 ClientSpawn
@@ -1357,6 +1385,7 @@ void ClientSpawn(gentity_t *ent) {
 	vec3_t	spawn_origin, spawn_angles;
 	gclient_t	*client;
 	int		i;
+	weapon_t	spawnWeapon;
 	clientPersistant_t	saved;
 	clientSession_t		savedSess;
 	int		persistant[MAX_PERSISTANT];
@@ -1480,15 +1509,24 @@ void ClientSpawn(gentity_t *ent) {
 
 	client->ps.clientNum = index;
 
-        client->ps.stats[STAT_WEAPONS] = ( 1 << WP_MACHINEGUN );
-        // g_startingAmmo_mg keeps g_startingWeapons, factory, and script loadouts aligned with machinegun spawns.
-        G_SeedConfiguredSpawnAmmo( &client->ps, WP_MACHINEGUN );
+	{
+		unsigned int startingMask = g_factoryCvarConfig.startingWeaponsStatMask;
+		weapon_t weapon;
 
-        client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GAUNTLET );
-        // g_startingAmmo_g drives melee spawn tuning across g_startingWeapons, factories, and scripted loadouts.
-        G_SeedConfiguredSpawnAmmo( &client->ps, WP_GAUNTLET );
-        // g_startingAmmo_gh defines the grapple stack whenever g_startingWeapons, factories, or scripts include it.
-        G_SeedConfiguredSpawnAmmo( &client->ps, WP_GRAPPLING_HOOK );
+		if ( startingMask == 0 ) {
+			startingMask = ( 1u << WP_MACHINEGUN ) | ( 1u << WP_GAUNTLET );
+		}
+
+		client->ps.stats[STAT_WEAPONS] = startingMask;
+
+		for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; ++weapon ) {
+			if ( startingMask & ( 1u << weapon ) ) {
+				G_SeedConfiguredSpawnAmmo( &client->ps, weapon );
+			}
+		}
+
+		spawnWeapon = G_SelectFactorySpawnWeapon( startingMask );
+	}
 
 	// health will count down towards max_health
 	ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
@@ -1509,7 +1547,7 @@ void ClientSpawn(gentity_t *ent) {
 		trap_LinkEntity (ent);
 
 		// force the base weapon up
-		client->ps.weapon = WP_MACHINEGUN;
+		client->ps.weapon = spawnWeapon;
 		client->ps.weaponstate = WEAPON_READY;
 
 	}
@@ -1532,15 +1570,8 @@ void ClientSpawn(gentity_t *ent) {
 		// fire the targets of the spawn point
 		G_UseTargets( spawnPoint, ent );
 
-		// select the highest weapon number available, after any
-		// spawn given items have fired
-		client->ps.weapon = 1;
-		for ( i = WP_NUM_WEAPONS - 1 ; i > 0 ; i-- ) {
-			if ( client->ps.stats[STAT_WEAPONS] & ( 1 << i ) ) {
-				client->ps.weapon = i;
-				break;
-			}
-		}
+		// honor the factory-configured spawn weapon selection.
+		client->ps.weapon = spawnWeapon;
 	}
 
 	// run a client frame to drop exactly to the floor,
