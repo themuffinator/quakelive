@@ -1,17 +1,23 @@
 # Deterministic CI Matrix
 
-The deterministic harness workflow runs both gameplay targets (QVM bytecode and Windows DLLs) so regressions surface regardless of build flavour. The workflow fans out into two jobs using a `target` matrix:
+The **Deterministic Harnesses** workflow executes the regression harnesses against every gameplay flavour on each push and pull request. A matrix fans the workflow out across the bytecode, native, and reverse-engineered targets so they execute the same pipeline in parallel.【F:.github/workflows/deterministic-harnesses.yml†L10-L33】
 
-- **Harnesses (QVM)** runs on `ubuntu-latest`, verifies the legacy toolchain, and executes the harness suite against the bytecode output.
-- **Harnesses (DLL)** runs on `windows-latest`, installs the Visual Studio 2010 components, verifies the `v100` toolset, builds the gameplay DLLs, asserts their export tables against the manifest, and executes the same harness suite.
+## Matrix jobs
 
-Each job drives `tests/run_harnesses.py`, which materialises deterministic artefacts underneath the shared `ARTIFACT_ROOT` (`artifacts/tests/<suite>/<target>/`):
+- **Harnesses (QVM)** – Runs on `ubuntu-latest`, re-validates the legacy toolchain, reuses the clean-room build helper, and drives the deterministic harness suite against the VM output.【F:.github/workflows/deterministic-harnesses.yml†L16-L47】【F:.github/workflows/deterministic-harnesses.yml†L74-L79】
+- **Harnesses (DLL)** – Runs on `windows-latest`, provisions the Visual Studio 2010 components, verifies the `v100` toolset, rebuilds the gameplay DLLs, checks their export table, and then executes the shared harness runner.【F:.github/workflows/deterministic-harnesses.yml†L22-L79】
+- **Harnesses (Reverse)** – Shares the Linux leg and extends the harness invocation with the reverse build root so the trace harness can diff the clean-room binaries against the expected transcript.【F:.github/workflows/deterministic-harnesses.yml†L28-L47】【F:.github/workflows/deterministic-harnesses.yml†L74-L79】
 
-- `match_sim/<target>/timeline.json` – JSON timeline from the scripted match simulation.
-- `client_regression/<target>/hud_hashes.json` – Stable HUD hash captures from the client regression harness.
-- `logs/<target>/*.log` – Text summaries confirming the harness outcomes and runtime metadata.
+## Artefacts
 
-The upload step now runs with `if: always()` so the logs survive failing harness runs, and [`actions/upload-artifact`](https://github.com/actions/upload-artifact) explicitly targets the JSON timelines, HUD hashes, and log outputs for quick discovery.【F:.github/workflows/deterministic-harnesses.yml†L15-L64】 Artefacts are retained for seven days, providing a convenient paper trail for triage. The harness driver itself lives alongside the repository tests and can be invoked locally:
+`tests/run_harnesses.py` emits a deterministic match timeline, HUD hash capture, and text summaries for every target, while the reverse leg adds normalised trace logs and diffs.【F:tests/run_harnesses.py†L27-L111】 These artefacts land underneath `artifacts/tests/<suite>/<target>/`, and the workflow uploads them even when a harness fails so the evidence is always available.【F:.github/workflows/deterministic-harnesses.yml†L81-L93】 In particular:
+
+- `logs/<target>/*.log` – Harness summaries for the match, client regression, and trace suites.
+- `match_sim/<target>/timeline.json` – The deterministic bot timeline from the scripted match.
+- `client_regression/<target>/hud_hashes.json` – Stable HUD hashes replayed from the regression snapshots.
+- `trace/<target>/*` – Reverse-only logs and diffs that compare the clean-room output with the expectation.
+
+Re-run the harness locally with the same entry point used by CI:
 
 ```bash
 python tests/run_harnesses.py --target qvm
@@ -20,9 +26,9 @@ python tests/run_harnesses.py --target dll
 
 ## Status badges
 
-Embed the workflow badges anywhere documentation surfaces build health (e.g., the repository overview or internal dashboards):
+Embed the workflow badges anywhere documentation surfaces build health (for example, in dashboards or the repository overview):
 
 - ![Harnesses (QVM)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/deterministic-harnesses.yml/badge.svg?branch=main&job=Harnesses%20(QVM))
 - ![Harnesses (DLL)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/deterministic-harnesses.yml/badge.svg?branch=main&job=Harnesses%20(DLL))
 
-These badges reflect the status of each matrix leg independently thanks to the `job` query parameter, making it easy to spot which target failed.
+Because the badge `job` parameter targets a single matrix leg, the status of each gameplay flavour is visible at a glance.

@@ -16,12 +16,21 @@ jobs:
           - target: qvm
             os: ubuntu-latest
             label: QVM
+            shell: bash
+            python: python
+            harness_args: ""
           - target: dll
             os: windows-latest
             label: DLL
+            shell: pwsh
+            python: python
+            harness_args: ""
           - target: re
             os: ubuntu-latest
             label: Reverse
+            shell: bash
+            python: python
+            harness_args: " --reverse-build-root build/re/linux"
     runs-on: ${{ matrix.os }}
     env:
       ARTIFACT_ROOT: artifacts/tests
@@ -63,20 +72,11 @@ jobs:
           python-version: '3.11'
 
       - name: Run deterministic harness suites
-        if: matrix.target == 'qvm'
-        run: |
-          python tests/run_harnesses.py --target ${{ matrix.target }} --artifact-root "${{ env.ARTIFACT_ROOT }}"
-
-      - name: Run deterministic harness suites (Windows)
-        if: matrix.target == 'dll'
-        shell: pwsh
-        run: |
-          python tests/run_harnesses.py --target ${{ matrix.target }} --artifact-root "${{ env.ARTIFACT_ROOT }}"
-
-      - name: Run clean-room trace harness
-        if: matrix.target == 're'
-        run: |
-          python tests/run_harnesses.py --target ${{ matrix.target }} --artifact-root "${{ env.ARTIFACT_ROOT }}" --reverse-build-root build/re/linux
+        shell: ${{ matrix.shell }}
+        run: >-
+          ${{ matrix.python }} tests/run_harnesses.py
+          --target ${{ matrix.target }}
+          --artifact-root "${{ env.ARTIFACT_ROOT }}"${{ matrix.harness_args }}
 
       - name: Upload harness artefacts
         if: always()
@@ -84,10 +84,10 @@ jobs:
         with:
           name: harness-${{ matrix.target }}
           path: |
-            ${{ env.ARTIFACT_ROOT }}/logs/**/*.log
-            ${{ env.ARTIFACT_ROOT }}/match_sim/**/*.json
-            ${{ env.ARTIFACT_ROOT }}/client_regression/**/*.json
-            ${{ env.ARTIFACT_ROOT }}/trace/**/*.log
-            ${{ env.ARTIFACT_ROOT }}/trace/**/*.diff
+            ${{ env.ARTIFACT_ROOT }}/logs/${{ matrix.target }}/**/*.log
+            ${{ env.ARTIFACT_ROOT }}/match_sim/${{ matrix.target }}/**/*.json
+            ${{ env.ARTIFACT_ROOT }}/client_regression/${{ matrix.target }}/**/*.json
+            ${{ env.ARTIFACT_ROOT }}/trace/${{ matrix.target }}/**/*.log
+            ${{ env.ARTIFACT_ROOT }}/trace/${{ matrix.target }}/**/*.diff
           if-no-files-found: warn
           retention-days: 7
