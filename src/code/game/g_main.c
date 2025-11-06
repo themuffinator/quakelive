@@ -28,6 +28,23 @@ level_locals_t	level;
 weaponConfig_t	g_weaponConfig;
 
 weaponReloadConfig_t	g_weaponReloadConfig;
+#define STRINGIZE_HELPER( x ) #x
+#define STRINGIZE( x ) STRINGIZE_HELPER( x )
+
+#define DEFAULT_STARTING_AMMO_BFG           10
+#define DEFAULT_STARTING_AMMO_CG            100
+#define DEFAULT_STARTING_AMMO_G             -1
+#define DEFAULT_STARTING_AMMO_GH            -1
+#define DEFAULT_STARTING_AMMO_GL            10
+#define DEFAULT_STARTING_AMMO_HMG           50
+#define DEFAULT_STARTING_AMMO_LG            100
+#define DEFAULT_STARTING_AMMO_MG            100
+#define DEFAULT_STARTING_AMMO_NG            10
+#define DEFAULT_STARTING_AMMO_PG            50
+#define DEFAULT_STARTING_AMMO_PL            5
+#define DEFAULT_STARTING_AMMO_RG            5
+#define DEFAULT_STARTING_AMMO_RL            5
+#define DEFAULT_STARTING_AMMO_SG            10
 
 typedef struct {
 	vmCvar_t	*vmCvar;
@@ -245,20 +262,20 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &weapon_reload_cg, "weapon_reload_cg", "0", 0, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
 	{ &weapon_reload_hmg, "weapon_reload_hmg", "0", 0, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
 
-	{ &g_startingAmmo_bfg, "g_startingAmmo_bfg", "10", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the BFG when it is part of the spawn loadout." },
-	{ &g_startingAmmo_cg, "g_startingAmmo_cg", "100", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the Chaingun when players spawn with it." },
-	{ &g_startingAmmo_g, "g_startingAmmo_g", "-1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo for the Gauntlet; -1 keeps the melee swings unlimited." },
-	{ &g_startingAmmo_gh, "g_startingAmmo_gh", "-1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo for the Grappling Hook; -1 mirrors Quake Live's infinite grapple." },
-	{ &g_startingAmmo_gl, "g_startingAmmo_gl", "10", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the Grenade Launcher when added to the loadout." },
-	{ &g_startingAmmo_hmg, "g_startingAmmo_hmg", "50", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo for the Heavy Machinegun on spawn." },
-	{ &g_startingAmmo_lg, "g_startingAmmo_lg", "100", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the Lightning Gun when it is in the spawn set." },
-	{ &g_startingAmmo_mg, "g_startingAmmo_mg", "100", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo for the Machinegun given at spawn." },
-	{ &g_startingAmmo_ng, "g_startingAmmo_ng", "10", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the Nailgun when included in the loadout." },
-	{ &g_startingAmmo_pg, "g_startingAmmo_pg", "50", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the Plasma Gun when players spawn with it." },
-	{ &g_startingAmmo_pl, "g_startingAmmo_pl", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo for the Proximity Launcher on spawn." },
-	{ &g_startingAmmo_rg, "g_startingAmmo_rg", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the Railgun when added to spawn weapons." },
-	{ &g_startingAmmo_rl, "g_startingAmmo_rl", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo granted for the Rocket Launcher when it is part of the spawn set." },
-	{ &g_startingAmmo_sg, "g_startingAmmo_sg", "10", CVAR_ARCHIVE, 0, qfalse, qfalse, "Starting ammo for the Shotgun on spawn." },
+	{ &g_startingAmmo_bfg, "g_startingAmmo_bfg", STRINGIZE( DEFAULT_STARTING_AMMO_BFG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Cells granted for the BFG whenever spawn loadouts (g_startingWeapons, factories, scripts) include it." },
+	{ &g_startingAmmo_cg, "g_startingAmmo_cg", STRINGIZE( DEFAULT_STARTING_AMMO_CG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Chaingun bullets provided on spawn when the weapon is part of the configured loadout." },
+	{ &g_startingAmmo_g, "g_startingAmmo_g", STRINGIZE( DEFAULT_STARTING_AMMO_G ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Gauntlet swings granted on spawn; -1 mirrors Quake Live's infinite melee behaviour." },
+	{ &g_startingAmmo_gh, "g_startingAmmo_gh", STRINGIZE( DEFAULT_STARTING_AMMO_GH ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grappling Hook ammo applied to players when scripts or factories grant the hook; -1 keeps it unlimited." },
+	{ &g_startingAmmo_gl, "g_startingAmmo_gl", STRINGIZE( DEFAULT_STARTING_AMMO_GL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grenade Launcher rounds distributed at spawn when the launcher is granted via loadouts." },
+	{ &g_startingAmmo_hmg, "g_startingAmmo_hmg", STRINGIZE( DEFAULT_STARTING_AMMO_HMG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Heavy Machinegun bullets issued alongside spawn loadouts that include the weapon." },
+	{ &g_startingAmmo_lg, "g_startingAmmo_lg", STRINGIZE( DEFAULT_STARTING_AMMO_LG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Lightning Gun cells assigned when loadouts or scripts give the Lightning Gun on spawn." },
+	{ &g_startingAmmo_mg, "g_startingAmmo_mg", STRINGIZE( DEFAULT_STARTING_AMMO_MG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Machinegun bullets supplied on spawn for any loadout that awards the Machinegun." },
+	{ &g_startingAmmo_ng, "g_startingAmmo_ng", STRINGIZE( DEFAULT_STARTING_AMMO_NG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Nailgun spikes given to players when factories or scripts seed the Nailgun." },
+	{ &g_startingAmmo_pg, "g_startingAmmo_pg", STRINGIZE( DEFAULT_STARTING_AMMO_PG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Plasmagun cells granted at spawn when the Plasmagun is included in the starting set." },
+	{ &g_startingAmmo_pl, "g_startingAmmo_pl", STRINGIZE( DEFAULT_STARTING_AMMO_PL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Proximity Launcher mines provided to players when loadouts grant the launcher." },
+	{ &g_startingAmmo_rg, "g_startingAmmo_rg", STRINGIZE( DEFAULT_STARTING_AMMO_RG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Railgun slugs applied on spawn when the Railgun is part of the configured loadout." },
+	{ &g_startingAmmo_rl, "g_startingAmmo_rl", STRINGIZE( DEFAULT_STARTING_AMMO_RL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Rockets handed out whenever spawn loadouts include the Rocket Launcher." },
+	{ &g_startingAmmo_sg, "g_startingAmmo_sg", STRINGIZE( DEFAULT_STARTING_AMMO_SG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Shotgun shells distributed when the Shotgun is in the spawn weapon set." },
 
 #ifdef MISSIONPACK
 	{ &g_obeliskHealth, "g_obeliskHealth", "2500", 0, 0, qfalse },
@@ -377,20 +394,20 @@ static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback ) {
 }
 
 void G_InitStartingAmmoConfig( void ) {
-	g_startingAmmoConfig.bfg = G_ReadStartingAmmoCvar( &g_startingAmmo_bfg, 10 );
-	g_startingAmmoConfig.chaingun = G_ReadStartingAmmoCvar( &g_startingAmmo_cg, 100 );
-	g_startingAmmoConfig.gauntlet = G_ReadStartingAmmoCvar( &g_startingAmmo_g, -1 );
-	g_startingAmmoConfig.grapplingHook = G_ReadStartingAmmoCvar( &g_startingAmmo_gh, -1 );
-	g_startingAmmoConfig.grenadeLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_gl, 10 );
-	g_startingAmmoConfig.heavyMachinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_hmg, 50 );
-	g_startingAmmoConfig.lightningGun = G_ReadStartingAmmoCvar( &g_startingAmmo_lg, 100 );
-	g_startingAmmoConfig.machinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_mg, 100 );
-	g_startingAmmoConfig.nailgun = G_ReadStartingAmmoCvar( &g_startingAmmo_ng, 10 );
-	g_startingAmmoConfig.plasmagun = G_ReadStartingAmmoCvar( &g_startingAmmo_pg, 50 );
-	g_startingAmmoConfig.proximityLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_pl, 5 );
-	g_startingAmmoConfig.railgun = G_ReadStartingAmmoCvar( &g_startingAmmo_rg, 5 );
-	g_startingAmmoConfig.rocketLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_rl, 5 );
-	g_startingAmmoConfig.shotgun = G_ReadStartingAmmoCvar( &g_startingAmmo_sg, 10 );
+	g_startingAmmoConfig.bfg = G_ReadStartingAmmoCvar( &g_startingAmmo_bfg, DEFAULT_STARTING_AMMO_BFG );
+	g_startingAmmoConfig.chaingun = G_ReadStartingAmmoCvar( &g_startingAmmo_cg, DEFAULT_STARTING_AMMO_CG );
+	g_startingAmmoConfig.gauntlet = G_ReadStartingAmmoCvar( &g_startingAmmo_g, DEFAULT_STARTING_AMMO_G );
+	g_startingAmmoConfig.grapplingHook = G_ReadStartingAmmoCvar( &g_startingAmmo_gh, DEFAULT_STARTING_AMMO_GH );
+	g_startingAmmoConfig.grenadeLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_gl, DEFAULT_STARTING_AMMO_GL );
+	g_startingAmmoConfig.heavyMachinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_hmg, DEFAULT_STARTING_AMMO_HMG );
+	g_startingAmmoConfig.lightningGun = G_ReadStartingAmmoCvar( &g_startingAmmo_lg, DEFAULT_STARTING_AMMO_LG );
+	g_startingAmmoConfig.machinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_mg, DEFAULT_STARTING_AMMO_MG );
+	g_startingAmmoConfig.nailgun = G_ReadStartingAmmoCvar( &g_startingAmmo_ng, DEFAULT_STARTING_AMMO_NG );
+	g_startingAmmoConfig.plasmagun = G_ReadStartingAmmoCvar( &g_startingAmmo_pg, DEFAULT_STARTING_AMMO_PG );
+	g_startingAmmoConfig.proximityLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_pl, DEFAULT_STARTING_AMMO_PL );
+	g_startingAmmoConfig.railgun = G_ReadStartingAmmoCvar( &g_startingAmmo_rg, DEFAULT_STARTING_AMMO_RG );
+	g_startingAmmoConfig.rocketLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_rl, DEFAULT_STARTING_AMMO_RL );
+	g_startingAmmoConfig.shotgun = G_ReadStartingAmmoCvar( &g_startingAmmo_sg, DEFAULT_STARTING_AMMO_SG );
 }
 
 void G_UpdateStartingAmmoConfig( void ) {
