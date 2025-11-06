@@ -512,19 +512,29 @@ void SV_DirectConnect( netadr_t from ) {
 
 	if ( !newcl ) {
 		if ( NET_IsLocalAddress( from ) ) {
-			count = 0;
+			qboolean onlyBots = qtrue;
+			int lastBotSlot = -1;
+
 			for ( i = startIndex; i < sv_maxclients->integer ; i++ ) {
 				cl = &svs.clients[i];
-				if ( cl->state != CS_FREE && cl->netchan.remoteAddress.type == NA_BOT ) {
-					count++;
+
+				if ( cl->state == CS_FREE ) {
+					onlyBots = qfalse;
+					break;
 				}
+
+				if ( !SV_ClientIsBot( cl ) ) {
+					onlyBots = qfalse;
+					break;
+				}
+
+				lastBotSlot = i;
 			}
-			// if they're all bots
-			if (count >= sv_maxclients->integer - startIndex) {
-				SV_DropClient(&svs.clients[sv_maxclients->integer - 1], "only bots on server");
-				newcl = &svs.clients[sv_maxclients->integer - 1];
-			}
-			else {
+
+			if ( onlyBots && lastBotSlot >= startIndex ) {
+				SV_DropClient( &svs.clients[lastBotSlot], "only bots on server" );
+				newcl = &svs.clients[lastBotSlot];
+			} else {
 				Com_Error( ERR_FATAL, "server is full on local connect\n" );
 				return;
 			}
@@ -639,12 +649,15 @@ or crashing -- SV_FinalMessage() will handle that
 void SV_DropClient( client_t *drop, const char *reason ) {
 	int		i;
 	challenge_t	*challenge;
+	qboolean	wasBot;
 
 	if ( drop->state == CS_ZOMBIE ) {
 		return;		// already dropped
 	}
 
-	if ( !drop->gentity || !(drop->gentity->r.svFlags & SVF_BOT) ) {
+	wasBot = SV_ClientIsBot( drop );
+
+	if ( !wasBot ) {
 		// see if we already have a challenge for this ip
 		challenge = &svs.challenges[0];
 
@@ -677,7 +690,7 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 	// add the disconnect command
 	SV_SendServerCommand( drop, "disconnect \"%s\"", reason);
 
-	if ( drop->netchan.remoteAddress.type == NA_BOT ) {
+	if ( wasBot ) {
 		SV_BotFreeClient( drop - svs.clients );
 	}
 
