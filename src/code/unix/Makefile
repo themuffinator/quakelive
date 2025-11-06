@@ -79,6 +79,19 @@ RPM_RELEASE=1
 DLL_ONLY=false
 # bk010215 - TODO - add all defaults / kill Ryan
 
+# Platform backend toggles default to the open adapter unless Steamworks support
+# is explicitly requested.
+QL_BUILD_STEAMWORKS ?= 0
+ifeq ($(origin QL_BUILD_OPEN_STEAM)), undefined
+  ifeq ($(QL_BUILD_STEAMWORKS),1)
+    QL_BUILD_OPEN_STEAM := 0
+  else
+    QL_BUILD_OPEN_STEAM := 1
+  endif
+endif
+
+PLATFORM_BACKEND_DEFS = -DQL_BUILD_STEAMWORKS=$(QL_BUILD_STEAMWORKS) -DQL_BUILD_OPEN_STEAM=$(QL_BUILD_OPEN_STEAM)
+
 
 ifeq ($(PLATFORM),linux)
 
@@ -322,16 +335,16 @@ endif #Linux
 endif #FreeBSD
 endif #IRIX
 
-DO_CC=$(CC) $(CFLAGS) -o $@ -c $<
-DO_CXX=$(CXX) $(CFLAGS) -o $@ -c $<
-DO_SMP_CC=$(CC) $(CFLAGS) -DSMP -o $@ -c $<
-DO_BOT_CC=$(CC) $(CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
-DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) -o $@ -c $<
-DO_SHLIB_CC=$(CC) $(CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_AS=$(CC) $(CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
+DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
+DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
+DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DSMP -o $@ -c $<
+DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
+DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
+DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DELF -x assembler-with-cpp -o $@ -c $<
 DO_NASM=nasm -f elf -o $@  $<
-DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) -o $@ -c $<
+DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
 
 #DO_LCC=$(LCC) -o $@ -S -Wf-target=bytecode -Wf-g -DQ3_VM -I$(CGDIR) -I$(GDIR)  -I$(UIDIR)  $< 
 
@@ -386,8 +399,6 @@ Q3OBJ = \
         $(B)/client/cl_scrn.o \
         $(B)/client/cl_ui.o \
         $(B)/client/ql_auth.o \
-        $(B)/client/platform_backend_open_steam.o \
-        $(B)/client/platform_backend_steamworks.o \
         $(B)/client/platform_services.o \
         \
         $(B)/client/cm_load.o \
@@ -543,6 +554,13 @@ Q3OBJ = \
 #	$(B)/client/math_matrix.o
 
 #	$(B)/client/q_shared.o \
+
+ifeq ($(QL_BUILD_OPEN_STEAM),1)
+Q3OBJ += $(B)/client/platform_backend_open_steam.o
+endif
+ifeq ($(QL_BUILD_STEAMWORKS),1)
+Q3OBJ += $(B)/client/platform_backend_steamworks.o
+endif
 
     ifeq ($(ARCH),i386)
 	  Q3OBJ += $(B)/client/vm_x86.o
@@ -1495,8 +1513,6 @@ Q3SOBJ = \
         $(B)/q3static/cl_scrn.o \
         $(B)/q3static/cl_ui.o \
         $(B)/q3static/ql_auth.o \
-        $(B)/q3static/platform_backend_open_steam.o \
-        $(B)/q3static/platform_backend_steamworks.o \
         $(B)/q3static/platform_services.o \
         \
         $(B)/q3static/cm_load.o \
@@ -1646,6 +1662,12 @@ Q3SOBJ = \
 	$(B)/q3static/snd_mixa.o \
 	$(B)/q3static/matha.o
 
+ifeq ($(QL_BUILD_OPEN_STEAM),1)
+Q3SOBJ += $(B)/q3static/platform_backend_open_steam.o
+endif
+ifeq ($(QL_BUILD_STEAMWORKS),1)
+Q3SOBJ += $(B)/q3static/platform_backend_steamworks.o
+endif
 ifeq ($(ARCH),i386)
   Q3SOBJ += $(B)/q3static/vm_x86.o
 endif

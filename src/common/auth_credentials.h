@@ -50,6 +50,10 @@ qboolean QL_ParsePlatformToken( const char *token, qlAuthCredentialKind kind, ql
 
 const char *QL_GetCredentialLabel( const ql_auth_credential_t *credential );
 
+qboolean QL_FormatCredentialForStorage( const ql_auth_credential_t *credential,
+    char *kindBuffer, size_t kindBufferSize,
+    char *valueBuffer, size_t valueBufferSize );
+
 qboolean QL_RequestExternalAuth( const ql_auth_credential_t *credential, ql_auth_response_t *response );
 
 char *QL_FormatCredentialForAuthorize( const ql_auth_credential_t *credential, char *buffer, size_t bufferSize );

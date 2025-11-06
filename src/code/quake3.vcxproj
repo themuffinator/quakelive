@@ -98,7 +98,10 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <QLBuildSteamworks>0</QLBuildSteamworks>
+    <QLBuildOpenSteam>1</QLBuildOpenSteam>
+  </PropertyGroup>
   <PropertyGroup>
     <_ProjectFileVersion>17.0.34511.75</_ProjectFileVersion>
   </PropertyGroup>
@@ -141,7 +144,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <PreprocessorDefinitions>_WIN32;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32;WIN32;NDEBUG;_WINDOWS;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -166,7 +169,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <Midl>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>true</MkTypLibCompatible>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TargetEnvironment>Win32</TargetEnvironment>
@@ -178,14 +181,14 @@
       <Command>rem bash -c "perl ./unix/cons -- release-TA"</Command>
     </PostBuildEvent>
     <ResourceCompile>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader />
       <PrecompiledHeaderOutputFile>.\Debug/quake3.pch</PrecompiledHeaderOutputFile>
@@ -211,7 +214,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <Midl>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>true</MkTypLibCompatible>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TargetEnvironment>Win32</TargetEnvironment>
@@ -223,7 +226,7 @@
       <Command>rem bash -c "perl ./unix/cons -- debug"</Command>
     </PostBuildEvent>
     <ResourceCompile>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
       <ResourceOutputFileName>win32\winquake.res</ResourceOutputFileName>
     </ResourceCompile>
@@ -232,7 +235,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <PreprocessorDefinitions>_WIN32;WIN32;NDEBUG;_WINDOWS;PRE_RELEASE_TADEMO;PRE_RELEASE_DEMO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32;WIN32;NDEBUG;_WINDOWS;PRE_RELEASE_TADEMO;PRE_RELEASE_DEMO;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -258,7 +261,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <Midl>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>true</MkTypLibCompatible>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TargetEnvironment>Win32</TargetEnvironment>
@@ -266,7 +269,7 @@
       <HeaderFileName />
     </Midl>
     <ResourceCompile>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
   </ItemDefinitionGroup>
@@ -274,7 +277,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -299,7 +302,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <Midl>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>true</MkTypLibCompatible>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TargetEnvironment>Win32</TargetEnvironment>
@@ -307,14 +310,14 @@
       <HeaderFileName />
     </Midl>
     <ResourceCompile>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug TA DEMO|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;PRE_RELEASE_TADEMO;PRE_RELEASE_DEMO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;PRE_RELEASE_TADEMO;PRE_RELEASE_DEMO;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader />
       <PrecompiledHeaderOutputFile>.\quake3___Win32_Debug_TA_DEMO/quake3.pch</PrecompiledHeaderOutputFile>
@@ -340,7 +343,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <Midl>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>true</MkTypLibCompatible>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TargetEnvironment>Win32</TargetEnvironment>
@@ -348,7 +351,7 @@
       <HeaderFileName />
     </Midl>
     <ResourceCompile>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
       <ResourceOutputFileName>win32\winquake.res</ResourceOutputFileName>
     </ResourceCompile>
@@ -358,7 +361,7 @@
       <AdditionalOptions>/vec /vec:stats /vec:pii /vec:o10 /vec:yes  %(AdditionalOptions)</AdditionalOptions>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <PreprocessorDefinitions>_WIN32;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32;WIN32;NDEBUG;_WINDOWS;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -384,7 +387,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <Midl>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>true</MkTypLibCompatible>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TargetEnvironment>Win32</TargetEnvironment>
@@ -392,14 +395,14 @@
       <HeaderFileName />
     </Midl>
     <ResourceCompile>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug TA|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader />
       <PrecompiledHeaderOutputFile>.\Debug_TA/quake3.pch</PrecompiledHeaderOutputFile>
@@ -425,7 +428,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <Midl>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>true</MkTypLibCompatible>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <TargetEnvironment>Win32</TargetEnvironment>
@@ -437,7 +440,7 @@
       <Command>rem bash -c "perl ./unix/cons -- debug-TA"</Command>
     </PostBuildEvent>
     <ResourceCompile>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
       <ResourceOutputFileName>win32\winquake.res</ResourceOutputFileName>
     </ResourceCompile>
@@ -691,6 +694,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='vector|Win32'">MaxSpeed</Optimization>
     </ClCompile>
     <ClCompile Include="..\common\platform\backends\platform_backend_open_steam.c">
+      <ExcludedFromBuild Condition="'$(QLBuildOpenSteam)'=='0'">true</ExcludedFromBuild>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug TA DEMO|Win32'">Disabled</Optimization>
       <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Debug TA DEMO|Win32'">true</BrowseInformation>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug TA|Win32'">Disabled</Optimization>
@@ -704,6 +708,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='vector|Win32'">MaxSpeed</Optimization>
     </ClCompile>
     <ClCompile Include="..\common\platform\backends\platform_backend_steamworks.c">
+      <ExcludedFromBuild Condition="'$(QLBuildSteamworks)'=='0'">true</ExcludedFromBuild>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug TA DEMO|Win32'">Disabled</Optimization>
       <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Debug TA DEMO|Win32'">true</BrowseInformation>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug TA|Win32'">Disabled</Optimization>

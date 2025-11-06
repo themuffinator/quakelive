@@ -78,9 +78,15 @@ static const char *const uiCredentialKindErrors[UI_CREDENTIAL_KIND_COUNT] = {
 };
 
 static const char *const uiCredentialAutoMessages[UI_CREDENTIAL_KIND_COUNT] = {
-        "This credential is managed manually.",
-        "Steam credentials are provisioned automatically while this build is linked to Steam. Manual entry is disabled while the token remains active.",
-        "Standalone launcher tokens are provisioned automatically for this installation. Manual entry is disabled while the token remains active."
+        "This credential must be managed manually.",
+        "Steam automatically provisions this credential while you're signed in, so manual entry stays disabled until the ticket expires.",
+        "The standalone launcher provisions this token for you on launch, so manual entry stays disabled until the cached token clears."
+};
+
+static const char *const uiCredentialAutoHints[UI_CREDENTIAL_KIND_COUNT] = {
+        "Enter the 16-character key from your retail copy.",
+        "Launch through Steam to refresh or repair the linked credential.",
+        "Launch from the standalone client to refresh or revoke the cached token."
 };
 
 static const char *const uiCredentialKindPrefixes[UI_CREDENTIAL_KIND_COUNT] = {
@@ -339,16 +345,21 @@ static void UI_CDKeyMenu_DrawKey( void *self ) {
         trap_Cvar_Set( "ui_credentialAutoMessage", "" );
         trap_Cvar_Set( "ui_credentialPrompt", "" );
         trap_Cvar_Set( "ui_credentialStatus", "" );
+        trap_Cvar_Set( "ui_credentialPreview", "" );
 
         if ( UI_CDKeyMenu_ShouldHideManual() ) {
                 const char *autoMessage = uiCredentialAutoMessages[cdkeyMenuInfo.credentialKind];
+                const char *autoHint = uiCredentialAutoHints[cdkeyMenuInfo.credentialKind];
                 if ( !autoMessage || !autoMessage[0] ) {
                         autoMessage = "Credentials are managed automatically by your platform.";
                 }
+                if ( !autoHint || !autoHint[0] ) {
+                        autoHint = "Launch through the linked platform to refresh the credential.";
+                }
                 trap_Cvar_Set( "ui_credentialAutoMessage", autoMessage );
-                trap_Cvar_Set( "ui_credentialPrompt", "Launch through the linked platform to refresh the credential." );
+                trap_Cvar_Set( "ui_credentialPrompt", autoHint );
                 UI_DrawProportionalString( 320, 240, autoMessage, UI_CENTER|UI_SMALLFONT, color_white );
-                UI_DrawProportionalString( 320, 272, "Launch through the linked platform to refresh the credential.", UI_CENTER|UI_SMALLFONT, color_white );
+                UI_DrawProportionalString( 320, 272, autoHint, UI_CENTER|UI_SMALLFONT, color_white );
                 return;
         }
 
@@ -367,7 +378,9 @@ static void UI_CDKeyMenu_DrawKey( void *self ) {
 	UI_FillRect( x - 4, y - 4, fieldWidth + 8, SMALLCHAR_HEIGHT + 8, listbar_color );
 	MField_Draw( &f->field, x, y, style, color );
 
-	instructions = uiCredentialKindPrompts[cdkeyMenuInfo.credentialKind];
+        trap_Cvar_Set( "ui_credentialPreview", f->field.buffer );
+
+        instructions = uiCredentialKindPrompts[cdkeyMenuInfo.credentialKind];
         UI_DrawProportionalString( 320, y - 36, instructions, UI_CENTER|UI_SMALLFONT, color_white );
         trap_Cvar_Set( "ui_credentialPrompt", instructions ? instructions : "" );
 

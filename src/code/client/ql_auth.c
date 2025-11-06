@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../../common/ql_auth_service.h"
+#include "../../common/platform/platform_backend_auth.h"
 #include "../../common/platform/platform_services.h"
 
 typedef struct {
@@ -108,78 +109,35 @@ static void QL_ClientAuth_TokenPreview( const ql_auth_credential_t *credential, 
     Com_sprintf( buffer, bufferSize, "%s…%s", head, tail );
 }
 
-static qboolean QL_ClientAuth_HandleSteamworksTicket( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
-    if ( !credential ) {
+static qboolean QL_ClientAuth_InvokeBackend( qboolean (*backend)( const ql_auth_credential_t *, ql_auth_response_t * ), const ql_auth_credential_t *credential, ql_auth_response_t *response, const char *label ) {
+    if ( !backend || !credential ) {
         return qfalse;
     }
 
-    char preview[32];
-    QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
+    qboolean handled = backend( credential, response );
 
-    if ( transport ) {
-        char detail[96];
-        Com_sprintf( detail, sizeof( detail ),
-            "validating Steam ticket (preview=%s)", preview );
-        QL_ClientAuth_LogStage( transport, "validate", detail );
-    }
-
-    if ( credential->length < 16 ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED, "Steam ticket rejected: payload too short" );
+    if ( handled ) {
         return qtrue;
     }
 
-    if ( strstr( credential->value, "denied" ) || strstr( credential->value, "invalid" ) ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED, "Steam backend denied the ticket" );
-        return qtrue;
+    if ( response && label ) {
+        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
+            "%s backend unavailable in this build", label );
     }
 
-    if ( strstr( credential->value, "retry" ) ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_PENDING, "Steam service busy, retry with refreshed ticket" );
-        return qtrue;
-    }
-
-    QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
-        "Steam session established (ticket=%s)", preview );
-    return qtrue;
+    return qfalse;
 }
 
-static qboolean QL_ClientAuth_HandleOpenSteamTicket( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
-    if ( !credential ) {
-        return qfalse;
-    }
+static qboolean QL_ClientAuth_HandleSteamworksTicket( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+    (void)transport;
 
-    char preview[32];
-    QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
+    return QL_ClientAuth_InvokeBackend( QL_PlatformBackendSteamworks_Authenticate,
+        credential, response, "Steamworks" );
+}
 
-    if ( transport ) {
-        char detail[128];
-
-        if ( credential->kind == QL_AUTH_CREDENTIAL_STANDALONE_TOKEN ) {
-            Com_sprintf( detail, sizeof( detail ),
-                "validating launcher token (preview=%s)", preview );
-        } else {
-            Com_sprintf( detail, sizeof( detail ),
-                "processing Steam ticket via open adapter (preview=%s)", preview );
-        }
-
-        QL_ClientAuth_LogStage( transport, "validate", detail );
-    }
-
-    if ( credential->length < 16 ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED,
-            "Open adapter rejected Steam credential: payload too short" );
-        return qtrue;
-    }
-
-    if ( strstr( credential->value, "denied" ) || strstr( credential->value, "invalid" ) ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED,
-            "Open adapter respected Steam denial" );
-        return qtrue;
-    }
-
-    QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
-        "Open adapter accepted Steam ticket (ticket=%s)", preview );
-    return qtrue;
+static qboolean QL_ClientAuth_HandleOpenSteamTicket( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+    return QL_ClientAuth_InvokeBackend( QL_PlatformBackendOpenSteam_Authenticate,
+        credential, response, "Open Steam Adapter" );
 }
 
 static qboolean QL_ClientAuth_HandleStandaloneToken( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
@@ -187,37 +145,8 @@ static qboolean QL_ClientAuth_HandleStandaloneToken( const ql_client_auth_transp
         return qfalse;
     }
 
-    char preview[32];
-    QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
-
-    if ( transport ) {
-        char detail[96];
-        Com_sprintf( detail, sizeof( detail ),
-            "validating launcher token (preview=%s)", preview );
-        QL_ClientAuth_LogStage( transport, "validate", detail );
-    }
-
-    if ( credential->length < 12 ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED,
-            "Standalone token rejected: payload too short" );
-        return qtrue;
-    }
-
-    if ( strstr( credential->value, "refresh" ) ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_PENDING,
-            "Launcher token expired, request a refresh" );
-        return qtrue;
-    }
-
-    if ( strstr( credential->value, "revoke" ) || strstr( credential->value, "denied" ) ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_DENIED,
-            "Launcher revoked the token" );
-        return qtrue;
-    }
-
-    QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
-        "Standalone token accepted (token=%s)", preview );
-    return qtrue;
+    return QL_ClientAuth_InvokeBackend( QL_PlatformBackendOpenSteam_Authenticate,
+        credential, response, "Open Steam Adapter" );
 }
 
 static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {

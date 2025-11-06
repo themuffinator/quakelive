@@ -117,6 +117,38 @@ const char *QL_GetCredentialLabel( const ql_auth_credential_t *credential ) {
     }
 }
 
+qboolean QL_FormatCredentialForStorage( const ql_auth_credential_t *credential,
+    char *kindBuffer, size_t kindBufferSize,
+    char *valueBuffer, size_t valueBufferSize )
+{
+    const char *label;
+
+    if ( !kindBuffer || kindBufferSize == 0 || !valueBuffer || valueBufferSize == 0 ) {
+        return qfalse;
+    }
+
+    kindBuffer[0] = '\0';
+    valueBuffer[0] = '\0';
+
+    if ( !credential || credential->kind == QL_AUTH_CREDENTIAL_EMPTY || credential->length == 0 ) {
+        return qfalse;
+    }
+
+    label = QL_GetCredentialLabel( credential );
+    if ( !label || !label[0] || !Q_stricmp( label, "unknown" ) ) {
+        return qfalse;
+    }
+
+    QL_CopyString( kindBuffer, kindBufferSize, label );
+    QL_CopyString( valueBuffer, valueBufferSize, credential->value );
+
+    if ( kindBuffer[0] == '\0' || valueBuffer[0] == '\0' ) {
+        return qfalse;
+    }
+
+    return qtrue;
+}
+
 qboolean QL_RequestExternalAuth( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
     if ( !response ) {
         return qfalse;

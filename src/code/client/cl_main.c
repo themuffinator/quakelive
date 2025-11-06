@@ -3343,14 +3343,17 @@ qboolean CL_CDKeyValidate( const char *key, const char *checksum ) {
 		return qfalse;
 	}
 
-	switch ( credential.kind ) {
-	case QL_AUTH_CREDENTIAL_LEGACY_CDKEY:
-		return CL_CDKeyValidateLegacyValue( credential.value, checksum );
-	case QL_AUTH_CREDENTIAL_STEAM:
-	case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-		return CL_CDKeyValidateTokenValue( credential.value );
-	default:
-		return qfalse;
-	}
+        switch ( credential.kind ) {
+        case QL_AUTH_CREDENTIAL_LEGACY_CDKEY:
+                return CL_CDKeyValidateLegacyValue( credential.value, checksum );
+        case QL_AUTH_CREDENTIAL_STEAM:
+        case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
+                if ( checksum && checksum[0] ) {
+                        return qfalse;
+                }
+                return CL_CDKeyValidateTokenValue( credential.value );
+        default:
+                return qfalse;
+        }
 }
 
