@@ -122,6 +122,7 @@ qboolean QL_FormatCredentialForStorage( const ql_auth_credential_t *credential,
     char *valueBuffer, size_t valueBufferSize )
 {
     const char *label;
+    char formatted[QL_AUTH_MAX_CREDENTIAL_STORAGE];
 
     if ( !kindBuffer || kindBufferSize == 0 || !valueBuffer || valueBufferSize == 0 ) {
         return qfalse;
@@ -140,7 +141,12 @@ qboolean QL_FormatCredentialForStorage( const ql_auth_credential_t *credential,
     }
 
     QL_CopyString( kindBuffer, kindBufferSize, label );
-    QL_CopyString( valueBuffer, valueBufferSize, credential->value );
+
+    if ( !QL_FormatCredentialForAuthorize( credential, formatted, sizeof( formatted ) ) ) {
+        return qfalse;
+    }
+
+    QL_CopyString( valueBuffer, valueBufferSize, formatted );
 
     if ( kindBuffer[0] == '\0' || valueBuffer[0] == '\0' ) {
         return qfalse;
