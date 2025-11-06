@@ -46,8 +46,10 @@ The tool prints one JSON document per line containing the original sequence
 number, server time, deterministic HUD payload, and its SHA-256 hash. For
 example, the sample capture yields:
 
-```json
+```jsonl
 {"hash": "db0c582635b0d000b8d8cc623979b0f556776ff168c4baf9717f6f2802632a11", "hud": {"ammo": {"rocket_launcher": 10}, "armor": 50, "health": 125, "position": [0.0, 0.0, 0.0], "weapon": "rocket_launcher"}, "sequence": 1, "serverTime": 1000}
+{"hash": "638c3a5679231de7caf143f388431effe769e912152bbd56f75a019ee5ab0e56", "hud": {"ammo": {"rocket_launcher": 9}, "armor": 40, "health": 115, "position": [0.0, 0.0, 0.0], "weapon": "rocket_launcher"}, "sequence": 2, "serverTime": 1016}
+{"hash": "fc456828d2c7d69712cee52bec1faa968bf274d60442ca33ef7f412badd2d1de", "hud": {"ammo": {"lightning_gun": 120, "rocket_launcher": 9}, "armor": 45, "health": 120, "position": [2.0, 0.0, 0.0], "weapon": "lightning_gun"}, "sequence": 3, "serverTime": 1032}
 ```
 
 Use the `--limit` flag to restrict playback to the first *N* snapshots. This is
