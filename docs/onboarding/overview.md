@@ -16,8 +16,9 @@ migration-era tooling that now lives alongside the legacy Quake III sources.
 - `references/` – Reference material captured during the migration, including Binary Ninja HLIL dumps
   for Quake III and Quake Live as well as extracted Quake Live assets used for parity checks.【F:docs/repo-overview.md†L6-L21】
 - `docs/` – Living documentation covering build pipelines, reverse-engineering stages, gameplay audits,
-  and test harnesses. Start with the repository overview, the reverse-engineering handbook, and the
-  documentation backlog to discover current processes and open documentation tasks.【F:docs/repo-overview.md†L6-L27】【F:docs/reverse-engineering/handbook.md†L1-L56】
+  and test harnesses. Start with the repository overview, the [Reverse-Engineering Handbook](../reverse-engineering/handbook.md),
+  the [Deterministic CI Matrix](../devops/ci-matrix.md), and the [documentation backlog](../documentation-backlog.md) to discover
+  current processes and open documentation tasks.【F:docs/repo-overview.md†L6-L38】【F:docs/reverse-engineering/handbook.md†L1-L56】【F:docs/devops/ci-matrix.md†L1-L38】【F:docs/documentation-backlog.md†L1-L29】
 - `tools/` – Automation that grew out of the migration effort, including CI guard scripts under
   `tools/ci/`, deterministic harness code beneath `tools/tests/`, and container definitions used to
   reproduce historical toolchains.【F:docs/toolchain-ci.md†L1-L22】【F:tools/ci/build-cleanroom.sh†L1-L44】【F:docs/reverse-engineering/handbook.md†L21-L37】
@@ -53,14 +54,14 @@ migration-era tooling that now lives alongside the legacy Quake III sources.
   `docs/testing/client-regression.md`, `docs/testing/rules-fixtures.md`, and the deterministic trace
   notes in `docs/reverse-engineering/trace-harness.md` document the harness behaviours and extension
   hooks.【F:docs/testing-strategy.md†L1-L43】【F:docs/testing/match-sim.md†L1-L45】【F:docs/testing/client-regression.md†L1-L55】【F:docs/testing/rules-fixtures.md†L1-L33】【F:docs/reverse-engineering/trace-harness.md†L1-L92】
-- **CI & artefact indexing:** `docs/devops/ci-matrix.md` explains the harness matrix, emitted artefacts,
-  and badges that surface build health across targets.【F:docs/devops/ci-matrix.md†L1-L34】
+- **CI & artefact indexing:** The [Deterministic CI Matrix](../devops/ci-matrix.md) explains the harness
+  matrix, emitted artefacts, and badges that surface build health across targets.【F:docs/devops/ci-matrix.md†L1-L38】
 - **Documentation backlog:** Track in-progress write-ups and outstanding audits in
   `docs/documentation-backlog.md` before claiming related work.
 
 ## Quick start
-1. **Clone and explore** – Skim the repository overview and reverse-engineering handbook to understand how
-   the Quake III baseline maps onto the staged Quake Live reconstructions and artefact archives.【F:docs/repo-overview.md†L1-L27】【F:docs/reverse-engineering/handbook.md†L1-L27】
+1. **Clone and explore** – Skim the repository overview and the [Reverse-Engineering Handbook](../reverse-engineering/handbook.md)
+   to understand how the Quake III baseline maps onto the staged Quake Live reconstructions and artefact archives.【F:docs/repo-overview.md†L1-L38】【F:docs/reverse-engineering/handbook.md†L1-L27】
 2. **Install build prerequisites** – Follow `docs/qvmtools.md` to verify the GPL-era QVM toolchain, review
    the migration plan in `docs/build-pipeline.md`, and use `docs/build/windows.md` plus the native pipeline
    notes when setting up the Visual Studio 2010 workflow.【F:docs/qvmtools.md†L1-L40】【F:docs/build-pipeline.md†L1-L89】【F:docs/build/windows.md†L1-L31】【F:docs/windows-native-pipeline.md†L1-L80】

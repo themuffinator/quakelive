@@ -1,0 +1,95 @@
+{
+  "metadata": {
+    "description": "Server override applied after aggressive movement",
+    "map": "qzdm6"
+  },
+  "snapshots": [
+    {
+      "sequence": 20,
+      "serverTime": 8000,
+      "playerState": {
+        "origin": [-256.0, 128.0, 64.0],
+        "health": 100,
+        "armor": 0,
+        "weapon": "shotgun",
+        "ammo": {
+          "shotgun": 8
+        }
+      },
+      "commands": []
+    },
+    {
+      "sequence": 21,
+      "serverTime": 8016,
+      "playerState": {
+        "origin": [-240.0, 144.0, 64.0],
+        "health": 95,
+        "armor": 5,
+        "weapon": "shotgun",
+        "ammo": {
+          "shotgun": 7
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [1.0, 1.0, 0.0], "scale": 0.2},
+        {"action": "damage", "amount": 5}
+      ]
+    },
+    {
+      "sequence": 22,
+      "serverTime": 8032,
+      "playerState": {
+        "origin": [-190.0, 200.0, 80.0],
+        "health": 95,
+        "armor": 5,
+        "weapon": "shotgun",
+        "ammo": {
+          "shotgun": 7
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [2.0, 2.5, 0.5], "scale": 0.5},
+        {"action": "override_state"}
+      ]
+    },
+    {
+      "sequence": 23,
+      "serverTime": 8048,
+      "playerState": {
+        "origin": [-184.0, 208.0, 96.0],
+        "health": 130,
+        "armor": 75,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "shotgun": 7,
+          "rocket_launcher": 5
+        }
+      },
+      "commands": [
+        {"action": "heal", "amount": 35},
+        {"action": "weapon", "weapon": "rocket_launcher"},
+        {"action": "ammo", "weapon": "rocket_launcher", "amount": 5},
+        {"action": "move", "direction": [0.5, 0.5, 1.0], "scale": 0.3}
+      ]
+    },
+    {
+      "sequence": 24,
+      "serverTime": 8064,
+      "playerState": {
+        "origin": [-150.0, 240.0, 96.0],
+        "health": 90,
+        "armor": 60,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "shotgun": 7,
+          "rocket_launcher": 4
+        }
+      },
+      "commands": [
+        {"action": "move", "direction": [2.0, 1.0, 0.0], "scale": 0.6},
+        {"action": "damage", "amount": 40},
+        {"action": "ammo", "weapon": "rocket_launcher", "amount": -1}
+      ]
+    }
+  ]
+}
