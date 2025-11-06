@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [qvm, dll]
+        target: [qvm, dll, re]
         include:
           - target: qvm
             os: ubuntu-latest
@@ -19,6 +19,9 @@ jobs:
           - target: dll
             os: windows-latest
             label: DLL
+          - target: re
+            os: ubuntu-latest
+            label: Reverse
     runs-on: ${{ matrix.os }}
     env:
       ARTIFACT_ROOT: artifacts/tests
@@ -29,6 +32,10 @@ jobs:
       - name: Verify QVM toolchain
         if: matrix.target == 'qvm'
         run: tools/ci/verify-qvm-toolchain.sh
+
+      - name: Build clean-room shared objects
+        if: matrix.target == 'qvm' || matrix.target == 're'
+        run: tools/ci/build-cleanroom.sh
 
       - name: Install Visual Studio 2010 components
         if: matrix.target == 'dll'
@@ -66,6 +73,11 @@ jobs:
         run: |
           python tests/run_harnesses.py --target ${{ matrix.target }} --artifact-root "${{ env.ARTIFACT_ROOT }}"
 
+      - name: Run clean-room trace harness
+        if: matrix.target == 're'
+        run: |
+          python tests/run_harnesses.py --target ${{ matrix.target }} --artifact-root "${{ env.ARTIFACT_ROOT }}" --reverse-build-root build/re/linux
+
       - name: Upload harness artefacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -75,5 +87,7 @@ jobs:
             ${{ env.ARTIFACT_ROOT }}/logs/**/*.log
             ${{ env.ARTIFACT_ROOT }}/match_sim/**/*.json
             ${{ env.ARTIFACT_ROOT }}/client_regression/**/*.json
+            ${{ env.ARTIFACT_ROOT }}/trace/**/*.log
+            ${{ env.ARTIFACT_ROOT }}/trace/**/*.diff
           if-no-files-found: warn
           retention-days: 7

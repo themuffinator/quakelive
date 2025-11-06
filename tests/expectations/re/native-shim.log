@@ -1,0 +1,25 @@
+[client] BindContext: ctx=0xPTR state=5
+[client] CL_Frame: start msec=16 state=5 catchers=0xPTR
+[client] CL_Frame: clearing-cddialog
+[client] hook: setActiveMenu(3)
+[client] CL_Frame: avidemo-screenshot
+[client] hook: checkTimeout(timeoutcount=2 serverTime=100)
+[client] hook: checkUserinfo()
+[client] hook: readPackets()
+[client] hook: setCGameTime()
+[client] CL_Frame: auto-paused
+[client] hook: updateScreen()
+[client] hook: beginProfiling()
+[client] CL_Frame: end realtime=1267 frametime=33
+[client] UnbindContext: ctx=0xPTR
+[game] BindContext: ctx=0xPTR
+[game] G_RunFrame: start levelTime=160 previous=64 -> msec=96
+[game] hook: run_scheduled_thinks(96)
+[game] hook: physics_step(ent=0)
+[game] hook: physics_step(ent=1)
+[game] hook: fire_event(ent=0)
+[game] hook: fire_event(ent=1)
+[game] hook: begin_match()
+[game] hook: begin_intermission()
+[game] G_RunFrame: end framenum=11 time=160
+[game] UnbindContext: ctx=0xPTR
