@@ -14,11 +14,23 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
   - `libs/`: Third-party libraries bundled with the original Quake III source (JPEG, zlib, etc.).
   - `q3map/`, `q3radiant/`: Level compilation and editing tools that ship with the Quake III source release.
   - `ui/`: Original mission pack UI sources included with the id Software release.
+- `src-re/`: Clean-room reconstruction workspace that holds annotated walkthroughs, vetted shims, and the replayable clean builds compiled by the reverse CI legs.【F:docs/reverse-engineering/handbook.md†L7-L34】
+- `tests/`: Deterministic harness entry points plus committed expectations that back the regression workflows across QVM, native DLL, and reverse targets.【F:tests/run_harnesses.py†L27-L116】【F:docs/devops/ci-matrix.md†L1-L18】
+- `tools/`: Automation and CI helpers used to stand up historical toolchains, build clean-room artefacts, and publish comparison data during review.【F:docs/toolchain-ci.md†L1-L24】【F:tools/ci/build-cleanroom.sh†L1-L44】
+- `artifacts/`: Structured output from the deterministic harnesses, including timelines, HUD hashes, and trace diffs organised per suite/target for downstream analysis.【F:docs/devops/ci-matrix.md†L15-L38】
+- `logs/`: Harness and workflow logs mirrored from CI so reviewers can inspect failure evidence without rerunning suites locally.【F:docs/devops/ci-matrix.md†L15-L34】
+- `ghidra_scripts/`: Automation used during symbol extraction and binary analysis passes, notably the export script that seeds the normalised symbol maps for the clean-room stages.【F:docs/reverse-engineering/handbook.md†L31-L37】
+- `docs/`: Living documentation covering build pipelines, reverse-engineering stages, gameplay audits, and test harnesses. Start with the reverse-engineering handbook, CI matrix, and documentation backlog when orienting yourself.【F:docs/reverse-engineering/handbook.md†L1-L37】【F:docs/devops/ci-matrix.md†L1-L38】【F:docs/documentation-backlog.md†L1-L29】
 
 ## Reverse-Engineering Workflow Notes
 - The HLIL exports are available for both Quake III (`references/hlil/quake3/`) and Quake Live (`references/hlil/quakelive/`). Keeping the two sets side-by-side enables systematic diffing between the retail Quake III code and the decompiled Quake Live functions when porting behavior.
 - Quake Live assets under `references/original-assets/quakelive/` expose binary modules (`cgamex86.dll`, `qagamex86.dll`, `uix86.dll`, etc.) and supporting data (fonts, icons, maps) to validate assumptions or reproduce file formats.
 - The active `src/` tree should evolve from the Quake III baseline towards Quake Live parity. Build scripts and auxiliary tools from the original release remain in place to facilitate compiling both the native engine and the QVMs as changes are introduced.
+
+## CI & Workflow References
+- **Toolchain (QVM):** Exercises the GPL-era QVM toolchain on every push/PR via `tools/ci/verify-qvm-toolchain.sh`, ensuring the legacy bytecode pipeline stays reproducible.【F:.github/workflows/toolchain.yml†L1-L15】【F:tools/ci/verify-qvm-toolchain.sh†L1-L45】
+- **Native DLL (VS2010):** Provisions Visual Studio 2010, rebuilds the Win32 gameplay DLLs, and validates their export surface with the shared PowerShell helpers.【F:.github/workflows/windows-native.yml†L1-L27】【F:tools/ci/build-windows-dlls.ps1†L1-L36】【F:tools/ci/assert-dll-exports.ps1†L1-L152】
+- **Deterministic Harnesses:** Fans out across QVM, DLL, and reverse targets, reusing the clean-room build helper and uploading artefacts/logs under `artifacts/` and `logs/` for review.【F:.github/workflows/deterministic-harnesses.yml†L10-L93】【F:docs/devops/ci-matrix.md†L15-L38】
 
 ## Next Steps for Contributors
 1. Familiarize yourself with the HLIL dump organization so that Quake Live specific behaviors can be tracked back to decompiled functions.
