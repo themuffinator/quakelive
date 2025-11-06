@@ -1,7 +1,19 @@
 #ifndef GAME_TESTS_FIXTURE_RUNNER_H
 #define GAME_TESTS_FIXTURE_RUNNER_H
 
+#if defined(__has_include)
+#if __has_include("g_local.h")
+#include "g_local.h"
+#elif __has_include("../code/game/g_local.h")
+#include "../code/game/g_local.h"
+#elif __has_include("../../code/game/g_local.h")
 #include "../../code/game/g_local.h"
+#else
+#error "Unable to locate g_local.h for fixture runner"
+#endif
+#else
+#include "../../code/game/g_local.h"
+#endif
 
 // Basic macro utilities reused in fixtures
 #ifndef GAME_TESTS_ARRAY_LEN

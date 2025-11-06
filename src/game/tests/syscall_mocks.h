@@ -1,7 +1,19 @@
 #ifndef GAME_TESTS_SYSCALL_MOCKS_H
 #define GAME_TESTS_SYSCALL_MOCKS_H
 
+#if defined(__has_include)
+#if __has_include("g_local.h")
+#include "g_local.h"
+#elif __has_include("../code/game/g_local.h")
+#include "../code/game/g_local.h"
+#elif __has_include("../../code/game/g_local.h")
 #include "../../code/game/g_local.h"
+#else
+#error "Unable to locate g_local.h for syscall mocks"
+#endif
+#else
+#include "../../code/game/g_local.h"
+#endif
 
 #include <stdarg.h>
 
