@@ -486,6 +486,7 @@ void 	Cvar_WriteVariables( fileHandle_t f );
 // with the archive flag set to true.
 
 void	Cvar_Init( void );
+void	Cvar_BootstrapExpandedDefaults( void );
 
 char	*Cvar_InfoString( int bit );
 char	*Cvar_InfoString_Big( int bit );

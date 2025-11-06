@@ -2649,10 +2649,12 @@ void Com_Init( char *commandLine ) {
 	Cbuf_Init ();
 
 	Com_InitZoneMemory();
-	Cmd_Init ();
+        Cmd_Init ();
 
-	// override anything from the config files with command line args
-	Com_StartupVariable( NULL );
+        Cvar_BootstrapExpandedDefaults();
+
+        // override anything from the config files with command line args
+        Com_StartupVariable( NULL );
 
 	// get the developer cvar set as early as possible
 	Com_StartupVariable( "developer" );

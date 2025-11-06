@@ -29,6 +29,33 @@ class CVarBootstrapTests(unittest.TestCase):
         self.assertIn("typedef struct weaponReloadConfig_s", header)
         self.assertIn("extern weaponReloadConfig_t g_weaponReloadConfig;", header)
 
+    def test_header_exposes_weapon_cvar_handles(self) -> None:
+        header = _read_source("src/code/game/g_local.h")
+        expected_symbols = [
+            "extern\tvmCvar_t\tg_damage_gauntlet;",
+            "extern\tvmCvar_t\tg_damage_mg;",
+            "extern\tvmCvar_t\tg_damage_mg_team;",
+            "extern\tvmCvar_t\tg_damage_sg;",
+            "extern\tvmCvar_t\tg_damage_gl;",
+            "extern\tvmCvar_t\tg_splashDamage_gl;",
+            "extern\tvmCvar_t\tg_splashRadius_gl;",
+            "extern\tvmCvar_t\tg_damage_rl;",
+            "extern\tvmCvar_t\tg_splashDamage_rl;",
+            "extern\tvmCvar_t\tg_splashRadius_rl;",
+            "extern\tvmCvar_t\tg_damage_pg;",
+            "extern\tvmCvar_t\tg_splashDamage_pg;",
+            "extern\tvmCvar_t\tg_splashRadius_pg;",
+            "extern\tvmCvar_t\tg_damage_lg;",
+            "extern\tvmCvar_t\tg_damage_rg;",
+            "extern\tvmCvar_t\tg_damage_bfg;",
+            "extern\tvmCvar_t\tg_splashDamage_bfg;",
+            "extern\tvmCvar_t\tg_splashRadius_bfg;",
+        ]
+
+        for symbol in expected_symbols:
+            with self.subTest(symbol=symbol):
+                self.assertIn(symbol, header)
+
     def test_register_cvars_initialises_configs(self) -> None:
         source = _read_source("src/code/game/g_main.c")
         body = _extract_function_body(source, "void G_RegisterCvars( void )")
@@ -54,16 +81,22 @@ class CVarBootstrapTests(unittest.TestCase):
         self.assertIn("g_startingAmmoConfig.gauntlet", body)
         self.assertIn("g_startingAmmoConfig.grapplingHook", body)
 
-    def test_cvar_init_bootstraps_expanded_defaults(self) -> None:
+    def test_cvar_bootstrap_invokes_startup_variable(self) -> None:
         source = _read_source("src/code/qcommon/cvar.c")
-        body = _extract_function_body(source, "void Cvar_Init (void)")
-        bootstrap_call = body.index("Cvar_InitExpandedDefaults();")
-        toggle_call = body.index("Cmd_AddCommand (\"toggle\", Cvar_Toggle_f);")
-        self.assertLess(
-            bootstrap_call,
-            toggle_call,
-            "expanded CVar defaults must be bootstrapped before binding commands",
-        )
+        body = _extract_function_body(source, "void Cvar_BootstrapExpandedDefaults( void )")
+        self.assertIn("Com_StartupVariable", body)
+
+    def test_com_init_bootstraps_expanded_defaults_before_startup_variables(self) -> None:
+        source = _read_source("src/code/qcommon/common.c")
+        body = _extract_function_body(source, "void Com_Init( char *commandLine )")
+        parse_call = body.index("Com_ParseCommandLine( commandLine );")
+        cmd_init_call = body.index("Cmd_Init ();")
+        bootstrap_call = body.index("Cvar_BootstrapExpandedDefaults();")
+        first_startup = body.index("Com_StartupVariable( NULL );")
+
+        self.assertLess(parse_call, bootstrap_call, "command line must be parsed before bootstrapping expanded CVars")
+        self.assertLess(cmd_init_call, bootstrap_call, "command system must be initialised before bootstrapping expanded CVars")
+        self.assertLess(bootstrap_call, first_startup, "expanded CVars must bootstrap before general startup variable processing")
 
 
 if __name__ == "__main__":

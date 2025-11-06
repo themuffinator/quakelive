@@ -37,16 +37,14 @@ static	cvar_t*		hashTable[FILE_HASH_SIZE];
 
 #define ARRAY_LEN(x) (sizeof(x) / sizeof((x)[0]))
 
-static void Cvar_InitExpandedDefaults( void );
-
 cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force);
 
-static void Cvar_InitExpandedDefaults( void ) {
-	static qboolean expandedDefaultsInitialised = qfalse;
-	static const char *const expandedCvarBootstrap[] = {
-		"g_startingAmmo_bfg",
-		"g_startingAmmo_cg",
-		"g_startingAmmo_g",
+void Cvar_BootstrapExpandedDefaults( void ) {
+        static qboolean expandedDefaultsInitialised = qfalse;
+        static const char *const expandedCvarBootstrap[] = {
+                "g_startingAmmo_bfg",
+                "g_startingAmmo_cg",
+                "g_startingAmmo_g",
 		"g_startingAmmo_gh",
 		"g_startingAmmo_gl",
 		"g_startingAmmo_hmg",
@@ -81,11 +79,11 @@ static void Cvar_InitExpandedDefaults( void ) {
 		return;
 	}
 
-	for ( i = 0 ; i < ARRAY_LEN( expandedCvarBootstrap ); i++ ) {
-		Com_StartupVariable( expandedCvarBootstrap[i] );
-	}
+        for ( i = 0 ; i < ARRAY_LEN( expandedCvarBootstrap ); i++ ) {
+                Com_StartupVariable( expandedCvarBootstrap[i] );
+        }
 
-	expandedDefaultsInitialised = qtrue;
+        expandedDefaultsInitialised = qtrue;
 }
 
 /*
@@ -951,8 +949,7 @@ void Cvar_Init (void) {
 	cvar_cheats = NULL;
 	cvar_modifiedFlags = 0;
 
-	Cvar_InitExpandedDefaults();
-	cvar_cheats = Cvar_Get("sv_cheats", "1", CVAR_ROM | CVAR_SYSTEMINFO );
+        cvar_cheats = Cvar_Get("sv_cheats", "1", CVAR_ROM | CVAR_SYSTEMINFO );
 
 	Cmd_AddCommand ("toggle", Cvar_Toggle_f);
 	Cmd_AddCommand ("set", Cvar_Set_f);

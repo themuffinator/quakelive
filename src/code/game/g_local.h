@@ -833,6 +833,25 @@ extern	vmCvar_t	g_enableBreath;
 extern	vmCvar_t	g_singlePlayer;
 extern	vmCvar_t	g_proxMineTimeout;
 
+extern	vmCvar_t	g_damage_gauntlet;
+extern	vmCvar_t	g_damage_mg;
+extern	vmCvar_t	g_damage_mg_team;
+extern	vmCvar_t	g_damage_sg;
+extern	vmCvar_t	g_damage_gl;
+extern	vmCvar_t	g_splashDamage_gl;
+extern	vmCvar_t	g_splashRadius_gl;
+extern	vmCvar_t	g_damage_rl;
+extern	vmCvar_t	g_splashDamage_rl;
+extern	vmCvar_t	g_splashRadius_rl;
+extern	vmCvar_t	g_damage_pg;
+extern	vmCvar_t	g_splashDamage_pg;
+extern	vmCvar_t	g_splashRadius_pg;
+extern	vmCvar_t	g_damage_lg;
+extern	vmCvar_t	g_damage_rg;
+extern	vmCvar_t	g_damage_bfg;
+extern	vmCvar_t	g_splashDamage_bfg;
+extern	vmCvar_t	g_splashRadius_bfg;
+
 extern	vmCvar_t	g_startingAmmo_bfg;
 extern	vmCvar_t	g_startingAmmo_cg;
 extern	vmCvar_t	g_startingAmmo_g;
