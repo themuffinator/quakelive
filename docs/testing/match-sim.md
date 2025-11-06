@@ -110,3 +110,21 @@ The resulting JSON document uses the following structure:
 
 Consumers can diff timelines between builds to verify deterministic behaviour or
 feed the frames into replay tooling to drive visualisations.
+
+## Programmatic usage
+
+The harness can also be driven directly from Python for use in automated tests
+or bespoke tooling:
+
+```python
+from pathlib import Path
+
+from tools.tests.match_sim import run_from_file
+
+result = run_from_file(Path("tools/tests/match_sim/sample_scenario.json"), seed=2024)
+print(result.frames[0].events)
+```
+
+The returned `SimulationResult` exposes the original `MatchConfig`, an ordered
+list of timeline frames, and helpers such as `write_json()` for exporting the
+payload.
