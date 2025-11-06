@@ -160,15 +160,21 @@ static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_
         return qtrue;
     }
 
-    qboolean fallbackHandled = QL_ClientAuth_HandleOpenSteamTicket( credential, response );
+    qboolean fallbackEligible = !handled || steamResponse.result == QL_AUTH_RESULT_PENDING;
+    if ( fallbackEligible ) {
+        qboolean fallbackHandled = QL_ClientAuth_HandleOpenSteamTicket( credential, response );
 
-    if ( fallbackHandled && response->result == QL_AUTH_RESULT_ACCEPTED ) {
-        char preview[32];
-        QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
+        if ( fallbackHandled ) {
+            if ( response->result == QL_AUTH_RESULT_ACCEPTED ) {
+                char preview[32];
+                QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
 
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
-            "Hybrid fallback accepted credential via open adapter (token=%s)", preview );
-        return qtrue;
+                QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
+                    "Hybrid fallback accepted credential via open adapter (token=%s)", preview );
+            }
+
+            return qtrue;
+        }
     }
 
     if ( handled ) {
@@ -176,7 +182,7 @@ static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_
         return qtrue;
     }
 
-    return fallbackHandled;
+    return qfalse;
 }
 
 static qboolean QL_ClientAuth_DispatchSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
