@@ -818,14 +818,61 @@ dflags		these flags are used to control how T_Damage works
 ============
 */
 
+static float G_KnockbackScaleForMOD( int mod, qboolean selfInflicted ) {
+        switch ( mod ) {
+        case MOD_GAUNTLET:
+                return g_knockbackConfig.gauntlet;
+        case MOD_MACHINEGUN:
+                return g_knockbackConfig.machinegun;
+        case MOD_SHOTGUN:
+                return g_knockbackConfig.shotgun;
+        case MOD_GRENADE:
+        case MOD_GRENADE_SPLASH:
+                return g_knockbackConfig.grenadeLauncher;
+        case MOD_ROCKET:
+        case MOD_ROCKET_SPLASH:
+                return selfInflicted ? g_knockbackConfig.rocketLauncherSelf : g_knockbackConfig.rocketLauncher;
+        case MOD_PLASMA:
+        case MOD_PLASMA_SPLASH:
+                return selfInflicted ? g_knockbackConfig.plasmagunSelf : g_knockbackConfig.plasmagun;
+        case MOD_LIGHTNING:
+                return g_knockbackConfig.lightningGun;
+        case MOD_RAILGUN:
+                return g_knockbackConfig.railgun;
+        case MOD_BFG:
+        case MOD_BFG_SPLASH:
+                return g_knockbackConfig.bfg;
+        case MOD_GRAPPLE:
+                return g_knockbackConfig.grapplingHook;
+#ifdef MISSIONPACK
+        case MOD_NAIL:
+                return g_knockbackConfig.nailgun;
+        case MOD_CHAINGUN:
+                return g_knockbackConfig.chaingun;
+        case MOD_PROXIMITY_MINE:
+                return g_knockbackConfig.proximityLauncher;
+#endif
+        default:
+                break;
+        }
+
+        return 1.0f;
+}
+
+static float G_KnockbackVerticalBoost( qboolean selfInflicted ) {
+        return selfInflicted ? g_knockbackConfig.verticalSelf : g_knockbackConfig.vertical;
+}
+
 void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			   vec3_t dir, vec3_t point, int damage, int dflags, int mod ) {
 	gclient_t	*client;
 	int			take;
 	int			save;
 	int			asave;
-	int			knockback;
+	float		knockbackValue;
+	int			knockbackInt;
 	int			max;
+	qboolean		selfInflicted;
 #ifdef MISSIONPACK
 	vec3_t		bouncedir, impactpoint;
 #endif
@@ -855,6 +902,8 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	if ( !attacker ) {
 		attacker = &g_entities[ENTITYNUM_WORLD];
 	}
+
+	selfInflicted = ( targ == attacker );
 
 	// shootable doors / buttons don't actually have any health
 	if ( targ->s.eType == ET_MOVER ) {
@@ -894,25 +943,48 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		VectorNormalize(dir);
 	}
 
-	knockback = damage;
-	if ( knockback > 200 ) {
-		knockback = 200;
+	knockbackValue = (float)damage;
+	knockbackValue *= G_KnockbackScaleForMOD( mod, selfInflicted );
+
+	{
+		float maxKnockback = g_knockbackConfig.maxKnockback;
+
+		if ( maxKnockback <= 0.0f ) {
+			maxKnockback = 200.0f;
+		}
+
+		if ( knockbackValue > maxKnockback ) {
+			knockbackValue = maxKnockback;
+		}
 	}
+
 	if ( targ->flags & FL_NO_KNOCKBACK ) {
-		knockback = 0;
+		knockbackValue = 0.0f;
 	}
 	if ( dflags & DAMAGE_NO_KNOCKBACK ) {
-		knockback = 0;
+		knockbackValue = 0.0f;
+	}
+
+	knockbackInt = (int)( knockbackValue + 0.5f );
+	if ( knockbackInt <= 0 && knockbackValue > 0.0f ) {
+		knockbackInt = 1;
 	}
 
 	// figure momentum add, even if the damage won't be taken
-	if ( knockback && targ->client ) {
+	if ( knockbackValue > 0.0f && targ->client ) {
 		vec3_t	kvel;
 		float	mass;
 
 		mass = 200;
 
-		VectorScale (dir, g_knockback.value * (float)knockback / mass, kvel);
+		VectorScale (dir, g_knockback.value * knockbackValue / mass, kvel);
+		{
+			float verticalBoost = G_KnockbackVerticalBoost( selfInflicted );
+
+			if ( verticalBoost != 0.0f ) {
+				kvel[2] += verticalBoost;
+			}
+		}
 		VectorAdd (targ->client->ps.velocity, kvel, targ->client->ps.velocity);
 
 		// set the timer so that the other client can't cancel
@@ -920,7 +992,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		if ( !targ->client->ps.pm_time ) {
 			int		t;
 
-			t = knockback * 2;
+			t = (int)( knockbackValue * 2.0f );
 			if ( t < 50 ) {
 				t = 50;
 			}
@@ -1017,7 +1089,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		}
 		client->damage_armor += asave;
 		client->damage_blood += take;
-		client->damage_knockback += knockback;
+		client->damage_knockback += knockbackInt;
 		if ( dir ) {
 			VectorCopy ( dir, client->damage_from );
 			client->damage_fromWorld = qfalse;
