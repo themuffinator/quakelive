@@ -145,6 +145,8 @@ typedef struct client_s {
 	qboolean		platformAuthSucceeded;
 	char			platformAuthLabel[32];
 	char			platformAuthToken[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+	char			platformAuthResult[32];
+	char			platformAuthOutcome[32];
 	char			platformAuthMessage[QL_AUTH_MAX_RESPONSE_MESSAGE];
 	char			platformSteamId[QL_AUTH_MAX_CREDENTIAL_STORAGE];
 #endif

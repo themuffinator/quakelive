@@ -35,6 +35,8 @@ static void SV_ClearPlatformAuthState( client_t *cl ) {
         cl->platformAuthSucceeded = qfalse;
         cl->platformAuthLabel[0] = '\0';
         cl->platformAuthToken[0] = '\0';
+        cl->platformAuthResult[0] = '\0';
+        cl->platformAuthOutcome[0] = '\0';
         cl->platformAuthMessage[0] = '\0';
         cl->platformSteamId[0] = '\0';
 }
@@ -83,10 +85,16 @@ static void SV_CapturePlatformAuthFromUserinfo( client_t *cl, const char *userin
                 Q_strncpyz( cl->platformAuthToken, combined, sizeof( cl->platformAuthToken ) );
                 Q_strncpyz( cl->platformAuthLabel, "steam", sizeof( cl->platformAuthLabel ) );
                 cl->platformAuthPending = qtrue;
+                Q_strncpyz( cl->platformAuthResult, "pending", sizeof( cl->platformAuthResult ) );
+                cl->platformAuthOutcome[0] = '\0';
         }
 }
 
 static void SV_FinalisePlatformAuthState( client_t *cl, qboolean accepted, const char *detail ) {
+        const char *result;
+        const char *outcome;
+        const char *message;
+
         if ( !cl ) {
                 return;
         }
@@ -94,7 +102,25 @@ static void SV_FinalisePlatformAuthState( client_t *cl, qboolean accepted, const
         cl->platformAuthPending = qfalse;
         cl->platformAuthSucceeded = accepted;
 
-        if ( detail && detail[0] ) {
+        result = Info_ValueForKey( cl->userinfo, QL_AUTH_USERINFO_KEY_RESULT );
+        outcome = Info_ValueForKey( cl->userinfo, QL_AUTH_USERINFO_KEY_OUTCOME );
+        message = Info_ValueForKey( cl->userinfo, QL_AUTH_USERINFO_KEY_MESSAGE );
+
+        if ( result && result[0] ) {
+                Q_strncpyz( cl->platformAuthResult, result, sizeof( cl->platformAuthResult ) );
+        } else {
+                cl->platformAuthResult[0] = '\0';
+        }
+
+        if ( outcome && outcome[0] ) {
+                Q_strncpyz( cl->platformAuthOutcome, outcome, sizeof( cl->platformAuthOutcome ) );
+        } else {
+                cl->platformAuthOutcome[0] = '\0';
+        }
+
+        if ( message && message[0] ) {
+                Q_strncpyz( cl->platformAuthMessage, message, sizeof( cl->platformAuthMessage ) );
+        } else if ( detail && detail[0] ) {
                 Q_strncpyz( cl->platformAuthMessage, detail, sizeof( cl->platformAuthMessage ) );
         } else {
                 cl->platformAuthMessage[0] = '\0';
@@ -102,32 +128,37 @@ static void SV_FinalisePlatformAuthState( client_t *cl, qboolean accepted, const
 }
 
 static void SV_LogPlatformAuth( const netadr_t *adr, const client_t *cl, const char *status, const char *detail ) {
-        char summary[QL_AUTH_MAX_RESPONSE_MESSAGE + 32];
+        char message[QL_AUTH_MAX_RESPONSE_MESSAGE * 2];
         const char *label;
         const char *steamId;
+        const char *result;
+        const char *outcome;
+
+        message[0] = '\0';
 
         if ( !cl ) {
                 return;
         }
 
-        summary[0] = '\0';
-
-        if ( status && status[0] ) {
-                Q_strncpyz( summary, status, sizeof( summary ) );
-        }
-
-        if ( detail && detail[0] ) {
-                if ( summary[0] ) {
-                        Q_strcat( summary, sizeof( summary ), ": " );
-                }
-
-                Q_strcat( summary, sizeof( summary ), detail );
-        }
-
         label = cl->platformAuthLabel[0] ? cl->platformAuthLabel : NULL;
         steamId = cl->platformSteamId[0] ? cl->platformSteamId : NULL;
+        result = cl->platformAuthResult[0] ? cl->platformAuthResult : NULL;
+        outcome = cl->platformAuthOutcome[0] ? cl->platformAuthOutcome : NULL;
 
-        NET_LogAuthTelemetry( NS_SERVER, adr, steamId, label, summary[0] ? summary : status );
+        if ( detail && detail[0] ) {
+                Q_strncpyz( message, detail, sizeof( message ) );
+        }
+
+        if ( cl->platformAuthMessage[0] ) {
+                if ( !message[0] ) {
+                        Q_strncpyz( message, cl->platformAuthMessage, sizeof( message ) );
+                } else if ( Q_stricmp( message, cl->platformAuthMessage ) ) {
+                        Q_strcat( message, sizeof( message ), " | " );
+                        Q_strcat( message, sizeof( message ), cl->platformAuthMessage );
+                }
+        }
+
+        NET_LogAuthTelemetry( NS_SERVER, adr, steamId, label, status, result, outcome, message[0] ? message : NULL );
 }
 #else
 #define SV_CapturePlatformAuthFromUserinfo(cl, userinfo) ((void)0)

@@ -741,23 +741,64 @@ qboolean	NET_StringToAdr( const char *s, netadr_t *a ) {
 }
 
 
-void NET_LogAuthTelemetry( netsrc_t source, const netadr_t *adr, const char *steamId, const char *credentialLabel, const char *status ) {
-	const char *direction;
-	const char *address;
-	const char *id;
-	const char *label;
-	const char *state;
+static void NET_SanitiseAuthString( const char *value, char *buffer, size_t bufferSize ) {
+        size_t i;
 
-	if ( source < NS_CLIENT || source > NS_SERVER ) {
-		direction = "unknown";
-	} else {
-		direction = netsrcString[source];
-	}
+        if ( !buffer || bufferSize == 0 ) {
+                return;
+        }
 
-	address = ( adr && adr->type != NA_BAD ) ? NET_AdrToString( *adr ) : "<invalid>";
-	id = ( steamId && steamId[0] ) ? steamId : "<missing>";
-	label = ( credentialLabel && credentialLabel[0] ) ? credentialLabel : "<unlabelled>";
-	state = ( status && status[0] ) ? status : "pending";
+        if ( !value ) {
+                buffer[0] = '\0';
+                return;
+        }
 
-	Com_Printf( "NET: %s auth %s credential=%s steamid=%s status=%s\n", direction, address, label, id, state );
+        for ( i = 0; i + 1 < bufferSize && value[i]; ++i ) {
+                char ch = value[i];
+
+                if ( ch == '\n' || ch == '\r' ) {
+                        ch = ' ';
+                } else if ( (unsigned char)ch < 0x20 ) {
+                        ch = '?';
+                }
+
+                buffer[i] = ch;
+        }
+
+        buffer[i] = '\0';
+}
+
+void NET_LogAuthTelemetry( netsrc_t source, const netadr_t *adr, const char *steamId, const char *credentialLabel, const char *status, const char *result, const char *outcome, const char *message ) {
+        const char *direction;
+        const char *address;
+        const char *id;
+        const char *label;
+        const char *state;
+        const char *resolvedResult;
+        const char *resolvedOutcome;
+        const char *resolvedMessage;
+        char safeResult[64];
+        char safeOutcome[64];
+        char safeMessage[MAX_STRING_CHARS];
+
+        if ( source < NS_CLIENT || source > NS_SERVER ) {
+                direction = "unknown";
+        } else {
+                direction = netsrcString[source];
+        }
+
+        address = ( adr && adr->type != NA_BAD ) ? NET_AdrToString( *adr ) : "<invalid>";
+        id = ( steamId && steamId[0] ) ? steamId : "<missing>";
+        label = ( credentialLabel && credentialLabel[0] ) ? credentialLabel : "<unlabelled>";
+        state = ( status && status[0] ) ? status : "pending";
+        resolvedResult = ( result && result[0] ) ? result : "-";
+        resolvedOutcome = ( outcome && outcome[0] ) ? outcome : "-";
+        resolvedMessage = ( message && message[0] ) ? message : "-";
+
+        NET_SanitiseAuthString( resolvedResult, safeResult, sizeof( safeResult ) );
+        NET_SanitiseAuthString( resolvedOutcome, safeOutcome, sizeof( safeOutcome ) );
+        NET_SanitiseAuthString( resolvedMessage, safeMessage, sizeof( safeMessage ) );
+
+        Com_Printf( "NET: %s auth %s credential=%s steamid=%s status=%s result=%s outcome=%s message=\"%s\"\n",
+                direction, address, label, id, state, safeResult, safeOutcome, safeMessage );
 }

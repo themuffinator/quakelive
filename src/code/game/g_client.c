@@ -37,6 +37,50 @@ static vec3_t	playerMaxs = {15, 15, 32};
 #if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
 static char g_clientAuthDenyMessage[QL_AUTH_MAX_RESPONSE_MESSAGE + 64];
 
+static const char *G_GetAuthResultString( qlAuthResult result ) {
+        switch ( result ) {
+        case QL_AUTH_RESULT_PENDING:
+                return "pending";
+        case QL_AUTH_RESULT_ACCEPTED:
+                return "accepted";
+        case QL_AUTH_RESULT_DENIED:
+                return "denied";
+        case QL_AUTH_RESULT_ERROR:
+                return "error";
+        default:
+                break;
+        }
+
+        return "unknown";
+}
+
+static const char *G_GetAuthOutcomeString( qlAuthOutcome outcome ) {
+        switch ( outcome ) {
+        case QL_AUTH_OUTCOME_SUCCESS:
+                return "success";
+        case QL_AUTH_OUTCOME_RETRY:
+                return "retry";
+        case QL_AUTH_OUTCOME_FAILURE:
+                return "failure";
+        default:
+                break;
+        }
+
+        return "unknown";
+}
+
+static void G_WritePlatformAuthUserinfo( int clientNum, char *userinfo, const char *result, const char *outcome, const char *message ) {
+        if ( !userinfo ) {
+                return;
+        }
+
+        Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_RESULT, result ? result : "" );
+        Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_OUTCOME, outcome ? outcome : "" );
+        Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_MESSAGE, message ? message : "" );
+
+        trap_SetUserinfo( clientNum, userinfo );
+}
+
 static qboolean G_ParseSteamId( const char *steamId, unsigned long long *outValue ) {
         unsigned long long value;
         const char *ch;
@@ -103,56 +147,70 @@ static void G_BuildSteamAuthToken( const char *userinfo, char *buffer, size_t bu
 	}
 }
 
-static char *G_RunPlatformAuthChecks( int clientNum, const char *userinfo, qboolean firstTime, qboolean isBot, gclient_t *client ) {
-	ql_auth_credential_t credential;
-	ql_auth_response_t response;
-	char token[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+static char *G_RunPlatformAuthChecks( int clientNum, char *userinfo, qboolean firstTime, qboolean isBot, gclient_t *client ) {
+        ql_auth_credential_t credential;
+        ql_auth_response_t response;
+        char token[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+        const char *resultString;
+        const char *outcomeString;
 
-	if ( !firstTime || isBot || !userinfo || !client ) {
-		return NULL;
-	}
+        if ( !firstTime || isBot || !userinfo || !client ) {
+                G_WritePlatformAuthUserinfo( clientNum, userinfo, NULL, NULL, NULL );
+                return NULL;
+        }
 
-	G_BuildSteamAuthToken( userinfo, token, sizeof( token ) );
+        G_BuildSteamAuthToken( userinfo, token, sizeof( token ) );
 
-	if ( !token[0] ) {
-		return NULL;
-	}
+        if ( !token[0] ) {
+                G_WritePlatformAuthUserinfo( clientNum, userinfo, NULL, NULL, NULL );
+                return NULL;
+        }
 
-	QL_InitAuthCredential( &credential );
+        QL_InitAuthCredential( &credential );
 
         if ( !QL_ParsePlatformToken( token, QL_AUTH_CREDENTIAL_STEAM, &credential ) ) {
                 Q_strncpyz( g_clientAuthDenyMessage, "Failed to verify Steam auth token", sizeof( g_clientAuthDenyMessage ) );
                 G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
+                G_WritePlatformAuthUserinfo( clientNum, userinfo, G_GetAuthResultString( QL_AUTH_RESULT_ERROR ), G_GetAuthOutcomeString( QL_AUTH_OUTCOME_FAILURE ), g_clientAuthDenyMessage );
                 return g_clientAuthDenyMessage;
         }
 
-        if ( !QL_RequestExternalAuth( &credential, &response ) ) {
+        if ( !QL_RequestExternalAuth( &credential, &response ) || response.result != QL_AUTH_RESULT_ACCEPTED ) {
                 const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
+
                 Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
-                G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
+
+                resultString = G_GetAuthResultString( response.result );
+                outcomeString = G_GetAuthOutcomeString( response.outcome );
+
+                if ( response.outcome == QL_AUTH_OUTCOME_RETRY ) {
+                        G_LogPrintf( "SteamAuthRetry: %i %s\n", clientNum, g_clientAuthDenyMessage );
+                } else {
+                        G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
+                }
+
+                G_WritePlatformAuthUserinfo( clientNum, userinfo, resultString, outcomeString, g_clientAuthDenyMessage );
                 return g_clientAuthDenyMessage;
         }
 
-        if ( response.result != QL_AUTH_RESULT_ACCEPTED ) {
-                const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
-                Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
-                G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
-                return g_clientAuthDenyMessage;
+        resultString = G_GetAuthResultString( response.result );
+        outcomeString = G_GetAuthOutcomeString( response.outcome );
+
+        G_WritePlatformAuthUserinfo( clientNum, userinfo, resultString, outcomeString, response.message[0] ? response.message : NULL );
+
+        if ( response.message[0] ) {
+                G_LogPrintf( "SteamAuthAccepted: %i %s\n", clientNum, response.message );
         }
 
-	if ( response.message[0] ) {
-		G_LogPrintf( "SteamAuthAccepted: %i %s\n", clientNum, response.message );
-	}
-
-	return NULL;
+        return NULL;
 }
 #else
-static char *G_RunPlatformAuthChecks( int clientNum, const char *userinfo, qboolean firstTime, qboolean isBot, gclient_t *client ) {
-	(void)clientNum;
-	(void)userinfo;
-	(void)firstTime;
-	(void)isBot;
-	(void)client;
+static char *G_RunPlatformAuthChecks( int clientNum, char *userinfo, qboolean firstTime, qboolean isBot, gclient_t *client ) {
+        (void)clientNum;
+        (void)userinfo;
+        (void)firstTime;
+        (void)isBot;
+        (void)client;
 	return NULL;
 }
 #endif

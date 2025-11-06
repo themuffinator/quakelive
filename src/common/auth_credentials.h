@@ -15,6 +15,12 @@ typedef enum {
 #define QL_AUTH_MAX_RESPONSE_MESSAGE 128
 #define QL_AUTH_MAX_CREDENTIAL_STORAGE (QL_AUTH_MAX_CREDENTIAL_LENGTH + 32)
 
+// Userinfo keys shared between the server and game for propagating
+// authentication telemetry.
+#define QL_AUTH_USERINFO_KEY_RESULT "ql_auth_result"
+#define QL_AUTH_USERINFO_KEY_OUTCOME "ql_auth_outcome"
+#define QL_AUTH_USERINFO_KEY_MESSAGE "ql_auth_message"
+
 typedef struct {
     qlAuthCredentialKind kind;
     char value[QL_AUTH_MAX_CREDENTIAL_LENGTH];
