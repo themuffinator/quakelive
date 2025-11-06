@@ -601,6 +601,7 @@ void SP_worldspawn( void ) {
 
 	// see if we want a warmup time
 	trap_SetConfigstring( CS_WARMUP, "" );
+	trap_SetConfigstring( CS_MATCH_STATE, "" );
 	if ( g_restarted.integer ) {
 		trap_Cvar_Set( "g_restarted", "0" );
 		level.warmupTime = 0;

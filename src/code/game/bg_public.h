@@ -79,6 +79,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_FLAGSTATUS			23		// string indicating flag status in CTF
 #define CS_SHADERSTATE			24
 #define CS_BOTINFO				25
+#define CS_MATCH_STATE				26
 
 #define	CS_ITEMS				27		// string of 0's and 1's that tell which items are present
 

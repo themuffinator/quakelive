@@ -192,6 +192,64 @@ static void CG_ParseWarmup( void ) {
 	cg.warmup = warmup;
 }
 
+static void CG_ParseMatchState( void ) {
+	const char *info;
+	int values[10] = { 0 };
+	int i;
+	const char *p;
+
+	cgs.matchOvertimeActive = qfalse;
+	cgs.matchOvertimeStartTime = 0;
+	cgs.matchOvertimeEndTime = 0;
+	cgs.matchOvertimeCount = 0;
+	cgs.matchTimeoutActive = qfalse;
+	cgs.matchTimeoutTeam = TEAM_FREE;
+	cgs.matchTimeoutExpireTime = 0;
+	cgs.matchTimeoutOwner = -1;
+	for ( i = 0; i < TEAM_NUM_TEAMS; i++ ) {
+		cgs.matchTimeoutRemaining[i] = 0;
+	}
+
+	info = CG_ConfigString( CS_MATCH_STATE );
+	if ( !info || !*info ) {
+		return;
+	}
+
+	p = info;
+	for ( i = 0; i < 10; i++ ) {
+		while ( *p == ' ' ) {
+			p++;
+		}
+		if ( !*p ) {
+			break;
+		}
+		values[i] = atoi( p );
+		while ( *p && *p != ' ' ) {
+			p++;
+		}
+		if ( !*p ) {
+			break;
+		}
+	}
+
+	cgs.matchOvertimeActive = values[0] ? qtrue : qfalse;
+	cgs.matchOvertimeStartTime = values[1];
+	cgs.matchOvertimeEndTime = values[2];
+	cgs.matchOvertimeCount = values[3];
+	cgs.matchTimeoutActive = values[4] ? qtrue : qfalse;
+	cgs.matchTimeoutTeam = values[5];
+	cgs.matchTimeoutExpireTime = values[6];
+	cgs.matchTimeoutOwner = values[7];
+	if ( values[8] < 0 ) {
+		values[8] = 0;
+	}
+	if ( values[9] < 0 ) {
+		values[9] = 0;
+	}
+	cgs.matchTimeoutRemaining[TEAM_RED] = values[8];
+	cgs.matchTimeoutRemaining[TEAM_BLUE] = values[9];
+}
+
 /*
 ================
 CG_SetConfigValues
@@ -217,6 +275,7 @@ void CG_SetConfigValues( void ) {
 	}
 #endif
 	cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
+	CG_ParseMatchState();
 }
 
 /*
@@ -285,6 +344,8 @@ static void CG_ConfigStringModified( void ) {
 		CG_ParseServerinfo();
 	} else if ( num == CS_WARMUP ) {
 		CG_ParseWarmup();
+	} else if ( num == CS_MATCH_STATE ) {
+		CG_ParseMatchState();
 	} else if ( num == CS_SCORES1 ) {
 		cgs.scores1 = atoi( str );
 	} else if ( num == CS_SCORES2 ) {

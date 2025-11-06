@@ -101,6 +101,7 @@ typedef struct ammoPackConfig_s {
 extern ammoPackConfig_t g_ammoPackConfig;
 void G_InitAmmoPackConfig( void );
 void G_UpdateAmmoPackConfig( void );
+int G_GetSuddenDeathRespawnDelay( void );
 
 typedef struct factoryCvarConfig_s {
 	int		startingWeaponsMask;
@@ -533,7 +534,20 @@ typedef struct {
 #ifdef MISSIONPACK
 	int			portalSequence;
 #endif
+
+	qboolean	overtimeActive;
+	int		overtimeStartTime;
+	int		overtimeEndTime;
+	int		overtimeCount;
 	qboolean	suddenDeathActive;
+	int		suddenDeathLastDelay;
+	qboolean	suddenDeathNoRespawnLogged;
+	int		timeoutRemaining[TEAM_NUM_TEAMS];
+	qboolean	timeoutActive;
+	int		timeoutTeam;
+	int		timeoutOwner;
+	int		timeoutStartTime;
+	int		timeoutExpireTime;
 } level_locals_t;
 
 

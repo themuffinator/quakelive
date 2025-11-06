@@ -1033,6 +1033,16 @@ typedef struct {
 	int				redflag, blueflag;		// flag status from configstrings
 	int				flagStatus;
 
+	qboolean	matchOvertimeActive;
+	int		matchOvertimeStartTime;
+	int		matchOvertimeEndTime;
+	int		matchOvertimeCount;
+	qboolean	matchTimeoutActive;
+	int		matchTimeoutTeam;
+	int		matchTimeoutExpireTime;
+	int		matchTimeoutOwner;
+	int		matchTimeoutRemaining[TEAM_NUM_TEAMS];
+
 	qboolean  newHud;
 
 	//

@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // g_combat.c
 
 #include "g_local.h"
+#include <limits.h>
 
 
 /*
@@ -630,7 +631,22 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	// don't allow respawn until the death anim is done
 	// g_forcerespawn may force spawning at some later time
-	self->client->respawnTime = level.time + 1700;
+	{
+		int respawnDelay = 1700;
+		if ( level.suddenDeathActive ) {
+			int suddenDeathDelay = G_GetSuddenDeathRespawnDelay();
+			if ( suddenDeathDelay < 0 ) {
+				self->client->respawnTime = INT_MAX;
+			} else {
+				if ( suddenDeathDelay < respawnDelay ) {
+					suddenDeathDelay = respawnDelay;
+				}
+				self->client->respawnTime = level.time + suddenDeathDelay;
+			}
+		} else {
+			self->client->respawnTime = level.time + respawnDelay;
+		}
+	}
 
 	// remove powerups
 	memset( self->client->ps.powerups, 0, sizeof(self->client->ps.powerups) );
