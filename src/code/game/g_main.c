@@ -513,46 +513,60 @@ void G_UpdateWeaponReloadConfig( void ) {
 }
 
 static int G_ReadAmmoPackCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
-	int value;
+        int value;
 
-	if ( !cvar ) {
-		G_ReportMissingCvar( cvarName );
-		return fallback;
-	}
+        if ( !cvar ) {
+                G_ReportMissingCvar( cvarName );
+                return fallback;
+        }
 
-	value = cvar->integer;
+        value = cvar->integer;
 
-	if ( value < 0 ) {
-		return fallback;
-	}
+        if ( value <= 0 ) {
+                return fallback;
+        }
 
-	return value;
+        return value;
+}
+
+static void G_AssignAmmoPackEntry( weapon_t weapon, const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+        int pickup;
+
+        pickup = G_ReadAmmoPackCvar( cvar, fallback, cvarName );
+
+        g_ammoPackConfig.weaponPickup[weapon] = pickup;
+        if ( pickup > 0 ) {
+                g_ammoPackConfig.weaponMax[weapon] = pickup * 4;
+        } else {
+                g_ammoPackConfig.weaponMax[weapon] = 0;
+        }
 }
 
 void G_InitAmmoPackConfig( void ) {
-	int weapon;
+        int weapon;
 
-	for ( weapon = WP_NONE; weapon < WP_NUM_WEAPONS; ++weapon ) {
-		g_ammoPackConfig.weaponPickup[weapon] = 0;
-	}
+        for ( weapon = WP_NONE; weapon < WP_NUM_WEAPONS; ++weapon ) {
+                g_ammoPackConfig.weaponPickup[weapon] = 0;
+                g_ammoPackConfig.weaponMax[weapon] = 0;
+        }
 
-	g_ammoPackConfig.weaponPickup[WP_MACHINEGUN] = G_ReadAmmoPackCvar( &g_ammoPack_mg, DEFAULT_AMMOPACK_MG, "g_ammoPack_mg" );
-	g_ammoPackConfig.weaponPickup[WP_SHOTGUN] = G_ReadAmmoPackCvar( &g_ammoPack_sg, DEFAULT_AMMOPACK_SG, "g_ammoPack_sg" );
-	g_ammoPackConfig.weaponPickup[WP_GRENADE_LAUNCHER] = G_ReadAmmoPackCvar( &g_ammoPack_gl, DEFAULT_AMMOPACK_GL, "g_ammoPack_gl" );
-	g_ammoPackConfig.weaponPickup[WP_ROCKET_LAUNCHER] = G_ReadAmmoPackCvar( &g_ammoPack_rl, DEFAULT_AMMOPACK_RL, "g_ammoPack_rl" );
-	g_ammoPackConfig.weaponPickup[WP_LIGHTNING] = G_ReadAmmoPackCvar( &g_ammoPack_lg, DEFAULT_AMMOPACK_LG, "g_ammoPack_lg" );
-	g_ammoPackConfig.weaponPickup[WP_RAILGUN] = G_ReadAmmoPackCvar( &g_ammoPack_rg, DEFAULT_AMMOPACK_RG, "g_ammoPack_rg" );
-	g_ammoPackConfig.weaponPickup[WP_PLASMAGUN] = G_ReadAmmoPackCvar( &g_ammoPack_pg, DEFAULT_AMMOPACK_PG, "g_ammoPack_pg" );
-	g_ammoPackConfig.weaponPickup[WP_BFG] = G_ReadAmmoPackCvar( &g_ammoPack_bfg, DEFAULT_AMMOPACK_BFG, "g_ammoPack_bfg" );
+        G_AssignAmmoPackEntry( WP_MACHINEGUN, &g_ammoPack_mg, DEFAULT_AMMOPACK_MG, "g_ammoPack_mg" );
+        G_AssignAmmoPackEntry( WP_SHOTGUN, &g_ammoPack_sg, DEFAULT_AMMOPACK_SG, "g_ammoPack_sg" );
+        G_AssignAmmoPackEntry( WP_GRENADE_LAUNCHER, &g_ammoPack_gl, DEFAULT_AMMOPACK_GL, "g_ammoPack_gl" );
+        G_AssignAmmoPackEntry( WP_ROCKET_LAUNCHER, &g_ammoPack_rl, DEFAULT_AMMOPACK_RL, "g_ammoPack_rl" );
+        G_AssignAmmoPackEntry( WP_LIGHTNING, &g_ammoPack_lg, DEFAULT_AMMOPACK_LG, "g_ammoPack_lg" );
+        G_AssignAmmoPackEntry( WP_RAILGUN, &g_ammoPack_rg, DEFAULT_AMMOPACK_RG, "g_ammoPack_rg" );
+        G_AssignAmmoPackEntry( WP_PLASMAGUN, &g_ammoPack_pg, DEFAULT_AMMOPACK_PG, "g_ammoPack_pg" );
+        G_AssignAmmoPackEntry( WP_BFG, &g_ammoPack_bfg, DEFAULT_AMMOPACK_BFG, "g_ammoPack_bfg" );
 
 #ifdef WP_HEAVY_MACHINEGUN
-	g_ammoPackConfig.weaponPickup[WP_HEAVY_MACHINEGUN] = G_ReadAmmoPackCvar( &g_ammoPack_hmg, DEFAULT_AMMOPACK_HMG, "g_ammoPack_hmg" );
+        G_AssignAmmoPackEntry( WP_HEAVY_MACHINEGUN, &g_ammoPack_hmg, DEFAULT_AMMOPACK_HMG, "g_ammoPack_hmg" );
 #endif
 
 #ifdef MISSIONPACK
-	g_ammoPackConfig.weaponPickup[WP_NAILGUN] = G_ReadAmmoPackCvar( &g_ammoPack_ng, DEFAULT_AMMOPACK_NG, "g_ammoPack_ng" );
-	g_ammoPackConfig.weaponPickup[WP_PROX_LAUNCHER] = G_ReadAmmoPackCvar( &g_ammoPack_pl, DEFAULT_AMMOPACK_PL, "g_ammoPack_pl" );
-	g_ammoPackConfig.weaponPickup[WP_CHAINGUN] = G_ReadAmmoPackCvar( &g_ammoPack_cg, DEFAULT_AMMOPACK_CG, "g_ammoPack_cg" );
+        G_AssignAmmoPackEntry( WP_NAILGUN, &g_ammoPack_ng, DEFAULT_AMMOPACK_NG, "g_ammoPack_ng" );
+        G_AssignAmmoPackEntry( WP_PROX_LAUNCHER, &g_ammoPack_pl, DEFAULT_AMMOPACK_PL, "g_ammoPack_pl" );
+        G_AssignAmmoPackEntry( WP_CHAINGUN, &g_ammoPack_cg, DEFAULT_AMMOPACK_CG, "g_ammoPack_cg" );
 #endif
 }
 
