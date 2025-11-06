@@ -7,7 +7,9 @@
 /*
  * Logging helpers used by the native prototypes to capture the data exchanged
  * with the VM-facing glue code.  The shim keeps a simple append-only log under
- * logs/re/native-shim.log so the traces can be diffed against the QVM runtime.
+ * logs/re/native-shim.log for human-readable traces and mirrors syscall
+ * contracts to logs/syscall_contract.log so the data can be diffed against the
+ * QVM runtime.
  */
 
 #ifdef __cplusplus

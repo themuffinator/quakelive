@@ -42,7 +42,7 @@ To ensure gameplay logic matches Quake Live behaviour throughout the transition 
   - Diff logs between QVM and DLL runs to confirm ordering and payload parity.
 - **Implementation Hooks:**
   - Introduce a shared `syscall_contract.expect` file enumerating required calls and argument schemas.
-  - Add a validator that flags missing or unexpected syscalls.
+  - Add a validator (`tools/tests/validate_syscall_contract.py`) that flags missing or unexpected syscalls and reports diffs.
 
 ## Tooling Requirements
 - Deterministic RNG seeding utilities shared across both build products.

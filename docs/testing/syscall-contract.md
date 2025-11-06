@@ -5,9 +5,9 @@ The engine now records every syscall that crosses the VM/native boundary to
 
 - **VM layer** entries (`vm-interpreted` and `vm-dll`) show the raw command IDs
   delivered by the virtual machine runtime.
-- **Shim layer** entries (`shim-cgame`, `shim-ui`, `shim-game`) reflect the
-  arguments observed by the native glue code before they are dispatched into the
-  engine.
+- **Shim layer** entries (`shim-cgame`, `shim-ui`, `shim-game`, and
+  `shim-native`) reflect the arguments observed by the native glue code and
+  clean-room prototypes before they are dispatched into the engine.
 
 Each line is space-delimited and encodes the origin, module name, and a fixed
 number of hexadecimal arguments. These lines provide a stable baseline that can

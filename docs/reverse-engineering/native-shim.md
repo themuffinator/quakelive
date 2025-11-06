@@ -14,7 +14,12 @@ trace lines to `logs/re/native-shim.log`. The helper truncates the log on first
 use, ensures the directory exists, and exposes `qlr_native_shim_logf`/`_syscall`
 for routine-level and syscall-level instrumentation. Prototype bindings call the
 logger around every outward hook invocation, allowing side-by-side comparison
-with the QVM trace output without patching the engine binaries.
+with the QVM trace output without patching the engine binaries. Syscall
+contracts are also mirrored to `logs/syscall_contract.log`, which shares the
+same origin/module/argument schema as the engine-side
+`SyscallContract_LogEvent` helper. Run `python
+tools/tests/validate_syscall_contract.py` to compare the shim output against the
+baseline in `tests/expectations/syscall_contract.expect` when auditing changes.
 
 ## Delta analysis
 - **Client frame sequencing:** The prototype preserves the cddialog/menu

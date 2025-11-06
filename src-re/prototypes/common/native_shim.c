@@ -17,8 +17,11 @@
 #endif
 
 static const char *const qlr_native_log_path = "logs/re/native-shim.log";
+static const char *const qlr_native_contract_path = "logs/syscall_contract.log";
 static FILE *qlr_native_log_handle = NULL;
+static FILE *qlr_native_contract_handle = NULL;
 static bool qlr_native_log_truncated = false;
+static bool qlr_native_contract_truncated = false;
 
 static bool qlr_native_shim_create_directory(const char *path) {
     if (!path || *path == '\0') {
@@ -56,31 +59,28 @@ static bool qlr_native_shim_create_directory(const char *path) {
     return true;
 }
 
-static bool qlr_native_shim_ensure_log_directory(void) {
-    static bool ensured = false;
-    if (ensured) {
-        return true;
+static bool qlr_native_shim_ensure_directory_for_path(const char *path) {
+    if (!path) {
+        return false;
     }
 
-    const char *slash = strrchr(qlr_native_log_path, '/');
+    const char *slash = strrchr(path, '/');
     if (!slash) {
-        ensured = true;
         return true;
     }
 
     char directory[512];
-    size_t dir_len = (size_t)(slash - qlr_native_log_path);
+    size_t dir_len = (size_t)(slash - path);
     if (dir_len >= sizeof(directory)) {
         return false;
     }
-    memcpy(directory, qlr_native_log_path, dir_len);
+    memcpy(directory, path, dir_len);
     directory[dir_len] = '\0';
 
     if (!qlr_native_shim_create_directory(directory)) {
         return false;
     }
 
-    ensured = true;
     return true;
 }
 
@@ -89,7 +89,7 @@ static FILE *qlr_native_shim_open_log(void) {
         return qlr_native_log_handle;
     }
 
-    if (!qlr_native_shim_ensure_log_directory()) {
+    if (!qlr_native_shim_ensure_directory_for_path(qlr_native_log_path)) {
         return NULL;
     }
 
@@ -108,6 +108,30 @@ static FILE *qlr_native_shim_open_log(void) {
     return qlr_native_log_handle;
 }
 
+static FILE *qlr_native_shim_open_contract_log(void) {
+    if (qlr_native_contract_handle) {
+        return qlr_native_contract_handle;
+    }
+
+    if (!qlr_native_shim_ensure_directory_for_path(qlr_native_contract_path)) {
+        return NULL;
+    }
+
+    if (!qlr_native_contract_truncated) {
+        FILE *truncate = fopen(qlr_native_contract_path, "w");
+        if (truncate) {
+            fclose(truncate);
+        }
+        qlr_native_contract_truncated = true;
+    }
+
+    qlr_native_contract_handle = fopen(qlr_native_contract_path, "a");
+    if (qlr_native_contract_handle) {
+        setvbuf(qlr_native_contract_handle, NULL, _IONBF, 0);
+    }
+    return qlr_native_contract_handle;
+}
+
 void qlr_native_shim_reset_log(void) {
     if (qlr_native_log_handle) {
         fclose(qlr_native_log_handle);
@@ -115,6 +139,13 @@ void qlr_native_shim_reset_log(void) {
     }
     qlr_native_log_truncated = false;
     qlr_native_shim_open_log();
+
+    if (qlr_native_contract_handle) {
+        fclose(qlr_native_contract_handle);
+        qlr_native_contract_handle = NULL;
+    }
+    qlr_native_contract_truncated = false;
+    qlr_native_shim_open_contract_log();
 }
 
 void qlr_native_shim_close(void) {
@@ -122,11 +153,18 @@ void qlr_native_shim_close(void) {
         fclose(qlr_native_log_handle);
         qlr_native_log_handle = NULL;
     }
+    if (qlr_native_contract_handle) {
+        fclose(qlr_native_contract_handle);
+        qlr_native_contract_handle = NULL;
+    }
 }
 
 void qlr_native_shim_flush(void) {
     if (qlr_native_log_handle) {
         fflush(qlr_native_log_handle);
+    }
+    if (qlr_native_contract_handle) {
+        fflush(qlr_native_contract_handle);
     }
 }
 
@@ -162,14 +200,31 @@ void qlr_native_shim_logf(const char *module, const char *symbol, const char *fm
 
 void qlr_native_shim_log_syscall(const char *module, int command, size_t argc, const intptr_t *argv) {
     FILE *stream = qlr_native_shim_open_log();
-    if (!stream) {
+    if (stream) {
+        qlr_native_shim_write_prefix(stream, module, "syscall");
+        fprintf(stream, "cmd=0x%X argc=%zu", command, argc);
+        for (size_t index = 0; index < argc; ++index) {
+            fprintf(stream, " arg%zu=0x%lX", index, (unsigned long)argv[index]);
+        }
+        fputc('\n', stream);
+    }
+
+    FILE *contract = qlr_native_shim_open_contract_log();
+    if (!contract) {
         return;
     }
 
-    qlr_native_shim_write_prefix(stream, module, "syscall");
-    fprintf(stream, "cmd=0x%X argc=%zu", command, argc);
-    for (size_t index = 0; index < argc; ++index) {
-        fprintf(stream, " arg%zu=0x%lX", index, (unsigned long)argv[index]);
+    const size_t max_args = 16;
+    size_t count = argc < max_args ? argc : max_args;
+
+    if (!module) {
+        module = "unknown";
     }
-    fputc('\n', stream);
+
+    fprintf(contract, "shim-native %s", module);
+    for (size_t index = 0; index < count; ++index) {
+        unsigned int value = (unsigned int)(uintptr_t)argv[index];
+        fprintf(contract, " %08x", value);
+    }
+    fputc('\n', contract);
 }
