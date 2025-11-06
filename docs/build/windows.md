@@ -16,7 +16,9 @@ the produced DLLs match the shipping runtime.【F:src/code/game/qagamex86.vcxpro
 
 ## Building from the command line
 
-Use the new project names as MSBuild targets when producing the native DLL set:
+Use the new project names as MSBuild targets when producing the native DLL set.
+These `/t:` selectors are the switches that route MSBuild toward the
+corresponding pipeline:
 
 ```powershell
 msbuild src\code\quake3.sln /t:qagamex86;cgamex86;uix86 /p:Configuration=Release /p:Platform=Win32
@@ -33,8 +35,9 @@ msbuild src\code\quake3.sln /t:game;cgame;q3_ui /p:Configuration=Release /p:Plat
 ## Verifying incremental builds
 
 To confirm that MSBuild’s tracking stays intact for both pipelines, run each set
-of targets twice in a row. The second invocation should report that every
-project is already up to date:
+of switches twice in a row. The second invocation should report that every
+project is already up to date (look for "Project is up-to-date" or "Skipping
+project" in the output):
 
 ```powershell
 msbuild src\code\quake3.sln /t:qagamex86;cgamex86;uix86 /p:Configuration=Debug /p:Platform=Win32

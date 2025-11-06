@@ -64,32 +64,11 @@
   <PropertyGroup>
     <_ProjectFileVersion>17.0.34511.75</_ProjectFileVersion>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'">
-    <OutDir>$(SolutionDir)..\..\build\win32-native\cgamex86\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)build\cgamex86\$(Configuration)\</IntDir>
+  <PropertyGroup Condition="'$(Platform)'=='Win32'">
+    <OutDir>$(SolutionDir)..\..\build\win32-native\$(ProjectName)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)build\$(ProjectName)\$(Configuration)\</IntDir>
     <LinkIncremental>false</LinkIncremental>
-    <TargetName>cgamex86</TargetName>
-    <TargetExt>.dll</TargetExt>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(SolutionDir)..\..\build\win32-native\cgamex86\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)build\cgamex86\$(Configuration)\</IntDir>
-    <LinkIncremental>false</LinkIncremental>
-    <TargetName>cgamex86</TargetName>
-    <TargetExt>.dll</TargetExt>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(SolutionDir)..\..\build\win32-native\cgamex86\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)build\cgamex86\$(Configuration)\</IntDir>
-    <LinkIncremental>false</LinkIncremental>
-    <TargetName>cgamex86</TargetName>
-    <TargetExt>.dll</TargetExt>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug TA|Win32'">
-    <OutDir>$(SolutionDir)..\..\build\win32-native\cgamex86\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)build\cgamex86\$(Configuration)\</IntDir>
-    <LinkIncremental>false</LinkIncremental>
-    <TargetName>cgamex86</TargetName>
+    <TargetName>$(ProjectName)</TargetName>
     <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'">
