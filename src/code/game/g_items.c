@@ -206,6 +206,20 @@ int Pickup_Holdable( gentity_t *ent, gentity_t *other ) {
 
 //======================================================================
 
+static qboolean G_FactoryAmmoPacksEnabled( void ) {
+	return ( g_factoryCvarConfig.ammoPackEnabled || g_factoryCvarConfig.ammoPackHackEnabled ) ? qtrue : qfalse;
+}
+
+static int G_GetConfiguredAmmoRespawnSeconds( void ) {
+	int respawn = g_factoryCvarConfig.ammoRespawnSeconds;
+
+	if ( respawn <= 0 ) {
+		respawn = RESPAWN_AMMO;
+	}
+
+	return respawn;
+}
+
 static int G_GetAmmoItemDefaultQuantity( weapon_t weapon ) {
 	const gitem_t *item;
 
@@ -229,6 +243,10 @@ static int G_GetAmmoPackPickupCount( weapon_t weapon, int fallback ) {
 		return fallback;
 	}
 
+	if ( !G_FactoryAmmoPacksEnabled() ) {
+		return fallback;
+	}
+
 	configured = g_ammoPackConfig.weaponPickup[weapon];
 	if ( configured <= 0 ) {
 		return fallback;
@@ -242,6 +260,14 @@ static int G_GetAmmoPackMaxStack( weapon_t weapon, int fallbackPack ) {
 
 	if ( fallbackPack <= 0 ) {
 		fallbackPack = G_GetAmmoItemDefaultQuantity( weapon );
+	}
+
+	if ( !G_FactoryAmmoPacksEnabled() ) {
+		if ( fallbackPack <= 0 ) {
+			return 0;
+		}
+
+		return fallbackPack * 4;
 	}
 
 	if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
@@ -313,7 +339,8 @@ void Add_Ammo (gentity_t *ent, int weapon, int count)
 
 int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 {
-	int		quantity;
+	int			quantity;
+	int			respawn;
 
 	quantity = G_ResolveAmmoPickupAmount( ent );
 
@@ -323,7 +350,16 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 
 	Add_Ammo (other, ent->item->giTag, quantity);
 
-	return RESPAWN_AMMO;
+	respawn = G_GetConfiguredAmmoRespawnSeconds();
+	if ( respawn <= 0 ) {
+		respawn = RESPAWN_AMMO;
+	}
+
+	if ( level.suddenDeathActive && !g_factoryCvarConfig.suddenDeathRespawn ) {
+		return 0;
+	}
+
+	return respawn;
 }
 
 //======================================================================

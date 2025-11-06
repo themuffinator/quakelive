@@ -31,6 +31,7 @@ weaponConfig_t	g_weaponConfig;
 weaponReloadConfig_t	g_weaponReloadConfig;
 knockbackConfig_t	g_knockbackConfig;
 ammoPackConfig_t	g_ammoPackConfig;
+factoryCvarConfig_t	g_factoryCvarConfig;
 startingAmmoConfig_t	g_startingAmmoConfig;
 #define STRINGIZE_HELPER( x ) #x
 #define STRINGIZE( x ) STRINGIZE_HELPER( x )
@@ -98,6 +99,13 @@ startingAmmoConfig_t	g_startingAmmoConfig;
 #define DEFAULT_AMMOPACK_RG                 10
 #define DEFAULT_AMMOPACK_RL                 5
 #define DEFAULT_AMMOPACK_SG                 10
+
+#define DEFAULT_STARTING_WEAPONS_MASK      ( ( 1 << ( WP_GAUNTLET - 1 ) ) | ( 1 << ( WP_MACHINEGUN - 1 ) ) )
+#define DEFAULT_INFINITE_AMMO              0
+#define DEFAULT_AMMO_PACK_TOGGLE           0
+#define DEFAULT_AMMO_PACK_HACK             0
+#define DEFAULT_AMMO_RESPAWN_SECONDS       40
+#define DEFAULT_SUDDEN_DEATH_RESPAWN       0
 
 typedef struct {
 	vmCvar_t	*vmCvar;
@@ -232,6 +240,12 @@ vmCvar_t	weapon_reload_ng;
 vmCvar_t	weapon_reload_prox;
 vmCvar_t	weapon_reload_cg;
 vmCvar_t	weapon_reload_hmg;
+vmCvar_t	g_startingWeapons;
+vmCvar_t	g_infiniteAmmo;
+vmCvar_t	g_ammoPack;
+vmCvar_t	g_ammoPackHack;
+vmCvar_t	g_ammoRespawn;
+vmCvar_t	g_suddenDeathRespawn;
 vmCvar_t	g_ammoPack_bfg;
 vmCvar_t	g_ammoPack_cg;
 vmCvar_t	g_ammoPack_gl;
@@ -390,6 +404,12 @@ static cvarTable_t		gameCvarTable[] = {
         { &weapon_reload_cg, "weapon_reload_cg", "0", 0, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
         { &weapon_reload_hmg, "weapon_reload_hmg", "0", 0, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
 
+        { &g_startingWeapons, "g_startingWeapons", STRINGIZE( DEFAULT_STARTING_WEAPONS_MASK ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Bitmask describing which weapons players spawn with; bit (weapon-1) matches the WP_* enum used by Quake Live factories." },
+        { &g_infiniteAmmo, "g_infiniteAmmo", STRINGIZE( DEFAULT_INFINITE_AMMO ), CVAR_ARCHIVE, 0, qfalse, qfalse, "When non-zero, spawn loadouts grant infinite ammunition mirroring Quake Live practice factories." },
+        { &g_ammoPack, "g_ammoPack", STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable Quake Live ammo pack sizing so pickups follow factory scripts instead of compiled defaults." },
+        { &g_ammoPackHack, "g_ammoPackHack", STRINGIZE( DEFAULT_AMMO_PACK_HACK ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Legacy Quake Live ammo pack override used by classic map factories." },
+        { &g_ammoRespawn, "g_ammoRespawn", STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds before ammo entities respawn; Quake Live factories reduce this for faster loops." },
+        { &g_suddenDeathRespawn, "g_suddenDeathRespawn", STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
         { &g_ammoPack_bfg, "g_ammoPack_bfg", STRINGIZE( DEFAULT_AMMOPACK_BFG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Cells granted when picking up a BFG ammo pack, matching Quake Live's default drop." },
         { &g_ammoPack_cg, "g_ammoPack_cg", STRINGIZE( DEFAULT_AMMOPACK_CG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Chaingun bullets restored per ammo belt pickup." },
         { &g_ammoPack_gl, "g_ammoPack_gl", STRINGIZE( DEFAULT_AMMOPACK_GL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grenade Launcher rounds provided by grenade ammo packs." },
@@ -596,6 +616,114 @@ void G_InitAmmoPackConfig( void ) {
 
 void G_UpdateAmmoPackConfig( void ) {
 	G_InitAmmoPackConfig();
+}
+
+static int G_ReadFactoryIntCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+	if ( !cvar ) {
+		G_ReportMissingCvar( cvarName );
+		return fallback;
+	}
+
+	return cvar->integer;
+}
+
+static qboolean G_ReadFactoryBoolCvar( const vmCvar_t *cvar, qboolean fallback, const char *cvarName ) {
+	int value = G_ReadFactoryIntCvar( cvar, fallback ? 1 : 0, cvarName );
+
+	return value ? qtrue : qfalse;
+}
+
+static int G_ReadStartingWeaponsMaskCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+	int mask = G_ReadFactoryIntCvar( cvar, fallback, cvarName );
+
+	if ( mask < 0 ) {
+		mask = 0;
+	}
+
+	return mask;
+}
+
+static unsigned int G_ComputeStartingWeaponsStatMask( int mask ) {
+	unsigned int statMask = 0;
+	weapon_t weapon;
+
+	if ( mask <= 0 ) {
+		return 0;
+	}
+
+	for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; ++weapon ) {
+		int cvarBit = 1 << ( weapon - 1 );
+
+		if ( mask & cvarBit ) {
+			statMask |= 1u << weapon;
+		}
+	}
+
+	return statMask;
+}
+
+static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {
+	factoryCvarConfig_t config;
+
+	config.startingWeaponsMask = G_ReadStartingWeaponsMaskCvar( &g_startingWeapons, DEFAULT_STARTING_WEAPONS_MASK, "g_startingWeapons" );
+	config.startingWeaponsStatMask = G_ComputeStartingWeaponsStatMask( config.startingWeaponsMask );
+	if ( config.startingWeaponsStatMask == 0 ) {
+		config.startingWeaponsMask = DEFAULT_STARTING_WEAPONS_MASK;
+		config.startingWeaponsStatMask = G_ComputeStartingWeaponsStatMask( config.startingWeaponsMask );
+	}
+
+	config.infiniteAmmo = G_ReadFactoryBoolCvar( &g_infiniteAmmo, DEFAULT_INFINITE_AMMO, "g_infiniteAmmo" );
+	config.ammoPackEnabled = G_ReadFactoryBoolCvar( &g_ammoPack, DEFAULT_AMMO_PACK_TOGGLE, "g_ammoPack" );
+	config.ammoPackHackEnabled = G_ReadFactoryBoolCvar( &g_ammoPackHack, DEFAULT_AMMO_PACK_HACK, "g_ammoPackHack" );
+	config.ammoRespawnSeconds = G_ReadFactoryIntCvar( &g_ammoRespawn, DEFAULT_AMMO_RESPAWN_SECONDS, "g_ammoRespawn" );
+	if ( config.ammoRespawnSeconds <= 0 ) {
+		config.ammoRespawnSeconds = DEFAULT_AMMO_RESPAWN_SECONDS;
+	}
+
+	config.suddenDeathRespawn = G_ReadFactoryBoolCvar( &g_suddenDeathRespawn, DEFAULT_SUDDEN_DEATH_RESPAWN, "g_suddenDeathRespawn" );
+
+	return config;
+}
+
+static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfig_t *config ) {
+	if ( !reason || !config ) {
+		return;
+	}
+
+	G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i suddenDeathRespawn=%i\n",
+		reason,
+		config->startingWeaponsMask,
+		config->startingWeaponsStatMask,
+		config->infiniteAmmo,
+		config->ammoPackEnabled,
+		config->ammoPackHackEnabled,
+		config->ammoRespawnSeconds,
+		config->suddenDeathRespawn );
+}
+
+static factoryCvarConfig_t s_reportedFactoryConfig;
+
+void G_InitFactoryCvarConfig( void ) {
+	g_factoryCvarConfig = G_LoadFactoryCvarConfig();
+	s_reportedFactoryConfig = g_factoryCvarConfig;
+	G_LogFactoryLoadoutState( "init", &g_factoryCvarConfig );
+}
+
+void G_UpdateFactoryCvarConfig( void ) {
+	factoryCvarConfig_t config = G_LoadFactoryCvarConfig();
+
+	if ( config.startingWeaponsMask != s_reportedFactoryConfig.startingWeaponsMask
+		|| config.startingWeaponsStatMask != s_reportedFactoryConfig.startingWeaponsStatMask
+		|| config.infiniteAmmo != s_reportedFactoryConfig.infiniteAmmo
+		|| config.ammoPackEnabled != s_reportedFactoryConfig.ammoPackEnabled
+		|| config.ammoPackHackEnabled != s_reportedFactoryConfig.ammoPackHackEnabled
+		|| config.ammoRespawnSeconds != s_reportedFactoryConfig.ammoRespawnSeconds
+		|| config.suddenDeathRespawn != s_reportedFactoryConfig.suddenDeathRespawn ) {
+		G_LogFactoryLoadoutState( "update", &config );
+		s_reportedFactoryConfig = config;
+	}
+
+	g_factoryCvarConfig = config;
 }
 
 static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
@@ -859,6 +987,7 @@ void G_RegisterCvars( void ) {
 	G_InitKnockbackConfig();
 	G_InitStartingAmmoConfig();
 	G_InitAmmoPackConfig();
+	G_InitFactoryCvarConfig();
 }
 
 void G_UpdateCvars( void ) {
@@ -894,6 +1023,7 @@ void G_UpdateCvars( void ) {
 	G_UpdateKnockbackConfig();
 	G_UpdateStartingAmmoConfig();
 	G_UpdateAmmoPackConfig();
+	G_UpdateFactoryCvarConfig();
 }
 
 /*
@@ -1820,9 +1950,22 @@ void CheckExitRules( void ) {
 	}
 
 	// check for sudden death
-	if ( ScoreIsTied() ) {
-		// always wait for sudden death
-		return;
+	{
+		qboolean suddenDeath = ScoreIsTied();
+
+		if ( level.suddenDeathActive != suddenDeath ) {
+			level.suddenDeathActive = suddenDeath;
+
+			if ( suddenDeath ) {
+				G_Printf( "Sudden death engaged (ammo respawn %s).\n", g_factoryCvarConfig.suddenDeathRespawn ? "active" : "paused" );
+			} else {
+				G_Printf( "Sudden death cleared; ammo respawn resumes.\n" );
+			}
+		}
+
+		if ( suddenDeath ) {
+			return;
+		}
 	}
 
 	if ( g_timelimit.integer && !level.warmupTime ) {

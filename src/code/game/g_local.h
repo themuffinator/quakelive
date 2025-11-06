@@ -102,6 +102,20 @@ extern ammoPackConfig_t g_ammoPackConfig;
 void G_InitAmmoPackConfig( void );
 void G_UpdateAmmoPackConfig( void );
 
+typedef struct factoryCvarConfig_s {
+	int		startingWeaponsMask;
+	unsigned int	startingWeaponsStatMask;
+	qboolean	infiniteAmmo;
+	qboolean	ammoPackEnabled;
+	qboolean	ammoPackHackEnabled;
+	int		ammoRespawnSeconds;
+	qboolean	suddenDeathRespawn;
+} factoryCvarConfig_t;
+
+extern factoryCvarConfig_t g_factoryCvarConfig;
+void G_InitFactoryCvarConfig( void );
+void G_UpdateFactoryCvarConfig( void );
+
 typedef struct startingAmmoConfig_s {
 	int		bfg;
 	int		chaingun;
@@ -519,6 +533,7 @@ typedef struct {
 #ifdef MISSIONPACK
 	int			portalSequence;
 #endif
+	qboolean	suddenDeathActive;
 } level_locals_t;
 
 
