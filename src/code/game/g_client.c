@@ -1263,6 +1263,87 @@ void ClientBegin( int clientNum ) {
 }
 
 /*
+==============================
+G_GetConfiguredSpawnAmmo
+
+Consolidate g_startingAmmo_* lookups so every spawn loadout path
+(g_startingWeapons, factories, scripted grants) applies the same
+clamps and "infinite" semantics.
+==============================
+*/
+static int G_GetConfiguredSpawnAmmo( weapon_t weapon ) {
+        int ammo;
+
+        switch ( weapon ) {
+        case WP_NONE:
+                return 0;
+        case WP_GAUNTLET:
+                ammo = g_startingAmmoConfig.gauntlet;
+                break;
+        case WP_MACHINEGUN:
+                ammo = g_startingAmmoConfig.machinegun;
+                break;
+        case WP_SHOTGUN:
+                ammo = g_startingAmmoConfig.shotgun;
+                break;
+        case WP_GRENADE_LAUNCHER:
+                ammo = g_startingAmmoConfig.grenadeLauncher;
+                break;
+        case WP_ROCKET_LAUNCHER:
+                ammo = g_startingAmmoConfig.rocketLauncher;
+                break;
+        case WP_LIGHTNING:
+                ammo = g_startingAmmoConfig.lightningGun;
+                break;
+        case WP_RAILGUN:
+                ammo = g_startingAmmoConfig.railgun;
+                break;
+        case WP_PLASMAGUN:
+                ammo = g_startingAmmoConfig.plasmagun;
+                break;
+        case WP_BFG:
+                ammo = g_startingAmmoConfig.bfg;
+                break;
+        case WP_GRAPPLING_HOOK:
+                ammo = g_startingAmmoConfig.grapplingHook;
+                break;
+#ifdef MISSIONPACK
+        case WP_NAILGUN:
+                ammo = g_startingAmmoConfig.nailgun;
+                break;
+        case WP_PROX_LAUNCHER:
+                ammo = g_startingAmmoConfig.proximityLauncher;
+                break;
+        case WP_CHAINGUN:
+                ammo = g_startingAmmoConfig.chaingun;
+                break;
+#endif
+#ifdef WP_HEAVY_MACHINEGUN
+        case WP_HEAVY_MACHINEGUN:
+                ammo = g_startingAmmoConfig.heavyMachinegun;
+                break;
+#endif
+        default:
+                return 0;
+        }
+
+        // -1 retains the INFINITE semantics expected by pmove and weapon fire; see g_startingAmmo_* CVars.
+        if ( ammo < 0 ) {
+                return -1;
+        }
+
+        return ammo;
+}
+
+static void G_SeedConfiguredSpawnAmmo( playerState_t *ps, weapon_t weapon ) {
+        if ( !ps || weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+                return;
+        }
+
+        ps->ammo[weapon] = G_GetConfiguredSpawnAmmo( weapon );
+}
+
+/*
 ===========
 ClientSpawn
 
@@ -1399,12 +1480,15 @@ void ClientSpawn(gentity_t *ent) {
 
 	client->ps.clientNum = index;
 
-	client->ps.stats[STAT_WEAPONS] = ( 1 << WP_MACHINEGUN );
-	client->ps.ammo[WP_MACHINEGUN] = g_startingAmmoConfig.machinegun;
+        client->ps.stats[STAT_WEAPONS] = ( 1 << WP_MACHINEGUN );
+        // g_startingAmmo_mg keeps g_startingWeapons, factory, and script loadouts aligned with machinegun spawns.
+        G_SeedConfiguredSpawnAmmo( &client->ps, WP_MACHINEGUN );
 
-	client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GAUNTLET );
-	client->ps.ammo[WP_GAUNTLET] = g_startingAmmoConfig.gauntlet;
-	client->ps.ammo[WP_GRAPPLING_HOOK] = g_startingAmmoConfig.grapplingHook;
+        client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GAUNTLET );
+        // g_startingAmmo_g drives melee spawn tuning across g_startingWeapons, factories, and scripted loadouts.
+        G_SeedConfiguredSpawnAmmo( &client->ps, WP_GAUNTLET );
+        // g_startingAmmo_gh defines the grapple stack whenever g_startingWeapons, factories, or scripts include it.
+        G_SeedConfiguredSpawnAmmo( &client->ps, WP_GRAPPLING_HOOK );
 
 	// health will count down towards max_health
 	ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
