@@ -1,5 +1,18 @@
 #include "fixture_runner.h"
+
+#if defined(__has_include)
+#if __has_include("bg_public.h")
+#include "bg_public.h"
+#elif __has_include("../code/game/bg_public.h")
+#include "../code/game/bg_public.h"
+#elif __has_include("../../code/game/bg_public.h")
 #include "../../code/game/bg_public.h"
+#else
+#error "Unable to locate bg_public.h for sample fixtures"
+#endif
+#else
+#include "../../code/game/bg_public.h"
+#endif
 
 #include <string.h>
 

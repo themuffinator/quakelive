@@ -11,7 +11,9 @@ active.
 - `fixture_runner.h` / `fixture_runner.c` provide a minimal runner that executes
   `game_fixture_t` definitions. The runner exposes `GT_RunFixtureSuite()` for
   invoking suites, `GT_Failf()` for emitting assertion messages, and
-  `GT_InitDefaultReporter()` for trap-print based logging.
+  `GT_InitDefaultReporter()` for trap-print based logging. The headers probe for
+  shared engine includes (`g_local.h`, `bg_public.h`) with `__has_include` so
+  the same sources compile when invoked from the DLL or QVM toolchains.
 - `syscall_mocks.h` / `syscall_mocks.c` bind the exported `trap_*` surface to a
   configurable handler. When no handler is installed, a default implementation
   logs `G_PRINT`/`G_ERROR` calls to the host console so that native test binaries
