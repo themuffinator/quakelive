@@ -160,7 +160,24 @@ void CG_ParseServerinfo( void ) {
 	trap_Cvar_Set("g_redTeam", cgs.redTeam);
 	Q_strncpyz( cgs.blueTeam, Info_ValueForKey( info, "g_blueTeam" ), sizeof(cgs.blueTeam) );
 	trap_Cvar_Set("g_blueTeam", cgs.blueTeam);
+
+	cgs.weaponReloadConfig.gauntlet = atoi( Info_ValueForKey( info, "weapon_reload_gauntlet" ) );
+	cgs.weaponReloadConfig.machinegun = atoi( Info_ValueForKey( info, "weapon_reload_mg" ) );
+	cgs.weaponReloadConfig.heavyMachinegun = atoi( Info_ValueForKey( info, "weapon_reload_hmg" ) );
+	cgs.weaponReloadConfig.shotgun = atoi( Info_ValueForKey( info, "weapon_reload_sg" ) );
+	cgs.weaponReloadConfig.grenadeLauncher = atoi( Info_ValueForKey( info, "weapon_reload_gl" ) );
+	cgs.weaponReloadConfig.rocketLauncher = atoi( Info_ValueForKey( info, "weapon_reload_rl" ) );
+	cgs.weaponReloadConfig.lightningGun = atoi( Info_ValueForKey( info, "weapon_reload_lg" ) );
+	cgs.weaponReloadConfig.railgun = atoi( Info_ValueForKey( info, "weapon_reload_rg" ) );
+	cgs.weaponReloadConfig.plasmagun = atoi( Info_ValueForKey( info, "weapon_reload_pg" ) );
+	cgs.weaponReloadConfig.bfg = atoi( Info_ValueForKey( info, "weapon_reload_bfg" ) );
+	cgs.weaponReloadConfig.grapplingHook = atoi( Info_ValueForKey( info, "weapon_reload_gh" ) );
+	cgs.weaponReloadConfig.hook = atoi( Info_ValueForKey( info, "weapon_reload_hook" ) );
+	cgs.weaponReloadConfig.nailgun = atoi( Info_ValueForKey( info, "weapon_reload_ng" ) );
+	cgs.weaponReloadConfig.proximityLauncher = atoi( Info_ValueForKey( info, "weapon_reload_prox" ) );
+	cgs.weaponReloadConfig.chaingun = atoi( Info_ValueForKey( info, "weapon_reload_cg" ) );
 }
+
 
 /*
 ==================

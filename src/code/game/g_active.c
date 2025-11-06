@@ -340,6 +340,7 @@ void SpectatorThink( gentity_t *ent, usercmd_t *ucmd ) {
 		pm.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;	// spectators can fly through bodies
 		pm.trace = trap_Trace;
 		pm.pointcontents = trap_PointContents;
+		pm.weaponReloads = &g_weaponReloadConfig;
 
 		// perform a pmove
 		Pmove (&pm);
@@ -915,6 +916,7 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 	pm.trace = trap_Trace;
 	pm.pointcontents = trap_PointContents;
+	pm.weaponReloads = &g_weaponReloadConfig;
 	pm.debugLevel = g_debugMove.integer;
 	pm.noFootsteps = ( g_dmflags.integer & DF_NO_FOOTSTEPS ) > 0;
 

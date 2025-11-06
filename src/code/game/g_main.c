@@ -416,21 +416,21 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_splashDamage_bfg, "g_splashDamage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashRadius_bfg, "g_splashRadius_bfg", "120", 0, 0, qtrue },
 
-	{ &weapon_reload_gauntlet, "weapon_reload_gauntlet", "0", 0, 0, qfalse, qfalse, "Gauntlet refire delay override in milliseconds; 0 preserves the compiled behaviour." },
-	{ &weapon_reload_mg, "weapon_reload_mg", "0", 0, 0, qfalse, qfalse, "Machinegun refire delay override in milliseconds; 0 keeps the built-in rate." },
-	{ &weapon_reload_sg, "weapon_reload_sg", "0", 0, 0, qfalse, qfalse, "Shotgun refire delay override in milliseconds; 0 leaves the default timing." },
-	{ &weapon_reload_gl, "weapon_reload_gl", "0", 0, 0, qfalse, qfalse, "Grenade Launcher refire delay override in milliseconds." },
-	{ &weapon_reload_rl, "weapon_reload_rl", "0", 0, 0, qfalse, qfalse, "Rocket Launcher refire delay override in milliseconds." },
-	{ &weapon_reload_lg, "weapon_reload_lg", "0", 0, 0, qfalse, qfalse, "Lightning Gun refire delay override in milliseconds." },
-	{ &weapon_reload_rg, "weapon_reload_rg", "0", 0, 0, qfalse, qfalse, "Railgun refire delay override in milliseconds." },
-	{ &weapon_reload_pg, "weapon_reload_pg", "0", 0, 0, qfalse, qfalse, "Plasma Gun refire delay override in milliseconds." },
-	{ &weapon_reload_bfg, "weapon_reload_bfg", "0", 0, 0, qfalse, qfalse, "BFG refire delay override in milliseconds." },
-	{ &weapon_reload_gh, "weapon_reload_gh", "0", 0, 0, qfalse, qfalse, "Grappling Hook refire delay override in milliseconds." },
-	{ &weapon_reload_hook, "weapon_reload_hook", "0", 0, 0, qfalse, qfalse, "Hook pull refire delay override in milliseconds." },
-	{ &weapon_reload_ng, "weapon_reload_ng", "0", 0, 0, qfalse, qfalse, "Nailgun refire delay override in milliseconds." },
-	{ &weapon_reload_prox, "weapon_reload_prox", "0", 0, 0, qfalse, qfalse, "Proximity Launcher refire delay override in milliseconds." },
-        { &weapon_reload_cg, "weapon_reload_cg", "0", 0, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
-        { &weapon_reload_hmg, "weapon_reload_hmg", "0", 0, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
+	{ &weapon_reload_gauntlet, "weapon_reload_gauntlet", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Gauntlet refire delay override in milliseconds; 0 preserves the compiled behaviour." },
+	{ &weapon_reload_mg, "weapon_reload_mg", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Machinegun refire delay override in milliseconds; 0 keeps the built-in rate." },
+	{ &weapon_reload_sg, "weapon_reload_sg", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Shotgun refire delay override in milliseconds; 0 leaves the default timing." },
+	{ &weapon_reload_gl, "weapon_reload_gl", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Grenade Launcher refire delay override in milliseconds." },
+	{ &weapon_reload_rl, "weapon_reload_rl", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Rocket Launcher refire delay override in milliseconds." },
+	{ &weapon_reload_lg, "weapon_reload_lg", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Lightning Gun refire delay override in milliseconds." },
+	{ &weapon_reload_rg, "weapon_reload_rg", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Railgun refire delay override in milliseconds." },
+	{ &weapon_reload_pg, "weapon_reload_pg", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Plasma Gun refire delay override in milliseconds." },
+	{ &weapon_reload_bfg, "weapon_reload_bfg", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "BFG refire delay override in milliseconds." },
+	{ &weapon_reload_gh, "weapon_reload_gh", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Grappling Hook refire delay override in milliseconds." },
+	{ &weapon_reload_hook, "weapon_reload_hook", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Hook pull refire delay override in milliseconds." },
+	{ &weapon_reload_ng, "weapon_reload_ng", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Nailgun refire delay override in milliseconds." },
+	{ &weapon_reload_prox, "weapon_reload_prox", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Proximity Launcher refire delay override in milliseconds." },
+        { &weapon_reload_cg, "weapon_reload_cg", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
+        { &weapon_reload_hmg, "weapon_reload_hmg", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
 
         { &g_startingWeapons, "g_startingWeapons", STRINGIZE( DEFAULT_STARTING_WEAPONS_MASK ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Bitmask describing which weapons players spawn with; bit (weapon-1) matches the WP_* enum used by Quake Live factories." },
         { &g_infiniteAmmo, "g_infiniteAmmo", STRINGIZE( DEFAULT_INFINITE_AMMO ), CVAR_ARCHIVE, 0, qfalse, qfalse, "When non-zero, spawn loadouts grant infinite ammunition mirroring Quake Live practice factories." },
@@ -517,7 +517,7 @@ static int G_ReadWeaponCvar( const vmCvar_t *cvar, int fallback, const char *cva
                 return fallback;
         }
 
-        if ( cvar->integer <= 0 ) {
+        if ( cvar->integer < 0 ) {
                 return fallback;
         }
 

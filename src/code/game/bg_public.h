@@ -190,6 +190,8 @@ typedef struct {
 	// these will be different functions during game and cgame
 	void		(*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
 	int			(*pointcontents)( const vec3_t point, int passEntityNum );
+
+	const weaponReloadConfig_t	*weaponReloads;
 } pmove_t;
 
 // if a full pmove isn't done on the client, you can just update the angles
@@ -305,10 +307,10 @@ typedef enum {
 typedef enum {
 	WP_NONE,
 
-       WP_GAUNTLET,
-       WP_MACHINEGUN,
-       WP_HEAVY_MACHINEGUN,
-       WP_SHOTGUN,
+	WP_GAUNTLET,
+	WP_MACHINEGUN,
+	WP_HEAVY_MACHINEGUN,
+	WP_SHOTGUN,
 	WP_GRENADE_LAUNCHER,
 	WP_ROCKET_LAUNCHER,
 	WP_LIGHTNING,
@@ -322,8 +324,26 @@ typedef enum {
 	WP_CHAINGUN,
 #endif
 
-       WP_NUM_WEAPONS
+	WP_NUM_WEAPONS
 } weapon_t;
+
+typedef struct weaponReloadConfig_s {
+        int             gauntlet;
+        int             machinegun;
+        int             shotgun;
+        int             grenadeLauncher;
+        int             rocketLauncher;
+        int             lightningGun;
+        int             railgun;
+        int             plasmagun;
+        int             bfg;
+        int             grapplingHook;
+        int             hook;
+        int             nailgun;
+        int             proximityLauncher;
+        int             chaingun;
+        int             heavyMachinegun;
+} weaponReloadConfig_t;
 
 
 // reward sounds (stored in ps->persistant[PERS_PLAYEREVENTS])
@@ -656,6 +676,9 @@ gitem_t	*BG_FindItemForWeapon( weapon_t weapon );
 gitem_t	*BG_FindItemForPowerup( powerup_t pw );
 gitem_t	*BG_FindItemForHoldable( holdable_t pw );
 #define	ITEM_INDEX(x) ((x)-bg_itemlist)
+
+int BG_GetWeaponReloadTime( weapon_t weapon, const weaponReloadConfig_t *config );
+int BG_GetDefaultWeaponReloadTime( weapon_t weapon );
 
 qboolean	BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const playerState_t *ps );
 

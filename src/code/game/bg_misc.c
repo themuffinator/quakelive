@@ -1634,3 +1634,104 @@ void BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s
 	s->loopSound = ps->loopSound;
 	s->generic1 = ps->generic1;
 }
+
+int BG_GetDefaultWeaponReloadTime( weapon_t weapon ) {
+	switch ( weapon ) {
+	case WP_GAUNTLET:
+		return 400;
+	case WP_MACHINEGUN:
+		return 100;
+	case WP_HEAVY_MACHINEGUN:
+		return 75;
+	case WP_SHOTGUN:
+		return 1000;
+	case WP_GRENADE_LAUNCHER:
+		return 800;
+	case WP_ROCKET_LAUNCHER:
+		return 800;
+	case WP_LIGHTNING:
+		return 50;
+	case WP_RAILGUN:
+		return 1500;
+	case WP_PLASMAGUN:
+		return 100;
+	case WP_BFG:
+		return 200;
+	case WP_GRAPPLING_HOOK:
+		return 400;
+#ifdef MISSIONPACK
+	case WP_NAILGUN:
+		return 1000;
+	case WP_PROX_LAUNCHER:
+		return 800;
+	case WP_CHAINGUN:
+		return 30;
+#endif
+	case WP_NONE:
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+int BG_GetWeaponReloadTime( weapon_t weapon, const weaponReloadConfig_t *config ) {
+	int configured = 0;
+
+	if ( config ) {
+		switch ( weapon ) {
+		case WP_GAUNTLET:
+			configured = config->gauntlet;
+			break;
+		case WP_MACHINEGUN:
+			configured = config->machinegun;
+			break;
+		case WP_HEAVY_MACHINEGUN:
+			configured = config->heavyMachinegun;
+			break;
+		case WP_SHOTGUN:
+			configured = config->shotgun;
+			break;
+		case WP_GRENADE_LAUNCHER:
+			configured = config->grenadeLauncher;
+			break;
+		case WP_ROCKET_LAUNCHER:
+			configured = config->rocketLauncher;
+			break;
+		case WP_LIGHTNING:
+			configured = config->lightningGun;
+			break;
+		case WP_RAILGUN:
+			configured = config->railgun;
+			break;
+		case WP_PLASMAGUN:
+			configured = config->plasmagun;
+			break;
+		case WP_BFG:
+			configured = config->bfg;
+			break;
+		case WP_GRAPPLING_HOOK:
+			configured = config->grapplingHook;
+			break;
+#ifdef MISSIONPACK
+		case WP_NAILGUN:
+			configured = config->nailgun;
+			break;
+		case WP_PROX_LAUNCHER:
+			configured = config->proximityLauncher;
+			break;
+		case WP_CHAINGUN:
+			configured = config->chaingun;
+			break;
+#endif
+		default:
+			break;
+		}
+	}
+
+	if ( configured > 0 ) {
+		return configured;
+	}
+
+	return BG_GetDefaultWeaponReloadTime( weapon );
+}

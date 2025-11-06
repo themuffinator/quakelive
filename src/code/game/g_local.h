@@ -139,23 +139,6 @@ extern startingAmmoConfig_t g_startingAmmoConfig;
 void G_InitStartingAmmoConfig( void );
 void G_UpdateStartingAmmoConfig( void );
 
-typedef struct weaponReloadConfig_s {
-	int		gauntlet;
-	int		machinegun;
-	int		shotgun;
-	int		grenadeLauncher;
-	int		rocketLauncher;
-	int		lightningGun;
-	int		railgun;
-	int		plasmagun;
-	int		bfg;
-	int		grapplingHook;
-	int		hook;
-	int		nailgun;
-	int		proximityLauncher;
-	int		chaingun;
-	int		heavyMachinegun;
-} weaponReloadConfig_t;
 
 extern weaponReloadConfig_t g_weaponReloadConfig;
 void G_InitWeaponReloadConfig( void );

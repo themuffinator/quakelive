@@ -1015,6 +1015,7 @@ typedef struct {
 	char			redTeam[MAX_QPATH];
 	char			blueTeam[MAX_QPATH];
 
+	weaponReloadConfig_t	weaponReloadConfig;
 	int				voteTime;
 	int				voteYes;
 	int				voteNo;
