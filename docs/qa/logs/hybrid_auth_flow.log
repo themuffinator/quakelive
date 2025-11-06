@@ -1,0 +1,5 @@
+-- Scenario 2: Hybrid --
+[auth] Hybrid dispatch (/steam/session/validate): submitting credential
+[auth] Hybrid payload summary: ticket=retry:T…FFFF (len=21)
+[auth] Hybrid result -> outcome=success, message="Hybrid fallback accepted credential via open adapter (token=retry:T…FFFF)"
+

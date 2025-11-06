@@ -312,9 +312,14 @@ char	*modNames[] = {
 	"MOD_CHAINGUN",
 	"MOD_PROXIMITY_MINE",
 	"MOD_KAMIKAZE",
-	"MOD_JUICED",
+        "MOD_JUICED",
 #endif
-	"MOD_GRAPPLE"
+        "MOD_GRAPPLE",
+        "MOD_SWITCHTEAM",
+        "MOD_THAW",
+        "MOD_LIGHTNING_DISCHARGE",
+        "MOD_HMG",
+        "MOD_RAILGUN_HEADSHOT"
 };
 
 #ifdef MISSIONPACK
@@ -824,6 +829,8 @@ static float G_KnockbackScaleForMOD( int mod, qboolean selfInflicted ) {
                 return g_knockbackConfig.gauntlet;
         case MOD_MACHINEGUN:
                 return g_knockbackConfig.machinegun;
+        case MOD_HMG:
+                return g_knockbackConfig.heavyMachinegun;
         case MOD_SHOTGUN:
                 return g_knockbackConfig.shotgun;
         case MOD_GRENADE:
@@ -836,8 +843,10 @@ static float G_KnockbackScaleForMOD( int mod, qboolean selfInflicted ) {
         case MOD_PLASMA_SPLASH:
                 return selfInflicted ? g_knockbackConfig.plasmagunSelf : g_knockbackConfig.plasmagun;
         case MOD_LIGHTNING:
+        case MOD_LIGHTNING_DISCHARGE:
                 return g_knockbackConfig.lightningGun;
         case MOD_RAILGUN:
+        case MOD_RAILGUN_HEADSHOT:
                 return g_knockbackConfig.railgun;
         case MOD_BFG:
         case MOD_BFG_SPLASH:
@@ -863,8 +872,69 @@ static float G_KnockbackVerticalBoost( qboolean selfInflicted ) {
         return selfInflicted ? g_knockbackConfig.verticalSelf : g_knockbackConfig.vertical;
 }
 
+static float G_ApplyKnockbackCripple( gentity_t *targ, float knockbackValue, int dflags, float *outPenalty ) {
+        float penalty = 0.0f;
+
+        if ( outPenalty ) {
+                *outPenalty = 0.0f;
+        }
+
+        if ( g_knockbackConfig.cripple <= 0.0f || !targ || !targ->client ) {
+                return knockbackValue;
+        }
+
+        if ( ( targ->flags & FL_NO_KNOCKBACK ) || ( dflags & DAMAGE_NO_KNOCKBACK ) ) {
+                return knockbackValue;
+        }
+
+        if ( targ->health <= 0 ) {
+                return knockbackValue;
+        }
+
+        qboolean crouched = ( targ->client->ps.pm_flags & PMF_DUCKED ) ? qtrue : qfalse;
+        int maxHealth = targ->client->ps.stats[STAT_MAX_HEALTH];
+        int currentHealth = targ->client->ps.stats[STAT_HEALTH];
+        qboolean weakened = ( maxHealth > 0 && currentHealth > 0 && currentHealth < maxHealth ) ? qtrue : qfalse;
+
+        if ( !crouched && !weakened ) {
+                return knockbackValue;
+        }
+
+        {
+                float scale = 1.0f;
+
+                if ( crouched ) {
+                        scale -= g_knockbackConfig.cripple;
+                }
+
+                if ( weakened ) {
+                        float deficitFraction = (float)( maxHealth - currentHealth ) / (float)maxHealth;
+
+                        scale -= g_knockbackConfig.cripple * deficitFraction;
+                }
+
+                if ( scale < 0.0f ) {
+                        scale = 0.0f;
+                }
+
+                penalty = knockbackValue - ( knockbackValue * scale );
+        }
+
+        if ( penalty < 0.0f ) {
+                penalty = 0.0f;
+        } else if ( penalty > knockbackValue ) {
+                penalty = knockbackValue;
+        }
+
+        if ( outPenalty ) {
+                *outPenalty = penalty;
+        }
+
+        return knockbackValue - penalty;
+}
+
 void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
-			   vec3_t dir, vec3_t point, int damage, int dflags, int mod ) {
+                           vec3_t dir, vec3_t point, int damage, int dflags, int mod ) {
 	gclient_t	*client;
 	int			take;
 	int			save;
@@ -876,6 +946,11 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 #ifdef MISSIONPACK
 	vec3_t		bouncedir, impactpoint;
 #endif
+	float		knockbackScale = 1.0f;
+	float		cripplePenalty = 0.0f;
+	float		knockbackPreClamp = 0.0f;
+	float		knockbackMax = 0.0f;
+	float		verticalBoostApplied = 0.0f;
 
 	if (!targ->takedamage) {
 		return;
@@ -943,8 +1018,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		VectorNormalize(dir);
 	}
 
+	knockbackScale = G_KnockbackScaleForMOD( mod, selfInflicted );
 	knockbackValue = (float)damage;
-	knockbackValue *= G_KnockbackScaleForMOD( mod, selfInflicted );
+	knockbackValue *= knockbackScale;
+	knockbackValue = G_ApplyKnockbackCripple( targ, knockbackValue, dflags, &cripplePenalty );
 
 	{
 		float maxKnockback = g_knockbackConfig.maxKnockback;
@@ -952,6 +1029,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		if ( maxKnockback <= 0.0f ) {
 			maxKnockback = 200.0f;
 		}
+
+		knockbackPreClamp = knockbackValue;
+		knockbackMax = maxKnockback;
 
 		if ( knockbackValue > maxKnockback ) {
 			knockbackValue = maxKnockback;
@@ -963,6 +1043,11 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	}
 	if ( dflags & DAMAGE_NO_KNOCKBACK ) {
 		knockbackValue = 0.0f;
+	}
+
+	if ( g_debugDamage.integer ) {
+		G_Printf( "knockback summary: dmg=%d scale=%.2f cripple=%.2f preClamp=%.2f cap=%.2f final=%.2f vertical=%.2f self=%d mod=%d\n",
+				damage, knockbackScale, cripplePenalty, knockbackPreClamp, knockbackMax, knockbackValue, verticalBoostApplied, selfInflicted, mod );
 	}
 
 	knockbackInt = (int)( knockbackValue + 0.5f );
@@ -984,6 +1069,8 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			if ( verticalBoost != 0.0f ) {
 				kvel[2] += verticalBoost;
 			}
+
+			verticalBoostApplied = verticalBoost;
 		}
 		VectorAdd (targ->client->ps.velocity, kvel, targ->client->ps.velocity);
 
@@ -993,11 +1080,18 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			int		t;
 
 			t = (int)( knockbackValue * 2.0f );
-			if ( t < 50 ) {
-				t = 50;
+			if ( g_knockbackConfig.cripple > 0.0f ) {
+				int floorValue = (int)g_knockbackConfig.cripple;
+
+				if ( floorValue > t ) {
+					t = floorValue;
+				}
 			}
 			if ( t > 200 ) {
 				t = 200;
+			}
+			if ( t < 0 ) {
+				t = 0;
 			}
 			targ->client->ps.pm_time = t;
 			targ->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;

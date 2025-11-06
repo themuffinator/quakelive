@@ -1,0 +1,9 @@
+-- Scenario 3: Open Steam Adapter --
+[auth] Open Steam Adapter dispatch (/launcher/auth/verify): submitting credential
+[auth] Open Steam Adapter payload summary: token=JWT-abc…resh (len=18)
+[auth] Open Steam Adapter result -> outcome=retry, message="Launcher token expired, request a refresh"
+
+-- Scenario 4: Open Steam Adapter --
+[auth] Open Steam Adapter dispatch (/launcher/auth/verify): submitting credential
+[auth] Open Steam Adapter payload summary: token=TOKEN-V…7890 (len=22)
+[auth] Open Steam Adapter result -> outcome=success, message="Standalone token accepted (token=TOKEN-V…7890)"

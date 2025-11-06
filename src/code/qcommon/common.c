@@ -2378,14 +2378,19 @@ static qlAuthCredentialKind Com_ParseCredentialKindLabel( const char *label ) {
 	return QL_AUTH_CREDENTIAL_EMPTY;
 }
 
-static qboolean Com_ParseStoredCredentialLine( const char *line, ql_auth_credential_t *credential ) {
+static qboolean Com_ParseStoredCredentialLine( const char *line, ql_auth_credential_t *credential, qboolean *outNeedsMigration ) {
 	char	local[QL_AUTH_MAX_CREDENTIAL_STORAGE + 64];
 	char	*cursor;
 	char	*value;
 	qlAuthCredentialKind kind;
+	qboolean	needsMigration = qfalse;
 
 	if ( !line || !credential ) {
 		return qfalse;
+	}
+
+	if ( outNeedsMigration ) {
+		*outNeedsMigration = qfalse;
 	}
 
 	Q_strncpyz( local, line, sizeof( local ) );
@@ -2422,16 +2427,65 @@ static qboolean Com_ParseStoredCredentialLine( const char *line, ql_auth_credent
 		}
 
 		if ( kind == QL_AUTH_CREDENTIAL_LEGACY_CDKEY ) {
-			return QL_ParseLegacyCDKey( value, credential );
+			if ( !QL_ParseLegacyCDKey( value, credential ) ) {
+				return qfalse;
+			}
+
+			if ( outNeedsMigration ) {
+				*outNeedsMigration = needsMigration;
+			}
+
+			return qtrue;
 		}
 
-		return QL_ParsePlatformToken( value, kind, credential );
+		if ( kind == QL_AUTH_CREDENTIAL_STEAM || kind == QL_AUTH_CREDENTIAL_STANDALONE_TOKEN ) {
+			const char *expectedPrefix = ( kind == QL_AUTH_CREDENTIAL_STEAM ) ? "steam:" : "standalone:";
+			size_t prefixLength = strlen( expectedPrefix );
+			qboolean hasPrefix = qfalse;
+			ql_auth_credential_t parsed;
+
+			if ( prefixLength > 0 && !Q_stricmpn( value, expectedPrefix, prefixLength ) ) {
+				hasPrefix = qtrue;
+			}
+
+			if ( hasPrefix ) {
+				if ( !QL_ParseCredentialString( value, &parsed ) || parsed.kind != kind ) {
+					return qfalse;
+				}
+
+				*credential = parsed;
+			} else {
+				needsMigration = qtrue;
+
+				if ( !QL_ParsePlatformToken( value, kind, credential ) ) {
+					return qfalse;
+				}
+			}
+
+			if ( outNeedsMigration ) {
+				*outNeedsMigration = needsMigration;
+			}
+
+			return qtrue;
+		}
+
+		return qfalse;
 	}
 
-	return QL_ParseCredentialString( cursor, credential );
+	needsMigration = qtrue;
+
+	if ( !QL_ParseCredentialString( cursor, credential ) ) {
+		return qfalse;
+	}
+
+	if ( outNeedsMigration ) {
+		*outNeedsMigration = needsMigration;
+	}
+
+	return qtrue;
 }
 
-static qboolean Com_LoadStoredCredential( const char *filename, ql_auth_credential_t *out ) {
+static qboolean Com_LoadStoredCredential( const char *filename, ql_auth_credential_t *out, qboolean *outNeedsMigration ) {
 	fileHandle_t	f;
 	char	fbuffer[MAX_OSPATH];
 	int	fileLen;
@@ -2439,9 +2493,14 @@ static qboolean Com_LoadStoredCredential( const char *filename, ql_auth_credenti
 	char	contents[QL_AUTH_MAX_CREDENTIAL_STORAGE + 256];
 	char	*cursor;
 	qboolean	parsed = qfalse;
+	qboolean	needsMigration = qfalse;
 
 	if ( !filename || !filename[0] || !out ) {
 		return qfalse;
+	}
+
+	if ( outNeedsMigration ) {
+		*outNeedsMigration = qfalse;
 	}
 
 	QL_InitAuthCredential( out );
@@ -2474,6 +2533,7 @@ static qboolean Com_LoadStoredCredential( const char *filename, ql_auth_credenti
 		char	*lineEnd = strchr( cursor, '\n' );
 		size_t	segmentLen = lineEnd ? (size_t)( lineEnd - cursor ) : strlen( cursor );
 		char	line[QL_AUTH_MAX_CREDENTIAL_STORAGE + 64];
+		qboolean	lineNeedsMigration = qfalse;
 
 		if ( segmentLen >= sizeof( line ) ) {
 			segmentLen = sizeof( line ) - 1;
@@ -2482,8 +2542,11 @@ static qboolean Com_LoadStoredCredential( const char *filename, ql_auth_credenti
 		Com_Memcpy( line, cursor, segmentLen );
 		line[segmentLen] = '\0';
 
-		if ( Com_ParseStoredCredentialLine( line, out ) ) {
+		if ( Com_ParseStoredCredentialLine( line, out, &lineNeedsMigration ) ) {
 			parsed = qtrue;
+			if ( lineNeedsMigration ) {
+				needsMigration = qtrue;
+			}
 			break;
 		}
 
@@ -2497,6 +2560,10 @@ static qboolean Com_LoadStoredCredential( const char *filename, ql_auth_credenti
 	if ( !parsed ) {
 		QL_InitAuthCredential( out );
 		return qfalse;
+	}
+
+	if ( outNeedsMigration ) {
+		*outNeedsMigration = needsMigration;
 	}
 
 	return qtrue;
@@ -2517,9 +2584,13 @@ static void Com_CopyCredentialToBuffer( const ql_auth_credential_t *credential, 
 
 void Com_ReadCDKey( const char *filename ) {
 	ql_auth_credential_t	credential;
+	qboolean	needsMigration = qfalse;
 
-	if ( Com_LoadStoredCredential( filename, &credential ) ) {
+	if ( Com_LoadStoredCredential( filename, &credential, &needsMigration ) ) {
 		Com_CopyCredentialToBuffer( &credential, cl_cdkey, sizeof( cl_cdkey ) );
+		if ( needsMigration ) {
+			cvar_modifiedFlags |= CVAR_ARCHIVE;
+		}
 	} else {
 		cl_cdkey[0] = '\0';
 	}
@@ -2532,9 +2603,13 @@ Com_AppendCDKey
 */
 void Com_AppendCDKey( const char *filename ) {
 	ql_auth_credential_t	credential;
+	qboolean	needsMigration = qfalse;
 
-	if ( Com_LoadStoredCredential( filename, &credential ) ) {
+	if ( Com_LoadStoredCredential( filename, &credential, &needsMigration ) ) {
 		Com_CopyCredentialToBuffer( &credential, cl_cdkey_mod, sizeof( cl_cdkey_mod ) );
+		if ( needsMigration ) {
+			cvar_modifiedFlags |= CVAR_ARCHIVE;
+		}
 	} else {
 		cl_cdkey_mod[0] = '\0';
 	}
@@ -2566,7 +2641,7 @@ static qboolean Com_CredentialValueContainsUnsafeWhitespace( const char *value )
 
 static void Com_WriteCredentialFile( fileHandle_t f, const ql_auth_credential_t *credential ) {
         char    label[32];
-        char    storedValue[QL_AUTH_MAX_CREDENTIAL_LENGTH];
+        char    storedValue[QL_AUTH_MAX_CREDENTIAL_STORAGE];
 
         if ( !f ) {
                 return;

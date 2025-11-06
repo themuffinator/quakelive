@@ -206,11 +206,108 @@ int Pickup_Holdable( gentity_t *ent, gentity_t *other ) {
 
 //======================================================================
 
+static int G_GetAmmoItemDefaultQuantity( weapon_t weapon ) {
+	const gitem_t *item;
+
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return 0;
+	}
+
+	for ( item = bg_itemlist + 1 ; item->classname ; ++item ) {
+		if ( item->giType == IT_AMMO && item->giTag == weapon ) {
+			return item->quantity;
+		}
+	}
+
+	return 0;
+}
+
+static int G_GetAmmoPackPickupCount( weapon_t weapon, int fallback ) {
+	int configured;
+
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return fallback;
+	}
+
+	configured = g_ammoPackConfig.weaponPickup[weapon];
+	if ( configured <= 0 ) {
+		return fallback;
+	}
+
+	return configured;
+}
+
+static int G_GetAmmoPackMaxStack( weapon_t weapon, int fallbackPack ) {
+	int maxStack;
+
+	if ( fallbackPack <= 0 ) {
+		fallbackPack = G_GetAmmoItemDefaultQuantity( weapon );
+	}
+
+	if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
+		maxStack = g_ammoPackConfig.weaponMax[weapon];
+		if ( maxStack > 0 ) {
+			return maxStack;
+		}
+
+		if ( fallbackPack <= 0 ) {
+			fallbackPack = g_ammoPackConfig.weaponPickup[weapon];
+		}
+	}
+
+	if ( fallbackPack <= 0 ) {
+		return 0;
+	}
+
+	return fallbackPack * 4;
+}
+
+static int G_ResolveAmmoPickupAmount( const gentity_t *ent ) {
+	int fallback;
+
+	if ( !ent || !ent->item ) {
+		return 0;
+	}
+
+	if ( ent->count < 0 ) {
+		return 0;
+	}
+
+	if ( ent->count > 0 ) {
+		return ent->count;
+	}
+
+	fallback = ent->item->quantity;
+
+	return G_GetAmmoPackPickupCount( ent->item->giTag, fallback );
+}
+
 void Add_Ammo (gentity_t *ent, int weapon, int count)
 {
+	weapon_t weaponIndex;
+	int maxStack;
+	int defaultPack;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	weaponIndex = (weapon_t)weapon;
+	if ( weaponIndex <= WP_NONE || weaponIndex >= WP_NUM_WEAPONS ) {
+		return;
+	}
+
 	ent->client->ps.ammo[weapon] += count;
-	if ( ent->client->ps.ammo[weapon] > 200 ) {
-		ent->client->ps.ammo[weapon] = 200;
+
+	if ( ent->client->ps.ammo[weapon] < 0 ) {
+		ent->client->ps.ammo[weapon] = 0;
+	}
+
+	defaultPack = G_GetAmmoItemDefaultQuantity( weaponIndex );
+	maxStack = G_GetAmmoPackMaxStack( weaponIndex, defaultPack );
+
+	if ( maxStack > 0 && ent->client->ps.ammo[weapon] > maxStack ) {
+		ent->client->ps.ammo[weapon] = maxStack;
 	}
 }
 
@@ -218,10 +315,10 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 {
 	int		quantity;
 
-	if ( ent->count ) {
-		quantity = ent->count;
-	} else {
-		quantity = ent->item->quantity;
+	quantity = G_ResolveAmmoPickupAmount( ent );
+
+	if ( quantity < 0 ) {
+		quantity = 0;
 	}
 
 	Add_Ammo (other, ent->item->giTag, quantity);
@@ -234,26 +331,35 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 
 int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 	int		quantity;
+	weapon_t	weapon;
+	int		basePickup;
+
+	weapon = ent->item ? (weapon_t)ent->item->giTag : WP_NONE;
+	basePickup = G_GetAmmoPackPickupCount( weapon, ent->item ? ent->item->quantity : 0 );
 
 	if ( ent->count < 0 ) {
 		quantity = 0; // None for you, sir!
+	} else if ( ent->count > 0 ) {
+		quantity = ent->count;
 	} else {
-		if ( ent->count ) {
-			quantity = ent->count;
-		} else {
-			quantity = ent->item->quantity;
+		quantity = basePickup;
+
+		if ( quantity <= 0 ) {
+			quantity = ent->item ? ent->item->quantity : 0;
 		}
 
-		// dropped items and teamplay weapons always have full ammo
-		if ( ! (ent->flags & FL_DROPPED_ITEM) && g_gametype.integer != GT_TEAM ) {
-			// respawning rules
-			// drop the quantity if the already have over the minimum
-			if ( other->client->ps.ammo[ ent->item->giTag ] < quantity ) {
-				quantity = quantity - other->client->ps.ammo[ ent->item->giTag ];
+		if ( !( ent->flags & FL_DROPPED_ITEM ) && g_gametype.integer != GT_TEAM ) {
+			if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS && basePickup > 0
+				&& other->client->ps.ammo[weapon] < basePickup ) {
+				quantity = basePickup - other->client->ps.ammo[weapon];
 			} else {
 				quantity = 1;		// only add a single shot
 			}
 		}
+	}
+
+	if ( quantity < 0 ) {
+		quantity = 0;
 	}
 
 	// add the weapon
@@ -261,8 +367,9 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 
 	Add_Ammo( other, ent->item->giTag, quantity );
 
-	if (ent->item->giTag == WP_GRAPPLING_HOOK)
+	if ( ent->item->giTag == WP_GRAPPLING_HOOK ) {
 		other->client->ps.ammo[ent->item->giTag] = -1; // unlimited ammo
+	}
 
 	// team deathmatch has slow weapon respawns
 	if ( g_gametype.integer == GT_TEAM ) {
