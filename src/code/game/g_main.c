@@ -48,6 +48,19 @@ startingAmmoConfig_t	g_startingAmmoConfig;
 #define DEFAULT_STARTING_AMMO_RL            5
 #define DEFAULT_STARTING_AMMO_SG            10
 
+#define DEFAULT_AMMOPACK_BFG                15
+#define DEFAULT_AMMOPACK_CG                 100
+#define DEFAULT_AMMOPACK_GL                 5
+#define DEFAULT_AMMOPACK_HMG                50
+#define DEFAULT_AMMOPACK_LG                 60
+#define DEFAULT_AMMOPACK_MG                 50
+#define DEFAULT_AMMOPACK_NG                 20
+#define DEFAULT_AMMOPACK_PG                 30
+#define DEFAULT_AMMOPACK_PL                 10
+#define DEFAULT_AMMOPACK_RG                 10
+#define DEFAULT_AMMOPACK_RL                 5
+#define DEFAULT_AMMOPACK_SG                 10
+
 typedef struct {
 	vmCvar_t	*vmCvar;
 	char		*cvarName;
@@ -158,6 +171,18 @@ vmCvar_t	weapon_reload_ng;
 vmCvar_t	weapon_reload_prox;
 vmCvar_t	weapon_reload_cg;
 vmCvar_t	weapon_reload_hmg;
+vmCvar_t	g_ammoPack_bfg;
+vmCvar_t	g_ammoPack_cg;
+vmCvar_t	g_ammoPack_gl;
+vmCvar_t	g_ammoPack_hmg;
+vmCvar_t	g_ammoPack_lg;
+vmCvar_t	g_ammoPack_mg;
+vmCvar_t	g_ammoPack_ng;
+vmCvar_t	g_ammoPack_pg;
+vmCvar_t	g_ammoPack_pl;
+vmCvar_t	g_ammoPack_rg;
+vmCvar_t	g_ammoPack_rl;
+vmCvar_t	g_ammoPack_sg;
 vmCvar_t	g_startingAmmo_bfg;
 vmCvar_t	g_startingAmmo_cg;
 vmCvar_t	g_startingAmmo_g;
@@ -301,10 +326,23 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &weapon_reload_hook, "weapon_reload_hook", "0", 0, 0, qfalse, qfalse, "Hook pull refire delay override in milliseconds." },
 	{ &weapon_reload_ng, "weapon_reload_ng", "0", 0, 0, qfalse, qfalse, "Nailgun refire delay override in milliseconds." },
 	{ &weapon_reload_prox, "weapon_reload_prox", "0", 0, 0, qfalse, qfalse, "Proximity Launcher refire delay override in milliseconds." },
-	{ &weapon_reload_cg, "weapon_reload_cg", "0", 0, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
-	{ &weapon_reload_hmg, "weapon_reload_hmg", "0", 0, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
+        { &weapon_reload_cg, "weapon_reload_cg", "0", 0, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
+        { &weapon_reload_hmg, "weapon_reload_hmg", "0", 0, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
 
-	{ &g_startingAmmo_bfg, "g_startingAmmo_bfg", STRINGIZE( DEFAULT_STARTING_AMMO_BFG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Cells granted for the BFG whenever spawn loadouts (g_startingWeapons, factories, scripts) include it." },
+        { &g_ammoPack_bfg, "g_ammoPack_bfg", STRINGIZE( DEFAULT_AMMOPACK_BFG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Cells granted when picking up a BFG ammo pack, matching Quake Live's default drop." },
+        { &g_ammoPack_cg, "g_ammoPack_cg", STRINGIZE( DEFAULT_AMMOPACK_CG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Chaingun bullets restored per ammo belt pickup." },
+        { &g_ammoPack_gl, "g_ammoPack_gl", STRINGIZE( DEFAULT_AMMOPACK_GL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grenade Launcher rounds provided by grenade ammo packs." },
+        { &g_ammoPack_hmg, "g_ammoPack_hmg", STRINGIZE( DEFAULT_AMMOPACK_HMG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Heavy Machinegun bullets added from heavy ammo packs." },
+        { &g_ammoPack_lg, "g_ammoPack_lg", STRINGIZE( DEFAULT_AMMOPACK_LG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Lightning Gun cells awarded from lightning ammo pickups." },
+        { &g_ammoPack_mg, "g_ammoPack_mg", STRINGIZE( DEFAULT_AMMOPACK_MG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Machinegun bullets restored by standard bullet boxes." },
+        { &g_ammoPack_ng, "g_ammoPack_ng", STRINGIZE( DEFAULT_AMMOPACK_NG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Nailgun spikes issued from nail ammo packs." },
+        { &g_ammoPack_pg, "g_ammoPack_pg", STRINGIZE( DEFAULT_AMMOPACK_PG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Plasmagun cells delivered with plasma ammo pickups." },
+        { &g_ammoPack_pl, "g_ammoPack_pl", STRINGIZE( DEFAULT_AMMOPACK_PL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Proximity Launcher mines granted from proximity ammo packs." },
+        { &g_ammoPack_rg, "g_ammoPack_rg", STRINGIZE( DEFAULT_AMMOPACK_RG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Railgun slugs provided whenever a rail ammo pack is collected." },
+        { &g_ammoPack_rl, "g_ammoPack_rl", STRINGIZE( DEFAULT_AMMOPACK_RL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Rockets granted per rocket ammo box pickup." },
+        { &g_ammoPack_sg, "g_ammoPack_sg", STRINGIZE( DEFAULT_AMMOPACK_SG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Shotgun shells restored with shell ammo packs." },
+
+        { &g_startingAmmo_bfg, "g_startingAmmo_bfg", STRINGIZE( DEFAULT_STARTING_AMMO_BFG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Cells granted for the BFG whenever spawn loadouts (g_startingWeapons, factories, scripts) include it." },
 	{ &g_startingAmmo_cg, "g_startingAmmo_cg", STRINGIZE( DEFAULT_STARTING_AMMO_CG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Chaingun bullets provided on spawn when the weapon is part of the configured loadout." },
 	{ &g_startingAmmo_g, "g_startingAmmo_g", STRINGIZE( DEFAULT_STARTING_AMMO_G ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Gauntlet swings granted on spawn; -1 mirrors Quake Live's infinite melee behaviour." },
 	{ &g_startingAmmo_gh, "g_startingAmmo_gh", STRINGIZE( DEFAULT_STARTING_AMMO_GH ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grappling Hook ammo applied to players when scripts or factories grant the hook; -1 keeps it unlimited." },
