@@ -38,20 +38,24 @@ int bot_maxdebugpolys;
 extern botlib_export_t	*botlib_export;
 int	bot_enable;
 
-void SV_BotRefreshEntityBotFlag( client_t *cl ) {
-	qboolean	shouldMarkBot;
-
+qboolean SV_ClientIsBot( const client_t *cl ) {
 	if ( !cl ) {
+		return qfalse;
+	}
+
+	if ( cl->netchan.remoteAddress.type != NA_BOT ) {
+		return qfalse;
+	}
+
+	return ( cl->state >= CS_CONNECTED );
+}
+
+void SV_BotRefreshEntityBotFlag( client_t *cl ) {
+	if ( !cl || !cl->gentity ) {
 		return;
 	}
 
-	if ( !cl->gentity ) {
-		return;
-	}
-
-	shouldMarkBot = ( cl->netchan.remoteAddress.type == NA_BOT && cl->state >= CS_CONNECTED );
-
-	if ( shouldMarkBot ) {
+	if ( SV_ClientIsBot( cl ) ) {
 		cl->gentity->r.svFlags |= SVF_BOT;
 	} else {
 		cl->gentity->r.svFlags &= ~SVF_BOT;

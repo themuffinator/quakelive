@@ -452,15 +452,10 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 		if (svs.clients[i].state >= CS_CONNECTED) {
 			char	*denied;
 
-			if ( svs.clients[i].netchan.remoteAddress.type == NA_BOT ) {
-				if ( killBots ) {
-					SV_DropClient( &svs.clients[i], "" );
-					continue;
-				}
-				isBot = qtrue;
-			}
-			else {
-				isBot = qfalse;
+			isBot = SV_ClientIsBot( &svs.clients[i] );
+			if ( isBot && killBots ) {
+				SV_DropClient( &svs.clients[i], "" );
+				continue;
 			}
 
 			// connect the client again
