@@ -1481,7 +1481,7 @@ static void PM_BeginWeaponChange( int weapon ) {
 
 	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
-	pm->ps->weaponTime += 200;
+	pm->ps->weaponTime += BG_GetWeaponReloadTime( pm->ps->weapon );
 	PM_StartTorsoAnim( TORSO_DROP );
 }
 
@@ -1505,7 +1505,7 @@ static void PM_FinishWeaponChange( void ) {
 
 	pm->ps->weapon = weapon;
 	pm->ps->weaponstate = WEAPON_RAISING;
-	pm->ps->weaponTime += 250;
+	pm->ps->weaponTime += BG_GetWeaponReloadTime( weapon );
 	PM_StartTorsoAnim( TORSO_RAISE );
 }
 
@@ -1643,50 +1643,8 @@ static void PM_Weapon( void ) {
 	// fire weapon
 	PM_AddEvent( EV_FIRE_WEAPON );
 
-	switch( pm->ps->weapon ) {
-	default:
-	case WP_GAUNTLET:
-		addTime = 400;
-		break;
-	case WP_LIGHTNING:
-		addTime = 50;
-		break;
-	case WP_SHOTGUN:
-		addTime = 1000;
-		break;
-	case WP_MACHINEGUN:
-		addTime = 100;
-		break;
-	case WP_GRENADE_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_ROCKET_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_PLASMAGUN:
-		addTime = 100;
-		break;
-	case WP_RAILGUN:
-		addTime = 1500;
-		break;
-	case WP_BFG:
-		addTime = 200;
-		break;
-	case WP_GRAPPLING_HOOK:
-		addTime = 400;
-		break;
-#ifdef MISSIONPACK
-	case WP_NAILGUN:
-		addTime = 1000;
-		break;
-	case WP_PROX_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_CHAINGUN:
-		addTime = 30;
-		break;
-#endif
-	}
+	// weapon_reload_* CVars determine this base refire via BG_SetWeaponReloadConfig.
+	addTime = BG_GetWeaponReloadTime( pm->ps->weapon );
 
 #ifdef MISSIONPACK
 	if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {

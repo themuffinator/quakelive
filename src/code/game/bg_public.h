@@ -86,9 +86,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	CS_SOUNDS				(CS_MODELS+MAX_MODELS)
 #define	CS_PLAYERS				(CS_SOUNDS+MAX_SOUNDS)
 #define CS_LOCATIONS			(CS_PLAYERS+MAX_CLIENTS)
-#define CS_PARTICLES			(CS_LOCATIONS+MAX_LOCATIONS) 
+#define CS_PARTICLES			(CS_LOCATIONS+MAX_LOCATIONS)
+#define CS_WEAPONRELOADS			(CS_PARTICLES+MAX_LOCATIONS)
 
-#define CS_MAX					(CS_PARTICLES+MAX_LOCATIONS)
+#define CS_MAX					(CS_WEAPONRELOADS+1)
 
 #if (CS_MAX) > MAX_CONFIGSTRINGS
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
@@ -110,6 +111,28 @@ typedef enum {
 } gametype_t;
 
 typedef enum { GENDER_MALE, GENDER_FEMALE, GENDER_NEUTER } gender_t;
+
+typedef struct weaponReloadConfig_s {
+	int		gauntlet;
+	int		machinegun;
+	int		shotgun;
+	int		grenadeLauncher;
+	int		rocketLauncher;
+	int		lightningGun;
+	int		railgun;
+	int		plasmagun;
+	int		bfg;
+	int		grapplingHook;
+	int		hook;
+	int		nailgun;
+	int		proximityLauncher;
+	int		chaingun;
+	int		heavyMachinegun;
+} weaponReloadConfig_t;
+
+void BG_SetWeaponReloadConfig( const weaponReloadConfig_t *config );
+int BG_GetWeaponReloadTime( weapon_t weapon );
+
 
 /*
 ===================================================================================

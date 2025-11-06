@@ -41,6 +41,53 @@ An item fires all of its targets when it is picked up.  If the toucher can't car
 "count" override quantity or duration on most items.
 */
 
+static weaponReloadConfig_t bg_weaponReloadConfig;
+
+void BG_SetWeaponReloadConfig( const weaponReloadConfig_t *config ) {
+	if ( config ) {
+		bg_weaponReloadConfig = *config;
+	} else {
+		memset( &bg_weaponReloadConfig, 0, sizeof( bg_weaponReloadConfig ) );
+	}
+}
+
+int BG_GetWeaponReloadTime( weapon_t weapon ) {
+	switch ( weapon ) {
+	case WP_GAUNTLET:
+		return bg_weaponReloadConfig.gauntlet;
+	case WP_MACHINEGUN:
+		return bg_weaponReloadConfig.machinegun;
+	case WP_SHOTGUN:
+		return bg_weaponReloadConfig.shotgun;
+	case WP_GRENADE_LAUNCHER:
+		return bg_weaponReloadConfig.grenadeLauncher;
+	case WP_ROCKET_LAUNCHER:
+		return bg_weaponReloadConfig.rocketLauncher;
+	case WP_LIGHTNING:
+		return bg_weaponReloadConfig.lightningGun;
+	case WP_RAILGUN:
+		return bg_weaponReloadConfig.railgun;
+	case WP_PLASMAGUN:
+		return bg_weaponReloadConfig.plasmagun;
+	case WP_BFG:
+		return bg_weaponReloadConfig.bfg;
+	case WP_GRAPPLING_HOOK:
+		return bg_weaponReloadConfig.grapplingHook;
+#ifdef MISSIONPACK
+	case WP_NAILGUN:
+		return bg_weaponReloadConfig.nailgun;
+	case WP_PROX_LAUNCHER:
+		return bg_weaponReloadConfig.proximityLauncher;
+	case WP_CHAINGUN:
+		return bg_weaponReloadConfig.chaingun;
+#endif
+	case WP_NONE:
+	default:
+		break;
+	}
+	return 0;
+}
+
 gitem_t	bg_itemlist[] = 
 {
 	{

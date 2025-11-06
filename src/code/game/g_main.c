@@ -489,6 +489,38 @@ static int G_ReadWeaponReloadCvar( const vmCvar_t *cvar, int fallback, const cha
         return cvar->integer;
 }
 
+static void G_BroadcastWeaponReloadConfig( void ) {
+	static char lastBroadcast[MAX_STRING_CHARS];
+	char buffer[MAX_STRING_CHARS];
+
+	Com_sprintf( buffer, sizeof( buffer ), "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		g_weaponReloadConfig.gauntlet,
+		g_weaponReloadConfig.machinegun,
+		g_weaponReloadConfig.shotgun,
+		g_weaponReloadConfig.grenadeLauncher,
+		g_weaponReloadConfig.rocketLauncher,
+		g_weaponReloadConfig.lightningGun,
+		g_weaponReloadConfig.railgun,
+		g_weaponReloadConfig.plasmagun,
+		g_weaponReloadConfig.bfg,
+		g_weaponReloadConfig.grapplingHook,
+		g_weaponReloadConfig.hook,
+		g_weaponReloadConfig.nailgun,
+		g_weaponReloadConfig.proximityLauncher,
+		g_weaponReloadConfig.chaingun,
+		g_weaponReloadConfig.heavyMachinegun );
+
+	BG_SetWeaponReloadConfig( &g_weaponReloadConfig );
+
+	if ( !Q_stricmp( buffer, lastBroadcast ) ) {
+		return;
+	}
+
+	Q_strncpyz( lastBroadcast, buffer, sizeof( lastBroadcast ) );
+	trap_SetConfigstring( CS_WEAPONRELOADS, buffer );
+}
+
+
 void G_InitWeaponReloadConfig( void ) {
         g_weaponReloadConfig.gauntlet = G_ReadWeaponReloadCvar( &weapon_reload_gauntlet, DEFAULT_WEAPON_RELOAD_GAUNTLET, "weapon_reload_gauntlet" );
         g_weaponReloadConfig.machinegun = G_ReadWeaponReloadCvar( &weapon_reload_mg, DEFAULT_WEAPON_RELOAD_MG, "weapon_reload_mg" );
@@ -505,6 +537,9 @@ void G_InitWeaponReloadConfig( void ) {
         g_weaponReloadConfig.proximityLauncher = G_ReadWeaponReloadCvar( &weapon_reload_prox, DEFAULT_WEAPON_RELOAD_PROX, "weapon_reload_prox" );
         g_weaponReloadConfig.chaingun = G_ReadWeaponReloadCvar( &weapon_reload_cg, DEFAULT_WEAPON_RELOAD_CG, "weapon_reload_cg" );
         g_weaponReloadConfig.heavyMachinegun = G_ReadWeaponReloadCvar( &weapon_reload_hmg, DEFAULT_WEAPON_RELOAD_HMG, "weapon_reload_hmg" );
+
+        // Share the resolved weapon_reload_* CVars with both prediction paths.
+        G_BroadcastWeaponReloadConfig();
 }
 
 void G_UpdateWeaponReloadConfig( void ) {

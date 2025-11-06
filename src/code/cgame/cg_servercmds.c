@@ -46,6 +46,50 @@ static const orderTask_t validOrders[] = {
 
 static const int numValidOrders = sizeof(validOrders) / sizeof(orderTask_t);
 
+static void CG_ParseWeaponReloadConfig( const char *str ) {
+	weaponReloadConfig_t config;
+	int *fields[] = {
+		&config.gauntlet,
+		&config.machinegun,
+		&config.shotgun,
+		&config.grenadeLauncher,
+		&config.rocketLauncher,
+		&config.lightningGun,
+		&config.railgun,
+		&config.plasmagun,
+		&config.bfg,
+		&config.grapplingHook,
+		&config.hook,
+		&config.nailgun,
+		&config.proximityLauncher,
+		&config.chaingun,
+		&config.heavyMachinegun
+	};
+	int fieldCount = sizeof( fields ) / sizeof( fields[0] );
+	char work[MAX_STRING_CHARS];
+	char *cursor;
+	int i;
+
+	memset( &config, 0, sizeof( config ) );
+	if ( !str || !str[0] ) {
+		BG_SetWeaponReloadConfig( &config );
+		return;
+	}
+
+	Q_strncpyz( work, str, sizeof( work ) );
+	cursor = work;
+
+	for ( i = 0; i < fieldCount; ++i ) {
+		char *token = COM_Parse( &cursor );
+		if ( !token || !token[0] ) {
+			break;
+		}
+		*fields[i] = atoi( token );
+	}
+
+	BG_SetWeaponReloadConfig( &config );
+}
+
 #ifdef MISSIONPACK // bk001204
 static int CG_ValidOrder(const char *p) {
 	int i;
@@ -217,6 +261,7 @@ void CG_SetConfigValues( void ) {
 	}
 #endif
 	cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
+	CG_ParseWeaponReloadConfig( CG_ConfigString( CS_WEAPONRELOADS ) );
 }
 
 /*
@@ -305,6 +350,8 @@ static void CG_ConfigStringModified( void ) {
 #ifdef MISSIONPACK
 		trap_S_StartLocalSound( cgs.media.voteNow, CHAN_ANNOUNCER );
 #endif //MISSIONPACK
+	} else if ( num == CS_WEAPONRELOADS ) {
+		CG_ParseWeaponReloadConfig( str );
 	} else if ( num >= CS_TEAMVOTE_TIME && num <= CS_TEAMVOTE_TIME + 1) {
 		cgs.teamVoteTime[num-CS_TEAMVOTE_TIME] = atoi( str );
 		cgs.teamVoteModified[num-CS_TEAMVOTE_TIME] = qtrue;

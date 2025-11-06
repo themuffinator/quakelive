@@ -25,9 +25,10 @@ def _extract_function_body(source: str, signature: str) -> str:
 
 class CVarBootstrapTests(unittest.TestCase):
     def test_header_declares_weapon_reload_config(self) -> None:
-        header = _read_source("src/code/game/g_local.h")
-        self.assertIn("typedef struct weaponReloadConfig_s", header)
-        self.assertIn("extern weaponReloadConfig_t g_weaponReloadConfig;", header)
+        game_header = _read_source("src/code/game/g_local.h")
+        shared_header = _read_source("src/code/game/bg_public.h")
+        self.assertIn("typedef struct weaponReloadConfig_s", shared_header)
+        self.assertIn("extern weaponReloadConfig_t g_weaponReloadConfig;", game_header)
 
     def test_header_declares_knockback_config(self) -> None:
         header = _read_source("src/code/game/g_local.h")
