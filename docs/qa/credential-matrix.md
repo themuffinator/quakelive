@@ -87,19 +87,23 @@ To capture canonical logs for each scenario and to archive proof of the hybrid f
 python3 tools/integration/auth_flow_trace.py | tee docs/qa/logs/hybrid_auth_flow_validation.log
 ```
 
-The script reflects the same classification rules implemented by the client dispatcher, making it suitable for regression validation.【F:tools/integration/auth_flow_trace.py†L48-L98】 The resulting log file includes the hybrid fallback confirmation:
+The script reflects the same classification rules implemented by the client dispatcher, making it suitable for regression validation.【F:tools/integration/auth_flow_trace.py†L48-L195】 The resulting log file includes the hybrid fallback confirmation:
 
 ```text
 -- Scenario 2: Hybrid --
 [auth] Hybrid dispatch (/steam/session/validate): submitting credential
 [auth] Hybrid payload summary: ticket=retry:T…FFFF (len=21)
+[auth] Hybrid steamworks.invoke (/steam/session/validate): invoking Steamworks backend
+[auth] Hybrid steamworks.result (/steam/session/validate): handled=true, backend=Steamworks, outcome=retry, message="Steam service busy, retry with refreshed ticket"
+[auth] Hybrid open_adapter.invoke (/steam/session/validate): invoking Open Steam Adapter backend
+[auth] Hybrid open_adapter.result (/steam/session/validate): handled=true, backend=Open Steam Adapter, outcome=success, message="Hybrid fallback accepted credential via open adapter (token=retry:T…FFFF)"
 [auth] Hybrid result -> outcome=success, message="Hybrid fallback accepted credential via open adapter (token=retry:T…FFFF)"
 ```
 
-The full validation transcript is stored at `docs/qa/logs/hybrid_auth_flow_validation.log` for traceability.【F:docs/qa/logs/hybrid_auth_flow_validation.log†L1-L19】
+The full validation transcript is stored at `docs/qa/logs/hybrid_auth_flow_validation.log` for traceability.【F:docs/qa/logs/hybrid_auth_flow_validation.log†L1-L33】
 
 ## Summary of Findings
 
 - Steam-only builds route exclusively through Steamworks and expose retry guidance whenever the ticket contains the `retry` marker, matching the updated Steam handler semantics.【F:src/code/client/ql_auth.c†L111-L163】
 - Open-only builds rely on the launcher adapter and expose retry guidance for `refresh` tokens while rejecting revoked credentials via the open handler heuristics.【F:src/code/client/ql_auth.c†L166-L195】
-- Hybrid builds honour the Steam result first but automatically replay pending credentials against the open adapter, producing the acceptance message captured in the validation session log.【F:src/code/client/ql_auth.c†L197-L225】【F:docs/qa/logs/hybrid_auth_flow_validation.log†L6-L13】
+- Hybrid builds honour the Steam result first but automatically replay pending credentials against the open adapter, producing the acceptance message captured in the validation session log.【F:src/code/client/ql_auth.c†L185-L239】【F:docs/qa/logs/hybrid_auth_flow_validation.log†L6-L20】

@@ -4,19 +4,29 @@ Provider/token combinations demonstrate success, retry, and failure paths.
 -- Scenario 1: Steamworks --
 [auth] Steamworks dispatch (/steam/session/validate): submitting credential
 [auth] Steamworks payload summary: ticket=TICKET-…cdef (len=23)
+[auth] Steamworks steamworks.invoke (/steam/session/validate): invoking Steamworks backend
+[auth] Steamworks steamworks.result (/steam/session/validate): handled=true, backend=Steamworks, outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
 [auth] Steamworks result -> outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
 
 -- Scenario 2: Hybrid --
 [auth] Hybrid dispatch (/steam/session/validate): submitting credential
 [auth] Hybrid payload summary: ticket=retry:T…FFFF (len=21)
+[auth] Hybrid steamworks.invoke (/steam/session/validate): invoking Steamworks backend
+[auth] Hybrid steamworks.result (/steam/session/validate): handled=true, backend=Steamworks, outcome=retry, message="Steam service busy, retry with refreshed ticket"
+[auth] Hybrid open_adapter.invoke (/steam/session/validate): invoking Open Steam Adapter backend
+[auth] Hybrid open_adapter.result (/steam/session/validate): handled=true, backend=Open Steam Adapter, outcome=success, message="Hybrid fallback accepted credential via open adapter (token=retry:T…FFFF)"
 [auth] Hybrid result -> outcome=success, message="Hybrid fallback accepted credential via open adapter (token=retry:T…FFFF)"
 
 -- Scenario 3: Open Steam Adapter --
 [auth] Open Steam Adapter dispatch (/launcher/auth/verify): submitting credential
 [auth] Open Steam Adapter payload summary: token=JWT-abc…resh (len=18)
+[auth] Open Steam Adapter standalone.invoke (/launcher/auth/verify): invoking Open Steam Adapter backend
+[auth] Open Steam Adapter standalone.result (/launcher/auth/verify): handled=true, backend=Open Steam Adapter, outcome=retry, message="Launcher token expired, request a refresh"
 [auth] Open Steam Adapter result -> outcome=retry, message="Launcher token expired, request a refresh"
 
 -- Scenario 4: Open Steam Adapter --
 [auth] Open Steam Adapter dispatch (/launcher/auth/verify): submitting credential
 [auth] Open Steam Adapter payload summary: token=TOKEN-V…7890 (len=22)
+[auth] Open Steam Adapter standalone.invoke (/launcher/auth/verify): invoking Open Steam Adapter backend
+[auth] Open Steam Adapter standalone.result (/launcher/auth/verify): handled=true, backend=Open Steam Adapter, outcome=success, message="Standalone token accepted (token=TOKEN-V…7890)"
 [auth] Open Steam Adapter result -> outcome=success, message="Standalone token accepted (token=TOKEN-V…7890)"

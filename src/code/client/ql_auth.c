@@ -83,6 +83,61 @@ static void QL_ClientAuth_LogResponse( const ql_client_auth_transport_t *transpo
         response->message );
 }
 
+static void QL_ClientAuth_LogBackendInvocation( const ql_client_auth_transport_t *transport, const char *stagePrefix, const char *label ) {
+    if ( !transport || !stagePrefix ) {
+        return;
+    }
+
+    char stage[64];
+    Com_sprintf( stage, sizeof( stage ), "%s.invoke", stagePrefix );
+
+    char detail[128];
+
+    if ( label && label[0] ) {
+        Com_sprintf( detail, sizeof( detail ), "invoking %s backend", label );
+    } else {
+        Q_strncpyz( detail, "invoking backend", sizeof( detail ) );
+    }
+
+    QL_ClientAuth_LogStage( transport, stage, detail );
+}
+
+static void QL_ClientAuth_LogBackendResult( const ql_client_auth_transport_t *transport, const char *stagePrefix, const char *label, qboolean handled, const ql_auth_response_t *response ) {
+    if ( !transport || !stagePrefix ) {
+        return;
+    }
+
+    char stage[64];
+    Com_sprintf( stage, sizeof( stage ), "%s.result", stagePrefix );
+
+    if ( !response ) {
+        QL_ClientAuth_LogStage( transport, stage, handled ? "handled=true, outcome=unknown, message=\"<missing>\"" : "handled=false, outcome=unknown, message=\"<missing>\"" );
+        return;
+    }
+
+    const char *outcome = QL_DescribeAuthOutcome( response );
+    const char *message = response->message[0] ? response->message : "<no message>";
+
+    char detail[256];
+
+    if ( label && label[0] ) {
+        Com_sprintf( detail, sizeof( detail ),
+            "handled=%s, backend=%s, outcome=%s, message=\"%s\"",
+            handled ? "true" : "false",
+            label,
+            outcome,
+            message );
+    } else {
+        Com_sprintf( detail, sizeof( detail ),
+            "handled=%s, outcome=%s, message=\"%s\"",
+            handled ? "true" : "false",
+            outcome,
+            message );
+    }
+
+    QL_ClientAuth_LogStage( transport, stage, detail );
+}
+
 static void QL_ClientAuth_TokenPreview( const ql_auth_credential_t *credential, char *buffer, size_t bufferSize ) {
     if ( !buffer || bufferSize == 0 ) {
         return;
@@ -129,24 +184,40 @@ static qboolean QL_ClientAuth_InvokeBackend( qboolean (*backend)( const ql_auth_
 }
 
 static qboolean QL_ClientAuth_HandleSteamworksTicket( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
-    (void)transport;
+    QL_ClientAuth_LogBackendInvocation( transport, "steamworks", "Steamworks" );
 
-    return QL_ClientAuth_InvokeBackend( QL_PlatformBackendSteamworks_Authenticate,
+    qboolean handled = QL_ClientAuth_InvokeBackend( QL_PlatformBackendSteamworks_Authenticate,
         credential, response, "Steamworks" );
+
+    QL_ClientAuth_LogBackendResult( transport, "steamworks", "Steamworks", handled, response );
+
+    return handled;
 }
 
-static qboolean QL_ClientAuth_HandleOpenSteamTicket( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
-    return QL_ClientAuth_InvokeBackend( QL_PlatformBackendOpenSteam_Authenticate,
+static qboolean QL_ClientAuth_HandleOpenSteamTicket( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+    QL_ClientAuth_LogBackendInvocation( transport, "open_adapter", "Open Steam Adapter" );
+
+    qboolean handled = QL_ClientAuth_InvokeBackend( QL_PlatformBackendOpenSteam_Authenticate,
         credential, response, "Open Steam Adapter" );
+
+    QL_ClientAuth_LogBackendResult( transport, "open_adapter", "Open Steam Adapter", handled, response );
+
+    return handled;
 }
 
-static qboolean QL_ClientAuth_HandleStandaloneToken( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+static qboolean QL_ClientAuth_HandleStandaloneToken( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
     if ( !credential || credential->kind != QL_AUTH_CREDENTIAL_STANDALONE_TOKEN ) {
         return qfalse;
     }
 
-    return QL_ClientAuth_InvokeBackend( QL_PlatformBackendOpenSteam_Authenticate,
+    QL_ClientAuth_LogBackendInvocation( transport, "standalone", "Open Steam Adapter" );
+
+    qboolean handled = QL_ClientAuth_InvokeBackend( QL_PlatformBackendOpenSteam_Authenticate,
         credential, response, "Open Steam Adapter" );
+
+    QL_ClientAuth_LogBackendResult( transport, "standalone", "Open Steam Adapter", handled, response );
+
+    return handled;
 }
 
 static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
@@ -160,7 +231,10 @@ static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_
         return qtrue;
     }
 
-    qboolean fallbackHandled = QL_ClientAuth_HandleOpenSteamTicket( credential, response );
+    QL_ClientAuth_LogBackendInvocation( transport, "open_adapter", "Open Steam Adapter" );
+
+    qboolean fallbackHandled = QL_ClientAuth_InvokeBackend( QL_PlatformBackendOpenSteam_Authenticate,
+        credential, response, "Open Steam Adapter" );
 
     if ( fallbackHandled && response->result == QL_AUTH_RESULT_ACCEPTED ) {
         char preview[32];
@@ -168,8 +242,12 @@ static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_
 
         QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
             "Hybrid fallback accepted credential via open adapter (token=%s)", preview );
+
+        QL_ClientAuth_LogBackendResult( transport, "open_adapter", "Open Steam Adapter", fallbackHandled, response );
         return qtrue;
     }
+
+    QL_ClientAuth_LogBackendResult( transport, "open_adapter", "Open Steam Adapter", fallbackHandled, response );
 
     if ( handled ) {
         *response = steamResponse;
@@ -191,7 +269,7 @@ static qboolean QL_ClientAuth_DispatchSteam( const ql_client_auth_transport_t *t
     }
 
     if ( !Q_stricmp( provider, "Open Steam Adapter" ) ) {
-        return QL_ClientAuth_HandleOpenSteamTicket( credential, response );
+        return QL_ClientAuth_HandleOpenSteamTicket( transport, credential, response );
     }
 
     return QL_ClientAuth_HandleSteamworksTicket( transport, credential, response );
@@ -260,7 +338,7 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
             handled = QL_ClientAuth_DispatchSteam( &transport, credential, response );
             break;
         case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-            handled = QL_ClientAuth_HandleStandaloneToken( credential, response );
+            handled = QL_ClientAuth_HandleStandaloneToken( &transport, credential, response );
             break;
         default:
             QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
