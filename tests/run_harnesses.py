@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from tools.tests.client_regression import ClientPredictor, ClientRegressionHarness
 from tools.tests.match_sim.harness import run_from_file
+from tools.tests.re_trace_harness import run_trace_harness
 DEFAULT_SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "sample_scenario.json"
 DEFAULT_SNAPSHOTS = REPO_ROOT / "tools" / "tests" / "client_regression" / "sample_snapshots.json"
 
@@ -64,7 +66,12 @@ def _run_client_harness(target: str, artifact_root: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run deterministic harness suites and emit artefacts.")
-    parser.add_argument("--target", choices=("qvm", "dll"), required=True, help="Build target driving the harness run")
+    parser.add_argument(
+        "--target",
+        choices=("qvm", "dll", "re"),
+        required=True,
+        help="Build target driving the harness run",
+    )
     parser.add_argument(
         "--artifact-root",
         type=Path,
@@ -72,6 +79,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Destination root for artefacts (defaults to artifacts/tests).",
     )
     parser.add_argument("--seed", type=int, default=2024, help="Seed override for deterministic simulations")
+    parser.add_argument(
+        "--reverse-build-root",
+        type=Path,
+        default=Path("build") / "re" / ("windows" if os.name == "nt" else "linux"),
+        help="Location of clean-room binaries for the trace harness.",
+    )
     args = parser.parse_args(argv)
 
     artifact_root = args.artifact_root
@@ -79,6 +92,23 @@ def main(argv: list[str] | None = None) -> int:
 
     _run_match_harness(args.target, artifact_root, args.seed)
     _run_client_harness(args.target, artifact_root)
+
+    if args.target == "re":
+        trace_artifact_root = artifact_root / "trace" / args.target
+        expectation = REPO_ROOT / "tests" / "expectations" / "re" / "native-shim.log"
+        result = run_trace_harness(args.reverse_build_root, expectation, trace_artifact_root)
+
+        summary_log = artifact_root / "logs" / args.target / "trace_harness.log"
+        status = "matched" if result.matches_expectation else "differs"
+        _write_text(
+            summary_log,
+            (
+                "Trace harness run completed successfully.\n"
+                f"Observed log: {result.log_path}\n"
+                f"Diff output: {result.diff_path}\n"
+                f"Expectation status: {status}\n"
+            ),
+        )
 
     return 0
 
