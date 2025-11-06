@@ -23,9 +23,22 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
 - `docs/`: Living documentation covering build pipelines, reverse-engineering stages, gameplay audits, and test harnesses. Start with the reverse-engineering handbook, CI matrix, and documentation backlog when orienting yourself.【F:docs/reverse-engineering/handbook.md†L1-L37】【F:docs/devops/ci-matrix.md†L1-L38】【F:docs/documentation-backlog.md†L1-L29】
 
 ## Reverse-Engineering Workflow Notes
-- The HLIL exports are available for both Quake III (`references/hlil/quake3/`) and Quake Live (`references/hlil/quakelive/`). Keeping the two sets side-by-side enables systematic diffing between the retail Quake III code and the decompiled Quake Live functions when porting behavior.
-- Quake Live assets under `references/original-assets/quakelive/` expose binary modules (`cgamex86.dll`, `qagamex86.dll`, `uix86.dll`, etc.) and supporting data (fonts, icons, maps) to validate assumptions or reproduce file formats.
-- The active `src/` tree should evolve from the Quake III baseline towards Quake Live parity. Build scripts and auxiliary tools from the original release remain in place to facilitate compiling both the native engine and the QVMs as changes are introduced.
+- The HLIL exports are available for both Quake III (`references/hlil/quake3/`) and
+  Quake Live (`references/hlil/quakelive/`). Keeping the two sets side-by-side
+  enables systematic diffing between the retail Quake III code and the decompiled
+  Quake Live functions when porting behaviour.【F:docs/onboarding/overview.md†L6-L19】
+- Quake Live assets under `references/original-assets/quakelive/` expose binary
+  modules (`cgamex86.dll`, `qagamex86.dll`, `uix86.dll`, etc.) and supporting data
+  (fonts, icons, maps) to validate assumptions or reproduce file formats.【F:docs/onboarding/overview.md†L6-L19】
+- The active `src/` tree should evolve from the Quake III baseline towards Quake
+  Live parity while the clean-room `src-re/` prototypes and sign-off drops are
+  traced through the deterministic harness for regression coverage.【F:docs/reverse-engineering/handbook.md†L11-L36】【F:docs/devops/ci-matrix.md†L1-L34】
+- Tests under `tests/` and automation under `tools/ci/` feed the deterministic
+  harness workflow, publishing artefacts into `artifacts/` and `logs/` so
+  reviewers can inspect parity evidence without rerunning the suites locally.【F:docs/devops/ci-matrix.md†L1-L34】【F:tests/run_harnesses.py†L27-L116】
+- CI workflows enforce the toolchain and harness guardrails on Linux and Windows
+  hosts, mirroring the scripts documented in the onboarding guide to keep the
+  reconstructed builds reproducible.【F:.github/workflows/toolchain.yml†L1-L15】【F:.github/workflows/windows-native.yml†L1-L27】【F:.github/workflows/deterministic-harnesses.yml†L10-L93】
 
 ## CI & Workflow References
 - **Toolchain (QVM):** Exercises the GPL-era QVM toolchain on every push/PR via `tools/ci/verify-qvm-toolchain.sh`, ensuring the legacy bytecode pipeline stays reproducible.【F:.github/workflows/toolchain.yml†L1-L15】【F:tools/ci/verify-qvm-toolchain.sh†L1-L45】
@@ -33,10 +46,20 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
 - **Deterministic Harnesses:** Fans out across QVM, DLL, and reverse targets, reusing the clean-room build helper and uploading artefacts/logs under `artifacts/` and `logs/` for review.【F:.github/workflows/deterministic-harnesses.yml†L10-L93】【F:docs/devops/ci-matrix.md†L15-L38】
 
 ## Next Steps for Contributors
-1. Familiarize yourself with the HLIL dump organization so that Quake Live specific behaviors can be tracked back to decompiled functions.
-2. Compare modules in `src/code/` against their HLIL equivalents to identify divergences that must be ported.
-3. Keep the documentation in this overview updated as the project introduces new directories, tooling, or reverse-engineered components.
-4. Use the living build notes in [`docs/qvmtools.md`](qvmtools.md), [`docs/windows-native-pipeline.md`](windows-native-pipeline.md), and the [`Native Toolchain Support Matrix`](platform/toolchain-matrix.md) when reproducing the legacy QVM toolchain or the Visual Studio DLL workflow so that outputs stay aligned with the archived Quake Live binaries.【F:docs/platform/toolchain-matrix.md†L1-L18】
+1. Skim the onboarding overview and reverse-engineering handbook to understand the
+   repository layout, stage outputs, and review cadence before diving into code or
+   artefacts.【F:docs/onboarding/overview.md†L1-L89】【F:docs/reverse-engineering/handbook.md†L1-L60】
+2. Familiarise yourself with the HLIL dump organisation in `references/hlil/` and
+   compare modules in `src/` and `src-re/` against their Quake Live counterparts to
+   identify behaviour gaps that must be ported.【F:docs/onboarding/overview.md†L6-L19】【F:docs/reverse-engineering/handbook.md†L11-L36】
+3. Run `tests/run_harnesses.py` locally (QVM, DLL, and reverse targets) to align
+   with the deterministic harness matrix and inspect the artefacts emitted under
+   `artifacts/` and `logs/`.【F:tests/run_harnesses.py†L27-L116】【F:docs/devops/ci-matrix.md†L1-L34】
+4. Keep this overview updated as the project introduces new directories, tooling,
+   or automation, and reference the living build notes in [`docs/qvmtools.md`](qvmtools.md),
+   [`docs/windows-native-pipeline.md`](windows-native-pipeline.md), and the
+   [`Native Toolchain Support Matrix`](platform/toolchain-matrix.md) when
+   reproducing legacy toolchains.【F:docs/platform/toolchain-matrix.md†L1-L18】
 
 ## Controls & Configuration Defaults
 - **Reference bindings** – The Quake Live snapshot in `references/original-assets/quakelive/baseq3/default.cfg` captures the modernized control scheme (weapon toggle on `F`, dedicated drop bindings, vote shortcuts, etc.).【68ce2a†L215-L224】【fcaf97†L1-L86】 Ported builds should ship this file—alongside curated training configs such as `tim.cfg` and `sponge.cfg`—so the engine can execute `exec default.cfg` during bootstrap without diverging from retail expectations.【F:src/code/qcommon/common.c†L2389-L2405】【F:src/code/ui/ui_main.c†L3223-L3263】
