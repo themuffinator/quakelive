@@ -572,6 +572,7 @@ gotnewcl:
 	Com_DPrintf( "Going from CS_FREE to CS_CONNECTED for %s\n", newcl->name );
 
 	newcl->state = CS_CONNECTED;
+	SV_BotRefreshEntityBotFlag( newcl );
 	newcl->nextSnapshotTime = svs.time;
 	newcl->lastPacketTime = svs.time;
 	newcl->lastConnectTime = svs.time;
@@ -759,6 +760,7 @@ void SV_ClientEnterWorld( client_t *client, usercmd_t *cmd ) {
 	ent = SV_GentityNum( clientNum );
 	ent->s.number = clientNum;
 	client->gentity = ent;
+	SV_BotRefreshEntityBotFlag( client );
 
 	client->deltaMessage = -1;
 	client->nextSnapshotTime = svs.time;	// generate a snapshot immediately

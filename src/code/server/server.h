@@ -348,6 +348,7 @@ qboolean	SV_inPVS (const vec3_t p1, const vec3_t p2);
 void		SV_BotFrame( int time );
 int			SV_BotAllocateClient(void);
 void		SV_BotFreeClient( int clientNum );
+void		SV_BotRefreshEntityBotFlag( client_t *cl );
 
 void		SV_BotInitCvars(void);
 int			SV_BotLibSetup( void );

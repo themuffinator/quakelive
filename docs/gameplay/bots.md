@@ -16,6 +16,8 @@ This page captures the current expectations for server-side bot handling in the 
 
 * The server marks a bot slot by setting `SVF_BOT` only after the `client_t` reaches `CS_CONNECTED`, ensuring entity flags stay in sync with live clients and mirroring the HLIL flow noted in the ClientConnect analysis.
 * Regression scenario: add a bot, issue `clientkick <botnum>`, then immediately connect as a human. Inspect `g_entities[botnum].r.svFlags` (via `entitylist` or debugging) to confirm the `SVF_BOT` bit clears once the slot returns to `CS_FREE`, preventing stale bot markers from leaking into recycled slots.
+* Regression scenario: populate a server with bots, run `map_restart`, and verify that each returning bot entity is re-flagged once it hits `CS_ACTIVE` while any human reconnecting during the restart keeps `SVF_BOT` cleared. This confirms the refresh call in `SV_ClientEnterWorld` mirrors the HLIL masking behaviour across state transitions.
+* Regression scenario: allow a human to reclaim a freshly freed bot slot (for example by connecting from localhost after a bot eviction) and watch the entity through the `CS_CONNECTED` handshake; the mask should clear as soon as the connection is accepted, matching the Quake Live HLIL expectations for admission checks.
 
 ## Known limitations
 

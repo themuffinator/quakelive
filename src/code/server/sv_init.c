@@ -481,11 +481,12 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 
 					client = &svs.clients[i];
 					client->state = CS_ACTIVE;
-					ent = SV_GentityNum( i );
-					ent->s.number = i;
-					client->gentity = ent;
+				ent = SV_GentityNum( i );
+				ent->s.number = i;
+				client->gentity = ent;
+				SV_BotRefreshEntityBotFlag( client );
 
-					client->deltaMessage = -1;
+				client->deltaMessage = -1;
 					client->nextSnapshotTime = svs.time;	// generate a snapshot immediately
 
 					VM_Call( gvm, GAME_CLIENT_BEGIN, i );

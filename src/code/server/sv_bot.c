@@ -38,7 +38,9 @@ int bot_maxdebugpolys;
 extern botlib_export_t	*botlib_export;
 int	bot_enable;
 
-static void SV_BotApplyEntityBotFlag( client_t *cl, qboolean markBot ) {
+void SV_BotRefreshEntityBotFlag( client_t *cl ) {
+	qboolean	shouldMarkBot;
+
 	if ( !cl ) {
 		return;
 	}
@@ -47,12 +49,9 @@ static void SV_BotApplyEntityBotFlag( client_t *cl, qboolean markBot ) {
 		return;
 	}
 
-	if ( !markBot ) {
-		cl->gentity->r.svFlags &= ~SVF_BOT;
-		return;
-	}
+	shouldMarkBot = ( cl->netchan.remoteAddress.type == NA_BOT && cl->state >= CS_CONNECTED );
 
-	if ( cl->state >= CS_CONNECTED ) {
+	if ( shouldMarkBot ) {
 		cl->gentity->r.svFlags |= SVF_BOT;
 	} else {
 		cl->gentity->r.svFlags &= ~SVF_BOT;
@@ -90,7 +89,7 @@ int SV_BotAllocateClient(void) {
 	cl->netchan.remoteAddress.type = NA_BOT;
 	cl->rate = 16384;
 
-	SV_BotApplyEntityBotFlag( cl, qtrue );
+	SV_BotRefreshEntityBotFlag( cl );
 
 	return i;
 }
@@ -110,7 +109,7 @@ void SV_BotFreeClient( int clientNum ) {
 	cl->state = CS_FREE;
 	cl->name[0] = 0;
 	cl->netchan.remoteAddress.type = NA_BAD;
-	SV_BotApplyEntityBotFlag( cl, qfalse );
+	SV_BotRefreshEntityBotFlag( cl );
 }
 
 /*
