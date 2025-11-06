@@ -29,6 +29,7 @@ weaponConfig_t	g_weaponConfig;
 
 weaponReloadConfig_t	g_weaponReloadConfig;
 knockbackConfig_t	g_knockbackConfig;
+ammoPackConfig_t	g_ammoPackConfig;
 startingAmmoConfig_t	g_startingAmmoConfig;
 #define STRINGIZE_HELPER( x ) #x
 #define STRINGIZE( x ) STRINGIZE_HELPER( x )
@@ -511,6 +512,54 @@ void G_UpdateWeaponReloadConfig( void ) {
 	G_InitWeaponReloadConfig();
 }
 
+static int G_ReadAmmoPackCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+	int value;
+
+	if ( !cvar ) {
+		G_ReportMissingCvar( cvarName );
+		return fallback;
+	}
+
+	value = cvar->integer;
+
+	if ( value < 0 ) {
+		return fallback;
+	}
+
+	return value;
+}
+
+void G_InitAmmoPackConfig( void ) {
+	int weapon;
+
+	for ( weapon = WP_NONE; weapon < WP_NUM_WEAPONS; ++weapon ) {
+		g_ammoPackConfig.weaponPickup[weapon] = 0;
+	}
+
+	g_ammoPackConfig.weaponPickup[WP_MACHINEGUN] = G_ReadAmmoPackCvar( &g_ammoPack_mg, DEFAULT_AMMOPACK_MG, "g_ammoPack_mg" );
+	g_ammoPackConfig.weaponPickup[WP_SHOTGUN] = G_ReadAmmoPackCvar( &g_ammoPack_sg, DEFAULT_AMMOPACK_SG, "g_ammoPack_sg" );
+	g_ammoPackConfig.weaponPickup[WP_GRENADE_LAUNCHER] = G_ReadAmmoPackCvar( &g_ammoPack_gl, DEFAULT_AMMOPACK_GL, "g_ammoPack_gl" );
+	g_ammoPackConfig.weaponPickup[WP_ROCKET_LAUNCHER] = G_ReadAmmoPackCvar( &g_ammoPack_rl, DEFAULT_AMMOPACK_RL, "g_ammoPack_rl" );
+	g_ammoPackConfig.weaponPickup[WP_LIGHTNING] = G_ReadAmmoPackCvar( &g_ammoPack_lg, DEFAULT_AMMOPACK_LG, "g_ammoPack_lg" );
+	g_ammoPackConfig.weaponPickup[WP_RAILGUN] = G_ReadAmmoPackCvar( &g_ammoPack_rg, DEFAULT_AMMOPACK_RG, "g_ammoPack_rg" );
+	g_ammoPackConfig.weaponPickup[WP_PLASMAGUN] = G_ReadAmmoPackCvar( &g_ammoPack_pg, DEFAULT_AMMOPACK_PG, "g_ammoPack_pg" );
+	g_ammoPackConfig.weaponPickup[WP_BFG] = G_ReadAmmoPackCvar( &g_ammoPack_bfg, DEFAULT_AMMOPACK_BFG, "g_ammoPack_bfg" );
+
+#ifdef WP_HEAVY_MACHINEGUN
+	g_ammoPackConfig.weaponPickup[WP_HEAVY_MACHINEGUN] = G_ReadAmmoPackCvar( &g_ammoPack_hmg, DEFAULT_AMMOPACK_HMG, "g_ammoPack_hmg" );
+#endif
+
+#ifdef MISSIONPACK
+	g_ammoPackConfig.weaponPickup[WP_NAILGUN] = G_ReadAmmoPackCvar( &g_ammoPack_ng, DEFAULT_AMMOPACK_NG, "g_ammoPack_ng" );
+	g_ammoPackConfig.weaponPickup[WP_PROX_LAUNCHER] = G_ReadAmmoPackCvar( &g_ammoPack_pl, DEFAULT_AMMOPACK_PL, "g_ammoPack_pl" );
+	g_ammoPackConfig.weaponPickup[WP_CHAINGUN] = G_ReadAmmoPackCvar( &g_ammoPack_cg, DEFAULT_AMMOPACK_CG, "g_ammoPack_cg" );
+#endif
+}
+
+void G_UpdateAmmoPackConfig( void ) {
+	G_InitAmmoPackConfig();
+}
+
 static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
         if ( !cvar ) {
                 G_ReportMissingCvar( cvarName );
@@ -771,6 +820,7 @@ void G_RegisterCvars( void ) {
 	G_InitWeaponReloadConfig();
 	G_InitKnockbackConfig();
 	G_InitStartingAmmoConfig();
+	G_InitAmmoPackConfig();
 }
 
 void G_UpdateCvars( void ) {
@@ -805,6 +855,7 @@ void G_UpdateCvars( void ) {
 	G_UpdateWeaponReloadConfig();
 	G_UpdateKnockbackConfig();
 	G_UpdateStartingAmmoConfig();
+	G_UpdateAmmoPackConfig();
 }
 
 /*
