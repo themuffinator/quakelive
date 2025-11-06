@@ -8,6 +8,8 @@ The **gameplay parity** documentation set keeps the reverse-engineering effort a
 | [`regression-rationale-template.md`](./regression-rationale-template.md) | Template for documenting intentional or accidental deviations from Quake Live behaviour, including required approvals. | Gameplay Systems (@gamedev-lead), QA Lead (@qa-automation), Release Manager (@release-captain) |
 | [`hlil-mapping-updates.md`](./hlil-mapping-updates.md) | Running log of HLIL export changes that affect gameplay validation and reference lookups. | Documentation Steward (@analysis-ops), HLIL Export Maintainer (@reverse-core) |
 
+> **Owner cross-check cadence:** Ping the owners in the rightmost column whenever you edit a file so they can confirm the update within one business day. Record sign-off directly in each document's banner note.
+
 ## Review Workflow
 1. Start with the **Gameplay Parity Ledger** to confirm the current implementation and the relevant code owners.
 2. If you discover a deviation, record it with the **Regression Rationale Template** and notify the listed owners for sign-off.

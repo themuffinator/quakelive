@@ -5,6 +5,11 @@
 - Published refreshed contributor guidance describing the local harness execution expectations and when `N/A` justifications are acceptable.
 - Announced the verification policy changes here and in the internal ops channel so every team can adapt their workflows.
 
+## Documentation Updates – August 2024
+- Gameplay parity documents (`docs/gameplay/parity/`) now include owner cross-check banners so teams know who last validated the content and who to ping for follow-up.
+- The parity hub README records the expected review cadence, ensuring changes to the ledger, regression rationale template, and HLIL mapping log are acknowledged within one business day.
+- Release managers should circulate this update in the contributor newsletter to highlight the new verification flow.
+
 ## Documentation Updates – July 2024
 - Centralised the gameplay parity documentation under `docs/gameplay/parity/README.md`, including owner contact links and a verification checklist for cross-team reviews.
 

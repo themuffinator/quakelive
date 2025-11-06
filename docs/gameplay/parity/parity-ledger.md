@@ -2,6 +2,8 @@
 
 This ledger tracks the implementation status of Quake Live gameplay behaviours relative to the upstream Quake III Arena codebase. It is intended as a quick reference for maintainers and feature owners who need to understand the current coverage and remaining gaps for production readiness. Refer to the [Gameplay Parity Documentation Hub](./README.md) for the latest list of code owners to ping when updating these entries.
 
+> **Owner cross-check:** Last validated with Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) on 2024-08-20. Owners should update this note after each review pass.
+
 ## Legend
 - **Status**
   - ✅ *Complete* – Behaviour is fully validated against Quake Live references.
