@@ -77,7 +77,7 @@ void QLR_CL_AdjustTimeDelta(qlr_snapshot_context_t *ctx) {
 }
 
 void QLR_CL_FirstSnapshot(qlr_snapshot_context_t *ctx) {
-    if (ctx->cl->timing.latest.snapFlags & 0x0001 /* SNAPFLAG_NOT_ACTIVE */) {
+    if (ctx->cl->timing.latest.snapFlags & QLR_SNAPFLAG_NOT_ACTIVE) {
         return;
     }
 
