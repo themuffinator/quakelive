@@ -11,6 +11,7 @@
 - The Accept button gracefully closes the menu if manual entry is disabled (auto-provisioned credentials), preventing the user from seeing stale values.
 - New `uiScript openCredentials` handler opens the credential menu from scriptable menus, enabling reuse for future navigation links.
 - Runtime now mirrors the `ui_credentialPreview` cvar so menu authors can confirm the text box content inside the standalone template without building the VM.
+- Engine-side credential loading now updates `ui_credentialKind` and `ui_credentialManualHidden` so script-only previews automatically reflect Steam/standalone auto-provision states when cached tokens exist.
 
 ## Layout Considerations
 - Credential type selector is positioned above the credential field (y ≈ 196) with the text field at y ≈ 252 for parity with the original frame.
@@ -24,11 +25,14 @@
 - Intro helper copy (`Choose how you want to manage your account credential.`) sits above the selector to reinforce that players can switch credential kinds even when manual entry is hidden.
 
 ## Design Snapshot
-- **State A – Manual entry enabled:** Legacy CD Key selected, text box visible, prompt (`Enter the 16-character key…`) rendered above the field, and status copy responding live to validation.
-- **State B – Steam auto-provisioned:** Steam Ticket selected with `ui_credentialManualHidden=1`, credential field hidden, banner copy swapped to the Steam automation notice, and the refresh hint updated to `Launch through Steam to refresh or repair the linked credential.`
-- **State C – Standalone auto-provisioned:** Standalone Token selected with manual entry hidden, auto message explains launcher ownership while the hint line reads `Launch from the standalone client to refresh or revoke the cached token.`
+### State A – Manual entry enabled
+Legacy CD Key selected, text box visible, prompt (`Enter the 16-character key…`) rendered above the field, and status copy responding live to validation. This mock reflects `ui_credentialKind=0` and `ui_credentialManualHidden=0`.
 
-> Screenshot capture is still pending; use the notes above to stage reference shots once the menu renders in engine.
+### State B – Steam auto-provisioned
+Steam Ticket selected with `ui_credentialManualHidden=1`, credential field hidden, banner copy swapped to the Steam automation notice, and the refresh hint updated to `Launch through Steam to refresh or repair the linked credential.` The Accept button dismisses the menu because manual entry is disabled.
+
+### State C – Standalone auto-provisioned
+Standalone Token selected with manual entry hidden, auto message explains launcher ownership while the hint line reads `Launch from the standalone client to refresh or revoke the cached token.`
 
 ## Localization Handoff
 - All runtime/UI copy for the credential menu has been catalogued in `docs/ui/localization/credential-menu_strings.md` so translators can batch the new text alongside other Quake Live menu updates.

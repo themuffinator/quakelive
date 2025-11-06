@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 
 #include "../game/botlib.h"
+#include "../../common/auth_credentials.h"
 
 extern	botlib_export_t	*botlib_export;
 
@@ -683,6 +684,38 @@ void Key_SetCatcher( int catcher ) {
 
 /*
 ====================
+CLUI_SyncCredentialCvars
+====================
+*/
+static void CLUI_SyncCredentialCvars( const char *rawValue ) {
+	ql_auth_credential_t credential;
+	qboolean parsed;
+	qboolean autoProvisioned;
+	qlAuthCredentialKind kind;
+
+	if ( !rawValue ) {
+		rawValue = "";
+	}
+
+	parsed = QL_ParseCredentialString( rawValue, &credential );
+	if ( !parsed ) {
+		QL_InitAuthCredential( &credential );
+	}
+
+	kind = credential.kind;
+	if ( kind == QL_AUTH_CREDENTIAL_EMPTY ) {
+		kind = QL_AUTH_CREDENTIAL_LEGACY_CDKEY;
+	}
+
+	autoProvisioned = ( credential.length > 0 && kind != QL_AUTH_CREDENTIAL_LEGACY_CDKEY );
+
+	Cvar_SetValue( "ui_credentialKind", (float)kind );
+	Cvar_Set( "ui_credentialAuto", autoProvisioned ? "1" : "0" );
+	Cvar_Set( "ui_credentialManualHidden", autoProvisioned ? "1" : "0" );
+}
+
+/*
+====================
 CLUI_GetCDKey
 ====================
 */
@@ -702,6 +735,8 @@ static void CLUI_GetCDKey( char *buf, int buflen ) {
 	}
 
 	Q_strncpyz( buf, source, buflen );
+
+	CLUI_SyncCredentialCvars( source );
 }
 
 
@@ -722,6 +757,8 @@ static void CLUI_SetCDKey( char *buf ) {
 	}
 	// set the flag so the file will be written at the next opportunity
 	cvar_modifiedFlags |= CVAR_ARCHIVE;
+
+	CLUI_SyncCredentialCvars( input );
 }
 
 /*
