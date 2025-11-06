@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -15,25 +16,14 @@ if str(REPO_ROOT) not in sys.path:
 from tools.tests.client_regression import ClientPredictor, ClientRegressionHarness
 from tools.tests.match_sim.harness import run_from_file
 from tools.tests.re_trace_harness import run_trace_harness
-DEFAULT_SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "sample_scenario.json"
-SNAPSHOT_ARCHIVES: dict[str, Path] = {
-    "baseline": REPO_ROOT / "tools" / "tests" / "client_regression" / "sample_snapshots.json",
-    "weapons_and_items": REPO_ROOT
-    / "tools"
-    / "tests"
-    / "client_regression"
-    / "weapons_and_items_snapshots.json",
-    "server_correction": REPO_ROOT
-    / "tools"
-    / "tests"
-    / "client_regression"
-    / "server_correction_snapshots.json",
-    "resource_drain": REPO_ROOT
-    / "tools"
-    / "tests"
-    / "client_regression"
-    / "resource_drain_snapshots.json",
+SCENARIO_ROOT = REPO_ROOT / "tools" / "tests" / "match_sim"
+SCENARIOS: dict[str, Path] = {
+    "duel": SCENARIO_ROOT / "sample_scenario.json",
+    "overtime": SCENARIO_ROOT / "overtime_scenario.json",
+    "loadouts": SCENARIO_ROOT / "complex_loadouts.json",
 }
+DEFAULT_SCENARIO = SCENARIOS["duel"]
+DEFAULT_SNAPSHOTS = REPO_ROOT / "tools" / "tests" / "client_regression" / "sample_snapshots.json"
 
 
 def _write_text(path: Path, text: str) -> None:
@@ -42,19 +32,33 @@ def _write_text(path: Path, text: str) -> None:
 
 
 def _run_match_harness(target: str, artifact_root: Path, seed: int) -> None:
-    timeline_path = artifact_root / "match_sim" / target / "timeline.json"
-    result = run_from_file(DEFAULT_SCENARIO, seed=seed, output_path=timeline_path)
+    summaries: list[dict[str, object]] = []
+    for slug, scenario_path in SCENARIOS.items():
+        timeline_path = artifact_root / "match_sim" / target / slug / "timeline.json"
+        result = run_from_file(scenario_path, seed=seed, output_path=timeline_path)
 
-    summary = {
-        "target": target,
-        "scenario": str(DEFAULT_SCENARIO.relative_to(REPO_ROOT)),
-        "seed": seed,
-        "frame_count": len(result.frames),
-        "duration_seconds": result.frames[-1].time if result.frames else 0.0,
-        "bots": sorted(result.frames[0].bots.keys()) if result.frames else [],
-    }
+        summaries.append(
+            {
+                "target": target,
+                "slug": slug,
+                "scenario": str(scenario_path.relative_to(REPO_ROOT)),
+                "seed": seed,
+                "frame_count": len(result.frames),
+                "duration_seconds": result.frames[-1].time if result.frames else 0.0,
+                "bots": sorted(result.frames[0].bots.keys()) if result.frames else [],
+            }
+        )
+
+    index_path = artifact_root / "match_sim" / target / "index.json"
+    _write_text(index_path, json.dumps(summaries, indent=2) + "\n")
+
     summary_log = artifact_root / "logs" / target / "match_sim.log"
-    _write_text(summary_log, "Match simulation harness completed successfully.\n" + json.dumps(summary, indent=2) + "\n")
+    _write_text(
+        summary_log,
+        "Match simulation harness completed successfully.\n"
+        + json.dumps(summaries, indent=2)
+        + "\n",
+    )
 
 
 def _run_client_harness(target: str, artifact_root: Path) -> None:
@@ -97,6 +101,37 @@ def _run_client_harness(target: str, artifact_root: Path) -> None:
     _write_text(log_path, log_text)
 
 
+def _ensure_reverse_build(target: str, reverse_build_root: Path) -> None:
+    """Run the clean-room build helper so trace harnesses have binaries."""
+
+    if target != "re":
+        return
+
+    build_script = REPO_ROOT / "tools" / "ci" / "build-cleanroom.sh"
+    if not build_script.exists():
+        raise FileNotFoundError(f"Missing clean-room build helper: {build_script}")
+
+    # Execute the helper from the repository root so relative paths align with CI.
+    subprocess.run([str(build_script)], check=True, cwd=str(REPO_ROOT))
+
+    if reverse_build_root.name.lower() == "windows":
+        extension = ".dll"
+    else:
+        extension = ".so"
+
+    expected_outputs = ["qlr_client_frame", "qlr_game_frame"]
+    missing = [
+        name
+        for name in expected_outputs
+        if not (reverse_build_root / f"{name}{extension}").exists()
+    ]
+    if missing:
+        formatted = ", ".join(missing)
+        raise FileNotFoundError(
+            "Clean-room build did not produce expected artefacts: " f"{formatted}"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run deterministic harness suites and emit artefacts.")
     parser.add_argument(
@@ -122,6 +157,8 @@ def main(argv: list[str] | None = None) -> int:
 
     artifact_root = args.artifact_root
     artifact_root.mkdir(parents=True, exist_ok=True)
+
+    _ensure_reverse_build(args.target, args.reverse_build_root)
 
     _run_match_harness(args.target, artifact_root, args.seed)
     _run_client_harness(args.target, artifact_root)

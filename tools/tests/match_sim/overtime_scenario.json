@@ -1,0 +1,60 @@
+{
+  "map": "qzdm13",
+  "duration": 12.5,
+  "tick_rate": 10,
+  "seed": 3141,
+  "metadata": {
+    "description": "Overtime sudden-death duel",
+    "regulation_duration": 10.0,
+    "overtime": true
+  },
+  "bots": [
+    {
+      "name": "keel",
+      "team": "red",
+      "spawn": {
+        "random_positions": [
+          {"position": [-64, 0, 80]},
+          {"position": [48, -96, 80]},
+          {"position": [96, 32, 80]}
+        ]
+      },
+      "initial_state": {
+        "health": 125,
+        "ammo": {"rocket": 12, "machinegun": 60},
+        "inventory": {"armor": 75, "mega": 1}
+      },
+      "script": [
+        {"time": 0.0, "action": "look", "params": {"direction": [1, 0, 0]}},
+        {"time": 0.1, "action": "move", "params": {"direction": [1, 0, 0], "speed": 320}},
+        {"time": 2.0, "action": "shoot", "params": {"weapon": "rocket", "cost": 1}},
+        {"time": 4.5, "action": "item", "params": {"name": "ammo_pack", "count": 1}},
+        {"time": 9.9, "action": "say", "params": {"message": "Regulation tied. Overtime!"}},
+        {"time": 10.2, "action": "set_state", "params": {"custom": {"phase": "overtime"}}},
+        {"time": 11.4, "action": "shoot", "params": {"weapon": "rocket", "cost": 2}},
+        {"time": 12.0, "action": "custom", "params": {"score": 1, "winning_shot": "rocket"}}
+      ]
+    },
+    {
+      "name": "visor",
+      "team": "blue",
+      "spawn": {
+        "position": [-128, 64, 80]
+      },
+      "initial_state": {
+        "health": 100,
+        "ammo": {"rail": 5, "plasma": 40},
+        "inventory": {"armor": 50}
+      },
+      "script": [
+        {"time": 0.0, "action": "look", "params": {"direction": [0, 1, 0]}},
+        {"time": 0.3, "action": "move", "params": {"direction": {"random": {"mode": "vector", "length": 1.0}}, "speed": 300}},
+        {"time": 5.2, "action": "shoot", "params": {"weapon": "rail", "cost": 1}},
+        {"time": 10.0, "action": "custom", "params": {"phase": "regulation_end", "score": 0}},
+        {"time": 10.5, "action": "damage", "params": {"amount": 80}},
+        {"time": 11.8, "action": "heal", "params": {"amount": 25}},
+        {"time": 12.2, "action": "say", "params": {"message": "gg"}}
+      ]
+    }
+  ]
+}

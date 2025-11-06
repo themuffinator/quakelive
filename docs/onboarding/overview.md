@@ -73,6 +73,7 @@ migration-era tooling that now lives alongside the legacy Quake III sources.
    native DLL, and reverse builds stay in lockstep.【F:tests/run_harnesses.py†L27-L111】【F:docs/testing/match-sim.md†L1-L45】【F:docs/testing/client-regression.md†L1-L55】【F:docs/testing/rules-fixtures.md†L1-L33】【F:docs/reverse-engineering/trace-harness.md†L1-L92】
 5. **Document findings** – Update the relevant architecture, gameplay, or reverse-engineering notes and log
    follow-ups in the documentation backlog so the wider team can track migration progress.【F:docs/reverse-engineering/handbook.md†L1-L56】【F:docs/documentation-backlog.md†L1-L40】
+6. **Validate against the contributor checklist** – Before opening your first PR, walk through the [Contributor Checklist](../process/contributor-checklist.md) so you understand the deterministic harness, baseline refresh, and syscall contract expectations reviewers will look for.【F:docs/process/contributor-checklist.md†L1-L45】
 
 By following these steps, new contributors can align with the current repository structure, tooling, and
 workflows established during the Quake Live migration.

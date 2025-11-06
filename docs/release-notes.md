@@ -1,5 +1,10 @@
 # Release Notes
 
+## Process Updates – September 2024
+- Re-emphasised deterministic harness expectations, baseline refresh discipline, and syscall contract logging in the contributor checklist.
+- Cross-linked the checklist from the PR template and onboarding overview so new contributors see the requirements before their first submission.
+- Posted an announcement in the `#reverse-maintenance` Slack channel summarising the stricter pre-flight requirements and linking back to the updated documentation.
+
 ## Process Updates – August 2024
 - Updated the pull request template to require reviewer-accessible links for harness run results, baseline diffs, and syscall contract records.
 - Published refreshed contributor guidance describing the local harness execution expectations and when `N/A` justifications are acceptable.

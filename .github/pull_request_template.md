@@ -1,3 +1,5 @@
+> ℹ️ Before filling this template, review the [Contributor Checklist](../docs/process/contributor-checklist.md) to confirm your harness runs, baselines, and syscall documentation are ready for review.
+
 ## Summary
 - [ ] Linked issue or task: <!-- e.g. JIRA-123 -->
 - [ ] Description of changes: <!-- brief summary -->

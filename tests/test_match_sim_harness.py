@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -12,6 +14,12 @@ if str(REPO_ROOT) not in sys.path:
 from tools.tests.match_sim.harness import MatchHarness, load_config, run_from_file
 
 SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "sample_scenario.json"
+SCENARIO_DIR = REPO_ROOT / "tools" / "tests" / "match_sim"
+ALL_SCENARIOS = [
+    SCENARIO,
+    SCENARIO_DIR / "overtime_scenario.json",
+    SCENARIO_DIR / "complex_loadouts.json",
+]
 
 
 def test_run_from_file_is_deterministic(tmp_path) -> None:
@@ -49,3 +57,14 @@ def test_seed_override_changes_randomised_outputs() -> None:
 
     assert default_direction != override_direction
     assert default_result.to_json(indent=None) != override_result.to_json(indent=None)
+
+
+@pytest.mark.parametrize("scenario_path", ALL_SCENARIOS, ids=[path.stem for path in ALL_SCENARIOS])
+def test_all_scenarios_produce_frames(scenario_path: Path) -> None:
+    """Ensure every shipped scenario runs without errors and emits timeline frames."""
+
+    result = run_from_file(scenario_path, seed=1337)
+
+    assert result.frames, "Scenario should produce at least one frame"
+    assert result.config.map
+    assert result.config.metadata is not None
