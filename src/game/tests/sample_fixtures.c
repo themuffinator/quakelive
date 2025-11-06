@@ -1,4 +1,4 @@
-#include "fixture_runner.h"
+#include "rules_fixtures.h"
 
 #if defined(__has_include)
 #if __has_include("bg_public.h")
