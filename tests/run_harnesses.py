@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -64,6 +65,37 @@ def _run_client_harness(target: str, artifact_root: Path) -> None:
     )
 
 
+def _ensure_reverse_build(target: str, reverse_build_root: Path) -> None:
+    """Run the clean-room build helper so trace harnesses have binaries."""
+
+    if target != "re":
+        return
+
+    build_script = REPO_ROOT / "tools" / "ci" / "build-cleanroom.sh"
+    if not build_script.exists():
+        raise FileNotFoundError(f"Missing clean-room build helper: {build_script}")
+
+    # Execute the helper from the repository root so relative paths align with CI.
+    subprocess.run([str(build_script)], check=True, cwd=str(REPO_ROOT))
+
+    if reverse_build_root.name.lower() == "windows":
+        extension = ".dll"
+    else:
+        extension = ".so"
+
+    expected_outputs = ["qlr_client_frame", "qlr_game_frame"]
+    missing = [
+        name
+        for name in expected_outputs
+        if not (reverse_build_root / f"{name}{extension}").exists()
+    ]
+    if missing:
+        formatted = ", ".join(missing)
+        raise FileNotFoundError(
+            "Clean-room build did not produce expected artefacts: " f"{formatted}"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run deterministic harness suites and emit artefacts.")
     parser.add_argument(
@@ -89,6 +121,8 @@ def main(argv: list[str] | None = None) -> int:
 
     artifact_root = args.artifact_root
     artifact_root.mkdir(parents=True, exist_ok=True)
+
+    _ensure_reverse_build(args.target, args.reverse_build_root)
 
     _run_match_harness(args.target, artifact_root, args.seed)
     _run_client_harness(args.target, artifact_root)

@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_ROOT="${REPO_ROOT}/build/re/linux"
 SRC_ROOT="${REPO_ROOT}/src-re/prototypes"
+INCLUDE_ROOT="${REPO_ROOT}/src-re/include"
 
 CC="${QLR_RE_CC:-${CC:-gcc}}"
 CFLAGS_DEFAULT="-std=c99 -Wall -Wextra -O2 -fPIC"
@@ -26,6 +27,7 @@ build_module() {
   "$CC" \
     $CFLAGS \
     -I"${SRC_ROOT}/common" \
+    -I"${INCLUDE_ROOT}" \
     "$@" \
     $LDFLAGS \
     -o "$output"
