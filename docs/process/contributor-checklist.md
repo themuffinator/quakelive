@@ -12,6 +12,7 @@ This checklist sets expectations for local validation before submitting a pull r
 - Execute the suites locally before pushing for review. Record the command, seed, and git revision in your run log.
 - Export the run artifacts to a durable location (CI dashboard, shared drive, or local HTML report) that reviewers can open.
 - Capture the resulting URL or artifact path—you must paste this into the **Harness run(s)** field of the PR template.
+- Store the raw command output or HTML bundle in `artifacts/harness-runs/` (or the team SharePoint) so it remains accessible for at least 30 days.
 - If a suite cannot be executed locally, document why (e.g. missing hardware target) and escalate to the module owner before opening the PR.
 - Marking `N/A` in the PR template is acceptable only after the module owner confirms the exemption and you note the reason.
 

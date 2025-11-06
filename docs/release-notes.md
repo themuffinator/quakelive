@@ -1,5 +1,10 @@
 # Release Notes
 
+## Process Updates – August 2024
+- Updated the pull request template to require reviewer-accessible links for harness run results, baseline diffs, and syscall contract records.
+- Published refreshed contributor guidance describing the local harness execution expectations and when `N/A` justifications are acceptable.
+- Announced the verification policy changes here and in the internal ops channel so every team can adapt their workflows.
+
 ## Documentation Updates – July 2024
 - Centralised the gameplay parity documentation under `docs/gameplay/parity/README.md`, including owner contact links and a verification checklist for cross-team reviews.
 
