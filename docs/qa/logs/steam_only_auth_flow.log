@@ -1,0 +1,5 @@
+-- Scenario 1: Steamworks --
+[auth] Steamworks dispatch (/steam/session/validate): submitting credential
+[auth] Steamworks payload summary: ticket=TICKET-…cdef (len=23)
+[auth] Steamworks result -> outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
+
