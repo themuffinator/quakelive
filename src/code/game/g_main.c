@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
 #include "g_local.h"
+#include "g_config.h"
 #include <limits.h>
 #include "../../../src-re/include/ql_types.h"
 #include <time.h>
@@ -29,84 +30,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 level_locals_t	level;
 weaponConfig_t	g_weaponConfig;
 
-weaponReloadConfig_t	g_weaponReloadConfig;
-knockbackConfig_t	g_knockbackConfig;
-ammoPackConfig_t	g_ammoPackConfig;
-factoryCvarConfig_t	g_factoryCvarConfig;
-startingAmmoConfig_t	g_startingAmmoConfig;
-#define STRINGIZE_HELPER( x ) #x
-#define STRINGIZE( x ) STRINGIZE_HELPER( x )
-
-#define DEFAULT_STARTING_AMMO_BFG           10      // Quake Live default (data_1007e194 -> "10").
-#define DEFAULT_STARTING_AMMO_CG            100     // Quake Live default (data_1007e154 -> "100").
-#define DEFAULT_STARTING_AMMO_G             -1      // Quake Live default (data_100875ec -> "-1").
-#define DEFAULT_STARTING_AMMO_GH            -1      // Quake Live default (data_100875ec -> "-1").
-#define DEFAULT_STARTING_AMMO_GL            10      // Quake Live default (data_1007e194 -> "10").
-#define DEFAULT_STARTING_AMMO_HMG           50      // Quake Live default (data_1007e1fc -> "50").
-#define DEFAULT_STARTING_AMMO_LG            100     // Quake Live default (data_1007e154 -> "100").
-#define DEFAULT_STARTING_AMMO_MG            100     // Quake Live default (data_1007e154 -> "100").
-#define DEFAULT_STARTING_AMMO_NG            10      // Quake Live default (data_1007e194 -> "10").
-#define DEFAULT_STARTING_AMMO_PG            50      // Quake Live default (data_1007e1fc -> "50").
-#define DEFAULT_STARTING_AMMO_PL            5       // Quake Live default (data_10087340 -> "5").
-#define DEFAULT_STARTING_AMMO_RG            5       // Quake Live default (data_10087340 -> "5").
-#define DEFAULT_STARTING_AMMO_RL            5       // Quake Live default (data_10087340 -> "5").
-#define DEFAULT_STARTING_AMMO_SG            10      // Quake Live default (data_1007e194 -> "10").
-
-#define DEFAULT_WEAPON_RELOAD_BFG           300     // Quake Live default (data_10085968 -> "300").
-#define DEFAULT_WEAPON_RELOAD_CG            50      // Quake Live default (data_1007e1fc -> "50").
-#define DEFAULT_WEAPON_RELOAD_GAUNTLET      400     // Quake Live default (data_10087355 -> "400").
-#define DEFAULT_WEAPON_RELOAD_GH            100     // Quake Live default (data_1007e154 -> "100").
-#define DEFAULT_WEAPON_RELOAD_GL            800     // Quake Live default (data_10086cbc -> "800").
-#define DEFAULT_WEAPON_RELOAD_HMG           75      // Quake Live default (data_100870d2 -> "75").
-#define DEFAULT_WEAPON_RELOAD_HOOK          100     // Quake Live default (data_1007e154 -> "100").
-#define DEFAULT_WEAPON_RELOAD_LG            50      // Quake Live default (data_1007e1fc -> "50").
-#define DEFAULT_WEAPON_RELOAD_MG            100     // Quake Live default (data_1007e154 -> "100").
-#define DEFAULT_WEAPON_RELOAD_NG            1000    // Quake Live default (data_1008747c -> "1000").
-#define DEFAULT_WEAPON_RELOAD_PG            100     // Quake Live default (data_1007e154 -> "100").
-#define DEFAULT_WEAPON_RELOAD_PROX          800     // Quake Live default (data_10086cbc -> "800").
-#define DEFAULT_WEAPON_RELOAD_RG            1500    // Quake Live default (data_10086760 -> "1500").
-#define DEFAULT_WEAPON_RELOAD_RL            800     // Quake Live default (data_10086cbc -> "800").
-#define DEFAULT_WEAPON_RELOAD_SG            1000    // Quake Live default (data_1008747c -> "1000").
-
-#define DEFAULT_KNOCKBACK_BFG               1.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d1d8 -> "1").
-#define DEFAULT_KNOCKBACK_CG                1.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d1d8 -> "1").
-#define DEFAULT_KNOCKBACK_G                 1.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d1d8 -> "1").
-#define DEFAULT_KNOCKBACK_GH                -5.0    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086b93 -> "-5").
-#define DEFAULT_KNOCKBACK_GL                1.10    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086b7c -> "1.10").
-#define DEFAULT_KNOCKBACK_HMG               1.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d1d8 -> "1").
-#define DEFAULT_KNOCKBACK_LG                1.75    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086b54 -> "1.75").
-#define DEFAULT_KNOCKBACK_MG                1.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d1d8 -> "1").
-#define DEFAULT_KNOCKBACK_NG                1.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d1d8 -> "1").
-#define DEFAULT_KNOCKBACK_PG                1.10    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086b7c -> "1.10").
-#define DEFAULT_KNOCKBACK_PG_SELF           1.30    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086b1c -> "1.30").
-#define DEFAULT_KNOCKBACK_PL                1.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d1d8 -> "1").
-#define DEFAULT_KNOCKBACK_RG                0.85    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086af4 -> "0.85").
-#define DEFAULT_KNOCKBACK_RL                0.90    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086adc -> "0.90").
-#define DEFAULT_KNOCKBACK_RL_SELF           1.10    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086b7c -> "1.10").
-#define DEFAULT_KNOCKBACK_SG                1.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d1d8 -> "1").
-#define DEFAULT_KNOCKBACK_VERTICAL          24.0    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086ab7 -> "24").
-#define DEFAULT_KNOCKBACK_VERTICAL_SELF     24.0    // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_10086ab7 -> "24").
-#define DEFAULT_KNOCKBACK_CRIPPLE           0.0     // Quake Live default (references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_part02.txt data_1007d0a8 -> "0").
-
-#define DEFAULT_AMMOPACK_BFG                15
-#define DEFAULT_AMMOPACK_CG                 100
-#define DEFAULT_AMMOPACK_GL                 5
-#define DEFAULT_AMMOPACK_HMG                50
-#define DEFAULT_AMMOPACK_LG                 60
-#define DEFAULT_AMMOPACK_MG                 50
-#define DEFAULT_AMMOPACK_NG                 20
-#define DEFAULT_AMMOPACK_PG                 30
-#define DEFAULT_AMMOPACK_PL                 10
-#define DEFAULT_AMMOPACK_RG                 10
-#define DEFAULT_AMMOPACK_RL                 5
-#define DEFAULT_AMMOPACK_SG                 10
-
-#define DEFAULT_STARTING_WEAPONS_MASK      ( ( 1 << ( WP_GAUNTLET - 1 ) ) | ( 1 << ( WP_MACHINEGUN - 1 ) ) )
-#define DEFAULT_INFINITE_AMMO              0
-#define DEFAULT_AMMO_PACK_TOGGLE           0
-#define DEFAULT_AMMO_PACK_HACK             0
-#define DEFAULT_AMMO_RESPAWN_SECONDS       40
-#define DEFAULT_SUDDEN_DEATH_RESPAWN       0
 
 typedef struct {
 	vmCvar_t	*vmCvar;
@@ -160,26 +83,6 @@ vmCvar_t	g_speed;
 vmCvar_t	g_gravity;
 vmCvar_t	g_cheats;
 vmCvar_t	g_knockback;
-vmCvar_t	g_knockback_g;
-vmCvar_t	g_knockback_mg;
-vmCvar_t	g_knockback_sg;
-vmCvar_t	g_knockback_gl;
-vmCvar_t	g_knockback_rl;
-vmCvar_t	g_knockback_rl_self;
-vmCvar_t	g_knockback_lg;
-vmCvar_t	g_knockback_rg;
-vmCvar_t	g_knockback_pg;
-vmCvar_t	g_knockback_pg_self;
-vmCvar_t	g_knockback_bfg;
-vmCvar_t	g_knockback_gh;
-vmCvar_t	g_knockback_ng;
-vmCvar_t	g_knockback_pl;
-vmCvar_t	g_knockback_cg;
-vmCvar_t	g_knockback_hmg;
-vmCvar_t	g_knockback_z;
-vmCvar_t	g_knockback_z_self;
-vmCvar_t	g_max_knockback;
-vmCvar_t	g_knockback_cripple;
 vmCvar_t	g_quadfactor;
 vmCvar_t	g_forcerespawn;
 vmCvar_t	g_inactivity;
@@ -236,53 +139,6 @@ vmCvar_t	g_damage_rg;
 vmCvar_t	g_damage_bfg;
 vmCvar_t	g_splashDamage_bfg;
 vmCvar_t	g_splashRadius_bfg;
-vmCvar_t	weapon_reload_gauntlet;
-vmCvar_t	weapon_reload_mg;
-vmCvar_t	weapon_reload_sg;
-vmCvar_t	weapon_reload_gl;
-vmCvar_t	weapon_reload_rl;
-vmCvar_t	weapon_reload_lg;
-vmCvar_t	weapon_reload_rg;
-vmCvar_t	weapon_reload_pg;
-vmCvar_t	weapon_reload_bfg;
-vmCvar_t	weapon_reload_gh;
-vmCvar_t	weapon_reload_hook;
-vmCvar_t	weapon_reload_ng;
-vmCvar_t	weapon_reload_prox;
-vmCvar_t	weapon_reload_cg;
-vmCvar_t	weapon_reload_hmg;
-vmCvar_t	g_startingWeapons;
-vmCvar_t	g_infiniteAmmo;
-vmCvar_t	g_ammoPack;
-vmCvar_t	g_ammoPackHack;
-vmCvar_t	g_ammoRespawn;
-vmCvar_t	g_suddenDeathRespawn;
-vmCvar_t	g_ammoPack_bfg;
-vmCvar_t	g_ammoPack_cg;
-vmCvar_t	g_ammoPack_gl;
-vmCvar_t	g_ammoPack_hmg;
-vmCvar_t	g_ammoPack_lg;
-vmCvar_t	g_ammoPack_mg;
-vmCvar_t	g_ammoPack_ng;
-vmCvar_t	g_ammoPack_pg;
-vmCvar_t	g_ammoPack_pl;
-vmCvar_t	g_ammoPack_rg;
-vmCvar_t	g_ammoPack_rl;
-vmCvar_t	g_ammoPack_sg;
-vmCvar_t	g_startingAmmo_bfg;
-vmCvar_t	g_startingAmmo_cg;
-vmCvar_t	g_startingAmmo_g;
-vmCvar_t	g_startingAmmo_gh;
-vmCvar_t	g_startingAmmo_gl;
-vmCvar_t	g_startingAmmo_hmg;
-vmCvar_t	g_startingAmmo_lg;
-vmCvar_t	g_startingAmmo_mg;
-vmCvar_t	g_startingAmmo_ng;
-vmCvar_t	g_startingAmmo_pg;
-vmCvar_t	g_startingAmmo_pl;
-vmCvar_t	g_startingAmmo_rg;
-vmCvar_t	g_startingAmmo_rl;
-vmCvar_t	g_startingAmmo_sg;
 static int matchFlow_lastTimeoutCount = -1;
 static int matchFlow_lastOvertimeLength = -1;
 static int matchFlow_lastSuddenDeathRespawn = INT_MIN;
@@ -350,28 +206,7 @@ static cvarTable_t		gameCvarTable[] = {
 
 	{ &g_speed, "g_speed", "320", 0, 0, qtrue  },
 	{ &g_gravity, "g_gravity", "800", 0, 0, qtrue  },
-	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue  },
-	{ &g_knockback_g, "g_knockback_g", STRINGIZE( DEFAULT_KNOCKBACK_G ), 0, 0, qfalse, qfalse, "Gauntlet knockback scalar applied when striking other players." },
-	{ &g_knockback_mg, "g_knockback_mg", STRINGIZE( DEFAULT_KNOCKBACK_MG ), 0, 0, qfalse, qfalse, "Machinegun knockback scalar applied to outgoing hits." },
-	{ &g_knockback_sg, "g_knockback_sg", STRINGIZE( DEFAULT_KNOCKBACK_SG ), 0, 0, qfalse, qfalse, "Shotgun knockback scalar for pellets that land on opponents." },
-	{ &g_knockback_gl, "g_knockback_gl", STRINGIZE( DEFAULT_KNOCKBACK_GL ), 0, 0, qfalse, qfalse, "Grenade Launcher knockback scalar applied to direct and splash damage." },
-	{ &g_knockback_rl, "g_knockback_rl", STRINGIZE( DEFAULT_KNOCKBACK_RL ), 0, 0, qfalse, qfalse, "Rocket Launcher knockback scalar for enemies struck by rockets." },
-	{ &g_knockback_rl_self, "g_knockback_rl_self", STRINGIZE( DEFAULT_KNOCKBACK_RL_SELF ), 0, 0, qfalse, qfalse, "Self-inflicted rocket knockback scalar used for rocket jumps." },
-	{ &g_knockback_lg, "g_knockback_lg", STRINGIZE( DEFAULT_KNOCKBACK_LG ), 0, 0, qfalse, qfalse, "Lightning Gun knockback scalar." },
-	{ &g_knockback_rg, "g_knockback_rg", STRINGIZE( DEFAULT_KNOCKBACK_RG ), 0, 0, qfalse, qfalse, "Railgun knockback scalar." },
-	{ &g_knockback_pg, "g_knockback_pg", STRINGIZE( DEFAULT_KNOCKBACK_PG ), 0, 0, qfalse, qfalse, "Plasmagun knockback scalar for opponents." },
-	{ &g_knockback_pg_self, "g_knockback_pg_self", STRINGIZE( DEFAULT_KNOCKBACK_PG_SELF ), 0, 0, qfalse, qfalse, "Self-inflicted plasmagun knockback scalar." },
-	{ &g_knockback_bfg, "g_knockback_bfg", STRINGIZE( DEFAULT_KNOCKBACK_BFG ), 0, 0, qfalse, qfalse, "BFG knockback scalar." },
-	{ &g_knockback_gh, "g_knockback_gh", STRINGIZE( DEFAULT_KNOCKBACK_GH ), 0, 0, qfalse, qfalse, "Grappling Hook knockback scalar." },
-	{ &g_knockback_ng, "g_knockback_ng", STRINGIZE( DEFAULT_KNOCKBACK_NG ), 0, 0, qfalse, qfalse, "Nailgun knockback scalar." },
-	{ &g_knockback_pl, "g_knockback_pl", STRINGIZE( DEFAULT_KNOCKBACK_PL ), 0, 0, qfalse, qfalse, "Proximity Launcher knockback scalar." },
-	{ &g_knockback_cg, "g_knockback_cg", STRINGIZE( DEFAULT_KNOCKBACK_CG ), 0, 0, qfalse, qfalse, "Chaingun knockback scalar." },
-	{ &g_knockback_hmg, "g_knockback_hmg", STRINGIZE( DEFAULT_KNOCKBACK_HMG ), 0, 0, qfalse, qfalse, "Heavy Machinegun knockback scalar." },
-	{ &g_knockback_z, "g_knockback_z", STRINGIZE( DEFAULT_KNOCKBACK_VERTICAL ), 0, 0, qfalse, qfalse, "Vertical knockback boost added after weapon scaling." },
-	{ &g_knockback_z_self, "g_knockback_z_self", STRINGIZE( DEFAULT_KNOCKBACK_VERTICAL_SELF ), 0, 0, qfalse, qfalse, "Vertical knockback boost when you knock yourself back." },
-	{ &g_max_knockback, "g_max_knockback", "200", 0, 0, qfalse, qfalse, "Upper clamp applied to computed knockback force." },
-	{ &g_knockback_cripple, "g_knockback_cripple", STRINGIZE( DEFAULT_KNOCKBACK_CRIPPLE ), 0, 0, qfalse, qfalse, "Additional knockback scalar consumed by cripple modifiers." },
-	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue  },
+	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue  },	{ &g_max_knockback, "g_max_knockback", "200", 0, 0, qfalse, qfalse, "Upper clamp applied to computed knockback force." },	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue  },
 	{ &g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue  },
 	{ &g_weaponTeamRespawn, "g_weaponTeamRespawn", "30", 0, 0, qtrue },
 	{ &g_forcerespawn, "g_forcerespawn", "20", 0, 0, qtrue },
@@ -389,9 +224,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_listEntity, "g_listEntity", "0", 0, 0, qfalse },
 	{ &g_overtime, "g_overtime", "120", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Overtime period length in seconds once regulation ends tied; 0 keeps sudden death active until the tie is broken." },
 	{ &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
-	{ &g_timeoutCount, "g_timeoutCount", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },
-	{ &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Enable timed respawns during sudden-death overtime." },
-	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_NORESTART, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
+	{ &g_timeoutCount, "g_timeoutCount", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_NORESTART, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
 	{ &g_suddenDeathRespawnTick, "g_suddenDeathRespawnTick", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Interval in seconds after which sudden-death respawn delays are increased." },
 	{ &g_suddenDeathRespawnMax, "g_suddenDeathRespawnMax", "10", CVAR_NORESTART, 0, qfalse, qfalse, "Maximum sudden-death respawn delay in seconds." },
 	{ &g_suddenDeathRespawnIncrement, "g_suddenDeathRespawnIncrement", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Seconds added to the sudden-death respawn delay at each tick." },
@@ -415,57 +248,6 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_damage_bfg, "g_damage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashDamage_bfg, "g_splashDamage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashRadius_bfg, "g_splashRadius_bfg", "120", 0, 0, qtrue },
-
-	{ &weapon_reload_gauntlet, "weapon_reload_gauntlet", "0", 0, 0, qfalse, qfalse, "Gauntlet refire delay override in milliseconds; 0 preserves the compiled behaviour." },
-	{ &weapon_reload_mg, "weapon_reload_mg", "0", 0, 0, qfalse, qfalse, "Machinegun refire delay override in milliseconds; 0 keeps the built-in rate." },
-	{ &weapon_reload_sg, "weapon_reload_sg", "0", 0, 0, qfalse, qfalse, "Shotgun refire delay override in milliseconds; 0 leaves the default timing." },
-	{ &weapon_reload_gl, "weapon_reload_gl", "0", 0, 0, qfalse, qfalse, "Grenade Launcher refire delay override in milliseconds." },
-	{ &weapon_reload_rl, "weapon_reload_rl", "0", 0, 0, qfalse, qfalse, "Rocket Launcher refire delay override in milliseconds." },
-	{ &weapon_reload_lg, "weapon_reload_lg", "0", 0, 0, qfalse, qfalse, "Lightning Gun refire delay override in milliseconds." },
-	{ &weapon_reload_rg, "weapon_reload_rg", "0", 0, 0, qfalse, qfalse, "Railgun refire delay override in milliseconds." },
-	{ &weapon_reload_pg, "weapon_reload_pg", "0", 0, 0, qfalse, qfalse, "Plasma Gun refire delay override in milliseconds." },
-	{ &weapon_reload_bfg, "weapon_reload_bfg", "0", 0, 0, qfalse, qfalse, "BFG refire delay override in milliseconds." },
-	{ &weapon_reload_gh, "weapon_reload_gh", "0", 0, 0, qfalse, qfalse, "Grappling Hook refire delay override in milliseconds." },
-	{ &weapon_reload_hook, "weapon_reload_hook", "0", 0, 0, qfalse, qfalse, "Hook pull refire delay override in milliseconds." },
-	{ &weapon_reload_ng, "weapon_reload_ng", "0", 0, 0, qfalse, qfalse, "Nailgun refire delay override in milliseconds." },
-	{ &weapon_reload_prox, "weapon_reload_prox", "0", 0, 0, qfalse, qfalse, "Proximity Launcher refire delay override in milliseconds." },
-        { &weapon_reload_cg, "weapon_reload_cg", "0", 0, 0, qfalse, qfalse, "Chaingun refire delay override in milliseconds." },
-        { &weapon_reload_hmg, "weapon_reload_hmg", "0", 0, 0, qfalse, qfalse, "Heavy Machinegun refire delay override in milliseconds." },
-
-        { &g_startingWeapons, "g_startingWeapons", STRINGIZE( DEFAULT_STARTING_WEAPONS_MASK ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Bitmask describing which weapons players spawn with; bit (weapon-1) matches the WP_* enum used by Quake Live factories." },
-        { &g_infiniteAmmo, "g_infiniteAmmo", STRINGIZE( DEFAULT_INFINITE_AMMO ), CVAR_ARCHIVE, 0, qfalse, qfalse, "When non-zero, spawn loadouts grant infinite ammunition mirroring Quake Live practice factories." },
-        { &g_ammoPack, "g_ammoPack", STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable Quake Live ammo pack sizing so pickups follow factory scripts instead of compiled defaults." },
-        { &g_ammoPackHack, "g_ammoPackHack", STRINGIZE( DEFAULT_AMMO_PACK_HACK ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Legacy Quake Live ammo pack override used by classic map factories." },
-        { &g_ammoRespawn, "g_ammoRespawn", STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds before ammo entities respawn; Quake Live factories reduce this for faster loops." },
-        { &g_suddenDeathRespawn, "g_suddenDeathRespawn", STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
-        { &g_ammoPack_bfg, "g_ammoPack_bfg", STRINGIZE( DEFAULT_AMMOPACK_BFG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Cells granted when picking up a BFG ammo pack, matching Quake Live's default drop." },
-        { &g_ammoPack_cg, "g_ammoPack_cg", STRINGIZE( DEFAULT_AMMOPACK_CG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Chaingun bullets restored per ammo belt pickup." },
-        { &g_ammoPack_gl, "g_ammoPack_gl", STRINGIZE( DEFAULT_AMMOPACK_GL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grenade Launcher rounds provided by grenade ammo packs." },
-        { &g_ammoPack_hmg, "g_ammoPack_hmg", STRINGIZE( DEFAULT_AMMOPACK_HMG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Heavy Machinegun bullets added from heavy ammo packs." },
-        { &g_ammoPack_lg, "g_ammoPack_lg", STRINGIZE( DEFAULT_AMMOPACK_LG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Lightning Gun cells awarded from lightning ammo pickups." },
-        { &g_ammoPack_mg, "g_ammoPack_mg", STRINGIZE( DEFAULT_AMMOPACK_MG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Machinegun bullets restored by standard bullet boxes." },
-        { &g_ammoPack_ng, "g_ammoPack_ng", STRINGIZE( DEFAULT_AMMOPACK_NG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Nailgun spikes issued from nail ammo packs." },
-        { &g_ammoPack_pg, "g_ammoPack_pg", STRINGIZE( DEFAULT_AMMOPACK_PG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Plasmagun cells delivered with plasma ammo pickups." },
-        { &g_ammoPack_pl, "g_ammoPack_pl", STRINGIZE( DEFAULT_AMMOPACK_PL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Proximity Launcher mines granted from proximity ammo packs." },
-        { &g_ammoPack_rg, "g_ammoPack_rg", STRINGIZE( DEFAULT_AMMOPACK_RG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Railgun slugs provided whenever a rail ammo pack is collected." },
-        { &g_ammoPack_rl, "g_ammoPack_rl", STRINGIZE( DEFAULT_AMMOPACK_RL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Rockets granted per rocket ammo box pickup." },
-        { &g_ammoPack_sg, "g_ammoPack_sg", STRINGIZE( DEFAULT_AMMOPACK_SG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Shotgun shells restored with shell ammo packs." },
-
-        { &g_startingAmmo_bfg, "g_startingAmmo_bfg", STRINGIZE( DEFAULT_STARTING_AMMO_BFG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Cells granted for the BFG whenever spawn loadouts (g_startingWeapons, factories, scripts) include it." },
-	{ &g_startingAmmo_cg, "g_startingAmmo_cg", STRINGIZE( DEFAULT_STARTING_AMMO_CG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Chaingun bullets provided on spawn when the weapon is part of the configured loadout." },
-	{ &g_startingAmmo_g, "g_startingAmmo_g", STRINGIZE( DEFAULT_STARTING_AMMO_G ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Gauntlet swings granted on spawn; -1 mirrors Quake Live's infinite melee behaviour." },
-	{ &g_startingAmmo_gh, "g_startingAmmo_gh", STRINGIZE( DEFAULT_STARTING_AMMO_GH ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grappling Hook ammo applied to players when scripts or factories grant the hook; -1 keeps it unlimited." },
-	{ &g_startingAmmo_gl, "g_startingAmmo_gl", STRINGIZE( DEFAULT_STARTING_AMMO_GL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Grenade Launcher rounds distributed at spawn when the launcher is granted via loadouts." },
-	{ &g_startingAmmo_hmg, "g_startingAmmo_hmg", STRINGIZE( DEFAULT_STARTING_AMMO_HMG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Heavy Machinegun bullets issued alongside spawn loadouts that include the weapon." },
-	{ &g_startingAmmo_lg, "g_startingAmmo_lg", STRINGIZE( DEFAULT_STARTING_AMMO_LG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Lightning Gun cells assigned when loadouts or scripts give the Lightning Gun on spawn." },
-	{ &g_startingAmmo_mg, "g_startingAmmo_mg", STRINGIZE( DEFAULT_STARTING_AMMO_MG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Machinegun bullets supplied on spawn for any loadout that awards the Machinegun." },
-	{ &g_startingAmmo_ng, "g_startingAmmo_ng", STRINGIZE( DEFAULT_STARTING_AMMO_NG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Nailgun spikes given to players when factories or scripts seed the Nailgun." },
-	{ &g_startingAmmo_pg, "g_startingAmmo_pg", STRINGIZE( DEFAULT_STARTING_AMMO_PG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Plasmagun cells granted at spawn when the Plasmagun is included in the starting set." },
-	{ &g_startingAmmo_pl, "g_startingAmmo_pl", STRINGIZE( DEFAULT_STARTING_AMMO_PL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Proximity Launcher mines provided to players when loadouts grant the launcher." },
-	{ &g_startingAmmo_rg, "g_startingAmmo_rg", STRINGIZE( DEFAULT_STARTING_AMMO_RG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Railgun slugs applied on spawn when the Railgun is part of the configured loadout." },
-	{ &g_startingAmmo_rl, "g_startingAmmo_rl", STRINGIZE( DEFAULT_STARTING_AMMO_RL ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Rockets handed out whenever spawn loadouts include the Rocket Launcher." },
-	{ &g_startingAmmo_sg, "g_startingAmmo_sg", STRINGIZE( DEFAULT_STARTING_AMMO_SG ), CVAR_ARCHIVE, 0, qfalse, qfalse, "Shotgun shells distributed when the Shotgun is in the spawn weapon set." },
-
 #ifdef MISSIONPACK
 	{ &g_obeliskHealth, "g_obeliskHealth", "2500", 0, 0, qfalse },
 	{ &g_obeliskRegenPeriod, "g_obeliskRegenPeriod", "1", 0, 0, qfalse },
@@ -548,284 +330,6 @@ void G_InitWeaponConfig( void ) {
 
 void G_UpdateWeaponConfig( void ) {
 	G_InitWeaponConfig();
-}
-
-static int G_ReadWeaponReloadCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
-        if ( !cvar ) {
-                G_ReportMissingCvar( cvarName );
-                return fallback;
-        }
-
-        if ( cvar->integer <= 0 ) {
-                return fallback;
-        }
-
-        return cvar->integer;
-}
-
-void G_InitWeaponReloadConfig( void ) {
-        g_weaponReloadConfig.gauntlet = G_ReadWeaponReloadCvar( &weapon_reload_gauntlet, DEFAULT_WEAPON_RELOAD_GAUNTLET, "weapon_reload_gauntlet" );
-        g_weaponReloadConfig.machinegun = G_ReadWeaponReloadCvar( &weapon_reload_mg, DEFAULT_WEAPON_RELOAD_MG, "weapon_reload_mg" );
-        g_weaponReloadConfig.shotgun = G_ReadWeaponReloadCvar( &weapon_reload_sg, DEFAULT_WEAPON_RELOAD_SG, "weapon_reload_sg" );
-        g_weaponReloadConfig.grenadeLauncher = G_ReadWeaponReloadCvar( &weapon_reload_gl, DEFAULT_WEAPON_RELOAD_GL, "weapon_reload_gl" );
-        g_weaponReloadConfig.rocketLauncher = G_ReadWeaponReloadCvar( &weapon_reload_rl, DEFAULT_WEAPON_RELOAD_RL, "weapon_reload_rl" );
-        g_weaponReloadConfig.lightningGun = G_ReadWeaponReloadCvar( &weapon_reload_lg, DEFAULT_WEAPON_RELOAD_LG, "weapon_reload_lg" );
-        g_weaponReloadConfig.railgun = G_ReadWeaponReloadCvar( &weapon_reload_rg, DEFAULT_WEAPON_RELOAD_RG, "weapon_reload_rg" );
-        g_weaponReloadConfig.plasmagun = G_ReadWeaponReloadCvar( &weapon_reload_pg, DEFAULT_WEAPON_RELOAD_PG, "weapon_reload_pg" );
-        g_weaponReloadConfig.bfg = G_ReadWeaponReloadCvar( &weapon_reload_bfg, DEFAULT_WEAPON_RELOAD_BFG, "weapon_reload_bfg" );
-        g_weaponReloadConfig.grapplingHook = G_ReadWeaponReloadCvar( &weapon_reload_gh, DEFAULT_WEAPON_RELOAD_GH, "weapon_reload_gh" );
-        g_weaponReloadConfig.hook = G_ReadWeaponReloadCvar( &weapon_reload_hook, DEFAULT_WEAPON_RELOAD_HOOK, "weapon_reload_hook" );
-        g_weaponReloadConfig.nailgun = G_ReadWeaponReloadCvar( &weapon_reload_ng, DEFAULT_WEAPON_RELOAD_NG, "weapon_reload_ng" );
-        g_weaponReloadConfig.proximityLauncher = G_ReadWeaponReloadCvar( &weapon_reload_prox, DEFAULT_WEAPON_RELOAD_PROX, "weapon_reload_prox" );
-        g_weaponReloadConfig.chaingun = G_ReadWeaponReloadCvar( &weapon_reload_cg, DEFAULT_WEAPON_RELOAD_CG, "weapon_reload_cg" );
-        g_weaponReloadConfig.heavyMachinegun = G_ReadWeaponReloadCvar( &weapon_reload_hmg, DEFAULT_WEAPON_RELOAD_HMG, "weapon_reload_hmg" );
-}
-
-void G_UpdateWeaponReloadConfig( void ) {
-	G_InitWeaponReloadConfig();
-}
-
-static int G_ReadAmmoPackCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
-        int value;
-
-        if ( !cvar ) {
-                G_ReportMissingCvar( cvarName );
-                return fallback;
-        }
-
-        value = cvar->integer;
-
-        if ( value <= 0 ) {
-                return fallback;
-        }
-
-        return value;
-}
-
-static void G_AssignAmmoPackEntry( weapon_t weapon, const vmCvar_t *cvar, int fallback, const char *cvarName ) {
-        int pickup;
-
-        pickup = G_ReadAmmoPackCvar( cvar, fallback, cvarName );
-
-        g_ammoPackConfig.weaponPickup[weapon] = pickup;
-        if ( pickup > 0 ) {
-                g_ammoPackConfig.weaponMax[weapon] = pickup * 4;
-        } else {
-                g_ammoPackConfig.weaponMax[weapon] = 0;
-        }
-}
-
-void G_InitAmmoPackConfig( void ) {
-        int weapon;
-
-        for ( weapon = WP_NONE; weapon < WP_NUM_WEAPONS; ++weapon ) {
-                g_ammoPackConfig.weaponPickup[weapon] = 0;
-                g_ammoPackConfig.weaponMax[weapon] = 0;
-        }
-
-        G_AssignAmmoPackEntry( WP_MACHINEGUN, &g_ammoPack_mg, DEFAULT_AMMOPACK_MG, "g_ammoPack_mg" );
-        G_AssignAmmoPackEntry( WP_SHOTGUN, &g_ammoPack_sg, DEFAULT_AMMOPACK_SG, "g_ammoPack_sg" );
-        G_AssignAmmoPackEntry( WP_GRENADE_LAUNCHER, &g_ammoPack_gl, DEFAULT_AMMOPACK_GL, "g_ammoPack_gl" );
-        G_AssignAmmoPackEntry( WP_ROCKET_LAUNCHER, &g_ammoPack_rl, DEFAULT_AMMOPACK_RL, "g_ammoPack_rl" );
-        G_AssignAmmoPackEntry( WP_LIGHTNING, &g_ammoPack_lg, DEFAULT_AMMOPACK_LG, "g_ammoPack_lg" );
-        G_AssignAmmoPackEntry( WP_RAILGUN, &g_ammoPack_rg, DEFAULT_AMMOPACK_RG, "g_ammoPack_rg" );
-        G_AssignAmmoPackEntry( WP_PLASMAGUN, &g_ammoPack_pg, DEFAULT_AMMOPACK_PG, "g_ammoPack_pg" );
-        G_AssignAmmoPackEntry( WP_BFG, &g_ammoPack_bfg, DEFAULT_AMMOPACK_BFG, "g_ammoPack_bfg" );
-
-        G_AssignAmmoPackEntry( WP_HEAVY_MACHINEGUN, &g_ammoPack_hmg, DEFAULT_AMMOPACK_HMG, "g_ammoPack_hmg" );
-#ifdef MISSIONPACK
-        G_AssignAmmoPackEntry( WP_NAILGUN, &g_ammoPack_ng, DEFAULT_AMMOPACK_NG, "g_ammoPack_ng" );
-        G_AssignAmmoPackEntry( WP_PROX_LAUNCHER, &g_ammoPack_pl, DEFAULT_AMMOPACK_PL, "g_ammoPack_pl" );
-        G_AssignAmmoPackEntry( WP_CHAINGUN, &g_ammoPack_cg, DEFAULT_AMMOPACK_CG, "g_ammoPack_cg" );
-#endif
-}
-
-void G_UpdateAmmoPackConfig( void ) {
-	G_InitAmmoPackConfig();
-}
-
-static int G_ReadFactoryIntCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
-	if ( !cvar ) {
-		G_ReportMissingCvar( cvarName );
-		return fallback;
-	}
-
-	return cvar->integer;
-}
-
-static qboolean G_ReadFactoryBoolCvar( const vmCvar_t *cvar, qboolean fallback, const char *cvarName ) {
-	int value = G_ReadFactoryIntCvar( cvar, fallback ? 1 : 0, cvarName );
-
-	return value ? qtrue : qfalse;
-}
-
-static int G_ReadStartingWeaponsMaskCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
-	int mask = G_ReadFactoryIntCvar( cvar, fallback, cvarName );
-
-	if ( mask < 0 ) {
-		mask = 0;
-	}
-
-	return mask;
-}
-
-static unsigned int G_ComputeStartingWeaponsStatMask( int mask ) {
-	unsigned int statMask = 0;
-	weapon_t weapon;
-
-	if ( mask <= 0 ) {
-		return 0;
-	}
-
-	for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; ++weapon ) {
-		int cvarBit = 1 << ( weapon - 1 );
-
-		if ( mask & cvarBit ) {
-			statMask |= 1u << weapon;
-		}
-	}
-
-	return statMask;
-}
-
-static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {
-	factoryCvarConfig_t config;
-
-	config.startingWeaponsMask = G_ReadStartingWeaponsMaskCvar( &g_startingWeapons, DEFAULT_STARTING_WEAPONS_MASK, "g_startingWeapons" );
-	config.startingWeaponsStatMask = G_ComputeStartingWeaponsStatMask( config.startingWeaponsMask );
-	if ( config.startingWeaponsStatMask == 0 ) {
-		config.startingWeaponsMask = DEFAULT_STARTING_WEAPONS_MASK;
-		config.startingWeaponsStatMask = G_ComputeStartingWeaponsStatMask( config.startingWeaponsMask );
-	}
-
-	config.infiniteAmmo = G_ReadFactoryBoolCvar( &g_infiniteAmmo, DEFAULT_INFINITE_AMMO, "g_infiniteAmmo" );
-	config.ammoPackEnabled = G_ReadFactoryBoolCvar( &g_ammoPack, DEFAULT_AMMO_PACK_TOGGLE, "g_ammoPack" );
-	config.ammoPackHackEnabled = G_ReadFactoryBoolCvar( &g_ammoPackHack, DEFAULT_AMMO_PACK_HACK, "g_ammoPackHack" );
-	config.ammoRespawnSeconds = G_ReadFactoryIntCvar( &g_ammoRespawn, DEFAULT_AMMO_RESPAWN_SECONDS, "g_ammoRespawn" );
-	if ( config.ammoRespawnSeconds <= 0 ) {
-		config.ammoRespawnSeconds = DEFAULT_AMMO_RESPAWN_SECONDS;
-	}
-
-	config.suddenDeathRespawn = G_ReadFactoryBoolCvar( &g_suddenDeathRespawn, DEFAULT_SUDDEN_DEATH_RESPAWN, "g_suddenDeathRespawn" );
-
-	return config;
-}
-
-static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfig_t *config ) {
-	if ( !reason || !config ) {
-		return;
-	}
-
-	G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i suddenDeathRespawn=%i\n",
-		reason,
-		config->startingWeaponsMask,
-		config->startingWeaponsStatMask,
-		config->infiniteAmmo,
-		config->ammoPackEnabled,
-		config->ammoPackHackEnabled,
-		config->ammoRespawnSeconds,
-		config->suddenDeathRespawn );
-}
-
-static factoryCvarConfig_t s_reportedFactoryConfig;
-
-void G_InitFactoryCvarConfig( void ) {
-	g_factoryCvarConfig = G_LoadFactoryCvarConfig();
-	s_reportedFactoryConfig = g_factoryCvarConfig;
-	G_LogFactoryLoadoutState( "init", &g_factoryCvarConfig );
-}
-
-void G_UpdateFactoryCvarConfig( void ) {
-	factoryCvarConfig_t config = G_LoadFactoryCvarConfig();
-
-	if ( config.startingWeaponsMask != s_reportedFactoryConfig.startingWeaponsMask
-		|| config.startingWeaponsStatMask != s_reportedFactoryConfig.startingWeaponsStatMask
-		|| config.infiniteAmmo != s_reportedFactoryConfig.infiniteAmmo
-		|| config.ammoPackEnabled != s_reportedFactoryConfig.ammoPackEnabled
-		|| config.ammoPackHackEnabled != s_reportedFactoryConfig.ammoPackHackEnabled
-		|| config.ammoRespawnSeconds != s_reportedFactoryConfig.ammoRespawnSeconds
-		|| config.suddenDeathRespawn != s_reportedFactoryConfig.suddenDeathRespawn ) {
-		G_LogFactoryLoadoutState( "update", &config );
-		s_reportedFactoryConfig = config;
-	}
-
-	g_factoryCvarConfig = config;
-}
-
-static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
-        if ( !cvar ) {
-                G_ReportMissingCvar( cvarName );
-                return fallback;
-        }
-
-        return cvar->integer;
-}
-
-void G_InitStartingAmmoConfig( void ) {
-	g_startingAmmoConfig.bfg = G_ReadStartingAmmoCvar( &g_startingAmmo_bfg, DEFAULT_STARTING_AMMO_BFG, "g_startingAmmo_bfg" );
-	g_startingAmmoConfig.chaingun = G_ReadStartingAmmoCvar( &g_startingAmmo_cg, DEFAULT_STARTING_AMMO_CG, "g_startingAmmo_cg" );
-	g_startingAmmoConfig.gauntlet = G_ReadStartingAmmoCvar( &g_startingAmmo_g, DEFAULT_STARTING_AMMO_G, "g_startingAmmo_g" );
-	g_startingAmmoConfig.grapplingHook = G_ReadStartingAmmoCvar( &g_startingAmmo_gh, DEFAULT_STARTING_AMMO_GH, "g_startingAmmo_gh" );
-	g_startingAmmoConfig.grenadeLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_gl, DEFAULT_STARTING_AMMO_GL, "g_startingAmmo_gl" );
-	g_startingAmmoConfig.heavyMachinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_hmg, DEFAULT_STARTING_AMMO_HMG, "g_startingAmmo_hmg" );
-	g_startingAmmoConfig.lightningGun = G_ReadStartingAmmoCvar( &g_startingAmmo_lg, DEFAULT_STARTING_AMMO_LG, "g_startingAmmo_lg" );
-	g_startingAmmoConfig.machinegun = G_ReadStartingAmmoCvar( &g_startingAmmo_mg, DEFAULT_STARTING_AMMO_MG, "g_startingAmmo_mg" );
-	g_startingAmmoConfig.nailgun = G_ReadStartingAmmoCvar( &g_startingAmmo_ng, DEFAULT_STARTING_AMMO_NG, "g_startingAmmo_ng" );
-	g_startingAmmoConfig.plasmagun = G_ReadStartingAmmoCvar( &g_startingAmmo_pg, DEFAULT_STARTING_AMMO_PG, "g_startingAmmo_pg" );
-	g_startingAmmoConfig.proximityLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_pl, DEFAULT_STARTING_AMMO_PL, "g_startingAmmo_pl" );
-	g_startingAmmoConfig.railgun = G_ReadStartingAmmoCvar( &g_startingAmmo_rg, DEFAULT_STARTING_AMMO_RG, "g_startingAmmo_rg" );
-	g_startingAmmoConfig.rocketLauncher = G_ReadStartingAmmoCvar( &g_startingAmmo_rl, DEFAULT_STARTING_AMMO_RL, "g_startingAmmo_rl" );
-	g_startingAmmoConfig.shotgun = G_ReadStartingAmmoCvar( &g_startingAmmo_sg, DEFAULT_STARTING_AMMO_SG, "g_startingAmmo_sg" );
-}
-
-void G_UpdateStartingAmmoConfig( void ) {
-	G_InitStartingAmmoConfig();
-}
-
-static float G_ReadKnockbackCvar( const vmCvar_t *cvar, float fallback, const char *cvarName ) {
-        if ( !cvar ) {
-                G_ReportMissingCvar( cvarName );
-                return fallback;
-        }
-
-        return cvar->value;
-}
-
-void G_InitKnockbackConfig( void ) {
-        g_knockbackConfig.gauntlet = G_ReadKnockbackCvar( &g_knockback_g, DEFAULT_KNOCKBACK_G, "g_knockback_g" );
-        g_knockbackConfig.machinegun = G_ReadKnockbackCvar( &g_knockback_mg, DEFAULT_KNOCKBACK_MG, "g_knockback_mg" );
-        g_knockbackConfig.shotgun = G_ReadKnockbackCvar( &g_knockback_sg, DEFAULT_KNOCKBACK_SG, "g_knockback_sg" );
-        g_knockbackConfig.grenadeLauncher = G_ReadKnockbackCvar( &g_knockback_gl, DEFAULT_KNOCKBACK_GL, "g_knockback_gl" );
-        g_knockbackConfig.rocketLauncher = G_ReadKnockbackCvar( &g_knockback_rl, DEFAULT_KNOCKBACK_RL, "g_knockback_rl" );
-        g_knockbackConfig.rocketLauncherSelf = G_ReadKnockbackCvar( &g_knockback_rl_self, DEFAULT_KNOCKBACK_RL_SELF, "g_knockback_rl_self" );
-        g_knockbackConfig.lightningGun = G_ReadKnockbackCvar( &g_knockback_lg, DEFAULT_KNOCKBACK_LG, "g_knockback_lg" );
-        g_knockbackConfig.railgun = G_ReadKnockbackCvar( &g_knockback_rg, DEFAULT_KNOCKBACK_RG, "g_knockback_rg" );
-        g_knockbackConfig.plasmagun = G_ReadKnockbackCvar( &g_knockback_pg, DEFAULT_KNOCKBACK_PG, "g_knockback_pg" );
-        g_knockbackConfig.plasmagunSelf = G_ReadKnockbackCvar( &g_knockback_pg_self, DEFAULT_KNOCKBACK_PG_SELF, "g_knockback_pg_self" );
-        g_knockbackConfig.bfg = G_ReadKnockbackCvar( &g_knockback_bfg, DEFAULT_KNOCKBACK_BFG, "g_knockback_bfg" );
-        g_knockbackConfig.grapplingHook = G_ReadKnockbackCvar( &g_knockback_gh, DEFAULT_KNOCKBACK_GH, "g_knockback_gh" );
-        g_knockbackConfig.nailgun = G_ReadKnockbackCvar( &g_knockback_ng, DEFAULT_KNOCKBACK_NG, "g_knockback_ng" );
-        g_knockbackConfig.proximityLauncher = G_ReadKnockbackCvar( &g_knockback_pl, DEFAULT_KNOCKBACK_PL, "g_knockback_pl" );
-        g_knockbackConfig.chaingun = G_ReadKnockbackCvar( &g_knockback_cg, DEFAULT_KNOCKBACK_CG, "g_knockback_cg" );
-        g_knockbackConfig.heavyMachinegun = G_ReadKnockbackCvar( &g_knockback_hmg, DEFAULT_KNOCKBACK_HMG, "g_knockback_hmg" );
-        g_knockbackConfig.vertical = G_ReadKnockbackCvar( &g_knockback_z, DEFAULT_KNOCKBACK_VERTICAL, "g_knockback_z" );
-        g_knockbackConfig.verticalSelf = G_ReadKnockbackCvar( &g_knockback_z_self, DEFAULT_KNOCKBACK_VERTICAL_SELF, "g_knockback_z_self" );
-
-        {
-                float maxKnockback = G_ReadKnockbackCvar( &g_max_knockback, 200.0f, "g_max_knockback" );
-
-                if ( maxKnockback <= 0.0f ) {
-                        maxKnockback = 200.0f;
-                }
-
-                g_knockbackConfig.maxKnockback = maxKnockback;
-        }
-
-        g_knockbackConfig.cripple = G_ReadKnockbackCvar( &g_knockback_cripple, DEFAULT_KNOCKBACK_CRIPPLE, "g_knockback_cripple" );
-}
-
-void G_UpdateKnockbackConfig( void ) {
-        G_InitKnockbackConfig();
 }
 
 
@@ -1002,15 +506,18 @@ void G_RegisterCvars( void ) {
 		}
 	}
 
-	if (remapped) {
-		G_RemapTeamShaders();
-	}
+        if (remapped) {
+                G_RemapTeamShaders();
+        }
 
-	// check some things
-	if ( g_gametype.integer < 0 || g_gametype.integer >= GT_MAX_GAME_TYPE ) {
-		G_Printf( "g_gametype %i is out of range, defaulting to 0\n", g_gametype.integer );
-		trap_Cvar_Set( "g_gametype", "0" );
-	}
+        G_Config_RegisterCvars();
+        G_Config_UpdateCvars();
+
+        // check some things
+        if ( g_gametype.integer < 0 || g_gametype.integer >= GT_MAX_GAME_TYPE ) {
+                G_Printf( "g_gametype %i is out of range, defaulting to 0\n", g_gametype.integer );
+                trap_Cvar_Set( "g_gametype", "0" );
+        }
 
 	level.warmupModificationCount = g_warmup.modificationCount;
 	G_InitWeaponConfig();
@@ -1045,15 +552,17 @@ void G_UpdateCvars( void ) {
 		}
 	}
 
-	if (remapped) {
-		G_RemapTeamShaders();
-	}
+        if (remapped) {
+                G_RemapTeamShaders();
+        }
 
-	G_UpdateWeaponConfig();
-	G_UpdateWeaponReloadConfig();
-	G_UpdateKnockbackConfig();
-	G_UpdateStartingAmmoConfig();
-	G_UpdateAmmoPackConfig();
+        G_Config_UpdateCvars();
+
+        G_UpdateWeaponConfig();
+        G_UpdateWeaponReloadConfig();
+        G_UpdateKnockbackConfig();
+        G_UpdateStartingAmmoConfig();
+        G_UpdateAmmoPackConfig();
 	G_UpdateFactoryCvarConfig();
 }
 

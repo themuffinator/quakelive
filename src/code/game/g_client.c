@@ -1264,85 +1264,24 @@ void ClientBegin( int clientNum ) {
 
 /*
 ==============================
-G_GetConfiguredSpawnAmmo
+G_SeedConfiguredSpawnAmmo
 
 Consolidate g_startingAmmo_* lookups so every spawn loadout path
 (g_startingWeapons, factories, scripted grants) applies the same
 clamps and "infinite" semantics.
 ==============================
 */
-static int G_GetConfiguredSpawnAmmo( weapon_t weapon ) {
-        int ammo;
-
-        switch ( weapon ) {
-        case WP_NONE:
-                return 0;
-        case WP_GAUNTLET:
-                ammo = g_startingAmmoConfig.gauntlet;
-                break;
-        case WP_MACHINEGUN:
-                ammo = g_startingAmmoConfig.machinegun;
-                break;
-        case WP_SHOTGUN:
-                ammo = g_startingAmmoConfig.shotgun;
-                break;
-        case WP_GRENADE_LAUNCHER:
-                ammo = g_startingAmmoConfig.grenadeLauncher;
-                break;
-        case WP_ROCKET_LAUNCHER:
-                ammo = g_startingAmmoConfig.rocketLauncher;
-                break;
-        case WP_LIGHTNING:
-                ammo = g_startingAmmoConfig.lightningGun;
-                break;
-        case WP_RAILGUN:
-                ammo = g_startingAmmoConfig.railgun;
-                break;
-        case WP_PLASMAGUN:
-                ammo = g_startingAmmoConfig.plasmagun;
-                break;
-        case WP_BFG:
-                ammo = g_startingAmmoConfig.bfg;
-                break;
-        case WP_GRAPPLING_HOOK:
-                ammo = g_startingAmmoConfig.grapplingHook;
-                break;
-#ifdef MISSIONPACK
-        case WP_NAILGUN:
-                ammo = g_startingAmmoConfig.nailgun;
-                break;
-        case WP_PROX_LAUNCHER:
-                ammo = g_startingAmmoConfig.proximityLauncher;
-                break;
-        case WP_CHAINGUN:
-                ammo = g_startingAmmoConfig.chaingun;
-                break;
-#endif
-        case WP_HEAVY_MACHINEGUN:
-                ammo = g_startingAmmoConfig.heavyMachinegun;
-                break;
-        default:
-                return 0;
-        }
-
-	if ( g_factoryCvarConfig.infiniteAmmo ) {
-		return -1;
-	}
-
-        // -1 retains the INFINITE semantics expected by pmove and weapon fire; see g_startingAmmo_* CVars.
-        if ( ammo < 0 ) {
-                return -1;
-        }
-
-        return ammo;
-}
-
-static void G_SeedConfiguredSpawnAmmo( playerState_t *ps, weapon_t weapon ) {
+static void G_SeedConfiguredSpawnAmmo( playerState_t *ps, weapon_t weapon, int configuredAmmo ) {
         if ( !ps || weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
                 return;
         }
 
-        ps->ammo[weapon] = G_GetConfiguredSpawnAmmo( weapon );
+        if ( g_factoryCvarConfig.infiniteAmmo || configuredAmmo < 0 ) {
+                ps->ammo[weapon] = -1;
+                return;
+        }
+
+        ps->ammo[weapon] = configuredAmmo;
 }
 
 static weapon_t G_SelectFactorySpawnWeapon( unsigned int statMask ) {
@@ -1510,6 +1449,25 @@ void ClientSpawn(gentity_t *ent) {
 	{
 		unsigned int startingMask = g_factoryCvarConfig.startingWeaponsStatMask;
 		weapon_t weapon;
+		const int startingAmmoTable[WP_NUM_WEAPONS] = {
+			[WP_NONE] = 0,
+			[WP_GAUNTLET] = g_startingAmmoConfig.gauntlet,
+			[WP_MACHINEGUN] = g_startingAmmoConfig.machinegun,
+			[WP_SHOTGUN] = g_startingAmmoConfig.shotgun,
+			[WP_GRENADE_LAUNCHER] = g_startingAmmoConfig.grenadeLauncher,
+			[WP_ROCKET_LAUNCHER] = g_startingAmmoConfig.rocketLauncher,
+			[WP_LIGHTNING] = g_startingAmmoConfig.lightningGun,
+			[WP_RAILGUN] = g_startingAmmoConfig.railgun,
+			[WP_PLASMAGUN] = g_startingAmmoConfig.plasmagun,
+			[WP_BFG] = g_startingAmmoConfig.bfg,
+			[WP_GRAPPLING_HOOK] = g_startingAmmoConfig.grapplingHook,
+#ifdef MISSIONPACK
+			[WP_NAILGUN] = g_startingAmmoConfig.nailgun,
+			[WP_PROX_LAUNCHER] = g_startingAmmoConfig.proximityLauncher,
+			[WP_CHAINGUN] = g_startingAmmoConfig.chaingun,
+#endif
+			[WP_HEAVY_MACHINEGUN] = g_startingAmmoConfig.heavyMachinegun,
+		};
 
 		if ( startingMask == 0 ) {
 			startingMask = ( 1u << WP_MACHINEGUN ) | ( 1u << WP_GAUNTLET );
@@ -1519,7 +1477,7 @@ void ClientSpawn(gentity_t *ent) {
 
 		for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; ++weapon ) {
 			if ( startingMask & ( 1u << weapon ) ) {
-				G_SeedConfiguredSpawnAmmo( &client->ps, weapon );
+				G_SeedConfiguredSpawnAmmo( &client->ps, weapon, startingAmmoTable[weapon] );
 			}
 		}
 
