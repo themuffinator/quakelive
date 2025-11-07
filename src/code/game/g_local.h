@@ -33,6 +33,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define BODY_QUEUE_SIZE		8
 
+// Extended server entity flags introduced by Quake Live.
+#define SVF_EXT_BOT			0x00000008
+
 #define INFINITE			1000000
 
 #define	FRAMETIME			100					// msec
@@ -199,6 +202,8 @@ struct gentity_s {
 	struct gclient_s	*client;			// NULL if not a client
 
 	qboolean	inuse;
+
+	int			svFlagsExt;			// Quake Live extended flags (e.g. SVF_EXT_BOT)
 
 	char		*classname;			// set in QuakeEd
 	int			spawnflags;			// set in QuakeEd
@@ -444,6 +449,14 @@ struct gclient_s {
 #endif
 
 	char		*areabits;
+
+	// Quake Live additions exposed by the Sully layout notes.
+	unsigned int	platformSteamIdLow;
+	unsigned int	platformSteamIdHigh;
+	int			sessionRestartBookmark[2];
+	int			timeoutThrottle;
+	int			banTimestamp;
+	int			commandTimeSeed;
 };
 
 

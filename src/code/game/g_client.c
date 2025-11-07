@@ -1089,33 +1089,39 @@ restarts.
 ============
 */
 char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
-	char		*value;
-//	char		*areabits;
+	char			userinfo[MAX_INFO_STRING];
+	gentity_t		*ent;
 	gclient_t	*client;
-	char		userinfo[MAX_INFO_STRING];
-	gentity_t	*ent;
+	const char	*ip;
+	const char	*password;
+	qboolean	isLocalClient;
+	char			*authFailure;
+	const char	*steamId;
+	unsigned long long parsedSteamId;
+	qboolean	haveSteamId;
 
 	ent = &g_entities[ clientNum ];
 
 	trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 
- 	// IP filtering
- 	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=500
- 	// recommanding PB based IP / GUID banning, the builtin system is pretty limited
- 	// check to see if they are on the banned IP list
-	value = Info_ValueForKey (userinfo, "ip");
-	if ( G_FilterPacket( value ) ) {
+	// IP filtering
+	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=500
+	// recommending PB based IP / GUID banning, the builtin system is pretty limited
+	// check to see if they are on the banned IP list
+	ip = Info_ValueForKey( userinfo, "ip" );
+	if ( G_FilterPacket( ip ) ) {
 		return "You are banned from this server.";
 	}
 
-  // we don't check password for bots and local client
-  // NOTE: local client <-> "ip" "localhost"
-  //   this means this client is not running in our current process
-	if ( !( ent->r.svFlags & SVF_BOT ) && (strcmp(value, "localhost") != 0)) {
-		// check for a password
-		value = Info_ValueForKey (userinfo, "password");
+	isLocalClient = ( ip && ip[0] && !strcmp( ip, "localhost" ) ) ? qtrue : qfalse;
+
+	// we don't check password for bots and local client
+	// NOTE: local client <-> "ip" "localhost"
+	//   this means this client is not running in our current process
+	if ( !isBot && !isLocalClient ) {
+		password = Info_ValueForKey( userinfo, "password" );
 		if ( g_password.string[0] && Q_stricmp( g_password.string, "none" ) &&
-			strcmp( g_password.string, value) != 0) {
+				strcmp( g_password.string, password ) != 0 ) {
 			return "Invalid password";
 		}
 	}
@@ -1124,11 +1130,30 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	ent->client = level.clients + clientNum;
 	client = ent->client;
 
-//	areabits = client->areabits;
-
-	memset( client, 0, sizeof(*client) );
+	memset( client, 0, sizeof( *client ) );
 
 	client->pers.connected = CON_CONNECTING;
+	client->pers.localClient = isLocalClient;
+
+	client->platformSteamIdLow = 0u;
+	client->platformSteamIdHigh = 0u;
+	client->sessionRestartBookmark[0] = -1;
+	client->sessionRestartBookmark[1] = -1;
+	client->timeoutThrottle = 0;
+	client->banTimestamp = level.time;
+	client->commandTimeSeed = trap_Milliseconds();
+	client->lastCmdTime = client->commandTimeSeed;
+	client->pers.cmd.serverTime = client->commandTimeSeed;
+
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	haveSteamId = qfalse;
+	if ( steamId && steamId[0] ) {
+		if ( G_ParseSteamId( steamId, &parsedSteamId ) ) {
+			client->platformSteamIdLow = (unsigned int)( parsedSteamId & 0xFFFFFFFFu );
+			client->platformSteamIdHigh = (unsigned int)( parsedSteamId >> 32 );
+			haveSteamId = qtrue;
+		}
+	}
 
 	// read or initialize the session data
 	if ( firstTime || level.newSession ) {
@@ -1136,53 +1161,51 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	}
 	G_ReadSessionData( client );
 
-	{
-		char *authFailure = G_RunPlatformAuthChecks( clientNum, userinfo, firstTime, isBot, client );
-
-		if ( authFailure ) {
-			return authFailure;
-		}
+	authFailure = G_RunPlatformAuthChecks( clientNum, userinfo, firstTime, isBot, client );
+	if ( authFailure ) {
+		client->pers.connected = CON_DISCONNECTED;
+		return authFailure;
 	}
 
-	if( isBot ) {
+	ent->svFlagsExt = 0;
+	if ( isBot ) {
 		ent->r.svFlags |= SVF_BOT;
+		ent->svFlagsExt |= SVF_EXT_BOT;
 		ent->inuse = qtrue;
-		if( !G_BotConnect( clientNum, !firstTime ) ) {
+		if ( !G_BotConnect( clientNum, !firstTime ) ) {
 			return "BotConnectfailed";
 		}
+	} else {
+		ent->r.svFlags &= ~SVF_BOT;
 	}
 
-	// get and distribute relevent paramters
+	// get and distribute relevant parameters
 	G_LogPrintf( "ClientConnect: %i\n", clientNum );
 	ClientUserinfoChanged( clientNum );
 
-	// don't do the "xxx connected" messages if they were caried over from previous level
+	// don't do the "xxx connected" messages if they were carried over from previous level
 	if ( firstTime ) {
 		if ( level.time > 5000 ) {
-			trap_SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " connected\n\"", client->pers.netname) );
+			trap_SendServerCommand( -1, va( "print \"%s" S_COLOR_WHITE " connected\n\"", client->pers.netname ) );
 		}
 		// TODO: investigate whether Quake Live's native code sends an additional "priv" handshake
 		// message here (sub_1003af1b). The HLIL dump suggests the engine verifies private-client
 		// access immediately after the bot/auth checks.
 	}
 
-        if ( !isBot ) {
-                const char *steamId = Info_ValueForKey( userinfo, "steamid" );
-
-                if ( steamId && steamId[0] ) {
+	if ( !isBot ) {
 #if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
-                        unsigned long long parsedId;
-
-                        if ( G_ParseSteamId( steamId, &parsedId ) ) {
-                                trap_Printf( va( "%s connected with Steam ID %llu\n", client->pers.netname, parsedId ) );
-                        } else {
-                                trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
-                        }
+		if ( haveSteamId ) {
+			trap_Printf( va( "%s connected with Steam ID %llu\n", client->pers.netname, parsedSteamId ) );
+		} else if ( steamId && steamId[0] ) {
+			trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
+		}
 #else
-                        trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
+		if ( steamId && steamId[0] ) {
+			trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
+		}
 #endif
-                }
-        }
+	}
 
 	if ( g_gametype.integer >= GT_TEAM &&
 		client->sess.sessionTeam != TEAM_SPECTATOR ) {
@@ -1191,11 +1214,6 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 	// count current clients and rank for scoreboard
 	CalculateRanks();
-
-	// for statistics
-//	client->areabits = areabits;
-//	if ( !client->areabits )
-//		client->areabits = G_Alloc( (trap_AAS_PointReachabilityAreaIndex( NULL ) + 7) / 8 );
 
 	if ( !firstTime && client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		client->ps.eFlags |= EF_TELEPORT_BIT;
