@@ -2,18 +2,20 @@
 #define GAME_TESTS_FIXTURE_RUNNER_H
 
 #if defined(__has_include)
-#if __has_include("g_local.h")
-#include "g_local.h"
-#elif __has_include("../code/game/g_local.h")
-#include "../code/game/g_local.h"
-#elif __has_include("../../code/game/g_local.h")
-#include "../../code/game/g_local.h"
+#if __has_include("q_shared.h")
+#include "q_shared.h"
+#elif __has_include("../code/game/q_shared.h")
+#include "../code/game/q_shared.h"
+#elif __has_include("../../code/game/q_shared.h")
+#include "../../code/game/q_shared.h"
 #else
-#error "Unable to locate g_local.h for fixture runner"
+#error "Unable to locate q_shared.h for fixture runner"
 #endif
 #else
-#include "../../code/game/g_local.h"
+#include "../../code/game/q_shared.h"
 #endif
+
+#include "../ql_game_types.h"
 
 // Basic macro utilities reused in fixtures
 #ifndef GAME_TESTS_ARRAY_LEN

@@ -2,18 +2,20 @@
 #define GAME_TESTS_SYSCALL_MOCKS_H
 
 #if defined(__has_include)
-#if __has_include("g_local.h")
-#include "g_local.h"
-#elif __has_include("../code/game/g_local.h")
-#include "../code/game/g_local.h"
-#elif __has_include("../../code/game/g_local.h")
-#include "../../code/game/g_local.h"
+#if __has_include("q_shared.h")
+#include "q_shared.h"
+#elif __has_include("../code/game/q_shared.h")
+#include "../code/game/q_shared.h"
+#elif __has_include("../../code/game/q_shared.h")
+#include "../../code/game/q_shared.h"
 #else
-#error "Unable to locate g_local.h for syscall mocks"
+#error "Unable to locate q_shared.h for syscall mocks"
 #endif
 #else
-#include "../../code/game/g_local.h"
+#include "../../code/game/q_shared.h"
 #endif
+
+#include "../ql_game_types.h"
 
 #include <stdarg.h>
 
