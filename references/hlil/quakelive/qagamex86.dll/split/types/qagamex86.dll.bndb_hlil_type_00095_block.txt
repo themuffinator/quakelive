@@ -1,0 +1,64 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10024ddb                                                  unimplemented  {fstp qword [esp], st0}
+10024de5                                                  result = sub_10020980(4, 
+10024de5                                                      "couldn't load skill %f from %s\n")
+10024dea                                                  break
+10024dea                                              
+10024c43                                              void var_49c
+10024c43                                              (*(data_104b13ac + 0x1d0))(eax_15, 0x28, 
+10024c43                                                  &var_49c, 0x90)
+10024c67                                              result = (*(data_104b13ac + 0x27c))(
+10024c67                                                  *(*((ebp_1 << 2) + &data_105e2f00)
+10024c67                                                      + 0x1960), 
+10024c67                                                  &var_49c)
+10024c67                                              
+10024c6e                                              if (result != 0)
+10024c6e                                                  break
+10024c6e                                              
+10024c90                                              (*(data_104b13ac + 0x1d0))(eax_15, 3, 
+10024c90                                                  &var_49c, 0x90)
+10024cb3                                              int32_t edx_13
+10024cb3                                              result, edx_13 = (*(data_104b13ac + 0x2d0))(
+10024cb3                                                  *(*((ebp_1 << 2) + &data_105e2f00)
+10024cb3                                                      + 0x1968), 
+10024cb3                                                  &var_49c)
+10024cb3                                              
+10024cba                                              if (result != 0)
+10024cba                                                  break
+10024cba                                              
+10024ccd                                              if (not(var_540_1 >= 3f))
+10024ccf                                                  result = result_2
+10024ccf                                              
+10024cd3                                              int32_t result_1 = result
+10024cd6                                              sub_10024590(ebp_1, edx_13)
+10024cef                                              (*(data_104b13ac + 0x74))(ebp_1, &var_40c)
+10024d00                                              *(*((ebp_1 << 2) + &data_105e2f00)
+10024d00                                                  + 0x1958) = eax_15
+10024d06                                              float xmm0_6
+10024d06                                              
+10024d06                                              if (var_53c_1 == 0)
+10024d10                                                  xmm0_6 = var_540_1
+10024d06                                              else
+10024d08                                                  xmm0_6 = var_530_1
+10024d08                                              
+10024d21                                              if (2f <= xmm0_6)
+10024d46                                                  *(*((ebp_1 << 2) + &data_105e2f00)
+10024d46                                                      + 0x1788) = 0
+10024d21                                              else
+10024d32                                                  *(*((ebp_1 << 2) + &data_105e2f00)
+10024d32                                                      + 0x1788) = 0x3f800000
+10024d32                                              
+10024d65                                              __builtin_memcpy(
+10024d65                                                  dest: *((ebp_1 << 2) + &data_105e2f00)
+10024d65                                                      + 0x1280, 
+10024d65                                                  src: &var_524, n: 0x84)
+10024d67                                              result = sub_1003a450(ebp_1)
+10024d67                                              
+10024d76                                              if (data_1059de8c != 0)
+10024d78                                                  unimplemented  {fld st0, dword [esp+0x14]}
+10024d85                                                  void* var_55c_11
+10024d85                                                  var_55c_11.q = fconvert.d(unimplemented  {
+10024d85                                                      fstp qword [esp], st0})

@@ -1,0 +1,7 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10024a9b                                      unimplemented  {fadd dword [ecx+0x2504]}
+10024aa1                                      var_540_1 = fconvert.s(unimplemented  {fstp dword [esp
+10024aa1                                          +0x14], st0})

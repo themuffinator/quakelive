@@ -1,0 +1,12 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10024bdc                                              unimplemented  {fstp dword [esp+0x74], st0}
+10024bef                                              sub_10070cf0()
+10024bfa                                              void var_4e0
+10024bfa                                              int32_t ecx_12 = sub_100709f0(&var_4e0, 0x40)
+10024bff                                              unimplemented  {fld st0, dword [esp+0x70]}
+10024c0f                                              int32_t var_558_9 = ecx_12
+10024c14                                              float var_558_10 = fconvert.s(unimplemented  {
+10024c14                                                  fstp dword [esp], st0})

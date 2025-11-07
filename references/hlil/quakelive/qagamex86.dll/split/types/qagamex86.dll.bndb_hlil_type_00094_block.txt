@@ -1,0 +1,15 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10024c14                                              unimplemented  {fstp dword [esp], st0}
+10024c14                                              top_1 += 1
+10024c18                                              int32_t eax_15 = (*(data_104b13ac + 0x1b8))(
+10024c18                                                  &var_524, var_558_10)
+10024c18                                              
+10024c21                                              if (eax_15 == 0)
+10024dcf                                                  unimplemented  {fld st0, dword [esp+0x70]}
+10024dd7                                                  void* var_558_16 = &var_524
+10024ddb                                                  char const* const var_560_5
+10024ddb                                                  var_560_5.q = fconvert.d(unimplemented  {
+10024ddb                                                      fstp qword [esp], st0})

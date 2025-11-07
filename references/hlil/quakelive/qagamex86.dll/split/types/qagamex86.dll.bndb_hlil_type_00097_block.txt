@@ -1,0 +1,11 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10027acc  {
+10027acc      [0x0] =  0x10027ab4
+10027ad0      [0x1] =  0x10027ab4
+10027ad4      [0x2] =  0x100279f4
+10027ad8      [0x3] =  0x10027a1d
+10027adc      [0x4] =  0x10027a54
+10027ae0  }

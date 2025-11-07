@@ -1,0 +1,35 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type (struct) */
+/* Name: Rich_Header */
+
+10000080  {
+10000080      uint32_t e_magic__DanS = 0x300c43f7
+10000084      uint32_t e_align[0x3] = 
+10000084      {
+10000084          [0x0] =  0x636222b3
+10000088          [0x1] =  0x636222b3
+1000008c          [0x2] =  0x636222b3
+10000090      }
+10000090      uint32_t e_entry_id0__009c9d1b = 0x63febfa8
+10000094      uint32_t e_entry_count0__5 = 0x636222b6
+10000098      uint32_t e_entry_id1__00984e93 = 0x63fa6c20
+1000009c      uint32_t e_entry_count1__1 = 0x636222b2
+100000a0      uint32_t e_entry_id2__009e9d1b = 0x63fcbfa8
+100000a4      uint32_t e_entry_count2__4 = 0x636222b7
+100000a8      uint32_t e_entry_id3__00aa9d1b = 0x63c8bfa8
+100000ac      uint32_t e_entry_count3__13 = 0x636222be
+100000b0      uint32_t e_entry_id4__00ab9d1b = 0x63c9bfa8
+100000b4      uint32_t e_entry_count4__5 = 0x636222b6
+100000b8      uint32_t e_entry_id5__00937809 = 0x63f15aba
+100000bc      uint32_t e_entry_count5__2 = 0x636222b1
+100000c0      uint32_t e_entry_id6__00010000 = 0x636322b3
+100000c4      uint32_t e_entry_count6__90 = 0x636222e9
+100000c8      uint32_t e_entry_id7__00ae9d1b = 0x63ccbfa8
+100000cc      uint32_t e_entry_count7__47 = 0x6362229c
+100000d0      uint32_t e_entry_id8__009b9d1b = 0x63f9bfa8
+100000d4      uint32_t e_entry_count8__1 = 0x636222b2
+100000d8      uint32_t e_entry_id9__009d9d1b = 0x63ffbfa8
+100000dc      uint32_t e_entry_count9__1 = 0x636222b2
+100000e0      char e_magic[0x4] = "Rich"
+100000e4      uint32_t e_checksum = 0x636222b3
+100000e8  }

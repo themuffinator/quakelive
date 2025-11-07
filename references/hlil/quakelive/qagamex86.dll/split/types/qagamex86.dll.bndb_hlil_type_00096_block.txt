@@ -1,0 +1,1649 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10024d85                                                  unimplemented  {fstp qword [esp], st0}
+10024d9e                                                  result = (*(data_104b13ac + 0x3c))(
+10024d9e                                                      "g_spSkill", 
+10024d9e                                                      sub_10070cb0(&data_1007d3f0))
+10024d9e                                              
+10024da3                                              edi_3 = var_534_1
+10024da7                                              i = i_1
+10024ac8                                          else
+10024aca                                              unimplemented  {fld st0, dword [esp+0x14]}
+10024ace                                              unimplemented  {fld st0, dword [esp+0x24]}
+10024ad2                                              unimplemented  {fucomip st0, st1}
+10024ad2                                                  f- unimplemented  {fucomip st0, st1}
+10024ad2                                              bool c_5 = unimplemented  {fucomip st0, st1}
+10024ad2                                                  f< unimplemented  {fucomip st0, st1}
+10024ad2                                              bool p_9 = is_unordered.t(
+10024ad2                                                  unimplemented  {fucomip st0, st1}, 
+10024ad2                                                  unimplemented  {fucomip st0, st1})
+10024ad2                                              bool z_6 = unimplemented  {fucomip st0, st1}
+10024ad2                                                  f== unimplemented  {fucomip st0, st1}
+10024ad2                                              unimplemented  {fucomip st0, st1}
+10024ad4                                              unimplemented  {fstp st0, st0}
+10024ad4                                              unimplemented  {fstp st0, st0}
+10024ad6                                              result:1.b = (var_53c_1 s< 0 ? 1 : 0) << 7
+10024ad6                                                  | (z_6 ? 1 : 0) << 6 | (a_2 ? 1 : 0) << 4
+10024ad6                                                  | (p_9 ? 1 : 0) << 2 | (c_5 ? 1 : 0)
+10024ad7                                              bool p_10 = unimplemented  {test ah, 0x44}
+10024ad7                                              
+10024ada                                              if (p_10)
+10024ada                                                  goto label_10024af6
+1002498f                                  else if (esi_2 s> 2 && esi_2 s> *(ecx_6 + 0x2508))
+100249ae                                      *(ecx_6 + 0x2504) = 0x3daaaaab
+100249b6                                      ecx_6 = *((ebp_1 << 2) + &data_105e2f00)
+100249bd                                      top_2 = top_1 - 1
+100249bd                                      unimplemented  {fld st0, dword [ecx+0x2504]}
+100249bd                                      goto label_100249c3
+100249bd                          
+10024db6                          i += 0x384
+10024dbc                          ebp_1 += 1
+10024dbd                          i_1 = i
+10024dc7                      while (i s< 0x104c22dc)
+10024dc7  
+10024dfa  sub_1007aaf9(result_3 ^ &var_544)
+10024e05  return result
+
+100248a6                    8d a4 24 00 00 00 00 8d 49 00                                                        ..$.....I.
+10024e06                    cc cc cc cc cc cc cc cc cc cc                                                        ..........
+
+10024e10    int32_t sub_10024e10(int32_t* arg1 @ esi)
+
+10024e1b  void var_484
+10024e1b  int32_t eax_1 = __security_cookie ^ &var_484
+10024e3b  void var_404
+10024e3b  (*(data_104b13ac + 0x78))(&var_404, 0x400)
+10024e6b  char var_405 = 0
+10024e73  int32_t result =
+10024e73      sub_10070a40("beyondreality", strncpy(&var_484, sub_10070cf0(), 0x7f), &var_484)
+10024e73  
+10024e7b  if (result == 0)
+10024e7d      *arg1 &= 0xfeffffff
+10024e7d  
+10024e8c  sub_1007aaf9(eax_1 ^ &var_484)
+10024e97  return result
+
+10024e98                                                                          cc cc cc cc cc cc cc cc                          ........
+
+10024ea0    int32_t sub_10024ea0()
+
+10024ece  for (void* i = &data_104b41dc; i s< 0x104c22dc; i += 0x384)
+10024eac      if (*(i + 4) != 0)
+10024eae          void* edx_1 = *i
+10024eae          
+10024ec0          if (*(edx_1 + 0x250) == 2 && *(edx_1 + 0x270) != 0)
+10024ed7              return *(i - 0x18c)
+10024ed7  
+10024ed0  return 0xffffffff
+
+10024ed8                                                                          cc cc cc cc cc cc cc cc                          ........
+
+10024ee0    int32_t sub_10024ee0()
+
+10024f12  for (void* i = &data_104b41dc; i s< 0x104c22dc; i += 0x384)
+10024f04      if (*(i + 4) != 0 && *(*i + 0x250) == 2 && (*(i - 0x5c) & 8) != 0)
+10024f1d          return *(i - 0x18c)
+10024f1d  
+10024f15  return 0xffffffff
+
+10024eed                                         8d 49 00                                                               .I.
+10024f1e                                                                                            cc cc                                ..
+
+10024f20    int32_t sub_10024f20(char* arg1 @ edi)
+
+10024f2b  void var_404
+10024f2b  int32_t eax_1 = __security_cookie ^ &var_404
+10024f3d  int32_t var_408 = 0x400
+10024f46  void* var_40c = &var_404
+10024f47  int32_t esi
+10024f47  int32_t var_410 = esi
+10024f48  (*(data_104b13ac + 0x34))()
+10024f4d  char* ecx_1 = arg1
+10024f4f  void* eax_2 = &var_404
+10024f52  int32_t result
+10024f52  
+10024f52  while (true)
+10024f52      char edx_1 = *eax_2
+10024f54      char temp0_1 = *ecx_1
+10024f54      bool c_1 = edx_1 u< temp0_1
+10024f54      
+10024f56      if (edx_1 == temp0_1)
+10024f5a          if (edx_1 == 0)
+10024f6e              result = 0
+10024f70              break
+10024f70          
+10024f5c          edx_1 = *(eax_2 + 1)
+10024f5f          char temp3_1 = ecx_1[1]
+10024f5f          c_1 = edx_1 u< temp3_1
+10024f5f          
+10024f62          if (edx_1 == temp3_1)
+10024f64              eax_2 += 2
+10024f67              ecx_1 = &ecx_1[2]
+10024f67              
+10024f6c              if (edx_1 != 0)
+10024f6c                  continue
+10024f6c              
+10024f6e              result = 0
+10024f70              break
+10024f70      
+10024f72      bool c_2 = unimplemented  {sbb eax, eax}
+10024f74      result = sbb.d(sbb.d(eax_2, eax_2, c_1), 0xffffffff, c_2)
+10024f74      break
+10024f74  
+10024f79  if (result != 0)
+10024f83      char* var_408_1 = arg1
+10024f84      int32_t var_40c_1 = esi
+10024f85      result = (*(data_104b13ac + 0x3c))()
+10024f85  
+10024f93  sub_1007aaf9(eax_1 ^ &var_404)
+10024f9e  return result
+
+10024f9f                                                                                               cc                                 .
+
+10024fa0    void sub_10024fa0(long double arg1 @ st0)
+
+10024fa0  float ecx
+10024fa0  float var_4 = ecx
+10024fa0  
+10024fac  if (data_1059de8c != 0)
+10024fb9      if (data_105dea44 == 0)
+10024fc5          sub_10024f20(U"0")
+10024fcf          sub_10024f20(U"0")
+10024fd9          sub_10024f20(U"0")
+10024fe8          sub_10024f20(U"1")
+10024ff2          return 
+10024ff2      
+10024ff3      char* eax_2 = sub_10024ea0()
+10024ff3      
+10024ffd      if (eax_2 == 0xffffffff)
+10025009          sub_10024f20(U"1")
+10025018          sub_10024f20("125")
+10025027          sub_10024f20(U"1")
+10025036          sub_10024f20("10")
+10025040          sub_10024f20("10")
+1002504a          sub_10024f20("10")
+10025059          sub_10024f20(U"1")
+10025063          sub_10024f20(U"1")
+1002506d          return 
+1002506d      
+10025083      if (data_100907dc == 0 && data_105dce50 != 0)
+10025093          (*(data_104b13ac + 0x60))(eax_2, "stopMusic")
+10025098          data_100907dc = 1
+10025098      
+100250c0      if (data_105e36b8 == 0 && data_100907d8 == 0)
+100250c6          void* eax_5 = *(eax_2 * 0x384 + &data_104b41dc)
+100250c6          
+100250dc          if (*(eax_5 + 0x250) == 2 && *(eax_5 + 0x348) != 3)
+100250de              int32_t eax_6 = data_105aa7ec
+100250e6              float xmm0_1
+100250e6              
+100250e6              if (eax_6 s< 2)
+100250e8                  xmm0_1 = 1f
+100250e6              else if (eax_6 != 2)
+100250fe                  xmm0_1 = 4f
+100250f2              else
+100250f4                  xmm0_1 = 3f
+100250f4              
+1002510c              var_4 = xmm0_1
+10025132              (*(data_104b13ac + 0x3c))("g_spSkill", sub_10070cb0(&data_1007d3f0))
+1002513d              sub_100378e0()
+10025142              data_100907d8 = 1
+10025142      
+10025158      if (data_105a3acc == 3 && data_100907d0 == 0)
+10025168          (*(data_104b13ac + 0x60))(eax_2, "playMusic music/fla22k_01_loop")
+1002516d          data_100907d0 = 1
+1002516d      
+1002517f      if (data_1059de8c != 2)
+1002517f          goto label_100251a2
+1002517f      
+10025188      if (data_105dce50 == 0)
+1002519d          (*(data_104b13ac + 0x3c))("g_training", &data_1007d1d8)
+100251a2          label_100251a2:
+100251a2          
+100251a9          if (data_105dce50 == 0)
+100251ab              int32_t eax_10 = sub_10024ee0()
+100251ab              
+100251cb              if (eax_10 != 0xffffffff
+100251cb                      && not(3f f<= *(*((eax_10 << 2) + &data_105e2f00) + 0x12c0)))
+100251d8                  *(eax_10 * 0x384 + 0x104b41f0) |= 0x40000
+100251d8      
+100251de      void* eax = *(eax_2 * 0x384 + &data_104b41dc)
+100251de      
+100251eb      if (*(eax + 0x2e8) != 0)
+100251ed          int32_t eax_13 = sub_10024ee0()
+100251ed          
+100251f5          if (eax_13 != 0xffffffff)
+100251f7              void* eax_14 = eax_13 * 0x384
+100251fd              *(eax_14 + 0x104b41f0) &= 0xfffeffff
+10025207              *(eax_14 + 0x104b41f0) |= 0x40000
+10025207          
+10025226          (*(data_104b13ac + 0x3c))("bot_training", &data_1007d0a8)
+1002523b          (*(data_104b13ac + 0x3c))("bot_dynamicSkill", &data_1007d1d8)
+1002524f          (*(data_104b13ac + 0x3c))("bot_followMe", &data_1007d0a8)
+1002525a          *(*(eax_2 * 0x384 + &data_104b41dc) + 0x89c) = 0
+100251eb      else if (data_105a3acc != 1)
+1002527c          int32_t eax_18 = sub_10024ee0()
+1002527c          
+10025286          if (eax_18 != 0xffffffff)
+10025299              (*(data_104b13ac + 0x2c))("g_spSkill")
+1002529b              var_4 = fconvert.s(arg1)
+100252ac              float xmm0_3
+100252ac              
+100252ac              if (float.t(1) <= fconvert.t(var_4))
+100252b8                  xmm0_3 = var_4
+100252b8                  
+100252c9                  if (not(xmm0_3 <= 5f))
+100252cb                      xmm0_3 = 5f
+100252ce                      var_4 = xmm0_3
+100252ac              else
+100252ae                  xmm0_3 = 1f
+100252ce                  var_4 = xmm0_3
+100252ce              
+100252d4              void* ecx_9 = *((eax_18 << 2) + &data_105e2f00)
+100252d4              
+100252e9              if (not(fconvert.t(var_4) <= fconvert.t(*(ecx_9 + 0x12c0))))
+100252eb                  void* edi_3 = data_104b13ac
+100252fc                  *(ecx_9 + 0x12c0) = xmm0_3
+10025315                  (*(edi_3 + 0x3c))("bot_startingSkill", sub_10070cb0(&data_1007d3f0))
+10025315          
+10025324          *(*(eax_2 * 0x384 + &data_104b41dc) + 0x89c) = 0
+1002526f      else
+10025271          *(eax + 0x89c) = 1
+10025271      
+1002533e      if (data_105de9d8 != 0 && data_100907c4 == 0)
+10025340          data_100907c4 = 1
+10025340          
+1002534c          if (eax_2 == data_105dcea4)
+1002535d              (*(data_104b13ac + 0x60))(eax_2, "playMusic music/win")
+10025367              return 
+10025367          
+10025376          (*(data_104b13ac + 0x60))(eax_2, "playMusic music/loss")
+
+10025381     cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc                                                   ...............
+
+10025390    int32_t sub_10025390(void* arg1)
+
+1002539b  void var_40c
+1002539b  int32_t eax_1 = __security_cookie ^ &var_40c
+100253af  int32_t eax_3 = data_100907e8
+100253af  
+100253b6  if (eax_3 == 0)
+100253c6      (*(data_104b13ac + 0x2c))("sv_maxclients")
+100253cb      long double x87_r0
+100253cb      eax_3 = sub_1007b550(x87_r0)
+100253d0      data_100907e8 = eax_3
+100253d0  
+100253d7  int32_t result = 0
+100253d9  int32_t i = 0
+100253d9  
+100253dd  if (eax_3 s> 0)
+100253f3      while (i s< 0x40)
+10025413          void var_404
+10025413          (*(data_104b13ac + 0x68))(i + 0x211, &var_404, 0x400)
+10025415          void* eax_5 = &var_404
+10025425          char j
+10025425          
+10025425          do
+10025420              j = *eax_5
+10025422              eax_5 += 1
+10025425          while (j != 0)
+10025429          void var_403
+10025429          
+10025429          if (eax_5 != &var_403)
+10025434              char* eax_7 = sub_10070cf0()
+10025445              char j_1
+10025445              
+10025445              do
+10025440                  j_1 = *eax_7
+10025442                  eax_7 = &eax_7[1]
+10025445              while (j_1 != 0)
+10025445              
+10025449              if (eax_7 != &eax_7[1])
+1002545a                  int32_t eax_10
+1002545a                  int32_t edx_4
+1002545a                  eax_10, edx_4 = atoi(sub_10070cf0())
+1002545a                  
+10025462                  if (eax_10 != 3 && sub_10018900(eax_10, edx_4, i, arg1) != 0)
+10025477                      result += 1
+10025477          
+10025478          i += 1
+10025478          
+1002547f          if (i s>= data_100907e8)
+1002547f              break
+1002547f  
+10025494  sub_1007aaf9(eax_1 ^ &var_40c)
+1002549f  return result
+
+100253ed                                         8d 49 00                                                               .I.
+
+100254a0    int32_t sub_100254a0(int32_t arg1)
+
+100254ab  void var_288
+100254ab  int32_t eax_1 = __security_cookie ^ &var_288
+100254ab  
+100254cf  if (*(arg1 * 0x384 + 0x104b41e0) != 0)
+100254d1      int32_t eax_5 = *(arg1 * 0x384 + &data_104b41dc)
+100254d1      
+100254d9      if (eax_5 != 0)
+100254e6          __builtin_memcpy(dest: &var_288, src: eax_5, n: 0x250)
+100254e6  
+100254f9  int32_t var_274
+100254f9  int32_t eax_6 = (*(data_104b13ac + 0x10c))(&var_274)
+100254f9  
+10025500  if (eax_6 == 0)
+10025516      int32_t var_294_1 = 0xa
+10025520      int32_t var_2c
+10025520      int32_t* var_29c_1 = &var_2c
+10025521      float var_26c
+10025521      float var_30_1 = fconvert.s(fconvert.t(var_26c) + fconvert.t(10.0))
+10025528      void* eax_7 = data_104b13ac
+1002552d      int32_t var_38 = var_274
+10025548      int32_t var_270
+10025548      int32_t var_34_1 = var_270
+10025558      int32_t eax_8 = (*(eax_7 + 0x114))(&var_274, &var_38, var_29c_1, eax_6, var_294_1)
+10025558      
+1002555f      if (eax_8 s> 0)
+10025561          eax_6 = var_2c
+10025561      
+1002556a      if (eax_8 s<= 0 || eax_6 == 0)
+1002557c          sub_1007aaf9(eax_1 ^ &var_288)
+10025587          return 1
+10025587  
+100255a3  void* ebx
+100255a3  int32_t result = (*(data_104b13ac + 0x134))(eax_6, &var_274, *(ebx + 0xc), 0x11c0fbe)
+100255b3  sub_1007aaf9(eax_1 ^ &var_288)
+100255be  return result
+
+100255bf                                                                                               cc                                 .
+
+100255c0    int32_t __fastcall sub_100255c0(void* arg1, void* arg2)
+
+100255cb  void* var_524
+100255cb  int32_t eax_1 = __security_cookie ^ &var_524
+100255d4  int32_t eax_2 = data_105e4ae8
+100255dc  void* esi = arg2
+100255e3  void* var_510 = esi
+100255e3  
+100255ef  if (eax_2 == 5 || eax_2 == 0xb)
+10025623      int32_t eax_4 = sub_10013b00(arg1)
+1002562b      var_524 = &data_105e4100
+1002562b      
+10025636      if (eax_4 != 1)
+10025638          var_524 = &data_105e4aa0
+100255ef  else if (eax_2 != 6)
+1002560c      if (sub_10013b00(arg1) != 1)
+10025618          var_524 = &data_105e4600
+1002560c      else
+1002560e          var_524 = &data_105e4940
+100255f4  else
+100255f6      var_524 = &data_105e40c0
+100255f6  
+10025640  int32_t eax_6 = data_100907e4
+10025640  
+10025647  if (eax_6 == 0)
+10025656      (*(data_104b13ac + 0x2c))("sv_maxclients")
+1002565b      long double x87_r0
+1002565b      eax_6 = sub_1007b550(x87_r0)
+10025660      data_100907e4 = eax_6
+10025660  
+10025665  int32_t i = 0
+10025667  int32_t result = 0
+10025669  int32_t i_1 = 0
+10025669  
+1002566f  if (eax_6 s> 0)
+10025678      int32_t* var_520_1 = esi - 4
+10025678      
+1002567f      while (i s< 0x40)
+100256a2          void var_40c
+100256a2          (*(data_104b13ac + 0x68))(i + 0x211, &var_40c, 0x400)
+100256a4          void* eax_8 = &var_40c
+100256b6          char j
+100256b6          
+100256b6          do
+100256b1              j = *eax_8
+100256b3              eax_8 += 1
+100256b6          while (j != 0)
+100256ba          void var_40b
+100256ba          
+100256ba          if (eax_8 != &var_40b)
+100256cc              char* eax_10 = sub_10070cf0()
+100256d9              char j_1
+100256d9              
+100256d9              do
+100256d4                  j_1 = *eax_10
+100256d6                  eax_10 = &eax_10[1]
+100256d9              while (j_1 != 0)
+100256d9              
+100256dd              if (eax_10 != &eax_10[1])
+100256f5                  int32_t eax_13
+100256f5                  int32_t edx_3
+100256f5                  eax_13, edx_3 = atoi(sub_10070cf0())
+100256f5                  
+10025701                  if (eax_13 != 3 && sub_10018900(eax_13, edx_3, i, arg1) != 0)
+1002571f                      int32_t eax_15 = sub_100254a0(i)
+10025727                      int32_t edx_4 = 0
+1002572f                      void var_50c
+1002572f                      
+1002572f                      if (result s> 0)
+1002573a                          do
+10025735                              if (eax_15 s< *(&var_50c + (edx_4 << 2)))
+10025740                                  if (result s> edx_4)
+10025742                                      int32_t* ecx_4 = var_520_1
+10025754                                      int32_t j_3 = result - edx_4
+10025765                                      int32_t j_2
+10025765                                      
+10025765                                      do
+10025759                                          void var_508
+10025759                                          *(&var_508 - esi + ecx_4) =
+10025759                                              *(&var_50c - esi + ecx_4)
+1002575e                                          ecx_4[1] = *ecx_4
+10025761                                          ecx_4 -= 4
+10025764                                          j_2 = j_3
+10025764                                          j_3 -= 1
+10025765                                      while (j_2 != 1)
+10025767                                      esi = var_510
+1002576b                                      i = i_1
+1002576b                                  
+10025740                                  break
+10025740                              
+10025737                              edx_4 += 1
+1002573a                          while (edx_4 s< result)
+1002573a                      
+10025773                      var_520_1 = &var_520_1[1]
+10025778                      result += 1
+10025779                      *(&var_50c + (edx_4 << 2)) = eax_15
+1002577d                      *(esi + (edx_4 << 2)) = i
+1002577d                      
+10025786                      if (result s>= 0x100)
+10025786                          break
+10025786          
+10025788          i += 1
+10025789          i_1 = i
+10025789          
+10025793          if (i s>= data_100907e4)
+10025793              break
+10025793  
+100257a8  sub_1007aaf9(eax_1 ^ &var_524)
+100257b3  return result
+
+100257b4                                                              cc cc cc cc cc cc cc cc cc cc cc cc                      ............
+
+100257c0    void* __convention("regparm") sub_100257c0(int32_t arg1, int32_t arg2, int32_t arg3, int32_t arg4)
+
+100257c8  void var_2c
+100257c8  int32_t eax_1 = __security_cookie ^ &var_2c
+100257dc  int32_t ebx_3 = arg4 * 0x28
+100257e8  *(ebx_3 + &data_105e20a4) = arg3
+100257ee  sub_10015ad0(&var_2c, 0x28, arg4)
+100257f9  void* result = &var_2c
+1002580d  char i
+1002580d  
+1002580d  do
+10025805      i = *result
+10025807      *(ebx_3 + 0x105e2080 - &var_2c + result) = i
+1002580a      result += 1
+1002580d  while (i != 0)
+10025815  sub_1007aaf9(eax_1 ^ &var_2c)
+1002581d  return result
+
+1002581e                                                                                            cc cc                                ..
+
+10025820    int32_t sub_10025820()
+
+10025828  void var_2c
+10025828  int32_t eax_1 = __security_cookie ^ &var_2c
+10025846  int32_t ebx
+10025846  void* esi_4 = ebx * 0x28
+10025846  
+10025853  if (esi_4 != 0xefa1df80
+10025853          && sub_10070a40(esi_4 + 0x105e2080, sub_10015ad0(&var_2c, 0x28, ebx), &var_2c)
+10025853          == 0)
+10025875      int32_t result = *(esi_4 + &data_105e20a4)
+10025883      sub_1007aaf9(eax_1 ^ &var_2c)
+1002588b      return result
+1002588b  
+1002586c  sub_1007aaf9(eax_1 ^ &var_2c)
+10025874  return 0
+
+1002588c                                      cc cc cc cc                                                              ....
+
+10025890    int32_t sub_10025890(int32_t arg1 @ edi, int32_t arg2)
+
+1002589b  int32_t var_73c
+1002589b  int32_t eax_1 = __security_cookie ^ &var_73c
+100258ac  int32_t ebx = 0
+100258af  int32_t ebp = 0
+100258b6  int32_t var_734 = 0
+100258ba  int32_t var_738 = 0
+100258be  var_73c = 0
+100258c4  int32_t var_72c[0x40]
+100258c4  int32_t var_62c[0x40]
+100258c4  int32_t var_52c[0x40]
+100258c4  
+100258c4  if (arg2 s> 0)
+100258ca      ebx = 0
+100258ca      
+100259c7      do
+100258d0          int32_t eax_3 = *(arg1 + (ebp << 2))
+100258da          void* esi_4 = eax_3 * 0x28
+100258e3          char eax_4
+100258e3          
+100258e3          if (*(esi_4 + &data_105e20a4) != 0)
+100258ef              void var_42c
+100258ef              int32_t edx_2
+100258ef              
+100258ef              if (eax_3 u> 0x3f)
+10025958                  edx_2 = sub_10020980(3, "ClientName: client out of range\n")
+100258ef              else
+1002590d                  void var_404
+1002590d                  (*(data_104b13ac + 0x68))(eax_3 + 0x211, &var_404, 0x400)
+1002592e                  strncpy(&var_42c, sub_10070cf0(), 0x27)
+1002593e                  char var_405_1 = 0
+10025946                  edx_2 = sub_10070b90(&var_42c)
+1002594b                  ebx = var_734
+1002594b              
+10025968              int32_t eax_10
+10025968              
+10025968              if (esi_4 != 0xefa1df80)
+10025971                  eax_10 = sub_10070a40(esi_4 + 0x105e2080, edx_2, &var_42c)
+10025971              
+10025978              if (esi_4 != 0xefa1df80 && eax_10 == 0)
+1002597e                  eax_4 = (*(esi_4 + &data_105e20a4)).b
+10025978              else
+1002597a                  eax_4 = 0
+100258e3          else
+100258e5              eax_4 = 0
+100258e5          
+10025986          if ((eax_4 & 1) != 0)
+10025988              int32_t eax_11 = var_73c
+1002598f              var_72c[eax_11] = *(arg1 + (ebp << 2))
+10025994              var_73c = eax_11 + 1
+10025986          else if ((eax_4 & 2) == 0)
+100259b6              var_52c[ebx] = *(arg1 + (ebp << 2))
+100259bd              ebx += 1
+100259be              var_734 = ebx
+1002599c          else
+100259a5              var_62c[var_738] = *(arg1 + (ebp << 2))
+100259ad              var_738 += 1
+100259ad          
+100259c2          ebp += 1
+100259c7      while (ebp s< arg2)
+100259c7  
+100259d3  int32_t esi_7 = var_73c * 4
+100259dc  memcpy(arg1, &var_72c, esi_7)
+100259f4  memcpy(esi_7 + arg1, &var_52c, ebx << 2)
+100259fd  int32_t esi_9 = ebx + var_73c
+10025a18  memcpy(arg1 + (esi_9 << 2), &var_62c, var_738 << 2)
+10025a2f  sub_1007aaf9(eax_1 ^ &var_73c)
+10025a3a  return esi_9 + var_738
+
+10025a3b                                                                                   cc cc cc cc cc                             .....
+
+10025a40    int32_t sub_10025a40(int32_t arg1)
+
+10025a4b  void var_22c
+10025a4b  int32_t eax_1 = __security_cookie ^ &var_22c
+10025a5e  void* ebx
+10025a5e  
+10025a5e  if (*(ebx + 8) != arg1)
+10025b05      int32_t eax_7 = (*(data_104b13ac + 0x1fc))(*(ebx + 0x1964), arg1, 2)
+10025b13      sub_1007aaf9(eax_1 ^ &var_22c)
+10025b1e      return eax_7
+10025b1e  
+10025a83  void var_204
+10025a83  (*(data_104b13ac + 0x200))(*(ebx + 0x1964), &var_204, 0x100)
+10025a92  sub_10015ad0(&var_22c, 0x28, *(ebx + 8))
+10025a9b  void* var_248 = &var_204
+10025a9e  void* var_24c = &var_22c
+10025ab1  void var_104
+10025ab1  sub_10070be0(&var_104, 0x100, 0x1007e2f4)
+10025ad3  int32_t eax_5 = (*(data_104b13ac + 0x1dc))(*(ebx + 0x1964), 1, &var_104)
+10025ae3  sub_1007aaf9(eax_1 ^ &var_22c)
+10025aee  return eax_5
+
+10025b1f                                                                                               cc                                 .
+
+10025b20    int32_t __fastcall sub_10025b20(int32_t arg1, void* arg2 @ edi)
+
+10025b21  void* esi = data_104b13ac
+10025b27  int32_t eax
+10025b27  int32_t var_8 = eax
+10025b27  
+10025b2b  if (arg1 == 0xffffffff)
+10025b32      int32_t eax_1 = sub_10070cb0("vsay_team %s")
+10025b48      return (*(esi + 0x15c))(*(arg2 + 8), eax_1)
+10025b48  
+10025b49  int32_t var_c = arg1
+10025b4f  int32_t eax_4 = sub_10070cb0("vtell %d %s")
+10025b65  return (*(esi + 0x15c))(*(arg2 + 8), eax_4)
+
+10025b66                    cc cc cc cc cc cc cc cc cc cc                                                        ..........
+
+10025b70    int32_t __fastcall sub_10025b70(int32_t arg1, void* arg2 @ edi)
+
+10025b71  void* esi = data_104b13ac
+10025b77  int32_t eax
+10025b77  int32_t var_8 = eax
+10025b77  
+10025b7b  if (arg1 == 0xffffffff)
+10025b82      int32_t eax_1 = sub_10070cb0("vosay_team %s")
+10025b98      return (*(esi + 0x15c))(*(arg2 + 8), eax_1)
+10025b98  
+10025b99  int32_t var_c = arg1
+10025b9f  int32_t eax_4 = sub_10070cb0("votell %d %s")
+10025bb5  return (*(esi + 0x15c))(*(arg2 + 8), eax_4)
+
+10025bb6                                                                    cc cc cc cc cc cc cc cc cc cc                        ..........
+
+10025bc0    int32_t sub_10025bc0(void* arg1)
+
+10025bcb  int32_t var_768
+10025bcb  int32_t eax_1 = __security_cookie ^ &var_768
+10025be5  int32_t var_758
+10025be5  int32_t eax_2 = sub_100255c0(arg1, &var_758)
+10025bf5  sub_10025890(&var_758, eax_2)
+10025bfa  int32_t eax_3 = *(arg1 + 0x1b24)
+10025c03  int32_t result = eax_3 - 1
+10025c03  
+10025c04  if (eax_3 != 1)
+10025c0b      int32_t var_754
+10025c0b      void var_658
+10025c0b      void var_608
+10025c0b      int32_t ebx_7
+10025c0b      void* esi_10
+10025c0b      
+10025c0b      if (result == 1)
+100260d0          ebx_7 = var_758
+100260d0          
+100260da          if (ebx_7 == *(arg1 + 0x1b3c))
+100260dc              ebx_7 = var_754
+100260dc          
+100260ed          sub_10015ad0(&var_658, 0x28, ebx_7)
+100260f5          int32_t var_77c_19 = 0
+10026100          sub_10020dc0(arg1, "cmd_getflag", &var_658)
+10026125          (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_608, 0x100)
+10026127          esi_10 = data_104b13ac
+10026130          char const* const var_77c_20 = "getflag"
+10026130          
+10026138          if (ebx_7 != 0xffffffff)
+10026156              label_10026156:
+10026156              int32_t var_780_19 = ebx_7
+1002615c              int32_t eax_35 = sub_10070cb0("vtell %d %s")
+1002616f              result = (*(esi_10 + 0x15c))(*(arg1 + 8), eax_35)
+10026138          else
+1002613f              int32_t eax_34 = sub_10070cb0("vsay_team %s")
+1002614f              result = (*(esi_10 + 0x15c))(*(arg1 + 8), eax_34)
+10025c0b      else
+10025c12          void var_630
+10025c12          
+10025c12          if (result == 2)
+10025f6d              int32_t ebx_6 = var_758
+10025f6d              
+10025f77              if (ebx_6 == *(arg1 + 0x1b3c))
+10025f79                  ebx_6 = var_754
+10025f79              
+10025f8a              sub_10015ad0(&var_658, 0x28, ebx_6)
+10025f8f              int32_t eax_26 = *(arg1 + 0x1b3c)
+10025f8f              
+10025f9b              if (eax_26 == 0xffffffff)
+10025ff9                  int32_t var_77c_14 = 0
+10026009                  sub_10020dc0(arg1, "cmd_getflag", &var_658)
+10025f9b              else
+10025fa5                  sub_10015ad0(&var_630, 0x28, eax_26)
+10025fb3                  int32_t var_77c_13 = 0
+10025fb3                  
+10025fb8                  if (*(arg1 + 0x1b3c) != *(arg1 + 8))
+10025fdb                      void* var_780_14 = &var_630
+10025fea                      sub_10020dc0(arg1, "cmd_accompany", &var_658)
+10025fb8                  else
+10025fc8                      sub_10020dc0(arg1, "cmd_accompanyme", &var_658)
+10025fc8              
+1002601a              sub_10025b20(ebx_6, arg1)
+1002603e              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_608, 0x100)
+10026040              int32_t var_750
+10026040              ebx_7 = var_750
+10026040              
+1002604d              if (ebx_7 == *(arg1 + 0x1b3c))
+1002604f                  ebx_7 = var_754
+1002604f              
+10026060              sub_10015ad0(&var_658, 0x28, ebx_7)
+10026068              int32_t var_77c_16 = 0
+10026073              sub_10020dc0(arg1, "cmd_getflag", &var_658)
+10026098              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_608, 0x100)
+1002609a              esi_10 = data_104b13ac
+100260a3              char const* const var_77c_17 = "returnflag"
+100260a3              
+100260ab              if (ebx_7 != 0xffffffff)
+100260ab                  goto label_10026156
+100260ab              
+100260b6              int32_t eax_32 = sub_10070cb0("vsay_team %s")
+100260c6              result = (*(esi_10 + 0x15c))(*(arg1 + 8), eax_32)
+10025c12          else
+10025c23              var_768 = int.d(float.s(eax_2))
+10025c27              long double x87_r7_1 = float.t(var_768)
+10025c33              long double x87_r5_1 = fconvert.t(0.5)
+10025c42              int32_t ebx_1 =
+10025c42                  sub_1007b550(fconvert.t(0.40000000000000002) * x87_r7_1 + x87_r5_1)
+10025c44              int32_t var_760_1 = ebx_1
+10025c44              
+10025c4b              if (ebx_1 s> 4)
+10025c4d                  var_760_1 = 4
+10025c55                  ebx_1 = 4
+10025c55              
+10025c5d              int32_t eax_8 = sub_1007b550(x87_r7_1 * x87_r5_1 + x87_r5_1)
+10025c62              var_768 = eax_8
+10025c62              
+10025c69              if (eax_8 s> 5)
+10025c6b                  var_768 = 5
+10025c6b              
+10025c73              int32_t eax_9 = *(arg1 + 0x1b3c)
+10025c7c              void var_508
+10025c7c              
+10025c7c              if (eax_9 == 0xffffffff)
+10025d63                  int32_t eax_14 = 0
+10025d65                  int32_t var_764_2 = 0
+10025d65                  
+10025d6b                  if (ebx_1 s> 0)
+10025e34                      do
+10025d80                          int32_t ebx_3 = (&var_758)[eax_14]
+10025d80                          
+10025d8a                          if (ebx_3 != *(arg1 + 0x1b3c))
+10025d9d                              sub_10015ad0(&var_658, 0x28, ebx_3)
+10025da5                              int32_t var_77c_5 = 0
+10025db0                              sub_10020dc0(arg1, "cmd_getflag", &var_658)
+10025db5                              void* esi_4 = data_104b13ac
+10025dbe                              char const* const var_77c_6 = "getflag"
+10025dbe                              
+10025dc6                              if (ebx_3 != 0xffffffff)
+10025de4                                  int32_t var_780_5 = ebx_3
+10025dea                                  int32_t eax_16 = sub_10070cb0("vtell %d %s")
+10025dfd                                  (*(esi_4 + 0x15c))(*(arg1 + 8), eax_16)
+10025dc6                              else
+10025dcd                                  int32_t eax_15 = sub_10070cb0("vsay_team %s")
+10025ddd                                  (*(esi_4 + 0x15c))(*(arg1 + 8), eax_15)
+10025ddd                              
+10025e22                              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10025e24                              eax_14 = var_764_2
+10025e24                          
+10025e2b                          eax_14 += 1
+10025e2c                          var_764_2 = eax_14
+10025e34                      while (eax_14 s< var_760_1)
+10025c7c              else
+10025c8f                  sub_10015ad0(&var_630, 0x28, eax_9)
+10025c94                  int32_t eax_10 = 0
+10025c99                  int32_t var_764_1 = 0
+10025c99                  
+10025c9f                  if (ebx_1 s> 0)
+10025d58                      do
+10025cb0                          int32_t ebx_2 = (&var_758)[eax_10]
+10025cb0                          
+10025cba                          if (ebx_2 != *(arg1 + 0x1b3c))
+10025ccd                              sub_10015ad0(&var_658, 0x28, ebx_2)
+10025cdb                              int32_t var_77c_3 = 0
+10025cdb                              
+10025ce0                              if (*(arg1 + 0x1b3c) != *(arg1 + 8))
+10025d01                                  void* var_780_2 = &var_630
+10025d10                                  sub_10020dc0(arg1, "cmd_accompany", &var_658)
+10025ce0                              else
+10025ceb                                  sub_10020dc0(arg1, "cmd_accompanyme", &var_658)
+10025ceb                              
+10025d21                              sub_10025b20(ebx_2, arg1)
+10025d46                              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10025d48                              eax_10 = var_764_1
+10025d48                          
+10025d4f                          eax_10 += 1
+10025d50                          var_764_1 = eax_10
+10025d58                      while (eax_10 s< var_760_1)
+10025e3a              result = var_768
+10025e3a              
+10025e40              if (result s> 0)
+10025e4a                  int32_t __saved_edi
+10025e4a                  void* edi_3 = &(&__saved_edi)[eax_2 + 7]
+10025e4e                  var_768 = result
+10025f62                  int32_t i
+10025f62                  
+10025f62                  do
+10025e52                      int32_t esi_5 = *edi_3
+10025e52                      
+10025e5a                      if (esi_5 != *(arg1 + 0x1b3c))
+10025e63                          if (esi_5 u> 0x3f)
+10025ec9                              sub_10020980(3, "ClientName: client out of range\n")
+10025e63                          else
+10025e82                              void var_408
+10025e82                              (*(data_104b13ac + 0x68))(esi_5 + 0x211, &var_408, 0x400)
+10025ea3                              strncpy(&var_658, sub_10070cf0(), 0x27)
+10025eb3                              char var_631_1 = 0
+10025ebb                              sub_10070b90(&var_658)
+10025ebb                          
+10025ed1                          int32_t var_77c_8 = 0
+10025ee1                          sub_10020dc0(arg1, "cmd_getflag", &var_658)
+10025f06                          (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_608, 0x100)
+10025f0b                          char const* const var_77c_9 = "returnflag"
+10025f0b                          
+10025f13                          if (esi_5 != 0xffffffff)
+10025f37                              void* ebx_5 = data_104b13ac
+10025f3d                              int32_t var_780_11 = esi_5
+10025f43                              int32_t eax_24 = sub_10070cb0("vtell %d %s")
+10025f56                              result = (*(ebx_5 + 0x15c))(*(arg1 + 8), eax_24)
+10025f13                          else
+10025f15                              void* esi_6 = data_104b13ac
+10025f20                              int32_t eax_23 = sub_10070cb0("vsay_team %s")
+10025f30                              result = (*(esi_6 + 0x15c))(*(arg1 + 8), eax_23)
+10025f30                      
+10025f5b                      edi_3 -= 4
+10025f5e                      i = var_768
+10025f5e                      var_768 -= 1
+10025f62                  while (i != 1)
+10025f62  
+10026181  sub_1007aaf9(eax_1 ^ &var_768)
+1002618c  return result
+
+10025ca7                       8d a4 24 00 00 00 00 8b ff                                                         ..$......
+10025d73                                                           8d a4 24 00 00 00 00 8d 9b 00 00 00 00                     ..$..........
+1002618d                                         cc cc cc                                                               ...
+
+10026190    int32_t sub_10026190(void* arg1)
+
+1002619d  int32_t result_1
+1002619d  int32_t var_4 = __security_cookie ^ &result_1
+100261a4  int32_t ebx
+100261a4  int32_t var_644 = ebx
+100261a5  int32_t ebp
+100261a5  int32_t var_648 = ebp
+100261ad  int32_t esi
+100261ad  int32_t var_64c = esi
+100261ae  int32_t edi
+100261ae  int32_t var_650 = edi
+100261ba  int32_t var_630
+100261ba  int32_t ebx_1 = sub_100255c0(arg1, &var_630)
+100261c1  int32_t var_634 = ebx_1
+100261c5  sub_10025890(&var_630, ebx_1)
+100261ca  int32_t eax_3 = *(arg1 + 0x1b24)
+100261d0  int32_t* esp = &var_650
+100261da  int32_t result
+100261da  int32_t var_62c
+100261da  int32_t var_628
+100261da  void var_530
+100261da  void var_508
+100261da  void var_408
+100261da  int32_t ebx_6
+100261da  
+100261da  if ((*(arg1 + 0x1b40) & 1) != 0)
+100265a6      result = eax_3 - 1
+100265a6      
+100265a7      if (eax_3 != 1)
+100265ae          if (result == 1)
+100268ff              int32_t ebx_13 = var_630
+10026910              sub_10015ad0(&var_530, 0x28, ebx_13)
+10026918              int32_t var_654_30 = 0
+10026923              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+10026948              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10026956              sub_10025b20(ebx_13, arg1)
+1002695b              ebx_6 = var_62c
+1002696c              label_1002696c:
+1002696c              sub_10015ad0(&var_530, 0x28, ebx_6)
+10026974              int32_t var_654_32 = 0
+1002697f              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+100269a3              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100269a5              esp = &var_634
+100269b1              result = sub_10025b20(ebx_6, arg1)
+100265ae          else if (result == 2)
+10026806              int32_t ebx_11 = var_630
+10026810              void* esi_12 = &var_530
+10026817              sub_10015ad0(esi_12, 0x28, ebx_11)
+1002681f              int32_t var_654_24 = 0
+1002682a              sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+1002684f              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+1002685d              sub_10025b20(ebx_11, arg1)
+1002686c              sub_10015ad0(esi_12, 0x28, var_62c)
+10026874              int32_t var_654_26 = 0
+1002687f              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+100268a3              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100268b1              sub_10025b20(var_62c, arg1)
+100268c0              sub_10015ad0(esi_12, 0x28, var_628)
+100268c8              int32_t var_654_28 = 0
+100268d3              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+100268f8              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100269a5              esp = &var_634
+100269b1              result = sub_10025b20(var_628, arg1)
+100265b5          else
+100265c6              result_1 = int.d(float.s(ebx_1))
+100265ca              long double x87_r7_4 = float.t(result_1)
+100265d6              long double x87_r5_3 = fconvert.t(0.5)
+100265e5              int32_t esi_7 =
+100265e5                  sub_1007b550(fconvert.t(0.20000000000000001) * x87_r7_4 + x87_r5_3)
+100265e7              int32_t var_63c_3 = esi_7
+100265e7              
+100265ee              if (esi_7 s> 2)
+100265f0                  var_63c_3 = 2
+100265f8                  esi_7 = 2
+100265f8              
+10026606              result = sub_1007b550(x87_r5_3 + x87_r7_4 * fconvert.t(0.69999999999999996))
+1002660b              result_1 = result
+1002660b              
+10026612              if (result s> 7)
+10026614                  result_1 = 7
+1002661c                  result = result_1
+1002661c              
+10026620              int32_t var_638_2 = 0
+10026620              
+1002662a              if (esi_7 s> 0)
+100266d9                  int32_t eax_40
+100266d9                  
+100266d9                  do
+10026634                      int32_t ebx_8 = (&var_630)[var_638_2]
+10026645                      sub_10015ad0(&var_530, 0x28, ebx_8)
+1002664d                      int32_t var_654_17 = 0
+10026658                      sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+1002667d                      (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+1002667f                      void* esi_9 = data_104b13ac
+10026688                      char const* const var_654_18 = "defend"
+10026688                      
+10026690                      if (ebx_8 != 0xffffffff)
+100266ae                          int32_t var_658_14 = ebx_8
+100266b4                          int32_t eax_37 = sub_10070cb0("vtell %d %s")
+100266c7                          (*(esi_9 + 0x15c))(*(arg1 + 8), eax_37)
+100266c9                          esp = &var_650
+10026690                      else
+10026697                          int32_t eax_36 = sub_10070cb0("vsay_team %s")
+100266a7                          (*(esi_9 + 0x15c))(*(arg1 + 8), eax_36)
+100266a9                          esp = &var_650
+100266a9                      
+100266d0                      eax_40 = var_638_2 + 1
+100266d1                      var_638_2 = eax_40
+100266d9                  while (eax_40 s< var_63c_3)
+100266df                  result = result_1
+100266e3                  ebx_1 = var_634
+100266e3              
+100266e9              if (result s> 0)
+100266ef                  void* edi_6 = &(&var_650)[ebx_1 + 7]
+100266f3                  var_634 = result
+100267fb                  int32_t i
+100267fb                  
+100267fb                  do
+100266f7                      int32_t esi_10 = *edi_6
+100266f7                      
+100266fc                      if (esi_10 u> 0x3f)
+10026762                          sub_10020980(3, "ClientName: client out of range\n")
+100266fc                      else
+1002671b                          (*(data_104b13ac + 0x68))(esi_10 + 0x211, &var_408, 0x400)
+1002673c                          strncpy(&var_530, sub_10070cf0(), 0x27)
+1002674c                          char var_509_2 = 0
+10026754                          sub_10070b90(&var_530)
+10026754                      
+1002676a                      int32_t var_654_20 = 0
+1002677a                      sub_10020dc0(arg1, "cmd_getflag", &var_530)
+1002679f                      (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100267a4                      char const* const var_654_21 = "getflag"
+100267a4                      
+100267ac                      if (esi_10 != 0xffffffff)
+100267d0                          void* ebx_10 = data_104b13ac
+100267d6                          int32_t var_658_19 = esi_10
+100267dc                          int32_t eax_47 = sub_10070cb0("vtell %d %s")
+100267ef                          result = (*(ebx_10 + 0x15c))(*(arg1 + 8), eax_47)
+100267f1                          esp = &var_650
+100267ac                      else
+100267ae                          void* esi_11 = data_104b13ac
+100267b9                          int32_t eax_45 = sub_10070cb0("vsay_team %s")
+100267c9                          result = (*(esi_11 + 0x15c))(*(arg1 + 8), eax_45)
+100267cb                          esp = &var_650
+100267cb                      
+100267f4                      edi_6 -= 4
+100267f7                      i = var_634
+100267f7                      var_634 -= 1
+100267fb                  while (i != 1)
+100261da  else
+100261e0      result = eax_3 - 1
+100261e0      
+100261e1      if (eax_3 != 1)
+100261e8          if (result == 1)
+10026501              int32_t ebx_7 = var_630
+1002650b              void* esi_6 = &var_530
+10026512              sub_10015ad0(esi_6, 0x28, ebx_7)
+1002651a              int32_t var_654_13 = 0
+10026525              sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+1002654a              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10026558              sub_10025b20(ebx_7, arg1)
+10026567              sub_10015ad0(esi_6, 0x28, var_62c)
+1002656f              int32_t var_654_15 = 0
+1002657a              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+1002659f              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100269a5              esp = &var_634
+100269b1              result = sub_10025b20(var_62c, arg1)
+100261e8          else
+100261ef              if (result == 2)
+10026447                  int32_t ebx_4 = var_630
+10026451                  void* esi_5 = &var_530
+10026458                  sub_10015ad0(esi_5, 0x28, ebx_4)
+10026460                  int32_t var_654_9 = 0
+1002646b                  sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+10026490                  (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+1002649e                  sub_10025b20(ebx_4, arg1)
+100264ad                  sub_10015ad0(esi_5, 0x28, var_62c)
+100264b5                  int32_t var_654_11 = 0
+100264c0                  sub_10020dc0(arg1, "cmd_getflag", &var_530)
+100264e5                  (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100264f3                  sub_10025b20(var_62c, arg1)
+100264f8                  ebx_6 = var_628
+100264fc                  goto label_1002696c
+100264fc              
+10026200              result_1 = int.d(float.s(ebx_1))
+10026204              long double x87_r7_1 = float.t(result_1)
+10026210              long double x87_r5_1 = fconvert.t(0.5)
+1002621f              int32_t esi_1 =
+1002621f                  sub_1007b550(fconvert.t(0.29999999999999999) * x87_r7_1 + x87_r5_1)
+10026221              int32_t var_63c_1 = esi_1
+10026221              
+10026228              if (esi_1 s> 3)
+1002622a                  var_63c_1 = 3
+10026232                  esi_1 = 3
+10026232              
+10026240              result = sub_1007b550(x87_r5_1 + x87_r7_1 * fconvert.t(0.69999999999999996))
+10026245              result_1 = result
+10026245              
+1002624c              if (result s> 6)
+1002624e                  result_1 = 6
+10026256                  result = result_1
+10026256              
+1002625a              int32_t var_638_1 = 0
+1002625a              
+10026264              if (esi_1 s> 0)
+10026313                  int32_t eax_13
+10026313                  
+10026313                  do
+1002626e                      int32_t ebx_2 = (&var_630)[var_638_1]
+1002627f                      sub_10015ad0(&var_530, 0x28, ebx_2)
+10026287                      int32_t var_654_2 = 0
+10026292                      sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+100262b7                      (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100262b9                      void* esi_3 = data_104b13ac
+100262c2                      char const* const var_654_3 = "defend"
+100262c2                      
+100262ca                      if (ebx_2 != 0xffffffff)
+100262e8                          int32_t var_658_2 = ebx_2
+100262ee                          int32_t eax_10 = sub_10070cb0("vtell %d %s")
+10026301                          (*(esi_3 + 0x15c))(*(arg1 + 8), eax_10)
+10026303                          esp = &var_650
+100262ca                      else
+100262d1                          int32_t eax_9 = sub_10070cb0("vsay_team %s")
+100262e1                          (*(esi_3 + 0x15c))(*(arg1 + 8), eax_9)
+100262e3                          esp = &var_650
+100262e3                      
+1002630a                      eax_13 = var_638_1 + 1
+1002630b                      var_638_1 = eax_13
+10026313                  while (eax_13 s< var_63c_1)
+10026319                  result = result_1
+1002631d                  ebx_1 = var_634
+1002631d              
+10026323              if (result s> 0)
+10026329                  int32_t edi_2 = var_630
+10026331                  result_1 = &(&var_650)[ebx_1 + 7]
+10026335                  int32_t var_63c_2 = result
+1002643c                  int32_t i_1
+1002643c                  
+1002643c                  do
+1002633d                      int32_t eax_15 = *result_1
+1002633d                      
+10026342                      if (eax_15 u> 0x3f)
+100263a7                          sub_10020980(3, "ClientName: client out of range\n")
+10026342                      else
+10026360                          (*(data_104b13ac + 0x68))(eax_15 + 0x211, &var_408, 0x400)
+10026381                          strncpy(&var_530, sub_10070cf0(), 0x27)
+10026391                          char var_509_1 = 0
+10026399                          sub_10070b90(&var_530)
+10026399                      
+100263af                      int32_t var_654_5 = 0
+100263bf                      sub_10020dc0(arg1, "cmd_getflag", &var_530)
+100263e4                      (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100263e6                      void* esi_4 = data_104b13ac
+100263ef                      char const* const var_654_6 = "getflag"
+100263ef                      
+100263f7                      if (edi_2 != 0xffffffff)
+10026415                          int32_t var_658_7 = edi_2
+1002641b                          int32_t eax_22 = sub_10070cb0("vtell %d %s")
+1002642e                          result = (*(esi_4 + 0x15c))(*(arg1 + 8), eax_22)
+10026430                          esp = &var_650
+100263f7                      else
+100263fe                          int32_t eax_21 = sub_10070cb0("vsay_team %s")
+1002640e                          result = (*(esi_4 + 0x15c))(*(arg1 + 8), eax_21)
+10026410                          esp = &var_650
+10026410                      
+10026433                      result_1 -= 4
+10026438                      i_1 = var_63c_2
+10026438                      var_63c_2 -= 1
+1002643c                  while (i_1 != 1)
+100269bd  *esp
+100269bd  esp[1]
+100269be  esp[2]
+100269bf  esp[3]
+100269c3  sub_1007aaf9(esp[0x193] ^ &esp[4])
+100269ce  return result
+
+100269cf                                               cc                                                                 .
+
+100269d0    char* sub_100269d0()
+// This function has unresolved stack usage. View graph of stack usage to resolve.
+
+100269db  void var_270
+100269db  int32_t eax_1 = __security_cookie ^ &var_270
+100269f2  int32_t var_25c
+100269f2  void* ebx
+100269f2  int32_t esi = sub_100255c0(ebx, &var_25c)
+100269f9  int32_t var_26c = esi
+100269fd  sub_10025890(&var_25c, esi)
+10026a07  char* eax_4 = esi - 1
+10026a07  
+10026a08  if (esi != 1)
+10026a0f      int32_t var_258
+10026a0f      void var_15c
+10026a0f      void var_10c
+10026a0f      int32_t ebp_5
+10026a0f      
+10026a0f      if (eax_4 == 1)
+10026e48          ebp_5 = var_25c
+10026e48          
+10026e52          if (ebp_5 == *(ebx + 0x1b3c))
+10026e54              ebp_5 = var_258
+10026e54          
+10026e65          label_10026e65:
+10026e65          sub_10015ad0(&var_15c, 0x28, ebp_5)
+10026e6d          int32_t var_280_20 = 0
+10026e78          sub_10020dc0(ebx, "cmd_defendbase", &var_15c)
+10026e9d          (*(data_104b13ac + 0x200))(*(ebx + 0x1964), &var_10c, 0x100)
+10026e9f          void* esi_13 = data_104b13ac
+10026ea8          char const* const var_280_21 = "defend"
+10026ea8          
+10026eb0          if (ebp_5 == 0xffffffff)
+10026eb7              int32_t eax_34 = sub_10070cb0("vsay_team %s")
+10026ec7              int32_t eax_35 = (*(esi_13 + 0x15c))(*(ebx + 8), eax_34)
+10026ed8              sub_1007aaf9(eax_1 ^ &var_270)
+10026ee3              return eax_35
+10026ee3          
+10026ee4          int32_t var_284_17 = ebp_5
+10026eea          int32_t eax_36 = sub_10070cb0("vtell %d %s")
+10026efd          eax_4 = (*(esi_13 + 0x15c))(*(ebx + 8), eax_36)
+10026a0f      else
+10026a16          if (eax_4 == 2)
+10026d92              int32_t ebp_4 = var_25c
+10026d92              
+10026d9c              if (ebp_4 == *(ebx + 0x1b3c))
+10026d9e                  ebp_4 = var_258
+10026d9e              
+10026daf              sub_10015ad0(&var_15c, 0x28, ebp_4)
+10026db7              int32_t var_280_16 = 0
+10026dc2              sub_10020dc0(ebx, "cmd_defendbase", &var_15c)
+10026de7              (*(data_104b13ac + 0x200))(*(ebx + 0x1964), &var_10c, 0x100)
+10026de9              void* esi_11 = data_104b13ac
+10026df2              char const* const var_280_17 = "defend"
+10026df2              
+10026dfa              if (ebp_4 != 0xffffffff)
+10026e18                  int32_t var_284_14 = ebp_4
+10026e1e                  int32_t eax_31 = sub_10070cb0("vtell %d %s")
+10026e31                  (*(esi_11 + 0x15c))(*(ebx + 8), eax_31)
+10026dfa              else
+10026e01                  int32_t eax_30 = sub_10070cb0("vsay_team %s")
+10026e11                  (*(esi_11 + 0x15c))(*(ebx + 8), eax_30)
+10026e11              
+10026e36              int32_t var_254
+10026e36              ebp_5 = var_254
+10026e36              
+10026e40              if (ebp_5 == *(ebx + 0x1b3c))
+10026e42                  ebp_5 = var_258
+10026e42              
+10026dfa              goto label_10026e65
+10026dfa          
+10026a2b          long double x87_r7_1 = float.t(int.d(float.s(esi)))
+10026a37          long double x87_r5_1 = fconvert.t(0.5)
+10026a41          int32_t eax_8 =
+10026a41              sub_1007b550(fconvert.t(0.59999999999999998) * x87_r7_1 + x87_r5_1)
+10026a46          int32_t var_260_1 = eax_8
+10026a46          
+10026a4d          if (eax_8 s> 6)
+10026a4f              var_260_1 = 6
+10026a4f          
+10026a61          int32_t i_6
+10026a61          int32_t ecx_1
+10026a61          i_6, ecx_1 = sub_1007b550(x87_r5_1 + x87_r7_1 * fconvert.t(0.29999999999999999))
+10026a66          int32_t i_4 = i_6
+10026a68          int32_t i_5 = i_4
+10026a68          
+10026a6f          if (i_4 s> 3)
+10026a71              i_5 = 3
+10026a79              i_4 = 3
+10026a79          
+10026a7d          int32_t eax_9 = 0
+10026a7f          int32_t var_268_2 = 0
+10026a7f          
+10026a87          if (var_260_1 s> 0)
+10026b41              do
+10026a90                  int32_t ebp_1 = (&var_25c)[eax_9]
+10026a90                  
+10026a9a                  if (ebp_1 != *(ebx + 0x1b3c))
+10026aad                      sub_10015ad0(&var_15c, 0x28, ebp_1)
+10026ab5                      int32_t var_280_2 = 0
+10026ac0                      sub_10020dc0(ebx, "cmd_defendbase", &var_15c)
+10026ae5                      (*(data_104b13ac + 0x200))(*(ebx + 0x1964), &var_10c, 0x100)
+10026ae7                      void* esi_2 = data_104b13ac
+10026af0                      char const* const var_280_3 = "defend"
+10026af0                      
+10026af8                      if (ebp_1 != 0xffffffff)
+10026b16                          int32_t var_284_2 = ebp_1
+10026b1c                          int32_t eax_13 = sub_10070cb0("vtell %d %s")
+10026b2f                          (*(esi_2 + 0x15c))(*(ebx + 8), eax_13)
+10026af8                      else
+10026aff                          int32_t eax_11 = sub_10070cb0("vsay_team %s")
+10026b0f                          (*(esi_2 + 0x15c))(*(ebx + 8), eax_11)
+10026b0f                  
+10026b38                  eax_9 = var_268_2 + 1
+10026b39                  var_268_2 = eax_9
+10026b41              while (eax_9 s< var_260_1)
+10026b41              
+10026b47              i_4 = i_5
+10026b4b              esi = var_26c
+10026b4b          
+10026b4f          eax_4 = *(ebx + 0x1b3c)
+10026b58          int32_t __saved_edi
+10026b58          
+10026b58          if (eax_4 != 0xffffffff)
+10026b6b              void var_134
+10026b6b              eax_4 = sub_10015ad0(&var_134, 0x28, eax_4)
+10026b6b              
+10026b75              if (i_4 s> 0)
+10026b83                  void* var_264_1 = &(&__saved_edi)[var_26c + 7]
+10026b87                  int32_t i_2 = i_4
+10026c8f                  void* eax_23
+10026c8f                  int32_t i
+10026c8f                  
+10026c8f                  do
+10026b90                      eax_23 = var_264_1
+10026b94                      int32_t ebp_2 = *eax_23
+10026b94                      
+10026b9c                      if (ebp_2 != *(ebx + 0x1b3c))
+10026baf                          sub_10015ad0(&var_15c, 0x28, ebp_2)
+10026bbd                          int32_t var_280_7 = 0
+10026bc4                          void* esi_5
+10026bc4                          
+10026bc4                          if (*(ebx + 0x1b3c) != *(ebx + 8))
+10026c08                              void* var_284_5 = &var_134
+10026c10                              sub_10020dc0(ebx, "cmd_accompany", &var_15c)
+10026c15                              esi_5 = data_104b13ac
+10026c1e                              char const* const var_280_9 = "followflagcarrier"
+10026c1e                              
+10026c26                              if (ebp_2 != 0xffffffff)
+10026c44                                  label_10026c44:
+10026c44                                  int32_t var_284_6 = ebp_2
+10026c4a                                  int32_t eax_20 = sub_10070cb0("vtell %d %s")
+10026c5d                                  (*(esi_5 + 0x15c))(*(ebx + 8), eax_20)
+10026c26                              else
+10026c2d                                  int32_t eax_18 = sub_10070cb0("vsay_team %s")
+10026c3d                                  (*(esi_5 + 0x15c))(*(ebx + 8), eax_18)
+10026bc4                          else
+10026bcd                              sub_10020dc0(ebx, "cmd_accompanyme", &var_15c)
+10026bd2                              esi_5 = data_104b13ac
+10026bdb                              char const* const var_280_8 = "followme"
+10026bdb                              
+10026be3                              if (ebp_2 != 0xffffffff)
+10026be3                                  goto label_10026c44
+10026be3                              
+10026bea                              int32_t eax_16 = sub_10070cb0("vsay_team %s")
+10026bfa                              (*(esi_5 + 0x15c))(*(ebx + 8), eax_16)
+10026c81                          eax_23 =
+10026c81                              (*(data_104b13ac + 0x200))(*(ebx + 0x1964), &var_10c, 0x100)
+10026c81                      
+10026c86                      var_264_1 -= 4
+10026c8b                      i = i_2
+10026c8b                      i_2 -= 1
+10026c8f                  while (i != 1)
+10026ca1                  sub_1007aaf9(eax_1 ^ &var_270)
+10026cac                  return eax_23
+10026b58          else if (i_4 s> 0)
+10026cb5              void* esi_6 = &(&__saved_edi)[esi + 7]
+10026cb9              void* var_26c_1 = esi_6
+10026cbd              int32_t i_3 = i_4
+10026d74              int32_t i_1
+10026d74              
+10026d74              do
+10026cc1                  int32_t ebp_3 = *esi_6
+10026cc1                  
+10026cc9                  if (ebp_3 != *(ebx + 0x1b3c))
+10026cdc                      sub_10015ad0(&var_15c, 0x28, ebp_3)
+10026ce4                      int32_t var_280_12 = 0
+10026cef                      sub_10020dc0(ebx, "cmd_getflag", &var_15c)
+10026cf4                      void* esi_8 = data_104b13ac
+10026cfd                      char const* const var_280_13 = "getflag"
+10026cfd                      
+10026d05                      if (ebp_3 != 0xffffffff)
+10026d23                          int32_t var_284_10 = ebp_3
+10026d29                          int32_t eax_26 = sub_10070cb0("vtell %d %s")
+10026d3c                          (*(esi_8 + 0x15c))(*(ebx + 8), eax_26)
+10026d05                      else
+10026d0c                          int32_t eax_24 = sub_10070cb0("vsay_team %s")
+10026d1c                          (*(esi_8 + 0x15c))(*(ebx + 8), eax_24)
+10026d1c                      
+10026d60                      eax_4 = (*(data_104b13ac + 0x200))(*(ebx + 0x1964), &var_10c, 0x100)
+10026d60                  
+10026d69                  esi_6 = var_26c_1 - 4
+10026d6c                  i_1 = i_3
+10026d6c                  i_3 -= 1
+10026d70                  var_26c_1 = esi_6
+10026d74              while (i_1 != 1)
+10026d86              sub_1007aaf9(eax_1 ^ &var_270)
+10026d91              return eax_4
+10026d91  
+10026f0e  sub_1007aaf9(eax_1 ^ &var_270)
+10026f19  return eax_4
+
+10026b8d                                         8d 49 00                                                               .I.
+10026f1a                                                                                cc cc cc cc cc cc                            ......
+
+10026f20    int32_t sub_10026f20(void* arg1)
+
+10026f2d  int32_t var_640
+10026f2d  int32_t var_4 = __security_cookie ^ &var_640
+10026f34  int32_t ebx
+10026f34  int32_t var_644 = ebx
+10026f35  int32_t ebp
+10026f35  int32_t var_648 = ebp
+10026f3d  int32_t esi
+10026f3d  int32_t var_64c = esi
+10026f3e  int32_t edi
+10026f3e  int32_t var_650 = edi
+10026f4a  int32_t var_630
+10026f4a  int32_t ebx_1 = sub_100255c0(arg1, &var_630)
+10026f51  int32_t var_634 = ebx_1
+10026f55  sub_10025890(&var_630, ebx_1)
+10026f5a  int32_t* esp = &var_650
+10026f66  int32_t result
+10026f66  int32_t var_62c
+10026f66  int32_t var_628
+10026f66  void var_530
+10026f66  void var_508
+10026f66  void var_408
+10026f66  int32_t ebx_7
+10026f66  
+10026f66  if ((*(arg1 + 0x1b40) & 1) != 0)
+1002732c      result = ebx_1 - 1
+1002732c      
+1002732d      if (ebx_1 != 1)
+10027334          if (result == 1)
+1002767d              int32_t ebx_14 = var_630
+1002768e              sub_10015ad0(&var_530, 0x28, ebx_14)
+10027696              int32_t var_654_30 = 0
+100276a1              sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+100276c5              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100276d3              sub_10025b20(ebx_14, arg1)
+100276d8              ebx_7 = var_62c
+100276e9              label_100276e9:
+100276e9              sub_10015ad0(&var_530, 0x28, ebx_7)
+100276f1              int32_t var_654_32 = 0
+100276fc              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+10027721              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10027723              esp = &var_634
+1002772f              result = sub_10025b20(ebx_7, arg1)
+10027334          else if (result == 2)
+10027584              int32_t ebx_12 = var_630
+1002758e              void* esi_13 = &var_530
+10027595              sub_10015ad0(esi_13, 0x28, ebx_12)
+1002759d              int32_t var_654_24 = 0
+100275a8              sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+100275cc              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100275da              sub_10025b20(ebx_12, arg1)
+100275e9              sub_10015ad0(esi_13, 0x28, var_62c)
+100275f1              int32_t var_654_26 = 0
+100275fc              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+10027621              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+1002762f              sub_10025b20(var_62c, arg1)
+1002763e              sub_10015ad0(esi_13, 0x28, var_628)
+10027646              int32_t var_654_28 = 0
+10027651              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+10027676              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10027723              esp = &var_634
+1002772f              result = sub_10025b20(var_628, arg1)
+1002733b          else
+1002734c              var_640 = int.d(float.s(ebx_1))
+10027350              long double x87_r7_4 = float.t(var_640)
+1002735c              long double x87_r5_3 = fconvert.t(0.5)
+1002736b              int32_t esi_8 =
+1002736b                  sub_1007b550(fconvert.t(0.40000000000000002) * x87_r7_4 + x87_r5_3)
+1002736d              int32_t var_63c_2 = esi_8
+1002736d              
+10027374              if (esi_8 s> 4)
+10027376                  var_63c_2 = 4
+1002737e                  esi_8 = 4
+1002737e              
+10027386              result = sub_1007b550(x87_r7_4 * x87_r5_3 + x87_r5_3)
+1002738b              var_640 = result
+1002738b              
+10027392              if (result s> 5)
+10027394                  var_640 = 5
+1002739c                  result = var_640
+1002739c              
+100273a0              int32_t var_638_2 = 0
+100273a0              
+100273aa              if (esi_8 s> 0)
+10027459                  int32_t eax_39
+10027459                  
+10027459                  do
+100273b4                      int32_t ebx_9 = (&var_630)[var_638_2]
+100273c5                      sub_10015ad0(&var_530, 0x28, ebx_9)
+100273cd                      int32_t var_654_17 = 0
+100273d8                      sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+100273fd                      (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100273ff                      void* esi_10 = data_104b13ac
+10027408                      char const* const var_654_18 = "defend"
+10027408                      
+10027410                      if (ebx_9 != 0xffffffff)
+1002742e                          int32_t var_658_14 = ebx_9
+10027434                          int32_t eax_36 = sub_10070cb0("vtell %d %s")
+10027447                          (*(esi_10 + 0x15c))(*(arg1 + 8), eax_36)
+10027449                          esp = &var_650
+10027410                      else
+10027417                          int32_t eax_34 = sub_10070cb0("vsay_team %s")
+10027427                          (*(esi_10 + 0x15c))(*(arg1 + 8), eax_34)
+10027429                          esp = &var_650
+10027429                      
+10027450                      eax_39 = var_638_2 + 1
+10027451                      var_638_2 = eax_39
+10027459                  while (eax_39 s< var_63c_2)
+1002745f                  result = var_640
+10027463                  ebx_1 = var_634
+10027463              
+10027469              if (result s> 0)
+1002746f                  void* edi_6 = &(&var_650)[ebx_1 + 7]
+10027473                  var_634 = result
+10027579                  int32_t i
+10027579                  
+10027579                  do
+10027477                      int32_t esi_11 = *edi_6
+10027477                      
+1002747c                      if (esi_11 u> 0x3f)
+100274e1                          sub_10020980(3, "ClientName: client out of range\n")
+1002747c                      else
+1002749a                          (*(data_104b13ac + 0x68))(esi_11 + 0x211, &var_408, 0x400)
+100274bb                          strncpy(&var_530, sub_10070cf0(), 0x27)
+100274cb                          char var_509_2 = 0
+100274d3                          sub_10070b90(&var_530)
+100274d3                      
+100274e9                      int32_t var_654_20 = 0
+100274f9                      sub_10020dc0(arg1, "cmd_getflag", &var_530)
+1002751d                      (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10027522                      char const* const var_654_21 = "getflag"
+10027522                      
+1002752a                      if (esi_11 != 0xffffffff)
+1002754e                          void* ebx_11 = data_104b13ac
+10027554                          int32_t var_658_19 = esi_11
+1002755a                          int32_t eax_46 = sub_10070cb0("vtell %d %s")
+1002756d                          result = (*(ebx_11 + 0x15c))(*(arg1 + 8), eax_46)
+1002756f                          esp = &var_650
+1002752a                      else
+1002752c                          void* esi_12 = data_104b13ac
+10027537                          int32_t eax_44 = sub_10070cb0("vsay_team %s")
+10027547                          result = (*(esi_12 + 0x15c))(*(arg1 + 8), eax_44)
+10027549                          esp = &var_650
+10027549                      
+10027572                      edi_6 -= 4
+10027575                      i = var_634
+10027575                      var_634 -= 1
+10027579                  while (i != 1)
+10026f66  else
+10026f6c      result = ebx_1 - 1
+10026f6c      
+10026f6d      if (ebx_1 != 1)
+10026f74          if (result == 1)
+10027288              int32_t ebx_8 = var_630
+10027292              void* esi_7 = &var_530
+10027299              sub_10015ad0(esi_7, 0x28, ebx_8)
+100272a1              int32_t var_654_13 = 0
+100272ac              sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+100272d1              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+100272df              sub_10025b20(ebx_8, arg1)
+100272ee              sub_10015ad0(esi_7, 0x28, var_62c)
+100272f6              int32_t var_654_15 = 0
+10027301              sub_10020dc0(arg1, "cmd_getflag", &var_530)
+10027325              (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10027723              esp = &var_634
+1002772f              result = sub_10025b20(var_62c, arg1)
+10026f74          else
+10026f7b              if (result == 2)
+100271cf                  int32_t ebx_5 = var_630
+100271d9                  void* esi_6 = &var_530
+100271e0                  sub_10015ad0(esi_6, 0x28, ebx_5)
+100271e8                  int32_t var_654_9 = 0
+100271f3                  sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+10027218                  (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10027226                  sub_10025b20(ebx_5, arg1)
+10027235                  sub_10015ad0(esi_6, 0x28, var_62c)
+1002723d                  int32_t var_654_11 = 0
+10027248                  sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+1002726c                  (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+1002727a                  sub_10025b20(var_62c, arg1)
+1002727f                  ebx_7 = var_628
+10027283                  goto label_100276e9
+10027283              
+10026f8c              var_640 = int.d(float.s(ebx_1))
+10026f90              long double x87_r7_1 = float.t(var_640)
+10026f96              long double x87_r5_1 = fconvert.t(0.5)
+10026fa7              int32_t esi_1 = sub_1007b550(x87_r7_1 * x87_r5_1 + x87_r5_1)
+10026fa9              int32_t var_63c_1 = esi_1
+10026fa9              
+10026fb0              if (esi_1 s> 5)
+10026fb2                  var_63c_1 = 5
+10026fba                  esi_1 = 5
+10026fba              
+10026fc8              result = sub_1007b550(x87_r5_1 + x87_r7_1 * fconvert.t(0.40000000000000002))
+10026fcd              var_640 = result
+10026fcd              
+10026fd4              if (result s> 4)
+10026fd6                  var_640 = 4
+10026fde                  result = var_640
+10026fde              
+10026fe2              int32_t var_638_1 = 0
+10026fe2              
+10026fec              if (esi_1 s> 0)
+1002709b                  int32_t eax_13
+1002709b                  
+1002709b                  do
+10026ff6                      int32_t ebx_2 = (&var_630)[var_638_1]
+10027007                      sub_10015ad0(&var_530, 0x28, ebx_2)
+1002700f                      int32_t var_654_2 = 0
+1002701a                      sub_10020dc0(arg1, "cmd_defendbase", &var_530)
+1002703f                      (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+10027041                      void* esi_3 = data_104b13ac
+1002704a                      char const* const var_654_3 = "defend"
+1002704a                      
+10027052                      if (ebx_2 != 0xffffffff)
+10027070                          int32_t var_658_2 = ebx_2
+10027076                          int32_t eax_10 = sub_10070cb0("vtell %d %s")
+10027089                          (*(esi_3 + 0x15c))(*(arg1 + 8), eax_10)
+1002708b                          esp = &var_650
+10027052                      else
+10027059                          int32_t eax_9 = sub_10070cb0("vsay_team %s")
+10027069                          (*(esi_3 + 0x15c))(*(arg1 + 8), eax_9)
+1002706b                          esp = &var_650
+1002706b                      
+10027092                      eax_13 = var_638_1 + 1
+10027093                      var_638_1 = eax_13
+1002709b                  while (eax_13 s< var_63c_1)
+100270a1                  result = var_640
+100270a5                  ebx_1 = var_634
+100270a5              
+100270ab              if (result s> 0)
+100270b1                  void* edi_2 = &(&var_650)[ebx_1 + 7]
+100270b5                  var_640 = result
+100271c4                  int32_t i_1
+100271c4                  
+100271c4                  do
+100270c0                      int32_t esi_4 = *edi_2
+100270c0                      
+100270c5                      if (esi_4 u> 0x3f)
+1002712b                          sub_10020980(3, "ClientName: client out of range\n")
+100270c5                      else
+100270e4                          (*(data_104b13ac + 0x68))(esi_4 + 0x211, &var_408, 0x400)
+10027105                          strncpy(&var_530, sub_10070cf0(), 0x27)
+10027115                          char var_509_1 = 0
+1002711d                          sub_10070b90(&var_530)
+1002711d                      
+10027133                      int32_t var_654_5 = 0
+10027143                      sub_10020dc0(arg1, "cmd_getflag", &var_530)
+10027168                      (*(data_104b13ac + 0x200))(*(arg1 + 0x1964), &var_508, 0x100)
+1002716d                      char const* const var_654_6 = "getflag"
+1002716d                      
+10027175                      if (esi_4 != 0xffffffff)
+10027199                          void* ebx_4 = data_104b13ac
+1002719f                          int32_t var_658_7 = esi_4
+100271a5                          int32_t eax_20 = sub_10070cb0("vtell %d %s")
+100271b8                          result = (*(ebx_4 + 0x15c))(*(arg1 + 8), eax_20)
+100271ba                          esp = &var_650
+10027175                      else
+10027177                          void* esi_5 = data_104b13ac
+10027182                          int32_t eax_18 = sub_10070cb0("vsay_team %s")
+10027192                          result = (*(esi_5 + 0x15c))(*(arg1 + 8), eax_18)
+10027194                          esp = &var_650
+10027194                      
+100271bd                      edi_2 -= 4
+100271c0                      i_1 = var_640
+100271c0                      var_640 -= 1
+100271c4                  while (i_1 != 1)
+1002773b  *esp
+1002773b  esp[1]
+1002773c  esp[2]
+1002773d  esp[3]
+10027741  sub_1007aaf9(esp[0x193] ^ &esp[4])
+1002774c  return result
+
+1002774d                                         cc cc cc                                                               ...
+
+10027750    int32_t __convention("regparm") sub_10027750(void* arg1)
+
+1002775c  bool cond:0 = sub_10013b00(arg1) != 1
+1002775f  int32_t eax_1 = *(arg1 + 0x1b28)
+10027765  int32_t result
+10027765  
+10027765  if (cond:0)
+10027778      result = eax_1 + (*(arg1 + 0x1b2c) << 1)
+10027765  else
+1002776d      result = *(arg1 + 0x1b2c) + (eax_1 << 1)
+1002776d  
+1002777e  if (result u> 3)
+100277ae      return result
+100277ae  
+10027780  switch (result)
+10027791      case 0
+10027791          return sub_10026f20(arg1)
+10027798      case 1
+10027798          return sub_100269d0()
+100277a3      case 2
+100277a3          return sub_10026190(arg1)
+100277a5      case 3
+100277a5          return sub_10025bc0(arg1)
+
+100277af                                               90                                                                 .
+100277b0  uint32_t jump_table_100277b0[0x4] = 
+100277b0  {
+100277b0      [0x0] =  0x10027787
+100277b4      [0x1] =  0x10027792
+100277b8      [0x2] =  0x10027799
+100277bc      [0x3] =  0x100277a4
+100277c0  }

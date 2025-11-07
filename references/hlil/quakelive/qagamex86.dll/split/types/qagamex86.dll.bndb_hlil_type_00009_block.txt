@@ -1,0 +1,377 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10001aa1                              unimplemented  {fld st0, dword [&data_1008b330]}
+10001aa8                              int32_t var_36c_2 = ecx_2
+10001aad                              float var_36c_3 =
+10001aad                                  fconvert.s(unimplemented  {fstp dword [esp], st0})
+10001aad                              unimplemented  {fstp dword [esp], st0}
+10001ac1                              int32_t xmm0_1 = sub_10018b20(*(var_350 + 0xc), ebx + 0x1984, 
+10001ac1                                  var_36c_3, ebp)
+10001ac1                              int16_t top = top - 1
+10001ac1                              unimplemented  {call sub_10018b20}
+10001ac1                              
+10001ad0                              if (xmm0_1 f> 0f)
+10001afb                                  result = 1
+10001b00                                  break
+10001b00                              
+10001ad2                              ebx = var_350
+10001a3b              else
+10001a51                  if (*(var_e8 * 0x384 + 0x104b41e0) != 0)
+10001a53                      eax_2 = *(var_e8 * 0x384 + &data_104b41dc)
+10001a5b                      void var_34c
+10001a5b                      
+10001a5b                      if (eax_2 != 0)
+10001a68                          __builtin_memcpy(dest: &var_34c, src: eax_2, n: 0x250)
+10001a68                  
+10001a6f                  int32_t var_348
+10001a6f                  
+10001a6f                  if (var_348 == 0)
+10001a6f                      goto label_10001a71
+10001a6f      
+10001ad6      ebp += 1
+10001ad6      
+10001ada      if (ebp s>= 0x40)
+10001ae0          result = 0
+10001ae0          break
+10001ae0  
+10001aef  sub_1007aaf9(eax_1 ^ &var_354)
+10001afa  return result
+
+10001b02        cc cc cc cc cc cc cc cc cc cc cc cc cc cc                                                    ..............
+
+10001b10    int32_t __fastcall sub_10001b10(void* arg1)
+
+10001b1b  float var_9c
+10001b1b  int32_t eax_1 = __security_cookie ^ &var_9c
+10001b1b  
+10001b2c  if (*(arg1 + 0x14) == 3)
+10001b3e      sub_1007aaf9(eax_1 ^ &var_9c)
+10001b49      return 1
+10001b49  
+10001b85  if (*(arg1 + 0x13c4) == 0 && *(arg1 + 0x13cc) == 0 && *(arg1 + 0x13d0) == 0
+10001b85          && *(arg1 + 0x13d4) == 0 && *(arg1 + 0x13d8) == 0)
+10001b91      int32_t eax_3 = *(arg1 + 0xc)
+10001ba9      int32_t eax_4 = *(data_104b13ac + 0x88)
+10001baf      float var_38_1 = fconvert.s(fconvert.t(*(arg1 + 0x1314)) - fconvert.t(24.0))
+10001bb7      int32_t var_40 = *(arg1 + 0x130c)
+10001bc6      int32_t var_3c_1 = *(arg1 + 0x1310)
+10001bc6      
+10001bd3      if ((eax_4(&var_40, eax_3) & 0x18) == 0)
+10001be7          int32_t ecx_2 = *(arg1 + 0xc)
+10001bea          long double x87_r7_4 = fconvert.t(*(arg1 + 0x1314)) + fconvert.t(32.0)
+10001bf0          void* eax_6 = data_104b13ac
+10001bf5          var_40 = *(arg1 + 0x130c)
+10001c03          float var_38_2 = fconvert.s(x87_r7_4)
+10001c0c          int32_t var_3c_2 = *(arg1 + 0x1310)
+10001c0c          
+10001c20          if (((*(eax_6 + 0x88))(&var_40, ecx_2) & 0x38) == 0)
+10001c2c              int32_t xmm0_5 = *(arg1 + 0x130c)
+10001c34              int32_t xmm1 = *(arg1 + 0x1310)
+10001c3c              var_9c = fconvert.s(fconvert.t(*(arg1 + 0x1314)))
+10001c40              long double x87_r7_6 = fconvert.t(var_9c)
+10001c44              void* ecx_4 = data_104b13ac
+10001c62              float var_20 = fconvert.s(fconvert.t(1.0) + x87_r7_6)
+10001c69              int32_t var_28 = xmm0_5
+10001c72              int32_t var_24 = xmm1
+10001c81              int32_t var_34 = xmm0_5
+10001c87              int32_t var_30 = xmm1
+10001c8f              float var_2c = fconvert.s(x87_r7_6 - fconvert.t(10.0))
+10001c9c              void var_1c
+10001c9c              void var_10
+10001c9c              (*(ecx_4 + 0x104))(4, &var_1c, &var_10)
+10001c9e              int32_t eax_8 = *(arg1 + 8)
+10001cc5              void var_98
+10001cc5              sub_10020ac0(eax_8, &var_10, &var_1c, &var_98, &var_28, eax_8, 1)
+10001cd7              int32_t var_48
+10001cd7              int32_t result
+10001cd7              result.b = var_48 == 0x3fe
+10001ce5              sub_1007aaf9(eax_1 ^ &var_9c)
+10001cf0              return result
+10001cf0  
+10001cfe  sub_1007aaf9(eax_1 ^ &var_9c)
+10001d09  return 0
+
+10001d0a                                cc cc cc cc cc cc                                                            ......
+
+10001d10    int32_t sub_10001d10(void* arg1 @ esi)
+
+10001d18  float var_30
+10001d18  int32_t eax_1 = __security_cookie ^ &var_30
+10001d18  
+10001d5a  if (data_105a8aac == 0 && data_105a3acc == 0 && data_10595d2c == 0 && data_105a862c == 0
+10001d5a          && data_105e3d2c == 0)
+10001d6c      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+10001d6c      
+10001d78      if (not(fconvert.t(*(arg1 + 0x17b4)) > x87_r6_2))
+10001d7e          int32_t eax_2 = data_105e4ae8
+10001d7e          
+10001d8f          if (eax_2 s< 3 && eax_2 != 1)
+10001db8              (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x1b, fconvert.s(float.t(0)), 
+10001db8                  fconvert.s(float.t(1)))
+10001dba              var_30 = fconvert.s(x87_r6_2)
+10001dc8              long double x87_r0_3
+10001dc8              
+10001dc8              if (data_105e498c == 0)
+10001ddd                  x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10001ddd              
+10001ded              if ((data_105e498c != 0 || not(x87_r0_3 > fconvert.t(var_30)))
+10001ded                      && sub_10001000() s> 1 && sub_10001b10(arg1) != 0)
+10001e08                  int32_t var_38_2 = 0
+10001e0a                  sub_100017d0()
+10001e0f                  int32_t var_3c_2 = 0x10090730
+10001e10                  char const* const var_40 = "[invalid var]"
+10001e15                  char const* const var_44_2 = "[invalid var]"
+10001e1b                  sub_10001650(arg1)
+10001e23                  void* var_48_1 = &data_10090708
+10001e3d                  sub_10020dc0(arg1, "game_enter", sub_10015df0(*(arg1 + 8), 0x20))
+10001e4d                  *(arg1 + 0x17b4) = data_105e2ef8
+10001e55                  *(arg1 + 0x1784) = 0
+10001e6b                  sub_1007aaf9(eax_1 ^ &var_30)
+10001e73                  return 1
+10001e73  
+10001e7d  sub_1007aaf9(eax_1 ^ &var_30)
+10001e85  return 0
+
+10001e86                    cc cc cc cc cc cc cc cc cc cc                                                        ..........
+
+10001e90    int32_t sub_10001e90(void* arg1 @ esi)
+
+10001e98  float var_2c
+10001e98  int32_t eax_1 = __security_cookie ^ &var_2c
+10001e98  
+10001ea5  if (data_105e3d2c == 0)
+10001ec4      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+10001ec4      
+10001ed0      if (not(fconvert.t(*(arg1 + 0x17b4)) > x87_r6_2))
+10001ed2          int32_t eax_3 = data_105e4ae8
+10001ed2          
+10001edf          if (eax_3 s< 3 && eax_3 != 1)
+10001f04              (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x1b, fconvert.s(float.t(0)), 
+10001f04                  fconvert.s(float.t(1)))
+10001f06              var_2c = fconvert.s(x87_r6_2)
+10001f14              long double x87_r0_3
+10001f14              
+10001f14              if (data_105e498c == 0)
+10001f29                  x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10001f29              
+10001f38              if ((data_105e498c != 0 || not(x87_r0_3 > fconvert.t(var_2c)))
+10001f38                      && sub_10001000() s> 1)
+10001f4d                  int32_t var_34_2 = 0
+10001f4f                  sub_100017d0()
+10001f54                  int32_t var_38 = 0x10090730
+10001f55                  char const* const var_3c_2 = "[invalid var]"
+10001f5a                  char const* const var_40 = "[invalid var]"
+10001f60                  sub_10001650(arg1)
+10001f68                  void* var_44_1 = &data_10090708
+10001f82                  sub_10020dc0(arg1, "game_exit", sub_10015df0(*(arg1 + 8), 0x20))
+10001f99                  *(arg1 + 0x17b4) = data_105e2ef8
+10001fa1                  *(arg1 + 0x1784) = 0
+10001fb0                  sub_1007aaf9(eax_1 ^ &var_2c)
+10001fb8                  return 1
+10001fb8  
+10001eaf  sub_1007aaf9(eax_1 ^ &var_2c)
+10001eb7  return 0
+
+10001fb9                                                                             cc cc cc cc cc cc cc                           .......
+
+10001fc0    int32_t sub_10001fc0(void* arg1 @ esi)
+
+10001fc8  float var_2c
+10001fc8  int32_t eax_1 = __security_cookie ^ &var_2c
+10001fc8  
+10001fde  if (data_105a862c == 0 && data_105e3d2c == 0 && sub_10017090(arg1) == 0)
+10001ff9      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+10001ff9      
+10002005      if (not(fconvert.t(*(arg1 + 0x17b4)) > x87_r6_2))
+10002007          int32_t eax_3 = data_105e4ae8
+10002007          
+1000200f          if (eax_3 s>= 3)
+10002026              (*(data_104b13ac + 0x15c))(*(arg1 + 8), "vtaunt")
+1000200f          else if (eax_3 != 1)
+10002064              (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x1a, fconvert.s(float.t(0)), 
+10002064                  fconvert.s(float.t(1)))
+10002066              var_2c = fconvert.s(x87_r6_2)
+10002074              long double x87_r0_3
+10002074              
+10002074              if (data_105e498c == 0)
+10002089                  x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10002089              
+10002098              if ((data_105e498c != 0 || not(x87_r0_3 > fconvert.t(var_2c)))
+10002098                      && sub_10001000() s> 1)
+100020a8                  int32_t var_34_3 = 0
+100020c0                  sub_10020dc0(arg1, "level_start", sub_10015df0(*(arg1 + 8), 0x20))
+100020d7                  *(arg1 + 0x17b4) = data_105e2ef8
+100020df                  *(arg1 + 0x1784) = 0
+100020ee                  sub_1007aaf9(eax_1 ^ &var_2c)
+100020f6                  return 1
+100020f6  
+10002033  sub_1007aaf9(eax_1 ^ &var_2c)
+1000203b  return 0
+
+100020f7                                                                       cc cc cc cc cc cc cc cc cc                         .........
+
+10002100    int32_t sub_10002100(void* arg1 @ esi)
+
+10002108  float var_30
+10002108  int32_t eax_1 = __security_cookie ^ &var_30
+10002108  
+1000214a  if (data_10595d2c == 0 && data_105a8aac == 0 && data_105a3acc == 0 && data_105a862c == 0
+1000214a          && data_105e3d2c == 0 && sub_10017090(arg1) == 0)
+1000216d      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+1000216d      
+10002179      if (not(fconvert.t(*(arg1 + 0x17b4)) > x87_r6_2))
+1000217f          int32_t eax_3 = data_105e4ae8
+1000217f          
+10002187          if (eax_3 s>= 3)
+10002194              if (sub_100010f0(arg1) != 0)
+100021ab                  (*(data_104b13ac + 0x15c))(*(arg1 + 8), "vtaunt")
+100021ab              
+100021bc              sub_1007aaf9(eax_1 ^ &var_30)
+100021c4              return 1
+100021c4          
+100021c8          if (eax_3 != 1)
+100021f1              (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x1a, fconvert.s(float.t(0)), 
+100021f1                  fconvert.s(float.t(1)))
+100021f3              var_30 = fconvert.s(x87_r6_2)
+10002201              long double x87_r0_3
+10002201              
+10002201              if (data_105e498c == 0)
+10002216                  x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10002216              
+10002226              if ((data_105e498c != 0 || not(x87_r0_3 > fconvert.t(var_30)))
+10002226                      && sub_10001000() s> 1)
+10002245                  char const* const var_50_1
+10002245                  int32_t var_4c
+10002245                  
+10002245                  if (sub_100010f0(arg1) == 0)
+1000228a                      int32_t var_38_7 = 0
+1000228a                      
+1000228e                      if (sub_10001240(arg1) == 0)
+100022c9                          sub_100017d0()
+100022ce                          int32_t var_3c_5 = 0x10090730
+100022d4                          int32_t var_40_2 = 0x100906e8
+100022d5                          int32_t var_44_5 = sub_100014f0()
+100022d6                          sub_10001390()
+100022de                          int32_t var_44_6 = 0x100906c4
+100022e0                          sub_10001650(arg1)
+100022eb                          void* var_48_5 = &data_10090708
+100022fb                          var_4c = sub_10015df0(*(arg1 + 8), 0x20)
+100022fc                          var_50_1 = "level_end"
+1000228e                      else
+10002295                          int32_t var_3c_4 = 0x10090730
+10002296                          char const* const var_40_1 = "[invalid var]"
+1000229b                          int32_t var_44_3 = sub_100017d0()
+1000229c                          sub_10001390()
+100022a4                          int32_t var_44_4 = 0x100906c4
+100022a6                          sub_10001650(arg1)
+100022b1                          void* var_48_3 = &data_10090708
+100022c1                          var_4c = sub_10015df0(*(arg1 + 8), 0x20)
+100022c2                          var_50_1 = "level_end_lose"
+10002245                  else
+10002247                      int32_t var_38_5 = 0
+10002249                      sub_100017d0()
+1000224e                      int32_t var_3c_3 = 0x10090730
+1000224f                      sub_100014f0()
+10002254                      int32_t var_40 = 0x100906e8
+10002255                      char const* const var_44_2 = "[invalid var]"
+1000225b                      sub_10001650(arg1)
+10002263                      void* var_48_1 = &data_10090708
+10002276                      var_4c = sub_10015df0(*(arg1 + 8), 0x20)
+10002277                      var_50_1 = "level_end_victory"
+10002277                  
+10002302                  sub_10020dc0(arg1, var_50_1, var_4c)
+10002312                  *(arg1 + 0x17b4) = data_105e2ef8
+1000231a                  *(arg1 + 0x1784) = 0
+10002330                  sub_1007aaf9(eax_1 ^ &var_30)
+10002338                  return 1
+10002338  
+10002342  sub_1007aaf9(eax_1 ^ &var_30)
+1000234a  return 0
+
+1000234b                                   cc cc cc cc cc                                                             .....
+
+10002350    int32_t sub_10002350(void* arg1 @ esi)
+
+10002358  float var_34
+10002358  int32_t eax_1 = __security_cookie ^ &var_34
+10002358  
+10002381  if (data_105e3d2c == 0 && data_105a862c == 0 && data_10595d2c == 0)
+10002387      int32_t eax_2 = data_105a3acc
+10002387      
+10002398      if (eax_2 != 2 && eax_2 != 1)
+100023a8          int32_t ecx_1
+100023a8          ecx_1.b = eax_2 == 0
+100023a8          
+100023ae          if (ecx_1 != 3)
+10002438              label_10002438:
+10002438              
+10002440              if (sub_10001000() s> 1)
+10002446                  int32_t eax_7 = *(arg1 + 0x174c)
+10002453                  int32_t var_28
+10002453                  int32_t eax_8
+10002453                  int32_t edx_2
+10002453                  
+10002453                  if (eax_7 s< 0 || eax_7 s>= 0x40)
+10002466                      edx_2 = 0x726f775b
+1000246c                      eax_8 = 0x5d646c
+10002471                      __builtin_strcpy(dest: &var_28, src: "[world]")
+10002453                  else
+1000245c                      eax_8, edx_2 = sub_10015df0(eax_7, 0x20)
+1000245c                  
+10002480                  if (data_105e4ae8 s< 3)
+1000250b                      label_1000250b:
+1000250b                      int32_t eax_13 = *(arg1 + 0x1750)
+1000250b                      
+10002514                      if (eax_13 == 0xe)
+10002516                          int32_t var_40_4 = 0
+10002519                          sub_10001650(arg1)
+10002753                          sub_10020dc0(arg1, "death_drown", &data_10090708)
+10002514                      else if (eax_13 == 0xf)
+10002531                          int32_t var_40_5 = 0
+10002534                          sub_10001650(arg1)
+10002753                          sub_10020dc0(arg1, "death_slime", &data_10090708)
+1000252f                      else if (eax_13 == 0x10)
+1000254c                          int32_t var_40_6 = 0
+1000254f                          sub_10001650(arg1)
+10002753                          sub_10020dc0(arg1, "death_lava", &data_10090708)
+1000254a                      else if (eax_13 == 0x13)
+10002567                          int32_t var_40_7 = 0
+1000256a                          sub_10001650(arg1)
+10002753                          sub_10020dc0(arg1, "death_cratered", &data_10090708)
+10002565                      else if (*(arg1 + 0x1758) != 0 || eax_13 == 0x11 || eax_13 == 0x14
+10002565                              || eax_13 == 0x15 || eax_13 == 0x16 || eax_13 == 0)
+10002741                          int32_t var_40_15 = 0
+10002744                          sub_10001650(arg1)
+10002753                          sub_10020dc0(arg1, "death_suicide", &data_10090708)
+100025b0                      else if (eax_13 != 0x12)
+100025cf                          int32_t eax_15
+100025cf                          
+100025cf                          if (eax_13 == 0x1a)
+100025e9                              eax_15 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), 
+100025e9                                  "death_kamikaze")
+100025e9                          
+100025f0                          if (eax_13 != 0x1a || eax_15 == 0)
+10002603                              int32_t eax_16 = *(arg1 + 0x1750)
+1000261b                              bool cond:4_1
+1000261b                              
+1000261b                              if (eax_16 == 2 || eax_16 == 0xa || eax_16 == 0xc
+1000261b                                      || eax_16 == 0xd)
+10002628                                  var_34 = rand() & 0x7fff
+1000262c                                  unimplemented  {fild st0, dword [esp+0x8]}
+10002630                                  unimplemented  {fdiv st0, qword [&data_1008b160]}
+10002636                                  unimplemented  {fld st0, qword [&data_1008b140]}
+1000263c                                  cond:4_1 = unimplemented  {fcomip st0, st1}
+1000263c                                      f<= unimplemented  {fcomip st0, st1}
+1000263c                                  unimplemented  {fcomip st0, st1}
+1000263e                                  unimplemented  {fstp st0, st0}
+1000263e                                  unimplemented  {fstp st0, st0}
+1000263e                              
+1000261b                              if ((eax_16 != 2 && eax_16 != 0xa && eax_16 != 0xc
+1000261b                                      && eax_16 != 0xd) || cond:4_1)
+100026be                                  var_34 = rand() & 0x7fff
+100026c2                                  unimplemented  {fild st0, dword [esp+0x8]}
+100026d7                                  unimplemented  {fdiv st0, qword [&data_1008b160]}
+100026e0                                  var_34.q = fconvert.d(unimplemented  {fstp qword [esp
+100026e0                                      +0x10], st0})

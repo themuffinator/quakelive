@@ -1,0 +1,20 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10024aa1                                      unimplemented  {fstp dword [esp+0x14], st0}
+10024a53                                      goto label_10024aa5
+10024a53                                  
+1002498f                                  int16_t top_2
+1002498f                                  
+1002498f                                  if (esi_2 s< 0)
+100249f3                                      if (esi_2 s< 0xffffffff && esi_2 s< *(ecx_6 + 0x2508))
+10024a01                                          *(ecx_6 + 0x2504) = 0xbdaaaaab
+10024a09                                          result_4 = *((ebp_1 << 2) + &data_105e2f00)
+10024a10                                          top_2 = top_1 - 1
+10024a10                                          unimplemented  {fld st0, dword [edx+0x2504]}
+100249c3                                          label_100249c3:
+100249c3                                          unimplemented  {fadd dword [esp+0x14]}
+100249c8                                          void* var_55c_1 = ecx_6
+100249cb                                          var_540_1 = fconvert.s(unimplemented  {fstp 
+100249cb                                              dword [esp+0x1c], st0})

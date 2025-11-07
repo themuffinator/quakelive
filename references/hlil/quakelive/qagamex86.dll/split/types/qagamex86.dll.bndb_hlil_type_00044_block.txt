@@ -1,0 +1,6 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+100196f2                                              unimplemented  {fsubr st0, qword [
+100196f2                                                  &data_1008b0f8]}

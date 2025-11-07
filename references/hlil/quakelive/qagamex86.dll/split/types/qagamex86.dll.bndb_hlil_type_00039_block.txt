@@ -1,0 +1,33 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+100195f1                                  unimplemented  {fstp dword [esp+0x18], st0}
+100195f5                                  unimplemented  {fld st0, dword [esp+0x18]}
+100195f9                                  unimplemented  {fld st0, dword [&data_1008b518]}
+100195ff                                  cond:2_1 = unimplemented  {fcomip st0, st1}
+100195ff                                      f> unimplemented  {fcomip st0, st1}
+100195ff                                  unimplemented  {fcomip st0, st1}
+10019601                                  unimplemented  {fstp st0, st0}
+10019601                                  unimplemented  {fstp st0, st0}
+10019601                              
+10019603                              int16_t top_56
+10019603                              
+10019603                              if (not(cond:1_1) && cond:2_1)
+100197ec                                  unimplemented  {fstp st2, st0}
+100197ec                                  unimplemented  {fstp st2, st0}
+100197ee                                  unimplemented  {fstp st0, st0}
+100197ee                                  unimplemented  {fstp st0, st0}
+100197ee                                  top_56 = top_23 + 2
+100197f0                                  label_100197f0:
+100197f0                                  unimplemented  {fstp st0, st0}
+100197f0                                  unimplemented  {fstp st0, st0}
+100197f0                                  top = top_56 + 1
+10019603                              else
+10019609                                  unimplemented  {fsub st0, dword [esi+0x130c]}
+10019613                                  var_274 =
+10019613                                      fconvert.s(unimplemented  {fstp dword [esp+0xc], st0})
+10019613                                  unimplemented  {fstp dword [esp+0xc], st0}
+10019617                                  unimplemented  {fsub st0, dword [esi+0x1310]}
+1001961d                                  float var_270_3 = fconvert.s(unimplemented  {fstp dword [
+1001961d                                      esp+0x10], st0})

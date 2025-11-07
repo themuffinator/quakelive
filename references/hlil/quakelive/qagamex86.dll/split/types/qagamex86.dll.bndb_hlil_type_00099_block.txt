@@ -1,0 +1,284 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+1002b659                          bool p_10 = unimplemented  {test ah, 0x44}
+1002b659                          
+1002b676                          if (p_10 && not(fconvert.t(data_105e2ef8) - fconvert.t(5.0)
+1002b676                                  <= fconvert.t(xmm0_6)))
+1002b67d                              sub_100278f0(arg1)
+1002b691                              *(arg1 + 0x1b1c) =
+1002b691                                  fconvert.s(fconvert.t(data_105e2ef8) + fconvert.t(120.0))
+1002b6a1                              sub_1007aaf9(eax_1 ^ &var_40)
+1002b6a9                              return 
+1002b6aa                      case 2, 8
+1002b6aa                          int32_t xmm0_7 = data_105e2ef8
+1002b6aa                          
+1002b6c8                          if (*(arg1 + 0x1b24) != eax_36 || *(arg1 + 0x1b34) != 0
+1002b6c8                                  || *(arg1 + 0x1b38) != 0)
+1002b6ca                              *(arg1 + 0x1b1c) = xmm0_7
+1002b6d2                              *(arg1 + 0x1b24) = eax_36
+1002b6d8                              *(arg1 + 0x1b34) = 0
+1002b6de                              *(arg1 + 0x1b38) = 0
+1002b6de                          
+1002b6fa                          if (not(fconvert.t(data_105e2ef8) - fconvert.t(240.0)
+1002b6fa                                  <= fconvert.t(*(arg1 + 0x1b20))))
+1002b6fc                              *(arg1 + 0x1b20) = xmm0_7
+1002b6fc                              
+1002b727                              if (not(fconvert.t(0.40000000000000002)
+1002b727                                      <= float.t(rand() & 0x7fff) / fconvert.t(32767.0)))
+1002b729                                  int32_t xmm0_8 = data_105e2ef8
+1002b731                                  *(arg1 + 0x1b40) ^= 1
+1002b738                                  *(arg1 + 0x1b1c) = xmm0_8
+1002b738                          
+1002b740                          float xmm0_9 = *(arg1 + 0x1b1c)
+1002b748                          xmm0_9 - 0f
+1002b74f                          eax_36:1.b = (xmm0_9 == 0f ? 1 : 0) << 6
+1002b74f                              | (is_unordered.d(xmm0_9, 0f) ? 1 : 0) << 2
+1002b74f                              | (xmm0_9 < 0f ? 1 : 0)
+1002b756                          bool p_12 = unimplemented  {test ah, 0x44}
+1002b756                          
+1002b773                          if (p_12 && not(fconvert.t(data_105e2ef8) - fconvert.t(3.0)
+1002b773                                  <= fconvert.t(xmm0_9)))
+1002b77b                              sub_10027750(arg1)
+1002b783                              label_1002b783:
+1002b783                              *(arg1 + 0x1b1c) = 0
+1002b795                              sub_1007aaf9(eax_1 ^ &var_40)
+1002b79d                              return 
+1002b79e                      case 3
+1002b79e                          int32_t xmm0_10 = data_105e2ef8
+1002b79e                          
+1002b7bc                          if (*(arg1 + 0x1b24) != eax_36 || *(arg1 + 0x1b34) != 0
+1002b7bc                                  || *(arg1 + 0x1b38) != 0)
+1002b7be                              *(arg1 + 0x1b1c) = xmm0_10
+1002b7c6                              *(arg1 + 0x1b24) = eax_36
+1002b7cc                              *(arg1 + 0x1b34) = 0
+1002b7d2                              *(arg1 + 0x1b38) = 0
+1002b7d2                          
+1002b7ee                          if (not(fconvert.t(data_105e2ef8) - fconvert.t(240.0)
+1002b7ee                                  <= fconvert.t(*(arg1 + 0x1b20))))
+1002b7f0                              *(arg1 + 0x1b20) = xmm0_10
+1002b7f0                              
+1002b81b                              if (not(fconvert.t(0.40000000000000002)
+1002b81b                                      <= float.t(rand() & 0x7fff) / fconvert.t(32767.0)))
+1002b81d                                  int32_t xmm0_11 = data_105e2ef8
+1002b825                                  *(arg1 + 0x1b40) ^= 1
+1002b82c                                  *(arg1 + 0x1b1c) = xmm0_11
+1002b82c                          
+1002b834                          float xmm0_12 = *(arg1 + 0x1b1c)
+1002b83c                          xmm0_12 - 0f
+1002b843                          eax_36:1.b = (xmm0_12 == 0f ? 1 : 0) << 6
+1002b843                              | (is_unordered.d(xmm0_12, 0f) ? 1 : 0) << 2
+1002b843                              | (xmm0_12 < 0f ? 1 : 0)
+1002b84a                          bool p_14 = unimplemented  {test ah, 0x44}
+1002b84a                          
+1002b867                          if (p_14 && not(fconvert.t(data_105e2ef8) - fconvert.t(2.0)
+1002b867                                  <= fconvert.t(xmm0_12)))
+1002b86f                              sub_10029d90(arg1)
+1002b874                              goto label_1002b783
+1002b887                      case 4
+1002b887                          if (*(arg1 + 0x1b24) != eax_36 || *(arg1 + 0x1b38) != 0)
+1002b891                              *(arg1 + 0x1b1c) = data_105e2ef8
+1002b899                              *(arg1 + 0x1b24) = eax_36
+1002b89f                              *(arg1 + 0x1b38) = 0
+1002b89f                          
+1002b8a5                          float xmm0_14 = *(arg1 + 0x1b1c)
+1002b8ad                          xmm0_14 - 0f
+1002b8b4                          eax_36:1.b = (xmm0_14 == 0f ? 1 : 0) << 6
+1002b8b4                              | (is_unordered.d(xmm0_14, 0f) ? 1 : 0) << 2
+1002b8b4                              | (xmm0_14 < 0f ? 1 : 0)
+1002b8bb                          bool p_16 = unimplemented  {test ah, 0x44}
+1002b8bb                          
+1002b8d8                          if (p_16 && not(fconvert.t(data_105e2ef8) - fconvert.t(5.0)
+1002b8d8                                  <= fconvert.t(xmm0_14)))
+1002b8df                              sub_10029df0(arg1)
+1002b8f3                              label_1002b8f3:
+1002b8f3                              *(arg1 + 0x1b1c) =
+1002b8f3                                  fconvert.s(fconvert.t(data_105e2ef8) + fconvert.t(30.0))
+1002b903                              sub_1007aaf9(eax_1 ^ &var_40)
+1002b90b                              return 
+1002b91a                      case 5
+1002b91a                          if (*(arg1 + 0x1b24) != eax_36 || *(arg1 + 0x1b38) != 0)
+1002b924                              *(arg1 + 0x1b1c) = data_105e2ef8
+1002b92c                              *(arg1 + 0x1b24) = eax_36
+1002b932                              *(arg1 + 0x1b38) = 0
+1002b932                          
+1002b938                          float xmm0_16 = *(arg1 + 0x1b1c)
+1002b940                          xmm0_16 - 0f
+1002b947                          eax_36:1.b = (xmm0_16 == 0f ? 1 : 0) << 6
+1002b947                              | (is_unordered.d(xmm0_16, 0f) ? 1 : 0) << 2
+1002b947                              | (xmm0_16 < 0f ? 1 : 0)
+1002b94e                          bool p_18 = unimplemented  {test ah, 0x44}
+1002b94e                          
+1002b967                          if (p_18 && not(fconvert.t(data_105e2ef8) - fconvert.t(5.0)
+1002b967                                  <= fconvert.t(xmm0_16)))
+1002b96a                              sub_1002a630(arg1)
+1002b96f                              goto label_1002b8f3
+1002b396          else
+1002b39c              float xmm1_1 = *(arg1 + 0x1b14)
+1002b3ad              xmm1_1 f- 0
+1002b3b0              eax_25:1.b = (xmm1_1 == 0f ? 1 : 0) << 6
+1002b3b0                  | (is_unordered.d(xmm1_1, 0f) ? 1 : 0) << 2 | (xmm1_1 < 0f ? 1 : 0)
+1002b3b1              bool p_2 = unimplemented  {test ah, 0x44}
+1002b3b4              bool p_4
+1002b3b4              
+1002b3b4              if (not(p_2))
+1002b3ba                  float xmm1_2 = *(arg1 + 0x1b18)
+1002b3c2                  xmm1_2 f- 0
+1002b3c5                  eax_25:1.b = (xmm1_2 == 0f ? 1 : 0) << 6
+1002b3c5                      | (is_unordered.d(xmm1_2, 0f) ? 1 : 0) << 2 | (xmm1_2 < 0f ? 1 : 0)
+1002b3c6                  p_4 = unimplemented  {test ah, 0x44}
+1002b3c6              
+1002b3c9              long double x87_r7_62
+1002b3c9              
+1002b3c9              if (p_2 || p_4)
+1002b453                  x87_r7_62 = fconvert.t(data_105e2ef8)
+1002b3c9              else if (fconvert.t(*(arg1 + 0x1790)) + fconvert.t(10.0)
+1002b3c9                      <= fconvert.t(data_105e2ef8))
+1002b433                  long double x87_r7_65 =
+1002b433                      float.t(rand() & 0x7fff) / fconvert.t(32767.0) * fconvert.t(10.0)
+1002b439                  long double x87_r6_27 = fconvert.t(data_105e2ef8)
+1002b449                  x87_r7_62 = x87_r6_27
+1002b44b                  *(arg1 + 0x1b18) = fconvert.s(x87_r7_65 + fconvert.t(5.0) + x87_r6_27)
+1002b3e7              else
+1002b3fe                  long double x87_r7_60 =
+1002b3fe                      float.t(rand() & 0x7fff) / fconvert.t(32767.0) * fconvert.t(10.0)
+1002b404                  long double x87_r6_25 = fconvert.t(data_105e2ef8)
+1002b414                  x87_r7_62 = x87_r6_25
+1002b416                  *(arg1 + 0x1b14) = fconvert.s(x87_r7_60 + fconvert.t(5.0) + x87_r6_25)
+1002b416              
+1002b459              float xmm0_3 = *(arg1 + 0x1b14)
+1002b461              xmm0_3 - 0f
+1002b468              eax_25:1.b = (xmm0_3 == 0f ? 1 : 0) << 6
+1002b468                  | (is_unordered.d(xmm0_3, 0f) ? 1 : 0) << 2 | (xmm0_3 < 0f ? 1 : 0)
+1002b46f              bool p_6 = unimplemented  {test ah, 0x44}
+1002b46f              
+1002b472              if (p_6)
+1002b478                  long double x87_r6_30 = x87_r7_62
+1002b478                  x87_r7_62 = fconvert.t(xmm0_3)
+1002b478                  
+1002b47e                  if (not(x87_r6_30 <= x87_r7_62))
+1002b48a                      sub_10020dc0(arg1, "whoisteamleader", 0)
+1002b4a8                      (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 1)
+1002b4b0                      *(arg1 + 0x1b14) = 0
+1002b4cd                      long double x87_r7_69 =
+1002b4cd                          float.t(rand() & 0x7fff) / fconvert.t(32767.0) * fconvert.t(10.0)
+1002b4d3                      long double x87_r6_31 = fconvert.t(data_105e2ef8)
+1002b4e3                      x87_r7_62 = x87_r6_31
+1002b4e5                      *(arg1 + 0x1b18) = fconvert.s(x87_r7_69 + fconvert.t(8.0) + x87_r6_31)
+1002b4e5              
+1002b4eb              float xmm0_4 = *(arg1 + 0x1b18)
+1002b4f3              xmm0_4 - 0f
+1002b4fa              eax_25:1.b = (xmm0_4 == 0f ? 1 : 0) << 6
+1002b4fa                  | (is_unordered.d(xmm0_4, 0f) ? 1 : 0) << 2 | (xmm0_4 < 0f ? 1 : 0)
+1002b501              bool p_8 = unimplemented  {test ah, 0x44}
+1002b501              
+1002b514              if (p_8 && not(x87_r7_62 <= fconvert.t(xmm0_4)))
+1002b522                  sub_10020dc0(arg1, "iamteamleader", 0)
+1002b540                  (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 1)
+1002b542                  void* esi_3 = data_104b13ac
+1002b54b                  char const* const var_54_4 = "startleader"
+1002b555                  int32_t eax_31 = sub_10070cb0("vsay_team %s")
+1002b565                  (*(esi_3 + 0x15c))(*(arg1 + 8), eax_31)
+1002b574                  sub_10015ad0(&var_2c, 0x28, *(arg1 + 8))
+1002b582                  strncpy(arg1 + 0x1af4, &var_2c, 0x20)
+1002b58e                  *(arg1 + 0x1b14) = 0
+1002b595                  *(arg1 + 0x1b18) = 0
+1002b5a7                  sub_1007aaf9(eax_1 ^ &var_40)
+1002b5af                  return 
+1002b174      else
+1002b17e          int32_t eax_14 = sub_10019970(arg1, 0)
+1002b183          int32_t ecx_9 = *(arg1 + 0x1b2c)
+1002b18b          int32_t eax_15 = *(arg1 + 0x1b28)
+1002b194          int32_t edi_5 = ecx_9 + (eax_15 << 1)
+1002b197          int32_t ebx_2 = eax_15 + (ecx_9 << 1)
+1002b197          
+1002b19d          if (eax_14 != *(arg1 + 8))
+1002b1a4              int32_t eax_16 = sub_10013b00(arg1)
+1002b1af              long double x87_r7_38
+1002b1af              bool cond:2_1
+1002b1af              
+1002b1af              if (eax_16 == 1)
+1002b1b3                  if (edi_5 s<= eax_16)
+1002b218                      cond:2_1 = ebx_2 s< 1
+1002b21b                      goto label_1002b29b
+1002b21b                  
+1002b1e7                  if (ebx_2 s<= eax_16)
+1002b1ed                      long double x87_r7_34 = fconvert.t(fconvert.s(
+1002b1ed                          fconvert.t(*(arg1 + 0x1310)) - fconvert.t(data_105e4aa4)))
+1002b1f1                      long double x87_r6_12 = fconvert.t(fconvert.s(
+1002b1f1                          fconvert.t(*(arg1 + 0x130c)) - fconvert.t(data_105e4aa0)))
+1002b1f5                      long double x87_r5_6 = fconvert.t(fconvert.s(
+1002b1f5                          fconvert.t(*(arg1 + 0x1314)) - fconvert.t(data_105e4aa8)))
+1002b209                      _CIsqrt()
+1002b212                      x87_r7_38 = fconvert.t(fconvert.s(x87_r7_34 * x87_r7_34
+1002b212                          + x87_r6_12 * x87_r6_12 + x87_r5_6 * x87_r5_6))
+1002b216                      goto label_1002b286
+1002b216                  
+1002b28c                  *(arg1 + 0x19a8) = 6
+1002b1af              else if (ebx_2 s<= 1)
+1002b298                  cond:2_1 = edi_5 s< 1
+1002b29b                  label_1002b29b:
+1002b29b                  
+1002b29b                  if (cond:2_1)
+1002b2d2                      *(arg1 + 0x19a8) = 4
+1002b29b                  else
+1002b29f                      int32_t eax_17 = sub_10019a20(arg1)
+1002b29f                      
+1002b2a7                      if (eax_17 != 0xffffffff)
+1002b2a9                          *(arg1 + 0x19a8) = 0xb
+1002b2b3                          *(arg1 + 0x19e8) = eax_17
+1002b2a7                      else if (eax_14 == 0xffffffff)
+1002b2d2                          *(arg1 + 0x19a8) = 4
+1002b2be                      else
+1002b2c0                          *(arg1 + 0x19ac) = eax_14
+1002b2c6                          *(arg1 + 0x19a8) = 2
+1002b220              else if (edi_5 s> 1)
+1002b28c                  *(arg1 + 0x19a8) = 6
+1002b255              else
+1002b257                  long double x87_r7_45 = fconvert.t(fconvert.s(fconvert.t(*(arg1 + 0x1310))
+1002b257                      - fconvert.t(data_105e4104)))
+1002b25b                  long double x87_r6_16 = fconvert.t(fconvert.s(fconvert.t(*(arg1 + 0x130c))
+1002b25b                      - fconvert.t(data_105e4100)))
+1002b25f                  long double x87_r5_8 = fconvert.t(fconvert.s(fconvert.t(*(arg1 + 0x1314))
+1002b25f                      - fconvert.t(data_105e4108)))
+1002b273                  _CIsqrt()
+1002b27c                  x87_r7_38 = fconvert.t(fconvert.s(x87_r7_45 * x87_r7_45
+1002b27c                      + x87_r6_16 * x87_r6_16 + x87_r5_8 * x87_r5_8))
+1002b286                  label_1002b286:
+1002b286                  
+1002b28a                  if (fconvert.t(1000.0) > x87_r7_38)
+1002b2d2                      *(arg1 + 0x19a8) = 4
+1002b28a                  else
+1002b28c                      *(arg1 + 0x19a8) = 6
+1002b2dc              int32_t ecx_10 = *(arg1 + 8)
+1002b2df              int32_t xmm0_2 = data_105e2ef8
+1002b2ec              *(arg1 + 0x1b40) ^= 1
+1002b2f2              *(arg1 + 0x19b0) = ecx_10
+1002b2f8              *(arg1 + 0x19b4) = 1
+1002b2fe              *(arg1 + 0x19b8) = xmm0_2
+1002b31b              long double x87_r7_50 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+1002b323              long double x87_r6_21 = fconvert.t(data_105e2ef8)
+1002b32f              *(arg1 + 0x1a44) = fconvert.s(x87_r7_50 + x87_r7_50 + x87_r6_21)
+1002b33b              *(arg1 + 0x1a48) = fconvert.s(x87_r6_21 + fconvert.t(600.0))
+1002b341              sub_10013da0(arg1)
+1002b348              sub_10013d50(arg1)
+1002b357              sub_1007aaf9(eax_1 ^ &var_40)
+1002b35f              return 
+1002b35f  
+1002b980  sub_1007aaf9(eax_1 ^ &var_40)
+
+1002b36d                                         8d 49 00                                                               .I.
+1002b989                             8d 49 00                                                                       .I.
+1002b98c  uint32_t jump_table_1002b98c[0x9] = 
+1002b98c  {
+1002b98c      [0x0] =  0x1002b617
+1002b990      [0x1] =  0x1002b976
+1002b994      [0x2] =  0x1002b6aa
+1002b998      [0x3] =  0x1002b79e
+1002b99c      [0x4] =  0x1002b879
+1002b9a0      [0x5] =  0x1002b90c
+1002b9a4      [0x6] =  0x1002b617
+1002b9a8      [0x7] =  0x1002b976
+1002b9ac      [0x8] =  0x1002b6aa
+1002b9b0  }

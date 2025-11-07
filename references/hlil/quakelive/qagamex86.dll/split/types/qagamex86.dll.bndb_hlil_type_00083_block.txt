@@ -1,0 +1,12 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+1001ead0  {
+1001ead0      [0x0] =  0x1001e84f
+1001ead4      [0x1] =  0x1001e84f
+1001ead8      [0x2] =  0x1001e84f
+1001eadc      [0x3] =  0x1001e84f
+1001eae0      [0x4] =  0x1001e877
+1001eae4      [0x5] =  0x1001e8b2
+1001eae8  }

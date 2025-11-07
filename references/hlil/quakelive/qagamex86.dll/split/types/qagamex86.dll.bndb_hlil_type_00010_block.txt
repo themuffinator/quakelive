@@ -1,0 +1,1310 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+100026e0                                  unimplemented  {fstp qword [esp+0x10], st0}
+100026e4                                  unimplemented  {fld1 }
+100026e6                                  float var_40_13 =
+100026e6                                      fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+100026e6                                  unimplemented  {fstp dword [esp+0x4], st0}
+100026ea                                  unimplemented  {fldz }
+100026ec                                  float var_44_14 =
+100026ec                                      fconvert.s(unimplemented  {fstp dword [esp], st0})
+100026ec                                  unimplemented  {fstp dword [esp], st0}
+100026f2                                  (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x18, 
+100026f2                                      var_44_14, var_40_13)
+100026f4                                  unimplemented  {fld st0, qword [esp+0x18]}
+100026f8                                  int32_t eax_26 = *(arg1 + 0x1750)
+100026fe                                  unimplemented  {fxch st0, st1}
+100026fe                                  unimplemented  {fxch st0, st1}
+10002703                                  bool cond:5_1 = unimplemented  {fcomip st0, st1}
+10002703                                      f<= unimplemented  {fcomip st0, st1}
+10002703                                  unimplemented  {fcomip st0, st1}
+10002705                                  unimplemented  {fstp st0, st0}
+10002705                                  unimplemented  {fstp st0, st0}
+10002707                                  int32_t var_40_14 = 0
+10002707                                  
+10002709                                  if (cond:5_1)
+1000272b                                      int32_t var_44_16 = sub_10001840(eax_26)
+10002737                                      sub_10020dc0(arg1, "death_praise", &var_28)
+10002709                                  else
+10002710                                      int32_t var_44_15 = sub_10001840(eax_26)
+1000271c                                      sub_10020dc0(arg1, "death_insult", &var_28)
+1000261b                              else
+10002642                                  int32_t eax_19 = *(arg1 + 0x1750)
+10002642                                  
+1000264b                                  if (eax_19 == 2)
+1000264d                                      int32_t var_40_10 = 0
+10002654                                      int32_t var_44_11 = sub_10001840(eax_19)
+10002660                                      sub_10020dc0(arg1, "death_gauntlet", &var_28)
+1000264b                                  else if (eax_19 == 0xa || eax_19 == 0x21)
+10002697                                      int32_t var_40_12 = 0
+1000269e                                      int32_t var_44_13 = sub_10001840(eax_19)
+100026aa                                      sub_10020dc0(arg1, "death_rail", &var_28)
+10002675                                  else
+10002677                                      int32_t var_40_11 = 0
+1000267e                                      int32_t var_44_12 = sub_10001840(eax_19)
+1000268a                                      sub_10020dc0(arg1, "death_bfg", &var_28)
+100025f0                          else
+100025f2                              int32_t var_40_9 = 0
+10002753                              sub_10020dc0(arg1, "death_kamikaze", &var_28)
+100025b9                      else
+100025bb                          int32_t var_40_8 = 0
+10002753                          sub_10020dc0(arg1, "death_telefrag", &var_28)
+10002753                      
+1000275b                      *(arg1 + 0x1784) = 0
+1000275b                      goto label_1000276d
+1000275b                  
+10002495                  bool cond:2_1 = sub_10018900(eax_8, edx_2, *(arg1 + 0x174c), arg1) == 0
+10002497                  int32_t eax_10 = data_105e4ae8
+10002497                  
+100024a1                  if (cond:2_1 || eax_10 == 0xc)
+100024d9                      if (eax_10 s< 3)
+100024d9                          goto label_1000250b
+100024d9                      
+100024f0                      (*(data_104b13ac + 0x15c))(*(arg1 + 8), "vtaunt")
+10002502                      sub_1007aaf9(eax_1 ^ &var_34)
+1000250a                      return 1
+1000250a                  
+100024ac                  if (*(arg1 + 0x174c) != *(arg1 + 8))
+100024b2                      int32_t var_40_3 = 0
+100024bf                      sub_10020dc0(arg1, "death_teammate", &var_28)
+100024c7                      *(arg1 + 0x1784) = 1
+1000276d                      label_1000276d:
+1000276d                      *(arg1 + 0x17b4) = data_105e2ef8
+10002782                      sub_1007aaf9(eax_1 ^ &var_34)
+1000278a                      return 1
+100023ae          else
+100023c0              long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+100023c0              
+100023cc              if (not(fconvert.t(*(arg1 + 0x17b4)) > x87_r6_2))
+100023f4                  (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x1d, 
+100023f4                      fconvert.s(float.t(0)), fconvert.s(float.t(1)))
+100023f6                  var_34 = fconvert.s(x87_r6_2)
+100023f6                  
+10002404                  if (data_105e4ae8 != 1)
+10002411                      if (data_105e498c != 0)
+10002411                          goto label_10002438
+10002411                      
+10002432                      if (not(float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10002432                              > fconvert.t(var_34)))
+10002432                          goto label_10002438
+10002432  
+10002795  sub_1007aaf9(eax_1 ^ &var_34)
+1000279d  return 0
+
+1000279e                                                                                            cc cc                                ..
+
+100027a0    int32_t sub_100027a0(void* arg1 @ esi, long double arg2 @ st1)
+
+100027a8  float var_34
+100027a8  int32_t eax_1 = __security_cookie ^ &var_34
+100027a8  
+100027c4  if (data_105a862c == 0 && data_105e3d2c == 0)
+100027d6      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+100027d6      
+100027e2      if (not(fconvert.t(*(arg1 + 0x17b4)) > x87_r6_2))
+1000280b          (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x1c, fconvert.s(float.t(0)), 
+1000280b              fconvert.s(float.t(1)))
+1000280d          var_34 = fconvert.s(x87_r6_2)
+1000280d          
+1000281b          if (data_105e4ae8 != 1)
+1000282e              long double x87_r0_3
+1000282e              long double x87_r7_5
+1000282e              
+1000282e              if (data_105e498c == 0)
+1000283f                  x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10002845                  x87_r7_5 = fconvert.t(var_34)
+1000284d                  arg2 = x87_r7_5
+1000284d              
+1000285e              if ((data_105e498c != 0 || not(x87_r0_3 > x87_r7_5))
+1000285e                      && *(arg1 + 0x1748) != *(arg1 + 8) && sub_10001000() s> 1
+1000285e                      && sub_10001b10(arg1) != 0 && sub_100019e0(arg1) == 0)
+10002899                  int32_t eax_9
+10002899                  int32_t edx_2
+10002899                  eax_9, edx_2 = sub_10015df0(*(arg1 + 0x1748), 0x20)
+100028a1                  bool cond:4_1 = data_105e4ae8 s< 3
+100028a8                  *(arg1 + 0x1784) = 0
+100028b2                  void var_28
+100028b2                  
+100028b2                  if (cond:4_1)
+1000291c                      label_1000291c:
+1000291c                      int32_t eax_13 = *(arg1 + 0x1754)
+10002925                      char const* const var_48_1
+10002925                      void* var_44_5
+10002925                      
+10002925                      if (eax_13 == 2)
+10002927                          int32_t var_40_4 = 0
+1000292d                          var_44_5 = &var_28
+1000292e                          var_48_1 = "kill_gauntlet"
+10002925                      else if (eax_13 == 0xa || eax_13 == 0x21)
+100029fe                          int32_t var_40_9 = 0
+10002a04                          var_44_5 = &var_28
+10002a05                          var_48_1 = "kill_rail"
+10002944                      else if (eax_13 != 0x12)
+10002967                          int32_t eax_15
+10002967                          
+10002967                          if (*(arg1 + 0x1750) == 0x1a)
+10002980                              eax_15 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), 
+10002980                                  "kill_kamikaze")
+10002980                          
+10002987                          if (*(arg1 + 0x1750) != 0x1a || eax_15 == 0)
+1000299e                              var_34 = rand() & 0x7fff
+100029c1                              var_34.q = fconvert.d(float.t(var_34) / fconvert.t(32767.0))
+100029d3                              (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x18, 
+100029d3                                  fconvert.s(float.t(0)), fconvert.s(float.t(1)))
+100029e2                              int32_t var_40_8 = 0
+100029e2                              
+100029e4                              if (arg2 <= fconvert.t(var_34.q))
+100029f6                                  var_44_5 = &var_28
+100029f7                                  var_48_1 = "kill_praise"
+100029e4                              else
+100029ea                                  var_44_5 = &var_28
+100029eb                                  var_48_1 = "kill_insult"
+10002987                          else
+10002989                              int32_t var_40_6 = 0
+1000298f                              var_44_5 = &var_28
+10002990                              var_48_1 = "kill_kamikaze"
+1000294d                      else
+1000294f                          int32_t var_40_5 = 0
+10002955                          var_44_5 = &var_28
+10002956                          var_48_1 = "kill_telefrag"
+10002956                      
+10002a0b                      sub_10020dc0(arg1, var_48_1, var_44_5)
+10002a0b                      goto label_10002a23
+10002a0b                  
+100028c5                  if (sub_10018900(eax_9, edx_2, *(arg1 + 0x1748), arg1) != 0)
+100028c7                      int32_t var_40_3 = 0
+100028d2                      sub_10020dc0(arg1, "kill_teammate", &var_28)
+100028d7                      *(arg1 + 0x1784) = 1
+10002a23                      label_10002a23:
+10002a23                      *(arg1 + 0x17b4) = data_105e2ef8
+10002a30                      sub_1007aaf9(eax_1 ^ &var_34)
+10002a38                      return 1
+10002a38                  
+100028ed                  if (data_105e4ae8 s< 3)
+100028ed                      goto label_1000291c
+100028ed                  
+10002904                  (*(data_104b13ac + 0x15c))(*(arg1 + 8), "vtaunt")
+10002904  
+10002913  sub_1007aaf9(eax_1 ^ &var_34)
+1000291b  return 0
+
+10002a39                                                                             cc cc cc cc cc cc cc                           .......
+
+10002a40    int32_t sub_10002a40(void* arg1 @ esi)
+
+10002a48  float var_30
+10002a48  int32_t eax_1 = __security_cookie ^ &var_30
+10002a48  
+10002a71  if (data_105a862c == 0 && data_105e3d2c == 0)
+10002a7f      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+10002a7f      
+10002a8b      if (not(fconvert.t(*(arg1 + 0x17b4)) > x87_r6_2) && sub_10001000() s> 1)
+10002aba          (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x1e, fconvert.s(float.t(0)), 
+10002aba              fconvert.s(float.t(1)))
+10002abc          var_30 = fconvert.s(x87_r6_2)
+10002ac0          int32_t eax_5 = data_105e4ae8
+10002ac0          
+10002ad0          if (eax_5 s< 3 && eax_5 != 1)
+10002ad9              long double x87_r0_3
+10002ad9              
+10002ad9              if (data_105e498c == 0)
+10002aee                  x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10002aee              
+10002afe              if ((data_105e498c != 0 || not(x87_r0_3 > fconvert.t(var_30)))
+10002afe                      && sub_10001b10(arg1) != 0 && sub_100019e0(arg1) == 0)
+10002b22                  int32_t eax_10 = *(arg1 + 0x196c)
+10002b2a                  char var_28
+10002b2a                  
+10002b2a                  if (eax_10 s< 0)
+10002b3d                      var_28 = 0
+10002b2a                  else
+10002b33                      sub_10015df0(eax_10, 0x20)
+10002b33                  
+10002b42                  int32_t var_38_2 = 0
+10002b4f                  sub_10020dc0(arg1, "enemy_suicide", &var_28)
+10002b66                  *(arg1 + 0x17b4) = data_105e2ef8
+10002b6e                  *(arg1 + 0x1784) = 0
+10002b7d                  sub_1007aaf9(eax_1 ^ &var_30)
+10002b85                  return 1
+10002b85  
+10002a61  sub_1007aaf9(eax_1 ^ &var_30)
+10002a69  return 0
+
+10002b86                    cc cc cc cc cc cc cc cc cc cc                                                        ..........
+
+10002b90    int32_t sub_10002b90()
+
+10002b98  void var_34
+10002b98  int32_t eax_1 = __security_cookie ^ &var_34
+10002b98  
+10002bb4  if (data_105a862c == 0 && data_105e3d2c == 0)
+10002bc6      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+10002bd2      void* ebx
+10002bd2      
+10002bd2      if (not(fconvert.t(*(ebx + 0x17b4)) > x87_r6_2) && sub_10001000() s> 1)
+10002be6          int32_t ecx_1 = *(ebx + 8)
+10002bf7          int32_t eax_5 = *(*(ecx_1 * 0x384 + &data_104b41dc) + 0x3c0)
+10002bf7          
+10002c10          if (eax_5 != 0 && eax_5 != ecx_1 && eax_5 u<= 0x3f)
+10002c39              (*(data_104b13ac + 0x1c4))(*(ebx + 0x1958), 0x1f, fconvert.s(float.t(0)), 
+10002c39                  fconvert.s(float.t(1)))
+10002c3f              int32_t eax_7 = data_105e4ae8
+10002c3f              
+10002c53              if (eax_7 s< 3 && eax_7 != 1)
+10002c60                  bool cond:2_1
+10002c60                  
+10002c60                  if (data_105e498c == 0)
+10002c87                      cond:2_1 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10002c87                          > fconvert.t(fconvert.s(x87_r6_2)) * fconvert.t(0.5)
+10002c87                  
+10002c8b                  if ((data_105e498c != 0 || not(cond:2_1)) && sub_10001b10(ebx) != 0)
+10002cbf                      void var_28
+10002cbf                      sub_10015ad0(&var_28, 0x20, 
+10002cbf                          *(*(*(ebx + 8) * 0x384 + &data_104b41dc) + 0x3c0))
+10002cdc                      int32_t var_40_3 = 0
+10002ce3                      int32_t var_44_2 =
+10002ce3                          sub_10001840(*(*(*(ebx + 8) * 0x384 + &data_104b41dc) + 0x3c8))
+10002ced                      sub_10020dc0(ebx, "hit_talking", &var_28)
+10002cfd                      *(ebx + 0x17b4) = data_105e2ef8
+10002d05                      *(ebx + 0x1784) = 0
+10002d1a                      sub_1007aaf9(eax_1 ^ &var_34)
+10002d22                      return 1
+10002d22  
+10002d2d  sub_1007aaf9(eax_1 ^ &var_34)
+10002d35  return 0
+
+10002d36                                                                    cc cc cc cc cc cc cc cc cc cc                        ..........
+
+10002d40    int32_t sub_10002d40()
+
+10002d4b  float var_124
+10002d4b  int32_t eax_1 = __security_cookie ^ &var_124
+10002d4b  
+10002d5d  if (data_105a862c == 0)
+10002d63      void* ebx
+10002d63      int32_t eax_2 = *(ebx + 8)
+10002d74      int32_t esi_1 = *(*(eax_2 * 0x384 + &data_104b41dc) + 0x3c0)
+10002d74      
+10002d9a      if (esi_1 != 0 && esi_1 != eax_2 && esi_1 u<= 0x3f && data_105e3d2c == 0)
+10002dac          long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+10002dac          
+10002db8          if (not(fconvert.t(*(ebx + 0x17b4)) > x87_r6_2) && sub_10001000() s> 1)
+10002def              (*(data_104b13ac + 0x1c4))(*(ebx + 0x1958), 0x20, fconvert.s(float.t(0)), 
+10002def                  fconvert.s(float.t(1)))
+10002df1              var_124 = fconvert.s(x87_r6_2)
+10002df5              int32_t eax_5 = data_105e4ae8
+10002df5              
+10002e09              if (eax_5 s< 3 && eax_5 != 1)
+10002e16                  long double x87_r0_3
+10002e16                  
+10002e16                  if (data_105e498c == 0)
+10002e2b                      x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10002e2b                  
+10002e41                  if ((data_105e498c != 0
+10002e41                          || not(x87_r0_3 > fconvert.t(var_124) * fconvert.t(0.5)))
+10002e41                          && sub_10001b10(ebx) != 0 && sub_100019e0(ebx) == 0)
+10002e7d                      void var_11c
+10002e7d                      (*(data_104b13ac + 0xfc))(*(ebx + 0x196c), &var_11c)
+10002e8a                      int32_t var_114
+10002e8a                      
+10002e8a                      if ((var_114 & 0x100) == 0)
+10002e99                          void var_28
+10002e99                          sub_10015ad0(&var_28, 0x20, esi_1)
+10002eb6                          int32_t var_130_4 = 0
+10002ebd                          int32_t var_134_3 = sub_10001840(
+10002ebd                              *(*(*(ebx + 8) * 0x384 + &data_104b41dc) + 0x3c8))
+10002ec7                          sub_10020dc0(ebx, "hit_nodeath", &var_28)
+10002ed7                          *(ebx + 0x17b4) = data_105e2ef8
+10002edf                          *(ebx + 0x1784) = 0
+10002ef7                          sub_1007aaf9(eax_1 ^ &var_124)
+10002f02                          return 1
+10002f02  
+10002f10  sub_1007aaf9(eax_1 ^ &var_124)
+10002f1b  return 0
+
+10002f1c                                                                                      cc cc cc cc                              ....
+
+10002f20    int32_t sub_10002f20()
+
+10002f2b  float var_124
+10002f2b  int32_t eax_1 = __security_cookie ^ &var_124
+10002f2b  
+10002f5f  if (data_105a862c == 0 && data_105e3d2c == 0)
+10002f6d      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+10002f79      void* ebx
+10002f79      
+10002f79      if (not(fconvert.t(*(ebx + 0x17b4)) > x87_r6_2) && sub_10001000() s> 1)
+10002fa8          (*(data_104b13ac + 0x1c4))(*(ebx + 0x1958), 0x21, fconvert.s(float.t(0)), 
+10002fa8              fconvert.s(float.t(1)))
+10002faa          var_124 = fconvert.s(x87_r6_2)
+10002fae          int32_t eax_5 = data_105e4ae8
+10002fae          
+10002fbe          if (eax_5 s< 3 && eax_5 != 1)
+10002fcb              long double x87_r0_3
+10002fcb              
+10002fcb              if (data_105e498c == 0)
+10002fe0                  x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+10002fe0              
+10002ff6              if ((data_105e498c != 0
+10002ff6                      || not(x87_r0_3 > fconvert.t(var_124) * fconvert.t(0.5)))
+10002ff6                      && sub_10001b10(ebx) != 0 && sub_100019e0(ebx) == 0)
+10003032                  void var_11c
+10003032                  (*(data_104b13ac + 0xfc))(*(ebx + 0x196c), &var_11c)
+1000303f                  int32_t var_114
+1000303f                  
+1000303f                  if ((var_114 & 0x100) == 0)
+10003058                      void var_28
+10003058                      sub_10015ad0(&var_28, 0x20, *(ebx + 0x196c))
+10003078                      int32_t var_130_4 = 0
+1000307f                      int32_t var_134_3 = sub_10001840(
+1000307f                          *(*(*(ebx + 0x196c) * 0x384 + &data_104b41dc) + 0x3c8))
+10003089                      sub_10020dc0(ebx, "hit_nokill", &var_28)
+100030a7                      *(ebx + 0x17b4) = data_105e2ef8
+100030af                      *(ebx + 0x1784) = 0
+100030b9                      sub_1007aaf9(eax_1 ^ &var_124)
+100030c4                      return 1
+100030c4  
+10002f4c  sub_1007aaf9(eax_1 ^ &var_124)
+10002f57  return 0
+
+100030c5                 cc cc cc cc cc cc cc cc cc cc cc                                                       ...........
+
+100030d0    int32_t sub_100030d0(void* arg1 @ esi)
+
+100030d8  float var_34
+100030d8  int32_t eax_1 = __security_cookie ^ &var_34
+100030d8  
+10003128  if (data_105a8aac == 0 && data_105a3acc == 0 && data_10595d2c == 0 && data_105a862c == 0
+10003128          && data_1059de8c == 0 && data_105e3d2c == 0 && sub_10017090(arg1) == 0)
+1000314b      long double x87_r6_2 = fconvert.t(data_105e2ef8) - fconvert.t(25.0)
+1000314b      
+10003164      if (not(fconvert.t(*(arg1 + 0x17b4)) > x87_r6_2) && data_105e4ae8 != 1)
+1000316a          int32_t eax_3 = *(arg1 + 0x19a8)
+1000316a          
+10003185          if (eax_3 != 1 && eax_3 != 2 && eax_3 != 5)
+100031ae              (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 0x22, fconvert.s(float.t(0)), 
+100031ae                  fconvert.s(float.t(1)))
+100031b0              var_34 = fconvert.s(x87_r6_2)
+100031cc              long double x87_r0_3 = float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+100031d8              long double x87_r7_6 =
+100031d8                  fconvert.t(*(arg1 + 0x1308)) * fconvert.t(0.10000000000000001)
+100031e2              long double x87_r1_1 = x87_r7_6
+100031e2              
+100031e4              if (not(x87_r0_3 > x87_r7_6))
+100031f1                  if (data_105e498c != 0)
+1000323b                      label_1000323b:
+1000323b                      
+10003243                      if (sub_10001000() s> 1 && sub_10001b10(arg1) != 0
+10003243                              && sub_100019e0(arg1) == 0)
+1000325b                          int32_t eax_14 = *(arg1 + 0x1748)
+10003264                          void var_28
+10003264                          
+10003264                          if (eax_14 != *(arg1 + 8))
+10003288                              sub_10015df0(eax_14, 0x20)
+10003264                          else
+10003267                              char* eax_15 = sub_10001650(arg1)
+1000327d                              char i
+1000327d                              
+1000327d                              do
+10003275                                  i = *eax_15
+10003277                                  *(&var_28 - &data_10090708 + eax_15) = i
+1000327a                                  eax_15 = &eax_15[1]
+1000327d                              while (i != 0)
+1000327d                          
+10003297                          if (data_105e4ae8 s< 3)
+100032cd                              var_34 = rand() & 0x7fff
+100032f0                              var_34.q = fconvert.d(float.t(var_34) / fconvert.t(32767.0))
+10003302                              int32_t ecx_8 = (*(data_104b13ac + 0x1c4))(*(arg1 + 0x1958), 
+10003302                                  0x19, fconvert.s(float.t(0)), fconvert.s(float.t(1)))
+10003311                              int32_t var_40_5 = 0
+10003313                              char const* const var_5c
+10003313                              
+10003313                              if (x87_r1_1 <= fconvert.t(var_34.q))
+10003346                                  int32_t var_44_6 = sub_10001930(ecx_8)
+10003347                                  sub_100017d0()
+1000334c                                  int32_t var_48_1 = 0x10090730
+1000334d                                  char const* const var_4c_4 = "[invalid var]"
+10003352                                  char const* const var_50_1 = "[invalid var]"
+1000335b                                  void* var_54_1 = &var_28
+1000335d                                  sub_10001650(arg1)
+10003365                                  void* var_58_3 = &data_10090708
+10003366                                  var_5c = "random_insult"
+10003313                              else
+1000331a                                  int32_t var_44_5 = sub_10001930(ecx_8)
+1000331b                                  sub_100017d0()
+10003320                                  int32_t var_48 = 0x10090730
+10003321                                  char const* const var_4c_3 = "[invalid var]"
+10003326                                  char const* const var_50 = "[invalid var]"
+1000332f                                  void* var_54 = &var_28
+10003331                                  sub_10001650(arg1)
+10003339                                  void* var_58_1 = &data_10090708
+1000333a                                  var_5c = "random_misc"
+1000333a                              
+1000336c                              sub_10020dc0(arg1, var_5c, &data_10090708)
+10003384                              *(arg1 + 0x17b4) = data_105e2ef8
+1000338c                              *(arg1 + 0x1784) = 0
+1000339b                              sub_1007aaf9(eax_1 ^ &var_34)
+100033a3                              return 1
+100033a3                          
+100032ae                          (*(data_104b13ac + 0x15c))(*(arg1 + 8), "vtaunt")
+100031f1                  else if (not(float.t(rand() & 0x7fff) / fconvert.t(32767.0)
+100031f1                          > fconvert.t(var_34)))
+1000321f                      var_34 = rand() & 0x7fff
+1000322d                      long double x87_r7_10 = fconvert.t(0.25)
+10003237                      x87_r1_1 = x87_r7_10
+10003237                      
+10003239                      if (not(float.t(var_34) / fconvert.t(32767.0) > x87_r7_10))
+10003239                          goto label_1000323b
+10003239  
+100032bd  sub_1007aaf9(eax_1 ^ &var_34)
+100032c5  return 0
+
+100033a4              cc cc cc cc cc cc cc cc cc cc cc cc                                                      ............
+
+100033b0    int32_t __convention("regparm") sub_100033b0(void* arg1)
+
+100033d9  return (*(data_104b13ac + 0x1cc))(*(arg1 + 0x1958), 0x17, 1, 0xfa0)
+
+100033da                                                                                cc cc cc cc cc cc                            ......
+100033e0  cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc                                                  ................
+
+100033f0    int32_t sub_100033f0(void* arg1 @ esi)
+
+100033fb  int32_t var_430
+100033fb  int32_t eax_1 = __security_cookie ^ &var_430
+1000341f  int32_t i_58 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "game_enter")
+1000342c  void var_40c
+1000342c  
+1000342c  if (i_58 s> 0)
+10003432      int32_t i_35 = i_58
+100034d0      int32_t i
+100034d0      
+100034d0      do
+10003453          (*(data_104b13ac + 0x78))(&var_40c, 0x400)
+1000346e          strncpy(0x10090730, sub_10070cf0(), 0x7f)
+10003473          int32_t var_440_1 = 0
+10003475          int32_t var_444_3 = 0x10090730
+1000347a          char const* const var_448_1 = "[invalid var]"
+1000347f          char const* const var_44c_1 = "[invalid var]"
+10003485          data_100907af = 0
+1000348c          sub_10001650(arg1)
+10003494          void* var_450_2 = &data_10090708
+100034ae          sub_10020dc0(arg1, "game_enter", sub_10015df0(*(arg1 + 8), 0x20))
+100034ca          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+100034cf          i = i_35
+100034cf          i_35 -= 1
+100034d0      while (i != 1)
+100034d0  
+100034ee  int32_t i_59
+100034ee  int32_t ecx_4
+100034ee  i_59, ecx_4 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "game_exit")
+100034ee  
+100034f5  if (i_59 s> 0)
+100034fb      int32_t i_36 = i_59
+1000358f      int32_t i_1
+1000358f      
+1000358f      do
+10003513          (*(data_104b13ac + 0x78))(&var_40c, 0x400)
+1000352e          strncpy(0x10090730, sub_10070cf0(), 0x7f)
+10003533          int32_t var_440_2 = 0
+10003535          int32_t var_444_7 = 0x10090730
+1000353a          char const* const var_448_2 = "[invalid var]"
+1000353f          char const* const var_44c_2 = "[invalid var]"
+10003545          data_100907af = 0
+1000354c          sub_10001650(arg1)
+10003557          void* var_450_4 = &data_10090708
+1000356e          sub_10020dc0(arg1, "game_exit", sub_10015df0(*(arg1 + 8), 0x20))
+10003589          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+1000358e          i_1 = i_36
+1000358e          i_36 -= 1
+1000358f      while (i_1 != 1)
+1000358f  
+100035ac  int32_t i_60 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "level_start")
+100035ac  
+100035b3  if (i_60 s> 0)
+100035b5      int32_t i_37 = i_60
+100035f4      int32_t i_2
+100035f4      
+100035f4      do
+100035ba          int32_t var_440_3 = 0
+100035d2          sub_10020dc0(arg1, "level_start", sub_10015df0(*(arg1 + 8), 0x20))
+100035ee          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+100035f3          i_2 = i_37
+100035f3          i_37 -= 1
+100035f4      while (i_2 != 1)
+100035f4  
+1000360e  int32_t i_61 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "level_end_victory")
+1000360e  
+1000361b  if (i_61 s> 0)
+10003621      int32_t i_38 = i_61
+100036b9      int32_t i_3
+100036b9      
+100036b9      do
+10003636          (*(data_104b13ac + 0x78))(&var_40c, 0x400)
+10003651          strncpy(0x10090730, sub_10070cf0(), 0x7f)
+10003656          int32_t var_440_4 = 0
+10003658          int32_t var_444_13 = 0x10090730
+1000365d          data_100907af = 0
+10003669          int32_t var_448_4 = 0x100906e8
+1000366a          int32_t var_44c_4 = sub_100014f0()
+1000366b          sub_10001390()
+10003673          int32_t var_44c_5 = 0x100906c4
+10003675          sub_10001650(arg1)
+1000367d          void* var_450_6 = &data_10090708
+10003697          sub_10020dc0(arg1, "level_end_victory", sub_10015df0(*(arg1 + 8), 0x20))
+100036b3          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+100036b8          i_3 = i_38
+100036b8          i_38 -= 1
+100036b9      while (i_3 != 1)
+100036b9  
+100036dd  int32_t i_62 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "level_end_lose")
+100036dd  
+100036e4  if (i_62 s> 0)
+100036ea      int32_t i_39 = i_62
+10003785      int32_t i_4
+10003785      
+10003785      do
+10003703          (*(data_104b13ac + 0x78))(&var_40c, 0x400)
+1000371e          strncpy(0x10090730, sub_10070cf0(), 0x7f)
+10003723          int32_t var_440_5 = 0
+10003725          int32_t var_444_17 = 0x10090730
+1000372a          data_100907af = 0
+10003736          int32_t var_448_5 = 0x100906e8
+10003737          int32_t var_44c_6 = sub_100014f0()
+10003738          sub_10001390()
+10003740          int32_t var_44c_7 = 0x100906c4
+10003742          sub_10001650(arg1)
+1000374d          void* var_450_8 = &data_10090708
+10003764          sub_10020dc0(arg1, "level_end_lose", sub_10015df0(*(arg1 + 8), 0x20))
+1000377f          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003784          i_4 = i_39
+10003784          i_39 -= 1
+10003785      while (i_4 != 1)
+10003785  
+100037a2  int32_t i_63 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "level_end")
+100037a2  
+100037a9  if (i_63 s> 0)
+100037af      int32_t i_40 = i_63
+10003846      int32_t i_5
+10003846      
+10003846      do
+100037c3          (*(data_104b13ac + 0x78))(&var_40c, 0x400)
+100037de          strncpy(0x10090730, sub_10070cf0(), 0x7f)
+100037e3          int32_t var_440_6 = 0
+100037e5          int32_t var_444_21 = 0x10090730
+100037ea          data_100907af = 0
+100037f6          int32_t var_448_6 = 0x100906e8
+100037f7          int32_t var_44c_8 = sub_100014f0()
+100037f8          sub_10001390()
+10003800          int32_t var_44c_9 = 0x100906c4
+10003802          sub_10001650(arg1)
+1000380d          void* var_450_10 = &data_10090708
+10003824          sub_10020dc0(arg1, "level_end", sub_10015df0(*(arg1 + 8), 0x20))
+10003840          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003845          i_5 = i_40
+10003845          i_40 -= 1
+10003846      while (i_5 != 1)
+10003846  
+10003859  sub_10015df0(*(arg1 + 0x174c), 0x20)
+10003876  int32_t i_64 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_drown")
+1000387d  char i_30
+1000387d  
+1000387d  if (i_64 s> 0)
+1000387f      int32_t i_41 = i_64
+100038af      int32_t i_6
+100038af      
+100038af      do
+10003881          int32_t var_440_7 = 0
+1000388e          sub_10020dc0(arg1, "death_drown", &i_30)
+100038a9          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+100038ae          i_6 = i_41
+100038ae          i_41 -= 1
+100038af      while (i_6 != 1)
+100038af  
+100038c8  int32_t i_65 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_slime")
+100038c8  
+100038cf  if (i_65 s> 0)
+100038d1      int32_t i_42 = i_65
+10003902      int32_t i_7
+10003902      
+10003902      do
+100038d3          int32_t var_440_8 = 0
+100038e0          sub_10020dc0(arg1, "death_slime", &i_30)
+100038fc          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003901          i_7 = i_42
+10003901          i_42 -= 1
+10003902      while (i_7 != 1)
+10003902  
+1000391c  int32_t i_66 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_lava")
+1000391c  
+10003923  if (i_66 s> 0)
+10003925      int32_t i_43 = i_66
+10003956      int32_t i_8
+10003956      
+10003956      do
+10003927          int32_t var_440_9 = 0
+10003934          sub_10020dc0(arg1, "death_lava", &i_30)
+10003950          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003955          i_8 = i_43
+10003955          i_43 -= 1
+10003956      while (i_8 != 1)
+10003956  
+10003970  int32_t i_67 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_cratered")
+10003970  
+10003977  if (i_67 s> 0)
+10003979      int32_t i_44 = i_67
+100039ae      int32_t i_9
+100039ae      
+100039ae      do
+10003980          int32_t var_440_10 = 0
+1000398d          sub_10020dc0(arg1, "death_cratered", &i_30)
+100039a8          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+100039ad          i_9 = i_44
+100039ad          i_44 -= 1
+100039ae      while (i_9 != 1)
+100039ae  
+100039c7  int32_t i_68 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_suicide")
+100039c7  
+100039ce  if (i_68 s> 0)
+100039d0      int32_t i_45 = i_68
+10003a01      int32_t i_10
+10003a01      
+10003a01      do
+100039d2          int32_t var_440_11 = 0
+100039df          sub_10020dc0(arg1, "death_suicide", &i_30)
+100039fb          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003a00          i_10 = i_45
+10003a00          i_45 -= 1
+10003a01      while (i_10 != 1)
+10003a01  
+10003a1b  int32_t i_69 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_telefrag")
+10003a1b  
+10003a22  if (i_69 s> 0)
+10003a24      int32_t i_46 = i_69
+10003a55      int32_t i_11
+10003a55      
+10003a55      do
+10003a26          int32_t var_440_12 = 0
+10003a33          sub_10020dc0(arg1, "death_telefrag", &i_30)
+10003a4f          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003a54          i_11 = i_46
+10003a54          i_46 -= 1
+10003a55      while (i_11 != 1)
+10003a55  
+10003a6f  int32_t i_70 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_gauntlet")
+10003a6f  
+10003a76  if (i_70 s> 0)
+10003a7e      int32_t i_47 = i_70
+10003b46      int32_t i_12
+10003b46      
+10003b46      do
+10003a97          char const* const eax_46
+10003a97          
+10003a97          switch (*(arg1 + 0x1750) - 1)
+10003a9e              case 0
+10003a9e                  eax_46 = "Shotgun"
+10003aa5              case 1
+10003aa5                  eax_46 = "Gauntlet"
+10003aac              case 2
+10003aac                  eax_46 = "Machine Gun"
+10003ab3              case 3, 4
+10003ab3                  eax_46 = "Grenade Launcher"
+10003aba              case 5, 6
+10003aba                  eax_46 = "Rocket Launcher"
+10003ac1              case 7, 8
+10003ac1                  eax_46 = "Plasmagun"
+10003ac8              case 9, 0x20
+10003ac8                  eax_46 = "Railgun"
+10003acf              case 0xa, 0x1e
+10003acf                  eax_46 = "Lightning Gun"
+10003ad6              case 0xb, 0xc
+10003ad6                  eax_46 = "BFG10K"
+10003add              case 0x16
+10003add                  eax_46 = "Nailgun"
+10003ae4              case 0x17
+10003ae4                  eax_46 = "Chaingun"
+10003aeb              case 0x18
+10003aeb                  eax_46 = "Proximity Launcher"
+10003af2              case 0x19
+10003af2                  eax_46 = "Kamikaze"
+10003af9              case 0x1a
+10003af9                  eax_46 = "Prox mine"
+10003b00              case 0x1b
+10003b00                  eax_46 = "Grapple"
+10003b07              case 0x1f
+10003b07                  eax_46 = "Heavy Machine Gun"
+10003a97              default
+10003b0e                  eax_46 = "[unknown weapon]"
+10003b0e          
+10003b13          int32_t var_440_13 = 0
+10003b15          char const* const var_444_35 = eax_46
+10003b21          sub_10020dc0(arg1, "death_gauntlet", &i_30)
+10003b40          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003b45          i_12 = i_47
+10003b45          i_47 -= 1
+10003b46      while (i_12 != 1)
+10003b46  
+10003b64  int32_t i_71 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_rail")
+10003b64  
+10003b6b  if (i_71 s> 0)
+10003b71      int32_t i_48 = i_71
+10003c3b      int32_t i_13
+10003c3b      
+10003c3b      do
+10003b8a          char const* const eax_52
+10003b8a          
+10003b8a          switch (*(arg1 + 0x1750) - 1)
+10003b91              case 0
+10003b91                  eax_52 = "Shotgun"
+10003b9b              case 1
+10003b9b                  eax_52 = "Gauntlet"
+10003ba2              case 2
+10003ba2                  eax_52 = "Machine Gun"
+10003ba9              case 3, 4
+10003ba9                  eax_52 = "Grenade Launcher"
+10003bb0              case 5, 6
+10003bb0                  eax_52 = "Rocket Launcher"
+10003bb7              case 7, 8
+10003bb7                  eax_52 = "Plasmagun"
+10003bbe              case 9, 0x20
+10003bbe                  eax_52 = "Railgun"
+10003bc5              case 0xa, 0x1e
+10003bc5                  eax_52 = "Lightning Gun"
+10003bcc              case 0xb, 0xc
+10003bcc                  eax_52 = "BFG10K"
+10003bd3              case 0x16
+10003bd3                  eax_52 = "Nailgun"
+10003bda              case 0x17
+10003bda                  eax_52 = "Chaingun"
+10003be1              case 0x18
+10003be1                  eax_52 = "Proximity Launcher"
+10003be8              case 0x19
+10003be8                  eax_52 = "Kamikaze"
+10003bef              case 0x1a
+10003bef                  eax_52 = "Prox mine"
+10003bf6              case 0x1b
+10003bf6                  eax_52 = "Grapple"
+10003bfd              case 0x1f
+10003bfd                  eax_52 = "Heavy Machine Gun"
+10003b8a              default
+10003c04                  eax_52 = "[unknown weapon]"
+10003c04          
+10003c09          int32_t var_440_14 = 0
+10003c0b          char const* const var_444_37 = eax_52
+10003c17          sub_10020dc0(arg1, "death_rail", &i_30)
+10003c35          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003c3a          i_13 = i_48
+10003c3a          i_48 -= 1
+10003c3b      while (i_13 != 1)
+10003c3b  
+10003c58  int32_t i_72 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_bfg")
+10003c58  
+10003c5f  if (i_72 s> 0)
+10003c65      int32_t i_49 = i_72
+10003d36      int32_t i_14
+10003d36      
+10003d36      do
+10003c87          char const* const eax_57
+10003c87          
+10003c87          switch (*(arg1 + 0x1750) - 1)
+10003c8e              case 0
+10003c8e                  eax_57 = "Shotgun"
+10003c95              case 1
+10003c95                  eax_57 = "Gauntlet"
+10003c9c              case 2
+10003c9c                  eax_57 = "Machine Gun"
+10003ca3              case 3, 4
+10003ca3                  eax_57 = "Grenade Launcher"
+10003caa              case 5, 6
+10003caa                  eax_57 = "Rocket Launcher"
+10003cb1              case 7, 8
+10003cb1                  eax_57 = "Plasmagun"
+10003cb8              case 9, 0x20
+10003cb8                  eax_57 = "Railgun"
+10003cbf              case 0xa, 0x1e
+10003cbf                  eax_57 = "Lightning Gun"
+10003cc6              case 0xb, 0xc
+10003cc6                  eax_57 = "BFG10K"
+10003ccd              case 0x16
+10003ccd                  eax_57 = "Nailgun"
+10003cd4              case 0x17
+10003cd4                  eax_57 = "Chaingun"
+10003cdb              case 0x18
+10003cdb                  eax_57 = "Proximity Launcher"
+10003ce2              case 0x19
+10003ce2                  eax_57 = "Kamikaze"
+10003ce9              case 0x1a
+10003ce9                  eax_57 = "Prox mine"
+10003cf0              case 0x1b
+10003cf0                  eax_57 = "Grapple"
+10003cf7              case 0x1f
+10003cf7                  eax_57 = "Heavy Machine Gun"
+10003c87              default
+10003cfe                  eax_57 = "[unknown weapon]"
+10003cfe          
+10003d03          int32_t var_440_15 = 0
+10003d05          char const* const var_444_39 = eax_57
+10003d11          sub_10020dc0(arg1, "death_bfg", &i_30)
+10003d30          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003d35          i_14 = i_49
+10003d35          i_49 -= 1
+10003d36      while (i_14 != 1)
+10003d36  
+10003d54  int32_t i_73 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_insult")
+10003d54  
+10003d5b  if (i_73 s> 0)
+10003d61      int32_t i_50 = i_73
+10003e29      int32_t i_15
+10003e29      
+10003e29      do
+10003d7a          char const* const eax_62
+10003d7a          
+10003d7a          switch (*(arg1 + 0x1750) - 1)
+10003d81              case 0
+10003d81                  eax_62 = "Shotgun"
+10003d88              case 1
+10003d88                  eax_62 = "Gauntlet"
+10003d8f              case 2
+10003d8f                  eax_62 = "Machine Gun"
+10003d96              case 3, 4
+10003d96                  eax_62 = "Grenade Launcher"
+10003d9d              case 5, 6
+10003d9d                  eax_62 = "Rocket Launcher"
+10003da4              case 7, 8
+10003da4                  eax_62 = "Plasmagun"
+10003dab              case 9, 0x20
+10003dab                  eax_62 = "Railgun"
+10003db2              case 0xa, 0x1e
+10003db2                  eax_62 = "Lightning Gun"
+10003db9              case 0xb, 0xc
+10003db9                  eax_62 = "BFG10K"
+10003dc0              case 0x16
+10003dc0                  eax_62 = "Nailgun"
+10003dc7              case 0x17
+10003dc7                  eax_62 = "Chaingun"
+10003dce              case 0x18
+10003dce                  eax_62 = "Proximity Launcher"
+10003dd5              case 0x19
+10003dd5                  eax_62 = "Kamikaze"
+10003ddc              case 0x1a
+10003ddc                  eax_62 = "Prox mine"
+10003de3              case 0x1b
+10003de3                  eax_62 = "Grapple"
+10003dea              case 0x1f
+10003dea                  eax_62 = "Heavy Machine Gun"
+10003d7a              default
+10003df1                  eax_62 = "[unknown weapon]"
+10003df1          
+10003df6          int32_t var_440_16 = 0
+10003df8          char const* const var_444_41 = eax_62
+10003e04          sub_10020dc0(arg1, "death_insult", &i_30)
+10003e23          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003e28          i_15 = i_50
+10003e28          i_50 -= 1
+10003e29      while (i_15 != 1)
+10003e29  
+10003e47  int32_t i_74 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "death_praise")
+10003e47  
+10003e4e  if (i_74 s> 0)
+10003e54      int32_t i_51 = i_74
+10003f21      int32_t i_16
+10003f21      
+10003f21      do
+10003e6d          char const* const eax_68
+10003e6d          
+10003e6d          switch (*(arg1 + 0x1750) - 1)
+10003e74              case 0
+10003e74                  eax_68 = "Shotgun"
+10003e7e              case 1
+10003e7e                  eax_68 = "Gauntlet"
+10003e88              case 2
+10003e88                  eax_68 = "Machine Gun"
+10003e8f              case 3, 4
+10003e8f                  eax_68 = "Grenade Launcher"
+10003e96              case 5, 6
+10003e96                  eax_68 = "Rocket Launcher"
+10003e9d              case 7, 8
+10003e9d                  eax_68 = "Plasmagun"
+10003ea4              case 9, 0x20
+10003ea4                  eax_68 = "Railgun"
+10003eab              case 0xa, 0x1e
+10003eab                  eax_68 = "Lightning Gun"
+10003eb2              case 0xb, 0xc
+10003eb2                  eax_68 = "BFG10K"
+10003eb9              case 0x16
+10003eb9                  eax_68 = "Nailgun"
+10003ec0              case 0x17
+10003ec0                  eax_68 = "Chaingun"
+10003ec7              case 0x18
+10003ec7                  eax_68 = "Proximity Launcher"
+10003ece              case 0x19
+10003ece                  eax_68 = "Kamikaze"
+10003ed5              case 0x1a
+10003ed5                  eax_68 = "Prox mine"
+10003edc              case 0x1b
+10003edc                  eax_68 = "Grapple"
+10003ee3              case 0x1f
+10003ee3                  eax_68 = "Heavy Machine Gun"
+10003e6d              default
+10003eea                  eax_68 = "[unknown weapon]"
+10003eea          
+10003eef          int32_t var_440_17 = 0
+10003ef1          char const* const var_444_43 = eax_68
+10003efd          sub_10020dc0(arg1, "death_praise", &i_30)
+10003f1b          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003f20          i_16 = i_51
+10003f20          i_51 -= 1
+10003f21      while (i_16 != 1)
+10003f21  
+10003f34  sub_10015df0(*(arg1 + 0x1748), 0x20)
+10003f51  int32_t i_75 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "kill_gauntlet")
+10003f51  
+10003f58  if (i_75 s> 0)
+10003f5a      int32_t i_52 = i_75
+10003f8f      int32_t i_17
+10003f8f      
+10003f8f      do
+10003f60          int32_t var_440_18 = 0
+10003f6d          sub_10020dc0(arg1, "kill_gauntlet", &i_30)
+10003f89          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003f8e          i_17 = i_52
+10003f8e          i_52 -= 1
+10003f8f      while (i_17 != 1)
+10003f8f  
+10003fa9  int32_t i_76 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "kill_rail")
+10003fa9  
+10003fb0  if (i_76 s> 0)
+10003fb2      int32_t i_53 = i_76
+10003fe2      int32_t i_18
+10003fe2      
+10003fe2      do
+10003fb4          int32_t var_440_19 = 0
+10003fc1          sub_10020dc0(arg1, "kill_rail", &i_30)
+10003fdc          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10003fe1          i_18 = i_53
+10003fe1          i_53 -= 1
+10003fe2      while (i_18 != 1)
+10003fe2  
+10003ffb  int32_t i_77 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "kill_telefrag")
+10003ffb  
+10004002  if (i_77 s> 0)
+10004004      int32_t i_54 = i_77
+10004035      int32_t i_19
+10004035      
+10004035      do
+10004006          int32_t var_440_20 = 0
+10004013          sub_10020dc0(arg1, "kill_telefrag", &i_30)
+1000402f          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10004034          i_19 = i_54
+10004034          i_54 -= 1
+10004035      while (i_19 != 1)
+10004035  
+1000404f  int32_t i_78 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "kill_insult")
+1000404f  
+10004056  if (i_78 s> 0)
+10004058      int32_t i_55 = i_78
+1000408f      int32_t i_20
+1000408f      
+1000408f      do
+10004060          int32_t var_440_21 = 0
+1000406d          sub_10020dc0(arg1, "kill_insult", &i_30)
+10004089          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+1000408e          i_20 = i_55
+1000408e          i_55 -= 1
+1000408f      while (i_20 != 1)
+1000408f  
+100040a9  int32_t i_79 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "kill_praise")
+100040a9  
+100040b0  if (i_79 s> 0)
+100040b2      int32_t i_56 = i_79
+100040e2      int32_t i_21
+100040e2      
+100040e2      do
+100040b4          int32_t var_440_22 = 0
+100040c1          sub_10020dc0(arg1, "kill_praise", &i_30)
+100040dc          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+100040e1          i_21 = i_56
+100040e1          i_56 -= 1
+100040e2      while (i_21 != 1)
+100040e2  
+100040fb  int32_t i_80 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "enemy_suicide")
+100040fb  
+10004102  if (i_80 s> 0)
+10004104      int32_t i_57 = i_80
+10004135      int32_t i_22
+10004135      
+10004135      do
+10004106          int32_t var_440_23 = 0
+10004113          sub_10020dc0(arg1, "enemy_suicide", &i_30)
+1000412f          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10004134          i_22 = i_57
+10004134          i_57 -= 1
+10004135      while (i_22 != 1)
+10004135  
+10004146  int32_t eax_84 = *(*(*(arg1 + 8) * 0x384 + &data_104b41dc) + 0x3c0)
+10004146  
+1000414f  if (eax_84 u> 0x3f)
+100041e0      sub_10020980(3, "ClientName: client out of range\n")
+1000414f  else
+1000416d      (*(data_104b13ac + 0x68))(eax_84 + 0x211, &var_40c, 0x400)
+10004188      strncpy(&i_30, sub_10070cf0(), 0x1f)
+1000418a      int32_t i_23 = sx.d(i_30)
+10004192      char* eax_88 = &i_30
+10004196      char var_40d_1 = 0
+1000419b      char* edi_2 = &i_30
+1000419b      
+1000419f      while (i_23 != 0)
+100041a8          char edx_54
+100041a8          
+100041a8          if (eax_88 != 0 && *eax_88 == 0x5e)
+100041aa              edx_54 = eax_88[1]
+100041aa          
+100041b9          if (eax_88 != 0 && *eax_88 == 0x5e && edx_54 != 0 && edx_54 s>= 0x30
+100041b9                  && edx_54 s<= 0x37)
+100041bb              eax_88 = &eax_88[1]
+100041b9          else if (i_23 u>= 0x20)
+100041c3              *edi_2 = i_23.b
+100041c5              edi_2 = &edi_2[1]
+100041c5          
+100041c6          i_23 = sx.d(eax_88[1])
+100041ca          eax_88 = &eax_88[1]
+100041ca      
+100041d2      if (*edi_2 != 0)
+100041d4          *edi_2 = 0
+100041d4  
+1000420e  char const* const edi_3
+1000420e  
+1000420e  switch (*(*(*(arg1 + 8) * 0x384 + &data_104b41dc) + 0x3c0) - 1)
+10004215      case 0
+10004215          edi_3 = "Shotgun"
+1000421f      case 1
+1000421f          edi_3 = "Gauntlet"
+10004229      case 2
+10004229          edi_3 = "Machine Gun"
+10004233      case 3, 4
+10004233          edi_3 = "Grenade Launcher"
+1000423a      case 5, 6
+1000423a          edi_3 = "Rocket Launcher"
+10004241      case 7, 8
+10004241          edi_3 = "Plasmagun"
+10004248      case 9, 0x20
+10004248          edi_3 = "Railgun"
+1000424f      case 0xa, 0x1e
+1000424f          edi_3 = "Lightning Gun"
+10004256      case 0xb, 0xc
+10004256          edi_3 = "BFG10K"
+1000425d      case 0x16
+1000425d          edi_3 = "Nailgun"
+10004264      case 0x17
+10004264          edi_3 = "Chaingun"
+1000426b      case 0x18
+1000426b          edi_3 = "Proximity Launcher"
+10004272      case 0x19
+10004272          edi_3 = "Kamikaze"
+10004279      case 0x1a
+10004279          edi_3 = "Prox mine"
+10004280      case 0x1b
+10004280          edi_3 = "Grapple"
+10004287      case 0x1f
+10004287          edi_3 = "Heavy Machine Gun"
+1000420e      default
+1000428e          edi_3 = "[unknown weapon]"
+1000428e  
+100042ab  int32_t i_81 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "hit_talking")
+100042ab  
+100042b2  if (i_81 s> 0)
+100042b4      int32_t i_31 = i_81
+100042e9      int32_t i_24
+100042e9      
+100042e9      do
+100042b6          int32_t var_440_24 = 0
+100042b8          char const* const var_444_59 = edi_3
+100042c4          sub_10020dc0(arg1, "hit_talking", &i_30)
+100042e3          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+100042e8          i_24 = i_31
+100042e8          i_31 -= 1
+100042e9      while (i_24 != 1)
+100042e9  
+10004303  int32_t i_82 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "hit_nodeath")
+10004303  
+1000430a  if (i_82 s> 0)
+1000430c      int32_t i_32 = i_82
+10004342      int32_t i_25
+10004342      
+10004342      do
+10004310          int32_t var_440_25 = 0
+10004312          char const* const var_444_61 = edi_3
+1000431e          sub_10020dc0(arg1, "hit_nodeath", &i_30)
+1000433c          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10004341          i_25 = i_32
+10004341          i_32 -= 1
+10004342      while (i_25 != 1)
+10004342  
+1000435b  int32_t i_83 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "hit_nokill")
+1000435b  
+10004362  if (i_83 s> 0)
+10004364      int32_t i_33 = i_83
+10004399      int32_t i_26
+10004399      
+10004399      do
+10004366          int32_t var_440_26 = 0
+10004368          char const* const var_444_63 = edi_3
+10004374          sub_10020dc0(arg1, "hit_nokill", &i_30)
+10004393          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10004398          i_26 = i_33
+10004398          i_33 -= 1
+10004399      while (i_26 != 1)
+10004399  
+1000439b  int32_t eax_99 = *(arg1 + 0x1748)
+1000439b  
+100043a4  if (eax_99 != *(arg1 + 8))
+100043c8      sub_10015df0(eax_99, 0x20)
+100043a4  else
+100043a7      char* eax_100 = sub_10001650(arg1)
+100043bd      char i_27
+100043bd      
+100043bd      do
+100043b5          i_27 = *eax_100
+100043b7          *(&i_30 - &data_10090708 + eax_100) = i_27
+100043ba          eax_100 = &eax_100[1]
+100043bd      while (i_27 != 0)
+100043bd  
+100043e8  int32_t i_84 = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "random_misc")
+100043e8  
+100043ef  if (i_84 s> 0)
+100043f5      int32_t i_34 = i_84
+10004503      int32_t i_28
+10004503      
+10004503      do
+10004402          var_430 = rand() & 0x7fff
+10004416          int32_t eax_104 =
+10004416              sub_1007b550(float.t(var_430) / fconvert.t(32767.0) * fconvert.t(11.9))
+1000441e          char const* const edi_4
+1000441e          
+1000441e          if (eax_104 u> 0xa)
+10004474              edi_4 = "BFG10K"
+1000441e          else
+10004420              switch (eax_104)
+10004427                  case 0
+10004427                      edi_4 = "Gauntlet"
+1000442e                  case 1
+1000442e                      edi_4 = "Shotgun"
+10004435                  case 2
+10004435                      edi_4 = "Machine Gun"
+1000443c                  case 3
+1000443c                      edi_4 = "Grenade Launcher"
+10004443                  case 4
+10004443                      edi_4 = "Rocket Launcher"
+1000444a                  case 5
+1000444a                      edi_4 = "Plasmagun"
+10004451                  case 6
+10004451                      edi_4 = "Railgun"
+10004458                  case 7
+10004458                      edi_4 = "Lightning Gun"
+1000445f                  case 8
+1000445f                      edi_4 = "Nailgun"
+10004466                  case 9
+10004466                      edi_4 = "Chaingun"
+1000446d                  case 0xa
+1000446d                      edi_4 = "Proximity Launcher"
+1000446d          
+1000448c          (*(data_104b13ac + 0x78))(&var_40c, 0x400)
+100044a7          strncpy(0x10090730, sub_10070cf0(), 0x7f)
+100044b0          int32_t var_440_28 = 0
+100044b2          char const* const var_444_68 = edi_4
+100044b3          int32_t var_448_25 = 0x10090730
+100044b8          char const* const var_44c_24 = "[invalid var]"
+100044bd          char const* const var_450_19 = "[invalid var]"
+100044c6          char* var_454_6 = &i_30
+100044c8          data_100907af = 0
+100044cf          sub_10001650(arg1)
+100044de          sub_10020dc0(arg1, "random_misc", &data_10090708)
+100044fd          (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+10004502          i_28 = i_34
+10004502          i_34 -= 1
+10004503      while (i_28 != 1)
+10004503  
+10004521  int32_t result = (*(data_104b13ac + 0x1f0))(*(arg1 + 0x1964), "random_insult")
+10004521  
+10004528  if (result s> 0)
+1000452e      int32_t ebp_1 = result
+1000463b      int32_t i_29
+1000463b      
+1000463b      do
+1000453b          var_430 = rand() & 0x7fff
+1000454f          int32_t eax_110 =
+1000454f              sub_1007b550(float.t(var_430) / fconvert.t(32767.0) * fconvert.t(11.9))
+10004557          char const* const edi_5
+10004557          
+10004557          if (eax_110 u> 0xa)
+100045ad              edi_5 = "BFG10K"
+10004557          else
+10004559              switch (eax_110)
+10004560                  case 0
+10004560                      edi_5 = "Gauntlet"
+10004567                  case 1
+10004567                      edi_5 = "Shotgun"
+1000456e                  case 2
+1000456e                      edi_5 = "Machine Gun"
+10004575                  case 3
+10004575                      edi_5 = "Grenade Launcher"
+1000457c                  case 4
+1000457c                      edi_5 = "Rocket Launcher"
+10004583                  case 5
+10004583                      edi_5 = "Plasmagun"
+1000458a                  case 6
+1000458a                      edi_5 = "Railgun"
+10004591                  case 7
+10004591                      edi_5 = "Lightning Gun"
+10004598                  case 8
+10004598                      edi_5 = "Nailgun"
+1000459f                  case 9
+1000459f                      edi_5 = "Chaingun"
+100045a6                  case 0xa
+100045a6                      edi_5 = "Proximity Launcher"
+100045a6          
+100045c5          (*(data_104b13ac + 0x78))(&var_40c, 0x400)
+100045e0          strncpy(0x10090730, sub_10070cf0(), 0x7f)
+100045e9          int32_t var_440_29 = 0
+100045eb          char const* const var_444_72 = edi_5
+100045ec          int32_t var_448_27 = 0x10090730
+100045f1          char const* const var_44c_25 = "[invalid var]"
+100045f6          char const* const var_450_20 = "[invalid var]"
+100045ff          char* var_454_7 = &i_30
+10004601          data_100907af = 0
+10004608          sub_10001650(arg1)
+10004617          sub_10020dc0(arg1, "random_insult", &data_10090708)
+10004635          result = (*(data_104b13ac + 0x1fc))(*(arg1 + 0x1964), 0, 0)
+1000463a          i_29 = ebp_1
+1000463a          ebp_1 -= 1
+1000463b      while (i_29 != 1)
+1000463b  
+1000464d  sub_1007aaf9(eax_1 ^ &var_430)
+10004658  return result
+
+10003436                                                                    8d a4 24 00 00 00 00 8d 49 00                        ..$.....I.
+1000397d                                                                                         8d 49 00                               .I.
+10003c69                             8d a4 24 00 00 00 00                                                           ..$....
+10004659                                                                             8d 49 00                                       .I.
+1000465c  uint32_t jump_table_1000465c[0x11] = 
+1000465c  {
+1000465c      [0x00] =  0x10003a9e
+10004660      [0x01] =  0x10003aa5
+10004664      [0x02] =  0x10003aac
+10004668      [0x03] =  0x10003ab3
+1000466c      [0x04] =  0x10003aba
+10004670      [0x05] =  0x10003ac1
+10004674      [0x06] =  0x10003ac8
+10004678      [0x07] =  0x10003acf
+1000467c      [0x08] =  0x10003ad6
+10004680      [0x09] =  0x10003add
+10004684      [0x0a] =  0x10003ae4
+10004688      [0x0b] =  0x10003aeb
+1000468c      [0x0c] =  0x10003af2
+10004690      [0x0d] =  0x10003af9
+10004694      [0x0e] =  0x10003b00
+10004698      [0x0f] =  0x10003b07
+1000469c      [0x10] =  0x10003b0e
+100046a0  }

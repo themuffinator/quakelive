@@ -1,0 +1,95 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+100247fa      bool a_1 = unimplemented  {add esp, 0x4}
+100247fd      arg2 - x87_r7_1
+100247ff      int16_t top_1 = 1
+10024801      int32_t __saved_edi
+10024801      result:1.b = (&__saved_edi s< 0 ? 1 : 0) << 7 | (arg2 == x87_r7_1 ? 1 : 0) << 6
+10024801          | (a_1 ? 1 : 0) << 4 | (is_unordered.t(arg2, x87_r7_1) ? 1 : 0) << 2
+10024801          | (arg2 < x87_r7_1 ? 1 : 0)
+10024802      bool p_2 = unimplemented  {test ah, 0x44}
+10024802      
+10024812      if (p_2 && data_105dce50 == 0)
+10024825          int32_t eax_2
+10024825          int32_t edx_1
+10024825          edx_1:eax_2 = muls.dp.d(0x10624dd3, arg1 - data_105dce64)
+10024827          result = data_104b1390
+1002482c          int32_t edx_2 = edx_1 s>> 6
+10024834          int32_t edi_3 = (edx_2 u>> 0x1f) + edx_2
+10024839          int32_t var_534_1 = edi_3
+10024839          
+10024843          if (edi_3 s< result - 5 || edi_3 s>= result)
+1002484c              data_104b1390 = edi_3 + 5
+10024851              result = sub_10024ea0()
+10024851              
+10024859              if (result != 0xffffffff)
+1002486a                  result = *(result * 0x384 + &data_104b41dc)
+1002486a                  
+1002487e                  if (*(result + 0x898) + 0x2710 s>= arg1)
+10024884                      int32_t edx_4 = *(result + 0x588)
+10024895                      void* i = &data_104b41dc
+1002489e                      void* ebp_1 = nullptr
+100248a0                      void* i_1 = &data_104b41dc
+100248a0                      
+10024dc7                      do
+100248b0                          int32_t* ecx_5 = *((ebp_1 << 2) + &data_105e2f00)
+100248b0                          
+100248d2                          if (ecx_5 != 0 && *ecx_5 != 0)
+100248d8                              result = *i
+100248d8                              
+100248e1                              if (*(result + 0x250) == 2)
+100248e7                                  float xmm0_1 = ecx_5[0x4b0]
+100248f3                                  int32_t result_4 = result
+100248f5                                  int32_t esi_2 = edx_4 - *(result_4 + 0x588)
+100248fe                                  float var_540_1 = xmm0_1
+10024904                                  float var_530_1 = xmm0_1
+1002490a                                  int32_t var_53c_1 = 0
+1002490a                                  
+10024912                                  if (not(2f <= xmm0_1))
+10024914                                      float xmm5_1 = ecx_5[0x5e2]
+1002491c                                      xmm5_1 - 1f
+1002491f                                      result:1.b = (xmm5_1 == 1f ? 1 : 0) << 6
+1002491f                                          | (is_unordered.d(xmm5_1, 1f) ? 1 : 0) << 2
+1002491f                                          | (xmm5_1 < 1f ? 1 : 0)
+10024920                                      bool p_4 = unimplemented  {test ah, 0x44}
+10024920                                      
+10024923                                      if (p_4)
+10024925                                          var_53c_1 = 1
+10024925                                  
+10024930                                  if (not(xmm0_1 < 2f))
+10024932                                      float xmm3_1 = ecx_5[0x5e2]
+1002493a                                      xmm3_1 f- 0
+1002493d                                      result:1.b = (xmm3_1 == 0f ? 1 : 0) << 6
+1002493d                                          | (is_unordered.d(xmm3_1, 0f) ? 1 : 0) << 2
+1002493d                                          | (xmm3_1 < 0f ? 1 : 0)
+1002493e                                      bool p_6 = unimplemented  {test ah, 0x44}
+1002493e                                      
+10024941                                      if (p_6)
+10024943                                          var_53c_1 = 1
+10024943                                  
+10024951                                  if (esi_2 != ecx_5[0x943])
+10024953                                      ecx_5[0x943] = esi_2
+10024960                                      *(*((ebp_1 << 2) + &data_105e2f00) + 0x2510) = edi_3
+10024960                                  
+1002496b                                  if (var_53c_1 != 0)
+1002496b                                      goto label_10024aae
+1002496b                                  
+10024971                                  void* ecx_6 = *((ebp_1 << 2) + &data_105e2f00)
+10024978                                  float xmm0_2 = *(ecx_6 + 0x2504)
+10024980                                  xmm0_2 f- 0
+10024983                                  result:1.b = (xmm0_2 == 0f ? 1 : 0) << 6
+10024983                                      | (is_unordered.d(xmm0_2, 0f) ? 1 : 0) << 2
+10024983                                      | (xmm0_2 < 0f ? 1 : 0)
+10024984                                  bool p_8 = unimplemented  {test ah, 0x44}
+10024984                                  
+10024987                                  if (p_8)
+10024a18                                      unimplemented  {fld st0, dword [esp+0x14]}
+10024a1e                                      int32_t eax_7 = edi_3 - *(ecx_6 + 0x2510)
+10024a1e                                      
+10024a27                                      if (eax_7 s> 0x1e)
+10024a2a                                          void* var_55c_3 = ecx_6
+10024a2b                                          *(ecx_6 + 0x2504) = 0
+10024a33                                          float var_55c_4 = fconvert.s(unimplemented  {fst 
+10024a33                                              dword [esp], st0})

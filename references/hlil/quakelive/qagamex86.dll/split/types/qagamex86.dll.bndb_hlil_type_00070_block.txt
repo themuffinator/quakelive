@@ -1,0 +1,24 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+1001a6c6                                  unimplemented  {fstp dword [esp+0x438], st0}
+1001a6cd                                  unimplemented  {fld st0, dword [esp+0x434]}
+1001a6d4                                  unimplemented  {fld st0, dword [esp+0x430]}
+1001a6db                                  unimplemented  {fld st0, dword [esp+0x438]}
+1001a6e2                                  unimplemented  {fld st0, st1}
+1001a6e4                                  unimplemented  {fmulp st2, st0}
+1001a6e4                                  unimplemented  {fmulp st2, st0}
+1001a6e6                                  unimplemented  {fld st0, st2}
+1001a6e8                                  unimplemented  {fmulp st3, st0}
+1001a6e8                                  unimplemented  {fmulp st3, st0}
+1001a6ea                                  unimplemented  {fxch st0, st1}
+1001a6ea                                  unimplemented  {fxch st0, st1}
+1001a6ec                                  unimplemented  {faddp st2, st0}
+1001a6ec                                  unimplemented  {faddp st2, st0}
+1001a6ee                                  unimplemented  {fmul st0, st0}
+1001a6f0                                  unimplemented  {faddp st1, st0}
+1001a6f0                                  unimplemented  {faddp st1, st0}
+1001a6f2                                  int32_t ecx_15 = _CIsqrt()
+1001a6f7                                  *(esp_13 + 0x1c) = fconvert.s(unimplemented  {fstp dword [
+1001a6f7                                      esp+0x1c], st0})

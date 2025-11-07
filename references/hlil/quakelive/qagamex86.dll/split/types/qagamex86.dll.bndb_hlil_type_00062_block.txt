@@ -1,0 +1,9 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+1001a8d2                                  unimplemented  {fstp dword [esp+0x430], st0}
+1001a8d9                                  unimplemented  {fld st0, dword [esp+0x44]}
+1001a8dd                                  unimplemented  {fsub st0, dword [esp+0x68]}
+1001a8e1                                  *(esp_13 + 0x434) = fconvert.s(unimplemented  {fstp 
+1001a8e1                                      dword [esp+0x434], st0})

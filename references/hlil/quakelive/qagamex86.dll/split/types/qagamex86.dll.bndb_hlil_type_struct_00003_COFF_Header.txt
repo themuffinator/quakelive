@@ -1,0 +1,14 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type (struct) */
+/* Name: COFF_Header */
+
+10000100  {
+10000100      char magic[0x4] = "PE\x00", 0
+10000104      enum coff_machine machine = IMAGE_FILE_MACHINE_I386
+10000106      uint16_t numberOfSections = 0x5
+10000108      uint32_t timeDateStamp = 0x5751f224
+1000010c      uint32_t pointerToSymbolTable = 0x0
+10000110      uint32_t numberOfSymbols = 0x0
+10000114      uint16_t sizeOfOptionalHeader = 0xe0
+10000116      enum coff_characteristics characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE | IMAGE_FILE_DLL
+10000118  }

@@ -1,0 +1,6 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10019842                                                          unimplemented  {fstp dword [esi+0x17d4]
+10019842                                                          , st0})

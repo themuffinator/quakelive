@@ -1,0 +1,118 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+100390d0      unimplemented  {fld st0, dword [&data_105a9168]}
+100390da      float var_4f8_1 = fconvert.s(unimplemented  {fstp dword [esp+0x38], st0})
+100390da      unimplemented  {fstp dword [esp+0x38], st0}
+100390e0      unimplemented  {fld st0, dword [esp+0x38]}
+100390e8      unimplemented  {fld st0, qword [&data_1008b3b0]}
+100390f2      bool cond:0_1 = unimplemented  {fcomip st0, st1} f<= unimplemented  {fcomip st0, st1}
+100390f2      unimplemented  {fcomip st0, st1}
+100390f4      unimplemented  {fstp st0, st0}
+100390f4      unimplemented  {fstp st0, st0}
+100390fa      int32_t var_4dc[0x2]
+100390fa      var_4dc[0] = arg3
+10039102      int32_t i = 0
+1003910a      int32_t i_2 = 3
+1003910a      
+10039112      if (not(cond:0_1))
+1003911c          int32_t var_4f8_2 = 0x3dcccccd
+10039112      else if (not(var_4f8_1 <= 1f))
+1003912f          int32_t var_4f8_3 = 0x3f800000
+1003912f      
+10039138      char const* const var_518_1
+10039138      
+10039138      if (arg7 == 1)
+1003915f          var_518_1 = "team_CTF_redplayer"
+1003915f          
+10039169          if (ebx == 0)
+1003916b              var_518_1 = "team_CTF_redspawn"
+10039138      else if (arg7 != 2)
+1003913d          var_518_1 = "info_player_deathmatch"
+1003913b      else if (ebx == 0)
+10039155          var_518_1 = "team_CTF_bluespawn"
+10039149      else
+1003914b          var_518_1 = "team_CTF_blueplayer"
+1003914b      
+10039177      char const* const var_534_1 = var_518_1
+1003917f      int32_t var_4fc_1 = 0
+10039187      void* result_2
+10039187      void* edx
+10039187      result_2, edx = sub_1006bfa0(nullptr, arg2, 0x244, var_534_1)
+1003918c      void* result_1 = result_2
+1003918c      
+10039193      if (result_1 != 0)
+100391a5          int32_t __saved_edi
+100391a5          var_4d8
+100391a5          void* result
+100391a5          int16_t top
+100391a5          
+100391a5          while (i s< 0x1a)
+100391b2              float var_50c_1 = -1f
+100391b2              
+100391b8              if (data_105dea44 == 0)
+10039233                  label_10039233:
+10039233                  char eax_9 = (*(result_1 + 0x248)).b
+10039233                  
+10039254                  if ((eax_9 & 2) == 0 && (arg7 != 0 || arg6 == 0 || (eax_9 & 1) != 0))
+1003925a                      var_4fc_1 += 1
+1003925e                      unimplemented  {fild st0, dword [esp+0x34]}
+10039265                      unimplemented  {fmul st0, dword [esp+0x40]}
+10039269                      int32_t var_538
+10039269                      var_538.q = fconvert.d(unimplemented  {fstp qword [esp], st0})
+10039269                      unimplemented  {fstp qword [esp], st0}
+1003926c                      ceil(var_538, var_534_1)
+10039275                      int32_t i_7 = sub_1007b550()
+1003927a                      i_2 = i_7
+1003927a                      
+10039281                      if (i_7 s> 0x1a)
+10039283                          i_7 = 0x1a
+10039294                          i_2 = i_7
+10039281                      else if (i_7 s< 3)
+1003928f                          i_7 = 3
+10039294                          i_2 = i_7
+10039294                      
+100392a3                      float xmm2_1
+100392a3                      
+100392a3                      if (i s< i_7 || i s< 5)
+100392b3                          xmm2_1 = (zx.o(0)).d
+100392a3                      else
+100392a5                          xmm2_1 = (&var_4dc)[i][0]
+100392a5                      
+100392b6                      int32_t edi_2 = data_105dce58
+100392bc                      float xmm0_2 = var_50c_1
+100392d2                      float var_4e4_1 = xmm2_1
+100392d8                      int16_t top_9 = top
+100392d8                      unimplemented  {fld st0, dword [esp+0x4c]}
+100392dc                      edx = nullptr
+100392dc                      
+100392e0                      if (edi_2 s> 0)
+100392e6                          float xmm3_1 = data_105a39a8
+100392f2                          void* esi_1 = &data_104b41dc
+100392f2                          
+10039406                          do
+100392f7                              void* ecx_1 = *esi_1
+100392f7                              
+10039308                              if (ecx_1 != 0 && *(ecx_1 + 0x250) != 0)
+1003930e                                  i_7 = *(ecx_1 + 0x10c)
+1003930e                                  
+10039324                                  if (i_7 != 3 && *(ecx_1 + 0xc0) s> 0)
+1003932a                                      int32_t var_4e0_1 = 0x3f800000
+1003932a                                      
+10039336                                      if (arg2 == 0 || i_7 != arg2)
+10039332                                          goto label_1003934b
+10039332                                      
+10039338                                      xmm3_1 f- 0
+1003933b                                      i_7:1.b = (xmm3_1 == 0f ? 1 : 0) << 6
+1003933b                                          | (is_unordered.d(xmm3_1, 0f) ? 1 : 0) << 2
+1003933b                                          | (xmm3_1 < 0f ? 1 : 0)
+1003933c                                      bool p_2 = unimplemented  {test ah, 0x44}
+1003933c                                      
+1003933f                                      if (p_2)
+10039345                                          float var_4e0_2 = xmm3_1
+1003934b                                          label_1003934b:
+1003934b                                          unimplemented  {fld st0, dword [ebp+0x64]}
+1003934e                                          unimplemented  {fsub st0, dword [ecx+0x14]}
+10039351                                          float var_508_1 = fconvert.s(unimplemented  {fstp 
+10039351                                              dword [esp+0x28], st0})

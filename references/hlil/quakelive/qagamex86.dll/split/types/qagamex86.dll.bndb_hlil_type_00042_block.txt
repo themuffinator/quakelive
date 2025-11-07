@@ -1,0 +1,53 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10019647                                  unimplemented  {fstp dword [esp+0x18], st0}
+1001964b                                  uint32_t eax_15 = sub_10013c60(&var_240)
+10019650                                  top_56 = top_23 + 2
+10019650                                  unimplemented  {fld st0, dword [esp+0x18]}
+1001965a                                  bool cond:4_1
+1001965a                                  
+1001965a                                  if (eax_15 == 0 && ebx s>= 0)
+1001965c                                      unimplemented  {fld st0, dword [esp+0x28]}
+10019660                                      unimplemented  {fxch st0, st1}
+10019660                                      unimplemented  {fxch st0, st1}
+10019662                                      cond:4_1 = unimplemented  {fcomi st0, st1}
+10019662                                          f> unimplemented  {fcomi st0, st1}
+10019664                                      unimplemented  {fstp st1, st0}
+10019664                                      unimplemented  {fstp st1, st0}
+10019664                                  
+10019666                                  if (eax_15 == 0 && ebx s>= 0 && cond:4_1)
+10019666                                      goto label_100197f0
+10019666                                  
+1001966c                                  unimplemented  {fld st0, dword [esp+0x3c]}
+10019670                                  unimplemented  {fmul st0, qword [&data_1008b510]}
+10019676                                  unimplemented  {fadd qword [&data_1008b508]}
+1001967c                                  unimplemented  {fmul st0, st0}
+1001967e                                  unimplemented  {fxch st0, st1}
+1001967e                                  unimplemented  {fxch st0, st1}
+10019680                                  bool cond:3_1 = unimplemented  {fcomip st0, st1}
+10019680                                      f> unimplemented  {fcomip st0, st1}
+10019680                                  unimplemented  {fcomip st0, st1}
+10019682                                  unimplemented  {fstp st0, st0}
+10019682                                  unimplemented  {fstp st0, st0}
+10019682                                  top = top_56 + 1
+10019682                                  
+10019684                                  if (not(cond:3_1))
+1001968d                                      int32_t eax_16
+1001968d                                      int32_t ecx_11
+1001968d                                      eax_16, ecx_11 = sub_10018900(eax_15, edx_5, i, esi)
+1001968d                                      
+10019697                                      if (eax_16 == 0)
+100196b5                                          if (ebx s>= 0 || (ecx_2 == eax_16
+100196b5                                                  && (var_238 & 0x100) == 0))
+100196d2                                              int32_t var_254_1
+100196d2                                              
+100196d2                                              if (var_268_2 <= 656100f)
+100196dc                                                  float var_254_2 = var_268_2
+100196d2                                              else
+100196d4                                                  __builtin_strncpy(dest: &var_254_1, 
+100196d4                                                      src: "@. I", n: 4)
+100196e2                                              unimplemented  {fld st0, dword [esp+0x2c]}
+100196e6                                              unimplemented  {fdiv st0, qword [
+100196e6                                                  &data_1008b4f8]}

@@ -1,0 +1,29 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+100197ba                                              unimplemented  {fstp dword [esp], st0}
+100197c1                                              void var_21c
+100197c1                                              int32_t eax_20 = sub_10018a00(&var_18, edx_8, 
+100197c1                                                  &var_21c, var_284_9)
+100197c1                                              top -= 1
+100197c1                                              unimplemented  {call sub_10018a00}
+100197cb                                              int32_t eax_21
+100197cb                                              
+100197cb                                              if (eax_20 == 0)
+100197d1                                                  esi = var_260
+100197d5                                                  sub_10016670(i_1, esi)
+100197da                                                  eax_21 = sub_10017470(esi)
+100197da                                                  unimplemented  {call sub_10017470}
+100197da                                              
+100197e1                                              if (eax_20 != 0 || eax_21 == 0)
+1001981a                                                  esi = var_260
+10019826                                                  label_10019826:
+10019826                                                  int32_t xmm0_8 = data_105e2ef8
+1001982e                                                  *(esi + 0x196c) = var_22c
+1001982e                                                  
+10019834                                                  if (arg6 s< 0)
+1001984a                                                      *(esi + 0x17d4) = xmm0_8
+10019834                                                  else
+10019836                                                      unimplemented  {fld st0, dword [
+10019836                                                          &data_105e2ef8]}

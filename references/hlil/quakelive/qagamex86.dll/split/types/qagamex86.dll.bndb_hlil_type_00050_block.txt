@@ -1,0 +1,12 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+100197a8                                              unimplemented  {fstp dword [esp+0x14], st0}
+100197ac                                              void var_18
+100197ac                                              int32_t ecx_14
+100197ac                                              int32_t edx_8
+100197ac                                              ecx_14, edx_8 =
+100197ac                                                  sub_100702b0(&var_274, &var_18)
+100197b1                                              unimplemented  {fld st0, dword [
+100197b1                                                  &data_1008b104]}

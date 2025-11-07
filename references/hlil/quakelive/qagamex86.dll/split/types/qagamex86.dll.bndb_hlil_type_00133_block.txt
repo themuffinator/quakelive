@@ -1,0 +1,88 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+1003c619      unimplemented  {fld st0, dword [eax+0x14]}
+1003c61c      void* edx_39 = data_104b13ac
+1003c622      ebx_3[0x88] = fconvert.s(unimplemented  {fstp dword [ebx+0x220], st0})
+1003c622      unimplemented  {fstp dword [ebx+0x220], st0}
+1003c629      unimplemented  {fld st0, dword [eax+0x18]}
+1003c62c      ebx_3[0x89] = fconvert.s(unimplemented  {fstp dword [ebx+0x224], st0})
+1003c62c      unimplemented  {fstp dword [ebx+0x224], st0}
+1003c632      unimplemented  {fld st0, dword [eax+0x1c]}
+1003c635      ebx_3[0x8a] = fconvert.s(unimplemented  {fstp dword [ebx+0x228], st0})
+1003c635      unimplemented  {fstp dword [ebx+0x228], st0}
+1003c641      (*(edx_39 + 0x9c))(ebx_3)
+1003c641  
+1003c656  if (data_1059566c != 0 && data_105a70cc != 0)
+1003c663      *(*((eax_43 << 2) + &data_10092ac8) + 0x2c) = 0
+1003c663  
+1003c675  if (edi_8[1] == 2 && edi_8[0xd4] == 2)
+1003c677      void* eax_70 = ebx_3[0x8f]
+1003c67d      int32_t ecx_46 = *(eax_70 + 0x354)
+1003c67d      
+1003c685      if (ecx_46 s>= 0)
+1003c687          *(eax_70 + 0xbd4) = ecx_46
+1003c693          *(ebx_3[0x8f] + 0xbd0) = 1
+1003c693  
+1003c69f  void* edx_41 = sub_10035600(ebx_3)
+1003c69f  
+1003c6ab  if (data_105a898c s>= 3)
+1003c6af      int32_t var_9a0 = 0
+1003c6b6      int32_t var_99c_1 = 0
+1003c6bd      int32_t var_998_1 = 0
+1003c6c4      int32_t var_994_1 = 0
+1003c6cb      int32_t i_4 = data_105dce58
+1003c6cb      
+1003c6d2      if (i_4 s> 0)
+1003c6d4          edx_41 = &data_104b41dc
+1003c6d9          int32_t i_3 = i_4
+1003c711          int32_t i_2
+1003c711          
+1003c711          do
+1003c6e0              void* eax_72 = *edx_41
+1003c6e0              
+1003c6e8              if (*(eax_72 + 0x250) == 2)
+1003c6ea                  int32_t ecx_47 = *(eax_72 + 4)
+1003c6ea                  
+1003c6f4                  if (ecx_47 == 0 && ecx_47 != 4)
+1003c6f6                      int32_t eax_73 = *(eax_72 + 0x348)
+1003c6fc                      (&var_9a0)[eax_73] += 1
+1003c6fc              
+1003c70a              edx_41 += 0x384
+1003c710              i_2 = i_3
+1003c710              i_3 -= 1
+1003c711          while (i_2 != 1)
+1003c711      
+1003c71f      data_105dce78 = data_105dce5c + 0x3e8
+1003c71f  
+1003c725  int32_t* ebx_4 = var_c20
+1003c729  int32_t* edi_10 = var_c24
+1003c729  
+1003c730  if (ebx_4[1] == 2)
+1003c732      void* eax_75 = edi_10[0x8f]
+1003c73e      *(eax_75 + 0x10c) = *(eax_75 + 0x348)
+1003c74a      *(edi_10[0x8f] + 4) = 2
+1003c74d      void* eax_77 = edi_10[0x8f]
+1003c753      *(eax_77 + 0xc) &= 0xffffefff
+1003c764      *(edi_10[0x8f] + 0x350) = 1
+1003c76e      edx_41 = edi_10[0x8f]
+1003c774      *(edx_41 + 0x88) = eax_43
+1003c774      
+1003c781      if (edi_10[0x76] != 0)
+1003c790          edx_41 = (*(data_104b13ac + 0xa0))(edi_10)
+1003c790  
+1003c799  sub_1002d5b0(edi_10, edx_41, ebx_4)
+1003c7aa  sub_1007aaf9(eax_1 ^ &var_c24)
+1003c7b2  return edi_10
+
+1003c6dd                                                                                         8d 49 00                               .I.
+1003c7b3                                                           90                                                         .
+1003c7b4  uint32_t jump_table_1003c7b4[0x5] = 
+1003c7b4  {
+1003c7b4      [0x0] =  0x1003c3f8
+1003c7b8      [0x1] =  0x1003c442
+1003c7bc      [0x2] =  0x1003c45e
+1003c7c0      [0x3] =  0x1003c482
+1003c7c4      [0x4] =  0x1003c489
+1003c7c8  }

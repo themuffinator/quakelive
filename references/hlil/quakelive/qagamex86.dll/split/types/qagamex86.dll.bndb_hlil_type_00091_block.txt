@@ -1,0 +1,30 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+100249d3                                          unimplemented  {fstp dword [esp], st0}
+100249d3                                          top_1 = top_2 + 1
+100249d7                                          sub_10024700(result, result_4, ebp_1, esi_2, 
+100249d7                                              var_55c_2, edi_3)
+10024aa5                                          label_10024aa5:
+10024aa5                                          xmm0_1 = var_540_1
+10024aae                                          label_10024aae:
+10024aae                                          
+10024aae                                          if (not(1f <= xmm0_1))
+10024ab0                                              var_540_1 = 1f
+10024aae                                          else if (not(xmm0_1 <= 5f))
+10024abd                                              var_540_1 = 5f
+10024abd                                          
+10024ac3                                          bool a_2 =
+10024ac3                                              unimplemented  {cmp dword [esp+0x18], 0x0}
+10024ac3                                          
+10024ac8                                          if (var_53c_1 != 0)
+10024af6                                              label_10024af6:
+10024af6                                              int32_t result_2 = 1
+10024afe                                              void var_40c
+10024afe                                              (*(data_104b13ac + 0x70))(ebp_1, &var_40c, 
+10024afe                                                  0x400)
+10024b00                                              unimplemented  {fld st0, dword [esp+0x20]}
+10024b07                                              void* var_55c_7
+10024b07                                              var_55c_7.q = fconvert.d(unimplemented  {fstp 
+10024b07                                                  qword [esp], st0})

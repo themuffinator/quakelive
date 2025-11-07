@@ -1,0 +1,867 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+1003a09e              unimplemented  {test ah, 0x44}
+
+1003a0af                                               cc                                                                 .
+
+1003a0b0    int32_t __fastcall sub_1003a0b0(char* arg1, char* arg2)
+
+1003a0b6  int32_t esi = 0
+1003a0b8  *arg1 = 0
+1003a0bb  char i = *arg2
+1003a0bd  char* ebx = arg1
+1003a0bf  void* edx = &arg2[1]
+1003a0c1  int32_t edi = 1
+1003a0c6  int32_t ebp = 0x3ff
+1003a0cb  int32_t var_4 = 0
+1003a0d3  int32_t var_c = 0
+1003a0d3  
+1003a0d9  if (i != 0)
+1003a0df      int32_t var_10_1 = 0x3fe
+1003a0e7      int32_t var_14_1 = 0x3fd
+1003a0e7      
+1003a1ba      do
+1003a123          if (i != 0x22 && i != 0x27 && i != 0x26 && i != 0x3c && i != 0x3e
+1003a123                  && (*ebx != 0 || i != 0x20))
+1003a12b              if (i == 0x5e)
+1003a12d                  i = *edx
+1003a12d                  
+1003a131                  if (i == 0)
+1003a131                      break
+1003a131                  
+1003a137                  i &= 7
+1003a137                  
+1003a139                  if (i != 0)
+1003a142                      if (esi s> var_14_1)
+1003a142                          break
+1003a142                      
+1003a14b                      char* ebx_1
+1003a14b                      
+1003a14b                      if (i == 7)
+1003a16a                          if (edi == 0)
+1003a16c                              var_14_1 += 2
+1003a170                              ebp += 2
+1003a172                              var_10_1 += 2
+1003a176                              edi = 1
+1003a176                          
+1003a17b                          *arg1 = 0x5e
+1003a17e                          ebx_1.b = *edx
+1003a180                          arg1[1] = ebx_1.b
+1003a183                          arg1 = &arg1[2]
+1003a186                          edx += 1
+1003a187                          esi += 2
+1003a14b                      else
+1003a14d                          var_14_1 -= 2
+1003a151                          var_10_1 -= 2
+1003a155                          *arg1 = 0x5e
+1003a158                          ebx_1.b = *edx
+1003a15a                          arg1[1] = ebx_1.b
+1003a15d                          edi = 0
+1003a15f                          ebp -= 2
+1003a161                          arg1 = &arg1[2]
+1003a163                          edx += 1
+1003a164                          esi += 2
+1003a139                  else
+1003a13b                      edx += 1
+1003a12b              else if (i != 0x20)
+1003a19f                  var_c = 0
+1003a1a7                  label_1003a1a7:
+1003a1a7                  
+1003a1ab                  if (esi s> var_10_1)
+1003a1ab                      break
+1003a1ab                  
+1003a1ad                  var_4 += 1
+1003a1b1                  *arg1 = i
+1003a1b3                  arg1 = &arg1[1]
+1003a1b4                  esi += 1
+1003a18d              else
+1003a193                  int32_t ebx_3 = var_c + 1
+1003a194                  var_c = ebx_3
+1003a194                  
+1003a19b                  if (ebx_3 s<= 3)
+1003a19b                      goto label_1003a1a7
+1003a19b          
+1003a1b5          i = *edx
+1003a1b7          edx += 1
+1003a1ba      while (i != 0)
+1003a1ba      
+1003a1c6      if (edi == 0)
+1003a1c8          *arg1 = 0x375e
+1003a1cd          arg1 = &arg1[2]
+1003a1cd  
+1003a1d0  *arg1 = 0
+1003a1d0  
+1003a1dd  if (*ebx == 0 || var_4 == 0)
+1003a1e2      if (ebp s< 1)
+1003a1e4          char const* const var_28_1 = "Q_strncpyz: destsize < 1"
+1003a1eb          sub_100531b0(0)
+1003a1eb      
+1003a1fd      i = strncpy(ebx, "UnnamedPlayer", ebp - 1)
+1003a206      ebx[ebp - 1] = 0
+1003a206  
+1003a212  return i
+
+1003a213                                                           cc cc cc cc cc cc cc cc cc cc cc cc cc                     .............
+
+1003a220    int32_t sub_1003a220(int32_t* arg1, int32_t* arg2)
+
+1003a232  int32_t edx = data_105dce40
+1003a23e  int32_t eax_2 = *(*arg1 * 0xbd8 + edx + 0x34c)
+1003a245  int32_t ecx_3 = *(*arg2 * 0xbd8 + edx + 0x34c)
+1003a245  
+1003a24e  if (eax_2 s> ecx_3)
+1003a255      return 1
+1003a255  
+1003a25a  int32_t edx_1
+1003a25a  edx_1.b = eax_2 s>= ecx_3
+1003a260  return edx_1 - 1
+
+1003a261     cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc                                                   ...............
+
+1003a270    int32_t sub_1003a270()
+
+1003a27b  int32_t var_104[0x40]
+1003a27b  int32_t result = __security_cookie ^ &var_104
+1003a27d  int32_t result_1 = result
+1003a28b  int32_t i_1 = 0
+1003a28b  
+1003a296  if (data_105a898c == 1)
+1003a29d      int32_t ebp_1 = data_105dce8c
+1003a2a3      int32_t edx_1 = 0
+1003a2a3      
+1003a2a7      if (ebp_1 s> 0)
+1003a2a9          int32_t ebx_1 = data_105dce40
+1003a2a9          
+1003a2db          do
+1003a2b0              int32_t ecx_1 = (&data_105dcea4)[edx_1]
+1003a2b9              int32_t eax_2 = ecx_1 * 0xbd8
+1003a2b9              
+1003a2d1              if (*(eax_2 + ebx_1 + 0x348) == 3 && *(eax_2 + ebx_1 + 0x36c) == 0)
+1003a2d3                  var_104[i_1] = ecx_1
+1003a2d7                  i_1 += 1
+1003a2d7              
+1003a2d8              edx_1 += 1
+1003a2db          while (edx_1 s< ebp_1)
+1003a2db      
+1003a2ec      result = qsort(&var_104, i_1, 4, sub_1003a220)
+1003a2ec      
+1003a2f8      if (i_1 s> 0)
+1003a2fa          int32_t (* ecx_2)[0x40] = &var_104
+1003a2fe          int32_t edi_1 = 1
+1003a329          int32_t i
+1003a329          
+1003a329          do
+1003a308              result = *ecx_2 * 0xbd8 + data_105dce40
+1003a308              
+1003a314              if (*(result + 0x370) != edi_1)
+1003a316                  *(result + 0x370) = edi_1
+1003a31c                  *(result + 0x374) = 1
+1003a31c              
+1003a322              edi_1 += 1
+1003a324              ecx_2 = &(*ecx_2)[1]
+1003a327              i = i_1
+1003a327              i_1 -= 1
+1003a329          while (i != 1)
+1003a329  
+1003a337  sub_1007aaf9(result_1 ^ &var_104)
+1003a342  return result
+
+1003a343           cc cc cc cc cc cc cc cc cc cc cc cc cc                                                     .............
+
+1003a350    int32_t __convention("regparm") sub_1003a350(int32_t arg1, int32_t arg2, int32_t arg3, int32_t arg4)
+
+1003a358  void var_54
+1003a358  int32_t eax_1 = __security_cookie ^ &var_54
+1003a358  
+1003a366  if (arg3 == 0)
+1003a368      char const* const var_68_1 = "Q_strncpyz: NULL src"
+1003a36e      sub_100531b0(arg3)
+1003a36e  
+1003a384  void var_2c
+1003a384  strncpy(&var_2c, arg3, 0x27)
+1003a38d  char var_5 = 0
+1003a392  sub_10070b90(&var_2c)
+1003a397  int32_t i = 0
+1003a397  
+1003a39f  if (data_105dce58 s> 0)
+1003a3a1      int32_t eax_3 = data_105dce40
+1003a3a6      int32_t edi_1 = 0
+1003a3a6      
+1003a413      do
+1003a3be          if (*(edi_1 + eax_3 + 0x250) == 2 && arg4 != i)
+1003a3c9              if (edi_1 + eax_3 == 0xfffffd84)
+1003a3cb                  char const* const var_68_2 = "Q_strncpyz: NULL src"
+1003a3d1                  sub_100531b0(edi_1 + eax_3 + 0x27c)
+1003a3d1              
+1003a3e1              strncpy(&var_54, edi_1 + eax_3 + 0x27c, 0x27)
+1003a3e6              void* eax_4 = &var_54
+1003a3ea              char var_2d_1 = 0
+1003a3ea              
+1003a3ff              if (sub_10070a40(eax_4, sub_10070b90(eax_4), &var_2c) == 0)
+1003a439                  sub_1007aaf9(eax_1 ^ &var_54)
+1003a441                  return 0
+1003a441              
+1003a401              eax_3 = data_105dce40
+1003a401          
+1003a406          i += 1
+1003a407          edi_1 += 0xbd8
+1003a413      while (i s< data_105dce58)
+1003a413  
+1003a424  sub_1007aaf9(eax_1 ^ &var_54)
+1003a42c  return 1
+
+1003a3aa                                8d 9b 00 00 00 00                                                            ......
+1003a442        cc cc cc cc cc cc cc cc cc cc cc cc cc cc                                                    ..............
+
+1003a450    int32_t sub_1003a450(void* arg1)
+
+1003a450  int32_t ebp
+1003a450  int32_t var_4_1 = ebp
+1003a45b  __chkstk(0x18a4)
+1003a465  int32_t i_4
+1003a465  int32_t eax_1 = __security_cookie ^ &i_4
+1003a46e  void* ecx = arg1
+1003a481  void* edi = *(ecx * 0x384 + &data_104b41dc)
+1003a49c  *(edi + 0x334) = data_105dce5c
+1003a4b0  int32_t arg_94
+1003a4b0  (*(data_104b13ac + 0x70))(ecx, &arg_94, 0x400)
+1003a4c2  int32_t eax_7 = strchr(&arg_94, 0x22)
+1003a4c9  int32_t eax_8
+1003a4c9  
+1003a4c9  if (eax_7 == 0)
+1003a4d5      eax_8 = strchr(&arg_94, 0x3b)
+1003a4d5  
+1003a4dc  if (eax_7 != 0 || eax_8 != 0)
+1003a4ef      __builtin_strcpy(dest: &arg_94, src: "\\name\\badinfo")
+1003a4ef  
+1003a51f  char* eax_9 = sub_10070cf0()
+1003a524  char const* const ecx_2 = "localhost"
+1003a530  int32_t eax_11
+1003a530  
+1003a530  while (true)
+1003a530      char edx_1 = *eax_9
+1003a532      char const temp0_1 = *ecx_2
+1003a532      bool c_1 = edx_1 u< temp0_1
+1003a532      
+1003a534      if (edx_1 == temp0_1)
+1003a538          if (edx_1 == 0)
+1003a54c              eax_11 = 0
+1003a54e              break
+1003a54e          
+1003a53a          edx_1 = eax_9[1]
+1003a53d          char temp3_1 = ecx_2[1]
+1003a53d          c_1 = edx_1 u< temp3_1
+1003a53d          
+1003a540          if (edx_1 == temp3_1)
+1003a542              eax_9 = &eax_9[2]
+1003a545              ecx_2 = &ecx_2[2]
+1003a545              
+1003a54a              if (edx_1 != 0)
+1003a54a                  continue
+1003a54a              
+1003a54c              eax_11 = 0
+1003a54e              break
+1003a54e      
+1003a550      bool c_2 = unimplemented  {sbb eax, eax}
+1003a552      eax_11 = sbb.d(sbb.d(eax_9, eax_9, c_1), 0xffffffff, c_2)
+1003a552      break
+1003a552  
+1003a557  if (eax_11 == 0)
+1003a559      *(edi + 0x270) = 1
+1003a559  
+1003a582  if (atoi(sub_10070cf0()) != 0)
+1003a58d      *(edi + 0xc) &= 0xfffbffff
+1003a582  else
+1003a584      *(edi + 0xc) |= 0x40000
+1003a584  
+1003a5a6  int32_t eax_15 = atoi(sub_10070cf0())
+1003a5ab  int32_t eax_16 = neg.d(eax_15)
+1003a5af  void* esi = edi + 0x27c
+1003a5b7  *(edi + 0x278) = neg.d(sbb.d(eax_16, eax_16, eax_15 != 0))
+1003a5bd  void* var_4 = esi
+1003a5bd  
+1003a5c3  if (esi == 0)
+1003a5c5      char const* const var_18_2 = "Q_strncpyz: NULL src"
+1003a5cb      sub_100531b0(esi)
+1003a5cb  
+1003a5e1  void arg_1094
+1003a5e1  strncpy(&arg_1094, esi, 0x3ff)
+1003a5f3  char arg_1493 = 0
+1003a624  void* var_1c_9
+1003a624  void arg_894
+1003a624  
+1003a624  if (sub_1003a350(ecx, sub_1003a0b0(&arg_894, sub_10070cf0()), &arg_894, ecx) != 0)
+1003a756      if (esi == 0)
+1003a758          char const* const var_18_10 = "Q_strncpyz: NULL dest"
+1003a75e          sub_100531b0(esi)
+1003a75e      
+1003a766      int32_t var_18_11 = 0x27
+1003a76f      var_1c_9 = &arg_894
+1003a624  else
+1003a62a      i_4 = 2
+1003a632      int32_t i = i_4
+1003a72c      void arg_494
+1003a72c      
+1003a72c      do
+1003a640          int32_t i_3 = i
+1003a646          int32_t eax_22 = sub_10070cb0("(%i) ")
+1003a646          
+1003a652          if (eax_22 == 0)
+1003a654              char const* const var_18_3 = "Q_strncpyz: NULL src"
+1003a65a              sub_100531b0(eax_22)
+1003a65a          
+1003a670          strncpy(&arg_494, eax_22, 0x3ff)
+1003a676          void* eax_23 = &arg_494
+1003a680          char arg_893 = 0
+1003a695          char j
+1003a695          
+1003a695          do
+1003a690              j = *eax_23
+1003a692              eax_23 += 1
+1003a695          while (j != 0)
+1003a697          void* ecx_5 = &arg_894
+1003a69e          void arg_495
+1003a69e          int32_t eax_24 = eax_23 - &arg_495
+1003a6a8          char j_1
+1003a6a8          
+1003a6a8          do
+1003a6a3              j_1 = *ecx_5
+1003a6a5              ecx_5 += 1
+1003a6a8          while (j_1 != 0)
+1003a6b6          void arg_895
+1003a6b6          
+1003a6b6          if (ecx_5 - &arg_895 + eax_24 + 1 s<= 0x400)
+1003a6bd              int32_t __saved_edi
+1003a6bd              void* ebx_4 = &__saved_edi + eax_24 + 0x4a8
+1003a6c4              int32_t esi_2 = 0x400 - eax_24
+1003a6c4              
+1003a6c8              if (ebx_4 == 0)
+1003a6ca                  char const* const var_18_4 = "Q_strncpyz: NULL dest"
+1003a6d0                  sub_100531b0(ebx_4)
+1003a6d0              
+1003a6db              if (esi_2 s< 1)
+1003a6dd                  char const* const var_18_5 = "Q_strncpyz: destsize < 1"
+1003a6e4                  sub_100531b0(0)
+1003a6e4              
+1003a6f9              eax_24 = strncpy(ebx_4, &arg_894, esi_2 - 1)
+1003a6ff              *(ebx_4 + esi_2 - 1) = 0
+1003a704              i = i_4
+1003a704          
+1003a722          if (sub_1003a350(eax_24, ecx, &arg_494, ecx) == 1)
+1003a722              break
+1003a722          
+1003a724          i += 1
+1003a725          i_4 = i
+1003a72c      while (i s< 0x64)
+1003a72c      
+1003a732      esi = var_4
+1003a732      
+1003a738      if (esi == 0)
+1003a73a          char const* const var_18_8 = "Q_strncpyz: NULL dest"
+1003a740          sub_100531b0(esi)
+1003a740      
+1003a748      int32_t var_18_9 = 0x27
+1003a751      var_1c_9 = &arg_494
+1003a751  
+1003a771  strncpy(esi, var_1c_9, 0x27)
+1003a777  *(esi + 0x27) = 0
+1003a777  
+1003a785  if (*(edi + 0x250) == 2)
+1003a787      void* ecx_8 = esi
+1003a789      void* eax_27 = &arg_1094
+1003a790      int32_t eax_29
+1003a790      
+1003a790      while (true)
+1003a790          char edx_6 = *eax_27
+1003a792          char temp5_1 = *ecx_8
+1003a792          bool c_4 = edx_6 u< temp5_1
+1003a792          
+1003a794          if (edx_6 == temp5_1)
+1003a798              if (edx_6 == 0)
+1003a7ac                  eax_29 = 0
+1003a7ae                  break
+1003a7ae              
+1003a79a              edx_6 = *(eax_27 + 1)
+1003a79d              char temp8_1 = *(ecx_8 + 1)
+1003a79d              c_4 = edx_6 u< temp8_1
+1003a79d              
+1003a7a0              if (edx_6 == temp8_1)
+1003a7a2                  eax_27 += 2
+1003a7a5                  ecx_8 += 2
+1003a7a5                  
+1003a7aa                  if (edx_6 != 0)
+1003a7aa                      continue
+1003a7aa                  
+1003a7ac                  eax_29 = 0
+1003a7ae                  break
+1003a7ae          
+1003a7b0          bool c_5 = unimplemented  {sbb eax, eax}
+1003a7b2          eax_29 = sbb.d(sbb.d(eax_27, eax_27, c_4), 0xffffffff, c_5)
+1003a7b2          break
+1003a7b2      
+1003a7b7      if (eax_29 != 0)
+1003a7bd          void* esi_3 = data_104b13ac
+1003a7c3          sub_1006c870(ecx)
+1003a7c8          char* var_18_12 = &data_104b13b8
+1003a7d0          void* var_1c_11 = &arg_1094
+1003a7e1          (*(esi_3 + 0x60))(0xffffffff, sub_10070cb0("print "%s^7 renamed to %s\n""))
+1003a7e1  
+1003a7f2  int32_t eax_33 = sub_10070cf0()
+1003a7f2  
+1003a801  if (edi == 0xfffffd5c)
+1003a803      char const* const var_18_13 = "Q_strncpyz: NULL dest"
+1003a809      sub_100531b0(edi + 0x2a4)
+1003a809  
+1003a813  if (eax_33 == 0)
+1003a815      char const* const var_18_14 = "Q_strncpyz: NULL src"
+1003a81b      sub_100531b0(eax_33)
+1003a81b  
+1003a82d  strncpy(edi + 0x2a4, eax_33, 0x17)
+1003a83f  *(edi + 0x2bb) = 0
+1003a849  int32_t i_7 = atoi(sub_10070cf0())
+1003a852  i_4 = i_7
+1003a852  
+1003a85e  if (i_7 s< 1 || i_7 s> 0x64)
+1003a860      i_4 = 0x64
+1003a860  
+1003a878  int32_t eax_36 = sub_1007b550(float.t(i_4) / fconvert.t(100.0) * float.t(data_1059a40c))
+1003a87d  *(edi + 0x2c8) = eax_36
+1003a883  int32_t ecx_9 = data_1059a40c
+1003a883  
+1003a890  if (eax_36 s< 1 || eax_36 s> ecx_9)
+1003a892      *(edi + 0x2c8) = ecx_9
+1003a892  
+1003a89e  *(edi + 0xdc) = *(edi + 0x2c8)
+1003a8ab  void* var_20_6
+1003a8ab  char* var_1c_15
+1003a8ab  void arg_54
+1003a8ab  
+1003a8ab  if (data_1059a0b4 == 0)
+1003a8c7      char* eax_37 = sub_10070cf0()
+1003a8c7      
+1003a8d0      if (eax_37 == 0)
+1003a8d2          char const* const var_18_16 = "Q_strncpyz: NULL src"
+1003a8d8          sub_100531b0(eax_37)
+1003a8d8      
+1003a8e0      int32_t var_18_17 = 0x3f
+1003a8e2      var_1c_15 = eax_37
+1003a8e7      var_20_6 = &arg_54
+1003a8ab  else
+1003a8ad      int32_t var_18_15 = 0x3f
+1003a8af      var_1c_15 = &data_1059a0b4
+1003a8b8      var_20_6 = &arg_54
+1003a8b8  
+1003a8e8  strncpy(var_20_6, var_1c_15, 0x3f)
+1003a8f8  char arg_93 = 0
+1003a900  void* var_20_7
+1003a900  char* var_1c_17
+1003a900  void arg_14
+1003a900  
+1003a900  if (data_10597054 == 0)
+1003a91c      char* eax_38 = sub_10070cf0()
+1003a91c      
+1003a925      if (eax_38 == 0)
+1003a927          char const* const var_18_19 = "Q_strncpyz: NULL src"
+1003a92d          sub_100531b0(eax_38)
+1003a92d      
+1003a935      int32_t var_18_20 = 0x3f
+1003a937      var_1c_17 = eax_38
+1003a93c      var_20_7 = &arg_14
+1003a900  else
+1003a902      int32_t var_18_18 = 0x3f
+1003a904      var_1c_17 = &data_10597054
+1003a90d      var_20_7 = &arg_14
+1003a90d  
+1003a93d  strncpy(var_20_7, var_1c_17, 0x3f)
+1003a943  char arg_53 = 0
+1003a948  int32_t eax_39 = *(edi + 0x348)
+1003a96d  int32_t eax_41 = atoi(sub_10070cf0())
+1003a97c  bool cond:1 = (*(ecx * 0x384 + &data_104b4180) & 8) != 0
+1003a987  i_4 = *(edi + 0x364)
+1003a987  
+1003a98b  if (not(cond:1))
+1003a99f      int32_t eax_43 = atoi(sub_10070cf0())
+1003a9ac      *(edi + 0x2ec) = data_1059650c | eax_43
+1003a9ac  
+1003a9b2  sub_1003a270()
+1003a9c3  char* eax_44 = sub_10070cf0()
+1003a9cf  void arg_1494
+1003a9cf  void* edx_8 = &arg_1494 - eax_44
+1003a9d9  char i_1
+1003a9d9  
+1003a9d9  do
+1003a9d1      i_1 = *eax_44
+1003a9d3      *(edx_8 + eax_44) = i_1
+1003a9d6      eax_44 = &eax_44[1]
+1003a9d9  while (i_1 != 0)
+1003a9e7  char* eax_45 = sub_10070cf0()
+1003a9f3  void arg_c94
+1003a9f3  void* edx_9 = &arg_c94 - eax_45
+1003a9fd  char i_2
+1003a9fd  
+1003a9fd  do
+1003a9f5      i_2 = *eax_45
+1003a9f7      *(edx_9 + eax_45) = i_2
+1003a9fa      eax_45 = &eax_45[1]
+1003a9fd  while (i_2 != 0)
+1003a9ff  void* eax_46 = var_4
+1003aa03  char const* const ecx_14 = "UnnamedPlayer"
+1003aa08  int32_t eax_48
+1003aa08  
+1003aa08  while (true)
+1003aa08      edx_9.b = *eax_46
+1003aa0a      char const temp9_1 = *ecx_14
+1003aa0a      bool c_6 = edx_9.b u< temp9_1
+1003aa0a      
+1003aa0c      if (edx_9.b == temp9_1)
+1003aa10          if (edx_9.b == 0)
+1003aa24              eax_48 = 0
+1003aa26              break
+1003aa26          
+1003aa12          edx_9.b = *(eax_46 + 1)
+1003aa15          char temp12_1 = ecx_14[1]
+1003aa15          c_6 = edx_9.b u< temp12_1
+1003aa15          
+1003aa18          if (edx_9.b == temp12_1)
+1003aa1a              eax_46 += 2
+1003aa1d              ecx_14 = &ecx_14[2]
+1003aa1d              
+1003aa22              if (edx_9.b != 0)
+1003aa22                  continue
+1003aa22              
+1003aa24              eax_48 = 0
+1003aa26              break
+1003aa26      
+1003aa28      bool c_7 = unimplemented  {sbb eax, eax}
+1003aa2a      eax_48 = sbb.d(sbb.d(eax_46, eax_46, c_6), 0xffffffff, c_7)
+1003aa2a      break
+1003aa2a  
+1003aa2f  if (eax_48 == 0)
+1003aa35      char* eax_49 = &arg_1494
+1003aa35      
+1003aa45      do
+1003aa40          ecx_14.b = *eax_49
+1003aa42          eax_49 = &eax_49[1]
+1003aa45      while (ecx_14.b != 0)
+1003aa45      
+1003aa49      void arg_1495
+1003aa49      
+1003aa49      if (eax_49 == &arg_1495)
+1003aa4b          char* eax_51 = &arg_c94
+1003aa4b          
+1003aa5a          do
+1003aa55              ecx_14.b = *eax_51
+1003aa57              eax_51 = &eax_51[1]
+1003aa5a          while (ecx_14.b != 0)
+1003aa5a          
+1003aa5e          void arg_c95
+1003aa5e          
+1003aa5e          if (eax_51 == &arg_c95)
+1003aa66              int32_t edx_11 = *(edi + 0x2c0) | *(edi + 0x2c4)
+1003aa66              
+1003aa6c              if (edx_11 == 0)
+1003aa74                  if (data_105aaa2c == edx_11)
+1003aaab                      int32_t* var_18_24 = &arg_94
+1003aab1                      sub_100573f0("Found client %i with deformed us…")
+1003aa74                  else
+1003aa7d                      int32_t* var_18_23 = &arg_94
+1003aa83                      sub_100573f0("Dropping client %i for a deforme…")
+1003aa9d                      (*(data_104b13ac + 0x5c))(*(edi + 0x88), "Detected bad userinfo.")
+1003aa9d  
+1003aac4  int32_t eax_59
+1003aac4  
+1003aac4  if ((*(ecx * 0x384 + &data_104b4180) & 8) == 0)
+1003ab5d      void* var_18_26 = edi + 0x2a4
+1003ab64      int32_t var_1c_20 = *(edi + 0x2c4)
+1003ab6b      int32_t var_20_9 = *(edi + 0x2c0)
+1003ab72      int32_t var_24_5 = *(edi + 0x370)
+1003ab79      int32_t var_28_1 = *(edi + 0x36c)
+1003ab7e      int32_t var_2c_1 = *(edi + 0x368)
+1003ab83      int32_t var_30_1 = *(edi + 0x2e8)
+1003ab8a      int32_t i_5 = i_4
+1003ab91      int32_t var_38_1 = eax_41
+1003ab98      int32_t var_3c_1 = *(edi + 0x360)
+1003ab99      int32_t var_40_1 = *(edi + 0x35c)
+1003ab9a      int32_t var_44_1 = *(edi + 0x2c8)
+1003aba2      void* var_48_1 = &arg_c94
+1003abaa      void* var_4c_1 = &arg_1494
+1003abb5      void* var_50_1 = &arg_14
+1003abc1      void* var_54_1 = &arg_54
+1003abc2      int32_t var_58_1 = *(edi + 0x348)
+1003abc3      void* var_5c_1 = var_4
+1003abc9      eax_59 = sub_10070cb0("n\%s\t\%i\model\%s\hmodel\%s\c1\…")
+1003aac4  else
+1003aadc      int32_t var_18_25 = *(edi + 0x370)
+1003aae1      int32_t var_1c_19 = *(edi + 0x36c)
+1003aae6      int32_t var_20_8 = *(edi + 0x368)
+1003aae7      int32_t var_24_4 = 1
+1003aae9      int32_t i_6 = i_4
+1003aaea      int32_t var_2c = eax_41
+1003ab08      int32_t var_30 = sub_10070cf0()
+1003ab0f      int32_t var_34 = *(edi + 0x360)
+1003ab10      int32_t var_38 = *(edi + 0x35c)
+1003ab11      int32_t var_3c = *(edi + 0x2c8)
+1003ab19      void* var_40 = &arg_c94
+1003ab21      void* var_44 = &arg_1494
+1003ab2a      void* var_48 = &arg_14
+1003ab36      void* var_4c = &arg_54
+1003ab37      int32_t var_50 = eax_39
+1003ab38      void* var_54 = var_4
+1003ab3e      eax_59 = sub_10070cb0("n\%s\t\%i\model\%s\hmodel\%s\c1\…")
+1003ab3e  
+1003abe8  (*(data_104b13ac + 0x64))(ecx + 0x211, eax_59)
+1003abea  int32_t var_20_10 = eax_59
+1003abeb  void* const var_24_6 = ecx
+1003abf1  int32_t result = sub_100573f0("ClientUserinfoChanged: %i %s\n")
+1003ac05  sub_1007aaf9(eax_1 ^ &i_4)
+1003ac0d  return result
+
+1003a638                                                                          8d a4 24 00 00 00 00 90                          ..$.....
+1003a68d                                         8d 49 00                                                               .I.
+1003ac0e                                            cc cc                                                                ..
+
+1003ac10    int32_t sub_1003ac10(void* arg1, int32_t arg2, int32_t arg3)
+// This function has unresolved stack usage. View graph of stack usage to resolve.
+
+1003ac21  void var_424
+1003ac21  int32_t eax_1 = __security_cookie ^ &var_424
+1003ac55  void var_410
+1003ac55  (*(data_104b13ac + 0x70))(arg1, &var_410, 0x400)
+1003ac63  char* eax_5 = sub_10070cf0()
+1003ac63  
+1003ac6e  if (arg3 == 0)
+1003ac7e      if (sub_10032460() == 0xffffffff)
+1003ac91          sub_1007aaf9(eax_1 ^ &var_424)
+1003ac99          return "You are banned from this server."
+1003ac99      
+1003ac9a      char const* const ecx_3 = "localhost"
+1003ac9f      char* eax_8 = eax_5
+1003aca1      int32_t eax_10
+1003aca1      
+1003aca1      while (true)
+1003aca1          char edx_1 = *eax_8
+1003aca3          char const temp0_1 = *ecx_3
+1003aca3          bool c_1 = edx_1 u< temp0_1
+1003aca3          
+1003aca5          if (edx_1 == temp0_1)
+1003aca9              if (edx_1 == 0)
+1003acbd                  eax_10 = 0
+1003acbf                  break
+1003acbf              
+1003acab              edx_1 = eax_8[1]
+1003acae              char temp3_1 = ecx_3[1]
+1003acae              c_1 = edx_1 u< temp3_1
+1003acae              
+1003acb1              if (edx_1 == temp3_1)
+1003acb3                  eax_8 = &eax_8[2]
+1003acb6                  ecx_3 = &ecx_3[2]
+1003acb6                  
+1003acbb                  if (edx_1 != 0)
+1003acbb                      continue
+1003acbb                  
+1003acbd                  eax_10 = 0
+1003acbf                  break
+1003acbf          
+1003acc1          bool c_2 = unimplemented  {sbb eax, eax}
+1003acc3          eax_10 = sbb.d(sbb.d(eax_8, eax_8, c_1), 0xffffffff, c_2)
+1003acc3          break
+1003acc3      
+1003acc8      if (eax_10 != 0)
+1003acda          data_105dce40
+1003acfa          *(*(arg1 * 0x384 + &data_104b41dc) + 0x368) = sub_10032460()
+1003acfa          
+1003ad0d          if (*(*(arg1 * 0x384 + &data_104b41dc) + 0x368) s< 2)
+1003ad18              char* eax_14
+1003ad18              int32_t edx_5
+1003ad18              eax_14, edx_5 = sub_10070cf0()
+1003ad18              
+1003ad26              if (data_104b14f4 != 0 && sub_10070a40("none", edx_5, &data_104b14f4) != 0)
+1003ad3b                  char* ecx_7 = eax_14
+1003ad3d                  char* eax_16 = &data_104b14f4
+1003ad42                  int32_t eax_18
+1003ad42                  
+1003ad42                  while (true)
+1003ad42                      char edx_6 = *eax_16
+1003ad44                      char temp4_1 = *ecx_7
+1003ad44                      bool c_3 = edx_6 u< temp4_1
+1003ad44                      
+1003ad46                      if (edx_6 == temp4_1)
+1003ad4a                          if (edx_6 == 0)
+1003ad5e                              eax_18 = 0
+1003ad60                              break
+1003ad60                          
+1003ad4c                          edx_6 = eax_16[1]
+1003ad4f                          char temp7_1 = ecx_7[1]
+1003ad4f                          c_3 = edx_6 u< temp7_1
+1003ad4f                          
+1003ad52                          if (edx_6 == temp7_1)
+1003ad54                              eax_16 = &eax_16[2]
+1003ad57                              ecx_7 = &ecx_7[2]
+1003ad57                              
+1003ad5c                              if (edx_6 != 0)
+1003ad5c                                  continue
+1003ad5c                              
+1003ad5e                              eax_18 = 0
+1003ad60                              break
+1003ad60                      
+1003ad62                      bool c_4 = unimplemented  {sbb eax, eax}
+1003ad64                      eax_18 = sbb.d(sbb.d(eax_16, eax_16, c_3), 0xffffffff, c_4)
+1003ad64                      break
+1003ad64                  
+1003ad69                  if (eax_18 != 0)
+1003ad7c                      sub_1007aaf9(eax_1 ^ &var_424)
+1003ad84                      return "Invalid password"
+1003ad84  
+1003ad85  void* ebx_6 = arg1 * 0x384 + &data_104b3fa0
+1003ad91  void* esi_8 = arg1 * 0xbd8 + data_105dce40
+1003ad9f  *(ebx_6 + 0x23c) = esi_8
+1003ada5  memset(esi_8, 0, 0xbd8)
+1003adaa  void* edx_7 = data_104b13ac
+1003adb3  *(esi_8 + 0x250) = 1
+1003adc4  int32_t eax_21
+1003adc4  int32_t edx_8
+1003adc4  eax_21, edx_8 = (*(edx_7 + 0x320))(arg1)
+1003adcd  *(esi_8 + 0x2c0) = eax_21
+1003add3  *(esi_8 + 0x2c4) = edx_8
+1003add3  
+1003ade2  if (arg2 != 0 || data_105dce7c != 0)
+1003ade6      sub_10065a40(esi_8)
+1003adeb      void* ebx_4 = *(ebx_6 + 0x23c)
+1003ae03      memset(ebx_4 + 0x568, 0, 0x32c)
+1003ae0e      *(ebx_4 + 0x56c) = data_105dce5c
+1003ae20      *(ebx_4 + 0x570) = data_105dce5c - data_105dce64
+1003ae23      int32_t eax_23 = rand()
+1003ae3c      *(ebx_4 + 0x568) = data_105dce5c + eax_23 + ebx_4 + 0x27c
+1003ae3e      ebx_6 = arg1 * 0x384 + &data_104b3fa0
+1003ae3e  
+1003ae42  sub_10065930(esi_8)
+1003ae42  
+1003ae4b  if (arg3 != 0)
+1003ae4d      *(ebx_6 + 0x1e0) |= 8
+1003ae59      *(ebx_6 + 0x240) = 1
+1003ae63      int32_t ecx_13
+1003ae63      ecx_13.b = arg2 == 0
+1003ae72      long double x87_r0
+1003ae72      
+1003ae72      if (sub_100373b0(x87_r0, arg1, ecx_13) == 0)
+1003ae85          sub_1007aaf9(eax_1 ^ &var_424)
+1003ae8d          return "BotConnectfailed"
+1003ae8d  
+1003ae98  if (arg2 != 0 && arg3 == 0 && (*(data_104b13ac + 0x334))(arg1) == 0)
+1003aec1      sub_1007aaf9(eax_1 ^ &var_424)
+1003aec9      return "Failed to verify Steam auth toke…"
+1003aec9  
+1003aeca  void* var_434_3 = arg1
+1003aed0  sub_100573f0("ClientConnect: %i\n")
+1003aed6  sub_1003a450(arg1)
+1003aed6  
+1003aeef  if (arg2 != 0 && data_1059de8c == 0)
+1003af01      int32_t var_434_4 = *(esi_8 + 0x368)
+1003af1b      (*(data_104b13ac + 0x60))(arg1, sub_10070cb0("priv %i"))
+1003af1b      
+1003af2a      if (data_105dce5c s> 0x1388)
+1003af3d          int32_t eax_33
+1003af3d          int32_t edx_15
+1003af3d          eax_33, edx_15 = (*(data_104b13ac + 0x320))(arg1)
+1003af49          int32_t* ecx_22 = data_104b13ac + 0x60
+1003af57          sub_1006c870(arg1)
+1003af5c          char* var_434_6 = &data_104b13b8
+1003af70          (*ecx_22)(0xffffffff, sub_10070cb0("print "%s^7 connected\n""))
+1003af70          
+1003af7d          if (edx_15 != 0 || eax_33 u> edx_15)
+1003af89              int32_t* ecx_24 = data_104b13ac + 8
+1003af8c              int32_t var_434_7 = edx_15
+1003af8d              int32_t var_438_2 = eax_33
+1003af94              sub_1006c870(arg1)
+1003af99              char* var_43c_6 = &data_104b13b8
+1003afab              (*ecx_24)(sub_10070cb0("%s connected with Steam ID %llu\n"))
+1003afab          
+1003afb0          ebx_6 = arg1 * 0x384 + &data_104b3fa0
+1003afb0      
+1003afb5      sub_10078450(ebx_6)
+1003afb5      
+1003afd0      if (data_105a898c s>= 3 && *(esi_8 + 0x348) != 3)
+1003afd6          sub_10040260(esi_8, 0xffffffff)
+1003afdb          ebx_6 = arg1 * 0x384 + &data_104b3fa0
+1003afdb      
+1003afe6      if (arg3 == 0)
+1003afea          sub_10063270(ebx_6)
+1003afea  
+1003afef  sub_10056070()
+1003afef  
+1003b001  if (arg2 == 0 && *(esi_8 + 0x348) == 3)
+1003b003      *(esi_8 + 0x68) |= 0x4000
+1003b003  
+1003b018  sub_1007aaf9(eax_1 ^ &var_424)
+1003b020  return 0
+
+1003b021     cc cc cc cc cc cc cc cc cc cc cc cc cc cc cc                                                   ...............
+
+1003b030    int32_t sub_1003b030(int32_t arg1)
+
+1003b040  void* edi_2 = arg1 * 0xbd8 + data_105dce40
+1003b040  
+1003b05a  if (*(arg1 * 0x384 + &data_104b4178) != 0)
+1003b068      (*(data_104b13ac + 0xa0))(arg1 * 0x384 + &data_104b3fa0)
+1003b068  
+1003b083  *(arg1 * 0x384 + 0x104b41e0) = 1
+1003b08d  *(arg1 * 0x384 + &data_104b41e4) = "noclass"
+1003b09a  *(arg1 * 0x384 + 0x104b41d8) = 0x3ff
+1003b0a4  *(arg1 * 0x384 + 0x104b42a8) = 0
+1003b0aa  *(arg1 * 0x384 + 0x104b42b0) = 0
+1003b0b0  *(arg1 * 0x384 + &data_104b41dc) = edi_2
+1003b0b8  *(arg1 * 0x384 + &data_104b3fa0) = arg1 * 0x384 s/ 0x384
+1003b0ba  int32_t ebx = *(edi_2 + 0x68)
+1003b0c2  *(edi_2 + 0x250) = 2
+1003b0d4  *(edi_2 + 0x2f4) = data_105dce5c
+1003b0da  *(edi_2 + 0x2f8) = 0
+1003b0e0  *(edi_2 + 0x32c) = 0
+1003b0e6  memset(edi_2, 0, 0x250)
+1003b0f0  bool cond:0 = *(edi_2 + 0x348) != 3
+1003b0f7  *(edi_2 + 0x68) = ebx
+1003b0fa  int32_t edx_3
+1003b0fa  edx_3.b = cond:0
+1003b100  *(edi_2 + 0x2d8) = 0xffffffff
+1003b106  *(edi_2 + 0x2dc) = 0xffffffff
+1003b10c  *(edi_2 + 0x3b8) = 0xffffffff
+1003b112  *(edi_2 + 0x3bc) = 0xffffffff
+1003b11c  *(edi_2 + 4) = (edx_3 - 1) & 2
+1003b11c  
+1003b133  switch (data_105a898c - 2)
+1003b13a      case 0
+1003b13a          sub_100634f0(arg1 * 0x384 + &data_104b3fa0)
+1003b143      case 2
+1003b143          sub_10038160(arg1 * 0x384 + &data_104b3fa0)
+1003b14c      case 7
+1003b14c          sub_1004bde0(arg1 * 0x384 + &data_104b3fa0)
+1003b155      case 9
+1003b155          sub_10038160(arg1 * 0x384 + &data_104b3fa0)
+1003b15e      case 0xa
+1003b15e          sub_100645a0(arg1 * 0x384 + &data_104b3fa0)
+1003b133      default
+1003b166          sub_1003bc30(arg1 * 0x384 + &data_104b3fa0)
+1003b166  
+1003b186  if (data_105a898c == 1
+1003b186          && (*(*(arg1 * 0x384 + &data_104b3fa0) * 0x384 + &data_104b4180) & 8) != 0)
+1003b188      *(edi_2 + 0x36c) = 0
+1003b188      
+1003b194      if (*(edi_2 + 0x34c) == 0)
+1003b1a0          *(edi_2 + 0x34c) = _time64(0)
+1003b1a0      
+1003b1a9      sub_1003a450(*(arg1 * 0x384 + &data_104b3fa0))
+1003b1a9  
+1003b1b5  int32_t var_14_4 = arg1
+1003b1bb  sub_100573f0("ClientBegin: %i\n")
+1003b1c7  return sub_10056070() __tailcall
+
+1003b1cc  uint32_t jump_table_1003b1cc[0x6] = 
+1003b1cc  {
+1003b1cc      [0x0] =  0x1003b13a
+1003b1d0      [0x1] =  0x1003b141
+1003b1d4      [0x2] =  0x1003b14a
+1003b1d8      [0x3] =  0x1003b153
+1003b1dc      [0x4] =  0x1003b15c
+1003b1e0      [0x5] =  0x1003b165
+1003b1e4  }

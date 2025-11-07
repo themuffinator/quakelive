@@ -1,0 +1,9 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10039365                                          unimplemented  {fstp dword [esp+0x30], st0}
+10039369                                          unimplemented  {fld st0, dword [esp+0x28]}
+1003936d                                          unimplemented  {fabs }
+1003936f                                          float var_508_2 = fconvert.s(unimplemented  {fstp 
+1003936f                                              dword [esp+0x28], st0})

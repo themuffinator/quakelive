@@ -1,0 +1,504 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+.text section started  {0x10001000-0x1007b9bb}
+
+10001000    int32_t sub_10001000()
+
+1000100b  void var_408
+1000100b  int32_t eax_1 = __security_cookie ^ &var_408
+10001014  int32_t eax_2 = data_100906bc
+10001014  
+1000101b  if (eax_2 == 0)
+1000102a      (*(data_104b13ac + 0x2c))("sv_maxclients")
+1000102f      long double x87_r0
+1000102f      eax_2 = sub_1007b550(x87_r0)
+10001034      data_100906bc = eax_2
+10001034  
+1000103b  int32_t result = 0
+1000103d  int32_t i = 0
+1000103d  
+10001041  if (eax_2 s> 0)
+10001053      while (i s< 0x40)
+1000106f          void var_404
+1000106f          (*(data_104b13ac + 0x68))(i + 0x211, &var_404, 0x400)
+10001071          void* eax_5 = &var_404
+10001085          char j
+10001085          
+10001085          do
+10001080              j = *eax_5
+10001082              eax_5 += 1
+10001085          while (j != 0)
+10001089          void var_403
+10001089          
+10001089          if (eax_5 != &var_403)
+10001094              char* eax_7 = sub_10070cf0()
+100010a5              char j_1
+100010a5              
+100010a5              do
+100010a0                  j_1 = *eax_7
+100010a2                  eax_7 = &eax_7[1]
+100010a5              while (j_1 != 0)
+100010a5              
+100010a9              if (eax_7 != &eax_7[1] && atoi(sub_10070cf0()) != 3)
+100010c4                  result += 1
+100010c4          
+100010c5          i += 1
+100010c5          
+100010cc          if (i s>= data_100906bc)
+100010cc              break
+100010cc  
+100010dd  sub_1007aaf9(eax_1 ^ &var_408)
+100010e8  return result
+
+1000107d                                                                                         8d 49 00                               .I.
+100010e9                             cc cc cc cc cc cc cc                                                           .......
+
+100010f0    int32_t sub_100010f0(void* arg1)
+
+100010fb  void var_668
+100010fb  int32_t eax_1 = __security_cookie ^ &var_668
+10001104  int32_t eax_2 = data_100906b8
+10001104  
+1000110f  if (eax_2 == 0)
+1000111e      (*(data_104b13ac + 0x2c))("sv_maxclients")
+10001123      long double x87_r0
+10001123      eax_2 = sub_1007b550(x87_r0)
+10001128      data_100906b8 = eax_2
+10001128  
+10001134  int32_t ecx_2 = *(arg1 + 0x110)
+1000113a  int32_t ebp = 0
+10001142  int32_t result
+10001142  
+10001142  if (eax_2 s<= 0)
+1000121a      label_1000121a:
+1000121a      result = 1
+10001142  else
+10001148      void* edi_1 = &data_104b41dc
+1000114d      void* var_664_1 = &data_104b41dc
+1000114d      
+10001157      while (true)
+10001157          if (edi_1 s>= 0x104c22dc)
+10001157              goto label_1000121a
+10001157          
+1000117a          void var_408
+1000117a          (*(data_104b13ac + 0x68))(ebp + 0x211, &var_408, 0x400)
+1000117c          void* eax_5 = &var_408
+10001195          char i
+10001195          
+10001195          do
+10001190              i = *eax_5
+10001192              eax_5 += 1
+10001195          while (i != 0)
+10001199          void var_407
+10001199          
+10001199          if (eax_5 != &var_407)
+100011a7              char* eax_7 = sub_10070cf0()
+100011b5              char i_1
+100011b5              
+100011b5              do
+100011b0                  i_1 = *eax_7
+100011b2                  eax_7 = &eax_7[1]
+100011b5              while (i_1 != 0)
+100011b5              
+100011b9              if (eax_7 != &eax_7[1] && atoi(sub_10070cf0()) != 3)
+100011df                  if (*(edi_1 + 4) != 0)
+100011e1                      int32_t esi_1 = *edi_1
+100011e1                      
+100011e5                      if (esi_1 != 0)
+100011f0                          void var_658
+100011f0                          __builtin_memcpy(dest: &var_658, src: esi_1, n: 0x250)
+100011f2                          edi_1 = var_664_1
+100011f2                  
+10001201                  int32_t var_558
+10001201                  
+10001201                  if (ecx_2 s< var_558)
+10001238                      result = 0
+1000123a                      break
+1000123a          
+10001203          ebp += 1
+10001204          edi_1 += 0x384
+1000120a          var_664_1 = edi_1
+1000120a          
+10001214          if (ebp s>= data_100906b8)
+10001214              goto label_1000121a
+10001214  
+1000122c  sub_1007aaf9(eax_1 ^ &var_668)
+10001237  return result
+
+1000123c                                                                                      cc cc cc cc                              ....
+
+10001240    int32_t sub_10001240(void* arg1)
+
+1000124b  void var_668
+1000124b  int32_t eax_1 = __security_cookie ^ &var_668
+10001254  int32_t eax_2 = data_10090728
+10001254  
+1000125f  if (eax_2 == 0)
+1000126e      (*(data_104b13ac + 0x2c))("sv_maxclients")
+10001273      long double x87_r0
+10001273      eax_2 = sub_1007b550(x87_r0)
+10001278      data_10090728 = eax_2
+10001278  
+10001284  int32_t ecx_2 = *(arg1 + 0x110)
+1000128a  int32_t ebp = 0
+10001292  int32_t result
+10001292  
+10001292  if (eax_2 s<= 0)
+1000136a      label_1000136a:
+1000136a      result = 1
+10001292  else
+10001298      void* edi_1 = &data_104b41dc
+1000129d      void* var_664_1 = &data_104b41dc
+1000129d      
+100012a7      while (true)
+100012a7          if (edi_1 s>= 0x104c22dc)
+100012a7              goto label_1000136a
+100012a7          
+100012ca          void var_408
+100012ca          (*(data_104b13ac + 0x68))(ebp + 0x211, &var_408, 0x400)
+100012cc          void* eax_5 = &var_408
+100012e5          char i
+100012e5          
+100012e5          do
+100012e0              i = *eax_5
+100012e2              eax_5 += 1
+100012e5          while (i != 0)
+100012e9          void var_407
+100012e9          
+100012e9          if (eax_5 != &var_407)
+100012f7              char* eax_7 = sub_10070cf0()
+10001305              char i_1
+10001305              
+10001305              do
+10001300                  i_1 = *eax_7
+10001302                  eax_7 = &eax_7[1]
+10001305              while (i_1 != 0)
+10001305              
+10001309              if (eax_7 != &eax_7[1] && atoi(sub_10070cf0()) != 3)
+1000132f                  if (*(edi_1 + 4) != 0)
+10001331                      int32_t esi_1 = *edi_1
+10001331                      
+10001335                      if (esi_1 != 0)
+10001340                          void var_658
+10001340                          __builtin_memcpy(dest: &var_658, src: esi_1, n: 0x250)
+10001342                          edi_1 = var_664_1
+10001342                  
+10001351                  int32_t var_558
+10001351                  
+10001351                  if (ecx_2 s> var_558)
+10001388                      result = 0
+1000138a                      break
+1000138a          
+10001353          ebp += 1
+10001354          edi_1 += 0x384
+1000135a          var_664_1 = edi_1
+1000135a          
+10001364          if (ebp s>= data_10090728)
+10001364              goto label_1000136a
+10001364  
+1000137c  sub_1007aaf9(eax_1 ^ &var_668)
+10001387  return result
+
+1000138c                                      cc cc cc cc                                                              ....
+
+10001390    int32_t sub_10001390()
+
+1000139b  int32_t var_66c
+1000139b  int32_t eax_1 = __security_cookie ^ &var_66c
+100013a4  int32_t eax_2 = data_100906e4
+100013ab  int32_t ebp = 0
+100013ab  
+100013b1  if (eax_2 == 0)
+100013c0      (*(data_104b13ac + 0x2c))("sv_maxclients")
+100013c5      long double x87_r0
+100013c5      eax_2 = sub_1007b550(x87_r0)
+100013ca      data_100906e4 = eax_2
+100013ca  
+100013cf  int32_t var_664 = 0xfff0bdc1
+100013d7  var_66c = 0
+100013d7  
+100013dd  if (eax_2 s> 0)
+100013e3      void* i = &data_104b41dc
+100013e8      void* i_1 = &data_104b41dc
+100013e8      
+100013f2      while (i s< 0x104c22dc)
+10001415          void var_40c
+10001415          (*(data_104b13ac + 0x68))(ebp + 0x211, &var_40c, 0x400)
+10001417          void* eax_5 = &var_40c
+10001429          char j
+10001429          
+10001429          do
+10001424              j = *eax_5
+10001426              eax_5 += 1
+10001429          while (j != 0)
+1000142d          void var_40b
+1000142d          
+1000142d          if (eax_5 != &var_40b)
+1000143b              char* eax_7 = sub_10070cf0()
+10001448              char j_1
+10001448              
+10001448              do
+10001443                  j_1 = *eax_7
+10001445                  eax_7 = &eax_7[1]
+10001448              while (j_1 != 0)
+10001448              
+1000144c              if (eax_7 != &eax_7[1] && atoi(sub_10070cf0()) != 3)
+10001472                  if (*(i + 4) != 0)
+10001474                      int32_t esi_1 = *i
+10001474                      
+10001478                      if (esi_1 != 0)
+10001483                          void var_65c
+10001483                          __builtin_memcpy(dest: &var_65c, src: esi_1, n: 0x250)
+10001485                          i = i_1
+10001485                  
+10001494                  int32_t var_55c
+10001494                  
+10001494                  if (var_55c s> var_664)
+10001496                      var_664 = var_55c
+1000149a                      var_66c = ebp
+1000149a          
+1000149e          ebp += 1
+1000149f          i += 0x384
+100014a5          i_1 = i
+100014a5          
+100014af          if (ebp s>= data_100906e4)
+100014af              break
+100014af  
+100014c1  sub_10015df0(var_66c, 0x20)
+100014d8  sub_1007aaf9(eax_1 ^ &var_66c)
+100014e3  return 0x100906c4
+
+100014e4              cc cc cc cc cc cc cc cc cc cc cc cc                                                      ............
+
+100014f0    int32_t sub_100014f0()
+
+100014fb  int32_t var_66c
+100014fb  int32_t eax_1 = __security_cookie ^ &var_66c
+10001504  int32_t eax_2 = data_1009072c
+1000150b  int32_t ebp = 0
+1000150b  
+10001511  if (eax_2 == 0)
+10001520      (*(data_104b13ac + 0x2c))("sv_maxclients")
+10001525      long double x87_r0
+10001525      eax_2 = sub_1007b550(x87_r0)
+1000152a      data_1009072c = eax_2
+1000152a  
+1000152f  int32_t var_664 = 0xf423f
+10001537  var_66c = 0
+10001537  
+1000153d  if (eax_2 s> 0)
+10001543      void* i = &data_104b41dc
+10001548      void* i_1 = &data_104b41dc
+10001548      
+10001552      while (i s< 0x104c22dc)
+10001575          void var_40c
+10001575          (*(data_104b13ac + 0x68))(ebp + 0x211, &var_40c, 0x400)
+10001577          void* eax_5 = &var_40c
+10001589          char j
+10001589          
+10001589          do
+10001584              j = *eax_5
+10001586              eax_5 += 1
+10001589          while (j != 0)
+1000158d          void var_40b
+1000158d          
+1000158d          if (eax_5 != &var_40b)
+1000159b              char* eax_7 = sub_10070cf0()
+100015a8              char j_1
+100015a8              
+100015a8              do
+100015a3                  j_1 = *eax_7
+100015a5                  eax_7 = &eax_7[1]
+100015a8              while (j_1 != 0)
+100015a8              
+100015ac              if (eax_7 != &eax_7[1] && atoi(sub_10070cf0()) != 3)
+100015d2                  if (*(i + 4) != 0)
+100015d4                      int32_t esi_1 = *i
+100015d4                      
+100015d8                      if (esi_1 != 0)
+100015e3                          void var_65c
+100015e3                          __builtin_memcpy(dest: &var_65c, src: esi_1, n: 0x250)
+100015e5                          i = i_1
+100015e5                  
+100015f4                  int32_t var_55c
+100015f4                  
+100015f4                  if (var_55c s< var_664)
+100015f6                      var_664 = var_55c
+100015fa                      var_66c = ebp
+100015fa          
+100015fe          ebp += 1
+100015ff          i += 0x384
+10001605          i_1 = i
+10001605          
+1000160f          if (ebp s>= data_1009072c)
+1000160f              break
+1000160f  
+10001621  sub_10015df0(var_66c, 0x20)
+10001638  sub_1007aaf9(eax_1 ^ &var_66c)
+10001643  return 0x100906e8
+
+10001644              cc cc cc cc cc cc cc cc cc cc cc cc                                                      ............
+
+10001650    int32_t sub_10001650(void* arg1)
+
+1000165b  int32_t var_50c
+1000165b  int32_t eax_1 = __security_cookie ^ &var_50c
+10001664  int32_t eax_2 = data_100906c0
+10001673  int32_t i = 0
+10001673  
+10001678  if (eax_2 == 0)
+10001687      (*(data_104b13ac + 0x2c))("sv_maxclients")
+1000168c      long double x87_r0
+1000168c      eax_2 = sub_1007b550(x87_r0)
+10001691      data_100906c0 = eax_2
+10001691  
+10001696  int32_t edi = 0
+10001698  int32_t var_508 = 0
+1000169c  int32_t var_504[0x40]
+1000169c  var_504[0] = 0
+1000169c  
+100016a2  if (eax_2 s> 0)
+100016b3      while (i s< 0x40)
+100016bc          if (i != *(arg1 + 8))
+100016df              void var_404
+100016df              (*(data_104b13ac + 0x68))(i + 0x211, &var_404, 0x400)
+100016e1              void* eax_5 = &var_404
+100016f5              char j
+100016f5              
+100016f5              do
+100016f0                  j = *eax_5
+100016f2                  eax_5 += 1
+100016f5              while (j != 0)
+100016f9              void var_403
+100016f9              
+100016f9              if (eax_5 != &var_403)
+10001707                  char* eax_7 = sub_10070cf0()
+10001715                  char j_1
+10001715                  
+10001715                  do
+10001710                      j_1 = *eax_7
+10001712                      eax_7 = &eax_7[1]
+10001715                  while (j_1 != 0)
+10001715                  
+10001719                  if (eax_7 != &eax_7[1])
+1000172d                      int32_t eax_10
+1000172d                      int32_t edx_3
+1000172d                      eax_10, edx_3 = atoi(sub_10070cf0())
+1000172d                      
+10001739                      if (eax_10 != 3 && sub_10018900(eax_10, edx_3, i, arg1) == 0)
+1000174a                          var_504[edi] = i
+1000174e                          edi += 1
+1000174f                          int32_t var_508_1 = edi
+1000174f          
+10001753          i += 1
+10001753          
+1000175a          if (i s>= data_100906c0)
+1000175a              break
+1000175a  
+1000176b  var_50c = rand() & 0x7fff
+1000176f  unimplemented  {fild st0, dword [esp+0x10]}
+10001773  unimplemented  {fdiv st0, qword [&data_1008b160]}
+10001779  unimplemented  {fimul st0, dword [esp+0x14]}
+1000177d  int32_t eax_14 = sub_1007b550()
+10001782  int32_t ecx_4 = 0
+10001786  int32_t var_524_2
+10001786  
+10001786  if (edi s<= 0)
+10001796      label_10001796:
+10001796      int32_t var_520_3 = 0x20
+10001798      var_524_2 = var_504[0]
+10001786  else
+10001788      while (true)
+10001788          eax_14 -= 1
+10001788          
+1000178b          if (eax_14 s<= 0)
+100017c5              int32_t var_520_4 = 0x20
+100017c7              var_524_2 = var_504[ecx_4]
+100017c8              break
+100017c8          
+1000178d          ecx_4 += 1
+1000178d          
+10001790          if (ecx_4 s>= edi)
+10001790              goto label_10001796
+10001790  
+1000179e  sub_10015df0(var_524_2, 0x20)
+100017b5  sub_1007aaf9(eax_1 ^ &var_50c)
+100017c0  return &data_10090708
+
+100016aa                                8d 9b 00 00 00 00                                                            ......
+100017ca                                cc cc cc cc cc cc                                                            ......
+
+100017d0    int32_t sub_100017d0()
+
+100017db  void var_404
+100017db  int32_t eax_1 = __security_cookie ^ &var_404
+100017f8  (*(data_104b13ac + 0x78))(&var_404, 0x400)
+10001813  strncpy(0x10090730, sub_10070cf0(), 0x7f)
+10001826  data_100907af = 0
+10001832  sub_1007aaf9(eax_1 ^ &var_404)
+1000183d  return 0x10090730
+
+1000183e                                                                                            cc cc                                ..
+
+10001840    int32_t __convention("regparm") sub_10001840(int32_t arg1)
+
+10001844  if (arg1 - 1 u<= 0x20)
+1000184d      switch (arg1 + &jump_table_100018bc[0x10]:3)
+10001859          case &lookup_table_10001900
+10001859              return "Shotgun"
+1000185f          case &lookup_table_10001900[1]
+1000185f              return "Gauntlet"
+10001865          case &lookup_table_10001900[2]
+10001865              return "Machine Gun"
+1000186b          case &lookup_table_10001900[3], &lookup_table_10001900[4]
+1000186b              return "Grenade Launcher"
+10001871          case &lookup_table_10001900[5], &lookup_table_10001900[6]
+10001871              return "Rocket Launcher"
+10001877          case &lookup_table_10001900[7], &lookup_table_10001900[8]
+10001877              return "Plasmagun"
+1000187d          case &lookup_table_10001900[9], &lookup_table_10001900[0x20]
+1000187d              return "Railgun"
+10001883          case &lookup_table_10001900[0xa], &lookup_table_10001900[0x1e]
+10001883              return "Lightning Gun"
+10001889          case &lookup_table_10001900[0xb], &lookup_table_10001900[0xc]
+10001889              return "BFG10K"
+1000188f          case &lookup_table_10001900[0x16]
+1000188f              return "Nailgun"
+10001895          case &lookup_table_10001900[0x17]
+10001895              return "Chaingun"
+1000189b          case &lookup_table_10001900[0x18]
+1000189b              return "Proximity Launcher"
+100018a1          case &lookup_table_10001900[0x19]
+100018a1              return "Kamikaze"
+100018a7          case &lookup_table_10001900[0x1a]
+100018a7              return "Prox mine"
+100018ad          case &lookup_table_10001900[0x1b]
+100018ad              return "Grapple"
+100018b3          case &lookup_table_10001900[0x1f]
+100018b3              return "Heavy Machine Gun"
+100018b3  
+100018b9  return "[unknown weapon]"
+
+100018ba                                                                                8b ff                                        ..
+100018bc  uint32_t jump_table_100018bc[0x11] = 
+100018bc  {
+100018bc      [0x00] =  0x10001854
+100018c0      [0x01] =  0x1000185a
+100018c4      [0x02] =  0x10001860
+100018c8      [0x03] =  0x10001866
+100018cc      [0x04] =  0x1000186c
+100018d0      [0x05] =  0x10001872
+100018d4      [0x06] =  0x10001878
+100018d8      [0x07] =  0x1000187e
+100018dc      [0x08] =  0x10001884
+100018e0      [0x09] =  0x1000188a
+100018e4      [0x0a] =  0x10001890
+100018e8      [0x0b] =  0x10001896
+100018ec      [0x0c] =  0x1000189c
+100018f0      [0x0d] =  0x100018a2
+100018f4      [0x0e] =  0x100018a8
+100018f8      [0x0f] =  0x100018ae
+100018fc      [0x10] =  0x100018b4
+10001900  }

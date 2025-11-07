@@ -1,0 +1,365 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+1001e3e3                                      unimplemented  {fstp dword [ebx+0x17c0], st0}
+1001e3e3                                      break
+1001e3e3                      
+1001e18a                      goto label_1001e309
+1001e18a                  
+1001e149                  int32_t eax_25 = *(ebx + 0x1964)
+1001e14f                  *(esp_7 - 4) = *(esp_7 + 0xc)
+1001e150                  int32_t edx_12 = *(ecx_10 + 0x1e0)
+1001e156                  *(esp_7 - 8) = eax_25
+1001e157                  edx_12()
+1001e157                  esp_21 = esp_7
+1001e0b7              else
+1001e0bd                  int32_t ecx_6 = *(ebx + 0x1964)
+1001e0c3                  void* edx_7 = data_104b13ac
+1001e0c9                  *(esp_7 - 4) = *(esp_7 + 0xc)
+1001e0ca                  int32_t eax_20 = *(edx_7 + 0x1e0)
+1001e0d0                  *(esp_7 - 8) = ecx_6
+1001e0d1                  eax_20()
+1001e0d1                  esp_21 = esp_7
+1001e0d1          
+1001e31e          int32_t eax_42 = *(ebx + 0x1964)
+1001e324          void* ecx_20 = data_104b13ac
+1001e334          *(esp_21 + 4) = esp_21 + 0x170
+1001e335          int32_t edx_22 = *(ecx_20 + 0x1e4)
+1001e33b          *esp_21 = eax_42
+1001e33c          int32_t eax_43 = edx_22()
+1001e33e          esp_1 = esp_21 + 8
+1001e341          esp_1[3] = eax_43
+1001e341          
+1001e347          if (eax_43 == 0)
+1001e34d              *esp_1
+1001e34d              esp_1[1]
+1001e358              sub_1007aaf9(esp_1[0xf5] ^ &esp_1[2])
+1001e360              return eax_43
+1001e360  
+1001e3f0  *esp_1
+1001e3f0  esp_1[1]
+1001e3f4  sub_1007aaf9(esp_1[0xf5] ^ &esp_1[2])
+1001e3fc  return eax_4
+
+1001e3fd                                                                                         cc cc cc                               ...
+
+1001e400    void sub_1001e400(void* arg1 @ esi, int32_t* arg2 @ edi)
+
+1001e411  if (arg2[1] == 3 && arg2[0x34] == 0xc)
+1001e418      int32_t eax
+1001e418      int32_t ecx_1
+1001e418      eax, ecx_1 = sub_10013b00(arg1)
+1001e418      
+1001e426      if (arg2[0x38] != eax)
+1001e433          if (*(arg1 + 0x1364) s> 0)
+1001e435              eax = *(arg1 + 0x138c)
+1001e435          
+1001e442          if (*(arg1 + 0x1364) s> 0 && (eax s> 0 || eax == 0xffffffff))
+1001e482              label_1001e482:
+1001e482              int32_t var_8_1 = ecx_1
+1001e497              (*(data_104b13ac + 0x2c4))(*(arg1 + 0x195c), &arg2[6], 
+1001e497                  fconvert.s(fconvert.t(160f)), 1)
+1001e499              eax = *(arg1 + 0x1954)
+1001e499              
+1001e4a5              if (eax s< 0x40)
+1001e4a9                  *(arg1 + (eax << 2) + 0x1854) = *arg2
+1001e4b0                  *(arg1 + 0x1954) += 1
+1001e442          else
+1001e44b              if (*(arg1 + 0x1358) s> 0)
+1001e44d                  eax = *(arg1 + 0x1394)
+1001e44d              
+1001e45a              if (*(arg1 + 0x1358) s> 0 && (eax s> 0 || eax == 0xffffffff))
+1001e455                  goto label_1001e482
+1001e455              
+1001e463              if (*(arg1 + 0x136c) s> 0)
+1001e465                  eax = *(arg1 + 0x139c)
+1001e465                  
+1001e472                  if (eax s> 0 || eax == 0xffffffff)
+1001e46d                      goto label_1001e482
+
+1001e4b7                                                                       cc cc cc cc cc cc cc cc cc                         .........
+
+1001e4c0    int32_t* sub_1001e4c0(void* arg1 @ esi, int32_t* arg2)
+
+1001e4cb  void var_17c
+1001e4cb  int32_t eax_1 = __security_cookie ^ &var_17c
+1001e4d4  int32_t* eax_2 = arg2
+1001e4db  int32_t ecx = *eax_2
+1001e4db  
+1001e4f5  if (*(arg1 + (ecx << 2) + 0x280) != *(ecx * 0x384 + 0x104b4200))
+1001e4fd      *(arg1 + 0x2488) = 0
+1001e503      int32_t ecx_2 = *eax_2
+1001e513      *(arg1 + (ecx_2 << 2) + 0x280) = *(ecx_2 * 0x384 + 0x104b4200)
+1001e51a      int32_t ecx_3 = eax_2[1]
+1001e520      int32_t ecx_4
+1001e520      
+1001e520      if (ecx_3 s<= 0xd)
+1001e527          ecx_4 = eax_2[0x2f]
+1001e520      else
+1001e522          ecx_4 = ecx_3 - 0xd
+1001e522      
+1001e537      void var_88
+1001e537      
+1001e537      if ((ecx_4 & 0xfffffcff) - 1 u<= 0x49)
+1001e544          switch ((ecx_4 & 0xfffffcff) + &jump_table_1001ea50[6]:3)
+1001ea16              case &lookup_table_1001ea6c, &lookup_table_1001ea6c[1], 
+1001ea16                      &lookup_table_1001ea6c[2], &lookup_table_1001ea6c[3], 
+1001ea16                      &lookup_table_1001ea6c[4], &lookup_table_1001ea6c[5], 
+1001ea16                      &lookup_table_1001ea6c[6], &lookup_table_1001ea6c[7], 
+1001ea16                      &lookup_table_1001ea6c[8], &lookup_table_1001ea6c[9], 
+1001ea16                      &lookup_table_1001ea6c[0xa], &lookup_table_1001ea6c[0xb], 
+1001ea16                      &lookup_table_1001ea6c[0xc], &lookup_table_1001ea6c[0xd], 
+1001ea16                      &lookup_table_1001ea6c[0xe], &lookup_table_1001ea6c[0xf], 
+1001ea16                      &lookup_table_1001ea6c[0x10], &lookup_table_1001ea6c[0x11], 
+1001ea16                      &lookup_table_1001ea6c[0x13], &lookup_table_1001ea6c[0x49]
+1001ea16                  eax_2 = eax_2[0x2c]
+1001ea16                  
+1001ea24                  if (eax_2 != *(arg1 + 8) && eax_2 u<= 0x1f)
+1001ea2f                      *(arg1 + 0x2488) |= 1 << eax_2.b
+1001e8f2              case &lookup_table_1001ea6c[0x26]
+1001e8f2                  data_105e43a0 = eax_2[0x19]
+1001e8ff                  data_105e43a4 = eax_2[0x1a]
+1001e90c                  data_105e43a8 = eax_2[0x1b]
+1001e91c                  data_105e43ac = data_105e2ef8
+1001e930                  sub_1007aaf9(eax_1 ^ &var_17c)
+1001e93b                  return eax_2
+1001e941              case &lookup_table_1001ea6c[0x29]
+1001e941                  if (*eax_2 == *(arg1 + 8))
+1001e947                      int32_t eax_26 = eax_2[0x30]
+1001e947                      
+1001e95a                      if (eax_26 s< 0 || eax_26 s> 0x100)
+1001e9ee                          int32_t var_18c_7 = eax_26
+1001e9f6                          int32_t eax_33 =
+1001e9f6                              sub_10020980(3, "EV_GENERAL_SOUND: eventParm (%d)…")
+1001ea0a                          sub_1007aaf9(eax_1 ^ &var_17c)
+1001ea15                          return eax_33
+1001ea15                      
+1001e97c                      (*(data_104b13ac + 0x68))(eax_26 + 0x111, &var_88, 0x80)
+1001e986                      void* eax_29 = &var_88
+1001e98d                      char const* const ecx_39 = "*falling1.wav"
+1001e98d                      
+1001e990                      while (true)
+1001e990                          char edx_10 = *eax_29
+1001e992                          char const temp5_1 = *ecx_39
+1001e992                          bool c_7 = edx_10 u< temp5_1
+1001e992                          
+1001e994                          if (edx_10 == temp5_1)
+1001e998                              if (edx_10 == 0)
+1001e9ac                                  eax_2 = nullptr
+1001e9ae                                  break
+1001e9ae                              
+1001e99a                              edx_10 = *(eax_29 + 1)
+1001e99d                              char temp9_1 = ecx_39[1]
+1001e99d                              c_7 = edx_10 u< temp9_1
+1001e99d                              
+1001e9a0                              if (edx_10 == temp9_1)
+1001e9a2                                  eax_29 += 2
+1001e9a5                                  ecx_39 = &ecx_39[2]
+1001e9a5                                  
+1001e9aa                                  if (edx_10 != 0)
+1001e9aa                                      continue
+1001e9aa                                  
+1001e9ac                                  eax_2 = nullptr
+1001e9ae                                  break
+1001e9ae                          
+1001e9b0                          bool c_8 = unimplemented  {sbb eax, eax}
+1001e9b2                          eax_2 = sbb.d(sbb.d(eax_29, eax_29, c_7), 0xffffffff, c_8)
+1001e9b2                          break
+1001e9b2                      
+1001e9bf                      if (eax_2 == 0 && *(arg1 + 0x13b0) s> 0)
+1001e9d1                          int32_t eax_32 = (*(data_104b13ac + 0x174))(*(arg1 + 8))
+1001e9e2                          sub_1007aaf9(eax_1 ^ &var_17c)
+1001e9ed                          return eax_32
+1001e64b              case &lookup_table_1001ea6c[0x2a]
+1001e64b                  int32_t eax_4 = eax_2[0x30]
+1001e64b                  
+1001e65e                  if (eax_4 s< 0 || eax_4 s> 0x100)
+1001e73c                      int32_t var_18c_3 = eax_4
+1001e744                      int32_t eax_15 = sub_10020980(3, "EV_GLOBAL_SOUND: eventParm (%d) …")
+1001e758                      sub_1007aaf9(eax_1 ^ &var_17c)
+1001e763                      return eax_15
+1001e763                  
+1001e67f                  (*(data_104b13ac + 0x68))(eax_4 + 0x111, &var_88, 0x80)
+1001e684                  char const* const ecx_14 = "sound/items/kamikazerespawn.wav"
+1001e689                  void* eax_7 = &var_88
+1001e690                  int32_t eax_9
+1001e690                  char edx_7
+1001e690                  
+1001e690                  while (true)
+1001e690                      edx_7 = *eax_7
+1001e692                      char const temp0_1 = *ecx_14
+1001e692                      bool c_1 = edx_7 u< temp0_1
+1001e692                      
+1001e694                      if (edx_7 == temp0_1)
+1001e698                          if (edx_7 == 0)
+1001e6ac                              eax_9 = 0
+1001e6ae                              break
+1001e6ae                          
+1001e69a                          edx_7 = *(eax_7 + 1)
+1001e69d                          char temp6_1 = ecx_14[1]
+1001e69d                          c_1 = edx_7 u< temp6_1
+1001e69d                          
+1001e6a0                          if (edx_7 == temp6_1)
+1001e6a2                              eax_7 += 2
+1001e6a5                              ecx_14 = &ecx_14[2]
+1001e6a5                              
+1001e6aa                              if (edx_7 != 0)
+1001e6aa                                  continue
+1001e6aa                              
+1001e6ac                              eax_9 = 0
+1001e6ae                              break
+1001e6ae                      
+1001e6b0                      bool c_2 = unimplemented  {sbb eax, eax}
+1001e6b2                      eax_9 = sbb.d(sbb.d(eax_7, eax_7, c_1), 0xffffffff, c_2)
+1001e6b2                      break
+1001e6b2                  
+1001e6b7                  if (eax_9 == 0)
+1001e6c0                      int32_t eax_10 = sub_10017c50()
+1001e6d1                      sub_1007aaf9(eax_1 ^ &var_17c)
+1001e6dc                      return eax_10
+1001e6dc                  
+1001e6dd                  char const* const ecx_17 = "sound/items/poweruprespawn.wav"
+1001e6e2                  void* eax_11 = &var_88
+1001e6e2                  
+1001e6f0                  while (true)
+1001e6f0                      edx_7 = *eax_11
+1001e6f2                      char const temp10_1 = *ecx_17
+1001e6f2                      bool c_3 = edx_7 u< temp10_1
+1001e6f2                      
+1001e6f4                      if (edx_7 == temp10_1)
+1001e6f8                          if (edx_7 == 0)
+1001e70c                              eax_2 = nullptr
+1001e70e                              break
+1001e70e                          
+1001e6fa                          edx_7 = *(eax_11 + 1)
+1001e6fd                          char temp13_1 = ecx_17[1]
+1001e6fd                          c_3 = edx_7 u< temp13_1
+1001e6fd                          
+1001e700                          if (edx_7 == temp13_1)
+1001e702                              eax_11 += 2
+1001e705                              ecx_17 = &ecx_17[2]
+1001e705                              
+1001e70a                              if (edx_7 != 0)
+1001e70a                                  continue
+1001e70a                              
+1001e70c                              eax_2 = nullptr
+1001e70e                              break
+1001e70e                      
+1001e710                      bool c_4 = unimplemented  {sbb eax, eax}
+1001e712                      eax_2 = sbb.d(sbb.d(eax_11, eax_11, c_3), 0xffffffff, c_4)
+1001e712                      break
+1001e712                  
+1001e717                  if (eax_2 == 0)
+1001e71f                      int32_t eax_14 = sub_10017cd0(arg1)
+1001e730                      sub_1007aaf9(eax_1 ^ &var_17c)
+1001e73b                      return eax_14
+1001e764              case &lookup_table_1001ea6c[0x2b]
+1001e764                  int32_t ecx_22 = data_105e4ae8
+1001e764                  
+1001e76d                  if (ecx_22 == 5)
+1001e773                      eax_2 = eax_2[0x30]
+1001e773                      
+1001e77b                      if (eax_2 u<= ecx_22)
+1001e781                          switch (eax_2)
+1001e788                              case nullptr, 1
+1001e788                                  *(arg1 + 0x1b2c) = 0
+1001e78e                                  label_1001e78e:
+1001e78e                                  *(arg1 + 0x1b28) = 0
+1001e794                                  *(arg1 + 0x1b34) = 1
+1001e7aa                                  sub_1007aaf9(eax_1 ^ &var_17c)
+1001e7b5                                  return eax_2
+1001e7b6                              case 2
+1001e7b6                                  *(arg1 + 0x1b2c) = 0
+1001e7bc                                  *(arg1 + 0x1b34) = 1
+1001e7d2                                  sub_1007aaf9(eax_1 ^ &var_17c)
+1001e7dd                                  return eax_2
+1001e781                              case 3
+1001e781                                  goto label_1001e78e
+1001e7e3                              case 4
+1001e7e3                                  *(arg1 + 0x1b2c) = 1
+1001e7e9                                  *(arg1 + 0x1b34) = 1
+1001e7fb                                  sub_1007aaf9(eax_1 ^ &var_17c)
+1001e806                                  return eax_2
+1001e80c                              case 5
+1001e80c                                  *(arg1 + 0x1b28) = 1
+1001e812                                  *(arg1 + 0x1b34) = 1
+1001e824                                  sub_1007aaf9(eax_1 ^ &var_17c)
+1001e82f                                  return eax_2
+1001e76d                  else if (ecx_22 == 6)
+1001e839                      eax_2 = eax_2[0x30]
+1001e839                      
+1001e848                      switch (eax_2)
+1001e84f                          case nullptr, 1, 2, 3
+1001e84f                              *(arg1 + 0x1b30) = 0
+1001e855                              *(arg1 + 0x1b34) = 1
+1001e86b                              sub_1007aaf9(eax_1 ^ &var_17c)
+1001e876                              return eax_2
+1001e882                          case 4
+1001e882                              int32_t eax_17 = sub_10013b00(arg1) - 1
+1001e887                              int32_t eax_18 = neg.d(eax_17)
+1001e88e                              *(arg1 + 0x1b30) = sbb.d(eax_18, eax_18, eax_17 != 0) + 2
+1001e894                              *(arg1 + 0x1b34) = 1
+1001e8a6                              sub_1007aaf9(eax_1 ^ &var_17c)
+1001e8b1                              return sbb.d(eax_18, eax_18, eax_17 != 0) + 2
+1001e8b8                          case 5
+1001e8b8                              int32_t eax_22 = sub_10013b00(arg1) - 2
+1001e8be                              int32_t eax_23 = neg.d(eax_22)
+1001e8c5                              *(arg1 + 0x1b30) = sbb.d(eax_23, eax_23, eax_22 != 0) + 2
+1001e8cb                              *(arg1 + 0x1b34) = 1
+1001e8e1                              sub_1007aaf9(eax_1 ^ &var_17c)
+1001e8ec                              return sbb.d(eax_23, eax_23, eax_22 != 0) + 2
+1001e54b              case &lookup_table_1001ea6c[0x39]
+1001e54b                  int32_t edi_1 = eax_2[0x25]
+1001e551                  int32_t edx_5 = *(arg1 + 8)
+1001e554                  int32_t ecx_8 = eax_2[0x26]
+1001e55a                  eax_2 = eax_2[0x30]
+1001e55a                  
+1001e567                  if (edi_1 == edx_5)
+1001e569                      *(arg1 + 0x1750) = eax_2
+1001e56f                      *(arg1 + 0x174c) = ecx_8
+1001e56f                      
+1001e587                      if (edi_1 == ecx_8 || edi_1 == 0x3ff || edi_1 == 0x3fe)
+1001e597                          *(arg1 + 0x176c) += 1
+1001e59d                          *(arg1 + 0x1758) = 1
+1001e587                      else
+1001e589                          *(arg1 + 0x176c) += 1
+1001e58f                          *(arg1 + 0x1758) = 0
+1001e567                  else if (ecx_8 == edx_5)
+1001e5a9                      int32_t xmm0_1 = data_105e2ef8
+1001e5b1                      *(arg1 + 0x1770) += 1
+1001e5b7                      *(arg1 + 0x1754) = eax_2
+1001e5bd                      *(arg1 + 0x1748) = edi_1
+1001e5c3                      *(arg1 + 0x17f8) = xmm0_1
+1001e5a7                  else if (ecx_8 == *(arg1 + 0x196c) && edi_1 == ecx_8)
+1001e5d9                      *(arg1 + 0x175c) = 1
+1001e5d9                  
+1001e5e6                  if (data_105e4ae8 == 6)
+1001e5fd                      void var_178
+1001e5fd                      int32_t edx_6
+1001e5fd                      eax_2, edx_6 = (*(data_104b13ac + 0xfc))(edi_1, &var_178)
+1001e60a                      char var_fc
+1001e60a                      
+1001e60a                      if ((var_fc & 8) != 0)
+1001e613                          eax_2 = sub_10018900(eax_2, edx_6, edi_1, arg1)
+1001e613                          
+1001e61d                          if (eax_2 == 0)
+1001e623                              *(arg1 + 0x1b30) = 3
+1001e62d                              *(arg1 + 0x1b34) = 1
+1001e63f                              sub_1007aaf9(eax_1 ^ &var_17c)
+1001e64a                              return eax_2
+1001e64a  
+1001ea41  sub_1007aaf9(eax_1 ^ &var_17c)
+1001ea4c  return eax_2
+
+1001ea4d                                         8d 49 00                                                               .I.
+1001ea50  uint32_t jump_table_1001ea50[0x7] = 
+1001ea50  {
+1001ea50      [0x0] =  0x1001ea16
+1001ea54      [0x1] =  0x1001e8ed
+1001ea58      [0x2] =  0x1001e93c
+1001ea5c      [0x3] =  0x1001e64b
+1001ea60      [0x4] =  0x1001e764
+1001ea64      [0x5] =  0x1001e54b
+1001ea68      [0x6] =  0x1001ea35
+1001ea6c  }

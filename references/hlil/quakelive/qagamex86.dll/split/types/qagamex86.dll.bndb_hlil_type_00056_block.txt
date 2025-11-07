@@ -1,0 +1,831 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10019370          unimplemented  {fld st0, dword [esp+0x180]}
+10019377          unimplemented  {fsub st0, dword [esi+0x130c]}
+1001937d          var_274 = fconvert.s(unimplemented  {fstp dword [esp+0xc], st0})
+1001937d          unimplemented  {fstp dword [esp+0xc], st0}
+10019381          unimplemented  {fld st0, dword [esp+0x184]}
+10019388          unimplemented  {fsub st0, dword [esi+0x1310]}
+1001938e          float var_270_1 = fconvert.s(unimplemented  {fstp dword [esp+0x10], st0})
+1001938e          unimplemented  {fstp dword [esp+0x10], st0}
+10019392          unimplemented  {fld st0, dword [esp+0x188]}
+10019399          unimplemented  {fsub st0, dword [esi+0x1314]}
+1001939f          float var_26c_1 = fconvert.s(unimplemented  {fstp dword [esp+0x14], st0})
+1001939f          unimplemented  {fstp dword [esp+0x14], st0}
+100193a3          unimplemented  {fld st0, dword [esp+0x10]}
+100193a7          unimplemented  {fld st0, dword [esp+0xc]}
+100193ab          unimplemented  {fld st0, dword [esp+0x14]}
+100193af          unimplemented  {fld st0, st1}
+100193b1          unimplemented  {fmulp st2, st0}
+100193b1          unimplemented  {fmulp st2, st0}
+100193b3          unimplemented  {fld st0, st2}
+100193b5          unimplemented  {fmulp st3, st0}
+100193b5          unimplemented  {fmulp st3, st0}
+100193b7          unimplemented  {fxch st0, st1}
+100193b7          unimplemented  {fxch st0, st1}
+100193b9          unimplemented  {faddp st2, st0}
+100193b9          unimplemented  {faddp st2, st0}
+100193bb          unimplemented  {fmul st0, st0}
+100193bd          unimplemented  {faddp st1, st0}
+100193bd          unimplemented  {faddp st1, st0}
+100193bf          float var_258_1 = fconvert.s(unimplemented  {fstp dword [esp+0x28], st0})
+100193bf          unimplemented  {fstp dword [esp+0x28], st0}
+100193c3          goto label_100193d5
+100193c3  
+10019811  sub_1007aaf9(eax_1 ^ &var_274)
+10019819  return 0
+
+100194dd                                                                                         8d 49 00                               .I.
+10019893                                                           cc cc cc cc cc cc cc cc cc cc cc cc cc                     .............
+
+100198a0    int32_t sub_100198a0(void* arg1 @ edi)
+
+100198ab  void var_fc
+100198ab  int32_t eax_1 = __security_cookie ^ &var_fc
+100198b6  int32_t i = 0
+100198b6  
+100198be  if (data_105e44d4 s> 0)
+100198c3      while (i s< 0x40)
+100198c8          if (i != *(arg1 + 8))
+100198dc              int32_t var_f8
+100198dc              int32_t eax_2
+100198dc              int32_t edx_2
+100198dc              eax_2, edx_2 = (*(data_104b13ac + 0xfc))(i, &var_f8)
+100198f0              char var_7c
+100198f0              
+100198f0              if (var_f8 != 0 && (var_7c & 0xe) != 0)
+100198f5                  int32_t eax_3
+100198f5                  int32_t ecx_3
+100198f5                  eax_3, ecx_3 = sub_10018900(eax_2, edx_2, i, arg1)
+100198f5                  
+100198ff                  if (eax_3 != 0)
+10019901                      unimplemented  {fld st0, dword [&data_1008b330]}
+10019908                      int32_t var_10c_2 = ecx_3
+1001990c                      float var_10c_3 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001990c                      unimplemented  {fstp dword [esp], st0}
+1001991d                      int32_t xmm0_1 =
+1001991d                          sub_10018b20(*(arg1 + 0xc), arg1 + 0x1984, var_10c_3, i)
+1001991d                      int16_t top = top - 1
+1001991d                      unimplemented  {call sub_10018b20}
+1001991d                      
+1001992b                      if (0 f< xmm0_1)
+1001995d                          sub_1007aaf9(eax_1 ^ &var_fc)
+10019968                          return i
+10019968          
+1001992d          i += 1
+1001992d          
+10019934          if (i s>= data_105e44d4)
+10019934              break
+10019934  
+10019944  sub_1007aaf9(eax_1 ^ &var_fc)
+1001994f  return 0xffffffff
+
+10019969                             cc cc cc cc cc cc cc                                                           .......
+
+10019970    int32_t sub_10019970(void* arg1 @ edi, int32_t arg2)
+
+1001997b  int32_t var_f0
+1001997b  int32_t eax_1 = __security_cookie ^ &var_f0
+1001998d  int32_t i = 0
+1001998d  
+10019995  if (data_105e44d4 s> 0)
+1001999a      while (i s< 0x40)
+100199a3          if (i != *(arg1 + 8) || arg2 == 0)
+100199b7              int32_t eax_2
+100199b7              int32_t edx_2
+100199b7              eax_2, edx_2 = (*(data_104b13ac + 0xfc))(i, &var_f0)
+100199cb              char var_74
+100199cb              
+100199cb              if (var_f0 != 0 && (var_74 & 0xe) != 0
+100199cb                      && sub_10018900(eax_2, edx_2, i, arg1) != 0)
+10019a0c                  sub_1007aaf9(eax_1 ^ &var_f0)
+10019a17                  return i
+10019a17          
+100199dc          i += 1
+100199dc          
+100199e3          if (i s>= data_105e44d4)
+100199e3              break
+100199e3  
+100199f3  sub_1007aaf9(eax_1 ^ &var_f0)
+100199fe  return 0xffffffff
+
+10019a18                                                                          cc cc cc cc cc cc cc cc                          ........
+
+10019a20    int32_t sub_10019a20(void* arg1 @ edi)
+
+10019a2b  void var_fc
+10019a2b  int32_t eax_1 = __security_cookie ^ &var_fc
+10019a36  int32_t i = 0
+10019a36  
+10019a3e  if (data_105e44d4 s> 0)
+10019a43      while (i s< 0x40)
+10019a48          if (i != *(arg1 + 8))
+10019a5c              int32_t var_f8
+10019a5c              int32_t eax_2
+10019a5c              int32_t edx_2
+10019a5c              eax_2, edx_2 = (*(data_104b13ac + 0xfc))(i, &var_f8)
+10019a70              char var_7c
+10019a70              
+10019a70              if (var_f8 != 0 && (var_7c & 0xe) != 0)
+10019a75                  int32_t eax_3
+10019a75                  int32_t ecx_3
+10019a75                  eax_3, ecx_3 = sub_10018900(eax_2, edx_2, i, arg1)
+10019a75                  
+10019a7f                  if (eax_3 == 0)
+10019a81                      unimplemented  {fld st0, dword [&data_1008b330]}
+10019a88                      int32_t var_10c_2 = ecx_3
+10019a8c                      float var_10c_3 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+10019a8c                      unimplemented  {fstp dword [esp], st0}
+10019a9d                      int32_t xmm0_1 =
+10019a9d                          sub_10018b20(*(arg1 + 0xc), arg1 + 0x1984, var_10c_3, i)
+10019a9d                      int16_t top = top - 1
+10019a9d                      unimplemented  {call sub_10018b20}
+10019a9d                      
+10019aab                      if (0 f< xmm0_1)
+10019add                          sub_1007aaf9(eax_1 ^ &var_fc)
+10019ae8                          return i
+10019ae8          
+10019aad          i += 1
+10019aad          
+10019ab4          if (i s>= data_105e44d4)
+10019ab4              break
+10019ab4  
+10019ac4  sub_1007aaf9(eax_1 ^ &var_fc)
+10019acf  return 0xffffffff
+
+10019ae9                             cc cc cc cc cc cc cc                                                           .......
+
+10019af0    int32_t* sub_10019af0(void* arg1 @ edi, int32_t* arg2, int32_t* arg3)
+
+10019afb  int32_t* result_1
+10019afb  int32_t eax_1 = __security_cookie ^ &result_1
+10019b04  int32_t* result = arg3
+10019b15  result_1 = result
+10019b15  
+10019b1b  if (arg2 != 0)
+10019b1d      *arg2 = 0
+10019b1d  
+10019b26  if (result != 0)
+10019b28      *result = 0
+10019b28  
+10019b2e  int32_t i = 0
+10019b2e  
+10019b36  if (data_105e44d4 s> 0)
+10019b3f      while (i s< 0x40)
+10019b48          if (i != *(arg1 + 8))
+10019b60              int32_t var_f8
+10019b60              int32_t ecx_2
+10019b60              result, ecx_2 = (*(data_104b13ac + 0xfc))(i, &var_f8)
+10019b78              char var_7c
+10019b78              
+10019b78              if (var_f8 != 0 && (var_7c & 0xe) != 0)
+10019b7e                  unimplemented  {fld st0, dword [esp+0x38]}
+10019b82                  unimplemented  {fsub st0, dword [edi+0x130c]}
+10019b88                  float var_104_1 = fconvert.s(unimplemented  {fstp dword [esp+0x14], st0})
+10019b88                  unimplemented  {fstp dword [esp+0x14], st0}
+10019b8c                  unimplemented  {fld st0, dword [esp+0x3c]}
+10019b90                  unimplemented  {fsub st0, dword [edi+0x1310]}
+10019b96                  float var_100_1 = fconvert.s(unimplemented  {fstp dword [esp+0x18], st0})
+10019b96                  unimplemented  {fstp dword [esp+0x18], st0}
+10019b9a                  unimplemented  {fld st0, dword [esp+0x40]}
+10019b9e                  unimplemented  {fsub st0, dword [edi+0x1314]}
+10019ba4                  float var_fc_1 = fconvert.s(unimplemented  {fstp dword [esp+0x1c], st0})
+10019ba4                  unimplemented  {fstp dword [esp+0x1c], st0}
+10019ba8                  unimplemented  {fld st0, dword [esp+0x18]}
+10019bac                  unimplemented  {fld st0, dword [esp+0x14]}
+10019bb0                  unimplemented  {fld st0, dword [esp+0x1c]}
+10019bb4                  unimplemented  {fld st0, dword [esp+0x124]}
+10019bbb                  unimplemented  {fld st0, st2}
+10019bbd                  unimplemented  {fmulp st3, st0}
+10019bbd                  unimplemented  {fmulp st3, st0}
+10019bbf                  unimplemented  {fld st0, st3}
+10019bc1                  unimplemented  {fmulp st4, st0}
+10019bc1                  unimplemented  {fmulp st4, st0}
+10019bc3                  unimplemented  {fxch st0, st2}
+10019bc3                  unimplemented  {fxch st0, st2}
+10019bc5                  unimplemented  {faddp st3, st0}
+10019bc5                  unimplemented  {faddp st3, st0}
+10019bc7                  unimplemented  {fmul st0, st0}
+10019bc9                  unimplemented  {faddp st2, st0}
+10019bc9                  unimplemented  {faddp st2, st0}
+10019bcb                  unimplemented  {fxch st0, st1}
+10019bcb                  unimplemented  {fxch st0, st1}
+10019bcd                  float var_108_1 = fconvert.s(unimplemented  {fstp dword [esp+0x10], st0})
+10019bcd                  unimplemented  {fstp dword [esp+0x10], st0}
+10019bd1                  unimplemented  {fld st0, dword [esp+0x10]}
+10019bd5                  unimplemented  {fld st0, st1}
+10019bd7                  unimplemented  {fmulp st2, st0}
+10019bd7                  unimplemented  {fmulp st2, st0}
+10019bd9                  bool cond:0_1 =
+10019bd9                      unimplemented  {fcomip st0, st1} f> unimplemented  {fcomip st0, st1}
+10019bd9                  unimplemented  {fcomip st0, st1}
+10019bdb                  unimplemented  {fstp st0, st0}
+10019bdb                  unimplemented  {fstp st0, st0}
+10019bdb                  
+10019bdd                  if (not(cond:0_1))
+10019bdf                      unimplemented  {fld st0, dword [&data_1008b330]}
+10019be6                      int32_t var_120_2 = ecx_2
+10019bea                      float var_120_3 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+10019bea                      unimplemented  {fstp dword [esp], st0}
+10019bfb                      int32_t edx_2
+10019bfb                      int32_t xmm0_1
+10019bfb                      result, edx_2, xmm0_1 =
+10019bfb                          sub_10018b20(*(arg1 + 0xc), arg1 + 0x1984, var_120_3, i)
+10019bfb                      unimplemented  {call sub_10018b20}
+10019bfb                      
+10019c09                      if (not(0 f>= xmm0_1))
+10019c0e                          result = sub_10018900(result, edx_2, i, arg1)
+10019c0e                          
+10019c18                          if (result == 0)
+10019c28                              if (result_1 != 0)
+10019c2a                                  result = result_1
+10019c2e                                  *result += 1
+10019c18                          else if (arg2 != 0)
+10019c1e                              *arg2 += 1
+10019c1e          
+10019c30          i += 1
+10019c30          
+10019c37          if (i s>= data_105e44d4)
+10019c37              break
+10019c37  
+10019c49  sub_1007aaf9(eax_1 ^ &result_1)
+10019c54  return result
+
+10019c55                                                                 cc cc cc cc cc cc cc cc cc cc cc                       ...........
+
+10019c60    int32_t sub_10019c60(void* arg1 @ edi)
+
+10019c6b  void var_fc
+10019c6b  int32_t eax_1 = __security_cookie ^ &var_fc
+10019c76  int32_t i = 0
+10019c76  
+10019c7e  if (data_105e44d4 s> 0)
+10019c83      while (i s< 0x40)
+10019c88          if (i != *(arg1 + 8))
+10019c9c              int32_t var_f8
+10019c9c              (*(data_104b13ac + 0xfc))(i, &var_f8)
+10019c9c              
+10019ca6              if (var_f8 != 0)
+10019cad                  int32_t eax_2
+10019cad                  int32_t edx_2
+10019cad                  eax_2, edx_2 = sub_10013c80(&var_f8)
+10019cad                  
+10019cb7                  if (eax_2 != 0)
+10019cbc                      int32_t eax_3
+10019cbc                      int32_t ecx_3
+10019cbc                      eax_3, ecx_3 = sub_10018900(eax_2, edx_2, i, arg1)
+10019cbc                      
+10019cc6                      if (eax_3 != 0)
+10019cc8                          unimplemented  {fld st0, dword [&data_1008b330]}
+10019cd2                          int32_t var_10c_2 = ecx_3
+10019cd9                          float var_10c_3 =
+10019cd9                              fconvert.s(unimplemented  {fstp dword [esp], st0})
+10019cd9                          unimplemented  {fstp dword [esp], st0}
+10019ce4                          int32_t xmm0_1 =
+10019ce4                              sub_10018b20(*(arg1 + 0xc), arg1 + 0x1984, var_10c_3, i)
+10019ce4                          int16_t top = top - 1
+10019ce4                          unimplemented  {call sub_10018b20}
+10019ce4                          
+10019cf2                          if (0 f< xmm0_1)
+10019d24                              sub_1007aaf9(eax_1 ^ &var_fc)
+10019d2f                              return i
+10019d2f          
+10019cf4          i += 1
+10019cf4          
+10019cfb          if (i s>= data_105e44d4)
+10019cfb              break
+10019cfb  
+10019d0b  sub_1007aaf9(eax_1 ^ &var_fc)
+10019d16  return 0xffffffff
+
+
+10019d30    int32_t sub_10019d30(void* arg1 @ edi)
+
+10019d3b  void var_fc
+10019d3b  int32_t eax_1 = __security_cookie ^ &var_fc
+10019d46  int32_t i = 0
+10019d46  
+10019d4e  if (data_105e44d4 s> 0)
+10019d53      while (i s< 0x40)
+10019d58          if (i != *(arg1 + 8))
+10019d6c              int32_t var_f8
+10019d6c              (*(data_104b13ac + 0xfc))(i, &var_f8)
+10019d6c              
+10019d76              if (var_f8 != 0)
+10019d7d                  int32_t eax_2
+10019d7d                  int32_t edx_2
+10019d7d                  eax_2, edx_2 = sub_10013c80(&var_f8)
+10019d7d                  
+10019d87                  if (eax_2 != 0)
+10019d8c                      int32_t eax_3
+10019d8c                      int32_t ecx_3
+10019d8c                      eax_3, ecx_3 = sub_10018900(eax_2, edx_2, i, arg1)
+10019d8c                      
+10019d96                      if (eax_3 == 0)
+10019d98                          unimplemented  {fld st0, dword [&data_1008b330]}
+10019da2                          int32_t var_10c_2 = ecx_3
+10019da9                          float var_10c_3 =
+10019da9                              fconvert.s(unimplemented  {fstp dword [esp], st0})
+10019da9                          unimplemented  {fstp dword [esp], st0}
+10019db4                          int32_t xmm0_1 =
+10019db4                              sub_10018b20(*(arg1 + 0xc), arg1 + 0x1984, var_10c_3, i)
+10019db4                          int16_t top = top - 1
+10019db4                          unimplemented  {call sub_10018b20}
+10019db4                          
+10019dc2                          if (0 f< xmm0_1)
+10019df4                              sub_1007aaf9(eax_1 ^ &var_fc)
+10019dff                              return i
+10019dff          
+10019dc4          i += 1
+10019dc4          
+10019dcb          if (i s>= data_105e44d4)
+10019dcb              break
+10019dcb  
+10019ddb  sub_1007aaf9(eax_1 ^ &var_fc)
+10019de6  return 0xffffffff
+
+
+10019e00    uint32_t sub_10019e00(long double arg1 @ st0, long double arg2 @ st1, void* arg3)
+
+10019e0d  void var_4a0
+10019e0d  int32_t var_4 = __security_cookie ^ &var_4a0
+10019e1c  int32_t ebx
+10019e1c  int32_t var_4a4 = ebx
+10019e1d  int32_t ebp
+10019e1d  int32_t var_4a8 = ebp
+10019e25  uint32_t result = *(arg3 + 0x196c)
+10019e2b  int32_t esi
+10019e2b  int32_t var_4ac = esi
+10019e2c  int32_t var_34 = 0xc0800000
+10019e35  int32_t var_30 = 0xc0800000
+10019e3e  int32_t var_2c = 0xc0800000
+10019e4f  float edi
+10019e4f  float var_4b0 = edi
+10019e4f  int32_t* esp_1 = &var_4b0
+10019e50  int32_t var_1c = 0x40800000
+10019e59  int32_t var_18 = 0x40800000
+10019e62  int32_t var_14 = 0x40800000
+10019e62  
+10019e6d  if (result s>= 0)
+10019e85      float var_488
+10019e85      (*(data_104b13ac + 0xfc))(result, &var_488)
+10019e87      int32_t eax_3 = *(arg3 + 0x196c)
+10019e8d      esp_1 = &var_4b0
+10019e8d      
+10019e93      if (eax_3 s< 0x40)
+10019f63          int32_t var_4bc_1 = 0x10
+10019f66          (*(data_104b13ac + 0x1c4))(*(arg3 + 0x1958), 0x10, fconvert.s(float.t(0)), 
+10019f66              fconvert.s(float.t(1)))
+10019f68          float var_490_1 = fconvert.s(arg1)
+10019f8c          int32_t var_4bc_2 = 7
+10019f8f          (*(data_104b13ac + 0x1c4))(*(arg3 + 0x1958), 7, fconvert.s(float.t(0)), 
+10019f8f              fconvert.s(float.t(1)))
+10019f91          float var_498_1 = fconvert.s(arg2)
+10019f95          long double x87_r1 = fconvert.t(0.94999999999999996)
+10019f95          
+10019fa6          if (fconvert.t(var_490_1) <= x87_r1)
+1001a01d              label_1001a01d:
+1001a01d              int32_t var_2a4_1 = 0xffffffff
+1001a02f              void var_2a8
+1001a02f              (*(data_104b13ac + 0x2cc))(*(arg3 + 0x1968), *(arg3 + 0x1980), &var_2a8)
+1001a038              int32_t* esp_2 = &var_4b0
+1001a038              
+1001a03e              if (var_2a4_1 != 0xffffffff)
+1001a069                  int32_t var_4bc_5
+1001a069                  float var_4b8_7
+1001a069                  float var_4b4_7
+1001a069                  
+1001a069                  if (var_2a4_1 != 2)
+1001a09c                      if (var_2a4_1 == 3)
+1001a09e                          unimplemented  {fld1 }
+1001a0a3                          var_4b4_7 = fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a0a3                          unimplemented  {fstp dword [esp+0x4], st0}
+1001a0a7                          unimplemented  {fldz }
+1001a0a9                          var_4b8_7 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a0a9                          unimplemented  {fstp dword [esp], st0}
+1001a0ac                          var_4bc_5 = 9
+1001a0ae                          goto label_1001a08e
+1001a0ae                      
+1001a0b3                      int32_t var_4b4_9
+1001a0b3                      
+1001a0b3                      if (var_2a4_1 != 4)
+1001a0f6                          if (var_2a4_1 == 5)
+1001a0f8                              unimplemented  {fld1 }
+1001a10f                              float var_4b4_10 =
+1001a10f                                  fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a10f                              unimplemented  {fstp dword [esp+0x4], st0}
+1001a113                              unimplemented  {fldz }
+1001a115                              float var_4b8_9 =
+1001a115                                  fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a115                              unimplemented  {fstp dword [esp], st0}
+1001a118                              int32_t var_4bc_7 = 0xa
+1001a11b                              (*(data_104b13ac + 0x1c4))(*(arg3 + 0x1958), 0xa)
+1001a11d                              float var_490_3 =
+1001a11d                                  fconvert.s(unimplemented  {fstp dword [esp+0x28], st0})
+1001a11d                              unimplemented  {fstp dword [esp+0x28], st0}
+1001a121                              unimplemented  {fld1 }
+1001a126                              float var_4ac_2 =
+1001a126                                  fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a126                              unimplemented  {fstp dword [esp+0x4], st0}
+1001a12a                              unimplemented  {fldz }
+1001a12c                              var_4b0 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a12c                              unimplemented  {fstp dword [esp], st0}
+1001a12f                              var_4b4_9 = 0x11
+1001a131                              goto label_1001a1fb
+1001a131                          
+1001a139                          if (var_2a4_1 == 6)
+1001a13b                              unimplemented  {fld1 }
+1001a140                              var_4b4_7 =
+1001a140                                  fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a140                              unimplemented  {fstp dword [esp+0x4], st0}
+1001a144                              unimplemented  {fldz }
+1001a146                              var_4b8_7 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a146                              unimplemented  {fstp dword [esp], st0}
+1001a149                              var_4bc_5 = 0xc
+1001a14b                              goto label_1001a08e
+1001a14b                          
+1001a153                          if (var_2a4_1 == 7)
+1001a155                              unimplemented  {fld1 }
+1001a15a                              var_4b4_7 =
+1001a15a                                  fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a15a                              unimplemented  {fstp dword [esp+0x4], st0}
+1001a15e                              unimplemented  {fldz }
+1001a160                              var_4b8_7 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a160                              unimplemented  {fstp dword [esp], st0}
+1001a163                              var_4bc_5 = 0xe
+1001a165                              goto label_1001a08e
+1001a165                          
+1001a16d                          if (var_2a4_1 == 8)
+1001a16f                              unimplemented  {fld1 }
+1001a186                              float var_4b4_11 =
+1001a186                                  fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a186                              unimplemented  {fstp dword [esp+0x4], st0}
+1001a18a                              unimplemented  {fldz }
+1001a18c                              float var_4b8_10 =
+1001a18c                                  fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a18c                              unimplemented  {fstp dword [esp], st0}
+1001a18f                              int32_t var_4bc_8 = 0xd
+1001a192                              (*(data_104b13ac + 0x1c4))(*(arg3 + 0x1958), 0xd)
+1001a194                              float var_490_4 =
+1001a194                                  fconvert.s(unimplemented  {fstp dword [esp+0x28], st0})
+1001a194                              unimplemented  {fstp dword [esp+0x28], st0}
+1001a198                              unimplemented  {fld1 }
+1001a19d                              float var_4ac_3 =
+1001a19d                                  fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a19d                              unimplemented  {fstp dword [esp+0x4], st0}
+1001a1a1                              unimplemented  {fldz }
+1001a1a3                              var_4b0 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a1a3                              unimplemented  {fstp dword [esp], st0}
+1001a1a6                              var_4b4_9 = 0x13
+1001a1a8                              goto label_1001a1fb
+1001a1a8                          
+1001a1ad                          if (var_2a4_1 == 9)
+1001a1af                              unimplemented  {fld1 }
+1001a1c6                              float var_4b4_12 =
+1001a1c6                                  fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a1c6                              unimplemented  {fstp dword [esp+0x4], st0}
+1001a1ca                              unimplemented  {fldz }
+1001a1cc                              float var_4b8_11 =
+1001a1cc                                  fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a1cc                              unimplemented  {fstp dword [esp], st0}
+1001a1cf                              int32_t var_4bc_9 = 0xf
+1001a1d2                              (*(data_104b13ac + 0x1c4))(*(arg3 + 0x1958), 0xf)
+1001a1d4                              float var_490_5 =
+1001a1d4                                  fconvert.s(unimplemented  {fstp dword [esp+0x28], st0})
+1001a1d4                              unimplemented  {fstp dword [esp+0x28], st0}
+1001a1d8                              unimplemented  {fld1 }
+1001a1dd                              float var_4ac_4 =
+1001a1dd                                  fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a1dd                              unimplemented  {fstp dword [esp+0x4], st0}
+1001a1e1                              unimplemented  {fldz }
+1001a1e3                              var_4b0 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a1e3                              unimplemented  {fstp dword [esp], st0}
+1001a1e6                              var_4b4_9 = 0x14
+1001a1e6                              goto label_1001a1fb
+1001a0b3                      else
+1001a0b5                          unimplemented  {fld1 }
+1001a0cc                          float var_4b4_8 =
+1001a0cc                              fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a0cc                          unimplemented  {fstp dword [esp+0x4], st0}
+1001a0d0                          unimplemented  {fldz }
+1001a0d2                          float var_4b8_8 =
+1001a0d2                              fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a0d2                          unimplemented  {fstp dword [esp], st0}
+1001a0d5                          int32_t var_4bc_6 = 0xb
+1001a0d8                          (*(data_104b13ac + 0x1c4))(*(arg3 + 0x1958), 0xb)
+1001a0da                          float var_490_2 =
+1001a0da                              fconvert.s(unimplemented  {fstp dword [esp+0x28], st0})
+1001a0da                          unimplemented  {fstp dword [esp+0x28], st0}
+1001a0de                          unimplemented  {fld1 }
+1001a0e3                          float var_4ac_1 =
+1001a0e3                              fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a0e3                          unimplemented  {fstp dword [esp+0x4], st0}
+1001a0e7                          unimplemented  {fldz }
+1001a0e9                          var_4b0 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a0e9                          unimplemented  {fstp dword [esp], st0}
+1001a0ec                          var_4b4_9 = 0x12
+1001a1fb                          label_1001a1fb:
+1001a1fb                          (*(data_104b13ac + 0x1c4))(*(arg3 + 0x1958), var_4b4_9)
+1001a1fd                          float var_480_1 =
+1001a1fd                              fconvert.s(unimplemented  {fstp dword [esp+0x30], st0})
+1001a1fd                          unimplemented  {fstp dword [esp+0x30], st0}
+1001a201                          esp_2 = &var_4a0
+1001a069                  else
+1001a06b                      unimplemented  {fld1 }
+1001a070                      var_4b4_7 = fconvert.s(unimplemented  {fstp dword [esp+0x4], st0})
+1001a070                      unimplemented  {fstp dword [esp+0x4], st0}
+1001a074                      unimplemented  {fldz }
+1001a076                      var_4b8_7 = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a076                      unimplemented  {fstp dword [esp], st0}
+1001a079                      var_4bc_5 = 8
+1001a08e                      label_1001a08e:
+1001a08e                      (*(data_104b13ac + 0x1c4))(*(arg3 + 0x1958), var_4bc_5, var_4b8_7, 
+1001a08e                          var_4b4_7)
+1001a090                      var_488 = fconvert.s(unimplemented  {fstp dword [esp+0x28], st0})
+1001a090                      unimplemented  {fstp dword [esp+0x28], st0}
+1001a201                      esp_2 = &var_4a0
+1001a20b                  int32_t xmm0_5
+1001a20b                  
+1001a20b                  if (data_105a862c == 0)
+1001a223                      xmm0_5 = esp_2[6]
+1001a20b                  else
+1001a20d                      xmm0_5 = data_1059dc48
+1001a215                      esp_2[6] = xmm0_5
+1001a21b                      esp_2[8] = xmm0_5
+1001a21b                  
+1001a22f                  if (not(0 f< xmm0_5))
+1001a239                      esp_2[6] = 0x38d1b717
+1001a239                  
+1001a23f                  int32_t ecx_12 = *(arg3 + 0x196c)
+1001a245                  void* edx_14 = data_104b13ac
+1001a24f                  *(esp_2 - 4) = &esp_2[0xa]
+1001a250                  int32_t eax_17 = *(edx_14 + 0xfc)
+1001a256                  *(esp_2 - 8) = ecx_12
+1001a257                  eax_17()
+1001a259                  char eax_18 = esp_2[0x29].b
+1001a259                  
+1001a269                  if ((eax_18 & 0xe) == 0 && eax_18 s< 0)
+1001a276                      esp_2[5] = rand() & 0x7fff
+1001a27a                      unimplemented  {fild st0, dword [esp+0x14]}
+1001a27e                      unimplemented  {fdiv st0, qword [&data_1008b160]}
+1001a284                      unimplemented  {fld st0, qword [&data_1008b2c0]}
+1001a28a                      unimplemented  {fxch st0, st1}
+1001a28a                      unimplemented  {fxch st0, st1}
+1001a28c                      bool cond:4_1 = unimplemented  {fcomip st0, st1}
+1001a28c                          f<= unimplemented  {fcomip st0, st1}
+1001a28c                      unimplemented  {fcomip st0, st1}
+1001a28e                      unimplemented  {fstp st0, st0}
+1001a28e                      unimplemented  {fstp st0, st0}
+1001a28e                      
+1001a290                      if (not(cond:4_1))
+1001a292                          unimplemented  {fld st0, dword [esp+0x18]}
+1001a296                          unimplemented  {fmul st0, qword [&data_1008b458]}
+1001a29c                          esp_2[6] = fconvert.s(unimplemented  {fstp dword [esp+0x18], st0})
+1001a29c                          unimplemented  {fstp dword [esp+0x18], st0}
+1001a29c                  
+1001a2a0                  unimplemented  {fld st0, dword [esp+0x40]}
+1001a2a4                  unimplemented  {fld st0, st0}
+1001a2a6                  unimplemented  {fsub st0, dword [esp+0x64]}
+1001a2aa                  esp_2[0x112] = fconvert.s(unimplemented  {fstp dword [esp+0x448], st0})
+1001a2aa                  unimplemented  {fstp dword [esp+0x448], st0}
+1001a2b1                  unimplemented  {fld st0, dword [esp+0x44]}
+1001a2b5                  unimplemented  {fld st0, st0}
+1001a2b7                  unimplemented  {fsub st0, dword [esp+0x68]}
+1001a2bb                  esp_2[0x113] = fconvert.s(unimplemented  {fstp dword [esp+0x44c], st0})
+1001a2bb                  unimplemented  {fstp dword [esp+0x44c], st0}
+1001a2c2                  unimplemented  {fld st0, dword [esp+0x48]}
+1001a2c6                  unimplemented  {fld st0, st0}
+1001a2c8                  unimplemented  {fsub st0, dword [esp+0x6c]}
+1001a2cc                  esp_2[0x114] = fconvert.s(unimplemented  {fstp dword [esp+0x450], st0})
+1001a2cc                  unimplemented  {fstp dword [esp+0x450], st0}
+1001a2d3                  unimplemented  {fld st0, dword [esp+0x38]}
+1001a2d7                  unimplemented  {fld1 }
+1001a2d9                  unimplemented  {fdivrp st1, st0}
+1001a2d9                  unimplemented  {fdivrp st1, st0}
+1001a2db                  unimplemented  {fld st0, dword [esp+0x448]}
+1001a2e2                  unimplemented  {fmul st0, st1}
+1001a2e4                  esp_2[0x112] = fconvert.s(unimplemented  {fstp dword [esp+0x448], st0})
+1001a2e4                  unimplemented  {fstp dword [esp+0x448], st0}
+1001a2eb                  unimplemented  {fld st0, dword [esp+0x44c]}
+1001a2f2                  unimplemented  {fmul st0, st1}
+1001a2f4                  esp_2[0x113] = fconvert.s(unimplemented  {fstp dword [esp+0x44c], st0})
+1001a2f4                  unimplemented  {fstp dword [esp+0x44c], st0}
+1001a2fb                  unimplemented  {fmul st0, dword [esp+0x450]}
+1001a302                  esp_2[0x114] = fconvert.s(unimplemented  {fstp dword [esp+0x450], st0})
+1001a302                  unimplemented  {fstp dword [esp+0x450], st0}
+1001a309                  unimplemented  {fld st0, dword [ebp+0x17dc]}
+1001a30f                  unimplemented  {fld st0, dword [&data_105e2ef8]}
+1001a315                  bool cond:3_1 =
+1001a315                      unimplemented  {fcomi st0, st1} f<= unimplemented  {fcomi st0, st1}
+1001a317                  unimplemented  {fstp st1, st0}
+1001a317                  unimplemented  {fstp st1, st0}
+1001a317                  
+1001a319                  if (cond:3_1)
+1001a386                      unimplemented  {fstp st0, st0}
+1001a386                      unimplemented  {fstp st0, st0}
+1001a319                  else
+1001a324                      unimplemented  {fadd qword [&data_1008b140]}
+1001a32a                      *(arg3 + 0x1838) = esp_2[0x112]
+1001a33b                      *(arg3 + 0x183c) = esp_2[0x113]
+1001a343                      *(arg3 + 0x17dc) =
+1001a343                          fconvert.s(unimplemented  {fstp dword [ebp+0x17dc], st0})
+1001a343                      unimplemented  {fstp dword [ebp+0x17dc], st0}
+1001a352                      *(arg3 + 0x1840) = esp_2[0x114]
+1001a360                      *(arg3 + 0x1844) = esp_2[0x10]
+1001a36e                      *(arg3 + 0x1848) = esp_2[0x11]
+1001a37c                      *(arg3 + 0x184c) = esp_2[0x12]
+1001a37c                  
+1001a388                  unimplemented  {fld st0, dword [esp+0x20]}
+1001a38c                  unimplemented  {fld st0, qword [&data_1008b348]}
+1001a392                  bool cond:6_1 =
+1001a392                      unimplemented  {fcomip st0, st1} f<= unimplemented  {fcomip st0, st1}
+1001a392                  unimplemented  {fcomip st0, st1}
+1001a394                  unimplemented  {fstp st0, st0}
+1001a394                  unimplemented  {fstp st0, st0}
+1001a394                  
+1001a396                  if (cond:6_1)
+1001a443                      unimplemented  {fstp st2, st0}
+1001a443                      unimplemented  {fstp st2, st0}
+1001a445                      unimplemented  {fstp st0, st0}
+1001a445                      unimplemented  {fstp st0, st0}
+1001a447                      unimplemented  {fstp st0, st0}
+1001a447                      unimplemented  {fstp st0, st0}
+1001a396                  else
+1001a39c                      unimplemented  {fld st0, dword [ebp+0x1844]}
+1001a3a2                      unimplemented  {fsubp st3, st0}
+1001a3a2                      unimplemented  {fsubp st3, st0}
+1001a3a4                      unimplemented  {fxch st0, st2}
+1001a3a4                      unimplemented  {fxch st0, st2}
+1001a3a6                      esp_2[0x10c] =
+1001a3a6                          fconvert.s(unimplemented  {fstp dword [esp+0x430], st0})
+1001a3a6                      unimplemented  {fstp dword [esp+0x430], st0}
+1001a3ad                      unimplemented  {fsub st0, dword [ebp+0x1848]}
+1001a3b3                      esp_2[0x10d] =
+1001a3b3                          fconvert.s(unimplemented  {fstp dword [esp+0x434], st0})
+1001a3b3                      unimplemented  {fstp dword [esp+0x434], st0}
+1001a3ba                      unimplemented  {fsub st0, dword [ebp+0x184c]}
+1001a3c0                      esp_2[0x10e] =
+1001a3c0                          fconvert.s(unimplemented  {fstp dword [esp+0x438], st0})
+1001a3c0                      unimplemented  {fstp dword [esp+0x438], st0}
+1001a3c7                      unimplemented  {fld st0, dword [esp+0x434]}
+1001a3ce                      unimplemented  {fld st0, dword [esp+0x430]}
+1001a3d5                      unimplemented  {fld st0, dword [esp+0x438]}
+1001a3dc                      unimplemented  {fld st0, st1}
+1001a3de                      unimplemented  {fmulp st2, st0}
+1001a3de                      unimplemented  {fmulp st2, st0}
+1001a3e0                      unimplemented  {fld st0, st2}
+1001a3e2                      unimplemented  {fmulp st3, st0}
+1001a3e2                      unimplemented  {fmulp st3, st0}
+1001a3e4                      unimplemented  {fxch st0, st1}
+1001a3e4                      unimplemented  {fxch st0, st1}
+1001a3e6                      unimplemented  {faddp st2, st0}
+1001a3e6                      unimplemented  {faddp st2, st0}
+1001a3e8                      unimplemented  {fmul st0, st0}
+1001a3ea                      unimplemented  {faddp st1, st0}
+1001a3ea                      unimplemented  {faddp st1, st0}
+1001a3ec                      esp_2[5] = fconvert.s(unimplemented  {fstp dword [esp+0x14], st0})
+1001a3ec                      unimplemented  {fstp dword [esp+0x14], st0}
+1001a3f0                      unimplemented  {fld st0, dword [&data_1008b450]}
+1001a3f6                      unimplemented  {fld st0, dword [esp+0x14]}
+1001a3fa                      bool cond:5_1 = unimplemented  {fcomip st0, st1}
+1001a3fa                          f<= unimplemented  {fcomip st0, st1}
+1001a3fa                      unimplemented  {fcomip st0, st1}
+1001a3fc                      unimplemented  {fstp st0, st0}
+1001a3fc                      unimplemented  {fstp st0, st0}
+1001a3fc                      
+1001a3fe                      if (not(cond:5_1))
+1001a400                          unimplemented  {fld st0, dword [ebp+0x183c]}
+1001a406                          unimplemented  {fmul st0, dword [esp+0x44c]}
+1001a40d                          unimplemented  {fld st0, dword [ebp+0x1838]}
+1001a413                          unimplemented  {fmul st0, dword [esp+0x448]}
+1001a41a                          unimplemented  {faddp st1, st0}
+1001a41a                          unimplemented  {faddp st1, st0}
+1001a41c                          unimplemented  {fld st0, dword [ebp+0x1840]}
+1001a422                          unimplemented  {fmul st0, dword [esp+0x450]}
+1001a429                          unimplemented  {faddp st1, st0}
+1001a429                          unimplemented  {faddp st1, st0}
+1001a42b                          unimplemented  {fldz }
+1001a42d                          bool cond:7_1 = unimplemented  {fcomip st0, st1}
+1001a42d                              f<= unimplemented  {fcomip st0, st1}
+1001a42d                          unimplemented  {fcomip st0, st1}
+1001a42f                          unimplemented  {fstp st0, st0}
+1001a42f                          unimplemented  {fstp st0, st0}
+1001a42f                          
+1001a431                          if (not(cond:7_1))
+1001a433                              unimplemented  {fld st0, dword [esp+0x18]}
+1001a437                              unimplemented  {fmul st0, qword [&data_1008b448]}
+1001a43d                              esp_2[6] =
+1001a43d                                  fconvert.s(unimplemented  {fstp dword [esp+0x18], st0})
+1001a43d                              unimplemented  {fstp dword [esp+0x18], st0}
+1001a43d                  
+1001a449                  int32_t ecx_13 = *(arg3 + 0x196c)
+1001a44f                  unimplemented  {fld st0, dword [&data_1008b330]}
+1001a455                  int32_t edx_15 = *(arg3 + 0xc)
+1001a458                  *(esp_2 - 4) = ecx_13
+1001a459                  *(esp_2 - 8) = ecx_13
+1001a460                  *(esp_2 - 8) = fconvert.s(unimplemented  {fstp dword [esp], st0})
+1001a460                  unimplemented  {fstp dword [esp], st0}
+1001a463                  *(esp_2 - 0xc) = arg3 + 0x1984
+1001a46a                  *(esp_2 - 0x10) = edx_15
+1001a46b                  long double st0_1
+1001a46b                  float xmm0_12
+1001a46b                  st0_1, xmm0_12 = sub_10018b20()
+1001a46b                  unimplemented  {call sub_10018b20}
+1001a470                  esp_1 = esp_2
+1001a479                  int32_t eax_37
+1001a479                  int32_t xmm0_34
+1001a479                  
+1001a479                  if (int.d(xmm0_12) == 0)
+1001acf9                      unimplemented  {fld st0, dword [ebp+0x197c]}
+1001acff                      unimplemented  {fadd qword [&data_1008b388]}
+1001ad05                      eax_37 = esp_1[0x83]
+1001ad12                      esp_1[0x10f] = *(arg3 + 0x1974)
+1001ad1b                      int32_t xmm0_36 = *(arg3 + 0x1978)
+1001ad23                      esp_1[0x111] =
+1001ad23                          fconvert.s(unimplemented  {fstp dword [esp+0x444], st0})
+1001ad23                      unimplemented  {fstp dword [esp+0x444], st0}
+1001ad2a                      esp_1[0x110] = xmm0_36
+1001ad2a                      
+1001ad53                      if (not(esp_1[8] f<= 0.5f)
+1001ad53                              && (eax_37 == 9 || eax_37 == 5 || eax_37 == 4))
+1001ad59                          int32_t edx_22 = *(arg3 + 8)
+1001ad5f                          int32_t eax_38 = *(arg3 + 0x1334)
+1001ad65                          esp_1[0x55] = 0
+1001ad6e                          int32_t xmm0_38 = *(arg3 + 0x1328)
+1001ad72                          esp_1[0x50] = edx_22
+1001ad79                          esp_1[0x46] = xmm0_38
+1001ad82                          int32_t xmm0_39 = *(arg3 + 0x132c)
+1001ad91                          *(esp_1 - 4) = &esp_1[0x119]
+1001ad92                          int32_t edx_24 = *(arg3 + 0x1970)
+1001ad98                          esp_1[0x49] = eax_38
+1001ad9f                          esp_1[0x47] = xmm0_39
+1001ada8                          int32_t xmm0_40 = *(arg3 + 0x1330)
+1001adb0                          *(esp_1 - 8) = 0x11c0fbe
+1001adb5                          esp_1[0x48] = xmm0_40
+1001adcd                          *(esp_1 - 0xc) = &esp_1[0x46]
+1001adce                          void* eax_40 = data_104b13ac
+1001add3                          esp_1[0x4a] = 0xc1000000
+1001addc                          esp_1[0x4b] = 0xc1000000
+1001ade5                          esp_1[0x4c] = 0xc1000000
+1001adf6                          *(esp_1 - 0x10) = edx_24
+1001adf7                          esp_1[0x54] = 0
+1001ae02                          esp_1[0x4d] = 0x41000000
+1001ae0b                          esp_1[0x4e] = 0x41000000
+1001ae14                          esp_1[0x4f] = 0x41000000
+1001ae1d                          *(esp_1 - 0x14) = arg3 + 0x1974
+1001ae1d                          
+1001ae2b                          if ((*(eax_40 + 0x2b4))() != 0)
+1001ae31                              unimplemented  {fld st0, dword [esp+0x464]}
+1001ae38                              unimplemented  {fsub st0, dword [ebx]}
+1001ae3a                              esp_1[0x10c] =
+1001ae3a                                  fconvert.s(unimplemented  {fstp dword [esp+0x430], st0})
+1001ae3a                              unimplemented  {fstp dword [esp+0x430], st0}
+1001ae41                              unimplemented  {fld st0, dword [esp+0x468]}
+1001ae48                              unimplemented  {fsub st0, dword [ebp+0x132c]}
+1001ae4e                              esp_1[0x10d] =
+1001ae4e                                  fconvert.s(unimplemented  {fstp dword [esp+0x434], st0})
+1001ae4e                              unimplemented  {fstp dword [esp+0x434], st0}
+1001ae55                              unimplemented  {fld st0, dword [esp+0x46c]}
+1001ae5c                              unimplemented  {fld st0, st0}
+1001ae5e                              unimplemented  {fsub st0, dword [ebp+0x1330]}
+1001ae64                              esp_1[0x10e] =
+1001ae64                                  fconvert.s(unimplemented  {fstp dword [esp+0x438], st0})
+1001ae64                              unimplemented  {fstp dword [esp+0x438], st0}
+1001ae6b                              unimplemented  {fld st0, dword [esp+0x434]}
+1001ae72                              unimplemented  {fld st0, dword [esp+0x430]}
+1001ae79                              unimplemented  {fld st0, dword [esp+0x438]}
+1001ae80                              unimplemented  {fld st0, st1}
+1001ae82                              unimplemented  {fmulp st2, st0}
+1001ae82                              unimplemented  {fmulp st2, st0}
+1001ae84                              unimplemented  {fld st0, st2}
+1001ae86                              unimplemented  {fmulp st3, st0}
+1001ae86                              unimplemented  {fmulp st3, st0}
+1001ae88                              unimplemented  {fxch st0, st1}
+1001ae88                              unimplemented  {fxch st0, st1}
+1001ae8a                              unimplemented  {faddp st2, st0}
+1001ae8a                              unimplemented  {faddp st2, st0}
+1001ae8c                              unimplemented  {fmul st0, st0}
+1001ae8e                              unimplemented  {faddp st1, st0}
+1001ae8e                              unimplemented  {faddp st1, st0}
+1001ae90                              esp_1[5] =
+1001ae90                                  fconvert.s(unimplemented  {fstp dword [esp+0x14], st0})
+1001ae90                              unimplemented  {fstp dword [esp+0x14], st0}
+1001ae94                              unimplemented  {fld st0, qword [&data_1008b418]}
+1001ae9a                              unimplemented  {fld st0, dword [esp+0x14]}
+1001ae9e                              bool cond:10_1 = unimplemented  {fcomip st0, st1}
+1001ae9e                                  f<= unimplemented  {fcomip st0, st1}
+1001ae9e                              unimplemented  {fcomip st0, st1}
+1001aea0                              unimplemented  {fstp st0, st0}
+1001aea0                              unimplemented  {fstp st0, st0}
+1001aea0                              
+1001aea2                              if (cond:10_1)
+1001aed7                                  unimplemented  {fstp st0, st0}
+1001aed7                                  unimplemented  {fstp st0, st0}
+1001aea2                              else
+1001aead                                  unimplemented  {fsub st0, qword [&data_1008b138]}
+1001aeb3                                  esp_1[0x10f] = esp_1[0x119]
+1001aebc                                  int32_t xmm0_42 = esp_1[0x11a]
+1001aec5                                  esp_1[0x111] = fconvert.s(unimplemented  {fstp dword [esp
+1001aec5                                      +0x444], st0})

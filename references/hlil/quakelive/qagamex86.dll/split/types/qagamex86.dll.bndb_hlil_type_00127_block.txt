@@ -1,0 +1,35 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10039383                                          unimplemented  {fstp dword [esp+0x30], st0}
+10039387                                          unimplemented  {fld st0, dword [esp+0x28]}
+1003938b                                          unimplemented  {fld st0, dword [esp+0x2c]}
+1003938f                                          bool cond:10_1 = unimplemented  {fcomip st0, st1}
+1003938f                                              f<= unimplemented  {fcomip st0, st1}
+1003938f                                          unimplemented  {fcomip st0, st1}
+10039391                                          unimplemented  {fstp st0, st0}
+10039391                                          unimplemented  {fstp st0, st0}
+10039391                                          
+10039393                                          if (not(cond:10_1))
+1003939b                                              float var_508_3 = var_504_2
+1003939b                                          
+100393a1                                          unimplemented  {fld st0, dword [esp+0x28]}
+100393a5                                          unimplemented  {fld st0, dword [esp+0x30]}
+100393a9                                          bool cond:12_1 = unimplemented  {fcomip st0, st1}
+100393a9                                              f<= unimplemented  {fcomip st0, st1}
+100393a9                                          unimplemented  {fcomip st0, st1}
+100393ab                                          unimplemented  {fstp st0, st0}
+100393ab                                          unimplemented  {fstp st0, st0}
+100393ab                                          
+100393ad                                          if (not(cond:12_1))
+100393b5                                              float var_508_4 = var_500_2
+100393b5                                          
+100393bb                                          unimplemented  {fld st0, dword [esp+0x28]}
+100393bf                                          xmm0_2 - -1f
+100393c2                                          unimplemented  {fmul st0, dword [esp+0x50]}
+100393c6                                          i_7:1.b = (xmm0_2 == -1f ? 1 : 0) << 6
+100393c6                                              | (is_unordered.d(xmm0_2, -1f) ? 1 : 0) << 2
+100393c6                                              | (xmm0_2 < -1f ? 1 : 0)
+100393c7                                          float var_508_5 = fconvert.s(unimplemented  {fstp 
+100393c7                                              dword [esp+0x28], st0})

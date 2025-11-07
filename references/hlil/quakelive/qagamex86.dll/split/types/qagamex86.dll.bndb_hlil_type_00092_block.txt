@@ -1,0 +1,33 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+10024b07                                              unimplemented  {fstp qword [esp], st0}
+10024b26                                              void* eax_10
+10024b26                                              void* edx_6
+10024b26                                              eax_10, edx_6 = sub_10070f30(
+10024b26                                                  sub_10070cb0("%1.2f"), &var_40c, "skill", 
+10024b26                                                  &var_40c)
+10024b48                                              char* var_558_7
+10024b48                                              
+10024b48                                              if (not(var_540_1 < 1f)
+10024b48                                                      && not(2f <= var_540_1))
+10024b8e                                                  eax_10 = &var_40c
+10024b95                                                  var_558_7 = &var_40c
+10024b48                                              else if (not(3f <= var_540_1))
+10024b65                                                  var_558_7 = &var_40c
+10024b5c                                              else if (4f <= var_540_1)
+10024b8e                                                  eax_10 = &var_40c
+10024b95                                                  var_558_7 = &var_40c
+10024b78                                              else
+10024b7a                                                  edx_6 = &var_40c
+10024b81                                                  var_558_7 = &var_40c
+10024b81                                              
+10024b9b                                              sub_10070f30(eax_10, edx_6, "handicap", 
+10024b9b                                                  var_558_7)
+10024baf                                              sub_10070cf0()
+10024bbf                                              void var_524
+10024bbf                                              sub_100709f0(&var_524, 0x40)
+10024bd6                                              atof(sub_10070cf0())
+10024bdc                                              float var_4e4_1 = fconvert.s(unimplemented  {
+10024bdc                                                  fstp dword [esp+0x74], st0})

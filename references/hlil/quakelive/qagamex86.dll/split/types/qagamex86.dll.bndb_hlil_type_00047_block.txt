@@ -1,0 +1,35 @@
+/* Extracted from: qagamex86.dll.bndb_hlil.txt */
+/* Kind: type */
+/* Name: block */
+
+1001970b                                          unimplemented  {fstp dword [esp], st0}
+10019716                                          int32_t eax_17
+10019716                                          int32_t edx_7
+10019716                                          int32_t xmm0_6
+10019716                                          eax_17, edx_7, xmm0_6 = sub_10018b20(
+10019716                                              *(esi + 0xc), esi + 0x1984, var_288_6, i)
+10019716                                          top -= 1
+10019716                                          unimplemented  {call sub_10018b20}
+10019716                                          
+10019724                                          if (0 f< xmm0_6)
+10019724                                              goto label_10019741
+10019724                                          
+10019729                                          int32_t eax_18 =
+10019729                                              sub_10020c10(eax_17, edx_7, esi, i.b)
+10019729                                          unimplemented  {call sub_10020c10}
+10019729                                          
+10019733                                          if (eax_18 == 0)
+100197e7                                              ebx = arg6
+10019733                                          else
+10019739                                              var_24c_1 = 1
+10019741                                              label_10019741:
+10019741                                              
+10019771                                              if (arg6 s>= 0 || var_268_2 <= 10000f
+10019771                                                      || ecx_2 != 0
+10019771                                                      || (var_238 & 0x100) != 0)
+10019745                                                  goto label_10019826
+10019745                                              
+10019777                                              unimplemented  {fld st0, dword [esi+0x130c]}
+10019784                                              unimplemented  {fsub st0, dword [esp+0x58]}
+10019788                                              var_274 = fconvert.s(unimplemented  {fstp 
+10019788                                                  dword [esp+0xc], st0})
