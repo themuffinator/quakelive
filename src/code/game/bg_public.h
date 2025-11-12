@@ -158,6 +158,21 @@ typedef enum {
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
 #define	MAXTOUCH	32
+typedef struct pmoveParams_s {
+	float	wishSpeed;
+	float	walkAccel;
+	float	walkFriction;
+	float	airAccel;
+	float	airControl;
+	float	airStepFriction;
+	int	airSteps;
+	float	airStopAccel;
+	float	strafeAccel;
+	float	circleStrafeFriction;
+	qboolean	bunnyHop;
+	qboolean	autoHop;
+} pmoveParams_t;
+
 typedef struct {
 	// state (in / out)
 	playerState_t	*ps;
@@ -185,6 +200,8 @@ typedef struct {
 	// for fixed msec Pmove
 	int			pmove_fixed;
 	int			pmove_msec;
+
+	const pmoveParams_t	*pmoveParams;
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame
