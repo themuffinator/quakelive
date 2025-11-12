@@ -97,7 +97,16 @@ static void G_PmoveCacheSettings( void ) {
 	g_pmoveSettings.jumpVelocityScaleAdd = g_pmove_jumpVelocityScaleAdd_cvar.value;
 	g_pmoveSettings.jumpVelocityTimeThreshold = g_pmove_jumpVelocityTimeThreshold_cvar.value;
 	g_pmoveSettings.jumpVelocityTimeThresholdOffset = g_pmove_jumpVelocityTimeThresholdOffset_cvar.value;
-	g_pmoveSettings.noPlayerClip = ( g_pmove_noPlayerClip_cvar.integer != 0 ) && ( g_instaGib.integer != 0 );
+	{
+		qboolean	noPlayerClip;
+
+		noPlayerClip = ( g_pmove_noPlayerClip_cvar.integer != 0 );
+		if ( g_instaGib.integer != 0 ) {
+			noPlayerClip = qtrue;
+		}
+
+		g_pmoveSettings.noPlayerClip = noPlayerClip;
+	}
 	g_pmoveSettings.rampJump = ( g_pmove_rampJump_cvar.integer != 0 );
 	g_pmoveSettings.rampJumpScale = g_pmove_rampJumpScale_cvar.value;
 	g_pmoveSettings.stepHeight = g_pmove_stepHeight_cvar.value;

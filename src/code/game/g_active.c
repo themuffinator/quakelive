@@ -338,6 +338,7 @@ void SpectatorThink( gentity_t *ent, usercmd_t *ucmd ) {
 		pm.ps = &client->ps;
 		pm.cmd = *ucmd;
 		pm.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;	// spectators can fly through bodies
+		pm.pmoveSettings = &g_pmoveSettings;
 		pm.trace = trap_Trace;
 		pm.pointcontents = trap_PointContents;
 
@@ -851,6 +852,9 @@ void ClientThink_real( gentity_t *ent ) {
 	if ( client->ps.powerups[PW_HASTE] ) {
 		client->ps.speed *= 1.3;
 	}
+	if ( g_pmoveSettings.noPlayerClip && g_pmoveSettings.velocityGh > 0.0f ) {
+		client->ps.speed = g_pmoveSettings.velocityGh;
+	}
 
 	// Let go of the hook if we aren't firing
 	if ( client->ps.weapon == WP_GRAPPLING_HOOK &&
@@ -913,6 +917,10 @@ void ClientThink_real( gentity_t *ent ) {
 	else {
 		pm.tracemask = MASK_PLAYERSOLID;
 	}
+	if ( g_pmoveSettings.noPlayerClip ) {
+		pm.tracemask &= ~CONTENTS_BODY;
+	}
+	pm.pmoveSettings = &g_pmoveSettings;
 	pm.trace = trap_Trace;
 	pm.pointcontents = trap_PointContents;
 	pm.debugLevel = g_debugMove.integer;

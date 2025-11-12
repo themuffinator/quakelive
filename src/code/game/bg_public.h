@@ -154,6 +154,7 @@ typedef enum {
 #define PMF_FOLLOW			4096	// spectate following another player
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
+#define PMF_CROUCH_SLIDE	32768	// crouch slide friction effect is active
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
@@ -172,6 +173,45 @@ typedef struct pmoveParams_s {
 	qboolean	bunnyHop;
 	qboolean	autoHop;
 } pmoveParams_t;
+
+typedef struct pmove_settings_s {
+	float	airAccel;
+	float	airControl;
+	float	airStepFriction;
+	int	airSteps;
+	float	airStopAccel;
+	qboolean	autoHop;
+	qboolean	bunnyHop;
+	qboolean	chainJump;
+	float	chainJumpVelocity;
+	float	circleStrafeFriction;
+	qboolean	crouchSlide;
+	float	crouchSlideFriction;
+	int	crouchSlideTime;
+	qboolean	crouchStepJump;
+	qboolean	doubleJump;
+	float	jumpTimeDeltaMin;
+	float	jumpVelocity;
+	float	jumpVelocityMax;
+	float	jumpVelocityScaleAdd;
+	float	jumpVelocityTimeThreshold;
+	float	jumpVelocityTimeThresholdOffset;
+	qboolean	noPlayerClip;
+	qboolean	rampJump;
+	float	rampJumpScale;
+	float	stepHeight;
+	qboolean	stepJump;
+	float	stepJumpVelocity;
+	float	strafeAccel;
+	float	velocityGh;
+	float	walkAccel;
+	float	walkFriction;
+	float	waterSwimScale;
+	float	waterWadeScale;
+	int	weaponDropTime;
+	int	weaponRaiseTime;
+	float	wishSpeed;
+} pmove_settings_t;
 
 typedef struct {
 	// state (in / out)
@@ -202,6 +242,7 @@ typedef struct {
 	int			pmove_msec;
 
 	const pmoveParams_t	*pmoveParams;
+	const pmove_settings_t	*pmoveSettings;
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame

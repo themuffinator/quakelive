@@ -1178,45 +1178,6 @@ int		trap_BotAllocWeaponState(void);
 void	trap_BotFreeWeaponState(int weaponstate);
 void	trap_BotResetWeaponState(int weaponstate);
 
-typedef struct {
-	float airAccel;
-	float airControl;
-	float airStepFriction;
-	int airSteps;
-	float airStopAccel;
-	qboolean autoHop;
-	qboolean bunnyHop;
-	qboolean chainJump;
-	float chainJumpVelocity;
-	float circleStrafeFriction;
-	qboolean crouchSlide;
-	float crouchSlideFriction;
-	int crouchSlideTime;
-	qboolean crouchStepJump;
-	qboolean doubleJump;
-	float jumpTimeDeltaMin;
-	float jumpVelocity;
-	float jumpVelocityMax;
-	float jumpVelocityScaleAdd;
-	float jumpVelocityTimeThreshold;
-	float jumpVelocityTimeThresholdOffset;
-	qboolean noPlayerClip;
-	qboolean rampJump;
-	float rampJumpScale;
-	float stepHeight;
-	qboolean stepJump;
-	float stepJumpVelocity;
-	float strafeAccel;
-	float velocityGh;
-	float walkAccel;
-	float walkFriction;
-	float waterSwimScale;
-	float waterWadeScale;
-	int weaponDropTime;
-	int weaponRaiseTime;
-	float wishSpeed;
-} pmove_settings_t;
-
 extern pmove_settings_t g_pmoveSettings;
 
 void G_RegisterPmoveCvars( void );

@@ -90,3 +90,5 @@ qboolean	PM_SlideMove( qboolean gravity );
 void		PM_StepSlideMove( qboolean gravity );
 
 
+const pmove_settings_t *PM_GetActiveSettings( void );
+
