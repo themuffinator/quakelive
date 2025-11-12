@@ -1171,6 +1171,10 @@ typedef struct playerState_s {
 	int			groundTraceLatestEntNum;
 	vec3_t		groundTraceLatestNormal;
 
+	int			doubleJumpTime;
+	int			doubleJumpEntNum;
+	vec3_t		doubleJumpNormal;
+
 	int			legsTimer;		// don't change low priority animations until this runs out
 	int			legsAnim;		// mask off ANIM_TOGGLEBIT
 

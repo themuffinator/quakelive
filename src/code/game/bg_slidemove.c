@@ -114,6 +114,10 @@ qboolean	PM_SlideMove( qboolean gravity ) {
 		// save entity for contact
 		PM_AddTouchEnt( trace.entityNum );
 
+		if ( trace.entityNum != ENTITYNUM_NONE && trace.plane.normal[2] < MIN_WALK_NORMAL ) {
+			PM_RecordDoubleJumpSupport( trace.entityNum, trace.plane.normal, pm->cmd.serverTime );
+		}
+
 		time_left -= time_left * trace.fraction;
 
 		if (numplanes >= MAX_CLIP_PLANES) {

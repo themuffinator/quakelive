@@ -87,6 +87,8 @@ void PM_ClipVelocity( vec3_t in, vec3_t normal, vec3_t out, float overbounce );
 void PM_AddTouchEnt( int entityNum );
 void PM_AddEvent( int newEvent );
 
+void PM_RecordDoubleJumpSupport( int entityNum, const vec3_t normal, int contactTime );
+
 qboolean	PM_SlideMove( qboolean gravity );
 void		PM_StepSlideMove( qboolean gravity, float stepHeight );
 void		PM_ApplyStepJump( float stepDelta, qboolean fromCrouchSlide );

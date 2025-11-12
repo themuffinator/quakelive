@@ -269,6 +269,136 @@ void PM_AddTouchEnt( int entityNum ) {
 }
 
 /*
+=============
+PM_RecordDoubleJumpSupport
+
+Caches the most recent non-walkable collision that can seed a double jump.
+=============
+*/
+void PM_RecordDoubleJumpSupport( int entityNum, const vec3_t normal, int contactTime ) {
+	const pmove_settings_t	*settings;
+
+	if ( !pm || !pm->ps || !normal ) {
+		return;
+	}
+
+	settings = PM_GetActiveSettings();
+	if ( !settings || !settings->doubleJump ) {
+		return;
+	}
+
+	if ( entityNum == ENTITYNUM_NONE ) {
+		return;
+	}
+
+	if ( normal[2] >= MIN_WALK_NORMAL ) {
+		return;
+	}
+
+	if ( contactTime <= 0 ) {
+		return;
+	}
+
+	if ( contactTime < pm->ps->doubleJumpTime ) {
+		return;
+	}
+
+	pm->ps->doubleJumpTime = contactTime;
+	pm->ps->doubleJumpEntNum = entityNum;
+	VectorCopy( normal, pm->ps->doubleJumpNormal );
+}
+
+/*
+=============
+PM_ResetDoubleJumpSupport
+
+Clears the cached double jump contact state.
+=============
+*/
+static void PM_ResetDoubleJumpSupport( void ) {
+	if ( !pm || !pm->ps ) {
+		return;
+	}
+
+	pm->ps->doubleJumpTime = 0;
+	pm->ps->doubleJumpEntNum = ENTITYNUM_NONE;
+	VectorClear( pm->ps->doubleJumpNormal );
+}
+
+/*
+=============
+PM_CanTriggerDoubleJump
+
+Evaluates whether the stored collision data enables a double jump.
+=============
+*/
+static qboolean PM_CanTriggerDoubleJump( const pmove_settings_t *settings, int commandTime, int timeDelta ) {
+	int	supportDelta;
+	int	groundDelta;
+
+	if ( !pm || !pm->ps || !settings ) {
+		return qfalse;
+	}
+
+	if ( !settings->doubleJump ) {
+		PM_ResetDoubleJumpSupport();
+		return qfalse;
+	}
+
+	if ( pm->ps->pm_flags & PMF_DOUBLE_JUMP ) {
+		return qfalse;
+	}
+
+	if ( pm->ps->doubleJumpEntNum == ENTITYNUM_NONE ) {
+		PM_ResetDoubleJumpSupport();
+		return qfalse;
+	}
+
+	if ( pm->ps->doubleJumpTime <= 0 ) {
+		PM_ResetDoubleJumpSupport();
+		return qfalse;
+	}
+
+	if ( commandTime < pm->ps->doubleJumpTime ) {
+		PM_ResetDoubleJumpSupport();
+		return qfalse;
+	}
+
+	if ( pm->ps->doubleJumpNormal[2] >= MIN_WALK_NORMAL ) {
+		PM_ResetDoubleJumpSupport();
+		return qfalse;
+	}
+
+	supportDelta = commandTime - pm->ps->doubleJumpTime;
+	if ( supportDelta < 0 ) {
+		supportDelta = 0;
+	}
+	if ( settings->jumpTimeDeltaMin > 0.0f && (float)supportDelta > settings->jumpTimeDeltaMin ) {
+		PM_ResetDoubleJumpSupport();
+		return qfalse;
+	}
+
+	if ( pm->ps->groundTraceLatestTime > 0 && pm->ps->groundTraceLatestTime >= pm->ps->doubleJumpTime ) {
+		groundDelta = pm->ps->groundTraceLatestTime - pm->ps->doubleJumpTime;
+		if ( groundDelta < 0 ) {
+			groundDelta = 0;
+		}
+		if ( settings->jumpTimeDeltaMin > 0.0f && (float)groundDelta > settings->jumpTimeDeltaMin ) {
+			PM_ResetDoubleJumpSupport();
+			return qfalse;
+		}
+	}
+
+	if ( timeDelta >= 0 && settings->jumpTimeDeltaMin > 0.0f ) {
+		if ( (float)timeDelta >= settings->jumpTimeDeltaMin ) {
+			return qfalse;
+		}
+	}
+
+	return qtrue;
+}
+
+/*
 ===================
 PM_StartTorsoAnim
 ===================
@@ -629,13 +759,16 @@ static qboolean PM_CheckJump( void ) {
 	jumpVelocityScale = 1.0f;
 	chainJumpActive = qfalse;
 	rampJumpActive = qfalse;
+	doubleJumpActive = qfalse;
 	timeDelta = -1;
 
 	jumpVelocityScale = PM_EvaluateJumpVelocityScale( pm->ps, settings, pm->cmd.serverTime, &timeDelta );
 
 	if ( settings->jumpTimeDeltaMin > 0.0f && timeDelta >= 0 ) {
 		if ( (float)timeDelta < settings->jumpTimeDeltaMin ) {
-			if ( settings->chainJump ) {
+			if ( settings->doubleJump && PM_CanTriggerDoubleJump( settings, pm->cmd.serverTime, timeDelta ) ) {
+				doubleJumpActive = qtrue;
+			} else if ( settings->chainJump ) {
 				chainJumpActive = qtrue;
 			} else {
 				return qfalse;
@@ -680,7 +813,15 @@ static qboolean PM_CheckJump( void ) {
 	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
 	VectorClear( pm->ps->groundTraceLatestNormal );
 	pm->ps->velocity[2] = jumpVelocity;
-	PM_AddEvent( EV_JUMP );
+
+	if ( doubleJumpActive ) {
+		PM_AddEvent( EV_DOUBLE_JUMP );
+		pm->ps->pm_flags |= PMF_DOUBLE_JUMP;
+		PM_ResetDoubleJumpSupport();
+	} else {
+		PM_AddEvent( EV_JUMP );
+		pm->ps->pm_flags &= ~PMF_DOUBLE_JUMP;
+	}
 
 	if ( chainJumpActive ) {
 		pm->ps->pm_flags |= PMF_CHAIN_JUMP;
@@ -1570,6 +1711,8 @@ static void PM_GroundTrace( void ) {
 		}
 		
 		PM_CrashLand();
+
+		pm->ps->pm_flags &= ~PMF_DOUBLE_JUMP;
 
 		// don't do landing time if we were just going down a slope
 		if ( pml.previous_velocity[2] < -200 ) {

@@ -157,6 +157,7 @@ typedef enum {
 #define PMF_CROUCH_SLIDE	32768	// crouch slide friction effect is active
 #define PMF_RAMP_JUMP		65536	// ramp jump scale applied to takeoff
 #define PMF_CHAIN_JUMP	131072	// jump executed within chain window
+#define PMF_DOUBLE_JUMP	262144	// performed a double jump since last landing
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
@@ -427,6 +428,7 @@ typedef enum {
 	EV_JUMP_PAD,			// boing sound at origin, jump sound on player
 
 	EV_JUMP,
+	EV_DOUBLE_JUMP,
 	EV_WATER_TOUCH,	// foot touches
 	EV_WATER_LEAVE,	// foot leaves
 	EV_WATER_UNDER,	// head touches
