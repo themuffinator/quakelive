@@ -64,6 +64,15 @@ extern	float	pm_wadeScale;
 
 extern	float	pm_accelerate;
 extern	float	pm_airaccelerate;
+extern	float	pm_aircontrol;
+extern	float	pm_airstepfriction;
+extern	int	pm_airsteps;
+extern	float	pm_airstopaccelerate;
+extern	float	pm_strafeaccelerate;
+extern	float	pm_circlestrafe_friction;
+extern	qboolean	pm_bunnyhop;
+extern	qboolean	pm_autohop;
+extern	float	pm_wishspeed;
 extern	float	pm_wateraccelerate;
 extern	float	pm_flyaccelerate;
 

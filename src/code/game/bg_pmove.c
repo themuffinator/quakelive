@@ -41,6 +41,16 @@ float	pm_airaccelerate = 1.0f;
 float	pm_wateraccelerate = 4.0f;
 float	pm_flyaccelerate = 8.0f;
 
+float	pm_aircontrol = 0.0f;
+float	pm_airstepfriction = 1.0f;
+int		pm_airsteps = 1;
+float	pm_airstopaccelerate = 0.0f;
+float	pm_strafeaccelerate = 0.0f;
+float	pm_circlestrafe_friction = 0.0f;
+qboolean	pm_bunnyhop = qfalse;
+qboolean	pm_autohop = qfalse;
+float	pm_wishspeed = 0.0f;
+
 float	pm_friction = 6.0f;
 float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
@@ -48,6 +58,46 @@ float	pm_spectatorfriction = 5.0f;
 
 int		c_pmove = 0;
 
+static const pmoveParams_t	pm_defaultParams = {
+	0.0f,	// wishSpeed
+	10.0f,	// walkAccel
+	6.0f,	// walkFriction
+	1.0f,	// airAccel
+	0.0f,	// airControl
+	1.0f,	// airStepFriction
+	1,	// airSteps
+	0.0f,	// airStopAccel
+	0.0f,	// strafeAccel
+	0.0f,	// circleStrafeFriction
+	qfalse,	// bunnyHop
+	qfalse	// autoHop
+};
+
+/*
+=============
+PM_LoadMoveParams
+
+Synchronises the active pmove parameter block with the legacy globals so
+movement helpers can consume Quake Live style tuning knobs without drifting
+from vanilla defaults when no overrides are supplied.
+=============
+*/
+static void PM_LoadMoveParams( const pmoveParams_t *params ) {
+	const pmoveParams_t	*cfg = params ? params : &pm_defaultParams;
+
+	pm_wishspeed = ( cfg->wishSpeed > 0.0f ) ? cfg->wishSpeed : 0.0f;
+	pm_accelerate = ( cfg->walkAccel > 0.0f ) ? cfg->walkAccel : pm_defaultParams.walkAccel;
+	pm_friction = ( cfg->walkFriction > 0.0f ) ? cfg->walkFriction : pm_defaultParams.walkFriction;
+	pm_airaccelerate = ( cfg->airAccel > 0.0f ) ? cfg->airAccel : pm_defaultParams.airAccel;
+	pm_aircontrol = cfg->airControl;
+	pm_airstepfriction = ( cfg->airStepFriction > 0.0f ) ? cfg->airStepFriction : pm_defaultParams.airStepFriction;
+	pm_airsteps = ( cfg->airSteps > 0 ) ? cfg->airSteps : pm_defaultParams.airSteps;
+	pm_airstopaccelerate = ( cfg->airStopAccel > 0.0f ) ? cfg->airStopAccel : 0.0f;
+	pm_strafeaccelerate = ( cfg->strafeAccel > 0.0f ) ? cfg->strafeAccel : 0.0f;
+	pm_circlestrafe_friction = ( cfg->circleStrafeFriction > 0.0f ) ? cfg->circleStrafeFriction : 0.0f;
+	pm_bunnyhop = cfg->bunnyHop;
+	pm_autohop = cfg->autoHop;
+}
 
 /*
 ===============
@@ -238,42 +288,65 @@ Handles user intended acceleration
 ==============
 */
 static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) {
-#if 1
-	// q2 style
-	int			i;
-	float		addspeed, accelspeed, currentspeed;
+	float	cappedWishSpeed = wishspeed;
+	float	currentSpeed;
+	float	addSpeed;
+	float	accelSpeed;
+	float	effectiveAccel = accel;
+	int		i;
 
-	currentspeed = DotProduct (pm->ps->velocity, wishdir);
-	addspeed = wishspeed - currentspeed;
-	if (addspeed <= 0) {
+	if ( pm_wishspeed > 0.0f && cappedWishSpeed > pm_wishspeed ) {
+		cappedWishSpeed = pm_wishspeed;
+	}
+
+	currentSpeed = DotProduct( pm->ps->velocity, wishdir );
+
+	if ( pm_bunnyhop || pm_autohop ) {
+		if ( pm_airstopaccelerate > 0.0f && currentSpeed < 0.0f ) {
+			effectiveAccel = pm_airstopaccelerate;
+		} else if ( pm_strafeaccelerate > 0.0f ) {
+			int forwardMove = pm->cmd.forwardmove;
+			int rightMove = pm->cmd.rightmove;
+
+			if ( abs( rightMove ) > abs( forwardMove ) && abs( rightMove ) > 0 ) {
+				effectiveAccel = pm_strafeaccelerate;
+			}
+		}
+	}
+
+	addSpeed = cappedWishSpeed - currentSpeed;
+	if ( addSpeed <= 0.0f ) {
 		return;
 	}
-	accelspeed = accel*pml.frametime*wishspeed;
-	if (accelspeed > addspeed) {
-		accelspeed = addspeed;
-	}
-	
-	for (i=0 ; i<3 ; i++) {
-		pm->ps->velocity[i] += accelspeed*wishdir[i];	
-	}
-#else
-	// proper way (avoids strafe jump maxspeed bug), but feels bad
-	vec3_t		wishVelocity;
-	vec3_t		pushDir;
-	float		pushLen;
-	float		canPush;
 
-	VectorScale( wishdir, wishspeed, wishVelocity );
-	VectorSubtract( wishVelocity, pm->ps->velocity, pushDir );
-	pushLen = VectorNormalize( pushDir );
-
-	canPush = accel*pml.frametime*wishspeed;
-	if (canPush > pushLen) {
-		canPush = pushLen;
+	accelSpeed = effectiveAccel * pml.frametime * cappedWishSpeed;
+	if ( accelSpeed > addSpeed ) {
+		accelSpeed = addSpeed;
 	}
 
-	VectorMA( pm->ps->velocity, canPush, pushDir, pm->ps->velocity );
-#endif
+	for ( i = 0; i < 3; i++ ) {
+		pm->ps->velocity[i] += accelSpeed * wishdir[i];
+	}
+
+	if ( pm_aircontrol > 0.0f && cappedWishSpeed > 0.0f ) {
+		vec3_t	wishVelocity;
+		vec3_t	pushDir;
+		float	pushLen;
+		float	canPush;
+
+		VectorScale( wishdir, cappedWishSpeed, wishVelocity );
+		VectorSubtract( wishVelocity, pm->ps->velocity, pushDir );
+		pushLen = VectorNormalize( pushDir );
+
+		if ( pushLen > 0.0f ) {
+			canPush = pm_aircontrol * pml.frametime * cappedWishSpeed;
+			if ( canPush > pushLen ) {
+				canPush = pushLen;
+			}
+
+			VectorMA( pm->ps->velocity, canPush, pushDir, pm->ps->velocity );
+		}
+	}
 }
 
 
@@ -599,13 +672,15 @@ PM_AirMove
 ===================
 */
 static void PM_AirMove( void ) {
-	int			i;
-	vec3_t		wishvel;
-	float		fmove, smove;
-	vec3_t		wishdir;
-	float		wishspeed;
-	float		scale;
+	int		i;
+	vec3_t	wishvel;
+	float	fmove, smove;
+	vec3_t	wishdir;
+	float	wishspeed;
+	float	scale;
 	usercmd_t	cmd;
+	int		stepIndex;
+	int		stepCount;
 
 	PM_Friction();
 
@@ -615,47 +690,62 @@ static void PM_AirMove( void ) {
 	cmd = pm->cmd;
 	scale = PM_CmdScale( &cmd );
 
-	// set the movementDir so clients can rotate the legs for strafing
 	PM_SetMovementDir();
 
-	// project moves down to flat plane
 	pml.forward[2] = 0;
 	pml.right[2] = 0;
-	VectorNormalize (pml.forward);
-	VectorNormalize (pml.right);
+	VectorNormalize( pml.forward );
+	VectorNormalize( pml.right );
 
 	for ( i = 0 ; i < 2 ; i++ ) {
-		wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
+		wishvel[i] = pml.forward[i] * fmove + pml.right[i] * smove;
 	}
 	wishvel[2] = 0;
 
-	VectorCopy (wishvel, wishdir);
-	wishspeed = VectorNormalize(wishdir);
+	VectorCopy( wishvel, wishdir );
+	wishspeed = VectorNormalize( wishdir );
 	wishspeed *= scale;
 
-	// not on ground, so little effect on velocity
-	PM_Accelerate (wishdir, wishspeed, pm_airaccelerate);
-
-	// we may have a ground plane that is very steep, even
-	// though we don't have a groundentity
-	// slide along the steep plane
-	if ( pml.groundPlane ) {
-		PM_ClipVelocity (pm->ps->velocity, pml.groundTrace.plane.normal, 
-			pm->ps->velocity, OVERCLIP );
+	if ( pm_wishspeed > 0.0f && wishspeed > pm_wishspeed ) {
+		wishspeed = pm_wishspeed;
 	}
 
-#if 0
-	//ZOID:  If we are on the grapple, try stair-stepping
-	//this allows a player to use the grapple to pull himself
-	//over a ledge
-	if (pm->ps->pm_flags & PMF_GRAPPLE_PULL)
-		PM_StepSlideMove ( qtrue );
-	else
-		PM_SlideMove ( qtrue );
-#endif
+	PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
 
-	PM_StepSlideMove ( qtrue );
+	if ( pm_circlestrafe_friction > 0.0f && pm->cmd.forwardmove && pm->cmd.rightmove ) {
+		float friction = 1.0f - ( pm_circlestrafe_friction * pml.frametime );
+
+		if ( friction < 0.0f ) {
+			friction = 0.0f;
+		}
+
+		pm->ps->velocity[0] *= friction;
+		pm->ps->velocity[1] *= friction;
+	}
+
+	if ( pml.groundPlane ) {
+		PM_ClipVelocity( pm->ps->velocity, pml.groundTrace.plane.normal, pm->ps->velocity, OVERCLIP );
+	}
+
+	stepCount = ( pm_airsteps > 1 ) ? pm_airsteps : 1;
+	for ( stepIndex = 0; stepIndex < stepCount; stepIndex++ ) {
+		PM_StepSlideMove( qtrue );
+
+		if ( stepIndex + 1 < stepCount ) {
+			float stepFriction = pm_airstepfriction;
+
+			if ( stepFriction < 0.0f ) {
+				stepFriction = 0.0f;
+			}
+
+			if ( stepFriction != 1.0f ) {
+				pm->ps->velocity[0] *= stepFriction;
+				pm->ps->velocity[1] *= stepFriction;
+			}
+		}
+	}
 }
+
 
 /*
 ===================
@@ -1838,6 +1928,19 @@ void trap_SnapVector( float *v );
 
 void PmoveSingle (pmove_t *pmove) {
 	pm = pmove;
+	PM_LoadMoveParams( pm->pmoveParams );
+
+	if ( pm->debugLevel > 1 ) {
+		Com_Printf( "pmove_cfg: wish=%.3f airAccel=%.3f airControl=%.3f airSteps=%d stop=%.3f strafe=%.3f autoHop=%d bunnyHop=%d\n",
+			pm_wishspeed,
+			pm_airaccelerate,
+			pm_aircontrol,
+			pm_airsteps,
+			pm_airstopaccelerate,
+			pm_strafeaccelerate,
+			pm_autohop ? 1 : 0,
+			pm_bunnyhop ? 1 : 0 );
+	}
 
 	// this counter lets us debug movement problems with a journal
 	// by setting a conditional breakpoint fot the previous frame
