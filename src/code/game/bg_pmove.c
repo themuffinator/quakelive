@@ -189,6 +189,48 @@ static void PM_LoadMoveParams( const pmoveParams_t *params ) {
 }
 
 /*
+=============
+PM_ApplyStepJump
+
+Ensures the configured step jump velocity is applied when stepping upwards.
+=============
+*/
+void PM_ApplyStepJump( float stepDelta, qboolean fromCrouchSlide ) {
+	const pmove_settings_t	*settings;
+	float			stepJumpVelocity;
+
+	if ( stepDelta <= 0.0f ) {
+		return;
+	}
+
+	settings = PM_GetActiveSettings();
+	if ( !settings->stepJump ) {
+		return;
+	}
+
+	stepJumpVelocity = settings->stepJumpVelocity;
+	if ( stepJumpVelocity <= 0.0f ) {
+		return;
+	}
+
+	if ( fromCrouchSlide ) {
+		if ( !( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) ) {
+			return;
+		}
+
+		if ( !settings->crouchSlide || !settings->crouchStepJump ) {
+			return;
+		}
+	}
+
+	if ( pm->ps->velocity[2] >= stepJumpVelocity ) {
+		return;
+	}
+
+	pm->ps->velocity[2] = stepJumpVelocity;
+}
+
+/*
 ===============
 PM_AddEvent
 
@@ -790,6 +832,10 @@ static void PM_FlyMove( void ) {
 	PM_Accelerate (wishdir, wishspeed, pm_flyaccelerate);
 
 	PM_StepSlideMove( qfalse, pm_stepHeight );
+
+	if ( !( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) ) {
+		PM_ApplyStepJump( pml.stepUp, qfalse );
+	}
 }
 
 
@@ -1027,6 +1073,10 @@ static void PM_WalkMove( void ) {
 	}
 
 	PM_StepSlideMove( qfalse, pm_stepHeight );
+
+	if ( !( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) ) {
+		PM_ApplyStepJump( pml.stepUp, qfalse );
+	}
 
 	//Com_Printf("velocity2 = %1.1f\n", VectorLength(pm->ps->velocity));
 

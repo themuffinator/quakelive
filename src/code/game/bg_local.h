@@ -46,6 +46,7 @@ typedef struct {
 	trace_t		groundTrace;
 
 	float		impactSpeed;
+	float		stepUp;
 
 	vec3_t		previous_origin;
 	vec3_t		previous_velocity;
@@ -88,6 +89,7 @@ void PM_AddEvent( int newEvent );
 
 qboolean	PM_SlideMove( qboolean gravity );
 void		PM_StepSlideMove( qboolean gravity, float stepHeight );
+void		PM_ApplyStepJump( float stepDelta, qboolean fromCrouchSlide );
 
 
 const pmove_settings_t *PM_GetActiveSettings( void );
