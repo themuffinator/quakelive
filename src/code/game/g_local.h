@@ -911,6 +911,7 @@ extern	vmCvar_t	g_teamAutoJoin;
 extern	vmCvar_t	g_teamForceBalance;
 extern	vmCvar_t	g_banIPs;
 extern	vmCvar_t	g_filterBan;
+extern	vmCvar_t	g_instaGib;
 extern	vmCvar_t	g_obeliskHealth;
 extern	vmCvar_t	g_obeliskRegenPeriod;
 extern	vmCvar_t	g_obeliskRegenAmount;
@@ -1176,6 +1177,50 @@ int		trap_BotLoadWeaponWeights(int weaponstate, char *filename);
 int		trap_BotAllocWeaponState(void);
 void	trap_BotFreeWeaponState(int weaponstate);
 void	trap_BotResetWeaponState(int weaponstate);
+
+typedef struct {
+	float airAccel;
+	float airControl;
+	float airStepFriction;
+	int airSteps;
+	float airStopAccel;
+	qboolean autoHop;
+	qboolean bunnyHop;
+	qboolean chainJump;
+	float chainJumpVelocity;
+	float circleStrafeFriction;
+	qboolean crouchSlide;
+	float crouchSlideFriction;
+	int crouchSlideTime;
+	qboolean crouchStepJump;
+	qboolean doubleJump;
+	float jumpTimeDeltaMin;
+	float jumpVelocity;
+	float jumpVelocityMax;
+	float jumpVelocityScaleAdd;
+	float jumpVelocityTimeThreshold;
+	float jumpVelocityTimeThresholdOffset;
+	qboolean noPlayerClip;
+	qboolean rampJump;
+	float rampJumpScale;
+	float stepHeight;
+	qboolean stepJump;
+	float stepJumpVelocity;
+	float strafeAccel;
+	float velocityGh;
+	float walkAccel;
+	float walkFriction;
+	float waterSwimScale;
+	float waterWadeScale;
+	int weaponDropTime;
+	int weaponRaiseTime;
+	float wishSpeed;
+} pmove_settings_t;
+
+extern pmove_settings_t g_pmoveSettings;
+
+void G_RegisterPmoveCvars( void );
+void G_RefreshPmoveSettings( void );
 
 int		trap_GeneticParentsAndChildSelection(int numranks, float *ranks, int *parent1, int *parent2, int *child);
 

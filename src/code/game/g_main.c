@@ -106,6 +106,7 @@ vmCvar_t	g_teamAutoJoin;
 vmCvar_t	g_teamForceBalance;
 vmCvar_t	g_banIPs;
 vmCvar_t	g_filterBan;
+vmCvar_t	g_instaGib;
 vmCvar_t	g_smoothClients;
 vmCvar_t	pmove_fixed;
 vmCvar_t	pmove_msec;
@@ -199,6 +200,7 @@ static cvarTable_t		gameCvarTable[] = {
 
 	{ &g_banIPs, "g_banIPs", "", CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_filterBan, "g_filterBan", "1", CVAR_ARCHIVE, 0, qfalse  },
+	{ &g_instaGib, "g_instaGib", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
 
 	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 
@@ -512,6 +514,8 @@ void G_RegisterCvars( void ) {
 
         G_Config_RegisterCvars();
         G_Config_UpdateCvars();
+	G_RegisterPmoveCvars();
+	G_RefreshPmoveSettings();
 
         // check some things
         if ( g_gametype.integer < 0 || g_gametype.integer >= GT_MAX_GAME_TYPE ) {
@@ -557,6 +561,7 @@ void G_UpdateCvars( void ) {
         }
 
         G_Config_UpdateCvars();
+	G_RefreshPmoveSettings();
 
         G_UpdateWeaponConfig();
         G_UpdateWeaponReloadConfig();
@@ -2410,6 +2415,7 @@ void G_RunFrame( int levelTime ) {
 	ctx = G_GetFrameContext();
 
 	G_UpdateCvars();
+	G_RefreshPmoveSettings();
 
 	G_DispatchScheduledThinks( ctx, msec );
 	G_StepEntities( ctx );
