@@ -50,6 +50,7 @@ float	pm_circlestrafe_friction = 0.0f;
 qboolean	pm_bunnyhop = qfalse;
 qboolean	pm_autohop = qfalse;
 float	pm_wishspeed = 0.0f;
+float	pm_stepHeight = 22.0f;
 
 float	pm_friction = 6.0f;
 float	pm_waterfriction = 1.0f;
@@ -138,6 +139,7 @@ static void PM_LoadMoveSettings( void ) {
 	const pmove_settings_t	*settings;
 	float	swimScale;
 	float	wadeScale;
+	float	stepHeight;
 
 	settings = PM_GetActiveSettings();
 
@@ -152,6 +154,12 @@ static void PM_LoadMoveSettings( void ) {
 		wadeScale = 0.70f;
 	}
 	pm_wadeScale = wadeScale;
+
+	stepHeight = settings->stepHeight;
+	if ( stepHeight <= 0.0f ) {
+		stepHeight = pm_defaultSettings.stepHeight;
+	}
+	pm_stepHeight = stepHeight;
 }
 
 /*
@@ -645,7 +653,7 @@ Flying out of the water
 static void PM_WaterJumpMove( void ) {
 	// waterjump has no control, but falls
 
-	PM_StepSlideMove( qtrue );
+	PM_StepSlideMove( qtrue, pm_stepHeight );
 
 	pm->ps->velocity[2] -= pm->ps->gravity * pml.frametime;
 	if (pm->ps->velocity[2] < 0) {
@@ -781,7 +789,7 @@ static void PM_FlyMove( void ) {
 
 	PM_Accelerate (wishdir, wishspeed, pm_flyaccelerate);
 
-	PM_StepSlideMove( qfalse );
+	PM_StepSlideMove( qfalse, pm_stepHeight );
 }
 
 
@@ -849,7 +857,7 @@ static void PM_AirMove( void ) {
 
 	stepCount = ( pm_airsteps > 1 ) ? pm_airsteps : 1;
 	for ( stepIndex = 0; stepIndex < stepCount; stepIndex++ ) {
-		PM_StepSlideMove( qtrue );
+		PM_StepSlideMove( qtrue, pm_stepHeight );
 
 		if ( stepIndex + 1 < stepCount ) {
 			float stepFriction = pm_airstepfriction;
@@ -1018,7 +1026,7 @@ static void PM_WalkMove( void ) {
 		return;
 	}
 
-	PM_StepSlideMove( qfalse );
+	PM_StepSlideMove( qfalse, pm_stepHeight );
 
 	//Com_Printf("velocity2 = %1.1f\n", VectorLength(pm->ps->velocity));
 
