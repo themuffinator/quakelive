@@ -155,6 +155,8 @@ typedef enum {
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
 #define PMF_CROUCH_SLIDE	32768	// crouch slide friction effect is active
+#define PMF_RAMP_JUMP		65536	// ramp jump scale applied to takeoff
+#define PMF_CHAIN_JUMP	131072	// jump executed within chain window
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 

@@ -600,6 +600,13 @@ PM_CheckJump
 =============
 */
 static qboolean PM_CheckJump( void ) {
+	const pmove_settings_t	*settings;
+	float			jumpVelocity;
+	qboolean		chainJumpActive;
+	qboolean		rampJumpActive;
+	int			lastContactTime;
+	int			timeDelta;
+
 	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
 		return qfalse;		// don't allow jump until all buttons are up
 	}
@@ -616,13 +623,83 @@ static qboolean PM_CheckJump( void ) {
 		return qfalse;
 	}
 
+	settings = PM_GetActiveSettings();
+	jumpVelocity = ( settings->jumpVelocity > 0.0f ) ? settings->jumpVelocity : JUMP_VELOCITY;
+	chainJumpActive = qfalse;
+	rampJumpActive = qfalse;
+	lastContactTime = 0;
+	timeDelta = 0;
+
+	if ( pm->ps->groundTraceHistoryCount > 0 ) {
+		int	index;
+
+		index = pm->ps->groundTraceHistoryIndex;
+		if ( index >= 0 && index < PS_GROUND_TRACE_HISTORY ) {
+			lastContactTime = pm->ps->groundTraceTimes[index];
+		}
+	}
+
+	if ( settings->jumpTimeDeltaMin > 0.0f && lastContactTime > 0 ) {
+		timeDelta = pm->cmd.serverTime - lastContactTime;
+		if ( timeDelta < 0 ) {
+			timeDelta = 0;
+		}
+
+		if ( timeDelta < settings->jumpTimeDeltaMin ) {
+			if ( settings->chainJump ) {
+				chainJumpActive = qtrue;
+			} else {
+				return qfalse;
+			}
+		}
+	}
+
+	if ( settings->rampJump && pm->ps->groundTraceLatestEntNum != ENTITYNUM_NONE ) {
+		if ( pm->ps->groundTraceLatestNormal[2] < 0.999f ) {
+			rampJumpActive = qtrue;
+		}
+	}
+
+	if ( chainJumpActive && settings->chainJumpVelocity > 0.0f && jumpVelocity < settings->chainJumpVelocity ) {
+		jumpVelocity = settings->chainJumpVelocity;
+	}
+
+	if ( rampJumpActive ) {
+		float	scale;
+
+		scale = settings->rampJumpScale;
+		if ( scale <= 0.0f ) {
+			scale = 1.0f;
+		}
+		jumpVelocity *= scale;
+	}
+
+	if ( settings->jumpVelocityMax > 0.0f && jumpVelocity > settings->jumpVelocityMax ) {
+		jumpVelocity = settings->jumpVelocityMax;
+	}
+
 	pml.groundPlane = qfalse;		// jumping away
 	pml.walking = qfalse;
 	pm->ps->pm_flags |= PMF_JUMP_HELD;
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->velocity[2] = JUMP_VELOCITY;
+	pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;
+	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
+	VectorClear( pm->ps->groundTraceLatestNormal );
+	pm->ps->velocity[2] = jumpVelocity;
 	PM_AddEvent( EV_JUMP );
+
+	if ( chainJumpActive ) {
+		pm->ps->pm_flags |= PMF_CHAIN_JUMP;
+	} else {
+		pm->ps->pm_flags &= ~PMF_CHAIN_JUMP;
+	}
+
+	if ( rampJumpActive ) {
+		pm->ps->pm_flags |= PMF_RAMP_JUMP;
+	} else {
+		pm->ps->pm_flags &= ~PMF_RAMP_JUMP;
+	}
 
 	if ( pm->cmd.forwardmove >= 0 ) {
 		PM_ForceLegsAnim( LEGS_JUMP );
@@ -1326,12 +1403,47 @@ static int PM_CorrectAllSolid( trace_t *trace ) {
 	}
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
+	pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;
+	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
+	VectorClear( pm->ps->groundTraceLatestNormal );
 	pml.groundPlane = qfalse;
 	pml.walking = qfalse;
 
 	return qfalse;
 }
 
+
+/*
+=============
+PM_RecordGroundContact
+
+Caches the ground contact history in the persistent player state.
+=============
+*/
+static void PM_RecordGroundContact( const trace_t *trace ) {
+	int		index;
+
+	if ( !pm || !pm->ps || !trace ) {
+		return;
+	}
+
+	if ( pm->ps->groundTraceHistoryCount < 0 ) {
+		pm->ps->groundTraceHistoryCount = 0;
+	}
+
+	if ( pm->ps->groundTraceHistoryCount < PS_GROUND_TRACE_HISTORY ) {
+		index = pm->ps->groundTraceHistoryCount;
+		pm->ps->groundTraceHistoryCount++;
+	} else {
+		index = ( pm->ps->groundTraceHistoryIndex + 1 ) % PS_GROUND_TRACE_HISTORY;
+	}
+
+	pm->ps->groundTraceHistoryIndex = index;
+
+	VectorCopy( trace->plane.normal, pm->ps->groundTraceNormals[index] );
+	pm->ps->groundTraceEntNums[index] = trace->entityNum;
+	pm->ps->groundTraceTimes[index] = pm->cmd.serverTime;
+}
 
 /*
 =============
@@ -1368,6 +1480,9 @@ static void PM_GroundTraceMissed( void ) {
 	}
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
+	pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;
+	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
+	VectorClear( pm->ps->groundTraceLatestNormal );
 	pml.groundPlane = qfalse;
 	pml.walking = qfalse;
 }
@@ -1381,6 +1496,8 @@ PM_GroundTrace
 static void PM_GroundTrace( void ) {
 	vec3_t		point;
 	trace_t		trace;
+	qboolean	justLanded;
+	int		previousGroundEntityNum;
 
 	point[0] = pm->ps->origin[0];
 	point[1] = pm->ps->origin[1];
@@ -1388,6 +1505,9 @@ static void PM_GroundTrace( void ) {
 
 	pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, point, pm->ps->clientNum, pm->tracemask);
 	pml.groundTrace = trace;
+
+	previousGroundEntityNum = pm->ps->groundEntityNum;
+	justLanded = ( previousGroundEntityNum == ENTITYNUM_NONE );
 
 	// do something corrective if the trace starts in a solid...
 	if ( trace.allsolid ) {
@@ -1438,6 +1558,10 @@ static void PM_GroundTrace( void ) {
 
 	pml.groundPlane = qtrue;
 	pml.walking = qtrue;
+	pm->ps->pm_flags &= ~( PMF_RAMP_JUMP | PMF_CHAIN_JUMP );
+	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
+	pm->ps->groundTraceLatestEntNum = trace.entityNum;
+	VectorCopy( trace.plane.normal, pm->ps->groundTraceLatestNormal );
 
 	// hitting solid ground will end a waterjump
 	if (pm->ps->pm_flags & PMF_TIME_WATERJUMP)
@@ -1446,7 +1570,7 @@ static void PM_GroundTrace( void ) {
 		pm->ps->pm_time = 0;
 	}
 
-	if ( pm->ps->groundEntityNum == ENTITYNUM_NONE ) {
+	if ( justLanded ) {
 		// just hit the ground
 		if ( pm->debugLevel ) {
 			Com_Printf("%i:Land\n", c_pmove);
@@ -1462,6 +1586,9 @@ static void PM_GroundTrace( void ) {
 		}
 	}
 
+	if ( justLanded || previousGroundEntityNum != trace.entityNum ) {
+		PM_RecordGroundContact( &trace );
+	}
 	pm->ps->groundEntityNum = trace.entityNum;
 
 	// don't reset the z velocity for slopes

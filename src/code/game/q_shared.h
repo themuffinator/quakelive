@@ -1137,6 +1137,7 @@ typedef struct {
 
 // playerState_t is the information needed by both the client and server
 // to predict player motion and actions
+#define PS_GROUND_TRACE_HISTORY	2
 // nothing outside of pmove should modify these, or some degree of prediction error
 // will occur
 
@@ -1161,6 +1162,14 @@ typedef struct playerState_s {
 									// changed by spawns, rotating objects, and teleporters
 
 	int			groundEntityNum;// ENTITYNUM_NONE = in air
+	int			groundTraceHistoryIndex;
+	int			groundTraceHistoryCount;
+	int			groundTraceTimes[PS_GROUND_TRACE_HISTORY];
+	int			groundTraceEntNums[PS_GROUND_TRACE_HISTORY];
+	vec3_t		groundTraceNormals[PS_GROUND_TRACE_HISTORY];
+	int			groundTraceLatestTime;
+	int			groundTraceLatestEntNum;
+	vec3_t		groundTraceLatestNormal;
 
 	int			legsTimer;		// don't change low priority animations until this runs out
 	int			legsAnim;		// mask off ANIM_TOGGLEBIT
