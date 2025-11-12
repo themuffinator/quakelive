@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "bg_public.h"
 #include "bg_local.h"
+#include "bg_pmove_jump.h"
 
 pmove_t		*pm;
 pml_t		pml;
@@ -602,9 +603,9 @@ PM_CheckJump
 static qboolean PM_CheckJump( void ) {
 	const pmove_settings_t	*settings;
 	float			jumpVelocity;
+	float			jumpVelocityScale;
 	qboolean		chainJumpActive;
 	qboolean		rampJumpActive;
-	int			lastContactTime;
 	int			timeDelta;
 
 	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
@@ -625,27 +626,15 @@ static qboolean PM_CheckJump( void ) {
 
 	settings = PM_GetActiveSettings();
 	jumpVelocity = ( settings->jumpVelocity > 0.0f ) ? settings->jumpVelocity : JUMP_VELOCITY;
+	jumpVelocityScale = 1.0f;
 	chainJumpActive = qfalse;
 	rampJumpActive = qfalse;
-	lastContactTime = 0;
-	timeDelta = 0;
+	timeDelta = -1;
 
-	if ( pm->ps->groundTraceHistoryCount > 0 ) {
-		int	index;
+	jumpVelocityScale = PM_EvaluateJumpVelocityScale( pm->ps, settings, pm->cmd.serverTime, &timeDelta );
 
-		index = pm->ps->groundTraceHistoryIndex;
-		if ( index >= 0 && index < PS_GROUND_TRACE_HISTORY ) {
-			lastContactTime = pm->ps->groundTraceTimes[index];
-		}
-	}
-
-	if ( settings->jumpTimeDeltaMin > 0.0f && lastContactTime > 0 ) {
-		timeDelta = pm->cmd.serverTime - lastContactTime;
-		if ( timeDelta < 0 ) {
-			timeDelta = 0;
-		}
-
-		if ( timeDelta < settings->jumpTimeDeltaMin ) {
+	if ( settings->jumpTimeDeltaMin > 0.0f && timeDelta >= 0 ) {
+		if ( (float)timeDelta < settings->jumpTimeDeltaMin ) {
 			if ( settings->chainJump ) {
 				chainJumpActive = qtrue;
 			} else {
@@ -672,6 +661,10 @@ static qboolean PM_CheckJump( void ) {
 			scale = 1.0f;
 		}
 		jumpVelocity *= scale;
+	}
+
+	if ( jumpVelocityScale > 1.0f ) {
+		jumpVelocity *= jumpVelocityScale;
 	}
 
 	if ( settings->jumpVelocityMax > 0.0f && jumpVelocity > settings->jumpVelocityMax ) {
