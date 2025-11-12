@@ -30,11 +30,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 pmove_t		*pm;
 pml_t		pml;
 
+#define PM_LEGACY_SWIM_SCALE	0.50f
+#define PM_LEGACY_WADE_SCALE	0.70f
+
 // movement parameters
 float	pm_stopspeed = 100.0f;
 float	pm_duckScale = 0.25f;
-float	pm_swimScale = 0.50f;
-float	pm_wadeScale = 0.70f;
+float	pm_swimScale = PM_LEGACY_SWIM_SCALE;
+float	pm_wadeScale = PM_LEGACY_WADE_SCALE;
 
 float	pm_accelerate = 10.0f;
 float	pm_airaccelerate = 1.0f;
@@ -56,6 +59,16 @@ float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
+qboolean	pm_crouchSlide = qfalse;
+float	pm_crouchSlideFriction = 0.5f;
+int		pm_crouchSlideTime = 2000;
+qboolean	pm_crouchStepJump = qfalse;
+float	pm_velocity_gh = 0.0f;
+qboolean	pm_noPlayerClip = qfalse;
+int		pm_weaponDropTime = 200;
+int		pm_weaponRaiseTime = 200;
+qboolean	pm_useLegacyWaterScale = qtrue;
+
 int		c_pmove = 0;
 
 static const pmoveParams_t	pm_defaultParams = {
@@ -70,7 +83,17 @@ static const pmoveParams_t	pm_defaultParams = {
 	0.0f,	// strafeAccel
 	0.0f,	// circleStrafeFriction
 	qfalse,	// bunnyHop
-	qfalse	// autoHop
+	qfalse,	// autoHop
+	qfalse,	// crouchSlide
+	0.5f,	// crouchSlideFriction
+	2000,	// crouchSlideTime
+	qfalse,	// crouchStepJump
+	0.0f,	// waterSwimScale (0 uses legacy)
+	0.0f,	// waterWadeScale (0 uses legacy)
+	200,	// weaponDropTime
+	200,	// weaponRaiseTime
+	0.0f,	// velocityGh
+	qfalse	// noPlayerClip
 };
 
 /*
@@ -97,7 +120,175 @@ static void PM_LoadMoveParams( const pmoveParams_t *params ) {
 	pm_circlestrafe_friction = ( cfg->circleStrafeFriction > 0.0f ) ? cfg->circleStrafeFriction : 0.0f;
 	pm_bunnyhop = cfg->bunnyHop;
 	pm_autohop = cfg->autoHop;
+	pm_crouchSlide = cfg->crouchSlide;
+	pm_crouchSlideFriction = ( cfg->crouchSlideFriction > 0.0f ) ? cfg->crouchSlideFriction : pm_defaultParams.crouchSlideFriction;
+	pm_crouchSlideTime = ( cfg->crouchSlideTime > 0 ) ? cfg->crouchSlideTime : pm_defaultParams.crouchSlideTime;
+	pm_crouchStepJump = cfg->crouchStepJump;
+	pm_weaponDropTime = ( cfg->weaponDropTime > 0 ) ? cfg->weaponDropTime : pm_defaultParams.weaponDropTime;
+	pm_weaponRaiseTime = ( cfg->weaponRaiseTime > 0 ) ? cfg->weaponRaiseTime : pm_defaultParams.weaponRaiseTime;
+	pm_velocity_gh = ( cfg->velocityGh > 0.0f ) ? cfg->velocityGh : 0.0f;
+	pm_noPlayerClip = cfg->noPlayerClip;
+	{
+		qboolean customSwim = ( cfg->waterSwimScale > 0.0f );
+		qboolean customWade = ( cfg->waterWadeScale > 0.0f );
+		float swimScale = customSwim ? cfg->waterSwimScale : PM_LEGACY_SWIM_SCALE;
+		float wadeScale = customWade ? cfg->waterWadeScale : PM_LEGACY_WADE_SCALE;
+
+		pm_useLegacyWaterScale = !( customSwim || customWade );
+		pm_swimScale = swimScale;
+		pm_wadeScale = wadeScale;
+	}
 }
+/*
+=============
+PM_IsCrouchSliding
+
+Returns qtrue if the player is currently in a crouch slide.
+=============
+*/
+static qboolean PM_IsCrouchSliding( void ) {
+	return ( pm->ps->pm_flags & PMF_CROUCH_SLIDING ) != 0;
+}
+
+/*
+=============
+PM_CanCrouchSlide
+
+Determines whether the player's current state allows entering a crouch slide.
+=============
+*/
+static qboolean PM_CanCrouchSlide( void ) {
+	vec3_t	horizontalVelocity;
+	float		speed;
+	float		minSpeed;
+
+	if ( !pm_crouchSlide ) {
+		return qfalse;
+	}
+	if ( pm->ps->pm_type != PM_NORMAL ) {
+		return qfalse;
+	}
+	if ( pm->ps->groundEntityNum == ENTITYNUM_NONE ) {
+		return qfalse;
+	}
+	if ( pm->waterlevel > 1 ) {
+		return qfalse;
+	}
+	if ( pm->ps->pm_flags & ( PMF_TIME_WATERJUMP | PMF_TIME_KNOCKBACK ) ) {
+		return qfalse;
+	}
+	if ( PM_IsCrouchSliding() ) {
+		return qfalse;
+	}
+
+	VectorCopy( pm->ps->velocity, horizontalVelocity );
+	horizontalVelocity[2] = 0.0f;
+	speed = VectorLength( horizontalVelocity );
+	minSpeed = pm->ps->speed * 0.75f;
+	if ( minSpeed < 200.0f ) {
+		minSpeed = 200.0f;
+	}
+
+	return speed >= minSpeed;
+}
+
+/*
+=============
+PM_BeginCrouchSlide
+
+Activates the crouch slide timer and flag.
+=============
+*/
+static void PM_BeginCrouchSlide( void ) {
+	if ( pm_crouchSlideTime <= 0 ) {
+		return;
+	}
+
+	pm->ps->pm_flags |= PMF_CROUCH_SLIDING;
+	pm->ps->pm_time = pm_crouchSlideTime;
+}
+
+/*
+=============
+PM_EndCrouchSlide
+
+Clears the crouch slide state if active.
+=============
+*/
+static void PM_EndCrouchSlide( void ) {
+	if ( !PM_IsCrouchSliding() ) {
+		return;
+	}
+
+	pm->ps->pm_flags &= ~PMF_CROUCH_SLIDING;
+	if ( !( pm->ps->pm_flags & ( PMF_TIME_WATERJUMP | PMF_TIME_LAND | PMF_TIME_KNOCKBACK ) ) ) {
+		pm->ps->pm_time = 0;
+	}
+}
+
+/*
+=============
+PM_UpdateCrouchSlide
+
+Validates the crouch slide state and ends it when conditions are not met.
+=============
+*/
+static void PM_UpdateCrouchSlide( void ) {
+	if ( !PM_IsCrouchSliding() ) {
+		return;
+	}
+	if ( !pm_crouchSlide ) {
+		PM_EndCrouchSlide();
+		return;
+	}
+	if ( !( pm->ps->pm_flags & PMF_DUCKED ) ) {
+		PM_EndCrouchSlide();
+		return;
+	}
+	if ( pm->ps->groundEntityNum == ENTITYNUM_NONE ) {
+		PM_EndCrouchSlide();
+		return;
+	}
+	if ( pm->waterlevel > 1 ) {
+		PM_EndCrouchSlide();
+		return;
+	}
+	if ( pm_crouchSlideTime <= 0 || pm->ps->pm_time <= 0 ) {
+		PM_EndCrouchSlide();
+	}
+}
+
+/*
+=============
+PM_ClampNoClipVelocity
+
+Limits horizontal velocity when player collision is disabled.
+=============
+*/
+static void PM_ClampNoClipVelocity( void ) {
+	vec3_t	horizontalVelocity;
+	float		speed;
+
+	if ( !pm_noPlayerClip || pm_velocity_gh <= 0.0f ) {
+		return;
+	}
+
+	VectorCopy( pm->ps->velocity, horizontalVelocity );
+	horizontalVelocity[2] = 0.0f;
+	speed = VectorLength( horizontalVelocity );
+
+	if ( speed <= pm_velocity_gh || speed <= 0.0f ) {
+		return;
+	}
+
+	if ( speed > 0.0f ) {
+		float scale = pm_velocity_gh / speed;
+
+		pm->ps->velocity[0] *= scale;
+		pm->ps->velocity[1] *= scale;
+	}
+}
+
 
 /*
 ===============
@@ -247,15 +438,73 @@ static void PM_Friction( void ) {
 		if ( pml.walking && !(pml.groundTrace.surfaceFlags & SURF_SLICK) ) {
 			// if getting knocked back, no friction
 			if ( ! (pm->ps->pm_flags & PMF_TIME_KNOCKBACK) ) {
+				float crouchScale = 1.0f;
+
+				if ( PM_IsCrouchSliding() ) {
+					float target = pm_crouchSlideFriction;
+					float decay = 0.0f;
+
+					if ( target < 0.0f ) {
+						target = 0.0f;
+					} else if ( target > 1.0f ) {
+						target = 1.0f;
+					}
+					if ( pm_crouchSlideTime > 0 && pm->ps->pm_time > 0 ) {
+						decay = (float)pm->ps->pm_time / (float)pm_crouchSlideTime;
+						if ( decay < 0.0f ) {
+							decay = 0.0f;
+						} else if ( decay > 1.0f ) {
+							decay = 1.0f;
+						}
+					}
+
+					crouchScale = target + ( 1.0f - target ) * ( 1.0f - decay );
+				}
+
 				control = speed < pm_stopspeed ? pm_stopspeed : speed;
-				drop += control*pm_friction*pml.frametime;
+				drop += control * pm_friction * crouchScale * pml.frametime;
 			}
 		}
 	}
 
 	// apply water friction even if just wading
 	if ( pm->waterlevel ) {
-		drop += speed*pm_waterfriction*pm->waterlevel*pml.frametime;
+		float targetScale;
+		float legacyScale;
+		float depthFrac = pm->waterlevel / 3.0f;
+
+		if ( depthFrac < 0.0f ) {
+			depthFrac = 0.0f;
+		} else if ( depthFrac > 1.0f ) {
+			depthFrac = 1.0f;
+		}
+
+		if ( pm_useLegacyWaterScale ) {
+			targetScale = 1.0f - ( 1.0f - pm_swimScale ) * depthFrac;
+			legacyScale = targetScale;
+		} else {
+			if ( pm->waterlevel >= 3 ) {
+				targetScale = pm_swimScale;
+			} else if ( pm->waterlevel == 2 ) {
+				targetScale = ( pm_wadeScale + pm_swimScale ) * 0.5f;
+			} else {
+				targetScale = pm_wadeScale;
+			}
+
+			legacyScale = 1.0f - ( 1.0f - PM_LEGACY_SWIM_SCALE ) * depthFrac;
+		}
+
+		if ( targetScale < 0.0001f ) {
+			targetScale = 0.0001f;
+		}
+
+		if ( legacyScale < 0.0f ) {
+			legacyScale = 0.0f;
+		}
+
+		float waterFrictionScale = legacyScale / targetScale;
+
+		drop += speed * pm_waterfriction * pm->waterlevel * waterFrictionScale * pml.frametime;
 	}
 
 	// apply flying friction
@@ -460,6 +709,13 @@ static qboolean PM_CheckJump( void ) {
 	} else {
 		PM_ForceLegsAnim( LEGS_JUMPB );
 		pm->ps->pm_flags |= PMF_BACKWARDS_JUMP;
+	}
+
+	if ( PM_IsCrouchSliding() ) {
+		if ( pm_crouchStepJump ) {
+			pm->ps->velocity[2] += STEPSIZE;
+		}
+		PM_EndCrouchSlide();
 	}
 
 	return qtrue;
@@ -849,9 +1105,32 @@ static void PM_WalkMove( void ) {
 	// clamp the speed lower if wading or walking on the bottom
 	if ( pm->waterlevel ) {
 		float	waterScale;
+		float	depthFrac = pm->waterlevel / 3.0f;
 
-		waterScale = pm->waterlevel / 3.0;
-		waterScale = 1.0 - ( 1.0 - pm_swimScale ) * waterScale;
+		if ( depthFrac < 0.0f ) {
+			depthFrac = 0.0f;
+		} else if ( depthFrac > 1.0f ) {
+			depthFrac = 1.0f;
+		}
+
+		if ( pm_useLegacyWaterScale ) {
+			waterScale = 1.0f - ( 1.0f - pm_swimScale ) * depthFrac;
+		} else {
+			if ( pm->waterlevel >= 3 ) {
+				waterScale = pm_swimScale;
+			} else if ( pm->waterlevel == 2 ) {
+				waterScale = ( pm_wadeScale + pm_swimScale ) * 0.5f;
+			} else {
+				waterScale = pm_wadeScale;
+			}
+		}
+
+		if ( waterScale < 0.0f ) {
+			waterScale = 0.0f;
+		} else if ( waterScale > 1.0f ) {
+			waterScale = 1.0f;
+		}
+
 		if ( wishspeed > pm->ps->speed * waterScale ) {
 			wishspeed = pm->ps->speed * waterScale;
 		}
@@ -1339,6 +1618,7 @@ Sets mins, maxs, and pm->ps->viewheight
 static void PM_CheckDuck (void)
 {
 	trace_t	trace;
+	qboolean wasDucked = ( pm->ps->pm_flags & PMF_DUCKED ) != 0;
 
 	if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
 		if ( pm->ps->pm_flags & PMF_INVULEXPAND ) {
@@ -1352,6 +1632,7 @@ static void PM_CheckDuck (void)
 		}
 		pm->ps->pm_flags |= PMF_DUCKED;
 		pm->ps->viewheight = CROUCH_VIEWHEIGHT;
+		PM_EndCrouchSlide();
 		return;
 	}
 	pm->ps->pm_flags &= ~PMF_INVULEXPAND;
@@ -1368,6 +1649,7 @@ static void PM_CheckDuck (void)
 	{
 		pm->maxs[2] = -8;
 		pm->ps->viewheight = DEAD_VIEWHEIGHT;
+		PM_EndCrouchSlide();
 		return;
 	}
 
@@ -1391,11 +1673,15 @@ static void PM_CheckDuck (void)
 	{
 		pm->maxs[2] = 16;
 		pm->ps->viewheight = CROUCH_VIEWHEIGHT;
+		if ( !wasDucked && PM_CanCrouchSlide() ) {
+			PM_BeginCrouchSlide();
+		}
 	}
 	else
 	{
 		pm->maxs[2] = 32;
 		pm->ps->viewheight = DEFAULT_VIEWHEIGHT;
+		PM_EndCrouchSlide();
 	}
 }
 
@@ -1571,7 +1857,7 @@ static void PM_BeginWeaponChange( int weapon ) {
 
 	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
-	pm->ps->weaponTime += 200;
+	pm->ps->weaponTime += pm_weaponDropTime;
 	PM_StartTorsoAnim( TORSO_DROP );
 }
 
@@ -1595,7 +1881,7 @@ static void PM_FinishWeaponChange( void ) {
 
 	pm->ps->weapon = weapon;
 	pm->ps->weaponstate = WEAPON_RAISING;
-	pm->ps->weaponTime += 250;
+	pm->ps->weaponTime += pm_weaponRaiseTime;
 	PM_StartTorsoAnim( TORSO_RAISE );
 }
 
@@ -1862,6 +2148,9 @@ static void PM_DropTimers( void ) {
 			pm->ps->pm_time -= pml.msec;
 		}
 	}
+
+	PM_UpdateCrouchSlide();
+	PM_ClampNoClipVelocity();
 
 	// drop animation counter
 	if ( pm->ps->legsTimer > 0 ) {

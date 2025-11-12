@@ -1,6 +1,6 @@
 #include "g_local.h"
 
-#define PMOVE_CVAR_FLAGS 0
+#define PMOVE_CVAR_FLAGS CVAR_SYSTEMINFO
 
 static vmCvar_t g_pmove_airAccel_cvar;
 static vmCvar_t g_pmove_airControl_cvar;
@@ -42,6 +42,7 @@ static vmCvar_t g_pmove_wishSpeed_cvar;
 static int g_pmove_last_frame = -1;
 static qboolean g_pmove_force_update = qtrue;
 
+static pmoveParams_t g_pmoveParams;
 pmove_settings_t g_pmoveSettings;
 
 /*
@@ -76,6 +77,8 @@ Copies the latched pmove cvar values into the live movement settings.
 =============
 */
 static void G_PmoveCacheSettings( void ) {
+	qboolean noPlayerClip = ( g_pmove_noPlayerClip_cvar.integer != 0 );
+
 	g_pmoveSettings.airAccel = g_pmove_airAccel_cvar.value;
 	g_pmoveSettings.airControl = g_pmove_airControl_cvar.value;
 	g_pmoveSettings.airStepFriction = g_pmove_airStepFriction_cvar.value;
@@ -97,7 +100,12 @@ static void G_PmoveCacheSettings( void ) {
 	g_pmoveSettings.jumpVelocityScaleAdd = g_pmove_jumpVelocityScaleAdd_cvar.value;
 	g_pmoveSettings.jumpVelocityTimeThreshold = g_pmove_jumpVelocityTimeThreshold_cvar.value;
 	g_pmoveSettings.jumpVelocityTimeThresholdOffset = g_pmove_jumpVelocityTimeThresholdOffset_cvar.value;
-	g_pmoveSettings.noPlayerClip = ( g_pmove_noPlayerClip_cvar.integer != 0 ) && ( g_instaGib.integer != 0 );
+
+	if ( g_instaGib.integer != 0 ) {
+		noPlayerClip = qtrue;
+	}
+
+	g_pmoveSettings.noPlayerClip = noPlayerClip;
 	g_pmoveSettings.rampJump = ( g_pmove_rampJump_cvar.integer != 0 );
 	g_pmoveSettings.rampJumpScale = g_pmove_rampJumpScale_cvar.value;
 	g_pmoveSettings.stepHeight = g_pmove_stepHeight_cvar.value;
@@ -112,6 +120,40 @@ static void G_PmoveCacheSettings( void ) {
 	g_pmoveSettings.weaponDropTime = g_pmove_weaponDropTime_cvar.integer;
 	g_pmoveSettings.weaponRaiseTime = g_pmove_weaponRaiseTime_cvar.integer;
 	g_pmoveSettings.wishSpeed = g_pmove_wishSpeed_cvar.value;
+
+	g_pmoveParams.wishSpeed = g_pmoveSettings.wishSpeed;
+	g_pmoveParams.walkAccel = g_pmoveSettings.walkAccel;
+	g_pmoveParams.walkFriction = g_pmoveSettings.walkFriction;
+	g_pmoveParams.airAccel = g_pmoveSettings.airAccel;
+	g_pmoveParams.airControl = g_pmoveSettings.airControl;
+	g_pmoveParams.airStepFriction = g_pmoveSettings.airStepFriction;
+	g_pmoveParams.airSteps = g_pmoveSettings.airSteps;
+	g_pmoveParams.airStopAccel = g_pmoveSettings.airStopAccel;
+	g_pmoveParams.strafeAccel = g_pmoveSettings.strafeAccel;
+	g_pmoveParams.circleStrafeFriction = g_pmoveSettings.circleStrafeFriction;
+	g_pmoveParams.bunnyHop = g_pmoveSettings.bunnyHop;
+	g_pmoveParams.autoHop = g_pmoveSettings.autoHop;
+	g_pmoveParams.crouchSlide = g_pmoveSettings.crouchSlide;
+	g_pmoveParams.crouchSlideFriction = g_pmoveSettings.crouchSlideFriction;
+	g_pmoveParams.crouchSlideTime = g_pmoveSettings.crouchSlideTime;
+	g_pmoveParams.crouchStepJump = g_pmoveSettings.crouchStepJump;
+	g_pmoveParams.waterSwimScale = g_pmoveSettings.waterSwimScale;
+	g_pmoveParams.waterWadeScale = g_pmoveSettings.waterWadeScale;
+	g_pmoveParams.weaponDropTime = g_pmoveSettings.weaponDropTime;
+	g_pmoveParams.weaponRaiseTime = g_pmoveSettings.weaponRaiseTime;
+	g_pmoveParams.velocityGh = g_pmoveSettings.velocityGh;
+	g_pmoveParams.noPlayerClip = g_pmoveSettings.noPlayerClip;
+}
+
+/*
+=============
+G_GetPmoveParams
+
+Returns the cached pmove tuning parameters for movement prediction.
+=============
+*/
+const pmoveParams_t *G_GetPmoveParams( void ) {
+	return &g_pmoveParams;
 }
 
 /*

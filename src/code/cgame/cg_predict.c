@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "cg_local.h"
 
+pmoveParams_t	cg_pmoveParams;
 static	pmove_t		cg_pmove;
 
 static	int			cg_numSolidEntities;
@@ -443,6 +444,7 @@ void CG_PredictPlayerState( void ) {
 
 	// prepare for pmove
 	cg_pmove.ps = &cg.predictedPlayerState;
+	cg_pmove.pmoveParams = &cg_pmoveParams;
 	cg_pmove.trace = CG_Trace;
 	cg_pmove.pointcontents = CG_PointContents;
 	if ( cg_pmove.ps->pm_type == PM_DEAD ) {
@@ -453,6 +455,9 @@ void CG_PredictPlayerState( void ) {
 	}
 	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
 		cg_pmove.tracemask &= ~CONTENTS_BODY;	// spectators can fly through bodies
+	}
+	if ( cg_pmove.pmoveParams && cg_pmove.pmoveParams->noPlayerClip ) {
+		cg_pmove.tracemask &= ~CONTENTS_BODY;
 	}
 	cg_pmove.noFootsteps = ( cgs.dmflags & DF_NO_FOOTSTEPS ) > 0;
 

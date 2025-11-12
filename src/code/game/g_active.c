@@ -902,6 +902,8 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 #endif
 
+	G_RefreshPmoveSettings();
+	pm.pmoveParams = G_GetPmoveParams();
 	pm.ps = &client->ps;
 	pm.cmd = *ucmd;
 	if ( pm.ps->pm_type == PM_DEAD ) {
@@ -912,6 +914,9 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 	else {
 		pm.tracemask = MASK_PLAYERSOLID;
+	}
+	if ( pm.pmoveParams && pm.pmoveParams->noPlayerClip ) {
+		pm.tracemask &= ~CONTENTS_BODY;
 	}
 	pm.trace = trap_Trace;
 	pm.pointcontents = trap_PointContents;

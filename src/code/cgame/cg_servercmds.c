@@ -165,6 +165,85 @@ void CG_ParseServerinfo( void ) {
 /*
 ==================
 CG_ParseWarmup
+
+/*
+=============
+CG_ParseSystemFloat
+
+Fetches a floating-point systeminfo value with a fallback default.
+=============
+*/
+static float CG_ParseSystemFloat( const char *info, const char *key, float defaultValue ) {
+	const char *value = Info_ValueForKey( info, key );
+
+	if ( !value || !*value ) {
+		return defaultValue;
+	}
+
+	return atof( value );
+}
+
+/*
+=============
+CG_ParseSystemInt
+
+Fetches an integer systeminfo value with a fallback default.
+=============
+*/
+static int CG_ParseSystemInt( const char *info, const char *key, int defaultValue ) {
+	const char *value = Info_ValueForKey( info, key );
+
+	if ( !value || !*value ) {
+		return defaultValue;
+	}
+
+	return atoi( value );
+}
+
+/*
+================
+CG_ParseSysteminfo
+
+Synchronizes the client pmove parameters with the server's configuration.
+================
+*/
+void CG_ParseSysteminfo( void ) {
+	const char *sysInfo = CG_ConfigString( CS_SYSTEMINFO );
+	const char *serverInfo = CG_ConfigString( CS_SERVERINFO );
+	int instaGib = 0;
+
+	cg_pmoveParams.wishSpeed = CG_ParseSystemFloat( sysInfo, "pmove_WishSpeed", 0.0f );
+	cg_pmoveParams.walkAccel = CG_ParseSystemFloat( sysInfo, "pmove_WalkAccel", 10.0f );
+	cg_pmoveParams.walkFriction = CG_ParseSystemFloat( sysInfo, "pmove_WalkFriction", 6.0f );
+	cg_pmoveParams.airAccel = CG_ParseSystemFloat( sysInfo, "pmove_AirAccel", 1.0f );
+	cg_pmoveParams.airControl = CG_ParseSystemFloat( sysInfo, "pmove_AirControl", 0.0f );
+	cg_pmoveParams.airStepFriction = CG_ParseSystemFloat( sysInfo, "pmove_AirStepFriction", 1.0f );
+	cg_pmoveParams.airSteps = CG_ParseSystemInt( sysInfo, "pmove_AirSteps", 1 );
+	cg_pmoveParams.airStopAccel = CG_ParseSystemFloat( sysInfo, "pmove_AirStopAccel", 0.0f );
+	cg_pmoveParams.strafeAccel = CG_ParseSystemFloat( sysInfo, "pmove_StrafeAccel", 0.0f );
+	cg_pmoveParams.circleStrafeFriction = CG_ParseSystemFloat( sysInfo, "pmove_CircleStrafeFriction", 0.0f );
+	cg_pmoveParams.bunnyHop = ( CG_ParseSystemInt( sysInfo, "pmove_BunnyHop", 0 ) != 0 );
+	cg_pmoveParams.autoHop = ( CG_ParseSystemInt( sysInfo, "pmove_AutoHop", 0 ) != 0 );
+	cg_pmoveParams.crouchSlide = ( CG_ParseSystemInt( sysInfo, "pmove_CrouchSlide", 0 ) != 0 );
+	cg_pmoveParams.crouchSlideFriction = CG_ParseSystemFloat( sysInfo, "pmove_CrouchSlideFriction", 0.5f );
+	cg_pmoveParams.crouchSlideTime = CG_ParseSystemInt( sysInfo, "pmove_CrouchSlideTime", 2000 );
+	cg_pmoveParams.crouchStepJump = ( CG_ParseSystemInt( sysInfo, "pmove_CrouchStepJump", 0 ) != 0 );
+	cg_pmoveParams.waterSwimScale = CG_ParseSystemFloat( sysInfo, "pmove_WaterSwimScale", 0.0f );
+	cg_pmoveParams.waterWadeScale = CG_ParseSystemFloat( sysInfo, "pmove_WaterWadeScale", 0.0f );
+	cg_pmoveParams.weaponDropTime = CG_ParseSystemInt( sysInfo, "pmove_WeaponDropTime", 200 );
+	cg_pmoveParams.weaponRaiseTime = CG_ParseSystemInt( sysInfo, "pmove_WeaponRaiseTime", 200 );
+	cg_pmoveParams.velocityGh = CG_ParseSystemFloat( sysInfo, "pmove_velocity_gh", 0.0f );
+	cg_pmoveParams.noPlayerClip = ( CG_ParseSystemInt( sysInfo, "pmove_noPlayerClip", 0 ) != 0 );
+
+	if ( serverInfo ) {
+		instaGib = atoi( Info_ValueForKey( serverInfo, "g_instaGib" ) );
+	}
+
+	if ( instaGib ) {
+		cg_pmoveParams.noPlayerClip = qtrue;
+	}
+}
+
 ==================
 */
 static void CG_ParseWarmup( void ) {
@@ -342,6 +421,8 @@ static void CG_ConfigStringModified( void ) {
 		CG_StartMusic();
 	} else if ( num == CS_SERVERINFO ) {
 		CG_ParseServerinfo();
+	} else if ( num == CS_SYSTEMINFO ) {
+		CG_ParseSysteminfo();
 	} else if ( num == CS_WARMUP ) {
 		CG_ParseWarmup();
 	} else if ( num == CS_MATCH_STATE ) {

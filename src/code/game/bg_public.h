@@ -154,8 +154,9 @@ typedef enum {
 #define PMF_FOLLOW			4096	// spectate following another player
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
+#define PMF_CROUCH_SLIDING	32768	// player is sliding while crouched
 
-#define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
+#define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK|PMF_CROUCH_SLIDING)
 
 #define	MAXTOUCH	32
 typedef struct pmoveParams_s {
@@ -171,6 +172,16 @@ typedef struct pmoveParams_s {
 	float	circleStrafeFriction;
 	qboolean	bunnyHop;
 	qboolean	autoHop;
+	qboolean	crouchSlide;
+	float	crouchSlideFriction;
+	int	crouchSlideTime;
+	qboolean	crouchStepJump;
+	float	waterSwimScale;
+	float	waterWadeScale;
+	int	weaponDropTime;
+	int	weaponRaiseTime;
+	float	velocityGh;
+	qboolean	noPlayerClip;
 } pmoveParams_t;
 
 typedef struct {

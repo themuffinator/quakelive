@@ -1219,6 +1219,7 @@ typedef struct {
 
 extern pmove_settings_t g_pmoveSettings;
 
+const pmoveParams_t *G_GetPmoveParams( void );
 void G_RegisterPmoveCvars( void );
 void G_RefreshPmoveSettings( void );
 
