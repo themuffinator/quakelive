@@ -1049,6 +1049,10 @@ typedef struct {
 	char		factorySpawnHints[MAX_STRING_CHARS];
 	qboolean	itemTimersEnabled;
 	int		itemTimerHeight;
+	qboolean	forceSmallScoreboardMessage;
+	qboolean	forceHudHints;
+	qboolean	forceDmgThroughSurface;
+	char		forcedAtmosphere[MAX_QPATH];
 
 	qboolean  newHud;
 

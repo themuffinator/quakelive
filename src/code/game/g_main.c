@@ -51,6 +51,13 @@ static int	s_itemTimersModCount = 0;
 static int	s_itemHeightModCount = 0;
 static int	s_lastItemTimerEnabled = -1;
 static int	s_lastItemTimerHeight = -1;
+static int	s_forceSmallScoreboardMessageModCount = -1;
+static int	s_forceSendConfigstringModCount = -1;
+static int	s_forceAtmosphericEffectsModCount = -1;
+static int	s_forceDmgThroughSurfaceModCount = -1;
+static int	s_forcedAtmosphereModCount = -1;
+static char	s_worldspawnAtmosphere[MAX_QPATH];
+static char	s_lastForcedCosmeticsPayload[MAX_INFO_STRING];
 
 static qlr_game_frame_context_t *G_GetFrameContext( void );
 static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec );
@@ -59,6 +66,82 @@ static void G_DispatchEvents( qlr_game_frame_context_t *ctx );
 static void G_FinishClientFrames( qlr_game_frame_context_t *ctx );
 static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued );
 static void G_UpdateTrainingState( void );
+
+/*
+=============
+G_SelectForcedAtmosphere
+
+Selects the highest priority forced atmosphere token to publish to clients.
+=============
+*/
+static const char *G_SelectForcedAtmosphere( void ) {
+	if ( g_forceAtmosphericEffects.string[0] ) {
+		return g_forceAtmosphericEffects.string;
+	}
+
+	if ( s_worldspawnAtmosphere[0] ) {
+		return s_worldspawnAtmosphere;
+	}
+
+	if ( g_forcedAtmosphere.string[0] ) {
+		return g_forcedAtmosphere.string;
+	}
+
+	return "";
+}
+
+/*
+=============
+G_UpdateForcedCosmeticsConfigstring
+
+Rebuilds the forced cosmetics payload and broadcasts it to all clients when requested.
+=============
+*/
+void G_UpdateForcedCosmeticsConfigstring( qboolean forceBroadcast ) {
+	char		info[MAX_INFO_STRING];
+	const char	*atmosphere;
+	qboolean	shouldBroadcast;
+
+	info[0] = '\0';
+
+	Info_SetValueForKey( info, "sb", g_forceSmallScoreboardMessage.integer ? "1" : "0" );
+	Info_SetValueForKey( info, "hud", g_forceSendConfigstring.integer ? "1" : "0" );
+	Info_SetValueForKey( info, "dmg", g_forceDmgThroughSurface.integer ? "1" : "0" );
+
+	atmosphere = G_SelectForcedAtmosphere();
+	if ( atmosphere && atmosphere[0] ) {
+		Info_SetValueForKey( info, "atm", atmosphere );
+	}
+
+	shouldBroadcast = forceBroadcast;
+	if ( !shouldBroadcast && Q_stricmp( info, s_lastForcedCosmeticsPayload ) ) {
+		shouldBroadcast = qtrue;
+	}
+
+	if ( !shouldBroadcast ) {
+		return;
+	}
+
+	trap_SetConfigstring( CS_FORCED_COSMETICS, info );
+	Q_strncpyz( s_lastForcedCosmeticsPayload, info, sizeof( s_lastForcedCosmeticsPayload ) );
+}
+
+/*
+=============
+G_SetWorldspawnAtmosphere
+
+Caches the worldspawn-provided atmosphere token and refreshes the broadcast payload.
+=============
+*/
+void G_SetWorldspawnAtmosphere( const char *atmosphere ) {
+	if ( atmosphere && atmosphere[0] ) {
+		Q_strncpyz( s_worldspawnAtmosphere, atmosphere, sizeof( s_worldspawnAtmosphere ) );
+	} else {
+		s_worldspawnAtmosphere[0] = '\0';
+	}
+
+	G_UpdateForcedCosmeticsConfigstring( qtrue );
+}
 
 void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
 	g_qlr_frame_ctx = ctx;
@@ -700,7 +783,15 @@ void G_RegisterCvars( void ) {
 	level.warmupModificationCount = g_warmup.modificationCount;
 	s_itemTimersModCount = g_itemTimers.modificationCount;
 	s_itemHeightModCount = g_itemHeight.modificationCount;
+	s_forceSmallScoreboardMessageModCount = g_forceSmallScoreboardMessage.modificationCount;
+	s_forceSendConfigstringModCount = g_forceSendConfigstring.modificationCount;
+	s_forceAtmosphericEffectsModCount = g_forceAtmosphericEffects.modificationCount;
+	s_forceDmgThroughSurfaceModCount = g_forceDmgThroughSurface.modificationCount;
+	s_forcedAtmosphereModCount = g_forcedAtmosphere.modificationCount;
+	s_worldspawnAtmosphere[0] = '\0';
+	s_lastForcedCosmeticsPayload[0] = '\0';
 	G_UpdateItemTimerConfig( qtrue );
+	G_UpdateForcedCosmeticsConfigstring( qtrue );
         G_InitWeaponConfig();
         G_InitWeaponReloadConfig();
         G_InitKnockbackConfig();
@@ -760,6 +851,18 @@ void G_UpdateCvars( void ) {
 		s_itemTimersModCount = g_itemTimers.modificationCount;
 		s_itemHeightModCount = g_itemHeight.modificationCount;
 		G_UpdateItemTimerConfig( qfalse );
+	}
+	if ( g_forceSmallScoreboardMessage.modificationCount != s_forceSmallScoreboardMessageModCount ||
+		 g_forceSendConfigstring.modificationCount != s_forceSendConfigstringModCount ||
+		 g_forceAtmosphericEffects.modificationCount != s_forceAtmosphericEffectsModCount ||
+		 g_forceDmgThroughSurface.modificationCount != s_forceDmgThroughSurfaceModCount ||
+		 g_forcedAtmosphere.modificationCount != s_forcedAtmosphereModCount ) {
+		s_forceSmallScoreboardMessageModCount = g_forceSmallScoreboardMessage.modificationCount;
+		s_forceSendConfigstringModCount = g_forceSendConfigstring.modificationCount;
+		s_forceAtmosphericEffectsModCount = g_forceAtmosphericEffects.modificationCount;
+		s_forceDmgThroughSurfaceModCount = g_forceDmgThroughSurface.modificationCount;
+		s_forcedAtmosphereModCount = g_forcedAtmosphere.modificationCount;
+		G_UpdateForcedCosmeticsConfigstring( qtrue );
 	}
 	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
 

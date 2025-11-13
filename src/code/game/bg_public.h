@@ -80,7 +80,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_SHADERSTATE			24
 #define CS_BOTINFO				25
 #define CS_MATCH_STATE				26
-#define CS_FORCED_ATMOSPHERE		0x2B3		// forces clients to enable map atmosphere effects
+// CS_FORCED_COSMETICS broadcasts an info string with the following keys:
+// \sb\<0|1>  - Forces the compact scoreboard tipline when set.
+// \hud\<0|1> - Enables HUD coaching widgets even if players disabled them.
+// \dmg\<0|1> - Advertises damage-through-surface overrides to clients.
+// \atm\<str> - Optional atmosphere token mirrored from the worldspawn or server override.
+#define CS_FORCED_COSMETICS		0x2B3
 
 //
 // Factory metadata configstrings provide clients with human-readable match factory data.

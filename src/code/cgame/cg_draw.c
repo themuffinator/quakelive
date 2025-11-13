@@ -820,7 +820,7 @@ static float CG_DrawTimer( float y ) {
 	int			mins, seconds, tens;
 	int			msec;
 
-	if ( !cgs.itemTimersEnabled ) {
+	if ( !cgs.itemTimersEnabled && !cgs.forceHudHints ) {
 		return y;
 	}
 

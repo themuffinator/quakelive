@@ -881,6 +881,9 @@ void ClientDisconnect( int clientNum );
 void ClientBegin( int clientNum );
 void ClientCommand( int clientNum );
 
+void G_UpdateForcedCosmeticsConfigstring( qboolean forceBroadcast );
+void G_SetWorldspawnAtmosphere( const char *atmosphere );
+
 //
 // g_active.c
 //

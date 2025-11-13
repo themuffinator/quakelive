@@ -31,7 +31,7 @@ typedef struct {
 
 typedef struct {
 	int	configIndex;
-	char	payload[8];
+	char	payload[MAX_INFO_STRING];
 } gt_force_broadcast_log_t;
 
 static void GT_ItemTimerVoteContextInit(gt_itemtimer_vote_context_t *ctx);
@@ -143,14 +143,29 @@ Records the configstring broadcast used by the `g_force*` family.
 =============
 */
 static void GT_ApplyForceBroadcast(const char *cvarName, qboolean enabled, gt_force_broadcast_log_t *log) {
+	static qboolean	forceSmallScoreboard = qfalse;
+	static qboolean	forceHudHints = qfalse;
+	static qboolean	forceDamageThroughSurface = qfalse;
+
 	if (!log) {
 		return;
 	}
 
+	if ( cvarName ) {
+		if ( Q_stricmp( cvarName, "g_forceSmallScoreboardMessage" ) == 0 ) {
+			forceSmallScoreboard = enabled ? qtrue : qfalse;
+		} else if ( Q_stricmp( cvarName, "g_forceSendConfigstring" ) == 0 ) {
+			forceHudHints = enabled ? qtrue : qfalse;
+		} else if ( Q_stricmp( cvarName, "g_forceDmgThroughSurface" ) == 0 ) {
+			forceDamageThroughSurface = enabled ? qtrue : qfalse;
+		}
+	}
+
 	log->configIndex = 0x2b3;
-	log->payload[0] = enabled ? '1' : '0';
-	log->payload[1] = '\0';
-	(void)cvarName;
+	log->payload[0] = '\0';
+	Info_SetValueForKey( log->payload, "sb", forceSmallScoreboard ? "1" : "0" );
+	Info_SetValueForKey( log->payload, "hud", forceHudHints ? "1" : "0" );
+	Info_SetValueForKey( log->payload, "dmg", forceDamageThroughSurface ? "1" : "0" );
 }
 
 /*
@@ -274,8 +289,16 @@ static qboolean GT_ForceBroadcastPushesConfigstring(void) {
 		return GT_Failf("expected configstring index 0x2B3, received %d", log.configIndex);
 	}
 
-	if (strcmp(log.payload, "1") != 0) {
-		return GT_Failf("expected payload '1', received '%s'", log.payload);
+	if ( Q_stricmp( Info_ValueForKey( log.payload, "hud" ), "1" ) != 0 ) {
+		return GT_Failf("expected hud flag '1', received '%s'", Info_ValueForKey( log.payload, "hud" ) );
+	}
+
+	if ( Q_stricmp( Info_ValueForKey( log.payload, "sb" ), "0" ) != 0 ) {
+		return GT_Failf("expected scoreboard flag '0', received '%s'", Info_ValueForKey( log.payload, "sb" ) );
+	}
+
+	if ( Q_stricmp( Info_ValueForKey( log.payload, "dmg" ), "0" ) != 0 ) {
+		return GT_Failf("expected damage flag '0', received '%s'", Info_ValueForKey( log.payload, "dmg" ) );
 	}
 
 	return qtrue;

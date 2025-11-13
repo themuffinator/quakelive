@@ -333,6 +333,99 @@ static void CG_ParseMatchState( void ) {
 		cgs.matchSuddenDeathSpawnDelayActive = values[19] ? qtrue : qfalse;
 	}
 }
+
+/*
+=============
+CG_RequestForcedAtmosphere
+
+Caches the forced atmosphere token and notifies the player when it changes.
+=============
+*/
+static void CG_RequestForcedAtmosphere( const char *effect ) {
+	if ( !effect ) {
+		effect = "";
+	}
+
+	if ( !effect[0] ) {
+		if ( cgs.forcedAtmosphere[0] ) {
+			cgs.forcedAtmosphere[0] = '\0';
+			CG_Printf( "Server cleared forced atmosphere overrides.\n" );
+		}
+		return;
+	}
+
+	if ( !Q_stricmp( effect, cgs.forcedAtmosphere ) ) {
+		return;
+	}
+
+	Q_strncpyz( cgs.forcedAtmosphere, effect, sizeof( cgs.forcedAtmosphere ) );
+	CG_Printf( "Server forced atmosphere: %s\n", cgs.forcedAtmosphere );
+}
+
+/*
+=============
+CG_ParseForcedCosmetics
+
+Parses the forced cosmetics configstring and updates local client state.
+=============
+*/
+static void CG_ParseForcedCosmetics( void ) {
+	const char		*info;
+	const char		*value;
+	qboolean	forceScoreboard;
+	qboolean	forceHud;
+	qboolean	forceDamage;
+	qboolean	previousScoreboard;
+	qboolean	previousHud;
+
+	previousScoreboard = cgs.forceSmallScoreboardMessage;
+	previousHud = cgs.forceHudHints;
+	forceScoreboard = qfalse;
+	forceHud = qfalse;
+	forceDamage = qfalse;
+
+	info = CG_ConfigString( CS_FORCED_COSMETICS );
+	if ( info && *info ) {
+		value = Info_ValueForKey( info, "sb" );
+		if ( value && *value ) {
+			forceScoreboard = atoi( value ) ? qtrue : qfalse;
+		}
+
+		value = Info_ValueForKey( info, "hud" );
+		if ( value && *value ) {
+			forceHud = atoi( value ) ? qtrue : qfalse;
+		}
+
+		value = Info_ValueForKey( info, "dmg" );
+		if ( value && *value ) {
+			forceDamage = atoi( value ) ? qtrue : qfalse;
+		}
+
+		value = Info_ValueForKey( info, "atm" );
+		if ( value ) {
+			CG_RequestForcedAtmosphere( value );
+		}
+	} else {
+		CG_RequestForcedAtmosphere( "" );
+	}
+
+	cgs.forceSmallScoreboardMessage = forceScoreboard;
+	cgs.forceHudHints = forceHud;
+	cgs.forceDmgThroughSurface = forceDamage;
+
+	if ( forceScoreboard && !previousScoreboard ) {
+		CG_CenterPrint( "Server enforced the compact scoreboard message.", SCREEN_HEIGHT * 0.30f, SMALLCHAR_WIDTH );
+	} else if ( !forceScoreboard && previousScoreboard ) {
+		CG_CenterPrint( "Server restored your scoreboard message preference.", SCREEN_HEIGHT * 0.30f, SMALLCHAR_WIDTH );
+	}
+
+	if ( forceHud && !previousHud ) {
+		CG_Printf( "Server forced HUD training widgets.\n" );
+	} else if ( !forceHud && previousHud ) {
+		CG_Printf( "Server cleared forced HUD training widgets.\n" );
+	}
+}
+
 /*
 ================
 CG_SetConfigValues
@@ -392,6 +485,7 @@ void CG_SetConfigValues( void ) {
 #endif
 	cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
 	CG_ParseMatchState();
+	CG_ParseForcedCosmetics();
 	CG_ParseFactoryMetadata();
 }
 
@@ -470,7 +564,9 @@ static void CG_ConfigStringModified( void ) {
 	} else if ( num == CS_LEVEL_START_TIME ) {
 		cgs.levelStartTime = atoi( str );
 	} else if ( num == CS_FACTORY_TITLE || num == CS_FACTORY_FLAGS || num == CS_SPAWN_HINTS ) {
-		CG_ParseFactoryMetadata();
+	CG_ParseFactoryMetadata();
+	} else if ( num == CS_FORCED_COSMETICS ) {
+	CG_ParseForcedCosmetics();
 	} else if ( num == CS_VOTE_TIME ) {
 		cgs.voteTime = atoi( str );
 		cgs.voteModified = qtrue;

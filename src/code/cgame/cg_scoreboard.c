@@ -74,6 +74,37 @@ static qboolean localClient; // true if local client has been displayed
 
 
 /*
+=============
+CG_DrawForcedScoreboardTip
+
+Draws the forced compact-scoreboard banner when the server enforces it.
+=============
+*/
+static void CG_DrawForcedScoreboardTip( float fade ) {
+	vec4_t	color;
+	const char	*message;
+	int	width;
+	int	x;
+	int	y;
+
+	if ( !cgs.forceSmallScoreboardMessage || fade <= 0.0f ) {
+		return;
+	}
+	message = "Compact scoreboard message forced by server";
+	width = CG_DrawStrlen( message ) * SMALLCHAR_WIDTH;
+	x = ( SCREEN_WIDTH - width ) / 2;
+	y = SB_TOP - SMALLCHAR_HEIGHT - 4;
+
+	color[0] = 1.0f;
+	color[1] = 1.0f;
+	color[2] = 1.0f;
+	color[3] = fade;
+
+	CG_DrawSmallStringColor( x, y, message, color );
+}
+
+
+/*
 =================
 CG_DrawFactoryMetadata
 
@@ -171,12 +202,14 @@ static void CG_DrawFactoryMetadata( float fade ) {
 	CG_DrawSmallStringColor( x, y, line, color );
 }
 
-							 /*
+/*
 =================
-CG_DrawScoreboard
+CG_DrawClientScore
+
+Draws a single client row in the scoreboard.
 =================
 */
-static void CG_DrawClientScore( int y, score_t *score, float *color, float fade, qboolean largeFormat ) {
+static void CG_DrawClientScore( int y, score_t *score, float *color, float fade, qboolean largeFormat, qboolean timersActive ) {
 	char	string[1024];
 	vec3_t	headAngles;
 	clientInfo_t	*ci;
@@ -268,14 +301,14 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 #endif
 	// draw the score line
 	if ( score->ping == -1 ) {
-		if ( cgs.itemTimersEnabled ) {
+		if ( timersActive ) {
 			Com_sprintf( string, sizeof( string ),
 				" connecting    %s", ci->name );
 		} else {
 			Com_sprintf( string, sizeof( string ),
 				" connecting %s", ci->name );
 		}
-	} else if ( cgs.itemTimersEnabled ) {
+	} else if ( timersActive ) {
 		if ( ci->team == TEAM_SPECTATOR ) {
 			Com_sprintf( string, sizeof( string ),
 				" SPECT %3i %4i %s", score->ping, score->time, ci->name );
@@ -338,11 +371,13 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 }
 
 /*
-=================
+=============
 CG_TeamScoreboard
-=================
+
+Renders the scoreboard rows for a specific team or grouping.
+=============
 */
-static int CG_TeamScoreboard( int y, team_t team, float fade, int maxClients, int lineHeight ) {
+static int CG_TeamScoreboard( int y, team_t team, float fade, int maxClients, int lineHeight, qboolean timersActive ) {
 	int		i;
 	score_t	*score;
 	float	color[4];
@@ -361,7 +396,7 @@ static int CG_TeamScoreboard( int y, team_t team, float fade, int maxClients, in
 			continue;
 		}
 
-		CG_DrawClientScore( y + lineHeight * count, score, color, fade, lineHeight >= SB_NORMAL_HEIGHT );
+		CG_DrawClientScore( y + lineHeight * count, score, color, fade, lineHeight >= SB_NORMAL_HEIGHT, timersActive );
 
 		count++;
 	}
@@ -385,6 +420,7 @@ qboolean CG_DrawOldScoreboard( void ) {
 	int lineHeight;
 	int topBorderSize, bottomBorderSize;
 	int			nameHeaderX;
+	qboolean		timersActive;
 
 	// don't draw amuthing if the menu or console is up
 	if ( cg_paused.integer ) {
@@ -458,13 +494,17 @@ qboolean CG_DrawOldScoreboard( void ) {
 	// scoreboard
 	y = SB_HEADER;
 
+	timersActive = ( cgs.itemTimersEnabled || cgs.forceHudHints );
+
 	CG_DrawPic( SB_SCORE_X + (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardScore );
 	CG_DrawPic( SB_PING_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardPing );
-	if ( cgs.itemTimersEnabled ) {
+	if ( timersActive ) {
 		CG_DrawPic( SB_TIME_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardTime );
 	}
-	nameHeaderX = SB_SCORELINE_X + (SB_RATING_WIDTH / 2) + ( cgs.itemTimersEnabled ? 16 : 11 ) * BIGCHAR_WIDTH;
+	nameHeaderX = SB_SCORELINE_X + (SB_RATING_WIDTH / 2) + ( timersActive ? 16 : 11 ) * BIGCHAR_WIDTH;
 	CG_DrawPic( nameHeaderX, y, 64, 32, cgs.media.scoreboardName );
+
+	CG_DrawForcedScoreboardTip( fade );
 
 	y = SB_TOP;
 
@@ -525,34 +565,34 @@ qboolean CG_DrawOldScoreboard( void ) {
 		y += lineHeight/2;
 
 		if ( cg.teamScores[0] >= cg.teamScores[1] ) {
-			n1 = CG_TeamScoreboard( y, TEAM_RED, fade, maxClients, lineHeight );
+			n1 = CG_TeamScoreboard( y, TEAM_RED, fade, maxClients, lineHeight, timersActive );
 			CG_DrawTeamBackground( 0, y - topBorderSize, 640, n1 * lineHeight + bottomBorderSize, 0.33f, TEAM_RED );
 			y += (n1 * lineHeight) + BIGCHAR_HEIGHT;
 			maxClients -= n1;
-			n2 = CG_TeamScoreboard( y, TEAM_BLUE, fade, maxClients, lineHeight );
+			n2 = CG_TeamScoreboard( y, TEAM_BLUE, fade, maxClients, lineHeight, timersActive );
 			CG_DrawTeamBackground( 0, y - topBorderSize, 640, n2 * lineHeight + bottomBorderSize, 0.33f, TEAM_BLUE );
 			y += (n2 * lineHeight) + BIGCHAR_HEIGHT;
 			maxClients -= n2;
 		} else {
-			n1 = CG_TeamScoreboard( y, TEAM_BLUE, fade, maxClients, lineHeight );
+			n1 = CG_TeamScoreboard( y, TEAM_BLUE, fade, maxClients, lineHeight, timersActive );
 			CG_DrawTeamBackground( 0, y - topBorderSize, 640, n1 * lineHeight + bottomBorderSize, 0.33f, TEAM_BLUE );
 			y += (n1 * lineHeight) + BIGCHAR_HEIGHT;
 			maxClients -= n1;
-			n2 = CG_TeamScoreboard( y, TEAM_RED, fade, maxClients, lineHeight );
+			n2 = CG_TeamScoreboard( y, TEAM_RED, fade, maxClients, lineHeight, timersActive );
 			CG_DrawTeamBackground( 0, y - topBorderSize, 640, n2 * lineHeight + bottomBorderSize, 0.33f, TEAM_RED );
 			y += (n2 * lineHeight) + BIGCHAR_HEIGHT;
 			maxClients -= n2;
 		}
-		n1 = CG_TeamScoreboard( y, TEAM_SPECTATOR, fade, maxClients, lineHeight );
+		n1 = CG_TeamScoreboard( y, TEAM_SPECTATOR, fade, maxClients, lineHeight, timersActive );
 		y += (n1 * lineHeight) + BIGCHAR_HEIGHT;
 
 	} else {
 		//
 		// free for all scoreboard
 		//
-		n1 = CG_TeamScoreboard( y, TEAM_FREE, fade, maxClients, lineHeight );
+		n1 = CG_TeamScoreboard( y, TEAM_FREE, fade, maxClients, lineHeight, timersActive );
 		y += (n1 * lineHeight) + BIGCHAR_HEIGHT;
-		n2 = CG_TeamScoreboard( y, TEAM_SPECTATOR, fade, maxClients - n1, lineHeight );
+		n2 = CG_TeamScoreboard( y, TEAM_SPECTATOR, fade, maxClients - n1, lineHeight, timersActive );
 		y += (n2 * lineHeight) + BIGCHAR_HEIGHT;
 	}
 
@@ -560,7 +600,7 @@ qboolean CG_DrawOldScoreboard( void ) {
 		// draw local client at the bottom
 		for ( i = 0 ; i < cg.numScores ; i++ ) {
 			if ( cg.scores[i].client == cg.snap->ps.clientNum ) {
-				CG_DrawClientScore( y, &cg.scores[i], fadeColor, fade, lineHeight >= SB_NORMAL_HEIGHT );
+				CG_DrawClientScore( y, &cg.scores[i], fadeColor, fade, lineHeight >= SB_NORMAL_HEIGHT, timersActive );
 				break;
 			}
 		}

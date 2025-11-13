@@ -610,10 +610,10 @@ void SP_worldspawn( void ) {
 
 	G_SpawnString( "atmosphere", "", &atmosphere );
 	if ( atmosphere && atmosphere[0] ) {
-		trap_SetConfigstring( CS_FORCED_ATMOSPHERE, atmosphere );
+		G_SetWorldspawnAtmosphere( atmosphere );
 	} else {
 		trap_Cvar_Update( &g_forcedAtmosphere );
-		trap_SetConfigstring( CS_FORCED_ATMOSPHERE, g_forcedAtmosphere.string );
+		G_SetWorldspawnAtmosphere( g_forcedAtmosphere.string );
 	}
 
 	g_entities[ENTITYNUM_WORLD].s.number = ENTITYNUM_WORLD;
