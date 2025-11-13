@@ -615,6 +615,13 @@ void SetTeam( gentity_t *ent, char *s ) {
 	client->sess.spectatorState = specState;
 	client->sess.spectatorClient = specClient;
 
+	client->lastKillCommandTime = 0;
+	client->killCommandCooldownExpires = 0;
+	client->friendlyFireComplaints = 0;
+	client->friendlyFireComplaintEndTime = 0;
+	client->teammateDamageGiven = 0;
+	client->teammateDamageThisLife = 0;
+
 	client->sess.teamLeader = qfalse;
 	if ( team == TEAM_RED || team == TEAM_BLUE ) {
 		teamLeader = TeamLeader( team );
@@ -648,6 +655,12 @@ void StopFollowing( gentity_t *ent ) {
 	ent->client->ps.persistant[ PERS_TEAM ] = TEAM_SPECTATOR;	
 	ent->client->sess.sessionTeam = TEAM_SPECTATOR;	
 	ent->client->sess.spectatorState = SPECTATOR_FREE;
+	ent->client->lastKillCommandTime = 0;
+	ent->client->killCommandCooldownExpires = 0;
+	ent->client->friendlyFireComplaints = 0;
+	ent->client->friendlyFireComplaintEndTime = 0;
+	ent->client->teammateDamageGiven = 0;
+	ent->client->teammateDamageThisLife = 0;
 	ent->client->ps.pm_flags &= ~PMF_FOLLOW;
 	ent->r.svFlags &= ~SVF_BOT;
 	ent->client->ps.clientNum = ent - g_entities;
