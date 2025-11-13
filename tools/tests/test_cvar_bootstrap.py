@@ -72,6 +72,11 @@ class CVarBootstrapTests(unittest.TestCase):
         self.assertLess(reload_call, knockback_call, "reload config must initialise before knockback config")
         self.assertLess(knockback_call, ammo_call, "knockback config must initialise before starting ammo")
 
+    def test_weapon_reload_config_populates_pmove_cache(self) -> None:
+        source = _read_source("src/game/g_config.c")
+        body = _extract_function_body(source, "void G_InitWeaponReloadConfig( void )")
+        self.assertIn("G_PmoveStoreWeaponReloads( &g_weaponReloadConfig );", body)
+
     def test_update_cvars_refreshes_configs(self) -> None:
         source = _read_source("src/code/game/g_main.c")
         body = _extract_function_body(source, "void G_UpdateCvars( void )")

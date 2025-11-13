@@ -310,6 +310,8 @@ void G_InitWeaponReloadConfig( void ) {
         g_weaponReloadConfig.proximityLauncher = G_ReadWeaponReloadCvar( &weapon_reload_prox, DEFAULT_WEAPON_RELOAD_PROX, "weapon_reload_prox" );
         g_weaponReloadConfig.chaingun = G_ReadWeaponReloadCvar( &weapon_reload_cg, DEFAULT_WEAPON_RELOAD_CG, "weapon_reload_cg" );
         g_weaponReloadConfig.heavyMachinegun = G_ReadWeaponReloadCvar( &weapon_reload_hmg, DEFAULT_WEAPON_RELOAD_HMG, "weapon_reload_hmg" );
+
+        G_PmoveStoreWeaponReloads( &g_weaponReloadConfig );
 }
 
 void G_UpdateWeaponReloadConfig( void ) {

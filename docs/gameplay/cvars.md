@@ -67,6 +67,7 @@ Quake Live exposes a `weapon_reload_*` family that lets operators retime each gu
 ### Usage notes
 
 * `G_InitWeaponReloadConfig` refreshes the reload table whenever CVars change, so weapon think code can re-query during warmup or between rounds without a restart.【F:src/code/game/g_main.c†L494-L508】
+* `G_PmoveStoreWeaponReloads` copies the parsed durations into `g_pmoveSettings.weaponReloadTimes`, keeping server prediction and client pmove in sync after reload CVars change.【F:src/game/g_config.c†L303-L315】【F:src/code/game/g_pmove.c†L170-L259】
 * Tuning refire timings is most visible in spawn loadouts from `g_startingWeapons` and in weapon pickup dominance during duel/CA rotations, making it a complementary knob to the spawn ammo controls documented above.【F:docs/gameplay/cvars.md†L5-L34】
 
 ## Ammo Pack Pickup Controls
@@ -132,5 +133,6 @@ The Quake Live VM reads `g_ammoPack_*` values to determine how much ammunition e
 * Persist a modified value (e.g. `seta g_startingAmmo_rl 25`) and restart the server to ensure the archived setting survives a relaunch.
 * Ensure gauntlet and grapple defaults remain infinite (`-1`) after a `cvar_restart`.
 * Change multiple `weapon_reload_*` CVars, issue a `map_restart`, and observe the new refire cadence in a live match to confirm `g_weaponReloadConfig` picked up the overrides.【F:src/code/game/g_main.c†L494-L508】
+* Adjust `weapon_reload_rl` and `weapon_reload_lg`, trigger a `map_restart`, and ensure rockets and lightning ticks adopt the new delays immediately via `PM_GetWeaponReloadTime` and the pmove cache.【F:src/code/game/bg_pmove.c†L211-L250】【F:src/code/game/bg_pmove.c†L2398-L2417】【F:src/code/game/g_pmove.c†L170-L259】
 * Override `g_ammoPack_*` values, pick up the corresponding ammo entities, and verify the awarded counts match the configured integers across base maps and factory scripts.【F:src/code/game/g_main.c†L515-L556】
 * Adjust `g_knockback_*` scalars (including the self variants), perform rocket and plasma jumps, and check that `G_KnockbackScaleForMOD` applies the updated force for both enemy hits and self-damage.【F:src/code/game/g_combat.c†L804-L862】
