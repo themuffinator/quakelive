@@ -1318,6 +1318,13 @@ after the first ClientBegin, and after each respawn
 Initializes all non-persistant parts of playerState
 ============
 */
+/*
+=============
+ClientSpawn
+
+Handles player respawns, seeding stats, inventory, and spawn state from the cached factory configuration.
+=============
+*/
 void ClientSpawn(gentity_t *ent) {
 	int		index;
 	vec3_t	spawn_origin, spawn_angles;
@@ -1334,9 +1341,13 @@ void ClientSpawn(gentity_t *ent) {
 	int		accuracy_hits, accuracy_shots;
 	int		eventSequence;
 	char	userinfo[MAX_INFO_STRING];
+	const factoryCvarConfig_t	*factoryConfig;
+	int		baseHealth;
+	int		spawnHealth;
 
 	index = ent - g_entities;
 	client = ent->client;
+	factoryConfig = &g_factoryCvarConfig;
 
 	// find a spawn point
 	// do it before setting health back up, so farthest
@@ -1422,9 +1433,15 @@ void ClientSpawn(gentity_t *ent) {
 
 	trap_GetUserinfo( index, userinfo, sizeof(userinfo) );
 	// set max health
+	baseHealth = factoryConfig->startingHealth;
+	if ( baseHealth < 1 ) {
+		baseHealth = 1;
+	}
 	client->pers.maxHealth = atoi( Info_ValueForKey( userinfo, "handicap" ) );
-	if ( client->pers.maxHealth < 1 || client->pers.maxHealth > 100 ) {
-		client->pers.maxHealth = 100;
+	if ( client->pers.maxHealth < 1 ) {
+		client->pers.maxHealth = baseHealth;
+	} else if ( client->pers.maxHealth > baseHealth ) {
+		client->pers.maxHealth = baseHealth;
 	}
 	// clear entity values
 	client->ps.stats[STAT_MAX_HEALTH] = client->pers.maxHealth;
@@ -1486,7 +1503,14 @@ void ClientSpawn(gentity_t *ent) {
 	}
 
 	// health will count down towards max_health
-	ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
+	spawnHealth = client->ps.stats[STAT_MAX_HEALTH] + factoryConfig->startingHealthBonus;
+	if ( spawnHealth < 1 ) {
+		spawnHealth = 1;
+	}
+	ent->health = client->ps.stats[STAT_HEALTH] = spawnHealth;
+	if ( factoryConfig->startingArmor > 0 ) {
+		client->ps.stats[STAT_ARMOR] = factoryConfig->startingArmor;
+	}
 
 	G_SetOrigin( ent, spawn_origin );
 	VectorCopy( spawn_origin, client->ps.origin );

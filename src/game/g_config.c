@@ -78,6 +78,9 @@
 #define DEFAULT_AMMO_PACK_HACK             0
 #define DEFAULT_AMMO_RESPAWN_SECONDS       40
 #define DEFAULT_SUDDEN_DEATH_RESPAWN       0
+#define DEFAULT_STARTING_HEALTH            100
+#define DEFAULT_STARTING_HEALTH_BONUS      25
+#define DEFAULT_STARTING_ARMOR             0
 
 weaponReloadConfig_t    g_weaponReloadConfig;
 knockbackConfig_t       g_knockbackConfig;
@@ -107,6 +110,9 @@ vmCvar_t        g_ammoPack;
 vmCvar_t        g_ammoPackHack;
 vmCvar_t        g_ammoRespawn;
 extern vmCvar_t g_suddenDeathRespawn;
+vmCvar_t        g_startingHealth;
+vmCvar_t        g_startingHealthBonus;
+vmCvar_t        g_startingArmor;
 
 vmCvar_t        g_ammoPack_bfg;
 vmCvar_t        g_ammoPack_cg;
@@ -188,6 +194,9 @@ static configCvarTable_t s_configCvarTable[] = {
         { &g_ammoPackHack,         "g_ammoPackHack",         STRINGIZE( DEFAULT_AMMO_PACK_HACK ), CVAR_ARCHIVE, "Legacy Quake Live ammo pack override used by classic map factories." },
         { &g_ammoRespawn,          "g_ammoRespawn",          STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ), CVAR_ARCHIVE, "Seconds before ammo entities respawn; Quake Live factories reduce this for faster loops." },
         { &g_suddenDeathRespawn,   "g_suddenDeathRespawn",   STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_ARCHIVE, "Allow ammo to continue respawning during sudden death when set to 1." },
+        { &g_startingHealth,       "g_startingHealth",       STRINGIZE( DEFAULT_STARTING_HEALTH ), CVAR_ARCHIVE, "Base health applied to spawns before handicap and health bonuses." },
+        { &g_startingHealthBonus,  "g_startingHealthBonus",  STRINGIZE( DEFAULT_STARTING_HEALTH_BONUS ), CVAR_ARCHIVE, "Extra health layered on top of the base value during spawns." },
+        { &g_startingArmor,        "g_startingArmor",        STRINGIZE( DEFAULT_STARTING_ARMOR ), CVAR_ARCHIVE, "Armor granted on spawn when positive, mirroring Quake Live factories." },
 
         { &g_ammoPack_bfg,         "g_ammoPack_bfg",         STRINGIZE( DEFAULT_AMMOPACK_BFG ), CVAR_ARCHIVE, "Cells granted when picking up a BFG ammo pack, matching Quake Live's default drop." },
         { &g_ammoPack_cg,          "g_ammoPack_cg",          STRINGIZE( DEFAULT_AMMOPACK_CG ), CVAR_ARCHIVE, "Chaingun bullets restored per ammo belt pickup." },
@@ -419,6 +428,49 @@ static unsigned int G_ComputeStartingWeaponsStatMask( int mask ) {
         return statMask;
 }
 
+/*
+=============
+G_ReadFactoryPositiveCvar
+
+Ensures factory CVars expecting positive integers fall back to defaults when invalid values are supplied.
+=============
+*/
+static int G_ReadFactoryPositiveCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+        int value = G_ReadFactoryIntCvar( cvar, fallback, cvarName );
+
+        if ( value < 1 ) {
+                G_Printf( "WARNING: gameplay config cvar %s must be positive; using fallback value %i\n", cvarName, fallback );
+                return fallback;
+        }
+
+        return value;
+}
+
+/*
+=============
+G_ReadFactoryNonNegativeCvar
+
+Clamps gameplay CVars that should stay non-negative to their fallback values and logs the adjustment for visibility.
+=============
+*/
+static int G_ReadFactoryNonNegativeCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+        int value = G_ReadFactoryIntCvar( cvar, fallback, cvarName );
+
+        if ( value < 0 ) {
+                G_Printf( "WARNING: gameplay config cvar %s must be non-negative; using fallback value %i\n", cvarName, fallback );
+                return fallback;
+        }
+
+        return value;
+}
+
+/*
+=============
+G_LoadFactoryCvarConfig
+
+Collects the current factory-oriented CVar values into the cached configuration so gameplay code can consult a validated snapshot.
+=============
+*/
 static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {
         factoryCvarConfig_t config;
 
@@ -438,16 +490,26 @@ static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {
         }
 
         config.suddenDeathRespawn = G_ReadFactoryBoolCvar( &g_suddenDeathRespawn, DEFAULT_SUDDEN_DEATH_RESPAWN, "g_suddenDeathRespawn" );
+        config.startingHealth = G_ReadFactoryPositiveCvar( &g_startingHealth, DEFAULT_STARTING_HEALTH, "g_startingHealth" );
+        config.startingHealthBonus = G_ReadFactoryNonNegativeCvar( &g_startingHealthBonus, DEFAULT_STARTING_HEALTH_BONUS, "g_startingHealthBonus" );
+        config.startingArmor = G_ReadFactoryNonNegativeCvar( &g_startingArmor, DEFAULT_STARTING_ARMOR, "g_startingArmor" );
 
         return config;
 }
 
+/*
+=============
+G_LogFactoryLoadoutState
+
+Emits the active factory configuration to the console so administrators can audit runtime changes.
+=============
+*/
 static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfig_t *config ) {
         if ( !reason || !config ) {
                 return;
         }
 
-        G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i suddenDeathRespawn=%i\n",
+        G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i suddenDeathRespawn=%i startHealth=%i bonus=%i armor=%i\n",
                 reason,
                 config->startingWeaponsMask,
                 config->startingWeaponsStatMask,
@@ -455,17 +517,34 @@ static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfi
                 config->ammoPackEnabled,
                 config->ammoPackHackEnabled,
                 config->ammoRespawnSeconds,
-                config->suddenDeathRespawn );
+                config->suddenDeathRespawn,
+                config->startingHealth,
+                config->startingHealthBonus,
+                config->startingArmor );
 }
 
 static factoryCvarConfig_t s_reportedFactoryConfig;
 
+/*
+=============
+G_InitFactoryCvarConfig
+
+Seeds the cached factory configuration during VM startup.
+=============
+*/
 void G_InitFactoryCvarConfig( void ) {
         g_factoryCvarConfig = G_LoadFactoryCvarConfig();
         s_reportedFactoryConfig = g_factoryCvarConfig;
         G_LogFactoryLoadoutState( "init", &g_factoryCvarConfig );
 }
 
+/*
+=============
+G_UpdateFactoryCvarConfig
+
+Refreshes the cached factory configuration and logs transitions when runtime CVars change.
+=============
+*/
 void G_UpdateFactoryCvarConfig( void ) {
         factoryCvarConfig_t config = G_LoadFactoryCvarConfig();
 
@@ -475,7 +554,10 @@ void G_UpdateFactoryCvarConfig( void ) {
                 || config.ammoPackEnabled != s_reportedFactoryConfig.ammoPackEnabled
                 || config.ammoPackHackEnabled != s_reportedFactoryConfig.ammoPackHackEnabled
                 || config.ammoRespawnSeconds != s_reportedFactoryConfig.ammoRespawnSeconds
-                || config.suddenDeathRespawn != s_reportedFactoryConfig.suddenDeathRespawn ) {
+                || config.suddenDeathRespawn != s_reportedFactoryConfig.suddenDeathRespawn
+                || config.startingHealth != s_reportedFactoryConfig.startingHealth
+                || config.startingHealthBonus != s_reportedFactoryConfig.startingHealthBonus
+                || config.startingArmor != s_reportedFactoryConfig.startingArmor ) {
                 G_LogFactoryLoadoutState( "update", &config );
                 s_reportedFactoryConfig = config;
         }
