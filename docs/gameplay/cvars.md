@@ -16,6 +16,34 @@ Competitive duel and team modes now expose Quake Live–style match pauses. Play
 | `g_timeoutCount` | `0` | Number of timeouts each team receives per match; initialised into `level.timeoutRemaining` and published via `CS_MATCH_STATE` for client HUDs.【F:src/code/game/g_main.c†L1093-L1121】【F:src/code/game/g_main.c†L2100-L2131】 |
 | `g_timeoutLen` | `60` | Timeout duration in seconds; values ≤0 hold the pause until a manual `timein`, while positive values trigger an automatic resume with broadcast messaging.【F:src/code/game/g_cmds.c†L1657-L1670】【F:src/code/game/g_main.c†L2295-L2316】 |
 
+## Vote Administration Controls
+
+Quake Live exposes additional vote governance CVars alongside the base `g_allowVote` toggle. These parameters gate when votes may be started, throttle repeat attempts, and cap how many proposals a player may issue per match. The HLIL registration table lists `g_allowVoteMidGame`, `g_voteDelay`, and `g_voteLimit` beside the stock vote knobs, each defaulting to `0` so dedicated servers begin with the legacy behaviour disabled.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L600-L744】 The vote fixtures exercise these toggles in isolation to confirm their impact on a running match.【F:src/game/tests/vote_control_fixtures.c†L165-L223】
+
+| CVar | Default | Notes |
+| --- | --- | --- |
+| `g_allowVoteMidGame` | `0` | When set, allows `callvote` to be issued while a match is live instead of limiting votes to warmup/intermission states. The fixtures verify mid-game calls are rejected until this toggle flips on.【F:src/game/tests/vote_control_fixtures.c†L165-L189】 |
+| `g_voteDelay` | `0` | Minimum number of seconds between vote proposals and the elapsed time since match start before the first callvote. Raising the value forces additional waiting; lowering it mid-match immediately relaxes the throttle.【F:src/game/tests/vote_control_fixtures.c†L195-L216】 |
+| `g_voteLimit` | `0` | Maximum number of votes a single player may initiate per map (0 keeps the legacy hardcoded limit). Increasing the limit mid-match allows further votes after the counter is exhausted.【F:src/game/tests/vote_control_fixtures.c†L205-L216】 |
+
+## Self-Kill and Forfeit Controls
+
+Quake Live retains the Quake III self-kill command but wraps it in a server-configurable cooldown so admins can suppress griefing macros. The binary's registration table seeds `g_allowKill` with a `1000` millisecond window and leaves `g_allowForfeit` disabled (`0`) until explicitly enabled for organised play.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L592-L640】 The fixtures assert that both toggles gate their respective commands as expected.【F:src/game/tests/vote_control_fixtures.c†L218-L252】
+
+| CVar | Default | Notes |
+| --- | --- | --- |
+| `g_allowKill` | `1000` | Minimum milliseconds between successful `kill` commands. Also enforces a spawn grace period; setting the value to `0` restores instant kills.【F:src/game/tests/vote_control_fixtures.c†L218-L240】 |
+| `g_allowForfeit` | `0` | Enables the `forfeit` console command when non-zero so duel/CA leagues can permit early surrenders.【F:src/game/tests/vote_control_fixtures.c†L242-L253】 |
+
+## Friendly Fire Complaint Controls
+
+Team-damage complaints mirror the retail DLL: attackers accrue infractions once they exceed the configured damage threshold and are kicked when the limit is reached. The registration block seeds `g_complaintDamageThreshold` and `g_complaintLimit` with non-zero defaults so a single heavy hit qualifies and the very next complaint produces a kick, matching the HLIL logic.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L676-L712】 The fixtures drive repeated complaints to ensure both the threshold and limit are honoured.【F:src/game/tests/vote_control_fixtures.c†L255-L298】
+
+| CVar | Default | Notes |
+| --- | --- | --- |
+| `g_complaintDamageThreshold` | `1` | Minimum friendly-fire damage required before the victim can register a complaint.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L676-L700】 |
+| `g_complaintLimit` | `1` | Number of recorded complaints that triggers an automatic kick for the attacker.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L700-L712】 |
+
 ## Starting Health and Armor Controls
 
 Quake Live publishes spawn stat knobs for the base health, bonus health stack, and armor granted to players when they respawn. Mirroring the retail DLL, the VM now mirrors `g_startingHealth`, `g_startingHealthBonus`, and `g_startingArmor` so factory scripts and votes can adjust the opening survivability without source edits.【F:src/game/g_config.c†L81-L115】
