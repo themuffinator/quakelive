@@ -1727,20 +1727,20 @@ Ensure sudden-death respawn messaging is delivered via center-print prompts.
 =============
 */
 static void G_TrackSuddenDeathAnnouncements( void ) {
-        const matchFactoryConfig_t *config = &g_matchFactoryConfig;
+	const matchFactoryConfig_t *config = &g_matchFactoryConfig;
 
-        if ( !level.overtimeActive ) {
-                return;
-        }
-        if ( !config->suddenDeathRespawnsEnabled ) {
-                if ( !level.suddenDeathNoRespawnLogged ) {
-                        level.suddenDeathNoRespawnLogged = qtrue;
-                        level.suddenDeathLastDelay = -1;
-                        G_LogPrintf( "match: sudden-death respawns disabled\n" );
-                        if ( config->suddenDeathPrintAnnouncements ) {
-                                trap_SendServerCommand( -1, "cp \"Sudden-death respawns disabled\n\"" );
-                        }
-                }
+	if ( !level.overtimeActive ) {
+		return;
+	}
+	if ( g_suddenDeathRespawn.integer <= 0 || !config->suddenDeathRespawnsEnabled ) {
+		if ( !level.suddenDeathNoRespawnLogged ) {
+			level.suddenDeathNoRespawnLogged = qtrue;
+			level.suddenDeathLastDelay = -1;
+			G_LogPrintf( "match: sudden-death respawns disabled\n" );
+			if ( config->suddenDeathPrintAnnouncements ) {
+				trap_SendServerCommand( -1, "cp \"Sudden-death respawns disabled\n\"" );
+			}
+		}
 		return;
 	}
 	int delay = G_GetSuddenDeathRespawnDelay();
@@ -1751,15 +1751,16 @@ static void G_TrackSuddenDeathAnnouncements( void ) {
 		level.suddenDeathLastDelay = delay;
 		level.suddenDeathNoRespawnLogged = qfalse;
 		G_LogPrintf( "match: sudden-death respawn delay %i ms\n", delay );
-                if ( config->suddenDeathPrintAnnouncements ) {
-                        if ( delay > 0 ) {
-                                trap_SendServerCommand( -1, va( "cp \"Sudden-death respawns available in %i seconds\n\"", delay / 1000 ) );
-                        } else {
+		if ( config->suddenDeathPrintAnnouncements ) {
+			if ( delay > 0 ) {
+				trap_SendServerCommand( -1, va( "cp \"Sudden-death respawns available in %i seconds\n\"", delay / 1000 ) );
+			} else {
 				trap_SendServerCommand( -1, "cp \"Sudden-death respawns available now\n\"" );
 			}
 		}
+	}
 }
-}
+
 
 static void LevelCheckTimers( void ) {
 	int team;

@@ -198,45 +198,8 @@ typedef struct pmoveParams_s {
 	qboolean	autoHop;
 } pmoveParams_t;
 
-typedef struct pmove_settings_s {
-	float	airAccel;
-	float	airControl;
-	float	airStepFriction;
-	int	airSteps;
-	float	airStopAccel;
-	qboolean	autoHop;
-	qboolean	bunnyHop;
-	qboolean	chainJump;
-	float	chainJumpVelocity;
-	float	circleStrafeFriction;
-	qboolean	crouchSlide;
-	float	crouchSlideFriction;
-	int	crouchSlideTime;
-	qboolean	crouchStepJump;
-	qboolean	doubleJump;
-	float	jumpTimeDeltaMin;
-	float	jumpVelocity;
-	float	jumpVelocityMax;
-	float	jumpVelocityScaleAdd;
-	float	jumpVelocityTimeThreshold;
-	float	jumpVelocityTimeThresholdOffset;
-	qboolean	noPlayerClip;
-	qboolean	rampJump;
-	float	rampJumpScale;
-	float	stepHeight;
-	qboolean	stepJump;
-	float	stepJumpVelocity;
-	float	strafeAccel;
-	float	velocityGh;
-	float	walkAccel;
-	float	walkFriction;
-	float	waterSwimScale;
-	float	waterWadeScale;
-	int	weaponDropTime;
-	int	weaponRaiseTime;
-	float	wishSpeed;
-	int	weaponReloadTimes[WP_NUM_WEAPONS];
-} pmove_settings_t;
+typedef struct pmove_settings_s pmove_settings_t;
+
 
 typedef struct {
 	// state (in / out)
@@ -407,6 +370,46 @@ typedef enum {
 
        WP_NUM_WEAPONS
 } weapon_t;
+
+struct pmove_settings_s {
+	float	airAccel;
+	float	airControl;
+	float	airStepFriction;
+	int	airSteps;
+	float	airStopAccel;
+	qboolean	autoHop;
+	qboolean	bunnyHop;
+	qboolean	chainJump;
+	float	chainJumpVelocity;
+	float	circleStrafeFriction;
+	qboolean	crouchSlide;
+	float	crouchSlideFriction;
+	int	crouchSlideTime;
+	qboolean	crouchStepJump;
+	qboolean	doubleJump;
+	float	jumpTimeDeltaMin;
+	float	jumpVelocity;
+	float	jumpVelocityMax;
+	float	jumpVelocityScaleAdd;
+	float	jumpVelocityTimeThreshold;
+	float	jumpVelocityTimeThresholdOffset;
+	qboolean	noPlayerClip;
+	qboolean	rampJump;
+	float	rampJumpScale;
+	float	stepHeight;
+	qboolean	stepJump;
+	float	stepJumpVelocity;
+	float	strafeAccel;
+	float	velocityGh;
+	float	walkAccel;
+	float	walkFriction;
+	float	waterSwimScale;
+	float	waterWadeScale;
+	int	weaponDropTime;
+	int	weaponRaiseTime;
+	float	wishSpeed;
+	int	weaponReloadTimes[WP_NUM_WEAPONS];
+};
 
 
 // reward sounds (stored in ps->persistant[PERS_PLAYEREVENTS])
