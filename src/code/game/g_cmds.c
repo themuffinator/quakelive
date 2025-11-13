@@ -802,26 +802,48 @@ void Cmd_FollowCycle_f( gentity_t *ent, int dir ) {
 
 
 /*
-==================
-G_Say
-==================
-*/
+=============
+G_SayTo
 
+Sends a chat message to a single recipient when chat permissions allow it.
+=============
+*/
 static void G_SayTo( gentity_t *ent, gentity_t *other, int mode, int color, const char *name, const char *message ) {
-	if (!other) {
+	if ( !other ) {
 		return;
 	}
-	if (!other->inuse) {
+	if ( !other->inuse ) {
 		return;
 	}
-	if (!other->client) {
+	if ( !other->client ) {
 		return;
 	}
 	if ( other->client->pers.connected != CON_CONNECTED ) {
 		return;
 	}
-	if ( mode == SAY_TEAM  && !OnSameTeam(ent, other) ) {
+	if ( mode == SAY_TEAM && !OnSameTeam( ent, other ) ) {
 		return;
+	}
+
+	if ( ent && ent->client && other->client ) {
+		const team_t	entTeam = ent->client->sess.sessionTeam;
+		const team_t	otherTeam = other->client->sess.sessionTeam;
+		const qboolean	isTeamGame = ( g_gametype.integer >= GT_TEAM );
+		const qboolean	sameClient = ( ent == other );
+
+		if ( entTeam == TEAM_SPECTATOR && otherTeam != TEAM_SPECTATOR && !sameClient && !g_allTalk.integer ) {
+			if ( mode == SAY_TELL ) {
+				trap_SendServerCommand( ent - g_entities, "print \"Spectators may only chat with other spectators unless g_allTalk is enabled.\\n\"" );
+			}
+			return;
+		}
+
+		if ( isTeamGame && mode != SAY_TEAM && !g_allTalk.integer && entTeam != TEAM_SPECTATOR && otherTeam != TEAM_SPECTATOR && entTeam != otherTeam ) {
+			if ( mode == SAY_TELL && !sameClient ) {
+				trap_SendServerCommand( ent - g_entities, "print \"Cross-team tells are disabled while g_allTalk is 0.\\n\"" );
+			}
+			return;
+		}
 	}
 	// no chatting to players in tournements
 	if ( (g_gametype.integer == GT_TOURNAMENT )
@@ -830,13 +852,20 @@ static void G_SayTo( gentity_t *ent, gentity_t *other, int mode, int color, cons
 		return;
 	}
 
-	trap_SendServerCommand( other-g_entities, va("%s \"%s%c%c%s\"", 
+	trap_SendServerCommand( other-g_entities, va( "%s \"%s%c%c%s\"",
 		mode == SAY_TEAM ? "tchat" : "chat",
 		name, Q_COLOR_ESCAPE, color, message));
 }
 
 #define EC		"\x19"
 
+/*
+=============
+G_Say
+
+Routes chat text according to chat mode and talk permissions.
+=============
+*/
 void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) {
 	int			j;
 	gentity_t	*other;

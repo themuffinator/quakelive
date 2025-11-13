@@ -893,6 +893,7 @@ extern	vmCvar_t	g_capturelimit;
 extern	vmCvar_t	g_friendlyFire;
 extern	vmCvar_t	g_password;
 extern	vmCvar_t	g_needpass;
+extern	vmCvar_t	g_allTalk;
 extern	vmCvar_t	g_gravity;
 extern	vmCvar_t	g_speed;
 extern	vmCvar_t	g_knockback;

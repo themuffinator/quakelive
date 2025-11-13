@@ -77,6 +77,7 @@ vmCvar_t	g_capturelimit;
 vmCvar_t	g_friendlyFire;
 vmCvar_t	g_password;
 vmCvar_t	g_needpass;
+vmCvar_t	g_allTalk;
 vmCvar_t	g_maxclients;
 vmCvar_t	g_maxGameClients;
 vmCvar_t	g_dedicated;
@@ -198,6 +199,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_instaGib, "g_instaGib", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
 
 	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+
+	{ &g_allTalk, "g_allTalk", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow players, spectators, and opposing teams to share chat when enabled." },
 
 	{ &g_dedicated, "dedicated", "0", 0, 0, qfalse  },
 
