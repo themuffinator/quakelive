@@ -1129,6 +1129,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	memset( client, 0, sizeof(*client) );
 
 	client->pers.connected = CON_CONNECTING;
+	G_InitClientVoteThrottle( client );
 
 	// read or initialize the session data
 	if ( firstTime || level.newSession ) {
@@ -1576,6 +1577,8 @@ void ClientDisconnect( int clientNum ) {
 	if ( !ent->client ) {
 		return;
 	}
+
+	G_ResetClientVoteThrottle( ent->client );
 
 	// stop any following clients
 	for ( i = 0 ; i < level.maxclients ; i++ ) {

@@ -1216,6 +1216,10 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 	int		i;
 	char	arg1[MAX_STRING_TOKENS];
 	char	arg2[MAX_STRING_TOKENS];
+	char	arg3[MAX_STRING_TOKENS];
+	int		voteSelection;
+	int		isNumeric;
+	const char	*scan;
 
 	if ( !g_allowVote.integer ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Voting not allowed here.\n\"" );
@@ -1238,6 +1242,26 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 	// make sure it is a valid command to vote on
 	trap_Argv( 1, arg1, sizeof( arg1 ) );
 	trap_Argv( 2, arg2, sizeof( arg2 ) );
+	voteSelection = -1;
+	arg3[0] = '\0';
+
+	if ( trap_Argc() > 3 ) {
+		trap_Argv( 3, arg3, sizeof( arg3 ) );
+		if ( arg3[0] ) {
+			voteSelection = atoi( arg3 );
+		}
+	} else if ( arg2[0] ) {
+		isNumeric = 1;
+		for ( scan = arg2; *scan; scan++ ) {
+			if ( *scan < '0' || *scan > '9' ) {
+				isNumeric = 0;
+				break;
+			}
+		}
+		if ( isNumeric ) {
+			voteSelection = atoi( arg2 );
+		}
+	}
 
 	if( strchr( arg1, ';' ) || strchr( arg2, ';' ) ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\n\"" );
@@ -1302,6 +1326,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "%s", level.voteString );
 	}
 
+	G_RegisterVoteCall( ent->client, ent - g_entities, voteSelection );
 	trap_SendServerCommand( -1, va("print \"%s called a vote.\n\"", ent->client->pers.netname ) );
 
 	// start the voting, the caller autoamtically votes yes
@@ -1368,8 +1393,10 @@ void Cmd_CallTeamVote_f( gentity_t *ent ) {
 	int		i, team, cs_offset;
 	char	arg1[MAX_STRING_TOKENS];
 	char	arg2[MAX_STRING_TOKENS];
+	int		voteSelection;
 
 	team = ent->client->sess.sessionTeam;
+	voteSelection = -1;
 	if ( team == TEAM_RED )
 		cs_offset = 0;
 	else if ( team == TEAM_BLUE )
@@ -1414,6 +1441,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent ) {
 
 		if ( !arg2[0] ) {
 			i = ent->client->ps.clientNum;
+			voteSelection = i;
 		}
 		else {
 			// numeric values are just slot numbers
@@ -1423,6 +1451,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent ) {
 			}
 			if ( i >= 3 || !arg2[i]) {
 				i = atoi( arg2 );
+				voteSelection = i;
 				if ( i < 0 || i >= level.maxclients ) {
 					trap_SendServerCommand( ent-g_entities, va("print \"Bad client slot: %i\n\"", i) );
 					return;
@@ -1453,6 +1482,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent ) {
 				}
 			}
 		}
+		voteSelection = i;
 		Com_sprintf(arg2, sizeof(arg2), "%d", i);
 	} else {
 		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\n\"" );
@@ -1461,6 +1491,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent ) {
 	}
 
 	Com_sprintf( level.teamVoteString[cs_offset], sizeof( level.teamVoteString[cs_offset] ), "%s %s", arg1, arg2 );
+	G_RegisterVoteCall( ent->client, ent - g_entities, voteSelection );
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
 		if ( level.clients[i].pers.connected == CON_DISCONNECTED )

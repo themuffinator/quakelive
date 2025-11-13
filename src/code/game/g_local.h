@@ -356,6 +356,7 @@ typedef struct {
 //
 #define MAX_NETNAME			36
 #define	MAX_VOTE_COUNT		3
+#define	VOTE_THROTTLE_MSEC	0x8CA
 
 // client data that stays across multiple respawns, but is cleared
 // on each level change or team change at ClientBegin()
@@ -373,6 +374,9 @@ typedef struct {
 	int			voteCount;			// to prevent people from constantly calling votes
 	int			teamVoteCount;		// to prevent people from constantly calling votes
 	qboolean	teamInfo;			// send team overlay updates?
+	int		voteDelayTime;
+	int		voteLastSelection;
+	int		voteLastEnableFrame;
 } clientPersistant_t;
 
 
@@ -765,6 +769,10 @@ void QDECL G_LogPrintf( const char *fmt, ... );
 void SendScoreboardMessageToAllClients( void );
 void G_UpdateMatchStateConfigString( void );
 void G_ApplyTimeoutPauseDelta( int msec );
+void G_InitClientVoteThrottle( gclient_t *client );
+void G_ResetClientVoteThrottle( gclient_t *client );
+void G_RegisterVoteCall( gclient_t *client, int clientNum, int voteSelection );
+void G_UpdateVoteThrottle( void );
 void QDECL G_Printf( const char *fmt, ... );
 void QDECL G_Error( const char *fmt, ... );
 

@@ -670,6 +670,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	// set client fields on player ents
 	for ( i=0 ; i<level.maxclients ; i++ ) {
 		g_entities[i].client = level.clients + i;
+		G_InitClientVoteThrottle( level.clients + i );
 	}
 
 	// always leave room for the max number of clients,
@@ -2383,11 +2384,11 @@ void G_RunThink (gentity_t *ent) {
 }
 
 /*
-================
+=============
 G_RunFrame
 
-Advances the non-player objects in the world
-================
+Advance the game simulation by one frame.
+=============
 */
 void G_RunFrame( int levelTime ) {
 	int		msec;
@@ -2421,6 +2422,7 @@ void G_RunFrame( int levelTime ) {
 	G_StepEntities( ctx );
 	G_DispatchEvents( ctx );
 	G_FinishClientFrames( ctx );
+	G_UpdateVoteThrottle();
 	G_CheckLevelTimers( ctx, previousWarmupTime, previousIntermissionQueued );
 
 	if ( g_listEntity.integer ) {
