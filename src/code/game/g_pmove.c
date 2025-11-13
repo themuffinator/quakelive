@@ -43,6 +43,7 @@ static int g_pmove_last_frame = -1;
 static qboolean g_pmove_force_update = qtrue;
 
 pmove_settings_t g_pmoveSettings;
+static int g_pmoveWeaponReloadOverrides[WP_NUM_WEAPONS];
 
 /*
 =============
@@ -65,6 +66,50 @@ Synchronizes a pmove tuning cvar mirror.
 static void G_PmoveUpdateCvar( vmCvar_t *vmCvar ) {
 	if ( vmCvar ) {
 		trap_Cvar_Update( vmCvar );
+	}
+}
+
+/*
+=============
+G_PmoveDefaultWeaponReloadTime
+
+Provides the compiled reload fallback for a specific weapon slot.
+=============
+*/
+static int G_PmoveDefaultWeaponReloadTime( weapon_t weapon ) {
+	switch ( weapon ) {
+	case WP_GAUNTLET:
+		return 400;
+	case WP_MACHINEGUN:
+		return 100;
+	case WP_SHOTGUN:
+		return 1000;
+	case WP_GRENADE_LAUNCHER:
+		return 800;
+	case WP_ROCKET_LAUNCHER:
+		return 800;
+	case WP_LIGHTNING:
+		return 50;
+	case WP_RAILGUN:
+		return 1500;
+	case WP_PLASMAGUN:
+		return 100;
+	case WP_BFG:
+		return 200;
+	case WP_GRAPPLING_HOOK:
+		return 400;
+	case WP_HEAVY_MACHINEGUN:
+		return 75;
+#ifdef MISSIONPACK
+	case WP_NAILGUN:
+		return 1000;
+	case WP_PROX_LAUNCHER:
+		return 800;
+	case WP_CHAINGUN:
+		return 30;
+#endif
+	default:
+		return 0;
 	}
 }
 
@@ -121,6 +166,96 @@ static void G_PmoveCacheSettings( void ) {
 	g_pmoveSettings.weaponDropTime = g_pmove_weaponDropTime_cvar.integer;
 	g_pmoveSettings.weaponRaiseTime = g_pmove_weaponRaiseTime_cvar.integer;
 	g_pmoveSettings.wishSpeed = g_pmove_wishSpeed_cvar.value;
+
+	{
+		weapon_t	weapon;
+
+		for ( weapon = WP_NONE; weapon < WP_NUM_WEAPONS; ++weapon ) {
+			int	reload;
+
+			reload = g_pmoveWeaponReloadOverrides[weapon];
+			if ( reload <= 0 ) {
+				reload = G_PmoveDefaultWeaponReloadTime( weapon );
+			}
+
+			g_pmoveSettings.weaponReloadTimes[weapon] = reload;
+		}
+	}
+}
+
+/*
+=============
+G_PmoveStoreWeaponReloads
+
+Caches reload durations from the gameplay configuration for pmove consumers.
+=============
+*/
+void G_PmoveStoreWeaponReloads( const weaponReloadConfig_t *config ) {
+	weapon_t	weapon;
+
+	for ( weapon = WP_NONE; weapon < WP_NUM_WEAPONS; ++weapon ) {
+		int	duration = 0;
+
+		if ( config ) {
+			switch ( weapon ) {
+			case WP_GAUNTLET:
+				duration = config->gauntlet;
+				break;
+			case WP_MACHINEGUN:
+				duration = config->machinegun;
+				break;
+			case WP_SHOTGUN:
+				duration = config->shotgun;
+				break;
+			case WP_GRENADE_LAUNCHER:
+				duration = config->grenadeLauncher;
+				break;
+			case WP_ROCKET_LAUNCHER:
+				duration = config->rocketLauncher;
+				break;
+			case WP_LIGHTNING:
+				duration = config->lightningGun;
+				break;
+			case WP_RAILGUN:
+				duration = config->railgun;
+				break;
+			case WP_PLASMAGUN:
+				duration = config->plasmagun;
+				break;
+			case WP_BFG:
+				duration = config->bfg;
+				break;
+			case WP_GRAPPLING_HOOK:
+				duration = config->grapplingHook;
+				break;
+			case WP_HEAVY_MACHINEGUN:
+				duration = config->heavyMachinegun;
+				break;
+#ifdef MISSIONPACK
+			case WP_NAILGUN:
+				duration = config->nailgun;
+				break;
+			case WP_PROX_LAUNCHER:
+				duration = config->proximityLauncher;
+				break;
+			case WP_CHAINGUN:
+				duration = config->chaingun;
+				break;
+#endif
+			default:
+				duration = 0;
+				break;
+			}
+		}
+
+		if ( duration <= 0 ) {
+			duration = G_PmoveDefaultWeaponReloadTime( weapon );
+		}
+
+		g_pmoveWeaponReloadOverrides[weapon] = duration;
+	}
+
+	g_pmove_force_update = qtrue;
 }
 
 /*

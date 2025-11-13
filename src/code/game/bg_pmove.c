@@ -111,7 +111,26 @@ static const pmove_settings_t	pm_defaultSettings = {
 	.waterWadeScale = 0.70f,
 	.weaponDropTime = 200,
 	.weaponRaiseTime = 200,
-	.wishSpeed = 400.0f
+	.wishSpeed = 400.0f,
+	.weaponReloadTimes = {
+		[WP_NONE] = 0,
+		[WP_GAUNTLET] = 400,
+		[WP_MACHINEGUN] = 100,
+		[WP_SHOTGUN] = 1000,
+		[WP_GRENADE_LAUNCHER] = 800,
+		[WP_ROCKET_LAUNCHER] = 800,
+		[WP_LIGHTNING] = 50,
+		[WP_RAILGUN] = 1500,
+		[WP_PLASMAGUN] = 100,
+		[WP_BFG] = 200,
+		[WP_GRAPPLING_HOOK] = 400,
+		[WP_HEAVY_MACHINEGUN] = 75,
+#ifdef MISSIONPACK
+		[WP_NAILGUN] = 1000,
+		[WP_PROX_LAUNCHER] = 800,
+		[WP_CHAINGUN] = 30,
+#endif
+	}
 };
 
 /*
@@ -187,6 +206,48 @@ static void PM_LoadMoveParams( const pmoveParams_t *params ) {
 	pm_circlestrafe_friction = ( cfg->circleStrafeFriction > 0.0f ) ? cfg->circleStrafeFriction : 0.0f;
 	pm_bunnyhop = cfg->bunnyHop;
 	pm_autohop = cfg->autoHop;
+}
+
+/*
+=============
+PM_GetDefaultWeaponReloadTime
+
+Returns the compiled weapon reload duration for a slot.
+=============
+*/
+static int PM_GetDefaultWeaponReloadTime( weapon_t weapon ) {
+	if ( weapon < WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return 0;
+	}
+
+	return pm_defaultSettings.weaponReloadTimes[weapon];
+}
+
+/*
+=============
+PM_GetWeaponReloadTime
+
+Resolves the reload time for a weapon, falling back to defaults when unset.
+=============
+*/
+static int PM_GetWeaponReloadTime( weapon_t weapon ) {
+	const pmove_settings_t	*settings;
+	int	reload;
+
+	settings = PM_GetActiveSettings();
+	if ( weapon < WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return PM_GetDefaultWeaponReloadTime( WP_NONE );
+	}
+
+	reload = settings->weaponReloadTimes[weapon];
+	if ( reload <= 0 ) {
+		reload = PM_GetDefaultWeaponReloadTime( weapon );
+	}
+	if ( reload <= 0 ) {
+		reload = 200;
+	}
+
+	return reload;
 }
 
 /*
@@ -2335,71 +2396,26 @@ static void PM_Weapon( void ) {
 	}
 
 	// fire weapon
-	PM_AddEvent( EV_FIRE_WEAPON );
+		PM_AddEvent( EV_FIRE_WEAPON );
 
-	switch( pm->ps->weapon ) {
-	default:
-	case WP_GAUNTLET:
-		addTime = 400;
-		break;
-	case WP_LIGHTNING:
-		addTime = 50;
-		break;
-        case WP_SHOTGUN:
-                addTime = 1000;
-                break;
-        case WP_MACHINEGUN:
-                addTime = 100;
-                break;
-        case WP_HEAVY_MACHINEGUN:
-                addTime = 75;
-                break;
-	case WP_GRENADE_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_ROCKET_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_PLASMAGUN:
-		addTime = 100;
-		break;
-	case WP_RAILGUN:
-		addTime = 1500;
-		break;
-	case WP_BFG:
-		addTime = 200;
-		break;
-	case WP_GRAPPLING_HOOK:
-		addTime = 400;
-		break;
-#ifdef MISSIONPACK
-	case WP_NAILGUN:
-		addTime = 1000;
-		break;
-	case WP_PROX_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_CHAINGUN:
-		addTime = 30;
-		break;
-#endif
-	}
+		addTime = PM_GetWeaponReloadTime( (weapon_t)pm->ps->weapon );
 
 #ifdef MISSIONPACK
-	if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
-		addTime /= 1.5;
-	}
-	else
-	if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
-		addTime /= 1.3;
+		if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
+			addTime /= 1.5;
+		}
+		else
+		if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
+			addTime /= 1.3;
   }
   else
 #endif
-	if ( pm->ps->powerups[PW_HASTE] ) {
-		addTime /= 1.3;
-	}
+		if ( pm->ps->powerups[PW_HASTE] ) {
+			addTime /= 1.3;
+		}
 
-	pm->ps->weaponTime += addTime;
+		pm->ps->weaponTime += addTime;
+
 }
 
 /*

@@ -214,6 +214,7 @@ typedef struct pmove_settings_s {
 	int	weaponDropTime;
 	int	weaponRaiseTime;
 	float	wishSpeed;
+	int	weaponReloadTimes[WP_NUM_WEAPONS];
 } pmove_settings_t;
 
 typedef struct {

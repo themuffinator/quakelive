@@ -530,45 +530,48 @@ void G_RegisterCvars( void ) {
 	G_InitStartingAmmoConfig();
 	G_InitAmmoPackConfig();
 	G_InitFactoryCvarConfig();
+
+	G_RefreshPmoveSettings();
 }
 
 void G_UpdateCvars( void ) {
-	int			i;
-	cvarTable_t	*cv;
-	qboolean remapped = qfalse;
+        int                     i;
+        cvarTable_t     *cv;
+        qboolean remapped = qfalse;
 
-	for ( i = 0, cv = gameCvarTable ; i < gameCvarTableSize ; i++, cv++ ) {
-		if ( cv->vmCvar ) {
-			trap_Cvar_Update( cv->vmCvar );
+        for ( i = 0, cv = gameCvarTable ; i < gameCvarTableSize ; i++, cv++ ) {
+                if ( cv->vmCvar ) {
+                        trap_Cvar_Update( cv->vmCvar );
 
-			if ( cv->modificationCount != cv->vmCvar->modificationCount ) {
-				cv->modificationCount = cv->vmCvar->modificationCount;
+                        if ( cv->modificationCount != cv->vmCvar->modificationCount ) {
+                                cv->modificationCount = cv->vmCvar->modificationCount;
 
-				if ( cv->trackChange ) {
-					trap_SendServerCommand( -1, va("print \"Server: %s changed to %s\n\"", 
-						cv->cvarName, cv->vmCvar->string ) );
-				}
+                                if ( cv->trackChange ) {
+                                        trap_SendServerCommand( -1, va("print \"Server: %s changed to %s\n\"",
+                                                cv->cvarName, cv->vmCvar->string ) );
+                                }
 
-				if (cv->teamShader) {
-					remapped = qtrue;
-				}
-			}
-		}
-	}
+                                if (cv->teamShader) {
+                                        remapped = qtrue;
+                                }
+                        }
+                }
+        }
 
         if (remapped) {
                 G_RemapTeamShaders();
         }
 
         G_Config_UpdateCvars();
-	G_RefreshPmoveSettings();
 
         G_UpdateWeaponConfig();
         G_UpdateWeaponReloadConfig();
         G_UpdateKnockbackConfig();
         G_UpdateStartingAmmoConfig();
         G_UpdateAmmoPackConfig();
-	G_UpdateFactoryCvarConfig();
+        G_UpdateFactoryCvarConfig();
+
+        G_RefreshPmoveSettings();
 }
 
 /*
