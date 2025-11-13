@@ -257,6 +257,39 @@ CG_SetConfigValues
 Called on load to set the initial values from configure strings
 ================
 */
+
+/*
+==================
+CG_ParseFactoryMetadata
+
+Refreshes the cached factory metadata strings from the latest configstrings.
+==================
+*/
+static void CG_ParseFactoryMetadata( void ) {
+	const char *info;
+
+	info = CG_ConfigString( CS_FACTORY_TITLE );
+	if ( info && *info ) {
+		Q_strncpyz( cgs.factoryTitle, info, sizeof( cgs.factoryTitle ) );
+	} else {
+		cgs.factoryTitle[0] = '\0';
+	}
+
+	info = CG_ConfigString( CS_FACTORY_FLAGS );
+	if ( info && *info ) {
+		cgs.factoryFlags = (unsigned int)atoi( info );
+	} else {
+		cgs.factoryFlags = 0u;
+	}
+
+	info = CG_ConfigString( CS_SPAWN_HINTS );
+	if ( info && *info ) {
+		Q_strncpyz( cgs.factorySpawnHints, info, sizeof( cgs.factorySpawnHints ) );
+	} else {
+		cgs.factorySpawnHints[0] = '\0';
+	}
+}
+
 void CG_SetConfigValues( void ) {
 	const char *s;
 
@@ -276,6 +309,7 @@ void CG_SetConfigValues( void ) {
 #endif
 	cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
 	CG_ParseMatchState();
+	CG_ParseFactoryMetadata();
 }
 
 /*
@@ -352,6 +386,8 @@ static void CG_ConfigStringModified( void ) {
 		cgs.scores2 = atoi( str );
 	} else if ( num == CS_LEVEL_START_TIME ) {
 		cgs.levelStartTime = atoi( str );
+	} else if ( num == CS_FACTORY_TITLE || num == CS_FACTORY_FLAGS || num == CS_SPAWN_HINTS ) {
+		CG_ParseFactoryMetadata();
 	} else if ( num == CS_VOTE_TIME ) {
 		cgs.voteTime = atoi( str );
 		cgs.voteModified = qtrue;

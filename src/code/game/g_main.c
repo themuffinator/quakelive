@@ -505,7 +505,7 @@ void G_RegisterCvars( void ) {
 	}
 
         if (remapped) {
-                G_RemapTeamShaders();
+                	G_RemapTeamShaders();
         }
 
         G_Config_RegisterCvars();
@@ -709,6 +709,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	LevelCheckTimers();
 	G_UpdateMatchStateConfigString();
+	G_MatchConfig_UpdateConfigstrings();
 
 }
 

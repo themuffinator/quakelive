@@ -1042,6 +1042,9 @@ typedef struct {
 	int		matchTimeoutExpireTime;
 	int		matchTimeoutOwner;
 	int		matchTimeoutRemaining[TEAM_NUM_TEAMS];
+	char		factoryTitle[MAX_STRING_CHARS];
+	unsigned int	factoryFlags;
+	char		factorySpawnHints[MAX_STRING_CHARS];
 
 	qboolean  newHud;
 

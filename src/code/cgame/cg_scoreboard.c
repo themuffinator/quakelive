@@ -73,6 +73,104 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 static qboolean localClient; // true if local client has been displayed
 
 
+/*
+=================
+CG_DrawFactoryMetadata
+
+Renders the active match factory metadata sourced from configstrings.
+=================
+*/
+static void CG_DrawFactoryMetadata( float fade ) {
+	vec4_t	color;
+	char	hints[MAX_STRING_CHARS];
+	char	line[MAX_STRING_CHARS];
+	int	x;
+	int	y;
+	int	timeoutCount;
+	int	timeoutLength;
+	int	overtimeLength;
+	qboolean	sdEnabled;
+	int	sdStart;
+	int	sdTick;
+	int	sdMax;
+	int	sdInc;
+	qboolean	sdPrint;
+	qboolean	sdDelay;
+
+	if ( fade <= 0.0f ) {
+		return;
+	}
+
+	if ( !cgs.factoryTitle[0] && !cgs.factorySpawnHints[0] && cgs.factoryFlags == 0u ) {
+		return;
+	}
+
+	color[0] = 1.0f;
+	color[1] = 1.0f;
+	color[2] = 1.0f;
+	color[3] = fade;
+
+	x = 8;
+	y = 72;
+
+	if ( cgs.factoryTitle[0] ) {
+		CG_DrawSmallStringColor( x, y, cgs.factoryTitle, color );
+		y += SMALLCHAR_HEIGHT;
+	} else if ( cgs.factoryFlags == 0u ) {
+		CG_DrawSmallStringColor( x, y, "Standard factory", color );
+		y += SMALLCHAR_HEIGHT;
+	}
+
+	if ( cgs.factoryFlags != 0u ) {
+		CG_DrawSmallStringColor( x, y, "Custom factory settings active", color );
+		y += SMALLCHAR_HEIGHT;
+	}
+
+	if ( !cgs.factorySpawnHints[0] ) {
+		return;
+	}
+
+	Q_strncpyz( hints, cgs.factorySpawnHints, sizeof( hints ) );
+	timeoutCount = atoi( Info_ValueForKey( hints, "toCount" ) );
+	timeoutLength = atoi( Info_ValueForKey( hints, "toLength" ) );
+	overtimeLength = atoi( Info_ValueForKey( hints, "otLength" ) );
+	sdEnabled = atoi( Info_ValueForKey( hints, "sd" ) ) ? qtrue : qfalse;
+	sdStart = atoi( Info_ValueForKey( hints, "sdStart" ) );
+	sdTick = atoi( Info_ValueForKey( hints, "sdTick" ) );
+	sdMax = atoi( Info_ValueForKey( hints, "sdMax" ) );
+	sdInc = atoi( Info_ValueForKey( hints, "sdInc" ) );
+	sdPrint = atoi( Info_ValueForKey( hints, "sdPrint" ) ) ? qtrue : qfalse;
+	sdDelay = atoi( Info_ValueForKey( hints, "sdDelay" ) ) ? qtrue : qfalse;
+
+	if ( timeoutCount > 0 && timeoutLength > 0 ) {
+		Com_sprintf( line, sizeof( line ), "Timeouts: %ix%is", timeoutCount, timeoutLength );
+	} else {
+		Q_strncpyz( line, "Timeouts: disabled", sizeof( line ) );
+	}
+	if ( overtimeLength > 0 ) {
+		char extra[64];
+		Com_sprintf( extra, sizeof( extra ), "  Overtime: %is", overtimeLength );
+		Q_strcat( line, sizeof( line ), extra );
+	} else {
+		Q_strcat( line, sizeof( line ), "  Overtime: disabled" );
+	}
+	CG_DrawSmallStringColor( x, y, line, color );
+	y += SMALLCHAR_HEIGHT;
+
+	if ( sdEnabled ) {
+		Com_sprintf( line, sizeof( line ), "Sudden death: on (start %is tick %is max %is +%is%s%s)",
+			sdStart,
+			sdTick,
+			sdMax,
+			sdInc,
+			sdDelay ? " delay" : "",
+			sdPrint ? "" : " silent" );
+	} else {
+		Q_strncpyz( line, "Sudden death: off", sizeof( line ) );
+	}
+	CG_DrawSmallStringColor( x, y, line, color );
+}
+
 							 /*
 =================
 CG_DrawScoreboard
@@ -339,6 +437,7 @@ qboolean CG_DrawOldScoreboard( void ) {
 		y = 60;
 		CG_DrawBigString( x, y, s, fade );
 	}
+	CG_DrawFactoryMetadata( fade );
 
 	// scoreboard
 	y = SB_HEADER;

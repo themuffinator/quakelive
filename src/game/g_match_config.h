@@ -7,5 +7,6 @@ extern matchFactoryConfig_t g_matchFactoryConfig;
 
 void G_InitMatchFactoryConfig( void );
 void G_UpdateMatchFactoryConfig( void );
+void G_MatchConfig_UpdateConfigstrings( void );
 
 #endif // G_MATCH_CONFIG_H
