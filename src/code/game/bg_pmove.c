@@ -727,6 +727,68 @@ static void PM_SetMovementDir( void ) {
 
 /*
 =============
+PM_ApplyJumpPlanarVelocity
+
+Adjusts the player's planar takeoff velocity for chain and ramp jumps
+while maintaining the facing direction.
+=============
+*/
+static void PM_ApplyJumpPlanarVelocity( qboolean chainJumpActive, qboolean rampJumpActive, const pmove_settings_t *settings ) {
+	vec3_t	planarVelocity;
+	vec3_t	planarDirection;
+	float	planarSpeed;
+	float	targetSpeed;
+	float	rampScale;
+
+	if ( !pm || !pm->ps || !settings ) {
+		return;
+	}
+
+	if ( !chainJumpActive && !rampJumpActive ) {
+		return;
+	}
+
+	planarVelocity[0] = pm->ps->velocity[0];
+	planarVelocity[1] = pm->ps->velocity[1];
+	planarVelocity[2] = 0.0f;
+
+	planarSpeed = VectorNormalize2( planarVelocity, planarDirection );
+	targetSpeed = planarSpeed;
+
+	if ( planarSpeed <= 0.0f ) {
+		planarDirection[0] = pml.forward[0];
+		planarDirection[1] = pml.forward[1];
+		planarDirection[2] = 0.0f;
+
+		if ( planarDirection[0] == 0.0f && planarDirection[1] == 0.0f ) {
+			planarDirection[0] = 1.0f;
+			planarDirection[1] = 0.0f;
+			planarDirection[2] = 0.0f;
+		} else {
+			VectorNormalize( planarDirection );
+		}
+	}
+
+	if ( chainJumpActive && settings->chainJumpVelocity > 0.0f ) {
+		if ( targetSpeed < settings->chainJumpVelocity ) {
+			targetSpeed = settings->chainJumpVelocity;
+		}
+	}
+
+	if ( rampJumpActive ) {
+		rampScale = settings->rampJumpScale;
+		if ( rampScale <= 0.0f ) {
+			rampScale = 1.0f;
+		}
+		targetSpeed *= rampScale;
+	}
+
+	pm->ps->velocity[0] = planarDirection[0] * targetSpeed;
+	pm->ps->velocity[1] = planarDirection[1] * targetSpeed;
+}
+
+/*
+=============
 PM_CheckJump
 =============
 */
@@ -782,20 +844,6 @@ static qboolean PM_CheckJump( void ) {
 		}
 	}
 
-	if ( chainJumpActive && settings->chainJumpVelocity > 0.0f && jumpVelocity < settings->chainJumpVelocity ) {
-		jumpVelocity = settings->chainJumpVelocity;
-	}
-
-	if ( rampJumpActive ) {
-		float	scale;
-
-		scale = settings->rampJumpScale;
-		if ( scale <= 0.0f ) {
-			scale = 1.0f;
-		}
-		jumpVelocity *= scale;
-	}
-
 	if ( jumpVelocityScale > 1.0f ) {
 		jumpVelocity *= jumpVelocityScale;
 	}
@@ -803,6 +851,8 @@ static qboolean PM_CheckJump( void ) {
 	if ( settings->jumpVelocityMax > 0.0f && jumpVelocity > settings->jumpVelocityMax ) {
 		jumpVelocity = settings->jumpVelocityMax;
 	}
+
+	PM_ApplyJumpPlanarVelocity( chainJumpActive, rampJumpActive, settings );
 
 	pml.groundPlane = qfalse;		// jumping away
 	pml.walking = qfalse;
