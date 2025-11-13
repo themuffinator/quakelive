@@ -628,6 +628,7 @@ typedef struct {
 	int		quadHogExpireTime;
 	int		quadHogLastActiveTime;
 	int		quadHogNextPingTime;
+	qboolean		matchForfeited;
 } level_locals_t;
 
 
@@ -655,6 +656,7 @@ void StopFollowing( gentity_t *ent );
 void BroadcastTeamChange( gclient_t *client, int oldTeam );
 void SetTeam( gentity_t *ent, char *s );
 void Cmd_FollowCycle_f( gentity_t *ent, int dir );
+void G_ApplyForfeit( gentity_t *ent );
 
 //
 // g_items.c

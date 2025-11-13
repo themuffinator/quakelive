@@ -459,6 +459,51 @@ void Cmd_TeamTask_f( gentity_t *ent ) {
 
 /*
 =============
+G_IsRoundCountdownActive
+=============
+*/
+static qboolean G_IsRoundCountdownActive( void ) {
+	if ( level.roundTransitionTime != ROUND_TRANSITION_NONE
+		&& level.roundTransitionTime > level.time ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+
+/*
+=============
+G_ForfeitGametypeName
+=============
+*/
+static const char *G_ForfeitGametypeName( int gametype ) {
+	static const char *const s_forfeitGametypeNames[] = {
+		"Free For All",
+		"Duel",
+		"Race",
+		"Team Deathmatch",
+		"Clan Arena",
+		"Capture the Flag",
+		"One Flag CTF",
+		"Overload",
+		"Harvester",
+		"Freeze Tag",
+		"Domination",
+		"Attack and Defend",
+		"Red Rover"
+	};
+
+	if ( gametype >= 0 && gametype < (int)( sizeof( s_forfeitGametypeNames ) / sizeof( s_forfeitGametypeNames[0] ) ) ) {
+		return s_forfeitGametypeNames[gametype];
+	}
+
+	return "Unknown Gametype";
+}
+
+
+/*
+=============
 Cmd_Kill_f
 
 Executes the self-kill command while honouring the g_allowKill cooldown.
@@ -504,6 +549,140 @@ void Cmd_Kill_f( gentity_t *ent ) {
 	ent->client->ps.stats[STAT_HEALTH] = ent->health = -999;
 	ent->client->pers.killCommandTime = level.time;
 	player_die( ent, ent, ent, 100000, MOD_SUICIDE );
+}
+
+/*
+=============
+Cmd_Forfeit_f
+
+Processes the player forfeit command.
+=============
+*/
+void Cmd_Forfeit_f( gentity_t *ent ) {
+	int		gametype;
+	const char	*gametypeName;
+	team_t	team;
+	team_t	losingTeam;
+	int		redScore;
+	int		blueScore;
+	int		teammateCount;
+	gclient_t	*opponent;
+	int		opponentScore;
+	int		i;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	if ( ent->health <= 0 ) {
+		return;
+	}
+
+	if ( g_allowForfeit.integer <= 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Forfeits are not enabled on this server.\\n\"" );
+		return;
+	}
+
+	if ( level.warmupTime != 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Forfeit is not available in warmup.\\n\"" );
+		return;
+	}
+
+	if ( level.timeoutActive ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Forfeit is not available during a pause or timeout.\\n\"" );
+		return;
+	}
+
+	if ( G_IsRoundCountdownActive() ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Forfeit is not available during a round countdown.\\n\"" );
+		return;
+	}
+
+	gametype = g_gametype.integer;
+	gametypeName = G_ForfeitGametypeName( gametype );
+
+	if ( gametype == GT_FFA || gametype == GT_RACE || gametype == GT_RED_ROVER ) {
+		trap_SendServerCommand( ent-g_entities, va( "print \"Forfeit is not available in %s.\\n\"", gametypeName ) );
+		return;
+	}
+
+	if ( gametype >= GT_TEAM ) {
+		team = ent->client->sess.sessionTeam;
+		if ( team != TEAM_RED && team != TEAM_BLUE ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Forfeit is only available to members of the losing team.\\n\"" );
+			return;
+		}
+
+		redScore = level.teamScores[TEAM_RED];
+		blueScore = level.teamScores[TEAM_BLUE];
+		if ( redScore == blueScore ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Forfeit is only available to the losing player.\\n\"" );
+			return;
+		}
+
+		losingTeam = ( redScore < blueScore ) ? TEAM_RED : TEAM_BLUE;
+		if ( team != losingTeam ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Forfeit is only available to members of the losing team.\\n\"" );
+			return;
+		}
+
+		teammateCount = TeamCount( ent->client->ps.clientNum, team );
+		if ( teammateCount > 0 ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Forfeit is only available to the last remaining player on the losing team.\\n\"" );
+			return;
+		}
+
+		G_ApplyForfeit( ent );
+		return;
+	}
+
+	if ( gametype == GT_TOURNAMENT ) {
+		opponent = NULL;
+		opponentScore = 0;
+
+		for ( i = 0; i < level.maxclients; i++ ) {
+			gclient_t *client;
+
+			if ( i == ent->client->ps.clientNum ) {
+				continue;
+			}
+
+			client = &level.clients[i];
+			if ( client->pers.connected != CON_CONNECTED ) {
+				continue;
+			}
+			if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
+				continue;
+			}
+
+			opponent = client;
+			opponentScore = client->ps.persistant[PERS_SCORE];
+			break;
+		}
+
+		if ( !opponent ) {
+			return;
+		}
+
+		if ( ent->client->ps.persistant[PERS_SCORE] >= opponentScore ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Forfeit is only available to the losing player.\\n\"" );
+			return;
+		}
+
+		if ( ent->client->ps.pm_type != PM_NORMAL || ent->health <= 0 ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Forfeit is only available to the losing player.\\n\"" );
+			return;
+		}
+
+		G_ApplyForfeit( ent );
+		return;
+	}
+
+	trap_SendServerCommand( ent-g_entities, va( "print \"Forfeit is not available in %s.\\n\"", gametypeName ) );
 }
 
 /*
@@ -2191,6 +2370,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_Noclip_f (ent);
 	else if (Q_stricmp (cmd, "kill") == 0)
 		Cmd_Kill_f (ent);
+	else if (Q_stricmp (cmd, "forfeit") == 0)
+		Cmd_Forfeit_f( ent );
 	else if (Q_stricmp (cmd, "teamtask") == 0)
 		Cmd_TeamTask_f (ent);
 	else if (Q_stricmp (cmd, "levelshot") == 0)

@@ -131,6 +131,10 @@ typedef enum {
 	GT_MAX_GAME_TYPE
 } gametype_t;
 
+// Quake Live repurposes the single-player slot for Race and adds Red Rover.
+#define GT_RACE			GT_SINGLE_PLAYER
+#define GT_RED_ROVER		12
+
 typedef enum { GENDER_MALE, GENDER_FEMALE, GENDER_NEUTER } gender_t;
 
 /*
