@@ -933,6 +933,14 @@ void Cmd_Follow_f( gentity_t *ent ) {
 	int		i;
 	char	arg[MAX_TOKEN_CHARS];
 
+	if ( level.trainingMapActive ) {
+		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
+			StopFollowing( ent );
+		}
+		trap_SendServerCommand( ent-g_entities, "print \"Following is disabled in training.\n\"" );
+		return;
+	}
+
 	if ( trap_Argc() != 2 ) {
 		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
 			StopFollowing( ent );
@@ -979,6 +987,14 @@ Cmd_FollowCycle_f
 void Cmd_FollowCycle_f( gentity_t *ent, int dir ) {
 	int		clientnum;
 	int		original;
+
+	if ( level.trainingMapActive ) {
+		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
+			StopFollowing( ent );
+		}
+		trap_SendServerCommand( ent-g_entities, "print \"Following is disabled in training.\n\"" );
+		return;
+	}
 
 	// if they are playing a tournement game, count as a loss
 	if ( (g_gametype.integer == GT_TOURNAMENT )
@@ -2084,6 +2100,11 @@ static qboolean G_ClientCanControlTimeouts( gentity_t *ent, team_t *teamOut ) {
 		return qfalse;
 	}
 
+	if ( level.trainingMapActive ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Timeouts are disabled in training.\n\"" );
+		return qfalse;
+	}
+
 	team = ent->client->sess.sessionTeam;
 	if ( team == TEAM_SPECTATOR ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Spectators cannot control timeouts.\\n\"" );
@@ -2155,6 +2176,11 @@ void Cmd_Timein_f( gentity_t *ent ) {
 	int pausedDuration = 0;
 	team_t owningTeam;
 	int owner;
+
+	if ( level.trainingMapActive ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Training matches do not support timeouts.\n\"" );
+		return;
+	}
 
 	if ( !level.timeoutActive ) {
 		trap_SendServerCommand( ent-g_entities, "print \"No timeout in progress.\\n\"" );

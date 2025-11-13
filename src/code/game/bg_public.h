@@ -80,6 +80,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_SHADERSTATE			24
 #define CS_BOTINFO				25
 #define CS_MATCH_STATE				26
+#define CS_FORCED_ATMOSPHERE		0x2B3		// forces clients to enable map atmosphere effects
 
 //
 // Factory metadata configstrings provide clients with human-readable match factory data.

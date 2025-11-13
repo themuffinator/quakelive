@@ -54,6 +54,7 @@ static void G_StepEntities( qlr_game_frame_context_t *ctx );
 static void G_DispatchEvents( qlr_game_frame_context_t *ctx );
 static void G_FinishClientFrames( qlr_game_frame_context_t *ctx );
 static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued );
+static void G_UpdateTrainingState( void );
 
 void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
 	g_qlr_frame_ctx = ctx;
@@ -170,6 +171,8 @@ vmCvar_t	g_quadHog;
 vmCvar_t	g_quadHogIdle;
 vmCvar_t	g_quadHogTime;
 vmCvar_t	g_quadHogPingRate;
+vmCvar_t	g_training;
+vmCvar_t	g_forcedAtmosphere;
 static matchFactoryConfig_t matchFlow_lastConfig;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
@@ -261,6 +264,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_complaintLimit, "g_complaintLimit", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Friendly-fire complaints recorded against a player before they are kicked." },
 	{ &g_warmup, "g_warmup", "20", CVAR_ARCHIVE, 0, qtrue  },
 	{ &g_doWarmup, "g_doWarmup", "0", 0, 0, qtrue  },
+	{ &g_training, "g_training", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Marks training sessions and disables competitive match flow when set." },
+	{ &g_forcedAtmosphere, "g_forcedAtmosphere", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional atmosphere effect applied when a map lacks an atmosphere worldspawn key." },
 	{ &g_listEntity, "g_listEntity", "0", 0, 0, qfalse },
         { &g_overtime, "g_overtime", "120", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Overtime period length in seconds once regulation ends tied; 0 keeps sudden death active until the tie is broken." },
         { &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
@@ -686,8 +691,22 @@ void G_UpdateCvars( void ) {
 	G_SyncMatchFactoryConfigToLevel();
 	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
 
+        G_UpdateTrainingState();
         G_RefreshPmoveSettings();
 }
+
+/*
+=============
+G_UpdateTrainingState
+
+Synchronises the latched g_training cvar with the level training flag.
+=============
+*/
+static void G_UpdateTrainingState( void ) {
+	trap_Cvar_Update( &g_training );
+	level.trainingMapActive = ( g_training.integer != 0 ) ? qtrue : qfalse;
+}
+
 
 /*
 ============
@@ -712,6 +731,9 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 
 	G_RegisterCvars();
+
+	trap_Cvar_Set( "g_training", "0" );
+	G_UpdateTrainingState();
 
 	G_ProcessIPBans();
 
@@ -801,6 +823,18 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	// parse the key/value pairs and spawn gentities
 	G_SpawnEntitiesFromString();
+	G_UpdateTrainingState();
+	if ( level.trainingMapActive ) {
+		int team;
+		for ( team = TEAM_FREE; team < TEAM_NUM_TEAMS; team++ ) {
+			level.timeoutRemaining[team] = 0;
+		}
+		level.timeoutActive = qfalse;
+		level.timeoutOwner = -1;
+		level.timeoutTeam = TEAM_FREE;
+		level.timeoutExpireTime = 0;
+		level.timeoutStartTime = 0;
+	}
 
 	// general initialization
 	G_FindTeams();
@@ -2075,6 +2109,14 @@ void CheckTournament( void ) {
 	// check because we run 3 game frames before calling Connect and/or ClientBegin
 	// for clients on a map_restart
 	if ( level.numPlayingClients == 0 ) {
+		return;
+	}
+
+	if ( level.trainingMapActive ) {
+		if ( level.warmupTime != 0 ) {
+			level.warmupTime = 0;
+			trap_SetConfigstring( CS_WARMUP, "" );
+		}
 		return;
 	}
 

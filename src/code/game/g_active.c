@@ -370,6 +370,12 @@ Returns qfalse if the client is dropped
 =================
 */
 qboolean ClientInactivityTimer( gclient_t *client ) {
+	if ( level.trainingMapActive ) {
+		client->inactivityTime = level.time + 60 * 1000;
+		client->inactivityWarning = qfalse;
+		return qtrue;
+	}
+
 	if ( ! g_inactivity.integer ) {
 		// give everyone some time, so if the operator sets g_inactivity during
 		// gameplay, everyone isn't kicked
@@ -1067,6 +1073,10 @@ SpectatorClientEndFrame
 */
 void SpectatorClientEndFrame( gentity_t *ent ) {
 	gclient_t	*cl;
+
+	if ( level.trainingMapActive && ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
+		StopFollowing( ent );
+	}
 
 	// if we are doing a chase cam or a remote view, grab the latest info
 	if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
