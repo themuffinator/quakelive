@@ -21,6 +21,7 @@ SCENARIOS: dict[str, Path] = {
     "duel": SCENARIO_ROOT / "sample_scenario.json",
     "overtime": SCENARIO_ROOT / "overtime_scenario.json",
     "loadouts": SCENARIO_ROOT / "complex_loadouts.json",
+    "factory": SCENARIO_ROOT / "factory_cvars.json",
 }
 DEFAULT_SCENARIO = SCENARIOS["duel"]
 DEFAULT_SNAPSHOTS = REPO_ROOT / "tools" / "tests" / "client_regression" / "sample_snapshots.json"

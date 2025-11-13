@@ -1,0 +1,20 @@
+2.500 visor drop quad_damage status=dropped bounce=False
+3.500 visor drop megahealth status=dropped bounce=False
+4.000 anarki drop yellow_armor status=dropped bounce=False
+4.500 visor respawn quad_damage
+5.500 visor respawn megahealth
+6.000 anarki respawn yellow_armor
+---
+2.500 visor drop quad_damage status=dropped bounce=True
+3.500 visor drop megahealth status=dropped bounce=True
+4.000 anarki drop yellow_armor status=dropped bounce=True
+4.500 visor respawn quad_damage
+5.500 visor respawn megahealth
+6.000 anarki respawn yellow_armor
+---
+2.500 visor drop quad_damage status=suppressed bounce=None
+3.000 visor return quad_damage
+3.500 visor drop megahealth status=suppressed bounce=None
+4.000 visor return megahealth
+4.000 anarki drop yellow_armor status=suppressed bounce=None
+4.500 anarki return yellow_armor

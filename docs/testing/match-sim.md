@@ -99,6 +99,7 @@ test suite as well as CI artefact generation:
 | `duel` | `tools/tests/match_sim/sample_scenario.json` | Baseline two-bot duel showcasing movement, combat, and randomised dodges. | `2024` | 101 | 10.0 |
 | `overtime` | `tools/tests/match_sim/overtime_scenario.json` | Sudden-death duel that flips into overtime with scripted scoreboard metadata. | `3141` | 126 | 12.5 |
 | `loadouts` | `tools/tests/match_sim/complex_loadouts.json` | Free-for-all stress test with stacked inventories, heavy ammo usage, and randomised loadouts. | `9001` | 161 | 8.0 |
+| `factory` | `tools/tests/match_sim/factory_cvars.json` | Factory CVar coverage exercising loadout toggles, spawn delays, and item drop rules. | `4242` | 161 | 8.0 |
 
 Run any scenario via:
 
