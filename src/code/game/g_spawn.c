@@ -616,6 +616,193 @@ void SP_worldspawn( void ) {
 
 
 /*
+=============
+G_UpdateSpawnQueueFlag
+
+Recomputes whether any clients are currently queued for delayed spawns.
+=============
+*/
+static void G_UpdateSpawnQueueFlag( void ) {
+	int             i;
+
+	level.spawnQueueActive = qfalse;
+
+	for ( i = 0; i < level.maxclients; ++i ) {
+		if ( level.clientSpawnQueued[i] ) {
+		        level.spawnQueueActive = qtrue;
+		        break;
+		}
+	}
+}
+
+/*
+=============
+G_ClearQueuedSpawnState
+
+Resets the queue bookkeeping for a particular client number.
+=============
+*/
+static void G_ClearQueuedSpawnState( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return;
+	}
+
+	level.clientSpawnQueued[clientNum] = qfalse;
+	level.clientSpawnInitial[clientNum] = qfalse;
+	level.clientSpawnNeedsEffect[clientNum] = qfalse;
+	level.clientFactoryLoadoutQueued[clientNum] = qfalse;
+	level.clientSpawnRequestTime[clientNum] = 0;
+}
+
+/*
+=============
+G_InitSpawnQueue
+
+Initialises the spawn delay bookkeeping used to mimic Quake Live's factory scheduling.
+=============
+*/
+void G_InitSpawnQueue( void ) {
+	int             i;
+
+	level.nextWarmupSpawnTime = 0;
+	level.spawnQueueActive = qfalse;
+
+	for ( i = 0; i < MAX_CLIENTS; ++i ) {
+		level.clientSpawnRequestTime[i] = 0;
+		level.clientSpawnQueued[i] = qfalse;
+		level.clientSpawnInitial[i] = qfalse;
+		level.clientSpawnNeedsEffect[i] = qfalse;
+		level.clientFactoryLoadoutQueued[i] = qfalse;
+	}
+}
+
+/*
+=============
+G_SyncMatchFactoryConfigToLevel
+
+Copies the active match factory toggle values into level state for quick access.
+=============
+*/
+void G_SyncMatchFactoryConfigToLevel( void ) {
+	level.matchAllowItemDrops = g_matchFactoryConfig.factoryAllowItemDrops;
+	level.matchAllowItemBounce = g_matchFactoryConfig.factoryAllowItemBounce;
+}
+
+/*
+=============
+G_ExecuteQueuedClientSpawn
+
+Think callback that finalises delayed spawn requests.
+=============
+*/
+static void G_ExecuteQueuedClientSpawn( gentity_t *ent ) {
+	int             clientNum;
+	qboolean        initialSpawn;
+	qboolean        needsEffect;
+	qboolean        announceEntry;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	clientNum = ent - g_entities;
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return;
+	}
+
+	if ( !level.clientSpawnQueued[clientNum] ) {
+		return;
+	}
+
+	initialSpawn = level.clientSpawnInitial[clientNum];
+	needsEffect = level.clientSpawnNeedsEffect[clientNum];
+	announceEntry = ( initialSpawn && needsEffect && ent->client->sess.sessionTeam != TEAM_SPECTATOR && g_gametype.integer != GT_TOURNAMENT ) ? qtrue : qfalse;
+
+	ent->think = NULL;
+	ent->nextthink = 0;
+
+	G_ClearQueuedSpawnState( clientNum );
+
+	ClientSpawn( ent );
+
+	if ( needsEffect && ent->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		gentity_t       *tent;
+
+		tent = G_TempEntity( ent->client->ps.origin, EV_PLAYER_TELEPORT_IN );
+		tent->s.clientNum = ent->s.clientNum;
+	}
+
+	if ( announceEntry ) {
+		trap_SendServerCommand( -1, va( "print \"%s" S_COLOR_WHITE " entered the game\n\"", ent->client->pers.netname ) );
+	}
+
+	G_UpdateSpawnQueueFlag();
+}
+
+/*
+=============
+G_RequestClientSpawn
+
+Queues or executes spawn requests, applying Quake Live factory delays where appropriate.
+=============
+*/
+qboolean G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean initialSpawn ) {
+	int             clientNum;
+	int             delayMs;
+	int             scheduledTime;
+	int             baseTime;
+	qboolean        needsEffect;
+
+	if ( !ent || !ent->client ) {
+		return qfalse;
+	}
+
+	clientNum = ent - g_entities;
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return qfalse;
+	}
+
+	delayMs = warmupSpawn ? g_matchFactoryConfig.factoryWarmupSpawnDelayMilliseconds : g_matchFactoryConfig.factoryRespawnDelayMilliseconds;
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		delayMs = 0;
+	}
+
+	if ( delayMs <= 0 ) {
+		ent->think = NULL;
+		ent->nextthink = 0;
+		G_ClearQueuedSpawnState( clientNum );
+		ClientSpawn( ent );
+		return qtrue;
+	}
+
+	baseTime = level.time;
+	if ( warmupSpawn && g_matchFactoryConfig.factoryWarmupSpawnDelayMilliseconds > 0 ) {
+		if ( level.nextWarmupSpawnTime > baseTime ) {
+		        baseTime = level.nextWarmupSpawnTime;
+		}
+		scheduledTime = baseTime + delayMs;
+		level.nextWarmupSpawnTime = scheduledTime;
+	} else {
+		scheduledTime = baseTime + delayMs;
+	}
+
+	needsEffect = ( ent->client->sess.sessionTeam != TEAM_SPECTATOR ) ? qtrue : qfalse;
+
+	level.clientSpawnRequestTime[clientNum] = scheduledTime;
+	level.clientSpawnQueued[clientNum] = qtrue;
+	level.clientSpawnInitial[clientNum] = initialSpawn ? qtrue : qfalse;
+	level.clientSpawnNeedsEffect[clientNum] = needsEffect;
+	level.clientFactoryLoadoutQueued[clientNum] = qtrue;
+	level.spawnQueueActive = qtrue;
+
+	ent->think = G_ExecuteQueuedClientSpawn;
+	ent->nextthink = scheduledTime;
+
+	return qfalse;
+}
+
+/*
 ==============
 G_SpawnEntitiesFromString
 

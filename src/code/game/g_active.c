@@ -595,15 +595,15 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 
 			if ( item ) {
 				drop = Drop_Item( ent, item, 0 );
-				// decide how many seconds it has left
-				drop->count = ( ent->client->ps.powerups[ j ] - level.time ) / 1000;
-				if ( drop->count < 1 ) {
-					drop->count = 1;
+				if ( drop ) {
+					// decide how many seconds it has left
+					drop->count = ( ent->client->ps.powerups[ j ] - level.time ) / 1000;
+					if ( drop->count < 1 ) {
+						drop->count = 1;
 				}
-
+			}
 				ent->client->ps.powerups[ j ] = 0;
 			}
-
 #ifdef MISSIONPACK
 			if ( g_gametype.integer == GT_HARVESTER ) {
 				if ( ent->client->ps.generic1 > 0 ) {
@@ -615,10 +615,12 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 					if ( item ) {
 						for ( j = 0; j < ent->client->ps.generic1; j++ ) {
 							drop = Drop_Item( ent, item, 0 );
-							if ( ent->client->sess.sessionTeam == TEAM_RED ) {
-								drop->spawnflags = TEAM_BLUE;
-							} else {
-								drop->spawnflags = TEAM_RED;
+							if ( drop ) {
+								if ( ent->client->sess.sessionTeam == TEAM_RED ) {
+									drop->spawnflags = TEAM_BLUE;
+								} else {
+									drop->spawnflags = TEAM_RED;
+								}
 							}
 						}
 					}

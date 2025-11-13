@@ -10,6 +10,10 @@
 #define DEFAULT_SUDDEN_DEATH_MAX_SECONDS		10
 #define DEFAULT_SUDDEN_DEATH_INCREMENT_SECONDS	1
 #define DEFAULT_SUDDEN_DEATH_PRINT			1
+#define DEFAULT_FACTORY_RESPAWN_DELAY_MILLISECONDS		0
+#define DEFAULT_FACTORY_WARMUP_DELAY_MILLISECONDS	0
+#define DEFAULT_FACTORY_ALLOW_ITEM_DROPS		1
+#define DEFAULT_FACTORY_ALLOW_ITEM_BOUNCE		1
 
 matchFactoryConfig_t g_matchFactoryConfig;
 
@@ -222,6 +226,10 @@ static matchFactoryConfig_t G_MatchConfig_Load( void ) {
 	config.suddenDeathIncrementSeconds = G_MatchConfig_ReadNonNegativeCvar( &g_suddenDeathRespawnIncrement, DEFAULT_SUDDEN_DEATH_INCREMENT_SECONDS, "g_suddenDeathRespawnIncrement" );
 	config.suddenDeathPrintAnnouncements = G_MatchConfig_ReadBoolCvar( &g_suddenDeathRespawnPrint, DEFAULT_SUDDEN_DEATH_PRINT ? qtrue : qfalse, "g_suddenDeathRespawnPrint" );
 	config.suddenDeathSpawnDelayActive = ( config.suddenDeathRespawnsEnabled && ( config.suddenDeathStartSeconds > 0 || config.suddenDeathIncrementSeconds > 0 ) ) ? qtrue : qfalse;
+	config.factoryRespawnDelayMilliseconds = G_MatchConfig_ReadNonNegativeCvar( &g_factoryRespawnDelay, DEFAULT_FACTORY_RESPAWN_DELAY_MILLISECONDS, "g_factoryRespawnDelay" );
+	config.factoryWarmupSpawnDelayMilliseconds = G_MatchConfig_ReadNonNegativeCvar( &g_factoryWarmupSpawnDelay, DEFAULT_FACTORY_WARMUP_DELAY_MILLISECONDS, "g_factoryWarmupSpawnDelay" );
+	config.factoryAllowItemDrops = G_MatchConfig_ReadBoolCvar( &g_factoryAllowItemDrops, DEFAULT_FACTORY_ALLOW_ITEM_DROPS ? qtrue : qfalse, "g_factoryAllowItemDrops" );
+	config.factoryAllowItemBounce = G_MatchConfig_ReadBoolCvar( &g_factoryAllowItemBounce, DEFAULT_FACTORY_ALLOW_ITEM_BOUNCE ? qtrue : qfalse, "g_factoryAllowItemBounce" );
 
 	return config;
 }
@@ -238,7 +246,7 @@ static void G_LogMatchFactoryConfig( const char *reason, const matchFactoryConfi
 		return;
 	}
 
-	G_Printf( "Match factory config (%s): timeoutLen=%i timeoutCount=%i overtime=%i suddenRespawn=%i start=%i tick=%i max=%i increment=%i print=%i delay=%i\n",
+        G_Printf( "Match factory config (%s): timeoutLen=%i timeoutCount=%i overtime=%i suddenRespawn=%i start=%i tick=%i max=%i increment=%i print=%i delay=%i respawnMs=%i warmupMs=%i drops=%i bounce=%i\n",
 		reason,
 		config->timeoutLengthSeconds,
 		config->timeoutCountPerTeam,
@@ -246,10 +254,14 @@ static void G_LogMatchFactoryConfig( const char *reason, const matchFactoryConfi
 		config->suddenDeathRespawnsEnabled ? 1 : 0,
 		config->suddenDeathStartSeconds,
 		config->suddenDeathTickSeconds,
-		config->suddenDeathMaxSeconds,
-		config->suddenDeathIncrementSeconds,
-		config->suddenDeathPrintAnnouncements ? 1 : 0,
-		config->suddenDeathSpawnDelayActive ? 1 : 0 );
+                config->suddenDeathMaxSeconds,
+                config->suddenDeathIncrementSeconds,
+                config->suddenDeathPrintAnnouncements ? 1 : 0,
+                config->suddenDeathSpawnDelayActive ? 1 : 0,
+                config->factoryRespawnDelayMilliseconds,
+                config->factoryWarmupSpawnDelayMilliseconds,
+                config->factoryAllowItemDrops ? 1 : 0,
+                config->factoryAllowItemBounce ? 1 : 0 );
 }
 
 /*
@@ -285,7 +297,11 @@ void G_UpdateMatchFactoryConfig( void ) {
 		|| config.suddenDeathMaxSeconds != s_reportedMatchFactoryConfig.suddenDeathMaxSeconds
 		|| config.suddenDeathIncrementSeconds != s_reportedMatchFactoryConfig.suddenDeathIncrementSeconds
 		|| config.suddenDeathPrintAnnouncements != s_reportedMatchFactoryConfig.suddenDeathPrintAnnouncements
-		|| config.suddenDeathSpawnDelayActive != s_reportedMatchFactoryConfig.suddenDeathSpawnDelayActive ) {
+		|| config.suddenDeathSpawnDelayActive != s_reportedMatchFactoryConfig.suddenDeathSpawnDelayActive
+		|| config.factoryRespawnDelayMilliseconds != s_reportedMatchFactoryConfig.factoryRespawnDelayMilliseconds
+		|| config.factoryWarmupSpawnDelayMilliseconds != s_reportedMatchFactoryConfig.factoryWarmupSpawnDelayMilliseconds
+		|| config.factoryAllowItemDrops != s_reportedMatchFactoryConfig.factoryAllowItemDrops
+		|| config.factoryAllowItemBounce != s_reportedMatchFactoryConfig.factoryAllowItemBounce ) {
 		G_LogMatchFactoryConfig( "update", &config );
 		s_reportedMatchFactoryConfig = config;
 	}
