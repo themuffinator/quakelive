@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
 #include "g_local.h"
+#include "g_match_config.h"
 
 qboolean	G_SpawnString( const char *key, const char *defaultString, char **out ) {
 	int		i;
@@ -640,5 +641,6 @@ void G_SpawnEntitiesFromString( void ) {
 	}	
 
 	level.spawning = qfalse;			// any future calls to G_Spawn*() will be errors
+	G_MatchConfig_UpdateConfigstrings();
 }
 

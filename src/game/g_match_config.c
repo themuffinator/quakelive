@@ -17,6 +17,110 @@ static matchFactoryConfig_t s_reportedMatchFactoryConfig;
 
 /*
 =============
+G_MatchConfig_BuildMetadataStrings
+
+Prepares the human-readable factory metadata strings that are sent through configstrings.
+=============
+*/
+static void G_MatchConfig_BuildMetadataStrings( char *title, int titleSize, char *flags, int flagsSize, char *spawnHints, int spawnHintsSize ) {
+	const matchFactoryConfig_t	*config;
+	unsigned int			mask;
+	qboolean				defaultSpawnDelayActive;
+	char				info[MAX_INFO_STRING];
+	char				buffer[32];
+
+	if ( !title || titleSize <= 0 || !flags || flagsSize <= 0 || !spawnHints || spawnHintsSize <= 0 ) {
+		return;
+	}
+
+	config = &g_matchFactoryConfig;
+	mask = 0u;
+
+	if ( config->timeoutLengthSeconds != DEFAULT_TIMEOUT_LENGTH_SECONDS ) {
+		mask |= FACTORY_FLAG_TIMEOUT_LENGTH;
+	}
+	if ( config->timeoutCountPerTeam != DEFAULT_TIMEOUT_COUNT_PER_TEAM ) {
+		mask |= FACTORY_FLAG_TIMEOUT_COUNT;
+	}
+	if ( config->overtimeLengthSeconds != DEFAULT_OVERTIME_LENGTH_SECONDS ) {
+		mask |= FACTORY_FLAG_OVERTIME_LENGTH;
+	}
+	if ( ( config->suddenDeathRespawnsEnabled ? qtrue : qfalse ) != ( DEFAULT_SUDDEN_DEATH_RESPAWN ? qtrue : qfalse ) ) {
+		mask |= FACTORY_FLAG_SUDDEN_DEATH_ENABLED;
+	}
+	if ( config->suddenDeathStartSeconds != DEFAULT_SUDDEN_DEATH_START_SECONDS ) {
+		mask |= FACTORY_FLAG_SUDDEN_DEATH_START;
+	}
+	if ( config->suddenDeathTickSeconds != DEFAULT_SUDDEN_DEATH_TICK_SECONDS ) {
+		mask |= FACTORY_FLAG_SUDDEN_DEATH_TICK;
+	}
+	if ( config->suddenDeathMaxSeconds != DEFAULT_SUDDEN_DEATH_MAX_SECONDS ) {
+		mask |= FACTORY_FLAG_SUDDEN_DEATH_MAX;
+	}
+	if ( config->suddenDeathIncrementSeconds != DEFAULT_SUDDEN_DEATH_INCREMENT_SECONDS ) {
+		mask |= FACTORY_FLAG_SUDDEN_DEATH_INCREMENT;
+	}
+	if ( ( config->suddenDeathPrintAnnouncements ? qtrue : qfalse ) != ( DEFAULT_SUDDEN_DEATH_PRINT ? qtrue : qfalse ) ) {
+		mask |= FACTORY_FLAG_SUDDEN_DEATH_PRINT;
+	}
+	defaultSpawnDelayActive = ( DEFAULT_SUDDEN_DEATH_RESPAWN && ( DEFAULT_SUDDEN_DEATH_START_SECONDS > 0 || DEFAULT_SUDDEN_DEATH_INCREMENT_SECONDS > 0 ) ) ? qtrue : qfalse;
+	if ( config->suddenDeathSpawnDelayActive != defaultSpawnDelayActive ) {
+		mask |= FACTORY_FLAG_SUDDEN_DEATH_DELAY;
+	}
+
+	if ( mask == 0u ) {
+		Q_strncpyz( title, "Standard Factory", titleSize );
+	} else {
+		Q_strncpyz( title, "Custom Factory", titleSize );
+	}
+
+	Com_sprintf( flags, flagsSize, "%u", mask );
+
+	info[0] = '\0';
+
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->timeoutCountPerTeam );
+	Info_SetValueForKey( info, "toCount", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->timeoutLengthSeconds );
+	Info_SetValueForKey( info, "toLength", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->overtimeLengthSeconds );
+	Info_SetValueForKey( info, "otLength", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->suddenDeathRespawnsEnabled ? 1 : 0 );
+	Info_SetValueForKey( info, "sd", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->suddenDeathStartSeconds );
+	Info_SetValueForKey( info, "sdStart", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->suddenDeathTickSeconds );
+	Info_SetValueForKey( info, "sdTick", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->suddenDeathMaxSeconds );
+	Info_SetValueForKey( info, "sdMax", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->suddenDeathIncrementSeconds );
+	Info_SetValueForKey( info, "sdInc", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->suddenDeathPrintAnnouncements ? 1 : 0 );
+	Info_SetValueForKey( info, "sdPrint", buffer );
+	Com_sprintf( buffer, sizeof( buffer ), "%i", config->suddenDeathSpawnDelayActive ? 1 : 0 );
+	Info_SetValueForKey( info, "sdDelay", buffer );
+
+	Q_strncpyz( spawnHints, info, spawnHintsSize );
+}
+/*
+=============
+G_MatchConfig_UpdateConfigstrings
+
+Publishes the cached match factory metadata into configstrings for clients.
+=============
+*/
+void G_MatchConfig_UpdateConfigstrings( void ) {
+	char				title[MAX_STRING_CHARS];
+	char				flags[32];
+	char				spawnHints[MAX_INFO_STRING];
+
+	G_MatchConfig_BuildMetadataStrings( title, sizeof( title ), flags, sizeof( flags ), spawnHints, sizeof( spawnHints ) );
+
+	trap_SetConfigstring( CS_FACTORY_TITLE, title );
+	trap_SetConfigstring( CS_FACTORY_FLAGS, flags );
+	trap_SetConfigstring( CS_SPAWN_HINTS, spawnHints );
+}
+/*
+=============
 G_MatchConfig_ReportMissingCvar
 
 Logs when a match factory CVar is unavailable so administrators can diagnose config issues.
@@ -159,6 +263,7 @@ void G_InitMatchFactoryConfig( void ) {
 	g_matchFactoryConfig = G_MatchConfig_Load();
 	s_reportedMatchFactoryConfig = g_matchFactoryConfig;
 	G_LogMatchFactoryConfig( "init", &g_matchFactoryConfig );
+	G_MatchConfig_UpdateConfigstrings();
 }
 
 /*
@@ -186,4 +291,5 @@ void G_UpdateMatchFactoryConfig( void ) {
 	}
 
 	g_matchFactoryConfig = config;
+	G_MatchConfig_UpdateConfigstrings();
 }

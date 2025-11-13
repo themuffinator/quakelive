@@ -81,9 +81,30 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_BOTINFO				25
 #define CS_MATCH_STATE				26
 
-#define	CS_ITEMS				27		// string of 0's and 1's that tell which items are present
+//
+// Factory metadata configstrings provide clients with human-readable match factory data.
+// CS_FACTORY_FLAGS encodes FACTORY_FLAG_* bits, while CS_SPAWN_HINTS is an info string
+// containing the keys: toCount, toLength, otLength, sd, sdStart, sdTick, sdMax, sdInc,
+// sdPrint, and sdDelay.
+//
+#define CS_FACTORY_TITLE		27		// descriptive title for the active match factory
+#define CS_FACTORY_FLAGS		28		// decimal bitmask describing customized factory settings
+#define CS_SPAWN_HINTS		29		// info string exposing timeout and sudden death metadata
 
-#define	CS_MODELS				32
+#define	CS_ITEMS				30		// string of 0's and 1's that tell which items are present
+
+#define	CS_MODELS				33
+
+#define FACTORY_FLAG_TIMEOUT_LENGTH		( 1 << 0 )
+#define FACTORY_FLAG_TIMEOUT_COUNT		( 1 << 1 )
+#define FACTORY_FLAG_OVERTIME_LENGTH	( 1 << 2 )
+#define FACTORY_FLAG_SUDDEN_DEATH_ENABLED	( 1 << 3 )
+#define FACTORY_FLAG_SUDDEN_DEATH_START	( 1 << 4 )
+#define FACTORY_FLAG_SUDDEN_DEATH_TICK	( 1 << 5 )
+#define FACTORY_FLAG_SUDDEN_DEATH_MAX		( 1 << 6 )
+#define FACTORY_FLAG_SUDDEN_DEATH_INCREMENT	( 1 << 7 )
+#define FACTORY_FLAG_SUDDEN_DEATH_PRINT	( 1 << 8 )
+#define FACTORY_FLAG_SUDDEN_DEATH_DELAY	( 1 << 9 )
 #define	CS_SOUNDS				(CS_MODELS+MAX_MODELS)
 #define	CS_PLAYERS				(CS_SOUNDS+MAX_SOUNDS)
 #define CS_LOCATIONS			(CS_PLAYERS+MAX_CLIENTS)
