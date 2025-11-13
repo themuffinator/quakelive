@@ -458,20 +458,52 @@ void Cmd_TeamTask_f( gentity_t *ent ) {
 
 
 /*
-=================
+=============
 Cmd_Kill_f
-=================
+
+Executes the self-kill command while honouring the g_allowKill cooldown.
+=============
 */
 void Cmd_Kill_f( gentity_t *ent ) {
+	int	cooldown;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		return;
 	}
-	if (ent->health <= 0) {
+	if ( ent->health <= 0 ) {
 		return;
 	}
+
+	cooldown = g_allowKill.integer;
+	if ( cooldown < 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Kill is not enabled on this server.\n\"" );
+		return;
+	}
+
+	if ( cooldown > 0 ) {
+		int	spawnElapsed;
+		int	killElapsed;
+
+		spawnElapsed = level.time - ent->client->respawnTime;
+		if ( spawnElapsed < cooldown ) {
+			return;
+		}
+
+		if ( ent->client->pers.killCommandTime >= 0 ) {
+			killElapsed = level.time - ent->client->pers.killCommandTime;
+			if ( killElapsed < cooldown ) {
+				return;
+			}
+		}
+	}
+
 	ent->flags &= ~FL_GODMODE;
 	ent->client->ps.stats[STAT_HEALTH] = ent->health = -999;
-	player_die (ent, ent, ent, 100000, MOD_SUICIDE);
+	ent->client->pers.killCommandTime = level.time;
+	player_die( ent, ent, ent, 100000, MOD_SUICIDE );
 }
 
 /*
@@ -615,6 +647,13 @@ void SetTeam( gentity_t *ent, char *s ) {
 	client->sess.spectatorState = specState;
 	client->sess.spectatorClient = specClient;
 
+	client->lastKillCommandTime = 0;
+	client->killCommandCooldownExpires = 0;
+	client->friendlyFireComplaints = 0;
+	client->friendlyFireComplaintEndTime = 0;
+	client->teammateDamageGiven = 0;
+	client->teammateDamageThisLife = 0;
+
 	client->sess.teamLeader = qfalse;
 	if ( team == TEAM_RED || team == TEAM_BLUE ) {
 		teamLeader = TeamLeader( team );
@@ -648,6 +687,12 @@ void StopFollowing( gentity_t *ent ) {
 	ent->client->ps.persistant[ PERS_TEAM ] = TEAM_SPECTATOR;	
 	ent->client->sess.sessionTeam = TEAM_SPECTATOR;	
 	ent->client->sess.spectatorState = SPECTATOR_FREE;
+	ent->client->lastKillCommandTime = 0;
+	ent->client->killCommandCooldownExpires = 0;
+	ent->client->friendlyFireComplaints = 0;
+	ent->client->friendlyFireComplaintEndTime = 0;
+	ent->client->teammateDamageGiven = 0;
+	ent->client->teammateDamageThisLife = 0;
 	ent->client->ps.pm_flags &= ~PMF_FOLLOW;
 	ent->r.svFlags &= ~SVF_BOT;
 	ent->client->ps.clientNum = ent - g_entities;
@@ -1376,38 +1421,72 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 }
 
 /*
-==================
+=============
 Cmd_Vote_f
-==================
+
+Process a client's ballot during an active vote, applying spectator and throttle rules.
+=============
 */
 void Cmd_Vote_f( gentity_t *ent ) {
 	char		msg[64];
+	int		voteSelection;
+	gclient_t	*client;
 
 	if ( !level.voteTime ) {
 		trap_SendServerCommand( ent-g_entities, "print \"No vote in progress.\n\"" );
 		return;
 	}
-	if ( ent->client->ps.eFlags & EF_VOTED ) {
+
+	client = ent->client;
+	if ( !client ) {
+		return;
+	}
+
+	trap_Argv( 1, msg, sizeof( msg ) );
+	voteSelection = atoi( msg );
+	if ( voteSelection <= 0 ) {
+		if ( msg[0] == 'y' || msg[0] == 'Y' ) {
+			voteSelection = 1;
+		} else if ( msg[0] == 'n' || msg[0] == 'N' ) {
+			voteSelection = 2;
+		}
+	}
+
+	if ( client->sess.sessionTeam == TEAM_SPECTATOR && !g_allowSpecVote.integer ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You may not participate in this vote.\n\"" );
+		return;
+	}
+
+	if ( client->ps.eFlags & EF_VOTED ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Vote already cast.\n\"" );
 		return;
 	}
-	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Not allowed to vote as spectator.\n\"" );
+
+	if ( client->pers.voteDelayTime > 0 && level.time - client->pers.voteDelayTime < VOTE_THROTTLE_MSEC ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You may only vote once every 2 seconds.\n\"" );
+		return;
+	}
+
+	if ( voteSelection >= 0 && voteSelection == client->pers.voteLastSelection ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You already voted for this arena.\n\"" );
 		return;
 	}
 
 	trap_SendServerCommand( ent-g_entities, "print \"Vote cast.\n\"" );
 
-	ent->client->ps.eFlags |= EF_VOTED;
+	client->ps.eFlags |= EF_VOTED;
+	client->pers.voteDelayTime = level.time;
+	client->pers.voteLastSelection = voteSelection;
+	client->pers.voteLastEnableFrame = -1;
 
-	trap_Argv( 1, msg, sizeof( msg ) );
+	trap_SendServerCommand( ent-g_entities, "disable_vote_ui" );
 
-	if ( msg[0] == 'y' || msg[1] == 'Y' || msg[1] == '1' ) {
+	if ( msg[0] == 'y' || msg[0] == 'Y' || msg[0] == '1' ) {
 		level.voteYes++;
 		trap_SetConfigstring( CS_VOTE_YES, va("%i", level.voteYes ) );
 	} else {
 		level.voteNo++;
-		trap_SetConfigstring( CS_VOTE_NO, va("%i", level.voteNo ) );	
+		trap_SetConfigstring( CS_VOTE_NO, va("%i", level.voteNo ) );
 	}
 
 	// a majority will be determined in CheckVote, which will also account
@@ -1772,6 +1851,64 @@ void Cmd_Timein_f( gentity_t *ent ) {
 
 /*
 =================
+Cmd_Complaint_f
+
+Processes friendly-fire complaint responses from the victim.
+=================
+*/
+static void Cmd_Complaint_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	gclient_t *client;
+	int attackerNum;
+	gentity_t *attacker;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	client = ent->client;
+
+	if ( client->complaintClient < 0 ) {
+		client->complaintClient = -1;
+		client->complaintEndTime = 0;
+		return;
+	}
+
+	if ( client->complaintEndTime > 0 && client->complaintEndTime <= level.time ) {
+		G_ComplaintResolve( ent, qfalse );
+		return;
+	}
+
+	attackerNum = client->complaintClient;
+
+	if ( attackerNum < 0 || attackerNum >= level.maxclients ) {
+		client->complaintClient = -1;
+		client->complaintEndTime = 0;
+		trap_SendServerCommand( ent - g_entities, "complaint -3" );
+		return;
+	}
+
+	attacker = &g_entities[attackerNum];
+
+	if ( !attacker->client || attacker->client->pers.connected != CON_CONNECTED ) {
+		client->complaintClient = -1;
+		client->complaintEndTime = 0;
+		trap_SendServerCommand( ent - g_entities, "complaint -3" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+
+	if ( arg[0] == 'y' || arg[0] == 'Y' || arg[0] == '1' ) {
+		G_ComplaintResolve( ent, qtrue );
+		return;
+	}
+
+	G_ComplaintResolve( ent, qfalse );
+}
+
+/*
+=================
 ClientCommand
 =================
 */
@@ -1797,6 +1934,10 @@ void ClientCommand( int clientNum ) {
 	}
 	if (Q_stricmp (cmd, "tell") == 0) {
 		Cmd_Tell_f ( ent );
+		return;
+	}
+	if (Q_stricmp (cmd, "complaint") == 0) {
+		Cmd_Complaint_f( ent );
 		return;
 	}
 	if (Q_stricmp (cmd, "vsay") == 0) {

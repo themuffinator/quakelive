@@ -1118,6 +1118,10 @@ void ClientEndFrame( gentity_t *ent ) {
 	int			i;
 	clientPersistant_t	*pers;
 
+	if ( ent->client->complaintClient >= 0 && ent->client->complaintEndTime > 0 && ent->client->complaintEndTime <= level.time ) {
+		G_ComplaintResolve( ent, qfalse );
+	}
+
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		SpectatorClientEndFrame( ent );
 		return;

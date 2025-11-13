@@ -1134,6 +1134,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	memset( client, 0, sizeof(*client) );
 
 	client->pers.connected = CON_CONNECTING;
+	client->pers.killCommandTime = -1;
 	G_InitClientVoteThrottle( client );
 
 	// read or initialize the session data
@@ -1231,6 +1232,8 @@ void ClientBegin( int clientNum ) {
 
 	client = level.clients + clientNum;
 
+	G_ComplaintResetClient( client, qtrue );
+
 	if ( ent->r.linked ) {
 		trap_UnlinkEntity( ent );
 	}
@@ -1242,6 +1245,13 @@ void ClientBegin( int clientNum ) {
 	client->pers.connected = CON_CONNECTED;
 	client->pers.enterTime = level.time;
 	client->pers.teamState.state = TEAM_BEGIN;
+
+	client->lastKillCommandTime = 0;
+	client->killCommandCooldownExpires = 0;
+	client->friendlyFireComplaints = 0;
+	client->friendlyFireComplaintEndTime = 0;
+	client->teammateDamageGiven = 0;
+	client->teammateDamageThisLife = 0;
 
 	// save eflags around this, because changing teams will
 	// cause this to happen with a valid entity, and we
@@ -1352,6 +1362,11 @@ void ClientSpawn(gentity_t *ent) {
 	gentity_t	*spawnPoint;
 	int		flags;
 	int		savedPing;
+	int		savedLastKillCommandTime;
+	int		savedKillCommandCooldownExpires;
+	int		savedFriendlyFireComplaints;
+	int		savedFriendlyFireComplaintEndTime;
+	int		savedTeammateDamageGiven;
 //	char	*savedAreaBits;
 	int		accuracy_hits, accuracy_shots;
 	int		eventSequence;
@@ -1419,6 +1434,11 @@ void ClientSpawn(gentity_t *ent) {
 	saved = client->pers;
 	savedSess = client->sess;
 	savedPing = client->ps.ping;
+	savedLastKillCommandTime = client->lastKillCommandTime;
+	savedKillCommandCooldownExpires = client->killCommandCooldownExpires;
+	savedFriendlyFireComplaints = client->friendlyFireComplaints;
+	savedFriendlyFireComplaintEndTime = client->friendlyFireComplaintEndTime;
+	savedTeammateDamageGiven = client->teammateDamageGiven;
 //	savedAreaBits = client->areabits;
 	accuracy_hits = client->accuracy_hits;
 	accuracy_shots = client->accuracy_shots;
@@ -1436,6 +1456,12 @@ void ClientSpawn(gentity_t *ent) {
 	client->accuracy_hits = accuracy_hits;
 	client->accuracy_shots = accuracy_shots;
 	client->lastkilled_client = -1;
+	client->lastKillCommandTime = savedLastKillCommandTime;
+	client->killCommandCooldownExpires = savedKillCommandCooldownExpires;
+	client->friendlyFireComplaints = savedFriendlyFireComplaints;
+	client->friendlyFireComplaintEndTime = savedFriendlyFireComplaintEndTime;
+	client->teammateDamageGiven = savedTeammateDamageGiven;
+	client->teammateDamageThisLife = 0;
 
 	for ( i = 0 ; i < MAX_PERSISTANT ; i++ ) {
 		client->ps.persistant[i] = persistant[i];
@@ -1618,6 +1644,8 @@ void ClientDisconnect( int clientNum ) {
 		return;
 	}
 
+	G_ComplaintClientDisconnected( clientNum );
+	G_ComplaintResetClient( ent->client, qtrue );
 	G_ResetClientVoteThrottle( ent->client );
 
 	// stop any following clients
@@ -1664,6 +1692,12 @@ void ClientDisconnect( int clientNum ) {
 	ent->client->pers.connected = CON_DISCONNECTED;
 	ent->client->ps.persistant[PERS_TEAM] = TEAM_FREE;
 	ent->client->sess.sessionTeam = TEAM_FREE;
+	ent->client->lastKillCommandTime = 0;
+	ent->client->killCommandCooldownExpires = 0;
+	ent->client->friendlyFireComplaints = 0;
+	ent->client->friendlyFireComplaintEndTime = 0;
+	ent->client->teammateDamageGiven = 0;
+	ent->client->teammateDamageThisLife = 0;
 
 	trap_SetConfigstring( CS_PLAYERS + clientNum, "");
 

@@ -106,9 +106,14 @@ vmCvar_t	g_podiumDrop;
 vmCvar_t	g_allowSpecVote;
 vmCvar_t	g_allowVote;
 vmCvar_t	g_allowVoteMidGame;
+vmCvar_t	g_allowKill;
+vmCvar_t	g_complaintLimit;
+vmCvar_t	g_complaintDamageThreshold;
 vmCvar_t	g_voteFlags;
 vmCvar_t	g_voteDelay;
 vmCvar_t	g_voteLimit;
+vmCvar_t	g_complaintDamageThreshold;
+vmCvar_t	g_complaintLimit;
 vmCvar_t	g_teamAutoJoin;
 vmCvar_t	g_teamForceBalance;
 vmCvar_t	g_banIPs;
@@ -230,9 +235,14 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_allowSpecVote, "g_allowSpecVote", "0", 0, 0, qfalse },
 	{ &g_allowVote, "g_allowVote", "1", CVAR_ARCHIVE, 0, qfalse },
 	{ &g_allowVoteMidGame, "g_allowVoteMidGame", "0", 0, 0, qfalse },
+	{ &g_allowKill, "g_allowKill", "1000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Minimum milliseconds between kill commands; 0 restores instant suicides." },
+	{ &g_complaintLimit, "g_complaintLimit", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Maximum complaints before a player is automatically kicked; 0 disables kicking." },
+	{ &g_complaintDamageThreshold, "g_complaintDamageThreshold", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Minimum damage from a teammate required to present the complaint prompt." },
 	{ &g_voteFlags, "g_voteFlags", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse },
 	{ &g_voteDelay, "g_voteDelay", "0", 0, 0, qfalse },
 	{ &g_voteLimit, "g_voteLimit", "0", 0, 0, qfalse },
+	{ &g_complaintDamageThreshold, "g_complaintDamageThreshold", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Minimum team damage required before a complaint prompt is issued." },
+	{ &g_complaintLimit, "g_complaintLimit", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Friendly-fire complaints recorded against a player before they are kicked." },
 	{ &g_warmup, "g_warmup", "20", CVAR_ARCHIVE, 0, qtrue  },
 	{ &g_doWarmup, "g_doWarmup", "0", 0, 0, qtrue  },
 	{ &g_listEntity, "g_listEntity", "0", 0, 0, qfalse },

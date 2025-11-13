@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import random
+import heapq
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence
@@ -97,6 +98,12 @@ class MatchHarness:
         # Store the resolved seed on the configuration so serialised timelines
         # reflect the actual deterministic inputs used for the run.
         self.config.seed = self.seed
+        self.factory_settings: Mapping[str, Any] = dict(self.config.metadata.get("factory", {}))
+        self._current_time: float = 0.0
+        self._spawn_queue: list[tuple[float, int, Dict[str, Any]]] = []
+        self._item_queue: list[tuple[float, int, Dict[str, Any]]] = []
+        self._event_counter = 0
+        self._next_warmup_spawn_time: float = 0.0
 
     @staticmethod
     def _resolve_seed(*seeds: Optional[int]) -> int:
@@ -119,11 +126,15 @@ class MatchHarness:
             for bot_config in self.config.bots
         }
         script_indices = {name: 0 for name in bots}
+        self._reset_queued_events()
 
         frames: List[TimelineFrame] = []
         for tick in range(total_ticks):
             current_time = tick * delta
+            self._current_time = current_time
             events: List[Dict[str, Any]] = []
+            events.extend(self._collect_scheduled_spawns(current_time, bots))
+            events.extend(self._collect_scheduled_items(current_time, bots))
             for bot_name, bot_state in bots.items():
                 idx = script_indices[bot_name]
                 bot_script = scripts.get(bot_name, [])
@@ -133,6 +144,11 @@ class MatchHarness:
                     event = self._apply_command(bot_state, command, delta)
                     events.append(event)
                 script_indices[bot_name] = idx
+            # Commands executed during the tick may have scheduled additional
+            # delayed events. Collect any that are now due so they appear within
+            # the same timeline frame.
+            events.extend(self._collect_scheduled_spawns(current_time, bots))
+            events.extend(self._collect_scheduled_items(current_time, bots))
             frame = TimelineFrame(
                 tick=tick,
                 time=round(current_time, 6),
@@ -169,7 +185,7 @@ class MatchHarness:
             for key, value in self._resolve_mapping(bot.initial_state.get("inventory", {})).items()
         }
         custom = dict(self._resolve_mapping(bot.initial_state.get("custom", {})))
-        return BotState(
+        state = BotState(
             name=bot.name,
             team=bot.team,
             position=position,
@@ -180,6 +196,8 @@ class MatchHarness:
             inventory=inventory,
             custom=custom,
         )
+        self._apply_factory_loadout(state, bot)
+        return state
 
     def _apply_command(self, state: BotState, command: CommandConfig, delta: float) -> Dict[str, Any]:
         params = self._resolve_mapping(command.params)
@@ -282,6 +300,77 @@ class MatchHarness:
         state.velocity = (0.0, 0.0, 0.0)
         return {"position": list(state.position)}
 
+    def _handle_request_spawn(
+        self, state: BotState, params: Mapping[str, Any], delta: float
+    ) -> Dict[str, Any]:
+        warmup = bool(params.get("warmup", False))
+        reason = params.get("reason")
+        delay_ms_key = "warmup_ms" if warmup else "live_ms"
+        delay_ms = self._get_factory_setting("spawn_delays", delay_ms_key, default=0)
+        delay_seconds = max(0.0, float(delay_ms) / 1000.0)
+        if warmup:
+            base_time = max(self._current_time, self._next_warmup_spawn_time)
+        else:
+            base_time = self._current_time
+        scheduled_time = round(base_time + delay_seconds, 6)
+        if warmup:
+            self._next_warmup_spawn_time = scheduled_time
+        payload = {
+            "bot": state.name,
+            "warmup": warmup,
+            "delay": delay_seconds,
+            "scheduled_time": scheduled_time,
+            "reason": reason,
+        }
+        self._schedule_spawn_event(scheduled_time, payload)
+        return {
+            "status": "queued",
+            "warmup": warmup,
+            "scheduled_time": scheduled_time,
+            "delay": delay_seconds,
+            "reason": reason,
+        }
+
+    def _handle_drop_item(
+        self, state: BotState, params: Mapping[str, Any], delta: float
+    ) -> Dict[str, Any]:
+        item = str(params.get("name", "unknown"))
+        allow_drops = bool(self._get_factory_setting("items", "allow_drops", default=True))
+        allow_bounce = bool(self._get_factory_setting("items", "allow_bounce", default=False))
+        respawn_seconds = self._get_factory_setting("items", "respawn_seconds")
+        return_seconds = self._get_factory_setting("items", "return_seconds")
+        details: Dict[str, Any] = {"item": item}
+        if not allow_drops:
+            details["status"] = "suppressed"
+            if return_seconds is None:
+                scheduled_time = round(self._current_time, 6)
+            else:
+                scheduled_time = round(self._current_time + float(return_seconds), 6)
+            self._schedule_item_event(
+                scheduled_time,
+                {
+                    "bot": state.name,
+                    "action": "item_return",
+                    "item": item,
+                    "return_time": scheduled_time,
+                },
+            )
+            return details
+        details["status"] = "dropped"
+        details["bounce"] = allow_bounce
+        if respawn_seconds is not None:
+            scheduled_time = round(self._current_time + float(respawn_seconds), 6)
+            self._schedule_item_event(
+                scheduled_time,
+                {
+                    "bot": state.name,
+                    "action": "item_respawn",
+                    "item": item,
+                    "respawn_time": scheduled_time,
+                },
+            )
+        return details
+
     # ------------------------------------------------------------------
     # Helpers for deterministic value resolution
     # ------------------------------------------------------------------
@@ -347,6 +436,105 @@ class MatchHarness:
         if length == 0:
             return tuple(0.0 for _ in vector)
         return tuple(component / length for component in vector)
+
+    # ------------------------------------------------------------------
+    # Factory configuration helpers
+    # ------------------------------------------------------------------
+
+    def _reset_queued_events(self) -> None:
+        self._spawn_queue = []
+        self._item_queue = []
+        self._event_counter = 0
+        self._next_warmup_spawn_time = 0.0
+
+    def _get_factory_setting(self, *keys: str, default: Any = None) -> Any:
+        value: Any = self.factory_settings
+        for key in keys:
+            if not isinstance(value, Mapping) or key not in value:
+                return default
+            value = value[key]
+        return value
+
+    def _apply_factory_loadout(self, state: BotState, bot: BotConfig) -> None:
+        loadouts = self._get_factory_setting("loadouts", default={})
+        if not isinstance(loadouts, Mapping):
+            return
+        loadout_id = bot.spawn.get("factory_loadout")
+        if loadout_id is None:
+            loadout_id = self._get_factory_setting("bot_loadouts", default={}).get(bot.name)
+        if loadout_id is None:
+            loadout_id = self._get_factory_setting("active_loadout")
+        if not loadout_id:
+            return
+        loadout = loadouts.get(loadout_id)
+        if not isinstance(loadout, Mapping):
+            return
+        ammo = loadout.get("ammo", {})
+        inventory = loadout.get("inventory", {})
+        if isinstance(ammo, Mapping):
+            for weapon, amount in ammo.items():
+                state.ammo[str(weapon)] = float(amount)
+        if isinstance(inventory, Mapping):
+            for item, count in inventory.items():
+                state.inventory[str(item)] = int(count)
+
+    def _schedule_spawn_event(self, time_point: float, payload: Dict[str, Any]) -> None:
+        entry = (time_point, self._event_counter, payload)
+        heapq.heappush(self._spawn_queue, entry)
+        self._event_counter += 1
+
+    def _schedule_item_event(self, time_point: float, payload: Dict[str, Any]) -> None:
+        entry = (time_point, self._event_counter, payload)
+        heapq.heappush(self._item_queue, entry)
+        self._event_counter += 1
+
+    def _collect_scheduled_spawns(
+        self, current_time: float, bots: Mapping[str, BotState]
+    ) -> List[Dict[str, Any]]:
+        events: List[Dict[str, Any]] = []
+        while self._spawn_queue and self._spawn_queue[0][0] <= current_time + 1e-6:
+            scheduled_time, _, payload = heapq.heappop(self._spawn_queue)
+            bot_name = payload.get("bot")
+            bot_state = bots.get(bot_name) if bot_name else None
+            team = bot_state.team if bot_state else None
+            events.append(
+                {
+                    "bot": bot_name,
+                    "team": team,
+                    "time": round(scheduled_time, 6),
+                    "action": "client_spawn",
+                    "details": {
+                        "warmup": bool(payload.get("warmup", False)),
+                        "delay": float(payload.get("delay", 0.0)),
+                        "scheduled_time": round(scheduled_time, 6),
+                        "reason": payload.get("reason"),
+                    },
+                }
+            )
+        return events
+
+    def _collect_scheduled_items(
+        self, current_time: float, bots: Mapping[str, BotState]
+    ) -> List[Dict[str, Any]]:
+        events: List[Dict[str, Any]] = []
+        while self._item_queue and self._item_queue[0][0] <= current_time + 1e-6:
+            scheduled_time, _, payload = heapq.heappop(self._item_queue)
+            bot_name = payload.get("bot")
+            bot_state = bots.get(bot_name) if bot_name else None
+            team = bot_state.team if bot_state else None
+            action = payload.get("action", "item_event")
+            details = {key: value for key, value in payload.items() if key not in {"bot", "action"}}
+            details["time"] = round(scheduled_time, 6)
+            events.append(
+                {
+                    "bot": bot_name,
+                    "team": team,
+                    "time": round(scheduled_time, 6),
+                    "action": action,
+                    "details": details,
+                }
+            )
+        return events
 
 
 def load_config(path: Path, *, seed: Optional[int] = None) -> MatchConfig:

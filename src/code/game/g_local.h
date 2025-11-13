@@ -122,6 +122,9 @@ typedef struct factoryCvarConfig_s {
 	int		startingHealth;
 	int		startingHealthBonus;
 	int		startingArmor;
+	int		allowKillDelayMilliseconds;
+	int		complaintDamageThreshold;
+	int		complaintLimit;
 } factoryCvarConfig_t;
 
 extern factoryCvarConfig_t g_factoryCvarConfig;
@@ -391,6 +394,7 @@ typedef struct {
 	int		voteLastSelection;
 	int		voteLastEnableFrame;
 	int		voteLastTime;
+	int		killCommandTime;
 } clientPersistant_t;
 
 
@@ -444,11 +448,24 @@ struct gclient_s {
 	int			airOutTime;
 
 	int			lastKillTime;		// for multiple kill rewards
+	int			lastKillCommandTime;	// last time the player issued the kill command
+	int			killCommandCooldownExpires;	// time when the kill command is allowed again
+	int			friendlyFireComplaints;	// number of friendly-fire complaints on this client
+	int			friendlyFireComplaintEndTime;	// time when the latest complaint penalty expires
+	int			teammateDamageGiven;	// accumulated teammate damage across the match
+	int			teammateDamageThisLife;	// accumulated teammate damage for the current life
 
 	qboolean	fireHeld;			// used for hook
 	gentity_t	*hook;				// grapple hook if out
 
 	int			switchTeamTime;		// time the player switched teams
+
+	int			complaintClient;
+	int			complaintEndTime;
+	int			complaintCount;
+	int			complaintTarget;
+	int			complaintDamage;
+	int			complaintLastDamageTime;
 
 	// timeResidual is used to handle events that happen every second
 	// like health / armor countdowns and regeneration
@@ -811,6 +828,10 @@ void G_UpdateVoteThrottle( void );
 int G_VoteGetFlags( void );
 int G_VoteGetLimit( void );
 qboolean G_VoteFlagsDisableMask( int mask );
+void G_ComplaintResetClient( gclient_t *client, qboolean resetCount );
+void G_ComplaintConsiderForDamage( gentity_t *attacker, gentity_t *victim, int damage );
+void G_ComplaintResolve( gentity_t *victim, qboolean filed );
+void G_ComplaintClientDisconnected( int clientNum );
 void QDECL G_Printf( const char *fmt, ... );
 void QDECL G_Error( const char *fmt, ... );
 
@@ -960,8 +981,13 @@ extern	vmCvar_t	g_blood;
 extern	vmCvar_t	g_allowSpecVote;
 extern	vmCvar_t	g_allowVote;
 extern	vmCvar_t	g_allowVoteMidGame;
+extern	vmCvar_t	g_allowKill;
+extern	vmCvar_t	g_complaintLimit;
+extern	vmCvar_t	g_complaintDamageThreshold;
 extern	vmCvar_t	g_voteDelay;
 extern	vmCvar_t	g_voteLimit;
+extern	vmCvar_t	g_complaintDamageThreshold;
+extern	vmCvar_t	g_complaintLimit;
 extern	vmCvar_t	g_voteFlags;
 extern	vmCvar_t	g_teamAutoJoin;
 extern	vmCvar_t	g_teamForceBalance;

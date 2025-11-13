@@ -1,0 +1,20 @@
+Match simulation harness coverage
+=================================
+
+The Python tests exercise the deterministic match simulator found under
+``tools/tests/match_sim``. In addition to the baseline duel and overtime
+scenarios, the suite now bundles ``factory_cvars.json`` to validate the
+behaviour of factory-related CVars:
+
+* ``test_factory_loadout_toggle_updates_inventory`` toggles the active
+  loadout metadata and ensures bots spawn with the expected ammo and
+  inventory stacks, while verifying per-bot overrides remain intact.
+* ``test_factory_spawn_delays_emit_client_spawn_events`` checks that
+  warmup and live ``ClientSpawn`` events are delayed according to the
+  configured factory schedule.
+* ``test_factory_item_flags_control_drop_behaviour`` flips the drop and
+  bounce flags and compares the resulting item timelines with the golden
+  expectations stored in ``tests/expectations/match_sim_factory_items.expect``.
+
+The new scenario is also registered inside ``tests/run_harnesses.py`` so
+CI artefact generation captures the extended coverage.

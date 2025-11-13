@@ -1,0 +1,83 @@
+{
+  "map": "focal_point",
+  "duration": 8.0,
+  "tick_rate": 20,
+  "seed": 4242,
+  "metadata": {
+    "description": "Factory cvar toggle coverage",
+    "mode": "ffa",
+    "factory": {
+      "active_loadout": "practice",
+      "loadouts": {
+        "practice": {
+          "ammo": {
+            "machinegun": 100,
+            "lightning": 75
+          },
+          "inventory": {
+            "armor": 25,
+            "gauntlet": 1
+          }
+        },
+        "tournament": {
+          "ammo": {
+            "rocket": 15,
+            "rail": 5
+          },
+          "inventory": {
+            "armor": 50,
+            "mega": 1
+          }
+        }
+      },
+      "spawn_delays": {
+        "warmup_ms": 500,
+        "live_ms": 1500
+      },
+      "items": {
+        "allow_drops": true,
+        "allow_bounce": false,
+        "respawn_seconds": 2.0,
+        "return_seconds": 0.5
+      }
+    }
+  },
+  "bots": [
+    {
+      "name": "visor",
+      "team": "red",
+      "spawn": {
+        "position": [0, 0, 64],
+        "factory_loadout": "tournament"
+      },
+      "initial_state": {
+        "health": 125,
+        "ammo": {},
+        "inventory": {}
+      },
+      "script": [
+        {"time": 0.0, "action": "request_spawn", "params": {"warmup": true, "reason": "warmup_start"}},
+        {"time": 1.0, "action": "request_spawn", "params": {"warmup": false, "reason": "match_restart"}},
+        {"time": 2.5, "action": "drop_item", "params": {"name": "quad_damage"}},
+        {"time": 3.5, "action": "drop_item", "params": {"name": "megahealth"}}
+      ]
+    },
+    {
+      "name": "anarki",
+      "team": "blue",
+      "spawn": {
+        "position": [64, 0, 64]
+      },
+      "initial_state": {
+        "health": 100,
+        "ammo": {},
+        "inventory": {}
+      },
+      "script": [
+        {"time": 0.2, "action": "request_spawn", "params": {"warmup": true}},
+        {"time": 1.2, "action": "request_spawn", "params": {"warmup": false}},
+        {"time": 4.0, "action": "drop_item", "params": {"name": "yellow_armor"}}
+      ]
+    }
+  ]
+}
