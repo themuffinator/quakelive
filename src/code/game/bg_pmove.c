@@ -61,18 +61,18 @@ float	pm_spectatorfriction = 5.0f;
 int		c_pmove = 0;
 
 static const pmoveParams_t	pm_defaultParams = {
-	0.0f,	// wishSpeed
+	400.0f,	// wishSpeed
 	10.0f,	// walkAccel
 	6.0f,	// walkFriction
 	1.0f,	// airAccel
 	0.0f,	// airControl
-	1.0f,	// airStepFriction
+	0.03f,	// airStepFriction
 	1,	// airSteps
-	0.0f,	// airStopAccel
-	0.0f,	// strafeAccel
-	0.0f,	// circleStrafeFriction
-	qfalse,	// bunnyHop
-	qfalse	// autoHop
+	1.0f,	// airStopAccel
+	1.0f,	// strafeAccel
+	6.0f,	// circleStrafeFriction
+	qtrue,	// bunnyHop
+	qtrue	// autoHop
 };
 
 static const pmove_settings_t	pm_defaultSettings = {
@@ -173,21 +173,65 @@ from vanilla defaults when no overrides are supplied.
 =============
 */
 static void PM_LoadMoveParams( const pmoveParams_t *params ) {
-	const pmoveParams_t	*cfg = params ? params : &pm_defaultParams;
+	const pmoveParams_t	*cfg;
+	const pmove_settings_t	*settings;
+	pmoveParams_t	derived;
 
-	pm_wishspeed = ( cfg->wishSpeed > 0.0f ) ? cfg->wishSpeed : 0.0f;
+	if ( params ) {
+		cfg = params;
+	} else {
+		settings = PM_GetActiveSettings();
+		derived = pm_defaultParams;
+		if ( settings ) {
+			if ( settings->wishSpeed >= 0.0f ) {
+				derived.wishSpeed = settings->wishSpeed;
+			}
+			if ( settings->walkAccel > 0.0f ) {
+				derived.walkAccel = settings->walkAccel;
+			}
+			if ( settings->walkFriction > 0.0f ) {
+				derived.walkFriction = settings->walkFriction;
+			}
+			if ( settings->airAccel > 0.0f ) {
+				derived.airAccel = settings->airAccel;
+			}
+			derived.airControl = settings->airControl;
+			if ( settings->airStepFriction > 0.0f ) {
+				derived.airStepFriction = settings->airStepFriction;
+			}
+			if ( settings->airSteps > 0 ) {
+				derived.airSteps = settings->airSteps;
+			}
+			if ( settings->airStopAccel >= 0.0f ) {
+				derived.airStopAccel = settings->airStopAccel;
+			}
+			if ( settings->strafeAccel >= 0.0f ) {
+				derived.strafeAccel = settings->strafeAccel;
+			}
+			if ( settings->circleStrafeFriction >= 0.0f ) {
+				derived.circleStrafeFriction = settings->circleStrafeFriction;
+			}
+			derived.bunnyHop = settings->bunnyHop;
+			derived.autoHop = settings->autoHop;
+		}
+
+		cfg = &derived;
+	}
+
+	pm_wishspeed = ( cfg->wishSpeed >= 0.0f ) ? cfg->wishSpeed : pm_defaultParams.wishSpeed;
 	pm_accelerate = ( cfg->walkAccel > 0.0f ) ? cfg->walkAccel : pm_defaultParams.walkAccel;
 	pm_friction = ( cfg->walkFriction > 0.0f ) ? cfg->walkFriction : pm_defaultParams.walkFriction;
 	pm_airaccelerate = ( cfg->airAccel > 0.0f ) ? cfg->airAccel : pm_defaultParams.airAccel;
 	pm_aircontrol = cfg->airControl;
 	pm_airstepfriction = ( cfg->airStepFriction > 0.0f ) ? cfg->airStepFriction : pm_defaultParams.airStepFriction;
 	pm_airsteps = ( cfg->airSteps > 0 ) ? cfg->airSteps : pm_defaultParams.airSteps;
-	pm_airstopaccelerate = ( cfg->airStopAccel > 0.0f ) ? cfg->airStopAccel : 0.0f;
-	pm_strafeaccelerate = ( cfg->strafeAccel > 0.0f ) ? cfg->strafeAccel : 0.0f;
-	pm_circlestrafe_friction = ( cfg->circleStrafeFriction > 0.0f ) ? cfg->circleStrafeFriction : 0.0f;
+	pm_airstopaccelerate = ( cfg->airStopAccel >= 0.0f ) ? cfg->airStopAccel : pm_defaultParams.airStopAccel;
+	pm_strafeaccelerate = ( cfg->strafeAccel >= 0.0f ) ? cfg->strafeAccel : pm_defaultParams.strafeAccel;
+	pm_circlestrafe_friction = ( cfg->circleStrafeFriction >= 0.0f ) ? cfg->circleStrafeFriction : pm_defaultParams.circleStrafeFriction;
 	pm_bunnyhop = cfg->bunnyHop;
 	pm_autohop = cfg->autoHop;
 }
+
 
 /*
 =============
