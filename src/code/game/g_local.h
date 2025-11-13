@@ -149,6 +149,11 @@ extern vmCvar_t g_startingHealthBonus;
 extern vmCvar_t g_startingArmor;
 extern vmCvar_t g_vampiricDamage;
 extern vmCvar_t g_training;
+extern vmCvar_t g_botsFile;
+extern vmCvar_t g_botSpawnList;
+extern vmCvar_t g_accessFile;
+extern vmCvar_t g_factoryTitle;
+extern vmCvar_t g_dropInactive;
 extern vmCvar_t g_forcedAtmosphere;
 
 typedef struct startingAmmoConfig_s {
