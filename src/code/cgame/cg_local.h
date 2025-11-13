@@ -1045,6 +1045,8 @@ typedef struct {
 	char		factoryTitle[MAX_STRING_CHARS];
 	unsigned int	factoryFlags;
 	char		factorySpawnHints[MAX_STRING_CHARS];
+	qboolean	itemTimersEnabled;
+	int		itemTimerHeight;
 
 	qboolean  newHud;
 

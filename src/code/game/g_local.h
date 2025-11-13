@@ -660,6 +660,8 @@ void BroadcastTeamChange( gclient_t *client, int oldTeam );
 void SetTeam( gentity_t *ent, char *s );
 void Cmd_FollowCycle_f( gentity_t *ent, int dir );
 void G_ApplyForfeit( gentity_t *ent );
+void G_SendItemTimerState( int clientNum, int enabled, int height );
+void G_BroadcastItemTimerState( int enabled, int height );
 
 //
 // g_items.c
@@ -1009,6 +1011,8 @@ extern	vmCvar_t	g_factoryRespawnDelay;
 extern	vmCvar_t	g_factoryWarmupSpawnDelay;
 extern	vmCvar_t	g_factoryAllowItemDrops;
 extern	vmCvar_t	g_factoryAllowItemBounce;
+extern	vmCvar_t	g_itemTimers;
+extern	vmCvar_t	g_itemHeight;
 extern	vmCvar_t	g_blood;
 extern	vmCvar_t	g_allowSpecVote;
 extern	vmCvar_t	g_allowVote;
@@ -1028,6 +1032,15 @@ extern	vmCvar_t	g_teamForceBalance;
 extern	vmCvar_t	g_banIPs;
 extern	vmCvar_t	g_filterBan;
 extern	vmCvar_t	g_instaGib;
+extern	vmCvar_t	g_itemTimers;
+extern	vmCvar_t	g_itemHeight;
+extern	vmCvar_t	g_forceSmallScoreboardMessage;
+extern	vmCvar_t	g_forceSendConfigstring;
+extern	vmCvar_t	g_forceAtmosphericEffects;
+extern	vmCvar_t	g_forceDmgThroughSurface;
+extern	vmCvar_t	g_playermodelOverride;
+extern	vmCvar_t	g_playerheadmodelOverride;
+extern	vmCvar_t	g_training;
 extern	vmCvar_t	g_obeliskHealth;
 extern	vmCvar_t	g_obeliskRegenPeriod;
 extern	vmCvar_t	g_obeliskRegenAmount;

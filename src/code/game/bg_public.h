@@ -93,6 +93,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_SPAWN_HINTS		29		// info string exposing timeout and sudden death metadata
 
 #define	CS_ITEMS				30		// string of 0's and 1's that tell which items are present
+#define	ITEM_TIMER_DEFAULT_HEIGHT	20		// default fallback height for HUD timer spacing
+#define	ITEM_TIMER_MAX_HEIGHT		128		// prevent oversized HUD timer spacing from breaking layouts
 
 #define	CS_MODELS				33
 

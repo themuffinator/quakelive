@@ -1197,6 +1197,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	}
 
 	// count current clients and rank for scoreboard
+	G_SendItemTimerState( clientNum, g_itemTimers.integer ? 1 : 0, g_itemHeight.integer );
 	CalculateRanks();
 
 	// for statistics
@@ -1278,6 +1279,7 @@ void ClientBegin( int clientNum ) {
 	G_LogPrintf( "ClientBegin: %i\n", clientNum );
 
 	// count current clients and rank for scoreboard
+	G_SendItemTimerState( clientNum, g_itemTimers.integer ? 1 : 0, g_itemHeight.integer );
 	CalculateRanks();
 }
 
