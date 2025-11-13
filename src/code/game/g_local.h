@@ -1005,6 +1005,7 @@ extern	vmCvar_t	g_blood;
 extern	vmCvar_t	g_allowSpecVote;
 extern	vmCvar_t	g_allowVote;
 extern	vmCvar_t	g_allowVoteMidGame;
+extern	vmCvar_t	g_allowForfeit;
 extern	vmCvar_t	g_allowKill;
 extern	vmCvar_t	g_complaintLimit;
 extern	vmCvar_t	g_complaintDamageThreshold;
