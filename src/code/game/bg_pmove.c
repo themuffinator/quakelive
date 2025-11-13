@@ -1329,8 +1329,20 @@ PM_GrappleMove
 ===================
 */
 static void PM_GrappleMove( void ) {
-	vec3_t vel, v;
-	float vlen;
+	vec3_t	vel, v;
+	float	vlen;
+	const pmove_settings_t	*settings;
+	float	maxSpeed;
+
+	settings = PM_GetActiveSettings();
+	if ( settings && settings->velocityGh > 0.0f ) {
+		maxSpeed = settings->velocityGh;
+	} else {
+		maxSpeed = pm_defaultSettings.velocityGh;
+	}
+	if ( maxSpeed <= 0.0f ) {
+		maxSpeed = 800.0f;
+	}
 
 	VectorScale(pml.forward, -16, v);
 	VectorAdd(pm->ps->grapplePoint, v, v);
@@ -1341,7 +1353,7 @@ static void PM_GrappleMove( void ) {
 	if (vlen <= 100)
 		VectorScale(vel, 10 * vlen, vel);
 	else
-		VectorScale(vel, 800, vel);
+		VectorScale( vel, maxSpeed, vel );
 
 	VectorCopy(vel, pm->ps->velocity);
 

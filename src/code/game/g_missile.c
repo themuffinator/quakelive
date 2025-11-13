@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_local.h"
 
 #define	MISSILE_PRESTEP_TIME	50
+#define	GUIDED_ROCKET_TURN_FRACTION	0.2f
 
 /*
 ================
@@ -428,7 +429,37 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 
 	// splash damage (doesn't apply to person directly hit)
 	if ( ent->splashDamage ) {
-		if( G_RadiusDamage( trace->endpos, ent->parent, ent->splashDamage, ent->splashRadius, 
+		vec3_t	splashOrigin;
+		vec3_t	normal;
+		float	normalLength;
+
+		VectorCopy( trace->endpos, splashOrigin );
+		if ( ent->s.weapon == WP_ROCKET_LAUNCHER && g_weaponConfig.rocketSplashOffset != 0 ) {
+			qboolean	haveNormal = qfalse;
+
+			VectorCopy( trace->plane.normal, normal );
+			normalLength = VectorLengthSquared( normal );
+			if ( normalLength > 0.0f ) {
+				normalLength = VectorNormalize( normal );
+				haveNormal = ( normalLength != 0.0f ) ? qtrue : qfalse;
+			}
+
+			if ( !haveNormal ) {
+				vec3_t	velocity;
+
+				BG_EvaluateTrajectoryDelta( &ent->s.pos, level.time, velocity );
+				if ( VectorNormalize( velocity ) != 0.0f ) {
+					VectorCopy( velocity, normal );
+					haveNormal = qtrue;
+				}
+			}
+
+			if ( haveNormal ) {
+				VectorMA( splashOrigin, ( float )g_weaponConfig.rocketSplashOffset, normal, splashOrigin );
+			}
+		}
+
+		if( G_RadiusDamage( splashOrigin, ent->parent, ent->splashDamage, ent->splashRadius, 
 			other, ent->splashMethodOfDeath ) ) {
 			if( !hitClient ) {
 				g_entities[ent->r.ownerNum].client->accuracy_hits++;
@@ -448,6 +479,50 @@ void G_RunMissile( gentity_t *ent ) {
 	vec3_t		origin;
 	trace_t		tr;
 	int			passent;
+
+	if ( ent->s.weapon == WP_ROCKET_LAUNCHER ) {
+		if ( g_weaponConfig.guidedRocketEnabled && ent->count ) {
+			gentity_t	*owner = ent->parent;
+
+			if ( owner && owner->inuse && owner->client && owner->client->sess.sessionTeam != TEAM_SPECTATOR
+				&& owner->client->ps.pm_type < PM_DEAD ) {
+				vec3_t	desiredDir;
+				vec3_t	currentDir;
+				float	speed;
+
+				AngleVectors( owner->client->ps.viewangles, desiredDir, NULL, NULL );
+				if ( VectorNormalize( desiredDir ) == 0.0f ) {
+					desiredDir[0] = 1.0f;
+					desiredDir[1] = 0.0f;
+					desiredDir[2] = 0.0f;
+				}
+
+				VectorCopy( ent->s.pos.trDelta, currentDir );
+				if ( VectorNormalize( currentDir ) == 0.0f ) {
+					VectorCopy( desiredDir, currentDir );
+				}
+
+				speed = ent->speed;
+				if ( speed <= 0.0f ) {
+					speed = VectorLength( ent->s.pos.trDelta );
+				}
+				if ( speed <= 0.0f ) {
+					speed = ( float )g_weaponConfig.rocketSpeed;
+				}
+
+				VectorMA( currentDir, GUIDED_ROCKET_TURN_FRACTION, desiredDir, currentDir );
+				if ( VectorNormalize( currentDir ) == 0.0f ) {
+					VectorCopy( desiredDir, currentDir );
+				}
+
+				VectorScale( currentDir, speed, ent->s.pos.trDelta );
+			} else {
+				ent->count = 0;
+			}
+		} else if ( ent->count ) {
+			ent->count = 0;
+		}
+	}
 
 	// get current position
 	BG_EvaluateTrajectory( &ent->s.pos, level.time, origin );
@@ -539,11 +614,12 @@ gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->splashMethodOfDeath = MOD_PLASMA_SPLASH;
 	bolt->clipmask = MASK_SHOT;
 	bolt->target_ent = NULL;
+	bolt->speed = ( float )g_weaponConfig.plasmaSpeed;
 
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, 2000, bolt->s.pos.trDelta );
+	VectorScale( dir, ( float )g_weaponConfig.plasmaSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 
 	VectorCopy (start, bolt->r.currentOrigin);
@@ -581,11 +657,12 @@ gentity_t *fire_grenade (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->splashMethodOfDeath = MOD_GRENADE_SPLASH;
 	bolt->clipmask = MASK_SHOT;
 	bolt->target_ent = NULL;
+	bolt->speed = ( float )g_weaponConfig.grenadeSpeed;
 
 	bolt->s.pos.trType = TR_GRAVITY;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, 700, bolt->s.pos.trDelta );
+	VectorScale( dir, ( float )g_weaponConfig.grenadeSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 
 	VectorCopy (start, bolt->r.currentOrigin);
@@ -622,11 +699,12 @@ gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->splashMethodOfDeath = MOD_BFG_SPLASH;
 	bolt->clipmask = MASK_SHOT;
 	bolt->target_ent = NULL;
+	bolt->speed = ( float )g_weaponConfig.bfgSpeed;
 
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, 2000, bolt->s.pos.trDelta );
+	VectorScale( dir, ( float )g_weaponConfig.bfgSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
 
@@ -662,11 +740,13 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->splashMethodOfDeath = MOD_ROCKET_SPLASH;
 	bolt->clipmask = MASK_SHOT;
 	bolt->target_ent = NULL;
+	bolt->speed = ( float )g_weaponConfig.rocketSpeed;
+	bolt->count = ( g_weaponConfig.guidedRocketEnabled != 0 ) ? 1 : 0;
 
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, 900, bolt->s.pos.trDelta );
+	VectorScale( dir, ( float )g_weaponConfig.rocketSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
 
@@ -695,12 +775,13 @@ gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 	hook->clipmask = MASK_SHOT;
 	hook->parent = self;
 	hook->target_ent = NULL;
+	hook->speed = ( float )g_weaponConfig.grappleSpeed;
 
 	hook->s.pos.trType = TR_LINEAR;
 	hook->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	hook->s.otherEntityNum = self->s.number; // use to match beam in client
 	VectorCopy( start, hook->s.pos.trBase );
-	VectorScale( dir, 800, hook->s.pos.trDelta );
+	VectorScale( dir, ( float )g_weaponConfig.grappleSpeed, hook->s.pos.trDelta );
 	SnapVector( hook->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, hook->r.currentOrigin);
 

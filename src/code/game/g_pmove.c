@@ -158,7 +158,19 @@ static void G_PmoveCacheSettings( void ) {
 	g_pmoveSettings.stepJump = ( g_pmove_stepJump_cvar.integer != 0 );
 	g_pmoveSettings.stepJumpVelocity = g_pmove_stepJumpVelocity_cvar.value;
 	g_pmoveSettings.strafeAccel = g_pmove_strafeAccel_cvar.value;
-	g_pmoveSettings.velocityGh = g_pmove_velocityGh_cvar.value;
+	{
+		float	grappleSpeed;
+
+		grappleSpeed = ( float )g_weaponConfig.grappleSpeed;
+		if ( grappleSpeed <= 0.0f ) {
+			grappleSpeed = g_pmove_velocityGh_cvar.value;
+			if ( grappleSpeed <= 0.0f ) {
+				grappleSpeed = pm_defaultSettings.velocityGh;
+			}
+		}
+
+		g_pmoveSettings.velocityGh = grappleSpeed;
+	}
 	g_pmoveSettings.walkAccel = g_pmove_walkAccel_cvar.value;
 	g_pmoveSettings.walkFriction = g_pmove_walkFriction_cvar.value;
 	g_pmoveSettings.waterSwimScale = g_pmove_waterSwimScale_cvar.value;

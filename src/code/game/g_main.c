@@ -151,6 +151,17 @@ vmCvar_t	g_damage_rg;
 vmCvar_t	g_damage_bfg;
 vmCvar_t	g_splashDamage_bfg;
 vmCvar_t	g_splashRadius_bfg;
+vmCvar_t	g_velocity_gl;
+vmCvar_t	g_velocity_rl;
+vmCvar_t	g_velocity_pg;
+vmCvar_t	g_velocity_bfg;
+vmCvar_t	g_velocity_gh;
+vmCvar_t	g_guidedRocket;
+vmCvar_t	g_rocketsplashOffset;
+vmCvar_t	g_quadHog;
+vmCvar_t	g_quadHogIdle;
+vmCvar_t	g_quadHogTime;
+vmCvar_t	g_quadHogPingRate;
 static matchFactoryConfig_t matchFlow_lastConfig;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
@@ -268,6 +279,17 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_damage_bfg, "g_damage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashDamage_bfg, "g_splashDamage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashRadius_bfg, "g_splashRadius_bfg", "120", 0, 0, qtrue },
+	{ &g_velocity_gl, "g_velocity_gl", "700", 0, 0, qtrue, qfalse, "Grenade Launcher projectile speed in ups; mirrors the compiled 700 default and feeds both server and client prediction." },
+	{ &g_velocity_rl, "g_velocity_rl", "900", 0, 0, qtrue, qfalse, "Rocket Launcher projectile speed in ups, defaulting to the baked-in 900 ups behaviour." },
+	{ &g_velocity_pg, "g_velocity_pg", "2000", 0, 0, qtrue, qfalse, "Plasmagun bolt speed in ups; aligns with the legacy 2000 ups firing velocity." },
+	{ &g_velocity_bfg, "g_velocity_bfg", "2000", 0, 0, qtrue, qfalse, "BFG projectile speed in ups pulled from the retail DLL defaults." },
+	{ &g_velocity_gh, "g_velocity_gh", "800", 0, 0, qtrue, qfalse, "Grappling Hook projectile speed in ups; 800 preserves the vanilla behaviour." },
+	{ &g_guidedRocket, "g_guidedRocket", "0", 0, 0, qtrue, qfalse, "Enable Quake Live style guided rockets when non-zero." },
+	{ &g_rocketsplashOffset, "g_rocketsplashOffset", "0", 0, 0, qtrue, qfalse, "Offset in ups applied along the impact normal before evaluating rocket splash damage; 0 retains classic explosions." },
+	{ &g_quadHog, "g_quadHog", "0", 0, 0, qtrue, qfalse, "Toggle Quad Hog survival mode that forces the carrier to fight the arena when enabled." },
+	{ &g_quadHogIdle, "g_quadHogIdle", "0", 0, 0, qtrue, qfalse, "Seconds of inactivity allowed for the Quad Hog carrier before the powerup is revoked; 0 disables the idle check." },
+	{ &g_quadHogTime, "g_quadHogTime", "0", 0, 0, qtrue, qfalse, "Maximum time in seconds a player may hold Quad during Quad Hog events before it auto-expires; 0 removes the cap." },
+	{ &g_quadHogPingRate, "g_quadHogPingRate", "0", 0, 0, qtrue, qfalse, "Seconds between Quad Hog reminder pings while the timer is active; 0 silences the announcements." },
 #ifdef MISSIONPACK
 	{ &g_obeliskHealth, "g_obeliskHealth", "2500", 0, 0, qfalse },
 	{ &g_obeliskRegenPeriod, "g_obeliskRegenPeriod", "1", 0, 0, qfalse },
@@ -314,16 +336,45 @@ static void G_ReportMissingCvar( const char *cvarName ) {
 }
 
 static int G_ReadWeaponCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
-        if ( !cvar ) {
-                G_ReportMissingCvar( cvarName );
-                return fallback;
-        }
+	if ( !cvar ) {
+		G_ReportMissingCvar( cvarName );
+		return fallback;
+	}
 
-        if ( cvar->integer <= 0 ) {
-                return fallback;
-        }
+	if ( cvar->integer <= 0 ) {
+		return fallback;
+	}
 
-        return cvar->integer;
+	return cvar->integer;
+}
+
+static int G_ReadWeaponCvarRaw( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+	if ( !cvar ) {
+		G_ReportMissingCvar( cvarName );
+		return fallback;
+	}
+
+	return cvar->integer;
+}
+
+static int G_ReadWeaponCvarAtLeast( const vmCvar_t *cvar, int fallback, const char *cvarName, int minValue ) {
+	int		value;
+
+	value = G_ReadWeaponCvar( cvar, fallback, cvarName );
+	if ( value < minValue ) {
+		return minValue;
+	}
+
+	return value;
+}
+
+static qboolean G_ReadWeaponBoolCvar( const vmCvar_t *cvar, qboolean fallback, const char *cvarName ) {
+	if ( !cvar ) {
+		G_ReportMissingCvar( cvarName );
+		return fallback;
+	}
+
+	return ( cvar->integer != 0 ) ? qtrue : qfalse;
 }
 
 void G_InitWeaponConfig( void ) {
@@ -335,17 +386,37 @@ void G_InitWeaponConfig( void ) {
 	g_weaponConfig.grenadeDamage = G_ReadWeaponCvar( &g_damage_gl, 100, "g_damage_gl" );
 	g_weaponConfig.grenadeSplashDamage = G_ReadWeaponCvar( &g_splashDamage_gl, 100, "g_splashDamage_gl" );
 	g_weaponConfig.grenadeSplashRadius = G_ReadWeaponCvar( &g_splashRadius_gl, 150, "g_splashRadius_gl" );
+	g_weaponConfig.grenadeSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_gl, 700, "g_velocity_gl", 1 );
 	g_weaponConfig.rocketDamage = G_ReadWeaponCvar( &g_damage_rl, 100, "g_damage_rl" );
 	g_weaponConfig.rocketSplashDamage = G_ReadWeaponCvar( &g_splashDamage_rl, 100, "g_splashDamage_rl" );
 	g_weaponConfig.rocketSplashRadius = G_ReadWeaponCvar( &g_splashRadius_rl, 120, "g_splashRadius_rl" );
+	g_weaponConfig.rocketSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_rl, 900, "g_velocity_rl", 1 );
+	g_weaponConfig.rocketSplashOffset = G_ReadWeaponCvarRaw( &g_rocketsplashOffset, 0, "g_rocketsplashOffset" );
 	g_weaponConfig.plasmaDamage = G_ReadWeaponCvar( &g_damage_pg, 20, "g_damage_pg" );
 	g_weaponConfig.plasmaSplashDamage = G_ReadWeaponCvar( &g_splashDamage_pg, 15, "g_splashDamage_pg" );
 	g_weaponConfig.plasmaSplashRadius = G_ReadWeaponCvar( &g_splashRadius_pg, 20, "g_splashRadius_pg" );
+	g_weaponConfig.plasmaSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_pg, 2000, "g_velocity_pg", 1 );
 	g_weaponConfig.lightningDamage = G_ReadWeaponCvar( &g_damage_lg, 8, "g_damage_lg" );
 	g_weaponConfig.railgunDamage = G_ReadWeaponCvar( &g_damage_rg, 100, "g_damage_rg" );
 	g_weaponConfig.bfgDamage = G_ReadWeaponCvar( &g_damage_bfg, 100, "g_damage_bfg" );
 	g_weaponConfig.bfgSplashDamage = G_ReadWeaponCvar( &g_splashDamage_bfg, 100, "g_splashDamage_bfg" );
 	g_weaponConfig.bfgSplashRadius = G_ReadWeaponCvar( &g_splashRadius_bfg, 120, "g_splashRadius_bfg" );
+	g_weaponConfig.bfgSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_bfg, 2000, "g_velocity_bfg", 1 );
+	g_weaponConfig.grappleSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_gh, 800, "g_velocity_gh", 1 );
+	g_weaponConfig.guidedRocketEnabled = G_ReadWeaponBoolCvar( &g_guidedRocket, qfalse, "g_guidedRocket" );
+	g_weaponConfig.quadHogEnabled = G_ReadWeaponBoolCvar( &g_quadHog, qfalse, "g_quadHog" );
+	g_weaponConfig.quadHogIdleSeconds = G_ReadWeaponCvarRaw( &g_quadHogIdle, 0, "g_quadHogIdle" );
+	if ( g_weaponConfig.quadHogIdleSeconds < 0 ) {
+		g_weaponConfig.quadHogIdleSeconds = 0;
+	}
+	g_weaponConfig.quadHogTimeSeconds = G_ReadWeaponCvarRaw( &g_quadHogTime, 0, "g_quadHogTime" );
+	if ( g_weaponConfig.quadHogTimeSeconds < 0 ) {
+		g_weaponConfig.quadHogTimeSeconds = 0;
+	}
+	g_weaponConfig.quadHogPingRateSeconds = G_ReadWeaponCvarRaw( &g_quadHogPingRate, 0, "g_quadHogPingRate" );
+	if ( g_weaponConfig.quadHogPingRateSeconds < 0 ) {
+		g_weaponConfig.quadHogPingRateSeconds = 0;
+	}
 }
 
 void G_UpdateWeaponConfig( void ) {
@@ -550,6 +621,11 @@ void G_RegisterCvars( void ) {
         G_InitFactoryCvarConfig();
         G_InitMatchFactoryConfig();
 	G_SyncMatchFactoryConfigToLevel();
+	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
+	level.quadHogOwner = ENTITYNUM_NONE;
+	level.quadHogExpireTime = 0;
+	level.quadHogLastActiveTime = 0;
+	level.quadHogNextPingTime = 0;
 
 	G_RefreshPmoveSettings();
 }
@@ -592,6 +668,7 @@ void G_UpdateCvars( void ) {
         G_UpdateFactoryCvarConfig();
         G_UpdateMatchFactoryConfig();
 	G_SyncMatchFactoryConfigToLevel();
+	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
 
         G_RefreshPmoveSettings();
 }
@@ -2399,6 +2476,151 @@ void G_RunThink (gentity_t *ent) {
 
 /*
 =============
+G_QuadHogReset
+
+Clears the Quad Hog tracking state on the server.
+=============
+*/
+static void G_QuadHogReset( void ) {
+	level.quadHogOwner = ENTITYNUM_NONE;
+	level.quadHogExpireTime = 0;
+	level.quadHogLastActiveTime = 0;
+	level.quadHogNextPingTime = 0;
+}
+
+/*
+=============
+G_QuadHogRemove
+
+Revokes the Quad powerup from the current Quad Hog carrier.
+=============
+*/
+static void G_QuadHogRemove( gentity_t *owner, const char *reason ) {
+	if ( owner && owner->client ) {
+		owner->client->ps.powerups[PW_QUAD] = 0;
+		if ( reason && reason[0] ) {
+			trap_SendServerCommand( owner->s.number, va( "print \"%s\n\"", reason ) );
+		}
+	}
+
+	G_QuadHogReset();
+}
+
+/*
+=============
+G_QuadHogOnPickup
+
+Initialises Quad Hog timers when a player claims the Quad.
+=============
+*/
+void G_QuadHogOnPickup( gentity_t *player ) {
+	if ( !level.quadHogEnabled ) {
+		G_QuadHogReset();
+		return;
+	}
+
+	if ( !player || !player->client ) {
+		G_QuadHogReset();
+		return;
+	}
+
+	level.quadHogOwner = player->s.number;
+	level.quadHogLastActiveTime = level.time;
+	if ( g_weaponConfig.quadHogTimeSeconds > 0 ) {
+		level.quadHogExpireTime = level.time + g_weaponConfig.quadHogTimeSeconds * 1000;
+	} else {
+		level.quadHogExpireTime = 0;
+	}
+	if ( g_weaponConfig.quadHogPingRateSeconds > 0 ) {
+		level.quadHogNextPingTime = level.time + g_weaponConfig.quadHogPingRateSeconds * 1000;
+	} else {
+		level.quadHogNextPingTime = 0;
+	}
+}
+
+/*
+=============
+G_QuadHogFrame
+
+Processes Quad Hog timers each server frame.
+=============
+*/
+void G_QuadHogFrame( void ) {
+	gentity_t	*owner;
+	qboolean	active = qfalse;
+
+	if ( !level.quadHogEnabled ) {
+		G_QuadHogReset();
+		return;
+	}
+
+	if ( level.quadHogOwner < 0 || level.quadHogOwner >= level.maxclients ) {
+		G_QuadHogReset();
+		return;
+	}
+
+	owner = &g_entities[level.quadHogOwner];
+	if ( !owner->inuse || !owner->client ) {
+		G_QuadHogReset();
+		return;
+	}
+
+	if ( owner->client->ps.powerups[PW_QUAD] <= level.time ) {
+		G_QuadHogReset();
+		return;
+	}
+
+	if ( g_weaponConfig.quadHogTimeSeconds > 0 && level.quadHogExpireTime > 0 && level.time >= level.quadHogExpireTime ) {
+		G_QuadHogRemove( owner, "Quad Hog: timer expired!" );
+		return;
+	}
+
+	if ( owner->client->pers.cmd.forwardmove || owner->client->pers.cmd.rightmove || owner->client->pers.cmd.upmove ) {
+		active = qtrue;
+	}
+	if ( owner->client->pers.cmd.buttons & BUTTON_ATTACK ) {
+		active = qtrue;
+	}
+	if ( !active ) {
+		vec3_t	velocity;
+
+		VectorCopy( owner->client->ps.velocity, velocity );
+		if ( VectorLengthSquared( velocity ) > 1.0f ) {
+			active = qtrue;
+		}
+	}
+
+	if ( active ) {
+		level.quadHogLastActiveTime = level.time;
+	} else if ( g_weaponConfig.quadHogIdleSeconds > 0 ) {
+		int	idleLimit = g_weaponConfig.quadHogIdleSeconds * 1000;
+		if ( level.time - level.quadHogLastActiveTime >= idleLimit ) {
+			G_QuadHogRemove( owner, "Quad Hog: idle penalty!" );
+			return;
+		}
+	}
+
+	if ( g_weaponConfig.quadHogPingRateSeconds > 0 ) {
+		if ( level.quadHogNextPingTime == 0 ) {
+			level.quadHogNextPingTime = level.time + g_weaponConfig.quadHogPingRateSeconds * 1000;
+		} else if ( level.time >= level.quadHogNextPingTime ) {
+			int	remainingMs = 0;
+
+			if ( g_weaponConfig.quadHogTimeSeconds > 0 && level.quadHogExpireTime > 0 ) {
+				remainingMs = level.quadHogExpireTime - level.time;
+				if ( remainingMs < 0 ) {
+					remainingMs = 0;
+				}
+			}
+
+			trap_SendServerCommand( owner->s.number, va( "print \"Quad Hog: %d seconds remaining\\n\"", remainingMs / 1000 ) );
+			level.quadHogNextPingTime = level.time + g_weaponConfig.quadHogPingRateSeconds * 1000;
+		}
+	}
+}
+
+/*
+=============
 G_RunFrame
 
 Advance the game simulation by one frame.
@@ -2435,6 +2657,7 @@ void G_RunFrame( int levelTime ) {
 	G_DispatchScheduledThinks( ctx, msec );
 	G_StepEntities( ctx );
 	G_DispatchEvents( ctx );
+	G_QuadHogFrame();
 	G_FinishClientFrames( ctx );
 	G_UpdateVoteThrottle();
 	G_CheckLevelTimers( ctx, previousWarmupTime, previousIntermissionQueued );

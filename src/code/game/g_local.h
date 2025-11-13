@@ -79,14 +79,25 @@ typedef struct weaponConfig_s {
 	int		rocketDamage;
 	int		rocketSplashDamage;
 	int		rocketSplashRadius;
+	int		grenadeSpeed;
+	int		rocketSpeed;
+	int		rocketSplashOffset;
 	int		plasmaDamage;
 	int		plasmaSplashDamage;
 	int		plasmaSplashRadius;
+	int		plasmaSpeed;
 	int		lightningDamage;
 	int		railgunDamage;
 	int		bfgDamage;
 	int		bfgSplashDamage;
 	int		bfgSplashRadius;
+	int		bfgSpeed;
+	int		grappleSpeed;
+	qboolean	guidedRocketEnabled;
+	int		quadHogEnabled;
+	int		quadHogIdleSeconds;
+	int		quadHogTimeSeconds;
+	int		quadHogPingRateSeconds;
 } weaponConfig_t;
 
 extern weaponConfig_t g_weaponConfig;
@@ -110,6 +121,8 @@ void G_AutoShuffleCountdown_Cancel( void );
 qboolean G_AutoShuffleCountdown_IsActive( void );
 int G_AutoShuffleCountdown_GetSecondsRemaining( void );
 void G_AutoShuffleCountdown_Frame( void );
+void G_QuadHogOnPickup( gentity_t *player );
+void G_QuadHogFrame( void );
 
 typedef struct factoryCvarConfig_s {
 	int		startingWeaponsMask;
@@ -579,6 +592,11 @@ typedef struct {
 	qboolean		spawnQueueActive;
 	qboolean		matchAllowItemDrops;
 	qboolean		matchAllowItemBounce;
+	qboolean		quadHogEnabled;
+	int		quadHogOwner;
+	int		quadHogExpireTime;
+	int		quadHogLastActiveTime;
+	int		quadHogNextPingTime;
 } level_locals_t;
 
 
