@@ -458,20 +458,52 @@ void Cmd_TeamTask_f( gentity_t *ent ) {
 
 
 /*
-=================
+=============
 Cmd_Kill_f
-=================
+
+Executes the self-kill command while honouring the g_allowKill cooldown.
+=============
 */
 void Cmd_Kill_f( gentity_t *ent ) {
+	int	cooldown;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		return;
 	}
-	if (ent->health <= 0) {
+	if ( ent->health <= 0 ) {
 		return;
 	}
+
+	cooldown = g_allowKill.integer;
+	if ( cooldown < 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Kill is not enabled on this server.\n\"" );
+		return;
+	}
+
+	if ( cooldown > 0 ) {
+		int	spawnElapsed;
+		int	killElapsed;
+
+		spawnElapsed = level.time - ent->client->respawnTime;
+		if ( spawnElapsed < cooldown ) {
+			return;
+		}
+
+		if ( ent->client->pers.killCommandTime >= 0 ) {
+			killElapsed = level.time - ent->client->pers.killCommandTime;
+			if ( killElapsed < cooldown ) {
+				return;
+			}
+		}
+	}
+
 	ent->flags &= ~FL_GODMODE;
 	ent->client->ps.stats[STAT_HEALTH] = ent->health = -999;
-	player_die (ent, ent, ent, 100000, MOD_SUICIDE);
+	ent->client->pers.killCommandTime = level.time;
+	player_die( ent, ent, ent, 100000, MOD_SUICIDE );
 }
 
 /*

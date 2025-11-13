@@ -391,6 +391,7 @@ typedef struct {
 	int		voteDelayTime;
 	int		voteLastSelection;
 	int		voteLastEnableFrame;
+	int		killCommandTime;
 } clientPersistant_t;
 
 
@@ -951,6 +952,7 @@ extern	vmCvar_t	g_blood;
 extern	vmCvar_t	g_allowSpecVote;
 extern	vmCvar_t	g_allowVote;
 extern	vmCvar_t	g_allowVoteMidGame;
+extern	vmCvar_t	g_allowKill;
 extern	vmCvar_t	g_voteDelay;
 extern	vmCvar_t	g_voteLimit;
 extern	vmCvar_t	g_voteFlags;

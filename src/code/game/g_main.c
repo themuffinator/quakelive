@@ -106,6 +106,7 @@ vmCvar_t	g_podiumDrop;
 vmCvar_t	g_allowSpecVote;
 vmCvar_t	g_allowVote;
 vmCvar_t	g_allowVoteMidGame;
+vmCvar_t	g_allowKill;
 vmCvar_t	g_voteFlags;
 vmCvar_t	g_voteDelay;
 vmCvar_t	g_voteLimit;
@@ -230,6 +231,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_allowSpecVote, "g_allowSpecVote", "0", 0, 0, qfalse },
 	{ &g_allowVote, "g_allowVote", "1", CVAR_ARCHIVE, 0, qfalse },
 	{ &g_allowVoteMidGame, "g_allowVoteMidGame", "0", 0, 0, qfalse },
+	{ &g_allowKill, "g_allowKill", "1000", 0, 0, qfalse, qfalse, "Minimum milliseconds between kill commands; negative disables the command entirely." },
 	{ &g_voteFlags, "g_voteFlags", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse },
 	{ &g_voteDelay, "g_voteDelay", "0", 0, 0, qfalse },
 	{ &g_voteLimit, "g_voteLimit", "0", 0, 0, qfalse },
