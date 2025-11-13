@@ -532,6 +532,7 @@ typedef struct {
 	char		voteDisplayString[MAX_STRING_CHARS];
 	int			voteTime;				// level.time vote was called
 	int			voteExecuteTime;		// time the vote is executed
+	int			voteEligibleTime;		// next level.time a vote may be issued
 	int			voteYes;
 	int			voteNo;
 	int			numVotingClients;		// set by CalculateRanks

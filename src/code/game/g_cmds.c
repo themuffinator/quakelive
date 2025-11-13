@@ -1271,6 +1271,14 @@ void Cmd_Where_f( gentity_t *ent ) {
 	trap_SendServerCommand( ent-g_entities, va("print \"%s\n\"", vtos( ent->s.origin ) ) );
 }
 
+#define VF_NO_MAP				0x0001
+#define VF_NO_MAP_RESTART		0x0002
+#define VF_NO_NEXTMAP			0x0004
+#define VF_NO_GAMETYPE			0x0008
+#define VF_NO_KICK			0x0010
+#define VF_NO_TIME_LIMIT		0x0040
+#define VF_NO_FRAG_LIMIT		0x0080
+
 static const char *gameNames[] = {
 	"Free For All",
 	"Tournament",
@@ -1283,142 +1291,302 @@ static const char *gameNames[] = {
 };
 
 /*
+=============
+G_VoteSelectionKey
+
+Generate a stable hash so repeated vote attempts can be detected.
+=============
+*/
+static int G_VoteSelectionKey( const char *command, const char *option ) {
+	int		hash;
+	const char	*scan;
+
+	if ( !command || !*command ) {
+		return -1;
+	}
+
+	hash = 5381;
+	for ( scan = command ; *scan ; scan++ ) {
+		hash = ( ( hash << 5 ) + hash ) ^ tolower( *scan );
+	}
+
+	if ( option && *option ) {
+		for ( scan = option ; *scan ; scan++ ) {
+			hash = ( ( hash << 5 ) + hash ) ^ tolower( *scan );
+		}
+	}
+
+	return hash;
+}
+
+/*
 ==================
 Cmd_CallVote_f
 ==================
 */
 void Cmd_CallVote_f( gentity_t *ent ) {
-	int		i;
-	char	arg1[MAX_STRING_TOKENS];
-	char	arg2[MAX_STRING_TOKENS];
-	char	arg3[MAX_STRING_TOKENS];
-	int		voteSelection;
-	int		isNumeric;
-	const char	*scan;
+	gclient_t       *client;
+	char            arg1[MAX_STRING_TOKENS];
+	char            arg2[MAX_STRING_TOKENS];
+	char            arg3[MAX_STRING_TOKENS];
+	char            buffer[MAX_STRING_CHARS];
+	int             voteSelection;
+	int             delayMsec;
+	int             remaining;
+	qboolean        isSpectator;
+	qboolean        midGame;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	client = ent->client;
+
+	trap_Argv( 1, arg1, sizeof( arg1 ) );
+	trap_Argv( 2, arg2, sizeof( arg2 ) );
+	trap_Argv( 3, arg3, sizeof( arg3 ) );
+
+	if ( strchr( arg1, ';' ) || strchr( arg2, ';' ) || strchr( arg3, ';' ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\\n\"" );
+		return;
+	}
+
+	delayMsec = g_voteDelay.integer > 0 ? g_voteDelay.integer * 1000 : 0;
+	isSpectator = ( client->sess.sessionTeam == TEAM_SPECTATOR );
+	midGame = ( level.warmupTime <= 0 && level.intermissiontime == 0 );
+
+	if ( delayMsec > 0 ) {
+		int             startWindow;
+
+		startWindow = level.startTime + delayMsec;
+		if ( level.time < startWindow ) {
+			remaining = startWindow - level.time;
+			trap_SendServerCommand( ent-g_entities,
+				va( "print \"Voting will be allowed in %.1f seconds.\\n\"", remaining / 1000.0f ) );
+			return;
+		}
+
+		if ( level.voteEligibleTime > level.time ) {
+			remaining = level.voteEligibleTime - level.time;
+			trap_SendServerCommand( ent-g_entities,
+				va( "print \"Voting will be allowed in %.1f seconds.\\n\"", remaining / 1000.0f ) );
+			return;
+		}
+	}
 
 	if ( !g_allowVote.integer ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Voting not allowed here.\n\"" );
+		trap_SendServerCommand( ent-g_entities, "print \"Public voting is not allowed here.\\n\"" );
+		return;
+	}
+
+	if ( g_voteLimit.integer > 0 && client->pers.voteCount >= g_voteLimit.integer ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You have called the maximum number of votes.\\n\"" );
+		return;
+	}
+
+	if ( isSpectator && !g_allowSpecVote.integer ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Not allowed to call a vote as spectator.\\n\"" );
+		return;
+	}
+
+	if ( !g_allowVoteMidGame.integer && midGame ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Voting is only allowed during warmup.\\n\"" );
 		return;
 	}
 
 	if ( level.voteTime ) {
-		trap_SendServerCommand( ent-g_entities, "print \"A vote is already in progress.\n\"" );
-		return;
-	}
-	if ( ent->client->pers.voteCount >= MAX_VOTE_COUNT ) {
-		trap_SendServerCommand( ent-g_entities, "print \"You have called the maximum number of votes.\n\"" );
-		return;
-	}
-	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Not allowed to call a vote as spectator.\n\"" );
+		trap_SendServerCommand( ent-g_entities, "print \"A vote is already in progress.\\n\"" );
 		return;
 	}
 
-	// make sure it is a valid command to vote on
-	trap_Argv( 1, arg1, sizeof( arg1 ) );
-	trap_Argv( 2, arg2, sizeof( arg2 ) );
+	if ( level.voteExecuteTime && level.voteExecuteTime > level.time ) {
+		trap_SendServerCommand( ent-g_entities, "print \"A vote is being executed.\\n\"" );
+		return;
+	}
+
 	voteSelection = -1;
-	arg3[0] = '\0';
-
-	if ( trap_Argc() > 3 ) {
-		trap_Argv( 3, arg3, sizeof( arg3 ) );
-		if ( arg3[0] ) {
-			voteSelection = atoi( arg3 );
-		}
-	} else if ( arg2[0] ) {
-		isNumeric = 1;
-		for ( scan = arg2; *scan; scan++ ) {
-			if ( *scan < '0' || *scan > '9' ) {
-				isNumeric = 0;
-				break;
-			}
-		}
-		if ( isNumeric ) {
-			voteSelection = atoi( arg2 );
-		}
-	}
-
-	if( strchr( arg1, ';' ) || strchr( arg2, ';' ) ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\n\"" );
-		return;
-	}
 
 	if ( !Q_stricmp( arg1, "map_restart" ) ) {
+		if ( g_voteFlags.integer & VF_NO_MAP_RESTART ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting on a map restart is disabled on this server.\\n\"" );
+			return;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "map_restart" );
+		Q_strncpyz( level.voteDisplayString, level.voteString, sizeof( level.voteDisplayString ) );
+		voteSelection = G_VoteSelectionKey( arg1, NULL );
 	} else if ( !Q_stricmp( arg1, "nextmap" ) ) {
+		if ( g_voteFlags.integer & VF_NO_NEXTMAP ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to move to the next map is disabled on this server.\\n\"" );
+			return;
+		}
+		trap_Cvar_VariableStringBuffer( "nextmap", buffer, sizeof( buffer ) );
+		if ( !buffer[0] ) {
+			trap_SendServerCommand( ent-g_entities, "print \"nextmap not set.\\n\"" );
+			return;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "vstr nextmap" );
+		Q_strncpyz( level.voteDisplayString, "nextmap", sizeof( level.voteDisplayString ) );
+		voteSelection = G_VoteSelectionKey( arg1, buffer );
 	} else if ( !Q_stricmp( arg1, "map" ) ) {
+		int             len;
+		fileHandle_t    f;
+
+		if ( g_voteFlags.integer & VF_NO_MAP ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to change the map being played is disabled on this server.\\n\"" );
+			return;
+		}
+		if ( !arg2[0] ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Missing map name.\\n\"" );
+			return;
+		}
+		Com_sprintf( buffer, sizeof( buffer ), "maps/%s.bsp", arg2 );
+		len = trap_FS_FOpenFile( buffer, &f, FS_READ );
+		if ( len <= 0 ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Map does not exist.\\n\"" );
+			return;
+		}
+		trap_FS_FCloseFile( f );
+		trap_Cvar_VariableStringBuffer( "nextmap", buffer, sizeof( buffer ) );
+		if ( buffer[0] ) {
+			Com_sprintf( level.voteString, sizeof( level.voteString ), "map %s; set nextmap \"%s\"", arg2, buffer );
+		} else {
+			Com_sprintf( level.voteString, sizeof( level.voteString ), "map %s", arg2 );
+		}
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "map %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
 	} else if ( !Q_stricmp( arg1, "g_gametype" ) ) {
+		int             gametype;
+
+		if ( g_voteFlags.integer & VF_NO_GAMETYPE ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to change the gametype being played is disabled on this server.\\n\"" );
+			return;
+		}
+
+		gametype = atoi( arg2 );
+		if ( gametype == GT_SINGLE_PLAYER || gametype < GT_FFA || gametype >= GT_MAX_GAME_TYPE ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Invalid gametype.\\n\"" );
+			return;
+		}
+
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_gametype %d", gametype );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "g_gametype %s", gameNames[gametype] );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
 	} else if ( !Q_stricmp( arg1, "kick" ) ) {
+		int             clientNum;
+
+		if ( g_voteFlags.integer & VF_NO_KICK ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to kick a player is disabled on this server.\\n\"" );
+			return;
+		}
+
+		if ( !arg2[0] ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Missing player name.\\n\"" );
+			return;
+		}
+
+		if ( !Q_stricmp( arg2, "all" ) ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to kick all players is not allowed.\\n\"" );
+			return;
+		}
+
+		clientNum = ClientNumberFromString( ent, arg2 );
+		if ( clientNum == -1 ) {
+			return;
+		}
+
+		if ( level.clients[clientNum].pers.localClient ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Cannot call a vote on the server host.\n\"" );
+			return;
+		}
+
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "clientkick %d", clientNum );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "kick %s", level.clients[clientNum].pers.netname );
+		voteSelection = G_VoteSelectionKey( arg1, level.clients[clientNum].pers.netname );
 	} else if ( !Q_stricmp( arg1, "clientkick" ) ) {
-	} else if ( !Q_stricmp( arg1, "g_doWarmup" ) ) {
+		int             clientNum;
+
+		if ( g_voteFlags.integer & VF_NO_KICK ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to kick a player is disabled on this server.\\n\"" );
+			return;
+		}
+
+		clientNum = atoi( arg2 );
+		if ( clientNum < 0 || clientNum >= level.maxclients ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Invalid client slot.\n\"" );
+			return;
+		}
+
+		if ( !g_entities[clientNum].inuse ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Invalid player id.\n\"" );
+			return;
+		}
+
+		if ( level.clients[clientNum].pers.localClient ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Cannot call a vote on the server host.\n\"" );
+			return;
+		}
+
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "clientkick %d", clientNum );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "clientkick %d", clientNum );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
 	} else if ( !Q_stricmp( arg1, "timelimit" ) ) {
+		if ( g_voteFlags.integer & VF_NO_TIME_LIMIT ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to change the games time limit is disabled on this server.\\n\"" );
+			return;
+		}
+
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "timelimit %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "timelimit %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
 	} else if ( !Q_stricmp( arg1, "fraglimit" ) ) {
+		if ( g_voteFlags.integer & VF_NO_FRAG_LIMIT ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to change the games frag limit is disabled on this server.\\n\"" );
+			return;
+		}
+
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "fraglimit %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "fraglimit %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "g_doWarmup" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_doWarmup %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "g_doWarmup %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
 	} else {
-		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\n\"" );
-		trap_SendServerCommand( ent-g_entities, "print \"Vote commands are: map_restart, nextmap, map <mapname>, g_gametype <n>, kick <player>, clientkick <clientnum>, g_doWarmup, timelimit <time>, fraglimit <frags>.\n\"" );
+		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\\n\"" );
+		trap_SendServerCommand( ent-g_entities, "print \"Vote commands are: map_restart, nextmap, map <mapname>, g_gametype <n>, kick <player>, clientkick <clientnum>, g_doWarmup, timelimit <time>, fraglimit <frags>.\\n\"" );
 		return;
 	}
 
-	// if there is still a vote to be executed
-	if ( level.voteExecuteTime ) {
-		level.voteExecuteTime = 0;
-		trap_SendConsoleCommand( EXEC_APPEND, va("%s\n", level.voteString ) );
+	if ( voteSelection != -1 && client->pers.voteDelayTime > 0
+			&& client->pers.voteLastSelection == voteSelection
+			&& level.time - client->pers.voteDelayTime < VOTE_THROTTLE_MSEC ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You already voted for this option.\\n\"" );
+		return;
 	}
 
-	// special case for g_gametype, check for bad values
-	if ( !Q_stricmp( arg1, "g_gametype" ) ) {
-		i = atoi( arg2 );
-		if( i == GT_SINGLE_PLAYER || i < GT_FFA || i >= GT_MAX_GAME_TYPE) {
-			trap_SendServerCommand( ent-g_entities, "print \"Invalid gametype.\n\"" );
-			return;
-		}
+	client->pers.voteCount++;
+	G_RegisterVoteCall( client, ent-g_entities, voteSelection );
+	trap_SendServerCommand( -1, va( "print \"%s called a vote.\\n\"", client->pers.netname ) );
 
-		Com_sprintf( level.voteString, sizeof( level.voteString ), "%s %d", arg1, i );
-		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "%s %s", arg1, gameNames[i] );
-	} else if ( !Q_stricmp( arg1, "map" ) ) {
-		// special case for map changes, we want to reset the nextmap setting
-		// this allows a player to change maps, but not upset the map rotation
-		char	s[MAX_STRING_CHARS];
-
-		trap_Cvar_VariableStringBuffer( "nextmap", s, sizeof(s) );
-		if (*s) {
-			Com_sprintf( level.voteString, sizeof( level.voteString ), "%s %s; set nextmap \"%s\"", arg1, arg2, s );
-		} else {
-			Com_sprintf( level.voteString, sizeof( level.voteString ), "%s %s", arg1, arg2 );
-		}
-		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "%s", level.voteString );
-	} else if ( !Q_stricmp( arg1, "nextmap" ) ) {
-		char	s[MAX_STRING_CHARS];
-
-		trap_Cvar_VariableStringBuffer( "nextmap", s, sizeof(s) );
-		if (!*s) {
-			trap_SendServerCommand( ent-g_entities, "print \"nextmap not set.\n\"" );
-			return;
-		}
-		Com_sprintf( level.voteString, sizeof( level.voteString ), "vstr nextmap");
-		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "%s", level.voteString );
-	} else {
-		Com_sprintf( level.voteString, sizeof( level.voteString ), "%s \"%s\"", arg1, arg2 );
-		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "%s", level.voteString );
-	}
-
-	G_RegisterVoteCall( ent->client, ent - g_entities, voteSelection );
-	trap_SendServerCommand( -1, va("print \"%s called a vote.\n\"", ent->client->pers.netname ) );
-
-	// start the voting, the caller autoamtically votes yes
 	level.voteTime = level.time;
 	level.voteYes = 1;
 	level.voteNo = 0;
 
-	for ( i = 0 ; i < level.maxclients ; i++ ) {
-		level.clients[i].ps.eFlags &= ~EF_VOTED;
+	if ( delayMsec > 0 ) {
+		level.voteEligibleTime = level.time + delayMsec;
 	}
-	ent->client->ps.eFlags |= EF_VOTED;
 
-	trap_SetConfigstring( CS_VOTE_TIME, va("%i", level.voteTime ) );
-	trap_SetConfigstring( CS_VOTE_STRING, level.voteDisplayString );	
-	trap_SetConfigstring( CS_VOTE_YES, va("%i", level.voteYes ) );
-	trap_SetConfigstring( CS_VOTE_NO, va("%i", level.voteNo ) );	
+	for ( voteSelection = 0 ; voteSelection < level.maxclients ; voteSelection++ ) {
+		level.clients[voteSelection].ps.eFlags &= ~EF_VOTED;
+	}
+	client->ps.eFlags |= EF_VOTED;
+
+	trap_SetConfigstring( CS_VOTE_TIME, va( "%i", level.voteTime ) );
+	trap_SetConfigstring( CS_VOTE_STRING, level.voteDisplayString );
+	trap_SetConfigstring( CS_VOTE_YES, va( "%i", level.voteYes ) );
+	trap_SetConfigstring( CS_VOTE_NO, va( "%i", level.voteNo ) );
 }
+
 
 /*
 =============
