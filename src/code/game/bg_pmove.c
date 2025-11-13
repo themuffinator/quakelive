@@ -191,6 +191,34 @@ static void PM_LoadMoveParams( const pmoveParams_t *params ) {
 
 /*
 =============
+PM_ShouldRequireJumpRelease
+
+Returns whether jump inputs must be released before another takeoff.
+=============
+*/
+static qboolean PM_ShouldRequireJumpRelease( const pmove_settings_t *settings ) {
+	const pmove_settings_t	*activeSettings;
+
+	activeSettings = settings ? settings : PM_GetActiveSettings();
+
+	if ( activeSettings ) {
+		if ( activeSettings->autoHop ) {
+			return qfalse;
+		}
+		if ( activeSettings->bunnyHop ) {
+			return qfalse;
+		}
+	}
+
+	if ( pm_autohop || pm_bunnyhop ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
 PM_ApplyStepJump
 
 Ensures the configured step jump velocity is applied when stepping upwards.
@@ -798,6 +826,7 @@ static qboolean PM_CheckJump( void ) {
 	float			jumpVelocityScale;
 	qboolean		chainJumpActive;
 	qboolean		rampJumpActive;
+	qboolean		releaseRequired;
 	int			timeDelta;
 
 	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
@@ -809,14 +838,16 @@ static qboolean PM_CheckJump( void ) {
 		return qfalse;
 	}
 
+	settings = PM_GetActiveSettings();
+	releaseRequired = PM_ShouldRequireJumpRelease( settings );
+
 	// must wait for jump to be released
-	if ( pm->ps->pm_flags & PMF_JUMP_HELD ) {
+	if ( releaseRequired && ( pm->ps->pm_flags & PMF_JUMP_HELD ) ) {
 		// clear upmove so cmdscale doesn't lower running speed
 		pm->cmd.upmove = 0;
 		return qfalse;
 	}
 
-	settings = PM_GetActiveSettings();
 	jumpVelocity = ( settings->jumpVelocity > 0.0f ) ? settings->jumpVelocity : JUMP_VELOCITY;
 	jumpVelocityScale = 1.0f;
 	chainJumpActive = qfalse;
@@ -2729,6 +2760,7 @@ void Pmove (pmove_t *pmove) {
 	// dependent behavior
 	while ( pmove->ps->commandTime != finalTime ) {
 		int		msec;
+		int		originalUpmove;
 
 		msec = finalTime - pmove->ps->commandTime;
 
@@ -2742,10 +2774,11 @@ void Pmove (pmove_t *pmove) {
 				msec = 66;
 			}
 		}
+		originalUpmove = pmove->cmd.upmove;
 		pmove->cmd.serverTime = pmove->ps->commandTime + msec;
 		PmoveSingle( pmove );
 
-		if ( pmove->ps->pm_flags & PMF_JUMP_HELD ) {
+		if ( ( pmove->ps->pm_flags & PMF_JUMP_HELD ) && originalUpmove >= 10 ) {
 			pmove->cmd.upmove = 20;
 		}
 	}
