@@ -43,6 +43,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	RESPAWN_MEGAHEALTH	35//120
 #define	RESPAWN_POWERUP		120
 
+/*
+=============
+G_MatchFactoryDropAllowed
+
+Returns whether the active match factory configuration permits item drops.
+=============
+*/
+static qboolean G_MatchFactoryDropAllowed( void ) {
+	return level.matchAllowItemDrops ? qtrue : qfalse;
+}
+
+/*
+=============
+G_MatchFactoryBounceAllowed
+
+Returns whether dropped and spawned items should bounce.
+=============
+*/
+static qboolean G_MatchFactoryBounceAllowed( void ) {
+	return level.matchAllowItemBounce ? qtrue : qfalse;
+}
+
 
 //======================================================================
 
@@ -706,6 +728,10 @@ Spawns an item and tosses it forward
 gentity_t *LaunchItem( gitem_t *item, vec3_t origin, vec3_t velocity ) {
 	gentity_t	*dropped;
 
+	if ( !G_MatchFactoryDropAllowed() && item && item->giType != IT_TEAM ) {
+		return NULL;
+	}
+
 	dropped = G_Spawn();
 
 	dropped->s.eType = ET_ITEM;
@@ -725,7 +751,13 @@ gentity_t *LaunchItem( gitem_t *item, vec3_t origin, vec3_t velocity ) {
 	dropped->s.pos.trTime = level.time;
 	VectorCopy( velocity, dropped->s.pos.trDelta );
 
-	dropped->s.eFlags |= EF_BOUNCE_HALF;
+	if ( G_MatchFactoryBounceAllowed() ) {
+		dropped->s.eFlags |= EF_BOUNCE_HALF;
+		dropped->physicsBounce = 0.50f;
+	} else {
+		dropped->s.eFlags &= ~EF_BOUNCE_HALF;
+		dropped->physicsBounce = 0.0f;
+	}
 #ifdef MISSIONPACK
 	if ((g_gametype.integer == GT_CTF || g_gametype.integer == GT_1FCTF)			&& item->giType == IT_TEAM) { // Special case for CTF flags
 #else
@@ -756,6 +788,10 @@ Spawns an item and tosses it forward
 gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle ) {
 	vec3_t	velocity;
 	vec3_t	angles;
+
+	if ( !G_MatchFactoryDropAllowed() && item && item->giType != IT_TEAM ) {
+		return NULL;
+	}
 
 	VectorCopy( ent->s.apos.trBase, angles );
 	angles[YAW] += angle;
@@ -1034,7 +1070,7 @@ void G_SpawnItem (gentity_t *ent, gitem_t *item) {
 	ent->nextthink = level.time + FRAMETIME * 2;
 	ent->think = FinishSpawningItem;
 
-	ent->physicsBounce = 0.50;		// items are bouncy
+	ent->physicsBounce = G_MatchFactoryBounceAllowed() ? 0.50f : 0.0f;	// items are bouncy when enabled
 
 	if ( item->giType == IT_POWERUP ) {
 		G_SoundIndex( "sound/items/poweruprespawn.wav" );

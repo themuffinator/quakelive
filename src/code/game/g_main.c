@@ -116,6 +116,10 @@ vmCvar_t	g_listEntity;
 vmCvar_t	g_overtime;
 vmCvar_t	g_timeoutLen;
 vmCvar_t	g_timeoutCount;
+vmCvar_t        g_factoryRespawnDelay;
+vmCvar_t        g_factoryWarmupSpawnDelay;
+vmCvar_t        g_factoryAllowItemDrops;
+vmCvar_t        g_factoryAllowItemBounce;
 vmCvar_t	g_suddenDeathRespawn;
 vmCvar_t	g_suddenDeathRespawnStart;
 vmCvar_t	g_suddenDeathRespawnTick;
@@ -222,7 +226,12 @@ static cvarTable_t		gameCvarTable[] = {
         { &g_overtime, "g_overtime", "120", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Overtime period length in seconds once regulation ends tied; 0 keeps sudden death active until the tie is broken." },
         { &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
         { &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
-	{ &g_timeoutCount, "g_timeoutCount", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_NORESTART, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
+	{ &g_timeoutCount, "g_timeoutCount", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },
+	{ &g_factoryRespawnDelay, "g_factoryRespawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds before a defeated player respawns when factories schedule queues." },
+	{ &g_factoryWarmupSpawnDelay, "g_factoryWarmupSpawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds applied to warmup spawns when factories request staggered starts." },
+	{ &g_factoryAllowItemDrops, "g_factoryAllowItemDrops", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether item drop logic fires for weapons and powerups spawned from players." },
+	{ &g_factoryAllowItemBounce, "g_factoryAllowItemBounce", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether dropped items bounce before coming to rest when factories disable the behaviour." },
+	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_NORESTART, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
 	{ &g_suddenDeathRespawnTick, "g_suddenDeathRespawnTick", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Interval in seconds after which sudden-death respawn delays are increased." },
 	{ &g_suddenDeathRespawnMax, "g_suddenDeathRespawnMax", "10", CVAR_NORESTART, 0, qfalse, qfalse, "Maximum sudden-death respawn delay in seconds." },
 	{ &g_suddenDeathRespawnIncrement, "g_suddenDeathRespawnIncrement", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Seconds added to the sudden-death respawn delay at each tick." },
@@ -527,6 +536,7 @@ void G_RegisterCvars( void ) {
         G_InitAmmoPackConfig();
         G_InitFactoryCvarConfig();
         G_InitMatchFactoryConfig();
+	G_SyncMatchFactoryConfigToLevel();
 
 	G_RefreshPmoveSettings();
 }
@@ -568,6 +578,7 @@ void G_UpdateCvars( void ) {
         G_UpdateAmmoPackConfig();
         G_UpdateFactoryCvarConfig();
         G_UpdateMatchFactoryConfig();
+	G_SyncMatchFactoryConfigToLevel();
 
         G_RefreshPmoveSettings();
 }
@@ -602,6 +613,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	// set some level globals
 	memset( &level, 0, sizeof( level ) );
+	G_InitSpawnQueue();
 	level.time = levelTime;
 	level.startTime = levelTime;
 

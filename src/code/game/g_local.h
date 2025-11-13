@@ -570,6 +570,15 @@ typedef struct {
 	qboolean	autoShuffleCountdownActive;
 	int		autoShuffleCountdownTargetTime;
 	int		autoShuffleCountdownLastAnnounce;
+	int			nextWarmupSpawnTime;
+	int			clientSpawnRequestTime[MAX_CLIENTS];
+	qboolean		clientSpawnQueued[MAX_CLIENTS];
+	qboolean		clientSpawnInitial[MAX_CLIENTS];
+	qboolean		clientSpawnNeedsEffect[MAX_CLIENTS];
+	qboolean		clientFactoryLoadoutQueued[MAX_CLIENTS];
+	qboolean		spawnQueueActive;
+	qboolean		matchAllowItemDrops;
+	qboolean		matchAllowItemBounce;
 } level_locals_t;
 
 
@@ -581,6 +590,9 @@ qboolean	G_SpawnString( const char *key, const char *defaultString, char **out )
 qboolean	G_SpawnFloat( const char *key, const char *defaultString, float *out );
 qboolean	G_SpawnInt( const char *key, const char *defaultString, int *out );
 qboolean	G_SpawnVector( const char *key, const char *defaultString, float *out );
+void		G_InitSpawnQueue( void );
+void		G_SyncMatchFactoryConfigToLevel( void );
+qboolean		G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean initialSpawn );
 void		G_SpawnEntitiesFromString( void );
 char *G_NewString( const char *string );
 
@@ -930,6 +942,10 @@ extern	vmCvar_t	g_warmup;
 extern	vmCvar_t	g_doWarmup;
 extern	vmCvar_t	g_timeoutLen;
 extern	vmCvar_t	g_timeoutCount;
+extern	vmCvar_t	g_factoryRespawnDelay;
+extern	vmCvar_t	g_factoryWarmupSpawnDelay;
+extern	vmCvar_t	g_factoryAllowItemDrops;
+extern	vmCvar_t	g_factoryAllowItemBounce;
 extern	vmCvar_t	g_blood;
 extern	vmCvar_t	g_allowVote;
 extern	vmCvar_t	g_teamAutoJoin;

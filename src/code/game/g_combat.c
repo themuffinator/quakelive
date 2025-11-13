@@ -116,10 +116,12 @@ void TossClientItems( gentity_t *self ) {
 					continue;
 				}
 				drop = Drop_Item( self, item, angle );
-				// decide how many seconds it has left
-				drop->count = ( self->client->ps.powerups[ i ] - level.time ) / 1000;
-				if ( drop->count < 1 ) {
-					drop->count = 1;
+				if ( drop ) {
+					// decide how many seconds it has left
+					drop->count = ( self->client->ps.powerups[ i ] - level.time ) / 1000;
+					if ( drop->count < 1 ) {
+						drop->count = 1;
+					}
 				}
 				angle += 45;
 			}

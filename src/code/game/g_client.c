@@ -686,13 +686,18 @@ respawn
 */
 void respawn( gentity_t *ent ) {
 	gentity_t	*tent;
+	qboolean	spawnedImmediately;
+	qboolean	warmupSpawn;
 
-	CopyToBodyQue (ent);
-	ClientSpawn(ent);
+	CopyToBodyQue( ent );
+	warmupSpawn = ( level.warmupTime > 0 ) ? qtrue : qfalse;
+	spawnedImmediately = G_RequestClientSpawn( ent, warmupSpawn, qfalse );
 
-	// add a teleportation effect
-	tent = G_TempEntity( ent->client->ps.origin, EV_PLAYER_TELEPORT_IN );
-	tent->s.clientNum = ent->s.clientNum;
+	if ( spawnedImmediately && ent->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		// add a teleportation effect
+		tent = G_TempEntity( ent->client->ps.origin, EV_PLAYER_TELEPORT_IN );
+		tent->s.clientNum = ent->s.clientNum;
+	}
 }
 
 /*
@@ -1219,6 +1224,8 @@ void ClientBegin( int clientNum ) {
 	gclient_t	*client;
 	gentity_t	*tent;
 	int			flags;
+	qboolean	spawnedImmediately;
+	qboolean	warmupSpawn;
 
 	ent = g_entities + clientNum;
 
@@ -1246,9 +1253,10 @@ void ClientBegin( int clientNum ) {
 	client->ps.eFlags = flags;
 
 	// locate ent at a spawn point
-	ClientSpawn( ent );
+	warmupSpawn = ( level.warmupTime > 0 ) ? qtrue : qfalse;
+	spawnedImmediately = G_RequestClientSpawn( ent, warmupSpawn, qtrue );
 
-	if ( client->sess.sessionTeam != TEAM_SPECTATOR ) {
+	if ( spawnedImmediately && client->sess.sessionTeam != TEAM_SPECTATOR ) {
 		// send event
 		tent = G_TempEntity( ent->client->ps.origin, EV_PLAYER_TELEPORT_IN );
 		tent->s.clientNum = ent->s.clientNum;
@@ -1273,18 +1281,25 @@ clamps and "infinite" semantics.
 ==============================
 */
 static void G_SeedConfiguredSpawnAmmo( playerState_t *ps, weapon_t weapon, int configuredAmmo ) {
-        if ( !ps || weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
-                return;
-        }
+	if ( !ps || weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return;
+	}
 
-        if ( g_factoryCvarConfig.infiniteAmmo || configuredAmmo < 0 ) {
-                ps->ammo[weapon] = -1;
-                return;
-        }
+	if ( g_factoryCvarConfig.infiniteAmmo || configuredAmmo < 0 ) {
+		ps->ammo[weapon] = -1;
+		return;
+	}
 
-        ps->ammo[weapon] = configuredAmmo;
+	ps->ammo[weapon] = configuredAmmo;
 }
 
+/*
+============
+G_SelectFactorySpawnWeapon
+
+Chooses an initial weapon based on the configured factory stat mask.
+============
+*/
 static weapon_t G_SelectFactorySpawnWeapon( unsigned int statMask ) {
 	weapon_t weapon;
 
@@ -1348,6 +1363,7 @@ void ClientSpawn(gentity_t *ent) {
 	index = ent - g_entities;
 	client = ent->client;
 	factoryConfig = &g_factoryCvarConfig;
+	level.clientFactoryLoadoutQueued[index] = qfalse;
 
 	// find a spawn point
 	// do it before setting health back up, so farthest

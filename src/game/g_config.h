@@ -49,6 +49,10 @@ extern vmCvar_t g_suddenDeathRespawnTick;
 extern vmCvar_t g_suddenDeathRespawnMax;
 extern vmCvar_t g_suddenDeathRespawnIncrement;
 extern vmCvar_t g_suddenDeathRespawnPrint;
+extern vmCvar_t g_factoryRespawnDelay;
+extern vmCvar_t g_factoryWarmupSpawnDelay;
+extern vmCvar_t g_factoryAllowItemDrops;
+extern vmCvar_t g_factoryAllowItemBounce;
 
 typedef struct matchFactoryConfig_s {
 	int		timeoutLengthSeconds;
@@ -61,6 +65,10 @@ typedef struct matchFactoryConfig_s {
 	int		suddenDeathIncrementSeconds;
 	qboolean	suddenDeathPrintAnnouncements;
 	qboolean	suddenDeathSpawnDelayActive;
+	int		 factoryRespawnDelayMilliseconds;
+	int		 factoryWarmupSpawnDelayMilliseconds;
+	qboolean	 factoryAllowItemDrops;
+	qboolean	 factoryAllowItemBounce;
 } matchFactoryConfig_t;
 
 void G_Config_RegisterCvars( void );
