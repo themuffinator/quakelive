@@ -104,6 +104,13 @@ void G_InitAmmoPackConfig( void );
 void G_UpdateAmmoPackConfig( void );
 int G_GetSuddenDeathRespawnDelay( void );
 
+void G_AutoShuffleCountdown_SetGuard( qboolean ( *guard )( void ) );
+void G_AutoShuffleCountdown_Arm( int milliseconds );
+void G_AutoShuffleCountdown_Cancel( void );
+qboolean G_AutoShuffleCountdown_IsActive( void );
+int G_AutoShuffleCountdown_GetSecondsRemaining( void );
+void G_AutoShuffleCountdown_Frame( void );
+
 typedef struct factoryCvarConfig_s {
 	int		startingWeaponsMask;
 	unsigned int	startingWeaponsStatMask;
@@ -549,6 +556,9 @@ typedef struct {
 	int		timeoutOwner;
 	int		timeoutStartTime;
 	int		timeoutExpireTime;
+	qboolean	autoShuffleCountdownActive;
+	int		autoShuffleCountdownTargetTime;
+	int		autoShuffleCountdownLastAnnounce;
 } level_locals_t;
 
 

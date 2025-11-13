@@ -1806,6 +1806,8 @@ static void LevelCheckTimers( void ) {
 		level.suddenDeathLastDelay = -1;
 		level.suddenDeathNoRespawnLogged = qfalse;
 	}
+	G_AutoShuffleCountdown_Frame();
+
 	if ( level.timeoutActive ) {
 		if ( level.timeoutExpireTime && level.time >= level.timeoutExpireTime ) {
 			int pausedDuration = 0;

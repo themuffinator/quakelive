@@ -48,6 +48,9 @@
     <ClCompile Include="bg_slidemove.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="g_autoshuffle.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="g_active.c">
       <Filter>Source Files</Filter>
     </ClCompile>
