@@ -1042,6 +1042,8 @@ typedef struct {
 	int		matchTimeoutExpireTime;
 	int		matchTimeoutOwner;
 	int		matchTimeoutRemaining[TEAM_NUM_TEAMS];
+	qboolean	matchForfeited;
+	int		matchForfeitWinner;
 
 	qboolean  newHud;
 

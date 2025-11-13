@@ -100,6 +100,7 @@ vmCvar_t	g_restarted;
 vmCvar_t	g_log;
 vmCvar_t	g_logSync;
 vmCvar_t	g_blood;
+vmCvar_t	g_allowForfeit;
 vmCvar_t	g_podiumDist;
 vmCvar_t	g_podiumDrop;
 vmCvar_t	g_allowVote;
@@ -213,6 +214,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_debugAlloc, "g_debugAlloc", "0", 0, 0, qfalse },
 	{ &g_motd, "g_motd", "", 0, 0, qfalse },
 	{ &g_blood, "com_blood", "1", 0, 0, qfalse },
+	{ &g_allowForfeit, "g_allowForfeit", "1", CVAR_ARCHIVE, 0, qfalse },
 
 	{ &g_podiumDist, "g_podiumDist", "80", 0, 0, qfalse },
 	{ &g_podiumDrop, "g_podiumDrop", "70", 0, 0, qfalse },
@@ -610,6 +612,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	level.timeoutActive = qfalse;
 	level.timeoutStartTime = 0;
 	level.timeoutExpireTime = 0;
+	level.matchForfeited = qfalse;
+	level.matchForfeitWinner = TEAM_FREE;
 	level.overtimeActive = qfalse;
 	level.overtimeStartTime = 0;
 	level.overtimeEndTime = 0;
@@ -1623,7 +1627,7 @@ void G_UpdateMatchStateConfigString( void ) {
 		blue = 0;
 	}
 
-	trap_SetConfigstring( CS_MATCH_STATE, va("%i %i %i %i %i %i %i %i %i %i",
+	trap_SetConfigstring( CS_MATCH_STATE, va("%i %i %i %i %i %i %i %i %i %i %i %i",
 		level.overtimeActive ? 1 : 0,
 		level.overtimeStartTime,
 		level.overtimeEndTime,
@@ -1633,7 +1637,9 @@ void G_UpdateMatchStateConfigString( void ) {
 		level.timeoutExpireTime,
 		level.timeoutOwner,
 		red,
-		blue ) );
+		blue,
+		level.matchForfeited ? 1 : 0,
+		level.matchForfeitWinner ) );
 }
 
 void G_ApplyTimeoutPauseDelta( int msec ) {

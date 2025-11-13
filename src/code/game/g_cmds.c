@@ -1742,6 +1742,301 @@ void Cmd_Timein_f( gentity_t *ent ) {
 
 
 /*
+=============
+G_ForfeitGametypeName
+
+Maps gametype enumerations to display strings when forfeits are denied.
+=============
+*/
+static const char *G_ForfeitGametypeName( int gametype ) {
+	switch ( gametype ) {
+		case GT_FFA:
+			return "Free For All";
+		case GT_TOURNAMENT:
+			return "Duel";
+		case GT_SINGLE_PLAYER:
+			return "Single Player";
+		case GT_TEAM:
+			return "Team Deathmatch";
+		case GT_CTF:
+			return "Capture the Flag";
+		case GT_1FCTF:
+			return "One Flag CTF";
+		case GT_OBELISK:
+			return "Overload";
+		case GT_HARVESTER:
+			return "Harvester";
+		default:
+			return "this gametype";
+	}
+}
+
+/*
+=============
+G_CountConnectedTeamPlayers
+
+Counts connected, non-spectator players on the supplied team.
+=============
+*/
+static int G_CountConnectedTeamPlayers( team_t team ) {
+	int	clientNum;
+	int	count;
+
+	count = 0;
+
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gclient_t	*client;
+
+		client = &level.clients[clientNum];
+		if ( client->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+
+		if ( client->sess.sessionTeam != team ) {
+			continue;
+		}
+
+		count++;
+	}
+
+	return count;
+}
+
+/*
+=============
+G_OtherTeam
+
+Returns the opposing team for standard RED/BLUE team identifiers.
+=============
+*/
+static team_t G_OtherTeam( team_t team ) {
+	if ( team == TEAM_RED ) {
+		return TEAM_BLUE;
+	}
+	if ( team == TEAM_BLUE ) {
+		return TEAM_RED;
+	}
+
+	return TEAM_FREE;
+}
+
+/*
+=============
+G_GetDuelOpponent
+
+Locates the connected duel opponent for the supplied player.
+=============
+*/
+static gclient_t *G_GetDuelOpponent( gentity_t *ent ) {
+	int	clientNum;
+
+	if ( !ent || !ent->client ) {
+		return NULL;
+	}
+
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gclient_t	*client;
+
+		client = &level.clients[clientNum];
+		if ( client == ent->client ) {
+			continue;
+		}
+		if ( client->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+		if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
+			continue;
+		}
+
+		return client;
+	}
+
+	return NULL;
+}
+
+/*
+=============
+G_FinaliseForfeit
+
+Broadcasts the server notifications and logs the match forfeit.
+=============
+*/
+static void G_FinaliseForfeit( gentity_t *ent, team_t forfeitingTeam ) {
+	team_t	winnerTeam;
+	gclient_t	*opponent;
+	const char	*winnerLabel;
+	char	buffer[MAX_NETNAME];
+	int	winnerMarker;
+
+	winnerTeam = G_OtherTeam( forfeitingTeam );
+	opponent = NULL;
+	winnerLabel = "The opposition";
+	winnerMarker = TEAM_FREE;
+
+	if ( forfeitingTeam == TEAM_FREE ) {
+		opponent = G_GetDuelOpponent( ent );
+		if ( opponent != NULL ) {
+			Q_strncpyz( buffer, opponent->pers.netname, sizeof( buffer ) );
+			winnerLabel = buffer;
+			winnerMarker = -( opponent - level.clients + 1 );
+		}
+	} else if ( winnerTeam == TEAM_RED ) {
+		winnerLabel = "^1Red Team";
+		winnerMarker = TEAM_RED;
+	} else if ( winnerTeam == TEAM_BLUE ) {
+		winnerLabel = "^4Blue Team";
+		winnerMarker = TEAM_BLUE;
+	}
+
+	trap_SendServerCommand( -1, "print \"Game has been forfeited.\\n\"" );
+	trap_SendServerCommand( -1, va( "print \"%s^7 WINS by forfeit.\\n\"", winnerLabel ) );
+	trap_SendServerCommand( -1, va( "cp \"%s^7 WINS by forfeit\\n\"", winnerLabel ) );
+	if ( ent != NULL ) {
+		trap_SendServerCommand( ent - g_entities, "print \"You forfeited the match.\\n\"" );
+	}
+
+	if ( forfeitingTeam == TEAM_RED || forfeitingTeam == TEAM_BLUE ) {
+		level.teamScores[forfeitingTeam] = SCORE_NOT_PRESENT;
+		trap_SetConfigstring( CS_SCORES1 + ( forfeitingTeam - TEAM_RED ), va( "%i", SCORE_NOT_PRESENT ) );
+	}
+
+	level.matchForfeited = qtrue;
+	level.matchForfeitWinner = winnerMarker;
+
+	G_UpdateMatchStateConfigString();
+	LogExit( "Players have forfeited." );
+}
+
+/*
+=============
+G_CanForfeitInDuel
+
+Validates duel-only forfeit restrictions.
+=============
+*/
+static qboolean G_CanForfeitInDuel( gentity_t *ent ) {
+	gclient_t	*opponent;
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is only available to the losing player.\\n\"" );
+		return qfalse;
+	}
+
+	opponent = G_GetDuelOpponent( ent );
+	if ( opponent == NULL ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is only available to members of the losing team.\\n\"" );
+		return qfalse;
+	}
+
+	if ( ent->client->ps.persistant[PERS_SCORE] >= opponent->ps.persistant[PERS_SCORE] ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is only available to the losing player.\\n\"" );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_CanForfeitInTeamMode
+
+Checks whether the caller may surrender their team.
+=============
+*/
+static qboolean G_CanForfeitInTeamMode( gentity_t *ent, team_t team ) {
+	team_t	otherTeam;
+	int	teamScore;
+	int	otherScore;
+	int	teamPlayers;
+
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is only available to members of the losing team.\\n\"" );
+		return qfalse;
+	}
+
+	teamScore = level.teamScores[team];
+	otherTeam = G_OtherTeam( team );
+	otherScore = level.teamScores[otherTeam];
+
+	if ( teamScore >= otherScore ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is only available to members of the losing team.\\n\"" );
+		return qfalse;
+	}
+
+	teamPlayers = G_CountConnectedTeamPlayers( team );
+	if ( teamPlayers > 1 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is only available to the last remaining player on the losing team.\\n\"" );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+Cmd_Forfeit_f
+
+Handles the Quake Live forfeit command.
+=============
+*/
+void Cmd_Forfeit_f( gentity_t *ent ) {
+	int	gametype;
+	team_t	team;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( !g_allowForfeit.integer ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeits are not enabled on this server.\\n\"" );
+		return;
+	}
+
+	if ( level.timeoutActive ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is not available during a pause or timeout.\\n\"" );
+		return;
+	}
+
+	if ( level.warmupTime > 0 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is not available during a round countdown.\\n\"" );
+		return;
+	}
+
+	if ( level.warmupTime < 0 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Forfeit is not available in warmup.\\n\"" );
+		return;
+	}
+
+	gametype = g_gametype.integer;
+	if ( gametype == GT_FFA || gametype == GT_SINGLE_PLAYER ) {
+		trap_SendServerCommand( ent - g_entities, va( "print \"Forfeit is not available in %s.\\n\"", G_ForfeitGametypeName( gametype ) ) );
+		return;
+	}
+
+	team = ent->client->sess.sessionTeam;
+
+	if ( gametype == GT_TOURNAMENT ) {
+		if ( !G_CanForfeitInDuel( ent ) ) {
+			return;
+		}
+
+		G_FinaliseForfeit( ent, TEAM_FREE );
+		return;
+	}
+
+	if ( gametype < GT_TEAM ) {
+		trap_SendServerCommand( ent - g_entities, va( "print \"Forfeit is not available in %s.\\n\"", G_ForfeitGametypeName( gametype ) ) );
+		return;
+	}
+
+	if ( !G_CanForfeitInTeamMode( ent, team ) ) {
+		return;
+	}
+
+	G_FinaliseForfeit( ent, team );
+}
+
+/*
 =================
 ClientCommand
 =================
@@ -1847,6 +2142,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_Timeout_f( ent );
 	else if ( !Q_stricmp( cmd, "timein" ) || !Q_stricmp( cmd, "resume" ) || !Q_stricmp( cmd, "unpause" ) )
 		Cmd_Timein_f( ent );
+	else if ( !Q_stricmp( cmd, "forfeit" ) )
+		Cmd_Forfeit_f( ent );
 	else if (Q_stricmp (cmd, "setviewpos") == 0)
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)

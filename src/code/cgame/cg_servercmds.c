@@ -194,7 +194,7 @@ static void CG_ParseWarmup( void ) {
 
 static void CG_ParseMatchState( void ) {
 	const char *info;
-	int values[10] = { 0 };
+	int values[12] = { 0 };
 	int i;
 	const char *p;
 
@@ -209,6 +209,8 @@ static void CG_ParseMatchState( void ) {
 	for ( i = 0; i < TEAM_NUM_TEAMS; i++ ) {
 		cgs.matchTimeoutRemaining[i] = 0;
 	}
+	cgs.matchForfeited = qfalse;
+	cgs.matchForfeitWinner = TEAM_FREE;
 
 	info = CG_ConfigString( CS_MATCH_STATE );
 	if ( !info || !*info ) {
@@ -216,7 +218,7 @@ static void CG_ParseMatchState( void ) {
 	}
 
 	p = info;
-	for ( i = 0; i < 10; i++ ) {
+	for ( i = 0; i < 12; i++ ) {
 		while ( *p == ' ' ) {
 			p++;
 		}
@@ -248,6 +250,8 @@ static void CG_ParseMatchState( void ) {
 	}
 	cgs.matchTimeoutRemaining[TEAM_RED] = values[8];
 	cgs.matchTimeoutRemaining[TEAM_BLUE] = values[9];
+	cgs.matchForfeited = values[10] ? qtrue : qfalse;
+	cgs.matchForfeitWinner = values[11];
 }
 
 /*
