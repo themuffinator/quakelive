@@ -148,6 +148,8 @@ extern vmCvar_t g_startingHealth;
 extern vmCvar_t g_startingHealthBonus;
 extern vmCvar_t g_startingArmor;
 extern vmCvar_t g_vampiricDamage;
+extern vmCvar_t g_training;
+extern vmCvar_t g_forcedAtmosphere;
 
 typedef struct startingAmmoConfig_s {
 	int		bfg;
@@ -629,6 +631,7 @@ typedef struct {
 	int		quadHogLastActiveTime;
 	int		quadHogNextPingTime;
 	qboolean		matchForfeited;
+	qboolean		trainingMapActive;
 } level_locals_t;
 
 

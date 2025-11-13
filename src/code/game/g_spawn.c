@@ -568,12 +568,23 @@ Every map should have exactly one worldspawn.
 "message"	Text to print during connection process
 */
 void SP_worldspawn( void ) {
-	char	*s;
+	char		*s;
+	char		*atmosphere;
+	int		trainingFlag;
+	qboolean	trainingActive;
 
 	G_SpawnString( "classname", "", &s );
 	if ( Q_stricmp( s, "worldspawn" ) ) {
 		G_Error( "SP_worldspawn: The first entity isn't 'worldspawn'" );
 	}
+
+	trainingFlag = 0;
+	if ( G_SpawnInt( "trainingMap", "0", &trainingFlag ) && trainingFlag ) {
+		trap_Cvar_Set( "g_training", "1" );
+	}
+	trap_Cvar_Update( &g_training );
+	trainingActive = ( g_training.integer != 0 ) ? qtrue : qfalse;
+	level.trainingMapActive = trainingActive;
 
 	// make some data visible to connecting client
 	trap_SetConfigstring( CS_GAME_VERSION, GAME_VERSION );
@@ -586,7 +597,7 @@ void SP_worldspawn( void ) {
 	G_SpawnString( "message", "", &s );
 	trap_SetConfigstring( CS_MESSAGE, s );				// map specific message
 
-	trap_SetConfigstring( CS_MOTD, g_motd.string );		// message of the day
+	trap_SetConfigstring( CS_MOTD, g_motd.string );	// message of the day
 
 	G_SpawnString( "gravity", "800", &s );
 	trap_Cvar_Set( "g_gravity", s );
@@ -597,13 +608,23 @@ void SP_worldspawn( void ) {
 	G_SpawnString( "enableBreath", "0", &s );
 	trap_Cvar_Set( "g_enableBreath", s );
 
+	G_SpawnString( "atmosphere", "", &atmosphere );
+	if ( atmosphere && atmosphere[0] ) {
+		trap_SetConfigstring( CS_FORCED_ATMOSPHERE, atmosphere );
+	} else {
+		trap_Cvar_Update( &g_forcedAtmosphere );
+		trap_SetConfigstring( CS_FORCED_ATMOSPHERE, g_forcedAtmosphere.string );
+	}
+
 	g_entities[ENTITYNUM_WORLD].s.number = ENTITYNUM_WORLD;
 	g_entities[ENTITYNUM_WORLD].classname = "worldspawn";
 
 	// see if we want a warmup time
 	trap_SetConfigstring( CS_WARMUP, "" );
 	trap_SetConfigstring( CS_MATCH_STATE, "" );
-	if ( g_restarted.integer ) {
+	if ( trainingActive ) {
+		level.warmupTime = 0;
+	} else if ( g_restarted.integer ) {
 		trap_Cvar_Set( "g_restarted", "0" );
 		level.warmupTime = 0;
 	} else if ( g_doWarmup.integer ) { // Turn it on
@@ -613,6 +634,7 @@ void SP_worldspawn( void ) {
 	}
 
 }
+
 
 
 /*
