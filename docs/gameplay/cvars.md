@@ -16,6 +16,21 @@ Competitive duel and team modes now expose Quake Live–style match pauses. Play
 | `g_timeoutCount` | `0` | Number of timeouts each team receives per match; initialised into `level.timeoutRemaining` and published via `CS_MATCH_STATE` for client HUDs.【F:src/code/game/g_main.c†L1093-L1121】【F:src/code/game/g_main.c†L2100-L2131】 |
 | `g_timeoutLen` | `60` | Timeout duration in seconds; values ≤0 hold the pause until a manual `timein`, while positive values trigger an automatic resume with broadcast messaging.【F:src/code/game/g_cmds.c†L1657-L1670】【F:src/code/game/g_main.c†L2295-L2316】 |
 
+## Starting Health and Armor Controls
+
+Quake Live publishes spawn stat knobs for the base health, bonus health stack, and armor granted to players when they respawn. Mirroring the retail DLL, the VM now mirrors `g_startingHealth`, `g_startingHealthBonus`, and `g_startingArmor` so factory scripts and votes can adjust the opening survivability without source edits.【F:src/game/g_config.c†L81-L115】
+
+| CVar | Default | Notes |
+| --- | --- | --- |
+| `g_startingHealth` | `100` | Base health applied before handicap clamping when a player spawns.【F:src/code/game/g_client.c†L1435-L1446】 |
+| `g_startingHealthBonus` | `25` | Additional health granted on top of the base value after handicap.【F:src/code/game/g_client.c†L1504-L1509】 |
+| `g_startingArmor` | `0` | Armor seeded on spawn when positive, matching Quake Live factory defaults.【F:src/code/game/g_client.c†L1504-L1512】 |
+
+### Usage notes
+
+* `G_LoadFactoryCvarConfig` caches the values alongside the other factory knobs, clamping invalid entries to safe fallbacks and logging any corrections for administrators.【F:src/game/g_config.c†L429-L563】
+* `ClientSpawn` applies the cached values, respecting player handicap limits before adding the configured bonus health and optional armor.【F:src/code/game/g_client.c†L1433-L1512】
+
 ## Starting Ammo Controls
 
 The server now registers the full Quake Live `g_startingAmmo_*` family so per-weapon spawn loadouts can be tuned without touching code. Each cvar exposes the amount of ammunition players receive when a weapon is granted through `g_startingWeapons`, factories, or scripted loadouts, and publishes a `helptext_*` mirror for in-console discovery. The defaults are defined once in `g_main.c`, ensuring the archived fallback used by `G_InitStartingAmmoConfig` matches the string advertised to administrators and mirrors the retail Quake Live DLL when no overrides are present.
@@ -128,6 +143,7 @@ The Quake Live VM reads `g_ammoPack_*` values to determine how much ammunition e
 
 * Use `cvarlist helptext_*` after the VM loads to confirm each help string registered with the expected description.
 * Include a weapon in `g_startingWeapons` (for example `set g_startingWeapons RL`) and run `map_restart` to verify the spawn ammo mirrors `g_startingAmmo_rl`.
+* Tweak `g_startingHealth`, `g_startingHealthBonus`, and `g_startingArmor`, issue a `map_restart`, and confirm the spawn health/armor reflect the new values while handicap clamping and respawn announcements remain intact.【F:src/code/game/g_client.c†L1433-L1512】
 * Tweak a selection of cvars (for example `g_startingAmmo_rl` and `g_startingAmmo_pg`) and restart the map to confirm the new values drive the spawn stack.
 * Persist a modified value (e.g. `seta g_startingAmmo_rl 25`) and restart the server to ensure the archived setting survives a relaunch.
 * Ensure gauntlet and grapple defaults remain infinite (`-1`) after a `cvar_restart`.

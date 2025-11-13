@@ -119,11 +119,18 @@ typedef struct factoryCvarConfig_s {
 	qboolean	ammoPackHackEnabled;
 	int		ammoRespawnSeconds;
 	qboolean	suddenDeathRespawn;
+	int		startingHealth;
+	int		startingHealthBonus;
+	int		startingArmor;
 } factoryCvarConfig_t;
 
 extern factoryCvarConfig_t g_factoryCvarConfig;
 void G_InitFactoryCvarConfig( void );
 void G_UpdateFactoryCvarConfig( void );
+
+extern vmCvar_t g_startingHealth;
+extern vmCvar_t g_startingHealthBonus;
+extern vmCvar_t g_startingArmor;
 
 typedef struct startingAmmoConfig_s {
 	int		bfg;
