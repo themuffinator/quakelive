@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 //
 #include "g_local.h"
+#include "g_match_config.h"
 
 #include "../../ui/menudef.h"			// for the voice chats
 
@@ -1685,15 +1686,12 @@ void Cmd_Timeout_f( gentity_t *ent ) {
 	level.timeoutOwner = ent->client->ps.clientNum;
 	level.timeoutStartTime = level.time;
 
-	timeoutLength = g_timeoutLen.integer;
-	if ( timeoutLength < 0 ) {
-		timeoutLength = 0;
-	}
-	if ( timeoutLength > 0 ) {
-		level.timeoutExpireTime = level.time + timeoutLength * 1000;
-	} else {
-		level.timeoutExpireTime = 0;
-	}
+        timeoutLength = g_matchFactoryConfig.timeoutLengthSeconds;
+        if ( timeoutLength > 0 ) {
+                level.timeoutExpireTime = level.time + timeoutLength * 1000;
+        } else {
+                level.timeoutExpireTime = 0;
+        }
 
 	level.timeoutRemaining[team] = remaining - 1;
 	if ( level.timeoutRemaining[team] < 0 ) {

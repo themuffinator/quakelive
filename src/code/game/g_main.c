@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "g_local.h"
 #include "g_config.h"
+#include "g_match_config.h"
 #include <limits.h>
 #include "../../../src-re/include/ql_types.h"
 #include <time.h>
@@ -140,13 +141,7 @@ vmCvar_t	g_damage_rg;
 vmCvar_t	g_damage_bfg;
 vmCvar_t	g_splashDamage_bfg;
 vmCvar_t	g_splashRadius_bfg;
-static int matchFlow_lastTimeoutCount = -1;
-static int matchFlow_lastOvertimeLength = -1;
-static int matchFlow_lastSuddenDeathRespawn = INT_MIN;
-static int matchFlow_lastSuddenDeathStart = INT_MIN;
-static int matchFlow_lastSuddenDeathTick = INT_MIN;
-static int matchFlow_lastSuddenDeathMax = INT_MIN;
-static int matchFlow_lastSuddenDeathIncrement = INT_MIN;
+static matchFactoryConfig_t matchFlow_lastConfig;
 #ifdef MISSIONPACK
 vmCvar_t	g_obeliskHealth;
 vmCvar_t	g_obeliskRegenPeriod;
@@ -224,8 +219,9 @@ static cvarTable_t		gameCvarTable[] = {
 
 	{ &g_allowVote, "g_allowVote", "1", CVAR_ARCHIVE, 0, qfalse },
 	{ &g_listEntity, "g_listEntity", "0", 0, 0, qfalse },
-	{ &g_overtime, "g_overtime", "120", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Overtime period length in seconds once regulation ends tied; 0 keeps sudden death active until the tie is broken." },
-	{ &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
+        { &g_overtime, "g_overtime", "120", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Overtime period length in seconds once regulation ends tied; 0 keeps sudden death active until the tie is broken." },
+        { &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
+        { &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
 	{ &g_timeoutCount, "g_timeoutCount", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_NORESTART, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
 	{ &g_suddenDeathRespawnTick, "g_suddenDeathRespawnTick", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Interval in seconds after which sudden-death respawn delays are increased." },
 	{ &g_suddenDeathRespawnMax, "g_suddenDeathRespawnMax", "10", CVAR_NORESTART, 0, qfalse, qfalse, "Maximum sudden-death respawn delay in seconds." },
@@ -524,12 +520,13 @@ void G_RegisterCvars( void ) {
         }
 
 	level.warmupModificationCount = g_warmup.modificationCount;
-	G_InitWeaponConfig();
-	G_InitWeaponReloadConfig();
-	G_InitKnockbackConfig();
-	G_InitStartingAmmoConfig();
-	G_InitAmmoPackConfig();
-	G_InitFactoryCvarConfig();
+        G_InitWeaponConfig();
+        G_InitWeaponReloadConfig();
+        G_InitKnockbackConfig();
+        G_InitStartingAmmoConfig();
+        G_InitAmmoPackConfig();
+        G_InitFactoryCvarConfig();
+        G_InitMatchFactoryConfig();
 
 	G_RefreshPmoveSettings();
 }
@@ -570,6 +567,7 @@ void G_UpdateCvars( void ) {
         G_UpdateStartingAmmoConfig();
         G_UpdateAmmoPackConfig();
         G_UpdateFactoryCvarConfig();
+        G_UpdateMatchFactoryConfig();
 
         G_RefreshPmoveSettings();
 }
@@ -619,23 +617,13 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	level.suddenDeathActive = qfalse;
 	level.suddenDeathLastDelay = -1;
 	level.suddenDeathNoRespawnLogged = qfalse;
-	{
-		int initialTimeouts = g_timeoutCount.integer;
-		int team;
-		if ( initialTimeouts < 0 ) {
-			initialTimeouts = 0;
-		}
-		for ( team = TEAM_FREE; team < TEAM_NUM_TEAMS; team++ ) {
-			level.timeoutRemaining[team] = initialTimeouts;
-		}
-	}
-	matchFlow_lastTimeoutCount = -1;
-	matchFlow_lastOvertimeLength = -1;
-	matchFlow_lastSuddenDeathRespawn = INT_MIN;
-	matchFlow_lastSuddenDeathStart = INT_MIN;
-	matchFlow_lastSuddenDeathTick = INT_MIN;
-	matchFlow_lastSuddenDeathMax = INT_MIN;
-	matchFlow_lastSuddenDeathIncrement = INT_MIN;
+        {
+                int team;
+                for ( team = TEAM_FREE; team < TEAM_NUM_TEAMS; team++ ) {
+                        level.timeoutRemaining[team] = g_matchFactoryConfig.timeoutCountPerTeam;
+                }
+        }
+        matchFlow_lastConfig = g_matchFactoryConfig;
 
 	level.snd_fry = G_SoundIndex("sound/player/fry.wav");	// FIXME standing in lava / slime
 
@@ -1668,28 +1656,18 @@ void G_ApplyTimeoutPauseDelta( int msec ) {
 }
 
 int G_GetSuddenDeathRespawnDelay( void ) {
+	const matchFactoryConfig_t *config = &g_matchFactoryConfig;
+
 	if ( !level.overtimeActive ) {
 		return 0;
 	}
-	if ( g_suddenDeathRespawn.integer <= 0 ) {
+	if ( !config->suddenDeathRespawnsEnabled ) {
 		return -1;
 	}
-	int baseDelay = g_suddenDeathRespawnStart.integer;
-	if ( baseDelay < 0 ) {
-		baseDelay = 0;
-	}
-	int tick = g_suddenDeathRespawnTick.integer;
-	if ( tick <= 0 ) {
-		tick = 1;
-	}
-	int increment = g_suddenDeathRespawnIncrement.integer;
-	if ( increment < 0 ) {
-		increment = 0;
-	}
-	int maxDelay = g_suddenDeathRespawnMax.integer;
-	if ( maxDelay < baseDelay ) {
-		maxDelay = baseDelay;
-	}
+	int baseDelay = config->suddenDeathStartSeconds;
+	int tick = config->suddenDeathTickSeconds;
+	int increment = config->suddenDeathIncrementSeconds;
+	int maxDelay = config->suddenDeathMaxSeconds;
 	int elapsed = ( level.time - level.overtimeStartTime ) / 1000;
 	if ( elapsed < 0 ) {
 		elapsed = 0;
@@ -1703,7 +1681,7 @@ int G_GetSuddenDeathRespawnDelay( void ) {
 }
 
 static void G_StartOrExtendOvertime( void ) {
-	const int lengthSeconds = g_overtime.integer;
+        const int lengthSeconds = g_matchFactoryConfig.overtimeLengthSeconds;
 	const int overtimeMillis = ( lengthSeconds > 0 ) ? lengthSeconds * 1000 : 0;
 	if ( !level.overtimeActive ) {
 		level.overtimeActive = qtrue;
@@ -1748,18 +1726,20 @@ Ensure sudden-death respawn messaging is delivered via center-print prompts.
 =============
 */
 static void G_TrackSuddenDeathAnnouncements( void ) {
-	if ( !level.overtimeActive ) {
-		return;
-	}
-	if ( g_suddenDeathRespawn.integer <= 0 ) {
-		if ( !level.suddenDeathNoRespawnLogged ) {
-			level.suddenDeathNoRespawnLogged = qtrue;
-			level.suddenDeathLastDelay = -1;
-			G_LogPrintf( "match: sudden-death respawns disabled\n" );
-			if ( g_suddenDeathRespawnPrint.integer ) {
-				trap_SendServerCommand( -1, "cp \"Sudden-death respawns disabled\n\"" );
-			}
-		}
+        const matchFactoryConfig_t *config = &g_matchFactoryConfig;
+
+        if ( !level.overtimeActive ) {
+                return;
+        }
+        if ( !config->suddenDeathRespawnsEnabled ) {
+                if ( !level.suddenDeathNoRespawnLogged ) {
+                        level.suddenDeathNoRespawnLogged = qtrue;
+                        level.suddenDeathLastDelay = -1;
+                        G_LogPrintf( "match: sudden-death respawns disabled\n" );
+                        if ( config->suddenDeathPrintAnnouncements ) {
+                                trap_SendServerCommand( -1, "cp \"Sudden-death respawns disabled\n\"" );
+                        }
+                }
 		return;
 	}
 	int delay = G_GetSuddenDeathRespawnDelay();
@@ -1770,10 +1750,10 @@ static void G_TrackSuddenDeathAnnouncements( void ) {
 		level.suddenDeathLastDelay = delay;
 		level.suddenDeathNoRespawnLogged = qfalse;
 		G_LogPrintf( "match: sudden-death respawn delay %i ms\n", delay );
-		if ( g_suddenDeathRespawnPrint.integer ) {
-			if ( delay > 0 ) {
-				trap_SendServerCommand( -1, va( "cp \"Sudden-death respawns available in %i seconds\n\"", delay / 1000 ) );
-			} else {
+                if ( config->suddenDeathPrintAnnouncements ) {
+                        if ( delay > 0 ) {
+                                trap_SendServerCommand( -1, va( "cp \"Sudden-death respawns available in %i seconds\n\"", delay / 1000 ) );
+                        } else {
 				trap_SendServerCommand( -1, "cp \"Sudden-death respawns available now\n\"" );
 			}
 		}
@@ -1782,41 +1762,36 @@ static void G_TrackSuddenDeathAnnouncements( void ) {
 
 static void LevelCheckTimers( void ) {
 	int team;
-	if ( matchFlow_lastTimeoutCount != g_timeoutCount.integer ) {
-		int newCount = g_timeoutCount.integer;
-		if ( newCount < 0 ) {
-			newCount = 0;
-		}
+	matchFactoryConfig_t previousConfig = matchFlow_lastConfig;
+	const matchFactoryConfig_t *config = &g_matchFactoryConfig;
+
+	if ( previousConfig.timeoutCountPerTeam != config->timeoutCountPerTeam ) {
 		for ( team = TEAM_FREE; team < TEAM_NUM_TEAMS; team++ ) {
-			level.timeoutRemaining[team] = newCount;
+			level.timeoutRemaining[team] = config->timeoutCountPerTeam;
 		}
-		matchFlow_lastTimeoutCount = g_timeoutCount.integer;
 		G_UpdateMatchStateConfigString();
 	}
-	if ( matchFlow_lastOvertimeLength != g_overtime.integer ) {
-		matchFlow_lastOvertimeLength = g_overtime.integer;
+	if ( previousConfig.overtimeLengthSeconds != config->overtimeLengthSeconds ) {
 		if ( level.overtimeActive ) {
-			if ( g_overtime.integer > 0 ) {
-				level.overtimeEndTime = level.time + g_overtime.integer * 1000;
+			if ( config->overtimeLengthSeconds > 0 ) {
+				level.overtimeEndTime = level.time + config->overtimeLengthSeconds * 1000;
 			} else {
 				level.overtimeEndTime = 0;
 			}
 			G_UpdateMatchStateConfigString();
 		}
 	}
-	if ( matchFlow_lastSuddenDeathRespawn != g_suddenDeathRespawn.integer ||
-		matchFlow_lastSuddenDeathStart != g_suddenDeathRespawnStart.integer ||
-		matchFlow_lastSuddenDeathTick != g_suddenDeathRespawnTick.integer ||
-		matchFlow_lastSuddenDeathMax != g_suddenDeathRespawnMax.integer ||
-		matchFlow_lastSuddenDeathIncrement != g_suddenDeathRespawnIncrement.integer ) {
-		matchFlow_lastSuddenDeathRespawn = g_suddenDeathRespawn.integer;
-		matchFlow_lastSuddenDeathStart = g_suddenDeathRespawnStart.integer;
-		matchFlow_lastSuddenDeathTick = g_suddenDeathRespawnTick.integer;
-		matchFlow_lastSuddenDeathMax = g_suddenDeathRespawnMax.integer;
-		matchFlow_lastSuddenDeathIncrement = g_suddenDeathRespawnIncrement.integer;
+	if ( previousConfig.suddenDeathRespawnsEnabled != config->suddenDeathRespawnsEnabled ||
+		previousConfig.suddenDeathStartSeconds != config->suddenDeathStartSeconds ||
+		previousConfig.suddenDeathTickSeconds != config->suddenDeathTickSeconds ||
+		previousConfig.suddenDeathMaxSeconds != config->suddenDeathMaxSeconds ||
+		previousConfig.suddenDeathIncrementSeconds != config->suddenDeathIncrementSeconds ) {
 		level.suddenDeathLastDelay = -1;
 		level.suddenDeathNoRespawnLogged = qfalse;
 	}
+
+	matchFlow_lastConfig = *config;
+
 	G_AutoShuffleCountdown_Frame();
 
 	if ( level.timeoutActive ) {
