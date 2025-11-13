@@ -151,6 +151,51 @@ char	*ConcatArgs( int start ) {
 
 	return line;
 }
+/*
+=============
+G_ClampItemTimerHeight
+
+Ensures the timer height sent to clients always uses a sensible fallback and sane upper bound.
+=============
+*/
+static int G_ClampItemTimerHeight( int rawHeight ) {
+	if ( rawHeight <= 0 ) {
+		return ITEM_TIMER_DEFAULT_HEIGHT;
+	}
+
+	if ( rawHeight > ITEM_TIMER_MAX_HEIGHT ) {
+		return ITEM_TIMER_MAX_HEIGHT;
+	}
+
+	return rawHeight;
+}
+
+
+/*
+=============
+G_SendItemTimerState
+
+Sends the current item timer configuration to a single client.
+=============
+*/
+void G_SendItemTimerState( int clientNum, int enabled, int height ) {
+	int	clampedHeight;
+
+	clampedHeight = G_ClampItemTimerHeight( height );
+	trap_SendServerCommand( clientNum, va( "itemcfg %i %i", enabled ? 1 : 0, clampedHeight ) );
+}
+
+/*
+=============
+G_BroadcastItemTimerState
+
+Broadcasts the current item timer configuration to every connected client.
+=============
+*/
+void G_BroadcastItemTimerState( int enabled, int height ) {
+	G_SendItemTimerState( -1, enabled, height );
+}
+
 
 /*
 ==================

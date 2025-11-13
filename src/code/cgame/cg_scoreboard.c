@@ -268,14 +268,29 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 #endif
 	// draw the score line
 	if ( score->ping == -1 ) {
-		Com_sprintf(string, sizeof(string),
-			" connecting    %s", ci->name);
-	} else if ( ci->team == TEAM_SPECTATOR ) {
-		Com_sprintf(string, sizeof(string),
-			" SPECT %3i %4i %s", score->ping, score->time, ci->name);
+		if ( cgs.itemTimersEnabled ) {
+			Com_sprintf( string, sizeof( string ),
+				" connecting    %s", ci->name );
+		} else {
+			Com_sprintf( string, sizeof( string ),
+				" connecting %s", ci->name );
+		}
+	} else if ( cgs.itemTimersEnabled ) {
+		if ( ci->team == TEAM_SPECTATOR ) {
+			Com_sprintf( string, sizeof( string ),
+				" SPECT %3i %4i %s", score->ping, score->time, ci->name );
+		} else {
+			Com_sprintf( string, sizeof( string ),
+				"%5i %4i %4i %s", score->score, score->ping, score->time, ci->name );
+		}
 	} else {
-		Com_sprintf(string, sizeof(string),
-			"%5i %4i %4i %s", score->score, score->ping, score->time, ci->name);
+		if ( ci->team == TEAM_SPECTATOR ) {
+			Com_sprintf( string, sizeof( string ),
+				" SPECT %3i %s", score->ping, ci->name );
+		} else {
+			Com_sprintf( string, sizeof( string ),
+				"%5i %4i %s", score->score, score->ping, ci->name );
+		}
 	}
 
 	// highlight your position
@@ -346,7 +361,7 @@ static int CG_TeamScoreboard( int y, team_t team, float fade, int maxClients, in
 			continue;
 		}
 
-		CG_DrawClientScore( y + lineHeight * count, score, color, fade, lineHeight == SB_NORMAL_HEIGHT );
+		CG_DrawClientScore( y + lineHeight * count, score, color, fade, lineHeight >= SB_NORMAL_HEIGHT );
 
 		count++;
 	}
@@ -369,6 +384,7 @@ qboolean CG_DrawOldScoreboard( void ) {
 	int maxClients;
 	int lineHeight;
 	int topBorderSize, bottomBorderSize;
+	int			nameHeaderX;
 
 	// don't draw amuthing if the menu or console is up
 	if ( cg_paused.integer ) {
@@ -444,23 +460,61 @@ qboolean CG_DrawOldScoreboard( void ) {
 
 	CG_DrawPic( SB_SCORE_X + (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardScore );
 	CG_DrawPic( SB_PING_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardPing );
-	CG_DrawPic( SB_TIME_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardTime );
-	CG_DrawPic( SB_NAME_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardName );
+	if ( cgs.itemTimersEnabled ) {
+		CG_DrawPic( SB_TIME_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardTime );
+	}
+	nameHeaderX = SB_SCORELINE_X + (SB_RATING_WIDTH / 2) + ( cgs.itemTimersEnabled ? 16 : 11 ) * BIGCHAR_WIDTH;
+	CG_DrawPic( nameHeaderX, y, 64, 32, cgs.media.scoreboardName );
 
 	y = SB_TOP;
 
-	// If there are more than SB_MAXCLIENTS_NORMAL, use the interleaved scores
-	if ( cg.numScores > SB_MAXCLIENTS_NORMAL ) {
-		maxClients = SB_MAXCLIENTS_INTER;
-		lineHeight = SB_INTER_HEIGHT;
-		topBorderSize = 8;
-		bottomBorderSize = 16;
-	} else {
-		maxClients = SB_MAXCLIENTS_NORMAL;
-		lineHeight = SB_NORMAL_HEIGHT;
-		topBorderSize = 16;
-		bottomBorderSize = 16;
+	// If there are more than the configured number of slots, use the interleaved scores
+	{
+		int		configuredHeight;
+		int		interHeight;
+		int		availableHeight;
+		int		normalMaxClients;
+		int		interMaxClients;
+
+		configuredHeight = cgs.itemTimerHeight;
+		if ( configuredHeight <= 0 ) {
+			configuredHeight = SB_NORMAL_HEIGHT;
+		} else if ( configuredHeight > ITEM_TIMER_MAX_HEIGHT ) {
+			configuredHeight = ITEM_TIMER_MAX_HEIGHT;
+		}
+		if ( configuredHeight < SB_INTER_HEIGHT ) {
+			configuredHeight = SB_INTER_HEIGHT;
+		}
+
+		interHeight = configuredHeight / 2;
+		if ( interHeight < SB_INTER_HEIGHT ) {
+			interHeight = SB_INTER_HEIGHT;
+		}
+
+		availableHeight = SB_STATUSBAR - SB_TOP;
+		normalMaxClients = availableHeight / configuredHeight;
+		if ( normalMaxClients <= 0 ) {
+			normalMaxClients = 1;
+		}
+
+		interMaxClients = availableHeight / interHeight - 1;
+		if ( interMaxClients <= 0 ) {
+			interMaxClients = 1;
+		}
+
+		if ( cg.numScores > normalMaxClients ) {
+			maxClients = interMaxClients;
+			lineHeight = interHeight;
+			topBorderSize = 8;
+			bottomBorderSize = 16;
+		} else {
+			maxClients = normalMaxClients;
+			lineHeight = configuredHeight;
+			topBorderSize = 16;
+			bottomBorderSize = 16;
+		}
 	}
+
 
 	localClient = qfalse;
 
@@ -506,7 +560,7 @@ qboolean CG_DrawOldScoreboard( void ) {
 		// draw local client at the bottom
 		for ( i = 0 ; i < cg.numScores ; i++ ) {
 			if ( cg.scores[i].client == cg.snap->ps.clientNum ) {
-				CG_DrawClientScore( y, &cg.scores[i], fadeColor, fade, lineHeight == SB_NORMAL_HEIGHT );
+				CG_DrawClientScore( y, &cg.scores[i], fadeColor, fade, lineHeight >= SB_NORMAL_HEIGHT );
 				break;
 			}
 		}

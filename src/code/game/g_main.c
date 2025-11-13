@@ -47,6 +47,10 @@ gentity_t		g_entities[MAX_GENTITIES];
 gclient_t		g_clients[MAX_CLIENTS];
 
 static qlr_game_frame_context_t *g_qlr_frame_ctx = NULL;
+static int	s_itemTimersModCount = 0;
+static int	s_itemHeightModCount = 0;
+static int	s_lastItemTimerEnabled = -1;
+static int	s_lastItemTimerHeight = -1;
 
 static qlr_game_frame_context_t *G_GetFrameContext( void );
 static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec );
@@ -54,7 +58,6 @@ static void G_StepEntities( qlr_game_frame_context_t *ctx );
 static void G_DispatchEvents( qlr_game_frame_context_t *ctx );
 static void G_FinishClientFrames( qlr_game_frame_context_t *ctx );
 static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued );
-
 void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
 	g_qlr_frame_ctx = ctx;
 
@@ -133,6 +136,8 @@ vmCvar_t        g_factoryRespawnDelay;
 vmCvar_t        g_factoryWarmupSpawnDelay;
 vmCvar_t        g_factoryAllowItemDrops;
 vmCvar_t        g_factoryAllowItemBounce;
+vmCvar_t        g_itemTimers;
+vmCvar_t        g_itemHeight;
 vmCvar_t        g_vampiricDamage;
 vmCvar_t	g_suddenDeathRespawn;
 vmCvar_t	g_suddenDeathRespawnStart;
@@ -270,6 +275,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_factoryWarmupSpawnDelay, "g_factoryWarmupSpawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds applied to warmup spawns when factories request staggered starts." },
 	{ &g_factoryAllowItemDrops, "g_factoryAllowItemDrops", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether item drop logic fires for weapons and powerups spawned from players." },
 	{ &g_factoryAllowItemBounce, "g_factoryAllowItemBounce", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether dropped items bounce before coming to rest when factories disable the behaviour." },
+	{ &g_itemTimers, "g_itemTimers", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Toggles broadcast of server-side item timer training aids when non-zero." },
+	{ &g_itemHeight, "g_itemHeight", "20", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Adjusts the vertical spacing clients apply to item timer widgets in the HUD." },
 	{ &g_vampiricDamage, "g_vampiricDamage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Fraction of dealt health damage returned to the attacker as healing." },
 	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_NORESTART, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
 	{ &g_suddenDeathRespawnTick, "g_suddenDeathRespawnTick", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Interval in seconds after which sudden-death respawn delays are increased." },
@@ -439,6 +446,34 @@ void G_UpdateWeaponConfig( void ) {
 	G_InitWeaponConfig();
 }
 
+/*
+=============
+G_UpdateItemTimerConfig
+
+Synchronises the item timer configuration cvars with all clients.
+=============
+*/
+static void G_UpdateItemTimerConfig( qboolean forceBroadcast ) {
+	int	enabled;
+	int	height;
+
+	enabled = g_itemTimers.integer ? 1 : 0;
+	height = g_itemHeight.integer;
+	if ( height <= 0 ) {
+		height = ITEM_TIMER_DEFAULT_HEIGHT;
+	} else if ( height > ITEM_TIMER_MAX_HEIGHT ) {
+		height = ITEM_TIMER_MAX_HEIGHT;
+	}
+
+	if ( !forceBroadcast && enabled == s_lastItemTimerEnabled && height == s_lastItemTimerHeight ) {
+		return;
+	}
+
+	s_lastItemTimerEnabled = enabled;
+	s_lastItemTimerHeight = height;
+
+	G_BroadcastItemTimerState( enabled, height );
+}
 
 static void LevelCheckTimers( void );
 void G_UpdateMatchStateConfigString( void );
@@ -629,6 +664,9 @@ void G_RegisterCvars( void ) {
         }
 
 	level.warmupModificationCount = g_warmup.modificationCount;
+	s_itemTimersModCount = g_itemTimers.modificationCount;
+	s_itemHeightModCount = g_itemHeight.modificationCount;
+	G_UpdateItemTimerConfig( qtrue );
         G_InitWeaponConfig();
         G_InitWeaponReloadConfig();
         G_InitKnockbackConfig();
@@ -684,6 +722,11 @@ void G_UpdateCvars( void ) {
         G_UpdateFactoryCvarConfig();
         G_UpdateMatchFactoryConfig();
 	G_SyncMatchFactoryConfigToLevel();
+	if ( g_itemTimers.modificationCount != s_itemTimersModCount || g_itemHeight.modificationCount != s_itemHeightModCount ) {
+		s_itemTimersModCount = g_itemTimers.modificationCount;
+		s_itemHeightModCount = g_itemHeight.modificationCount;
+		G_UpdateItemTimerConfig( qfalse );
+	}
 	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
 
         G_RefreshPmoveSettings();

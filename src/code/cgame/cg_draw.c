@@ -813,10 +813,23 @@ CG_DrawTimer
 =================
 */
 static float CG_DrawTimer( float y ) {
-	char		*s;
+	int			lineHeight;
+	int			drawY;
+	char			*s;
 	int			w;
 	int			mins, seconds, tens;
 	int			msec;
+
+	if ( !cgs.itemTimersEnabled ) {
+		return y;
+	}
+
+	lineHeight = cgs.itemTimerHeight;
+	if ( lineHeight <= 0 ) {
+		lineHeight = ITEM_TIMER_DEFAULT_HEIGHT;
+	} else if ( lineHeight > ITEM_TIMER_MAX_HEIGHT ) {
+		lineHeight = ITEM_TIMER_MAX_HEIGHT;
+	}
 
 	msec = cg.time - cgs.levelStartTime;
 
@@ -829,9 +842,17 @@ static float CG_DrawTimer( float y ) {
 	s = va( "%i:%i%i", mins, tens, seconds );
 	w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
 
-	CG_DrawBigString( 635 - w, y + 2, s, 1.0F);
+	drawY = y + ( lineHeight - BIGCHAR_HEIGHT ) / 2;
+	if ( drawY < y + 2 ) {
+		drawY = y + 2;
+	}
+	if ( drawY + BIGCHAR_HEIGHT > y + lineHeight ) {
+		drawY = y + lineHeight - BIGCHAR_HEIGHT;
+	}
 
-	return y + BIGCHAR_HEIGHT + 4;
+	CG_DrawBigString( 635 - w, drawY, s, 1.0F);
+
+	return y + lineHeight;
 }
 
 
