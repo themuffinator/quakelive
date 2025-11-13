@@ -108,6 +108,7 @@ vmCvar_t	g_allowVote;
 vmCvar_t	g_allowVoteMidGame;
 vmCvar_t	g_allowForfeit;
 vmCvar_t	g_allowKill;
+vmCvar_t	g_allowForfeit;
 vmCvar_t	g_complaintLimit;
 vmCvar_t	g_complaintDamageThreshold;
 vmCvar_t	g_voteFlags;
@@ -250,6 +251,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_allowVoteMidGame, "g_allowVoteMidGame", "0", 0, 0, qfalse },
 	{ &g_allowForfeit, "g_allowForfeit", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enables the forfeit console command when non-zero so duel and CA leagues can permit early surrenders." },
 	{ &g_allowKill, "g_allowKill", "1000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Minimum milliseconds between kill commands; 0 restores instant suicides." },
+	{ &g_allowForfeit, "g_allowForfeit", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enables match forfeits when non-zero." },
 	{ &g_complaintLimit, "g_complaintLimit", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Maximum complaints before a player is automatically kicked; 0 disables kicking." },
 	{ &g_complaintDamageThreshold, "g_complaintDamageThreshold", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Minimum damage from a teammate required to present the complaint prompt." },
 	{ &g_voteFlags, "g_voteFlags", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse },
@@ -735,6 +737,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	level.suddenDeathActive = qfalse;
 	level.suddenDeathLastDelay = -1;
 	level.suddenDeathNoRespawnLogged = qfalse;
+	level.matchForfeited = qfalse;
         {
                 int team;
                 for ( team = TEAM_FREE; team < TEAM_NUM_TEAMS; team++ ) {
@@ -1755,6 +1758,21 @@ void G_UpdateMatchStateConfigString( void ) {
 		blue ) );
 }
 
+/*
+=============
+G_ResetTimeoutState
+
+Clears the timeout bookkeeping so matches can resume immediately.
+=============
+*/
+void G_ResetTimeoutState( void ) {
+	level.timeoutActive = qfalse;
+	level.timeoutOwner = -1;
+	level.timeoutTeam = TEAM_FREE;
+	level.timeoutExpireTime = 0;
+	level.timeoutStartTime = 0;
+}
+
 void G_ApplyTimeoutPauseDelta( int msec ) {
 	if ( msec <= 0 ) {
 		return;
@@ -1835,6 +1853,55 @@ static void G_StopOvertime( void ) {
 	level.suddenDeathNoRespawnLogged = qfalse;
 	G_LogPrintf( "match: overtime cleared\n" );
 	G_UpdateMatchStateConfigString();
+
+
+/*
+=============
+G_HandleForfeit
+
+Transitions the current match into a forfeited state and synchronises timers, scores, and logs.
+=============
+*/
+void G_HandleForfeit( gentity_t *caller ) {
+	int pausedDuration;
+
+	if ( level.matchForfeited ) {
+		return;
+	}
+
+	level.matchForfeited = qtrue;
+
+	pausedDuration = 0;
+	if ( level.timeoutActive ) {
+		if ( level.timeoutStartTime > 0 && level.time > level.timeoutStartTime ) {
+			pausedDuration = level.time - level.timeoutStartTime;
+		}
+		if ( pausedDuration > 0 ) {
+			G_ApplyTimeoutPauseDelta( pausedDuration );
+		}
+	}
+
+	G_ResetTimeoutState();
+	G_StopOvertime();
+	G_UpdateMatchStateConfigString();
+
+	if ( g_gametype.integer >= GT_TEAM ) {
+		level.teamScores[TEAM_RED] = -999;
+		level.teamScores[TEAM_BLUE] = -999;
+		trap_SetConfigstring( CS_SCORES1, va( "%i", level.teamScores[TEAM_RED] ) );
+		trap_SetConfigstring( CS_SCORES2, va( "%i", level.teamScores[TEAM_BLUE] ) );
+	} else if ( g_gametype.integer == GT_TOURNAMENT && caller && caller->client ) {
+		if ( caller->health > 0 ) {
+			caller->flags &= ~FL_GODMODE;
+			caller->client->ps.stats[STAT_HEALTH] = caller->health = -999;
+			caller->client->pers.killCommandTime = level.time;
+			player_die( caller, caller, caller, 100000, MOD_SUICIDE );
+		}
+	}
+
+	trap_SendServerCommand( -1, "print \"Game has been forfeited.\n\"" );
+	LogExit( "Players have forfeited." );
+	CalculateRanks();
 }
 
 /*

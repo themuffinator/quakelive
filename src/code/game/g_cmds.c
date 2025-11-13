@@ -1929,14 +1929,6 @@ static qboolean G_ClientCanControlTimeouts( gentity_t *ent, team_t *teamOut ) {
 	return qtrue;
 }
 
-static void G_ResetTimeoutState( void ) {
-	level.timeoutActive = qfalse;
-	level.timeoutOwner = -1;
-	level.timeoutTeam = TEAM_FREE;
-	level.timeoutExpireTime = 0;
-	level.timeoutStartTime = 0;
-}
-
 void Cmd_Timeout_f( gentity_t *ent ) {
 	team_t team;
 	int remaining;
@@ -2016,6 +2008,48 @@ void Cmd_Timein_f( gentity_t *ent ) {
 	G_UpdateMatchStateConfigString();
 }
 
+/*
+=============
+Cmd_Forfeit_f
+
+Concedes the current match when permitted by the server configuration.
+=============
+*/
+void Cmd_Forfeit_f( gentity_t *ent ) {
+	team_t team;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( g_allowForfeit.integer <= 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Forfeit is not enabled on this server.\n\"" );
+		return;
+	}
+
+	if ( level.matchForfeited ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Match has already been forfeited.\n\"" );
+		return;
+	}
+
+	if ( g_gametype.integer != GT_TOURNAMENT && g_gametype.integer < GT_TEAM ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Forfeit is only available in duel or team modes.\n\"" );
+		return;
+	}
+
+	team = ent->client->sess.sessionTeam;
+	if ( g_gametype.integer >= GT_TEAM ) {
+		if ( team != TEAM_RED && team != TEAM_BLUE ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Join a team before forfeiting the match.\n\"" );
+			return;
+		}
+	} else if ( team == TEAM_SPECTATOR ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Spectators cannot forfeit matches.\n\"" );
+		return;
+	}
+
+	G_HandleForfeit( ent );
+}
 
 /*
 =================
@@ -2185,6 +2219,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_Timeout_f( ent );
 	else if ( !Q_stricmp( cmd, "timein" ) || !Q_stricmp( cmd, "resume" ) || !Q_stricmp( cmd, "unpause" ) )
 		Cmd_Timein_f( ent );
+	else if ( !Q_stricmp( cmd, "forfeit" ) )
+		Cmd_Forfeit_f( ent );
 	else if (Q_stricmp (cmd, "setviewpos") == 0)
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)
