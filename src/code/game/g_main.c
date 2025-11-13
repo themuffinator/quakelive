@@ -1736,6 +1736,13 @@ static void G_StopOvertime( void ) {
 	G_UpdateMatchStateConfigString();
 }
 
+/*
+=============
+G_TrackSuddenDeathAnnouncements
+
+Ensure sudden-death respawn messaging is delivered via center-print prompts.
+=============
+*/
 static void G_TrackSuddenDeathAnnouncements( void ) {
 	if ( !level.overtimeActive ) {
 		return;
@@ -1746,7 +1753,7 @@ static void G_TrackSuddenDeathAnnouncements( void ) {
 			level.suddenDeathLastDelay = -1;
 			G_LogPrintf( "match: sudden-death respawns disabled\n" );
 			if ( g_suddenDeathRespawnPrint.integer ) {
-				trap_SendServerCommand( -1, "print \"Sudden-death respawns disabled\n\"" );
+				trap_SendServerCommand( -1, "cp \"Sudden-death respawns disabled\n\"" );
 			}
 		}
 		return;
@@ -1761,12 +1768,12 @@ static void G_TrackSuddenDeathAnnouncements( void ) {
 		G_LogPrintf( "match: sudden-death respawn delay %i ms\n", delay );
 		if ( g_suddenDeathRespawnPrint.integer ) {
 			if ( delay > 0 ) {
-				trap_SendServerCommand( -1, va( "print \"Sudden-death respawns in %i seconds\n\"", delay / 1000 ) );
+				trap_SendServerCommand( -1, va( "cp \"Sudden-death respawns available in %i seconds\n\"", delay / 1000 ) );
 			} else {
-				trap_SendServerCommand( -1, "print \"Sudden-death respawns now available\n\"" );
+				trap_SendServerCommand( -1, "cp \"Sudden-death respawns available now\n\"" );
 			}
 		}
-	}
+}
 }
 
 static void LevelCheckTimers( void ) {
