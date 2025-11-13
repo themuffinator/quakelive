@@ -121,6 +121,15 @@ vmCvar_t	g_teamForceBalance;
 vmCvar_t	g_banIPs;
 vmCvar_t	g_filterBan;
 vmCvar_t	g_instaGib;
+vmCvar_t	g_itemTimers;
+vmCvar_t	g_itemHeight;
+vmCvar_t	g_forceSmallScoreboardMessage;
+vmCvar_t	g_forceSendConfigstring;
+vmCvar_t	g_forceAtmosphericEffects;
+vmCvar_t	g_forceDmgThroughSurface;
+vmCvar_t	g_playermodelOverride;
+vmCvar_t	g_playerheadmodelOverride;
+vmCvar_t	g_training;
 vmCvar_t	g_smoothClients;
 vmCvar_t	pmove_fixed;
 vmCvar_t	pmove_msec;
@@ -223,6 +232,15 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_banIPs, "g_banIPs", "", CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_filterBan, "g_filterBan", "1", CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_instaGib, "g_instaGib", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
+	{ &g_itemTimers, "g_itemTimers", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Force server-controlled item timers to display for all clients when non-zero." },
+	{ &g_itemHeight, "g_itemHeight", "35", CVAR_ARCHIVE, 0, qfalse, qfalse, "Vertical offset in units applied to enforced item timer indicators." },
+	{ &g_forceSmallScoreboardMessage, "g_forceSmallScoreboardMessage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Prefer the compact scoreboard centerprint even with small player counts." },
+	{ &g_forceSendConfigstring, "g_forceSendConfigstring", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Resend all configstrings to clients on map load when enabled to debug sync issues." },
+	{ &g_forceAtmosphericEffects, "g_forceAtmosphericEffects", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable atmospheric map effects such as snow or rain regardless of client preference." },
+	{ &g_forceDmgThroughSurface, "g_forceDmgThroughSurface", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow splash damage to pass through non-solid surfaces for testing when set." },
+	{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional model path used to override every player's model selection server-wide." },
+	{ &g_playerheadmodelOverride, "g_playerheadmodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional head model override applied to all players for consistent visuals." },
+	{ &g_training, "g_training", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable the training progression gate so players must complete tutorials." },
 
 	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 
