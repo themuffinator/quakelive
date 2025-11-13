@@ -325,7 +325,7 @@ void PM_StepSlideMove( qboolean gravity, float stepHeight ) {
 			}
 		}
 
-		if ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) {
+		if ( delta > 0.0f && ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) ) {
 			PM_ApplyStepJump( delta, qtrue );
 		}
 
