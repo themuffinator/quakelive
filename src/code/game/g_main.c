@@ -629,6 +629,12 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	G_InitSpawnQueue();
 	level.time = levelTime;
 	level.startTime = levelTime;
+	level.voteLastCaller = -1;
+	level.voteLastSelection = -1;
+	level.voteLastTime = 0;
+	level.voteDelayMsec = 0;
+	level.voteLimit = 0;
+	level.voteFlags = 0;
 
 	level.timeoutOwner = -1;
 	level.timeoutTeam = TEAM_FREE;

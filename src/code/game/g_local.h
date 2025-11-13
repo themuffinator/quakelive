@@ -370,7 +370,6 @@ typedef struct {
 //
 #define MAX_NETNAME			36
 #define	MAX_VOTE_COUNT		3
-#define	VOTE_THROTTLE_MSEC	0x8CA
 
 // client data that stays across multiple respawns, but is cleared
 // on each level change or team change at ClientBegin()
@@ -391,6 +390,7 @@ typedef struct {
 	int		voteDelayTime;
 	int		voteLastSelection;
 	int		voteLastEnableFrame;
+	int		voteLastTime;
 } clientPersistant_t;
 
 
@@ -518,6 +518,12 @@ typedef struct {
 	int			voteYes;
 	int			voteNo;
 	int			numVotingClients;		// set by CalculateRanks
+	int			voteLastCaller;
+	int			voteLastSelection;
+	int			voteLastTime;
+	int			voteDelayMsec;
+	int			voteLimit;
+	int			voteFlags;
 
 	// team voting state
 	char		teamVoteString[2][MAX_STRING_CHARS];
@@ -802,6 +808,9 @@ void G_InitClientVoteThrottle( gclient_t *client );
 void G_ResetClientVoteThrottle( gclient_t *client );
 void G_RegisterVoteCall( gclient_t *client, int clientNum, int voteSelection );
 void G_UpdateVoteThrottle( void );
+int G_VoteGetFlags( void );
+int G_VoteGetLimit( void );
+qboolean G_VoteFlagsDisableMask( int mask );
 void QDECL G_Printf( const char *fmt, ... );
 void QDECL G_Error( const char *fmt, ... );
 
