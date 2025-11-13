@@ -25,6 +25,207 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_local.h"
 #include <limits.h>
 
+#define COMPLAINT_PROMPT_MSEC	15500
+#define COMPLAINT_DECAY_MSEC	15500
+
+/*
+=============
+G_ComplaintResetClient
+
+Clears the complaint bookkeeping attached to a client. When resetCount is true the lifetime
+complaint counter is also zeroed.
+=============
+*/
+void G_ComplaintResetClient( gclient_t *client, qboolean resetCount ) {
+	if ( !client ) {
+		return;
+	}
+
+	client->complaintClient = -1;
+	client->complaintEndTime = 0;
+	client->complaintTarget = -1;
+	client->complaintDamage = 0;
+	client->complaintLastDamageTime = 0;
+
+	if ( resetCount ) {
+		client->complaintCount = 0;
+	}
+}
+
+/*
+=============
+G_ComplaintConsiderForDamage
+
+Accumulates team damage dealt by an attacker and prompts the victim once the configured
+threshold is exceeded.
+=============
+*/
+void G_ComplaintConsiderForDamage( gentity_t *attacker, gentity_t *victim, int damage ) {
+	gclient_t *attackerClient;
+	gclient_t *victimClient;
+	int threshold;
+
+	if ( damage <= 0 || !attacker || !victim ) {
+		return;
+	}
+
+	attackerClient = attacker->client;
+	victimClient = victim->client;
+
+	if ( !attackerClient || !victimClient ) {
+		return;
+	}
+
+	if ( attackerClient->pers.connected != CON_CONNECTED ) {
+		return;
+	}
+
+	if ( attackerClient == victimClient ) {
+		return;
+	}
+
+	if ( attackerClient->sess.sessionTeam != victimClient->sess.sessionTeam ) {
+		return;
+	}
+
+	if ( attackerClient->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	threshold = g_complaintDamageThreshold.integer;
+	if ( threshold <= 0 ) {
+		return;
+	}
+
+	if ( attackerClient->complaintTarget != victim->s.number ) {
+		attackerClient->complaintTarget = victim->s.number;
+		attackerClient->complaintDamage = 0;
+	}
+
+	if ( attackerClient->complaintLastDamageTime > 0 && level.time - attackerClient->complaintLastDamageTime > COMPLAINT_DECAY_MSEC ) {
+		attackerClient->complaintDamage = 0;
+	}
+
+	attackerClient->complaintLastDamageTime = level.time;
+
+	if ( damage > INT_MAX - attackerClient->complaintDamage ) {
+		attackerClient->complaintDamage = INT_MAX;
+	} else {
+		attackerClient->complaintDamage += damage;
+	}
+
+	if ( attackerClient->complaintDamage < threshold ) {
+		return;
+	}
+
+	if ( victimClient->complaintClient >= 0 && victimClient->complaintEndTime > level.time ) {
+		attackerClient->complaintDamage = 0;
+		attackerClient->complaintTarget = -1;
+		return;
+	}
+
+	if ( attackerClient->sess.sessionTeam == TEAM_SPECTATOR ) {
+		trap_SendServerCommand( victim - g_entities, "complaint -4" );
+		attackerClient->complaintDamage = 0;
+		attackerClient->complaintTarget = -1;
+		return;
+	}
+
+	victimClient->complaintClient = attacker->s.number;
+	victimClient->complaintEndTime = level.time + COMPLAINT_PROMPT_MSEC;
+	trap_SendServerCommand( victim - g_entities, va( "complaint %i", attacker->s.number ) );
+
+	attackerClient->complaintDamage = 0;
+	attackerClient->complaintTarget = -1;
+}
+
+/*
+=============
+G_ComplaintResolve
+
+Finalises a pending complaint, applying either the punishment or forgiveness flow
+for the attacker and informing both parties of the outcome.
+=============
+*/
+void G_ComplaintResolve( gentity_t *victim, qboolean filed ) {
+	gclient_t *victimClient;
+	gentity_t *attacker;
+	gclient_t *attackerClient;
+	int attackerNum;
+	int victimNum;
+
+	if ( !victim || !victim->client ) {
+		return;
+	}
+
+	victimClient = victim->client;
+	victimNum = victim - g_entities;
+	attackerNum = victimClient->complaintClient;
+	victimClient->complaintClient = -1;
+	victimClient->complaintEndTime = 0;
+
+	if ( attackerNum < 0 || attackerNum >= level.maxclients ) {
+		trap_SendServerCommand( victimNum, "complaint -3" );
+		return;
+	}
+
+	attacker = g_entities + attackerNum;
+	attackerClient = attacker->client;
+
+	if ( !attackerClient || attackerClient->pers.connected != CON_CONNECTED ) {
+		trap_SendServerCommand( victimNum, "complaint -3" );
+		return;
+	}
+
+	attackerClient->complaintDamage = 0;
+	attackerClient->complaintTarget = -1;
+	attackerClient->complaintLastDamageTime = 0;
+
+	if ( filed ) {
+		attackerClient->complaintCount++;
+		trap_SendServerCommand( attackerNum, "print \"^1Warning^7: Complaint filed against you.\n\"" );
+		trap_SendServerCommand( victimNum, "complaint -1" );
+
+		if ( g_complaintLimit.integer > 0 && attackerClient->complaintCount >= g_complaintLimit.integer ) {
+			trap_DropClient( attackerNum, "kicked after too many complaints." );
+		}
+	} else {
+		trap_SendServerCommand( attackerNum, "print \"No complaint filed against you.\n\"" );
+		trap_SendServerCommand( victimNum, "complaint -2" );
+	}
+}
+
+/*
+=============
+G_ComplaintClientDisconnected
+
+Clears any outstanding complaint state that references a departing client and
+notifies victims that the complaint is no longer actionable.
+=============
+*/
+void G_ComplaintClientDisconnected( int clientNum ) {
+	int i;
+
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return;
+	}
+
+	for ( i = 0; i < level.maxclients; ++i ) {
+		gclient_t *client = level.clients + i;
+
+		if ( client->complaintClient == clientNum ) {
+			client->complaintClient = -1;
+			client->complaintEndTime = 0;
+			trap_SendServerCommand( i, "complaint -3" );
+		}
+
+		if ( client->complaintTarget == clientNum ) {
+			client->complaintTarget = -1;
+			client->complaintDamage = 0;
+			client->complaintLastDamageTime = 0;
+		}
+	}
+}
 
 /*
 ============
@@ -1184,6 +1385,14 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	// save some from armor
 	asave = CheckArmor (targ, take, dflags);
 	take -= asave;
+
+	if ( attacker->client && client && attacker != targ && OnSameTeam( targ, attacker ) ) {
+		int teamDamage = take + asave;
+
+		if ( teamDamage > 0 ) {
+			G_ComplaintConsiderForDamage( attacker, targ, teamDamage );
+		}
+	}
 
 	if ( g_debugDamage.integer ) {
 		G_Printf( "%i: client:%i health:%i damage:%i armor:%i\n", level.time, targ->s.number,

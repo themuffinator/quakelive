@@ -1772,6 +1772,64 @@ void Cmd_Timein_f( gentity_t *ent ) {
 
 /*
 =================
+Cmd_Complaint_f
+
+Processes friendly-fire complaint responses from the victim.
+=================
+*/
+static void Cmd_Complaint_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	gclient_t *client;
+	int attackerNum;
+	gentity_t *attacker;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	client = ent->client;
+
+	if ( client->complaintClient < 0 ) {
+		client->complaintClient = -1;
+		client->complaintEndTime = 0;
+		return;
+	}
+
+	if ( client->complaintEndTime > 0 && client->complaintEndTime <= level.time ) {
+		G_ComplaintResolve( ent, qfalse );
+		return;
+	}
+
+	attackerNum = client->complaintClient;
+
+	if ( attackerNum < 0 || attackerNum >= level.maxclients ) {
+		client->complaintClient = -1;
+		client->complaintEndTime = 0;
+		trap_SendServerCommand( ent - g_entities, "complaint -3" );
+		return;
+	}
+
+	attacker = &g_entities[attackerNum];
+
+	if ( !attacker->client || attacker->client->pers.connected != CON_CONNECTED ) {
+		client->complaintClient = -1;
+		client->complaintEndTime = 0;
+		trap_SendServerCommand( ent - g_entities, "complaint -3" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+
+	if ( arg[0] == 'y' || arg[0] == 'Y' || arg[0] == '1' ) {
+		G_ComplaintResolve( ent, qtrue );
+		return;
+	}
+
+	G_ComplaintResolve( ent, qfalse );
+}
+
+/*
+=================
 ClientCommand
 =================
 */
@@ -1797,6 +1855,10 @@ void ClientCommand( int clientNum ) {
 	}
 	if (Q_stricmp (cmd, "tell") == 0) {
 		Cmd_Tell_f ( ent );
+		return;
+	}
+	if (Q_stricmp (cmd, "complaint") == 0) {
+		Cmd_Complaint_f( ent );
 		return;
 	}
 	if (Q_stricmp (cmd, "vsay") == 0) {

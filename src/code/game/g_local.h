@@ -450,6 +450,13 @@ struct gclient_s {
 
 	int			switchTeamTime;		// time the player switched teams
 
+	int			complaintClient;
+	int			complaintEndTime;
+	int			complaintCount;
+	int			complaintTarget;
+	int			complaintDamage;
+	int			complaintLastDamageTime;
+
 	// timeResidual is used to handle events that happen every second
 	// like health / armor countdowns and regeneration
 	int			timeResidual;
@@ -802,6 +809,10 @@ void G_InitClientVoteThrottle( gclient_t *client );
 void G_ResetClientVoteThrottle( gclient_t *client );
 void G_RegisterVoteCall( gclient_t *client, int clientNum, int voteSelection );
 void G_UpdateVoteThrottle( void );
+void G_ComplaintResetClient( gclient_t *client, qboolean resetCount );
+void G_ComplaintConsiderForDamage( gentity_t *attacker, gentity_t *victim, int damage );
+void G_ComplaintResolve( gentity_t *victim, qboolean filed );
+void G_ComplaintClientDisconnected( int clientNum );
 void QDECL G_Printf( const char *fmt, ... );
 void QDECL G_Error( const char *fmt, ... );
 
@@ -953,6 +964,8 @@ extern	vmCvar_t	g_allowVote;
 extern	vmCvar_t	g_allowVoteMidGame;
 extern	vmCvar_t	g_voteDelay;
 extern	vmCvar_t	g_voteLimit;
+extern	vmCvar_t	g_complaintDamageThreshold;
+extern	vmCvar_t	g_complaintLimit;
 extern	vmCvar_t	g_voteFlags;
 extern	vmCvar_t	g_teamAutoJoin;
 extern	vmCvar_t	g_teamForceBalance;
