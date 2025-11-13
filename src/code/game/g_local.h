@@ -122,6 +122,9 @@ typedef struct factoryCvarConfig_s {
 	int		startingHealth;
 	int		startingHealthBonus;
 	int		startingArmor;
+	int		allowKillDelayMilliseconds;
+	int		complaintDamageThreshold;
+	int		complaintLimit;
 } factoryCvarConfig_t;
 
 extern factoryCvarConfig_t g_factoryCvarConfig;
@@ -445,6 +448,12 @@ struct gclient_s {
 	int			airOutTime;
 
 	int			lastKillTime;		// for multiple kill rewards
+	int			lastKillCommandTime;	// last time the player issued the kill command
+	int			killCommandCooldownExpires;	// time when the kill command is allowed again
+	int			friendlyFireComplaints;	// number of friendly-fire complaints on this client
+	int			friendlyFireComplaintEndTime;	// time when the latest complaint penalty expires
+	int			teammateDamageGiven;	// accumulated teammate damage across the match
+	int			teammateDamageThisLife;	// accumulated teammate damage for the current life
 
 	qboolean	fireHeld;			// used for hook
 	gentity_t	*hook;				// grapple hook if out
@@ -953,6 +962,8 @@ extern	vmCvar_t	g_allowSpecVote;
 extern	vmCvar_t	g_allowVote;
 extern	vmCvar_t	g_allowVoteMidGame;
 extern	vmCvar_t	g_allowKill;
+extern	vmCvar_t	g_complaintLimit;
+extern	vmCvar_t	g_complaintDamageThreshold;
 extern	vmCvar_t	g_voteDelay;
 extern	vmCvar_t	g_voteLimit;
 extern	vmCvar_t	g_voteFlags;

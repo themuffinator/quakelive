@@ -82,6 +82,10 @@
 #define DEFAULT_STARTING_HEALTH_BONUS      25
 #define DEFAULT_STARTING_ARMOR             0
 
+#define DEFAULT_ALLOW_KILL_DELAY_MILLISECONDS      1000
+#define DEFAULT_COMPLAINT_DAMAGE_THRESHOLD        1
+#define DEFAULT_COMPLAINT_LIMIT                   1
+
 weaponReloadConfig_t    g_weaponReloadConfig;
 knockbackConfig_t       g_knockbackConfig;
 ammoPackConfig_t        g_ammoPackConfig;
@@ -493,6 +497,9 @@ static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {
         config.startingHealth = G_ReadFactoryPositiveCvar( &g_startingHealth, DEFAULT_STARTING_HEALTH, "g_startingHealth" );
         config.startingHealthBonus = G_ReadFactoryNonNegativeCvar( &g_startingHealthBonus, DEFAULT_STARTING_HEALTH_BONUS, "g_startingHealthBonus" );
         config.startingArmor = G_ReadFactoryNonNegativeCvar( &g_startingArmor, DEFAULT_STARTING_ARMOR, "g_startingArmor" );
+	config.allowKillDelayMilliseconds = G_ReadFactoryNonNegativeCvar( &g_allowKill, DEFAULT_ALLOW_KILL_DELAY_MILLISECONDS, "g_allowKill" );
+	config.complaintDamageThreshold = G_ReadFactoryNonNegativeCvar( &g_complaintDamageThreshold, DEFAULT_COMPLAINT_DAMAGE_THRESHOLD, "g_complaintDamageThreshold" );
+	config.complaintLimit = G_ReadFactoryNonNegativeCvar( &g_complaintLimit, DEFAULT_COMPLAINT_LIMIT, "g_complaintLimit" );
 
         return config;
 }
@@ -509,7 +516,7 @@ static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfi
                 return;
         }
 
-        G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i suddenDeathRespawn=%i startHealth=%i bonus=%i armor=%i\n",
+        G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i suddenDeathRespawn=%i startHealth=%i bonus=%i armor=%i allowKill=%i complaintThreshold=%i complaintLimit=%i\n",
                 reason,
                 config->startingWeaponsMask,
                 config->startingWeaponsStatMask,
@@ -520,7 +527,10 @@ static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfi
                 config->suddenDeathRespawn,
                 config->startingHealth,
                 config->startingHealthBonus,
-                config->startingArmor );
+                config->startingArmor,
+                config->allowKillDelayMilliseconds,
+                config->complaintDamageThreshold,
+                config->complaintLimit );
 }
 
 static factoryCvarConfig_t s_reportedFactoryConfig;
@@ -557,7 +567,10 @@ void G_UpdateFactoryCvarConfig( void ) {
                 || config.suddenDeathRespawn != s_reportedFactoryConfig.suddenDeathRespawn
                 || config.startingHealth != s_reportedFactoryConfig.startingHealth
                 || config.startingHealthBonus != s_reportedFactoryConfig.startingHealthBonus
-                || config.startingArmor != s_reportedFactoryConfig.startingArmor ) {
+                || config.startingArmor != s_reportedFactoryConfig.startingArmor
+                || config.allowKillDelayMilliseconds != s_reportedFactoryConfig.allowKillDelayMilliseconds
+                || config.complaintDamageThreshold != s_reportedFactoryConfig.complaintDamageThreshold
+                || config.complaintLimit != s_reportedFactoryConfig.complaintLimit ) {
                 G_LogFactoryLoadoutState( "update", &config );
                 s_reportedFactoryConfig = config;
         }
