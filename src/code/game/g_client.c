@@ -1134,6 +1134,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	memset( client, 0, sizeof(*client) );
 
 	client->pers.connected = CON_CONNECTING;
+	client->pers.killCommandTime = -1;
 	G_InitClientVoteThrottle( client );
 
 	// read or initialize the session data

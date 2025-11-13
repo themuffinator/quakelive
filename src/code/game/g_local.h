@@ -394,6 +394,7 @@ typedef struct {
 	int		voteDelayTime;
 	int		voteLastSelection;
 	int		voteLastEnableFrame;
+	int		killCommandTime;
 } clientPersistant_t;
 
 
