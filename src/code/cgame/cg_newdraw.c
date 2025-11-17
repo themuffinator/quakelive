@@ -1392,27 +1392,6 @@ qboolean CG_OwnerDrawVisible(int flags) {
 		}
 	}
 
-	if (flags & CG_SHOW_HEALTHOK) {
-		if (cg.snap->ps.stats[STAT_HEALTH] >= 25) {
-			return qtrue;
-		}
-	}
-
-	if (flags & CG_SHOW_SINGLEPLAYER) {
-		if( cgs.gametype == GT_SINGLE_PLAYER ) {
-			return qtrue;
-		}
-	}
-
-	if (flags & CG_SHOW_TOURNAMENT) {
-		if( cgs.gametype == GT_TOURNAMENT ) {
-			return qtrue;
-		}
-	}
-
-	if (flags & CG_SHOW_DURINGINCOMINGVOICE) {
-	}
-
 	if (flags & CG_SHOW_IF_PLAYER_HAS_FLAG) {
 		if (cg.snap->ps.powerups[PW_REDFLAG] || cg.snap->ps.powerups[PW_BLUEFLAG] || cg.snap->ps.powerups[PW_NEUTRALFLAG]) {
 			return qtrue;
