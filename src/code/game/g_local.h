@@ -613,6 +613,22 @@ typedef struct {
 } racePointInfo_t;
 
 typedef struct {
+	int		thawTime;
+	int		thawTick;
+	int		thawRadius;
+	qboolean	thawThroughSurface;
+	qboolean	thawWinningTeam;
+	int		roundDelay;
+	qboolean	resetWeapons;
+	qboolean	resetHealth;
+	qboolean	resetArmor;
+	qboolean	removePowerups;
+	int		protectedSpawnTime;
+	int		environmentalRespawnDelay;
+	int		autoThawTime;
+} freezeRoundConfig_t;
+
+typedef struct {
 	struct gclient_s	*clients;		// [maxclients]
 
 	struct gentity_s	*gentities;
@@ -724,6 +740,7 @@ typedef struct {
 	qboolean		spawnQueueActive;
 	qboolean		matchAllowItemDrops;
 	qboolean		matchAllowItemBounce;
+	freezeRoundConfig_t	freezeConfig;
 	int			freezeLivingCount[TEAM_NUM_TEAMS];
 	int			freezeLivingHealth[TEAM_NUM_TEAMS];
 	qboolean		quadHogEnabled;
@@ -750,6 +767,7 @@ qboolean	G_SpawnVector( const char *key, const char *defaultString, float *out )
 void	G_InitSpawnQueue( void );
 void	G_SyncMatchFactoryConfigToLevel( void );
 qboolean	G_FreezeGametypeEnabled( void );
+void	G_FreezeSyncCvars( void );
 void	G_FreezeInitClient( gentity_t *ent );
 void	G_FreezeThawClient( gentity_t *ent, qboolean wasAuto, int helperNum );
 void	G_FreezeClientEndFrame( gentity_t *ent );

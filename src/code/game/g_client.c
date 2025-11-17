@@ -48,8 +48,8 @@ void G_FreezeClientEndFrame( gentity_t *ent ) {
 	}
 
 	client = ent->client;
-	thawTick = g_freezeThawTick.integer;
-	thawTotal = g_freezeThawTime.integer;
+	thawTick = level.freezeConfig.thawTick;
+	thawTotal = level.freezeConfig.thawTime;
 	if ( thawTick <= 0 ) {
 		thawTick = thawTotal;
 	}
@@ -1435,7 +1435,7 @@ static gentity_t *G_FreezeFindThawHelper( gentity_t *ent ) {
 		return NULL;
 	}
 
-	radius = (float)g_freezeThawRadius.integer;
+	radius = (float)level.freezeConfig.thawRadius;
 	if ( radius <= 0.0f ) {
 		return NULL;
 	}
@@ -1469,7 +1469,7 @@ static gentity_t *G_FreezeFindThawHelper( gentity_t *ent ) {
 			continue;
 		}
 
-		if ( !g_freezeThawThroughSurface.integer ) {
+		if ( !level.freezeConfig.thawThroughSurface ) {
 			trap_Trace( &trace, helper->r.currentOrigin, NULL, NULL,
 			ent->r.currentOrigin, helper->s.number, MASK_SOLID );
 			if ( trace.fraction < 1.0f ) {
@@ -1506,8 +1506,8 @@ void G_FreezeInitClient( gentity_t *ent ) {
 	client->freezeProtectedUntil = 0;
 	client->freezeEnvironmentalRespawnTime = 0;
 	client->freezeLastHelper = -1;
-	if ( G_FreezeGametypeEnabled() && g_freezeProtectedSpawnTime.integer > 0 ) {
-		client->freezeProtectedUntil = level.time + g_freezeProtectedSpawnTime.integer;
+	if ( G_FreezeGametypeEnabled() && level.freezeConfig.protectedSpawnTime > 0 ) {
+		client->freezeProtectedUntil = level.time + level.freezeConfig.protectedSpawnTime;
 	}
 }
 
@@ -1530,18 +1530,18 @@ static void G_FreezeApplyFreezeState( gentity_t *self, qboolean environmental ) 
 	client->freezeFrozen = qtrue;
 	client->freezeTime = level.time;
 	client->freezeAccumulatedThaw = 0;
-	thawTick = g_freezeThawTick.integer;
+	thawTick = level.freezeConfig.thawTick;
 	if ( thawTick <= 0 ) {
-		thawTick = g_freezeThawTime.integer;
+		thawTick = level.freezeConfig.thawTime;
 	}
 	if ( thawTick <= 0 ) {
 		thawTick = 100;
 	}
 	client->freezeNextThawTick = level.time + thawTick;
-	client->freezeAutoThawTime = ( g_freezeAutoThawTime.integer > 0 )
-	? level.time + g_freezeAutoThawTime.integer : 0;
-	if ( environmental && g_freezeEnvironmentalRespawnDelay.integer > 0 ) {
-		client->freezeEnvironmentalRespawnTime = level.time + g_freezeEnvironmentalRespawnDelay.integer;
+	client->freezeAutoThawTime = ( level.freezeConfig.autoThawTime > 0 )
+		? level.time + level.freezeConfig.autoThawTime : 0;
+	if ( environmental && level.freezeConfig.environmentalRespawnDelay > 0 ) {
+		client->freezeEnvironmentalRespawnTime = level.time + level.freezeConfig.environmentalRespawnDelay;
 	} else {
 		client->freezeEnvironmentalRespawnTime = 0;
 	}
@@ -1586,18 +1586,18 @@ void G_FreezeThawClient( gentity_t *ent, qboolean wasAuto, int helperNum ) {
 	client->freezeLastHelper = -1;
 	client->ps.pm_type = PM_NORMAL;
 	ent->takedamage = qtrue;
-	if ( g_freezeResetHealthOnRound.integer ) {
+	if ( level.freezeConfig.resetHealth ) {
 		ent->health = client->ps.stats[STAT_MAX_HEALTH];
 		client->ps.stats[STAT_HEALTH] = ent->health;
 	}
-	if ( g_freezeResetArmorOnRound.integer ) {
+	if ( level.freezeConfig.resetArmor ) {
 		client->ps.stats[STAT_ARMOR] = g_factoryCvarConfig.startingArmor;
 	}
-	if ( g_freezeRemovePowerupsOnRound.integer ) {
+	if ( level.freezeConfig.removePowerups ) {
 		memset( client->ps.powerups, 0, sizeof( client->ps.powerups ) );
 	}
-	if ( g_freezeProtectedSpawnTime.integer > 0 ) {
-		client->freezeProtectedUntil = level.time + g_freezeProtectedSpawnTime.integer;
+	if ( level.freezeConfig.protectedSpawnTime > 0 ) {
+		client->freezeProtectedUntil = level.time + level.freezeConfig.protectedSpawnTime;
 	} else {
 		client->freezeProtectedUntil = 0;
 	}

@@ -1143,6 +1143,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 		G_RaceInitLevel();
 	}
 	G_InitSpawnQueue();
+	G_FreezeSyncCvars();
 	level.time = levelTime;
 	level.startTime = levelTime;
 	level.roundState = ROUNDSTATE_INACTIVE;

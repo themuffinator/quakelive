@@ -1191,6 +1191,7 @@ void G_Frame_BeginRoundWarmup( void ) {
 	level.roundStartTime = level.time;
 	G_RRResetRoundState();
 	if ( G_FreezeGametypeEnabled() ) {
+		G_FreezeSyncCvars();
 		G_FreezeResetClientsForRound( qtrue );
 		G_FreezeScheduleWarmupDelay();
 	}
@@ -1227,6 +1228,7 @@ static void G_Frame_BeginRoundActive( void ) {
 	level.roundStartTime = level.time;
 	level.roundNumber++;
 	if ( G_FreezeGametypeEnabled() ) {
+		G_FreezeSyncCvars();
 		G_FreezeResetClientsForRound( qfalse );
 	}
 }
@@ -1240,6 +1242,50 @@ Returns qtrue when the freeze ruleset should run for the active gametype.
 */
 qboolean G_FreezeGametypeEnabled( void ) {
 	return ( g_gametype.integer == GT_FREEZE ) ? qtrue : qfalse;
+}
+
+/*
+=============
+G_FreezeSyncCvars
+
+Copies the current freeze-related CVars into the cached level state.
+=============
+*/
+void G_FreezeSyncCvars( void ) {
+	freezeRoundConfig_t	*config;
+
+	config = &level.freezeConfig;
+	config->thawTime = g_freezeThawTime.integer;
+	if ( config->thawTime <= 0 ) {
+		config->thawTime = 2000;
+	}
+	config->thawTick = g_freezeThawTick.integer;
+	if ( config->thawTick <= 0 ) {
+		config->thawTick = config->thawTime;
+	}
+	if ( config->thawTick <= 0 ) {
+		config->thawTick = 100;
+	}
+	config->thawRadius = g_freezeThawRadius.integer;
+	if ( config->thawRadius <= 0 ) {
+		config->thawRadius = 96;
+	}
+	config->thawThroughSurface = g_freezeThawThroughSurface.integer ? qtrue : qfalse;
+	config->thawWinningTeam = g_freezeThawWinningTeam.integer ? qtrue : qfalse;
+	config->roundDelay = g_freezeRoundDelay.integer;
+	if ( config->roundDelay < 0 ) {
+		config->roundDelay = 0;
+	}
+	config->resetWeapons = g_freezeResetWeaponsOnRound.integer ? qtrue : qfalse;
+	config->resetHealth = g_freezeResetHealthOnRound.integer ? qtrue : qfalse;
+	config->resetArmor = g_freezeResetArmorOnRound.integer ? qtrue : qfalse;
+	config->removePowerups = g_freezeRemovePowerupsOnRound.integer ? qtrue : qfalse;
+	config->protectedSpawnTime = ( g_freezeProtectedSpawnTime.integer > 0 )
+		? g_freezeProtectedSpawnTime.integer : 0;
+	config->environmentalRespawnDelay = ( g_freezeEnvironmentalRespawnDelay.integer > 0 )
+		? g_freezeEnvironmentalRespawnDelay.integer : 0;
+	config->autoThawTime = ( g_freezeAutoThawTime.integer > 0 )
+		? g_freezeAutoThawTime.integer : 0;
 }
 
 /*
@@ -1292,7 +1338,7 @@ static void G_FreezeResetClientsForRound( qboolean warmup ) {
 			continue;
 		}
 
-		if ( g_freezeResetWeaponsOnRound.integer ) {
+		if ( level.freezeConfig.resetWeapons ) {
 			G_RequestClientSpawn( ent, warmup, qfalse );
 			continue;
 		}
@@ -1302,14 +1348,14 @@ static void G_FreezeResetClientsForRound( qboolean warmup ) {
 		ent->client->ps.pm_type = PM_NORMAL;
 		ent->client->respawnTime = level.time;
 		ent->takedamage = qtrue;
-		if ( g_freezeResetHealthOnRound.integer ) {
+		if ( level.freezeConfig.resetHealth ) {
 			ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
 			ent->client->ps.stats[STAT_HEALTH] = ent->health;
 		}
-		if ( g_freezeResetArmorOnRound.integer ) {
+		if ( level.freezeConfig.resetArmor ) {
 			ent->client->ps.stats[STAT_ARMOR] = g_factoryCvarConfig.startingArmor;
 		}
-		if ( g_freezeRemovePowerupsOnRound.integer ) {
+		if ( level.freezeConfig.removePowerups ) {
 			memset( ent->client->ps.powerups, 0, sizeof( ent->client->ps.powerups ) );
 		}
 	}
@@ -1395,7 +1441,7 @@ Automatically thaws members of the winning team when configured.
 static void G_FreezeThawWinningPlayers( team_t winner ) {
 	int		clientNum;
 
-	if ( !g_freezeThawWinningTeam.integer ) {
+	if ( !level.freezeConfig.thawWinningTeam ) {
 		return;
 	}
 
@@ -1449,7 +1495,7 @@ static void G_FreezeHandleRoundEnd( team_t winner ) {
 			level.freezeLivingHealth[TEAM_RED], level.freezeLivingHealth[TEAM_BLUE] ) );
 	}
 	level.roundState = ROUNDSTATE_COMPLETE;
-	delay = g_freezeRoundDelay.integer;
+	delay = level.freezeConfig.roundDelay;
 	level.roundTransitionTime = ( delay > 0 ) ? level.time + delay : level.time;
 }
 
