@@ -1517,20 +1517,36 @@ static void CG_DrawGameStatus(rectDef_t *rect, float scale, vec4_t color, qhandl
 }
 
 const char *CG_GameTypeString() {
-	if ( cgs.gametype == GT_FFA ) {
+	switch ( cgs.gametype ) {
+	case GT_FFA:
 		return "Free For All";
-	} else if ( cgs.gametype == GT_TEAM ) {
+	case GT_TOURNAMENT:
+		return "Duel";
+	case GT_SINGLE_PLAYER:
+		return "Race";
+	case GT_TEAM:
 		return "Team Deathmatch";
-	} else if ( cgs.gametype == GT_CTF ) {
+	case GT_CLAN_ARENA:
+		return "Clan Arena";
+	case GT_CTF:
 		return "Capture the Flag";
-	} else if ( cgs.gametype == GT_1FCTF ) {
+	case GT_1FCTF:
 		return "One Flag CTF";
-	} else if ( cgs.gametype == GT_OBELISK ) {
+	case GT_OBELISK:
 		return "Overload";
-	} else if ( cgs.gametype == GT_HARVESTER ) {
+	case GT_HARVESTER:
 		return "Harvester";
+	case GT_FREEZE:
+		return "Freeze Tag";
+	case GT_DOMINATION:
+		return "Domination";
+	case GT_ATTACK_DEFEND:
+		return "Attack & Defend";
+	case GT_RED_ROVER:
+		return "Red Rover";
+	default:
+		return "";
 	}
-	return "";
 }
 static void CG_DrawGameType(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle ) {
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, CG_GameTypeString(), 0, 0, textStyle);

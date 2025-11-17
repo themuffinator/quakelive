@@ -878,8 +878,114 @@ Synchronises the latched g_training cvar with the level training flag.
 =============
 */
 static void G_UpdateTrainingState( void ) {
-	trap_Cvar_Update( &g_training );
-	level.trainingMapActive = ( g_training.integer != 0 ) ? qtrue : qfalse;
+trap_Cvar_Update( &g_training );
+level.trainingMapActive = ( g_training.integer != 0 ) ? qtrue : qfalse;
+}
+
+typedef enum {
+	GAMETYPE_LIFECYCLE_INIT,
+	GAMETYPE_LIFECYCLE_CLIENT_BEGIN,
+	GAMETYPE_LIFECYCLE_CLIENT_SPAWN
+} gametypeLifecycleStage_t;
+
+/*
+=============
+G_GametypeHandleDefault
+
+No-op placeholder used when a gametype does not require custom
+lifecycle handling.
+=============
+*/
+static void G_GametypeHandleDefault( gametypeLifecycleStage_t stage, gentity_t *ent ) {
+	(void)stage;
+	(void)ent;
+}
+
+/*
+=============
+G_GametypeHandleDuel
+
+Hook invoked whenever a Duel lifecycle stage fires.  The Quake Live
+binary applies custom loadouts here; the GPL drop simply preserves the
+dispatch point for parity with the HLIL notes.
+=============
+*/
+static void G_GametypeHandleDuel( gametypeLifecycleStage_t stage, gentity_t *ent ) {
+	(void)stage;
+	(void)ent;
+}
+
+/*
+=============
+G_GametypeHandleClanArena
+
+Ensures round-based Clan Arena matches start in the warmup state so the
+existing round controller can manage respawns.
+=============
+*/
+static void G_GametypeHandleClanArena( gametypeLifecycleStage_t stage, gentity_t *ent ) {
+	if ( stage == GAMETYPE_LIFECYCLE_INIT ) {
+		G_Frame_BeginRoundWarmup();
+	}
+
+	(void)ent;
+}
+
+/*
+=============
+G_RunGametypeLifecycle
+
+Routes the current lifecycle stage through any gametype-specific helper
+that needs to mirror the Quake Live dispatch table.
+=============
+*/
+static void G_RunGametypeLifecycle( gametypeLifecycleStage_t stage, gentity_t *ent ) {
+	switch ( g_gametype.integer ) {
+	case GT_TOURNAMENT:
+		G_GametypeHandleDuel( stage, ent );
+		break;
+
+	case GT_CLAN_ARENA:
+		G_GametypeHandleClanArena( stage, ent );
+		break;
+
+	default:
+		G_GametypeHandleDefault( stage, ent );
+		break;
+	}
+}
+
+/*
+=============
+G_GametypeInit
+
+Executes the init-stage lifecycle hook for the current gametype.
+=============
+*/
+void G_GametypeInit( void ) {
+	G_RunGametypeLifecycle( GAMETYPE_LIFECYCLE_INIT, NULL );
+}
+
+/*
+=============
+G_GametypeClientBegin
+
+Executes the ClientBegin-stage lifecycle hook for the current gametype.
+=============
+*/
+void G_GametypeClientBegin( gentity_t *ent ) {
+	G_RunGametypeLifecycle( GAMETYPE_LIFECYCLE_CLIENT_BEGIN, ent );
+}
+
+/*
+=============
+G_GametypeClientSpawn
+
+Executes the ClientSpawn-stage lifecycle hook for the current gametype.
+=============
+*/
+void G_GametypeClientSpawn( gentity_t *ent ) {
+	G_RunGametypeLifecycle( GAMETYPE_LIFECYCLE_CLIENT_SPAWN, ent );
 }
 
 
@@ -1018,6 +1124,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	if( g_gametype.integer >= GT_TEAM ) {
 		G_CheckTeamItems();
 	}
+
+	G_GametypeInit();
 
 	SaveRegisteredItems();
 

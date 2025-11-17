@@ -186,6 +186,15 @@ void UI_LoadArenas( void ) {
 			if( strstr( type, "tourney" ) ) {
 				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_TOURNAMENT);
 			}
+			if( strstr( type, "single" ) || strstr( type, "race" ) ) {
+				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_SINGLE_PLAYER);
+			}
+			if( strstr( type, "team" ) || strstr( type, "tdm" ) ) {
+				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_TEAM);
+			}
+			if( strstr( type, "clanarena" ) || strstr( type, "ca" ) ) {
+				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_CLAN_ARENA);
+			}
 			if( strstr( type, "ctf" ) ) {
 				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_CTF);
 			}
@@ -197,6 +206,18 @@ void UI_LoadArenas( void ) {
 			}
 			if( strstr( type, "harvester" ) ) {
 				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_HARVESTER);
+			}
+			if( strstr( type, "freeze" ) || strstr( type, "freezetag" ) ) {
+				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_FREEZE);
+			}
+			if( strstr( type, "domination" ) || strstr( type, "dom" ) ) {
+				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_DOMINATION);
+			}
+			if( strstr( type, "attackdefend" ) || strstr( type, "ad" ) ) {
+				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_ATTACK_DEFEND);
+			}
+			if( strstr( type, "redrover" ) || strstr( type, "rr" ) ) {
+				uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_RED_ROVER);
 			}
 		} else {
 			uiInfo.mapList[uiInfo.mapCount].typeBits |= (1 << GT_FFA);

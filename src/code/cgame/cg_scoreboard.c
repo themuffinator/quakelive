@@ -103,6 +103,63 @@ static void CG_DrawForcedScoreboardTip( float fade ) {
 	CG_DrawSmallStringColor( x, y, message, color );
 }
 
+static const char *const s_gametypeHudHints[GT_MAX_GAME_TYPE] = {
+	[GT_FFA] = "This is a Free For All game",
+	[GT_TOURNAMENT] = "This is a Duel game",
+	[GT_SINGLE_PLAYER] = "This is a Race game",
+	[GT_TEAM] = "This is a Team Deathmatch game",
+	[GT_CLAN_ARENA] = "This is a Clan Arena game",
+	[GT_CTF] = "This is a Capture the Flag game",
+	[GT_1FCTF] = "This is a One Flag CTF game",
+	[GT_OBELISK] = "This is an Overload game",
+	[GT_HARVESTER] = "This is a Harvester game",
+	[GT_FREEZE] = "This is a Freeze Tag game",
+	[GT_DOMINATION] = "This is a Domination game",
+	[GT_ATTACK_DEFEND] = "This is an Attack & Defend game",
+	[GT_RED_ROVER] = "This is a Red Rover game"
+};
+
+/*
+=============
+CG_DrawForcedGametypeHint
+
+Displays the gametype training hint when the server forces HUD widgets.
+=============
+*/
+static void CG_DrawForcedGametypeHint( float fade ) {
+	const char		*hint;
+	vec4_t	color;
+	int	width;
+	int	x;
+	int	y;
+	int	lineOffset;
+
+	if ( !cgs.forceHudHints || fade <= 0.0f ) {
+		return;
+	}
+
+	if ( cgs.gametype < 0 || cgs.gametype >= GT_MAX_GAME_TYPE ) {
+		return;
+	}
+
+	hint = s_gametypeHudHints[cgs.gametype];
+	if ( !hint || !*hint ) {
+		return;
+	}
+
+	color[0] = 1.0f;
+	color[1] = 1.0f;
+	color[2] = 1.0f;
+	color[3] = fade;
+
+	width = CG_DrawStrlen( hint ) * SMALLCHAR_WIDTH;
+	lineOffset = cgs.forceSmallScoreboardMessage ? 2 : 1;
+	y = SB_TOP - ( lineOffset * SMALLCHAR_HEIGHT ) - 4;
+	x = ( SCREEN_WIDTH - width ) / 2;
+
+	CG_DrawSmallStringColor( x, y, hint, color );
+}
+
 
 /*
 =================
@@ -505,6 +562,7 @@ qboolean CG_DrawOldScoreboard( void ) {
 	CG_DrawPic( nameHeaderX, y, 64, 32, cgs.media.scoreboardName );
 
 	CG_DrawForcedScoreboardTip( fade );
+	CG_DrawForcedGametypeHint( fade );
 
 	y = SB_TOP;
 

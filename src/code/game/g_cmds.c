@@ -1520,14 +1520,19 @@ void Cmd_Where_f( gentity_t *ent ) {
 #define VF_NO_FRAG_LIMIT		0x0080
 
 static const char *gameNames[] = {
-	"Free For All",
-	"Tournament",
-	"Single Player",
-	"Team Deathmatch",
-	"Capture the Flag",
-	"One Flag CTF",
-	"Overload",
-	"Harvester"
+"Free For All",
+"Duel",
+"Race",
+"Team Deathmatch",
+"Clan Arena",
+"Capture the Flag",
+"One Flag CTF",
+"Overload",
+"Harvester",
+"Freeze Tag",
+"Domination",
+"Attack and Defend",
+"Red Rover"
 };
 
 /*

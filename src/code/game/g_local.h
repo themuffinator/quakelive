@@ -648,11 +648,14 @@ qboolean	G_SpawnString( const char *key, const char *defaultString, char **out )
 qboolean	G_SpawnFloat( const char *key, const char *defaultString, float *out );
 qboolean	G_SpawnInt( const char *key, const char *defaultString, int *out );
 qboolean	G_SpawnVector( const char *key, const char *defaultString, float *out );
-void		G_InitSpawnQueue( void );
-void		G_SyncMatchFactoryConfigToLevel( void );
-qboolean		G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean initialSpawn );
-void		G_SpawnEntitiesFromString( void );
-char *G_NewString( const char *string );
+void	G_InitSpawnQueue( void );
+void	G_SyncMatchFactoryConfigToLevel( void );
+qboolean	G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean initialSpawn );
+void	G_SpawnEntitiesFromString( void );
+char	*G_NewString( const char *string );
+void	G_GametypeInit( void );
+void	G_GametypeClientBegin( gentity_t *ent );
+void	G_GametypeClientSpawn( gentity_t *ent );
 
 //
 // g_cmds.c

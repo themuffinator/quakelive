@@ -238,19 +238,21 @@ void CG_DrawInformation( void ) {
 	case GT_FFA:
 		s = "Free For All";
 		break;
-	case GT_SINGLE_PLAYER:
-		s = "Single Player";
-		break;
 	case GT_TOURNAMENT:
-		s = "Tournament";
+		s = "Duel";
+		break;
+	case GT_SINGLE_PLAYER:
+		s = "Race";
 		break;
 	case GT_TEAM:
 		s = "Team Deathmatch";
 		break;
+	case GT_CLAN_ARENA:
+		s = "Clan Arena";
+		break;
 	case GT_CTF:
 		s = "Capture The Flag";
 		break;
-#ifdef MISSIONPACK
 	case GT_1FCTF:
 		s = "One Flag CTF";
 		break;
@@ -260,7 +262,18 @@ void CG_DrawInformation( void ) {
 	case GT_HARVESTER:
 		s = "Harvester";
 		break;
-#endif
+	case GT_FREEZE:
+		s = "Freeze Tag";
+		break;
+	case GT_DOMINATION:
+		s = "Domination";
+		break;
+	case GT_ATTACK_DEFEND:
+		s = "Attack & Defend";
+		break;
+	case GT_RED_ROVER:
+		s = "Red Rover";
+		break;
 	default:
 		s = "Unknown Gametype";
 		break;

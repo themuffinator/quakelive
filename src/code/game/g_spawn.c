@@ -399,6 +399,62 @@ void G_ParseField( const char *key, const char *value, gentity_t *ent ) {
 
 
 /*
+=================
+G_SpawnGametypeAliases
+
+Mapping of gametype enum values to the spawn string tokens used by
+worldspawn "gametype" filters.
+=================
+*/
+#define MAX_GAMETYPE_NAME_ALIASES 3
+
+static const char *const s_gametypeSpawnNames[GT_MAX_GAME_TYPE][MAX_GAMETYPE_NAME_ALIASES] = {
+	[GT_FFA] = { "ffa", NULL, NULL },
+	[GT_TOURNAMENT] = { "tournament", "duel", NULL },
+	[GT_SINGLE_PLAYER] = { "single", "race", NULL },
+	[GT_TEAM] = { "team", "tdm", NULL },
+	[GT_CLAN_ARENA] = { "clanarena", "ca", NULL },
+	[GT_CTF] = { "ctf", NULL, NULL },
+	[GT_1FCTF] = { "oneflag", "1fctf", NULL },
+	[GT_OBELISK] = { "obelisk", "overload", NULL },
+	[GT_HARVESTER] = { "harvester", NULL, NULL },
+	[GT_FREEZE] = { "freeze", "freezetag", NULL },
+	[GT_DOMINATION] = { "domination", "dom", NULL },
+	[GT_ATTACK_DEFEND] = { "attackdefend", "ad", NULL },
+	[GT_RED_ROVER] = { "redrover", "rr", NULL }
+};
+
+/*
+===================
+G_SpawnGametypeMatchesFilter
+
+Returns qtrue when the current gametype is permitted by the entity's
+"gametype" spawn value, or when no filter is defined.
+===================
+*/
+static qboolean G_SpawnGametypeMatchesFilter( const char *value ) {
+	int				aliasIndex;
+
+	if ( !value || !*value ) {
+		return qtrue;
+	}
+
+	if ( g_gametype.integer < GT_FFA || g_gametype.integer >= GT_MAX_GAME_TYPE ) {
+		return qtrue;
+	}
+
+	for ( aliasIndex = 0; aliasIndex < MAX_GAMETYPE_NAME_ALIASES; aliasIndex++ ) {
+		const char *token = s_gametypeSpawnNames[g_gametype.integer][aliasIndex];
+
+		if ( token && strstr( value, token ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
 ===================
 G_SpawnGEntityFromSpawnVars
 
@@ -409,8 +465,7 @@ level.spawnVars[], then call the class specfic spawn function
 void G_SpawnGEntityFromSpawnVars( void ) {
 	int			i;
 	gentity_t	*ent;
-	char		*s, *value, *gametypeName;
-	static char *gametypeNames[] = {"ffa", "tournament", "single", "team", "ctf", "oneflag", "obelisk", "harvester", "teamtournament"};
+	char		*s, *value;
 
 	// get the next free entity
 	ent = G_Spawn();
@@ -456,15 +511,10 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 	}
 #endif
 
-	if( G_SpawnString( "gametype", NULL, &value ) ) {
-		if( g_gametype.integer >= GT_FFA && g_gametype.integer < GT_MAX_GAME_TYPE ) {
-			gametypeName = gametypeNames[g_gametype.integer];
-
-			s = strstr( value, gametypeName );
-			if( !s ) {
-				G_FreeEntity( ent );
-				return;
-			}
+	if ( G_SpawnString( "gametype", NULL, &value ) ) {
+		if ( !G_SpawnGametypeMatchesFilter( value ) ) {
+			G_FreeEntity( ent );
+			return;
 		}
 	}
 

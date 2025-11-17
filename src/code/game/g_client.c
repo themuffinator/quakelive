@@ -1330,6 +1330,8 @@ void ClientBegin( int clientNum ) {
 	}
 	G_LogPrintf( "ClientBegin: %i\n", clientNum );
 
+	G_GametypeClientBegin( ent );
+
 	// count current clients and rank for scoreboard
 	G_SendItemTimerState( clientNum, g_itemTimers.integer ? 1 : 0, g_itemHeight.integer );
 	CalculateRanks();
@@ -1665,6 +1667,7 @@ void ClientSpawn(gentity_t *ent) {
 	}
 
 	// run the presend to set anything else
+	G_GametypeClientSpawn( ent );
 	ClientEndFrame( ent );
 
 	// clear entity state values

@@ -126,22 +126,26 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 typedef enum {
 	GT_FFA,				// free for all
-	GT_TOURNAMENT,		// one on one tournament
-	GT_SINGLE_PLAYER,	// single player ffa
+	GT_TOURNAMENT,	// one on one tournament
+	GT_SINGLE_PLAYER,	// race replaces the original single player slot
 
 	//-- team games go after this --
 
 	GT_TEAM,			// team deathmatch
+	GT_CLAN_ARENA,	// clan arena
 	GT_CTF,				// capture the flag
 	GT_1FCTF,
 	GT_OBELISK,
 	GT_HARVESTER,
+	GT_FREEZE,
+	GT_DOMINATION,
+	GT_ATTACK_DEFEND,
+	GT_RED_ROVER,
 	GT_MAX_GAME_TYPE
 } gametype_t;
 
-// Quake Live repurposes the single-player slot for Race and adds Red Rover.
-#define GT_RACE			GT_SINGLE_PLAYER
-#define GT_RED_ROVER		12
+// Quake Live repurposes the single-player slot for Race.
+#define GT_RACE		GT_SINGLE_PLAYER
 
 typedef enum { GENDER_MALE, GENDER_FEMALE, GENDER_NEUTER } gender_t;
 
