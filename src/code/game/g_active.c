@@ -1319,6 +1319,8 @@ G_FreezeResetClientsForRound
 Respawns or restores each player before a freeze round begins.
 ============
 */
+static void G_FreezeThawWinningPlayers( team_t winner );
+
 static void G_FreezeResetClientsForRound( qboolean warmup ) {
 	int			clientNum;
 
@@ -1417,6 +1419,7 @@ Returns the winning team once only one side has living players left.
 static team_t G_FreezeEvaluateRoundWinner( void ) {
 	qboolean	redAlive;
 	qboolean	blueAlive;
+	team_t		winner;
 
 	G_FreezeRecountLivingClients();
 	redAlive = ( level.freezeLivingCount[TEAM_RED] > 0 ) ? qtrue : qfalse;
@@ -1428,7 +1431,12 @@ static team_t G_FreezeEvaluateRoundWinner( void ) {
 	if ( !redAlive && !blueAlive ) {
 		return TEAM_FREE;
 	}
-	return redAlive ? TEAM_RED : TEAM_BLUE;
+
+	winner = redAlive ? TEAM_RED : TEAM_BLUE;
+	if ( level.freezeConfig.thawWinningTeam ) {
+		G_FreezeThawWinningPlayers( winner );
+	}
+	return winner;
 }
 
 /*
@@ -1479,7 +1487,6 @@ static void G_FreezeHandleRoundEnd( team_t winner ) {
 	if ( winner != TEAM_RED && winner != TEAM_BLUE ) {
 		return;
 	}
-	G_FreezeThawWinningPlayers( winner );
 
 	level.teamScores[winner]++;
 	trap_SetConfigstring( CS_SCORES1, va( "%i", level.teamScores[TEAM_RED] ) );

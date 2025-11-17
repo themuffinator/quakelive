@@ -38,6 +38,7 @@ void G_FreezeClientEndFrame( gentity_t *ent ) {
 	gentity_t	*helper;
 	int		thawTick;
 	int		thawTotal;
+	int		helperCount;
 
 	if ( !ent || !ent->client ) {
 		return;
@@ -61,15 +62,19 @@ void G_FreezeClientEndFrame( gentity_t *ent ) {
 	}
 
 	if ( client->freezeFrozen ) {
-		helper = G_FreezeFindThawHelper( ent );
-		if ( helper ) {
+		helper = NULL;
+		helperCount = G_FreezeCountThawHelpers( ent, &helper );
+		if ( helperCount > 0 ) {
 			if ( client->freezeNextThawTick <= level.time ) {
-				client->freezeAccumulatedThaw += thawTick;
+				client->freezeAccumulatedThaw += helperCount * thawTick;
+				if ( client->freezeAccumulatedThaw > thawTotal ) {
+					client->freezeAccumulatedThaw = thawTotal;
+				}
 				client->freezeNextThawTick = level.time + thawTick;
-				client->freezeLastHelper = helper->s.number;
+				client->freezeLastHelper = helper ? helper->s.number : -1;
 			}
 			if ( client->freezeAccumulatedThaw >= thawTotal ) {
-				G_FreezeThawClient( ent, qfalse, helper->s.number );
+				G_FreezeThawClient( ent, qfalse, client->freezeLastHelper );
 				return;
 			}
 		} else {
@@ -1421,30 +1426,68 @@ static vec3_t	playerMaxs = {15, 15, 32};
 
 /*
 =============
-G_FreezeFindThawHelper
+G_FreezeHelperHasLineOfSight
 
-Returns the first teammate capable of thawing the specified client.
+Ensures thaw credit can pass between a frozen client and a helper.
 =============
 */
-static gentity_t *G_FreezeFindThawHelper( gentity_t *ent ) {
+static qboolean G_FreezeHelperHasLineOfSight( gentity_t *ent, gentity_t *helper ) {
+	trace_t		trace;
+	vec3_t		start;
+	vec3_t		end;
+
+	VectorCopy( helper->r.currentOrigin, start );
+	VectorCopy( ent->r.currentOrigin, end );
+	if ( helper->client ) {
+		start[2] += helper->client->ps.viewheight * 0.5f;
+	}
+	if ( ent->client ) {
+		end[2] += ent->client->ps.viewheight * 0.5f;
+	}
+
+	trap_Trace( &trace, start, NULL, NULL, end, helper->s.number, MASK_SOLID );
+	if ( trace.fraction < 1.0f && trace.entityNum != ent->s.number ) {
+		return qfalse;
+	}
+
+	trap_Trace( &trace, end, NULL, NULL, start, ent->s.number, MASK_SOLID );
+	if ( trace.fraction < 1.0f && trace.entityNum != helper->s.number ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_FreezeCountThawHelpers
+
+Counts allies able to thaw the specified client and returns the primary helper.
+=============
+*/
+static int G_FreezeCountThawHelpers( gentity_t *ent, gentity_t **primaryHelper ) {
 	float		radius;
 	float		radiusSq;
 	int		clientNum;
+	int		count;
 
+	if ( primaryHelper ) {
+		*primaryHelper = NULL;
+	}
 	if ( !ent || !ent->client ) {
-		return NULL;
+		return 0;
 	}
 
 	radius = (float)level.freezeConfig.thawRadius;
 	if ( radius <= 0.0f ) {
-		return NULL;
+		return 0;
 	}
 	radiusSq = radius * radius;
+	count = 0;
 
 	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
 		gentity_t	*helper;
 		vec3_t		delta;
-		trace_t	trace;
 
 		helper = &g_entities[clientNum];
 		if ( helper == ent || !helper->inuse || !helper->client ) {
@@ -1469,18 +1512,17 @@ static gentity_t *G_FreezeFindThawHelper( gentity_t *ent ) {
 			continue;
 		}
 
-		if ( !level.freezeConfig.thawThroughSurface ) {
-			trap_Trace( &trace, helper->r.currentOrigin, NULL, NULL,
-			ent->r.currentOrigin, helper->s.number, MASK_SOLID );
-			if ( trace.fraction < 1.0f ) {
-				continue;
-			}
+		if ( !level.freezeConfig.thawThroughSurface && !G_FreezeHelperHasLineOfSight( ent, helper ) ) {
+			continue;
 		}
 
-		return helper;
+		count++;
+		if ( primaryHelper && !*primaryHelper ) {
+			*primaryHelper = helper;
+		}
 	}
 
-	return NULL;
+	return count;
 }
 
 /*
