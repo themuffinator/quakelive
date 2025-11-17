@@ -37,19 +37,37 @@ typedef struct ql_gclient_s {
     uint8_t __pad6[0xBD8 - 0x56C];
 } ql_gclient_t;
 
+// Documented offsets lifted from references/hlil/quakelive/qagamex86.dll/
+// sully_interpreted/structs/gentity_t.md so that this mirror stays aligned with
+// the Sully interpretation of the retail qagame binary.
+enum {
+    QL_GENTITY_OFFSET_R_SVFLAGS      = 0x068,
+    QL_GENTITY_OFFSET_SVFLAGS_EXT    = 0x1E0,
+    QL_GENTITY_OFFSET_CLIENT         = 0x23C,
+    QL_GENTITY_OFFSET_CONNECTED      = 0x240,
+    QL_GENTITY_OFFSET_COMMAND_TIME   = 0x27C,
+    QL_GENTITY_OFFSET_WARMUP_TIMEOUT = 0x32C,
+    QL_GENTITY_SIZE_BYTES            = 0x384
+};
+
 typedef struct ql_gentity_s {
-    uint8_t __pad0[0x068];
+    uint8_t __pad0[QL_GENTITY_OFFSET_R_SVFLAGS];
     int32_t r_svFlags;                 // 0x068
-    uint8_t __pad1[0x1E0 - 0x06C];
+    uint8_t __pad1[QL_GENTITY_OFFSET_SVFLAGS_EXT -
+                   (QL_GENTITY_OFFSET_R_SVFLAGS + sizeof(int32_t))];
     int32_t svFlagsExt;                // 0x1E0
-    uint8_t __pad2[0x23C - 0x1E4];
+    uint8_t __pad2[QL_GENTITY_OFFSET_CLIENT -
+                   (QL_GENTITY_OFFSET_SVFLAGS_EXT + sizeof(int32_t))];
     ql_gclient_t *client;              // 0x23C
     int32_t connected;                 // 0x240
-    uint8_t __pad3[0x27C - 0x244];
+    uint8_t __pad3[QL_GENTITY_OFFSET_COMMAND_TIME -
+                   (QL_GENTITY_OFFSET_CONNECTED + sizeof(int32_t))];
     int32_t command_time_mirror;       // 0x27C
-    uint8_t __pad4[0x32C - 0x280];
+    uint8_t __pad4[QL_GENTITY_OFFSET_WARMUP_TIMEOUT -
+                   (QL_GENTITY_OFFSET_COMMAND_TIME + sizeof(int32_t))];
     int32_t warmup_timeout_state;      // 0x32C
-    uint8_t __pad5[0x384 - 0x330];
+    uint8_t __pad5[QL_GENTITY_SIZE_BYTES -
+                   (QL_GENTITY_OFFSET_WARMUP_TIMEOUT + sizeof(int32_t))];
 } ql_gentity_t;
 
 typedef struct ql_level_locals_s {
