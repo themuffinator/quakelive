@@ -66,6 +66,7 @@ static void G_DispatchEvents( qlr_game_frame_context_t *ctx );
 static void G_FinishClientFrames( qlr_game_frame_context_t *ctx );
 static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued );
 static void G_UpdateTrainingState( void );
+static void G_UpdateDominationTutorialText( void );
 
 /*
 =============
@@ -162,6 +163,12 @@ vmCvar_t	g_dmflags;
 vmCvar_t	g_fraglimit;
 vmCvar_t	g_timelimit;
 vmCvar_t	g_capturelimit;
+vmCvar_t	g_domCapTime;
+vmCvar_t	g_domTeammateCapScale;
+vmCvar_t	g_domDistressThreshold;
+vmCvar_t	g_domEnableContention;
+vmCvar_t	g_domNeutralFlag;
+vmCvar_t	g_domScoreRate;
 vmCvar_t	g_friendlyFire;
 vmCvar_t	g_password;
 vmCvar_t	g_needpass;
@@ -311,6 +318,12 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_fraglimit, "fraglimit", "20", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 	{ &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 	{ &g_capturelimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
+	{ &g_domCapTime, "g_domCapTime", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds required to capture a Domination point with a single attacker." },
+	{ &g_domTeammateCapScale, "g_domTeammateCapScale", "0.5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Additional capture speed gained per extra teammate assisting." },
+	{ &g_domDistressThreshold, "g_domDistressThreshold", "75", CVAR_ARCHIVE, 0, qfalse, qfalse, "Percent progress when defenders receive a distress warning." },
+	{ &g_domEnableContention, "g_domEnableContention", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow Domination progress to continue when both teams contest a point." },
+	{ &g_domNeutralFlag, "g_domNeutralFlag", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Require Domination points to be neutralized before capture completes when non-zero." },
+	{ &g_domScoreRate, "g_domScoreRate", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds between Domination score ticks per owned point." },
 
 	{ &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
 
@@ -781,12 +794,13 @@ void G_RegisterCvars( void ) {
 	s_forceSendConfigstringModCount = g_forceSendConfigstring.modificationCount;
 	s_forceAtmosphericEffectsModCount = g_forceAtmosphericEffects.modificationCount;
 	s_forceDmgThroughSurfaceModCount = g_forceDmgThroughSurface.modificationCount;
-	s_forcedAtmosphereModCount = g_forcedAtmosphere.modificationCount;
-	s_worldspawnAtmosphere[0] = '\0';
-	s_lastForcedCosmeticsPayload[0] = '\0';
-	G_UpdateItemTimerConfig( qtrue );
-	G_UpdateForcedCosmeticsConfigstring( qtrue );
-        G_InitWeaponConfig();
+s_forcedAtmosphereModCount = g_forcedAtmosphere.modificationCount;
+s_worldspawnAtmosphere[0] = '\0';
+s_lastForcedCosmeticsPayload[0] = '\0';
+G_UpdateItemTimerConfig( qtrue );
+G_UpdateForcedCosmeticsConfigstring( qtrue );
+G_UpdateDominationTutorialText();
+G_InitWeaponConfig();
         G_InitWeaponReloadConfig();
         G_InitKnockbackConfig();
         G_InitStartingAmmoConfig();
@@ -860,8 +874,9 @@ void G_UpdateCvars( void ) {
 	}
 	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
 
-        G_UpdateTrainingState();
-        G_RefreshPmoveSettings();
+G_UpdateTrainingState();
+G_UpdateDominationTutorialText();
+G_RefreshPmoveSettings();
 }
 
 /*
@@ -3063,6 +3078,7 @@ void G_RunFrame( int levelTime ) {
 	G_DispatchScheduledThinks( ctx, msec );
 	G_StepEntities( ctx );
 	G_DispatchEvents( ctx );
+	Team_RunDomination();
 	G_QuadHogFrame();
 	G_FinishClientFrames( ctx );
 	G_UpdateVoteThrottle();
@@ -3079,3 +3095,21 @@ void G_RunFrame( int levelTime ) {
 	}
 }
 
+
+/*
+=============
+G_UpdateDominationTutorialText
+
+Publishes Domination tutorial strings so clients can surface gametype tips.
+=============
+*/
+static void G_UpdateDominationTutorialText( void ) {
+	if ( g_gametype.integer == GT_DOMINATION ) {
+		trap_SetConfigstring( CS_TUTORIAL_NAME, "Domination" );
+		trap_SetConfigstring( CS_TUTORIAL_TEXT, "Capture domination points to earn points for your team." );
+		return;
+	}
+
+	trap_SetConfigstring( CS_TUTORIAL_NAME, "" );
+	trap_SetConfigstring( CS_TUTORIAL_TEXT, "" );
+}

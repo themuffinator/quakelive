@@ -33,6 +33,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define BODY_QUEUE_SIZE		8
 
+#define DOMINATION_MAX_POINTS	8
+#define DOMINATION_LABEL_MAX	8
+
 #define INFINITE			1000000
 
 #define	FRAMETIME			100					// msec
@@ -499,6 +502,7 @@ struct gclient_s {
 	// like health / armor countdowns and regeneration
 	int			timeResidual;
 
+	int		dominationTouchFrame[DOMINATION_MAX_POINTS];
 	gentity_t	*persistantPowerup;
 	int			portalID;
 	int			ammoTimes[WP_NUM_WEAPONS];
@@ -765,6 +769,7 @@ void Touch_DoorTrigger( gentity_t *ent, gentity_t *other, trace_t *trace );
 // g_trigger.c
 //
 void trigger_teleporter_touch (gentity_t *self, gentity_t *other, trace_t *trace );
+void InitTrigger( gentity_t *self );
 
 
 //
@@ -886,6 +891,10 @@ void G_RunClient( gentity_t *ent );
 qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 );
 void Team_CheckDroppedItem( gentity_t *dropped );
 qboolean CheckObeliskAttack( gentity_t *obelisk, gentity_t *attacker );
+void Team_InitDomination( void );
+void Team_RunDomination( void );
+void Team_RegisterDominationPoint( gentity_t *ent, const char *label );
+void Team_DominationPointTouch( gentity_t *ent, gentity_t *other, trace_t *trace );
 
 //
 // g_mem.c
@@ -961,6 +970,12 @@ extern	vmCvar_t	g_dmflags;
 extern	vmCvar_t	g_fraglimit;
 extern	vmCvar_t	g_timelimit;
 extern	vmCvar_t	g_capturelimit;
+extern	vmCvar_t	g_domCapTime;
+extern	vmCvar_t	g_domTeammateCapScale;
+extern	vmCvar_t	g_domDistressThreshold;
+extern	vmCvar_t	g_domEnableContention;
+extern	vmCvar_t	g_domNeutralFlag;
+extern	vmCvar_t	g_domScoreRate;
 extern	vmCvar_t	g_friendlyFire;
 extern	vmCvar_t	g_password;
 extern	vmCvar_t	g_needpass;

@@ -78,6 +78,9 @@
     <ClCompile Include="g_mem.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="g_entity.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="g_misc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
