@@ -833,6 +833,8 @@ void ClientThink_real( gentity_t *ent ) {
 		client->ps.speed = g_pmoveSettings.velocityGh;
 	}
 
+	G_RRProcessClient( ent );
+
 	// Let go of the hook if we aren't firing
 	if ( client->ps.weapon == WP_GRAPPLING_HOOK &&
 		client->hook && !( ucmd->buttons & BUTTON_ATTACK ) ) {
@@ -1183,6 +1185,60 @@ Transitions the round controller into the warmup state.
 void G_Frame_BeginRoundWarmup( void ) {
 	level.roundState = ROUNDSTATE_WARMUP;
 	level.roundTransitionTime = ROUND_TRANSITION_NONE;
+	level.roundStartTime = level.time;
+	G_RRResetRoundState();
+}
+
+/*
+=============
+G_RoundControllerGametypeEnabled
+
+Returns qtrue when the round controller should run for the active gametype.
+=============
+*/
+static qboolean G_RoundControllerGametypeEnabled( void ) {
+	switch ( g_gametype.integer ) {
+		case GT_CLAN_ARENA:
+		case GT_RED_ROVER:
+			return qtrue;
+		default:
+			return qfalse;
+	}
+}
+
+/*
+=============
+G_Frame_BeginRoundActive
+
+Transitions the controller into the active state and records timing data.
+=============
+*/
+static void G_Frame_BeginRoundActive( void ) {
+	level.roundState = ROUNDSTATE_ACTIVE;
+	level.roundTransitionTime = ROUND_TRANSITION_NONE;
+	level.roundStartTime = level.time;
+	level.roundNumber++;
+}
+
+/*
+=============
+G_Frame_CheckRoundLimit
+
+Ends the match when the configured round limit has been reached.
+=============
+*/
+static qboolean G_Frame_CheckRoundLimit( void ) {
+	if ( roundlimit.integer <= 0 ) {
+		return qfalse;
+}
+
+	if ( level.roundNumber < roundlimit.integer ) {
+		return qfalse;
+}
+
+	trap_SendServerCommand( -1, "print \"Round limit hit.\n\"" );
+	LogExit( "Round limit hit." );
+	return qtrue;
 }
 
 /*
@@ -1193,19 +1249,45 @@ Runs per-frame updates for the round controller state machine.
 =============
 */
 void G_Frame_UpdateRoundController( void ) {
+	if ( !G_RoundControllerGametypeEnabled() ) {
+		level.roundState = ROUNDSTATE_INACTIVE;
+		level.roundTransitionTime = ROUND_TRANSITION_NONE;
+		return;
+	}
+
 	switch ( level.roundState ) {
-	case ROUNDSTATE_COMPLETE:
-		if ( level.roundTransitionTime == 0 ) {
+		case ROUNDSTATE_INACTIVE:
 			G_Frame_BeginRoundWarmup();
 			break;
-		}
 
-		if ( level.roundTransitionTime > 0 && level.time >= level.roundTransitionTime ) {
-			G_Frame_BeginRoundWarmup();
-		}
-		break;
+		case ROUNDSTATE_WARMUP:
+			if ( level.warmupTime == 0 ) {
+				G_Frame_BeginRoundActive();
+			}
+			break;
 
-	default:
-		break;
+		case ROUNDSTATE_ACTIVE:
+			if ( g_gametype.integer == GT_RED_ROVER ) {
+				G_RRTrackRoundActivity();
+			}
+			break;
+
+		case ROUNDSTATE_COMPLETE:
+			if ( G_Frame_CheckRoundLimit() ) {
+				break;
+			}
+			if ( level.roundTransitionTime == 0 ) {
+				G_Frame_BeginRoundWarmup();
+				break;
+			}
+
+			if ( level.roundTransitionTime > 0 && level.time >= level.roundTransitionTime ) {
+				G_Frame_BeginRoundWarmup();
+			}
+			break;
+
+		default:
+			break;
 	}
 }
+

@@ -715,6 +715,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 			AddScore( attacker, self->r.currentOrigin, -1 );
 		} else {
 			AddScore( attacker, self->r.currentOrigin, 1 );
+			G_ADAwardBonus( attacker, self->r.currentOrigin, g_adElimScoreBonus.integer, S_COLOR_YELLOW "Elimination bonus" );
 
 			if( meansOfDeath == MOD_GAUNTLET ) {
 				
@@ -750,6 +751,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	// Add team bonuses
 	Team_FragBonuses(self, inflictor, attacker);
+	G_RRHandlePlayerDeath( self, attacker );
 
 	// if I committed suicide, the flag does not fall, it returns.
 	if (meansOfDeath == MOD_SUICIDE) {
@@ -1417,6 +1419,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	// save some from armor
 	asave = CheckArmor (targ, take, dflags);
 	take -= asave;
+	if ( take > 0 ) {
+		G_RRHandleDamageScore( attacker, targ, take );
+	}
 
 	if ( attacker->client && client && attacker != targ && OnSameTeam( targ, attacker ) ) {
 		int teamDamage = take + asave;

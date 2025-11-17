@@ -1644,6 +1644,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	// run the presend to set anything else
 	G_GametypeClientSpawn( ent );
+	G_RRInitClient( ent );
 	ClientEndFrame( ent );
 
 	// clear entity state values
@@ -1736,6 +1737,441 @@ void ClientDisconnect( int clientNum ) {
 
 	if ( ent->r.svFlags & SVF_BOT ) {
 		BotAIShutdownClient( clientNum, qfalse );
+	}
+}
+
+
+
+/*
+=============
+G_RRIsActive
+
+Returns qtrue when the Red Rover infection rule set should execute.
+=============
+*/
+static qboolean G_RRIsActive( void ) {
+	if ( g_gametype.integer != GT_RED_ROVER ) {
+		return qfalse;
+	}
+
+	if ( !g_rrInfected.integer ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_RRResolveScoreValue
+
+Rounds the floating-point cvar payload into an integer score value.
+=============
+*/
+static int G_RRResolveScoreValue( float value ) {
+	int			score;
+
+	score = ( value >= 0.0f ) ? (int)( value + 0.5f ) : (int)( value - 0.5f );
+	if ( score == 0 && value > 0.0f ) {
+		score = 1;
+	}
+
+	return score;
+}
+
+/*
+=============
+G_RRAnnounceState
+
+Sends a centerprint message informing a single client about their status.
+=============
+*/
+static void G_RRAnnounceState( gentity_t *ent, const char *message ) {
+	if ( !ent || !ent->client || !message || !message[0] ) {
+		return;
+	}
+
+	trap_SendServerCommand( ent - g_entities, va( "cp \"%s\"", message ) );
+}
+
+/*
+=============
+G_RRApplyScoreDelta
+
+Adds the provided delta to a client's score while respecting the
+negative-score policy cvar.
+=============
+*/
+static void G_RRApplyScoreDelta( gentity_t *ent, int score ) {
+	int			current;
+
+	if ( !ent || !ent->client || score == 0 ) {
+		return;
+	}
+
+	if ( score < 0 && !g_rrAllowNegativeScores.integer ) {
+		current = ent->client->ps.persistant[PERS_SCORE];
+		if ( current + score < 0 ) {
+			score = -current;
+		}
+	}
+
+	if ( score != 0 ) {
+		AddScore( ent, ent->r.currentOrigin, score );
+	}
+}
+
+/*
+=============
+G_RRSetClientState
+
+Transitions a player between survivor and infected states.
+=============
+*/
+static void G_RRSetClientState( gentity_t *ent, rrInfectionState_t state, qboolean announce ) {
+	int			spreadDelay;
+	int			warningDelay;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	ent->client->rrInfectionState = state;
+	ent->client->rrInfectionChangeTime = level.time;
+	ent->client->rrAccumulatedDamage = 0;
+	ent->client->ps.generic1 = ( state == RR_STATE_INFECTED ) ? 1 : 0;
+
+	spreadDelay = g_rrInfectedSpreadTime.integer;
+	if ( spreadDelay < 0 ) {
+		spreadDelay = 0;
+	}
+	ent->client->rrInfectionNextSpreadTime = level.time + ( spreadDelay * 1000 );
+
+	warningDelay = g_rrInfectedSpreadWarningTime.integer;
+	if ( warningDelay < 0 ) {
+		warningDelay = 0;
+	}
+	ent->client->rrInfectionNextWarningTime = ent->client->rrInfectionNextSpreadTime - ( warningDelay * 1000 );
+	if ( ent->client->rrInfectionNextWarningTime < level.time ) {
+		ent->client->rrInfectionNextWarningTime = level.time;
+	}
+
+	ent->client->rrInfectionNextPingTime = level.time + g_rrInfectedSurvivorPingRate.integer;
+
+	if ( announce ) {
+		if ( state == RR_STATE_INFECTED ) {
+			G_RRAnnounceState( ent, "You have been infected!" );
+		} else {
+			G_RRAnnounceState( ent, "You are a survivor." );
+		}
+	}
+}
+
+/*
+=============
+G_RRInitClient
+
+Initializes the infection state when a player spawns.
+=============
+*/
+void G_RRInitClient( gentity_t *ent ) {
+	if ( !G_RRIsActive() || !ent || !ent->client ) {
+		return;
+	}
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	if ( ent->client->sess.sessionTeam == TEAM_BLUE ) {
+		G_RRSetClientState( ent, RR_STATE_INFECTED, qfalse );
+		return;
+	}
+
+	G_RRSetClientState( ent, RR_STATE_SURVIVOR, qfalse );
+}
+
+/*
+=============
+G_RRWarnSurvivor
+
+Periodically notifies slow survivors that they must keep moving.
+=============
+*/
+static void G_RRWarnSurvivor( gentity_t *ent ) {
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( g_rrInfectedSurvivorPingRate.integer <= 0 ) {
+		return;
+	}
+
+	if ( ent->client->rrInfectionNextPingTime > level.time ) {
+		return;
+	}
+
+	G_RRAnnounceState( ent, "Move it! Survivors that stall risk infection." );
+	ent->client->rrInfectionNextPingTime = level.time + g_rrInfectedSurvivorPingRate.integer;
+}
+
+/*
+=============
+G_RRProcessClient
+
+Runs per-frame infection logic for the specified player.
+=============
+*/
+void G_RRProcessClient( gentity_t *ent ) {
+	float		minSpeed;
+	float		planarSpeedSq;
+	float		minSpeedSq;
+
+	if ( !G_RRIsActive() || !ent || !ent->client ) {
+		return;
+	}
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	if ( ent->client->rrInfectionState == RR_STATE_INFECTED ) {
+		if ( g_rrInfectedZombieSpeed.value > 0.0f ) {
+			ent->client->ps.speed *= g_rrInfectedZombieSpeed.value;
+		}
+		return;
+	}
+
+	minSpeed = g_rrInfectedSurvivorMinSpeed.value;
+	if ( minSpeed > 0.0f ) {
+		planarSpeedSq = ( ent->client->ps.velocity[0] * ent->client->ps.velocity[0] )
+			+ ( ent->client->ps.velocity[1] * ent->client->ps.velocity[1] );
+		minSpeedSq = minSpeed * minSpeed;
+		if ( planarSpeedSq < minSpeedSq ) {
+			G_RRWarnSurvivor( ent );
+		} else {
+			ent->client->rrInfectionNextPingTime = level.time + g_rrInfectedSurvivorPingRate.integer;
+		}
+	}
+
+	if ( g_rrInfectedSpreadTime.integer > 0 ) {
+		if ( ent->client->rrInfectionNextSpreadTime <= level.time ) {
+			G_RRSetClientState( ent, RR_STATE_INFECTED, qtrue );
+			return;
+		}
+		if ( ent->client->rrInfectionNextWarningTime > 0
+			&& level.time >= ent->client->rrInfectionNextWarningTime ) {
+			G_RRAnnounceState( ent, "Warning! The infection is spreading." );
+			ent->client->rrInfectionNextWarningTime = 0;
+		}
+	}
+}
+
+/*
+=============
+G_RRGrantRoundBonus
+
+Awards the configured round bonus to the specified team.
+=============
+*/
+static void G_RRGrantRoundBonus( team_t team ) {
+	int			score;
+	int	clientNum;
+
+	score = G_RRResolveScoreValue( g_rrRoundScoreBonus.value );
+	if ( score <= 0 ) {
+		return;
+	}
+
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gentity_t	*target;
+
+		target = &g_entities[clientNum];
+		if ( !target->inuse || !target->client ) {
+			continue;
+		}
+
+		if ( target->client->sess.sessionTeam != team ) {
+			continue;
+		}
+
+		G_RRApplyScoreDelta( target, score );
+	}
+}
+
+/*
+=============
+G_RRCheckRoundCompletion
+
+Evaluates whether an active round has a winner yet.
+=============
+*/
+static void G_RRCheckRoundCompletion( void ) {
+	int			survivors;
+	int			infected;
+	int			clientNum;
+	team_t	winner;
+
+	if ( !G_RRIsActive() ) {
+		return;
+	}
+
+	if ( level.roundState != ROUNDSTATE_ACTIVE ) {
+		return;
+	}
+
+	survivors = 0;
+	infected = 0;
+
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gentity_t	*scan = &g_entities[clientNum];
+		if ( !scan->inuse || !scan->client ) {
+			continue;
+		}
+		if ( scan->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+			continue;
+		}
+
+		if ( scan->client->rrInfectionState == RR_STATE_INFECTED ) {
+			infected++;
+		} else {
+			survivors++;
+		}
+	}
+
+	if ( survivors > 0 && infected > 0 ) {
+		return;
+	}
+
+	winner = ( survivors >= infected ) ? TEAM_RED : TEAM_BLUE;
+	G_RRGrantRoundBonus( winner );
+	level.roundState = ROUNDSTATE_COMPLETE;
+	level.roundTransitionTime = level.time + 2000;
+}
+
+/*
+=============
+G_RRHandlePlayerDeath
+
+Injects infection conversion logic when a client dies.
+=============
+*/
+void G_RRHandlePlayerDeath( gentity_t *victim, gentity_t *attacker ) {
+	if ( !G_RRIsActive() || !victim || !victim->client ) {
+		return;
+	}
+
+	if ( victim->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	if ( attacker && attacker->client
+		&& attacker->client->rrInfectionState == RR_STATE_INFECTED
+		&& victim->client->rrInfectionState == RR_STATE_SURVIVOR ) {
+		G_RRSetClientState( victim, RR_STATE_INFECTED, qtrue );
+	}
+
+	G_RRCheckRoundCompletion();
+}
+
+/*
+=============
+G_RRHandleDamageScore
+
+Awards survivor score based on the configured scoring method.
+=============
+*/
+void G_RRHandleDamageScore( gentity_t *attacker, gentity_t *targ, int damage ) {
+	int			threshold;
+	int			bonus;
+
+	if ( !G_RRIsActive() || damage <= 0 ) {
+		return;
+	}
+
+	if ( !attacker || !attacker->client || !targ || !targ->client ) {
+		return;
+	}
+
+	if ( attacker->client->rrInfectionState != RR_STATE_SURVIVOR
+		|| targ->client->rrInfectionState != RR_STATE_INFECTED ) {
+		return;
+	}
+
+	if ( g_rrInfectedSurvivorScoreMethod.integer == 0 ) {
+		threshold = g_rrInfectedSurvivorScoreRate.integer;
+		if ( threshold <= 0 ) {
+			return;
+		}
+
+		attacker->client->rrAccumulatedDamage += damage;
+		bonus = G_RRResolveScoreValue( g_rrInfectedSurvivorScoreBonus.value );
+		while ( attacker->client->rrAccumulatedDamage >= threshold && bonus > 0 ) {
+			attacker->client->rrAccumulatedDamage -= threshold;
+			G_RRApplyScoreDelta( attacker, bonus );
+		}
+		return;
+	}
+
+	bonus = G_RRResolveScoreValue( damage * g_rrDamageScoreBonus.value );
+	if ( bonus > 0 ) {
+		G_RRApplyScoreDelta( attacker, bonus );
+	}
+}
+
+/*
+=============
+G_RRResetRoundState
+
+Clears per-round state whenever the controller enters warmup.
+=============
+*/
+void G_RRResetRoundState( void ) {
+	int			clientNum;
+
+	if ( !G_RRIsActive() ) {
+		return;
+	}
+
+	level.roundStartTime = level.time;
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gentity_t	*ent = &g_entities[clientNum];
+		if ( !ent->inuse || !ent->client ) {
+			continue;
+		}
+		G_RRInitClient( ent );
+	}
+}
+
+/*
+=============
+G_RRTrackRoundActivity
+
+Monitors round timers and completion state each frame.
+=============
+*/
+void G_RRTrackRoundActivity( void ) {
+	int			limit;
+
+	if ( !G_RRIsActive() ) {
+		return;
+	}
+
+	if ( level.roundState != ROUNDSTATE_ACTIVE ) {
+		return;
+	}
+
+	G_RRCheckRoundCompletion();
+
+	limit = roundtimelimit.integer;
+	if ( limit <= 0 ) {
+		return;
+	}
+
+	if ( level.time - level.roundStartTime >= limit * 1000 ) {
+		G_RRGrantRoundBonus( TEAM_RED );
+		level.roundState = ROUNDSTATE_COMPLETE;
+		level.roundTransitionTime = level.time + 2000;
 	}
 }
 

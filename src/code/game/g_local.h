@@ -35,6 +35,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define DOMINATION_MAX_POINTS	8
 #define DOMINATION_LABEL_MAX	8
+#define MAX_RACE_POINTS		64
+#define RACE_INVALID_TIME		0x7fffffff
 
 #define INFINITE			1000000
 
@@ -69,6 +71,17 @@ typedef enum {
 
 typedef struct gentity_s gentity_t;
 typedef struct gclient_s gclient_t;
+
+typedef struct {
+	qboolean		initialized;
+	qboolean		active;
+	int			startTime;
+	int			nextCheckpoint;
+	int			lastFinishTime;
+	int			bestTime;
+	int			currentSplits[MAX_RACE_POINTS];
+	int			bestSplits[MAX_RACE_POINTS];
+} raceClientState_t;
 
 typedef struct weaponConfig_s {
 	int		gauntletDamage;
@@ -158,6 +171,23 @@ extern vmCvar_t g_accessFile;
 extern vmCvar_t g_factoryTitle;
 extern vmCvar_t g_dropInactive;
 extern vmCvar_t g_forcedAtmosphere;
+extern vmCvar_t roundlimit;
+extern vmCvar_t roundtimelimit;
+extern vmCvar_t g_rrRoundScoreBonus;
+extern vmCvar_t g_rrInfectedZombieSpeed;
+extern vmCvar_t g_rrInfectedSurvivorScoreMethod;
+extern vmCvar_t g_rrInfectedSurvivorScoreBonus;
+extern vmCvar_t g_rrInfectedSurvivorScoreRate;
+extern vmCvar_t g_rrInfectedSurvivorMinSpeed;
+extern vmCvar_t g_rrInfectedSurvivorPingRate;
+extern vmCvar_t g_rrInfectedSpreadWarningTime;
+extern vmCvar_t g_rrInfectedSpreadTime;
+extern vmCvar_t g_rrInfected;
+extern vmCvar_t g_rrDamageScoreBonus;
+extern vmCvar_t g_rrAllowNegativeScores;
+extern vmCvar_t g_adTouchScoreBonus;
+extern vmCvar_t g_adElimScoreBonus;
+extern vmCvar_t g_adCaptureScoreBonus;
 
 typedef struct startingAmmoConfig_s {
 	int		bfg;
@@ -335,6 +365,8 @@ struct gentity_s {
 	float		random;
 
 	gitem_t		*item;			// for bonus items
+	int			racePointIndex;
+	qboolean		racePointAdminSpawned;
 };
 
 
@@ -364,6 +396,11 @@ typedef enum {
 } roundState_t;
 
 #define ROUND_TRANSITION_NONE	-1
+
+typedef enum {
+	RR_STATE_SURVIVOR = 0,
+	RR_STATE_INFECTED
+} rrInfectionState_t;
 
 typedef struct {
 	playerTeamStateState_t	state;
@@ -509,6 +546,14 @@ struct gclient_s {
 	int			invulnerabilityTime;
 
 	char		*areabits;
+
+	rrInfectionState_t	rrInfectionState;
+	int			rrInfectionChangeTime;
+	int			rrInfectionNextSpreadTime;
+	int			rrInfectionNextWarningTime;
+	int			rrInfectionNextPingTime;
+	int			rrAccumulatedDamage;
+	raceClientState_t	raceState;
 };
 
 
@@ -622,6 +667,8 @@ typedef struct {
 	int			nextWarmupSpawnTime;
 	int			clientSpawnRequestTime[MAX_CLIENTS];
 	qboolean		clientSpawnQueued[MAX_CLIENTS];
+	int			roundNumber;
+	int			roundStartTime;
 	qboolean		clientSpawnInitial[MAX_CLIENTS];
 	qboolean		clientSpawnNeedsEffect[MAX_CLIENTS];
 	qboolean		clientFactoryLoadoutQueued[MAX_CLIENTS];
@@ -635,6 +682,9 @@ typedef struct {
 	int		quadHogNextPingTime;
 	qboolean		matchForfeited;
 	qboolean		trainingMapActive;
+	gentity_t		*racePoints[MAX_RACE_POINTS];
+	int			racePointCount;
+	gentity_t		*raceLastSpawnedPoint;
 } level_locals_t;
 
 
@@ -654,6 +704,12 @@ char	*G_NewString( const char *string );
 void	G_GametypeInit( void );
 void	G_GametypeClientBegin( gentity_t *ent );
 void	G_GametypeClientSpawn( gentity_t *ent );
+void	G_RaceInitLevel( void );
+void	G_RaceClientBegin( gentity_t *ent );
+void	G_RaceClientSpawn( gentity_t *ent );
+void	G_RaceHandlePointTouch( gentity_t *point, gentity_t *player );
+void	G_RaceSendScoreboard( gentity_t *ent );
+void	G_RaceAdminCommand( gentity_t *ent );
 
 //
 // g_cmds.c
@@ -809,6 +865,12 @@ void ClientSpawn( gentity_t *ent );
 void player_die (gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod);
 void AddScore( gentity_t *ent, vec3_t origin, int score );
 void CalculateRanks( void );
+void G_RRInitClient( gentity_t *ent );
+void G_RRProcessClient( gentity_t *ent );
+void G_RRHandlePlayerDeath( gentity_t *victim, gentity_t *attacker );
+void G_RRHandleDamageScore( gentity_t *attacker, gentity_t *targ, int damage );
+void G_RRResetRoundState( void );
+void G_RRTrackRoundActivity( void );
 qboolean SpotWouldTelefrag( gentity_t *spot );
 
 //

@@ -283,6 +283,9 @@ vmCvar_t	g_quadHogTime;
 vmCvar_t	g_quadHogPingRate;
 vmCvar_t	g_training;
 vmCvar_t	g_forcedAtmosphere;
+vmCvar_t	g_adTouchScoreBonus;
+vmCvar_t	g_adElimScoreBonus;
+vmCvar_t	g_adCaptureScoreBonus;
 static matchFactoryConfig_t matchFlow_lastConfig;
 vmCvar_t	g_obeliskHealth;
 vmCvar_t	g_obeliskRegenPeriod;
@@ -295,6 +298,20 @@ vmCvar_t	g_singlePlayer;
 vmCvar_t	g_enableDust;
 vmCvar_t	g_enableBreath;
 vmCvar_t	g_proxMineTimeout;
+vmCvar_t	g_rrRoundScoreBonus;
+vmCvar_t	g_rrInfectedZombieSpeed;
+vmCvar_t	g_rrInfectedSurvivorScoreMethod;
+vmCvar_t	g_rrInfectedSurvivorScoreBonus;
+vmCvar_t	g_rrInfectedSurvivorScoreRate;
+vmCvar_t	g_rrInfectedSurvivorMinSpeed;
+vmCvar_t	g_rrInfectedSurvivorPingRate;
+vmCvar_t	g_rrInfectedSpreadWarningTime;
+vmCvar_t	g_rrInfectedSpreadTime;
+vmCvar_t	g_rrInfected;
+vmCvar_t	g_rrDamageScoreBonus;
+vmCvar_t	g_rrAllowNegativeScores;
+vmCvar_t	roundlimit;
+vmCvar_t	roundtimelimit;
 
 // bk001129 - made static to avoid aliasing
 static cvarTable_t		gameCvarTable[] = {
@@ -324,6 +341,20 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_domEnableContention, "g_domEnableContention", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow Domination progress to continue when both teams contest a point." },
 	{ &g_domNeutralFlag, "g_domNeutralFlag", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Require Domination points to be neutralized before capture completes when non-zero." },
 	{ &g_domScoreRate, "g_domScoreRate", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds between Domination score ticks per owned point." },
+	{ &roundlimit, "roundlimit", "10", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue, qfalse, "Maximum number of rounds to play before the match ends." },
+	{ &roundtimelimit, "roundtimelimit", "180", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue, qfalse, "Seconds allowed per active round before it times out." },
+	{ &g_rrRoundScoreBonus, "g_rrRoundScoreBonus", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Score bonus granted to the team that wins a Red Rover round." },
+	{ &g_rrInfectedZombieSpeed, "g_rrInfectedZombieSpeed", "1.15", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Speed multiplier applied to infected players." },
+	{ &g_rrInfectedSurvivorScoreMethod, "g_rrInfectedSurvivorScoreMethod", "2", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Selects the survivor scoring mode: thresholds or direct damage scaling." },
+	{ &g_rrInfectedSurvivorScoreBonus, "g_rrInfectedSurvivorScoreBonus", "1", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Base score bonus awarded to survivors when the configured method triggers." },
+	{ &g_rrInfectedSurvivorScoreRate, "g_rrInfectedSurvivorScoreRate", "30", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Damage threshold required before issuing survivor score bonuses when using the threshold method." },
+	{ &g_rrInfectedSurvivorMinSpeed, "g_rrInfectedSurvivorMinSpeed", "500", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Minimum planar speed survivors must maintain before receiving penalty pings." },
+	{ &g_rrInfectedSurvivorPingRate, "g_rrInfectedSurvivorPingRate", "2000", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Milliseconds between survivor warning pings when moving too slowly." },
+	{ &g_rrInfectedSpreadWarningTime, "g_rrInfectedSpreadWarningTime", "10", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Seconds before forced infection that survivors begin receiving warning cues." },
+	{ &g_rrInfectedSpreadTime, "g_rrInfectedSpreadTime", "40", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Seconds a survivor can avoid infection before the virus automatically spreads." },
+	{ &g_rrInfected, "g_rrInfected", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable the infection ruleset inside Red Rover." },
+	{ &g_rrDamageScoreBonus, "g_rrDamageScoreBonus", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Multiplier applied to survivor damage when using damage-based scoring." },
+	{ &g_rrAllowNegativeScores, "g_rrAllowNegativeScores", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Allow Red Rover scoring adjustments to drive a player's score below zero." },
 
 	{ &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
 
@@ -352,6 +383,9 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_botsFile, "g_botsFile", "", CVAR_INIT | CVAR_ROM, 0, qfalse, qfalse, "Override bot definition list with a custom script when specified." },
 	{ &g_botSpawnList, "g_botSpawnList", "", 0, 0, qfalse, qfalse, "Space-separated bot names automatically spawned on map start when set." },
 	{ &g_training, "g_training", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable the training progression gate so players must complete tutorials." },
+	{ &g_adTouchScoreBonus, "g_adTouchScoreBonus", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend touch bonus added to the scoring totals whenever an attacker grabs the flag." },
+	{ &g_adElimScoreBonus, "g_adElimScoreBonus", "2", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend elimination bonus granted to teams and players for each enemy frag." },
+	{ &g_adCaptureScoreBonus, "g_adCaptureScoreBonus", "3", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend capture bonus layered on top of the base team point whenever the flag is secured." },
 
 	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 
@@ -926,18 +960,46 @@ static void G_GametypeHandleDuel( gametypeLifecycleStage_t stage, gentity_t *ent
 
 /*
 =============
-G_GametypeHandleClanArena
+G_GametypeHandleRoundBased
 
-Ensures round-based Clan Arena matches start in the warmup state so the
-existing round controller can manage respawns.
+Ensures round-based matches start in the warmup state so the round
+controller can manage respawns.
 =============
 */
-static void G_GametypeHandleClanArena( gametypeLifecycleStage_t stage, gentity_t *ent ) {
+static void G_GametypeHandleRoundBased( gametypeLifecycleStage_t stage, gentity_t *ent ) {
 	if ( stage == GAMETYPE_LIFECYCLE_INIT ) {
 		G_Frame_BeginRoundWarmup();
 	}
 
 	(void)ent;
+}
+
+/*
+=============
+G_GametypeHandleRace
+
+Routes the race-specific lifecycle hooks.
+=============
+*/
+static void G_GametypeHandleRace( gametypeLifecycleStage_t stage, gentity_t *ent ) {
+	switch ( stage ) {
+	case GAMETYPE_LIFECYCLE_CLIENT_BEGIN:
+		if ( ent ) {
+			G_RaceClientBegin( ent );
+		}
+		break;
+
+	case GAMETYPE_LIFECYCLE_CLIENT_SPAWN:
+		if ( ent ) {
+			G_RaceClientSpawn( ent );
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	G_GametypeHandleDefault( stage, ent );
 }
 
 /*
@@ -953,9 +1015,13 @@ static void G_RunGametypeLifecycle( gametypeLifecycleStage_t stage, gentity_t *e
 	case GT_TOURNAMENT:
 		G_GametypeHandleDuel( stage, ent );
 		break;
+	case GT_RACE:
+		G_GametypeHandleRace( stage, ent );
+		break;
 
 	case GT_CLAN_ARENA:
-		G_GametypeHandleClanArena( stage, ent );
+	case GT_RED_ROVER:
+		G_GametypeHandleRoundBased( stage, ent );
 		break;
 
 	default:
@@ -1029,8 +1095,11 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_InitMemory();
 
-	// set some level globals
+// set some level globals
 	memset( &level, 0, sizeof( level ) );
+	if ( g_gametype.integer == GT_RACE ) {
+		G_RaceInitLevel();
+	}
 	G_InitSpawnQueue();
 	level.time = levelTime;
 	level.startTime = levelTime;

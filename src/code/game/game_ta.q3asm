@@ -25,6 +25,7 @@ g_mem
 g_misc
 g_missile
 g_mover
+g_race
 g_session
 g_spawn
 g_svcmds

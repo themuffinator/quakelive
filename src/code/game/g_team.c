@@ -71,6 +71,64 @@ static void Team_DominationAnnounceCapture( dominationPoint_t *point, team_t pre
 static void Team_DominationAnnounceNeutralized( dominationPoint_t *point, team_t attacker );
 static void Team_DominationSendDistress( dominationPoint_t *point );
 
+/*
+=============
+G_ADBonusesEnabled
+
+Returns qtrue when Attack & Defend score bonuses should be processed.
+=============
+*/
+static qboolean G_ADBonusesEnabled( void ) {
+	if ( g_gametype.integer != GT_ATTACK_DEFEND ) {
+		return qfalse;
+	}
+
+	if ( level.warmupTime ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_ADAnnounceBonus
+
+Broadcasts the configured centerprint messaging for Attack & Defend bonuses.
+=============
+*/
+static void G_ADAnnounceBonus( gentity_t *player, const char *label, int bonus ) {
+	char		command[MAX_STRING_CHARS];
+
+	if ( !player || !player->client || bonus <= 0 ) {
+		return;
+	}
+
+	if ( !label || !label[0] ) {
+		return;
+	}
+
+	Com_sprintf( command, sizeof( command ), "cp \"%s ^7(+%i)\"", label, bonus );
+	G_TeamCommand( player->client->sess.sessionTeam, command );
+}
+
+/*
+=============
+G_ADAwardBonus
+
+Applies Attack & Defend score bonuses and surfaces their HUD feedback.
+=============
+*/
+void G_ADAwardBonus( gentity_t *player, const vec3_t origin, int bonus, const char *label ) {
+	if ( !G_ADBonusesEnabled() || bonus <= 0 || !player || !player->client ) {
+		return;
+	}
+
+	AddScore( player, origin, bonus );
+	AddTeamScore( origin, player->client->sess.sessionTeam, bonus );
+	G_ADAnnounceBonus( player, label, bonus );
+}
+
 void Team_InitGame( void ) {
 	memset(&teamgame, 0, sizeof teamgame);
 	Team_InitDomination();
@@ -1228,6 +1286,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 
 	// other gets another 10 frag bonus
 	AddScore(other, ent->r.currentOrigin, CTF_CAPTURE_BONUS);
+	G_ADAwardBonus( other, ent->r.currentOrigin, g_adCaptureScoreBonus.integer, S_COLOR_GREEN "Capture bonus" );
 
 	Team_CaptureFlagSound( ent, team );
 
@@ -1303,6 +1362,7 @@ int Team_TouchEnemyFlag( gentity_t *ent, gentity_t *other, int team ) {
 	}
 
 	AddScore(other, ent->r.currentOrigin, CTF_FLAG_BONUS);
+	G_ADAwardBonus( other, ent->r.currentOrigin, g_adTouchScoreBonus.integer, S_COLOR_CYAN "Touch bonus" );
 	cl->pers.teamState.flagsince = level.time;
 	Team_TakeFlagSound( ent, team );
 

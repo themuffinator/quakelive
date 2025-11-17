@@ -192,6 +192,7 @@ void SP_team_redobelisk( gentity_t *ent );
 void SP_team_neutralobelisk( gentity_t *ent );
 void SP_team_dom_point( gentity_t *ent );
 void SP_item_botroam( gentity_t *ent ) {};
+void SP_race_point( gentity_t *ent );
 
 spawn_t	spawns[] = {
 	// info entities don't do anything at all, but provide positional
@@ -248,6 +249,7 @@ spawn_t	spawns[] = {
 	{"misc_model", SP_misc_model},
 	{"misc_portal_surface", SP_misc_portal_surface},
 	{"misc_portal_camera", SP_misc_portal_camera},
+	{"race_point", SP_race_point},
 
 	{"shooter_rocket", SP_shooter_rocket},
 	{"shooter_grenade", SP_shooter_grenade},
