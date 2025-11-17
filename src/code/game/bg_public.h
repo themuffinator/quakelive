@@ -79,7 +79,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_FLAGSTATUS			23		// string indicating flag status in CTF
 #define CS_SHADERSTATE			24
 #define CS_BOTINFO				25
-#define CS_MATCH_STATE				26
+#define CS_MATCH_STATE				0x295		// timeout/overtime state info payload
 // CS_FORCED_COSMETICS broadcasts an info string with the following keys:
 // \sb\<0|1>  - Forces the compact scoreboard tipline when set.
 // \hud\<0|1> - Enables HUD coaching widgets even if players disabled them.
@@ -101,15 +101,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // containing the keys: toCount, toLength, otLength, sd, sdStart, sdTick, sdMax, sdInc,
 // sdPrint, and sdDelay.
 //
-#define CS_FACTORY_TITLE		27		// descriptive title for the active match factory
-#define CS_FACTORY_FLAGS		28		// decimal bitmask describing customized factory settings
-#define CS_SPAWN_HINTS		29		// info string exposing timeout and sudden death metadata
+#define CS_FACTORY_TITLE		0x2A2		// descriptive title for the active match factory
+#define CS_FACTORY_FLAGS		0x2A3		// decimal bitmask describing customized factory settings
+#define CS_SPAWN_HINTS		0x2A5	// info string exposing timeout and sudden death metadata
 
-#define	CS_ITEMS				30		// string of 0's and 1's that tell which items are present
+#define CS_ITEMS				27		// string of 0's and 1's that tell which items are present
 #define	ITEM_TIMER_DEFAULT_HEIGHT	20		// default fallback height for HUD timer spacing
 #define	ITEM_TIMER_MAX_HEIGHT		128		// prevent oversized HUD timer spacing from breaking layouts
 
-#define	CS_MODELS				33
+#define CS_MODELS				32
 
 #define FACTORY_FLAG_TIMEOUT_LENGTH		( 1 << 0 )
 #define FACTORY_FLAG_TIMEOUT_COUNT		( 1 << 1 )
@@ -125,8 +125,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	CS_PLAYERS				(CS_SOUNDS+MAX_SOUNDS)
 #define CS_LOCATIONS			(CS_PLAYERS+MAX_CLIENTS)
 #define CS_PARTICLES			(CS_LOCATIONS+MAX_LOCATIONS)
-#define CS_RACE_SCORES			(CS_PARTICLES+MAX_LOCATIONS)
-#define CS_RACE_INFO			(CS_RACE_SCORES+1)
+#define CS_RACE_SCORES			0x2BC
+#define CS_RACE_INFO			0x2BD
 
 #define CS_MAX					(CS_RACE_INFO+1)
 
