@@ -16,11 +16,13 @@ from tools.tests.match_sim.harness import MatchHarness, load_config, run_from_fi
 
 SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "sample_scenario.json"
 SCENARIO_DIR = REPO_ROOT / "tools" / "tests" / "match_sim"
+FREEZE_SCENARIO = SCENARIO_DIR / "freeze_cvars.json"
 ALL_SCENARIOS = [
     SCENARIO,
     SCENARIO_DIR / "overtime_scenario.json",
     SCENARIO_DIR / "complex_loadouts.json",
     SCENARIO_DIR / "factory_cvars.json",
+    FREEZE_SCENARIO,
 ]
 
 

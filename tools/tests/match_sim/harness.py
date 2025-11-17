@@ -106,16 +106,24 @@ class MatchHarness:
         # reflect the actual deterministic inputs used for the run.
         self.config.seed = self.seed
         self.factory_settings: Mapping[str, Any] = dict(self.config.metadata.get("factory", {}))
+        self.freeze_settings: Mapping[str, Any] = self._load_freeze_settings(
+            self.config.metadata.get("freeze")
+        )
         (
             self.bot_profiles,
             self.spawn_schedule,
             self.access_permissions,
         ) = self._load_bot_resources(self.config.metadata.get("bot_resources"))
+        self._bot_configs: Dict[str, BotConfig] = {bot.name: bot for bot in self.config.bots}
+        self._active_bots: Mapping[str, BotState] = {}
         self._current_time: float = 0.0
         self._spawn_queue: list[tuple[float, int, Dict[str, Any]]] = []
         self._item_queue: list[tuple[float, int, Dict[str, Any]]] = []
+        self._pending_freeze_events: list[Dict[str, Any]] = []
         self._event_counter = 0
         self._next_warmup_spawn_time: float = 0.0
+        self._freeze_round_state: Optional[str] = None
+        self._freeze_round_index: int = 0
 
     @staticmethod
     def _resolve_seed(*seeds: Optional[int]) -> int:
@@ -133,6 +141,7 @@ class MatchHarness:
         delta = 1.0 / float(tick_rate)
 
         bots = {bot.name: self._initialise_bot(bot) for bot in self.config.bots}
+        self._active_bots = bots
         scripts = {
             bot_config.name: sorted(bot_config.script, key=lambda command: command.time)
             for bot_config in self.config.bots
@@ -148,6 +157,8 @@ class MatchHarness:
             events: List[Dict[str, Any]] = []
             events.extend(self._collect_scheduled_spawns(current_time, bots))
             events.extend(self._collect_scheduled_items(current_time, bots))
+            self._advance_freeze_state(current_time, bots)
+            events.extend(self._collect_freeze_events())
             for bot_name, bot_state in bots.items():
                 idx = script_indices[bot_name]
                 bot_script = scripts.get(bot_name, [])
@@ -162,6 +173,8 @@ class MatchHarness:
             # the same timeline frame.
             events.extend(self._collect_scheduled_spawns(current_time, bots))
             events.extend(self._collect_scheduled_items(current_time, bots))
+            self._advance_freeze_state(current_time, bots)
+            events.extend(self._collect_freeze_events())
             frame = TimelineFrame(
                 tick=tick,
                 time=round(current_time, 6),
@@ -216,6 +229,7 @@ class MatchHarness:
             custom=custom,
         )
         self._apply_factory_loadout(state, bot)
+        self._snapshot_factory_defaults(state)
         return state
 
     def _apply_command(self, state: BotState, command: CommandConfig, delta: float) -> Dict[str, Any]:
@@ -272,9 +286,23 @@ class MatchHarness:
         return {"item": item, "count": state.inventory[item]}
 
     def _handle_damage(self, state: BotState, params: Mapping[str, Any], delta: float) -> Dict[str, Any]:
+        target_state = self._resolve_target_state(params.get("target"), state)
+        if target_state is None:
+            return {"status": "missing_target"}
         amount = float(params.get("amount", 0.0))
-        state.health = max(0.0, state.health - amount)
-        return {"health": state.health, "amount": amount}
+        if self._freeze_should_block_damage(target_state):
+            expires = target_state.custom.get("freeze_protected_until")
+            return {
+                "status": "blocked",
+                "reason": "spawn_protection",
+                "target": target_state.name,
+                "expires": expires,
+            }
+        target_state.health = max(0.0, target_state.health - amount)
+        details: Dict[str, Any] = {"health": target_state.health, "amount": amount}
+        if target_state is not state:
+            details["target"] = target_state.name
+        return details
 
     def _handle_heal(self, state: BotState, params: Mapping[str, Any], delta: float) -> Dict[str, Any]:
         amount = float(params.get("amount", 0.0))
@@ -412,6 +440,87 @@ class MatchHarness:
             )
         return details
 
+    def _handle_set_round_state(
+        self, state: BotState, params: Mapping[str, Any], delta: float
+    ) -> Dict[str, Any]:
+        round_state = str(params.get("state", "warmup")).lower()
+        previous_state = self._freeze_round_state
+        self._freeze_round_state = round_state
+        details: Dict[str, Any] = {"state": round_state, "previous": previous_state}
+        if round_state == "active":
+            self._freeze_round_index += 1
+            details["round"] = self._freeze_round_index
+            self._freeze_reset_for_round()
+        return details
+
+    def _handle_freeze_target(
+        self, state: BotState, params: Mapping[str, Any], delta: float
+    ) -> Dict[str, Any]:
+        target_state = self._resolve_target_state(params.get("target"), state)
+        if target_state is None:
+            return {"status": "missing_target"}
+        reason = str(params.get("reason", "damage"))
+        environmental = bool(params.get("environmental", False))
+        details = self._freeze_apply_freeze(target_state, reason, environmental)
+        details["target"] = target_state.name
+        return details
+
+    def _handle_assist_thaw(
+        self, state: BotState, params: Mapping[str, Any], delta: float
+    ) -> Dict[str, Any]:
+        target_state = self._resolve_target_state(params.get("target"), None)
+        if target_state is None:
+            return {"status": "missing_target"}
+        if not target_state.custom.get("freeze_frozen"):
+            return {"status": "not_frozen", "target": target_state.name}
+        distance = self._distance(state.position, target_state.position)
+        thaw_radius = float(self.freeze_settings.get("thaw_radius", 0.0))
+        if thaw_radius and distance > thaw_radius:
+            return {
+                "status": "out_of_range",
+                "target": target_state.name,
+                "distance": distance,
+                "radius": thaw_radius,
+            }
+        line_of_sight = bool(params.get("line_of_sight", True))
+        if (not line_of_sight) and not bool(self.freeze_settings.get("thaw_through_surface")):
+            return {
+                "status": "blocked",
+                "target": target_state.name,
+                "reason": "line_of_sight",
+            }
+        progress = target_state.custom.get("freeze_progress", 0.0)
+        thaw_tick = float(self.freeze_settings.get("thaw_tick", 0.0))
+        thaw_time = float(self.freeze_settings.get("thaw_time", 1.0))
+        progress += thaw_tick
+        target_state.custom["freeze_progress"] = progress
+        details = {
+            "status": "progress",
+            "target": target_state.name,
+            "progress": progress,
+            "required": thaw_time,
+        }
+        if thaw_time and progress >= thaw_time:
+            target_state.custom["freeze_progress"] = 0.0
+            self._freeze_thaw_bot(target_state, reason="assist", source=state.name)
+            details["status"] = "completed"
+        return details
+
+    def _handle_complete_round(
+        self, state: BotState, params: Mapping[str, Any], delta: float
+    ) -> Dict[str, Any]:
+        winner = params.get("winner")
+        if not winner:
+            return {"status": "missing_winner"}
+        team = str(winner)
+        thawed: List[str] = []
+        if bool(self.freeze_settings.get("thaw_winning_team")):
+            for target_state in self._active_bots.values():
+                if target_state.team == team and target_state.custom.get("freeze_frozen"):
+                    self._freeze_thaw_bot(target_state, reason="round_win", source=team)
+                    thawed.append(target_state.name)
+        return {"winner": team, "thawed": thawed}
+
     # ------------------------------------------------------------------
     # Helpers for deterministic value resolution
     # ------------------------------------------------------------------
@@ -487,6 +596,7 @@ class MatchHarness:
         self._item_queue = []
         self._event_counter = 0
         self._next_warmup_spawn_time = 0.0
+        self._pending_freeze_events = []
 
     def _prime_spawn_schedule(self) -> None:
         for entry in self.spawn_schedule:
@@ -797,6 +907,9 @@ class MatchHarness:
             bot_name = payload.get("bot")
             bot_state = bots.get(bot_name) if bot_name else None
             team = bot_state.team if bot_state else None
+            protection = None
+            if bot_state is not None:
+                protection = self._freeze_apply_spawn_protection(bot_state, scheduled_time)
             events.append(
                 {
                     "bot": bot_name,
@@ -813,6 +926,7 @@ class MatchHarness:
                         "alias": payload.get("alias"),
                         "source": payload.get("source"),
                         "count": payload.get("count"),
+                        "freeze_protection_expires": protection,
                     },
                 }
             )
@@ -840,6 +954,188 @@ class MatchHarness:
                 }
             )
         return events
+
+    def _collect_freeze_events(self) -> List[Dict[str, Any]]:
+        events = list(self._pending_freeze_events)
+        self._pending_freeze_events = []
+        return events
+
+    # ------------------------------------------------------------------
+    # Freeze Tag helpers
+    # ------------------------------------------------------------------
+
+    def _load_freeze_settings(self, payload: Any) -> Mapping[str, Any]:
+        if not isinstance(payload, Mapping):
+            return {"enabled": False}
+        cvars = payload.get("cvars", payload)
+        if not isinstance(cvars, Mapping):
+            return {"enabled": False}
+        settings = {
+            "enabled": bool(payload.get("enabled", True)),
+            "protected_spawn_time": self._convert_ms(cvars.get("g_freezeProtectedSpawnTime"), default=0.0),
+            "auto_thaw_time": self._convert_ms(cvars.get("g_freezeAutoThawTime"), default=0.0),
+            "environmental_respawn_delay": self._convert_ms(
+                cvars.get("g_freezeEnvironmentalRespawnDelay"), default=0.0
+            ),
+            "thaw_time": self._convert_ms(cvars.get("g_freezeThawTime"), default=2.0),
+            "thaw_tick": self._convert_ms(cvars.get("g_freezeThawTick"), default=0.25),
+            "thaw_radius": float(cvars.get("g_freezeThawRadius", 0.0)),
+            "thaw_through_surface": bool(cvars.get("g_freezeThawThroughSurface", 0)),
+            "thaw_winning_team": bool(cvars.get("g_freezeThawWinningTeam", 0)),
+            "reset_weapons": bool(cvars.get("g_freezeResetWeaponsOnRound", 0)),
+            "reset_health": bool(cvars.get("g_freezeResetHealthOnRound", 0)),
+            "reset_armor": bool(cvars.get("g_freezeResetArmorOnRound", 0)),
+            "remove_powerups": bool(cvars.get("g_freezeRemovePowerupsOnRound", 0)),
+        }
+        return settings
+
+    @staticmethod
+    def _convert_ms(value: Any, *, default: float = 0.0) -> float:
+        if value is None:
+            return float(default)
+        return max(0.0, float(value) / 1000.0)
+
+    def _advance_freeze_state(self, current_time: float, bots: Mapping[str, BotState]) -> None:
+        if not bool(self.freeze_settings.get("enabled")):
+            return
+        for bot_state in bots.values():
+            if not bot_state.custom.get("freeze_frozen"):
+                continue
+            deadline = bot_state.custom.get("freeze_thaw_deadline")
+            if deadline is None:
+                continue
+            if current_time + 1e-6 >= deadline:
+                reason = "auto_thaw"
+                if bot_state.custom.get("freeze_environmental"):
+                    reason = "environmental"
+                self._freeze_thaw_bot(bot_state, reason=reason, source="timer")
+
+    def _freeze_apply_freeze(
+        self, state: BotState, reason: str, environmental: bool
+    ) -> Dict[str, Any]:
+        state.custom["freeze_frozen"] = True
+        state.custom["freeze_progress"] = 0.0
+        state.custom["freeze_environmental"] = environmental
+        state.custom["freeze_applied_at"] = self._current_time
+        auto_thaw = float(self.freeze_settings.get("auto_thaw_time", 0.0))
+        env_delay = float(self.freeze_settings.get("environmental_respawn_delay", 0.0))
+        if environmental and env_delay > 0:
+            deadline = self._current_time + env_delay
+        elif auto_thaw > 0:
+            deadline = self._current_time + auto_thaw
+        else:
+            deadline = None
+        state.custom["freeze_thaw_deadline"] = deadline
+        state.health = 0.0
+        return {
+            "status": "frozen",
+            "reason": reason,
+            "deadline": deadline,
+            "environmental": environmental,
+        }
+
+    def _freeze_thaw_bot(self, state: BotState, *, reason: str, source: Any) -> None:
+        if not state.custom.get("freeze_frozen"):
+            return
+        state.custom["freeze_frozen"] = False
+        state.custom["freeze_progress"] = 0.0
+        state.custom["freeze_environmental"] = False
+        state.custom["freeze_thaw_deadline"] = None
+        self._freeze_reset_player(state, source="thaw")
+        expires = self._freeze_apply_spawn_protection(state, self._current_time)
+        event = {
+            "bot": state.name,
+            "team": state.team,
+            "time": round(self._current_time, 6),
+            "action": "freeze_thaw",
+            "details": {
+                "reason": reason,
+                "source": source,
+                "protected_until": expires,
+            },
+        }
+        self._pending_freeze_events.append(event)
+
+    def _freeze_apply_spawn_protection(
+        self, state: BotState, timestamp: float
+    ) -> Optional[float]:
+        if not bool(self.freeze_settings.get("enabled")):
+            return None
+        duration = float(self.freeze_settings.get("protected_spawn_time", 0.0))
+        if duration <= 0.0:
+            state.custom.pop("freeze_protected_until", None)
+            return None
+        expires = round(timestamp + duration, 6)
+        state.custom["freeze_protected_until"] = expires
+        return expires
+
+    def _freeze_should_block_damage(self, state: BotState) -> bool:
+        if not bool(self.freeze_settings.get("enabled")):
+            return False
+        expires = state.custom.get("freeze_protected_until")
+        if expires is None:
+            return False
+        return self._current_time + 1e-6 < float(expires)
+
+    def _freeze_reset_for_round(self) -> None:
+        if not bool(self.freeze_settings.get("enabled")):
+            return
+        for bot_state in self._active_bots.values():
+            self._freeze_reset_player(bot_state, source="round_reset")
+
+    def _freeze_reset_player(self, state: BotState, *, source: str) -> None:
+        defaults = state.custom.get("factory_defaults")
+        if not isinstance(defaults, Mapping):
+            return
+        if bool(self.freeze_settings.get("reset_weapons")):
+            ammo_defaults = defaults.get("ammo") or {}
+            state.ammo = {weapon: float(amount) for weapon, amount in ammo_defaults.items()}
+            inventory_defaults = defaults.get("inventory") or {}
+            preserved_armor = state.inventory.get("armor")
+            new_inventory = {
+                key: int(value)
+                for key, value in inventory_defaults.items()
+                if key != "armor"
+            }
+            state.inventory = new_inventory
+            if preserved_armor is not None:
+                state.inventory["armor"] = int(preserved_armor)
+        if bool(self.freeze_settings.get("reset_health")):
+            state.health = float(defaults.get("health", state.health))
+        if bool(self.freeze_settings.get("reset_armor")):
+            armor_default = defaults.get("inventory", {}).get("armor", 0)
+            state.inventory["armor"] = int(armor_default)
+        if bool(self.freeze_settings.get("remove_powerups")):
+            self._strip_powerups(state)
+
+    def _strip_powerups(self, state: BotState) -> None:
+        removals = []
+        for key in list(state.inventory.keys()):
+            if key.startswith("powerup") or key.endswith("powerup"):
+                removals.append(key)
+            elif key in {"quad_damage", "regeneration", "haste", "invisibility", "battle_suit"}:
+                removals.append(key)
+        for key in removals:
+            state.inventory.pop(key, None)
+
+    def _snapshot_factory_defaults(self, state: BotState) -> None:
+        state.custom["factory_defaults"] = {
+            "health": state.health,
+            "ammo": copy.deepcopy(state.ammo),
+            "inventory": copy.deepcopy(state.inventory),
+        }
+
+    def _resolve_target_state(
+        self, target_reference: Any, default: Optional[BotState]
+    ) -> Optional[BotState]:
+        if target_reference is None:
+            return default
+        target_name = str(target_reference)
+        return self._active_bots.get(target_name)
+
+    @staticmethod
+    def _distance(a: Sequence[float], b: Sequence[float]) -> float:
+        return math.sqrt(sum((a[i] - b[i]) ** 2 for i in range(3)))
 
 
 def load_config(path: Path, *, seed: Optional[int] = None) -> MatchConfig:

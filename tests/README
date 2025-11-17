@@ -18,3 +18,34 @@ behaviour of factory-related CVars:
 
 The new scenario is also registered inside ``tests/run_harnesses.py`` so
 CI artefact generation captures the extended coverage.
+
+Freeze Tag CVar coverage
+------------------------
+
+The ``freeze_cvars.json`` scenario exercises the end-to-end Freeze Tag
+flow. ``tests/test_freeze_cvars.py`` drives the harness twice per test so
+every ``g_freeze*`` toggle is checked with the relevant observable:
+
+* ``test_spawn_protection_blocks_damage_until_expiry`` verifies the
+  damage commands logged by ``shade`` stay blocked until the configured
+  protection window expires.
+* ``test_auto_thaw_and_inventory_resets`` inspects the recorded
+  ``freeze_thaw`` events to ensure the auto-thaw timer fires at 7.5s and
+  that the subsequent round reset reapplies the factory loadout, armor
+  and powerup stripping.
+* ``test_thaw_assist_respects_through_surface_toggle`` compares two
+  harness runs (surface blocking enabled and disabled) so thaw assists
+  only complete when ``g_freezeThawThroughSurface`` is non-zero.
+* ``test_winning_team_credit_thaws_players_when_enabled`` confirms the
+  winning team receives thaw credit and that disabling
+  ``g_freezeThawWinningTeam`` causes the frozen player to wait for the
+  later auto-thaw deadline (~13.2s).
+
+Run the suite with::
+
+    pytest tests/test_freeze_cvars.py -vv
+
+When executing the deterministic harness bundle via ``tests/run_harnesses.py``
+the freeze scenario contributes to ``artifacts/tests/logs/<target>/match_sim.log``.
+The log lists the scenario slug, seed, and resulting frame count so any
+regression immediately stands out in CI artifacts.

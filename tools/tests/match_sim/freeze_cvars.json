@@ -1,0 +1,111 @@
+{
+  "map": "terminal_height",
+  "duration": 14.0,
+  "tick_rate": 20,
+  "seed": 1337,
+  "metadata": {
+    "description": "Freeze tag CVar coverage scenario",
+    "mode": "freeze",
+    "factory": {
+      "active_loadout": "freeze_defaults",
+      "loadouts": {
+        "freeze_defaults": {
+          "ammo": {
+            "rocket": 10,
+            "rail": 5
+          },
+          "inventory": {
+            "armor": 50,
+            "grenade": 1
+          }
+        }
+      }
+    },
+    "freeze": {
+      "enabled": true,
+      "cvars": {
+        "g_freezeProtectedSpawnTime": 3000,
+        "g_freezeAutoThawTime": 4000,
+        "g_freezeEnvironmentalRespawnDelay": 6000,
+        "g_freezeThawTime": 2000,
+        "g_freezeThawTick": 500,
+        "g_freezeThawRadius": 128,
+        "g_freezeThawThroughSurface": 0,
+        "g_freezeThawWinningTeam": 1,
+        "g_freezeResetWeaponsOnRound": 1,
+        "g_freezeResetHealthOnRound": 1,
+        "g_freezeResetArmorOnRound": 1,
+        "g_freezeRemovePowerupsOnRound": 1
+      }
+    }
+  },
+  "bots": [
+    {
+      "name": "referee",
+      "team": null,
+      "initial_state": {
+        "health": 100
+      },
+      "script": [
+        {"time": 0.0, "action": "set_round_state", "params": {"state": "active"}},
+        {"time": 3.5, "action": "freeze_target", "params": {"target": "ember", "reason": "rail"}},
+        {"time": 9.0, "action": "set_round_state", "params": {"state": "active"}},
+        {"time": 9.2, "action": "freeze_target", "params": {"target": "ember", "reason": "final_push"}},
+        {"time": 9.3, "action": "complete_round", "params": {"winner": "red"}}
+      ]
+    },
+    {
+      "name": "ember",
+      "team": "red",
+      "spawn": {
+        "position": [0, 0, 0],
+        "factory_loadout": "freeze_defaults"
+      },
+      "initial_state": {
+        "health": 125,
+        "ammo": {
+          "rocket": 2
+        },
+        "inventory": {
+          "armor": 25
+        }
+      },
+      "script": [
+        {"time": 0.0, "action": "request_spawn", "params": {"warmup": false, "reason": "round_start"}},
+        {"time": 8.0, "action": "set_state", "params": {"health": 25, "ammo": {"rocket": 3}, "inventory": {"armor": 5, "powerup_quad": 1}}}
+      ]
+    },
+    {
+      "name": "forge",
+      "team": "red",
+      "spawn": {
+        "position": [32, 0, 0]
+      },
+      "initial_state": {
+        "health": 100
+      },
+      "script": [
+        {"time": 0.0, "action": "request_spawn", "params": {"warmup": false}},
+        {"time": 4.0, "action": "assist_thaw", "params": {"target": "ember", "line_of_sight": true}},
+        {"time": 4.5, "action": "assist_thaw", "params": {"target": "ember", "line_of_sight": true}},
+        {"time": 5.0, "action": "assist_thaw", "params": {"target": "ember", "line_of_sight": false}},
+        {"time": 5.5, "action": "assist_thaw", "params": {"target": "ember", "line_of_sight": false}}
+      ]
+    },
+    {
+      "name": "shade",
+      "team": "blue",
+      "spawn": {
+        "position": [196, 0, 0]
+      },
+      "initial_state": {
+        "health": 100
+      },
+      "script": [
+        {"time": 0.0, "action": "request_spawn", "params": {"warmup": false}},
+        {"time": 0.1, "action": "damage", "params": {"target": "ember", "amount": 50}},
+        {"time": 3.2, "action": "damage", "params": {"target": "ember", "amount": 40}}
+      ]
+    }
+  ]
+}
