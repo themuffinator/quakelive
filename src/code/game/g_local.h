@@ -155,6 +155,9 @@ extern vmCvar_t g_accessFile;
 extern vmCvar_t g_factoryTitle;
 extern vmCvar_t g_dropInactive;
 extern vmCvar_t g_forcedAtmosphere;
+extern vmCvar_t g_adTouchScoreBonus;
+extern vmCvar_t g_adElimScoreBonus;
+extern vmCvar_t g_adCaptureScoreBonus;
 
 typedef struct startingAmmoConfig_s {
 	int		bfg;
