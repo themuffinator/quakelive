@@ -32,6 +32,7 @@ $CC  ../g_combat.c
 $CC  ../g_items.c
 $CC  ../g_mem.c
 $CC  ../g_misc.c
+$CC  ../g_entity.c
 $CC  ../g_missile.c
 $CC  ../g_mover.c
 $CC  ../g_session.c

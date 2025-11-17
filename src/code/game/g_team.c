@@ -23,6 +23,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "g_local.h"
 
+#define DOMINATION_DISTRESS_REPEAT_TIME	2000
+
+typedef struct dominationPoint_s {
+	gentity_t	*trigger;
+	team_t	ownerTeam;
+	team_t	capturingTeam;
+	float	progress;
+	int	redOccupants;
+	int	blueOccupants;
+	int	lastOccupancyFrame;
+	int	lastDistressTime;
+	qboolean	distressNotified;
+	qboolean	neutralizing;
+	char	label[DOMINATION_LABEL_MAX];
+} dominationPoint_t;
+
 
 typedef struct teamgame_s {
 	float			last_flag_capture;
@@ -34,6 +50,9 @@ typedef struct teamgame_s {
 	int				blueTakenTime;
 	int				redObeliskAttackedTime;
 	int				blueObeliskAttackedTime;
+	dominationPoint_t		dominationPoints[DOMINATION_MAX_POINTS];
+	int				dominationPointCount;
+	int				dominationNextScoreTime;
 } teamgame_t;
 
 teamgame_t teamgame;
@@ -41,6 +60,16 @@ teamgame_t teamgame;
 gentity_t	*neutralObelisk;
 
 void Team_SetFlagStatus( int team, flagStatus_t status );
+static void Team_InitDominationState( void );
+static void Team_InitDomination( void );
+static dominationPoint_t *Team_DominationPointForTrigger( const gentity_t *ent );
+static void Team_DominationUpdatePointState( dominationPoint_t *point, int captureTime );
+static int Team_DominationCaptureTime( void );
+static int Team_DominationScoreInterval( void );
+static float Team_DominationCaptureMultiplier( int playerCount );
+static void Team_DominationAnnounceCapture( dominationPoint_t *point, team_t previousOwner );
+static void Team_DominationAnnounceNeutralized( dominationPoint_t *point, team_t attacker );
+static void Team_DominationSendDistress( dominationPoint_t *point );
 
 /*
 =============
@@ -102,6 +131,7 @@ void G_ADAwardBonus( gentity_t *player, const vec3_t origin, int bonus, const ch
 
 void Team_InitGame( void ) {
 	memset(&teamgame, 0, sizeof teamgame);
+	Team_InitDomination();
 
 	switch( g_gametype.integer ) {
 	case GT_CTF:
@@ -116,6 +146,459 @@ void Team_InitGame( void ) {
 	default:
 		break;
 	}
+}
+
+/*
+=============
+Team_InitDominationState
+
+Clears Domination point tracking between matches.
+=============
+*/
+static void Team_InitDominationState( void ) {
+	int		i;
+
+	for ( i = 0; i < DOMINATION_MAX_POINTS; i++ ) {
+		dominationPoint_t	*point = &teamgame.dominationPoints[i];
+
+		memset( point, 0, sizeof( *point ) );
+		point->ownerTeam = TEAM_FREE;
+		point->capturingTeam = TEAM_FREE;
+	}
+
+	teamgame.dominationPointCount = 0;
+	teamgame.dominationNextScoreTime = 0;
+}
+
+/*
+=============
+Team_InitDomination
+
+Initializes Domination bookkeeping for the active match.
+=============
+*/
+static void Team_InitDomination( void ) {
+	Team_InitDominationState();
+
+	if ( g_gametype.integer != GT_DOMINATION ) {
+		return;
+	}
+
+	level.teamScores[TEAM_RED] = 0;
+	level.teamScores[TEAM_BLUE] = 0;
+}
+
+/*
+=============
+Team_DominationPointForTrigger
+
+Looks up the Domination point associated with the supplied trigger.
+=============
+*/
+static dominationPoint_t *Team_DominationPointForTrigger( const gentity_t *ent ) {
+	int		i;
+
+	for ( i = 0; i < teamgame.dominationPointCount; i++ ) {
+		if ( teamgame.dominationPoints[i].trigger == ent ) {
+			return &teamgame.dominationPoints[i];
+		}
+	}
+
+	return NULL;
+}
+
+/*
+=============
+Team_DominationCaptureTime
+
+Returns the Domination capture time in milliseconds.
+=============
+*/
+static int Team_DominationCaptureTime( void ) {
+	int		seconds = g_domCapTime.integer;
+
+	if ( seconds < 1 ) {
+		seconds = 1;
+	}
+
+	return seconds * 1000;
+}
+
+/*
+=============
+Team_DominationScoreInterval
+
+Returns the Domination scoring cadence in milliseconds.
+=============
+*/
+static int Team_DominationScoreInterval( void ) {
+	int		seconds = g_domScoreRate.integer;
+
+	if ( seconds < 1 ) {
+		seconds = 1;
+	}
+
+	return seconds * 1000;
+}
+
+/*
+=============
+Team_DominationCaptureMultiplier
+
+Calculates the capture speed adjustment granted by teammates.
+=============
+*/
+static float Team_DominationCaptureMultiplier( int playerCount ) {
+	float		scale;
+
+	if ( playerCount <= 0 ) {
+		return 0.0f;
+	}
+
+	if ( playerCount == 1 ) {
+		return 1.0f;
+	}
+
+	scale = g_domTeammateCapScale.value;
+	return 1.0f + ( playerCount - 1 ) * scale;
+}
+
+/*
+=============
+Team_RegisterDominationPoint
+
+Registers a Domination trigger volume with the game state.
+=============
+*/
+void Team_RegisterDominationPoint( gentity_t *trigger, const char *label ) {
+	dominationPoint_t	*point;
+	char			defaultLabel[DOMINATION_LABEL_MAX];
+	int		index;
+
+	if ( teamgame.dominationPointCount >= DOMINATION_MAX_POINTS ) {
+		G_Printf( "WARNING: too many Domination points (max %d)\n", DOMINATION_MAX_POINTS );
+		G_FreeEntity( trigger );
+		return;
+	}
+
+	index = teamgame.dominationPointCount;
+	point = &teamgame.dominationPoints[index];
+	memset( point, 0, sizeof( *point ) );
+	point->trigger = trigger;
+	point->ownerTeam = TEAM_FREE;
+	point->capturingTeam = TEAM_FREE;
+
+	if ( label && label[0] ) {
+		Q_strncpyz( point->label, label, sizeof( point->label ) );
+	} else {
+		Com_sprintf( defaultLabel, sizeof( defaultLabel ), "%c", 'A' + index );
+		Q_strncpyz( point->label, defaultLabel, sizeof( point->label ) );
+	}
+
+	teamgame.dominationPointCount++;
+
+	if ( teamgame.dominationNextScoreTime == 0 ) {
+		teamgame.dominationNextScoreTime = level.time + Team_DominationScoreInterval();
+	}
+}
+
+/*
+=============
+Team_DominationPointTouch
+
+Counts players occupying a Domination point trigger.
+=============
+*/
+void Team_DominationPointTouch( gentity_t *trigger, gentity_t *other, trace_t *trace ) {
+	dominationPoint_t	*point;
+	int		pointIndex;
+
+	(void)trace;
+
+	if ( g_gametype.integer != GT_DOMINATION ) {
+		return;
+	}
+
+	if ( !other->client ) {
+		return;
+	}
+
+	if ( other->client->sess.sessionTeam != TEAM_RED && other->client->sess.sessionTeam != TEAM_BLUE ) {
+		return;
+	}
+
+	point = Team_DominationPointForTrigger( trigger );
+	if ( !point ) {
+		return;
+	}
+
+	pointIndex = point - teamgame.dominationPoints;
+	if ( pointIndex < 0 || pointIndex >= DOMINATION_MAX_POINTS ) {
+		return;
+	}
+
+	if ( other->client->dominationTouchFrame[pointIndex] == level.framenum ) {
+		return;
+	}
+
+	other->client->dominationTouchFrame[pointIndex] = level.framenum;
+
+	if ( point->lastOccupancyFrame != level.framenum ) {
+		point->redOccupants = 0;
+		point->blueOccupants = 0;
+		point->lastOccupancyFrame = level.framenum;
+	}
+
+	if ( other->client->sess.sessionTeam == TEAM_RED ) {
+		point->redOccupants++;
+	} else {
+		point->blueOccupants++;
+	}
+}
+
+/*
+=============
+Team_DominationAnnounceCapture
+
+Broadcasts that a Domination point has changed hands.
+=============
+*/
+static void Team_DominationAnnounceCapture( dominationPoint_t *point, team_t previousOwner ) {
+	gentity_t		*te;
+	const char	*teamName;
+
+	if ( point->ownerTeam != TEAM_RED && point->ownerTeam != TEAM_BLUE ) {
+		return;
+	}
+
+	te = G_TempEntity( point->trigger->s.origin, EV_GLOBAL_TEAM_SOUND );
+	te->r.svFlags |= SVF_BROADCAST;
+	te->s.eventParm = ( point->ownerTeam == TEAM_RED ) ? GTS_RED_CAPTURE : GTS_BLUE_CAPTURE;
+
+	teamName = TeamName( point->ownerTeam );
+	trap_SendServerCommand( -1, va( "cp \"%s captured %s\"", teamName, point->label ) );
+
+	if ( previousOwner != TEAM_FREE && previousOwner != point->ownerTeam ) {
+		point->lastDistressTime = 0;
+	}
+}
+
+/*
+=============
+Team_DominationAnnounceNeutralized
+
+Informs players that a Domination point has been neutralized.
+=============
+*/
+static void Team_DominationAnnounceNeutralized( dominationPoint_t *point, team_t attacker ) {
+	gentity_t		*te;
+	team_t		victim;
+
+	if ( attacker != TEAM_RED && attacker != TEAM_BLUE ) {
+		return;
+	}
+
+	victim = ( attacker == TEAM_RED ) ? TEAM_BLUE : TEAM_RED;
+	te = G_TempEntity( point->trigger->s.origin, EV_GLOBAL_TEAM_SOUND );
+	te->r.svFlags |= SVF_BROADCAST;
+	te->s.eventParm = ( victim == TEAM_RED ) ? GTS_RED_TAKEN : GTS_BLUE_TAKEN;
+	trap_SendServerCommand( -1, va( "cp \"%s neutralized %s\"", TeamName( attacker ), point->label ) );
+}
+
+/*
+=============
+Team_DominationSendDistress
+
+Warns defenders that their point is close to being captured.
+=============
+*/
+static void Team_DominationSendDistress( dominationPoint_t *point ) {
+	team_t		team = point->ownerTeam;
+
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return;
+	}
+
+	if ( level.time - point->lastDistressTime < DOMINATION_DISTRESS_REPEAT_TIME ) {
+		return;
+	}
+
+	point->lastDistressTime = level.time;
+	point->distressNotified = qtrue;
+	G_TeamCommand( team, va( "cp \"Protect domination point %s!\"", point->label ) );
+}
+
+/*
+=============
+Team_DominationUpdatePointState
+
+Advances capture progress for a single Domination point.
+=============
+*/
+static void Team_DominationUpdatePointState( dominationPoint_t *point, int captureTime ) {
+	int		redOccupants = 0;
+	int		blueOccupants = 0;
+	team_t	advanceTeam = TEAM_FREE;
+	int		playerCount = 0;
+	float		delta;
+	float		threshold;
+
+	if ( point->lastOccupancyFrame == level.framenum ) {
+		redOccupants = point->redOccupants;
+		blueOccupants = point->blueOccupants;
+	}
+
+	if ( redOccupants > 0 || blueOccupants > 0 ) {
+		if ( redOccupants > 0 && blueOccupants > 0 ) {
+			if ( g_domEnableContention.integer ) {
+				if ( redOccupants != blueOccupants ) {
+					advanceTeam = ( redOccupants > blueOccupants ) ? TEAM_RED : TEAM_BLUE;
+					playerCount = abs( redOccupants - blueOccupants );
+				}
+			}
+		} else if ( redOccupants > 0 ) {
+			advanceTeam = TEAM_RED;
+			playerCount = redOccupants;
+		} else {
+			advanceTeam = TEAM_BLUE;
+			playerCount = blueOccupants;
+		}
+	}
+
+	if ( advanceTeam != TEAM_FREE && point->capturingTeam == TEAM_FREE && point->ownerTeam == advanceTeam && point->ownerTeam != TEAM_FREE ) {
+		advanceTeam = TEAM_FREE;
+	}
+
+	if ( advanceTeam == TEAM_FREE || playerCount <= 0 ) {
+		if ( point->capturingTeam == TEAM_FREE ) {
+			point->progress = 0.0f;
+			point->neutralizing = qfalse;
+			point->distressNotified = qfalse;
+		}
+		point->redOccupants = 0;
+		point->blueOccupants = 0;
+		return;
+	}
+
+	delta = ( captureTime > 0 ) ? ( (float)level.msec / (float)captureTime ) * 100.0f : 0.0f;
+	delta *= Team_DominationCaptureMultiplier( playerCount );
+	if ( delta <= 0.0f ) {
+		point->redOccupants = 0;
+		point->blueOccupants = 0;
+		return;
+	}
+
+	if ( point->capturingTeam == TEAM_FREE ) {
+		point->capturingTeam = advanceTeam;
+		point->progress = 0.0f;
+		point->neutralizing = ( g_domNeutralFlag.integer && point->ownerTeam != TEAM_FREE && point->ownerTeam != advanceTeam );
+		point->distressNotified = qfalse;
+	}
+
+	if ( point->capturingTeam != advanceTeam ) {
+		point->progress -= delta;
+		if ( point->progress <= 0.0f ) {
+			point->progress = 0.0f;
+			point->capturingTeam = advanceTeam;
+			point->neutralizing = ( g_domNeutralFlag.integer && point->ownerTeam != TEAM_FREE && point->ownerTeam != advanceTeam );
+			point->distressNotified = qfalse;
+		}
+		point->redOccupants = 0;
+		point->blueOccupants = 0;
+		return;
+	}
+
+	point->progress += delta;
+	if ( point->progress >= 100.0f ) {
+		point->progress = 100.0f;
+		if ( point->neutralizing ) {
+
+			point->ownerTeam = TEAM_FREE;
+			point->neutralizing = qfalse;
+			point->progress = 0.0f;
+			Team_DominationAnnounceNeutralized( point, point->capturingTeam );
+			point->distressNotified = qfalse;
+			point->lastDistressTime = 0;
+		} else {
+			team_t	previousOwner = point->ownerTeam;
+
+			point->ownerTeam = point->capturingTeam;
+			point->capturingTeam = TEAM_FREE;
+			point->progress = 0.0f;
+			point->distressNotified = qfalse;
+			if ( previousOwner != point->ownerTeam ) {
+				Team_DominationAnnounceCapture( point, previousOwner );
+			}
+		}
+	}
+
+	threshold = Com_Clamp( 0.0f, 100.0f, g_domDistressThreshold.value );
+	if ( point->ownerTeam != TEAM_FREE && point->capturingTeam != TEAM_FREE && point->capturingTeam != point->ownerTeam ) {
+		if ( !point->distressNotified && point->progress >= threshold ) {
+			Team_DominationSendDistress( point );
+		}
+	}
+
+	point->redOccupants = 0;
+	point->blueOccupants = 0;
+}
+
+/*
+=============
+Team_RunDomination
+
+Executes Domination capture logic and handles scoring.
+=============
+*/
+void Team_RunDomination( void ) {
+	int		captureTime;
+	int		scoreInterval;
+	int		redOwned = 0;
+	int		blueOwned = 0;
+	int		i;
+	vec3_t	origin = { 0.0f, 0.0f, 0.0f };
+
+	if ( g_gametype.integer != GT_DOMINATION ) {
+		teamgame.dominationNextScoreTime = 0;
+		return;
+	}
+
+	if ( teamgame.dominationPointCount <= 0 ) {
+		teamgame.dominationNextScoreTime = 0;
+		return;
+	}
+
+	captureTime = Team_DominationCaptureTime();
+	scoreInterval = Team_DominationScoreInterval();
+
+	for ( i = 0; i < teamgame.dominationPointCount; i++ ) {
+		dominationPoint_t	*point = &teamgame.dominationPoints[i];
+
+		Team_DominationUpdatePointState( point, captureTime );
+		if ( point->ownerTeam == TEAM_RED ) {
+			redOwned++;
+		} else if ( point->ownerTeam == TEAM_BLUE ) {
+			blueOwned++;
+		}
+	}
+
+	if ( teamgame.dominationNextScoreTime == 0 ) {
+		teamgame.dominationNextScoreTime = level.time + scoreInterval;
+	}
+
+	if ( level.time < teamgame.dominationNextScoreTime ) {
+		return;
+	}
+
+	if ( redOwned > 0 ) {
+		AddTeamScore( origin, TEAM_RED, redOwned );
+	}
+
+	if ( blueOwned > 0 ) {
+		AddTeamScore( origin, TEAM_BLUE, blueOwned );
+	}
+
+	teamgame.dominationNextScoreTime = level.time + scoreInterval;
 }
 
 int OtherTeam(int team) {

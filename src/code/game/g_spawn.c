@@ -190,6 +190,7 @@ void SP_team_CTF_bluespawn( gentity_t *ent );
 void SP_team_blueobelisk( gentity_t *ent );
 void SP_team_redobelisk( gentity_t *ent );
 void SP_team_neutralobelisk( gentity_t *ent );
+void SP_team_dom_point( gentity_t *ent );
 void SP_item_botroam( gentity_t *ent ) {};
 void SP_race_point( gentity_t *ent );
 
@@ -263,6 +264,7 @@ spawn_t	spawns[] = {
 	{"team_redobelisk", SP_team_redobelisk},
 	{"team_blueobelisk", SP_team_blueobelisk},
 	{"team_neutralobelisk", SP_team_neutralobelisk},
+	{"team_dom_point", SP_team_dom_point},
 	{"item_botroam", SP_item_botroam},
 
 	{0, 0}
