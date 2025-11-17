@@ -97,6 +97,11 @@ Request current scoreboard information
 ==================
 */
 void Cmd_Score_f( gentity_t *ent ) {
+	if ( g_gametype.integer == GT_RACE ) {
+		G_RaceSendScoreboard( ent );
+		return;
+	}
+
 	DeathmatchScoreboardMessage( ent );
 }
 
@@ -2478,6 +2483,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_Timein_f( ent );
 	else if ( !Q_stricmp( cmd, "forfeit" ) )
 		Cmd_Forfeit_f( ent );
+	else if ( !Q_stricmp( cmd, "racepoint" ) )
+		G_RaceAdminCommand( ent );
 	else if (Q_stricmp (cmd, "setviewpos") == 0)
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)

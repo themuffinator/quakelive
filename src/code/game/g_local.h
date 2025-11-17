@@ -33,6 +33,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define BODY_QUEUE_SIZE		8
 
+#define MAX_RACE_POINTS		64
+#define RACE_INVALID_TIME		0x7fffffff
+
 #define INFINITE			1000000
 
 #define	FRAMETIME			100					// msec
@@ -66,6 +69,17 @@ typedef enum {
 
 typedef struct gentity_s gentity_t;
 typedef struct gclient_s gclient_t;
+
+typedef struct {
+	qboolean		initialized;
+	qboolean		active;
+	int			startTime;
+	int			nextCheckpoint;
+	int			lastFinishTime;
+	int			bestTime;
+	int			currentSplits[MAX_RACE_POINTS];
+	int			bestSplits[MAX_RACE_POINTS];
+} raceClientState_t;
 
 typedef struct weaponConfig_s {
 	int		gauntletDamage;
@@ -169,6 +183,9 @@ extern vmCvar_t g_rrInfectedSpreadTime;
 extern vmCvar_t g_rrInfected;
 extern vmCvar_t g_rrDamageScoreBonus;
 extern vmCvar_t g_rrAllowNegativeScores;
+extern vmCvar_t g_adTouchScoreBonus;
+extern vmCvar_t g_adElimScoreBonus;
+extern vmCvar_t g_adCaptureScoreBonus;
 
 typedef struct startingAmmoConfig_s {
 	int		bfg;
@@ -346,6 +363,8 @@ struct gentity_s {
 	float		random;
 
 	gitem_t		*item;			// for bonus items
+	int			racePointIndex;
+	qboolean		racePointAdminSpawned;
 };
 
 
@@ -531,6 +550,7 @@ struct gclient_s {
 	int			rrInfectionNextWarningTime;
 	int			rrInfectionNextPingTime;
 	int			rrAccumulatedDamage;
+	raceClientState_t	raceState;
 };
 
 
@@ -659,6 +679,9 @@ typedef struct {
 	int		quadHogNextPingTime;
 	qboolean		matchForfeited;
 	qboolean		trainingMapActive;
+	gentity_t		*racePoints[MAX_RACE_POINTS];
+	int			racePointCount;
+	gentity_t		*raceLastSpawnedPoint;
 } level_locals_t;
 
 
@@ -678,6 +701,12 @@ char	*G_NewString( const char *string );
 void	G_GametypeInit( void );
 void	G_GametypeClientBegin( gentity_t *ent );
 void	G_GametypeClientSpawn( gentity_t *ent );
+void	G_RaceInitLevel( void );
+void	G_RaceClientBegin( gentity_t *ent );
+void	G_RaceClientSpawn( gentity_t *ent );
+void	G_RaceHandlePointTouch( gentity_t *point, gentity_t *player );
+void	G_RaceSendScoreboard( gentity_t *ent );
+void	G_RaceAdminCommand( gentity_t *ent );
 
 //
 // g_cmds.c

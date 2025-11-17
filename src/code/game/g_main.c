@@ -276,6 +276,9 @@ vmCvar_t	g_quadHogTime;
 vmCvar_t	g_quadHogPingRate;
 vmCvar_t	g_training;
 vmCvar_t	g_forcedAtmosphere;
+vmCvar_t	g_adTouchScoreBonus;
+vmCvar_t	g_adElimScoreBonus;
+vmCvar_t	g_adCaptureScoreBonus;
 static matchFactoryConfig_t matchFlow_lastConfig;
 vmCvar_t	g_obeliskHealth;
 vmCvar_t	g_obeliskRegenPeriod;
@@ -367,6 +370,9 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_botsFile, "g_botsFile", "", CVAR_INIT | CVAR_ROM, 0, qfalse, qfalse, "Override bot definition list with a custom script when specified." },
 	{ &g_botSpawnList, "g_botSpawnList", "", 0, 0, qfalse, qfalse, "Space-separated bot names automatically spawned on map start when set." },
 	{ &g_training, "g_training", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable the training progression gate so players must complete tutorials." },
+	{ &g_adTouchScoreBonus, "g_adTouchScoreBonus", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend touch bonus added to the scoring totals whenever an attacker grabs the flag." },
+	{ &g_adElimScoreBonus, "g_adElimScoreBonus", "2", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend elimination bonus granted to teams and players for each enemy frag." },
+	{ &g_adCaptureScoreBonus, "g_adCaptureScoreBonus", "3", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend capture bonus layered on top of the base team point whenever the flag is secured." },
 
 	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 
@@ -955,6 +961,34 @@ static void G_GametypeHandleRoundBased( gametypeLifecycleStage_t stage, gentity_
 
 /*
 =============
+G_GametypeHandleRace
+
+Routes the race-specific lifecycle hooks.
+=============
+*/
+static void G_GametypeHandleRace( gametypeLifecycleStage_t stage, gentity_t *ent ) {
+	switch ( stage ) {
+	case GAMETYPE_LIFECYCLE_CLIENT_BEGIN:
+		if ( ent ) {
+			G_RaceClientBegin( ent );
+		}
+		break;
+
+	case GAMETYPE_LIFECYCLE_CLIENT_SPAWN:
+		if ( ent ) {
+			G_RaceClientSpawn( ent );
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	G_GametypeHandleDefault( stage, ent );
+}
+
+/*
+=============
 G_RunGametypeLifecycle
 
 Routes the current lifecycle stage through any gametype-specific helper
@@ -965,6 +999,9 @@ static void G_RunGametypeLifecycle( gametypeLifecycleStage_t stage, gentity_t *e
 	switch ( g_gametype.integer ) {
 	case GT_TOURNAMENT:
 		G_GametypeHandleDuel( stage, ent );
+		break;
+	case GT_RACE:
+		G_GametypeHandleRace( stage, ent );
 		break;
 
 	case GT_CLAN_ARENA:
@@ -1043,8 +1080,11 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_InitMemory();
 
-	// set some level globals
+// set some level globals
 	memset( &level, 0, sizeof( level ) );
+	if ( g_gametype.integer == GT_RACE ) {
+		G_RaceInitLevel();
+	}
 	G_InitSpawnQueue();
 	level.time = levelTime;
 	level.startTime = levelTime;
