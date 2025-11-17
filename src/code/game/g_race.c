@@ -25,6 +25,155 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 static char g_raceScores[MAX_STRING_CHARS];
 static char g_raceInfo[MAX_STRING_CHARS];
 
+static void G_RaceUpdateInfoConfigString( void );
+
+/*
+=============
+G_RacePrintMessage
+
+Sends a print message to a specific client or the server console when ent is NULL.
+=============
+*/
+static void G_RacePrintMessage( gentity_t *ent, const char *message ) {
+	if ( !message || !*message ) {
+		return;
+	}
+
+	if ( ent && ent->client ) {
+		trap_SendServerCommand( ent - g_entities, va( "print \"%s\"", message ) );
+		return;
+	}
+
+	G_Printf( "%s", message );
+}
+
+/*
+=============
+G_RaceDropPointToFloor
+
+Drops a checkpoint to the ground and reports startsolid errors.
+=============
+*/
+static qboolean G_RaceDropPointToFloor( gentity_t *ent ) {
+	trace_t	tr;
+	vec3_t	dest;
+
+	if ( !ent ) {
+		return qfalse;
+	}
+
+	if ( ent->spawnflags & 1 ) {
+		G_SetOrigin( ent, ent->s.origin );
+		return qtrue;
+	}
+
+	VectorSet( dest, ent->s.origin[0], ent->s.origin[1], ent->s.origin[2] - 4096 );
+	trap_Trace( &tr, ent->s.origin, ent->r.mins, ent->r.maxs, dest, ent->s.number, MASK_SOLID );
+	if ( tr.startsolid ) {
+		G_Printf( "SP_race_point: startsolid at %s\n", vtos( ent->s.origin ) );
+		G_FreeEntity( ent );
+		return qfalse;
+	}
+
+	ent->s.groundEntityNum = tr.entityNum;
+	G_SetOrigin( ent, tr.endpos );
+	return qtrue;
+}
+
+/*
+=============
+G_RaceCachePointMetadata
+
+Persists origin and target metadata for a checkpoint.
+=============
+*/
+static void G_RaceCachePointMetadata( gentity_t *ent ) {
+	racePointInfo_t	*info;
+
+	if ( !ent || ent->racePointIndex < 0 || ent->racePointIndex >= MAX_RACE_POINTS ) {
+		return;
+	}
+
+	info = &level.racePointInfo[ent->racePointIndex];
+	memset( info, 0, sizeof( *info ) );
+	info->inUse = qtrue;
+	info->adminSpawned = ent->racePointAdminSpawned;
+	VectorCopy( ent->s.origin, info->origin );
+	if ( ent->target ) {
+		Q_strncpyz( info->target, ent->target, sizeof( info->target ) );
+	}
+	if ( ent->targetname ) {
+		Q_strncpyz( info->targetname, ent->targetname, sizeof( info->targetname ) );
+	}
+}
+
+/*
+=============
+G_RaceSendPointMetadataCommand
+
+Broadcasts the admin_race_point_%i payload for a specific checkpoint index.
+=============
+*/
+qboolean G_RaceSendPointMetadataCommand( int clientNum, int index ) {
+	racePointInfo_t	*info;
+	const char	*target;
+	const char	*targetname;
+
+	if ( index < 0 || index >= MAX_RACE_POINTS ) {
+		return qfalse;
+	}
+
+	info = &level.racePointInfo[index];
+	if ( !info->inUse ) {
+		return qfalse;
+	}
+
+	target = ( info->target[0] ) ? info->target : "-";
+	targetname = ( info->targetname[0] ) ? info->targetname : "-";
+	trap_SendServerCommand( clientNum, va( "admin_race_point_%i %.2f %.2f %.2f %s %s",
+		index, info->origin[0], info->origin[1], info->origin[2], target, targetname ) );
+	return qtrue;
+}
+
+/*
+=============
+G_RaceBroadcastInitCommand
+
+Sends race_init followed by metadata for each checkpoint.
+=============
+*/
+void G_RaceBroadcastInitCommand( int clientNum ) {
+	int	count;
+	int	i;
+
+	count = level.racePointCount;
+	if ( count < 0 ) {
+		count = 0;
+	}
+	if ( count > MAX_RACE_POINTS ) {
+		count = MAX_RACE_POINTS;
+	}
+
+	trap_SendServerCommand( clientNum, va( "race_init %i", level.racePointCount ) );
+	for ( i = 0; i < count; i++ ) {
+		if ( level.racePointInfo[i].inUse ) {
+			G_RaceSendPointMetadataCommand( clientNum, i );
+		}
+	}
+}
+
+/*
+=============
+G_RaceSendInfoCommand
+
+Flushes the race_info payload to a specific client.
+=============
+*/
+void G_RaceSendInfoCommand( int clientNum ) {
+	G_RaceUpdateInfoConfigString();
+	trap_SendServerCommand( clientNum, g_raceInfo );
+}
+
 /*
 =============
 G_RaceFormatMilliseconds
@@ -90,17 +239,6 @@ static void G_RaceResetClient( gclient_t *client ) {
 	}
 
 	G_RaceClearClientRunState( client );
-}
-
-/*
-=============
-G_RaceBroadcastInitCommand
-
-Sends the race_init command to a specific client or everyone when clientNum is -1.
-=============
-*/
-static void G_RaceBroadcastInitCommand( int clientNum ) {
-	trap_SendServerCommand( clientNum, va( "race_init %i", level.racePointCount ) );
 }
 
 /*
@@ -418,6 +556,7 @@ static void G_RaceRegisterPoint( gentity_t *ent ) {
 	ent->racePointAdminSpawned = qfalse;
 	level.racePointCount++;
 	level.raceLastSpawnedPoint = ent;
+	G_RaceCachePointMetadata( ent );
 	G_RaceUpdateInfoConfigString();
 }
 
@@ -454,7 +593,9 @@ void SP_race_point( gentity_t *ent ) {
 	ent->r.svFlags |= SVF_NOCLIENT;
 	ent->touch = G_RacePointTouch;
 	ent->racePointIndex = -1;
-	G_SetOrigin( ent, ent->s.origin );
+	if ( !G_RaceDropPointToFloor( ent ) ) {
+		return;
+	}
 	trap_LinkEntity( ent );
 	G_RaceRegisterPoint( ent );
 }
@@ -479,13 +620,14 @@ static void G_RaceAdminClearPoints( gentity_t *ent ) {
 
 	if ( cleared > 0 ) {
 		memset( level.racePoints, 0, sizeof( level.racePoints ) );
+		memset( level.racePointInfo, 0, sizeof( level.racePointInfo ) );
 		level.racePointCount = 0;
 		level.raceLastSpawnedPoint = NULL;
 	}
 
 	G_RaceUpdateInfoConfigString();
 	G_RaceBroadcastInitCommand( -1 );
-	trap_SendServerCommand( ent - g_entities, "print \"clearing race points\n\"" );
+	G_RacePrintMessage( ent, "clearing race points\n" );
 }
 
 /*
@@ -501,8 +643,11 @@ static void G_RaceAdminDumpPoints( gentity_t *ent ) {
 
 	point = NULL;
 	while ( ( point = G_Find( point, FOFS( classname ), "race_point" ) ) != NULL ) {
-		Com_sprintf( buffer, sizeof( buffer ), "%i: %.2f %.2f %.2f\n", point->racePointIndex, point->s.origin[0], point->s.origin[1], point->s.origin[2] );
-		trap_SendServerCommand( ent - g_entities, va( "print \"%s\"", buffer ) );
+		const char *target = ( point->target && *point->target ) ? point->target : "-";
+		const char *targetName = ( point->targetname && *point->targetname ) ? point->targetname : "-";
+		Com_sprintf( buffer, sizeof( buffer ), "%i: %.2f %.2f %.2f target=%s targetname=%s\n",
+			point->racePointIndex, point->s.origin[0], point->s.origin[1], point->s.origin[2], target, targetName );
+		G_RacePrintMessage( ent, buffer );
 	}
 }
 
@@ -539,8 +684,12 @@ static void G_RaceAdminSpawnPoint( gentity_t *ent ) {
 	Com_sprintf( targetName, sizeof( targetName ), "admin_race_point_%i", point->racePointIndex );
 	point->targetname = G_NewString( targetName );
 	point->racePointAdminSpawned = qtrue;
+	G_RaceCachePointMetadata( point );
 	trap_SendServerCommand( -1, "print \"spawning a race point\n\"" );
-	trap_SendServerCommand( -1, va( "admin_race_point_%i %.2f %.2f %.2f", point->racePointIndex, point->s.origin[0], point->s.origin[1], point->s.origin[2] ) );
+	trap_SendServerCommand( -1, va( "admin_race_point_%i %.2f %.2f %.2f %s %s",
+		point->racePointIndex, point->s.origin[0], point->s.origin[1], point->s.origin[2],
+		( point->target && *point->target ) ? point->target : "-",
+		point->targetname ? point->targetname : "-" ) );
 	G_RaceBroadcastInitCommand( -1 );
 }
 
@@ -591,6 +740,28 @@ void G_RaceAdminCommand( gentity_t *ent ) {
 
 /*
 =============
+G_RaceServerClearPoints
+
+Clears all checkpoints when invoked from the dedicated console.
+=============
+*/
+void G_RaceServerClearPoints( void ) {
+	G_RaceAdminClearPoints( NULL );
+}
+
+/*
+=============
+G_RaceServerDumpPoints
+
+Dumps checkpoint metadata to the server console.
+=============
+*/
+void G_RaceServerDumpPoints( void ) {
+	G_RaceAdminDumpPoints( NULL );
+}
+
+/*
+=============
 G_RaceInitLevel
 
 Clears the per-level race state and configstrings.
@@ -600,6 +771,7 @@ void G_RaceInitLevel( void ) {
 	memset( level.racePoints, 0, sizeof( level.racePoints ) );
 	level.racePointCount = 0;
 	level.raceLastSpawnedPoint = NULL;
+	memset( level.racePointInfo, 0, sizeof( level.racePointInfo ) );
 	Q_strncpyz( g_raceScores, "scores_race 0", sizeof( g_raceScores ) );
 	Q_strncpyz( g_raceInfo, "race_info 0", sizeof( g_raceInfo ) );
 	trap_SetConfigstring( CS_RACE_SCORES, g_raceScores );

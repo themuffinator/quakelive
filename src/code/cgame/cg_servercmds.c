@@ -57,6 +57,115 @@ static int CG_ValidOrder(const char *p) {
 	}
 	return -1;
 }
+/*
+=============
+CG_ParseRaceInit
+
+Resets the cached race metadata when a race_init command arrives.
+=============
+*/
+static void CG_ParseRaceInit( void ) {
+	int count = 0;
+
+	if ( trap_Argc() > 1 ) {
+		count = atoi( CG_Argv( 1 ) );
+	}
+
+	if ( count < 0 ) {
+		count = 0;
+	}
+	if ( count > MAX_RACE_POINTS ) {
+		count = MAX_RACE_POINTS;
+	}
+
+	cgs.racePointCount = count;
+	cgs.raceLeaderSplitCount = 0;
+	memset( cgs.racePoints, 0, sizeof( cgs.racePoints ) );
+	memset( cgs.raceLeaderSplits, 0, sizeof( cgs.raceLeaderSplits ) );
+}
+
+/*
+=============
+CG_ParseRaceInfoCommand
+
+Stores the latest leader split data from the race_info command.
+=============
+*/
+static void CG_ParseRaceInfoCommand( void ) {
+	int count = 0;
+	int argc;
+	int i;
+
+	argc = trap_Argc();
+	if ( argc > 1 ) {
+		count = atoi( CG_Argv( 1 ) );
+	}
+	if ( count < 0 ) {
+		count = 0;
+	}
+	if ( count > MAX_RACE_POINTS ) {
+		count = MAX_RACE_POINTS;
+	}
+
+	cgs.racePointCount = count;
+	cgs.raceLeaderSplitCount = 0;
+	for ( i = 0; i < count && ( i + 2 ) < argc; i++ ) {
+		cgs.raceLeaderSplits[i] = atoi( CG_Argv( i + 2 ) );
+		cgs.raceLeaderSplitCount++;
+	}
+}
+
+/*
+=============
+CG_ParseAdminRacePoint
+
+Updates local checkpoint metadata for admin_race_point_%i commands.
+=============
+*/
+static void CG_ParseAdminRacePoint( const char *cmd ) {
+	int index;
+	cgRacePointInfo_t *info;
+
+	if ( !cmd ) {
+		return;
+	}
+
+	index = atoi( cmd + 17 );
+	if ( index < 0 || index >= MAX_RACE_POINTS ) {
+		return;
+	}
+
+	info = &cgs.racePoints[index];
+	memset( info, 0, sizeof( *info ) );
+	info->active = qtrue;
+	if ( trap_Argc() > 1 ) {
+		info->origin[0] = atof( CG_Argv( 1 ) );
+	}
+	if ( trap_Argc() > 2 ) {
+		info->origin[1] = atof( CG_Argv( 2 ) );
+	}
+	if ( trap_Argc() > 3 ) {
+		info->origin[2] = atof( CG_Argv( 3 ) );
+	}
+	if ( trap_Argc() > 4 ) {
+		const char *target = CG_Argv( 4 );
+		if ( target && Q_stricmp( target, "-" ) ) {
+			Q_strncpyz( info->target, target, sizeof( info->target ) );
+		}
+	}
+	if ( trap_Argc() > 5 ) {
+		const char *targetName = CG_Argv( 5 );
+		if ( targetName && Q_stricmp( targetName, "-" ) ) {
+			Q_strncpyz( info->targetname, targetName, sizeof( info->targetname ) );
+		}
+	}
+
+	if ( index >= cgs.racePointCount ) {
+		cgs.racePointCount = index + 1;
+	}
+}
+
+
 
 /*
 =================
@@ -1262,6 +1371,21 @@ static void CG_ServerCommand( void ) {
 			height = ITEM_TIMER_MAX_HEIGHT;
 		}
 		cgs.itemTimerHeight = height;
+		return;
+	}
+
+	if ( !strcmp( cmd, "race_init" ) ) {
+		CG_ParseRaceInit();
+		return;
+	}
+
+	if ( !strcmp( cmd, "race_info" ) ) {
+		CG_ParseRaceInfoCommand();
+		return;
+	}
+
+	if ( !Q_stricmpn( cmd, "admin_race_point_", 17 ) ) {
+		CG_ParseAdminRacePoint( cmd );
 		return;
 	}
 

@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // this file holds commands that can be executed by the server console, but not remote clients
 
+#include <stdlib.h>
 #include "g_local.h"
 
 
@@ -445,6 +446,7 @@ ConsoleCommand
 */
 qboolean	ConsoleCommand( void ) {
 	char	cmd[MAX_TOKEN_CHARS];
+	char	arg[MAX_TOKEN_CHARS];
 
 	trap_Argv( 0, cmd, sizeof( cmd ) );
 
@@ -490,6 +492,53 @@ qboolean	ConsoleCommand( void ) {
 
 	if (Q_stricmp (cmd, "listip") == 0) {
 		trap_SendConsoleCommand( EXEC_NOW, "g_banIPs\n" );
+		return qtrue;
+	}
+
+	if ( Q_stricmp( cmd, "racepoint" ) == 0 ) {
+		if ( g_gametype.integer != GT_RACE ) {
+			G_Printf( "RacePoint is only permitted in Race.\n" );
+			return qtrue;
+		}
+
+		if ( trap_Argc() > 1 ) {
+			trap_Argv( 1, arg, sizeof( arg ) );
+			if ( !Q_stricmp( arg, "clear" ) ) {
+				G_RaceServerClearPoints();
+				return qtrue;
+			}
+
+			if ( !Q_stricmp( arg, "dump" ) ) {
+				G_RaceServerDumpPoints();
+				return qtrue;
+			}
+		}
+
+		G_Printf( "RacePoint spawns must be issued by a player.\n" );
+		return qtrue;
+	}
+
+	if ( Q_stricmp( cmd, "race_init" ) == 0 ) {
+		if ( g_gametype.integer == GT_RACE ) {
+			G_RaceBroadcastInitCommand( -1 );
+		}
+		return qtrue;
+	}
+
+	if ( Q_stricmp( cmd, "race_info" ) == 0 ) {
+		if ( g_gametype.integer == GT_RACE ) {
+			G_RaceSendInfoCommand( -1 );
+		}
+		return qtrue;
+	}
+
+	if ( !Q_stricmpn( cmd, "admin_race_point_", 17 ) ) {
+		if ( g_gametype.integer == GT_RACE ) {
+			int index = atoi( cmd + 17 );
+			if ( !G_RaceSendPointMetadataCommand( -1, index ) ) {
+				G_Printf( "invalid race point %i\n", index );
+			}
+		}
 		return qtrue;
 	}
 

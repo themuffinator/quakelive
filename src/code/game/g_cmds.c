@@ -2485,6 +2485,30 @@ void ClientCommand( int clientNum ) {
 		Cmd_Forfeit_f( ent );
 	else if ( !Q_stricmp( cmd, "racepoint" ) )
 		G_RaceAdminCommand( ent );
+	else if ( !Q_stricmp( cmd, "race_init" ) ) {
+		if ( g_gametype.integer == GT_RACE ) {
+			G_RaceBroadcastInitCommand( ent - g_entities );
+		} else {
+			trap_SendServerCommand( clientNum, "print \"Race commands are only available in Race.\\n\"" );
+		}
+	}
+	else if ( !Q_stricmp( cmd, "race_info" ) ) {
+		if ( g_gametype.integer == GT_RACE ) {
+			G_RaceSendInfoCommand( ent - g_entities );
+		} else {
+			trap_SendServerCommand( clientNum, "print \"Race commands are only available in Race.\\n\"" );
+		}
+	}
+	else if ( !Q_stricmpn( cmd, "admin_race_point_", 17 ) ) {
+		if ( g_gametype.integer == GT_RACE ) {
+			int index = atoi( cmd + 17 );
+			if ( !G_RaceSendPointMetadataCommand( ent - g_entities, index ) ) {
+				trap_SendServerCommand( clientNum, va( "print \"invalid race point %i\\n\"", index ) );
+			}
+		} else {
+			trap_SendServerCommand( clientNum, "print \"Race commands are only available in Race.\\n\"" );
+		}
+	}
 	else if (Q_stricmp (cmd, "setviewpos") == 0)
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)

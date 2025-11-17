@@ -156,6 +156,12 @@ typedef struct {
 //=================================================
 
 
+typedef struct {
+	vec3_t	origin;
+	char	target[MAX_QPATH];
+	char	targetname[MAX_QPATH];
+	qboolean	active;
+} cgRacePointInfo_t;
 
 // centity_t have a direct corespondence with gentity_t in the game, but
 // only the entityState_t is directly communicated to the cgame
@@ -1036,6 +1042,11 @@ typedef struct {
 	char		forcedAtmosphere[MAX_QPATH];
 
 	qboolean  newHud;
+
+	int		racePointCount;
+	int		raceLeaderSplitCount;
+	cgRacePointInfo_t	racePoints[MAX_RACE_POINTS];
+	int		raceLeaderSplits[MAX_RACE_POINTS];
 
 	//
 	// locally derived information from gamestate

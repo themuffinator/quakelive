@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 // g_local.h -- local definitions for game module
 
+#include <stddef.h>
+
 #include "q_shared.h"
 #include "bg_public.h"
 #include "g_public.h"
@@ -603,6 +605,14 @@ struct gclient_s {
 #define	MAX_SPAWN_VARS_CHARS	4096
 
 typedef struct {
+	vec3_t	origin;
+	char	target[MAX_QPATH];
+	char	targetname[MAX_QPATH];
+	qboolean	inUse;
+	qboolean	adminSpawned;
+} racePointInfo_t;
+
+typedef struct {
 	struct gclient_s	*clients;		// [maxclients]
 
 	struct gentity_s	*gentities;
@@ -721,11 +731,11 @@ typedef struct {
 	int		quadHogExpireTime;
 	int		quadHogLastActiveTime;
 	int		quadHogNextPingTime;
-	qboolean		matchForfeited;
 	qboolean		trainingMapActive;
 	gentity_t		*racePoints[MAX_RACE_POINTS];
 	int			racePointCount;
 	gentity_t		*raceLastSpawnedPoint;
+	racePointInfo_t	racePointInfo[MAX_RACE_POINTS];
 } level_locals_t;
 
 
@@ -757,6 +767,11 @@ void	G_RaceClientSpawn( gentity_t *ent );
 void	G_RaceHandlePointTouch( gentity_t *point, gentity_t *player );
 void	G_RaceSendScoreboard( gentity_t *ent );
 void	G_RaceAdminCommand( gentity_t *ent );
+void	G_RaceBroadcastInitCommand( int clientNum );
+void	G_RaceSendInfoCommand( int clientNum );
+qboolean	G_RaceSendPointMetadataCommand( int clientNum, int index );
+void	G_RaceServerClearPoints( void );
+void	G_RaceServerDumpPoints( void );
 
 //
 // g_cmds.c
@@ -1067,7 +1082,7 @@ void BotTestAAS(vec3_t origin);
 extern	level_locals_t	level;
 extern	gentity_t		g_entities[MAX_GENTITIES];
 
-#define	FOFS(x) ((int)&(((gentity_t *)0)->x))
+#define	FOFS(x) offsetof( gentity_t, x )
 
 extern	vmCvar_t	g_gametype;
 extern	vmCvar_t	g_dedicated;
