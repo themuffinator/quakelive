@@ -24,8 +24,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_local.h"
 
 #define DOMINATION_DISTRESS_REPEAT_TIME	2000
+#define DOMINATION_MAX_POINT_SPAWNS	25
 
 typedef struct dominationPoint_s {
+	gentity_t	*pointEnt;
 	gentity_t	*trigger;
 	team_t	ownerTeam;
 	team_t	capturingTeam;
@@ -37,6 +39,9 @@ typedef struct dominationPoint_s {
 	qboolean	distressNotified;
 	qboolean	neutralizing;
 	char	label[DOMINATION_LABEL_MAX];
+	char	targetName[MAX_QPATH];
+	gentity_t	*spawnTargets[DOMINATION_MAX_POINT_SPAWNS];
+	int	spawnTargetCount;
 } dominationPoint_t;
 
 
@@ -63,6 +68,11 @@ void Team_SetFlagStatus( int team, flagStatus_t status );
 static void Team_InitDominationState( void );
 static void Team_InitDomination( void );
 static dominationPoint_t *Team_DominationPointForTrigger( const gentity_t *ent );
+static dominationPoint_t *Team_DominationPointForPointEnt( const gentity_t *ent );
+static dominationPoint_t *Team_DominationPointForTargetName( const char *targetname );
+static void Team_DominationBuildSpawnList( dominationPoint_t *point );
+static void Team_DominationPointThink( gentity_t *ent );
+static void Team_DominationEventOrigin( const dominationPoint_t *point, vec3_t origin );
 static void Team_DominationUpdatePointState( dominationPoint_t *point, int captureTime );
 static int Team_DominationCaptureTime( void );
 static int Team_DominationScoreInterval( void );
@@ -70,6 +80,28 @@ static float Team_DominationCaptureMultiplier( int playerCount );
 static void Team_DominationAnnounceCapture( dominationPoint_t *point, team_t previousOwner );
 static void Team_DominationAnnounceNeutralized( dominationPoint_t *point, team_t attacker );
 static void Team_DominationSendDistress( dominationPoint_t *point );
+
+/*
+=============
+SP_team_dom_point
+
+Registers Domination control point metadata and links spawn targets.
+=============
+*/
+void SP_team_dom_point( gentity_t *ent ) {
+	if ( g_gametype.integer != GT_DOMINATION ) {
+		G_FreeEntity( ent );
+		return;
+	}
+
+	if ( !ent->targetname || !ent->targetname[0] ) {
+		G_Printf( "SP_team_dom_point: missing targetname\n" );
+		G_FreeEntity( ent );
+		return;
+	}
+
+	Team_RegisterDominationPoint( ent );
+}
 
 /*
 =============
@@ -209,6 +241,150 @@ static dominationPoint_t *Team_DominationPointForTrigger( const gentity_t *ent )
 
 /*
 =============
+Team_DominationPointForPointEnt
+
+Looks up the Domination point that owns the provided info entity.
+=============
+*/
+static dominationPoint_t *Team_DominationPointForPointEnt( const gentity_t *ent ) {
+	int		i;
+
+	for ( i = 0; i < teamgame.dominationPointCount; i++ ) {
+		if ( teamgame.dominationPoints[i].pointEnt == ent ) {
+			return &teamgame.dominationPoints[i];
+		}
+	}
+
+	return NULL;
+}
+
+/*
+=============
+Team_DominationPointForTargetName
+
+Finds a Domination point using its targetname.
+=============
+*/
+static dominationPoint_t *Team_DominationPointForTargetName( const char *targetname ) {
+	int		i;
+
+	if ( !targetname || !targetname[0] ) {
+		return NULL;
+	}
+
+	for ( i = 0; i < teamgame.dominationPointCount; i++ ) {
+		if ( !Q_stricmp( teamgame.dominationPoints[i].targetName, targetname ) ) {
+			return &teamgame.dominationPoints[i];
+		}
+	}
+
+	return NULL;
+}
+
+/*
+=============
+Team_DominationBuildSpawnList
+
+Collects info_player_deathmatch nodes tied to a Domination point.
+=============
+*/
+static void Team_DominationBuildSpawnList( dominationPoint_t *point ) {
+	gentity_t	*match;
+	const char	*target;
+	int		count;
+	int		i;
+
+	if ( !point || !point->pointEnt ) {
+		return;
+	}
+
+	match = NULL;
+	count = 0;
+	target = point->pointEnt->target;
+	point->pointEnt->target_ent = NULL;
+	point->spawnTargetCount = 0;
+	point->pointEnt->count = 0;
+
+	if ( !target || !target[0] ) {
+		return;
+	}
+
+	while ( ( match = G_Find( match, FOFS( targetname ), target ) ) != NULL ) {
+		if ( Q_stricmp( match->classname, "info_player_deathmatch" ) ) {
+			continue;
+		}
+
+		if ( count >= DOMINATION_MAX_POINT_SPAWNS ) {
+			G_Printf( "WARNING: Domination point %s exceeded spawn budget (%d)\n",
+				point->label, DOMINATION_MAX_POINT_SPAWNS );
+			break;
+		}
+
+		point->spawnTargets[count++] = match;
+	}
+
+	point->spawnTargetCount = count;
+	point->pointEnt->count = count;
+	point->pointEnt->target_ent = NULL;
+
+	for ( i = count - 1; i >= 0; i-- ) {
+		match = point->spawnTargets[i];
+		match->nextTrain = point->pointEnt->target_ent;
+		point->pointEnt->target_ent = match;
+	}
+}
+
+/*
+=============
+Team_DominationPointThink
+
+Retries spawn linking for Domination metadata entities.
+=============
+*/
+static void Team_DominationPointThink( gentity_t *ent ) {
+	dominationPoint_t	*point;
+
+	point = Team_DominationPointForPointEnt( ent );
+	if ( !point ) {
+		ent->think = NULL;
+		ent->nextthink = 0;
+		return;
+	}
+
+	Team_DominationBuildSpawnList( point );
+	if ( point->spawnTargetCount > 0 || !ent->target || !ent->target[0] ) {
+		ent->think = NULL;
+		ent->nextthink = 0;
+		return;
+	}
+
+	ent->nextthink = level.time + 100;
+}
+
+/*
+=============
+Team_DominationEventOrigin
+
+Derives an origin for Domination temp entities.
+=============
+*/
+static void Team_DominationEventOrigin( const dominationPoint_t *point, vec3_t origin ) {
+	if ( point->trigger ) {
+		VectorCopy( point->trigger->s.origin, origin );
+		return;
+	}
+
+	if ( point->pointEnt ) {
+		VectorCopy( point->pointEnt->s.origin, origin );
+		return;
+	}
+
+	VectorClear( origin );
+}
+
+
+/*
+=============
 Team_DominationCaptureTime
 
 Returns the Domination capture time in milliseconds.
@@ -267,32 +443,45 @@ static float Team_DominationCaptureMultiplier( int playerCount ) {
 =============
 Team_RegisterDominationPoint
 
-Registers a Domination trigger volume with the game state.
+Registers a Domination control point metadata entity.
 =============
 */
-void Team_RegisterDominationPoint( gentity_t *trigger, const char *label ) {
+void Team_RegisterDominationPoint( gentity_t *pointEnt ) {
 	dominationPoint_t	*point;
-	char			defaultLabel[DOMINATION_LABEL_MAX];
+	char		defaultLabel[DOMINATION_LABEL_MAX];
 	int		index;
 
 	if ( teamgame.dominationPointCount >= DOMINATION_MAX_POINTS ) {
 		G_Printf( "WARNING: too many Domination points (max %d)\n", DOMINATION_MAX_POINTS );
-		G_FreeEntity( trigger );
+		G_FreeEntity( pointEnt );
 		return;
 	}
 
 	index = teamgame.dominationPointCount;
 	point = &teamgame.dominationPoints[index];
 	memset( point, 0, sizeof( *point ) );
-	point->trigger = trigger;
+	point->pointEnt = pointEnt;
 	point->ownerTeam = TEAM_FREE;
 	point->capturingTeam = TEAM_FREE;
+	point->trigger = NULL;
 
-	if ( label && label[0] ) {
-		Q_strncpyz( point->label, label, sizeof( point->label ) );
+	if ( pointEnt->message && pointEnt->message[0] ) {
+		Q_strncpyz( point->label, pointEnt->message, sizeof( point->label ) );
 	} else {
 		Com_sprintf( defaultLabel, sizeof( defaultLabel ), "%c", 'A' + index );
 		Q_strncpyz( point->label, defaultLabel, sizeof( point->label ) );
+	}
+
+	if ( pointEnt->targetname ) {
+		Q_strncpyz( point->targetName, pointEnt->targetname, sizeof( point->targetName ) );
+	} else {
+		point->targetName[0] = '\0';
+	}
+
+	Team_DominationBuildSpawnList( point );
+	if ( point->spawnTargetCount <= 0 && pointEnt->target && pointEnt->target[0] ) {
+		pointEnt->think = Team_DominationPointThink;
+		pointEnt->nextthink = level.time + 100;
 	}
 
 	teamgame.dominationPointCount++;
@@ -300,6 +489,41 @@ void Team_RegisterDominationPoint( gentity_t *trigger, const char *label ) {
 	if ( teamgame.dominationNextScoreTime == 0 ) {
 		teamgame.dominationNextScoreTime = level.time + Team_DominationScoreInterval();
 	}
+/*
+=============
+Team_RegisterDominationTrigger
+
+Binds a Domination capture trigger to its metadata entity.
+=============
+*/
+qboolean Team_RegisterDominationTrigger( gentity_t *trigger ) {
+	dominationPoint_t	*point;
+
+	if ( g_gametype.integer != GT_DOMINATION ) {
+		G_FreeEntity( trigger );
+		return qfalse;
+	}
+
+	if ( !trigger->target || !trigger->target[0] ) {
+		G_Printf( "trigger_capturezone: missing target\n" );
+		return qfalse;
+	}
+
+	point = Team_DominationPointForTargetName( trigger->target );
+	if ( !point ) {
+		return qfalse;
+	}
+
+	if ( point->trigger && point->trigger != trigger ) {
+		G_Printf( "trigger_capturezone: duplicate target %s\n", trigger->target );
+		return qfalse;
+	}
+
+	point->trigger = trigger;
+	trigger->target_ent = point->pointEnt;
+	return qtrue;
+}
+
 }
 
 /*
@@ -366,12 +590,13 @@ Broadcasts that a Domination point has changed hands.
 static void Team_DominationAnnounceCapture( dominationPoint_t *point, team_t previousOwner ) {
 	gentity_t		*te;
 	const char	*teamName;
+	vec3_t	origin;
 
 	if ( point->ownerTeam != TEAM_RED && point->ownerTeam != TEAM_BLUE ) {
 		return;
-	}
+	Team_DominationEventOrigin( point, origin );
 
-	te = G_TempEntity( point->trigger->s.origin, EV_GLOBAL_TEAM_SOUND );
+	te = G_TempEntity( origin, EV_GLOBAL_TEAM_SOUND );
 	te->r.svFlags |= SVF_BROADCAST;
 	te->s.eventParm = ( point->ownerTeam == TEAM_RED ) ? GTS_RED_CAPTURE : GTS_BLUE_CAPTURE;
 
@@ -393,13 +618,14 @@ Informs players that a Domination point has been neutralized.
 static void Team_DominationAnnounceNeutralized( dominationPoint_t *point, team_t attacker ) {
 	gentity_t		*te;
 	team_t		victim;
+	vec3_t	origin;
 
 	if ( attacker != TEAM_RED && attacker != TEAM_BLUE ) {
 		return;
 	}
-
+	Team_DominationEventOrigin( point, origin );
 	victim = ( attacker == TEAM_RED ) ? TEAM_BLUE : TEAM_RED;
-	te = G_TempEntity( point->trigger->s.origin, EV_GLOBAL_TEAM_SOUND );
+	te = G_TempEntity( origin, EV_GLOBAL_TEAM_SOUND );
 	te->r.svFlags |= SVF_BROADCAST;
 	te->s.eventParm = ( victim == TEAM_RED ) ? GTS_RED_TAKEN : GTS_BLUE_TAKEN;
 	trap_SendServerCommand( -1, va( "cp \"%s neutralized %s\"", TeamName( attacker ), point->label ) );

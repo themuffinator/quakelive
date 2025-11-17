@@ -61,7 +61,8 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 void Team_CheckHurtCarrier(gentity_t *targ, gentity_t *attacker);
 void Team_InitGame(void);
 void Team_RunDomination( void );
-void Team_RegisterDominationPoint( gentity_t *trigger, const char *label );
+void Team_RegisterDominationPoint( gentity_t *ent );
+qboolean Team_RegisterDominationTrigger( gentity_t *trigger );
 void Team_DominationPointTouch( gentity_t *trigger, gentity_t *other, trace_t *trace );
 void Team_ReturnFlag(int team);
 void Team_FreeEntity(gentity_t *ent);

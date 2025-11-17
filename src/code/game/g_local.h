@@ -987,7 +987,8 @@ void Team_CheckDroppedItem( gentity_t *dropped );
 qboolean CheckObeliskAttack( gentity_t *obelisk, gentity_t *attacker );
 void Team_InitDomination( void );
 void Team_RunDomination( void );
-void Team_RegisterDominationPoint( gentity_t *ent, const char *label );
+void Team_RegisterDominationPoint( gentity_t *ent );
+qboolean Team_RegisterDominationTrigger( gentity_t *trigger );
 void Team_DominationPointTouch( gentity_t *ent, gentity_t *other, trace_t *trace );
 
 //

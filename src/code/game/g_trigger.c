@@ -20,7 +20,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 //
+
 #include "g_local.h"
+
+static void trigger_capturezone_link( gentity_t *ent );
 
 
 void InitTrigger( gentity_t *self ) {
@@ -210,6 +213,60 @@ void SP_trigger_push( gentity_t *self ) {
 	self->think = AimAtTarget;
 	self->nextthink = level.time + FRAMETIME;
 	trap_LinkEntity (self);
+}
+
+/*
+=============
+trigger_capturezone_link
+
+Retries the Domination trigger binding until its metadata is available.
+=============
+*/
+static void trigger_capturezone_link( gentity_t *ent ) {
+	if ( Team_RegisterDominationTrigger( ent ) ) {
+		ent->think = NULL;
+		ent->nextthink = 0;
+		return;
+	}
+
+	ent->nextthink = level.time + 100;
+}
+
+/*
+=============
+SP_trigger_capturezone
+
+Spawns a Domination capture trigger volume.
+=============
+*/
+void SP_trigger_capturezone( gentity_t *ent ) {
+	if ( g_gametype.integer != GT_DOMINATION ) {
+		G_FreeEntity( ent );
+		return;
+	}
+
+	if ( !ent->model || !ent->model[0] ) {
+		G_Printf( "SP_trigger_capturezone: missing model\n" );
+		G_FreeEntity( ent );
+		return;
+	}
+
+	if ( !ent->target || !ent->target[0] ) {
+		G_Printf( "SP_trigger_capturezone: missing target\n" );
+		G_FreeEntity( ent );
+		return;
+	}
+
+	trap_SetBrushModel( ent, ent->model );
+	InitTrigger( ent );
+	ent->touch = Team_DominationPointTouch;
+	ent->r.svFlags |= SVF_NOCLIENT;
+	trap_LinkEntity( ent );
+
+	if ( !Team_RegisterDominationTrigger( ent ) ) {
+		ent->think = trigger_capturezone_link;
+		ent->nextthink = level.time + 100;
+	}
 }
 
 

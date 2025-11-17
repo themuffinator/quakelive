@@ -18,6 +18,7 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 | Weapon balance deltas (damage, refire, ammo) | ⚠️ In Progress | `src/code/game/bg_pmove.c`, `src/code/game/bg_misc.c` | `references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md` | Gameplay Systems (@gamedev-lead) |
 | Loadout unlock rules | ❌ Not Started | `src/code/game/g_items.c` | `references/hlil/quakelive/qagamex86.dll_split/g_items.md` | Progression (@live-ops) |
 | Physics adjustments (air control, stair smoothing) | ✅ Complete | `src/code/game/bg_pmove.c` | `references/hlil/quakelive/qagamex86.dll_split/PmoveSingle_*.md` | Movement (@physics-guild) |
+| Domination capture volumes & metadata entities | ✅ Complete | `src/code/game/g_trigger.c`, `src/code/game/g_team.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part01.txt†L39210-L39410` | Modes (@mutator-crew) |
 | Matchmaking skill scaling hooks | ❌ Not Started | `src/code/game/g_active.c`, `src/code/game/g_client.c` | `references/hlil/quakelive/qagamex86.dll_split/g_active.md` | Backend Integrations (@services-team) |
 
 ## UI-Driven Gameplay Flags
@@ -32,6 +33,10 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 - [ ] Confirm new ports against the linked HLIL snippets prior to merging.
 - [ ] Update the ledger when new gameplay deltas are documented or shipped.
 - [ ] Notify the release manager if a ⚠️ item is promoted to ✅ so the change can be tracked in release notes.
+
+## Domination Mapping Entities
+- **`team_dom_point`** – Point entity that names each control point via `targetname`, optional `message` label, and an optional `target` string that should reference nearby `info_player_deathmatch` spawn pads. The game now records the metadata, chains the referenced spawn nodes, and exposes the data through `Team_RegisterDominationPoint` so announcer, scoring, and distress logic can reason about individual capture points.
+- **`trigger_capturezone`** – Brush trigger that must `target` the desired `team_dom_point`. When occupied the volume feeds Domination scoring through `Team_RegisterDominationTrigger` and `Team_DominationPointTouch`, enabling the capture timers, contention rules, and periodic score ticks introduced in Quake Live.
 
 ## Contacts
 - **Primary Maintainer:** @gamedev-lead

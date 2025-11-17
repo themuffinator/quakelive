@@ -24,30 +24,3 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_local.h"
 #include "g_team.h"
 
-/*
-=============
-SP_team_dom_point
-
-Spawns a Domination capture trigger volume.
-=============
-*/
-void SP_team_dom_point( gentity_t *ent ) {
-	if ( g_gametype.integer != GT_DOMINATION ) {
-		G_FreeEntity( ent );
-		return;
-	}
-
-	if ( !ent->model || !ent->model[0] ) {
-		G_Printf( "SP_team_dom_point: missing model\n" );
-		G_FreeEntity( ent );
-		return;
-	}
-
-	trap_SetBrushModel( ent, ent->model );
-	InitTrigger( ent );
-
-	ent->touch = Team_DominationPointTouch;
-	ent->r.svFlags |= SVF_NOCLIENT;
-
-	Team_RegisterDominationPoint( ent, ent->message );
-}
