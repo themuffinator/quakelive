@@ -6,7 +6,7 @@ The existing repository retains the Quake III Arena virtual machine pipeline so 
 
 - The `src/lcc/` subtree packages the Quake-specific fork of the LCC compiler along with helper drivers (`q3lcc`, `q3rcc`, `q3cpp`). On Windows hosts it is built by `buildnt.sh`, which generates an `out` directory and drives `nmake` against `makefile.nt` to emit the toolchain binaries.【F:src/lcc/buildnt.sh†L1-L4】 The `makefile.nt` recipe invokes Microsoft `cl` in debug/`/MDd` mode to compile and link the individual compiler stages (`q3rcc`, `q3cpp`, `lcc`, etc.), then archives them into the deliverables consumed by the VM build scripts.【F:src/lcc/makefile.nt†L1-L118】
 - The root engine `Construct` script still knows how to build these tools on demand. When a build requests `q3lcc` or `q3asm`, the script creates a `qvmtools/` staging directory, runs the appropriate `make` command inside `src/lcc/` or `src/q3asm/`, and copies the resulting executables back into `code/qvmtools/` for reuse by the per-module build scripts.【F:src/code/Construct†L260-L308】
-- Each VM (game, cgame, UI) is then compiled by thin shell/batch wrappers such as `src/code/game/game.sh`, which drive `q3lcc` in `-Wf-target=bytecode` mode across the module’s C sources before invoking `q3asm` to assemble the final `.qvm` payload.【F:src/code/game/game.sh†L1-L48】 The assembler itself lives under `src/q3asm/` and is built with a minimal GNU makefile that targets the host’s C compiler (`gcc`).【F:src/q3asm/Makefile†L1-L12】
+- Each gameplay VM (game, cgame) is then compiled by thin shell/batch wrappers such as `src/code/game/game.sh`, which drive `q3lcc` in `-Wf-target=bytecode` mode across the module’s C sources before invoking `q3asm` to assemble the final `.qvm` payload.【F:src/code/game/game.sh†L1-L48】 The assembler itself lives under `src/q3asm/` and is built with a minimal GNU makefile that targets the host’s C compiler (`gcc`).【F:src/q3asm/Makefile†L1-L12】
 - Shared support code for these tools is provided in `src/libs/` (for example `libs/cmdlib/` centralises logging, file IO, and allocation helpers that are linked into `q3asm`).【F:src/libs/cmdlib/cmdlib.cpp†L1-L158】 The q3asm readme confirms these files were copied from the engine’s common utilities for portability.【F:src/q3asm/README.Id†L1-L10】
 
 This pipeline remains functional and should keep shipping alongside any new native-focused workflow to preserve bytecode compatibility for legacy mod builds and regression testing.
@@ -38,7 +38,7 @@ The goal is to preserve the Quake III VM pipeline while layering in a native DLL
    - Capture minimal host requirements (Perl, GNU make, Microsoft CL for the Windows variant) in repository docs so contributors can continue producing `.qvm` artefacts.
 
 2. **Introduce a dedicated native build configuration.**
-   - Add a CMake or MSBuild definition under `build/native/` (or extend `src/code/quake3.sln`) that produces `qagamex86.dll`, `cgamex86.dll`, and `uix86.dll` with the `v100` toolset while leaving the existing VM projects untouched.
+   - Add a CMake or MSBuild definition under `build/native/` (or extend `src/code/quake3.sln`) that produces `qagamex86.dll` and `cgamex86.dll` with the `v100` toolset while leaving the existing VM projects untouched.
    - Configure each target for Win32, `/MD` runtime linkage, and export lists consistent with the legacy DLLs.
    - Ensure the configuration sets the same preprocessor symbols used by the VM build (`Q3_VM`, platform macros) so source compatibility is maintained during the transition.
 

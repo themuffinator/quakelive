@@ -22,4 +22,4 @@
 | credential_menu.auto_hint_standalone | Launch from the standalone client to refresh or revoke the cached token. | Refresh hint when standalone hides manual entry. |
 | credential_menu.accept_disabled | Automatic credentials close the menu when you press Accept. | Supplemental QA note for tooltip/screenshot staging. |
 
-> The localization table mirrors the runtime string arrays in `src/code/q3_ui/ui_cdkey.c`. Translators should keep the guidance tone consistent and ensure "Steam" and "Standalone" product names remain unaltered.
+> The localization table mirrors the runtime string arrays in `src/code/ui/ui_cdkey.c`. Translators should keep the guidance tone consistent and ensure "Steam" and "Standalone" product names remain unaltered.

@@ -28,7 +28,7 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
   enables systematic diffing between the retail Quake III code and the decompiled
   Quake Live functions when porting behaviour.【F:docs/onboarding/overview.md†L6-L19】
 - Quake Live assets under `references/original-assets/quakelive/` expose binary
-  modules (`cgamex86.dll`, `qagamex86.dll`, `uix86.dll`, etc.) and supporting data
+  modules (`cgamex86.dll`, `qagamex86.dll`, etc.) and supporting data
   (fonts, icons, maps) to validate assumptions or reproduce file formats.【F:docs/onboarding/overview.md†L6-L19】
 - The active `src/` tree should evolve from the Quake III baseline towards Quake
   Live parity while the clean-room `src-re/` prototypes and sign-off drops are

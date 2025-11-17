@@ -59,7 +59,6 @@ BAIDIR=$(GDIR)
 BLIBDIR=$(MOUNT_DIR)/botlib
 NDIR=$(MOUNT_DIR)/null
 UIDIR=$(MOUNT_DIR)/ui
-Q3UIDIR=$(MOUNT_DIR)/q3_ui
 FTDIR=$(MOUNT_DIR)/ft2
 JPDIR=$(MOUNT_DIR)/jpeg-6
 SPLNDIR=$(MOUNT_DIR)/splines
@@ -1042,13 +1041,9 @@ $(B)/baseq3/vm/cgame.qvm:
 	cd $(CGDIR) && ./cgame.sh
 	mv /tmp/quake3/baseq3/vm/cgame.qvm $@
 
-$(B)/baseq3/vm/ui.qvm:
-	cd $(Q3UIDIR) && ./q3_ui.sh
-	mv /tmp/quake3/baseq3/vm/ui.qvm $@
-
 $(B)/baseq3/vm/qagame.qvm:
-	cd $(GDIR) && ./game.sh
-	mv /tmp/quake3/baseq3/vm/qagame.qvm $@
+cd $(GDIR) && ./game.sh
+mv /tmp/quake3/baseq3/vm/qagame.qvm $@
 
 $(B)/missionpack/vm/cgame.qvm:
 	cd $(CGDIR) && ./cgame_ta.sh
@@ -1397,47 +1392,47 @@ $(B)/baseq3/ui$(ARCH).$(SHLIBEXT) : $(Q3UIOBJ)
 	$(CC) $(CFLAGS) $(SHLIBLDFLAGS) -o $@ $(Q3UIOBJ)
 
 $(B)/baseq3/ui/bg_misc.o : $(GDIR)/bg_misc.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_addbots.o : $(Q3UIDIR)/ui_addbots.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_atoms.o : $(Q3UIDIR)/ui_atoms.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_cinematics.o : $(Q3UIDIR)/ui_cinematics.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_cdkey.o : $(Q3UIDIR)/ui_cdkey.c; $(DO_SHLIB_CC)
-$(B)/baseq3/ui/ui_confirm.o : $(Q3UIDIR)/ui_confirm.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_connect.o : $(Q3UIDIR)/ui_connect.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_controls2.o : $(Q3UIDIR)/ui_controls2.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_credits.o : $(Q3UIDIR)/ui_credits.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_demo2.o : $(Q3UIDIR)/ui_demo2.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_display.o : $(Q3UIDIR)/ui_display.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_gameinfo.o : $(Q3UIDIR)/ui_gameinfo.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_ingame.o : $(Q3UIDIR)/ui_ingame.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_loadconfig.o : $(Q3UIDIR)/ui_loadconfig.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_main.o : $(Q3UIDIR)/ui_main.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_menu.o : $(Q3UIDIR)/ui_menu.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_mfield.o : $(Q3UIDIR)/ui_mfield.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_mods.o : $(Q3UIDIR)/ui_mods.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_network.o : $(Q3UIDIR)/ui_network.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_options.o : $(Q3UIDIR)/ui_options.c; $(DO_SHLIB_CC)
-$(B)/baseq3/ui/ui_playermodel.o : $(Q3UIDIR)/ui_playermodel.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_players.o : $(Q3UIDIR)/ui_players.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_playersettings.o : $(Q3UIDIR)/ui_playersettings.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_preferences.o : $(Q3UIDIR)/ui_preferences.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_qmenu.o : $(Q3UIDIR)/ui_qmenu.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_quit.o : $(Q3UIDIR)/ui_quit.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_removebots.o : $(Q3UIDIR)/ui_removebots.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_saveconfig.o : $(Q3UIDIR)/ui_saveconfig.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_serverinfo.o : $(Q3UIDIR)/ui_serverinfo.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_servers2.o : $(Q3UIDIR)/ui_servers2.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_setup.o : $(Q3UIDIR)/ui_setup.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_sound.o : $(Q3UIDIR)/ui_sound.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_sparena.o : $(Q3UIDIR)/ui_sparena.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_specifyserver.o : $(Q3UIDIR)/ui_specifyserver.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_splevel.o : $(Q3UIDIR)/ui_splevel.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_sppostgame.o : $(Q3UIDIR)/ui_sppostgame.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_spskill.o : $(Q3UIDIR)/ui_spskill.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_startserver.o : $(Q3UIDIR)/ui_startserver.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_team.o : $(Q3UIDIR)/ui_team.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_teamorders.o : $(Q3UIDIR)/ui_teamorders.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_syscalls.o : $(Q3UIDIR)/ui_syscalls.c; $(DO_SHLIB_CC) 
-$(B)/baseq3/ui/ui_video.o : $(Q3UIDIR)/ui_video.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_addbots.o : $(UIDIR)/ui_addbots.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_atoms.o : $(UIDIR)/ui_atoms.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_cinematics.o : $(UIDIR)/ui_cinematics.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_cdkey.o : $(UIDIR)/ui_cdkey.c; $(DO_SHLIB_CC)
+$(B)/baseq3/ui/ui_confirm.o : $(UIDIR)/ui_confirm.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_connect.o : $(UIDIR)/ui_connect.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_controls2.o : $(UIDIR)/ui_controls2.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_credits.o : $(UIDIR)/ui_credits.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_demo2.o : $(UIDIR)/ui_demo2.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_display.o : $(UIDIR)/ui_display.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_gameinfo.o : $(UIDIR)/ui_gameinfo.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_ingame.o : $(UIDIR)/ui_ingame.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_loadconfig.o : $(UIDIR)/ui_loadconfig.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_main.o : $(UIDIR)/ui_main.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_menu.o : $(UIDIR)/ui_menu.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_mfield.o : $(UIDIR)/ui_mfield.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_mods.o : $(UIDIR)/ui_mods.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_network.o : $(UIDIR)/ui_network.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_options.o : $(UIDIR)/ui_options.c; $(DO_SHLIB_CC)
+$(B)/baseq3/ui/ui_playermodel.o : $(UIDIR)/ui_playermodel.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_players.o : $(UIDIR)/ui_players.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_playersettings.o : $(UIDIR)/ui_playersettings.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_preferences.o : $(UIDIR)/ui_preferences.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_qmenu.o : $(UIDIR)/ui_qmenu.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_quit.o : $(UIDIR)/ui_quit.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_removebots.o : $(UIDIR)/ui_removebots.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_saveconfig.o : $(UIDIR)/ui_saveconfig.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_serverinfo.o : $(UIDIR)/ui_serverinfo.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_servers2.o : $(UIDIR)/ui_servers2.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_setup.o : $(UIDIR)/ui_setup.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_sound.o : $(UIDIR)/ui_sound.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_sparena.o : $(UIDIR)/ui_sparena.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_specifyserver.o : $(UIDIR)/ui_specifyserver.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_splevel.o : $(UIDIR)/ui_splevel.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_sppostgame.o : $(UIDIR)/ui_sppostgame.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_spskill.o : $(UIDIR)/ui_spskill.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_startserver.o : $(UIDIR)/ui_startserver.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_team.o : $(UIDIR)/ui_team.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_teamorders.o : $(UIDIR)/ui_teamorders.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_syscalls.o : $(UIDIR)/ui_syscalls.c; $(DO_SHLIB_CC) 
+$(B)/baseq3/ui/ui_video.o : $(UIDIR)/ui_video.c; $(DO_SHLIB_CC) 
 
 # bk001205 - these wre the only SHLIB compiles in 1.17
 $(B)/baseq3/ui/q_math.o : $(GDIR)/q_math.c; $(DO_SHLIB_CC) 
@@ -1998,47 +1993,47 @@ Q3SOBJ += \
 	\
 	$(B)/q3static/ui_syscalls.o
 
-$(B)/q3static/ui_addbots.o : $(Q3UIDIR)/ui_addbots.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_atoms.o : $(Q3UIDIR)/ui_atoms.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_cinematics.o : $(Q3UIDIR)/ui_cinematics.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_cdkey.o : $(Q3UIDIR)/ui_cdkey.c; $(DO_CC) -DQ3_STATIC
-$(B)/q3static/ui_confirm.o : $(Q3UIDIR)/ui_confirm.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_connect.o : $(Q3UIDIR)/ui_connect.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_controls2.o : $(Q3UIDIR)/ui_controls2.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_credits.o : $(Q3UIDIR)/ui_credits.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_demo2.o : $(Q3UIDIR)/ui_demo2.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_display.o : $(Q3UIDIR)/ui_display.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_gameinfo.o : $(Q3UIDIR)/ui_gameinfo.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_ingame.o : $(Q3UIDIR)/ui_ingame.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_loadconfig.o : $(Q3UIDIR)/ui_loadconfig.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_main.o : $(Q3UIDIR)/ui_main.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_menu.o : $(Q3UIDIR)/ui_menu.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_mfield.o : $(Q3UIDIR)/ui_mfield.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_mods.o : $(Q3UIDIR)/ui_mods.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_network.o : $(Q3UIDIR)/ui_network.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_options.o : $(Q3UIDIR)/ui_options.c; $(DO_CC) -DQ3_STATIC
-$(B)/q3static/ui_playermodel.o : $(Q3UIDIR)/ui_playermodel.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_players.o : $(Q3UIDIR)/ui_players.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_playersettings.o : $(Q3UIDIR)/ui_playersettings.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_preferences.o : $(Q3UIDIR)/ui_preferences.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_qmenu.o : $(Q3UIDIR)/ui_qmenu.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_quit.o : $(Q3UIDIR)/ui_quit.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_removebots.o : $(Q3UIDIR)/ui_removebots.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_saveconfig.o : $(Q3UIDIR)/ui_saveconfig.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_serverinfo.o : $(Q3UIDIR)/ui_serverinfo.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_servers2.o : $(Q3UIDIR)/ui_servers2.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_setup.o : $(Q3UIDIR)/ui_setup.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_sound.o : $(Q3UIDIR)/ui_sound.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_sparena.o : $(Q3UIDIR)/ui_sparena.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_specifyserver.o : $(Q3UIDIR)/ui_specifyserver.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_splevel.o : $(Q3UIDIR)/ui_splevel.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_sppostgame.o : $(Q3UIDIR)/ui_sppostgame.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_spskill.o : $(Q3UIDIR)/ui_spskill.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_startserver.o : $(Q3UIDIR)/ui_startserver.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_team.o : $(Q3UIDIR)/ui_team.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_teamorders.o : $(Q3UIDIR)/ui_teamorders.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_syscalls.o : $(Q3UIDIR)/ui_syscalls.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/ui_video.o : $(Q3UIDIR)/ui_video.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_addbots.o : $(UIDIR)/ui_addbots.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_atoms.o : $(UIDIR)/ui_atoms.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_cinematics.o : $(UIDIR)/ui_cinematics.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_cdkey.o : $(UIDIR)/ui_cdkey.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/ui_confirm.o : $(UIDIR)/ui_confirm.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_connect.o : $(UIDIR)/ui_connect.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_controls2.o : $(UIDIR)/ui_controls2.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_credits.o : $(UIDIR)/ui_credits.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_demo2.o : $(UIDIR)/ui_demo2.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_display.o : $(UIDIR)/ui_display.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_gameinfo.o : $(UIDIR)/ui_gameinfo.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_ingame.o : $(UIDIR)/ui_ingame.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_loadconfig.o : $(UIDIR)/ui_loadconfig.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_main.o : $(UIDIR)/ui_main.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_menu.o : $(UIDIR)/ui_menu.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_mfield.o : $(UIDIR)/ui_mfield.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_mods.o : $(UIDIR)/ui_mods.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_network.o : $(UIDIR)/ui_network.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_options.o : $(UIDIR)/ui_options.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/ui_playermodel.o : $(UIDIR)/ui_playermodel.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_players.o : $(UIDIR)/ui_players.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_playersettings.o : $(UIDIR)/ui_playersettings.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_preferences.o : $(UIDIR)/ui_preferences.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_qmenu.o : $(UIDIR)/ui_qmenu.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_quit.o : $(UIDIR)/ui_quit.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_removebots.o : $(UIDIR)/ui_removebots.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_saveconfig.o : $(UIDIR)/ui_saveconfig.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_serverinfo.o : $(UIDIR)/ui_serverinfo.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_servers2.o : $(UIDIR)/ui_servers2.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_setup.o : $(UIDIR)/ui_setup.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_sound.o : $(UIDIR)/ui_sound.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_sparena.o : $(UIDIR)/ui_sparena.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_specifyserver.o : $(UIDIR)/ui_specifyserver.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_splevel.o : $(UIDIR)/ui_splevel.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_sppostgame.o : $(UIDIR)/ui_sppostgame.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_spskill.o : $(UIDIR)/ui_spskill.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_startserver.o : $(UIDIR)/ui_startserver.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_team.o : $(UIDIR)/ui_team.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_teamorders.o : $(UIDIR)/ui_teamorders.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_syscalls.o : $(UIDIR)/ui_syscalls.c; $(DO_CC) -DQ3_STATIC 
+$(B)/q3static/ui_video.o : $(UIDIR)/ui_video.c; $(DO_CC) -DQ3_STATIC 
 
 
 ## add shared files
@@ -2128,7 +2123,6 @@ clean2: clean-bins
 	rm -f $(CGDIR)/vm/*.asm
 	rm -f $(GDIR)/vm/*.asm
 	rm -f $(UIDIR)/vm/*.asm
-	rm -f $(Q3UIDIR)/vm/*.asm
 
 # TTimo: linuxq3ded linuxquake3 linuxquake3-smp .. hardcoded the names .. maybe not such a good thing
 # FIXME: also, removing the *.so is crappy .. I just want to avoid rm -rf debugi386-glibc to save the symlinks to pk3's for testing

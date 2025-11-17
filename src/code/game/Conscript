@@ -15,7 +15,7 @@ Import qw( BASE_CFLAGS TARGET_DIR INSTALL_DIR NO_VM NO_SO CC CXX LINK );
 $env = new cons(
   # the code has the very bad habit of doing things like #include "../ui/ui_shared.h"
   # this seems to confuse the dependency analysis, explicit toplevel includes seem to fix
-  CPPPATH => '#cgame:#game:#q3_ui',
+  CPPPATH => '#cgame:#game:#ui',
   CC => $CC,
   CXX => $CXX,
   LINK => $LINK,
@@ -36,7 +36,7 @@ $ta_env = new cons(%ta_env_hash);
 $vm_env = new cons(
   # the code has the very bad habit of doing things like #include "../ui/ui_shared.h"
   # this seems to confuse the dependency analysis, explicit toplevel includes seem to fix
-  CPPPATH => '#cgame:#game:#q3_ui',
+  CPPPATH => '#cgame:#game:#ui',
   CC => 'q3lcc',
   CCCOM => '%CC %CFLAGS %_IFLAGS -c %< -o %>',
   SUFOBJ => '.asm',

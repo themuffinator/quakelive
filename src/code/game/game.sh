@@ -3,7 +3,7 @@
 mkdir -p vm
 cd vm
 
-CC="q3lcc -DQ3_VM -S -Wf-target=bytecode -Wf-g -I../../cgame -I../../game -I../../q3_ui"
+CC="q3lcc -DQ3_VM -S -Wf-target=bytecode -Wf-g -I../../cgame -I../../game -I../../ui"
 
 $CC  ../g_main.c
 $CC  ../g_syscalls.c

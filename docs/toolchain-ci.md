@@ -9,7 +9,7 @@ The deterministic harness workflow complements those guards by building both tar
 
 ## QVM toolchain guard
 
-The `Toolchain (QVM)` workflow exposes a single `qvm-prereqs` job that runs on Ubuntu and executes `tools/ci/verify-qvm-toolchain.sh`, ensuring that the legacy QVM builders can still be produced on demand.【F:.github/workflows/toolchain.yml†L1-L18】【F:tools/ci/verify-qvm-toolchain.sh†L1-L45】 The script checks that `perl`, `make`, and `gcc` are available, dry-runs the `src/q3asm/` and `src/lcc/` makefiles, and confirms that the wrapper scripts (`game.sh`, `cgame.sh`, `q3_ui.sh`) are still present in the expected locations. Any missing prerequisite fails the job immediately.
+The `Toolchain (QVM)` workflow exposes a single `qvm-prereqs` job that runs on Ubuntu and executes `tools/ci/verify-qvm-toolchain.sh`, ensuring that the legacy QVM builders can still be produced on demand.【F:.github/workflows/toolchain.yml†L1-L18】【F:tools/ci/verify-qvm-toolchain.sh†L1-L45】 The script checks that `perl`, `make`, and `gcc` are available, dry-runs the `src/q3asm/` and `src/lcc/` makefiles, and confirms that the wrapper scripts (`game.sh`, `cgame.sh`) are still present in the expected locations. Any missing prerequisite fails the job immediately.
 
 ## Native DLL validation
 

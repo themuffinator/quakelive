@@ -33,7 +33,6 @@ echo "lcc makefile parsed successfully"
 VM_SCRIPTS=(
   "$ROOT_DIR/src/code/game/game.sh"
   "$ROOT_DIR/src/code/cgame/cgame.sh"
-  "$ROOT_DIR/src/code/q3_ui/q3_ui.sh"
 )
 
 for script in "${VM_SCRIPTS[@]}"; do

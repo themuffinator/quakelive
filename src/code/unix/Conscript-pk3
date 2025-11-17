@@ -119,11 +119,10 @@ sub build_pk3 {
 # <target file>, [ <fileset1>, <fileset2>, ... ]
 # where <fileset>: [ <source directory>, <directory in zip>, <file1>, <file2>, .. ]
 
-build_pk3('baseq3/pak8.pk3', 
-	[ [ '#../../../media/Q3Media-1.32/baseq3/menu/art', 'menu/art', 'pblogo.tga' ],
-	[ '../Q3/q3_ui/q3_ui', 'vm', 'ui.qvm' ],
-	[ '../Q3/cgame/cgame', 'vm', 'cgame.qvm' ],
-	[ '../Q3/game/game', 'vm', 'qagame.qvm' ] ]
+build_pk3('baseq3/pak8.pk3',
+[ [ '#../../../media/Q3Media-1.32/baseq3/menu/art', 'menu/art', 'pblogo.tga' ],
+[ '../Q3/cgame/cgame', 'vm', 'cgame.qvm' ],
+[ '../Q3/game/game', 'vm', 'qagame.qvm' ] ]
 );
 
 build_pk3('missionpack/pak3.pk3',

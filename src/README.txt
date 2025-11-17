@@ -175,7 +175,7 @@ q3radiant/Radiant.sln
 To compile the qvms, you need to run some batch files:
 you will need to have lcc.exe q3cpp.exe q3rcc.exe and q3asm.exe in your path
 ( some precompiled binaries are provided in lcc/bin and code/win32/mod-sdk-setup/bin )
-the qvm batch files are in code/game code/cgame code/q3_ui code/ui ..
+the qvm batch files are in code/game code/cgame code/ui ..
 
 COMPILING ON GNU/LINUX
 ==================

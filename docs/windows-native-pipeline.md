@@ -1,6 +1,6 @@
 # Visual Studio 2010 Native Build Guidance
 
-Quake Live’s retail gameplay modules were compiled as Win32 DLLs with the Visual Studio 2010 (`v100`) toolset and import the Visual C++ 2010 CRT pair (`MSVCR100.dll`, `MSVCP100.dll`).【F:docs/hlil_comparison.md†L8-L17】 The Visual Studio solution under `src/code/` now pins each gameplay project (`game`, `cgame`, and `q3_ui`) to that legacy toolset so Release builds continue to emit Quake Live–style binaries (`qagamex86.dll`, `cgamex86.dll`, `uix86.dll`) with the same exports and CRT bindings.
+Quake Live’s retail gameplay modules were compiled as Win32 DLLs with the Visual Studio 2010 (`v100`) toolset and import the Visual C++ 2010 CRT pair (`MSVCR100.dll`, `MSVCP100.dll`).【F:docs/hlil_comparison.md†L8-L17】 The Visual Studio solution under `src/code/` now pins the supported gameplay projects (`game` and `cgame`) to that legacy toolset so Release builds continue to emit Quake Live–style binaries (`qagamex86.dll`, `cgamex86.dll`) with the same exports and CRT bindings.
 
 ## Required project files
 
@@ -8,16 +8,15 @@ Open `src/code/quake3.sln` inside Visual Studio and load the following projects:
 
 - `game/game.vcxproj` – Produces `../Release/qagamex86.dll` for the Release Win32 configuration and loads its export table from `game.def` (which lists `dllEntry` and `vmMain`).【F:src/code/game/game.vcxproj†L285-L313】【F:src/code/game/game.def†L1-L4】
 - `cgame/cgame.vcxproj` – Produces `../Release/cgamex86.dll` and wires the same export pair via `cgame.def`.【F:src/code/cgame/cgame.vcxproj†L171-L199】【F:src/code/cgame/cgame.def†L1-L4】
-- `q3_ui/q3_ui.vcxproj` – Produces `../Release/uix86.dll` while referencing `ui.def` for its export list.【F:src/code/q3_ui/q3_ui.vcxproj†L168-L194】【F:src/code/q3_ui/ui.def†L1-L3】
 
-Each project already sets a Win32 dynamic-library configuration with explicit output paths and map/PDB generation so no additional post-build steps are required.【F:src/code/game/game.vcxproj†L285-L355】【F:src/code/cgame/cgame.vcxproj†L171-L240】【F:src/code/q3_ui/q3_ui.vcxproj†L168-L236】 Building the solution with the proper toolset will drop the DLLs into the `src/code/<project>/Release/` directories alongside their `.lib`, `.pdb`, and `.map` files.
+Each project already sets a Win32 dynamic-library configuration with explicit output paths and map/PDB generation so no additional post-build steps are required.【F:src/code/game/game.vcxproj†L285-L355】【F:src/code/cgame/cgame.vcxproj†L171-L240】 Building the solution with the proper toolset will drop the DLLs into the `src/code/<project>/Release/` directories alongside their `.lib`, `.pdb`, and `.map` files.
 
 ## Retargeting to the `v100` toolset
 
 1. Install Visual Studio 2010 SP1 or a newer Visual Studio release that includes the “Visual Studio 2010 (v100) toolset” optional component. Confirm that `vcvarsall.bat` accepts `-vcvars_ver=10.0` to load the toolchain.
-2. The project files checked into source control already pin **ToolsVersion** to `4.0` and **Platform Toolset** to `v100`, ensuring MSBuild treats them as Visual Studio 2010 projects even when opened in newer IDEs.【F:src/code/game/game.vcxproj†L2-L64】【F:src/code/cgame/cgame.vcxproj†L2-L46】【F:src/code/q3_ui/q3_ui.vcxproj†L2-L48】 If Visual Studio offers to upgrade the toolset, decline the prompt and keep the saved XML unchanged.
-3. Release configurations are locked to the `/MD` runtime (`MultiThreadedDLL`) so the shipped binaries keep importing the legacy CRT pair (`MSVCR100.dll`, `MSVCP100.dll`).【F:src/code/game/game.vcxproj†L285-L350】【F:src/code/cgame/cgame.vcxproj†L171-L206】【F:src/code/q3_ui/q3_ui.vcxproj†L168-L206】 Package the x86 redistributable alongside the DLLs when deploying to clean machines.
-4. Build the `Release|Win32` configuration to generate the DLLs with aligned exports. The `.def` files enforce the two-function export tables required by the game engine loader.【F:src/code/game/game.def†L1-L4】【F:src/code/cgame/cgame.def†L1-L4】【F:src/code/q3_ui/ui.def†L1-L3】
+2. The project files checked into source control already pin **ToolsVersion** to `4.0` and **Platform Toolset** to `v100`, ensuring MSBuild treats them as Visual Studio 2010 projects even when opened in newer IDEs.【F:src/code/game/game.vcxproj†L2-L64】【F:src/code/cgame/cgame.vcxproj†L2-L46】 If Visual Studio offers to upgrade the toolset, decline the prompt and keep the saved XML unchanged.
+3. Release configurations are locked to the `/MD` runtime (`MultiThreadedDLL`) so the shipped binaries keep importing the legacy CRT pair (`MSVCR100.dll`, `MSVCP100.dll`).【F:src/code/game/game.vcxproj†L285-L350】【F:src/code/cgame/cgame.vcxproj†L171-L206】 Package the x86 redistributable alongside the DLLs when deploying to clean machines.
+4. Build the `Release|Win32` configuration to generate the DLLs with aligned exports. The `.def` files enforce the two-function export tables required by the game engine loader.【F:src/code/game/game.def†L1-L4】【F:src/code/cgame/cgame.def†L1-L4】
 
 ## Command-line builds and MSBuild overrides
 

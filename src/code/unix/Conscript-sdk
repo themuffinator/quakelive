@@ -77,7 +77,7 @@ sub launch {
   $RAW_DATA = "mod-sdk-$Q3_VER";
   system("rm -rf $RAW_DATA ; mkdir -p $RAW_DATA/code");
   # actual code
-  system("cp -R cgame game q3_ui ui $RAW_DATA/code");
+  system("cp -R cgame game ui $RAW_DATA/code");
   # UI stuff
   system("cp -R ../ui $RAW_DATA");
   # tools
