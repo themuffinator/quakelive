@@ -497,7 +497,7 @@ qboolean	ConsoleCommand( void ) {
 
 	if ( Q_stricmp( cmd, "racepoint" ) == 0 ) {
 		if ( g_gametype.integer != GT_RACE ) {
-			G_Printf( "RacePoint is only permitted in Race.\n" );
+			G_Printf( GAMEPRINT_RACEPOINT_RACE_ONLY );
 			return qtrue;
 		}
 
@@ -536,8 +536,10 @@ qboolean	ConsoleCommand( void ) {
 		if ( g_gametype.integer == GT_RACE ) {
 			int index = atoi( cmd + 17 );
 			if ( !G_RaceSendPointMetadataCommand( -1, index ) ) {
-				G_Printf( "invalid race point %i\n", index );
+				G_Printf( GAMEPRINT_RACEPOINT_INVALID_INDEX, index );
 			}
+		} else {
+			G_Printf( GAMEPRINT_RACEPOINT_RACE_ONLY );
 		}
 		return qtrue;
 	}

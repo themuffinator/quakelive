@@ -409,7 +409,6 @@ void Cmd_God_f (gentity_t *ent)
 	trap_SendServerCommand( ent-g_entities, va("print \"%s\"", msg));
 }
 
-
 /*
 ==================
 Cmd_Notarget_f
@@ -462,6 +461,75 @@ void Cmd_Noclip_f( gentity_t *ent ) {
 
 
 /*
+============
+Cmd_ThawTarget_f
+
+Cheat helper that lets developers thaw a frozen teammate directly by slot.
+============
+*/
+static void Cmd_ThawTarget_f( gentity_t *ent ) {
+	char	arg[MAX_TOKEN_CHARS];
+	int		targetNum;
+	gentity_t	*target;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( !G_FreezeGametypeEnabled() ) {
+		trap_SendServerCommand( ent - g_entities, "print \"" GAMEPRINT_THAW_FREEZE_ONLY "\"" );
+		G_LogPrintf( "cmd: thawtarget denied outside Freeze for client %i\n", ent->client->ps.clientNum );
+		return;
+	}
+
+	if ( !CheatsOk( ent ) ) {
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"" GAMEPRINT_THAW_INVALID_TARGET "\"" );
+		G_LogPrintf( "cmd: thawtarget missing argument from client %i\n", ent->client->ps.clientNum );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	targetNum = atoi( arg );
+	if ( targetNum < 0 || targetNum >= level.maxclients ) {
+		trap_SendServerCommand( ent - g_entities, "print \"" GAMEPRINT_THAW_INVALID_TARGET "\"" );
+		G_LogPrintf( "cmd: thawtarget invalid slot %s from client %i\n", arg, ent->client->ps.clientNum );
+		return;
+	}
+
+	target = &g_entities[targetNum];
+	if ( !target->inuse || !target->client || target->client->pers.connected != CON_CONNECTED ) {
+		trap_SendServerCommand( ent - g_entities, "print \"" GAMEPRINT_THAW_INVALID_TARGET "\"" );
+		G_LogPrintf( "cmd: thawtarget unavailable client %i requested by %i\n", targetNum, ent->client->ps.clientNum );
+		return;
+	}
+
+	if ( target->client->sess.sessionTeam != TEAM_RED && target->client->sess.sessionTeam != TEAM_BLUE ) {
+		trap_SendServerCommand( ent - g_entities, "print \"" GAMEPRINT_THAW_INVALID_TARGET "\"" );
+		G_LogPrintf( "cmd: thawtarget non-team target %i requested by %i\n", targetNum, ent->client->ps.clientNum );
+		return;
+	}
+
+	if ( ent->client->sess.sessionTeam != TEAM_SPECTATOR && ent->client->sess.sessionTeam != target->client->sess.sessionTeam ) {
+		trap_SendServerCommand( ent - g_entities, "print \"" GAMEPRINT_THAW_INVALID_TARGET "\"" );
+		G_LogPrintf( "cmd: thawtarget team mismatch client %i target %i\n", ent->client->ps.clientNum, targetNum );
+		return;
+	}
+
+	if ( !target->client->freezeFrozen ) {
+		trap_SendServerCommand( ent - g_entities, "print \"" GAMEPRINT_THAW_INVALID_TARGET "\"" );
+		G_LogPrintf( "cmd: thawtarget requested for non-frozen client %i by %i\n", targetNum, ent->client->ps.clientNum );
+		return;
+	}
+
+	G_FreezeThawClient( target, qfalse, ent - g_entities );
+	G_LogPrintf( "cmd: thawtarget thawed client %i via client %i\n", targetNum, ent->client->ps.clientNum );
+}
+
+/*
 ==================
 Cmd_LevelShot_f
 
@@ -488,16 +556,6 @@ void Cmd_LevelShot_f( gentity_t *ent ) {
 }
 
 
-/*
-==================
-Cmd_LevelShot_f
-
-This is just to help generate the level pictures
-for the menus.  It goes to the intermission immediately
-and sends over a command to the client to resize the view,
-hide the scoreboard, and take a special screenshot
-==================
-*/
 void Cmd_TeamTask_f( gentity_t *ent ) {
 	char userinfo[MAX_INFO_STRING];
 	char		arg[MAX_TOKEN_CHARS];
@@ -2491,6 +2549,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_Notarget_f (ent);
 	else if (Q_stricmp (cmd, "noclip") == 0)
 		Cmd_Noclip_f (ent);
+	else if (Q_stricmp (cmd, "thawtarget") == 0)
+		Cmd_ThawTarget_f( ent );
 	else if (Q_stricmp (cmd, "kill") == 0)
 		Cmd_Kill_f (ent);
 	else if (Q_stricmp (cmd, "forfeit") == 0)
@@ -2531,24 +2591,28 @@ void ClientCommand( int clientNum ) {
 		if ( g_gametype.integer == GT_RACE ) {
 			G_RaceBroadcastInitCommand( ent - g_entities );
 		} else {
-			trap_SendServerCommand( clientNum, "print \"Race commands are only available in Race.\\n\"" );
+			trap_SendServerCommand( clientNum, "print \"" GAMEPRINT_RACEPOINT_RACE_ONLY "\"" );
+			G_LogPrintf( "cmd: %s denied outside Race for client %i\n", cmd, clientNum );
 		}
 	}
 	else if ( !Q_stricmp( cmd, "race_info" ) ) {
 		if ( g_gametype.integer == GT_RACE ) {
 			G_RaceSendInfoCommand( ent - g_entities );
 		} else {
-			trap_SendServerCommand( clientNum, "print \"Race commands are only available in Race.\\n\"" );
+			trap_SendServerCommand( clientNum, "print \"" GAMEPRINT_RACEPOINT_RACE_ONLY "\"" );
+			G_LogPrintf( "cmd: %s denied outside Race for client %i\n", cmd, clientNum );
 		}
 	}
 	else if ( !Q_stricmpn( cmd, "admin_race_point_", 17 ) ) {
 		if ( g_gametype.integer == GT_RACE ) {
 			int index = atoi( cmd + 17 );
 			if ( !G_RaceSendPointMetadataCommand( ent - g_entities, index ) ) {
-				trap_SendServerCommand( clientNum, va( "print \"invalid race point %i\\n\"", index ) );
+				trap_SendServerCommand( clientNum, va( "print \"" GAMEPRINT_RACEPOINT_INVALID_INDEX "\"", index ) );
+				G_LogPrintf( "cmd: %s invalid index %i from client %i\n", cmd, index, clientNum );
 			}
 		} else {
-			trap_SendServerCommand( clientNum, "print \"Race commands are only available in Race.\\n\"" );
+			trap_SendServerCommand( clientNum, "print \"" GAMEPRINT_RACEPOINT_RACE_ONLY "\"" );
+			G_LogPrintf( "cmd: %s denied outside Race for client %i\n", cmd, clientNum );
 		}
 	}
 	else if (Q_stricmp (cmd, "setviewpos") == 0)

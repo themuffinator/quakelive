@@ -25,6 +25,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	GAME_API_VERSION	8
 
+// localized print strings mirrored from HLIL dumps so commands can share consistent text payloads.
+#define GAMEPRINT_RACEPOINT_RACE_ONLY        "RacePoint is only permitted in the Race gametype.\n"
+#define GAMEPRINT_RACEPOINT_INVALID_INDEX    "invalid race point %i\n"
+#define GAMEPRINT_THAW_INVALID_TARGET        "Invalid thaw target.\n"
+#define GAMEPRINT_THAW_FREEZE_ONLY           "Thaw commands are only available in Freeze Tag.\n"
+
 // entity->svFlags
 // the server does not know how to interpret most of the values
 // in entityStates (level eType), so the game must explicitly flag

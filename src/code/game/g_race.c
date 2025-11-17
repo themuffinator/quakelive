@@ -708,7 +708,7 @@ void G_RaceAdminCommand( gentity_t *ent ) {
 	}
 
 	if ( g_gametype.integer != GT_RACE ) {
-		trap_SendServerCommand( ent - g_entities, "print \"RacePoint is only permitted in Race.\n\"" );
+		trap_SendServerCommand( ent - g_entities, "print \"" GAMEPRINT_RACEPOINT_RACE_ONLY "\"" );
 		return;
 	}
 
