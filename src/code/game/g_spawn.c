@@ -709,6 +709,27 @@ static void G_UpdateSpawnQueueFlag( void ) {
 
 /*
 =============
+G_CountQueuedSpawns
+
+Returns the number of clients currently waiting on delayed spawn slots.
+=============
+*/
+static int G_CountQueuedSpawns( void ) {
+	int		i;
+	int		queued;
+
+	queued = 0;
+	for ( i = 0; i < level.maxclients; ++i ) {
+		if ( level.clientSpawnQueued[i] ) {
+			++queued;
+		}
+	}
+
+	return queued;
+}
+
+/*
+=============
 G_ClearQueuedSpawnState
 
 Resets the queue bookkeeping for a particular client number.
@@ -838,6 +859,12 @@ qboolean G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean in
 
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		delayMs = 0;
+	}
+
+	if ( delayMs > 0 && g_maxDeferredSpawns.integer > 0 ) {
+		if ( G_CountQueuedSpawns() >= g_maxDeferredSpawns.integer ) {
+			delayMs = 0;
+		}
 	}
 
 	if ( delayMs <= 0 ) {

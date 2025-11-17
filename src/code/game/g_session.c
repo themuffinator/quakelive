@@ -91,8 +91,11 @@ void G_ReadSessionData( gclient_t *client ) {
 	// bk001205 - format issues
 	client->sess.sessionTeam = (team_t)sessionTeam;
 	client->sess.spectatorState = (spectatorState_t)spectatorState;
+	if ( client->sess.sessionTeam == TEAM_SPECTATOR && !g_teamSpecFreeCam.integer && client->sess.spectatorState == SPECTATOR_FREE ) {
+		client->sess.spectatorState = SPECTATOR_SCOREBOARD;
+	}
 	client->sess.teamLeader = (qboolean)teamLeader;
-}
+	}
 
 
 /*
@@ -145,8 +148,7 @@ void G_InitSessionData( gclient_t *client, char *userinfo ) {
 			}
 		}
 	}
-
-	sess->spectatorState = SPECTATOR_FREE;
+	sess->spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
 	sess->spectatorTime = level.time;
 
 	G_WriteClientSessionData( client );

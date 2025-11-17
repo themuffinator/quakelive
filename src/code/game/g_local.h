@@ -771,6 +771,7 @@ void Cmd_FollowCycle_f( gentity_t *ent, int dir );
 void G_ApplyForfeit( gentity_t *ent );
 void G_SendItemTimerState( int clientNum, int enabled, int height );
 void G_BroadcastItemTimerState( int enabled, int height );
+qboolean G_GiveItemByName( gentity_t *ent, const char *name );
 
 //
 // g_items.c
@@ -1149,6 +1150,9 @@ extern	vmCvar_t	g_complaintLimit;
 extern	vmCvar_t	g_voteFlags;
 extern	vmCvar_t	g_teamAutoJoin;
 extern	vmCvar_t	g_teamForceBalance;
+extern	vmCvar_t	g_teamSpawnAsSpec;
+extern	vmCvar_t	g_teamSpecFreeCam;
+extern	vmCvar_t	g_teamSpecSayEnable;
 extern	vmCvar_t	g_banIPs;
 extern	vmCvar_t	g_filterBan;
 extern	vmCvar_t	g_instaGib;
@@ -1158,6 +1162,8 @@ extern	vmCvar_t	g_forceSmallScoreboardMessage;
 extern	vmCvar_t	g_forceSendConfigstring;
 extern	vmCvar_t	g_forceAtmosphericEffects;
 extern	vmCvar_t	g_forceDmgThroughSurface;
+extern	vmCvar_t	g_grantItemOnSpawn;
+extern	vmCvar_t	g_maxDeferredSpawns;
 extern	vmCvar_t	g_playermodelOverride;
 extern	vmCvar_t	g_playerheadmodelOverride;
 extern	vmCvar_t	g_training;

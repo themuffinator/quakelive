@@ -222,6 +222,11 @@ vmCvar_t	g_forceSmallScoreboardMessage;
 vmCvar_t	g_forceSendConfigstring;
 vmCvar_t	g_forceAtmosphericEffects;
 vmCvar_t	g_forceDmgThroughSurface;
+vmCvar_t	g_grantItemOnSpawn;
+vmCvar_t	g_maxDeferredSpawns;
+vmCvar_t	g_teamSpawnAsSpec;
+vmCvar_t	g_teamSpecFreeCam;
+vmCvar_t	g_teamSpecSayEnable;
 vmCvar_t	g_playermodelOverride;
 vmCvar_t	g_playerheadmodelOverride;
 vmCvar_t	g_training;
@@ -392,8 +397,11 @@ static cvarTable_t		gameCvarTable[] = {
 
 	{ &g_friendlyFire, "g_friendlyFire", "0", CVAR_ARCHIVE, 0, qtrue  },
 
-	{ &g_teamAutoJoin, "g_teamAutoJoin", "0", CVAR_ARCHIVE  },
-	{ &g_teamForceBalance, "g_teamForceBalance", "0", CVAR_ARCHIVE  },
+        { &g_teamAutoJoin, "g_teamAutoJoin", "0", CVAR_ARCHIVE  },
+        { &g_teamForceBalance, "g_teamForceBalance", "0", CVAR_ARCHIVE  },
+        { &g_teamSpawnAsSpec, "g_teamSpawnAsSpec", "0", 0, 0, qfalse, qfalse, "Force all join attempts into spectator slots until administrators clear the flag." },
+        { &g_teamSpecFreeCam, "g_teamSpecFreeCam", "0", 0, 0, qfalse, qfalse, "Allow spectators to use free-flying cameras when non-zero; otherwise they stay in follow or scoreboard views." },
+        { &g_teamSpecSayEnable, "g_teamSpecSayEnable", "1", 0, 0, qfalse, qfalse, "Permit spectators to chat while observing when enabled." },
 
 	{ &g_log, "g_log", "games.log", CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_logSync, "g_logSync", "0", CVAR_ARCHIVE, 0, qfalse  },
@@ -406,10 +414,11 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_instaGib, "g_instaGib", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
 	{ &g_itemTimers, "g_itemTimers", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Force server-controlled item timers to display for all clients when non-zero." },
 	{ &g_itemHeight, "g_itemHeight", "35", CVAR_ARCHIVE, 0, qfalse, qfalse, "Vertical offset in units applied to enforced item timer indicators." },
-	{ &g_forceSmallScoreboardMessage, "g_forceSmallScoreboardMessage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Prefer the compact scoreboard centerprint even with small player counts." },
-	{ &g_forceSendConfigstring, "g_forceSendConfigstring", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Resend all configstrings to clients on map load when enabled to debug sync issues." },
-	{ &g_forceAtmosphericEffects, "g_forceAtmosphericEffects", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable atmospheric map effects such as snow or rain regardless of client preference." },
-	{ &g_forceDmgThroughSurface, "g_forceDmgThroughSurface", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow splash damage to pass through non-solid surfaces for testing when set." },
+        { &g_forceSmallScoreboardMessage, "g_forceSmallScoreboardMessage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Prefer the compact scoreboard centerprint even with small player counts." },
+        { &g_forceSendConfigstring, "g_forceSendConfigstring", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Resend all configstrings to clients on map load when enabled to debug sync issues." },
+        { &g_forceAtmosphericEffects, "g_forceAtmosphericEffects", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable atmospheric map effects such as snow or rain regardless of client preference." },
+        { &g_forceDmgThroughSurface, "g_forceDmgThroughSurface", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow splash damage to pass through non-solid surfaces for testing when set." },
+        { &g_grantItemOnSpawn, "g_grantItemOnSpawn", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Whitespace or comma separated list of `give` tokens handed to every spawn, mirroring Quake Live's server-only spawn grants." },
 	{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional model path used to override every player's model selection server-wide." },
 	{ &g_playerheadmodelOverride, "g_playerheadmodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional head model override applied to all players for consistent visuals." },
 	{ &g_botsFile, "g_botsFile", "", CVAR_INIT | CVAR_ROM, 0, qfalse, qfalse, "Override bot definition list with a custom script when specified." },
@@ -460,15 +469,16 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_training, "g_training", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Marks training sessions and disables competitive match flow when set." },
 	{ &g_forcedAtmosphere, "g_forcedAtmosphere", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional atmosphere effect applied when a map lacks an atmosphere worldspawn key." },
 	{ &g_listEntity, "g_listEntity", "0", 0, 0, qfalse },
-        { &g_overtime, "g_overtime", "120", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Overtime period length in seconds once regulation ends tied; 0 keeps sudden death active until the tie is broken." },
-        { &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
-        { &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
+	{ &g_overtime, "g_overtime", "120", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Overtime period length in seconds once regulation ends tied; 0 keeps sudden death active until the tie is broken." },
+	{ &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
+	{ &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
 	{ &g_timeoutCount, "g_timeoutCount", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },
 	{ &g_factoryTitle, "g_factoryTitle", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Short factory title pushed via serverinfo for display on connected clients." },
 	{ &g_factoryRespawnDelay, "g_factoryRespawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds before a defeated player respawns when factories schedule queues." },
 	{ &g_factoryWarmupSpawnDelay, "g_factoryWarmupSpawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds applied to warmup spawns when factories request staggered starts." },
 	{ &g_factoryAllowItemDrops, "g_factoryAllowItemDrops", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether item drop logic fires for weapons and powerups spawned from players." },
 	{ &g_factoryAllowItemBounce, "g_factoryAllowItemBounce", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether dropped items bounce before coming to rest when factories disable the behaviour." },
+	{ &g_maxDeferredSpawns, "g_maxDeferredSpawns", "4", 0, 0, qfalse, qfalse, "Maximum simultaneous delayed spawns the queue may hold before new respawns execute immediately." },
 	{ &g_itemTimers, "g_itemTimers", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Toggles broadcast of server-side item timer training aids when non-zero." },
 	{ &g_itemHeight, "g_itemHeight", "20", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Adjusts the vertical spacing clients apply to item timer widgets in the HUD." },
 	{ &g_vampiricDamage, "g_vampiricDamage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Fraction of dealt health damage returned to the attacker as healing." },

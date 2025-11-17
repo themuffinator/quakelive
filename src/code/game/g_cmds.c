@@ -271,6 +271,86 @@ int ClientNumberFromString( gentity_t *to, char *s ) {
 	return -1;
 }
 
+
+/*
+=============
+G_GiveItemByName
+
+Grants inventory matching the `give` command tokens so non-cheat code paths can reuse the logic.
+=============
+*/
+qboolean G_GiveItemByName( gentity_t *ent, const char *name ) {
+	gitem_t		*it;
+	gentity_t	*it_ent;
+	trace_t	trace;
+	int			 i;
+
+	if ( !ent || !ent->client || !name || !name[0] ) {
+		return qfalse;
+	}
+
+	if ( Q_stricmp( name, "health" ) == 0 ) {
+		ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
+		return qtrue;
+	}
+
+	if ( Q_stricmp( name, "weapons" ) == 0 ) {
+		ent->client->ps.stats[STAT_WEAPONS] = ( 1 << WP_NUM_WEAPONS ) - 1 - ( 1 << WP_GRAPPLING_HOOK ) - ( 1 << WP_NONE );
+		return qtrue;
+	}
+
+	if ( Q_stricmp( name, "ammo" ) == 0 ) {
+		for ( i = 0 ; i < MAX_WEAPONS ; i++ ) {
+			ent->client->ps.ammo[i] = 999;
+		}
+		return qtrue;
+	}
+
+	if ( Q_stricmp( name, "armor" ) == 0 ) {
+		ent->client->ps.stats[STAT_ARMOR] = 200;
+		return qtrue;
+	}
+
+	if ( Q_stricmp( name, "excellent" ) == 0 ) {
+		ent->client->ps.persistant[PERS_EXCELLENT_COUNT]++;
+		return qtrue;
+	}
+	if ( Q_stricmp( name, "impressive" ) == 0 ) {
+		ent->client->ps.persistant[PERS_IMPRESSIVE_COUNT]++;
+		return qtrue;
+	}
+	if ( Q_stricmp( name, "gauntletaward" ) == 0 ) {
+		ent->client->ps.persistant[PERS_GAUNTLET_FRAG_COUNT]++;
+		return qtrue;
+	}
+	if ( Q_stricmp( name, "defend" ) == 0 ) {
+		ent->client->ps.persistant[PERS_DEFEND_COUNT]++;
+		return qtrue;
+	}
+	if ( Q_stricmp( name, "assist" ) == 0 ) {
+		ent->client->ps.persistant[PERS_ASSIST_COUNT]++;
+		return qtrue;
+	}
+
+	it = BG_FindItem( name );
+	if ( !it ) {
+		return qfalse;
+	}
+
+	it_ent = G_Spawn();
+	VectorCopy( ent->r.currentOrigin, it_ent->s.origin );
+	it_ent->classname = it->classname;
+	G_SpawnItem( it_ent, it );
+	FinishSpawningItem( it_ent );
+	memset( &trace, 0, sizeof( trace ) );
+	Touch_Item( it_ent, ent, &trace );
+	if ( it_ent->inuse ) {
+		G_FreeEntity( it_ent );
+	}
+
+	return qtrue;
+}
+
 /*
 ==================
 Cmd_Give_f
@@ -280,95 +360,26 @@ Give items to a client
 */
 void Cmd_Give_f (gentity_t *ent)
 {
-	char		*name;
-	gitem_t		*it;
-	int			i;
-	qboolean	give_all;
-	gentity_t		*it_ent;
-	trace_t		trace;
+	char			*name;
 
 	if ( !CheatsOk( ent ) ) {
 		return;
 	}
 
 	name = ConcatArgs( 1 );
-
-	if (Q_stricmp(name, "all") == 0)
-		give_all = qtrue;
-	else
-		give_all = qfalse;
-
-	if (give_all || Q_stricmp( name, "health") == 0)
-	{
-		ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
-		if (!give_all)
-			return;
-	}
-
-	if (give_all || Q_stricmp(name, "weapons") == 0)
-	{
-		ent->client->ps.stats[STAT_WEAPONS] = (1 << WP_NUM_WEAPONS) - 1 - 
-			( 1 << WP_GRAPPLING_HOOK ) - ( 1 << WP_NONE );
-		if (!give_all)
-			return;
-	}
-
-	if (give_all || Q_stricmp(name, "ammo") == 0)
-	{
-		for ( i = 0 ; i < MAX_WEAPONS ; i++ ) {
-			ent->client->ps.ammo[i] = 999;
-		}
-		if (!give_all)
-			return;
-	}
-
-	if (give_all || Q_stricmp(name, "armor") == 0)
-	{
-		ent->client->ps.stats[STAT_ARMOR] = 200;
-
-		if (!give_all)
-			return;
-	}
-
-	if (Q_stricmp(name, "excellent") == 0) {
-		ent->client->ps.persistant[PERS_EXCELLENT_COUNT]++;
-		return;
-	}
-	if (Q_stricmp(name, "impressive") == 0) {
-		ent->client->ps.persistant[PERS_IMPRESSIVE_COUNT]++;
-		return;
-	}
-	if (Q_stricmp(name, "gauntletaward") == 0) {
-		ent->client->ps.persistant[PERS_GAUNTLET_FRAG_COUNT]++;
-		return;
-	}
-	if (Q_stricmp(name, "defend") == 0) {
-		ent->client->ps.persistant[PERS_DEFEND_COUNT]++;
-		return;
-	}
-	if (Q_stricmp(name, "assist") == 0) {
-		ent->client->ps.persistant[PERS_ASSIST_COUNT]++;
+	if ( !name[0] ) {
 		return;
 	}
 
-	// spawn a specific item right on the player
-	if ( !give_all ) {
-		it = BG_FindItem (name);
-		if (!it) {
-			return;
-		}
-
-		it_ent = G_Spawn();
-		VectorCopy( ent->r.currentOrigin, it_ent->s.origin );
-		it_ent->classname = it->classname;
-		G_SpawnItem (it_ent, it);
-		FinishSpawningItem(it_ent );
-		memset( &trace, 0, sizeof( trace ) );
-		Touch_Item (it_ent, ent, &trace);
-		if (it_ent->inuse) {
-			G_FreeEntity( it_ent );
-		}
+	if ( Q_stricmp( name, "all" ) == 0 ) {
+		G_GiveItemByName( ent, "health" );
+		G_GiveItemByName( ent, "weapons" );
+		G_GiveItemByName( ent, "ammo" );
+		G_GiveItemByName( ent, "armor" );
+		return;
 	}
+
+	G_GiveItemByName( ent, name );
 }
 
 
@@ -832,6 +843,15 @@ void SetTeam( gentity_t *ent, char *s ) {
 		team = TEAM_FREE;
 	}
 
+	if ( g_teamSpawnAsSpec.integer && g_gametype.integer >= GT_TEAM && team != TEAM_SPECTATOR ) {
+		team = TEAM_SPECTATOR;
+		specState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
+	}
+
+	if ( team == TEAM_SPECTATOR && specState == SPECTATOR_FREE && !g_teamSpecFreeCam.integer ) {
+		specState = SPECTATOR_SCOREBOARD;
+	}
+
 	// override decision if limiting the players
 	if ( (g_gametype.integer == GT_TOURNAMENT)
 		&& level.numNonSpectatorClients >= 2 ) {
@@ -913,9 +933,14 @@ to free floating spectator mode
 =================
 */
 void StopFollowing( gentity_t *ent ) {
-	ent->client->ps.persistant[ PERS_TEAM ] = TEAM_SPECTATOR;	
-	ent->client->sess.sessionTeam = TEAM_SPECTATOR;	
-	ent->client->sess.spectatorState = SPECTATOR_FREE;
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	ent->client->ps.persistant[ PERS_TEAM ] = TEAM_SPECTATOR;
+	ent->client->sess.sessionTeam = TEAM_SPECTATOR;
+	ent->client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
+	ent->client->sess.spectatorClient = -1;
 	ent->client->lastKillCommandTime = 0;
 	ent->client->killCommandCooldownExpires = 0;
 	ent->client->friendlyFireComplaints = 0;
@@ -980,8 +1005,12 @@ Cmd_Follow_f
 =================
 */
 void Cmd_Follow_f( gentity_t *ent ) {
-	int		i;
+	int			i;
 	char	arg[MAX_TOKEN_CHARS];
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
 
 	if ( level.trainingMapActive ) {
 		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
@@ -993,7 +1022,11 @@ void Cmd_Follow_f( gentity_t *ent ) {
 
 	if ( trap_Argc() != 2 ) {
 		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
-			StopFollowing( ent );
+			if ( g_teamSpecFreeCam.integer ) {
+				StopFollowing( ent );
+			} else {
+				trap_SendServerCommand( ent-g_entities, "print \"Free-flying spectators are disabled while g_teamSpecFreeCam is 0.\n\"" );
+			}
 		}
 		return;
 	}
@@ -1027,6 +1060,7 @@ void Cmd_Follow_f( gentity_t *ent ) {
 
 	ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
 	ent->client->sess.spectatorClient = i;
+
 }
 
 /*
@@ -1116,25 +1150,33 @@ static void G_SayTo( gentity_t *ent, gentity_t *other, int mode, int color, cons
 	}
 
 	if ( ent && ent->client && other->client ) {
-		const team_t	entTeam = ent->client->sess.sessionTeam;
-		const team_t	otherTeam = other->client->sess.sessionTeam;
+		if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR && !g_teamSpecSayEnable.integer ) {
+			if ( ent == other ) {
+				trap_SendServerCommand( ent - g_entities, "print \"Spectator chat is disabled while g_teamSpecSayEnable is 0.\n\"" );
+			}
+			return;
+		}
+
+		const team_t		entTeam = ent->client->sess.sessionTeam;
+		const team_t		otherTeam = other->client->sess.sessionTeam;
 		const qboolean	isTeamGame = ( g_gametype.integer >= GT_TEAM );
 		const qboolean	sameClient = ( ent == other );
 
 		if ( entTeam == TEAM_SPECTATOR && otherTeam != TEAM_SPECTATOR && !sameClient && !g_allTalk.integer ) {
 			if ( mode == SAY_TELL ) {
-				trap_SendServerCommand( ent - g_entities, "print \"Spectators may only chat with other spectators unless g_allTalk is enabled.\\n\"" );
+				trap_SendServerCommand( ent - g_entities, "print \"Spectators may only chat with other spectators unless g_allTalk is enabled.\n\"" );
 			}
 			return;
 		}
 
 		if ( isTeamGame && mode != SAY_TEAM && !g_allTalk.integer && entTeam != TEAM_SPECTATOR && otherTeam != TEAM_SPECTATOR && entTeam != otherTeam ) {
 			if ( mode == SAY_TELL && !sameClient ) {
-				trap_SendServerCommand( ent - g_entities, "print \"Cross-team tells are disabled while g_allTalk is 0.\\n\"" );
+				trap_SendServerCommand( ent - g_entities, "print \"Cross-team tells are disabled while g_allTalk is 0.\n\"" );
 			}
 			return;
 		}
 	}
+
 	// no chatting to players in tournements
 	if ( (g_gametype.integer == GT_TOURNAMENT )
 		&& other->client->sess.sessionTeam == TEAM_FREE

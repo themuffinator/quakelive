@@ -1755,6 +1755,54 @@ static void G_SeedConfiguredSpawnAmmo( playerState_t *ps, weapon_t weapon, int c
 }
 
 /*
+=============
+G_GrantConfiguredItems
+
+Parses g_grantItemOnSpawn and grants the requested `give` tokens at spawn time.
+=============
+*/
+static void G_GrantConfiguredItems( gentity_t *ent ) {
+	char		grantBuffer[MAX_CVAR_VALUE_STRING];
+	char		grantToken[MAX_TOKEN_CHARS];
+	const char	*cursor;
+	int			tokenLength;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( !g_grantItemOnSpawn.string[0] ) {
+		return;
+	}
+
+	Q_strncpyz( grantBuffer, g_grantItemOnSpawn.string, sizeof( grantBuffer ) );
+	cursor = grantBuffer;
+
+	while ( *cursor ) {
+		while ( *cursor && ( *cursor <= ' ' || *cursor == ',' || *cursor == ';' ) ) {
+			++cursor;
+		}
+
+		if ( !*cursor ) {
+			break;
+		}
+
+		tokenLength = 0;
+		while ( *cursor && *cursor != ',' && *cursor != ';' && *cursor > ' ' ) {
+			if ( tokenLength < (int)sizeof( grantToken ) - 1 ) {
+				grantToken[tokenLength++] = *cursor;
+			}
+			++cursor;
+		}
+		grantToken[tokenLength] = '\0';
+
+		if ( grantToken[0] ) {
+			G_GiveItemByName( ent, grantToken );
+		}
+	}
+}
+
+/*
 ============
 G_SelectFactorySpawnWeapon
 
@@ -1830,6 +1878,17 @@ void ClientSpawn(gentity_t *ent) {
 	client = ent->client;
 	factoryConfig = &g_factoryCvarConfig;
 	level.clientFactoryLoadoutQueued[index] = qfalse;
+
+	if ( g_teamSpawnAsSpec.integer && g_gametype.integer >= GT_TEAM && client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		client->sess.sessionTeam = TEAM_SPECTATOR;
+		client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
+		client->sess.spectatorClient = -1;
+	}
+
+	if ( client->sess.sessionTeam == TEAM_SPECTATOR && !g_teamSpecFreeCam.integer
+		&& client->sess.spectatorState == SPECTATOR_FREE ) {
+		client->sess.spectatorState = SPECTATOR_SCOREBOARD;
+	}
 
 	// find a spawn point
 	// do it before setting health back up, so farthest
@@ -2017,7 +2076,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	} else {
 		G_KillBox( ent );
-		trap_LinkEntity (ent);
+		trap_LinkEntity ( ent );
 
 		// force the base weapon up
 		client->ps.weapon = spawnWeapon;
@@ -2062,6 +2121,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	// run the presend to set anything else
 	G_GametypeClientSpawn( ent );
+	G_GrantConfiguredItems( ent );
 	G_RRInitClient( ent );
 	ClientEndFrame( ent );
 

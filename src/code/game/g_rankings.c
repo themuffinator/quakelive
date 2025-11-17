@@ -85,7 +85,7 @@ void G_RankRunFrame()
 				if( ent->client->sess.sessionTeam != TEAM_SPECTATOR )
 				{
 					ent->client->sess.sessionTeam = TEAM_SPECTATOR;
-					ent->client->sess.spectatorState = SPECTATOR_FREE;
+					ent->client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
 					G_RequestClientSpawn( ent, qfalse, qfalse );
 					// make sure by now CS_GRAND rankingsGameID is ready
 					trap_SendServerCommand( i, va("rank_status %i\n",status) );
