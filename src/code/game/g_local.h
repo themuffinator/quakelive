@@ -275,6 +275,16 @@ extern knockbackConfig_t g_knockbackConfig;
 void G_InitKnockbackConfig( void );
 void G_UpdateKnockbackConfig( void );
 
+typedef struct targetCvarConfig_s {
+	char		cvarName[MAX_CVAR_VALUE_STRING];
+	char		cvarValue[MAX_CVAR_VALUE_STRING];
+} targetCvarConfig_t;
+
+#define KEY_FLAG_SILVER		0x01
+#define KEY_FLAG_GOLD			0x02
+#define KEY_FLAG_MASTER		0x04
+#define MAX_TARGET_CVAR_PAIRS	8
+
 struct gentity_s {
 	entityState_t	s;				// communicated by server to clients
 	entityShared_t	r;				// shared by both the server system and game
@@ -381,6 +391,11 @@ struct gentity_s {
 	float		random;
 
 	gitem_t		*item;			// for bonus items
+	int			keyMask;
+	int			targetCvarCount;
+	targetCvarConfig_t	*targetCvars;
+	int			targetAchievementCount;
+	int			*targetAchievementIds;
 	int			racePointIndex;
 	qboolean		racePointAdminSpawned;
 };

@@ -29,6 +29,12 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 | Race/CTF timers | ❌ Not Started | `src/code/cgame/cg_scoreboard.c`, `src/code/cgame/cg_event.c` | `references/hlil/quakelive/cgamex86.dll_split/CG_DrawScoreboard.md` | HUD (@hud-taskforce) |
 | Item timer/training HUD overrides | ⚠️ In Progress | `docs/gameplay/cvars.md`, `src/game/tests/cosmetics_fixtures.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L1100-L1138` | Coaching UX (@hud-taskforce) |
 
+## Entity Targets
+
+- **`target_remove_keys`** – Drops any carried key items from the activator, clearing the bitmask used by scripted door logic. Map authors do not need any additional keys: the helper simply inspects the activator’s inventory when triggered. 【F:src/code/game/g_target.c†L94-L138】
+- **`target_cvar`** – Accepts `cvar`/`value` pairs (or numbered variants such as `cvar1`/`value1`) and applies up to eight server cvar updates in one go. Values fall back to the legacy `cvarValue` keys so existing map sources remain compatible, and every trigger automatically refreshes the cached match factory config so sudden-death and timeout CVars remain in sync. 【F:src/code/game/g_target.c†L172-L274】
+- **`target_achievement`** – Emits achievement IDs (from `achievement`/`award` keys) to the triggering player so backend listeners or HUD scripts can raise notifications. Multiple IDs are allowed per entity, letting a single trigger report a bundle of awards. 【F:src/code/game/g_target.c†L466-L535】
+
 ## Validation Checklist
 - [ ] Confirm new ports against the linked HLIL snippets prior to merging.
 - [ ] Update the ledger when new gameplay deltas are documented or shipped.

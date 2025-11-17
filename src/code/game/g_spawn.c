@@ -153,6 +153,7 @@ void SP_trigger_hurt (gentity_t *ent);
 void SP_trigger_capturezone( gentity_t *ent );
 
 void SP_target_remove_powerups( gentity_t *ent );
+void SP_target_remove_keys( gentity_t *ent );
 void SP_target_give (gentity_t *ent);
 void SP_target_delay (gentity_t *ent);
 void SP_target_speaker (gentity_t *ent);
@@ -166,6 +167,8 @@ void SP_target_kill (gentity_t *ent);
 void SP_target_position (gentity_t *ent);
 void SP_target_location (gentity_t *ent);
 void SP_target_push (gentity_t *ent);
+void SP_target_cvar( gentity_t *ent );
+void SP_target_achievement( gentity_t *ent );
 
 void SP_light (gentity_t *self);
 void SP_info_null (gentity_t *self);
@@ -231,6 +234,7 @@ spawn_t	spawns[] = {
 	// targets perform no action by themselves, but must be triggered
 	// by another entity
 	{"target_give", SP_target_give},
+	{"target_remove_keys", SP_target_remove_keys},
 	{"target_remove_powerups", SP_target_remove_powerups},
 	{"target_delay", SP_target_delay},
 	{"target_speaker", SP_target_speaker},
@@ -243,6 +247,8 @@ spawn_t	spawns[] = {
 	{"target_position", SP_target_position},
 	{"target_location", SP_target_location},
 	{"target_push", SP_target_push},
+	{"target_cvar", SP_target_cvar},
+	{"target_achievement", SP_target_achievement},
 
 	{"light", SP_light},
 	{"path_corner", SP_path_corner},

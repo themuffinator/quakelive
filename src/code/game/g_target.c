@@ -20,7 +20,43 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 //
+#include <ctype.h>
+
 #include "g_local.h"
+
+typedef struct targetKeyInfo_s {
+	int		bit;
+	const char	*classname;
+} targetKeyInfo_t;
+
+static const targetKeyInfo_t targetKeyInfo[] = {
+	{ KEY_FLAG_SILVER, "item_key_silver" },
+	{ KEY_FLAG_GOLD, "item_key_gold" },
+	{ KEY_FLAG_MASTER, "item_key_master" }
+};
+
+/*
+=============
+G_TargetSuffixIsNumeric
+
+Ensures that target key suffixes are empty or purely numeric.
+=============
+*/
+static qboolean G_TargetSuffixIsNumeric( const char *suffix ) {
+	if ( !suffix ) {
+		return qfalse;
+	}
+
+	while ( *suffix ) {
+		if ( !isdigit( (unsigned char)*suffix ) ) {
+			return qfalse;
+		}
+
+		suffix++;
+	}
+
+	return qtrue;
+}
 
 //==========================================================
 
@@ -87,6 +123,61 @@ void SP_target_remove_powerups( gentity_t *ent ) {
 
 //==========================================================
 
+/*
+=============
+Use_Target_RemoveKeys
+
+Drops all carried key items from the activator.
+=============
+*/
+static void Use_Target_RemoveKeys( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
+	int		i;
+	int		keyCount;
+
+	if ( !activator || !activator->client ) {
+		return;
+	}
+
+	if ( !activator->keyMask ) {
+		return;
+	}
+
+	keyCount = sizeof( targetKeyInfo ) / sizeof( targetKeyInfo[0] );
+	for ( i = 0; i < keyCount; i++ ) {
+		const targetKeyInfo_t	*info;
+		gitem_t				*item;
+
+		info = &targetKeyInfo[i];
+		if ( !( activator->keyMask & info->bit ) ) {
+			continue;
+		}
+
+		item = BG_FindItem( info->classname );
+		if ( !item ) {
+			G_Printf( "WARNING: target_remove_keys missing %s definition\n", info->classname );
+			continue;
+		}
+
+		Drop_Item( activator, item, 0 );
+	}
+
+	activator->keyMask = 0;
+}
+
+/*
+=============
+SP_target_remove_keys
+
+Registers the target_remove_keys entity.
+=============
+*/
+void SP_target_remove_keys( gentity_t *ent ) {
+	ent->use = Use_Target_RemoveKeys;
+}
+
+
+//==========================================================
+
 /*QUAKED target_delay (1 0 0) (-8 -8 -8) (8 8 8)
 "wait" seconds to pause before firing targets.
 "random" delay variance, total delay = delay +/- random seconds
@@ -113,6 +204,134 @@ void SP_target_delay( gentity_t *ent ) {
 	ent->use = Use_Target_Delay;
 }
 
+
+//==========================================================
+
+/*
+=============
+Use_Target_Cvar
+
+Applies configured server CVars when triggered.
+=============
+*/
+static void Use_Target_Cvar( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
+	int		i;
+
+	if ( !ent->targetCvars || ent->targetCvarCount <= 0 ) {
+		return;
+	}
+
+	for ( i = 0; i < ent->targetCvarCount; i++ ) {
+		trap_Cvar_Set( ent->targetCvars[i].cvarName, ent->targetCvars[i].cvarValue );
+	}
+
+	G_UpdateMatchFactoryConfig();
+	G_SyncMatchFactoryConfigToLevel();
+}
+
+/*
+=============
+SP_target_cvar
+
+Parses cvar/value pairs from spawn arguments.
+=============
+*/
+void SP_target_cvar( gentity_t *ent ) {
+	int		i;
+	int		capacity;
+
+	ent->targetCvarCount = 0;
+	ent->targetCvars = NULL;
+
+	capacity = 0;
+	for ( i = 0; i < level.numSpawnVars; i++ ) {
+		const char	*key;
+		const char	*suffix;
+		const char	*name;
+
+		key = level.spawnVars[i][0];
+		if ( !key || Q_stricmpn( key, "cvar", 4 ) ) {
+			continue;
+		}
+
+		suffix = key + 4;
+		if ( !G_TargetSuffixIsNumeric( suffix ) ) {
+			continue;
+		}
+
+		name = level.spawnVars[i][1];
+		if ( !name || !name[0] ) {
+			continue;
+		}
+
+		capacity++;
+	}
+
+	if ( capacity > MAX_TARGET_CVAR_PAIRS ) {
+		capacity = MAX_TARGET_CVAR_PAIRS;
+	}
+
+	if ( capacity <= 0 ) {
+		G_Printf( "WARNING: target_cvar at %s has no cvar fields\n", vtos( ent->s.origin ) );
+		return;
+	}
+
+	ent->targetCvars = G_Alloc( capacity * sizeof( targetCvarConfig_t ) );
+	for ( i = 0; i < level.numSpawnVars && ent->targetCvarCount < capacity; i++ ) {
+		const char	*key;
+		const char	*suffix;
+		const char	*name;
+		char		valueKey[32];
+		char		*valueString;
+
+		key = level.spawnVars[i][0];
+		if ( !key || Q_stricmpn( key, "cvar", 4 ) ) {
+			continue;
+		}
+
+		suffix = key + 4;
+		if ( !G_TargetSuffixIsNumeric( suffix ) ) {
+			continue;
+		}
+
+		name = level.spawnVars[i][1];
+		if ( !name || !name[0] ) {
+			continue;
+		}
+
+		if ( suffix[0] ) {
+			Com_sprintf( valueKey, sizeof( valueKey ), "value%s", suffix );
+		} else {
+			Q_strncpyz( valueKey, "value", sizeof( valueKey ) );
+		}
+
+		G_SpawnString( valueKey, "", &valueString );
+		if ( !valueString[0] ) {
+			if ( suffix[0] ) {
+				Com_sprintf( valueKey, sizeof( valueKey ), "cvarValue%s", suffix );
+			} else {
+				Q_strncpyz( valueKey, "cvarValue", sizeof( valueKey ) );
+			}
+			G_SpawnString( valueKey, "", &valueString );
+		}
+
+		if ( !valueString[0] ) {
+			G_Printf( "WARNING: target_cvar missing value for %s at %s\n", key, vtos( ent->s.origin ) );
+			continue;
+		}
+
+	Q_strncpyz( ent->targetCvars[ ent->targetCvarCount ].cvarName, name, sizeof( ent->targetCvars[0].cvarName ) );
+	Q_strncpyz( ent->targetCvars[ ent->targetCvarCount ].cvarValue, valueString, sizeof( ent->targetCvars[0].cvarValue ) );
+	ent->targetCvarCount++;
+	}
+
+	if ( !ent->targetCvarCount ) {
+		G_Printf( "WARNING: target_cvar at %s has no valid pairs\n", vtos( ent->s.origin ) );
+		return;
+	}
+
+	ent->use = Use_Target_Cvar;
+}
 
 //==========================================================
 
@@ -465,3 +684,128 @@ void SP_target_location( gentity_t *self ){
 	G_SetOrigin( self, self->s.origin );
 }
 
+
+//==========================================================
+
+/*
+=============
+Use_Target_Achievement
+
+Queues achievement notifications for the activator.
+=============
+*/
+static void Use_Target_Achievement( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
+	int		i;
+
+	if ( !activator || !activator->client ) {
+		G_Printf( "WARNING: target_achievement requires a player activator at %s\n", vtos( ent->s.origin ) );
+		return;
+	}
+
+	if ( !ent->targetAchievementIds || ent->targetAchievementCount <= 0 ) {
+		return;
+	}
+
+	for ( i = 0; i < ent->targetAchievementCount; i++ ) {
+		int		id;
+
+		id = ent->targetAchievementIds[i];
+		G_Printf( "target_achievement: %s triggered %i\n", activator->client->pers.netname, id );
+		trap_SendServerCommand( activator - g_entities, va( "cp \"Achievement %i triggered\"", id ) );
+	}
+}
+
+/*
+=============
+SP_target_achievement
+
+Initialises the target_achievement entity.
+=============
+*/
+void SP_target_achievement( gentity_t *ent ) {
+	int		i;
+	int		total;
+
+	ent->targetAchievementIds = NULL;
+	ent->targetAchievementCount = 0;
+	total = 0;
+
+	for ( i = 0; i < level.numSpawnVars; i++ ) {
+		const char	*key;
+		const char	*suffix;
+		int		id;
+
+		key = level.spawnVars[i][0];
+		if ( !key ) {
+			continue;
+		}
+
+		suffix = NULL;
+		if ( !Q_stricmpn( key, "achievement", 11 ) ) {
+			suffix = key + 11;
+		} else if ( !Q_stricmpn( key, "award", 5 ) ) {
+			suffix = key + 5;
+		} else {
+			continue;
+		}
+
+		if ( !G_TargetSuffixIsNumeric( suffix ) ) {
+			continue;
+		}
+
+		id = atoi( level.spawnVars[i][1] );
+		if ( id <= 0 ) {
+			continue;
+		}
+
+		total++;
+	}
+
+	if ( total <= 0 ) {
+		G_Printf( "WARNING: target_achievement at %s has no awards\n", vtos( ent->s.origin ) );
+		return;
+	}
+
+	ent->targetAchievementIds = G_Alloc( total * sizeof( int ) );
+	for ( i = 0; i < level.numSpawnVars; i++ ) {
+		const char	*key;
+		const char	*suffix;
+		int		id;
+
+		if ( ent->targetAchievementCount >= total ) {
+			break;
+		}
+
+		key = level.spawnVars[i][0];
+		if ( !key ) {
+			continue;
+		}
+
+		suffix = NULL;
+		if ( !Q_stricmpn( key, "achievement", 11 ) ) {
+			suffix = key + 11;
+		} else if ( !Q_stricmpn( key, "award", 5 ) ) {
+			suffix = key + 5;
+		} else {
+			continue;
+		}
+
+		if ( !G_TargetSuffixIsNumeric( suffix ) ) {
+			continue;
+		}
+
+		id = atoi( level.spawnVars[i][1] );
+		if ( id <= 0 ) {
+			continue;
+		}
+
+		ent->targetAchievementIds[ ent->targetAchievementCount++ ] = id;
+	}
+
+	if ( !ent->targetAchievementCount ) {
+		G_Printf( "WARNING: target_achievement at %s has no valid awards\n", vtos( ent->s.origin ) );
+		return;
+	}
+
+	ent->use = Use_Target_Achievement;
+}
