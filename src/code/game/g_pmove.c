@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include "g_local.h"
 
 #define PMOVE_CVAR_FLAGS 0
@@ -41,6 +42,166 @@ static vmCvar_t g_pmove_wishSpeed_cvar;
 
 static int g_pmove_last_frame = -1;
 static qboolean g_pmove_force_update = qtrue;
+
+static char s_pmoveSettingsPayload[MAX_INFO_STRING];
+
+/*
+=============
+G_PmoveAppendPayload
+
+Appends formatted text to the pmove payload buffer.
+=============
+*/
+static qboolean G_PmoveAppendPayload( char *buffer, size_t bufferSize, size_t *length, const char *fmt, ... ) {
+	va_list args;
+	int written;
+
+	if ( !buffer || !length || !fmt || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	va_start( args, fmt );
+	written = Q_vsnprintf( buffer + *length, bufferSize - *length, fmt, args );
+	va_end( args );
+
+	if ( written < 0 || ( size_t )written >= ( bufferSize - *length ) ) {
+		return qfalse;
+	}
+
+	*length += written;
+	return qtrue;
+}
+
+/*
+=============
+G_PmoveSerializeSettings
+
+Encodes the active pmove settings into a JSON payload for configstring broadcasts.
+=============
+*/
+static qboolean G_PmoveSerializeSettings( const pmove_settings_t *settings, char *buffer, size_t bufferSize ) {
+	size_t length = 0;
+	weapon_t weapon;
+
+	if ( !settings || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+
+	if ( !G_PmoveAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+
+#define PMOVE_BOOL_FIELD( name ) \
+	if ( !G_PmoveAppendPayload( buffer, bufferSize, &length, "\"%s\":%s,", #name, settings->name ? "true" : "false" ) ) { \
+		return qfalse; \
+	}
+
+#define PMOVE_INT_FIELD( name ) \
+	if ( !G_PmoveAppendPayload( buffer, bufferSize, &length, "\"%s\":%i,", #name, settings->name ) ) { \
+		return qfalse; \
+	}
+
+#define PMOVE_FLOAT_FIELD( name ) \
+	if ( !G_PmoveAppendPayload( buffer, bufferSize, &length, "\"%s\":%.6f,", #name, settings->name ) ) { \
+		return qfalse; \
+	}
+
+	PMOVE_FLOAT_FIELD( airAccel );
+	PMOVE_FLOAT_FIELD( airControl );
+	PMOVE_FLOAT_FIELD( airStepFriction );
+	PMOVE_INT_FIELD( airSteps );
+	PMOVE_FLOAT_FIELD( airStopAccel );
+	PMOVE_BOOL_FIELD( autoHop );
+	PMOVE_BOOL_FIELD( bunnyHop );
+	PMOVE_BOOL_FIELD( chainJump );
+	PMOVE_FLOAT_FIELD( chainJumpVelocity );
+	PMOVE_FLOAT_FIELD( circleStrafeFriction );
+	PMOVE_BOOL_FIELD( crouchSlide );
+	PMOVE_FLOAT_FIELD( crouchSlideFriction );
+	PMOVE_INT_FIELD( crouchSlideTime );
+	PMOVE_BOOL_FIELD( crouchStepJump );
+	PMOVE_BOOL_FIELD( doubleJump );
+	PMOVE_FLOAT_FIELD( jumpTimeDeltaMin );
+	PMOVE_FLOAT_FIELD( jumpVelocity );
+	PMOVE_FLOAT_FIELD( jumpVelocityMax );
+	PMOVE_FLOAT_FIELD( jumpVelocityScaleAdd );
+	PMOVE_FLOAT_FIELD( jumpVelocityTimeThreshold );
+	PMOVE_FLOAT_FIELD( jumpVelocityTimeThresholdOffset );
+	PMOVE_BOOL_FIELD( noPlayerClip );
+	PMOVE_BOOL_FIELD( rampJump );
+	PMOVE_FLOAT_FIELD( rampJumpScale );
+	PMOVE_FLOAT_FIELD( stepHeight );
+	PMOVE_BOOL_FIELD( stepJump );
+	PMOVE_FLOAT_FIELD( stepJumpVelocity );
+	PMOVE_FLOAT_FIELD( strafeAccel );
+	PMOVE_FLOAT_FIELD( velocityGh );
+	PMOVE_FLOAT_FIELD( walkAccel );
+	PMOVE_FLOAT_FIELD( walkFriction );
+	PMOVE_FLOAT_FIELD( waterSwimScale );
+	PMOVE_FLOAT_FIELD( waterWadeScale );
+	PMOVE_INT_FIELD( weaponDropTime );
+	PMOVE_INT_FIELD( weaponRaiseTime );
+	PMOVE_FLOAT_FIELD( wishSpeed );
+
+#undef PMOVE_BOOL_FIELD
+#undef PMOVE_INT_FIELD
+#undef PMOVE_FLOAT_FIELD
+
+	if ( !G_PmoveAppendPayload( buffer, bufferSize, &length, "\"weaponReloadTimes\":[" ) ) {
+		return qfalse;
+	}
+
+	for ( weapon = WP_NONE; weapon < WP_NUM_WEAPONS; ++weapon ) {
+		const char *separator = ( weapon == WP_NONE ) ? "" : ",";
+		if ( !G_PmoveAppendPayload( buffer, bufferSize, &length, "%s%i", separator, settings->weaponReloadTimes[weapon] ) ) {
+			return qfalse;
+		}
+	}
+
+	if ( !G_PmoveAppendPayload( buffer, bufferSize, &length, "]}" ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_PmovePublishSettings
+
+Updates the pmove settings configstring when the payload changes.
+=============
+*/
+static void G_PmovePublishSettings( qboolean forceBroadcast ) {
+	char payload[MAX_INFO_STRING];
+	qboolean encoded;
+
+	encoded = G_PmoveSerializeSettings( &g_pmoveSettings, payload, sizeof( payload ) );
+	if ( !encoded ) {
+		payload[0] = '\0';
+	}
+
+	if ( !forceBroadcast && !Q_stricmp( payload, s_pmoveSettingsPayload ) ) {
+		return;
+	}
+
+	trap_SetConfigstring( CS_PMOVE_SETTINGS, payload );
+	Q_strncpyz( s_pmoveSettingsPayload, payload, sizeof( s_pmoveSettingsPayload ) );
+}
+
+/*
+=============
+G_PmoveClearConfigstring
+
+Resets the pmove settings configstring payload cache and clears the broadcast state.
+=============
+*/
+void G_PmoveClearConfigstring( void ) {
+	s_pmoveSettingsPayload[0] = '\0';
+	trap_SetConfigstring( CS_PMOVE_SETTINGS, "" );
+}
 
 pmove_settings_t g_pmoveSettings;
 static int g_pmoveWeaponReloadOverrides[WP_NUM_WEAPONS];
@@ -191,6 +352,7 @@ static void G_PmoveCacheSettings( void ) {
 			g_pmoveSettings.weaponReloadTimes[weapon] = reload;
 		}
 	}
+	G_PmovePublishSettings( qfalse );
 }
 
 /*

@@ -1132,7 +1132,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 		Com_sprintf( startTimeBuffer, sizeof( startTimeBuffer ), "%u", (unsigned int)levelStart );
 		trap_Cvar_Set( "g_levelStartTime", startTimeBuffer );
 	}
-
+	G_PmoveClearConfigstring();
 
 G_RegisterCvars();
 trap_Cvar_Update( &mercylimit );
@@ -1289,6 +1289,7 @@ G_ShutdownGame
 */
 void G_ShutdownGame( int restart ) {
 	G_Printf ("==== ShutdownGame ====\n");
+	G_PmoveClearConfigstring();
 
 	if ( level.logFile ) {
 		G_LogPrintf("ShutdownGame:\n" );

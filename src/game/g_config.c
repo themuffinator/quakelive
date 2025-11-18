@@ -328,7 +328,8 @@ void G_InitWeaponReloadConfig( void ) {
 }
 
 void G_UpdateWeaponReloadConfig( void ) {
-        G_InitWeaponReloadConfig();
+	G_InitWeaponReloadConfig();
+	G_RefreshPmoveSettings();
 }
 
 static int G_ReadAmmoPackCvar( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
