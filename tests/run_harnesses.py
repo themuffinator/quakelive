@@ -22,6 +22,7 @@ SCENARIOS: dict[str, Path] = {
     "overtime": SCENARIO_ROOT / "overtime_scenario.json",
     "loadouts": SCENARIO_ROOT / "complex_loadouts.json",
     "factory": SCENARIO_ROOT / "factory_cvars.json",
+    "rotation": SCENARIO_ROOT / "rotation_vote.json",
     "bot_resources": SCENARIO_ROOT / "bot_resource_schedule.json",
     "freeze": SCENARIO_ROOT / "freeze_cvars.json",
 }

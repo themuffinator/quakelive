@@ -32,6 +32,8 @@ static char		*g_botInfos[MAX_BOTS];
 int				g_numArenas;
 static char		*g_arenaInfos[MAX_ARENAS];
 
+#define MAX_MAP_GAMETYPE_ALIASES	3
+
 
 #define BOT_BEGIN_DELAY_BASE		2000
 #define BOT_BEGIN_DELAY_INCREMENT	1500
@@ -203,6 +205,106 @@ const char *G_GetArenaInfoByMap( const char *map ) {
 	return NULL;
 }
 
+/*
+=============
+G_MapTypeContainsToken
+
+Returns qtrue when a whitespace delimited type list includes the supplied token.
+=============
+*/
+static qboolean G_MapTypeContainsToken( const char *typeList, const char *token ) {
+	const char	*scan;
+	size_t		tokenLength;
+
+	if ( !typeList || !*typeList || !token || !*token ) {
+		return qfalse;
+	}
+
+	tokenLength = strlen( token );
+	scan = typeList;
+	while ( *scan ) {
+		const char *start;
+		size_t length;
+
+		while ( *scan && *scan <= ' ' ) {
+			scan++;
+		}
+		if ( !*scan ) {
+			break;
+		}
+
+		start = scan;
+		while ( *scan && *scan > ' ' ) {
+			scan++;
+		}
+		length = scan - start;
+
+		if ( length == tokenLength && !Q_strnicmp( start, token, tokenLength ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+G_MapSupportsGametype
+
+Determines whether the supplied map exposes entities for the requested gametype.
+=============
+*/
+qboolean G_MapSupportsGametype( const char *map, gametype_t gametype ) {
+	static const char *const s_gametypeTokens[GT_MAX_GAME_TYPE][MAX_MAP_GAMETYPE_ALIASES] = {
+		[GT_FFA] = { "ffa", NULL, NULL },
+		[GT_TOURNAMENT] = { "duel", "tourney", NULL },
+		[GT_SINGLE_PLAYER] = { "single", NULL, NULL },
+		[GT_TEAM] = { "tdm", "team", NULL },
+		[GT_CLAN_ARENA] = { "ca", "clanarena", NULL },
+		[GT_CTF] = { "ctf", NULL, NULL },
+		[GT_1FCTF] = { "oneflag", "1fctf", NULL },
+		[GT_OBELISK] = { "overload", "obelisk", NULL },
+		[GT_HARVESTER] = { "har", "harvester", NULL },
+		[GT_FREEZE] = { "ft", "freeze", NULL },
+		[GT_DOMINATION] = { "dom", "domination", NULL },
+		[GT_ATTACK_DEFEND] = { "ad", "attackdefend", NULL },
+		[GT_RED_ROVER] = { "rr", "redrover", NULL },
+		[GT_RACE] = { "race", NULL, NULL }
+	};
+	const char					*info;
+	const char					*types;
+	const char *const			*aliases;
+	int						aliasIndex;
+
+	if ( !map || !*map || map[0] == '_' ) {
+		return qtrue;
+	}
+
+	if ( gametype < GT_FFA || gametype >= GT_MAX_GAME_TYPE ) {
+		return qtrue;
+	}
+
+	info = G_GetArenaInfoByMap( map );
+	if ( !info ) {
+		return qtrue;
+	}
+
+	types = Info_ValueForKey( info, "type" );
+	if ( !types || !*types ) {
+		return qtrue;
+	}
+
+	aliases = s_gametypeTokens[gametype];
+	for ( aliasIndex = 0; aliasIndex < MAX_MAP_GAMETYPE_ALIASES; aliasIndex++ ) {
+		const char *token = aliases[aliasIndex];
+
+		if ( token && G_MapTypeContainsToken( types, token ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
 
 /*
 =================

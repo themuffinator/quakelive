@@ -19,12 +19,14 @@ from tools.tests.match_sim.harness import MatchHarness, load_config, run_from_fi
 
 SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "sample_scenario.json"
 SCENARIO_DIR = REPO_ROOT / "tools" / "tests" / "match_sim"
+ROTATION_SCENARIO = SCENARIO_DIR / "rotation_vote.json"
 FREEZE_SCENARIO = SCENARIO_DIR / "freeze_cvars.json"
 ALL_SCENARIOS = [
     SCENARIO,
     SCENARIO_DIR / "overtime_scenario.json",
     SCENARIO_DIR / "complex_loadouts.json",
     SCENARIO_DIR / "factory_cvars.json",
+    ROTATION_SCENARIO,
     FREEZE_SCENARIO,
 ]
 
@@ -308,6 +310,28 @@ def test_all_scenarios_produce_frames(scenario_path: Path) -> None:
     assert result.frames, "Scenario should produce at least one frame"
     assert result.config.map
     assert result.config.metadata is not None
+
+
+def test_rotation_vote_metadata_tracks_factory_title() -> None:
+    """The rotation scenario captures factory vote details for documentation."""
+
+    config = load_config(ROTATION_SCENARIO)
+    metadata = config.metadata
+    rotation_meta = metadata.get("rotation", {})
+    factory_meta = metadata.get("factory", {})
+
+    assert rotation_meta["factory_id"] == "power-tdm"
+    assert rotation_meta["vote_command"] == "map purgatory power-tdm"
+    assert rotation_meta["g_factoryTitle"] == factory_meta.get("title")
+
+    result = MatchHarness(config, seed=config.seed).run()
+    frame0 = result.frames[0]
+    for bot_name in ("sarge", "slash"):
+        bot_state = frame0.bots[bot_name]
+        assert bot_state["ammo"]["rocket"] == pytest.approx(20.0)
+        assert bot_state["ammo"]["lightning"] == pytest.approx(60.0)
+        assert bot_state["inventory"]["armor"] == 75
+        assert bot_state["inventory"]["gauntlet"] == 1
 
 def _configure_factory_config(**overrides) -> MatchHarness:
     config = load_config(SCENARIO_DIR / "factory_cvars.json")

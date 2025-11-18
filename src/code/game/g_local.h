@@ -148,6 +148,8 @@ const factoryDefinition_t *Factory_FindById( const char *id );
 qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReapply );
 void Factory_ApplyCurrentSelection( qboolean forceReapply );
 void G_RefreshAllCvars( void );
+const char *G_GetArenaInfoByMap( const char *map );
+qboolean G_MapSupportsGametype( const char *map, gametype_t gametype );
 
 typedef struct factoryCvarConfig_s {
 	int		startingWeaponsMask;

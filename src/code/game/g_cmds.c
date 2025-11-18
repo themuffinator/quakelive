@@ -1778,8 +1778,11 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 		Q_strncpyz( level.voteDisplayString, "nextmap", sizeof( level.voteDisplayString ) );
 		voteSelection = G_VoteSelectionKey( arg1, buffer );
 	} else if ( !Q_stricmp( arg1, "map" ) ) {
-		int             len;
-		fileHandle_t    f;
+		int			len;
+		fileHandle_t	f;
+		const factoryDefinition_t *factoryOverride;
+		char		voteOptionBuffer[MAX_STRING_TOKENS];
+		const char	*voteOption;
 
 		if ( g_voteFlags.integer & VF_NO_MAP ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to change the map being played is disabled on this server.\\n\"" );
@@ -1796,14 +1799,43 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 			return;
 		}
 		trap_FS_FCloseFile( f );
+
+		factoryOverride = NULL;
+		voteOption = arg2;
+		if ( arg3[0] ) {
+			factoryOverride = Factory_FindById( arg3 );
+			if ( !factoryOverride ) {
+				trap_SendServerCommand( ent-g_entities, "print \"Invalid factory specified.\\n\"" );
+				return;
+			}
+			if ( !G_MapSupportsGametype( arg2, factoryOverride->baseGametype ) ) {
+				trap_SendServerCommand( ent-g_entities, "print \"Map not supported for this gametype.\\n\"" );
+				return;
+			}
+			Com_sprintf( voteOptionBuffer, sizeof( voteOptionBuffer ), "%s %s", arg2, arg3 );
+			voteOption = voteOptionBuffer;
+		}
+
 		trap_Cvar_VariableStringBuffer( "nextmap", buffer, sizeof( buffer ) );
 		if ( buffer[0] ) {
-			Com_sprintf( level.voteString, sizeof( level.voteString ), "map %s; set nextmap \"%s\"", arg2, buffer );
+			if ( factoryOverride ) {
+				Com_sprintf( level.voteString, sizeof( level.voteString ), "map %s %s; set nextmap \"%s\"", arg2, arg3, buffer );
+			} else {
+				Com_sprintf( level.voteString, sizeof( level.voteString ), "map %s; set nextmap \"%s\"", arg2, buffer );
+			}
 		} else {
-			Com_sprintf( level.voteString, sizeof( level.voteString ), "map %s", arg2 );
+			if ( factoryOverride ) {
+				Com_sprintf( level.voteString, sizeof( level.voteString ), "map %s %s", arg2, arg3 );
+			} else {
+				Com_sprintf( level.voteString, sizeof( level.voteString ), "map %s", arg2 );
+			}
 		}
-		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "map %s", arg2 );
-		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+		if ( factoryOverride ) {
+			Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "map %s %s", arg2, arg3 );
+		} else {
+			Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "map %s", arg2 );
+		}
+		voteSelection = G_VoteSelectionKey( arg1, voteOption );
 	} else if ( !Q_stricmp( arg1, "g_gametype" ) ) {
 		int             gametype;
 

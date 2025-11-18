@@ -100,6 +100,7 @@ test suite as well as CI artefact generation:
 | `overtime` | `tools/tests/match_sim/overtime_scenario.json` | Sudden-death duel that flips into overtime with scripted scoreboard metadata. | `3141` | 126 | 12.5 |
 | `loadouts` | `tools/tests/match_sim/complex_loadouts.json` | Free-for-all stress test with stacked inventories, heavy ammo usage, and randomised loadouts. | `9001` | 161 | 8.0 |
 | `factory` | `tools/tests/match_sim/factory_cvars.json` | Factory CVar coverage exercising loadout toggles, spawn delays, and item drop rules. | `4242` | 161 | 8.0 |
+| `rotation` | `tools/tests/match_sim/rotation_vote.json` | Map vote example capturing a factory override that updates `g_factoryTitle`. | `5150` | 121 | 6.0 |
 
 Run any scenario via:
 

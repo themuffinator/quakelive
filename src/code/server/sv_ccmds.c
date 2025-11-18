@@ -22,6 +22,933 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 
+#define SV_FACTORY_MAX_JSON_STRING        4096
+#define SV_FACTORY_FILE_LIST_BUFFER       4096
+
+#define SV_MAX_MAP_GAMETYPE_ALIASES       3
+
+typedef struct svFactoryParseState_s {
+	const char *cursor;
+	const char *end;
+	const char *filename;
+	int line;
+} svFactoryParseState_t;
+
+typedef struct svFactoryDefinition_s {
+	char *id;
+	gametype_t baseGametype;
+	char *sourceFile;
+	struct svFactoryDefinition_s *next;
+} svFactoryDefinition_t;
+
+static qboolean s_svFactoryRegistryLoaded = qfalse;
+static svFactoryDefinition_t *s_svFactoryList = NULL;
+static qboolean s_svArenaRegistryLoaded = qfalse;
+static int s_svNumArenaInfos = 0;
+static char *s_svArenaInfos[MAX_ARENAS];
+
+/*
+=============
+SV_FactoryCopyString
+
+Allocates a persistent copy of the supplied string using the zone allocator.
+=============
+*/
+static char *SV_FactoryCopyString( const char *value ) {
+	size_t length;
+	char *copy;
+
+	if ( !value ) {
+		return NULL;
+	}
+
+	length = strlen( value ) + 1u;
+	copy = ( char * )Z_Malloc( length );
+	if ( copy ) {
+		memcpy( copy, value, length );
+	}
+
+	return copy;
+}
+
+/*
+=============
+SV_FactoryReportParseError
+
+Logs a descriptive parse error so administrators can diagnose malformed JSON.
+=============
+*/
+static void SV_FactoryReportParseError( const svFactoryParseState_t *state, const char *message ) {
+	const char *filename = ( state && state->filename ) ? state->filename : "<unknown>";
+	int line = state ? state->line : 0;
+
+	if ( !message ) {
+		message = "unknown parse error";
+	}
+
+	Com_Printf( "factories: parse error in %s at line %i: %s\n", filename, line, message );
+}
+
+/*
+=============
+SV_FactorySkipWhitespace
+
+Advances the parse cursor beyond any whitespace, updating the current line.
+=============
+*/
+static void SV_FactorySkipWhitespace( svFactoryParseState_t *state ) {
+	if ( !state || !state->cursor || state->cursor >= state->end ) {
+		return;
+	}
+
+	while ( state->cursor < state->end ) {
+		char ch = *state->cursor;
+
+		if ( ch == '\n' ) {
+			state->line++;
+		}
+
+		if ( ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n' ) {
+			return;
+		}
+
+		state->cursor++;
+	}
+}
+
+/*
+=============
+SV_FactoryParseExpectedChar
+
+Ensures the next non-whitespace character matches *ch*.
+=============
+*/
+static qboolean SV_FactoryParseExpectedChar( svFactoryParseState_t *state, char ch ) {
+	SV_FactorySkipWhitespace( state );
+	if ( !state || !state->cursor || state->cursor >= state->end ) {
+		SV_FactoryReportParseError( state, va( "expected '%c'", ch ) );
+		return qfalse;
+	}
+	if ( *state->cursor != ch ) {
+		SV_FactoryReportParseError( state, va( "expected '%c'", ch ) );
+		return qfalse;
+	}
+	state->cursor++;
+	return qtrue;
+}
+
+/*
+=============
+SV_FactorySkipJsonString
+
+Skips over a JSON string literal, handling escapes.
+=============
+*/
+static qboolean SV_FactorySkipJsonString( svFactoryParseState_t *state ) {
+	if ( !state || !state->cursor || state->cursor >= state->end || *state->cursor != '"' ) {
+		SV_FactoryReportParseError( state, "expected string" );
+		return qfalse;
+	}
+
+	state->cursor++;
+	while ( state->cursor < state->end ) {
+		char ch = *state->cursor++;
+
+		if ( ch == '"' ) {
+			return qtrue;
+		}
+
+		if ( ch == '\\' && state->cursor < state->end ) {
+			state->cursor++;
+		}
+	}
+
+	SV_FactoryReportParseError( state, "unterminated string" );
+	return qfalse;
+}
+
+/*
+=============
+SV_FactoryParseJsonString
+
+Parses a JSON string literal and returns a heap-allocated copy.
+=============
+*/
+static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
+	char buffer[SV_FACTORY_MAX_JSON_STRING];
+	int length;
+
+	SV_FactorySkipWhitespace( state );
+	if ( !state || !state->cursor || state->cursor >= state->end || *state->cursor != '"' ) {
+		SV_FactoryReportParseError( state, "expected string" );
+		return NULL;
+	}
+
+	state->cursor++;
+	length = 0;
+	while ( state->cursor < state->end ) {
+		char ch = *state->cursor++;
+
+		if ( ch == '"' ) {
+			buffer[length] = '\0';
+			return SV_FactoryCopyString( buffer );
+		}
+
+		if ( ch == '\\' && state->cursor < state->end ) {
+			char escaped = *state->cursor++;
+
+			switch ( escaped ) {
+			case '\"':
+				case '\\':
+					case '/':
+							ch = escaped;
+							break;
+						case 'b':
+								ch = '\b';
+								break;
+							case 'f':
+									ch = '\f';
+									break;
+								case 'n':
+										ch = '\n';
+										break;
+									case 'r':
+											ch = '\r';
+											break;
+										case 't':
+												ch = '\t';
+												break;
+											default:
+													SV_FactoryReportParseError( state, "invalid escape" );
+													return NULL;
+												}
+											}
+
+											if ( length + 1 >= SV_FACTORY_MAX_JSON_STRING ) {
+												SV_FactoryReportParseError( state, "string literal too long" );
+												return NULL;
+											}
+
+											buffer[length++] = ch;
+										}
+
+										SV_FactoryReportParseError( state, "unterminated string" );
+										return NULL;
+									}
+
+									/*
+									=============
+									SV_FactoryParseLiteralString
+
+									Parses a literal token (numbers, booleans) int o a new string.
+									=============
+									*/
+									static char *SV_FactoryParseLiteralString( svFactoryParseState_t *state ) {
+										char buffer[SV_FACTORY_MAX_JSON_STRING];
+										int length;
+
+										SV_FactorySkipWhitespace( state );
+										if ( !state || !state->cursor || state->cursor >= state->end ) {
+											SV_FactoryReportParseError( state, "expected literal" );
+											return NULL;
+										}
+
+										length = 0;
+										while ( state->cursor < state->end ) {
+											char ch = *state->cursor;
+
+											if ( ch == ',' || ch == '}' || ch == ']' || ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' ) {
+												break;
+											}
+
+											if ( length + 1 >= SV_FACTORY_MAX_JSON_STRING ) {
+												SV_FactoryReportParseError( state, "literal too long" );
+												return NULL;
+											}
+
+											buffer[length++] = ch;
+											state->cursor++;
+										}
+
+										buffer[length] = '\0';
+										return SV_FactoryCopyString( buffer );
+									}
+
+									/*
+									=============
+									SV_FactorySkipValue
+
+									Skips an arbitrary JSON value (objects, arrays, strings, literals).
+									=============
+									*/
+									static qboolean SV_FactorySkipValue( svFactoryParseState_t *state ) {
+										SV_FactorySkipWhitespace( state );
+										if ( !state || !state->cursor || state->cursor >= state->end ) {
+											SV_FactoryReportParseError( state, "unexpected end of data" );
+											return qfalse;
+										}
+
+										switch ( *state->cursor ) {
+										case '{':
+												state->cursor++;
+												while ( state->cursor < state->end ) {
+													if ( !SV_FactorySkipJsonString( state ) ) {
+														return qfalse;
+													}
+													if ( !SV_FactoryParseExpectedChar( state, ':' ) ) {
+														return qfalse;
+													}
+													if ( !SV_FactorySkipValue( state ) ) {
+														return qfalse;
+													}
+													SV_FactorySkipWhitespace( state );
+													if ( state->cursor >= state->end ) {
+														break;
+													}
+													if ( *state->cursor == '}' ) {
+														state->cursor++;
+														return qtrue;
+													}
+													if ( *state->cursor != ',' ) {
+														SV_FactoryReportParseError( state, "expected ',' or '}'" );
+														return qfalse;
+													}
+													state->cursor++;
+												}
+												SV_FactoryReportParseError( state, "unterminated object" );
+												return qfalse;
+											case '[':
+													state->cursor++;
+													while ( state->cursor < state->end ) {
+														if ( !SV_FactorySkipValue( state ) ) {
+															return qfalse;
+														}
+														SV_FactorySkipWhitespace( state );
+														if ( state->cursor >= state->end ) {
+															break;
+														}
+														if ( *state->cursor == ']' ) {
+															state->cursor++;
+															return qtrue;
+														}
+														if ( *state->cursor != ',' ) {
+															SV_FactoryReportParseError( state, "expected ',' or ']'" );
+															return qfalse;
+														}
+														state->cursor++;
+													}
+													SV_FactoryReportParseError( state, "unterminated array" );
+													return qfalse;
+												case '"':
+														return SV_FactorySkipJsonString( state );
+													default:
+															( void )SV_FactoryParseLiteralString( state );
+															return qtrue;
+														}
+													}
+
+													/*
+													=============
+													SV_FactoryMapBaseGametype
+
+													Translates textual base gametype tokens int o gametype_t values.
+													=============
+													*/
+													static qboolean SV_FactoryMapBaseGametype( const char *token, gametype_t *outType ) {
+														static const struct {
+															const char *name;
+															gametype_t type;
+														} s_gametypeMap[] = {
+															{ "ffa", GT_FFA },
+															{ "duel", GT_TOURNAMENT },
+															{ "race", GT_RACE },
+															{ "tdm", GT_TEAM },
+															{ "ca", GT_CLAN_ARENA },
+															{ "ctf", GT_CTF },
+															{ "oneflag", GT_1FCTF },
+															{ "dom", GT_DOMINATION },
+															{ "ad", GT_ATTACK_DEFEND },
+															{ "ft", GT_FREEZE },
+															{ "har", GT_HARVESTER },
+															{ "rr", GT_RED_ROVER }
+														};
+														int i;
+
+														if ( !token || !*token ) {
+															return qfalse;
+														}
+
+														for ( i = 0; i < (int)( sizeof( s_gametypeMap ) / sizeof( s_gametypeMap[0] ) ); i++ ) {
+															if ( !Q_stricmp( token, s_gametypeMap[i].name ) ) {
+																if ( outType ) {
+																	*outType = s_gametypeMap[i].type;
+																}
+																return qtrue;
+															}
+														}
+
+														return qfalse;
+													}
+
+													/*
+													=============
+													SV_FactoryParseDefinition
+
+													Parses a single factory definition object.
+													=============
+													*/
+													static svFactoryDefinition_t *SV_FactoryParseDefinition( svFactoryParseState_t *state, const char *sourceFile ) {
+														svFactoryDefinition_t *definition;
+														char *id;
+														char *basegt;
+
+														if ( !SV_FactoryParseExpectedChar( state, '{' ) ) {
+															return NULL;
+														}
+
+														definition = ( svFactoryDefinition_t * )Z_Malloc( sizeof( svFactoryDefinition_t ) );
+														if ( !definition ) {
+															return NULL;
+														}
+
+														definition->sourceFile = sourceFile ? SV_FactoryCopyString( sourceFile ) : NULL;
+														definition->id = NULL;
+														definition->baseGametype = GT_FFA;
+														definition->next = NULL;
+
+														id = NULL;
+														basegt = NULL;
+
+														while ( state && state->cursor < state->end ) {
+															char *key;
+
+															SV_FactorySkipWhitespace( state );
+															if ( state->cursor >= state->end ) {
+																SV_FactoryReportParseError( state, "unterminated factory object" );
+																goto fail;
+															}
+															if ( *state->cursor == '}' ) {
+																state->cursor++;
+																break;
+															}
+
+															key = SV_FactoryParseJsonString( state );
+															if ( !key ) {
+																goto fail;
+															}
+															if ( !SV_FactoryParseExpectedChar( state, ':' ) ) {
+																Z_Free( key );
+																goto fail;
+															}
+
+															if ( !Q_stricmp( key, "id" ) ) {
+																if ( id ) {
+																	Z_Free( id );
+																}
+																id = SV_FactoryParseJsonString( state );
+															} else if ( !Q_stricmp( key, "basegt" ) ) {
+																if ( basegt ) {
+																	Z_Free( basegt );
+																}
+																basegt = SV_FactoryParseJsonString( state );
+															} else {
+																if ( !SV_FactorySkipValue( state ) ) {
+																	Z_Free( key );
+																	goto fail;
+																}
+															}
+
+															Z_Free( key );
+
+															SV_FactorySkipWhitespace( state );
+															if ( state->cursor >= state->end ) {
+																SV_FactoryReportParseError( state, "unterminated factory object" );
+																goto fail;
+															}
+															if ( *state->cursor == '}' ) {
+																state->cursor++;
+																break;
+															}
+															if ( *state->cursor != ',' ) {
+																SV_FactoryReportParseError( state, "expected ',' or '}'" );
+																goto fail;
+															}
+															state->cursor++;
+														}
+
+														if ( !id ) {
+															SV_FactoryReportParseError( state, "factory missing id" );
+															goto fail;
+														}
+														if ( !basegt || !SV_FactoryMapBaseGametype( basegt, &definition->baseGametype ) ) {
+															SV_FactoryReportParseError( state, va( "factory %s missing valid basegt", id ) );
+															goto fail;
+														}
+
+														definition->id = id;
+														Z_Free( basegt );
+														return definition;
+
+														fail:
+														if ( id ) {
+															Z_Free( id );
+														}
+														if ( basegt ) {
+															Z_Free( basegt );
+														}
+														if ( definition ) {
+															if ( definition->sourceFile ) {
+																Z_Free( definition->sourceFile );
+															}
+															Z_Free( definition );
+														}
+														return NULL;
+													}
+
+													/*
+													=============
+													SV_FactoryRegisterDefinition
+
+													Adds a parsed definition to the registry when the id is unique.
+													=============
+													*/
+													static qboolean SV_FactoryRegisterDefinition( svFactoryDefinition_t *definition ) {
+														svFactoryDefinition_t *iter;
+
+														if ( !definition || !definition->id ) {
+															return qfalse;
+														}
+
+														for ( iter = s_svFactoryList; iter; iter = iter->next ) {
+															if ( !Q_stricmp( iter->id, definition->id ) ) {
+																Com_Printf( "factories: duplicate id %s from %s ignored (already provided by %s)\n",
+																definition->id,
+																definition->sourceFile ? definition->sourceFile : "<unknown>",
+																iter->sourceFile ? iter->sourceFile : "<unknown>" );
+																return qfalse;
+															}
+														}
+
+														definition->next = s_svFactoryList;
+														s_svFactoryList = definition;
+														return qtrue;
+													}
+
+													/*
+													=============
+													SV_FactoryParseFactoriesBuffer
+
+													Reads a JSON array of factory definitions from memory.
+													=============
+													*/
+													static int SV_FactoryParseFactoriesBuffer( const char *filename, const char *buffer, int length ) {
+														svFactoryParseState_t state;
+														int count;
+
+														if ( !buffer || length <= 0 ) {
+															return 0;
+														}
+
+														state.cursor = buffer;
+														state.end = buffer + length;
+														state.filename = filename;
+														state.line = 1;
+
+														SV_FactorySkipWhitespace( &state );
+														if ( !SV_FactoryParseExpectedChar( &state, '[' ) ) {
+															return 0;
+														}
+
+														count = 0;
+														while ( state.cursor < state.end ) {
+															svFactoryDefinition_t *definition = SV_FactoryParseDefinition( &state, filename );
+															if ( !definition ) {
+																break;
+															}
+															if ( SV_FactoryRegisterDefinition( definition ) ) {
+																count++;
+															}
+
+															SV_FactorySkipWhitespace( &state );
+															if ( state.cursor >= state.end ) {
+																break;
+															}
+															if ( *state.cursor == ']' ) {
+																state.cursor++;
+																return count;
+															}
+															if ( *state.cursor != ',' ) {
+																SV_FactoryReportParseError( &state, "expected ',' or ']'" );
+																return count;
+															}
+															state.cursor++;
+														}
+
+														SV_FactoryReportParseError( &state, "unterminated factory array" );
+														return count;
+													}
+
+													/*
+													=============
+													SV_FactoryLoadFile
+
+													Reads and parses a factories file.
+													=============
+													*/
+													static qboolean SV_FactoryLoadFile( const char *filename ) {
+														fileHandle_t file;
+														int length;
+														char *data;
+
+														length = FS_FOpenFileRead( filename, &file, qfalse );
+														if ( length <= 0 ) {
+															return qfalse;
+														}
+														if ( length >= SV_FACTORY_MAX_JSON_STRING * 64 ) {
+															Com_Printf( "factories: file %s too large (%i bytes)\n", filename, length );
+															FS_FCloseFile( file );
+															return qfalse;
+														}
+
+														data = ( char * )Z_Malloc( length + 1 );
+														if ( !data ) {
+															FS_FCloseFile( file );
+															return qfalse;
+														}
+
+														FS_Read( data, length, file );
+														data[length] = '\0';
+														FS_FCloseFile( file );
+
+														SV_FactoryParseFactoriesBuffer( filename, data, length );
+														Z_Free( data );
+														return qtrue;
+													}
+
+													/*
+													=============
+													SV_FactoryLoadSupplementalFiles
+
+													Loads optional *.factories files from the scripts directory.
+													=============
+													*/
+													static void SV_FactoryLoadSupplementalFiles( void ) {
+														char fileList[SV_FACTORY_FILE_LIST_BUFFER];
+														char *cursor;
+														int count;
+														int index;
+
+														count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
+														cursor = fileList;
+														for ( index = 0; index < count; index++ ) {
+															int length = strlen( cursor );
+															char path[MAX_QPATH];
+
+															if ( length <= 0 ) {
+																cursor++;
+																continue;
+															}
+
+															Com_sprint f( path, sizeof( path ), "scripts/%s", cursor );
+															SV_FactoryLoadFile( path );
+															cursor += length + 1;
+														}
+													}
+
+													/*
+													=============
+													SV_FactoryEnsureRegistryLoaded
+
+													Initialises the factory registry on demand.
+													=============
+													*/
+													static void SV_FactoryEnsureRegistryLoaded( void ) {
+														if ( s_svFactoryRegistryLoaded ) {
+															return;
+														}
+
+														SV_FactoryLoadFile( "scripts/factories.txt" );
+														SV_FactoryLoadSupplementalFiles();
+														s_svFactoryRegistryLoaded = qtrue;
+													}
+
+													/*
+													=============
+													SV_FactoryFindById
+
+													Looks up a previously parsed factory definition by id.
+													=============
+													*/
+													static const svFactoryDefinition_t *SV_FactoryFindById( const char *id ) {
+														const svFactoryDefinition_t *factory;
+
+														SV_FactoryEnsureRegistryLoaded();
+														if ( !id || !*id ) {
+															return NULL;
+														}
+
+														for ( factory = s_svFactoryList; factory; factory = factory->next ) {
+															if ( !Q_stricmp( factory->id, id ) ) {
+																return factory;
+															}
+														}
+
+														return NULL;
+													}
+
+													/*
+													=============
+													SV_ParseInfos
+
+													Parses info blocks from arena definition files.
+													=============
+													*/
+													static int SV_ParseInfos( char *buf, int max, char *infos[] ) {
+														char *token;
+														int count;
+														char key[MAX_TOKEN_CHARS];
+														char info[MAX_INFO_STRING];
+
+														count = 0;
+
+														while ( 1 ) {
+															token = COM_Parse( &buf );
+															if ( !token[0] ) {
+																break;
+															}
+															if ( strcmp( token, "{" ) ) {
+																Com_Printf( "Missing { in info file\n" );
+																break;
+															}
+
+															if ( count == max ) {
+																Com_Printf( "Max infos exceeded\n" );
+																break;
+															}
+
+															info[0] = '\0';
+															while ( 1 ) {
+																token = COM_ParseExt( &buf, qtrue );
+																if ( !token[0] ) {
+																	Com_Printf( "Unexpected end of info file\n" );
+																	break;
+																}
+																if ( !strcmp( token, "}" ) ) {
+																	break;
+																}
+																Q_strncpyz( key, token, sizeof( key ) );
+
+																token = COM_ParseExt( &buf, qfalse );
+																if ( !token[0] ) {
+																	Q_strncpyz( token, "<NULL>", MAX_TOKEN_CHARS );
+																}
+																Info_SetValueForKey( info, key, token );
+															}
+
+															infos[count] = ( char * )Z_Malloc( strlen( info ) + strlen( "\\num\\" ) + strlen( va( "%d", MAX_ARENAS ) ) + 1 );
+															if ( infos[count] ) {
+																strcpy( infos[count], info );
+																count++;
+															}
+														}
+
+														return count;
+													}
+
+													/*
+													=============
+													SV_LoadArenasFromFile
+
+													Loads arena definitions from the given file.
+													=============
+													*/
+													static void SV_LoadArenasFromFile( const char *filename ) {
+														fileHandle_t file;
+														int length;
+														char buffer[MAX_ARENAS_TEXT];
+
+														length = FS_FOpenFileRead( filename, &file, qfalse );
+														if ( length <= 0 ) {
+															return;
+														}
+														if ( length >= MAX_ARENAS_TEXT ) {
+															Com_Printf( "arenas: file %s too large (%i bytes)\n", filename, length );
+															FS_FCloseFile( file );
+															return;
+														}
+
+														FS_Read( buffer, length, file );
+														buffer[length] = '\0';
+														FS_FCloseFile( file );
+
+														s_svNumArenaInfos += SV_ParseInfos( buffer, MAX_ARENAS - s_svNumArenaInfos, &s_svArenaInfos[s_svNumArenaInfos] );
+													}
+
+													/*
+													=============
+													SV_LoadArenaRegistry
+
+													Initialises the cached arena metadata used for gametype validation.
+													=============
+													*/
+													static void SV_LoadArenaRegistry( void ) {
+														char fileList[MAX_ARENAS_TEXT];
+														char *cursor;
+														int count;
+														int index;
+
+														if ( s_svArenaRegistryLoaded ) {
+															return;
+														}
+
+														s_svNumArenaInfos = 0;
+														SV_LoadArenasFromFile( "scripts/arenas.txt" );
+
+														count = FS_GetFileList( "scripts", ".arena", fileList, sizeof( fileList ) );
+														cursor = fileList;
+														for ( index = 0; index < count; index++ ) {
+															int length = strlen( cursor );
+															char path[MAX_QPATH];
+
+															if ( length <= 0 ) {
+																cursor++;
+																continue;
+															}
+
+															Com_sprint f( path, sizeof( path ), "scripts/%s", cursor );
+															SV_LoadArenasFromFile( path );
+															cursor += length + 1;
+														}
+
+														s_svArenaRegistryLoaded = qtrue;
+													}
+
+													/*
+													=============
+													SV_GetArenaInfoByMap
+
+													Returns arena metadata for the supplied map name when available.
+													=============
+													*/
+													static const char *SV_GetArenaInfoByMap( const char *map ) {
+														int index;
+
+														if ( !map || !*map ) {
+															return NULL;
+														}
+
+														SV_LoadArenaRegistry();
+														for ( index = 0; index < s_svNumArenaInfos; index++ ) {
+															if ( !Q_stricmp( Info_ValueForKey( s_svArenaInfos[index], "map" ), map ) ) {
+																return s_svArenaInfos[index];
+															}
+														}
+
+														return NULL;
+													}
+
+													/*
+													=============
+													SV_MapTypesContainToken
+
+													Returns qtrue when the arena type list includes the supplied token.
+													=============
+													*/
+													static qboolean SV_MapTypesContainToken( const char *typeList, const char *token ) {
+														const char *scan;
+														size_t tokenLength;
+
+														if ( !typeList || !*typeList || !token || !*token ) {
+															return qfalse;
+														}
+
+														tokenLength = strlen( token );
+														scan = typeList;
+														while ( *scan ) {
+															const char *start;
+															size_t length;
+
+															while ( *scan && *scan <= ' ' ) {
+																scan++;
+															}
+															if ( !*scan ) {
+																break;
+															}
+
+															start = scan;
+															while ( *scan && *scan > ' ' ) {
+																scan++;
+															}
+															length = scan - start;
+
+															if ( length == tokenLength && !Q_strnicmp( start, token, tokenLength ) ) {
+																return qtrue;
+															}
+														}
+
+														return qfalse;
+													}
+
+													/*
+													=============
+													SV_MapSupportsGametype
+
+													Determines whether the supplied map exposes entities for the requested gametype.
+													=============
+													*/
+													static qboolean SV_MapSupportsGametype( const char *mapName, gametype_t gametype ) {
+														static const char *const s_gametypeTokens[GT_MAX_GAME_TYPE][SV_MAX_MAP_GAMETYPE_ALIASES] = {
+															[GT_FFA] = { "ffa", NULL, NULL },
+															[GT_TOURNAMENT] = { "duel", "tourney", NULL },
+															[GT_SINGLE_PLAYER] = { "single", NULL, NULL },
+															[GT_TEAM] = { "tdm", "team", NULL },
+															[GT_CLAN_ARENA] = { "ca", "clanarena", NULL },
+															[GT_CTF] = { "ctf", NULL, NULL },
+															[GT_1FCTF] = { "oneflag", "1fctf", NULL },
+															[GT_OBELISK] = { "overload", "obelisk", NULL },
+															[GT_HARVESTER] = { "har", "harvester", NULL },
+															[GT_FREEZE] = { "ft", "freeze", NULL },
+															[GT_DOMINATION] = { "dom", "domination", NULL },
+															[GT_ATTACK_DEFEND] = { "ad", "attackdefend", NULL },
+															[GT_RED_ROVER] = { "rr", "redrover", NULL },
+															[GT_RACE] = { "race", NULL, NULL }
+														};
+														const char *info;
+														const char *types;
+														const char *const*aliases;
+														int aliasIndex;
+
+														if ( !mapName || !*mapName || mapName[0] == '_' ) {
+															return qtrue;
+														}
+
+														if ( gametype < GT_FFA || gametype >= GT_MAX_GAME_TYPE ) {
+															return qtrue;
+														}
+
+														info = SV_GetArenaInfoByMap( mapName );
+														if ( !info ) {
+															return qtrue;
+														}
+
+														types = Info_ValueForKey( info, "type" );
+														if ( !types || !*types ) {
+															return qtrue;
+														}
+
+														aliases = s_gametypeTokens[gametype];
+														for ( aliasIndex = 0; aliasIndex < SV_MAX_MAP_GAMETYPE_ALIASES; aliasIndex++ ) {
+															const char *token = aliases[aliasIndex];
+
+															if ( token && SV_MapTypesContainToken( types, token ) ) {
+																return qtrue;
+															}
+														}
+
+														return qfalse;
+													}
+
+
 /*
 ===============================================================================
 
@@ -141,6 +1068,8 @@ static void SV_Map_f( void ) {
 	qboolean	killBots, cheat;
 	char		expanded[MAX_QPATH];
 	char		mapname[MAX_QPATH];
+	const svFactoryDefinition_t	*factoryOverride;
+	const char		*factoryId;
 
 	map = Cmd_Argv(1);
 	if ( !map ) {
@@ -157,6 +1086,9 @@ static void SV_Map_f( void ) {
 
 	// force latched values to get set
 	Cvar_Get ("g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH );
+
+	factoryOverride = NULL;
+	factoryId = NULL;
 
 	cmd = Cmd_Argv(0);
 	if( Q_stricmpn( cmd, "sp", 2 ) == 0 ) {
@@ -181,9 +1113,28 @@ static void SV_Map_f( void ) {
 		}
 	}
 
+	if ( Cmd_Argc() > 2 ) {
+		factoryId = Cmd_Argv( 2 );
+		if ( factoryId && *factoryId ) {
+			factoryOverride = SV_FactoryFindById( factoryId );
+			if ( !factoryOverride ) {
+				Com_Printf( "Invalid factory specified.\n" );
+				return;
+			}
+			if ( !cheat && !SV_MapSupportsGametype( map, factoryOverride->baseGametype ) ) {
+				Com_Printf( "Map not supported for this gametype.\n" );
+				return;
+			}
+		}
+	}
+
 	// save the map name here cause on a map restart we reload the q3config.cfg
 	// and thus nuke the arguments of the map command
 	Q_strncpyz(mapname, map, sizeof(mapname));
+
+	if ( factoryOverride ) {
+		Cvar_Set( "g_factory", factoryOverride->id );
+	}
 
 	// start up the map
 	SV_SpawnServer( mapname, killBots );

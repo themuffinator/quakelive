@@ -1,0 +1,77 @@
+{
+  "map": "purgatory",
+  "duration": 6.0,
+  "tick_rate": 20,
+  "seed": 5150,
+  "metadata": {
+    "description": "Rotation vote selects the power preset for TDM",
+    "mode": "tdm",
+    "rotation": {
+      "next_map": "purgatory",
+      "factory_id": "power-tdm",
+      "vote_command": "map purgatory power-tdm",
+      "g_factoryTitle": "Power Preset"
+    },
+    "factory": {
+      "title": "Power Preset",
+      "active_loadout": "power",
+      "bot_loadouts": {
+        "sarge": "power",
+        "slash": "power"
+      },
+      "loadouts": {
+        "power": {
+          "ammo": {
+            "rocket": 20,
+            "lightning": 60
+          },
+          "inventory": {
+            "armor": 75,
+            "gauntlet": 1
+          }
+        }
+      },
+      "items": {
+        "allow_drops": true,
+        "allow_bounce": false
+      }
+    }
+  },
+  "bots": [
+    {
+      "name": "sarge",
+      "team": "red",
+      "spawn": {
+        "position": [0, 0, 64],
+        "factory_loadout": "power"
+      },
+      "initial_state": {
+        "health": 150,
+        "ammo": {},
+        "inventory": {}
+      },
+      "script": [
+        {"time": 0.0, "action": "look", "params": {"direction": [1, 0, 0]}},
+        {"time": 1.0, "action": "move", "params": {"direction": [1, 0, 0], "speed": 320}},
+        {"time": 2.0, "action": "shoot", "params": {"weapon": "rocket"}}
+      ]
+    },
+    {
+      "name": "slash",
+      "team": "blue",
+      "spawn": {
+        "position": [96, -32, 64]
+      },
+      "initial_state": {
+        "health": 125,
+        "ammo": {},
+        "inventory": {}
+      },
+      "script": [
+        {"time": 0.0, "action": "look", "params": {"direction": [-1, 0, 0]}},
+        {"time": 0.5, "action": "move", "params": {"direction": [-1, 0, 0], "speed": 300}},
+        {"time": 3.0, "action": "say", "params": {"message": "Factory vote locked in."}}
+      ]
+    }
+  ]
+}
