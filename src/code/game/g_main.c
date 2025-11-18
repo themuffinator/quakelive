@@ -163,6 +163,7 @@ vmCvar_t	g_dmflags;
 vmCvar_t	g_fraglimit;
 vmCvar_t	g_timelimit;
 vmCvar_t	g_capturelimit;
+vmCvar_t	g_scorelimit;
 vmCvar_t	g_domCapTime;
 vmCvar_t	g_domTeammateCapScale;
 vmCvar_t	g_domDistressThreshold;
@@ -356,6 +357,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_fraglimit, "fraglimit", "20", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 	{ &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 	{ &g_capturelimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
+	{ &g_scorelimit, "g_scorelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue, qfalse, "Team score threshold that ends Attack & Defend matches when positive." },
 	{ &g_domCapTime, "g_domCapTime", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds required to capture a Domination point with a single attacker." },
 	{ &g_domTeammateCapScale, "g_domTeammateCapScale", "0.5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Additional capture speed gained per extra teammate assisting." },
 	{ &g_domDistressThreshold, "g_domDistressThreshold", "75", CVAR_ARCHIVE, 0, qfalse, qfalse, "Percent progress when defenders receive a distress warning." },
@@ -2159,6 +2161,21 @@ void CheckExitRules( void ) {
 		if ( level.teamScores[TEAM_BLUE] >= g_capturelimit.integer ) {
 			trap_SendServerCommand( -1, "print \"Blue hit the capturelimit.\n\"" );
 			LogExit( "Capturelimit hit." );
+			return;
+		}
+	}
+
+	if ( g_gametype.integer == GT_ATTACK_DEFEND && g_scorelimit.integer ) {
+
+		if ( level.teamScores[TEAM_RED] >= g_scorelimit.integer ) {
+			trap_SendServerCommand( -1, "print \"Red hit the scorelimit.\n\"" );
+			LogExit( "Scorelimit hit." );
+			return;
+		}
+
+		if ( level.teamScores[TEAM_BLUE] >= g_scorelimit.integer ) {
+			trap_SendServerCommand( -1, "print \"Blue hit the scorelimit.\n\"" );
+			LogExit( "Scorelimit hit." );
 			return;
 		}
 	}
