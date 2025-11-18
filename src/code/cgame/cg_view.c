@@ -316,6 +316,8 @@ static void CG_OffsetFirstPersonView( void ) {
 	float			delta;
 	float			speed;
 	float			f;
+	float			kickScale;
+	float			bobScale;
 	vec3_t			predictedVelocity;
 	int				timeDelta;
 	
@@ -325,6 +327,8 @@ static void CG_OffsetFirstPersonView( void ) {
 
 	origin = cg.refdef.vieworg;
 	angles = cg.refdefViewAngles;
+	kickScale = cg.kickScale;
+	bobScale = cg.bobScale;
 
 	// if dead, fix the angle and don't add any kick
 	if ( cg.snap->ps.stats[STAT_HEALTH] <= 0 ) {
@@ -343,13 +347,13 @@ static void CG_OffsetFirstPersonView( void ) {
 		ratio = cg.time - cg.damageTime;
 		if ( ratio < DAMAGE_DEFLECT_TIME ) {
 			ratio /= DAMAGE_DEFLECT_TIME;
-			angles[PITCH] += ratio * cg.v_dmg_pitch;
-			angles[ROLL] += ratio * cg.v_dmg_roll;
+			angles[PITCH] += ratio * cg.v_dmg_pitch * kickScale;
+			angles[ROLL] += ratio * cg.v_dmg_roll * kickScale;
 		} else {
 			ratio = 1.0 - ( ratio - DAMAGE_DEFLECT_TIME ) / DAMAGE_RETURN_TIME;
 			if ( ratio > 0 ) {
-				angles[PITCH] += ratio * cg.v_dmg_pitch;
-				angles[ROLL] += ratio * cg.v_dmg_roll;
+				angles[PITCH] += ratio * cg.v_dmg_pitch * kickScale;
+				angles[ROLL] += ratio * cg.v_dmg_roll * kickScale;
 			}
 		}
 	}
@@ -366,21 +370,21 @@ static void CG_OffsetFirstPersonView( void ) {
 	VectorCopy( cg.predictedPlayerState.velocity, predictedVelocity );
 
 	delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[0]);
-	angles[PITCH] += delta * cg_runpitch.value;
+	angles[PITCH] += delta * cg_runpitch.value * bobScale;
 	
 	delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[1]);
-	angles[ROLL] -= delta * cg_runroll.value;
+	angles[ROLL] -= delta * cg_runroll.value * bobScale;
 
 	// add angles based on bob
 
 	// make sure the bob is visible even at low speeds
 	speed = cg.xyspeed > 200 ? cg.xyspeed : 200;
 
-	delta = cg.bobfracsin * cg_bobpitch.value * speed;
+	delta = cg.bobfracsin * cg_bobpitch.value * speed * bobScale;
 	if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
 		delta *= 3;		// crouching
 	angles[PITCH] += delta;
-	delta = cg.bobfracsin * cg_bobroll.value * speed;
+	delta = cg.bobfracsin * cg_bobroll.value * speed * bobScale;
 	if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
 		delta *= 3;		// crouching accentuates roll
 	if (cg.bobcycle & 1)
@@ -400,7 +404,7 @@ static void CG_OffsetFirstPersonView( void ) {
 	}
 
 	// add bob height
-	bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value;
+	bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value * bobScale;
 	if (bob > 6) {
 		bob = 6;
 	}
