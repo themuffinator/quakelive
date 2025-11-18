@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // for a 3D rendering
 #include "cg_local.h"
 
+static void CG_SetZoomState( qboolean zoomState );
+static void CG_HandleZoomOutOnDeath( void );
+
 
 /*
 =============================================================================
@@ -218,6 +221,8 @@ CG_OffsetThirdPersonView
 ===============
 */
 #define	FOCUS_DISTANCE	512
+#define	THIRD_PERSON_PITCH_MIN	-45.0f
+#define	THIRD_PERSON_PITCH_MAX	45.0f
 static void CG_OffsetThirdPersonView( void ) {
 	vec3_t		forward, right, up;
 	vec3_t		view;
@@ -228,15 +233,25 @@ static void CG_OffsetThirdPersonView( void ) {
 	vec3_t		focusPoint;
 	float		focusDist;
 	float		forwardScale, sideScale;
+	float		thirdPersonPitch;
 
 	cg.refdef.vieworg[2] += cg.predictedPlayerState.viewheight;
 
+	thirdPersonPitch = cg_thirdPersonPitch.value;
+	if ( thirdPersonPitch < THIRD_PERSON_PITCH_MIN ) {
+		thirdPersonPitch = THIRD_PERSON_PITCH_MIN;
+	} else if ( thirdPersonPitch > THIRD_PERSON_PITCH_MAX ) {
+		thirdPersonPitch = THIRD_PERSON_PITCH_MAX;
+	}
+
 	VectorCopy( cg.refdefViewAngles, focusAngles );
+	focusAngles[PITCH] -= thirdPersonPitch;
 
 	// if dead, look at killer
 	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
 		focusAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
 		cg.refdefViewAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
+		CG_HandleZoomOutOnDeath();
 	}
 
 	if ( focusAngles[PITCH] > 45 ) {
@@ -250,6 +265,7 @@ static void CG_OffsetThirdPersonView( void ) {
 
 	view[2] += 8;
 
+	cg.refdefViewAngles[PITCH] -= thirdPersonPitch;
 	cg.refdefViewAngles[PITCH] *= 0.5;
 
 	AngleVectors( cg.refdefViewAngles, forward, right, up );
@@ -320,6 +336,7 @@ static void CG_OffsetFirstPersonView( void ) {
 	int				timeDelta;
 	
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		CG_HandleZoomOutOnDeath();
 		return;
 	}
 
@@ -332,6 +349,7 @@ static void CG_OffsetFirstPersonView( void ) {
 		angles[PITCH] = -15;
 		angles[YAW] = cg.snap->ps.stats[STAT_DEAD_YAW];
 		origin[2] += cg.predictedPlayerState.viewheight;
+		CG_HandleZoomOutOnDeath();
 		return;
 	}
 
@@ -442,20 +460,70 @@ static void CG_OffsetFirstPersonView( void ) {
 
 //======================================================================
 
-void CG_ZoomDown_f( void ) { 
-	if ( cg.zoomed ) {
+/*
+=============
+CG_SetZoomState
+
+Updates the zoom state if it changes.
+=============
+*/
+static void CG_SetZoomState( qboolean zoomState ) {
+	if ( cg.zoomed == zoomState ) {
 		return;
 	}
-	cg.zoomed = qtrue;
+
+	cg.zoomed = zoomState;
 	cg.zoomTime = cg.time;
 }
 
-void CG_ZoomUp_f( void ) { 
+/*
+=============
+CG_HandleZoomOutOnDeath
+
+Releases the zoom when required by cg_zoomOutOnDeath.
+=============
+*/
+static void CG_HandleZoomOutOnDeath( void ) {
+	if ( !cg.zoomOutOnDeath ) {
+		return;
+	}
+
 	if ( !cg.zoomed ) {
 		return;
 	}
-	cg.zoomed = qfalse;
-	cg.zoomTime = cg.time;
+
+	CG_SetZoomState( qfalse );
+}
+
+/*
+=============
+CG_ZoomDown_f
+
+Handles the +zoom press action.
+=============
+*/
+void CG_ZoomDown_f( void ) {
+	if ( cg.zoomToggle ) {
+		CG_SetZoomState( !cg.zoomed );
+		return;
+	}
+
+	CG_SetZoomState( qtrue );
+}
+
+/*
+=============
+CG_ZoomUp_f
+
+Handles the +zoom release action.
+=============
+*/
+void CG_ZoomUp_f( void ) {
+	if ( cg.zoomToggle ) {
+		return;
+	}
+
+	CG_SetZoomState( qfalse );
 }
 
 
@@ -475,7 +543,9 @@ static int CG_CalcFov( void ) {
 	float	v;
 	int		contents;
 	float	fov_x, fov_y;
+	float	baseFov;
 	float	zoomFov;
+	float	zoomSensitivityValue;
 	float	f;
 	int		inwater;
 
@@ -496,6 +566,8 @@ static int CG_CalcFov( void ) {
 			}
 		}
 
+		baseFov = fov_x;
+
 		// account for zooms
 		zoomFov = cg_zoomFov.value;
 		if ( zoomFov < 1 ) {
@@ -504,20 +576,29 @@ static int CG_CalcFov( void ) {
 			zoomFov = 160;
 		}
 
-		if ( cg.zoomed ) {
+		if ( cg_zoomScaling.integer ) {
 			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
 			if ( f > 1.0 ) {
-				fov_x = zoomFov;
-			} else {
-				fov_x = fov_x + f * ( zoomFov - fov_x );
+				f = 1.0;
 			}
+
+			if ( cg.zoomed ) {
+				if ( f >= 1.0f ) {
+					fov_x = zoomFov;
+				} else {
+					fov_x = baseFov + f * ( zoomFov - baseFov );
+				}
+			} else {
+				if ( f >= 1.0f ) {
+					fov_x = baseFov;
+				} else {
+					fov_x = zoomFov + f * ( baseFov - zoomFov );
+				}
+			}
+		} else if ( cg.zoomed ) {
+			fov_x = zoomFov;
 		} else {
-			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
-			if ( f > 1.0 ) {
-				fov_x = fov_x;
-			} else {
-				fov_x = zoomFov + f * ( fov_x - zoomFov );
-			}
+			fov_x = baseFov;
 		}
 	}
 
@@ -527,15 +608,12 @@ static int CG_CalcFov( void ) {
 
 	// warp if underwater
 	contents = CG_PointContents( cg.refdef.vieworg, -1 );
-	if ( contents & ( CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA ) ){
+	inwater = ( contents & ( CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA ) ) ? qtrue : qfalse;
+	if ( inwater && cg_waterWarp.integer ) {
 		phase = cg.time / 1000.0 * WAVE_FREQUENCY * M_PI * 2;
 		v = WAVE_AMPLITUDE * sin( phase );
 		fov_x += v;
 		fov_y -= v;
-		inwater = qtrue;
-	}
-	else {
-		inwater = qfalse;
 	}
 
 
@@ -544,9 +622,15 @@ static int CG_CalcFov( void ) {
 	cg.refdef.fov_y = fov_y;
 
 	if ( !cg.zoomed ) {
-		cg.zoomSensitivity = 1;
+		cg.zoomSensitivity = 1.0f;
 	} else {
-		cg.zoomSensitivity = cg.refdef.fov_y / 75.0;
+		zoomSensitivityValue = cg_zoomSensitivity.value;
+		if ( zoomSensitivityValue < 0.01f ) {
+			zoomSensitivityValue = 0.01f;
+		} else if ( zoomSensitivityValue > 1.0f ) {
+			zoomSensitivityValue = 1.0f;
+		}
+		cg.zoomSensitivity = zoomSensitivityValue;
 	}
 
 	return inwater;

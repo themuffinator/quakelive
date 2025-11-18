@@ -37,6 +37,61 @@ int drawTeamOverlayModificationCount = -1;
 //static char teamChat1[256];
 //static char teamChat2[256];
 
+/*
+=============
+CG_IsSelfOnTeamOverlay
+
+Indicates if the local player should appear on the overlay.
+=============
+*/
+qboolean CG_IsSelfOnTeamOverlay( void ) {
+	return ( qboolean )( cg_selfOnTeamOverlay.integer != 0 );
+}
+
+/*
+=============
+CG_TeamOverlayXValue
+
+Returns the configured overlay X coordinate.
+=============
+*/
+float CG_TeamOverlayXValue( void ) {
+	return cg_drawTeamOverlayX.value;
+}
+
+/*
+=============
+CG_TeamOverlayYValue
+
+Returns the configured overlay Y coordinate.
+=============
+*/
+float CG_TeamOverlayYValue( void ) {
+	return cg_drawTeamOverlayY.value;
+}
+
+/*
+=============
+CG_TeamOverlaySizeValue
+
+Returns the overlay size scalar.
+=============
+*/
+float CG_TeamOverlaySizeValue( void ) {
+	return cg_drawTeamOverlaySize.value;
+}
+
+/*
+=============
+CG_TeamOverlayOpacityValue
+
+Returns the overlay opacity scalar.
+=============
+*/
+float CG_TeamOverlayOpacityValue( void ) {
+	return cg_drawTeamOverlayOpacity.value;
+}
+
 static const score_t *CG_GetScoreForClientNum(int clientNum) {
 int i;
 

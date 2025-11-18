@@ -39,6 +39,40 @@ char teamChat1[256];
 char teamChat2[256];
 
 
+/*
+=============
+CG_ShouldDrawSpriteSelf
+
+Helper predicate so sprite rendering can consult cg_drawSpriteSelf.
+=============
+*/
+qboolean CG_ShouldDrawSpriteSelf( void ) {
+	return ( qboolean )( cg_drawSpriteSelf.integer != 0 );
+}
+
+/*
+=============
+CG_ShouldDrawTieredArmor
+
+Determines if tiered armor prompts should render.
+=============
+*/
+qboolean CG_ShouldDrawTieredArmor( void ) {
+	return ( qboolean )( cg_drawTieredArmorAvailability.integer != 0 );
+}
+
+/*
+=============
+CG_ShouldDrawSpeedometer
+
+Decides whether the HUD speedometer should be visible.
+=============
+*/
+qboolean CG_ShouldDrawSpeedometer( void ) {
+	return ( qboolean )( cg_speedometer.integer != 0 );
+}
+
+
 int CG_Text_Width(const char *text, float scale, int limit) {
   int count,len;
 	float out;
