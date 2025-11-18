@@ -293,6 +293,295 @@ void UI_LoadBots( void ) {
 	trap_Print( va( "%i bots parsed\n", ui_numBots ) );
 }
 
+/*
+=============
+UI_ClearMapRotations
+
+Resets the cached list of map rotation entries so subsequent loads start fresh.
+=============
+*/
+static void UI_ClearMapRotations( void ) {
+	Com_Memset( uiInfo.mapRotations, 0, sizeof( uiInfo.mapRotations ) );
+	uiInfo.mapRotationCount = 0;
+}
+
+/*
+=============
+UI_TrimRotationToken
+
+Strips leading and trailing whitespace from a rotation token in-place.
+=============
+*/
+static void UI_TrimRotationToken( char *token ) {
+	char	*start;
+	char	*end;
+	size_t	length;
+
+	if ( token == NULL ) {
+		return;
+	}
+
+	start = token;
+	while ( *start == ' ' || *start == '\t' ) {
+		start++;
+	}
+
+	length = strlen( start );
+	end = start + length;
+	while ( end > start && ( end[-1] == ' ' || end[-1] == '\t' ) ) {
+		end--;
+	}
+	*end = '\0';
+
+	if ( start != token ) {
+		memmove( token, start, ( end - start ) + 1 );
+	}
+}
+
+/*
+=============
+UI_MapIndexForRotationToken
+
+Finds the arena index for a given map token, matching either load or display names.
+=============
+*/
+static int UI_MapIndexForRotationToken( const char *token ) {
+	int i;
+
+	if ( token == NULL || token[0] == '\0' ) {
+		return -1;
+	}
+
+	for ( i = 0; i < uiInfo.mapCount; i++ ) {
+		if ( !Q_stricmp( uiInfo.mapList[i].mapLoadName, token )
+			|| !Q_stricmp( uiInfo.mapList[i].mapName, token ) ) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+/*
+=============
+UI_PopulateRotationMetadata
+
+Copies friendly metadata into the rotation entry after resolving the arena index.
+=============
+*/
+static void UI_PopulateRotationMetadata( mapRotationInfo_t *entry, int mapIndex ) {
+	if ( entry == NULL ) {
+		return;
+	}
+
+	entry->mapIndex = mapIndex;
+
+	if ( mapIndex >= 0 && mapIndex < uiInfo.mapCount ) {
+		const mapInfo *map = &uiInfo.mapList[mapIndex];
+		Q_strncpyz( entry->mapTitle, map->mapName, sizeof( entry->mapTitle ) );
+	} else if ( entry->mapTitle[0] == '\0' ) {
+		Q_strncpyz( entry->mapTitle, entry->mapName, sizeof( entry->mapTitle ) );
+	}
+}
+
+/*
+=============
+UI_AddMapRotationFromLine
+
+Parses a single rotation definition and appends it to the cache when valid.
+=============
+*/
+static void UI_AddMapRotationFromLine( const char *line, const char *sourceTag ) {
+	char			buffer[MAX_MAP_ROTATION_TOKEN * 2];
+	char			*cursor;
+	char			*separator;
+	char			*comment;
+	mapRotationInfo_t	rotation;
+	const char		*sourceName = ( sourceTag && sourceTag[0] ) ? sourceTag : "map rotation source";
+	int			mapIndex;
+
+	if ( line == NULL ) {
+		return;
+	}
+
+	Q_strncpyz( buffer, line, sizeof( buffer ) );
+	cursor = buffer;
+	while ( *cursor == ' ' || *cursor == '\t' ) {
+		cursor++;
+	}
+	if ( *cursor == '\0' || *cursor == '#' ) {
+		return;
+	}
+
+	comment = strchr( cursor, '#' );
+	if ( comment ) {
+		*comment = '\0';
+	}
+
+	separator = strchr( cursor, '|' );
+	if ( separator == NULL ) {
+		Com_Printf( S_COLOR_RED "^1map rotation item missing map or factory name, skipping: %s\n", cursor );
+		return;
+	}
+
+	*separator = '\0';
+	separator++;
+	UI_TrimRotationToken( cursor );
+	UI_TrimRotationToken( separator );
+
+	if ( cursor[0] == '\0' || separator[0] == '\0' ) {
+		Com_Printf( S_COLOR_RED "^1map rotation item missing map or factory name, skipping: %s\n", line );
+		return;
+	}
+
+	if ( uiInfo.mapRotationCount >= MAX_MAP_ROTATIONS ) {
+		Com_Printf( S_COLOR_RED "^1map rotation cache full (%i entries), skipping remainder from %s\n",
+			MAX_MAP_ROTATIONS, sourceName );
+		return;
+	}
+
+	mapIndex = UI_MapIndexForRotationToken( cursor );
+	if ( mapIndex < 0 ) {
+		Com_Printf( S_COLOR_RED "^1map doesn't exist, skipping: %s\n", cursor );
+		return;
+	}
+
+	Com_Memset( &rotation, 0, sizeof( rotation ) );
+	Q_strncpyz( rotation.mapName, cursor, sizeof( rotation.mapName ) );
+	Q_strncpyz( rotation.factoryId, separator, sizeof( rotation.factoryId ) );
+	Q_strncpyz( rotation.mapTitle, cursor, sizeof( rotation.mapTitle ) );
+	UI_PopulateRotationMetadata( &rotation, mapIndex );
+
+	uiInfo.mapRotations[uiInfo.mapRotationCount++] = rotation;
+}
+
+/*
+=============
+UI_ParseMapRotationText
+
+Tokenizes rotation definitions from a buffer and forwards them to the line parser.
+=============
+*/
+static void UI_ParseMapRotationText( const char *text, const char *sourceTag ) {
+	const char	*cursor;
+	char		line[MAX_MAP_ROTATION_TOKEN * 2];
+	size_t	length;
+
+	if ( text == NULL ) {
+		return;
+	}
+
+	cursor = text;
+	while ( *cursor ) {
+		length = 0;
+		while ( cursor[length] && cursor[length] != '\n' && cursor[length] != '\r'
+			&& length < sizeof( line ) - 1 ) {
+			line[length] = cursor[length];
+			length++;
+		}
+		line[length] = '\0';
+		UI_AddMapRotationFromLine( line, sourceTag );
+
+		cursor += length;
+		while ( *cursor == '\n' || *cursor == '\r' ) {
+			cursor++;
+		}
+	}
+}
+
+/*
+=============
+UI_LoadMapRotationsFromInlineCvar
+
+Attempts to load rotation definitions embedded in a CVar string.
+=============
+*/
+static qboolean UI_LoadMapRotationsFromInlineCvar( const char *cvarName ) {
+	char buffer[MAX_CVAR_VALUE_STRING];
+
+	if ( cvarName == NULL ) {
+		return qfalse;
+	}
+
+	trap_Cvar_VariableStringBuffer( cvarName, buffer, sizeof( buffer ) );
+	if ( buffer[0] == '\0' ) {
+		return qfalse;
+	}
+
+	UI_ParseMapRotationText( buffer, cvarName );
+	return ( uiInfo.mapRotationCount > 0 );
+}
+
+/*
+=============
+UI_LoadMapRotationsFromFile
+
+Loads rotation definitions from disk, mirroring the HLIL file size guardrails.
+=============
+*/
+static qboolean UI_LoadMapRotationsFromFile( const char *path ) {
+	fileHandle_t file;
+	int		length;
+	static char buffer[MAX_MAP_ROTATION_FILE_BYTES];
+
+	if ( path == NULL || path[0] == '\0' ) {
+		return qfalse;
+	}
+
+	length = trap_FS_FOpenFile( path, &file, FS_READ );
+	if ( length <= 0 || !file ) {
+		Com_Printf( S_COLOR_RED "^1rotation file not found: %s\n", path );
+		return qfalse;
+	}
+	if ( length >= MAX_MAP_ROTATION_FILE_BYTES ) {
+		Com_Printf( S_COLOR_RED "^1rotations file too large: %s is %i, max allowed is %i^7\n",
+			path, length, MAX_MAP_ROTATION_FILE_BYTES - 1 );
+		trap_FS_FCloseFile( file );
+		return qfalse;
+	}
+
+	trap_FS_Read( buffer, length, file );
+	buffer[length] = '\0';
+	trap_FS_FCloseFile( file );
+
+	UI_ParseMapRotationText( buffer, path );
+	return ( uiInfo.mapRotationCount > 0 );
+}
+
+/*
+=============
+UI_LoadMapRotations
+
+Builds the UI map rotation cache from inline CVars, user-selected files, or defaults.
+=============
+*/
+void UI_LoadMapRotations( void ) {
+	static const char *inlineCvars[] = { "ui_mapRotation", "sv_mapRotation", "g_mapRotation", NULL };
+	static const char *fileCvars[] = { "ui_mapPoolFile", "sv_mapPoolFile", NULL };
+	char		path[MAX_QPATH];
+	int		index;
+
+	UI_ClearMapRotations();
+
+	for ( index = 0; inlineCvars[index] != NULL && uiInfo.mapRotationCount == 0; index++ ) {
+		UI_LoadMapRotationsFromInlineCvar( inlineCvars[index] );
+	}
+
+	if ( uiInfo.mapRotationCount == 0 ) {
+		for ( index = 0; fileCvars[index] != NULL && uiInfo.mapRotationCount == 0; index++ ) {
+			trap_Cvar_VariableStringBuffer( fileCvars[index], path, sizeof( path ) );
+			if ( path[0] != '\0' ) {
+				UI_LoadMapRotationsFromFile( path );
+			}
+		}
+	}
+
+	if ( uiInfo.mapRotationCount == 0 ) {
+		UI_LoadMapRotationsFromFile( "mappool.txt" );
+	}
+
+	Com_Printf( "loaded %i maps into the map rotation cache\n", uiInfo.mapRotationCount );
+}
 
 /*
 ===============

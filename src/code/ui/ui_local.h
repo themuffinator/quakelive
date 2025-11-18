@@ -623,6 +623,9 @@ typedef struct {
 #define MAX_TEAMS 64
 #define MAX_GAMETYPES 16
 #define MAX_MAPS 128
+#define MAX_MAP_ROTATIONS 256
+#define MAX_MAP_ROTATION_TOKEN 1024
+#define MAX_MAP_ROTATION_FILE_BYTES 0x8000
 #define MAX_SPMAPS 16
 #define PLAYERS_PER_TEAM 5
 #define MAX_PINGREQUESTS		32
@@ -692,6 +695,15 @@ typedef struct {
 	qhandle_t levelShot;
 	qboolean active;
 } mapInfo;
+
+typedef struct {
+	char		mapName[MAX_MAP_ROTATION_TOKEN];
+	char		mapTitle[MAX_MAP_ROTATION_TOKEN];
+	char		factoryId[MAX_MAP_ROTATION_TOKEN];
+	char		factoryConfig[MAX_MAP_ROTATION_TOKEN];
+	char		factoryGameType[MAX_MAP_ROTATION_TOKEN];
+	int		mapIndex;
+} mapRotationInfo_t;
 
 typedef struct {
 	const char *tierName;
@@ -838,6 +850,9 @@ typedef struct {
 
 	int mapCount;
 	mapInfo mapList[MAX_MAPS];
+
+	int mapRotationCount;
+	mapRotationInfo_t mapRotations[MAX_MAP_ROTATIONS];
 
 
 	int tierCount;
@@ -1119,6 +1134,7 @@ char *UI_GetBotInfoByNumber( int num );
 char *UI_GetBotInfoByName( const char *name );
 int UI_GetNumBots( void );
 void UI_LoadBots( void );
+void UI_LoadMapRotations( void );
 char *UI_GetBotNameByNumber( int num );
 
 void UI_GetBestScore( int level, int *score, int *skill );

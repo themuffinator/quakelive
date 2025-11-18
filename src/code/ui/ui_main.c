@@ -1262,8 +1262,10 @@ void UI_Load() {
 
 #ifdef PRE_RELEASE_TADEMO
 	UI_ParseGameInfo("demogameinfo.txt");
+	UI_LoadMapRotations();
 #else
 	UI_ParseGameInfo("gameinfo.txt");
+	UI_LoadMapRotations();
 	UI_LoadArenas();
 #endif
 
@@ -3492,8 +3494,10 @@ static void UI_RunMenuScript(char **args) {
 		} else if (Q_stricmp(name, "loadGameInfo") == 0) {
 #ifdef PRE_RELEASE_TADEMO
 			UI_ParseGameInfo("demogameinfo.txt");
+			UI_LoadMapRotations();
 #else
 			UI_ParseGameInfo("gameinfo.txt");
+			UI_LoadMapRotations();
 #endif
 			UI_LoadBestScores(uiInfo.mapList[ui_currentMap.integer].mapLoadName, uiInfo.gameTypes[ui_gameType.integer].gtEnum);
 		} else if (Q_stricmp(name, "resetScores") == 0) {
@@ -5348,10 +5352,12 @@ void _UI_Init( qboolean inGameLoad ) {
 #ifdef PRE_RELEASE_TADEMO
 	UI_ParseTeamInfo("demoteaminfo.txt");
 	UI_ParseGameInfo("demogameinfo.txt");
+	UI_LoadMapRotations();
 #else
 	UI_ParseTeamInfo("teaminfo.txt");
 	UI_LoadTeams();
 	UI_ParseGameInfo("gameinfo.txt");
+	UI_LoadMapRotations();
 #endif
 
         menuSet = UI_Cvar_VariableString("ui_menuFiles");
