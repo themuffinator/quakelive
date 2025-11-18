@@ -136,6 +136,117 @@ float BG_GetHandicapScalar( handicap_type_t type, weapon_t weapon ) {
 	return 1.0f;
 }
 
+/*
+=============
+BG_GetWeaponAmmoPackSize
+
+Returns the default ammo pack pickup size for the supplied weapon.
+=============
+*/
+int BG_GetWeaponAmmoPackSize( weapon_t weapon ) {
+	const bgWeaponStats_t	*stats;
+
+	stats = BG_GetWeaponStats( weapon );
+	if ( !stats ) {
+		return 0;
+	}
+
+	return stats->pickupQuantity;
+}
+
+/*
+=============
+BG_GetWeaponAmmoPackMaxStack
+
+Returns the standard ammo stack cap for the supplied weapon.
+=============
+*/
+int BG_GetWeaponAmmoPackMaxStack( weapon_t weapon ) {
+	const bgWeaponStats_t	*stats;
+
+	stats = BG_GetWeaponStats( weapon );
+	if ( !stats ) {
+		return 0;
+	}
+
+	return stats->maxStack;
+}
+
+/*
+=============
+BG_PlayerHasPersistantPowerup
+
+Returns whether the persistant powerup stored in the supplied playerstate
+matches the requested tag.
+=============
+*/
+qboolean BG_PlayerHasPersistantPowerup( const playerState_t *ps, powerup_t powerup ) {
+	const gitem_t	*item;
+
+	if ( !ps ) {
+		return qfalse;
+	}
+
+	if ( powerup <= PW_NONE || powerup >= PW_NUM_POWERUPS ) {
+		return qfalse;
+	}
+
+	if ( ps->stats[STAT_PERSISTANT_POWERUP] <= 0 || ps->stats[STAT_PERSISTANT_POWERUP] >= bg_numItems ) {
+		return qfalse;
+	}
+
+	item = &bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]];
+	return (item->giTag == powerup) ? qtrue : qfalse;
+}
+
+/*
+=============
+BG_GetArmorUpperBound
+
+Returns the maximum armor stack allowed for the supplied playerstate.
+=============
+*/
+int BG_GetArmorUpperBound( const playerState_t *ps ) {
+	int	upperBound;
+
+	if ( !ps ) {
+		return 0;
+	}
+
+	upperBound = ps->stats[STAT_MAX_HEALTH] * 2;
+	if ( BG_PlayerHasPersistantPowerup( ps, PW_GUARD ) ) {
+		upperBound = ps->stats[STAT_MAX_HEALTH];
+	}
+
+	return upperBound;
+}
+
+/*
+=============
+BG_GetHealthUpperBound
+
+Returns the maximum health stack allowed for a health pickup with the supplied
+quantity.
+=============
+*/
+int BG_GetHealthUpperBound( const playerState_t *ps, int pickupQuantity ) {
+	int	upperBound;
+
+	if ( !ps ) {
+		return 0;
+	}
+
+	upperBound = ps->stats[STAT_MAX_HEALTH];
+	if ( BG_PlayerHasPersistantPowerup( ps, PW_GUARD ) ) {
+		return upperBound;
+	}
+
+	if ( pickupQuantity == 5 || pickupQuantity == 100 ) {
+		upperBound = ps->stats[STAT_MAX_HEALTH] * 2;
+	}
+
+	return upperBound;
+}
 
 /*QUAKED item_***** ( 0 0 0 ) (-16 -16 -16) (16 16 16) suspended
 DO NOT USE THIS CLASS, IT JUST HOLDS GENERAL INFORMATION.
@@ -1420,7 +1531,7 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 			int weapon;
 
 			for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
-				const int maxAmmo = BG_GetWeaponMaxAmmo( weapon );
+				const int maxAmmo = BG_GetWeaponAmmoPackMaxStack( weapon );
 
 				if ( maxAmmo <= 0 ) {
 					continue;
@@ -1434,23 +1545,21 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 			return qfalse;
 		}
 
-		if ( ps->ammo[item->giTag] >= BG_GetWeaponMaxAmmo( item->giTag ) ) {
+		const int maxAmmo = BG_GetWeaponAmmoPackMaxStack( item->giTag );
+		if ( maxAmmo > 0 && ps->ammo[item->giTag] >= maxAmmo ) {
 			return qfalse;
 		}
 
 		return qtrue;
 
 	case IT_ARMOR:
-		if( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
+		if ( BG_PlayerHasPersistantPowerup( ps, PW_SCOUT ) ) {
 			return qfalse;
 		}
 
-		// we also clamp armor to the maxhealth for handicapping
-		if( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
-			upperBound = ps->stats[STAT_MAX_HEALTH];
-		}
-		else {
-			upperBound = ps->stats[STAT_MAX_HEALTH] * 2;
+		upperBound = BG_GetArmorUpperBound( ps );
+		if ( upperBound <= 0 ) {
+			return qfalse;
 		}
 
 		if ( ps->stats[STAT_ARMOR] >= upperBound ) {
@@ -1459,20 +1568,12 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 		return qtrue;
 
 	case IT_HEALTH:
-		// small and mega healths will go over the max, otherwise
-		// don't pick up if already at max
-		if( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
-			upperBound = ps->stats[STAT_MAX_HEALTH];
-		}
-		else
-		if ( item->quantity == 5 || item->quantity == 100 ) {
-			if ( ps->stats[STAT_HEALTH] >= ps->stats[STAT_MAX_HEALTH] * 2 ) {
-				return qfalse;
-			}
-			return qtrue;
+		upperBound = BG_GetHealthUpperBound( ps, item->quantity );
+		if ( upperBound <= 0 ) {
+			return qfalse;
 		}
 
-		if ( ps->stats[STAT_HEALTH] >= ps->stats[STAT_MAX_HEALTH] ) {
+		if ( ps->stats[STAT_HEALTH] >= upperBound ) {
 			return qfalse;
 		}
 		return qtrue;

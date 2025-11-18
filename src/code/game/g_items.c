@@ -304,10 +304,24 @@ static int Pickup_Key( gentity_t *ent, gentity_t *other ) {
 
 //======================================================================
 
+/*
+=============
+G_FactoryAmmoPacksEnabled
+
+Returns whether the server factory configuration has ammo pack overrides enabled.
+=============
+*/
 static qboolean G_FactoryAmmoPacksEnabled( void ) {
 	return ( g_factoryCvarConfig.ammoPackEnabled || g_factoryCvarConfig.ammoPackHackEnabled ) ? qtrue : qfalse;
 }
 
+/*
+=============
+G_GetConfiguredAmmoRespawnSeconds
+
+Resolves the respawn time used for ammo pickups when factory settings are active.
+=============
+*/
 static int G_GetConfiguredAmmoRespawnSeconds( void ) {
 	int respawn = g_factoryCvarConfig.ammoRespawnSeconds;
 
@@ -318,76 +332,81 @@ static int G_GetConfiguredAmmoRespawnSeconds( void ) {
 	return respawn;
 }
 
-static int G_GetAmmoItemDefaultQuantity( weapon_t weapon ) {
-	const gitem_t *item;
+/*
+=============
+G_GetAmmoPackPickupCount
 
-	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
-		return 0;
-	}
-
-	for ( item = bg_itemlist + 1 ; item->classname ; ++item ) {
-		if ( item->giType == IT_AMMO && item->giTag == weapon ) {
-			return item->quantity;
-		}
-	}
-
-	return 0;
-}
-
+Returns the ammo amount granted by a pickup for the supplied weapon, applying
+factory overrides when available.
+=============
+*/
 static int G_GetAmmoPackPickupCount( weapon_t weapon, int fallback ) {
-	int configured;
+	int	basePickup;
+	int	configured;
 
 	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
 		return fallback;
 	}
 
+	basePickup = fallback > 0 ? fallback : BG_GetWeaponAmmoPackSize( weapon );
 	if ( !G_FactoryAmmoPacksEnabled() ) {
-		return fallback;
+		return basePickup;
 	}
 
 	configured = g_ammoPackConfig.weaponPickup[weapon];
-	if ( configured <= 0 ) {
-		return fallback;
+	if ( configured > 0 ) {
+		return configured;
 	}
 
-	return configured;
+	return basePickup;
 }
 
+/*
+=============
+G_GetAmmoPackMaxStack
+
+Returns the maximum stack size that ammo packs should clamp to for a weapon.
+=============
+*/
 static int G_GetAmmoPackMaxStack( weapon_t weapon, int fallbackPack ) {
-	int maxStack;
+	int	baseStack;
+	int	configured;
 
-	if ( fallbackPack <= 0 ) {
-		fallbackPack = G_GetAmmoItemDefaultQuantity( weapon );
-	}
-
-	if ( !G_FactoryAmmoPacksEnabled() ) {
-		if ( fallbackPack <= 0 ) {
-			return 0;
-		}
-
-		return fallbackPack * 4;
-	}
-
-	if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
-		maxStack = g_ammoPackConfig.weaponMax[weapon];
-		if ( maxStack > 0 ) {
-			return maxStack;
-		}
-
-		if ( fallbackPack <= 0 ) {
-			fallbackPack = g_ammoPackConfig.weaponPickup[weapon];
-		}
-	}
-
-	if ( fallbackPack <= 0 ) {
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
 		return 0;
 	}
 
-	return fallbackPack * 4;
+	if ( fallbackPack <= 0 ) {
+		fallbackPack = BG_GetWeaponAmmoPackSize( weapon );
+	}
+
+	baseStack = BG_GetWeaponAmmoPackMaxStack( weapon );
+	if ( baseStack <= 0 ) {
+		baseStack = fallbackPack;
+	}
+
+	if ( !G_FactoryAmmoPacksEnabled() ) {
+		return baseStack;
+	}
+
+	configured = g_ammoPackConfig.weaponMax[weapon];
+	if ( configured > 0 ) {
+		return configured;
+	}
+
+	return baseStack;
 }
 
+/*
+=============
+G_ResolveAmmoPickupAmount
+
+Determines how much ammo an entity should grant, taking server overrides into
+account.
+=============
+*/
 static int G_ResolveAmmoPickupAmount( const gentity_t *ent ) {
-	int fallback;
+	int	fallback;
 
 	if ( !ent || !ent->item ) {
 		return 0;
@@ -402,10 +421,20 @@ static int G_ResolveAmmoPickupAmount( const gentity_t *ent ) {
 	}
 
 	fallback = ent->item->quantity;
+	if ( fallback <= 0 ) {
+		fallback = BG_GetWeaponAmmoPackSize( ent->item->giTag );
+	}
 
 	return G_GetAmmoPackPickupCount( ent->item->giTag, fallback );
 }
 
+/*
+=============
+Add_Ammo
+
+Adds ammo to the supplied client while clamping to the configured maximum.
+=============
+*/
 void Add_Ammo (gentity_t *ent, int weapon, int count)
 {
 	weapon_t weaponIndex;
@@ -427,7 +456,7 @@ void Add_Ammo (gentity_t *ent, int weapon, int count)
 		ent->client->ps.ammo[weapon] = 0;
 	}
 
-	defaultPack = G_GetAmmoItemDefaultQuantity( weaponIndex );
+	defaultPack = BG_GetWeaponAmmoPackSize( weaponIndex );
 	maxStack = G_GetAmmoPackMaxStack( weaponIndex, defaultPack );
 
 	if ( maxStack > 0 && ent->client->ps.ammo[weapon] > maxStack ) {
@@ -435,6 +464,13 @@ void Add_Ammo (gentity_t *ent, int weapon, int count)
 	}
 }
 
+/*
+=============
+Pickup_Ammo
+
+Processes an ammo pickup for the specified entity and client.
+=============
+*/
 int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 {
 	int			quantity;
@@ -463,6 +499,13 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 //======================================================================
 
 
+/*
+=============
+Pickup_Weapon
+
+Handles weapon pickups and issues any ammo associated with the weapon.
+=============
+*/
 int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 	int		quantity;
 	weapon_t	weapon;
@@ -516,19 +559,26 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 
 //======================================================================
 
+/*
+=============
+Pickup_Health
+
+Applies health pickups while respecting the configured overstack bounds.
+=============
+*/
 int Pickup_Health (gentity_t *ent, gentity_t *other) {
 	int			max;
 	int			quantity;
+	playerState_t	*ps;
 
-	// small and mega healths will go over the max
-	if( other->client && bg_itemlist[other->client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
-		max = other->client->ps.stats[STAT_MAX_HEALTH];
+	if ( !other || !other->client ) {
+		return RESPAWN_HEALTH;
 	}
-	else
-	if ( ent->item->quantity != 5 && ent->item->quantity != 100 ) {
+
+	ps = &other->client->ps;
+	max = BG_GetHealthUpperBound( ps, ent->item ? ent->item->quantity : 0 );
+	if ( max <= 0 ) {
 		max = other->client->ps.stats[STAT_MAX_HEALTH];
-	} else {
-		max = other->client->ps.stats[STAT_MAX_HEALTH] * 2;
 	}
 
 	if ( ent->count ) {
@@ -539,10 +589,10 @@ int Pickup_Health (gentity_t *ent, gentity_t *other) {
 
 	other->health += quantity;
 
-	if (other->health > max ) {
+	if ( other->health > max ) {
 		other->health = max;
 	}
-	other->client->ps.stats[STAT_HEALTH] = other->health;
+	ps->stats[STAT_HEALTH] = other->health;
 
 	if ( ent->item->quantity == 100 ) {		// mega health respawns slow
 		return RESPAWN_MEGAHEALTH;
@@ -553,20 +603,27 @@ int Pickup_Health (gentity_t *ent, gentity_t *other) {
 
 //======================================================================
 
+/*
+=============
+Pickup_Armor
+
+Adds armor from pickups and clamps it based on the player's current powerups.
+=============
+*/
 int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
 	int		upperBound;
+	playerState_t	*ps;
 
-	other->client->ps.stats[STAT_ARMOR] += ent->item->quantity;
-
-	if( other->client && bg_itemlist[other->client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
-		upperBound = other->client->ps.stats[STAT_MAX_HEALTH];
-	}
-	else {
-		upperBound = other->client->ps.stats[STAT_MAX_HEALTH] * 2;
+	if ( !other || !other->client ) {
+		return RESPAWN_ARMOR;
 	}
 
-	if ( other->client->ps.stats[STAT_ARMOR] > upperBound ) {
-		other->client->ps.stats[STAT_ARMOR] = upperBound;
+	ps = &other->client->ps;
+	ps->stats[STAT_ARMOR] += ent->item->quantity;
+
+	upperBound = BG_GetArmorUpperBound( ps );
+	if ( upperBound > 0 && ps->stats[STAT_ARMOR] > upperBound ) {
+		ps->stats[STAT_ARMOR] = upperBound;
 	}
 
 	return RESPAWN_ARMOR;

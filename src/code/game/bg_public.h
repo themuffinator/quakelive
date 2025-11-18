@@ -425,6 +425,11 @@ extern const int bg_weaponStatsCount;
 const bgWeaponStats_t *BG_GetWeaponStats( weapon_t weapon );
 int BG_GetWeaponMaxAmmo( weapon_t weapon );
 float BG_GetHandicapScalar( handicap_type_t type, weapon_t weapon );
+int BG_GetWeaponAmmoPackSize( weapon_t weapon );
+int BG_GetWeaponAmmoPackMaxStack( weapon_t weapon );
+qboolean BG_PlayerHasPersistantPowerup( const playerState_t *ps, powerup_t powerup );
+int BG_GetArmorUpperBound( const playerState_t *ps );
+int BG_GetHealthUpperBound( const playerState_t *ps, int pickupQuantity );
 
 
 struct pmove_settings_s {
