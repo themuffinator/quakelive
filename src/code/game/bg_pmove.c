@@ -2463,23 +2463,19 @@ static void PM_Weapon( void ) {
 	}
 
 	// fire weapon
-		PM_AddEvent( EV_FIRE_WEAPON );
+	PM_AddEvent( EV_FIRE_WEAPON );
 
-		addTime = PM_GetWeaponReloadTime( (weapon_t)pm->ps->weapon );
+	addTime = PM_GetWeaponReloadTime( (weapon_t)pm->ps->weapon );
 
-		if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
-			addTime /= 1.5;
-		}
-		else
-		if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
-			addTime /= 1.3;
-  }
-  else
-		if ( pm->ps->powerups[PW_HASTE] ) {
-			addTime /= 1.3;
-		}
+	if ( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
+		addTime /= 1.5;
+	} else if ( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
+		addTime /= 1.3;
+	} else if ( pm->ps->powerups[PW_HASTE] ) {
+		addTime /= 1.3;
+	}
 
-		pm->ps->weaponTime += addTime;
+	pm->ps->weaponTime += addTime;
 
 }
 
