@@ -268,6 +268,7 @@ static void UI_CalcPostGameStats() {
 	newInfo.blueScore = atoi(UI_Argv(12));
 	time = atoi(UI_Argv(13));
 	newInfo.captures = atoi(UI_Argv(14));
+	UI_MatchSummaryParseFromPostgame();
 
 	newInfo.time = (time - trap_Cvar_VariableValue("ui_matchStartTime")) / 1000;
 	adjustedTime = uiInfo.mapList[ui_currentMap.integer].timeToBeat[game];

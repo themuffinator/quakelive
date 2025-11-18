@@ -774,6 +774,33 @@ typedef struct {
 	int numLines;
 } serverStatusInfo_t;
 
+#define MAX_MATCH_SUMMARY_PLAYERS MAX_CLIENTS
+
+typedef struct uiMatchPlayerInfo_s {
+	int clientNum;
+	team_t team;
+	int rank;
+	int score;
+	char name[MAX_NAME_LENGTH];
+} uiMatchPlayerInfo_t;
+
+typedef struct uiMatchPlayerList_s {
+	uiMatchPlayerInfo_t entries[MAX_MATCH_SUMMARY_PLAYERS];
+	int entryCount;
+} uiMatchPlayerList_t;
+
+typedef struct uiMatchSummaryCache_s {
+	qboolean valid;
+	int totalClients;
+	int localClientNum;
+	int redScore;
+	int blueScore;
+	int matchTimeSeconds;
+	uiMatchPlayerList_t endOfMatch;
+	uiMatchPlayerList_t redTeam;
+	uiMatchPlayerList_t blueTeam;
+} uiMatchSummaryCache_t;
+
 typedef struct {
 	const char *modName;
 	const char *modDescr;
@@ -901,6 +928,7 @@ typedef struct {
 	int effectsColor;
 
 	qboolean inGameLoad;
+	uiMatchSummaryCache_t matchSummary;
 
 }	uiInfo_t;
 
@@ -1151,6 +1179,8 @@ void UI_SPUnlock_f( void );
 void UI_SPUnlockMedals_f( void );
 
 void UI_InitGameinfo( void );
+void UI_ResetMatchSummaryCache( void );
+void UI_MatchSummaryParseFromPostgame( void );
 
 //
 // ui_login.c

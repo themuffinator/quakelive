@@ -1994,13 +1994,126 @@ static void UI_DrawRedBlue(rectDef_t *rect, float scale, vec4_t color, int textS
 }
 
 static void UI_DrawCrosshair(rectDef_t *rect, float scale, vec4_t color) {
- 	trap_R_SetColor( color );
+	trap_R_SetColor(color);
 	if (uiInfo.currentCrosshair < 0 || uiInfo.currentCrosshair >= NUM_CROSSHAIRS) {
 		uiInfo.currentCrosshair = 0;
 	}
-	UI_DrawHandlePic( rect->x, rect->y - rect->h, rect->w, rect->h, uiInfo.uiDC.Assets.crosshairShader[uiInfo.currentCrosshair]);
- 	trap_R_SetColor( NULL );
+	UI_DrawHandlePic(rect->x, rect->y - rect->h, rect->w, rect->h, uiInfo.uiDC.Assets.crosshairShader[uiInfo.currentCrosshair]);
+	trap_R_SetColor(NULL);
 }
+
+/*
+=============
+UI_ClearMatchSummaryList
+
+Resets a cached match summary list so new data can be appended safely.
+=============
+*/
+static void UI_ClearMatchSummaryList(uiMatchPlayerList_t *list) {
+	if (!list) {
+		return;
+	}
+	memset(list, 0, sizeof(*list));
+}
+
+/*
+=============
+UI_ResetMatchSummaryCache
+
+Clears the cached match summary payload exposed to the scoreboards.
+=============
+*/
+void UI_ResetMatchSummaryCache(void) {
+	memset(&uiInfo.matchSummary, 0, sizeof(uiInfo.matchSummary));
+}
+
+/*
+=============
+UI_MatchSummaryAppend
+
+Appends a player row to the specified list without exceeding the cap.
+=============
+*/
+static void UI_MatchSummaryAppend(uiMatchPlayerList_t *list, const uiMatchPlayerInfo_t *entry) {
+	if (!list || !entry) {
+		return;
+	}
+	if (list->entryCount >= MAX_MATCH_SUMMARY_PLAYERS) {
+		return;
+	}
+	list->entries[list->entryCount++] = *entry;
+}
+
+/*
+=============
+UI_MatchSummaryParseFromPostgame
+
+Parses the `postgame` console command payload emitted by the game module to
+refresh the end-of-match, red team, and blue team caches.
+=============
+*/
+void UI_MatchSummaryParseFromPostgame(void) {
+	char info[MAX_INFO_STRING];
+	int argc;
+	int playerTriples;
+	int argOffset;
+	int i;
+	uiMatchPlayerInfo_t entry;
+	const char *rawName;
+	uiMatchSummaryCache_t *cache = &uiInfo.matchSummary;
+
+	UI_ResetMatchSummaryCache();
+	argc = trap_Argc();
+	if (argc < 3) {
+		return;
+	}
+
+	cache->totalClients = atoi(UI_Argv(1));
+	cache->localClientNum = atoi(UI_Argv(2));
+	cache->redScore = (argc > 11) ? atoi(UI_Argv(11)) : 0;
+	cache->blueScore = (argc > 12) ? atoi(UI_Argv(12)) : 0;
+	cache->matchTimeSeconds = (argc > 13) ? (atoi(UI_Argv(13)) / 1000) : 0;
+
+	UI_ClearMatchSummaryList(&cache->endOfMatch);
+	UI_ClearMatchSummaryList(&cache->redTeam);
+	UI_ClearMatchSummaryList(&cache->blueTeam);
+
+	playerTriples = cache->totalClients;
+	argOffset = 15;
+	for (i = 0; i < playerTriples && (argOffset + 2) < argc; i++, argOffset += 3) {
+		int clientNum = atoi(UI_Argv(argOffset));
+		int rank = atoi(UI_Argv(argOffset + 1));
+		int score = atoi(UI_Argv(argOffset + 2));
+
+		if (clientNum < 0 || clientNum >= MAX_CLIENTS) {
+			continue;
+		}
+
+		trap_GetConfigString(CS_PLAYERS + clientNum, info, sizeof(info));
+		memset(&entry, 0, sizeof(entry));
+		entry.clientNum = clientNum;
+		entry.rank = rank;
+		entry.score = score;
+		entry.team = (team_t)atoi(Info_ValueForKey(info, "t"));
+		rawName = Info_ValueForKey(info, "n");
+		if (!rawName || !rawName[0]) {
+			rawName = va("Player %i", clientNum);
+		}
+		Q_strncpyz(entry.name, rawName, sizeof(entry.name));
+		Q_CleanStr(entry.name);
+
+		UI_MatchSummaryAppend(&cache->endOfMatch, &entry);
+		if (entry.team == TEAM_RED) {
+			UI_MatchSummaryAppend(&cache->redTeam, &entry);
+		} else if (entry.team == TEAM_BLUE) {
+			UI_MatchSummaryAppend(&cache->blueTeam, &entry);
+		}
+	}
+
+	cache->valid = (cache->endOfMatch.entryCount > 0) ? qtrue : qfalse;
+}
+
+
 
 /*
 ===============
@@ -5262,9 +5375,10 @@ void _UI_Init( qboolean inGameLoad ) {
 
 	//uiInfo.inGameLoad = inGameLoad;
 
-        UI_RegisterCvars();
-        UI_UpdateCvars();
-        UI_InitMemory();
+	UI_RegisterCvars();
+	UI_UpdateCvars();
+	UI_InitMemory();
+	UI_ResetMatchSummaryCache();
 
 	// cache redundant calulations
 	trap_GetGlconfig( &uiInfo.uiDC.glconfig );
