@@ -1497,6 +1497,7 @@ extern pmove_settings_t g_pmoveSettings;
 void G_PmoveStoreWeaponReloads( const weaponReloadConfig_t *config );
 void G_RegisterPmoveCvars( void );
 void G_RefreshPmoveSettings( void );
+void G_PmoveClearConfigstring( void );
 
 int		trap_GeneticParentsAndChildSelection(int numranks, float *ranks, int *parent1, int *parent2, int *child);
 
