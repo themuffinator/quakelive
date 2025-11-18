@@ -1145,6 +1145,163 @@ qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTim
 
 
 
+
+/*
+=============
+BG_IsDroppedItem
+
+Checks whether the network state describes a dropped pickup rather than a
+map-spawned instance.
+=============
+*/
+static qboolean BG_IsDroppedItem( const entityState_t *ent ) {
+	return ( ent->modelindex2 != 0 );
+}
+
+/*
+=============
+BG_MaxAmmoForWeapon
+
+Returns the hard cap for the supplied weapon type. Dropped ammo ignores the
+limit so players can still recover after a weapon toss.
+=============
+*/
+static int BG_MaxAmmoForWeapon( weapon_t weapon ) {
+	static const int weaponMaxAmmo[WP_NUM_WEAPONS] = {
+		0,	// WP_NONE
+		0,	// WP_GAUNTLET
+		200,	// WP_MACHINEGUN
+		150,	// WP_HEAVY_MACHINEGUN
+		25,	// WP_SHOTGUN
+		25,	// WP_GRENADE_LAUNCHER
+		20,	// WP_ROCKET_LAUNCHER
+		150,	// WP_LIGHTNING
+		50,	// WP_RAILGUN
+		200,	// WP_PLASMAGUN
+		200,	// WP_BFG
+		0,	// WP_GRAPPLING_HOOK
+		150,	// WP_NAILGUN
+		15,	// WP_PROX_LAUNCHER
+		100	// WP_CHAINGUN
+	};
+
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return 0;
+	}
+
+	return weaponMaxAmmo[weapon];
+}
+
+/*
+=============
+BG_PlayerCarryingFlag
+
+Returns qtrue when the player already has one of the flag powerups active.
+=============
+*/
+static qboolean BG_PlayerCarryingFlag( const playerState_t *ps ) {
+	if ( ps->powerups[PW_REDFLAG] ) {
+		return qtrue;
+	}
+	if ( ps->powerups[PW_BLUEFLAG] ) {
+		return qtrue;
+	}
+	if ( ps->powerups[PW_NEUTRALFLAG] ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+BG_TeamFlagCanBeGrabbed
+
+Validates CTF-style item grabs for CTF, 1FCTF, and Harvester based on the
+player team, carried flags, and whether the item was dropped in the field.
+=============
+*/
+static qboolean BG_TeamFlagCanBeGrabbed( int gametype, const gitem_t *item, const entityState_t *ent, const playerState_t *ps ) {
+	const qboolean dropped = BG_IsDroppedItem( ent );
+	const team_t playerTeam = ps->persistant[PERS_TEAM];
+	const int flagTag = item->giTag;
+	const qboolean carryingAnyFlag = BG_PlayerCarryingFlag( ps );
+
+	switch ( gametype ) {
+	case GT_CTF:
+		if ( playerTeam == TEAM_RED ) {
+			if ( flagTag == PW_BLUEFLAG ) {
+				return carryingAnyFlag ? qfalse : qtrue;
+			}
+
+			if ( flagTag == PW_REDFLAG ) {
+				if ( ps->powerups[PW_BLUEFLAG] ) {
+					return qtrue;
+				}
+
+				return dropped && !ps->powerups[PW_NEUTRALFLAG] && !ps->powerups[PW_REDFLAG];
+			}
+		}
+		else if ( playerTeam == TEAM_BLUE ) {
+			if ( flagTag == PW_REDFLAG ) {
+				return carryingAnyFlag ? qfalse : qtrue;
+			}
+
+			if ( flagTag == PW_BLUEFLAG ) {
+				if ( ps->powerups[PW_REDFLAG] ) {
+					return qtrue;
+				}
+
+				return dropped && !ps->powerups[PW_NEUTRALFLAG] && !ps->powerups[PW_BLUEFLAG];
+			}
+		}
+		break;
+
+	case GT_1FCTF:
+		if ( flagTag == PW_NEUTRALFLAG ) {
+			return carryingAnyFlag ? qfalse : qtrue;
+		}
+
+		if ( playerTeam == TEAM_RED ) {
+			if ( flagTag == PW_BLUEFLAG ) {
+				return ps->powerups[PW_NEUTRALFLAG] != 0;
+			}
+
+			if ( flagTag == PW_REDFLAG ) {
+				if ( dropped ) {
+					return qtrue;
+				}
+
+				return ps->powerups[PW_NEUTRALFLAG] != 0;
+			}
+		}
+		else if ( playerTeam == TEAM_BLUE ) {
+			if ( flagTag == PW_REDFLAG ) {
+				return ps->powerups[PW_NEUTRALFLAG] != 0;
+			}
+
+			if ( flagTag == PW_BLUEFLAG ) {
+				if ( dropped ) {
+					return qtrue;
+				}
+
+				return ps->powerups[PW_NEUTRALFLAG] != 0;
+			}
+		}
+		break;
+
+	case GT_HARVESTER:
+		return qtrue;
+
+	default:
+		break;
+	}
+
+	return qfalse;
+}
+
+
+
 /*
 ================
 BG_CanItemBeGrabbed
@@ -1153,9 +1310,10 @@ Returns false if the item should not be picked up.
 This needs to be the same for client side prediction and server use.
 ================
 */
-qboolean BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const playerState_t *ps ) {
+qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps ) {
 	gitem_t	*item;
 	int		upperBound;
+	const qboolean dropped = BG_IsDroppedItem( ent );
 
 	if ( ent->modelindex < 1 || ent->modelindex >= bg_numItems ) {
 		Com_Error( ERR_DROP, "BG_CanItemBeGrabbed: index out of range" );
@@ -1163,14 +1321,45 @@ qboolean BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const play
 
 	item = &bg_itemlist[ent->modelindex];
 
+	if ( dropped && ps->clientNum == ent->otherEntityNum && currentTime < ent->time2 + 1000 ) {
+		return qfalse;
+	}
+
 	switch( item->giType ) {
 	case IT_WEAPON:
 		return qtrue;	// weapons are always picked up
 
 	case IT_AMMO:
-		if ( ps->ammo[ item->giTag ] >= 200 ) {
-			return qfalse;		// can't hold any more
+		if ( dropped ) {
+			return qtrue;
 		}
+
+		if ( item->giTag <= WP_NONE || item->giTag >= WP_NUM_WEAPONS ) {
+			return qtrue;
+		}
+
+		if ( item->giTag == WP_NONE ) {
+			int weapon;
+
+			for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
+				const int maxAmmo = BG_MaxAmmoForWeapon( weapon );
+
+				if ( maxAmmo <= 0 ) {
+					continue;
+				}
+
+				if ( ps->ammo[weapon] < maxAmmo ) {
+					return qtrue;
+				}
+			}
+
+			return qfalse;
+		}
+
+		if ( ps->ammo[item->giTag] >= BG_MaxAmmoForWeapon( item->giTag ) ) {
+			return qfalse;
+		}
+
 		return qtrue;
 
 	case IT_ARMOR:
@@ -1230,42 +1419,7 @@ qboolean BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const play
 		return qtrue;
 
 	case IT_TEAM: // team items, such as flags
-		if( gametype == GT_1FCTF ) {
-			// neutral flag can always be picked up
-			if( item->giTag == PW_NEUTRALFLAG ) {
-				return qtrue;
-			}
-			if (ps->persistant[PERS_TEAM] == TEAM_RED) {
-				if (item->giTag == PW_BLUEFLAG  && ps->powerups[PW_NEUTRALFLAG] ) {
-					return qtrue;
-				}
-			} else if (ps->persistant[PERS_TEAM] == TEAM_BLUE) {
-				if (item->giTag == PW_REDFLAG  && ps->powerups[PW_NEUTRALFLAG] ) {
-					return qtrue;
-				}
-			}
-		}
-		if( gametype == GT_CTF ) {
-			// ent->modelindex2 is non-zero on items if they are dropped
-			// we need to know this because we can pick up our dropped flag (and return it)
-			// but we can't pick up our flag at base
-			if (ps->persistant[PERS_TEAM] == TEAM_RED) {
-				if (item->giTag == PW_BLUEFLAG ||
-					(item->giTag == PW_REDFLAG && ent->modelindex2) ||
-					(item->giTag == PW_REDFLAG && ps->powerups[PW_BLUEFLAG]) )
-					return qtrue;
-			} else if (ps->persistant[PERS_TEAM] == TEAM_BLUE) {
-				if (item->giTag == PW_REDFLAG ||
-					(item->giTag == PW_BLUEFLAG && ent->modelindex2) ||
-					(item->giTag == PW_BLUEFLAG && ps->powerups[PW_REDFLAG]) )
-					return qtrue;
-			}
-		}
-
-		if( gametype == GT_HARVESTER ) {
-			return qtrue;
-		}
-		return qfalse;
+		return BG_TeamFlagCanBeGrabbed( gametype, item, ent, ps );
 
 	case IT_HOLDABLE:
 		// can only hold one item at a time
