@@ -2544,6 +2544,61 @@ float CG_GetValue(int ownerDraw) {
 	return -1;
 }
 
+
+/*
+=============
+CG_SpectatorPlayerSlotActive
+
+Returns qtrue when the requested spectator slot has a valid client.
+=============
+*/
+static qboolean CG_SpectatorPlayerSlotActive( int slot ) {
+	return ( CG_SpectatorClientInfo( slot ) != NULL );
+}
+
+/*
+=============
+CG_LocalPlayerHasWeapon
+
+Checks if the predicted player currently owns the supplied weapon.
+=============
+*/
+static qboolean CG_LocalPlayerHasWeapon( weapon_t weapon ) {
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return qfalse;
+	}
+
+	return ( ( cg.snap->ps.stats[STAT_WEAPONS] & ( 1 << weapon ) ) != 0 );
+}
+
+/*
+=============
+CG_LoadoutsEnabled
+
+Determines whether the active server advertises g_loadout as enabled.
+=============
+*/
+static qboolean CG_LoadoutsEnabled( void ) {
+	const char *info;
+	const char *value;
+
+	info = CG_ConfigString( CS_SERVERINFO );
+	if ( !info || !*info ) {
+		return qfalse;
+	}
+
+	value = Info_ValueForKey( info, "g_loadout" );
+	if ( !value || !*value ) {
+		return qfalse;
+	}
+
+	return ( atoi( value ) != 0 );
+}
+
 qboolean CG_OtherTeamHasFlag() {
 	if (cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF) {
 		int team = cg.snap->ps.persistant[PERS_TEAM];
@@ -2592,8 +2647,13 @@ qboolean CG_YourTeamHasFlag() {
 	return qfalse;
 }
 
-// THINKABOUTME: should these be exclusive or inclusive.. 
-// 
+/*
+=============
+CG_OwnerDrawVisible
+
+Evaluates the ownerdraw visibility bitmasks for HUD and menu scripts.
+=============
+*/
 qboolean CG_OwnerDrawVisible(int flags) {
 
 	if (flags & CG_SHOW_TEAMINFO) {
@@ -2673,6 +2733,110 @@ qboolean CG_OwnerDrawVisible(int flags) {
 		if (cg.snap->ps.powerups[PW_REDFLAG] || cg.snap->ps.powerups[PW_BLUEFLAG] || cg.snap->ps.powerups[PW_NEUTRALFLAG]) {
 			return qtrue;
 		}
+	}
+
+	if (flags & CG_SHOW_IF_PLYR1) {
+		return CG_SpectatorPlayerSlotActive( 0 );
+	}
+
+	if (flags & CG_SHOW_IF_PLYR2) {
+		return CG_SpectatorPlayerSlotActive( 1 );
+	}
+
+	if (flags & CG_SHOW_IF_G_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_GAUNTLET );
+	}
+
+	if (flags & CG_SHOW_IF_MG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_MACHINEGUN );
+	}
+
+	if (flags & CG_SHOW_IF_SG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_SHOTGUN );
+	}
+
+	if (flags & CG_SHOW_IF_GL_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_GRENADE_LAUNCHER );
+	}
+
+	if (flags & CG_SHOW_IF_RL_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_ROCKET_LAUNCHER );
+	}
+
+	if (flags & CG_SHOW_IF_LG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_LIGHTNING );
+	}
+
+	if (flags & CG_SHOW_IF_RG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_RAILGUN );
+	}
+
+	if (flags & CG_SHOW_IF_PG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_PLASMAGUN );
+	}
+
+	if (flags & CG_SHOW_IF_BFG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_BFG );
+	}
+
+	if (flags & CG_SHOW_IF_CG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_CHAINGUN );
+	}
+
+	if (flags & CG_SHOW_IF_NG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_NAILGUN );
+	}
+
+	if (flags & CG_SHOW_IF_PL_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_PROX_LAUNCHER );
+	}
+
+	if (flags & CG_SHOW_IF_HMG_FIRED) {
+		return CG_LocalPlayerHasWeapon( WP_HEAVY_MACHINEGUN );
+	}
+
+	if (flags & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED)) {
+		qboolean loadoutsEnabled = CG_LoadoutsEnabled();
+
+		if (flags & CG_SHOW_IF_LOADOUT_ENABLED) {
+			return loadoutsEnabled;
+		}
+
+		return (loadoutsEnabled == qfalse);
+	}
+
+	if (flags & (CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC |
+		CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC)) {
+		team_t playerTeam = TEAM_FREE;
+		qboolean spectator = qfalse;
+
+		if (cg.snap) {
+			playerTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+			spectator = (playerTeam == TEAM_SPECTATOR) || (cg.snap->ps.pm_type == PM_SPECTATOR) ||
+				(cg.snap->ps.pm_flags & PMF_FOLLOW);
+		}
+
+		if (flags & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC) {
+			return (playerTeam == TEAM_RED) || spectator;
+		}
+
+		if (flags & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC) {
+			return (playerTeam == TEAM_BLUE) || spectator;
+		}
+
+		if (flags & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC) {
+			return (playerTeam == TEAM_RED) && !spectator;
+		}
+
+		return (playerTeam == TEAM_BLUE) && !spectator;
+	}
+
+	if (flags & CG_SHOW_IF_1ST_PLYR_FOLLOWED) {
+		return CG_SpectatorSlotFollowed( 0 );
+	}
+
+	if (flags & CG_SHOW_IF_2ND_PLYR_FOLLOWED) {
+		return CG_SpectatorSlotFollowed( 1 );
 	}
 	return qfalse;
 }
