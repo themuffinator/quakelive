@@ -1928,6 +1928,53 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath="g_factory.c">
+				<FileConfiguration
+					Name="Debug TA|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						Optimization="0"
+						PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;BUILDING_REF_GL;DEBUG;QAGAME;$(NoInherit)"
+						BrowseInformation="1"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						Optimization="0"
+						PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;BUILDING_REF_GL;DEBUG;GLOBALRANK;$(NoInherit)"
+						BrowseInformation="1"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release Alpha|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						Optimization="2"
+						PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;C_ONLY;$(NoInherit)"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug Alpha|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						Optimization="0"
+						PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;C_ONLY;$(NoInherit)"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						Optimization="2"
+						PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;GLOBALRANK;$(NoInherit)"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release TA|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						Optimization="2"
+						PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;$(NoInherit)"/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="g_weapon.c">
 				<FileConfiguration
 					Name="Debug TA|Win32">

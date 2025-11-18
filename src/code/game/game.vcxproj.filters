@@ -117,6 +117,9 @@
     <ClCompile Include="g_utils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="g_factory.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="g_weapon.c">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -56,6 +56,7 @@ static int	s_forceSendConfigstringModCount = -1;
 static int	s_forceAtmosphericEffectsModCount = -1;
 static int	s_forceDmgThroughSurfaceModCount = -1;
 static int	s_forcedAtmosphereModCount = -1;
+static int	s_factoryModCount = 0;
 static char	s_worldspawnAtmosphere[MAX_QPATH];
 static char	s_lastForcedCosmeticsPayload[MAX_INFO_STRING];
 
@@ -237,6 +238,7 @@ vmCvar_t	g_botsFile;
 vmCvar_t	g_botSpawnList;
 vmCvar_t	g_accessFile;
 vmCvar_t	g_factoryTitle;
+vmCvar_t	g_factory;
 vmCvar_t	g_dropInactive;
 vmCvar_t	g_smoothClients;
 vmCvar_t	pmove_fixed;
@@ -480,6 +482,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
 	{ &g_timeoutCount, "g_timeoutCount", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },
 	{ &g_factoryTitle, "g_factoryTitle", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Short factory title pushed via serverinfo for display on connected clients." },
+	{ &g_factory, "g_factory", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Identifier of the active factory loaded from scripts/factories*." },
 	{ &g_factoryRespawnDelay, "g_factoryRespawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds before a defeated player respawns when factories schedule queues." },
 	{ &g_factoryWarmupSpawnDelay, "g_factoryWarmupSpawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds applied to warmup spawns when factories request staggered starts." },
 	{ &g_factoryAllowItemDrops, "g_factoryAllowItemDrops", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether item drop logic fires for weapons and powerups spawned from players." },
@@ -546,6 +549,24 @@ static cvarTable_t		gameCvarTable[] = {
 
 // bk001129 - made static to avoid aliasing
 static int gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[0] );
+
+/*
+=============
+G_RefreshAllCvars
+
+Synchronises every registered vmCvar_t with the engine so scripted factory updates can be applied immediately.
+=============
+*/
+void G_RefreshAllCvars( void ) {
+	int				 i;
+	cvarTable_t	*cv;
+
+	for ( i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++ ) {
+		if ( cv->vmCvar ) {
+			trap_Cvar_Update( cv->vmCvar );
+		}
+	}
+}
 
 static void G_RegisterCvarHelp( const cvarTable_t *cv ) {
 	char helpName[MAX_CVAR_VALUE_STRING];
@@ -870,6 +891,7 @@ void G_RegisterCvars( void ) {
         }
 
 	level.warmupModificationCount = g_warmup.modificationCount;
+	s_factoryModCount = g_factory.modificationCount;
 	s_itemTimersModCount = g_itemTimers.modificationCount;
 	s_itemHeightModCount = g_itemHeight.modificationCount;
 	s_forceSmallScoreboardMessageModCount = g_forceSmallScoreboardMessage.modificationCount;
@@ -923,11 +945,16 @@ void G_UpdateCvars( void ) {
                 }
         }
 
-        if (remapped) {
-                G_RemapTeamShaders();
-        }
+	if (remapped) {
+		G_RemapTeamShaders();
+	}
 
-        G_Config_UpdateCvars();
+	if ( g_factory.modificationCount != s_factoryModCount ) {
+		s_factoryModCount = g_factory.modificationCount;
+		Factory_ApplyCurrentSelection( qfalse );
+	}
+
+	G_Config_UpdateCvars();
 
         G_UpdateWeaponConfig();
         G_UpdateWeaponReloadConfig();
@@ -1144,9 +1171,11 @@ G_UpdateTrainingState();
 	G_ProcessIPBans();
 
 	G_InitMemory();
+	G_FactoryRegistry_Init();
 
 // set some level globals
 	memset( &level, 0, sizeof( level ) );
+	Factory_ApplyCurrentSelection( qtrue );
 	if ( g_gametype.integer == GT_RACE ) {
 		G_RaceInitLevel();
 	}

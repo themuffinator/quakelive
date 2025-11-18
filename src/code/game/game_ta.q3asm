@@ -33,5 +33,6 @@ g_target
 g_team
 g_trigger
 g_utils
+g_factory
 g_weapon
 ai_vcmd

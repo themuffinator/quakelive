@@ -76,6 +76,8 @@ set cc=lcc -DQ3_VM -S -Wf-target=bytecode -Wf-g -I..\..\cgame -I..\..\game -I..\
 @if errorlevel 1 goto quit
 %cc%  ../g_utils.c
 @if errorlevel 1 goto quit
+%cc%  ../g_factory.c
+@if errorlevel 1 goto quit
 %cc%  ../g_weapon.c
 @if errorlevel 1 goto quit
 %cc%  ../ai_vcmd.c

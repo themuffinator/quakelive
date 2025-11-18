@@ -42,6 +42,7 @@ $CC  ../g_target.c
 $CC  ../g_team.c
 $CC  ../g_trigger.c
 $CC  ../g_utils.c
+$CC  ../g_factory.c
 $CC  ../g_weapon.c
 
 q3asm -f ../game_ta

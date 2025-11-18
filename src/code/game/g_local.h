@@ -141,6 +141,13 @@ int G_AutoShuffleCountdown_GetSecondsRemaining( void );
 void G_AutoShuffleCountdown_Frame( void );
 void G_QuadHogOnPickup( gentity_t *player );
 void G_QuadHogFrame( void );
+typedef struct factoryDefinition_s factoryDefinition_t;
+
+void G_FactoryRegistry_Init( void );
+const factoryDefinition_t *Factory_FindById( const char *id );
+qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReapply );
+void Factory_ApplyCurrentSelection( qboolean forceReapply );
+void G_RefreshAllCvars( void );
 
 typedef struct factoryCvarConfig_s {
 	int		startingWeaponsMask;
@@ -158,6 +165,24 @@ typedef struct factoryCvarConfig_s {
 	int		complaintLimit;
 } factoryCvarConfig_t;
 
+typedef struct factoryOverride_s {
+	const char			*name;
+	const char			*value;
+	const struct factoryOverride_s	*next;
+} factoryOverride_t;
+
+struct factoryDefinition_s {
+	const char			*id;
+	const char			*title;
+	const char			*description;
+	const char			*baseGametypeName;
+	gametype_t			baseGametype;
+	const char			*sourceFile;
+	const factoryOverride_t	*overrides;
+	int				overrideCount;
+	const struct factoryDefinition_s	*next;
+};
+
 extern factoryCvarConfig_t g_factoryCvarConfig;
 void G_InitFactoryCvarConfig( void );
 void G_UpdateFactoryCvarConfig( void );
@@ -171,6 +196,7 @@ extern vmCvar_t g_botsFile;
 extern vmCvar_t g_botSpawnList;
 extern vmCvar_t g_accessFile;
 extern vmCvar_t g_factoryTitle;
+extern vmCvar_t g_factory;
 extern vmCvar_t g_dropInactive;
 extern vmCvar_t g_forcedAtmosphere;
 extern vmCvar_t roundlimit;
