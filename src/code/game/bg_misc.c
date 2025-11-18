@@ -1447,16 +1447,15 @@ Implements the shared armor pickup checks used by the DLL's case tables.
 */
 static qboolean BG_CanGrabArmorItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
 {
-	int upperBound;
+	int	upperBound;
 
-	if ( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
+	if ( BG_PlayerHasPersistantPowerup( ps, PW_SCOUT ) ) {
 		return qfalse;
 	}
 
-	if ( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
-		upperBound = ps->stats[STAT_MAX_HEALTH];
-	} else {
-		upperBound = ps->stats[STAT_MAX_HEALTH] * 2;
+	upperBound = BG_GetArmorUpperBound( ps );
+	if ( upperBound <= 0 ) {
+		return qfalse;
 	}
 
 	if ( ps->stats[STAT_ARMOR] >= upperBound ) {
@@ -1475,22 +1474,14 @@ Shared translation of the DLL helper sub_1002ce00 for health pickups.
 */
 static qboolean BG_CanGrabHealthItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
 {
-	int upperBound;
+	int	upperBound;
 
-	if ( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
-		upperBound = ps->stats[STAT_MAX_HEALTH];
-	} else {
-		upperBound = ps->stats[STAT_MAX_HEALTH] * 2;
+	upperBound = BG_GetHealthUpperBound( ps, item->quantity );
+	if ( upperBound <= 0 ) {
+		return qfalse;
 	}
 
-	if ( item->quantity == 5 || item->quantity == 100 ) {
-		if ( ps->stats[STAT_HEALTH] >= upperBound ) {
-			return qfalse;
-		}
-		return qtrue;
-	}
-
-	if ( ps->stats[STAT_HEALTH] >= ps->stats[STAT_MAX_HEALTH] ) {
+	if ( ps->stats[STAT_HEALTH] >= upperBound ) {
 		return qfalse;
 	}
 
@@ -1549,8 +1540,10 @@ BG_CanGrabKeyItem
 */
 static qboolean BG_CanGrabKeyItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
 {
-	return qtrue;
+return qtrue;
 }
+
+static qboolean BG_TeamFlagCanBeGrabbed( int gametype, const gitem_t *item, const entityState_t *ent, const playerState_t *ps );
 
 /*
 =============
@@ -1563,16 +1556,16 @@ static qboolean BG_CanGrabTeamItem( int gametype, int currentTime, const entityS
 }
 
 static const bgItemGrabFunc_t bg_itemGrabHandlers[IT_TEAM + 1] = {
-	[IT_BAD] = NULL,
-	[IT_WEAPON] = BG_CanGrabWeaponItem,
-	[IT_AMMO] = BG_CanGrabAmmoItem,
-	[IT_ARMOR] = BG_CanGrabArmorItem,
-	[IT_HEALTH] = BG_CanGrabHealthItem,
-	[IT_POWERUP] = BG_CanGrabPowerupItem,
-	[IT_HOLDABLE] = BG_CanGrabHoldableItem,
-	[IT_PERSISTANT_POWERUP] = BG_CanGrabPersistantPowerupItem,
-	[IT_KEY] = BG_CanGrabKeyItem,
-	[IT_TEAM] = BG_CanGrabTeamItem
+	NULL,						// IT_BAD
+	BG_CanGrabWeaponItem,		// IT_WEAPON
+	BG_CanGrabAmmoItem,		// IT_AMMO
+	BG_CanGrabArmorItem,		// IT_ARMOR
+	BG_CanGrabHealthItem,		// IT_HEALTH
+	BG_CanGrabPowerupItem,		// IT_POWERUP
+	BG_CanGrabHoldableItem,		// IT_HOLDABLE
+	BG_CanGrabPersistantPowerupItem,	// IT_PERSISTANT_POWERUP
+	BG_CanGrabKeyItem,		// IT_KEY
+	BG_CanGrabTeamItem		// IT_TEAM
 };
 
 static qboolean BG_PlayerCarryingFlag( const playerState_t *ps ) {
@@ -1705,103 +1698,11 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 		Com_Error( ERR_DROP, "BG_CanItemBeGrabbed: IT_BAD" );
 	}
   
-	switch( item->giType ) {
-	case IT_WEAPON:
-		return qtrue;	// weapons are always picked up
-
-	case IT_AMMO:
-		if ( dropped ) {
-			return qtrue;
-		}
-
-		if ( item->giTag <= WP_NONE || item->giTag >= WP_NUM_WEAPONS ) {
-			return qtrue;
-		}
-
-		if ( item->giTag == WP_NONE ) {
-			int weapon;
-
-			for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
-				const int maxAmmo = BG_GetWeaponAmmoPackMaxStack( weapon );
-
-				if ( maxAmmo <= 0 ) {
-					continue;
-				}
-
-				if ( ps->ammo[weapon] < maxAmmo ) {
-					return qtrue;
-				}
-			}
-
-			return qfalse;
-		}
-
-		const int maxAmmo = BG_GetWeaponAmmoPackMaxStack( item->giTag );
-		if ( maxAmmo > 0 && ps->ammo[item->giTag] >= maxAmmo ) {
-			return qfalse;
-		}
-
-		return qtrue;
-
-	case IT_ARMOR:
-		if ( BG_PlayerHasPersistantPowerup( ps, PW_SCOUT ) ) {
-			return qfalse;
-		}
-
-		upperBound = BG_GetArmorUpperBound( ps );
-		if ( upperBound <= 0 ) {
-			return qfalse;
-		}
-
-		if ( ps->stats[STAT_ARMOR] >= upperBound ) {
-			return qfalse;
-		}
-		return qtrue;
-
-	case IT_HEALTH:
-		upperBound = BG_GetHealthUpperBound( ps, item->quantity );
-		if ( upperBound <= 0 ) {
-			return qfalse;
-		}
-
-		if ( ps->stats[STAT_HEALTH] >= upperBound ) {
-			return qfalse;
-		}
-		return qtrue;
-
-	case IT_POWERUP:
-		return qtrue;	// powerups are always picked up
-
-	case IT_PERSISTANT_POWERUP:
-		// can only hold one item at a time
-		if ( ps->stats[STAT_PERSISTANT_POWERUP] ) {
-			return qfalse;
-		}
-
-		// check team only
-		if( ( ent->generic1 & 2 ) && ( ps->persistant[PERS_TEAM] != TEAM_RED ) ) {
-			return qfalse;
-		}
-		if( ( ent->generic1 & 4 ) && ( ps->persistant[PERS_TEAM] != TEAM_BLUE ) ) {
-			return qfalse;
-		}
-
-		return qtrue;
-
-	case IT_TEAM: // team items, such as flags
-		return BG_TeamFlagCanBeGrabbed( gametype, item, ent, ps );
-
-	case IT_HOLDABLE:
-		// can only hold one item at a time
-		if ( ps->stats[STAT_HOLDABLE_ITEM] ) {
-			return qfalse;
-		}
-		return qtrue;
-
 	handler = bg_itemGrabHandlers[item->giType];
 	if ( handler ) {
 		return handler( gametype, currentTime, ent, ps, item, dropped );
 	}
+
 
 #ifndef Q3_VM
 #ifndef NDEBUG
