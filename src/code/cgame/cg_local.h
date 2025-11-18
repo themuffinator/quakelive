@@ -645,6 +645,8 @@ typedef struct {
 	float		bobfracsin;
 	int			bobcycle;
 	float		xyspeed;
+	float		speedometerSample;
+	int		speedometerSampleTime;
 	int     nextOrbitTime;
 
 	//qboolean cameraMode;		// if rendering from a loaded camera
@@ -752,6 +754,14 @@ typedef struct {
 	qhandle_t	lagometerShader;
 	qhandle_t	backTileShader;
 	qhandle_t	noammoShader;
+	qhandle_t	healthBar100;
+	qhandle_t	healthBar200;
+	qhandle_t	armorBar100;
+	qhandle_t	armorBar200;
+	qhandle_t	healthTick100;
+	qhandle_t	healthTick200;
+	qhandle_t	armorTick100;
+	qhandle_t	armorTick200;
 
 	qhandle_t	smokePuffShader;
 	qhandle_t	smokePuffRageProShader;

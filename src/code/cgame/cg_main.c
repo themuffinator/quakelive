@@ -926,6 +926,14 @@ static void CG_RegisterGraphics( void ) {
 
 	cgs.media.backTileShader = trap_R_RegisterShader( "gfx/2d/backtile" );
 	cgs.media.noammoShader = trap_R_RegisterShader( "icons/noammo" );
+	cgs.media.healthBar200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h200.tga" );
+	cgs.media.healthBar100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h100.tga" );
+	cgs.media.armorBar200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a200.tga" );
+	cgs.media.armorBar100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a100.tga" );
+	cgs.media.healthTick200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h200line.tga" );
+	cgs.media.healthTick100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h100line.tga" );
+	cgs.media.armorTick200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a200line.tga" );
+	cgs.media.armorTick100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a100line.tga" );
 
 	// powerup shaders
 	cgs.media.quadShader = trap_R_RegisterShader("powerups/quad" );
