@@ -759,6 +759,188 @@ static void CG_CalcEntityLerpPositions( centity_t *cent ) {
 		cg.snap->serverTime, cg.time, cent->lerpOrigin );
 	}
 }
+#define DOM_POINT_ICON_HEIGHT 64.0f
+#define DOM_POINT_NEAR_RADIUS 36.0f
+#define DOM_POINT_FAR_RADIUS 24.0f
+
+/*
+=============
+CG_DominationClampTeam
+
+Normalizes potentially invalid team numbers to valid enums.
+=============
+*/
+static team_t CG_DominationClampTeam( int value ) {
+	if ( value >= TEAM_RED && value <= TEAM_SPECTATOR ) {
+		return (team_t)value;
+	}
+
+	return TEAM_FREE;
+}
+
+/*
+=============
+CG_DominationProgressIndex
+
+Converts the transmitted capture progress into a shader bucket.
+=============
+*/
+static int CG_DominationProgressIndex( float progress ) {
+	float	clamped;
+	int		index;
+
+	clamped = Com_Clamp( 0.0f, 1.0f, progress );
+	index = (int)( clamped * DOM_POINT_STATE_COUNT );
+	if ( index >= DOM_POINT_STATE_COUNT ) {
+		index = DOM_POINT_STATE_COUNT - 1;
+	}
+
+	return index;
+}
+
+/*
+=============
+CG_DominationSelectShader
+
+Picks the capture/defense overlay shader for a Domination point.
+=============
+*/
+static qhandle_t CG_DominationSelectShader( qboolean capture, qboolean distress, int index ) {
+	if ( index < 0 || index >= DOM_POINT_STATE_COUNT ) {
+		return 0;
+	}
+
+	if ( capture ) {
+		return distress ? cgs.media.domCapDistressShaders[index] : cgs.media.domCapShaders[index];
+	}
+
+	return distress ? cgs.media.domDefDistressShaders[index] : cgs.media.domDefShaders[index];
+}
+
+/*
+=============
+CG_DominationAddBillboard
+
+Adds a sprite overlay for Domination control points.
+=============
+*/
+static void CG_DominationAddBillboard( const centity_t *cent, qhandle_t shader, float height, float radius ) {
+	refEntity_t ent;
+
+	if ( !shader ) {
+		return;
+	}
+
+	memset( &ent, 0, sizeof( ent ) );
+	ent.reType = RT_SPRITE;
+	ent.customShader = shader;
+	ent.radius = radius;
+	ent.rotation = 0.0f;
+	ent.shaderRGBA[0] = 0xff;
+	ent.shaderRGBA[1] = 0xff;
+	ent.shaderRGBA[2] = 0xff;
+	ent.shaderRGBA[3] = 0xff;
+	VectorCopy( cent->lerpOrigin, ent.origin );
+	ent.origin[2] += height;
+
+	trap_R_AddRefEntityToScene( &ent );
+}
+
+/*
+=============
+CG_DominationPoint
+
+Renders Domination capture points and their icon overlays.
+=============
+*/
+static void CG_DominationPoint( centity_t *cent ) {
+	refEntity_t	model;
+	team_t		owner;
+	team_t		capturing;
+	team_t		viewerTeam;
+	float		progress;
+	int		progressIndex;
+	qhandle_t	shader;
+	qboolean	captureIcon;
+	qboolean	distress;
+	vec3_t	delta;
+	float		distance;
+	float		radius;
+
+	if ( !cgs.media.domPointModel ) {
+		return;
+	}
+
+	owner = CG_DominationClampTeam( cent->currentState.modelindex );
+	capturing = CG_DominationClampTeam( cent->currentState.modelindex2 );
+	viewerTeam = TEAM_FREE;
+	if ( cg.snap ) {
+		viewerTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+	}
+
+	memset( &model, 0, sizeof( model ) );
+	model.reType = RT_MODEL;
+	model.hModel = cgs.media.domPointModel;
+	VectorCopy( cent->lerpOrigin, model.origin );
+	VectorCopy( cent->lerpOrigin, model.lightingOrigin );
+	AnglesToAxis( cent->currentState.angles, model.axis );
+	switch ( owner ) {
+	case TEAM_RED:
+		model.customSkin = cgs.media.domPointSkinRed;
+		break;
+	case TEAM_BLUE:
+		model.customSkin = cgs.media.domPointSkinBlue;
+		break;
+	case TEAM_FREE:
+	default:
+		model.customSkin = cgs.media.domPointSkinNeutral;
+		break;
+	}
+
+	trap_R_AddRefEntityToScene( &model );
+
+	if ( capturing == TEAM_FREE ) {
+		cent->miscTime = 0;
+		return;
+	}
+
+	progress = (float)cent->currentState.frame / 255.0f;
+	progressIndex = CG_DominationProgressIndex( progress );
+
+	distress = qfalse;
+	if ( cent->currentState.time2 > 0 ) {
+		distress = ( cg.time - cent->currentState.time2 ) <= DOMINATION_DISTRESS_REPEAT_TIME;
+	}
+
+	captureIcon = qtrue;
+	if ( viewerTeam == owner && owner != TEAM_FREE ) {
+		captureIcon = qfalse;
+	} else if ( viewerTeam == TEAM_FREE || viewerTeam == TEAM_SPECTATOR || owner == TEAM_FREE ) {
+		captureIcon = qtrue;
+	}
+
+	shader = CG_DominationSelectShader( captureIcon, distress, progressIndex );
+	if ( !shader ) {
+		return;
+	}
+
+	VectorSubtract( cg.refdef.vieworg, cent->lerpOrigin, delta );
+	distance = VectorLength( delta );
+	radius = ( distance < 512.0f ) ? DOM_POINT_NEAR_RADIUS : DOM_POINT_FAR_RADIUS;
+
+	CG_DominationAddBillboard( cent, shader, DOM_POINT_ICON_HEIGHT, radius );
+
+	if ( distress && viewerTeam == owner && owner != TEAM_FREE && cgs.media.dominationDistressSound ) {
+		if ( cg.time - cent->miscTime >= DOMINATION_DISTRESS_REPEAT_TIME ) {
+			trap_S_StartSound( cent->lerpOrigin, ENTITYNUM_NONE, CHAN_LOCAL, cgs.media.dominationDistressSound );
+			cent->miscTime = cg.time;
+		}
+	} else if ( !distress ) {
+		cent->miscTime = 0;
+	}
+}
+
+
 
 /*
 ===============
@@ -770,6 +952,11 @@ static void CG_TeamBase( centity_t *cent ) {
 	vec3_t angles;
 	int t, h;
 	float c;
+
+	if ( cgs.gametype == GT_DOMINATION ) {
+		CG_DominationPoint( cent );
+		return;
+	}
 
 	if ( cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF ) {
 		// show the flag base

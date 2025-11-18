@@ -589,6 +589,10 @@ static void CG_RegisterSounds( void ) {
 		if ( cgs.gametype == GT_OBELISK || cg_buildScript.integer ) {
 			cgs.media.yourBaseIsUnderAttackSound = trap_S_RegisterSound( "sound/teamplay/voc_base_attack.wav", qtrue );
 		}
+
+		if ( cgs.gametype == GT_DOMINATION || cg_buildScript.integer ) {
+			cgs.media.dominationDistressSound = trap_S_RegisterSound( "sound/feedback/domination_distress.wav", qtrue );
+		}
 	}
 
 	cgs.media.tracerSound = trap_S_RegisterSound( "sound/weapons/machinegun/buletby1.wav", qfalse );
@@ -896,6 +900,49 @@ static void CG_RegisterGraphics( void ) {
 		cgs.media.harvesterRedSkin = trap_R_RegisterSkin( "models/powerups/harvester/red.skin" );
 		cgs.media.harvesterBlueSkin = trap_R_RegisterSkin( "models/powerups/harvester/blue.skin" );
 		cgs.media.harvesterNeutralModel = trap_R_RegisterModel( "models/powerups/obelisk/obelisk.md3" );
+	}
+
+	if ( cgs.gametype == GT_DOMINATION || cg_buildScript.integer ) {
+		static const char *const domCapNames[DOM_POINT_STATE_COUNT] = {
+			"gfx/2d/dom_point/dom_cap_a",
+			"gfx/2d/dom_point/dom_cap_b",
+			"gfx/2d/dom_point/dom_cap_c",
+			"gfx/2d/dom_point/dom_cap_d",
+			"gfx/2d/dom_point/dom_cap_e"
+		};
+		static const char *const domCapDistressNames[DOM_POINT_STATE_COUNT] = {
+			"gfx/2d/dom_point/dom_cap_a_dist",
+			"gfx/2d/dom_point/dom_cap_b_dist",
+			"gfx/2d/dom_point/dom_cap_c_dist",
+			"gfx/2d/dom_point/dom_cap_d_dist",
+			"gfx/2d/dom_point/dom_cap_e_dist"
+		};
+		static const char *const domDefNames[DOM_POINT_STATE_COUNT] = {
+			"gfx/2d/dom_point/dom_def_a",
+			"gfx/2d/dom_point/dom_def_b",
+			"gfx/2d/dom_point/dom_def_c",
+			"gfx/2d/dom_point/dom_def_d",
+			"gfx/2d/dom_point/dom_def_e"
+		};
+		static const char *const domDefDistressNames[DOM_POINT_STATE_COUNT] = {
+			"gfx/2d/dom_point/dom_def_a_dist",
+			"gfx/2d/dom_point/dom_def_b_dist",
+			"gfx/2d/dom_point/dom_def_c_dist",
+			"gfx/2d/dom_point/dom_def_d_dist",
+			"gfx/2d/dom_point/dom_def_e_dist"
+		};
+
+		cgs.media.domPointModel = trap_R_RegisterModel( "models/powerups/domination/dompoint.md3" );
+		cgs.media.domPointSkinRed = trap_R_RegisterSkin( "models/powerups/domination/domred.skin" );
+		cgs.media.domPointSkinBlue = trap_R_RegisterSkin( "models/powerups/domination/domblue.skin" );
+		cgs.media.domPointSkinNeutral = trap_R_RegisterSkin( "models/powerups/domination/domntrl.skin" );
+
+		for ( i = 0; i < DOM_POINT_STATE_COUNT; i++ ) {
+			cgs.media.domCapShaders[i] = trap_R_RegisterShader( domCapNames[i] );
+			cgs.media.domCapDistressShaders[i] = trap_R_RegisterShader( domCapDistressNames[i] );
+			cgs.media.domDefShaders[i] = trap_R_RegisterShader( domDefNames[i] );
+			cgs.media.domDefDistressShaders[i] = trap_R_RegisterShader( domDefDistressNames[i] );
+		}
 	}
 
 	cgs.media.redKamikazeShader = trap_R_RegisterShader( "models/weaphits/kamikred" );
