@@ -1902,6 +1902,74 @@ static void CG_PlayerPowerups( centity_t *cent, refEntity_t *torso ) {
 
 
 /*
+=============
+CG_IsFrozenPlayer
+
+Determines whether the frozen overlay should render for the entity.
+=============
+*/
+static qboolean CG_IsFrozenPlayer( const centity_t *cent ) {
+	if ( !cent ) {
+		return qfalse;
+	}
+
+	if ( cgs.gametype != GT_FREEZE ) {
+		return qfalse;
+	}
+
+	if ( cg.snap && cent->currentState.number == cg.snap->ps.clientNum ) {
+		if ( cg.snap->ps.pm_type == PM_FREEZE ) {
+			return qtrue;
+		}
+	}
+
+	if ( cent->currentState.powerups & ( 1 << PW_NUM_POWERUPS ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+
+/*
+=============
+CG_AddFrozenPlayerShell
+
+Renders the frozen overlay sprite when a player is immobilized in Freeze Tag.
+=============
+*/
+static void CG_AddFrozenPlayerShell( centity_t *cent ) {
+	refEntity_t	frozen;
+	int		renderfx;
+
+	if ( !CG_IsFrozenPlayer( cent ) ) {
+		return;
+	}
+
+	if ( !cgs.media.frozenPlayerShader ) {
+		return;
+	}
+
+	memset( &frozen, 0, sizeof( frozen ) );
+	VectorCopy( cent->lerpOrigin, frozen.origin );
+	frozen.origin[2] += 32.0f;
+	frozen.reType = RT_SPRITE;
+	frozen.customShader = cgs.media.frozenPlayerShader;
+	frozen.radius = 32;
+	frozen.shaderRGBA[0] = 255;
+	frozen.shaderRGBA[1] = 255;
+	frozen.shaderRGBA[2] = 255;
+	frozen.shaderRGBA[3] = 200;
+	renderfx = 0;
+	if ( cg.snap && cent->currentState.number == cg.snap->ps.clientNum && !cg.renderingThirdPerson ) {
+		renderfx = RF_THIRD_PERSON;
+	}
+	frozen.renderfx = renderfx;
+	trap_R_AddRefEntityToScene( &frozen );
+}
+
+
+/*
 ===============
 CG_PlayerFloatSprite
 
@@ -2492,6 +2560,9 @@ void CG_Player( centity_t *cent ) {
 		powerup.customSkin = 0;
 		trap_R_AddRefEntityToScene( &powerup );
 	}
+
+	CG_AddFrozenPlayerShell( cent );
+
 	if ( cent->currentState.powerups & ( 1 << PW_INVULNERABILITY ) ) {
 		if ( !ci->invulnerabilityStartTime ) {
 			ci->invulnerabilityStartTime = cg.time;
