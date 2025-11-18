@@ -531,7 +531,9 @@ static int CG_CalcFov( void ) {
 	float	v;
 	int		contents;
 	float	fov_x, fov_y;
+	float	baseFov;
 	float	zoomFov;
+	float	zoomSensitivityValue;
 	float	f;
 	int		inwater;
 
@@ -552,6 +554,8 @@ static int CG_CalcFov( void ) {
 			}
 		}
 
+		baseFov = fov_x;
+
 		// account for zooms
 		zoomFov = cg_zoomFov.value;
 		if ( zoomFov < 1 ) {
@@ -560,20 +564,29 @@ static int CG_CalcFov( void ) {
 			zoomFov = 160;
 		}
 
-		if ( cg.zoomed ) {
+		if ( cg_zoomScaling.integer ) {
 			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
 			if ( f > 1.0 ) {
-				fov_x = zoomFov;
-			} else {
-				fov_x = fov_x + f * ( zoomFov - fov_x );
+				f = 1.0;
 			}
+
+			if ( cg.zoomed ) {
+				if ( f >= 1.0f ) {
+					fov_x = zoomFov;
+				} else {
+					fov_x = baseFov + f * ( zoomFov - baseFov );
+				}
+			} else {
+				if ( f >= 1.0f ) {
+					fov_x = baseFov;
+				} else {
+					fov_x = zoomFov + f * ( baseFov - zoomFov );
+				}
+			}
+		} else if ( cg.zoomed ) {
+			fov_x = zoomFov;
 		} else {
-			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
-			if ( f > 1.0 ) {
-				fov_x = fov_x;
-			} else {
-				fov_x = zoomFov + f * ( fov_x - zoomFov );
-			}
+			fov_x = baseFov;
 		}
 	}
 
@@ -583,15 +596,12 @@ static int CG_CalcFov( void ) {
 
 	// warp if underwater
 	contents = CG_PointContents( cg.refdef.vieworg, -1 );
-	if ( contents & ( CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA ) ){
+	inwater = ( contents & ( CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA ) ) ? qtrue : qfalse;
+	if ( inwater && cg_waterWarp.integer ) {
 		phase = cg.time / 1000.0 * WAVE_FREQUENCY * M_PI * 2;
 		v = WAVE_AMPLITUDE * sin( phase );
 		fov_x += v;
 		fov_y -= v;
-		inwater = qtrue;
-	}
-	else {
-		inwater = qfalse;
 	}
 
 
@@ -600,9 +610,15 @@ static int CG_CalcFov( void ) {
 	cg.refdef.fov_y = fov_y;
 
 	if ( !cg.zoomed ) {
-		cg.zoomSensitivity = 1;
+		cg.zoomSensitivity = 1.0f;
 	} else {
-		cg.zoomSensitivity = cg.refdef.fov_y / 75.0;
+		zoomSensitivityValue = cg_zoomSensitivity.value;
+		if ( zoomSensitivityValue < 0.01f ) {
+			zoomSensitivityValue = 0.01f;
+		} else if ( zoomSensitivityValue > 1.0f ) {
+			zoomSensitivityValue = 1.0f;
+		}
+		cg.zoomSensitivity = zoomSensitivityValue;
 	}
 
 	return inwater;
