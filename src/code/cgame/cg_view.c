@@ -29,6 +29,60 @@ static void CG_HandleZoomOutOnDeath( void );
 
 
 /*
+=============
+CG_CalcHorPlusFov
+
+Adjusts the provided horizontal FOV to match the requested r_aspectRatio
+preset, mirroring Quake Live's Hor+ behaviour.
+=============
+*/
+static float CG_CalcHorPlusFov( float baseFov ) {
+	const char *ratioString;
+	int ratio;
+	float baseWidth;
+	float baseHeight;
+	float targetWidth;
+	float targetHeight;
+	float x;
+	float fovY;
+
+	ratioString = trap_Cvar_VariableString( "r_aspectRatio" );
+	ratio = atoi( ratioString );
+	if ( ratio <= 0 ) {
+		return baseFov;
+	}
+
+	targetWidth = 4.0f;
+	targetHeight = 3.0f;
+	switch ( ratio ) {
+		case 1:
+			targetWidth = 16.0f;
+			targetHeight = 9.0f;
+			break;
+		case 2:
+			targetWidth = 16.0f;
+			targetHeight = 10.0f;
+			break;
+		case 3:
+			targetWidth = 5.0f;
+			targetHeight = 4.0f;
+			break;
+		default:
+			return baseFov;
+	}
+
+	baseWidth = 4.0f;
+	baseHeight = 3.0f;
+	x = baseWidth / tan( baseFov / 360.0f * M_PI );
+	fovY = atan2( baseHeight, x );
+	fovY = fovY * 360.0f / M_PI;
+
+	x = targetHeight / tan( fovY / 360.0f * M_PI );
+	return atan2( targetWidth, x ) * 360.0f / M_PI;
+}
+
+
+/*
 =============================================================================
 
   MODEL TESTING
@@ -606,9 +660,10 @@ static int CG_CalcFov( void ) {
 		}
 	}
 
-	x = cg.refdef.width / tan( fov_x / 360 * M_PI );
+	fov_x = CG_CalcHorPlusFov( fov_x );
+	x = cg.refdef.width / tan( fov_x / 360.0f * M_PI );
 	fov_y = atan2( cg.refdef.height, x );
-	fov_y = fov_y * 360 / M_PI;
+	fov_y = fov_y * 360.0f / M_PI;
 
 	// warp if underwater
 	contents = CG_PointContents( cg.refdef.vieworg, -1 );
