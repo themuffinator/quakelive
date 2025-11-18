@@ -12,7 +12,7 @@ menuDef {
 	style WINDOW_STYLE_FILLED
 	border 1
 	disableColor .5 .5 .5 1
-	onopen { uiScript loadArenas }
+	onopen { uiScript loadArenas ; uiScript updateCallvoteMapPreview }
 
 		itemDef {
 			name status

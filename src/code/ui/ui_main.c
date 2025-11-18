@@ -3775,10 +3775,27 @@ static void UI_RunMenuScript(char **args) {
 			UI_StartSkirmish(qfalse);
 		} else if (Q_stricmp(name, "closeingame") == 0) {
 			UI_CloseInGameMenu();
-		} else if (Q_stricmp(name, "voteMap") == 0) {
-			if (ui_currentNetMap.integer >=0 && ui_currentNetMap.integer < uiInfo.mapCount) {
-				trap_Cmd_ExecuteText( EXEC_APPEND, va("callvote map %s\n",uiInfo.mapList[ui_currentNetMap.integer].mapLoadName) );
+	} else if (Q_stricmp(name, "voteMap") == 0) {
+		if (ui_currentNetMap.integer >= 0 && ui_currentNetMap.integer < uiInfo.mapCount) {
+			const mapRotationInfo_t *rotation = NULL;
+			const char *factoryId = NULL;
+			const char *mapName = uiInfo.mapList[ui_currentNetMap.integer].mapLoadName;
+
+			if (uiInfo.callvoteRotationIndex >= 0 && uiInfo.callvoteRotationIndex < uiInfo.mapRotationCount) {
+				rotation = &uiInfo.mapRotations[uiInfo.callvoteRotationIndex];
+				if (rotation->factoryId[0]) {
+					factoryId = rotation->factoryId;
+				}
 			}
+
+			if (factoryId && factoryId[0]) {
+				trap_Cmd_ExecuteText(EXEC_APPEND, va("callvote map %s %s\n", mapName, factoryId));
+			} else {
+				trap_Cmd_ExecuteText(EXEC_APPEND, va("callvote map %s\n", mapName));
+			}
+		}
+	} else if (Q_stricmp(name, "updateCallvoteMapPreview") == 0) {
+		UI_HandleCallvoteMapPreviewScript();
 		} else if (Q_stricmp(name, "voteKick") == 0) {
 			if (uiInfo.playerIndex >= 0 && uiInfo.playerIndex < uiInfo.playerCount) {
 				trap_Cmd_ExecuteText( EXEC_APPEND, va("callvote kick %s\n",uiInfo.playerNames[uiInfo.playerIndex]) );
@@ -4603,9 +4620,11 @@ static int UI_FeederCount(float feederID) {
 		// so the pending FEEDER_CVMAPS hook will live alongside the existing map
 		// feeders and continue to pull from `uiInfo.mapList`.
 		return UI_MapCountByGameType(feederID == FEEDER_MAPS ? qtrue : qfalse);
+	} else if (feederID == FEEDER_CVMAPS) {
+		return UI_CountVisibleCallvoteRotations();
 	} else if (feederID == FEEDER_MAP_ROTATIONS) {
 		return uiInfo.mapRotationCount;
-		} else if (feederID == FEEDER_SERVERS) {
+	} else if (feederID == FEEDER_SERVERS) {
 		return uiInfo.serverStatus.numDisplayServers;
 	} else if (feederID == FEEDER_SERVERSTATUS) {
 		return uiInfo.serverStatusInfo.numLines;
@@ -4670,19 +4689,370 @@ static const char *UI_SelectedHead(int index, int *actual) {
 	return "";
 }
 
+/*
+=============
+UI_GetIndexFromSelection
+
+Converts a backing map index into the display slot while skipping inactive arenas.
+=============
+*/
 static int UI_GetIndexFromSelection(int actual) {
-	int i, c;
+	int i;
+	int c;
+
 	c = 0;
 	for (i = 0; i < uiInfo.mapCount; i++) {
 		if (uiInfo.mapList[i].active) {
 			if (i == actual) {
 				return c;
 			}
-				c++;
+			c++;
 		}
 	}
-  return 0;
+
+	return 0;
 }
+
+/*
+=============
+UI_GetFilteredCallvoteGametype
+
+Normalizes the callvote gametype filter so out-of-range values fall back to Default.
+=============
+*/
+static int UI_GetFilteredCallvoteGametype(void) {
+	int gametype;
+
+	gametype = ui_cvgametype.integer;
+	if (gametype < -1 || gametype >= GT_MAX_GAME_TYPE) {
+		return -1;
+	}
+
+	return gametype;
+}
+
+/*
+=============
+UI_ParseCallvoteGametypeToken
+
+Converts textual factory tokens to the corresponding gametype enumeration.
+=============
+*/
+static int UI_ParseCallvoteGametypeToken(const char *token) {
+	int value;
+
+	if (token == NULL || token[0] == '\0') {
+		return -1;
+	}
+
+	if (token[0] == '-' || (token[0] >= '0' && token[0] <= '9')) {
+		value = atoi(token);
+		if (value >= -1 && value < GT_MAX_GAME_TYPE) {
+			return value;
+		}
+	}
+
+	if (!Q_stricmp(token, "default")) {
+		return -1;
+	}
+	if (!Q_stricmp(token, "ffa") || !Q_stricmp(token, "dm")
+		|| !Q_stricmp(token, "freeforall") || !Q_stricmp(token, "free for all")) {
+		return GT_FFA;
+	}
+	if (!Q_stricmp(token, "duel") || !Q_stricmp(token, "tournament")) {
+		return GT_TOURNAMENT;
+	}
+	if (!Q_stricmp(token, "race") || !Q_stricmp(token, "singleplayer") || !Q_stricmp(token, "sp")) {
+		return GT_SINGLE_PLAYER;
+	}
+	if (!Q_stricmp(token, "tdm") || !Q_stricmp(token, "team") || !Q_stricmp(token, "team deathmatch")) {
+		return GT_TEAM;
+	}
+	if (!Q_stricmp(token, "clanarena") || !Q_stricmpn(token, "ca", 2)) {
+		return GT_CLAN_ARENA;
+	}
+	if (!Q_stricmp(token, "ctf")) {
+		return GT_CTF;
+	}
+	if (!Q_stricmp(token, "oneflag") || !Q_stricmp(token, "1fctf") || !Q_stricmpn(token, "1f", 2)) {
+		return GT_1FCTF;
+	}
+	if (!Q_stricmp(token, "overload") || !Q_stricmp(token, "obelisk")) {
+		return GT_OBELISK;
+	}
+	if (!Q_stricmp(token, "harvester") || !Q_stricmp(token, "har")) {
+		return GT_HARVESTER;
+	}
+	if (!Q_stricmp(token, "freeze") || !Q_stricmp(token, "freezetag") || !Q_stricmpn(token, "ft", 2)) {
+		return GT_FREEZE;
+	}
+	if (!Q_stricmp(token, "domination") || !Q_stricmp(token, "dom")) {
+		return GT_DOMINATION;
+	}
+	if (!Q_stricmp(token, "attackdefend") || !Q_stricmp(token, "attack defend") || !Q_stricmp(token, "ad")) {
+		return GT_ATTACK_DEFEND;
+	}
+	if (!Q_stricmp(token, "redrover") || !Q_stricmp(token, "rr")) {
+		return GT_RED_ROVER;
+	}
+
+	return -1;
+}
+
+/*
+=============
+UI_GetCallvoteRotationGametype
+
+Derives the gametype associated with a cached rotation entry.
+=============
+*/
+static int UI_GetCallvoteRotationGametype(const mapRotationInfo_t *rotation) {
+	int gametype;
+
+	if (rotation == NULL) {
+		return -1;
+	}
+
+	if (rotation->factoryGameType[0]) {
+		gametype = UI_ParseCallvoteGametypeToken(rotation->factoryGameType);
+		if (gametype >= -1) {
+			return gametype;
+		}
+	}
+
+	if (rotation->factoryId[0]) {
+		gametype = UI_ParseCallvoteGametypeToken(rotation->factoryId);
+		if (gametype >= -1) {
+			return gametype;
+		}
+	}
+
+	return -1;
+}
+
+/*
+=============
+UI_RotationMatchesGametype
+
+Checks whether a rotation entry should be displayed for the active gametype filter.
+=============
+*/
+static qboolean UI_RotationMatchesGametype(const mapRotationInfo_t *rotation, int gametype) {
+	int entryGametype;
+
+	if (rotation == NULL) {
+		return qfalse;
+	}
+
+	if (gametype < 0) {
+		return qtrue;
+	}
+
+	entryGametype = UI_GetCallvoteRotationGametype(rotation);
+	if (entryGametype < 0) {
+		return qfalse;
+	}
+
+	return (entryGametype == gametype) ? qtrue : qfalse;
+}
+
+/*
+=============
+UI_CountVisibleCallvoteRotations
+
+Counts the rotation entries that pass the current gametype filter.
+=============
+*/
+static int UI_CountVisibleCallvoteRotations(void) {
+	int count;
+	int gametype;
+	int i;
+
+	count = 0;
+	gametype = UI_GetFilteredCallvoteGametype();
+	for (i = 0; i < uiInfo.mapRotationCount; i++) {
+		if (UI_RotationMatchesGametype(&uiInfo.mapRotations[i], gametype)) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
+/*
+=============
+UI_GetCallvoteRotationIndexFromDisplayRow
+
+Translates a feeder row into the backing rotation index while honoring filters.
+=============
+*/
+static int UI_GetCallvoteRotationIndexFromDisplayRow(int row) {
+	int gametype;
+	int visible;
+	int i;
+
+	if (row < 0) {
+		return -1;
+	}
+
+	gametype = UI_GetFilteredCallvoteGametype();
+	visible = 0;
+	for (i = 0; i < uiInfo.mapRotationCount; i++) {
+		if (!UI_RotationMatchesGametype(&uiInfo.mapRotations[i], gametype)) {
+			continue;
+		}
+		if (visible == row) {
+			return i;
+		}
+		visible++;
+	}
+
+	return -1;
+}
+
+/*
+=============
+UI_GetCallvoteDisplayRowForRotation
+
+Finds the feeder row associated with a specific rotation index.
+=============
+*/
+static int UI_GetCallvoteDisplayRowForRotation(int rotationIndex) {
+	int gametype;
+	int row;
+	int i;
+
+	if (rotationIndex < 0 || rotationIndex >= uiInfo.mapRotationCount) {
+		return -1;
+	}
+
+	gametype = UI_GetFilteredCallvoteGametype();
+	row = 0;
+	for (i = 0; i < uiInfo.mapRotationCount; i++) {
+		if (!UI_RotationMatchesGametype(&uiInfo.mapRotations[i], gametype)) {
+			continue;
+		}
+		if (i == rotationIndex) {
+			return row;
+		}
+		row++;
+	}
+
+	return -1;
+}
+
+/*
+=============
+UI_GetCallvoteRotationEntryForDisplay
+
+Returns the rotation entry for a filtered feeder index and optionally reports the backing index.
+=============
+*/
+static const mapRotationInfo_t *UI_GetCallvoteRotationEntryForDisplay(int index, int *rotationIndex) {
+	int actual;
+
+	actual = UI_GetCallvoteRotationIndexFromDisplayRow(index);
+	if (rotationIndex) {
+			*rotationIndex = actual;
+	}
+	if (actual < 0 || actual >= uiInfo.mapRotationCount) {
+		return NULL;
+	}
+
+	return &uiInfo.mapRotations[actual];
+}
+
+/*
+=============
+UI_SetCurrentNetMap
+
+Centralizes the shared net-map cinematic playback wiring.
+=============
+*/
+static void UI_SetCurrentNetMap(int mapIndex) {
+	int previous;
+
+	if (mapIndex < 0 || mapIndex >= uiInfo.mapCount) {
+		return;
+	}
+
+	previous = ui_currentNetMap.integer;
+	if (previous >= 0 && previous < uiInfo.mapCount) {
+		if (uiInfo.mapList[previous].cinematic >= 0) {
+			trap_CIN_StopCinematic(uiInfo.mapList[previous].cinematic);
+			uiInfo.mapList[previous].cinematic = -1;
+		}
+	}
+
+	ui_currentNetMap.integer = mapIndex;
+	trap_Cvar_Set("ui_currentNetMap", va("%d", mapIndex));
+
+	if (uiInfo.mapList[mapIndex].cinematic >= 0) {
+		trap_CIN_StopCinematic(uiInfo.mapList[mapIndex].cinematic);
+		uiInfo.mapList[mapIndex].cinematic = -1;
+	}
+
+	uiInfo.mapList[mapIndex].cinematic = trap_CIN_PlayCinematic(
+		va("%s.roq", uiInfo.mapList[mapIndex].mapLoadName), 0, 0, 0, 0, (CIN_loop | CIN_silent));
+}
+
+/*
+=============
+UI_SelectCallvoteRotation
+
+Updates the current callvote selection and refreshes the preview map state.
+=============
+*/
+static void UI_SelectCallvoteRotation(int rotationIndex) {
+	int mapIndex;
+
+	if (rotationIndex < 0 || rotationIndex >= uiInfo.mapRotationCount) {
+		uiInfo.callvoteRotationIndex = -1;
+		return;
+	}
+
+	mapIndex = uiInfo.mapRotations[rotationIndex].mapIndex;
+	if (mapIndex < 0 || mapIndex >= uiInfo.mapCount) {
+		uiInfo.callvoteRotationIndex = -1;
+		return;
+	}
+
+	uiInfo.callvoteRotationIndex = rotationIndex;
+	UI_SetCurrentNetMap(mapIndex);
+}
+
+/*
+=============
+UI_HandleCallvoteMapPreviewScript
+
+Rebuilds the callvote map preview when gametype filters change.
+=============
+*/
+static void UI_HandleCallvoteMapPreviewScript(void) {
+	int available;
+	int rotationIndex;
+	int displayRow;
+
+	available = UI_CountVisibleCallvoteRotations();
+	if (available <= 0) {
+		uiInfo.callvoteRotationIndex = -1;
+		return;
+	}
+
+	rotationIndex = uiInfo.callvoteRotationIndex;
+	if (rotationIndex >= 0 && rotationIndex < uiInfo.mapRotationCount) {
+		if (UI_RotationMatchesGametype(&uiInfo.mapRotations[rotationIndex], UI_GetFilteredCallvoteGametype())) {
+			displayRow = UI_GetCallvoteDisplayRowForRotation(rotationIndex);
+			if (displayRow >= 0) {
+				Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, displayRow, NULL);
+				return;
+			}
+		}
+	}
+
+	Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, 0, NULL);
+}
+
 
 static void UI_UpdatePendingPings() { 
 	if (!UI_ServerBrowserEnabled()) {
@@ -4714,6 +5084,17 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 	} else if (feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS) {
 		int actual;
 		return UI_SelectedMap(index, &actual);
+	} else if (feederID == FEEDER_CVMAPS) {
+		const mapRotationInfo_t *rotation;
+
+		rotation = UI_GetCallvoteRotationEntryForDisplay(index, NULL);
+		if (rotation) {
+			if (rotation->mapTitle[0]) {
+				return rotation->mapTitle;
+			}
+			return rotation->mapName;
+		}
+		return "";
 	} else if (feederID == FEEDER_MAP_ROTATIONS) {
 		mapRotationInfo_t *entry = UI_MapRotationEntryForIndex(index);
 		if (entry) {
@@ -4878,6 +5259,16 @@ static qhandle_t UI_FeederItemImage(float feederID, int index) {
 			}
 			return uiInfo.mapList[index].levelShot;
 		}
+	} else if (feederID == FEEDER_CVMAPS) {
+		const mapRotationInfo_t *rotation;
+
+		rotation = UI_GetCallvoteRotationEntryForDisplay(index, NULL);
+		if (rotation && rotation->mapIndex >= 0 && rotation->mapIndex < uiInfo.mapCount) {
+			if (uiInfo.mapList[rotation->mapIndex].levelShot == -1) {
+				uiInfo.mapList[rotation->mapIndex].levelShot = trap_R_RegisterShaderNoMip(uiInfo.mapList[rotation->mapIndex].imageName);
+			}
+			return uiInfo.mapList[rotation->mapIndex].levelShot;
+		}
 	}
   return 0;
 }
@@ -4900,7 +5291,7 @@ static void UI_FeederSelection(float feederID, int index) {
 			updateModel = qtrue;
 		}
 } else if (feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS) {
-int actual, map;
+    int actual, previous;
 		map = (feederID == FEEDER_ALLMAPS) ? ui_currentNetMap.integer : ui_currentMap.integer;
 		// HLIL map-rotation strings (`^1map rotation item missing map…`) show the native
 		// UI reusing the same cinematic + metadata pairing when browsing rotation
@@ -4914,18 +5305,36 @@ int actual, map;
 		ui_mapIndex.integer = index;
 
 		if (feederID == FEEDER_MAPS) {
+			previous = ui_currentMap.integer;
+			if (previous >= 0 && previous < uiInfo.mapCount) {
+				if (uiInfo.mapList[previous].cinematic >= 0) {
+					trap_CIN_StopCinematic(uiInfo.mapList[previous].cinematic);
+					uiInfo.mapList[previous].cinematic = -1;
+				}
+			}
+
 			ui_currentMap.integer = actual;
 			trap_Cvar_Set("ui_currentMap", va("%d", actual));
-	  	uiInfo.mapList[ui_currentMap.integer].cinematic = trap_CIN_PlayCinematic(va("%s.roq", uiInfo.mapList[ui_currentMap.integer].mapLoadName), 0, 0, 0, 0, (CIN_loop | CIN_silent) );
+			uiInfo.mapList[ui_currentMap.integer].cinematic = trap_CIN_PlayCinematic(
+				va("%s.roq", uiInfo.mapList[ui_currentMap.integer].mapLoadName), 0, 0, 0, 0, (CIN_loop | CIN_silent));
 			UI_LoadBestScores(uiInfo.mapList[ui_currentMap.integer].mapLoadName, uiInfo.gameTypes[ui_gameType.integer].gtEnum);
 			trap_Cvar_Set("ui_opponentModel", uiInfo.mapList[ui_currentMap.integer].opponentName);
 			updateOpponentModel = qtrue;
 		} else {
-			ui_currentNetMap.integer = actual;
-			trap_Cvar_Set("ui_currentNetMap", va("%d", actual));
-	  	uiInfo.mapList[ui_currentNetMap.integer].cinematic = trap_CIN_PlayCinematic(va("%s.roq", uiInfo.mapList[ui_currentNetMap.integer].mapLoadName), 0, 0, 0, 0, (CIN_loop | CIN_silent) );
+			UI_SetCurrentNetMap(actual);
+			uiInfo.callvoteRotationIndex = -1;
+		}
+	} else if (feederID == FEEDER_CVMAPS) {
+		int rotationIndex;
+		const mapRotationInfo_t *rotation;
+
+		rotation = UI_GetCallvoteRotationEntryForDisplay(index, &rotationIndex);
+		if (!rotation) {
+			uiInfo.callvoteRotationIndex = -1;
+			return;
 		}
 
+		UI_SelectCallvoteRotation(rotationIndex);
 	} else if (feederID == FEEDER_MAP_ROTATIONS) {
 		if (UI_MapRotationEntryForIndex(index)) {
 			uiInfo.currentMapRotation = index;
@@ -6141,6 +6550,7 @@ vmCvar_t	ui_dedicated;
 vmCvar_t	ui_gameType;
 vmCvar_t	ui_netGameType;
 vmCvar_t	ui_actualNetGameType;
+vmCvar_t	ui_cvgametype;
 vmCvar_t	ui_joinGameType;
 vmCvar_t	ui_netSource;
 vmCvar_t	ui_serverFilterType;
@@ -6184,6 +6594,8 @@ vmCvar_t	ui_recordSPDemo;
 vmCvar_t	ui_realCaptureLimit;
 vmCvar_t	ui_realWarmUp;
 vmCvar_t	ui_serverStatusTimeOut;
+vmCvar_t	ui_mapVotingDisabled;
+vmCvar_t	ui_gameTypeVotingDisabled;
 
 
 // bk001129 - made static to avoid aliasing
@@ -6251,10 +6663,11 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_redteam, "ui_redteam", "Pagans", CVAR_ARCHIVE },
 	{ &ui_blueteam, "ui_blueteam", "Stroggs", CVAR_ARCHIVE },
 	{ &ui_dedicated, "ui_dedicated", "0", CVAR_ARCHIVE },
-	{ &ui_gameType, "ui_gametype", "3", CVAR_ARCHIVE },
-	{ &ui_joinGameType, "ui_joinGametype", "0", CVAR_ARCHIVE },
-	{ &ui_netGameType, "ui_netGametype", "3", CVAR_ARCHIVE },
-	{ &ui_actualNetGameType, "ui_actualNetGametype", "3", CVAR_ARCHIVE },
+{ &ui_gameType, "ui_gametype", "3", CVAR_ARCHIVE },
+{ &ui_joinGameType, "ui_joinGametype", "0", CVAR_ARCHIVE },
+{ &ui_netGameType, "ui_netGametype", "3", CVAR_ARCHIVE },
+{ &ui_actualNetGameType, "ui_actualNetGametype", "3", CVAR_ARCHIVE },
+{ &ui_cvgametype, "ui_cvgametype", "-1", CVAR_ARCHIVE },
 	{ &ui_redteam1, "ui_redteam1", "0", CVAR_ARCHIVE },
 	{ &ui_redteam2, "ui_redteam2", "0", CVAR_ARCHIVE },
 	{ &ui_redteam3, "ui_redteam3", "0", CVAR_ARCHIVE },
@@ -6307,7 +6720,9 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_teamArenaFirstRun, "ui_teamArenaFirstRun", "0", CVAR_ARCHIVE},
 	{ &ui_realWarmUp, "g_warmup", "20", CVAR_ARCHIVE},
 	{ &ui_realCaptureLimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART},
-	{ &ui_serverStatusTimeOut, "ui_serverStatusTimeOut", "7000", CVAR_ARCHIVE},
+{ &ui_serverStatusTimeOut, "ui_serverStatusTimeOut", "7000", CVAR_ARCHIVE},
+{ &ui_mapVotingDisabled, "ui_mapVotingDisabled", "0", CVAR_TEMP},
+{ &ui_gameTypeVotingDisabled, "ui_gameTypeVotingDisabled", "0", CVAR_TEMP},
 
 };
 
