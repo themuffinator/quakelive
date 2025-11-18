@@ -437,10 +437,11 @@ void CG_PredictPlayerState( void ) {
 		return;
 	}
 
-	// prepare for pmove
-	cg_pmove.ps = &cg.predictedPlayerState;
-	cg_pmove.trace = CG_Trace;
-	cg_pmove.pointcontents = CG_PointContents;
+// prepare for pmove
+cg_pmove.ps = &cg.predictedPlayerState;
+cg_pmove.pmoveSettings = &cg_pmoveSettings;
+cg_pmove.trace = CG_Trace;
+cg_pmove.pointcontents = CG_PointContents;
 	if ( cg_pmove.ps->pm_type == PM_DEAD ) {
 		cg_pmove.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;
 	}

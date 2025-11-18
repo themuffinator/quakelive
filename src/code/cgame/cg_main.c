@@ -83,6 +83,7 @@ cgs_t				cgs;
 centity_t			cg_entities[MAX_GENTITIES];
 weaponInfo_t		cg_weapons[MAX_WEAPONS];
 itemInfo_t			cg_items[MAX_ITEMS];
+pmove_settings_t		cg_pmoveSettings;
 
 
 vmCvar_t	cg_railTrailTime;
@@ -1935,6 +1936,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cg_entities, 0, sizeof(cg_entities) );
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );
+	CG_ParsePmoveConfigString( NULL );
 
 	cg.clientNum = clientNum;
 

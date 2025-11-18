@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "cg_local.h"
 #include "../../ui/menudef.h" // bk001205 - for Q3_ui as well
+#include <stdlib.h>
 
 #define MATCH_STATE_VALUE_COUNT	20
 
@@ -47,6 +48,481 @@ static const orderTask_t validOrders[] = {
 };
 
 static const int numValidOrders = sizeof(validOrders) / sizeof(orderTask_t);
+
+/*
+=============
+CG_CopyDefaultPmoveSettings
+
+Copies the compiled pmove defaults into the destination buffer.
+=============
+*/
+static void CG_CopyDefaultPmoveSettings( pmove_settings_t *settings ) {
+	const pmove_settings_t *defaults;
+
+	if ( !settings ) {
+		return;
+	}
+
+	defaults = PM_GetDefaultSettings();
+	if ( defaults ) {
+		Com_Memcpy( settings, defaults, sizeof( pmove_settings_t ) );
+	} else {
+		Com_Memset( settings, 0, sizeof( pmove_settings_t ) );
+	}
+}
+
+/*
+=============
+CG_SkipPmoveWhitespace
+
+Advances the cursor past JSON whitespace characters.
+=============
+*/
+static void CG_SkipPmoveWhitespace( const char **cursor ) {
+	const char *c;
+
+	if ( !cursor || !*cursor ) {
+		return;
+	}
+
+	c = *cursor;
+	while ( *c == ' ' || *c == '\t' || *c == '\n' || *c == '\r' ) {
+		++c;
+	}
+	*cursor = c;
+}
+
+/*
+=============
+CG_ExpectPmoveChar
+
+Validates that the next non-whitespace character matches the expected token.
+=============
+*/
+static qboolean CG_ExpectPmoveChar( const char **cursor, char expected ) {
+	if ( !cursor || !*cursor ) {
+		return qfalse;
+	}
+
+	CG_SkipPmoveWhitespace( cursor );
+	if ( !*cursor || **cursor != expected ) {
+		return qfalse;
+	}
+
+	(*cursor)++;
+	return qtrue;
+}
+
+/*
+=============
+CG_ParsePmoveJsonString
+
+Parses a JSON string token, optionally copying it into the supplied buffer.
+=============
+*/
+static qboolean CG_ParsePmoveJsonString( const char **cursor, char *buffer, size_t bufferSize ) {
+	size_t length;
+
+	if ( !cursor || !*cursor ) {
+		return qfalse;
+	}
+
+	CG_SkipPmoveWhitespace( cursor );
+	if ( **cursor != '"' ) {
+		return qfalse;
+	}
+
+	(*cursor)++;
+	length = 0u;
+	while ( **cursor && **cursor != '"' ) {
+		if ( buffer && bufferSize > 0u ) {
+			if ( length + 1u >= bufferSize ) {
+				return qfalse;
+			}
+			buffer[length++] = **cursor;
+		}
+		(*cursor)++;
+	}
+
+	if ( **cursor != '"' ) {
+		return qfalse;
+	}
+
+	if ( buffer && bufferSize > 0u ) {
+		buffer[length] = '\0';
+	}
+
+	(*cursor)++;
+	return qtrue;
+}
+
+/*
+=============
+CG_ParsePmoveJsonBool
+
+Reads a boolean token from the payload.
+=============
+*/
+static qboolean CG_ParsePmoveJsonBool( const char **cursor, qboolean *value ) {
+	if ( !cursor || !*cursor || !value ) {
+		return qfalse;
+	}
+
+	CG_SkipPmoveWhitespace( cursor );
+	if ( !Q_strnicmp( *cursor, "true", 4 ) ) {
+		*value = qtrue;
+		*cursor += 4;
+		return qtrue;
+	}
+
+	if ( !Q_strnicmp( *cursor, "false", 5 ) ) {
+		*value = qfalse;
+		*cursor += 5;
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CG_ParsePmoveJsonFloat
+
+Reads a floating point token from the payload.
+=============
+*/
+static qboolean CG_ParsePmoveJsonFloat( const char **cursor, float *value ) {
+	double parsed;
+	char *endPtr;
+
+	if ( !cursor || !*cursor || !value ) {
+		return qfalse;
+	}
+
+	CG_SkipPmoveWhitespace( cursor );
+	parsed = strtod( *cursor, &endPtr );
+	if ( endPtr == *cursor ) {
+		return qfalse;
+	}
+
+	*value = (float)parsed;
+	*cursor = endPtr;
+	return qtrue;
+}
+
+/*
+=============
+CG_ParsePmoveJsonInt
+
+Reads an integer token from the payload.
+=============
+*/
+static qboolean CG_ParsePmoveJsonInt( const char **cursor, int *value ) {
+	long parsed;
+	char *endPtr;
+
+	if ( !cursor || !*cursor || !value ) {
+		return qfalse;
+	}
+
+	CG_SkipPmoveWhitespace( cursor );
+	parsed = strtol( *cursor, &endPtr, 10 );
+	if ( endPtr == *cursor ) {
+		return qfalse;
+	}
+
+	*value = (int)parsed;
+	*cursor = endPtr;
+	return qtrue;
+}
+
+/*
+=============
+CG_SkipPmoveJsonValue
+
+Skips a JSON value so unknown tokens don't poison the decoder.
+=============
+*/
+static qboolean CG_SkipPmoveJsonValue( const char **cursor ) {
+	int depth;
+
+	if ( !cursor || !*cursor ) {
+		return qfalse;
+	}
+
+	CG_SkipPmoveWhitespace( cursor );
+	if ( !*cursor ) {
+		return qfalse;
+	}
+
+	if ( **cursor == '{' ) {
+		depth = 1;
+		(*cursor)++;
+		while ( depth > 0 && **cursor ) {
+			if ( **cursor == '{' ) {
+				++depth;
+				(*cursor)++;
+			} else if ( **cursor == '}' ) {
+				--depth;
+				(*cursor)++;
+			} else if ( **cursor == '"' ) {
+				if ( !CG_ParsePmoveJsonString( cursor, NULL, 0 ) ) {
+					return qfalse;
+				}
+			} else {
+				(*cursor)++;
+			}
+		}
+		return depth == 0;
+	}
+
+	if ( **cursor == '[' ) {
+		depth = 1;
+		(*cursor)++;
+		while ( depth > 0 && **cursor ) {
+			if ( **cursor == '[' ) {
+				++depth;
+				(*cursor)++;
+			} else if ( **cursor == ']' ) {
+				--depth;
+				(*cursor)++;
+			} else if ( **cursor == '"' ) {
+				if ( !CG_ParsePmoveJsonString( cursor, NULL, 0 ) ) {
+					return qfalse;
+				}
+			} else {
+				(*cursor)++;
+			}
+		}
+		return depth == 0;
+	}
+
+	if ( **cursor == '"' ) {
+		return CG_ParsePmoveJsonString( cursor, NULL, 0 );
+	}
+
+	while ( **cursor && **cursor != ',' && **cursor != '}' && **cursor != ']' ) {
+		(*cursor)++;
+	}
+	return qtrue;
+}
+
+/*
+=============
+CG_ParsePmoveWeaponReloadTimes
+
+Decodes the weapon reload times array from the payload.
+=============
+*/
+static qboolean CG_ParsePmoveWeaponReloadTimes( const char **cursor, int *reloadTimes ) {
+	int weapon;
+
+	if ( !cursor || !*cursor || !reloadTimes ) {
+		return qfalse;
+	}
+
+	if ( !CG_ExpectPmoveChar( cursor, '[' ) ) {
+		return qfalse;
+	}
+
+	weapon = 0;
+	while ( qtrue ) {
+		CG_SkipPmoveWhitespace( cursor );
+		if ( !*cursor ) {
+			return qfalse;
+		}
+
+		if ( **cursor == ']' ) {
+			(*cursor)++;
+			break;
+		}
+
+		if ( weapon >= WP_NUM_WEAPONS ) {
+			return qfalse;
+		}
+
+		if ( !CG_ParsePmoveJsonInt( cursor, &reloadTimes[weapon] ) ) {
+			return qfalse;
+		}
+		++weapon;
+
+		CG_SkipPmoveWhitespace( cursor );
+		if ( **cursor == ',' ) {
+			(*cursor)++;
+			continue;
+		} else if ( **cursor == ']' ) {
+			(*cursor)++;
+			break;
+		} else {
+			return qfalse;
+		}
+	}
+
+	return ( weapon == WP_NUM_WEAPONS );
+}
+
+/*
+=============
+CG_ParsePmoveSettingsPayload
+
+Decodes the pmove configstring payload into a settings structure.
+=============
+*/
+static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_settings_t *settings ) {
+	pmove_settings_t parsed;
+	const char *cursor;
+	char key[64];
+	qboolean valid;
+
+	if ( !settings ) {
+		return qfalse;
+	}
+
+	CG_CopyDefaultPmoveSettings( &parsed );
+	if ( !payload || !*payload ) {
+		Com_Memcpy( settings, &parsed, sizeof( parsed ) );
+		return qfalse;
+	}
+
+	cursor = payload;
+	if ( !CG_ExpectPmoveChar( &cursor, '{' ) ) {
+		Com_Memcpy( settings, &parsed, sizeof( parsed ) );
+		return qfalse;
+	}
+
+	valid = qtrue;
+	while ( valid ) {
+		CG_SkipPmoveWhitespace( &cursor );
+		if ( !*cursor ) {
+			valid = qfalse;
+			break;
+		}
+
+		if ( *cursor == '}' ) {
+			++cursor;
+			break;
+		}
+
+		if ( !CG_ParsePmoveJsonString( &cursor, key, sizeof( key ) ) ) {
+			valid = qfalse;
+			break;
+		}
+
+		if ( !CG_ExpectPmoveChar( &cursor, ':' ) ) {
+			valid = qfalse;
+			break;
+		}
+
+		if ( !Q_stricmp( key, "weaponReloadTimes" ) ) {
+			if ( !CG_ParsePmoveWeaponReloadTimes( &cursor, parsed.weaponReloadTimes ) ) {
+				valid = qfalse;
+			}
+		}
+
+	#define PMOVE_BOOL_FIELD( name ) \
+		else if ( !Q_stricmp( key, #name ) ) { \
+			if ( !CG_ParsePmoveJsonBool( &cursor, &parsed.name ) ) { \
+				valid = qfalse; \
+			} \
+		}
+	#define PMOVE_INT_FIELD( name ) \
+		else if ( !Q_stricmp( key, #name ) ) { \
+			if ( !CG_ParsePmoveJsonInt( &cursor, &parsed.name ) ) { \
+				valid = qfalse; \
+			} \
+		}
+	#define PMOVE_FLOAT_FIELD( name ) \
+		else if ( !Q_stricmp( key, #name ) ) { \
+			if ( !CG_ParsePmoveJsonFloat( &cursor, &parsed.name ) ) { \
+				valid = qfalse; \
+			} \
+		}
+
+		PMOVE_FLOAT_FIELD( airAccel )
+		PMOVE_FLOAT_FIELD( airControl )
+		PMOVE_FLOAT_FIELD( airStepFriction )
+		PMOVE_INT_FIELD( airSteps )
+		PMOVE_FLOAT_FIELD( airStopAccel )
+		PMOVE_BOOL_FIELD( autoHop )
+		PMOVE_BOOL_FIELD( bunnyHop )
+		PMOVE_BOOL_FIELD( chainJump )
+		PMOVE_FLOAT_FIELD( chainJumpVelocity )
+		PMOVE_FLOAT_FIELD( circleStrafeFriction )
+		PMOVE_BOOL_FIELD( crouchSlide )
+		PMOVE_FLOAT_FIELD( crouchSlideFriction )
+		PMOVE_INT_FIELD( crouchSlideTime )
+		PMOVE_BOOL_FIELD( crouchStepJump )
+		PMOVE_BOOL_FIELD( doubleJump )
+		PMOVE_FLOAT_FIELD( jumpTimeDeltaMin )
+		PMOVE_FLOAT_FIELD( jumpVelocity )
+		PMOVE_FLOAT_FIELD( jumpVelocityMax )
+		PMOVE_FLOAT_FIELD( jumpVelocityScaleAdd )
+		PMOVE_FLOAT_FIELD( jumpVelocityTimeThreshold )
+		PMOVE_FLOAT_FIELD( jumpVelocityTimeThresholdOffset )
+		PMOVE_BOOL_FIELD( noPlayerClip )
+		PMOVE_BOOL_FIELD( rampJump )
+		PMOVE_FLOAT_FIELD( rampJumpScale )
+		PMOVE_FLOAT_FIELD( stepHeight )
+		PMOVE_BOOL_FIELD( stepJump )
+		PMOVE_FLOAT_FIELD( stepJumpVelocity )
+		PMOVE_FLOAT_FIELD( strafeAccel )
+		PMOVE_FLOAT_FIELD( velocityGh )
+		PMOVE_FLOAT_FIELD( walkAccel )
+		PMOVE_FLOAT_FIELD( walkFriction )
+		PMOVE_FLOAT_FIELD( waterSwimScale )
+		PMOVE_FLOAT_FIELD( waterWadeScale )
+		PMOVE_INT_FIELD( weaponDropTime )
+		PMOVE_INT_FIELD( weaponRaiseTime )
+		PMOVE_FLOAT_FIELD( wishSpeed )
+
+	#undef PMOVE_BOOL_FIELD
+	#undef PMOVE_INT_FIELD
+	#undef PMOVE_FLOAT_FIELD
+
+		else {
+			if ( !CG_SkipPmoveJsonValue( &cursor ) ) {
+				valid = qfalse;
+			}
+		}
+
+		if ( !valid ) {
+			break;
+		}
+
+		CG_SkipPmoveWhitespace( &cursor );
+		if ( *cursor == ',' ) {
+			++cursor;
+			continue;
+		} else if ( *cursor == '}' ) {
+			++cursor;
+			break;
+		} else {
+			valid = qfalse;
+			break;
+		}
+	}
+
+	if ( !valid ) {
+		CG_CopyDefaultPmoveSettings( &parsed );
+	}
+
+	Com_Memcpy( settings, &parsed, sizeof( parsed ) );
+	return valid;
+}
+
+/*
+=============
+CG_ParsePmoveConfigString
+
+Decodes the server broadcast pmove settings into the active client cache.
+=============
+*/
+void CG_ParsePmoveConfigString( const char *payload ) {
+	pmove_settings_t parsed;
+
+	CG_ParsePmoveSettingsPayload( payload, &parsed );
+	Com_Memcpy( &cg_pmoveSettings, &parsed, sizeof( cg_pmoveSettings ) );
+}
 
 static int CG_ValidOrder(const char *p) {
 	int i;
@@ -571,24 +1047,25 @@ static void CG_ParseFactoryMetadata( void ) {
 }
 
 void CG_SetConfigValues( void ) {
-	const char *s;
+const char *s;
 
-	cgs.scores1 = atoi( CG_ConfigString( CS_SCORES1 ) );
-	cgs.scores2 = atoi( CG_ConfigString( CS_SCORES2 ) );
-	cgs.levelStartTime = atoi( CG_ConfigString( CS_LEVEL_START_TIME ) );
-	if( cgs.gametype == GT_CTF ) {
-		s = CG_ConfigString( CS_FLAGSTATUS );
-		cgs.redflag = s[0] - '0';
-		cgs.blueflag = s[1] - '0';
-	}
-	else if( cgs.gametype == GT_1FCTF ) {
-		s = CG_ConfigString( CS_FLAGSTATUS );
-		cgs.flagStatus = s[0] - '0';
-	}
-	cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
-	CG_ParseMatchState();
-	CG_ParseForcedCosmetics();
-	CG_ParseFactoryMetadata();
+cgs.scores1 = atoi( CG_ConfigString( CS_SCORES1 ) );
+cgs.scores2 = atoi( CG_ConfigString( CS_SCORES2 ) );
+cgs.levelStartTime = atoi( CG_ConfigString( CS_LEVEL_START_TIME ) );
+if( cgs.gametype == GT_CTF ) {
+s = CG_ConfigString( CS_FLAGSTATUS );
+cgs.redflag = s[0] - '0';
+cgs.blueflag = s[1] - '0';
+}
+else if( cgs.gametype == GT_1FCTF ) {
+s = CG_ConfigString( CS_FLAGSTATUS );
+cgs.flagStatus = s[0] - '0';
+}
+cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
+CG_ParseMatchState();
+CG_ParseForcedCosmetics();
+CG_ParseFactoryMetadata();
+CG_ParsePmoveConfigString( CG_ConfigString( CS_PMOVE_SETTINGS ) );
 }
 
 /*
@@ -701,23 +1178,25 @@ static void CG_ConfigStringModified( void ) {
 		if ( str[0] != '*' ) {	// player specific sounds don't register here
 			cgs.gameSounds[ num-CS_SOUNDS] = trap_S_RegisterSound( str, qfalse );
 		}
-	} else if ( num >= CS_PLAYERS && num < CS_PLAYERS+MAX_CLIENTS ) {
-		CG_NewClientInfo( num - CS_PLAYERS );
-		CG_BuildSpectatorString();
-	} else if ( num == CS_FLAGSTATUS ) {
-		if( cgs.gametype == GT_CTF ) {
-			// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
-			cgs.redflag = str[0] - '0';
-			cgs.blueflag = str[1] - '0';
-		}
-		else if( cgs.gametype == GT_1FCTF ) {
-			cgs.flagStatus = str[0] - '0';
-		}
-	}
-	else if ( num == CS_SHADERSTATE ) {
-		CG_ShaderStateChanged();
-	}
-		
+} else if ( num >= CS_PLAYERS && num < CS_PLAYERS+MAX_CLIENTS ) {
+CG_NewClientInfo( num - CS_PLAYERS );
+CG_BuildSpectatorString();
+} else if ( num == CS_FLAGSTATUS ) {
+if( cgs.gametype == GT_CTF ) {
+// format is rb where its red/blue, 0 is at base, 1 is taken, 2 is dropped
+cgs.redflag = str[0] - '0';
+cgs.blueflag = str[1] - '0';
+}
+else if( cgs.gametype == GT_1FCTF ) {
+cgs.flagStatus = str[0] - '0';
+}
+}
+else if ( num == CS_SHADERSTATE ) {
+CG_ShaderStateChanged();
+} else if ( num == CS_PMOVE_SETTINGS ) {
+CG_ParsePmoveConfigString( str );
+}
+
 }
 
 
