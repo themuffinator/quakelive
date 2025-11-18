@@ -194,6 +194,132 @@ void CG_Text_Paint(float x, float y, float scale, vec4_t color, const char *text
 }
 
 
+/*
+=============
+CG_WorldCoordToScreenCoord
+
+Projects a world position into the 640x480 virtual screen space.
+=============
+*/
+static qboolean CG_WorldCoordToScreenCoord( const vec3_t world, float *x, float *y ) {
+	vec3_t	transformed;
+	float	tanHalfFovX;
+	float	tanHalfFovY;
+	float	ndcX;
+	float	ndcY;
+	float	pixelX;
+	float	pixelY;
+	float	widthScale;
+	float	heightScale;
+	float	forward;
+	float	right;
+	float	up;
+
+	if ( cgs.glconfig.vidWidth <= 0 || cgs.glconfig.vidHeight <= 0 || cg.refdef.width <= 0 || cg.refdef.height <= 0 ) {
+		return qfalse;
+	}
+
+	VectorSubtract( world, cg.refdef.vieworg, transformed );
+	right = DotProduct( transformed, cg.refdef.viewaxis[1] );
+	up = DotProduct( transformed, cg.refdef.viewaxis[2] );
+	forward = DotProduct( transformed, cg.refdef.viewaxis[0] );
+	if ( forward <= 0.001f ) {
+		return qfalse;
+	}
+
+	tanHalfFovX = tan( DEG2RAD( cg.refdef.fov_x * 0.5f ) );
+	tanHalfFovY = tan( DEG2RAD( cg.refdef.fov_y * 0.5f ) );
+	if ( tanHalfFovX == 0.0f || tanHalfFovY == 0.0f ) {
+		return qfalse;
+	}
+
+	ndcX = right / ( forward * tanHalfFovX );
+	ndcY = up / ( forward * tanHalfFovY );
+	pixelX = cg.refdef.x + ( 1.0f + ndcX ) * cg.refdef.width * 0.5f;
+	pixelY = cg.refdef.y + ( 1.0f - ndcY ) * cg.refdef.height * 0.5f;
+	if ( pixelX < 0.0f || pixelX > cgs.glconfig.vidWidth || pixelY < 0.0f || pixelY > cgs.glconfig.vidHeight ) {
+		return qfalse;
+	}
+
+	widthScale = (float)SCREEN_WIDTH / (float)cgs.glconfig.vidWidth;
+	heightScale = (float)SCREEN_HEIGHT / (float)cgs.glconfig.vidHeight;
+	if ( x ) {
+		*x = pixelX * widthScale;
+	}
+	if ( y ) {
+		*y = pixelY * heightScale;
+	}
+	return qtrue;
+}
+
+/*
+=============
+CG_DrawRacePoints
+
+Renders projected race checkpoint icons and their distance labels.
+=============
+*/
+static void CG_DrawRacePoints( void ) {
+	int	slotCount;
+	int	i;
+	float	screenX;
+	float	screenY;
+	vec3_t	delta;
+	float	distance;
+	char	distanceText[16];
+	int	textWidth;
+	int	textX;
+	int	textY;
+	qhandle_t	shader;
+	const float	iconSize = 32.0f;
+	cgRacePointInfo_t	*info;
+
+	if ( cgs.gametype != GT_RACE || !cg.snap || cgs.racePointCount <= 0 ) {
+		return;
+	}
+
+	slotCount = cgs.racePointCount;
+	if ( cgs.raceLeaderSplitCount > slotCount ) {
+		slotCount = cgs.raceLeaderSplitCount;
+	}
+	if ( slotCount > MAX_RACE_POINTS ) {
+		slotCount = MAX_RACE_POINTS;
+	}
+
+	for ( i = 0; i < slotCount; i++ ) {
+		info = &cgs.racePoints[i];
+		if ( !info->active ) {
+			continue;
+		}
+		if ( !CG_WorldCoordToScreenCoord( info->origin, &screenX, &screenY ) ) {
+			continue;
+		}
+
+		VectorSubtract( info->origin, cg.predictedPlayerState.origin, delta );
+		distance = VectorLength( delta );
+		shader = cgs.media.raceCheckpointShader;
+		if ( i == 0 && cgs.media.raceStartShader ) {
+			shader = cgs.media.raceStartShader;
+		} else if ( i == cgs.racePointCount - 1 && cgs.media.raceFinishShader ) {
+			shader = cgs.media.raceFinishShader;
+		} else if ( !shader ) {
+			continue;
+		}
+
+		CG_DrawPic( screenX - ( iconSize * 0.5f ), screenY - ( iconSize * 0.5f ), iconSize, iconSize, shader );
+		if ( distance >= 1000.0f ) {
+			Com_sprintf( distanceText, sizeof( distanceText ), "%.1fk", distance / 1000.0f );
+		} else {
+			Com_sprintf( distanceText, sizeof( distanceText ), "%.0f", distance );
+		}
+		textWidth = CG_DrawStrlen( distanceText ) * SMALLCHAR_WIDTH;
+		textX = (int)( screenX - ( textWidth / 2 ) );
+		textY = (int)( screenY + ( iconSize * 0.5f ) + 2.0f );
+		CG_DrawStringExt( textX, textY, distanceText, colorWhite, qfalse, qtrue, SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0 );
+	}
+}
+
+
 
 /*
 ==============
@@ -1826,6 +1952,10 @@ static void CG_Draw2D( void ) {
 
 	if ( !CG_DrawFollow() ) {
 		CG_DrawWarmup();
+	}
+
+	if ( cgs.gametype == GT_RACE ) {
+		CG_DrawRacePoints();
 	}
 
 	// don't draw center string if scoreboard is up

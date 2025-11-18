@@ -109,6 +109,7 @@ static void CG_ParseRaceInfoCommand( void ) {
 
 	cgs.racePointCount = count;
 	cgs.raceLeaderSplitCount = 0;
+	memset( cgs.raceLeaderSplits, 0, sizeof( cgs.raceLeaderSplits ) );
 	for ( i = 0; i < count && ( i + 2 ) < argc; i++ ) {
 		cgs.raceLeaderSplits[i] = atoi( CG_Argv( i + 2 ) );
 		cgs.raceLeaderSplitCount++;
