@@ -480,6 +480,11 @@ qboolean	ConsoleCommand( void ) {
 		return qtrue;
 	}
 
+	if ( Q_stricmp( cmd, "reload_factories" ) == 0 ) {
+		Factory_Reload_f();
+		return qtrue;
+	}
+
 	if (Q_stricmp (cmd, "addip") == 0) {
 		Svcmd_AddIP_f();
 		return qtrue;

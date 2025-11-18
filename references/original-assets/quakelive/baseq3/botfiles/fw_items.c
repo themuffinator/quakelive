@@ -37,6 +37,11 @@
 #define W_CHAINGUN			40
 #define GWW_CHAINGUN		40
 #endif
+#ifndef W_HEAVYMACHINEGUN
+#define W_HEAVYMACHINEGUN		W_MACHINEGUN
+#define GWW_HEAVYMACHINEGUN	GWW_MACHINEGUN
+#endif
+
 #ifndef W_KAMIKAZE
 #define W_KAMIKAZE			200
 #endif
@@ -345,6 +350,34 @@ weight "weapon_machinegun"
 	} //switch
 } //end weight
 
+weight "weapon_hmg"
+{
+	switch(INVENTORY_HEAVYMACHINEGUN)
+	{
+		case 1:
+		{
+			switch(INVENTORY_HEAVYBULLETS)
+			{
+				case 40: return WEAPON_SCALE(W_HEAVYMACHINEGUN - 10);
+				default: return WEAPON_SCALE(W_HEAVYMACHINEGUN);
+			} //end switch
+		} //end case
+		default:
+		{
+#ifdef WEAPONS_STAY
+			switch(INVENTORY_HEAVYBULLETS)
+			{
+				case 50: return WEAPON_SCALE(GWW_HEAVYMACHINEGUN);
+				case 200: return WEAPON_SCALE(GWW_HEAVYMACHINEGUN - 10);
+				default: return balance(5, 3, 7);
+			} //end switch
+#else
+			return 1;
+#endif
+		} //end default
+	} //end switch
+} //end weight
+
 weight "weapon_grenadelauncher"
 {
 	switch(INVENTORY_GRENADELAUNCHER)
@@ -559,6 +592,24 @@ weight "ammo_shells"
 weight "ammo_bullets"
 {
 	switch(INVENTORY_BULLETS)
+	{
+		case 20: return AMMO_SCALE(20);
+		case 40: return AMMO_SCALE(20);
+		case 60: return AMMO_SCALE(20);
+		case 80: return AMMO_SCALE(20);
+		case 100: return AMMO_SCALE(20);
+		case 120: return AMMO_SCALE(20);
+		case 140: return AMMO_SCALE(20);
+		case 160: return AMMO_SCALE(20);
+		case 180: return AMMO_SCALE(20);
+		case 200: return AMMO_SCALE(20);
+		default: return 0;
+	} //end switch
+} //end weight
+
+weight "ammo_hmg"
+{
+	switch(INVENTORY_HEAVYBULLETS)
 	{
 		case 20: return AMMO_SCALE(20);
 		case 40: return AMMO_SCALE(20);
@@ -941,6 +992,33 @@ weight "holdable_invulnerability"
 			} //end switch
 		} //end case
 		default: return 0; //already has a holdable
+	} //end switch
+} //end weight
+
+weight "item_key_silver"
+{
+	switch(INVENTORY_KEY_SILVER)
+	{
+		case 1: return POWERUP_SCALE(60);
+		default: return 0;
+	} //end switch
+} //end weight
+
+weight "item_key_gold"
+{
+	switch(INVENTORY_KEY_GOLD)
+	{
+		case 1: return POWERUP_SCALE(80);
+		default: return 0;
+	} //end switch
+} //end weight
+
+weight "item_key_master"
+{
+	switch(INVENTORY_KEY_MASTER)
+	{
+		case 1: return POWERUP_SCALE(100);
+		default: return 0;
 	} //end switch
 } //end weight
 

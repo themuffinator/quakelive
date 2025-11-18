@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 import copy
+import ctypes
+import os
+import subprocess
 import sys
 
 import pytest
@@ -24,6 +27,239 @@ ALL_SCENARIOS = [
     SCENARIO_DIR / "factory_cvars.json",
     FREEZE_SCENARIO,
 ]
+
+SRC_DIR = REPO_ROOT / "src"
+CODE_DIR = SRC_DIR / "code"
+GAME_CODE_DIR = CODE_DIR / "game"
+
+FACTORY_METADATA_SOURCE = (
+    """
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+
+#define GAME_INCLUDE
+#include "game/g_match_config.c"
+
+vmCvar_t g_timeoutLen;
+vmCvar_t g_timeoutCount;
+vmCvar_t g_overtime;
+vmCvar_t g_suddenDeathRespawn;
+vmCvar_t g_suddenDeathRespawnStart;
+vmCvar_t g_suddenDeathRespawnTick;
+vmCvar_t g_suddenDeathRespawnMax;
+vmCvar_t g_suddenDeathRespawnIncrement;
+vmCvar_t g_suddenDeathRespawnPrint;
+vmCvar_t g_factoryRespawnDelay;
+vmCvar_t g_factoryWarmupSpawnDelay;
+vmCvar_t g_factoryAllowItemDrops;
+vmCvar_t g_factoryAllowItemBounce;
+vmCvar_t g_factoryTitle;
+
+static char qlr_factoryTitleConfig[MAX_STRING_CHARS];
+static char qlr_factoryFlagsConfig[32];
+static char qlr_factorySpawnHints[MAX_INFO_STRING];
+
+/*
+=============
+Q_strncpyz
+
+Test harness friendly string copy helper.
+=============
+*/
+void Q_strncpyz( char *dest, const char *src, int destsize ) {
+@TAB@if ( !dest || destsize <= 0 ) {
+@TAB@@TAB@return;
+@TAB@}
+@TAB@if ( !src ) {
+@TAB@@TAB@src = "";
+@TAB@}
+@TAB@strncpy( dest, src, destsize - 1 );
+@TAB@dest[destsize - 1] = '\0';
+}
+
+/*
+=============
+Com_sprintf
+
+Minimal vsnprintf wrapper for metadata tests.
+=============
+*/
+void QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) {
+@TAB@va_list args;
+@TAB@if ( !dest || size <= 0 || !fmt ) {
+@TAB@@TAB@return;
+@TAB@}
+@TAB@va_start( args, fmt );
+@TAB@vsnprintf( dest, size, fmt, args );
+@TAB@va_end( args );
+}
+
+/*
+=============
+Info_SetValueForKey
+
+Appends a key/value pair to an info string buffer.
+=============
+*/
+void Info_SetValueForKey( char *info, const char *key, const char *value ) {
+@TAB@char buffer[MAX_INFO_STRING];
+@TAB@if ( !info || !key || !value ) {
+@TAB@@TAB@return;
+@TAB@}
+@TAB@Com_sprintf( buffer, sizeof( buffer ), "\\%s\\%s", key, value );
+@TAB@if ( strlen( buffer ) + strlen( info ) >= MAX_INFO_STRING ) {
+@TAB@@TAB@return;
+@TAB@}
+@TAB@strcat( info, buffer );
+}
+
+/*
+=============
+G_Printf
+
+Silences logging in the factory metadata harness.
+=============
+*/
+void QDECL G_Printf( const char *fmt, ... ) {
+@TAB@(void)fmt;
+}
+
+/*
+=============
+trap_SetConfigstring
+
+Captures configstring updates for verification.
+=============
+*/
+void trap_SetConfigstring( int num, const char *string ) {
+@TAB@const char *value = string ? string : "";
+@TAB@switch ( num ) {
+@TAB@@TAB@case CS_FACTORY_TITLE:
+@TAB@@TAB@@TAB@Q_strncpyz( qlr_factoryTitleConfig, value, sizeof( qlr_factoryTitleConfig ) );
+@TAB@@TAB@@TAB@break;
+@TAB@@TAB@case CS_FACTORY_FLAGS:
+@TAB@@TAB@@TAB@Q_strncpyz( qlr_factoryFlagsConfig, value, sizeof( qlr_factoryFlagsConfig ) );
+@TAB@@TAB@@TAB@break;
+@TAB@@TAB@case CS_SPAWN_HINTS:
+@TAB@@TAB@@TAB@Q_strncpyz( qlr_factorySpawnHints, value, sizeof( qlr_factorySpawnHints ) );
+@TAB@@TAB@@TAB@break;
+@TAB@@TAB@default:
+@TAB@@TAB@@TAB@break;
+@TAB@}
+}
+
+/*
+=============
+trap_Cvar_Update
+
+Stubbed cvar update to satisfy g_match_config references.
+=============
+*/
+void trap_Cvar_Update( vmCvar_t *cvar ) {
+@TAB@(void)cvar;
+}
+
+/*
+=============
+QLR_ClearCapturedConfigstrings
+
+Resets the captured configstring buffers between runs.
+=============
+*/
+static void QLR_ClearCapturedConfigstrings( void ) {
+@TAB@memset( qlr_factoryTitleConfig, 0, sizeof( qlr_factoryTitleConfig ) );
+@TAB@memset( qlr_factoryFlagsConfig, 0, sizeof( qlr_factoryFlagsConfig ) );
+@TAB@memset( qlr_factorySpawnHints, 0, sizeof( qlr_factorySpawnHints ) );
+}
+
+/*
+=============
+QLR_ResetFactoryConfig
+
+Restores the cached factory config snapshot to default values.
+=============
+*/
+void QLR_ResetFactoryConfig( void ) {
+@TAB@memset( &g_matchFactoryConfig, 0, sizeof( g_matchFactoryConfig ) );
+@TAB@g_matchFactoryConfig.timeoutLengthSeconds = DEFAULT_TIMEOUT_LENGTH_SECONDS;
+@TAB@g_matchFactoryConfig.timeoutCountPerTeam = DEFAULT_TIMEOUT_COUNT_PER_TEAM;
+@TAB@g_matchFactoryConfig.overtimeLengthSeconds = DEFAULT_OVERTIME_LENGTH_SECONDS;
+@TAB@g_matchFactoryConfig.suddenDeathRespawnsEnabled = DEFAULT_SUDDEN_DEATH_RESPAWN ? qtrue : qfalse;
+@TAB@g_matchFactoryConfig.suddenDeathStartSeconds = DEFAULT_SUDDEN_DEATH_START_SECONDS;
+@TAB@g_matchFactoryConfig.suddenDeathTickSeconds = DEFAULT_SUDDEN_DEATH_TICK_SECONDS;
+@TAB@g_matchFactoryConfig.suddenDeathMaxSeconds = DEFAULT_SUDDEN_DEATH_MAX_SECONDS;
+@TAB@g_matchFactoryConfig.suddenDeathIncrementSeconds = DEFAULT_SUDDEN_DEATH_INCREMENT_SECONDS;
+@TAB@g_matchFactoryConfig.suddenDeathPrintAnnouncements = DEFAULT_SUDDEN_DEATH_PRINT ? qtrue : qfalse;
+@TAB@g_matchFactoryConfig.suddenDeathSpawnDelayActive = ( g_matchFactoryConfig.suddenDeathRespawnsEnabled && ( g_matchFactoryConfig.suddenDeathStartSeconds > 0 || g_matchFactoryConfig.suddenDeathIncrementSeconds > 0 ) ) ? qtrue : qfalse;
+@TAB@g_matchFactoryConfig.factoryRespawnDelayMilliseconds = DEFAULT_FACTORY_RESPAWN_DELAY_MILLISECONDS;
+@TAB@g_matchFactoryConfig.factoryWarmupSpawnDelayMilliseconds = DEFAULT_FACTORY_WARMUP_DELAY_MILLISECONDS;
+@TAB@g_matchFactoryConfig.factoryAllowItemDrops = DEFAULT_FACTORY_ALLOW_ITEM_DROPS ? qtrue : qfalse;
+@TAB@g_matchFactoryConfig.factoryAllowItemBounce = DEFAULT_FACTORY_ALLOW_ITEM_BOUNCE ? qtrue : qfalse;
+@TAB@memset( &g_factoryTitle, 0, sizeof( g_factoryTitle ) );
+@TAB@QLR_SetFactoryTitle( "" );
+@TAB@QLR_ClearCapturedConfigstrings();
+}
+
+/*
+=============
+QLR_SetFactoryTitle
+
+Overrides the g_factoryTitle CVar for testing.
+=============
+*/
+void QLR_SetFactoryTitle( const char *value ) {
+@TAB@const char *source = value ? value : "";
+@TAB@Q_strncpyz( g_factoryTitle.string, source, sizeof( g_factoryTitle.string ) );
+@TAB@g_factoryTitle.modificationCount++;
+}
+
+/*
+=============
+QLR_SetTimeoutLength
+
+Tweaks the cached timeout length to trigger flag masks.
+=============
+*/
+void QLR_SetTimeoutLength( int seconds ) {
+@TAB@g_matchFactoryConfig.timeoutLengthSeconds = seconds;
+}
+
+/*
+=============
+QLR_GetFactoryTitleConfigstring
+
+Exposes the most recent CS_FACTORY_TITLE payload.
+=============
+*/
+const char *QLR_GetFactoryTitleConfigstring( void ) {
+@TAB@return qlr_factoryTitleConfig;
+}
+
+/*
+=============
+QLR_GetFactoryFlagsConfigstring
+
+Exposes the most recent CS_FACTORY_FLAGS payload.
+=============
+*/
+const char *QLR_GetFactoryFlagsConfigstring( void ) {
+@TAB@return qlr_factoryFlagsConfig;
+}
+
+/*
+=============
+QLR_BuildFactoryMetadata
+
+Invokes the production code to emit fresh configstrings.
+=============
+*/
+void QLR_BuildFactoryMetadata( void ) {
+@TAB@G_MatchConfig_UpdateConfigstrings();
+}
+"""
+    .replace("@TAB@", "\t")
+)
 
 
 def test_run_from_file_is_deterministic(tmp_path) -> None:
@@ -185,3 +421,100 @@ def test_factory_item_flags_control_drop_behaviour(tmp_path: Path) -> None:
             "Item drop expectations diverged. "
             f"Captured summary written to {output_path}"
         )
+
+
+def _build_factory_metadata_library(tmp_path: Path) -> Path:
+    src_path = tmp_path / "factory_metadata_test.c"
+    src_path.write_text(FACTORY_METADATA_SOURCE, encoding="utf-8")
+
+    if sys.platform == "darwin":
+        lib_path = tmp_path / "libfactory_metadata_test.dylib"
+        compile_cmd = [
+            "cc",
+            "-std=c99",
+            "-dynamiclib",
+            "-I",
+            str(SRC_DIR),
+            "-I",
+            str(CODE_DIR),
+            "-I",
+            str(GAME_CODE_DIR),
+            "-o",
+            str(lib_path),
+            str(src_path),
+        ]
+    elif os.name == "nt":
+        raise RuntimeError("Factory metadata harness is unavailable on Windows toolchains")
+    else:
+        lib_path = tmp_path / "libfactory_metadata_test.so"
+        compile_cmd = [
+            "cc",
+            "-std=c99",
+            "-shared",
+            "-fPIC",
+            "-I",
+            str(SRC_DIR),
+            "-I",
+            str(CODE_DIR),
+            "-I",
+            str(GAME_CODE_DIR),
+            "-o",
+            str(lib_path),
+            str(src_path),
+        ]
+
+    subprocess.run(compile_cmd, check=True)
+    return lib_path
+
+
+def _load_factory_metadata_library(lib_path: Path) -> ctypes.CDLL:
+    library = ctypes.CDLL(str(lib_path))
+    library.QLR_ResetFactoryConfig.argtypes = []
+    library.QLR_ResetFactoryConfig.restype = None
+    library.QLR_SetFactoryTitle.argtypes = [ctypes.c_char_p]
+    library.QLR_SetFactoryTitle.restype = None
+    library.QLR_SetTimeoutLength.argtypes = [ctypes.c_int]
+    library.QLR_SetTimeoutLength.restype = None
+    library.QLR_BuildFactoryMetadata.argtypes = []
+    library.QLR_BuildFactoryMetadata.restype = None
+    library.QLR_GetFactoryTitleConfigstring.argtypes = []
+    library.QLR_GetFactoryTitleConfigstring.restype = ctypes.c_char_p
+    library.QLR_GetFactoryFlagsConfigstring.argtypes = []
+    library.QLR_GetFactoryFlagsConfigstring.restype = ctypes.c_char_p
+    return library
+
+
+@pytest.fixture(scope="module")
+def factory_metadata_library(tmp_path_factory: pytest.TempPathFactory) -> ctypes.CDLL:
+    if os.name == "nt":
+        pytest.skip("Factory metadata harness requires a POSIX toolchain")
+    tmp_path = tmp_path_factory.mktemp("factory_metadata")
+    lib_path = _build_factory_metadata_library(tmp_path)
+    return _load_factory_metadata_library(lib_path)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Factory metadata harness requires a POSIX toolchain")
+def test_factory_title_configstring_matches_trimmed_preset(factory_metadata_library: ctypes.CDLL) -> None:
+    library = factory_metadata_library
+    library.QLR_ResetFactoryConfig()
+    library.QLR_SetFactoryTitle(b"  Practice Preset  ")
+    library.QLR_BuildFactoryMetadata()
+
+    title = library.QLR_GetFactoryTitleConfigstring()
+    flags = library.QLR_GetFactoryFlagsConfigstring()
+
+    assert title is not None
+    assert title.decode("utf-8") == "Practice Preset"
+    assert flags is not None
+    assert flags.decode("utf-8") == "0"
+
+    library.QLR_SetTimeoutLength(90)
+    library.QLR_BuildFactoryMetadata()
+
+    updated_title = library.QLR_GetFactoryTitleConfigstring()
+    updated_flags = library.QLR_GetFactoryFlagsConfigstring()
+
+    assert updated_title is not None
+    assert updated_title.decode("utf-8") == "Practice Preset"
+    assert updated_flags is not None
+    assert updated_flags.decode("utf-8") == "1"

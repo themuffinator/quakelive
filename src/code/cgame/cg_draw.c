@@ -72,6 +72,21 @@ qboolean CG_ShouldDrawSpeedometer( void ) {
 	return ( qboolean )( cg_speedometer.integer != 0 );
 }
 
+/*
+=============
+CG_IsMenuHudActive
+
+Reports if the Quake Live HUD menus should be drawn instead of legacy elements.
+=============
+*/
+static qboolean CG_IsMenuHudActive( void ) {
+	if ( cg_useLegacyHud.integer ) {
+		return qfalse;
+	}
+
+	return cg.competitiveHudLoaded;
+}
+
 
 int CG_Text_Width(const char *text, float scale, int limit) {
   int count,len;
@@ -1057,24 +1072,32 @@ static void CG_DrawReward( void ) {
 	count = cg.rewardCount[0] - count*10;		// number of small rewards to draw
 	*/
 
-	if ( cg.rewardCount[0] >= 10 ) {
-		y = 56;
-		x = 320 - ICON_SIZE/2;
-		CG_DrawPic( x, y, ICON_SIZE-4, ICON_SIZE-4, cg.rewardShader[0] );
-		Com_sprintf(buf, sizeof(buf), "%d", cg.rewardCount[0]);
-		x = ( SCREEN_WIDTH - SMALLCHAR_WIDTH * CG_DrawStrlen( buf ) ) / 2;
-		CG_DrawStringExt( x, y+ICON_SIZE, buf, color, qfalse, qtrue,
-								SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0 );
-	}
-	else {
-
-		count = cg.rewardCount[0];
+	count = cg.rewardCount[0];
+	if (count > 0) {
+		int rowSize = cg_drawRewardsRowSize.integer;
+		float iconSize = ICON_SIZE - 4.0f;
+		float padding = ICON_SIZE;
+		rowSize = Com_Clamp(1, MAX_REWARDSTACK, rowSize);
 
 		y = 56;
-		x = 320 - count * ICON_SIZE/2;
-		for ( i = 0 ; i < count ; i++ ) {
-			CG_DrawPic( x, y, ICON_SIZE-4, ICON_SIZE-4, cg.rewardShader[0] );
-			x += ICON_SIZE;
+		{
+			int fullRows = (count + rowSize - 1) / rowSize;
+			for (i = 0; i < count; i++) {
+				int row = i / rowSize;
+				int col = i % rowSize;
+				int rowColumns = (row == fullRows - 1 && (count % rowSize)) ? (count % rowSize) : rowSize;
+				float totalWidth = rowColumns * padding;
+				float baseX = 320.0f - totalWidth * 0.5f;
+				x = baseX + col * padding;
+				CG_DrawPic( x, y + row * padding, iconSize, iconSize, cg.rewardShader[0] );
+			}
+		}
+
+		if ( count >= 10 ) {
+			Com_sprintf(buf, sizeof(buf), "%d", count);
+			x = ( SCREEN_WIDTH - SMALLCHAR_WIDTH * CG_DrawStrlen( buf ) ) / 2;
+			CG_DrawStringExt( x, y + iconSize + SMALLCHAR_HEIGHT, buf, color, qfalse, qtrue,
+				SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0 );
 		}
 	}
 	trap_R_SetColor( NULL );
@@ -1946,32 +1969,52 @@ static void CG_Draw2D( void ) {
 		return;
 	}
 */
-	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
-		CG_DrawSpectator();
+	qboolean	spectator;
+	qboolean	menuHudActive;
+	qboolean	canShowStatus;
+
+	spectator = ( qboolean )( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
+	menuHudActive = CG_IsMenuHudActive();
+	canShowStatus = ( qboolean )( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 );
+
+	if ( menuHudActive && cg_drawStatus.integer && ( spectator || canShowStatus ) ) {
+		Menu_PaintAll();
+		CG_DrawTimedMenus();
+	}
+
+	if ( spectator ) {
+		if ( !menuHudActive ) {
+			CG_DrawSpectator();
+		}
 		CG_DrawCrosshair();
 		CG_DrawCrosshairNames();
 	} else {
-		// don't draw any status if dead or the scoreboard is being explicitly shown
-		if ( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 ) {
-
-			if ( cg_drawStatus.integer ) {
-				Menu_PaintAll();
-				CG_DrawTimedMenus();
+		if ( canShowStatus ) {
+			if ( !menuHudActive ) {
+				CG_DrawAmmoWarning();
+				CG_DrawProxWarning();
+				CG_DrawWeaponSelect();
+				CG_DrawReward();
 			}
-      
-			CG_DrawAmmoWarning();
-
-			CG_DrawProxWarning();
 			CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
-			CG_DrawWeaponSelect();
-
-			//CG_DrawPersistantPowerup();
-			CG_DrawReward();
 		}
-    
+
 		if ( cgs.gametype >= GT_TEAM ) {
 		}
+	}
+
+	if ( menuHudActive ) {
+		if ( cg.showScores ) {
+			cg.scoreBoardShowing = CG_DrawScoreboard();
+			if ( !cg.scoreBoardShowing ) {
+				CG_DrawCenterString();
+			}
+		} else {
+			cg.scoreBoardShowing = qfalse;
+			CG_DrawCenterString();
+		}
+		return;
 	}
 
 	CG_DrawVote();

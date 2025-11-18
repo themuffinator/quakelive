@@ -144,6 +144,7 @@ void G_FactoryRegistry_Init( void );
 const factoryDefinition_t *Factory_FindById( const char *id );
 qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReapply );
 void Factory_ApplyCurrentSelection( qboolean forceReapply );
+void Factory_Reload_f( void );
 void G_RefreshAllCvars( void );
 
 typedef struct factoryCvarConfig_s {

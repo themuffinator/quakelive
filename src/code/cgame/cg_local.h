@@ -476,6 +476,7 @@ typedef struct {
 	qboolean	levelShot;			// taking a level menu screenshot
 	int			deferredPlayerLoading;
 	qboolean	loading;			// don't defer players at initial startup
+	qboolean	competitiveHudLoaded;	// tracks if Quake Live HUD menus are available
 	qboolean	intermissionStarted;	// don't play voice rewards, because game will end shortly
 
 	// there are only one or two snapshot_t that are relevent at a time
@@ -661,6 +662,8 @@ typedef struct {
 	float		bobfracsin;
 	int			bobcycle;
 	float		xyspeed;
+	float		speedometerSample;
+	int		speedometerSampleTime;
 	int     nextOrbitTime;
 
 	//qboolean cameraMode;		// if rendering from a loaded camera
@@ -768,6 +771,14 @@ typedef struct {
 	qhandle_t	lagometerShader;
 	qhandle_t	backTileShader;
 	qhandle_t	noammoShader;
+	qhandle_t	healthBar100;
+	qhandle_t	healthBar200;
+	qhandle_t	armorBar100;
+	qhandle_t	armorBar200;
+	qhandle_t	healthTick100;
+	qhandle_t	healthTick200;
+	qhandle_t	armorTick100;
+	qhandle_t	armorTick200;
 
 	qhandle_t	smokePuffShader;
 	qhandle_t	smokePuffRageProShader;
@@ -1138,6 +1149,7 @@ extern	cg_t			cg;
 extern	centity_t		cg_entities[MAX_GENTITIES];
 extern	weaponInfo_t	cg_weapons[MAX_WEAPONS];
 extern	itemInfo_t		cg_items[MAX_ITEMS];
+extern	pmove_settings_t		cg_pmoveSettings;
 extern	markPoly_t		cg_markPolys[MAX_MARK_POLYS];
 
 extern	vmCvar_t		cg_centertime;
@@ -1162,6 +1174,7 @@ extern	vmCvar_t		cg_drawRewards;
 extern	vmCvar_t		cg_drawRewardsRowSize;
 extern	vmCvar_t		cg_drawCheckpointRemaining;
 extern	vmCvar_t		cg_drawProfileImages;
+extern	vmCvar_t		cg_drawSprites;
 extern	vmCvar_t		cg_drawPregameMessages;
 extern	vmCvar_t		cg_drawSpecMessages;
 extern	vmCvar_t		cg_drawItemPickups;
@@ -1262,6 +1275,7 @@ extern	vmCvar_t		cg_drawFullWeaponBar;
 extern	vmCvar_t		cg_drawHitFriendTime;
 extern	vmCvar_t		cg_drawDeadFriendTime;
 extern	vmCvar_t		cg_speedometer;
+extern	vmCvar_t		cg_useLegacyHud;
 extern	vmCvar_t		cg_redTeamName;
 extern	vmCvar_t		cg_blueTeamName;
 extern	vmCvar_t		cg_currentSelectedPlayer;
@@ -1546,6 +1560,7 @@ void CG_InitConsoleCommands( void );
 void CG_ExecuteNewServerCommands( int latestSequence );
 void CG_ParseServerinfo( void );
 void CG_SetConfigValues( void );
+void CG_ParsePmoveConfigString( const char *payload );
 void CG_LoadVoiceChats( void );
 void CG_ShaderStateChanged(void);
 void CG_VoiceChatLocal( int mode, qboolean voiceOnly, int clientNum, int color, const char *cmd );

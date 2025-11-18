@@ -21,6 +21,55 @@ static matchFactoryConfig_t s_reportedMatchFactoryConfig;
 
 /*
 =============
+G_MatchConfig_CopyTrimmedFactoryTitle
+
+Copies the g_factoryTitle CVar into the provided buffer after trimming whitespace.
+=============
+*/
+static qboolean G_MatchConfig_CopyTrimmedFactoryTitle( char *buffer, int bufferSize ) {
+	const char	*source;
+	int			start;
+	int			end;
+	int			length;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	trap_Cvar_Update( &g_factoryTitle );
+	source = g_factoryTitle.string;
+	if ( !source ) {
+		buffer[0] = '\0';
+		return qfalse;
+	}
+
+	start = 0;
+	while ( source[start] && (unsigned char)source[start] <= ' ' ) {
+		start++;
+	}
+
+	end = (int)strlen( source );
+	while ( end > start && (unsigned char)source[end - 1] <= ' ' ) {
+		end--;
+	}
+
+	length = end - start;
+	if ( length <= 0 ) {
+		buffer[0] = '\0';
+		return qfalse;
+	}
+
+	if ( length >= bufferSize ) {
+		length = bufferSize - 1;
+	}
+
+	memcpy( buffer, source + start, (size_t)length );
+	buffer[length] = '\0';
+return qtrue;
+}
+
+/*
+=============
 G_MatchConfig_BuildMetadataStrings
 
 Prepares the human-readable factory metadata strings that are sent through configstrings.
@@ -32,6 +81,8 @@ static void G_MatchConfig_BuildMetadataStrings( char *title, int titleSize, char
 	qboolean				defaultSpawnDelayActive;
 	char				info[MAX_INFO_STRING];
 	char				buffer[32];
+	char				trimmedTitle[MAX_CVAR_VALUE_STRING];
+	qboolean				customTitle;
 
 	if ( !title || titleSize <= 0 || !flags || flagsSize <= 0 || !spawnHints || spawnHintsSize <= 0 ) {
 		return;
@@ -72,7 +123,10 @@ static void G_MatchConfig_BuildMetadataStrings( char *title, int titleSize, char
 		mask |= FACTORY_FLAG_SUDDEN_DEATH_DELAY;
 	}
 
-	if ( mask == 0u ) {
+	customTitle = G_MatchConfig_CopyTrimmedFactoryTitle( trimmedTitle, sizeof( trimmedTitle ) );
+	if ( customTitle ) {
+		Q_strncpyz( title, trimmedTitle, titleSize );
+	} else if ( mask == 0u ) {
 		Q_strncpyz( title, "Standard Factory", titleSize );
 	} else {
 		Q_strncpyz( title, "Custom Factory", titleSize );

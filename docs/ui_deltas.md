@@ -18,6 +18,10 @@ This report compares the repository's current cgame and UI implementations with 
 - Replace or augment `cg_scoreboard.c` with logic that feeds the menu-driven HUD, including widescreen scaling, per-gametype end-game scoreboards, and sudden-death messaging expected by the Quake Live menus.【F:src/code/cgame/cg_scoreboard.c†L266-L352】【F:references/original-assets/quakelive/baseq3/ui/comp_hud.menu†L24-L118】
 - Port the Quake Live HUD menu set (`comp_hud.menu`, `hud3.menu`, end-of-game menus) and ensure referenced shaders such as `ui/assets/score/scorebox_spec.tga` and `ui/assets/score/ink_fade_left.tga` are available from the extracted assets.【F:references/original-assets/quakelive/baseq3/ui/comp_hud.menu†L32-L92】【F:references/original-assets/quakelive/baseq3/ui/comp_spectator_follow.menu†L168-L207】
 
+### HUD gating behavior
+- The HUD loader now inspects `cg_hudFiles` scripts for `comp_*.menu` references and records whether the Quake Live competitive HUD assets are available, exposing a fallback via the new `cg_useLegacyHud` cvar for debugging legacy overlays.【F:src/code/cgame/cg_main.c†L1829-L1876】【F:src/code/cgame/cg_main.c†L169-L212】
+- `cg_draw.c` short-circuits most legacy drawing calls whenever those competitive menus are active so that owner-draw/menu code remains the single source of HUD elements during gameplay and spectator modes.【F:src/code/cgame/cg_draw.c†L1937-L2005】【F:src/code/cgame/cg_draw.c†L70-L89】
+
 ## Spectator Controls and Overlays
 
 ### Current implementation

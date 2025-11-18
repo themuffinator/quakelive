@@ -108,6 +108,8 @@ python -m tools.tests.match_sim tools/tests/match_sim/overtime_scenario.json --s
   --output build/match-timelines/overtime.json
 ```
 
+When a scenario exercises factory presets, issue the `reload_factories` server console command (exposed via `ConsoleCommand`) before starting the harness run so the latest JSON files are parsed without a `map_restart`. CI drivers can append the verb to their remote console queue (or run it interactively) to pick up new `.factories` files before replaying the deterministic inputs.【F:src/code/game/g_svcmds.c†L480-L486】【F:src/code/game/g_factory.c†L933-L985】
+
 Each command materialises a `frames` array whose length matches the values in the
 table above (frames = duration × tick rate + 1). The CLI writes the resulting
 timeline to the provided output path or prints it to stdout when omitted.

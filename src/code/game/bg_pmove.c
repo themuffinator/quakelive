@@ -151,6 +151,17 @@ const pmove_settings_t *PM_GetActiveSettings( void ) {
 
 /*
 =============
+PM_GetDefaultSettings
+
+Returns the compiled fallback pmove tuning block for consumers outside the movement module.
+=============
+*/
+const pmove_settings_t *PM_GetDefaultSettings( void ) {
+	return &pm_defaultSettings;
+}
+
+/*
+=============
 PM_LoadMoveSettings
 
 Synchronises extended Quake Live movement settings with legacy globals.

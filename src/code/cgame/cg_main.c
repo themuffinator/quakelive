@@ -83,6 +83,7 @@ cgs_t				cgs;
 centity_t			cg_entities[MAX_GENTITIES];
 weaponInfo_t		cg_weapons[MAX_WEAPONS];
 itemInfo_t			cg_items[MAX_ITEMS];
+pmove_settings_t		cg_pmoveSettings;
 
 
 vmCvar_t	cg_railTrailTime;
@@ -108,6 +109,7 @@ vmCvar_t	cg_drawRewards;
 vmCvar_t	cg_drawRewardsRowSize;
 vmCvar_t	cg_drawCheckpointRemaining;
 vmCvar_t	cg_drawProfileImages;
+vmCvar_t	cg_drawSprites;
 vmCvar_t	cg_drawPregameMessages;
 vmCvar_t	cg_drawSpecMessages;
 vmCvar_t	cg_drawItemPickups;
@@ -209,6 +211,7 @@ vmCvar_t	cg_drawFullWeaponBar;
 vmCvar_t	cg_drawHitFriendTime;
 vmCvar_t	cg_drawDeadFriendTime;
 vmCvar_t	cg_speedometer;
+vmCvar_t	cg_useLegacyHud;
 
 vmCvar_t 	cg_redTeamName;
 vmCvar_t 	cg_blueTeamName;
@@ -246,6 +249,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_gibs, "cg_gibs", "1", CVAR_ARCHIVE  },
 	{ &cg_draw2D, "cg_draw2D", "1", CVAR_ARCHIVE  },
 	{ &cg_drawStatus, "cg_drawStatus", "1", CVAR_ARCHIVE  },
+	{ &cg_useLegacyHud, "cg_useLegacyHud", "0", CVAR_ARCHIVE },
 	{ &cg_drawTimer, "cg_drawTimer", "0", CVAR_ARCHIVE  },
 	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
 	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  },
@@ -259,6 +263,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawRewardsRowSize, "cg_drawRewardsRowSize", "9", CVAR_ARCHIVE },
 	{ &cg_drawCheckpointRemaining, "cg_drawCheckpointRemaining", "1", CVAR_ARCHIVE },
 	{ &cg_drawProfileImages, "cg_drawProfileImages", "1", CVAR_ARCHIVE },
+	{ &cg_drawSprites, "cg_drawSprites", "1", CVAR_ARCHIVE },
 	{ &cg_drawPregameMessages, "cg_drawPregameMessages", "1", CVAR_ARCHIVE },
 	{ &cg_drawSpecMessages, "cg_drawSpecMessages", "1", CVAR_ARCHIVE },
 	{ &cg_drawItemPickups, "cg_drawItemPickups", "5", CVAR_ARCHIVE },
@@ -926,6 +931,14 @@ static void CG_RegisterGraphics( void ) {
 
 	cgs.media.backTileShader = trap_R_RegisterShader( "gfx/2d/backtile" );
 	cgs.media.noammoShader = trap_R_RegisterShader( "icons/noammo" );
+	cgs.media.healthBar200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h200.tga" );
+	cgs.media.healthBar100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h100.tga" );
+	cgs.media.armorBar200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a200.tga" );
+	cgs.media.armorBar100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a100.tga" );
+	cgs.media.healthTick200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h200line.tga" );
+	cgs.media.healthTick100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h100line.tga" );
+	cgs.media.armorTick200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a200line.tga" );
+	cgs.media.armorTick100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a100line.tga" );
 
 	// powerup shaders
 	cgs.media.quadShader = trap_R_RegisterShader("powerups/quad" );
@@ -1835,6 +1848,40 @@ CG_LoadHudMenu();
 
 =================
 */
+#define CG_HUD_SCRIPT_BUFFER 4096
+
+/*
+=============
+CG_HudScriptHasCompetitiveMenus
+
+Scans the hud script for Quake Live competitive HUD menu references.
+=============
+*/
+static qboolean CG_HudScriptHasCompetitiveMenus( const char *hudSet ) {
+	fileHandle_t	f;
+	int			len;
+	char		buffer[CG_HUD_SCRIPT_BUFFER];
+
+	len = trap_FS_FOpenFile( hudSet, &f, FS_READ );
+	if ( len <= 0 ) {
+		return qfalse;
+	}
+
+	if ( len >= CG_HUD_SCRIPT_BUFFER ) {
+		len = CG_HUD_SCRIPT_BUFFER - 1;
+	}
+
+	trap_FS_Read( buffer, len, f );
+	buffer[len] = '\0';
+	trap_FS_FCloseFile( f );
+
+	if ( strstr( buffer, "comp_hud" ) || strstr( buffer, "comp_spectator" ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
 void CG_LoadHudMenu() {
 	char buff[1024];
 	const char *hudSet;
@@ -1899,6 +1946,7 @@ void CG_LoadHudMenu() {
 		hudSet = "ui/hud.txt";
 	}
 
+	cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );
 	CG_LoadMenus(hudSet);
 }
 
@@ -1943,6 +1991,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cg_entities, 0, sizeof(cg_entities) );
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );
+	CG_ParsePmoveConfigString( NULL );
 
 	cg.clientNum = clientNum;
 
