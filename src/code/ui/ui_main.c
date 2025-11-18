@@ -3794,8 +3794,10 @@ static void UI_RunMenuScript(char **args) {
 				trap_Cmd_ExecuteText(EXEC_APPEND, va("callvote map %s\n", mapName));
 			}
 		}
-	} else if (Q_stricmp(name, "updateCallvoteMapPreview") == 0) {
-		UI_HandleCallvoteMapPreviewScript();
+		} else if (Q_stricmp(name, "updateCallvoteMapPreview") == 0) {
+			UI_HandleCallvoteMapPreviewScript();
+		} else if (Q_stricmp(name, "applyCallvotePreset") == 0) {
+			UI_HandleCallvotePresetScript();
 		} else if (Q_stricmp(name, "voteKick") == 0) {
 			if (uiInfo.playerIndex >= 0 && uiInfo.playerIndex < uiInfo.playerCount) {
 				trap_Cmd_ExecuteText( EXEC_APPEND, va("callvote kick %s\n",uiInfo.playerNames[uiInfo.playerIndex]) );
@@ -4713,6 +4715,66 @@ static int UI_GetIndexFromSelection(int actual) {
 	return 0;
 }
 
+static qboolean ui_callvotePresetInFlight = qfalse;
+
+/*
+=============
+UI_ClearCallvotePresetState
+
+Resets the preset-related CVars when manual selections override them.
+=============
+*/
+static void UI_ClearCallvotePresetState(void) {
+	trap_Cvar_Set("ui_cvPresetRotation", "-1");
+	trap_Cvar_Set("ui_cvPresetGametype", "-1");
+	trap_Cvar_Set("ui_cvPresetActive", "0");
+	ui_cvPresetRotation.integer = -1;
+	ui_cvPresetGametype.integer = -1;
+	ui_cvPresetActive.integer = 0;
+}
+
+/*
+=============
+UI_SetCallvotePresetState
+
+Synchronizes the preset CVars with the selected rotation metadata.
+=============
+*/
+static void UI_SetCallvotePresetState(int rotationIndex, const mapRotationInfo_t *rotation) {
+	int gametype;
+
+	if (!rotation) {
+		UI_ClearCallvotePresetState();
+		return;
+	}
+
+	gametype = UI_GetCallvoteRotationGametype(rotation);
+	trap_Cvar_Set("ui_cvPresetRotation", va("%d", rotationIndex));
+	trap_Cvar_Set("ui_cvPresetGametype", va("%d", gametype));
+	trap_Cvar_Set("ui_cvPresetActive", "1");
+	ui_cvPresetRotation.integer = rotationIndex;
+	ui_cvPresetGametype.integer = gametype;
+	ui_cvPresetActive.integer = 1;
+}
+
+/*
+=============
+UI_GetPresetRotationIndex
+
+Returns the preset rotation index when it is still valid for the cache.
+=============
+*/
+static int UI_GetPresetRotationIndex(void) {
+	int index;
+
+	index = ui_cvPresetRotation.integer;
+	if (index < 0 || index >= uiInfo.mapRotationCount) {
+		return -1;
+	}
+
+	return index;
+}
+
 /*
 =============
 UI_GetFilteredCallvoteGametype
@@ -4722,6 +4784,20 @@ Normalizes the callvote gametype filter so out-of-range values fall back to Defa
 */
 static int UI_GetFilteredCallvoteGametype(void) {
 	int gametype;
+	int presetIndex;
+	mapRotationInfo_t *rotation;
+
+	if (ui_cvPresetActive.integer > 0) {
+		presetIndex = UI_GetPresetRotationIndex();
+		rotation = UI_MapRotationEntryForIndex(presetIndex);
+		if (rotation) {
+			gametype = UI_GetCallvoteRotationGametype(rotation);
+			if (gametype >= -1 && gametype < GT_MAX_GAME_TYPE) {
+				return gametype;
+			}
+		}
+		UI_ClearCallvotePresetState();
+	}
 
 	gametype = ui_cvGameType.integer;
 	if (gametype < -1 || gametype >= GT_MAX_GAME_TYPE) {
@@ -5011,6 +5087,12 @@ static void UI_SelectCallvoteRotation(int rotationIndex) {
 		return;
 	}
 
+	if (ui_callvotePresetInFlight) {
+		ui_callvotePresetInFlight = qfalse;
+	} else {
+		UI_ClearCallvotePresetState();
+	}
+
 	mapIndex = uiInfo.mapRotations[rotationIndex].mapIndex;
 	if (mapIndex < 0 || mapIndex >= uiInfo.mapCount) {
 		uiInfo.callvoteRotationIndex = -1;
@@ -5020,6 +5102,7 @@ static void UI_SelectCallvoteRotation(int rotationIndex) {
 	uiInfo.callvoteRotationIndex = rotationIndex;
 	UI_SetCurrentNetMap(mapIndex);
 }
+
 
 /*
 =============
@@ -5032,6 +5115,7 @@ static void UI_HandleCallvoteMapPreviewScript(void) {
 	int available;
 	int rotationIndex;
 	int displayRow;
+	mapRotationInfo_t *rotation;
 
 	available = UI_CountVisibleCallvoteRotations();
 	if (available <= 0) {
@@ -5050,8 +5134,45 @@ static void UI_HandleCallvoteMapPreviewScript(void) {
 		}
 	}
 
+	if (ui_cvPresetActive.integer > 0) {
+		rotationIndex = UI_GetPresetRotationIndex();
+		rotation = UI_MapRotationEntryForIndex(rotationIndex);
+		if (rotation && UI_RotationMatchesGametype(rotation, UI_GetFilteredCallvoteGametype())) {
+			displayRow = UI_GetCallvoteDisplayRowForRotation(rotationIndex);
+			if (displayRow >= 0) {
+				ui_callvotePresetInFlight = qtrue;
+				Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, displayRow, NULL);
+				return;
+			}
+		}
+		UI_ClearCallvotePresetState();
+	}
+
 	Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, 0, NULL);
 }
+
+
+/*
+=============
+UI_HandleCallvotePresetScript
+
+Captures the currently highlighted rotation list entry and activates the preset state.
+=============
+*/
+static void UI_HandleCallvotePresetScript(void) {
+	int rotationIndex;
+	mapRotationInfo_t *rotation;
+
+	rotationIndex = uiInfo.currentMapRotation;
+	rotation = UI_MapRotationEntryForIndex(rotationIndex);
+	if (!rotation) {
+		UI_ClearCallvotePresetState();
+		return;
+	}
+
+	UI_SetCallvotePresetState(rotationIndex, rotation);
+}
+
 
 
 static void UI_UpdatePendingPings() { 
@@ -6554,7 +6675,10 @@ vmCvar_t	ui_dedicated;
 vmCvar_t	ui_gameType;
 vmCvar_t	ui_netGameType;
 vmCvar_t	ui_actualNetGameType;
-vmCvar_t	ui_cvGameType;
+vmCvar_t	ui_cvgametype;
+vmCvar_t	ui_cvPresetRotation;
+vmCvar_t	ui_cvPresetGametype;
+vmCvar_t	ui_cvPresetActive;
 vmCvar_t	ui_joinGameType;
 vmCvar_t	ui_netSource;
 vmCvar_t	ui_serverFilterType;
@@ -6671,7 +6795,10 @@ static cvarTable_t		cvarTable[] = {
 { &ui_joinGameType, "ui_joinGametype", "0", CVAR_ARCHIVE },
 { &ui_netGameType, "ui_netGametype", "3", CVAR_ARCHIVE },
 { &ui_actualNetGameType, "ui_actualNetGametype", "3", CVAR_ARCHIVE },
-{ &ui_cvGameType, "ui_cvGameType", "-1", CVAR_ARCHIVE },
+{ &ui_cvgametype, "ui_cvgametype", "-1", CVAR_ARCHIVE },
+	{ &ui_cvPresetRotation, "ui_cvPresetRotation", "-1", CVAR_ARCHIVE },
+	{ &ui_cvPresetGametype, "ui_cvPresetGametype", "-1", CVAR_ARCHIVE },
+	{ &ui_cvPresetActive, "ui_cvPresetActive", "0", CVAR_ARCHIVE },
 	{ &ui_redteam1, "ui_redteam1", "0", CVAR_ARCHIVE },
 	{ &ui_redteam2, "ui_redteam2", "0", CVAR_ARCHIVE },
 	{ &ui_redteam3, "ui_redteam3", "0", CVAR_ARCHIVE },
