@@ -164,6 +164,8 @@ vmCvar_t  ui_browserAwesomium;
 #define UI_INGAME_FILE_QUAKELIVE        "ui/ingame_quakelive.txt"
 
 static uiMenuFlow_t ui_activeMenuFlow = UI_MENU_FLOW_LEGACY;
+static qboolean ui_browserActiveKnown = qfalse;
+static qboolean ui_browserActiveState = qfalse;
 
 static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
         return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
@@ -178,16 +180,34 @@ static uiMenuFlow_t UI_RequestedMenuFlow(void) {
 }
 
 static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {
-        uiMenuFlow_t requested = UI_RequestedMenuFlow();
-        if (requested == UI_MENU_FLOW_QUAKELIVE && !UI_BrowserOverlayAvailable()) {
-                return UI_MENU_FLOW_LEGACY;
-        }
-        return requested;
+	uiMenuFlow_t requested = UI_RequestedMenuFlow();
+	if (requested == UI_MENU_FLOW_QUAKELIVE && !UI_BrowserOverlayAvailable()) {
+		return UI_MENU_FLOW_LEGACY;
+	}
+	return requested;
+}
+
+/*
+=============
+UI_SetBrowserActive
+
+Inform the engine overlay about whether the Awesomium-driven UI is active.
+=============
+*/
+static void UI_SetBrowserActive(qboolean active) {
+	if (ui_browserActiveKnown && ui_browserActiveState == active) {
+		return;
+	}
+
+	ui_browserActiveState = active;
+	ui_browserActiveKnown = qtrue;
+	trap_Cmd_ExecuteText(EXEC_NOW, active ? "web_browserActive 1\n" : "web_browserActive 0\n");
 }
 
 static void UI_SetActiveMenuFlow(uiMenuFlow_t flow) {
-        ui_activeMenuFlow = flow;
-        ui_new.integer = (flow == UI_MENU_FLOW_QUAKELIVE);
+	ui_activeMenuFlow = flow;
+	ui_new.integer = (flow == UI_MENU_FLOW_QUAKELIVE);
+	UI_SetBrowserActive(flow == UI_MENU_FLOW_QUAKELIVE);
 }
 
 qboolean UI_UsingLegacyMenuFlow(void) {
@@ -1194,9 +1214,10 @@ void UI_LoadMenus(const char *menuFile, qboolean reset) {
                 }
         }
 
-        UI_UpdateActiveMenuFlowForFile(menuFile);
+	UI_UpdateActiveMenuFlowForFile(menuFile);
+	UI_SetBrowserActive(!UI_UsingLegacyMenuFlow());
 
-        if (reset) {
+	if (reset) {
                 Menu_Reset();
         }
 
@@ -5435,6 +5456,8 @@ void UI_LoadNonIngame() {
 
 void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 	char buf[256];
+
+	UI_SetBrowserActive(!UI_UsingLegacyMenuFlow());
 
 	// this should be the ONLY way the menu system is brought up
 	// enusure minumum menu data is cached
