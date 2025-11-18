@@ -210,6 +210,7 @@ vmCvar_t	cg_drawFullWeaponBar;
 vmCvar_t	cg_drawHitFriendTime;
 vmCvar_t	cg_drawDeadFriendTime;
 vmCvar_t	cg_speedometer;
+vmCvar_t	cg_useLegacyHud;
 
 vmCvar_t 	cg_redTeamName;
 vmCvar_t 	cg_blueTeamName;
@@ -247,6 +248,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_gibs, "cg_gibs", "1", CVAR_ARCHIVE  },
 	{ &cg_draw2D, "cg_draw2D", "1", CVAR_ARCHIVE  },
 	{ &cg_drawStatus, "cg_drawStatus", "1", CVAR_ARCHIVE  },
+	{ &cg_useLegacyHud, "cg_useLegacyHud", "0", CVAR_ARCHIVE },
 	{ &cg_drawTimer, "cg_drawTimer", "0", CVAR_ARCHIVE  },
 	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
 	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  },
@@ -1836,6 +1838,40 @@ CG_LoadHudMenu();
 
 =================
 */
+#define CG_HUD_SCRIPT_BUFFER 4096
+
+/*
+=============
+CG_HudScriptHasCompetitiveMenus
+
+Scans the hud script for Quake Live competitive HUD menu references.
+=============
+*/
+static qboolean CG_HudScriptHasCompetitiveMenus( const char *hudSet ) {
+	fileHandle_t	f;
+	int			len;
+	char		buffer[CG_HUD_SCRIPT_BUFFER];
+
+	len = trap_FS_FOpenFile( hudSet, &f, FS_READ );
+	if ( len <= 0 ) {
+		return qfalse;
+	}
+
+	if ( len >= CG_HUD_SCRIPT_BUFFER ) {
+		len = CG_HUD_SCRIPT_BUFFER - 1;
+	}
+
+	trap_FS_Read( buffer, len, f );
+	buffer[len] = '\0';
+	trap_FS_FCloseFile( f );
+
+	if ( strstr( buffer, "comp_hud" ) || strstr( buffer, "comp_spectator" ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
 void CG_LoadHudMenu() {
 	char buff[1024];
 	const char *hudSet;
@@ -1900,6 +1936,7 @@ void CG_LoadHudMenu() {
 		hudSet = "ui/hud.txt";
 	}
 
+	cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );
 	CG_LoadMenus(hudSet);
 }
 

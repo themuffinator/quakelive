@@ -460,6 +460,7 @@ typedef struct {
 	qboolean	levelShot;			// taking a level menu screenshot
 	int			deferredPlayerLoading;
 	qboolean	loading;			// don't defer players at initial startup
+	qboolean	competitiveHudLoaded;	// tracks if Quake Live HUD menus are available
 	qboolean	intermissionStarted;	// don't play voice rewards, because game will end shortly
 
 	// there are only one or two snapshot_t that are relevent at a time
@@ -1252,6 +1253,7 @@ extern	vmCvar_t		cg_drawFullWeaponBar;
 extern	vmCvar_t		cg_drawHitFriendTime;
 extern	vmCvar_t		cg_drawDeadFriendTime;
 extern	vmCvar_t		cg_speedometer;
+extern	vmCvar_t		cg_useLegacyHud;
 extern	vmCvar_t		cg_redTeamName;
 extern	vmCvar_t		cg_blueTeamName;
 extern	vmCvar_t		cg_currentSelectedPlayer;

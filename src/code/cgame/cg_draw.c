@@ -72,6 +72,21 @@ qboolean CG_ShouldDrawSpeedometer( void ) {
 	return ( qboolean )( cg_speedometer.integer != 0 );
 }
 
+/*
+=============
+CG_IsMenuHudActive
+
+Reports if the Quake Live HUD menus should be drawn instead of legacy elements.
+=============
+*/
+static qboolean CG_IsMenuHudActive( void ) {
+	if ( cg_useLegacyHud.integer ) {
+		return qfalse;
+	}
+
+	return cg.competitiveHudLoaded;
+}
+
 
 int CG_Text_Width(const char *text, float scale, int limit) {
   int count,len;
@@ -1946,32 +1961,52 @@ static void CG_Draw2D( void ) {
 		return;
 	}
 */
-	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
-		CG_DrawSpectator();
+	qboolean	spectator;
+	qboolean	menuHudActive;
+	qboolean	canShowStatus;
+
+	spectator = ( qboolean )( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
+	menuHudActive = CG_IsMenuHudActive();
+	canShowStatus = ( qboolean )( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 );
+
+	if ( menuHudActive && cg_drawStatus.integer && ( spectator || canShowStatus ) ) {
+		Menu_PaintAll();
+		CG_DrawTimedMenus();
+	}
+
+	if ( spectator ) {
+		if ( !menuHudActive ) {
+			CG_DrawSpectator();
+		}
 		CG_DrawCrosshair();
 		CG_DrawCrosshairNames();
 	} else {
-		// don't draw any status if dead or the scoreboard is being explicitly shown
-		if ( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 ) {
-
-			if ( cg_drawStatus.integer ) {
-				Menu_PaintAll();
-				CG_DrawTimedMenus();
+		if ( canShowStatus ) {
+			if ( !menuHudActive ) {
+				CG_DrawAmmoWarning();
+				CG_DrawProxWarning();
+				CG_DrawWeaponSelect();
+				CG_DrawReward();
 			}
-      
-			CG_DrawAmmoWarning();
-
-			CG_DrawProxWarning();
 			CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
-			CG_DrawWeaponSelect();
-
-			//CG_DrawPersistantPowerup();
-			CG_DrawReward();
 		}
-    
+
 		if ( cgs.gametype >= GT_TEAM ) {
 		}
+	}
+
+	if ( menuHudActive ) {
+		if ( cg.showScores ) {
+			cg.scoreBoardShowing = CG_DrawScoreboard();
+			if ( !cg.scoreBoardShowing ) {
+				CG_DrawCenterString();
+			}
+		} else {
+			cg.scoreBoardShowing = qfalse;
+			CG_DrawCenterString();
+		}
+		return;
 	}
 
 	CG_DrawVote();
