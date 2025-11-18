@@ -75,6 +75,9 @@
     <ClCompile Include="g_main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="g_match_state.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="g_mem.c">
       <Filter>Source Files</Filter>
     </ClCompile>

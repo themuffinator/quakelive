@@ -51,6 +51,7 @@ $vm_ta_env = new cons(%vm_ta_env_hash);
 # the file with vmMain function MUST be the first one of the list
 @FILES = qw(
   g_main.c
+  g_match_state.c
   ai_chat.c
   ai_cmd.c
   ai_dmnet.c

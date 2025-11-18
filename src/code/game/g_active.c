@@ -1195,6 +1195,7 @@ void G_Frame_BeginRoundWarmup( void ) {
 		G_FreezeResetClientsForRound( qtrue );
 		G_FreezeScheduleWarmupDelay();
 	}
+	G_UpdateMatchStateConfigString();
 }
 
 /*
@@ -1231,6 +1232,7 @@ static void G_Frame_BeginRoundActive( void ) {
 		G_FreezeSyncCvars();
 		G_FreezeResetClientsForRound( qfalse );
 	}
+	G_UpdateMatchStateConfigString();
 }
 
 /*
@@ -1504,6 +1506,7 @@ static void G_FreezeHandleRoundEnd( team_t winner ) {
 	level.roundState = ROUNDSTATE_COMPLETE;
 	delay = level.freezeConfig.roundDelay;
 	level.roundTransitionTime = ( delay > 0 ) ? level.time + delay : level.time;
+	G_UpdateMatchStateConfigString();
 }
 
 /*
@@ -1536,8 +1539,11 @@ Runs per-frame updates for the round controller state machine.
 */
 void G_Frame_UpdateRoundController( void ) {
 	if ( !G_RoundControllerGametypeEnabled() ) {
-		level.roundState = ROUNDSTATE_INACTIVE;
-		level.roundTransitionTime = ROUND_TRANSITION_NONE;
+		if ( level.roundState != ROUNDSTATE_INACTIVE || level.roundTransitionTime != ROUND_TRANSITION_NONE ) {
+			level.roundState = ROUNDSTATE_INACTIVE;
+			level.roundTransitionTime = ROUND_TRANSITION_NONE;
+			G_UpdateMatchStateConfigString();
+		}
 		return;
 	}
 

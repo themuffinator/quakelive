@@ -2250,39 +2250,6 @@ void CheckExitRules( void ) {
 
 
 
-void G_UpdateMatchStateConfigString( void ) {
-	int red = level.timeoutRemaining[TEAM_RED];
-	int blue = level.timeoutRemaining[TEAM_BLUE];
-
-	if ( g_gametype.integer < GT_TEAM ) {
-		int duel = level.timeoutRemaining[TEAM_FREE];
-		if ( duel < 0 ) {
-			duel = 0;
-		}
-		red = duel;
-		blue = duel;
-	}
-
-	if ( red < 0 ) {
-		red = 0;
-	}
-	if ( blue < 0 ) {
-		blue = 0;
-	}
-
-	trap_SetConfigstring( CS_MATCH_STATE, va("%i %i %i %i %i %i %i %i %i %i",
-		level.overtimeActive ? 1 : 0,
-		level.overtimeStartTime,
-		level.overtimeEndTime,
-		level.overtimeCount,
-		level.timeoutActive ? 1 : 0,
-		level.timeoutTeam,
-		level.timeoutExpireTime,
-		level.timeoutOwner,
-		red,
-		blue ) );
-}
-
 /*
 =============
 G_ResetTimeoutState

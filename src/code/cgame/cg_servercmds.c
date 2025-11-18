@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../ui/menudef.h" // bk001205 - for Q3_ui as well
 #include <stdlib.h>
 
-#define MATCH_STATE_VALUE_COUNT	20
+#include "../../game/match_state_keys.h"
 
 typedef struct {
 	const char *order;
@@ -790,129 +790,113 @@ static void CG_ParseWarmup( void ) {
 
 /*
 =============
+CG_InfoIntForMatchKey
+
+Extracts an integer value from the supplied match-state info string.
+=============
+*/
+static int CG_InfoIntForMatchKey( const char *info, const char *key, int defaultValue ) {
+const char *value;
+
+if ( !info || !key ) {
+return defaultValue;
+}
+
+value = Info_ValueForKey( info, key );
+if ( !value || !*value ) {
+return defaultValue;
+}
+
+return atoi( value );
+}
+
+/*
+=============
+CG_ResetMatchStateFields
+
+Clears cached match-state variables before parsing.
+=============
+*/
+static void CG_ResetMatchStateFields( void ) {
+int i;
+
+cgs.matchOvertimeActive = qfalse;
+cgs.matchOvertimeStartTime = 0;
+cgs.matchOvertimeEndTime = 0;
+cgs.matchOvertimeCount = 0;
+cgs.matchTimeoutActive = qfalse;
+cgs.matchTimeoutTeam = TEAM_FREE;
+cgs.matchTimeoutExpireTime = 0;
+cgs.matchTimeoutOwner = -1;
+for ( i = 0; i < TEAM_NUM_TEAMS; i++ ) {
+cgs.matchTimeoutRemaining[i] = 0;
+}
+cgs.matchTimeoutLengthSeconds = 0;
+cgs.matchTimeoutCountPerTeam = 0;
+cgs.matchOvertimeLengthSeconds = 0;
+cgs.matchSuddenDeathRespawnsEnabled = qfalse;
+cgs.matchSuddenDeathStartSeconds = 0;
+cgs.matchSuddenDeathTickSeconds = 0;
+cgs.matchSuddenDeathMaxSeconds = 0;
+cgs.matchSuddenDeathIncrementSeconds = 0;
+cgs.matchSuddenDeathPrintAnnouncements = qfalse;
+cgs.matchSuddenDeathSpawnDelayActive = qfalse;
+cgs.matchRoundTransitionTime = 0;
+cgs.matchRoundNumber = 0;
+cgs.matchRoundTurn = 0;
+cgs.matchRoundState = 0;
+}
+
+/*
+=============
 CG_ParseMatchState
 
 Parses the match state configstring and updates client state.
 =============
 */
 static void CG_ParseMatchState( void ) {
-	const char *info;
-	int values[MATCH_STATE_VALUE_COUNT] = { 0 };
-	int i;
-	int parsed = 0;
-	const char *p;
+const char *info;
+int timeoutRemaining;
 
-	cgs.matchOvertimeActive = qfalse;
-	cgs.matchOvertimeStartTime = 0;
-	cgs.matchOvertimeEndTime = 0;
-	cgs.matchOvertimeCount = 0;
-	cgs.matchTimeoutActive = qfalse;
-	cgs.matchTimeoutTeam = TEAM_FREE;
-	cgs.matchTimeoutExpireTime = 0;
-	cgs.matchTimeoutOwner = -1;
-	for ( i = 0; i < TEAM_NUM_TEAMS; i++ ) {
-		cgs.matchTimeoutRemaining[i] = 0;
-	}
-	cgs.matchTimeoutLengthSeconds = 0;
-	cgs.matchTimeoutCountPerTeam = 0;
-	cgs.matchOvertimeLengthSeconds = 0;
-	cgs.matchSuddenDeathRespawnsEnabled = qfalse;
-	cgs.matchSuddenDeathStartSeconds = 0;
-	cgs.matchSuddenDeathTickSeconds = 0;
-	cgs.matchSuddenDeathMaxSeconds = 0;
-	cgs.matchSuddenDeathIncrementSeconds = 0;
-	cgs.matchSuddenDeathPrintAnnouncements = qfalse;
-	cgs.matchSuddenDeathSpawnDelayActive = qfalse;
+CG_ResetMatchStateFields();
 
-	info = CG_ConfigString( CS_MATCH_STATE );
-	if ( !info || !*info ) {
-		return;
-	}
+info = CG_ConfigString( CS_MATCH_STATE );
+if ( !info || !*info ) {
+return;
+}
 
-	p = info;
-	for ( i = 0; i < MATCH_STATE_VALUE_COUNT; i++ ) {
-		while ( *p == ' ' ) {
-			p++;
-		}
-		if ( !*p ) {
-			break;
-		}
-		values[i] = atoi( p );
-		parsed = i + 1;
-		while ( *p && *p != ' ' ) {
-			p++;
-		}
-		if ( !*p ) {
-			break;
-		}
-	}
-
-	if ( parsed > 0 ) {
-		cgs.matchOvertimeActive = values[0] ? qtrue : qfalse;
-	}
-	if ( parsed > 1 ) {
-		cgs.matchOvertimeStartTime = values[1];
-	}
-	if ( parsed > 2 ) {
-		cgs.matchOvertimeEndTime = values[2];
-	}
-	if ( parsed > 3 ) {
-		cgs.matchOvertimeCount = values[3];
-	}
-	if ( parsed > 4 ) {
-		cgs.matchTimeoutActive = values[4] ? qtrue : qfalse;
-	}
-	if ( parsed > 5 ) {
-		cgs.matchTimeoutTeam = values[5];
-	}
-	if ( parsed > 6 ) {
-		cgs.matchTimeoutExpireTime = values[6];
-	}
-	if ( parsed > 7 ) {
-		cgs.matchTimeoutOwner = values[7];
-	}
-	if ( parsed > 8 ) {
-		if ( values[8] < 0 ) {
-			values[8] = 0;
-		}
-		cgs.matchTimeoutRemaining[TEAM_RED] = values[8];
-	}
-	if ( parsed > 9 ) {
-		if ( values[9] < 0 ) {
-			values[9] = 0;
-		}
-		cgs.matchTimeoutRemaining[TEAM_BLUE] = values[9];
-	}
-	if ( parsed > 10 ) {
-		cgs.matchTimeoutLengthSeconds = values[10];
-	}
-	if ( parsed > 11 ) {
-		cgs.matchTimeoutCountPerTeam = values[11];
-	}
-	if ( parsed > 12 ) {
-		cgs.matchOvertimeLengthSeconds = values[12];
-	}
-	if ( parsed > 13 ) {
-		cgs.matchSuddenDeathRespawnsEnabled = values[13] ? qtrue : qfalse;
-	}
-	if ( parsed > 14 ) {
-		cgs.matchSuddenDeathStartSeconds = values[14];
-	}
-	if ( parsed > 15 ) {
-		cgs.matchSuddenDeathTickSeconds = values[15];
-	}
-	if ( parsed > 16 ) {
-		cgs.matchSuddenDeathMaxSeconds = values[16];
-	}
-	if ( parsed > 17 ) {
-		cgs.matchSuddenDeathIncrementSeconds = values[17];
-	}
-	if ( parsed > 18 ) {
-		cgs.matchSuddenDeathPrintAnnouncements = values[18] ? qtrue : qfalse;
-	}
-	if ( parsed > 19 ) {
-		cgs.matchSuddenDeathSpawnDelayActive = values[19] ? qtrue : qfalse;
-	}
+cgs.matchRoundTransitionTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIME, 0 );
+cgs.matchRoundNumber = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_ROUND, 0 );
+cgs.matchRoundTurn = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TURN, 0 );
+cgs.matchRoundState = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_STATE, 0 );
+cgs.matchOvertimeActive = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_ACTIVE, 0 ) ? qtrue : qfalse;
+cgs.matchOvertimeStartTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_START, 0 );
+cgs.matchOvertimeEndTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_END, 0 );
+cgs.matchOvertimeCount = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_COUNT, 0 );
+cgs.matchOvertimeLengthSeconds = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_LENGTH, 0 );
+cgs.matchTimeoutActive = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_ACTIVE, 0 ) ? qtrue : qfalse;
+cgs.matchTimeoutTeam = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_TEAM, TEAM_FREE );
+cgs.matchTimeoutExpireTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_EXPIRE, 0 );
+cgs.matchTimeoutOwner = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_OWNER, -1 );
+timeoutRemaining = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_RED, 0 );
+if ( timeoutRemaining < 0 ) {
+timeoutRemaining = 0;
+}
+cgs.matchTimeoutRemaining[TEAM_RED] = timeoutRemaining;
+timeoutRemaining = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_BLUE, 0 );
+if ( timeoutRemaining < 0 ) {
+timeoutRemaining = 0;
+}
+cgs.matchTimeoutRemaining[TEAM_BLUE] = timeoutRemaining;
+cgs.matchTimeoutLengthSeconds = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_LENGTH, 0 );
+cgs.matchTimeoutCountPerTeam = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_COUNT, 0 );
+cgs.matchSuddenDeathRespawnsEnabled = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_RESPAWNS, 0 ) ? qtrue : qfalse;
+cgs.matchSuddenDeathStartSeconds = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_START, 0 );
+cgs.matchSuddenDeathTickSeconds = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_TICK, 0 );
+cgs.matchSuddenDeathMaxSeconds = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_MAX, 0 );
+cgs.matchSuddenDeathIncrementSeconds = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_INCREMENT, 0 );
+cgs.matchSuddenDeathPrintAnnouncements = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_PRINT, 0 ) ? qtrue : qfalse;
+cgs.matchSuddenDeathSpawnDelayActive = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_DELAY, 0 ) ? qtrue : qfalse;
 }
 
 /*

@@ -2568,6 +2568,7 @@ static void G_RRCheckRoundCompletion( void ) {
 	G_RRGrantRoundBonus( winner );
 	level.roundState = ROUNDSTATE_COMPLETE;
 	level.roundTransitionTime = level.time + 2000;
+	G_UpdateMatchStateConfigString();
 }
 
 /*
@@ -2693,7 +2694,9 @@ void G_RRTrackRoundActivity( void ) {
 		G_RRGrantRoundBonus( TEAM_RED );
 		level.roundState = ROUNDSTATE_COMPLETE;
 		level.roundTransitionTime = level.time + 2000;
+		G_UpdateMatchStateConfigString();
 	}
 }
+
 
 
