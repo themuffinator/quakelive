@@ -968,6 +968,9 @@ typedef struct {
 	qhandle_t retrieveShader;
 	qhandle_t escortShader;
 	qhandle_t flagShaders[3];
+	qhandle_t	raceStartShader;
+	qhandle_t	raceCheckpointShader;
+	qhandle_t	raceFinishShader;
 	sfxHandle_t	countPrepareTeamSound;
 
 	sfxHandle_t ammoregenSound;

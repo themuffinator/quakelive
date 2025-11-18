@@ -1152,6 +1152,9 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.flagShaders[0] = trap_R_RegisterShaderNoMip("ui/assets/statusbar/flag_in_base.tga");
 	cgs.media.flagShaders[1] = trap_R_RegisterShaderNoMip("ui/assets/statusbar/flag_capture.tga");
 	cgs.media.flagShaders[2] = trap_R_RegisterShaderNoMip("ui/assets/statusbar/flag_missing.tga");
+	cgs.media.raceStartShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/start" );
+	cgs.media.raceCheckpointShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/checkpoint" );
+	cgs.media.raceFinishShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/finish" );
 
 	trap_R_RegisterModel( "models/players/james/lower.md3" );
 	trap_R_RegisterModel( "models/players/james/upper.md3" );
