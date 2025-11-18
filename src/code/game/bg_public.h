@@ -400,6 +400,23 @@ typedef enum {
        WP_NUM_WEAPONS
 } weapon_t;
 
+typedef struct weaponStats_s {
+	weapon_t	weapon;
+	int		pickupQuantity;
+	int		maxStack;
+	int		handicapFlags;
+	float	pickupHandicapScale;
+	float	armorHandicapScale;
+	float	healthHandicapScale;
+	float	respawnHandicapScale;
+} weaponStats_t;
+
+extern const weaponStats_t bg_weaponStats[];
+extern const int bg_weaponStatsCount;
+
+const weaponStats_t *BG_WeaponStatsForWeapon( weapon_t weapon );
+
+
 struct pmove_settings_s {
 	float	airAccel;
 	float	airControl;
