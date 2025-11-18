@@ -505,7 +505,7 @@ menuDef {
 			group grpCallVote
 			type ITEM_TYPE_MULTI
 			text ""
-                        cvar "ui_cvgametype"
+                        cvar "ui_cvGameType"
                         cvarFloatList { "Default" -1 "FFA" 0 "Duel" 1 "Race" 2 "TDM" 3 "CA" 4 "CTF" 5 "1F" 6 "OVL" 7 "HAR" 8 "FT" 9 "DOM" 10 "AD" 11 "RR" 12 }
 			rect 382 96 139 20
 			textaligny 11

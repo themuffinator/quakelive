@@ -4723,7 +4723,7 @@ Normalizes the callvote gametype filter so out-of-range values fall back to Defa
 static int UI_GetFilteredCallvoteGametype(void) {
 	int gametype;
 
-	gametype = ui_cvgametype.integer;
+	gametype = ui_cvGameType.integer;
 	if (gametype < -1 || gametype >= GT_MAX_GAME_TYPE) {
 		return -1;
 	}
@@ -6550,7 +6550,7 @@ vmCvar_t	ui_dedicated;
 vmCvar_t	ui_gameType;
 vmCvar_t	ui_netGameType;
 vmCvar_t	ui_actualNetGameType;
-vmCvar_t	ui_cvgametype;
+vmCvar_t	ui_cvGameType;
 vmCvar_t	ui_joinGameType;
 vmCvar_t	ui_netSource;
 vmCvar_t	ui_serverFilterType;
@@ -6667,7 +6667,7 @@ static cvarTable_t		cvarTable[] = {
 { &ui_joinGameType, "ui_joinGametype", "0", CVAR_ARCHIVE },
 { &ui_netGameType, "ui_netGametype", "3", CVAR_ARCHIVE },
 { &ui_actualNetGameType, "ui_actualNetGametype", "3", CVAR_ARCHIVE },
-{ &ui_cvgametype, "ui_cvgametype", "-1", CVAR_ARCHIVE },
+{ &ui_cvGameType, "ui_cvGameType", "-1", CVAR_ARCHIVE },
 	{ &ui_redteam1, "ui_redteam1", "0", CVAR_ARCHIVE },
 	{ &ui_redteam2, "ui_redteam2", "0", CVAR_ARCHIVE },
 	{ &ui_redteam3, "ui_redteam3", "0", CVAR_ARCHIVE },
