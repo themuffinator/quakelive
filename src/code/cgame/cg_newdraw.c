@@ -232,6 +232,255 @@ color[0] = color[1] = color[2] = 0.4f; color[3] = 0.6f;
 }
 }
 
+/*
+=============
+CG_NormalizedTo100
+
+Returns a normalized percentage for values capped at 100.
+=============
+*/
+static float CG_NormalizedTo100(int value) {
+return Com_Clamp(0.0f, 100.0f, (float)value) * (1.0f / 100.0f);
+}
+
+/*
+=============
+CG_NormalizedTo200
+
+Returns a normalized percentage for values capped at 200.
+=============
+*/
+static float CG_NormalizedTo200(int value) {
+return Com_Clamp(0.0f, 200.0f, (float)value) * (1.0f / 200.0f);
+}
+
+/*
+=============
+CG_DrawBarFill
+
+Renders a clipped portion of the supplied shader using the specified color and ratio.
+=============
+*/
+static void CG_DrawBarFill(const rectDef_t *rect, qhandle_t shader, float fraction, const vec4_t color) {
+float x;
+float y;
+float w;
+float h;
+
+if (!rect) {
+return;
+}
+
+if (fraction <= 0.0f || rect->w <= 0.0f || rect->h <= 0.0f) {
+return;
+}
+
+if (fraction > 1.0f) {
+fraction = 1.0f;
+}
+
+if (shader) {
+x = rect->x;
+y = rect->y;
+w = rect->w * fraction;
+h = rect->h;
+CG_AdjustFrom640(&x, &y, &w, &h);
+trap_R_SetColor(color);
+trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, fraction, 1.0f, shader);
+trap_R_SetColor(NULL);
+} else {
+CG_FillRect(rect->x, rect->y, rect->w * fraction, rect->h, color);
+}
+}
+
+/*
+=============
+CG_DrawPlayerHealthBar
+
+Draws the player health fill bar for either the 0-100 or 0-200 range.
+=============
+*/
+static void CG_DrawPlayerHealthBar(rectDef_t *rect, qhandle_t shader, qboolean use200Range) {
+vec4_t barColor;
+float ratio;
+int health;
+int armor;
+
+if (!cg.snap) {
+return;
+}
+
+health = cg.snap->ps.stats[STAT_HEALTH];
+armor = cg.snap->ps.stats[STAT_ARMOR];
+CG_GetColorForHealth(health, armor, barColor);
+barColor[3] = 1.0f;
+ratio = (use200Range) ? CG_NormalizedTo200(health) : CG_NormalizedTo100(health);
+
+if (!shader) {
+shader = (use200Range) ? cgs.media.healthBar200 : cgs.media.healthBar100;
+}
+
+CG_DrawBarFill(rect, shader, ratio, barColor);
+}
+
+/*
+=============
+CG_DrawPlayerArmorBar
+
+Draws the player armor fill bar for either the 0-100 or 0-200 range.
+=============
+*/
+static void CG_DrawPlayerArmorBar(rectDef_t *rect, qhandle_t shader, qboolean use200Range) {
+vec4_t barColor;
+float ratio;
+int armor;
+
+if (!cg.snap) {
+return;
+}
+
+armor = cg.snap->ps.stats[STAT_ARMOR];
+CG_GetArmorTierColor(armor, barColor);
+barColor[3] = 1.0f;
+ratio = (use200Range) ? CG_NormalizedTo200(armor) : CG_NormalizedTo100(armor);
+
+if (!shader) {
+shader = (use200Range) ? cgs.media.armorBar200 : cgs.media.armorBar100;
+}
+
+CG_DrawBarFill(rect, shader, ratio, barColor);
+}
+
+/*
+=============
+CG_CountLivingPlayers
+
+Determines how many teammates and enemies are alive based on clientinfo health data.
+=============
+*/
+static void CG_CountLivingPlayers(int *friendCount, int *enemyCount) {
+team_t myTeam;
+int i;
+
+if (!friendCount || !enemyCount) {
+return;
+}
+
+*friendCount = 0;
+*enemyCount = 0;
+
+if (!cg.snap) {
+return;
+}
+
+myTeam = cg.snap->ps.persistant[PERS_TEAM];
+if (myTeam == TEAM_SPECTATOR && (cg.snap->ps.pm_flags & PMF_FOLLOW)) {
+int followClient = cg.snap->ps.clientNum;
+if (followClient >= 0 && followClient < cgs.maxclients && cgs.clientinfo[followClient].infoValid) {
+myTeam = cgs.clientinfo[followClient].team;
+}
+}
+
+for (i = 0; i < cgs.maxclients; i++) {
+const clientInfo_t *ci = &cgs.clientinfo[i];
+team_t team;
+qboolean alive;
+
+if (!ci->infoValid) {
+continue;
+}
+
+team = ci->team;
+if (team != TEAM_RED && team != TEAM_BLUE) {
+continue;
+}
+
+if (i == cg.snap->ps.clientNum) {
+alive = (cg.snap->ps.stats[STAT_HEALTH] > 0);
+} else {
+alive = (ci->health > 0);
+}
+
+if (!alive) {
+continue;
+}
+
+if (team == myTeam) {
+(*friendCount)++;
+} else {
+(*enemyCount)++;
+}
+}
+}
+
+/*
+=============
+CG_DrawPlayerCount
+
+Draws the text for either the friendly or enemy player count widgets.
+=============
+*/
+static void CG_DrawPlayerCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, qboolean friendly) {
+char buffer[8];
+int friendCount;
+int enemyCount;
+int width;
+
+CG_CountLivingPlayers(&friendCount, &enemyCount);
+Com_sprintf(buffer, sizeof(buffer), "%i", friendly ? friendCount : enemyCount);
+width = CG_Text_Width(buffer, scale, 0);
+CG_Text_Paint(rect->x + (rect->w - width) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_SampleSpeedometer
+
+Samples and caches the player's horizontal speed for the current frame.
+=============
+*/
+static float CG_SampleSpeedometer(void) {
+vec3_t horizontalVelocity;
+
+if (!cg.snap) {
+cg.speedometerSample = 0.0f;
+cg.speedometerSampleTime = cg.time;
+return 0.0f;
+}
+
+if (cg.speedometerSampleTime == cg.time) {
+return cg.speedometerSample;
+}
+
+VectorCopy(cg.snap->ps.velocity, horizontalVelocity);
+horizontalVelocity[2] = 0.0f;
+cg.speedometerSample = VectorLength(horizontalVelocity);
+cg.speedometerSampleTime = cg.time;
+return cg.speedometerSample;
+}
+
+/*
+=============
+CG_DrawSpeedometer
+
+Renders the HUD speedometer text when the corresponding cvar is enabled.
+=============
+*/
+static void CG_DrawSpeedometer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+char buffer[32];
+float speed;
+int width;
+
+if (!CG_ShouldDrawSpeedometer()) {
+return;
+}
+
+speed = CG_SampleSpeedometer();
+Com_sprintf(buffer, sizeof(buffer), "%i", (int)(speed + 0.5f));
+width = CG_Text_Width(buffer, scale, 0);
+CG_Text_Paint(rect->x + (rect->w - width) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
 void CG_SpectatorFollowCycle(int dir) {
 int i;
 int index = -1;
@@ -380,9 +629,33 @@ Com_sprintf(buffer, sizeof(buffer), "Following %s", ci->name);
 CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);
 }
 
-static void CG_DrawTeamColorized(rectDef_t *rect) {
+/*
+=============
+CG_DrawTeamColorized
+
+Fills the supplied rect with the team color, tinting the provided shader if available.
+=============
+*/
+static void CG_DrawTeamColorized(rectDef_t *rect, qhandle_t shader) {
 vec4_t color;
+float x;
+float y;
+float w;
+float h;
+
 CG_GetTeamColor(&color);
+if (shader) {
+x = rect->x;
+y = rect->y;
+w = rect->w;
+h = rect->h;
+CG_AdjustFrom640(&x, &y, &w, &h);
+trap_R_SetColor(color);
+trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader);
+trap_R_SetColor(NULL);
+return;
+}
+
 CG_FillRect(rect->x, rect->y, rect->w, rect->h, color);
 }
 
@@ -1877,6 +2150,12 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
   case CG_PLAYER_ARMOR_VALUE:
     CG_DrawPlayerArmorValue(&rect, scale, color, shader, textStyle);
     break;
+  case CG_PLAYER_ARMOR_BAR_100:
+CG_DrawPlayerArmorBar(&rect, shader, qfalse);
+break;
+  case CG_PLAYER_ARMOR_BAR_200:
+CG_DrawPlayerArmorBar(&rect, shader, qtrue);
+break;
   case CG_PLAYER_AMMO_ICON:
     CG_DrawPlayerAmmoIcon(&rect, ownerDrawFlags & CG_SHOW_2DONLY);
     break;
@@ -1928,6 +2207,12 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
   case CG_PLAYER_HEALTH:
     CG_DrawPlayerHealth(&rect, scale, color, shader, textStyle);
     break;
+  case CG_PLAYER_HEALTH_BAR_100:
+CG_DrawPlayerHealthBar(&rect, shader, qfalse);
+break;
+  case CG_PLAYER_HEALTH_BAR_200:
+CG_DrawPlayerHealthBar(&rect, shader, qtrue);
+break;
   case CG_RED_SCORE:
     CG_DrawRedScore(&rect, scale, color, shader, textStyle);
     break;
@@ -2076,8 +2361,17 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
     CG_DrawArmorTieredColorized(&rect);
                 break;
   case CG_TEAM_COLORIZED:
-    CG_DrawTeamColorized(&rect);
+    CG_DrawTeamColorized(&rect, shader);
                 break;
+  case CG_SPEEDOMETER:
+CG_DrawSpeedometer(&rect, scale, color, textStyle);
+break;
+  case CG_TEAM_PLYR_COUNT:
+CG_DrawPlayerCount(&rect, scale, color, textStyle, qtrue);
+break;
+  case CG_ENEMY_PLYR_COUNT:
+CG_DrawPlayerCount(&rect, scale, color, textStyle, qfalse);
+break;
   case CG_FOLLOW_PLAYER_NAME_EX:
     CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle);
                 break;
