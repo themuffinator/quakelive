@@ -8,6 +8,7 @@ import ctypes
 import os
 import subprocess
 import sys
+from collections.abc import Iterable, Mapping
 
 import pytest
 
@@ -399,10 +400,16 @@ def test_factory_spawn_delays_emit_client_spawn_events() -> None:
     ]
 
 
-def _summarise_item_events(result) -> str:
+def _summarise_item_events(frames: Iterable[object]) -> str:
     lines: list[str] = []
-    for frame in result.frames:
-        for event in frame.events:
+    for frame in frames:
+        events = getattr(frame, "events", None)
+        if events is None:
+            if isinstance(frame, Mapping):
+                events = frame.get("events", [])
+            else:
+                raise TypeError("Frame does not expose event data")
+        for event in events:
             action = event["action"]
             if action not in {"drop_item", "item_respawn", "item_return"}:
                 continue
@@ -432,7 +439,7 @@ def test_factory_item_flags_control_drop_behaviour(tmp_path: Path) -> None:
 
     results = [baseline.run(), allow_bounce.run(), no_drops.run()]
     summaries = [
-        _summarise_item_events(result)
+        _summarise_item_events(result.frames)
         for result in results
     ]
 
@@ -445,6 +452,42 @@ def test_factory_item_flags_control_drop_behaviour(tmp_path: Path) -> None:
             "Item drop expectations diverged. "
             f"Captured summary written to {output_path}"
         )
+
+
+def _read_factory_item_sections() -> list[str]:
+    expectation = _read_expectation("match_sim_factory_items.expect")
+    return [section.strip() for section in expectation.split("\n---\n")]
+
+
+def test_cli_item_parity_matches_baseline_expectation(harness_parity_runs) -> None:
+    sections = _read_factory_item_sections()
+    baseline_expectation = sections[0]
+    reference_payload: dict[str, object] | None = None
+
+    for target in ("qvm", "dll"):
+        run = harness_parity_runs.require(target)
+        payload = run.load_match_timeline("factory")
+        summary = _summarise_item_events(payload["frames"]).strip()
+        assert summary == baseline_expectation
+
+        if reference_payload is None:
+            reference_payload = payload
+        else:
+            assert payload == reference_payload, f"{target} payload diverged from parity baseline"
+
+
+def test_cli_item_parity_native_build_matches_vm(harness_parity_runs) -> None:
+    native_run = harness_parity_runs.get("re")
+    if native_run is None:
+        pytest.skip(harness_parity_runs.missing_reason("re") or "Native build support unavailable")
+
+    reference_payload = harness_parity_runs.require("qvm").load_match_timeline("factory")
+    native_payload = native_run.load_match_timeline("factory")
+
+    assert native_payload == reference_payload
+
+    trace_log = native_run.read_log("trace_harness")
+    assert "Trace harness run completed successfully." in trace_log
 
 
 def _build_factory_metadata_library(tmp_path: Path) -> Path:

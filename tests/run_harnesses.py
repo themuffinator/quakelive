@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -15,7 +16,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from tools.tests.client_regression import ClientPredictor, ClientRegressionHarness
 from tools.tests.match_sim.harness import run_from_file
-from tools.tests.re_trace_harness import run_trace_harness
+from tools.tests.re_trace_harness import TraceHarnessResult, run_trace_harness
+
 SCENARIO_ROOT = REPO_ROOT / "tools" / "tests" / "match_sim"
 SCENARIOS: dict[str, Path] = {
     "duel": SCENARIO_ROOT / "sample_scenario.json",
@@ -27,7 +29,38 @@ SCENARIOS: dict[str, Path] = {
     "freeze": SCENARIO_ROOT / "freeze_cvars.json",
 }
 DEFAULT_SCENARIO = SCENARIOS["duel"]
-DEFAULT_SNAPSHOTS = REPO_ROOT / "tools" / "tests" / "client_regression" / "sample_snapshots.json"
+SNAPSHOT_ROOT = REPO_ROOT / "tools" / "tests" / "client_regression"
+DEFAULT_SNAPSHOTS = SNAPSHOT_ROOT / "sample_snapshots.json"
+SNAPSHOT_ARCHIVES: dict[str, Path] = {
+    "hud_baseline": DEFAULT_SNAPSHOTS,
+    "weapons_and_items": SNAPSHOT_ROOT / "weapons_and_items_snapshots.json",
+    "resource_drain": SNAPSHOT_ROOT / "resource_drain_snapshots.json",
+    "server_correction": SNAPSHOT_ROOT / "server_correction_snapshots.json",
+}
+
+
+@dataclass(slots=True)
+class HarnessBundleResult:
+    """Summary of a harness bundle invocation for a specific target."""
+
+    target: str
+    artifact_root: Path
+    match_summaries: list[dict[str, object]]
+    client_regression_entries: list[dict[str, object]]
+    trace_result: TraceHarnessResult | None = None
+
+    def match_timeline_path(self, slug: str) -> Path:
+        return self.artifact_root / "match_sim" / self.target / slug / "timeline.json"
+
+    def load_match_timeline(self, slug: str) -> dict[str, object]:
+        timeline_path = self.match_timeline_path(slug)
+        return json.loads(timeline_path.read_text(encoding="utf-8"))
+
+    def log_path(self, harness_name: str) -> Path:
+        return self.artifact_root / "logs" / self.target / f"{harness_name}.log"
+
+    def read_log(self, harness_name: str) -> str:
+        return self.log_path(harness_name).read_text(encoding="utf-8")
 
 
 def _write_text(path: Path, text: str) -> None:
@@ -35,7 +68,7 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _run_match_harness(target: str, artifact_root: Path, seed: int) -> None:
+def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict[str, object]]:
     summaries: list[dict[str, object]] = []
     for slug, scenario_path in SCENARIOS.items():
         timeline_path = artifact_root / "match_sim" / target / slug / "timeline.json"
@@ -64,8 +97,10 @@ def _run_match_harness(target: str, artifact_root: Path, seed: int) -> None:
         + "\n",
     )
 
+    return summaries
 
-def _run_client_harness(target: str, artifact_root: Path) -> None:
+
+def _run_client_harness(target: str, artifact_root: Path) -> list[dict[str, object]]:
     harness = ClientRegressionHarness(ClientPredictor())
 
     manifest: dict[str, dict[str, object]] = {}
@@ -104,6 +139,8 @@ def _run_client_harness(target: str, artifact_root: Path) -> None:
     )
     _write_text(log_path, log_text)
 
+    return log_entries
+
 
 def _ensure_reverse_build(target: str, reverse_build_root: Path) -> None:
     """Run the clean-room build helper so trace harnesses have binaries."""
@@ -136,6 +173,51 @@ def _ensure_reverse_build(target: str, reverse_build_root: Path) -> None:
         )
 
 
+def run_harness_bundle(
+    target: str,
+    artifact_root: Path,
+    *,
+    seed: int = 2024,
+    reverse_build_root: Path | None = None,
+) -> HarnessBundleResult:
+    """Execute the harness bundle for *target* and capture summary metadata."""
+
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    if reverse_build_root is None:
+        reverse_build_root = Path("build") / "re" / ("windows" if os.name == "nt" else "linux")
+
+    _ensure_reverse_build(target, reverse_build_root)
+
+    match_summaries = _run_match_harness(target, artifact_root, seed)
+    client_entries = _run_client_harness(target, artifact_root)
+
+    trace_result: TraceHarnessResult | None = None
+    if target == "re":
+        trace_artifact_root = artifact_root / "trace" / target
+        expectation = REPO_ROOT / "tests" / "expectations" / "re" / "native-shim.log"
+        trace_result = run_trace_harness(reverse_build_root, expectation, trace_artifact_root)
+
+        summary_log = artifact_root / "logs" / target / "trace_harness.log"
+        status = "matched" if trace_result.matches_expectation else "differs"
+        _write_text(
+            summary_log,
+            (
+                "Trace harness run completed successfully.\n"
+                f"Observed log: {trace_result.log_path}\n"
+                f"Diff output: {trace_result.diff_path}\n"
+                f"Expectation status: {status}\n"
+            ),
+        )
+
+    return HarnessBundleResult(
+        target=target,
+        artifact_root=artifact_root,
+        match_summaries=match_summaries,
+        client_regression_entries=client_entries,
+        trace_result=trace_result,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run deterministic harness suites and emit artefacts.")
     parser.add_argument(
@@ -160,29 +242,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     artifact_root = args.artifact_root
-    artifact_root.mkdir(parents=True, exist_ok=True)
-
-    _ensure_reverse_build(args.target, args.reverse_build_root)
-
-    _run_match_harness(args.target, artifact_root, args.seed)
-    _run_client_harness(args.target, artifact_root)
-
-    if args.target == "re":
-        trace_artifact_root = artifact_root / "trace" / args.target
-        expectation = REPO_ROOT / "tests" / "expectations" / "re" / "native-shim.log"
-        result = run_trace_harness(args.reverse_build_root, expectation, trace_artifact_root)
-
-        summary_log = artifact_root / "logs" / args.target / "trace_harness.log"
-        status = "matched" if result.matches_expectation else "differs"
-        _write_text(
-            summary_log,
-            (
-                "Trace harness run completed successfully.\n"
-                f"Observed log: {result.log_path}\n"
-                f"Diff output: {result.diff_path}\n"
-                f"Expectation status: {status}\n"
-            ),
-        )
+    run_harness_bundle(
+        args.target,
+        artifact_root,
+        seed=args.seed,
+        reverse_build_root=args.reverse_build_root,
+    )
 
     return 0
 

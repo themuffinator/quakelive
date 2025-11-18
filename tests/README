@@ -19,6 +19,36 @@ behaviour of factory-related CVars:
 The new scenario is also registered inside ``tests/run_harnesses.py`` so
 CI artefact generation captures the extended coverage.
 
+Harness parity workflow
+-----------------------
+
+``tests/conftest.py`` exposes the ``harness_parity_runs`` fixture, which
+wraps ``tests/run_harnesses.py`` and spins up deterministic harness runs
+for every supported target. The fixture captures the generated
+``match_sim`` timelines, HUD hash manifests, and harness logs inside a
+temporary artefact tree so the Python tests can diff the results without
+shelling out to the runner each time. Two parity-focused tests live in
+``tests/test_match_sim_harness.py``:
+
+* ``test_cli_item_parity_matches_baseline_expectation`` ensures both the
+  ``qvm`` and ``dll`` harness runs produce the same factory item timeline
+  and that the JSON payload matches the baseline expectation captured in
+  ``tests/expectations/match_sim_factory_items.expect``.
+* ``test_cli_item_parity_native_build_matches_vm`` compares the optional
+  native ``re`` target against the ``qvm`` payload and inspects the
+  ``trace_harness.log`` summary so the clean-room trace harness stays in
+  sync with the VM output.
+
+Execute the new coverage with::
+
+    pytest tests/test_match_sim_harness.py -k cli_item_parity -vv
+
+The fixture always runs the ``qvm`` and ``dll`` targets. The native
+``re`` target is only enabled when the clean-room build prerequisites are
+present (POSIX shell, ``gcc``, and the ``src-re/prototypes`` tree). When
+these requirements are missing, the fixture records the reason so tests
+can skip gracefully using ``HarnessTargetMatrix.missing_reason("re")``.
+
 Freeze Tag CVar coverage
 ------------------------
 
