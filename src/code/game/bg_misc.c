@@ -1381,13 +1381,200 @@ static qboolean BG_IsDroppedItem( const entityState_t *ent ) {
 	return ( ent->modelindex2 != 0 );
 }
 
+
+typedef qboolean (*bgItemGrabFunc_t)( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped );
+
 /*
 =============
-BG_PlayerCarryingFlag
+BG_CanGrabWeaponItem
 
-Returns qtrue when the player already has one of the flag powerups active.
+Translated from the DLL helper sub_1002d1c0; currently weapons are always available.
 =============
 */
+static qboolean BG_CanGrabWeaponItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	return qtrue;
+}
+
+/*
+=============
+BG_CanGrabAmmoItem
+
+Table-driven version of the legacy ammo branch in BG_CanItemBeGrabbed.
+=============
+*/
+static qboolean BG_CanGrabAmmoItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	int weapon;
+
+	if ( dropped ) {
+		return qtrue;
+	}
+
+	if ( item->giTag <= WP_NONE || item->giTag >= WP_NUM_WEAPONS ) {
+		return qtrue;
+	}
+
+	if ( item->giTag == WP_NONE ) {
+		for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
+			const int maxAmmo = BG_GetWeaponMaxAmmo( weapon );
+
+			if ( maxAmmo <= 0 ) {
+				continue;
+			}
+
+			if ( ps->ammo[weapon] < maxAmmo ) {
+				return qtrue;
+			}
+		}
+
+		return qfalse;
+	}
+
+	if ( ps->ammo[item->giTag] >= BG_GetWeaponMaxAmmo( item->giTag ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+BG_CanGrabArmorItem
+
+Implements the shared armor pickup checks used by the DLL's case tables.
+=============
+*/
+static qboolean BG_CanGrabArmorItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	int upperBound;
+
+	if ( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
+		return qfalse;
+	}
+
+	if ( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
+		upperBound = ps->stats[STAT_MAX_HEALTH];
+	} else {
+		upperBound = ps->stats[STAT_MAX_HEALTH] * 2;
+	}
+
+	if ( ps->stats[STAT_ARMOR] >= upperBound ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+BG_CanGrabHealthItem
+
+Shared translation of the DLL helper sub_1002ce00 for health pickups.
+=============
+*/
+static qboolean BG_CanGrabHealthItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	int upperBound;
+
+	if ( bg_itemlist[ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
+		upperBound = ps->stats[STAT_MAX_HEALTH];
+	} else {
+		upperBound = ps->stats[STAT_MAX_HEALTH] * 2;
+	}
+
+	if ( item->quantity == 5 || item->quantity == 100 ) {
+		if ( ps->stats[STAT_HEALTH] >= upperBound ) {
+			return qfalse;
+		}
+		return qtrue;
+	}
+
+	if ( ps->stats[STAT_HEALTH] >= ps->stats[STAT_MAX_HEALTH] ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+BG_CanGrabPowerupItem
+=============
+*/
+static qboolean BG_CanGrabPowerupItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	return qtrue;
+}
+
+/*
+=============
+BG_CanGrabPersistantPowerupItem
+=============
+*/
+static qboolean BG_CanGrabPersistantPowerupItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	if ( ps->stats[STAT_PERSISTANT_POWERUP] ) {
+		return qfalse;
+	}
+
+	if ( ( ent->generic1 & 2 ) && ( ps->persistant[PERS_TEAM] != TEAM_RED ) ) {
+		return qfalse;
+	}
+	if ( ( ent->generic1 & 4 ) && ( ps->persistant[PERS_TEAM] != TEAM_BLUE ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+BG_CanGrabHoldableItem
+=============
+*/
+static qboolean BG_CanGrabHoldableItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	if ( ps->stats[STAT_HOLDABLE_ITEM] ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+BG_CanGrabKeyItem
+=============
+*/
+static qboolean BG_CanGrabKeyItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	return qtrue;
+}
+
+/*
+=============
+BG_CanGrabTeamItem
+=============
+*/
+static qboolean BG_CanGrabTeamItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
+{
+	return BG_TeamFlagCanBeGrabbed( gametype, item, ent, ps );
+}
+
+static const bgItemGrabFunc_t bg_itemGrabHandlers[IT_TEAM + 1] = {
+	[IT_BAD] = NULL,
+	[IT_WEAPON] = BG_CanGrabWeaponItem,
+	[IT_AMMO] = BG_CanGrabAmmoItem,
+	[IT_ARMOR] = BG_CanGrabArmorItem,
+	[IT_HEALTH] = BG_CanGrabHealthItem,
+	[IT_POWERUP] = BG_CanGrabPowerupItem,
+	[IT_HOLDABLE] = BG_CanGrabHoldableItem,
+	[IT_PERSISTANT_POWERUP] = BG_CanGrabPersistantPowerupItem,
+	[IT_KEY] = BG_CanGrabKeyItem,
+	[IT_TEAM] = BG_CanGrabTeamItem
+};
+
 static qboolean BG_PlayerCarryingFlag( const playerState_t *ps ) {
 	if ( ps->powerups[PW_REDFLAG] ) {
 		return qtrue;
@@ -1500,9 +1687,9 @@ This needs to be the same for client side prediction and server use.
 ================
 */
 qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps ) {
-	gitem_t	*item;
-	int		upperBound;
+	gitem_t *item;
 	const qboolean dropped = BG_IsDroppedItem( ent );
+	bgItemGrabFunc_t handler;
 
 	if ( ent->modelindex < 1 || ent->modelindex >= bg_numItems ) {
 		Com_Error( ERR_DROP, "BG_CanItemBeGrabbed: index out of range" );
@@ -1514,6 +1701,10 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 		return qfalse;
 	}
 
+	if ( item->giType < IT_BAD || item->giType > IT_TEAM ) {
+		Com_Error( ERR_DROP, "BG_CanItemBeGrabbed: IT_BAD" );
+	}
+  
 	switch( item->giType ) {
 	case IT_WEAPON:
 		return qtrue;	// weapons are always picked up
@@ -1607,20 +1798,16 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 		}
 		return qtrue;
 
-        case IT_KEY:
-		return qtrue;
-
-        case IT_BAD:
-            Com_Error( ERR_DROP, "BG_CanItemBeGrabbed: IT_BAD" );
-        default:
-#ifndef Q3_VM
-#ifndef NDEBUG // bk0001204
-          Com_Printf("BG_CanItemBeGrabbed: unknown enum %d\n", item->giType );
-#endif
-#endif
-         break;
+	handler = bg_itemGrabHandlers[item->giType];
+	if ( handler ) {
+		return handler( gametype, currentTime, ent, ps, item, dropped );
 	}
 
+#ifndef Q3_VM
+#ifndef NDEBUG
+	Com_Printf( "BG_CanItemBeGrabbed: unknown enum %d\n", item->giType );
+#endif
+#endif
 	return qfalse;
 }
 
