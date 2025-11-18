@@ -162,6 +162,8 @@ vmCvar_t	g_gametype;
 vmCvar_t	g_dmflags;
 vmCvar_t	g_fraglimit;
 vmCvar_t	g_timelimit;
+vmCvar_t	mercylimit;
+vmCvar_t	g_mercytime;
 vmCvar_t	g_capturelimit;
 vmCvar_t	g_domCapTime;
 vmCvar_t	g_domTeammateCapScale;
@@ -354,7 +356,9 @@ static cvarTable_t		gameCvarTable[] = {
 	// change anytime vars
 	{ &g_dmflags, "dmflags", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue  },
 	{ &g_fraglimit, "fraglimit", "20", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
-	{ &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
+{ &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
+{ &mercylimit, "mercylimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue, qfalse, "Score differential that triggers the mercy rule once the grace window expires; 0 disables mercy checks." },
+{ &g_mercytime, "g_mercytime", "10", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Minutes after match start before the server evaluates mercylimit." },
 	{ &g_capturelimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 	{ &g_domCapTime, "g_domCapTime", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds required to capture a Domination point with a single attacker." },
 	{ &g_domTeammateCapScale, "g_domTeammateCapScale", "0.5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Additional capture speed gained per extra teammate assisting." },
@@ -1128,10 +1132,12 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	}
 
 
-	G_RegisterCvars();
+G_RegisterCvars();
+trap_Cvar_Update( &mercylimit );
+trap_Cvar_Update( &g_mercytime );
 
-	trap_Cvar_Set( "g_training", "0" );
-	G_UpdateTrainingState();
+trap_Cvar_Set( "g_training", "0" );
+G_UpdateTrainingState();
 
 	G_ProcessIPBans();
 
@@ -2105,17 +2111,46 @@ void CheckExitRules( void ) {
 		}
 	}
 
-	if ( g_timelimit.integer && !level.warmupTime ) {
-		if ( level.time - level.startTime >= g_timelimit.integer*60000 ) {
-			trap_SendServerCommand( -1, "print \"Timelimit hit.\n\"");
-			LogExit( "Timelimit hit." );
-			return;
-		}
-	}
+        if ( g_timelimit.integer && !level.warmupTime ) {
+                if ( level.time - level.startTime >= g_timelimit.integer*60000 ) {
+                        trap_SendServerCommand( -1, "print \"Timelimit hit.\n\"");
+                        LogExit( "Timelimit hit." );
+                        return;
+                }
+        }
 
-	if ( level.numPlayingClients < 2 ) {
-		return;
-	}
+        if ( g_gametype.integer >= GT_TEAM && g_gametype.integer != GT_ATTACK_DEFEND && mercylimit.integer > 0 && !level.warmupTime ) {
+                int mercyWindowMinutes = g_mercytime.integer;
+                int mercyWindowMsec;
+                int scoreDelta;
+                int scoreSpread;
+                const char *leadingTeam;
+
+                if ( mercyWindowMinutes < 0 ) {
+                        mercyWindowMinutes = 0;
+                }
+
+                if ( mercyWindowMinutes > 0 && mercyWindowMinutes > INT_MAX / 60000 ) {
+                        mercyWindowMsec = INT_MAX;
+                } else {
+                        mercyWindowMsec = mercyWindowMinutes * 60000;
+                }
+
+                if ( level.time - level.startTime >= mercyWindowMsec ) {
+                        scoreDelta = level.teamScores[TEAM_RED] - level.teamScores[TEAM_BLUE];
+                        scoreSpread = ( scoreDelta >= 0 ) ? scoreDelta : -scoreDelta;
+                        if ( scoreSpread > mercylimit.integer ) {
+                                leadingTeam = ( scoreDelta > 0 ) ? "Red" : "Blue";
+                                trap_SendServerCommand( -1, va( "print \"%s hit the mercylimit.\n\"", leadingTeam ) );
+                                LogExit( "Mercylimit hit." );
+                                return;
+                        }
+                }
+        }
+
+        if ( level.numPlayingClients < 2 ) {
+                return;
+        }
 
 	if ( g_gametype.integer < GT_CTF && g_fraglimit.integer ) {
 		if ( level.teamScores[TEAM_RED] >= g_fraglimit.integer ) {

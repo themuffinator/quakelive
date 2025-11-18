@@ -16,6 +16,15 @@ Competitive duel and team modes now expose Quake Live–style match pauses. Play
 | `g_timeoutCount` | `0` | Number of timeouts each team receives per match; initialised into `level.timeoutRemaining` and published via `CS_MATCH_STATE` for client HUDs.【F:src/code/game/g_main.c†L1093-L1121】【F:src/code/game/g_main.c†L2100-L2131】 |
 | `g_timeoutLen` | `60` | Timeout duration in seconds; values ≤0 hold the pause until a manual `timein`, while positive values trigger an automatic resume with broadcast messaging.【F:src/code/game/g_cmds.c†L1657-L1670】【F:src/code/game/g_main.c†L2295-L2316】 |
 
+## Mercy Rule Controls
+
+Team games can optionally end early when one side builds an insurmountable lead. The HLIL uses `g_mercytime` to delay any mercy evaluation until a minimum number of minutes has elapsed, then checks whether the absolute score spread exceeds `mercylimit` (ignoring warmup periods, pauses, and Attack & Defend's bespoke flow). When triggered, the server prints which team hit the limit and logs a `Mercylimit hit.` exit so demos match Quake Live's console text.【F:src/code/game/g_main.c†L2088-L2144】【F:src/code/game/g_main.c†L2146-L2184】
+
+| CVar | Default | Notes |
+| --- | --- | --- |
+| `mercylimit` | `0` | Absolute score difference that ends team-based matches once the grace window expires; `0` disables the mercy rule entirely.【F:src/code/game/g_main.c†L352-L356】【F:src/code/game/g_main.c†L2088-L2144】 |
+| `g_mercytime` | `10` | Minutes to wait after match start before evaluating `mercylimit`, allowing teams time to trade rounds before an early blowout ends the map.【F:src/code/game/g_main.c†L353-L356】【F:src/code/game/g_main.c†L2088-L2144】 |
+
 ## Vote Administration Controls
 
 Quake Live exposes additional vote governance CVars alongside the base `g_allowVote` toggle. These parameters gate when votes may be started, throttle repeat attempts, and cap how many proposals a player may issue per match. The HLIL registration table lists `g_allowVoteMidGame`, `g_voteDelay`, and `g_voteLimit` beside the stock vote knobs, each defaulting to `0` so dedicated servers begin with the legacy behaviour disabled.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L600-L744】 The vote fixtures exercise these toggles in isolation to confirm their impact on a running match.【F:src/game/tests/vote_control_fixtures.c†L165-L223】
