@@ -820,6 +820,8 @@ avatar banks exposed on the player setup menus.
 - `FEEDER_MAPS`, `FEEDER_ALLMAPS`, and the unimplemented `FEEDER_CVMAPS`
 options all draw from `mapList[]` so upcoming map-rotation menus can reuse the
 already-cached level metadata.
+- `FEEDER_MAP_ROTATIONS` surfaces the parsed `mapRotations[]` cache so rotation
+pool menus can inspect the resolved map/factory metadata.
 - `FEEDER_SERVERS` uses `serverStatus.displayServers[]`, while
 `FEEDER_SERVERSTATUS` and `FEEDER_FINDPLAYER` rely on `serverStatusInfo` and
 `foundPlayerServerNames[]` to paint MOTDs and search results.
@@ -828,6 +830,9 @@ already-cached level metadata.
 with the live client list.
 - `FEEDER_MODS`, `FEEDER_CINEMATICS`, and `FEEDER_DEMOS` are powered by
 `modList[]`, `movieList[]`, and `demoList[]` respectively.
+- `FEEDER_MATCHSUMMARY_END`, `FEEDER_MATCHSUMMARY_RED`, and
+`FEEDER_MATCHSUMMARY_BLUE` read from the cached `matchSummary` player lists
+populated after each `postgame` command.
 
 Definitions that only exist in the menu scripts today (`FEEDER_CLANS`,
 `FEEDER_REDTEAM_LIST`, `FEEDER_BLUETEAM_LIST`, `FEEDER_SCOREBOARD`,
@@ -880,6 +885,7 @@ typedef struct {
 
 	int mapRotationCount;
 	mapRotationInfo_t mapRotations[MAX_MAP_ROTATIONS];
+	int currentMapRotation;
 
 
 	int tierCount;
@@ -929,6 +935,9 @@ typedef struct {
 
 	qboolean inGameLoad;
 	uiMatchSummaryCache_t matchSummary;
+	int currentMatchSummaryEnd;
+	int currentMatchSummaryRed;
+	int currentMatchSummaryBlue;
 
 }	uiInfo_t;
 

@@ -2025,6 +2025,9 @@ Clears the cached match summary payload exposed to the scoreboards.
 */
 void UI_ResetMatchSummaryCache(void) {
 	memset(&uiInfo.matchSummary, 0, sizeof(uiInfo.matchSummary));
+	uiInfo.currentMatchSummaryEnd = 0;
+	uiInfo.currentMatchSummaryRed = 0;
+	uiInfo.currentMatchSummaryBlue = 0;
 }
 
 /*
@@ -2111,6 +2114,67 @@ void UI_MatchSummaryParseFromPostgame(void) {
 	}
 
 	cache->valid = (cache->endOfMatch.entryCount > 0) ? qtrue : qfalse;
+}
+
+/*
+=============
+UI_MatchSummaryListForFeeder
+
+Routes match summary feeder IDs to their cached player lists.
+=============
+*/
+static uiMatchPlayerList_t *UI_MatchSummaryListForFeeder(float feederID) {
+	uiMatchSummaryCache_t *cache = &uiInfo.matchSummary;
+
+	if (!cache->valid) {
+		return NULL;
+	}
+
+	if (feederID == FEEDER_MATCHSUMMARY_END) {
+		return &cache->endOfMatch;
+	} else if (feederID == FEEDER_MATCHSUMMARY_RED) {
+		return &cache->redTeam;
+	} else if (feederID == FEEDER_MATCHSUMMARY_BLUE) {
+		return &cache->blueTeam;
+	}
+
+	return NULL;
+}
+
+/*
+=============
+UI_MatchSummaryTeamString
+
+Returns the localized team label for cached match summary entries.
+=============
+*/
+static const char *UI_MatchSummaryTeamString(team_t team) {
+	switch (team) {
+		case TEAM_RED:
+			return "RED";
+		case TEAM_BLUE:
+			return "BLUE";
+		case TEAM_SPECTATOR:
+			return "SPECTATOR";
+		default:
+			return "FREE";
+	}
+}
+
+/*
+=============
+UI_MapRotationEntryForIndex
+
+Returns the cached map rotation entry for the provided index, or NULL if the
+row is unavailable.
+=============
+*/
+static mapRotationInfo_t *UI_MapRotationEntryForIndex(int index) {
+	if (index < 0 || index >= uiInfo.mapRotationCount) {
+		return NULL;
+	}
+
+	return &uiInfo.mapRotations[index];
 }
 
 
@@ -4533,13 +4597,15 @@ static int UI_FeederCount(float feederID) {
 		return uiInfo.q3HeadCount;
 	} else if (feederID == FEEDER_CINEMATICS) {
 		return uiInfo.movieCount;
-	} else if (feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS) {
+		} else if (feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS) {
 		// Map-rotation scripting in the Quake Live HLIL (`^1map rotation item missing
 		// map…` strings in `quakelive_steam.exe_hlil_part02.txt`) mirrors this branch,
 		// so the pending FEEDER_CVMAPS hook will live alongside the existing map
 		// feeders and continue to pull from `uiInfo.mapList`.
 		return UI_MapCountByGameType(feederID == FEEDER_MAPS ? qtrue : qfalse);
-	} else if (feederID == FEEDER_SERVERS) {
+	} else if (feederID == FEEDER_MAP_ROTATIONS) {
+		return uiInfo.mapRotationCount;
+		} else if (feederID == FEEDER_SERVERS) {
 		return uiInfo.serverStatus.numDisplayServers;
 	} else if (feederID == FEEDER_SERVERSTATUS) {
 		return uiInfo.serverStatusInfo.numLines;
@@ -4559,8 +4625,13 @@ static int UI_FeederCount(float feederID) {
 		return uiInfo.myTeamCount;
 	} else if (feederID == FEEDER_MODS) {
 		return uiInfo.modCount;
-	} else if (feederID == FEEDER_DEMOS) {
+		} else if (feederID == FEEDER_DEMOS) {
 		return uiInfo.demoCount;
+			} else if (feederID == FEEDER_MATCHSUMMARY_END
+		|| feederID == FEEDER_MATCHSUMMARY_RED
+		|| feederID == FEEDER_MATCHSUMMARY_BLUE) {
+		uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
+		return (list) ? list->entryCount : 0;
 	}
 	return 0;
 }
@@ -4629,6 +4700,9 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 	static char clientBuff[32];
 	static int lastColumn = -1;
 	static int lastTime = 0;
+	static char matchSummaryScore[16];
+	static char matchSummaryRank[16];
+	static char matchSummaryClient[16];
 	*handle = -1;
 	if (feederID == FEEDER_HEADS) {
 		int actual;
@@ -4640,7 +4714,26 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 	} else if (feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS) {
 		int actual;
 		return UI_SelectedMap(index, &actual);
-	} else if (feederID == FEEDER_SERVERS) {
+	} else if (feederID == FEEDER_MAP_ROTATIONS) {
+		mapRotationInfo_t *entry = UI_MapRotationEntryForIndex(index);
+		if (entry) {
+			switch (column) {
+				case 1:
+					return (entry->mapName[0]) ? entry->mapName : entry->mapTitle;
+				case 2:
+					return entry->factoryId;
+				case 3:
+					return entry->factoryConfig;
+				case 4:
+					return entry->factoryGameType;
+				default:
+					if (entry->mapTitle[0]) {
+						return entry->mapTitle;
+					}
+					return entry->mapName;
+			}
+		}
+} else if (feederID == FEEDER_SERVERS) {
 		if (!UI_ServerBrowserEnabled()) {
 			return "";
 		}
@@ -4733,6 +4826,28 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 		if (index >= 0 && index < uiInfo.demoCount) {
 			return uiInfo.demoList[index];
 		}
+} else if (feederID == FEEDER_MATCHSUMMARY_END
+		|| feederID == FEEDER_MATCHSUMMARY_RED
+		|| feederID == FEEDER_MATCHSUMMARY_BLUE) {
+		uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
+		if (list && index >= 0 && index < list->entryCount) {
+			uiMatchPlayerInfo_t *entry = &list->entries[index];
+			switch (column) {
+				case 1:
+					Com_sprintf(matchSummaryScore, sizeof(matchSummaryScore), "%i", entry->score);
+					return matchSummaryScore;
+				case 2:
+					Com_sprintf(matchSummaryRank, sizeof(matchSummaryRank), "%i", entry->rank);
+					return matchSummaryRank;
+				case 3:
+					return UI_MatchSummaryTeamString(entry->team);
+				case 4:
+					Com_sprintf(matchSummaryClient, sizeof(matchSummaryClient), "%i", entry->clientNum);
+					return matchSummaryClient;
+				default:
+					return entry->name;
+			}
+		}
 	}
 	return "";
 }
@@ -4784,8 +4899,8 @@ static void UI_FeederSelection(float feederID, int index) {
       trap_Cvar_Set( "headmodel", uiInfo.q3HeadNames[index]);
 			updateModel = qtrue;
 		}
-  } else if (feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS) {
-		int actual, map;
+} else if (feederID == FEEDER_MAPS || feederID == FEEDER_ALLMAPS) {
+int actual, map;
 		map = (feederID == FEEDER_ALLMAPS) ? ui_currentNetMap.integer : ui_currentMap.integer;
 		// HLIL map-rotation strings (`^1map rotation item missing map…`) show the native
 		// UI reusing the same cinematic + metadata pairing when browsing rotation
@@ -4811,7 +4926,11 @@ static void UI_FeederSelection(float feederID, int index) {
 	  	uiInfo.mapList[ui_currentNetMap.integer].cinematic = trap_CIN_PlayCinematic(va("%s.roq", uiInfo.mapList[ui_currentNetMap.integer].mapLoadName), 0, 0, 0, 0, (CIN_loop | CIN_silent) );
 		}
 
-  } else if (feederID == FEEDER_SERVERS) {
+	} else if (feederID == FEEDER_MAP_ROTATIONS) {
+		if (UI_MapRotationEntryForIndex(index)) {
+			uiInfo.currentMapRotation = index;
+		}
+	} else if (feederID == FEEDER_SERVERS) {
 		const char *mapName = NULL;
 		uiInfo.serverStatus.currentServer = index;
 		trap_LAN_GetServerInfo(ui_netSource.integer, uiInfo.serverStatus.displayServers[index], info, MAX_STRING_CHARS);
@@ -4847,8 +4966,21 @@ static void UI_FeederSelection(float feederID, int index) {
 		  trap_CIN_StopCinematic(uiInfo.previewMovie);
 		}
 		uiInfo.previewMovie = -1;
-  } else if (feederID == FEEDER_DEMOS) {
+	} else if (feederID == FEEDER_DEMOS) {
 		uiInfo.demoIndex = index;
+	} else if (feederID == FEEDER_MATCHSUMMARY_END
+		|| feederID == FEEDER_MATCHSUMMARY_RED
+		|| feederID == FEEDER_MATCHSUMMARY_BLUE) {
+		uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
+		if (list && index >= 0 && index < list->entryCount) {
+			if (feederID == FEEDER_MATCHSUMMARY_END) {
+				uiInfo.currentMatchSummaryEnd = index;
+			} else if (feederID == FEEDER_MATCHSUMMARY_RED) {
+				uiInfo.currentMatchSummaryRed = index;
+			} else {
+				uiInfo.currentMatchSummaryBlue = index;
+			}
+		}
 	}
 }
 

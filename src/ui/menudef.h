@@ -91,6 +91,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define FEEDER_REDTEAM_STATS                                    0x11                    // premium statistics board for red team
 #define FEEDER_BLUETEAM_STATS                                   0x12                    // premium statistics board for blue team
 #define FEEDER_CVMAPS                                           0x13                    // maps for the gametype you wish to cv to
+#define FEEDER_MAP_ROTATIONS                                    0x14                    // cached map rotation entries
+#define FEEDER_MATCHSUMMARY_END                                 0x15                    // cached end-of-match rows
+#define FEEDER_MATCHSUMMARY_RED                                 0x16                    // cached red-team rows
+#define FEEDER_MATCHSUMMARY_BLUE                                0x17                    // cached blue-team rows
 
 // display flags
 #define CG_SHOW_BLUE_TEAM_HAS_REDFLAG     0x00000001
