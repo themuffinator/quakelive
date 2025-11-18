@@ -25,6 +25,45 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "bg_public.h"
 
+const weaponStats_t bg_weaponStats[] = {
+	{ WP_GAUNTLET, 0, -1, 0, 0.000000000f, 0.847000003f, 1.000000000f, 1.000000000f },
+	{ WP_MACHINEGUN, 50, 150, 0, 1.000000000f, 1.000000000f, 0.000000000f, 1.000000000f },
+	{ WP_SHOTGUN, 5, 25, 1, 1.000000000f, 0.490000010f, 0.000000000f, 1.000000000f },
+	{ WP_GRENADE_LAUNCHER, 5, 25, 0, 0.007000000f, 0.564000010f, 0.070000000f, 1.000000000f },
+	{ WP_ROCKET_LAUNCHER, 5, 25, 1, 1.000000000f, 0.003000000f, 0.003000000f, 1.000000000f },
+	{ WP_LIGHTNING, 50, 150, 1, 1.000000000f, 1.000000000f, 0.728999972f, 1.000000000f },
+	{ WP_RAILGUN, 5, 25, 1, 0.000000000f, 1.000000000f, 0.000000000f, 1.000000000f },
+	{ WP_PLASMAGUN, 50, 150, 1, 0.772000015f, 0.000000000f, 1.000000000f, 1.000000000f },
+	{ WP_BFG, 2, 25, 0, 0.003000000f, 0.351999998f, 1.000000000f, 1.000000000f },
+	{ WP_GRAPPLING_HOOK, 0, -1, 0, 0.317000002f, 0.666000009f, 0.861999989f, 1.000000000f },
+	{ WP_NAILGUN, 5, 25, 0, 0.000000000f, 1.000000000f, 0.700999975f, 1.000000000f },
+	{ WP_PROX_LAUNCHER, 5, 5, 0, 1.000000000f, 0.000000000f, 0.486000001f, 1.000000000f },
+	{ WP_CHAINGUN, 100, 200, 0, 0.721000016f, 0.721000016f, 0.721000016f, 1.000000000f },
+	{ WP_HEAVY_MACHINEGUN, 50, 150, 1, 0.806999981f, 0.647000015f, 0.000000000f, 1.000000000f }
+};
+
+const int bg_weaponStatsCount = sizeof( bg_weaponStats ) / sizeof( bg_weaponStats[0] );
+
+/*
+=============
+BG_WeaponStatsForWeapon
+
+Returns the stat record for a weapon enumeration or NULL when no mapping exists.
+=============
+*/
+const weaponStats_t *BG_WeaponStatsForWeapon( weapon_t weapon ) {
+	int		index;
+
+	for ( index = 0; index < bg_weaponStatsCount; index++ ) {
+		if ( bg_weaponStats[index].weapon == weapon ) {
+			return &bg_weaponStats[index];
+		}
+	}
+
+	return NULL;
+}
+
+
 /*QUAKED item_***** ( 0 0 0 ) (-16 -16 -16) (16 16 16) suspended
 DO NOT USE THIS CLASS, IT JUST HOLDS GENERAL INFORMATION.
 The suspended flag will allow items to hang in the air, otherwise they are dropped to the next surface.
