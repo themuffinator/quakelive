@@ -6514,6 +6514,10 @@ vmCvar_t	ui_drawCrosshair;
 vmCvar_t	ui_drawCrosshairNames;
 vmCvar_t	ui_marks;
 
+vmCvar_t	ui_globalpreset;
+vmCvar_t	ui_screenDamage_Team_preset;
+vmCvar_t	ui_screenDamage_preset;
+
 vmCvar_t	ui_server1;
 vmCvar_t	ui_server2;
 vmCvar_t	ui_server3;
@@ -6681,6 +6685,9 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_netSource, "ui_netSource", "0", CVAR_ARCHIVE },
         { &ui_menuFiles, "ui_menuFiles", "ui/menus.txt", CVAR_ARCHIVE },
         { &ui_menuFlow, "ui_menuFlow", "1", CVAR_ARCHIVE },
+	{ &ui_globalpreset, "ui_globalpreset", "0", CVAR_ARCHIVE },
+	{ &ui_screenDamage_Team_preset, "ui_screenDamage_Team_preset", "0", CVAR_ARCHIVE },
+	{ &ui_screenDamage_preset, "ui_screenDamage_preset", "0", CVAR_ARCHIVE },
         { &ui_browserAwesomium, "ui_browserAwesomium", "0", CVAR_TEMP },
 	{ &ui_currentTier, "ui_currentTier", "0", CVAR_ARCHIVE },
 	{ &ui_currentMap, "ui_currentMap", "0", CVAR_ARCHIVE },
