@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // for a 3D rendering
 #include "cg_local.h"
 
+static void CG_SetZoomState( qboolean zoomState );
+static void CG_HandleZoomOutOnDeath( void );
+
 
 /*
 =============================================================================
@@ -237,6 +240,7 @@ static void CG_OffsetThirdPersonView( void ) {
 	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
 		focusAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
 		cg.refdefViewAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
+		CG_HandleZoomOutOnDeath();
 	}
 
 	if ( focusAngles[PITCH] > 45 ) {
@@ -320,6 +324,7 @@ static void CG_OffsetFirstPersonView( void ) {
 	int				timeDelta;
 	
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		CG_HandleZoomOutOnDeath();
 		return;
 	}
 
@@ -332,6 +337,7 @@ static void CG_OffsetFirstPersonView( void ) {
 		angles[PITCH] = -15;
 		angles[YAW] = cg.snap->ps.stats[STAT_DEAD_YAW];
 		origin[2] += cg.predictedPlayerState.viewheight;
+		CG_HandleZoomOutOnDeath();
 		return;
 	}
 
@@ -442,20 +448,70 @@ static void CG_OffsetFirstPersonView( void ) {
 
 //======================================================================
 
-void CG_ZoomDown_f( void ) { 
-	if ( cg.zoomed ) {
+/*
+=============
+CG_SetZoomState
+
+Updates the zoom state if it changes.
+=============
+*/
+static void CG_SetZoomState( qboolean zoomState ) {
+	if ( cg.zoomed == zoomState ) {
 		return;
 	}
-	cg.zoomed = qtrue;
+
+	cg.zoomed = zoomState;
 	cg.zoomTime = cg.time;
 }
 
-void CG_ZoomUp_f( void ) { 
+/*
+=============
+CG_HandleZoomOutOnDeath
+
+Releases the zoom when required by cg_zoomOutOnDeath.
+=============
+*/
+static void CG_HandleZoomOutOnDeath( void ) {
+	if ( !cg.zoomOutOnDeath ) {
+		return;
+	}
+
 	if ( !cg.zoomed ) {
 		return;
 	}
-	cg.zoomed = qfalse;
-	cg.zoomTime = cg.time;
+
+	CG_SetZoomState( qfalse );
+}
+
+/*
+=============
+CG_ZoomDown_f
+
+Handles the +zoom press action.
+=============
+*/
+void CG_ZoomDown_f( void ) {
+	if ( cg.zoomToggle ) {
+		CG_SetZoomState( !cg.zoomed );
+		return;
+	}
+
+	CG_SetZoomState( qtrue );
+}
+
+/*
+=============
+CG_ZoomUp_f
+
+Handles the +zoom release action.
+=============
+*/
+void CG_ZoomUp_f( void ) {
+	if ( cg.zoomToggle ) {
+		return;
+	}
+
+	CG_SetZoomState( qfalse );
 }
 
 
