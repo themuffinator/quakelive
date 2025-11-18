@@ -218,6 +218,8 @@ CG_OffsetThirdPersonView
 ===============
 */
 #define	FOCUS_DISTANCE	512
+#define	THIRD_PERSON_PITCH_MIN	-45.0f
+#define	THIRD_PERSON_PITCH_MAX	45.0f
 static void CG_OffsetThirdPersonView( void ) {
 	vec3_t		forward, right, up;
 	vec3_t		view;
@@ -228,10 +230,19 @@ static void CG_OffsetThirdPersonView( void ) {
 	vec3_t		focusPoint;
 	float		focusDist;
 	float		forwardScale, sideScale;
+	float		thirdPersonPitch;
 
 	cg.refdef.vieworg[2] += cg.predictedPlayerState.viewheight;
 
+	thirdPersonPitch = cg_thirdPersonPitch.value;
+	if ( thirdPersonPitch < THIRD_PERSON_PITCH_MIN ) {
+		thirdPersonPitch = THIRD_PERSON_PITCH_MIN;
+	} else if ( thirdPersonPitch > THIRD_PERSON_PITCH_MAX ) {
+		thirdPersonPitch = THIRD_PERSON_PITCH_MAX;
+	}
+
 	VectorCopy( cg.refdefViewAngles, focusAngles );
+	focusAngles[PITCH] -= thirdPersonPitch;
 
 	// if dead, look at killer
 	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
@@ -250,6 +261,7 @@ static void CG_OffsetThirdPersonView( void ) {
 
 	view[2] += 8;
 
+	cg.refdefViewAngles[PITCH] -= thirdPersonPitch;
 	cg.refdefViewAngles[PITCH] *= 0.5;
 
 	AngleVectors( cg.refdefViewAngles, forward, right, up );
