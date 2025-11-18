@@ -163,6 +163,18 @@ iteminfo "weapon_machinegun"
 	maxs					{15,15,15}
 } //end iteminfo
 
+iteminfo "weapon_hmg"
+{
+	name				"Heavy Machinegun"
+	model			"models/weapons3/hmg/hmg.md3"
+	modelindex		MODELINDEX_HEAVYMACHINEGUN
+	type			ITEM_WEAPON
+	index			INVENTORY_HEAVYMACHINEGUN
+	respawntime		15
+	mins			{-15,-15,-15}
+	maxs			{15,15,15}
+} //end iteminfo
+
 iteminfo "weapon_grenadelauncher"
 {
 	name					"Grenade Launcher"
@@ -310,6 +322,18 @@ iteminfo "ammo_bullets"
 	respawntime				40
 	mins					{-15,-15,-15}
 	maxs					{15,15,15}
+} //end iteminfo
+
+iteminfo "ammo_hmg"
+{
+	name				"Heavy Bullets"
+	model			"models/powerups/ammo/hmgam.md3"
+	modelindex		MODELINDEX_HEAVYBULLETS
+	type			ITEM_AMMO
+	index			INVENTORY_HEAVYBULLETS
+	respawntime		40
+	mins			{-15,-15,-15}
+	maxs			{15,15,15}
 } //end iteminfo
 
 iteminfo "ammo_grenades"
@@ -482,6 +506,42 @@ iteminfo "holdable_invulnerability"
 	respawntime				60
 	mins					{-15,-15,-15}
 	maxs					{15,15,15}
+} //end iteminfo
+
+iteminfo "item_key_silver"
+{
+	name				"Silver Key"
+	model			"models/powerups/keys/key_silver.md3"
+	modelindex		MODELINDEX_SILVERKEY
+	type			ITEM_KEY
+	index			INVENTORY_KEY_SILVER
+	respawntime		60
+	mins			{-15,-15,-15}
+	maxs			{15,15,15}
+} //end iteminfo
+
+iteminfo "item_key_gold"
+{
+	name				"Gold Key"
+	model			"models/powerups/keys/key_gold.md3"
+	modelindex		MODELINDEX_GOLDKEY
+	type			ITEM_KEY
+	index			INVENTORY_KEY_GOLD
+	respawntime		60
+	mins			{-15,-15,-15}
+	maxs			{15,15,15}
+} //end iteminfo
+
+iteminfo "item_key_master"
+{
+	name				"Master Key"
+	model			"models/powerups/keys/key_master.md3"
+	modelindex		MODELINDEX_MASTERKEY
+	type			ITEM_KEY
+	index			INVENTORY_KEY_MASTER
+	respawntime		60
+	mins			{-15,-15,-15}
+	maxs			{15,15,15}
 } //end iteminfo
 
 iteminfo "item_quad"
