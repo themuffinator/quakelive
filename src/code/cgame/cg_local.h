@@ -78,6 +78,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	NUM_CROSSHAIRS		10
 
+#define DOM_POINT_STATE_COUNT	5
+#define DOMINATION_DISTRESS_REPEAT_TIME	2000
+
 #define TEAM_OVERLAY_MAXNAME_WIDTH	12
 #define TEAM_OVERLAY_MAXLOCATION_WIDTH	16
 
@@ -698,6 +701,15 @@ typedef struct {
 	qhandle_t	harvesterBlueSkin;
 	qhandle_t	harvesterNeutralModel;
 
+	qhandle_t	domPointModel;
+	qhandle_t	domPointSkinRed;
+	qhandle_t	domPointSkinBlue;
+	qhandle_t	domPointSkinNeutral;
+	qhandle_t	domCapShaders[DOM_POINT_STATE_COUNT];
+	qhandle_t	domCapDistressShaders[DOM_POINT_STATE_COUNT];
+	qhandle_t	domDefShaders[DOM_POINT_STATE_COUNT];
+	qhandle_t	domDefDistressShaders[DOM_POINT_STATE_COUNT];
+
 	qhandle_t	armorModel;
 	qhandle_t	armorIcon;
 
@@ -937,6 +949,7 @@ typedef struct {
 	sfxHandle_t	youHaveFlagSound;
 	sfxHandle_t yourBaseIsUnderAttackSound;
 	sfxHandle_t holyShitSound;
+	sfxHandle_t dominationDistressSound;
 
 	// tournament sounds
 	sfxHandle_t	count3Sound;
