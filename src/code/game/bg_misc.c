@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "bg_public.h"
 
-const weaponStats_t bg_weaponStats[] = {
+const bgWeaponStats_t bg_weaponStats[] = {
 	{ WP_GAUNTLET, 0, -1, 0, 0.000000000f, 0.847000003f, 1.000000000f, 1.000000000f },
 	{ WP_MACHINEGUN, 50, 150, 0, 1.000000000f, 1.000000000f, 0.000000000f, 1.000000000f },
 	{ WP_SHOTGUN, 5, 25, 1, 1.000000000f, 0.490000010f, 0.000000000f, 1.000000000f },
@@ -44,15 +44,37 @@ const weaponStats_t bg_weaponStats[] = {
 
 const int bg_weaponStatsCount = sizeof( bg_weaponStats ) / sizeof( bg_weaponStats[0] );
 
+static const int bg_weaponMaxAmmo[WP_NUM_WEAPONS] = {
+	0,		// WP_NONE
+	0,		// WP_GAUNTLET
+	200,	// WP_MACHINEGUN
+	150,	// WP_HEAVY_MACHINEGUN
+	25,	// WP_SHOTGUN
+	25,	// WP_GRENADE_LAUNCHER
+	20,	// WP_ROCKET_LAUNCHER
+	150,	// WP_LIGHTNING
+	50,	// WP_RAILGUN
+	200,	// WP_PLASMAGUN
+	200,	// WP_BFG
+	0,		// WP_GRAPPLING_HOOK
+	150,	// WP_NAILGUN
+	15,	// WP_PROX_LAUNCHER
+	100	// WP_CHAINGUN
+};
+
 /*
 =============
-BG_WeaponStatsForWeapon
+BG_GetWeaponStats
 
 Returns the stat record for a weapon enumeration or NULL when no mapping exists.
 =============
 */
-const weaponStats_t *BG_WeaponStatsForWeapon( weapon_t weapon ) {
+const bgWeaponStats_t *BG_GetWeaponStats( weapon_t weapon ) {
 	int		index;
+
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return NULL;
+	}
 
 	for ( index = 0; index < bg_weaponStatsCount; index++ ) {
 		if ( bg_weaponStats[index].weapon == weapon ) {
@@ -61,6 +83,57 @@ const weaponStats_t *BG_WeaponStatsForWeapon( weapon_t weapon ) {
 	}
 
 	return NULL;
+}
+
+/*
+=============
+BG_GetWeaponMaxAmmo
+
+Returns the hard cap for the supplied weapon type. Dropped ammo ignores the
+limit so players can still recover after a weapon toss.
+=============
+*/
+int BG_GetWeaponMaxAmmo( weapon_t weapon ) {
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return 0;
+	}
+
+	return bg_weaponMaxAmmo[weapon];
+}
+
+/*
+=============
+BG_GetHandicapScalar
+
+Returns the handicap scalar associated with the requested weapon and type.
+=============
+*/
+float BG_GetHandicapScalar( handicap_type_t type, weapon_t weapon ) {
+	const bgWeaponStats_t	*stats;
+
+	if ( type < 0 || type >= HANDICAP_SCALAR_MAX ) {
+		return 1.0f;
+	}
+
+	stats = BG_GetWeaponStats( weapon );
+	if ( !stats ) {
+		return 1.0f;
+	}
+
+	switch ( type ) {
+	case HANDICAP_SCALAR_PICKUP:
+		return stats->pickupHandicapScale;
+	case HANDICAP_SCALAR_ARMOR:
+		return stats->armorHandicapScale;
+	case HANDICAP_SCALAR_HEALTH:
+		return stats->healthHandicapScale;
+	case HANDICAP_SCALAR_RESPAWN:
+		return stats->respawnHandicapScale;
+	default:
+		break;
+	}
+
+	return 1.0f;
 }
 
 
@@ -1199,40 +1272,6 @@ static qboolean BG_IsDroppedItem( const entityState_t *ent ) {
 
 /*
 =============
-BG_MaxAmmoForWeapon
-
-Returns the hard cap for the supplied weapon type. Dropped ammo ignores the
-limit so players can still recover after a weapon toss.
-=============
-*/
-static int BG_MaxAmmoForWeapon( weapon_t weapon ) {
-	static const int weaponMaxAmmo[WP_NUM_WEAPONS] = {
-		0,	// WP_NONE
-		0,	// WP_GAUNTLET
-		200,	// WP_MACHINEGUN
-		150,	// WP_HEAVY_MACHINEGUN
-		25,	// WP_SHOTGUN
-		25,	// WP_GRENADE_LAUNCHER
-		20,	// WP_ROCKET_LAUNCHER
-		150,	// WP_LIGHTNING
-		50,	// WP_RAILGUN
-		200,	// WP_PLASMAGUN
-		200,	// WP_BFG
-		0,	// WP_GRAPPLING_HOOK
-		150,	// WP_NAILGUN
-		15,	// WP_PROX_LAUNCHER
-		100	// WP_CHAINGUN
-	};
-
-	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
-		return 0;
-	}
-
-	return weaponMaxAmmo[weapon];
-}
-
-/*
-=============
 BG_PlayerCarryingFlag
 
 Returns qtrue when the player already has one of the flag powerups active.
@@ -1381,7 +1420,7 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 			int weapon;
 
 			for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
-				const int maxAmmo = BG_MaxAmmoForWeapon( weapon );
+				const int maxAmmo = BG_GetWeaponMaxAmmo( weapon );
 
 				if ( maxAmmo <= 0 ) {
 					continue;
@@ -1395,7 +1434,7 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 			return qfalse;
 		}
 
-		if ( ps->ammo[item->giTag] >= BG_MaxAmmoForWeapon( item->giTag ) ) {
+		if ( ps->ammo[item->giTag] >= BG_GetWeaponMaxAmmo( item->giTag ) ) {
 			return qfalse;
 		}
 

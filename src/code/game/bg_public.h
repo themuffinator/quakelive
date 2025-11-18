@@ -400,7 +400,7 @@ typedef enum {
        WP_NUM_WEAPONS
 } weapon_t;
 
-typedef struct weaponStats_s {
+typedef struct bgWeaponStats_s {
 	weapon_t	weapon;
 	int		pickupQuantity;
 	int		maxStack;
@@ -409,12 +409,22 @@ typedef struct weaponStats_s {
 	float	armorHandicapScale;
 	float	healthHandicapScale;
 	float	respawnHandicapScale;
-} weaponStats_t;
+} bgWeaponStats_t;
 
-extern const weaponStats_t bg_weaponStats[];
+typedef enum weaponHandicapType_e {
+	HANDICAP_SCALAR_PICKUP,
+	HANDICAP_SCALAR_ARMOR,
+	HANDICAP_SCALAR_HEALTH,
+	HANDICAP_SCALAR_RESPAWN,
+	HANDICAP_SCALAR_MAX
+} handicap_type_t;
+
+extern const bgWeaponStats_t bg_weaponStats[];
 extern const int bg_weaponStatsCount;
 
-const weaponStats_t *BG_WeaponStatsForWeapon( weapon_t weapon );
+const bgWeaponStats_t *BG_GetWeaponStats( weapon_t weapon );
+int BG_GetWeaponMaxAmmo( weapon_t weapon );
+float BG_GetHandicapScalar( handicap_type_t type, weapon_t weapon );
 
 
 struct pmove_settings_s {
