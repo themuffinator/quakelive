@@ -632,6 +632,8 @@ typedef struct {
 	float		v_dmg_time;
 	float		v_dmg_pitch;
 	float		v_dmg_roll;
+	float		kickScale;
+	float		bobScale;
 
 	vec3_t		kick_angles;	// weapon kicks
 	vec3_t		kick_origin;
@@ -1106,6 +1108,7 @@ extern	vmCvar_t		cg_runroll;
 extern	vmCvar_t		cg_bobup;
 extern	vmCvar_t		cg_bobpitch;
 extern	vmCvar_t		cg_bobroll;
+extern	vmCvar_t		cg_bob;
 extern	vmCvar_t		cg_swingSpeed;
 extern	vmCvar_t		cg_shadows;
 extern	vmCvar_t		cg_gibs;
@@ -1196,6 +1199,7 @@ extern	vmCvar_t		cg_drawFriend;
 extern	vmCvar_t		cg_teamChatsOnly;
 extern	vmCvar_t		cg_noVoiceChats;
 extern	vmCvar_t		cg_noVoiceText;
+extern	vmCvar_t		cg_kickScale;
 extern  vmCvar_t		cg_scorePlum;
 extern	vmCvar_t		cg_smoothClients;
 extern	vmCvar_t		pmove_fixed;

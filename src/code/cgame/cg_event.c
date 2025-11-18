@@ -520,7 +520,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.landSound );
 		if ( clientNum == cg.predictedPlayerState.clientNum ) {
 			// smooth landing z changes
-			cg.landChange = -8;
+			cg.landChange = -8 * cg.kickScale;
 			cg.landTime = cg.time;
 		}
 		break;
@@ -530,7 +530,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		trap_S_StartSound( NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*pain100_1.wav" ) );
 		if ( clientNum == cg.predictedPlayerState.clientNum ) {
 			// smooth landing z changes
-			cg.landChange = -16;
+			cg.landChange = -16 * cg.kickScale;
 			cg.landTime = cg.time;
 		}
 		break;
@@ -540,7 +540,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		cent->pe.painTime = cg.time;	// don't play a pain sound right after this
 		if ( clientNum == cg.predictedPlayerState.clientNum ) {
 			// smooth landing z changes
-			cg.landChange = -24;
+			cg.landChange = -24 * cg.kickScale;
 			cg.landTime = cg.time;
 		}
 		break;

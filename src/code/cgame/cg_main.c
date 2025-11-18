@@ -92,6 +92,7 @@ vmCvar_t	cg_runroll;
 vmCvar_t	cg_bobup;
 vmCvar_t	cg_bobpitch;
 vmCvar_t	cg_bobroll;
+vmCvar_t	cg_bob;
 vmCvar_t	cg_swingSpeed;
 vmCvar_t	cg_shadows;
 vmCvar_t	cg_gibs;
@@ -182,6 +183,7 @@ vmCvar_t	cg_teamChatsOnly;
 vmCvar_t	cg_noVoiceChats;
 vmCvar_t	cg_noVoiceText;
 vmCvar_t	cg_hudFiles;
+vmCvar_t	cg_kickScale;
 vmCvar_t 	cg_scorePlum;
 vmCvar_t 	cg_smoothClients;
 vmCvar_t	pmove_fixed;
@@ -285,6 +287,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_bobup , "cg_bobup", "0.005", CVAR_CHEAT },
 	{ &cg_bobpitch, "cg_bobpitch", "0.002", CVAR_ARCHIVE },
 	{ &cg_bobroll, "cg_bobroll", "0.002", CVAR_ARCHIVE },
+	{ &cg_bob, "cg_bob", "1", CVAR_ARCHIVE },
+	{ &cg_kickScale, "cg_kickScale", "1", CVAR_ARCHIVE },
 	{ &cg_swingSpeed, "cg_swingSpeed", "0.3", CVAR_CHEAT },
 	{ &cg_animSpeed, "cg_animspeed", "1", CVAR_CHEAT },
 	{ &cg_debugAnim, "cg_debuganim", "0", CVAR_CHEAT },
@@ -387,6 +391,16 @@ void CG_RegisterCvars( void ) {
 
 	forceModelModificationCount = cg_forceModel.modificationCount;
 
+	cg.kickScale = cg_kickScale.value;
+	if ( cg.kickScale < 0.0f ) {
+		cg.kickScale = 0.0f;
+	}
+
+	cg.bobScale = cg_bob.value;
+	if ( cg.bobScale < 0.0f ) {
+		cg.bobScale = 0.0f;
+	}
+
 	trap_Cvar_Register(NULL, "model", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "headmodel", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "team_model", DEFAULT_TEAM_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
@@ -447,6 +461,15 @@ void CG_UpdateCvars( void ) {
 		CG_ForceModelChange();
 	}
 
+	cg.kickScale = cg_kickScale.value;
+	if ( cg.kickScale < 0.0f ) {
+		cg.kickScale = 0.0f;
+	}
+
+	cg.bobScale = cg_bob.value;
+	if ( cg.bobScale < 0.0f ) {
+		cg.bobScale = 0.0f;
+	}
 	cg.zoomToggle = (qboolean)( cg_zoomToggle.integer != 0 );
 	cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
 }
