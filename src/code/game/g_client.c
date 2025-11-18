@@ -1918,6 +1918,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	index = ent - g_entities;
 	client = ent->client;
+	ent->keyMask = 0;
 	factoryConfig = &g_factoryCvarConfig;
 	level.clientFactoryLoadoutQueued[index] = qfalse;
 

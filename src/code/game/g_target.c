@@ -24,17 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "g_local.h"
 
-typedef struct targetKeyInfo_s {
-	int		bit;
-	const char	*classname;
-} targetKeyInfo_t;
-
-static const targetKeyInfo_t targetKeyInfo[] = {
-	{ KEY_FLAG_SILVER, "item_key_silver" },
-	{ KEY_FLAG_GOLD, "item_key_gold" },
-	{ KEY_FLAG_MASTER, "item_key_master" }
-};
-
 /*
 =============
 G_TargetSuffixIsNumeric
@@ -131,37 +120,11 @@ Drops all carried key items from the activator.
 =============
 */
 static void Use_Target_RemoveKeys( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
-	int		i;
-	int		keyCount;
-
 	if ( !activator || !activator->client ) {
 		return;
 	}
 
-	if ( !activator->keyMask ) {
-		return;
-	}
-
-	keyCount = sizeof( targetKeyInfo ) / sizeof( targetKeyInfo[0] );
-	for ( i = 0; i < keyCount; i++ ) {
-		const targetKeyInfo_t	*info;
-		gitem_t				*item;
-
-		info = &targetKeyInfo[i];
-		if ( !( activator->keyMask & info->bit ) ) {
-			continue;
-		}
-
-		item = BG_FindItem( info->classname );
-		if ( !item ) {
-			G_Printf( "WARNING: target_remove_keys missing %s definition\n", info->classname );
-			continue;
-		}
-
-		Drop_Item( activator, item, 0 );
-	}
-
-	activator->keyMask = 0;
+	G_DropClientKeys( activator );
 }
 
 /*

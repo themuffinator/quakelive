@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 //
 #include "g_local.h"
+#include "g_rankings.h"
 
 /*
 
@@ -41,6 +42,51 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	RESPAWN_AMMO		40
 #define	RESPAWN_HOLDABLE	60
 #define	RESPAWN_MEGAHEALTH	35//120
+static const keyItemDef_t g_keyItemDefs[] = {
+	{ KEY_FLAG_SILVER, "item_key_silver" },
+	{ KEY_FLAG_GOLD, "item_key_gold" },
+	{ KEY_FLAG_MASTER, "item_key_master" }
+};
+
+/*
+===============
+G_KeyItemDefs
+
+Returns the static key definition table so callers can iterate over supported key items.
+===============
+*/
+const keyItemDef_t *G_KeyItemDefs( int *count ) {
+	if ( count ) {
+		*count = sizeof( g_keyItemDefs ) / sizeof( g_keyItemDefs[0] );
+	}
+
+	return g_keyItemDefs;
+}
+
+/*
+===============
+G_KeyItemForBit
+
+Resolves the gitem definition for a particular key mask bit.
+===============
+*/
+gitem_t *G_KeyItemForBit( int bit ) {
+	int			 i;
+	int			 count;
+	const keyItemDef_t	*defs;
+
+	defs = G_KeyItemDefs( &count );
+	for ( i = 0 ; i < count ; i++ ) {
+		if ( defs[i].bit != bit ) {
+			continue;
+		}
+
+		return BG_FindItemByClassname( defs[i].classname );
+	}
+
+	return NULL;
+}
+
 #define	RESPAWN_POWERUP		120
 
 /*
@@ -218,13 +264,41 @@ int Pickup_PersistantPowerup( gentity_t *ent, gentity_t *other ) {
 
 int Pickup_Holdable( gentity_t *ent, gentity_t *other ) {
 
-	other->client->ps.stats[STAT_HOLDABLE_ITEM] = ent->item - bg_itemlist;
+        other->client->ps.stats[STAT_HOLDABLE_ITEM] = ent->item - bg_itemlist;
 
-	if( ent->item->giTag == HI_KAMIKAZE ) {
-		other->client->ps.eFlags |= EF_KAMIKAZE;
+        if( ent->item->giTag == HI_KAMIKAZE ) {
+                other->client->ps.eFlags |= EF_KAMIKAZE;
+        }
+
+        return RESPAWN_HOLDABLE;
+}
+
+/*
+===============
+Pickup_Key
+
+Awards the configured key bit to the activator and prevents the source entity from respawning automatically.
+===============
+*/
+static int Pickup_Key( gentity_t *ent, gentity_t *other ) {
+	int	keyBit;
+
+	if ( !ent || !ent->item || !other ) {
+		return 0;
 	}
 
-	return RESPAWN_HOLDABLE;
+	keyBit = ent->item->giTag;
+	if ( keyBit <= 0 ) {
+		return 0;
+	}
+
+	other->keyMask |= keyBit;
+
+	if ( other->client ) {
+		trap_RankReportInt( other->s.number, -1, QGR_KEY_FLAG_PICKUP, 1, 1 );
+	}
+
+	return -1;
 }
 
 
@@ -620,6 +694,9 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	case IT_HOLDABLE:
 		respawn = Pickup_Holdable(ent, other);
 		break;
+	case IT_KEY:
+		respawn = Pickup_Key( ent, other );
+		break;
 	default:
 		return;
 	}
@@ -719,7 +796,7 @@ Spawns an item and tosses it forward
 gentity_t *LaunchItem( gitem_t *item, vec3_t origin, vec3_t velocity ) {
 	gentity_t	*dropped;
 
-	if ( !G_MatchFactoryDropAllowed() && item && item->giType != IT_TEAM ) {
+	if ( !G_MatchFactoryDropAllowed() && item && item->giType != IT_TEAM && item->giType != IT_KEY ) {
 		return NULL;
 	}
 
@@ -775,8 +852,13 @@ Spawns an item and tosses it forward
 gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle ) {
 	vec3_t	velocity;
 	vec3_t	angles;
+	gentity_t	*dropped;
 
-	if ( !G_MatchFactoryDropAllowed() && item && item->giType != IT_TEAM ) {
+	if ( !item ) {
+		return NULL;
+	}
+
+	if ( !G_MatchFactoryDropAllowed() && item->giType != IT_TEAM && item->giType != IT_KEY ) {
 		return NULL;
 	}
 
@@ -787,8 +869,51 @@ gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle ) {
 	AngleVectors( angles, velocity, NULL, NULL );
 	VectorScale( velocity, 150, velocity );
 	velocity[2] += 200 + crandom() * 50;
-	
-	return LaunchItem( item, ent->s.pos.trBase, velocity );
+
+	dropped = LaunchItem( item, ent->s.pos.trBase, velocity );
+	if ( dropped && ent && item->giType == IT_KEY ) {
+		ent->keyMask &= ~item->giTag;
+	}
+
+	return dropped;
+}
+
+/*
+=============
+G_DropClientKeys
+
+Drops all carried keys for the specified entity.
+=============
+*/
+void G_DropClientKeys( gentity_t *ent ) {
+	int				count;
+	int				i;
+	const keyItemDef_t	*defs;
+
+	if ( !ent || !ent->keyMask ) {
+		return;
+	}
+
+	defs = G_KeyItemDefs( &count );
+	for ( i = 0 ; i < count ; i++ ) {
+		const keyItemDef_t	*def;
+		gitem_t			*item;
+
+		def = &defs[i];
+		if ( !( ent->keyMask & def->bit ) ) {
+			continue;
+		}
+
+		item = BG_FindItemByClassname( def->classname );
+		if ( !item ) {
+			G_Printf( "WARNING: missing key definition for %s\n", def->classname );
+			continue;
+		}
+
+		Drop_Item( ent, item, 0 );
+	}
+
+	ent->keyMask = 0;
 }
 
 

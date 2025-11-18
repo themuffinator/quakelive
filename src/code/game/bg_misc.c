@@ -547,6 +547,56 @@ gitem_t	bg_itemlist[] =
 /* sounds */ "sound/items/use_medkit.wav"
 	},
 
+        //
+        // KEY ITEMS
+        //
+/*QUAKED item_key_silver (.3 .3 1) (-16 -16 -16) (16 16 16) suspended
+*/
+        {
+                "item_key_silver",
+                "sound/items/key_silver.wav",
+        { "models/powerups/keys/key_silver.md3",
+                0, 0, 0},
+/* icon */              "icons/key_silver",
+/* pickup */    "Silver Key",
+                0,
+                IT_KEY,
+                KEY_FLAG_SILVER,
+/* precache */ "",
+/* sounds */ ""
+        },
+/*QUAKED item_key_gold (.3 .3 1) (-16 -16 -16) (16 16 16) suspended
+*/
+        {
+                "item_key_gold",
+                "sound/items/key_gold.wav",
+        { "models/powerups/keys/key_gold.md3",
+                0, 0, 0},
+/* icon */              "icons/key_gold",
+/* pickup */    "Gold Key",
+                0,
+                IT_KEY,
+                KEY_FLAG_GOLD,
+/* precache */ "",
+/* sounds */ ""
+        },
+/*QUAKED item_key_master (.3 .3 1) (-16 -16 -16) (16 16 16) suspended
+*/
+        {
+                "item_key_master",
+                "sound/items/key_gold.wav",
+        { "models/powerups/keys/key_master.md3",
+                0, 0, 0},
+/* icon */              "icons/key_master",
+/* pickup */    "Master Key",
+                0,
+                IT_KEY,
+                KEY_FLAG_MASTER,
+/* precache */ "",
+/* sounds */ ""
+        },
+
+
 	//
 	// POWERUP ITEMS
 	//
@@ -1031,6 +1081,27 @@ gitem_t	*BG_FindItem( const char *pickupName ) {
 }
 
 /*
+===============
+BG_FindItemByClassname
+===============
+*/
+gitem_t *BG_FindItemByClassname( const char *className ) {
+	gitem_t *it;
+
+	if ( !className || !*className ) {
+		return NULL;
+	}
+
+	for ( it = bg_itemlist + 1 ; it->classname ; it++ ) {
+		if ( !Q_stricmp( it->classname, className ) ) {
+			return it;
+		}
+	}
+
+	return NULL;
+}
+
+/*
 ============
 BG_PlayerTouchesItem
 
@@ -1185,6 +1256,9 @@ qboolean BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const play
 		if ( ps->stats[STAT_HOLDABLE_ITEM] ) {
 			return qfalse;
 		}
+		return qtrue;
+
+        case IT_KEY:
 		return qtrue;
 
         case IT_BAD:

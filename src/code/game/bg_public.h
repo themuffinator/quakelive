@@ -35,6 +35,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	RANK_TIED_FLAG		0x4000
 
+#define KEY_FLAG_SILVER         0x01
+#define KEY_FLAG_GOLD           0x02
+#define KEY_FLAG_MASTER         0x04
+
 #define DEFAULT_SHOTGUN_SPREAD	700
 #define DEFAULT_SHOTGUN_COUNT	11
 
@@ -728,6 +732,7 @@ typedef enum {
 	IT_HOLDABLE,			// single use, holdable item
 							// EFX: rotate + bob
 	IT_PERSISTANT_POWERUP,
+	IT_KEY,
 	IT_TEAM
 } itemType_t;
 
@@ -755,6 +760,7 @@ extern	gitem_t	bg_itemlist[];
 extern	int		bg_numItems;
 
 gitem_t	*BG_FindItem( const char *pickupName );
+gitem_t	*BG_FindItemByClassname( const char *className );
 gitem_t	*BG_FindItemForWeapon( weapon_t weapon );
 gitem_t	*BG_FindItemForPowerup( powerup_t pw );
 gitem_t	*BG_FindItemForHoldable( holdable_t pw );

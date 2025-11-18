@@ -282,9 +282,15 @@ typedef struct targetCvarConfig_s {
 	char		cvarValue[MAX_CVAR_VALUE_STRING];
 } targetCvarConfig_t;
 
-#define KEY_FLAG_SILVER		0x01
-#define KEY_FLAG_GOLD			0x02
-#define KEY_FLAG_MASTER		0x04
+typedef struct keyItemDef_s {
+	int	bit;
+	const char	*classname;
+} keyItemDef_t;
+
+const keyItemDef_t *G_KeyItemDefs( int *count );
+gitem_t *G_KeyItemForBit( int bit );
+void G_DropClientKeys( gentity_t *ent );
+
 #define MAX_TARGET_CVAR_PAIRS	8
 
 struct gentity_s {
