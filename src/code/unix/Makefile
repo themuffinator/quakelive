@@ -81,6 +81,7 @@ DLL_ONLY=false
 # Platform backend toggles default to the open adapter unless Steamworks support
 # is explicitly requested.
 QL_BUILD_STEAMWORKS ?= 0
+QL_ENABLE_OGG ?= 1
 ifeq ($(origin QL_BUILD_OPEN_STEAM)), undefined
   ifeq ($(QL_BUILD_STEAMWORKS),1)
     QL_BUILD_OPEN_STEAM := 0
@@ -89,7 +90,26 @@ ifeq ($(origin QL_BUILD_OPEN_STEAM)), undefined
   endif
 endif
 
-PLATFORM_BACKEND_DEFS = -DQL_BUILD_STEAMWORKS=$(QL_BUILD_STEAMWORKS) -DQL_BUILD_OPEN_STEAM=$(QL_BUILD_OPEN_STEAM)
+PLATFORM_BACKEND_DEFS = -DQL_BUILD_STEAMWORKS=$(QL_BUILD_STEAMWORKS) -DQL_BUILD_OPEN_STEAM=$(QL_BUILD_OPEN_STEAM) -DQL_ENABLE_OGG=$(QL_ENABLE_OGG)
+
+PKG_CONFIG ?= pkg-config
+
+ifeq ($(QL_ENABLE_OGG),1)
+  ifeq ($(origin OGG_CFLAGS), undefined)
+    OGG_CFLAGS := $(shell $(PKG_CONFIG) --cflags vorbisfile vorbis ogg 2>/dev/null)
+  endif
+  ifeq ($(origin OGG_LDFLAGS), undefined)
+    OGG_LDFLAGS := $(shell $(PKG_CONFIG) --libs vorbisfile vorbis ogg 2>/dev/null)
+  endif
+  ifeq ($(strip $(OGG_LDFLAGS)),)
+    $(error Vorbis support enabled but libvorbis/libogg development files were not found. Install the codec SDKs, set OGG_CFLAGS/OGG_LDFLAGS manually, or rebuild with QL_ENABLE_OGG=0 for dedicated-only targets.)
+  endif
+  CLIENT_OGG_CFLAGS := $(OGG_CFLAGS)
+  CLIENT_OGG_LDFLAGS := $(OGG_LDFLAGS) -lvorbisfile -lvorbis -logg
+else
+  CLIENT_OGG_CFLAGS :=
+  CLIENT_OGG_LDFLAGS :=
+endif
 
 
 ifeq ($(PLATFORM),linux)
@@ -174,7 +194,7 @@ ifeq ($(PLATFORM),linux)
   RANLIB=ranlib
 
   THREAD_LDFLAGS=-lpthread
-  LDFLAGS=-ldl -lm -lvorbisfile -lvorbis -logg
+  LDFLAGS=-ldl -lm
   GLLDFLAGS=-L/usr/X11R6/lib -lX11 -lXext -lXxf86dga -lXxf86vm
 
   ifeq ($(ARCH),axp)
@@ -249,7 +269,7 @@ RANLIB=ranlib
 
 THREAD_LDFLAGS=-lpthread
 # don't need -ldl (FreeBSD)
-LDFLAGS=-lm -lvorbisfile -lvorbis -logg
+LDFLAGS=-lm
 #GLLDFLAGS=-L/usr/X11R6/lib -L$(MESADIR)/lib -lGL -lX11 -lXext -lXxf86dga -lXxf86vm
 #GLLDFLAGS=-L/usr/X11/lib -lGL -lX11 -lXext -lm
 GLLDFLAGS=-L/usr/X11R6/lib -lGL -lX11 -lXext -lXxf86dga -lXxf86vm
@@ -295,7 +315,7 @@ SHLIBLDFLAGS=-shared
 ARFLAGS=ar rv
 RANLIB=ranlib
 
-LDFLAGS=-ldl -lm -lvorbisfile -lvorbis -logg
+LDFLAGS=-ldl -lm
 GLLDFLAGS=-L/usr/X11/lib -lGL -lX11 -lXext -lm
 
 TARGETS=$(B)/sgiquake3 \
@@ -322,9 +342,9 @@ ARFLAGS=ar rv
 RANLIB=ranlib
 
 ifeq ($(PLATFORM),freebsd)
-LDFLAGS=-lm -lvorbisfile -lvorbis -logg
+LDFLAGS=-lm
 else
-LDFLAGS=-ldl -lm -lvorbisfile -lvorbis -logg
+LDFLAGS=-ldl -lm
 endif # ifeq freebsd
 
 TARGETS=\
@@ -334,16 +354,16 @@ endif #Linux
 endif #FreeBSD
 endif #IRIX
 
-DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
-DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
-DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DSMP -o $@ -c $<
-DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
-DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
-DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DELF -x assembler-with-cpp -o $@ -c $<
+DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
+DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
+DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DSMP -o $@ -c $<
+DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
+DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
+DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
 DO_NASM=nasm -f elf -o $@  $<
-DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
+DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
 
 #DO_LCC=$(LCC) -o $@ -S -Wf-target=bytecode -Wf-g -DQ3_VM -I$(CGDIR) -I$(GDIR)  -I$(UIDIR)  $< 
 
@@ -626,13 +646,13 @@ endif #FreeBSD
 endif #IRIX
 
 $(B)/$(PLATFORM)quake3 : $(Q3OBJ) $(Q3POBJ)
-	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) 
+	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
 # TTimo: splines code requires C++ linking, but splines have not been officially included in the codebase
-#	$(CXX)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) 
+#	$(CXX)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
 
 $(B)/$(PLATFORM)quake3-smp : $(Q3OBJ) $(Q3POBJ_SMP)
 	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ_SMP) $(GLLDFLAGS) \
-		$(THREAD_LDFLAGS) $(LDFLAGS) 
+		$(THREAD_LDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
 
 $(B)/client/cl_cgame.o : $(CDIR)/cl_cgame.c; $(DO_CC)   
 $(B)/client/cl_cin.o : $(CDIR)/cl_cin.c; $(DO_CC)       

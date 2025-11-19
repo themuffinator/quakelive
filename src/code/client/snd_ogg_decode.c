@@ -1,4 +1,6 @@
 #include "snd_local.h"
+
+#if QL_ENABLE_OGG
 #include <vorbis/vorbisfile.h>
 #include <limits.h>
 
@@ -252,3 +254,18 @@ qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, w
 	*outPcm = pcm;
 	return qtrue;
 }
+
+#else
+
+/*
+=============
+S_VorbisDecodeMemory
+
+Vorbis decoding is disabled when QL_ENABLE_OGG is 0.
+=============
+*/
+qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, wavinfo_t *info, short **outPcm ) {
+	return qfalse;
+}
+
+#endif

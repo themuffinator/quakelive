@@ -80,6 +80,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="VorbisSdk">
+    <VorbisSdkDir Condition="'$(VorbisSdkDir)'==''">$(ProjectDir)..\..\libs\vorbis</VorbisSdkDir>
+    <VorbisIncludeDir>$(VorbisSdkDir)\include</VorbisIncludeDir>
+    <VorbisLibDir>$(VorbisSdkDir)\lib\Win32</VorbisLibDir>
+    <VorbisDependencies>vorbisfile.lib;vorbis.lib;ogg.lib</VorbisDependencies>
+  </PropertyGroup>
   <PropertyGroup>
     <_ProjectFileVersion>17.0.34511.75</_ProjectFileVersion>
   </PropertyGroup>
@@ -108,6 +114,15 @@
     <IntDir>.\Debug_TA\</IntDir>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(VorbisIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(VorbisLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(VorbisDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='vector|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>

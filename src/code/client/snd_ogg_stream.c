@@ -1,5 +1,7 @@
 #include "snd_ogg_stream.h"
 
+#if QL_ENABLE_OGG
+
 #if defined(Q3_BIG_ENDIAN) || defined(__BIG_ENDIAN__)
 #define SND_OGG_BIG_ENDIAN_OUTPUT 1
 #else
@@ -241,3 +243,103 @@ int S_OggStreamWidth( const snd_ogg_stream_t *stream ) {
 	}
 	return stream->width;
 }
+
+#else
+
+/*
+=============
+S_OggStreamOpen
+
+Stubbed when QL_ENABLE_OGG is 0.
+=============
+*/
+qboolean S_OggStreamOpen( snd_ogg_stream_t *stream, const char *path ) {
+	return qfalse;
+}
+
+/*
+=============
+S_OggStreamClose
+
+Stubbed when QL_ENABLE_OGG is 0.
+=============
+*/
+void S_OggStreamClose( snd_ogg_stream_t *stream ) {
+	(void)stream;
+}
+
+/*
+=============
+S_OggStreamRead
+
+Stubbed when QL_ENABLE_OGG is 0.
+=============
+*/
+int S_OggStreamRead( snd_ogg_stream_t *stream, byte *buffer, int bytesToRead ) {
+	(void)stream;
+	(void)buffer;
+	(void)bytesToRead;
+	return 0;
+}
+
+/*
+=============
+S_OggStreamRestart
+
+Stubbed when QL_ENABLE_OGG is 0.
+=============
+*/
+qboolean S_OggStreamRestart( snd_ogg_stream_t *stream ) {
+	(void)stream;
+	return qfalse;
+}
+
+/*
+=============
+S_OggStreamActive
+
+Stubbed when QL_ENABLE_OGG is 0.
+=============
+*/
+qboolean S_OggStreamActive( const snd_ogg_stream_t *stream ) {
+	(void)stream;
+	return qfalse;
+}
+
+/*
+=============
+S_OggStreamRate
+
+Stubbed when QL_ENABLE_OGG is 0.
+=============
+*/
+int S_OggStreamRate( const snd_ogg_stream_t *stream ) {
+	(void)stream;
+	return 0;
+}
+
+/*
+=============
+S_OggStreamChannels
+
+Stubbed when QL_ENABLE_OGG is 0.
+=============
+*/
+int S_OggStreamChannels( const snd_ogg_stream_t *stream ) {
+	(void)stream;
+	return 0;
+}
+
+/*
+=============
+S_OggStreamWidth
+
+Stubbed when QL_ENABLE_OGG is 0.
+=============
+*/
+int S_OggStreamWidth( const snd_ogg_stream_t *stream ) {
+	(void)stream;
+	return 0;
+}
+
+#endif

@@ -31,6 +31,23 @@ the native DLLs untouched:
 msbuild src\code\quake3.sln /t:game;cgame /p:Configuration=Release /p:Platform=Win32
 ```
 
+## Vorbis codec prerequisites
+
+The Visual Studio projects now assume the Vorbis headers and import libraries
+are available so the client’s Ogg decoder can link successfully. Place the
+official Xiph.Org SDK (or any build that ships `vorbisfile.lib`, `vorbis.lib`,
+`ogg.lib`, and the matching `include/vorbis/` headers) under
+`src/libs/vorbis/` and the MSBuild files will automatically pull them in for
+both Debug and Release outputs. If you keep the SDK somewhere else, define the
+`VorbisSdkDir` property when invoking MSBuild:
+
+```powershell
+msbuild src\code\quake3.sln /t:quake3 /p:Configuration=Debug /p:VorbisSdkDir=C:\SDKs\vorbis-1.3.7
+```
+
+Without these libraries the linker fails fast, mirroring the Unix makefile’s
+`OGG_CFLAGS`/`OGG_LDFLAGS` checks.
+
 ## Verifying incremental builds
 
 To confirm that MSBuild’s tracking stays intact for both pipelines, run each set

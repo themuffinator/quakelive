@@ -3,12 +3,16 @@
 
 #include "../game/q_shared.h"
 #include "../qcommon/qcommon.h"
+#if QL_ENABLE_OGG
 #include <vorbis/vorbisfile.h>
+#endif
 
 typedef struct snd_ogg_stream_s {
 	fileHandle_t		handle;
+#if QL_ENABLE_OGG
 	OggVorbis_File	vorbisFile;
 	ov_callbacks	callbacks;
+#endif
 	qboolean		active;
 	int			channels;
 	int			rate;
