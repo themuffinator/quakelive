@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_legacy_cvars.h"
 #include "generated/ql_gametype_strings.h"
 #include <limits.h>
+#include <stdint.h>
 #include "../../../src-re/include/ql_types.h"
 #include <time.h>
 #include <stdlib.h>
@@ -72,7 +73,9 @@ static int	s_teamSizeMinModCount = 0;
 static char	s_worldspawnAtmosphere[MAX_QPATH];
 static char	s_lastForcedCosmeticsPayload[MAX_INFO_STRING];
 static char	s_gameStateBuffer[GAME_STATE_BUFFER_LENGTH];
+static char	s_customSettingsPayload[MAX_INFO_STRING];
 static qboolean s_customSettingsDirty = qtrue;
+static uint64_t s_lastCustomSettingsMask = 0;
 static const char *s_duelSpawnGrantScript = "weapon_gauntlet weapon_machinegun ammo_bullets 100";
 static vmCvar_t	g_weaponRespawnLegacy;
 static vmCvar_t	g_damageGauntletLegacy;
@@ -97,6 +100,9 @@ static void G_UpdateGameStateForLevel( void );
 static qboolean G_ParseAdminAccessTier( const char *token, int *tierOut );
 static void G_InsertAdminAccessEntry( const char *steamId, int tier );
 static void G_LoadAdminAccessFile( void );
+static qboolean G_CustomSettingMatchesDefault( const cvarTable_t *cv );
+static uint64_t G_ComputeCustomSettingsMask( void );
+static void G_UpdateCustomSettingsConfigstring( qboolean forceBroadcast );
 
 /*
 =============
@@ -1215,6 +1221,7 @@ LegacyCvar_UpdateAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) 
 
 	G_SyncAdminConfig();
 	G_RefreshPmoveSettings();
+	G_UpdateCustomSettingsConfigstring( qtrue );
 }
 
 void G_UpdateCvars( void ) {
@@ -1302,6 +1309,7 @@ void G_UpdateCvars( void ) {
 	G_UpdateTrainingState();
 	G_UpdateGametypeTutorialText();
 	G_RefreshPmoveSettings();
+	G_UpdateCustomSettingsConfigstring( qfalse );
 }
 
 /*
@@ -1327,6 +1335,94 @@ for additional gameplay overrides before rebuilding the string.
 void G_ClearCustomSettingsDirtyFlag( void ) {
 	s_customSettingsDirty = qfalse;
 }
+
+/*
+=============
+G_CustomSettingMatchesDefault
+
+Returns whether the tracked CVar is still set to its default value.
+=============
+*/
+static qboolean G_CustomSettingMatchesDefault( const cvarTable_t *cv ) {
+	if ( !cv || !cv->vmCvar ) {
+		return qtrue;
+	}
+
+	if ( !cv->defaultString ) {
+		return ( cv->vmCvar->string[0] == '\0' ) ? qtrue : qfalse;
+	}
+
+	return ( Q_stricmp( cv->vmCvar->string, cv->defaultString ) == 0 ) ? qtrue : qfalse;
+}
+
+/*
+=============
+G_ComputeCustomSettingsMask
+
+Aggregates the bitmask representing all gameplay CVars flagged as custom
+settings that currently deviate from their defaults.
+=============
+*/
+static uint64_t G_ComputeCustomSettingsMask( void ) {
+	uint64_t	mask;
+	uint64_t	bit;
+	int		i;
+	cvarTable_t	*cv;
+
+	mask = 0;
+	bit = 1;
+
+	for ( i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++ ) {
+		if ( !cv->customSetting ) {
+			continue;
+		}
+
+		if ( bit == 0 ) {
+			break;
+		}
+
+		if ( !G_CustomSettingMatchesDefault( cv ) ) {
+			mask |= bit;
+		}
+
+		bit <<= 1;
+	}
+
+	return mask;
+}
+
+/*
+=============
+G_UpdateCustomSettingsConfigstring
+
+Serialises the custom-settings mask, mirrors it into g_customSettings, and
+publishes the value to CS_CUSTOM_SETTINGS when the payload changes.
+=============
+*/
+static void G_UpdateCustomSettingsConfigstring( qboolean forceBroadcast ) {
+	uint64_t	mask;
+	char		payload[MAX_INFO_STRING];
+
+	if ( !forceBroadcast && !G_CustomSettingsDirty() ) {
+		return;
+	}
+
+	mask = G_ComputeCustomSettingsMask();
+	Com_sprintf( payload, sizeof( payload ), "%llu", (unsigned long long)mask );
+
+	if ( !forceBroadcast && mask == s_lastCustomSettingsMask &&
+		!Q_stricmp( payload, s_customSettingsPayload ) ) {
+		G_ClearCustomSettingsDirtyFlag();
+		return;
+	}
+
+	trap_Cvar_Set( "g_customSettings", payload );
+	trap_SetConfigstring( CS_CUSTOM_SETTINGS, payload );
+	Q_strncpyz( s_customSettingsPayload, payload, sizeof( s_customSettingsPayload ) );
+	s_lastCustomSettingsMask = mask;
+	G_ClearCustomSettingsDirtyFlag();
+}
+
 
 /*
 =============
