@@ -135,8 +135,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_RACE_INFO			0x2BD
 #define CS_RACE_STATUS		CS_RACE_SCORES
 #define CS_PMOVE_SETTINGS		0x2BE
+#define CS_LOADOUT_FLAGS		0x2BF		// aggregated bitmask describing the disabled loadout weapons
+#define CS_LOADOUT_MASK		0x2C0		// bitmask describing the map-authored disable_loadout tokens
 
-#define CS_MAX					(CS_PMOVE_SETTINGS+1)
+#define CS_MAX					(CS_LOADOUT_MASK+1)
 
 #if (CS_MAX) > MAX_CONFIGSTRINGS
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS

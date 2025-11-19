@@ -63,6 +63,7 @@ static int	s_forceSmallScoreboardMessageModCount = -1;
 static int	s_forceSendConfigstringModCount = -1;
 static int	s_forceAtmosphericEffectsModCount = -1;
 static int	s_forceDmgThroughSurfaceModCount = -1;
+static int	s_disableLoadoutModCount = 0;
 static int	s_forcedAtmosphereModCount = -1;
 static int	s_factoryModCount = 0;
 static int	s_roundWarmupDelayModCount = 0;
@@ -249,6 +250,7 @@ vmCvar_t	g_forceSendConfigstring;
 vmCvar_t	g_forceAtmosphericEffects;
 vmCvar_t	g_forceDmgThroughSurface;
 vmCvar_t	g_grantItemOnSpawn;
+vmCvar_t	g_disableLoadout;
 vmCvar_t	g_maxDeferredSpawns;
 vmCvar_t	g_teamSpawnAsSpec;
 vmCvar_t	g_teamSpecFreeCam;
@@ -511,6 +513,7 @@ static cvarTable_t		gameCvarTable[] = {
         { &g_forceAtmosphericEffects, "g_forceAtmosphericEffects", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable atmospheric map effects such as snow or rain regardless of client preference." },
         { &g_forceDmgThroughSurface, "g_forceDmgThroughSurface", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow splash damage to pass through non-solid surfaces for testing when set." },
         { &g_grantItemOnSpawn, "g_grantItemOnSpawn", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Whitespace or comma separated list of `give` tokens handed to every spawn, mirroring Quake Live's server-only spawn grants." },
+        { &g_disableLoadout, "g_disableLoadout", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Additional loadout restrictions expressed as a whitespace or comma separated list of weapon tokens (g, mg, sg, gl, rl, lg, rg, pg, bfg, gh, ng, pl, cg, hmg) or a numeric bitmask." },
 	{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional model path used to override every player's model selection server-wide." },
 	{ &g_playerheadmodelOverride, "g_playerheadmodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional head model override applied to all players for consistent visuals." },
 	{ &g_allowCustomHeadmodels, "g_allowCustomHeadmodels", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow clients to request independent headmodel strings; disabling forces heads to track the enforced player model." },
@@ -1249,6 +1252,10 @@ void G_UpdateCvars( void ) {
 		s_forceDmgThroughSurfaceModCount = g_forceDmgThroughSurface.modificationCount;
 		s_forcedAtmosphereModCount = g_forcedAtmosphere.modificationCount;
 		G_UpdateForcedCosmeticsConfigstring( qtrue );
+	}
+	if ( g_disableLoadout.modificationCount != s_disableLoadoutModCount ) {
+		s_disableLoadoutModCount = g_disableLoadout.modificationCount;
+		G_UpdateDisableLoadoutConfigstrings();
 	}
 	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
 
