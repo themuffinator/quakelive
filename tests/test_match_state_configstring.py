@@ -20,6 +20,7 @@ MATCH_STATE_SOURCE = (
     """
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define GAME_INCLUDE
@@ -46,7 +47,7 @@ void Q_strncpyz( char *dest, const char *src, int destsize ) {
 @TAB@@TAB@src = "";
 @TAB@}
 @TAB@strncpy( dest, src, destsize - 1 );
-@TAB@dest[destsize - 1] = '\0';
+@TAB@dest[destsize - 1] = 0;
 }
 
 /*
@@ -83,6 +84,62 @@ void Info_SetValueForKey( char *info, const char *key, const char *value ) {
 @TAB@@TAB@return;
 @TAB@}
 @TAB@strcat( info, buffer );
+}
+
+/*
+=============
+Info_ValueForKey
+
+Searches an info string for the value associated with the requested key.
+=============
+*/
+char *Info_ValueForKey( const char *info, const char *key ) {
+@TAB@static char valueBuffers[2][MAX_INFO_STRING];
+@TAB@static int bufferIndex = 0;
+@TAB@const char *keyStart;
+@TAB@const char *valueStart;
+@TAB@int keyLength;
+@TAB@int valueLength;
+@TAB@size_t lookupLength;
+@TAB@char *out;
+
+@TAB@bufferIndex ^= 1;
+@TAB@out = valueBuffers[bufferIndex];
+@TAB@out[0] = 0;
+
+@TAB@if ( !info || !key || !*key ) {
+@TAB@@TAB@return out;
+@TAB@}
+
+@TAB@lookupLength = strlen( key );
+@TAB@while ( *info ) {
+@TAB@@TAB@if ( *info == '\\\\' ) {
+@TAB@@TAB@@TAB@info++;
+@TAB@@TAB@}
+@TAB@@TAB@keyStart = info;
+@TAB@@TAB@while ( *info && *info != '\\\\' ) {
+@TAB@@TAB@@TAB@info++;
+@TAB@@TAB@}
+@TAB@@TAB@keyLength = info - keyStart;
+@TAB@@TAB@if ( *info == '\\\\' ) {
+@TAB@@TAB@@TAB@info++;
+@TAB@@TAB@}
+@TAB@@TAB@valueStart = info;
+@TAB@@TAB@while ( *info && *info != '\\\\' ) {
+@TAB@@TAB@@TAB@info++;
+@TAB@@TAB@}
+@TAB@@TAB@if ( keyLength == (int)lookupLength && strncmp( keyStart, key, lookupLength ) == 0 ) {
+@TAB@@TAB@@TAB@valueLength = info - valueStart;
+@TAB@@TAB@@TAB@if ( valueLength >= MAX_INFO_STRING ) {
+@TAB@@TAB@@TAB@@TAB@valueLength = MAX_INFO_STRING - 1;
+@TAB@@TAB@@TAB@}
+@TAB@@TAB@@TAB@memcpy( out, valueStart, (size_t)valueLength );
+@TAB@@TAB@@TAB@out[valueLength] = 0;
+@TAB@@TAB@@TAB@return out;
+@TAB@@TAB@}
+@TAB@}
+
+@TAB@return out;
 }
 
 /*
@@ -191,6 +248,192 @@ Exposes the captured configstring to the Python harness.
 const char *QLR_GetMatchStateConfigstring( void ) {
 @TAB@return qlr_matchStateConfig;
 }
+
+typedef struct qlrClientMatchState_s {
+@TAB@int matchTimeoutLengthSeconds;
+@TAB@int matchTimeoutCountPerTeam;
+@TAB@int matchOvertimeLengthSeconds;
+@TAB@qboolean matchSuddenDeathRespawnsEnabled;
+@TAB@int matchSuddenDeathStartSeconds;
+@TAB@int matchSuddenDeathTickSeconds;
+@TAB@int matchSuddenDeathMaxSeconds;
+@TAB@int matchSuddenDeathIncrementSeconds;
+@TAB@qboolean matchSuddenDeathPrintAnnouncements;
+@TAB@qboolean matchSuddenDeathSpawnDelayActive;
+} qlrClientMatchState_t;
+
+static qlrClientMatchState_t qlr_clientMatchState;
+
+/*
+=============
+QLR_ResetClientMatchState
+
+Clears the cached client-side match factory values between tests.
+=============
+*/
+void QLR_ResetClientMatchState( void ) {
+@TAB@memset( &qlr_clientMatchState, 0, sizeof( qlr_clientMatchState ) );
+}
+
+/*
+=============
+QLR_InfoIntForMatchKey
+
+Lightweight info-string integer parser for the client harness.
+=============
+*/
+static int QLR_InfoIntForMatchKey( const char *info, const char *key, int defaultValue ) {
+@TAB@const char *value;
+
+@TAB@if ( !info || !key ) {
+@TAB@@TAB@return defaultValue;
+@TAB@}
+
+@TAB@value = Info_ValueForKey( info, key );
+@TAB@if ( !value || !*value ) {
+@TAB@@TAB@return defaultValue;
+@TAB@}
+
+@TAB@return atoi( value );
+}
+
+/*
+=============
+QLR_ParseMatchStateOnClient
+
+Parses the captured configstring and populates the fake client state.
+=============
+*/
+void QLR_ParseMatchStateOnClient( void ) {
+@TAB@const char *info;
+
+@TAB@info = QLR_GetMatchStateConfigstring();
+@TAB@QLR_ResetClientMatchState();
+@TAB@if ( !info || !*info ) {
+@TAB@@TAB@return;
+@TAB@}
+
+@TAB@qlr_clientMatchState.matchTimeoutLengthSeconds = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_LENGTH, 0 );
+@TAB@qlr_clientMatchState.matchTimeoutCountPerTeam = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_TIMEOUT_COUNT, 0 );
+@TAB@qlr_clientMatchState.matchOvertimeLengthSeconds = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_LENGTH, 0 );
+@TAB@qlr_clientMatchState.matchSuddenDeathRespawnsEnabled = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_RESPAWNS, 0 ) ? qtrue : qfalse;
+@TAB@qlr_clientMatchState.matchSuddenDeathStartSeconds = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_START, 0 );
+@TAB@qlr_clientMatchState.matchSuddenDeathTickSeconds = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_TICK, 0 );
+@TAB@qlr_clientMatchState.matchSuddenDeathMaxSeconds = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_MAX, 0 );
+@TAB@qlr_clientMatchState.matchSuddenDeathIncrementSeconds = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_INCREMENT, 0 );
+@TAB@qlr_clientMatchState.matchSuddenDeathPrintAnnouncements = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_PRINT, 0 ) ? qtrue : qfalse;
+@TAB@qlr_clientMatchState.matchSuddenDeathSpawnDelayActive = QLR_InfoIntForMatchKey( info, MATCH_STATE_KEY_SUDDEN_DELAY, 0 ) ? qtrue : qfalse;
+}
+
+/*
+=============
+QLR_GetClientTimeoutLengthSeconds
+
+Exposes the parsed timeout length for assertions.
+=============
+*/
+int QLR_GetClientTimeoutLengthSeconds( void ) {
+@TAB@return qlr_clientMatchState.matchTimeoutLengthSeconds;
+}
+
+/*
+=============
+QLR_GetClientTimeoutCountPerTeam
+
+Exposes the parsed timeout quota for assertions.
+=============
+*/
+int QLR_GetClientTimeoutCountPerTeam( void ) {
+@TAB@return qlr_clientMatchState.matchTimeoutCountPerTeam;
+}
+
+/*
+=============
+QLR_GetClientOvertimeLengthSeconds
+
+Exposes the parsed overtime window for assertions.
+=============
+*/
+int QLR_GetClientOvertimeLengthSeconds( void ) {
+@TAB@return qlr_clientMatchState.matchOvertimeLengthSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathRespawnsEnabled
+
+Indicates whether the client saw sudden-death respawns enabled.
+=============
+*/
+int QLR_GetClientSuddenDeathRespawnsEnabled( void ) {
+@TAB@return qlr_clientMatchState.matchSuddenDeathRespawnsEnabled ? 1 : 0;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathStartSeconds
+
+Exposes the parsed sudden-death start time.
+=============
+*/
+int QLR_GetClientSuddenDeathStartSeconds( void ) {
+@TAB@return qlr_clientMatchState.matchSuddenDeathStartSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathTickSeconds
+
+Exposes the parsed sudden-death tick interval.
+=============
+*/
+int QLR_GetClientSuddenDeathTickSeconds( void ) {
+@TAB@return qlr_clientMatchState.matchSuddenDeathTickSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathMaxSeconds
+
+Exposes the parsed sudden-death max duration.
+=============
+*/
+int QLR_GetClientSuddenDeathMaxSeconds( void ) {
+@TAB@return qlr_clientMatchState.matchSuddenDeathMaxSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathIncrementSeconds
+
+Exposes the parsed sudden-death increment.
+=============
+*/
+int QLR_GetClientSuddenDeathIncrementSeconds( void ) {
+@TAB@return qlr_clientMatchState.matchSuddenDeathIncrementSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathPrintAnnouncements
+
+Indicates whether the client observed sudden-death announcements enabled.
+=============
+*/
+int QLR_GetClientSuddenDeathPrintAnnouncements( void ) {
+@TAB@return qlr_clientMatchState.matchSuddenDeathPrintAnnouncements ? 1 : 0;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathSpawnDelayActive
+
+Indicates whether spawn delay is active for sudden-death.
+=============
+*/
+int QLR_GetClientSuddenDeathSpawnDelayActive( void ) {
+@TAB@return qlr_clientMatchState.matchSuddenDeathSpawnDelayActive ? 1 : 0;
+}
 """
 ).replace("@TAB@", "\t")
 
@@ -259,6 +502,30 @@ def _load_match_state_library(lib_path: Path) -> ctypes.CDLL:
     library.QLR_BuildMatchStateConfigstring.restype = None
     library.QLR_GetMatchStateConfigstring.argtypes = []
     library.QLR_GetMatchStateConfigstring.restype = ctypes.c_char_p
+    library.QLR_ResetClientMatchState.argtypes = []
+    library.QLR_ResetClientMatchState.restype = None
+    library.QLR_ParseMatchStateOnClient.argtypes = []
+    library.QLR_ParseMatchStateOnClient.restype = None
+    library.QLR_GetClientTimeoutLengthSeconds.argtypes = []
+    library.QLR_GetClientTimeoutLengthSeconds.restype = ctypes.c_int
+    library.QLR_GetClientTimeoutCountPerTeam.argtypes = []
+    library.QLR_GetClientTimeoutCountPerTeam.restype = ctypes.c_int
+    library.QLR_GetClientOvertimeLengthSeconds.argtypes = []
+    library.QLR_GetClientOvertimeLengthSeconds.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathRespawnsEnabled.argtypes = []
+    library.QLR_GetClientSuddenDeathRespawnsEnabled.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathStartSeconds.argtypes = []
+    library.QLR_GetClientSuddenDeathStartSeconds.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathTickSeconds.argtypes = []
+    library.QLR_GetClientSuddenDeathTickSeconds.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathMaxSeconds.argtypes = []
+    library.QLR_GetClientSuddenDeathMaxSeconds.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathIncrementSeconds.argtypes = []
+    library.QLR_GetClientSuddenDeathIncrementSeconds.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathPrintAnnouncements.argtypes = []
+    library.QLR_GetClientSuddenDeathPrintAnnouncements.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathSpawnDelayActive.argtypes = []
+    library.QLR_GetClientSuddenDeathSpawnDelayActive.restype = ctypes.c_int
     return library
 
 
@@ -311,3 +578,23 @@ def test_match_state_configstring_includes_expected_keys(match_state_library: ct
 
     for key, expected_value in expected.items():
         assert fields.get(key) == expected_value, f"Missing or incorrect value for {key}"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Match-state harness requires a POSIX toolchain")
+def test_client_parser_receives_factory_config(match_state_library: ctypes.CDLL) -> None:
+    library = match_state_library
+    library.QLR_ResetMatchState()
+    library.QLR_ResetClientMatchState()
+    library.QLR_BuildMatchStateConfigstring()
+    library.QLR_ParseMatchStateOnClient()
+
+    assert library.QLR_GetClientTimeoutLengthSeconds() == 75
+    assert library.QLR_GetClientTimeoutCountPerTeam() == 2
+    assert library.QLR_GetClientOvertimeLengthSeconds() == 120
+    assert library.QLR_GetClientSuddenDeathRespawnsEnabled() == 1
+    assert library.QLR_GetClientSuddenDeathStartSeconds() == 15
+    assert library.QLR_GetClientSuddenDeathTickSeconds() == 5
+    assert library.QLR_GetClientSuddenDeathMaxSeconds() == 60
+    assert library.QLR_GetClientSuddenDeathIncrementSeconds() == 3
+    assert library.QLR_GetClientSuddenDeathPrintAnnouncements() == 1
+    assert library.QLR_GetClientSuddenDeathSpawnDelayActive() == 1
