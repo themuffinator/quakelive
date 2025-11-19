@@ -545,6 +545,7 @@ void Team_ClampWarmupToShuffleCountdown( void ) {
 	if ( level.warmupTime < targetTime ) {
 		level.warmupTime = targetTime;
 		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+		G_UpdateReadyUpConfigstring();
 	}
 }
 

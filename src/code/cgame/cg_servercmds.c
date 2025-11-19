@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // Mirrors the VF_* vote flag bits exposed via g_voteFlags on the server.
 #define CG_VOTEFLAG_NO_MAP	0x0001
 #define CG_VOTEFLAG_NO_NEXTMAP	0x0004
+#define CG_VOTEFLAG_NO_ENDVOTE	0x0800
 #ifndef VF_NO_GAMETYPE
 #define VF_NO_GAMETYPE	0x0008
 #endif
@@ -791,6 +792,24 @@ void CG_ParseServerinfo( void ) {
 	cgs.voteFlags = atoi( voteFlagsValue );
 	mapVotingDisabled = ( cgs.voteFlags & ( CG_VOTEFLAG_NO_MAP | CG_VOTEFLAG_NO_NEXTMAP ) ) ? qtrue : qfalse;
 	trap_Cvar_Set( "ui_mapVotingDisabled", mapVotingDisabled ? "1" : "0" );
+
+	/*
+	 * g_voteFlags bits used by map and end-match voting:
+	 *	0x0001 (CG_VOTEFLAG_NO_MAP)		- blocks manual callvote map commands.
+	 *	0x0004 (CG_VOTEFLAG_NO_NEXTMAP)	- blocks manual callvote nextmap commands.
+	 *	0x0800 (CG_VOTEFLAG_NO_ENDVOTE)	- disables the automatic end-match vote menu.
+	 *
+	 * During overtime Quake Live also suppresses end-match voting regardless of
+	 * the configured flags, so mirror that behavior for the UI toggle here.
+	 */
+	{
+		qboolean		overtimeActive;
+		qboolean		endMapVotingDisabled;
+
+		overtimeActive = cgs.matchOvertimeActive ? qtrue : qfalse;
+		endMapVotingDisabled = ( ( cgs.voteFlags & CG_VOTEFLAG_NO_ENDVOTE ) != 0 ) || overtimeActive;
+		trap_Cvar_Set( "ui_endMapVotingDisabled", endMapVotingDisabled ? "1" : "0" );
+	}
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
   
 	serverLoadout = Info_ValueForKey( info, "loadout" );

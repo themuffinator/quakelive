@@ -8,7 +8,7 @@ The freeze controller snapshots every `g_freeze*` CVar into `level.freezeConfig`
 
 ## `g_roundWarmupDelay`
 
-`g_roundWarmupDelay` determines how long the server waits before transitioning from warmup to an active freeze round. `G_FreezeScheduleWarmupDelay` in `g_active.c` reads the cvar whenever warmup begins and publishes the new countdown via `CS_WARMUP`, so changing the delay updates both the server state machine and the HUD clock immediately.【F:src/code/game/g_active.c†L1291-L1313】
+`g_roundWarmupDelay` determines how long the server waits before transitioning from warmup to an active freeze round. `G_FreezeScheduleWarmupDelay` in `g_active.c` reads the cvar whenever warmup begins and publishes the new countdown via `CS_WARMUP` and `CS_READYUP_STATUS`, so changing the delay updates both the server state machine and the HUD clock immediately. UI code should consume `CS_READYUP_STATUS` for ready-up deadlines instead of inferring them from `CS_WARMUP`.【F:src/code/game/g_active.c†L1438-L1462】【F:src/code/game/bg_public.h†L94-L109】
 
 ## `g_freezeResetWeaponsOnRound`
 

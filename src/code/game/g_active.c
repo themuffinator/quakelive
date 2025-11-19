@@ -1452,11 +1452,13 @@ static void G_FreezeScheduleWarmupDelay( void ) {
 	if ( delay > 0 ) {
 		level.warmupTime = level.time + delay;
 		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+		G_UpdateReadyUpConfigstring();
 		return;
 	}
 
 	level.warmupTime = 0;
 	trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+	G_UpdateReadyUpConfigstring();
 }
 
 /*
@@ -1725,6 +1727,7 @@ void G_Frame_UpdateRoundController( void ) {
 			if ( level.warmupTime != -1 ) {
 				level.warmupTime = -1;
 				trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+				G_UpdateReadyUpConfigstring();
 				G_LogPrintf( "Warmup:\n" );
 			}
 			break;
@@ -1786,6 +1789,7 @@ void G_FreezeRunFrame( void ) {
 		if ( level.warmupTime > 0 && level.time >= level.warmupTime ) {
 			level.warmupTime = 0;
 			trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+			G_UpdateReadyUpConfigstring();
 		}
 		return;
 	}
