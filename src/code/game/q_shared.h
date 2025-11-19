@@ -23,6 +23,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __Q_SHARED_H
 #define __Q_SHARED_H
 
+#ifndef QL_ENABLE_OGG
+#define QL_ENABLE_OGG 1
+#endif
+
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 

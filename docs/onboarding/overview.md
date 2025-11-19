@@ -65,6 +65,11 @@ migration-era tooling that now lives alongside the legacy Quake III sources.
 2. **Install build prerequisites** – Follow `docs/qvmtools.md` to verify the GPL-era QVM toolchain, review
    the migration plan in `docs/build-pipeline.md`, and use `docs/build/windows.md` plus the native pipeline
    notes when setting up the Visual Studio 2010 workflow.【F:docs/qvmtools.md†L1-L40】【F:docs/build-pipeline.md†L1-L89】【F:docs/build/windows.md†L1-L31】【F:docs/windows-native-pipeline.md†L1-L80】
+   Install the Vorbis SDKs alongside the core compiler toolchains so the client’s Ogg decoder always links:
+   Linux builders can `apt install libogg-dev libvorbis-dev` (or export custom `OGG_CFLAGS`/`OGG_LDFLAGS`),
+   while Windows contributors should drop the SDK headers and `vorbisfile.lib;vorbis.lib;ogg.lib` imports
+   under `src/libs/vorbis` (or override the `VorbisSdkDir` property). Dedicated-only builds can set
+   `QL_ENABLE_OGG=0` to skip the dependency entirely.
 3. **Run the tooling checks** – Execute the CI helpers (`tools/ci/verify-qvm-toolchain.sh`,
    `tools/ci/install-vs-v100.ps1`, `tools/ci/verify-vs-toolchain.ps1`, and `tools/ci/build-cleanroom.sh`) or
    inspect the `Toolchain (QVM)`, `Native DLL (VS2010)`, and `Deterministic Harnesses` workflows to confirm

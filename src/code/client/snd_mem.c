@@ -237,6 +237,9 @@ Checks whether the provided sound path already declares an OGG extension.
 =============
 */
 static qboolean S_PathIsOgg( const char *name ) {
+#if !QL_ENABLE_OGG
+	return qfalse;
+#endif
 	const char	*dot;
 
 	if ( !name ) {
@@ -259,6 +262,9 @@ Sniffs the first bytes of a file to see whether it contains the OggS magic heade
 =============
 */
 static qboolean S_BufferIsOgg( const byte *data, int length ) {
+#if !QL_ENABLE_OGG
+	return qfalse;
+#endif
 	if ( !data || length < 4 ) {
 		return qfalse;
 	}
@@ -278,6 +284,9 @@ Combines extension checks and magic sniffing to detect Vorbis assets.
 =============
 */
 static qboolean S_IsOggSound( const char *name, const byte *data, int length ) {
+#if !QL_ENABLE_OGG
+	return qfalse;
+#endif
 	if ( S_PathIsOgg( name ) ) {
 		return qtrue;
 	}
