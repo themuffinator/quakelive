@@ -213,6 +213,12 @@ void CG_Respawn( void ) {
 
 	// select the weapon the server says we are using
 	cg.weaponSelect = cg.snap->ps.weapon;
+
+	cg.autoActionFired = qfalse;
+	cg.autoActionScreenshotQueued = qfalse;
+	cg.autoActionStatsQueued = qfalse;
+	cg.autoActionScreenshotTime = 0;
+	cg.autoActionStatsTime = 0;
 }
 
 extern char *eventnames[];
@@ -517,9 +523,13 @@ void CG_TransitionPlayerState( playerState_t *ps, playerState_t *ops ) {
 		cg.mapRestart = qfalse;
 	}
 
-	if ( cg.snap->ps.pm_type != PM_INTERMISSION 
+	if ( cg.snap->ps.pm_type != PM_INTERMISSION
 		&& ps->persistant[PERS_TEAM] != TEAM_SPECTATOR ) {
 		CG_CheckLocalSounds( ps, ops );
+	}
+
+	if ( ops->pm_type != PM_INTERMISSION && ps->pm_type == PM_INTERMISSION ) {
+		CG_HandleAutoActionsIntermission( ps );
 	}
 
 	// check for going low on ammo
