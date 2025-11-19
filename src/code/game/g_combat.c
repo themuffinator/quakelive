@@ -1710,7 +1710,7 @@ G_RadiusDamage
 ============
 */
 qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, float radius,
-					 gentity_t *ignore, int mod) {
+					 gentity_t *ignore, int mod, qboolean *splashMidAir ) {
 	float		points, dist;
 	gentity_t	*ent;
 	int			entityList[MAX_GENTITIES];
@@ -1720,10 +1720,13 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 	vec3_t		dir;
 	int			i, e;
 	qboolean	hitClient = qfalse;
+	qboolean	splashAwardMidAir;
 
 	if ( radius < 1 ) {
 		radius = 1;
 	}
+
+	splashAwardMidAir = qfalse;
 
 	for ( i = 0 ; i < 3 ; i++ ) {
 		mins[i] = origin[i] - radius;
@@ -1762,6 +1765,12 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 			if( LogAccuracyHit( ent, attacker ) ) {
 				hitClient = qtrue;
 			}
+
+			if ( !splashAwardMidAir
+				&& ( mod == MOD_ROCKET_SPLASH || mod == MOD_PLASMA_SPLASH || mod == MOD_BFG_SPLASH )
+				&& G_IsMidAirEligibleTarget( ent ) ) {
+				splashAwardMidAir = qtrue;
+			}
 			VectorSubtract (ent->r.currentOrigin, origin, dir);
 			// push the center of mass higher than the origin so players
 			// get knocked into the air more
@@ -1770,5 +1779,10 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 		}
 	}
 
+	if ( splashMidAir ) {
+		*splashMidAir = splashAwardMidAir;
+	}
+
 	return hitClient;
 }
+
