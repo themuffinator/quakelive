@@ -853,6 +853,10 @@ typedef struct {
 	qhandle_t	scoreboardPing;
 	qhandle_t	scoreboardScore;
 	qhandle_t	scoreboardTime;
+	qhandle_t	scoreboxSpecShader;
+	qhandle_t	scoreboxFollowShader;
+	qhandle_t	inkFadeLeftShader;
+	qhandle_t	inkFadeRightShader;
 
 	// medals shown during gameplay
 	qhandle_t	medalImpressive;

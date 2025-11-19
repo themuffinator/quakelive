@@ -1282,12 +1282,36 @@ newClient = cg.spectatorClientOrder[index];
 trap_SendClientCommand(va("follow %d", newClient));
 }
 
-static void CG_DrawSpectatorPlayerName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+/*
+=============
+CG_DrawSpectatorPlayerName
+
+Renders the tracked spectator player name with an optional backing shader.
+=============
+*/
+static void CG_DrawSpectatorPlayerName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, qhandle_t shader) {
 const clientInfo_t *ci = CG_SpectatorClientInfo(slot);
 vec4_t drawColor;
+vec4_t modulate;
+float x;
+float y;
+float w;
+float h;
 
 if (!ci) {
 return;
+}
+
+if (shader) {
+Vector4Set(modulate, 1.0f, 1.0f, 1.0f, 1.0f);
+x = rect->x;
+y = rect->y;
+w = rect->w;
+h = rect->h;
+CG_AdjustFrom640(&x, &y, &w, &h);
+trap_R_SetColor(modulate);
+trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader);
+trap_R_SetColor(NULL);
 }
 
 Vector4Copy(color, drawColor);
@@ -2833,9 +2857,21 @@ static void CG_DrawNewChatArea(rectDef_t *rect, float scale, vec4_t color, int t
 	}
 }
 
-static void CG_DrawHealthColorized(rectDef_t *rect) {
+/*
+=============
+CG_DrawHealthColorized
+
+Fills the supplied rectangle using the player's health color, optionally tinting a shader.
+=============
+*/
+static void CG_DrawHealthColorized(rectDef_t *rect, qhandle_t shader) {
 const clientInfo_t *ci;
 vec4_t color;
+vec4_t modulate;
+float x;
+float y;
+float w;
+float h;
 int slot;
 int health;
 int armor;
@@ -2858,6 +2894,20 @@ armor = ci->armor;
 
 CG_GetColorForHealth(health, armor, color);
 color[3] = 0.5f;
+
+if (shader) {
+Vector4Copy(color, modulate);
+x = rect->x;
+y = rect->y;
+w = rect->w;
+h = rect->h;
+CG_AdjustFrom640(&x, &y, &w, &h);
+trap_R_SetColor(modulate);
+trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader);
+trap_R_SetColor(NULL);
+return;
+}
+
 CG_FillRect(rect->x, rect->y, rect->w, rect->h, color);
 }
 
@@ -5306,9 +5356,14 @@ break;
   case CG_OVERTIME:
     CG_DrawOvertime(&rect, scale, color, textStyle);
                 break;
-  case CG_1ST_PLYR:
-    CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 0);
+  case CG_1ST_PLYR: {
+qhandle_t nameShader = shader;
+if (!nameShader && cg.competitiveHudLoaded) {
+nameShader = cgs.media.inkFadeLeftShader;
+}
+    CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 0, nameShader);
                 break;
+}
   case CG_1ST_PLYR_SCORE:
     CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 0);
                 break;
@@ -5318,9 +5373,14 @@ break;
   case CG_1ST_PLYR_AVATAR:
 		CG_DrawSpectatorProfileImage(&rect, 0);
 			break;
-  case CG_2ND_PLYR:
-    CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 1);
+  case CG_2ND_PLYR: {
+qhandle_t nameShader = shader;
+if (!nameShader && cg.competitiveHudLoaded) {
+nameShader = cgs.media.inkFadeRightShader;
+}
+    CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 1, nameShader);
                 break;
+}
   case CG_2ND_PLYR_SCORE:
     CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 1);
                 break;
@@ -5330,15 +5390,25 @@ break;
   case CG_2ND_PLYR_AVATAR:
 		CG_DrawSpectatorProfileImage(&rect, 1);
 			break;
-  case CG_HEALTH_COLORIZED:
-    CG_DrawHealthColorized(&rect);
+  case CG_HEALTH_COLORIZED: {
+qhandle_t followShader = shader;
+if (!followShader && cg.competitiveHudLoaded) {
+followShader = cgs.media.scoreboxFollowShader;
+}
+    CG_DrawHealthColorized(&rect, followShader);
                 break;
+}
   case CG_ARMORTIERED_COLORIZED:
     CG_DrawArmorTieredColorized(&rect);
                 break;
-  case CG_TEAM_COLORIZED:
-    CG_DrawTeamColorized(&rect, shader);
+  case CG_TEAM_COLORIZED: {
+qhandle_t teamShader = shader;
+if (!teamShader && cg.competitiveHudLoaded) {
+teamShader = cgs.media.scoreboxSpecShader;
+}
+    CG_DrawTeamColorized(&rect, teamShader);
                 break;
+}
 	case CG_FOLLOW_PLAYER_NAME_EX:
 	CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle);
 	break;
