@@ -587,6 +587,8 @@ typedef struct {
 
 	// low ammo warning state
 	int			lowAmmoWarning;		// 1 = low, 2 = empty
+	float		lowAmmoWarningPercentile;
+	vec4_t		weaponBarGrenadeColor;
 
 	// kill timers for carnage reward
 	int			lastKillTime;
@@ -1203,6 +1205,25 @@ extern	vmCvar_t		cg_drawInputCmds;
 extern	vmCvar_t		cg_drawInputCmdsX;
 extern	vmCvar_t		cg_drawInputCmdsY;
 extern	vmCvar_t		cg_drawInputCmdsSize;
+extern	vmCvar_t		cg_weaponBar;
+extern	vmCvar_t		cg_weaponColor_grenade;
+extern	vmCvar_t		cg_weaponConfig;
+extern	vmCvar_t		cg_weaponConfig_g;
+extern	vmCvar_t		cg_weaponConfig_mg;
+extern	vmCvar_t		cg_weaponConfig_sg;
+extern	vmCvar_t		cg_weaponConfig_gl;
+extern	vmCvar_t		cg_weaponConfig_rl;
+extern	vmCvar_t		cg_weaponConfig_lg;
+extern	vmCvar_t		cg_weaponConfig_rg;
+extern	vmCvar_t		cg_weaponConfig_pg;
+extern	vmCvar_t		cg_weaponConfig_bfg;
+extern	vmCvar_t		cg_weaponConfig_gh;
+extern	vmCvar_t		cg_weaponConfig_ng;
+extern	vmCvar_t		cg_weaponConfig_pl;
+extern	vmCvar_t		cg_weaponConfig_cg;
+extern	vmCvar_t		cg_weaponConfig_hmg;
+extern	vmCvar_t		cg_weaponPrimary;
+extern	vmCvar_t		cg_weaponPrimaryQueued;
 extern	vmCvar_t		cg_drawTeamOverlay;
 extern	vmCvar_t		cg_selfOnTeamOverlay;
 extern	vmCvar_t		cg_drawTeamOverlayX;
@@ -1244,6 +1265,8 @@ extern	vmCvar_t		cg_tracerChance;
 extern	vmCvar_t		cg_tracerWidth;
 extern	vmCvar_t		cg_tracerLength;
 extern	vmCvar_t		cg_autoswitch;
+extern	vmCvar_t		cg_switchOnEmpty;
+extern	vmCvar_t		cg_switchToEmpty;
 extern	vmCvar_t		cg_ignore;
 extern	vmCvar_t		cg_simpleItems;
 extern	vmCvar_t		cg_fov;
@@ -1262,6 +1285,7 @@ extern	vmCvar_t		cg_lagometer;
 extern	vmCvar_t		cg_drawAttacker;
 extern	vmCvar_t		cg_synchronousClients;
 extern	vmCvar_t		cg_teamChatTime;
+extern	vmCvar_t		cg_lowAmmoWarningPercentile;
 extern	vmCvar_t		cg_teamChatHeight;
 extern	vmCvar_t		cg_stats;
 extern	vmCvar_t 		cg_forceModel;
@@ -1278,9 +1302,12 @@ extern	vmCvar_t		cg_teammatePOIsMaxWidth;
 extern	vmCvar_t		cg_teamChatsOnly;
 extern	vmCvar_t		cg_noVoiceChats;
 extern	vmCvar_t		cg_noVoiceText;
+extern	vmCvar_t		cg_useItemMessage;
+extern	vmCvar_t		cg_useItemWarning;
 extern	vmCvar_t		cg_kickScale;
 extern  vmCvar_t		cg_scorePlum;
 extern	vmCvar_t		cg_smoothClients;
+extern	vmCvar_t		cg_loadout;
 extern	vmCvar_t		pmove_fixed;
 extern	vmCvar_t		pmove_msec;
 //extern	vmCvar_t		cg_pmove_fixed;
