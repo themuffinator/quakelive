@@ -463,6 +463,24 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 }
 
 /*
+=============
+G_SynchronizeRocketConfig
+
+Reapplies weapon configuration speed and guidance values so acceleration tweaks stay in sync for prediction.
+=============
+*/
+static void G_SynchronizeRocketConfig( gentity_t *bolt, vec3_t dir ) {
+	float	speed;
+
+	speed = ( float )g_weaponConfig.rocketSpeed;
+	bolt->speed = speed;
+	bolt->count = ( g_weaponConfig.guidedRocketEnabled != 0 ) ? 1 : 0;
+
+	VectorScale( dir, speed, bolt->s.pos.trDelta );
+	SnapVector( bolt->s.pos.trDelta );
+}
+
+/*
 ================
 G_RunMissile
 ================
@@ -728,17 +746,31 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->splashMethodOfDeath = MOD_ROCKET_SPLASH;
 	bolt->clipmask = MASK_SHOT;
 	bolt->target_ent = NULL;
-	bolt->speed = ( float )g_weaponConfig.rocketSpeed;
-	bolt->count = ( g_weaponConfig.guidedRocketEnabled != 0 ) ? 1 : 0;
 
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, ( float )g_weaponConfig.rocketSpeed, bolt->s.pos.trDelta );
-	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
+	G_SynchronizeRocketConfig( bolt, dir );
 	VectorCopy (start, bolt->r.currentOrigin);
 
 	return bolt;
+}
+
+/*
+=============
+G_SynchronizeGrappleConfig
+
+Reapplies grapple speed so accelerated hooks stay aligned between server and client prediction.
+=============
+*/
+static void G_SynchronizeGrappleConfig( gentity_t *hook, vec3_t dir ) {
+	float	speed;
+
+	speed = ( float )g_weaponConfig.grappleSpeed;
+	hook->speed = speed;
+
+	VectorScale( dir, speed, hook->s.pos.trDelta );
+	SnapVector( hook->s.pos.trDelta );
 }
 
 /*
@@ -763,14 +795,12 @@ gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 	hook->clipmask = MASK_SHOT;
 	hook->parent = self;
 	hook->target_ent = NULL;
-	hook->speed = ( float )g_weaponConfig.grappleSpeed;
 
 	hook->s.pos.trType = TR_LINEAR;
 	hook->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	hook->s.otherEntityNum = self->s.number; // use to match beam in client
 	VectorCopy( start, hook->s.pos.trBase );
-	VectorScale( dir, ( float )g_weaponConfig.grappleSpeed, hook->s.pos.trDelta );
-	SnapVector( hook->s.pos.trDelta );			// save net bandwidth
+	G_SynchronizeGrappleConfig( hook, dir );
 	VectorCopy (start, hook->r.currentOrigin);
 
 	self->client->hook = hook;
