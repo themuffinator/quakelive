@@ -1272,16 +1272,16 @@ static void CG_AddToTeamChat( const char *str ) {
 	int lastcolor;
 	int chatHeight;
 
-	if (cg_teamChatHeight.integer < TEAMCHAT_HEIGHT) {
-		chatHeight = cg_teamChatHeight.integer;
-	} else {
-		chatHeight = TEAMCHAT_HEIGHT;
-	}
+	chatHeight = CG_GetChatHistoryLength();
 
-	if (chatHeight <= 0 || cg_teamChatTime.integer <= 0) {
+	if ( chatHeight <= 0 || cg_teamChatTime.integer <= 0 ) {
 		// team chat disabled, dump into normal chat
 		cgs.teamChatPos = cgs.teamLastChatPos = 0;
 		return;
+	}
+
+	if ( cg_teamChatBeep.integer && cgs.media.talkSound ) {
+		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
 	}
 
 	len = 0;
@@ -1331,7 +1331,7 @@ static void CG_AddToTeamChat( const char *str ) {
 
 	if (cgs.teamChatPos - cgs.teamLastChatPos > chatHeight)
 		cgs.teamLastChatPos = cgs.teamChatPos - chatHeight;
-}
+	}
 
 /*
 ===============
@@ -1719,7 +1719,7 @@ void CG_PlayVoiceChat( bufferedVoiceChat_t *vchat ) {
 		return;
 	}
 
-	if ( !cg_noVoiceChats.integer ) {
+	if ( cg_playVoiceChats.integer ) {
 		trap_S_StartLocalSound( vchat->snd, CHAN_VOICE);
 		if (vchat->clientNum != cg.snap->ps.clientNum) {
 			int orderTask = CG_ValidOrder(vchat->cmd);
@@ -1733,7 +1733,7 @@ void CG_PlayVoiceChat( bufferedVoiceChat_t *vchat ) {
 			CG_ShowResponseHead();
 		}
 	}
-	if (!vchat->voiceOnly && !cg_noVoiceText.integer) {
+	if ( !vchat->voiceOnly && cg_showVoiceText.integer ) {
 		CG_AddToTeamChat( vchat->message );
 		CG_Printf( "%s\n", vchat->message );
 	}
@@ -1943,7 +1943,6 @@ static void CG_ServerCommand( void ) {
 
 	if ( !strcmp( cmd, "chat" ) ) {
 		if ( !cg_teamChatsOnly.integer ) {
-			trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
 			Q_strncpyz( text, CG_Argv(1), MAX_SAY_TEXT );
 			CG_RemoveChatEscapeChar( text );
 			CG_Printf( "%s\n", text );
@@ -1952,7 +1951,6 @@ static void CG_ServerCommand( void ) {
 	}
 
 	if ( !strcmp( cmd, "tchat" ) ) {
-		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
 		Q_strncpyz( text, CG_Argv(1), MAX_SAY_TEXT );
 		CG_RemoveChatEscapeChar( text );
 		CG_AddToTeamChat( text );

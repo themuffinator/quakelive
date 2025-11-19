@@ -255,6 +255,9 @@ vmCvar_t	cg_synchronousClients;
 vmCvar_t 	cg_teamChatTime;
 vmCvar_t 	cg_lowAmmoWarningPercentile;
 vmCvar_t 	cg_teamChatHeight;
+vmCvar_t	cg_chatHistoryLength;
+vmCvar_t	cg_chatbeep;
+vmCvar_t	cg_teamChatBeep;
 vmCvar_t 	cg_stats;
 vmCvar_t 	cg_buildScript;
 vmCvar_t 	cg_forceModel;
@@ -287,8 +290,8 @@ vmCvar_t	cg_teammatePOIs;
 vmCvar_t	cg_teammatePOIsMinWidth;
 vmCvar_t	cg_teammatePOIsMaxWidth;
 vmCvar_t	cg_teamChatsOnly;
-vmCvar_t	cg_noVoiceChats;
-vmCvar_t	cg_noVoiceText;
+vmCvar_t	cg_playVoiceChats;
+vmCvar_t	cg_showVoiceText;
 vmCvar_t	cg_useItemMessage;
 vmCvar_t	cg_useItemWarning;
 vmCvar_t	cg_hudFiles;
@@ -504,8 +507,11 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_thirdPersonAngle, "cg_thirdPersonAngle", "0", CVAR_CHEAT },
 	{ &cg_thirdPersonPitch, "cg_thirdPersonPitch", "4.0", CVAR_CHEAT },
 	{ &cg_thirdPerson, "cg_thirdPerson", "0", 0 },
-	{ &cg_teamChatTime, "cg_teamChatTime", "3000", CVAR_ARCHIVE  },
-	{ &cg_teamChatHeight, "cg_teamChatHeight", "0", CVAR_ARCHIVE  },
+{ &cg_teamChatTime, "cg_teamChatTime", "3000", CVAR_ARCHIVE  },
+{ &cg_teamChatHeight, "cg_teamChatHeight", "0", CVAR_ARCHIVE  },
+{ &cg_chatHistoryLength, "cg_chatHistoryLength", "0", CVAR_ARCHIVE },
+{ &cg_chatbeep, "cg_chatbeep", "1", CVAR_ARCHIVE },
+{ &cg_teamChatBeep, "cg_teamChatBeep", "1", CVAR_ARCHIVE },
 	{ &cg_forceModel, "cg_forceModel", "0", CVAR_ARCHIVE  },
 	{ &cg_forceTeamModel, "cg_forceTeamModel", "", CVAR_ARCHIVE },
 	{ &cg_forceTeamSkin, "cg_forceTeamSkin", "", CVAR_ARCHIVE },
@@ -534,10 +540,10 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_teammatePOIs, "cg_teammatePOIs", "1", CVAR_ARCHIVE },
 	{ &cg_teammatePOIsMinWidth, "cg_teammatePOIsMinWidth", "4.0", CVAR_ARCHIVE },
 	{ &cg_teammatePOIsMaxWidth, "cg_teammatePOIsMaxWidth", "24.0", CVAR_ARCHIVE },
-	{ &cg_teamChatsOnly, "cg_teamChatsOnly", "0", CVAR_ARCHIVE },
-	{ &cg_noVoiceChats, "cg_noVoiceChats", "0", CVAR_ARCHIVE },
-	{ &cg_noVoiceText, "cg_noVoiceText", "0", CVAR_ARCHIVE },
-	{ &cg_voiceChatIndicator, "cg_voiceChatIndicator", "1", CVAR_ARCHIVE },
+{ &cg_teamChatsOnly, "cg_teamChatsOnly", "0", CVAR_ARCHIVE },
+{ &cg_playVoiceChats, "cg_playVoiceChats", "1", CVAR_ARCHIVE },
+{ &cg_showVoiceText, "cg_showVoiceText", "1", CVAR_ARCHIVE },
+{ &cg_voiceChatIndicator, "cg_voiceChatIndicator", "1", CVAR_ARCHIVE },
 	// the following variables are created in other parts of the system,
 	// but we also reference them here
 	{ &cg_buildScript, "com_buildScript", "0", 0 },	// force loading of all possible data amd error on failures
@@ -1550,8 +1556,8 @@ void CG_UpdateCvars( void ) {
 		CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha_Team, &cg.screenDamageAlphaTeam, &screenDamageAlphaTeamModificationCount );
 	}
 	cg.zoomToggle = (qboolean)( cg_zoomToggle.integer != 0 );
-	cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
-	CG_UpdateDamagePlumSettings();
+cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
+CG_UpdateDamagePlumSettings();
 
 	CG_UpdateSimpleItemsSettings();
 	CG_UpdateCrosshairColorSettings();
@@ -1563,8 +1569,50 @@ void CG_UpdateCvars( void ) {
 	}
 }
 
+/*
+=============
+CG_GetChatHistoryLength
+
+Calculates the bounded chat history length using cg_chatHistoryLength,
+falling back to cg_teamChatHeight when the new cvar isn't configured.
+=============
+*/
+int CG_GetChatHistoryLength( void ) {
+	int historyLength;
+
+	historyLength = cg_chatHistoryLength.integer;
+	if ( historyLength <= 0 ) {
+		historyLength = cg_teamChatHeight.integer;
+	}
+	if ( historyLength <= 0 ) {
+		historyLength = TEAMCHAT_HEIGHT;
+	}
+	if ( historyLength > TEAMCHAT_HEIGHT ) {
+		historyLength = TEAMCHAT_HEIGHT;
+	}
+
+	return historyLength;
+}
+
+/*
+=============
+CG_ShouldDisplayVoiceIndicator
+
+Returns whether voice chat indicators should be drawn.
+=============
+*/
+qboolean CG_ShouldDisplayVoiceIndicator( void ) {
+	if ( !cg.voiceChatIndicatorEnabled ) {
+		return qfalse;
+	}
+	if ( !cg_playVoiceChats.integer && !cg_showVoiceText.integer ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
 int CG_CrosshairPlayer( void ) {
-	if ( cg.time > ( cg.crosshairClientTime + 1000 ) ) {
+if ( cg.time > ( cg.crosshairClientTime + 1000 ) ) {
 		return -1;
 	}
 	return cg.crosshairClientNum;
@@ -1586,6 +1634,9 @@ void QDECL CG_Printf( const char *msg, ... ) {
 	va_end (argptr);
 
 	trap_Print( text );
+	if ( cg_chatbeep.integer && cgs.media.talkSound ) {
+		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
+	}
 }
 
 void QDECL CG_Error( const char *msg, ... ) {

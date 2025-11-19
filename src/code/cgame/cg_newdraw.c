@@ -31,7 +31,7 @@ typedef enum cgVoteSlotField_e {
 	CG_VOTE_FIELD_MAP,
 	CG_VOTE_FIELD_NAME,
 	CG_VOTE_FIELD_COUNT
-} cgVoteSlotField_t;
+	} cgVoteSlotField_t;
 
 //
 // Forward declarations for HUD ownerdraw helpers used by Quake Live menus.
@@ -1309,7 +1309,7 @@ int width;
 CG_CountLivingPlayers(&friendCount, &enemyCount);
 Com_sprintf(buffer, sizeof(buffer), "%i", friendly ? friendCount : enemyCount);
 width = CG_Text_Width(buffer, scale, 0);
-CG_Text_Paint(rect->x + (rect->w - width) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+		CG_Text_Paint(rect->x + (rect->w - width) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
 /*
@@ -2965,10 +2965,7 @@ static void CG_DrawNewChatArea(rectDef_t *rect, float scale, vec4_t color, int t
 		return;
 	}
 
-	chatHeight = cg_teamChatHeight.integer;
-	if (chatHeight <= 0 || chatHeight > TEAMCHAT_HEIGHT) {
-		chatHeight = TEAMCHAT_HEIGHT;
-	}
+	chatHeight = CG_GetChatHistoryLength();
 
 	maxLines = chatHeight;
 	lineHeight = CG_Text_Height("A", scale, 0);
@@ -3514,12 +3511,24 @@ static void CG_DrawPlayerStatus( rectDef_t *rect ) {
 }
 
 
+/*
+=============
+CG_DrawSelectedPlayerName
+
+Draws the selected player's name or the active voice client's name.
+=============
+*/
 static void CG_DrawSelectedPlayerName( rectDef_t *rect, float scale, vec4_t color, qboolean voice, int textStyle) {
 	clientInfo_t *ci;
-  ci = cgs.clientinfo + ((voice) ? cgs.currentVoiceClient : sortedTeamPlayers[CG_GetSelectedPlayer()]);
-  if (ci) {
-    CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, ci->name, 0, 0, textStyle);
-  }
+
+	if ( voice && !CG_ShouldDisplayVoiceIndicator() ) {
+		return;
+	}
+
+	ci = cgs.clientinfo + ( ( voice ) ? cgs.currentVoiceClient : sortedTeamPlayers[CG_GetSelectedPlayer()] );
+	if ( ci ) {
+		CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, ci->name, 0, 0, textStyle);
+	}
 }
 
 static void CG_DrawSelectedPlayerLocation( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
@@ -3626,6 +3635,13 @@ static void CG_DrawSelectedPlayerPowerup( rectDef_t *rect, qboolean draw2D ) {
 }
 
 
+/*
+=============
+CG_DrawSelectedPlayerHead
+
+Draws the head model for the selected player or active voice client.
+=============
+*/
 static void CG_DrawSelectedPlayerHead( rectDef_t *rect, qboolean draw2D, qboolean voice ) {
 	clipHandle_t	cm;
 	clientInfo_t	*ci;
@@ -3633,47 +3649,48 @@ static void CG_DrawSelectedPlayerHead( rectDef_t *rect, qboolean draw2D, qboolea
 	vec3_t			origin;
 	vec3_t			mins, maxs, angles;
 
+	if ( voice && !CG_ShouldDisplayVoiceIndicator() ) {
+		return;
+	}
 
-  ci = cgs.clientinfo + ((voice) ? cgs.currentVoiceClient : sortedTeamPlayers[CG_GetSelectedPlayer()]);
+	ci = cgs.clientinfo + ( ( voice ) ? cgs.currentVoiceClient : sortedTeamPlayers[CG_GetSelectedPlayer()] );
 
-  if (ci) {
-  	if ( cg_draw3dIcons.integer ) {
-	  	cm = ci->headModel;
-  		if ( !cm ) {
-  			return;
-	  	}
+	if (ci) {
+		if ( cg_draw3dIcons.integer ) {
+			cm = ci->headModel;
+			if ( !cm ) {
+				return;
+			}
 
-  		// offset the origin y and z to center the head
-  		trap_R_ModelBounds( cm, mins, maxs );
+			// offset the origin y and z to center the head
+			trap_R_ModelBounds( cm, mins, maxs );
 
-	  	origin[2] = -0.5 * ( mins[2] + maxs[2] );
-  		origin[1] = 0.5 * ( mins[1] + maxs[1] );
+			origin[2] = -0.5 * ( mins[2] + maxs[2] );
+			origin[1] = 0.5 * ( mins[1] + maxs[1] );
 
-	  	// calculate distance so the head nearly fills the box
-  		// assume heads are taller than wide
-  		len = 0.7 * ( maxs[2] - mins[2] );		
-  		origin[0] = len / 0.268;	// len / tan( fov/2 )
+			// calculate distance so the head nearly fills the box
+			// assume heads are taller than wide
+			len = 0.7 * ( maxs[2] - mins[2] );
+			origin[0] = len / 0.268;	// len / tan( fov/2 )
 
-  		// allow per-model tweaking
-  		VectorAdd( origin, ci->headOffset, origin );
+			// allow per-model tweaking
+			VectorAdd( origin, ci->headOffset, origin );
 
-    	angles[PITCH] = 0;
-    	angles[YAW] = 180;
-    	angles[ROLL] = 0;
-  	
-      CG_Draw3DModel( rect->x, rect->y, rect->w, rect->h, ci->headModel, ci->headSkin, origin, angles );
-  	} else if ( cg_drawIcons.integer ) {
-	  	CG_DrawPic( rect->x, rect->y, rect->w, rect->h, ci->modelIcon );
-  	}
+			angles[PITCH] = 0;
+			angles[YAW] = 180;
+			angles[ROLL] = 0;
 
-  	// if they are deferred, draw a cross out
-  	if ( ci->deferred ) {
-  		CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cgs.media.deferShader );
-  	}
-  }
+			CG_Draw3DModel( rect->x, rect->y, rect->w, rect->h, ci->headModel, ci->headSkin, origin, angles );
+		} else if ( cg_drawIcons.integer ) {
+			CG_DrawPic( rect->x, rect->y, rect->w, rect->h, ci->modelIcon );
+		}
 
+		// if they are deferred, draw a cross out
+		if ( ci->deferred ) {
+			CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cgs.media.deferShader );
+		}
+	}
 }
-
 
 static void CG_DrawPlayerHealth(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle ) {
 	playerState_t	*ps;
