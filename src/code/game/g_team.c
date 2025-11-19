@@ -87,6 +87,8 @@ static float Team_DominationCaptureMultiplier( int playerCount );
 static void Team_DominationAnnounceCapture( dominationPoint_t *point, team_t previousOwner );
 static void Team_DominationAnnounceNeutralized( dominationPoint_t *point, team_t attacker );
 static void Team_DominationSendDistress( dominationPoint_t *point );
+static void G_ClearDroppedFlagState( gentity_t *flag );
+static void G_ApplyDroppedFlagMetadata( gentity_t *drop, qboolean tackleDrop, qboolean suicideDrop, const gentity_t *attacker );
 
 /*
 =============
@@ -1459,31 +1461,69 @@ static void G_InitFlagDropPhysics( gentity_t *carrier, gentity_t *drop ) {
 
 /*
 =============
+G_ClearDroppedFlagState
+
+Resets the tackle metadata stored on a flag entity.
+=============
+*/
+static void G_ClearDroppedFlagState( gentity_t *flag ) {
+	if ( !flag ) {
+		return;
+	}
+
+	flag->flagDroppedByEnemy = qfalse;
+	flag->flagDroppedBySuicide = qfalse;
+	flag->flagDroppedByClientNum = ENTITYNUM_NONE;
+}
+
+/*
+=============
+G_ApplyDroppedFlagMetadata
+
+Records how a flag was dropped so the return logic can react accordingly.
+=============
+*/
+static void G_ApplyDroppedFlagMetadata( gentity_t *drop, qboolean tackleDrop, qboolean suicideDrop, const gentity_t *attacker ) {
+	if ( !drop ) {
+		return;
+	}
+
+	G_ClearDroppedFlagState( drop );
+	drop->flagDroppedByEnemy = tackleDrop;
+	drop->flagDroppedBySuicide = suicideDrop;
+	if ( attacker ) {
+		drop->flagDroppedByClientNum = attacker->s.number;
+	}
+}
+
+/*
+=============
 G_HandleFlagTackleBonus
 
 Awards the tackle bonus and accompanying messaging when an attacker forces a drop.
 =============
 */
-static void G_HandleFlagTackleBonus( gentity_t *carrier, gentity_t *attacker, int flagTeam ) {
+static qboolean G_HandleFlagTackleBonus( gentity_t *carrier, gentity_t *attacker, int flagTeam ) {
 	if ( !g_flagConfig.tackleFlag ) {
-		return;
+		return qfalse;
 	}
 
 	if ( !carrier || !carrier->client || !attacker || !attacker->client ) {
-		return;
+		return qfalse;
 	}
 
 	if ( attacker == carrier ) {
-		return;
+		return qfalse;
 	}
 
 	if ( OnSameTeam( carrier, attacker ) ) {
-		return;
+		return qfalse;
 	}
 
 	AddScore( attacker, carrier->r.currentOrigin, g_flagConfig.droppedFlagBonus );
 	PrintMsg( NULL, "%s" S_COLOR_WHITE " tackled the %s flag carrier!\n",
 		attacker->client->pers.netname, TeamName( flagTeam ) );
+	return qtrue;
 }
 
 /*
@@ -1496,6 +1536,7 @@ Drops or returns a carried flag depending on the provided context and configurat
 flagDropResult_t G_TossFlag( gentity_t *carrier, int flagPowerup, flagDropContext_t context, gentity_t *attacker, int meansOfDeath, gentity_t **dropped ) {
 	int flagTeam;
 	qboolean suicide;
+	qboolean tackleDrop;
 	gitem_t *item;
 	gentity_t *drop;
 	vec3_t velocity;
@@ -1520,6 +1561,7 @@ flagDropResult_t G_TossFlag( gentity_t *carrier, int flagPowerup, flagDropContex
 
 	carrier->client->ps.powerups[ flagPowerup ] = 0;
 	suicide = ( context == FLAG_DROP_CONTEXT_DEATH && ( attacker == carrier || meansOfDeath == MOD_SUICIDE ) );
+	tackleDrop = qfalse;
 	result = FLAG_DROP_RESULT_NONE;
 
 	if ( context == FLAG_DROP_CONTEXT_FORCED_RETURN || ( suicide && g_flagConfig.returnOnSuicide ) ) {
@@ -1537,8 +1579,9 @@ flagDropResult_t G_TossFlag( gentity_t *carrier, int flagPowerup, flagDropContex
 	if ( drop ) {
 		G_InitFlagDropPhysics( carrier, drop );
 		if ( context == FLAG_DROP_CONTEXT_DEATH ) {
-			G_HandleFlagTackleBonus( carrier, attacker, flagTeam );
+			tackleDrop = G_HandleFlagTackleBonus( carrier, attacker, flagTeam );
 		}
+		G_ApplyDroppedFlagMetadata( drop, tackleDrop, suicide, attacker );
 		Team_CheckDroppedItem( drop );
 		result = FLAG_DROP_RESULT_DROPPED;
 		if ( dropped ) {
@@ -1904,6 +1947,7 @@ gentity_t *Team_ResetFlag( int team ) {
 		else {
 			rent = ent;
 			RespawnItem(ent);
+			G_ClearDroppedFlagState( ent );
 		}
 	}
 
@@ -2057,31 +2101,64 @@ Team_DroppedFlagThink
 */
 int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 	int			i;
-	gentity_t	*player;
-	gclient_t	*cl = other->client;
+	gentity_t		*player;
+	gclient_t		*cl;
 	int			enemy_flag;
+	qboolean		teammateTouch;
+	qboolean		tackleReturn;
+
+	cl = ( other && other->client ) ? other->client : NULL;
+	if ( !cl ) {
+		Team_SetFlagStatus( team, FLAG_ATBASE );
+		return 0;
+	}
 
 	if( g_gametype.integer == GT_1FCTF ) {
 		enemy_flag = PW_NEUTRALFLAG;
 	}
 	else {
-	if (cl->sess.sessionTeam == TEAM_RED) {
-		enemy_flag = PW_BLUEFLAG;
-	} else {
-		enemy_flag = PW_REDFLAG;
+		if ( cl->sess.sessionTeam == TEAM_RED ) {
+			enemy_flag = PW_BLUEFLAG;
+		} else {
+			enemy_flag = PW_REDFLAG;
+		}
 	}
 
+	teammateTouch = ( cl->sess.sessionTeam == team );
+	tackleReturn = ( ent && ent->flagDroppedByEnemy && other && other->client && !teammateTouch && ent->flagDroppedByClientNum == other->s.number );
+
 	if ( ent->flags & FL_DROPPED_ITEM ) {
+		if ( ent->flagDroppedBySuicide && g_flagConfig.returnOnSuicide ) {
+			Team_SetFlagStatus( team, FLAG_ATBASE );
+			G_ClearDroppedFlagState( ent );
+			return 0;
+		}
+
+		if ( tackleReturn ) {
+			PrintMsg( NULL, "%s" S_COLOR_WHITE " forced the %s flag to return!\n",
+				cl->pers.netname, TeamName( team ) );
+			G_ClearDroppedFlagState( ent );
+			Team_ReturnFlagSound( Team_ResetFlag( team ), team );
+			return 0;
+		}
+
+		if ( !teammateTouch ) {
+			return 0;
+		}
+
 		// hey, its not home.  return it by teleporting it back
-		PrintMsg( NULL, "%s" S_COLOR_WHITE " returned the %s flag!\n", 
-			cl->pers.netname, TeamName(team));
+		PrintMsg( NULL, "%s" S_COLOR_WHITE " returned the %s flag!\n",
+				cl->pers.netname, TeamName(team));
 		AddScore(other, ent->r.currentOrigin, CTF_RECOVERY_BONUS);
+		if ( ent->flagDroppedByEnemy && g_flagConfig.droppedFlagBonus > 0 ) {
+			AddScore( other, ent->r.currentOrigin, g_flagConfig.droppedFlagBonus );
+		}
 		other->client->pers.teamState.flagrecovery++;
 		other->client->pers.teamState.lastreturnedflag = level.time;
+		G_ClearDroppedFlagState( ent );
 		//ResetFlag will remove this entity!  We must return zero
 		Team_ReturnFlagSound(Team_ResetFlag(team), team);
 		return 0;
-	}
 	}
 
 	// the flag is at home base.  if the player has the enemy
@@ -2092,7 +2169,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 		PrintMsg( NULL, "%s" S_COLOR_WHITE " captured the flag!\n", cl->pers.netname );
 	}
 	else {
-	PrintMsg( NULL, "%s" S_COLOR_WHITE " captured the %s flag!\n", cl->pers.netname, TeamName(OtherTeam(team)));
+		PrintMsg( NULL, "%s" S_COLOR_WHITE " captured the %s flag!\n", cl->pers.netname, TeamName(OtherTeam(team)));
 	}
 
 	cl->ps.powerups[enemy_flag] = 0;
@@ -2131,7 +2208,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 			if (player != other)
 				AddScore(player, ent->r.currentOrigin, CTF_TEAM_BONUS);
 			// award extra points for capture assists
-			if (player->client->pers.teamState.lastreturnedflag + 
+			if (player->client->pers.teamState.lastreturnedflag +
 				CTF_RETURN_FLAG_ASSIST_TIMEOUT > level.time) {
 				AddScore (player, ent->r.currentOrigin, CTF_RETURN_FLAG_ASSIST_BONUS);
 				other->client->pers.teamState.assists++;
@@ -2142,7 +2219,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 				player->client->ps.eFlags |= EF_AWARD_ASSIST;
 				player->client->rewardTime = level.time + REWARD_SPRITE_TIME;
 
-			} else if (player->client->pers.teamState.lastfraggedcarrier + 
+			} else if (player->client->pers.teamState.lastfraggedcarrier +
 				CTF_FRAG_CARRIER_ASSIST_TIMEOUT > level.time) {
 				AddScore(player, ent->r.currentOrigin, CTF_FRAG_CARRIER_ASSIST_BONUS);
 				other->client->pers.teamState.assists++;
