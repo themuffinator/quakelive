@@ -229,6 +229,61 @@ static wavinfo_t GetWavinfo (char *name, byte *wav, int wavlength)
 	return info;
 }
 
+/*
+=============
+S_PathIsOgg
+
+Checks whether the provided sound path already declares an OGG extension.
+=============
+*/
+static qboolean S_PathIsOgg( const char *name ) {
+	const char	*dot;
+
+	if ( !name ) {
+		return qfalse;
+	}
+
+	dot = strrchr( name, '.' );
+	if ( !dot || !*( dot + 1 ) ) {
+		return qfalse;
+	}
+
+	return ( qboolean )( !Q_stricmp( dot + 1, "ogg" ) );
+}
+
+/*
+=============
+S_BufferIsOgg
+
+Sniffs the first bytes of a file to see whether it contains the OggS magic header.
+=============
+*/
+static qboolean S_BufferIsOgg( const byte *data, int length ) {
+	if ( !data || length < 4 ) {
+		return qfalse;
+	}
+
+	if ( data[0] != 'O' || data[1] != 'g' || data[2] != 'g' || data[3] != 'S' ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+S_IsOggSound
+
+Combines extension checks and magic sniffing to detect Vorbis assets.
+=============
+*/
+static qboolean S_IsOggSound( const char *name, const byte *data, int length ) {
+	if ( S_PathIsOgg( name ) ) {
+		return qtrue;
+	}
+
+	return S_BufferIsOgg( data, length );
+}
 
 /*
 ================
@@ -329,9 +384,12 @@ of a forced fallback of a player specific sound
 qboolean S_LoadSound( sfx_t *sfx )
 {
 	byte	*data;
+	byte	*source;
 	short	*samples;
+	short	*oggPcm;
 	wavinfo_t	info;
-	int		size;
+	int			 size;
+	qboolean	isOgg;
 
 	// player specific sounds are never directly loaded
 	if ( sfx->soundName[0] == '*') {
@@ -344,11 +402,24 @@ qboolean S_LoadSound( sfx_t *sfx )
 		return qfalse;
 	}
 
-	info = GetWavinfo( sfx->soundName, data, size );
-	if ( info.channels != 1 ) {
-		Com_Printf ("%s is a stereo wav file\n", sfx->soundName);
-		FS_FreeFile (data);
-		return qfalse;
+	oggPcm = NULL;
+	source = NULL;
+	isOgg = S_IsOggSound( sfx->soundName, data, size );
+
+	if ( isOgg ) {
+		if ( !S_VorbisDecodeMemory( sfx->soundName, data, size, &info, &oggPcm ) ) {
+			FS_FreeFile( data );
+			return qfalse;
+		}
+		source = (byte *)oggPcm;
+	} else {
+		info = GetWavinfo( sfx->soundName, data, size );
+		if ( info.channels != 1 ) {
+			Com_Printf ("%s is a stereo wav file\n", sfx->soundName);
+			FS_FreeFile (data);
+			return qfalse;
+		}
+		source = data + info.dataofs;
 	}
 
 	if ( info.width == 1 ) {
@@ -357,6 +428,14 @@ qboolean S_LoadSound( sfx_t *sfx )
 
 	if ( info.rate != 22050 ) {
 		Com_DPrintf(S_COLOR_YELLOW "WARNING: %s is not a 22kHz wav file\n", sfx->soundName);
+	}
+
+	if ( info.samples <= 0 || info.width <= 0 || !source ) {
+		if ( oggPcm ) {
+			Hunk_FreeTempMemory( oggPcm );
+		}
+		FS_FreeFile( data );
+		return qfalse;
 	}
 
 	samples = Hunk_AllocateTempMemory(info.samples * sizeof(short) * 2);
@@ -372,28 +451,31 @@ qboolean S_LoadSound( sfx_t *sfx )
 	if( sfx->soundCompressed == qtrue) {
 		sfx->soundCompressionMethod = 1;
 		sfx->soundData = NULL;
-		sfx->soundLength = ResampleSfxRaw( samples, info.rate, info.width, info.samples, (data + info.dataofs) );
+		sfx->soundLength = ResampleSfxRaw( samples, info.rate, info.width, info.samples, source );
 		S_AdpcmEncodeSound(sfx, samples);
 #if 0
 	} else if (info.samples>(SND_CHUNK_SIZE*16) && info.width >1) {
 		sfx->soundCompressionMethod = 3;
 		sfx->soundData = NULL;
-		sfx->soundLength = ResampleSfxRaw( samples, info.rate, info.width, info.samples, (data + info.dataofs) );
+		sfx->soundLength = ResampleSfxRaw( samples, info.rate, info.width, info.samples, source );
 		encodeMuLaw( sfx, samples);
 	} else if (info.samples>(SND_CHUNK_SIZE*6400) && info.width >1) {
 		sfx->soundCompressionMethod = 2;
 		sfx->soundData = NULL;
-		sfx->soundLength = ResampleSfxRaw( samples, info.rate, info.width, info.samples, (data + info.dataofs) );
+		sfx->soundLength = ResampleSfxRaw( samples, info.rate, info.width, info.samples, source );
 		encodeWavelet( sfx, samples);
 #endif
 	} else {
 		sfx->soundCompressionMethod = 0;
 		sfx->soundLength = info.samples;
 		sfx->soundData = NULL;
-		ResampleSfx( sfx, info.rate, info.width, data + info.dataofs, qfalse );
+		ResampleSfx( sfx, info.rate, info.width, source, qfalse );
 	}
-	
+
 	Hunk_FreeTempMemory(samples);
+	if ( oggPcm ) {
+		Hunk_FreeTempMemory( oggPcm );
+	}
 	FS_FreeFile( data );
 
 	return qtrue;

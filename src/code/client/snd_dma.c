@@ -59,6 +59,7 @@ static qboolean		s_backgroundIsOgg;
 #define		SOUND_FULLVOLUME	80
 
 #define		SOUND_ATTENUATE		0.0008f
+#define		S_DEFAULT_OGG_SANITY		"sound/world/telein.ogg"
 
 channel_t   s_channels[MAX_CHANNELS];
 channel_t   loop_channels[MAX_CHANNELS];
@@ -107,7 +108,7 @@ portable_samplepair_t	s_rawsamples[MAX_RAW_SAMPLES];
 // ====================================================================
 
 
-void S_SoundInfo_f(void) {	
+void S_SoundInfo_f(void) {
 	Com_Printf("----- Sound Info -----\n" );
 	if (!s_soundStarted) {
 		Com_Printf ("sound system not started\n");
@@ -132,7 +133,37 @@ void S_SoundInfo_f(void) {
 	Com_Printf("----------------------\n" );
 }
 
+/*
+=============
+S_TestOgg_f
 
+Registers and plays a Vorbis asset to verify decoding and resampling.
+=============
+*/
+static void S_TestOgg_f( void ) {
+	const char		*path;
+	sfxHandle_t	handle;
+
+	if ( !s_soundStarted ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: sound system not initialized\n" );
+		return;
+	}
+
+	if ( Cmd_Argc() > 1 ) {
+		path = Cmd_Argv( 1 );
+	} else {
+		path = S_DEFAULT_OGG_SANITY;
+	}
+
+	handle = S_RegisterSound( path, qfalse );
+	if ( !handle ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: could not register %s for ogg test\n", path );
+		return;
+	}
+
+	S_StartLocalSound( handle, CHAN_LOCAL_SOUND );
+	Com_Printf( "Started OGG sanity playback for %s\n", path );
+}
 
 /*
 ================
@@ -168,6 +199,7 @@ void S_Init( void ) {
 	Cmd_AddCommand("s_list", S_SoundList_f);
 	Cmd_AddCommand("s_info", S_SoundInfo_f);
 	Cmd_AddCommand("s_stop", S_StopAllSounds);
+	Cmd_AddCommand("s_testogg", S_TestOgg_f);
 
 	r = SNDDMA_Init();
 	Com_Printf("------------------------------------\n");
@@ -237,11 +269,12 @@ void S_Shutdown( void ) {
 
 	s_soundStarted = 0;
 
-    Cmd_RemoveCommand("play");
+	Cmd_RemoveCommand("play");
 	Cmd_RemoveCommand("music");
 	Cmd_RemoveCommand("stopsound");
 	Cmd_RemoveCommand("soundlist");
 	Cmd_RemoveCommand("soundinfo");
+	Cmd_RemoveCommand("s_testogg");
 }
 
 

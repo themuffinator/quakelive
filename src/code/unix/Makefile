@@ -419,6 +419,7 @@ Q3OBJ = \
 $(B)/client/snd_dma.o \
 $(B)/client/snd_mem.o \
 $(B)/client/snd_mix.o \
+	$(B)/client/snd_ogg_decode.o \
 $(B)/client/snd_ogg_stream.o \
 $(B)/client/snd_wavelet.o \
 	\
@@ -651,6 +652,7 @@ $(B)/client/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC)
 $(B)/client/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC)       
 $(B)/client/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC)
 $(B)/client/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC)
+$(B)/client/snd_ogg_decode.o : $(CDIR)/snd_ogg_decode.c; $(DO_CC)
 $(B)/client/snd_ogg_stream.o : $(CDIR)/snd_ogg_stream.c; $(DO_CC)
 $(B)/client/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC)
 $(B)/client/sv_bot.o : $(SDIR)/sv_bot.c; $(DO_CC)        
@@ -1530,6 +1532,7 @@ Q3SOBJ = \
 $(B)/q3static/snd_dma.o \
 $(B)/q3static/snd_mem.o \
 $(B)/q3static/snd_mix.o \
+	$(B)/q3static/snd_ogg_decode.o \
 $(B)/q3static/snd_ogg_stream.o \
 $(B)/q3static/snd_wavelet.o \
 	\
@@ -1695,6 +1698,7 @@ $(B)/q3static/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC) -DQ3_STATIC       
 $(B)/q3static/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_ogg_decode.o : $(CDIR)/snd_ogg_decode.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_ogg_stream.o : $(CDIR)/snd_ogg_stream.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/sv_bot.o : $(SDIR)/sv_bot.c; $(DO_CC) -DQ3_STATIC        
