@@ -3501,6 +3501,10 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	cgs.media.charsetPropGlow	= trap_R_RegisterShaderNoMip( "menu/art/font1_prop_glo.tga" );
 	cgs.media.charsetPropB		= trap_R_RegisterShaderNoMip( "menu/art/font2_prop.tga" );
 
+	trap_Cvar_Set( "ui_mainmenu", "0" );
+	trap_Cvar_Set( "ui_intermission", "0" );
+	trap_Cvar_Set( "ui_warmup", "0" );
+
 	CG_RegisterCvars();
 
 	CG_InitConsoleCommands();

@@ -30,6 +30,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../game/match_state_keys.h"
 
+#ifndef VF_NO_GAMETYPE
+#define VF_NO_GAMETYPE	0x0008
+#endif
+
 typedef struct {
 	const char *order;
 	int taskNum;
@@ -756,17 +760,22 @@ and whenever the server updates any serverinfo flagged cvars
 */
 void CG_ParseServerinfo( void ) {
 	const char	*info;
+	const char	*gametypeValue;
 	char	*mapname;
 	char	oldModelOverride[MAX_QPATH];
 	char	oldHeadOverride[MAX_QPATH];
 	const char	*modelOverride;
 	const char	*headOverride;
 	const char	*serverLoadout;
+	const char	*voteFlagsString;
+	int		voteFlags;
 
 	info = CG_ConfigString( CS_SERVERINFO );
 	Q_strncpyz( oldModelOverride, cgs.playermodelOverride, sizeof( oldModelOverride ) );
 	Q_strncpyz( oldHeadOverride, cgs.playerheadmodelOverride, sizeof( oldHeadOverride ) );
-	cgs.gametype = atoi( Info_ValueForKey( info, "g_gametype" ) );
+	gametypeValue = Info_ValueForKey( info, "g_gametype" );
+	cgs.gametype = atoi( gametypeValue );
+	trap_Cvar_Set( "cg_gametype", gametypeValue );
 	trap_Cvar_Set("g_gametype", va("%i", cgs.gametype));
 	cgs.dmflags = atoi( Info_ValueForKey( info, "dmflags" ) );
 	cgs.teamflags = atoi( Info_ValueForKey( info, "teamflags" ) );
@@ -774,6 +783,7 @@ void CG_ParseServerinfo( void ) {
 	cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
+  
 	serverLoadout = Info_ValueForKey( info, "loadout" );
 	if ( !serverLoadout || !serverLoadout[0] ) {
 		serverLoadout = Info_ValueForKey( info, "g_loadout" );
@@ -783,6 +793,19 @@ void CG_ParseServerinfo( void ) {
 	}
 	Q_strncpyz( cgs.loadout, serverLoadout, sizeof( cgs.loadout ) );
 	trap_Cvar_Set( "cg_loadout", cgs.loadout );
+  
+	{
+		const char	*armorTieredValue;
+
+		armorTieredValue = Info_ValueForKey( info, "g_armorTiered" );
+		if ( !armorTieredValue[0] ) {
+			armorTieredValue = "0";
+		}
+
+		cg.armorTieredEnabled = (qboolean)( atoi( armorTieredValue ) != 0 );
+		trap_Cvar_Set( "cg_armorTiered", armorTieredValue );
+	}
+  
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
 CG_SetTeamNameCvar( "g_redteam", Info_ValueForKey( info, "g_redTeam" ), DEFAULT_REDTEAM_NAME, cgs.redTeam, sizeof( cgs.redTeam ) );
@@ -793,6 +816,14 @@ CG_SetTeamNameCvar( "g_blueteam", Info_ValueForKey( info, "g_blueTeam" ), DEFAUL
 	Q_strncpyz( cgs.playerheadmodelOverride, headOverride, sizeof( cgs.playerheadmodelOverride ) );
 	if ( Q_stricmp( oldModelOverride, cgs.playermodelOverride ) || Q_stricmp( oldHeadOverride, cgs.playerheadmodelOverride ) ) {
 		CG_ApplyModelOverrides();
+	}
+
+	voteFlagsString = Info_ValueForKey( info, "g_voteFlags" );
+	voteFlags = atoi( voteFlagsString );
+	if ( voteFlags & VF_NO_GAMETYPE ) {
+		trap_Cvar_Set( "ui_gameTypeVotingDisabled", "1" );
+	} else {
+		trap_Cvar_Set( "ui_gameTypeVotingDisabled", "0" );
 	}
 }
 
@@ -822,6 +853,7 @@ static void CG_ParseWarmup( void ) {
 	}
 
 	cg.warmup = warmup;
+	trap_Cvar_Set( "ui_warmup", va( "%i", cg.warmup ) );
 }
 
 /*
