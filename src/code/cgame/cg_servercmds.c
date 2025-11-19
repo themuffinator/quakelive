@@ -756,6 +756,7 @@ and whenever the server updates any serverinfo flagged cvars
 */
 void CG_ParseServerinfo( void ) {
 	const char	*info;
+	const char	*gametypeValue;
 	char	*mapname;
 	char	oldModelOverride[MAX_QPATH];
 	char	oldHeadOverride[MAX_QPATH];
@@ -765,7 +766,9 @@ void CG_ParseServerinfo( void ) {
 	info = CG_ConfigString( CS_SERVERINFO );
 	Q_strncpyz( oldModelOverride, cgs.playermodelOverride, sizeof( oldModelOverride ) );
 	Q_strncpyz( oldHeadOverride, cgs.playerheadmodelOverride, sizeof( oldHeadOverride ) );
-	cgs.gametype = atoi( Info_ValueForKey( info, "g_gametype" ) );
+	gametypeValue = Info_ValueForKey( info, "g_gametype" );
+	cgs.gametype = atoi( gametypeValue );
+	trap_Cvar_Set( "cg_gametype", gametypeValue );
 	trap_Cvar_Set("g_gametype", va("%i", cgs.gametype));
 	cgs.dmflags = atoi( Info_ValueForKey( info, "dmflags" ) );
 	cgs.teamflags = atoi( Info_ValueForKey( info, "teamflags" ) );
