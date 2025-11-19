@@ -4067,7 +4067,274 @@ void CG_ShowResponseHead() {
 	cg.voiceTime = cg.time;
 }
 
+/*
+=============
+CG_MenuScript_OpenScoreboard
+
+Requests fresh scoreboard data and forces the HUD overlay to appear.
+=============
+*/
+static void CG_MenuScript_OpenScoreboard( void ) {
+	CG_BuildSpectatorString();
+	if ( cg.scoresRequestTime + 2000 < cg.time ) {
+		cg.scoresRequestTime = cg.time;
+		trap_SendClientCommand( "score" );
+		if ( !cg.showScores ) {
+			cg.showScores = qtrue;
+			cg.numScores = 0;
+		}
+	} else {
+		cg.showScores = qtrue;
+	}
+	CG_EventHandling( CGAME_EVENT_SCOREBOARD );
+}
+
+/*
+=============
+CG_MenuScript_CloseScoreboard
+
+Hides the Quake Live scoreboard overlay.
+=============
+*/
+static void CG_MenuScript_CloseScoreboard( void ) {
+	if ( cg.showScores ) {
+		cg.showScores = qfalse;
+		cg.scoreFadeTime = cg.time;
+	}
+	if ( cgs.eventHandling == CGAME_EVENT_SCOREBOARD ) {
+		CG_EventHandling( CGAME_EVENT_NONE );
+	}
+}
+
+/*
+=============
+CG_MenuScript_WebCommand
+
+Dispatches browser-related console commands on behalf of HUD scripts.
+=============
+*/
+static void CG_MenuScript_WebCommand( const char *command, const char *argument ) {
+	char buffer[MAX_STRING_CHARS];
+
+	if ( !command || !*command ) {
+		return;
+	}
+
+	if ( argument && *argument ) {
+		Com_sprintf( buffer, sizeof( buffer ), "%s %s\n", command, argument );
+	} else {
+		Com_sprintf( buffer, sizeof( buffer ), "%s\n", command );
+	}
+
+	trap_SendConsoleCommand( buffer );
+}
+
+/*
+=============
+CG_MenuScript_FollowClient
+
+Follows the specified client if they are valid.
+=============
+*/
+static void CG_MenuScript_FollowClient( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+		return;
+	}
+	if ( !cgs.clientinfo[clientNum].infoValid ) {
+		return;
+	}
+
+	trap_SendClientCommand( va( "follow %d", clientNum ) );
+}
+
+/*
+=============
+CG_MenuScript_FollowSlot
+
+Follows the player occupying a spectator slot (0 = primary, 1 = secondary).
+=============
+*/
+static void CG_MenuScript_FollowSlot( int slot ) {
+	int clientNum;
+
+	CG_UpdateSpectatorTargets();
+	if ( slot < 0 || slot >= cg.spectatorClientCount ) {
+		return;
+	}
+
+	clientNum = cg.spectatorClientOrder[slot];
+	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+		return;
+	}
+
+	CG_MenuScript_FollowClient( clientNum );
+}
+
+/*
+=============
+CG_MenuScript_StopFollowing
+
+Releases the spectator camera from any follow target.
+=============
+*/
+static void CG_MenuScript_StopFollowing( void ) {
+	trap_SendClientCommand( "follow" );
+}
+
+/*
+=============
+CG_MenuScript_ToggleHudEditor
+
+Toggles the HUD editor event catcher used by Quake Live.
+=============
+*/
+static void CG_MenuScript_ToggleHudEditor( void ) {
+	int catcher;
+	qboolean enable;
+
+	enable = ( cgs.eventHandling != CGAME_EVENT_EDITHUD );
+	catcher = trap_Key_GetCatcher();
+	if ( enable ) {
+		CG_EventHandling( CGAME_EVENT_EDITHUD );
+		trap_Key_SetCatcher( catcher | KEYCATCH_CGAME );
+	} else {
+		CG_EventHandling( CGAME_EVENT_NONE );
+		trap_Key_SetCatcher( catcher & ~KEYCATCH_CGAME );
+	}
+}
+
+/*
+=============
+CG_MenuScript_ParseOptionalToken
+
+Reads the next token if one exists without permanently advancing on failure.
+=============
+*/
+static qboolean CG_MenuScript_ParseOptionalToken( char **args, const char **out ) {
+	char *backup;
+
+	if ( !args || !out ) {
+		return qfalse;
+	}
+
+	backup = *args;
+	if ( String_Parse( args, out ) ) {
+		return qtrue;
+	}
+
+	*out = NULL;
+	*args = backup;
+	return qfalse;
+}
+
+/*
+=============
+CG_MenuScript_FollowName
+
+Follows the player whose name was provided by a menu script.
+=============
+*/
+static void CG_MenuScript_FollowName( const char *playerName ) {
+	int clientNum;
+
+	if ( !playerName || !*playerName ) {
+		return;
+	}
+
+	clientNum = CG_ClientNumFromName( playerName );
+	if ( clientNum >= 0 ) {
+		CG_MenuScript_FollowClient( clientNum );
+	}
+}
+
 void CG_RunMenuScript(char **args) {
+	const char *name;
+	const char *argument;
+
+	if ( !args ) {
+		return;
+	}
+
+	if ( !String_Parse( args, &name ) ) {
+		return;
+	}
+
+	if ( !Q_stricmp( name, "openScoreboard" ) ) {
+		CG_MenuScript_OpenScoreboard();
+		return;
+	}
+
+	if ( !Q_stricmp( name, "closeScoreboard" ) ) {
+		CG_MenuScript_CloseScoreboard();
+		return;
+	}
+
+	if ( !Q_stricmp( name, "spectatorFollowNext" ) ) {
+		CG_SpectatorFollowCycle( 1 );
+		return;
+	}
+
+	if ( !Q_stricmp( name, "spectatorFollowPrev" ) ) {
+		CG_SpectatorFollowCycle( -1 );
+		return;
+	}
+
+	if ( !Q_stricmp( name, "spectatorFollowPrimary" ) ) {
+		CG_MenuScript_FollowSlot( 0 );
+		return;
+	}
+
+	if ( !Q_stricmp( name, "spectatorFollowSecondary" ) ) {
+		CG_MenuScript_FollowSlot( 1 );
+		return;
+	}
+
+	if ( !Q_stricmp( name, "spectatorFollowSlot" ) ) {
+		if ( String_Parse( args, &argument ) ) {
+			CG_MenuScript_FollowSlot( atoi( argument ) );
+		}
+		return;
+	}
+
+	if ( !Q_stricmp( name, "spectatorFollowClient" ) ) {
+		if ( String_Parse( args, &argument ) ) {
+			CG_MenuScript_FollowClient( atoi( argument ) );
+		}
+		return;
+	}
+
+	if ( !Q_stricmp( name, "spectatorFollowName" ) || !Q_stricmp( name, "spectatorFollowPlayer" ) ) {
+		if ( String_Parse( args, &argument ) ) {
+			CG_MenuScript_FollowName( argument );
+		}
+		return;
+	}
+
+	if ( !Q_stricmp( name, "spectatorFollowStop" ) ) {
+		CG_MenuScript_StopFollowing();
+		return;
+	}
+
+	if ( !Q_stricmp( name, "hud_editToggle" ) ) {
+		CG_MenuScript_ToggleHudEditor();
+		return;
+	}
+
+	if ( !Q_stricmp( name, "web_showBrowserHash" ) ) {
+		argument = NULL;
+		CG_MenuScript_ParseOptionalToken( args, &argument );
+		CG_MenuScript_WebCommand( "web_showBrowser", argument );
+		return;
+	}
+
+	if ( !Q_strnicmp( name, "web_", 4 ) ) {
+		argument = NULL;
+		CG_MenuScript_ParseOptionalToken( args, &argument );
+		CG_MenuScript_WebCommand( name, argument );
+		return;
+	}
+
+	Com_Printf( "Unknown cgame menu script '%s'\n", name );
 }
 
 
