@@ -20,14 +20,47 @@ MATCH_STATE_SOURCE = (
     """
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define GAME_INCLUDE
 #include "code/game/g_match_state.c"
 
+typedef struct qlr_cgs_s {
+        qboolean        matchOvertimeActive;
+        int             matchOvertimeStartTime;
+        int             matchOvertimeEndTime;
+        int             matchOvertimeCount;
+        qboolean        matchTimeoutActive;
+        int             matchTimeoutTeam;
+        int             matchTimeoutExpireTime;
+        int             matchTimeoutOwner;
+        int             matchTimeoutRemaining[TEAM_NUM_TEAMS];
+        int             matchTimeoutLengthSeconds;
+        int             matchTimeoutCountPerTeam;
+        int             matchOvertimeLengthSeconds;
+        qboolean        matchSuddenDeathRespawnsEnabled;
+        int             matchSuddenDeathStartSeconds;
+        int             matchSuddenDeathTickSeconds;
+        int             matchSuddenDeathMaxSeconds;
+        int             matchSuddenDeathIncrementSeconds;
+        qboolean        matchSuddenDeathPrintAnnouncements;
+        qboolean        matchSuddenDeathSpawnDelayActive;
+        int             matchRoundTransitionTime;
+        int             matchRoundNumber;
+        int             matchRoundTurn;
+        int             matchRoundState;
+} cgs_t;
+
+extern cgs_t cgs;
+const char *CG_ConfigString( int index );
+
+#include "code/cgame/cg_match_state_parse_impl.h"
+
 level_locals_t level;
 matchFactoryConfig_t g_matchFactoryConfig;
 vmCvar_t g_gametype;
+cgs_t cgs;
 
 static char qlr_matchStateConfig[MAX_INFO_STRING];
 
@@ -46,7 +79,7 @@ void Q_strncpyz( char *dest, const char *src, int destsize ) {
 @TAB@@TAB@src = "";
 @TAB@}
 @TAB@strncpy( dest, src, destsize - 1 );
-@TAB@dest[destsize - 1] = '\0';
+@TAB@dest[destsize - 1] = '\\0';
 }
 
 /*
@@ -83,6 +116,81 @@ void Info_SetValueForKey( char *info, const char *key, const char *value ) {
 @TAB@@TAB@return;
 @TAB@}
 @TAB@strcat( info, buffer );
+}
+
+/*
+=============
+Info_ValueForKey
+
+Retrieves the value for a key from an info string payload.
+=============
+*/
+#define INFO_SEPARATOR_CHAR 92
+char *Info_ValueForKey( const char *info, const char *key ) {
+@TAB@static char valuePool[2][MAX_INFO_STRING];
+@TAB@static int poolIndex = 0;
+@TAB@const char *cursor;
+@TAB@const char *keyStart;
+@TAB@const char *valueStart;
+@TAB@size_t keyLength;
+@TAB@size_t tokenLength;
+@TAB@size_t valueLength;
+
+@TAB@if ( !info || !key || !*key ) {
+@TAB@@TAB@return "";
+@TAB@}
+
+@TAB@keyLength = strlen( key );
+@TAB@cursor = info;
+@TAB@while ( (unsigned char)*cursor == INFO_SEPARATOR_CHAR ) {
+@TAB@@TAB@cursor++;
+@TAB@@TAB@keyStart = cursor;
+@TAB@@TAB@while ( *cursor && (unsigned char)*cursor != INFO_SEPARATOR_CHAR ) {
+@TAB@@TAB@@TAB@cursor++;
+@TAB@@TAB@}
+@TAB@@TAB@tokenLength = (size_t)( cursor - keyStart );
+@TAB@@TAB@if ( tokenLength == keyLength && !strncmp( keyStart, key, keyLength ) ) {
+@TAB@@TAB@@TAB@if ( (unsigned char)*cursor == INFO_SEPARATOR_CHAR ) {
+@TAB@@TAB@@TAB@@TAB@cursor++;
+@TAB@@TAB@@TAB@}
+@TAB@@TAB@@TAB@valueStart = cursor;
+@TAB@@TAB@@TAB@while ( *cursor && (unsigned char)*cursor != INFO_SEPARATOR_CHAR ) {
+@TAB@@TAB@@TAB@@TAB@cursor++;
+@TAB@@TAB@@TAB@}
+@TAB@@TAB@@TAB@valueLength = cursor - valueStart;
+@TAB@@TAB@@TAB@if ( valueLength >= sizeof( valuePool[0] ) ) {
+@TAB@@TAB@@TAB@@TAB@valueLength = sizeof( valuePool[0] ) - 1u;
+@TAB@@TAB@@TAB@}
+@TAB@@TAB@@TAB@poolIndex ^= 1;
+@TAB@@TAB@@TAB@memcpy( valuePool[poolIndex], valueStart, valueLength );
+@TAB@@TAB@@TAB@valuePool[poolIndex][valueLength] = '\\0';
+@TAB@@TAB@@TAB@return valuePool[poolIndex];
+@TAB@@TAB@}
+@TAB@@TAB@if ( (unsigned char)*cursor == INFO_SEPARATOR_CHAR ) {
+@TAB@@TAB@@TAB@cursor++;
+@TAB@@TAB@@TAB@while ( *cursor && (unsigned char)*cursor != INFO_SEPARATOR_CHAR ) {
+@TAB@@TAB@@TAB@@TAB@cursor++;
+@TAB@@TAB@@TAB@}
+@TAB@@TAB@}
+@TAB@}
+
+@TAB@return "";
+}
+#undef INFO_SEPARATOR_CHAR
+
+/*
+=============
+CG_ConfigString
+
+Returns the cached configstring for the requested index.
+=============
+*/
+const char *CG_ConfigString( int index ) {
+@TAB@if ( index == CS_MATCH_STATE ) {
+@TAB@@TAB@return qlr_matchStateConfig;
+@TAB@}
+
+@TAB@return "";
 }
 
 /*
@@ -132,6 +240,7 @@ Restores globals to default values between tests.
 void QLR_ResetMatchState( void ) {
 @TAB@memset( &level, 0, sizeof( level ) );
 @TAB@memset( &g_matchFactoryConfig, 0, sizeof( g_matchFactoryConfig ) );
+@TAB@memset( &cgs, 0, sizeof( cgs ) );
 @TAB@g_gametype.integer = GT_TEAM;
 @TAB@QLR_ClearMatchStateConfig();
 }
@@ -191,6 +300,127 @@ Exposes the captured configstring to the Python harness.
 const char *QLR_GetMatchStateConfigstring( void ) {
 @TAB@return qlr_matchStateConfig;
 }
+
+/*
+=============
+QLR_ParseClientMatchState
+
+Invokes the cgame parser to refresh cached match-state fields.
+=============
+*/
+void QLR_ParseClientMatchState( void ) {
+@TAB@CG_ParseMatchState();
+}
+
+/*
+=============
+QLR_GetClientTimeoutLength
+
+Exposes the parsed timeout length in seconds for verification.
+=============
+*/
+int QLR_GetClientTimeoutLength( void ) {
+@TAB@return cgs.matchTimeoutLengthSeconds;
+}
+
+/*
+=============
+QLR_GetClientTimeoutCount
+
+Exposes the parsed per-team timeout count for verification.
+=============
+*/
+int QLR_GetClientTimeoutCount( void ) {
+@TAB@return cgs.matchTimeoutCountPerTeam;
+}
+
+/*
+=============
+QLR_GetClientOvertimeLength
+
+Returns the parsed overtime window duration.
+=============
+*/
+int QLR_GetClientOvertimeLength( void ) {
+@TAB@return cgs.matchOvertimeLengthSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathRespawns
+
+Indicates whether sudden-death respawns are enabled.
+=============
+*/
+int QLR_GetClientSuddenDeathRespawns( void ) {
+@TAB@return cgs.matchSuddenDeathRespawnsEnabled ? 1 : 0;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathStart
+
+Returns the parsed sudden-death start offset.
+=============
+*/
+int QLR_GetClientSuddenDeathStart( void ) {
+@TAB@return cgs.matchSuddenDeathStartSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathTick
+
+Returns the parsed sudden-death tick interval.
+=============
+*/
+int QLR_GetClientSuddenDeathTick( void ) {
+@TAB@return cgs.matchSuddenDeathTickSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathMax
+
+Returns the parsed sudden-death maximum duration.
+=============
+*/
+int QLR_GetClientSuddenDeathMax( void ) {
+@TAB@return cgs.matchSuddenDeathMaxSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathIncrement
+
+Returns the parsed sudden-death increment duration.
+=============
+*/
+int QLR_GetClientSuddenDeathIncrement( void ) {
+@TAB@return cgs.matchSuddenDeathIncrementSeconds;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathPrint
+
+Indicates whether sudden-death announcements are enabled.
+=============
+*/
+int QLR_GetClientSuddenDeathPrint( void ) {
+@TAB@return cgs.matchSuddenDeathPrintAnnouncements ? 1 : 0;
+}
+
+/*
+=============
+QLR_GetClientSuddenDeathDelay
+
+Indicates whether sudden-death spawn delay is active.
+=============
+*/
+int QLR_GetClientSuddenDeathDelay( void ) {
+@TAB@return cgs.matchSuddenDeathSpawnDelayActive ? 1 : 0;
+}
 """
 ).replace("@TAB@", "\t")
 
@@ -221,6 +451,10 @@ def _build_match_state_library(tmp_path: Path) -> Path:
             str(GAME_CODE_DIR),
             "-I",
             str(SRC_DIR / "game"),
+            "-I",
+            str(CODE_DIR / "cgame"),
+            "-I",
+            str(CODE_DIR / "renderer"),
             "-o",
             str(lib_path),
             str(src_path),
@@ -242,6 +476,10 @@ def _build_match_state_library(tmp_path: Path) -> Path:
             str(GAME_CODE_DIR),
             "-I",
             str(SRC_DIR / "game"),
+            "-I",
+            str(CODE_DIR / "cgame"),
+            "-I",
+            str(CODE_DIR / "renderer"),
             "-o",
             str(lib_path),
             str(src_path),
@@ -259,6 +497,28 @@ def _load_match_state_library(lib_path: Path) -> ctypes.CDLL:
     library.QLR_BuildMatchStateConfigstring.restype = None
     library.QLR_GetMatchStateConfigstring.argtypes = []
     library.QLR_GetMatchStateConfigstring.restype = ctypes.c_char_p
+    library.QLR_ParseClientMatchState.argtypes = []
+    library.QLR_ParseClientMatchState.restype = None
+    library.QLR_GetClientTimeoutLength.argtypes = []
+    library.QLR_GetClientTimeoutLength.restype = ctypes.c_int
+    library.QLR_GetClientTimeoutCount.argtypes = []
+    library.QLR_GetClientTimeoutCount.restype = ctypes.c_int
+    library.QLR_GetClientOvertimeLength.argtypes = []
+    library.QLR_GetClientOvertimeLength.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathRespawns.argtypes = []
+    library.QLR_GetClientSuddenDeathRespawns.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathStart.argtypes = []
+    library.QLR_GetClientSuddenDeathStart.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathTick.argtypes = []
+    library.QLR_GetClientSuddenDeathTick.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathMax.argtypes = []
+    library.QLR_GetClientSuddenDeathMax.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathIncrement.argtypes = []
+    library.QLR_GetClientSuddenDeathIncrement.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathPrint.argtypes = []
+    library.QLR_GetClientSuddenDeathPrint.restype = ctypes.c_int
+    library.QLR_GetClientSuddenDeathDelay.argtypes = []
+    library.QLR_GetClientSuddenDeathDelay.restype = ctypes.c_int
     return library
 
 
@@ -311,3 +571,15 @@ def test_match_state_configstring_includes_expected_keys(match_state_library: ct
 
     for key, expected_value in expected.items():
         assert fields.get(key) == expected_value, f"Missing or incorrect value for {key}"
+
+    library.QLR_ParseClientMatchState()
+    assert library.QLR_GetClientTimeoutLength() == 75
+    assert library.QLR_GetClientTimeoutCount() == 2
+    assert library.QLR_GetClientOvertimeLength() == 120
+    assert library.QLR_GetClientSuddenDeathRespawns() == 1
+    assert library.QLR_GetClientSuddenDeathStart() == 15
+    assert library.QLR_GetClientSuddenDeathTick() == 5
+    assert library.QLR_GetClientSuddenDeathMax() == 60
+    assert library.QLR_GetClientSuddenDeathIncrement() == 3
+    assert library.QLR_GetClientSuddenDeathPrint() == 1
+    assert library.QLR_GetClientSuddenDeathDelay() == 1

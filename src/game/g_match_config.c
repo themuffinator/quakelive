@@ -340,11 +340,12 @@ Refreshes the cached match factory configuration and emits transition logs when 
 =============
 */
 void G_UpdateMatchFactoryConfig( void ) {
-	matchFactoryConfig_t config = G_MatchConfig_Load();
+        matchFactoryConfig_t config = G_MatchConfig_Load();
+        qboolean configChanged = qfalse;
 
-	if ( config.timeoutLengthSeconds != s_reportedMatchFactoryConfig.timeoutLengthSeconds
-		|| config.timeoutCountPerTeam != s_reportedMatchFactoryConfig.timeoutCountPerTeam
-		|| config.overtimeLengthSeconds != s_reportedMatchFactoryConfig.overtimeLengthSeconds
+        if ( config.timeoutLengthSeconds != s_reportedMatchFactoryConfig.timeoutLengthSeconds
+                || config.timeoutCountPerTeam != s_reportedMatchFactoryConfig.timeoutCountPerTeam
+                || config.overtimeLengthSeconds != s_reportedMatchFactoryConfig.overtimeLengthSeconds
 		|| config.suddenDeathRespawnsEnabled != s_reportedMatchFactoryConfig.suddenDeathRespawnsEnabled
 		|| config.suddenDeathStartSeconds != s_reportedMatchFactoryConfig.suddenDeathStartSeconds
 		|| config.suddenDeathTickSeconds != s_reportedMatchFactoryConfig.suddenDeathTickSeconds
@@ -354,12 +355,17 @@ void G_UpdateMatchFactoryConfig( void ) {
 		|| config.suddenDeathSpawnDelayActive != s_reportedMatchFactoryConfig.suddenDeathSpawnDelayActive
 		|| config.factoryRespawnDelayMilliseconds != s_reportedMatchFactoryConfig.factoryRespawnDelayMilliseconds
 		|| config.factoryWarmupSpawnDelayMilliseconds != s_reportedMatchFactoryConfig.factoryWarmupSpawnDelayMilliseconds
-		|| config.factoryAllowItemDrops != s_reportedMatchFactoryConfig.factoryAllowItemDrops
-		|| config.factoryAllowItemBounce != s_reportedMatchFactoryConfig.factoryAllowItemBounce ) {
-		G_LogMatchFactoryConfig( "update", &config );
-		s_reportedMatchFactoryConfig = config;
-	}
+                || config.factoryAllowItemDrops != s_reportedMatchFactoryConfig.factoryAllowItemDrops
+                || config.factoryAllowItemBounce != s_reportedMatchFactoryConfig.factoryAllowItemBounce ) {
+                G_LogMatchFactoryConfig( "update", &config );
+                s_reportedMatchFactoryConfig = config;
+                configChanged = qtrue;
+        }
 
-	g_matchFactoryConfig = config;
-	G_MatchConfig_UpdateConfigstrings();
+        g_matchFactoryConfig = config;
+        G_MatchConfig_UpdateConfigstrings();
+
+        if ( configChanged ) {
+                G_UpdateMatchStateConfigString();
+        }
 }
