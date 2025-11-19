@@ -70,6 +70,8 @@ static void CG_DrawGameTypeMap(rectDef_t *rect, float text_x, float text_y, floa
 static void CG_DrawMatchDetails(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
 static void CG_DrawMatchEndCondition(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
 static void CG_DrawMatchStatus(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
+static void CG_DrawRoundLabel(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
+static void CG_DrawLocalTime(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
 static void CG_DrawVoteGametype(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle, int slot);
 static void CG_DrawVoteName(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle, int slot);
 static void CG_DrawVoteMapSlot(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle, int slot);
@@ -2278,6 +2280,47 @@ static void CG_DrawMatchStatus(rectDef_t *rect, float text_x, float text_y, floa
 	}
 
 	Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GetMatchStateLabel(), CG_GetGameStatusText() );
+	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
+	CG_Text_Paint( x, y, scale, color, buffer, 0, 0, textStyle );
+}
+
+/*
+=============
+CG_DrawRoundLabel
+
+Displays the current round or match state string.
+=============
+*/
+static void CG_DrawRoundLabel(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+	const char	*label;
+	float		x;
+	float		y;
+
+	label = CG_GetMatchStateLabel();
+	if ( !label || !*label ) {
+		return;
+	}
+
+	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
+	CG_Text_Paint( x, y, scale, color, label, 0, 0, textStyle );
+}
+
+/*
+=============
+CG_DrawLocalTime
+
+Paints the client's current local time in hours and minutes.
+=============
+*/
+static void CG_DrawLocalTime(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+	qtime_t	qt;
+	char	buffer[32];
+	float	x;
+	float	y;
+
+	trap_RealTime( &qt );
+	Com_sprintf( buffer, sizeof( buffer ), "%02i:%02i", qt.tm_hour, qt.tm_min );
+
 	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
 	CG_Text_Paint( x, y, scale, color, buffer, 0, 0, textStyle );
 }
@@ -5108,6 +5151,13 @@ static void CG_DrawVoteTimer(rectDef_t *rect, float scale, vec4_t color, int tex
 }
 
 
+/*
+=============
+CG_OwnerDraw
+
+Routes owner-draw IDs to their rendering helpers.
+=============
+*/
 void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle) {
 	rectDef_t rect;
 
@@ -5124,16 +5174,110 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
   rect.w = w;
   rect.h = h;
 
-  switch (ownerDraw) {
-  case CG_SERVER_SETTINGS:
-    CG_DrawServerSettings(&rect, text_x, text_y, scale, color, textStyle);
-    break;
-  case CG_STARTING_WEAPONS:
-    CG_DrawStartingWeapons(&rect, text_x, text_y, scale, color, textStyle);
-    break;
-  case CG_GAME_LIMIT:
-    CG_DrawGameLimit(&rect, text_x, text_y, scale, color, textStyle);
-    break;
+	switch (ownerDraw) {
+	case CG_SERVER_SETTINGS:
+		CG_DrawServerSettings(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_STARTING_WEAPONS:
+		CG_DrawStartingWeapons(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_GAME_LIMIT:
+		CG_DrawGameLimit(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_GAME_TYPE_ICON:
+		CG_DrawGameTypeIcon(&rect);
+		break;
+	case CG_GAME_TYPE_MAP:
+		CG_DrawGameTypeMap(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_GAME_TYPE:
+		CG_DrawGameType(&rect, scale, color, shader, textStyle);
+		break;
+	case CG_GAME_STATUS:
+		CG_DrawGameStatus(&rect, scale, color, shader, textStyle);
+		break;
+	case CG_MATCH_DETAILS:
+		CG_DrawMatchDetails(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_MATCH_END_CONDITION:
+		CG_DrawMatchEndCondition(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_MATCH_STATUS:
+		CG_DrawMatchStatus(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_CAPFRAGLIMIT:
+		CG_DrawCapFragLimit(&rect, scale, color, shader, textStyle);
+		break;
+	case CG_LEVELTIMER:
+		CG_DrawLevelTimer(&rect, scale, color, textStyle);
+		break;
+	case CG_ROUND:
+		CG_DrawRoundLabel(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_ROUNDTIMER:
+		CG_DrawRoundTimer(&rect, scale, color, textStyle);
+		break;
+	case CG_OVERTIME:
+		CG_DrawOvertime(&rect, scale, color, textStyle);
+		break;
+	case CG_LOCALTIME:
+		CG_DrawLocalTime(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+	case CG_PLAYER_COUNTS:
+		CG_DrawPlayerCounts(&rect, scale, color, textStyle);
+		break;
+	case CG_MAP_NAME:
+		CG_DrawMapName(&rect, scale, color, textStyle);
+		break;
+	case CG_VOTEGAMETYPE1:
+		CG_DrawVoteGametype(&rect, text_x, text_y, scale, color, textStyle, 1);
+		break;
+	case CG_VOTEGAMETYPE2:
+		CG_DrawVoteGametype(&rect, text_x, text_y, scale, color, textStyle, 2);
+		break;
+	case CG_VOTEGAMETYPE3:
+		CG_DrawVoteGametype(&rect, text_x, text_y, scale, color, textStyle, 3);
+		break;
+	case CG_VOTEMAP1:
+		CG_DrawVoteMapSlot(&rect, text_x, text_y, scale, color, textStyle, 1);
+		break;
+	case CG_VOTEMAP2:
+		CG_DrawVoteMapSlot(&rect, text_x, text_y, scale, color, textStyle, 2);
+		break;
+	case CG_VOTEMAP3:
+		CG_DrawVoteMapSlot(&rect, text_x, text_y, scale, color, textStyle, 3);
+		break;
+	case CG_VOTESHOT1:
+		CG_DrawVoteShot(&rect, 1);
+		break;
+	case CG_VOTESHOT2:
+		CG_DrawVoteShot(&rect, 2);
+		break;
+	case CG_VOTESHOT3:
+		CG_DrawVoteShot(&rect, 3);
+		break;
+	case CG_VOTENAME1:
+		CG_DrawVoteName(&rect, text_x, text_y, scale, color, textStyle, 1);
+		break;
+	case CG_VOTENAME2:
+		CG_DrawVoteName(&rect, text_x, text_y, scale, color, textStyle, 2);
+		break;
+	case CG_VOTENAME3:
+		CG_DrawVoteName(&rect, text_x, text_y, scale, color, textStyle, 3);
+		break;
+	case CG_VOTECOUNT1:
+		CG_DrawVoteCount(&rect, text_x, text_y, scale, color, textStyle, 1);
+		break;
+	case CG_VOTECOUNT2:
+		CG_DrawVoteCount(&rect, text_x, text_y, scale, color, textStyle, 2);
+		break;
+	case CG_VOTECOUNT3:
+		CG_DrawVoteCount(&rect, text_x, text_y, scale, color, textStyle, 3);
+		break;
+	case CG_VOTETIMER:
+		CG_DrawVoteTimer(&rect, text_x, text_y, scale, color, textStyle);
+		break;
+
   case CG_PLAYER_ARMOR_ICON:
     CG_DrawPlayerArmorIcon(&rect, ownerDrawFlags & CG_SHOW_2DONLY);
     break;
@@ -5157,12 +5301,6 @@ break;
     break;
   case CG_PLAYER_AMMO_VALUE:
     CG_DrawPlayerAmmoValue(&rect, scale, color, shader, textStyle);
-    break;
-  case CG_GAME_TYPE_ICON:
-    CG_DrawGameTypeIcon(&rect);
-    break;
-  case CG_GAME_TYPE_MAP:
-    CG_DrawGameTypeMap(&rect, text_x, text_y, scale, color, textStyle);
     break;
   case CG_SELECTEDPLAYER_HEAD:
     CG_DrawSelectedPlayerHead(&rect, ownerDrawFlags & CG_SHOW_2DONLY, qfalse);
@@ -5302,42 +5440,9 @@ break;
   case CG_AREA_NEW_CHAT:
                 CG_DrawNewChatArea(&rect, scale, color, textStyle);
                 break;
-  case CG_MATCH_DETAILS:
-    CG_DrawMatchDetails(&rect, text_x, text_y, scale, color, textStyle);
-                break;
-  case CG_SERVER_SETTINGS:
-                CG_DrawServerSettings(&rect, scale, color, textStyle);
-                break;
-  case CG_STARTING_WEAPONS:
-                CG_DrawStartingWeapons(&rect, scale, color, textStyle);
-                break;
-  case CG_GAME_LIMIT:
-                CG_DrawGameLimit(&rect, scale, color, textStyle);
-                break;
-  case CG_GAME_TYPE:
-    CG_DrawGameType(&rect, scale, color, shader, textStyle);
-    break;
-  case CG_GAME_TYPE_MAP:
-                CG_DrawGameTypeMap(&rect, scale, color, textStyle);
-                break;
-  case CG_GAME_STATUS:
-    CG_DrawGameStatus(&rect, scale, color, shader, textStyle);
-                break;
-  case CG_MATCH_STATUS:
-                CG_DrawMatchStatus(&rect, scale, color, textStyle);
-                break;
-  case CG_MAP_NAME:
-    CG_DrawMapName(&rect, scale, color, textStyle);
-                break;
-  case CG_MATCH_DETAILS:
-                CG_DrawMatchDetails(&rect, scale, color, textStyle);
-                break;
-  case CG_PLAYER_COUNTS:
-    CG_DrawPlayerCounts(&rect, scale, color, textStyle);
-                break;
   case CG_KILLER:
     CG_DrawKiller(&rect, scale, color, shader, textStyle);
-		break;
+    break;
 	case CG_ACCURACY:
 	case CG_ASSISTS:
 	case CG_DEFEND:
@@ -5368,12 +5473,6 @@ break;
                         CG_DrawNewTeamInfo(&rect, text_x, text_y, scale, color, shader);
                 }
                 break;
-  case CG_MATCH_END_CONDITION:
-    CG_DrawMatchEndCondition(&rect, text_x, text_y, scale, color, textStyle);
-                break;
-  case CG_CAPFRAGLIMIT:
-    CG_DrawCapFragLimit(&rect, scale, color, shader, textStyle);
-                break;
   case CG_1STPLACE:
     CG_Draw1stPlace(&rect, scale, color, shader, textStyle);
                 break;
@@ -5389,21 +5488,9 @@ break;
   case CG_PLAYER_OBIT:
     CG_DrawPlayerObituary(&rect, scale, color, textStyle);
                 break;
-  case CG_LEVELTIMER:
-    CG_DrawLevelTimer(&rect, scale, color, textStyle);
-                break;
-  case CG_ROUNDTIMER:
-    CG_DrawRoundTimer(&rect, scale, color, textStyle);
-                break;
   case CG_MATCH_STATE:
 		CG_DrawMatchState(&rect, scale, color, textStyle);
 		break;
-  case CG_MATCH_END_CONDITION:
-                CG_DrawMatchEndCondition(&rect, scale, color, textStyle);
-                break;
-  case CG_OVERTIME:
-    CG_DrawOvertime(&rect, scale, color, textStyle);
-                break;
   case CG_1ST_PLYR: {
 qhandle_t nameShader = shader;
 if (!nameShader && cg.competitiveHudLoaded) {
@@ -5489,108 +5576,12 @@ break;
   case CG_MATCH_WINNER:
     CG_DrawGameStatus(&rect, scale, color, shader, textStyle);
                 break;
-  case CG_VOTEGAMETYPE1:
-    CG_DrawVoteGametype(&rect, text_x, text_y, scale, color, textStyle, 1);
-                break;
-  case CG_VOTEGAMETYPE2:
-    CG_DrawVoteGametype(&rect, text_x, text_y, scale, color, textStyle, 2);
-                break;
-  case CG_VOTEGAMETYPE3:
-    CG_DrawVoteGametype(&rect, text_x, text_y, scale, color, textStyle, 3);
-                break;
-  case CG_VOTENAME1:
-    CG_DrawVoteName(&rect, text_x, text_y, scale, color, textStyle, 1);
-                break;
-  case CG_VOTENAME2:
-    CG_DrawVoteName(&rect, text_x, text_y, scale, color, textStyle, 2);
-                break;
-  case CG_VOTENAME3:
-    CG_DrawVoteName(&rect, text_x, text_y, scale, color, textStyle, 3);
-                break;
-  case CG_VOTEMAP1:
-    CG_DrawVoteMapSlot(&rect, text_x, text_y, scale, color, textStyle, 1);
-                break;
-  case CG_VOTEMAP2:
-    CG_DrawVoteMapSlot(&rect, text_x, text_y, scale, color, textStyle, 2);
-                break;
-  case CG_VOTEMAP3:
-    CG_DrawVoteMapSlot(&rect, text_x, text_y, scale, color, textStyle, 3);
-                break;
-  case CG_VOTESHOT1:
-    CG_DrawVoteShot(&rect, 1);
-                break;
-  case CG_VOTESHOT2:
-    CG_DrawVoteShot(&rect, 2);
-                break;
-  case CG_VOTESHOT3:
-    CG_DrawVoteShot(&rect, 3);
-                break;
-  case CG_VOTECOUNT1:
-    CG_DrawVoteCount(&rect, text_x, text_y, scale, color, textStyle, 1);
-                break;
-  case CG_VOTECOUNT2:
-    CG_DrawVoteCount(&rect, text_x, text_y, scale, color, textStyle, 2);
-                break;
-  case CG_VOTECOUNT3:
-    CG_DrawVoteCount(&rect, text_x, text_y, scale, color, textStyle, 3);
-                break;
-  case CG_VOTETIMER:
-    CG_DrawVoteTimer(&rect, text_x, text_y, scale, color, textStyle);
-                break;
   case CG_RACE_STATUS:
   case CG_RACE_TIMES:
   case CG_FLAG_STATUS:
   case CG_RED_BASESTATUS:
   case CG_BLUE_BASESTATUS:
   case CG_PLAYER_HASKEY:
-                break;
-  case CG_VOTEGAMETYPE1:
-                CG_DrawVoteGametype(&rect, scale, color, textStyle, 0);
-                break;
-  case CG_VOTEGAMETYPE2:
-                CG_DrawVoteGametype(&rect, scale, color, textStyle, 1);
-                break;
-  case CG_VOTEGAMETYPE3:
-                CG_DrawVoteGametype(&rect, scale, color, textStyle, 2);
-                break;
-  case CG_VOTEMAP1:
-                CG_DrawVoteMap(&rect, scale, color, textStyle, 0);
-                break;
-  case CG_VOTEMAP2:
-                CG_DrawVoteMap(&rect, scale, color, textStyle, 1);
-                break;
-  case CG_VOTEMAP3:
-                CG_DrawVoteMap(&rect, scale, color, textStyle, 2);
-                break;
-  case CG_VOTENAME1:
-                CG_DrawVoteName(&rect, scale, color, textStyle, 0);
-                break;
-  case CG_VOTENAME2:
-                CG_DrawVoteName(&rect, scale, color, textStyle, 1);
-                break;
-  case CG_VOTENAME3:
-                CG_DrawVoteName(&rect, scale, color, textStyle, 2);
-                break;
-  case CG_VOTECOUNT1:
-                CG_DrawVoteCount(&rect, scale, color, textStyle, 0);
-                break;
-  case CG_VOTECOUNT2:
-                CG_DrawVoteCount(&rect, scale, color, textStyle, 1);
-                break;
-  case CG_VOTECOUNT3:
-                CG_DrawVoteCount(&rect, scale, color, textStyle, 2);
-                break;
-  case CG_VOTESHOT1:
-                CG_DrawVoteShot(&rect, 0);
-                break;
-  case CG_VOTESHOT2:
-                CG_DrawVoteShot(&rect, 1);
-                break;
-  case CG_VOTESHOT3:
-                CG_DrawVoteShot(&rect, 2);
-                break;
-  case CG_VOTETIMER:
-                CG_DrawVoteTimer(&rect, scale, color, textStyle);
                 break;
   default:
     break;
