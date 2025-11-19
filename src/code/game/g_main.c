@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 level_locals_t	level;
 weaponConfig_t	g_weaponConfig;
+flagConfig_t	g_flagConfig;
 
 
 typedef struct {
@@ -369,6 +370,13 @@ vmCvar_t	g_rrAllowNegativeScores;
 vmCvar_t	roundlimit;
 vmCvar_t	roundtimelimit;
 vmCvar_t	practiceflags;
+vmCvar_t	g_flagBounce;
+vmCvar_t	g_flagPhysics;
+vmCvar_t	g_throwFlagVelocity;
+vmCvar_t	g_throwFlagForwardMult;
+vmCvar_t	g_tackleFlag;
+vmCvar_t	g_returnFlagOnSuicide;
+vmCvar_t	g_droppedFlagBonus;
 
 // bk001129 - made static to avoid aliasing
 static cvarTable_t		gameCvarTable[] = {
@@ -472,6 +480,13 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_adTouchScoreBonus, "g_adTouchScoreBonus", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend touch bonus added to the scoring totals whenever an attacker grabs the flag." },
 	{ &g_adElimScoreBonus, "g_adElimScoreBonus", "2", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend elimination bonus granted to teams and players for each enemy frag." },
 	{ &g_adCaptureScoreBonus, "g_adCaptureScoreBonus", "3", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Attack & Defend capture bonus layered on top of the base team point whenever the flag is secured." },
+	{ &g_flagBounce, "g_flagBounce", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Bounce scale applied to dropped flags; the legacy behavior keeps this at zero." },
+	{ &g_flagPhysics, "g_flagPhysics", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Selects optional flag physics modes; zero preserves the classic handling." },
+	{ &g_throwFlagVelocity, "g_throwFlagVelocity", "200", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Vertical velocity applied when tossing a flag, matching the legacy 200 ups default." },
+	{ &g_throwFlagForwardMult, "g_throwFlagForwardMult", "150", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Forward speed multiplier for flag tosses; 150 mirrors the hardcoded Quake III value." },
+	{ &g_tackleFlag, "g_tackleFlag", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable experimental tackle mechanics that jostle flags from carriers when non-zero." },
+	{ &g_returnFlagOnSuicide, "g_returnFlagOnSuicide", "1", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Return a carried flag immediately when its owner suicides, matching the classic logic." },
+	{ &g_droppedFlagBonus, "g_droppedFlagBonus", "10", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Score bonus granted to players that recover a dropped friendly flag." },
 
 	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 
@@ -789,6 +804,43 @@ void G_UpdateWeaponConfig( void ) {
 
 /*
 =============
+G_InitFlagConfig
+
+Initializes the cached flag configuration cvars so other systems can read them without repeated VM lookups.
+=============
+*/
+void G_InitFlagConfig( void ) {
+	G_UpdateFlagConfig();
+}
+
+/*
+=============
+G_UpdateFlagConfig
+
+Refreshes the cached flag physics and toss settings from the latest cvar values.
+=============
+*/
+void G_UpdateFlagConfig( void ) {
+	float	bounce;
+
+	bounce = g_flagBounce.value;
+	if ( bounce < 0.0f ) {
+		bounce = 0.0f;
+	} else if ( bounce > 1.0f ) {
+		bounce = 1.0f;
+	}
+	g_flagConfig.flagBounce = bounce;
+
+	g_flagConfig.flagPhysics = ( g_flagPhysics.integer < 0 ) ? 0 : g_flagPhysics.integer;
+	g_flagConfig.throwFlagVelocity = ( g_throwFlagVelocity.integer < 0 ) ? 0 : g_throwFlagVelocity.integer;
+	g_flagConfig.throwFlagForwardMult = ( g_throwFlagForwardMult.integer < 0 ) ? 0 : g_throwFlagForwardMult.integer;
+	g_flagConfig.tackleFlag = ( g_tackleFlag.integer != 0 ) ? qtrue : qfalse;
+	g_flagConfig.returnFlagOnSuicide = ( g_returnFlagOnSuicide.integer != 0 ) ? qtrue : qfalse;
+	g_flagConfig.droppedFlagBonus = ( g_droppedFlagBonus.integer < 0 ) ? 0 : g_droppedFlagBonus.integer;
+}
+
+/*
+=============
 G_UpdateItemTimerConfig
 
 Synchronises the item timer configuration cvars with all clients.
@@ -1020,11 +1072,12 @@ LegacyCvar_UpdateAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) 
 	G_UpdateForcedCosmeticsConfigstring( qtrue );
 	G_UpdateGametypeTutorialText();
 	G_InitWeaponConfig();
-        G_InitWeaponReloadConfig();
-        G_InitKnockbackConfig();
-        G_InitStartingAmmoConfig();
-        G_InitAmmoPackConfig();
-        G_InitFactoryCvarConfig();
+	G_InitWeaponReloadConfig();
+	G_InitKnockbackConfig();
+	G_InitStartingAmmoConfig();
+	G_InitAmmoPackConfig();
+	G_InitFlagConfig();
+	G_InitFactoryCvarConfig();
         G_InitMatchFactoryConfig();
 	G_SyncMatchFactoryConfigToLevel();
 	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
@@ -1072,12 +1125,13 @@ void G_UpdateCvars( void ) {
 
 	G_Config_UpdateCvars();
 
-        G_UpdateWeaponConfig();
-        G_UpdateWeaponReloadConfig();
-        G_UpdateKnockbackConfig();
-        G_UpdateStartingAmmoConfig();
-        G_UpdateAmmoPackConfig();
-        G_UpdateFactoryCvarConfig();
+	G_UpdateWeaponConfig();
+	G_UpdateWeaponReloadConfig();
+	G_UpdateKnockbackConfig();
+	G_UpdateStartingAmmoConfig();
+	G_UpdateAmmoPackConfig();
+	G_UpdateFlagConfig();
+	G_UpdateFactoryCvarConfig();
         G_UpdateMatchFactoryConfig();
 	G_SyncMatchFactoryConfigToLevel();
 	if ( g_itemTimers.modificationCount != s_itemTimersModCount || g_itemHeight.modificationCount != s_itemHeightModCount ) {

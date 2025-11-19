@@ -1449,17 +1449,19 @@ static void CG_DrawCrosshair(void) {
 		CG_ColorForHealth( hcolor );
 		trap_R_SetColor( hcolor );
 	} else {
-		trap_R_SetColor( NULL );
+		trap_R_SetColor( cg.crosshairColor );
 	}
 
 	w = h = cg_crosshairSize.value;
 
-	// pulse the size of the crosshair when picking up items
-	f = cg.time - cg.itemPickupBlendTime;
-	if ( f > 0 && f < ITEM_BLOB_TIME ) {
-		f /= ITEM_BLOB_TIME;
-		w *= ( 1 + f );
-		h *= ( 1 + f );
+	if ( cg.crosshairPulseEnabled ) {
+		// pulse the size of the crosshair when picking up items
+		f = cg.time - cg.itemPickupBlendTime;
+		if ( f > 0 && f < ITEM_BLOB_TIME ) {
+			f /= ITEM_BLOB_TIME;
+			w *= ( 1 + f );
+			h *= ( 1 + f );
+		}
 	}
 
 	x = cg_crosshairX.integer;

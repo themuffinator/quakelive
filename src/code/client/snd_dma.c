@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "snd_local.h"
 #include "client.h"
+#include "snd_ogg_stream.h"
 
 void S_Play_f(void);
 void S_SoundList_f(void);
@@ -45,6 +46,8 @@ static wavinfo_t	s_backgroundInfo;
 //int			s_nextWavChunk;
 static int			s_backgroundSamples;
 static char		s_backgroundLoop[MAX_QPATH];
+static snd_ogg_stream_t	s_backgroundOgg;
+static qboolean		s_backgroundIsOgg;
 //static char		s_backgroundMusic[MAX_QPATH]; //TTimo: unused
 
 
@@ -56,6 +59,7 @@ static char		s_backgroundLoop[MAX_QPATH];
 #define		SOUND_FULLVOLUME	80
 
 #define		SOUND_ATTENUATE		0.0008f
+#define		S_DEFAULT_OGG_SANITY		"sound/world/telein.ogg"
 
 channel_t   s_channels[MAX_CHANNELS];
 channel_t   loop_channels[MAX_CHANNELS];
@@ -104,7 +108,7 @@ portable_samplepair_t	s_rawsamples[MAX_RAW_SAMPLES];
 // ====================================================================
 
 
-void S_SoundInfo_f(void) {	
+void S_SoundInfo_f(void) {
 	Com_Printf("----- Sound Info -----\n" );
 	if (!s_soundStarted) {
 		Com_Printf ("sound system not started\n");
@@ -129,7 +133,37 @@ void S_SoundInfo_f(void) {
 	Com_Printf("----------------------\n" );
 }
 
+/*
+=============
+S_TestOgg_f
 
+Registers and plays a Vorbis asset to verify decoding and resampling.
+=============
+*/
+static void S_TestOgg_f( void ) {
+	const char		*path;
+	sfxHandle_t	handle;
+
+	if ( !s_soundStarted ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: sound system not initialized\n" );
+		return;
+	}
+
+	if ( Cmd_Argc() > 1 ) {
+		path = Cmd_Argv( 1 );
+	} else {
+		path = S_DEFAULT_OGG_SANITY;
+	}
+
+	handle = S_RegisterSound( path, qfalse );
+	if ( !handle ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: could not register %s for ogg test\n", path );
+		return;
+	}
+
+	S_StartLocalSound( handle, CHAN_LOCAL_SOUND );
+	Com_Printf( "Started OGG sanity playback for %s\n", path );
+}
 
 /*
 ================
@@ -165,6 +199,7 @@ void S_Init( void ) {
 	Cmd_AddCommand("s_list", S_SoundList_f);
 	Cmd_AddCommand("s_info", S_SoundInfo_f);
 	Cmd_AddCommand("s_stop", S_StopAllSounds);
+	Cmd_AddCommand("s_testogg", S_TestOgg_f);
 
 	r = SNDDMA_Init();
 	Com_Printf("------------------------------------\n");
@@ -234,11 +269,12 @@ void S_Shutdown( void ) {
 
 	s_soundStarted = 0;
 
-    Cmd_RemoveCommand("play");
+	Cmd_RemoveCommand("play");
 	Cmd_RemoveCommand("music");
 	Cmd_RemoveCommand("stopsound");
 	Cmd_RemoveCommand("soundlist");
 	Cmd_RemoveCommand("soundinfo");
+	Cmd_RemoveCommand("s_testogg");
 }
 
 
@@ -1412,18 +1448,218 @@ int S_FindWavChunk( fileHandle_t f, char *chunk ) {
 }
 
 /*
+============
+S_FileExists
+
+Returns qtrue if the filesystem can open the requested path.
+============
+*/
+static qboolean S_FileExists( const char *path ) {
+	fileHandle_t	f;
+	int			len;
+
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+
+	len = FS_FOpenFileRead( path, &f, qtrue );
+	if ( !f ) {
+		return qfalse;
+	}
+	FS_FCloseFile( f );
+	return ( len >= 0 );
+}
+
+/*
+============
+S_SetTrackExtension
+
+Replaces the extension on the provided source path.
+============
+*/
+static void S_SetTrackExtension( const char *source, const char *extension, char *dest, int destSize ) {
+	char	base[MAX_QPATH];
+
+	if ( !source || !dest || destSize <= 0 ) {
+		return;
+	}
+
+	COM_StripExtension( source, base );
+	Com_sprintf( dest, destSize, "%s%s", base, extension );
+}
+
+/*
+============
+S_ResolveMusicFile
+
+Normalizes the music path and infers an extension when missing.
+============
+*/
+static qboolean S_ResolveMusicFile( const char *input, char *resolved, int resolvedSize, qboolean *isOgg ) {
+	const char	*dot;
+	char		candidate[MAX_QPATH];
+
+	if ( isOgg ) {
+		*isOgg = qfalse;
+	}
+
+	if ( !resolved || resolvedSize <= 0 ) {
+		return qfalse;
+	}
+
+	if ( !input || !input[0] ) {
+		resolved[0] = '\0';
+		return qfalse;
+	}
+
+	Q_strncpyz( resolved, input, resolvedSize );
+	dot = strrchr( resolved, '.' );
+	if ( dot ) {
+		if ( !Q_stricmp( dot + 1, "ogg" ) && isOgg ) {
+			*isOgg = qtrue;
+		}
+		return qtrue;
+	}
+
+	Q_strncpyz( candidate, resolved, sizeof( candidate ) );
+	COM_DefaultExtension( candidate, sizeof( candidate ), ".ogg" );
+	if ( S_FileExists( candidate ) ) {
+		Q_strncpyz( resolved, candidate, resolvedSize );
+		if ( isOgg ) {
+			*isOgg = qtrue;
+		}
+		return qtrue;
+	}
+
+	Q_strncpyz( candidate, resolved, sizeof( candidate ) );
+	COM_DefaultExtension( candidate, sizeof( candidate ), ".wav" );
+	Q_strncpyz( resolved, candidate, resolvedSize );
+	return qtrue;
+}
+
+/*
+============
+S_OpenBackgroundOgg
+
+Initializes the Vorbis decoder for the requested music track.
+============
+*/
+static qboolean S_OpenBackgroundOgg( const char *name ) {
+	if ( !S_OggStreamOpen( &s_backgroundOgg, name ) ) {
+		return qfalse;
+	}
+
+	s_backgroundIsOgg = qtrue;
+	s_backgroundFile = 0;
+	s_backgroundInfo.format = WAV_FORMAT_PCM;
+	s_backgroundInfo.channels = S_OggStreamChannels( &s_backgroundOgg );
+	s_backgroundInfo.rate = S_OggStreamRate( &s_backgroundOgg );
+	s_backgroundInfo.width = S_OggStreamWidth( &s_backgroundOgg );
+	s_backgroundInfo.samples = 0;
+	s_backgroundSamples = 0;
+
+	if ( s_backgroundInfo.channels <= 0 || s_backgroundInfo.width <= 0 || s_backgroundInfo.rate <= 0 ) {
+		S_OggStreamClose( &s_backgroundOgg );
+		s_backgroundIsOgg = qfalse;
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+============
+S_OpenBackgroundWav
+
+Loads the WAV header for the requested music track and begins streaming.
+============
+*/
+static qboolean S_OpenBackgroundWav( const char *name ) {
+	char	dump[16];
+	int		len;
+
+	FS_FOpenFileRead( name, &s_backgroundFile, qtrue );
+	if ( !s_backgroundFile ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: couldn't open music file %s\n", name );
+		return qfalse;
+	}
+
+	FS_Read( dump, 12, s_backgroundFile );
+
+	if ( !S_FindWavChunk( s_backgroundFile, "fmt " ) ) {
+		Com_Printf( "No fmt chunk in %s\n", name );
+		FS_FCloseFile( s_backgroundFile );
+		s_backgroundFile = 0;
+		return qfalse;
+	}
+
+	s_backgroundInfo.format = FGetLittleShort( s_backgroundFile );
+	s_backgroundInfo.channels = FGetLittleShort( s_backgroundFile );
+	s_backgroundInfo.rate = FGetLittleLong( s_backgroundFile );
+	FGetLittleLong( s_backgroundFile );
+	FGetLittleShort( s_backgroundFile );
+	s_backgroundInfo.width = FGetLittleShort( s_backgroundFile ) / 8;
+
+	if ( s_backgroundInfo.format != WAV_FORMAT_PCM ) {
+		FS_FCloseFile( s_backgroundFile );
+		s_backgroundFile = 0;
+		Com_Printf( "Not a microsoft PCM format wav: %s\n", name );
+		return qfalse;
+	}
+
+	if ( s_backgroundInfo.channels != 2 || s_backgroundInfo.rate != 22050 ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: music file %s is not 22k stereo\n", name );
+	}
+
+	len = S_FindWavChunk( s_backgroundFile, "data" );
+	if ( len == 0 ) {
+		FS_FCloseFile( s_backgroundFile );
+		s_backgroundFile = 0;
+		Com_Printf( "No data chunk in %s\n", name );
+		return qfalse;
+	}
+
+	s_backgroundInfo.samples = len / ( s_backgroundInfo.width * s_backgroundInfo.channels );
+	s_backgroundSamples = s_backgroundInfo.samples;
+
+	Sys_BeginStreamedFile( s_backgroundFile, 0x10000 );
+	s_backgroundIsOgg = qfalse;
+	return qtrue;
+}
+
+/*
+============
+S_BackgroundTrackLoop
+
+Restarts playback using the configured loop track, if available.
+============
+*/
+static qboolean S_BackgroundTrackLoop( void ) {
+	if ( !s_backgroundLoop[0] ) {
+		return qfalse;
+	}
+
+	S_StartBackgroundTrack( s_backgroundLoop, s_backgroundLoop );
+	return ( s_backgroundFile || S_OggStreamActive( &s_backgroundOgg ) );
+}
+
+/*
 ======================
 S_StopBackgroundTrack
 ======================
 */
 void S_StopBackgroundTrack( void ) {
-	if ( !s_backgroundFile ) {
-		return;
-	}
-	Sys_EndStreamedFile( s_backgroundFile );
-	FS_FCloseFile( s_backgroundFile );
-	s_backgroundFile = 0;
-	s_rawend = 0;
+if ( s_backgroundFile ) {
+Sys_EndStreamedFile( s_backgroundFile );
+FS_FCloseFile( s_backgroundFile );
+s_backgroundFile = 0;
+}
+if ( S_OggStreamActive( &s_backgroundOgg ) ) {
+S_OggStreamClose( &s_backgroundOgg );
+}
+s_backgroundIsOgg = qfalse;
+s_backgroundSamples = 0;
+s_rawend = 0;
 }
 
 /*
@@ -1432,9 +1668,11 @@ S_StartBackgroundTrack
 ======================
 */
 void S_StartBackgroundTrack( const char *intro, const char *loop ){
-	int		len;
-	char	dump[16];
-	char	name[MAX_QPATH];
+	char	introPath[MAX_QPATH];
+	char	loopPath[MAX_QPATH];
+	char	fallback[MAX_QPATH];
+	qboolean	introIsOgg;
+	qboolean	success;
 
 	if ( !intro ) {
 		intro = "";
@@ -1444,14 +1682,23 @@ void S_StartBackgroundTrack( const char *intro, const char *loop ){
 	}
 	Com_DPrintf( "S_StartBackgroundTrack( %s, %s )\n", intro, loop );
 
-	Q_strncpyz( name, intro, sizeof( name ) - 4 );
-	COM_DefaultExtension( name, sizeof( name ), ".wav" );
-
 	if ( !intro[0] ) {
 		return;
 	}
 
-	Q_strncpyz( s_backgroundLoop, loop, sizeof( s_backgroundLoop ) );
+	introIsOgg = qfalse;
+	success = qfalse;
+
+	if ( !S_ResolveMusicFile( intro, introPath, sizeof( introPath ), &introIsOgg ) ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: couldn't resolve music file %s\n", intro );
+		return;
+	}
+
+	if ( S_ResolveMusicFile( loop, loopPath, sizeof( loopPath ), NULL ) ) {
+		Q_strncpyz( s_backgroundLoop, loopPath, sizeof( s_backgroundLoop ) );
+	} else {
+		s_backgroundLoop[0] = '\0';
+	}
 
 	// close the background track, but DON'T reset s_rawend
 	// if restarting the same back ground track
@@ -1460,61 +1707,29 @@ void S_StartBackgroundTrack( const char *intro, const char *loop ){
 		FS_FCloseFile( s_backgroundFile );
 		s_backgroundFile = 0;
 	}
+	if ( S_OggStreamActive( &s_backgroundOgg ) ) {
+		S_OggStreamClose( &s_backgroundOgg );
+	}
+	s_backgroundIsOgg = qfalse;
 
-	//
-	// open up a wav file and get all the info
-	//
-	FS_FOpenFileRead( name, &s_backgroundFile, qtrue );
-	if ( !s_backgroundFile ) {
-		Com_Printf( S_COLOR_YELLOW "WARNING: couldn't open music file %s\n", name );
+	if ( introIsOgg ) {
+		if ( S_OpenBackgroundOgg( introPath ) ) {
+			success = qtrue;
+		} else {
+S_SetTrackExtension( introPath, ".wav", fallback, sizeof( fallback ) );
+Com_Printf( S_COLOR_YELLOW "WARNING: couldn't decode Vorbis music file %s, falling back to WAV\n", introPath );
+			if ( s_backgroundLoop[0] && !Q_stricmp( s_backgroundLoop, introPath ) ) {
+				Q_strncpyz( s_backgroundLoop, fallback, sizeof( s_backgroundLoop ) );
+			}
+			success = S_OpenBackgroundWav( fallback );
+		}
+	} else {
+		success = S_OpenBackgroundWav( introPath );
+	}
+
+	if ( !success ) {
 		return;
 	}
-
-	// skip the riff wav header
-
-	FS_Read(dump, 12, s_backgroundFile);
-
-	if ( !S_FindWavChunk( s_backgroundFile, "fmt " ) ) {
-		Com_Printf( "No fmt chunk in %s\n", name );
-		FS_FCloseFile( s_backgroundFile );
-		s_backgroundFile = 0;
-		return;
-	}
-
-	// save name for soundinfo
-	s_backgroundInfo.format = FGetLittleShort( s_backgroundFile );
-	s_backgroundInfo.channels = FGetLittleShort( s_backgroundFile );
-	s_backgroundInfo.rate = FGetLittleLong( s_backgroundFile );
-	FGetLittleLong(  s_backgroundFile );
-	FGetLittleShort(  s_backgroundFile );
-	s_backgroundInfo.width = FGetLittleShort( s_backgroundFile ) / 8;
-
-	if ( s_backgroundInfo.format != WAV_FORMAT_PCM ) {
-		FS_FCloseFile( s_backgroundFile );
-		s_backgroundFile = 0;
-		Com_Printf("Not a microsoft PCM format wav: %s\n", name);
-		return;
-	}
-
-	if ( s_backgroundInfo.channels != 2 || s_backgroundInfo.rate != 22050 ) {
-		Com_Printf(S_COLOR_YELLOW "WARNING: music file %s is not 22k stereo\n", name );
-	}
-
-	if ( ( len = S_FindWavChunk( s_backgroundFile, "data" ) ) == 0 ) {
-		FS_FCloseFile( s_backgroundFile );
-		s_backgroundFile = 0;
-		Com_Printf("No data chunk in %s\n", name);
-		return;
-	}
-
-	s_backgroundInfo.samples = len / (s_backgroundInfo.width * s_backgroundInfo.channels);
-
-	s_backgroundSamples = s_backgroundInfo.samples;
-
-	//
-	// start the background streaming
-	//
-	Sys_BeginStreamedFile( s_backgroundFile, 0x10000 );
 }
 
 /*
@@ -1529,8 +1744,10 @@ void S_UpdateBackgroundTrack( void ) {
 	int		fileBytes;
 	int		r;
 	static	float	musicVolume = 0.5f;
+	qboolean	usingOgg;
 
-	if ( !s_backgroundFile ) {
+	usingOgg = ( s_backgroundIsOgg && S_OggStreamActive( &s_backgroundOgg ) );
+	if ( !s_backgroundFile && !usingOgg ) {
 		return;
 	}
 
@@ -1552,50 +1769,83 @@ void S_UpdateBackgroundTrack( void ) {
 
 		// decide how much data needs to be read from the file
 		fileSamples = bufferSamples * s_backgroundInfo.rate / dma.speed;
-
-		// don't try and read past the end of the file
-		if ( fileSamples > s_backgroundSamples ) {
-			fileSamples = s_backgroundSamples;
+		if ( fileSamples <= 0 ) {
+			return;
 		}
 
 		// our max buffer size
 		fileBytes = fileSamples * (s_backgroundInfo.width * s_backgroundInfo.channels);
-		if ( fileBytes > sizeof(raw) ) {
-			fileBytes = sizeof(raw);
+		if ( fileBytes > sizeof( raw ) ) {
+			fileBytes = sizeof( raw );
 			fileSamples = fileBytes / (s_backgroundInfo.width * s_backgroundInfo.channels);
 		}
 
-		r = Sys_StreamedRead( raw, 1, fileBytes, s_backgroundFile );
-		if ( r != fileBytes ) {
-			Com_Printf("StreamedRead failure on music track\n");
-			S_StopBackgroundTrack();
-			return;
-		}
-
-		// byte swap if needed
-		S_ByteSwapRawSamples( fileSamples, s_backgroundInfo.width, s_backgroundInfo.channels, raw );
-
-		// add to raw buffer
-		S_RawSamples( fileSamples, s_backgroundInfo.rate, 
-			s_backgroundInfo.width, s_backgroundInfo.channels, raw, musicVolume );
-
-		s_backgroundSamples -= fileSamples;
-		if ( !s_backgroundSamples ) {
-			// loop
-			if (s_backgroundLoop[0]) {
-				Sys_EndStreamedFile( s_backgroundFile );
-				FS_FCloseFile( s_backgroundFile );
-				s_backgroundFile = 0;
-				S_StartBackgroundTrack( s_backgroundLoop, s_backgroundLoop );
-				if ( !s_backgroundFile ) {
-					return;		// loop failed to restart
-				}
-			} else {
-				s_backgroundFile = 0;
+		if ( usingOgg ) {
+			r = S_OggStreamRead( &s_backgroundOgg, raw, fileBytes );
+			if ( r < 0 ) {
+				Com_Printf( S_COLOR_YELLOW "WARNING: Vorbis decode error on %s\n", s_backgroundOgg.path );
+				S_StopBackgroundTrack();
 				return;
 			}
+			if ( r == 0 ) {
+				if ( !S_BackgroundTrackLoop() ) {
+					S_StopBackgroundTrack();
+					return;
+				}
+				usingOgg = ( s_backgroundIsOgg && S_OggStreamActive( &s_backgroundOgg ) );
+				continue;
+			}
+
+			fileSamples = r / (s_backgroundInfo.width * s_backgroundInfo.channels);
+		} else {
+			// don't try and read past the end of the file
+			if ( fileSamples > s_backgroundSamples ) {
+				fileSamples = s_backgroundSamples;
+			}
+
+			fileBytes = fileSamples * (s_backgroundInfo.width * s_backgroundInfo.channels);
+			if ( fileBytes > sizeof( raw ) ) {
+				fileBytes = sizeof( raw );
+				fileSamples = fileBytes / (s_backgroundInfo.width * s_backgroundInfo.channels);
+			}
+
+			if ( fileSamples <= 0 ) {
+				if ( !S_BackgroundTrackLoop() ) {
+					S_StopBackgroundTrack();
+					return;
+				}
+				usingOgg = ( s_backgroundIsOgg && S_OggStreamActive( &s_backgroundOgg ) );
+				continue;
+			}
+
+			r = Sys_StreamedRead( raw, 1, fileBytes, s_backgroundFile );
+			if ( r != fileBytes ) {
+				Com_Printf("StreamedRead failure on music track\n");
+				S_StopBackgroundTrack();
+				return;
+			}
+
+			// byte swap if needed
+			S_ByteSwapRawSamples( fileSamples, s_backgroundInfo.width, s_backgroundInfo.channels, raw );
 		}
-	}
+
+		// add to raw buffer
+		S_RawSamples( fileSamples, s_backgroundInfo.rate,
+			s_backgroundInfo.width, s_backgroundInfo.channels, raw, musicVolume );
+
+		if ( usingOgg ) {
+			continue;
+		}
+
+		s_backgroundSamples -= fileSamples;
+		if ( s_backgroundSamples <= 0 ) {
+			if ( !S_BackgroundTrackLoop() ) {
+				S_StopBackgroundTrack();
+				return;
+			}
+			usingOgg = ( s_backgroundIsOgg && S_OggStreamActive( &s_backgroundOgg ) );
+		}
+}
 }
 
 

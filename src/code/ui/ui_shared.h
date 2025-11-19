@@ -29,6 +29,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../ui/menudef.h"
 
+#define QL_FONT_NAME_TEXT "fonts/font"
+#define QL_FONT_NAME_SMALL "fonts/smallfont"
+#define QL_FONT_NAME_BIG "fonts/bigfont"
+
+#define QL_FONT_TEXT_POINT_SIZE 24
+#define QL_FONT_SMALL_POINT_SIZE 16
+#define QL_FONT_BIG_POINT_SIZE 48
+
 #define MAX_MENUNAME 32
 #define MAX_ITEMTEXT 64
 #define MAX_ITEMACTION 64
@@ -440,6 +448,7 @@ qboolean UI_OutOfMemory();
 void Controls_GetConfig( void );
 void Controls_SetConfig(qboolean restart);
 void Controls_SetDefaults( void );
+void UI_NormalizeFontPath( const char **fontName, int *pointSize, const char *defaultFont, int defaultPointSize );
 
 int			trap_PC_AddGlobalDefine( char *define );
 int			trap_PC_LoadSource( const char *filename );

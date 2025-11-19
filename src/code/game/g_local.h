@@ -138,6 +138,20 @@ typedef struct ammoPackConfig_s {
 extern ammoPackConfig_t g_ammoPackConfig;
 void G_InitAmmoPackConfig( void );
 void G_UpdateAmmoPackConfig( void );
+
+typedef struct flagConfig_s {
+	float		flagBounce;
+	int		flagPhysics;
+	int		throwFlagVelocity;
+	int		throwFlagForwardMult;
+	qboolean	tackleFlag;
+	qboolean	returnFlagOnSuicide;
+	int		droppedFlagBonus;
+} flagConfig_t;
+
+extern flagConfig_t g_flagConfig;
+void G_InitFlagConfig( void );
+void G_UpdateFlagConfig( void );
 int G_GetSuddenDeathRespawnDelay( void );
 
 void G_AutoShuffleCountdown_SetGuard( qboolean ( *guard )( void ) );

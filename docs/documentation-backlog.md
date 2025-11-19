@@ -22,6 +22,7 @@ This backlog tracks upcoming documentation work required to keep contributors al
 
 ## HUD and Menu Follow-Ups
 - **UI Asset Audit:** Catalogue outstanding HUD/menu elements that differ from Quake Live (fonts, icons, layout). Include screenshots or HLIL references where available.
+- **UI bundle automation gate:** Keep the scripting guide and HUD audit in sync with the `tools/build_ui_bundle.sh` + `tests/run_ui_validation.py` workflow so contributors run the font bake and headless validation before touching fonts or HUD scripts.【F:docs/ui/scripting-guide.md†L17-L61】【F:docs/ui/hud-audit.md†L22-L61】
 - **Menu Scripting Guide:** Expand on how the reconstructed UI scripts map to Quake Live behaviour, noting missing cvars, commands, or localisation entries.
 - **Accessibility and Scalability Tasks:** Track plans for resolution scaling, colourblind modes, and other HUD usability improvements flagged during testing.
 

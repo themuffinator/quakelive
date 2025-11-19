@@ -81,6 +81,7 @@ DLL_ONLY=false
 # Platform backend toggles default to the open adapter unless Steamworks support
 # is explicitly requested.
 QL_BUILD_STEAMWORKS ?= 0
+QL_ENABLE_OGG ?= 1
 ifeq ($(origin QL_BUILD_OPEN_STEAM)), undefined
   ifeq ($(QL_BUILD_STEAMWORKS),1)
     QL_BUILD_OPEN_STEAM := 0
@@ -89,7 +90,26 @@ ifeq ($(origin QL_BUILD_OPEN_STEAM)), undefined
   endif
 endif
 
-PLATFORM_BACKEND_DEFS = -DQL_BUILD_STEAMWORKS=$(QL_BUILD_STEAMWORKS) -DQL_BUILD_OPEN_STEAM=$(QL_BUILD_OPEN_STEAM)
+PLATFORM_BACKEND_DEFS = -DQL_BUILD_STEAMWORKS=$(QL_BUILD_STEAMWORKS) -DQL_BUILD_OPEN_STEAM=$(QL_BUILD_OPEN_STEAM) -DQL_ENABLE_OGG=$(QL_ENABLE_OGG)
+
+PKG_CONFIG ?= pkg-config
+
+ifeq ($(QL_ENABLE_OGG),1)
+  ifeq ($(origin OGG_CFLAGS), undefined)
+    OGG_CFLAGS := $(shell $(PKG_CONFIG) --cflags vorbisfile vorbis ogg 2>/dev/null)
+  endif
+  ifeq ($(origin OGG_LDFLAGS), undefined)
+    OGG_LDFLAGS := $(shell $(PKG_CONFIG) --libs vorbisfile vorbis ogg 2>/dev/null)
+  endif
+  ifeq ($(strip $(OGG_LDFLAGS)),)
+    $(error Vorbis support enabled but libvorbis/libogg development files were not found. Install the codec SDKs, set OGG_CFLAGS/OGG_LDFLAGS manually, or rebuild with QL_ENABLE_OGG=0 for dedicated-only targets.)
+  endif
+  CLIENT_OGG_CFLAGS := $(OGG_CFLAGS)
+  CLIENT_OGG_LDFLAGS := $(OGG_LDFLAGS) -lvorbisfile -lvorbis -logg
+else
+  CLIENT_OGG_CFLAGS :=
+  CLIENT_OGG_LDFLAGS :=
+endif
 
 
 ifeq ($(PLATFORM),linux)
@@ -334,16 +354,16 @@ endif #Linux
 endif #FreeBSD
 endif #IRIX
 
-DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
-DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
-DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DSMP -o $@ -c $<
-DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
-DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
-DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -DELF -x assembler-with-cpp -o $@ -c $<
+DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
+DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
+DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DSMP -o $@ -c $<
+DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
+DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
+DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
 DO_NASM=nasm -f elf -o $@  $<
-DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) -o $@ -c $<
+DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
 
 #DO_LCC=$(LCC) -o $@ -S -Wf-target=bytecode -Wf-g -DQ3_VM -I$(CGDIR) -I$(GDIR)  -I$(UIDIR)  $< 
 
@@ -416,10 +436,12 @@ Q3OBJ = \
 	$(B)/client/huffman.o \
 	\
 	$(B)/client/snd_adpcm.o \
-	$(B)/client/snd_dma.o \
-	$(B)/client/snd_mem.o \
-	$(B)/client/snd_mix.o \
-	$(B)/client/snd_wavelet.o \
+$(B)/client/snd_dma.o \
+$(B)/client/snd_mem.o \
+$(B)/client/snd_mix.o \
+	$(B)/client/snd_ogg_decode.o \
+$(B)/client/snd_ogg_stream.o \
+$(B)/client/snd_wavelet.o \
 	\
 	$(B)/client/sv_bot.o \
 	$(B)/client/sv_ccmds.o \
@@ -624,13 +646,13 @@ endif #FreeBSD
 endif #IRIX
 
 $(B)/$(PLATFORM)quake3 : $(Q3OBJ) $(Q3POBJ)
-	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) 
+	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
 # TTimo: splines code requires C++ linking, but splines have not been officially included in the codebase
-#	$(CXX)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) 
+#	$(CXX)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
 
 $(B)/$(PLATFORM)quake3-smp : $(Q3OBJ) $(Q3POBJ_SMP)
 	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ_SMP) $(GLLDFLAGS) \
-		$(THREAD_LDFLAGS) $(LDFLAGS) 
+		$(THREAD_LDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
 
 $(B)/client/cl_cgame.o : $(CDIR)/cl_cgame.c; $(DO_CC)   
 $(B)/client/cl_cin.o : $(CDIR)/cl_cin.c; $(DO_CC)       
@@ -648,9 +670,11 @@ $(B)/client/platform_backend_open_steam.o : $(MOUNT_DIR)/common/platform/backend
 $(B)/client/platform_backend_steamworks.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_steamworks.c; $(DO_CC)
 $(B)/client/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC)   
 $(B)/client/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC)       
-$(B)/client/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC)        
-$(B)/client/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC)       
-$(B)/client/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC)     
+$(B)/client/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC)
+$(B)/client/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC)
+$(B)/client/snd_ogg_decode.o : $(CDIR)/snd_ogg_decode.c; $(DO_CC)
+$(B)/client/snd_ogg_stream.o : $(CDIR)/snd_ogg_stream.c; $(DO_CC)
+$(B)/client/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC)
 $(B)/client/sv_bot.o : $(SDIR)/sv_bot.c; $(DO_CC)        
 $(B)/client/sv_client.o : $(SDIR)/sv_client.c; $(DO_CC)     
 $(B)/client/sv_ccmds.o : $(SDIR)/sv_ccmds.c; $(DO_CC)       
@@ -1525,10 +1549,12 @@ Q3SOBJ = \
 	$(B)/q3static/net_chan.o \
 	\
 	$(B)/q3static/snd_adpcm.o \
-	$(B)/q3static/snd_dma.o \
-	$(B)/q3static/snd_mem.o \
-	$(B)/q3static/snd_mix.o \
-	$(B)/q3static/snd_wavelet.o \
+$(B)/q3static/snd_dma.o \
+$(B)/q3static/snd_mem.o \
+$(B)/q3static/snd_mix.o \
+	$(B)/q3static/snd_ogg_decode.o \
+$(B)/q3static/snd_ogg_stream.o \
+$(B)/q3static/snd_wavelet.o \
 	\
 	$(B)/q3static/sv_bot.o \
 	$(B)/q3static/sv_ccmds.o \
@@ -1690,9 +1716,11 @@ $(B)/q3static/platform_backend_open_steam.o : $(MOUNT_DIR)/common/platform/backe
 $(B)/q3static/platform_backend_steamworks.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_steamworks.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC) -DQ3_STATIC   
 $(B)/q3static/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC) -DQ3_STATIC       
-$(B)/q3static/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC) -DQ3_STATIC        
-$(B)/q3static/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC) -DQ3_STATIC       
-$(B)/q3static/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC) -DQ3_STATIC     
+$(B)/q3static/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_ogg_decode.o : $(CDIR)/snd_ogg_decode.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_ogg_stream.o : $(CDIR)/snd_ogg_stream.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/sv_bot.o : $(SDIR)/sv_bot.c; $(DO_CC) -DQ3_STATIC        
 $(B)/q3static/sv_client.o : $(SDIR)/sv_client.c; $(DO_CC) -DQ3_STATIC     
 $(B)/q3static/sv_ccmds.o : $(SDIR)/sv_ccmds.c; $(DO_CC) -DQ3_STATIC       

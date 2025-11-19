@@ -111,6 +111,79 @@ static qboolean G_MatchFactoryBounceAllowed( void ) {
 	return level.matchAllowItemBounce ? qtrue : qfalse;
 }
 
+/*
+=============
+G_BuildItemTossVelocity
+
+Constructs the base toss velocity for dropped and launched items.
+=============
+*/
+static void G_BuildItemTossVelocity( gentity_t *ent, gitem_t *item, float angle, vec3_t velocity ) {
+	vec3_t	angles;
+	vec3_t	forward;
+
+	if ( !ent || !item ) {
+		VectorClear( velocity );
+		return;
+	}
+
+	VectorCopy( ent->s.apos.trBase, angles );
+	angles[YAW] += angle;
+	angles[PITCH] = 0;
+
+	AngleVectors( angles, forward, NULL, NULL );
+
+	if ( item->giType == IT_TEAM && g_flagConfig.flagPhysics ) {
+		VectorScale( forward, g_flagConfig.throwFlagVelocity, velocity );
+		if ( ent->client ) {
+			vec3_t	playerVelocity;
+
+			VectorScale( ent->client->ps.velocity, g_flagConfig.throwFlagForwardMult, playerVelocity );
+			VectorAdd( velocity, playerVelocity, velocity );
+		}
+	} else {
+		VectorScale( forward, 150, velocity );
+	}
+
+	velocity[2] += 200 + crandom() * 50;
+}
+
+/*
+===============
+G_ApplyItemBounceSettings
+
+Configures physics bounce behaviour for dropped items.
+===============
+*/
+static void G_ApplyItemBounceSettings( gentity_t *dropped, gitem_t *item ) {
+	qboolean	factoryAllowsBounce;
+
+	if ( !dropped ) {
+		return;
+	}
+
+	factoryAllowsBounce = G_MatchFactoryBounceAllowed();
+
+	if ( !item || item->giType != IT_TEAM || !g_flagConfig.flagPhysics ) {
+		if ( factoryAllowsBounce ) {
+			dropped->s.eFlags |= EF_BOUNCE_HALF;
+			dropped->physicsBounce = 0.50f;
+		} else {
+			dropped->s.eFlags &= ~EF_BOUNCE_HALF;
+			dropped->physicsBounce = 0.0f;
+		}
+		return;
+	}
+
+	if ( factoryAllowsBounce && g_flagConfig.flagPhysics ) {
+		dropped->s.eFlags |= EF_BOUNCE_HALF;
+		dropped->physicsBounce = g_flagConfig.flagBounce;
+	} else {
+		dropped->s.eFlags &= ~EF_BOUNCE_HALF;
+		dropped->physicsBounce = 0.0f;
+	}
+}
+
 
 //======================================================================
 
@@ -876,13 +949,7 @@ gentity_t *LaunchItem( gitem_t *item, vec3_t origin, vec3_t velocity ) {
 	dropped->s.pos.trTime = level.time;
 	VectorCopy( velocity, dropped->s.pos.trDelta );
 
-	if ( G_MatchFactoryBounceAllowed() ) {
-		dropped->s.eFlags |= EF_BOUNCE_HALF;
-		dropped->physicsBounce = 0.50f;
-	} else {
-		dropped->s.eFlags &= ~EF_BOUNCE_HALF;
-		dropped->physicsBounce = 0.0f;
-	}
+	G_ApplyItemBounceSettings( dropped, item );
 	if ((g_gametype.integer == GT_CTF || g_gametype.integer == GT_1FCTF)			&& item->giType == IT_TEAM) { // Special case for CTF flags
 		dropped->think = Team_DroppedFlagThink;
 		dropped->nextthink = level.time + 30000;
@@ -908,7 +975,6 @@ Spawns an item and tosses it forward
 */
 gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle ) {
 	vec3_t	velocity;
-	vec3_t	angles;
 	gentity_t	*dropped;
 
 	if ( !item ) {
@@ -919,13 +985,7 @@ gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle ) {
 		return NULL;
 	}
 
-	VectorCopy( ent->s.apos.trBase, angles );
-	angles[YAW] += angle;
-	angles[PITCH] = 0;	// always forward
-
-	AngleVectors( angles, velocity, NULL, NULL );
-	VectorScale( velocity, 150, velocity );
-	velocity[2] += 200 + crandom() * 50;
+	G_BuildItemTossVelocity( ent, item, angle, velocity );
 
 	dropped = LaunchItem( item, ent->s.pos.trBase, velocity );
 	if ( dropped && ent && item->giType == IT_KEY ) {

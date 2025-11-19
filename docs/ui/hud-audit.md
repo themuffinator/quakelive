@@ -23,9 +23,9 @@ These files should remain, but their dependencies must be harmonised with the re
 | Area | Reference Location | GPL Status | Gap Summary |
 | --- | --- | --- | --- |
 | HUD & menu art | `ui/assets/{hud,score,menu,flags,main_menu,statusbar}` | Missing | Scoreboard state badges, menu chrome, and national flag textures are unavailable, forcing Quake III fallbacks and stripping visual cues from score widgets and navigation flows.
-| Fonts | `baseq3/fonts/*.ttf` | Missing | Droid Sans, Noto Sans, and Handel Gothic TTFs are not staged or baked into atlases, so scripted point sizes fall back to Quake III bitmap fonts.
+| Fonts | `baseq3/fonts/*.ttf` | Automated | `tools/build_ui_bundle.sh` pulls in the Quake Live TTFs declared in `tools/packaging/ui_bundle_manifest.json`, bakes deterministic `.dat`/`.tga` pairs via `tools/packaging/bake_fonts.py`, and records glyph metrics in `artifacts/ui_bundle/metrics/font_metrics.json` for CI triage.
 | Shader scripts | `baseq3/scripts/ui*.shader` (tracked in the global asset audit) | Missing | Gradient, cursor, and overlay materials referenced by menus do not compile without the Quake Live shader definitions.
-| Packaging hooks | `pak/ui` structure in the reference PK3s | Missing | No reproducible PK3 exists in the GPL build to bundle menus, art, fonts, and shaders for distribution.
+| Packaging hooks | `pak/ui` structure in the reference PK3s | In Progress | `tools/build_ui_bundle.sh` now archives fonts/scripts into `build/ui_bundle/pak_uiql.pk3` and emits logs for CI uploads; the art and shader payloads still need to be staged to complete the bundle.
 
 ## Parity Gaps & Recommended Actions
 | Area | Gap | Action |
@@ -33,14 +33,14 @@ These files should remain, but their dependencies must be harmonised with the re
 | Locale & team metadata | `country.txt` and `teaminfo.txt` remain exclusive to the reference snapshot, blocking country pickers and spectator team callouts. | Import both tables, validate UTF-8 encoding, and confirm dropdown population inside `ingame_join.menu` and scoreboard panels.
 | Legacy HUD preset | `hud3.txt` is missing, preventing the legacy HUD preset from appearing in configuration utilities. | Stage `hud3.txt`, add it to the HUD selector list, and test preset rotation to ensure bindings persist.
 | HUD/menu art | Quake Live’s art hierarchy is absent, so gradients, scoreboxes, and iconography degrade to Quake III defaults. | Stage `ui/assets/*` inside a dedicated PK3 (e.g., `pak_uiql.pk3`), then repoint menu scripts to the restored textures.
-| Fonts & readability | The Quake Live TTFs are not baked, causing inconsistent typography and reduced legibility at scripted sizes. | Add a font-bake step that emits `fonts/font`, `fonts/smallfont`, and `fonts/bigfont` atlases before packaging.
+| Fonts & readability | Glyph counts must remain in lockstep with Quake Live defaults to keep scripted `textscale` stable. | Run `tools/build_ui_bundle.sh` (font bake) and `python tests/run_ui_validation.py` before landing HUD changes so glyph or shader drift is caught in CI logs.
 | Shader/material coverage | UI shader scripts are missing, leading to placeholder gradients and cursors. | Import the `ui*.shader` definitions alongside the art bundle and trigger shader cache regeneration in the build pipeline.
 | Build integration | There is no automated packaging flow for HUD assets. | Extend the data build to archive menus, art, fonts, and shaders into reproducible PK3s and document the process in the scripting guide.
 
 ## Follow-Up Validation Checklist
 - [ ] Confirm all menu and metadata files referenced by Quake Live scripts exist in `src/ui` with identical casing.
 - [ ] Verify that UI art directories resolve in-game by launching with a clean homepath and inspecting HUD, scoreboard, and menu screens.
-- [ ] Run font bake tooling and compare generated atlas metrics against Quake Live defaults to ensure `textscale` directives remain accurate.
+- [x] Run font bake tooling and compare generated atlas metrics against Quake Live defaults to ensure `textscale` directives remain accurate (`tools/build_ui_bundle.sh` + `tests/run_ui_validation.py`).
 - [ ] Recompile shader caches with the imported `ui*.shader` files and validate gradients/cursors in the renderer.
 - [ ] Exercise the packaging workflow to ensure PK3 generation is deterministic and platform-agnostic.
 

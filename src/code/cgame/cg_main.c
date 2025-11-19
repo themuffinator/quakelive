@@ -27,6 +27,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // display context for new ui stuff
 displayContextDef_t cgDC;
 
+#define DEFAULT_WEAPON_BAR_GRENADE_COLOR	"0x007000FF"
+#define DEFAULT_SCREEN_DAMAGE_COLOR		"0x700000C8"
+#define DEFAULT_SCREEN_DAMAGE_SELF_COLOR	"0x00000000"
+#define DEFAULT_SCREEN_DAMAGE_TEAM_COLOR	"0x700000C8"
+#define DEFAULT_SCREEN_DAMAGE_ALPHA		"200"
+
 int forceModelModificationCount = -1;
 int forceTeamModelModificationCount = -1;
 int forceTeamSkinModificationCount = -1;
@@ -42,9 +48,32 @@ int enemyUpperColorModificationCount = -1;
 int enemyLowerColorModificationCount = -1;
 static int damagePlumModificationCount = -1;
 static int damagePlumColorStyleModificationCount = -1;
+int deadBodyDarkenModificationCount = -1;
+int deadBodyColorModificationCount = -1;
+int screenDamageColorModificationCount = -1;
+int screenDamageSelfColorModificationCount = -1;
+int screenDamageTeamColorModificationCount = -1;
+int screenDamageAlphaModificationCount = -1;
+int screenDamageAlphaTeamModificationCount = -1;
+int armorTieredModificationCount = -1;
+int vignetteModificationCount = -1;
+int voiceChatIndicatorModificationCount = -1;
+int simpleItemsHeightOffsetModificationCount = -1;
+int simpleItemsBobModificationCount = -1;
+int simpleItemsRadiusModificationCount = -1;
+static int crosshairColorModificationCount = -1;
+static int crosshairBrightnessModificationCount = -1;
+static int crosshairPulseModificationCount = -1;
+static int crosshairHitStyleModificationCount = -1;
+static int crosshairHitTimeModificationCount = -1;
+static int crosshairHitColorModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
+static void CG_UpdateSimpleItemsSettings( void );
+static void CG_UpdateCrosshairColorSettings( void );
+static void CG_UpdateCrosshairPulseSettings( void );
+static void CG_UpdateCrosshairHitSettings( void );
 
 
 /*
@@ -100,6 +129,9 @@ itemInfo_t			cg_items[MAX_ITEMS];
 pmove_settings_t		cg_pmoveSettings;
 
 
+static int		weaponColorGrenadeModCount = -1;
+static int		lowAmmoWarningPercentileModCount = -1;
+
 vmCvar_t	cg_railTrailTime;
 vmCvar_t	cg_centertime;
 vmCvar_t	cg_runpitch;
@@ -134,10 +166,35 @@ vmCvar_t	cg_drawInputCmds;
 vmCvar_t	cg_drawInputCmdsX;
 vmCvar_t	cg_drawInputCmdsY;
 vmCvar_t	cg_drawInputCmdsSize;
+vmCvar_t	cg_weaponBar;
+vmCvar_t	cg_weaponColor_grenade;
+vmCvar_t	cg_weaponConfig;
+vmCvar_t	cg_weaponConfig_g;
+vmCvar_t	cg_weaponConfig_mg;
+vmCvar_t	cg_weaponConfig_sg;
+vmCvar_t	cg_weaponConfig_gl;
+vmCvar_t	cg_weaponConfig_rl;
+vmCvar_t	cg_weaponConfig_lg;
+vmCvar_t	cg_weaponConfig_rg;
+vmCvar_t	cg_weaponConfig_pg;
+vmCvar_t	cg_weaponConfig_bfg;
+vmCvar_t	cg_weaponConfig_gh;
+vmCvar_t	cg_weaponConfig_ng;
+vmCvar_t	cg_weaponConfig_pl;
+vmCvar_t	cg_weaponConfig_cg;
+vmCvar_t	cg_weaponConfig_hmg;
+vmCvar_t	cg_weaponPrimary;
+vmCvar_t	cg_weaponPrimaryQueued;
 vmCvar_t	cg_crosshairSize;
 vmCvar_t	cg_crosshairX;
 vmCvar_t	cg_crosshairY;
 vmCvar_t	cg_crosshairHealth;
+vmCvar_t	cg_crosshairColor;
+vmCvar_t	cg_crosshairBrightness;
+vmCvar_t	cg_crosshairPulse;
+vmCvar_t	cg_crosshairHitStyle;
+vmCvar_t	cg_crosshairHitTime;
+vmCvar_t	cg_crosshairHitColor;
 vmCvar_t	cg_enemyCrosshairNames;
 vmCvar_t	cg_enemyCrosshairNamesOpacity;
 vmCvar_t	cg_teammateCrosshairNames;
@@ -167,8 +224,13 @@ vmCvar_t	cg_tracerChance;
 vmCvar_t	cg_tracerWidth;
 vmCvar_t	cg_tracerLength;
 vmCvar_t	cg_autoswitch;
+vmCvar_t	cg_switchOnEmpty;
+vmCvar_t	cg_switchToEmpty;
 vmCvar_t	cg_ignore;
 vmCvar_t	cg_simpleItems;
+vmCvar_t	cg_simpleItemsHeightOffset;
+vmCvar_t	cg_simpleItemsBob;
+vmCvar_t	cg_simpleItemsRadius;
 vmCvar_t	cg_fov;
 vmCvar_t	cg_zoomFov;
 vmCvar_t	cg_zoomToggle;
@@ -185,6 +247,7 @@ vmCvar_t	cg_lagometer;
 vmCvar_t	cg_drawAttacker;
 vmCvar_t	cg_synchronousClients;
 vmCvar_t 	cg_teamChatTime;
+vmCvar_t 	cg_lowAmmoWarningPercentile;
 vmCvar_t 	cg_teamChatHeight;
 vmCvar_t 	cg_stats;
 vmCvar_t 	cg_buildScript;
@@ -220,12 +283,15 @@ vmCvar_t	cg_teammatePOIsMaxWidth;
 vmCvar_t	cg_teamChatsOnly;
 vmCvar_t	cg_noVoiceChats;
 vmCvar_t	cg_noVoiceText;
+vmCvar_t	cg_useItemMessage;
+vmCvar_t	cg_useItemWarning;
 vmCvar_t	cg_hudFiles;
 vmCvar_t	cg_kickScale;
 vmCvar_t 	cg_scorePlum;
 vmCvar_t 	cg_damagePlum;
 vmCvar_t 	cg_damagePlumColorStyle;
 vmCvar_t 	cg_smoothClients;
+vmCvar_t 	cg_loadout;
 vmCvar_t	pmove_fixed;
 //vmCvar_t	cg_pmove_fixed;
 vmCvar_t	pmove_msec;
@@ -245,9 +311,12 @@ vmCvar_t	cg_oldRocket;
 vmCvar_t	cg_oldPlasma;
 vmCvar_t	cg_trueLightning;
 vmCvar_t	cg_drawTieredArmorAvailability;
+vmCvar_t	cg_armorTiered;
 vmCvar_t	cg_drawFullWeaponBar;
 vmCvar_t	cg_drawHitFriendTime;
 vmCvar_t	cg_drawDeadFriendTime;
+vmCvar_t	cg_deadBodyDarken;
+vmCvar_t	cg_deadBodyColor;
 vmCvar_t	cg_speedometer;
 vmCvar_t	cg_specNames;
 vmCvar_t	cg_specItemTimers;
@@ -257,6 +326,11 @@ vmCvar_t	cg_specItemTimersSize;
 vmCvar_t	cg_specTeamVitals;
 vmCvar_t	cg_specTeamVitalsHealthColor;
 vmCvar_t	cg_itemTimers;
+vmCvar_t	cg_screenDamage;
+vmCvar_t	cg_screenDamage_Self;
+vmCvar_t	cg_screenDamage_Team;
+vmCvar_t	cg_screenDamageAlpha;
+vmCvar_t	cg_screenDamageAlpha_Team;
 vmCvar_t	cg_overheadNamesWidth;
 vmCvar_t	cg_obituaryRowSize;
 vmCvar_t	cg_spectating;
@@ -268,6 +342,8 @@ vmCvar_t	cg_gameInfo4;
 vmCvar_t	cg_gameInfo5;
 vmCvar_t	cg_gameInfo6;
 vmCvar_t	cg_useLegacyHud;
+vmCvar_t	cg_vignette;
+vmCvar_t	cg_voiceChatIndicator;
 
 vmCvar_t 	cg_redTeamName;
 vmCvar_t 	cg_blueTeamName;
@@ -295,6 +371,8 @@ static void CG_UpdateDamagePlumSettings( void );
 static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_ignore, "cg_ignore", "0", 0 },	// used for debugging
 	{ &cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE },
+	{ &cg_switchOnEmpty, "cg_switchOnEmpty", "1", CVAR_ARCHIVE },
+	{ &cg_switchToEmpty, "cg_switchToEmpty", "1", CVAR_ARCHIVE },
 	{ &cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE },
 	{ &cg_zoomFov, "cg_zoomfov", "22.5", CVAR_ARCHIVE },
 	{ &cg_zoomToggle, "cg_zoomToggle", "0", CVAR_ARCHIVE },
@@ -310,12 +388,14 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_draw2D, "cg_draw2D", "1", CVAR_ARCHIVE  },
 	{ &cg_drawStatus, "cg_drawStatus", "1", CVAR_ARCHIVE  },
 	{ &cg_useLegacyHud, "cg_useLegacyHud", "0", CVAR_ARCHIVE },
+	{ &cg_vignette, "cg_vignette", "1", CVAR_ARCHIVE },
 	{ &cg_drawTimer, "cg_drawTimer", "0", CVAR_ARCHIVE  },
 	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
 	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  },
 	{ &cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawIcons, "cg_drawIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawAmmoWarning, "cg_drawAmmoWarning", "1", CVAR_ARCHIVE  },
+	{ &cg_lowAmmoWarningPercentile, "cg_lowAmmoWarningPercentile", "0.20", CVAR_ARCHIVE },
 	{ &cg_drawAttacker, "cg_drawAttacker", "1", CVAR_ARCHIVE  },
 	{ &cg_drawCrosshair, "cg_drawCrosshair", "4", CVAR_ARCHIVE },
 	{ &cg_drawCrosshairNames, "cg_drawCrosshairNames", "1", CVAR_ARCHIVE },
@@ -325,27 +405,38 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawProfileImages, "cg_drawProfileImages", "1", CVAR_ARCHIVE },
 	{ &cg_drawSprites, "cg_drawSprites", "1", CVAR_ARCHIVE },
 	{ &cg_drawPregameMessages, "cg_drawPregameMessages", "1", CVAR_ARCHIVE },
-	{ &cg_drawSpecMessages, "cg_drawSpecMessages", "1", CVAR_ARCHIVE },
-	{ &cg_drawItemPickups, "cg_drawItemPickups", "5", CVAR_ARCHIVE },
-	{ &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", CVAR_ARCHIVE },
-	{ &cg_drawDemoHUD, "cg_drawDemoHUD", "1", CVAR_ARCHIVE },
-	{ &cg_drawFragMessages, "cg_drawFragMessages", "1", CVAR_ARCHIVE },
-	{ &cg_drawInputCmds, "cg_drawInputCmds", "0", CVAR_ARCHIVE },
+{ &cg_drawSpecMessages, "cg_drawSpecMessages", "1", CVAR_ARCHIVE },
+	{ &cg_useItemMessage, "cg_useItemMessage", "1", CVAR_ARCHIVE },
+	{ &cg_useItemWarning, "cg_useItemWarning", "1", CVAR_ARCHIVE },
+{ &cg_drawItemPickups, "cg_drawItemPickups", "5", CVAR_ARCHIVE },
+{ &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", CVAR_ARCHIVE },
+{ &cg_drawDemoHUD, "cg_drawDemoHUD", "1", CVAR_ARCHIVE },
+{ &cg_drawFragMessages, "cg_drawFragMessages", "1", CVAR_ARCHIVE },
+{ &cg_drawInputCmds, "cg_drawInputCmds", "0", CVAR_ARCHIVE },
 	{ &cg_drawInputCmdsX, "cg_drawInputCmdsX", "640", CVAR_ARCHIVE },
 	{ &cg_drawInputCmdsY, "cg_drawInputCmdsY", "480", CVAR_ARCHIVE },
 	{ &cg_drawInputCmdsSize, "cg_drawInputCmdsSize", "16", CVAR_ARCHIVE },
-	{ &cg_crosshairSize, "cg_crosshairSize", "24", CVAR_ARCHIVE },
-	{ &cg_crosshairHealth, "cg_crosshairHealth", "1", CVAR_ARCHIVE },
-	{ &cg_enemyCrosshairNames, "cg_enemyCrosshairNames", "1", CVAR_ARCHIVE },
-	{ &cg_enemyCrosshairNamesOpacity, "cg_enemyCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
-	{ &cg_teammateCrosshairNames, "cg_teammateCrosshairNames", "1", CVAR_ARCHIVE },
-	{ &cg_teammateCrosshairNamesOpacity, "cg_teammateCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
-	{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "29", CVAR_ARCHIVE },
+{ &cg_crosshairSize, "cg_crosshairSize", "24", CVAR_ARCHIVE },
+{ &cg_crosshairHealth, "cg_crosshairHealth", "1", CVAR_ARCHIVE },
+{ &cg_crosshairColor, "cg_crosshairColor", "4", CVAR_ARCHIVE },
+{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1", CVAR_ARCHIVE },
+{ &cg_crosshairPulse, "cg_crosshairPulse", "1", CVAR_ARCHIVE },
+{ &cg_crosshairHitStyle, "cg_crosshairHitStyle", "2", CVAR_ARCHIVE },
+{ &cg_crosshairHitTime, "cg_crosshairHitTime", "200", CVAR_ARCHIVE },
+{ &cg_crosshairHitColor, "cg_crosshairHitColor", "1", CVAR_ARCHIVE },
+{ &cg_enemyCrosshairNames, "cg_enemyCrosshairNames", "1", CVAR_ARCHIVE },
+{ &cg_enemyCrosshairNamesOpacity, "cg_enemyCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
+{ &cg_teammateCrosshairNames, "cg_teammateCrosshairNames", "1", CVAR_ARCHIVE },
+{ &cg_teammateCrosshairNamesOpacity, "cg_teammateCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
+{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "29", CVAR_ARCHIVE },
 	{ &cg_drawCrosshairTeamHealthSize, "cg_drawCrosshairTeamHealthSize", "0.12", CVAR_ARCHIVE },
 	{ &cg_crosshairX, "cg_crosshairX", "0", CVAR_ARCHIVE },
 	{ &cg_crosshairY, "cg_crosshairY", "0", CVAR_ARCHIVE },
 	{ &cg_brassTime, "cg_brassTime", "2500", CVAR_ARCHIVE },
 	{ &cg_simpleItems, "cg_simpleItems", "0", CVAR_ARCHIVE },
+	{ &cg_simpleItemsHeightOffset, "cg_simpleItemsHeightOffset", "0", CVAR_ARCHIVE },
+	{ &cg_simpleItemsBob, "cg_simpleItemsBob", "0", CVAR_ARCHIVE },
+	{ &cg_simpleItemsRadius, "cg_simpleItemsRadius", "14", CVAR_ARCHIVE },
 	{ &cg_addMarks, "cg_marks", "1", CVAR_ARCHIVE },
 	{ &cg_lagometer, "cg_lagometer", "1", CVAR_ARCHIVE },
 	{ &cg_railTrailTime, "cg_railTrailTime", "400", CVAR_ARCHIVE  },
@@ -410,6 +501,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_teamChatsOnly, "cg_teamChatsOnly", "0", CVAR_ARCHIVE },
 	{ &cg_noVoiceChats, "cg_noVoiceChats", "0", CVAR_ARCHIVE },
 	{ &cg_noVoiceText, "cg_noVoiceText", "0", CVAR_ARCHIVE },
+	{ &cg_voiceChatIndicator, "cg_voiceChatIndicator", "1", CVAR_ARCHIVE },
 	// the following variables are created in other parts of the system,
 	// but we also reference them here
 	{ &cg_buildScript, "com_buildScript", "0", 0 },	// force loading of all possible data amd error on failures
@@ -450,9 +542,31 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_oldPlasma, "cg_oldPlasma", "1", CVAR_ARCHIVE},
 	{ &cg_trueLightning, "cg_trueLightning", "0.0", CVAR_ARCHIVE },
 	{ &cg_drawTieredArmorAvailability, "cg_drawTieredArmorAvailability", "1", CVAR_ARCHIVE },
+	{ &cg_armorTiered, "cg_armorTiered", "1", CVAR_ARCHIVE },
 	{ &cg_drawFullWeaponBar, "cg_drawFullWeaponBar", "0", CVAR_ARCHIVE },
+	{ &cg_weaponBar, "cg_weaponBar", "4", CVAR_ARCHIVE },
+	{ &cg_weaponColor_grenade, "cg_weaponColor_grenade", DEFAULT_WEAPON_BAR_GRENADE_COLOR, CVAR_ARCHIVE },
+	{ &cg_weaponConfig, "cg_weaponConfig", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_g, "cg_weaponConfig_g", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_mg, "cg_weaponConfig_mg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_sg, "cg_weaponConfig_sg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_gl, "cg_weaponConfig_gl", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_rl, "cg_weaponConfig_rl", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_lg, "cg_weaponConfig_lg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_rg, "cg_weaponConfig_rg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_pg, "cg_weaponConfig_pg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_bfg, "cg_weaponConfig_bfg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_gh, "cg_weaponConfig_gh", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_ng, "cg_weaponConfig_ng", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_pl, "cg_weaponConfig_pl", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_cg, "cg_weaponConfig_cg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_hmg, "cg_weaponConfig_hmg", "", CVAR_ARCHIVE },
+	{ &cg_weaponPrimary, "cg_weaponPrimary", "", CVAR_ROM },
+	{ &cg_weaponPrimaryQueued, "cg_weaponPrimaryQueued", "", CVAR_TEMP },
 	{ &cg_drawHitFriendTime, "cg_drawHitFriendTime", "5000", CVAR_ARCHIVE },
 	{ &cg_drawDeadFriendTime, "cg_drawDeadFriendTime", "3000", CVAR_ARCHIVE },
+	{ &cg_deadBodyDarken, "cg_deadBodyDarken", "1", CVAR_ARCHIVE },
+	{ &cg_deadBodyColor, "cg_deadBodyColor", "0x333333ff", CVAR_ARCHIVE },
 	{ &cg_speedometer, "cg_speedometer", "0", CVAR_ARCHIVE },
 	{ &cg_specNames, "cg_specNames", "1", CVAR_ARCHIVE },
 	{ &cg_specItemTimers, "cg_specItemTimers", "1", CVAR_ARCHIVE },
@@ -462,6 +576,11 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_specTeamVitals, "cg_specTeamVitals", "1", CVAR_ARCHIVE },
 	{ &cg_specTeamVitalsHealthColor, "cg_specTeamVitalsHealthColor", "0", CVAR_ARCHIVE },
 	{ &cg_itemTimers, "cg_itemTimers", "1", CVAR_ARCHIVE },
+	{ &cg_screenDamage, "cg_screenDamage", DEFAULT_SCREEN_DAMAGE_COLOR, CVAR_ARCHIVE },
+	{ &cg_screenDamage_Self, "cg_screenDamage_Self", DEFAULT_SCREEN_DAMAGE_SELF_COLOR, CVAR_ARCHIVE },
+	{ &cg_screenDamage_Team, "cg_screenDamage_Team", DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, CVAR_ARCHIVE },
+	{ &cg_screenDamageAlpha, "cg_screenDamageAlpha", DEFAULT_SCREEN_DAMAGE_ALPHA, CVAR_ARCHIVE },
+	{ &cg_screenDamageAlpha_Team, "cg_screenDamageAlpha_Team", DEFAULT_SCREEN_DAMAGE_ALPHA, CVAR_ARCHIVE },
 	{ &cg_overheadNamesWidth, "cg_overheadNamesWidth", "120", CVAR_ARCHIVE },
 	{ &cg_obituaryRowSize, "cg_obituaryRowSize", "5", CVAR_ARCHIVE },
 	{ &cg_spectating, "cg_spectating", "0", CVAR_ROM },
@@ -471,7 +590,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_gameInfo3, "cg_gameInfo3", "", CVAR_ROM },
 	{ &cg_gameInfo4, "cg_gameInfo4", "", CVAR_ROM },
 	{ &cg_gameInfo5, "cg_gameInfo5", "", CVAR_ROM },
-	{ &cg_gameInfo6, "cg_gameInfo6", "", CVAR_ROM }
+	{ &cg_gameInfo6, "cg_gameInfo6", "", CVAR_ROM },
+	{ &cg_loadout, "cg_loadout", "0", CVAR_ROM }
 //	{ &cg_pmove_fixed, "cg_pmove_fixed", "0", CVAR_USERINFO | CVAR_ARCHIVE }
 };
 
@@ -679,6 +799,227 @@ static void CG_UpdateDamagePlumSettings( void ) {
 
 static int  cvarTableSize = sizeof( cvarTable ) / sizeof( cvarTable[0] );
 
+static const vec4_t cg_defaultDeadBodyColor = { 51.0f / 255.0f, 51.0f / 255.0f, 51.0f / 255.0f, 1.0f };
+
+/*
+=============
+CG_ParseDeadBodyHexDigit
+
+Converts a hexadecimal character into an integer for corpse color parsing.
+=============
+*/
+static int CG_ParseDeadBodyHexDigit( char ch ) {
+	if ( ch >= '0' && ch <= '9' ) {
+		return ch - '0';
+	}
+	if ( ch >= 'a' && ch <= 'f' ) {
+		return 10 + ( ch - 'a' );
+	}
+	if ( ch >= 'A' && ch <= 'F' ) {
+		return 10 + ( ch - 'A' );
+	}
+	return -1;
+}
+
+/*
+=============
+CG_ParseDeadBodyColor
+
+Parses the configured corpse tint into a normalized RGBA vector.
+=============
+*/
+static qboolean CG_ParseDeadBodyColor( const char *value, vec4_t color ) {
+	char buffer[64];
+	const char *hex;
+	unsigned int raw;
+	int len;
+	int digit;
+	int i;
+	byte components[4];
+
+	if ( !value || !*value ) {
+		return qfalse;
+	}
+	Q_strncpyz( buffer, value, sizeof( buffer ) );
+	hex = buffer;
+	while ( *hex == ' ' || *hex == '	' || *hex == '"' ) {
+		hex++;
+	}
+	if ( !Q_stricmp( hex, "NULL" ) ) {
+		return qfalse;
+	}
+	if ( hex[0] == '0' && ( hex[1] == 'x' || hex[1] == 'X' ) ) {
+		hex += 2;
+	}
+	len = strlen( hex );
+	if ( len != 6 && len != 8 ) {
+		return qfalse;
+	}
+	raw = 0;
+	for ( i = 0 ; i < len ; i++ ) {
+		digit = CG_ParseDeadBodyHexDigit( hex[i] );
+		if ( digit < 0 ) {
+			return qfalse;
+		}
+		raw = ( raw << 4 ) | digit;
+	}
+	if ( len == 6 ) {
+		components[0] = ( raw >> 16 ) & 0xFF;
+		components[1] = ( raw >> 8 ) & 0xFF;
+		components[2] = raw & 0xFF;
+		components[3] = 0xFF;
+	} else {
+		components[0] = ( raw >> 24 ) & 0xFF;
+		components[1] = ( raw >> 16 ) & 0xFF;
+		components[2] = ( raw >> 8 ) & 0xFF;
+		components[3] = raw & 0xFF;
+	}
+	for ( i = 0 ; i < 4 ; i++ ) {
+		color[i] = components[i] / 255.0f;
+	}
+	return qtrue;
+}
+
+/*
+=============
+CG_UpdateDeadBodyPalette
+
+Synchronizes the cached corpse shading state with the latest cvars.
+=============
+*/
+static void CG_UpdateDeadBodyPalette( void ) {
+	cg.deadBodyDarken = (qboolean)( cg_deadBodyDarken.integer != 0 );
+	if ( !CG_ParseDeadBodyColor( cg_deadBodyColor.string, cg.deadBodyColor ) ) {
+		Vector4Copy( cg_defaultDeadBodyColor, cg.deadBodyColor );
+	}
+}
+
+/*
+=============
+CG_ParseHexNibble
+
+Converts a single hexadecimal digit to an integer value.
+=============
+*/
+static int CG_ParseHexNibble( const char ch ) {
+	if ( ch >= '0' && ch <= '9' ) {
+		return ch - '0';
+	}
+	if ( ch >= 'a' && ch <= 'f' ) {
+		return 10 + ch - 'a';
+	}
+	if ( ch >= 'A' && ch <= 'F' ) {
+		return 10 + ch - 'A';
+	}
+	return -1;
+}
+
+/*
+=============
+CG_ParseWeaponBarColor
+
+Parses a RRGGBBAA hex string into a normalized vec4_t.
+=============
+*/
+static qboolean CG_ParseWeaponBarColor( const char *hex, vec4_t color ) {
+	const char	*value;
+	int		i;
+	int		high;
+	int		low;
+
+	if ( !hex || !hex[0] ) {
+		return qfalse;
+	}
+
+	value = hex;
+	if ( !Q_stricmpn( value, "0x", 2 ) ) {
+		value += 2;
+	}
+
+	if ( Q_strlen( value ) != 8 ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < 4; i++ ) {
+		high = CG_ParseHexNibble( value[i * 2] );
+		low = CG_ParseHexNibble( value[i * 2 + 1] );
+
+		if ( high < 0 || low < 0 ) {
+			return qfalse;
+		}
+
+		color[i] = ( (float)( ( high << 4 ) | low ) ) / 255.0f;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_UpdateWeaponBarGrenadeColor
+
+Caches cg_weaponColor_grenade in cg.weaponBarGrenadeColor.
+=============
+*/
+static void CG_UpdateWeaponBarGrenadeColor( void ) {
+	vec4_t	parsedColor;
+
+	if ( !CG_ParseWeaponBarColor( cg_weaponColor_grenade.string, parsedColor ) ) {
+		CG_ParseWeaponBarColor( DEFAULT_WEAPON_BAR_GRENADE_COLOR, parsedColor );
+	}
+
+	Vector4Copy( parsedColor, cg.weaponBarGrenadeColor );
+	weaponColorGrenadeModCount = cg_weaponColor_grenade.modificationCount;
+}
+
+/*
+=============
+CG_UpdateLowAmmoWarningPercentile
+
+Caches cg_lowAmmoWarningPercentile for quick access.
+=============
+*/
+static void CG_UpdateLowAmmoWarningPercentile( void ) {
+	float	clamped;
+
+	clamped = Com_Clamp( 0.0f, 1.0f, cg_lowAmmoWarningPercentile.value );
+	cg.lowAmmoWarningPercentile = clamped;
+	lowAmmoWarningPercentileModCount = cg_lowAmmoWarningPercentile.modificationCount;
+}
+
+/*
+=============
+CG_UpdateScreenDamageColorFromCvar
+
+Parses a screen damage color customization string and caches the result.
+=============
+*/
+static void CG_UpdateScreenDamageColorFromCvar( vmCvar_t *colorCvar, const char *defaultValue, vec4_t target, int *modificationCount ) {
+	vec4_t	parsedColor;
+
+	if ( !CG_ParseWeaponBarColor( colorCvar->string, parsedColor ) ) {
+		CG_ParseWeaponBarColor( defaultValue, parsedColor );
+	}
+
+	Vector4Copy( parsedColor, target );
+	*modificationCount = colorCvar->modificationCount;
+}
+
+/*
+=============
+CG_UpdateScreenDamageAlphaFromCvar
+
+Caches the scalar alpha intensity used by screen damage effects.
+=============
+*/
+static void CG_UpdateScreenDamageAlphaFromCvar( vmCvar_t *alphaCvar, float *target, int *modificationCount ) {
+	float	clamped;
+
+	clamped = Com_Clamp( 0.0f, 200.0f, alphaCvar->value );
+	*target = clamped;
+	*modificationCount = alphaCvar->modificationCount;
+}
+
 /*
 =================
 CG_RegisterCvars
@@ -706,12 +1047,23 @@ void CG_RegisterCvars( void ) {
         forceEnemySkinModificationCount = cg_forceEnemySkin.modificationCount;
         forceTeamWeaponColorModificationCount = cg_forceTeamWeaponColor.modificationCount;
         forceEnemyWeaponColorModificationCount = cg_forceEnemyWeaponColor.modificationCount;
-        teamHeadColorModificationCount = cg_teamHeadColor.modificationCount;
-        teamUpperColorModificationCount = cg_teamUpperColor.modificationCount;
-        teamLowerColorModificationCount = cg_teamLowerColor.modificationCount;
-        enemyHeadColorModificationCount = cg_enemyHeadColor.modificationCount;
-        enemyUpperColorModificationCount = cg_enemyUpperColor.modificationCount;
-        enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;
+	teamHeadColorModificationCount = cg_teamHeadColor.modificationCount;
+	teamUpperColorModificationCount = cg_teamUpperColor.modificationCount;
+	teamLowerColorModificationCount = cg_teamLowerColor.modificationCount;
+	enemyHeadColorModificationCount = cg_enemyHeadColor.modificationCount;
+	enemyUpperColorModificationCount = cg_enemyUpperColor.modificationCount;
+	enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;
+	deadBodyDarkenModificationCount = cg_deadBodyDarken.modificationCount;
+	deadBodyColorModificationCount = cg_deadBodyColor.modificationCount;
+
+	CG_UpdateDeadBodyPalette();
+	armorTieredModificationCount = cg_armorTiered.modificationCount;
+	vignetteModificationCount = cg_vignette.modificationCount;
+	voiceChatIndicatorModificationCount = cg_voiceChatIndicator.modificationCount;
+
+	cg.armorTieredEnabled = (qboolean)( cg_armorTiered.integer != 0 );
+	cg.vignetteEnabled = (qboolean)( cg_vignette.integer != 0 );
+	cg.voiceChatIndicatorEnabled = (qboolean)( cg_voiceChatIndicator.integer != 0 );
 
 	cg.kickScale = cg_kickScale.value;
 	if ( cg.kickScale < 0.0f ) {
@@ -724,6 +1076,17 @@ void CG_RegisterCvars( void ) {
 	}
 
 	CG_UpdateDamagePlumSettings();
+CG_UpdateSimpleItemsSettings();
+CG_UpdateWeaponBarGrenadeColor();
+CG_UpdateLowAmmoWarningPercentile();
+CG_UpdateCrosshairColorSettings();
+CG_UpdateCrosshairPulseSettings();
+CG_UpdateCrosshairHitSettings();
+	CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage, DEFAULT_SCREEN_DAMAGE_COLOR, cg.screenDamageColor, &screenDamageColorModificationCount );
+	CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage_Self, DEFAULT_SCREEN_DAMAGE_SELF_COLOR, cg.screenDamageSelfColor, &screenDamageSelfColorModificationCount );
+	CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage_Team, DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, cg.screenDamageTeamColor, &screenDamageTeamColorModificationCount );
+	CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha, &cg.screenDamageAlpha, &screenDamageAlphaModificationCount );
+	CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha_Team, &cg.screenDamageAlphaTeam, &screenDamageAlphaTeamModificationCount );
 
 	trap_Cvar_Register(NULL, "model", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "headmodel", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
@@ -751,6 +1114,239 @@ static void CG_ForceModelChange( void ) {
 }
 
 /*
+=============
+CG_UpdateSimpleItemsSettings
+
+Synchronize cached simple item settings with their cvars.
+=============
+*/
+static void CG_UpdateSimpleItemsSettings( void ) {
+if ( simpleItemsHeightOffsetModificationCount != cg_simpleItemsHeightOffset.modificationCount ) {
+simpleItemsHeightOffsetModificationCount = cg_simpleItemsHeightOffset.modificationCount;
+cg.simpleItemsHeightOffset = cg_simpleItemsHeightOffset.value;
+}
+
+	if ( simpleItemsBobModificationCount != cg_simpleItemsBob.modificationCount ) {
+		simpleItemsBobModificationCount = cg_simpleItemsBob.modificationCount;
+		cg.simpleItemsBob = cg_simpleItemsBob.value;
+		if ( cg.simpleItemsBob < 0.0f ) {
+			cg.simpleItemsBob = 0.0f;
+		}
+	}
+
+	if ( simpleItemsRadiusModificationCount != cg_simpleItemsRadius.modificationCount ) {
+		simpleItemsRadiusModificationCount = cg_simpleItemsRadius.modificationCount;
+		cg.simpleItemsRadius = cg_simpleItemsRadius.value;
+		if ( cg.simpleItemsRadius < 0.0f ) {
+			cg.simpleItemsRadius = 0.0f;
+}
+}
+}
+
+#define QL_CROSSHAIR_COLOR_COUNT	27
+
+static const vec3_t cg_crosshairPalette[QL_CROSSHAIR_COLOR_COUNT] = {
+	{ 1.00f, 1.00f, 1.00f },
+	{ 1.00f, 1.00f, 1.00f },
+	{ 0.90f, 0.90f, 0.90f },
+	{ 0.75f, 0.75f, 0.75f },
+	{ 0.50f, 0.50f, 0.50f },
+	{ 0.25f, 0.25f, 0.25f },
+	{ 0.00f, 0.00f, 0.00f },
+	{ 1.00f, 0.35f, 0.35f },
+	{ 1.00f, 0.00f, 0.00f },
+	{ 0.70f, 0.00f, 0.00f },
+	{ 1.00f, 0.55f, 0.00f },
+	{ 1.00f, 0.80f, 0.00f },
+	{ 1.00f, 1.00f, 0.00f },
+	{ 0.80f, 1.00f, 0.00f },
+	{ 0.55f, 1.00f, 0.00f },
+	{ 0.00f, 1.00f, 0.00f },
+	{ 0.00f, 1.00f, 0.55f },
+	{ 0.00f, 1.00f, 0.80f },
+	{ 0.00f, 1.00f, 1.00f },
+	{ 0.00f, 0.80f, 1.00f },
+	{ 0.00f, 0.55f, 1.00f },
+	{ 0.00f, 0.00f, 1.00f },
+	{ 0.35f, 0.00f, 1.00f },
+	{ 0.55f, 0.00f, 1.00f },
+	{ 0.80f, 0.00f, 1.00f },
+	{ 1.00f, 0.00f, 1.00f },
+	{ 1.00f, 0.00f, 0.55f }
+};
+
+/*
+=============
+CG_CrosshairHexCharToInt
+
+Converts a hexadecimal character for crosshair color parsing.
+=============
+*/
+static int CG_CrosshairHexCharToInt( char ch ) {
+	if ( ch >= '0' && ch <= '9' ) {
+		return ch - '0';
+	}
+	if ( ch >= 'a' && ch <= 'f' ) {
+		return 10 + ( ch - 'a' );
+	}
+	if ( ch >= 'A' && ch <= 'F' ) {
+		return 10 + ( ch - 'A' );
+	}
+	return -1;
+}
+
+/*
+=============
+CG_ParseCrosshairColorString
+
+Attempts to parse a custom crosshair color string into a vec4_t.
+=============
+*/
+static qboolean CG_ParseCrosshairColorString( const char *value, vec4_t color ) {
+	char		buffer[64];
+	const char	*hex;
+	unsigned int raw;
+	int		len;
+	int		digit;
+	int		i;
+
+	if ( !value || !*value ) {
+		return qfalse;
+	}
+	Q_strncpyz( buffer, value, sizeof( buffer ) );
+	hex = buffer;
+	while ( *hex == ' ' || *hex == '\t' || *hex == '"' ) {
+		hex++;
+	}
+	if ( !Q_stricmp( hex, "NULL" ) ) {
+		return qfalse;
+	}
+	if ( hex[0] == '0' && ( hex[1] == 'x' || hex[1] == 'X' ) ) {
+		hex += 2;
+	} else if ( hex[0] == '#' ) {
+		hex++;
+	}
+	len = strlen( hex );
+	if ( len != 6 && len != 8 ) {
+		return qfalse;
+	}
+	raw = 0u;
+	for ( i = 0 ; i < len ; i++ ) {
+		digit = CG_CrosshairHexCharToInt( hex[i] );
+		if ( digit < 0 ) {
+			return qfalse;
+		}
+		raw = ( raw << 4 ) | (unsigned int)digit;
+	}
+	if ( len == 6 ) {
+		color[0] = ( ( raw >> 16 ) & 0xFF ) / 255.0f;
+		color[1] = ( ( raw >> 8 ) & 0xFF ) / 255.0f;
+		color[2] = ( raw & 0xFF ) / 255.0f;
+		color[3] = 1.0f;
+	} else {
+		color[0] = ( ( raw >> 24 ) & 0xFF ) / 255.0f;
+		color[1] = ( ( raw >> 16 ) & 0xFF ) / 255.0f;
+		color[2] = ( ( raw >> 8 ) & 0xFF ) / 255.0f;
+		color[3] = ( raw & 0xFF ) / 255.0f;
+	}
+	return qtrue;
+}
+
+/*
+=============
+CG_SetCrosshairColorFromIndex
+
+Populates a color vector using a palette-backed crosshair index.
+=============
+*/
+static void CG_SetCrosshairColorFromIndex( int index, vec4_t color ) {
+	if ( index < 1 || index >= QL_CROSSHAIR_COLOR_COUNT ) {
+		index = 1;
+	}
+	VectorCopy( cg_crosshairPalette[index], color );
+	color[3] = 1.0f;
+}
+
+/*
+=============
+CG_UpdateCrosshairColorSettings
+
+Synchronizes cached crosshair color information with user settings.
+=============
+*/
+static void CG_UpdateCrosshairColorSettings( void ) {
+	vec4_t	baseColor;
+	float	brightness;
+	int	i;
+
+	if ( crosshairColorModificationCount == cg_crosshairColor.modificationCount &&
+		crosshairBrightnessModificationCount == cg_crosshairBrightness.modificationCount ) {
+		return;
+	}
+	if ( !CG_ParseCrosshairColorString( cg_crosshairColor.string, baseColor ) ) {
+		CG_SetCrosshairColorFromIndex( cg_crosshairColor.integer, baseColor );
+	}
+	brightness = Com_Clamp( 0.0f, 2.0f, cg_crosshairBrightness.value );
+	for ( i = 0 ; i < 3 ; i++ ) {
+		cg.crosshairColor[i] = Com_Clamp( 0.0f, 1.0f, baseColor[i] * brightness );
+	}
+	cg.crosshairColor[3] = Com_Clamp( 0.0f, 1.0f, brightness );
+	crosshairColorModificationCount = cg_crosshairColor.modificationCount;
+	crosshairBrightnessModificationCount = cg_crosshairBrightness.modificationCount;
+}
+
+/*
+=============
+CG_UpdateCrosshairPulseSettings
+
+Caches the boolean used to control the pickup crosshair pulse.
+=============
+*/
+static void CG_UpdateCrosshairPulseSettings( void ) {
+	if ( crosshairPulseModificationCount == cg_crosshairPulse.modificationCount ) {
+		return;
+	}
+	cg.crosshairPulseEnabled = (qboolean)( cg_crosshairPulse.integer != 0 );
+	crosshairPulseModificationCount = cg_crosshairPulse.modificationCount;
+}
+
+/*
+=============
+CG_UpdateCrosshairHitSettings
+
+Synchronizes hit indicator timing, style, and color caches.
+=============
+*/
+static void CG_UpdateCrosshairHitSettings( void ) {
+	vec4_t	baseColor;
+	int		clampedTime;
+
+	if ( crosshairHitStyleModificationCount != cg_crosshairHitStyle.modificationCount ) {
+		cg.crosshairHitStyle = cg_crosshairHitStyle.integer;
+		crosshairHitStyleModificationCount = cg_crosshairHitStyle.modificationCount;
+	}
+	if ( crosshairHitTimeModificationCount != cg_crosshairHitTime.modificationCount ) {
+		clampedTime = cg_crosshairHitTime.integer;
+		if ( clampedTime < 0 ) {
+			clampedTime = 0;
+		}
+		if ( clampedTime > 2000 ) {
+			clampedTime = 2000;
+		}
+		cg.crosshairHitTime = clampedTime;
+		crosshairHitTimeModificationCount = cg_crosshairHitTime.modificationCount;
+	}
+	if ( crosshairHitColorModificationCount != cg_crosshairHitColor.modificationCount ) {
+		if ( !CG_ParseCrosshairColorString( cg_crosshairHitColor.string, baseColor ) ) {
+			CG_SetCrosshairColorFromIndex( cg_crosshairHitColor.integer, baseColor );
+		}
+		VectorCopy( baseColor, cg.crosshairHitColor );
+		crosshairHitColorModificationCount = cg_crosshairHitColor.modificationCount;
+	}
+}
+
+
+/*
 =================
 CG_UpdateCvars
 =================
@@ -759,6 +1355,7 @@ void CG_UpdateCvars( void ) {
 	int			i;
 	cvarTable_t	*cv;
 	qboolean	refreshClients;
+	qboolean	refreshDeadBodyPalette;
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Update( cv->vmCvar );
@@ -781,6 +1378,7 @@ void CG_UpdateCvars( void ) {
 	}
 
 	refreshClients = qfalse;
+	refreshDeadBodyPalette = qfalse;
 
 	if ( forceModelModificationCount != cg_forceModel.modificationCount ) {
 		forceModelModificationCount = cg_forceModel.modificationCount;
@@ -834,10 +1432,34 @@ void CG_UpdateCvars( void ) {
 		enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;
 		refreshClients = qtrue;
 	}
+	if ( deadBodyDarkenModificationCount != cg_deadBodyDarken.modificationCount ) {
+		deadBodyDarkenModificationCount = cg_deadBodyDarken.modificationCount;
+		refreshDeadBodyPalette = qtrue;
+	}
+	if ( deadBodyColorModificationCount != cg_deadBodyColor.modificationCount ) {
+		deadBodyColorModificationCount = cg_deadBodyColor.modificationCount;
+		refreshDeadBodyPalette = qtrue;
+  }
+	if ( armorTieredModificationCount != cg_armorTiered.modificationCount ) {
+		armorTieredModificationCount = cg_armorTiered.modificationCount;
+		cg.armorTieredEnabled = (qboolean)( cg_armorTiered.integer != 0 );
+	}
+	if ( vignetteModificationCount != cg_vignette.modificationCount ) {
+		vignetteModificationCount = cg_vignette.modificationCount;
+		cg.vignetteEnabled = (qboolean)( cg_vignette.integer != 0 );
+	}
+	if ( voiceChatIndicatorModificationCount != cg_voiceChatIndicator.modificationCount ) {
+		voiceChatIndicatorModificationCount = cg_voiceChatIndicator.modificationCount;
+		cg.voiceChatIndicatorEnabled = (qboolean)( cg_voiceChatIndicator.integer != 0 );
+	}
 
 	if ( refreshClients ) {
 		CG_ForceModelChange();
 	}
+	if ( refreshDeadBodyPalette ) {
+		CG_UpdateDeadBodyPalette();
+	}
+
 
 	cg.kickScale = cg_kickScale.value;
 	if ( cg.kickScale < 0.0f ) {
@@ -848,9 +1470,35 @@ void CG_UpdateCvars( void ) {
 	if ( cg.bobScale < 0.0f ) {
 		cg.bobScale = 0.0f;
 	}
+	if ( weaponColorGrenadeModCount != cg_weaponColor_grenade.modificationCount ) {
+		CG_UpdateWeaponBarGrenadeColor();
+	}
+	if ( lowAmmoWarningPercentileModCount != cg_lowAmmoWarningPercentile.modificationCount ) {
+		CG_UpdateLowAmmoWarningPercentile();
+	}
+	if ( screenDamageColorModificationCount != cg_screenDamage.modificationCount ) {
+		CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage, DEFAULT_SCREEN_DAMAGE_COLOR, cg.screenDamageColor, &screenDamageColorModificationCount );
+	}
+	if ( screenDamageSelfColorModificationCount != cg_screenDamage_Self.modificationCount ) {
+		CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage_Self, DEFAULT_SCREEN_DAMAGE_SELF_COLOR, cg.screenDamageSelfColor, &screenDamageSelfColorModificationCount );
+	}
+	if ( screenDamageTeamColorModificationCount != cg_screenDamage_Team.modificationCount ) {
+		CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage_Team, DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, cg.screenDamageTeamColor, &screenDamageTeamColorModificationCount );
+	}
+	if ( screenDamageAlphaModificationCount != cg_screenDamageAlpha.modificationCount ) {
+		CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha, &cg.screenDamageAlpha, &screenDamageAlphaModificationCount );
+	}
+	if ( screenDamageAlphaTeamModificationCount != cg_screenDamageAlpha_Team.modificationCount ) {
+		CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha_Team, &cg.screenDamageAlphaTeam, &screenDamageAlphaTeamModificationCount );
+	}
 	cg.zoomToggle = (qboolean)( cg_zoomToggle.integer != 0 );
 	cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
 	CG_UpdateDamagePlumSettings();
+
+CG_UpdateSimpleItemsSettings();
+CG_UpdateCrosshairColorSettings();
+CG_UpdateCrosshairPulseSettings();
+CG_UpdateCrosshairHitSettings();
 }
 
 int CG_CrosshairPlayer( void ) {
@@ -2328,7 +2976,21 @@ void CG_LoadHudMenu() {
 	CG_LoadMenus(hudSet);
 }
 
+
+/*
+=============
+CG_AssetCache
+
+Registers the shared UI assets used by the client game module.
+=============
+*/
 void CG_AssetCache() {
+	if ( !cgDC.Assets.fontRegistered ) {
+		trap_R_RegisterFont( QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE, &cgDC.Assets.textFont );
+		trap_R_RegisterFont( QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE, &cgDC.Assets.smallFont );
+		trap_R_RegisterFont( QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE, &cgDC.Assets.bigFont );
+		cgDC.Assets.fontRegistered = qtrue;
+	}
 	//if (Assets.textFont == NULL) {
 	//  trap_R_RegisterFont("fonts/arial.ttf", 72, &Assets.textFont);
 	//}

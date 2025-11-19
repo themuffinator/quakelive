@@ -1180,6 +1180,49 @@ static void CG_ApplyClientColorOverrides( clientInfo_t *ci, cgClientOverrideCont
 		VectorCopy( ci->upperColor, ci->weaponPrimaryColor );
 		VectorCopy( ci->upperColor, ci->weaponSecondaryColor );
 		ci->weaponColorForced = qtrue;
+}
+}
+
+/*
+=============
+CG_ShouldTintDeadBody
+
+Determines whether corpse tinting should be applied to the specified entity.
+=============
+*/
+static qboolean CG_ShouldTintDeadBody( const centity_t *cent, const clientInfo_t *ci ) {
+	if ( !cent || !ci ) {
+		return qfalse;
+	}
+	if ( !( cent->currentState.eFlags & EF_DEAD ) ) {
+		return qfalse;
+	}
+	if ( !cg.deadBodyDarken ) {
+		return qfalse;
+	}
+	if ( !ci->headColorForced && !ci->upperColorForced && !ci->lowerColorForced ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+/*
+=============
+CG_ApplyDeadBodyTint
+
+Copies the cached corpse color into a render entity.
+=============
+*/
+static void CG_ApplyDeadBodyTint( refEntity_t *re ) {
+	int component;
+	float clamped;
+
+	if ( !re ) {
+		return;
+	}
+	for ( component = 0 ; component < 4 ; component++ ) {
+		clamped = Com_Clamp( 0.0f, 1.0f, cg.deadBodyColor[component] );
+		re->shaderRGBA[component] = (byte)( clamped * 255.0f );
 	}
 }
 
@@ -2623,6 +2666,7 @@ void CG_Player( centity_t *cent ) {
 	float			c;
 	float			angle;
 	vec3_t			dir, angles;
+	qboolean		tintCorpse;
 
 	// the client number is stored in clientNum.  It can't be derived
 	// from the entity number, because a single client may have
@@ -2632,6 +2676,7 @@ void CG_Player( centity_t *cent ) {
 		CG_Error( "Bad clientNum on player entity");
 	}
 	ci = &cgs.clientinfo[ clientNum ];
+	tintCorpse = CG_ShouldTintDeadBody( cent, ci );
 
 	// it is possible to see corpses from disconnected players that may
 	// not have valid clientinfo
@@ -2691,6 +2736,9 @@ void CG_Player( centity_t *cent ) {
 	legs.shadowPlane = shadowPlane;
 	legs.renderfx = renderfx;
 	VectorCopy (legs.origin, legs.oldorigin);	// don't positionally lerp at all
+	if ( tintCorpse ) {
+		CG_ApplyDeadBodyTint( &legs );
+	}
 
 	CG_AddRefEntityWithPowerups( &legs, &cent->currentState, ci->team );
 
@@ -2715,6 +2763,9 @@ void CG_Player( centity_t *cent ) {
 
 	torso.shadowPlane = shadowPlane;
 	torso.renderfx = renderfx;
+	if ( tintCorpse ) {
+		CG_ApplyDeadBodyTint( &torso );
+	}
 
 	CG_AddRefEntityWithPowerups( &torso, &cent->currentState, ci->team );
 
@@ -2938,6 +2989,9 @@ void CG_Player( centity_t *cent ) {
 
 	head.shadowPlane = shadowPlane;
 	head.renderfx = renderfx;
+	if ( tintCorpse ) {
+		CG_ApplyDeadBodyTint( &head );
+	}
 
 	CG_AddRefEntityWithPowerups( &head, &cent->currentState, ci->team );
 

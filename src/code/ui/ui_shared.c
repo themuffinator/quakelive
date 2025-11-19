@@ -40,6 +40,35 @@ typedef struct scrollInfo_s {
 	qboolean scrollDir;
 } scrollInfo_t;
 
+typedef struct {
+	const char *token;
+	const char *fontName;
+	int pointSize;
+} uiLegacyFontAlias_t;
+
+static const uiLegacyFontAlias_t uiLegacyFontMap[] = {
+	{ "FONT_DEFAULT", QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE },
+	{ "FONT_SANS", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE },
+	{ "FONT_MONO", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE },
+	{ "FONT_SMALL", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE },
+	{ "FONT_BIG", QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE },
+	{ "0", QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE },
+	{ "1", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE },
+	{ "2", QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE },
+	{ "font0", QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE },
+	{ "font1", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE },
+	{ "font2", QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE },
+	{ "fonts/font0", QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE },
+	{ "fonts/font1", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE },
+	{ "fonts/font2", QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE },
+	{ "menu/art/font1", QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE },
+	{ "menu/art/font2", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE },
+	{ "menu/art/font3", QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE },
+	{ "fonts/arial.ttf", QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE },
+	{ "fonts/verdana.ttf", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE },
+	{ "fonts/tahoma.ttf", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE }
+};
+
 static scrollInfo_t scrollInfo;
 
 static void (*captureFunc) (void *p) = NULL;
@@ -503,6 +532,37 @@ qboolean PC_String_Parse(int handle, const char **out) {
 	
 	*(out) = String_Alloc(token.string);
     return qtrue;
+}
+
+/*
+=============
+UI_NormalizeFontPath
+
+Maps legacy Quake III font tokens onto the baked Quake Live atlas names.
+=============
+*/
+void UI_NormalizeFontPath( const char **fontName, int *pointSize, const char *defaultFont, int defaultPointSize ) {
+	int i;
+
+	if ( fontName == NULL || *fontName == NULL || pointSize == NULL ) {
+		return;
+	}
+
+	for ( i = 0; i < (int)( sizeof( uiLegacyFontMap ) / sizeof( uiLegacyFontMap[0] ) ); i++ ) {
+		if ( !Q_stricmp( *fontName, uiLegacyFontMap[i].token ) ) {
+			*fontName = uiLegacyFontMap[i].fontName;
+			*pointSize = uiLegacyFontMap[i].pointSize;
+			return;
+		}
+	}
+
+	if ( (*fontName)[0] == '\0' && defaultFont != NULL ) {
+		*fontName = defaultFont;
+	}
+
+	if ( *pointSize <= 0 ) {
+		*pointSize = defaultPointSize;
+	}
 }
 
 /*
@@ -5234,13 +5294,29 @@ Menu Keyword Parse functions
 ===============
 */
 
+/*
+=============
+MenuParse_font
+
+Resolves menu-level font declarations to the baked Quake Live atlases.
+=============
+*/
 qboolean MenuParse_font( itemDef_t *item, int handle ) {
 	menuDef_t *menu = (menuDef_t*)item;
+	const char *fontPath;
+	int pointSize = QL_FONT_TEXT_POINT_SIZE;
+
 	if (!PC_String_Parse(handle, &menu->font)) {
 		return qfalse;
 	}
+
+	fontPath = menu->font;
+	UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE );
+
 	if (!DC->Assets.fontRegistered) {
-		DC->registerFont(menu->font, 48, &DC->Assets.textFont);
+		DC->registerFont( fontPath, pointSize, &DC->Assets.textFont );
+		DC->registerFont( QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE, &DC->Assets.smallFont );
+		DC->registerFont( QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE, &DC->Assets.bigFont );
 		DC->Assets.fontRegistered = qtrue;
 	}
 	return qtrue;

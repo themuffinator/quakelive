@@ -471,8 +471,23 @@ static void UI_RegisterQLMenuAssets( void ) {
 		trap_R_RegisterShaderNoMip( uiQLTextureNames[i] );
 	}
 }
+
+/*
+=============
+AssetCache
+
+Registers fonts, shaders, and shared UI textures for the frontend.
+=============
+*/
 void AssetCache() {
 	int n;
+
+	if ( !uiInfo.uiDC.Assets.fontRegistered ) {
+		trap_R_RegisterFont( QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE, &uiInfo.uiDC.Assets.textFont );
+		trap_R_RegisterFont( QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE, &uiInfo.uiDC.Assets.smallFont );
+		trap_R_RegisterFont( QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE, &uiInfo.uiDC.Assets.bigFont );
+		uiInfo.uiDC.Assets.fontRegistered = qtrue;
+	}
 	//if (Assets.textFont == NULL) {
 	//}
 	//Assets.background = trap_R_RegisterShaderNoMip( ASSET_BACKGROUND );
@@ -978,32 +993,40 @@ qboolean Asset_Parse(int handle) {
 		// font
 		if (Q_stricmp(token.string, "font") == 0) {
 			int pointSize;
+			const char *fontPath;
 			if (!PC_String_Parse(handle, &tempStr) || !PC_Int_Parse(handle,&pointSize)) {
 				return qfalse;
 			}
-			trap_R_RegisterFont(tempStr, pointSize, &uiInfo.uiDC.Assets.textFont);
+			fontPath = tempStr;
+			UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE );
+			trap_R_RegisterFont(fontPath, pointSize, &uiInfo.uiDC.Assets.textFont);
 			uiInfo.uiDC.Assets.fontRegistered = qtrue;
 			continue;
 		}
 
 		if (Q_stricmp(token.string, "smallFont") == 0) {
 			int pointSize;
+			const char *fontPath;
 			if (!PC_String_Parse(handle, &tempStr) || !PC_Int_Parse(handle,&pointSize)) {
 				return qfalse;
 			}
-			trap_R_RegisterFont(tempStr, pointSize, &uiInfo.uiDC.Assets.smallFont);
+			fontPath = tempStr;
+			UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE );
+			trap_R_RegisterFont(fontPath, pointSize, &uiInfo.uiDC.Assets.smallFont);
 			continue;
 		}
 
 		if (Q_stricmp(token.string, "bigFont") == 0) {
 			int pointSize;
+			const char *fontPath;
 			if (!PC_String_Parse(handle, &tempStr) || !PC_Int_Parse(handle,&pointSize)) {
 				return qfalse;
 			}
-			trap_R_RegisterFont(tempStr, pointSize, &uiInfo.uiDC.Assets.bigFont);
+			fontPath = tempStr;
+			UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE );
+			trap_R_RegisterFont(fontPath, pointSize, &uiInfo.uiDC.Assets.bigFont);
 			continue;
 		}
-
 
 		// gradientbar
 		if (Q_stricmp(token.string, "gradientbar") == 0) {
