@@ -1079,6 +1079,7 @@ void TossClientCubes( gentity_t *self );
 //
 // g_missile.c
 //
+qboolean G_IsMidAirEligibleTarget( gentity_t *target );
 void G_RunMissile( gentity_t *ent );
 
 gentity_t *fire_blaster (gentity_t *self, vec3_t start, vec3_t aimdir);

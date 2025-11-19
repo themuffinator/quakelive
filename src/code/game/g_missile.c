@@ -26,6 +26,42 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	GUIDED_ROCKET_TURN_FRACTION	0.2f
 
 /*
+=============
+G_IsMidAirEligibleTarget
+
+Determines whether the target is at least g_weaponConfig.midAirMinimumHeight units above the nearest ground trace.
+Returns qfalse for missing clients or invalid traces.
+=============
+*/
+qboolean G_IsMidAirEligibleTarget( gentity_t *target ) {
+	trace_t tr;
+	vec3_t start;
+	vec3_t end;
+	float heightAboveGround;
+
+	if ( !target || !target->client ) {
+		return qfalse;
+	}
+
+	VectorCopy( target->r.currentOrigin, start );
+	VectorCopy( start, end );
+	end[2] -= 8192.0f;
+
+	trap_Trace( &tr, start, target->r.mins, target->r.maxs, end, target->s.number, MASK_SOLID );
+
+	if ( tr.startsolid || tr.allsolid || tr.fraction == 1.0f ) {
+		return qfalse;
+	}
+
+	heightAboveGround = start[2] - tr.endpos[2];
+	if ( heightAboveGround < 0.0f ) {
+		heightAboveGround = 0.0f;
+	}
+
+	return heightAboveGround >= ( float )g_weaponConfig.midAirMinimumHeight;
+}
+
+/*
 ================
 G_BounceMissile
 
