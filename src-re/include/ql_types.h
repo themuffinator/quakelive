@@ -138,20 +138,21 @@ typedef struct {
 
 /* Hook table used when bridging CL_Frame into prototype harnesses. */
 typedef struct {
-    void (*stopAllSounds)(void);
-    void (*setActiveMenu)(int menuId);
-    void (*writeDemoMessage)(void *msg, int header);
-    void (*checkTimeout)(qlr_client_connection_shadow_t *clc,
-                         qlr_client_static_shadow_t *cls,
-                         qlr_client_active_shadow_t *cl);
-    void (*checkUserinfo)(void);
-    void (*readPackets)(void);
-    void (*sendCmd)(void);
-    void (*predictMovement)(void);
-    void (*runConsole)(void);
-    void (*updateScreen)(void);
-    void (*setCGameTime)(void);
-    void (*firstSnapshot)(void);
+void (*stopAllSounds)(void);
+void (*setActiveMenu)(int menuId);
+void (*writeDemoMessage)(void *msg, int header);
+void (*checkTimeout)(qlr_client_connection_shadow_t *clc,
+                     qlr_client_static_shadow_t *cls,
+                     qlr_client_active_shadow_t *cl);
+void (*checkUserinfo)(void);
+void (*readPackets)(void);
+void (*sendCmd)(void);
+void (*checkForResend)(void);
+void (*predictMovement)(void);
+void (*runConsole)(void);
+void (*updateScreen)(void);
+void (*setCGameTime)(void);
+void (*firstSnapshot)(void);
     void (*beginProfiling)(void);
 } qlr_client_frame_hooks_t;
 
