@@ -223,7 +223,10 @@ vmCvar_t	cg_gun_z;
 vmCvar_t	cg_tracerChance;
 vmCvar_t	cg_tracerWidth;
 vmCvar_t	cg_tracerLength;
+vmCvar_t	cg_autoHop;
+vmCvar_t	cg_autoProjectileNudge;
 vmCvar_t	cg_autoswitch;
+vmCvar_t	cg_projectileNudge;
 vmCvar_t	cg_switchOnEmpty;
 vmCvar_t	cg_switchToEmpty;
 vmCvar_t	cg_ignore;
@@ -387,6 +390,9 @@ static void CG_UpdateDamagePlumSettings( void );
 
 static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_ignore, "cg_ignore", "0", 0 },	// used for debugging
+	{ &cg_autoHop, "cg_autoHop", "1", CVAR_ARCHIVE },
+	{ &cg_autoProjectileNudge, "cg_autoProjectileNudge", "0", CVAR_ARCHIVE },
+	{ &cg_projectileNudge, "cg_projectileNudge", "0", CVAR_ARCHIVE },
 	{ &cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE },
 	{ &cg_switchOnEmpty, "cg_switchOnEmpty", "1", CVAR_ARCHIVE },
 	{ &cg_switchToEmpty, "cg_switchToEmpty", "1", CVAR_ARCHIVE },

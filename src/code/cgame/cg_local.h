@@ -708,6 +708,10 @@ typedef struct {
 
 	vec3_t		kick_angles;	// weapon kicks
 	vec3_t		kick_origin;
+	qboolean	projectileNudgeActive;
+	int		projectileNudgeCommandTime;
+	int		projectileNudgeMsec;
+	vec3_t		projectileNudgeOrigin;
 
 	// temp working variables for player view
 	float		bobfracsin;
@@ -1323,6 +1327,9 @@ extern	vmCvar_t		cg_viewsize;
 extern	vmCvar_t		cg_tracerChance;
 extern	vmCvar_t		cg_tracerWidth;
 extern	vmCvar_t		cg_tracerLength;
+extern	vmCvar_t		cg_autoHop;
+extern	vmCvar_t		cg_autoProjectileNudge;
+extern	vmCvar_t		cg_projectileNudge;
 extern	vmCvar_t		cg_autoswitch;
 extern	vmCvar_t		cg_switchOnEmpty;
 extern	vmCvar_t		cg_switchToEmpty;

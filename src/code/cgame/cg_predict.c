@@ -35,6 +35,74 @@ static	int			cg_numTriggerEntities;
 static	centity_t	*cg_triggerEntities[MAX_ENTITIES_IN_SNAPSHOT];
 
 /*
+=============
+CG_LocalProjectileNudge
+
+Applies the configured projectile nudge offsets to the supplied origin and
+command timestamp, caching the adjusted values for later consumers.
+=============
+*/
+static void CG_LocalProjectileNudge( vec3_t origin, int *msec ) {
+	float		manual;
+	float		autoComponent;
+	float		totalMsec;
+	float		nudgeSeconds;
+	int		appliedMsec;
+	int		adjustedTime;
+	vec3_t		delta;
+
+	if ( !origin ) {
+		return;
+	}
+
+	manual = cg_projectileNudge.value;
+	if ( manual < 0.0f ) {
+		manual = 0.0f;
+	}
+
+	autoComponent = 0.0f;
+	if ( cg_autoProjectileNudge.integer && cg.snap ) {
+		autoComponent = (float)cg.snap->ping * 0.5f;
+		if ( autoComponent < 0.0f ) {
+			autoComponent = 0.0f;
+		}
+	}
+
+	totalMsec = manual + autoComponent;
+	if ( totalMsec <= 0.0f ) {
+		cg.projectileNudgeActive = qfalse;
+		cg.projectileNudgeMsec = 0;
+		cg.projectileNudgeCommandTime = 0;
+		VectorClear( cg.projectileNudgeOrigin );
+		return;
+	}
+
+	if ( totalMsec > 90.0f ) {
+		totalMsec = 90.0f;
+	}
+
+	appliedMsec = (int)totalMsec;
+	if ( appliedMsec <= 0 ) {
+		appliedMsec = 1;
+	}
+
+	nudgeSeconds = totalMsec * 0.001f;
+	VectorScale( cg.predictedPlayerState.velocity, nudgeSeconds, delta );
+	VectorAdd( origin, delta, origin );
+
+	adjustedTime = 0;
+	if ( msec ) {
+		*msec += appliedMsec;
+		adjustedTime = *msec;
+	}
+
+	cg.projectileNudgeActive = qtrue;
+	cg.projectileNudgeMsec = appliedMsec;
+	cg.projectileNudgeCommandTime = adjustedTime;
+	VectorCopy( origin, cg.projectileNudgeOrigin );
+}
+
+/*
 ====================
 CG_BuildSolidList
 
@@ -413,8 +481,13 @@ void CG_PredictPlayerState( void ) {
 	qboolean	moved;
 	usercmd_t	oldestCmd;
 	usercmd_t	latestCmd;
+	pmove_settings_t	localPmoveSettings;
 
 	cg.hyperspace = qfalse;	// will be set if touching a trigger_teleport
+	cg.projectileNudgeActive = qfalse;
+	cg.projectileNudgeMsec = 0;
+	cg.projectileNudgeCommandTime = 0;
+	VectorClear( cg.projectileNudgeOrigin );
 
 	// if this is the first frame we must guarantee
 	// predictedPlayerState is valid even if there is some
@@ -437,11 +510,15 @@ void CG_PredictPlayerState( void ) {
 		return;
 	}
 
-// prepare for pmove
-cg_pmove.ps = &cg.predictedPlayerState;
-cg_pmove.pmoveSettings = &cg_pmoveSettings;
-cg_pmove.trace = CG_Trace;
-cg_pmove.pointcontents = CG_PointContents;
+	// prepare for pmove
+	cg_pmove.ps = &cg.predictedPlayerState;
+	Com_Memcpy( &localPmoveSettings, &cg_pmoveSettings, sizeof( localPmoveSettings ) );
+	if ( cg_autoHop.integer ) {
+		localPmoveSettings.autoHop = qtrue;
+	}
+	cg_pmove.pmoveSettings = &localPmoveSettings;
+	cg_pmove.trace = CG_Trace;
+	cg_pmove.pointcontents = CG_PointContents;
 	if ( cg_pmove.ps->pm_type == PM_DEAD ) {
 		cg_pmove.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;
 	}
@@ -579,6 +656,15 @@ cg_pmove.pointcontents = CG_PointContents;
 		}
 
 		Pmove (&cg_pmove);
+
+		{
+			vec3_t		nudgedOrigin;
+			int			nudgedTime;
+
+			VectorCopy( cg.predictedPlayerState.origin, nudgedOrigin );
+			nudgedTime = cg_pmove.cmd.serverTime;
+			CG_LocalProjectileNudge( nudgedOrigin, &nudgedTime );
+		}
 
 		moved = qtrue;
 
