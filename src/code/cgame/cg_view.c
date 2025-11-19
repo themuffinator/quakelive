@@ -885,6 +885,8 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		return;
 	}
 
+	CG_RunQueuedAutoActions();
+
 	// let the client system know what our weapon and zoom settings are
 	trap_SetUserCmdValue( cg.weaponSelect, cg.zoomSensitivity );
 

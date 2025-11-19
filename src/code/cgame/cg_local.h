@@ -94,6 +94,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define DEFAULT_REDTEAM_NAME		"Stroggs"
 #define DEFAULT_BLUETEAM_NAME		"Pagans"
 
+// cg_autoAction bit masks
+#define CG_AUTOACTION_DEMO_RECORD	( 1 << 0 )
+#define CG_AUTOACTION_SCREENSHOT	( 1 << 1 )
+#define CG_AUTOACTION_STATS_UPLOAD	( 1 << 2 )
+
 typedef enum {
 	FOOTSTEP_NORMAL,
 	FOOTSTEP_BOOT,
@@ -625,6 +630,12 @@ typedef struct {
 	float		projectileNudgeOffset;
 	qboolean	predictLocalRailshots;
 	int			autoActionFlags;
+	qboolean	autoActionFired;
+	qboolean	autoActionScreenshotQueued;
+	qboolean	autoActionStatsQueued;
+	int			autoActionScreenshotTime;
+	int			autoActionStatsTime;
+	int			autoActionDemoIndex;
 	qboolean	deadBodyDarken;
 	vec4_t		deadBodyColor;
 
@@ -1880,6 +1891,8 @@ void CG_LoadVoiceChats( void );
 void CG_ShaderStateChanged(void);
 void CG_VoiceChatLocal( int mode, qboolean voiceOnly, int clientNum, int color, const char *cmd );
 void CG_PlayBufferedVoiceChats( void );
+void CG_HandleAutoActionsIntermission( const playerState_t *ps );
+void CG_RunQueuedAutoActions( void );
 
 qboolean CG_ShouldDrawSpriteSelf( void );
 qboolean CG_ShouldDrawTieredArmor( void );

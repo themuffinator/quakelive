@@ -33,6 +33,10 @@ displayContextDef_t cgDC;
 #define DEFAULT_SCREEN_DAMAGE_TEAM_COLOR	"0x700000C8"
 #define DEFAULT_SCREEN_DAMAGE_ALPHA		"200"
 
+#define CG_AUTOACTION_MAX_RECORDINGS		1000
+#define CG_AUTOACTION_SCREENSHOT_DELAY		1000
+#define CG_AUTOACTION_STATS_DELAY		1500
+
 int forceModelModificationCount = -1;
 int forceTeamModelModificationCount = -1;
 int forceTeamSkinModificationCount = -1;
@@ -1284,6 +1288,87 @@ static void CG_ClearAutomationState( void ) {
 	cg.projectileNudgeOffset = 0.0f;
 	cg.predictLocalRailshots = qfalse;
 	cg.autoActionFlags = 0;
+	cg.autoActionFired = qfalse;
+	cg.autoActionScreenshotQueued = qfalse;
+	cg.autoActionStatsQueued = qfalse;
+	cg.autoActionScreenshotTime = 0;
+	cg.autoActionStatsTime = 0;
+	cg.autoActionDemoIndex = 0;
+}
+
+/*
+=============
+CG_HandleAutoActionsIntermission
+
+Dispatches cg_autoAction console commands after entering intermission.
+=============
+*/
+void CG_HandleAutoActionsIntermission( const playerState_t *ps ) {
+	char		demoName[MAX_QPATH];
+	int		flags;
+
+	if ( cg.demoPlayback ) {
+		return;
+	}
+
+	if ( !ps || ps->persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	if ( cg.autoActionFired ) {
+		return;
+	}
+
+	flags = cg.autoActionFlags;
+	if ( flags == 0 ) {
+		return;
+	}
+
+	cg.autoActionFired = qtrue;
+	cg.autoActionScreenshotQueued = qfalse;
+	cg.autoActionStatsQueued = qfalse;
+
+	if ( flags & CG_AUTOACTION_DEMO_RECORD ) {
+		trap_SendConsoleCommand( "stoprecord; wait\n" );
+		Com_sprintf( demoName, sizeof( demoName ), "auto%03i", cg.autoActionDemoIndex );
+		cg.autoActionDemoIndex = ( cg.autoActionDemoIndex + 1 ) % CG_AUTOACTION_MAX_RECORDINGS;
+		trap_SendConsoleCommand( va( "record \"%s\"\n", demoName ) );
+	}
+
+	if ( flags & CG_AUTOACTION_SCREENSHOT ) {
+		cg.autoActionScreenshotQueued = qtrue;
+		cg.autoActionScreenshotTime = cg.time + CG_AUTOACTION_SCREENSHOT_DELAY;
+	}
+
+	if ( flags & CG_AUTOACTION_STATS_UPLOAD ) {
+		cg.autoActionStatsQueued = qtrue;
+		cg.autoActionStatsTime = cg.time + CG_AUTOACTION_STATS_DELAY;
+	}
+}
+
+/*
+=============
+CG_RunQueuedAutoActions
+
+Executes delayed screenshot and stat commands tied to cg_autoAction.
+=============
+*/
+void CG_RunQueuedAutoActions( void ) {
+	if ( cg.demoPlayback ) {
+		cg.autoActionScreenshotQueued = qfalse;
+		cg.autoActionStatsQueued = qfalse;
+		return;
+	}
+
+	if ( cg.autoActionScreenshotQueued && cg.time >= cg.autoActionScreenshotTime ) {
+		cg.autoActionScreenshotQueued = qfalse;
+		trap_SendConsoleCommand( "screenshotJPEG scoreboard\n" );
+	}
+
+	if ( cg.autoActionStatsQueued && cg.time >= cg.autoActionStatsTime ) {
+		cg.autoActionStatsQueued = qfalse;
+		trap_SendConsoleCommand( "pstats\n" );
+	}
 }
 
 #define QL_CROSSHAIR_COLOR_COUNT	27
