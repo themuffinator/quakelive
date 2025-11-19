@@ -1,5 +1,8 @@
 # Release Notes
 
+## Gameplay Parity Updates – October 2024
+- **BG_CanItemBeGrabbed parity tables** – The shared `bg_misc.c` implementation that backs both qagame and cgame prediction now reads from the same HLIL-derived case tables, so any change to the handler list must keep both modules in sync (`CG_TouchItem` still delegates to `BG_CanItemBeGrabbed`). The regenerated tables live alongside the Binary Ninja exports under `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/` (`sub_1002ced0` and its `data_100809e4` block) and `references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil_split/` (`sub_10001560` and its `data_10067294` block). When the HLIL artifacts change: 1) re-export the qagame and cgame DLLs and replace the `_hlil_part*.txt` files in those directories, 2) diff the updated case tables against `src/code/game/bg_misc.c`'s `bg_itemGrabHandlers` wiring and adjust the helper implementations, and 3) rebuild both qagame and cgame (verifying `src/code/cgame/cg_predict.c::CG_TouchItem` still calls into the shared helper) so server and client prediction stay identical.
+
 ## Process Updates – September 2024
 - Re-emphasised deterministic harness expectations, baseline refresh discipline, and syscall contract logging in the contributor checklist.
 - Cross-linked the checklist from the PR template and onboarding overview so new contributors see the requirements before their first submission.
