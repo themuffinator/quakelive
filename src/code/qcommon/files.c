@@ -594,6 +594,134 @@ qboolean FS_FileExists( const char *file )
 	return qfalse;
 }
 
+
+/*
+=============
+FS_PreflightPathExists
+
+Checks whether an asset exists under a specific search root and reports the
+path inspected so callers can surface actionable packaging guidance.
+=============
+*/
+static qboolean FS_PreflightPathExists( const char *asset, const char *label, const char *rootPath )
+{
+	FILE *handle;
+	char fullpath[MAX_OSPATH];
+	qboolean exists;
+
+	if ( !rootPath || !rootPath[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( fullpath, sizeof( fullpath ), "%s", FS_BuildOSPath( rootPath, fs_gamedir, asset ) );
+
+	if ( !Q_stricmp( rootPath, fs_homepath->string ) ) {
+		exists = FS_FileExists( asset );
+	} else {
+		handle = fopen( fullpath, "rb" );
+
+		exists = ( handle != NULL );
+
+		if ( handle ) {
+			fclose( handle );
+		}
+	}
+
+	if ( !exists ) {
+		Com_Printf( "WARNING: FS_InitFilesystem preflight missing \"%s\" in %s (checked %s)\n", asset, label, fullpath );
+	} else {
+		Com_DPrintf( "FS_InitFilesystem preflight found \"%s\" in %s (checked %s)\n", asset, label, fullpath );
+	}
+
+	return exists;
+}
+
+/*
+=============
+	FS_RunAssetPreflight
+
+Ensures critical configs, fonts, and UI scripts exist across configured search
+paths before proceeding with filesystem startup.
+=============
+*/
+static void FS_RunAssetPreflight( void )
+{
+	int i, j;
+	qboolean missing = qfalse;
+
+	const char *fontAssets[] = {
+		"fonts/handelgothic.ttf",
+		"fonts/notosans-regular.ttf",
+		"fonts/droidsansmono.ttf",
+		"fonts/droidsansfallbackfull.ttf"
+	};
+
+	const char *uiScriptAssets[] = {
+		"ui/main.menu",
+		"ui/comp_hud.menu",
+		"ui/teaminfo.txt"
+	};
+
+	struct {
+		const char *label;
+		const char *path;
+	} roots[] = {
+		{ "homepath", fs_homepath->string },
+		{ "basepath", fs_basepath->string },
+		{ "cdpath", fs_cdpath->string }
+	};
+
+	for ( i = 0; i < sizeof( roots ) / sizeof( roots[0] ); i++ ) {
+		Com_DPrintf( "FS_InitFilesystem preflight scanning %s (%s)\n", roots[i].label, roots[i].path );
+	}
+
+	if ( !FS_PreflightPathExists( "default.cfg", "homepath", fs_homepath->string )
+		&& !FS_PreflightPathExists( "default.cfg", "basepath", fs_basepath->string )
+		&& !FS_PreflightPathExists( "default.cfg", "cdpath", fs_cdpath->string ) ) {
+		Com_Printf( "ERROR: FS_InitFilesystem preflight could not locate \"default.cfg\" in any configured search path.\n" );
+		missing = qtrue;
+	}
+
+	for ( i = 0; i < sizeof( fontAssets ) / sizeof( fontAssets[0] ); i++ ) {
+		qboolean found = qfalse;
+
+		for ( j = 0; j < sizeof( roots ) / sizeof( roots[0] ); j++ ) {
+			if ( FS_PreflightPathExists( fontAssets[i], roots[j].label, roots[j].path ) ) {
+				found = qtrue;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			Com_Printf( "ERROR: FS_InitFilesystem preflight missing font asset \"%s\" across all search paths.\n", fontAssets[i] );
+			missing = qtrue;
+		}
+	}
+
+	for ( i = 0; i < sizeof( uiScriptAssets ) / sizeof( uiScriptAssets[0] ); i++ ) {
+		qboolean found = qfalse;
+
+		for ( j = 0; j < sizeof( roots ) / sizeof( roots[0] ); j++ ) {
+			if ( FS_PreflightPathExists( uiScriptAssets[i], roots[j].label, roots[j].path ) ) {
+				found = qtrue;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			Com_Printf( "ERROR: FS_InitFilesystem preflight missing UI script \"%s\" across all search paths.\n", uiScriptAssets[i] );
+			missing = qtrue;
+		}
+	}
+
+	if ( missing ) {
+		Com_Printf( "Ensure packaged assets mirror the Quake Live layout: place default.cfg at the root of your PK3, ship fonts/ttf"
+			" files (handelgothic, notosans-regular, droidsansmono, droidsansfallbackfull) under fonts/, and keep ui/*.menu and"
+			" supporting txt files adjacent to the packaged UI DLLs. Review tools/packaging/ui_bundle_manifest.json and"
+			" docs/quakelive_asset_audit.md for the expected staging tree.\n" );
+		Com_Error( ERR_FATAL, "Required startup assets are missing; see preflight log for details." );
+	}
+}
 /*
 ================
 FS_SV_FileExists
@@ -3256,6 +3384,8 @@ void FS_InitFilesystem( void ) {
 
 	// see if we are going to allow add-ons
 	FS_SetRestrictions();
+
+	FS_RunAssetPreflight();
 
 	// if we can't find default.cfg, assume that the paths are
 	// busted and error out now, rather than getting an unreadable
