@@ -88,6 +88,8 @@ typedef struct weaponConfig_s {
 	int		machinegunTeamDamage;
 	int		heavyMachinegunDamage;
 	int		shotgunDamage;
+	float		shotgunFalloffScale;
+	int		shotgunFalloffRange;
 	int		grenadeDamage;
 	int		grenadeSplashDamage;
 	int		grenadeSplashRadius;
@@ -96,17 +98,25 @@ typedef struct weaponConfig_s {
 	int		rocketSplashRadius;
 	int		grenadeSpeed;
 	int		rocketSpeed;
+	float		rocketAccelerationFactor;
+	int		rocketAccelerationRate;
 	int		rocketSplashOffset;
 	int		plasmaDamage;
 	int		plasmaSplashDamage;
 	int		plasmaSplashRadius;
 	int		plasmaSpeed;
+	float		plasmaAccelerationFactor;
+	int		plasmaAccelerationRate;
 	int		lightningDamage;
+	float		lightningFalloffScale;
+	int		lightningFalloffRange;
 	int		railgunDamage;
 	int		bfgDamage;
 	int		bfgSplashDamage;
 	int		bfgSplashRadius;
 	int		bfgSpeed;
+	float		bfgAccelerationFactor;
+	int		bfgAccelerationRate;
 	int		grappleSpeed;
 	qboolean	guidedRocketEnabled;
 	int		quadHogEnabled;
@@ -163,6 +173,19 @@ typedef struct factoryCvarConfig_s {
 	int		allowKillDelayMilliseconds;
 	int		complaintDamageThreshold;
 	int		complaintLimit;
+	int		respawnDelayMinMilliseconds;
+	int		respawnDelayMaxMilliseconds;
+	int		regenHealthFixedPoint;
+	int		regenHealthRateFixedPoint;
+	int		regenArmorFixedPoint;
+	int		regenArmorRateFixedPoint;
+	qboolean	regenArmorAfterHealth;
+	qboolean	spawnItemPowerup;
+	qboolean	spawnItemHoldable;
+	qboolean	spawnItemWeapons;
+	qboolean	spawnItemHealth;
+	qboolean	spawnItemArmor;
+	qboolean	spawnItemAmmo;
 } factoryCvarConfig_t;
 
 typedef struct factoryOverride_s {

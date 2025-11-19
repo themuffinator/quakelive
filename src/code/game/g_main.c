@@ -678,12 +678,67 @@ static qboolean G_ReadWeaponBoolCvar( const vmCvar_t *cvar, qboolean fallback, c
 	return ( cvar->integer != 0 ) ? qtrue : qfalse;
 }
 
+/*
+=============
+G_ReadWeaponCvarNonNegative
+
+Clamps gameplay CVars that allow zero to non-negative integers while respecting fallbacks when invalid data is supplied.
+=============
+*/
+static int G_ReadWeaponCvarNonNegative( const vmCvar_t *cvar, int fallback, const char *cvarName ) {
+	int		value;
+
+	value = G_ReadWeaponCvarRaw( cvar, fallback, cvarName );
+	if ( value < 0 ) {
+		return fallback;
+	}
+
+	return value;
+}
+
+/*
+=============
+G_ReadWeaponFloatCvarRaw
+
+Returns floating-point gameplay CVar values or the supplied fallback when the variable is missing.
+=============
+*/
+static float G_ReadWeaponFloatCvarRaw( const vmCvar_t *cvar, float fallback, const char *cvarName ) {
+	if ( !cvar ) {
+		G_ReportMissingCvar( cvarName );
+		return fallback;
+	}
+
+	return cvar->value;
+}
+
+/*
+=============
+G_ReadWeaponFloatCvarNonNegative
+
+Ensures floating-point gameplay CVars stay non-negative and fall back when invalid values are entered.
+=============
+*/
+static float G_ReadWeaponFloatCvarNonNegative( const vmCvar_t *cvar, float fallback, const char *cvarName ) {
+	float		value;
+
+	value = G_ReadWeaponFloatCvarRaw( cvar, fallback, cvarName );
+	if ( value < 0.0f ) {
+		return fallback;
+	}
+
+	return value;
+}
+
+
 void G_InitWeaponConfig( void ) {
 	g_weaponConfig.gauntletDamage = G_ReadWeaponCvar( &g_damage_g, 50, "g_damage_g" );
 	g_weaponConfig.machinegunDamage = G_ReadWeaponCvar( &g_damage_mg, 7, "g_damage_mg" );
 	g_weaponConfig.machinegunTeamDamage = G_ReadWeaponCvar( &g_damage_mg_team, 5, "g_damage_mg_team" );
 	g_weaponConfig.heavyMachinegunDamage = G_ReadWeaponCvar( &g_damage_hmg, 10, "g_damage_hmg" );
 	g_weaponConfig.shotgunDamage = G_ReadWeaponCvar( &g_damage_sg, 10, "g_damage_sg" );
+	g_weaponConfig.shotgunFalloffScale = G_ReadWeaponFloatCvarNonNegative( &g_damage_sg_falloff, 0.0f, "g_damage_sg_falloff" );
+	g_weaponConfig.shotgunFalloffRange = G_ReadWeaponCvarNonNegative( &g_range_sg_falloff, 0, "g_range_sg_falloff" );
 	g_weaponConfig.grenadeDamage = G_ReadWeaponCvar( &g_damage_gl, 100, "g_damage_gl" );
 	g_weaponConfig.grenadeSplashDamage = G_ReadWeaponCvar( &g_splashDamage_gl, 100, "g_splashDamage_gl" );
 	g_weaponConfig.grenadeSplashRadius = G_ReadWeaponCvar( &g_splashRadius_gl, 150, "g_splashRadius_gl" );
@@ -692,17 +747,25 @@ void G_InitWeaponConfig( void ) {
 	g_weaponConfig.rocketSplashDamage = G_ReadWeaponCvar( &g_splashDamage_rl, 100, "g_splashDamage_rl" );
 	g_weaponConfig.rocketSplashRadius = G_ReadWeaponCvar( &g_splashRadius_rl, 120, "g_splashRadius_rl" );
 	g_weaponConfig.rocketSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_rl, 900, "g_velocity_rl", 1 );
+	g_weaponConfig.rocketAccelerationFactor = G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_rl, 0.0f, "g_accelFactor_rl" );
+	g_weaponConfig.rocketAccelerationRate = G_ReadWeaponCvarNonNegative( &g_accelRate_rl, 0, "g_accelRate_rl" );
 	g_weaponConfig.rocketSplashOffset = G_ReadWeaponCvarRaw( &g_rocketsplashOffset, 0, "g_rocketsplashOffset" );
 	g_weaponConfig.plasmaDamage = G_ReadWeaponCvar( &g_damage_pg, 20, "g_damage_pg" );
 	g_weaponConfig.plasmaSplashDamage = G_ReadWeaponCvar( &g_splashDamage_pg, 15, "g_splashDamage_pg" );
 	g_weaponConfig.plasmaSplashRadius = G_ReadWeaponCvar( &g_splashRadius_pg, 20, "g_splashRadius_pg" );
 	g_weaponConfig.plasmaSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_pg, 2000, "g_velocity_pg", 1 );
+	g_weaponConfig.plasmaAccelerationFactor = G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_pg, 0.0f, "g_accelFactor_pg" );
+	g_weaponConfig.plasmaAccelerationRate = G_ReadWeaponCvarNonNegative( &g_accelRate_pg, 0, "g_accelRate_pg" );
 	g_weaponConfig.lightningDamage = G_ReadWeaponCvar( &g_damage_lg, 8, "g_damage_lg" );
+	g_weaponConfig.lightningFalloffScale = G_ReadWeaponFloatCvarNonNegative( &g_damage_lg_falloff, 0.0f, "g_damage_lg_falloff" );
+	g_weaponConfig.lightningFalloffRange = G_ReadWeaponCvarNonNegative( &g_range_lg_falloff, 0, "g_range_lg_falloff" );
 	g_weaponConfig.railgunDamage = G_ReadWeaponCvar( &g_damage_rg, 100, "g_damage_rg" );
 	g_weaponConfig.bfgDamage = G_ReadWeaponCvar( &g_damage_bfg, 100, "g_damage_bfg" );
 	g_weaponConfig.bfgSplashDamage = G_ReadWeaponCvar( &g_splashDamage_bfg, 100, "g_splashDamage_bfg" );
 	g_weaponConfig.bfgSplashRadius = G_ReadWeaponCvar( &g_splashRadius_bfg, 120, "g_splashRadius_bfg" );
 	g_weaponConfig.bfgSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_bfg, 2000, "g_velocity_bfg", 1 );
+	g_weaponConfig.bfgAccelerationFactor = G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_bfg, 0.0f, "g_accelFactor_bfg" );
+	g_weaponConfig.bfgAccelerationRate = G_ReadWeaponCvarNonNegative( &g_accelRate_bfg, 0, "g_accelRate_bfg" );
 	g_weaponConfig.grappleSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_gh, 800, "g_velocity_gh", 1 );
 	g_weaponConfig.guidedRocketEnabled = G_ReadWeaponBoolCvar( &g_guidedRocket, qfalse, "g_guidedRocket" );
 	g_weaponConfig.quadHogEnabled = G_ReadWeaponBoolCvar( &g_quadHog, qfalse, "g_quadHog" );
