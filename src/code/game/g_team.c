@@ -952,6 +952,180 @@ qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 ) {
 	return qfalse;
 }
 
+/*
+=============
+G_FlagPowerupTeam
+
+Resolves the owning team for a specific flag powerup constant.
+=============
+*/
+static int G_FlagPowerupTeam( int flagPowerup ) {
+	switch ( flagPowerup ) {
+	case PW_REDFLAG:
+		return TEAM_RED;
+	case PW_BLUEFLAG:
+		return TEAM_BLUE;
+	case PW_NEUTRALFLAG:
+		return TEAM_FREE;
+	default:
+		break;
+	}
+
+	return -1;
+}
+
+/*
+=============
+G_BuildFlagDropVelocity
+
+Computes the outgoing velocity for a dropped flag based on the configured tuning values.
+=============
+*/
+static void G_BuildFlagDropVelocity( gentity_t *carrier, vec3_t velocity ) {
+	float forwardSpeed;
+	float verticalSpeed;
+	vec3_t forward;
+
+	VectorClear( velocity );
+	if ( !carrier || !carrier->client ) {
+		return;
+	}
+
+	forwardSpeed = ( g_flagConfig.throwFlagForwardMult > 0 ) ? g_flagConfig.throwFlagForwardMult : 150.0f;
+	verticalSpeed = ( g_flagConfig.throwFlagVelocity > 0 ) ? g_flagConfig.throwFlagVelocity : 200.0f;
+
+	AngleVectors( carrier->client->ps.viewangles, forward, NULL, NULL );
+	VectorScale( forward, forwardSpeed, velocity );
+	velocity[2] += verticalSpeed + crandom() * 50.0f;
+}
+
+/*
+=============
+G_InitFlagDropPhysics
+
+Applies the configured physics settings to a dropped flag entity.
+=============
+*/
+static void G_InitFlagDropPhysics( gentity_t *carrier, gentity_t *drop ) {
+	float bounce;
+
+	if ( !drop ) {
+		return;
+	}
+
+	if ( g_flagConfig.flagPhysics > 0 ) {
+		drop->physicsObject = qtrue;
+	}
+
+	bounce = g_flagConfig.flagBounce;
+	if ( bounce < 0.0f ) {
+		bounce = 0.0f;
+	} else if ( bounce > 1.0f ) {
+		bounce = 1.0f;
+	}
+
+	if ( bounce > 0.0f ) {
+		drop->s.eFlags |= EF_BOUNCE_HALF;
+		drop->physicsBounce = bounce;
+	} else {
+		drop->s.eFlags &= ~EF_BOUNCE_HALF;
+		drop->physicsBounce = 0.0f;
+	}
+
+	(void)carrier;
+}
+
+/*
+=============
+G_HandleFlagTackleBonus
+
+Awards the tackle bonus and accompanying messaging when an attacker forces a drop.
+=============
+*/
+static void G_HandleFlagTackleBonus( gentity_t *carrier, gentity_t *attacker, int flagTeam ) {
+	if ( !g_flagConfig.tackleFlag ) {
+		return;
+	}
+
+	if ( !carrier || !carrier->client || !attacker || !attacker->client ) {
+		return;
+	}
+
+	if ( attacker == carrier ) {
+		return;
+	}
+
+	if ( OnSameTeam( carrier, attacker ) ) {
+		return;
+	}
+
+	AddScore( attacker, carrier->r.currentOrigin, g_flagConfig.droppedFlagBonus );
+	PrintMsg( NULL, "%s" S_COLOR_WHITE " tackled the %s flag carrier!\n",
+		attacker->client->pers.netname, TeamName( flagTeam ) );
+}
+
+/*
+=============
+G_TossFlag
+
+Drops or returns a carried flag depending on the provided context and configuration.
+=============
+*/
+flagDropResult_t G_TossFlag( gentity_t *carrier, int flagPowerup, flagDropContext_t context, gentity_t *attacker, int meansOfDeath, gentity_t **dropped ) {
+	int flagTeam;
+	qboolean suicide;
+	gitem_t *item;
+	gentity_t *drop;
+	vec3_t velocity;
+	flagDropResult_t result;
+
+	if ( dropped ) {
+		*dropped = NULL;
+	}
+
+	if ( !carrier || !carrier->client ) {
+		return FLAG_DROP_RESULT_NONE;
+	}
+
+	flagTeam = G_FlagPowerupTeam( flagPowerup );
+	if ( flagTeam == -1 ) {
+		return FLAG_DROP_RESULT_NONE;
+	}
+
+	if ( !carrier->client->ps.powerups[ flagPowerup ] ) {
+		return FLAG_DROP_RESULT_NONE;
+	}
+
+	carrier->client->ps.powerups[ flagPowerup ] = 0;
+	suicide = ( context == FLAG_DROP_CONTEXT_DEATH && ( attacker == carrier || meansOfDeath == MOD_SUICIDE ) );
+	result = FLAG_DROP_RESULT_NONE;
+
+	if ( context == FLAG_DROP_CONTEXT_FORCED_RETURN || ( suicide && g_flagConfig.returnOnSuicide ) ) {
+		Team_ReturnFlag( flagTeam );
+		return FLAG_DROP_RESULT_RETURNED;
+	}
+
+	item = BG_FindItemForPowerup( flagPowerup );
+	if ( !item ) {
+		return FLAG_DROP_RESULT_NONE;
+	}
+
+	G_BuildFlagDropVelocity( carrier, velocity );
+	drop = LaunchItem( item, carrier->s.pos.trBase, velocity );
+	if ( drop ) {
+		G_InitFlagDropPhysics( carrier, drop );
+		if ( context == FLAG_DROP_CONTEXT_DEATH ) {
+			G_HandleFlagTackleBonus( carrier, attacker, flagTeam );
+		}
+		Team_CheckDroppedItem( drop );
+		result = FLAG_DROP_RESULT_DROPPED;
+		if ( dropped ) {
+			*dropped = drop;
+		}
+	}
+
+	return result;
+}
 
 static char ctfFlagStatusRemap[] = { '0', '1', '*', '*', '2' };
 static char oneFlagStatusRemap[] = { '0', '1', '2', '3', '4' };

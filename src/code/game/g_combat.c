@@ -272,15 +272,15 @@ void AddScore( gentity_t *ent, vec3_t origin, int score ) {
 =================
 TossClientItems
 
-Toss the weapon and powerups for the killed player
+Toss the weapon and powerups for the specified player using the configured flag rules.
 =================
 */
-void TossClientItems( gentity_t *self ) {
+void TossClientItems( gentity_t *self, gentity_t *attacker, flagDropContext_t context, int meansOfDeath ) {
 	gitem_t		*item;
 	int			weapon;
 	float		angle;
 	int			i;
-	gentity_t	*drop;
+	gentity_t		*drop;
 
 	// drop the weapon if not a gauntlet or machinegun
 	weapon = self->s.weapon;
@@ -298,7 +298,7 @@ void TossClientItems( gentity_t *self ) {
 		}
 	}
 
-	if ( weapon > WP_MACHINEGUN && weapon != WP_GRAPPLING_HOOK && 
+	if ( weapon > WP_MACHINEGUN && weapon != WP_GRAPPLING_HOOK &&
 		self->client->ps.ammo[ weapon ] ) {
 		// find the item type for this weapon
 		item = BG_FindItemForWeapon( weapon );
@@ -311,6 +311,9 @@ void TossClientItems( gentity_t *self ) {
 	if ( g_gametype.integer != GT_TEAM ) {
 		angle = 45;
 		for ( i = 1 ; i < PW_NUM_POWERUPS ; i++ ) {
+			if ( i == PW_NEUTRALFLAG || i == PW_REDFLAG || i == PW_BLUEFLAG ) {
+				continue;
+			}
 			if ( self->client->ps.powerups[ i ] > level.time ) {
 				item = BG_FindItemForPowerup( i );
 				if ( !item ) {
@@ -328,8 +331,11 @@ void TossClientItems( gentity_t *self ) {
 			}
 		}
 	}
-}
 
+	G_TossFlag( self, PW_NEUTRALFLAG, context, attacker, meansOfDeath, NULL );
+	G_TossFlag( self, PW_REDFLAG, context, attacker, meansOfDeath, NULL );
+	G_TossFlag( self, PW_BLUEFLAG, context, attacker, meansOfDeath, NULL );
+}
 
 /*
 =================
@@ -757,38 +763,16 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	Team_FragBonuses(self, inflictor, attacker);
 	G_RRHandlePlayerDeath( self, attacker );
 
-	// if I committed suicide, the flag does not fall, it returns.
-	if (meansOfDeath == MOD_SUICIDE) {
-		if ( self->client->ps.powerups[PW_NEUTRALFLAG] ) {		// only happens in One Flag CTF
-			Team_ReturnFlag( TEAM_FREE );
-			self->client->ps.powerups[PW_NEUTRALFLAG] = 0;
-		}
-		else if ( self->client->ps.powerups[PW_REDFLAG] ) {		// only happens in standard CTF
-			Team_ReturnFlag( TEAM_RED );
-			self->client->ps.powerups[PW_REDFLAG] = 0;
-		}
-		else if ( self->client->ps.powerups[PW_BLUEFLAG] ) {	// only happens in standard CTF
-			Team_ReturnFlag( TEAM_BLUE );
-			self->client->ps.powerups[PW_BLUEFLAG] = 0;
-		}
-	}
-
 	// if client is in a nodrop area, don't drop anything (but return CTF flags!)
 	contents = trap_PointContents( self->r.currentOrigin, -1 );
 	if ( !( contents & CONTENTS_NODROP )) {
-		TossClientItems( self );
+		TossClientItems( self, attacker, FLAG_DROP_CONTEXT_DEATH, meansOfDeath );
 		G_DropClientKeys( self );
 	}
 	else {
-		if ( self->client->ps.powerups[PW_NEUTRALFLAG] ) {		// only happens in One Flag CTF
-			Team_ReturnFlag( TEAM_FREE );
-		}
-		else if ( self->client->ps.powerups[PW_REDFLAG] ) {		// only happens in standard CTF
-			Team_ReturnFlag( TEAM_RED );
-		}
-		else if ( self->client->ps.powerups[PW_BLUEFLAG] ) {	// only happens in standard CTF
-			Team_ReturnFlag( TEAM_BLUE );
-		}
+		G_TossFlag( self, PW_NEUTRALFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, attacker, meansOfDeath, NULL );
+		G_TossFlag( self, PW_REDFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, attacker, meansOfDeath, NULL );
+		G_TossFlag( self, PW_BLUEFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, attacker, meansOfDeath, NULL );
 		self->keyMask = 0;
 	}
 	TossClientPersistantPowerups( self );

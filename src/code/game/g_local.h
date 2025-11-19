@@ -145,7 +145,7 @@ typedef struct flagConfig_s {
 	int		throwFlagVelocity;
 	int		throwFlagForwardMult;
 	qboolean	tackleFlag;
-	qboolean	returnFlagOnSuicide;
+	qboolean	returnOnSuicide;
 	int		droppedFlagBonus;
 } flagConfig_t;
 
@@ -153,6 +153,18 @@ extern flagConfig_t g_flagConfig;
 void G_InitFlagConfig( void );
 void G_UpdateFlagConfig( void );
 int G_GetSuddenDeathRespawnDelay( void );
+
+typedef enum {
+	FLAG_DROP_CONTEXT_DEATH,
+	FLAG_DROP_CONTEXT_FORCED_RETURN,
+	FLAG_DROP_CONTEXT_SCRIPTED
+} flagDropContext_t;
+
+typedef enum {
+	FLAG_DROP_RESULT_NONE,
+	FLAG_DROP_RESULT_RETURNED,
+	FLAG_DROP_RESULT_DROPPED
+} flagDropResult_t;
 
 void G_AutoShuffleCountdown_SetGuard( qboolean ( *guard )( void ) );
 void G_AutoShuffleCountdown_Arm( int milliseconds );
@@ -980,7 +992,7 @@ void G_Damage (gentity_t *targ, gentity_t *inflictor, gentity_t *attacker, vec3_
 qboolean G_RadiusDamage (vec3_t origin, gentity_t *attacker, float damage, float radius, gentity_t *ignore, int mod);
 int G_InvulnerabilityEffect( gentity_t *targ, vec3_t dir, vec3_t point, vec3_t impactpoint, vec3_t bouncedir );
 void body_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath );
-void TossClientItems( gentity_t *self );
+void TossClientItems( gentity_t *self, gentity_t *attacker, flagDropContext_t context, int meansOfDeath );
 void TossClientPersistantPowerups( gentity_t *self );
 void TossClientCubes( gentity_t *self );
 
@@ -1143,6 +1155,7 @@ void G_RunClient( gentity_t *ent );
 //
 qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 );
 void Team_CheckDroppedItem( gentity_t *dropped );
+flagDropResult_t G_TossFlag( gentity_t *carrier, int flagPowerup, flagDropContext_t context, gentity_t *attacker, int meansOfDeath, gentity_t **dropped );
 qboolean CheckObeliskAttack( gentity_t *obelisk, gentity_t *attacker );
 void Team_InitDomination( void );
 void Team_RunDomination( void );

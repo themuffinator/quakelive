@@ -94,13 +94,9 @@ void Use_target_remove_powerups( gentity_t *ent, gentity_t *other, gentity_t *ac
 		return;
 	}
 
-	if( activator->client->ps.powerups[PW_REDFLAG] ) {
-		Team_ReturnFlag( TEAM_RED );
-	} else if( activator->client->ps.powerups[PW_BLUEFLAG] ) {
-		Team_ReturnFlag( TEAM_BLUE );
-	} else if( activator->client->ps.powerups[PW_NEUTRALFLAG] ) {
-		Team_ReturnFlag( TEAM_FREE );
-	}
+G_TossFlag( activator, PW_REDFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, NULL, MOD_UNKNOWN, NULL );
+G_TossFlag( activator, PW_BLUEFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, NULL, MOD_UNKNOWN, NULL );
+G_TossFlag( activator, PW_NEUTRALFLAG, FLAG_DROP_CONTEXT_FORCED_RETURN, NULL, MOD_UNKNOWN, NULL );
 
 	memset( activator->client->ps.powerups, 0, sizeof( activator->client->ps.powerups ) );
 }

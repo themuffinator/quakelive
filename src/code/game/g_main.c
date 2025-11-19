@@ -835,7 +835,7 @@ void G_UpdateFlagConfig( void ) {
 	g_flagConfig.throwFlagVelocity = ( g_throwFlagVelocity.integer < 0 ) ? 0 : g_throwFlagVelocity.integer;
 	g_flagConfig.throwFlagForwardMult = ( g_throwFlagForwardMult.integer < 0 ) ? 0 : g_throwFlagForwardMult.integer;
 	g_flagConfig.tackleFlag = ( g_tackleFlag.integer != 0 ) ? qtrue : qfalse;
-	g_flagConfig.returnFlagOnSuicide = ( g_returnFlagOnSuicide.integer != 0 ) ? qtrue : qfalse;
+	g_flagConfig.returnOnSuicide = ( g_returnFlagOnSuicide.integer != 0 ) ? qtrue : qfalse;
 	g_flagConfig.droppedFlagBonus = ( g_droppedFlagBonus.integer < 0 ) ? 0 : g_droppedFlagBonus.integer;
 }
 

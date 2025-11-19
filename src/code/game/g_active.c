@@ -576,17 +576,20 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 				j = PW_NEUTRALFLAG;
 			}
 
-			if ( item ) {
-				drop = Drop_Item( ent, item, 0 );
-				if ( drop ) {
-					// decide how many seconds it has left
-					drop->count = ( ent->client->ps.powerups[ j ] - level.time ) / 1000;
-					if ( drop->count < 1 ) {
-						drop->count = 1;
+		if ( item ) {
+			int remaining = ent->client->ps.powerups[ j ];
+			flagDropResult_t dropResult;
+			gentity_t *dropped = NULL;
+
+			dropResult = G_TossFlag( ent, j, FLAG_DROP_CONTEXT_SCRIPTED, NULL, MOD_UNKNOWN, &dropped );
+			if ( dropResult == FLAG_DROP_RESULT_DROPPED && dropped ) {
+				// decide how many seconds it has left
+				dropped->count = ( remaining - level.time ) / 1000;
+				if ( dropped->count < 1 ) {
+					dropped->count = 1;
 				}
 			}
-				ent->client->ps.powerups[ j ] = 0;
-			}
+		}
 			if ( g_gametype.integer == GT_HARVESTER ) {
 				if ( ent->client->ps.generic1 > 0 ) {
 					if ( ent->client->sess.sessionTeam == TEAM_RED ) {

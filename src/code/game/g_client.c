@@ -2220,7 +2220,7 @@ void ClientDisconnect( int clientNum ) {
 
 		// They don't get to take powerups with them!
 		// Especially important for stuff like CTF flags
-		TossClientItems( ent );
+		TossClientItems( ent, NULL, FLAG_DROP_CONTEXT_SCRIPTED, MOD_UNKNOWN );
 		TossClientPersistantPowerups( ent );
 		if( g_gametype.integer == GT_HARVESTER ) {
 			TossClientCubes( ent );
