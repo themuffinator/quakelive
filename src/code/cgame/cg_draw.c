@@ -1516,6 +1516,47 @@ static void CG_ScanForCrosshairEntity( void ) {
 
 
 /*
+=============
+CG_ShouldRenderCrosshairName
+
+Determines if the current crosshair target should have their name displayed.
+=============
+*/
+static qboolean CG_ShouldRenderCrosshairName( const clientInfo_t *ci, float *opacityScale ) {
+	team_t	myTeam;
+	team_t	targetTeam;
+	qboolean	teamGame;
+	float		alpha;
+
+	if ( !ci || !ci->infoValid ) {
+		return qfalse;
+	}
+
+	alpha = 1.0f;
+	teamGame = ( qboolean )( cgs.gametype >= GT_TEAM );
+	myTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+	targetTeam = ci->team;
+
+	if ( teamGame && targetTeam != TEAM_FREE && targetTeam != TEAM_SPECTATOR && myTeam == targetTeam ) {
+		if ( !cg_teammateCrosshairNames.integer ) {
+			return qfalse;
+		}
+		alpha *= Com_Clamp( 0.0f, 1.0f, cg_teammateCrosshairNamesOpacity.value );
+	} else {
+		if ( !cg_enemyCrosshairNames.integer ) {
+			return qfalse;
+		}
+		alpha *= Com_Clamp( 0.0f, 1.0f, cg_enemyCrosshairNamesOpacity.value );
+	}
+
+	if ( opacityScale ) {
+		*opacityScale = alpha;
+	}
+
+	return qtrue;
+}
+
+/*
 =====================
 CG_DrawCrosshairNames
 =====================
@@ -1524,6 +1565,9 @@ static void CG_DrawCrosshairNames( void ) {
 	float		*color;
 	char		*name;
 	float		w;
+	float		nameScale;
+	float		opacityScale;
+	const clientInfo_t	*ci;
 
 	if ( !cg_drawCrosshair.integer ) {
 		return;
@@ -1545,10 +1589,28 @@ static void CG_DrawCrosshairNames( void ) {
 		return;
 	}
 
-	name = cgs.clientinfo[ cg.crosshairClientNum ].name;
-	color[3] *= 0.5f;
-	w = CG_Text_Width(name, 0.3f, 0);
-	CG_Text_Paint( 320 - w / 2, 190, 0.3f, color, name, 0, 0, ITEM_TEXTSTYLE_SHADOWED);
+	ci = &cgs.clientinfo[ cg.crosshairClientNum ];
+	opacityScale = 1.0f;
+	if ( !CG_ShouldRenderCrosshairName( ci, &opacityScale ) ) {
+		trap_R_SetColor( NULL );
+		return;
+	}
+
+	name = ci->name;
+	color[3] *= ( 0.5f * opacityScale );
+
+	nameScale = 0.3f;
+	w = CG_Text_Width( name, nameScale, 0 );
+	if ( cg_overheadNamesWidth.value > 0.0f && w > cg_overheadNamesWidth.value ) {
+		float clampedScale = cg_overheadNamesWidth.value / w;
+		if ( clampedScale < 0.1f ) {
+			clampedScale = 0.1f;
+		}
+		nameScale *= clampedScale;
+		w = CG_Text_Width( name, nameScale, 0 );
+	}
+
+	CG_Text_Paint( 320 - w / 2, 190, nameScale, color, name, 0, 0, ITEM_TEXTSTYLE_SHADOWED);
 	trap_R_SetColor( NULL );
 }
 
@@ -2069,6 +2131,9 @@ static void CG_Draw2D( void ) {
 
 	spectator = ( qboolean )( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
 	menuHudActive = CG_IsMenuHudActive();
+	if ( cg.demoPlayback && !cg_drawDemoHUD.integer ) {
+		menuHudActive = qfalse;
+	}
 	canShowStatus = ( qboolean )( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 );
 	menuScoreboardHandled = qfalse;
 

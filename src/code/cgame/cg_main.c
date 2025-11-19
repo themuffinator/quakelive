@@ -114,6 +114,8 @@ vmCvar_t	cg_drawPregameMessages;
 vmCvar_t	cg_drawSpecMessages;
 vmCvar_t	cg_drawItemPickups;
 vmCvar_t	cg_drawSpriteSelf;
+vmCvar_t	cg_drawDemoHUD;
+vmCvar_t	cg_drawFragMessages;
 vmCvar_t	cg_drawInputCmds;
 vmCvar_t	cg_drawInputCmdsX;
 vmCvar_t	cg_drawInputCmdsY;
@@ -122,6 +124,10 @@ vmCvar_t	cg_crosshairSize;
 vmCvar_t	cg_crosshairX;
 vmCvar_t	cg_crosshairY;
 vmCvar_t	cg_crosshairHealth;
+vmCvar_t	cg_enemyCrosshairNames;
+vmCvar_t	cg_enemyCrosshairNamesOpacity;
+vmCvar_t	cg_teammateCrosshairNames;
+vmCvar_t	cg_teammateCrosshairNamesOpacity;
 vmCvar_t	cg_drawCrosshairTeamHealth;
 vmCvar_t	cg_drawCrosshairTeamHealthSize;
 vmCvar_t	cg_draw2D;
@@ -181,6 +187,10 @@ vmCvar_t	cg_drawTeamOverlaySize;
 vmCvar_t	cg_drawTeamOverlayOpacity;
 vmCvar_t	cg_teamOverlayUserinfo;
 vmCvar_t	cg_drawFriend;
+vmCvar_t	cg_teammateNames;
+vmCvar_t	cg_teammatePOIs;
+vmCvar_t	cg_teammatePOIsMinWidth;
+vmCvar_t	cg_teammatePOIsMaxWidth;
 vmCvar_t	cg_teamChatsOnly;
 vmCvar_t	cg_noVoiceChats;
 vmCvar_t	cg_noVoiceText;
@@ -211,6 +221,24 @@ vmCvar_t	cg_drawFullWeaponBar;
 vmCvar_t	cg_drawHitFriendTime;
 vmCvar_t	cg_drawDeadFriendTime;
 vmCvar_t	cg_speedometer;
+vmCvar_t	cg_specNames;
+vmCvar_t	cg_specItemTimers;
+vmCvar_t	cg_specItemTimersX;
+vmCvar_t	cg_specItemTimersY;
+vmCvar_t	cg_specItemTimersSize;
+vmCvar_t	cg_specTeamVitals;
+vmCvar_t	cg_specTeamVitalsHealthColor;
+vmCvar_t	cg_itemTimers;
+vmCvar_t	cg_overheadNamesWidth;
+vmCvar_t	cg_obituaryRowSize;
+vmCvar_t	cg_spectating;
+vmCvar_t	cg_gametype;
+vmCvar_t	cg_gameInfo1;
+vmCvar_t	cg_gameInfo2;
+vmCvar_t	cg_gameInfo3;
+vmCvar_t	cg_gameInfo4;
+vmCvar_t	cg_gameInfo5;
+vmCvar_t	cg_gameInfo6;
 vmCvar_t	cg_useLegacyHud;
 
 vmCvar_t 	cg_redTeamName;
@@ -265,16 +293,22 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawProfileImages, "cg_drawProfileImages", "1", CVAR_ARCHIVE },
 	{ &cg_drawSprites, "cg_drawSprites", "1", CVAR_ARCHIVE },
 	{ &cg_drawPregameMessages, "cg_drawPregameMessages", "1", CVAR_ARCHIVE },
-	{ &cg_drawSpecMessages, "cg_drawSpecMessages", "1", CVAR_ARCHIVE },
-	{ &cg_drawItemPickups, "cg_drawItemPickups", "5", CVAR_ARCHIVE },
-	{ &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", CVAR_ARCHIVE },
-	{ &cg_drawInputCmds, "cg_drawInputCmds", "0", CVAR_ARCHIVE },
+{ &cg_drawSpecMessages, "cg_drawSpecMessages", "1", CVAR_ARCHIVE },
+{ &cg_drawItemPickups, "cg_drawItemPickups", "5", CVAR_ARCHIVE },
+{ &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", CVAR_ARCHIVE },
+{ &cg_drawDemoHUD, "cg_drawDemoHUD", "1", CVAR_ARCHIVE },
+{ &cg_drawFragMessages, "cg_drawFragMessages", "1", CVAR_ARCHIVE },
+{ &cg_drawInputCmds, "cg_drawInputCmds", "0", CVAR_ARCHIVE },
 	{ &cg_drawInputCmdsX, "cg_drawInputCmdsX", "640", CVAR_ARCHIVE },
 	{ &cg_drawInputCmdsY, "cg_drawInputCmdsY", "480", CVAR_ARCHIVE },
 	{ &cg_drawInputCmdsSize, "cg_drawInputCmdsSize", "16", CVAR_ARCHIVE },
-	{ &cg_crosshairSize, "cg_crosshairSize", "24", CVAR_ARCHIVE },
-	{ &cg_crosshairHealth, "cg_crosshairHealth", "1", CVAR_ARCHIVE },
-	{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "29", CVAR_ARCHIVE },
+{ &cg_crosshairSize, "cg_crosshairSize", "24", CVAR_ARCHIVE },
+{ &cg_crosshairHealth, "cg_crosshairHealth", "1", CVAR_ARCHIVE },
+{ &cg_enemyCrosshairNames, "cg_enemyCrosshairNames", "1", CVAR_ARCHIVE },
+{ &cg_enemyCrosshairNamesOpacity, "cg_enemyCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
+{ &cg_teammateCrosshairNames, "cg_teammateCrosshairNames", "1", CVAR_ARCHIVE },
+{ &cg_teammateCrosshairNamesOpacity, "cg_teammateCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
+{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "29", CVAR_ARCHIVE },
 	{ &cg_drawCrosshairTeamHealthSize, "cg_drawCrosshairTeamHealthSize", "0.12", CVAR_ARCHIVE },
 	{ &cg_crosshairX, "cg_crosshairX", "0", CVAR_ARCHIVE },
 	{ &cg_crosshairY, "cg_crosshairY", "0", CVAR_ARCHIVE },
@@ -325,6 +359,10 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_teamOverlayUserinfo, "teamoverlay", "0", CVAR_ROM | CVAR_USERINFO },
 	{ &cg_stats, "cg_stats", "0", 0 },
 	{ &cg_drawFriend, "cg_drawFriend", "1", CVAR_ARCHIVE },
+	{ &cg_teammateNames, "cg_teammateNames", "1", CVAR_ARCHIVE },
+	{ &cg_teammatePOIs, "cg_teammatePOIs", "1", CVAR_ARCHIVE },
+	{ &cg_teammatePOIsMinWidth, "cg_teammatePOIsMinWidth", "4.0", CVAR_ARCHIVE },
+	{ &cg_teammatePOIsMaxWidth, "cg_teammatePOIsMaxWidth", "24.0", CVAR_ARCHIVE },
 	{ &cg_teamChatsOnly, "cg_teamChatsOnly", "0", CVAR_ARCHIVE },
 	{ &cg_noVoiceChats, "cg_noVoiceChats", "0", CVAR_ARCHIVE },
 	{ &cg_noVoiceText, "cg_noVoiceText", "0", CVAR_ARCHIVE },
@@ -369,7 +407,25 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawFullWeaponBar, "cg_drawFullWeaponBar", "0", CVAR_ARCHIVE },
 	{ &cg_drawHitFriendTime, "cg_drawHitFriendTime", "5000", CVAR_ARCHIVE },
 	{ &cg_drawDeadFriendTime, "cg_drawDeadFriendTime", "3000", CVAR_ARCHIVE },
-	{ &cg_speedometer, "cg_speedometer", "0", CVAR_ARCHIVE }
+	{ &cg_speedometer, "cg_speedometer", "0", CVAR_ARCHIVE },
+	{ &cg_specNames, "cg_specNames", "1", CVAR_ARCHIVE },
+	{ &cg_specItemTimers, "cg_specItemTimers", "1", CVAR_ARCHIVE },
+	{ &cg_specItemTimersX, "cg_specItemTimersX", "0", CVAR_ARCHIVE },
+	{ &cg_specItemTimersY, "cg_specItemTimersY", "0", CVAR_ARCHIVE },
+	{ &cg_specItemTimersSize, "cg_specItemTimersSize", "0.24", CVAR_ARCHIVE },
+	{ &cg_specTeamVitals, "cg_specTeamVitals", "1", CVAR_ARCHIVE },
+	{ &cg_specTeamVitalsHealthColor, "cg_specTeamVitalsHealthColor", "0", CVAR_ARCHIVE },
+	{ &cg_itemTimers, "cg_itemTimers", "1", CVAR_ARCHIVE },
+	{ &cg_overheadNamesWidth, "cg_overheadNamesWidth", "120", CVAR_ARCHIVE },
+	{ &cg_obituaryRowSize, "cg_obituaryRowSize", "5", CVAR_ARCHIVE },
+	{ &cg_spectating, "cg_spectating", "0", CVAR_ROM },
+	{ &cg_gametype, "cg_gametype", "0", CVAR_ROM },
+	{ &cg_gameInfo1, "cg_gameInfo1", "", CVAR_ROM },
+	{ &cg_gameInfo2, "cg_gameInfo2", "", CVAR_ROM },
+	{ &cg_gameInfo3, "cg_gameInfo3", "", CVAR_ROM },
+	{ &cg_gameInfo4, "cg_gameInfo4", "", CVAR_ROM },
+	{ &cg_gameInfo5, "cg_gameInfo5", "", CVAR_ROM },
+	{ &cg_gameInfo6, "cg_gameInfo6", "", CVAR_ROM }
 //	{ &cg_pmove_fixed, "cg_pmove_fixed", "0", CVAR_USERINFO | CVAR_ARCHIVE }
 };
 
