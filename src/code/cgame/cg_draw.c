@@ -708,6 +708,8 @@ static float CG_DrawTimer( float y ) {
 	int			w;
 	int			mins, seconds, tens;
 	int			msec;
+	qboolean	countDown;
+	int			remaining;
 
 	if ( !cgs.itemTimersEnabled && !cgs.forceHudHints ) {
 		return y;
@@ -720,15 +722,30 @@ static float CG_DrawTimer( float y ) {
 		lineHeight = ITEM_TIMER_MAX_HEIGHT;
 	}
 
+	countDown = ( qboolean )( cgs.timelimit > 0 && !Q_stricmp( cg_levelTimerDirection.string, "down" ) );
 	msec = cg.time - cgs.levelStartTime;
+	remaining = 0;
 
-	seconds = msec / 1000;
-	mins = seconds / 60;
-	seconds -= mins * 60;
-	tens = seconds / 10;
-	seconds -= tens * 10;
-
-	s = va( "%i:%i%i", mins, tens, seconds );
+	if ( countDown ) {
+		remaining = cgs.timelimit * 60000 - msec;
+		if ( remaining <= 0 ) {
+			s = "OT";
+		} else {
+			seconds = remaining / 1000;
+			mins = seconds / 60;
+			seconds -= mins * 60;
+			tens = seconds / 10;
+			seconds -= tens * 10;
+			s = va( "%i:%i%i", mins, tens, seconds );
+		}
+	} else {
+		seconds = msec / 1000;
+		mins = seconds / 60;
+		seconds -= mins * 60;
+		tens = seconds / 10;
+		seconds -= tens * 10;
+		s = va( "%i:%i%i", mins, tens, seconds );
+	}
 	w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
 
 	drawY = y + ( lineHeight - BIGCHAR_HEIGHT ) / 2;

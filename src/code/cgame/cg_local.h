@@ -77,6 +77,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	GIANT_HEIGHT		48
 
 #define	NUM_CROSSHAIRS		10
+#define CG_MAX_LIGHTNING_STYLES 5
 
 #define DOM_POINT_STATE_COUNT	5
 #define DOMINATION_DISTRESS_REPEAT_TIME	2000
@@ -808,6 +809,7 @@ typedef struct {
 	qhandle_t	railCoreShader;
 
 	qhandle_t	lightningShader;
+	qhandle_t	lightningStyleShaders[CG_MAX_LIGHTNING_STYLES];
 
 	qhandle_t	friendShader;
 	qhandle_t	frozenPlayerShader;
@@ -1246,6 +1248,8 @@ extern	vmCvar_t		cg_drawCrosshairNames;
 extern	vmCvar_t		cg_drawRewards;
 extern	vmCvar_t		cg_drawRewardsRowSize;
 extern	vmCvar_t		cg_drawCheckpointRemaining;
+extern	vmCvar_t		cg_levelTimerDirection;
+extern	vmCvar_t		cg_raceBeep;
 extern	vmCvar_t		cg_drawProfileImages;
 extern	vmCvar_t		cg_drawSprites;
 extern	vmCvar_t		cg_drawPregameMessages;
@@ -1418,6 +1422,9 @@ extern	vmCvar_t		cg_oldRail;
 extern	vmCvar_t		cg_oldRocket;
 extern	vmCvar_t		cg_oldPlasma;
 extern	vmCvar_t		cg_trueLightning;
+extern	vmCvar_t		cg_lightningStyle;
+extern	vmCvar_t		cg_lightningImpact;
+extern	vmCvar_t		cg_lightningImpactCap;
 extern	vmCvar_t		cg_drawTieredArmorAvailability;
 extern	vmCvar_t		cg_armorTiered;
 extern	vmCvar_t		cg_drawFullWeaponBar;

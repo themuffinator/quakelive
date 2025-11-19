@@ -349,6 +349,71 @@ static const cgRaceClientStatus_t *CG_RaceStatusForClient( int clientNum ) {
 	return &cgs.raceStatus[clientNum];
 }
 
+
+/*
+=============
+CG_RaceShouldPlayCheckpointFeedback
+
+Determines if checkpoint notifications should be emitted for a client.
+=============
+*/
+static qboolean CG_RaceShouldPlayCheckpointFeedback( int clientNum ) {
+	if ( cg_raceBeep.integer == 0 || !cg.snap ) {
+		return qfalse;
+	}
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		return qfalse;
+	}
+	if ( clientNum < 0 ) {
+		return qfalse;
+	}
+	if ( !( cg.snap->ps.pm_flags & PMF_FOLLOW ) && clientNum == cg.clientNum ) {
+		return qtrue;
+	}
+	if ( ( cg.snap->ps.pm_flags & PMF_FOLLOW ) && clientNum == cg.spectatorFollowClient ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+
+/*
+=============
+CG_RacePlayCheckpointFeedback
+
+Emits the checkpoint centerprint and audio cue when enabled.
+=============
+*/
+static void CG_RacePlayCheckpointFeedback( const cgRaceClientProgress_t *progress ) {
+	char		statusText[64];
+	int		 total;
+	int		 cleared;
+	int		 remaining;
+
+	if ( !progress ) {
+		return;
+	}
+
+	total = ( cgs.racePointCount > 0 ) ? ( cgs.racePointCount - 1 ) : 0;
+	cleared = progress->currentCheckpoint;
+	if ( total <= 0 || cleared <= 0 ) {
+		return;
+	}
+
+	remaining = total - cleared;
+	if ( remaining < 0 ) {
+		remaining = 0;
+	}
+	if ( remaining > 0 ) {
+		Com_sprintf( statusText, sizeof( statusText ), "%i remaining", remaining );
+	} else {
+		Q_strncpyz( statusText, "Finish", sizeof( statusText ) );
+	}
+
+	CG_CenterPrint( va( "Checkpoint\n%s", statusText ), SCREEN_HEIGHT * 0.30f, BIGCHAR_WIDTH );
+	trap_S_StartLocalSound( cgs.media.selectSound, CHAN_LOCAL_SOUND );
+}
+
 /*
 =============
 CG_RaceUpdateClientProgress
@@ -406,6 +471,9 @@ static void CG_RaceUpdateClientProgress( int clientNum, const vec3_t origin, con
 	if ( CG_RacePointContainsIndex( progress->currentCheckpoint + 1, origin ) ) {
 		progress->currentCheckpoint++;
 		progress->lastTouchTime = cg.time;
+		if ( CG_RaceShouldPlayCheckpointFeedback( clientNum ) ) {
+			CG_RacePlayCheckpointFeedback( progress );
+		}
 		if ( progress->currentCheckpoint >= cgs.racePointCount - 1 ) {
 			progress->runActive = qfalse;
 		}

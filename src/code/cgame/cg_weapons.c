@@ -23,6 +23,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cg_weapons.c -- events and effects dealing with weapons
 #include "cg_local.h"
 
+typedef struct {
+	const char	*shaderName;
+	int		segments;
+} cgLightningStyleDef_t;
+
+static const cgLightningStyleDef_t cg_lightningStyleDefs[CG_MAX_LIGHTNING_STYLES] = {
+	{ "lightningBoltNew", 1 },
+	{ "lightningBolt2", 1 },
+	{ "lightningBolt3", 2 },
+	{ "lightningBolt4", 1 },
+	{ "lightningBolt5", 3 }
+};
+
+static int		cg_lightningImpactFrameTime;
+static int		cg_lightningImpactCount;
+
 /*
 ==========================
 CG_MachineGunEjectBrass
@@ -685,7 +701,28 @@ void CG_RegisterWeapon( int weaponNum ) {
 		weaponInfo->firingSound = trap_S_RegisterSound( "sound/weapons/lightning/lg_hum.wav", qfalse );
 
 		weaponInfo->flashSound[0] = trap_S_RegisterSound( "sound/weapons/lightning/lg_fire.wav", qfalse );
-		cgs.media.lightningShader = trap_R_RegisterShader( "lightningBoltNew");
+		cgs.media.lightningShader = trap_R_RegisterShader( "lightningBoltNew" );
+		{
+			int		styleIndex;
+
+			for ( styleIndex = 0; styleIndex < CG_MAX_LIGHTNING_STYLES; ++styleIndex ) {
+				const char		*styleName;
+
+				styleName = cg_lightningStyleDefs[styleIndex].shaderName;
+				if ( !styleName || !styleName[0] ) {
+					cgs.media.lightningStyleShaders[styleIndex] = 0;
+					continue;
+				}
+
+				cgs.media.lightningStyleShaders[styleIndex] = trap_R_RegisterShader( styleName );
+			}
+
+			if ( cgs.media.lightningStyleShaders[0] ) {
+				cgs.media.lightningShader = cgs.media.lightningStyleShaders[0];
+			} else {
+				cgs.media.lightningStyleShaders[0] = cgs.media.lightningShader;
+			}
+		}
 		cgs.media.lightningExplosionModel = trap_R_RegisterModel( "models/weaphits/crackle.md3" );
 		cgs.media.sfx_lghit1 = trap_S_RegisterSound( "sound/weapons/lightning/lg_hit.wav", qfalse );
 		cgs.media.sfx_lghit2 = trap_S_RegisterSound( "sound/weapons/lightning/lg_hit2.wav", qfalse );
@@ -950,6 +987,157 @@ static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 }
 
 
+
+
+/*
+=============
+CG_LightningActiveStyleIndex
+
+Returns the zero-based lightning style index derived from cg_lightningStyle.
+=============
+*/
+static int CG_LightningActiveStyleIndex( void ) {
+	int		style;
+	int		index;
+
+	style = cg_lightningStyle.integer;
+	index = style - 1;
+	if ( index < 0 ) {
+		index = 0;
+	}
+	if ( index >= CG_MAX_LIGHTNING_STYLES ) {
+		index = CG_MAX_LIGHTNING_STYLES - 1;
+	}
+
+	return index;
+}
+
+
+/*
+=============
+CG_LightningCurrentShader
+
+Fetches the shader handle for the active lightning style.
+=============
+*/
+static qhandle_t CG_LightningCurrentShader( void ) {
+	int		index;
+	qhandle_t	handle;
+
+	index = CG_LightningActiveStyleIndex();
+	handle = cgs.media.lightningStyleShaders[index];
+	if ( !handle ) {
+		handle = cgs.media.lightningShader;
+	}
+	return handle;
+}
+
+
+/*
+=============
+CG_LightningSegmentCount
+
+Returns the number of beam submissions to draw for the active style.
+=============
+*/
+static int CG_LightningSegmentCount( void ) {
+	int		index;
+	int		segments;
+
+	index = CG_LightningActiveStyleIndex();
+	segments = cg_lightningStyleDefs[index].segments;
+	if ( segments <= 0 ) {
+		segments = 1;
+	}
+	return segments;
+}
+
+
+/*
+=============
+CG_SubmitLightningBeams
+
+Submits the lightning beam to the renderer the requested number of times.
+=============
+*/
+static void CG_SubmitLightningBeams( const refEntity_t *beamTemplate, int segmentCount ) {
+	int		i;
+	refEntity_t	beam;
+
+	if ( segmentCount <= 0 ) {
+		segmentCount = 1;
+	}
+
+	for ( i = 0; i < segmentCount; ++i ) {
+		beam = *beamTemplate;
+		beam.shaderTime += (float)i * 0.01f;
+		trap_R_AddRefEntityToScene( &beam );
+	}
+}
+
+
+/*
+=============
+CG_CanDrawLightningImpact
+
+Checks whether the lightning impact effect can be emitted this frame.
+=============
+*/
+static qboolean CG_CanDrawLightningImpact( void ) {
+	int		cap;
+
+	if ( cg_lightningImpact.integer == 0 ) {
+		return qfalse;
+	}
+
+	cap = cg_lightningImpactCap.integer;
+	if ( cap <= 0 ) {
+		return qfalse;
+	}
+
+	if ( cg.time != cg_lightningImpactFrameTime ) {
+		cg_lightningImpactFrameTime = cg.time;
+		cg_lightningImpactCount = 0;
+	}
+
+	if ( cg_lightningImpactCount >= cap ) {
+		return qfalse;
+	}
+
+	cg_lightningImpactCount++;
+	return qtrue;
+}
+
+
+/*
+=============
+CG_DrawLightningImpact
+
+Spawns the lightning impact model when the beam hits a surface.
+=============
+*/
+static void CG_DrawLightningImpact( const vec3_t endPos, const vec3_t dir ) {
+	refEntity_t	beam;
+	vec3_t	angles;
+	vec3_t	origin;
+
+	if ( !CG_CanDrawLightningImpact() || !cgs.media.lightningExplosionModel ) {
+		return;
+	}
+
+	memset( &beam, 0, sizeof( beam ) );
+	beam.hModel = cgs.media.lightningExplosionModel;
+
+	VectorMA( endPos, -16, dir, origin );
+	VectorCopy( origin, beam.origin );
+
+	angles[0] = rand() % 360;
+	angles[1] = rand() % 360;
+	angles[2] = rand() % 360;
+	AnglesToAxis( angles, beam.axis );
+	trap_R_AddRefEntityToScene( &beam );
+}
+
 /*
 ===============
 CG_LightningBolt
@@ -1025,28 +1213,16 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 	VectorCopy( origin, beam.origin );
 
 	beam.reType = RT_LIGHTNING;
-	beam.customShader = cgs.media.lightningShader;
-	trap_R_AddRefEntityToScene( &beam );
+	beam.customShader = CG_LightningCurrentShader();
+	CG_SubmitLightningBeams( &beam, CG_LightningSegmentCount() );
 
 	// add the impact flare if it hit something
 	if ( trace.fraction < 1.0 ) {
-		vec3_t	angles;
 		vec3_t	dir;
 
 		VectorSubtract( beam.oldorigin, beam.origin, dir );
 		VectorNormalize( dir );
-
-		memset( &beam, 0, sizeof( beam ) );
-		beam.hModel = cgs.media.lightningExplosionModel;
-
-		VectorMA( trace.endpos, -16, dir, beam.origin );
-
-		// make a random orientation
-		angles[0] = rand() % 360;
-		angles[1] = rand() % 360;
-		angles[2] = rand() % 360;
-		AnglesToAxis( angles, beam.axis );
-		trap_R_AddRefEntityToScene( &beam );
+		CG_DrawLightningImpact( trace.endpos, dir );
 	}
 }
 /*
