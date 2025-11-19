@@ -1114,8 +1114,16 @@ void ClientUserinfoChanged( int clientNum ) {
 	trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 
 	// check for malformed or illegal info strings
-	if ( !Info_Validate(userinfo) ) {
-		strcpy (userinfo, "\\name\\badinfo");
+	if ( !Info_Validate( userinfo ) ) {
+		if ( g_kickBadUserinfo.integer ) {
+			G_LogPrintf( "Dropping client %i for a deformed userinfo: %s\n", clientNum, userinfo );
+			trap_DropClient( clientNum, "Bad userinfo" );
+			return;
+		}
+
+		G_LogPrintf( "Found client %i with deformed userinfo, but cowardly refusing to kick: %s\n", clientNum, userinfo );
+		trap_SendServerCommand( clientNum, "print \"WARNING: Invalid userinfo detected.\\n\"" );
+		strcpy( userinfo, "\\name\\badinfo" );
 	}
 
 	// check for local client
@@ -1689,6 +1697,15 @@ static const char *G_GetAuthResultString( qlAuthResult result ) {
 	G_SendItemTimerState( clientNum, g_itemTimers.integer ? 1 : 0, g_itemHeight.integer );
 	CalculateRanks();
 
+	if ( !( ent->r.svFlags & SVF_BOT ) ) {
+		char		autoDetail[MAX_INFO_STRING];
+		const char		*ipInfo;
+
+		ipInfo = Info_ValueForKey( userinfo, "ip" );
+		Q_strncpyz( autoDetail, ipInfo ? ipInfo : "", sizeof( autoDetail ) );
+		G_AutoAction( AUTOACTION_PLAYER_CONNECT, ent, autoDetail );
+	}
+
 	// for statistics
 //	client->areabits = areabits;
 //	if ( !client->areabits )
@@ -2197,6 +2214,17 @@ void ClientDisconnect( int clientNum ) {
 	ent = g_entities + clientNum;
 	if ( !ent->client ) {
 		return;
+	}
+
+	if ( !( ent->r.svFlags & SVF_BOT ) ) {
+		char		userinfo[MAX_INFO_STRING];
+		char		autoDetail[MAX_INFO_STRING];
+		const char		*ipInfo;
+
+		trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
+		ipInfo = Info_ValueForKey( userinfo, "ip" );
+		Q_strncpyz( autoDetail, ipInfo ? ipInfo : "", sizeof( autoDetail ) );
+		G_AutoAction( AUTOACTION_PLAYER_DISCONNECT, ent, autoDetail );
 	}
 
 	G_ComplaintClientDisconnected( clientNum );

@@ -664,3 +664,155 @@ int DebugLine(vec3_t start, vec3_t end, int color) {
 
 	return trap_DebugPolygonCreate(color, 4, points);
 }
+
+static const char *const g_autoActionEventNames[AUTOACTION_MAX] = {
+	"match_start",
+	"match_end",
+	"player_connect",
+	"player_disconnect"
+};
+
+/*
+============
+G_AutoAction_TrimToken
+
+Trims leading and trailing whitespace from the supplied buffer.
+============
+*/
+static char *G_AutoAction_TrimToken( char *text ) {
+	char *start;
+	char *end;
+
+	if ( !text ) {
+		return "";
+	}
+
+	start = text;
+	while ( *start && *start <= ' ' ) {
+		start++;
+	}
+
+	end = start + strlen( start );
+	while ( end > start && *( end - 1 ) <= ' ' ) {
+		*( --end ) = '\0';
+	}
+
+	return start;
+}
+
+/*
+============
+G_AutoAction_RunCommand
+
+Publishes context to helper CVars before executing the requested command.
+============
+*/
+static void G_AutoAction_RunCommand( const char *eventName, const char *command, const gentity_t *subject, const char *details ) {
+	char		subjectName[MAX_NETNAME];
+	char		clientNumBuffer[16];
+	int		clientNum;
+
+	if ( !eventName || !command || !command[0] ) {
+		return;
+	}
+
+	subjectName[0] = '\0';
+	clientNum = -1;
+	if ( subject && subject->client ) {
+		Q_strncpyz( subjectName, subject->client->pers.netname, sizeof( subjectName ) );
+		Q_CleanStr( subjectName );
+		clientNum = subject->s.number;
+	}
+
+	Com_sprintf( clientNumBuffer, sizeof( clientNumBuffer ), "%i", clientNum );
+	trap_Cvar_Set( "g_autoActionEvent", eventName );
+	trap_Cvar_Set( "g_autoActionSubject", subjectName );
+	trap_Cvar_Set( "g_autoActionClientNum", clientNumBuffer );
+	trap_Cvar_Set( "g_autoActionDetails", details ? details : "" );
+
+	G_Printf( "autoaction: %s -> %s\n", eventName, command );
+	trap_SendConsoleCommand( EXEC_APPEND, va( "%s\n", command ) );
+}
+
+/*
+============
+G_AutoAction
+
+Executes any configured administrative scripts associated with the supplied event.
+============
+*/
+void G_AutoAction( autoActionEvent_t event, const gentity_t *subject, const char *details ) {
+	char		config[MAX_CVAR_VALUE_STRING];
+	const char	*eventName;
+	char		*cursor;
+
+	if ( event < 0 || event >= AUTOACTION_MAX ) {
+		return;
+	}
+
+	if ( !g_autoAction.string[0] ) {
+		return;
+	}
+
+	eventName = g_autoActionEventNames[event];
+	Q_strncpyz( config, g_autoAction.string, sizeof( config ) );
+	cursor = config;
+
+	while ( cursor && *cursor ) {
+		char *entry = cursor;
+		char *next = cursor;
+		char *separator;
+		char *eventToken;
+		char *commandToken;
+		autoActionEvent_t configuredEvent;
+		int			tokenIndex;
+
+		while ( *next && *next != ',' && *next != ';' ) {
+			next++;
+		}
+		if ( *next ) {
+			*next++ = '\0';
+		}
+		cursor = next;
+
+		entry = G_AutoAction_TrimToken( entry );
+		if ( !entry[0] ) {
+			continue;
+		}
+
+		separator = strchr( entry, ':' );
+		if ( !separator ) {
+			separator = strchr( entry, '=' );
+		}
+		if ( !separator ) {
+			continue;
+		}
+
+		*separator++ = '\0';
+		eventToken = G_AutoAction_TrimToken( entry );
+		commandToken = G_AutoAction_TrimToken( separator );
+		if ( !eventToken[0] || !commandToken[0] ) {
+			continue;
+		}
+
+		configuredEvent = AUTOACTION_MAX;
+		for ( tokenIndex = 0; tokenIndex < AUTOACTION_MAX; tokenIndex++ ) {
+			if ( !Q_stricmp( eventToken, g_autoActionEventNames[tokenIndex] ) ) {
+				configuredEvent = (autoActionEvent_t)tokenIndex;
+				break;
+			}
+		}
+
+		if ( configuredEvent == AUTOACTION_MAX ) {
+			G_Printf( "autoaction: unknown event token '%s' in g_autoAction entry '%s'\n", eventToken, entry );
+			continue;
+		}
+
+		if ( configuredEvent != event ) {
+			continue;
+		}
+
+		G_AutoAction_RunCommand( eventName, commandToken, subject, details );
+	}
+}
+

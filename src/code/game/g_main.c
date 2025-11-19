@@ -250,6 +250,11 @@ vmCvar_t	g_playerCylinders;
 vmCvar_t	g_playerheadScale;
 vmCvar_t	g_playerheadScaleOffset;
 vmCvar_t	g_playerModelScale;
+vmCvar_t	g_autoAction;
+vmCvar_t	g_floodprot_maxcount;
+vmCvar_t	g_floodprot_decay;
+vmCvar_t	g_floodprot_penalty;
+vmCvar_t	g_kickBadUserinfo;
 vmCvar_t	g_playermodelOverride;
 vmCvar_t	g_playerheadmodelOverride;
 vmCvar_t	g_training;
@@ -474,6 +479,11 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_playerheadScale, "g_playerheadScale", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Primary multiplier applied to forced head models for visibility parity." },
 	{ &g_playerheadScaleOffset, "g_playerheadScaleOffset", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Secondary head-model scalar layered on top of g_playerheadScale so admins can fine-tune the enforced size." },
 	{ &g_playerModelScale, "g_playerModelScale", "1.1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Applies a global scale multiplier to server-enforced player models." },
+	{ &g_autoAction, "g_autoAction", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Comma or semicolon separated list of event:command pairs executed automatically (match_start, match_end, player_connect, player_disconnect)." },
+	{ &g_floodprot_maxcount, "g_floodprot_maxcount", "8", CVAR_ARCHIVE, 0, qfalse, qfalse, "Maximum chat or command bursts allowed before flood protection engages; 0 disables the limiter." },
+	{ &g_floodprot_decay, "g_floodprot_decay", "1000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Milliseconds required before a flood point decays back off the counter." },
+	{ &g_floodprot_penalty, "g_floodprot_penalty", "4000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Milliseconds players are muted from commands after tripping flood protection; 0 scales to decay*maxcount." },
+	{ &g_kickBadUserinfo, "g_kickBadUserinfo", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Drop clients submitting malformed userinfo when non-zero; 0 only warns and repairs the data." },
 	{ &g_botsFile, "g_botsFile", "", CVAR_INIT | CVAR_ROM, 0, qfalse, qfalse, "Override bot definition list with a custom script when specified." },
 	{ &g_botSpawnList, "g_botSpawnList", "", 0, 0, qfalse, qfalse, "Space-separated bot names automatically spawned on map start when set." },
 	{ &g_training, "g_training", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable the training progression gate so players must complete tutorials." },
@@ -1496,6 +1506,19 @@ G_UpdateTrainingState();
 	G_UpdateMatchStateConfigString();
 	G_MatchConfig_UpdateConfigstrings();
 
+	{
+		char		mapName[MAX_QPATH];
+		char		detail[MAX_QPATH + 16];
+
+		trap_Cvar_VariableStringBuffer( "mapname", mapName, sizeof( mapName ) );
+		if ( restart ) {
+			Com_sprintf( detail, sizeof( detail ), "%s|restart", mapName );
+		} else {
+			Q_strncpyz( detail, mapName, sizeof( detail ) );
+		}
+		G_AutoAction( AUTOACTION_MATCH_START, NULL, detail );
+	}
+
 }
 
 
@@ -2004,6 +2027,10 @@ or moved to a new level based on the "nextmap" cvar
 void ExitLevel (void) {
 	int		i;
 	gclient_t *cl;
+	char		mapName[MAX_QPATH];
+
+	trap_Cvar_VariableStringBuffer( "mapname", mapName, sizeof( mapName ) );
+	G_AutoAction( AUTOACTION_MATCH_END, NULL, mapName );
 
 	//bot interbreeding
 	BotInterbreedEndMatch();

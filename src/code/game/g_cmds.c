@@ -156,6 +156,84 @@ char	*ConcatArgs( int start ) {
 
 	return line;
 }
+
+/*
+============
+G_FloodLimited
+
+Applies the configured flood control policy and optionally records a usage.
+============
+*/
+static qboolean G_FloodLimited( gentity_t *ent, const char *action, qboolean recordUsage ) {
+	gclient_t		*client;
+	const char	*label;
+	int		maxCount;
+	int		decay;
+
+	if ( !ent || !ent->client ) {
+		return qfalse;
+	}
+
+	maxCount = g_floodprot_maxcount.integer;
+	decay = g_floodprot_decay.integer;
+	if ( maxCount <= 0 || decay <= 0 ) {
+		return qfalse;
+	}
+
+	client = ent->client;
+	label = ( action && action[0] ) ? action : "issuing commands";
+
+	if ( client->floodPenaltyTime > level.time ) {
+		const int	remainingMs = client->floodPenaltyTime - level.time;
+		const int	remainingSeconds = ( remainingMs + 999 ) / 1000;
+
+		trap_SendServerCommand( ent - g_entities,
+			va( "print \"Flood protection: wait %d second%s before %s.\\n\"",
+			remainingSeconds, ( remainingSeconds == 1 ) ? "" : "s", label ) );
+		return qtrue;
+	}
+
+	if ( !recordUsage ) {
+		return qfalse;
+	}
+
+	if ( client->floodLastTime > 0 ) {
+		const int elapsed = level.time - client->floodLastTime;
+		if ( elapsed > 0 ) {
+			int reduction = elapsed / decay;
+			if ( reduction > 0 ) {
+				client->floodCount -= reduction;
+				if ( client->floodCount < 0 ) {
+					client->floodCount = 0;
+				}
+			}
+		}
+	}
+
+	client->floodLastTime = level.time;
+	client->floodCount++;
+	if ( client->floodCount > maxCount ) {
+		int penalty = g_floodprot_penalty.integer;
+		if ( penalty <= 0 ) {
+			penalty = decay * maxCount;
+			if ( penalty <= 0 ) {
+				penalty = decay;
+			}
+		}
+
+		client->floodPenaltyTime = level.time + penalty;
+		client->floodCount = 0;
+
+		trap_SendServerCommand( ent - g_entities,
+			va( "print \"Flood protection triggered. Please wait %d second%s before %s.\\n\"",
+			( penalty + 999 ) / 1000, ( ( penalty + 999 ) / 1000 ) == 1 ? "" : "s", label ) );
+		G_LogPrintf( "floodprot: client %i (%s) blocked for %dms via %s\n",
+			ent - g_entities, client->pers.netname, penalty, label );
+		return qtrue;
+	}
+
+	return qfalse;
+}
 /*
 =============
 G_ClampItemTimerHeight
@@ -1338,6 +1416,10 @@ static void Cmd_Say_f( gentity_t *ent, int mode, qboolean arg0 ) {
 		p = ConcatArgs( 1 );
 	}
 
+	if ( G_FloodLimited( ent, ( mode == SAY_TEAM ) ? "using team chat" : "chatting", qtrue ) ) {
+		return;
+	}
+
 	G_Say( ent, NULL, mode, p );
 }
 
@@ -1368,6 +1450,10 @@ static void Cmd_Tell_f( gentity_t *ent ) {
 	}
 
 	p = ConcatArgs( 2 );
+
+	if ( G_FloodLimited( ent, "sending tells", qtrue ) ) {
+		return;
+	}
 
 	G_LogPrintf( "tell: %s to %s: %s\n", ent->client->pers.netname, target->client->pers.netname, p );
 	G_Say( ent, target, SAY_TELL, p );
@@ -1448,6 +1534,7 @@ Cmd_Voice_f
 */
 static void Cmd_Voice_f( gentity_t *ent, int mode, qboolean arg0, qboolean voiceonly ) {
 	char		*p;
+	const char		*action;
 
 	if ( trap_Argc () < 2 && !arg0 ) {
 		return;
@@ -1460,6 +1547,16 @@ static void Cmd_Voice_f( gentity_t *ent, int mode, qboolean arg0, qboolean voice
 	else
 	{
 		p = ConcatArgs( 1 );
+	}
+
+	if ( mode == SAY_TEAM ) {
+		action = voiceonly ? "using team voice commands" : "using team voice chat";
+	} else {
+		action = voiceonly ? "using voice commands" : "using voice chat";
+	}
+
+	if ( G_FloodLimited( ent, action, qtrue ) ) {
+		return;
 	}
 
 	G_Voice( ent, NULL, mode, p, voiceonly );
@@ -1493,6 +1590,10 @@ static void Cmd_VoiceTell_f( gentity_t *ent, qboolean voiceonly ) {
 
 	id = ConcatArgs( 2 );
 
+	if ( G_FloodLimited( ent, voiceonly ? "sending private voice commands" : "sending private voice chats", qtrue ) ) {
+		return;
+	}
+
 	G_LogPrintf( "vtell: %s to %s: %s\n", ent->client->pers.netname, target->client->pers.netname, id );
 	G_Voice( ent, target, SAY_TELL, id, voiceonly );
 	// don't tell to the player self if it was already directed to this player
@@ -1513,6 +1614,10 @@ static void Cmd_VoiceTaunt_f( gentity_t *ent ) {
 	int i;
 
 	if (!ent->client) {
+		return;
+	}
+
+	if ( G_FloodLimited( ent, "sending voice taunts", qtrue ) ) {
 		return;
 	}
 
@@ -1601,6 +1706,9 @@ void Cmd_GameCommand_f( gentity_t *ent ) {
 		return;
 	}
 	if ( order < 0 || order > sizeof(gc_orders)/sizeof(char *) ) {
+		return;
+	}
+	if ( G_FloodLimited( ent, "issuing team commands", qtrue ) ) {
 		return;
 	}
 	G_Say( ent, &g_entities[player], SAY_TELL, gc_orders[order] );
@@ -2515,6 +2623,9 @@ void ClientCommand( int clientNum ) {
 		return;		// not fully in game yet
 	}
 
+	if ( G_FloodLimited( ent, "issuing commands", qfalse ) ) {
+		return;
+	}
 
 	trap_Argv( 0, cmd, sizeof( cmd ) );
 

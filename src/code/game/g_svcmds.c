@@ -436,6 +436,83 @@ void	Svcmd_ForceTeam_f( void ) {
 	SetTeam( &g_entities[cl - level.clients], str );
 }
 
+/*
+=============
+Svcmd_FloodStatus_f
+
+Reports the current flood protection counters for each connected client.
+=============
+*/
+static void Svcmd_FloodStatus_f( void ) {
+	int			maxCount;
+	int			decay;
+	int			penalty;
+	int			visibleClients;
+	qboolean	found;
+	int			i;
+
+	maxCount = g_floodprot_maxcount.integer;
+	decay = g_floodprot_decay.integer;
+	penalty = g_floodprot_penalty.integer;
+	if ( maxCount <= 0 || decay <= 0 ) {
+		G_Printf( "Flood protection is disabled. Set g_floodprot_maxcount and g_floodprot_decay to enable it.\n" );
+		return;
+	}
+
+	if ( penalty <= 0 ) {
+		penalty = decay * maxCount;
+		if ( penalty <= 0 ) {
+			penalty = decay;
+		}
+	}
+
+	G_Printf( "Flood protection window: %d uses / %dms decay / %dms penalty\n", maxCount, decay, penalty );
+	found = qfalse;
+	visibleClients = 0;
+
+	for ( i = 0; i < level.maxclients; i++ ) {
+		gclient_t       *cl;
+		char            lastBuffer[32];
+		const char      *lastDesc;
+		int             penaltyRemaining;
+		int             sinceLast;
+
+		cl = &level.clients[i];
+		if ( cl->pers.connected == CON_DISCONNECTED ) {
+			continue;
+		}
+
+		visibleClients++;
+		penaltyRemaining = cl->floodPenaltyTime - level.time;
+		if ( penaltyRemaining < 0 ) {
+			penaltyRemaining = 0;
+		}
+
+		sinceLast = ( cl->floodLastTime > 0 ) ? level.time - cl->floodLastTime : -1;
+		if ( sinceLast >= 0 ) {
+			Com_sprintf( lastBuffer, sizeof( lastBuffer ), "%ims ago", sinceLast );
+			lastDesc = lastBuffer;
+		} else {
+			lastDesc = "no activity";
+		}
+
+		if ( cl->floodCount <= 0 && penaltyRemaining <= 0 ) {
+			continue;
+		}
+
+		found = qtrue;
+		G_Printf( "#%i %s: count=%i penalty=%ims last=%s\n", i, cl->pers.netname, cl->floodCount, penaltyRemaining, lastDesc );
+	}
+
+	if ( !found ) {
+		if ( visibleClients > 0 ) {
+			G_Printf( "No clients currently have flood counters or penalties.\n" );
+		} else {
+			G_Printf( "No active clients to report.\n" );
+		}
+	}
+}
+
 char	*ConcatArgs( int start );
 
 /*
@@ -457,6 +534,11 @@ qboolean	ConsoleCommand( void ) {
 
 	if ( Q_stricmp (cmd, "forceteam") == 0 ) {
 		Svcmd_ForceTeam_f();
+		return qtrue;
+	}
+
+	if ( Q_stricmp( cmd, "floodstatus" ) == 0 ) {
+		Svcmd_FloodStatus_f();
 		return qtrue;
 	}
 
