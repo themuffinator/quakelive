@@ -30,6 +30,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../game/match_state_keys.h"
 
+// Mirrors the VF_* vote flag bits exposed via g_voteFlags on the server.
+#define CG_VOTEFLAG_NO_MAP	0x0001
+#define CG_VOTEFLAG_NO_NEXTMAP	0x0004
+
 typedef struct {
 	const char *order;
 	int taskNum;
@@ -761,6 +765,8 @@ void CG_ParseServerinfo( void ) {
 	char	oldHeadOverride[MAX_QPATH];
 	const char	*modelOverride;
 	const char	*headOverride;
+	const char	*voteFlagsValue;
+	qboolean	mapVotingDisabled;
 
 	info = CG_ConfigString( CS_SERVERINFO );
 	Q_strncpyz( oldModelOverride, cgs.playermodelOverride, sizeof( oldModelOverride ) );
@@ -772,6 +778,10 @@ void CG_ParseServerinfo( void ) {
 	cgs.fraglimit = atoi( Info_ValueForKey( info, "fraglimit" ) );
 	cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
+	voteFlagsValue = Info_ValueForKey( info, "g_voteFlags" );
+	cgs.voteFlags = atoi( voteFlagsValue );
+	mapVotingDisabled = ( cgs.voteFlags & ( CG_VOTEFLAG_NO_MAP | CG_VOTEFLAG_NO_NEXTMAP ) ) ? qtrue : qfalse;
+	trap_Cvar_Set( "ui_mapVotingDisabled", mapVotingDisabled ? "1" : "0" );
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
