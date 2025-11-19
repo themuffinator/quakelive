@@ -773,6 +773,17 @@ void CG_ParseServerinfo( void ) {
 	cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
+	{
+		const char	*armorTieredValue;
+
+		armorTieredValue = Info_ValueForKey( info, "g_armorTiered" );
+		if ( !armorTieredValue[0] ) {
+			armorTieredValue = "0";
+		}
+
+		cg.armorTieredEnabled = (qboolean)( atoi( armorTieredValue ) != 0 );
+		trap_Cvar_Set( "cg_armorTiered", armorTieredValue );
+	}
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
 CG_SetTeamNameCvar( "g_redteam", Info_ValueForKey( info, "g_redTeam" ), DEFAULT_REDTEAM_NAME, cgs.redTeam, sizeof( cgs.redTeam ) );
