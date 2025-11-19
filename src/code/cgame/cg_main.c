@@ -154,6 +154,8 @@ vmCvar_t	cg_drawCrosshairNames;
 vmCvar_t	cg_drawRewards;
 vmCvar_t	cg_drawRewardsRowSize;
 vmCvar_t	cg_drawCheckpointRemaining;
+vmCvar_t	cg_levelTimerDirection;
+vmCvar_t	cg_raceBeep;
 vmCvar_t	cg_drawProfileImages;
 vmCvar_t	cg_drawSprites;
 vmCvar_t	cg_drawPregameMessages;
@@ -327,6 +329,9 @@ vmCvar_t	cg_oldRail;
 vmCvar_t	cg_oldRocket;
 vmCvar_t	cg_oldPlasma;
 vmCvar_t	cg_trueLightning;
+vmCvar_t	cg_lightningStyle;
+vmCvar_t	cg_lightningImpact;
+vmCvar_t	cg_lightningImpactCap;
 vmCvar_t	cg_drawTieredArmorAvailability;
 vmCvar_t	cg_armorTiered;
 vmCvar_t	cg_drawFullWeaponBar;
@@ -407,6 +412,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_useLegacyHud, "cg_useLegacyHud", "0", CVAR_ARCHIVE },
 	{ &cg_vignette, "cg_vignette", "1", CVAR_ARCHIVE },
 	{ &cg_drawTimer, "cg_drawTimer", "0", CVAR_ARCHIVE  },
+	{ &cg_levelTimerDirection, "cg_levelTimerDirection", "up", CVAR_ARCHIVE },
 	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
 	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  },
 	{ &cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE  },
@@ -419,6 +425,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawRewards, "cg_drawRewards", "1", CVAR_ARCHIVE },
 	{ &cg_drawRewardsRowSize, "cg_drawRewardsRowSize", "9", CVAR_ARCHIVE },
 	{ &cg_drawCheckpointRemaining, "cg_drawCheckpointRemaining", "1", CVAR_ARCHIVE },
+	{ &cg_raceBeep, "cg_raceBeep", "1", CVAR_ARCHIVE },
 	{ &cg_drawProfileImages, "cg_drawProfileImages", "1", CVAR_ARCHIVE },
 	{ &cg_drawSprites, "cg_drawSprites", "1", CVAR_ARCHIVE },
 	{ &cg_drawPregameMessages, "cg_drawPregameMessages", "1", CVAR_ARCHIVE },
@@ -558,6 +565,9 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_oldRocket, "cg_oldRocket", "1", CVAR_ARCHIVE},
 	{ &cg_oldPlasma, "cg_oldPlasma", "1", CVAR_ARCHIVE},
 	{ &cg_trueLightning, "cg_trueLightning", "0.0", CVAR_ARCHIVE },
+	{ &cg_lightningStyle, "cg_lightningStyle", "1", CVAR_ARCHIVE },
+	{ &cg_lightningImpact, "cg_lightningImpact", "1", CVAR_ARCHIVE },
+	{ &cg_lightningImpactCap, "cg_lightningImpactCap", "512", CVAR_ARCHIVE },
 	{ &cg_drawTieredArmorAvailability, "cg_drawTieredArmorAvailability", "1", CVAR_ARCHIVE },
 	{ &cg_armorTiered, "cg_armorTiered", "1", CVAR_ARCHIVE },
 	{ &cg_drawFullWeaponBar, "cg_drawFullWeaponBar", "0", CVAR_ARCHIVE },
