@@ -22,6 +22,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_image.c
 #include "tr_local.h"
 
+#include <limits.h>
+#include <setjmp.h>
+
+#include <png.h>
+
 /*
  * Include file for users of JPEG library.
  * You will need to have included system headers that define at least
@@ -37,6 +42,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 static void LoadBMP( const char *name, byte **pic, int *width, int *height );
 static void LoadTGA( const char *name, byte **pic, int *width, int *height );
 static void LoadJPG( const char *name, byte **pic, int *width, int *height );
+static void LoadPNG( const char *name, byte **pic, int *width, int *height );
 
 static byte			 s_intensitytable[256];
 static unsigned char s_gammatable[256];
@@ -791,6 +797,178 @@ image_t *R_CreateImage( const char *name, const byte *pic, int width, int height
 	return image;
 }
 
+
+/*
+=========================================================
+
+PNG LOADING
+
+=========================================================
+*/
+
+typedef struct pngMemoryBuffer_s {
+	const byte	*data;
+	size_t			size;
+	size_t			offset;
+} pngMemoryBuffer_t;
+
+/*
+=============
+PNGReadData
+
+Custom read callback for libpng that consumes data from a file buffer.
+=============
+*/
+static void PNGReadData( png_structp png_ptr, png_bytep data, png_size_t length ) {
+	pngMemoryBuffer_t	*pngMem;
+
+	pngMem = ( pngMemoryBuffer_t * )png_get_io_ptr( png_ptr );
+	if ( !pngMem || pngMem->offset + length > pngMem->size ) {
+		png_error( png_ptr, "LoadPNG: attempted to read past end of buffer" );
+		return;
+	}
+
+	Com_Memcpy( data, pngMem->data + pngMem->offset, length );
+	pngMem->offset += length;
+}
+
+/*
+=============
+LoadPNG
+
+Loads PNG files and converts them to 32-bit RGBA pixel data.
+=============
+*/
+static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
+	int					len;
+	byte				*fileData;
+	png_structp		png_ptr;
+	png_infop			info_ptr;
+	png_bytep			*row_pointers;
+	byte				*imageData;
+	png_uint_32		pngWidth;
+	png_uint_32		pngHeight;
+	int					bitDepth;
+	int					colorType;
+	qboolean			addAlpha;
+	int					intent;
+	double				gammaValue;
+	pngMemoryBuffer_t	pngMem;
+	png_size_t		rowBytes;
+	size_t				dataSize;
+	png_bytep			rowBase;
+	png_uint_32		row;
+
+	*pic = NULL;
+
+	len = ri.FS_ReadFile( name, (void **)&fileData );
+	if ( len <= 0 || !fileData ) {
+		return;
+	}
+
+	row_pointers = NULL;
+	imageData = NULL;
+	png_ptr = NULL;
+	info_ptr = NULL;
+
+	if ( len < 8 || png_sig_cmp( fileData, 0, 8 ) ) {
+		goto done;
+	}
+
+	png_ptr = png_create_read_struct( PNG_LIBPNG_VER_STRING, NULL, NULL, NULL );
+	if ( !png_ptr ) {
+		goto done;
+	}
+
+	info_ptr = png_create_info_struct( png_ptr );
+	if ( !info_ptr ) {
+		goto done;
+	}
+
+	if ( setjmp( png_jmpbuf( png_ptr ) ) ) {
+		ri.Printf( PRINT_WARNING, "LoadPNG: Error occurred while decoding %s.\n", name );
+		goto done;
+	}
+
+	pngMem.data = fileData;
+	pngMem.size = len;
+	pngMem.offset = 0;
+	png_set_read_fn( png_ptr, &pngMem, PNGReadData );
+
+	png_read_info( png_ptr, info_ptr );
+	png_get_IHDR( png_ptr, info_ptr, &pngWidth, &pngHeight, &bitDepth, &colorType, NULL, NULL, NULL );
+	if ( pngWidth == 0 || pngHeight == 0 || pngWidth > INT_MAX || pngHeight > INT_MAX ) {
+		goto done;
+	}
+
+	addAlpha = ( colorType & PNG_COLOR_MASK_ALPHA ) ? qfalse : qtrue;
+	if ( colorType == PNG_COLOR_TYPE_PALETTE || colorType == PNG_COLOR_TYPE_GRAY || png_get_valid( png_ptr, info_ptr, PNG_INFO_tRNS ) ) {
+		png_set_expand( png_ptr );
+	}
+	if ( colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_GRAY_ALPHA ) {
+		png_set_gray_to_rgb( png_ptr );
+	}
+	if ( bitDepth == 16 ) {
+		png_set_strip_16( png_ptr );
+	}
+	if ( png_get_valid( png_ptr, info_ptr, PNG_INFO_tRNS ) ) {
+		addAlpha = qfalse;
+	}
+
+	if ( png_get_sRGB( png_ptr, info_ptr, &intent ) ) {
+		png_set_sRGB_gAMA_and_cHRM( png_ptr, info_ptr, intent );
+	} else if ( png_get_gAMA( png_ptr, info_ptr, &gammaValue ) ) {
+		png_set_gamma( png_ptr, 2.2, gammaValue );
+	} else {
+		png_set_gamma( png_ptr, 2.2, 0.45455 );
+	}
+
+	if ( addAlpha ) {
+		png_set_filler( png_ptr, 0xff, PNG_FILLER_AFTER );
+	}
+
+	png_read_update_info( png_ptr, info_ptr );
+	rowBytes = png_get_rowbytes( png_ptr, info_ptr );
+	dataSize = rowBytes * (size_t)pngHeight;
+	if ( rowBytes == 0 || dataSize == 0 || dataSize > INT_MAX ) {
+		goto done;
+	}
+
+	imageData = ri.Malloc( (int)dataSize );
+	row_pointers = ri.Malloc( pngHeight * sizeof( png_bytep ) );
+	if ( !imageData || !row_pointers ) {
+		goto done;
+	}
+
+	rowBase = imageData;
+	for ( row = 0; row < pngHeight; row++ ) {
+		row_pointers[row] = rowBase;
+		rowBase += rowBytes;
+	}
+
+	png_read_image( png_ptr, row_pointers );
+	png_read_end( png_ptr, NULL );
+
+	*pic = imageData;
+	imageData = NULL;
+	*width = (int)pngWidth;
+	*height = (int)pngHeight;
+
+
+	done:
+	if ( row_pointers ) {
+		ri.Free( row_pointers );
+	}
+	if ( imageData ) {
+		ri.Free( imageData );
+	}
+	if ( png_ptr ) {
+		png_destroy_read_struct( &png_ptr, info_ptr ? &info_ptr : NULL, NULL );
+	}
+	if ( fileData ) {
+		ri.FS_FreeFile( fileData );
+	}
+	}
 
 /*
 =========================================================
@@ -1825,22 +2003,35 @@ void R_LoadImage( const char *name, byte **pic, int *width, int *height ) {
 	}
 
 	if ( !Q_stricmp( name+len-4, ".tga" ) ) {
-	  LoadTGA( name, pic, width, height );            // try tga first
-    if (!*pic) {                                    //
-		  char altname[MAX_QPATH];                      // try jpg in place of tga 
-      strcpy( altname, name );                      
-      len = strlen( altname );                  
-      altname[len-3] = 'j';
-      altname[len-2] = 'p';
-      altname[len-1] = 'g';
-			LoadJPG( altname, pic, width, height );
+		LoadTGA( name, pic, width, height );		// try tga first
+		if ( !*pic ) {				//
+			char altname[MAX_QPATH];			// try png / jpg in place of tga
+
+			Q_strncpyz( altname, name, sizeof( altname ) );
+			len = strlen( altname );
+			altname[len-3] = 'p';
+			altname[len-2] = 'n';
+			altname[len-1] = 'g';
+			LoadPNG( altname, pic, width, height );
+			if ( !*pic ) {
+				altname[len-3] = 'j';
+				altname[len-2] = 'p';
+				altname[len-1] = 'g';
+				LoadJPG( altname, pic, width, height );
+			}
 		}
-  } else if ( !Q_stricmp(name+len-4, ".pcx") ) {
-    LoadPCX32( name, pic, width, height );
-	} else if ( !Q_stricmp( name+len-4, ".bmp" ) ) {
-		LoadBMP( name, pic, width, height );
-	} else if ( !Q_stricmp( name+len-4, ".jpg" ) ) {
-		LoadJPG( name, pic, width, height );
+		if ( !*pic ) {
+			ri.Printf( PRINT_WARNING, "image not found (tga/jpg/png): %s\n", name );
+		}
+	} else if ( !Q_stricmp(name+len-4, ".pcx") ) {
+	LoadPCX32( name, pic, width, height );
+		} else if ( !Q_stricmp( name+len-4, ".bmp" ) ) {
+			LoadBMP( name, pic, width, height );
+		} else if ( !Q_stricmp( name+len-4, ".png" ) ) {
+			LoadPNG( name, pic, width, height );
+		} else if ( !Q_stricmp( name+len-4, ".jpg" ) ) {
+			LoadJPG( name, pic, width, height );
+		}
 	}
 }
 
