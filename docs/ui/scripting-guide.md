@@ -15,11 +15,13 @@ This guide documents how to stage Quake Live HUD and menu assets inside the GPL 
 
 ### 3. Stage Art, Fonts, and Shaders
 - Import the entire `ui/assets` hierarchy into a reproducible bundle (for example `pak_uiql.pk3`). This includes HUD chrome, score state textures, menu backgrounds, and national flags.
-- Copy Quake Live’s TTFs from `references/original-assets/quakelive/baseq3/fonts` and run the font bake tool to generate `fonts/font`, `fonts/smallfont`, and `fonts/bigfont` atlases that match scripted `textscale` expectations.
+- Point the font bake step at `references/original-assets/quakelive/baseq3/fonts/` so the canonical Quake Live TTFs (`handelgothic.ttf`, `notosans-regular.ttf`, `droidsansmono.ttf`, `droidsansfallbackfull.ttf`) remain intact in their original location. Treat this directory as the staging input for packaging rather than copying the binaries elsewhere.
+- Run the font bake tool against the staged TTFs to regenerate `fonts/font`, `fonts/smallfont`, and `fonts/bigfont` atlases that match scripted `textscale` expectations. `handelgothic.ttf` feeds the default `font`/`bigFont` look, `notosans-regular.ttf` drives the `smallFont` text blocks, and `droidsansfallbackfull.ttf` keeps multilingual glyphs available for HUD prompts.
 - Bring over the `ui*.shader` files and any dependent materials so gradients, cursors, and overlay effects compile correctly.
 
 ### 4. Package the Assets
 - Extend the data build to archive scripts, art, fonts, and shaders into a deterministic PK3. Keep the packaging recipe under version control (e.g., `tools/build_ui_bundle.sh`).
+- Track packaging manifests under `tools/` so the bundle recipe is auditable. `tools/packaging/ui_bundle_manifest.json` now lists the Quake Live font binaries sourced from `references/original-assets/quakelive/baseq3/fonts/`, the paths they must occupy inside the PK3 (`fonts/*.ttf`), their HUD roles (`font`, `smallFont`, `bigFont`, `mono`), and the license caveats (Handel Gothic remains proprietary, while the Droid and Noto families stay under Apache 2.0).
 - Version PK3 outputs or manifests to ensure reproducibility across Windows, macOS, and Linux builds.
 
 ### 5. Validate In-Game

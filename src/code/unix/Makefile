@@ -174,7 +174,7 @@ ifeq ($(PLATFORM),linux)
   RANLIB=ranlib
 
   THREAD_LDFLAGS=-lpthread
-  LDFLAGS=-ldl -lm
+  LDFLAGS=-ldl -lm -lvorbisfile -lvorbis -logg
   GLLDFLAGS=-L/usr/X11R6/lib -lX11 -lXext -lXxf86dga -lXxf86vm
 
   ifeq ($(ARCH),axp)
@@ -249,7 +249,7 @@ RANLIB=ranlib
 
 THREAD_LDFLAGS=-lpthread
 # don't need -ldl (FreeBSD)
-LDFLAGS=-lm
+LDFLAGS=-lm -lvorbisfile -lvorbis -logg
 #GLLDFLAGS=-L/usr/X11R6/lib -L$(MESADIR)/lib -lGL -lX11 -lXext -lXxf86dga -lXxf86vm
 #GLLDFLAGS=-L/usr/X11/lib -lGL -lX11 -lXext -lm
 GLLDFLAGS=-L/usr/X11R6/lib -lGL -lX11 -lXext -lXxf86dga -lXxf86vm
@@ -295,7 +295,7 @@ SHLIBLDFLAGS=-shared
 ARFLAGS=ar rv
 RANLIB=ranlib
 
-LDFLAGS=-ldl -lm
+LDFLAGS=-ldl -lm -lvorbisfile -lvorbis -logg
 GLLDFLAGS=-L/usr/X11/lib -lGL -lX11 -lXext -lm
 
 TARGETS=$(B)/sgiquake3 \
@@ -322,9 +322,9 @@ ARFLAGS=ar rv
 RANLIB=ranlib
 
 ifeq ($(PLATFORM),freebsd)
-LDFLAGS=-lm
+LDFLAGS=-lm -lvorbisfile -lvorbis -logg
 else
-LDFLAGS=-ldl -lm
+LDFLAGS=-ldl -lm -lvorbisfile -lvorbis -logg
 endif # ifeq freebsd
 
 TARGETS=\
@@ -416,10 +416,12 @@ Q3OBJ = \
 	$(B)/client/huffman.o \
 	\
 	$(B)/client/snd_adpcm.o \
-	$(B)/client/snd_dma.o \
-	$(B)/client/snd_mem.o \
-	$(B)/client/snd_mix.o \
-	$(B)/client/snd_wavelet.o \
+$(B)/client/snd_dma.o \
+$(B)/client/snd_mem.o \
+$(B)/client/snd_mix.o \
+	$(B)/client/snd_ogg_decode.o \
+$(B)/client/snd_ogg_stream.o \
+$(B)/client/snd_wavelet.o \
 	\
 	$(B)/client/sv_bot.o \
 	$(B)/client/sv_ccmds.o \
@@ -648,9 +650,11 @@ $(B)/client/platform_backend_open_steam.o : $(MOUNT_DIR)/common/platform/backend
 $(B)/client/platform_backend_steamworks.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_steamworks.c; $(DO_CC)
 $(B)/client/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC)   
 $(B)/client/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC)       
-$(B)/client/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC)        
-$(B)/client/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC)       
-$(B)/client/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC)     
+$(B)/client/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC)
+$(B)/client/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC)
+$(B)/client/snd_ogg_decode.o : $(CDIR)/snd_ogg_decode.c; $(DO_CC)
+$(B)/client/snd_ogg_stream.o : $(CDIR)/snd_ogg_stream.c; $(DO_CC)
+$(B)/client/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC)
 $(B)/client/sv_bot.o : $(SDIR)/sv_bot.c; $(DO_CC)        
 $(B)/client/sv_client.o : $(SDIR)/sv_client.c; $(DO_CC)     
 $(B)/client/sv_ccmds.o : $(SDIR)/sv_ccmds.c; $(DO_CC)       
@@ -1525,10 +1529,12 @@ Q3SOBJ = \
 	$(B)/q3static/net_chan.o \
 	\
 	$(B)/q3static/snd_adpcm.o \
-	$(B)/q3static/snd_dma.o \
-	$(B)/q3static/snd_mem.o \
-	$(B)/q3static/snd_mix.o \
-	$(B)/q3static/snd_wavelet.o \
+$(B)/q3static/snd_dma.o \
+$(B)/q3static/snd_mem.o \
+$(B)/q3static/snd_mix.o \
+	$(B)/q3static/snd_ogg_decode.o \
+$(B)/q3static/snd_ogg_stream.o \
+$(B)/q3static/snd_wavelet.o \
 	\
 	$(B)/q3static/sv_bot.o \
 	$(B)/q3static/sv_ccmds.o \
@@ -1690,9 +1696,11 @@ $(B)/q3static/platform_backend_open_steam.o : $(MOUNT_DIR)/common/platform/backe
 $(B)/q3static/platform_backend_steamworks.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_steamworks.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC) -DQ3_STATIC   
 $(B)/q3static/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC) -DQ3_STATIC       
-$(B)/q3static/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC) -DQ3_STATIC        
-$(B)/q3static/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC) -DQ3_STATIC       
-$(B)/q3static/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC) -DQ3_STATIC     
+$(B)/q3static/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_ogg_decode.o : $(CDIR)/snd_ogg_decode.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_ogg_stream.o : $(CDIR)/snd_ogg_stream.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_wavelet.o : $(CDIR)/snd_wavelet.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/sv_bot.o : $(SDIR)/sv_bot.c; $(DO_CC) -DQ3_STATIC        
 $(B)/q3static/sv_client.o : $(SDIR)/sv_client.c; $(DO_CC) -DQ3_STATIC     
 $(B)/q3static/sv_ccmds.o : $(SDIR)/sv_ccmds.c; $(DO_CC) -DQ3_STATIC       

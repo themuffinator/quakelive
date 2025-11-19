@@ -490,6 +490,9 @@ typedef struct {
 	int			deferredPlayerLoading;
 	qboolean	loading;			// don't defer players at initial startup
 	qboolean	competitiveHudLoaded;	// tracks if Quake Live HUD menus are available
+	qboolean	armorTieredEnabled;	// caches cg_armorTiered for HUD scripting
+	qboolean	voiceChatIndicatorEnabled;	// caches cg_voiceChatIndicator state
+	qboolean	vignetteEnabled;	// caches cg_vignette state
 	qboolean	intermissionStarted;	// don't play voice rewards, because game will end shortly
 
 	// there are only one or two snapshot_t that are relevent at a time
@@ -602,6 +605,8 @@ typedef struct {
 
 	// low ammo warning state
 	int			lowAmmoWarning;		// 1 = low, 2 = empty
+	float		lowAmmoWarningPercentile;
+	vec4_t		weaponBarGrenadeColor;
 
 	// kill timers for carnage reward
 	int			lastKillTime;
@@ -654,6 +659,13 @@ typedef struct {
 	float		damageTime;
 	float		damageX, damageY, damageValue;
 
+	// cached screen damage customization
+	vec4_t		screenDamageColor;
+	vec4_t		screenDamageSelfColor;
+	vec4_t		screenDamageTeamColor;
+	float		screenDamageAlpha;
+	float		screenDamageAlphaTeam;
+
 	// status bar head
 	float		headYaw;
 	float		headEndPitch;
@@ -669,6 +681,9 @@ typedef struct {
 	float		v_dmg_roll;
 	float		kickScale;
 	float		bobScale;
+	float		simpleItemsHeightOffset;
+	float		simpleItemsRadius;
+	float		simpleItemsBob;
 
 	vec3_t		kick_angles;	// weapon kicks
 	vec3_t		kick_origin;
@@ -1218,6 +1233,25 @@ extern	vmCvar_t		cg_drawInputCmds;
 extern	vmCvar_t		cg_drawInputCmdsX;
 extern	vmCvar_t		cg_drawInputCmdsY;
 extern	vmCvar_t		cg_drawInputCmdsSize;
+extern	vmCvar_t		cg_weaponBar;
+extern	vmCvar_t		cg_weaponColor_grenade;
+extern	vmCvar_t		cg_weaponConfig;
+extern	vmCvar_t		cg_weaponConfig_g;
+extern	vmCvar_t		cg_weaponConfig_mg;
+extern	vmCvar_t		cg_weaponConfig_sg;
+extern	vmCvar_t		cg_weaponConfig_gl;
+extern	vmCvar_t		cg_weaponConfig_rl;
+extern	vmCvar_t		cg_weaponConfig_lg;
+extern	vmCvar_t		cg_weaponConfig_rg;
+extern	vmCvar_t		cg_weaponConfig_pg;
+extern	vmCvar_t		cg_weaponConfig_bfg;
+extern	vmCvar_t		cg_weaponConfig_gh;
+extern	vmCvar_t		cg_weaponConfig_ng;
+extern	vmCvar_t		cg_weaponConfig_pl;
+extern	vmCvar_t		cg_weaponConfig_cg;
+extern	vmCvar_t		cg_weaponConfig_hmg;
+extern	vmCvar_t		cg_weaponPrimary;
+extern	vmCvar_t		cg_weaponPrimaryQueued;
 extern	vmCvar_t		cg_drawTeamOverlay;
 extern	vmCvar_t		cg_selfOnTeamOverlay;
 extern	vmCvar_t		cg_drawTeamOverlayX;
@@ -1259,8 +1293,13 @@ extern	vmCvar_t		cg_tracerChance;
 extern	vmCvar_t		cg_tracerWidth;
 extern	vmCvar_t		cg_tracerLength;
 extern	vmCvar_t		cg_autoswitch;
+extern	vmCvar_t		cg_switchOnEmpty;
+extern	vmCvar_t		cg_switchToEmpty;
 extern	vmCvar_t		cg_ignore;
 extern	vmCvar_t		cg_simpleItems;
+extern	vmCvar_t		cg_simpleItemsHeightOffset;
+extern	vmCvar_t		cg_simpleItemsBob;
+extern	vmCvar_t		cg_simpleItemsRadius;
 extern	vmCvar_t		cg_fov;
 extern	vmCvar_t		cg_zoomFov;
 extern	vmCvar_t		cg_zoomToggle;
@@ -1277,6 +1316,7 @@ extern	vmCvar_t		cg_lagometer;
 extern	vmCvar_t		cg_drawAttacker;
 extern	vmCvar_t		cg_synchronousClients;
 extern	vmCvar_t		cg_teamChatTime;
+extern	vmCvar_t		cg_lowAmmoWarningPercentile;
 extern	vmCvar_t		cg_teamChatHeight;
 extern	vmCvar_t		cg_stats;
 extern	vmCvar_t 		cg_forceModel;
@@ -1305,9 +1345,12 @@ extern	vmCvar_t		cg_teammatePOIsMaxWidth;
 extern	vmCvar_t		cg_teamChatsOnly;
 extern	vmCvar_t		cg_noVoiceChats;
 extern	vmCvar_t		cg_noVoiceText;
+extern	vmCvar_t		cg_useItemMessage;
+extern	vmCvar_t		cg_useItemWarning;
 extern	vmCvar_t		cg_kickScale;
 extern  vmCvar_t		cg_scorePlum;
 extern	vmCvar_t		cg_smoothClients;
+extern	vmCvar_t		cg_loadout;
 extern	vmCvar_t		pmove_fixed;
 extern	vmCvar_t		pmove_msec;
 //extern	vmCvar_t		cg_pmove_fixed;
@@ -1326,6 +1369,7 @@ extern	vmCvar_t		cg_oldRocket;
 extern	vmCvar_t		cg_oldPlasma;
 extern	vmCvar_t		cg_trueLightning;
 extern	vmCvar_t		cg_drawTieredArmorAvailability;
+extern	vmCvar_t		cg_armorTiered;
 extern	vmCvar_t		cg_drawFullWeaponBar;
 extern	vmCvar_t		cg_drawHitFriendTime;
 extern	vmCvar_t		cg_drawDeadFriendTime;
@@ -1340,6 +1384,11 @@ extern	vmCvar_t		cg_specItemTimersSize;
 extern	vmCvar_t		cg_specTeamVitals;
 extern	vmCvar_t		cg_specTeamVitalsHealthColor;
 extern	vmCvar_t		cg_itemTimers;
+extern	vmCvar_t		cg_screenDamage;
+extern	vmCvar_t		cg_screenDamage_Self;
+extern	vmCvar_t		cg_screenDamage_Team;
+extern	vmCvar_t		cg_screenDamageAlpha;
+extern	vmCvar_t		cg_screenDamageAlpha_Team;
 extern	vmCvar_t		cg_overheadNamesWidth;
 extern	vmCvar_t		cg_obituaryRowSize;
 extern	vmCvar_t		cg_spectating;
@@ -1351,6 +1400,8 @@ extern	vmCvar_t		cg_gameInfo4;
 extern	vmCvar_t		cg_gameInfo5;
 extern	vmCvar_t		cg_gameInfo6;
 extern	vmCvar_t		cg_useLegacyHud;
+extern	vmCvar_t		cg_vignette;
+extern	vmCvar_t		cg_voiceChatIndicator;
 extern	vmCvar_t		cg_redTeamName;
 extern	vmCvar_t		cg_blueTeamName;
 extern	vmCvar_t		cg_currentSelectedPlayer;

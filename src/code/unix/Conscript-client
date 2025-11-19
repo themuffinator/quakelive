@@ -145,15 +145,15 @@ $env = new cons(
   CC => $CC,
   CXX => $CXX,
   LINK => $LINK,
-	ENV => { PATH => $ENV{PATH}, HOME => $ENV{HOME} },
+        ENV => { PATH => $ENV{PATH}, HOME => $ENV{HOME} },
   CFLAGS => $BASE_CFLAGS,
-  LIBS => ' ' . $BUILD_DIR . '/unix/splines.a ' 
-  . $BUILD_DIR . '/unix/botlib.a ' 
+  LIBS => ' ' . $BUILD_DIR . '/unix/splines.a '
+  . $BUILD_DIR . '/unix/botlib.a '
   . $BUILD_DIR . '/unix/jpeglib.a '
   . $BUILD_DIR . '/unix/asmlib.a '
   . $BUILD_DIR . '/unix/inlinelib.a '
-	. $BASE_LDFLAGS
-  . '-L/usr/X11R6/lib -lX11 -lXext -lXxf86dga -lXxf86vm -ldl -lm'
+        . $BASE_LDFLAGS
+  . '-L/usr/X11R6/lib -lX11 -lXext -lXxf86dga -lXxf86vm -ldl -lm -lvorbisfile -lvorbis -logg'
 );
 
 @RENDERER_FILES = qw(
@@ -220,6 +220,7 @@ $COMMON_REF = \@COMMON_FILES;
   ../client/snd_dma.c
   ../client/snd_mem.c
   ../client/snd_mix.c
+  ../client/snd_ogg_stream.c
   ../client/snd_wavelet.c
   );
 $SOUND_REF = \@SOUND_FILES;

@@ -165,6 +165,7 @@ extern cvar_t	*s_testsound;
 extern cvar_t	*s_separation;
 
 qboolean S_LoadSound( sfx_t *sfx );
+qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, wavinfo_t *info, short **outPcm );
 
 void		SND_free(sndBuffer *v);
 sndBuffer*	SND_malloc();
