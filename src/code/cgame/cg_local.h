@@ -1186,6 +1186,7 @@ typedef struct {
 	int				capturelimit;
 	int				timelimit;
 	int				maxclients;
+	int				voteFlags;
 	char			mapname[MAX_QPATH];
 	char			redTeam[MAX_QPATH];
 	char			blueTeam[MAX_QPATH];

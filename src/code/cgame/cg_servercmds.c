@@ -30,6 +30,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../game/match_state_keys.h"
 
+// Mirrors the server's g_voteFlags bit assignments so we can reason
+// about the end-of-match voting UI without relying on magic numbers.
+#define VF_NO_MAP			0x0001
+#define VF_NO_MAP_RESTART		0x0002
+#define VF_NO_NEXTMAP			0x0004
+#define VF_NO_GAMETYPE			0x0008
+#define VF_NO_END_MAP_VOTE	0x0800
+
 typedef struct {
 	const char *order;
 	int taskNum;
@@ -762,6 +770,11 @@ void CG_ParseServerinfo( void ) {
 	const char	*modelOverride;
 	const char	*headOverride;
 
+	const char	*voteFlagsValue;
+	qboolean	mapVotingDisabled;
+	qboolean	endMapVotingDisabled;
+	qboolean	gameTypeVotingDisabled;
+
 	info = CG_ConfigString( CS_SERVERINFO );
 	Q_strncpyz( oldModelOverride, cgs.playermodelOverride, sizeof( oldModelOverride ) );
 	Q_strncpyz( oldHeadOverride, cgs.playerheadmodelOverride, sizeof( oldHeadOverride ) );
@@ -773,6 +786,22 @@ void CG_ParseServerinfo( void ) {
 	cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
+	voteFlagsValue = Info_ValueForKey( info, "g_voteFlags" );
+	cgs.voteFlags = ( voteFlagsValue && voteFlagsValue[0] ) ? atoi( voteFlagsValue ) : 0;
+
+	/*
+	** The bits mirror g_cmds.c:
+	** 	VF_NO_MAP disables callvote map.
+	** 	VF_NO_NEXTMAP disables callvote nextmap.
+	** 	VF_NO_GAMETYPE disables callvote gametype.
+	** 	VF_NO_END_MAP_VOTE disables the end-of-match map vote regardless of overtime.
+	*/
+	mapVotingDisabled = ( cgs.voteFlags & ( VF_NO_MAP | VF_NO_NEXTMAP ) ) ? qtrue : qfalse;
+	trap_Cvar_Set( "ui_mapVotingDisabled", mapVotingDisabled ? "1" : "0" );
+	endMapVotingDisabled = ( ( cgs.voteFlags & VF_NO_END_MAP_VOTE ) != 0 ) || cgs.matchOvertimeActive;
+	trap_Cvar_Set( "ui_endMapVotingDisabled", endMapVotingDisabled ? "1" : "0" );
+	gameTypeVotingDisabled = ( cgs.voteFlags & VF_NO_GAMETYPE ) ? qtrue : qfalse;
+	trap_Cvar_Set( "ui_gameTypeVotingDisabled", gameTypeVotingDisabled ? "1" : "0" );
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
 CG_SetTeamNameCvar( "g_redteam", Info_ValueForKey( info, "g_redTeam" ), DEFAULT_REDTEAM_NAME, cgs.redTeam, sizeof( cgs.redTeam ) );
