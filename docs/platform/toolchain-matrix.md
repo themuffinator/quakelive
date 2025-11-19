@@ -19,7 +19,7 @@ This matrix tracks the host expectations for rebuilding Quake Live’s native ga
 
 - Target a glibc-based distribution capable of producing 32-bit binaries; the archived guidance calls for GCC along with the original OpenGL/X11 development headers used by the Quake III Unix port.【F:src/code/unix/README.Linux†L68-L155】【F:src/README.txt†L180-L188】
 - Ensure runtime hosts provide X11 with DGA and VidMode extensions, plus vendor-specific OpenGL drivers (or Mesa/Glide for 3dfx hardware) so the 32-bit `qagamei386.so` and other shared objects can load as they did in Quake Live.【F:src/code/unix/README.Linux†L84-L155】
-- Reference `qagamei386.so` from `references/original-assets/quakelive/baseq3/` when validating the rebuilt library to confirm symbol parity with the original Quake Live server module.【F:docs/reference-mapping.md†L18-L24】
+- Reference `qagamei386.so` from `assets/quakelive/baseq3/` when validating the rebuilt library to confirm symbol parity with the original Quake Live server module.【F:docs/reference-mapping.md†L18-L24】
 
 ### 32-bit runtime payload reference
 

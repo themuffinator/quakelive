@@ -2,7 +2,7 @@
 
 ## Referenced `steam_api` Surface
 
-Symbols imported by the stock launcher (`quakelive_steam.exe`) were extracted with `objdump -p references/original-assets/quakelive/quakelive_steam.exe`. The table groups the discovered entry points by the runtime feature they service.
+Symbols imported by the stock launcher (`quakelive_steam.exe`) were extracted with `objdump -p assets/quakelive/quakelive_steam.exe`. The table groups the discovered entry points by the runtime feature they service.
 
 | Feature | Symbols |
 | --- | --- |

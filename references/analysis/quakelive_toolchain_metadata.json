@@ -1,6 +1,6 @@
 [
   {
-    "path": "references/original-assets/quakelive/quakelive_steam.exe",
+    "path": "assets/quakelive/quakelive_steam.exe",
     "machine": "0x14c",
     "timestamp": "2016-06-03T21:09:31Z",
     "linker_version": "10.0",
@@ -33,7 +33,7 @@
     }
   },
   {
-    "path": "references/original-assets/quakelive/awesomium.dll",
+    "path": "assets/quakelive/awesomium.dll",
     "machine": "0x14c",
     "timestamp": "2014-03-28T18:57:29Z",
     "linker_version": "10.0",
@@ -65,7 +65,7 @@
     }
   },
   {
-    "path": "references/original-assets/quakelive/awesomium_process.exe",
+    "path": "assets/quakelive/awesomium_process.exe",
     "machine": "0x14c",
     "timestamp": "2014-03-28T18:12:49Z",
     "linker_version": "10.0",
@@ -98,7 +98,7 @@
     }
   },
   {
-    "path": "references/original-assets/quakelive/libGLESv2.dll",
+    "path": "assets/quakelive/libGLESv2.dll",
     "machine": "0x14c",
     "timestamp": "2014-02-11T07:49:15Z",
     "linker_version": "10.0",
@@ -130,7 +130,7 @@
     }
   },
   {
-    "path": "references/original-assets/quakelive/libEGL.dll",
+    "path": "assets/quakelive/libEGL.dll",
     "machine": "0x14c",
     "timestamp": "2014-02-11T07:59:28Z",
     "linker_version": "10.0",
@@ -162,7 +162,7 @@
     }
   },
   {
-    "path": "references/original-assets/quakelive/avcodec-53.dll",
+    "path": "assets/quakelive/avcodec-53.dll",
     "machine": "0x14c",
     "timestamp": "2011-11-29T21:57:02Z",
     "linker_version": "2.20",
@@ -178,7 +178,7 @@
     "file_info": {}
   },
   {
-    "path": "references/original-assets/quakelive/avformat-53.dll",
+    "path": "assets/quakelive/avformat-53.dll",
     "machine": "0x14c",
     "timestamp": "2011-11-29T21:57:01Z",
     "linker_version": "2.20",
@@ -194,7 +194,7 @@
     "file_info": {}
   },
   {
-    "path": "references/original-assets/quakelive/avutil-51.dll",
+    "path": "assets/quakelive/avutil-51.dll",
     "machine": "0x14c",
     "timestamp": "2011-11-29T21:56:33Z",
     "linker_version": "2.20",

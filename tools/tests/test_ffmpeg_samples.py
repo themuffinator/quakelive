@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_LIBDIR = REPO_ROOT / "references" / "original-assets" / "quakelive"
+DEFAULT_LIBDIR = REPO_ROOT / "assets" / "quakelive"
 REQUIRED_LIBS = ["avcodec-53.dll", "avformat-53.dll", "avutil-51.dll"]
 SAMPLE_CLIP = Path(__file__).resolve().parent / "media" / "vp8_sample.webm"
 

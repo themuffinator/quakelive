@@ -21,5 +21,5 @@
 2. Implement the missing draw helpers in `src/code/cgame/cg_newdraw.c` (dual player names, scores, health/armor bars, dual item stacks) and update `CG_DrawActive`’s owner-draw switch to call them.
 3. Replace the legacy spectator marquee logic in `CG_DrawTeamSpectators` with routines that pull two tracked clients (primary/secondary) and expose their data for the new owner-draw widgets, matching the layout used by `comp_spectator_follow.menu`.
 4. Hook spectator input transitions: update `CG_KeyEvent`/`CG_MouseEvent` to respect the new dual-follow state machine and expose menu actions (`nextTeamMember`, `prevTeamMember`, etc.) needed by the spectator follow menus.
-5. Update the Quake Live spectator HUD scripts (e.g., `references/original-assets/quakelive/baseq3/ui/comp_spectator_follow.menu`) to remove legacy marquee elements, point to the new owner-draw IDs, and ensure widescreen positioning lines up with the revised renderer.
+5. Update the Quake Live spectator HUD scripts (e.g., `assets/quakelive/baseq3/ui/comp_spectator_follow.menu`) to remove legacy marquee elements, point to the new owner-draw IDs, and ensure widescreen positioning lines up with the revised renderer.
 :::

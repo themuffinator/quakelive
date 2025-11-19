@@ -6,7 +6,7 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
 ## Top-Level Layout
 - `references/`: Archival material gathered from both Quake III Arena and Quake Live to inform the reverse-engineering process. It is split into:
   - `hlil/`: High Level Intermediate Language (HLIL) output produced by Binary Ninja for a range of Quake Live and Quake III binaries. Each binary has a monolithic HLIL text dump (`*.txt`) and a `*_split/` directory containing per-function files for easier comparison and diffing.
-  - `original-assets/`: A snapshot of upstream assets. The `quake3/src/` subtree mirrors the original Quake III Arena source distribution, while `quakelive/` collects extracted Quake Live game assets (e.g. DLLs, bot files, maps) for reference while rebuilding features.
+- `assets/`: A snapshot of upstream assets. The `quake3/src/` subtree mirrors the original Quake III Arena source distribution, while `quakelive/` collects extracted Quake Live game assets (e.g. DLLs, bot files, maps) for reference while rebuilding features. Treat this directory as read-only so it continues to reflect the shipping data layout.
 - `src/`: The active working tree for the reconstructed codebase. It currently matches the Quake III Arena source and provides the starting point for Quake Live specific changes. Key subdirectories include:
   - `code/`: Engine and game VM sources. This houses the client (`client/`), game logic (`game/`), UI module (`ui/`), bot library (`botlib/`), renderer (`renderer/`), and supporting build files for different platforms (e.g. `win32/`, `unix/`, Visual Studio project files).
   - `common/`: Shared utilities (math, BSP parsing, command handling, etc.) used by tools and the engine during asset processing.
@@ -27,7 +27,7 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
   Quake Live (`references/hlil/quakelive/`). Keeping the two sets side-by-side
   enables systematic diffing between the retail Quake III code and the decompiled
   Quake Live functions when porting behaviour.【F:docs/onboarding/overview.md†L6-L19】
-- Quake Live assets under `references/original-assets/quakelive/` expose binary
+- Quake Live assets under `assets/quakelive/` expose binary
   modules (`cgamex86.dll`, `qagamex86.dll`, etc.) and supporting data
   (fonts, icons, maps) to validate assumptions or reproduce file formats.【F:docs/onboarding/overview.md†L6-L19】
 - The active `src/` tree should evolve from the Quake III baseline towards Quake
@@ -62,7 +62,7 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
    reproducing legacy toolchains.【F:docs/platform/toolchain-matrix.md†L1-L18】
 
 ## Controls & Configuration Defaults
-- **Reference bindings** – The Quake Live snapshot in `references/original-assets/quakelive/baseq3/default.cfg` captures the modernized control scheme (weapon toggle on `F`, dedicated drop bindings, vote shortcuts, etc.).【68ce2a†L215-L224】【fcaf97†L1-L86】 Ported builds should ship this file—alongside curated training configs such as `tim.cfg` and `sponge.cfg`—so the engine can execute `exec default.cfg` during bootstrap without diverging from retail expectations.【F:src/code/qcommon/common.c†L2389-L2405】【F:src/code/ui/ui_main.c†L3223-L3263】
+- **Reference bindings** – The Quake Live snapshot in `assets/quakelive/baseq3/default.cfg` captures the modernized control scheme (weapon toggle on `F`, dedicated drop bindings, vote shortcuts, etc.).【68ce2a†L215-L224】【fcaf97†L1-L86】 Ported builds should ship this file—alongside curated training configs such as `tim.cfg` and `sponge.cfg`—so the engine can execute `exec default.cfg` during bootstrap without diverging from retail expectations.【F:src/code/qcommon/common.c†L2389-L2405】【F:src/code/ui/ui_main.c†L3223-L3263】
 - **Packaging requirement** – Ensure any PK3 or installer produced from this repo places the Quake Live `default.cfg` at the data root; the filesystem layer treats its absence as a fatal error.【F:src/code/qcommon/files.c†L3260-L3314】 Coordinate asset packaging with the workflow outlined in `docs/quakelive_asset_audit.md` so HUD/menu assets and configuration defaults stay in sync.
 
 ## Documentation Backlog
