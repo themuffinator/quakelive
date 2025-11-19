@@ -290,11 +290,15 @@ vmCvar_t	g_suddenDeathRespawnTick;
 vmCvar_t	g_suddenDeathRespawnMax;
 vmCvar_t	g_suddenDeathRespawnIncrement;
 vmCvar_t	g_suddenDeathRespawnPrint;
+vmCvar_t	g_damage_cg;
 vmCvar_t	g_damage_g;
+vmCvar_t	g_damage_gh;
 vmCvar_t	g_damage_mg;
 vmCvar_t	g_damage_mg_team;
 vmCvar_t	g_damage_hmg;
+vmCvar_t	g_damage_ng;
 vmCvar_t	g_damage_sg;
+vmCvar_t	g_damage_sg_outer;
 vmCvar_t	g_damage_gl;
 vmCvar_t	g_splashDamage_gl;
 vmCvar_t	g_splashRadius_gl;
@@ -302,6 +306,7 @@ vmCvar_t	g_damage_rl;
 vmCvar_t	g_splashDamage_rl;
 vmCvar_t	g_splashRadius_rl;
 vmCvar_t	g_damage_pg;
+vmCvar_t	g_damage_pl;
 vmCvar_t	g_splashDamage_pg;
 vmCvar_t	g_splashRadius_pg;
 vmCvar_t	g_damage_lg;
@@ -330,8 +335,16 @@ vmCvar_t	g_velocity_rl;
 vmCvar_t	g_velocity_pg;
 vmCvar_t	g_velocity_bfg;
 vmCvar_t	g_velocity_gh;
+vmCvar_t	g_lightningDischarge;
+vmCvar_t	g_gauntletSpeedFactor;
+vmCvar_t	g_headShotDamage_rg;
+vmCvar_t	g_ironsights_mg;
+vmCvar_t	g_midAirMinHeight;
+vmCvar_t	g_nailbounce;
+vmCvar_t	g_nailbouncepercentage;
 vmCvar_t	g_guidedRocket;
 vmCvar_t	g_rocketsplashOffset;
+vmCvar_t	g_quadDamageFactor;
 vmCvar_t	g_quadHog;
 vmCvar_t	g_quadHogIdle;
 vmCvar_t	g_quadHogTime;
@@ -582,11 +595,15 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_suddenDeathRespawnMax, "g_suddenDeathRespawnMax", "10", CVAR_NORESTART, 0, qfalse, qfalse, "Maximum sudden-death respawn delay in seconds." },
 	{ &g_suddenDeathRespawnIncrement, "g_suddenDeathRespawnIncrement", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Seconds added to the sudden-death respawn delay at each tick." },
 	{ &g_suddenDeathRespawnPrint, "g_suddenDeathRespawnPrint", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Print announcements when sudden-death respawn delays change." },
+	{ &g_damage_cg, "g_damage_cg", "8", 0, 0, qtrue, qfalse, "Chaingun bullet damage per hit; 8 mirrors the Quake Live HLIL defaults." },
 	{ &g_damage_g, "g_damage_g", "50", 0, 0, qtrue },
+	{ &g_damage_gh, "g_damage_gh", "10", 0, 0, qtrue, qfalse, "Grappling Hook projectile impact damage; 10 matches the retail DLL export." },
 	{ &g_damage_mg, "g_damage_mg", "7", 0, 0, qtrue },
 	{ &g_damage_mg_team, "g_damage_mg_team", "5", 0, 0, qtrue },
+	{ &g_damage_ng, "g_damage_ng", "12", 0, 0, qtrue, qfalse, "Nailgun projectile damage per bolt; 12 reproduces the HLIL tables." },
 	{ &g_damage_hmg, "g_damage_hmg", "10", 0, 0, qtrue },
 	{ &g_damage_sg, "g_damage_sg", "10", 0, 0, qtrue },
+	{ &g_damage_sg_outer, "g_damage_sg_outer", "5", 0, 0, qtrue, qfalse, "Shotgun outer-ring pellet damage when Quake Live's dual spread is active." },
 	{ &g_damage_gl, "g_damage_gl", "100", 0, 0, qtrue },
 	{ &g_splashDamage_gl, "g_splashDamage_gl", "100", 0, 0, qtrue },
 	{ &g_splashRadius_gl, "g_splashRadius_gl", "150", 0, 0, qtrue },
@@ -594,6 +611,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_splashDamage_rl, "g_splashDamage_rl", "100", 0, 0, qtrue },
 	{ &g_splashRadius_rl, "g_splashRadius_rl", "120", 0, 0, qtrue },
 	{ &g_damage_pg, "g_damage_pg", "20", 0, 0, qtrue },
+	{ &g_damage_pl, "g_damage_pl", "0", 0, 0, qtrue, qfalse, "Direct-hit damage applied by the proximity mine launcher before the mine arms." },
 	{ &g_splashDamage_pg, "g_splashDamage_pg", "15", 0, 0, qtrue },
 	{ &g_splashRadius_pg, "g_splashRadius_pg", "20", 0, 0, qtrue },
 	{ &g_damage_lg, "g_damage_lg", "8", 0, 0, qtrue },
@@ -616,10 +634,18 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_velocity_pg, "g_velocity_pg", "2000", 0, 0, qtrue, qfalse, "Plasmagun bolt speed in ups; aligns with the legacy 2000 ups firing velocity." },
 	{ &g_velocity_bfg, "g_velocity_bfg", "2000", 0, 0, qtrue, qfalse, "BFG projectile speed in ups pulled from the retail DLL defaults." },
 	{ &g_velocity_gh, "g_velocity_gh", "800", 0, 0, qtrue, qfalse, "Grappling Hook projectile speed in ups; 800 preserves the vanilla behaviour." },
+	{ &g_lightningDischarge, "g_lightningDischarge", "0", 0, 0, qtrue, qfalse, "When enabled, lightning gun shots discharge and damage the shooter when fired in hazardous volumes." },
+	{ &g_gauntletSpeedFactor, "g_gauntletSpeedFactor", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Gauntlet swing speed multiplier requested by Quake Live factories; 1.0 retains stock timing." },
+	{ &g_headShotDamage_rg, "g_headShotDamage_rg", "0", 0, 0, qtrue, qfalse, "Extra railgun damage applied to headshots whenever headshot mutators run; 0 keeps the classic behaviour." },
+	{ &g_ironsights_mg, "g_ironsights_mg", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Machinegun ironsight spread/recoil scale pulled from the HLIL weapon tables." },
+	{ &g_midAirMinHeight, "g_midAirMinHeight", "96", CVAR_ARCHIVE, 0, qfalse, qfalse, "Minimum height in units that a target must reach before mid-air medals and splash bonuses register." },
+	{ &g_nailbounce, "g_nailbounce", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Toggle Quake Live's bouncing nailgun projectiles; set to 0 for classic straight shots." },
+	{ &g_nailbouncepercentage, "g_nailbouncepercentage", "65", CVAR_ARCHIVE, 0, qfalse, qfalse, "Chance (0-100) for a nailgun bolt to bounce while g_nailbounce is active." },
 	{ &g_powerupRespawn, "g_powerupRespawn", "120", CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds before powerups respawn after being collected; 0 uses each entity's scripted timing." },
 	{ &g_guidedRocket, "g_guidedRocket", "0", 0, 0, qtrue, qfalse, "Enable Quake Live style guided rockets when non-zero." },
 	{ &g_rocketsplashOffset, "g_rocketsplashOffset", "0", 0, 0, qtrue, qfalse, "Offset in ups applied along the impact normal before evaluating rocket splash damage; 0 retains classic explosions." },
 	{ &g_damagePlums, "g_damagePlums", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Toggle per-player damage plums emitted by the server when scoring events occur." },
+	{ &g_quadDamageFactor, "g_quadDamageFactor", "3", CVAR_ARCHIVE, 0, qfalse, qfalse, "Damage multiplier applied while Quad Damage is active; 3 mirrors the Quake Live DLL." },
 	{ &g_quadHog, "g_quadHog", "0", 0, 0, qtrue, qfalse, "Toggle Quad Hog survival mode that forces the carrier to fight the arena when enabled." },
 	{ &g_quadHogIdle, "g_quadHogIdle", "0", 0, 0, qtrue, qfalse, "Seconds of inactivity allowed for the Quad Hog carrier before the powerup is revoked; 0 disables the idle check." },
 	{ &g_quadHogTime, "g_quadHogTime", "0", 0, 0, qtrue, qfalse, "Maximum time in seconds a player may hold Quad during Quad Hog events before it auto-expires; 0 removes the cap." },
