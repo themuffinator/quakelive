@@ -110,6 +110,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_FACTORY_TITLE		0x2A2		// descriptive title for the active match factory
 #define CS_FACTORY_FLAGS		0x2A3		// decimal bitmask describing customized factory settings
 #define CS_SPAWN_HINTS		0x2A5	// info string exposing timeout and sudden death metadata
+#define CS_MAP_AUTHOR		0x2A6		// primary author name lifted from the worldspawn
+#define CS_MAP_AUTHOR_ALT		0x2A7		// optional secondary author (author2 key)
 
 #define CS_ITEMS				27		// string of 0's and 1's that tell which items are present
 #define	ITEM_TIMER_DEFAULT_HEIGHT	20		// default fallback height for HUD timer spacing
@@ -135,8 +137,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_RACE_INFO			0x2BD
 #define CS_RACE_STATUS		CS_RACE_SCORES
 #define CS_PMOVE_SETTINGS		0x2BE
+#define CS_MATCH_AWARDS		0x2BF		// info string announcing accuracy/perfect medals
+#define CS_CUSTOM_SETTINGS		0x2C0		// serialized factory overrides broadcast at init
+#define CS_ROTATION_TITLES		0x2C1		// queue of map titles/modes for the upcoming rotation
+#define CS_ROTATION_CONFIGS		0x2C2		// queued map configs (map/cfg/gt triplets)
+#define CS_SUDDENDEATH_STATUS		0x2C3		// sudden-death toggle mirrored for clients
+#define CS_READYUP_STATUS		0x2C4		// ready-up controller state machine payload
+#define CS_SPAWN_HINTS_ALT		0x2C5		// floating-point spawn metadata for HUD hints
+#define CS_RACE_RECORDS		0x2C6		// race checkpoint history used by race_init
+#define CS_LOADOUT_FLAGS		0x2C7		// bitmask of forced loadout toggles
+#define CS_LOADOUT_MASK		0x2C9		// bitmask of disabled loadout entries
 
-#define CS_MAX					(CS_PMOVE_SETTINGS+1)
+#define CS_MAX					(CS_LOADOUT_MASK + 1)
 
 #if (CS_MAX) > MAX_CONFIGSTRINGS
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
