@@ -228,6 +228,7 @@ typedef enum {
 #define PMF_RAMP_JUMP		65536	// ramp jump scale applied to takeoff
 #define PMF_CHAIN_JUMP	131072	// jump executed within chain window
 #define PMF_DOUBLE_JUMP	262144	// performed a double jump since last landing
+#define PMF_IRONSIGHTS	524288	// ironsight/ADS input is being held
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
