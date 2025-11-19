@@ -28,6 +28,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 displayContextDef_t cgDC;
 
 int forceModelModificationCount = -1;
+int forceTeamModelModificationCount = -1;
+int forceTeamSkinModificationCount = -1;
+int forceEnemyModelModificationCount = -1;
+int forceEnemySkinModificationCount = -1;
+int forceTeamWeaponColorModificationCount = -1;
+int forceEnemyWeaponColorModificationCount = -1;
+int teamHeadColorModificationCount = -1;
+int teamUpperColorModificationCount = -1;
+int teamLowerColorModificationCount = -1;
+int enemyHeadColorModificationCount = -1;
+int enemyUpperColorModificationCount = -1;
+int enemyLowerColorModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
@@ -175,6 +187,18 @@ vmCvar_t 	cg_teamChatHeight;
 vmCvar_t 	cg_stats;
 vmCvar_t 	cg_buildScript;
 vmCvar_t 	cg_forceModel;
+vmCvar_t	cg_forceTeamModel;
+vmCvar_t	cg_forceTeamSkin;
+vmCvar_t	cg_forceEnemyModel;
+vmCvar_t	cg_forceEnemySkin;
+vmCvar_t	cg_forceTeamWeaponColor;
+vmCvar_t	cg_forceEnemyWeaponColor;
+vmCvar_t	cg_teamHeadColor;
+vmCvar_t	cg_teamUpperColor;
+vmCvar_t	cg_teamLowerColor;
+vmCvar_t	cg_enemyHeadColor;
+vmCvar_t	cg_enemyUpperColor;
+vmCvar_t	cg_enemyLowerColor;
 vmCvar_t	cg_paused;
 vmCvar_t	cg_blood;
 vmCvar_t	cg_predictItems;
@@ -348,6 +372,18 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_teamChatTime, "cg_teamChatTime", "3000", CVAR_ARCHIVE  },
 	{ &cg_teamChatHeight, "cg_teamChatHeight", "0", CVAR_ARCHIVE  },
 	{ &cg_forceModel, "cg_forceModel", "0", CVAR_ARCHIVE  },
+	{ &cg_forceTeamModel, "cg_forceTeamModel", "", CVAR_ARCHIVE },
+	{ &cg_forceTeamSkin, "cg_forceTeamSkin", "", CVAR_ARCHIVE },
+	{ &cg_forceEnemyModel, "cg_forceEnemyModel", "", CVAR_ARCHIVE },
+	{ &cg_forceEnemySkin, "cg_forceEnemySkin", "", CVAR_ARCHIVE },
+	{ &cg_forceTeamWeaponColor, "cg_forceTeamWeaponColor", "0", CVAR_ARCHIVE },
+	{ &cg_forceEnemyWeaponColor, "cg_forceEnemyWeaponColor", "0", CVAR_ARCHIVE },
+	{ &cg_teamHeadColor, "cg_teamHeadColor", "", CVAR_ARCHIVE },
+	{ &cg_teamUpperColor, "cg_teamUpperColor", "", CVAR_ARCHIVE },
+	{ &cg_teamLowerColor, "cg_teamLowerColor", "", CVAR_ARCHIVE },
+	{ &cg_enemyHeadColor, "cg_enemyHeadColor", "", CVAR_ARCHIVE },
+	{ &cg_enemyUpperColor, "cg_enemyUpperColor", "", CVAR_ARCHIVE },
+	{ &cg_enemyLowerColor, "cg_enemyLowerColor", "", CVAR_ARCHIVE },
 	{ &cg_predictItems, "cg_predictItems", "1", CVAR_ARCHIVE },
 	{ &cg_deferPlayers, "cg_deferPlayers", "0", CVAR_ARCHIVE },
 	{ &cg_drawTeamOverlay, "cg_drawTeamOverlay", "0", CVAR_ARCHIVE },
@@ -439,6 +475,7 @@ CG_RegisterCvars
 void CG_RegisterCvars( void ) {
 	int			i;
 	cvarTable_t	*cv;
+	qboolean	refreshClients;
 	char		var[MAX_TOKEN_CHARS];
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
@@ -451,6 +488,18 @@ void CG_RegisterCvars( void ) {
 	cgs.localServer = atoi( var );
 
 	forceModelModificationCount = cg_forceModel.modificationCount;
+        forceTeamModelModificationCount = cg_forceTeamModel.modificationCount;
+        forceTeamSkinModificationCount = cg_forceTeamSkin.modificationCount;
+        forceEnemyModelModificationCount = cg_forceEnemyModel.modificationCount;
+        forceEnemySkinModificationCount = cg_forceEnemySkin.modificationCount;
+        forceTeamWeaponColorModificationCount = cg_forceTeamWeaponColor.modificationCount;
+        forceEnemyWeaponColorModificationCount = cg_forceEnemyWeaponColor.modificationCount;
+        teamHeadColorModificationCount = cg_teamHeadColor.modificationCount;
+        teamUpperColorModificationCount = cg_teamUpperColor.modificationCount;
+        teamLowerColorModificationCount = cg_teamLowerColor.modificationCount;
+        enemyHeadColorModificationCount = cg_enemyHeadColor.modificationCount;
+        enemyUpperColorModificationCount = cg_enemyUpperColor.modificationCount;
+        enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;
 
 	cg.kickScale = cg_kickScale.value;
 	if ( cg.kickScale < 0.0f ) {
@@ -516,9 +565,62 @@ void CG_UpdateCvars( void ) {
 		trap_Cvar_Set( "teamoverlay", "1" );
 	}
 
-	// if force model changed
+	refreshClients = qfalse;
+
 	if ( forceModelModificationCount != cg_forceModel.modificationCount ) {
 		forceModelModificationCount = cg_forceModel.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( forceTeamModelModificationCount != cg_forceTeamModel.modificationCount ) {
+		forceTeamModelModificationCount = cg_forceTeamModel.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( forceTeamSkinModificationCount != cg_forceTeamSkin.modificationCount ) {
+		forceTeamSkinModificationCount = cg_forceTeamSkin.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( forceEnemyModelModificationCount != cg_forceEnemyModel.modificationCount ) {
+		forceEnemyModelModificationCount = cg_forceEnemyModel.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( forceEnemySkinModificationCount != cg_forceEnemySkin.modificationCount ) {
+		forceEnemySkinModificationCount = cg_forceEnemySkin.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( forceTeamWeaponColorModificationCount != cg_forceTeamWeaponColor.modificationCount ) {
+		forceTeamWeaponColorModificationCount = cg_forceTeamWeaponColor.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( forceEnemyWeaponColorModificationCount != cg_forceEnemyWeaponColor.modificationCount ) {
+		forceEnemyWeaponColorModificationCount = cg_forceEnemyWeaponColor.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( teamHeadColorModificationCount != cg_teamHeadColor.modificationCount ) {
+		teamHeadColorModificationCount = cg_teamHeadColor.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( teamUpperColorModificationCount != cg_teamUpperColor.modificationCount ) {
+		teamUpperColorModificationCount = cg_teamUpperColor.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( teamLowerColorModificationCount != cg_teamLowerColor.modificationCount ) {
+		teamLowerColorModificationCount = cg_teamLowerColor.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( enemyHeadColorModificationCount != cg_enemyHeadColor.modificationCount ) {
+		enemyHeadColorModificationCount = cg_enemyHeadColor.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( enemyUpperColorModificationCount != cg_enemyUpperColor.modificationCount ) {
+		enemyUpperColorModificationCount = cg_enemyUpperColor.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( enemyLowerColorModificationCount != cg_enemyLowerColor.modificationCount ) {
+		enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;
+		refreshClients = qtrue;
+	}
+
+	if ( refreshClients ) {
 		CG_ForceModelChange();
 	}
 

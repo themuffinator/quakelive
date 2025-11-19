@@ -336,6 +336,19 @@ typedef struct {
 
 	vec3_t			color1;
 	vec3_t			color2;
+	vec3_t			headColor;
+	vec3_t			upperColor;
+	vec3_t			lowerColor;
+	vec3_t			weaponPrimaryColor;
+	vec3_t			weaponSecondaryColor;
+
+	qboolean			headColorForced;
+	qboolean			upperColorForced;
+	qboolean			lowerColorForced;
+	qboolean			weaponColorForced;
+	qboolean			modelForced;
+	qboolean			headModelForced;
+	qboolean			skinForced;
 
 	int				score;			// updated by score servercmds
 	int				location;		// location index for team mode
@@ -1265,6 +1278,18 @@ extern	vmCvar_t		cg_teamChatTime;
 extern	vmCvar_t		cg_teamChatHeight;
 extern	vmCvar_t		cg_stats;
 extern	vmCvar_t 		cg_forceModel;
+extern	vmCvar_t 		cg_forceTeamModel;
+extern	vmCvar_t 		cg_forceTeamSkin;
+extern	vmCvar_t 		cg_forceEnemyModel;
+extern	vmCvar_t 		cg_forceEnemySkin;
+extern	vmCvar_t 		cg_forceTeamWeaponColor;
+extern	vmCvar_t 		cg_forceEnemyWeaponColor;
+extern	vmCvar_t 		cg_teamHeadColor;
+extern	vmCvar_t 		cg_teamUpperColor;
+extern	vmCvar_t 		cg_teamLowerColor;
+extern	vmCvar_t 		cg_enemyHeadColor;
+extern	vmCvar_t 		cg_enemyUpperColor;
+extern	vmCvar_t 		cg_enemyLowerColor;
 extern	vmCvar_t 		cg_buildScript;
 extern	vmCvar_t		cg_paused;
 extern	vmCvar_t		cg_blood;
