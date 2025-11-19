@@ -817,6 +817,12 @@ typedef struct {
 	qhandle_t	charsetPropGlow;
 	qhandle_t	charsetPropB;
 	qhandle_t	whiteShader;
+	qhandle_t	loadingBackground;
+	qhandle_t	gameTypeBackground;
+	qhandle_t	logoBackground;
+	qhandle_t	qlLogo;
+	qhandle_t	menuSmokeShader;
+	qhandle_t	modifiedIcon;
 
 	qhandle_t	redCubeModel;
 	qhandle_t	blueCubeModel;

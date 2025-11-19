@@ -3500,6 +3500,12 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	cgs.media.charsetProp		= trap_R_RegisterShaderNoMip( "menu/art/font1_prop.tga" );
 	cgs.media.charsetPropGlow	= trap_R_RegisterShaderNoMip( "menu/art/font1_prop_glo.tga" );
 	cgs.media.charsetPropB		= trap_R_RegisterShaderNoMip( "menu/art/font2_prop.tga" );
+	cgs.media.loadingBackground	= trap_R_RegisterShaderNoMip( "levelshots/loadingback.jpg" );
+	cgs.media.gameTypeBackground	= trap_R_RegisterShaderNoMip( "ui/assets/main_menu/gt_background.tga" );
+	cgs.media.logoBackground	= trap_R_RegisterShaderNoMip( "ui/assets/main_menu/logo_background.tga" );
+	cgs.media.qlLogo			= trap_R_RegisterShaderNoMip( "ui/assets/main_menu/ql_logo.tga" );
+	cgs.media.menuSmokeShader	= trap_R_RegisterShaderNoMip( "ui/assets/backscreen_smoke.jpg" );
+	cgs.media.modifiedIcon		= trap_R_RegisterShaderNoMip( "icons/modified.tga" );
 
 	CG_RegisterCvars();
 
