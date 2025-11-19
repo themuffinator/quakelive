@@ -730,6 +730,70 @@ static int G_CountQueuedSpawns( void ) {
 
 /*
 =============
+G_FactoryRespawnWindowActive
+
+Returns qtrue when an active factory configures staggered respawn delays.
+=============
+*/
+static qboolean G_FactoryRespawnWindowActive( void ) {
+	if ( !g_factory.string[0] ) {
+		return qfalse;
+	}
+
+	if ( g_factoryCvarConfig.respawnDelayMinMilliseconds <= 0
+		&& g_factoryCvarConfig.respawnDelayMaxMilliseconds <= 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_FactoryComputeRespawnDelay
+
+Maps a queue slot to a millisecond delay inside the configured min/max window.
+=============
+*/
+static int G_FactoryComputeRespawnDelay( int slotIndex ) {
+	int		minDelay;
+	int		maxDelay;
+	int		slotCount;
+	int		span;
+	int		offset;
+
+	minDelay = g_factoryCvarConfig.respawnDelayMinMilliseconds;
+	maxDelay = g_factoryCvarConfig.respawnDelayMaxMilliseconds;
+	if ( minDelay < 0 ) {
+		minDelay = 0;
+	}
+	if ( maxDelay < minDelay ) {
+		maxDelay = minDelay;
+	}
+
+	slotCount = g_maxDeferredSpawns.integer;
+	if ( slotCount <= 0 ) {
+		slotCount = 1;
+	}
+
+	if ( slotCount == 1 || maxDelay == minDelay ) {
+		return maxDelay;
+	}
+
+	if ( slotIndex < 0 ) {
+		slotIndex = 0;
+	}
+	if ( slotIndex > slotCount - 1 ) {
+		slotIndex = slotCount - 1;
+	}
+
+	span = maxDelay - minDelay;
+	offset = ( span * slotIndex ) / ( slotCount - 1 );
+	return minDelay + offset;
+}
+
+/*
+=============
 G_ClearQueuedSpawnState
 
 Resets the queue bookkeeping for a particular client number.
@@ -845,6 +909,7 @@ qboolean G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean in
 	int             scheduledTime;
 	int             baseTime;
 	qboolean        needsEffect;
+	int		queuedCount;
 
 	if ( !ent || !ent->client ) {
 		return qfalse;
@@ -855,16 +920,34 @@ qboolean G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean in
 		return qfalse;
 	}
 
-	delayMs = warmupSpawn ? g_matchFactoryConfig.factoryWarmupSpawnDelayMilliseconds : g_matchFactoryConfig.factoryRespawnDelayMilliseconds;
+	queuedCount = 0;
+	if ( warmupSpawn ) {
+		delayMs = g_matchFactoryConfig.factoryWarmupSpawnDelayMilliseconds;
+		if ( delayMs > 0 && g_maxDeferredSpawns.integer > 0 ) {
+			queuedCount = G_CountQueuedSpawns();
+			if ( queuedCount >= g_maxDeferredSpawns.integer ) {
+				delayMs = 0;
+			}
+		}
+	} else if ( G_FactoryRespawnWindowActive() ) {
+		queuedCount = G_CountQueuedSpawns();
+		if ( g_maxDeferredSpawns.integer > 0 && queuedCount >= g_maxDeferredSpawns.integer ) {
+			delayMs = 0;
+		} else {
+			delayMs = G_FactoryComputeRespawnDelay( queuedCount );
+		}
+	} else {
+		delayMs = g_matchFactoryConfig.factoryRespawnDelayMilliseconds;
+		if ( delayMs > 0 && g_maxDeferredSpawns.integer > 0 ) {
+			queuedCount = G_CountQueuedSpawns();
+			if ( queuedCount >= g_maxDeferredSpawns.integer ) {
+				delayMs = 0;
+			}
+		}
+	}
 
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		delayMs = 0;
-	}
-
-	if ( delayMs > 0 && g_maxDeferredSpawns.integer > 0 ) {
-		if ( G_CountQueuedSpawns() >= g_maxDeferredSpawns.integer ) {
-			delayMs = 0;
-		}
 	}
 
 	if ( delayMs <= 0 ) {
