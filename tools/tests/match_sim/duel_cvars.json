@@ -1,0 +1,54 @@
+{
+  "map": "qztourney6",
+  "duration": 5.0,
+  "tick_rate": 20,
+  "seed": 1337,
+  "metadata": {
+    "description": "Duel CVars and configstring coverage",
+    "duel": {
+      "loadout_grant": "weapon_gauntlet weapon_machinegun ammo_bullets 100",
+      "ready_up": {
+        "warmup_time": -1,
+        "min_players": 2,
+        "countdown_seconds": 20,
+        "ready_configstring": "ready:0"
+      },
+      "sudden_death": {
+        "respawn": 0,
+        "start_seconds": 3,
+        "tick_seconds": 60,
+        "max_seconds": 10,
+        "increment_seconds": 1,
+        "print_announcements": 1
+      }
+    }
+  },
+  "bots": [
+    {
+      "name": "sarge",
+      "team": "red",
+      "spawn": {
+        "position": [0, 0, 80]
+      },
+      "initial_state": {
+        "health": 125,
+        "ammo": {"machinegun": 50},
+        "inventory": {"armor": 25}
+      },
+      "script": []
+    },
+    {
+      "name": "anarki",
+      "team": "blue",
+      "spawn": {
+        "position": [128, -64, 80]
+      },
+      "initial_state": {
+        "health": 100,
+        "ammo": {"machinegun": 25},
+        "inventory": {"armor": 0}
+      },
+      "script": []
+    }
+  ]
+}

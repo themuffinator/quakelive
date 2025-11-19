@@ -29,6 +29,7 @@ SCENARIOS: dict[str, Path] = {
     "freeze": SCENARIO_ROOT / "freeze_cvars.json",
     "ctf_flag_cvars": SCENARIO_ROOT / "ctf_flag_cvars.json",
     "clanarena_shuffle": SCENARIO_ROOT / "clanarena_shuffle.json",
+    "duel_cvars": SCENARIO_ROOT / "duel_cvars.json",
 }
 DEFAULT_SCENARIO = SCENARIOS["duel"]
 SNAPSHOT_ROOT = REPO_ROOT / "tools" / "tests" / "client_regression"

@@ -8,10 +8,29 @@ typedef enum {
 void QLR_RecordGametypeDuelStage( gametypeLifecycleStage_t stage );
 void QLR_RecordGametypeDefaultStage( gametypeLifecycleStage_t stage );
 #endif
+#if defined(QLR_INSTRUMENT_MATCH_SIM)
+void QLR_RecordMatchSimDuelEvent( const char *action, const char *details );
+#endif
 
 static void G_DuelInit( void );
 static void G_DuelClientBegin( gentity_t *ent );
 static void G_DuelClientSpawn( gentity_t *ent );
+
+/*
+=============
+G_LogDuelMatchSimEvent
+
+Forwards duel-specific lifecycle markers to the match-sim instrumentation hook.
+=============
+*/
+static void G_LogDuelMatchSimEvent( const char *action, const char *details ) {
+#if defined(QLR_INSTRUMENT_MATCH_SIM)
+	QLR_RecordMatchSimDuelEvent( action, details );
+#else
+	(void)action;
+	(void)details;
+#endif
+}
 
 /*
 =============
@@ -40,29 +59,32 @@ static void G_GametypeHandleDuel( gametypeLifecycleStage_t stage, gentity_t *ent
 	switch ( stage ) {
 	case GAMETYPE_LIFECYCLE_INIT:
 #if defined(QLR_INSTRUMENT_GAMETYPE_LIFECYCLE)
-		QLR_RecordGametypeDuelStage( stage );
+                QLR_RecordGametypeDuelStage( stage );
 #endif
-		G_DuelInit();
-		G_GametypeHandleDefault( stage, ent );
-		break;
-	case GAMETYPE_LIFECYCLE_CLIENT_BEGIN:
+                G_DuelInit();
+		G_LogDuelMatchSimEvent( "duel_ready_configstring", va( "%i", level.warmupTime ) );
+                G_GametypeHandleDefault( stage, ent );
+                break;
+        case GAMETYPE_LIFECYCLE_CLIENT_BEGIN:
 #if defined(QLR_INSTRUMENT_GAMETYPE_LIFECYCLE)
-		QLR_RecordGametypeDuelStage( stage );
+                QLR_RecordGametypeDuelStage( stage );
 #endif
-		if ( ent ) {
-			G_DuelClientBegin( ent );
-		}
-		G_GametypeHandleDefault( stage, ent );
-		break;
-	case GAMETYPE_LIFECYCLE_CLIENT_SPAWN:
+                if ( ent ) {
+                        G_DuelClientBegin( ent );
+                }
+		G_LogDuelMatchSimEvent( "duel_ready_configstring", va( "%i", level.warmupTime ) );
+                G_GametypeHandleDefault( stage, ent );
+                break;
+        case GAMETYPE_LIFECYCLE_CLIENT_SPAWN:
 #if defined(QLR_INSTRUMENT_GAMETYPE_LIFECYCLE)
-		QLR_RecordGametypeDuelStage( stage );
+                QLR_RecordGametypeDuelStage( stage );
 #endif
-		if ( ent ) {
-			G_DuelClientSpawn( ent );
-		}
-		G_GametypeHandleDefault( stage, ent );
-		break;
+                if ( ent ) {
+                        G_DuelClientSpawn( ent );
+                }
+		G_LogDuelMatchSimEvent( "duel_spawn_loadout", s_duelSpawnGrantScript );
+                G_GametypeHandleDefault( stage, ent );
+                break;
 	default:
 		G_GametypeHandleDefault( stage, ent );
 		break;
@@ -121,15 +143,27 @@ Resets duel warmup and sudden-death state before the countdown begins.
 =============
 */
 static void G_DuelInit( void ) {
-	if ( level.warmupTime != -1 ) {
-		level.warmupTime = -1;
-		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
-	}
+        if ( level.warmupTime != -1 ) {
+                level.warmupTime = -1;
+                trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+        }
 
 	G_UpdateReadyUpConfigstring();
 	level.suddenDeathActive = qfalse;
 	level.suddenDeathLastDelay = -1;
 	level.suddenDeathNoRespawnLogged = qfalse;
+	G_LogDuelMatchSimEvent(
+	"duel_sudden_death",
+	va(
+	"respawn=%i start=%i tick=%i max=%i increment=%i print=%i",
+	g_suddenDeathRespawn.integer,
+	g_suddenDeathRespawnStart.integer,
+	g_suddenDeathRespawnTick.integer,
+	g_suddenDeathRespawnMax.integer,
+	g_suddenDeathRespawnIncrement.integer,
+	g_suddenDeathRespawnPrint.integer
+	)
+	);
 }
 
 /*

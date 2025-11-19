@@ -115,6 +115,7 @@ class MatchHarness:
         self.clanarena_settings: Mapping[str, Any] = self._load_clanarena_settings(
             self.config.metadata.get("clanarena")
         )
+        self.duel_settings: Mapping[str, Any] = dict(self.config.metadata.get("duel", {}))
         (
             self.bot_profiles,
             self.spawn_schedule,
@@ -162,6 +163,7 @@ class MatchHarness:
         script_indices = {name: 0 for name in bots}
         self._reset_queued_events()
         self._prime_spawn_schedule()
+        self._prime_duel_events()
 
         frames: List[TimelineFrame] = []
         for tick in range(total_ticks):
@@ -1105,6 +1107,33 @@ class MatchHarness:
         entry = (time_point, self._event_counter, payload)
         heapq.heappush(self._item_queue, entry)
         self._event_counter += 1
+
+    def _prime_duel_events(self) -> None:
+        duel = self.duel_settings
+        if not isinstance(duel, Mapping):
+            return
+
+        loadout = duel.get("loadout_grant")
+        if loadout:
+            self._schedule_item_event(
+                0.0,
+                {
+                    "action": "duel_loadout",
+                    "script": str(loadout),
+                },
+            )
+
+        ready = duel.get("ready_up")
+        if isinstance(ready, Mapping) and ready:
+            payload = {"action": "duel_ready_up"}
+            payload.update({key: value for key, value in ready.items()})
+            self._schedule_item_event(0.0, payload)
+
+        sudden_death = duel.get("sudden_death")
+        if isinstance(sudden_death, Mapping) and sudden_death:
+            payload = {"action": "duel_sudden_death"}
+            payload.update({key: value for key, value in sudden_death.items()})
+            self._schedule_item_event(0.0, payload)
 
     def _collect_scheduled_spawns(
         self, current_time: float, bots: Mapping[str, BotState]
