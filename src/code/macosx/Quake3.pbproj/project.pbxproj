@@ -1718,9 +1718,9 @@
 			refType = 4;
 			sourceTree = "<group>";
 		};
-		012AD9A500868211C697A10E = {
-			children = (
-				012AD9A600868211C697A10E,
+012AD9A500868211C697A10E = {
+children = (
+012AD9A600868211C697A10E,
 				012AD9A700868211C697A10E,
 				012AD9A800868211C697A10E,
 				012AD9A900868211C697A10E,
@@ -1735,11 +1735,12 @@
 				012AD9B200868211C697A10E,
 				012AD9B300868211C697A10E,
 				012AD9B400868211C697A10E,
-				012AD9B500868211C697A10E,
-				012AD9B600868211C697A10E,
-				012AD9B700868211C697A10E,
-				012AD9B800868211C697A10E,
-			);
+012AD9B500868211C697A10E,
+012AD9B600868211C697A10E,
+012AD9B700868211C697A10E,
+012AD9B800868211C697A10E,
+012AD9BA00868211C697A10E,
+);
 			isa = PBXGroup;
 			path = client;
 			refType = 4;
@@ -1881,22 +1882,30 @@
 			refType = 4;
 			sourceTree = "<group>";
 		};
-		012AD9B700868211C697A10E = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			path = snd_public.h;
-			refType = 4;
-			sourceTree = "<group>";
-		};
-		012AD9B800868211C697A10E = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.c;
-			path = snd_wavelet.c;
-			refType = 4;
-			sourceTree = "<group>";
-		};
+012AD9B700868211C697A10E = {
+fileEncoding = 30;
+isa = PBXFileReference;
+lastKnownFileType = sourcecode.c.h;
+path = snd_public.h;
+refType = 4;
+sourceTree = "<group>";
+};
+012AD9B800868211C697A10E = {
+fileEncoding = 30;
+isa = PBXFileReference;
+lastKnownFileType = sourcecode.c.c;
+path = snd_wavelet.c;
+refType = 4;
+sourceTree = "<group>";
+};
+012AD9BA00868211C697A10E = {
+fileEncoding = 30;
+isa = PBXFileReference;
+lastKnownFileType = sourcecode.c.c;
+path = snd_ogg_stream.c;
+refType = 4;
+sourceTree = "<group>";
+};
 		012ADA2400868211C697A10E = {
 			children = (
 				012ADA2500868211C697A10E,
@@ -5122,7 +5131,7 @@
 				LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/Quake3/code/macosx/GameRanger SDK/Libraries\"";
 				OPTIMIZATION_CFLAGS = "-O2";
 				OTHER_CFLAGS = "-DDEDICATED -DMACOS_X -DBOTLIB -force_cpusubtype_ALL -Wno-long-double";
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = Q3DedicatedServer;
 				REZ_EXECUTABLE = YES;
@@ -6419,7 +6428,7 @@
 			);
 			buildSettings = {
 				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = All;
 				SECTORDER_FLAGS = "";
@@ -7179,18 +7188,24 @@
 			settings = {
 			};
 		};
-		04362826008698F8C697A10E = {
-			fileRef = 012AD9B600868211C697A10E;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		043628270086991FC697A10E = {
-			fileRef = 012AD9B800868211C697A10E;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
+04362826008698F8C697A10E = {
+fileRef = 012AD9B600868211C697A10E;
+isa = PBXBuildFile;
+settings = {
+};
+};
+043628270086991FC697A10E = {
+fileRef = 012AD9B800868211C697A10E;
+isa = PBXBuildFile;
+settings = {
+};
+};
+0436282800869920C697A10E = {
+fileRef = 012AD9BA00868211C697A10E;
+isa = PBXBuildFile;
+settings = {
+};
+};
 		0436282E00869A16C697A10E = {
 			fileRef = 012ADB3B00868211C697A10E;
 			isa = PBXBuildFile;
@@ -7861,7 +7876,7 @@
 				LIBRARY_SEARCH_PATHS = "";
 				OPTIMIZATION_CFLAGS = "-O2";
 				OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -force_cpusubtype_ALL";
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = Quake3;
 				SECTORDER_FLAGS = "";
@@ -8088,10 +8103,11 @@
 				0436281E00869827C697A10E,
 				04362823008698F8C697A10E,
 				04362824008698F8C697A10E,
-				04362825008698F8C697A10E,
-				04362826008698F8C697A10E,
-				043628270086991FC697A10E,
-				0436282E00869A16C697A10E,
+04362825008698F8C697A10E,
+04362826008698F8C697A10E,
+043628270086991FC697A10E,
+0436282800869920C697A10E,
+0436282E00869A16C697A10E,
 				0436282F00869A7FC697A10E,
 				0436283100869A8EC697A10E,
 				0436283300869AC5C697A10E,
@@ -8851,7 +8867,7 @@
 				LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/QUAKE3/CODE/macosx/GameRanger SDK/Libraries\"";
 				OPTIMIZATION_CFLAGS = "-O2";
 				OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -force_cpusubtype_ALL -faltivec";
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = "Quake3 G4";
 				SECTORDER_FLAGS = "";
@@ -9429,8 +9445,8 @@
 				4FF090D004896C0E00030DA8,
 				4FF090D104896C0E00030DA8,
 				4FF090D204896C0E00030DA8,
-				4FF090D304896C0E00030DA8,
 				4FF090D404896C0E00030DA8,
+				4FF090D304896C0E00030DA8,
 				4FF090D504896C0E00030DA8,
 				4FF090D604896C0E00030DA8,
 				4FF090D704896C0E00030DA8,
@@ -9916,18 +9932,24 @@
 			settings = {
 			};
 		};
-		4FF090D104896C0E00030DA8 = {
-			fileRef = 012AD9B600868211C697A10E;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4FF090D204896C0E00030DA8 = {
-			fileRef = 012AD9B800868211C697A10E;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
+4FF090D104896C0E00030DA8 = {
+fileRef = 012AD9B600868211C697A10E;
+isa = PBXBuildFile;
+settings = {
+};
+};
+4FF090D204896C0E00030DA8 = {
+fileRef = 012AD9B800868211C697A10E;
+isa = PBXBuildFile;
+settings = {
+};
+};
+4FF090D404896C0E00030DA8 = {
+fileRef = 012AD9BA00868211C697A10E;
+isa = PBXBuildFile;
+settings = {
+};
+};
 		4FF090D304896C0E00030DA8 = {
 			fileRef = 012ADB3B00868211C697A10E;
 			isa = PBXBuildFile;
@@ -10419,7 +10441,7 @@
 				LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/Quake3/code/macosx/GameRanger SDK/Libraries\"";
 				OPTIMIZATION_CFLAGS = "-O2";
 				OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -force_cpusubtype_ALL -faltivec -falign-loops=16 -falign-jumps=16 -fstrict-aliasing ";
-				OTHER_LDFLAGS = "";
+				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = Q3DedicatedServer;
 				REZ_EXECUTABLE = YES;
