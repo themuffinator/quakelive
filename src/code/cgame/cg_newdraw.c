@@ -29,6 +29,15 @@ extern displayContextDef_t cgDC;
 #define CG_RACE_CHECKPOINT_HALF_WIDTH 24.0f
 #define CG_RACE_CHECKPOINT_HEIGHT 48.0f
 
+typedef struct {
+	char	command[MAX_TOKEN_CHARS];
+	char	arg1[MAX_TOKEN_CHARS];
+	char	arg2[MAX_TOKEN_CHARS];
+} cgVoteInfo_t;
+
+static int cgStartingWeaponsMask;
+static int cgStartingWeaponsSpawnCount = -1;
+
 /*
 =============
 CG_RaceFormatMilliseconds
@@ -1519,6 +1528,695 @@ static void CG_DrawPlayerCounts(rectDef_t *rect, float scale, vec4_t color, int 
 
 	active = CG_CountActivePlayers();
 	Com_sprintf( buffer, sizeof( buffer ), "%i/%i players", active, cgs.maxclients );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_CleanMapName
+
+Normalizes a BSP path into a presentation-friendly map name.
+=============
+*/
+static void CG_CleanMapName( const char *source, char *buffer, size_t bufferSize ) {
+	char		local[MAX_QPATH];
+	char		*dot;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	if ( !source || !*source ) {
+		return;
+	}
+
+	Q_strncpyz( local, source, sizeof( local ) );
+	if ( !Q_stricmpn( local, "maps/", 5 ) ) {
+		source = local + 5;
+	} else {
+		source = local;
+	}
+
+	Q_strncpyz( buffer, source, bufferSize );
+	dot = strrchr( buffer, '.' );
+	if ( dot ) {
+		*dot = '\0';
+	}
+}
+
+/*
+=============
+CG_GetDisplayMapName
+
+Builds a sanitized map name for UI usage.
+=============
+*/
+static void CG_GetDisplayMapName( char *buffer, size_t bufferSize ) {
+	const char *serverInfo;
+	const char *configName;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	serverInfo = CG_ConfigString( CS_SERVERINFO );
+	configName = serverInfo ? Info_ValueForKey( serverInfo, "mapname" ) : NULL;
+	if ( configName && *configName ) {
+		CG_CleanMapName( configName, buffer, bufferSize );
+		if ( buffer[0] ) {
+			return;
+		}
+	}
+
+	if ( cgs.mapname[0] ) {
+		CG_CleanMapName( cgs.mapname, buffer, bufferSize );
+	}
+
+	if ( !buffer[0] ) {
+		Q_strncpyz( buffer, "Unknown", bufferSize );
+	}
+}
+
+/*
+=============
+CG_GetServerLocationString
+
+Extracts the location or hostname from the serverinfo configstring.
+=============
+*/
+static void CG_GetServerLocationString( char *buffer, size_t bufferSize ) {
+	const char	*info;
+	const char	*value;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	info = CG_ConfigString( CS_SERVERINFO );
+	if ( !info || !*info ) {
+		return;
+	}
+
+	value = Info_ValueForKey( info, "sv_location" );
+	if ( !value || !*value ) {
+		value = Info_ValueForKey( info, "location" );
+	}
+	if ( !value || !*value ) {
+		value = Info_ValueForKey( info, "sv_hostname" );
+	}
+	if ( !value || !*value ) {
+		value = "Unknown location";
+	}
+
+	Q_strncpyz( buffer, value, bufferSize );
+}
+
+/*
+=============
+CG_GameTypeShortString
+
+Returns the abbreviated label for the current gametype.
+=============
+*/
+static const char *CG_GameTypeShortString( void ) {
+	switch ( cgs.gametype ) {
+	case GT_FFA:
+		return "FFA";
+	case GT_TOURNAMENT:
+		return "Duel";
+	case GT_SINGLE_PLAYER:
+		return "Race";
+	case GT_TEAM:
+		return "TDM";
+	case GT_CLAN_ARENA:
+		return "CA";
+	case GT_CTF:
+		return "CTF";
+	case GT_1FCTF:
+		return "1FCTF";
+	case GT_OBELISK:
+		return "Overload";
+	case GT_HARVESTER:
+		return "Harvester";
+	case GT_FREEZE:
+		return "Freeze";
+	case GT_DOMINATION:
+		return "Dom";
+	case GT_ATTACK_DEFEND:
+		return "A&D";
+	case GT_RED_ROVER:
+		return "Red Rover";
+	default:
+		return "Game";
+	}
+}
+
+/*
+=============
+CG_BuildMatchStateString
+
+Populates a buffer with the current high-level match state label.
+=============
+*/
+static void CG_BuildMatchStateString( char *buffer, size_t bufferSize ) {
+	const char *label = "In Progress";
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	if ( cg.snap && cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		label = "Intermission";
+	} else if ( cgs.matchTimeoutActive ) {
+		label = "Timeout";
+	} else if ( cgs.matchOvertimeActive ) {
+		label = "Overtime";
+	} else if ( cg.warmup > 0 ) {
+		label = "Warmup";
+	}
+
+	Q_strncpyz( buffer, label, bufferSize );
+}
+
+/*
+=============
+CG_BuildGameLimitString
+
+Creates a human-readable limit summary for the active gametype.
+=============
+*/
+static void CG_BuildGameLimitString( char *buffer, size_t bufferSize, qboolean verbose ) {
+	char		segment[64];
+	qboolean	wroteSegment = qfalse;
+	int		limit;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	limit = ( cgs.gametype >= GT_CTF ) ? cgs.capturelimit : cgs.fraglimit;
+	if ( limit > 0 ) {
+		if ( cgs.gametype >= GT_CTF ) {
+			Com_sprintf( segment, sizeof( segment ), verbose ? "Capture Limit %i" : "%i captures", limit );
+		} else {
+			Com_sprintf( segment, sizeof( segment ), verbose ? "Frag Limit %i" : "%i frags", limit );
+		}
+		Q_strcat( buffer, bufferSize, segment );
+		wroteSegment = qtrue;
+	}
+
+	if ( cgs.timelimit > 0 ) {
+		if ( wroteSegment ) {
+			Q_strcat( buffer, bufferSize, verbose ? "  " : "  /  " );
+		}
+		Com_sprintf( segment, sizeof( segment ), verbose ? "Time Limit %i" : "%i min", cgs.timelimit );
+		Q_strcat( buffer, bufferSize, segment );
+		wroteSegment = qtrue;
+	}
+
+	if ( !wroteSegment ) {
+		Q_strncpyz( buffer, "Unlimited", bufferSize );
+	}
+}
+
+/*
+=============
+CG_UpdateStartingWeaponsCache
+
+Snapshots the most recent spawn weapon mask for later display.
+=============
+*/
+static void CG_UpdateStartingWeaponsCache( void ) {
+	int spawnCount;
+
+	if ( !cg.snap ) {
+		return;
+	}
+
+	spawnCount = cg.snap->ps.persistant[PERS_SPAWN_COUNT];
+	if ( spawnCount == cgStartingWeaponsSpawnCount ) {
+		return;
+	}
+
+	cgStartingWeaponsSpawnCount = spawnCount;
+	cgStartingWeaponsMask = cg.snap->ps.stats[STAT_WEAPONS];
+}
+
+/*
+=============
+CG_BuildStartingWeaponsString
+
+Formats the cached starting weapon mask into a comma separated list.
+=============
+*/
+static void CG_BuildStartingWeaponsString( char *buffer, size_t bufferSize ) {
+	int		mask;
+	int		weapon;
+	qboolean	wrote = qfalse;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	CG_UpdateStartingWeaponsCache();
+	mask = cgStartingWeaponsMask;
+	buffer[0] = '\0';
+
+	if ( mask == 0 && cg.snap ) {
+		mask = cg.snap->ps.stats[STAT_WEAPONS];
+	}
+
+	for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
+		const gitem_t *item;
+
+		if ( ( mask & ( 1 << weapon ) ) == 0 ) {
+			continue;
+		}
+
+		item = BG_FindItemForWeapon( (weapon_t)weapon );
+		if ( !item || !item->pickup_name || !item->pickup_name[0] ) {
+			continue;
+		}
+
+		if ( wrote ) {
+			Q_strcat( buffer, bufferSize, ", " );
+		}
+		Q_strcat( buffer, bufferSize, item->pickup_name );
+		wrote = qtrue;
+	}
+
+	if ( !wrote ) {
+		Q_strncpyz( buffer, CG_LoadoutsEnabled() ? "Loadouts enabled" : "Standard loadout", bufferSize );
+	}
+}
+
+/*
+=============
+CG_ParseActiveVote
+
+Decomposes the vote string into command and argument tokens.
+=============
+*/
+static qboolean CG_ParseActiveVote( cgVoteInfo_t *voteInfo ) {
+	char		buffer[MAX_STRING_TOKENS];
+	char		*cursor;
+	const char	*token;
+
+	if ( !voteInfo || !cgs.voteTime || !cgs.voteString[0] ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( buffer, cgs.voteString, sizeof( buffer ) );
+	cursor = buffer;
+
+	token = COM_ParseExt( &cursor, qfalse );
+	if ( !token || !*token ) {
+		return qfalse;
+	}
+	Q_strncpyz( voteInfo->command, token, sizeof( voteInfo->command ) );
+
+	token = COM_ParseExt( &cursor, qfalse );
+	if ( token && *token ) {
+		Q_strncpyz( voteInfo->arg1, token, sizeof( voteInfo->arg1 ) );
+	} else {
+		voteInfo->arg1[0] = '\0';
+	}
+
+	token = COM_ParseExt( &cursor, qfalse );
+	if ( token && *token ) {
+		Q_strncpyz( voteInfo->arg2, token, sizeof( voteInfo->arg2 ) );
+	} else {
+		voteInfo->arg2[0] = '\0';
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_FriendlyVoteCommand
+
+Returns a user-facing description for the parsed vote command.
+=============
+*/
+static const char *CG_FriendlyVoteCommand( const cgVoteInfo_t *voteInfo ) {
+	static char label[32];
+
+	if ( !voteInfo || !voteInfo->command[0] ) {
+		return "";
+	}
+
+	if ( !Q_stricmp( voteInfo->command, "map" ) ) {
+		return "Map";
+	}
+	if ( !Q_stricmp( voteInfo->command, "nextmap" ) ) {
+		return "Next Map";
+	}
+	if ( !Q_stricmp( voteInfo->command, "g_gametype" ) || !Q_stricmp( voteInfo->command, "gametype" ) ) {
+		return "Gametype";
+	}
+	if ( !Q_stricmp( voteInfo->command, "kick" ) || !Q_stricmp( voteInfo->command, "clientkick" ) ) {
+		return "Kick";
+	}
+	if ( !Q_stricmp( voteInfo->command, "shuffle" ) ) {
+		return "Shuffle";
+	}
+
+	Q_strncpyz( label, voteInfo->command, sizeof( label ) );
+	return Q_strupr( label );
+}
+
+/*
+=============
+CG_DrawServerSettings
+
+Displays the active server hostname and location summary.
+=============
+*/
+static void CG_DrawServerSettings(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	const char *info;
+	const char *hostname;
+	char location[128];
+	char buffer[MAX_STRING_CHARS];
+
+	info = CG_ConfigString( CS_SERVERINFO );
+	if ( !info || !*info ) {
+		return;
+	}
+
+	hostname = Info_ValueForKey( info, "sv_hostname" );
+	if ( !hostname || !*hostname ) {
+		hostname = "Unnamed server";
+	}
+
+	CG_GetServerLocationString( location, sizeof( location ) );
+	Com_sprintf( buffer, sizeof( buffer ), "%s - %s", hostname, location );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawGameLimit
+
+Prints the frag/capture and time limit summary.
+=============
+*/
+static void CG_DrawGameLimit(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	char buffer[64];
+
+	CG_BuildGameLimitString( buffer, sizeof( buffer ), qtrue );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawGameTypeIcon
+
+Renders the gametype icon using the supplied shader.
+=============
+*/
+static void CG_DrawGameTypeIcon(rectDef_t *rect, qhandle_t shader) {
+	if ( !shader ) {
+		return;
+	}
+
+	CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );
+}
+
+/*
+=============
+CG_DrawGameTypeMap
+
+Outputs the gametype, server location, and map tuple.
+=============
+*/
+static void CG_DrawGameTypeMap(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	char location[128];
+	char mapName[MAX_QPATH];
+	char buffer[MAX_STRING_CHARS];
+
+	CG_GetServerLocationString( location, sizeof( location ) );
+	CG_GetDisplayMapName( mapName, sizeof( mapName ) );
+	Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s", CG_GameTypeString(), location, mapName );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawMatchDetails
+
+Shows the match state, gametype shorthand, location, and map.
+=============
+*/
+static void CG_DrawMatchDetails(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	char state[32];
+	char location[128];
+	char mapName[MAX_QPATH];
+	char buffer[MAX_STRING_CHARS];
+
+	CG_BuildMatchStateString( state, sizeof( state ) );
+	CG_GetServerLocationString( location, sizeof( location ) );
+	CG_GetDisplayMapName( mapName, sizeof( mapName ) );
+	Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s - %s", state, CG_GameTypeShortString(), location, mapName );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawMatchEndCondition
+
+Displays the text describing how the match can end.
+=============
+*/
+static void CG_DrawMatchEndCondition(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	char buffer[64];
+
+	CG_BuildGameLimitString( buffer, sizeof( buffer ), qtrue );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawMatchStatus
+
+Combines the match state with the scoreboard status text.
+=============
+*/
+static void CG_DrawMatchStatus(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	char state[32];
+	char buffer[MAX_STRING_CHARS];
+
+	CG_BuildMatchStateString( state, sizeof( state ) );
+	Com_sprintf( buffer, sizeof( buffer ), "%s - %s", state, CG_GetGameStatusText() );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawStartingWeapons
+
+Prints the cached starting weapon list for the player.
+=============
+*/
+static void CG_DrawStartingWeapons(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	char buffer[MAX_STRING_CHARS];
+
+	CG_BuildStartingWeaponsString( buffer, sizeof( buffer ) );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawVoteGametypeSlot
+
+Displays the parsed vote command label for HUD slots.
+=============
+*/
+static void CG_DrawVoteGametypeSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+	cgVoteInfo_t voteInfo;
+	const char *label;
+
+	(void)slot;
+	if ( !CG_ParseActiveVote( &voteInfo ) ) {
+		return;
+	}
+
+	label = CG_FriendlyVoteCommand( &voteInfo );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, label, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawVoteMapSlot
+
+Renders the target of the vote, typically a map or argument.
+=============
+*/
+static void CG_DrawVoteMapSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+	cgVoteInfo_t voteInfo;
+	char mapName[MAX_QPATH];
+
+	(void)slot;
+	if ( !CG_ParseActiveVote( &voteInfo ) ) {
+		return;
+	}
+
+	mapName[0] = '\0';
+	if ( voteInfo.arg1[0] ) {
+		CG_CleanMapName( voteInfo.arg1, mapName, sizeof( mapName ) );
+	}
+	if ( !mapName[0] && voteInfo.arg1[0] ) {
+		Q_strncpyz( mapName, voteInfo.arg1, sizeof( mapName ) );
+	}
+	if ( !mapName[0] ) {
+		Q_strncpyz( mapName, voteInfo.command, sizeof( mapName ) );
+	}
+
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, mapName, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawVoteShot
+
+Attempts to paint the levelshot for the voted map.
+=============
+*/
+static void CG_DrawVoteShot(rectDef_t *rect, int slot) {
+	cgVoteInfo_t voteInfo;
+	char mapName[MAX_QPATH];
+	char shotPath[MAX_QPATH];
+	qhandle_t shader;
+
+	(void)slot;
+	if ( !CG_ParseActiveVote( &voteInfo ) ) {
+		return;
+	}
+	if ( !voteInfo.arg1[0] ) {
+		return;
+	}
+
+	CG_CleanMapName( voteInfo.arg1, mapName, sizeof( mapName ) );
+	if ( !mapName[0] ) {
+		return;
+	}
+
+	Com_sprintf( shotPath, sizeof( shotPath ), "levelshots/%s", mapName );
+	shader = trap_R_RegisterShaderNoMip( shotPath );
+	if ( !shader ) {
+		shader = cgs.media.deferShader;
+	}
+	if ( !shader ) {
+		return;
+	}
+
+	CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );
+}
+
+/*
+=============
+CG_DrawVoteNameSlot
+
+Prints the raw vote string for contextual HUD elements.
+=============
+*/
+static void CG_DrawVoteNameSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+	char buffer[MAX_STRING_CHARS];
+
+	(void)slot;
+	if ( !cgs.voteTime || !cgs.voteString[0] ) {
+		return;
+	}
+
+	Com_sprintf( buffer, sizeof( buffer ), "Vote: %s", cgs.voteString );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawVoteCountSlot
+
+Shows the yes/no tally for the current vote.
+=============
+*/
+static void CG_DrawVoteCountSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
+	char buffer[64];
+
+	(void)slot;
+	if ( !cgs.voteTime ) {
+		return;
+	}
+
+	Com_sprintf( buffer, sizeof( buffer ), "Yes %i / No %i", cgs.voteYes, cgs.voteNo );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawVoteTimer
+
+Outputs the number of seconds remaining on the vote.
+=============
+*/
+static void CG_DrawVoteTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	int seconds;
+	char buffer[32];
+
+	if ( !cgs.voteTime ) {
+		return;
+	}
+
+	seconds = ( VOTE_TIME - ( cg.time - cgs.voteTime ) ) / 1000;
+	if ( seconds < 0 ) {
+		seconds = 0;
+	}
+	Com_sprintf( buffer, sizeof( buffer ), "%is remaining", seconds );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawMatchRound
+
+Displays the current round and turn numbers when available.
+=============
+*/
+static void CG_DrawMatchRound(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	char buffer[32];
+
+	if ( cgs.matchRoundNumber <= 0 ) {
+		return;
+	}
+
+	if ( cgs.matchRoundTurn > 0 ) {
+		Com_sprintf( buffer, sizeof( buffer ), "Round %i - Turn %i", cgs.matchRoundNumber, cgs.matchRoundTurn );
+	} else {
+		Com_sprintf( buffer, sizeof( buffer ), "Round %i", cgs.matchRoundNumber );
+	}
+
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_DrawLocalTime
+
+Renders the player's local system time in HH:MM.
+=============
+*/
+static void CG_DrawLocalTime(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	qtime_t now;
+	char buffer[32];
+
+	if ( trap_RealTime( &now ) == -1 ) {
+		return;
+	}
+
+	Com_sprintf( buffer, sizeof( buffer ), "%02i:%02i", now.tm_hour, now.tm_min );
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
@@ -3621,10 +4319,19 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
   rect.w = w;
   rect.h = h;
 
-  switch (ownerDraw) {
-  case CG_PLAYER_ARMOR_ICON:
-    CG_DrawPlayerArmorIcon(&rect, ownerDrawFlags & CG_SHOW_2DONLY);
-    break;
+switch (ownerDraw) {
+case CG_SERVER_SETTINGS:
+CG_DrawServerSettings(&rect, scale, color, textStyle);
+break;
+case CG_STARTING_WEAPONS:
+CG_DrawStartingWeapons(&rect, scale, color, textStyle);
+break;
+case CG_GAME_LIMIT:
+CG_DrawGameLimit(&rect, scale, color, textStyle);
+break;
+case CG_PLAYER_ARMOR_ICON:
+CG_DrawPlayerArmorIcon(&rect, ownerDrawFlags & CG_SHOW_2DONLY);
+break;
   case CG_PLAYER_ARMOR_ICON2D:
     CG_DrawPlayerArmorIcon(&rect, qtrue);
     break;
@@ -3778,26 +4485,89 @@ break;
   case CG_AREA_TEAMCHAT:
     CG_DrawAreaTeamChat(&rect, scale, color, shader);
     break;
-  case CG_AREA_CHAT:
-    CG_DrawAreaChat(&rect, scale, color, shader);
-    break;
-  case CG_AREA_NEW_CHAT:
-		CG_DrawNewChatArea(&rect, scale, color, textStyle);
-		break;
-  case CG_GAME_TYPE:
-    CG_DrawGameType(&rect, scale, color, shader, textStyle);
-    break;
-  case CG_GAME_STATUS:
-    CG_DrawGameStatus(&rect, scale, color, shader, textStyle);
-                break;
-  case CG_MAP_NAME:
-    CG_DrawMapName(&rect, scale, color, textStyle);
-                break;
-  case CG_PLAYER_COUNTS:
-    CG_DrawPlayerCounts(&rect, scale, color, textStyle);
-                break;
-  case CG_KILLER:
-    CG_DrawKiller(&rect, scale, color, shader, textStyle);
+case CG_AREA_CHAT:
+CG_DrawAreaChat(&rect, scale, color, shader);
+break;
+case CG_AREA_NEW_CHAT:
+CG_DrawNewChatArea(&rect, scale, color, textStyle);
+break;
+case CG_GAME_TYPE_ICON:
+CG_DrawGameTypeIcon(&rect, shader);
+break;
+case CG_GAME_TYPE:
+CG_DrawGameType(&rect, scale, color, shader, textStyle);
+break;
+case CG_GAME_TYPE_MAP:
+CG_DrawGameTypeMap(&rect, scale, color, textStyle);
+break;
+case CG_GAME_STATUS:
+CG_DrawGameStatus(&rect, scale, color, shader, textStyle);
+break;
+case CG_MATCH_DETAILS:
+CG_DrawMatchDetails(&rect, scale, color, textStyle);
+break;
+case CG_MATCH_END_CONDITION:
+CG_DrawMatchEndCondition(&rect, scale, color, textStyle);
+break;
+case CG_MATCH_STATUS:
+CG_DrawMatchStatus(&rect, scale, color, textStyle);
+break;
+case CG_MAP_NAME:
+CG_DrawMapName(&rect, scale, color, textStyle);
+break;
+case CG_PLAYER_COUNTS:
+CG_DrawPlayerCounts(&rect, scale, color, textStyle);
+break;
+case CG_VOTEGAMETYPE1:
+CG_DrawVoteGametypeSlot(&rect, scale, color, textStyle, 0);
+break;
+case CG_VOTEGAMETYPE2:
+CG_DrawVoteGametypeSlot(&rect, scale, color, textStyle, 1);
+break;
+case CG_VOTEGAMETYPE3:
+CG_DrawVoteGametypeSlot(&rect, scale, color, textStyle, 2);
+break;
+case CG_VOTEMAP1:
+CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 0);
+break;
+case CG_VOTEMAP2:
+CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 1);
+break;
+case CG_VOTEMAP3:
+CG_DrawVoteMapSlot(&rect, scale, color, textStyle, 2);
+break;
+case CG_VOTESHOT1:
+CG_DrawVoteShot(&rect, 0);
+break;
+case CG_VOTESHOT2:
+CG_DrawVoteShot(&rect, 1);
+break;
+case CG_VOTESHOT3:
+CG_DrawVoteShot(&rect, 2);
+break;
+case CG_VOTENAME1:
+CG_DrawVoteNameSlot(&rect, scale, color, textStyle, 0);
+break;
+case CG_VOTENAME2:
+CG_DrawVoteNameSlot(&rect, scale, color, textStyle, 1);
+break;
+case CG_VOTENAME3:
+CG_DrawVoteNameSlot(&rect, scale, color, textStyle, 2);
+break;
+case CG_VOTECOUNT1:
+CG_DrawVoteCountSlot(&rect, scale, color, textStyle, 0);
+break;
+case CG_VOTECOUNT2:
+CG_DrawVoteCountSlot(&rect, scale, color, textStyle, 1);
+break;
+case CG_VOTECOUNT3:
+CG_DrawVoteCountSlot(&rect, scale, color, textStyle, 2);
+break;
+case CG_VOTETIMER:
+CG_DrawVoteTimer(&rect, scale, color, textStyle);
+break;
+case CG_KILLER:
+CG_DrawKiller(&rect, scale, color, shader, textStyle);
 		break;
 	case CG_ACCURACY:
 	case CG_ASSISTS:
@@ -3847,18 +4617,24 @@ break;
   case CG_PLAYER_OBIT:
     CG_DrawPlayerObituary(&rect, scale, color, textStyle);
                 break;
-  case CG_LEVELTIMER:
-    CG_DrawLevelTimer(&rect, scale, color, textStyle);
-                break;
-  case CG_ROUNDTIMER:
-    CG_DrawRoundTimer(&rect, scale, color, textStyle);
-                break;
-  case CG_MATCH_STATE:
-		CG_DrawMatchState(&rect, scale, color, textStyle);
+case CG_LEVELTIMER:
+CG_DrawLevelTimer(&rect, scale, color, textStyle);
+break;
+case CG_ROUND:
+CG_DrawMatchRound(&rect, scale, color, textStyle);
+break;
+case CG_ROUNDTIMER:
+CG_DrawRoundTimer(&rect, scale, color, textStyle);
+break;
+case CG_MATCH_STATE:
+CG_DrawMatchState(&rect, scale, color, textStyle);
 		break;
-  case CG_OVERTIME:
-    CG_DrawOvertime(&rect, scale, color, textStyle);
-                break;
+case CG_OVERTIME:
+CG_DrawOvertime(&rect, scale, color, textStyle);
+break;
+case CG_LOCALTIME:
+CG_DrawLocalTime(&rect, scale, color, textStyle);
+break;
   case CG_1ST_PLYR:
     CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 0);
                 break;
