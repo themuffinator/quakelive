@@ -810,8 +810,12 @@ CG_AddBufferedSound
 =====================
 */
 void CG_AddBufferedSound( sfxHandle_t sfx ) {
-	if ( !sfx )
+	if ( !sfx ) {
 		return;
+	}
+	if ( cgs.announcerProfile == ANNOUNCER_PROFILE_DISABLED ) {
+		return;
+	}
 	cg.soundBuffer[cg.soundBufferIn] = sfx;
 	cg.soundBufferIn = (cg.soundBufferIn + 1) % MAX_SOUNDBUFFER;
 	if (cg.soundBufferIn == cg.soundBufferOut) {
@@ -825,6 +829,10 @@ CG_PlayBufferedSounds
 =====================
 */
 static void CG_PlayBufferedSounds( void ) {
+	if ( cgs.announcerProfile == ANNOUNCER_PROFILE_DISABLED ) {
+		cg.soundBufferOut = cg.soundBufferIn;
+		return;
+	}
 	if ( cg.soundTime < cg.time ) {
 		if (cg.soundBufferOut != cg.soundBufferIn && cg.soundBuffer[cg.soundBufferOut]) {
 			trap_S_StartLocalSound(cg.soundBuffer[cg.soundBufferOut], CHAN_ANNOUNCER);

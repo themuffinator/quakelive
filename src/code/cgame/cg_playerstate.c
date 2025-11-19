@@ -279,6 +279,9 @@ pushReward
 ==================
 */
 static void pushReward(sfxHandle_t sfx, qhandle_t shader, int rewardCount) {
+	if ( cgs.announcerProfile == ANNOUNCER_PROFILE_DISABLED || !cg_announcerRewardsVO.integer ) {
+		sfx = 0;
+	}
 	if (cg.rewardStack < (MAX_REWARDSTACK-1)) {
 		cg.rewardStack++;
 		cg.rewardSound[cg.rewardStack] = sfx;
@@ -295,6 +298,7 @@ CG_CheckLocalSounds
 void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 	int			highScore, health, armor, reward;
 	sfxHandle_t sfx;
+	qboolean		rewardVOEnabled;
 
 	// don't play the sounds if the player just changed teams
 	if ( ps->persistant[PERS_TEAM] != ops->persistant[PERS_TEAM] ) {
@@ -329,6 +333,7 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 		return;
 	}
 
+	rewardVOEnabled = (qboolean)( cg_announcerRewardsVO.integer && cgs.announcerProfile != ANNOUNCER_PROFILE_DISABLED );
 	// reward sounds
 	reward = qfalse;
 	if (ps->persistant[PERS_CAPTURES] != ops->persistant[PERS_CAPTURES]) {
@@ -380,15 +385,21 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 	if (ps->persistant[PERS_PLAYEREVENTS] != ops->persistant[PERS_PLAYEREVENTS]) {
 		if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_DENIEDREWARD) !=
 				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_DENIEDREWARD)) {
-			trap_S_StartLocalSound( cgs.media.deniedSound, CHAN_ANNOUNCER );
+			if ( rewardVOEnabled ) {
+				trap_S_StartLocalSound( cgs.media.deniedSound, CHAN_ANNOUNCER );
+			}
 		}
 		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_GAUNTLETREWARD) !=
 				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_GAUNTLETREWARD)) {
-			trap_S_StartLocalSound( cgs.media.humiliationSound, CHAN_ANNOUNCER );
+			if ( rewardVOEnabled ) {
+				trap_S_StartLocalSound( cgs.media.humiliationSound, CHAN_ANNOUNCER );
+			}
 		}
 		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_HOLYSHIT) !=
 				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_HOLYSHIT)) {
-			trap_S_StartLocalSound( cgs.media.holyShitSound, CHAN_ANNOUNCER );
+			if ( rewardVOEnabled ) {
+				trap_S_StartLocalSound( cgs.media.holyShitSound, CHAN_ANNOUNCER );
+			}
 		}
 		reward = qtrue;
 	}

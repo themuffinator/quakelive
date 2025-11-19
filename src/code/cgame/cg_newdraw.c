@@ -31,7 +31,7 @@ typedef enum cgVoteSlotField_e {
 	CG_VOTE_FIELD_MAP,
 	CG_VOTE_FIELD_NAME,
 	CG_VOTE_FIELD_COUNT
-} cgVoteSlotField_t;
+	} cgVoteSlotField_t;
 
 //
 // Forward declarations for HUD ownerdraw helpers used by Quake Live menus.
@@ -123,6 +123,39 @@ void CG_RaceResetState( void ) {
 	cgs.raceLeaderClientNum = -1;
 	for ( i = 0; i < MAX_CLIENTS; ++i ) {
 		cgs.raceProgress[i].currentCheckpoint = -1;
+	}
+}
+
+/*
+=============
+CG_RacePlayCue
+
+Plays a race HUD cue when enabled.
+=============
+*/
+void CG_RacePlayCue( cgRaceCue_t cue ) {
+	sfxHandle_t sfx = 0;
+
+	if ( !cg_raceBeep.integer ) {
+		return;
+	}
+
+	switch ( cue ) {
+	case CG_RACE_CUE_START:
+		sfx = cgs.media.raceStartBeep;
+		break;
+	case CG_RACE_CUE_CHECKPOINT:
+		sfx = cgs.media.raceCheckpointBeep;
+		break;
+	case CG_RACE_CUE_FINISH:
+		sfx = cgs.media.raceFinishBeep;
+		break;
+	default:
+		return;
+	}
+
+	if ( sfx ) {
+		trap_S_StartLocalSound( sfx, CHAN_LOCAL_SOUND );
 	}
 }
 
@@ -350,6 +383,71 @@ static const cgRaceClientStatus_t *CG_RaceStatusForClient( int clientNum ) {
 	return &cgs.raceStatus[clientNum];
 }
 
+
+/*
+=============
+CG_RaceShouldPlayCheckpointFeedback
+
+Determines if checkpoint notifications should be emitted for a client.
+=============
+*/
+static qboolean CG_RaceShouldPlayCheckpointFeedback( int clientNum ) {
+	if ( cg_raceBeep.integer == 0 || !cg.snap ) {
+		return qfalse;
+	}
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		return qfalse;
+	}
+	if ( clientNum < 0 ) {
+		return qfalse;
+	}
+	if ( !( cg.snap->ps.pm_flags & PMF_FOLLOW ) && clientNum == cg.clientNum ) {
+		return qtrue;
+	}
+	if ( ( cg.snap->ps.pm_flags & PMF_FOLLOW ) && clientNum == cg.spectatorFollowClient ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+
+/*
+=============
+CG_RacePlayCheckpointFeedback
+
+Emits the checkpoint centerprint and audio cue when enabled.
+=============
+*/
+static void CG_RacePlayCheckpointFeedback( const cgRaceClientProgress_t *progress ) {
+	char		statusText[64];
+	int		 total;
+	int		 cleared;
+	int		 remaining;
+
+	if ( !progress ) {
+		return;
+	}
+
+	total = ( cgs.racePointCount > 0 ) ? ( cgs.racePointCount - 1 ) : 0;
+	cleared = progress->currentCheckpoint;
+	if ( total <= 0 || cleared <= 0 ) {
+		return;
+	}
+
+	remaining = total - cleared;
+	if ( remaining < 0 ) {
+		remaining = 0;
+	}
+	if ( remaining > 0 ) {
+		Com_sprintf( statusText, sizeof( statusText ), "%i remaining", remaining );
+	} else {
+		Q_strncpyz( statusText, "Finish", sizeof( statusText ) );
+	}
+
+	CG_CenterPrint( va( "Checkpoint\n%s", statusText ), SCREEN_HEIGHT * 0.30f, BIGCHAR_WIDTH );
+	trap_S_StartLocalSound( cgs.media.selectSound, CHAN_LOCAL_SOUND );
+}
+
 /*
 =============
 CG_RaceUpdateClientProgress
@@ -391,6 +489,7 @@ static void CG_RaceUpdateClientProgress( int clientNum, const vec3_t origin, con
 			progress->runActive = qtrue;
 			progress->currentCheckpoint = 0;
 			progress->lastTouchTime = cg.time;
+			CG_RacePlayCue( CG_RACE_CUE_START );
 		}
 		return;
 	}
@@ -407,8 +506,14 @@ static void CG_RaceUpdateClientProgress( int clientNum, const vec3_t origin, con
 	if ( CG_RacePointContainsIndex( progress->currentCheckpoint + 1, origin ) ) {
 		progress->currentCheckpoint++;
 		progress->lastTouchTime = cg.time;
+		if ( CG_RaceShouldPlayCheckpointFeedback( clientNum ) ) {
+			CG_RacePlayCheckpointFeedback( progress );
+		}
 		if ( progress->currentCheckpoint >= cgs.racePointCount - 1 ) {
 			progress->runActive = qfalse;
+			CG_RacePlayCue( CG_RACE_CUE_FINISH );
+		} else {
+			CG_RacePlayCue( CG_RACE_CUE_CHECKPOINT );
 		}
 	}
 }
@@ -1375,7 +1480,7 @@ int width;
 CG_CountLivingPlayers(&friendCount, &enemyCount);
 Com_sprintf(buffer, sizeof(buffer), "%i", friendly ? friendCount : enemyCount);
 width = CG_Text_Width(buffer, scale, 0);
-CG_Text_Paint(rect->x + (rect->w - width) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+		CG_Text_Paint(rect->x + (rect->w - width) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
 /*
@@ -3031,10 +3136,7 @@ static void CG_DrawNewChatArea(rectDef_t *rect, float scale, vec4_t color, int t
 		return;
 	}
 
-	chatHeight = cg_teamChatHeight.integer;
-	if (chatHeight <= 0 || chatHeight > TEAMCHAT_HEIGHT) {
-		chatHeight = TEAMCHAT_HEIGHT;
-	}
+	chatHeight = CG_GetChatHistoryLength();
 
 	maxLines = chatHeight;
 	lineHeight = CG_Text_Height("A", scale, 0);
@@ -3580,12 +3682,24 @@ static void CG_DrawPlayerStatus( rectDef_t *rect ) {
 }
 
 
+/*
+=============
+CG_DrawSelectedPlayerName
+
+Draws the selected player's name or the active voice client's name.
+=============
+*/
 static void CG_DrawSelectedPlayerName( rectDef_t *rect, float scale, vec4_t color, qboolean voice, int textStyle) {
 	clientInfo_t *ci;
-  ci = cgs.clientinfo + ((voice) ? cgs.currentVoiceClient : sortedTeamPlayers[CG_GetSelectedPlayer()]);
-  if (ci) {
-    CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, ci->name, 0, 0, textStyle);
-  }
+
+	if ( voice && !CG_ShouldDisplayVoiceIndicator() ) {
+		return;
+	}
+
+	ci = cgs.clientinfo + ( ( voice ) ? cgs.currentVoiceClient : sortedTeamPlayers[CG_GetSelectedPlayer()] );
+	if ( ci ) {
+		CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, ci->name, 0, 0, textStyle);
+	}
 }
 
 static void CG_DrawSelectedPlayerLocation( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
@@ -3692,6 +3806,13 @@ static void CG_DrawSelectedPlayerPowerup( rectDef_t *rect, qboolean draw2D ) {
 }
 
 
+/*
+=============
+CG_DrawSelectedPlayerHead
+
+Draws the head model for the selected player or active voice client.
+=============
+*/
 static void CG_DrawSelectedPlayerHead( rectDef_t *rect, qboolean draw2D, qboolean voice ) {
 	clipHandle_t	cm;
 	clientInfo_t	*ci;
@@ -3699,47 +3820,48 @@ static void CG_DrawSelectedPlayerHead( rectDef_t *rect, qboolean draw2D, qboolea
 	vec3_t			origin;
 	vec3_t			mins, maxs, angles;
 
+	if ( voice && !CG_ShouldDisplayVoiceIndicator() ) {
+		return;
+	}
 
-  ci = cgs.clientinfo + ((voice) ? cgs.currentVoiceClient : sortedTeamPlayers[CG_GetSelectedPlayer()]);
+	ci = cgs.clientinfo + ( ( voice ) ? cgs.currentVoiceClient : sortedTeamPlayers[CG_GetSelectedPlayer()] );
 
-  if (ci) {
-  	if ( cg_draw3dIcons.integer ) {
-	  	cm = ci->headModel;
-  		if ( !cm ) {
-  			return;
-	  	}
+	if (ci) {
+		if ( cg_draw3dIcons.integer ) {
+			cm = ci->headModel;
+			if ( !cm ) {
+				return;
+			}
 
-  		// offset the origin y and z to center the head
-  		trap_R_ModelBounds( cm, mins, maxs );
+			// offset the origin y and z to center the head
+			trap_R_ModelBounds( cm, mins, maxs );
 
-	  	origin[2] = -0.5 * ( mins[2] + maxs[2] );
-  		origin[1] = 0.5 * ( mins[1] + maxs[1] );
+			origin[2] = -0.5 * ( mins[2] + maxs[2] );
+			origin[1] = 0.5 * ( mins[1] + maxs[1] );
 
-	  	// calculate distance so the head nearly fills the box
-  		// assume heads are taller than wide
-  		len = 0.7 * ( maxs[2] - mins[2] );		
-  		origin[0] = len / 0.268;	// len / tan( fov/2 )
+			// calculate distance so the head nearly fills the box
+			// assume heads are taller than wide
+			len = 0.7 * ( maxs[2] - mins[2] );
+			origin[0] = len / 0.268;	// len / tan( fov/2 )
 
-  		// allow per-model tweaking
-  		VectorAdd( origin, ci->headOffset, origin );
+			// allow per-model tweaking
+			VectorAdd( origin, ci->headOffset, origin );
 
-    	angles[PITCH] = 0;
-    	angles[YAW] = 180;
-    	angles[ROLL] = 0;
-  	
-      CG_Draw3DModel( rect->x, rect->y, rect->w, rect->h, ci->headModel, ci->headSkin, origin, angles );
-  	} else if ( cg_drawIcons.integer ) {
-	  	CG_DrawPic( rect->x, rect->y, rect->w, rect->h, ci->modelIcon );
-  	}
+			angles[PITCH] = 0;
+			angles[YAW] = 180;
+			angles[ROLL] = 0;
 
-  	// if they are deferred, draw a cross out
-  	if ( ci->deferred ) {
-  		CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cgs.media.deferShader );
-  	}
-  }
+			CG_Draw3DModel( rect->x, rect->y, rect->w, rect->h, ci->headModel, ci->headSkin, origin, angles );
+		} else if ( cg_drawIcons.integer ) {
+			CG_DrawPic( rect->x, rect->y, rect->w, rect->h, ci->modelIcon );
+		}
 
+		// if they are deferred, draw a cross out
+		if ( ci->deferred ) {
+			CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cgs.media.deferShader );
+		}
+	}
 }
-
 
 static void CG_DrawPlayerHealth(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle ) {
 	playerState_t	*ps;
