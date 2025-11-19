@@ -46,6 +46,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	INTERMISSION_DELAY_TIME	1000
 #define	SP_INTERMISSION_DELAY_TIME	5000
 
+#define	GAME_STATE_PRE_GAME				"PRE_GAME"
+#define	GAME_STATE_COUNT_DOWN		"COUNT_DOWN"
+#define	GAME_STATE_IN_PROGRESS	"IN_PROGRESS"
+
 // gentity->flags
 #define	FL_GODMODE				0x00000010
 #define	FL_NOTARGET				0x00000020
@@ -264,6 +268,7 @@ extern vmCvar_t g_startingHealthBonus;
 extern vmCvar_t g_startingArmor;
 extern vmCvar_t g_vampiricDamage;
 extern vmCvar_t g_training;
+extern vmCvar_t g_gameState;
 extern vmCvar_t g_botsFile;
 extern vmCvar_t g_botSpawnList;
 extern vmCvar_t g_accessFile;
@@ -1177,6 +1182,7 @@ void G_RunThink (gentity_t *ent);
 void QDECL G_LogPrintf( const char *fmt, ... );
 void SendScoreboardMessageToAllClients( void );
 void G_UpdateMatchStateConfigString( void );
+void G_SetGameState( const char *state );
 void G_ResetTimeoutState( void );
 void G_HandleForfeit( gentity_t *caller );
 void G_ApplyTimeoutPauseDelta( int msec );
