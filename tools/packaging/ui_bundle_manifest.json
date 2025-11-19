@@ -3,6 +3,11 @@
   "description": "Fonts and HUD/UI dependencies sourced from assets/quakelive/baseq3/fonts and bundled so FS_InitFilesystem can satisfy Quake Live font lookups.",
   "files": [
     {
+      "source": "assets/quakelive/baseq3/default.cfg",
+      "destination": "default.cfg",
+      "description": "Baseline Quake Live bindings expected by FS_InitFilesystem"
+    },
+    {
       "source": "assets/quakelive/baseq3/fonts/handelgothic.ttf",
       "destination": "fonts/handelgothic.ttf",
       "roles": ["font", "bigFont"],
@@ -50,6 +55,34 @@
       "source": "assets/quakelive/baseq3/syncerror.cfg",
       "destination": "syncerror.cfg",
       "license": "Quake Live profile snapshot packaged for tutorial flows."
+    },
+      "source_dir": "assets/quakelive/baseq3/scripts",
+      "destination": "scripts",
+      "include": ["ui*.shader"],
+      "description": "Shader scripts referenced by Quake Live HUD menus"
+    },
+    {
+      "source_dir": "assets/quakelive/baseq3/ui",
+      "destination": "ui",
+      "include": ["**/*.menu", "**/*.txt"],
+      "description": "Menu scripts and HUD definitions consumed by the native UI module"
     }
-  ]
+  ],
+  "audit": {
+    "required_paths": [
+      "default.cfg",
+      "fonts/handelgothic.ttf",
+      "fonts/notosans-regular.ttf",
+      "fonts/droidsansmono.ttf",
+      "fonts/droidsansfallbackfull.ttf",
+      "scripts/ui.shader",
+      "scripts/ui_hud.shader",
+      "ui/main.menu"
+    ],
+    "required_globs": [
+      "ui/**/*.menu",
+      "ui/**/*.txt",
+      "scripts/ui*.shader"
+    ]
+  }
 }

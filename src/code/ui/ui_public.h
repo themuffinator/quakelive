@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __UI_PUBLIC_H__
 #define __UI_PUBLIC_H__
 
-#define UI_API_VERSION	6
+#define UI_API_VERSION	7
 
 typedef struct {
 	connstate_t		connState;
@@ -124,6 +124,7 @@ typedef enum {
 	// 1.32
 	UI_FS_SEEK,
 	UI_SET_PBCLSTATUS,
+	UI_LAUNCHER_READSCREENSHOT,
 
 	UI_MEMSET = 100,
 	UI_MEMCPY,

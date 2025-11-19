@@ -890,6 +890,9 @@ int CL_UISystemCalls( int *args ) {
 
 	case UI_FS_SEEK:
 		return FS_Seek( args[1], args[2], args[3] );
+
+	case UI_LAUNCHER_READSCREENSHOT:
+		return CL_MenuReadScreenshot( VMA(1), VMA(2), args[3] );
 	
 	case UI_R_REGISTERMODEL:
 		return re.RegisterModel( VMA(1) );
