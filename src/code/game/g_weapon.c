@@ -99,16 +99,11 @@ qboolean CheckGauntletAttack( gentity_t *ent ) {
 		return qfalse;
 	}
 
-	if (ent->client->ps.powerups[PW_QUAD] ) {
+	if ( ent->client->ps.powerups[PW_QUAD] ) {
 		G_AddEvent( ent, EV_POWERUP_QUAD, 0 );
-		s_quadFactor = g_quadfactor.value;
-	} else {
-		s_quadFactor = 1;
-	}
-	if( ent->client->persistantPowerup && ent->client->persistantPowerup->item && ent->client->persistantPowerup->item->giTag == PW_DOUBLER ) {
-		s_quadFactor *= 2;
 	}
 
+	s_quadFactor = 1;
 	damage = g_weaponConfig.gauntletDamage * s_quadFactor;
 	G_Damage( traceEnt, ent, ent, forward, tr.endpos,
 		damage, 0, MOD_GAUNTLET );
@@ -773,15 +768,7 @@ FireWeapon
 ===============
 */
 void FireWeapon( gentity_t *ent ) {
-	if (ent->client->ps.powerups[PW_QUAD] ) {
-		s_quadFactor = g_quadfactor.value;
-	} else {
-		s_quadFactor = 1;
-	}
-	if( ent->client->persistantPowerup && ent->client->persistantPowerup->item && ent->client->persistantPowerup->item->giTag == PW_DOUBLER ) {
-		s_quadFactor *= 2;
-	}
-
+	s_quadFactor = 1;
 	// track shots taken for accuracy tracking.  Grapple is not a weapon and gauntet is just not tracked
 	if( ent->s.weapon != WP_GRAPPLING_HOOK && ent->s.weapon != WP_GAUNTLET ) {
 		if( ent->s.weapon == WP_NAILGUN ) {

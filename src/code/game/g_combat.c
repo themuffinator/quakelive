@@ -235,6 +235,10 @@ ScorePlum
 void ScorePlum( gentity_t *ent, vec3_t origin, int score ) {
 	gentity_t *plum;
 
+	if ( !g_damagePlums.integer ) {
+		return;
+	}
+
 	plum = G_TempEntity( origin, EV_SCOREPLUM );
 	// only send this temp entity to a single client
 	plum->r.svFlags |= SVF_SINGLECLIENT;
@@ -266,6 +270,124 @@ void AddScore( gentity_t *ent, vec3_t origin, int score ) {
 	if ( g_gametype.integer == GT_TEAM )
 		level.teamScores[ ent->client->ps.persistant[PERS_TEAM] ] += score;
 	CalculateRanks();
+}
+/*
+=============
+G_CalcPowerupDamageScale
+
+Returns the total powerup-based damage multiplier for the attacker.
+=============
+*/
+static float G_CalcPowerupDamageScale( gentity_t *attacker ) {
+	float		scale;
+
+	scale = 1.0f;
+	if ( !attacker || !attacker->client ) {
+		return scale;
+	}
+
+	if ( attacker->client->ps.powerups[PW_QUAD] ) {
+		scale *= g_weaponConfig.quadDamageMultiplier;
+	}
+
+	if ( attacker->client->persistantPowerup && attacker->client->persistantPowerup->item && attacker->client->persistantPowerup->item->giTag == PW_DOUBLER ) {
+		scale *= 2.0f;
+	}
+
+	return scale;
+}
+/*
+=============
+G_IsRailgunHeadshot
+
+Determines if the supplied impact point resides in the head region of the target.
+=============
+*/
+static qboolean G_IsRailgunHeadshot( gentity_t *targ, vec3_t point ) {
+	float	headThreshold;
+	float	height;
+
+	if ( !targ || !targ->client || !point ) {
+		return qfalse;
+	}
+
+	height = targ->r.maxs[2] - targ->r.mins[2];
+	if ( height <= 0.0f ) {
+		return qfalse;
+	}
+
+	headThreshold = targ->r.currentOrigin[2] + targ->r.maxs[2] - ( height * 0.25f );
+	return point[2] >= headThreshold;
+}
+/*
+=============
+G_ClampModDamage
+
+Clamps weapon damage against the active weapon configuration when CVars change mid-match.
+=============
+*/
+static int G_ClampModDamage( int damage, int mod, gentity_t *attacker ) {
+	int		configuredDamage;
+
+	configuredDamage = 0;
+	(void)attacker;
+	switch ( mod ) {
+	case MOD_GAUNTLET:
+		configuredDamage = g_weaponConfig.gauntletDamage;
+		break;
+	case MOD_MACHINEGUN:
+		configuredDamage = ( g_gametype.integer != GT_TEAM ) ? g_weaponConfig.machinegunDamage : g_weaponConfig.machinegunTeamDamage;
+		break;
+	case MOD_HMG:
+		configuredDamage = g_weaponConfig.heavyMachinegunDamage;
+		break;
+	case MOD_SHOTGUN:
+		configuredDamage = g_weaponConfig.shotgunDamage;
+		break;
+	case MOD_GRENADE:
+		configuredDamage = g_weaponConfig.grenadeDamage;
+		break;
+	case MOD_GRENADE_SPLASH:
+		configuredDamage = g_weaponConfig.grenadeSplashDamage;
+		break;
+	case MOD_ROCKET:
+		configuredDamage = g_weaponConfig.rocketDamage;
+		break;
+	case MOD_ROCKET_SPLASH:
+		configuredDamage = g_weaponConfig.rocketSplashDamage;
+		break;
+	case MOD_PLASMA:
+		configuredDamage = g_weaponConfig.plasmaDamage;
+		break;
+	case MOD_PLASMA_SPLASH:
+		configuredDamage = g_weaponConfig.plasmaSplashDamage;
+		break;
+	case MOD_RAILGUN:
+	case MOD_RAILGUN_HEADSHOT:
+		configuredDamage = g_weaponConfig.railgunDamage;
+		break;
+	case MOD_LIGHTNING:
+	case MOD_LIGHTNING_DISCHARGE:
+		configuredDamage = g_weaponConfig.lightningDamage;
+		break;
+	case MOD_BFG:
+		configuredDamage = g_weaponConfig.bfgDamage;
+		break;
+	case MOD_BFG_SPLASH:
+		configuredDamage = g_weaponConfig.bfgSplashDamage;
+		break;
+	case MOD_PROXIMITY_MINE:
+		configuredDamage = g_weaponConfig.proximityLauncherDamage;
+		break;
+	default:
+		break;
+	}
+
+	if ( configuredDamage > 0 && damage > configuredDamage ) {
+		return configuredDamage;
+	}
+
+	return damage;
 }
 /*
 =============
@@ -1227,7 +1349,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	float		knockbackPreClamp = 0.0f;
 	float		knockbackMax = 0.0f;
 	float		verticalBoostApplied = 0.0f;
+	float		powerupScale;
 
+	powerupScale = 1.0f;
 	if (!targ->takedamage) {
 		return;
 	}
@@ -1285,6 +1409,18 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 				return;
 			}
 		}
+	}
+
+	damage = G_ClampModDamage( damage, mod, attacker );
+
+	if ( ( mod == MOD_RAILGUN || mod == MOD_RAILGUN_HEADSHOT ) && G_IsRailgunHeadshot( targ, point ) ) {
+		mod = MOD_RAILGUN_HEADSHOT;
+		damage += g_weaponConfig.railgunHeadshotDamage;
+	}
+
+	powerupScale = G_CalcPowerupDamageScale( attacker );
+	if ( powerupScale != 1.0f ) {
+		damage = (int)( ( (float)damage * powerupScale ) + 0.5f );
 	}
 
 	if ( !dir ) {
