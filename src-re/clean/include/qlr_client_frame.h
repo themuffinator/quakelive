@@ -50,17 +50,18 @@ typedef struct qlr_client_frame_cvars_s {
 } qlr_client_frame_cvars_t;
 
 typedef struct qlr_client_frame_hooks_s {
-    void (*stop_all_sounds)(void);
-    void (*set_active_menu)(int menu_id);
-    void (*check_timeout)(qlr_client_connection_t *clc, qlr_client_static_t *cls, qlr_client_active_t *cl);
-    void (*check_userinfo)(void);
-    void (*read_packets)(void);
-    void (*send_cmd)(void);
-    void (*predict_movement)(void);
-    void (*run_console)(void);
-    void (*update_screen)(void);
-    void (*set_cgame_time)(void);
-    void (*begin_profiling)(void);
+void (*stop_all_sounds)(void);
+void (*set_active_menu)(int menu_id);
+void (*check_timeout)(qlr_client_connection_t *clc, qlr_client_static_t *cls, qlr_client_active_t *cl);
+void (*check_userinfo)(void);
+void (*read_packets)(void);
+void (*send_cmd)(void);
+void (*check_for_resend)(void);
+void (*predict_movement)(void);
+void (*run_console)(void);
+void (*update_screen)(void);
+void (*set_cgame_time)(void);
+void (*begin_profiling)(void);
 } qlr_client_frame_hooks_t;
 
 typedef struct qlr_client_frame_context_s {
