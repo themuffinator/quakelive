@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //==================================================================
 
 // the "gameversion" client command will print this plus compile date
-#define	GAMEVERSION	"baseq3"
+#define	GAMEVERSION	"baseqz"
 
 #define BODY_QUEUE_SIZE		8
 
@@ -262,6 +262,8 @@ struct factoryDefinition_s {
 extern factoryCvarConfig_t g_factoryCvarConfig;
 void G_InitFactoryCvarConfig( void );
 void G_UpdateFactoryCvarConfig( void );
+qboolean G_CustomSettingsDirty( void );
+void G_ClearCustomSettingsDirtyFlag( void );
 
 extern vmCvar_t g_startingHealth;
 extern vmCvar_t g_startingHealthBonus;
@@ -1326,6 +1328,7 @@ extern	vmCvar_t	g_domScoreRate;
 extern	vmCvar_t	g_friendlyFire;
 extern	vmCvar_t	g_password;
 extern	vmCvar_t	g_needpass;
+extern	vmCvar_t	g_customSettings;
 extern	vmCvar_t	g_allTalk;
 extern	vmCvar_t	g_gravity;
 extern	vmCvar_t	g_speed;

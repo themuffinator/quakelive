@@ -24,6 +24,91 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_local.h"
 #include "g_match_config.h"
 
+#define MAX_MAP_AUTHOR_STRING	MAX_QPATH
+
+/*
+=============
+G_IsWhitespaceChar
+
+Returns qtrue if the provided character is treated as whitespace when trimming strings.
+=============
+*/
+static qboolean G_IsWhitespaceChar( int c ) {
+	switch ( c ) {
+		case ' ':
+		case '\t':
+		case '\r':
+		case '\n':
+		case '\f':
+		case '\v':
+			return qtrue;
+		default:
+			break;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+G_CopyTrimmedAuthorString
+
+Copies the provided string into the destination buffer after trimming leading/trailing whitespace.
+=============
+*/
+static void G_CopyTrimmedAuthorString( char *dest, int destSize, const char *src ) {
+	const char	*start;
+	const char	*end;
+	size_t		length;
+
+	if ( !dest || destSize <= 0 ) {
+		return;
+	}
+
+	dest[0] = '\0';
+
+	if ( !src ) {
+		return;
+	}
+
+	start = src;
+	while ( *start && G_IsWhitespaceChar( *start ) ) {
+		++start;
+	}
+
+	end = start + strlen( start );
+	while ( end > start && G_IsWhitespaceChar( *( end - 1 ) ) ) {
+		--end;
+	}
+
+	length = (size_t)( end - start );
+	if ( length >= (size_t)destSize ) {
+		length = destSize - 1;
+	}
+
+	if ( length > 0 ) {
+		memcpy( dest, start, length );
+	}
+	dest[length] = '\0';
+}
+
+/*
+=============
+G_UpdateServerinfoMapAuthors
+
+Mirrors the current map author strings into the public serverinfo payload.
+=============
+*/
+static void G_UpdateServerinfoMapAuthors( const char *author, const char *authorAlt ) {
+	char	serverinfo[MAX_INFO_STRING];
+
+	trap_GetServerinfo( serverinfo, sizeof( serverinfo ) );
+	Info_SetValueForKey( serverinfo, "mapAuthor", ( author && author[0] ) ? author : "" );
+	Info_SetValueForKey( serverinfo, "mapAuthor2", ( authorAlt && authorAlt[0] ) ? authorAlt : "" );
+	trap_SetConfigstring( CS_SERVERINFO, serverinfo );
+}
+
+
 qboolean	G_SpawnString( const char *key, const char *defaultString, char **out ) {
 	int		i;
 
@@ -617,11 +702,22 @@ Every map should have exactly one worldspawn.
 "gravity"	800 is default gravity
 "message"	Text to print during connection process
 */
+/*
+=============
+SP_worldspawn
+
+Initializes the worldspawn entity, publishes metadata, and exposes gameplay configstrings.
+=============
+*/
 void SP_worldspawn( void ) {
 	char		*s;
+	char		*t;
 	char		*atmosphere;
-	int		trainingFlag;
+	char		author[MAX_MAP_AUTHOR_STRING];
+	char		authorAlt[MAX_MAP_AUTHOR_STRING];
+	int			trainingFlag;
 	qboolean	trainingActive;
+
 
 	G_SpawnString( "classname", "", &s );
 	if ( Q_stricmp( s, "worldspawn" ) ) {
@@ -646,6 +742,15 @@ void SP_worldspawn( void ) {
 
 	G_SpawnString( "message", "", &s );
 	trap_SetConfigstring( CS_MESSAGE, s );				// map specific message
+
+	G_SpawnString( "author", "", &s );
+	G_CopyTrimmedAuthorString( author, sizeof( author ), s );
+	trap_SetConfigstring( CS_MAP_AUTHOR, author );
+
+	G_SpawnString( "author2", "", &t );
+	G_CopyTrimmedAuthorString( authorAlt, sizeof( authorAlt ), t );
+	trap_SetConfigstring( CS_MAP_AUTHOR_ALT, authorAlt );
+	G_UpdateServerinfoMapAuthors( author, authorAlt );
 
 	trap_SetConfigstring( CS_MOTD, g_motd.string );	// message of the day
 

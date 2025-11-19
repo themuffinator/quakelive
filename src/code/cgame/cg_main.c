@@ -406,6 +406,7 @@ vmCvar_t	cg_singlePlayerActive;
 vmCvar_t	cg_recordSPDemo;
 vmCvar_t	cg_recordSPDemoName;
 vmCvar_t	cg_obeliskRespawnDelay;
+vmCvar_t	cg_lastmsg;
 
 typedef struct {
 	vmCvar_t	*vmCvar;
@@ -422,6 +423,9 @@ static void CG_RegisterAnnouncerVoiceSet( cgAnnouncerProfile_t profile, const ch
 static sfxHandle_t CG_RegisterRaceCueSound( const char *name );
 static void CG_SetActiveAnnouncerProfile( cgAnnouncerProfile_t profile );
 static void CG_UpdateAnnouncerProfileFromCvar( qboolean force );
+static qboolean CG_ParseLastMessageValue( const char *value, int *timestamp, char *message, int messageSize );
+static void CG_WriteLastMessageCvar( int timestamp, const char *message );
+static void CG_ReplayLastMessageFromCvar( void );
 
 static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_ignore, "cg_ignore", "0", 0 },	// used for debugging
@@ -596,6 +600,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_recordSPDemo, "ui_recordSPDemo", "0", CVAR_ARCHIVE},
 	{ &cg_recordSPDemoName, "ui_recordSPDemoName", "", CVAR_ARCHIVE},
 	{ &cg_obeliskRespawnDelay, "g_obeliskRespawnDelay", "10", CVAR_SERVERINFO},
+	{ &cg_lastmsg, "cg_lastmsg", "0", CVAR_ARCHIVE },
 	{ &cg_hudFiles, "cg_hudFiles", "ui/hud.txt", CVAR_ARCHIVE},
 	{ &cg_cameraOrbit, "cg_cameraOrbit", "0", CVAR_CHEAT},
 	{ &cg_cameraOrbitDelay, "cg_cameraOrbitDelay", "50", CVAR_ARCHIVE},
@@ -1756,6 +1761,97 @@ int CG_GetChatHistoryLength( void ) {
 	}
 
 	return historyLength;
+}
+
+/*
+=============
+CG_ParseLastMessageValue
+
+Parses the persisted last message payload into its timestamp and body.
+=============
+*/
+static qboolean CG_ParseLastMessageValue( const char *value, int *timestamp, char *message, int messageSize ) {
+	const char		*cursor;
+	int			parsed;
+	int			sign;
+
+	if ( !value || !*value || !message || messageSize <= 0 ) {
+		return qfalse;
+	}
+
+	cursor = value;
+	sign = 1;
+	if ( *cursor == '-' ) {
+		sign = -1;
+		cursor++;
+	} else if ( *cursor == '+' ) {
+		cursor++;
+	}
+
+	if ( *cursor < '0' || *cursor > '9' ) {
+		return qfalse;
+	}
+
+	parsed = 0;
+	while ( *cursor >= '0' && *cursor <= '9' ) {
+		parsed = ( parsed * 10 ) + ( *cursor - '0' );
+		cursor++;
+	}
+	parsed *= sign;
+
+	while ( *cursor == ' ' || *cursor == '\t' ) {
+		cursor++;
+	}
+
+	Q_strncpyz( message, cursor, messageSize );
+	if ( timestamp ) {
+		*timestamp = parsed;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_WriteLastMessageCvar
+
+Persists the latest last message data into cg_lastmsg for UI consumers.
+=============
+*/
+static void CG_WriteLastMessageCvar( int timestamp, const char *message ) {
+	char	buffer[MAX_STRING_CHARS];
+
+	if ( !message ) {
+		message = "";
+	}
+
+	Com_sprintf( buffer, sizeof( buffer ), "%i %s", timestamp, message );
+	trap_Cvar_Set( "cg_lastmsg", buffer );
+	trap_Cvar_Update( &cg_lastmsg );
+}
+
+/*
+=============
+CG_ReplayLastMessageFromCvar
+
+Restores the persisted last message into the HUD print stack when initializing.
+=============
+*/
+static void CG_ReplayLastMessageFromCvar( void ) {
+	char	storedValue[MAX_STRING_CHARS];
+	char	message[MAX_STRING_CHARS];
+	int		storedTime;
+
+	trap_Cvar_VariableStringBuffer( "cg_lastmsg", storedValue, sizeof( storedValue ) );
+	if ( !CG_ParseLastMessageValue( storedValue, &storedTime, message, sizeof( message ) ) ) {
+		return;
+	}
+
+	if ( message[0] ) {
+		CG_SetPrintString( SYSTEM_PRINT, message );
+	}
+
+	CG_WriteLastMessageCvar( cg.time, message );
 }
 
 /*
@@ -3581,6 +3677,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	CG_LoadingString( "" );
 
 	CG_InitTeamChat();
+	CG_ReplayLastMessageFromCvar();
 
 	CG_ShaderStateChanged();
 

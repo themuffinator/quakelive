@@ -161,7 +161,7 @@ static void GT_ApplyForceBroadcast(const char *cvarName, qboolean enabled, gt_fo
 		}
 	}
 
-	log->configIndex = 0x2b3;
+	log->configIndex = CS_FORCED_COSMETICS;
 	log->payload[0] = '\0';
 	Info_SetValueForKey( log->payload, "sb", forceSmallScoreboard ? "1" : "0" );
 	Info_SetValueForKey( log->payload, "hud", forceHudHints ? "1" : "0" );
@@ -285,7 +285,7 @@ static qboolean GT_ForceBroadcastPushesConfigstring(void) {
 	memset(&log, 0, sizeof(log));
 	GT_ApplyForceBroadcast("g_forceSendConfigstring", qtrue, &log);
 
-	if (log.configIndex != 0x2b3) {
+	if (log.configIndex != CS_FORCED_COSMETICS) {
 		return GT_Failf("expected configstring index 0x2B3, received %d", log.configIndex);
 	}
 
