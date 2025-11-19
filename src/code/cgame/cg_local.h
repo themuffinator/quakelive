@@ -1454,6 +1454,33 @@ qboolean CG_YourTeamHasFlag();
 qboolean CG_OtherTeamHasFlag();
 qhandle_t CG_StatusHandle(int task);
 
+/*
+=============
+CG_DrawNewTeamInfo
+
+Renders the teammate/status list for the new HUD ownerdraws.
+=============
+*/
+void CG_DrawNewTeamInfo(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, qhandle_t shader);
+
+/*
+=============
+CG_DrawTeamSpectators
+
+Displays the primary and secondary spectator targets on the new HUD.
+=============
+*/
+void CG_DrawTeamSpectators(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader);
+
+/*
+=============
+CG_DrawMedal
+
+Draws the medal counter for a specific ownerdraw on the new HUD.
+=============
+*/
+void CG_DrawMedal(int ownerDraw, rectDef_t *rect, float scale, vec4_t color, qhandle_t shader);
+
 
 
 //
