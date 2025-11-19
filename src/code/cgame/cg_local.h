@@ -1188,6 +1188,7 @@ typedef struct {
 	int				voteFlags;
 	int				maxclients;
 	char			mapname[MAX_QPATH];
+	char			loadout[MAX_INFO_VALUE];
 	char			redTeam[MAX_QPATH];
 	char			blueTeam[MAX_QPATH];
 	char			playermodelOverride[MAX_QPATH];
