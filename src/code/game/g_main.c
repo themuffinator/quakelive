@@ -292,6 +292,18 @@ vmCvar_t	g_damage_rg;
 vmCvar_t	g_damage_bfg;
 vmCvar_t	g_splashDamage_bfg;
 vmCvar_t	g_splashRadius_bfg;
+vmCvar_t	g_damage_sg_falloff;
+vmCvar_t	g_damage_lg_falloff;
+vmCvar_t	g_range_sg_falloff;
+vmCvar_t	g_range_lg_falloff;
+vmCvar_t	g_accelFactor_rl;
+vmCvar_t	g_accelRate_rl;
+vmCvar_t	g_accelFactor_pg;
+vmCvar_t	g_accelRate_pg;
+vmCvar_t	g_accelFactor_bfg;
+vmCvar_t	g_accelRate_bfg;
+vmCvar_t	g_damagePlums;
+vmCvar_t	g_powerupRespawn;
 vmCvar_t	g_velocity_gl;
 vmCvar_t	g_velocity_rl;
 vmCvar_t	g_velocity_pg;
@@ -527,13 +539,25 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_damage_bfg, "g_damage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashDamage_bfg, "g_splashDamage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashRadius_bfg, "g_splashRadius_bfg", "120", 0, 0, qtrue },
+	{ &g_damage_sg_falloff, "g_damage_sg_falloff", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Fractional shotgun damage multiplier applied once a target exceeds g_range_sg_falloff; 0 preserves the legacy drop-off curve." },
+	{ &g_range_sg_falloff, "g_range_sg_falloff", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Distance in units before shotgun damage begins to fall off; 0 keeps the compiled default distance." },
+	{ &g_damage_lg_falloff, "g_damage_lg_falloff", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Fractional lightning gun damage applied while beams exceed g_range_lg_falloff; 0 leaves Quake III style damage intact." },
+	{ &g_range_lg_falloff, "g_range_lg_falloff", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Distance in units before lightning gun damage begins scaling down; 0 reuses the original compiled distance." },
+	{ &g_accelFactor_rl, "g_accelFactor_rl", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Scale applied to rocket acceleration tests when factories enable projectile acceleration; 0 keeps stock speeds." },
+	{ &g_accelRate_rl, "g_accelRate_rl", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Milliseconds between rocket acceleration steps when g_accelFactor_rl is active; 0 reuses the baked timing." },
+	{ &g_accelFactor_pg, "g_accelFactor_pg", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Scale applied to plasmagun bolt acceleration when Quake Live factories request faster bolts." },
+	{ &g_accelRate_pg, "g_accelRate_pg", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Milliseconds between plasmagun acceleration steps while the associated factor is non-zero." },
+	{ &g_accelFactor_bfg, "g_accelFactor_bfg", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Scale applied to BFG projectile acceleration; 0 leaves classic trajectories untouched." },
+	{ &g_accelRate_bfg, "g_accelRate_bfg", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Milliseconds between BFG acceleration updates whenever acceleration is enabled." },
 	{ &g_velocity_gl, "g_velocity_gl", "700", 0, 0, qtrue, qfalse, "Grenade Launcher projectile speed in ups; mirrors the compiled 700 default and feeds both server and client prediction." },
 	{ &g_velocity_rl, "g_velocity_rl", "900", 0, 0, qtrue, qfalse, "Rocket Launcher projectile speed in ups, defaulting to the baked-in 900 ups behaviour." },
 	{ &g_velocity_pg, "g_velocity_pg", "2000", 0, 0, qtrue, qfalse, "Plasmagun bolt speed in ups; aligns with the legacy 2000 ups firing velocity." },
 	{ &g_velocity_bfg, "g_velocity_bfg", "2000", 0, 0, qtrue, qfalse, "BFG projectile speed in ups pulled from the retail DLL defaults." },
 	{ &g_velocity_gh, "g_velocity_gh", "800", 0, 0, qtrue, qfalse, "Grappling Hook projectile speed in ups; 800 preserves the vanilla behaviour." },
+	{ &g_powerupRespawn, "g_powerupRespawn", "120", CVAR_ARCHIVE, 0, qfalse, qfalse, "Seconds before powerups respawn after being collected; 0 uses each entity's scripted timing." },
 	{ &g_guidedRocket, "g_guidedRocket", "0", 0, 0, qtrue, qfalse, "Enable Quake Live style guided rockets when non-zero." },
 	{ &g_rocketsplashOffset, "g_rocketsplashOffset", "0", 0, 0, qtrue, qfalse, "Offset in ups applied along the impact normal before evaluating rocket splash damage; 0 retains classic explosions." },
+	{ &g_damagePlums, "g_damagePlums", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Toggle per-player damage plums emitted by the server when scoring events occur." },
 	{ &g_quadHog, "g_quadHog", "0", 0, 0, qtrue, qfalse, "Toggle Quad Hog survival mode that forces the carrier to fight the arena when enabled." },
 	{ &g_quadHogIdle, "g_quadHogIdle", "0", 0, 0, qtrue, qfalse, "Seconds of inactivity allowed for the Quad Hog carrier before the powerup is revoked; 0 disables the idle check." },
 	{ &g_quadHogTime, "g_quadHogTime", "0", 0, 0, qtrue, qfalse, "Maximum time in seconds a player may hold Quad during Quad Hog events before it auto-expires; 0 removes the cap." },
