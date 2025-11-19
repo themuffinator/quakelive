@@ -24,13 +24,46 @@ MATCH_STATE_SOURCE = (
 #include <string.h>
 
 #define GAME_INCLUDE
-#include "code/game/g_match_state.c"
+#include "code/game/g_local.h"
+#include "game/g_match_config.h"
+#include "game/match_state_keys.h"
+
+#define DEFAULT_TIMEOUT_LENGTH_SECONDS                  60
+#define DEFAULT_TIMEOUT_COUNT_PER_TEAM                  0
+#define DEFAULT_OVERTIME_LENGTH_SECONDS         120
+#define DEFAULT_SUDDEN_DEATH_RESPAWN                    0
+#define DEFAULT_SUDDEN_DEATH_START_SECONDS              3
+#define DEFAULT_SUDDEN_DEATH_TICK_SECONDS               60
+#define DEFAULT_SUDDEN_DEATH_MAX_SECONDS                10
+#define DEFAULT_SUDDEN_DEATH_INCREMENT_SECONDS  1
+#define DEFAULT_SUDDEN_DEATH_PRINT                      1
+#define DEFAULT_FACTORY_RESPAWN_DELAY_MILLISECONDS              0
+#define DEFAULT_FACTORY_WARMUP_DELAY_MILLISECONDS       0
+#define DEFAULT_FACTORY_ALLOW_ITEM_DROPS                1
+#define DEFAULT_FACTORY_ALLOW_ITEM_BOUNCE               1
 
 level_locals_t level;
-matchFactoryConfig_t g_matchFactoryConfig;
 vmCvar_t g_gametype;
+vmCvar_t g_timeoutLen;
+vmCvar_t g_timeoutCount;
+vmCvar_t g_overtime;
+vmCvar_t g_suddenDeathRespawn;
+vmCvar_t g_suddenDeathRespawnStart;
+vmCvar_t g_suddenDeathRespawnTick;
+vmCvar_t g_suddenDeathRespawnMax;
+vmCvar_t g_suddenDeathRespawnIncrement;
+vmCvar_t g_suddenDeathRespawnPrint;
+vmCvar_t g_factoryRespawnDelay;
+vmCvar_t g_factoryWarmupSpawnDelay;
+vmCvar_t g_factoryAllowItemDrops;
+vmCvar_t g_factoryAllowItemBounce;
+vmCvar_t g_factoryTitle;
 
 static char qlr_matchStateConfig[MAX_INFO_STRING];
+static int qlr_matchStateConfigUpdates;
+static char qlr_factoryTitleConfig[MAX_STRING_CHARS];
+static char qlr_factoryFlagsConfig[32];
+static char qlr_factorySpawnHintsConfig[MAX_INFO_STRING];
 
 /*
 =============
@@ -84,6 +117,25 @@ void Info_SetValueForKey( char *info, const char *key, const char *value ) {
 @TAB@@TAB@return;
 @TAB@}
 @TAB@strcat( info, buffer );
+}
+
+/*
+=============
+G_Printf
+
+Routes server log messages to stdout for harness visibility.
+=============
+*/
+void QDECL G_Printf( const char *fmt, ... ) {
+@TAB@va_list args;
+
+@TAB@if ( !fmt ) {
+@TAB@@TAB@return;
+@TAB@}
+
+@TAB@va_start( args, fmt );
+@TAB@vfprintf( stdout, fmt, args );
+@TAB@va_end( args );
 }
 
 /*
@@ -151,10 +203,23 @@ Captures configstring updates from g_match_state.c.
 */
 void trap_SetConfigstring( int num, const char *string ) {
 @TAB@const char *value = string ? string : "";
-@TAB@if ( num != CS_MATCH_STATE ) {
-@TAB@@TAB@return;
+@TAB@switch ( num ) {
+@TAB@case CS_MATCH_STATE:
+@TAB@@TAB@qlr_matchStateConfigUpdates++;
+@TAB@@TAB@Q_strncpyz( qlr_matchStateConfig, value, sizeof( qlr_matchStateConfig ) );
+@TAB@@TAB@break;
+@TAB@case CS_FACTORY_TITLE:
+@TAB@@TAB@Q_strncpyz( qlr_factoryTitleConfig, value, sizeof( qlr_factoryTitleConfig ) );
+@TAB@@TAB@break;
+@TAB@case CS_FACTORY_FLAGS:
+@TAB@@TAB@Q_strncpyz( qlr_factoryFlagsConfig, value, sizeof( qlr_factoryFlagsConfig ) );
+@TAB@@TAB@break;
+@TAB@case CS_SPAWN_HINTS:
+@TAB@@TAB@Q_strncpyz( qlr_factorySpawnHintsConfig, value, sizeof( qlr_factorySpawnHintsConfig ) );
+@TAB@@TAB@break;
+@TAB@default:
+@TAB@@TAB@break;
 @TAB@}
-@TAB@Q_strncpyz( qlr_matchStateConfig, value, sizeof( qlr_matchStateConfig ) );
 }
 
 /*
@@ -177,7 +242,16 @@ Resets the captured configstring buffer.
 */
 static void QLR_ClearMatchStateConfig( void ) {
 @TAB@memset( qlr_matchStateConfig, 0, sizeof( qlr_matchStateConfig ) );
+@TAB@qlr_matchStateConfigUpdates = 0;
+@TAB@memset( qlr_factoryTitleConfig, 0, sizeof( qlr_factoryTitleConfig ) );
+@TAB@memset( qlr_factoryFlagsConfig, 0, sizeof( qlr_factoryFlagsConfig ) );
+@TAB@memset( qlr_factorySpawnHintsConfig, 0, sizeof( qlr_factorySpawnHintsConfig ) );
 }
+
+static void QLR_SetVmCvarInt( vmCvar_t *cvar, int value );
+static void QLR_SetVmCvarString( vmCvar_t *cvar, const char *value );
+void QLR_SetFactoryCvarsDefaults( void );
+void QLR_SetFactoryCvarsCustom( void );
 
 /*
 =============
@@ -191,6 +265,126 @@ void QLR_ResetMatchState( void ) {
 @TAB@memset( &g_matchFactoryConfig, 0, sizeof( g_matchFactoryConfig ) );
 @TAB@g_gametype.integer = GT_TEAM;
 @TAB@QLR_ClearMatchStateConfig();
+@TAB@QLR_SetFactoryCvarsDefaults();
+}
+
+/*
+=============
+QLR_SetVmCvarInt
+
+Assigns the integer and string representations of a vmCvar_t.
+=============
+*/
+static void QLR_SetVmCvarInt( vmCvar_t *cvar, int value ) {
+@TAB@if ( !cvar ) {
+@TAB@@TAB@return;
+@TAB@}
+
+@TAB@cvar->integer = value;
+@TAB@cvar->value = (float)value;
+@TAB@Com_sprintf( cvar->string, sizeof( cvar->string ), "%i", value );
+}
+
+/*
+=============
+QLR_SetVmCvarString
+
+Copies the provided string into a vmCvar_t buffer.
+=============
+*/
+static void QLR_SetVmCvarString( vmCvar_t *cvar, const char *value ) {
+@TAB@if ( !cvar ) {
+@TAB@@TAB@return;
+@TAB@}
+
+@TAB@if ( !value ) {
+@TAB@@TAB@value = "";
+@TAB@}
+
+@TAB@Q_strncpyz( cvar->string, value, sizeof( cvar->string ) );
+@TAB@cvar->integer = atoi( cvar->string );
+@TAB@cvar->value = (float)cvar->integer;
+}
+
+/*
+=============
+QLR_SetFactoryCvarsDefaults
+
+Seeds the factory cvars with stock values prior to loading configs.
+=============
+*/
+void QLR_SetFactoryCvarsDefaults( void ) {
+@TAB@QLR_SetVmCvarString( &g_factoryTitle, "" );
+@TAB@QLR_SetVmCvarInt( &g_timeoutLen, DEFAULT_TIMEOUT_LENGTH_SECONDS );
+@TAB@QLR_SetVmCvarInt( &g_timeoutCount, DEFAULT_TIMEOUT_COUNT_PER_TEAM );
+@TAB@QLR_SetVmCvarInt( &g_overtime, DEFAULT_OVERTIME_LENGTH_SECONDS );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawn, DEFAULT_SUDDEN_DEATH_RESPAWN );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnStart, DEFAULT_SUDDEN_DEATH_START_SECONDS );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnTick, DEFAULT_SUDDEN_DEATH_TICK_SECONDS );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnMax, DEFAULT_SUDDEN_DEATH_MAX_SECONDS );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnIncrement, DEFAULT_SUDDEN_DEATH_INCREMENT_SECONDS );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnPrint, DEFAULT_SUDDEN_DEATH_PRINT );
+@TAB@QLR_SetVmCvarInt( &g_factoryRespawnDelay, DEFAULT_FACTORY_RESPAWN_DELAY_MILLISECONDS );
+@TAB@QLR_SetVmCvarInt( &g_factoryWarmupSpawnDelay, DEFAULT_FACTORY_WARMUP_DELAY_MILLISECONDS );
+@TAB@QLR_SetVmCvarInt( &g_factoryAllowItemDrops, DEFAULT_FACTORY_ALLOW_ITEM_DROPS );
+@TAB@QLR_SetVmCvarInt( &g_factoryAllowItemBounce, DEFAULT_FACTORY_ALLOW_ITEM_BOUNCE );
+}
+
+/*
+=============
+QLR_SetFactoryCvarsCustom
+
+Applies a custom factory profile for mid-match updates.
+=============
+*/
+void QLR_SetFactoryCvarsCustom( void ) {
+@TAB@QLR_SetVmCvarString( &g_factoryTitle, "" );
+@TAB@QLR_SetVmCvarInt( &g_timeoutLen, 75 );
+@TAB@QLR_SetVmCvarInt( &g_timeoutCount, 2 );
+@TAB@QLR_SetVmCvarInt( &g_overtime, 210 );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawn, 1 );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnStart, 20 );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnTick, 15 );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnMax, 90 );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnIncrement, 4 );
+@TAB@QLR_SetVmCvarInt( &g_suddenDeathRespawnPrint, 0 );
+@TAB@QLR_SetVmCvarInt( &g_factoryRespawnDelay, 2000 );
+@TAB@QLR_SetVmCvarInt( &g_factoryWarmupSpawnDelay, 500 );
+@TAB@QLR_SetVmCvarInt( &g_factoryAllowItemDrops, 0 );
+@TAB@QLR_SetVmCvarInt( &g_factoryAllowItemBounce, 0 );
+}
+
+/*
+=============
+QLR_InitMatchFactoryConfigHarness
+
+Initialises the match factory cache using the harness cvars.
+=============
+*/
+void QLR_InitMatchFactoryConfigHarness( void ) {
+@TAB@G_InitMatchFactoryConfig();
+}
+
+/*
+=============
+QLR_UpdateMatchFactoryConfigHarness
+
+Propagates cvar changes through G_UpdateMatchFactoryConfig.
+=============
+*/
+void QLR_UpdateMatchFactoryConfigHarness( void ) {
+@TAB@G_UpdateMatchFactoryConfig();
+}
+
+/*
+=============
+QLR_GetMatchStateConfigUpdateCount
+
+Exposes how many times the match-state configstring changed.
+=============
+*/
+int QLR_GetMatchStateConfigUpdateCount( void ) {
+@TAB@return qlr_matchStateConfigUpdates;
 }
 
 /*
@@ -467,6 +661,8 @@ def _build_match_state_library(tmp_path: Path) -> Path:
             "-o",
             str(lib_path),
             str(src_path),
+            str(CODE_DIR / "game" / "g_match_state.c"),
+            str(SRC_DIR / "game" / "g_match_config.c"),
         ]
     elif os.name == "nt":
         raise RuntimeError("Match-state harness requires a POSIX toolchain")
@@ -488,6 +684,8 @@ def _build_match_state_library(tmp_path: Path) -> Path:
             "-o",
             str(lib_path),
             str(src_path),
+            str(CODE_DIR / "game" / "g_match_state.c"),
+            str(SRC_DIR / "game" / "g_match_config.c"),
         ]
 
     subprocess.run(compile_cmd, check=True)
@@ -506,6 +704,16 @@ def _load_match_state_library(lib_path: Path) -> ctypes.CDLL:
     library.QLR_ResetClientMatchState.restype = None
     library.QLR_ParseMatchStateOnClient.argtypes = []
     library.QLR_ParseMatchStateOnClient.restype = None
+    library.QLR_SetFactoryCvarsDefaults.argtypes = []
+    library.QLR_SetFactoryCvarsDefaults.restype = None
+    library.QLR_SetFactoryCvarsCustom.argtypes = []
+    library.QLR_SetFactoryCvarsCustom.restype = None
+    library.QLR_InitMatchFactoryConfigHarness.argtypes = []
+    library.QLR_InitMatchFactoryConfigHarness.restype = None
+    library.QLR_UpdateMatchFactoryConfigHarness.argtypes = []
+    library.QLR_UpdateMatchFactoryConfigHarness.restype = None
+    library.QLR_GetMatchStateConfigUpdateCount.argtypes = []
+    library.QLR_GetMatchStateConfigUpdateCount.restype = ctypes.c_int
     library.QLR_GetClientTimeoutLengthSeconds.argtypes = []
     library.QLR_GetClientTimeoutLengthSeconds.restype = ctypes.c_int
     library.QLR_GetClientTimeoutCountPerTeam.argtypes = []
@@ -597,4 +805,36 @@ def test_client_parser_receives_factory_config(match_state_library: ctypes.CDLL)
     assert library.QLR_GetClientSuddenDeathMaxSeconds() == 60
     assert library.QLR_GetClientSuddenDeathIncrementSeconds() == 3
     assert library.QLR_GetClientSuddenDeathPrintAnnouncements() == 1
+    assert library.QLR_GetClientSuddenDeathSpawnDelayActive() == 1
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Match-state harness requires a POSIX toolchain")
+def test_match_factory_updates_refresh_match_state_configstring(match_state_library: ctypes.CDLL) -> None:
+    library = match_state_library
+    library.QLR_ResetMatchState()
+    library.QLR_ResetClientMatchState()
+    library.QLR_SetFactoryCvarsDefaults()
+    library.QLR_InitMatchFactoryConfigHarness()
+
+    assert library.QLR_GetMatchStateConfigUpdateCount() == 0
+
+    library.QLR_UpdateMatchFactoryConfigHarness()
+    assert library.QLR_GetMatchStateConfigUpdateCount() == 0
+
+    library.QLR_SetFactoryCvarsCustom()
+    library.QLR_UpdateMatchFactoryConfigHarness()
+    assert library.QLR_GetMatchStateConfigUpdateCount() == 1
+
+    library.QLR_ResetClientMatchState()
+    library.QLR_ParseMatchStateOnClient()
+
+    assert library.QLR_GetClientTimeoutLengthSeconds() == 75
+    assert library.QLR_GetClientTimeoutCountPerTeam() == 2
+    assert library.QLR_GetClientOvertimeLengthSeconds() == 210
+    assert library.QLR_GetClientSuddenDeathRespawnsEnabled() == 1
+    assert library.QLR_GetClientSuddenDeathStartSeconds() == 20
+    assert library.QLR_GetClientSuddenDeathTickSeconds() == 15
+    assert library.QLR_GetClientSuddenDeathMaxSeconds() == 90
+    assert library.QLR_GetClientSuddenDeathIncrementSeconds() == 4
+    assert library.QLR_GetClientSuddenDeathPrintAnnouncements() == 0
     assert library.QLR_GetClientSuddenDeathSpawnDelayActive() == 1
