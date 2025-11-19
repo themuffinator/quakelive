@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <limits.h>
 #include "../../../src-re/include/ql_types.h"
 #include <time.h>
+#include <stdlib.h>
 
 #ifndef ARRAY_LEN
 #define ARRAY_LEN( x ) ( sizeof( x ) / sizeof( (x)[0] ) )
@@ -75,6 +76,7 @@ static legacyCvarAlias_t	s_legacyCvarAliases[] = {
 	{ &g_damage_g, "g_damage_g", &g_damageGauntletLegacy, "g_damage_gauntlet", "50", 0, -1, -1 }
 };
 
+#define MAX_ADMIN_ACCESS_FILE_BYTES	8192
 static qlr_game_frame_context_t *G_GetFrameContext( void );
 static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec );
 static void G_StepEntities( qlr_game_frame_context_t *ctx );
@@ -84,6 +86,10 @@ static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmu
 static void G_UpdateTrainingState( void );
 static void G_UpdateGametypeTutorialText( void );
 static void G_SyncAdminConfig( void );
+static void G_ResetAdminAccessList( void );
+static qboolean G_ParseAdminAccessTier( const char *token, int *tierOut );
+static void G_InsertAdminAccessEntry( const char *steamId, int tier );
+static void G_LoadAdminAccessFile( void );
 
 /*
 =============
@@ -1281,6 +1287,178 @@ static void G_SyncAdminConfig( void ) {
 	level.adminConfig.playerHeadScaleOffset = g_playerheadScaleOffset.value;
 }
 
+/*
+=============
+G_ResetAdminAccessList
+
+Clears any cached SteamID privilege pairs for the new level.
+=============
+*/
+static void G_ResetAdminAccessList( void ) {
+	level.adminAccessEntryCount = 0;
+	memset( level.adminAccessList, 0, sizeof( level.adminAccessList ) );
+}
+
+/*
+=============
+G_ParseAdminAccessTier
+
+Validates the privilege tier token pulled from the access file.
+=============
+*/
+static qboolean G_ParseAdminAccessTier( const char *token, int *tierOut ) {
+	char		*endptr;
+	long		value;
+
+	if ( !token || !token[0] || !tierOut ) {
+		return qfalse;
+	}
+
+	value = strtol( token, &endptr, 10 );
+	if ( *endptr != '\0' ) {
+		return qfalse;
+	}
+
+	if ( value < 0 ) {
+		value = 0;
+	} else if ( value > INT_MAX ) {
+		value = INT_MAX;
+	}
+
+	*tierOut = ( int )value;
+	return qtrue;
+}
+
+/*
+=============
+G_InsertAdminAccessEntry
+
+Adds or updates a cached privilege entry for a SteamID.
+=============
+*/
+static void G_InsertAdminAccessEntry( const char *steamId, int tier ) {
+	int		i;
+
+	if ( !steamId || !steamId[0] ) {
+		return;
+	}
+
+	for ( i = 0; i < level.adminAccessEntryCount; i++ ) {
+		if ( !Q_stricmp( level.adminAccessList[i].steamId, steamId ) ) {
+			level.adminAccessList[i].privilegeTier = tier;
+			return;
+		}
+	}
+
+	if ( level.adminAccessEntryCount >= MAX_ADMIN_ACCESS_ENTRIES ) {
+		G_Printf( "WARNING: access list full, skipping SteamID %s\n", steamId );
+		return;
+	}
+
+	Q_strncpyz( level.adminAccessList[level.adminAccessEntryCount].steamId, steamId,
+			sizeof( level.adminAccessList[level.adminAccessEntryCount].steamId ) );
+	level.adminAccessList[level.adminAccessEntryCount].privilegeTier = tier;
+	level.adminAccessEntryCount++;
+}
+
+/*
+=============
+G_LoadAdminAccessFile
+
+Loads g_accessFile and caches its SteamID to privilege tier mappings.
+=============
+*/
+static void G_LoadAdminAccessFile( void ) {
+	fileHandle_t	handle;
+	int			length;
+	char		buffer[MAX_ADMIN_ACCESS_FILE_BYTES + 1];
+	char		*cursor;
+	qboolean	truncated;
+
+	G_ResetAdminAccessList();
+	G_Printf( "initializing access list...\n" );
+
+	if ( !g_accessFile.string[0] ) {
+		G_Printf( "file not found: %s\n", g_accessFile.string );
+		return;
+	}
+
+	length = trap_FS_FOpenFile( g_accessFile.string, &handle, FS_READ );
+	if ( length <= 0 || !handle ) {
+		if ( handle ) {
+			trap_FS_FCloseFile( handle );
+		}
+		G_Printf( "file not found: %s\n", g_accessFile.string );
+		return;
+	}
+
+	if ( length > MAX_ADMIN_ACCESS_FILE_BYTES ) {
+		length = MAX_ADMIN_ACCESS_FILE_BYTES;
+		truncated = qtrue;
+	} else {
+		truncated = qfalse;
+	}
+
+	trap_FS_Read( buffer, length, handle );
+	buffer[length] = '\0';
+	trap_FS_FCloseFile( handle );
+
+	if ( truncated ) {
+		G_Printf( "WARNING: %s exceeds %i bytes; truncating access list.\n", g_accessFile.string, MAX_ADMIN_ACCESS_FILE_BYTES );
+	}
+
+	cursor = buffer;
+	while ( qtrue ) {
+		char	*steamToken;
+		char	*tierToken;
+		int		tier;
+
+		steamToken = COM_ParseExt( &cursor, qtrue );
+		if ( !steamToken[0] ) {
+			break;
+		}
+
+		tierToken = COM_ParseExt( &cursor, qtrue );
+		if ( !tierToken[0] ) {
+			G_Printf( "WARNING: malformed access entry missing tier for SteamID %s\n", steamToken );
+			continue;
+		}
+
+		if ( !G_ParseAdminAccessTier( tierToken, &tier ) ) {
+			G_Printf( "WARNING: invalid access tier '%s' for SteamID %s\n", tierToken, steamToken );
+			continue;
+		}
+
+		G_InsertAdminAccessEntry( steamToken, tier );
+	}
+
+	G_Printf( "loaded %i access entries from %s\n", level.adminAccessEntryCount, g_accessFile.string );
+}
+
+/*
+=============
+G_AdminAccessForSteamID
+
+Returns the cached privilege tier for the supplied SteamID if present.
+=============
+*/
+int G_AdminAccessForSteamID( const char *steamId ) {
+	int	i;
+
+	if ( !steamId || !steamId[0] ) {
+		return 0;
+	}
+
+	for ( i = 0; i < level.adminAccessEntryCount; i++ ) {
+		if ( !Q_stricmp( level.adminAccessList[i].steamId, steamId ) ) {
+			return level.adminAccessList[i].privilegeTier;
+		}
+	}
+
+	return 0;
+}
+
+
 typedef enum {
 	GAMETYPE_LIFECYCLE_INIT,
 	GAMETYPE_LIFECYCLE_CLIENT_BEGIN,
@@ -1456,6 +1634,7 @@ G_UpdateTrainingState();
 
 // set some level globals
 	memset( &level, 0, sizeof( level ) );
+	G_LoadAdminAccessFile();
 	G_SyncAdminConfig();
 	Factory_ApplyCurrentSelection( qtrue );
 	if ( g_gametype.integer == GT_RACE ) {
