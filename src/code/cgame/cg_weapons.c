@@ -1391,12 +1391,16 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	weapon_t	weaponNum;
 	weaponInfo_t	*weapon;
 	centity_t	*nonPredictedCent;
+	qboolean	drawFlash;
+	qboolean	continuousFlash;
 //	int	col;
 
 	weaponNum = cent->currentState.weapon;
 
 	CG_RegisterWeapon( weaponNum );
 	weapon = &cg_weapons[weaponNum];
+	drawFlash = ( cg_muzzleFlash.integer != 0 );
+	continuousFlash = ( weaponNum == WP_LIGHTNING || weaponNum == WP_GAUNTLET || weaponNum == WP_GRAPPLING_HOOK );
 
 	// add the weapon
 	memset( &gun, 0, sizeof( gun ) );
@@ -1472,13 +1476,15 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	}
 
 	// add the flash
-	if ( ( weaponNum == WP_LIGHTNING || weaponNum == WP_GAUNTLET || weaponNum == WP_GRAPPLING_HOOK )
-		&& ( nonPredictedCent->currentState.eFlags & EF_FIRING ) ) 
-	{
+	if ( continuousFlash && ( nonPredictedCent->currentState.eFlags & EF_FIRING ) ) {
 		// continuous flash
 	} else {
 		// impulse flash
-		if ( cg.time - cent->muzzleFlashTime > MUZZLE_FLASH_TIME && !cent->pe.railgunFlash ) {
+		if ( drawFlash ) {
+			if ( cg.time - cent->muzzleFlashTime > MUZZLE_FLASH_TIME && !cent->pe.railgunFlash ) {
+				return;
+			}
+		} else if ( weaponNum != WP_RAILGUN ) {
 			return;
 		}
 	}
@@ -1486,7 +1492,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	memset( &flash, 0, sizeof( flash ) );
 	VectorCopy( parent->lightingOrigin, flash.lightingOrigin );
 	flash.shadowPlane = parent->shadowPlane;
-	flash.renderfx = parent->renderfx;
+	flash.renderfx = drawFlash ? parent->renderfx : 0;
 
 	flash.hModel = weapon->flashModel;
 	if (!flash.hModel) {
@@ -1508,7 +1514,9 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	}
 
 	CG_PositionRotatedEntityOnTag( &flash, &gun, weapon->weaponModel, "tag_flash");
-	trap_R_AddRefEntityToScene( &flash );
+	if ( drawFlash ) {
+		trap_R_AddRefEntityToScene( &flash );
+	}
 
 	if ( ps || cg.renderingThirdPerson ||
 		cent->currentState.number != cg.predictedPlayerState.clientNum ) {
@@ -1705,14 +1713,21 @@ CG_WeaponSelectable
 ===============
 */
 static qboolean CG_WeaponSelectable( int i ) {
-	if ( !cg.snap->ps.ammo[i] ) {
-		return qfalse;
-	}
-	if ( ! (cg.snap->ps.stats[ STAT_WEAPONS ] & ( 1 << i ) ) ) {
+	int	ammo;
+
+	if ( !( cg.snap->ps.stats[ STAT_WEAPONS ] & ( 1 << i ) ) ) {
 		return qfalse;
 	}
 
-	return qtrue;
+	ammo = cg.snap->ps.ammo[i];
+	if ( ammo == -1 ) {
+		return qtrue;
+	}
+	if ( ammo > 0 ) {
+		return qtrue;
+	}
+
+	return ( cg_switchToEmpty.integer != 0 );
 }
 
 /*
@@ -1827,6 +1842,10 @@ The current weapon has just run out of ammo
 void CG_OutOfAmmoChange( void ) {
 	int		i;
 
+	if ( !cg_switchOnEmpty.integer ) {
+		return;
+	}
+
 	cg.weaponSelectTime = cg.time;
 
 	for ( i = 15 ; i > 0 ; i-- ) {
@@ -1871,7 +1890,9 @@ void CG_FireWeapon( centity_t *cent ) {
 
 	// mark the entity as muzzle flashing, so when it is added it will
 	// append the flash to the weapon model
-	cent->muzzleFlashTime = cg.time;
+	if ( cg_muzzleFlash.integer ) {
+		cent->muzzleFlashTime = cg.time;
+	}
 
 	// lightning gun only does this this on initial press
 	if ( ent->weapon == WP_LIGHTNING ) {

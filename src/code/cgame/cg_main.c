@@ -294,6 +294,8 @@ vmCvar_t	cg_playVoiceChats;
 vmCvar_t	cg_showVoiceText;
 vmCvar_t	cg_useItemMessage;
 vmCvar_t	cg_useItemWarning;
+vmCvar_t	cg_allowTaunt;
+vmCvar_t	cg_muzzleFlash;
 vmCvar_t	cg_hudFiles;
 vmCvar_t	cg_kickScale;
 vmCvar_t 	cg_scorePlum;
@@ -451,7 +453,9 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawSpecMessages, "cg_drawSpecMessages", "1", CVAR_ARCHIVE },
 	{ &cg_useItemMessage, "cg_useItemMessage", "1", CVAR_ARCHIVE },
 	{ &cg_useItemWarning, "cg_useItemWarning", "1", CVAR_ARCHIVE },
-	{ &cg_drawItemPickups, "cg_drawItemPickups", "5", CVAR_ARCHIVE },
+	{ &cg_allowTaunt, "cg_allowTaunt", "1", CVAR_ARCHIVE },
+	{ &cg_muzzleFlash, "cg_muzzleFlash", "1", CVAR_ARCHIVE },
+{ &cg_drawItemPickups, "cg_drawItemPickups", "5", CVAR_ARCHIVE },
 { &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", CVAR_ARCHIVE },
 { &cg_drawDemoHUD, "cg_drawDemoHUD", "1", CVAR_ARCHIVE },
 { &cg_drawFragMessages, "cg_drawFragMessages", "1", CVAR_ARCHIVE },

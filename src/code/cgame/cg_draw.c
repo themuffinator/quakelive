@@ -1942,6 +1942,8 @@ static void CG_DrawAmmoWarning( void ) {
 
 	if ( cg.lowAmmoWarning == 2 ) {
 		s = "OUT OF AMMO";
+	} else if ( cg.lowAmmoWarning == 3 ) {
+		s = "NO AMMO FOR THIS WEAPON";
 	} else {
 		s = "LOW AMMO WARNING";
 	}

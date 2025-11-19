@@ -471,8 +471,10 @@ static void CG_UseItem( centity_t *cent ) {
 	// print a message if the local player
 	if ( es->number == cg.snap->ps.clientNum ) {
 		if ( !itemNum ) {
-			CG_CenterPrint( "No item to use", SCREEN_HEIGHT * 0.30, BIGCHAR_WIDTH );
-		} else {
+			if ( cg_useItemWarning.integer ) {
+				CG_CenterPrint( "No item to use", SCREEN_HEIGHT * 0.30, BIGCHAR_WIDTH );
+			}
+		} else if ( cg_useItemMessage.integer ) {
 			item = BG_FindItemForHoldable( itemNum );
 			CG_CenterPrint( va("Use %s", item->pickup_name), SCREEN_HEIGHT * 0.30, BIGCHAR_WIDTH );
 		}
@@ -739,30 +741,51 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		break;
 	case EV_TAUNT:
 		DEBUGNAME("EV_TAUNT");
+		if ( !cg_allowTaunt.integer ) {
+			break;
+		}
 		trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*taunt.wav" ) );
 		break;
 	case EV_TAUNT_YES:
 		DEBUGNAME("EV_TAUNT_YES");
+		if ( !cg_allowTaunt.integer ) {
+			break;
+		}
 		CG_VoiceChatLocal(SAY_TEAM, qfalse, es->number, COLOR_CYAN, VOICECHAT_YES);
 		break;
 	case EV_TAUNT_NO:
 		DEBUGNAME("EV_TAUNT_NO");
+		if ( !cg_allowTaunt.integer ) {
+			break;
+		}
 		CG_VoiceChatLocal(SAY_TEAM, qfalse, es->number, COLOR_CYAN, VOICECHAT_NO);
 		break;
 	case EV_TAUNT_FOLLOWME:
 		DEBUGNAME("EV_TAUNT_FOLLOWME");
+		if ( !cg_allowTaunt.integer ) {
+			break;
+		}
 		CG_VoiceChatLocal(SAY_TEAM, qfalse, es->number, COLOR_CYAN, VOICECHAT_FOLLOWME);
 		break;
 	case EV_TAUNT_GETFLAG:
 		DEBUGNAME("EV_TAUNT_GETFLAG");
+		if ( !cg_allowTaunt.integer ) {
+			break;
+		}
 		CG_VoiceChatLocal(SAY_TEAM, qfalse, es->number, COLOR_CYAN, VOICECHAT_ONGETFLAG);
 		break;
 	case EV_TAUNT_GUARDBASE:
 		DEBUGNAME("EV_TAUNT_GUARDBASE");
+		if ( !cg_allowTaunt.integer ) {
+			break;
+		}
 		CG_VoiceChatLocal(SAY_TEAM, qfalse, es->number, COLOR_CYAN, VOICECHAT_ONDEFENSE);
 		break;
 	case EV_TAUNT_PATROL:
 		DEBUGNAME("EV_TAUNT_PATROL");
+		if ( !cg_allowTaunt.integer ) {
+			break;
+		}
 		CG_VoiceChatLocal(SAY_TEAM, qfalse, es->number, COLOR_CYAN, VOICECHAT_ONPATROL);
 		break;
 	case EV_WATER_TOUCH:
@@ -855,7 +878,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	case EV_NOAMMO:
 		DEBUGNAME("EV_NOAMMO");
 //		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.noAmmoSound );
-		if ( es->number == cg.snap->ps.clientNum ) {
+		if ( es->number == cg.snap->ps.clientNum && cg_switchOnEmpty.integer ) {
 			CG_OutOfAmmoChange();
 		}
 		break;

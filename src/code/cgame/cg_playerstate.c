@@ -39,12 +39,13 @@ void CG_CheckAmmo( void ) {
 	int		total;
 	int		previous;
 	int		weapons;
+	int		warning;
 
 	// see about how many seconds of ammo we have remaining
 	weapons = cg.snap->ps.stats[ STAT_WEAPONS ];
 	total = 0;
 	for ( i = WP_MACHINEGUN ; i < WP_NUM_WEAPONS ; i++ ) {
-		if ( ! ( weapons & ( 1 << i ) ) ) {
+		if ( !( weapons & ( 1 << i ) ) ) {
 			continue;
 		}
 		switch ( i ) {
@@ -60,18 +61,35 @@ void CG_CheckAmmo( void ) {
 			break;
 		}
 		if ( total >= 5000 ) {
-			cg.lowAmmoWarning = 0;
-			return;
+			total = 5000;
+			break;
 		}
 	}
 
 	previous = cg.lowAmmoWarning;
 
 	if ( total == 0 ) {
-		cg.lowAmmoWarning = 2;
+		warning = 2;
+	} else if ( total < 5000 ) {
+		warning = 1;
 	} else {
-		cg.lowAmmoWarning = 1;
+		warning = 0;
 	}
+
+	if ( warning == 0 && !cg_switchOnEmpty.integer ) {
+		int	weapon;
+		int	ammo;
+
+		weapon = cg.snap->ps.weapon;
+		if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
+			ammo = cg.snap->ps.ammo[ weapon ];
+			if ( ammo == 0 ) {
+				warning = 3;
+			}
+		}
+	}
+
+	cg.lowAmmoWarning = warning;
 
 	// play a sound on transitions
 	if ( cg.lowAmmoWarning != previous ) {
