@@ -446,10 +446,19 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 				}
 			}
 
-			if ( haveNormal ) {
-				VectorMA( splashOrigin, ( float )g_weaponConfig.rocketSplashOffset, normal, splashOrigin );
-			}
-		}
+				if ( haveNormal ) {
+					float	splashOffset;
+
+					splashOffset = ( float )g_weaponConfig.rocketSplashOffset;
+					if ( splashOffset > ( float )ent->splashRadius ) {
+						splashOffset = ( float )ent->splashRadius;
+					} else if ( splashOffset < -(float)ent->splashRadius ) {
+						splashOffset = -(float)ent->splashRadius;
+					}
+
+					VectorMA( splashOrigin, splashOffset, normal, splashOrigin );
+				}
+}
 
 		if( G_RadiusDamage( splashOrigin, ent->parent, ent->splashDamage, ent->splashRadius, 
 			other, ent->splashMethodOfDeath ) ) {
@@ -478,6 +487,73 @@ static void G_SynchronizeRocketConfig( gentity_t *bolt, vec3_t dir ) {
 
 	VectorScale( dir, speed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );
+}
+
+/*
+=============
+G_InitializeMissileAcceleration
+
+Stores acceleration configuration on the entity for later prediction updates.
+=============
+*/
+static void G_InitializeMissileAcceleration( gentity_t *bolt, float accelerationFactor, int accelerationRate ) {
+	float	factor;
+
+	if ( accelerationFactor <= 0.0f || accelerationRate <= 0 ) {
+		bolt->s.time = 0;
+		bolt->s.time2 = 0;
+		bolt->s.generic1 = 0;
+		return;
+	}
+
+	factor = accelerationFactor;
+	if ( factor < 0.0f ) {
+		factor = 0.0f;
+	}
+
+	bolt->s.time = level.time;
+	bolt->s.time2 = accelerationRate;
+	bolt->s.generic1 = (int)( factor * 1000.0f );
+}
+
+/*
+=============
+G_UpdateMissileAcceleration
+
+Accelerates missiles over time based on their stored configuration.
+=============
+*/
+static void G_UpdateMissileAcceleration( gentity_t *ent ) {
+	float	accelerationFactor;
+	int		accelerationRate;
+	vec3_t	currentOrigin;
+
+	accelerationRate = ent->s.time2;
+	if ( accelerationRate <= 0 ) {
+		return;
+	}
+
+	accelerationFactor = (float)ent->s.generic1 / 1000.0f;
+	if ( accelerationFactor <= 0.0f ) {
+		return;
+	}
+
+	if ( ent->s.time <= 0 ) {
+		ent->s.time = level.time;
+	}
+
+	while ( level.time - ent->s.time >= accelerationRate ) {
+		ent->s.time += accelerationRate;
+
+		BG_EvaluateTrajectory( &ent->s.pos, level.time, currentOrigin );
+		VectorCopy( currentOrigin, ent->s.pos.trBase );
+		ent->s.pos.trTime = level.time;
+		ent->s.pos.trType = TR_LINEAR;
+
+		VectorScale( ent->s.pos.trDelta, accelerationFactor, ent->s.pos.trDelta );
+		SnapVector( ent->s.pos.trDelta );
+		ent->speed = VectorLength( ent->s.pos.trDelta );
+	}
 }
 
 /*
@@ -531,7 +607,11 @@ void G_RunMissile( gentity_t *ent ) {
 			}
 		} else if ( ent->count ) {
 			ent->count = 0;
-		}
+}
+}
+
+	if ( ent->s.weapon == WP_ROCKET_LAUNCHER || ent->s.weapon == WP_PLASMAGUN || ent->s.weapon == WP_BFG ) {
+		G_UpdateMissileAcceleration( ent );
 	}
 
 	// get current position
@@ -630,6 +710,8 @@ gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir) {
 
 	VectorCopy (start, bolt->r.currentOrigin);
 
+	G_InitializeMissileAcceleration( bolt, g_weaponConfig.plasmaAccelerationFactor, g_weaponConfig.plasmaAccelerationRate );
+
 	return bolt;
 }	
 
@@ -714,6 +796,8 @@ gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir) {
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
 
+	G_InitializeMissileAcceleration( bolt, g_weaponConfig.bfgAccelerationFactor, g_weaponConfig.bfgAccelerationRate );
+
 	return bolt;
 }
 
@@ -752,6 +836,8 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	VectorCopy( start, bolt->s.pos.trBase );
 	G_SynchronizeRocketConfig( bolt, dir );
 	VectorCopy (start, bolt->r.currentOrigin);
+
+	G_InitializeMissileAcceleration( bolt, g_weaponConfig.rocketAccelerationFactor, g_weaponConfig.rocketAccelerationRate );
 
 	return bolt;
 }
