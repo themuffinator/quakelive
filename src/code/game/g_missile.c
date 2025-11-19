@@ -424,10 +424,13 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		vec3_t	splashOrigin;
 		vec3_t	normal;
 		float	normalLength;
+		float	offset;
 
 		VectorCopy( trace->endpos, splashOrigin );
 		if ( ent->s.weapon == WP_ROCKET_LAUNCHER && g_weaponConfig.rocketSplashOffset != 0 ) {
 			qboolean	haveNormal = qfalse;
+
+			offset = Com_Clamp( -1.0f * ( float )ent->splashRadius, ( float )ent->splashRadius, ( float )g_weaponConfig.rocketSplashOffset );
 
 			VectorCopy( trace->plane.normal, normal );
 			normalLength = VectorLengthSquared( normal );
@@ -447,7 +450,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 			}
 
 			if ( haveNormal ) {
-				VectorMA( splashOrigin, ( float )g_weaponConfig.rocketSplashOffset, normal, splashOrigin );
+				VectorMA( splashOrigin, offset, normal, splashOrigin );
 			}
 		}
 
@@ -463,6 +466,37 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 }
 
 /*
+=============
+G_UpdateMissileAcceleration
+
+Advance missile acceleration according to configured rate and factor.
+=============
+*/
+static void G_UpdateMissileAcceleration( gentity_t *ent, float accelFactor, int accelRate ) {
+	vec3_t		currentOrigin;
+
+	if ( accelFactor <= 0.0f || accelRate <= 0 ) {
+		return;
+	}
+
+	if ( ent->s.time == 0 ) {
+		ent->s.time = level.time;
+	}
+
+	if ( ent->s.time2 == 0 ) {
+		ent->s.time2 = ent->s.time + accelRate;
+	}
+
+	while ( level.time >= ent->s.time2 ) {
+		BG_EvaluateTrajectory( &ent->s.pos, ent->s.time2, currentOrigin );
+		VectorCopy( currentOrigin, ent->s.pos.trBase );
+		ent->s.pos.trTime = ent->s.time2;
+		VectorScale( ent->s.pos.trDelta, 1.0f + accelFactor, ent->s.pos.trDelta );
+		ent->s.time2 += accelRate;
+	}
+}
+
+/*
 ================
 G_RunMissile
 ================
@@ -471,6 +505,25 @@ void G_RunMissile( gentity_t *ent ) {
 	vec3_t		origin;
 	trace_t		tr;
 	int			passent;
+
+	float		accelFactor;
+	int			accelRate;
+
+	accelFactor = 0.0f;
+	accelRate = 0;
+
+	switch ( ent->s.weapon ) {
+	case WP_ROCKET_LAUNCHER:
+	case WP_PLASMAGUN:
+	case WP_BFG:
+		accelFactor = ( float )ent->s.generic1 / 1000.0f;
+		accelRate = ent->s.pos.trDuration;
+		break;
+	default:
+		break;
+	}
+
+	G_UpdateMissileAcceleration( ent, accelFactor, accelRate );
 
 	if ( ent->s.weapon == WP_ROCKET_LAUNCHER ) {
 		if ( g_weaponConfig.guidedRocketEnabled && ent->count ) {
@@ -604,6 +657,18 @@ gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->target_ent = NULL;
 	bolt->speed = ( float )g_weaponConfig.plasmaSpeed;
 
+	bolt->s.generic1 = 0;
+	bolt->s.time = 0;
+	bolt->s.time2 = 0;
+	bolt->s.pos.trDuration = 0;
+
+	if ( g_weaponConfig.plasmaAccelerationFactor > 0.0f && g_weaponConfig.plasmaAccelerationRate > 0 ) {
+		bolt->s.generic1 = ( int )( g_weaponConfig.plasmaAccelerationFactor * 1000.0f );
+		bolt->s.pos.trDuration = g_weaponConfig.plasmaAccelerationRate;
+		bolt->s.time = level.time;
+		bolt->s.time2 = level.time + bolt->s.pos.trDuration;
+	}
+
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
@@ -689,6 +754,18 @@ gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->target_ent = NULL;
 	bolt->speed = ( float )g_weaponConfig.bfgSpeed;
 
+	bolt->s.generic1 = 0;
+	bolt->s.time = 0;
+	bolt->s.time2 = 0;
+	bolt->s.pos.trDuration = 0;
+
+	if ( g_weaponConfig.bfgAccelerationFactor > 0.0f && g_weaponConfig.bfgAccelerationRate > 0 ) {
+		bolt->s.generic1 = ( int )( g_weaponConfig.bfgAccelerationFactor * 1000.0f );
+		bolt->s.pos.trDuration = g_weaponConfig.bfgAccelerationRate;
+		bolt->s.time = level.time;
+		bolt->s.time2 = level.time + bolt->s.pos.trDuration;
+	}
+
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
@@ -730,6 +807,18 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->target_ent = NULL;
 	bolt->speed = ( float )g_weaponConfig.rocketSpeed;
 	bolt->count = ( g_weaponConfig.guidedRocketEnabled != 0 ) ? 1 : 0;
+
+	bolt->s.generic1 = 0;
+	bolt->s.time = 0;
+	bolt->s.time2 = 0;
+	bolt->s.pos.trDuration = 0;
+
+	if ( g_weaponConfig.rocketAccelerationFactor > 0.0f && g_weaponConfig.rocketAccelerationRate > 0 ) {
+		bolt->s.generic1 = ( int )( g_weaponConfig.rocketAccelerationFactor * 1000.0f );
+		bolt->s.pos.trDuration = g_weaponConfig.rocketAccelerationRate;
+		bolt->s.time = level.time;
+		bolt->s.time2 = level.time + bolt->s.pos.trDuration;
+	}
 
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
