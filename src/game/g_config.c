@@ -77,6 +77,7 @@
 #define DEFAULT_AMMO_PACK_TOGGLE           0
 #define DEFAULT_AMMO_PACK_HACK             0
 #define DEFAULT_AMMO_RESPAWN_SECONDS       40
+#define DEFAULT_POWERUP_RESPAWN_SECONDS    120
 #define DEFAULT_SUDDEN_DEATH_RESPAWN       0
 #define DEFAULT_STARTING_HEALTH            100
 #define DEFAULT_STARTING_HEALTH_BONUS      25
@@ -529,10 +530,11 @@ static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {
         config.infiniteAmmo = G_ReadFactoryBoolCvar( &g_infiniteAmmo, DEFAULT_INFINITE_AMMO, "g_infiniteAmmo" );
         config.ammoPackEnabled = G_ReadFactoryBoolCvar( &g_ammoPack, DEFAULT_AMMO_PACK_TOGGLE, "g_ammoPack" );
         config.ammoPackHackEnabled = G_ReadFactoryBoolCvar( &g_ammoPackHack, DEFAULT_AMMO_PACK_HACK, "g_ammoPackHack" );
-        config.ammoRespawnSeconds = G_ReadFactoryIntCvar( &g_ammoRespawn, DEFAULT_AMMO_RESPAWN_SECONDS, "g_ammoRespawn" );
-        if ( config.ammoRespawnSeconds <= 0 ) {
-                config.ammoRespawnSeconds = DEFAULT_AMMO_RESPAWN_SECONDS;
-        }
+	config.ammoRespawnSeconds = G_ReadFactoryIntCvar( &g_ammoRespawn, DEFAULT_AMMO_RESPAWN_SECONDS, "g_ammoRespawn" );
+	if ( config.ammoRespawnSeconds <= 0 ) {
+		config.ammoRespawnSeconds = DEFAULT_AMMO_RESPAWN_SECONDS;
+	}
+	config.powerupRespawnSeconds = G_ReadFactoryNonNegativeCvar( &g_powerupRespawn, DEFAULT_POWERUP_RESPAWN_SECONDS, "g_powerupRespawn" );
 
         config.suddenDeathRespawn = G_ReadFactoryBoolCvar( &g_suddenDeathRespawn, DEFAULT_SUDDEN_DEATH_RESPAWN, "g_suddenDeathRespawn" );
         config.startingHealth = G_ReadFactoryPositiveCvar( &g_startingHealth, DEFAULT_STARTING_HEALTH, "g_startingHealth" );
@@ -573,7 +575,7 @@ static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfi
                 return;
         }
 
-	G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i suddenDeathRespawn=%i startHealth=%i bonus=%i armor=%i allowKill=%i complaintThreshold=%i complaintLimit=%i respawnMin=%i respawnMax=%i regenHealth=%i regenHealthRate=%i regenArmor=%i regenArmorRate=%i regenArmorAfterHealth=%i spawnPowerup=%i spawnHoldable=%i spawnWeapons=%i spawnHealth=%i spawnArmor=%i spawnAmmo=%i\n",
+	G_Printf( "Factory loadout (%s): mask=%i statMask=0x%X infiniteAmmo=%i ammoPack=%i hack=%i ammoRespawn=%i powerupRespawn=%i suddenDeathRespawn=%i startHealth=%i bonus=%i armor=%i allowKill=%i complaintThreshold=%i complaintLimit=%i respawnMin=%i respawnMax=%i regenHealth=%i regenHealthRate=%i regenArmor=%i regenArmorRate=%i regenArmorAfterHealth=%i spawnPowerup=%i spawnHoldable=%i spawnWeapons=%i spawnHealth=%i spawnArmor=%i spawnAmmo=%i\n",
 	reason,
 	config->startingWeaponsMask,
 	config->startingWeaponsStatMask,
@@ -581,6 +583,7 @@ static void G_LogFactoryLoadoutState( const char *reason, const factoryCvarConfi
 	config->ammoPackEnabled,
 	config->ammoPackHackEnabled,
 	config->ammoRespawnSeconds,
+	config->powerupRespawnSeconds,
 	config->suddenDeathRespawn,
 	config->startingHealth,
 	config->startingHealthBonus,
@@ -634,6 +637,7 @@ void G_UpdateFactoryCvarConfig( void ) {
 	|| config.ammoPackEnabled != s_reportedFactoryConfig.ammoPackEnabled
 	|| config.ammoPackHackEnabled != s_reportedFactoryConfig.ammoPackHackEnabled
 	|| config.ammoRespawnSeconds != s_reportedFactoryConfig.ammoRespawnSeconds
+	|| config.powerupRespawnSeconds != s_reportedFactoryConfig.powerupRespawnSeconds
 	|| config.suddenDeathRespawn != s_reportedFactoryConfig.suddenDeathRespawn
 	|| config.startingHealth != s_reportedFactoryConfig.startingHealth
 	|| config.startingHealthBonus != s_reportedFactoryConfig.startingHealthBonus
@@ -670,6 +674,13 @@ static int G_ReadStartingAmmoCvar( const vmCvar_t *cvar, int fallback, const cha
         return cvar->integer;
 }
 
+/*
+=============
+G_InitStartingAmmoConfig
+
+Loads the per-weapon spawn ammo overrides from CVars.
+=============
+*/
 void G_InitStartingAmmoConfig( void ) {
         g_startingAmmoConfig.bfg = G_ReadStartingAmmoCvar( &g_startingAmmo_bfg, DEFAULT_STARTING_AMMO_BFG, "g_startingAmmo_bfg" );
         g_startingAmmoConfig.chaingun = G_ReadStartingAmmoCvar( &g_startingAmmo_cg, DEFAULT_STARTING_AMMO_CG, "g_startingAmmo_cg" );
@@ -700,6 +711,13 @@ static float G_ReadKnockbackCvar( const vmCvar_t *cvar, float fallback, const ch
         return cvar->value;
 }
 
+/*
+=============
+G_InitKnockbackConfig
+
+Reads knockback scale CVars into the cached config block.
+=============
+*/
 void G_InitKnockbackConfig( void ) {
         g_knockbackConfig.gauntlet = G_ReadKnockbackCvar( &g_knockback_g, DEFAULT_KNOCKBACK_G, "g_knockback_g" );
         g_knockbackConfig.machinegun = G_ReadKnockbackCvar( &g_knockback_mg, DEFAULT_KNOCKBACK_MG, "g_knockback_mg" );

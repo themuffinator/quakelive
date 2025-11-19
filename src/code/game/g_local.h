@@ -126,6 +126,14 @@ typedef struct weaponConfig_s {
 	float		bfgAccelerationFactor;
 	int		bfgAccelerationRate;
 	int		grappleSpeed;
+	float		gauntletSpeedFactor;
+	int		lightningDischargeFlags;
+	int		railgunHeadshotDamage;
+	float		machinegunIronsightsScale;
+	int		midAirMinimumHeight;
+	qboolean	nailgunBounceEnabled;
+	int		nailgunBouncePercentage;
+	float		quadDamageMultiplier;
 	qboolean	guidedRocketEnabled;
 	int		quadHogEnabled;
 	int		quadHogIdleSeconds;
@@ -203,6 +211,7 @@ typedef struct factoryCvarConfig_s {
 	qboolean	ammoPackEnabled;
 	qboolean	ammoPackHackEnabled;
 	int		ammoRespawnSeconds;
+	int		powerupRespawnSeconds;
 	qboolean	suddenDeathRespawn;
 	int		startingHealth;
 	int		startingHealthBonus;
