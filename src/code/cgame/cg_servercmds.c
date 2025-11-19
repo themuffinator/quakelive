@@ -420,7 +420,11 @@ static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_setting
 			break;
 		}
 
-		if ( !Q_stricmp( key, "weaponReloadTimes" ) ) {
+		if ( !Q_stricmp( key, "weaponReloadOverrides" ) ) {
+			if ( !CG_ParsePmoveWeaponReloadTimes( &cursor, parsed.weaponReloadOverrides ) ) {
+				valid = qfalse;
+			}
+		} else if ( !Q_stricmp( key, "weaponReloadTimes" ) ) {
 			if ( !CG_ParsePmoveWeaponReloadTimes( &cursor, parsed.weaponReloadTimes ) ) {
 				valid = qfalse;
 			}

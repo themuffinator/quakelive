@@ -490,6 +490,7 @@ struct pmove_settings_s {
 	int	midAirMinimumHeight;
 	qboolean	nailgunBounceEnabled;
 	int	nailgunBouncePercentage;
+	int	weaponReloadOverrides[WP_NUM_WEAPONS];
 	int	weaponReloadTimes[WP_NUM_WEAPONS];
 };
 
