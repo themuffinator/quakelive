@@ -30,6 +30,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../game/match_state_keys.h"
 
+#ifndef VF_NO_GAMETYPE
+#define VF_NO_GAMETYPE	0x0008
+#endif
+
 typedef struct {
 	const char *order;
 	int taskNum;
@@ -762,6 +766,8 @@ void CG_ParseServerinfo( void ) {
 	char	oldHeadOverride[MAX_QPATH];
 	const char	*modelOverride;
 	const char	*headOverride;
+	const char	*voteFlagsString;
+	int		voteFlags;
 
 	info = CG_ConfigString( CS_SERVERINFO );
 	Q_strncpyz( oldModelOverride, cgs.playermodelOverride, sizeof( oldModelOverride ) );
@@ -797,6 +803,14 @@ CG_SetTeamNameCvar( "g_blueteam", Info_ValueForKey( info, "g_blueTeam" ), DEFAUL
 	Q_strncpyz( cgs.playerheadmodelOverride, headOverride, sizeof( cgs.playerheadmodelOverride ) );
 	if ( Q_stricmp( oldModelOverride, cgs.playermodelOverride ) || Q_stricmp( oldHeadOverride, cgs.playerheadmodelOverride ) ) {
 		CG_ApplyModelOverrides();
+	}
+
+	voteFlagsString = Info_ValueForKey( info, "g_voteFlags" );
+	voteFlags = atoi( voteFlagsString );
+	if ( voteFlags & VF_NO_GAMETYPE ) {
+		trap_Cvar_Set( "ui_gameTypeVotingDisabled", "1" );
+	} else {
+		trap_Cvar_Set( "ui_gameTypeVotingDisabled", "0" );
 	}
 }
 
