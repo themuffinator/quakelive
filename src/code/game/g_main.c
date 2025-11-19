@@ -806,7 +806,13 @@ static float G_ReadWeaponFloatCvarNonNegative( const vmCvar_t *cvar, float fallb
 	return value;
 }
 
+/*
+=============
+G_InitWeaponConfig
 
+Refreshes the cached weapon config block from gameplay CVars.
+=============
+*/
 void G_InitWeaponConfig( void ) {
 	g_weaponConfig.gauntletDamage = G_ReadWeaponCvar( &g_damage_g, 50, "g_damage_g" );
 	g_weaponConfig.machinegunDamage = G_ReadWeaponCvar( &g_damage_mg, 7, "g_damage_mg" );
@@ -843,6 +849,17 @@ void G_InitWeaponConfig( void ) {
 	g_weaponConfig.bfgAccelerationFactor = G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_bfg, 0.0f, "g_accelFactor_bfg" );
 	g_weaponConfig.bfgAccelerationRate = G_ReadWeaponCvarNonNegative( &g_accelRate_bfg, 0, "g_accelRate_bfg" );
 	g_weaponConfig.grappleSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_gh, 800, "g_velocity_gh", 1 );
+	g_weaponConfig.gauntletSpeedFactor = G_ReadWeaponFloatCvarNonNegative( &g_gauntletSpeedFactor, 1.0f, "g_gauntletSpeedFactor" );
+	g_weaponConfig.lightningDischargeFlags = G_ReadWeaponCvarNonNegative( &g_lightningDischarge, 0, "g_lightningDischarge" );
+	g_weaponConfig.railgunHeadshotDamage = G_ReadWeaponCvarNonNegative( &g_headShotDamage_rg, 0, "g_headShotDamage_rg" );
+	g_weaponConfig.machinegunIronsightsScale = G_ReadWeaponFloatCvarNonNegative( &g_ironsights_mg, 1.0f, "g_ironsights_mg" );
+	g_weaponConfig.midAirMinimumHeight = G_ReadWeaponCvarNonNegative( &g_midAirMinHeight, 96, "g_midAirMinHeight" );
+	g_weaponConfig.nailgunBounceEnabled = G_ReadWeaponBoolCvar( &g_nailbounce, qtrue, "g_nailbounce" );
+	g_weaponConfig.nailgunBouncePercentage = G_ReadWeaponCvarNonNegative( &g_nailbouncepercentage, 65, "g_nailbouncepercentage" );
+	if ( g_weaponConfig.nailgunBouncePercentage > 100 ) {
+		g_weaponConfig.nailgunBouncePercentage = 100;
+	}
+	g_weaponConfig.quadDamageMultiplier = G_ReadWeaponFloatCvarNonNegative( &g_quadDamageFactor, 3.0f, "g_quadDamageFactor" );
 	g_weaponConfig.guidedRocketEnabled = G_ReadWeaponBoolCvar( &g_guidedRocket, qfalse, "g_guidedRocket" );
 	g_weaponConfig.quadHogEnabled = G_ReadWeaponBoolCvar( &g_quadHog, qfalse, "g_quadHog" );
 	g_weaponConfig.quadHogIdleSeconds = G_ReadWeaponCvarRaw( &g_quadHogIdle, 0, "g_quadHogIdle" );
