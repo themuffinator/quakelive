@@ -654,6 +654,13 @@ typedef struct {
 	float		damageTime;
 	float		damageX, damageY, damageValue;
 
+	// cached screen damage customization
+	vec4_t		screenDamageColor;
+	vec4_t		screenDamageSelfColor;
+	vec4_t		screenDamageTeamColor;
+	float		screenDamageAlpha;
+	float		screenDamageAlphaTeam;
+
 	// status bar head
 	float		headYaw;
 	float		headEndPitch;
@@ -1363,6 +1370,11 @@ extern	vmCvar_t		cg_specItemTimersSize;
 extern	vmCvar_t		cg_specTeamVitals;
 extern	vmCvar_t		cg_specTeamVitalsHealthColor;
 extern	vmCvar_t		cg_itemTimers;
+extern	vmCvar_t		cg_screenDamage;
+extern	vmCvar_t		cg_screenDamage_Self;
+extern	vmCvar_t		cg_screenDamage_Team;
+extern	vmCvar_t		cg_screenDamageAlpha;
+extern	vmCvar_t		cg_screenDamageAlpha_Team;
 extern	vmCvar_t		cg_overheadNamesWidth;
 extern	vmCvar_t		cg_obituaryRowSize;
 extern	vmCvar_t		cg_spectating;

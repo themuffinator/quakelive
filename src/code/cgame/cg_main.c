@@ -28,6 +28,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 displayContextDef_t cgDC;
 
 #define DEFAULT_WEAPON_BAR_GRENADE_COLOR	"0x007000FF"
+#define DEFAULT_SCREEN_DAMAGE_COLOR		"0x700000C8"
+#define DEFAULT_SCREEN_DAMAGE_SELF_COLOR	"0x00000000"
+#define DEFAULT_SCREEN_DAMAGE_TEAM_COLOR	"0x700000C8"
+#define DEFAULT_SCREEN_DAMAGE_ALPHA		"200"
 
 int forceModelModificationCount = -1;
 int forceTeamModelModificationCount = -1;
@@ -42,6 +46,11 @@ int teamLowerColorModificationCount = -1;
 int enemyHeadColorModificationCount = -1;
 int enemyUpperColorModificationCount = -1;
 int enemyLowerColorModificationCount = -1;
+int screenDamageColorModificationCount = -1;
+int screenDamageSelfColorModificationCount = -1;
+int screenDamageTeamColorModificationCount = -1;
+int screenDamageAlphaModificationCount = -1;
+int screenDamageAlphaTeamModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
@@ -283,6 +292,11 @@ vmCvar_t	cg_specItemTimersSize;
 vmCvar_t	cg_specTeamVitals;
 vmCvar_t	cg_specTeamVitalsHealthColor;
 vmCvar_t	cg_itemTimers;
+vmCvar_t	cg_screenDamage;
+vmCvar_t	cg_screenDamage_Self;
+vmCvar_t	cg_screenDamage_Team;
+vmCvar_t	cg_screenDamageAlpha;
+vmCvar_t	cg_screenDamageAlpha_Team;
 vmCvar_t	cg_overheadNamesWidth;
 vmCvar_t	cg_obituaryRowSize;
 vmCvar_t	cg_spectating;
@@ -506,6 +520,11 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_specTeamVitals, "cg_specTeamVitals", "1", CVAR_ARCHIVE },
 	{ &cg_specTeamVitalsHealthColor, "cg_specTeamVitalsHealthColor", "0", CVAR_ARCHIVE },
 	{ &cg_itemTimers, "cg_itemTimers", "1", CVAR_ARCHIVE },
+	{ &cg_screenDamage, "cg_screenDamage", DEFAULT_SCREEN_DAMAGE_COLOR, CVAR_ARCHIVE },
+	{ &cg_screenDamage_Self, "cg_screenDamage_Self", DEFAULT_SCREEN_DAMAGE_SELF_COLOR, CVAR_ARCHIVE },
+	{ &cg_screenDamage_Team, "cg_screenDamage_Team", DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, CVAR_ARCHIVE },
+	{ &cg_screenDamageAlpha, "cg_screenDamageAlpha", DEFAULT_SCREEN_DAMAGE_ALPHA, CVAR_ARCHIVE },
+	{ &cg_screenDamageAlpha_Team, "cg_screenDamageAlpha_Team", DEFAULT_SCREEN_DAMAGE_ALPHA, CVAR_ARCHIVE },
 	{ &cg_overheadNamesWidth, "cg_overheadNamesWidth", "120", CVAR_ARCHIVE },
 	{ &cg_obituaryRowSize, "cg_obituaryRowSize", "5", CVAR_ARCHIVE },
 	{ &cg_spectating, "cg_spectating", "0", CVAR_ROM },
@@ -616,6 +635,39 @@ static void CG_UpdateLowAmmoWarningPercentile( void ) {
 }
 
 /*
+=============
+CG_UpdateScreenDamageColorFromCvar
+
+Parses a screen damage color customization string and caches the result.
+=============
+*/
+static void CG_UpdateScreenDamageColorFromCvar( vmCvar_t *colorCvar, const char *defaultValue, vec4_t target, int *modificationCount ) {
+	vec4_t	parsedColor;
+
+	if ( !CG_ParseWeaponBarColor( colorCvar->string, parsedColor ) ) {
+		CG_ParseWeaponBarColor( defaultValue, parsedColor );
+	}
+
+	Vector4Copy( parsedColor, target );
+	*modificationCount = colorCvar->modificationCount;
+}
+
+/*
+=============
+CG_UpdateScreenDamageAlphaFromCvar
+
+Caches the scalar alpha intensity used by screen damage effects.
+=============
+*/
+static void CG_UpdateScreenDamageAlphaFromCvar( vmCvar_t *alphaCvar, float *target, int *modificationCount ) {
+	float	clamped;
+
+	clamped = Com_Clamp( 0.0f, 200.0f, alphaCvar->value );
+	*target = clamped;
+	*modificationCount = alphaCvar->modificationCount;
+}
+
+/*
 =================
 CG_RegisterCvars
 =================
@@ -658,6 +710,12 @@ void CG_RegisterCvars( void ) {
 	if ( cg.bobScale < 0.0f ) {
 		cg.bobScale = 0.0f;
 	}
+
+	CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage, DEFAULT_SCREEN_DAMAGE_COLOR, cg.screenDamageColor, &screenDamageColorModificationCount );
+	CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage_Self, DEFAULT_SCREEN_DAMAGE_SELF_COLOR, cg.screenDamageSelfColor, &screenDamageSelfColorModificationCount );
+	CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage_Team, DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, cg.screenDamageTeamColor, &screenDamageTeamColorModificationCount );
+	CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha, &cg.screenDamageAlpha, &screenDamageAlphaModificationCount );
+	CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha_Team, &cg.screenDamageAlphaTeam, &screenDamageAlphaTeamModificationCount );
 
 	CG_UpdateWeaponBarGrenadeColor();
 	CG_UpdateLowAmmoWarningPercentile();
@@ -789,6 +847,21 @@ void CG_UpdateCvars( void ) {
 	}
 	if ( lowAmmoWarningPercentileModCount != cg_lowAmmoWarningPercentile.modificationCount ) {
 		CG_UpdateLowAmmoWarningPercentile();
+	}
+	if ( screenDamageColorModificationCount != cg_screenDamage.modificationCount ) {
+		CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage, DEFAULT_SCREEN_DAMAGE_COLOR, cg.screenDamageColor, &screenDamageColorModificationCount );
+	}
+	if ( screenDamageSelfColorModificationCount != cg_screenDamage_Self.modificationCount ) {
+		CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage_Self, DEFAULT_SCREEN_DAMAGE_SELF_COLOR, cg.screenDamageSelfColor, &screenDamageSelfColorModificationCount );
+	}
+	if ( screenDamageTeamColorModificationCount != cg_screenDamage_Team.modificationCount ) {
+		CG_UpdateScreenDamageColorFromCvar( &cg_screenDamage_Team, DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, cg.screenDamageTeamColor, &screenDamageTeamColorModificationCount );
+	}
+	if ( screenDamageAlphaModificationCount != cg_screenDamageAlpha.modificationCount ) {
+		CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha, &cg.screenDamageAlpha, &screenDamageAlphaModificationCount );
+	}
+	if ( screenDamageAlphaTeamModificationCount != cg_screenDamageAlpha_Team.modificationCount ) {
+		CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha_Team, &cg.screenDamageAlphaTeam, &screenDamageAlphaTeamModificationCount );
 	}
 	cg.zoomToggle = (qboolean)( cg_zoomToggle.integer != 0 );
 	cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
