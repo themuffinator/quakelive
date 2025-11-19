@@ -40,6 +40,8 @@ int teamLowerColorModificationCount = -1;
 int enemyHeadColorModificationCount = -1;
 int enemyUpperColorModificationCount = -1;
 int enemyLowerColorModificationCount = -1;
+int deadBodyDarkenModificationCount = -1;
+int deadBodyColorModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
@@ -244,6 +246,8 @@ vmCvar_t	cg_drawTieredArmorAvailability;
 vmCvar_t	cg_drawFullWeaponBar;
 vmCvar_t	cg_drawHitFriendTime;
 vmCvar_t	cg_drawDeadFriendTime;
+vmCvar_t	cg_deadBodyDarken;
+vmCvar_t	cg_deadBodyColor;
 vmCvar_t	cg_speedometer;
 vmCvar_t	cg_specNames;
 vmCvar_t	cg_specItemTimers;
@@ -443,6 +447,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawFullWeaponBar, "cg_drawFullWeaponBar", "0", CVAR_ARCHIVE },
 	{ &cg_drawHitFriendTime, "cg_drawHitFriendTime", "5000", CVAR_ARCHIVE },
 	{ &cg_drawDeadFriendTime, "cg_drawDeadFriendTime", "3000", CVAR_ARCHIVE },
+	{ &cg_deadBodyDarken, "cg_deadBodyDarken", "1", CVAR_ARCHIVE },
+	{ &cg_deadBodyColor, "cg_deadBodyColor", "0x333333ff", CVAR_ARCHIVE },
 	{ &cg_speedometer, "cg_speedometer", "0", CVAR_ARCHIVE },
 	{ &cg_specNames, "cg_specNames", "1", CVAR_ARCHIVE },
 	{ &cg_specItemTimers, "cg_specItemTimers", "1", CVAR_ARCHIVE },
@@ -466,6 +472,101 @@ static cvarTable_t cvarTable[] = { // bk001129
 };
 
 static int  cvarTableSize = sizeof( cvarTable ) / sizeof( cvarTable[0] );
+
+static const vec4_t cg_defaultDeadBodyColor = { 51.0f / 255.0f, 51.0f / 255.0f, 51.0f / 255.0f, 1.0f };
+
+/*
+=============
+CG_ParseDeadBodyHexDigit
+
+Converts a hexadecimal character into an integer for corpse color parsing.
+=============
+*/
+static int CG_ParseDeadBodyHexDigit( char ch ) {
+	if ( ch >= '0' && ch <= '9' ) {
+		return ch - '0';
+	}
+	if ( ch >= 'a' && ch <= 'f' ) {
+		return 10 + ( ch - 'a' );
+	}
+	if ( ch >= 'A' && ch <= 'F' ) {
+		return 10 + ( ch - 'A' );
+	}
+	return -1;
+}
+
+/*
+=============
+CG_ParseDeadBodyColor
+
+Parses the configured corpse tint into a normalized RGBA vector.
+=============
+*/
+static qboolean CG_ParseDeadBodyColor( const char *value, vec4_t color ) {
+	char buffer[64];
+	const char *hex;
+	unsigned int raw;
+	int len;
+	int digit;
+	int i;
+	byte components[4];
+
+	if ( !value || !*value ) {
+		return qfalse;
+	}
+	Q_strncpyz( buffer, value, sizeof( buffer ) );
+	hex = buffer;
+	while ( *hex == ' ' || *hex == '	' || *hex == '"' ) {
+		hex++;
+	}
+	if ( !Q_stricmp( hex, "NULL" ) ) {
+		return qfalse;
+	}
+	if ( hex[0] == '0' && ( hex[1] == 'x' || hex[1] == 'X' ) ) {
+		hex += 2;
+	}
+	len = strlen( hex );
+	if ( len != 6 && len != 8 ) {
+		return qfalse;
+	}
+	raw = 0;
+	for ( i = 0 ; i < len ; i++ ) {
+		digit = CG_ParseDeadBodyHexDigit( hex[i] );
+		if ( digit < 0 ) {
+			return qfalse;
+		}
+		raw = ( raw << 4 ) | digit;
+	}
+	if ( len == 6 ) {
+		components[0] = ( raw >> 16 ) & 0xFF;
+		components[1] = ( raw >> 8 ) & 0xFF;
+		components[2] = raw & 0xFF;
+		components[3] = 0xFF;
+	} else {
+		components[0] = ( raw >> 24 ) & 0xFF;
+		components[1] = ( raw >> 16 ) & 0xFF;
+		components[2] = ( raw >> 8 ) & 0xFF;
+		components[3] = raw & 0xFF;
+	}
+	for ( i = 0 ; i < 4 ; i++ ) {
+		color[i] = components[i] / 255.0f;
+	}
+	return qtrue;
+}
+
+/*
+=============
+CG_UpdateDeadBodyPalette
+
+Synchronizes the cached corpse shading state with the latest cvars.
+=============
+*/
+static void CG_UpdateDeadBodyPalette( void ) {
+	cg.deadBodyDarken = (qboolean)( cg_deadBodyDarken.integer != 0 );
+	if ( !CG_ParseDeadBodyColor( cg_deadBodyColor.string, cg.deadBodyColor ) ) {
+		Vector4Copy( cg_defaultDeadBodyColor, cg.deadBodyColor );
+	}
+}
 
 /*
 =================
@@ -496,10 +597,14 @@ void CG_RegisterCvars( void ) {
         forceEnemyWeaponColorModificationCount = cg_forceEnemyWeaponColor.modificationCount;
         teamHeadColorModificationCount = cg_teamHeadColor.modificationCount;
         teamUpperColorModificationCount = cg_teamUpperColor.modificationCount;
-        teamLowerColorModificationCount = cg_teamLowerColor.modificationCount;
-        enemyHeadColorModificationCount = cg_enemyHeadColor.modificationCount;
-        enemyUpperColorModificationCount = cg_enemyUpperColor.modificationCount;
-        enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;
+	teamLowerColorModificationCount = cg_teamLowerColor.modificationCount;
+	enemyHeadColorModificationCount = cg_enemyHeadColor.modificationCount;
+	enemyUpperColorModificationCount = cg_enemyUpperColor.modificationCount;
+	enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;
+	deadBodyDarkenModificationCount = cg_deadBodyDarken.modificationCount;
+	deadBodyColorModificationCount = cg_deadBodyColor.modificationCount;
+
+	CG_UpdateDeadBodyPalette();
 
 	cg.kickScale = cg_kickScale.value;
 	if ( cg.kickScale < 0.0f ) {
@@ -544,6 +649,7 @@ CG_UpdateCvars
 void CG_UpdateCvars( void ) {
 	int			i;
 	cvarTable_t	*cv;
+	qboolean	refreshDeadBodyPalette;
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Update( cv->vmCvar );
@@ -566,6 +672,7 @@ void CG_UpdateCvars( void ) {
 	}
 
 	refreshClients = qfalse;
+	refreshDeadBodyPalette = qfalse;
 
 	if ( forceModelModificationCount != cg_forceModel.modificationCount ) {
 		forceModelModificationCount = cg_forceModel.modificationCount;
@@ -619,10 +726,22 @@ void CG_UpdateCvars( void ) {
 		enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;
 		refreshClients = qtrue;
 	}
+	if ( deadBodyDarkenModificationCount != cg_deadBodyDarken.modificationCount ) {
+		deadBodyDarkenModificationCount = cg_deadBodyDarken.modificationCount;
+		refreshDeadBodyPalette = qtrue;
+	}
+	if ( deadBodyColorModificationCount != cg_deadBodyColor.modificationCount ) {
+		deadBodyColorModificationCount = cg_deadBodyColor.modificationCount;
+		refreshDeadBodyPalette = qtrue;
+	}
 
 	if ( refreshClients ) {
 		CG_ForceModelChange();
 	}
+	if ( refreshDeadBodyPalette ) {
+		CG_UpdateDeadBodyPalette();
+	}
+
 
 	cg.kickScale = cg_kickScale.value;
 	if ( cg.kickScale < 0.0f ) {
