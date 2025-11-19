@@ -1,0 +1,41 @@
+name: UI Validation
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  ui-bundle:
+    runs-on: ubuntu-latest
+    env:
+      UI_ARTIFACT_ROOT: artifacts/ui_bundle
+      UI_VALIDATION_ROOT: artifacts/ui_validation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build UI bundle
+        run: tools/build_ui_bundle.sh
+
+      - name: Run headless UI validation
+        run: >-
+          python3 tests/run_ui_validation.py
+          --bundle build/ui_bundle/pak_uiql.pk3
+          --homepath build/ui_validation/home
+          --log-dir "${{ env.UI_VALIDATION_ROOT }}/logs"
+
+      - name: Upload UI artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-validation
+          path: |
+            ${{ env.UI_ARTIFACT_ROOT }}/**
+            ${{ env.UI_VALIDATION_ROOT }}/**
+          if-no-files-found: warn
+          retention-days: 7

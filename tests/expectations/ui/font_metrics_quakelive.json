@@ -1,0 +1,26 @@
+{
+  "font": {
+    "glyphs": 232,
+    "unitsPerEm": 2048,
+    "ascent": 1839,
+    "descent": -450
+  },
+  "bigfont": {
+    "glyphs": 232,
+    "unitsPerEm": 2048,
+    "ascent": 1839,
+    "descent": -450
+  },
+  "smallfont": {
+    "glyphs": 2416,
+    "unitsPerEm": 2048,
+    "ascent": 2189,
+    "descent": -600
+  },
+  "monofont": {
+    "glyphs": 898,
+    "unitsPerEm": 2048,
+    "ascent": 2163,
+    "descent": -555
+  }
+}
