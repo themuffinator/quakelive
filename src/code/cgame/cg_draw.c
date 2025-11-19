@@ -2065,10 +2065,12 @@ static void CG_Draw2D( void ) {
 	qboolean	spectator;
 	qboolean	menuHudActive;
 	qboolean	canShowStatus;
+	qboolean	menuScoreboardHandled;
 
 	spectator = ( qboolean )( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
 	menuHudActive = CG_IsMenuHudActive();
 	canShowStatus = ( qboolean )( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 );
+	menuScoreboardHandled = qfalse;
 
 	if ( menuHudActive && cg_drawStatus.integer && ( spectator || canShowStatus ) ) {
 		Menu_PaintAll();
@@ -2107,7 +2109,7 @@ static void CG_Draw2D( void ) {
 			cg.scoreBoardShowing = qfalse;
 			CG_DrawCenterString();
 		}
-		return;
+		menuScoreboardHandled = qtrue;
 	}
 
 	CG_DrawVote();
@@ -2129,9 +2131,11 @@ static void CG_Draw2D( void ) {
 	}
 
 	// don't draw center string if scoreboard is up
-	cg.scoreBoardShowing = CG_DrawActiveScoreboard( qfalse, qfalse );
-	if ( !cg.scoreBoardShowing) {
-		CG_DrawCenterString();
+	if ( !menuScoreboardHandled ) {
+		cg.scoreBoardShowing = CG_DrawActiveScoreboard( qfalse, qfalse );
+		if ( !cg.scoreBoardShowing) {
+			CG_DrawCenterString();
+		}
 	}
 }
 
