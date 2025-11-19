@@ -45,10 +45,19 @@ int enemyLowerColorModificationCount = -1;
 int simpleItemsHeightOffsetModificationCount = -1;
 int simpleItemsBobModificationCount = -1;
 int simpleItemsRadiusModificationCount = -1;
+static int crosshairColorModificationCount = -1;
+static int crosshairBrightnessModificationCount = -1;
+static int crosshairPulseModificationCount = -1;
+static int crosshairHitStyleModificationCount = -1;
+static int crosshairHitTimeModificationCount = -1;
+static int crosshairHitColorModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
 static void CG_UpdateSimpleItemsSettings( void );
+static void CG_UpdateCrosshairColorSettings( void );
+static void CG_UpdateCrosshairPulseSettings( void );
+static void CG_UpdateCrosshairHitSettings( void );
 
 
 /*
@@ -164,6 +173,12 @@ vmCvar_t	cg_crosshairSize;
 vmCvar_t	cg_crosshairX;
 vmCvar_t	cg_crosshairY;
 vmCvar_t	cg_crosshairHealth;
+vmCvar_t	cg_crosshairColor;
+vmCvar_t	cg_crosshairBrightness;
+vmCvar_t	cg_crosshairPulse;
+vmCvar_t	cg_crosshairHitStyle;
+vmCvar_t	cg_crosshairHitTime;
+vmCvar_t	cg_crosshairHitColor;
 vmCvar_t	cg_enemyCrosshairNames;
 vmCvar_t	cg_enemyCrosshairNamesOpacity;
 vmCvar_t	cg_teammateCrosshairNames;
@@ -370,6 +385,12 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawInputCmdsSize, "cg_drawInputCmdsSize", "16", CVAR_ARCHIVE },
 { &cg_crosshairSize, "cg_crosshairSize", "24", CVAR_ARCHIVE },
 { &cg_crosshairHealth, "cg_crosshairHealth", "1", CVAR_ARCHIVE },
+{ &cg_crosshairColor, "cg_crosshairColor", "4", CVAR_ARCHIVE },
+{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1", CVAR_ARCHIVE },
+{ &cg_crosshairPulse, "cg_crosshairPulse", "1", CVAR_ARCHIVE },
+{ &cg_crosshairHitStyle, "cg_crosshairHitStyle", "2", CVAR_ARCHIVE },
+{ &cg_crosshairHitTime, "cg_crosshairHitTime", "200", CVAR_ARCHIVE },
+{ &cg_crosshairHitColor, "cg_crosshairHitColor", "1", CVAR_ARCHIVE },
 { &cg_enemyCrosshairNames, "cg_enemyCrosshairNames", "1", CVAR_ARCHIVE },
 { &cg_enemyCrosshairNamesOpacity, "cg_enemyCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
 { &cg_teammateCrosshairNames, "cg_teammateCrosshairNames", "1", CVAR_ARCHIVE },
@@ -669,9 +690,12 @@ void CG_RegisterCvars( void ) {
 		cg.bobScale = 0.0f;
 	}
 
-	CG_UpdateSimpleItemsSettings();
-	CG_UpdateWeaponBarGrenadeColor();
-	CG_UpdateLowAmmoWarningPercentile();
+CG_UpdateSimpleItemsSettings();
+CG_UpdateWeaponBarGrenadeColor();
+CG_UpdateLowAmmoWarningPercentile();
+CG_UpdateCrosshairColorSettings();
+CG_UpdateCrosshairPulseSettings();
+CG_UpdateCrosshairHitSettings();
 
 	trap_Cvar_Register(NULL, "model", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "headmodel", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
@@ -706,10 +730,10 @@ Synchronize cached simple item settings with their cvars.
 =============
 */
 static void CG_UpdateSimpleItemsSettings( void ) {
-	if ( simpleItemsHeightOffsetModificationCount != cg_simpleItemsHeightOffset.modificationCount ) {
-		simpleItemsHeightOffsetModificationCount = cg_simpleItemsHeightOffset.modificationCount;
-		cg.simpleItemsHeightOffset = cg_simpleItemsHeightOffset.value;
-	}
+if ( simpleItemsHeightOffsetModificationCount != cg_simpleItemsHeightOffset.modificationCount ) {
+simpleItemsHeightOffsetModificationCount = cg_simpleItemsHeightOffset.modificationCount;
+cg.simpleItemsHeightOffset = cg_simpleItemsHeightOffset.value;
+}
 
 	if ( simpleItemsBobModificationCount != cg_simpleItemsBob.modificationCount ) {
 		simpleItemsBobModificationCount = cg_simpleItemsBob.modificationCount;
@@ -724,9 +748,212 @@ static void CG_UpdateSimpleItemsSettings( void ) {
 		cg.simpleItemsRadius = cg_simpleItemsRadius.value;
 		if ( cg.simpleItemsRadius < 0.0f ) {
 			cg.simpleItemsRadius = 0.0f;
+}
+}
+}
+
+#define QL_CROSSHAIR_COLOR_COUNT	27
+
+static const vec3_t cg_crosshairPalette[QL_CROSSHAIR_COLOR_COUNT] = {
+	{ 1.00f, 1.00f, 1.00f },
+	{ 1.00f, 1.00f, 1.00f },
+	{ 0.90f, 0.90f, 0.90f },
+	{ 0.75f, 0.75f, 0.75f },
+	{ 0.50f, 0.50f, 0.50f },
+	{ 0.25f, 0.25f, 0.25f },
+	{ 0.00f, 0.00f, 0.00f },
+	{ 1.00f, 0.35f, 0.35f },
+	{ 1.00f, 0.00f, 0.00f },
+	{ 0.70f, 0.00f, 0.00f },
+	{ 1.00f, 0.55f, 0.00f },
+	{ 1.00f, 0.80f, 0.00f },
+	{ 1.00f, 1.00f, 0.00f },
+	{ 0.80f, 1.00f, 0.00f },
+	{ 0.55f, 1.00f, 0.00f },
+	{ 0.00f, 1.00f, 0.00f },
+	{ 0.00f, 1.00f, 0.55f },
+	{ 0.00f, 1.00f, 0.80f },
+	{ 0.00f, 1.00f, 1.00f },
+	{ 0.00f, 0.80f, 1.00f },
+	{ 0.00f, 0.55f, 1.00f },
+	{ 0.00f, 0.00f, 1.00f },
+	{ 0.35f, 0.00f, 1.00f },
+	{ 0.55f, 0.00f, 1.00f },
+	{ 0.80f, 0.00f, 1.00f },
+	{ 1.00f, 0.00f, 1.00f },
+	{ 1.00f, 0.00f, 0.55f }
+};
+
+/*
+=============
+CG_CrosshairHexCharToInt
+
+Converts a hexadecimal character for crosshair color parsing.
+=============
+*/
+static int CG_CrosshairHexCharToInt( char ch ) {
+	if ( ch >= '0' && ch <= '9' ) {
+		return ch - '0';
+	}
+	if ( ch >= 'a' && ch <= 'f' ) {
+		return 10 + ( ch - 'a' );
+	}
+	if ( ch >= 'A' && ch <= 'F' ) {
+		return 10 + ( ch - 'A' );
+	}
+	return -1;
+}
+
+/*
+=============
+CG_ParseCrosshairColorString
+
+Attempts to parse a custom crosshair color string into a vec4_t.
+=============
+*/
+static qboolean CG_ParseCrosshairColorString( const char *value, vec4_t color ) {
+	char		buffer[64];
+	const char	*hex;
+	unsigned int raw;
+	int		len;
+	int		digit;
+	int		i;
+
+	if ( !value || !*value ) {
+		return qfalse;
+	}
+	Q_strncpyz( buffer, value, sizeof( buffer ) );
+	hex = buffer;
+	while ( *hex == ' ' || *hex == '\t' || *hex == '"' ) {
+		hex++;
+	}
+	if ( !Q_stricmp( hex, "NULL" ) ) {
+		return qfalse;
+	}
+	if ( hex[0] == '0' && ( hex[1] == 'x' || hex[1] == 'X' ) ) {
+		hex += 2;
+	} else if ( hex[0] == '#' ) {
+		hex++;
+	}
+	len = strlen( hex );
+	if ( len != 6 && len != 8 ) {
+		return qfalse;
+	}
+	raw = 0u;
+	for ( i = 0 ; i < len ; i++ ) {
+		digit = CG_CrosshairHexCharToInt( hex[i] );
+		if ( digit < 0 ) {
+			return qfalse;
 		}
+		raw = ( raw << 4 ) | (unsigned int)digit;
+	}
+	if ( len == 6 ) {
+		color[0] = ( ( raw >> 16 ) & 0xFF ) / 255.0f;
+		color[1] = ( ( raw >> 8 ) & 0xFF ) / 255.0f;
+		color[2] = ( raw & 0xFF ) / 255.0f;
+		color[3] = 1.0f;
+	} else {
+		color[0] = ( ( raw >> 24 ) & 0xFF ) / 255.0f;
+		color[1] = ( ( raw >> 16 ) & 0xFF ) / 255.0f;
+		color[2] = ( ( raw >> 8 ) & 0xFF ) / 255.0f;
+		color[3] = ( raw & 0xFF ) / 255.0f;
+	}
+	return qtrue;
+}
+
+/*
+=============
+CG_SetCrosshairColorFromIndex
+
+Populates a color vector using a palette-backed crosshair index.
+=============
+*/
+static void CG_SetCrosshairColorFromIndex( int index, vec4_t color ) {
+	if ( index < 1 || index >= QL_CROSSHAIR_COLOR_COUNT ) {
+		index = 1;
+	}
+	VectorCopy( cg_crosshairPalette[index], color );
+	color[3] = 1.0f;
+}
+
+/*
+=============
+CG_UpdateCrosshairColorSettings
+
+Synchronizes cached crosshair color information with user settings.
+=============
+*/
+static void CG_UpdateCrosshairColorSettings( void ) {
+	vec4_t	baseColor;
+	float	brightness;
+	int	i;
+
+	if ( crosshairColorModificationCount == cg_crosshairColor.modificationCount &&
+		crosshairBrightnessModificationCount == cg_crosshairBrightness.modificationCount ) {
+		return;
+	}
+	if ( !CG_ParseCrosshairColorString( cg_crosshairColor.string, baseColor ) ) {
+		CG_SetCrosshairColorFromIndex( cg_crosshairColor.integer, baseColor );
+	}
+	brightness = Com_Clamp( 0.0f, 2.0f, cg_crosshairBrightness.value );
+	for ( i = 0 ; i < 3 ; i++ ) {
+		cg.crosshairColor[i] = Com_Clamp( 0.0f, 1.0f, baseColor[i] * brightness );
+	}
+	cg.crosshairColor[3] = Com_Clamp( 0.0f, 1.0f, brightness );
+	crosshairColorModificationCount = cg_crosshairColor.modificationCount;
+	crosshairBrightnessModificationCount = cg_crosshairBrightness.modificationCount;
+}
+
+/*
+=============
+CG_UpdateCrosshairPulseSettings
+
+Caches the boolean used to control the pickup crosshair pulse.
+=============
+*/
+static void CG_UpdateCrosshairPulseSettings( void ) {
+	if ( crosshairPulseModificationCount == cg_crosshairPulse.modificationCount ) {
+		return;
+	}
+	cg.crosshairPulseEnabled = (qboolean)( cg_crosshairPulse.integer != 0 );
+	crosshairPulseModificationCount = cg_crosshairPulse.modificationCount;
+}
+
+/*
+=============
+CG_UpdateCrosshairHitSettings
+
+Synchronizes hit indicator timing, style, and color caches.
+=============
+*/
+static void CG_UpdateCrosshairHitSettings( void ) {
+	vec4_t	baseColor;
+	int		clampedTime;
+
+	if ( crosshairHitStyleModificationCount != cg_crosshairHitStyle.modificationCount ) {
+		cg.crosshairHitStyle = cg_crosshairHitStyle.integer;
+		crosshairHitStyleModificationCount = cg_crosshairHitStyle.modificationCount;
+	}
+	if ( crosshairHitTimeModificationCount != cg_crosshairHitTime.modificationCount ) {
+		clampedTime = cg_crosshairHitTime.integer;
+		if ( clampedTime < 0 ) {
+			clampedTime = 0;
+		}
+		if ( clampedTime > 2000 ) {
+			clampedTime = 2000;
+		}
+		cg.crosshairHitTime = clampedTime;
+		crosshairHitTimeModificationCount = cg_crosshairHitTime.modificationCount;
+	}
+	if ( crosshairHitColorModificationCount != cg_crosshairHitColor.modificationCount ) {
+		if ( !CG_ParseCrosshairColorString( cg_crosshairHitColor.string, baseColor ) ) {
+			CG_SetCrosshairColorFromIndex( cg_crosshairHitColor.integer, baseColor );
+		}
+		VectorCopy( baseColor, cg.crosshairHitColor );
+		crosshairHitColorModificationCount = cg_crosshairHitColor.modificationCount;
 	}
 }
+
 
 /*
 =================
@@ -834,7 +1061,10 @@ void CG_UpdateCvars( void ) {
 	cg.zoomToggle = (qboolean)( cg_zoomToggle.integer != 0 );
 	cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
 
-	CG_UpdateSimpleItemsSettings();
+CG_UpdateSimpleItemsSettings();
+CG_UpdateCrosshairColorSettings();
+CG_UpdateCrosshairPulseSettings();
+CG_UpdateCrosshairHitSettings();
 }
 
 int CG_CrosshairPlayer( void ) {
