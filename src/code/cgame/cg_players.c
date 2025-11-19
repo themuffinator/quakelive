@@ -39,6 +39,12 @@ char	*cg_customSoundNames[MAX_CUSTOM_SOUNDS] = {
 	"*taunt.wav"
 };
 
+typedef enum {
+	CG_CLIENT_OVERRIDE_SELF,
+	CG_CLIENT_OVERRIDE_TEAMMATE,
+	CG_CLIENT_OVERRIDE_ENEMY,
+	CG_CLIENT_OVERRIDE_FFA
+} cgClientOverrideContext_t;
 
 /*
 ================
@@ -889,6 +895,295 @@ void CG_ApplyModelOverrides( void ) {
 }
 
 /*
+=============
+CG_GetLocalPlayerTeam
+
+Returns the team for the local player if it is known.
+=============
+*/
+static team_t CG_GetLocalPlayerTeam( void ) {
+	if ( cg.snap ) {
+		return (team_t)cg.snap->ps.persistant[PERS_TEAM];
+	}
+	if ( cg.clientNum >= 0 && cg.clientNum < MAX_CLIENTS ) {
+		clientInfo_t *selfInfo;
+
+		selfInfo = &cgs.clientinfo[cg.clientNum];
+		if ( selfInfo->infoValid ) {
+			return selfInfo->team;
+		}
+	}
+	return TEAM_FREE;
+}
+
+/*
+=============
+CG_GetClientOverrideContext
+
+Determines which override category should be used for the provided client.
+=============
+*/
+static cgClientOverrideContext_t CG_GetClientOverrideContext( int clientNum, const clientInfo_t *ci ) {
+	team_t localTeam;
+
+	if ( clientNum == cg.clientNum ) {
+		return CG_CLIENT_OVERRIDE_SELF;
+	}
+	if ( !ci ) {
+		return CG_CLIENT_OVERRIDE_ENEMY;
+	}
+	if ( cgs.gametype < GT_TEAM ) {
+		return CG_CLIENT_OVERRIDE_FFA;
+	}
+	localTeam = CG_GetLocalPlayerTeam();
+	if ( localTeam != TEAM_FREE && localTeam != TEAM_SPECTATOR && ci->team == localTeam ) {
+		return CG_CLIENT_OVERRIDE_TEAMMATE;
+	}
+	return CG_CLIENT_OVERRIDE_ENEMY;
+}
+
+/*
+=============
+CG_ShouldUseTeamOverrides
+
+Returns qtrue when the friendly override set should be used.
+=============
+*/
+static qboolean CG_ShouldUseTeamOverrides( cgClientOverrideContext_t context ) {
+	if ( context == CG_CLIENT_OVERRIDE_SELF || context == CG_CLIENT_OVERRIDE_TEAMMATE ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+/*
+=============
+CG_HexCharToInt
+
+Converts a hexadecimal character into an integer value.
+=============
+*/
+static int CG_HexCharToInt( char ch ) {
+	if ( ch >= '0' && ch <= '9' ) {
+		return ch - '0';
+	}
+	if ( ch >= 'a' && ch <= 'f' ) {
+		return 10 + ( ch - 'a' );
+	}
+	if ( ch >= 'A' && ch <= 'F' ) {
+		return 10 + ( ch - 'A' );
+	}
+	return -1;
+}
+
+/*
+=============
+CG_ParseOverrideColorString
+
+Attempts to parse a custom color override into a normalized RGB vector.
+=============
+*/
+static qboolean CG_ParseOverrideColorString( const char *value, vec3_t color ) {
+	char buffer[64];
+	const char *hex;
+	unsigned int raw;
+	int len;
+	int digit;
+	int i;
+
+	if ( !value || !*value ) {
+		return qfalse;
+	}
+	Q_strncpyz( buffer, value, sizeof( buffer ) );
+	hex = buffer;
+	while ( *hex == ' ' || *hex == '	' || *hex == '"' ) {
+		hex++;
+	}
+	if ( !Q_stricmp( hex, "NULL" ) ) {
+		return qfalse;
+	}
+	if ( hex[0] == '0' && ( hex[1] == 'x' || hex[1] == 'X' ) ) {
+		hex += 2;
+	}
+	len = strlen( hex );
+	if ( len != 6 && len != 8 ) {
+		return qfalse;
+	}
+	raw = 0;
+	for ( i = 0 ; i < len ; i++ ) {
+		digit = CG_HexCharToInt( hex[i] );
+		if ( digit < 0 ) {
+			return qfalse;
+		}
+		raw = ( raw << 4 ) | digit;
+	}
+	if ( len == 6 ) {
+		color[0] = ( ( raw >> 16 ) & 0xFF ) / 255.0f;
+		color[1] = ( ( raw >> 8 ) & 0xFF ) / 255.0f;
+		color[2] = ( raw & 0xFF ) / 255.0f;
+	} else {
+		color[0] = ( ( raw >> 24 ) & 0xFF ) / 255.0f;
+		color[1] = ( ( raw >> 16 ) & 0xFF ) / 255.0f;
+		color[2] = ( ( raw >> 8 ) & 0xFF ) / 255.0f;
+	}
+	return qtrue;
+}
+
+/*
+=============
+CG_ParseForcedSkinString
+
+Parses a forced skin selection if one is provided.
+=============
+*/
+static qboolean CG_ParseForcedSkinString( const char *value, char *skinName, int skinNameSize ) {
+	if ( !value || !*value ) {
+		return qfalse;
+	}
+	if ( !Q_stricmp( value, "NULL" ) ) {
+		return qfalse;
+	}
+	Q_strncpyz( skinName, value, skinNameSize );
+	return qtrue;
+}
+
+/*
+=============
+CG_ParseForcedModelString
+
+Splits a forced model string into model and optional skin components.
+=============
+*/
+static qboolean CG_ParseForcedModelString( const char *value, char *modelName, int modelNameSize, char *skinName, int skinNameSize ) {
+	char buffer[MAX_QPATH];
+	char *slash;
+
+	if ( skinName && skinNameSize > 0 ) {
+		skinName[0] = '\0';
+	}
+	if ( !value || !*value ) {
+		return qfalse;
+	}
+	if ( !Q_stricmp( value, "NULL" ) ) {
+		return qfalse;
+	}
+	Q_strncpyz( buffer, value, sizeof( buffer ) );
+	slash = strchr( buffer, '/' );
+	if ( slash ) {
+		*slash = '\0';
+		if ( skinName && skinNameSize > 0 ) {
+			Q_strncpyz( skinName, slash + 1, skinNameSize );
+		}
+	}
+	Q_strncpyz( modelName, buffer, modelNameSize );
+	return qtrue;
+}
+
+/*
+=============
+CG_ApplyClientModelOverrides
+
+Applies any configured model or skin overrides to the supplied client info.
+=============
+*/
+static void CG_ApplyClientModelOverrides( clientInfo_t *ci, cgClientOverrideContext_t context ) {
+	qboolean useTeam;
+	qboolean allowBodyOverride;
+	qboolean allowHeadOverride;
+	char forcedModel[MAX_QPATH];
+	char forcedSkin[MAX_QPATH];
+	const char *modelValue;
+	const char *skinValue;
+
+	if ( !ci ) {
+		return;
+	}
+	useTeam = CG_ShouldUseTeamOverrides( context );
+	allowBodyOverride = ( cgs.playermodelOverride[0] == '\0' );
+	allowHeadOverride = ( cgs.playerheadmodelOverride[0] == '\0' );
+	forcedModel[0] = '\0';
+	forcedSkin[0] = '\0';
+	modelValue = useTeam ? cg_forceTeamModel.string : cg_forceEnemyModel.string;
+	skinValue = useTeam ? cg_forceTeamSkin.string : cg_forceEnemySkin.string;
+	if ( CG_ParseForcedModelString( modelValue, forcedModel, sizeof( forcedModel ), forcedSkin, sizeof( forcedSkin ) ) ) {
+		if ( allowBodyOverride ) {
+			Q_strncpyz( ci->modelName, forcedModel, sizeof( ci->modelName ) );
+			ci->modelForced = qtrue;
+		}
+		if ( allowHeadOverride ) {
+			Q_strncpyz( ci->headModelName, forcedModel, sizeof( ci->headModelName ) );
+			ci->headModelForced = qtrue;
+		}
+		if ( forcedSkin[0] ) {
+			if ( allowBodyOverride ) {
+				Q_strncpyz( ci->skinName, forcedSkin, sizeof( ci->skinName ) );
+				ci->skinForced = qtrue;
+			}
+			if ( allowHeadOverride ) {
+				Q_strncpyz( ci->headSkinName, forcedSkin, sizeof( ci->headSkinName ) );
+				ci->skinForced = qtrue;
+			}
+		}
+	}
+	if ( CG_ParseForcedSkinString( skinValue, forcedSkin, sizeof( forcedSkin ) ) ) {
+		if ( allowBodyOverride ) {
+			Q_strncpyz( ci->skinName, forcedSkin, sizeof( ci->skinName ) );
+			ci->skinForced = qtrue;
+		}
+		if ( allowHeadOverride ) {
+			Q_strncpyz( ci->headSkinName, forcedSkin, sizeof( ci->headSkinName ) );
+			ci->skinForced = qtrue;
+		}
+	}
+}
+
+/*
+=============
+CG_ApplyClientColorOverrides
+
+Resolves the final color set that should be used for the specified client.
+=============
+*/
+static void CG_ApplyClientColorOverrides( clientInfo_t *ci, cgClientOverrideContext_t context ) {
+	qboolean useTeam;
+	const char *value;
+
+	if ( !ci ) {
+		return;
+	}
+	useTeam = CG_ShouldUseTeamOverrides( context );
+	value = useTeam ? cg_teamHeadColor.string : cg_enemyHeadColor.string;
+	if ( CG_ParseOverrideColorString( value, ci->headColor ) ) {
+		ci->headColorForced = qtrue;
+	} else {
+		VectorCopy( ci->color1, ci->headColor );
+		ci->headColorForced = qfalse;
+	}
+	value = useTeam ? cg_teamUpperColor.string : cg_enemyUpperColor.string;
+	if ( CG_ParseOverrideColorString( value, ci->upperColor ) ) {
+		ci->upperColorForced = qtrue;
+	} else {
+		VectorCopy( ci->color1, ci->upperColor );
+		ci->upperColorForced = qfalse;
+	}
+	value = useTeam ? cg_teamLowerColor.string : cg_enemyLowerColor.string;
+	if ( CG_ParseOverrideColorString( value, ci->lowerColor ) ) {
+		ci->lowerColorForced = qtrue;
+	} else {
+		VectorCopy( ci->color2, ci->lowerColor );
+		ci->lowerColorForced = qfalse;
+	}
+	VectorCopy( ci->color1, ci->weaponPrimaryColor );
+	VectorCopy( ci->color2, ci->weaponSecondaryColor );
+	ci->weaponColorForced = qfalse;
+	if ( ( useTeam && cg_forceTeamWeaponColor.integer ) || ( !useTeam && cg_forceEnemyWeaponColor.integer ) ) {
+		VectorCopy( ci->upperColor, ci->weaponPrimaryColor );
+		VectorCopy( ci->upperColor, ci->weaponSecondaryColor );
+		ci->weaponColorForced = qtrue;
+	}
+}
+
+/*
 ======================
 CG_NewClientInfo
 ======================
@@ -899,6 +1194,7 @@ void CG_NewClientInfo( int clientNum ) {
 	const char	*configstring;
 	const char	*v;
 	char		*slash;
+	cgClientOverrideContext_t overrideContext;
 
 	ci = &cgs.clientinfo[clientNum];
 
@@ -1030,8 +1326,7 @@ void CG_NewClientInfo( int clientNum ) {
 			if ( slash ) {
 				Q_strncpyz( newInfo.headSkinName, slash + 1, sizeof( newInfo.headSkinName ) );
 			}
-		}
-	} else {
+			} else {
 		Q_strncpyz( newInfo.headModelName, v, sizeof( newInfo.headModelName ) );
 
 		slash = strchr( newInfo.headModelName, '/' );
@@ -1045,8 +1340,12 @@ void CG_NewClientInfo( int clientNum ) {
 		}
 	}
 
-	// scan for an existing clientinfo that matches this modelname
-	// so we can avoid loading checks if possible
+	overrideContext = CG_GetClientOverrideContext( clientNum, &newInfo );
+	CG_ApplyClientModelOverrides( &newInfo, overrideContext );
+	CG_ApplyClientColorOverrides( &newInfo, overrideContext );
+
+// scan for an existing clientinfo that matches this modelname
+// so we can avoid loading checks if possible
 	if ( !CG_ScanForExistingClientInfo( &newInfo ) ) {
 		qboolean	forceDefer;
 

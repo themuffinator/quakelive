@@ -246,14 +246,14 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
 	VectorCopy(start, re->origin);
 	VectorCopy(end, re->oldorigin);
  
-	re->shaderRGBA[0] = ci->color1[0] * 255;
-    re->shaderRGBA[1] = ci->color1[1] * 255;
-    re->shaderRGBA[2] = ci->color1[2] * 255;
-    re->shaderRGBA[3] = 255;
+		re->shaderRGBA[0] = ci->weaponPrimaryColor[0] * 255;
+		re->shaderRGBA[1] = ci->weaponPrimaryColor[1] * 255;
+		re->shaderRGBA[2] = ci->weaponPrimaryColor[2] * 255;
+		re->shaderRGBA[3] = 255;
 
-	le->color[0] = ci->color1[0] * 0.75;
-	le->color[1] = ci->color1[1] * 0.75;
-	le->color[2] = ci->color1[2] * 0.75;
+		le->color[0] = ci->weaponPrimaryColor[0] * 0.75;
+		le->color[1] = ci->weaponPrimaryColor[1] * 0.75;
+		le->color[2] = ci->weaponPrimaryColor[2] * 0.75;
 	le->color[3] = 1.0f;
 
 	AxisClear( re->axis );
@@ -287,14 +287,14 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
             re->radius = 1.1f;
 			re->customShader = cgs.media.railRingsShader;
 
-            re->shaderRGBA[0] = ci->color2[0] * 255;
-            re->shaderRGBA[1] = ci->color2[1] * 255;
-            re->shaderRGBA[2] = ci->color2[2] * 255;
-            re->shaderRGBA[3] = 255;
+		re->shaderRGBA[0] = ci->weaponSecondaryColor[0] * 255;
+		re->shaderRGBA[1] = ci->weaponSecondaryColor[1] * 255;
+		re->shaderRGBA[2] = ci->weaponSecondaryColor[2] * 255;
+		re->shaderRGBA[3] = 255;
 
-            le->color[0] = ci->color2[0] * 0.75;
-            le->color[1] = ci->color2[1] * 0.75;
-            le->color[2] = ci->color2[2] * 0.75;
+		le->color[0] = ci->weaponSecondaryColor[0] * 0.75;
+		le->color[1] = ci->weaponSecondaryColor[1] * 0.75;
+		le->color[2] = ci->weaponSecondaryColor[2] * 0.75;
             le->color[3] = 1.0f;
 
             le->pos.trType = TR_LINEAR;
@@ -1326,9 +1326,9 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		clientInfo_t	*ci;
 
 		ci = &cgs.clientinfo[ cent->currentState.clientNum ];
-		flash.shaderRGBA[0] = 255 * ci->color1[0];
-		flash.shaderRGBA[1] = 255 * ci->color1[1];
-		flash.shaderRGBA[2] = 255 * ci->color1[2];
+		flash.shaderRGBA[0] = 255 * ci->weaponPrimaryColor[0];
+		flash.shaderRGBA[1] = 255 * ci->weaponPrimaryColor[1];
+		flash.shaderRGBA[2] = 255 * ci->weaponPrimaryColor[2];
 	}
 
 	CG_PositionRotatedEntityOnTag( &flash, &gun, weapon->weaponModel, "tag_flash");
@@ -1917,7 +1917,7 @@ void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, im
 		VectorCopy( lightColor, le->lightColor );
 		if ( weapon == WP_RAILGUN ) {
 			// colorize with client color
-			VectorCopy( cgs.clientinfo[clientNum].color1, le->color );
+			VectorCopy( cgs.clientinfo[clientNum].weaponPrimaryColor, le->color );
 		}
 	}
 
@@ -1929,7 +1929,7 @@ void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, im
 		float	*color;
 
 		// colorize with client color
-		color = cgs.clientinfo[clientNum].color2;
+		color = cgs.clientinfo[clientNum].weaponSecondaryColor;
 		CG_ImpactMark( mark, origin, dir, random()*360, color[0],color[1], color[2],1, alphaFade, radius, qfalse );
 	} else {
 		CG_ImpactMark( mark, origin, dir, random()*360, 1,1,1,1, alphaFade, radius, qfalse );
