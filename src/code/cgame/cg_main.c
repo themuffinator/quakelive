@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // display context for new ui stuff
 displayContextDef_t cgDC;
 
+#define DEFAULT_WEAPON_BAR_GRENADE_COLOR	"0x007000FF"
+
 int forceModelModificationCount = -1;
 int forceTeamModelModificationCount = -1;
 int forceTeamSkinModificationCount = -1;
@@ -43,9 +45,13 @@ int enemyLowerColorModificationCount = -1;
 int armorTieredModificationCount = -1;
 int vignetteModificationCount = -1;
 int voiceChatIndicatorModificationCount = -1;
+int simpleItemsHeightOffsetModificationCount = -1;
+int simpleItemsBobModificationCount = -1;
+int simpleItemsRadiusModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
+static void CG_UpdateSimpleItemsSettings( void );
 
 
 /*
@@ -101,6 +107,9 @@ itemInfo_t			cg_items[MAX_ITEMS];
 pmove_settings_t		cg_pmoveSettings;
 
 
+static int		weaponColorGrenadeModCount = -1;
+static int		lowAmmoWarningPercentileModCount = -1;
+
 vmCvar_t	cg_railTrailTime;
 vmCvar_t	cg_centertime;
 vmCvar_t	cg_runpitch;
@@ -135,6 +144,25 @@ vmCvar_t	cg_drawInputCmds;
 vmCvar_t	cg_drawInputCmdsX;
 vmCvar_t	cg_drawInputCmdsY;
 vmCvar_t	cg_drawInputCmdsSize;
+vmCvar_t	cg_weaponBar;
+vmCvar_t	cg_weaponColor_grenade;
+vmCvar_t	cg_weaponConfig;
+vmCvar_t	cg_weaponConfig_g;
+vmCvar_t	cg_weaponConfig_mg;
+vmCvar_t	cg_weaponConfig_sg;
+vmCvar_t	cg_weaponConfig_gl;
+vmCvar_t	cg_weaponConfig_rl;
+vmCvar_t	cg_weaponConfig_lg;
+vmCvar_t	cg_weaponConfig_rg;
+vmCvar_t	cg_weaponConfig_pg;
+vmCvar_t	cg_weaponConfig_bfg;
+vmCvar_t	cg_weaponConfig_gh;
+vmCvar_t	cg_weaponConfig_ng;
+vmCvar_t	cg_weaponConfig_pl;
+vmCvar_t	cg_weaponConfig_cg;
+vmCvar_t	cg_weaponConfig_hmg;
+vmCvar_t	cg_weaponPrimary;
+vmCvar_t	cg_weaponPrimaryQueued;
 vmCvar_t	cg_crosshairSize;
 vmCvar_t	cg_crosshairX;
 vmCvar_t	cg_crosshairY;
@@ -168,8 +196,13 @@ vmCvar_t	cg_tracerChance;
 vmCvar_t	cg_tracerWidth;
 vmCvar_t	cg_tracerLength;
 vmCvar_t	cg_autoswitch;
+vmCvar_t	cg_switchOnEmpty;
+vmCvar_t	cg_switchToEmpty;
 vmCvar_t	cg_ignore;
 vmCvar_t	cg_simpleItems;
+vmCvar_t	cg_simpleItemsHeightOffset;
+vmCvar_t	cg_simpleItemsBob;
+vmCvar_t	cg_simpleItemsRadius;
 vmCvar_t	cg_fov;
 vmCvar_t	cg_zoomFov;
 vmCvar_t	cg_zoomToggle;
@@ -186,6 +219,7 @@ vmCvar_t	cg_lagometer;
 vmCvar_t	cg_drawAttacker;
 vmCvar_t	cg_synchronousClients;
 vmCvar_t 	cg_teamChatTime;
+vmCvar_t 	cg_lowAmmoWarningPercentile;
 vmCvar_t 	cg_teamChatHeight;
 vmCvar_t 	cg_stats;
 vmCvar_t 	cg_buildScript;
@@ -221,10 +255,13 @@ vmCvar_t	cg_teammatePOIsMaxWidth;
 vmCvar_t	cg_teamChatsOnly;
 vmCvar_t	cg_noVoiceChats;
 vmCvar_t	cg_noVoiceText;
+vmCvar_t	cg_useItemMessage;
+vmCvar_t	cg_useItemWarning;
 vmCvar_t	cg_hudFiles;
 vmCvar_t	cg_kickScale;
 vmCvar_t 	cg_scorePlum;
 vmCvar_t 	cg_smoothClients;
+vmCvar_t 	cg_loadout;
 vmCvar_t	pmove_fixed;
 //vmCvar_t	cg_pmove_fixed;
 vmCvar_t	pmove_msec;
@@ -293,6 +330,8 @@ typedef struct {
 static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_ignore, "cg_ignore", "0", 0 },	// used for debugging
 	{ &cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE },
+	{ &cg_switchOnEmpty, "cg_switchOnEmpty", "1", CVAR_ARCHIVE },
+	{ &cg_switchToEmpty, "cg_switchToEmpty", "1", CVAR_ARCHIVE },
 	{ &cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE },
 	{ &cg_zoomFov, "cg_zoomfov", "22.5", CVAR_ARCHIVE },
 	{ &cg_zoomToggle, "cg_zoomToggle", "0", CVAR_ARCHIVE },
@@ -315,6 +354,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawIcons, "cg_drawIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawAmmoWarning, "cg_drawAmmoWarning", "1", CVAR_ARCHIVE  },
+	{ &cg_lowAmmoWarningPercentile, "cg_lowAmmoWarningPercentile", "0.20", CVAR_ARCHIVE },
 	{ &cg_drawAttacker, "cg_drawAttacker", "1", CVAR_ARCHIVE  },
 	{ &cg_drawCrosshair, "cg_drawCrosshair", "4", CVAR_ARCHIVE },
 	{ &cg_drawCrosshairNames, "cg_drawCrosshairNames", "1", CVAR_ARCHIVE },
@@ -325,6 +365,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawSprites, "cg_drawSprites", "1", CVAR_ARCHIVE },
 	{ &cg_drawPregameMessages, "cg_drawPregameMessages", "1", CVAR_ARCHIVE },
 { &cg_drawSpecMessages, "cg_drawSpecMessages", "1", CVAR_ARCHIVE },
+	{ &cg_useItemMessage, "cg_useItemMessage", "1", CVAR_ARCHIVE },
+	{ &cg_useItemWarning, "cg_useItemWarning", "1", CVAR_ARCHIVE },
 { &cg_drawItemPickups, "cg_drawItemPickups", "5", CVAR_ARCHIVE },
 { &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", CVAR_ARCHIVE },
 { &cg_drawDemoHUD, "cg_drawDemoHUD", "1", CVAR_ARCHIVE },
@@ -345,6 +387,9 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_crosshairY, "cg_crosshairY", "0", CVAR_ARCHIVE },
 	{ &cg_brassTime, "cg_brassTime", "2500", CVAR_ARCHIVE },
 	{ &cg_simpleItems, "cg_simpleItems", "0", CVAR_ARCHIVE },
+	{ &cg_simpleItemsHeightOffset, "cg_simpleItemsHeightOffset", "0", CVAR_ARCHIVE },
+	{ &cg_simpleItemsBob, "cg_simpleItemsBob", "0", CVAR_ARCHIVE },
+	{ &cg_simpleItemsRadius, "cg_simpleItemsRadius", "14", CVAR_ARCHIVE },
 	{ &cg_addMarks, "cg_marks", "1", CVAR_ARCHIVE },
 	{ &cg_lagometer, "cg_lagometer", "1", CVAR_ARCHIVE },
 	{ &cg_railTrailTime, "cg_railTrailTime", "400", CVAR_ARCHIVE  },
@@ -450,6 +495,25 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawTieredArmorAvailability, "cg_drawTieredArmorAvailability", "1", CVAR_ARCHIVE },
 	{ &cg_armorTiered, "cg_armorTiered", "1", CVAR_ARCHIVE },
 	{ &cg_drawFullWeaponBar, "cg_drawFullWeaponBar", "0", CVAR_ARCHIVE },
+	{ &cg_weaponBar, "cg_weaponBar", "4", CVAR_ARCHIVE },
+	{ &cg_weaponColor_grenade, "cg_weaponColor_grenade", DEFAULT_WEAPON_BAR_GRENADE_COLOR, CVAR_ARCHIVE },
+	{ &cg_weaponConfig, "cg_weaponConfig", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_g, "cg_weaponConfig_g", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_mg, "cg_weaponConfig_mg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_sg, "cg_weaponConfig_sg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_gl, "cg_weaponConfig_gl", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_rl, "cg_weaponConfig_rl", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_lg, "cg_weaponConfig_lg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_rg, "cg_weaponConfig_rg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_pg, "cg_weaponConfig_pg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_bfg, "cg_weaponConfig_bfg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_gh, "cg_weaponConfig_gh", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_ng, "cg_weaponConfig_ng", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_pl, "cg_weaponConfig_pl", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_cg, "cg_weaponConfig_cg", "", CVAR_ARCHIVE },
+	{ &cg_weaponConfig_hmg, "cg_weaponConfig_hmg", "", CVAR_ARCHIVE },
+	{ &cg_weaponPrimary, "cg_weaponPrimary", "", CVAR_ROM },
+	{ &cg_weaponPrimaryQueued, "cg_weaponPrimaryQueued", "", CVAR_TEMP },
 	{ &cg_drawHitFriendTime, "cg_drawHitFriendTime", "5000", CVAR_ARCHIVE },
 	{ &cg_drawDeadFriendTime, "cg_drawDeadFriendTime", "3000", CVAR_ARCHIVE },
 	{ &cg_speedometer, "cg_speedometer", "0", CVAR_ARCHIVE },
@@ -470,11 +534,105 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_gameInfo3, "cg_gameInfo3", "", CVAR_ROM },
 	{ &cg_gameInfo4, "cg_gameInfo4", "", CVAR_ROM },
 	{ &cg_gameInfo5, "cg_gameInfo5", "", CVAR_ROM },
-	{ &cg_gameInfo6, "cg_gameInfo6", "", CVAR_ROM }
+	{ &cg_gameInfo6, "cg_gameInfo6", "", CVAR_ROM },
+	{ &cg_loadout, "cg_loadout", "0", CVAR_ROM }
 //	{ &cg_pmove_fixed, "cg_pmove_fixed", "0", CVAR_USERINFO | CVAR_ARCHIVE }
 };
 
 static int  cvarTableSize = sizeof( cvarTable ) / sizeof( cvarTable[0] );
+
+/*
+=============
+CG_ParseHexNibble
+
+Converts a single hexadecimal digit to an integer value.
+=============
+*/
+static int CG_ParseHexNibble( const char ch ) {
+	if ( ch >= '0' && ch <= '9' ) {
+		return ch - '0';
+	}
+	if ( ch >= 'a' && ch <= 'f' ) {
+		return 10 + ch - 'a';
+	}
+	if ( ch >= 'A' && ch <= 'F' ) {
+		return 10 + ch - 'A';
+	}
+	return -1;
+}
+
+/*
+=============
+CG_ParseWeaponBarColor
+
+Parses a RRGGBBAA hex string into a normalized vec4_t.
+=============
+*/
+static qboolean CG_ParseWeaponBarColor( const char *hex, vec4_t color ) {
+	const char	*value;
+	int		i;
+	int		high;
+	int		low;
+
+	if ( !hex || !hex[0] ) {
+		return qfalse;
+	}
+
+	value = hex;
+	if ( !Q_stricmpn( value, "0x", 2 ) ) {
+		value += 2;
+	}
+
+	if ( Q_strlen( value ) != 8 ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < 4; i++ ) {
+		high = CG_ParseHexNibble( value[i * 2] );
+		low = CG_ParseHexNibble( value[i * 2 + 1] );
+
+		if ( high < 0 || low < 0 ) {
+			return qfalse;
+		}
+
+		color[i] = ( (float)( ( high << 4 ) | low ) ) / 255.0f;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_UpdateWeaponBarGrenadeColor
+
+Caches cg_weaponColor_grenade in cg.weaponBarGrenadeColor.
+=============
+*/
+static void CG_UpdateWeaponBarGrenadeColor( void ) {
+	vec4_t	parsedColor;
+
+	if ( !CG_ParseWeaponBarColor( cg_weaponColor_grenade.string, parsedColor ) ) {
+		CG_ParseWeaponBarColor( DEFAULT_WEAPON_BAR_GRENADE_COLOR, parsedColor );
+	}
+
+	Vector4Copy( parsedColor, cg.weaponBarGrenadeColor );
+	weaponColorGrenadeModCount = cg_weaponColor_grenade.modificationCount;
+}
+
+/*
+=============
+CG_UpdateLowAmmoWarningPercentile
+
+Caches cg_lowAmmoWarningPercentile for quick access.
+=============
+*/
+static void CG_UpdateLowAmmoWarningPercentile( void ) {
+	float	clamped;
+
+	clamped = Com_Clamp( 0.0f, 1.0f, cg_lowAmmoWarningPercentile.value );
+	cg.lowAmmoWarningPercentile = clamped;
+	lowAmmoWarningPercentileModCount = cg_lowAmmoWarningPercentile.modificationCount;
+}
 
 /*
 =================
@@ -527,6 +685,10 @@ void CG_RegisterCvars( void ) {
 		cg.bobScale = 0.0f;
 	}
 
+	CG_UpdateSimpleItemsSettings();
+	CG_UpdateWeaponBarGrenadeColor();
+	CG_UpdateLowAmmoWarningPercentile();
+
 	trap_Cvar_Register(NULL, "model", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "headmodel", DEFAULT_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
 	trap_Cvar_Register(NULL, "team_model", DEFAULT_TEAM_MODEL, CVAR_USERINFO | CVAR_ARCHIVE );
@@ -549,6 +711,36 @@ static void CG_ForceModelChange( void ) {
 			continue;
 		}
 		CG_NewClientInfo( i );
+	}
+}
+
+/*
+=============
+CG_UpdateSimpleItemsSettings
+
+Synchronize cached simple item settings with their cvars.
+=============
+*/
+static void CG_UpdateSimpleItemsSettings( void ) {
+	if ( simpleItemsHeightOffsetModificationCount != cg_simpleItemsHeightOffset.modificationCount ) {
+		simpleItemsHeightOffsetModificationCount = cg_simpleItemsHeightOffset.modificationCount;
+		cg.simpleItemsHeightOffset = cg_simpleItemsHeightOffset.value;
+	}
+
+	if ( simpleItemsBobModificationCount != cg_simpleItemsBob.modificationCount ) {
+		simpleItemsBobModificationCount = cg_simpleItemsBob.modificationCount;
+		cg.simpleItemsBob = cg_simpleItemsBob.value;
+		if ( cg.simpleItemsBob < 0.0f ) {
+			cg.simpleItemsBob = 0.0f;
+		}
+	}
+
+	if ( simpleItemsRadiusModificationCount != cg_simpleItemsRadius.modificationCount ) {
+		simpleItemsRadiusModificationCount = cg_simpleItemsRadius.modificationCount;
+		cg.simpleItemsRadius = cg_simpleItemsRadius.value;
+		if ( cg.simpleItemsRadius < 0.0f ) {
+			cg.simpleItemsRadius = 0.0f;
+		}
 	}
 }
 
@@ -661,8 +853,16 @@ void CG_UpdateCvars( void ) {
 	if ( cg.bobScale < 0.0f ) {
 		cg.bobScale = 0.0f;
 	}
+	if ( weaponColorGrenadeModCount != cg_weaponColor_grenade.modificationCount ) {
+		CG_UpdateWeaponBarGrenadeColor();
+	}
+	if ( lowAmmoWarningPercentileModCount != cg_lowAmmoWarningPercentile.modificationCount ) {
+		CG_UpdateLowAmmoWarningPercentile();
+	}
 	cg.zoomToggle = (qboolean)( cg_zoomToggle.integer != 0 );
 	cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
+
+	CG_UpdateSimpleItemsSettings();
 }
 
 int CG_CrosshairPlayer( void ) {

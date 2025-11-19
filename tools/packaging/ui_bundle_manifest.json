@@ -1,0 +1,30 @@
+{
+  "package": "pak_uiql.pk3",
+  "description": "Fonts and HUD/UI dependencies sourced from references/original-assets/quakelive/baseq3/fonts and bundled so FS_InitFilesystem can satisfy Quake Live font lookups.",
+  "files": [
+    {
+      "source": "references/original-assets/quakelive/baseq3/fonts/handelgothic.ttf",
+      "destination": "fonts/handelgothic.ttf",
+      "roles": ["font", "bigFont"],
+      "license": "Handel Gothic remains proprietary; limit redistribution to Quake Live compatibility testing."
+    },
+    {
+      "source": "references/original-assets/quakelive/baseq3/fonts/notosans-regular.ttf",
+      "destination": "fonts/notosans-regular.ttf",
+      "roles": ["smallFont"],
+      "license": "Apache License 2.0 (Google Noto Sans)."
+    },
+    {
+      "source": "references/original-assets/quakelive/baseq3/fonts/droidsansmono.ttf",
+      "destination": "fonts/droidsansmono.ttf",
+      "roles": ["mono"],
+      "license": "Apache License 2.0 (Google Droid Sans Mono)."
+    },
+    {
+      "source": "references/original-assets/quakelive/baseq3/fonts/droidsansfallbackfull.ttf",
+      "destination": "fonts/droidsansfallbackfull.ttf",
+      "roles": ["smallFont", "fallback"],
+      "license": "Apache License 2.0 (Google Droid Sans Fallback)."
+    }
+  ]
+}
