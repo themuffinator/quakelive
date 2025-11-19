@@ -253,6 +253,7 @@ static	cvar_t		*fs_basepath;
 static	cvar_t		*fs_basegame;
 static	cvar_t		*fs_cdpath;
 static	cvar_t		*fs_copyfiles;
+static	cvar_t		*fs_webpath;
 static	cvar_t		*fs_gamedirvar;
 static	cvar_t		*fs_restrict;
 static	searchpath_t	*fs_searchpaths;
@@ -480,6 +481,88 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 	Com_sprintf( ospath[toggle], sizeof( ospath[0] ), "%s%s", base, temp );
 	
 	return ospath[toggle];
+}
+
+
+/*
+=============
+FS_StripProtocol
+
+Removes scheme and host components from a URI so only the path remains.
+=============
+*/
+static const char *FS_StripProtocol( const char *uri ) {
+	const char *pathStart;
+	const char *separator;
+
+	if ( !uri ) {
+		return NULL;
+	}
+
+	pathStart = uri;
+	separator = strstr( uri, "://" );
+	if ( separator ) {
+		pathStart = separator + 3;
+		separator = strchr( pathStart, '/' );
+		if ( separator ) {
+			pathStart = separator + 1;
+		}
+	}
+
+	while ( *pathStart == '/' ) {
+		pathStart++;
+	}
+
+	return pathStart;
+}
+
+
+/*
+=============
+FS_RewriteWebPath
+
+Normalize an intercepted URI into a quake path. Screenshots are forced to
+resolve under fs_homepath/screenshots, other requests are prefixed with
+fs_webpath.
+=============
+*/
+qboolean FS_RewriteWebPath( const char *uri, char *outPath, int outSize ) {
+	const char *trimmed;
+	char localPath[MAX_QPATH];
+	int i;
+
+	if ( !uri || !outPath || outSize <= 0 ) {
+		return qfalse;
+	}
+
+	trimmed = FS_StripProtocol( uri );
+	if ( !trimmed || !*trimmed ) {
+		return qfalse;
+	}
+
+	for ( i = 0; trimmed[i] && trimmed[i] != '?' && trimmed[i] != '#'; i++ ) {
+		if ( i >= (int)sizeof( localPath ) - 1 ) {
+			break;
+		}
+		localPath[i] = trimmed[i];
+	}
+	localPath[i] = '\0';
+
+	if ( !*localPath || strstr( localPath, ".." ) ) {
+		return qfalse;
+	}
+
+	if ( !Q_stricmpn( localPath, "screenshots/", 12 ) ) {
+		Q_strncpyz( outPath, localPath, outSize );
+		return qtrue;
+	}
+
+	if ( !fs_webpath || !fs_webpath->string[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( outPath, outSize, "%s/%s", fs_webpath->string, localPath );
+	return qtrue;
 }
 
 
@@ -1628,6 +1711,55 @@ void FS_FreeFile( void *buffer ) {
 }
 
 /*
+=============
+FS_UIReadWebFile
+
+Open a rewritten URI and stream its data into the supplied buffer. Returns the
+number of bytes copied or -1 on failure.
+=============
+*/
+int FS_UIReadWebFile( const char *uri, byte *buffer, int bufferSize ) {
+	fileHandle_t handle;
+	char qpath[MAX_OSPATH];
+	int length;
+	int bytesRead;
+
+	if ( !fs_searchpaths ) {
+		Com_Error( ERR_FATAL, "Filesystem call made without initialization\n" );
+	}
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return -1;
+	}
+
+	if ( !FS_RewriteWebPath( uri, qpath, sizeof( qpath ) ) ) {
+		Com_Printf( "FS_UIReadWebFile: unable to rewrite uri '%s'\n", uri ? uri : "<null>" );
+		return -1;
+	}
+
+	length = FS_FOpenFileRead( qpath, &handle, qtrue );
+	if ( !handle || length <= 0 ) {
+		Com_Printf( "FS_UIReadWebFile: missing asset for '%s' (%s)\n", uri ? uri : "<null>", qpath );
+		return -1;
+	}
+
+	bytesRead = length;
+	if ( bytesRead > bufferSize ) {
+		Com_Printf( "FS_UIReadWebFile: truncating %s to %i of %i bytes\n", qpath, bufferSize, length );
+		bytesRead = bufferSize;
+	}
+
+	if ( FS_Read( buffer, bytesRead, handle ) != bytesRead ) {
+		Com_Printf( "FS_UIReadWebFile: short read on %s\n", qpath );
+		bytesRead = -1;
+	}
+
+	FS_FCloseFile( handle );
+
+	return bytesRead;
+}
+
+/*
 ============
 FS_WriteFile
 
@@ -2745,6 +2877,7 @@ static void FS_Startup( const char *gameName ) {
 
 	fs_debug = Cvar_Get( "fs_debug", "0", 0 );
 	fs_copyfiles = Cvar_Get( "fs_copyfiles", "0", CVAR_INIT );
+	fs_webpath = Cvar_Get( "fs_webpath", "web", CVAR_INIT );
 	fs_cdpath = Cvar_Get ("fs_cdpath", Sys_DefaultCDPath(), CVAR_INIT );
 	fs_basepath = Cvar_Get ("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT );
 	fs_basegame = Cvar_Get ("fs_basegame", "", CVAR_INIT );
@@ -3249,6 +3382,7 @@ void FS_InitFilesystem( void ) {
 	Com_StartupVariable( "fs_homepath" );
 	Com_StartupVariable( "fs_game" );
 	Com_StartupVariable( "fs_copyfiles" );
+	Com_StartupVariable( "fs_webpath" );
 	Com_StartupVariable( "fs_restrict" );
 
 	// try to start up normally
