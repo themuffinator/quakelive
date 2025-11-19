@@ -991,14 +991,19 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 					//
 					CG_AddBufferedSound( cgs.media.blueFlagReturnedSound );
 					break;
-				case GTS_BLUE_RETURN: // CTF red flag returned, 1FCTF: neutral flag returned
-					if ( cgs.clientinfo[cg.clientNum].team == TEAM_BLUE )
-						CG_AddBufferedSound( cgs.media.returnYourTeamSound );
-					else
-						CG_AddBufferedSound( cgs.media.returnOpponentSound );
-					//
-					CG_AddBufferedSound( cgs.media.redFlagReturnedSound );
-					break;
+			case GTS_BLUE_RETURN: // CTF red flag returned, 1FCTF: neutral flag returned
+				if ( cgs.clientinfo[cg.clientNum].team == TEAM_BLUE )
+					CG_AddBufferedSound( cgs.media.returnYourTeamSound );
+				else
+					CG_AddBufferedSound( cgs.media.returnOpponentSound );
+				//
+				CG_AddBufferedSound( cgs.media.redFlagReturnedSound );
+				break;
+			case GTS_NEUTRALFLAG_DROPPED:
+				if ( cgs.media.neutralFlagReturnedSound ) {
+					CG_AddBufferedSound( cgs.media.neutralFlagReturnedSound );
+				}
+				break;
 
 				case GTS_RED_TAKEN: // CTF: red team took blue flag, 1FCTF: blue team took the neutral flag
 					// if this player picked up the flag then a sound is played in CG_CheckLocalSounds

@@ -2027,13 +2027,10 @@ Automatically set in Launch_Item if the item is one of the flags
 Flags are unique in that if they are dropped, the base flag must be respawned when they time out
 ==============
 */
-void Team_DroppedFlagThink(gentity_t *ent) {
-	int		team = TEAM_FREE;
-
-	if ( ent->timestamp > level.time ) {
-		ent->nextthink = ent->timestamp;
-		return;
-	}
+void Team_DroppedFlagThink( gentity_t *ent ) {
+	int		team;
+	int		dropDeadline;
+	int		pingInterval;
 
 	if( ent->item->giTag == PW_REDFLAG ) {
 		team = TEAM_RED;
@@ -2041,12 +2038,36 @@ void Team_DroppedFlagThink(gentity_t *ent) {
 	else if( ent->item->giTag == PW_BLUEFLAG ) {
 		team = TEAM_BLUE;
 	}
-	else if( ent->item->giTag == PW_NEUTRALFLAG ) {
+	else {
 		team = TEAM_FREE;
 	}
 
-	Team_ReturnFlagSound( Team_ResetFlag( team ), team );
-	// Reset Flag will delete this entity
+	dropDeadline = ent->timestamp;
+	if ( dropDeadline <= 0 || dropDeadline <= level.time ) {
+		Team_ReturnFlagSound( Team_ResetFlag( team ), team );
+		// Reset Flag will delete this entity
+		return;
+	}
+
+	ent->nextthink = dropDeadline;
+	if ( ent->item->giTag == PW_NEUTRALFLAG ) {
+		pingInterval = g_flagConfig.neutralFlagPingTimeMs;
+		if ( pingInterval > 0 ) {
+			int		pingThinkTime;
+			gentity_t	*te;
+
+			pingThinkTime = level.time + pingInterval;
+			if ( pingThinkTime > dropDeadline ) {
+				pingThinkTime = dropDeadline;
+			}
+
+			ent->nextthink = pingThinkTime;
+
+			te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_TEAM_SOUND );
+			te->s.eventParm = GTS_NEUTRALFLAG_DROPPED;
+			te->r.svFlags |= SVF_BROADCAST;
+		}
+	}
 }
 
 
