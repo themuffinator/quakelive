@@ -341,6 +341,7 @@ Refreshes the cached match factory configuration and emits transition logs when 
 */
 void G_UpdateMatchFactoryConfig( void ) {
 	matchFactoryConfig_t config = G_MatchConfig_Load();
+	qboolean changed = qfalse;
 
 	if ( config.timeoutLengthSeconds != s_reportedMatchFactoryConfig.timeoutLengthSeconds
 		|| config.timeoutCountPerTeam != s_reportedMatchFactoryConfig.timeoutCountPerTeam
@@ -358,8 +359,13 @@ void G_UpdateMatchFactoryConfig( void ) {
 		|| config.factoryAllowItemBounce != s_reportedMatchFactoryConfig.factoryAllowItemBounce ) {
 		G_LogMatchFactoryConfig( "update", &config );
 		s_reportedMatchFactoryConfig = config;
+		changed = qtrue;
 	}
 
 	g_matchFactoryConfig = config;
 	G_MatchConfig_UpdateConfigstrings();
+	if ( changed ) {
+		G_UpdateMatchStateConfigString();
+	}
 }
+
