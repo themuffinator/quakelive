@@ -23,6 +23,188 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "g_local.h"
 #include "g_match_config.h"
+#include <ctype.h>
+
+#define DISABLE_LOADOUT_G			( 1u << 0 )
+#define DISABLE_LOADOUT_MG		( 1u << 1 )
+#define DISABLE_LOADOUT_SG		( 1u << 2 )
+#define DISABLE_LOADOUT_GL		( 1u << 3 )
+#define DISABLE_LOADOUT_RL		( 1u << 4 )
+#define DISABLE_LOADOUT_LG		( 1u << 5 )
+#define DISABLE_LOADOUT_RG		( 1u << 6 )
+#define DISABLE_LOADOUT_PG		( 1u << 7 )
+#define DISABLE_LOADOUT_BFG		( 1u << 8 )
+#define DISABLE_LOADOUT_GH		( 1u << 9 )
+#define DISABLE_LOADOUT_NG		( 1u << 10 )
+#define DISABLE_LOADOUT_PL		( 1u << 11 )
+#define DISABLE_LOADOUT_CG		( 1u << 12 )
+#define DISABLE_LOADOUT_HMG		( 1u << 13 )
+
+typedef struct disableLoadoutToken_s {
+	const char		*token;
+	unsigned int	mask;
+} disableLoadoutToken_t;
+
+static const disableLoadoutToken_t s_disableLoadoutTokens[] = {
+	{ "g", DISABLE_LOADOUT_G },
+	{ "mg", DISABLE_LOADOUT_MG },
+	{ "sg", DISABLE_LOADOUT_SG },
+	{ "gl", DISABLE_LOADOUT_GL },
+	{ "rl", DISABLE_LOADOUT_RL },
+	{ "lg", DISABLE_LOADOUT_LG },
+	{ "rg", DISABLE_LOADOUT_RG },
+	{ "pg", DISABLE_LOADOUT_PG },
+	{ "bfg", DISABLE_LOADOUT_BFG },
+	{ "gh", DISABLE_LOADOUT_GH },
+	{ "ng", DISABLE_LOADOUT_NG },
+	{ "pl", DISABLE_LOADOUT_PL },
+	{ "cg", DISABLE_LOADOUT_CG },
+	{ "hmg", DISABLE_LOADOUT_HMG },
+	{ NULL, 0 }
+};
+
+/*
+=============
+G_LoadoutTokenToMask
+
+Translates a disable_loadout token into the corresponding bitfield.
+=============
+*/
+static unsigned int G_LoadoutTokenToMask( const char *token ) {
+	const disableLoadoutToken_t	*entry;
+
+	if ( !token || !token[0] ) {
+		return 0;
+	}
+
+	for ( entry = s_disableLoadoutTokens; entry->token; ++entry ) {
+		if ( !Q_stricmp( token, entry->token ) ) {
+			return entry->mask;
+		}
+	}
+
+	G_Printf( "WARNING: Unknown disable_loadout token '%s\n'", token );
+	return 0;
+}
+
+/*
+=============
+G_ParseDisableLoadoutString
+
+Converts a map or cvar disable_loadout string into a mask.
+=============
+*/
+static unsigned int G_ParseDisableLoadoutString( const char *value ) {
+	const char		*cursor;
+	unsigned int	mask;
+	char			token[16];
+	char			*endPtr;
+	long			numeric;
+	int			length;
+
+	if ( !value ) {
+		return 0;
+	}
+
+	while ( *value && isspace( (unsigned char)*value ) ) {
+		value++;
+	}
+
+	if ( !*value ) {
+		return 0;
+	}
+
+	numeric = strtol( value, &endPtr, 0 );
+	if ( endPtr != value ) {
+		qboolean onlyWhitespace = qtrue;
+
+		while ( *endPtr ) {
+			if ( !isspace( (unsigned char)*endPtr ) ) {
+				onlyWhitespace = qfalse;
+				break;
+			}
+			endPtr++;
+		}
+
+		if ( onlyWhitespace ) {
+			if ( numeric < 0 ) {
+				return 0;
+			}
+			return (unsigned int)numeric;
+		}
+	}
+
+	mask = 0;
+	cursor = value;
+	while ( *cursor ) {
+		while ( *cursor && ( isspace( (unsigned char)*cursor ) || *cursor == ',' || *cursor == ';' ) ) {
+			cursor++;
+		}
+
+		if ( !*cursor ) {
+			break;
+		}
+
+		length = 0;
+		while ( cursor[length] && !isspace( (unsigned char)cursor[length] ) && cursor[length] != ',' && cursor[length] != ';' && length < (int)( sizeof( token ) - 1 ) ) {
+			token[length] = tolower( (unsigned char)cursor[length] );
+			length++;
+		}
+		token[length] = '\0';
+
+		while ( *cursor && !isspace( (unsigned char)*cursor ) && *cursor != ',' && *cursor != ';' ) {
+			cursor++;
+		}
+
+		if ( !token[0] ) {
+			continue;
+		}
+
+		mask |= G_LoadoutTokenToMask( token );
+	}
+
+	return mask;
+}
+
+/*
+=============
+G_WriteDisableLoadoutConfigstrings
+
+Publishes the latest disable_loadout bitmasks to connected clients.
+=============
+*/
+static void G_WriteDisableLoadoutConfigstrings( unsigned int mapMask, unsigned int serverMask ) {
+	unsigned int combinedMask;
+
+	combinedMask = mapMask | serverMask;
+	if ( !combinedMask ) {
+		trap_SetConfigstring( CS_LOADOUT_FLAGS, "" );
+		trap_SetConfigstring( CS_LOADOUT_MASK, "" );
+		return;
+	}
+
+	trap_SetConfigstring( CS_LOADOUT_FLAGS, va( "%u", combinedMask ) );
+	if ( mapMask ) {
+		trap_SetConfigstring( CS_LOADOUT_MASK, va( "%u", mapMask ) );
+	} else {
+		trap_SetConfigstring( CS_LOADOUT_MASK, "" );
+	}
+}
+
+/*
+=============
+G_UpdateDisableLoadoutConfigstrings
+
+Recomputes the disable_loadout configstrings from the map cache and server cvar.
+=============
+*/
+void G_UpdateDisableLoadoutConfigstrings( void ) {
+	unsigned int serverMask;
+
+	trap_Cvar_Update( &g_disableLoadout );
+	serverMask = G_ParseDisableLoadoutString( g_disableLoadout.string );
+	G_WriteDisableLoadoutConfigstrings( level.disableLoadoutMapMask, serverMask );
+}
 
 #define MAX_MAP_AUTHOR_STRING	MAX_QPATH
 
@@ -713,6 +895,8 @@ void SP_worldspawn( void ) {
 	char		*s;
 	char		*t;
 	char		*atmosphere;
+	char		*disableLoadout;
+	int		trainingFlag;
 	char		author[MAX_MAP_AUTHOR_STRING];
 	char		authorAlt[MAX_MAP_AUTHOR_STRING];
 	int			trainingFlag;
@@ -770,6 +954,11 @@ void SP_worldspawn( void ) {
 		trap_Cvar_Update( &g_forcedAtmosphere );
 		G_SetWorldspawnAtmosphere( g_forcedAtmosphere.string );
 	}
+
+	G_SpawnString( "disable_loadout", "", &disableLoadout );
+	level.disableLoadoutMapMask = G_ParseDisableLoadoutString( disableLoadout );
+	trap_Cvar_Set( "g_disableLoadout", va( "%u", level.disableLoadoutMapMask ) );
+	G_UpdateDisableLoadoutConfigstrings();
 
 	g_entities[ENTITYNUM_WORLD].s.number = ENTITYNUM_WORLD;
 	g_entities[ENTITYNUM_WORLD].classname = "worldspawn";

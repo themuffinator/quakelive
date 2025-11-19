@@ -1815,26 +1815,22 @@ static void G_SeedConfiguredSpawnAmmo( playerState_t *ps, weapon_t weapon, int c
 
 /*
 =============
-G_GrantConfiguredItems
+G_RunGrantScript
 
-Parses g_grantItemOnSpawn and grants the requested `give` tokens at spawn time.
+Shared grant parser used by duel and the spawn CVar helper.
 =============
 */
-static void G_GrantConfiguredItems( gentity_t *ent ) {
+void G_RunGrantScript( gentity_t *ent, const char *script ) {
 	char		grantBuffer[MAX_CVAR_VALUE_STRING];
 	char		grantToken[MAX_TOKEN_CHARS];
-	const char	*cursor;
-	int			tokenLength;
+	const char		*cursor;
+	int		tokenLength;
 
-	if ( !ent || !ent->client ) {
+	if ( !ent || !ent->client || !script || !script[0] ) {
 		return;
 	}
 
-	if ( !g_grantItemOnSpawn.string[0] ) {
-		return;
-	}
-
-	Q_strncpyz( grantBuffer, g_grantItemOnSpawn.string, sizeof( grantBuffer ) );
+	Q_strncpyz( grantBuffer, script, sizeof( grantBuffer ) );
 	cursor = grantBuffer;
 
 	while ( *cursor ) {
@@ -1853,12 +1849,23 @@ static void G_GrantConfiguredItems( gentity_t *ent ) {
 			}
 			++cursor;
 		}
-		grantToken[tokenLength] = '\0';
+		grantToken[tokenLength] = '\\0';
 
 		if ( grantToken[0] ) {
 			G_GiveItemByName( ent, grantToken );
 		}
 	}
+}
+
+/*
+=============
+G_GrantConfiguredItems
+
+Parses g_grantItemOnSpawn and grants the requested `give` tokens at spawn time.
+=============
+*/
+static void G_GrantConfiguredItems( gentity_t *ent ) {
+	G_RunGrantScript( ent, g_grantItemOnSpawn.string );
 }
 
 /*
