@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //==================================================================
 
 // the "gameversion" client command will print this plus compile date
-#define	GAMEVERSION	"baseq3"
+#define	GAMEVERSION	"baseqz"
 
 #define BODY_QUEUE_SIZE		8
 
@@ -45,6 +45,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	INTERMISSION_DELAY_TIME	1000
 #define	SP_INTERMISSION_DELAY_TIME	5000
+
+#define	GAME_STATE_PRE_GAME				"PRE_GAME"
+#define	GAME_STATE_COUNT_DOWN		"COUNT_DOWN"
+#define	GAME_STATE_IN_PROGRESS	"IN_PROGRESS"
 
 // gentity->flags
 #define	FL_GODMODE				0x00000010
@@ -258,12 +262,15 @@ struct factoryDefinition_s {
 extern factoryCvarConfig_t g_factoryCvarConfig;
 void G_InitFactoryCvarConfig( void );
 void G_UpdateFactoryCvarConfig( void );
+qboolean G_CustomSettingsDirty( void );
+void G_ClearCustomSettingsDirtyFlag( void );
 
 extern vmCvar_t g_startingHealth;
 extern vmCvar_t g_startingHealthBonus;
 extern vmCvar_t g_startingArmor;
 extern vmCvar_t g_vampiricDamage;
 extern vmCvar_t g_training;
+extern vmCvar_t g_gameState;
 extern vmCvar_t g_botsFile;
 extern vmCvar_t g_botSpawnList;
 extern vmCvar_t g_accessFile;
@@ -1178,6 +1185,7 @@ void G_RunThink (gentity_t *ent);
 void QDECL G_LogPrintf( const char *fmt, ... );
 void SendScoreboardMessageToAllClients( void );
 void G_UpdateMatchStateConfigString( void );
+void G_SetGameState( const char *state );
 void G_ResetTimeoutState( void );
 void G_HandleForfeit( gentity_t *caller );
 void G_ApplyTimeoutPauseDelta( int msec );
@@ -1321,6 +1329,7 @@ extern	vmCvar_t	g_domScoreRate;
 extern	vmCvar_t	g_friendlyFire;
 extern	vmCvar_t	g_password;
 extern	vmCvar_t	g_needpass;
+extern	vmCvar_t	g_customSettings;
 extern	vmCvar_t	g_allTalk;
 extern	vmCvar_t	g_gravity;
 extern	vmCvar_t	g_speed;

@@ -49,6 +49,7 @@ typedef struct {
 	qboolean	trackChange;	    // track this variable, and announce if changed
 	qboolean	teamShader;	    // track and if changed, update shader state
 	const char	*helpString; // optional help text advertised alongside the cvar
+	qboolean	customSetting; // counts toward g_customSettings when true
 } cvarTable_t;
 
 gentity_t		g_entities[MAX_GENTITIES];
@@ -69,6 +70,8 @@ static int	s_roundWarmupDelayModCount = 0;
 static int	s_teamSizeMinModCount = 0;
 static char	s_worldspawnAtmosphere[MAX_QPATH];
 static char	s_lastForcedCosmeticsPayload[MAX_INFO_STRING];
+static char	s_gameStateBuffer[GAME_STATE_BUFFER_LENGTH];
+static qboolean s_customSettingsDirty = qtrue;
 static vmCvar_t	g_weaponRespawnLegacy;
 static vmCvar_t	g_damageGauntletLegacy;
 static legacyCvarAlias_t	s_legacyCvarAliases[] = {
@@ -77,6 +80,7 @@ static legacyCvarAlias_t	s_legacyCvarAliases[] = {
 };
 
 #define MAX_ADMIN_ACCESS_FILE_BYTES	8192
+#define GAME_STATE_BUFFER_LENGTH		16
 static qlr_game_frame_context_t *G_GetFrameContext( void );
 static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec );
 static void G_StepEntities( qlr_game_frame_context_t *ctx );
@@ -87,6 +91,7 @@ static void G_UpdateTrainingState( void );
 static void G_UpdateGametypeTutorialText( void );
 static void G_SyncAdminConfig( void );
 static void G_ResetAdminAccessList( void );
+static void G_UpdateGameStateForLevel( void );
 static qboolean G_ParseAdminAccessTier( const char *token, int *tierOut );
 static void G_InsertAdminAccessEntry( const char *steamId, int tier );
 static void G_LoadAdminAccessFile( void );
@@ -167,6 +172,26 @@ void G_SetWorldspawnAtmosphere( const char *atmosphere ) {
 	G_UpdateForcedCosmeticsConfigstring( qtrue );
 }
 
+/*
+=============
+G_SetGameState
+
+Writes the provided state token to the g_gameState CVar when it changes.
+=============
+*/
+void G_SetGameState( const char *state ) {
+	const char	*value;
+
+	value = ( state && state[0] ) ? state : GAME_STATE_PRE_GAME;
+
+	if ( !Q_stricmp( s_gameStateBuffer, value ) ) {
+		return;
+	}
+
+	trap_Cvar_Set( "g_gameState", value );
+	Q_strncpyz( s_gameStateBuffer, value, sizeof( s_gameStateBuffer ) );
+}
+
 void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
 	g_qlr_frame_ctx = ctx;
 
@@ -197,6 +222,8 @@ vmCvar_t	g_domScoreRate;
 vmCvar_t	g_friendlyFire;
 vmCvar_t	g_password;
 vmCvar_t	g_needpass;
+vmCvar_t	g_gameState;
+vmCvar_t	g_customSettings;
 vmCvar_t	g_allTalk;
 vmCvar_t	g_maxclients;
 vmCvar_t	g_maxGameClients;
@@ -425,9 +452,11 @@ static cvarTable_t		gameCvarTable[] = {
 	{ NULL, "gamedate", __DATE__ , CVAR_ROM, 0, qfalse  },
 	{ &g_restarted, "g_restarted", "0", CVAR_ROM, 0, qfalse  },
 	{ NULL, "sv_mapname", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
+	{ &g_gameState, "g_gameState", GAME_STATE_PRE_GAME, CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Publishes the current match phase (PRE_GAME, COUNT_DOWN, IN_PROGRESS)." },
 
 	// latched vars
 	{ &g_gametype, "g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH, 0, qfalse  },
+	{ &g_customSettings, "g_customSettings", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Digest of flagged gameplay overrides published to CS_SERVERINFO.", qfalse },
 
 	{ &g_maxclients, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_maxGameClients, "g_maxGameClients", "0", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
@@ -1121,14 +1150,19 @@ cv->defaultString, cv->cvarFlags );
 		        cv->modificationCount = cv->vmCvar->modificationCount;
 		}
 
+		if ( cv->customSetting ) {
+			s_customSettingsDirty = qtrue;
+		}
+
 		if (cv->teamShader) {
 		        remapped = qtrue;
 		}
 	}
 
 LegacyCvar_RegisterAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) );
+	s_customSettingsDirty = qtrue;
 
-if (remapped) {
+	if (remapped) {
                 	G_RemapTeamShaders();
         }
 
@@ -1196,6 +1230,10 @@ void G_UpdateCvars( void ) {
                                                 cv->cvarName, cv->vmCvar->string ) );
                                 }
 
+				if ( cv->customSetting ) {
+					s_customSettingsDirty = qtrue;
+				}
+
                                 if (cv->teamShader) {
                                         remapped = qtrue;
                                 }
@@ -1256,6 +1294,30 @@ void G_UpdateCvars( void ) {
 	G_UpdateTrainingState();
 	G_UpdateGametypeTutorialText();
 	G_RefreshPmoveSettings();
+}
+
+/*
+=============
+G_CustomSettingsDirty
+
+Returns whether any tracked gameplay CVars have changed since the last
+custom-settings digest was published.
+=============
+*/
+qboolean G_CustomSettingsDirty( void ) {
+	return s_customSettingsDirty;
+}
+
+/*
+=============
+G_ClearCustomSettingsDirtyFlag
+
+Marks the custom-settings digest as up-to-date so later updates can wait
+for additional gameplay overrides before rebuilding the string.
+=============
+*/
+void G_ClearCustomSettingsDirtyFlag( void ) {
+	s_customSettingsDirty = qfalse;
 }
 
 /*
@@ -1646,6 +1708,7 @@ G_UpdateTrainingState();
 	level.startTime = levelTime;
 	level.roundState = ROUNDSTATE_INACTIVE;
 	level.roundTransitionTime = ROUND_TRANSITION_NONE;
+	G_SetGameState( GAME_STATE_PRE_GAME );
 
 	level.timeoutOwner = -1;
 	level.timeoutTeam = TEAM_FREE;
@@ -3457,17 +3520,47 @@ static void G_FinishClientFrames( qlr_game_frame_context_t *ctx ) {
 	}
 }
 
-static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued ) {
-        CheckTournament();
-        CheckExitRules();
-        CheckTeamStatus();
-        CheckVote();
-        CheckTeamVote( TEAM_RED );
-        CheckTeamVote( TEAM_BLUE );
-        CheckCvars();
+/*
+=============
+G_UpdateGameStateForLevel
 
-        if ( !ctx ) {
-                return;
+Evaluates warmup, intermission, and overtime state to keep g_gameState in sync.
+=============
+*/
+static void G_UpdateGameStateForLevel( void ) {
+	const char	*state;
+	int		countdownRemaining;
+
+	if ( level.intermissiontime || level.intermissionQueued ) {
+		state = GAME_STATE_PRE_GAME;
+	} else if ( level.warmupTime > 0 ) {
+		countdownRemaining = level.warmupTime - level.time;
+		if ( countdownRemaining <= 0 ) {
+			state = GAME_STATE_IN_PROGRESS;
+		} else {
+			state = GAME_STATE_COUNT_DOWN;
+		}
+	} else if ( level.warmupTime == 0 ) {
+		state = GAME_STATE_IN_PROGRESS;
+	} else {
+		state = GAME_STATE_PRE_GAME;
+	}
+
+	G_SetGameState( state );
+}
+
+static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued ) {
+	CheckTournament();
+	CheckExitRules();
+	CheckTeamStatus();
+	CheckVote();
+	CheckTeamVote( TEAM_RED );
+	CheckTeamVote( TEAM_BLUE );
+	CheckCvars();
+	G_UpdateGameStateForLevel();
+
+	if ( !ctx ) {
+		return;
         }
 
         if ( ctx->hooks.begin_match && previousWarmupTime > 0 && level.warmupTime <= 0 ) {
