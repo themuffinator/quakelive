@@ -71,6 +71,16 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install pytest
+        if: matrix.target == 'dll'
+        shell: ${{ matrix.shell }}
+        run: ${{ matrix.python }} -m pip install pytest
+
+      - name: Validate default.cfg bootstrap
+        if: matrix.target == 'dll'
+        shell: ${{ matrix.shell }}
+        run: ${{ matrix.python }} -m pytest tests/test_default_cfg_presence.py -vv
+
       - name: Run deterministic harness suites
         shell: ${{ matrix.shell }}
         run: >-
