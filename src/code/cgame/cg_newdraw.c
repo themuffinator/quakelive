@@ -4369,37 +4369,49 @@ static const char *CG_GameTypeShortString( void ) {
 =============
 CG_DrawServerSettings
 
-Prints the primary server limits and loadout policy.
+Summarizes factory metadata and server toggles for the intro/about overlays.
 =============
 */
 static void CG_DrawServerSettings(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	char		buffer[128];
-	char		limitBuffer[16];
-	char		fragBuffer[16];
-	char		captureBuffer[16];
-	const char	*loadoutText;
+	char		buffer[256];
+	char		value[MAX_INFO_VALUE];
+	const char	*info;
+	qboolean	loadoutsEnabled;
+	qboolean	itemTimersEnabled;
+	qboolean	trainingEnabled;
 
-	if ( cgs.timelimit > 0 ) {
-		Com_sprintf( limitBuffer, sizeof( limitBuffer ), "%i", cgs.timelimit );
-	} else {
-		Q_strncpyz( limitBuffer, "Off", sizeof( limitBuffer ) );
+	info = CG_ConfigString( CS_SERVERINFO );
+	buffer[0] = '\0';
+	loadoutsEnabled = CG_LoadoutsEnabled();
+	itemTimersEnabled = qfalse;
+	trainingEnabled = qfalse;
+
+	if ( info && *info ) {
+		CG_GetServerInfoValue( info, "g_itemTimers", value, sizeof( value ) );
+		if ( value[0] && atoi( value ) ) {
+			itemTimersEnabled = qtrue;
+		}
+		CG_GetServerInfoValue( info, "g_training", value, sizeof( value ) );
+		if ( value[0] && atoi( value ) ) {
+			trainingEnabled = qtrue;
+		}
 	}
 
-	if ( cgs.fraglimit > 0 ) {
-		Com_sprintf( fragBuffer, sizeof( fragBuffer ), "%i", cgs.fraglimit );
+	if ( cgs.factoryTitle[0] ) {
+		CG_AppendServerSetting( buffer, sizeof( buffer ), cgs.factoryTitle );
 	} else {
-		Q_strncpyz( fragBuffer, "Off", sizeof( fragBuffer ) );
+		CG_AppendServerSetting( buffer, sizeof( buffer ), "Standard factory" );
+	}
+	CG_AppendServerSetting( buffer, sizeof( buffer ), loadoutsEnabled ? "Loadouts on" : "Loadouts off" );
+	CG_AppendServerSetting( buffer, sizeof( buffer ), itemTimersEnabled ? "Item timers on" : "Item timers off" );
+	if ( trainingEnabled ) {
+		CG_AppendServerSetting( buffer, sizeof( buffer ), "Training mode" );
 	}
 
-	if ( cgs.capturelimit > 0 ) {
-		Com_sprintf( captureBuffer, sizeof( captureBuffer ), "%i", cgs.capturelimit );
-	} else {
-		Q_strncpyz( captureBuffer, "Off", sizeof( captureBuffer ) );
+	if ( !buffer[0] ) {
+		return;
 	}
 
-	loadoutText = CG_LoadoutsEnabled() ? "On" : "Off";
-	Com_sprintf( buffer, sizeof( buffer ), "Timelimit %s  Fraglimit %s  Capturelimit %s  Loadouts %s",
-		limitBuffer, fragBuffer, captureBuffer, loadoutText );
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
@@ -4407,77 +4419,116 @@ static void CG_DrawServerSettings(rectDef_t *rect, float scale, vec4_t color, in
 =============
 CG_DrawStartingWeapons
 
-Lists the weapons currently flagged in the player stats bitmask.
+Lists the spawn loadout when the server advertises g_startingWeapons.
 =============
 */
 static void CG_DrawStartingWeapons(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	char		buffer[MAX_STRING_CHARS];
+	const char	*info;
+	char		value[MAX_INFO_VALUE];
+	int		mask;
 	int		weapon;
-	qboolean	first;
-	const char	*name;
+	char		buffer[256];
+	qboolean	listed;
 
-	if ( !cg.snap ) {
+	info = CG_ConfigString( CS_SERVERINFO );
+	if ( !info || !*info ) {
 		return;
 	}
 
+	CG_GetServerInfoValue( info, "g_startingWeapons", value, sizeof( value ) );
+	mask = value[0] ? (int)strtol( value, NULL, 0 ) : 0;
 	buffer[0] = '\0';
-	first = qtrue;
+	listed = qfalse;
+
 	for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
-		if ( !( cg.snap->ps.stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
+		int			bit;
+		const char	*weaponName;
+
+		bit = 1 << ( weapon - 1 );
+		if ( ( mask & bit ) == 0 ) {
 			continue;
 		}
 
-		name = CG_ResolveWeaponName( weapon );
-		if ( !name ) {
+		weaponName = CG_ResolveWeaponName( weapon );
+		if ( !weaponName ) {
 			continue;
 		}
 
-		if ( !first ) {
+		if ( listed ) {
 			Q_strcat( buffer, sizeof( buffer ), ", " );
 		}
-		Q_strcat( buffer, sizeof( buffer ), name );
-		first = qfalse;
+		Q_strcat( buffer, sizeof( buffer ), weaponName );
+		listed = qtrue;
 	}
 
-	if ( first ) {
-		Q_strncpyz( buffer, "Default loadout", sizeof( buffer ) );
+	if ( !listed ) {
+		if ( CG_LoadoutsEnabled() ) {
+			Q_strncpyz( buffer, "Factory loadouts active", sizeof( buffer ) );
+		} else {
+			Q_strncpyz( buffer, "Default loadout", sizeof( buffer ) );
+		}
 	}
 
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
-}
-
 
 /*
 =============
 CG_DrawGameLimit
 
-Displays the active frag or capture limit alongside the timelimit.
+Describes the active timelimit and score limits for the match.
 =============
 */
 static void CG_DrawGameLimit(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	char		buffer[96];
-	const char	*limitLabel;
+	char		buffer[128];
+	const char	*info;
 	int		limitValue;
-	char		timeBuffer[16];
+	char		value[MAX_INFO_VALUE];
 
-	if ( cgs.gametype >= GT_CTF ) {
-		limitLabel = "Capture limit";
-		limitValue = cgs.capturelimit;
-	} else {
-		limitLabel = "Frag limit";
-		limitValue = cgs.fraglimit;
-	}
+	buffer[0] = '\0';
+	info = CG_ConfigString( CS_SERVERINFO );
 
 	if ( cgs.timelimit > 0 ) {
-		Com_sprintf( timeBuffer, sizeof( timeBuffer ), "%i", cgs.timelimit );
-	} else {
-		Q_strncpyz( timeBuffer, "Off", sizeof( timeBuffer ) );
+		char segment[32];
+		Com_sprintf( segment, sizeof( segment ), "Time %i", cgs.timelimit );
+		CG_AppendServerSetting( buffer, sizeof( buffer ), segment );
 	}
 
-	if ( limitValue > 0 ) {
-		Com_sprintf( buffer, sizeof( buffer ), "%s %i  Time %s", limitLabel, limitValue, timeBuffer );
-	} else {
-		Com_sprintf( buffer, sizeof( buffer ), "%s Off  Time %s", limitLabel, timeBuffer );
+	limitValue = 0;
+	if ( cgs.gametype >= GT_CTF && cgs.gametype != GT_ATTACK_DEFEND ) {
+		limitValue = cgs.capturelimit;
+		if ( limitValue > 0 ) {
+			char segment[32];
+			Com_sprintf( segment, sizeof( segment ), "Captures %i", limitValue );
+			CG_AppendServerSetting( buffer, sizeof( buffer ), segment );
+		}
+	} else if ( cgs.gametype == GT_ATTACK_DEFEND ) {
+		if ( info && *info ) {
+			CG_GetServerInfoValue( info, "g_scorelimit", value, sizeof( value ) );
+			limitValue = value[0] ? atoi( value ) : 0;
+		}
+		if ( limitValue > 0 ) {
+			char segment[32];
+			Com_sprintf( segment, sizeof( segment ), "Score %i", limitValue );
+			CG_AppendServerSetting( buffer, sizeof( buffer ), segment );
+		}
+	} else if ( cgs.fraglimit > 0 ) {
+		char segment[32];
+		Com_sprintf( segment, sizeof( segment ), "Frags %i", cgs.fraglimit );
+		CG_AppendServerSetting( buffer, sizeof( buffer ), segment );
+	}
+
+	if ( info && *info ) {
+		CG_GetServerInfoValue( info, "mercylimit", value, sizeof( value ) );
+		limitValue = value[0] ? atoi( value ) : 0;
+		if ( limitValue > 0 ) {
+			char segment[32];
+			Com_sprintf( segment, sizeof( segment ), "Mercy %i", limitValue );
+			CG_AppendServerSetting( buffer, sizeof( buffer ), segment );
+		}
+	}
+
+	if ( !buffer[0] ) {
+		return;
 	}
 
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
@@ -4487,16 +4538,16 @@ static void CG_DrawGameLimit(rectDef_t *rect, float scale, vec4_t color, int tex
 =============
 CG_DrawGameTypeMap
 
-Prints the gametype, server location, and map name on one line.
+Outputs "Gametype Fullname - Server Location - Map" for intro panels.
 =============
 */
 static void CG_DrawGameTypeMap(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	char		location[128];
+	char		location[64];
 	char		mapName[MAX_QPATH];
 	char		buffer[256];
 
-	CG_GetServerLocationString( location, sizeof( location ) );
-	CG_BuildCleanMapName( mapName, sizeof( mapName ) );
+	CG_GetServerLocation( location, sizeof( location ) );
+	CG_GetMapDisplayName( mapName, sizeof( mapName ) );
 	Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s", CG_GameTypeString(), location, mapName );
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
@@ -4505,18 +4556,18 @@ static void CG_DrawGameTypeMap(rectDef_t *rect, float scale, vec4_t color, int t
 =============
 CG_DrawMatchDetails
 
-Outputs the match phase, gametype short name, server, and map.
+Renders "Game state - Gametype Shortname - Server Location - Map" text.
 =============
 */
 static void CG_DrawMatchDetails(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	char		state[64];
-	char		location[128];
+	char		location[64];
 	char		mapName[MAX_QPATH];
-	char		buffer[320];
+	char		buffer[256];
+	const char	*state;
 
-	CG_BuildMatchStateLabel( state, sizeof( state ), qtrue );
-	CG_GetServerLocationString( location, sizeof( location ) );
-	CG_BuildCleanMapName( mapName, sizeof( mapName ) );
+	state = CG_GetMatchStateLabel();
+	CG_GetServerLocation( location, sizeof( location ) );
+	CG_GetMapDisplayName( mapName, sizeof( mapName ) );
 	Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s - %s", state, CG_GameTypeShortString(), location, mapName );
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
@@ -4525,31 +4576,28 @@ static void CG_DrawMatchDetails(rectDef_t *rect, float scale, vec4_t color, int 
 =============
 CG_DrawMatchStatus
 
-Combines the match state with the standard score status text.
+Renders "Game State - Scores message" using the existing HUD helpers.
 =============
 */
 static void CG_DrawMatchStatus(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	char		state[64];
-	const char      *status;
+	const char	*state;
+	const char	*status;
 	char		buffer[256];
 
-	CG_BuildMatchStateLabel( state, sizeof( state ), qtrue );
+	if ( !cg.snap ) {
+		return;
+	}
+
+	state = CG_GetMatchStateLabel();
 	status = CG_GetGameStatusText();
-	if ( state[0] && status && *status ) {
-		Com_sprintf( buffer, sizeof( buffer ), "%s - %s", state, status );
-		CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
-		return;
+	if ( !state ) {
+		state = "";
 	}
-
-	if ( state[0] ) {
-		CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, state, 0, 0, textStyle);
-		return;
-	}
-
 	if ( !status ) {
 		status = "";
 	}
-	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, status, 0, 0, textStyle);
+	Com_sprintf( buffer, sizeof( buffer ), "%s - %s", state, status );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
 /*
