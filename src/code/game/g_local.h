@@ -198,6 +198,12 @@ extern vmCvar_t g_accessFile;
 extern vmCvar_t g_factoryTitle;
 extern vmCvar_t g_factory;
 extern vmCvar_t g_dropInactive;
+extern vmCvar_t g_allowCustomHeadmodels;
+extern vmCvar_t g_playerCylinders;
+extern vmCvar_t g_playerheadScale;
+extern vmCvar_t g_playerheadScaleOffset;
+extern vmCvar_t g_playerModelScale;
+extern vmCvar_t practiceflags;
 extern vmCvar_t g_forcedAtmosphere;
 extern vmCvar_t roundlimit;
 extern vmCvar_t roundtimelimit;
@@ -661,6 +667,15 @@ typedef struct {
 } freezeRoundConfig_t;
 
 typedef struct {
+	qboolean	allowCustomHeadmodels;
+	qboolean	playerCylinders;
+	float		playerModelScale;
+	float		playerHeadScale;
+	float		playerHeadScaleOffset;
+	int		practiceFlags;
+} adminConfig_t;
+
+typedef struct {
 	struct gclient_s	*clients;		// [maxclients]
 
 	struct gentity_s	*gentities;
@@ -772,6 +787,7 @@ typedef struct {
 	qboolean		spawnQueueActive;
 	qboolean		matchAllowItemDrops;
 	qboolean		matchAllowItemBounce;
+	adminConfig_t	adminConfig;
 	freezeRoundConfig_t	freezeConfig;
 	int			freezeLivingCount[TEAM_NUM_TEAMS];
 	int			freezeLivingHealth[TEAM_NUM_TEAMS];

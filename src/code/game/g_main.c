@@ -69,6 +69,7 @@ static void G_FinishClientFrames( qlr_game_frame_context_t *ctx );
 static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued );
 static void G_UpdateTrainingState( void );
 static void G_UpdateGametypeTutorialText( void );
+static void G_SyncAdminConfig( void );
 
 /*
 =============
@@ -208,6 +209,7 @@ vmCvar_t	g_allowVote;
 vmCvar_t	g_allowVoteMidGame;
 vmCvar_t	g_allowForfeit;
 vmCvar_t	g_allowKill;
+vmCvar_t	g_allowCustomHeadmodels;
 vmCvar_t	g_allowForfeit;
 vmCvar_t	g_complaintLimit;
 vmCvar_t	g_complaintDamageThreshold;
@@ -232,6 +234,10 @@ vmCvar_t	g_maxDeferredSpawns;
 vmCvar_t	g_teamSpawnAsSpec;
 vmCvar_t	g_teamSpecFreeCam;
 vmCvar_t	g_teamSpecSayEnable;
+vmCvar_t	g_playerCylinders;
+vmCvar_t	g_playerheadScale;
+vmCvar_t	g_playerheadScaleOffset;
+vmCvar_t	g_playerModelScale;
 vmCvar_t	g_playermodelOverride;
 vmCvar_t	g_playerheadmodelOverride;
 vmCvar_t	g_training;
@@ -339,6 +345,7 @@ vmCvar_t	g_rrDamageScoreBonus;
 vmCvar_t	g_rrAllowNegativeScores;
 vmCvar_t	roundlimit;
 vmCvar_t	roundtimelimit;
+vmCvar_t	practiceflags;
 
 // bk001129 - made static to avoid aliasing
 static cvarTable_t		gameCvarTable[] = {
@@ -401,6 +408,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_rrInfected, "g_rrInfected", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable the infection ruleset inside Red Rover." },
 	{ &g_rrDamageScoreBonus, "g_rrDamageScoreBonus", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Multiplier applied to survivor damage when using damage-based scoring." },
 	{ &g_rrAllowNegativeScores, "g_rrAllowNegativeScores", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Allow Red Rover scoring adjustments to drive a player's score below zero." },
+	{ &practiceflags, "practiceflags", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Bitmask consumed by practice factories to enable Quake Live's training assists (RJ, SJ, etc.)." },
 
 	{ &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
 
@@ -430,6 +438,11 @@ static cvarTable_t		gameCvarTable[] = {
         { &g_grantItemOnSpawn, "g_grantItemOnSpawn", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Whitespace or comma separated list of `give` tokens handed to every spawn, mirroring Quake Live's server-only spawn grants." },
 	{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional model path used to override every player's model selection server-wide." },
 	{ &g_playerheadmodelOverride, "g_playerheadmodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional head model override applied to all players for consistent visuals." },
+	{ &g_allowCustomHeadmodels, "g_allowCustomHeadmodels", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow clients to request independent headmodel strings; disabling forces heads to track the enforced player model." },
+	{ &g_playerCylinders, "g_playerCylinders", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Toggles the Quake Live player-cylinder collision volumes so forced cosmetics line up with the server's hitboxes." },
+	{ &g_playerheadScale, "g_playerheadScale", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Primary multiplier applied to forced head models for visibility parity." },
+	{ &g_playerheadScaleOffset, "g_playerheadScaleOffset", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Secondary head-model scalar layered on top of g_playerheadScale so admins can fine-tune the enforced size." },
+	{ &g_playerModelScale, "g_playerModelScale", "1.1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Applies a global scale multiplier to server-enforced player models." },
 	{ &g_botsFile, "g_botsFile", "", CVAR_INIT | CVAR_ROM, 0, qfalse, qfalse, "Override bot definition list with a custom script when specified." },
 	{ &g_botSpawnList, "g_botSpawnList", "", 0, 0, qfalse, qfalse, "Space-separated bot names automatically spawned on map start when set." },
 	{ &g_training, "g_training", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable the training progression gate so players must complete tutorials." },
@@ -899,13 +912,13 @@ void G_RegisterCvars( void ) {
 	s_forceSendConfigstringModCount = g_forceSendConfigstring.modificationCount;
 	s_forceAtmosphericEffectsModCount = g_forceAtmosphericEffects.modificationCount;
 	s_forceDmgThroughSurfaceModCount = g_forceDmgThroughSurface.modificationCount;
-s_forcedAtmosphereModCount = g_forcedAtmosphere.modificationCount;
-s_worldspawnAtmosphere[0] = '\0';
-s_lastForcedCosmeticsPayload[0] = '\0';
-G_UpdateItemTimerConfig( qtrue );
-G_UpdateForcedCosmeticsConfigstring( qtrue );
-G_UpdateGametypeTutorialText();
-G_InitWeaponConfig();
+	s_forcedAtmosphereModCount = g_forcedAtmosphere.modificationCount;
+	s_worldspawnAtmosphere[0] = '\0';
+	s_lastForcedCosmeticsPayload[0] = '\0';
+	G_UpdateItemTimerConfig( qtrue );
+	G_UpdateForcedCosmeticsConfigstring( qtrue );
+	G_UpdateGametypeTutorialText();
+	G_InitWeaponConfig();
         G_InitWeaponReloadConfig();
         G_InitKnockbackConfig();
         G_InitStartingAmmoConfig();
@@ -919,6 +932,7 @@ G_InitWeaponConfig();
 	level.quadHogLastActiveTime = 0;
 	level.quadHogNextPingTime = 0;
 
+	G_SyncAdminConfig();
 	G_RefreshPmoveSettings();
 }
 
@@ -984,9 +998,10 @@ void G_UpdateCvars( void ) {
 	}
 	level.quadHogEnabled = ( g_weaponConfig.quadHogEnabled != 0 );
 
-G_UpdateTrainingState();
-G_UpdateGametypeTutorialText();
-G_RefreshPmoveSettings();
+	G_SyncAdminConfig();
+	G_UpdateTrainingState();
+	G_UpdateGametypeTutorialText();
+	G_RefreshPmoveSettings();
 }
 
 /*
@@ -997,8 +1012,25 @@ Synchronises the latched g_training cvar with the level training flag.
 =============
 */
 static void G_UpdateTrainingState( void ) {
-trap_Cvar_Update( &g_training );
-level.trainingMapActive = ( g_training.integer != 0 ) ? qtrue : qfalse;
+	trap_Cvar_Update( &g_training );
+	level.trainingMapActive = ( g_training.integer != 0 ) ? qtrue : qfalse;
+}
+
+/*
+=============
+G_SyncAdminConfig
+
+Copies the admin-facing cosmetic CVars into the level cache so other
+systems can read consistent values without touching the VM handles.
+=============
+*/
+static void G_SyncAdminConfig( void ) {
+	level.adminConfig.allowCustomHeadmodels = ( g_allowCustomHeadmodels.integer != 0 ) ? qtrue : qfalse;
+	level.adminConfig.playerCylinders = ( g_playerCylinders.integer != 0 ) ? qtrue : qfalse;
+	level.adminConfig.practiceFlags = practiceflags.integer;
+	level.adminConfig.playerModelScale = g_playerModelScale.value;
+	level.adminConfig.playerHeadScale = g_playerheadScale.value;
+	level.adminConfig.playerHeadScaleOffset = g_playerheadScaleOffset.value;
 }
 
 typedef enum {
@@ -1176,6 +1208,7 @@ G_UpdateTrainingState();
 
 // set some level globals
 	memset( &level, 0, sizeof( level ) );
+	G_SyncAdminConfig();
 	Factory_ApplyCurrentSelection( qtrue );
 	if ( g_gametype.integer == GT_RACE ) {
 		G_RaceInitLevel();
