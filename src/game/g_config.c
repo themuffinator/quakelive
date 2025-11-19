@@ -117,6 +117,19 @@ extern vmCvar_t g_suddenDeathRespawn;
 vmCvar_t        g_startingHealth;
 vmCvar_t        g_startingHealthBonus;
 vmCvar_t        g_startingArmor;
+vmCvar_t        g_respawn_delay_min;
+vmCvar_t        g_respawn_delay_max;
+vmCvar_t        g_regenHealth;
+vmCvar_t        g_regenHealthRate;
+vmCvar_t        g_regenArmor;
+vmCvar_t        g_regenArmorRate;
+vmCvar_t        g_regenArmorAfterHealth;
+vmCvar_t        g_spawnItemPowerup;
+vmCvar_t        g_spawnItemHoldable;
+vmCvar_t        g_spawnItemWeapons;
+vmCvar_t        g_spawnItemHealth;
+vmCvar_t        g_spawnItemArmor;
+vmCvar_t        g_spawnItemAmmo;
 
 vmCvar_t        g_ammoPack_bfg;
 vmCvar_t        g_ammoPack_cg;
@@ -196,13 +209,26 @@ static configCvarTable_t s_configCvarTable[] = {
         { &g_infiniteAmmo,         "g_infiniteAmmo",         STRINGIZE( DEFAULT_INFINITE_AMMO ), CVAR_ARCHIVE, "When non-zero, spawn loadouts grant infinite ammunition mirroring Quake Live practice factories." },
         { &g_ammoPack,             "g_ammoPack",             STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ), CVAR_ARCHIVE, "Enable Quake Live ammo pack sizing so pickups follow factory scripts instead of compiled defaults." },
         { &g_ammoPackHack,         "g_ammoPackHack",         STRINGIZE( DEFAULT_AMMO_PACK_HACK ), CVAR_ARCHIVE, "Legacy Quake Live ammo pack override used by classic map factories." },
-        { &g_ammoRespawn,          "g_ammoRespawn",          STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ), CVAR_ARCHIVE, "Seconds before ammo entities respawn; Quake Live factories reduce this for faster loops." },
-        { &g_suddenDeathRespawn,   "g_suddenDeathRespawn",   STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_ARCHIVE, "Allow ammo to continue respawning during sudden death when set to 1." },
-        { &g_startingHealth,       "g_startingHealth",       STRINGIZE( DEFAULT_STARTING_HEALTH ), CVAR_ARCHIVE, "Base health applied to spawns before handicap and health bonuses." },
-        { &g_startingHealthBonus,  "g_startingHealthBonus",  STRINGIZE( DEFAULT_STARTING_HEALTH_BONUS ), CVAR_ARCHIVE, "Extra health layered on top of the base value during spawns." },
-        { &g_startingArmor,        "g_startingArmor",        STRINGIZE( DEFAULT_STARTING_ARMOR ), CVAR_ARCHIVE, "Armor granted on spawn when positive, mirroring Quake Live factories." },
+	{ &g_ammoRespawn,          "g_ammoRespawn",          STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ), CVAR_ARCHIVE, "Seconds before ammo entities respawn; Quake Live factories reduce this for faster loops." },
+	{ &g_suddenDeathRespawn,   "g_suddenDeathRespawn",   STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_ARCHIVE, "Allow ammo to continue respawning during sudden death when set to 1." },
+	{ &g_startingHealth,       "g_startingHealth",       STRINGIZE( DEFAULT_STARTING_HEALTH ), CVAR_ARCHIVE, "Base health applied to spawns before handicap and health bonuses." },
+	{ &g_startingHealthBonus,  "g_startingHealthBonus",  STRINGIZE( DEFAULT_STARTING_HEALTH_BONUS ), CVAR_ARCHIVE, "Extra health layered on top of the base value during spawns." },
+	{ &g_startingArmor,        "g_startingArmor",        STRINGIZE( DEFAULT_STARTING_ARMOR ), CVAR_ARCHIVE, "Armor granted on spawn when positive, mirroring Quake Live factories." },
+	{ &g_respawn_delay_min,    "g_respawn_delay_min",    "500", CVAR_ARCHIVE, "Minimum respawn delay in milliseconds applied when factories gate staggered spawns." },
+	{ &g_respawn_delay_max,    "g_respawn_delay_max",    "3500", CVAR_ARCHIVE, "Maximum respawn delay in milliseconds enforced by queue-driven factories." },
+	{ &g_regenHealth,          "g_regenHealth",          "1250", CVAR_ARCHIVE, "Fixed-point health pool replenished when loadout modes enable regeneration (1250 = 125 health)." },
+	{ &g_regenHealthRate,      "g_regenHealthRate",      "133", CVAR_ARCHIVE, "Fixed-point health added per tick while regeneration runs; Quake Live Domination factories use 133." },
+	{ &g_regenArmor,           "g_regenArmor",           "1250", CVAR_ARCHIVE, "Fixed-point armor pool restored by regeneration-enabled factories (1250 = 125 armor)." },
+	{ &g_regenArmorRate,       "g_regenArmorRate",       "133", CVAR_ARCHIVE, "Fixed-point armor added per regeneration tick when enabled." },
+	{ &g_regenArmorAfterHealth, "g_regenArmorAfterHealth", "1", CVAR_ARCHIVE, "When non-zero, armor regeneration waits for the health pool to finish refilling before ticking." },
+	{ &g_spawnItemPowerup,     "g_spawnItemPowerup",     "0", CVAR_ARCHIVE, "Allow map-placed powerups to spawn when factories do not rely solely on loadouts." },
+	{ &g_spawnItemHoldable,    "g_spawnItemHoldable",    "0", CVAR_ARCHIVE, "Enable holdable item spawns in loadout modes when set to 1." },
+	{ &g_spawnItemWeapons,     "g_spawnItemWeapons",     "0", CVAR_ARCHIVE, "Permit world weapons to spawn alongside loadouts in modes such as Domination when non-zero." },
+	{ &g_spawnItemHealth,      "g_spawnItemHealth",      "0", CVAR_ARCHIVE, "Toggle map health item spawns while factories prefer regen-driven play." },
+	{ &g_spawnItemArmor,       "g_spawnItemArmor",       "0", CVAR_ARCHIVE, "Enable map armor pickups when factory loadouts no longer want to suppress them." },
+	{ &g_spawnItemAmmo,        "g_spawnItemAmmo",        "0", CVAR_ARCHIVE, "Allow ammo packs to spawn even when factories hand out fixed loadouts." },
 
-        { &g_ammoPack_bfg,         "g_ammoPack_bfg",         STRINGIZE( DEFAULT_AMMOPACK_BFG ), CVAR_ARCHIVE, "Cells granted when picking up a BFG ammo pack, matching Quake Live's default drop." },
+	{ &g_ammoPack_bfg,         "g_ammoPack_bfg",         STRINGIZE( DEFAULT_AMMOPACK_BFG ), CVAR_ARCHIVE, "Cells granted when picking up a BFG ammo pack, matching Quake Live's default drop." },
         { &g_ammoPack_cg,          "g_ammoPack_cg",          STRINGIZE( DEFAULT_AMMOPACK_CG ), CVAR_ARCHIVE, "Chaingun bullets restored per ammo belt pickup." },
         { &g_ammoPack_gl,          "g_ammoPack_gl",          STRINGIZE( DEFAULT_AMMOPACK_GL ), CVAR_ARCHIVE, "Grenade Launcher rounds provided by grenade ammo packs." },
         { &g_ammoPack_hmg,         "g_ammoPack_hmg",         STRINGIZE( DEFAULT_AMMOPACK_HMG ), CVAR_ARCHIVE, "Heavy Machinegun bullets added from heavy ammo packs." },
