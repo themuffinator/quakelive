@@ -103,6 +103,9 @@ Explode a missile without an impact
 void G_ExplodeMissile( gentity_t *ent ) {
 	vec3_t		dir;
 	vec3_t		origin;
+	qboolean	splashMidAir;
+
+	splashMidAir = qfalse;
 
 	BG_EvaluateTrajectory( &ent->s.pos, level.time, origin );
 	SnapVector( origin );
@@ -120,14 +123,13 @@ void G_ExplodeMissile( gentity_t *ent ) {
 	// splash damage
 	if ( ent->splashDamage ) {
 		if( G_RadiusDamage( ent->r.currentOrigin, ent->parent, ent->splashDamage, ent->splashRadius, ent
-			, ent->splashMethodOfDeath ) ) {
+				, ent->splashMethodOfDeath, &splashMidAir ) ) {
 			g_entities[ent->r.ownerNum].client->accuracy_hits++;
 		}
 	}
 
 	trap_LinkEntity( ent );
 }
-
 
 /*
 ================
@@ -304,6 +306,7 @@ G_MissileImpact
 void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	gentity_t		*other;
 	qboolean		hitClient = qfalse;
+	qboolean		splashMidAir = qfalse;
 	vec3_t			forward, impactpoint, bouncedir;
 	int				eFlags;
 	other = &g_entities[trace->entityNum];
@@ -497,7 +500,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 }
 
 		if( G_RadiusDamage( splashOrigin, ent->parent, ent->splashDamage, ent->splashRadius, 
-			other, ent->splashMethodOfDeath ) ) {
+			other, ent->splashMethodOfDeath, &splashMidAir ) ) {
 			if( !hitClient ) {
 				g_entities[ent->r.ownerNum].client->accuracy_hits++;
 			}
