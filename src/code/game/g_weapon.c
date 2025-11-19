@@ -29,6 +29,115 @@ static	float	s_quadFactor;
 static	vec3_t	forward, right, up;
 static	vec3_t	muzzle;
 
+/*
+=============
+G_GetMachinegunIronsightScale
+
+Returns a sanitized ironsight scalar for machinegun recoil/spread calculations.
+=============
+*/
+static float G_GetMachinegunIronsightScale( void ) {
+	float	scale;
+
+	scale = g_weaponConfig.machinegunIronsightsScale;
+	if ( scale <= 0.0f ) {
+		scale = 1.0f;
+	}
+
+	return scale;
+}
+
+/*
+=============
+G_PlayerHasMachinegunIronsights
+
+Returns whether the player has enabled ironsights/ADS for the machinegun.
+=============
+*/
+static qboolean G_PlayerHasMachinegunIronsights( const gentity_t *ent ) {
+	if ( !ent || !ent->client ) {
+		return qfalse;
+	}
+
+	if ( ent->s.weapon != WP_MACHINEGUN ) {
+		return qfalse;
+	}
+
+	return ( ent->client->ps.pm_flags & PMF_IRONSIGHTS ) ? qtrue : qfalse;
+}
+
+/*
+=============
+G_RailgunDidHeadshot
+
+Checks whether the supplied trace impacted the target's head volume.
+=============
+*/
+static qboolean G_RailgunDidHeadshot( gentity_t *target, const trace_t *trace ) {
+	float	headRegion;
+	float	headStart;
+
+	if ( !target || !target->client || !trace ) {
+		return qfalse;
+	}
+
+	headRegion = 8.0f;
+	headStart = target->r.absmax[2] - headRegion;
+	if ( headStart < target->r.absmin[2] ) {
+		headStart = target->r.absmin[2];
+	}
+
+	if ( trace->endpos[2] >= headStart ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+G_GetGauntletSpeedScale
+
+Returns the sanitized gauntlet swing scale.
+=============
+*/
+static float G_GetGauntletSpeedScale( void ) {
+	float	scale;
+
+	scale = g_weaponConfig.gauntletSpeedFactor;
+	if ( scale <= 0.0f ) {
+		scale = 1.0f;
+	}
+
+	return scale;
+}
+
+/*
+=============
+G_GetGauntletSwingTime
+
+Resolves the current gauntlet weaponTime in milliseconds.
+=============
+*/
+static int G_GetGauntletSwingTime( void ) {
+	float	speedScale;
+	int		baseTime;
+	int		scaledTime;
+
+	speedScale = G_GetGauntletSpeedScale();
+	baseTime = g_pmoveSettings.weaponReloadTimes[WP_GAUNTLET];
+	if ( baseTime <= 0 ) {
+		baseTime = 400;
+	}
+
+	scaledTime = (int)( (float)baseTime / speedScale );
+	if ( scaledTime < 0 ) {
+		scaledTime = 0;
+	}
+
+	return scaledTime;
+}
+
 #define NUM_NAILSHOTS 15
 
 /*
@@ -57,30 +166,57 @@ GAUNTLET
 ======================================================================
 */
 
-void Weapon_Gauntlet( gentity_t *ent ) {
+/*
+=============
+Weapon_Gauntlet
 
+Drives gauntlet cadence, animation, and muzzle events with the configured speed factor.
+=============
+*/
+void Weapon_Gauntlet( gentity_t *ent ) {
+	int	swingTime;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	swingTime = G_GetGauntletSwingTime();
+	ent->client->ps.weaponTime = swingTime;
+	ent->client->ps.torsoTimer = swingTime;
+	ent->client->ps.weaponstate = WEAPON_FIRING;
+	ent->client->ps.torsoAnim =
+		( ( ent->client->ps.torsoAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT ) | TORSO_ATTACK2;
+
+	G_AddEvent( ent, EV_FIRE_WEAPON, 0 );
 }
 
+
 /*
-===============
+=============
 CheckGauntletAttack
-===============
+
+Executes the gauntlet melee trace using the configured speed/length modifiers.
+=============
 */
 qboolean CheckGauntletAttack( gentity_t *ent ) {
 	trace_t		tr;
 	vec3_t		end;
-	gentity_t	*tent;
-	gentity_t	*traceEnt;
-	int			damage;
+	gentity_t		*tent;
+	gentity_t		*traceEnt;
+	int				damage;
+	float	reachScale;
+	float	reach;
 
 	// set aiming directions
-	AngleVectors (ent->client->ps.viewangles, forward, right, up);
+	AngleVectors( ent->client->ps.viewangles, forward, right, up );
 
-	CalcMuzzlePoint ( ent, forward, right, up, muzzle );
+	CalcMuzzlePoint( ent, forward, right, up, muzzle );
 
-	VectorMA (muzzle, 32, forward, end);
+	reachScale = G_GetGauntletSpeedScale();
+	reach = 32.0f * reachScale;
+	VectorMA( muzzle, reach, forward, end );
 
-	trap_Trace (&tr, muzzle, NULL, NULL, end, ent->s.number, MASK_SHOT);
+	trap_Trace( &tr, muzzle, NULL, NULL, end, ent->s.number, MASK_SHOT );
 	if ( tr.surfaceFlags & SURF_NOIMPACT ) {
 		return qfalse;
 	}
@@ -149,7 +285,14 @@ void SnapVectorTowards( vec3_t v, vec3_t to ) {
 #define	HEAVY_MACHINEGUN_SPREAD	0
 #define	HEAVY_MACHINEGUN_DAMAGE	(g_weaponConfig.heavyMachinegunDamage)
 
-void Bullet_Fire (gentity_t *ent, float spread, int damage, meansOfDeath_t mod ) {
+/*
+=============
+Bullet_Fire
+
+Fires a generic hitscan bullet, applying ironsight spread scaling when needed.
+=============
+*/
+void Bullet_Fire( gentity_t *ent, float spread, int damage, meansOfDeath_t mod ) {
 	trace_t		tr;
 	vec3_t		end;
 	vec3_t		impactpoint, bouncedir;
@@ -158,20 +301,30 @@ void Bullet_Fire (gentity_t *ent, float spread, int damage, meansOfDeath_t mod )
 	gentity_t	*tent;
 	gentity_t	*traceEnt;
 	int			i, passent;
+	qboolean		ironsightKick;
+	float		ironsightScale;
+
+	ironsightKick = ( mod == MOD_MACHINEGUN ) && G_PlayerHasMachinegunIronsights( ent );
+	ironsightScale = ironsightKick ? G_GetMachinegunIronsightScale() : 1.0f;
 
 	damage *= s_quadFactor;
 
 	r = random() * M_PI * 2.0f;
-	u = sin(r) * crandom() * spread * 16;
-	r = cos(r) * crandom() * spread * 16;
-	VectorMA (muzzle, 8192*16, forward, end);
-	VectorMA (end, r, right, end);
-	VectorMA (end, u, up, end);
+	u = sin( r ) * crandom() * spread * 16;
+	r = cos( r ) * crandom() * spread * 16;
+	if ( ironsightKick ) {
+		u *= ironsightScale;
+		r *= ironsightScale;
+	}
+
+	VectorMA( muzzle, 8192 * 16, forward, end );
+	VectorMA( end, r, right, end );
+	VectorMA( end, u, up, end );
 
 	passent = ent->s.number;
-	for (i = 0; i < 10; i++) {
+	for ( i = 0; i < 10; i++ ) {
 
-		trap_Trace (&tr, muzzle, NULL, NULL, end, passent, MASK_SHOT);
+		trap_Trace( &tr, muzzle, NULL, NULL, end, passent, MASK_SHOT );
 		if ( tr.surfaceFlags & SURF_NOIMPACT ) {
 			return;
 		}
@@ -210,12 +363,13 @@ void Bullet_Fire (gentity_t *ent, float spread, int damage, meansOfDeath_t mod )
 			}
 			else {
 				G_Damage( traceEnt, ent, ent, forward, tr.endpos,
-					damage, 0, mod);
+					 damage, 0, mod);
 			}
 		}
 		break;
 	}
 }
+
 
 
 /*
@@ -465,12 +619,28 @@ void weapon_railgun_fire (gentity_t *ent) {
 				}
 			}
 			else {
-				if( LogAccuracyHit( traceEnt, ent ) ) {
-					hits++;
-				}
-				G_Damage (traceEnt, ent, ent, forward, trace.endpos, damage, 0, MOD_RAILGUN);
+			if( LogAccuracyHit( traceEnt, ent ) ) {
+				hits++;
 			}
-		}
+			{
+				qboolean		headshot;
+				int			shotDamage;
+				meansOfDeath_t	railMod;
+				int			headshotBonus;
+
+				headshot = G_RailgunDidHeadshot( traceEnt, &trace );
+				railMod = headshot ? MOD_RAILGUN_HEADSHOT : MOD_RAILGUN;
+				shotDamage = damage;
+				headshotBonus = g_weaponConfig.railgunHeadshotDamage;
+				if ( headshot && headshotBonus > 0 ) {
+					headshotBonus *= s_quadFactor;
+					shotDamage += headshotBonus;
+				}
+
+				G_Damage (traceEnt, ent, ent, forward, trace.endpos, shotDamage, 0, railMod);
+			}
+}
+}
 		if ( trace.contents & CONTENTS_SOLID ) {
 			break;		// we hit something solid enough to stop the beam
 		}
@@ -852,11 +1022,34 @@ void FireWeapon( gentity_t *ent ) {
 		weapon_supershotgun_fire( ent );
 		break;
 	case WP_MACHINEGUN:
+	{
+		qboolean		ironsightActive;
+		float		ironsightScale;
+		float		spreadValue;
+
+		ironsightActive = G_PlayerHasMachinegunIronsights( ent );
+		ironsightScale = ironsightActive ? G_GetMachinegunIronsightScale() : 1.0f;
+		spreadValue = MACHINEGUN_SPREAD;
+
 		if ( g_gametype.integer != GT_TEAM ) {
-			Bullet_Fire( ent, MACHINEGUN_SPREAD, MACHINEGUN_DAMAGE, MOD_MACHINEGUN );
+			Bullet_Fire( ent, spreadValue, MACHINEGUN_DAMAGE, MOD_MACHINEGUN );
 		} else {
-			Bullet_Fire( ent, MACHINEGUN_SPREAD, MACHINEGUN_TEAM_DAMAGE, MOD_MACHINEGUN );
+			Bullet_Fire( ent, spreadValue, MACHINEGUN_TEAM_DAMAGE, MOD_MACHINEGUN );
 		}
+
+		if ( ironsightActive ) {
+			int			weaponTime;
+			int			scaledTime;
+
+			weaponTime = ent->client->ps.weaponTime;
+			scaledTime = (int)( (float)weaponTime * ironsightScale );
+			if ( scaledTime < 0 ) {
+				scaledTime = 0;
+			}
+			ent->client->ps.weaponTime = scaledTime;
+			ent->client->ps.torsoTimer = scaledTime;
+		}
+	}
 		break;
 	case WP_HEAVY_MACHINEGUN:
 		Bullet_Fire( ent, HEAVY_MACHINEGUN_SPREAD, HEAVY_MACHINEGUN_DAMAGE, MOD_HMG );
