@@ -456,13 +456,39 @@ Resolves the respawn time used for ammo pickups when factory settings are active
 =============
 */
 static int G_GetConfiguredAmmoRespawnSeconds( void ) {
-	int respawn = g_factoryCvarConfig.ammoRespawnSeconds;
+	int		respawn = g_factoryCvarConfig.ammoRespawnSeconds;
 
 	if ( respawn <= 0 ) {
 		respawn = RESPAWN_AMMO;
 	}
 
 	return respawn;
+}
+
+/*
+=============
+G_ApplyPowerupRespawnOverride
+
+Overrides the respawn time for powerups when factories supply a non-zero delay.
+=============
+*/
+static int G_ApplyPowerupRespawnOverride( const gentity_t *ent, int respawnSeconds ) {
+	int		factorySeconds;
+
+	if ( respawnSeconds <= 0 || !ent || !ent->item ) {
+		return respawnSeconds;
+	}
+
+	if ( ent->item->giType != IT_POWERUP ) {
+		return respawnSeconds;
+	}
+
+	factorySeconds = g_factoryCvarConfig.powerupRespawnSeconds;
+	if ( factorySeconds <= 0 ) {
+		return respawnSeconds;
+	}
+
+	return factorySeconds;
 }
 
 /*
@@ -948,6 +974,8 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 			respawn = 1;
 		}
 	}
+
+	respawn = G_ApplyPowerupRespawnOverride( ent, respawn );
 
 	// dropped items will not respawn
 	if ( ent->flags & FL_DROPPED_ITEM ) {

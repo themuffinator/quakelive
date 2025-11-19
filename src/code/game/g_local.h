@@ -235,6 +235,8 @@ typedef struct factoryCvarConfig_s {
 	qboolean	spawnItemAmmo;
 } factoryCvarConfig_t;
 
+#define FACTORY_FIXED_POINT_SCALE	10
+
 typedef struct factoryOverride_s {
 	const char			*name;
 	const char			*value;
@@ -727,6 +729,8 @@ struct gclient_s {
 	// timeResidual is used to handle events that happen every second
 	// like health / armor countdowns and regeneration
 	int			timeResidual;
+	int			factoryRegenHealthRemainder;
+	int			factoryRegenArmorRemainder;
 
 	int		dominationTouchFrame[DOMINATION_MAX_POINTS];
 	gentity_t	*persistantPowerup;

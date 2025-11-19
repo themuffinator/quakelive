@@ -399,6 +399,145 @@ qboolean ClientInactivityTimer( gclient_t *client ) {
 }
 
 /*
+=============
+G_FactoryRegenEnabled
+
+Returns whether a factory selection with regeneration settings is active.
+=============
+*/
+static qboolean G_FactoryRegenEnabled( void ) {
+	if ( !g_factory.string[0] ) {
+		return qfalse;
+	}
+
+	if ( g_factoryCvarConfig.regenHealthFixedPoint <= 0
+		&& g_factoryCvarConfig.regenArmorFixedPoint <= 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_FactoryFixedPointToInt
+
+Converts tenths-based fixed-point values into whole units.
+=============
+*/
+static int G_FactoryFixedPointToInt( int value ) {
+	if ( value <= 0 ) {
+		return 0;
+	}
+
+	return value / FACTORY_FIXED_POINT_SCALE;
+}
+
+/*
+=============
+G_FactoryConsumeRegenRate
+
+Accumulates a fixed-point regeneration rate and emits whole-unit deltas.
+=============
+*/
+static int G_FactoryConsumeRegenRate( int *remainder, int rateFixedPoint ) {
+	int		delta;
+
+	if ( !remainder || rateFixedPoint <= 0 ) {
+		return 0;
+	}
+
+	*remainder += rateFixedPoint;
+	if ( *remainder < FACTORY_FIXED_POINT_SCALE ) {
+		return 0;
+	}
+
+	delta = *remainder / FACTORY_FIXED_POINT_SCALE;
+	*remainder %= FACTORY_FIXED_POINT_SCALE;
+
+	return delta;
+}
+
+/*
+=============
+G_RunFactoryRegen
+
+Applies factory-driven health and armor regeneration for the supplied entity.
+=============
+*/
+static void G_RunFactoryRegen( gentity_t *ent ) {
+	gclient_t	*client;
+	int		healthTarget;
+	int		armorTarget;
+	qboolean	healthFilled;
+	int		delta;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	client = ent->client;
+	if ( client->ps.pm_type == PM_DEAD
+		|| client->ps.pm_type == PM_SPECTATOR
+		|| client->ps.pm_type == PM_FREEZE
+		|| client->ps.pm_type == PM_INTERMISSION ) {
+		return;
+	}
+
+	if ( client->sess.sessionTeam == TEAM_SPECTATOR || ent->health <= 0 ) {
+		client->factoryRegenHealthRemainder = 0;
+		client->factoryRegenArmorRemainder = 0;
+		return;
+	}
+
+	if ( !G_FactoryRegenEnabled() ) {
+		client->factoryRegenHealthRemainder = 0;
+		client->factoryRegenArmorRemainder = 0;
+		return;
+	}
+
+	healthTarget = G_FactoryFixedPointToInt( g_factoryCvarConfig.regenHealthFixedPoint );
+	armorTarget = G_FactoryFixedPointToInt( g_factoryCvarConfig.regenArmorFixedPoint );
+	if ( healthTarget <= 0 && armorTarget <= 0 ) {
+		client->factoryRegenHealthRemainder = 0;
+		client->factoryRegenArmorRemainder = 0;
+		return;
+	}
+
+	healthFilled = qtrue;
+	if ( healthTarget > 0 ) {
+		if ( ent->health < healthTarget ) {
+			healthFilled = qfalse;
+			delta = G_FactoryConsumeRegenRate( &client->factoryRegenHealthRemainder, g_factoryCvarConfig.regenHealthRateFixedPoint );
+			if ( delta > 0 ) {
+				ent->health += delta;
+				if ( ent->health > healthTarget ) {
+					ent->health = healthTarget;
+				}
+				if ( client->ps.stats[STAT_HEALTH] < ent->health ) {
+					client->ps.stats[STAT_HEALTH] = ent->health;
+				}
+			}
+			if ( ent->health >= healthTarget ) {
+				healthFilled = qtrue;
+			}
+		}
+	}
+
+	if ( armorTarget > 0 && client->ps.stats[STAT_ARMOR] < armorTarget ) {
+		if ( !g_factoryCvarConfig.regenArmorAfterHealth || healthFilled ) {
+			delta = G_FactoryConsumeRegenRate( &client->factoryRegenArmorRemainder, g_factoryCvarConfig.regenArmorRateFixedPoint );
+			if ( delta > 0 ) {
+				client->ps.stats[STAT_ARMOR] += delta;
+				if ( client->ps.stats[STAT_ARMOR] > armorTarget ) {
+					client->ps.stats[STAT_ARMOR] = armorTarget;
+				}
+			}
+		}
+	}
+}
+
+/*
 ==================
 ClientTimerActions
 
@@ -414,6 +553,8 @@ void ClientTimerActions( gentity_t *ent, int msec ) {
 
 	while ( client->timeResidual >= 1000 ) {
 		client->timeResidual -= 1000;
+
+		G_RunFactoryRegen( ent );
 
 		// regenerate
 		if( bg_itemlist[client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
