@@ -719,6 +719,37 @@ static void CG_ParseTeamInfo( void ) {
 
 
 /*
+=============
+CG_SetTeamNameCvar
+
+Synchronizes cached team labels and archived client cvars with incoming
+serverinfo updates while allowing manual edits between updates.
+=============
+*/
+static void CG_SetTeamNameCvar( const char *cvarName, const char *serverValue, const char *defaultValue, char *cachedValue, int cachedValueSize ) {
+	const char	*resolvedValue;
+	char		currentValue[MAX_CVAR_VALUE_STRING];
+
+	if ( serverValue && serverValue[0] ) {
+		resolvedValue = serverValue;
+	} else if ( defaultValue ) {
+		resolvedValue = defaultValue;
+	} else {
+		resolvedValue = "";
+	}
+
+	if ( cachedValue && cachedValueSize > 0 ) {
+		Q_strncpyz( cachedValue, resolvedValue, cachedValueSize );
+	}
+
+	trap_Cvar_VariableStringBuffer( cvarName, currentValue, sizeof( currentValue ) );
+	if ( Q_stricmp( currentValue, resolvedValue ) ) {
+		trap_Cvar_Set( cvarName, resolvedValue );
+	}
+}
+
+
+/*
 ================
 CG_ParseServerinfo
 
@@ -747,10 +778,8 @@ void CG_ParseServerinfo( void ) {
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
-	Q_strncpyz( cgs.redTeam, Info_ValueForKey( info, "g_redTeam" ), sizeof(cgs.redTeam) );
-	trap_Cvar_Set("g_redTeam", cgs.redTeam);
-	Q_strncpyz( cgs.blueTeam, Info_ValueForKey( info, "g_blueTeam" ), sizeof(cgs.blueTeam) );
-	trap_Cvar_Set("g_blueTeam", cgs.blueTeam);
+CG_SetTeamNameCvar( "g_redteam", Info_ValueForKey( info, "g_redTeam" ), DEFAULT_REDTEAM_NAME, cgs.redTeam, sizeof( cgs.redTeam ) );
+CG_SetTeamNameCvar( "g_blueteam", Info_ValueForKey( info, "g_blueTeam" ), DEFAULT_BLUETEAM_NAME, cgs.blueTeam, sizeof( cgs.blueTeam ) );
 	modelOverride = Info_ValueForKey( info, "g_playermodelOverride" );
 	headOverride = Info_ValueForKey( info, "g_playerheadmodelOverride" );
 	Q_strncpyz( cgs.playermodelOverride, modelOverride, sizeof( cgs.playermodelOverride ) );

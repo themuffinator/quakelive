@@ -372,8 +372,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_paused, "cl_paused", "0", CVAR_ROM },
 	{ &cg_blood, "com_blood", "1", CVAR_ARCHIVE },
 	{ &cg_synchronousClients, "g_synchronousClients", "0", 0 },	// communicated by systeminfo
-	{ &cg_redTeamName, "g_redteam", DEFAULT_REDTEAM_NAME, CVAR_ARCHIVE | CVAR_SERVERINFO | CVAR_USERINFO },
-	{ &cg_blueTeamName, "g_blueteam", DEFAULT_BLUETEAM_NAME, CVAR_ARCHIVE | CVAR_SERVERINFO | CVAR_USERINFO },
+	{ &cg_redTeamName, "g_redteam", DEFAULT_REDTEAM_NAME, CVAR_ARCHIVE },
+	{ &cg_blueTeamName, "g_blueteam", DEFAULT_BLUETEAM_NAME, CVAR_ARCHIVE },
 	{ &cg_currentSelectedPlayer, "cg_currentSelectedPlayer", "0", CVAR_ARCHIVE},
 	{ &cg_currentSelectedPlayerName, "cg_currentSelectedPlayerName", "", CVAR_ARCHIVE},
 	{ &cg_singlePlayer, "ui_singlePlayerActive", "0", CVAR_USERINFO},

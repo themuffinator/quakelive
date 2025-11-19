@@ -1486,9 +1486,9 @@ Provides a human readable label for the supplied team.
 static const char *CG_GetTeamLabel( team_t team ) {
 	switch ( team ) {
 	case TEAM_RED:
-		return ( cgs.redTeam[0] != '\0' ) ? cgs.redTeam : "Red";
+		return ( cg_redTeamName.string[0] != '\0' ) ? cg_redTeamName.string : DEFAULT_REDTEAM_NAME;
 	case TEAM_BLUE:
-		return ( cgs.blueTeam[0] != '\0' ) ? cgs.blueTeam : "Blue";
+		return ( cg_blueTeamName.string[0] != '\0' ) ? cg_blueTeamName.string : DEFAULT_BLUETEAM_NAME;
 	default:
 		return "Spectator";
 	}
