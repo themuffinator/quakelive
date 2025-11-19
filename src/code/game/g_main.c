@@ -72,6 +72,7 @@ static char	s_worldspawnAtmosphere[MAX_QPATH];
 static char	s_lastForcedCosmeticsPayload[MAX_INFO_STRING];
 static char	s_gameStateBuffer[GAME_STATE_BUFFER_LENGTH];
 static qboolean s_customSettingsDirty = qtrue;
+static const char *s_duelSpawnGrantScript = "weapon_gauntlet weapon_machinegun ammo_bullets 100";
 static vmCvar_t	g_weaponRespawnLegacy;
 static vmCvar_t	g_damageGauntletLegacy;
 static legacyCvarAlias_t	s_legacyCvarAliases[] = {
@@ -1544,14 +1545,23 @@ static void G_GametypeHandleDefault( gametypeLifecycleStage_t stage, gentity_t *
 =============
 G_GametypeHandleDuel
 
-Hook invoked whenever a Duel lifecycle stage fires.  The Quake Live
-binary applies custom loadouts here; the GPL drop simply preserves the
-dispatch point for parity with the HLIL notes.
+Dispatches duel-specific lifecycle helpers recovered from the HLIL flow.
 =============
 */
 static void G_GametypeHandleDuel( gametypeLifecycleStage_t stage, gentity_t *ent ) {
-	(void)stage;
-	(void)ent;
+	switch ( stage ) {
+	case GAMETYPE_LIFECYCLE_INIT:
+		G_DuelInit();
+		break;
+	case GAMETYPE_LIFECYCLE_CLIENT_BEGIN:
+		G_DuelClientBegin( ent );
+		break;
+	case GAMETYPE_LIFECYCLE_CLIENT_SPAWN:
+		G_DuelClientSpawn( ent );
+		break;
+	default:
+		break;
+	}
 }
 
 /*
@@ -1596,6 +1606,81 @@ static void G_GametypeHandleRace( gametypeLifecycleStage_t stage, gentity_t *ent
 	}
 
 	G_GametypeHandleDefault( stage, ent );
+}
+
+/*
+=============
+G_DuelInit
+
+Resets duel warmup and sudden-death state before the countdown begins.
+=============
+*/
+static void G_DuelInit( void ) {
+	if ( level.warmupTime != -1 ) {
+		level.warmupTime = -1;
+		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+	}
+
+	G_UpdateReadyUpConfigstring();
+	level.suddenDeathActive = qfalse;
+	level.suddenDeathLastDelay = -1;
+	level.suddenDeathNoRespawnLogged = qfalse;
+}
+
+/*
+=============
+G_DuelClientBegin
+
+Starts or pauses the warmup countdown whenever duel players connect.
+=============
+*/
+static void G_DuelClientBegin( gentity_t *ent ) {
+	int		countdownSeconds;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( level.numPlayingClients < 2 ) {
+		if ( level.warmupTime != -1 ) {
+			level.warmupTime = -1;
+			trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+			G_UpdateReadyUpConfigstring();
+		}
+		return;
+	}
+
+	if ( level.warmupTime >= 0 ) {
+		return;
+	}
+
+	countdownSeconds = g_warmup.integer;
+	if ( countdownSeconds < 1 ) {
+		countdownSeconds = 1;
+	}
+
+	level.warmupTime = level.time + ( countdownSeconds - 1 ) * 1000;
+	trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+	G_UpdateReadyUpConfigstring();
+}
+
+/*
+=============
+G_DuelClientSpawn
+
+Applies the duel spawn loadout captured from the HLIL notes.
+=============
+*/
+static void G_DuelClientSpawn( gentity_t *ent ) {
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	G_RunGrantScript( ent, s_duelSpawnGrantScript );
 }
 
 /*

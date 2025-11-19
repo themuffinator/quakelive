@@ -1208,6 +1208,7 @@ void ClientUserinfoChanged( int clientNum );
 void ClientDisconnect( int clientNum );
 void ClientBegin( int clientNum );
 void ClientCommand( int clientNum );
+void G_RunGrantScript( gentity_t *ent, const char *script );
 
 void G_UpdateForcedCosmeticsConfigstring( qboolean forceBroadcast );
 void G_SetWorldspawnAtmosphere( const char *atmosphere );
