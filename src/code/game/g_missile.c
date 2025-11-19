@@ -463,9 +463,76 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 }
 
 /*
-================
+=============
+G_NailgunBounce
+
+Handles nailgun ricochet behavior, including bounce chance and limits.
+=============
+*/
+static qboolean G_NailgunBounce( gentity_t *ent, trace_t *trace ) {
+	gentity_t	*other;
+	vec3_t		velocity;
+	float		dot;
+	float		scale;
+	int			hitTime;
+
+	if ( ent->s.weapon != WP_NAILGUN ) {
+		return qfalse;
+	}
+
+	if ( !g_weaponConfig.nailgunBounceEnabled || g_weaponConfig.nailgunBouncePercentage <= 0 ) {
+		return qfalse;
+	}
+
+	other = &g_entities[trace->entityNum];
+	if ( other->takedamage ) {
+		return qfalse;
+	}
+
+	if ( ent->count >= NAILGUN_MAX_BOUNCES ) {
+		G_FreeEntity( ent );
+		return qtrue;
+	}
+
+	if ( ( float )g_weaponConfig.nailgunBouncePercentage < random() * 100.0f ) {
+		return qfalse;
+	}
+
+	hitTime = level.previousTime + ( level.time - level.previousTime ) * trace->fraction;
+	BG_EvaluateTrajectoryDelta( &ent->s.pos, hitTime, velocity );
+	dot = DotProduct( velocity, trace->plane.normal );
+	VectorMA( velocity, -2 * dot, trace->plane.normal, ent->s.pos.trDelta );
+	scale = ( float )g_weaponConfig.nailgunBouncePercentage / 100.0f;
+	VectorScale( ent->s.pos.trDelta, scale, ent->s.pos.trDelta );
+	SnapVector( ent->s.pos.trDelta );
+
+	if ( VectorLengthSquared( ent->s.pos.trDelta ) == 0.0f ) {
+		G_FreeEntity( ent );
+		return qtrue;
+	}
+
+	VectorCopy( trace->endpos, ent->r.currentOrigin );
+	VectorAdd( ent->r.currentOrigin, trace->plane.normal, ent->r.currentOrigin );
+	VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
+	ent->s.pos.trTime = level.time;
+
+	vectoangles( ent->s.pos.trDelta, ent->s.apos.trBase );
+	ent->s.apos.trTime = level.time;
+	ent->s.apos.trType = TR_LINEAR;
+
+	G_AddEvent( ent, EV_GRENADE_BOUNCE, 0 );
+	++ent->count;
+	trap_LinkEntity( ent );
+
+	return qtrue;
+}
+
+/*
+=============
 G_RunMissile
-================
+
+Simulates missile movement, including impacts and special-case behaviors.
+=============
 */
 void G_RunMissile( gentity_t *ent ) {
 	vec3_t		origin;
@@ -554,6 +621,12 @@ void G_RunMissile( gentity_t *ent ) {
 			}
 			G_FreeEntity( ent );
 			return;
+		}
+
+		if ( ent->s.weapon == WP_NAILGUN ) {
+			if ( G_NailgunBounce( ent, &tr ) ) {
+				return;
+			}
 		}
 		G_MissileImpact( ent, &tr );
 		if ( ent->s.eType != ET_MISSILE ) {
@@ -780,11 +853,14 @@ gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 
 
 /*
-=================
+=============
 fire_nail
-=================
+
+Fires a nail projectile, seeding spread and bounce tracking.
+=============
 */
 #define NAILGUN_SPREAD	500
+#define NAILGUN_MAX_BOUNCES	3
 
 gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t right, vec3_t up ) {
 	gentity_t	*bolt;
@@ -824,6 +900,7 @@ gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t righ
 	SnapVector( bolt->s.pos.trDelta );
 
 	VectorCopy( start, bolt->r.currentOrigin );
+	bolt->count = 0;
 
 	return bolt;
 }	
