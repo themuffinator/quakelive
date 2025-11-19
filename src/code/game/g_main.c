@@ -316,6 +316,10 @@ vmCvar_t	g_accelFactor_bfg;
 vmCvar_t	g_accelRate_bfg;
 vmCvar_t	g_damagePlums;
 vmCvar_t	g_powerupRespawn;
+vmCvar_t	g_flightThrust;
+vmCvar_t	g_flightRefuelRate;
+vmCvar_t	g_battleSuitDampen;
+vmCvar_t	g_dropDamagedHealth;
 vmCvar_t	g_velocity_gl;
 vmCvar_t	g_velocity_rl;
 vmCvar_t	g_velocity_pg;
@@ -483,6 +487,10 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_floodprot_maxcount, "g_floodprot_maxcount", "8", CVAR_ARCHIVE, 0, qfalse, qfalse, "Maximum chat or command bursts allowed before flood protection engages; 0 disables the limiter." },
 	{ &g_floodprot_decay, "g_floodprot_decay", "1000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Milliseconds required before a flood point decays back off the counter." },
 	{ &g_floodprot_penalty, "g_floodprot_penalty", "4000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Milliseconds players are muted from commands after tripping flood protection; 0 scales to decay*maxcount." },
+        { &g_flightThrust, "g_flightThrust", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Overrides the upward thrust applied while the Flight powerup is active; 0 keeps the compiled movement behaviour." },
+        { &g_flightRefuelRate, "g_flightRefuelRate", "1.0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Multiplier applied to the duration granted when refuelling the Flight powerup." },
+        { &g_battleSuitDampen, "g_battleSuitDampen", "0.5", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Damage scale applied to players protected by the Battlesuit; 0 disables mitigation, 1.0 removes it." },
+        { &g_dropDamagedHealth, "g_dropDamagedHealth", "1", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "When disabled, health items dropped by players ignore their damaged counts and always heal for their base amount." },
 	{ &g_kickBadUserinfo, "g_kickBadUserinfo", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Drop clients submitting malformed userinfo when non-zero; 0 only warns and repairs the data." },
 	{ &g_botsFile, "g_botsFile", "", CVAR_INIT | CVAR_ROM, 0, qfalse, qfalse, "Override bot definition list with a custom script when specified." },
 	{ &g_botSpawnList, "g_botSpawnList", "", 0, 0, qfalse, qfalse, "Space-separated bot names automatically spawned on map start when set." },

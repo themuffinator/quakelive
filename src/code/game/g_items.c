@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 #include "g_local.h"
 #include "g_rankings.h"
+#include <limits.h>
 
 /*
 
@@ -155,6 +156,58 @@ G_ApplyItemBounceSettings
 Configures physics bounce behaviour for dropped items.
 ===============
 */
+
+/*
+=============
+G_GetFlightRefuelMilliseconds
+
+Scales the amount of time granted when refuelling the Flight powerup.
+=============
+*/
+static int G_GetFlightRefuelMilliseconds( int baseMilliseconds ) {
+	float	refuelRate;
+	float	scaled;
+	float	maxMilliseconds;
+
+	if ( baseMilliseconds <= 0 ) {
+		return 0;
+	}
+
+	refuelRate = g_flightRefuelRate.value;
+	if ( refuelRate <= 0.0f ) {
+		return baseMilliseconds;
+	}
+
+	scaled = (float)baseMilliseconds * refuelRate;
+	maxMilliseconds = (float)INT_MAX;
+	if ( scaled < 1.0f ) {
+		scaled = 1.0f;
+	} else if ( scaled > maxMilliseconds ) {
+		scaled = maxMilliseconds;
+	}
+
+	return (int)scaled;
+}
+
+/*
+=============
+G_ShouldUseDroppedHealthCount
+
+Returns qtrue when a dropped health pickup should use its stored count.
+=============
+*/
+static qboolean G_ShouldUseDroppedHealthCount( const gentity_t *ent ) {
+	if ( !ent || ent->count <= 0 ) {
+		return qfalse;
+	}
+
+	if ( !( ent->flags & FL_DROPPED_ITEM ) ) {
+		return qtrue;
+	}
+
+	return g_dropDamagedHealth.integer ? qtrue : qfalse;
+}
+
 static void G_ApplyItemBounceSettings( gentity_t *dropped, gitem_t *item ) {
 	qboolean	factoryAllowsBounce;
 
@@ -205,7 +258,14 @@ int Pickup_Powerup( gentity_t *ent, gentity_t *other ) {
 		quantity = ent->item->quantity;
 	}
 
-	other->client->ps.powerups[ent->item->giTag] += quantity * 1000;
+	if ( ent->item->giTag == PW_FLIGHT ) {
+		int	milliseconds;
+
+		milliseconds = G_GetFlightRefuelMilliseconds( quantity * 1000 );
+		other->client->ps.powerups[ent->item->giTag] += milliseconds;
+	} else {
+		other->client->ps.powerups[ent->item->giTag] += quantity * 1000;
+	}
 
 	if ( ent->item->giTag == PW_QUAD ) {
 		G_QuadHogOnPickup( other );
@@ -654,10 +714,12 @@ int Pickup_Health (gentity_t *ent, gentity_t *other) {
 		max = other->client->ps.stats[STAT_MAX_HEALTH];
 	}
 
-	if ( ent->count ) {
+	if ( G_ShouldUseDroppedHealthCount( ent ) ) {
 		quantity = ent->count;
-	} else {
+	} else if ( ent->item ) {
 		quantity = ent->item->quantity;
+	} else {
+		quantity = 0;
 	}
 
 	other->health += quantity;

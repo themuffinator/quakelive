@@ -267,6 +267,27 @@ void AddScore( gentity_t *ent, vec3_t origin, int score ) {
 		level.teamScores[ ent->client->ps.persistant[PERS_TEAM] ] += score;
 	CalculateRanks();
 }
+/*
+=============
+G_BattleSuitDamageScale
+
+Returns the active damage scale applied when the Battlesuit powerup is running.
+=============
+*/
+static float G_BattleSuitDamageScale( void ) {
+	float	scale;
+
+	scale = g_battleSuitDampen.value;
+	if ( scale <= 0.0f ) {
+		scale = 0.5f;
+	} else if ( scale > 1.0f ) {
+		scale = 1.0f;
+	}
+
+	return scale;
+}
+
+
 
 /*
 =================
@@ -1384,7 +1405,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		if ( ( dflags & DAMAGE_RADIUS ) || ( mod == MOD_FALLING ) ) {
 			return;
 		}
-		damage *= 0.5;
+		damage *= G_BattleSuitDamageScale();
 	}
 
 	// add to the attacker's hit counter (if the target isn't a general entity like a prox mine)

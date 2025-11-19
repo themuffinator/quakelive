@@ -121,6 +121,7 @@ static qboolean G_PmoveSerializeSettings( const pmove_settings_t *settings, char
 	PMOVE_BOOL_FIELD( crouchSlide );
 	PMOVE_FLOAT_FIELD( crouchSlideFriction );
 	PMOVE_INT_FIELD( crouchSlideTime );
+	PMOVE_FLOAT_FIELD( flightThrust );
 	PMOVE_BOOL_FIELD( crouchStepJump );
 	PMOVE_BOOL_FIELD( doubleJump );
 	PMOVE_FLOAT_FIELD( jumpTimeDeltaMin );
@@ -293,6 +294,7 @@ static void G_PmoveCacheSettings( void ) {
 	g_pmoveSettings.crouchSlide = ( g_pmove_crouchSlide_cvar.integer != 0 );
 	g_pmoveSettings.crouchSlideFriction = g_pmove_crouchSlideFriction_cvar.value;
 	g_pmoveSettings.crouchSlideTime = g_pmove_crouchSlideTime_cvar.integer;
+	g_pmoveSettings.flightThrust = ( g_flightThrust.value > 0.0f ) ? g_flightThrust.value : 0.0f;
 	g_pmoveSettings.crouchStepJump = ( g_pmove_crouchStepJump_cvar.integer != 0 );
 	g_pmoveSettings.doubleJump = ( g_pmove_doubleJump_cvar.integer != 0 );
 	g_pmoveSettings.jumpTimeDeltaMin = g_pmove_jumpTimeDeltaMin_cvar.value;
@@ -526,6 +528,7 @@ void G_RefreshPmoveSettings( void ) {
 	G_PmoveUpdateCvar( &g_pmove_weaponDropTime_cvar );
 	G_PmoveUpdateCvar( &g_pmove_weaponRaiseTime_cvar );
 	G_PmoveUpdateCvar( &g_pmove_wishSpeed_cvar );
+	trap_Cvar_Update( &g_flightThrust );
 
 	G_PmoveCacheSettings();
 

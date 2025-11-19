@@ -446,6 +446,7 @@ struct pmove_settings_s {
 	qboolean	crouchSlide;
 	float	crouchSlideFriction;
 	int	crouchSlideTime;
+	float	flightThrust;
 	qboolean	crouchStepJump;
 	qboolean	doubleJump;
 	float	jumpTimeDeltaMin;
