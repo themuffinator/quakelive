@@ -73,6 +73,44 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static qboolean localClient; // true if local client has been displayed
 
+/*
+=============
+CG_DamagePlumPresetDescription
+
+Provides a human-readable label for the cached damage-plum preset.
+=============
+*/
+static const char *CG_DamagePlumPresetDescription( void ) {
+	switch ( cg.damagePlumPreset ) {
+	case DAMAGE_PLUM_PRESET_ALL_WEAPONS:
+		return "All weapons";
+	case DAMAGE_PLUM_PRESET_AOE_WEAPONS:
+		return "AoE weapons";
+	case DAMAGE_PLUM_PRESET_CUSTOM:
+		return "Custom list";
+	default:
+		return "Off";
+	}
+}
+
+/*
+=============
+CG_DamagePlumStyleDescription
+
+Returns the label for the selected damage-plum color style.
+=============
+*/
+static const char *CG_DamagePlumStyleDescription( void ) {
+	switch ( CG_GetDamagePlumColorStyle() ) {
+	case DAMAGE_PLUM_COLOR_STYLE_DAMAGE:
+		return "Damage colors";
+	case DAMAGE_PLUM_COLOR_STYLE_WEAPON:
+		return "Weapon colors";
+	default:
+		return "1-color fade";
+	}
+}
+
 
 /*
 =============
@@ -196,6 +234,20 @@ static void CG_DrawFactoryMetadata( float fade ) {
 
 	if ( cgs.factoryFlags != 0u ) {
 		CG_DrawSmallStringColor( x, y, "Custom factory settings active", color );
+		y += SMALLCHAR_HEIGHT;
+	}
+
+	if ( CG_DamagePlumsEnabled() ) {
+		const char		*presetDesc;
+		const char		*styleDesc;
+
+		presetDesc = CG_DamagePlumPresetDescription();
+		styleDesc = CG_DamagePlumStyleDescription();
+		Com_sprintf( line, sizeof( line ), "Damage numbers: %s (%s)", presetDesc, styleDesc );
+		CG_DrawSmallStringColor( x, y, line, color );
+		y += SMALLCHAR_HEIGHT;
+	} else {
+		CG_DrawSmallStringColor( x, y, "Damage numbers: Off", color );
 		y += SMALLCHAR_HEIGHT;
 	}
 

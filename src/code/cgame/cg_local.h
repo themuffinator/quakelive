@@ -109,6 +109,19 @@ typedef enum {
 	IMPACTSOUND_FLESH
 } impactSound_t;
 
+typedef enum {
+	DAMAGE_PLUM_PRESET_OFF,
+	DAMAGE_PLUM_PRESET_ALL_WEAPONS,
+	DAMAGE_PLUM_PRESET_AOE_WEAPONS,
+	DAMAGE_PLUM_PRESET_CUSTOM
+} damagePlumPreset_t;
+
+typedef enum {
+	DAMAGE_PLUM_COLOR_STYLE_MONOCHROME = 1,
+	DAMAGE_PLUM_COLOR_STYLE_DAMAGE,
+	DAMAGE_PLUM_COLOR_STYLE_WEAPON
+} damagePlumColorStyle_t;
+
 //=================================================
 
 // player entities need to track more information
@@ -651,6 +664,9 @@ typedef struct {
 	// blend blobs
 	float		damageTime;
 	float		damageX, damageY, damageValue;
+	damagePlumPreset_t	damagePlumPreset;
+	unsigned int	damagePlumWeaponBits;
+	damagePlumColorStyle_t	damagePlumColorStyle;
 
 	// status bar head
 	float		headYaw;
@@ -1305,6 +1321,8 @@ extern	vmCvar_t		cg_noVoiceChats;
 extern	vmCvar_t		cg_noVoiceText;
 extern	vmCvar_t		cg_kickScale;
 extern  vmCvar_t		cg_scorePlum;
+extern  vmCvar_t		cg_damagePlum;
+extern  vmCvar_t		cg_damagePlumColorStyle;
 extern	vmCvar_t		cg_smoothClients;
 extern	vmCvar_t		pmove_fixed;
 extern	vmCvar_t		pmove_msec;
@@ -1536,6 +1554,10 @@ void CG_CheckEvents( centity_t *cent );
 const char	*CG_PlaceString( int rank );
 void CG_EntityEvent( centity_t *cent, vec3_t position );
 void CG_PainEvent( centity_t *cent, int health );
+
+qboolean CG_DamagePlumsEnabled( void );
+qboolean CG_ShouldRenderDamagePlumForWeapon( weapon_t weapon );
+damagePlumColorStyle_t CG_GetDamagePlumColorStyle( void );
 
 
 //

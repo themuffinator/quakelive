@@ -29,6 +29,43 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //==========================================================================
 
 /*
+=============
+CG_DamagePlumsEnabled
+
+Returns qtrue when any damage plums should be displayed.
+=============
+*/
+qboolean CG_DamagePlumsEnabled( void ) {
+	return ( cg.damagePlumWeaponBits != 0u );
+}
+
+/*
+=============
+CG_ShouldRenderDamagePlumForWeapon
+
+Determines if a specific weapon should show damage plums.
+=============
+*/
+qboolean CG_ShouldRenderDamagePlumForWeapon( weapon_t weapon ) {
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return qfalse;
+	}
+
+	return ( ( cg.damagePlumWeaponBits & ( 1u << weapon ) ) != 0u );
+}
+
+/*
+=============
+CG_GetDamagePlumColorStyle
+
+Returns the cached damage plum color style.
+=============
+*/
+damagePlumColorStyle_t CG_GetDamagePlumColorStyle( void ) {
+	return cg.damagePlumColorStyle;
+}
+
+/*
 ===================
 CG_PlaceString
 
