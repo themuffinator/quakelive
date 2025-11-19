@@ -1248,7 +1248,7 @@ extern	vmCvar_t	g_enableBreath;
 extern	vmCvar_t	g_singlePlayer;
 extern	vmCvar_t	g_proxMineTimeout;
 
-extern	vmCvar_t	g_damage_gauntlet;
+extern	vmCvar_t	g_damage_g;
 extern	vmCvar_t	g_damage_mg;
 extern	vmCvar_t	g_damage_mg_team;
 extern	vmCvar_t	g_damage_sg;

@@ -37,7 +37,7 @@ class CVarBootstrapTests(unittest.TestCase):
     def test_header_exposes_weapon_cvar_handles(self) -> None:
         header = _read_source("src/code/game/g_local.h")
         expected_symbols = [
-            "extern\tvmCvar_t\tg_damage_gauntlet;",
+            "extern\tvmCvar_t\tg_damage_g;",
             "extern\tvmCvar_t\tg_damage_mg;",
             "extern\tvmCvar_t\tg_damage_mg_team;",
             "extern\tvmCvar_t\tg_damage_sg;",

@@ -24,10 +24,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_local.h"
 #include "g_config.h"
 #include "g_match_config.h"
+#include "g_legacy_cvars.h"
 #include "generated/ql_gametype_strings.h"
 #include <limits.h>
 #include "../../../src-re/include/ql_types.h"
 #include <time.h>
+
+#ifndef ARRAY_LEN
+#define ARRAY_LEN( x ) ( sizeof( x ) / sizeof( (x)[0] ) )
+#endif
 
 level_locals_t	level;
 weaponConfig_t	g_weaponConfig;
@@ -60,6 +65,12 @@ static int	s_forcedAtmosphereModCount = -1;
 static int	s_factoryModCount = 0;
 static char	s_worldspawnAtmosphere[MAX_QPATH];
 static char	s_lastForcedCosmeticsPayload[MAX_INFO_STRING];
+static vmCvar_t	g_weaponRespawnLegacy;
+static vmCvar_t	g_damageGauntletLegacy;
+static legacyCvarAlias_t	s_legacyCvarAliases[] = {
+	{ &g_weaponRespawn, "g_weaponRespawn", &g_weaponRespawnLegacy, "g_weaponrespawn", "5", 0, -1, -1 },
+	{ &g_damage_g, "g_damage_g", &g_damageGauntletLegacy, "g_damage_gauntlet", "50", 0, -1, -1 }
+};
 
 static qlr_game_frame_context_t *G_GetFrameContext( void );
 static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec );
@@ -262,7 +273,7 @@ vmCvar_t	g_suddenDeathRespawnTick;
 vmCvar_t	g_suddenDeathRespawnMax;
 vmCvar_t	g_suddenDeathRespawnIncrement;
 vmCvar_t	g_suddenDeathRespawnPrint;
-vmCvar_t	g_damage_gauntlet;
+vmCvar_t	g_damage_g;
 vmCvar_t	g_damage_mg;
 vmCvar_t	g_damage_mg_team;
 vmCvar_t	g_damage_hmg;
@@ -446,7 +457,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_speed, "g_speed", "320", 0, 0, qtrue  },
 	{ &g_gravity, "g_gravity", "800", 0, 0, qtrue  },
 	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue  },	{ &g_max_knockback, "g_max_knockback", "200", 0, 0, qfalse, qfalse, "Upper clamp applied to computed knockback force." },	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue  },
-	{ &g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue  },
+	{ &g_weaponRespawn, "g_weaponRespawn", "5", 0, 0, qtrue  },
 	{ &g_weaponTeamRespawn, "g_weaponTeamRespawn", "30", 0, 0, qtrue },
 	{ &g_forcerespawn, "g_forcerespawn", "20", 0, 0, qtrue },
 	{ &g_inactivity, "g_inactivity", "0", 0, 0, qtrue },
@@ -497,7 +508,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_suddenDeathRespawnMax, "g_suddenDeathRespawnMax", "10", CVAR_NORESTART, 0, qfalse, qfalse, "Maximum sudden-death respawn delay in seconds." },
 	{ &g_suddenDeathRespawnIncrement, "g_suddenDeathRespawnIncrement", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Seconds added to the sudden-death respawn delay at each tick." },
 	{ &g_suddenDeathRespawnPrint, "g_suddenDeathRespawnPrint", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Print announcements when sudden-death respawn delays change." },
-	{ &g_damage_gauntlet, "g_damage_gauntlet", "50", 0, 0, qtrue },
+	{ &g_damage_g, "g_damage_g", "50", 0, 0, qtrue },
 	{ &g_damage_mg, "g_damage_mg", "7", 0, 0, qtrue },
 	{ &g_damage_mg_team, "g_damage_mg_team", "5", 0, 0, qtrue },
 	{ &g_damage_hmg, "g_damage_hmg", "10", 0, 0, qtrue },
@@ -631,7 +642,7 @@ static qboolean G_ReadWeaponBoolCvar( const vmCvar_t *cvar, qboolean fallback, c
 }
 
 void G_InitWeaponConfig( void ) {
-	g_weaponConfig.gauntletDamage = G_ReadWeaponCvar( &g_damage_gauntlet, 50, "g_damage_gauntlet" );
+	g_weaponConfig.gauntletDamage = G_ReadWeaponCvar( &g_damage_g, 50, "g_damage_g" );
 	g_weaponConfig.machinegunDamage = G_ReadWeaponCvar( &g_damage_mg, 7, "g_damage_mg" );
 	g_weaponConfig.machinegunTeamDamage = G_ReadWeaponCvar( &g_damage_mg_team, 5, "g_damage_mg_team" );
 	g_weaponConfig.heavyMachinegunDamage = G_ReadWeaponCvar( &g_damage_hmg, 10, "g_damage_hmg" );
@@ -863,9 +874,9 @@ void G_RegisterCvars( void ) {
 	cvarTable_t     *cv;
 	qboolean remapped = qfalse;
 
-	for ( i = 0, cv = gameCvarTable ; i < gameCvarTableSize ; i++, cv++ ) {
-		trap_Cvar_Register( cv->vmCvar, cv->cvarName,
-		        cv->defaultString, cv->cvarFlags );
+for ( i = 0, cv = gameCvarTable ; i < gameCvarTableSize ; i++, cv++ ) {
+trap_Cvar_Register( cv->vmCvar, cv->cvarName,
+cv->defaultString, cv->cvarFlags );
 		G_RegisterCvarHelp( cv );
 		if ( cv->vmCvar ) {
 		        cv->modificationCount = cv->vmCvar->modificationCount;
@@ -876,12 +887,15 @@ void G_RegisterCvars( void ) {
 		}
 	}
 
-        if (remapped) {
+LegacyCvar_RegisterAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) );
+
+if (remapped) {
                 	G_RemapTeamShaders();
         }
 
         G_Config_RegisterCvars();
-        G_Config_UpdateCvars();
+G_Config_UpdateCvars();
+LegacyCvar_UpdateAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) );
 	G_RegisterPmoveCvars();
 	G_RefreshPmoveSettings();
 
