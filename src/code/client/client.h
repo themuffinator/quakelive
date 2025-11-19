@@ -509,6 +509,7 @@ int Key_GetCatcher( void );
 void Key_SetCatcher( int catcher );
 void LAN_LoadCachedServers();
 void LAN_SaveServersToCache();
+int CL_MenuReadScreenshot( const char *requestedName, byte *buffer, int bufferSize );
 
 
 //
