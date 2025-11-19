@@ -557,8 +557,63 @@ static void G_UpdateMissileAcceleration( gentity_t *ent ) {
 }
 
 /*
+=============
+G_HandleNailgunBounce
+
+Attempts to ricochet a nail off the impacted surface when bounce logic is enabled.
+Returns qtrue if the collision was converted into a bounce.
+=============
+*/
+static qboolean G_HandleNailgunBounce( gentity_t *ent, trace_t *trace ) {
+	vec3_t	 velocity;
+	float	 speed;
+	float	 dot;
+
+	if ( !g_weaponConfig.nailgunBounceEnabled || ent->count <= 0 ) {
+		return qfalse;
+	}
+
+	if ( g_entities[trace->entityNum].takedamage ) {
+		return qfalse;
+	}
+
+	BG_EvaluateTrajectoryDelta( &ent->s.pos, level.time, velocity );
+	speed = VectorLength( velocity );
+	if ( speed <= 0.0f ) {
+		return qfalse;
+	}
+
+	dot = DotProduct( velocity, trace->plane.normal );
+	VectorMA( velocity, -2.0f * dot, trace->plane.normal, velocity );
+	if ( VectorNormalize( velocity ) == 0.0f ) {
+		return qfalse;
+	}
+
+	VectorScale( velocity, speed, ent->s.pos.trDelta );
+	SnapVector( ent->s.pos.trDelta );
+
+	ent->s.pos.trType = TR_LINEAR;
+	ent->s.pos.trTime = level.time;
+	VectorCopy( trace->endpos, ent->r.currentOrigin );
+	VectorAdd( ent->r.currentOrigin, trace->plane.normal, ent->r.currentOrigin );
+	VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
+
+	vectoangles( ent->s.pos.trDelta, ent->s.apos.trBase );
+	ent->s.apos.trType = TR_LINEAR;
+	ent->s.apos.trTime = level.time;
+
+	ent->count--;
+	trap_LinkEntity( ent );
+
+	return qtrue;
+}
+
+/*
 ================
 G_RunMissile
+
+Advances missile movement, handling impacts and any special-case behavior such as
+nail ricochets.
 ================
 */
 void G_RunMissile( gentity_t *ent ) {
@@ -651,6 +706,9 @@ void G_RunMissile( gentity_t *ent ) {
 				ent->parent->client->hook = NULL;
 			}
 			G_FreeEntity( ent );
+			return;
+		}
+		if ( ent->s.weapon == WP_NAILGUN && G_HandleNailgunBounce( ent, &tr ) ) {
 			return;
 		}
 		G_MissileImpact( ent, &tr );
@@ -896,17 +954,22 @@ gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 
 
 /*
-=================
+=============
 fire_nail
-=================
+
+Creates and fires a nail projectile, optionally enabling ricochet behavior based on
+	the configured bounce chance.
+=============
 */
 #define NAILGUN_SPREAD	500
 
 gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t right, vec3_t up ) {
-	gentity_t	*bolt;
-	vec3_t		dir;
-	vec3_t		end;
-	float		r, u, scale;
+	gentity_t		*bolt;
+	vec3_t		 dir;
+	vec3_t		 end;
+	float		 r, u, scale;
+	qboolean	canBounce;
+	vec3_t		 angles;
 
 	bolt = G_Spawn();
 	bolt->classname = "nail";
@@ -926,6 +989,18 @@ gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t righ
 	bolt->s.pos.trTime = level.time;
 	VectorCopy( start, bolt->s.pos.trBase );
 
+	canBounce = qfalse;
+	if ( g_weaponConfig.nailgunBounceEnabled ) {
+		int	bounceRoll;
+
+		bounceRoll = Q_irand( 1, 100 );
+		if ( bounceRoll > 100 - g_weaponConfig.nailgunBouncePercentage ) {
+			canBounce = qtrue;
+		}
+	}
+
+	bolt->count = canBounce ? 4 : 0;
+
 	r = random() * M_PI * 2.0f;
 	u = sin(r) * crandom() * NAILGUN_SPREAD * 16;
 	r = cos(r) * crandom() * NAILGUN_SPREAD * 16;
@@ -939,10 +1014,17 @@ gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t righ
 	VectorScale( dir, scale, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );
 
+	if ( canBounce ) {
+		vectoangles( dir, angles );
+		VectorCopy( angles, bolt->s.apos.trBase );
+		bolt->s.apos.trType = TR_LINEAR;
+		bolt->s.apos.trTime = level.time;
+	}
+
 	VectorCopy( start, bolt->r.currentOrigin );
 
 	return bolt;
-}	
+}
 
 
 /*
