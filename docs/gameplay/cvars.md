@@ -1,5 +1,17 @@
 # Gameplay CVar Notes
 
+## Custom Settings Digest
+
+Quake Live servers expose `g_customSettings` as a read-only digest of gameplay overrides so browsers can advertise when a match di
+ffers from stock rules. The VM mirrors that behaviour by registering `g_customSettings` as a ROM `CVAR_SERVERINFO` string and ke
+eping it out of admin consoles; later logic rewrites the value whenever tracked CVars deviate, ensuring `CS_SERVERINFO` always re
+ports the aggregate fingerprint.【F:src/code/game/g_main.c†L190-L205】【F:src/code/game/g_main.c†L426-L433】 The server flags any cu
+stom-marked CVar in the registration table, flips a shared dirty bit inside `G_UpdateCvars`, and exposes helper functions so futu
+re digest rebuilds know when to refresh the string before pushing it to clients.【F:src/code/game/g_main.c†L1108-L1134】【F:src/code
+/game/g_main.c†L1189-L1207】【F:src/code/game/g_main.c†L1267-L1289】 Because the value is synthesized from other knobs, admins sho
+uld treat `g_customSettings` as telemetry rather than a toggle—changing it manually will be overwritten the next time gameplay CV
+ars update.
+
 ## Match Timeout Controls
 
 Competitive duel and team modes now expose Quake Live–style match pauses. Players call `timeout` (alias `pause`) to consume one of their team's `g_timeoutCount` allotments, freezing play, logging the owner, and sharing the pause state through `CS_MATCH_STATE` for HUD parity.【F:src/code/game/g_cmds.c†L1593-L1675】【F:src/code/game/g_main.c†L2100-L2149】 The server starts the countdown using `g_timeoutLen` and remembers when the break began so resuming can credit the lost time back to warmup and intermission timers.【F:src/code/game/g_cmds.c†L1657-L1670】【F:src/code/game/g_main.c†L2133-L2149】

@@ -48,6 +48,7 @@ typedef struct {
 	qboolean	trackChange;	    // track this variable, and announce if changed
 	qboolean	teamShader;	    // track and if changed, update shader state
 	const char	*helpString; // optional help text advertised alongside the cvar
+	qboolean	customSetting; // counts toward g_customSettings when true
 } cvarTable_t;
 
 gentity_t		g_entities[MAX_GENTITIES];
@@ -68,6 +69,7 @@ static int	s_roundWarmupDelayModCount = 0;
 static int	s_teamSizeMinModCount = 0;
 static char	s_worldspawnAtmosphere[MAX_QPATH];
 static char	s_lastForcedCosmeticsPayload[MAX_INFO_STRING];
+static qboolean s_customSettingsDirty = qtrue;
 static vmCvar_t	g_weaponRespawnLegacy;
 static vmCvar_t	g_damageGauntletLegacy;
 static legacyCvarAlias_t	s_legacyCvarAliases[] = {
@@ -191,6 +193,7 @@ vmCvar_t	g_domScoreRate;
 vmCvar_t	g_friendlyFire;
 vmCvar_t	g_password;
 vmCvar_t	g_needpass;
+vmCvar_t	g_customSettings;
 vmCvar_t	g_allTalk;
 vmCvar_t	g_maxclients;
 vmCvar_t	g_maxGameClients;
@@ -422,6 +425,7 @@ static cvarTable_t		gameCvarTable[] = {
 
 	// latched vars
 	{ &g_gametype, "g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH, 0, qfalse  },
+	{ &g_customSettings, "g_customSettings", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Digest of flagged gameplay overrides published to CS_SERVERINFO.", qfalse },
 
 	{ &g_maxclients, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_maxGameClients, "g_maxGameClients", "0", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
@@ -1115,14 +1119,19 @@ cv->defaultString, cv->cvarFlags );
 		        cv->modificationCount = cv->vmCvar->modificationCount;
 		}
 
+		if ( cv->customSetting ) {
+			s_customSettingsDirty = qtrue;
+		}
+
 		if (cv->teamShader) {
 		        remapped = qtrue;
 		}
 	}
 
 LegacyCvar_RegisterAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) );
+	s_customSettingsDirty = qtrue;
 
-if (remapped) {
+	if (remapped) {
                 	G_RemapTeamShaders();
         }
 
@@ -1190,6 +1199,10 @@ void G_UpdateCvars( void ) {
                                                 cv->cvarName, cv->vmCvar->string ) );
                                 }
 
+				if ( cv->customSetting ) {
+					s_customSettingsDirty = qtrue;
+				}
+
                                 if (cv->teamShader) {
                                         remapped = qtrue;
                                 }
@@ -1250,6 +1263,30 @@ void G_UpdateCvars( void ) {
 	G_UpdateTrainingState();
 	G_UpdateGametypeTutorialText();
 	G_RefreshPmoveSettings();
+}
+
+/*
+=============
+G_CustomSettingsDirty
+
+Returns whether any tracked gameplay CVars have changed since the last
+custom-settings digest was published.
+=============
+*/
+qboolean G_CustomSettingsDirty( void ) {
+	return s_customSettingsDirty;
+}
+
+/*
+=============
+G_ClearCustomSettingsDirtyFlag
+
+Marks the custom-settings digest as up-to-date so later updates can wait
+for additional gameplay overrides before rebuilding the string.
+=============
+*/
+void G_ClearCustomSettingsDirtyFlag( void ) {
+	s_customSettingsDirty = qfalse;
 }
 
 /*
