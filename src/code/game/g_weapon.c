@@ -583,6 +583,36 @@ LIGHTNING GUN
 ======================================================================
 */
 
+/*
+=============
+Weapon_LightningDischargeMask
+
+Returns the contents mask for media that should trigger lightning discharge.
+=============
+*/
+static int Weapon_LightningDischargeMask( void ) {
+	return CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA;
+}
+
+/*
+=============
+Weapon_LightningDischargeActive
+
+Checks whether the configured lightning discharge feature is enabled.
+=============
+*/
+static qboolean Weapon_LightningDischargeActive( void ) {
+	return ( g_weaponConfig.lightningDischargeFlags > 0 );
+}
+
+/*
+=============
+Weapon_LightningFire
+
+Fires the lightning gun, optionally triggering a discharge when the trace or muzzle
+intersects hazardous media.
+=============
+*/
 void Weapon_LightningFire( gentity_t *ent ) {
 	trace_t		tr;
 	vec3_t		end;
@@ -595,6 +625,33 @@ void Weapon_LightningFire( gentity_t *ent ) {
 	passent = ent->s.number;
 	for (i = 0; i < 10; i++) {
 		VectorMA( muzzle, LIGHTNING_RANGE, forward, end );
+
+		if ( Weapon_LightningDischargeActive() ) {
+			trace_t dischargeTrace;
+			qboolean dischargePending = qfalse;
+			int muzzleContents;
+
+			muzzleContents = trap_PointContents( muzzle, ent->s.number );
+			if ( muzzleContents & Weapon_LightningDischargeMask() ) {
+				VectorCopy( muzzle, dischargePoint );
+				dischargePending = qtrue;
+			} else {
+				trap_Trace( &dischargeTrace, muzzle, NULL, NULL, end, ent->s.number, Weapon_LightningDischargeMask() );
+				if ( ( dischargeTrace.contents & Weapon_LightningDischargeMask() ) && dischargeTrace.fraction < 1.0f ) {
+					VectorCopy( dischargeTrace.endpos, dischargePoint );
+					dischargePending = qtrue;
+				}
+			}
+
+			if ( dischargePending ) {
+				tent = G_TempEntity( dischargePoint, EV_LIGHTNINGBOLT );
+				VectorCopy( muzzle, tent->s.origin2 );
+				SnapVector( tent->s.origin2 );
+
+				G_Damage( ent, ent, ent, forward, dischargePoint, damage, 0, MOD_LIGHTNING_DISCHARGE );
+				return;
+			}
+		}
 
 		trap_Trace( &tr, muzzle, NULL, NULL, end, passent, MASK_SHOT );
 
