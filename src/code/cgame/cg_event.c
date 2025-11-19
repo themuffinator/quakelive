@@ -111,6 +111,92 @@ const char	*CG_PlaceString( int rank ) {
 
 /*
 =============
+CG_TryFollowKiller
+
+Issues a follow command for the killer when the spectator was viewing the victim.
+=============
+*/
+static void CG_TryFollowKiller( int target, int attacker ) {
+	if ( cg_followKiller.integer <= 0 ) {
+		return;
+	}
+	if ( cg.demoPlayback ) {
+		return;
+	}
+	if ( attacker < 0 || attacker >= cgs.maxclients ) {
+		return;
+	}
+	if ( attacker == target ) {
+		return;
+	}
+	if ( !CG_IsSpectatorCamera() ) {
+		return;
+	}
+	if ( !cg.snap || !( cg.snap->ps.pm_flags & PMF_FOLLOW ) ) {
+		return;
+	}
+	if ( cg.snap->ps.clientNum != target ) {
+		return;
+	}
+
+	trap_SendClientCommand( va( "follow %d", attacker ) );
+}
+
+/*
+=============
+CG_TrackFlagCarrierByPowerup
+
+Notifies the spectator tracker when the requested flag powerup is held.
+=============
+*/
+static void CG_TrackFlagCarrierByPowerup( powerup_t powerup ) {
+	int clientNum;
+
+	if ( powerup <= PW_NONE || powerup >= PW_NUM_POWERUPS ) {
+		return;
+	}
+
+	for ( clientNum = 0; clientNum < cgs.maxclients; clientNum++ ) {
+		const clientInfo_t *ci = &cgs.clientinfo[clientNum];
+
+		if ( !ci->infoValid ) {
+			continue;
+		}
+		if ( ( ci->powerups & ( 1 << powerup ) ) == 0 ) {
+			continue;
+		}
+
+		CG_SpectatorTrackEvent( clientNum, CG_SPECTATOR_TRACK_FLAG );
+		break;
+	}
+}
+
+/*
+=============
+CG_TrackFlagCarrierForEvent
+
+Evaluates global team sound events to follow the current flag carrier.
+=============
+*/
+static void CG_TrackFlagCarrierForEvent( int eventParm ) {
+	powerup_t powerup = PW_NUM_POWERUPS;
+
+	switch ( eventParm ) {
+		case GTS_RED_TAKEN:
+			powerup = ( cgs.gametype == GT_1FCTF ) ? PW_NEUTRALFLAG : PW_BLUEFLAG;
+			break;
+		case GTS_BLUE_TAKEN:
+			powerup = ( cgs.gametype == GT_1FCTF ) ? PW_NEUTRALFLAG : PW_REDFLAG;
+			break;
+		default:
+			return;
+	}
+
+	CG_TrackFlagCarrierByPowerup( powerup );
+}
+
+/*
+=============
 CG_Obituary
 =============
 */
@@ -183,7 +269,7 @@ static void CG_Obituary( entityState_t *ent ) {
 		break;
 	}
 
-	if (attacker == target) {
+	if ( attacker == target ) {
 		gender = ci->gender;
 		switch (mod) {
 		case MOD_KAMIKAZE:
@@ -236,10 +322,13 @@ static void CG_Obituary( entityState_t *ent ) {
 		}
 	}
 
+	CG_TryFollowKiller( target, attacker );
+
 	if (message) {
 		CG_Printf( "%s %s.\n", targetName, message);
 		return;
 	}
+
 
 	// check for kill messages from the current clientNum
 	if ( attacker == cg.snap->ps.clientNum ) {
@@ -1028,42 +1117,48 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 
 			case GTS_RED_TAKEN: // CTF: red team took blue flag, 1FCTF: blue team took the neutral flag
 				// if this player picked up the flag then a sound is played in CG_CheckLocalSounds
-					if (cg.snap->ps.powerups[PW_BLUEFLAG] || cg.snap->ps.powerups[PW_NEUTRALFLAG]) {
-					}
-					else {
+				if (cg.snap->ps.powerups[PW_BLUEFLAG] || cg.snap->ps.powerups[PW_NEUTRALFLAG]) {
+				}
+				else {
 					if (cgs.clientinfo[cg.clientNum].team == TEAM_BLUE) {
-							if (cgs.gametype == GT_1FCTF) 
-								CG_AddBufferedSound( cgs.media.yourTeamTookTheFlagSound );
-							else
-						 	CG_AddBufferedSound( cgs.media.enemyTookYourFlagSound );
-						}
-						else if (cgs.clientinfo[cg.clientNum].team == TEAM_RED) {
-							if (cgs.gametype == GT_1FCTF)
-								CG_AddBufferedSound( cgs.media.enemyTookTheFlagSound );
-							else
- 							CG_AddBufferedSound( cgs.media.yourTeamTookEnemyFlagSound );
-						}
-					}
-					break;
-				case GTS_BLUE_TAKEN: // CTF: blue team took the red flag, 1FCTF red team took the neutral flag
-					// if this player picked up the flag then a sound is played in CG_CheckLocalSounds
-					if (cg.snap->ps.powerups[PW_REDFLAG] || cg.snap->ps.powerups[PW_NEUTRALFLAG]) {
-					}
-					else {
-						if (cgs.clientinfo[cg.clientNum].team == TEAM_RED) {
-							if (cgs.gametype == GT_1FCTF)
-								CG_AddBufferedSound( cgs.media.yourTeamTookTheFlagSound );
-							else
+						if (cgs.gametype == GT_1FCTF) {
+							CG_AddBufferedSound( cgs.media.yourTeamTookTheFlagSound );
+						} else {
 							CG_AddBufferedSound( cgs.media.enemyTookYourFlagSound );
 						}
-						else if (cgs.clientinfo[cg.clientNum].team == TEAM_BLUE) {
-							if (cgs.gametype == GT_1FCTF)
-								CG_AddBufferedSound( cgs.media.enemyTookTheFlagSound );
-							else
+					}
+					else if (cgs.clientinfo[cg.clientNum].team == TEAM_RED) {
+						if (cgs.gametype == GT_1FCTF) {
+							CG_AddBufferedSound( cgs.media.enemyTookTheFlagSound );
+						} else {
 							CG_AddBufferedSound( cgs.media.yourTeamTookEnemyFlagSound );
 						}
 					}
-					break;
+				}
+				CG_TrackFlagCarrierForEvent( es->eventParm );
+				break;
+			case GTS_BLUE_TAKEN: // CTF: blue team took the red flag, 1FCTF red team took the neutral flag
+				// if this player picked up the flag then a sound is played in CG_CheckLocalSounds
+				if (cg.snap->ps.powerups[PW_REDFLAG] || cg.snap->ps.powerups[PW_NEUTRALFLAG]) {
+				}
+				else {
+					if (cgs.clientinfo[cg.clientNum].team == TEAM_RED) {
+						if (cgs.gametype == GT_1FCTF) {
+							CG_AddBufferedSound( cgs.media.yourTeamTookTheFlagSound );
+						} else {
+							CG_AddBufferedSound( cgs.media.enemyTookYourFlagSound );
+						}
+					}
+					else if (cgs.clientinfo[cg.clientNum].team == TEAM_BLUE) {
+						if (cgs.gametype == GT_1FCTF) {
+							CG_AddBufferedSound( cgs.media.enemyTookTheFlagSound );
+						} else {
+							CG_AddBufferedSound( cgs.media.yourTeamTookEnemyFlagSound );
+						}
+					}
+				}
+				CG_TrackFlagCarrierForEvent( es->eventParm );
+				break;
 				case GTS_REDOBELISK_ATTACKED: // Overload: red obelisk is being attacked
 					if (cgs.clientinfo[cg.clientNum].team == TEAM_RED) {
 						CG_AddBufferedSound( cgs.media.yourBaseIsUnderAttackSound );
@@ -1132,6 +1227,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.quadSound );
+		CG_SpectatorTrackEvent( es->number, CG_SPECTATOR_TRACK_POWERUP );
 		break;
 	case EV_POWERUP_BATTLESUIT:
 		DEBUGNAME("EV_POWERUP_BATTLESUIT");
@@ -1140,6 +1236,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.protectSound );
+		CG_SpectatorTrackEvent( es->number, CG_SPECTATOR_TRACK_POWERUP );
 		break;
 	case EV_POWERUP_REGEN:
 		DEBUGNAME("EV_POWERUP_REGEN");
@@ -1148,6 +1245,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.regenSound );
+		CG_SpectatorTrackEvent( es->number, CG_SPECTATOR_TRACK_POWERUP );
 		break;
 
 	case EV_GIB_PLAYER:

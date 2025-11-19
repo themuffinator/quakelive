@@ -79,6 +79,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	NUM_CROSSHAIRS		10
 #define CG_MAX_LIGHTNING_STYLES 5
 
+#define CG_VIEW_FILTER_MAX_SAMPLES	32
+
 #define DOM_POINT_STATE_COUNT	5
 #define DOMINATION_DISTRESS_REPEAT_TIME	2000
 
@@ -123,6 +125,21 @@ typedef enum {
 	DAMAGE_PLUM_COLOR_STYLE_WEAPON
 } damagePlumColorStyle_t;
 
+typedef enum {
+	CG_SPECTATOR_TRACK_NONE = 0,
+	CG_SPECTATOR_TRACK_POWERUP,
+	CG_SPECTATOR_TRACK_FLAG
+} cgSpectatorTrackType_t;
+
+typedef struct {
+	int		count;
+	int		index;
+	float	lastYaw;
+	float	lastPitch;
+	float	yawSamples[CG_VIEW_FILTER_MAX_SAMPLES];
+	float	pitchSamples[CG_VIEW_FILTER_MAX_SAMPLES];
+} cgViewAngleFilter_t;
+  
 typedef enum {
 	ANNOUNCER_PROFILE_DISABLED = 0,
 	ANNOUNCER_PROFILE_DEFAULT,
@@ -593,6 +610,7 @@ typedef struct {
 	// view rendering
 	refdef_t	refdef;
 	vec3_t		refdefViewAngles;		// will be converted to refdef.viewaxis
+	cgViewAngleFilter_t	viewFilter;
 
 	// zoom key
 	qboolean	zoomed;
@@ -630,6 +648,10 @@ typedef struct {
 	int				spectatorClientOrder[MAX_CLIENTS];
 	int				spectatorClientCount;
 	int				spectatorTargetUpdateTime;
+	int				spectatorTrackedClient;
+	int				trackedPlayerClientNum;
+	int				trackedPlayerExpireTime;
+	cgSpectatorTrackType_t	trackedPlayerPriority;
 
 	// skull trails
 	skulltrail_t	skulltrails[MAX_CLIENTS];
@@ -1440,6 +1462,10 @@ extern	vmCvar_t		cg_disableLoadout_cg;
 extern	vmCvar_t		cg_disableLoadout_hmg;
 extern	vmCvar_t		cg_trueShotgun;
 extern	vmCvar_t		cg_trackPlayer;
+extern	vmCvar_t		cg_followKiller;
+extern	vmCvar_t		cg_followPowerup;
+extern	vmCvar_t		cg_ignoreMouseInput;
+extern	vmCvar_t		cg_filter_angles;
 extern	vmCvar_t		cg_smoothClients;
 extern	vmCvar_t		cg_loadout;
 extern	vmCvar_t		pmove_fixed;
@@ -1611,6 +1637,9 @@ int CG_Text_Height(const char *text, float scale, int limit);
 void CG_SelectPrevPlayer();
 void CG_SelectNextPlayer();
 void CG_SpectatorFollowCycle(int dir);
+void CG_SpectatorTrackEvent( int clientNum, cgSpectatorTrackType_t trackType );
+void CG_UpdateSpectatorTracking( void );
+qboolean CG_IsSpectatorCamera( void );
 float CG_GetValue(int ownerDraw);
 qboolean CG_OwnerDrawVisible(int flags);
 void CG_RunMenuScript(char **args);

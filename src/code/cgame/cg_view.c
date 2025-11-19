@@ -26,6 +26,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static void CG_SetZoomState( qboolean zoomState );
 static void CG_HandleZoomOutOnDeath( void );
+static void CG_ResetViewAngleFilter( const vec3_t angles );
+static void CG_FilterViewAngles( vec3_t angles );
+static void CG_UpdateSpectatorCvar( void );
 
 
 /*
@@ -566,215 +569,130 @@ static void CG_HandleZoomOutOnDeath( void ) {
 	CG_SetZoomState( qfalse );
 }
 
+
 /*
 =============
-CG_ZoomDown_f
+CG_ResetViewAngleFilter
 
-Handles the +zoom press action.
+Clears the view smoothing buffer using the supplied angles as a baseline.
 =============
 */
-void CG_ZoomDown_f( void ) {
-	if ( cg.zoomToggle ) {
-		CG_SetZoomState( !cg.zoomed );
-		return;
-	}
-
-	CG_SetZoomState( qtrue );
+static void CG_ResetViewAngleFilter( const vec3_t angles ) {
+	cg.viewFilter.count = 0;
+	cg.viewFilter.index = 0;
+	cg.viewFilter.lastYaw = angles[YAW];
+	cg.viewFilter.lastPitch = angles[PITCH];
+	memset( cg.viewFilter.yawSamples, 0, sizeof( cg.viewFilter.yawSamples ) );
+	memset( cg.viewFilter.pitchSamples, 0, sizeof( cg.viewFilter.pitchSamples ) );
 }
 
 /*
 =============
-CG_ZoomUp_f
+CG_ViewFilterAverage
 
-Handles the +zoom release action.
+Returns the average delta stored in the view filter sample buffer.
 =============
 */
-void CG_ZoomUp_f( void ) {
-	if ( cg.zoomToggle ) {
-		return;
+static float CG_ViewFilterAverage( const float *samples, int count, int sampleLimit, int index ) {
+	float sum = 0.0f;
+	int i;
+	int sampleIndex = index;
+
+	if ( count <= 0 || sampleLimit <= 0 ) {
+		return 0.0f;
 	}
 
-	CG_SetZoomState( qfalse );
+	for ( i = 0; i < count; i++ ) {
+		if ( --sampleIndex < 0 ) {
+			sampleIndex = sampleLimit - 1;
+		}
+		sum += samples[sampleIndex];
+	}
+
+	return sum / (float)count;
 }
 
-
 /*
-====================
-CG_CalcFov
+=============
+CG_FilterViewAngles
 
-Fixed fov at intermissions, otherwise account for fov variable and zooms.
-====================
+Applies HLIL-style smoothing to the spectator camera view angles.
+=============
 */
-#define	WAVE_AMPLITUDE	1
-#define	WAVE_FREQUENCY	0.4
+static void CG_FilterViewAngles( vec3_t angles ) {
+	int sampleLimit;
+	float yawDelta;
+	float pitchDelta;
+	float averageYaw;
+	float averagePitch;
 
-static int CG_CalcFov( void ) {
-	float	x;
-	float	phase;
-	float	v;
-	int		contents;
-	float	fov_x, fov_y;
-	float	baseFov;
-	float	zoomFov;
-	float	f;
-	int		inwater;
-
-	if ( cg.predictedPlayerState.pm_type == PM_INTERMISSION ) {
-		// if in intermission, use a fixed value
-		fov_x = 90;
-	} else {
-		// user selectable
-		if ( cgs.dmflags & DF_FIXED_FOV ) {
-			// dmflag to prevent wide fov for all clients
-			fov_x = 90;
-		} else {
-			fov_x = cg_fov.value;
-			if ( fov_x < 1 ) {
-				fov_x = 1;
-			} else if ( fov_x > 160 ) {
-				fov_x = 160;
-			}
-		}
-
-		baseFov = fov_x;
-
-		// account for zooms
-		zoomFov = cg_zoomFov.value;
-		if ( zoomFov < 1 ) {
-			zoomFov = 1;
-		} else if ( zoomFov > 160 ) {
-			zoomFov = 160;
-		}
-
-		if ( cg_zoomScaling.integer ) {
-			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
-			if ( f > 1.0 ) {
-				f = 1.0;
-			}
-
-			if ( cg.zoomed ) {
-				if ( f >= 1.0f ) {
-					fov_x = zoomFov;
-				} else {
-					fov_x = baseFov + f * ( zoomFov - baseFov );
-				}
-			} else {
-				if ( f >= 1.0f ) {
-					fov_x = baseFov;
-				} else {
-					fov_x = zoomFov + f * ( baseFov - zoomFov );
-				}
-			}
-		} else if ( cg.zoomed ) {
-			fov_x = zoomFov;
-		} else {
-			fov_x = baseFov;
-		}
+	sampleLimit = cg_filter_angles.integer;
+	if ( sampleLimit < 0 ) {
+		sampleLimit = 0;
+	}
+	if ( sampleLimit > CG_VIEW_FILTER_MAX_SAMPLES ) {
+		sampleLimit = CG_VIEW_FILTER_MAX_SAMPLES;
 	}
 
-	fov_x = CG_CalcHorPlusFov( fov_x );
-	x = cg.refdef.width / tan( fov_x / 360.0f * M_PI );
-	fov_y = atan2( cg.refdef.height, x );
-	fov_y = fov_y * 360.0f / M_PI;
-
-	// warp if underwater
-	contents = CG_PointContents( cg.refdef.vieworg, -1 );
-	inwater = ( contents & ( CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA ) ) ? qtrue : qfalse;
-	if ( inwater && cg_waterWarp.integer ) {
-		phase = cg.time / 1000.0 * WAVE_FREQUENCY * M_PI * 2;
-		v = WAVE_AMPLITUDE * sin( phase );
-		fov_x += v;
-		fov_y -= v;
+	if ( sampleLimit == 0 || !CG_IsSpectatorCamera() ) {
+		CG_ResetViewAngleFilter( angles );
+		return;
 	}
 
-
-	// set it
-	cg.refdef.fov_x = fov_x;
-	cg.refdef.fov_y = fov_y;
-
-	if ( !cg.zoomed ) {
-		cg.zoomSensitivity = 1.0f;
-	} else {
-		float baseHorizontalFov;
-		float baseVerticalFov;
-		float baseX;
-
-		baseHorizontalFov = CG_CalcHorPlusFov( baseFov );
-		baseX = cg.refdef.width / tan( baseHorizontalFov / 360.0f * M_PI );
-		baseVerticalFov = atan2( cg.refdef.height, baseX );
-		baseVerticalFov = baseVerticalFov * 360.0f / M_PI;
-		if ( baseVerticalFov <= 0.0f ) {
-			baseVerticalFov = 1.0f;
-		}
-
-		if ( cg_zoomSensitivity.value <= 0.0f ) {
-			cg.zoomSensitivity = cg.refdef.fov_y / 75.0f;
-		} else {
-			cg.zoomSensitivity = ( cg.refdef.fov_y / baseVerticalFov ) * cg_zoomSensitivity.value;
-		}
+	if ( cg.viewFilter.count == 0 ) {
+		CG_ResetViewAngleFilter( angles );
 	}
 
-	return inwater;
+	if ( cg.viewFilter.index >= sampleLimit ) {
+		cg.viewFilter.index = 0;
+	}
+	if ( cg.viewFilter.count > sampleLimit ) {
+		cg.viewFilter.count = sampleLimit;
+	}
+
+	yawDelta = AngleSubtract( angles[YAW], cg.viewFilter.lastYaw );
+	pitchDelta = angles[PITCH] - cg.viewFilter.lastPitch;
+
+	cg.viewFilter.yawSamples[cg.viewFilter.index] = yawDelta;
+	cg.viewFilter.pitchSamples[cg.viewFilter.index] = pitchDelta;
+	cg.viewFilter.index++;
+	if ( cg.viewFilter.index >= sampleLimit ) {
+		cg.viewFilter.index = 0;
+	}
+	if ( cg.viewFilter.count < sampleLimit ) {
+		cg.viewFilter.count++;
+	}
+
+	averageYaw = CG_ViewFilterAverage( cg.viewFilter.yawSamples, cg.viewFilter.count, sampleLimit, cg.viewFilter.index );
+	averagePitch = CG_ViewFilterAverage( cg.viewFilter.pitchSamples, cg.viewFilter.count, sampleLimit, cg.viewFilter.index );
+
+	cg.viewFilter.lastYaw = AngleNormalize360( cg.viewFilter.lastYaw + averageYaw );
+	cg.viewFilter.lastPitch += averagePitch;
+
+	angles[YAW] = cg.viewFilter.lastYaw;
+	angles[PITCH] = cg.viewFilter.lastPitch;
 }
 
-
-
 /*
-===============
-CG_DamageBlendBlob
+=============
+CG_UpdateSpectatorCvar
 
-===============
+Keeps the cg_spectating ROM cvar in sync with the current spectator state.
+=============
 */
-static void CG_DamageBlendBlob( void ) {
-	int			t;
-	int			maxTime;
-	refEntity_t		ent;
+static void CG_UpdateSpectatorCvar( void ) {
+	qboolean spectating = CG_IsSpectatorCamera();
+	int desired = spectating ? 1 : 0;
 
-	if ( !cg.damageValue ) {
+	if ( cg_spectating.integer == desired ) {
 		return;
 	}
 
-	//if (cg.cameraMode) {
-	//	return;
-	//}
-
-	// ragePro systems can't fade blends, so don't obscure the screen
-	if ( cgs.glconfig.hardwareType == GLHW_RAGEPRO ) {
-		return;
-	}
-
-	maxTime = DAMAGE_TIME;
-	t = cg.time - cg.damageTime;
-	if ( t <= 0 || t >= maxTime ) {
-		return;
-	}
-
-
-	memset( &ent, 0, sizeof( ent ) );
-	ent.reType = RT_SPRITE;
-	ent.renderfx = RF_FIRST_PERSON;
-
-	VectorMA( cg.refdef.vieworg, 8, cg.refdef.viewaxis[0], ent.origin );
-	VectorMA( ent.origin, cg.damageX * -8, cg.refdef.viewaxis[1], ent.origin );
-	VectorMA( ent.origin, cg.damageY * 8, cg.refdef.viewaxis[2], ent.origin );
-
-	ent.radius = cg.damageValue * 3;
-	ent.customShader = cgs.media.viewBloodShader;
-	ent.shaderRGBA[0] = 255;
-	ent.shaderRGBA[1] = 255;
-	ent.shaderRGBA[2] = 255;
-	ent.shaderRGBA[3] = 200 * ( 1.0 - ((float)t / maxTime) );
-	trap_R_AddRefEntityToScene( &ent );
+	trap_Cvar_Set( "cg_spectating", desired ? "1" : "0" );
+	cg_spectating.integer = desired;
+	cg_spectating.value = (float)desired;
 }
 
-
-/*
-===============
-CG_CalcViewValues
-
-Sets cg.refdef view values
-===============
-*/
 static int CG_CalcViewValues( void ) {
 	playerState_t	*ps;
 
@@ -847,8 +765,11 @@ static int CG_CalcViewValues( void ) {
 		CG_OffsetFirstPersonView();
 	}
 
+	CG_FilterViewAngles( cg.refdefViewAngles );
+
 	// position eye reletive to origin
 	AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+
 
 	if ( cg.hyperspace ) {
 		cg.refdef.rdflags |= RDF_NOWORLDMODEL | RDF_HYPERSPACE;
@@ -972,9 +893,12 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// update cg.predictedPlayerState
 	CG_PredictPlayerState();
+	CG_UpdateSpectatorTracking();
+	CG_UpdateSpectatorCvar();
 
 	// decide on third person view
 	cg.renderingThirdPerson = cg_thirdPerson.integer || (cg.snap->ps.stats[STAT_HEALTH] <= 0);
+
 
 	// build cg.refdef
 	inwater = CG_CalcViewValues();

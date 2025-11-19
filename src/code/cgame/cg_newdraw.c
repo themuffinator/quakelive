@@ -54,6 +54,7 @@ static void CG_DrawVoteTimer(rectDef_t *rect, float scale, vec4_t color, int tex
 
 #define CG_RACE_CHECKPOINT_HALF_WIDTH 24.0f
 #define CG_RACE_CHECKPOINT_HEIGHT 48.0f
+#define CG_SPECTATOR_TRACK_TIMEOUT 5000
 
 enum {
 ROUNDSTATE_INACTIVE,
@@ -989,116 +990,286 @@ return NULL;
 }
 
 static void CG_BuildSpectatorClientOrder(void) {
-int i;
+	int i;
 
-cg.spectatorClientCount = 0;
+	cg.spectatorClientCount = 0;
 
-for (i = 0; i < cg.numScores && cg.spectatorClientCount < MAX_CLIENTS; i++) {
-int clientNum = cg.scores[i].client;
-clientInfo_t *ci;
+	for ( i = 0; i < cg.numScores && cg.spectatorClientCount < MAX_CLIENTS; i++ ) {
+		int clientNum = cg.scores[i].client;
+		clientInfo_t *ci;
 
-if (clientNum < 0 || clientNum >= cgs.maxclients) {
-continue;
+		if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+			continue;
+		}
+
+		ci = &cgs.clientinfo[clientNum];
+		if ( !ci->infoValid || ci->team == TEAM_SPECTATOR ) {
+			continue;
+		}
+
+		cg.spectatorClientOrder[cg.spectatorClientCount++] = clientNum;
+	}
+
+	if ( cg.spectatorClientCount > 0 ) {
+		return;
+	}
+
+	for ( i = 0; i < cgs.maxclients && cg.spectatorClientCount < MAX_CLIENTS; i++ ) {
+		clientInfo_t *ci = &cgs.clientinfo[i];
+		if ( !ci->infoValid || ci->team == TEAM_SPECTATOR ) {
+			continue;
+		}
+		cg.spectatorClientOrder[cg.spectatorClientCount++] = i;
+	}
 }
 
-ci = &cgs.clientinfo[clientNum];
-if (!ci->infoValid || ci->team == TEAM_SPECTATOR) {
-continue;
+static void CG_UpdateSpectatorTargets( void ) {
+	int i;
+	int primary = -1;
+	int secondary = -1;
+
+	if ( !cg.snap ) {
+		cg.spectatorPrimaryClient = -1;
+		cg.spectatorSecondaryClient = -1;
+		cg.spectatorClientCount = 0;
+		return;
+	}
+
+	CG_BuildSpectatorClientOrder();
+
+	if ( cg.snap->ps.pm_flags & PMF_FOLLOW ) {
+		cg.spectatorFollowClient = cg.snap->ps.clientNum;
+	} else {
+		cg.spectatorFollowClient = -1;
+	}
+
+	if ( cg.spectatorFollowClient >= 0 && cg.spectatorFollowClient < cgs.maxclients ) {
+		const clientInfo_t *ci = &cgs.clientinfo[cg.spectatorFollowClient];
+
+		if ( ci->infoValid && ci->team != TEAM_SPECTATOR ) {
+			primary = cg.spectatorFollowClient;
+		}
+	}
+
+	for ( i = 0; primary == -1 && i < cg.spectatorClientCount; i++ ) {
+		primary = cg.spectatorClientOrder[i];
+	}
+
+	for ( i = 0; i < cg.spectatorClientCount; i++ ) {
+		int clientNum = cg.spectatorClientOrder[i];
+
+		if ( clientNum == primary ) {
+			continue;
+		}
+
+		secondary = clientNum;
+		break;
+	}
+
+	cg.spectatorPrimaryClient = primary;
+	cg.spectatorSecondaryClient = secondary;
+	cg.spectatorTargetUpdateTime = cg.time;
 }
 
-cg.spectatorClientOrder[cg.spectatorClientCount++] = clientNum;
+static const clientInfo_t *CG_SpectatorClientInfo( int slot ) {
+	int clientNum = -1;
+
+	if ( slot == 0 ) {
+		clientNum = cg.spectatorPrimaryClient;
+	} else if ( slot == 1 ) {
+		clientNum = cg.spectatorSecondaryClient;
+	}
+
+	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+		return NULL;
+	}
+
+	if ( !cgs.clientinfo[clientNum].infoValid ) {
+		return NULL;
+	}
+
+	return &cgs.clientinfo[clientNum];
 }
 
-if (cg.spectatorClientCount > 0) {
-return;
+static const score_t *CG_SpectatorClientScore( int slot ) {
+	const clientInfo_t *ci = CG_SpectatorClientInfo( slot );
+
+	if ( !ci ) {
+		return NULL;
+	}
+
+	return CG_GetScoreForClientNum( ci->clientNum );
 }
 
-for (i = 0; i < cgs.maxclients && cg.spectatorClientCount < MAX_CLIENTS; i++) {
-clientInfo_t *ci = &cgs.clientinfo[i];
-if (!ci->infoValid || ci->team == TEAM_SPECTATOR) {
-continue;
-}
-cg.spectatorClientOrder[cg.spectatorClientCount++] = i;
-}
+static qboolean CG_SpectatorSlotFollowed( int slot ) {
+	int clientNum = ( slot == 0 ) ? cg.spectatorPrimaryClient : cg.spectatorSecondaryClient;
+
+	return ( clientNum >= 0 && clientNum == cg.spectatorFollowClient );
 }
 
-static void CG_UpdateSpectatorTargets(void) {
-int i;
-int primary = -1;
-int secondary = -1;
+/*
+=============
+CG_SpectatorSlotTracked
 
-if (!cg.snap) {
-cg.spectatorPrimaryClient = -1;
-cg.spectatorSecondaryClient = -1;
-cg.spectatorClientCount = 0;
-return;
-}
+Returns qtrue when the requested spectator slot matches the tracked client.
+=============
+*/
+static qboolean CG_SpectatorSlotTracked( int slot ) {
+	int clientNum = -1;
 
-CG_BuildSpectatorClientOrder();
+	if ( slot == 0 ) {
+		clientNum = cg.spectatorPrimaryClient;
+	} else if ( slot == 1 ) {
+		clientNum = cg.spectatorSecondaryClient;
+	}
 
-if (cg.snap->ps.pm_flags & PMF_FOLLOW) {
-cg.spectatorFollowClient = cg.snap->ps.clientNum;
-} else {
-cg.spectatorFollowClient = cg.snap->ps.clientNum;
-}
-
-if (cg.spectatorFollowClient >= 0 && cg.spectatorFollowClient < cgs.maxclients) {
-clientInfo_t *ci = &cgs.clientinfo[cg.spectatorFollowClient];
-if (ci->infoValid && ci->team != TEAM_SPECTATOR) {
-primary = cg.spectatorFollowClient;
-}
+	return ( clientNum >= 0 && clientNum == cg.spectatorTrackedClient );
 }
 
-for (i = 0; primary == -1 && i < cg.spectatorClientCount; i++) {
-primary = cg.spectatorClientOrder[i];
+/*
+=============
+CG_IsSpectatorCamera
+
+Returns qtrue when the local client is spectating or following a player.
+=============
+*/
+qboolean CG_IsSpectatorCamera( void ) {
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+	if ( cg.snap->ps.pm_flags & PMF_FOLLOW ) {
+		return qtrue;
+	}
+	if ( cg.snap->ps.pm_type == PM_SPECTATOR ) {
+		return qtrue;
+	}
+	return ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
 }
 
-for (i = 0; i < cg.spectatorClientCount; i++) {
-int clientNum = cg.spectatorClientOrder[i];
-if (clientNum == primary) {
-continue;
-}
-secondary = clientNum;
-break;
+
+/*
+=============
+CG_ShouldAutoFollowTrack
+
+Determines whether automatic follow commands should be issued for a track event.
+=============
+*/
+static qboolean CG_ShouldAutoFollowTrack( cgSpectatorTrackType_t trackType ) {
+	int followMode;
+
+	if ( cg.demoPlayback ) {
+		return qfalse;
+	}
+	if ( !CG_IsSpectatorCamera() ) {
+		return qfalse;
+	}
+
+	followMode = cg_followPowerup.integer;
+	if ( followMode <= 0 ) {
+		return qfalse;
+	}
+	if ( followMode > 1 && trackType != CG_SPECTATOR_TRACK_FLAG ) {
+		return qfalse;
+	}
+	return qtrue;
 }
 
-cg.spectatorPrimaryClient = primary;
-cg.spectatorSecondaryClient = secondary;
-cg.spectatorTargetUpdateTime = cg.time;
+/*
+=============
+CG_SetTrackPlayerCvarValue
+
+Updates the cg_trackPlayer cvar to the supplied client number.
+=============
+*/
+static void CG_SetTrackPlayerCvarValue( int clientNum ) {
+	if ( clientNum < 0 ) {
+		if ( cg_trackPlayer.integer != -1 ) {
+			trap_Cvar_Set( "cg_trackPlayer", "-1" );
+			cg_trackPlayer.integer = -1;
+			cg_trackPlayer.value = -1.0f;
+		}
+		return;
+	}
+
+	if ( cg_trackPlayer.integer == clientNum ) {
+		return;
+	}
+
+	trap_Cvar_Set( "cg_trackPlayer", va( "%d", clientNum ) );
+	cg_trackPlayer.integer = clientNum;
+	cg_trackPlayer.value = (float)clientNum;
 }
 
-static const clientInfo_t *CG_SpectatorClientInfo(int slot) {
-int clientNum = -1;
+/*
+=============
+CG_SpectatorTrackEvent
 
-if (slot == 0) {
-clientNum = cg.spectatorPrimaryClient;
-} else if (slot == 1) {
-clientNum = cg.spectatorSecondaryClient;
+Records a potential follow target generated by a powerup or flag event.
+=============
+*/
+void CG_SpectatorTrackEvent( int clientNum, cgSpectatorTrackType_t trackType ) {
+	if ( trackType <= CG_SPECTATOR_TRACK_NONE ) {
+		return;
+	}
+	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+		return;
+	}
+	if ( !cgs.clientinfo[clientNum].infoValid ) {
+		return;
+	}
+
+	if ( cg.trackedPlayerClientNum >= 0 &&
+		cg.trackedPlayerPriority > trackType &&
+		cg.trackedPlayerExpireTime > cg.time ) {
+		return;
+	}
+
+	cg.trackedPlayerClientNum = clientNum;
+	cg.trackedPlayerPriority = trackType;
+	cg.trackedPlayerExpireTime = cg.time + CG_SPECTATOR_TRACK_TIMEOUT;
+
+	if ( CG_ShouldAutoFollowTrack( trackType ) ) {
+		trap_SendClientCommand( va( "follow %d", clientNum ) );
+	}
 }
 
-if (clientNum < 0 || clientNum >= cgs.maxclients) {
-return NULL;
+/*
+=============
+CG_UpdateSpectatorTracking
+
+Maintains the tracked client state and exposes it through cg_trackPlayer.
+=============
+*/
+void CG_UpdateSpectatorTracking( void ) {
+	qboolean autoActive = qfalse;
+	int target = -1;
+
+	if ( cg.trackedPlayerClientNum >= 0 && cg.trackedPlayerExpireTime > cg.time ) {
+		if ( cg.trackedPlayerClientNum < cgs.maxclients &&
+			cgs.clientinfo[cg.trackedPlayerClientNum].infoValid ) {
+			target = cg.trackedPlayerClientNum;
+			autoActive = qtrue;
+		} else {
+			cg.trackedPlayerClientNum = -1;
+			cg.trackedPlayerPriority = CG_SPECTATOR_TRACK_NONE;
+			cg.trackedPlayerExpireTime = 0;
+		}
+	}
+
+	if ( autoActive ) {
+		CG_SetTrackPlayerCvarValue( target );
+	} else {
+		target = cg_trackPlayer.integer;
+		if ( target < 0 || target >= cgs.maxclients ||
+			!cgs.clientinfo[target].infoValid ) {
+			target = -1;
+		}
+		CG_SetTrackPlayerCvarValue( target );
+	}
+
+	cg.spectatorTrackedClient = target;
 }
 
-if (!cgs.clientinfo[clientNum].infoValid) {
-return NULL;
-}
-
-return &cgs.clientinfo[clientNum];
-}
-
-static const score_t *CG_SpectatorClientScore(int slot) {
-const clientInfo_t *ci = CG_SpectatorClientInfo(slot);
-if (!ci) {
-return NULL;
-}
-return CG_GetScoreForClientNum(ci->clientNum);
-}
-
-static qboolean CG_SpectatorSlotFollowed(int slot) {
-int clientNum = (slot == 0) ? cg.spectatorPrimaryClient : cg.spectatorSecondaryClient;
-return (clientNum >= 0 && clientNum == cg.spectatorFollowClient);
-}
 
 static void CG_GetArmorTierColor(int armor, vec4_t color) {
 if (armor >= 150) {
@@ -1397,36 +1568,36 @@ Renders the tracked spectator player name with an optional backing shader.
 =============
 */
 static void CG_DrawSpectatorPlayerName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, qhandle_t shader) {
-const clientInfo_t *ci = CG_SpectatorClientInfo(slot);
-vec4_t drawColor;
-vec4_t modulate;
-float x;
-float y;
-float w;
-float h;
+	const clientInfo_t *ci = CG_SpectatorClientInfo( slot );
+	vec4_t drawColor;
+	vec4_t modulate;
+	float x;
+	float y;
+	float w;
+	float h;
 
-if (!ci) {
-return;
-}
+	if ( !ci ) {
+		return;
+	}
 
-if (shader) {
-Vector4Set(modulate, 1.0f, 1.0f, 1.0f, 1.0f);
-x = rect->x;
-y = rect->y;
-w = rect->w;
-h = rect->h;
-CG_AdjustFrom640(&x, &y, &w, &h);
-trap_R_SetColor(modulate);
-trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader);
-trap_R_SetColor(NULL);
-}
+	if ( shader ) {
+		Vector4Set( modulate, 1.0f, 1.0f, 1.0f, 1.0f );
+		x = rect->x;
+		y = rect->y;
+		w = rect->w;
+		h = rect->h;
+		CG_AdjustFrom640( &x, &y, &w, &h );
+		trap_R_SetColor( modulate );
+		trap_R_DrawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader );
+		trap_R_SetColor( NULL );
+	}
 
-Vector4Copy(color, drawColor);
-if (CG_SpectatorSlotFollowed(slot)) {
-drawColor[3] = 1.0f;
-}
+	Vector4Copy( color, drawColor );
+	if ( CG_SpectatorSlotFollowed( slot ) || CG_SpectatorSlotTracked( slot ) ) {
+		drawColor[3] = 1.0f;
+	}
 
-CG_Text_Paint(rect->x, rect->y, scale, drawColor, ci->name, 0, 0, textStyle);
+	CG_Text_Paint( rect->x, rect->y, scale, drawColor, ci->name, 0, 0, textStyle );
 }
 
 static void CG_DrawSpectatorPlayerScore(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot) {
@@ -4361,12 +4532,20 @@ qboolean CG_OwnerDrawVisible(int flags) {
 		return (playerTeam == TEAM_BLUE) && !spectator;
 	}
 
-	if (flags & CG_SHOW_IF_1ST_PLYR_FOLLOWED) {
+	if ( flags & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) {
 		return CG_SpectatorSlotFollowed( 0 );
 	}
 
-	if (flags & CG_SHOW_IF_2ND_PLYR_FOLLOWED) {
+	if ( flags & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) {
 		return CG_SpectatorSlotFollowed( 1 );
+	}
+
+	if ( flags & CG_SHOW_IF_1ST_PLYR_TRACKED ) {
+		return CG_SpectatorSlotTracked( 0 );
+	}
+
+	if ( flags & CG_SHOW_IF_2ND_PLYR_TRACKED ) {
+		return CG_SpectatorSlotTracked( 1 );
 	}
 	return qfalse;
 }
@@ -5710,40 +5889,48 @@ break;
   }
 }
 
-void CG_MouseEvent(int x, int y) {
-int n;
-qboolean allowSpectatorUi = (cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW));
+void CG_MouseEvent( int x, int y ) {
+	int n;
+	qboolean allowSpectatorUi = ( cg.snap && ( cg.snap->ps.pm_flags & PMF_FOLLOW ) );
 
-if ( (cg.predictedPlayerState.pm_type == PM_NORMAL || (cg.predictedPlayerState.pm_type == PM_SPECTATOR && !allowSpectatorUi)) && cg.showScores == qfalse) {
-    trap_Key_SetCatcher(0);
-return;
-}
+	if ( cg_ignoreMouseInput.integer ) {
+		return;
+	}
 
-	cgs.cursorX+= x;
-	if (cgs.cursorX < 0)
+	if ( ( cg.predictedPlayerState.pm_type == PM_NORMAL || ( cg.predictedPlayerState.pm_type == PM_SPECTATOR && !allowSpectatorUi ) ) &&
+		 cg.showScores == qfalse ) {
+		trap_Key_SetCatcher( 0 );
+		return;
+	}
+
+	cgs.cursorX += x;
+	if ( cgs.cursorX < 0 ) {
 		cgs.cursorX = 0;
-	else if (cgs.cursorX > 640)
+	} else if ( cgs.cursorX > 640 ) {
 		cgs.cursorX = 640;
+	}
 
 	cgs.cursorY += y;
-	if (cgs.cursorY < 0)
+	if ( cgs.cursorY < 0 ) {
 		cgs.cursorY = 0;
-	else if (cgs.cursorY > 480)
+	} else if ( cgs.cursorY > 480 ) {
 		cgs.cursorY = 480;
+	}
 
-	n = Display_CursorType(cgs.cursorX, cgs.cursorY);
+	n = Display_CursorType( cgs.cursorX, cgs.cursorY );
 	cgs.activeCursor = 0;
-	if (n == CURSOR_ARROW) {
+	if ( n == CURSOR_ARROW ) {
 		cgs.activeCursor = cgs.media.selectCursor;
-	} else if (n == CURSOR_SIZER) {
+	} else if ( n == CURSOR_SIZER ) {
 		cgs.activeCursor = cgs.media.sizeCursor;
 	}
 
-  if (cgs.capturedItem) {
-	  Display_MouseMove(cgs.capturedItem, x, y);
-  } else {
-	  Display_MouseMove(NULL, cgs.cursorX, cgs.cursorY);
-  }
+	if ( cgs.capturedItem ) {
+		Display_MouseMove( cgs.capturedItem, x, y );
+	} else {
+		Display_MouseMove( NULL, cgs.cursorX, cgs.cursorY );
+	}
+}
 
 }
 

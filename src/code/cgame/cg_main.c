@@ -316,6 +316,10 @@ vmCvar_t 	cg_disableLoadout_cg;
 vmCvar_t 	cg_disableLoadout_hmg;
 vmCvar_t 	cg_trueShotgun;
 vmCvar_t 	cg_trackPlayer;
+vmCvar_t 	cg_followKiller;
+vmCvar_t 	cg_followPowerup;
+vmCvar_t 	cg_ignoreMouseInput;
+vmCvar_t 	cg_filter_angles;
 vmCvar_t 	cg_smoothClients;
 vmCvar_t 	cg_loadout;
 vmCvar_t	pmove_fixed;
@@ -611,6 +615,10 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_preferredStartingWeapons, "cg_preferredStartingWeapons", "", 0x00080801 },
 	{ &cg_trueShotgun, "cg_trueShotgun", "0", 0x00081801 },
 	{ &cg_trackPlayer, "cg_trackPlayer", "-1", CVAR_CHEAT },
+	{ &cg_followKiller, "cg_followKiller", "0", CVAR_ARCHIVE },
+	{ &cg_followPowerup, "cg_followPowerup", "0", CVAR_ARCHIVE },
+	{ &cg_ignoreMouseInput, "cg_ignoreMouseInput", "0", CVAR_ARCHIVE },
+	{ &cg_filter_angles, "cg_filter_angles", "0", CVAR_ARCHIVE },
 	{ &cg_drawHitFriendTime, "cg_drawHitFriendTime", "5000", CVAR_ARCHIVE },
 	{ &cg_drawDeadFriendTime, "cg_drawDeadFriendTime", "3000", CVAR_ARCHIVE },
 	{ &cg_deadBodyDarken, "cg_deadBodyDarken", "1", CVAR_ARCHIVE },
@@ -3310,7 +3318,19 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cg_entities, 0, sizeof(cg_entities) );
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );
+	cg.spectatorPrimaryClient = -1;
+	cg.spectatorSecondaryClient = -1;
+	cg.spectatorFollowClient = -1;
+	cg.spectatorTrackedClient = -1;
+	cg.trackedPlayerClientNum = -1;
+	cg.trackedPlayerPriority = CG_SPECTATOR_TRACK_NONE;
+	cg.trackedPlayerExpireTime = 0;
+	cg.viewFilter.count = 0;
+	cg.viewFilter.index = 0;
+	cg.viewFilter.lastYaw = 0.0f;
+	cg.viewFilter.lastPitch = 0.0f;
 	CG_ParsePmoveConfigString( NULL );
+
 
 	cg.clientNum = clientNum;
 
