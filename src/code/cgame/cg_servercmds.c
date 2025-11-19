@@ -766,6 +766,7 @@ void CG_ParseServerinfo( void ) {
 	char	oldHeadOverride[MAX_QPATH];
 	const char	*modelOverride;
 	const char	*headOverride;
+	const char	*serverLoadout;
 	const char	*voteFlagsString;
 	int		voteFlags;
 
@@ -782,6 +783,17 @@ void CG_ParseServerinfo( void ) {
 	cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
+  
+	serverLoadout = Info_ValueForKey( info, "loadout" );
+	if ( !serverLoadout || !serverLoadout[0] ) {
+		serverLoadout = Info_ValueForKey( info, "g_loadout" );
+	}
+	if ( !serverLoadout ) {
+		serverLoadout = "";
+	}
+	Q_strncpyz( cgs.loadout, serverLoadout, sizeof( cgs.loadout ) );
+	trap_Cvar_Set( "cg_loadout", cgs.loadout );
+  
 	{
 		const char	*armorTieredValue;
 
@@ -793,6 +805,7 @@ void CG_ParseServerinfo( void ) {
 		cg.armorTieredEnabled = (qboolean)( atoi( armorTieredValue ) != 0 );
 		trap_Cvar_Set( "cg_armorTiered", armorTieredValue );
 	}
+  
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
 CG_SetTeamNameCvar( "g_redteam", Info_ValueForKey( info, "g_redTeam" ), DEFAULT_REDTEAM_NAME, cgs.redTeam, sizeof( cgs.redTeam ) );
