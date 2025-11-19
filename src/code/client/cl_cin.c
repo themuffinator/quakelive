@@ -34,6 +34,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "snd_local.h"
 
+#ifdef USE_FFMPEG
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
+#endif
+
 #define MAXSIZE				8
 #define MINSIZE				4
 
@@ -129,6 +135,33 @@ typedef struct {
 	int					playonwalls;
 	byte*				buf;
 	long				drawX, drawY;
+#ifdef USE_FFMPEG
+	struct {
+		AVFormatContext		*formatCtx;
+		AVCodecContext		*codecCtx;
+		AVIOContext			*ioCtx;
+		AVPacket			*packet;
+		AVFrame				*frame;
+		struct SwsContext	*swsCtx;
+		byte				*buffer;
+		byte				*ioBuffer;
+		int					streamIndex;
+		int					textureWidth;
+		int					textureHeight;
+		int					frameDuration;
+
+		int					memorySize;
+		int					ioBufferSize;
+		qboolean			initialized;
+		qboolean			eof;
+		struct {
+			const byte		*base;
+			int				length;
+			int				position;
+		} source;
+	} ffmpeg;
+	qboolean				useFFmpeg;
+#endif
 } cin_cache;
 
 static cinematics_t		cin;
@@ -163,6 +196,401 @@ static int CIN_HandleForVideo(void) {
 	return -1;
 }
 
+/*
+=============
+CIN_NextPowerOfTwo
+
+Calculates the next power-of-two value for cinematic textures.
+=============
+*/
+static int CIN_NextPowerOfTwo( int value ) {
+	int	result;
+
+	for ( result = 1 ; result < value ; result <<= 1 ) {
+		/* loop until result is at least value */
+	}
+
+	return result;
+}
+
+
+
+
+#ifdef USE_FFMPEG
+/*
+=============
+FFmpegReadPacket
+
+Supplies buffered data to FFmpeg using the virtual filesystem.
+=============
+*/
+static int FFmpegReadPacket( void *opaque, uint8_t *buf, int buf_size ) {
+	cin_cache	*cinLoc;
+	int			remaining;
+
+	cinLoc = (cin_cache *)opaque;
+	if ( !cinLoc || buf_size <= 0 ) {
+		return AVERROR_EOF;
+	}
+
+	remaining = cinLoc->ffmpeg.source.length - cinLoc->ffmpeg.source.position;
+	if ( remaining <= 0 ) {
+		return AVERROR_EOF;
+	}
+
+	if ( buf_size > remaining ) {
+		buf_size = remaining;
+	}
+
+	Com_Memcpy( buf, cinLoc->ffmpeg.source.base + cinLoc->ffmpeg.source.position, buf_size );
+	cinLoc->ffmpeg.source.position += buf_size;
+
+	return buf_size;
+}
+
+/*
+=============
+FFmpegSeek
+
+Handles seek requests for FFmpeg buffered input.
+=============
+*/
+static int64_t FFmpegSeek( void *opaque, int64_t offset, int whence ) {
+	cin_cache	*cinLoc;
+	int64_t			target;
+
+	cinLoc = (cin_cache *)opaque;
+	if ( !cinLoc ) {
+		return -1;
+	}
+
+	if ( whence == AVSEEK_SIZE ) {
+		return cinLoc->ffmpeg.source.length;
+	}
+
+	target = offset;
+	switch ( whence ) {
+		case SEEK_CUR:
+			target += cinLoc->ffmpeg.source.position;
+			break;
+		case SEEK_END:
+			target += cinLoc->ffmpeg.source.length;
+			break;
+		default:
+			break;
+	}
+
+	if ( target < 0 || target > cinLoc->ffmpeg.source.length ) {
+		return -1;
+	}
+
+	cinLoc->ffmpeg.source.position = (int)target;
+	return target;
+}
+
+/*
+=============
+CIN_ShutdownFFmpeg
+
+Releases FFmpeg decoder state for the active cinematic handle.
+=============
+*/
+static void CIN_ShutdownFFmpeg( int handle ) {
+	if ( handle < 0 || handle >= MAX_VIDEO_HANDLES ) {
+		return;
+	}
+
+	if ( !cinTable[handle].useFFmpeg ) {
+		return;
+	}
+
+	if ( cinTable[handle].ffmpeg.codecCtx ) {
+		avcodec_free_context( &cinTable[handle].ffmpeg.codecCtx );
+	}
+
+	if ( cinTable[handle].ffmpeg.formatCtx ) {
+		avformat_close_input( &cinTable[handle].ffmpeg.formatCtx );
+	}
+
+	if ( cinTable[handle].ffmpeg.frame ) {
+		av_frame_free( &cinTable[handle].ffmpeg.frame );
+	}
+
+	if ( cinTable[handle].ffmpeg.packet ) {
+		av_packet_free( &cinTable[handle].ffmpeg.packet );
+	}
+
+	if ( cinTable[handle].ffmpeg.swsCtx ) {
+		sws_freeContext( cinTable[handle].ffmpeg.swsCtx );
+		cinTable[handle].ffmpeg.swsCtx = NULL;
+	}
+
+	if ( cinTable[handle].ffmpeg.ioCtx ) {
+		av_free( cinTable[handle].ffmpeg.ioCtx );
+		cinTable[handle].ffmpeg.ioCtx = NULL;
+	}
+
+	if ( cinTable[handle].ffmpeg.ioBuffer ) {
+		av_free( cinTable[handle].ffmpeg.ioBuffer );
+		cinTable[handle].ffmpeg.ioBuffer = NULL;
+	}
+
+	if ( cinTable[handle].ffmpeg.buffer ) {
+		Z_Free( cinTable[handle].ffmpeg.buffer );
+		cinTable[handle].ffmpeg.buffer = NULL;
+	}
+
+	if ( cinTable[handle].ffmpeg.source.base ) {
+		FS_FreeFile( (void *)cinTable[handle].ffmpeg.source.base );
+		cinTable[handle].ffmpeg.source.base = NULL;
+	}
+
+	cinTable[handle].ffmpeg.source.position = 0;
+	cinTable[handle].ffmpeg.source.length = 0;
+	cinTable[handle].useFFmpeg = qfalse;
+	cinTable[handle].ffmpeg.initialized = qfalse;
+	cinTable[handle].ffmpeg.eof = qfalse;
+}
+
+/*
+=============
+CIN_InitFFmpegCinematic
+
+Initializes FFmpeg decoding for supported cinematic formats.
+=============
+*/
+static qboolean CIN_InitFFmpegCinematic( int handle, const char *name, int systemBits ) {
+	AVCodec				*codec;
+	AVStream				*stream;
+	AVRational			frameRate;
+	int					frameDuration;
+
+	(void)systemBits;
+
+	cinTable[handle].useFFmpeg = qfalse;
+	cinTable[handle].ffmpeg.eof = qfalse;
+
+	cinTable[handle].ffmpeg.source.length = FS_ReadFile( name, (void **)&cinTable[handle].ffmpeg.source.base );
+	if ( cinTable[handle].ffmpeg.source.length <= 0 ) {
+		return qfalse;
+	}
+
+	cinTable[handle].ffmpeg.source.position = 0;
+	cinTable[handle].ffmpeg.ioBufferSize = 32768;
+	cinTable[handle].ffmpeg.ioBuffer = (byte *)av_malloc( cinTable[handle].ffmpeg.ioBufferSize );
+	if ( !cinTable[handle].ffmpeg.ioBuffer ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	cinTable[handle].ffmpeg.formatCtx = avformat_alloc_context();
+	if ( !cinTable[handle].ffmpeg.formatCtx ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	cinTable[handle].ffmpeg.ioCtx = avio_alloc_context( cinTable[handle].ffmpeg.ioBuffer, cinTable[handle].ffmpeg.ioBufferSize, 0,
+		&cinTable[handle], FFmpegReadPacket, NULL, FFmpegSeek );
+	if ( !cinTable[handle].ffmpeg.ioCtx ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	cinTable[handle].ffmpeg.formatCtx->pb = cinTable[handle].ffmpeg.ioCtx;
+	cinTable[handle].ffmpeg.formatCtx->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+	if ( avformat_open_input( &cinTable[handle].ffmpeg.formatCtx, NULL, NULL, NULL ) < 0 ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	if ( avformat_find_stream_info( cinTable[handle].ffmpeg.formatCtx, NULL ) < 0 ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	cinTable[handle].ffmpeg.streamIndex = av_find_best_stream( cinTable[handle].ffmpeg.formatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0 );
+	if ( cinTable[handle].ffmpeg.streamIndex < 0 ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	stream = cinTable[handle].ffmpeg.formatCtx->streams[cinTable[handle].ffmpeg.streamIndex];
+	if ( stream->codecpar->codec_id != AV_CODEC_ID_VP8 && stream->codecpar->codec_id != AV_CODEC_ID_H264 ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	codec = avcodec_find_decoder( stream->codecpar->codec_id );
+	if ( !codec ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	cinTable[handle].ffmpeg.codecCtx = avcodec_alloc_context3( codec );
+	if ( !cinTable[handle].ffmpeg.codecCtx ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	if ( avcodec_parameters_to_context( cinTable[handle].ffmpeg.codecCtx, stream->codecpar ) < 0 ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	if ( avcodec_open2( cinTable[handle].ffmpeg.codecCtx, codec, NULL ) < 0 ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	cinTable[handle].ffmpeg.frame = av_frame_alloc();
+	cinTable[handle].ffmpeg.packet = av_packet_alloc();
+	if ( !cinTable[handle].ffmpeg.frame || !cinTable[handle].ffmpeg.packet ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	cinTable[handle].CIN_WIDTH = cinTable[handle].ffmpeg.codecCtx->width;
+	cinTable[handle].CIN_HEIGHT = cinTable[handle].ffmpeg.codecCtx->height;
+	cinTable[handle].ffmpeg.textureWidth = CIN_NextPowerOfTwo( cinTable[handle].CIN_WIDTH );
+	cinTable[handle].ffmpeg.textureHeight = CIN_NextPowerOfTwo( cinTable[handle].CIN_HEIGHT );
+	cinTable[handle].ffmpeg.memorySize = cinTable[handle].ffmpeg.textureWidth * cinTable[handle].ffmpeg.textureHeight * 4;
+	cinTable[handle].ffmpeg.buffer = (byte *)Z_Malloc( cinTable[handle].ffmpeg.memorySize );
+	if ( !cinTable[handle].ffmpeg.buffer ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+	Com_Memset( cinTable[handle].ffmpeg.buffer, 0, cinTable[handle].ffmpeg.memorySize );
+
+	cinTable[handle].ffmpeg.swsCtx = sws_getContext( cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT,
+		cinTable[handle].ffmpeg.codecCtx->pix_fmt, cinTable[handle].ffmpeg.textureWidth,
+		cinTable[handle].ffmpeg.textureHeight, AV_PIX_FMT_RGBA, SWS_BILINEAR, NULL, NULL, NULL );
+	if ( !cinTable[handle].ffmpeg.swsCtx ) {
+		CIN_ShutdownFFmpeg( handle );
+		return qfalse;
+	}
+
+	frameRate = stream->avg_frame_rate.num && stream->avg_frame_rate.den ? stream->avg_frame_rate : stream->r_frame_rate;
+	if ( !frameRate.num || !frameRate.den ) {
+		frameRate.num = 30;
+		frameRate.den = 1;
+	}
+
+	frameDuration = (int)(( (double)frameRate.den * 1000.0 ) / (double)frameRate.num);
+	if ( frameDuration <= 0 ) {
+		frameDuration = 33;
+	}
+
+	cinTable[handle].ffmpeg.frameDuration = frameDuration;
+	cinTable[handle].ffmpeg.initialized = qtrue;
+	cinTable[handle].useFFmpeg = qtrue;
+	cinTable[handle].drawX = cinTable[handle].ffmpeg.textureWidth;
+	cinTable[handle].drawY = cinTable[handle].ffmpeg.textureHeight;
+	cinTable[handle].buf = cinTable[handle].ffmpeg.buffer;
+	cinTable[handle].dirty = qtrue;
+	cinTable[handle].startTime = cinTable[handle].lastTime = CL_ScaledMilliseconds()*com_timescale->value;
+	cinTable[handle].status = FMV_PLAY;
+
+	return qtrue;
+}
+
+/*
+=============
+CIN_FFmpegDecodeFrame
+
+Decodes the next video frame through FFmpeg.
+=============
+*/
+static qboolean CIN_FFmpegDecodeFrame( int handle ) {
+	int			result;
+	int			lineSize[4];
+	uint8_t		*data[4];
+
+	if ( !cinTable[handle].ffmpeg.initialized ) {
+		return qfalse;
+	}
+
+	while ( ( result = av_read_frame( cinTable[handle].ffmpeg.formatCtx, cinTable[handle].ffmpeg.packet ) ) >= 0 ) {
+		if ( cinTable[handle].ffmpeg.packet->stream_index != cinTable[handle].ffmpeg.streamIndex ) {
+			av_packet_unref( cinTable[handle].ffmpeg.packet );
+			continue;
+		}
+
+		if ( avcodec_send_packet( cinTable[handle].ffmpeg.codecCtx, cinTable[handle].ffmpeg.packet ) < 0 ) {
+			av_packet_unref( cinTable[handle].ffmpeg.packet );
+			return qfalse;
+		}
+
+		av_packet_unref( cinTable[handle].ffmpeg.packet );
+
+		while ( ( result = avcodec_receive_frame( cinTable[handle].ffmpeg.codecCtx, cinTable[handle].ffmpeg.frame ) ) == 0 ) {
+			data[0] = cinTable[handle].ffmpeg.buffer;
+			data[1] = data[2] = data[3] = NULL;
+			lineSize[0] = cinTable[handle].ffmpeg.textureWidth * 4;
+			Com_Memset( cinTable[handle].ffmpeg.buffer, 0, cinTable[handle].ffmpeg.memorySize );
+			sws_scale( cinTable[handle].ffmpeg.swsCtx, (const uint8_t * const*)cinTable[handle].ffmpeg.frame->data,
+			cinTable[handle].ffmpeg.frame->linesize, 0, cinTable[handle].CIN_HEIGHT, data, lineSize );
+cinTable[handle].dirty = qtrue;
+cinTable[handle].ffmpeg.eof = qfalse;
+return qtrue;
+}
+
+		if ( result == AVERROR_EOF ) {
+			break;
+		}
+	}
+
+	cinTable[handle].ffmpeg.eof = qtrue;
+	return qfalse;
+}
+
+/*
+=============
+CIN_RunFFmpegCinematic
+
+Advances FFmpeg-backed cinematics based on elapsed time.
+=============
+*/
+static e_status CIN_RunFFmpegCinematic( int handle ) {
+	int			thisTime;
+
+	if ( !cinTable[handle].useFFmpeg ) {
+		return FMV_EOF;
+	}
+
+	if ( cinTable[handle].alterGameState && cls.state != CA_CINEMATIC ) {
+		return cinTable[handle].status;
+	}
+
+	if ( cinTable[handle].status == FMV_IDLE ) {
+		return FMV_IDLE;
+	}
+
+	thisTime = CL_ScaledMilliseconds()*com_timescale->value;
+	if ( thisTime - cinTable[handle].lastTime < cinTable[handle].ffmpeg.frameDuration ) {
+		return cinTable[handle].status;
+	}
+
+	while ( thisTime - cinTable[handle].lastTime >= cinTable[handle].ffmpeg.frameDuration && cinTable[handle].status == FMV_PLAY ) {
+		if ( !CIN_FFmpegDecodeFrame( handle ) ) {
+			if ( cinTable[handle].looping ) {
+				cinTable[handle].ffmpeg.source.position = 0;
+				cinTable[handle].ffmpeg.eof = qfalse;
+				av_seek_frame( cinTable[handle].ffmpeg.formatCtx, cinTable[handle].ffmpeg.streamIndex, 0, AVSEEK_FLAG_BACKWARD );
+				avcodec_flush_buffers( cinTable[handle].ffmpeg.codecCtx );
+				continue;
+			}
+
+			cinTable[handle].status = FMV_EOF;
+			break;
+		}
+
+		cinTable[handle].lastTime += cinTable[handle].ffmpeg.frameDuration;
+	}
+
+	return cinTable[handle].status;
+}
+#endif
 
 extern int CL_ScaledMilliseconds(void);
 
@@ -1372,26 +1800,37 @@ SCR_StopCinematic
 ==================
 */
 e_status CIN_StopCinematic(int handle) {
-	
+
 	if (handle < 0 || handle>= MAX_VIDEO_HANDLES || cinTable[handle].status == FMV_EOF) return FMV_EOF;
 	currentHandle = handle;
 
 	Com_DPrintf("trFMV::stop(), closing %s\n", cinTable[currentHandle].fileName);
-
-	if (!cinTable[currentHandle].buf) {
-		return FMV_EOF;
-	}
 
 	if (cinTable[currentHandle].alterGameState) {
 		if ( cls.state != CA_CINEMATIC ) {
 			return cinTable[currentHandle].status;
 		}
 	}
+
+#ifdef USE_FFMPEG
+	if ( cinTable[currentHandle].useFFmpeg ) {
+		cinTable[currentHandle].status = FMV_EOF;
+		RoQShutdown();
+		CIN_ShutdownFFmpeg( currentHandle );
+		return FMV_EOF;
+	}
+#endif
+
+	if (!cinTable[currentHandle].buf) {
+		return FMV_EOF;
+	}
+
 	cinTable[currentHandle].status = FMV_EOF;
 	RoQShutdown();
 
 	return FMV_EOF;
 }
+
 
 /*
 ==================
@@ -1404,11 +1843,17 @@ Fetch and decompress the pending frame
 
 e_status CIN_RunCinematic (int handle)
 {
-        // bk001204 - init
-	int	start = 0;
-	int     thisTime = 0;
+	// bk001204 - init
+	int		start = 0;
+	int		thisTime = 0;
 
 	if (handle < 0 || handle>= MAX_VIDEO_HANDLES || cinTable[handle].status == FMV_EOF) return FMV_EOF;
+
+#ifdef USE_FFMPEG
+	if ( cinTable[handle].useFFmpeg ) {
+		return CIN_RunFFmpegCinematic( handle );
+	}
+#endif
 
 	if (cin.currentHandle != handle) {
 		currentHandle = handle;
@@ -1444,13 +1889,13 @@ e_status CIN_RunCinematic (int handle)
 
 	start = cinTable[currentHandle].startTime;
 	while(  (cinTable[currentHandle].tfps != cinTable[currentHandle].numQuads)
-		&& (cinTable[currentHandle].status == FMV_PLAY) ) 
+		&& (cinTable[currentHandle].status == FMV_PLAY) )
 	{
 		RoQInterrupt();
 		if (start != cinTable[currentHandle].startTime) {
 			// we need to use CL_ScaledMilliseconds because of the smp mode calls from the renderer
 		  cinTable[currentHandle].tfps = ((((CL_ScaledMilliseconds()*com_timescale->value)
-							  - cinTable[currentHandle].startTime)*3)/100);
+					  - cinTable[currentHandle].startTime)*3)/100);
 			start = cinTable[currentHandle].startTime;
 		}
 	}
@@ -1472,6 +1917,7 @@ e_status CIN_RunCinematic (int handle)
 	return cinTable[currentHandle].status;
 }
 
+
 /*
 ==================
 CL_PlayCinematic
@@ -1480,10 +1926,10 @@ CL_PlayCinematic
 */
 int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBits ) {
 	unsigned short RoQID;
-	char	name[MAX_OSPATH];
-	int		i;
+	char		name[MAX_OSPATH];
+	int			i;
 
-	if (strstr(arg, "/") == NULL && strstr(arg, "\\") == NULL) {
+	if (strstr(arg, "/") == NULL && strstr(arg, "\") == NULL) {
 		Com_sprintf (name, sizeof(name), "video/%s", arg);
 	} else {
 		Com_sprintf (name, sizeof(name), "%s", arg);
@@ -1507,13 +1953,6 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 	strcpy(cinTable[currentHandle].fileName, name);
 
 	cinTable[currentHandle].ROQSize = 0;
-	cinTable[currentHandle].ROQSize = FS_FOpenFileRead (cinTable[currentHandle].fileName, &cinTable[currentHandle].iFile, qtrue);
-
-	if (cinTable[currentHandle].ROQSize<=0) {
-		Com_DPrintf("play(%s), ROQSize<=0\n", arg);
-		cinTable[currentHandle].fileName[0] = 0;
-		return -1;
-	}
 
 	CIN_SetExtents(currentHandle, x, y, w, h);
 	CIN_SetLooping(currentHandle, (systemBits & CIN_loop)!=0);
@@ -1535,8 +1974,31 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 		cinTable[currentHandle].playonwalls = cl_inGameVideo->integer;
 	}
 
+#ifdef USE_FFMPEG
+	if ( CIN_InitFFmpegCinematic( currentHandle, cinTable[currentHandle].fileName, systemBits ) ) {
+		if (cinTable[currentHandle].alterGameState) {
+			cls.state = CA_CINEMATIC;
+		}
+
+		Con_Close();
+
+		s_rawend = s_soundtime;
+
+		return currentHandle;
+	}
+#endif
+
+	cinTable[currentHandle].ROQSize = FS_FOpenFileRead (cinTable[currentHandle].fileName, &cinTable[currentHandle].iFile, qtrue);
+
+	if (cinTable[currentHandle].ROQSize<=0) {
+		Com_DPrintf("play(%s), ROQSize<=0
+", arg);
+		cinTable[currentHandle].fileName[0] = 0;
+		return -1;
+	}
+
 	initRoQ();
-					
+
 	FS_Read (cin.file, 16, cinTable[currentHandle].iFile);
 
 	RoQID = (unsigned short)(cin.file[0]) + (unsigned short)(cin.file[1])*256;
@@ -1548,23 +2010,26 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 		Sys_BeginStreamedFile( cinTable[currentHandle].iFile, 0x10000 );
 
 		cinTable[currentHandle].status = FMV_PLAY;
-		Com_DPrintf("trFMV::play(), playing %s\n", arg);
+		Com_DPrintf("trFMV::play(), playing %s
+", arg);
 
 		if (cinTable[currentHandle].alterGameState) {
 			cls.state = CA_CINEMATIC;
 		}
-		
+
 		Con_Close();
 
 		s_rawend = s_soundtime;
 
 		return currentHandle;
 	}
-	Com_DPrintf("trFMV::play(), invalid RoQ ID\n");
+	Com_DPrintf("trFMV::play(), invalid RoQ ID
+");
 
 	RoQShutdown();
 	return -1;
 }
+
 
 void CIN_SetExtents (int handle, int x, int y, int w, int h) {
 	if (handle < 0 || handle>= MAX_VIDEO_HANDLES || cinTable[handle].status == FMV_EOF) return;
@@ -1731,7 +2196,7 @@ void CIN_UploadCinematic(int handle) {
 				}
 			}
 		}
-		re.UploadCinematic( 256, 256, 256, 256, cinTable[handle].buf, handle, cinTable[handle].dirty);
+			re.UploadCinematic( cinTable[handle].drawX, cinTable[handle].drawY, cinTable[handle].drawX, cinTable[handle].drawY, cinTable[handle].buf, handle, cinTable[handle].dirty);
 		if (cl_inGameVideo->integer == 0 && cinTable[handle].playonwalls == 1) {
 			cinTable[handle].playonwalls--;
 		}
