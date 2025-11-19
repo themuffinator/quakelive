@@ -247,7 +247,14 @@ static void CG_Item( centity_t *cent ) {
 		memset( &ent, 0, sizeof( ent ) );
 		ent.reType = RT_SPRITE;
 		VectorCopy( cent->lerpOrigin, ent.origin );
-		ent.radius = 14;
+		if ( cg.simpleItemsBob > 0.0f ) {
+			float		spriteBobScale;
+
+			spriteBobScale = 0.005f + cent->currentState.number * 0.00001f;
+			ent.origin[2] += cos( ( cg.time + 1000 ) * spriteBobScale ) * cg.simpleItemsBob;
+		}
+		ent.origin[2] += cg.simpleItemsHeightOffset;
+		ent.radius = cg.simpleItemsRadius;
 		ent.customShader = cg_items[es->modelindex].icon;
 		ent.shaderRGBA[0] = 255;
 		ent.shaderRGBA[1] = 255;

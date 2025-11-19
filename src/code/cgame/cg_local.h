@@ -667,6 +667,9 @@ typedef struct {
 	float		v_dmg_roll;
 	float		kickScale;
 	float		bobScale;
+	float		simpleItemsHeightOffset;
+	float		simpleItemsRadius;
+	float		simpleItemsBob;
 
 	vec3_t		kick_angles;	// weapon kicks
 	vec3_t		kick_origin;
@@ -1259,6 +1262,9 @@ extern	vmCvar_t		cg_tracerLength;
 extern	vmCvar_t		cg_autoswitch;
 extern	vmCvar_t		cg_ignore;
 extern	vmCvar_t		cg_simpleItems;
+extern	vmCvar_t		cg_simpleItemsHeightOffset;
+extern	vmCvar_t		cg_simpleItemsBob;
+extern	vmCvar_t		cg_simpleItemsRadius;
 extern	vmCvar_t		cg_fov;
 extern	vmCvar_t		cg_zoomFov;
 extern	vmCvar_t		cg_zoomToggle;
