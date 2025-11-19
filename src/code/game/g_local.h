@@ -797,6 +797,14 @@ typedef struct {
 	int		practiceFlags;
 } adminConfig_t;
 
+#define MAX_ADMIN_ACCESS_ENTRIES	128
+#define MAX_ADMIN_STEAMID_LENGTH	32
+
+typedef struct {
+	char		steamId[MAX_ADMIN_STEAMID_LENGTH];
+	int			privilegeTier;
+} adminAccessEntry_t;
+
 typedef struct {
 	struct gclient_s	*clients;		// [maxclients]
 
@@ -911,6 +919,8 @@ typedef struct {
 	qboolean		matchAllowItemDrops;
 	qboolean		matchAllowItemBounce;
 	adminConfig_t	adminConfig;
+	int			adminAccessEntryCount;
+	adminAccessEntry_t	adminAccessList[MAX_ADMIN_ACCESS_ENTRIES];
 	freezeRoundConfig_t	freezeConfig;
 	int			freezeLivingCount[TEAM_NUM_TEAMS];
 	int			freezeLivingHealth[TEAM_NUM_TEAMS];
@@ -937,6 +947,7 @@ qboolean	G_SpawnInt( const char *key, const char *defaultString, int *out );
 qboolean	G_SpawnVector( const char *key, const char *defaultString, float *out );
 void	G_InitSpawnQueue( void );
 void	G_SyncMatchFactoryConfigToLevel( void );
+int		G_AdminAccessForSteamID( const char *steamId );
 qboolean	G_FreezeGametypeEnabled( void );
 void	G_FreezeSyncCvars( void );
 void	G_FreezeInitClient( gentity_t *ent );
