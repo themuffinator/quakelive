@@ -1,7 +1,7 @@
 # HUD & Menu Asset Audit
 
 ## Scope
-This audit compares the Quake Live reference snapshot in `references/original-assets/quakelive/baseq3/ui` against the GPL tree under `src/ui`. It captures the state of script coverage, supporting assets, and build integration tasks required to reproduce Quake Live’s HUD and menu presentation inside the open-source build.
+This audit compares the Quake Live reference snapshot in `assets/quakelive/baseq3/ui` against the GPL tree under `src/ui`. It captures the state of script coverage, supporting assets, and build integration tasks required to reproduce Quake Live’s HUD and menu presentation inside the open-source build.
 
 ## Inventory Snapshot
 ### Definition Parity

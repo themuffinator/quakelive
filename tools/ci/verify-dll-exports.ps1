@@ -51,7 +51,7 @@ if (-not $dumpbin) {
     throw 'dumpbin.exe is required to validate the Quake Live reference DLLs.'
 }
 
-$referenceDir = Join-Path $RepoRoot 'references/original-assets/quakelive/baseq3'
+$referenceDir = Join-Path $RepoRoot 'assets/quakelive/baseq3'
 $targets = @(
     @{ Name = 'qagamex86.dll'; Imports = @('MSVCR100.dll', 'MSVCP100.dll') },
     @{ Name = 'cgamex86.dll'; Imports = @('MSVCR100.dll') },

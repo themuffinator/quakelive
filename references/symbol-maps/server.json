@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "binary": "server",
-  "input_path": "references/original-assets/server.x86",
+  "input_path": "assets/server.x86",
   "generated_at": "2024-05-01T00:00:00Z",
   "normalization": {
     "alias_source": "references/analysis/quakelive_symbol_aliases.json",
