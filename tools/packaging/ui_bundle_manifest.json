@@ -32,6 +32,30 @@
       "license": "Apache License 2.0 (Google Droid Sans Fallback)."
     },
     {
+      "source": "assets/quakelive/baseq3/default.cfg",
+      "destination": "default.cfg",
+      "license": "Quake Live retail configuration defaults required by engine bootstrap."
+    },
+    {
+      "source": "assets/quakelive/baseq3/tim.cfg",
+      "destination": "tim.cfg",
+      "license": "Quake Live profile snapshot packaged for tutorial flows."
+    },
+    {
+      "source": "assets/quakelive/baseq3/sponge.cfg",
+      "destination": "sponge.cfg",
+      "license": "Quake Live profile snapshot packaged for tutorial flows."
+    },
+    {
+      "source": "assets/quakelive/baseq3/ttimo.cfg",
+      "destination": "ttimo.cfg",
+      "license": "Quake Live profile snapshot packaged for tutorial flows."
+    },
+    {
+      "source": "assets/quakelive/baseq3/syncerror.cfg",
+      "destination": "syncerror.cfg",
+      "license": "Quake Live profile snapshot packaged for tutorial flows."
+    },
       "source_dir": "assets/quakelive/baseq3/scripts",
       "destination": "scripts",
       "include": ["ui*.shader"],
