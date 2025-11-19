@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cg_weapons.c -- events and effects dealing with weapons
 #include "cg_local.h"
 
+#define CG_PREDICTED_HITSCAN_LIFETIME 200
+
 typedef struct {
 	const char	*shaderName;
 	int		segments;
@@ -1150,73 +1152,113 @@ angle)
 ===============
 */
 static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
-	trace_t  trace;
-	refEntity_t  beam;
-	vec3_t   forward;
-	vec3_t   muzzlePoint, endPoint;
+	trace_t	 trace;
+	refEntity_t	 beam;
+	vec3_t	 forward;
+	vec3_t	 muzzlePoint, endPoint;
+	qboolean	 usedPrediction;
+	qboolean	 addImpact;
+	vec3_t	 storedStart;
+	vec3_t	 storedEnd;
+	qboolean	 storedHit;
+	vec3_t	 impactPoint;
 
-	if (cent->currentState.weapon != WP_LIGHTNING) {
+	if ( cent->currentState.weapon != WP_LIGHTNING ) {
 		return;
 	}
 
 	memset( &beam, 0, sizeof( beam ) );
+	usedPrediction = qfalse;
+	addImpact = qfalse;
 
-	// CPMA  "true" lightning
-	if ((cent->currentState.number == cg.predictedPlayerState.clientNum) && (cg_trueLightning.value != 0)) {
-		vec3_t angle;
-		int i;
-
-		for (i = 0; i < 3; i++) {
-			float a = cent->lerpAngles[i] - cg.refdefViewAngles[i];
-			if (a > 180) {
-				a -= 360;
-			}
-			if (a < -180) {
-				a += 360;
-			}
-
-			angle[i] = cg.refdefViewAngles[i] + a * (1.0 - cg_trueLightning.value);
-			if (angle[i] < 0) {
-				angle[i] += 360;
-			}
-			if (angle[i] > 360) {
-				angle[i] -= 360;
-			}
+	if ( cg_predictLocalRailshots.integer && cent->currentState.number == cg.predictedPlayerState.clientNum ) {
+		if ( CG_GetStoredPredictedBeam( WP_LIGHTNING, storedStart, storedEnd, &storedHit ) ) {
+			usedPrediction = qtrue;
+			addImpact = storedHit;
+			VectorCopy( storedStart, beam.origin );
+			VectorCopy( storedEnd, beam.oldorigin );
+			VectorCopy( storedEnd, impactPoint );
 		}
-
-		AngleVectors(angle, forward, NULL, NULL );
-		VectorCopy(cent->lerpOrigin, muzzlePoint );
-//		VectorCopy(cg.refdef.vieworg, muzzlePoint );
-	} else {
-		// !CPMA
-		AngleVectors( cent->lerpAngles, forward, NULL, NULL );
-		VectorCopy(cent->lerpOrigin, muzzlePoint );
 	}
 
-	// FIXME: crouch
-	muzzlePoint[2] += DEFAULT_VIEWHEIGHT;
+	if ( !usedPrediction ) {
+		// CPMA  "true" lightning
+		if ( ( cent->currentState.number == cg.predictedPlayerState.clientNum ) && ( cg_trueLightning.value != 0 ) ) {
+			vec3_t angle;
+			int i;
 
-	VectorMA( muzzlePoint, 14, forward, muzzlePoint );
+			for ( i = 0; i < 3; i++ ) {
+				float a = cent->lerpAngles[i] - cg.refdefViewAngles[i];
+				if ( a > 180 ) {
+					a -= 360;
+				}
+				if ( a < -180 ) {
+					a += 360;
+				}
 
-	// project forward by the lightning range
-	VectorMA( muzzlePoint, LIGHTNING_RANGE, forward, endPoint );
+				angle[i] = cg.refdefViewAngles[i] + a * ( 1.0 - cg_trueLightning.value );
+				if ( angle[i] < 0 ) {
+					angle[i] += 360;
+				}
+				if ( angle[i] > 360 ) {
+					angle[i] -= 360;
+				}
+			}
 
-	// see if it hit a wall
-	CG_Trace( &trace, muzzlePoint, vec3_origin, vec3_origin, endPoint, 
-		cent->currentState.number, MASK_SHOT );
+			AngleVectors( angle, forward, NULL, NULL );
+			VectorCopy( cent->lerpOrigin, muzzlePoint );
+		} else {
+			AngleVectors( cent->lerpAngles, forward, NULL, NULL );
+			VectorCopy( cent->lerpOrigin, muzzlePoint );
+		}
 
-	// this is the endpoint
-	VectorCopy( trace.endpos, beam.oldorigin );
+		// FIXME: crouch
+		muzzlePoint[2] += DEFAULT_VIEWHEIGHT;
 
-	// use the provided origin, even though it may be slightly
-	// different than the muzzle origin
-	VectorCopy( origin, beam.origin );
+		VectorMA( muzzlePoint, 14, forward, muzzlePoint );
+
+		// project forward by the lightning range
+		VectorMA( muzzlePoint, LIGHTNING_RANGE, forward, endPoint );
+
+		// see if it hit a wall
+		CG_Trace( &trace, muzzlePoint, vec3_origin, vec3_origin, endPoint,
+				cent->currentState.number, MASK_SHOT );
+
+		// this is the endpoint
+		VectorCopy( trace.endpos, beam.oldorigin );
+
+		// use the provided origin, even though it may be slightly
+		// different than the muzzle origin
+		VectorCopy( origin, beam.origin );
+		VectorCopy( trace.endpos, impactPoint );
+		addImpact = ( trace.fraction < 1.0f );
+	}
 
 	beam.reType = RT_LIGHTNING;
 	beam.customShader = CG_LightningCurrentShader();
 	CG_SubmitLightningBeams( &beam, CG_LightningSegmentCount() );
 
 	// add the impact flare if it hit something
+	if ( addImpact ) {
+		vec3_t angles;
+		vec3_t dir;
+
+		VectorSubtract( beam.oldorigin, beam.origin, dir );
+		VectorNormalize( dir );
+
+		memset( &beam, 0, sizeof( beam ) );
+		beam.hModel = cgs.media.lightningExplosionModel;
+
+		VectorMA( impactPoint, -16, dir, beam.origin );
+
+		// make a random orientation
+		angles[0] = rand() % 360;
+		angles[1] = rand() % 360;
+		angles[2] = rand() % 360;
+		AnglesToAxis( angles, beam.axis );
+		trap_R_AddRefEntityToScene( &beam );
+  }
+  
 	if ( trace.fraction < 1.0 ) {
 		vec3_t	dir;
 
@@ -1224,6 +1266,7 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 		VectorNormalize( dir );
 		CG_DrawLightningImpact( trace.endpos, dir );
 	}
+
 }
 /*
 
@@ -1290,6 +1333,104 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 */
 
 /*
+=============
+CG_BuildPredictedBeam
+
+Builds the predicted muzzle start/end pair for local hitscan weapons.
+=============
+*/
+static qboolean CG_BuildPredictedBeam( centity_t *cent, weapon_t weapon, vec3_t start, vec3_t end, qboolean *hitWorld ) {
+	trace_t	trace;
+	vec3_t	forward;
+	vec3_t	right;
+	vec3_t	up;
+	vec3_t	muzzle;
+	vec3_t	traceStart;
+	vec3_t	finish;
+	qboolean	localHit;
+
+	if ( !cg_predictLocalRailshots.integer ) {
+		return qfalse;
+	}
+	if ( cent->currentState.number != cg.predictedPlayerState.clientNum ) {
+		return qfalse;
+	}
+	if ( weapon != WP_RAILGUN && weapon != WP_LIGHTNING ) {
+		return qfalse;
+	}
+
+	VectorCopy( cg.predictedPlayerState.origin, muzzle );
+	muzzle[2] += cg.predictedPlayerState.viewheight;
+	AngleVectors( cg.predictedPlayerState.viewangles, forward, right, up );
+	VectorMA( muzzle, 14, forward, muzzle );
+
+	VectorCopy( muzzle, traceStart );
+	VectorCopy( muzzle, start );
+	if ( weapon == WP_RAILGUN ) {
+		VectorMA( start, 4, right, start );
+		VectorMA( start, -1, up, start );
+		VectorMA( traceStart, 8192, forward, finish );
+	} else {
+		VectorMA( traceStart, LIGHTNING_RANGE, forward, finish );
+	}
+
+	CG_Trace( &trace, traceStart, vec3_origin, vec3_origin, finish, cent->currentState.number, MASK_SHOT );
+	VectorCopy( trace.endpos, end );
+	localHit = ( trace.fraction < 1.0f );
+	if ( hitWorld ) {
+		*hitWorld = localHit;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_GetStoredPredictedBeam
+
+Returns the cached start/end data for a previously predicted hitscan.
+=============
+*/
+static qboolean CG_GetStoredPredictedBeam( weapon_t weapon, vec3_t start, vec3_t end, qboolean *hitWorld ) {
+	if ( !cg_predictLocalRailshots.integer ) {
+		return qfalse;
+	}
+
+	switch ( weapon ) {
+	case WP_RAILGUN:
+		if ( !cg.predictedLocalRailValid ) {
+			return qfalse;
+		}
+		if ( cg.time - cg.predictedLocalRailTime > CG_PREDICTED_HITSCAN_LIFETIME ) {
+			return qfalse;
+		}
+		VectorCopy( cg.predictedLocalRailStart, start );
+		VectorCopy( cg.predictedLocalRailEnd, end );
+		if ( hitWorld ) {
+			*hitWorld = cg.predictedLocalRailHit;
+		}
+		return qtrue;
+	case WP_LIGHTNING:
+		if ( !cg.predictedLocalLightningValid ) {
+			return qfalse;
+		}
+		if ( cg.time - cg.predictedLocalLightningTime > CG_PREDICTED_HITSCAN_LIFETIME ) {
+			return qfalse;
+		}
+		VectorCopy( cg.predictedLocalLightningStart, start );
+		VectorCopy( cg.predictedLocalLightningEnd, end );
+		if ( hitWorld ) {
+			*hitWorld = cg.predictedLocalLightningHit;
+		}
+		return qtrue;
+	default:
+		break;
+	}
+
+	return qfalse;
+}
+
+/*
 ===============
 CG_SpawnRailTrail
 
@@ -1297,18 +1438,29 @@ Origin will be the exact tag point, which is slightly
 different than the muzzle point used for determining hits.
 ===============
 */
-static void CG_SpawnRailTrail( centity_t *cent, vec3_t origin ) {
+static void CG_SpawnRailTrail( centity_t *cent, vec3_t origin, qboolean forcePredicted ) {
 	clientInfo_t	*ci;
+	vec3_t	start;
+	vec3_t	end;
 
 	if ( cent->currentState.weapon != WP_RAILGUN ) {
 		return;
 	}
-	if ( !cent->pe.railgunFlash ) {
-		return;
+	if ( forcePredicted ) {
+		if ( !CG_GetStoredPredictedBeam( WP_RAILGUN, start, end, NULL ) ) {
+			forcePredicted = qfalse;
+		}
 	}
-	cent->pe.railgunFlash = qtrue;
+	if ( !forcePredicted ) {
+		if ( !cent->pe.railgunFlash ) {
+			return;
+		}
+		cent->pe.railgunFlash = qtrue;
+		VectorCopy( origin, start );
+		VectorCopy( cent->pe.railgunImpact, end );
+	}
 	ci = &cgs.clientinfo[ cent->currentState.clientNum ];
-	CG_RailTrail( ci, origin, cent->pe.railgunImpact );
+	CG_RailTrail( ci, start, end );
 }
 
 
@@ -1394,11 +1546,13 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	qboolean	drawFlash;
 	qboolean	continuousFlash;
 //	int	col;
+	qboolean	allowPredictedHitScan;
 
 	weaponNum = cent->currentState.weapon;
 
 	CG_RegisterWeapon( weaponNum );
 	weapon = &cg_weapons[weaponNum];
+	allowPredictedHitScan = ( ps && cg_predictLocalRailshots.integer && cent->currentState.number == cg.predictedPlayerState.clientNum );
 	drawFlash = ( cg_muzzleFlash.integer != 0 );
 	continuousFlash = ( weaponNum == WP_LIGHTNING || weaponNum == WP_GAUNTLET || weaponNum == WP_GRAPPLING_HOOK );
 
@@ -1524,7 +1678,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		CG_LightningBolt( nonPredictedCent, flash.origin );
 
 		// add rail trail
-		CG_SpawnRailTrail( cent, flash.origin );
+		CG_SpawnRailTrail( cent, flash.origin, ( allowPredictedHitScan && weaponNum == WP_RAILGUN ) );
 
 		if ( weapon->flashDlightColor[0] || weapon->flashDlightColor[1] || weapon->flashDlightColor[2] ) {
 			trap_R_AddLightToScene( flash.origin, 300 + (rand()&31), weapon->flashDlightColor[0],
@@ -1892,6 +2046,37 @@ void CG_FireWeapon( centity_t *cent ) {
 	// append the flash to the weapon model
 	if ( cg_muzzleFlash.integer ) {
 		cent->muzzleFlashTime = cg.time;
+	}
+
+	if ( cg_predictLocalRailshots.integer && cent->currentState.number == cg.predictedPlayerState.clientNum ) {
+		vec3_t		predictedStart;
+		vec3_t		predictedEnd;
+		qboolean		hitWorld = qfalse;
+
+		if ( ent->weapon == WP_RAILGUN ) {
+			if ( CG_BuildPredictedBeam( cent, WP_RAILGUN, predictedStart, predictedEnd, &hitWorld ) ) {
+				cg.predictedLocalRailValid = qtrue;
+				cg.predictedLocalRailTime = cg.time;
+				cg.predictedLocalRailHit = hitWorld;
+				VectorCopy( predictedStart, cg.predictedLocalRailStart );
+				VectorCopy( predictedEnd, cg.predictedLocalRailEnd );
+				cent->pe.railgunFlash = qtrue;
+				VectorCopy( predictedEnd, cent->pe.railgunImpact );
+			} else {
+				cg.predictedLocalRailValid = qfalse;
+			}
+		} else if ( ent->weapon == WP_LIGHTNING ) {
+			if ( CG_BuildPredictedBeam( cent, WP_LIGHTNING, predictedStart, predictedEnd, &hitWorld ) ) {
+				cg.predictedLocalLightningValid = qtrue;
+				cg.predictedLocalLightningTime = cg.time;
+				cg.predictedLocalLightningHit = hitWorld;
+				VectorCopy( predictedStart, cg.predictedLocalLightningStart );
+				VectorCopy( predictedEnd, cg.predictedLocalLightningEnd );
+				CG_LightningBoltBeam( predictedStart, predictedEnd );
+			} else {
+				cg.predictedLocalLightningValid = qfalse;
+			}
+		}
 	}
 
 	// lightning gun only does this this on initial press

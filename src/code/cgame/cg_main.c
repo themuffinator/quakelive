@@ -342,6 +342,7 @@ vmCvar_t	cg_oldRail;
 vmCvar_t	cg_oldRocket;
 vmCvar_t	cg_oldPlasma;
 vmCvar_t	cg_trueLightning;
+vmCvar_t	cg_predictLocalRailshots;
 vmCvar_t	cg_lightningStyle;
 vmCvar_t	cg_lightningImpact;
 vmCvar_t	cg_lightningImpactCap;
@@ -591,6 +592,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_oldRocket, "cg_oldRocket", "1", CVAR_ARCHIVE},
 	{ &cg_oldPlasma, "cg_oldPlasma", "1", CVAR_ARCHIVE},
 	{ &cg_trueLightning, "cg_trueLightning", "0.0", CVAR_ARCHIVE },
+	{ &cg_predictLocalRailshots, "cg_predictLocalRailshots", "0", CVAR_ARCHIVE },
 	{ &cg_lightningStyle, "cg_lightningStyle", "1", CVAR_ARCHIVE },
 	{ &cg_lightningImpact, "cg_lightningImpact", "1", CVAR_ARCHIVE },
 	{ &cg_lightningImpactCap, "cg_lightningImpactCap", "512", CVAR_ARCHIVE },
