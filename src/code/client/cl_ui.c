@@ -898,7 +898,7 @@ int CL_UISystemCalls( int *args ) {
 		return re.RegisterSkin( VMA(1) );
 
 	case UI_R_REGISTERSHADERNOMIP:
-		return re.RegisterShaderNoMip( VMA(1) );
+		return CL_Steam_RegisterShader( VMA(1) );
 
 	case UI_R_CLEARSCENE:
 		re.ClearScene();

@@ -2356,7 +2356,9 @@ void CL_Init( void ) {
 
 	// cgame might not be initialized before menu is used
 	Cvar_Get ("cg_viewsize", "100", CVAR_ARCHIVE );
-
+	
+	CL_InitSteamResources();
+	
 	//
 	// register our commands
 	//
@@ -2414,12 +2416,13 @@ void CL_Shutdown( void ) {
 	recursive = qtrue;
 
 	CL_Disconnect( qtrue );
-
+	
 	S_Shutdown();
 	CL_ShutdownRef();
 	
 	CL_ShutdownUI();
-
+	CL_ShutdownSteamResources();
+	
 	Cmd_RemoveCommand ("cmd");
 	Cmd_RemoveCommand ("configstrings");
 	Cmd_RemoveCommand ("userinfo");

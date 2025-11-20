@@ -413,13 +413,14 @@ Q3OBJ = \
 	$(B)/client/cl_input.o \
 	$(B)/client/cl_keys.o \
 	$(B)/client/cl_main.o \
-        $(B)/client/cl_net_chan.o \
-        $(B)/client/cl_parse.o \
-        $(B)/client/cl_scrn.o \
-        $(B)/client/cl_ui.o \
-        $(B)/client/ql_auth.o \
-        $(B)/client/platform_services.o \
-        \
+	$(B)/client/cl_net_chan.o \
+	$(B)/client/cl_parse.o \
+	$(B)/client/cl_scrn.o \
+	$(B)/client/cl_steam_resources.o \
+	$(B)/client/cl_ui.o \
+	$(B)/client/ql_auth.o \
+	$(B)/client/platform_services.o \
+	\
         $(B)/client/cm_load.o \
 	$(B)/client/cm_patch.o \
 	$(B)/client/cm_polylib.o \
@@ -660,9 +661,10 @@ $(B)/client/cl_console.o : $(CDIR)/cl_console.c; $(DO_CC)
 $(B)/client/cl_input.o : $(CDIR)/cl_input.c; $(DO_CC)   
 $(B)/client/cl_keys.o : $(CDIR)/cl_keys.c; $(DO_CC)     
 $(B)/client/cl_main.o : $(CDIR)/cl_main.c; $(DO_CC)     
-$(B)/client/cl_net_chan.o : $(CDIR)/cl_net_chan.c; $(DO_CC)  
-$(B)/client/cl_parse.o : $(CDIR)/cl_parse.c; $(DO_CC)   
-$(B)/client/cl_scrn.o : $(CDIR)/cl_scrn.c; $(DO_CC)    
+$(B)/client/cl_net_chan.o : $(CDIR)/cl_net_chan.c; $(DO_CC)
+$(B)/client/cl_parse.o : $(CDIR)/cl_parse.c; $(DO_CC)
+$(B)/client/cl_scrn.o : $(CDIR)/cl_scrn.c; $(DO_CC)
+$(B)/client/cl_steam_resources.o : $(CDIR)/cl_steam_resources.c; $(DO_CC)
 $(B)/client/cl_ui.o : $(CDIR)/cl_ui.c; $(DO_CC)
 $(B)/client/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC)
 $(B)/client/platform_services.o : $(MOUNT_DIR)/common/platform/platform_services.c; $(DO_CC)
@@ -1527,11 +1529,12 @@ Q3SOBJ = \
 	$(B)/q3static/cl_input.o \
 	$(B)/q3static/cl_keys.o \
 	$(B)/q3static/cl_main.o \
-        $(B)/q3static/cl_net_chan.o \
-        $(B)/q3static/cl_parse.o \
-        $(B)/q3static/cl_scrn.o \
-        $(B)/q3static/cl_ui.o \
-        $(B)/q3static/ql_auth.o \
+$(B)/q3static/cl_net_chan.o \
+$(B)/q3static/cl_parse.o \
+$(B)/q3static/cl_scrn.o \
+$(B)/q3static/cl_steam_resources.o \
+$(B)/q3static/cl_ui.o \
+$(B)/q3static/ql_auth.o \
         $(B)/q3static/platform_services.o \
         \
         $(B)/q3static/cm_load.o \
@@ -1706,9 +1709,10 @@ $(B)/q3static/cl_console.o : $(CDIR)/cl_console.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_input.o : $(CDIR)/cl_input.c; $(DO_CC) -DQ3_STATIC 
 $(B)/q3static/cl_keys.o : $(CDIR)/cl_keys.c; $(DO_CC) -DQ3_STATIC 
 $(B)/q3static/cl_main.o : $(CDIR)/cl_main.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/cl_net_chan.o : $(CDIR)/cl_net_chan.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/cl_parse.o : $(CDIR)/cl_parse.c; $(DO_CC) -DQ3_STATIC 
-$(B)/q3static/cl_scrn.o : $(CDIR)/cl_scrn.c; $(DO_CC) -DQ3_STATIC    
+$(B)/q3static/cl_net_chan.o : $(CDIR)/cl_net_chan.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/cl_parse.o : $(CDIR)/cl_parse.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/cl_scrn.o : $(CDIR)/cl_scrn.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/cl_steam_resources.o : $(CDIR)/cl_steam_resources.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_ui.o : $(CDIR)/cl_ui.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/platform_services.o : $(MOUNT_DIR)/common/platform/platform_services.c; $(DO_CC) -DQ3_STATIC
