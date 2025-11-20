@@ -249,6 +249,7 @@ typedef struct searchpath_s {
 static	char		fs_gamedir[MAX_OSPATH];	// this will be a single file name with no separators
 static	cvar_t		*fs_debug;
 static	cvar_t		*fs_homepath;
+static	cvar_t		*fs_webpath;
 static	cvar_t		*fs_basepath;
 static	cvar_t		*fs_basegame;
 static	cvar_t		*fs_cdpath;
@@ -256,6 +257,7 @@ static	cvar_t		*fs_copyfiles;
 static	cvar_t		*fs_webpath;
 static	cvar_t		*fs_gamedirvar;
 static	cvar_t		*fs_restrict;
+static	cvar_t		*fs_webMappings;
 static	searchpath_t	*fs_searchpaths;
 static	int			fs_readCount;			// total bytes read
 static	int			fs_loadCount;			// total files read
@@ -264,6 +266,16 @@ static	int			fs_packFiles;			// total number of files in packs
 
 static int fs_fakeChkSum;
 static int fs_checksumFeed;
+
+typedef struct {
+	char				prefix[MAX_OSPATH];
+	char				base[MAX_OSPATH];
+	qboolean		useHomepath;
+} fsFallbackMapping_t;
+
+static fsFallbackMapping_t	fs_fallbackMappings[FS_MAX_FALLBACK_MAPPINGS];
+static int					fs_fallbackMappingCount = 0;
+static fsFallbackMetrics_t	fs_fallbackMetrics;
 
 typedef union qfile_gus {
 	FILE*		o;
@@ -359,7 +371,7 @@ int FS_LoadStack()
 {
 	return fs_loadStack;
 }
-                      
+
 /*
 ================
 return a hash value for the filename
@@ -407,7 +419,7 @@ static FILE	*FS_FileForHandle( fileHandle_t f ) {
 	if ( ! fsh[f].handleFiles.file.o ) {
 		Com_Error( ERR_DROP, "FS_FileForHandle: NULL" );
 	}
-	
+
 	return fsh[f].handleFiles.file.o;
 }
 
@@ -469,7 +481,7 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 	char	temp[MAX_OSPATH];
 	static char ospath[2][MAX_OSPATH];
 	static int toggle;
-	
+
 	toggle ^= 1;		// flip-flop to allow two returns without clash
 
 	if( !game || !game[0] ) {
@@ -479,7 +491,7 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 	Com_sprintf( temp, sizeof(temp), "/%s/%s", game, qpath );
 	FS_ReplaceSeparators( temp );	
 	Com_sprintf( ospath[toggle], sizeof( ospath[0] ), "%s%s", base, temp );
-	
+
 	return ospath[toggle];
 }
 
@@ -575,7 +587,7 @@ Creates any directories needed to store the given filename
 */
 static qboolean FS_CreatePath (char *OSPath) {
 	char	*ofs;
-	
+
 	// make absolutely sure that it can't back up the path
 	// FIXME: is c: allowed???
 	if ( strstr( OSPath, ".." ) || strstr( OSPath, "::" ) ) {
@@ -814,8 +826,8 @@ Tests if the file exists
 */
 qboolean FS_SV_FileExists( const char *file )
 {
-	FILE *f;
-	char *testpath;
+FILE *f;
+char *testpath;
 
 	testpath = FS_BuildOSPath( fs_homepath->string, file, "");
 	testpath[strlen(testpath)-1] = '\0';
@@ -824,16 +836,249 @@ qboolean FS_SV_FileExists( const char *file )
 	if (f) {
 		fclose( f );
 		return qtrue;
+}
+return qfalse;
+}
+
+static const char *const fs_defaultFallbackMappings = "https://cdn.quakelive.com/=web;http://localhost/=web;quakelive://screenshots/=home:screenshots";
+
+/*
+=============
+	FS_ClearFallbackMappings
+
+	Resets the configured web fallback mapping table.
+	=============
+*/
+static void FS_ClearFallbackMappings( void ) {
+	fs_fallbackMappingCount = 0;
+	Com_Memset( fs_fallbackMappings, 0, sizeof( fs_fallbackMappings ) );
+	Com_Memset( &fs_fallbackMetrics, 0, sizeof( fs_fallbackMetrics ) );
 	}
+
+/*
+	=============
+	FS_AddFallbackMapping
+
+	Adds a mapping entry that rewrites URL prefixes into filesystem-relative paths.
+	=============
+*/
+static void FS_AddFallbackMapping( const char *prefix, const char *base, qboolean useHomepath ) {
+	fsFallbackMapping_t *slot;
+
+	if ( !prefix || !*prefix || fs_fallbackMappingCount >= FS_MAX_FALLBACK_MAPPINGS ) {
+	return;
+	}
+
+	slot = &fs_fallbackMappings[fs_fallbackMappingCount++];
+	Q_strncpyz( slot->prefix, prefix, sizeof( slot->prefix ) );
+	Q_strncpyz( slot->base, base ? base : "", sizeof( slot->base ) );
+	slot->useHomepath = useHomepath;
+	}
+
+/*
+=============
+FS_ParseFallbackMappings
+
+Parses the fs_webMappings cvar into a list of prefix-to-filesystem mappings.
+=============
+*/
+static void FS_ParseFallbackMappings( const char *rawMappings ) {
+	char entry[MAX_OSPATH * 2];
+	const char *cursor;
+
+	FS_ClearFallbackMappings();
+	if ( !rawMappings || !*rawMappings ) {
+	return;
+	}
+
+	cursor = rawMappings;
+	while ( *cursor ) {
+	const char *separator;
+	const char *terminator;
+	qboolean useHomepath;
+	char prefix[MAX_OSPATH];
+	char target[MAX_OSPATH];
+
+	separator = strchr( cursor, ';' );
+	if ( !separator ) {
+	separator = cursor + strlen( cursor );
+	}
+
+	terminator = strchr( cursor, '=' );
+	if ( !terminator || terminator > separator ) {
+	break;
+	}
+
+	Com_Memset( entry, 0, sizeof( entry ) );
+	Q_strncpyz( entry, cursor, separator - cursor + 1 );
+	entry[separator - cursor] = '\0';
+
+	Com_Memset( prefix, 0, sizeof( prefix ) );
+	Com_Memset( target, 0, sizeof( target ) );
+
+	Q_strncpyz( prefix, entry, terminator - cursor + 1 );
+	prefix[terminator - cursor] = '\0';
+	Q_strncpyz( target, terminator + 1, sizeof( target ) );
+
+	useHomepath = ( Q_stricmpn( target, "home", 4 ) == 0 );
+	if ( target[0] && target[4] == ':' ) {
+	char adjusted[MAX_OSPATH];
+	Q_strncpyz( adjusted, target + 5, sizeof( adjusted ) );
+	Q_strncpyz( target, adjusted, sizeof( target ) );
+	}
+
+	FS_AddFallbackMapping( prefix, target, useHomepath );
+
+	cursor = (*separator == ';') ? separator + 1 : separator;
+	}
+	}
+
+/*
+	=============
+	FS_FOpenFileReadForRoot
+
+	Opens a file relative to a specific root path using the filesystem handle table.
+	=============
+*/
+static int FS_FOpenFileReadForRoot( const char *root, const char *filename, fileHandle_t *fp ) {
+	char *ospath;
+	fileHandle_t handle;
+
+	if ( !root || !*root ) {
+	return 0;
+	}
+
+	if ( !fs_searchpaths ) {
+	Com_Error( ERR_FATAL, "Filesystem call made without initialization\n" );
+	}
+
+	handle = FS_HandleForFile();
+	fsh[handle].zipFile = qfalse;
+	Q_strncpyz( fsh[handle].name, filename, sizeof( fsh[handle].name ) );
+
+	S_ClearSoundBuffer();
+
+	ospath = FS_BuildOSPath( root, fs_gamedir, filename );
+	ospath[strlen( ospath ) - 1] = '\0';
+
+	if ( fs_debug->integer ) {
+	Com_Printf( "FS_FOpenFileReadForRoot (%s): %s\n", root, ospath );
+	}
+
+	fsh[handle].handleFiles.file.o = fopen( ospath, "rb" );
+	fsh[handle].handleSync = qfalse;
+
+	if ( !fsh[handle].handleFiles.file.o ) {
+	return 0;
+	}
+
+	*fp = handle;
+	return FS_filelength( handle );
+	}
+
+/*
+	=============
+	FS_FOpenWebFileRead
+
+	Retries failed HTTP/resource requests using mapped filesystem paths.
+	=============
+*/
+	qboolean FS_FOpenWebFileRead( const char *request, fileHandle_t *file, char *resolvedPath, size_t resolvedSize ) {
+	int index;
+
+	if ( !request || !file ) {
+	return qfalse;
+	}
+
+	for ( index = 0; index < fs_fallbackMappingCount; ++index ) {
+	fsFallbackMapping_t *mapping;
+	const char *suffix;
+	char qpath[MAX_QPATH];
+	const char *root;
+	int length;
+
+	mapping = &fs_fallbackMappings[index];
+	if ( Q_strnicmp( request, mapping->prefix, strlen( mapping->prefix ) ) != 0 ) {
+	continue;
+	}
+
+	suffix = request + strlen( mapping->prefix );
+	while ( *suffix == '/' || *suffix == '\\' ) {
+	++suffix;
+	}
+
+	if ( mapping->base[0] ) {
+	Com_sprintf( qpath, sizeof( qpath ), "%s/%s", mapping->base, suffix );
+	} else {
+	Q_strncpyz( qpath, suffix, sizeof( qpath ) );
+	}
+
+	root = mapping->useHomepath ? fs_homepath->string : fs_webpath->string;
+	if ( !root || !*root ) {
+	++fs_fallbackMetrics.misses;
+	Com_Printf( "web-fallback: root missing for %s (mapped from %s) [miss=%d]\n",
+	qpath,
+	request,
+	fs_fallbackMetrics.misses );
+	return qfalse;
+	}
+
+	length = FS_FOpenFileReadForRoot( root, qpath, file );
+	if ( length > 0 && *file ) {
+	++fs_fallbackMetrics.hits;
+	if ( resolvedPath && resolvedSize > 0 ) {
+	Q_strncpyz( resolvedPath, qpath, resolvedSize );
+	}
+	Com_Printf( "web-fallback: %s -> %s (%s) [hit=%d miss=%d]\n",
+	request,
+	qpath,
+	mapping->useHomepath ? "fs_homepath" : "fs_webpath",
+	fs_fallbackMetrics.hits,
+	fs_fallbackMetrics.misses );
+	return qtrue;
+	}
+
+	++fs_fallbackMetrics.misses;
+	Com_Printf( "web-fallback: %s -> %s failed (%s) [hit=%d miss=%d]\n",
+	request,
+	qpath,
+	mapping->useHomepath ? "fs_homepath" : "fs_webpath",
+	fs_fallbackMetrics.hits,
+	fs_fallbackMetrics.misses );
+	return qfalse;
+	}
+
+	++fs_fallbackMetrics.misses;
+	Com_Printf( "web-fallback: no mapping for %s [hit=%d miss=%d]\n",
+	request,
+	fs_fallbackMetrics.hits,
+	fs_fallbackMetrics.misses );
+
 	return qfalse;
 }
 
+/*
+	=============
+	FS_GetFallbackMetrics
+
+	Copies the current fallback hit/miss metrics for external inspection.
+	=============
+*/
+	void FS_GetFallbackMetrics( fsFallbackMetrics_t *outMetrics ) {
+	if ( !outMetrics ) {
+	return;
+	}
+
+	outMetrics->hits = fs_fallbackMetrics.hits;
+	outMetrics->misses = fs_fallbackMetrics.misses;
+	}
+
 
 /*
-===========
-FS_SV_FOpenFileWrite
+	===========
+	FS_SV_FOpenFileWrite
 
-===========
+	===========
 */
 fileHandle_t FS_SV_FOpenFileWrite( const char *filename ) {
 	char *ospath;
@@ -944,7 +1189,7 @@ int FS_SV_FOpenFileRead( const char *filename, fileHandle_t *fp ) {
 	    f = 0;
 	  }
   }
-  
+
 	*fp = f;
 	if (f) {
 		return FS_filelength(f);
@@ -1141,7 +1386,7 @@ Ignore case and seprator char distinctions
 */
 qboolean FS_FilenameCompare( const char *s1, const char *s2 ) {
 	int		c1, c2;
-	
+
 	do {
 		c1 = *s1++;
 		c2 = *s2++;
@@ -1159,12 +1404,12 @@ qboolean FS_FilenameCompare( const char *s1, const char *s2 ) {
 		if ( c2 == '\\' || c2 == ':' ) {
 			c2 = '/';
 		}
-		
+
 		if (c1 != c2) {
 			return -1;		// strings not equal
 		}
 	} while (c1);
-	
+
 	return 0;		// strings are equal
 }
 
@@ -1236,7 +1481,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				} while(pakFile != NULL);
 			} else if ( search->dir ) {
 				dir = search->dir;
-			
+
 				netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
 				temp = fopen (netpath, "rb");
 				if ( !temp ) {
@@ -1390,7 +1635,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 			}
 
 			dir = search->dir;
-			
+
 			netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
 			fsh[*file].handleFiles.file.o = fopen (netpath, "rb");
 			if ( !fsh[*file].handleFiles.file.o ) {
@@ -1404,7 +1649,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				&& Q_stricmp( filename + l - 4, ".dat" ) ) {	// for journal files
 				fs_fakeChkSum = random();
 			}
-      
+
 			Q_strncpyz( fsh[*file].name, filename, sizeof( fsh[*file].name ) );
 			fsh[*file].zipFile = qfalse;
 			if ( fs_debug->integer ) {
@@ -1424,7 +1669,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 			return FS_filelength (*file);
 		}		
 	}
-	
+
 	Com_DPrintf ("Can't find %s\n", filename);
 #ifdef FS_MISSING
 	if (missingFiles) {
@@ -1783,7 +2028,7 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 		}
 		return -1;
 	}
-	
+
 	if ( !buffer ) {
 		if ( isConfig && com_journal && com_journal->integer == 1 ) {
 			Com_DPrintf( "Writing len for %s to journal file.\n", qpath );
@@ -2705,7 +2950,7 @@ Ignore case and seprator char distinctions
 */
 int FS_PathCmp( const char *s1, const char *s2 ) {
 	int		c1, c2;
-	
+
 	do {
 		c1 = *s1++;
 		c2 = *s2++;
@@ -2723,7 +2968,7 @@ int FS_PathCmp( const char *s1, const char *s2 ) {
 		if ( c2 == '\\' || c2 == ':' ) {
 			c2 = '/';
 		}
-		
+
 		if (c1 < c2) {
 			return -1;		// strings not equal
 		}
@@ -2731,7 +2976,7 @@ int FS_PathCmp( const char *s1, const char *s2 ) {
 			return 1;
 		}
 	} while (c1);
-	
+
 	return 0;		// strings are equal
 }
 
@@ -2891,7 +3136,7 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 			return;			// we've already got this one
 		}
 	}
-	
+
 	Q_strncpyz( fs_gamedir, dir, sizeof( fs_gamedir ) );
 
 	//
@@ -3108,7 +3353,7 @@ void FS_Shutdown( qboolean closemfp ) {
 
 void Com_AppendCDKey( const char *filename );
 void Com_ReadCDKey( const char *filename );
- 
+
 /*
 ================
 FS_ReorderPurePaks
@@ -3122,13 +3367,13 @@ static void FS_ReorderPurePaks()
 	int i;
 	searchpath_t **p_insert_index, // for linked list reordering
 		**p_previous; // when doing the scan
-	
+
 	// only relevant when connected to pure server
 	if ( !fs_numServerPaks )
 		return;
-	
+
 	fs_reordered = qfalse;
-	
+
 	p_insert_index = &fs_searchpaths; // we insert in order at the beginning of the list 
 	for ( i = 0 ; i < fs_numServerPaks ; i++ ) {
 		p_previous = p_insert_index; // track the pointer-to-current-item
@@ -3155,7 +3400,7 @@ FS_Startup
 ================
 */
 static void FS_Startup( const char *gameName ) {
-        const char *homePath;
+	        const char *homePath;
 	cvar_t	*fs;
 
 	Com_Printf( "----- FS_Startup -----\n" );
@@ -3166,13 +3411,17 @@ static void FS_Startup( const char *gameName ) {
 	fs_cdpath = Cvar_Get ("fs_cdpath", Sys_DefaultCDPath(), CVAR_INIT );
 	fs_basepath = Cvar_Get ("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT );
 	fs_basegame = Cvar_Get ("fs_basegame", "", CVAR_INIT );
-  homePath = Sys_DefaultHomePath();
-  if (!homePath || !homePath[0]) {
-		homePath = fs_basepath->string;
+	homePath = Sys_DefaultHomePath();
+	if (!homePath || !homePath[0]) {
+	homePath = fs_basepath->string;
 	}
 	fs_homepath = Cvar_Get ("fs_homepath", homePath, CVAR_INIT );
+	fs_webpath = Cvar_Get ("fs_webpath", "", CVAR_INIT );
+	fs_webMappings = Cvar_Get ("fs_webMappings", fs_defaultFallbackMappings, CVAR_ARCHIVE );
 	fs_gamedirvar = Cvar_Get ("fs_game", "", CVAR_INIT|CVAR_SYSTEMINFO );
 	fs_restrict = Cvar_Get ("fs_restrict", "", CVAR_INIT );
+
+	FS_ParseFallbackMappings( fs_webMappings->string );
 
 	// add search path elements in reverse priority order
 	if (fs_cdpath->string[0]) {
@@ -3181,12 +3430,12 @@ static void FS_Startup( const char *gameName ) {
 	if (fs_basepath->string[0]) {
 		FS_AddGameDirectory( fs_basepath->string, gameName );
 	}
-  // fs_homepath is somewhat particular to *nix systems, only add if relevant
-  // NOTE: same filtering below for mods and basegame
+	// fs_homepath is somewhat particular to *nix systems, only add if relevant
+	// NOTE: same filtering below for mods and basegame
 	if (fs_basepath->string[0] && Q_stricmp(fs_homepath->string,fs_basepath->string)) {
 		FS_AddGameDirectory ( fs_homepath->string, gameName );
 	}
-        
+
 	// check for additional base game so mods can be based upon other mods
 	if ( fs_basegame->string[0] && !Q_stricmp( gameName, BASEGAME ) && Q_stricmp( fs_basegame->string, gameName ) ) {
 		if (fs_cdpath->string[0]) {
@@ -3228,7 +3477,7 @@ static void FS_Startup( const char *gameName ) {
 	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=506
 	// reorder the pure pk3 files according to server order
 	FS_ReorderPurePaks();
-	
+
 	// print the current search paths
 	FS_Path_f();
 
@@ -3236,11 +3485,11 @@ static void FS_Startup( const char *gameName ) {
 
 	Com_Printf( "----------------------\n" );
 
-#ifdef FS_MISSING
+	#ifdef FS_MISSING
 	if (missingFiles == NULL) {
 		missingFiles = fopen( "\\missing.txt", "ab" );
 	}
-#endif
+	#endif
 	Com_Printf( "%d files in pk3 files\n", fs_packFiles );
 }
 

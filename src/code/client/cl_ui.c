@@ -871,7 +871,26 @@ int CL_UISystemCalls( int *args ) {
 		return 0;
 
 	case UI_FS_FOPENFILE:
-		return FS_FOpenFileByMode( VMA(1), VMA(2), args[3] );
+	{
+		const char *request;
+		fileHandle_t *file;
+		int length;
+		char resolved[MAX_QPATH];
+
+		request = VMA( 1 );
+		file = VMA( 2 );
+		length = FS_FOpenFileByMode( request, file, args[3] );
+		if ( length > 0 || args[3] != FS_READ ) {
+			return length;
+		}
+
+		Com_Memset( resolved, 0, sizeof( resolved ) );
+		if ( FS_FOpenWebFileRead( request, file, resolved, sizeof( resolved ) ) && *file ) {
+			return FS_filelength( *file );
+		}
+
+		return length;
+	}
 
 	case UI_FS_READ:
 		FS_Read2( VMA(1), args[2], args[3] );

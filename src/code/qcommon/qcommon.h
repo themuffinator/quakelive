@@ -526,6 +526,12 @@ issues.
 
 #define BASEGAME "baseq3"
 
+typedef struct {
+	int		hits;
+	int		misses;
+} fsFallbackMetrics_t;
+
+#define FS_MAX_FALLBACK_MAPPINGS	8
 typedef struct pack_s pack_t;
 
 qboolean FS_Initialized();
@@ -581,6 +587,9 @@ int		FS_Read( void *buffer, int len, fileHandle_t f );
 
 void	FS_FCloseFile( fileHandle_t f );
 // note: you can't just fclose from another DLL, due to MS libc issues
+
+qboolean FS_FOpenWebFileRead( const char *request, fileHandle_t *file, char *resolvedPath, size_t resolvedSize );
+void	FS_GetFallbackMetrics( fsFallbackMetrics_t *outMetrics );
 
 int		FS_ReadFile( const char *qpath, void **buffer );
 // returns the length of the file
