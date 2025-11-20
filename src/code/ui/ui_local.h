@@ -147,6 +147,8 @@ typedef enum {
 qboolean UI_BrowserOverlayAvailable(void);
 qboolean UI_UsingLegacyMenuFlow(void);
 void UI_ApplyMenuFlowChange(uiMenuFlow_t flow, qboolean reload);
+qhandle_t UI_ImageCache_Register( const char *uri );
+void UI_ImageCache_Shutdown( void );
 const char *UI_DefaultMenuFile(void);
 const char *UI_DefaultIngameFile(void);
 

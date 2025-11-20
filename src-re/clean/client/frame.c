@@ -175,9 +175,9 @@ void CL_Frame(int msec) {
 	};
 
 	qlr_native_shim_logf("client", "CL_Frame", "start msec=%d state=%d catchers=0x%X",
-				 msec,
-				 ctx->cls->state,
-				 ctx->cls->key_catchers);
+			 msec,
+			 ctx->cls->state,
+			 ctx->cls->key_catchers);
 
 	if (ctx->cls->cd_dialog) {
 		ctx->cls->cd_dialog = false;
@@ -197,14 +197,15 @@ void CL_Frame(int msec) {
 		ctx->cls->clock.delta = msec;
 	}
 
+	bool autopause = qlr_client_should_autopause(ctx);
+
 	qlr_client_call_hook("check_userinfo", ctx->hooks.check_userinfo);
 	qlr_client_call_timeout_hook(ctx);
 	qlr_client_call_hook("read_packets", ctx->hooks.read_packets);
 
-	if (qlr_client_should_autopause(ctx)) {
+	if (autopause) {
 		qlr_native_shim_logf("client", "CL_Frame", "auto-paused");
 	} else {
-		qlr_client_call_hook("run_console", ctx->hooks.run_console);
 		qlr_client_call_hook("predict_movement", ctx->hooks.predict_movement);
 		qlr_client_call_hook("send_cmd", ctx->hooks.send_cmd);
 		qlr_client_call_hook("check_for_resend", ctx->hooks.check_for_resend);
@@ -213,9 +214,13 @@ void CL_Frame(int msec) {
 	qlr_client_call_hook("set_cgame_time", ctx->hooks.set_cgame_time);
 	qlr_client_call_hook("update_screen", ctx->hooks.update_screen);
 	qlr_client_call_hook("sound_update", ctx->hooks.sound_update);
+	qlr_client_call_hook("run_cinematic", ctx->hooks.run_cinematic);
+	if (!autopause) {
+		qlr_client_call_hook("run_console", ctx->hooks.run_console);
+	}
 	qlr_client_call_hook("begin_profiling", ctx->hooks.begin_profiling);
 
 	qlr_native_shim_logf("client", "CL_Frame", "end realtime=%d delta=%d",
-				 ctx->cls ? ctx->cls->clock.current : -1,
-				 ctx->cls ? ctx->cls->clock.delta : -1);
+			 ctx->cls ? ctx->cls->clock.current : -1,
+			 ctx->cls ? ctx->cls->clock.delta : -1);
 }

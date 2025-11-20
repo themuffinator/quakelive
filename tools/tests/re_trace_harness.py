@@ -157,6 +157,7 @@ class _QlrClientFrameHooks(ctypes.Structure):
         ("runConsole", _ClientVoidHook),
         ("updateScreen", _ClientVoidHook),
         ("soundUpdate", _ClientVoidHook),
+        ("runCinematic", _ClientVoidHook),
         ("setCGameTime", _ClientVoidHook),
         ("firstSnapshot", _ClientVoidHook),
         ("beginProfiling", _ClientVoidHook),
@@ -308,6 +309,8 @@ def _initialise_client_context(registry: _CallbackRegistry) -> _QlrClientFrameCo
     @_ClientVoidHook
     def _sound_hook() -> None:
         hooks_called.append('sound')
+    def _cinematic_hook() -> None:
+        hooks_called.append('cinematic')
 
     hooks = _QlrClientFrameHooks(
         stopAllSounds=_void_hook,
@@ -321,6 +324,7 @@ def _initialise_client_context(registry: _CallbackRegistry) -> _QlrClientFrameCo
         runConsole=_void_hook,
         updateScreen=_void_hook,
         soundUpdate=_sound_hook,
+        runCinematic=_cinematic_hook,
         setCGameTime=_void_hook,
         firstSnapshot=_void_hook,
         beginProfiling=_void_hook,

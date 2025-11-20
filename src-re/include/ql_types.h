@@ -152,6 +152,7 @@ void (*predictMovement)(void);
 void (*runConsole)(void);
 void (*updateScreen)(void);
 void (*soundUpdate)(void);
+	void (*runCinematic)(void);
 void (*setCGameTime)(void);
 void (*firstSnapshot)(void);
     void (*beginProfiling)(void);
@@ -159,11 +160,11 @@ void (*firstSnapshot)(void);
 
 /* Aggregated context passed into the CL_Frame shim. */
 typedef struct {
-    qlr_client_static_shadow_t *cls;
-    qlr_client_active_shadow_t *cl;
-    qlr_client_connection_shadow_t *clc;
-    qlr_client_frame_cvars_t cvars;
-    qlr_client_frame_hooks_t hooks;
+	qlr_client_static_shadow_t *cls;
+	qlr_client_active_shadow_t *cl;
+	qlr_client_connection_shadow_t *clc;
+	qlr_client_frame_cvars_t cvars;
+	qlr_client_frame_hooks_t hooks;
 } qlr_client_frame_context_t;
 
 /*

@@ -66,11 +66,11 @@ void (*begin_profiling)(void);
 } qlr_client_frame_hooks_t;
 
 typedef struct qlr_client_frame_context_s {
-    qlr_client_static_t *cls;
-    qlr_client_active_t *cl;
-    qlr_client_connection_t *clc;
-    qlr_client_frame_cvars_t cvars;
-    qlr_client_frame_hooks_t hooks;
+	qlr_client_static_t *cls;
+	qlr_client_active_t *cl;
+	qlr_client_connection_t *clc;
+	qlr_client_frame_cvars_t cvars;
+	qlr_client_frame_hooks_t hooks;
 } qlr_client_frame_context_t;
 
 void QLR_ClientFrame_BindContext(qlr_client_frame_context_t *ctx);

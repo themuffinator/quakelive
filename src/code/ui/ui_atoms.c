@@ -57,6 +57,239 @@ void QDECL Com_Printf( const char *msg, ... ) {
 #endif
 
 qboolean newUI = qfalse;
+static int uiCachedImageCount = 0;
+
+#define UI_IMAGE_CACHE_LIMIT 128
+
+typedef struct uiCachedImage_s {
+	char uri[MAX_STRING_CHARS];
+	qhandle_t shader;
+} uiCachedImage_t;
+
+static uiCachedImage_t uiCachedImages[UI_IMAGE_CACHE_LIMIT];
+
+
+/*
+=============
+UI_ImageCache_Reset
+
+Clear the cached image table so lookups start fresh.
+=============
+*/
+	static void UI_ImageCache_Reset( void ) {
+	uiCachedImageCount = 0;
+	Com_Memset( uiCachedImages, 0, sizeof( uiCachedImages ) );
+}
+
+/*
+=============
+	UI_ImageCache_Find
+
+	Return the cached shader for the provided URI if present.
+=============
+*/
+	static qhandle_t UI_ImageCache_Find( const char *uri ) {
+	int i;
+
+	if ( !uri || !uri[0] ) {
+	return 0;
+}
+
+	for ( i = 0; i < uiCachedImageCount; i++ ) {
+	if ( !Q_stricmp( uiCachedImages[i].uri, uri ) ) {
+	return uiCachedImages[i].shader;
+}
+}
+
+	return 0;
+}
+
+/*
+=============
+	UI_ImageCache_Store
+
+	Persist a shader handle against its source URI in the cache.
+=============
+*/
+	static void UI_ImageCache_Store( const char *uri, qhandle_t shader ) {
+	int i;
+
+	if ( uiCachedImageCount >= UI_IMAGE_CACHE_LIMIT ) {
+	for ( i = 1; i < UI_IMAGE_CACHE_LIMIT; i++ ) {
+	uiCachedImages[i - 1] = uiCachedImages[i];
+}
+	uiCachedImageCount = UI_IMAGE_CACHE_LIMIT - 1;
+}
+
+	Q_strncpyz( uiCachedImages[uiCachedImageCount].uri, uri, sizeof( uiCachedImages[uiCachedImageCount].uri ) );
+	uiCachedImages[uiCachedImageCount].shader = shader;
+	uiCachedImageCount++;
+}
+
+/*
+=============
+	UI_ImageCache_StripProtocol
+
+	Remove a scheme prefix from a URI, returning the path portion.
+=============
+*/
+	static const char *UI_ImageCache_StripProtocol( const char *uri ) {
+	const char *separator;
+
+	if ( !uri ) {
+	return NULL;
+}
+
+	separator = strstr( uri, "://" );
+	if ( separator ) {
+	return separator + 3;
+}
+
+	separator = strchr( uri, ':' );
+	if ( separator ) {
+	return separator + 1;
+}
+
+	return uri;
+}
+
+/*
+=============
+	UI_ImageCache_IsSteamUri
+
+	Detect whether the provided URI references a Steam-backed image.
+=============
+*/
+	static qboolean UI_ImageCache_IsSteamUri( const char *uri ) {
+	if ( !uri ) {
+	return qfalse;
+}
+
+	return ( !Q_stricmpn( uri, "steam://", 8 ) || !Q_stricmpn( uri, "steam:", 6 ) ) ? qtrue : qfalse;
+}
+
+/*
+=============
+	UI_ImageCache_RewriteWebPath
+
+	Normalize an HTTP-style URI into a quake path for registration.
+=============
+*/
+	static qboolean UI_ImageCache_RewriteWebPath( const char *uri, char *outPath, int outSize ) {
+	const char *trimmed;
+	char localPath[MAX_QPATH];
+	char webPath[MAX_QPATH];
+	int i;
+
+	if ( !uri || !outPath || outSize <= 0 ) {
+	return qfalse;
+}
+
+	trimmed = UI_ImageCache_StripProtocol( uri );
+	if ( !trimmed || !*trimmed ) {
+	return qfalse;
+}
+
+	for ( i = 0; trimmed[i] && trimmed[i] != '?' && trimmed[i] != '#'; i++ ) {
+	if ( i >= (int)sizeof( localPath ) - 1 ) {
+	break;
+}
+	localPath[i] = trimmed[i];
+}
+	localPath[i] = '\0';
+
+	if ( !*localPath || strstr( localPath, ".." ) ) {
+	return qfalse;
+}
+
+	if ( !Q_stricmpn( localPath, "screenshots/", 12 ) ) {
+	Q_strncpyz( outPath, localPath, outSize );
+	return qtrue;
+}
+
+	trap_Cvar_VariableStringBuffer( "fs_webpath", webPath, sizeof( webPath ) );
+	if ( !webPath[0] ) {
+	return qfalse;
+}
+
+	Com_sprintf( outPath, outSize, "%s/%s", webPath, localPath );
+	return qtrue;
+}
+
+/*
+=============
+	UI_ImageCache_ReadFromPak
+
+	Prime a web.pak entry through FS_FOpenFileRead / FS_Read before registration.
+=============
+*/
+	static qboolean UI_ImageCache_ReadFromPak( const char *qpath ) {
+	fileHandle_t handle;
+	byte scratch[1];
+	int length;
+
+	length = trap_FS_FOpenFile( qpath, &handle, FS_READ );
+	if ( length <= 0 || !handle ) {
+	return qfalse;
+}
+
+	if ( length > 0 ) {
+	trap_FS_Read( scratch, 1, handle );
+}
+
+	trap_FS_FCloseFile( handle );
+	return qtrue;
+}
+
+/*
+=============
+	UI_ImageCache_Register
+
+	Resolve or create a shader handle for a URI, caching results for reuse.
+=============
+*/
+	qhandle_t UI_ImageCache_Register( const char *uri ) {
+	qhandle_t shader;
+	char qpath[MAX_QPATH];
+
+	shader = UI_ImageCache_Find( uri );
+	if ( shader ) {
+	return shader;
+}
+
+	if ( !uri || !uri[0] ) {
+	return 0;
+}
+
+	if ( UI_ImageCache_IsSteamUri( uri ) ) {
+	const char *steamPath = UI_ImageCache_StripProtocol( uri );
+	Com_sprintf( qpath, sizeof( qpath ), "steam/%s", steamPath );
+	} else if ( UI_ImageCache_RewriteWebPath( uri, qpath, sizeof( qpath ) ) ) {
+	/* path rewritten into qpath */
+	} else {
+	Q_strncpyz( qpath, uri, sizeof( qpath ) );
+}
+
+	UI_ImageCache_ReadFromPak( qpath );
+	shader = trap_R_RegisterShaderNoMip( qpath );
+
+	if ( shader ) {
+	UI_ImageCache_Store( uri, shader );
+}
+
+	return shader;
+}
+
+/*
+=============
+	UI_ImageCache_Shutdown
+
+	Release cached image metadata when the UI shuts down.
+=============
+*/
+	void UI_ImageCache_Shutdown( void ) {
+	UI_ImageCache_Reset();
+}
 
 
 /*
@@ -434,6 +667,7 @@ UI_Shutdown
 =================
 */
 void UI_Shutdown( void ) {
+	UI_ImageCache_Shutdown();
 }
 
 /*
@@ -462,7 +696,10 @@ void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 void UI_DrawNamedPic( float x, float y, float width, float height, const char *picname ) {
 	qhandle_t	hShader;
 
-	hShader = trap_R_RegisterShaderNoMip( picname );
+	hShader = UI_ImageCache_Register( picname );
+	if ( !hShader ) {
+		hShader = trap_R_RegisterShaderNoMip( picname );
+	}
 	UI_AdjustFrom640( &x, &y, &width, &height );
 	trap_R_DrawStretchPic( x, y, width, height, 0, 0, 1, 1, hShader );
 }
