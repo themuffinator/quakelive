@@ -111,11 +111,22 @@ void trap_FS_Read( void *buffer, int len, fileHandle_t f ) {
 }
 
 void trap_FS_Write( const void *buffer, int len, fileHandle_t f ) {
-	syscall( UI_FS_WRITE, buffer, len, f );
+syscall( UI_FS_WRITE, buffer, len, f );
 }
 
 void trap_FS_FCloseFile( fileHandle_t f ) {
-	syscall( UI_FS_FCLOSEFILE, f );
+syscall( UI_FS_FCLOSEFILE, f );
+}
+
+/*
+=============
+trap_Launcher_ReadScreenshot
+
+Read a screenshot file into the provided buffer through the launcher-safe syscall.
+=============
+*/
+int trap_Launcher_ReadScreenshot( const char *requestedName, void *buffer, int bufferSize ) {
+	return syscall( UI_LAUNCHER_READSCREENSHOT, requestedName, buffer, bufferSize );
 }
 
 int trap_FS_GetFileList(  const char *path, const char *extension, char *listbuf, int bufsize ) {

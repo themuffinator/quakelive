@@ -18,6 +18,13 @@ PANELS = [
     "default.menu",
     "end_scoreboard_ca.menu",
 ]
+CONFIGS = [
+    "default.cfg",
+    "syncerror.cfg",
+    "tim.cfg",
+    "sponge.cfg",
+    "ttimo.cfg",
+]
 FONT_PATTERN = re.compile(r"\b(font|smallFont|bigFont)\s+\"([^\"]+)\"", re.IGNORECASE)
 
 
@@ -99,6 +106,18 @@ def verify_shaders(shader_source: pathlib.Path, expectations_path: pathlib.Path)
     return not missing, {"expected": expectations, "missing": missing}
 
 
+def verify_configs(baseq3: pathlib.Path, configs: List[str]) -> Tuple[bool, Dict[str, object]]:
+    missing = []
+    sizes: Dict[str, int] = {}
+    for config in configs:
+        cfg_path = baseq3 / config
+        if not cfg_path.exists():
+            missing.append(config)
+            continue
+        sizes[config] = cfg_path.stat().st_size
+    return not missing, {"missing": missing, "sizes": sizes}
+
+
 def main() -> int:
     args = parse_args()
     baseq3 = ensure_clean_homepath(args.homepath)
@@ -107,6 +126,7 @@ def main() -> int:
     panels_report = inspect_panels(args.panels_root)
     metrics_ok, metrics_report = verify_metrics(args.metrics, args.expected_metrics)
     shaders_ok, shader_report = verify_shaders(args.shader_source, args.expected_shaders)
+    configs_ok, config_report = verify_configs(baseq3, CONFIGS)
 
     summary = {
         "bundle": args.bundle.as_posix(),
@@ -114,6 +134,7 @@ def main() -> int:
         "panels": panels_report,
         "glyphMetrics": metrics_report,
         "shaderHandles": shader_report,
+        "configs": config_report,
     }
 
     args.log_dir.mkdir(parents=True, exist_ok=True)
@@ -122,7 +143,7 @@ def main() -> int:
 
     print(f"Panel report written to {summary_path}")
 
-    return 0 if (metrics_ok and shaders_ok) else 1
+    return 0 if (metrics_ok and shaders_ok and configs_ok) else 1
 
 
 if __name__ == "__main__":

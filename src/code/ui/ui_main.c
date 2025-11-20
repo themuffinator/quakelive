@@ -5922,10 +5922,17 @@ static void UI_ParseGameInfo(const char *teamFile) {
 	}
 }
 
+/*
+=============
+UI_Pause
+
+Pause or resume the client while toggling the UI keycatcher.
+=============
+*/
 static void UI_Pause(qboolean b) {
 	if (b) {
 		// pause the game and set the ui keycatcher
-	  trap_Cvar_Set( "cl_paused", "1" );
+		trap_Cvar_Set( "cl_paused", "1" );
 		trap_Key_SetCatcher( KEYCATCH_UI );
 	} else {
 		// unpause the game and clear the ui keycatcher
@@ -5936,30 +5943,60 @@ static void UI_Pause(qboolean b) {
 }
 
 
-static int UI_PlayCinematic(const char *name, float x, float y, float w, float h) {
-  return trap_CIN_PlayCinematic(name, x, y, w, h, (CIN_loop | CIN_silent));
+/*
+=============
+UI_LauncherPlayCinematic
+
+Play a silent cinematic for launcher surfaces, registering a renderer-owned shader handle.
+Arguments mirror the legacy autoplay hook: path, loop toggle, and optional width/height.
+=============
+*/
+static qhandle_t UI_LauncherPlayCinematic(const char *name, qboolean loop, int width, int height) {
+	int flags = CIN_silent | CIN_shader;
+
+	if (loop) {
+		flags |= CIN_loop;
+	}
+
+	return trap_CIN_PlayCinematic(name, 0, 0, width, height, flags);
 }
 
+/*
+=============
+UI_PlayCinematic
+
+Fallback UI cinematic helper for silent looping playback without shader registration.
+=============
+*/
+static int UI_PlayCinematic(const char *name, float x, float y, float w, float h) {
+	return trap_CIN_PlayCinematic(name, x, y, w, h, (CIN_loop | CIN_silent));
+}
+
+/*
+=============
+UI_StopCinematic
+=============
+*/
 static void UI_StopCinematic(int handle) {
 	if (handle >= 0) {
-	  trap_CIN_StopCinematic(handle);
+		trap_CIN_StopCinematic(handle);
 	} else {
 		handle = abs(handle);
 		if (handle == UI_MAPCINEMATIC) {
 			if (uiInfo.mapList[ui_currentMap.integer].cinematic >= 0) {
-			  trap_CIN_StopCinematic(uiInfo.mapList[ui_currentMap.integer].cinematic);
-			  uiInfo.mapList[ui_currentMap.integer].cinematic = -1;
+				trap_CIN_StopCinematic(uiInfo.mapList[ui_currentMap.integer].cinematic);
+				uiInfo.mapList[ui_currentMap.integer].cinematic = -1;
 			}
 		} else if (handle == UI_NETMAPCINEMATIC) {
 			if (uiInfo.serverStatus.currentServerCinematic >= 0) {
-			  trap_CIN_StopCinematic(uiInfo.serverStatus.currentServerCinematic);
+				trap_CIN_StopCinematic(uiInfo.serverStatus.currentServerCinematic);
 				uiInfo.serverStatus.currentServerCinematic = -1;
 			}
 		} else if (handle == UI_CLANCINEMATIC) {
-		  int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_teamName"));
-		  if (i >= 0 && i < uiInfo.teamCount) {
+			int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_teamName"));
+			if (i >= 0 && i < uiInfo.teamCount) {
 				if (uiInfo.teamList[i].cinematic >= 0) {
-				  trap_CIN_StopCinematic(uiInfo.teamList[i].cinematic);
+					trap_CIN_StopCinematic(uiInfo.teamList[i].cinematic);
 					uiInfo.teamList[i].cinematic = -1;
 				}
 			}
@@ -5967,13 +6004,24 @@ static void UI_StopCinematic(int handle) {
 	}
 }
 
+
+/*
+=============
+UI_DrawCinematic
+=============
+*/
 static void UI_DrawCinematic(int handle, float x, float y, float w, float h) {
 	trap_CIN_SetExtents(handle, x, y, w, h);
-  trap_CIN_DrawCinematic(handle);
+	trap_CIN_DrawCinematic(handle);
 }
 
+/*
+=============
+UI_RunCinematicFrame
+=============
+*/
 static void UI_RunCinematicFrame(int handle) {
-  trap_CIN_RunCinematic(handle);
+	trap_CIN_RunCinematic(handle);
 }
 
 
@@ -6129,6 +6177,7 @@ void _UI_Init( qboolean inGameLoad ) {
 	uiInfo.uiDC.startBackgroundTrack = &trap_S_StartBackgroundTrack;
 	uiInfo.uiDC.stopBackgroundTrack = &trap_S_StopBackgroundTrack;
 	uiInfo.uiDC.playCinematic = &UI_PlayCinematic;
+	uiInfo.uiDC.playLauncherCinematic = &UI_LauncherPlayCinematic;
 	uiInfo.uiDC.stopCinematic = &UI_StopCinematic;
 	uiInfo.uiDC.drawCinematic = &UI_DrawCinematic;
 	uiInfo.uiDC.runCinematicFrame = &UI_RunCinematicFrame;

@@ -253,6 +253,7 @@ static	cvar_t		*fs_basepath;
 static	cvar_t		*fs_basegame;
 static	cvar_t		*fs_cdpath;
 static	cvar_t		*fs_copyfiles;
+static	cvar_t		*fs_webpath;
 static	cvar_t		*fs_gamedirvar;
 static	cvar_t		*fs_restrict;
 static	searchpath_t	*fs_searchpaths;
@@ -484,6 +485,88 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 
 
 /*
+=============
+FS_StripProtocol
+
+Removes scheme and host components from a URI so only the path remains.
+=============
+*/
+static const char *FS_StripProtocol( const char *uri ) {
+	const char *pathStart;
+	const char *separator;
+
+	if ( !uri ) {
+		return NULL;
+	}
+
+	pathStart = uri;
+	separator = strstr( uri, "://" );
+	if ( separator ) {
+		pathStart = separator + 3;
+		separator = strchr( pathStart, '/' );
+		if ( separator ) {
+			pathStart = separator + 1;
+		}
+	}
+
+	while ( *pathStart == '/' ) {
+		pathStart++;
+	}
+
+	return pathStart;
+}
+
+
+/*
+=============
+FS_RewriteWebPath
+
+Normalize an intercepted URI into a quake path. Screenshots are forced to
+resolve under fs_homepath/screenshots, other requests are prefixed with
+fs_webpath.
+=============
+*/
+qboolean FS_RewriteWebPath( const char *uri, char *outPath, int outSize ) {
+	const char *trimmed;
+	char localPath[MAX_QPATH];
+	int i;
+
+	if ( !uri || !outPath || outSize <= 0 ) {
+		return qfalse;
+	}
+
+	trimmed = FS_StripProtocol( uri );
+	if ( !trimmed || !*trimmed ) {
+		return qfalse;
+	}
+
+	for ( i = 0; trimmed[i] && trimmed[i] != '?' && trimmed[i] != '#'; i++ ) {
+		if ( i >= (int)sizeof( localPath ) - 1 ) {
+			break;
+		}
+		localPath[i] = trimmed[i];
+	}
+	localPath[i] = '\0';
+
+	if ( !*localPath || strstr( localPath, ".." ) ) {
+		return qfalse;
+	}
+
+	if ( !Q_stricmpn( localPath, "screenshots/", 12 ) ) {
+		Q_strncpyz( outPath, localPath, outSize );
+		return qtrue;
+	}
+
+	if ( !fs_webpath || !fs_webpath->string[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( outPath, outSize, "%s/%s", fs_webpath->string, localPath );
+	return qtrue;
+}
+
+
+/*
 ============
 FS_CreatePath
 
@@ -594,6 +677,134 @@ qboolean FS_FileExists( const char *file )
 	return qfalse;
 }
 
+
+/*
+=============
+FS_PreflightPathExists
+
+Checks whether an asset exists under a specific search root and reports the
+path inspected so callers can surface actionable packaging guidance.
+=============
+*/
+static qboolean FS_PreflightPathExists( const char *asset, const char *label, const char *rootPath )
+{
+	FILE *handle;
+	char fullpath[MAX_OSPATH];
+	qboolean exists;
+
+	if ( !rootPath || !rootPath[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( fullpath, sizeof( fullpath ), "%s", FS_BuildOSPath( rootPath, fs_gamedir, asset ) );
+
+	if ( !Q_stricmp( rootPath, fs_homepath->string ) ) {
+		exists = FS_FileExists( asset );
+	} else {
+		handle = fopen( fullpath, "rb" );
+
+		exists = ( handle != NULL );
+
+		if ( handle ) {
+			fclose( handle );
+		}
+	}
+
+	if ( !exists ) {
+		Com_Printf( "WARNING: FS_InitFilesystem preflight missing \"%s\" in %s (checked %s)\n", asset, label, fullpath );
+	} else {
+		Com_DPrintf( "FS_InitFilesystem preflight found \"%s\" in %s (checked %s)\n", asset, label, fullpath );
+	}
+
+	return exists;
+}
+
+/*
+=============
+	FS_RunAssetPreflight
+
+Ensures critical configs, fonts, and UI scripts exist across configured search
+paths before proceeding with filesystem startup.
+=============
+*/
+static void FS_RunAssetPreflight( void )
+{
+	int i, j;
+	qboolean missing = qfalse;
+
+	const char *fontAssets[] = {
+		"fonts/handelgothic.ttf",
+		"fonts/notosans-regular.ttf",
+		"fonts/droidsansmono.ttf",
+		"fonts/droidsansfallbackfull.ttf"
+	};
+
+	const char *uiScriptAssets[] = {
+		"ui/main.menu",
+		"ui/comp_hud.menu",
+		"ui/teaminfo.txt"
+	};
+
+	struct {
+		const char *label;
+		const char *path;
+	} roots[] = {
+		{ "homepath", fs_homepath->string },
+		{ "basepath", fs_basepath->string },
+		{ "cdpath", fs_cdpath->string }
+	};
+
+	for ( i = 0; i < sizeof( roots ) / sizeof( roots[0] ); i++ ) {
+		Com_DPrintf( "FS_InitFilesystem preflight scanning %s (%s)\n", roots[i].label, roots[i].path );
+	}
+
+	if ( !FS_PreflightPathExists( "default.cfg", "homepath", fs_homepath->string )
+		&& !FS_PreflightPathExists( "default.cfg", "basepath", fs_basepath->string )
+		&& !FS_PreflightPathExists( "default.cfg", "cdpath", fs_cdpath->string ) ) {
+		Com_Printf( "ERROR: FS_InitFilesystem preflight could not locate \"default.cfg\" in any configured search path.\n" );
+		missing = qtrue;
+	}
+
+	for ( i = 0; i < sizeof( fontAssets ) / sizeof( fontAssets[0] ); i++ ) {
+		qboolean found = qfalse;
+
+		for ( j = 0; j < sizeof( roots ) / sizeof( roots[0] ); j++ ) {
+			if ( FS_PreflightPathExists( fontAssets[i], roots[j].label, roots[j].path ) ) {
+				found = qtrue;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			Com_Printf( "ERROR: FS_InitFilesystem preflight missing font asset \"%s\" across all search paths.\n", fontAssets[i] );
+			missing = qtrue;
+		}
+	}
+
+	for ( i = 0; i < sizeof( uiScriptAssets ) / sizeof( uiScriptAssets[0] ); i++ ) {
+		qboolean found = qfalse;
+
+		for ( j = 0; j < sizeof( roots ) / sizeof( roots[0] ); j++ ) {
+			if ( FS_PreflightPathExists( uiScriptAssets[i], roots[j].label, roots[j].path ) ) {
+				found = qtrue;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			Com_Printf( "ERROR: FS_InitFilesystem preflight missing UI script \"%s\" across all search paths.\n", uiScriptAssets[i] );
+			missing = qtrue;
+		}
+	}
+
+	if ( missing ) {
+		Com_Printf( "Ensure packaged assets mirror the Quake Live layout: place default.cfg at the root of your PK3, ship fonts/ttf"
+			" files (handelgothic, notosans-regular, droidsansmono, droidsansfallbackfull) under fonts/, and keep ui/*.menu and"
+			" supporting txt files adjacent to the packaged UI DLLs. Review tools/packaging/ui_bundle_manifest.json and"
+			" docs/quakelive_asset_audit.md for the expected staging tree.\n" );
+		Com_Error( ERR_FATAL, "Required startup assets are missing; see preflight log for details." );
+	}
+}
 /*
 ================
 FS_SV_FileExists
@@ -1628,6 +1839,55 @@ void FS_FreeFile( void *buffer ) {
 }
 
 /*
+=============
+FS_UIReadWebFile
+
+Open a rewritten URI and stream its data into the supplied buffer. Returns the
+number of bytes copied or -1 on failure.
+=============
+*/
+int FS_UIReadWebFile( const char *uri, byte *buffer, int bufferSize ) {
+	fileHandle_t handle;
+	char qpath[MAX_OSPATH];
+	int length;
+	int bytesRead;
+
+	if ( !fs_searchpaths ) {
+		Com_Error( ERR_FATAL, "Filesystem call made without initialization\n" );
+	}
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return -1;
+	}
+
+	if ( !FS_RewriteWebPath( uri, qpath, sizeof( qpath ) ) ) {
+		Com_Printf( "FS_UIReadWebFile: unable to rewrite uri '%s'\n", uri ? uri : "<null>" );
+		return -1;
+	}
+
+	length = FS_FOpenFileRead( qpath, &handle, qtrue );
+	if ( !handle || length <= 0 ) {
+		Com_Printf( "FS_UIReadWebFile: missing asset for '%s' (%s)\n", uri ? uri : "<null>", qpath );
+		return -1;
+	}
+
+	bytesRead = length;
+	if ( bytesRead > bufferSize ) {
+		Com_Printf( "FS_UIReadWebFile: truncating %s to %i of %i bytes\n", qpath, bufferSize, length );
+		bytesRead = bufferSize;
+	}
+
+	if ( FS_Read( buffer, bytesRead, handle ) != bytesRead ) {
+		Com_Printf( "FS_UIReadWebFile: short read on %s\n", qpath );
+		bytesRead = -1;
+	}
+
+	FS_FCloseFile( handle );
+
+	return bytesRead;
+}
+
+/*
 ============
 FS_WriteFile
 
@@ -2187,70 +2447,76 @@ int	FS_GetFileList(  const char *path, const char *extension, char *listbuf, int
 }
 
 /*
-=======================
-Sys_ConcatenateFileLists
+=============
+Sys_CountFileList
 
-mkv: Naive implementation. Concatenates three lists into a
-     new list, and frees the old lists from the heap.
-bk001129 - from cvs1.17 (mkv)
-
-FIXME TTimo those two should move to common.c next to Sys_ListFiles
-=======================
- */
-static unsigned int Sys_CountFileList(char **list)
+Counts entries in a NULL-terminated file list.
+=============
+*/
+static unsigned int Sys_CountFileList( char **list )
 {
-  int i = 0;
+	int i = 0;
 
-  if (list)
-  {
-    while (*list)
-    {
-      list++;
-      i++;
-    }
-  }
-  return i;
+	if ( list )
+	{
+		while ( *list )
+		{
+			list++;
+			i++;
+		}
+	}
+
+	return i;
 }
 
+/*
+=============
+Sys_ConcatenateFileLists
+
+Concatenates three file lists into a newly allocated list of duplicated strings,
+then frees the source lists.
+=============
+*/
 static char** Sys_ConcatenateFileLists( char **list0, char **list1, char **list2 )
 {
-  int totalLength = 0;
-  char** cat = NULL, **dst, **src;
+	unsigned int totalLength = 0;
+	char **cat, **dst, **src;
 
-  totalLength += Sys_CountFileList(list0);
-  totalLength += Sys_CountFileList(list1);
-  totalLength += Sys_CountFileList(list2);
+	totalLength += Sys_CountFileList( list0 );
+	totalLength += Sys_CountFileList( list1 );
+	totalLength += Sys_CountFileList( list2 );
 
-  /* Create new list. */
-  dst = cat = Z_Malloc( ( totalLength + 1 ) * sizeof( char* ) );
+	dst = cat = Z_Malloc( ( totalLength + 1 ) * sizeof( char* ) );
 
-  /* Copy over lists. */
-  if (list0)
-  {
-    for (src = list0; *src; src++, dst++)
-      *dst = *src;
-  }
-  if (list1)
-  {
-    for (src = list1; *src; src++, dst++)
-      *dst = *src;
-  }
-  if (list2)
-  {
-    for (src = list2; *src; src++, dst++)
-      *dst = *src;
-  }
+	if ( list0 )
+	{
+		for ( src = list0; *src; src++, dst++ )
+		{
+			*dst = CopyString( *src );
+		}
+	}
+	if ( list1 )
+	{
+		for ( src = list1; *src; src++, dst++ )
+		{
+			*dst = CopyString( *src );
+		}
+	}
+	if ( list2 )
+	{
+		for ( src = list2; *src; src++, dst++ )
+		{
+			*dst = CopyString( *src );
+		}
+	}
 
-  // Terminate the list
-  *dst = NULL;
+	*dst = NULL;
 
-  // Free our old lists.
-  // NOTE: not freeing their content, it's been merged in dst and still being used
-  if (list0) Z_Free( list0 );
-  if (list1) Z_Free( list1 );
-  if (list2) Z_Free( list2 );
+	FS_FreeFileList( list0 );
+	FS_FreeFileList( list1 );
+	FS_FreeFileList( list2 );
 
-  return cat;
+	return cat;
 }
 
 /*
@@ -2896,6 +3162,7 @@ static void FS_Startup( const char *gameName ) {
 
 	fs_debug = Cvar_Get( "fs_debug", "0", 0 );
 	fs_copyfiles = Cvar_Get( "fs_copyfiles", "0", CVAR_INIT );
+	fs_webpath = Cvar_Get( "fs_webpath", "web", CVAR_INIT );
 	fs_cdpath = Cvar_Get ("fs_cdpath", Sys_DefaultCDPath(), CVAR_INIT );
 	fs_basepath = Cvar_Get ("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT );
 	fs_basegame = Cvar_Get ("fs_basegame", "", CVAR_INIT );
@@ -3400,6 +3667,7 @@ void FS_InitFilesystem( void ) {
 	Com_StartupVariable( "fs_homepath" );
 	Com_StartupVariable( "fs_game" );
 	Com_StartupVariable( "fs_copyfiles" );
+	Com_StartupVariable( "fs_webpath" );
 	Com_StartupVariable( "fs_restrict" );
 
 	// try to start up normally
@@ -3407,6 +3675,8 @@ void FS_InitFilesystem( void ) {
 
 	// see if we are going to allow add-ons
 	FS_SetRestrictions();
+
+	FS_RunAssetPreflight();
 
 	// if we can't find default.cfg, assume that the paths are
 	// busted and error out now, rather than getting an unreadable

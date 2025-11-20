@@ -129,7 +129,10 @@ def load_manifest(manifest_path: pathlib.Path) -> Dict:
 def resolve_roles(manifest: Dict, repo_root: pathlib.Path) -> Dict[str, pathlib.Path]:
     role_map: Dict[str, pathlib.Path] = {}
     for entry in manifest.get("files", []):
-        source = pathlib.Path(entry["source"])
+        source_field = entry.get("source")
+        if not source_field:
+            continue
+        source = pathlib.Path(source_field)
         if not source.is_absolute():
             source = repo_root / source
         source = source.resolve()

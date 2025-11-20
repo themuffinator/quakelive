@@ -31,14 +31,66 @@ import sys
 manifest = json.loads(pathlib.Path("${MANIFEST}").read_text())
 staging = pathlib.Path("${STAGING}")
 log_path = pathlib.Path("${copy_log}")
+repo_root = pathlib.Path("${REPO_ROOT}")
 logs = []
+copied_paths = []
 
-for entry in manifest.get('files', []):
-    source = pathlib.Path(entry['source'])
-    destination = staging / entry['destination']
+
+def resolve_path(path: str) -> pathlib.Path:
+    candidate = pathlib.Path(path)
+    if not candidate.is_absolute():
+        candidate = repo_root / candidate
+    return candidate
+
+
+def copy_file(source: pathlib.Path, destination: pathlib.Path) -> None:
+    if not source.is_file():
+        raise SystemExit(f"Missing source file: {source}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
     logs.append(f"Copied {source} -> {destination}")
+    copied_paths.append(destination.relative_to(staging).as_posix())
+
+for entry in manifest.get('files', []):
+    if 'source_dir' in entry:
+        source_dir = resolve_path(entry['source_dir'])
+        if not source_dir.is_dir():
+            raise SystemExit(f"Manifest source_dir is missing: {source_dir}")
+        include = entry.get('include', ['**/*'])
+        matched = False
+        for pattern in include:
+            for candidate in source_dir.glob(pattern):
+                if candidate.is_dir():
+                    continue
+                rel = candidate.relative_to(source_dir)
+                destination = staging / entry['destination'] / rel
+                copy_file(candidate, destination)
+                matched = True
+        if not matched:
+            raise SystemExit(
+                f"No files matched manifest include patterns {include} under {source_dir}"
+            )
+        continue
+
+    source = resolve_path(entry['source'])
+    destination = staging / entry['destination']
+    copy_file(source, destination)
+
+audit = manifest.get('audit', {})
+errors = []
+for rel_path in audit.get('required_paths', []):
+    target = staging / rel_path
+    if not target.exists():
+        errors.append(f"Missing required path in staging: {rel_path}")
+for pattern in audit.get('required_globs', []):
+    matches = [p for p in staging.glob(pattern) if p.is_file()]
+    if not matches:
+        errors.append(f"No files matched audit glob '{pattern}' in staging")
+
+if errors:
+    for line in errors:
+        print(line, file=sys.stderr)
+    sys.exit("Asset validation failed; required inputs are missing or misplaced")
 
 log_path.write_text('\n'.join(logs) + '\n', encoding='utf-8')
 PY

@@ -187,14 +187,15 @@ $RENDERER_REF = \@RENDERER_FILES;
   ../client/cl_cgame.c   
   ../client/cl_cin.c       
   ../client/cl_console.c  
-  ../client/cl_input.c   
-  ../client/cl_keys.c     
-  ../client/cl_main.c     
-  ../client/cl_net_chan.c  
-  ../client/cl_parse.c   
-  ../client/cl_scrn.c    
-  ../client/cl_ui.c         
-  );
+../client/cl_input.c
+../client/cl_keys.c
+../client/cl_main.c
+../client/cl_net_chan.c
+../client/cl_parse.c
+../client/cl_screenshot_io.c
+../client/cl_scrn.c
+../client/cl_ui.c
+);
 $CLIENT_REF = \@CLIENT_FILES;
 
 @COMMON_FILES = qw(

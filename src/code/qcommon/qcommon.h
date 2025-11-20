@@ -590,6 +590,9 @@ int		FS_ReadFile( const char *qpath, void **buffer );
 // the buffer should be considered read-only, because it may be cached
 // for other uses.
 
+qboolean FS_RewriteWebPath( const char *uri, char *outPath, int outSize );
+int		FS_UIReadWebFile( const char *uri, byte *buffer, int bufferSize );
+
 void	FS_ForceFlush( fileHandle_t f );
 // forces flush on files we're writing to.
 

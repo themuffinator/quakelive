@@ -1291,11 +1291,49 @@ void Script_Play(itemDef_t *item, char **args) {
 }
 
 void Script_playLooped(itemDef_t *item, char **args) {
-        const char *val;
-        if (String_Parse(args, &val)) {
-                DC->stopBackgroundTrack();
-                DC->startBackgroundTrack(val, val);
-        }
+	const char *val;
+	if (String_Parse(args, &val)) {
+		DC->stopBackgroundTrack();
+		DC->startBackgroundTrack(val, val);
+	}
+}
+
+/*
+=============
+Script_PlayLauncherCinematic
+
+Start silent shader-backed playback for launcher menu surfaces.
+Arguments: <path> [loop] [width] [height] to mirror legacy autoplay semantics.
+=============
+*/
+static void Script_PlayLauncherCinematic(itemDef_t *item, char **args) {
+	const char *path;
+	int shouldLoop = 1;
+	int width = 0;
+	int height = 0;
+	qhandle_t shaderHandle;
+
+	if (!item) {
+		return;
+	}
+
+	if (!String_Parse(args, &path)) {
+		return;
+	}
+
+	Int_Parse(args, &shouldLoop);
+	Int_Parse(args, &width);
+	Int_Parse(args, &height);
+
+	if (!DC->playLauncherCinematic) {
+		return;
+	}
+
+	shaderHandle = DC->playLauncherCinematic(path, shouldLoop ? qtrue : qfalse, width, height);
+	if (shaderHandle > 0) {
+		item->window.background = shaderHandle;
+		item->window.style = WINDOW_STYLE_SHADER;
+	}
 }
 
 #ifndef CGAME
@@ -1324,31 +1362,33 @@ static void Script_Leave(itemDef_t *item, char **args) {
 
 commandDef_t commandList[] =
 {
-  {"fadein", &Script_FadeIn},                   // group/name
-  {"fadeout", &Script_FadeOut},                 // group/name
-  {"show", &Script_Show},                       // group/name
-  {"hide", &Script_Hide},                       // group/name
-  {"setcolor", &Script_SetColor},               // works on this
-  {"open", &Script_Open},                       // menu
+	{"fadein", &Script_FadeIn},				// group/name
+	{"fadeout", &Script_FadeOut},			// group/name
+	{"show", &Script_Show},				// group/name
+	{"hide", &Script_Hide},				// group/name
+	{"setcolor", &Script_SetColor},			// works on this
+	{"open", &Script_Open},				// menu
 	{"conditionalopen", &Script_ConditionalOpen},	// menu
-  {"close", &Script_Close},                     // menu
-  {"setasset", &Script_SetAsset},               // works on this
-  {"setbackground", &Script_SetBackground},     // works on this
-  {"setitemcolor", &Script_SetItemColor},       // group/name
-  {"setteamcolor", &Script_SetTeamColor},       // sets this background color to team color
-  {"setfocus", &Script_SetFocus},               // sets this background color to team color
-  {"setplayermodel", &Script_SetPlayerModel},   // sets this background color to team color
-  {"setplayerhead", &Script_SetPlayerHead},     // sets this background color to team color
-  {"transition", &Script_Transition},           // group/name
-  {"setcvar", &Script_SetCvar},           // group/name
-  {"exec", &Script_Exec},           // group/name
-  {"play", &Script_Play},           // group/name
-  {"playlooped", &Script_playLooped},           // group/name
-  {"stoprefresh", &Script_StopRefresh},
-  {"closeingame", &Script_CloseInGame},
-  {"leave", &Script_Leave},
-  {"orbit", &Script_Orbit}                      // group/name
+	{"close", &Script_Close},				// menu
+	{"setasset", &Script_SetAsset},			// works on this
+	{"setbackground", &Script_SetBackground},	// works on this
+	{"setitemcolor", &Script_SetItemColor},	// group/name
+	{"setteamcolor", &Script_SetTeamColor},	// sets this background color to team color
+	{"setfocus", &Script_SetFocus},			// sets this background color to team color
+	{"setplayermodel", &Script_SetPlayerModel},	// sets this background color to team color
+	{"setplayerhead", &Script_SetPlayerHead},	// sets this background color to team color
+	{"transition", &Script_Transition},		// group/name
+	{"setcvar", &Script_SetCvar},			// group/name
+	{"exec", &Script_Exec},			// group/name
+	{"play", &Script_Play},				// group/name
+	{"playlooped", &Script_playLooped},		// group/name
+	{"playlaunchercinematic", &Script_PlayLauncherCinematic},
+	{"stoprefresh", &Script_StopRefresh},
+	{"closeingame", &Script_CloseInGame},
+	{"leave", &Script_Leave},
+	{"orbit", &Script_Orbit}					// group/name
 };
+
 
 int scriptCommandCount = sizeof(commandList) / sizeof(commandDef_t);
 

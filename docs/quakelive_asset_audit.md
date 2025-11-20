@@ -25,7 +25,19 @@ The reference dump enumerates the Windows launcher (`quakelive_steam.exe`) and s
 3. **Prepare shader and font resources** – Copy `scripts/ui*.shader` into `baseq3/scripts/` and run the Quake III font generator (or an equivalent freetype-based tool) against the TTFs stored under `assets/quakelive/baseq3/fonts/` to produce `.tga` atlases referenced by the menus. Record the generator inputs so future HUD changes can be rebuilt reproducibly and call out the source/license for each TTF (Handel Gothic is redistribution-restricted, Droid/Noto are Apache 2.0).
 4. **Bundle art dependencies** – Stage icons and levelshots used by the menus under `baseq3/icons/` and `baseq3/levelshots/`. When possible, convert PNG→TGA to match renderer expectations, otherwise confirm PNG loading paths.
 5. **Assemble distributable packages** – Zip the staged directories into PK3 archives (e.g., `pak100ql.pk3`) or embed them in a platform-specific installer. Ensure `default.cfg` and curated configs live at the root of the PK3 so the engine bootstrap succeeds, and honor the packaging manifest at `tools/packaging/ui_bundle_manifest.json` so the reference fonts are copied from `assets/quakelive/baseq3/fonts/` into `fonts/*.ttf` for `FS_InitFilesystem` checks.
-6. **Document regeneration commands** – Add scripts (PowerShell/Bash) that call out the exact copy, conversion, and `zip` commands, allowing automated rebuilds when upstream assets change. Reference this document from README/porting guides so contributors can rerun the pipeline.
+6. **Verify bootstrap diagnostics** – The filesystem now emits preflight warnings enumerating which search path (homepath/basepath/cdpath) was missing `default.cfg`, key `ui/*.menu` scripts, or the required TTFs. Use these logs to confirm your PK3 layout matches the expected Quake Live directory tree before distributing builds.
+7. **Document regeneration commands** – Add scripts (PowerShell/Bash) that call out the exact copy, conversion, and `zip` commands, allowing automated rebuilds when upstream assets change. Reference this document from README/porting guides so contributors can rerun the pipeline.
+
+### Packaging command sequence
+
+Run the UI bundle pipeline from the repository root to stage the HUD assets, validate the manifest, and emit a distributable PK3:
+
+```bash
+export REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash tools/build_ui_bundle.sh
+```
+
+The script copies `default.cfg`, the Quake Live TTF set (`fonts/*.ttf`), shader scripts (`scripts/ui*.shader`), and the entire `ui/*.menu`/`ui/*.txt` tree into `build/ui_bundle/staging/`. It then enforces the manifest-defined audit gates (required paths and globs) before invoking `zip`, causing the build to fail if any required file is missing or placed under the wrong PK3 path.
 
 ## Configuration Alignment Plan
 
