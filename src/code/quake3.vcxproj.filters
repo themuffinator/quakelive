@@ -45,6 +45,9 @@
     <ClCompile Include="client\cl_ui.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="client\cl_webpak.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="client\ql_auth.c">
       <Filter>Source Files</Filter>
     </ClCompile>

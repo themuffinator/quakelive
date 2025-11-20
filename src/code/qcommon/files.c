@@ -220,7 +220,7 @@ typedef struct fileInPack_s {
 	struct	fileInPack_s*	next;		// next file in the hash
 } fileInPack_t;
 
-typedef struct {
+typedef struct pack_s {
 	char			pakFilename[MAX_OSPATH];	// c:\quake3\baseq3\pak0.pk3
 	char			pakBasename[MAX_OSPATH];	// pak0
 	char			pakGamename[MAX_OSPATH];	// baseq3
@@ -2035,6 +2035,157 @@ static pack_t *FS_LoadZipFile( char *zipfile, const char *basename )
 	return pack;
 }
 
+/*
+=============
+FS_FindFileInPack
+
+Locate a file entry inside a loaded pack by its lowercased virtual path.
+=============
+*/
+static fileInPack_t *FS_FindFileInPack( const pack_t *pack, const char *filename ) {
+	fileInPack_t	*pakFile;
+	long			hash;
+
+	if ( !pack || !filename || !pack->hashTable ) {
+		return NULL;
+	}
+
+	hash = FS_HashFileName( filename, pack->hashSize );
+	pakFile = pack->hashTable[hash];
+	while ( pakFile ) {
+		if ( !FS_FilenameCompare( pakFile->name, filename ) ) {
+			return pakFile;
+		}
+
+		pakFile = pakFile->next;
+	}
+
+	return NULL;
+}
+
+/*
+=============
+FS_LoadPackExplicit
+
+Parse a standalone pack file without modifying the active search path.
+=============
+*/
+pack_t *FS_LoadPackExplicit( const char *packPath ) {
+	char			packCopy[MAX_OSPATH];
+	const char		*base;
+
+	if ( !packPath || !packPath[0] ) {
+		return NULL;
+	}
+
+	Q_strncpyz( packCopy, packPath, sizeof( packCopy ) );
+	base = COM_SkipPath( packCopy );
+	if ( !base || !*base ) {
+		return NULL;
+	}
+
+	return FS_LoadZipFile( packCopy, base );
+}
+
+/*
+=============
+FS_FreePak
+
+Release resources owned by a standalone pack.
+=============
+*/
+void FS_FreePak( pack_t *pack ) {
+	if ( !pack ) {
+		return;
+	}
+
+	if ( pack->handle ) {
+		unzClose( pack->handle );
+	}
+	if ( pack->buildBuffer ) {
+		Z_Free( pack->buildBuffer );
+	}
+
+	Z_Free( pack );
+}
+
+/*
+=============
+FS_PakFileExists
+
+Check whether a given virtual path exists inside the supplied pack.
+=============
+*/
+qboolean FS_PakFileExists( const pack_t *pack, const char *filename ) {
+	char		fixed[MAX_ZPATH];
+
+	if ( !pack || !filename || !filename[0] ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( fixed, filename, sizeof( fixed ) );
+	Q_strlwr( fixed );
+
+	return ( FS_FindFileInPack( pack, fixed ) != NULL );
+}
+
+/*
+=============
+FS_ReadFileFromPak
+
+Read a file from a standalone pack into a freshly allocated buffer.
+=============
+*/
+int FS_ReadFileFromPak( pack_t *pack, const char *filename, void **buffer ) {
+	fileInPack_t	*pakFile;
+	char			normalized[MAX_ZPATH];
+	unz_file_info	fileInfo;
+	int				readBytes;
+
+	if ( !pack || !filename || !buffer ) {
+		return -1;
+	}
+
+	*buffer = NULL;
+
+	if ( filename[0] == '/' || filename[0] == '\\' ) {
+		filename++;
+	}
+
+	if ( strstr( filename, ".." ) || strstr( filename, "::" ) ) {
+		return -1;
+	}
+
+	Q_strncpyz( normalized, filename, sizeof( normalized ) );
+	Q_strlwr( normalized );
+
+	pakFile = FS_FindFileInPack( pack, normalized );
+	if ( !pakFile ) {
+		return -1;
+	}
+
+	unzSetCurrentFileInfoPosition( pack->handle, pakFile->pos );
+	if ( unzGetCurrentFileInfo( pack->handle, &fileInfo, NULL, 0, NULL, 0, NULL, 0 ) != UNZ_OK ) {
+		return -1;
+	}
+
+	if ( unzOpenCurrentFile( pack->handle ) != UNZ_OK ) {
+		return -1;
+	}
+
+	*buffer = Z_Malloc( fileInfo.uncompressed_size + 1 );
+	readBytes = unzReadCurrentFile( pack->handle, *buffer, fileInfo.uncompressed_size );
+	unzCloseCurrentFile( pack->handle );
+
+	if ( readBytes < 0 ) {
+		Z_Free( *buffer );
+		*buffer = NULL;
+		return -1;
+	}
+
+	((byte *)*buffer)[readBytes] = 0;
+	return readBytes;
+}
 /*
 =================================================================================
 

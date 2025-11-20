@@ -526,6 +526,8 @@ issues.
 
 #define BASEGAME "baseq3"
 
+typedef struct pack_s pack_t;
+
 qboolean FS_Initialized();
 
 void	FS_InitFilesystem (void);
@@ -565,6 +567,11 @@ int		FS_FOpenFileRead( const char *qpath, fileHandle_t *file, qboolean uniqueFIL
 
 int		FS_FileIsInPAK(const char *filename, int *pChecksum );
 // returns 1 if a file is in the PAK file, otherwise -1
+
+pack_t *FS_LoadPackExplicit( const char *packPath );
+void FS_FreePak( pack_t *pack );
+qboolean FS_PakFileExists( const pack_t *pack, const char *filename );
+int FS_ReadFileFromPak( pack_t *pack, const char *filename, void **buffer );
 
 int		FS_Write( const void *buffer, int len, fileHandle_t f );
 

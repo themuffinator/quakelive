@@ -2263,10 +2263,10 @@ void CL_Init( void ) {
 
 	cls.realtime = 0;
 
-	CL_InitInput ();
+CL_InitInput ();
 
-	//
-	// register our variables
+//
+// register our variables
 	//
 	cl_noprint = Cvar_Get( "cl_noprint", "0", 0 );
 	cl_motd = Cvar_Get ("cl_motd", "1", 0);
@@ -2384,6 +2384,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("model", CL_SetModel_f );
 	Cmd_AddCommand ("web_showBrowser", CL_Web_ShowBrowser_f );
 	Cmd_AddCommand ("web_changeHash", CL_Web_ChangeHash_f );
+	CL_WebPak_Init();
 	CL_InitRef();
 
 	SCR_Init ();
@@ -2417,7 +2418,8 @@ void CL_Shutdown( void ) {
 
 	S_Shutdown();
 	CL_ShutdownRef();
-	
+
+	CL_WebPak_Shutdown();
 	CL_ShutdownUI();
 
 	Cmd_RemoveCommand ("cmd");
