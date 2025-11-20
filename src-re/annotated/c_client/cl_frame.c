@@ -46,72 +46,76 @@ static bool qlr_should_autopause(const qlr_client_frame_context_t *ctx) {
 }
 
 void QLR_CL_Frame(qlr_client_frame_context_t *ctx, int msec) {
-    if (!ctx->cvars.com_cl_running->integer) {
-        return;
-    }
+	if (!ctx->cvars.com_cl_running->integer) {
+		return;
+	}
 
-    if (ctx->cls->cddialog) {
-        ctx->cls->cddialog = false;
-        if (ctx->hooks.setActiveMenu) {
-            ctx->hooks.setActiveMenu(QLR_UIMENU_NEED_CD);
-        }
-    } else if (ctx->cls->state == QLR_CA_DISCONNECTED && (ctx->cls->keyCatchers & 0x1) == 0 &&
-               !ctx->cvars.com_sv_running->integer) {
-        if (ctx->hooks.stopAllSounds) {
-            ctx->hooks.stopAllSounds();
-        }
-        if (ctx->hooks.setActiveMenu) {
-            ctx->hooks.setActiveMenu(QLR_UIMENU_MAIN);
-        }
-    }
+	if (ctx->cls->cddialog) {
+		ctx->cls->cddialog = false;
+		if (ctx->hooks.setActiveMenu) {
+			ctx->hooks.setActiveMenu(QLR_UIMENU_NEED_CD);
+		}
+	} else if (ctx->cls->state == QLR_CA_DISCONNECTED && (ctx->cls->keyCatchers & 0x1) == 0 &&
+	           !ctx->cvars.com_sv_running->integer) {
+		if (ctx->hooks.stopAllSounds) {
+			ctx->hooks.stopAllSounds();
+		}
+		if (ctx->hooks.setActiveMenu) {
+			ctx->hooks.setActiveMenu(QLR_UIMENU_MAIN);
+		}
+	}
 
-    qlr_lock_to_avidemo_rate(ctx, &msec);
+	qlr_lock_to_avidemo_rate(ctx, &msec);
 
-    ctx->cls->realFrametime = msec;
-    ctx->cls->frametime = msec;
-    ctx->cls->realtime += msec;
+	ctx->cls->realFrametime = msec;
+	ctx->cls->frametime = msec;
+	ctx->cls->realtime += msec;
 
-    if (ctx->hooks.checkTimeout) {
-        ctx->hooks.checkTimeout(ctx->clc, ctx->cls, ctx->cl);
-    }
+	bool autopause = qlr_should_autopause(ctx);
 
-    if (ctx->hooks.checkUserinfo) {
-        ctx->hooks.checkUserinfo();
-    }
+	if (ctx->hooks.checkTimeout) {
+		ctx->hooks.checkTimeout(ctx->clc, ctx->cls, ctx->cl);
+	}
 
-    if (ctx->hooks.readPackets) {
-        ctx->hooks.readPackets();
-    }
+	if (ctx->hooks.checkUserinfo) {
+		ctx->hooks.checkUserinfo();
+	}
 
-    if (ctx->hooks.setCGameTime) {
-        ctx->hooks.setCGameTime();
-    }
+	if (ctx->hooks.readPackets) {
+		ctx->hooks.readPackets();
+	}
 
-    if (qlr_should_autopause(ctx)) {
-        goto finalize_frame;
-    }
+	if (!autopause) {
+		if (ctx->hooks.predictMovement) {
+			ctx->hooks.predictMovement();
+		}
 
-    if (ctx->hooks.runConsole) {
-        ctx->hooks.runConsole();
-    }
+		if (ctx->hooks.sendCmd) {
+			ctx->hooks.sendCmd();
+		}
+	}
 
-    if (ctx->hooks.predictMovement) {
-        ctx->hooks.predictMovement();
-    }
+	if (ctx->hooks.setCGameTime) {
+		ctx->hooks.setCGameTime();
+	}
 
-    if (ctx->hooks.sendCmd) {
-        ctx->hooks.sendCmd();
-    }
+	if (ctx->hooks.updateScreen) {
+		ctx->hooks.updateScreen();
+	}
 
-finalize_frame:
-    if (ctx->hooks.updateScreen) {
-        ctx->hooks.updateScreen();
-    }
+	if (ctx->hooks.runCinematic) {
+		ctx->hooks.runCinematic();
+	}
 
-    if (ctx->hooks.beginProfiling) {
-        ctx->hooks.beginProfiling();
-    }
+	if (!autopause && ctx->hooks.runConsole) {
+		ctx->hooks.runConsole();
+	}
+
+	if (ctx->hooks.beginProfiling) {
+		ctx->hooks.beginProfiling();
+	}
 }
+
 
 /*
  * External dependencies summary for prototype scaffolding:

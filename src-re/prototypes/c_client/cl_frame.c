@@ -159,7 +159,7 @@ void CL_Frame(int msec) {
 		qlr_native_shim_logf("client", "CL_Frame", "clearing-cddialog");
 		qlr_client_call_menu_hook(ctx->hooks.setActiveMenu, QLR_UIMENU_NEED_CD);
 	} else if (ctx->cls->state == QLR_CA_DISCONNECTED && (ctx->cls->keyCatchers & 0x1) == 0 &&
-		   ctx->cvars.com_sv_running && !ctx->cvars.com_sv_running->integer) {
+	           ctx->cvars.com_sv_running && !ctx->cvars.com_sv_running->integer) {
 		qlr_client_call_hook("stopAllSounds", ctx->hooks.stopAllSounds);
 		qlr_client_call_menu_hook(ctx->hooks.setActiveMenu, QLR_UIMENU_MAIN);
 	}
@@ -170,14 +170,15 @@ void CL_Frame(int msec) {
 	ctx->cls->frametime = msec;
 	ctx->cls->realtime += msec;
 
+	bool autopause = qlr_should_autopause(ctx);
+
 	qlr_client_call_hook("checkUserinfo", ctx->hooks.checkUserinfo);
 	qlr_client_call_timeout_hook(ctx->hooks.checkTimeout, ctx);
 	qlr_client_call_hook("readPackets", ctx->hooks.readPackets);
 
-	if (qlr_should_autopause(ctx)) {
+	if (autopause) {
 		qlr_native_shim_logf("client", "CL_Frame", "auto-paused");
 	} else {
-		qlr_client_call_hook("runConsole", ctx->hooks.runConsole);
 		qlr_client_call_hook("predictMovement", ctx->hooks.predictMovement);
 		qlr_client_call_hook("sendCmd", ctx->hooks.sendCmd);
 		qlr_client_call_hook("checkForResend", ctx->hooks.checkForResend);
@@ -185,6 +186,10 @@ void CL_Frame(int msec) {
 
 	qlr_client_call_hook("setCGameTime", ctx->hooks.setCGameTime);
 	qlr_client_call_hook("updateScreen", ctx->hooks.updateScreen);
+	qlr_client_call_hook("runCinematic", ctx->hooks.runCinematic);
+	if (!autopause) {
+		qlr_client_call_hook("runConsole", ctx->hooks.runConsole);
+	}
 	qlr_client_call_hook("beginProfiling", ctx->hooks.beginProfiling);
 
 	qlr_native_shim_logf("client", "CL_Frame", "end realtime=%d frametime=%d", ctx->cls->realtime, ctx->cls->frametime);
