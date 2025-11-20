@@ -36,11 +36,13 @@ build_module() {
 build_module qlr_client_frame \
   -I"${SRC_ROOT}/c_client" \
   "${SRC_ROOT}/c_client/cl_frame.c" \
-  "${SRC_ROOT}/common/native_shim.c"
+  "${SRC_ROOT}/common/native_shim.c" \
+  "${SRC_ROOT}/common/fs_imports.c"
 
 build_module qlr_game_frame \
   -I"${SRC_ROOT}/g_gameplay" \
   "${SRC_ROOT}/g_gameplay/g_frame.c" \
-  "${SRC_ROOT}/common/native_shim.c"
+  "${SRC_ROOT}/common/native_shim.c" \
+  "${SRC_ROOT}/common/fs_imports.c"
 
 echo "Clean-room shared objects stored under ${BUILD_ROOT}" 

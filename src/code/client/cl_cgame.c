@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 
 #include "../game/botlib.h"
+#include "../../../src-re/include/fs_imports.h"
 
 extern	botlib_export_t	*botlib_export;
 
@@ -465,18 +466,18 @@ int CL_CgameSystemCalls( int *args ) {
 		Cmd_ArgsBuffer( VMA(1), args[2] );
 		return 0;
 	case CG_FS_FOPENFILE:
-		return FS_FOpenFileByMode( VMA(1), VMA(2), args[3] );
+		return qlr_fs_imports.fopen_file_by_mode( VMA(1), VMA(2), args[3] );
 	case CG_FS_READ:
-		FS_Read2( VMA(1), args[2], args[3] );
+		qlr_fs_imports.read_file( VMA(1), args[2], args[3] );
 		return 0;
 	case CG_FS_WRITE:
-		FS_Write( VMA(1), args[2], args[3] );
+		qlr_fs_imports.write_file( VMA(1), args[2], args[3] );
 		return 0;
 	case CG_FS_FCLOSEFILE:
-		FS_FCloseFile( args[1] );
+		qlr_fs_imports.close_file( args[1] );
 		return 0;
 	case CG_FS_SEEK:
-		return FS_Seek( args[1], args[2], args[3] );
+		return qlr_fs_imports.seek_file( args[1], args[2], args[3] );
 	case CG_SENDCONSOLECOMMAND:
 		Cbuf_AddText( VMA(1) );
 		return 0;

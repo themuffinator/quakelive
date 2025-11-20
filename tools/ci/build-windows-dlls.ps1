@@ -85,18 +85,21 @@ $shimExports = @(
     'qlr_native_shim_close',
     'qlr_native_shim_flush',
     'qlr_native_shim_logf',
-    'qlr_native_shim_log_syscall'
+    'qlr_native_shim_log_syscall',
+    'qlr_fs_imports'
 )
 
 Invoke-RePrototypeBuild \
     -Name 'qlr_client_frame' \
     -Sources @(
         (Join-Path $cleanRoot 'c_client\cl_frame.c'),
-        (Join-Path $cleanRoot 'common\native_shim.c')
+        (Join-Path $cleanRoot 'common\native_shim.c'),
+        (Join-Path $cleanRoot 'common\fs_imports.c')
     ) \
     -IncludeDirs @(
         (Join-Path $cleanRoot 'c_client'),
-        (Join-Path $cleanRoot 'common')
+        (Join-Path $cleanRoot 'common'),
+        (Join-Path $RepoRoot 'src-re\include')
     ) \
     -Exports (@('CL_Frame', 'QLR_ClientFrame_BindContext', 'QLR_ClientFrame_UnbindContext') + $shimExports)
 
@@ -104,11 +107,13 @@ Invoke-RePrototypeBuild \
     -Name 'qlr_game_frame' \
     -Sources @(
         (Join-Path $cleanRoot 'g_gameplay\g_frame.c'),
-        (Join-Path $cleanRoot 'common\native_shim.c')
+        (Join-Path $cleanRoot 'common\native_shim.c'),
+        (Join-Path $cleanRoot 'common\fs_imports.c')
     ) \
     -IncludeDirs @(
         (Join-Path $cleanRoot 'g_gameplay'),
-        (Join-Path $cleanRoot 'common')
+        (Join-Path $cleanRoot 'common'),
+        (Join-Path $RepoRoot 'src-re\include')
     ) \
     -Exports (@('G_RunFrame', 'QLR_Game_BindFrameContext', 'QLR_Game_UnbindFrameContext') + $shimExports)
 

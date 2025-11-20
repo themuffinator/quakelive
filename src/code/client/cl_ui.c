@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../game/botlib.h"
 #include "../../common/auth_credentials.h"
+#include "../../../src-re/include/fs_imports.h"
 
 extern	botlib_export_t	*botlib_export;
 
@@ -51,22 +52,23 @@ LAN_LoadCachedServers
 void LAN_LoadCachedServers( ) {
 	int size;
 	fileHandle_t fileIn;
+
 	cls.numglobalservers = cls.nummplayerservers = cls.numfavoriteservers = 0;
 	cls.numGlobalServerAddresses = 0;
-	if (FS_SV_FOpenFileRead("servercache.dat", &fileIn)) {
-		FS_Read(&cls.numglobalservers, sizeof(int), fileIn);
-		FS_Read(&cls.nummplayerservers, sizeof(int), fileIn);
-		FS_Read(&cls.numfavoriteservers, sizeof(int), fileIn);
-		FS_Read(&size, sizeof(int), fileIn);
+	if (qlr_fs_imports.sv_fopen_file_read("servercache.dat", &fileIn)) {
+		qlr_fs_imports.read_file(&cls.numglobalservers, sizeof(int), fileIn);
+		qlr_fs_imports.read_file(&cls.nummplayerservers, sizeof(int), fileIn);
+		qlr_fs_imports.read_file(&cls.numfavoriteservers, sizeof(int), fileIn);
+		qlr_fs_imports.read_file(&size, sizeof(int), fileIn);
 		if (size == sizeof(cls.globalServers) + sizeof(cls.favoriteServers) + sizeof(cls.mplayerServers)) {
-			FS_Read(&cls.globalServers, sizeof(cls.globalServers), fileIn);
-			FS_Read(&cls.mplayerServers, sizeof(cls.mplayerServers), fileIn);
-			FS_Read(&cls.favoriteServers, sizeof(cls.favoriteServers), fileIn);
+			qlr_fs_imports.read_file(&cls.globalServers, sizeof(cls.globalServers), fileIn);
+			qlr_fs_imports.read_file(&cls.mplayerServers, sizeof(cls.mplayerServers), fileIn);
+			qlr_fs_imports.read_file(&cls.favoriteServers, sizeof(cls.favoriteServers), fileIn);
 		} else {
 			cls.numglobalservers = cls.nummplayerservers = cls.numfavoriteservers = 0;
 			cls.numGlobalServerAddresses = 0;
 		}
-		FS_FCloseFile(fileIn);
+		qlr_fs_imports.close_file(fileIn);
 	}
 }
 
@@ -77,16 +79,17 @@ LAN_SaveServersToCache
 */
 void LAN_SaveServersToCache( ) {
 	int size;
-	fileHandle_t fileOut = FS_SV_FOpenFileWrite("servercache.dat");
-	FS_Write(&cls.numglobalservers, sizeof(int), fileOut);
-	FS_Write(&cls.nummplayerservers, sizeof(int), fileOut);
-	FS_Write(&cls.numfavoriteservers, sizeof(int), fileOut);
+	fileHandle_t fileOut = qlr_fs_imports.sv_fopen_file_write("servercache.dat");
+
+	qlr_fs_imports.write_file(&cls.numglobalservers, sizeof(int), fileOut);
+	qlr_fs_imports.write_file(&cls.nummplayerservers, sizeof(int), fileOut);
+	qlr_fs_imports.write_file(&cls.numfavoriteservers, sizeof(int), fileOut);
 	size = sizeof(cls.globalServers) + sizeof(cls.favoriteServers) + sizeof(cls.mplayerServers);
-	FS_Write(&size, sizeof(int), fileOut);
-	FS_Write(&cls.globalServers, sizeof(cls.globalServers), fileOut);
-	FS_Write(&cls.mplayerServers, sizeof(cls.mplayerServers), fileOut);
-	FS_Write(&cls.favoriteServers, sizeof(cls.favoriteServers), fileOut);
-	FS_FCloseFile(fileOut);
+	qlr_fs_imports.write_file(&size, sizeof(int), fileOut);
+	qlr_fs_imports.write_file(&cls.globalServers, sizeof(cls.globalServers), fileOut);
+	qlr_fs_imports.write_file(&cls.mplayerServers, sizeof(cls.mplayerServers), fileOut);
+	qlr_fs_imports.write_file(&cls.favoriteServers, sizeof(cls.favoriteServers), fileOut);
+	qlr_fs_imports.close_file(fileOut);
 }
 
 
@@ -871,26 +874,26 @@ int CL_UISystemCalls( int *args ) {
 		return 0;
 
 	case UI_FS_FOPENFILE:
-		return FS_FOpenFileByMode( VMA(1), VMA(2), args[3] );
+		return qlr_fs_imports.fopen_file_by_mode( VMA(1), VMA(2), args[3] );
 
 	case UI_FS_READ:
-		FS_Read2( VMA(1), args[2], args[3] );
+		qlr_fs_imports.read_file( VMA(1), args[2], args[3] );
 		return 0;
 
 	case UI_FS_WRITE:
-		FS_Write( VMA(1), args[2], args[3] );
+		qlr_fs_imports.write_file( VMA(1), args[2], args[3] );
 		return 0;
 
 	case UI_FS_FCLOSEFILE:
-		FS_FCloseFile( args[1] );
+		qlr_fs_imports.close_file( args[1] );
 		return 0;
 
 	case UI_FS_GETFILELIST:
-		return FS_GetFileList( VMA(1), VMA(2), VMA(3), args[4] );
+		return qlr_fs_imports.get_file_list( VMA(1), VMA(2), VMA(3), args[4] );
 
 	case UI_FS_SEEK:
-		return FS_Seek( args[1], args[2], args[3] );
-	
+		return qlr_fs_imports.seek_file( args[1], args[2], args[3] );
+
 	case UI_R_REGISTERMODEL:
 		return re.RegisterModel( VMA(1) );
 
