@@ -186,6 +186,7 @@ void CL_Frame(int msec) {
 
 	qlr_client_call_hook("setCGameTime", ctx->hooks.setCGameTime);
 	qlr_client_call_hook("updateScreen", ctx->hooks.updateScreen);
+	qlr_client_call_hook("soundUpdate", ctx->hooks.soundUpdate);
 	qlr_client_call_hook("runCinematic", ctx->hooks.runCinematic);
 	if (!autopause) {
 		qlr_client_call_hook("runConsole", ctx->hooks.runConsole);

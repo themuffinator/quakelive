@@ -9,6 +9,7 @@
 [client] hook: setCGameTime()
 [client] CL_Frame: auto-paused
 [client] hook: updateScreen()
+[client] hook: soundUpdate()
 [client] hook: beginProfiling()
 [client] CL_Frame: end realtime=1267 frametime=33
 [client] UnbindContext: ctx=0xPTR
