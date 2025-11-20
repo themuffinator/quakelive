@@ -60,6 +60,7 @@ void (*check_for_resend)(void);
 void (*predict_movement)(void);
 void (*run_console)(void);
 void (*update_screen)(void);
+void (*sound_update)(void);
 void (*set_cgame_time)(void);
 void (*begin_profiling)(void);
 } qlr_client_frame_hooks_t;

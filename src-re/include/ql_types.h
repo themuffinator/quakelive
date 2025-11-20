@@ -151,6 +151,7 @@ void (*checkForResend)(void);
 void (*predictMovement)(void);
 void (*runConsole)(void);
 void (*updateScreen)(void);
+void (*soundUpdate)(void);
 void (*setCGameTime)(void);
 void (*firstSnapshot)(void);
     void (*beginProfiling)(void);

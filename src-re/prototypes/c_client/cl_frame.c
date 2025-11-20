@@ -185,6 +185,7 @@ void CL_Frame(int msec) {
 
 	qlr_client_call_hook("setCGameTime", ctx->hooks.setCGameTime);
 	qlr_client_call_hook("updateScreen", ctx->hooks.updateScreen);
+	qlr_client_call_hook("soundUpdate", ctx->hooks.soundUpdate);
 	qlr_client_call_hook("beginProfiling", ctx->hooks.beginProfiling);
 
 	qlr_native_shim_logf("client", "CL_Frame", "end realtime=%d frametime=%d", ctx->cls->realtime, ctx->cls->frametime);

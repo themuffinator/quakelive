@@ -212,6 +212,7 @@ void CL_Frame(int msec) {
 
 	qlr_client_call_hook("set_cgame_time", ctx->hooks.set_cgame_time);
 	qlr_client_call_hook("update_screen", ctx->hooks.update_screen);
+	qlr_client_call_hook("sound_update", ctx->hooks.sound_update);
 	qlr_client_call_hook("begin_profiling", ctx->hooks.begin_profiling);
 
 	qlr_native_shim_logf("client", "CL_Frame", "end realtime=%d delta=%d",
