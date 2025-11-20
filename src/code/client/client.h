@@ -515,6 +515,9 @@ int Key_GetCatcher( void );
 void Key_SetCatcher( int catcher );
 void LAN_LoadCachedServers();
 void LAN_SaveServersToCache();
+qhandle_t CL_Steam_RegisterShader( const char *url );
+void CL_InitSteamResources( void );
+void CL_ShutdownSteamResources( void );
 int CL_MenuReadScreenshot( const char *requestedName, byte *buffer, int bufferSize );
 
 

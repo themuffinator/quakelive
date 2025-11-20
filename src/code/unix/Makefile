@@ -417,6 +417,7 @@ $(B)/client/cl_net_chan.o \
 $(B)/client/cl_parse.o \
 $(B)/client/cl_screenshot_io.o \
 $(B)/client/cl_scrn.o \
+	$(B)/client/cl_steam_resources.o \
 $(B)/client/cl_ui.o \
 $(B)/client/cl_webpak.o \
         $(B)/client/ql_auth.o \
@@ -666,6 +667,7 @@ $(B)/client/cl_net_chan.o : $(CDIR)/cl_net_chan.c; $(DO_CC)
 $(B)/client/cl_parse.o : $(CDIR)/cl_parse.c; $(DO_CC)
 $(B)/client/cl_screenshot_io.o : $(CDIR)/cl_screenshot_io.c; $(DO_CC)
 $(B)/client/cl_scrn.o : $(CDIR)/cl_scrn.c; $(DO_CC)
+$(B)/client/cl_steam_resources.o : $(CDIR)/cl_steam_resources.c; $(DO_CC)
 $(B)/client/cl_ui.o : $(CDIR)/cl_ui.c; $(DO_CC)
 $(B)/client/cl_webpak.o : $(CDIR)/cl_webpak.c; $(DO_CC)
 $(B)/client/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC)
@@ -1716,6 +1718,7 @@ $(B)/q3static/cl_net_chan.o : $(CDIR)/cl_net_chan.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_parse.o : $(CDIR)/cl_parse.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_screenshot_io.o : $(CDIR)/cl_screenshot_io.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_scrn.o : $(CDIR)/cl_scrn.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/cl_steam_resources.o : $(CDIR)/cl_steam_resources.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_ui.o : $(CDIR)/cl_ui.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_webpak.o : $(CDIR)/cl_webpak.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC) -DQ3_STATIC

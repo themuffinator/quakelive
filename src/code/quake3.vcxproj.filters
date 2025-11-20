@@ -42,6 +42,9 @@
     <ClCompile Include="client\cl_scrn.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="client\cl_steam_resources.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="client\cl_ui.c">
       <Filter>Source Files</Filter>
     </ClCompile>
