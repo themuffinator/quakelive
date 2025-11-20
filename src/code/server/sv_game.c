@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 
 #include "../game/botlib.h"
+#include <limits.h>
 
 botlib_export_t	*botlib_export;
 
@@ -285,6 +286,158 @@ void SV_GetUsercmd( int clientNum, usercmd_t *cmd ) {
 	*cmd = svs.clients[clientNum].lastUsercmd;
 }
 
+/*
+=============
+SV_ParseSteamIdString
+
+Parses a decimal SteamID string into two 32-bit integer parts.
+=============
+*/
+static qboolean SV_ParseSteamIdString( const char *steamId, uint32_t *steamIdLow, uint32_t *steamIdHigh ) {
+	unsigned long long value;
+	const char *ch;
+
+	if ( !steamId || !steamId[0] || !steamIdLow || !steamIdHigh ) {
+		return qfalse;
+	}
+
+	value = 0ull;
+
+	for ( ch = steamId; *ch; ++ch ) {
+		if ( *ch < '0' || *ch > '9' ) {
+			return qfalse;
+		}
+
+		if ( value > (ULLONG_MAX / 10ull) ) {
+			return qfalse;
+		}
+
+		value *= 10ull;
+
+		if ( value > (ULLONG_MAX - (unsigned long long)(*ch - '0')) ) {
+			return qfalse;
+		}
+
+		value += (unsigned long long)(*ch - '0');
+	}
+
+	*steamIdLow = (uint32_t)( value & 0xffffffffu );
+	*steamIdHigh = (uint32_t)( ( value >> 32 ) & 0xffffffffu );
+
+	return qtrue;
+}
+
+/*
+=============
+SV_GetAuthResultString
+
+Returns the userinfo result label for authentication telemetry.
+=============
+*/
+static const char *SV_GetAuthResultString( qlAuthResult result ) {
+	switch ( result ) {
+		case QL_AUTH_RESULT_ACCEPTED:
+		return "accepted";
+		case QL_AUTH_RESULT_DENIED:
+		return "denied";
+		case QL_AUTH_RESULT_ERROR:
+		return "error";
+		case QL_AUTH_RESULT_PENDING:
+		default:
+		return "pending";
+	}
+}
+
+/*
+=============
+SV_GetAuthOutcomeString
+
+Returns the userinfo outcome label for authentication telemetry.
+=============
+*/
+static const char *SV_GetAuthOutcomeString( qlAuthOutcome outcome ) {
+	switch ( outcome ) {
+		case QL_AUTH_OUTCOME_SUCCESS:
+		return "success";
+		case QL_AUTH_OUTCOME_RETRY:
+		return "retry";
+		case QL_AUTH_OUTCOME_FAILURE:
+		default:
+		return "failure";
+	}
+}
+
+/*
+=============
+SV_GetClientSteamId
+
+Writes the client's SteamID components if supplied in the userinfo.
+=============
+*/
+static qboolean SV_GetClientSteamId( int clientNum, uint32_t *steamIdLow, uint32_t *steamIdHigh ) {
+	client_t *cl;
+
+	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
+		return qfalse;
+	}
+
+	cl = &svs.clients[clientNum];
+
+	#if SV_HAS_PLATFORM_AUTH
+	if ( cl->platformSteamId[0] ) {
+		return SV_ParseSteamIdString( cl->platformSteamId, steamIdLow, steamIdHigh );
+	}
+	#endif
+
+	return qfalse;
+}
+
+/*
+=============
+SV_VerifyClientSteamAuth
+
+Validates the Steam authentication token captured from the client.
+=============
+*/
+static qboolean SV_VerifyClientSteamAuth( int clientNum ) {
+	#if !SV_HAS_PLATFORM_AUTH
+	(void)clientNum;
+	return qfalse;
+	#else
+	ql_auth_credential_t credential;
+	ql_auth_response_t response;
+	client_t *cl;
+
+	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
+		return qfalse;
+	}
+
+	cl = &svs.clients[clientNum];
+
+	if ( !cl->platformAuthToken[0] ) {
+		return qfalse;
+	}
+
+	QL_InitAuthCredential( &credential );
+	Com_Memset( &response, 0, sizeof( response ) );
+
+	if ( !QL_ParsePlatformToken( cl->platformAuthToken, QL_AUTH_CREDENTIAL_STEAM, &credential ) ) {
+		return qfalse;
+	}
+
+	if ( !QL_RequestExternalAuth( &credential, &response ) ) {
+		return qfalse;
+	}
+
+	cl->platformAuthSucceeded = response.result == QL_AUTH_RESULT_ACCEPTED;
+	Q_strncpyz( cl->platformAuthResult, SV_GetAuthResultString( response.result ), sizeof( cl->platformAuthResult ) );
+	Q_strncpyz( cl->platformAuthOutcome, SV_GetAuthOutcomeString( response.outcome ), sizeof( cl->platformAuthOutcome ) );
+	Q_strncpyz( cl->platformAuthMessage, response.message, sizeof( cl->platformAuthMessage ) );
+
+	return cl->platformAuthSucceeded;
+	#endif
+}
+
 //==============================================
 
 static int	FloatAsInt( float f ) {
@@ -416,6 +569,10 @@ int SV_GameSystemCalls( int *args ) {
 	case G_GET_SERVERINFO:
 		SV_GetServerinfo( VMA(1), args[2] );
 		return 0;
+	case G_STEAMID_QUERY:
+		return SV_GetClientSteamId( args[1], (uint32_t *)VMA(2), (uint32_t *)VMA(3) );
+	case G_STEAM_AUTH_VALIDATE:
+		return SV_VerifyClientSteamAuth( args[1] );
 	case G_ADJUST_AREA_PORTAL_STATE:
 		SV_AdjustAreaPortalState( VMA(1), args[2] );
 		return 0;

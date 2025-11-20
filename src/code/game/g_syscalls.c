@@ -142,6 +142,28 @@ void trap_GetServerinfo( char *buffer, int bufferSize ) {
 	syscall( G_GET_SERVERINFO, buffer, bufferSize );
 }
 
+/*
+=============
+trap_GetSteamId
+
+Queries the engine for the client's SteamID split into 32-bit parts.
+=============
+*/
+qboolean trap_GetSteamId( int clientNum, unsigned int *steamIdLow, unsigned int *steamIdHigh ) {
+	return syscall( G_STEAMID_QUERY, clientNum, steamIdLow, steamIdHigh );
+}
+
+/*
+=============
+trap_VerifySteamAuth
+
+Validates the client's Steam authentication state on the server.
+=============
+*/
+qboolean trap_VerifySteamAuth( int clientNum ) {
+	return syscall( G_STEAM_AUTH_VALIDATE, clientNum );
+}
+
 void trap_SetBrushModel( gentity_t *ent, const char *name ) {
 	syscall( G_SET_BRUSH_MODEL, ent, name );
 }
