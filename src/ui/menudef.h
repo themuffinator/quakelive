@@ -1,193 +1,167 @@
-/*
-===========================================================================
-Copyright (C) 1999-2005 Id Software, Inc.
 
-This file is part of Quake III Arena source code.
+#define ITEM_TYPE_TEXT					0		// simple text
+#define ITEM_TYPE_BUTTON				1       // button, basically text with a border 
+#define ITEM_TYPE_RADIOBUTTON			2       // toggle button, may be grouped 
+#define ITEM_TYPE_CHECKBOX				3       // check box
+#define ITEM_TYPE_EDITFIELD				4       // editable text, associated with a cvar
+#define ITEM_TYPE_COMBO					5       // drop down list
+#define ITEM_TYPE_LISTBOX				6       // scrollable list  
+#define ITEM_TYPE_MODEL					7       // model
+#define ITEM_TYPE_OWNERDRAW				8       // owner draw, name specs what it is
+#define ITEM_TYPE_NUMERICFIELD			9       // editable text, associated with a cvar
+#define ITEM_TYPE_SLIDER				10      // mouse speed, volume, etc.
+#define ITEM_TYPE_YESNO					11      // yes no cvar setting
+#define ITEM_TYPE_MULTI					12      // multiple list setting, enumerated
+#define ITEM_TYPE_BIND					13	    // multiple list setting, enumerated
+#define ITEM_TYPE_SLIDER_COLOR			14      // team colors, etc.
+#define ITEM_TYPE_PRESET				15      //
+#define ITEM_TYPE_PRESETLIST			16      //
 
-Quake III Arena source code is free software; you can redistribute it
-and/or modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation; either version 2 of the License,
-or (at your option) any later version.
+#define ITEM_ALIGN_LEFT					0       // left alignment
+#define ITEM_ALIGN_CENTER				1       // center alignment
+#define ITEM_ALIGN_RIGHT				2       // right alignment
 
-Quake III Arena source code is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+#define	WIDESCREEN_STRETCH				0
+#define	WIDESCREEN_LEFT					1
+#define	WIDESCREEN_CENTER				2
+#define	WIDESCREEN_RIGHT				3
 
-You should have received a copy of the GNU General Public License
-along with Foobar; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-===========================================================================
-*/
+#define	FONT_DEFAULT					0
+#define	FONT_SANS						1
+#define	FONT_MONO						2
 
-#define ITEM_TYPE_TEXT 0                  // simple text
-#define ITEM_TYPE_BUTTON 1                // button, basically text with a border 
-#define ITEM_TYPE_RADIOBUTTON 2           // toggle button, may be grouped 
-#define ITEM_TYPE_CHECKBOX 3              // check box
-#define ITEM_TYPE_EDITFIELD 4             // editable text, associated with a cvar
-#define ITEM_TYPE_COMBO 5                 // drop down list
-#define ITEM_TYPE_LISTBOX 6               // scrollable list  
-#define ITEM_TYPE_MODEL 7                 // model
-#define ITEM_TYPE_OWNERDRAW 8             // owner draw, name specs what it is
-#define ITEM_TYPE_NUMERICFIELD 9          // editable text, associated with a cvar
-#define ITEM_TYPE_SLIDER 10               // mouse speed, volume, etc.
-#define ITEM_TYPE_YESNO 11                // yes no cvar setting
-#define ITEM_TYPE_MULTI 12                // multiple list setting, enumerated
-#define ITEM_TYPE_BIND 13		              // multiple list setting, enumerated
-    
-#define ITEM_ALIGN_LEFT 0                 // left alignment
-#define ITEM_ALIGN_CENTER 1               // center alignment
-#define ITEM_ALIGN_RIGHT 2                // right alignment
-
-#define FONT_DEFAULT 0
-#define FONT_SANS 1
-#define FONT_MONO 2
-
-#define WIDESCREEN_STRETCH 0
-#define WIDESCREEN_LEFT 1
-#define WIDESCREEN_CENTER 2
-#define WIDESCREEN_RIGHT 3
-
-#define ITEM_TEXTSTYLE_NORMAL 0           // normal text
-#define ITEM_TEXTSTYLE_BLINK 1            // fast blinking
-#define ITEM_TEXTSTYLE_PULSE 2            // slow pulsing
-#define ITEM_TEXTSTYLE_SHADOWED 3         // drop shadow ( need a color for this )
-#define ITEM_TEXTSTYLE_OUTLINED 4         // drop shadow ( need a color for this )
-#define ITEM_TEXTSTYLE_OUTLINESHADOWED 5  // drop shadow ( need a color for this )
-#define ITEM_TEXTSTYLE_SHADOWEDMORE 6         // drop shadow ( need a color for this )
+#define ITEM_TEXTSTYLE_NORMAL			0       // normal text
+#define ITEM_TEXTSTYLE_BLINK			1       // fast blinking
+#define ITEM_TEXTSTYLE_PULSE			2       // slow pulsing
+#define ITEM_TEXTSTYLE_SHADOWED			3       // drop shadow ( need a color for this )
+#define ITEM_TEXTSTYLE_OUTLINED			4       // drop shadow ( need a color for this )
+#define ITEM_TEXTSTYLE_OUTLINESHADOWED	5		// drop shadow ( need a color for this )
+#define ITEM_TEXTSTYLE_SHADOWEDMORE		6		// drop shadow ( need a color for this )
                           
-#define WINDOW_BORDER_NONE 0              // no border
-#define WINDOW_BORDER_FULL 1              // full border based on border color ( single pixel )
-#define WINDOW_BORDER_HORZ 2              // horizontal borders only
-#define WINDOW_BORDER_VERT 3              // vertical borders only 
-#define WINDOW_BORDER_KCGRADIENT 4        // horizontal border using the gradient bars
+#define WINDOW_BORDER_NONE				0       // no border
+#define WINDOW_BORDER_FULL				1       // full border based on border color ( single pixel )
+#define WINDOW_BORDER_HORZ				2       // horizontal borders only
+#define WINDOW_BORDER_VERT				3       // vertical borders only 
+#define WINDOW_BORDER_KCGRADIENT		4       // horizontal border using the gradient bars
   
-#define WINDOW_STYLE_EMPTY 0              // no background
-#define WINDOW_STYLE_FILLED 1             // filled with background color
-#define WINDOW_STYLE_GRADIENT 2           // gradient bar based on background color 
-#define WINDOW_STYLE_SHADER   3           // gradient bar based on background color 
-#define WINDOW_STYLE_TEAMCOLOR 4          // team color
-#define WINDOW_STYLE_CINEMATIC 5          // cinematic
+#define WINDOW_STYLE_EMPTY				0       // no background
+#define WINDOW_STYLE_FILLED				1       // filled with background color
+#define WINDOW_STYLE_GRADIENT			2       // gradient bar based on background color 
+#define WINDOW_STYLE_SHADER				3       // gradient bar based on background color 
+#define WINDOW_STYLE_TEAMCOLOR			4       // team color
+#define WINDOW_STYLE_CINEMATIC			5       // cinematic
 
-#define MENU_TRUE 1                       // uh.. true
-#define MENU_FALSE 0                      // and false
+#define MENU_TRUE						1       // uh.. true
+#define MENU_FALSE						0       // and false
 
-#define HUD_VERTICAL				0x00
-#define HUD_HORIZONTAL				0x01
+#define HUD_VERTICAL						0x00
+#define HUD_HORIZONTAL						0x01
 
 // list box element types
-#define LISTBOX_TEXT  0x00
-#define LISTBOX_IMAGE 0x01
+#define LISTBOX_TEXT						0x00
+#define LISTBOX_IMAGE						0x01
 
 // list feeders
-#define FEEDER_HEADS                                            0x00                    // model heads
-#define FEEDER_MAPS                                             0x01                    // text maps based on game type
-#define FEEDER_SERVERS                                          0x02                    // servers
-#define FEEDER_CLANS                                            0x03                    // clan names
-#define FEEDER_ALLMAPS                                          0x04                    // all maps available, in graphic format
-#define FEEDER_REDTEAM_LIST                                     0x05                    // red team members
-#define FEEDER_BLUETEAM_LIST                                    0x06                    // blue team members
-#define FEEDER_PLAYER_LIST                                      0x07                    // players
-#define FEEDER_TEAM_LIST                                        0x08                    // team members for team voting
-#define FEEDER_MODS                                             0x09                    //
-#define FEEDER_DEMOS                                            0x0a                    //
-#define FEEDER_SCOREBOARD                                       0x0b                    //
-#define FEEDER_Q3HEADS                                          0x0c                    // model heads
-#define FEEDER_SERVERSTATUS                                     0x0d                    // server status
-#define FEEDER_FINDPLAYER                                       0x0e                    // find player
-#define FEEDER_CINEMATICS                                       0x0f                    // cinematics
-#define FEEDER_ENDSCOREBOARD                                    0x10                    // premium scoreboard w/ country flags & quit players
-#define FEEDER_REDTEAM_STATS                                    0x11                    // premium statistics board for red team
-#define FEEDER_BLUETEAM_STATS                                   0x12                    // premium statistics board for blue team
-#define FEEDER_CVMAPS                                           0x13                    // maps for the gametype you wish to cv to
-#define FEEDER_MAP_ROTATIONS                                    0x14                    // cached map rotation entries
-#define FEEDER_MATCHSUMMARY_END                                 0x15                    // cached end-of-match rows
-#define FEEDER_MATCHSUMMARY_RED                                 0x16                    // cached red-team rows
-#define FEEDER_MATCHSUMMARY_BLUE                                0x17                    // cached blue-team rows
+#define FEEDER_HEADS						0x00			// model heads
+#define FEEDER_MAPS							0x01			// text maps based on game type
+#define FEEDER_SERVERS						0x02			// servers
+#define FEEDER_CLANS						0x03			// clan names
+#define FEEDER_ALLMAPS						0x04			// all maps available, in graphic format
+#define FEEDER_REDTEAM_LIST					0x05			// red team members
+#define FEEDER_BLUETEAM_LIST				0x06			// blue team members
+#define FEEDER_PLAYER_LIST					0x07			// players
+#define FEEDER_TEAM_LIST					0x08			// team members for team voting
+#define FEEDER_MODS							0x09			// 
+#define FEEDER_DEMOS 						0x0a			//
+#define FEEDER_SCOREBOARD					0x0b			// 
+#define FEEDER_Q3HEADS		 				0x0c			// model heads
+#define FEEDER_SERVERSTATUS					0x0d			// server status
+#define FEEDER_FINDPLAYER					0x0e			// find player
+#define FEEDER_CINEMATICS					0x0f			// cinematics
+#define FEEDER_ENDSCOREBOARD				0x10			// premium scoreboard w/ country flags & quit players
+#define FEEDER_REDTEAM_STATS                0x11            // premium statistics board for red team
+#define FEEDER_BLUETEAM_STATS               0x12            // premium statistics board for blue team
+#define FEEDER_CVMAPS						0x13			// maps for the gametype you wish to cv to
 
 // display flags
-#define CG_SHOW_BLUE_TEAM_HAS_REDFLAG     0x00000001
-#define CG_SHOW_RED_TEAM_HAS_BLUEFLAG     0x00000002
-#define CG_SHOW_DUEL                      0x00000004
-#define CG_SHOW_CLAN_ARENA                0x00000008
-#define CG_SHOW_CTF                       0x00000010
-#define CG_SHOW_ONEFLAG                   0x00000020
-#define CG_SHOW_OBELISK                   0x00000040
-#define CG_SHOW_HARVESTER                 0x00000080
-#define CG_SHOW_DOMINATION                0x00000100
-#define CG_SHOW_ANYNONTEAMGAME            0x00000200
-#define CG_SHOW_ANYTEAMGAME               0x00000400
-#define CG_SHOW_HEALTHCRITICAL            0x00000800
-#define CG_SHOW_IF_NOT_WARMUP             0x00001000
-#define CG_SHOW_IF_PLAYER_HAS_FLAG        0x00002000
-#define CG_SHOW_IF_WARMUP                 0x00004000
-#define CG_SHOW_IF_BLUE_IS_FIRST_PLACE    0x00008000
-#define CG_SHOW_TEAMINFO                  0x00010000
-#define CG_SHOW_NOTEAMINFO                0x00020000
-#define CG_SHOW_OTHERTEAMHASFLAG          0x00040000
-#define CG_SHOW_YOURTEAMHASENEMYFLAG      0x00080000
-#define CG_SHOW_INTERMISSION              0x00100000
-#define CG_SHOW_NOTINTERMISSION           0x00200000
-#define CG_SHOW_IF_MSG_PRESENT            0x00400000
-#define CG_SHOW_IF_NOTICE_PRESENT         0x00800000
-#define CG_SHOW_IF_CHAT_VISIBLE           0x01000000
-#define CG_SHOW_IF_PLYR_IS_FIRST_PLACE    0x02000000
-#define CG_SHOW_IF_PLYR_IS_NOT_FIRST_PLACE 0x04000000
-#define CG_SHOW_IF_RED_IS_FIRST_PLACE     0x08000000
-#define CG_SHOW_2DONLY                    0x10000000
-#define CG_SHOW_IF_PLYR_IS_ON_RED         0x20000000
-#define CG_SHOW_IF_PLYR_IS_ON_BLUE        0x40000000
-#define CG_SHOW_PLAYERS_REMAINING         0x80000000
+#define CG_SHOW_BLUE_TEAM_HAS_REDFLAG		0x00000001
+#define CG_SHOW_RED_TEAM_HAS_BLUEFLAG		0x00000002
+#define CG_SHOW_DUEL						0x00000004
+#define CG_SHOW_CLAN_ARENA					0x00000008
+#define CG_SHOW_CTF							0x00000010
+#define CG_SHOW_ONEFLAG						0x00000020
+#define CG_SHOW_OBELISK						0x00000040
+#define CG_SHOW_HARVESTER					0x00000080
+#define CG_SHOW_DOMINATION			        0x00000100
+#define CG_SHOW_ANYNONTEAMGAME				0x00000200
+#define CG_SHOW_ANYTEAMGAME					0x00000400
+#define CG_SHOW_HEALTHCRITICAL				0x00000800
+#define CG_SHOW_IF_NOT_WARMUP				0x00001000
+#define CG_SHOW_IF_PLAYER_HAS_FLAG			0x00002000
+#define CG_SHOW_IF_WARMUP					0x00004000
+#define CG_SHOW_IF_BLUE_IS_FIRST_PLACE		0x00008000
+#define CG_SHOW_TEAMINFO			        0x00010000
+#define CG_SHOW_NOTEAMINFO		            0x00020000
+#define CG_SHOW_OTHERTEAMHASFLAG			0x00040000
+#define CG_SHOW_YOURTEAMHASENEMYFLAG		0x00080000
+#define CG_SHOW_INTERMISSION				0x00100000
+#define CG_SHOW_NOTINTERMISSION				0x00200000
+#define CG_SHOW_IF_MSG_PRESENT				0x00400000
+#define CG_SHOW_IF_NOTICE_PRESENT			0x00800000
+#define CG_SHOW_IF_CHAT_VISIBLE				0x01000000
+#define CG_SHOW_IF_PLYR_IS_FIRST_PLACE		0x02000000
+#define CG_SHOW_IF_PLYR_IS_NOT_FIRST_PLACE	0x04000000
+#define CG_SHOW_IF_RED_IS_FIRST_PLACE		0x08000000
+#define CG_SHOW_2DONLY						0x10000000
+#define CG_SHOW_IF_PLYR_IS_ON_RED			0x20000000
+#define CG_SHOW_IF_PLYR_IS_ON_BLUE			0x40000000
+#define CG_SHOW_PLAYERS_REMAINING			0x80000000
 
-// ownerdrawflag2
-#define CG_SHOW_IF_PLYR1                  0x00000001
-#define CG_SHOW_IF_PLYR2                  0x00000002
-#define CG_SHOW_IF_G_FIRED                0x00000004
-#define CG_SHOW_IF_MG_FIRED               0x00000008
-#define CG_SHOW_IF_SG_FIRED               0x00000010
-#define CG_SHOW_IF_GL_FIRED               0x00000020
-#define CG_SHOW_IF_RL_FIRED               0x00000040
-#define CG_SHOW_IF_LG_FIRED               0x00000080
-#define CG_SHOW_IF_RG_FIRED               0x00000100
-#define CG_SHOW_IF_PG_FIRED               0x00000200
-#define CG_SHOW_IF_BFG_FIRED              0x00000400
-#define CG_SHOW_IF_CG_FIRED               0x00000800
-#define CG_SHOW_IF_NG_FIRED               0x00001000
-#define CG_SHOW_IF_PL_FIRED               0x00002000
-#define CG_SHOW_IF_HMG_FIRED              0x00004000
-#define CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC 0x00008000
-#define CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC 0x00010000
-#define CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC 0x00020000
-#define CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC 0x00040000
-#define CG_SHOW_IF_LOADOUT_ENABLED        0x00080000
-#define CG_SHOW_IF_LOADOUT_DISABLED       0x00100000
-#define CG_SHOW_IF_1ST_PLYR_FOLLOWED      0x00200000
-#define CG_SHOW_IF_2ND_PLYR_FOLLOWED      0x00400000
-#define CG_SHOW_IF_1ST_PLYR_TRACKED       0x00800000
-#define CG_SHOW_IF_2ND_PLYR_TRACKED       0x01000000
+//ownerdrawflag2
+#define	CG_SHOW_IF_PLYR1					0x00000001
+#define	CG_SHOW_IF_PLYR2					0x00000002
+#define	CG_SHOW_IF_G_FIRED					0x00000004
+#define	CG_SHOW_IF_MG_FIRED					0x00000008
+#define	CG_SHOW_IF_SG_FIRED					0x00000010
+#define	CG_SHOW_IF_GL_FIRED					0x00000020
+#define	CG_SHOW_IF_RL_FIRED					0x00000040
+#define	CG_SHOW_IF_LG_FIRED					0x00000080
+#define	CG_SHOW_IF_RG_FIRED					0x00000100
+#define	CG_SHOW_IF_PG_FIRED					0x00000200
+#define	CG_SHOW_IF_BFG_FIRED				0x00000400
+#define	CG_SHOW_IF_CG_FIRED					0x00000800
+#define	CG_SHOW_IF_NG_FIRED					0x00001000
+#define	CG_SHOW_IF_PL_FIRED					0x00002000
+#define	CG_SHOW_IF_HMG_FIRED				0x00004000
+#define CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC   0x00008000
+#define CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC	0x00010000
+#define CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC   0x00020000
+#define CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC  0x00040000
+#define CG_SHOW_IF_LOADOUT_ENABLED			0x00080000
+#define CG_SHOW_IF_LOADOUT_DISABLED			0x00100000
+#define CG_SHOW_IF_1ST_PLYR_FOLLOWED		0x00200000
+#define CG_SHOW_IF_2ND_PLYR_FOLLOWED		0x00400000
+#define CG_SHOW_IF_1ST_PLYR_TRACKED		0x00800000
+#define CG_SHOW_IF_2ND_PLYR_TRACKED		0x01000000
 
-
-#define UI_SHOW_LEADER                                  0x00000001
-#define UI_SHOW_NOTLEADER                               0x00000002
-#define UI_SHOW_FAVORITESERVERS                         0x00000004
-#define UI_SHOW_ANYNONTEAMGAME                          0x00000008
-#define UI_SHOW_ANYTEAMGAME                             0x00000010
-#define UI_SHOW_NEWHIGHSCORE                            0x00000020
-#define UI_SHOW_DEMOAVAILABLE                           0x00000040
-#define UI_SHOW_NEWBESTTIME                             0x00000080
-#define UI_SHOW_FFA                                     0x00000100
-#define UI_SHOW_NOTFFA                                  0x00000200
-#define UI_SHOW_NETANYNONTEAMGAME                       0x00000400
-#define UI_SHOW_NETANYTEAMGAME                          0x00000800
-#define UI_SHOW_NOTFAVORITESERVERS                      0x00001000
-#define UI_SHOW_IF_LOADOUT_ENABLED                      0x00002000
-#define UI_SHOW_IF_LOADOUT_DISABLED                     0x00004000
-#define UI_SHOW_IF_NOT_INTERMISSION                     0x00008000
-#define UI_SHOW_IF_WARMUP                               0x00010000
-#define UI_SHOW_IF_NOT_WARMUP                           0x00020000
-
-
-
+#define UI_SHOW_LEADER				        0x00000001
+#define UI_SHOW_NOTLEADER			        0x00000002
+#define UI_SHOW_FAVORITESERVERS				0x00000004
+#define UI_SHOW_ANYNONTEAMGAME				0x00000008
+#define UI_SHOW_ANYTEAMGAME					0x00000010
+#define UI_SHOW_NEWHIGHSCORE				0x00000020
+#define UI_SHOW_DEMOAVAILABLE				0x00000040
+#define UI_SHOW_NEWBESTTIME					0x00000080
+#define UI_SHOW_FFA							0x00000100
+#define UI_SHOW_NOTFFA						0x00000200
+#define UI_SHOW_NETANYNONTEAMGAME	 		0x00000400
+#define UI_SHOW_NETANYTEAMGAME		 		0x00000800
+#define UI_SHOW_NOTFAVORITESERVERS			0x00001000
+#define UI_SHOW_IF_LOADOUT_ENABLED			0x00002000
+#define UI_SHOW_IF_LOADOUT_DISABLED			0x00004000
+#define UI_SHOW_IF_NOT_INTERMISSION			0x00008000
+#define UI_SHOW_IF_WARMUP					0x00010000
+#define UI_SHOW_IF_NOT_WARMUP				0x00020000
 
 // owner draw types
 // ideally these should be done outside of this file but
@@ -204,9 +178,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	CG_MATCH_END_CONDITION				9						
 #define	CG_MATCH_STATUS						10		// Game State - Scores message				
 #define	CG_CAPFRAGLIMIT						11						
-// Quake Live HUD match clock ownerdraws
 #define	CG_LEVELTIMER						12						
-// Quake Live round state ownerdraw IDs
 #define	CG_ROUND							13						
 #define	CG_ROUNDTIMER						14						
 #define	CG_OVERTIME							15						
@@ -582,29 +554,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_BLUETEAMMODEL				556
 #define UI_SERVER_SETTINGS				557
 #define UI_STARTING_WEAPONS				558
-
-
-// Legacy Quake III owner draws retained for cg_newdraw stubs
-#define CG_SELECTEDPLAYER_HEAD 1000
-#define CG_SELECTEDPLAYER_NAME 1001
-#define CG_SELECTEDPLAYER_LOCATION 1002
-#define CG_SELECTEDPLAYER_STATUS 1003
-#define CG_SELECTEDPLAYER_WEAPON 1004
-#define CG_SELECTEDPLAYER_POWERUP 1005
-#define CG_SELECTEDPLAYER_ARMOR 1006
-#define CG_SELECTEDPLAYER_HEALTH 1007
-#define CG_PLAYER_LOCATION 1008
-#define CG_PLAYER_STATUS 1009
-#define CG_TEAMINFO 1010
-#define CG_VOICE_HEAD 1011
-#define CG_VOICE_NAME 1012
-#define CG_AREA_SYSTEMCHAT 1013
-#define CG_AREA_TEAMCHAT 1014
-#define CG_AREA_CHAT 1015
-#define CG_RED_FLAGHEAD 1016
-#define CG_RED_FLAGNAME 1017
-#define CG_BLUE_FLAGHEAD 1018
-#define CG_BLUE_FLAGNAME 1019
 
 #define VOICECHAT_GETFLAG			"getflag"				// command someone to get the flag
 #define VOICECHAT_OFFENSE			"offense"				// command someone to go on offense

@@ -1,0 +1,179 @@
+
+characters {
+
+	{ "anarki"        "default"     }
+	{ "anarki"        "bright"	    }
+	{ "anarki"        "sport"	    }
+	{ "anarki"        "sport_blue"  }
+	{ "anarki"        "sport_red"   }
+
+	{ "biker"         "default"     }
+	{ "biker"         "bright"     }
+	{ "biker"         "hossman"     }
+	{ "biker"         "slammer"     }
+	{ "biker"         "sport"	    }
+	{ "biker"         "sport_blue"  }
+	{ "biker"         "sport_red"   }
+	{ "biker"         "stroggo"     }
+  
+	{ "bitterman"     "default"     }
+	{ "bitterman"     "bright"	    }
+	{ "bitterman"     "sport"	    }
+	{ "bitterman"     "sport_blue"  }
+	{ "bitterman"     "sport_red"   }
+  
+	{ "bones"         "default"     }
+	{ "bones"         "bright"      }
+	{ "bones"         "bones"       }
+	{ "bones"         "bright"		}
+	{ "bones"         "sport"	    }
+	{ "bones"         "sport_blue"  }
+	{ "bones"         "sport_red"   }
+
+	{ "crash"         "default"     }
+	{ "crash"         "bright"      }
+	{ "crash"         "sport"	    }
+	{ "crash"         "sport_blue"  }
+	{ "crash"         "sport_red"   }
+  
+	{ "doom"          "default"     }
+	{ "doom"          "bright"      }
+	{ "doom"          "phobos"      }
+	{ "doom"          "sport"	    }
+	{ "doom"          "sport_blue"  }
+	{ "doom"          "sport_red"   }
+  
+	{ "grunt"         "default"     }
+	{ "grunt"         "bright"      }
+	{ "grunt"         "sport"	    }
+	{ "grunt"         "sport_blue"  }
+	{ "grunt"         "sport_red"   }
+	{ "grunt"         "stripe"      }
+  
+	{ "hunter"        "default"     }
+	{ "hunter"         "bright"      }
+	{ "hunter"        "harpy"       }
+	{ "hunter"        "sport"	    }
+	{ "hunter"        "sport_blue"  }
+	{ "hunter"        "sport_red"   }
+
+	{ "james"         "default"     }
+	{ "james"         "bright"      }
+	{ "james"         "sport"	    }
+	{ "james"         "sport_blue"  }
+	{ "james"         "sport_red"   }
+
+	{ "janet"         "default"     }
+	{ "janet"         "bright"      }
+	{ "janet"         "sport"	    }
+	{ "janet"         "sport_blue"  }
+	{ "janet"         "sport_red"   }
+  
+	{ "keel"          "default"     }
+	{ "keel"          "bright"      }
+	{ "keel"          "sport"	    }
+	{ "keel"          "sport_blue"  }
+	{ "keel"          "sport_red"   }
+	
+	{ "klesk"         "default"     }
+	{ "klesk"         "bright"      }
+	{ "klesk"         "flisk"       }
+	{ "klesk"         "sport"	    }
+	{ "klesk"         "sport_blue"  }
+	{ "klesk"         "sport_red"   }
+  
+	{ "lucy"          "default"     }
+	{ "lucy"         "bright"      }
+	{ "lucy"          "angel"       }
+	{ "lucy"          "sport"	    }
+	{ "lucy"          "sport_blue"  }
+	{ "lucy"          "sport_red"   }
+  
+	{ "major"         "default"     }
+	{ "major"         "bright"      }
+	{ "major"         "daemia"      }
+	{ "major"         "sport"	    }
+	{ "major"         "sport_blue"  }
+	{ "major"         "sport_red"   }
+  
+	{ "mynx"          "default"     }
+	{ "mynx"         "bright"      }
+	{ "mynx"          "sport"	    }
+	{ "mynx"          "sport_blue"  }
+	{ "mynx"          "sport_red"   }
+	
+	{ "orbb"          "default"     }
+	{ "orbb"         "bright"      }
+	{ "orbb"          "sport"	    }
+	{ "orbb"          "sport_blue"  }
+	{ "orbb"          "sport_red"   }
+	
+	{ "ranger"        "default"     }
+	{ "ranger"        "bright"      }
+	{ "ranger"        "sport"	    }
+	{ "ranger"        "sport_blue"  }
+	{ "ranger"        "sport_red"   }
+	{ "ranger"        "wrack"       }
+	
+	{ "razor"         "default"     }
+	{ "razor"         "bright"      }
+	{ "razor"         "id"          }
+	{ "razor"         "patriot"     }
+	{ "razor"         "sport"	    }
+	{ "razor"         "sport_blue"  }
+	{ "razor"         "sport_red"   }
+
+	{ "santa"         "default"       }
+	{ "santa"         "bright"       }
+	{ "santa"         "sport"       }
+	{ "santa"         "sport_blue"       }
+	{ "santa"         "sport_red"       }
+	
+	{ "sarge"         "default"     }
+	{ "sarge"         "bright"      }
+	{ "sarge"         "krusade"     }
+	{ "sarge"         "roderic"     }
+	{ "sarge"         "sport"	    }
+	{ "sarge"         "sport_blue"  }
+	{ "sarge"         "sport_red"   }
+  
+	{ "slash"         "default"     }
+	{ "slash"         "bright"      }
+	{ "slash"         "sport"	    }
+	{ "slash"         "sport_blue"  }
+	{ "slash"         "sport_red"   }
+	{ "slash"         "yuriko"      }
+	
+	{ "sorlag"        "default"     }
+	{ "sorlag"         "bright"      }
+	{ "sorlag"        "sport"	    }
+	{ "sorlag"        "sport_blue"  }
+	{ "sorlag"        "sport_red"   }
+	
+	{ "tankJr"        "default"     }
+	{ "tankJr"        "bright"      }
+	{ "tankJr"        "sport"	    }
+	{ "tankJr"        "sport_blue"  }
+	{ "tankJr"        "sport_red"   }
+	
+	{ "uriel"         "default"     }
+	{ "uriel"         "bright"      }
+	{ "uriel"         "sport"	    }
+	{ "uriel"         "sport_blue"  }
+	{ "uriel"         "sport_red"   }
+	{ "uriel"         "zael"        }
+	
+	{ "visor"         "default"     }
+	{ "visor"         "bright"      }
+	{ "visor"         "gorre"       }
+	{ "visor"         "sport"	    }
+	{ "visor"         "sport_blue"  }
+	{ "visor"         "sport_red"   }
+  
+	{ "xaero"         "default"     }
+	{ "xaero"         "bright"      }
+	{ "xaero"         "sport"	    }
+	{ "xaero"         "sport_blue"  }
+	{ "xaero"         "sport_red"   }
+	
+}

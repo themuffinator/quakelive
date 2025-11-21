@@ -12,7 +12,7 @@ menuDef {
 	style WINDOW_STYLE_FILLED
 	border 1
 	disableColor .5 .5 .5 1
-	onopen { uiScript loadArenas ; uiScript updateCallvoteMapPreview }
+	onopen { uiScript loadArenas }
 
 		itemDef {
 			name status
@@ -505,8 +505,8 @@ menuDef {
 			group grpCallVote
 			type ITEM_TYPE_MULTI
 			text ""
-                        cvar "ui_cvGameType"
-                        cvarFloatList { "Default" -1 "FFA" 0 "Duel" 1 "Race" 2 "TDM" 3 "CA" 4 "CTF" 5 "1F" 6 "OVL" 7 "HAR" 8 "FT" 9 "DOM" 10 "AD" 11 "RR" 12 }
+			cvar "ui_cvgametype"
+			cvarFloatList { "Default" -1 "FFA" 0 "Duel" 1 "Race" 2 "TDM" 3 "CA" 4 "CTF" 5 "1F" 6 "HAR" 8 "FT" 9 "DOM" 10 "AD" 11 "RR" 12 }
 			rect 382 96 139 20
 			textaligny 11
 			textalign ITEM_ALIGN_LEFT
@@ -571,66 +571,6 @@ menuDef {
 			showCvar { "0" }
 			cvarTest2 "ui_gameTypeVotingDisabled"
 			showCvar2 { "1" }
-		}
-
-		itemDef {
-			name "preset_bg"
-			group grpCallVote
-			style WINDOW_STYLE_FILLED
-			rect 265 240 230 100
-			border 1
-			bordercolor .6 .6 .6 0.5
-			backcolor 0.22 0.22 0.22 0.5
-			textalign ITEM_ALIGN_LEFT
-			decoration
-			visible 1
-			cvarTest "ui_mapVotingDisabled"
-			hideCvar { "1" }
-		}
-
-		itemDef {
-			name "preset_label"
-			group grpCallVote
-			rect 267 242 228 14
-			textscale .18
-			textalignx 4
-			textaligny 10
-			textalign ITEM_ALIGN_LEFT
-			backcolor 0.12 0.12 0.12 1
-			visible 1
-			style WINDOW_STYLE_FILLED
-			text "Rotation Presets"
-			decoration
-			cvarTest "ui_mapVotingDisabled"
-			hideCvar { "1" }
-		}
-
-		itemDef {
-			name "preset_list"
-			group grpCallVote
-			rect 267 260 228 72
-			style WINDOW_STYLE_FILLED
-			type ITEM_TYPE_LISTBOX
-			elementwidth 120
-			elementheight 18
-			font FONT_SANS
-			textscale .18
-			elementtype LISTBOX_TEXT
-			feeder FEEDER_MAP_ROTATIONS
-			border 1
-			bordercolor .5 .5 .5 .5
-			forecolor 1 1 1 1
-			backcolor 0 0 0 .25
-			outlinecolor 0.70 0.70 0.70 0.8
-			visible 1
-			mouseEnter { setitemcolor preset_list bordercolor .7 0 0 1 }
-			mouseExit { setitemcolor preset_list bordercolor .5 .5 .5 1 }
-			onFocus { uiScript applyCallvotePreset ; uiScript updateCallvoteMapPreview }
-			action { uiScript applyCallvotePreset ; uiScript updateCallvoteMapPreview }
-			cvarTest "ui_mapVotingDisabled"
-			hideCvar { "1" }
-			cvarTest2 "ui_gameTypeVotingDisabled"
-			hideCvar2 { "1" }
 		}
 		
 		itemDef {
