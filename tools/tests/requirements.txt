@@ -1,0 +1,3 @@
+# Dependencies for deterministic harnesses and regression tests.
+# Keep versions aligned with CI setup in .github/workflows/deterministic-harnesses.yml.
+pytest>=7.4
