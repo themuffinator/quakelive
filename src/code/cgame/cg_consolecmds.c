@@ -115,23 +115,23 @@ extern menuDef_t *menuScoreboard;
 void Menu_Reset();			// FIXME: add to right include file
 
 static void CG_LoadHud_f( void) {
-  char buff[1024];
+	char buff[1024];
 	const char *hudSet;
-  memset(buff, 0, sizeof(buff));
+
+	memset(buff, 0, sizeof(buff));
 
 	String_Init();
 	Menu_Reset();
-	
+
 	trap_Cvar_VariableStringBuffer("cg_hudFiles", buff, sizeof(buff));
 	hudSet = buff;
 	if (hudSet[0] == '\0') {
-		hudSet = "ui/hud.txt";
+		hudSet = CG_DEFAULT_HUD_FILE;
 	}
 
 	CG_LoadMenus(hudSet);
-  menuScoreboard = NULL;
+	menuScoreboard = NULL;
 }
-
 
 static void CG_scrollScoresDown_f( void) {
 	if (menuScoreboard && cg.scoreBoardShowing) {
