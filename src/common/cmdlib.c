@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cmdlib.c
 
 #include "cmdlib.h"
+#include "../code/game/q_shared.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -294,71 +295,174 @@ void SetQdirFromPath( const char *path )
 	Error ("SetQdirFromPath: no '%s' in %s", BASEDIRNAME, path);
 }
 
+/*
+=============
+ExpandArg
+
+Expands a potentially relative argument path using the current working directory.
+=============
+*/
 char *ExpandArg (const char *path)
 {
 	static char full[1024];
+	char	cwd[sizeof( full )];
+	size_t	cwdLen;
+	size_t	pathLen;
+
+	if (!path)
+		Error ("ExpandArg: NULL path");
+
+	pathLen = strlen( path );
 
 	if (path[0] != '/' && path[0] != '\\' && path[1] != ':')
 	{
-		Q_getwd (full);
-		strcat (full, path);
+		Q_getwd (cwd);
+		cwdLen = strlen( cwd );
+
+		if (cwdLen + pathLen >= sizeof( full ))
+			Error ("ExpandArg: path length %zu exceeds buffer of %zu", cwdLen + pathLen, sizeof( full ));
+
+		Com_sprintf( full, sizeof( full ), "%s%s", cwd, path );
 	}
 	else
-		strcpy (full, path);
+	{
+		if (pathLen >= sizeof( full ))
+			Error ("ExpandArg: path length %zu exceeds buffer of %zu", pathLen, sizeof( full ));
+
+		Q_strncpyz( full, path, sizeof( full ) );
+	}
+
 	return full;
 }
 
+/*
+=============
+ExpandPath
+
+Expands a relative script path using the base quake directory.
+=============
+*/
 char *ExpandPath (const char *path)
 {
 	static char full[1024];
+	size_t	baseLen;
+	size_t	pathLen;
+
 	if (!qdir)
 		Error ("ExpandPath called without qdir set");
+	if (!path)
+		Error ("ExpandPath: NULL path");
+
+	pathLen = strlen( path );
+
 	if (path[0] == '/' || path[0] == '\\' || path[1] == ':') {
-		strcpy( full, path );
+		if (pathLen >= sizeof( full ))
+			Error ("ExpandPath: path length %zu exceeds buffer of %zu", pathLen, sizeof( full ));
+
+		Q_strncpyz( full, path, sizeof( full ) );
 		return full;
 	}
-	sprintf (full, "%s%s", qdir, path);
+
+	baseLen = strlen( qdir );
+	if (baseLen + pathLen >= sizeof( full ))
+		Error ("ExpandPath: path length %zu exceeds buffer of %zu", baseLen + pathLen, sizeof( full ));
+
+	Com_sprintf (full, sizeof( full ), "%s%s", qdir, path);
 	return full;
 }
 
+/*
+=============
+ExpandGamePath
+
+Expands a relative path using the current game directory.
+=============
+*/
 char *ExpandGamePath (const char *path)
 {
 	static char full[1024];
+	size_t	baseLen;
+	size_t	pathLen;
+
 	if (!qdir)
 		Error ("ExpandGamePath called without qdir set");
+	if (!path)
+		Error ("ExpandGamePath: NULL path");
+
+	pathLen = strlen( path );
+
 	if (path[0] == '/' || path[0] == '\\' || path[1] == ':') {
-		strcpy( full, path );
+		if (pathLen >= sizeof( full ))
+			Error ("ExpandGamePath: path length %zu exceeds buffer of %zu", pathLen, sizeof( full ));
+
+		Q_strncpyz( full, path, sizeof( full ) );
 		return full;
 	}
-	sprintf (full, "%s%s", gamedir, path);
+
+	baseLen = strlen( gamedir );
+	if (baseLen + pathLen >= sizeof( full ))
+		Error ("ExpandGamePath: path length %zu exceeds buffer of %zu", baseLen + pathLen, sizeof( full ));
+
+	Com_sprintf (full, sizeof( full ), "%s%s", gamedir, path);
 	return full;
 }
 
+/*
+=============
+ExpandPathAndArchive
+
+Expands a relative path and writes it to the archive directory when enabled.
+=============
+*/
 char *ExpandPathAndArchive (const char *path)
 {
 	char	*expanded;
 	char	archivename[1024];
+	size_t	archiveLen;
+	size_t	pathLen;
+
+	if (!path)
+		Error ("ExpandPathAndArchive: NULL path");
 
 	expanded = ExpandPath (path);
 
 	if (archive)
 	{
-		sprintf (archivename, "%s/%s", archivedir, path);
+		archiveLen = strlen( archivedir );
+		pathLen = strlen( path );
+
+		if (archiveLen + 1 + pathLen >= sizeof( archivename ))
+			Error ("ExpandPathAndArchive: path length %zu exceeds buffer of %zu", archiveLen + 1 + pathLen, sizeof( archivename ));
+
+		Com_sprintf (archivename, sizeof( archivename ), "%s/%s", archivedir, path);
 		QCopyFile (expanded, archivename);
 	}
 	return expanded;
 }
 
+/*
+=============
+copystring
 
+Allocates and copies a string while preserving termination.
+=============
+*/
 char *copystring(const char *s)
 {
 	char	*b;
-	b = malloc(strlen(s)+1);
-	strcpy (b, s);
+	size_t	len;
+
+	if (!s)
+		Error ("copystring: NULL input");
+
+	len = strlen( s );
+	b = malloc(len+1);
+	if (!b)
+		Error ("copystring: failed on %zu bytes", len + 1);
+
+	Q_strncpyz (b, s, len + 1);
 	return b;
 }
-
-
 
 /*
 ================
