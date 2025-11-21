@@ -1,0 +1,19 @@
+{
+  "map": "focal_point",
+  "duration": 1.0,
+  "tick_rate": 20,
+  "seed": 7331,
+  "metadata": {
+    "description": "CVar toggle timeline coverage",
+    "cvars": {
+      "g_flagBounce": 0,
+      "g_flagPhysics": 0,
+      "g_mercytime": 10,
+      "g_rocketsplashOffset": 0,
+      "g_suddenDeathRespawnStart": 3,
+      "g_suddenDeathRespawnTick": 60,
+      "mercylimit": 0
+    }
+  },
+  "bots": []
+}

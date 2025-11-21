@@ -106,6 +106,9 @@ class MatchHarness:
         # reflect the actual deterministic inputs used for the run.
         self.config.seed = self.seed
         self.factory_settings: Mapping[str, Any] = dict(self.config.metadata.get("factory", {}))
+        self.cvar_overrides: Mapping[str, Any] = self._load_cvar_overrides(
+            self.config.metadata.get("cvars")
+        )
         self.freeze_settings: Mapping[str, Any] = self._load_freeze_settings(
             self.config.metadata.get("freeze")
         )
@@ -170,6 +173,8 @@ class MatchHarness:
             current_time = tick * delta
             self._current_time = current_time
             events: List[Dict[str, Any]] = []
+            if tick == 0 and self.cvar_overrides:
+                events.extend(self._emit_cvar_toggles())
             events.extend(self._collect_scheduled_spawns(current_time, bots))
             events.extend(self._collect_scheduled_items(current_time, bots))
             self._advance_freeze_state(current_time, bots)
@@ -268,6 +273,17 @@ class MatchHarness:
             "details": dict(details),
         }
         return event
+
+    def _record_cvar_event(self, name: str, value: Any) -> Dict[str, Any]:
+        self._event_counter += 1
+        return {
+            "bot": None,
+            "team": None,
+            "time": self._current_time,
+            "action": "cvar_toggle",
+            "details": {"name": name, "value": value},
+            "seq": self._event_counter,
+        }
 
     # ------------------------------------------------------------------
     # Command handlers
@@ -833,6 +849,12 @@ class MatchHarness:
             value = value[key]
         return value
 
+    def _load_cvar_overrides(self, payload: Any) -> Mapping[str, Any]:
+        if not isinstance(payload, Mapping):
+            return {}
+        ordered = sorted((str(key), payload[key]) for key in payload)
+        return {name: value for name, value in ordered}
+
     def _load_bot_resources(
         self, payload: Any
     ) -> Tuple[Mapping[str, Mapping[str, Any]], List[Mapping[str, Any]], Mapping[str, Any]]:
@@ -1207,6 +1229,12 @@ class MatchHarness:
     def _collect_freeze_events(self) -> List[Dict[str, Any]]:
         events = list(self._pending_freeze_events)
         self._pending_freeze_events = []
+        return events
+
+    def _emit_cvar_toggles(self) -> List[Dict[str, Any]]:
+        events: List[Dict[str, Any]] = []
+        for name, value in self.cvar_overrides.items():
+            events.append(self._record_cvar_event(name, value))
         return events
 
     # ------------------------------------------------------------------
