@@ -4,6 +4,11 @@ This checklist sets expectations for local validation before submitting a pull r
 
 Before opening a pull request you should be able to hand a reviewer everything they need to deterministically replay your work: the exact harness command lines (with seeds), the refreshed baselines, and a pointer to the syscall contract changelog when behaviour crosses that boundary.
 
+## UI Retail Assets Are Frozen
+- The retail menu sources in `src/ui/` are immutable; CI checks will block any pull request that modifies files in that path.
+- Route UI tweaks through code-driven hooks or layered asset overrides (for example, extend the packaging manifest consumed by `tools/build_ui_bundle.sh` instead of patching the retail menus directly).
+- When a change truly requires a new UI asset, add it as an overlay package so reviewers can isolate the delta without disturbing the upstream retail files.
+
 ## 1. Prepare Your Workspace
 - Sync with the latest `main` branch and rebase your work.
 - Install or update required toolchains (see `docs/toolchain-ci.md`).

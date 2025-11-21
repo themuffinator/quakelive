@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Exclude retail UI sources from release archives to discourage direct edits
+src/ui export-ignore
