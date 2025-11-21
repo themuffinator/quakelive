@@ -130,6 +130,8 @@ static const pmove_settings_t	pm_defaultSettings = {
 	.weaponReloadOverrides = {
 	[WP_NONE] = 0,
 	},
+	// HLIL parity: weapon refire timings lifted from qagamex86.dll (matches Q3 defaults
+	// except for the Quake Live-exclusive heavy machinegun entry).
 	.weaponReloadTimes = {
 	[WP_NONE] = 0,
 	[WP_GAUNTLET] = 400,

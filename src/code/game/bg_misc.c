@@ -467,7 +467,7 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_machinegun",
 /* pickup */	"Machinegun",
-		40,
+		50,	// QL ammo pickup (Q3 default: 40)
 		IT_WEAPON,
 		WP_MACHINEGUN,
 /* precache */ "",
@@ -499,7 +499,7 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_grenade",
 /* pickup */	"Grenade Launcher",
-		10,
+		5,	// QL ammo pickup (Q3 default: 10)
 		IT_WEAPON,
 		WP_GRENADE_LAUNCHER,
 /* precache */ "",
@@ -515,7 +515,7 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_rocket",
 /* pickup */	"Rocket Launcher",
-		10,
+		5,	// QL ammo pickup (Q3 default: 10)
 		IT_WEAPON,
 		WP_ROCKET_LAUNCHER,
 /* precache */ "",
@@ -531,7 +531,7 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_lightning",
 /* pickup */	"Lightning Gun",
-		100,
+		60,	// QL ammo pickup (Q3 default: 100)
 		IT_WEAPON,
 		WP_LIGHTNING,
 /* precache */ "",
@@ -563,7 +563,7 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_plasma",
 /* pickup */	"Plasma Gun",
-		50,
+		30,	// QL ammo pickup (Q3 default: 50)
 		IT_WEAPON,
 		WP_PLASMAGUN,
 /* precache */ "",
@@ -579,7 +579,7 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_bfg",
 /* pickup */	"BFG10K",
-		20,
+		15,	// QL ammo pickup (Q3 default: 20)
 		IT_WEAPON,
 		WP_BFG,
 /* precache */ "",
@@ -1191,7 +1191,7 @@ Only in One Flag CTF games
 		0, 0, 0},
 /* icon */		"icons/iconw_nailgun",
 /* pickup */	"Nailgun",
-		10,
+		20,	// QL ammo pickup (Q3 default: 10)
 		IT_WEAPON,
 		WP_NAILGUN,
 /* precache */ "",
@@ -1207,7 +1207,7 @@ Only in One Flag CTF games
 		0, 0, 0},
 /* icon */		"icons/iconw_proxlauncher",
 /* pickup */	"Prox Launcher",
-		5,
+		10,	// QL ammo pickup (Q3 default: 5)
 		IT_WEAPON,
 		WP_PROX_LAUNCHER,
 /* precache */ "",
@@ -1228,7 +1228,7 @@ Only in One Flag CTF games
 		0, 0, 0},
 /* icon */		"icons/iconw_chaingun",
 /* pickup */	"Chaingun",
-		80,
+		100,	// QL ammo pickup (Q3 default: 80)
 		IT_WEAPON,
 		WP_CHAINGUN,
 /* precache */ "",
