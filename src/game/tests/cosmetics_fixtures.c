@@ -38,7 +38,7 @@ static void GT_ItemTimerVoteContextInit(gt_itemtimer_vote_context_t *ctx);
 static qboolean GT_ItemTimerApplyVote(gt_itemtimer_vote_context_t *ctx, const char *option);
 static void GT_TrainingCommandContextInit(gt_training_command_context_t *ctx);
 static qboolean GT_TrainingAllowsAddbot(gt_training_command_context_t *ctx);
-static void GT_ApplyForceBroadcast(const char *cvarName, qboolean enabled, gt_force_broadcast_log_t *log);
+static void GT_ApplyForceBroadcast(const char *cvarName, qboolean enabled, const char *atmosphere, gt_force_broadcast_log_t *log);
 
 /*
 =============
@@ -142,10 +142,12 @@ GT_ApplyForceBroadcast
 Records the configstring broadcast used by the `g_force*` family.
 =============
 */
-static void GT_ApplyForceBroadcast(const char *cvarName, qboolean enabled, gt_force_broadcast_log_t *log) {
+static void GT_ApplyForceBroadcast(const char *cvarName, qboolean enabled, const char *atmosphere, gt_force_broadcast_log_t *log) {
 	static qboolean	forceSmallScoreboard = qfalse;
 	static qboolean	forceHudHints = qfalse;
 	static qboolean	forceDamageThroughSurface = qfalse;
+	static char	forcedAtmosphericEffects[MAX_INFO_STRING];
+	static char	forcedAtmosphereFallback[MAX_INFO_STRING];
 
 	if (!log) {
 		return;
@@ -158,6 +160,18 @@ static void GT_ApplyForceBroadcast(const char *cvarName, qboolean enabled, gt_fo
 			forceHudHints = enabled ? qtrue : qfalse;
 		} else if ( Q_stricmp( cvarName, "g_forceDmgThroughSurface" ) == 0 ) {
 			forceDamageThroughSurface = enabled ? qtrue : qfalse;
+		} else if ( Q_stricmp( cvarName, "g_forceAtmosphericEffects" ) == 0 ) {
+			if ( enabled && atmosphere && atmosphere[0] ) {
+				Q_strncpyz( forcedAtmosphericEffects, atmosphere, sizeof( forcedAtmosphericEffects ) );
+			} else {
+				forcedAtmosphericEffects[0] = '\0';
+			}
+		} else if ( Q_stricmp( cvarName, "g_forcedAtmosphere" ) == 0 ) {
+			if ( enabled && atmosphere && atmosphere[0] ) {
+				Q_strncpyz( forcedAtmosphereFallback, atmosphere, sizeof( forcedAtmosphereFallback ) );
+			} else {
+				forcedAtmosphereFallback[0] = '\0';
+			}
 		}
 	}
 
@@ -166,6 +180,12 @@ static void GT_ApplyForceBroadcast(const char *cvarName, qboolean enabled, gt_fo
 	Info_SetValueForKey( log->payload, "sb", forceSmallScoreboard ? "1" : "0" );
 	Info_SetValueForKey( log->payload, "hud", forceHudHints ? "1" : "0" );
 	Info_SetValueForKey( log->payload, "dmg", forceDamageThroughSurface ? "1" : "0" );
+
+	if ( forcedAtmosphericEffects[0] ) {
+		Info_SetValueForKey( log->payload, "atm", forcedAtmosphericEffects );
+	} else if ( forcedAtmosphereFallback[0] ) {
+		Info_SetValueForKey( log->payload, "atm", forcedAtmosphereFallback );
+	}
 }
 
 /*
@@ -283,7 +303,7 @@ static qboolean GT_ForceBroadcastPushesConfigstring(void) {
 	gt_force_broadcast_log_t log;
 
 	memset(&log, 0, sizeof(log));
-	GT_ApplyForceBroadcast("g_forceSendConfigstring", qtrue, &log);
+	GT_ApplyForceBroadcast("g_forceSendConfigstring", qtrue, NULL, &log);
 
 	if (log.configIndex != CS_FORCED_COSMETICS) {
 		return GT_Failf("expected configstring index 0x2B3, received %d", log.configIndex);
@@ -299,6 +319,48 @@ static qboolean GT_ForceBroadcastPushesConfigstring(void) {
 
 	if ( Q_stricmp( Info_ValueForKey( log.payload, "dmg" ), "0" ) != 0 ) {
 		return GT_Failf("expected damage flag '0', received '%s'", Info_ValueForKey( log.payload, "dmg" ) );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+GT_ForceBroadcastAddsAtmosphereOverride
+
+Ensures forced atmosphere strings are included in the broadcast payload.
+=============
+*/
+static qboolean GT_ForceBroadcastAddsAtmosphereOverride(void) {
+	gt_force_broadcast_log_t log;
+
+	memset(&log, 0, sizeof(log));
+	GT_ApplyForceBroadcast("g_forceAtmosphericEffects", qtrue, "snow", &log);
+
+	if ( Q_stricmp( Info_ValueForKey( log.payload, "atm" ), "snow" ) != 0 ) {
+		return GT_Failf("expected forced atmosphere 'snow', received '%s'", Info_ValueForKey( log.payload, "atm" ) );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+GT_ForceBroadcastFallsBackToServerOverride
+
+Verifies fallback atmosphere tokens are published when explicit overrides clear.
+=============
+*/
+static qboolean GT_ForceBroadcastFallsBackToServerOverride(void) {
+	gt_force_broadcast_log_t log;
+
+	memset(&log, 0, sizeof(log));
+	GT_ApplyForceBroadcast("g_forceAtmosphericEffects", qtrue, "snow", &log);
+	GT_ApplyForceBroadcast("g_forceAtmosphericEffects", qfalse, NULL, &log);
+	GT_ApplyForceBroadcast("g_forcedAtmosphere", qtrue, "rain", &log);
+
+	if ( Q_stricmp( Info_ValueForKey( log.payload, "atm" ), "rain" ) != 0 ) {
+		return GT_Failf("expected fallback atmosphere 'rain', received '%s'", Info_ValueForKey( log.payload, "atm" ) );
 	}
 
 	return qtrue;
@@ -339,8 +401,23 @@ static const game_fixture_t gt_cosmetics_training_fixtures[] = {
 		GT_ForceBroadcastPushesConfigstring,
 		NULL,
 		"Verifies force toggles refresh configstring 0x2B3"
+	},
+	{
+		"force_atmosphere_override_included",
+		NULL,
+		GT_ForceBroadcastAddsAtmosphereOverride,
+		NULL,
+		"Confirms forced atmospheric effects are published to clients"
+	},
+	{
+		"force_atmosphere_fallback_included",
+		NULL,
+		GT_ForceBroadcastFallsBackToServerOverride,
+		NULL,
+		"Ensures server fallback atmosphere strings are broadcast when overrides clear"
 	}
 };
+
 
 /*
 =============

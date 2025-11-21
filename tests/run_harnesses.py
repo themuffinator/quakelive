@@ -113,7 +113,8 @@ def _run_client_harness(target: str, artifact_root: Path) -> list[dict[str, obje
     manifest: dict[str, dict[str, object]] = {}
     log_entries: list[dict[str, object]] = []
 
-    for scenario, archive in SNAPSHOT_ARCHIVES.items():
+    for scenario in sorted(SNAPSHOT_ARCHIVES.keys()):
+        archive = SNAPSHOT_ARCHIVES[scenario]
         archive_payload = json.loads(archive.read_text(encoding="utf-8"))
         metadata = archive_payload.get("metadata", {})
         snapshots = harness.load_snapshots(archive)
