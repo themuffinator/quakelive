@@ -8,9 +8,11 @@ you contribute effectively to the reconstruction effort.
 
 1. **Clone the repository**
    ```bash
-   git clone git@github.com:id-software/quakelive-reverse.git
+   git clone https://github.com/quakelive-reverse/quakelive-reverse.git
    cd quakelive-reverse
    ```
+   Using the HTTPS URL avoids SSH key prompts for newcomers who have not yet
+   configured GitHub authentication.
 2. **Install and verify the QVM toolchain**
    - Follow the Linux build instructions in [`docs/qvmtools.md`](../qvmtools.md) to
      install `gcc-multilib`, `make`, and the patched LCC toolchain, then execute
