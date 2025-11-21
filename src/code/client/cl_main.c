@@ -104,6 +104,8 @@ void CL_ServerStatus_f(void);
 void CL_ServerStatusResponse( netadr_t from, msg_t *msg );
 void CL_Web_ShowBrowser_f( void );
 void CL_Web_ChangeHash_f( void );
+void CL_Web_BrowserActive_f( void );
+void CL_Web_StopRefresh_f( void );
 
 /*
 ===============
@@ -2386,6 +2388,8 @@ CL_InitInput ();
 	Cmd_AddCommand ("model", CL_SetModel_f );
 	Cmd_AddCommand ("web_showBrowser", CL_Web_ShowBrowser_f );
 	Cmd_AddCommand ("web_changeHash", CL_Web_ChangeHash_f );
+	Cmd_AddCommand ("web_browserActive", CL_Web_BrowserActive_f );
+	Cmd_AddCommand ("web_stopRefresh", CL_Web_StopRefresh_f );
 	CL_WebPak_Init();
 	CL_InitRef();
 

@@ -35,6 +35,13 @@ extern qboolean getCameraInfo(int time, vec3_t *origin, vec3_t *angles);
 static qboolean cl_webBrowserVisible = qfalse;
 static char cl_webBrowserHash[MAX_STRING_CHARS];
 
+/*
+=============
+CL_Web_ShowBrowser_f
+
+Marks the browser overlay as visible and records an optional hash target.
+=============
+*/
 void CL_Web_ShowBrowser_f( void ) {
 	cl_webBrowserVisible = qtrue;
 	if ( Cmd_Argc() > 1 ) {
@@ -44,11 +51,43 @@ void CL_Web_ShowBrowser_f( void ) {
 	Com_DPrintf( "web_showBrowser\n" );
 }
 
+/*
+=============
+CL_Web_ChangeHash_f
+
+Updates the browser target and ensures the overlay remains visible.
+=============
+*/
 void CL_Web_ChangeHash_f( void ) {
 	const char *hash = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
 	Q_strncpyz( cl_webBrowserHash, hash, sizeof( cl_webBrowserHash ) );
 	cl_webBrowserVisible = qtrue;
 	Com_DPrintf( "web_changeHash %s\n", cl_webBrowserHash );
+}
+
+/*
+=============
+CL_Web_BrowserActive_f
+
+Stub for toggling the browser overlay active state used by the UI VM.
+=============
+*/
+void CL_Web_BrowserActive_f( void ) {
+	qboolean active = ( Cmd_Argc() > 1 && atoi( Cmd_Argv( 1 ) ) != 0 );
+
+	cl_webBrowserVisible = active;
+	Com_DPrintf( "web_browserActive %s\n", active ? "1" : "0" );
+}
+
+/*
+=============
+CL_Web_StopRefresh_f
+
+Stub handler for stopping Awesomium refresh cycles triggered by UI scripts.
+=============
+*/
+void CL_Web_StopRefresh_f( void ) {
+	Com_DPrintf( "web_stopRefresh\n" );
 }
 
 /*
