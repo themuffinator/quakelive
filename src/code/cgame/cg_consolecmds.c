@@ -242,6 +242,7 @@ static void CG_NextTeamMember_f( void ) {
   }
 }
 
+
 static void CG_PrevTeamMember_f( void ) {
   if (cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW)) {
     CG_SpectatorFollowCycle(-1);
@@ -250,9 +251,84 @@ static void CG_PrevTeamMember_f( void ) {
   }
 }
 
+/*
+=============
+CG_SpectatorFollowNext_f
+
+Cycles to the next follow target while spectating.
+=============
+*/
+static void CG_SpectatorFollowNext_f( void ) {
+	CG_SpectatorFollowCycle( 1 );
+}
+
+/*
+=============
+CG_SpectatorFollowPrev_f
+
+Cycles to the previous follow target while spectating.
+=============
+*/
+static void CG_SpectatorFollowPrev_f( void ) {
+	CG_SpectatorFollowCycle( -1 );
+}
+
+/*
+=============
+CG_SpectatorStopFollow_f
+
+Stops following any player and releases the spectator camera.
+=============
+*/
+static void CG_SpectatorStopFollow_f( void ) {
+	CG_StopSpectatorFollow();
+}
+
+/*
+=============
+CG_SpectatorLockCamera_f
+
+Locks the spectator camera onto the current follow target.
+=============
+*/
+static void CG_SpectatorLockCamera_f( void ) {
+	CG_SetSpectatorCameraLock( qtrue );
+}
+
+/*
+=============
+CG_SpectatorUnlockCamera_f
+
+Releases any spectator camera lock so targets can be changed.
+=============
+*/
+static void CG_SpectatorUnlockCamera_f( void ) {
+	CG_SetSpectatorCameraLock( qfalse );
+}
+
+/*
+=============
+CG_IsSpectatorInput
+
+Returns qtrue when the local client is spectating or following another player.
+=============
+*/
+static qboolean CG_IsSpectatorInput( void ) {
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+	return ( ( cg.snap->ps.pm_flags & PMF_FOLLOW ) || cg.snap->ps.pm_type == PM_SPECTATOR ||
+			cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
+}
+
+// ASS U ME's enumeration order as far as task specific orders, OFFENSE is zero, CAMP is last
 // ASS U ME's enumeration order as far as task specific orders, OFFENSE is zero, CAMP is last
 //
 static void CG_NextOrder_f( void ) {
+	if ( CG_IsSpectatorInput() ) {
+		cgs.orderPending = qfalse;
+		return;
+	}
 	clientInfo_t *ci = cgs.clientinfo + cg.snap->ps.clientNum;
 	if (ci) {
 		if (!ci->teamLeader && sortedTeamPlayers[cg_currentSelectedPlayer.integer] != cg.snap->ps.clientNum) {
@@ -282,19 +358,39 @@ static void CG_NextOrder_f( void ) {
 }
 
 
+
 static void CG_ConfirmOrder_f (void ) {
-	trap_SendConsoleCommand(va("cmd vtell %d %s\n", cgs.acceptLeader, VOICECHAT_YES));
+	if ( CG_IsSpectatorInput() ) {
+		return;
+	}
+	trap_SendConsoleCommand(va("cmd vtell %d %s
+", cgs.acceptLeader, VOICECHAT_YES));
 	trap_SendConsoleCommand("+button5; wait; -button5");
 	if (cg.time < cgs.acceptOrderTime) {
-		trap_SendClientCommand(va("teamtask %d\n", cgs.acceptTask));
+		trap_SendClientCommand(va("teamtask %d
+", cgs.acceptTask));
 		cgs.acceptOrderTime = 0;
 	}
 }
 
 static void CG_DenyOrder_f (void ) {
-	trap_SendConsoleCommand(va("cmd vtell %d %s\n", cgs.acceptLeader, VOICECHAT_NO));
+	if ( CG_IsSpectatorInput() ) {
+		return;
+	}
+	trap_SendConsoleCommand(va("cmd vtell %d %s
+", cgs.acceptLeader, VOICECHAT_NO));
 	trap_SendConsoleCommand("+button6; wait; -button6");
 	if (cg.time < cgs.acceptOrderTime) {
+		cgs.acceptOrderTime = 0;
+	}
+}
+static void CG_DenyOrder_f (void ) {
+if ( CG_IsSpectatorInput() ) {
+return;
+}
+trap_SendConsoleCommand(va("cmd vtell %d %s\n", cgs.acceptLeader, VOICECHAT_NO));
+trap_SendConsoleCommand("+button6; wait; -button6");
+if (cg.time < cgs.acceptOrderTime) {
 		cgs.acceptOrderTime = 0;
 	}
 }
@@ -475,6 +571,11 @@ static consoleCommand_t	commands[] = {
 	{ "loadhud", CG_LoadHud_f },
 	{ "nextTeamMember", CG_NextTeamMember_f },
 	{ "prevTeamMember", CG_PrevTeamMember_f },
+	{ "spectatorFollowNext", CG_SpectatorFollowNext_f },
+	{ "spectatorFollowPrev", CG_SpectatorFollowPrev_f },
+	{ "spectatorFollowStop", CG_SpectatorStopFollow_f },
+	{ "spectatorCameraLock", CG_SpectatorLockCamera_f },
+	{ "spectatorCameraUnlock", CG_SpectatorUnlockCamera_f },
 	{ "nextOrder", CG_NextOrder_f },
 	{ "confirmOrder", CG_ConfirmOrder_f },
 	{ "denyOrder", CG_DenyOrder_f },

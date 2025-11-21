@@ -705,6 +705,7 @@ typedef struct {
 	int				spectatorClientCount;
 	int				spectatorTargetUpdateTime;
 	int				spectatorTrackedClient;
+	qboolean		spectatorCameraLocked;
 	int				trackedPlayerClientNum;
 	int				trackedPlayerExpireTime;
 	cgSpectatorTrackType_t	trackedPlayerPriority;
@@ -1729,6 +1730,9 @@ void CG_SpectatorFollowCycle(int dir);
 void CG_SpectatorTrackEvent( int clientNum, cgSpectatorTrackType_t trackType );
 void CG_UpdateSpectatorTracking( void );
 qboolean CG_IsSpectatorCamera( void );
+qboolean CG_SpectatorFollowRequest( int clientNum );
+void CG_StopSpectatorFollow( void );
+void CG_SetSpectatorCameraLock( qboolean locked );
 float CG_GetValue(int ownerDraw);
 qboolean CG_OwnerDrawVisible(int flags);
 void CG_RunMenuScript(char **args);
