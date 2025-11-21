@@ -5470,10 +5470,18 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 	//	return;
 	//}
 
-  rect.x = x;
-  rect.y = y;
-  rect.w = w;
-  rect.h = h;
+rect.x = x;
+rect.y = y;
+	rect.w = w;
+	rect.h = h;
+
+	if ( ownerDraw == CG_ROUNDTIMER || ownerDraw == CG_OVERTIME ||
+		ownerDraw == CG_1ST_PLYR || ownerDraw == CG_1ST_PLYR_SCORE ||
+		ownerDraw == CG_1ST_PLYR_HEALTH_ARMOR || ownerDraw == CG_1ST_PLYR_AVATAR ||
+		ownerDraw == CG_2ND_PLYR || ownerDraw == CG_2ND_PLYR_SCORE ||
+		ownerDraw == CG_2ND_PLYR_HEALTH_ARMOR || ownerDraw == CG_2ND_PLYR_AVATAR ) {
+		CG_TouchCompetitiveScores();
+	}
 
 	switch (ownerDraw) {
 	case CG_SERVER_SETTINGS:

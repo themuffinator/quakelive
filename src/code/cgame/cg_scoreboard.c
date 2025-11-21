@@ -75,6 +75,24 @@ static qboolean localClient; // true if local client has been displayed
 
 /*
 =============
+CG_TouchCompetitiveScores
+
+Requests updated score data to populate Quake Live HUD ownerdraws.
+=============
+*/
+void CG_TouchCompetitiveScores( void ) {
+	if ( !cg.competitiveHudLoaded ) {
+		return;
+	}
+
+	if ( cg.scoresRequestTime + 2000 < cg.time ) {
+		cg.scoresRequestTime = cg.time;
+		trap_SendClientCommand( "score" );
+	}
+}
+
+/*
+=============
 CG_DamagePlumPresetDescription
 
 Provides a human-readable label for the cached damage-plum preset.

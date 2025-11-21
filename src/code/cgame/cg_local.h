@@ -1881,6 +1881,7 @@ void CG_DrawInformation( void );
 //
 qboolean CG_DrawOldScoreboard( void );
 void CG_DrawOldTourneyScoreboard( void );
+void CG_TouchCompetitiveScores( void );
 
 //
 // cg_consolecmds.c
