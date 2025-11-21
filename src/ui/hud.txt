@@ -1,8 +1,9 @@
 // hud menu defs
-// 
+//
 {
-        loadMenu { "ui/hud.menu" }
-        loadMenu { "ui/score.menu" }
-        loadMenu { "ui/teamscore.menu" }
-        loadMenu { "ui/comp_spectator_follow.menu" }
+	loadMenu { "ui/hud.menu" }
+	loadMenu { "ui/score.menu" }
+	loadMenu { "ui/teamscore.menu" }
+	loadMenu { "ui/comp_spectator.menu" }
+	loadMenu { "ui/comp_spectator_follow.menu" }
 }
