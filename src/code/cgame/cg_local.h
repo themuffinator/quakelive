@@ -379,6 +379,38 @@ typedef struct {
 	int				team;
 } score_t;
 
+// HUD scoreboard export used by competitive menu overlays
+typedef struct {
+	int					clientNum;
+	int					score;
+	int					ping;
+	int					time;
+	team_t			team;
+	qboolean			spectator;
+	qboolean			localPlayer;
+} cgHudScoreboardEntry_t;
+
+typedef struct {
+	int					count;
+	cgHudScoreboardEntry_t	entries[MAX_CLIENTS];
+	float				scoreX;
+	float				scoreWidth;
+	float				pingX;
+	float				pingWidth;
+	float				timeX;
+	float				timeWidth;
+	float				nameX;
+	float				nameWidth;
+	qboolean			widescreen;
+	qboolean			overtimeActive;
+	int				overtimeCount;
+	qboolean			suddenDeathConfigured;
+	int				suddenDeathStart;
+	int				suddenDeathTick;
+	int				suddenDeathMax;
+	int				suddenDeathIncrement;
+} cgHudScoreboard_t;
+
 // each client has an associated clientInfo_t
 // that contains media references necessary to present the
 // client model and other color coded effects
@@ -1881,6 +1913,7 @@ void CG_DrawInformation( void );
 //
 qboolean CG_DrawOldScoreboard( void );
 void CG_DrawOldTourneyScoreboard( void );
+const cgHudScoreboard_t *CG_GetHudScoreboard( void );
 
 //
 // cg_consolecmds.c

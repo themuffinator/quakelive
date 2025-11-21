@@ -73,6 +73,102 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static qboolean localClient; // true if local client has been displayed
 
+static cgHudScoreboard_t cgHudScoreboard;
+
+/*
+=============
+CG_ScoreboardWideScale
+
+Returns the widescreen-scaled coordinate for a 640-based x position.
+=============
+*/
+static float CG_ScoreboardWideScale( float baseX ) {
+	float		scale;
+
+	if ( cgs.glconfig.vidWidth <= 0 || cg.refdef.width <= 0 ) {
+		return baseX;
+	}
+
+	scale = (float)cg.refdef.width / (float)SCREEN_WIDTH;
+	return baseX * scale;
+}
+
+/*
+=============
+CG_ResetHudScoreboard
+
+Clears and seeds the HUD scoreboard cache for menu-driven scoreboxes.
+=============
+*/
+static void CG_ResetHudScoreboard( qboolean timersActive ) {
+	memset( &cgHudScoreboard, 0, sizeof( cgHudScoreboard ) );
+
+	cgHudScoreboard.widescreen = ( cgs.glconfig.vidWidth > SCREEN_WIDTH );
+	cgHudScoreboard.scoreX = CG_ScoreboardWideScale( SB_SCORE_X + (SB_RATING_WIDTH / 2) );
+	cgHudScoreboard.scoreWidth = SB_RATING_WIDTH;
+	cgHudScoreboard.pingX = CG_ScoreboardWideScale( SB_PING_X );
+	cgHudScoreboard.pingWidth = 5 * BIGCHAR_WIDTH;
+	cgHudScoreboard.timeX = CG_ScoreboardWideScale( SB_TIME_X );
+	cgHudScoreboard.timeWidth = timersActive ? ( 5 * BIGCHAR_WIDTH ) : 0;
+	cgHudScoreboard.nameX = CG_ScoreboardWideScale( SB_NAME_X );
+	cgHudScoreboard.nameWidth = 15 * BIGCHAR_WIDTH;
+	cgHudScoreboard.overtimeActive = cgs.matchOvertimeActive;
+	cgHudScoreboard.overtimeCount = cgs.matchOvertimeCount;
+	cgHudScoreboard.suddenDeathConfigured =
+		( cgs.matchSuddenDeathStartSeconds > 0 && cgs.matchSuddenDeathTickSeconds > 0 );
+	cgHudScoreboard.suddenDeathStart = cgs.matchSuddenDeathStartSeconds;
+	cgHudScoreboard.suddenDeathTick = cgs.matchSuddenDeathTickSeconds;
+	cgHudScoreboard.suddenDeathMax = cgs.matchSuddenDeathMaxSeconds;
+	cgHudScoreboard.suddenDeathIncrement = cgs.matchSuddenDeathIncrementSeconds;
+}
+
+/*
+=============
+CG_HudScoreboardContainsClient
+
+Checks if the cached HUD scoreboard already contains the supplied client.
+=============
+*/
+static qboolean CG_HudScoreboardContainsClient( int clientNum ) {
+	int		i;
+
+	for ( i = 0; i < cgHudScoreboard.count; i++ ) {
+		if ( cgHudScoreboard.entries[i].clientNum == clientNum ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CG_AppendHudScoreboardEntry
+
+Caches a scoreboard row for the menu-driven HUD overlays.
+=============
+*/
+static void CG_AppendHudScoreboardEntry( const score_t *score, const clientInfo_t *ci ) {
+	cgHudScoreboardEntry_t	*entry;
+
+	if ( !score || !ci || cgHudScoreboard.count >= MAX_CLIENTS ) {
+		return;
+	}
+
+	if ( CG_HudScoreboardContainsClient( score->client ) ) {
+		return;
+	}
+
+	entry = &cgHudScoreboard.entries[cgHudScoreboard.count++];
+	entry->clientNum = score->client;
+	entry->score = score->score;
+	entry->ping = score->ping;
+	entry->time = score->time;
+	entry->team = ci->team;
+	entry->spectator = ( ci->team == TEAM_SPECTATOR );
+	entry->localPlayer = ( cg.snap && score->client == cg.snap->ps.clientNum );
+}
+
 /*
 =============
 CG_DamagePlumPresetDescription
@@ -315,6 +411,8 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 	}
 	
 	ci = &cgs.clientinfo[score->client];
+
+	CG_AppendHudScoreboardEntry( score, ci );
 
 	iconx = SB_BOTICON_X + (SB_RATING_WIDTH / 2);
 	headx = SB_HEAD_X + (SB_RATING_WIDTH / 2);
@@ -587,6 +685,7 @@ qboolean CG_DrawOldScoreboard( void ) {
 	y = SB_HEADER;
 
 	timersActive = ( cgs.itemTimersEnabled || cgs.forceHudHints );
+	CG_ResetHudScoreboard( timersActive );
 
 	CG_DrawPic( SB_SCORE_X + (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardScore );
 	CG_DrawPic( SB_PING_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardPing );
@@ -817,4 +916,16 @@ void CG_DrawOldTourneyScoreboard( void ) {
 
 
 }
+
+/*
+=============
+CG_GetHudScoreboard
+
+Returns the cached HUD scoreboard data for menu rendering.
+=============
+*/
+const cgHudScoreboard_t *CG_GetHudScoreboard( void ) {
+	return &cgHudScoreboard;
+}
+
 
