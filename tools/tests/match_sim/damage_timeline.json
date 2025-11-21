@@ -1,0 +1,32 @@
+{
+  "map": "campgrounds",
+  "duration": 2.0,
+  "tick_rate": 10,
+  "seed": 777,
+  "metadata": {
+    "description": "Two bots trading scripted damage for parity checks"
+  },
+  "bots": [
+    {
+      "name": "uriel",
+      "team": "red",
+      "initial_state": {"health": 125},
+      "script": [
+        {"time": 0.2, "action": "damage", "params": {"amount": 30, "target": "stripe"}},
+        {"time": 0.7, "action": "damage", "params": {"amount": 45, "target": "stripe"}},
+        {"time": 1.4, "action": "heal", "params": {"amount": 15}}
+      ]
+    },
+    {
+      "name": "stripe",
+      "team": "blue",
+      "initial_state": {"health": 110},
+      "script": [
+        {"time": 0.1, "action": "damage", "params": {"amount": 20, "target": "uriel"}},
+        {"time": 0.6, "action": "damage", "params": {"amount": 65, "target": "uriel"}},
+        {"time": 1.2, "action": "damage", "params": {"amount": 50, "target": "uriel"}},
+        {"time": 1.6, "action": "heal", "params": {"amount": 10}}
+      ]
+    }
+  ]
+}
