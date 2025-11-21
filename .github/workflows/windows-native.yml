@@ -22,8 +22,8 @@ jobs:
       - name: Verify Visual Studio v100 toolset
         run: tools/ci/verify-vs-toolchain.ps1 -RequireV100
 
-      - name: Build Win32 gameplay DLLs
-        run: tools/ci/build-windows-dlls.ps1 -PlatformToolset $env:PLATFORM_TOOLSET
+      - name: Validate project toolsets and Windows payloads
+        run: tools/ci/validate-windows-native.ps1 -PlatformToolset $env:PLATFORM_TOOLSET
 
       - name: Validate gameplay DLL exports
         run: tools/ci/assert-dll-exports.ps1
