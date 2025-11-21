@@ -164,11 +164,35 @@ static qboolean ui_browserActiveState = qfalse;
 static const char *ui_browserRefreshCommand = "web_stopRefresh\n";
 
 static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
-	return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
+return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
+}
+
+/*
+=============
+UI_MenuFileExists
+
+Check whether a menu definition file can be opened via the virtual FS.
+=============
+*/
+static qboolean UI_MenuFileExists(const char *menuFile) {
+	fileHandle_t handle;
+	int length;
+
+	if (!menuFile || !*menuFile) {
+		return qfalse;
+	}
+
+	length = trap_FS_FOpenFile(menuFile, &handle, FS_READ);
+	if (length > 0) {
+		trap_FS_FCloseFile(handle);
+		return qtrue;
+	}
+
+	return qfalse;
 }
 
 qboolean UI_BrowserOverlayAvailable(void) {
-        return ui_browserAwesomium.integer != 0;
+return ui_browserAwesomium.integer != 0;
 }
 
 static uiMenuFlow_t UI_RequestedMenuFlow(void) {
@@ -236,19 +260,25 @@ static void UI_UpdateActiveMenuFlowForFile(const char *menuFile) {
 }
 
 const char *UI_DefaultMenuFile(void) {
+	const char *menuFile;
+
+	menuFile = UI_UsingLegacyMenuFlow() ? UI_MENU_FILE_LEGACY : UI_MENU_FILE_QUAKELIVE;
 	if (ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED) {
-		return UI_MENU_FILE_QUAKELIVE_BRIDGE;
+		menuFile = UI_MENU_FILE_QUAKELIVE_BRIDGE;
 	}
 
-	return UI_UsingLegacyMenuFlow() ? UI_MENU_FILE_LEGACY : UI_MENU_FILE_QUAKELIVE;
+	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_MENU_FILE_LEGACY;
 }
 
 const char *UI_DefaultIngameFile(void) {
+	const char *menuFile;
+
+	menuFile = UI_UsingLegacyMenuFlow() ? UI_INGAME_FILE_LEGACY : UI_INGAME_FILE_QUAKELIVE;
 	if (ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED) {
-		return UI_INGAME_FILE_QUAKELIVE_BRIDGE;
+		menuFile = UI_INGAME_FILE_QUAKELIVE_BRIDGE;
 	}
 
-	return UI_UsingLegacyMenuFlow() ? UI_INGAME_FILE_LEGACY : UI_INGAME_FILE_QUAKELIVE;
+	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_INGAME_FILE_LEGACY;
 }
 
 static void UI_UpdateActiveMenuFlow(void) {
@@ -6918,8 +6948,8 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_blueteam4, "ui_blueteam4", "0", CVAR_ARCHIVE },
 	{ &ui_blueteam5, "ui_blueteam5", "0", CVAR_ARCHIVE },
 	{ &ui_netSource, "ui_netSource", "0", CVAR_ARCHIVE },
-{ &ui_menuFiles, "ui_menuFiles", UI_MENU_FILE_QUAKELIVE, CVAR_ARCHIVE },
-{ &ui_menuFlow, "ui_menuFlow", "1", CVAR_ARCHIVE },
+{ &ui_menuFiles, "ui_menuFiles", UI_MENU_FILE_LEGACY, CVAR_ARCHIVE },
+{ &ui_menuFlow, "ui_menuFlow", "0", CVAR_ARCHIVE },
 { &ui_globalpreset, "ui_globalpreset", "0", CVAR_ARCHIVE },
 { &ui_screenDamage_Team_preset, "ui_screenDamage_Team_preset", "0", CVAR_ARCHIVE },
 { &ui_screenDamage_preset, "ui_screenDamage_preset", "0", CVAR_ARCHIVE },
