@@ -140,6 +140,7 @@ typedef struct client_s {
 	char			lastClientCommandString[MAX_STRING_CHARS];
 	sharedEntity_t	*gentity;			// SV_GentityNum(clientnum)
 	char			name[MAX_NAME_LENGTH];			// extracted from userinfo, high bits masked
+	qboolean		isBot;
 #if SV_HAS_PLATFORM_AUTH
 	qboolean		platformAuthPending;
 	qboolean		platformAuthSucceeded;
@@ -415,6 +416,18 @@ void SV_Trace( trace_t *results, const vec3_t start, vec3_t mins, vec3_t maxs, c
 
 void SV_ClipToEntity( trace_t *trace, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int entityNum, int contentmask, int capsule );
 // clip to a specific entity
+
+//
+// sv_rankings.c
+//
+qboolean SV_RankActive( void );
+void SV_RankBegin( char *gamekey );
+qboolean SV_RankCheckInit( void );
+void SV_RankPoll( void );
+int SV_RankUserStatus( int index );
+void SV_RankUserReset( int index );
+void SV_RankReportInt( int index1, int index2, int key, int value, qboolean accum );
+void SV_RankReportStr( int index1, int index2, int key, char *value );
 
 //
 // sv_net_chan.c

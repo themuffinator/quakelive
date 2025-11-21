@@ -5470,10 +5470,18 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 	//	return;
 	//}
 
-  rect.x = x;
-  rect.y = y;
-  rect.w = w;
-  rect.h = h;
+rect.x = x;
+rect.y = y;
+	rect.w = w;
+	rect.h = h;
+
+	if ( ownerDraw == CG_ROUNDTIMER || ownerDraw == CG_OVERTIME ||
+		ownerDraw == CG_1ST_PLYR || ownerDraw == CG_1ST_PLYR_SCORE ||
+		ownerDraw == CG_1ST_PLYR_HEALTH_ARMOR || ownerDraw == CG_1ST_PLYR_AVATAR ||
+		ownerDraw == CG_2ND_PLYR || ownerDraw == CG_2ND_PLYR_SCORE ||
+		ownerDraw == CG_2ND_PLYR_HEALTH_ARMOR || ownerDraw == CG_2ND_PLYR_AVATAR ) {
+		CG_TouchCompetitiveScores();
+	}
 
 	switch (ownerDraw) {
 	case CG_SERVER_SETTINGS:
@@ -5889,12 +5897,25 @@ break;
   }
 }
 
+/*
+=============
+CG_MouseEvent
+
+Routes mouse movement through the HUD when spectator overlays are active.
+=============
+*/
 void CG_MouseEvent( int x, int y ) {
 	int n;
-	qboolean allowSpectatorUi = ( cg.snap && ( cg.snap->ps.pm_flags & PMF_FOLLOW ) );
+	qboolean allowSpectatorUi = qfalse;
 
 	if ( cg_ignoreMouseInput.integer ) {
 		return;
+	}
+
+	if ( cg.snap ) {
+		allowSpectatorUi = ( cg.snap->ps.pm_flags & PMF_FOLLOW ) ||
+			( cg.snap->ps.pm_type == PM_SPECTATOR ) ||
+			( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
 	}
 
 	if ( ( cg.predictedPlayerState.pm_type == PM_NORMAL || ( cg.predictedPlayerState.pm_type == PM_SPECTATOR && !allowSpectatorUi ) ) &&
@@ -5980,28 +6001,40 @@ void CG_EventHandling(int type) {
 
 
 
+/*
+=============
+CG_KeyEvent
+
+Forwards key input to the HUD when the spectator UI is visible.
+=============
+*/
 void CG_KeyEvent(int key, qboolean down) {
-qboolean allowSpectatorUi = (cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW));
+	qboolean allowSpectatorUi = qfalse;
 
-if (!down) {
-return;
-}
+	if ( !down ) {
+		return;
+	}
 
-if ( cg.predictedPlayerState.pm_type == PM_NORMAL || (cg.predictedPlayerState.pm_type == PM_SPECTATOR && !allowSpectatorUi && cg.showScores == qfalse)) {
-CG_EventHandling(CGAME_EVENT_NONE);
-    trap_Key_SetCatcher(0);
-return;
-}
+	if ( cg.snap ) {
+		allowSpectatorUi = ( cg.snap->ps.pm_flags & PMF_FOLLOW ) ||
+			( cg.snap->ps.pm_type == PM_SPECTATOR ) ||
+			( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
+	}
 
-  //if (key == trap_Key_GetKey("teamMenu") || !Display_CaptureItem(cgs.cursorX, cgs.cursorY)) {
-    // if we see this then we should always be visible
-  //  CG_EventHandling(CGAME_EVENT_NONE);
-  //  trap_Key_SetCatcher(0);
-  //}
+	if ( cg.predictedPlayerState.pm_type == PM_NORMAL || ( cg.predictedPlayerState.pm_type == PM_SPECTATOR && !allowSpectatorUi && cg.showScores == qfalse ) ) {
+		CG_EventHandling(CGAME_EVENT_NONE);
+		trap_Key_SetCatcher(0);
+		return;
+	}
+
+	//if (key == trap_Key_GetKey("teamMenu") || !Display_CaptureItem(cgs.cursorX, cgs.cursorY)) {
+	// if we see this then we should always be visible
+	//  CG_EventHandling(CGAME_EVENT_NONE);
+	//  trap_Key_SetCatcher(0);
+	//}
 
 
-
-  Display_HandleKey(key, down, cgs.cursorX, cgs.cursorY);
+	Display_HandleKey(key, down, cgs.cursorX, cgs.cursorY);
 
 	if (cgs.capturedItem) {
 		cgs.capturedItem = NULL;
@@ -6011,6 +6044,7 @@ return;
 		}
 	}
 }
+
 
 int CG_ClientNumFromName(const char *p) {
   int i;

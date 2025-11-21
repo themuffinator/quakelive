@@ -68,6 +68,7 @@ static int	s_forceDmgThroughSurfaceModCount = -1;
 static int	s_disableLoadoutModCount = 0;
 static int	s_forcedAtmosphereModCount = -1;
 static int	s_factoryModCount = 0;
+static int	s_rulesetModCount = 0;
 static int	s_roundWarmupDelayModCount = 0;
 static int	s_teamSizeMinModCount = 0;
 static char	s_worldspawnAtmosphere[MAX_QPATH];
@@ -97,6 +98,7 @@ static void G_UpdateGametypeTutorialText( void );
 static void G_SyncAdminConfig( void );
 static void G_ResetAdminAccessList( void );
 static void G_UpdateGameStateForLevel( void );
+static void G_SyncRulesetCvar( void );
 static qboolean G_ParseAdminAccessTier( const char *token, int *tierOut );
 static void G_InsertAdminAccessEntry( const char *steamId, int tier );
 static void G_LoadAdminAccessFile( void );
@@ -198,6 +200,24 @@ void G_SetGameState( const char *state ) {
 
 	trap_Cvar_Set( "g_gameState", value );
 	Q_strncpyz( s_gameStateBuffer, value, sizeof( s_gameStateBuffer ) );
+}
+
+/*
+=============
+G_SyncRulesetCvar
+
+Caches the active ruleset token on the level state and flags the custom-settings digest when deviating from default.
+=============
+*/
+static void G_SyncRulesetCvar( void ) {
+	const char	*ruleset;
+
+	ruleset = g_ruleset.string[0] ? g_ruleset.string : "standard";
+	Q_strncpyz( level.rulesetName, ruleset, sizeof( level.rulesetName ) );
+
+	if ( Q_stricmp( ruleset, "standard" ) ) {
+		s_customSettingsDirty = qtrue;
+	}
 }
 
 void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
@@ -312,6 +332,7 @@ vmCvar_t	g_botSpawnList;
 vmCvar_t	g_accessFile;
 vmCvar_t	g_factoryTitle;
 vmCvar_t	g_factory;
+vmCvar_t	g_ruleset;
 vmCvar_t	g_dropInactive;
 vmCvar_t	g_smoothClients;
 vmCvar_t	pmove_fixed;
@@ -466,6 +487,7 @@ static cvarTable_t		gameCvarTable[] = {
 	// latched vars
 	{ &g_gametype, "g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH, 0, qfalse  },
 	{ &g_customSettings, "g_customSettings", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Digest of flagged gameplay overrides published to CS_SERVERINFO.", qfalse },
+	{ &g_ruleset, "g_ruleset", "standard", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Active competitive ruleset advertised to clients and feeds the custom-settings digest.", qtrue },
 
 	{ &g_maxclients, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_maxGameClients, "g_maxGameClients", "0", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
@@ -1190,6 +1212,7 @@ LegacyCvar_UpdateAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) 
 
 	level.warmupModificationCount = g_warmup.modificationCount;
 	s_factoryModCount = g_factory.modificationCount;
+	s_rulesetModCount = g_ruleset.modificationCount;
 	s_itemTimersModCount = g_itemTimers.modificationCount;
 	s_itemHeightModCount = g_itemHeight.modificationCount;
 	s_forceSmallScoreboardMessageModCount = g_forceSmallScoreboardMessage.modificationCount;
@@ -1199,6 +1222,7 @@ LegacyCvar_UpdateAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) 
 	s_forcedAtmosphereModCount = g_forcedAtmosphere.modificationCount;
 	s_roundWarmupDelayModCount = g_roundWarmupDelay.modificationCount;
 	s_teamSizeMinModCount = g_teamSizeMin.modificationCount;
+	G_SyncRulesetCvar();
 	s_worldspawnAtmosphere[0] = '\0';
 	s_lastForcedCosmeticsPayload[0] = '\0';
 	G_UpdateItemTimerConfig( qtrue );
@@ -1264,6 +1288,11 @@ void G_UpdateCvars( void ) {
 	if ( g_roundWarmupDelay.modificationCount != s_roundWarmupDelayModCount ) {
 		s_roundWarmupDelayModCount = g_roundWarmupDelay.modificationCount;
 		G_FreezeHandleWarmupDelayCvarUpdate();
+	}
+
+	if ( g_ruleset.modificationCount != s_rulesetModCount ) {
+		s_rulesetModCount = g_ruleset.modificationCount;
+		G_SyncRulesetCvar();
 	}
 
 	if ( g_factory.modificationCount != s_factoryModCount ) {

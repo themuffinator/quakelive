@@ -35,21 +35,39 @@ typedef struct bot_debugpoly_s
 static bot_debugpoly_t *debugpolygons;
 int bot_maxdebugpolys;
 
-extern botlib_export_t	*botlib_export;
-int	bot_enable;
+extern botlib_export_t  *botlib_export;
+int		bot_enable;
 
+/*
+===============
+SV_ClientIsBot
+
+Determines whether the server slot represents an active bot connection.
+===============
+*/
 qboolean SV_ClientIsBot( const client_t *cl ) {
 	if ( !cl ) {
 		return qfalse;
 	}
 
-	if ( cl->netchan.remoteAddress.type != NA_BOT ) {
+	if ( cl->state < CS_CONNECTED ) {
 		return qfalse;
 	}
 
-	return ( cl->state >= CS_CONNECTED );
+	if ( cl->isBot ) {
+		return qtrue;
+	}
+
+	return ( cl->netchan.remoteAddress.type == NA_BOT );
 }
 
+/*
+===============
+SV_BotRefreshEntityBotFlag
+
+Synchronises the SVF_BOT flag on the client entity with the bot mask.
+===============
+*/
 void SV_BotRefreshEntityBotFlag( client_t *cl ) {
 	if ( !cl || !cl->gentity ) {
 		return;
@@ -62,15 +80,14 @@ void SV_BotRefreshEntityBotFlag( client_t *cl ) {
 	}
 }
 
-
 /*
 ==================
 SV_BotAllocateClient
 ==================
 */
 int SV_BotAllocateClient(void) {
-	int			i;
-	client_t	*cl;
+	int				i;
+	client_t		*cl;
 
 	// find a client slot
 	for ( i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++ ) {
@@ -87,6 +104,7 @@ int SV_BotAllocateClient(void) {
 	if ( cl->gentity ) {
 		cl->gentity->s.number = i;
 	}
+	cl->isBot = qtrue;
 	cl->state = CS_ACTIVE;
 	cl->lastPacketTime = svs.time;
 	cl->lastConnectTime = svs.time;
@@ -104,7 +122,7 @@ SV_BotFreeClient
 ==================
 */
 void SV_BotFreeClient( int clientNum ) {
-	client_t	*cl;
+	client_t		*cl;
 
 	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
 		Com_Error( ERR_DROP, "SV_BotFreeClient: bad clientNum: %i", clientNum );
@@ -112,6 +130,7 @@ void SV_BotFreeClient( int clientNum ) {
 	cl = &svs.clients[clientNum];
 	cl->state = CS_FREE;
 	cl->name[0] = 0;
+	cl->isBot = qfalse;
 	cl->netchan.remoteAddress.type = NA_BAD;
 	SV_BotRefreshEntityBotFlag( cl );
 }

@@ -263,6 +263,28 @@ void AddScore( gentity_t *ent, vec3_t origin, int score ) {
 	if ( level.warmupTime ) {
 		return;
 	}
+
+	if ( ent->client->scoreModifier > 0.0f && ent->client->scoreModifier != 1.0f ) {
+		float	scaled;
+		int		resolved;
+
+		scaled = (float)score * ent->client->scoreModifier;
+		if ( scaled > 0.0f ) {
+			resolved = (int)( scaled + 0.5f );
+			if ( resolved < 1 ) {
+				resolved = 1;
+			}
+		} else if ( scaled < 0.0f ) {
+			resolved = (int)( scaled - 0.5f );
+			if ( resolved > -1 ) {
+				resolved = -1;
+			}
+		} else {
+			resolved = 0;
+		}
+
+		score = resolved;
+	}
 	// show score plum
 	ScorePlum(ent, origin, score);
 	//
@@ -1396,6 +1418,21 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			max /= 2;
 		}
 		damage = damage * max / 100;
+	}
+
+	if ( attacker->client ) {
+		float	ratingScale;
+		int		scaledDamage;
+
+		ratingScale = attacker->client->damageModifier;
+		if ( ratingScale > 0.0f && ratingScale != 1.0f ) {
+			scaledDamage = ( int )( ( (float)damage * ratingScale ) + 0.5f );
+			if ( scaledDamage < 1 && damage > 0 ) {
+				scaledDamage = 1;
+			}
+
+			damage = scaledDamage;
+		}
 	}
 
 	client = targ->client;

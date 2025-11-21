@@ -164,6 +164,94 @@ qboolean trap_VerifySteamAuth( int clientNum ) {
 	return syscall( G_STEAM_AUTH_VALIDATE, clientNum );
 }
 
+/*
+=============
+trap_RankBegin
+
+Starts a rankings session with the provided game key.
+=============
+*/
+void trap_RankBegin( char *gamekey ) {
+	syscall( G_RANK_BEGIN, gamekey );
+}
+
+/*
+=============
+trap_RankPoll
+
+Processes pending ranking work queued by the engine.
+=============
+*/
+void trap_RankPoll( void ) {
+	syscall( G_RANK_POLL );
+}
+
+/*
+=============
+trap_RankCheckInit
+
+Checks whether the rankings layer has been initialised.
+=============
+*/
+qboolean trap_RankCheckInit( void ) {
+	return syscall( G_RANK_CHECK_INIT );
+}
+
+/*
+=============
+trap_RankActive
+
+Reports whether rankings are currently active on the server.
+=============
+*/
+qboolean trap_RankActive( void ) {
+	return syscall( G_RANK_ACTIVE );
+}
+
+/*
+=============
+trap_RankUserStatus
+
+Queries the current rankings status for a specific client slot.
+=============
+*/
+int trap_RankUserStatus( int index ) {
+	return syscall( G_RANK_USER_STATUS, index );
+}
+
+/*
+=============
+trap_RankUserReset
+
+Clears any rankings state cached for a specific client slot.
+=============
+*/
+void trap_RankUserReset( int index ) {
+	syscall( G_RANK_USER_RESET, index );
+}
+
+/*
+=============
+trap_RankReportInt
+
+Submits an integer ranking report for one or two players.
+=============
+*/
+void trap_RankReportInt( int index1, int index2, int key, int value, qboolean accum ) {
+	syscall( G_RANK_REPORT_INT, index1, index2, key, value, accum );
+}
+
+/*
+=============
+trap_RankReportStr
+
+Submits a string ranking report for one or two players.
+=============
+*/
+void trap_RankReportStr( int index1, int index2, int key, char *value ) {
+	syscall( G_RANK_REPORT_STR, index1, index2, key, value );
+}
+
 void trap_SetBrushModel( gentity_t *ent, const char *name ) {
 	syscall( G_SET_BRUSH_MODEL, ent, name );
 }

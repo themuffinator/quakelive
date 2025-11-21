@@ -63,7 +63,10 @@ def _collect_harness_runs(tmp_path_factory: pytest.TempPathFactory) -> HarnessTa
     supported, reason = _detect_native_support()
     if supported:
         artifact_root = tmp_path_factory.mktemp("harness_re")
-        runs["re"] = run_harness_bundle("re", artifact_root)
+        try:
+            runs["re"] = run_harness_bundle("re", artifact_root)
+        except Exception as exc:  # pragma: no cover - defensive
+            missing["re"] = f"Native harness failed: {exc}"
     else:
         missing["re"] = reason or "Native reverse build tooling unavailable"
 

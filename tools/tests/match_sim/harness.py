@@ -106,6 +106,9 @@ class MatchHarness:
         # reflect the actual deterministic inputs used for the run.
         self.config.seed = self.seed
         self.factory_settings: Mapping[str, Any] = dict(self.config.metadata.get("factory", {}))
+        self.cvar_overrides: Mapping[str, Any] = self._load_cvar_overrides(
+            self.config.metadata.get("cvars")
+        )
         self.freeze_settings: Mapping[str, Any] = self._load_freeze_settings(
             self.config.metadata.get("freeze")
         )
@@ -114,6 +117,9 @@ class MatchHarness:
         )
         self.clanarena_settings: Mapping[str, Any] = self._load_clanarena_settings(
             self.config.metadata.get("clanarena")
+        )
+        self.rating_settings: Mapping[str, Any] = self._load_rating_settings(
+            self.config.metadata.get("rating")
         )
         self.duel_settings: Mapping[str, Any] = dict(self.config.metadata.get("duel", {}))
         (
@@ -170,6 +176,8 @@ class MatchHarness:
             current_time = tick * delta
             self._current_time = current_time
             events: List[Dict[str, Any]] = []
+            if tick == 0 and self.cvar_overrides:
+                events.extend(self._emit_cvar_toggles())
             events.extend(self._collect_scheduled_spawns(current_time, bots))
             events.extend(self._collect_scheduled_items(current_time, bots))
             self._advance_freeze_state(current_time, bots)
@@ -268,6 +276,17 @@ class MatchHarness:
             "details": dict(details),
         }
         return event
+
+    def _record_cvar_event(self, name: str, value: Any) -> Dict[str, Any]:
+        self._event_counter += 1
+        return {
+            "bot": None,
+            "team": None,
+            "time": self._current_time,
+            "action": "cvar_toggle",
+            "details": {"name": name, "value": value},
+            "seq": self._event_counter,
+        }
 
     # ------------------------------------------------------------------
     # Command handlers
@@ -833,6 +852,12 @@ class MatchHarness:
             value = value[key]
         return value
 
+    def _load_cvar_overrides(self, payload: Any) -> Mapping[str, Any]:
+        if not isinstance(payload, Mapping):
+            return {}
+        ordered = sorted((str(key), payload[key]) for key in payload)
+        return {name: value for name, value in ordered}
+
     def _load_bot_resources(
         self, payload: Any
     ) -> Tuple[Mapping[str, Mapping[str, Any]], List[Mapping[str, Any]], Mapping[str, Any]]:
@@ -1147,6 +1172,10 @@ class MatchHarness:
             protection = None
             if bot_state is not None:
                 protection = self._freeze_apply_spawn_protection(bot_state, scheduled_time)
+            rating = self._resolve_rating_scales(bot_name)
+            if bot_state is not None:
+                bot_state.custom["rating_damage_scale"] = rating.get("damage_scale", 1.0)
+                bot_state.custom["rating_score_scale"] = rating.get("score_scale", 1.0)
             events.append(
                 {
                     "bot": bot_name,
@@ -1164,6 +1193,7 @@ class MatchHarness:
                         "source": payload.get("source"),
                         "count": payload.get("count"),
                         "freeze_protection_expires": protection,
+                        "rating": rating,
                     },
                 }
             )
@@ -1208,6 +1238,53 @@ class MatchHarness:
         events = list(self._pending_freeze_events)
         self._pending_freeze_events = []
         return events
+
+    def _emit_cvar_toggles(self) -> List[Dict[str, Any]]:
+        events: List[Dict[str, Any]] = []
+        for name, value in self.cvar_overrides.items():
+            events.append(self._record_cvar_event(name, value))
+        return events
+
+    # ------------------------------------------------------------------
+    # Rating helpers
+    # ------------------------------------------------------------------
+
+    def _load_rating_settings(self, payload: Any) -> Mapping[str, Any]:
+        if not isinstance(payload, Mapping):
+            return {}
+        settings: Dict[str, Any] = {}
+        default_entry = payload.get("default", {})
+        if isinstance(default_entry, Mapping):
+            settings["default"] = {
+                "damage_scale": float(default_entry.get("damage_scale", 1.0)),
+                "score_scale": float(default_entry.get("score_scale", 1.0)),
+            }
+        bot_entries = payload.get("bots", {})
+        if isinstance(bot_entries, Mapping):
+            bot_settings: Dict[str, Dict[str, float]] = {}
+            for name, entry in bot_entries.items():
+                if not isinstance(entry, Mapping):
+                    continue
+                bot_settings[str(name)] = {
+                    "damage_scale": float(entry.get("damage_scale", settings.get("default", {}).get("damage_scale", 1.0))),
+                    "score_scale": float(entry.get("score_scale", settings.get("default", {}).get("score_scale", 1.0))),
+                }
+            settings["bots"] = bot_settings
+        return settings
+
+    def _resolve_rating_scales(self, bot_name: Optional[str]) -> Dict[str, float]:
+        default_settings = self.rating_settings.get("default", {})
+        damage_scale = float(default_settings.get("damage_scale", 1.0))
+        score_scale = float(default_settings.get("score_scale", 1.0))
+        if bot_name:
+            bot_entry = self.rating_settings.get("bots", {}).get(bot_name)
+            if isinstance(bot_entry, Mapping):
+                damage_scale = float(bot_entry.get("damage_scale", damage_scale))
+                score_scale = float(bot_entry.get("score_scale", score_scale))
+        return {
+            "damage_scale": damage_scale,
+            "score_scale": score_scale,
+        }
 
     # ------------------------------------------------------------------
     # Freeze Tag helpers

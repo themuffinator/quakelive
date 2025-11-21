@@ -1,0 +1,22 @@
+{
+  "damage_timeline": {
+    "qvm": [
+      "0.100 stripe damage uriel amount=20.0 health=105.0",
+      "0.200 uriel damage stripe amount=30.0 health=80.0",
+      "0.600 stripe damage uriel amount=65.0 health=40.0",
+      "0.700 uriel damage stripe amount=45.0 health=35.0",
+      "1.200 stripe damage uriel amount=50.0 health=0.0",
+      "1.400 uriel heal uriel amount=15.0 health=15.0",
+      "1.600 stripe heal stripe amount=10.0 health=45.0"
+    ],
+    "dll": [
+      "0.100 stripe damage uriel amount=20.0 health=105.0",
+      "0.200 uriel damage stripe amount=30.0 health=80.0",
+      "0.600 stripe damage uriel amount=65.0 health=40.0",
+      "0.700 uriel damage stripe amount=45.0 health=35.0",
+      "1.200 stripe damage uriel amount=50.0 health=0.0",
+      "1.400 uriel heal uriel amount=15.0 health=15.0",
+      "1.600 stripe heal stripe amount=10.0 health=45.0"
+    ]
+  }
+}

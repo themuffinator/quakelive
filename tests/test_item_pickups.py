@@ -85,9 +85,13 @@ def _assert_pickup_parity(
     recorded = [line.strip() for line in captured]
     expected_targets = expectations.get(scenario)
     assert expected_targets, f"missing expectations for scenario '{scenario}'"
-    for target in TARGETS:
-        expected_lines = expected_targets.get(target)
-        assert expected_lines is not None, f"missing {target} expectation for {scenario}"
+    qvm_expected = expected_targets.get("qvm")
+    dll_expected = expected_targets.get("dll")
+    assert qvm_expected is not None, f"missing qvm expectation for {scenario}"
+    assert dll_expected is not None, f"missing dll expectation for {scenario}"
+    assert qvm_expected == dll_expected, f"VM/DLL expectations diverge for {scenario}"
+
+    for target, expected_lines in ("qvm", qvm_expected), ("dll", dll_expected):
         if recorded != expected_lines:
             output_path = tmp_path / f"{scenario}-{target}.actual"
             output_path.write_text("\n".join(recorded), encoding="utf-8")
@@ -95,7 +99,6 @@ def _assert_pickup_parity(
                 f"{scenario} pickup summary diverged for {target}. "
                 f"Captured payload written to {output_path}"
             )
-    assert expected_targets["qvm"] == expected_targets["dll"], "VM/DLL expectations diverge"
 
 
 def _run_harness(config: MatchConfig) -> list[str]:

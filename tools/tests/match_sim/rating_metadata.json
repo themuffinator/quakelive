@@ -1,0 +1,59 @@
+{
+  "map": "rating_arena",
+  "duration": 3.0,
+  "tick_rate": 20,
+  "seed": 1010,
+  "metadata": {
+    "description": "Rating scale parity coverage",
+    "rating": {
+      "default": {
+        "damage_scale": 1.0,
+        "score_scale": 1.0
+      },
+      "bots": {
+        "anarki": {
+          "damage_scale": 0.9,
+          "score_scale": 1.1
+        },
+        "visor": {
+          "damage_scale": 1.25,
+          "score_scale": 0.8
+        }
+      }
+    }
+  },
+  "bots": [
+    {
+      "name": "anarki",
+      "team": "red",
+      "spawn": {
+        "position": [0, 0, 64]
+      },
+      "initial_state": {
+        "health": 100,
+        "ammo": {},
+        "inventory": {}
+      },
+      "script": [
+        {"time": 0.0, "action": "request_spawn", "params": {"warmup": true, "reason": "warmup_start"}},
+        {"time": 1.0, "action": "request_spawn", "params": {"warmup": false, "reason": "live_start"}}
+      ]
+    },
+    {
+      "name": "visor",
+      "team": "blue",
+      "spawn": {
+        "position": [64, 0, 64]
+      },
+      "initial_state": {
+        "health": 100,
+        "ammo": {},
+        "inventory": {}
+      },
+      "script": [
+        {"time": 0.5, "action": "request_spawn", "params": {"warmup": true, "reason": "warmup_start"}},
+        {"time": 1.5, "action": "request_spawn", "params": {"warmup": false, "reason": "live_start"}}
+      ]
+    }
+  ]
+}

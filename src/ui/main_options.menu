@@ -25,14 +25,12 @@
 	focusColor 1 .75 0 1
 	disableColor .5 .5 .5 1
 
-        onClose {
-                setitemcolor navbtn2t forecolor 1 1 1 1
-                setitemcolor navbtn3t forecolor 1 1 1 1
-                setitemcolor navbtn4t forecolor 1 1 1 1
-                setitemcolor navbtn2o backcolor 1 1 1 0
-                setitemcolor navbtn3o backcolor 1 1 1 0
-                setitemcolor navbtn4o backcolor 1 1 1 0
-        }
+   	onClose {
+			setitemcolor navbtn2t forecolor 1 1 1 1
+			setitemcolor navbtn3t forecolor 1 1 1 1
+			setitemcolor navbtn2o backcolor 1 1 1 0
+			setitemcolor navbtn3o backcolor 1 1 1 0
+      	}
 
 	itemDef {
 		name "ingameRect"
@@ -168,8 +166,8 @@
 	      	decoration 
 		}
 		
-                itemDef {
-                        name navbtn3t
+		itemDef {
+			name navbtn3t
 			rect 151 63 91 20
 			text "Game Settings"
 			textscale .18
@@ -179,55 +177,8 @@
 			textalign ITEM_ALIGN_CENTER		
 			forecolor 1 1 1 1
 			visible 1 
-                        decoration
-                }
-
-                // credentials
-                itemDef {
-                        name navbtn4
-                        rect 242 63 96 16
-                        border 1
-                        bordercolor 0.196 0.196 0.196 1
-                        style WINDOW_STYLE_FILLED
-                        visible 1
-                        type 1
-                        action { close main_options ; uiScript openCredentials
-                                setitemcolor navbtn1t forecolor 1 1 1 1
-                                setitemcolor navbtn2t forecolor 1 1 1 1
-                                setitemcolor navbtn3t forecolor 1 1 1 1
-                                setitemcolor navbtn4t forecolor 0.964 0.815 0 1
-                                setitemcolor navbtn5t forecolor 1 1 1 1
-                                setitemcolor navbtn1o backcolor 1 1 1 0
-                                setitemcolor navbtn2o backcolor 1 1 1 0
-                                setitemcolor navbtn3o backcolor 1 1 1 0
-                                setitemcolor navbtn4o backcolor 0.196 0.196 0.196 1
-                                setitemcolor navbtn5o backcolor 1 1 1 0
-                        }
-                }
-
-                itemDef {
-                        name navbtn4o
-                        rect 242 63 96 16
-                        border 1
-                        bordercolor 0.196 0.196 0.196 1
-                        style WINDOW_STYLE_FILLED
-                        visible 1
-                        decoration
-                }
-
-                itemDef {
-                        name navbtn4t
-                        rect 243 63 96 20
-                        text "Credentials"
-                        textscale .18
-                        style WINDOW_STYLE_EMPTY
-                        textalignx 48
-                        textaligny 14
-                        textalign ITEM_ALIGN_CENTER
-                        forecolor 1 1 1 1
-                        visible 1
-                        decoration
-                }
+			decoration
+		}
 
 	//		BACK			//
 

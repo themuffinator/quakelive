@@ -26,6 +26,30 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 /*
 ===============
+G_SetClientRatingModifiers
+
+Applies rating metadata to the runtime damage and score modifiers for a client.
+===============
+*/
+void G_SetClientRatingModifiers( gclient_t *client, float damageScale, float scoreScale ) {
+	if ( !client ) {
+		return;
+	}
+
+	if ( damageScale <= 0.0f ) {
+		damageScale = 1.0f;
+	}
+	if ( scoreScale <= 0.0f ) {
+		scoreScale = 1.0f;
+	}
+
+	client->damageModifier = damageScale;
+	client->scoreModifier = scoreScale;
+}
+
+
+/*
+===============
 G_DamageFeedback
 
 Called just before a snapshot is sent to the given player.

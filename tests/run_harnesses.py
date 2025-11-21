@@ -30,6 +30,9 @@ SCENARIOS: dict[str, Path] = {
     "ctf_flag_cvars": SCENARIO_ROOT / "ctf_flag_cvars.json",
     "clanarena_shuffle": SCENARIO_ROOT / "clanarena_shuffle.json",
     "duel_cvars": SCENARIO_ROOT / "duel_cvars.json",
+    "rating_metadata": SCENARIO_ROOT / "rating_metadata.json",
+    "ruleset_pql": SCENARIO_ROOT / "ruleset_pql.json",
+    "damage_timeline": SCENARIO_ROOT / "damage_timeline.json",
 }
 DEFAULT_SCENARIO = SCENARIOS["duel"]
 SNAPSHOT_ROOT = REPO_ROOT / "tools" / "tests" / "client_regression"
@@ -86,6 +89,8 @@ def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict
                 "frame_count": len(result.frames),
                 "duration_seconds": result.frames[-1].time if result.frames else 0.0,
                 "bots": sorted(result.frames[0].bots.keys()) if result.frames else [],
+                "metadata": result.config.metadata,
+                "ruleset": result.config.metadata.get("ruleset"),
             }
         )
 
@@ -109,7 +114,8 @@ def _run_client_harness(target: str, artifact_root: Path) -> list[dict[str, obje
     manifest: dict[str, dict[str, object]] = {}
     log_entries: list[dict[str, object]] = []
 
-    for scenario, archive in SNAPSHOT_ARCHIVES.items():
+    for scenario in sorted(SNAPSHOT_ARCHIVES.keys()):
+        archive = SNAPSHOT_ARCHIVES[scenario]
         archive_payload = json.loads(archive.read_text(encoding="utf-8"))
         metadata = archive_payload.get("metadata", {})
         snapshots = harness.load_snapshots(archive)

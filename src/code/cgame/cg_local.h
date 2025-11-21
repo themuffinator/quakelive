@@ -31,6 +31,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // If you absolutely need something stored, it can either be kept
 // by the server in the server stored userinfos, or stashed in a cvar.
 
+#define CG_DEFAULT_HUD_FILE		"ui/hud3.txt"
+#define CG_LEGACY_HUD_FILE		"ui/hud.txt"
+
 #define CG_FONT_THRESHOLD 0.1
 
 #define	POWERUP_BLINKS		5
@@ -682,6 +685,9 @@ typedef struct {
 	score_t		scores[MAX_CLIENTS];
 	qboolean	showScores;
 	qboolean	scoreBoardShowing;
+	qboolean	scoreboardTimerRunning;
+	int			scoreboardTimerStartTime;
+	int			scoreboardTimerStopTime;
 	int			scoreFadeTime;
 	char		killerName[MAX_NAME_LENGTH];
 	char			spectatorList[MAX_STRING_CHARS];		// list of names
@@ -1914,6 +1920,10 @@ void CG_DrawInformation( void );
 qboolean CG_DrawOldScoreboard( void );
 void CG_DrawOldTourneyScoreboard( void );
 const cgHudScoreboard_t *CG_GetHudScoreboard( void );
+void CG_TouchCompetitiveScores( void );
+void CG_StartScoreboardTimer( int startTime );
+void CG_StopScoreboardTimer( int stopTime );
+int CG_GetScoreboardTimerSeconds( void );
 
 //
 // cg_consolecmds.c

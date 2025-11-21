@@ -166,6 +166,7 @@ vmCvar_t  ui_browserAwesomium;
 static uiMenuFlow_t ui_activeMenuFlow = UI_MENU_FLOW_LEGACY;
 static qboolean ui_browserActiveKnown = qfalse;
 static qboolean ui_browserActiveState = qfalse;
+static const char *ui_browserRefreshCommand = "web_stopRefresh\n";
 
 static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
         return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
@@ -1222,20 +1223,28 @@ void UI_LoadMenus(const char *menuFile, qboolean reset) {
         int handle;
         int start;
 
-        start = trap_Milliseconds();
+	start = trap_Milliseconds();
 
-        handle = trap_PC_LoadSource(menuFile);
-        if (!handle) {
-                const char *fallback = UI_MENU_FILE_LEGACY;
-                trap_Error(va(S_COLOR_YELLOW "menu file not found: %s, using default\n", menuFile));
-                if (!UI_MenuFileEquals(menuFile, fallback)) {
-                        menuFile = fallback;
-                        handle = trap_PC_LoadSource(menuFile);
-                }
-                if (!handle) {
-                        trap_Error(va(S_COLOR_RED "default menu file not found: %s, unable to continue!\n", fallback));
-                }
-        }
+	handle = trap_PC_LoadSource(menuFile);
+	if (!handle) {
+		const char *fallback = UI_DefaultMenuFile();
+		const char *fatalFallback = fallback;
+
+		trap_Error(va(S_COLOR_YELLOW "menu file not found: %s, using default\n", menuFile));
+		if (!UI_MenuFileEquals(menuFile, fallback)) {
+			menuFile = fallback;
+			handle = trap_PC_LoadSource(menuFile);
+		}
+		if (!handle && !UI_MenuFileEquals(fallback, UI_MENU_FILE_LEGACY)) {
+			fatalFallback = UI_MENU_FILE_LEGACY;
+			menuFile = fatalFallback;
+			handle = trap_PC_LoadSource(menuFile);
+		}
+		if (!handle) {
+			trap_Error(va(S_COLOR_RED "default menu file not found: %s, unable to continue!\n", fatalFallback));
+		}
+	}
+
 
 	UI_UpdateActiveMenuFlowForFile(menuFile);
 	UI_SetBrowserActive(!UI_UsingLegacyMenuFlow());
@@ -1290,6 +1299,7 @@ void UI_Load() {
 	UI_ParseGameInfo("gameinfo.txt");
 	UI_LoadMapRotations();
 	UI_LoadArenas();
+	UI_LoadRulesets();
 #endif
 
         UI_LoadMenus(menuSet, qtrue);
@@ -3579,6 +3589,14 @@ static void UI_RunMenuScript(char **args) {
 	char buff[1024];
 
 	if (String_Parse(args, &name)) {
+		if (Q_stricmp(name, "stopRefresh") == 0) {
+			UI_StopServerRefresh();
+			if (UI_BrowserOverlayAvailable() && ui_browserRefreshCommand && *ui_browserRefreshCommand) {
+				trap_Cmd_ExecuteText(EXEC_NOW, ui_browserRefreshCommand);
+			}
+			return;
+		}
+
 		if (Q_stricmp(name, "StartServer") == 0) {
 			int i, clients, oldclients;
 			float skill;
@@ -6747,7 +6765,7 @@ vmCvar_t	ui_dedicated;
 vmCvar_t	ui_gameType;
 vmCvar_t	ui_netGameType;
 vmCvar_t	ui_actualNetGameType;
-vmCvar_t	ui_cvgametype;
+vmCvar_t	ui_cvGameType;
 vmCvar_t	ui_cvPresetRotation;
 vmCvar_t	ui_cvPresetGametype;
 vmCvar_t	ui_cvPresetActive;
@@ -6867,7 +6885,7 @@ static cvarTable_t		cvarTable[] = {
 { &ui_joinGameType, "ui_joinGametype", "0", CVAR_ARCHIVE },
 { &ui_netGameType, "ui_netGametype", "3", CVAR_ARCHIVE },
 { &ui_actualNetGameType, "ui_actualNetGametype", "3", CVAR_ARCHIVE },
-{ &ui_cvgametype, "ui_cvgametype", "-1", CVAR_ARCHIVE },
+{ &ui_cvGameType, "ui_cvGameType", "-1", CVAR_ARCHIVE },
 	{ &ui_cvPresetRotation, "ui_cvPresetRotation", "-1", CVAR_ARCHIVE },
 	{ &ui_cvPresetGametype, "ui_cvPresetGametype", "-1", CVAR_ARCHIVE },
 	{ &ui_cvPresetActive, "ui_cvPresetActive", "0", CVAR_ARCHIVE },
@@ -6882,12 +6900,12 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_blueteam4, "ui_blueteam4", "0", CVAR_ARCHIVE },
 	{ &ui_blueteam5, "ui_blueteam5", "0", CVAR_ARCHIVE },
 	{ &ui_netSource, "ui_netSource", "0", CVAR_ARCHIVE },
-        { &ui_menuFiles, "ui_menuFiles", "ui/menus.txt", CVAR_ARCHIVE },
-        { &ui_menuFlow, "ui_menuFlow", "1", CVAR_ARCHIVE },
-	{ &ui_globalpreset, "ui_globalpreset", "0", CVAR_ARCHIVE },
-	{ &ui_screenDamage_Team_preset, "ui_screenDamage_Team_preset", "0", CVAR_ARCHIVE },
-	{ &ui_screenDamage_preset, "ui_screenDamage_preset", "0", CVAR_ARCHIVE },
-        { &ui_browserAwesomium, "ui_browserAwesomium", "0", CVAR_TEMP },
+{ &ui_menuFiles, "ui_menuFiles", UI_MENU_FILE_QUAKELIVE, CVAR_ARCHIVE },
+{ &ui_menuFlow, "ui_menuFlow", "1", CVAR_ARCHIVE },
+{ &ui_globalpreset, "ui_globalpreset", "0", CVAR_ARCHIVE },
+{ &ui_screenDamage_Team_preset, "ui_screenDamage_Team_preset", "0", CVAR_ARCHIVE },
+{ &ui_screenDamage_preset, "ui_screenDamage_preset", "0", CVAR_ARCHIVE },
+{ &ui_browserAwesomium, "ui_browserAwesomium", "1", CVAR_TEMP },
 	{ &ui_currentTier, "ui_currentTier", "0", CVAR_ARCHIVE },
 	{ &ui_currentMap, "ui_currentMap", "0", CVAR_ARCHIVE },
 	{ &ui_currentNetMap, "ui_currentNetMap", "0", CVAR_ARCHIVE },

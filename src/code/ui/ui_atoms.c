@@ -569,52 +569,51 @@ qboolean UI_ConsoleCommand( int realTime ) {
 	uiInfo.uiDC.frameTime = realTime - uiInfo.uiDC.realTime;
 	uiInfo.uiDC.realTime = realTime;
 
-        cmd = UI_Argv( 0 );
+	cmd = UI_Argv( 0 );
 
-        // ensure minimum menu data is available
-        //Menu_Cache();
+	// ensure minimum menu data is available
+	//Menu_Cache();
 
-        if ( Q_stricmp(cmd, "web_showBrowser") == 0 ) {
-                if (!UI_BrowserOverlayAvailable()) {
-                        Com_Printf("UI: browser overlay unavailable; using legacy menus instead.\n");
-                        if (!UI_UsingLegacyMenuFlow()) {
-                                UI_ApplyMenuFlowChange(UI_MENU_FLOW_LEGACY, qtrue);
-                        }
-                        return qtrue;
-                }
-                return qfalse;
-        }
+	if ( Q_stricmp(cmd, "web_showBrowser") == 0 ) {
+		if (!UI_BrowserOverlayAvailable()) {
+			Com_Printf("UI: browser overlay unavailable; browser overlay hooks are inert.\n");
+			return qfalse;
+		}
 
-        if ( Q_stricmp(cmd, "ui_useLegacyMenus") == 0 || Q_stricmp(cmd, "ui_emergencyLegacyMenus") == 0 ) {
-                UI_ApplyMenuFlowChange(UI_MENU_FLOW_LEGACY, qtrue);
-                return qtrue;
-        }
+		UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qfalse);
+		return qfalse;
+	}
 
-        if ( Q_stricmp(cmd, "ui_useQuakeLiveMenus") == 0 ) {
-                if (!UI_BrowserOverlayAvailable()) {
-                        Com_Printf("UI: browser overlay unavailable; cannot enable web-driven menus.\n");
-                        return qtrue;
-                }
-                UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qtrue);
-                return qtrue;
-        }
+	if ( Q_stricmp(cmd, "ui_useLegacyMenus") == 0 || Q_stricmp(cmd, "ui_emergencyLegacyMenus") == 0 ) {
+		UI_ApplyMenuFlowChange(UI_MENU_FLOW_LEGACY, qtrue);
+		return qtrue;
+	}
 
-        if ( Q_stricmp(cmd, "ui_toggleMenuFlow") == 0 ) {
-                if (UI_UsingLegacyMenuFlow()) {
-                        if (!UI_BrowserOverlayAvailable()) {
-                                Com_Printf("UI: browser overlay unavailable; staying on legacy menus.\n");
-                                return qtrue;
-                        }
-                        UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qtrue);
-                } else {
-                        UI_ApplyMenuFlowChange(UI_MENU_FLOW_LEGACY, qtrue);
-                }
-                return qtrue;
-        }
+	if ( Q_stricmp(cmd, "ui_useQuakeLiveMenus") == 0 ) {
+		if (!UI_BrowserOverlayAvailable()) {
+			Com_Printf("UI: browser overlay unavailable; cannot enable web-driven menus.\n");
+			return qtrue;
+		}
+		UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qtrue);
+		return qtrue;
+	}
 
-        if ( Q_stricmp (cmd, "ui_test") == 0 ) {
-                UI_ShowPostGame(qtrue);
-        }
+	if ( Q_stricmp(cmd, "ui_toggleMenuFlow") == 0 ) {
+		if (UI_UsingLegacyMenuFlow()) {
+			if (!UI_BrowserOverlayAvailable()) {
+				Com_Printf("UI: browser overlay unavailable; staying on legacy menus.\n");
+				return qtrue;
+			}
+			UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qtrue);
+		} else {
+			UI_ApplyMenuFlowChange(UI_MENU_FLOW_LEGACY, qtrue);
+		}
+		return qtrue;
+	}
+
+	if ( Q_stricmp (cmd, "ui_test") == 0 ) {
+		UI_ShowPostGame(qtrue);
+	}
 
 	if ( Q_stricmp (cmd, "ui_report") == 0 ) {
 		UI_Report();

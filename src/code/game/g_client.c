@@ -26,6 +26,59 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/platform/platform_config.h"
 #include <limits.h>
 
+
+/*
+=============
+G_ParseRatingScaleValue
+
+Converts a userinfo token into a rating scale fallback value.
+=============
+*/
+static float G_ParseRatingScaleValue( const char *value ) {
+	float	scale;
+
+	if ( !value || !value[0] ) {
+		return 1.0f;
+	}
+
+	scale = (float)atof( value );
+	if ( scale <= 0.0f ) {
+		return 1.0f;
+	}
+
+	return scale;
+}
+
+/*
+=============
+	G_LoadClientRatingMetadata
+
+Refreshes the cached rating metadata for the supplied client.
+=============
+*/
+static void G_LoadClientRatingMetadata( gclient_t *client, const char *userinfo ) {
+	const char	*damageScale;
+	const char	*scoreScale;
+
+	if ( !client ) {
+		return;
+	}
+
+	if ( !userinfo ) {
+		client->pers.ratingDamageScale = 1.0f;
+		client->pers.ratingScoreScale = 1.0f;
+		client->pers.ratingMetadataLoaded = qfalse;
+		return;
+	}
+
+	damageScale = Info_ValueForKey( userinfo, "rating_damage" );
+	scoreScale = Info_ValueForKey( userinfo, "rating_score" );
+
+	client->pers.ratingDamageScale = G_ParseRatingScaleValue( damageScale );
+	client->pers.ratingScoreScale = G_ParseRatingScaleValue( scoreScale );
+	client->pers.ratingMetadataLoaded = qtrue;
+}
+
 /*
 =============
 G_FreezeClientEndFrame
@@ -1126,6 +1179,8 @@ void ClientUserinfoChanged( int clientNum ) {
 		strcpy( userinfo, "\\name\\badinfo" );
 	}
 
+	G_LoadClientRatingMetadata( client, userinfo );
+
 	// check for local client
 	s = Info_ValueForKey( userinfo, "ip" );
 	if ( !strcmp( s, "localhost" ) ) {
@@ -1348,6 +1403,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	gentity_t	*ent;
 
 	ent = &g_entities[ clientNum ];
+	ent->r.svFlags &= ~SVF_BOT;
 
 	trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 
@@ -1382,6 +1438,9 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 	client->pers.connected = CON_CONNECTING;
 	client->pers.killCommandTime = -1;
+	client->pers.ratingDamageScale = 1.0f;
+	client->pers.ratingScoreScale = 1.0f;
+	client->pers.ratingMetadataLoaded = qfalse;
 	G_InitClientVoteThrottle( client );
 
 	// read or initialize the session data
@@ -1408,6 +1467,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 	// get and distribute relevent paramters
 	G_LogPrintf( "ClientConnect: %i\n", clientNum );
+	G_LogPrintf( "ClientMask: %i %s\n", clientNum, ( ent->r.svFlags & SVF_BOT ) ? "bot" : "human" );
 	ClientUserinfoChanged( clientNum );
 
 	// don't do the "xxx connected" messages if they were caried over from previous level
@@ -2066,6 +2126,14 @@ void ClientSpawn(gentity_t *ent) {
 	// clear entity values
 	client->ps.stats[STAT_MAX_HEALTH] = client->pers.maxHealth;
 	client->ps.eFlags = flags;
+
+	if ( client->pers.ratingDamageScale <= 0.0f ) {
+		client->pers.ratingDamageScale = 1.0f;
+	}
+	if ( client->pers.ratingScoreScale <= 0.0f ) {
+		client->pers.ratingScoreScale = 1.0f;
+	}
+	G_SetClientRatingModifiers( client, client->pers.ratingDamageScale, client->pers.ratingScoreScale );
 
 	ent->s.groundEntityNum = ENTITYNUM_NONE;
 	ent->client = &level.clients[index];

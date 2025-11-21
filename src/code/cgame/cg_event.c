@@ -109,6 +109,75 @@ const char	*CG_PlaceString( int rank ) {
 	return str;
 }
 
+
+/*
+=============
+CG_StartScoreboardTimer
+
+Begins tracking the scoreboard stopwatch so draw calls can format timer fields.
+=============
+*/
+void CG_StartScoreboardTimer( int startTime ) {
+	if ( cg.scoreboardTimerRunning ) {
+		return;
+	}
+
+	cg.scoreboardTimerRunning = qtrue;
+	cg.scoreboardTimerStartTime = ( startTime > 0 ) ? startTime : cg.time;
+	cg.scoreboardTimerStopTime = 0;
+}
+
+/*
+=============
+CG_StopScoreboardTimer
+
+Stops the scoreboard stopwatch and records the most recent checkpoint.
+=============
+*/
+void CG_StopScoreboardTimer( int stopTime ) {
+	int		anchor;
+
+	if ( !cg.scoreboardTimerRunning ) {
+		return;
+	}
+
+	anchor = ( stopTime > 0 ) ? stopTime : cg.time;
+	if ( anchor < cg.scoreboardTimerStartTime ) {
+		anchor = cg.scoreboardTimerStartTime;
+	}
+
+	cg.scoreboardTimerStopTime = anchor;
+	cg.scoreboardTimerRunning = qfalse;
+}
+
+/*
+=============
+CG_GetScoreboardTimerSeconds
+
+Returns the stopwatch value in seconds for scoreboard formatting hooks.
+=============
+*/
+int CG_GetScoreboardTimerSeconds( void ) {
+	int		endTime;
+	int		elapsed;
+
+	if ( cg.scoreboardTimerStartTime <= 0 ) {
+		return 0;
+	}
+
+	endTime = cg.scoreboardTimerRunning ? cg.time : cg.scoreboardTimerStopTime;
+	if ( endTime < cg.scoreboardTimerStartTime ) {
+		return 0;
+	}
+
+	elapsed = endTime - cg.scoreboardTimerStartTime;
+	if ( elapsed < 0 ) {
+		return 0;
+	}
+
+	return ( elapsed + 500 ) / 1000;
+}
+
 /*
 =============
 CG_TryFollowKiller

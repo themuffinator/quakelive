@@ -1856,6 +1856,7 @@ Selects the appropriate scoreboard implementation for the current HUD mode.
 */
 static qboolean CG_DrawActiveScoreboard( qboolean menuHudActive, qboolean forceDisplay ) {
 	qboolean	requested;
+	qboolean	drawn;
 
 	requested = forceDisplay;
 	if ( !requested ) {
@@ -1866,14 +1867,23 @@ static qboolean CG_DrawActiveScoreboard( qboolean menuHudActive, qboolean forceD
 	}
 
 	if ( !requested ) {
+		CG_StopScoreboardTimer( cg.time );
 		return qfalse;
 	}
 
+	CG_StartScoreboardTimer( cg.time );
+
 	if ( cg_useLegacyHud.integer ) {
-		return CG_DrawOldScoreboard();
+		drawn = CG_DrawOldScoreboard();
+	} else {
+		drawn = CG_DrawScoreboard();
 	}
 
-	return CG_DrawScoreboard();
+	if ( !drawn ) {
+		CG_StopScoreboardTimer( cg.time );
+	}
+
+	return drawn;
 }
 
 /*

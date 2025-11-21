@@ -1144,6 +1144,12 @@ static void CG_ParseForcedCosmetics( void ) {
 	} else if ( !forceHud && previousHud ) {
 		CG_Printf( "Server cleared forced HUD training widgets.\n" );
 	}
+
+	if ( forceDamage && !previousDamage ) {
+		CG_Printf( "Server forced damage through surfaces.\n" );
+	} else if ( !forceDamage && previousDamage ) {
+		CG_Printf( "Server restored default surface damage rules.\n" );
+	}
 }
 
 /*

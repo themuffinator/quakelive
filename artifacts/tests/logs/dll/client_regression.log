@@ -1,18 +1,64 @@
-Client regression harness generated HUD hashes.
+Client regression harness generated HUD hashes for captured scenarios.
 [
   {
-    "sequence": 1,
-    "serverTime": 1000,
-    "hash": "db0c582635b0d000b8d8cc623979b0f556776ff168c4baf9717f6f2802632a11"
+    "scenario": "hud_baseline",
+    "archive": "tools/tests/client_regression/sample_snapshots.json",
+    "metadata": {
+      "description": "Synthetic capture used for regression harness tests",
+      "map": "qzdm6"
+    },
+    "frameCount": 3,
+    "hashes": [
+      "db0c582635b0d000b8d8cc623979b0f556776ff168c4baf9717f6f2802632a11",
+      "638c3a5679231de7caf143f388431effe769e912152bbd56f75a019ee5ab0e56",
+      "fc456828d2c7d69712cee52bec1faa968bf274d60442ca33ef7f412badd2d1de"
+    ]
   },
   {
-    "sequence": 2,
-    "serverTime": 1016,
-    "hash": "638c3a5679231de7caf143f388431effe769e912152bbd56f75a019ee5ab0e56"
+    "scenario": "resource_drain",
+    "archive": "tools/tests/client_regression/resource_drain_snapshots.json",
+    "metadata": {
+      "description": "Sustained fight with attrition and recovery",
+      "map": "qzpractice1"
+    },
+    "frameCount": 5,
+    "hashes": [
+      "36e4b60a34bf875d6b457ee4db3cd806be8b9efa5208314ba8d0d4d21cd0d630",
+      "dfe4acd3d186ad813f469da5a267c538289a6faa5c0542766bafa69736004101",
+      "503a6129457b9fae4ae216d262037a6e3b559bdbe5b714180164d26af4b59664",
+      "f50331e421913018229f3c6bbf140f48347162d8a2bac38d24ef00b7d0e1e4eb",
+      "abcf77c69e98c7792800435c09229ea664e912cde7376742e11ddcb4f614b94c"
+    ]
   },
   {
-    "sequence": 3,
-    "serverTime": 1032,
-    "hash": "fc456828d2c7d69712cee52bec1faa968bf274d60442ca33ef7f412badd2d1de"
+    "scenario": "server_correction",
+    "archive": "tools/tests/client_regression/server_correction_snapshots.json",
+    "metadata": {
+      "description": "Server override applied after aggressive movement",
+      "map": "qzdm6"
+    },
+    "frameCount": 5,
+    "hashes": [
+      "b8f8c3a4ee5da098cb9742ee0ea7d223031a028a501be204cbf04addfeeaa9ea",
+      "88169c344538663fe617fff5f766e93a9861da1c17189a07d14a868205ee1e6d",
+      "e79954ecd8b60788ba3f29caf923f9a305421434975c9649d031db1dbc931357",
+      "eb79d52ca2a24dd508f66a0a538b68b13e2e5e42df845222c7e66cfc8151d9e5",
+      "b03c5b2c6821be17da30c244636ddc65ed2f4d6b5df0004130a9d768ac7e314f"
+    ]
+  },
+  {
+    "scenario": "weapons_and_items",
+    "archive": "tools/tests/client_regression/weapons_and_items_snapshots.json",
+    "metadata": {
+      "description": "Weapon cycling with mixed pickups and attrition",
+      "map": "qztourney7"
+    },
+    "frameCount": 4,
+    "hashes": [
+      "50cc3bf0beb765c921b9cc3975cc611356ead31c522ffa9510963d3468ebf28d",
+      "d50a4ede5b09d25864802265283488288b5227f8f5fa53e32eba76e3f8224ef3",
+      "b0d4bc9d00594d0e65346d309f2cec2733a6d8d80c2801576f836f50378d3af1",
+      "822dc1c14922b22b10010c58e9356d09fc37455599208f1509d5e02cff22db98"
+    ]
   }
 ]

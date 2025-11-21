@@ -3102,14 +3102,14 @@ void CG_LoadMenus(const char *menuFile) {
 
 	start = trap_Milliseconds();
 
-	len = trap_FS_FOpenFile( menuFile, &f, FS_READ );
-	if ( !f ) {
-		trap_Error( va( S_COLOR_YELLOW "menu file not found: %s, using default\n", menuFile ) );
-		len = trap_FS_FOpenFile( "ui/hud.txt", &f, FS_READ );
-		if (!f) {
-			trap_Error( va( S_COLOR_RED "default menu file not found: ui/hud.txt, unable to continue!\n", menuFile ) );
-		}
-	}
+        len = trap_FS_FOpenFile( menuFile, &f, FS_READ );
+        if ( !f ) {
+                trap_Error( va( S_COLOR_YELLOW "menu file not found: %s, using default\n", menuFile ) );
+                len = trap_FS_FOpenFile( CG_LEGACY_HUD_FILE, &f, FS_READ );
+                if (!f) {
+                        trap_Error( va( S_COLOR_RED "default menu file not found: %s, unable to continue!\n", CG_LEGACY_HUD_FILE ) );
+                }
+        }
 
 	if ( len >= MAX_MENUDEFFILE ) {
 		trap_Error( va( S_COLOR_RED "menu file too large: %s is %i, max allowed is %i", menuFile, len, MAX_MENUDEFFILE ) );
@@ -3120,7 +3120,7 @@ void CG_LoadMenus(const char *menuFile) {
 	trap_FS_Read( buf, len, f );
 	buf[len] = 0;
 	trap_FS_FCloseFile( f );
-	
+
 	COM_Compress(buf);
 
 	Menu_Reset();
@@ -3350,25 +3350,90 @@ static void CG_FeederSelection(float feederID, int index) {
 
 static float CG_Cvar_Get(const char *cvar) {
 	char buff[128];
-	memset(buff, 0, sizeof(buff));
-	trap_Cvar_VariableStringBuffer(cvar, buff, sizeof(buff));
-	return atof(buff);
+
+	memset( buff, 0, sizeof( buff ) );
+	trap_Cvar_VariableStringBuffer( cvar, buff, sizeof( buff ) );
+	return atof( buff );
 }
 
 void CG_Text_PaintWithCursor(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style) {
-	CG_Text_Paint(x, y, scale, color, text, 0, limit, style);
+	CG_Text_Paint( x, y, scale, color, text, 0, limit, style );
+}
+
+/*
+=============
+CG_LevelTimerWidth
+
+Returns the width of the level timer string for layout calculations.
+=============
+*/
+static int CG_LevelTimerWidth( float scale ) {
+	char buffer[32];
+	int msec;
+	int seconds;
+
+	msec = cg.time - cgs.levelStartTime;
+	if ( msec < 0 ) {
+	msec = 0;
+	}
+
+	seconds = msec / 1000;
+	Com_sprintf( buffer, sizeof( buffer ), "%02i:%02i", seconds / 60, seconds % 60 );
+
+	return CG_Text_Width( buffer, scale, 0 );
+}
+
+/*
+=============
+CG_RoundLabelWidth
+
+Returns the width of the current match state label.
+=============
+*/
+static int CG_RoundLabelWidth( float scale ) {
+	char buffer[32];
+	const char *label;
+
+	if ( cgs.matchTimeoutActive ) {
+	label = "Timeout";
+	} else if ( cgs.matchOvertimeActive ) {
+	label = "Overtime";
+	} else if ( cg.snap && cg.snap->ps.pm_type == PM_INTERMISSION ) {
+	label = "Intermission";
+	} else if ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) {
+	label = "Warmup";
+	} else if ( cgs.matchRoundState == ROUNDSTATE_COMPLETE ) {
+	label = "Round complete";
+	} else if ( cgs.matchRoundNumber > 0 ) {
+	Com_sprintf( buffer, sizeof( buffer ), "Round %i", cgs.matchRoundNumber );
+	label = buffer;
+	} else {
+	label = "In progress";
+	}
+
+	return CG_Text_Width( label, scale, 0 );
 }
 
 static int CG_OwnerDrawWidth(int ownerDraw, float scale) {
 	switch ( ownerDraw ) {
 	case CG_GAME_TYPE:
-		return CG_Text_Width(CG_GameTypeString(), scale, 0);
+		return CG_Text_Width( CG_GameTypeString(), scale, 0 );
 	case CG_GAME_STATUS:
-		return CG_Text_Width(CG_GetGameStatusText(), scale, 0);
+		return CG_Text_Width( CG_GetGameStatusText(), scale, 0 );
 		break;
 	case CG_KILLER:
-		return CG_Text_Width(CG_GetKillerText(), scale, 0);
+		return CG_Text_Width( CG_GetKillerText(), scale, 0 );
 		break;
+	case CG_LEVELTIMER:
+	case CG_ROUNDTIMER:
+		return CG_LevelTimerWidth( scale );
+	case CG_OVERTIME:
+		return ( cg.timelimitWarnings & 4 ) ? CG_Text_Width( "OVERTIME", scale, 0 ) : 0;
+	case CG_ROUND:
+		return CG_RoundLabelWidth( scale );
+	case CG_HEALTH_COLORIZED:
+	case CG_1ST_PLYR_HEALTH_ARMOR:
+		return CG_Text_Width( "000 / 000", scale, 0 );
 	case CG_RACE_STATUS:
 		return CG_Text_Width( CG_GetRaceStatusText(), scale, 0 );
 	case CG_RACE_TIMES: {
@@ -3380,12 +3445,13 @@ static int CG_OwnerDrawWidth(int ownerDraw, float scale) {
 		return width;
 	}
 	case CG_RED_NAME:
-		return CG_Text_Width(cg_redTeamName.string, scale, 0);
+		return CG_Text_Width( cg_redTeamName.string, scale, 0 );
 		break;
 	case CG_BLUE_NAME:
-		return CG_Text_Width(cg_blueTeamName.string, scale, 0);
+		return CG_Text_Width( cg_blueTeamName.string, scale, 0 );
 		break;
 	}
+
 	return 0;
 }
 
@@ -3398,12 +3464,119 @@ static void CG_StopCinematic(int handle) {
 }
 
 static void CG_DrawCinematic(int handle, float x, float y, float w, float h) {
-  trap_CIN_SetExtents(handle, x, y, w, h);
-  trap_CIN_DrawCinematic(handle);
+	trap_CIN_SetExtents(handle, x, y, w, h);
+	trap_CIN_DrawCinematic(handle);
 }
 
 static void CG_RunCinematicFrame(int handle) {
-  trap_CIN_RunCinematic(handle);
+	trap_CIN_RunCinematic(handle);
+}
+
+static const char *cgScoreTextureNames[] = {
+	"ui/assets/score/adbr.tga",
+	"ui/assets/score/adtl.tga",
+	"ui/assets/score/adtm.tga",
+	"ui/assets/score/adtr.tga",
+	"ui/assets/score/arrow.tga",
+	"ui/assets/score/arrowgray.tga",
+	"ui/assets/score/bg_tabmenu.tga",
+	"ui/assets/score/bgfill.tga",
+	"ui/assets/score/bgfill_blue.tga",
+	"ui/assets/score/bgfill_red.tga",
+	"ui/assets/score/blue_team_player_bar.tga",
+	"ui/assets/score/btn.tga",
+	"ui/assets/score/ca_score_blu.tga",
+	"ui/assets/score/ca_score_red.tga",
+	"ui/assets/score/dom_score_blu.tga",
+	"ui/assets/score/dom_score_red.tga",
+	"ui/assets/score/flagb.tga",
+	"ui/assets/score/flagr.tga",
+	"ui/assets/score/frame_bl.tga",
+	"ui/assets/score/frame_bottom.tga",
+	"ui/assets/score/frame_br.tga",
+	"ui/assets/score/frame_left.tga",
+	"ui/assets/score/frame_mid.tga",
+	"ui/assets/score/frame_right.tga",
+	"ui/assets/score/frameb.tga",
+	"ui/assets/score/framebl.tga",
+	"ui/assets/score/framebr.tga",
+	"ui/assets/score/framel.tga",
+	"ui/assets/score/framem.tga",
+	"ui/assets/score/framer.tga",
+	"ui/assets/score/framet.tga",
+	"ui/assets/score/frametl.tga",
+	"ui/assets/score/frametr.tga",
+	"ui/assets/score/gradientbar2.tga",
+	"ui/assets/score/gtbox.tga",
+	"ui/assets/score/ink_fade_left.tga",
+	"ui/assets/score/ink_fade_right.tga",
+	"ui/assets/score/logo2.tga",
+	"ui/assets/score/medal_assist_sm.tga",
+	"ui/assets/score/medal_capture_sm.tga",
+	"ui/assets/score/medal_defend_sm.tga",
+	"ui/assets/score/navbarl.tga",
+	"ui/assets/score/navbarm.tga",
+	"ui/assets/score/navbarr.tga",
+	"ui/assets/score/navfriends.tga",
+	"ui/assets/score/navleft.tga",
+	"ui/assets/score/navright.tga",
+	"ui/assets/score/not_ready.tga",
+	"ui/assets/score/ping.tga",
+	"ui/assets/score/red_team_player_bar.tga",
+	"ui/assets/score/rr_remaining_enemy.tga",
+	"ui/assets/score/rr_remaining_team.tga",
+	"ui/assets/score/sb_borderangle.tga",
+	"ui/assets/score/sb_borderend.tga",
+	"ui/assets/score/sb_borderline.tga",
+	"ui/assets/score/sb_borderstart.tga",
+	"ui/assets/score/scoreb.tga",
+	"ui/assets/score/scorebl.tga",
+	"ui/assets/score/scorebox.tga",
+	"ui/assets/score/scorebox_blue.tga",
+	"ui/assets/score/scorebox_follow.tga",
+	"ui/assets/score/scorebox_red.tga",
+	"ui/assets/score/scorebox_spec.tga",
+	"ui/assets/score/scorebr.tga",
+	"ui/assets/score/scorel.tga",
+	"ui/assets/score/scorem.tga",
+	"ui/assets/score/scorer.tga",
+	"ui/assets/score/scoretl.tga",
+	"ui/assets/score/scoretl2.tga",
+	"ui/assets/score/scoretl2_blue.tga",
+	"ui/assets/score/scoretl2_red.tga",
+	"ui/assets/score/scoretl3.tga",
+	"ui/assets/score/scoretl_blue.tga",
+	"ui/assets/score/scoretl_red.tga",
+	"ui/assets/score/scoretm.tga",
+	"ui/assets/score/scoretm3.tga",
+	"ui/assets/score/scoretr.tga",
+	"ui/assets/score/scoretr3.tga",
+	"ui/assets/score/specl.tga",
+	"ui/assets/score/specm.tga",
+	"ui/assets/score/specr.tga",
+	"ui/assets/score/statsfilll.tga",
+	"ui/assets/score/statsfillm.tga",
+	"ui/assets/score/statsfillr.tga",
+	"ui/assets/score/statsl.tga",
+	"ui/assets/score/statsm.tga",
+	"ui/assets/score/statsr.tga",
+	"ui/assets/score/votecast_backlit.tga"
+};
+
+/*
+=============
+CG_RegisterScoreTextures
+
+Registers the HUD score asset pack used by Quake Live menu scripts.
+=============
+*/
+static void CG_RegisterScoreTextures( void ) {
+	int index;
+	int count = sizeof( cgScoreTextureNames ) / sizeof( cgScoreTextureNames[0] );
+
+	for ( index = 0; index < count; index++ ) {
+		trap_R_RegisterShaderNoMip( cgScoreTextureNames[index] );
+	}
 }
 
 /*
@@ -3499,15 +3672,15 @@ void CG_LoadHudMenu() {
 	cgDC.stopCinematic = &CG_StopCinematic;
 	cgDC.drawCinematic = &CG_DrawCinematic;
 	cgDC.runCinematicFrame = &CG_RunCinematicFrame;
-	
+
 	Init_Display(&cgDC);
 
 	Menu_Reset();
-	
+
 	trap_Cvar_VariableStringBuffer("cg_hudFiles", buff, sizeof(buff));
 	hudSet = buff;
 	if (hudSet[0] == '\0') {
-		hudSet = "ui/hud.txt";
+		hudSet = CG_DEFAULT_HUD_FILE;
 	}
 
 	cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );
@@ -3551,6 +3724,8 @@ void CG_AssetCache() {
 	cgDC.Assets.scrollBarThumb = trap_R_RegisterShaderNoMip( ASSET_SCROLL_THUMB );
 	cgDC.Assets.sliderBar = trap_R_RegisterShaderNoMip( ASSET_SLIDER_BAR );
 	cgDC.Assets.sliderThumb = trap_R_RegisterShaderNoMip( ASSET_SLIDER_THUMB );
+
+	CG_RegisterScoreTextures();
 }
 /*
 =================
