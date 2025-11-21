@@ -3120,7 +3120,7 @@ void CG_LoadMenus(const char *menuFile) {
 	trap_FS_Read( buf, len, f );
 	buf[len] = 0;
 	trap_FS_FCloseFile( f );
-	
+
 	COM_Compress(buf);
 
 	Menu_Reset();
@@ -3350,25 +3350,90 @@ static void CG_FeederSelection(float feederID, int index) {
 
 static float CG_Cvar_Get(const char *cvar) {
 	char buff[128];
-	memset(buff, 0, sizeof(buff));
-	trap_Cvar_VariableStringBuffer(cvar, buff, sizeof(buff));
-	return atof(buff);
+
+	memset( buff, 0, sizeof( buff ) );
+	trap_Cvar_VariableStringBuffer( cvar, buff, sizeof( buff ) );
+	return atof( buff );
 }
 
 void CG_Text_PaintWithCursor(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style) {
-	CG_Text_Paint(x, y, scale, color, text, 0, limit, style);
+	CG_Text_Paint( x, y, scale, color, text, 0, limit, style );
+}
+
+/*
+=============
+CG_LevelTimerWidth
+
+Returns the width of the level timer string for layout calculations.
+=============
+*/
+static int CG_LevelTimerWidth( float scale ) {
+	char buffer[32];
+	int msec;
+	int seconds;
+
+	msec = cg.time - cgs.levelStartTime;
+	if ( msec < 0 ) {
+	msec = 0;
+	}
+
+	seconds = msec / 1000;
+	Com_sprintf( buffer, sizeof( buffer ), "%02i:%02i", seconds / 60, seconds % 60 );
+
+	return CG_Text_Width( buffer, scale, 0 );
+}
+
+/*
+=============
+CG_RoundLabelWidth
+
+Returns the width of the current match state label.
+=============
+*/
+static int CG_RoundLabelWidth( float scale ) {
+	char buffer[32];
+	const char *label;
+
+	if ( cgs.matchTimeoutActive ) {
+	label = "Timeout";
+	} else if ( cgs.matchOvertimeActive ) {
+	label = "Overtime";
+	} else if ( cg.snap && cg.snap->ps.pm_type == PM_INTERMISSION ) {
+	label = "Intermission";
+	} else if ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) {
+	label = "Warmup";
+	} else if ( cgs.matchRoundState == ROUNDSTATE_COMPLETE ) {
+	label = "Round complete";
+	} else if ( cgs.matchRoundNumber > 0 ) {
+	Com_sprintf( buffer, sizeof( buffer ), "Round %i", cgs.matchRoundNumber );
+	label = buffer;
+	} else {
+	label = "In progress";
+	}
+
+	return CG_Text_Width( label, scale, 0 );
 }
 
 static int CG_OwnerDrawWidth(int ownerDraw, float scale) {
 	switch ( ownerDraw ) {
 	case CG_GAME_TYPE:
-		return CG_Text_Width(CG_GameTypeString(), scale, 0);
+		return CG_Text_Width( CG_GameTypeString(), scale, 0 );
 	case CG_GAME_STATUS:
-		return CG_Text_Width(CG_GetGameStatusText(), scale, 0);
+		return CG_Text_Width( CG_GetGameStatusText(), scale, 0 );
 		break;
 	case CG_KILLER:
-		return CG_Text_Width(CG_GetKillerText(), scale, 0);
+		return CG_Text_Width( CG_GetKillerText(), scale, 0 );
 		break;
+	case CG_LEVELTIMER:
+	case CG_ROUNDTIMER:
+		return CG_LevelTimerWidth( scale );
+	case CG_OVERTIME:
+		return ( cg.timelimitWarnings & 4 ) ? CG_Text_Width( "OVERTIME", scale, 0 ) : 0;
+	case CG_ROUND:
+		return CG_RoundLabelWidth( scale );
+	case CG_HEALTH_COLORIZED:
+	case CG_1ST_PLYR_HEALTH_ARMOR:
+		return CG_Text_Width( "000 / 000", scale, 0 );
 	case CG_RACE_STATUS:
 		return CG_Text_Width( CG_GetRaceStatusText(), scale, 0 );
 	case CG_RACE_TIMES: {
@@ -3380,12 +3445,13 @@ static int CG_OwnerDrawWidth(int ownerDraw, float scale) {
 		return width;
 	}
 	case CG_RED_NAME:
-		return CG_Text_Width(cg_redTeamName.string, scale, 0);
+		return CG_Text_Width( cg_redTeamName.string, scale, 0 );
 		break;
 	case CG_BLUE_NAME:
-		return CG_Text_Width(cg_blueTeamName.string, scale, 0);
+		return CG_Text_Width( cg_blueTeamName.string, scale, 0 );
 		break;
 	}
+
 	return 0;
 }
 
@@ -3606,11 +3672,11 @@ void CG_LoadHudMenu() {
 	cgDC.stopCinematic = &CG_StopCinematic;
 	cgDC.drawCinematic = &CG_DrawCinematic;
 	cgDC.runCinematicFrame = &CG_RunCinematicFrame;
-	
+
 	Init_Display(&cgDC);
 
 	Menu_Reset();
-	
+
 	trap_Cvar_VariableStringBuffer("cg_hudFiles", buff, sizeof(buff));
 	hudSet = buff;
 	if (hudSet[0] == '\0') {

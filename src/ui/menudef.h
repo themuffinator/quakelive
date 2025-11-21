@@ -204,6 +204,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	CG_MATCH_END_CONDITION				9						
 #define	CG_MATCH_STATUS						10		// Game State - Scores message				
 #define	CG_CAPFRAGLIMIT						11						
+// Quake Live HUD match clock ownerdraws
 #define	CG_LEVELTIMER						12						
 // Quake Live round state ownerdraw IDs
 #define	CG_ROUND							13						
