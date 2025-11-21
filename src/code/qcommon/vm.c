@@ -39,6 +39,10 @@ and one exported function: Perform
 vm_t	*currentVM = NULL; // bk001212
 vm_t	*lastVM    = NULL; // bk001212
 int		vm_debugLevel;
+static cvar_t	*vm_trace;
+
+static fileHandle_t vmTraceHandle;
+static qboolean vmTraceOpenAttempted;
 
 #define	MAX_VM		3
 vm_t	vmTable[MAX_VM];
@@ -59,6 +63,91 @@ void VM_Debug( int level ) {
 }
 
 /*
+=============
+VM_OpenTraceLog
+
+Opens the trace log lazily when tracing is enabled.
+=============
+*/
+static fileHandle_t VM_OpenTraceLog( void ) {
+	fileHandle_t handle;
+
+	if ( vmTraceHandle ) {
+		return vmTraceHandle;
+	}
+
+	if ( vmTraceOpenAttempted ) {
+		return 0;
+	}
+
+	vmTraceOpenAttempted = qtrue;
+	handle = FS_FOpenFileAppend( "vm_trace.log" );
+	if ( handle <= 0 ) {
+		vmTraceOpenAttempted = qfalse;
+		return 0;
+	}
+
+	vmTraceHandle = handle;
+	return vmTraceHandle;
+}
+
+/*
+=============
+VM_CloseTraceLog
+
+Closes the active trace log handle when tracing completes.
+=============
+*/
+static void VM_CloseTraceLog( void ) {
+	if ( vmTraceHandle ) {
+		FS_FCloseFile( vmTraceHandle );
+		vmTraceHandle = 0;
+	}
+
+	vmTraceOpenAttempted = qfalse;
+}
+
+/*
+=============
+VM_LogTraceEvent
+
+Writes a formatted line to the trace log when vm_trace is enabled.
+=============
+*/
+static void VM_LogTraceEvent( const char *fmt, ... ) {
+	fileHandle_t handle;
+	char buffer[1024];
+	va_list args;
+	int length;
+
+	if ( !vm_trace || !vm_trace->integer ) {
+		return;
+	}
+
+	handle = VM_OpenTraceLog();
+	if ( !handle ) {
+		return;
+	}
+
+	va_start( args, fmt );
+	length = Q_vsnprintf( buffer, sizeof( buffer ), fmt, args );
+	va_end( args );
+
+	if ( length < 0 ) {
+		VM_CloseTraceLog();
+		return;
+	}
+
+	if ( length >= sizeof( buffer ) ) {
+		length = sizeof( buffer ) - 1;
+	}
+	buffer[length++] = '\n';
+
+	FS_Write( buffer, length, handle );
+	VM_CloseTraceLog();
+}
+
+/*
 ==============
 VM_Init
 ==============
@@ -67,6 +156,9 @@ void VM_Init( void ) {
 	Cvar_Get( "vm_cgame", "2", CVAR_ARCHIVE );	// !@# SHIP WITH SET TO 2
 	Cvar_Get( "vm_game", "2", CVAR_ARCHIVE );	// !@# SHIP WITH SET TO 2
 	Cvar_Get( "vm_ui", "2", CVAR_ARCHIVE );		// !@# SHIP WITH SET TO 2
+	vm_trace = Cvar_Get( "vm_trace", "0", CVAR_TEMP );
+	vmTraceHandle = 0;
+	vmTraceOpenAttempted = qfalse;
 
 	Cmd_AddCommand ("vmprofile", VM_VmProfile_f );
 	Cmd_AddCommand ("vminfo", VM_VmInfo_f );
@@ -494,6 +586,7 @@ vm_t *VM_Create( const char *module, int (*systemCalls)(int *),
 		Com_Printf( "Loading dll file %s.\n", vm->name );
 		vm->dllHandle = Sys_LoadDll( module, vm->fqpath , &vm->entryPoint, VM_DllSyscall );
 		if ( vm->dllHandle ) {
+			VM_LogTraceEvent( "create %s native %s", module, vm->fqpath );
 			return vm;
 		}
 
@@ -507,6 +600,7 @@ vm_t *VM_Create( const char *module, int (*systemCalls)(int *),
 	length = FS_ReadFile( filename, (void **)&header );
 	if ( !header ) {
 		Com_Printf( "Failed.\n" );
+		VM_LogTraceEvent( "create %s failed qvm", module );
 		VM_Free( vm );
 		return NULL;
 	}
@@ -571,6 +665,7 @@ vm_t *VM_Create( const char *module, int (*systemCalls)(int *),
 	vm->stackBottom = vm->programStack - STACK_SIZE;
 
 	Com_Printf("%s loaded in %d bytes on the hunk\n", module, remaining - Hunk_MemoryRemaining());
+	VM_LogTraceEvent( "create %s %s", module, vm->dllHandle ? "native" : ( vm->compiled ? "compiled" : "interpreted" ) );
 
 	return vm;
 }
@@ -581,6 +676,7 @@ VM_Free
 ==============
 */
 void VM_Free( vm_t *vm ) {
+	VM_LogTraceEvent( "free %s", vm->name );
 
 	if ( vm->dllHandle ) {
 		Sys_UnloadDll( vm->dllHandle );
@@ -691,6 +787,7 @@ int	QDECL VM_Call( vm_t *vm, int callnum, ... ) {
 	oldVM = currentVM;
 	currentVM = vm;
 	lastVM = vm;
+	VM_LogTraceEvent( "call %s %i", vm->name, callnum );
 
 	if ( vm_debugLevel ) {
 	  Com_Printf( "VM_Call( %i )\n", callnum );

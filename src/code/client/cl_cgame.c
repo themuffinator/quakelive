@@ -728,6 +728,32 @@ int CL_CgameSystemCalls( int *args ) {
 
 /*
 ====================
+CL_LoadCGameVM
+
+Attempts to load the cgame VM, preferring a native module when present.
+====================
+*/
+static vm_t *CL_LoadCGameVM( vmInterpret_t interpret ) {
+	vm_t	*vm;
+
+	vm = NULL;
+
+	if ( interpret != VMI_COMPILED ) {
+		vm = VM_Create( "cgame", CL_CgameSystemCalls, VMI_NATIVE );
+		if ( vm ) {
+			if ( vm->dllHandle || interpret != VMI_BYTECODE || !vm->compiled ) {
+				return vm;
+			}
+			VM_Free( vm );
+			vm = NULL;
+		}
+	}
+
+	return VM_Create( "cgame", CL_CgameSystemCalls, interpret );
+}
+
+/*
+====================
 CL_InitCGame
 
 Should only be called by CL_StartHunkUsers
@@ -757,7 +783,7 @@ void CL_InitCGame( void ) {
 	else {
 		interpret = Cvar_VariableValue( "vm_cgame" );
 	}
-	cgvm = VM_Create( "cgame", CL_CgameSystemCalls, interpret );
+	cgvm = CL_LoadCGameVM( interpret );
 	if ( !cgvm ) {
 		Com_Error( ERR_DROP, "VM_Create on cgame failed" );
 	}

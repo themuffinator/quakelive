@@ -573,6 +573,27 @@ int SV_GameSystemCalls( int *args ) {
 		return SV_GetClientSteamId( args[1], (uint32_t *)VMA(2), (uint32_t *)VMA(3) );
 	case G_STEAM_AUTH_VALIDATE:
 		return SV_VerifyClientSteamAuth( args[1] );
+	case G_RANK_BEGIN:
+		SV_RankBegin( VMA(1) );
+		return 0;
+	case G_RANK_POLL:
+		SV_RankPoll();
+		return 0;
+	case G_RANK_CHECK_INIT:
+		return SV_RankCheckInit();
+	case G_RANK_ACTIVE:
+		return SV_RankActive();
+	case G_RANK_USER_STATUS:
+		return SV_RankUserStatus( args[1] );
+	case G_RANK_USER_RESET:
+		SV_RankUserReset( args[1] );
+		return 0;
+	case G_RANK_REPORT_INT:
+		SV_RankReportInt( args[1], args[2], args[3], args[4], args[5] );
+		return 0;
+	case G_RANK_REPORT_STR:
+		SV_RankReportStr( args[1], args[2], args[3], VMA(4) );
+		return 0;
 	case G_ADJUST_AREA_PORTAL_STATE:
 		SV_AdjustAreaPortalState( VMA(1), args[2] );
 		return 0;
@@ -1093,6 +1114,32 @@ void SV_RestartGameProgs( void ) {
 
 
 /*
+=============
+SV_LoadGameModule
+
+Attempts to load the game VM, preferring a native module when present.
+=============
+*/
+static vm_t *SV_LoadGameModule( vmInterpret_t interpret ) {
+	vm_t	*vm;
+
+	vm = NULL;
+
+	if ( interpret != VMI_COMPILED ) {
+		vm = VM_Create( "qagame", SV_GameSystemCalls, VMI_NATIVE );
+		if ( vm ) {
+			if ( vm->dllHandle || interpret != VMI_BYTECODE || !vm->compiled ) {
+				return vm;
+			}
+			VM_Free( vm );
+			vm = NULL;
+		}
+	}
+
+	return VM_Create( "qagame", SV_GameSystemCalls, interpret );
+}
+
+/*
 ===============
 SV_InitGameProgs
 
@@ -1101,6 +1148,7 @@ Called on a normal map change, not on a map_restart
 */
 void SV_InitGameProgs( void ) {
 	cvar_t	*var;
+	vmInterpret_t interpret;
 	//FIXME these are temp while I make bots run in vm
 	extern int	bot_enable;
 
@@ -1113,7 +1161,8 @@ void SV_InitGameProgs( void ) {
 	}
 
 	// load the dll or bytecode
-	gvm = VM_Create( "qagame", SV_GameSystemCalls, Cvar_VariableValue( "vm_game" ) );
+	interpret = Cvar_VariableValue( "vm_game" );
+	gvm = SV_LoadGameModule( interpret );
 	if ( !gvm ) {
 		Com_Error( ERR_FATAL, "VM_Create on game failed" );
 	}
