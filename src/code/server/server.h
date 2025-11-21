@@ -140,6 +140,7 @@ typedef struct client_s {
 	char			lastClientCommandString[MAX_STRING_CHARS];
 	sharedEntity_t	*gentity;			// SV_GentityNum(clientnum)
 	char			name[MAX_NAME_LENGTH];			// extracted from userinfo, high bits masked
+	qboolean		isBot;
 #if SV_HAS_PLATFORM_AUTH
 	qboolean		platformAuthPending;
 	qboolean		platformAuthSucceeded;

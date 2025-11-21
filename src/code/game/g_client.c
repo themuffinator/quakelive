@@ -1403,6 +1403,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	gentity_t	*ent;
 
 	ent = &g_entities[ clientNum ];
+	ent->r.svFlags &= ~SVF_BOT;
 
 	trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 
@@ -1466,6 +1467,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 	// get and distribute relevent paramters
 	G_LogPrintf( "ClientConnect: %i\n", clientNum );
+	G_LogPrintf( "ClientMask: %i %s\n", clientNum, ( ent->r.svFlags & SVF_BOT ) ? "bot" : "human" );
 	ClientUserinfoChanged( clientNum );
 
 	// don't do the "xxx connected" messages if they were caried over from previous level

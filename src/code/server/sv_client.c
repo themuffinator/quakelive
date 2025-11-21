@@ -550,7 +550,7 @@ void SV_DirectConnect( netadr_t from ) {
 	cl->reliableAcknowledge = 0;
 	cl->reliableSequence = 0;
 
-gotnewcl:	
+gotnewcl:
 	// build a new connection
 	// accept the new client
 	// this is the only place a client_t is ever initialized
@@ -558,9 +558,11 @@ gotnewcl:
 	clientNum = newcl - svs.clients;
 	ent = SV_GentityNum( clientNum );
 	newcl->gentity = ent;
+	newcl->isBot = qfalse;
 
 	// save the challenge
 	newcl->challenge = challenge;
+
 
 	// save the address
 	Netchan_Setup (NS_SERVER, &newcl->netchan , from, qport);

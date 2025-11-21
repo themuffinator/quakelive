@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import copy
 import ctypes
+import difflib
 import hashlib
 import os
 import subprocess
@@ -450,6 +451,42 @@ def _summarise_scoreboard_hashes(frames: Iterable[object]) -> str:
 def _read_expectation(name: str) -> str:
     expectation_path = REPO_ROOT / "tests" / "expectations" / name
     return expectation_path.read_text(encoding="utf-8").strip()
+
+
+def test_bot_connect_log_diff_records_mask(tmp_path: Path) -> None:
+    """Connection logs should surface bot masking differences."""
+
+    config = load_config(SCENARIO)
+    bot_names = [bot.name for bot in config.bots[:2]]
+
+    human_logs = _simulate_client_connect_logs(bot_names, [False, True])
+    bot_logs = _simulate_client_connect_logs(bot_names, [True, True])
+
+    diff = "\n".join(
+        difflib.unified_diff(
+            human_logs, bot_logs, fromfile="human", tofile="bot", lineterm=""
+        )
+    )
+    expected = _read_expectation("bot_masking_logs.expect")
+    if diff.strip() != expected.strip():
+        output_path = tmp_path / "bot_masking_logs.actual"
+        output_path.write_text(diff, encoding="utf-8")
+        pytest.fail(
+            "Bot masking log diff diverged from expectation. "
+            f"Captured diff written to {output_path}"
+        )
+
+
+def _simulate_client_connect_logs(names: Iterable[str], mask_states: Iterable[bool]) -> list[str]:
+    """Build a log transcript mirroring ClientConnect mask prints."""
+
+    transcript: list[str] = []
+    for client_num, (name, is_bot) in enumerate(zip(names, mask_states)):
+        transcript.append(f"ClientConnect: {client_num}")
+        mask = "bot" if is_bot else "human"
+        transcript.append(f"ClientMask: {client_num} {mask}")
+        transcript.append(f"{name}^7 connected")
+    return transcript
 
 
 def test_factory_item_flags_control_drop_behaviour(tmp_path: Path) -> None:

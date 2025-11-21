@@ -1,0 +1,9 @@
+--- human
++++ bot
+@@ -1,5 +1,5 @@
+ ClientConnect: 0
+-ClientMask: 0 human
++ClientMask: 0 bot
+ sarge^7 connected
+ ClientConnect: 1
+ ClientMask: 1 bot

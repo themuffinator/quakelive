@@ -723,7 +723,7 @@ qboolean SV_CheckPaused( void ) {
 	// only pause if there is just a single client connected
 	count = 0;
 	for (i=0,cl=svs.clients ; i < sv_maxclients->integer ; i++,cl++) {
-		if ( cl->state >= CS_CONNECTED && cl->netchan.remoteAddress.type != NA_BOT ) {
+		if ( cl->state >= CS_CONNECTED && !SV_ClientIsBot( cl ) ) {
 			count++;
 		}
 	}
