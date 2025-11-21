@@ -48,6 +48,12 @@
 - Next "Work on the plan" step: begin **Gameplay parity closure → Weapon balance deltas**.
 - Prepare supporting materials before coding: extract current constants from HLIL dumps, generate baseline demo captures, and line-item the ledger entry for quick updates.
 
+### Weapon balance deltas kickoff (2024-11-08)
+- [ ] **Reference diffing and ownership:** Re-diff Quake Live HLIL weapon constants against the current `bg_pmove.c`/`bg_misc.c` defaults to confirm the 2024-09-22 ledger snapshot is still accurate; tag Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) as approvers.
+- [ ] **Deterministic captures:** Regenerate rocket/rail/lightning scrim captures with the current reverse build and stash them under `artifacts/tests/weapon-balance-deltas.md`, noting command lines and seeds so QA can replay parity evidence.
+- [ ] **Ledger refresh:** If the diff or captures deviate, update `docs/gameplay/parity/parity-ledger.md` with before/after values and a new owner approval note; otherwise, record a "revalidated" timestamp tied to the refreshed captures.
+- [ ] **Harness/CI follow-up:** Add a deterministic weapon timing runner (reload/refire/ammo pickup) to the existing test harness matrix and wire it into CI artifacts so future deltas block on parity regressions.
+
 ## Update protocol
 - Leave the date and a short note when ticking an item; include links to the relevant MR/commit and any updated parity evidence (logs, captures).
 - When asked to "Work on the plan", pick the next unchecked top-level item above and break it into actionable PR-ready tasks before implementation.
