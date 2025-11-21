@@ -30,6 +30,7 @@ SCENARIOS: dict[str, Path] = {
     "ctf_flag_cvars": SCENARIO_ROOT / "ctf_flag_cvars.json",
     "clanarena_shuffle": SCENARIO_ROOT / "clanarena_shuffle.json",
     "duel_cvars": SCENARIO_ROOT / "duel_cvars.json",
+    "ruleset_pql": SCENARIO_ROOT / "ruleset_pql.json",
     "damage_timeline": SCENARIO_ROOT / "damage_timeline.json",
 }
 DEFAULT_SCENARIO = SCENARIOS["duel"]
@@ -87,6 +88,8 @@ def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict
                 "frame_count": len(result.frames),
                 "duration_seconds": result.frames[-1].time if result.frames else 0.0,
                 "bots": sorted(result.frames[0].bots.keys()) if result.frames else [],
+                "metadata": result.config.metadata,
+                "ruleset": result.config.metadata.get("ruleset"),
             }
         )
 

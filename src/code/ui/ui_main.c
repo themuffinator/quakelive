@@ -1290,6 +1290,7 @@ void UI_Load() {
 	UI_ParseGameInfo("gameinfo.txt");
 	UI_LoadMapRotations();
 	UI_LoadArenas();
+	UI_LoadRulesets();
 #endif
 
         UI_LoadMenus(menuSet, qtrue);

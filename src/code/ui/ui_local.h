@@ -375,6 +375,7 @@ int UI_AdjustTimeByGame(int time);
 void UI_ShowPostGame(qboolean newHigh);
 void UI_ClearScores();
 void UI_LoadArenas(void);
+void UI_LoadRulesets( void );
 
 //
 // ui_menu.c
@@ -653,6 +654,7 @@ typedef struct {
 #define MAX_DEMOS 256
 #define MAX_MOVIES 256
 #define MAX_PLAYERMODELS 256
+#define MAX_RULESETS 8
 
 
 typedef struct {
@@ -706,6 +708,11 @@ typedef struct {
 	char		factoryGameType[MAX_MAP_ROTATION_TOKEN];
 	int		mapIndex;
 } mapRotationInfo_t;
+
+typedef struct {
+	char		name[MAX_TOKEN_CHARS];
+	char		description[MAX_STRING_CHARS];
+} rulesetInfo_t;
 
 typedef struct {
 	const char *tierName;
@@ -888,6 +895,10 @@ typedef struct {
 	int mapRotationCount;
 	mapRotationInfo_t mapRotations[MAX_MAP_ROTATIONS];
 	int currentMapRotation;
+	int rulesetCount;
+	int rulesetIndex;
+	rulesetInfo_t rulesets[MAX_RULESETS];
+	char activeRuleset[MAX_CVAR_VALUE_STRING];
 
 
 	int tierCount;

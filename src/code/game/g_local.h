@@ -276,6 +276,7 @@ extern vmCvar_t g_botSpawnList;
 extern vmCvar_t g_accessFile;
 extern vmCvar_t g_factoryTitle;
 extern vmCvar_t g_factory;
+extern vmCvar_t g_ruleset;
 extern vmCvar_t g_disableLoadout;
 extern vmCvar_t g_dropInactive;
 extern vmCvar_t g_allowCustomHeadmodels;
@@ -926,6 +927,7 @@ typedef struct {
 	qboolean		spawnQueueActive;
 	qboolean		matchAllowItemDrops;
 	qboolean		matchAllowItemBounce;
+	char			rulesetName[MAX_CVAR_VALUE_STRING];
 	adminConfig_t	adminConfig;
 	int			adminAccessEntryCount;
 	adminAccessEntry_t	adminAccessList[MAX_ADMIN_ACCESS_ENTRIES];

@@ -1,0 +1,26 @@
+{
+  "map": "focal_point",
+  "duration": 2.0,
+  "tick_rate": 10,
+  "seed": 9001,
+  "metadata": {
+    "description": "Ruleset propagation sanity check",
+    "ruleset": "pql"
+  },
+  "bots": [
+    {
+      "name": "sarge",
+      "team": "red",
+      "spawn": {"position": [0, 0, 64]},
+      "initial_state": {
+        "health": 100,
+        "ammo": {"machinegun": 50},
+        "inventory": {"gauntlet": 1}
+      },
+      "script": [
+        {"time": 0.0, "action": "look", "params": {"direction": [1, 0, 0]}},
+        {"time": 0.5, "action": "move", "params": {"direction": [0, 1, 0], "speed": 320}}
+      ]
+    }
+  ]
+}
