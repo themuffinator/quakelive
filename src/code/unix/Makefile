@@ -82,7 +82,7 @@ DLL_ONLY=false
 # is explicitly requested.
 QL_BUILD_STEAMWORKS ?= 0
 QL_ENABLE_OGG ?= 1
-ifeq ($(origin QL_BUILD_OPEN_STEAM)), undefined
+ifeq ($(origin QL_BUILD_OPEN_STEAM), undefined)
   ifeq ($(QL_BUILD_STEAMWORKS),1)
     QL_BUILD_OPEN_STEAM := 0
   else
@@ -1072,8 +1072,8 @@ $(B)/baseq3/vm/cgame.qvm:
 	mv /tmp/quake3/baseq3/vm/cgame.qvm $@
 
 $(B)/baseq3/vm/qagame.qvm:
-cd $(GDIR) && ./game.sh
-mv /tmp/quake3/baseq3/vm/qagame.qvm $@
+	cd $(GDIR) && ./game.sh
+	mv /tmp/quake3/baseq3/vm/qagame.qvm $@
 
 $(B)/missionpack/vm/cgame.qvm:
 	cd $(CGDIR) && ./cgame_ta.sh

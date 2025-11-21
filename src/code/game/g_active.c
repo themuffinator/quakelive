@@ -1353,6 +1353,8 @@ G_Frame_BeginRoundWarmup
 Transitions the round controller into the warmup state.
 =============
 */
+static void G_FreezeScheduleWarmupDelay( void );
+static void G_FreezeResetClientsForRound( qboolean warmup );
 void G_Frame_BeginRoundWarmup( void ) {
 	level.roundState = ROUNDSTATE_WARMUP;
 	level.roundTransitionTime = ROUND_TRANSITION_NONE;
