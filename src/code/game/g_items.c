@@ -114,6 +114,158 @@ static qboolean G_MatchFactoryBounceAllowed( void ) {
 
 /*
 =============
+G_ItemFactorySpawnAllowed
+
+Returns qtrue when the active factory configuration allows an item of the
+specified class to spawn or be picked up.
+=============
+*/
+static qboolean G_ItemFactorySpawnAllowed( const gitem_t *item ) {
+	if ( !item ) {
+		return qfalse;
+	}
+
+	switch ( item->giType ) {
+	case IT_WEAPON:
+		return g_factoryCvarConfig.spawnItemWeapons ? qtrue : qfalse;
+	case IT_POWERUP:
+		return g_factoryCvarConfig.spawnItemPowerup ? qtrue : qfalse;
+	case IT_HOLDABLE:
+		return g_factoryCvarConfig.spawnItemHoldable ? qtrue : qfalse;
+	case IT_HEALTH:
+		return g_factoryCvarConfig.spawnItemHealth ? qtrue : qfalse;
+	case IT_ARMOR:
+		return g_factoryCvarConfig.spawnItemArmor ? qtrue : qfalse;
+	case IT_AMMO:
+		return g_factoryCvarConfig.spawnItemAmmo ? qtrue : qfalse;
+	default:
+		return qtrue;
+	}
+}
+
+/*
+=============
+G_GetItemUnlockTier
+
+Resolves the unlock tier linked to the provided item. A return value of
+ITEM_UNLOCK_TIER_NONE indicates that no unlock is required.
+=============
+*/
+static int G_GetItemUnlockTier( const gitem_t *item ) {
+	if ( !item ) {
+		return ITEM_UNLOCK_TIER_NONE;
+	}
+
+	if ( item->giType == IT_WEAPON ) {
+		switch ( item->giTag ) {
+		case WP_SHOTGUN:
+			return 0;
+		case WP_GAUNTLET:
+			return 1;
+		case WP_MACHINEGUN:
+			return 2;
+		case WP_GRENADE_LAUNCHER:
+			return 3;
+		case WP_ROCKET_LAUNCHER:
+			return 4;
+		case WP_PLASMAGUN:
+			return 5;
+		case WP_RAILGUN:
+			return 6;
+		case WP_LIGHTNING:
+			return 7;
+		case WP_BFG:
+			return 8;
+		case WP_NAILGUN:
+			return 9;
+		case WP_CHAINGUN:
+			return 0x0A;
+		case WP_PROX_LAUNCHER:
+			return 0x0B;
+		case WP_GRAPPLING_HOOK:
+			return 0x0E;
+		case WP_HEAVY_MACHINEGUN:
+			return 0x0F;
+		default:
+			return ITEM_UNLOCK_TIER_NONE;
+		}
+	}
+
+	if ( item->giType == IT_HOLDABLE && item->giTag == HI_KAMIKAZE ) {
+		return 0x0C;
+	}
+
+	return ITEM_UNLOCK_TIER_NONE;
+}
+
+/*
+=============
+G_ClientMeetsItemUnlock
+
+Checks whether the supplied client satisfies the unlock tier requirements
+associated with an item.
+=============
+*/
+static qboolean G_ClientMeetsItemUnlock( const gclient_t *client, const gitem_t *item ) {
+	int		unlockTier;
+	unsigned int	unlockFlag;
+
+	unlockTier = G_GetItemUnlockTier( item );
+	if ( unlockTier >= ITEM_UNLOCK_TIER_NONE ) {
+		return qtrue;
+	}
+
+	if ( !client ) {
+		return qfalse;
+	}
+
+	unlockFlag = ( unlockTier < 32 ) ? ITEM_PROGRESSION_FLAG( unlockTier ) : 0;
+	if ( client->pers.progressionFlags & unlockFlag ) {
+		return qtrue;
+	}
+
+	if ( client->pers.itemProgressionTier >= unlockTier ) {
+		return qtrue;
+	}
+
+	if ( client->pers.itemProgressionTier + 1 >= unlockTier ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+	G_UpdateClientItemUnlockProgress
+
+Raises the client's unlock tier and flags after a gated item has been
+successfully collected.
+=============
+*/
+static void G_UpdateClientItemUnlockProgress( gclient_t *client, const gitem_t *item ) {
+	int		unlockTier;
+
+	if ( !client ) {
+		return;
+	}
+
+	unlockTier = G_GetItemUnlockTier( item );
+	if ( unlockTier >= ITEM_UNLOCK_TIER_NONE || unlockTier < 0 ) {
+		return;
+	}
+
+	if ( unlockTier > client->pers.itemProgressionTier ) {
+		client->pers.itemProgressionTier = unlockTier;
+	}
+
+	if ( unlockTier < 32 ) {
+		client->pers.progressionFlags |= ITEM_PROGRESSION_FLAG( unlockTier );
+	}
+}
+
+/*
+=============
 G_BuildItemTossVelocity
 
 Constructs the base toss velocity for dropped and launched items.
@@ -874,6 +1026,15 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	if (other->health < 1)
 		return;		// dead people can't pickup
 
+	if ( !G_ItemFactorySpawnAllowed( ent->item ) ) {
+		return;
+	}
+
+	if ( !G_ClientMeetsItemUnlock( other->client, ent->item ) ) {
+		other->client->ps.persistant[PERS_PLAYEREVENTS] ^= PLAYEREVENT_DENIEDREWARD;
+		return;
+	}
+
 	// the same pickup rules are used for client side and server side
 	if ( !BG_CanItemBeGrabbed( g_gametype.integer, level.time, &ent->s, &other->client->ps ) ) {
 		return;
@@ -922,6 +1083,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	if ( !respawn ) {
 		return;
 	}
+	G_UpdateClientItemUnlockProgress( other->client, ent->item );
 
 	// play the normal pickup sound
 	if (predict) {
@@ -1156,6 +1318,10 @@ free fall from their spawn points
 void FinishSpawningItem( gentity_t *ent ) {
 	trace_t		tr;
 	vec3_t		dest;
+	if ( !G_ItemFactorySpawnAllowed( ent->item ) ) {
+		G_FreeEntity( ent );
+		return;
+	}
 
 	VectorSet( ent->r.mins, -ITEM_RADIUS, -ITEM_RADIUS, -ITEM_RADIUS );
 	VectorSet( ent->r.maxs, ITEM_RADIUS, ITEM_RADIUS, ITEM_RADIUS );
@@ -1386,6 +1552,10 @@ void G_SpawnItem (gentity_t *ent, gitem_t *item) {
 	RegisterItem( item );
 	if ( G_ItemDisabled(item) )
 		return;
+
+	if ( !G_ItemFactorySpawnAllowed( item ) ) {
+		return;
+	}
 
 	ent->item = item;
 	// some movers spawn on the second frame, so delay item

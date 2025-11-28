@@ -68,6 +68,8 @@ static void G_LoadClientRatingMetadata( gclient_t *client, const char *userinfo 
 		client->pers.ratingDamageScale = 1.0f;
 		client->pers.ratingScoreScale = 1.0f;
 		client->pers.ratingMetadataLoaded = qfalse;
+	client->pers.itemProgressionTier = ( g_training.integer != 0 ) ? 0 : ITEM_UNLOCK_TIER_NONE;
+	client->pers.progressionFlags = 0;
 		return;
 	}
 
@@ -1442,6 +1444,8 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	client->pers.ratingDamageScale = 1.0f;
 	client->pers.ratingScoreScale = 1.0f;
 	client->pers.ratingMetadataLoaded = qfalse;
+	client->pers.itemProgressionTier = ( g_training.integer != 0 ) ? 0 : ITEM_UNLOCK_TIER_NONE;
+	client->pers.progressionFlags = 0;
 	G_InitClientVoteThrottle( client );
 
 	// read or initialize the session data

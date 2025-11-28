@@ -683,6 +683,9 @@ typedef struct {
 #define MAX_NETNAME			36
 #define	MAX_VOTE_COUNT		3
 #define	VOTE_THROTTLE_MSEC	0x8CA
+#define ITEM_UNLOCK_TIER_NONE	0x10
+#define ITEM_PROGRESSION_FLAG( tier )\
+	( 1u << (tier) )
 
 // client data that stays across multiple respawns, but is cleared
 // on each level change or team change at ClientBegin()
@@ -707,6 +710,8 @@ typedef struct {
 	float		ratingDamageScale;
 	float		ratingScoreScale;
 	qboolean	ratingMetadataLoaded;
+	int			itemProgressionTier;
+	unsigned int	progressionFlags;
 } clientPersistant_t;
 
 
