@@ -97,6 +97,7 @@ jobs:
             ${{ env.ARTIFACT_ROOT }}/logs/${{ matrix.target }}/**/*.log
             ${{ env.ARTIFACT_ROOT }}/match_sim/${{ matrix.target }}/**/*.json
             ${{ env.ARTIFACT_ROOT }}/client_regression/${{ matrix.target }}/**/*.json
+            ${{ env.ARTIFACT_ROOT }}/weapon_baselines/${{ matrix.target }}/**/*.json
             ${{ env.ARTIFACT_ROOT }}/trace/${{ matrix.target }}/**/*.log
             ${{ env.ARTIFACT_ROOT }}/trace/${{ matrix.target }}/**/*.diff
           if-no-files-found: warn

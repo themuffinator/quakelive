@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -53,6 +54,7 @@ class HarnessBundleResult:
     artifact_root: Path
     match_summaries: list[dict[str, object]]
     client_regression_entries: list[dict[str, object]]
+    weapon_baseline: dict[str, object]
     trace_result: TraceHarnessResult | None = None
 
     def match_timeline_path(self, slug: str) -> Path:
@@ -72,6 +74,162 @@ class HarnessBundleResult:
 def _write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _normalize_weapon_label(label: str) -> str:
+    slug = label.strip().lower().replace(" ", "_")
+    aliases = {
+        "lightning": "lightning_gun",
+        "lg": "lightning_gun",
+        "prox_launcher": "proximity_launcher",
+        "proximity_mine_launcher": "proximity_launcher",
+    }
+
+    return aliases.get(slug, slug)
+
+
+def _parse_markdown_table(md_path: Path, header: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    lines = md_path.read_text(encoding="utf-8").splitlines()
+
+    try:
+        start = lines.index(header)
+    except ValueError as exc:  # pragma: no cover - defensive guard for CI debugging
+        raise ValueError(f"Missing table header {header} in {md_path}") from exc
+
+    headers: list[str] = []
+    for offset, line in enumerate(lines[start + 1 :], start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if not stripped.startswith("|"):
+            if headers:
+                break
+            continue
+
+        cells = [cell.strip() for cell in stripped.strip("|").split("|") if cell.strip()]
+        if not headers:
+            headers = cells
+            continue
+
+        if all(cell.startswith("-") for cell in cells):
+            continue
+        if len(headers) != len(cells):
+            continue
+
+        rows.append(dict(zip(headers, cells)))
+
+    return rows
+
+
+def _reference_weapon_constants(md_path: Path) -> dict[str, dict[str, int]]:
+    reload_table = _parse_markdown_table(md_path, "## Weapon Reload Times")
+    ammo_table = _parse_markdown_table(md_path, "## Ammo Pickup / Max Stack")
+
+    reloads = {
+        _normalize_weapon_label(entry["Weapon"]): int(entry["Reload (ms)"])
+        for entry in reload_table
+    }
+    ammo_pickups: dict[str, int] = {}
+    ammo_max: dict[str, int] = {}
+    for entry in ammo_table:
+        weapon = _normalize_weapon_label(entry["Weapon"])
+        ammo_pickups[weapon] = int(entry["Pickup Qty"])
+        ammo_max[weapon] = int(entry["Max Stack"])
+
+    return {
+        "reload_ms": reloads,
+        "pickup": ammo_pickups,
+        "max_stack": ammo_max,
+    }
+
+
+def _extract_default_reload_times(source: Path) -> dict[str, int]:
+    pattern = re.compile(r"\[\s*WP_([A-Z0-9_]+)\s*\]\s*=\s*([0-9-]+)")
+    matches = pattern.finditer(source.read_text(encoding="utf-8"))
+    reloads = {
+        _normalize_weapon_label(match.group(1)): int(match.group(2))
+        for match in matches
+        if match.group(1) not in {"NONE", "NUM_WEAPONS"}
+    }
+
+    return reloads
+
+
+def _extract_weapon_stat_table(source: Path) -> dict[str, dict[str, int]]:
+    pattern = re.compile(r"\{\s*WP_([A-Z0-9_]+)\s*,\s*([0-9-]+)\s*,\s*([0-9-]+)")
+    stats = {}
+    for match in pattern.finditer(source.read_text(encoding="utf-8")):
+        weapon = _normalize_weapon_label(match.group(1))
+        stats[weapon] = {"pickup": int(match.group(2)), "max_stack": int(match.group(3))}
+
+    return stats
+
+
+def _collect_weapon_defaults() -> dict[str, dict[str, int]]:
+    reloads = _extract_default_reload_times(REPO_ROOT / "src" / "code" / "game" / "bg_pmove.c")
+    stats = _extract_weapon_stat_table(REPO_ROOT / "src" / "code" / "game" / "bg_misc.c")
+
+    pickups = {weapon: values["pickup"] for weapon, values in stats.items()}
+    max_stacks = {weapon: values["max_stack"] for weapon, values in stats.items()}
+
+    return {
+        "reload_ms": reloads,
+        "pickup": pickups,
+        "max_stack": max_stacks,
+    }
+
+
+def _diff_weapon_constants(
+    reference: dict[str, dict[str, int]], defaults: dict[str, dict[str, int]]
+) -> dict[str, list[dict[str, object]]]:
+    mismatches: dict[str, list[dict[str, object]]] = {"reload_ms": [], "pickup": [], "max_stack": []}
+
+    for weapon, expected in reference["reload_ms"].items():
+        observed = defaults["reload_ms"].get(weapon)
+        if observed != expected:
+            mismatches["reload_ms"].append({"weapon": weapon, "expected": expected, "observed": observed})
+
+    for bucket in ("pickup", "max_stack"):
+        for weapon, expected in reference[bucket].items():
+            observed = defaults[bucket].get(weapon)
+            if observed != expected:
+                mismatches[bucket].append({"weapon": weapon, "expected": expected, "observed": observed})
+
+    return mismatches
+
+
+def _run_weapon_baseline_harness(target: str, artifact_root: Path) -> dict[str, object]:
+    reference = _reference_weapon_constants(
+        REPO_ROOT / "references" / "hlil" / "quakelive" / "qagamex86.dll_split" / "bg_pmove.md"
+    )
+    defaults = _collect_weapon_defaults()
+    mismatches = _diff_weapon_constants(reference, defaults)
+
+    payload = {
+        "reference": reference,
+        "defaults": defaults,
+        "mismatches": mismatches,
+    }
+
+    baseline_path = artifact_root / "weapon_baselines" / target / "weapon_baselines.json"
+    _write_text(baseline_path, json.dumps(payload, indent=2) + "\n")
+
+    log_lines = [
+        "Weapon baseline harness completed successfully.",
+        f"Reference source: references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md",
+        f"Defaults source: src/code/game/bg_pmove.c + src/code/game/bg_misc.c",
+    ]
+    for category, entries in mismatches.items():
+        log_lines.append(f"{category} mismatches: {len(entries)}")
+        for entry in entries:
+            log_lines.append(f"  - {entry['weapon']}: expected {entry['expected']}, observed {entry['observed']}")
+
+    log_text = "\n".join(log_lines) + "\n"
+    log_path = artifact_root / "logs" / target / "weapon_baseline.log"
+    _write_text(log_path, log_text)
+
+    return payload
 
 
 def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict[str, object]]:
@@ -199,6 +357,7 @@ def run_harness_bundle(
 
     match_summaries = _run_match_harness(target, artifact_root, seed)
     client_entries = _run_client_harness(target, artifact_root)
+    weapon_baseline = _run_weapon_baseline_harness(target, artifact_root)
 
     trace_result: TraceHarnessResult | None = None
     if target == "re":
@@ -223,6 +382,7 @@ def run_harness_bundle(
         artifact_root=artifact_root,
         match_summaries=match_summaries,
         client_regression_entries=client_entries,
+        weapon_baseline=weapon_baseline,
         trace_result=trace_result,
     )
 
