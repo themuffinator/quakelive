@@ -1274,6 +1274,8 @@ void G_SetWorldspawnAtmosphere( const char *atmosphere );
 void ClientThink( int clientNum );
 void G_Frame_BeginRoundWarmup( void );
 void G_Frame_UpdateRoundController( void );
+void G_SetClientRatingModifiers( gclient_t *client, float damageScale, float scoreScale );
+void G_RefreshClientRatingModifiers( gclient_t *client );
 void ClientEndFrame( gentity_t *ent );
 void G_RunClient( gentity_t *ent );
 

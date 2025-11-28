@@ -1180,6 +1180,7 @@ void ClientUserinfoChanged( int clientNum ) {
 	}
 
 	G_LoadClientRatingMetadata( client, userinfo );
+	G_RefreshClientRatingModifiers( client );
 
 	// check for local client
 	s = Info_ValueForKey( userinfo, "ip" );
@@ -2127,13 +2128,7 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.stats[STAT_MAX_HEALTH] = client->pers.maxHealth;
 	client->ps.eFlags = flags;
 
-	if ( client->pers.ratingDamageScale <= 0.0f ) {
-		client->pers.ratingDamageScale = 1.0f;
-	}
-	if ( client->pers.ratingScoreScale <= 0.0f ) {
-		client->pers.ratingScoreScale = 1.0f;
-	}
-	G_SetClientRatingModifiers( client, client->pers.ratingDamageScale, client->pers.ratingScoreScale );
+	G_RefreshClientRatingModifiers( client );
 
 	ent->s.groundEntityNum = ENTITYNUM_NONE;
 	ent->client = &level.clients[index];
