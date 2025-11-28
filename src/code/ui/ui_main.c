@@ -160,14 +160,19 @@ vmCvar_t  ui_teamArenaFirstRun;
 vmCvar_t  ui_menuFlow;
 vmCvar_t  ui_browserAwesomium;
 
-static uiMenuFlow_t ui_activeMenuFlow = UI_MENU_FLOW_LEGACY;
+static uiMenuFlow_t ui_activeMenuFlow = UI_MENU_FLOW_QUAKELIVE;
 static qboolean ui_browserActiveKnown = qfalse;
 static qboolean ui_browserActiveState = qfalse;
 static const char *ui_browserRefreshCommand = "web_stopRefresh\n";
 
+/*
+=============
+UI_MenuFileEquals
+=============
+*/
 static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
-return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
-		}
+	return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
+}
 
 /*
 =============
@@ -191,33 +196,51 @@ static qboolean UI_MenuFileExists(const char *menuFile) {
 	}
 
 	return qfalse;
-		}
+}
 
+/*
+=============
+UI_BrowserOverlayAvailable
+
+Check whether the Awesomium overlay is enabled.
+=============
+*/
 qboolean UI_BrowserOverlayAvailable(void) {
-return ui_browserAwesomium.integer != 0;
-		}
+	return ui_browserAwesomium.integer != 0;
+}
 
+/*
+=============
+UI_RequestedMenuFlow
+
+Return the enforced Quake Live menu flow now that legacy scripts are retired.
+=============
+*/
 static uiMenuFlow_t UI_RequestedMenuFlow(void) {
-        return (ui_menuFlow.integer > 0) ? UI_MENU_FLOW_QUAKELIVE : UI_MENU_FLOW_LEGACY;
-		}
+return UI_MENU_FLOW_QUAKELIVE;
+}
 
+/*
+=============
+UI_ResolveMenuFlowInternal
+
+Resolve which menu flow should be active, preferring the browser overlay and
+falling back to bridge scripts when the overlay is unavailable.
+=============
+*/
 static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {
 	uiMenuFlow_t requested = UI_RequestedMenuFlow();
 
-	if (requested == UI_MENU_FLOW_QUAKELIVE) {
-		if (UI_BrowserOverlayAvailable()) {
-			return UI_MENU_FLOW_QUAKELIVE;
-		}
-
-		if (UI_BrowserBridgeAvailable()) {
-			return UI_MENU_FLOW_BRIDGED;
-		}
-
-		return UI_MENU_FLOW_LEGACY;
+	if (requested == UI_MENU_FLOW_QUAKELIVE && UI_BrowserOverlayAvailable()) {
+		return UI_MENU_FLOW_QUAKELIVE;
 	}
 
-	return requested;
-		}
+	if (UI_BrowserBridgeAvailable()) {
+		return UI_MENU_FLOW_BRIDGED;
+	}
+
+	return UI_MENU_FLOW_QUAKELIVE;
+}
 
 /*
 =============
@@ -234,121 +257,173 @@ static void UI_SetBrowserActive(qboolean active) {
 	ui_browserActiveState = active;
 	ui_browserActiveKnown = qtrue;
 	trap_Cmd_ExecuteText(EXEC_NOW, active ? "web_browserActive 1\n" : "web_browserActive 0\n");
-		}
+}
 
+/*
+=============
+UI_SetActiveMenuFlow
+
+Apply the resolved menu flow selection to runtime state.
+=============
+*/
 static void UI_SetActiveMenuFlow(uiMenuFlow_t flow) {
 	ui_activeMenuFlow = flow;
 	ui_new.integer = (flow != UI_MENU_FLOW_LEGACY);
 	UI_SetBrowserActive(flow == UI_MENU_FLOW_QUAKELIVE);
 	UI_BrowserBridge_SetActive(flow == UI_MENU_FLOW_BRIDGED);
-		}
+}
 
+/*
+=============
+UI_UsingLegacyMenuFlow
+
+Check whether the legacy menu flow flag is active.
+=============
+*/
 qboolean UI_UsingLegacyMenuFlow(void) {
 	return (ui_activeMenuFlow == UI_MENU_FLOW_LEGACY);
-		}
+}
 
+/*
+=============
+UI_ServerBrowserEnabled
+
+Determine if the native server browser should remain enabled.
+=============
+*/
 static qboolean UI_ServerBrowserEnabled(void) {
-	return (UI_UsingLegacyMenuFlow() || ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED);
-		}
+	return (ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED);
+}
 
+/*
+=============
+UI_UpdateActiveMenuFlowForFile
+
+Update the active menu flow based on which menu file set is being loaded.
+=============
+*/
 static void UI_UpdateActiveMenuFlowForFile(const char *menuFile) {
 	if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_QUAKELIVE)) {
 		UI_SetActiveMenuFlow(UI_MENU_FLOW_QUAKELIVE);
 	} else if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE_BRIDGE) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_QUAKELIVE_BRIDGE)) {
 		UI_SetActiveMenuFlow(UI_MENU_FLOW_BRIDGED);
-	} else if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_LEGACY) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_LEGACY)) {
-		UI_SetActiveMenuFlow(UI_MENU_FLOW_LEGACY);
 	}
-		}
+}
 
+/*
+=============
+UI_DefaultMenuFile
+
+Resolve the root menu definition file, preferring Quake Live scripts.
+=============
+*/
 const char *UI_DefaultMenuFile(void) {
 	const char *menuFile;
 
-	menuFile = UI_UsingLegacyMenuFlow() ? UI_MENU_FILE_LEGACY : UI_MENU_FILE_QUAKELIVE;
+	menuFile = (ui_activeMenuFlow == UI_MENU_FLOW_LEGACY) ? UI_MENU_FILE_LEGACY : UI_MENU_FILE_QUAKELIVE;
 	if (ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED) {
 		menuFile = UI_MENU_FILE_QUAKELIVE_BRIDGE;
 	}
 
-	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_MENU_FILE_LEGACY;
-		}
+	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_MENU_FILE_QUAKELIVE;
+}
 
+/*
+=============
+UI_DefaultIngameFile
+
+Resolve the in-game menu definition file, preferring Quake Live scripts.
+=============
+*/
 const char *UI_DefaultIngameFile(void) {
 	const char *menuFile;
 
-	menuFile = UI_UsingLegacyMenuFlow() ? UI_INGAME_FILE_LEGACY : UI_INGAME_FILE_QUAKELIVE;
+	menuFile = (ui_activeMenuFlow == UI_MENU_FLOW_LEGACY) ? UI_INGAME_FILE_LEGACY : UI_INGAME_FILE_QUAKELIVE;
 	if (ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED) {
 		menuFile = UI_INGAME_FILE_QUAKELIVE_BRIDGE;
 	}
 
-	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_INGAME_FILE_LEGACY;
-		}
+	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_INGAME_FILE_QUAKELIVE;
+}
 
+/*
+=============
+UI_UpdateActiveMenuFlow
+
+Refresh the menu flow state from the current runtime configuration.
+=============
+*/
 static void UI_UpdateActiveMenuFlow(void) {
 	UI_SetActiveMenuFlow(UI_ResolveMenuFlowInternal());
-		}
+}
 
+/*
+=============
+UI_ApplyMenuFlowChange
+/*
+=============
+UI_ApplyMenuFlowChange
+
+Apply a menu flow change and optionally reload the UI to pick up new defaults.
+=============
+*/
 void UI_ApplyMenuFlowChange(uiMenuFlow_t flow, qboolean reload) {
 	trap_Cvar_SetValue("ui_menuFlow", flow);
 	UI_UpdateActiveMenuFlow();
 	if (reload) {
 		UI_Load();
 	}
-		}
+}
 
-void _UI_Init( qboolean );
-void _UI_Shutdown( void );
 void _UI_KeyEvent( int key, qboolean down );
 void _UI_MouseEvent( int dx, int dy );
 void _UI_Refresh( int realtime );
 qboolean _UI_IsFullscreen( void );
 void UI_Load( void );
 int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11  ) {
-  switch ( command ) {
-	  case UI_GETAPIVERSION:
-		  return UI_API_VERSION;
+	switch ( command ) {
+	case UI_GETAPIVERSION:
+		return UI_API_VERSION;
 
-	  case UI_INIT:
-		  _UI_Init(arg0);
-		  return 0;
+	case UI_INIT:
+		_UI_Init(arg0);
+		return 0;
 
-	  case UI_SHUTDOWN:
-		  _UI_Shutdown();
-		  return 0;
+	case UI_SHUTDOWN:
+		_UI_Shutdown();
+		return 0;
 
-	  case UI_KEY_EVENT:
-		  _UI_KeyEvent( arg0, arg1 );
-		  return 0;
+	case UI_KEY_EVENT:
+		_UI_KeyEvent( arg0, arg1 );
+		return 0;
 
-	  case UI_MOUSE_EVENT:
-		  _UI_MouseEvent( arg0, arg1 );
-		  return 0;
+	case UI_MOUSE_EVENT:
+		_UI_MouseEvent( arg0, arg1 );
+		return 0;
 
-	  case UI_REFRESH:
-		  _UI_Refresh( arg0 );
-		  return 0;
+	case UI_REFRESH:
+		_UI_Refresh( arg0 );
+		return 0;
 
-	  case UI_IS_FULLSCREEN:
-		  return _UI_IsFullscreen();
+	case UI_IS_FULLSCREEN:
+		return _UI_IsFullscreen();
 
-	  case UI_SET_ACTIVE_MENU:
-		  _UI_SetActiveMenu( arg0 );
-		  return 0;
+	case UI_SET_ACTIVE_MENU:
+		_UI_SetActiveMenu( arg0 );
+		return 0;
 
-	  case UI_CONSOLE_COMMAND:
-		  return UI_ConsoleCommand(arg0);
+	case UI_CONSOLE_COMMAND:
+		return UI_ConsoleCommand(arg0);
 
-	  case UI_DRAW_CONNECT_SCREEN:
-		  UI_DrawConnectScreen( arg0 );
-		  return 0;
-	  case UI_HASUNIQUECDKEY: // mod authors need to observe this
-	    return qtrue; // bk010117 - change this to qfalse for mods!
-
-	}
+	case UI_DRAW_CONNECT_SCREEN:
+		UI_DrawConnectScreen( arg0 );
+		return 0;
+	case UI_HASUNIQUECDKEY: // mod authors need to observe this
+		return qtrue; // bk010117 - change this to qfalse for mods!
+}
 
 	return -1;
-		}
-
-
+}
 
 static const char *const uiQLTextureNames[] = {
 	"ui/assets/3_cursor3",
@@ -1266,10 +1341,15 @@ qboolean Load_Menu(int handle) {
 	return qfalse;
 		}
 
+/*
+=============
+UI_LoadMenus
+=============
+*/
 void UI_LoadMenus(const char *menuFile, qboolean reset) {
-        pc_token_t token;
-        int handle;
-        int start;
+pc_token_t token;
+int handle;
+int start;
 
 	start = trap_Milliseconds();
 
@@ -1299,8 +1379,8 @@ void UI_LoadMenus(const char *menuFile, qboolean reset) {
 	UI_BrowserBridge_SetActive(ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED);
 
 	if (reset) {
-                Menu_Reset();
-        }
+		Menu_Reset();
+	}
 
 	while ( 1 ) {
 		if (!trap_PC_ReadToken(handle, &token))
@@ -1327,19 +1407,28 @@ void UI_LoadMenus(const char *menuFile, qboolean reset) {
 	trap_PC_FreeSource( handle );
 		}
 
-void UI_Load() {
-        char lastName[1024];
-        menuDef_t *menu = Menu_GetFocused();
-        const char *menuSet = UI_Cvar_VariableString("ui_menuFiles");
-        if (menu && menu->window.name) {
-                strcpy(lastName, menu->window.name);
-        }
-        UI_UpdateActiveMenuFlow();
-        if (menuSet == NULL || menuSet[0] == '\0') {
-                menuSet = UI_DefaultMenuFile();
-        }
+/*
+=============
+UI_Load
 
-        String_Init();
+Reload menu definitions and supporting data, respecting the active menu flow.
+=============
+*/
+void UI_Load() {
+	char lastName[1024];
+	menuDef_t *menu = Menu_GetFocused();
+	const char *menuSet = UI_Cvar_VariableString("ui_menuFiles");
+	const char *ingameSet;
+
+	if (menu && menu->window.name) {
+		strcpy(lastName, menu->window.name);
+	}
+	UI_UpdateActiveMenuFlow();
+	if (menuSet == NULL || menuSet[0] == '\0') {
+		menuSet = UI_DefaultMenuFile();
+	}
+
+	String_Init();
 
 #ifdef PRE_RELEASE_TADEMO
 	UI_ParseGameInfo("demogameinfo.txt");
@@ -1351,12 +1440,15 @@ void UI_Load() {
 	UI_LoadRulesets();
 #endif
 
-        UI_LoadMenus(menuSet, qtrue);
-        UI_LoadMenus(UI_DefaultIngameFile(), qfalse);
-        Menus_CloseAll();
-        Menus_ActivateByName(lastName);
+	ingameSet = UI_DefaultIngameFile();
+	Com_Printf("UI: loading %s (flow %d) with ingame %s\n", menuSet, ui_activeMenuFlow, ingameSet);
 
-		}
+	UI_LoadMenus(menuSet, qtrue);
+	UI_LoadMenus(ingameSet, qfalse);
+	Menus_CloseAll();
+	Menus_ActivateByName(lastName);
+
+}
 
 static const char *handicapValues[] = {"None","95","90","85","80","75","70","65","60","55","50","45","40","35","30","25","20","15","10","5",NULL};
 
@@ -4944,7 +5036,7 @@ static int UI_GetPresetRotationIndex(void) {
 
 	index = ui_cvPresetRotation.integer;
 	if (index < 0 || index >= uiInfo.mapRotationCount) {
-		return -1;
+			return -1;
 	}
 
 	return index;
@@ -4976,7 +5068,7 @@ static int UI_GetFilteredCallvoteGametype(void) {
 
 	gametype = ui_cvGameType.integer;
 	if (gametype < -1 || gametype >= GT_MAX_GAME_TYPE) {
-		return -1;
+			return -1;
 	}
 
 	return gametype;
@@ -4993,7 +5085,7 @@ static int UI_ParseCallvoteGametypeToken(const char *token) {
 	int value;
 
 	if (token == NULL || token[0] == '\0') {
-		return -1;
+			return -1;
 	}
 
 	if (token[0] == '-' || (token[0] >= '0' && token[0] <= '9')) {
@@ -5004,7 +5096,7 @@ static int UI_ParseCallvoteGametypeToken(const char *token) {
 	}
 
 	if (!Q_stricmp(token, "default")) {
-		return -1;
+			return -1;
 	}
 	if (!Q_stricmp(token, "ffa") || !Q_stricmp(token, "dm")
 		|| !Q_stricmp(token, "freeforall") || !Q_stricmp(token, "free for all")) {
@@ -5047,7 +5139,7 @@ static int UI_ParseCallvoteGametypeToken(const char *token) {
 		return GT_RED_ROVER;
 	}
 
-	return -1;
+		return -1;
 		}
 
 /*
@@ -5061,7 +5153,7 @@ static int UI_GetCallvoteRotationGametype(const mapRotationInfo_t *rotation) {
 	int gametype;
 
 	if (rotation == NULL) {
-		return -1;
+			return -1;
 	}
 
 	if (rotation->factoryGameType[0]) {
@@ -5078,7 +5170,7 @@ static int UI_GetCallvoteRotationGametype(const mapRotationInfo_t *rotation) {
 		}
 	}
 
-	return -1;
+		return -1;
 		}
 
 /*
@@ -5143,7 +5235,7 @@ static int UI_GetCallvoteRotationIndexFromDisplayRow(int row) {
 	int i;
 
 	if (row < 0) {
-		return -1;
+			return -1;
 	}
 
 	gametype = UI_GetFilteredCallvoteGametype();
@@ -5158,7 +5250,7 @@ static int UI_GetCallvoteRotationIndexFromDisplayRow(int row) {
 		visible++;
 	}
 
-	return -1;
+		return -1;
 		}
 
 /*
@@ -5174,7 +5266,7 @@ static int UI_GetCallvoteDisplayRowForRotation(int rotationIndex) {
 	int i;
 
 	if (rotationIndex < 0 || rotationIndex >= uiInfo.mapRotationCount) {
-		return -1;
+			return -1;
 	}
 
 	gametype = UI_GetFilteredCallvoteGametype();
@@ -5189,7 +5281,7 @@ static int UI_GetCallvoteDisplayRowForRotation(int rotationIndex) {
 		row++;
 	}
 
-	return -1;
+		return -1;
 		}
 
 /*
@@ -7060,11 +7152,11 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_blueteam4, "ui_blueteam4", "0", CVAR_ARCHIVE },
 	{ &ui_blueteam5, "ui_blueteam5", "0", CVAR_ARCHIVE },
 	{ &ui_netSource, "ui_netSource", "0", CVAR_ARCHIVE },
-{ &ui_menuFiles, "ui_menuFiles", UI_MENU_FILE_LEGACY, CVAR_ARCHIVE },
-{ &ui_menuFlow, "ui_menuFlow", "0", CVAR_ARCHIVE },
-{ &ui_globalpreset, "ui_globalpreset", "0", CVAR_ARCHIVE },
-{ &ui_screenDamage_Team_preset, "ui_screenDamage_Team_preset", "0", CVAR_ARCHIVE },
-{ &ui_screenDamage_preset, "ui_screenDamage_preset", "0", CVAR_ARCHIVE },
+	{ &ui_menuFiles, "ui_menuFiles", UI_MENU_FILE_QUAKELIVE, CVAR_ARCHIVE },
+	{ &ui_menuFlow, "ui_menuFlow", "1", CVAR_ARCHIVE },
+	{ &ui_globalpreset, "ui_globalpreset", "0", CVAR_ARCHIVE },
+	{ &ui_screenDamage_Team_preset, "ui_screenDamage_Team_preset", "0", CVAR_ARCHIVE },
+	{ &ui_screenDamage_preset, "ui_screenDamage_preset", "0", CVAR_ARCHIVE },
 { &ui_browserAwesomium, "ui_browserAwesomium", "1", CVAR_TEMP },
 	{ &ui_currentTier, "ui_currentTier", "0", CVAR_ARCHIVE },
 	{ &ui_currentMap, "ui_currentMap", "0", CVAR_ARCHIVE },
