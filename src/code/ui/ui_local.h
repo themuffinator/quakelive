@@ -805,6 +805,7 @@ typedef struct uiMatchPlayerInfo_s {
 	int rank;
 	int score;
 	char name[MAX_NAME_LENGTH];
+	char country[16];
 } uiMatchPlayerInfo_t;
 
 typedef struct uiMatchPlayerList_s {
@@ -856,10 +857,14 @@ with the live client list.
 - `FEEDER_MATCHSUMMARY_END`, `FEEDER_MATCHSUMMARY_RED`, and
 `FEEDER_MATCHSUMMARY_BLUE` read from the cached `matchSummary` player lists
 populated after each `postgame` command.
+- `FEEDER_ENDSCOREBOARD`, `FEEDER_REDTEAM_STATS`, `FEEDER_BLUETEAM_STATS`,
+`FEEDER_REDTEAM_LIST`, `FEEDER_BLUETEAM_LIST`, and `FEEDER_SCOREBOARD` reuse
+the `matchSummary` caches to drive the end-of-match scoreboards until native
+network payloads are recovered.
+- `FEEDER_COUNTRIES` enumerates `countryList[]` loaded from `ui/country.txt` so
+UI scripts can expose locale dropdowns.
 
-Definitions that only exist in the menu scripts today (`FEEDER_CLANS`,
-`FEEDER_REDTEAM_LIST`, `FEEDER_BLUETEAM_LIST`, `FEEDER_SCOREBOARD`,
-`FEEDER_ENDSCOREBOARD`, `FEEDER_REDTEAM_STATS`, `FEEDER_BLUETEAM_STATS`) do not
+Definitions that only exist in the menu scripts today (`FEEDER_CLANS`) do not
 yet have backing storage inside `uiInfo_t`. The HLIL-guided parity plan calls
 for those feeders once their data sources have been recovered.
 =============
@@ -884,6 +889,9 @@ typedef struct {
 
 	int teamCount;
 	teamInfo teamList[MAX_TEAMS];
+
+	int countryCount;
+	const char *countryList[256];
 
 	int numGameTypes;
 	gameTypeInfo gameTypes[MAX_GAMETYPES];

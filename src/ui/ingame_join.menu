@@ -35,8 +35,8 @@ itemDef {
 //	FRAME 	//
 
 itemDef {
-	name window
-	rect 0 0 64 64
+name window
+rect 0 0 64 64
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/menu/boxtl.tga"
 	visible 1
@@ -79,14 +79,36 @@ itemDef {
 	name window
 	rect 64 64 64 64
 	style WINDOW_STYLE_SHADER
-	background "ui/assets/menu/boxbr.tga"
-	visible 1
-	decoration
-	}
+background "ui/assets/menu/boxbr.tga"
+visible 1
+decoration
+}
 
 itemDef {
-     	name team
-     	text "Team RED"
+name country_label
+text "COUNTRY"
+type 1
+rect 8 6 112 12
+textscale .2
+forecolor 1 1 1 1
+visible 1
+}
+
+itemDef {
+name country_list
+type ITEM_TYPE_LISTBOX
+rect 8 18 112 16
+textscale .2
+forecolor 1 1 1 1
+visible 1
+elementtype LISTBOX_TEXT
+feeder FEEDER_COUNTRIES
+columns 0 112
+}
+
+itemDef {
+name team
+text "Team RED"
 	type 1
       	style WINDOW_STYLE_GRADIENT	
      	rect 0 40 128 20   

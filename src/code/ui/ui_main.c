@@ -137,6 +137,8 @@ static int UI_MapCountByGameType(qboolean singlePlayer);
 static int UI_HeadCountByTeam( void );
 static void UI_ParseGameInfo(const char *teamFile);
 static void UI_ParseTeamInfo(const char *teamFile);
+static void UI_LoadCountries(void);
+static const char *UI_ValidateCountryCode(const char *code);
 static const char *UI_SelectedMap(int index, int *actual);
 static const char *UI_SelectedHead(int index, int *actual);
 static int UI_GetIndexFromSelection(int actual);
@@ -165,7 +167,7 @@ static const char *ui_browserRefreshCommand = "web_stopRefresh\n";
 
 static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
 return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
-}
+		}
 
 /*
 =============
@@ -189,15 +191,15 @@ static qboolean UI_MenuFileExists(const char *menuFile) {
 	}
 
 	return qfalse;
-}
+		}
 
 qboolean UI_BrowserOverlayAvailable(void) {
 return ui_browserAwesomium.integer != 0;
-}
+		}
 
 static uiMenuFlow_t UI_RequestedMenuFlow(void) {
         return (ui_menuFlow.integer > 0) ? UI_MENU_FLOW_QUAKELIVE : UI_MENU_FLOW_LEGACY;
-}
+		}
 
 static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {
 	uiMenuFlow_t requested = UI_RequestedMenuFlow();
@@ -215,7 +217,7 @@ static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {
 	}
 
 	return requested;
-}
+		}
 
 /*
 =============
@@ -232,22 +234,22 @@ static void UI_SetBrowserActive(qboolean active) {
 	ui_browserActiveState = active;
 	ui_browserActiveKnown = qtrue;
 	trap_Cmd_ExecuteText(EXEC_NOW, active ? "web_browserActive 1\n" : "web_browserActive 0\n");
-}
+		}
 
 static void UI_SetActiveMenuFlow(uiMenuFlow_t flow) {
 	ui_activeMenuFlow = flow;
 	ui_new.integer = (flow != UI_MENU_FLOW_LEGACY);
 	UI_SetBrowserActive(flow == UI_MENU_FLOW_QUAKELIVE);
 	UI_BrowserBridge_SetActive(flow == UI_MENU_FLOW_BRIDGED);
-}
+		}
 
 qboolean UI_UsingLegacyMenuFlow(void) {
 	return (ui_activeMenuFlow == UI_MENU_FLOW_LEGACY);
-}
+		}
 
 static qboolean UI_ServerBrowserEnabled(void) {
 	return (UI_UsingLegacyMenuFlow() || ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED);
-}
+		}
 
 static void UI_UpdateActiveMenuFlowForFile(const char *menuFile) {
 	if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_QUAKELIVE)) {
@@ -257,7 +259,7 @@ static void UI_UpdateActiveMenuFlowForFile(const char *menuFile) {
 	} else if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_LEGACY) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_LEGACY)) {
 		UI_SetActiveMenuFlow(UI_MENU_FLOW_LEGACY);
 	}
-}
+		}
 
 const char *UI_DefaultMenuFile(void) {
 	const char *menuFile;
@@ -268,7 +270,7 @@ const char *UI_DefaultMenuFile(void) {
 	}
 
 	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_MENU_FILE_LEGACY;
-}
+		}
 
 const char *UI_DefaultIngameFile(void) {
 	const char *menuFile;
@@ -279,11 +281,11 @@ const char *UI_DefaultIngameFile(void) {
 	}
 
 	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_INGAME_FILE_LEGACY;
-}
+		}
 
 static void UI_UpdateActiveMenuFlow(void) {
 	UI_SetActiveMenuFlow(UI_ResolveMenuFlowInternal());
-}
+		}
 
 void UI_ApplyMenuFlowChange(uiMenuFlow_t flow, qboolean reload) {
 	trap_Cvar_SetValue("ui_menuFlow", flow);
@@ -291,7 +293,7 @@ void UI_ApplyMenuFlowChange(uiMenuFlow_t flow, qboolean reload) {
 	if (reload) {
 		UI_Load();
 	}
-}
+		}
 
 void _UI_Init( qboolean );
 void _UI_Shutdown( void );
@@ -344,7 +346,7 @@ int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int a
 	}
 
 	return -1;
-}
+		}
 
 
 
@@ -517,7 +519,7 @@ static void UI_RegisterQLMenuAssets( void ) {
 	for ( i = 0; i < count; i++ ) {
 		trap_R_RegisterShaderNoMip( uiQLTextureNames[i] );
 	}
-}
+		}
 
 /*
 =============
@@ -564,21 +566,21 @@ void AssetCache() {
 	UI_RegisterQLMenuAssets();
 
 	uiInfo.newHighScoreSound = trap_S_RegisterSound("sound/feedback/voc_newhighscore.wav", qfalse);
-}
+		}
 
 void _UI_DrawSides(float x, float y, float w, float h, float size) {
 	UI_AdjustFrom640( &x, &y, &w, &h );
 	size *= uiInfo.uiDC.xscale;
 	trap_R_DrawStretchPic( x, y, size, h, 0, 0, 0, 0, uiInfo.uiDC.whiteShader );
 	trap_R_DrawStretchPic( x + w - size, y, size, h, 0, 0, 0, 0, uiInfo.uiDC.whiteShader );
-}
+		}
 
 void _UI_DrawTopBottom(float x, float y, float w, float h, float size) {
 	UI_AdjustFrom640( &x, &y, &w, &h );
 	size *= uiInfo.uiDC.yscale;
 	trap_R_DrawStretchPic( x, y, w, size, 0, 0, 0, 0, uiInfo.uiDC.whiteShader );
 	trap_R_DrawStretchPic( x, y + h - size, w, size, 0, 0, 0, 0, uiInfo.uiDC.whiteShader );
-}
+		}
 /*
 ================
 UI_DrawRect
@@ -593,7 +595,7 @@ void _UI_DrawRect( float x, float y, float width, float height, float size, cons
   _UI_DrawSides(x, y, width, height, size);
 
 	trap_R_SetColor( NULL );
-}
+		}
 
 int Text_Width(const char *text, float scale, int limit) {
   int count,len;
@@ -628,7 +630,7 @@ int Text_Width(const char *text, float scale, int limit) {
     }
   }
   return out * useScale;
-}
+		}
 
 int Text_Height(const char *text, float scale, int limit) {
   int len, count;
@@ -665,7 +667,7 @@ int Text_Height(const char *text, float scale, int limit) {
     }
   }
   return max * useScale;
-}
+		}
 
 void Text_PaintChar(float x, float y, float width, float height, float scale, float s, float t, float s2, float t2, qhandle_t hShader) {
   float w, h;
@@ -673,7 +675,7 @@ void Text_PaintChar(float x, float y, float width, float height, float scale, fl
   h = height * scale;
   UI_AdjustFrom640( &x, &y, &w, &h );
   trap_R_DrawStretchPic( x, y, w, h, s, t, s2, t2, hShader );
-}
+		}
 
 void Text_Paint(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style) {
   int len, count;
@@ -741,7 +743,7 @@ void Text_Paint(float x, float y, float scale, vec4_t color, const char *text, f
     }
 	  trap_R_SetColor( NULL );
   }
-}
+		}
 
 void Text_PaintWithCursor(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style) {
   int len, count;
@@ -839,7 +841,7 @@ void Text_PaintWithCursor(float x, float y, float scale, vec4_t color, const cha
 
 	  trap_R_SetColor( NULL );
   }
-}
+		}
 
 
 static void Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t color, const char* text, float adjust, int limit) {
@@ -895,7 +897,7 @@ static void Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t 
 	  trap_R_SetColor( NULL );
   }
 
-}
+		}
 
 
 void UI_ShowPostGame(qboolean newHigh) {
@@ -904,7 +906,7 @@ void UI_ShowPostGame(qboolean newHigh) {
 	trap_Cvar_Set( "sv_killserver", "1" );
 	uiInfo.soundHighScore = newHigh;
   _UI_SetActiveMenu(UIMENU_POSTGAME);
-}
+		}
 /*
 =================
 _UI_Refresh
@@ -916,7 +918,7 @@ void UI_DrawCenteredPic(qhandle_t image, int w, int h) {
   x = (SCREEN_WIDTH - w) / 2;
   y = (SCREEN_HEIGHT - h) / 2;
   UI_DrawHandlePic(x, y, w, h, image);
-}
+		}
 
 int frameCount = 0;
 int startTime;
@@ -979,7 +981,7 @@ void _UI_Refresh( int realtime )
 	}
 #endif
 
-}
+		}
 
 /*
 =================
@@ -988,7 +990,7 @@ _UI_Shutdown
 */
 void _UI_Shutdown( void ) {
 	trap_LAN_SaveCachedServers();
-}
+		}
 
 char *defaultMenu = NULL;
 
@@ -1014,7 +1016,7 @@ char *GetMenuBuffer(const char *filename) {
 	//COM_Compress(buf);
   return buf;
 
-}
+		}
 
 qboolean Asset_Parse(int handle) {
 	pc_token_t token;
@@ -1173,7 +1175,7 @@ qboolean Asset_Parse(int handle) {
 
 	}
 	return qfalse;
-}
+		}
 
 void Font_Report() {
   int i;
@@ -1182,13 +1184,13 @@ void Font_Report() {
   for ( i = 32; i < 96; i++) {
     Com_Printf("Glyph handle %i: %i\n", i, uiInfo.uiDC.Assets.textFont.glyphs[i].glyph);
   }
-}
+		}
 
 void UI_Report() {
   String_Report();
   //Font_Report();
 
-}
+		}
 
 void UI_ParseMenu(const char *menuFile) {
 	int handle;
@@ -1235,7 +1237,7 @@ void UI_ParseMenu(const char *menuFile) {
 		}
 	}
 	trap_PC_FreeSource(handle);
-}
+		}
 
 qboolean Load_Menu(int handle) {
 	pc_token_t token;
@@ -1262,7 +1264,7 @@ qboolean Load_Menu(int handle) {
 		UI_ParseMenu(token.string); 
 	}
 	return qfalse;
-}
+		}
 
 void UI_LoadMenus(const char *menuFile, qboolean reset) {
         pc_token_t token;
@@ -1323,7 +1325,7 @@ void UI_LoadMenus(const char *menuFile, qboolean reset) {
 	Com_Printf("UI menu load time = %d milli seconds\n", trap_Milliseconds() - start);
 
 	trap_PC_FreeSource( handle );
-}
+		}
 
 void UI_Load() {
         char lastName[1024];
@@ -1354,7 +1356,7 @@ void UI_Load() {
         Menus_CloseAll();
         Menus_ActivateByName(lastName);
 
-}
+		}
 
 static const char *handicapValues[] = {"None","95","90","85","80","75","70","65","60","55","50","45","40","35","30","25","20","15","10","5",NULL};
 
@@ -1365,11 +1367,11 @@ static void UI_DrawHandicap(rectDef_t *rect, float scale, vec4_t color, int text
   i = 20 - h / 5;
 
   Text_Paint(rect->x, rect->y, scale, color, handicapValues[i], 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawClanName(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
   Text_Paint(rect->x, rect->y, scale, color, UI_Cvar_VariableString("ui_teamName"), 0, 0, textStyle);
-}
+		}
 
 
 static void UI_SetCapFragLimits(qboolean uiVars) {
@@ -1387,11 +1389,11 @@ static void UI_SetCapFragLimits(qboolean uiVars) {
 		trap_Cvar_Set("capturelimit", va("%d", cap));
 		trap_Cvar_Set("fraglimit", va("%d", frag));
 	}
-}
+		}
 // ui_gameType assumes gametype 0 is -1 ALL and will not show
 static void UI_DrawGameType(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
   Text_Paint(rect->x, rect->y, scale, color, uiInfo.gameTypes[ui_gameType.integer].gameType, 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawNetGameType(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	if (ui_netGameType.integer < 0 || ui_netGameType.integer > uiInfo.numGameTypes) {
@@ -1399,14 +1401,14 @@ static void UI_DrawNetGameType(rectDef_t *rect, float scale, vec4_t color, int t
 		trap_Cvar_Set("ui_actualNetGameType", "0");
 	}
   Text_Paint(rect->x, rect->y, scale, color, uiInfo.gameTypes[ui_netGameType.integer].gameType , 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawJoinGameType(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	if (ui_joinGameType.integer < 0 || ui_joinGameType.integer > uiInfo.numJoinGameTypes) {
 		trap_Cvar_Set("ui_joinGameType", "0");
 	}
   Text_Paint(rect->x, rect->y, scale, color, uiInfo.joinGameTypes[ui_joinGameType.integer].gameType , 0, 0, textStyle);
-}
+		}
 
 
 
@@ -1423,7 +1425,7 @@ static int UI_TeamIndexFromName(const char *name) {
 
   return 0;
 
-}
+		}
 
 static void UI_DrawClanLogo(rectDef_t *rect, float scale, vec4_t color) {
   int i;
@@ -1440,7 +1442,7 @@ static void UI_DrawClanLogo(rectDef_t *rect, float scale, vec4_t color) {
   	UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon);
     trap_R_SetColor(NULL);
   }
-}
+		}
 
 static void UI_DrawClanCinematic(rectDef_t *rect, float scale, vec4_t color) {
   int i;
@@ -1468,7 +1470,7 @@ static void UI_DrawClanCinematic(rectDef_t *rect, float scale, vec4_t color) {
 		}
 	}
 
-}
+		}
 
 static void UI_DrawPreviewCinematic(rectDef_t *rect, float scale, vec4_t color) {
 	if (uiInfo.previewMovie > -2) {
@@ -1482,7 +1484,7 @@ static void UI_DrawPreviewCinematic(rectDef_t *rect, float scale, vec4_t color) 
 		}
 	} 
 
-}
+		}
 
 
 
@@ -1493,7 +1495,7 @@ static void UI_DrawSkill(rectDef_t *rect, float scale, vec4_t color, int textSty
     i = 1;
   }
   Text_Paint(rect->x, rect->y, scale, color, skillLevels[i-1],0, 0, textStyle);
-}
+		}
 
 
 static void UI_DrawTeamName(rectDef_t *rect, float scale, vec4_t color, qboolean blue, int textStyle) {
@@ -1502,7 +1504,7 @@ static void UI_DrawTeamName(rectDef_t *rect, float scale, vec4_t color, qboolean
   if (i >= 0 && i < uiInfo.teamCount) {
     Text_Paint(rect->x, rect->y, scale, color, va("%s: %s", (blue) ? "Blue" : "Red", uiInfo.teamList[i].teamName),0, 0, textStyle);
   }
-}
+		}
 
 static void UI_DrawTeamMember(rectDef_t *rect, float scale, vec4_t color, qboolean blue, int num, int textStyle) {
 	// 0 - None
@@ -1530,12 +1532,12 @@ static void UI_DrawTeamMember(rectDef_t *rect, float scale, vec4_t color, qboole
 		}
 	}
   Text_Paint(rect->x, rect->y, scale, color, text, 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawEffects(rectDef_t *rect, float scale, vec4_t color) {
 	UI_DrawHandlePic( rect->x, rect->y - 14, 128, 8, uiInfo.uiDC.Assets.fxBasePic );
 	UI_DrawHandlePic( rect->x + uiInfo.effectsColor * 16 + 8, rect->y - 16, 16, 12, uiInfo.uiDC.Assets.fxPic[uiInfo.effectsColor] );
-}
+		}
 
 static void UI_DrawMapPreview(rectDef_t *rect, float scale, vec4_t color, qboolean net) {
 	int map = (net) ? ui_currentNetMap.integer : ui_currentMap.integer;
@@ -1575,7 +1577,7 @@ static void UI_DrawMapTimeToBeat(rectDef_t *rect, float scale, vec4_t color, int
 	seconds = time % 60;
 
   Text_Paint(rect->x, rect->y, scale, color, va("%02i:%02i", minutes, seconds), 0, 0, textStyle);
-}
+		}
 
 
 
@@ -1607,7 +1609,7 @@ static void UI_DrawMapCinematic(rectDef_t *rect, float scale, vec4_t color, qboo
 	} else {
 		UI_DrawMapPreview(rect, scale, color, net);
 	}
-}
+		}
 
 
 
@@ -1654,14 +1656,14 @@ static void UI_DrawPlayerModel(rectDef_t *rect) {
 
   UI_DrawPlayer( rect->x, rect->y, rect->w, rect->h, &info, uiInfo.uiDC.realTime / 2);
 
-}
+		}
 
 static void UI_DrawNetSource(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	if (ui_netSource.integer < 0 || ui_netSource.integer > numNetSources) {
 		ui_netSource.integer = 0;
 	}
   Text_Paint(rect->x, rect->y, scale, color, va("Source: %s", netSources[ui_netSource.integer]), 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawNetMapPreview(rectDef_t *rect, float scale, vec4_t color) {
 
@@ -1670,7 +1672,7 @@ static void UI_DrawNetMapPreview(rectDef_t *rect, float scale, vec4_t color) {
 	} else {
 		UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, trap_R_RegisterShaderNoMip("menu/art/unknownmap"));
 	}
-}
+		}
 
 static void UI_DrawNetMapCinematic(rectDef_t *rect, float scale, vec4_t color) {
 	if (ui_currentNetMap.integer < 0 || ui_currentNetMap.integer > uiInfo.mapCount) {
@@ -1685,7 +1687,7 @@ static void UI_DrawNetMapCinematic(rectDef_t *rect, float scale, vec4_t color) {
 	} else {
 		UI_DrawNetMapPreview(rect, scale, color);
 	}
-}
+		}
 
 
 
@@ -1694,7 +1696,7 @@ static void UI_DrawNetFilter(rectDef_t *rect, float scale, vec4_t color, int tex
 		ui_serverFilterType.integer = 0;
 	}
   Text_Paint(rect->x, rect->y, scale, color, va("Filter: %s", serverFilters[ui_serverFilterType.integer].description), 0, 0, textStyle);
-}
+		}
 
 
 static void UI_DrawTier(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
@@ -1704,7 +1706,7 @@ static void UI_DrawTier(rectDef_t *rect, float scale, vec4_t color, int textStyl
     i = 0;
   }
   Text_Paint(rect->x, rect->y, scale, color, va("Tier: %s", uiInfo.tierList[i].tierName),0, 0, textStyle);
-}
+		}
 
 static void UI_DrawTierMap(rectDef_t *rect, int index) {
   int i;
@@ -1718,7 +1720,7 @@ static void UI_DrawTierMap(rectDef_t *rect, int index) {
 	}
 												 
 	UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.tierList[i].mapHandles[index]);
-}
+		}
 
 static const char *UI_EnglishMapName(const char *map) {
 	int i;
@@ -1728,7 +1730,7 @@ static const char *UI_EnglishMapName(const char *map) {
 		}
 	}
 	return "";
-}
+		}
 
 static void UI_DrawTierMapName(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
   int i, j;
@@ -1742,7 +1744,7 @@ static void UI_DrawTierMapName(rectDef_t *rect, float scale, vec4_t color, int t
 	}
 
   Text_Paint(rect->x, rect->y, scale, color, UI_EnglishMapName(uiInfo.tierList[i].maps[j]), 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawTierGameType(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
   int i, j;
@@ -1756,7 +1758,7 @@ static void UI_DrawTierGameType(rectDef_t *rect, float scale, vec4_t color, int 
 	}
 
   Text_Paint(rect->x, rect->y, scale, color, uiInfo.gameTypes[uiInfo.tierList[i].gameTypes[j]].gameType , 0, 0, textStyle);
-}
+		}
 
 
 
@@ -1768,7 +1770,7 @@ static const char *UI_AIFromName(const char *name) {
 		}
 	}
 	return "James";
-}
+		}
 
 
 
@@ -1804,7 +1806,7 @@ static void UI_DrawOpponent(rectDef_t *rect) {
 
   UI_DrawPlayer( rect->x, rect->y, rect->w, rect->h, &info2, uiInfo.uiDC.realTime / 2);
 
-}
+		}
 
 static void UI_NextOpponent() {
   int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_opponentName"));
@@ -1820,7 +1822,7 @@ static void UI_NextOpponent() {
 		}
 	}
  	trap_Cvar_Set( "ui_opponentName", uiInfo.teamList[i].teamName );
-}
+		}
 
 static void UI_PriorOpponent() {
   int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_opponentName"));
@@ -1836,7 +1838,7 @@ static void UI_PriorOpponent() {
 		}
 	}
  	trap_Cvar_Set( "ui_opponentName", uiInfo.teamList[i].teamName );
-}
+		}
 
 static void	UI_DrawPlayerLogo(rectDef_t *rect, vec3_t color) {
   int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_teamName"));
@@ -1850,7 +1852,7 @@ static void	UI_DrawPlayerLogo(rectDef_t *rect, vec3_t color) {
  	trap_R_SetColor( color );
 	UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon );
  	trap_R_SetColor( NULL );
-}
+		}
 
 static void	UI_DrawPlayerLogoMetal(rectDef_t *rect, vec3_t color) {
   int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_teamName"));
@@ -1863,7 +1865,7 @@ static void	UI_DrawPlayerLogoMetal(rectDef_t *rect, vec3_t color) {
  	trap_R_SetColor( color );
 	UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon_Metal );
  	trap_R_SetColor( NULL );
-}
+		}
 
 static void	UI_DrawPlayerLogoName(rectDef_t *rect, vec3_t color) {
   int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_teamName"));
@@ -1876,7 +1878,7 @@ static void	UI_DrawPlayerLogoName(rectDef_t *rect, vec3_t color) {
  	trap_R_SetColor( color );
 	UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon_Name );
  	trap_R_SetColor( NULL );
-}
+		}
 
 static void	UI_DrawOpponentLogo(rectDef_t *rect, vec3_t color) {
   int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_opponentName"));
@@ -1889,7 +1891,7 @@ static void	UI_DrawOpponentLogo(rectDef_t *rect, vec3_t color) {
  	trap_R_SetColor( color );
 	UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon );
  	trap_R_SetColor( NULL );
-}
+		}
 
 static void	UI_DrawOpponentLogoMetal(rectDef_t *rect, vec3_t color) {
   int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_opponentName"));
@@ -1902,7 +1904,7 @@ static void	UI_DrawOpponentLogoMetal(rectDef_t *rect, vec3_t color) {
  	trap_R_SetColor( color );
 	UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon_Metal );
  	trap_R_SetColor( NULL );
-}
+		}
 
 static void	UI_DrawOpponentLogoName(rectDef_t *rect, vec3_t color) {
   int i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_opponentName"));
@@ -1915,18 +1917,18 @@ static void	UI_DrawOpponentLogoName(rectDef_t *rect, vec3_t color) {
  	trap_R_SetColor( color );
 	UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon_Name );
  	trap_R_SetColor( NULL );
-}
+		}
 
 static void UI_DrawAllMapsSelection(rectDef_t *rect, float scale, vec4_t color, int textStyle, qboolean net) {
 	int map = (net) ? ui_currentNetMap.integer : ui_currentMap.integer;
 	if (map >= 0 && map < uiInfo.mapCount) {
 	  Text_Paint(rect->x, rect->y, scale, color, uiInfo.mapList[map].mapName, 0, 0, textStyle);
 	}
-}
+		}
 
 static void UI_DrawOpponentName(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
   Text_Paint(rect->x, rect->y, scale, color, UI_Cvar_VariableString("ui_opponentName"), 0, 0, textStyle);
-}
+		}
 
 
 static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
@@ -2043,7 +2045,7 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 		return Text_Width(s, scale, 0);
 	}
 	return 0;
-}
+		}
 
 static void UI_DrawBotName(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	int value = uiInfo.botIndex;
@@ -2061,17 +2063,17 @@ static void UI_DrawBotName(rectDef_t *rect, float scale, vec4_t color, int textS
 		text = UI_GetBotNameByNumber(value);
 	}
   Text_Paint(rect->x, rect->y, scale, color, text, 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawBotSkill(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	if (uiInfo.skillIndex >= 0 && uiInfo.skillIndex < numSkillLevels) {
 	  Text_Paint(rect->x, rect->y, scale, color, skillLevels[uiInfo.skillIndex], 0, 0, textStyle);
 	}
-}
+		}
 
 static void UI_DrawRedBlue(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
   Text_Paint(rect->x, rect->y, scale, color, (uiInfo.redBlue == 0) ? "Red" : "Blue", 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawCrosshair(rectDef_t *rect, float scale, vec4_t color) {
 	trap_R_SetColor(color);
@@ -2080,7 +2082,7 @@ static void UI_DrawCrosshair(rectDef_t *rect, float scale, vec4_t color) {
 	}
 	UI_DrawHandlePic(rect->x, rect->y - rect->h, rect->w, rect->h, uiInfo.uiDC.Assets.crosshairShader[uiInfo.currentCrosshair]);
 	trap_R_SetColor(NULL);
-}
+		}
 
 /*
 =============
@@ -2094,7 +2096,7 @@ static void UI_ClearMatchSummaryList(uiMatchPlayerList_t *list) {
 		return;
 	}
 	memset(list, 0, sizeof(*list));
-}
+		}
 
 /*
 =============
@@ -2108,7 +2110,7 @@ void UI_ResetMatchSummaryCache(void) {
 	uiInfo.currentMatchSummaryEnd = 0;
 	uiInfo.currentMatchSummaryRed = 0;
 	uiInfo.currentMatchSummaryBlue = 0;
-}
+		}
 
 /*
 =============
@@ -2125,7 +2127,7 @@ static void UI_MatchSummaryAppend(uiMatchPlayerList_t *list, const uiMatchPlayer
 		return;
 	}
 	list->entries[list->entryCount++] = *entry;
-}
+		}
 
 /*
 =============
@@ -2180,21 +2182,23 @@ void UI_MatchSummaryParseFromPostgame(void) {
 		entry.team = (team_t)atoi(Info_ValueForKey(info, "t"));
 		rawName = Info_ValueForKey(info, "n");
 		if (!rawName || !rawName[0]) {
-			rawName = va("Player %i", clientNum);
+		rawName = va("Player %i", clientNum);
 		}
 		Q_strncpyz(entry.name, rawName, sizeof(entry.name));
 		Q_CleanStr(entry.name);
 
+		Q_strncpyz(entry.country, UI_ValidateCountryCode(Info_ValueForKey(info, "country")), sizeof(entry.country));
+
 		UI_MatchSummaryAppend(&cache->endOfMatch, &entry);
 		if (entry.team == TEAM_RED) {
-			UI_MatchSummaryAppend(&cache->redTeam, &entry);
+		UI_MatchSummaryAppend(&cache->redTeam, &entry);
 		} else if (entry.team == TEAM_BLUE) {
 			UI_MatchSummaryAppend(&cache->blueTeam, &entry);
 		}
 	}
 
 	cache->valid = (cache->endOfMatch.entryCount > 0) ? qtrue : qfalse;
-}
+		}
 
 /*
 =============
@@ -2210,16 +2214,16 @@ static uiMatchPlayerList_t *UI_MatchSummaryListForFeeder(float feederID) {
 		return NULL;
 	}
 
-	if (feederID == FEEDER_MATCHSUMMARY_END) {
-		return &cache->endOfMatch;
-	} else if (feederID == FEEDER_MATCHSUMMARY_RED) {
-		return &cache->redTeam;
-	} else if (feederID == FEEDER_MATCHSUMMARY_BLUE) {
-		return &cache->blueTeam;
+	if (feederID == FEEDER_MATCHSUMMARY_END || feederID == FEEDER_ENDSCOREBOARD || feederID == FEEDER_SCOREBOARD) {
+	return &cache->endOfMatch;
+	} else if (feederID == FEEDER_MATCHSUMMARY_RED || feederID == FEEDER_REDTEAM_STATS || feederID == FEEDER_REDTEAM_LIST) {
+	return &cache->redTeam;
+	} else if (feederID == FEEDER_MATCHSUMMARY_BLUE || feederID == FEEDER_BLUETEAM_STATS || feederID == FEEDER_BLUETEAM_LIST) {
+	return &cache->blueTeam;
 	}
 
 	return NULL;
-}
+	}
 
 /*
 =============
@@ -2239,7 +2243,7 @@ static const char *UI_MatchSummaryTeamString(team_t team) {
 		default:
 			return "FREE";
 	}
-}
+		}
 
 /*
 =============
@@ -2255,7 +2259,7 @@ static mapRotationInfo_t *UI_MapRotationEntryForIndex(int index) {
 	}
 
 	return &uiInfo.mapRotations[index];
-}
+		}
 
 
 
@@ -2310,7 +2314,7 @@ static void UI_BuildPlayerList() {
 	if (n < uiInfo.myTeamCount) {
 		trap_Cvar_Set("cg_selectedPlayerName", uiInfo.teamNames[n]);
 	}
-}
+		}
 
 
 static void UI_DrawSelectedPlayer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
@@ -2319,7 +2323,7 @@ static void UI_DrawSelectedPlayer(rectDef_t *rect, float scale, vec4_t color, in
 		UI_BuildPlayerList();
 	}
   Text_Paint(rect->x, rect->y, scale, color, (uiInfo.teamLeader) ? UI_Cvar_VariableString("cg_selectedPlayerName") : UI_Cvar_VariableString("name") , 0, 0, textStyle);
-}
+		}
 
 static void UI_DrawServerRefreshDate(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	if (uiInfo.serverStatus.refreshActive) {
@@ -2335,7 +2339,7 @@ static void UI_DrawServerRefreshDate(rectDef_t *rect, float scale, vec4_t color,
 		Q_strncpyz(buff, UI_Cvar_VariableString(va("ui_lastServerRefresh_%i", ui_netSource.integer)), 64);
 	  Text_Paint(rect->x, rect->y, scale, color, va("Refresh Time: %s", buff), 0, 0, textStyle);
 	}
-}
+		}
 
 static void UI_DrawServerMOTD(rectDef_t *rect, float scale, vec4_t color) {
 	if (uiInfo.serverStatus.motdLen) {
@@ -2394,7 +2398,7 @@ static void UI_DrawServerMOTD(rectDef_t *rect, float scale, vec4_t color) {
 		}
 
 	}
-}
+		}
 
 static void UI_DrawKeyBindStatus(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 //	int ofs = 0; TTimo: unused
@@ -2403,7 +2407,7 @@ static void UI_DrawKeyBindStatus(rectDef_t *rect, float scale, vec4_t color, int
 	} else {
 		Text_Paint(rect->x, rect->y, scale, color, "Press ENTER or CLICK to change, Press BACKSPACE to clear", 0, 0, textStyle);
 	}
-}
+		}
 
 static void UI_DrawGLInfo(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	char * eptr;
@@ -2450,7 +2454,7 @@ static void UI_DrawGLInfo(rectDef_t *rect, float scale, vec4_t color, int textSt
 	}
 
 
-}
+		}
 
 // FIXME: table drive
 //
@@ -2619,7 +2623,7 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
       break;
   }
 
-}
+		}
 
 static qboolean UI_OwnerDrawVisible(int flags) {
 	qboolean vis = qtrue;
@@ -2731,7 +2735,7 @@ static qboolean UI_OwnerDrawVisible(int flags) {
 		}
 	}
   return vis;
-}
+		}
 
 static qboolean UI_Handicap_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2751,7 +2755,7 @@ static qboolean UI_Handicap_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_Effects_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2772,7 +2776,7 @@ static qboolean UI_Effects_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_ClanName_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2799,7 +2803,7 @@ static qboolean UI_ClanName_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_GameType_HandleKey(int flags, float *special, int key, qboolean resetMap) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2838,7 +2842,7 @@ static qboolean UI_GameType_HandleKey(int flags, float *special, int key, qboole
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_NetGameType_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2863,7 +2867,7 @@ static qboolean UI_NetGameType_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_JoinGameType_HandleKey(int flags, float *special, int key) {
 	if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2885,7 +2889,7 @@ static qboolean UI_JoinGameType_HandleKey(int flags, float *special, int key) {
 		return qtrue;
 	}
 	return qfalse;
-}
+		}
 
 
 
@@ -2909,7 +2913,7 @@ static qboolean UI_Skill_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_TeamName_HandleKey(int flags, float *special, int key, qboolean blue) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2933,7 +2937,7 @@ static qboolean UI_TeamName_HandleKey(int flags, float *special, int key, qboole
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_TeamMember_HandleKey(int flags, float *special, int key, qboolean blue, int num) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2967,7 +2971,7 @@ static qboolean UI_TeamMember_HandleKey(int flags, float *special, int key, qboo
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_NetSource_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -2996,7 +3000,7 @@ static qboolean UI_NetSource_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_NetFilter_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -3016,7 +3020,7 @@ static qboolean UI_NetFilter_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_OpponentName_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -3028,7 +3032,7 @@ static qboolean UI_OpponentName_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_BotName_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -3058,7 +3062,7 @@ static qboolean UI_BotName_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
   return qfalse;
-}
+		}
 
 static qboolean UI_BotSkill_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -3075,7 +3079,7 @@ static qboolean UI_BotSkill_HandleKey(int flags, float *special, int key) {
     return qtrue;
   }
 	return qfalse;
-}
+		}
 
 static qboolean UI_RedBlue_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -3083,7 +3087,7 @@ static qboolean UI_RedBlue_HandleKey(int flags, float *special, int key) {
 		return qtrue;
 	}
 	return qfalse;
-}
+		}
 
 static qboolean UI_Crosshair_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
@@ -3102,7 +3106,7 @@ static qboolean UI_Crosshair_HandleKey(int flags, float *special, int key) {
 		return qtrue;
 	}
 	return qfalse;
-}
+		}
 
 
 
@@ -3136,7 +3140,7 @@ static qboolean UI_SelectedPlayer_HandleKey(int flags, float *special, int key) 
 	 	trap_Cvar_Set( "cg_selectedPlayer", va("%d", selected));
 	}
 	return qfalse;
-}
+		}
 
 
 static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, int key) {
@@ -3211,12 +3215,12 @@ static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, 
   }
 
   return qfalse;
-}
+		}
 
 
 static float UI_GetValue(int ownerDraw) {
   return 0;
-}
+		}
 
 /*
 =================
@@ -3225,7 +3229,7 @@ UI_ServersQsortCompare
 */
 static int QDECL UI_ServersQsortCompare( const void *arg1, const void *arg2 ) {
 	return trap_LAN_CompareServers( ui_netSource.integer, uiInfo.serverStatus.sortKey, uiInfo.serverStatus.sortDir, *(int*)arg1, *(int*)arg2);
-}
+		}
 
 
 /*
@@ -3243,7 +3247,7 @@ void UI_ServersSort(int column, qboolean force) {
 
 	uiInfo.serverStatus.sortKey = column;
 	qsort( &uiInfo.serverStatus.displayServers[0], uiInfo.serverStatus.numDisplayServers, sizeof(int), UI_ServersQsortCompare);
-}
+		}
 
 /*
 static void UI_StartSinglePlayer() {
@@ -3282,7 +3286,7 @@ static void UI_StartSinglePlayer() {
 	}
 	
 
-}
+		}
 */
 
 /*
@@ -3313,7 +3317,7 @@ static void UI_LoadMods() {
 		}
 	}
 
-}
+		}
 
 
 /*
@@ -3337,7 +3341,66 @@ static void UI_LoadTeams() {
 		}
 	}
 
-}
+		}
+
+
+/*
+=============
+UI_LoadCountries
+
+Loads the country.txt table so dropdown feeders can enumerate country codes.
+=============
+*/
+static void UI_LoadCountries(void) {
+	char	*token;
+	char	*p;
+	char	*buff;
+
+	uiInfo.countryCount = 0;
+	buff = GetMenuBuffer("country.txt");
+	if (!buff) {
+		return;
+	}
+
+	p = buff;
+	while (1) {
+		token = COM_ParseExt(&p, qtrue);
+		if (!token || token[0] == '\0') {
+			break;
+		}
+
+		if (uiInfo.countryCount >= (int)(sizeof(uiInfo.countryList) / sizeof(uiInfo.countryList[0]))) {
+			break;
+		}
+
+		uiInfo.countryList[uiInfo.countryCount++] = String_Alloc(token);
+	}
+		}
+
+
+/*
+============
+UI_ValidateCountryCode
+
+Returns a table-backed country code or a safe default when the provided code
+is empty or unknown.
+============
+*/
+static const char *UI_ValidateCountryCode(const char *code) {
+	int i;
+
+	if (!code || !code[0]) {
+		return (uiInfo.countryCount > 0) ? uiInfo.countryList[0] : "";
+	}
+
+	for (i = 0; i < uiInfo.countryCount; i++) {
+		if (Q_stricmp(code, uiInfo.countryList[i]) == 0) {
+			return uiInfo.countryList[i];
+		}
+	}
+
+	return (uiInfo.countryCount > 0) ? uiInfo.countryList[0] : code;
+		}
 
 
 /*
@@ -3368,7 +3431,7 @@ static void UI_LoadMovies() {
 		}
 	}
 
-}
+		}
 
 
 
@@ -3405,7 +3468,7 @@ static void UI_LoadDemos() {
 		}
 	}
 
-}
+		}
 
 
 static qboolean UI_SetNextMap(int actual, int index) {
@@ -3417,7 +3480,7 @@ static qboolean UI_SetNextMap(int actual, int index) {
 		}
 	}
 	return qfalse;
-}
+		}
 
 
 static void UI_StartSkirmish(qboolean next) {
@@ -3508,7 +3571,7 @@ static void UI_StartSkirmish(qboolean next) {
 	if (g >= GT_TEAM ) {
 		trap_Cmd_ExecuteText( EXEC_APPEND, "wait 5; team Red\n" );
 	}
-}
+		}
 
 static void UI_Update(const char *name) {
 	int	val = trap_Cvar_VariableValue(name);
@@ -3629,7 +3692,7 @@ static void UI_Update(const char *name) {
 			trap_Cvar_SetValue( "m_pitch", -0.022f );
 		}
 	}
-}
+		}
 
 static void UI_RunMenuScript(char **args) {
 	const char *name, *name2;
@@ -4031,10 +4094,10 @@ static void UI_RunMenuScript(char **args) {
 			Com_Printf("unknown UI script %s\n", name);
 		}
 	}
-}
+		}
 
 static void UI_GetTeamColor(vec4_t *color) {
-}
+		}
 
 /*
 ==================
@@ -4065,7 +4128,7 @@ static int UI_MapCountByGameType(qboolean singlePlayer) {
 		}
 	}
 	return c;
-}
+		}
 
 qboolean UI_hasSkinForBase(const char *base, const char *team) {
 	char	test[1024];
@@ -4081,7 +4144,7 @@ qboolean UI_hasSkinForBase(const char *base, const char *team) {
 		return qtrue;
 	}
 	return qfalse;
-}
+		}
 
 /*
 ==================
@@ -4140,7 +4203,7 @@ static int UI_HeadCountByTeam() {
 		}
 	}
 	return c;
-}
+		}
 
 /*
 ==================
@@ -4159,7 +4222,7 @@ static void UI_InsertServerIntoDisplayList(int num, int position) {
 		uiInfo.serverStatus.displayServers[i] = uiInfo.serverStatus.displayServers[i-1];
 	}
 	uiInfo.serverStatus.displayServers[position] = num;
-}
+		}
 
 /*
 ==================
@@ -4178,7 +4241,7 @@ static void UI_RemoveServerFromDisplayList(int num) {
 			return;
 		}
 	}
-}
+		}
 
 /*
 ==================
@@ -4217,7 +4280,7 @@ static void UI_BinaryServerInsertion(int num) {
 		offset++;
 	}
 	UI_InsertServerIntoDisplayList(num, offset);
-}
+		}
 
 /*
 ==================
@@ -4341,7 +4404,7 @@ static void UI_BuildServerDisplayList(qboolean force) {
 //		UI_StopServerRefresh();
 //		uiInfo.serverStatus.nextDisplayRefresh = 0;
 	}
-}
+		}
 
 typedef struct
 {
@@ -4395,7 +4458,7 @@ static void UI_SortServerStatusInfo( serverStatusInfo_t *info ) {
 			}
 		}
 	}
-}
+		}
 
 /*
 ==================
@@ -4493,7 +4556,7 @@ static int UI_GetServerStatusInfo( const char *serverAddress, serverStatusInfo_t
 		return qtrue;
 	}
 	return qfalse;
-}
+		}
 
 /*
 ==================
@@ -4511,7 +4574,7 @@ static char *stristr(char *str, char *charset) {
 		str++;
 	}
 	return NULL;
-}
+	}
 
 /*
 ==================
@@ -4650,7 +4713,7 @@ static void UI_BuildFindPlayerList(qboolean force) {
 		// show the server status info for the selected server
 		UI_FeederSelection(FEEDER_FINDPLAYER, uiInfo.currentFoundPlayerServer);
 	}
-}
+		}
 
 /*
 ==================
@@ -4687,7 +4750,7 @@ static void UI_BuildServerStatus(qboolean force) {
 	else {
 		uiInfo.nextServerStatusRefresh = uiInfo.uiDC.realTime + 500;
 	}
-}
+		}
 
 /*
 ==================
@@ -4733,34 +4796,58 @@ static int UI_FeederCount(float feederID) {
 		}
 		return uiInfo.myTeamCount;
 	} else if (feederID == FEEDER_MODS) {
-		return uiInfo.modCount;
-		} else if (feederID == FEEDER_DEMOS) {
-		return uiInfo.demoCount;
-			} else if (feederID == FEEDER_MATCHSUMMARY_END
-		|| feederID == FEEDER_MATCHSUMMARY_RED
-		|| feederID == FEEDER_MATCHSUMMARY_BLUE) {
-		uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
-		return (list) ? list->entryCount : 0;
-	}
-	return 0;
-}
-
-static const char *UI_SelectedMap(int index, int *actual) {
-	int i, c;
-	c = 0;
-	*actual = 0;
-	for (i = 0; i < uiInfo.mapCount; i++) {
-		if (uiInfo.mapList[i].active) {
-			if (c == index) {
-				*actual = i;
-				return uiInfo.mapList[i].mapName;
+		if (index >= 0 && index < uiInfo.modCount) {
+			if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
+				return uiInfo.modList[index].modDescr;
 			} else {
-				c++;
+				return uiInfo.modList[index].modName;
+			}
+		}
+	} else if (feederID == FEEDER_CINEMATICS) {
+		if (index >= 0 && index < uiInfo.movieCount) {
+			return uiInfo.movieList[index];
+		}
+	} else if (feederID == FEEDER_DEMOS) {
+		if (index >= 0 && index < uiInfo.demoCount) {
+			return uiInfo.demoList[index];
+		}
+	} else if (feederID == FEEDER_COUNTRIES) {
+		if (index >= 0 && index < uiInfo.countryCount) {
+			return uiInfo.countryList[index];
+		}
+	} else if (feederID == FEEDER_MATCHSUMMARY_END
+		|| feederID == FEEDER_MATCHSUMMARY_RED
+		|| feederID == FEEDER_MATCHSUMMARY_BLUE
+		|| feederID == FEEDER_ENDSCOREBOARD
+		|| feederID == FEEDER_REDTEAM_STATS
+		|| feederID == FEEDER_BLUETEAM_STATS
+		|| feederID == FEEDER_REDTEAM_LIST
+		|| feederID == FEEDER_BLUETEAM_LIST
+		|| feederID == FEEDER_SCOREBOARD) {
+		uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
+		if (list && index >= 0 && index < list->entryCount) {
+			uiMatchPlayerInfo_t *entry = &list->entries[index];
+			switch (column) {
+				case 0:
+					return entry->country;
+				case 1:
+					Com_sprintf(matchSummaryScore, sizeof(matchSummaryScore), "%i", entry->score);
+					return matchSummaryScore;
+				case 2:
+					Com_sprintf(matchSummaryRank, sizeof(matchSummaryRank), "%i", entry->rank);
+					return matchSummaryRank;
+				case 3:
+					return UI_MatchSummaryTeamString(entry->team);
+				case 4:
+					Com_sprintf(matchSummaryClient, sizeof(matchSummaryClient), "%i", entry->clientNum);
+					return matchSummaryClient;
+				default:
+					return entry->name;
 			}
 		}
 	}
 	return "";
-}
+		}
 
 static const char *UI_SelectedHead(int index, int *actual) {
 	int i, c;
@@ -4777,7 +4864,7 @@ static const char *UI_SelectedHead(int index, int *actual) {
 		}
 	}
 	return "";
-}
+		}
 
 /*
 =============
@@ -4801,7 +4888,7 @@ static int UI_GetIndexFromSelection(int actual) {
 	}
 
 	return 0;
-}
+		}
 
 static qboolean ui_callvotePresetInFlight = qfalse;
 
@@ -4819,7 +4906,7 @@ static void UI_ClearCallvotePresetState(void) {
 	ui_cvPresetRotation.integer = -1;
 	ui_cvPresetGametype.integer = -1;
 	ui_cvPresetActive.integer = 0;
-}
+		}
 
 /*
 =============
@@ -4843,7 +4930,7 @@ static void UI_SetCallvotePresetState(int rotationIndex, const mapRotationInfo_t
 	ui_cvPresetRotation.integer = rotationIndex;
 	ui_cvPresetGametype.integer = gametype;
 	ui_cvPresetActive.integer = 1;
-}
+		}
 
 /*
 =============
@@ -4861,7 +4948,7 @@ static int UI_GetPresetRotationIndex(void) {
 	}
 
 	return index;
-}
+		}
 
 /*
 =============
@@ -4893,7 +4980,7 @@ static int UI_GetFilteredCallvoteGametype(void) {
 	}
 
 	return gametype;
-}
+		}
 
 /*
 =============
@@ -4961,7 +5048,7 @@ static int UI_ParseCallvoteGametypeToken(const char *token) {
 	}
 
 	return -1;
-}
+		}
 
 /*
 =============
@@ -4992,7 +5079,7 @@ static int UI_GetCallvoteRotationGametype(const mapRotationInfo_t *rotation) {
 	}
 
 	return -1;
-}
+		}
 
 /*
 =============
@@ -5018,7 +5105,7 @@ static qboolean UI_RotationMatchesGametype(const mapRotationInfo_t *rotation, in
 	}
 
 	return (entryGametype == gametype) ? qtrue : qfalse;
-}
+		}
 
 /*
 =============
@@ -5041,7 +5128,7 @@ static int UI_CountVisibleCallvoteRotations(void) {
 	}
 
 	return count;
-}
+		}
 
 /*
 =============
@@ -5072,7 +5159,7 @@ static int UI_GetCallvoteRotationIndexFromDisplayRow(int row) {
 	}
 
 	return -1;
-}
+		}
 
 /*
 =============
@@ -5103,7 +5190,7 @@ static int UI_GetCallvoteDisplayRowForRotation(int rotationIndex) {
 	}
 
 	return -1;
-}
+		}
 
 /*
 =============
@@ -5124,7 +5211,7 @@ static const mapRotationInfo_t *UI_GetCallvoteRotationEntryForDisplay(int index,
 	}
 
 	return &uiInfo.mapRotations[actual];
-}
+		}
 
 /*
 =============
@@ -5158,7 +5245,7 @@ static void UI_SetCurrentNetMap(int mapIndex) {
 
 	uiInfo.mapList[mapIndex].cinematic = trap_CIN_PlayCinematic(
 		va("%s.roq", uiInfo.mapList[mapIndex].mapLoadName), 0, 0, 0, 0, (CIN_loop | CIN_silent));
-}
+		}
 
 /*
 =============
@@ -5189,7 +5276,7 @@ static void UI_SelectCallvoteRotation(int rotationIndex) {
 
 	uiInfo.callvoteRotationIndex = rotationIndex;
 	UI_SetCurrentNetMap(mapIndex);
-}
+		}
 
 
 /*
@@ -5237,7 +5324,7 @@ static void UI_HandleCallvoteMapPreviewScript(void) {
 	}
 
 	Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, 0, NULL);
-}
+		}
 
 
 /*
@@ -5259,7 +5346,7 @@ static void UI_HandleCallvotePresetScript(void) {
 	}
 
 	UI_SetCallvotePresetState(rotationIndex, rotation);
-}
+		}
 
 
 
@@ -5271,7 +5358,7 @@ static void UI_UpdatePendingPings() {
 	uiInfo.serverStatus.refreshActive = qtrue;
 	uiInfo.serverStatus.refreshtime = uiInfo.uiDC.realTime + 1000;
 
-}
+		}
 
 static const char *UI_FeederItemText(float feederID, int index, int column, qhandle_t *handle) {
 	static char info[MAX_STRING_CHARS];
@@ -5400,47 +5487,59 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 		if (index >= 0 && index < uiInfo.myTeamCount) {
 			return uiInfo.teamNames[index];
 		}
-	} else if (feederID == FEEDER_MODS) {
-		if (index >= 0 && index < uiInfo.modCount) {
-			if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
-				return uiInfo.modList[index].modDescr;
-			} else {
-				return uiInfo.modList[index].modName;
-			}
-		}
-	} else if (feederID == FEEDER_CINEMATICS) {
-		if (index >= 0 && index < uiInfo.movieCount) {
-			return uiInfo.movieList[index];
-		}
-	} else if (feederID == FEEDER_DEMOS) {
-		if (index >= 0 && index < uiInfo.demoCount) {
-			return uiInfo.demoList[index];
-		}
-} else if (feederID == FEEDER_MATCHSUMMARY_END
-		|| feederID == FEEDER_MATCHSUMMARY_RED
-		|| feederID == FEEDER_MATCHSUMMARY_BLUE) {
-		uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
-		if (list && index >= 0 && index < list->entryCount) {
-			uiMatchPlayerInfo_t *entry = &list->entries[index];
-			switch (column) {
-				case 1:
-					Com_sprintf(matchSummaryScore, sizeof(matchSummaryScore), "%i", entry->score);
-					return matchSummaryScore;
-				case 2:
-					Com_sprintf(matchSummaryRank, sizeof(matchSummaryRank), "%i", entry->rank);
-					return matchSummaryRank;
-				case 3:
-					return UI_MatchSummaryTeamString(entry->team);
-				case 4:
-					Com_sprintf(matchSummaryClient, sizeof(matchSummaryClient), "%i", entry->clientNum);
-					return matchSummaryClient;
-				default:
-					return entry->name;
-			}
-		}
-	}
-	return "";
+} else if (feederID == FEEDER_MODS) {
+if (index >= 0 && index < uiInfo.modCount) {
+if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
+	return uiInfo.modList[index].modDescr;
+} else {
+	return uiInfo.modList[index].modName;
 }
+}
+	} else if (feederID == FEEDER_CINEMATICS) {
+	if (index >= 0 && index < uiInfo.movieCount) {
+	return uiInfo.movieList[index];
+}
+	} else if (feederID == FEEDER_DEMOS) {
+	if (index >= 0 && index < uiInfo.demoCount) {
+	return uiInfo.demoList[index];
+}
+	} else if (feederID == FEEDER_COUNTRIES) {
+	if (index >= 0 && index < uiInfo.countryCount) {
+	return uiInfo.countryList[index];
+}
+	} else if (feederID == FEEDER_MATCHSUMMARY_END
+	|| feederID == FEEDER_MATCHSUMMARY_RED
+	|| feederID == FEEDER_MATCHSUMMARY_BLUE
+	|| feederID == FEEDER_ENDSCOREBOARD
+	|| feederID == FEEDER_REDTEAM_STATS
+	|| feederID == FEEDER_BLUETEAM_STATS
+	|| feederID == FEEDER_REDTEAM_LIST
+	|| feederID == FEEDER_BLUETEAM_LIST
+	|| feederID == FEEDER_SCOREBOARD) {
+	uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
+	if (list && index >= 0 && index < list->entryCount) {
+	uiMatchPlayerInfo_t *entry = &list->entries[index];
+	switch (column) {
+	case 0:
+	return entry->country;
+	case 1:
+Com_sprintf(matchSummaryScore, sizeof(matchSummaryScore), "%i", entry->score);
+return matchSummaryScore;
+case 2:
+Com_sprintf(matchSummaryRank, sizeof(matchSummaryRank), "%i", entry->rank);
+return matchSummaryRank;
+case 3:
+return UI_MatchSummaryTeamString(entry->team);
+case 4:
+Com_sprintf(matchSummaryClient, sizeof(matchSummaryClient), "%i", entry->clientNum);
+return matchSummaryClient;
+default:
+return entry->name;
+}
+}
+}
+return "";
+		}
 
 
 static qhandle_t UI_FeederItemImage(float feederID, int index) {
@@ -5480,7 +5579,7 @@ static qhandle_t UI_FeederItemImage(float feederID, int index) {
 		}
 	}
   return 0;
-}
+		}
 
 static void UI_FeederSelection(float feederID, int index) {
 	static char info[MAX_STRING_CHARS];
@@ -5584,23 +5683,33 @@ static void UI_FeederSelection(float feederID, int index) {
 		  trap_CIN_StopCinematic(uiInfo.previewMovie);
 		}
 		uiInfo.previewMovie = -1;
-	} else if (feederID == FEEDER_DEMOS) {
-		uiInfo.demoIndex = index;
-	} else if (feederID == FEEDER_MATCHSUMMARY_END
-		|| feederID == FEEDER_MATCHSUMMARY_RED
-		|| feederID == FEEDER_MATCHSUMMARY_BLUE) {
-		uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
-		if (list && index >= 0 && index < list->entryCount) {
-			if (feederID == FEEDER_MATCHSUMMARY_END) {
-				uiInfo.currentMatchSummaryEnd = index;
-			} else if (feederID == FEEDER_MATCHSUMMARY_RED) {
-				uiInfo.currentMatchSummaryRed = index;
-			} else {
-				uiInfo.currentMatchSummaryBlue = index;
-			}
-		}
-	}
+} else if (feederID == FEEDER_DEMOS) {
+uiInfo.demoIndex = index;
+} else if (feederID == FEEDER_COUNTRIES) {
+if (index >= 0 && index < uiInfo.countryCount) {
+trap_Cvar_Set("ui_country", uiInfo.countryList[index]);
 }
+} else if (feederID == FEEDER_MATCHSUMMARY_END
+|| feederID == FEEDER_MATCHSUMMARY_RED
+|| feederID == FEEDER_MATCHSUMMARY_BLUE
+|| feederID == FEEDER_ENDSCOREBOARD
+|| feederID == FEEDER_REDTEAM_STATS
+|| feederID == FEEDER_BLUETEAM_STATS
+|| feederID == FEEDER_REDTEAM_LIST
+|| feederID == FEEDER_BLUETEAM_LIST
+|| feederID == FEEDER_SCOREBOARD) {
+uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
+if (list && index >= 0 && index < list->entryCount) {
+if (feederID == FEEDER_MATCHSUMMARY_END) {
+uiInfo.currentMatchSummaryEnd = index;
+} else if (feederID == FEEDER_MATCHSUMMARY_RED) {
+uiInfo.currentMatchSummaryRed = index;
+} else {
+uiInfo.currentMatchSummaryBlue = index;
+}
+}
+	}
+		}
 
 static qboolean Team_Parse(char **p) {
   char *token;
@@ -5660,7 +5769,7 @@ static qboolean Team_Parse(char **p) {
   }
 
   return qfalse;
-}
+		}
 
 static qboolean Character_Parse(char **p) {
   char *token;
@@ -5716,7 +5825,7 @@ static qboolean Character_Parse(char **p) {
   }
 
   return qfalse;
-}
+		}
 
 
 static qboolean Alias_Parse(char **p) {
@@ -5760,7 +5869,7 @@ static qboolean Alias_Parse(char **p) {
   }
 
   return qfalse;
-}
+		}
 
 
 
@@ -5810,7 +5919,7 @@ static void UI_ParseTeamInfo(const char *teamFile) {
 
   }
 
-}
+		}
 
 
 static qboolean GameType_Parse(char **p, qboolean join) {
@@ -5872,7 +5981,7 @@ static qboolean GameType_Parse(char **p, qboolean join) {
 		}
 	}
 	return qfalse;
-}
+		}
 
 static qboolean MapList_Parse(char **p) {
 	char *token;
@@ -5936,7 +6045,7 @@ static qboolean MapList_Parse(char **p) {
 		}
 	}
 	return qfalse;
-}
+		}
 
 static void UI_ParseGameInfo(const char *teamFile) {
 	char	*token;
@@ -5985,7 +6094,7 @@ static void UI_ParseGameInfo(const char *teamFile) {
 		}
 
 	}
-}
+		}
 
 /*
 =============
@@ -6005,7 +6114,7 @@ static void UI_Pause(qboolean b) {
 		trap_Key_ClearStates();
 		trap_Cvar_Set( "cl_paused", "0" );
 	}
-}
+		}
 
 
 /*
@@ -6024,7 +6133,7 @@ static qhandle_t UI_LauncherPlayCinematic(const char *name, qboolean loop, int w
 	}
 
 	return trap_CIN_PlayCinematic(name, 0, 0, width, height, flags);
-}
+		}
 
 /*
 =============
@@ -6035,7 +6144,7 @@ Fallback UI cinematic helper for silent looping playback without shader registra
 */
 static int UI_PlayCinematic(const char *name, float x, float y, float w, float h) {
 	return trap_CIN_PlayCinematic(name, x, y, w, h, (CIN_loop | CIN_silent));
-}
+		}
 
 /*
 =============
@@ -6067,7 +6176,7 @@ static void UI_StopCinematic(int handle) {
 			}
 		}
 	}
-}
+		}
 
 
 /*
@@ -6078,7 +6187,7 @@ UI_DrawCinematic
 static void UI_DrawCinematic(int handle, float x, float y, float w, float h) {
 	trap_CIN_SetExtents(handle, x, y, w, h);
 	trap_CIN_DrawCinematic(handle);
-}
+		}
 
 /*
 =============
@@ -6087,7 +6196,7 @@ UI_RunCinematicFrame
 */
 static void UI_RunCinematicFrame(int handle) {
 	trap_CIN_RunCinematic(handle);
-}
+		}
 
 
 
@@ -6158,7 +6267,7 @@ static void UI_BuildQ3Model_List( void )
 		}
 	}	
 
-}
+		}
 
 
 
@@ -6258,9 +6367,12 @@ void _UI_Init( qboolean inGameLoad ) {
 
 	start = trap_Milliseconds();
 
-  uiInfo.teamCount = 0;
-  uiInfo.characterCount = 0;
-  uiInfo.aliasCount = 0;
+	uiInfo.teamCount = 0;
+	uiInfo.characterCount = 0;
+	uiInfo.aliasCount = 0;
+	uiInfo.countryCount = 0;
+
+	UI_LoadCountries();
 
 #ifdef PRE_RELEASE_TADEMO
 	UI_ParseTeamInfo("demoteaminfo.txt");
@@ -6314,7 +6426,7 @@ void _UI_Init( qboolean inGameLoad ) {
 	trap_Cvar_Register(NULL, "debug_protocol", "", 0 );
 
 	trap_Cvar_Set("ui_actualNetGameType", va("%d", ui_netGameType.integer));
-}
+		}
 
 
 /*
@@ -6342,7 +6454,7 @@ void _UI_KeyEvent( int key, qboolean down ) {
   //if ((s > 0) && (s != menu_null_sound)) {
 	//  trap_S_StartLocalSound( s, CHAN_LOCAL_SOUND );
   //}
-}
+		}
 
 /*
 =================
@@ -6370,7 +6482,7 @@ void _UI_MouseEvent( int dx, int dy )
 		Display_MouseMove(NULL, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory);
   }
 
-}
+		}
 
 void UI_LoadNonIngame() {
         const char *menuSet = UI_Cvar_VariableString("ui_menuFiles");
@@ -6381,7 +6493,7 @@ void UI_LoadNonIngame() {
         UI_LoadMenus(menuSet, qfalse);
         UI_LoadMenus(UI_DefaultIngameFile(), qfalse);
         uiInfo.inGameLoad = qfalse;
-}
+		}
 
 void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 	char buf[256];
@@ -6456,11 +6568,11 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		  return;
 	  }
   }
-}
+		}
 
 qboolean _UI_IsFullscreen( void ) {
 	return Menus_AnyFullScreenVisible();
-}
+		}
 
 
 
@@ -6482,7 +6594,7 @@ static void UI_ReadableSize ( char *buf, int bufsize, int value )
 	} else { // bytes
 		Com_sprintf( buf, bufsize, "%d bytes", value );
 	}
-}
+		}
 
 // Assumes time is in msec
 static void UI_PrintTime ( char *buf, int bufsize, int time ) {
@@ -6495,12 +6607,12 @@ static void UI_PrintTime ( char *buf, int bufsize, int time ) {
 	} else  { // secs
 		Com_sprintf( buf, bufsize, "%d sec", time );
 	}
-}
+		}
 
 void Text_PaintCenter(float x, float y, float scale, vec4_t color, const char *text, float adjust) {
 	int len = Text_Width(text, scale, 0);
 	Text_Paint(x - len / 2, y, scale, color, text, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE);
-}
+		}
 
 void Text_PaintCenter_AutoWrapped(float x, float y, float xmax, float ystep, float scale, vec4_t color, const char *str, float adjust) {
 	int width;
@@ -6556,7 +6668,7 @@ void Text_PaintCenter_AutoWrapped(float x, float y, float xmax, float ystep, flo
 			}
 		}
 	}
-}
+		}
 
 static void UI_DisplayDownloadInfo( const char *downloadName, float centerPoint, float yStart, float scale ) {
 	static char dlText[]	= "Downloading:";
@@ -6625,7 +6737,7 @@ static void UI_DisplayDownloadInfo( const char *downloadName, float centerPoint,
 			Text_PaintCenter(leftWidth, yStart+272, scale, colorWhite, va("%s/Sec", xferRateBuf), 0);
 		}
 	}
-}
+		}
 
 /*
 ========================
@@ -6719,7 +6831,7 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 	}
 
 	// password required / connection rejected information goes here
-}
+		}
 
 
 /*
@@ -7014,7 +7126,7 @@ void UI_RegisterCvars( void ) {
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Register( cv->vmCvar, cv->cvarName, cv->defaultString, cv->cvarFlags );
 	}
-}
+		}
 
 /*
 =================
@@ -7028,7 +7140,7 @@ void UI_UpdateCvars( void ) {
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Update( cv->vmCvar );
 	}
-}
+		}
 
 
 /*
@@ -7060,7 +7172,7 @@ void UI_StopServerRefresh( void )
 						(int) trap_Cvar_VariableValue("cl_maxPing"));
 	}
 
-}
+		}
 
 /*
 =================
@@ -7114,7 +7226,7 @@ static void UI_DoServerRefresh( void )
 	}
 	//
 	UI_BuildServerDisplayList(qfalse);
-}
+		}
 
 /*
 =================
@@ -7173,5 +7285,5 @@ static void UI_StartServerRefresh(qboolean full)
 			trap_Cmd_ExecuteText( EXEC_NOW, va( "globalservers %d %d full empty\n", i, (int)trap_Cvar_VariableValue( "protocol" ) ) );
 		}
 	}
-}
+		}
 
