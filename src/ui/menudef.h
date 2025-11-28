@@ -453,6 +453,7 @@
 #define	CG_RED_FLAGSTATUS					283						
 #define	CG_RED_SCORE						284						
 #define	CG_RED_NAME							285						
+// Quake Live round-based and Domination HUD overlays
 #define	CG_RED_OWNED_FLAGS					286						
 #define	CG_RED_AVG_PING						287						
 #define	CG_RED_BASESTATUS					288						

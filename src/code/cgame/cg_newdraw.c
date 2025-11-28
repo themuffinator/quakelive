@@ -2948,6 +2948,111 @@ static void CG_DrawTeamTimeoutCount(rectDef_t *rect, float scale, vec4_t color, 
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
+
+/*
+=============
+CG_ClampTeamValue
+
+Normalizes potentially invalid team numbers for HUD calculations.
+=============
+*/
+static team_t CG_ClampTeamValue( int value ) {
+	if ( value >= TEAM_RED && value <= TEAM_SPECTATOR ) {
+		return (team_t)value;
+	}
+
+	return TEAM_FREE;
+}
+
+/*
+=============
+CG_GetRoundTeamCount
+
+Returns the round-based team count, falling back to the roster size.
+=============
+*/
+static int CG_GetRoundTeamCount( team_t team ) {
+	int	count;
+
+	if ( team <= TEAM_FREE || team >= TEAM_NUM_TEAMS ) {
+		return 0;
+	}
+
+	count = cgs.matchTeamCount[team];
+	if ( count > 0 ) {
+		return count;
+	}
+
+	return CG_CountPlayersForTeam( team );
+}
+
+/*
+=============
+CG_DrawClanArenaPlayers
+
+Displays the remaining player count for round-based team modes.
+=============
+*/
+static void CG_DrawClanArenaPlayers(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team) {
+	char	buffer[64];
+	int		count;
+
+	count = CG_GetRoundTeamCount( team );
+	Com_sprintf( buffer, sizeof( buffer ), "%s players %i", CG_GetTeamLabel( team ), count );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
+/*
+=============
+CG_CountDominationOwnedFlags
+
+Counts Domination capture points owned by the specified team.
+=============
+*/
+static int CG_CountDominationOwnedFlags( team_t team ) {
+	int		owned;
+	int		index;
+	centity_t	*cent;
+
+	if ( cgs.gametype != GT_DOMINATION || !cg.snap ) {
+		return 0;
+	}
+
+	owned = 0;
+	for ( index = 0; index < cg.snap->numEntities; index++ ) {
+		cent = &cg_entities[cg.snap->entities[index].number];
+		if ( cent->currentState.eType != ET_TEAM ) {
+			continue;
+		}
+
+		if ( CG_ClampTeamValue( cent->currentState.modelindex ) == team ) {
+			owned++;
+		}
+	}
+
+	return owned;
+}
+
+/*
+=============
+CG_DrawDominationOwnedFlags
+
+Renders the number of Domination points controlled by a team.
+=============
+*/
+static void CG_DrawDominationOwnedFlags(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team) {
+	char	buffer[64];
+	int		owned;
+
+	if ( team <= TEAM_FREE || team >= TEAM_NUM_TEAMS ) {
+		return;
+	}
+
+	owned = CG_CountDominationOwnedFlags( team );
+	Com_sprintf( buffer, sizeof( buffer ), "%s flags %i", CG_GetTeamLabel( team ), owned );
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+}
+
 /*
 =============
 CG_DrawTeamAveragePing
@@ -5861,6 +5966,18 @@ break;
 		break;
   case CG_BLUE_PLAYER_COUNT:
 		CG_DrawTeamPlayerCount(&rect, scale, color, textStyle, TEAM_BLUE);
+		break;
+	case CG_RED_CLAN_PLYRS:
+		CG_DrawClanArenaPlayers(&rect, scale, color, textStyle, TEAM_RED);
+		break;
+	case CG_BLUE_CLAN_PLYRS:
+		CG_DrawClanArenaPlayers(&rect, scale, color, textStyle, TEAM_BLUE);
+		break;
+	case CG_RED_OWNED_FLAGS:
+		CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_RED);
+		break;
+	case CG_BLUE_OWNED_FLAGS:
+		CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_BLUE);
 		break;
   case CG_RED_TIMEOUT_COUNT:
 		CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_RED);

@@ -8,6 +8,7 @@
 ## Owner-Draw Expansion Requirements
 - The classic UI currently defines owner-draw IDs only through `CG_CAPTURES` (69), with rendering handled in `cg_newdraw.c` via helpers like `CG_DrawRedScore` and `CG_DrawBlueScore` that only expose base scores.
 - Quake Live HUD scripts reference extended owner-draw IDs such as `CG_1ST_PLACE_SCORE` (84), `CG_RED_SCORE` (284), and `CG_BLUE_SCORE` (312). The listboxes expect detailed columns (SCORE, K/D, DMG, WEAP, TIME, PING) that `CG_DrawScoreboard` and its data structures do not yet supply.
+- Round-based overlays now map to Quake Live owner-draw IDs: `CG_RED_CLAN_PLYRS`/`CG_BLUE_CLAN_PLYRS` report the match state counts for Clan Arena, while `CG_RED_OWNED_FLAGS`/`CG_BLUE_OWNED_FLAGS` count Domination points directly from the ET_TEAM domination entities and render in `comp_hud.menu` without placeholder text.
 - Supporting these widgets will require expanding the owner-draw enum in `src/ui/menudef.h`, adding render handlers in `cg_newdraw.c`, and enriching the scoreboard data in `cg_scoreboard.c` so the listbox feeders can surface the extra statistics.
 
 ## Spectator Overlay Replacement Tasks
