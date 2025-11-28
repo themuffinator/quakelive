@@ -26,3 +26,17 @@ def test_ui_menu_defaults_use_existing_assets() -> None:
 
     for menu_file in (legacy_menu, legacy_ingame):
         assert (REPO_ROOT / "src" / menu_file).exists(), menu_file
+
+
+def test_ingame_hud_selector_includes_all_presets() -> None:
+    advanced_menu = (REPO_ROOT / "src/ui/ingame_options_advanced.menu").read_text(encoding="utf-8")
+
+    assert 'cvar "cg_hudfiles"' in advanced_menu
+
+    hud_cycle = re.search(
+        r"cvarStrList\s*{\s*Normal\s+\"ui/hud.txt\"\s+Small\s+\"ui/hud2.txt\"\s+Large\s+\"ui/hud3.txt\"\s*}\s*\n\s*rect",
+        advanced_menu,
+    )
+    assert hud_cycle, "HUD preset rotation should expose all three hud*.txt presets"
+
+    assert 'action { exec "loadhud" }' in advanced_menu
