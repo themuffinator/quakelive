@@ -3040,6 +3040,102 @@ static void CG_DrawSelectedPlayerBestWeapon(rectDef_t *rect, float scale, vec4_t
 
 /*
 =============
+CG_BuildOvertimeLabel
+
+Formats the overtime status string with the current round and remaining time if known.
+=============
+*/
+static qboolean CG_BuildOvertimeLabel( char *buffer, size_t bufferSize ) {
+	int		remaining;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	if ( !cgs.matchOvertimeActive ) {
+		return qfalse;
+	}
+
+	remaining = -1;
+	if ( cgs.matchOvertimeStartTime > 0 ) {
+		int		elapsed;
+
+		elapsed = ( cg.time - cgs.matchOvertimeStartTime + 500 ) / 1000;
+		if ( elapsed < 0 ) {
+			elapsed = 0;
+		}
+		if ( cgs.matchOvertimeLengthSeconds > 0 ) {
+			remaining = cgs.matchOvertimeLengthSeconds - elapsed;
+		} else if ( cgs.matchOvertimeEndTime > cg.time ) {
+			remaining = ( cgs.matchOvertimeEndTime - cg.time + 999 ) / 1000;
+		}
+	}
+
+	if ( remaining >= 0 ) {
+		if ( remaining < 0 ) {
+			remaining = 0;
+		}
+		Com_sprintf( buffer, bufferSize, "Overtime %i (%is)", cgs.matchOvertimeCount, remaining );
+	} else {
+		Com_sprintf( buffer, bufferSize, "Overtime %i", cgs.matchOvertimeCount );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_BuildSuddenDeathLabel
+
+Provides a sudden-death countdown or active tick summary for HUD elements.
+=============
+*/
+static qboolean CG_BuildSuddenDeathLabel( char *buffer, size_t bufferSize ) {
+	int		startSeconds;
+	int		tickSeconds;
+	int		elapsed;
+	int		suddenElapsed;
+	int		nextTick;
+	int		capSeconds;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	startSeconds = cgs.matchSuddenDeathStartSeconds;
+	tickSeconds = cgs.matchSuddenDeathTickSeconds;
+	if ( startSeconds <= 0 || tickSeconds <= 0 ) {
+		return qfalse;
+	}
+
+	elapsed = CG_GetScoreboardTimerSeconds();
+	if ( elapsed < startSeconds ) {
+		Com_sprintf( buffer, bufferSize, "Sudden death in %is", startSeconds - elapsed );
+		return qtrue;
+	}
+
+	suddenElapsed = elapsed - startSeconds;
+	capSeconds = cgs.matchSuddenDeathMaxSeconds;
+	if ( capSeconds > 0 && suddenElapsed > capSeconds ) {
+		suddenElapsed = capSeconds;
+	}
+
+	nextTick = tickSeconds - ( suddenElapsed % tickSeconds );
+	if ( capSeconds > 0 && suddenElapsed >= capSeconds ) {
+		nextTick = 0;
+	}
+
+	if ( nextTick > 0 ) {
+		Com_sprintf( buffer, bufferSize, "Sudden death +%is (next %is)", suddenElapsed, nextTick );
+	} else {
+		Com_sprintf( buffer, bufferSize, "Sudden death +%is", suddenElapsed );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
 CG_BuildMatchStateLabel
 
 Generates the textual description of the active match phase.
@@ -3062,8 +3158,11 @@ static void CG_BuildMatchStateLabel( char *buffer, size_t bufferSize, qboolean i
 		return;
 	}
 
-	if ( cgs.matchOvertimeActive ) {
-		Com_sprintf( buffer, bufferSize, "Overtime %i", cgs.matchOvertimeCount );
+	if ( CG_BuildOvertimeLabel( buffer, bufferSize ) ) {
+		return;
+	}
+
+	if ( CG_BuildSuddenDeathLabel( buffer, bufferSize ) ) {
 		return;
 	}
 
@@ -3357,18 +3456,16 @@ CG_FillRect(rect->x, rect->y, rect->w, rect->h, color);
 }
 
 static void CG_DrawLevelTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-int msec;
-int seconds;
-char buffer[32];
+	int		seconds;
+	char	buffer[32];
 
-msec = cg.time - cgs.levelStartTime;
-if (msec < 0) {
-msec = 0;
-}
+	seconds = CG_GetScoreboardTimerSeconds();
+	if ( seconds < 0 ) {
+		seconds = 0;
+	}
 
-seconds = msec / 1000;
-Com_sprintf(buffer, sizeof(buffer), "%02i:%02i", seconds / 60, seconds % 60);
-CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);
+	Com_sprintf( buffer, sizeof( buffer ), "%02i:%02i", seconds / 60, seconds % 60 );
+	CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 static void CG_DrawRoundTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {

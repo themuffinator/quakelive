@@ -163,7 +163,7 @@ static void CG_AppendHudScoreboardEntry( const score_t *score, const clientInfo_
 	entry->clientNum = score->client;
 	entry->score = score->score;
 	entry->ping = score->ping;
-	entry->time = score->time;
+	entry->time = CG_ScoreboardTimeSeconds( score );
 	entry->team = ci->team;
 	entry->spectator = ( ci->team == TEAM_SPECTATOR );
 	entry->localPlayer = ( cg.snap && score->client == cg.snap->ps.clientNum );
@@ -437,6 +437,75 @@ static void CG_FormatScoreboardTime( int timeSeconds, char *buffer, int bufferSi
 }
 
 /*
+=============
+CG_ClientRaceTimeSeconds
+
+Returns the race timer in seconds for the supplied client when available.
+=============
+*/
+static int CG_ClientRaceTimeSeconds( int clientNum ) {
+	const cgRaceClientStatus_t	*status;
+	int							elapsed;
+
+	if ( cgs.gametype != GT_SINGLE_PLAYER ) {
+		return -1;
+	}
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return -1;
+	}
+
+	status = &cgs.raceStatus[clientNum];
+	if ( !status->initialized ) {
+		return -1;
+	}
+
+	if ( status->currentElapsed >= 0 ) {
+		elapsed = status->currentElapsed;
+	} else if ( status->lastTime >= 0 ) {
+		elapsed = status->lastTime;
+	} else if ( status->bestTime >= 0 ) {
+		elapsed = status->bestTime;
+	} else {
+		return -1;
+	}
+
+	if ( elapsed < 0 ) {
+		elapsed = 0;
+	}
+
+	return ( elapsed + 500 ) / 1000;
+}
+
+/*
+=============
+CG_ScoreboardTimeSeconds
+
+Determines which timer value to display for the provided scoreboard entry.
+=============
+*/
+static int CG_ScoreboardTimeSeconds( const score_t *score ) {
+	int		raceTime;
+	int		timeValue;
+
+	if ( !score ) {
+		return 0;
+	}
+
+	raceTime = CG_ClientRaceTimeSeconds( score->client );
+	if ( raceTime >= 0 ) {
+		return raceTime;
+	}
+
+	timeValue = score->time;
+	if ( timeValue <= 0 ) {
+		timeValue = CG_GetScoreboardTimerSeconds();
+	}
+
+	return timeValue;
+}
+
+/*
 =================
 CG_DrawClientScore
 
@@ -536,12 +605,8 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 		}
 	}
 	// draw the score line
-	timeValue = score->time;
+	timeValue = CG_ScoreboardTimeSeconds( score );
 	if ( timersActive ) {
-		if ( timeValue <= 0 ) {
-			timeValue = CG_GetScoreboardTimerSeconds();
-		}
-
 		CG_FormatScoreboardTime( timeValue, timeString, sizeof( timeString ) );
 	} else {
 		timeString[0] = '\0';

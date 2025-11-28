@@ -112,19 +112,61 @@ const char	*CG_PlaceString( int rank ) {
 
 /*
 =============
+CG_MatchClockMilliseconds
+
+Returns the current match clock in milliseconds, clamping for timeouts,
+overtime, and sudden-death end caps.
+=============
+*/
+static int CG_MatchClockMilliseconds( void ) {
+	int		anchor;
+	int		now;
+	int		overtimeEnd;
+	int		suddenMax;
+
+	anchor = cgs.levelStartTime;
+	if ( anchor <= 0 ) {
+		return 0;
+	}
+
+	now = ( cgs.matchTimeoutActive && cgs.matchTimeoutExpireTime > 0 ) ? cgs.matchTimeoutExpireTime : cg.time;
+
+	overtimeEnd = cgs.matchOvertimeEndTime;
+	if ( cgs.matchOvertimeActive && !overtimeEnd && cgs.matchOvertimeStartTime > 0 && cgs.matchOvertimeLengthSeconds > 0 ) {
+		overtimeEnd = cgs.matchOvertimeStartTime + ( cgs.matchOvertimeLengthSeconds * 1000 );
+	}
+	if ( overtimeEnd > 0 && now > overtimeEnd ) {
+		now = overtimeEnd;
+	}
+
+	suddenMax = 0;
+	if ( cgs.matchSuddenDeathStartSeconds > 0 && cgs.matchSuddenDeathMaxSeconds > 0 ) {
+		suddenMax = cgs.levelStartTime + ( ( cgs.matchSuddenDeathStartSeconds + cgs.matchSuddenDeathMaxSeconds ) * 1000 );
+	}
+	if ( suddenMax > 0 && now > suddenMax ) {
+		now = suddenMax;
+	}
+
+	if ( now < anchor ) {
+		return 0;
+	}
+
+	return now - anchor;
+}
+
+/*
+=============
 CG_StartScoreboardTimer
 
 Begins tracking the scoreboard stopwatch so draw calls can format timer fields.
 =============
 */
 void CG_StartScoreboardTimer( int startTime ) {
-	if ( cg.scoreboardTimerRunning ) {
-		return;
-	}
+	(void)startTime;
 
 	cg.scoreboardTimerRunning = qtrue;
-	cg.scoreboardTimerStartTime = ( startTime > 0 ) ? startTime : cg.time;
-	cg.scoreboardTimerStopTime = 0;
+	cg.scoreboardTimerStartTime = CG_MatchClockMilliseconds();
+	cg.scoreboardTimerStopTime = cg.scoreboardTimerStartTime;
 }
 
 /*
@@ -137,15 +179,13 @@ Stops the scoreboard stopwatch and records the most recent checkpoint.
 void CG_StopScoreboardTimer( int stopTime ) {
 	int		anchor;
 
+	(void)stopTime;
+
 	if ( !cg.scoreboardTimerRunning ) {
 		return;
 	}
 
-	anchor = ( stopTime > 0 ) ? stopTime : cg.time;
-	if ( anchor < cg.scoreboardTimerStartTime ) {
-		anchor = cg.scoreboardTimerStartTime;
-	}
-
+	anchor = CG_MatchClockMilliseconds();
 	cg.scoreboardTimerStopTime = anchor;
 	cg.scoreboardTimerRunning = qfalse;
 }
@@ -158,19 +198,9 @@ Returns the stopwatch value in seconds for scoreboard formatting hooks.
 =============
 */
 int CG_GetScoreboardTimerSeconds( void ) {
-	int		endTime;
 	int		elapsed;
 
-	if ( cg.scoreboardTimerStartTime <= 0 ) {
-		return 0;
-	}
-
-	endTime = cg.scoreboardTimerRunning ? cg.time : cg.scoreboardTimerStopTime;
-	if ( endTime < cg.scoreboardTimerStartTime ) {
-		return 0;
-	}
-
-	elapsed = endTime - cg.scoreboardTimerStartTime;
+	elapsed = CG_MatchClockMilliseconds();
 	if ( elapsed < 0 ) {
 		return 0;
 	}

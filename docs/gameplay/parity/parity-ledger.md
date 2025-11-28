@@ -33,12 +33,17 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 - **HLIL reference:** Alignment validated against `references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md` and mirrored in `bg_pmove.c`/`bg_misc.c` defaults for release builds.
 - **Owner approval:** Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) acknowledged the capture review on 2024-09-22; status promoted to ✅ per the parity plan.
 
+### Race/CTF timer verification (2024-12-09)
+
+- **Evidence:** Replay notes in [`artifacts/tests/race-ctf-timer-verification.md`](../../artifacts/tests/race-ctf-timer-verification.md) capture scoreboard and HUD clocks staying aligned with race splits, CTF overtime rollovers, and sudden-death ticks.
+- **Approvals:** HUD Taskforce (@hud-taskforce) and QA Lead (@qa-automation) reviewed the demo timestamps and approved promoting the entry to ✅ after confirming timeout clamping and overtime sequencing matched the captured references.
+
 ## UI-Driven Gameplay Flags
 | Feature | Status | Source Modules | Reference | Owner |
 |---------|--------|----------------|-----------|-------|
 | Competitive rulesets (PQL/Classic/Standard) | ⚠️ In Progress | `src/code/game/g_main.c`, `src/code/ui/ui_gameinfo.c` | `references/hlil/quakelive/uix86.dll_split/UI_FeederSelection.md` | Rulesets (@ui-systems) |
 | Instagib mutator toggles | ✅ Complete | `src/code/game/g_weapons.c`, `src/code/game/bg_misc.c` | `references/hlil/quakelive/qagamex86.dll_split/FireWeapon.md` | Modes (@mutator-crew) |
-| Race/CTF timers | ❌ Not Started | `src/code/cgame/cg_scoreboard.c`, `src/code/cgame/cg_event.c` | `references/hlil/quakelive/cgamex86.dll_split/CG_DrawScoreboard.md` | HUD (@hud-taskforce) |
+| Race/CTF timers | ✅ Complete | `src/code/cgame/cg_scoreboard.c`, `src/code/cgame/cg_event.c`, `src/code/cgame/cg_newdraw.c` | `references/hlil/quakelive/cgamex86.dll_split/CG_DrawScoreboard.md`, `artifacts/tests/race-ctf-timer-verification.md` | HUD (@hud-taskforce) |
 | Item timer/training HUD overrides | ⚠️ In Progress | `docs/gameplay/cvars.md`, `src/game/tests/cosmetics_fixtures.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L1100-L1138` | Coaching UX (@hud-taskforce) |
 
 ## Entity Targets
