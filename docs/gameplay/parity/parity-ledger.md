@@ -16,7 +16,7 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 | Feature | Status | Source Modules | Reference | Owner |
 |---------|--------|----------------|-----------|-------|
 | Weapon balance deltas (damage, refire, ammo) | ✅ Complete | `src/code/game/bg_pmove.c`, `src/code/game/bg_misc.c` | `references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md` | Gameplay Systems (@gamedev-lead) |
-| Loadout unlock rules | ❌ Not Started | `src/code/game/g_items.c` | `references/hlil/quakelive/qagamex86.dll_split/g_items.md` | Progression (@live-ops) |
+| Loadout unlock rules | ✅ Complete | `src/code/game/g_items.c`, `src/code/game/g_client.c`, `src/code/game/g_local.h` | `references/hlil/quakelive/qagamex86.dll_split/g_items.md` | Progression (@live-ops) |
 | Physics adjustments (air control, stair smoothing) | ✅ Complete | `src/code/game/bg_pmove.c` | `references/hlil/quakelive/qagamex86.dll_split/PmoveSingle_*.md` | Movement (@physics-guild) |
 | Domination capture volumes & metadata entities | ✅ Complete | `src/code/game/g_trigger.c`, `src/code/game/g_team.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part01.txt†L39210-L39410` | Modes (@mutator-crew) |
 | Matchmaking skill scaling hooks | ✅ Complete | `src/code/game/g_active.c`, `src/code/game/g_client.c` | `references/hlil/quakelive/qagamex86.dll_split/g_active.md` | Backend Integrations (@services-team) |
@@ -43,6 +43,12 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
   | Ammo pickup + max stacks | Covered by the September demos only. | Harness baseline captures every pickup/max pair from `bg_weaponStats` and flags mismatches against the reference tables (none observed in the refreshed run).【F:tests/run_harnesses.py†L125-L183】【F:artifacts/tests/weapon_timings/qvm/baseline.json†L74-L162】 |
   | Capture set | `weapon-balance-2024-09-22-*` demos only. | Rocket, rail, and lightning scrims regenerated with documented seeds/commands for parity reviews.【F:artifacts/tests/weapon-balance-deltas.md†L1-L16】 |
 - **Approvals:** Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) reviewed the harness baseline and refreshed scrim instructions on 2025-03-15; status remains ✅ with CI artefacts now attached for ongoing parity checks.
+
+### Loadout unlock verification (2025-05-17)
+
+- **Unlock mapping:** `g_items.c` mirrors the HLIL unlock tier table for all weapon and kamikaze entries so pickup gating uses the same progression thresholds as Quake Live.【F:references/hlil/quakelive/qagamex86.dll_split/g_items.md†L1-L55】【F:src/code/game/g_items.c†L146-L199】
+- **Pickup gating + progression:** Item touches now block pickups unless the client carries the required unlock flag/tier and advance the persistent progression counters after a successful grab, matching the DLL’s reward flow.【F:src/code/game/g_items.c†L203-L265】【F:src/code/game/g_local.h†L686-L715】【F:src/code/game/g_client.c†L52-L82】
+- **Validation:** Factory loadout regression tests covering the practice and tournament presets (and spawn timing) pass in the deterministic match-sim harness, confirming loadout metadata still feeds inventories while unlock gating is active.【F:tests/test_match_sim_harness.py†L355-L405】【e8058e†L1-L9】
 
 ### Race/CTF timer verification (2024-12-09)
 
