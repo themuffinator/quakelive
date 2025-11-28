@@ -38,6 +38,23 @@ consumers under `src/code/` so the indices stay aligned with the retail DLL.
 Add additional entries here as more Quake Live configstrings are recovered or
 when future HLIL exports expose new payloads.
 
+## Keeping code and ledger aligned
+
+Run the CI-backed ledger lint locally before landing configstring changes:
+
+```
+pytest tests/test_configstrings_ledger.py -q
+```
+
+If the check fails:
+
+1. Reconcile the reported macro definitions in `src/code/` so their indices
+   match the ledger table. Conflicting or legacy definitions should be removed
+   or updated so only the documented index remains.
+2. When adding a newly recovered configstring, extend the ledger table with the
+   canonical index and source reference, then introduce the matching macro in
+   code. Re-run the lint to confirm both sides are synchronized.
+
 ## HLIL-derived gametype strings
 
 The Domination/Freeze tutorial payloads and the HUD gametype hints both reuse

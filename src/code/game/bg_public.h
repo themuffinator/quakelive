@@ -85,7 +85,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_FLAGSTATUS			23		// string indicating flag status in CTF
 #define CS_SHADERSTATE			24
 #define CS_BOTINFO				25
-#define CS_MAP_AUTHOR			26		// primary map author metadata published by worldspawn
 #define CS_MATCH_STATE				0x295		// timeout/overtime state info payload
 // CS_FORCED_COSMETICS broadcasts an info string with the following keys:
 // \sb\<0|1>  - Forces the compact scoreboard tipline when set.
@@ -116,7 +115,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_MAP_AUTHOR_ALT		0x2A7		// optional secondary author (author2 key)
 
 #define CS_ITEMS				27		// string of 0's and 1's that tell which items are present
-#define CS_MAP_AUTHOR_ALT		28		// optional secondary map author metadata
 #define	ITEM_TIMER_DEFAULT_HEIGHT	20		// default fallback height for HUD timer spacing
 #define	ITEM_TIMER_MAX_HEIGHT		128		// prevent oversized HUD timer spacing from breaking layouts
 
