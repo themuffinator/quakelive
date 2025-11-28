@@ -31,3 +31,16 @@ This matrix tracks the host expectations for rebuilding Quake Live’s native ga
 - Automate retargeting or validation so the Visual Studio projects default to the `v100` toolset and fail fast if the required CRT or launcher runtime is missing.【F:docs/windows-native-pipeline.md†L15-L24】【F:docs/quakelive_asset_audit.md†L19-L31】
 - Capture WOW64-specific smoke tests (e.g., on Windows 7) to ensure the 32-bit DLLs load once the Visual C++ redistributable and launcher payload are staged.【F:docs/build-pipeline.md†L16-L25】
 - Capture additional CI coverage for the 32-bit glibc preset if we want automated parity checks beyond the manual helper script.【F:docs/build/linux-glibc-32bit.md†L1-L39】【F:tools/build/linux32_qagame.sh†L1-L36】
+
+## Non-Windows native status
+
+- **Linux rebuilds remain server-only.** The documented glibc preset and helper script exclusively target the 32-bit `qagamei386.so` server module and explicitly disable Vorbis while diffing exports against the archived server binary, leaving the client and renderer unbuilt on Linux.【F:docs/build/linux-glibc-32bit.md†L1-L36】
+- **Legacy rendering/input stack is unported.** The Unix makefile still advertises X11/GLX/DGA-era client builds tied to `/usr/X11R6` headers and Glide-era Mesa copies, while the legacy README calls for XFree86 with DGA/VidMode mouse paths and Glide-specific OpenGL drivers—none of which are wired into modern CI or available on current distributions.【F:src/code/unix/Makefile†L4-L198】【F:src/code/unix/README.Linux†L68-L177】
+- **Audio path is anchored to OSS `/dev/dsp`.** The shipped Linux instructions require mmap’ing `/dev/dsp` with permissive device permissions, so there is no ALSA/PulseAudio shim or SDL abstraction to satisfy the sound backend on contemporary systems.【F:src/code/unix/README.Linux†L161-L177】
+- **Platform syscalls are stubbed.** Core Unix-side helpers such as `Sys_LowPhysicalMemory`, `Sys_FunctionCmp`, and profiling hooks return fixed placeholders, so parity checks and telemetry cannot yet rely on native implementations when running outside Windows.【F:src/code/unix/unix_main.c†L102-L142】
+
+### Blockers and next steps
+
+- Modernise the Unix client toolchain by replacing the XFree86/GLX/DGA assumptions with SDL2 or a contemporary GL loader, then gate Linux client builds in CI once the dependency chain is reproducible on current distros.【F:src/code/unix/Makefile†L4-L198】【F:src/code/unix/README.Linux†L68-L155】 Document interim skips for any renderer/input tests that assume GLX or DGA until the migration lands.
+- Add an audio shim layer that can select ALSA/PulseAudio backends (or a null sink for headless runs) so `/dev/dsp` is no longer required; skip Linux sound validation tests until this adapter exists.【F:src/code/unix/README.Linux†L161-L177】
+- Flesh out the Unix `Sys_*` helpers to report memory, checksum, and profiling data and ensure tests that exercise those hooks are disabled on non-Windows hosts until real implementations replace the current stubs.【F:src/code/unix/unix_main.c†L102-L142】
