@@ -210,15 +210,22 @@ Caches the active ruleset token on the level state and flags the custom-settings
 =============
 */
 static void G_SyncRulesetCvar( void ) {
-	const char	*ruleset;
+	const char		*ruleset;
 
 	ruleset = g_ruleset.string[0] ? g_ruleset.string : "standard";
 	Q_strncpyz( level.rulesetName, ruleset, sizeof( level.rulesetName ) );
+
+	if ( !g_factory.string[0] ) {
+		trap_Cvar_Set( "g_factory", ruleset );
+		trap_Cvar_Update( &g_factory );
+		s_factoryModCount = g_factory.modificationCount;
+	}
 
 	if ( Q_stricmp( ruleset, "standard" ) ) {
 		s_customSettingsDirty = qtrue;
 	}
 }
+
 
 void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
 	g_qlr_frame_ctx = ctx;
@@ -564,8 +571,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_banIPs, "g_banIPs", "", CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_filterBan, "g_filterBan", "1", CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_instaGib, "g_instaGib", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
-	{ &g_itemTimers, "g_itemTimers", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Force server-controlled item timers to display for all clients when non-zero." },
-	{ &g_itemHeight, "g_itemHeight", "35", CVAR_ARCHIVE, 0, qfalse, qfalse, "Vertical offset in units applied to enforced item timer indicators." },
+{ &g_itemTimers, "g_itemTimers", "1", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Force server-controlled item timers to display for all clients when non-zero." },
+{ &g_itemHeight, "g_itemHeight", "20", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Vertical offset in units applied to enforced item timer indicators." },
         { &g_forceSmallScoreboardMessage, "g_forceSmallScoreboardMessage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Prefer the compact scoreboard centerprint even with small player counts." },
         { &g_forceSendConfigstring, "g_forceSendConfigstring", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Resend all configstrings to clients on map load when enabled to debug sync issues." },
         { &g_forceAtmosphericEffects, "g_forceAtmosphericEffects", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable atmospheric map effects such as snow or rain regardless of client preference." },
@@ -649,15 +656,13 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
 	{ &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
 	{ &g_timeoutCount, "g_timeoutCount", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },
-	{ &g_factoryTitle, "g_factoryTitle", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Short factory title pushed via serverinfo for display on connected clients." },
-	{ &g_factory, "g_factory", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Identifier of the active factory loaded from scripts/factories*." },
+{ &g_factoryTitle, "g_factoryTitle", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Short factory title pushed via serverinfo for display on connected clients." },
+{ &g_factory, "g_factory", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Identifier of the active factory loaded from scripts/factories*, defaulting to the active ruleset token when unset." },
 	{ &g_factoryRespawnDelay, "g_factoryRespawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds before a defeated player respawns when factories schedule queues." },
 	{ &g_factoryWarmupSpawnDelay, "g_factoryWarmupSpawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds applied to warmup spawns when factories request staggered starts." },
 	{ &g_factoryAllowItemDrops, "g_factoryAllowItemDrops", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether item drop logic fires for weapons and powerups spawned from players." },
 	{ &g_factoryAllowItemBounce, "g_factoryAllowItemBounce", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether dropped items bounce before coming to rest when factories disable the behaviour." },
 	{ &g_maxDeferredSpawns, "g_maxDeferredSpawns", "4", 0, 0, qfalse, qfalse, "Maximum simultaneous delayed spawns the queue may hold before new respawns execute immediately." },
-	{ &g_itemTimers, "g_itemTimers", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Toggles broadcast of server-side item timer training aids when non-zero." },
-	{ &g_itemHeight, "g_itemHeight", "20", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Adjusts the vertical spacing clients apply to item timer widgets in the HUD." },
 	{ &g_vampiricDamage, "g_vampiricDamage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Fraction of dealt health damage returned to the attacker as healing." },
 	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_NORESTART, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
 	{ &g_suddenDeathRespawnTick, "g_suddenDeathRespawnTick", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Interval in seconds after which sudden-death respawn delays are increased." },

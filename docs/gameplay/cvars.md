@@ -105,6 +105,8 @@ Quake Live layers a set of server CVars that gate coaching affordances and force
 
 * Training servers set `g_training` to `1` when the scripted tutorial runs, so harnesses that replay the onboarding sequence should expect `addbot`, voting, and similar admin commands to be rejected until the tutorial releases the block.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part01.txt†L25148-L25178】
 * `g_itemTimers` votes must pass the warmup and server policy checks baked into the callvote handler; invalid options trigger the same Quake Live console guidance captured in the HLIL dump.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L14137-L14171】【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L44224-L44224】
+* When `g_factory` is unset, the server mirrors the active `g_ruleset` token into the factory selector so competitive configs resolve to the correct script namespace before publishing serverinfo.【F:src/code/game/g_main.c†L214-L222】
+* The enforced timer broadcast clamps `g_itemHeight` to the Quake Live default (`20`) and delivers the sanitized payload to every client (and to new joiners) using the `itemcfg` command.【F:src/code/game/g_cmds.c†L238-L276】【F:src/code/game/g_main.c†L1000-L1015】
 
 ## Starting Health and Armor Controls
 

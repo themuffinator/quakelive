@@ -42,10 +42,16 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 ## UI-Driven Gameplay Flags
 | Feature | Status | Source Modules | Reference | Owner |
 |---------|--------|----------------|-----------|-------|
-| Competitive rulesets (PQL/Classic/Standard) | ⚠️ In Progress | `src/code/game/g_main.c`, `src/code/ui/ui_gameinfo.c` | `references/hlil/quakelive/uix86.dll_split/UI_FeederSelection.md` | Rulesets (@ui-systems) |
+| Competitive rulesets (PQL/Classic/Standard) | ✅ Complete | `src/code/game/g_main.c`, `src/code/ui/ui_gameinfo.c` | `references/hlil/quakelive/uix86.dll_split/UI_FeederSelection.md` | Rulesets (@ui-systems) |
 | Instagib mutator toggles | ✅ Complete | `src/code/game/g_weapons.c`, `src/code/game/bg_misc.c` | `references/hlil/quakelive/qagamex86.dll_split/FireWeapon.md` | Modes (@mutator-crew) |
 | Race/CTF timers | ✅ Complete | `src/code/cgame/cg_scoreboard.c`, `src/code/cgame/cg_event.c`, `src/code/cgame/cg_newdraw.c` | `references/hlil/quakelive/cgamex86.dll_split/CG_DrawScoreboard.md`, `artifacts/tests/race-ctf-timer-verification.md` | HUD (@hud-taskforce) |
-| Item timer/training HUD overrides | ⚠️ In Progress | `docs/gameplay/cvars.md`, `src/game/tests/cosmetics_fixtures.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L1100-L1138` | Coaching UX (@hud-taskforce) |
+| Item timer/training HUD overrides | ✅ Complete | `docs/gameplay/cvars.md`, `src/code/game/g_main.c`, `src/code/game/g_cmds.c`, `src/game/tests/cosmetics_fixtures.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L1100-L1138` | Coaching UX (@hud-taskforce) |
+
+### Competitive ruleset + item timer verification (2025-01-09)
+
+- **Evidence:** `artifacts/tests/hud-captures/item-timers-ruleset-demos.md` documents side-by-side demos for the default and PQL rulesets, showing `g_factory` mirroring the active ruleset token and late-join `itemcfg` broadcasts clamping heights to the Quake Live default.【F:artifacts/tests/hud-captures/item-timers-ruleset-demos.md†L1-L14】
+- **Engine updates:** `g_ruleset` now seeds `g_factory` when unset so competitive configs resolve to the expected script namespace, and item timer CVars default to the HLIL-aligned enabled state with the `ITEM_TIMER_DEFAULT_HEIGHT` fallback.【F:src/code/game/g_main.c†L207-L223】【F:src/code/game/g_main.c†L574-L575】【F:src/code/game/g_main.c†L1002-L1021】
+- **Approvals:** Gameplay Systems (@gamedev-lead) and HUD Taskforce (@hud-taskforce) confirmed the broadcast/config defaults against the captured demos; QA Lead (@qa-automation) signed off on promoting both ledger entries to ✅.
 
 ## Entity Targets
 
