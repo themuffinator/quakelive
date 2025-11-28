@@ -20,7 +20,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 //
-
 #include "g_local.h"
 
 
@@ -45,6 +44,40 @@ void G_SetClientRatingModifiers( gclient_t *client, float damageScale, float sco
 
 	client->damageModifier = damageScale;
 	client->scoreModifier = scoreScale;
+}
+
+
+/*
+=============
+G_RefreshClientRatingModifiers
+
+Synchronises the runtime rating modifiers with the cached persistence values.
+=============
+*/
+void G_RefreshClientRatingModifiers( gclient_t *client ) {
+	float	damageScale;
+	float	scoreScale;
+
+	if ( !client ) {
+		return;
+	}
+
+	damageScale = client->pers.ratingDamageScale;
+	scoreScale = client->pers.ratingScoreScale;
+
+	if ( damageScale <= 0.0f ) {
+		damageScale = 1.0f;
+		client->pers.ratingDamageScale = damageScale;
+	}
+
+	if ( scoreScale <= 0.0f ) {
+		scoreScale = 1.0f;
+		client->pers.ratingScoreScale = scoreScale;
+	}
+
+	if ( client->damageModifier != damageScale || client->scoreModifier != scoreScale ) {
+		G_SetClientRatingModifiers( client, damageScale, scoreScale );
+	}
 }
 
 
@@ -1273,6 +1306,9 @@ void ClientEndFrame( gentity_t *ent ) {
 	}
 
 	pers = &ent->client->pers;
+	if ( pers->ratingMetadataLoaded ) {
+		G_RefreshClientRatingModifiers( ent->client );
+	}
 	G_FreezeClientEndFrame( ent );
 
 	// turn off any expired powerups
