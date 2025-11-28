@@ -1987,23 +1987,20 @@ static void CG_ServerCommand( void ) {
 		return;
 	}
 
-	if ( !strcmp( cmd, "itemcfg" ) ) {
-		int	enabled = 0;
-		int	height = ITEM_TIMER_DEFAULT_HEIGHT;
-		if ( trap_Argc() > 1 ) {
-			enabled = atoi( CG_Argv( 1 ) );
+		if ( !strcmp( cmd, "itemcfg" ) ) {
+			int		enabled = 0;
+			int		height = ITEM_TIMER_DEFAULT_HEIGHT;
+			if ( trap_Argc() > 1 ) {
+				enabled = atoi( CG_Argv( 1 ) );
+			}
+			if ( trap_Argc() > 2 ) {
+				height = atoi( CG_Argv( 2 ) );
+			}
+			cgs.serverItemTimersEnabled = enabled ? qtrue : qfalse;
+			cgs.serverItemTimerHeight = height;
+			CG_RecomputeItemTimerState();
+			return;
 		}
-		if ( trap_Argc() > 2 ) {
-			height = atoi( CG_Argv( 2 ) );
-		}
-		cgs.itemTimersEnabled = enabled ? qtrue : qfalse;
-		if ( height <= 0 ) {
-			height = ITEM_TIMER_DEFAULT_HEIGHT;
-		} else if ( height > ITEM_TIMER_MAX_HEIGHT ) {
-			height = ITEM_TIMER_MAX_HEIGHT;
-		}
-		cgs.itemTimerHeight = height;
-		return;
 	}
 
 	if ( !strcmp( cmd, "race_init" ) ) {

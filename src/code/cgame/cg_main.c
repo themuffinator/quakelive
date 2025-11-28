@@ -71,6 +71,7 @@ static int crosshairPulseModificationCount = -1;
 static int crosshairHitStyleModificationCount = -1;
 static int crosshairHitTimeModificationCount = -1;
 static int crosshairHitColorModificationCount = -1;
+static int itemTimersCvarModificationCount = -1;
 
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
@@ -668,7 +669,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_specItemTimersSize, "cg_specItemTimersSize", "0.24", CVAR_ARCHIVE },
 	{ &cg_specTeamVitals, "cg_specTeamVitals", "1", CVAR_ARCHIVE },
 	{ &cg_specTeamVitalsHealthColor, "cg_specTeamVitalsHealthColor", "0", CVAR_ARCHIVE },
-	{ &cg_itemTimers, "cg_itemTimers", "1", CVAR_ARCHIVE },
+{ &cg_itemTimers, "cg_itemTimers", "0", CVAR_ARCHIVE },
 	{ &cg_screenDamage, "cg_screenDamage", DEFAULT_SCREEN_DAMAGE_COLOR, CVAR_ARCHIVE },
 	{ &cg_screenDamage_Self, "cg_screenDamage_Self", DEFAULT_SCREEN_DAMAGE_SELF_COLOR, CVAR_ARCHIVE },
 	{ &cg_screenDamage_Team, "cg_screenDamage_Team", DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, CVAR_ARCHIVE },
@@ -1580,6 +1581,32 @@ static void CG_UpdateCrosshairHitSettings( void ) {
 
 
 /*
+=============
+CG_RecomputeItemTimerState
+
+Combines server-provided item timer overrides with the local preference so HUD training widgets mirror Quake Live.
+=============
+*/
+void CG_RecomputeItemTimerState( void ) {
+	int		height;
+
+	if ( cgs.serverItemTimersEnabled || cg_itemTimers.integer ) {
+		height = cgs.serverItemTimerHeight;
+		if ( height <= 0 ) {
+			height = ITEM_TIMER_DEFAULT_HEIGHT;
+		} else if ( height > ITEM_TIMER_MAX_HEIGHT ) {
+			height = ITEM_TIMER_MAX_HEIGHT;
+		}
+
+		cgs.itemTimersEnabled = qtrue;
+		cgs.itemTimerHeight = height;
+	} else {
+		cgs.itemTimersEnabled = qfalse;
+		cgs.itemTimerHeight = ITEM_TIMER_DEFAULT_HEIGHT;
+	}
+}
+
+/*
 =================
 CG_UpdateCvars
 =================
@@ -1725,8 +1752,13 @@ void CG_UpdateCvars( void ) {
 		CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha_Team, &cg.screenDamageAlphaTeam, &screenDamageAlphaTeamModificationCount );
 	}
 	cg.zoomToggle = (qboolean)( cg_zoomToggle.integer != 0 );
-cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
-CG_UpdateDamagePlumSettings();
+	cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
+	CG_UpdateDamagePlumSettings();
+
+	if ( itemTimersCvarModificationCount != cg_itemTimers.modificationCount ) {
+		itemTimersCvarModificationCount = cg_itemTimers.modificationCount;
+		CG_RecomputeItemTimerState();
+	}
 
 	CG_UpdateSimpleItemsSettings();
 	CG_UpdateCrosshairColorSettings();

@@ -316,6 +316,9 @@ Copies a ruleset token into the cache when space is available.
 */
 static void UI_AddRulesetFromToken( const char *token ) {
 	rulesetInfo_t	*entry;
+	const char		*configPath;
+	const char		*delimiter;
+	size_t			nameLength;
 
 	if ( token == NULL || token[0] == '\0' ) {
 		return;
@@ -326,14 +329,31 @@ static void UI_AddRulesetFromToken( const char *token ) {
 	}
 
 	entry = &uiInfo.rulesets[uiInfo.rulesetCount++];
-	Q_strncpyz( entry->name, token, sizeof( entry->name ) );
-	Q_strncpyz( entry->description, token, sizeof( entry->description ) );
+	delimiter = strchr( token, ':' );
+	if ( delimiter ) {
+		nameLength = delimiter - token;
+		if ( nameLength >= sizeof( entry->name ) ) {
+			nameLength = sizeof( entry->name ) - 1;
+		}
 
-	if ( !Q_stricmp( token, uiInfo.activeRuleset ) ) {
+		Q_strncpyz( entry->name, token, nameLength + 1 );
+		configPath = delimiter + 1;
+	} else {
+		configPath = NULL;
+		Q_strncpyz( entry->name, token, sizeof( entry->name ) );
+	}
+
+	Q_strncpyz( entry->description, entry->name, sizeof( entry->description ) );
+	if ( configPath && configPath[0] ) {
+		Q_strncpyz( entry->configPath, configPath, sizeof( entry->configPath ) );
+	} else {
+		Q_strncpyz( entry->configPath, va( "rulesets/%s.cfg", entry->name ), sizeof( entry->configPath ) );
+	}
+
+	if ( !Q_stricmp( entry->name, uiInfo.activeRuleset ) ) {
 		uiInfo.rulesetIndex = uiInfo.rulesetCount - 1;
 	}
 }
-
 /*
 =============
 UI_LoadRulesets

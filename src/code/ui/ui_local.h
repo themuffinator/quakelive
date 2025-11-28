@@ -726,6 +726,7 @@ typedef struct {
 typedef struct {
 	char		name[MAX_TOKEN_CHARS];
 	char		description[MAX_STRING_CHARS];
+	char		configPath[MAX_QPATH];
 } rulesetInfo_t;
 
 typedef struct {

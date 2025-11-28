@@ -2223,14 +2223,10 @@ static void CG_DrawServerSettings(rectDef_t *rect, float text_x, float text_y, f
 	info = CG_ConfigString( CS_SERVERINFO );
 	buffer[0] = '\0';
 	loadoutsEnabled = CG_LoadoutsEnabled();
-	itemTimersEnabled = qfalse;
+	itemTimersEnabled = ( cgs.itemTimersEnabled || cgs.forceHudHints );
 	trainingEnabled = qfalse;
 
 	if ( info && *info ) {
-		CG_GetServerInfoValue( info, "g_itemTimers", value, sizeof( value ) );
-		if ( value[0] && atoi( value ) ) {
-			itemTimersEnabled = qtrue;
-		}
 		CG_GetServerInfoValue( info, "g_training", value, sizeof( value ) );
 		if ( value[0] && atoi( value ) ) {
 			trainingEnabled = qtrue;
@@ -4818,17 +4814,13 @@ static void CG_DrawServerSettings(rectDef_t *rect, float scale, vec4_t color, in
 	qboolean	itemTimersEnabled;
 	qboolean	trainingEnabled;
 
-	info = CG_ConfigString( CS_SERVERINFO );
-	buffer[0] = '\0';
-	loadoutsEnabled = CG_LoadoutsEnabled();
-	itemTimersEnabled = qfalse;
+info = CG_ConfigString( CS_SERVERINFO );
+buffer[0] = '\0';
+loadoutsEnabled = CG_LoadoutsEnabled();
+	itemTimersEnabled = ( cgs.itemTimersEnabled || cgs.forceHudHints );
 	trainingEnabled = qfalse;
 
 	if ( info && *info ) {
-		CG_GetServerInfoValue( info, "g_itemTimers", value, sizeof( value ) );
-		if ( value[0] && atoi( value ) ) {
-			itemTimersEnabled = qtrue;
-		}
 		CG_GetServerInfoValue( info, "g_training", value, sizeof( value ) );
 		if ( value[0] && atoi( value ) ) {
 			trainingEnabled = qtrue;

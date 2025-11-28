@@ -1288,7 +1288,9 @@ typedef struct {
 	unsigned int	factoryFlags;
 	char		factorySpawnHints[MAX_STRING_CHARS];
 	qboolean	itemTimersEnabled;
+	qboolean	serverItemTimersEnabled;
 	int		itemTimerHeight;
+	int		serverItemTimerHeight;
 	qboolean	forceSmallScoreboardMessage;
 	qboolean	forceHudHints;
 	qboolean	forceDmgThroughSurface;
@@ -1636,6 +1638,7 @@ void QDECL CG_Error( const char *msg, ... );
 void CG_StartMusic( void );
 
 void CG_UpdateCvars( void );
+void CG_RecomputeItemTimerState( void );
 
 int CG_CrosshairPlayer( void );
 int CG_LastAttacker( void );

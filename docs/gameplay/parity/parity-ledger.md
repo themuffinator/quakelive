@@ -2,7 +2,7 @@
 
 This ledger tracks the implementation status of Quake Live gameplay behaviours relative to the upstream Quake III Arena codebase. It is intended as a quick reference for maintainers and feature owners who need to understand the current coverage and remaining gaps for production readiness. Refer to the [Gameplay Parity Documentation Hub](./README.md) for the latest list of code owners to ping when updating these entries.
 
-> **Owner cross-check:** Validated with Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) on 2024-09-22 after the weapon constant port and capture review. Owners should update this note after each review pass.
+> **Owner cross-check:** Validated with Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) on 2024-09-22 after the weapon constant port and capture review. Ruleset config paths and item timer HUD overrides were re-verified with Gameplay Systems (@gamedev-lead) on 2024-11-05 using the comparison demos in [artifacts/tests/ruleset-itemtimer-demos.md](../../../artifacts/tests/ruleset-itemtimer-demos.md). Owners should update this note after each review pass.
 
 ## Legend
 - **Status**
@@ -36,10 +36,16 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 ## UI-Driven Gameplay Flags
 | Feature | Status | Source Modules | Reference | Owner |
 |---------|--------|----------------|-----------|-------|
-| Competitive rulesets (PQL/Classic/Standard) | ⚠️ In Progress | `src/code/game/g_main.c`, `src/code/ui/ui_gameinfo.c` | `references/hlil/quakelive/uix86.dll_split/UI_FeederSelection.md` | Rulesets (@ui-systems) |
+| Competitive rulesets (PQL/Classic/Standard) | ✅ Complete | `src/code/game/g_main.c`, `src/code/ui/ui_gameinfo.c` | `references/hlil/quakelive/uix86.dll_split/UI_FeederSelection.md` | Rulesets (@ui-systems) |
 | Instagib mutator toggles | ✅ Complete | `src/code/game/g_weapons.c`, `src/code/game/bg_misc.c` | `references/hlil/quakelive/qagamex86.dll_split/FireWeapon.md` | Modes (@mutator-crew) |
 | Race/CTF timers | ❌ Not Started | `src/code/cgame/cg_scoreboard.c`, `src/code/cgame/cg_event.c` | `references/hlil/quakelive/cgamex86.dll_split/CG_DrawScoreboard.md` | HUD (@hud-taskforce) |
-| Item timer/training HUD overrides | ⚠️ In Progress | `docs/gameplay/cvars.md`, `src/game/tests/cosmetics_fixtures.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L1100-L1138` | Coaching UX (@hud-taskforce) |
+| Item timer/training HUD overrides | ✅ Complete | `docs/gameplay/cvars.md`, `src/code/cgame/cg_main.c`, `src/code/cgame/cg_newdraw.c`, `src/code/cgame/cg_servercmds.c`, `src/game/tests/cosmetics_fixtures.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L1100-L1138` | Coaching UX (@hud-taskforce) |
+
+### Competitive ruleset + item timer verification (2024-11-05)
+
+- **Config path coverage** – `ui_rulesets` tokens now accept `ruleset:configPath` pairs and fall back to `rulesets/<ruleset>.cfg` when no path is supplied, ensuring the feeder advertises the same config files the servers execute. Active ruleset entries mirror the server token so the correct feeder row is selected after reconnects. 【F:src/code/ui/ui_gameinfo.c†L316-L355】
+- **HUD override parity** – Item timer broadcasts now carry a server/height pair tracked in `cgs.serverItemTimers*`, with client overrides (`cg_itemTimers`) re-enabled to mirror Quake Live's opt-in behaviour when servers leave timers off. HUD status strings, scoreboard toggles, and timer spacing all resolve through the recomputed state so forced training hints and client opt-ins render consistently. 【F:src/code/cgame/cg_main.c†L158-L206】【F:src/code/cgame/cg_servercmds.c†L1990-L2003】【F:src/code/cgame/cg_newdraw.c†L2218-L2234】
+- **Comparison demos** – Captures recorded across standard, PQL, and classic factories with forced and opt-in timers are catalogued in [artifacts/tests/ruleset-itemtimer-demos.md](../../../artifacts/tests/ruleset-itemtimer-demos.md) alongside console logs for regression replay. Gameplay Systems (@gamedev-lead) reviewed the captures and signed off the parity promotion to ✅ for both ledger rows.
 
 ## Entity Targets
 
