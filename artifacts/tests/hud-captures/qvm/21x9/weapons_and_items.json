@@ -1,0 +1,102 @@
+{
+  "metadata": {
+    "aspect": "21x9",
+    "hudConfig": {
+      "cg_useCompetitiveHud": true,
+      "hudFiles": [
+        "ui/hud.txt",
+        "ui/hud3.menu"
+      ],
+      "description": "Competitive HUD assets enabled for captures"
+    },
+    "commit": "42b511bff5b4109893a29f815eb90811cf927b01",
+    "scenario": "weapons_and_items",
+    "archive": "tools/tests/client_regression/weapons_and_items_snapshots.json",
+    "frames": 4,
+    "snapshotMetadata": {
+      "description": "Weapon cycling with mixed pickups and attrition",
+      "map": "qztourney7"
+    }
+  },
+  "frames": [
+    {
+      "sequence": 10,
+      "serverTime": 5000,
+      "hash": "50cc3bf0beb765c921b9cc3975cc611356ead31c522ffa9510963d3468ebf28d",
+      "hud": {
+        "health": 125,
+        "armor": 50,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "machinegun": 70,
+          "rocket_launcher": 5
+        },
+        "position": [
+          128.0,
+          -64.0,
+          32.0
+        ]
+      }
+    },
+    {
+      "sequence": 11,
+      "serverTime": 5016,
+      "hash": "d50a4ede5b09d25864802265283488288b5227f8f5fa53e32eba76e3f8224ef3",
+      "hud": {
+        "health": 110,
+        "armor": 35,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "machinegun": 70,
+          "rocket_launcher": 4
+        },
+        "position": [
+          136.0,
+          -60.0,
+          32.0
+        ]
+      }
+    },
+    {
+      "sequence": 12,
+      "serverTime": 5032,
+      "hash": "b0d4bc9d00594d0e65346d309f2cec2733a6d8d80c2801576f836f50378d3af1",
+      "hud": {
+        "health": 100,
+        "armor": 25,
+        "weapon": "lightning_gun",
+        "ammo": {
+          "lightning_gun": 150,
+          "machinegun": 70,
+          "rocket_launcher": 3
+        },
+        "position": [
+          156.0,
+          -44.0,
+          32.0
+        ]
+      }
+    },
+    {
+      "sequence": 13,
+      "serverTime": 5048,
+      "hash": "822dc1c14922b22b10010c58e9356d09fc37455599208f1509d5e02cff22db98",
+      "hud": {
+        "health": 120,
+        "armor": 50,
+        "weapon": "railgun",
+        "ammo": {
+          "lightning_gun": 130,
+          "machinegun": 70,
+          "railgun": 5,
+          "rocket_launcher": 3
+        },
+        "position": [
+          160.0,
+          -32.0,
+          48.0
+        ]
+      }
+    }
+  ]
+}
