@@ -7191,7 +7191,7 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_bigFont, "ui_bigFont", "0.4", CVAR_ARCHIVE},
 	{ &ui_findPlayer, "ui_findPlayer", "Sarge", CVAR_ARCHIVE},
 	{ &ui_Q3Model, "ui_q3model", "0", CVAR_ARCHIVE},
-	{ &ui_hudFiles, "cg_hudFiles", "ui/hud.txt", CVAR_ARCHIVE},
+	{ &ui_hudFiles, "cg_hudFiles", "ui/hud3.txt", CVAR_ARCHIVE},
 	{ &ui_recordSPDemo, "ui_recordSPDemo", "0", CVAR_ARCHIVE},
 	{ &ui_teamArenaFirstRun, "ui_teamArenaFirstRun", "0", CVAR_ARCHIVE},
 	{ &ui_realWarmUp, "g_warmup", "20", CVAR_ARCHIVE},
