@@ -1,0 +1,181 @@
+{
+  "target": "qvm",
+  "commit": "538d820e8dd869e20ba599250394a370a30017ed",
+  "reference": "references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md",
+  "reload_times": {
+    "BFG": {
+      "reference_ms": 300,
+      "repo_ms": 300,
+      "matches": true
+    },
+    "Chaingun": {
+      "reference_ms": 50,
+      "repo_ms": 50,
+      "matches": true
+    },
+    "Gauntlet": {
+      "reference_ms": 400,
+      "repo_ms": 400,
+      "matches": true
+    },
+    "Grappling Hook": {
+      "reference_ms": 100,
+      "repo_ms": 100,
+      "matches": true
+    },
+    "Grenade Launcher": {
+      "reference_ms": 800,
+      "repo_ms": 800,
+      "matches": true
+    },
+    "Heavy Machinegun": {
+      "reference_ms": 75,
+      "repo_ms": 75,
+      "matches": true
+    },
+    "Lightning Gun": {
+      "reference_ms": 50,
+      "repo_ms": 50,
+      "matches": true
+    },
+    "Machinegun": {
+      "reference_ms": 100,
+      "repo_ms": 100,
+      "matches": true
+    },
+    "Nailgun": {
+      "reference_ms": 1000,
+      "repo_ms": 1000,
+      "matches": true
+    },
+    "Plasmagun": {
+      "reference_ms": 100,
+      "repo_ms": 100,
+      "matches": true
+    },
+    "Proximity Launcher": {
+      "reference_ms": 800,
+      "repo_ms": 800,
+      "matches": true
+    },
+    "Railgun": {
+      "reference_ms": 1500,
+      "repo_ms": 1500,
+      "matches": true
+    },
+    "Rocket Launcher": {
+      "reference_ms": 800,
+      "repo_ms": 800,
+      "matches": true
+    },
+    "Shotgun": {
+      "reference_ms": 1000,
+      "repo_ms": 1000,
+      "matches": true
+    }
+  },
+  "ammo_pickups": {
+    "BFG": {
+      "reference_pickup": 15,
+      "repo_pickup": 15,
+      "reference_max_stack": 60,
+      "repo_max_stack": 60,
+      "matches": true
+    },
+    "Chaingun": {
+      "reference_pickup": 100,
+      "repo_pickup": 100,
+      "reference_max_stack": 400,
+      "repo_max_stack": 400,
+      "matches": true
+    },
+    "Gauntlet": {
+      "reference_pickup": 0,
+      "repo_pickup": 0,
+      "reference_max_stack": -1,
+      "repo_max_stack": -1,
+      "matches": true
+    },
+    "Grappling Hook": {
+      "reference_pickup": 0,
+      "repo_pickup": 0,
+      "reference_max_stack": -1,
+      "repo_max_stack": -1,
+      "matches": true
+    },
+    "Grenade Launcher": {
+      "reference_pickup": 5,
+      "repo_pickup": 5,
+      "reference_max_stack": 20,
+      "repo_max_stack": 20,
+      "matches": true
+    },
+    "Heavy Machinegun": {
+      "reference_pickup": 50,
+      "repo_pickup": 50,
+      "reference_max_stack": 200,
+      "repo_max_stack": 200,
+      "matches": true
+    },
+    "Lightning Gun": {
+      "reference_pickup": 60,
+      "repo_pickup": 60,
+      "reference_max_stack": 240,
+      "repo_max_stack": 240,
+      "matches": true
+    },
+    "Machinegun": {
+      "reference_pickup": 50,
+      "repo_pickup": 50,
+      "reference_max_stack": 200,
+      "repo_max_stack": 200,
+      "matches": true
+    },
+    "Nailgun": {
+      "reference_pickup": 20,
+      "repo_pickup": 20,
+      "reference_max_stack": 80,
+      "repo_max_stack": 80,
+      "matches": true
+    },
+    "Plasmagun": {
+      "reference_pickup": 30,
+      "repo_pickup": 30,
+      "reference_max_stack": 120,
+      "repo_max_stack": 120,
+      "matches": true
+    },
+    "Proximity Launcher": {
+      "reference_pickup": 10,
+      "repo_pickup": 10,
+      "reference_max_stack": 40,
+      "repo_max_stack": 40,
+      "matches": true
+    },
+    "Railgun": {
+      "reference_pickup": 10,
+      "repo_pickup": 10,
+      "reference_max_stack": 40,
+      "repo_max_stack": 40,
+      "matches": true
+    },
+    "Rocket Launcher": {
+      "reference_pickup": 5,
+      "repo_pickup": 5,
+      "reference_max_stack": 20,
+      "repo_max_stack": 20,
+      "matches": true
+    },
+    "Shotgun": {
+      "reference_pickup": 10,
+      "repo_pickup": 10,
+      "reference_max_stack": 40,
+      "repo_max_stack": 40,
+      "matches": true
+    }
+  },
+  "sources": {
+    "bg_pmove": "src/code/game/bg_pmove.c",
+    "bg_misc": "src/code/game/bg_misc.c"
+  }
+}

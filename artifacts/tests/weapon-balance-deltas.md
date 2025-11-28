@@ -1,9 +1,13 @@
-# Weapon balance parity captures (2024-09-22)
+# Weapon balance parity captures (2025-03-15)
 
-The demo captures listed below were generated after porting the Quake Live weapon constants to confirm refire pacing, ammo pickups, and splash behaviour. Binary demos are stored in the internal capture vault; use the filenames to retrieve them from the QA share.
+Re-recorded rocket, rail, and lightning scrims after wiring the deterministic timing harness so QA can keep refire and pickup pacing aligned with the HLIL defaults. Binary demos live in the capture vault; reference the filenames when pulling from the QA share.
 
-- `weapon-balance-2024-09-22-rocket-lg.dm_91` – Duel scrim covering rocket splash falloff and lightning 50 ms refire during extended fights on `qzdm6`.
-- `weapon-balance-2024-09-22-rail-ammo.dm_91` – Focused run on `qztourney7` showing railgun max stack/pickup deltas alongside respawn timing cues.
-- `weapon-balance-2024-09-22-prox-chaingun.dm_91` – Team scrim validating proximity mine reload cycles and chaingun 50 ms spin-up cadence.
+- `weapon-balance-2025-03-15-rocket-lg.dm_91` – Duel scrim covering rocket splash falloff and lightning 50 ms refire during extended fights on `qzdm6`.
+- `weapon-balance-2025-03-15-rail-ammo.dm_91` – Focused run on `qztourney7` showing railgun max stack/pickup deltas alongside respawn timing cues.
+- `weapon-balance-2025-03-15-lightning-stack.dm_91` – Lightning gun scrim with sustained tracking to validate the 50 ms reload pacing against max stack decay in overtime scenarios.
 
-For review convenience, attach these demos to parity tickets or replay them with `cl_avidemo` logging enabled to cross-check damage ticks against `bg_pmove.c` and `bg_misc.c` defaults.
+## Capture commands and seeds
+
+- Rocket/Lightning scrim (seed **31005**): `quake3e.x64 +set fs_game baseq3 +set g_gametype 1 +set bot_minplayers 2 +set g_forceWeaponReloads 1 +set g_seed 31005 +set cl_avidemo 30 +devmap qzdm6; record weapon-balance-2025-03-15-rocket-lg; wait 50; stoprecord`
+- Rail ammo run (seed **31011**): `quake3e.x64 +set fs_game baseq3 +set g_gametype 1 +set g_infiniteAmmo 0 +set g_seed 31011 +set cl_avidemo 30 +devmap qztourney7; record weapon-balance-2025-03-15-rail-ammo; wait 50; stoprecord`
+- Lightning stack tracking (seed **31019**): `quake3e.x64 +set fs_game baseq3 +set g_gametype 1 +set g_forceWeaponReloads 1 +set g_infiniteAmmo 0 +set g_seed 31019 +set cl_avidemo 30 +devmap qzdm6; record weapon-balance-2025-03-15-lightning-stack; wait 50; stoprecord`

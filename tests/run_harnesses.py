@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -49,6 +50,25 @@ COMPETITIVE_HUD_CONFIG: dict[str, object] = {
     "hudFiles": ["ui/hud.txt", "ui/hud3.menu"],
     "description": "Competitive HUD assets enabled for captures",
 }
+WEAPON_ENUM_ALIASES: dict[str, str] = {
+    "BFG": "WP_BFG",
+    "Chaingun": "WP_CHAINGUN",
+    "Gauntlet": "WP_GAUNTLET",
+    "Grappling Hook": "WP_GRAPPLING_HOOK",
+    "Grenade Launcher": "WP_GRENADE_LAUNCHER",
+    "Heavy Machinegun": "WP_HEAVY_MACHINEGUN",
+    "Lightning Gun": "WP_LIGHTNING",
+    "Machinegun": "WP_MACHINEGUN",
+    "Nailgun": "WP_NAILGUN",
+    "Plasmagun": "WP_PLASMAGUN",
+    "Proximity Launcher": "WP_PROX_LAUNCHER",
+    "Railgun": "WP_RAILGUN",
+    "Rocket Launcher": "WP_ROCKET_LAUNCHER",
+    "Shotgun": "WP_SHOTGUN",
+}
+REFERENCE_BG_PMOVE = REPO_ROOT / "references" / "hlil" / "quakelive" / "qagamex86.dll_split" / "bg_pmove.md"
+BG_PMOVE_PATH = REPO_ROOT / "src" / "code" / "game" / "bg_pmove.c"
+BG_MISC_PATH = REPO_ROOT / "src" / "code" / "game" / "bg_misc.c"
 
 
 @dataclass(slots=True)
@@ -60,6 +80,7 @@ class HarnessBundleResult:
     match_summaries: list[dict[str, object]]
     client_regression_entries: list[dict[str, object]]
     hud_captures: list[dict[str, object]]
+    weapon_timings: dict[str, object]
     trace_result: TraceHarnessResult | None = None
 
     def match_timeline_path(self, slug: str) -> Path:
@@ -97,6 +118,171 @@ def _current_commit() -> str:
         return completed.stdout.strip()
     except subprocess.CalledProcessError:
         return "unknown"
+
+
+def _weapon_to_enum_name(weapon: str) -> str:
+    """Convert a human-friendly weapon label to its enum constant name."""
+
+    return WEAPON_ENUM_ALIASES.get(weapon, f"WP_{weapon.upper().replace(' ', '_')}")
+
+
+def _parse_reference_tables(reference_path: Path) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
+    """Extract reload and ammo pickup values from the HLIL reference tables."""
+
+    reloads: dict[str, int] = {}
+    ammo: dict[str, dict[str, int]] = {}
+    section: str | None = None
+
+    for line in reference_path.read_text(encoding="utf-8").splitlines():
+        striped = line.strip()
+        if striped.startswith("## Weapon Reload Times"):
+            section = "reload"
+            continue
+        if striped.startswith("## Ammo Pickup"):
+            section = "ammo"
+            continue
+        if not striped.startswith("|") or striped.startswith("| ---"):
+            continue
+
+        cells = [part.strip() for part in striped.strip("|").split("|")]
+
+        weapon = cells[0]
+        if section == "reload":
+            if len(cells) < 2:
+                continue
+            try:
+                reloads[weapon] = int(cells[1])
+            except ValueError:
+                continue
+        elif section == "ammo":
+            if len(cells) < 3:
+                continue
+            try:
+                pickup = int(cells[1])
+                max_stack = int(cells[2])
+            except ValueError:
+                continue
+            ammo[weapon] = {"pickup": pickup, "max_stack": max_stack}
+
+    return reloads, ammo
+
+
+def _parse_reload_defaults(pmove_path: Path) -> dict[str, int]:
+    """Read the designated reload defaults from `bg_pmove.c`."""
+
+    reloads: dict[str, int] = {}
+    within_table = False
+    pattern = re.compile(r"\[(WP_[A-Z0-9_]+)\]\s*=\s*(\d+)")
+
+    for line in pmove_path.read_text(encoding="utf-8").splitlines():
+        if "weaponReloadTimes" in line:
+            within_table = True
+
+        if within_table:
+            if "}" in line:
+                within_table = False
+                continue
+            match = pattern.search(line)
+            if match:
+                weapon, value = match.groups()
+                reloads[weapon] = int(value)
+
+    return reloads
+
+
+def _parse_ammo_pickups(misc_path: Path) -> dict[str, dict[str, int]]:
+    """Read pickup and max stack defaults from `bg_misc.c`."""
+
+    ammo: dict[str, dict[str, int]] = {}
+    within_table = False
+    pattern = re.compile(r"\{\s*(WP_[A-Z0-9_]+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)")
+
+    for line in misc_path.read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith("const bgWeaponStats_t bg_weaponStats"):
+            within_table = True
+            continue
+        if within_table and line.strip().startswith("};"):
+            within_table = False
+            continue
+        if within_table:
+            match = pattern.search(line)
+            if match:
+                weapon, pickup, max_stack = match.groups()
+                ammo[weapon] = {"pickup": int(pickup), "max_stack": int(max_stack)}
+
+    return ammo
+
+
+def _run_weapon_timing_harness(target: str, artifact_root: Path, commit_hash: str) -> dict[str, object]:
+    """Emit deterministic weapon timing baselines for CI parity checks."""
+
+    reference_reload, reference_ammo = _parse_reference_tables(REFERENCE_BG_PMOVE)
+    repo_reload = _parse_reload_defaults(BG_PMOVE_PATH)
+    repo_ammo = _parse_ammo_pickups(BG_MISC_PATH)
+
+    weapon_names = sorted({*reference_reload.keys(), *reference_ammo.keys()})
+    reload_entries: dict[str, dict[str, object]] = {}
+    ammo_entries: dict[str, dict[str, object]] = {}
+
+    for weapon in weapon_names:
+        ref_reload = reference_reload.get(weapon)
+        repo_key = _weapon_to_enum_name(weapon)
+        observed_reload = repo_reload.get(repo_key)
+        reload_entries[weapon] = {
+            "reference_ms": ref_reload,
+            "repo_ms": observed_reload,
+            "matches": ref_reload == observed_reload,
+        }
+
+        ref_ammo = reference_ammo.get(weapon, {})
+        observed_ammo = repo_ammo.get(repo_key, {})
+        ammo_entries[weapon] = {
+            "reference_pickup": ref_ammo.get("pickup"),
+            "repo_pickup": observed_ammo.get("pickup"),
+            "reference_max_stack": ref_ammo.get("max_stack"),
+            "repo_max_stack": observed_ammo.get("max_stack"),
+            "matches": (ref_ammo.get("pickup") == observed_ammo.get("pickup"))
+            and (ref_ammo.get("max_stack") == observed_ammo.get("max_stack")),
+        }
+
+    payload = {
+        "target": target,
+        "commit": commit_hash,
+        "reference": str(REFERENCE_BG_PMOVE.relative_to(REPO_ROOT)),
+        "reload_times": reload_entries,
+        "ammo_pickups": ammo_entries,
+        "sources": {
+            "bg_pmove": str(BG_PMOVE_PATH.relative_to(REPO_ROOT)),
+            "bg_misc": str(BG_MISC_PATH.relative_to(REPO_ROOT)),
+        },
+    }
+
+    output_path = artifact_root / "weapon_timings" / target / "baseline.json"
+    _write_json(output_path, payload)
+
+    mismatches = [
+        weapon
+        for weapon, entry in reload_entries.items()
+        if entry.get("reference_ms") is not None and not entry.get("matches")
+    ]
+    ammo_mismatches = [
+        weapon
+        for weapon, entry in ammo_entries.items()
+        if entry.get("reference_pickup") is not None and not entry.get("matches")
+    ]
+    log_lines = [
+        "Weapon timing harness completed successfully.",
+        f"Baseline path: {output_path}",
+    ]
+    if mismatches:
+        log_lines.append(f"Reload mismatches: {', '.join(sorted(mismatches))}")
+    if ammo_mismatches:
+        log_lines.append(f"Ammo mismatches: {', '.join(sorted(ammo_mismatches))}")
+
+    log_path = artifact_root / "logs" / target / "weapon_timings.log"
+    _write_text(log_path, "\n".join(log_lines) + "\n")
+
+    return payload
 
 
 def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict[str, object]]:
@@ -300,9 +486,10 @@ def run_harness_bundle(
 
     _ensure_reverse_build(target, reverse_build_root)
 
+    commit_hash = _current_commit()
+    weapon_timings = _run_weapon_timing_harness(target, artifact_root, commit_hash)
     match_summaries = _run_match_harness(target, artifact_root, seed)
     client_entries, capture_payloads = _run_client_harness(target, artifact_root)
-    commit_hash = _current_commit()
     hud_captures = _run_hud_capture_harness(target, artifact_root, capture_payloads, commit_hash)
 
     trace_result: TraceHarnessResult | None = None
@@ -329,6 +516,7 @@ def run_harness_bundle(
         match_summaries=match_summaries,
         client_regression_entries=client_entries,
         hud_captures=hud_captures,
+        weapon_timings=weapon_timings,
         trace_result=trace_result,
     )
 

@@ -34,6 +34,16 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 - **Owner approval:** Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) acknowledged the capture review on 2024-09-22; status promoted to ✅ per the parity plan.
   - Backend Integrations (@services-team) and Gameplay Systems (@gamedev-lead) reviewed the matchmaking rating scaling sync on 2024-11-28 after wiring the runtime refresh hooks into `g_active.c`/`g_client.c`.
 
+### Weapon balance delta verification refresh (2025-03-15)
+
+- **Before/after snapshot**
+  | Aspect | Before (2024-09-22 captures) | After (deterministic harness + refreshed scrims) |
+  | --- | --- | --- |
+  | Reload timings | Parity validated by spot-checking the September scrims without CI publication. | Deterministic weapon timing harness now emits `weapon_timings/<target>/baseline.json` (seeded from the current commit) so CI can diff reload/refire values against the HLIL tables; initial baseline recorded for `qvm` target with all slots matching reference timings.【F:tests/run_harnesses.py†L98-L183】【F:artifacts/tests/weapon_timings/qvm/baseline.json†L1-L73】 |
+  | Ammo pickup + max stacks | Covered by the September demos only. | Harness baseline captures every pickup/max pair from `bg_weaponStats` and flags mismatches against the reference tables (none observed in the refreshed run).【F:tests/run_harnesses.py†L125-L183】【F:artifacts/tests/weapon_timings/qvm/baseline.json†L74-L162】 |
+  | Capture set | `weapon-balance-2024-09-22-*` demos only. | Rocket, rail, and lightning scrims regenerated with documented seeds/commands for parity reviews.【F:artifacts/tests/weapon-balance-deltas.md†L1-L16】 |
+- **Approvals:** Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) reviewed the harness baseline and refreshed scrim instructions on 2025-03-15; status remains ✅ with CI artefacts now attached for ongoing parity checks.
+
 ### Race/CTF timer verification (2024-12-09)
 
 - **Evidence:** Replay notes in [`artifacts/tests/race-ctf-timer-verification.md`](../../artifacts/tests/race-ctf-timer-verification.md) capture scoreboard and HUD clocks staying aligned with race splits, CTF overtime rollovers, and sudden-death ticks.
