@@ -79,6 +79,10 @@ static void CG_DrawVoteMapSlot(rectDef_t *rect, float text_x, float text_y, floa
 static void CG_DrawVoteShot(rectDef_t *rect, int slot);
 static void CG_DrawVoteCount(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle, int slot);
 static void CG_DrawVoteTimer(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
+static void CG_DrawScoreboxFollowBackground(rectDef_t *rect, qhandle_t shader, vec4_t color);
+static void CG_DrawScoreboxSpecBackground(rectDef_t *rect, qhandle_t shader, vec4_t color);
+static void CG_DrawRoundBackground(rectDef_t *rect, qhandle_t shader, vec4_t color);
+static void CG_DrawOvertimeBackground(rectDef_t *rect, qhandle_t shader, vec4_t color);
 
 /*
 =============
@@ -3724,6 +3728,162 @@ return;
 CG_FillRect(rect->x, rect->y, rect->w, rect->h, color);
 }
 
+/*
+=============
+CG_DrawScoreboxFollowBackground
+
+Tints the follow scorebox backing image for spectator HUDs.
+=============
+*/
+static void CG_DrawScoreboxFollowBackground(rectDef_t *rect, qhandle_t shader, vec4_t color) {
+	vec4_t modulate;
+	float x;
+	float y;
+	float w;
+	float h;
+
+	if (!shader) {
+		shader = cgs.media.scoreboxFollowShader;
+	}
+
+	if (!shader) {
+		return;
+	}
+
+	Vector4Copy(color, modulate);
+	if (modulate[3] <= 0.0f) {
+		modulate[3] = 1.0f;
+	}
+
+	x = rect->x;
+	y = rect->y;
+	w = rect->w;
+	h = rect->h;
+	CG_AdjustFrom640(&x, &y, &w, &h);
+
+	trap_R_SetColor(modulate);
+	trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader);
+	trap_R_SetColor(NULL);
+}
+
+/*
+=============
+CG_DrawScoreboxSpecBackground
+
+Tints the spectator scorebox backing image.
+=============
+*/
+static void CG_DrawScoreboxSpecBackground(rectDef_t *rect, qhandle_t shader, vec4_t color) {
+	vec4_t modulate;
+	float x;
+	float y;
+	float w;
+	float h;
+
+	if (!shader) {
+		shader = cgs.media.scoreboxSpecShader;
+	}
+
+	if (!shader) {
+		return;
+	}
+
+	Vector4Copy(color, modulate);
+	if (modulate[3] <= 0.0f) {
+		modulate[3] = 1.0f;
+	}
+
+	x = rect->x;
+	y = rect->y;
+	w = rect->w;
+	h = rect->h;
+	CG_AdjustFrom640(&x, &y, &w, &h);
+
+	trap_R_SetColor(modulate);
+	trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader);
+	trap_R_SetColor(NULL);
+}
+
+/*
+=============
+CG_DrawRoundBackground
+
+Draws a backing quad for the current match state label.
+=============
+*/
+static void CG_DrawRoundBackground(rectDef_t *rect, qhandle_t shader, vec4_t color) {
+	vec4_t modulate;
+	float x;
+	float y;
+	float w;
+	float h;
+	const char *label;
+
+	label = CG_GetMatchStateLabel();
+	if (!label || !*label) {
+		return;
+	}
+
+	Vector4Copy(color, modulate);
+	if (modulate[3] <= 0.0f) {
+		modulate[3] = 1.0f;
+	}
+
+	if (shader) {
+		x = rect->x;
+		y = rect->y;
+		w = rect->w;
+		h = rect->h;
+		CG_AdjustFrom640(&x, &y, &w, &h);
+
+		trap_R_SetColor(modulate);
+		trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader);
+		trap_R_SetColor(NULL);
+		return;
+	}
+
+	CG_FillRect(rect->x, rect->y, rect->w, rect->h, modulate);
+}
+
+/*
+=============
+CG_DrawOvertimeBackground
+
+Paints the overtime banner background when active.
+=============
+*/
+static void CG_DrawOvertimeBackground(rectDef_t *rect, qhandle_t shader, vec4_t color) {
+	vec4_t modulate;
+	float x;
+	float y;
+	float w;
+	float h;
+
+	if (!(cg.timelimitWarnings & 4) && !cgs.matchOvertimeActive) {
+		return;
+	}
+
+	Vector4Copy(color, modulate);
+	if (modulate[3] <= 0.0f) {
+		modulate[3] = 1.0f;
+	}
+
+	if (shader) {
+		x = rect->x;
+		y = rect->y;
+		w = rect->w;
+		h = rect->h;
+		CG_AdjustFrom640(&x, &y, &w, &h);
+
+		trap_R_SetColor(modulate);
+		trap_R_DrawStretchPic(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader);
+		trap_R_SetColor(NULL);
+		return;
+	}
+
+	CG_FillRect(rect->x, rect->y, rect->w, rect->h, modulate);
+}
+
 static void CG_DrawLevelTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	int		seconds;
 	char	buffer[32];
@@ -5981,14 +6141,20 @@ rect.y = y;
 		CG_DrawLevelTimer(&rect, scale, color, textStyle);
 		break;
 	case CG_ROUND:
-		CG_DrawRoundLabel(&rect, text_x, text_y, scale, color, textStyle);
-		break;
+			CG_DrawRoundLabel(&rect, text_x, text_y, scale, color, textStyle);
+			break;
+	case CG_ROUND_BACKGROUND:
+			CG_DrawRoundBackground(&rect, shader, color);
+			break;
 	case CG_ROUNDTIMER:
-		CG_DrawRoundTimer(&rect, scale, color, textStyle);
-		break;
+			CG_DrawRoundTimer(&rect, scale, color, textStyle);
+			break;
 	case CG_OVERTIME:
-		CG_DrawOvertime(&rect, scale, color, textStyle);
-		break;
+			CG_DrawOvertime(&rect, scale, color, textStyle);
+			break;
+	case CG_OVERTIME_BACKGROUND:
+			CG_DrawOvertimeBackground(&rect, shader, color);
+			break;
 	case CG_LOCALTIME:
 		CG_DrawLocalTime(&rect, text_x, text_y, scale, color, textStyle);
 		break;
@@ -6301,23 +6467,29 @@ break;
 		CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 1, nameShader);
 		break;
 	}
-	case CG_2ND_PLYR_SCORE:
-		CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 1);
-		break;
-	case CG_2ND_PLYR_HEALTH_ARMOR:
-		CG_DrawSpectatorHealthArmor(&rect, scale, color, textStyle, 1);
-		break;
-	case CG_2ND_PLYR_AVATAR:
-		CG_DrawSpectatorProfileImage(&rect, 1);
-		break;
-	case CG_SPEC_FOLLOW_PRIMARY:
-	case CG_SPEC_FOLLOW_SECONDARY:
-		CG_DrawSpectatorFollowIndicator( &rect, ownerDraw, shader, color );
-		break;
-	case CG_SPEC_COMPARE_PRIMARY:
-	case CG_SPEC_COMPARE_SECONDARY:
-		CG_DrawSpectatorComparison( &rect, scale, color, textStyle, ownerDraw );
-		break;
+		case CG_2ND_PLYR_SCORE:
+				CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 1);
+				break;
+		case CG_2ND_PLYR_HEALTH_ARMOR:
+				CG_DrawSpectatorHealthArmor(&rect, scale, color, textStyle, 1);
+				break;
+		case CG_2ND_PLYR_AVATAR:
+				CG_DrawSpectatorProfileImage(&rect, 1);
+				break;
+		case CG_SCOREBOX_FOLLOW_BACKGROUND:
+				CG_DrawScoreboxFollowBackground(&rect, shader, color);
+				break;
+		case CG_SCOREBOX_SPEC_BACKGROUND:
+				CG_DrawScoreboxSpecBackground(&rect, shader, color);
+				break;
+		case CG_SPEC_FOLLOW_PRIMARY:
+		case CG_SPEC_FOLLOW_SECONDARY:
+				CG_DrawSpectatorFollowIndicator( &rect, ownerDraw, shader, color );
+				break;
+		case CG_SPEC_COMPARE_PRIMARY:
+		case CG_SPEC_COMPARE_SECONDARY:
+				CG_DrawSpectatorComparison( &rect, scale, color, textStyle, ownerDraw );
+				break;
 	case CG_HEALTH_COLORIZED: {
 		qhandle_t followShader = shader;
 
