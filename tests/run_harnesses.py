@@ -43,6 +43,12 @@ SNAPSHOT_ARCHIVES: dict[str, Path] = {
     "resource_drain": SNAPSHOT_ROOT / "resource_drain_snapshots.json",
     "server_correction": SNAPSHOT_ROOT / "server_correction_snapshots.json",
 }
+HUD_ASPECT_RATIOS: tuple[str, ...] = ("4x3", "16x9", "21x9")
+COMPETITIVE_HUD_CONFIG: dict[str, object] = {
+    "cg_useCompetitiveHud": True,
+    "hudFiles": ["ui/hud.txt", "ui/hud3.menu"],
+    "description": "Competitive HUD assets enabled for captures",
+}
 
 
 @dataclass(slots=True)
@@ -53,6 +59,7 @@ class HarnessBundleResult:
     artifact_root: Path
     match_summaries: list[dict[str, object]]
     client_regression_entries: list[dict[str, object]]
+    hud_captures: list[dict[str, object]]
     trace_result: TraceHarnessResult | None = None
 
     def match_timeline_path(self, slug: str) -> Path:
@@ -72,6 +79,24 @@ class HarnessBundleResult:
 def _write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _write_json(path: Path, payload: dict[str, object]) -> None:
+    _write_text(path, json.dumps(payload, indent=2) + "\n")
+
+
+def _current_commit() -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return completed.stdout.strip()
+    except subprocess.CalledProcessError:
+        return "unknown"
 
 
 def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict[str, object]]:
@@ -108,11 +133,14 @@ def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict
     return summaries
 
 
-def _run_client_harness(target: str, artifact_root: Path) -> list[dict[str, object]]:
+def _run_client_harness(
+    target: str, artifact_root: Path
+) -> tuple[list[dict[str, object]], dict[str, dict[str, object]]]:
     harness = ClientRegressionHarness(ClientPredictor())
 
     manifest: dict[str, dict[str, object]] = {}
     log_entries: list[dict[str, object]] = []
+    capture_payloads: dict[str, dict[str, object]] = {}
 
     for scenario in sorted(SNAPSHOT_ARCHIVES.keys()):
         archive = SNAPSHOT_ARCHIVES[scenario]
@@ -127,6 +155,12 @@ def _run_client_harness(target: str, artifact_root: Path) -> list[dict[str, obje
             "frames": payloads,
         }
 
+        capture_payloads[scenario] = {
+            "frames": payloads,
+            "metadata": metadata,
+            "archive": str(archive.relative_to(REPO_ROOT)),
+        }
+
         log_entries.append(
             {
                 "scenario": scenario,
@@ -138,7 +172,7 @@ def _run_client_harness(target: str, artifact_root: Path) -> list[dict[str, obje
         )
 
     hashes_path = artifact_root / "client_regression" / target / "hud_hashes.json"
-    _write_text(hashes_path, json.dumps(manifest, indent=2) + "\n")
+    _write_json(hashes_path, manifest)
 
     log_path = artifact_root / "logs" / target / "client_regression.log"
     log_text = (
@@ -148,7 +182,76 @@ def _run_client_harness(target: str, artifact_root: Path) -> list[dict[str, obje
     )
     _write_text(log_path, log_text)
 
-    return log_entries
+    return log_entries, capture_payloads
+
+
+def _run_hud_capture_harness(
+    target: str,
+    artifact_root: Path,
+    capture_payloads: dict[str, dict[str, object]],
+    commit_hash: str,
+) -> list[dict[str, object]]:
+    hud_root = artifact_root / "hud-captures" / target
+    hud_root.mkdir(parents=True, exist_ok=True)
+
+    manifest_entries: list[dict[str, object]] = []
+
+    for aspect in HUD_ASPECT_RATIOS:
+        aspect_root = hud_root / aspect
+        aspect_root.mkdir(parents=True, exist_ok=True)
+
+        for scenario, payload in sorted(capture_payloads.items()):
+            frames = payload.get("frames", [])
+            metadata = payload.get("metadata", {})
+            archive = payload.get("archive")
+
+            capture_payload = {
+                "metadata": {
+                    "aspect": aspect,
+                    "hudConfig": COMPETITIVE_HUD_CONFIG,
+                    "commit": commit_hash,
+                    "scenario": scenario,
+                    "archive": archive,
+                    "frames": len(frames),
+                    "snapshotMetadata": metadata,
+                },
+                "frames": frames,
+            }
+
+            capture_path = aspect_root / f"{scenario}.json"
+            _write_json(capture_path, capture_payload)
+
+            manifest_entries.append(
+                {
+                    "target": target,
+                    "aspect": aspect,
+                    "scenario": scenario,
+                    "frames": len(frames),
+                    "hashes": [frame.get("hash") for frame in frames],
+                    "path": str(capture_path.relative_to(artifact_root)),
+                    "hudConfig": COMPETITIVE_HUD_CONFIG,
+                    "commit": commit_hash,
+                }
+            )
+
+    manifest = {
+        "commit": commit_hash,
+        "hudConfig": COMPETITIVE_HUD_CONFIG,
+        "captures": manifest_entries,
+    }
+
+    manifest_path = hud_root / "manifest.json"
+    _write_json(manifest_path, manifest)
+
+    log_path = artifact_root / "logs" / target / "hud_captures.log"
+    _write_text(
+        log_path,
+        "HUD capture harness produced competitive HUD baselines.\n"
+        + json.dumps(manifest_entries, indent=2)
+        + "\n",
+    )
+
+    return manifest_entries
 
 
 def _ensure_reverse_build(target: str, reverse_build_root: Path) -> None:
@@ -198,7 +301,9 @@ def run_harness_bundle(
     _ensure_reverse_build(target, reverse_build_root)
 
     match_summaries = _run_match_harness(target, artifact_root, seed)
-    client_entries = _run_client_harness(target, artifact_root)
+    client_entries, capture_payloads = _run_client_harness(target, artifact_root)
+    commit_hash = _current_commit()
+    hud_captures = _run_hud_capture_harness(target, artifact_root, capture_payloads, commit_hash)
 
     trace_result: TraceHarnessResult | None = None
     if target == "re":
@@ -223,6 +328,7 @@ def run_harness_bundle(
         artifact_root=artifact_root,
         match_summaries=match_summaries,
         client_regression_entries=client_entries,
+        hud_captures=hud_captures,
         trace_result=trace_result,
     )
 
