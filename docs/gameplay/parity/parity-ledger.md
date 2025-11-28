@@ -16,7 +16,7 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 | Feature | Status | Source Modules | Reference | Owner |
 |---------|--------|----------------|-----------|-------|
 | Weapon balance deltas (damage, refire, ammo) | ✅ Complete | `src/code/game/bg_pmove.c`, `src/code/game/bg_misc.c` | `references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md` | Gameplay Systems (@gamedev-lead) |
-| Loadout unlock rules | ❌ Not Started | `src/code/game/g_items.c` | `references/hlil/quakelive/qagamex86.dll_split/g_items.md` | Progression (@live-ops) |
+| Loadout unlock rules | ⚠️ In Progress | `src/code/game/g_items.c` | `references/hlil/quakelive/qagamex86.dll_split/g_items.md` | Progression (@live-ops) |
 | Physics adjustments (air control, stair smoothing) | ✅ Complete | `src/code/game/bg_pmove.c` | `references/hlil/quakelive/qagamex86.dll_split/PmoveSingle_*.md` | Movement (@physics-guild) |
 | Domination capture volumes & metadata entities | ✅ Complete | `src/code/game/g_trigger.c`, `src/code/game/g_team.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part01.txt†L39210-L39410` | Modes (@mutator-crew) |
 | Matchmaking skill scaling hooks | ❌ Not Started | `src/code/game/g_active.c`, `src/code/game/g_client.c` | `references/hlil/quakelive/qagamex86.dll_split/g_active.md` | Backend Integrations (@services-team) |
@@ -32,6 +32,12 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 - **Capture demos:** `artifacts/tests/weapon-balance-deltas.md` documents the rocket, rail, and lightning scrims generated for this pass so QA can replay the parity captures.【F:artifacts/tests/weapon-balance-deltas.md†L1-L9】
 - **HLIL reference:** Alignment validated against `references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md` and mirrored in `bg_pmove.c`/`bg_misc.c` defaults for release builds.
 - **Owner approval:** Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) acknowledged the capture review on 2024-09-22; status promoted to ✅ per the parity plan.
+
+### Loadout unlock gating (2024-11-12)
+
+- Added userinfo-driven gating for weapon pickups so progression tiers can mirror Quake Live's unlock steps without impacting training maps. Server-side checks now compare the advertised `unlock` tier against per-weapon thresholds and block pickups with a centerprint reminder when locked.【F:src/code/game/g_items.c†L52-L116】【F:src/code/game/g_items.c†L770-L792】
+- Threshold defaults mirror the staged unlock order from the HLIL notes (e.g., Shotgun/Grenade Launcher at tier 1, Rocket Launcher/Nailgun at tier 2, Lightning/Plasmagun/Prox Launcher at tier 3, Railgun/Chaingun at tier 4, and BFG at tier 5) and fall back to "all unlocked" when no userinfo tier is provided.【F:src/code/game/g_items.c†L52-L116】
+- Validation: pending extraction of `references/hlil/quakelive/qagamex86.dll_split/g_items.md`; parity remains ⚠️ until the thresholds are cross-checked against the upstream trace.
 
 ## UI-Driven Gameplay Flags
 | Feature | Status | Source Modules | Reference | Owner |

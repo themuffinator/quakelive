@@ -38,16 +38,124 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 
-#define	RESPAWN_ARMOR		25
-#define	RESPAWN_HEALTH		35
-#define	RESPAWN_AMMO		40
-#define	RESPAWN_HOLDABLE	60
-#define	RESPAWN_MEGAHEALTH	35//120
+#define RESPAWN_ARMOR		25
+#define RESPAWN_HEALTH		35
+#define RESPAWN_AMMO		40
+#define RESPAWN_HOLDABLE	60
+#define RESPAWN_MEGAHEALTH	35//120
 static const keyItemDef_t g_keyItemDefs[] = {
 	{ KEY_FLAG_SILVER, "item_key_silver" },
 	{ KEY_FLAG_GOLD, "item_key_gold" },
 	{ KEY_FLAG_MASTER, "item_key_master" }
 };
+
+typedef struct weaponUnlockDef_s {
+	weapon_t	weapon;
+	int		threshold;
+} weaponUnlockDef_t;
+
+static const weaponUnlockDef_t s_weaponUnlockDefs[] = {
+	{ WP_MACHINEGUN, 0 },
+	{ WP_SHOTGUN, 1 },
+	{ WP_GRENADE_LAUNCHER, 1 },
+	{ WP_ROCKET_LAUNCHER, 2 },
+	{ WP_LIGHTNING, 3 },
+	{ WP_RAILGUN, 4 },
+	{ WP_PLASMAGUN, 3 },
+	{ WP_BFG, 5 },
+	{ WP_GRAPPLING_HOOK, 0 },
+	{ WP_NAILGUN, 2 },
+	{ WP_PROX_LAUNCHER, 3 },
+	{ WP_CHAINGUN, 4 },
+	{ WP_HEAVY_MACHINEGUN, 2 },
+	{ WP_NUM_WEAPONS, -1 }
+};
+
+/*
+===============
+G_GetClientUnlockProgress
+
+Parses the player's unlock tier from their userinfo, defaulting to fully unlocked when absent.
+===============
+*/
+static int G_GetClientUnlockProgress( const gclient_t *client ) {
+	const char	*unlockValue;
+	int		progress;
+
+	if ( !client ) {
+		return INT_MAX;
+	}
+
+	unlockValue = client->pers.userinfo[0] ? Info_ValueForKey( client->pers.userinfo, "unlock" ) : "";
+	if ( !unlockValue || !unlockValue[0] ) {
+		return INT_MAX;
+	}
+
+	progress = atoi( unlockValue );
+	if ( progress < 0 ) {
+		progress = 0;
+	}
+
+	return progress;
+}
+
+/*
+===============
+G_LookupWeaponUnlockThreshold
+
+Returns the unlock threshold for the given weapon index.
+===============
+*/
+static int G_LookupWeaponUnlockThreshold( weapon_t weapon ) {
+	const weaponUnlockDef_t	*def;
+
+	for ( def = s_weaponUnlockDefs ; def->weapon != WP_NUM_WEAPONS ; ++def ) {
+		if ( def->weapon == weapon ) {
+			return def->threshold;
+		}
+	}
+
+	return 0;
+}
+
+/*
+===============
+G_WeaponUnlockedForClient
+
+Returns qtrue when a player's unlock tier satisfies the weapon's unlock threshold.
+===============
+*/
+static qboolean G_WeaponUnlockedForClient( gentity_t *ent, weapon_t weapon ) {
+	int		progress;
+	int		threshold;
+	gitem_t	*item;
+
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return qtrue;
+	}
+
+	if ( level.trainingMapActive ) {
+		return qtrue;
+	}
+
+	threshold = G_LookupWeaponUnlockThreshold( weapon );
+	if ( threshold <= 0 ) {
+		return qtrue;
+	}
+
+	progress = G_GetClientUnlockProgress( ent ? ent->client : NULL );
+	if ( progress >= threshold ) {
+		return qtrue;
+	}
+
+	if ( ent && ent->client ) {
+		item = BG_FindItemForWeapon( weapon );
+		trap_SendServerCommand( ent - g_entities, va( "cp \"%s locked (tier %i)\"", item ? item->pickup_name : "Weapon", threshold ) );
+	}
+
+	return qfalse;
+}
+
 
 /*
 ===============
@@ -672,6 +780,10 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 
 	weapon = ent->item ? (weapon_t)ent->item->giTag : WP_NONE;
 	basePickup = G_GetAmmoPackPickupCount( weapon, ent->item ? ent->item->quantity : 0 );
+
+	if ( !G_WeaponUnlockedForClient( other, weapon ) ) {
+		return 0;
+	}
 
 	if ( ent->count < 0 ) {
 		quantity = 0; // None for you, sir!
