@@ -601,7 +601,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_recordSPDemoName, "ui_recordSPDemoName", "", CVAR_ARCHIVE},
 	{ &cg_obeliskRespawnDelay, "g_obeliskRespawnDelay", "10", CVAR_SERVERINFO},
 	{ &cg_lastmsg, "cg_lastmsg", "0", CVAR_ARCHIVE },
-	{ &cg_hudFiles, "cg_hudFiles", "ui/hud.txt", CVAR_ARCHIVE},
+	{ &cg_hudFiles, "cg_hudFiles", CG_DEFAULT_HUD_FILE, CVAR_ARCHIVE},
 	{ &cg_cameraOrbit, "cg_cameraOrbit", "0", CVAR_CHEAT},
 	{ &cg_cameraOrbitDelay, "cg_cameraOrbitDelay", "50", CVAR_ARCHIVE},
 	{ &cg_timescaleFadeEnd, "cg_timescaleFadeEnd", "1", 0},
@@ -3681,6 +3681,7 @@ void CG_LoadHudMenu() {
 	hudSet = buff;
 	if (hudSet[0] == '\0') {
 		hudSet = CG_DEFAULT_HUD_FILE;
+		trap_Cvar_Set("cg_hudFiles", hudSet);
 	}
 
 	cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );

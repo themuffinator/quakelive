@@ -14,6 +14,7 @@ from typing import Dict, List, Tuple
 PANELS = [
     "hud.txt",
     "hud2.txt",
+    "hud3.txt",
     "hud3.menu",
     "default.menu",
     "end_scoreboard_ca.menu",

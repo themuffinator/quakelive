@@ -754,8 +754,11 @@ static void FS_RunAssetPreflight( void )
 	const char *uiScriptAssets[] = {
 		"ui/main.menu",
 		"ui/comp_hud.menu",
+		"ui/hud.txt",
+		"ui/hud2.txt",
+		"ui/hud3.txt",
 		"ui/teaminfo.txt"
-	};
+};
 
 	struct {
 		const char *label;

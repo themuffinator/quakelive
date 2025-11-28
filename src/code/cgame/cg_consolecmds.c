@@ -114,6 +114,14 @@ static void CG_ScoresUp_f( void ) {
 extern menuDef_t *menuScoreboard;
 void Menu_Reset();			// FIXME: add to right include file
 
+/*
+=============
+CG_LoadHud_f
+
+Loads the HUD preset referenced by the cg_hudFiles cvar and applies a default
+when the cvar is blank.
+=============
+*/
 static void CG_LoadHud_f( void) {
 	char buff[1024];
 	const char *hudSet;
@@ -127,6 +135,7 @@ static void CG_LoadHud_f( void) {
 	hudSet = buff;
 	if (hudSet[0] == '\0') {
 		hudSet = CG_DEFAULT_HUD_FILE;
+		trap_Cvar_Set("cg_hudFiles", hudSet);
 	}
 
 	CG_LoadMenus(hudSet);
