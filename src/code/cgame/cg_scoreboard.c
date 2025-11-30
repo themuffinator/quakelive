@@ -75,6 +75,26 @@ static qboolean localClient; // true if local client has been displayed
 
 static cgHudScoreboard_t cgHudScoreboard;
 
+static void CG_UpdateHudScoreboardSummary( void );
+
+/*
+=============
+CG_ScoreboardWideScaleFactor
+
+Returns the widescreen scale factor for 640-based coordinates.
+=============
+*/
+static float CG_ScoreboardWideScaleFactor( void ) {
+	float		scale;
+
+	if ( cgs.glconfig.vidWidth <= 0 || cg.refdef.width <= 0 ) {
+		return 1.0f;
+	}
+
+	scale = (float)cg.refdef.width / (float)SCREEN_WIDTH;
+	return scale;
+}
+
 /*
 =============
 CG_ScoreboardWideScale
@@ -83,14 +103,7 @@ Returns the widescreen-scaled coordinate for a 640-based x position.
 =============
 */
 static float CG_ScoreboardWideScale( float baseX ) {
-	float		scale;
-
-	if ( cgs.glconfig.vidWidth <= 0 || cg.refdef.width <= 0 ) {
-		return baseX;
-	}
-
-	scale = (float)cg.refdef.width / (float)SCREEN_WIDTH;
-	return baseX * scale;
+	return baseX * CG_ScoreboardWideScaleFactor();
 }
 
 /*
@@ -101,25 +114,76 @@ Clears and seeds the HUD scoreboard cache for menu-driven scoreboxes.
 =============
 */
 static void CG_ResetHudScoreboard( qboolean timersActive ) {
+	float		scale;
+
 	memset( &cgHudScoreboard, 0, sizeof( cgHudScoreboard ) );
 
+	scale = CG_ScoreboardWideScaleFactor();
+
+	cgHudScoreboard.scale = scale;
 	cgHudScoreboard.widescreen = ( cgs.glconfig.vidWidth > SCREEN_WIDTH );
 	cgHudScoreboard.scoreX = CG_ScoreboardWideScale( SB_SCORE_X + (SB_RATING_WIDTH / 2) );
-	cgHudScoreboard.scoreWidth = SB_RATING_WIDTH;
+	cgHudScoreboard.scoreWidth = SB_RATING_WIDTH * scale;
 	cgHudScoreboard.pingX = CG_ScoreboardWideScale( SB_PING_X );
-	cgHudScoreboard.pingWidth = 5 * BIGCHAR_WIDTH;
+	cgHudScoreboard.pingWidth = 5 * BIGCHAR_WIDTH * scale;
 	cgHudScoreboard.timeX = CG_ScoreboardWideScale( SB_TIME_X );
-	cgHudScoreboard.timeWidth = timersActive ? ( 5 * BIGCHAR_WIDTH ) : 0;
+	cgHudScoreboard.timeWidth = timersActive ? ( 5 * BIGCHAR_WIDTH * scale ) : 0;
 	cgHudScoreboard.nameX = CG_ScoreboardWideScale( SB_NAME_X );
-	cgHudScoreboard.nameWidth = 15 * BIGCHAR_WIDTH;
+	cgHudScoreboard.nameWidth = 15 * BIGCHAR_WIDTH * scale;
+	cgHudScoreboard.overtimeConfigured = (qboolean)( cgs.matchOvertimeCount > 0 );
 	cgHudScoreboard.overtimeActive = cgs.matchOvertimeActive;
 	cgHudScoreboard.overtimeCount = cgs.matchOvertimeCount;
 	cgHudScoreboard.suddenDeathConfigured =
 		( cgs.matchSuddenDeathStartSeconds > 0 && cgs.matchSuddenDeathTickSeconds > 0 );
+	cgHudScoreboard.suddenDeathActive = cgs.matchSuddenDeathSpawnDelayActive;
+	cgHudScoreboard.suddenDeathRespawns = cgs.matchSuddenDeathRespawnsEnabled;
+	cgHudScoreboard.suddenDeathDelayActive = cgs.matchSuddenDeathSpawnDelayActive;
 	cgHudScoreboard.suddenDeathStart = cgs.matchSuddenDeathStartSeconds;
 	cgHudScoreboard.suddenDeathTick = cgs.matchSuddenDeathTickSeconds;
 	cgHudScoreboard.suddenDeathMax = cgs.matchSuddenDeathMaxSeconds;
 	cgHudScoreboard.suddenDeathIncrement = cgs.matchSuddenDeathIncrementSeconds;
+
+	CG_UpdateHudScoreboardSummary();
+}
+
+/*
+=============
+CG_UpdateHudScoreboardSummary
+
+Builds gametype-aware summary metadata for HUD menu scoreboxes.
+=============
+*/
+static void CG_UpdateHudScoreboardSummary( void ) {
+	const char		*summary;
+
+	cgHudScoreboard.gametype = cgs.gametype;
+	cgHudScoreboard.teamGame = (qboolean)( cgs.gametype >= GT_TEAM );
+	cgHudScoreboard.redScore = 0;
+	cgHudScoreboard.blueScore = 0;
+	cgHudScoreboard.leadingTeam = TEAM_FREE;
+	cgHudScoreboard.scoresTied = qfalse;
+	summary = "Scoreboard";
+
+	if ( cgHudScoreboard.teamGame ) {
+		cgHudScoreboard.redScore = cg.teamScores[0];
+		cgHudScoreboard.blueScore = cg.teamScores[1];
+		if ( cgHudScoreboard.redScore == cgHudScoreboard.blueScore ) {
+			cgHudScoreboard.scoresTied = qtrue;
+			summary = va( "Teams are tied at %i", cgHudScoreboard.redScore );
+		} else if ( cgHudScoreboard.redScore > cgHudScoreboard.blueScore ) {
+			cgHudScoreboard.leadingTeam = TEAM_RED;
+			summary = va( "Red leads %i to %i", cgHudScoreboard.redScore, cgHudScoreboard.blueScore );
+		} else {
+			cgHudScoreboard.leadingTeam = TEAM_BLUE;
+			summary = va( "Blue leads %i to %i", cgHudScoreboard.blueScore, cgHudScoreboard.redScore );
+		}
+	} else if ( cg.snap && cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR ) {
+		summary = va( "%s place with %i",
+			CG_PlaceString( cg.snap->ps.persistant[PERS_RANK] + 1 ),
+			cg.snap->ps.persistant[PERS_SCORE] );
+	}
+
+	Q_strncpyz( cgHudScoreboard.summary, summary, sizeof( cgHudScoreboard.summary ) );
 }
 
 /*
@@ -771,6 +835,10 @@ qboolean CG_DrawOldScoreboard( void ) {
 	// don't draw amuthing if the menu or console is up
 	if ( cg_paused.integer ) {
 		cg.deferredPlayerLoading = 0;
+		return qfalse;
+	}
+
+	if ( cg.competitiveHudLoaded ) {
 		return qfalse;
 	}
 
