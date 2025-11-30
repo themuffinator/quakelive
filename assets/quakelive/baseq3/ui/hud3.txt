@@ -4,6 +4,7 @@
 	loadMenu { "ui/comp_hud.menu" }
 	loadMenu { "ui/comp_spectator.menu" }
 	loadMenu { "ui/comp_spectator_follow.menu" }
+	loadMenu { "ui/hud3.menu" }
 	loadMenu { "ui/ingame_scoreboard_ffa.menu" }
 	loadMenu { "ui/ingame_scoreboard_duel.menu" }
 	loadMenu { "ui/ingame_scoreboard_race.menu" }
@@ -16,4 +17,22 @@
 	loadMenu { "ui/ingame_scoreboard_ft.menu" }
 	loadMenu { "ui/ingame_scoreboard_dom.menu" }
 	loadMenu { "ui/ingame_scoreboard_ad.menu" }
+	loadMenu { "ui/ingamescorenoteam.menu" }
+	loadMenu { "ui/ingamescoreteam.menu" }
+	loadMenu { "ui/ingamestats.menu" }
+	loadMenu { "ui/endscorenoteam.menu" }
+	loadMenu { "ui/endscoreteam.menu" }
+	loadMenu { "ui/endgamevote.menu" }
+	loadMenu { "ui/end_scoreboard_ffa.menu" }
+	loadMenu { "ui/end_scoreboard_duel.menu" }
+	loadMenu { "ui/end_scoreboard_race.menu" }
+	loadMenu { "ui/end_scoreboard_rr.menu" }
+	loadMenu { "ui/end_scoreboard_tdm.menu" }
+	loadMenu { "ui/end_scoreboard_ca.menu" }
+	loadMenu { "ui/end_scoreboard_ctf.menu" }
+	loadMenu { "ui/end_scoreboard_1fctf.menu" }
+	loadMenu { "ui/end_scoreboard_har.menu" }
+	loadMenu { "ui/end_scoreboard_ft.menu" }
+	loadMenu { "ui/end_scoreboard_dom.menu" }
+	loadMenu { "ui/end_scoreboard_ad.menu" }
 }

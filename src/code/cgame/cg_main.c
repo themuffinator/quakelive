@@ -3591,10 +3591,12 @@ static void CG_RegisterScoreTextures( void ) {
 }
 
 /*
-=================
-CG_LoadHudMenu();
+=============
+CG_LoadHudMenu
 
-=================
+Initializes the menu context and loads the HUD script referenced by
+cg_hudFiles, tracking whether competitive Quake Live HUDs are requested.
+=============
 */
 #define CG_HUD_SCRIPT_BUFFER 4096
 
