@@ -1300,6 +1300,7 @@ static void CG_ConfigStringModified( void ) {
 		CG_ParseRaceStatusString( str );
 	} else if ( num == CS_VOTE_TIME ) {
 		cgs.voteTime = atoi( str );
+		trap_Cvar_Set( "ui_voteactive", cgs.voteTime ? "1" : "0" );
 		cgs.voteModified = qtrue;
 	} else if ( num == CS_VOTE_YES ) {
 		cgs.voteYes = atoi( str );
@@ -1453,6 +1454,7 @@ static void CG_MapRestart( void ) {
 	cg.intermissionStarted = qfalse;
 
 	cgs.voteTime = 0;
+	trap_Cvar_Set( "ui_voteactive", "0" );
 
 	cg.mapRestart = qtrue;
 
