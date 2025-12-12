@@ -7084,6 +7084,11 @@ void CG_RunMenuScript(char **args) {
 		return;
 	}
 
+	if ( !Q_stricmp( name, "stopRefresh" ) ) {
+		CG_MenuScript_WebCommand( "web_stopRefresh", NULL );
+		return;
+	}
+
 	if ( !Q_stricmp( name, "web_showBrowserHash" ) ) {
 		argument = NULL;
 		CG_MenuScript_ParseOptionalToken( args, &argument );
