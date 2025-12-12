@@ -19,22 +19,37 @@ typedef struct ql_gentity_s ql_gentity_t;
 typedef struct ql_level_locals_s ql_level_locals_t;
 
 typedef struct ql_gclient_s {
-    uint8_t __pad0[0x2C0];
-    uint32_t steam_id_low;             // 0x2C0
-    uint32_t steam_id_high;            // 0x2C4
-    int32_t pers_max_health;           // 0x2C8
-    uint8_t __pad1[0x2D8 - 0x2CC];
-    int32_t session_restart_bookmark0; // 0x2D8
-    int32_t session_restart_bookmark1; // 0x2DC
-    uint8_t __pad2[0x32C - 0x2E0];
-    int32_t timeout_throttle;          // 0x32C
-    uint8_t __pad3[0x348 - 0x330];
-    int32_t session_team;              // 0x348
-    uint8_t __pad4[0x368 - 0x34C];
-    int64_t ban_timestamp;             // 0x368
-    uint8_t __pad5[0x568 - 0x370];
-    int32_t command_time_seed;         // 0x568
-    uint8_t __pad6[0xBD8 - 0x56C];
+	uint8_t player_state_and_linkage[0x250];	// 0x000 (ps/entity linkage cleared on spawn)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41211-L41218】
+	int32_t pers_connected;				// 0x250 (connection state initialised in ClientConnect/Begin)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41117-L41124】【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41211-L41213】
+	uint8_t pers_block[0x2C0 - 0x254];		// 0x254 persistent fields preserved across warmup
+	uint32_t steam_id_low;				// 0x2C0 (Steam64 low from engine callback)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41118-L41123】
+	uint32_t steam_id_high;			// 0x2C4 (Steam64 high from engine callback)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41118-L41123】
+	int32_t pers_max_health;			// 0x2C8 (handicap-capped max health mirrored into ps stats)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L40982-L41003】
+	uint8_t pers_pad[0x2D8 - 0x2CC];		// 0x2CC reserved pers/session fields
+	int32_t session_restart_bookmark0;		// 0x2D8 (rejoin bookmark reset to -1 on spawn)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41219-L41224】
+	int32_t session_restart_bookmark1;		// 0x2DC (paired bookmark cleared with session reset)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41219-L41224】
+	uint8_t session_pad[0x2F4 - 0x2E0];		// 0x2E0 session state carried between restarts
+	int32_t session_enter_time;			// 0x2F4 (level time stamped during ClientBegin)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41211-L41215】
+	int32_t timeout_reset_time;			// 0x2F8 (vote/timeout window cleared when spawning)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41213-L41216】
+	uint8_t timeout_pad[0x32C - 0x2FC];	// 0x2FC placeholders for mirrored ps values
+	int32_t timeout_throttle;			// 0x32C (timeout/invite throttle zeroed on Begin)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41213-L41216】
+	uint8_t session_state_pad[0x348 - 0x330];	// 0x330 transition bookkeeping
+	int32_t session_team;				// 0x348 (sess.team inspected for reconnect handling)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41216-L41221】
+	uint8_t ban_pad[0x368 - 0x34C];		// 0x34C punishment/session metadata (_time64 when absent)
+	int64_t ban_timestamp;			// 0x368 (ban expiry stored for localhost bypass)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41155-L41159】
+	uint8_t warmup_pad[0x3B8 - 0x370];		// 0x370 match timing mirrors updated on Begin
+	int32_t award_restart_marker0;		// 0x3B8 (award/stat reset marker set to -1)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41221-L41224】
+	int32_t award_restart_marker1;		// 0x3BC (paired marker cleared with session reset)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41221-L41224】
+	uint8_t award_and_stat_block[0x568 - 0x3C0];	// 0x3C0 award trackers and stat mirrors (cleared during ClientConnect)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41124-L41131】
+	int32_t command_time_seed;			// 0x568 (randomised command clock seed)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41126-L41132】
+	int32_t command_time_base;			// 0x56C (level.time snapshot for command seed window)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41127-L41130】
+	int32_t command_time_delta;			// 0x570 (delta between server time and last command)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41127-L41130】
+	uint8_t roster_pad[0x578 - 0x574];		// 0x574 alignment gap for roster tracking
+	int32_t restart_queue_position;		// 0x578 (queue slot assigned while rebuilding teams)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L12299-L12313】
+	int32_t restart_queue_rejoin;		// 0x57C (flag noting reuse of prior slot)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L12305-L12313】
+	int32_t team_seed_rank;			// 0x580 (per-team seed used when pairing same opponents)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L12314-L12329】
+	int32_t team_seed_reused;			// 0x584 (whether the team seed came from a prior match)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L12320-L12329】
+	uint8_t weapon_and_award_stats[0xBD8 - 0x588];	// 0x588 rolling weapon stats/awards (zeroed on connect)【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L41124-L41131】
 } ql_gclient_t;
 
 // Documented offsets lifted from references/hlil/quakelive/qagamex86.dll/
@@ -99,15 +114,26 @@ typedef ql_level_locals_t level_locals_t;
 #define QL_STATIC_ASSERT(cond, msg) typedef char static_assertion_##__LINE__[(cond) ? 1 : -1]
 #endif
 
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, player_state_and_linkage) == 0x000, "gclient_t.player_state_and_linkage offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, pers_connected) == 0x250, "gclient_t.pers_connected offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, steam_id_low) == 0x2C0, "gclient_t.steam_id_low offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, steam_id_high) == 0x2C4, "gclient_t.steam_id_high offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, pers_max_health) == 0x2C8, "gclient_t.pers_max_health offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, session_restart_bookmark0) == 0x2D8, "gclient_t.session_restart_bookmark0 offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, session_restart_bookmark1) == 0x2DC, "gclient_t.session_restart_bookmark1 offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, session_enter_time) == 0x2F4, "gclient_t.session_enter_time offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, timeout_reset_time) == 0x2F8, "gclient_t.timeout_reset_time offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, timeout_throttle) == 0x32C, "gclient_t.timeout_throttle offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, session_team) == 0x348, "gclient_t.session_team offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, ban_timestamp) == 0x368, "gclient_t.ban_timestamp offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, award_restart_marker0) == 0x3B8, "gclient_t.award_restart_marker0 offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, command_time_seed) == 0x568, "gclient_t.command_time_seed offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, command_time_base) == 0x56C, "gclient_t.command_time_base offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, command_time_delta) == 0x570, "gclient_t.command_time_delta offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, restart_queue_position) == 0x578, "gclient_t.restart_queue_position offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, restart_queue_rejoin) == 0x57C, "gclient_t.restart_queue_rejoin offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, team_seed_rank) == 0x580, "gclient_t.team_seed_rank offset");
+QL_STATIC_ASSERT(offsetof(ql_gclient_t, weapon_and_award_stats) == 0x588, "gclient_t.weapon_and_award_stats offset");
 QL_STATIC_ASSERT(sizeof(ql_gclient_t) == 0x0BD8, "gclient_t size");
 
 QL_STATIC_ASSERT(offsetof(ql_gentity_t, r_svFlags) == 0x068, "gentity_t.r_svFlags offset");
