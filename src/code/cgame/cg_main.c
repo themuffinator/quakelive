@@ -165,7 +165,6 @@ vmCvar_t	cg_announcerRewardsVO;
 vmCvar_t	cg_raceBeep;
 vmCvar_t	cg_drawCheckpointRemaining;
 vmCvar_t	cg_levelTimerDirection;
-vmCvar_t	cg_raceBeep;
 vmCvar_t	cg_drawProfileImages;
 vmCvar_t	cg_drawSprites;
 vmCvar_t	cg_drawPregameMessages;
@@ -468,7 +467,6 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_announcerRewardsVO, "cg_announcerRewardsVO", "1", CVAR_ARCHIVE },
 	{ &cg_raceBeep, "cg_raceBeep", "1", CVAR_ARCHIVE },
 	{ &cg_drawCheckpointRemaining, "cg_drawCheckpointRemaining", "1", CVAR_ARCHIVE },
-	{ &cg_raceBeep, "cg_raceBeep", "1", CVAR_ARCHIVE },
 	{ &cg_drawProfileImages, "cg_drawProfileImages", "1", CVAR_ARCHIVE },
 	{ &cg_drawSprites, "cg_drawSprites", "1", CVAR_ARCHIVE },
 	{ &cg_drawPregameMessages, "cg_drawPregameMessages", "1", CVAR_ARCHIVE },
