@@ -3799,6 +3799,18 @@ static void UI_RunMenuScript(char **args) {
 			return;
 		}
 
+		if (Q_stricmp(name, "web_showBrowser") == 0) {
+			if (String_Parse(args, &name2)) {
+				Com_sprintf(buff, sizeof(buff), "web_showBrowser %s\n", name2);
+			} else {
+				Com_sprintf(buff, sizeof(buff), "web_showBrowser\n");
+			}
+
+			UI_SetBrowserActive(qtrue);
+			trap_Cmd_ExecuteText(EXEC_NOW, buff);
+			return;
+		}
+
 		if (Q_stricmp(name, "StartServer") == 0) {
 			int i, clients, oldclients;
 			float skill;
