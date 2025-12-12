@@ -404,8 +404,11 @@ typedef struct {
 	float				timeWidth;
 	float				nameX;
 	float				nameWidth;
-	float				scale;
+	float					scale;
+	float					scoreboardX;
+	float					scoreboardWidth;
 	int					gametype;
+	int					variant;
 	qboolean			teamGame;
 	int					redScore;
 	int					blueScore;
@@ -413,9 +416,11 @@ typedef struct {
 	qboolean			scoresTied;
 	char				summary[128];
 	qboolean			widescreen;
+	qboolean			overtimeVisible;
 	qboolean			overtimeConfigured;
 	qboolean			overtimeActive;
 	int				overtimeCount;
+	char				overtimeLabel[32];
 	qboolean			suddenDeathConfigured;
 	qboolean			suddenDeathActive;
 	qboolean			suddenDeathRespawns;
@@ -424,6 +429,9 @@ typedef struct {
 	int				suddenDeathTick;
 	int				suddenDeathMax;
 	int				suddenDeathIncrement;
+	qboolean			suddenDeathVisible;
+	char				suddenDeathLabel[32];
+	int					teamCounts[TEAM_NUM_TEAMS];
 } cgHudScoreboard_t;
 
 // each client has an associated clientInfo_t
@@ -1937,6 +1945,8 @@ qboolean CG_DrawOldScoreboard( void );
 void CG_DrawOldTourneyScoreboard( void );
 void CG_BuildHudScoreboard( void );
 const cgHudScoreboard_t *CG_GetHudScoreboard( void );
+const cgHudScoreboardEntry_t *CG_GetHudScoreboardEntry( int index, team_t team );
+int CG_GetHudScoreboardTeamCount( team_t team );
 void CG_TouchCompetitiveScores( void );
 void CG_StartScoreboardTimer( int startTime );
 void CG_StopScoreboardTimer( int stopTime );

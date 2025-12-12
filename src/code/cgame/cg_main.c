@@ -3164,23 +3164,56 @@ static qboolean CG_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, 
 	return qfalse;
 }
 
+/*
+=============
+CG_FindScoreIndexForClient
+
+Maps a client number back to its score index for feeder lookups.
+=============
+*/
+static int CG_FindScoreIndexForClient( int clientNum ) {
+	int		i;
+
+	for ( i = 0; i < cg.numScores; i++ ) {
+		if ( cg.scores[i].client == clientNum ) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+
 
 static int CG_FeederCount(float feederID) {
 	int i, count;
 	count = 0;
+
+	if ( cg.competitiveHudLoaded ) {
+		CG_BuildHudScoreboard();
+	}
 	if (feederID == FEEDER_REDTEAM_LIST) {
+		if ( cg.competitiveHudLoaded ) {
+			return CG_GetHudScoreboardTeamCount( TEAM_RED );
+		}
 		for (i = 0; i < cg.numScores; i++) {
 			if (cg.scores[i].team == TEAM_RED) {
 				count++;
 			}
 		}
 	} else if (feederID == FEEDER_BLUETEAM_LIST) {
+		if ( cg.competitiveHudLoaded ) {
+			return CG_GetHudScoreboardTeamCount( TEAM_BLUE );
+		}
 		for (i = 0; i < cg.numScores; i++) {
 			if (cg.scores[i].team == TEAM_BLUE) {
 				count++;
 			}
 		}
 	} else if (feederID == FEEDER_SCOREBOARD) {
+		if ( cg.competitiveHudLoaded ) {
+			return cgHudScoreboard.count;
+		}
 		return cg.numScores;
 	}
 	return count;
@@ -3224,6 +3257,22 @@ void CG_SetScoreSelection(void *p) {
 // FIXME: might need to cache this info
 static clientInfo_t * CG_InfoFromScoreIndex(int index, int team, int *scoreIndex) {
 	int i, count;
+
+	if ( cg.competitiveHudLoaded ) {
+		const cgHudScoreboardEntry_t		*entry;
+		int		mappedIndex;
+
+		CG_BuildHudScoreboard();
+		entry = CG_GetHudScoreboardEntry( index, team );
+		if ( entry ) {
+			mappedIndex = CG_FindScoreIndexForClient( entry->clientNum );
+			if ( mappedIndex >= 0 ) {
+				*scoreIndex = mappedIndex;
+				return &cgs.clientinfo[entry->clientNum];
+			}
+		}
+	}
+
 	if ( cgs.gametype >= GT_TEAM ) {
 		count = 0;
 		for (i = 0; i < cg.numScores; i++) {
@@ -3246,6 +3295,8 @@ static const char *CG_FeederItemText(float feederID, int index, int column, qhan
 	clientInfo_t *info = NULL;
 	int team = -1;
 	score_t *sp = NULL;
+	const cgHudScoreboardEntry_t	*hudEntry = NULL;
+	int clientNum = -1;
 
 	*handle = -1;
 
@@ -3256,7 +3307,18 @@ static const char *CG_FeederItemText(float feederID, int index, int column, qhan
 	}
 
 	info = CG_InfoFromScoreIndex(index, team, &scoreIndex);
-	sp = &cg.scores[scoreIndex];
+	if ( scoreIndex >= 0 && scoreIndex < cg.numScores ) {
+		sp = &cg.scores[scoreIndex];
+	}
+	if ( cg.competitiveHudLoaded ) {
+		hudEntry = CG_GetHudScoreboardEntry( index, team );
+	}
+
+	if ( hudEntry ) {
+		clientNum = hudEntry->clientNum;
+	} else if ( sp ) {
+		clientNum = sp->client;
+	}
 
 	if (info && info->infoValid) {
 		switch (column) {
@@ -3277,52 +3339,65 @@ static const char *CG_FeederItemText(float feederID, int index, int column, qhan
 					return va("%i", info->handicap );
 					}
 				}
+		break;
+		case 1:
+			if (team == -1) {
+				return "";
+			} else {
+				*handle = CG_StatusHandle(info->teamTask);
+			}
 			break;
-			case 1:
-				if (team == -1) {
+		case 2:
+			if ( clientNum >= 0 && ( cg.snap->ps.stats[ STAT_CLIENTS_READY ] & ( 1 << clientNum ) ) ) {
+				return "Ready";
+			}
+			if (team == -1) {
+				if (cgs.gametype == GT_TOURNAMENT) {
+					return va("%i/%i", info->wins, info->losses);
+				} else if (info->infoValid && info->team == TEAM_SPECTATOR ) {
+					return "Spectator";
+				} else {
 					return "";
-				} else {
-					*handle = CG_StatusHandle(info->teamTask);
 				}
-		  break;
-			case 2:
-				if ( cg.snap->ps.stats[ STAT_CLIENTS_READY ] & ( 1 << sp->client ) ) {
-					return "Ready";
+			} else {
+				if (info->teamLeader) {
+					return "Leader";
 				}
-				if (team == -1) {
-					if (cgs.gametype == GT_TOURNAMENT) {
-						return va("%i/%i", info->wins, info->losses);
-					} else if (info->infoValid && info->team == TEAM_SPECTATOR ) {
-						return "Spectator";
-					} else {
-						return "";
-					}
-				} else {
-					if (info->teamLeader) {
-						return "Leader";
-					}
-				}
-			break;
-			case 3:
-				return info->name;
-			break;
-			case 4:
-				return va("%i", info->score);
-			break;
-			case 5:
-				return va("%4i", sp->time);
-			break;
-			case 6:
-				if ( sp->ping == -1 ) {
+			}
+		break;
+		case 3:
+			return info->name;
+		break;
+		case 4:
+			if ( hudEntry ) {
+				return va("%i", hudEntry->score );
+			}
+			return va("%i", info->score);
+		break;
+		case 5:
+			if ( hudEntry ) {
+				return va("%4i", hudEntry->time );
+			}
+			return va("%4i", sp ? sp->time : 0 );
+		break;
+		case 6:
+			if ( hudEntry ) {
+				if ( hudEntry->ping == -1 ) {
 					return "connecting";
-				} 
-				return va("%4i", sp->ping);
-			break;
+				}
+				return va("%4i", hudEntry->ping );
+			}
+			if ( sp && sp->ping == -1 ) {
+				return "connecting";
+			}
+			return va("%4i", sp ? sp->ping : 0 );
+		break;
 		}
 	}
 
 	return "";
 }
+
 
 static qhandle_t CG_FeederItemImage(float feederID, int index) {
 	return 0;

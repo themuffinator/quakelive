@@ -60,6 +60,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SB_TIME_X			(SB_SCORELINE_X + 17 * BIGCHAR_WIDTH + 8) // width 5
 #define SB_NAME_X			(SB_SCORELINE_X + 22 * BIGCHAR_WIDTH) // width 15
 
+typedef enum {
+	CG_HUD_SCOREBOARD_VARIANT_FFA,
+	CG_HUD_SCOREBOARD_VARIANT_TEAM,
+	CG_HUD_SCOREBOARD_VARIANT_ROUND,
+	CG_HUD_SCOREBOARD_VARIANT_DOMINATION,
+	CG_HUD_SCOREBOARD_VARIANT_ATTACK_DEFEND
+} cgHudScoreboardVariant_t;
+
 // The new and improved score board
 //
 // In cases where the number of clients is high, the score board heads are interleaved
@@ -76,6 +84,7 @@ static qboolean localClient; // true if local client has been displayed
 static cgHudScoreboard_t cgHudScoreboard;
 
 static void CG_UpdateHudScoreboardSummary( void );
+static void CG_UpdateHudScoreboardBanners( void );
 
 /*
 =============
@@ -108,13 +117,40 @@ static float CG_ScoreboardWideScale( float baseX ) {
 
 /*
 =============
+CG_ScoreboardVariant
+
+Determines which HUD scoreboard variant should be exposed for the gametype.
+=============
+*/
+static cgHudScoreboardVariant_t CG_ScoreboardVariant( void ) {
+	switch ( cgs.gametype ) {
+	case GT_CA:
+	case GT_FREEZE:
+		return CG_HUD_SCOREBOARD_VARIANT_ROUND;
+	case GT_DOMINATION:
+		return CG_HUD_SCOREBOARD_VARIANT_DOMINATION;
+	case GT_ATTACK_DEFEND:
+		return CG_HUD_SCOREBOARD_VARIANT_ATTACK_DEFEND;
+	default:
+		break;
+	}
+
+	if ( cgs.gametype >= GT_TEAM ) {
+		return CG_HUD_SCOREBOARD_VARIANT_TEAM;
+	}
+
+	return CG_HUD_SCOREBOARD_VARIANT_FFA;
+}
+
+/*
+=============
 CG_ResetHudScoreboard
 
 Clears and seeds the HUD scoreboard cache for menu-driven scoreboxes.
 =============
 */
 static void CG_ResetHudScoreboard( qboolean timersActive ) {
-	float		scale;
+	float			scale;
 
 	memset( &cgHudScoreboard, 0, sizeof( cgHudScoreboard ) );
 
@@ -122,6 +158,8 @@ static void CG_ResetHudScoreboard( qboolean timersActive ) {
 
 	cgHudScoreboard.scale = scale;
 	cgHudScoreboard.widescreen = ( cgs.glconfig.vidWidth > SCREEN_WIDTH );
+	cgHudScoreboard.scoreboardX = CG_ScoreboardWideScale( SCOREBOARD_X );
+	cgHudScoreboard.scoreboardWidth = CG_ScoreboardWideScale( SCREEN_WIDTH );
 	cgHudScoreboard.scoreX = CG_ScoreboardWideScale( SB_SCORE_X + (SB_RATING_WIDTH / 2) );
 	cgHudScoreboard.scoreWidth = SB_RATING_WIDTH * scale;
 	cgHudScoreboard.pingX = CG_ScoreboardWideScale( SB_PING_X );
@@ -130,11 +168,14 @@ static void CG_ResetHudScoreboard( qboolean timersActive ) {
 	cgHudScoreboard.timeWidth = timersActive ? ( 5 * BIGCHAR_WIDTH * scale ) : 0;
 	cgHudScoreboard.nameX = CG_ScoreboardWideScale( SB_NAME_X );
 	cgHudScoreboard.nameWidth = 15 * BIGCHAR_WIDTH * scale;
+	cgHudScoreboard.gametype = cgs.gametype;
+	cgHudScoreboard.variant = CG_ScoreboardVariant();
+
 	cgHudScoreboard.overtimeConfigured = (qboolean)( cgs.matchOvertimeCount > 0 );
 	cgHudScoreboard.overtimeActive = cgs.matchOvertimeActive;
 	cgHudScoreboard.overtimeCount = cgs.matchOvertimeCount;
 	cgHudScoreboard.suddenDeathConfigured =
-		( cgs.matchSuddenDeathStartSeconds > 0 && cgs.matchSuddenDeathTickSeconds > 0 );
+			( cgs.matchSuddenDeathStartSeconds > 0 && cgs.matchSuddenDeathTickSeconds > 0 );
 	cgHudScoreboard.suddenDeathActive = cgs.matchSuddenDeathSpawnDelayActive;
 	cgHudScoreboard.suddenDeathRespawns = cgs.matchSuddenDeathRespawnsEnabled;
 	cgHudScoreboard.suddenDeathDelayActive = cgs.matchSuddenDeathSpawnDelayActive;
@@ -144,7 +185,9 @@ static void CG_ResetHudScoreboard( qboolean timersActive ) {
 	cgHudScoreboard.suddenDeathIncrement = cgs.matchSuddenDeathIncrementSeconds;
 
 	CG_UpdateHudScoreboardSummary();
+	CG_UpdateHudScoreboardBanners();
 }
+
 
 /*
 =============
@@ -184,6 +227,40 @@ static void CG_UpdateHudScoreboardSummary( void ) {
 	}
 
 	Q_strncpyz( cgHudScoreboard.summary, summary, sizeof( cgHudScoreboard.summary ) );
+}
+
+/*
+=============
+CG_UpdateHudScoreboardBanners
+
+Refreshes overtime and sudden-death banner state for menu consumers.
+=============
+*/
+static void CG_UpdateHudScoreboardBanners( void ) {
+	const char			*respawnSuffix;
+	const char			*delaySuffix;
+
+	cgHudScoreboard.overtimeVisible = (qboolean)( cgHudScoreboard.overtimeConfigured || cgHudScoreboard.overtimeActive );
+	cgHudScoreboard.suddenDeathVisible = (qboolean)( cgHudScoreboard.suddenDeathConfigured || cgHudScoreboard.suddenDeathActive );
+
+	cgHudScoreboard.overtimeLabel[0] = '\0';
+	cgHudScoreboard.suddenDeathLabel[0] = '\0';
+
+	if ( cgHudScoreboard.overtimeVisible ) {
+		if ( cgHudScoreboard.overtimeCount > 0 ) {
+			Com_sprintf( cgHudScoreboard.overtimeLabel, sizeof( cgHudScoreboard.overtimeLabel ),
+				"Overtime x%i", cgHudScoreboard.overtimeCount );
+		} else {
+			Q_strncpyz( cgHudScoreboard.overtimeLabel, "Overtime", sizeof( cgHudScoreboard.overtimeLabel ) );
+		}
+	}
+
+	if ( cgHudScoreboard.suddenDeathVisible ) {
+		respawnSuffix = cgHudScoreboard.suddenDeathRespawns ? " +respawn" : "";
+		delaySuffix = cgHudScoreboard.suddenDeathDelayActive ? " +delay" : "";
+		Com_sprintf( cgHudScoreboard.suddenDeathLabel, sizeof( cgHudScoreboard.suddenDeathLabel ),
+			"Sudden Death%s%s", respawnSuffix, delaySuffix );
+	}
 }
 
 /*
@@ -231,6 +308,10 @@ static void CG_AppendHudScoreboardEntry( const score_t *score, const clientInfo_
 	entry->team = ci->team;
 	entry->spectator = ( ci->team == TEAM_SPECTATOR );
 	entry->localPlayer = ( cg.snap && score->client == cg.snap->ps.clientNum );
+
+	if ( ci->team >= TEAM_FREE && ci->team < TEAM_NUM_TEAMS ) {
+		cgHudScoreboard.teamCounts[ci->team]++;
+	}
 }
 
 /*
@@ -1152,4 +1233,56 @@ const cgHudScoreboard_t *CG_GetHudScoreboard( void ) {
 	return &cgHudScoreboard;
 }
 
+/*
+=============
+CG_GetHudScoreboardEntry
 
+Returns a cached HUD scoreboard entry for listbox owner-draws.
+=============
+*/
+const cgHudScoreboardEntry_t *CG_GetHudScoreboardEntry( int index, team_t team ) {
+	int		i;
+	int		filteredIndex;
+
+	if ( index < 0 ) {
+		return NULL;
+	}
+
+	if ( team >= TEAM_FREE && team < TEAM_NUM_TEAMS ) {
+		filteredIndex = 0;
+		for ( i = 0; i < cgHudScoreboard.count; i++ ) {
+			if ( cgHudScoreboard.entries[i].team != team ) {
+				continue;
+			}
+
+			if ( filteredIndex == index ) {
+				return &cgHudScoreboard.entries[i];
+			}
+
+			filteredIndex++;
+		}
+
+		return NULL;
+	}
+
+	if ( index >= cgHudScoreboard.count ) {
+		return NULL;
+	}
+
+	return &cgHudScoreboard.entries[index];
+}
+
+/*
+=============
+CG_GetHudScoreboardTeamCount
+
+Returns the number of cached HUD scoreboard rows for a specific team.
+=============
+*/
+int CG_GetHudScoreboardTeamCount( team_t team ) {
+	if ( team >= TEAM_FREE && team < TEAM_NUM_TEAMS ) {
+		return cgHudScoreboard.teamCounts[team];
+	}
+
+	return cgHudScoreboard.count;
+}
