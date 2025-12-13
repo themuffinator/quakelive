@@ -1097,9 +1097,11 @@ static void CG_ParseForcedCosmetics( void ) {
 	qboolean	forceDamage;
 	qboolean	previousScoreboard;
 	qboolean	previousHud;
+	qboolean	previousDamage;
 
 	previousScoreboard = cgs.forceSmallScoreboardMessage;
 	previousHud = cgs.forceHudHints;
+	previousDamage = cgs.forceDmgThroughSurface;
 	forceScoreboard = qfalse;
 	forceHud = qfalse;
 	forceDamage = qfalse;

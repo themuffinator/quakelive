@@ -38,6 +38,33 @@ consumers under `src/code/` so the indices stay aligned with the retail DLL.
 Add additional entries here as more Quake Live configstrings are recovered or
 when future HLIL exports expose new payloads.
 
+## Forced cosmetics and tutorial broadcasts
+
+- The HLIL routine that publishes `CS_FORCED_COSMETICS` builds an info string
+  containing `sb`, `hud`, `dmg`, and optional `atm` keys; in the reimpl the
+  same payload is assembled inside `G_UpdateForcedCosmeticsConfigstring()` and
+  pushed whenever the tracked CVars (`g_forceSmallScoreboardMessage`,
+  `g_forceSendConfigstring`, `g_forceDmgThroughSurface`, `g_forcedAtmosphere`)
+  change or when the worldspawn `atmosphere` key is parsed through
+  `G_SetWorldspawnAtmosphere()`.【F:src/code/game/g_main.c†L134-L166】【F:src/code/game/g_main.c†L1213-L1244】【F:src/code/game/g_main.c†L1324-L1345】【F:src/code/game/g_spawn.c†L930-L979】
+- Clients react to the broadcast via `CG_ParseForcedCosmetics()` after
+  `CG_ConfigStringModified()` sees a `CS_FORCED_COSMETICS` update, flipping the
+  HUD coaching widgets, compact scoreboard notice, and damage-through-surface
+  toggle while propagating any `atm` override to the local atmosphere state.
+  The parser now tracks previous damage state so clearing the flag prints the
+  correct restoration message.【F:src/code/cgame/cg_servercmds.c†L1092-L1155】【F:src/code/cgame/cg_servercmds.c†L1315-L1366】
+- `G_UpdateGametypeTutorialText()` mirrors the HLIL tutorial routine by
+  clearing all tutorial configstrings (`CS_TUTORIAL_NAME`, `CS_TUTORIAL_TEXT`,
+  and the `CS_FREEZE_TIP_*` block) before repopulating them from the gametype
+  tutorial table; it is run during level init and whenever CVars refresh in
+  `G_UpdateCvars()`.【F:src/code/game/g_main.c†L3803-L3838】【F:src/code/game/g_main.c†L1324-L1345】
+- The client draws the tutorial headline/body directly from
+  `CS_TUTORIAL_NAME`/`CS_TUTORIAL_TEXT` inside `CG_DrawPregameCoach()`, but the
+  Freeze Tag tip configstrings are not parsed anywhere yet, leaving those HLIL
+  payloads unused client-side. Aligning with HLIL would require adding
+  `CG_ConfigStringModified()` handlers for `CS_FREEZE_TIP_*` and plumbing the
+  strings into the HUD widgets that expect them.【F:src/code/cgame/cg_newdraw.c†L3505-L3546】【F:src/code/cgame/cg_servercmds.c†L1315-L1366】
+
 ## HLIL-derived gametype strings
 
 The Domination/Freeze tutorial payloads and the HUD gametype hints both reuse
