@@ -863,6 +863,7 @@ typedef struct {
 	char			testModelName[MAX_QPATH];
 	qboolean		testGun;
 
+	int				rageQuitTime;
 } cg_t;
 
 
