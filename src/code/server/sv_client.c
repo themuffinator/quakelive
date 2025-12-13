@@ -458,13 +458,6 @@ void SV_DirectConnect( netadr_t from ) {
 		Info_SetValueForKey( userinfo, "ip", "localhost" );
 	}
 
-	if ( net_fakevacban->integer ) {
-		Com_Printf( "VAC ban on record (net_fakevacban) for %s\n", NET_AdrToString( from ) );
-		NET_LogAuthTelemetry( NS_SERVER, &from, NULL, "vac", "rejected", "fakevacban", "VAC ban on record" );
-		NET_OutOfBandPrint( NS_SERVER, from, "print\nVAC ban on record\n" );
-		return;
-	}
-
 	newcl = &temp;
 	Com_Memset (newcl, 0, sizeof(client_t));
 
@@ -590,6 +583,30 @@ gotnewcl:
 		} else {
 			SV_LogPlatformAuth( &from, newcl, "connect", "token_absent" );
 		}
+	}
+
+	if ( net_fakevacban->integer ) {
+		const char *steamId;
+		const char *label;
+
+		Info_SetValueForKey( newcl->userinfo, QL_AUTH_USERINFO_KEY_RESULT, SV_FAKEVACBAN_RESULT_CODE );
+		Info_SetValueForKey( newcl->userinfo, QL_AUTH_USERINFO_KEY_OUTCOME, SV_FAKEVACBAN_OUTCOME );
+		Info_SetValueForKey( newcl->userinfo, QL_AUTH_USERINFO_KEY_MESSAGE, SV_FAKEVACBAN_AUTH_MESSAGE );
+
+		if ( !newcl->platformAuthLabel[0] ) {
+			Q_strncpyz( newcl->platformAuthLabel, SV_FAKEVACBAN_LABEL, sizeof( newcl->platformAuthLabel ) );
+		}
+
+		SV_FinalisePlatformAuthState( newcl, qfalse, SV_FAKEVACBAN_AUTH_MESSAGE );
+		SV_LogPlatformAuth( &from, newcl, SV_FAKEVACBAN_STATUS, SV_FAKEVACBAN_AUTH_MESSAGE );
+
+		steamId = newcl->platformSteamId[0] ? newcl->platformSteamId : NULL;
+		label = newcl->platformAuthLabel[0] ? newcl->platformAuthLabel : SV_FAKEVACBAN_LABEL;
+
+		Com_Printf( "%s (net_fakevacban) for %s\n", SV_FAKEVACBAN_OUTCOME, NET_AdrToString( from ) );
+		NET_LogAuthTelemetry( NS_SERVER, &from, steamId, label, SV_FAKEVACBAN_STATUS, SV_FAKEVACBAN_RESULT_CODE, SV_FAKEVACBAN_OUTCOME, SV_FAKEVACBAN_AUTH_MESSAGE );
+		NET_OutOfBandPrint( NS_SERVER, from, "print\n" SV_FAKEVACBAN_AUTH_MESSAGE "\n" );
+		return;
 	}
 #endif
 
