@@ -35,6 +35,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SV_HAS_PLATFORM_AUTH 0
 #endif
 
+#define SV_FAKEVACBAN_RESULT_CODE "3"
+#define SV_FAKEVACBAN_OUTCOME "VAC ban on record"
+#define SV_FAKEVACBAN_AUTH_MESSAGE "Failed to authenticate with Steam: VAC ban on record"
+#define SV_FAKEVACBAN_STATUS "failed"
+#define SV_FAKEVACBAN_LABEL "steam"
+
 //=============================================================================
 
 #define	PERS_SCORE				0		// !!! MUST NOT CHANGE, SERVER AND
