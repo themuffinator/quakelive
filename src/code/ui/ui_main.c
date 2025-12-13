@@ -4953,7 +4953,7 @@ Resets the preset-related CVars when manual selections override them.
 */
 static void UI_ClearCallvotePresetState(void) {
 	trap_Cvar_Set("ui_cvPresetRotation", "-1");
-	trap_Cvar_Set("ui_cvPresetGametype", "-1");
+	trap_Cvar_Set("ui_cvPresetGameType", "-1");
 	trap_Cvar_Set("ui_cvPresetActive", "0");
 	ui_cvPresetRotation.integer = -1;
 	ui_cvPresetGametype.integer = -1;
@@ -4977,7 +4977,7 @@ static void UI_SetCallvotePresetState(int rotationIndex, const mapRotationInfo_t
 
 	gametype = UI_GetCallvoteRotationGametype(rotation);
 	trap_Cvar_Set("ui_cvPresetRotation", va("%d", rotationIndex));
-	trap_Cvar_Set("ui_cvPresetGametype", va("%d", gametype));
+	trap_Cvar_Set("ui_cvPresetGameType", va("%d", gametype));
 	trap_Cvar_Set("ui_cvPresetActive", "1");
 	ui_cvPresetRotation.integer = rotationIndex;
 	ui_cvPresetGametype.integer = gametype;
@@ -7013,6 +7013,21 @@ vmCvar_t	ui_scoreTimeBonus;
 vmCvar_t	ui_scoreSkillBonus;
 vmCvar_t	ui_scoreShutoutBonus;
 vmCvar_t	ui_scoreTime;
+vmCvar_t	ui_scoreAccuracy2;
+vmCvar_t	ui_scoreImpressives2;
+vmCvar_t	ui_scoreExcellents2;
+vmCvar_t	ui_scoreCaptures2;
+vmCvar_t	ui_scoreDefends2;
+vmCvar_t	ui_scoreAssists2;
+vmCvar_t	ui_scoreGauntlets2;
+vmCvar_t	ui_scoreScore2;
+vmCvar_t	ui_scorePerfect2;
+vmCvar_t	ui_scoreTeam2;
+vmCvar_t	ui_scoreBase2;
+vmCvar_t	ui_scoreTimeBonus2;
+vmCvar_t	ui_scoreSkillBonus2;
+vmCvar_t	ui_scoreShutoutBonus2;
+vmCvar_t	ui_scoreTime2;
 vmCvar_t	ui_captureLimit;
 vmCvar_t	ui_fragLimit;
 vmCvar_t	ui_smallFont;
@@ -7026,6 +7041,48 @@ vmCvar_t	ui_realWarmUp;
 vmCvar_t	ui_serverStatusTimeOut;
 vmCvar_t	ui_mapVotingDisabled;
 vmCvar_t	ui_gameTypeVotingDisabled;
+vmCvar_t	ui_bloomPreset;
+vmCvar_t	ui_forceEnemyModel;
+vmCvar_t	ui_forceEnemyModelBright;
+vmCvar_t	ui_forceEnemySkin;
+vmCvar_t	ui_forceTeamModel;
+vmCvar_t	ui_forceTeamModelBright;
+vmCvar_t	ui_forceTeamSkin;
+vmCvar_t	ui_enemyHeadColor;
+vmCvar_t	ui_enemyLowerColor;
+vmCvar_t	ui_enemyUpperColor;
+vmCvar_t	ui_teamHeadColor;
+vmCvar_t	ui_teamLowerColor;
+vmCvar_t	ui_teamUpperColor;
+vmCvar_t	ui_mousePitch;
+vmCvar_t	ui_screenDamage;
+vmCvar_t	ui_screenDamage_Team;
+vmCvar_t	ui_teammateIndicator;
+vmCvar_t	ui_drawRewards;
+vmCvar_t	ui_postProcessPreset;
+vmCvar_t	ui_marksPreset;
+vmCvar_t	ui_lightingModelPreset;
+vmCvar_t	ui_lowAmmoPreset;
+vmCvar_t	ui_impactSparks;
+vmCvar_t	ui_announcer;
+vmCvar_t	ui_voteactive;
+vmCvar_t	ui_endMapVotingDisabled;
+vmCvar_t	ui_mainmenu;
+vmCvar_t	ui_priv;
+vmCvar_t	ui_warmup;
+vmCvar_t	ui_doWarmup;
+vmCvar_t	ui_drawTimer;
+vmCvar_t	ui_friendlyFire;
+vmCvar_t	ui_maxClients;
+vmCvar_t	ui_Warmup;
+vmCvar_t	ui_pure;
+vmCvar_t	ui_saveCaptureLimit;
+vmCvar_t	ui_saveFragLimit;
+vmCvar_t	ui_recordSPDemoName;
+vmCvar_t	ui_glCustom;
+vmCvar_t	ui_country;
+vmCvar_t	ui_opponentModel;
+vmCvar_t	ui_cdkeyvalid;
 
 
 // bk001129 - made static to avoid aliasing
@@ -7093,13 +7150,13 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_redteam, "ui_redteam", "Pagans", CVAR_ARCHIVE },
 	{ &ui_blueteam, "ui_blueteam", "Stroggs", CVAR_ARCHIVE },
 	{ &ui_dedicated, "ui_dedicated", "0", CVAR_ARCHIVE },
-{ &ui_gameType, "ui_gametype", "3", CVAR_ARCHIVE },
-{ &ui_joinGameType, "ui_joinGametype", "0", CVAR_ARCHIVE },
-{ &ui_netGameType, "ui_netGametype", "3", CVAR_ARCHIVE },
-{ &ui_actualNetGameType, "ui_actualNetGametype", "3", CVAR_ARCHIVE },
-{ &ui_cvGameType, "ui_cvGameType", "-1", CVAR_ARCHIVE },
+	{ &ui_gameType, "ui_gameType", "3", CVAR_ARCHIVE },
+	{ &ui_joinGameType, "ui_joinGameType", "0", CVAR_ARCHIVE },
+	{ &ui_netGameType, "ui_netGameType", "3", CVAR_ARCHIVE },
+	{ &ui_actualNetGameType, "ui_actualNetGameType", "3", CVAR_ARCHIVE },
+	{ &ui_cvGameType, "ui_cvGameType", "-1", CVAR_ARCHIVE },
 	{ &ui_cvPresetRotation, "ui_cvPresetRotation", "-1", CVAR_ARCHIVE },
-	{ &ui_cvPresetGametype, "ui_cvPresetGametype", "-1", CVAR_ARCHIVE },
+	{ &ui_cvPresetGametype, "ui_cvPresetGameType", "-1", CVAR_ARCHIVE },
 	{ &ui_cvPresetActive, "ui_cvPresetActive", "0", CVAR_ARCHIVE },
 	{ &ui_redteam1, "ui_redteam1", "0", CVAR_ARCHIVE },
 	{ &ui_redteam2, "ui_redteam2", "0", CVAR_ARCHIVE },
@@ -7117,7 +7174,7 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_globalpreset, "ui_globalpreset", "0", CVAR_ARCHIVE },
 	{ &ui_screenDamage_Team_preset, "ui_screenDamage_Team_preset", "0", CVAR_ARCHIVE },
 	{ &ui_screenDamage_preset, "ui_screenDamage_preset", "0", CVAR_ARCHIVE },
-{ &ui_browserAwesomium, "ui_browserAwesomium", "1", CVAR_TEMP },
+	{ &ui_browserAwesomium, "ui_browserAwesomium", "1", CVAR_TEMP },
 	{ &ui_currentTier, "ui_currentTier", "0", CVAR_ARCHIVE },
 	{ &ui_currentMap, "ui_currentMap", "0", CVAR_ARCHIVE },
 	{ &ui_currentNetMap, "ui_currentNetMap", "0", CVAR_ARCHIVE },
@@ -7136,7 +7193,7 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_scoreCaptures, "ui_scoreCaptures", "0", CVAR_ARCHIVE},
 	{ &ui_scoreDefends, "ui_scoreDefends", "0", CVAR_ARCHIVE},
 	{ &ui_scoreAssists, "ui_scoreAssists", "0", CVAR_ARCHIVE},
-	{ &ui_scoreGauntlets, "ui_scoreGauntlets", "0",CVAR_ARCHIVE},
+	{ &ui_scoreGauntlets, "ui_scoreGauntlets", "0", CVAR_ARCHIVE},
 	{ &ui_scoreScore, "ui_scoreScore", "0", CVAR_ARCHIVE},
 	{ &ui_scorePerfect, "ui_scorePerfect", "0", CVAR_ARCHIVE},
 	{ &ui_scoreTeam, "ui_scoreTeam", "0 to 0", CVAR_ARCHIVE},
@@ -7145,6 +7202,21 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_scoreTimeBonus, "ui_scoreTimeBonus", "0", CVAR_ARCHIVE},
 	{ &ui_scoreSkillBonus, "ui_scoreSkillBonus", "0", CVAR_ARCHIVE},
 	{ &ui_scoreShutoutBonus, "ui_scoreShutoutBonus", "0", CVAR_ARCHIVE},
+	{ &ui_scoreAccuracy2, "ui_scoreAccuracy2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreImpressives2, "ui_scoreImpressives2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreExcellents2, "ui_scoreExcellents2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreCaptures2, "ui_scoreCaptures2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreDefends2, "ui_scoreDefends2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreAssists2, "ui_scoreAssists2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreGauntlets2, "ui_scoreGauntlets2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreScore2, "ui_scoreScore2", "0", CVAR_ARCHIVE},
+	{ &ui_scorePerfect2, "ui_scorePerfect2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreTeam2, "ui_scoreTeam2", "0 to 0", CVAR_ARCHIVE},
+	{ &ui_scoreBase2, "ui_scoreBase2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreTime2, "ui_scoreTime2", "00:00", CVAR_ARCHIVE},
+	{ &ui_scoreTimeBonus2, "ui_scoreTimeBonus2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreSkillBonus2, "ui_scoreSkillBonus2", "0", CVAR_ARCHIVE},
+	{ &ui_scoreShutoutBonus2, "ui_scoreShutoutBonus2", "0", CVAR_ARCHIVE},
 	{ &ui_fragLimit, "ui_fragLimit", "10", 0},
 	{ &ui_captureLimit, "ui_captureLimit", "5", 0},
 	{ &ui_smallFont, "ui_smallFont", "0.25", CVAR_ARCHIVE},
@@ -7156,9 +7228,51 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_teamArenaFirstRun, "ui_teamArenaFirstRun", "0", CVAR_ARCHIVE},
 	{ &ui_realWarmUp, "g_warmup", "20", CVAR_ARCHIVE},
 	{ &ui_realCaptureLimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART},
-{ &ui_serverStatusTimeOut, "ui_serverStatusTimeOut", "7000", CVAR_ARCHIVE},
-{ &ui_mapVotingDisabled, "ui_mapVotingDisabled", "0", CVAR_TEMP},
-{ &ui_gameTypeVotingDisabled, "ui_gameTypeVotingDisabled", "0", CVAR_TEMP},
+	{ &ui_bloomPreset, "ui_bloomPreset", "0", CVAR_ARCHIVE},
+	{ &ui_forceEnemyModel, "ui_forceEnemyModel", "", CVAR_ARCHIVE},
+	{ &ui_forceEnemyModelBright, "ui_forceEnemyModelBright", "0", CVAR_ARCHIVE},
+	{ &ui_forceEnemySkin, "ui_forceEnemySkin", "", CVAR_ARCHIVE},
+	{ &ui_forceTeamModel, "ui_forceTeamModel", "", CVAR_ARCHIVE},
+	{ &ui_forceTeamModelBright, "ui_forceTeamModelBright", "0", CVAR_ARCHIVE},
+	{ &ui_forceTeamSkin, "ui_forceTeamSkin", "", CVAR_ARCHIVE},
+	{ &ui_enemyHeadColor, "ui_enemyHeadColor", "0", CVAR_ARCHIVE},
+	{ &ui_enemyLowerColor, "ui_enemyLowerColor", "0", CVAR_ARCHIVE},
+	{ &ui_enemyUpperColor, "ui_enemyUpperColor", "0", CVAR_ARCHIVE},
+	{ &ui_teamHeadColor, "ui_teamHeadColor", "0", CVAR_ARCHIVE},
+	{ &ui_teamLowerColor, "ui_teamLowerColor", "0", CVAR_ARCHIVE},
+	{ &ui_teamUpperColor, "ui_teamUpperColor", "0", CVAR_ARCHIVE},
+	{ &ui_mousePitch, "ui_mousePitch", "0", CVAR_ARCHIVE},
+	{ &ui_screenDamage, "ui_screenDamage", "0", CVAR_ARCHIVE},
+	{ &ui_screenDamage_Team, "ui_screenDamage_Team", "0", CVAR_ARCHIVE},
+	{ &ui_teammateIndicator, "ui_teammateIndicator", "0", CVAR_ARCHIVE},
+	{ &ui_drawRewards, "ui_drawRewards", "0", CVAR_ARCHIVE},
+	{ &ui_postProcessPreset, "ui_postProcessPreset", "0", CVAR_ARCHIVE},
+	{ &ui_marksPreset, "ui_marksPreset", "0", CVAR_ARCHIVE},
+	{ &ui_lightingModelPreset, "ui_lightingModelPreset", "0", CVAR_ARCHIVE},
+	{ &ui_lowAmmoPreset, "ui_lowAmmoPreset", "0", CVAR_ARCHIVE},
+	{ &ui_impactSparks, "ui_impactSparks", "0", CVAR_ARCHIVE},
+	{ &ui_announcer, "ui_announcer", "1", CVAR_ARCHIVE},
+	{ &ui_voteactive, "ui_voteactive", "0", CVAR_TEMP},
+	{ &ui_endMapVotingDisabled, "ui_endMapVotingDisabled", "0", CVAR_TEMP},
+	{ &ui_mainmenu, "ui_mainmenu", "0", CVAR_TEMP},
+	{ &ui_priv, "ui_priv", "0", CVAR_TEMP},
+	{ &ui_warmup, "ui_warmup", "0", CVAR_TEMP},
+	{ &ui_doWarmup, "ui_doWarmup", "0", CVAR_TEMP},
+	{ &ui_drawTimer, "ui_drawTimer", "0", CVAR_TEMP},
+	{ &ui_friendlyFire, "ui_friendlyFire", "0", CVAR_TEMP},
+	{ &ui_maxClients, "ui_maxClients", "0", CVAR_TEMP},
+	{ &ui_Warmup, "ui_Warmup", "0", CVAR_TEMP},
+	{ &ui_pure, "ui_pure", "0", CVAR_TEMP},
+	{ &ui_saveCaptureLimit, "ui_saveCaptureLimit", "0", CVAR_TEMP},
+	{ &ui_saveFragLimit, "ui_saveFragLimit", "0", CVAR_TEMP},
+	{ &ui_recordSPDemoName, "ui_recordSPDemoName", "", CVAR_TEMP},
+	{ &ui_glCustom, "ui_glCustom", "0", CVAR_ARCHIVE},
+	{ &ui_country, "ui_country", "", CVAR_ARCHIVE},
+	{ &ui_opponentModel, "ui_opponentModel", "", CVAR_ARCHIVE},
+	{ &ui_cdkeyvalid, "ui_cdkeyvalid", "", CVAR_TEMP},
+	{ &ui_serverStatusTimeOut, "ui_serverStatusTimeOut", "7000", CVAR_ARCHIVE},
+	{ &ui_mapVotingDisabled, "ui_mapVotingDisabled", "0", CVAR_TEMP},
+	{ &ui_gameTypeVotingDisabled, "ui_gameTypeVotingDisabled", "0", CVAR_TEMP},
 
 };
 
