@@ -8,6 +8,14 @@ from typing import Any, Mapping, MutableMapping, Sequence
 from .harness import HUDState, Snapshot
 
 
+@dataclass(frozen=True)
+class PredictionResult:
+    """Aggregate predicted HUD state and generated user command."""
+
+    hud: HUDState
+    user_cmd: Mapping[str, Any]
+
+
 @dataclass
 class _PlayerState:
     """Mutable representation of the simulated player state."""
@@ -63,8 +71,8 @@ class ClientPredictor:
         self._last_server_time = None
         self._match_state = None
 
-    def predict(self, snapshot: Snapshot) -> HUDState:
-        """Consume *snapshot* and return a HUDState."""
+    def predict(self, snapshot: Snapshot) -> PredictionResult:
+        """Consume *snapshot* and return HUD and usercmd outputs."""
 
         if self._state is None:
             self._state = _PlayerState.from_snapshot(snapshot)
@@ -76,7 +84,7 @@ class ClientPredictor:
 
         self._match_state = self._normalise_match_state(snapshot.match_state)
 
-        return HUDState(
+        hud_state = HUDState(
             health=self._state.health,
             armor=self._state.armor,
             weapon=self._state.weapon,
@@ -84,6 +92,10 @@ class ClientPredictor:
             position=list(self._state.origin.values()),
             match_state=self._match_state,
         )
+
+        user_cmd = self._normalise_user_cmd(snapshot.user_cmd)
+
+        return PredictionResult(hud=hud_state, user_cmd=user_cmd)
 
     def _advance(self, state: _PlayerState, snapshot: Snapshot, delta: int) -> _PlayerState:
         next_state = state.clone()
@@ -155,4 +167,18 @@ class ClientPredictor:
         if not isinstance(match_state, Mapping):  # pragma: no cover - defensive guard
             raise TypeError("match_state must be a mapping when provided")
         return {str(key): value for key, value in match_state.items()}
+
+    @staticmethod
+    def _normalise_user_cmd(user_cmd: Mapping[str, Any] | None) -> Mapping[str, Any]:
+        if user_cmd is None:
+            return {}
+        if not isinstance(user_cmd, Mapping):  # pragma: no cover - defensive guard
+            raise TypeError("user_cmd must be a mapping when provided")
+        canonical: dict[str, Any] = {}
+        for key, value in user_cmd.items():
+            if isinstance(value, (list, tuple)):
+                canonical[str(key)] = [value_part for value_part in value]
+            else:
+                canonical[str(key)] = value
+        return canonical
 

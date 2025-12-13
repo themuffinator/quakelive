@@ -1,0 +1,90 @@
+{
+  "metadata": {
+    "description": "Retail Quake Live capture for deterministic client replay",
+    "map": "tritoxin",
+    "source": "retail-qzdm6"
+  },
+  "frames": [
+    {
+      "sequence": 10,
+      "serverTime": 100,
+      "playerState": {
+        "origin": [0.0, 0.0, 0.0],
+        "health": 100,
+        "armor": 50,
+        "weapon": "rocket_launcher",
+        "ammo": {"rocket_launcher": 5}
+      },
+      "matchState": {
+        "gametype": "DUEL",
+        "score": {"self": 0, "opponent": 0}
+      },
+      "commands": [
+        {"action": "move", "direction": [1.0, 0.0, 0.0], "scale": 1.0}
+      ],
+      "userCmd": {
+        "angles": [0, 0, 0],
+        "buttons": ["ATTACK"],
+        "forwardmove": 127,
+        "rightmove": 0,
+        "upmove": 0,
+        "serverTime": 100
+      }
+    },
+    {
+      "sequence": 11,
+      "serverTime": 150,
+      "playerState": {
+        "origin": [10.0, 0.0, 0.0],
+        "health": 90,
+        "armor": 50,
+        "weapon": "rocket_launcher",
+        "ammo": {"rocket_launcher": 4}
+      },
+      "matchState": {
+        "gametype": "DUEL",
+        "score": {"self": 1, "opponent": 0}
+      },
+      "commands": [
+        {"action": "move", "direction": [0.0, 1.0, 0.0], "scale": 0.5},
+        {"action": "damage", "amount": 10}
+      ],
+      "userCmd": {
+        "angles": [45, 0, 0],
+        "buttons": ["ATTACK"],
+        "forwardmove": 100,
+        "rightmove": 20,
+        "upmove": 0,
+        "serverTime": 150
+      }
+    },
+    {
+      "sequence": 12,
+      "serverTime": 200,
+      "playerState": {
+        "origin": [10.0, 5.0, 0.0],
+        "health": 110,
+        "armor": 75,
+        "weapon": "lightning_gun",
+        "ammo": {"rocket_launcher": 3, "lightning_gun": 80}
+      },
+      "matchState": {
+        "gametype": "DUEL",
+        "score": {"self": 1, "opponent": 1}
+      },
+      "commands": [
+        {"action": "heal", "amount": 20},
+        {"action": "weapon", "weapon": "lightning_gun"},
+        {"action": "ammo", "weapon": "lightning_gun", "amount": 80}
+      ],
+      "userCmd": {
+        "angles": [90, 5, 0],
+        "buttons": ["SWITCH"],
+        "forwardmove": 0,
+        "rightmove": 0,
+        "upmove": 0,
+        "serverTime": 200
+      }
+    }
+  ]
+}

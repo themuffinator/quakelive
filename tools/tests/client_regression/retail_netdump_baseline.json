@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "description": "Baseline hashes derived from retail capture netdumps",
+    "source": "retail-qzdm6",
+    "map": "tritoxin"
+  },
+  "frames": [
+    {
+      "sequence": 10,
+      "serverTime": 100,
+      "hash": "7954082f88768416480121a8d2858964b9e55e8e92cf436215490227e230b501",
+      "usercmdHash": "4da6cfe5084eaa59b63e09397373fa4ecb09d1d8fda74159a3c2f675f625e4e7"
+    },
+    {
+      "sequence": 11,
+      "serverTime": 150,
+      "hash": "fbc07edb989f9c7309788121384b9cafe1cd46c21311db187476c4d75d031f48",
+      "usercmdHash": "c0a938e31944de3dfa4e36b11463815ecb028dc0ef5c20b34c582b5e1541b08e"
+    },
+    {
+      "sequence": 12,
+      "serverTime": 200,
+      "hash": "d8b533ea74bc3a259e6678b99d4ecde0b6c043eb6802ce09a0d6fa3baaa29e2f",
+      "usercmdHash": "4d07b9c86b137d2a0ac01130ddfb84610111b66ec63236f77116cdf2e741e934"
+    }
+  ]
+}

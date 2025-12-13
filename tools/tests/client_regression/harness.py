@@ -36,6 +36,7 @@ class Snapshot:
     player_state: Mapping[str, Any]
     match_state: Mapping[str, Any]
     commands: Sequence[Mapping[str, Any]]
+    user_cmd: Mapping[str, Any] | None = None
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "Snapshot":
@@ -48,12 +49,15 @@ class Snapshot:
         player_state = payload.get("playerState", {})
         match_state = payload.get("matchState", {})
         commands = payload.get("commands", [])
+        user_cmd = payload.get("userCmd") or payload.get("usercmd")
         if not isinstance(player_state, Mapping):
             raise TypeError("playerState must be a mapping")
         if not isinstance(match_state, Mapping):
             raise TypeError("matchState must be a mapping")
         if not isinstance(commands, Sequence):
             raise TypeError("commands must be a sequence")
+        if user_cmd is not None and not isinstance(user_cmd, Mapping):
+            raise TypeError("userCmd must be a mapping when provided")
 
         return cls(
             sequence=sequence,
@@ -61,6 +65,7 @@ class Snapshot:
             player_state=dict(player_state),
             match_state=dict(match_state),
             commands=[dict(command) for command in commands],
+            user_cmd=dict(user_cmd) if user_cmd is not None else None,
         )
 
 
@@ -100,6 +105,8 @@ class PlaybackFrame:
     server_time: int
     hud: HUDState
     hud_hash: str
+    usercmd: Mapping[str, Any]
+    usercmd_hash: str | None
 
 
 class HUDHasher:
@@ -124,12 +131,19 @@ class ClientRegressionHarness:
     def frame_to_payload(self, frame: PlaybackFrame) -> Dict[str, Any]:
         """Convert a :class:`PlaybackFrame` into a serialisable payload."""
 
-        return {
+        payload: Dict[str, Any] = {
             "sequence": frame.sequence,
             "serverTime": frame.server_time,
             "hash": frame.hud_hash,
             "hud": frame.hud.to_dict(),
         }
+
+        if frame.usercmd:
+            payload["usercmd"] = frame.usercmd
+            if frame.usercmd_hash:
+                payload["usercmdHash"] = frame.usercmd_hash
+
+        return payload
 
     @staticmethod
     def load_snapshots(path: Path) -> List[Snapshot]:
@@ -152,19 +166,43 @@ class ClientRegressionHarness:
         snapshots.sort(key=lambda snap: (snap.server_time, snap.sequence))
         return snapshots
 
+    @staticmethod
+    def load_netdump(path: Path) -> tuple[List[Snapshot], Mapping[str, Any]]:
+        """Load retail snapshot frames and associated metadata from *path*."""
+
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        metadata = payload.get("metadata", {})
+        frames = payload.get("frames") or payload.get("snapshots")
+        if frames is None:
+            raise ValueError("Netdump archives must define a 'frames' collection")
+        if not isinstance(frames, Sequence):
+            raise TypeError("'frames' must be a sequence of snapshot payloads")
+
+        snapshots = [Snapshot.from_payload(frame) for frame in frames]
+        snapshots.sort(key=lambda snap: (snap.server_time, snap.sequence))
+
+        if not isinstance(metadata, Mapping):  # pragma: no cover - defensive guard
+            raise TypeError("'metadata' must be a mapping when provided")
+
+        return snapshots, metadata
+
     def replay(self, snapshots: Iterable[Snapshot]) -> Iterator[PlaybackFrame]:
         """Replay *snapshots* through the predictor, yielding playback frames."""
 
         self.predictor.reset()
         for snapshot in snapshots:
-            hud_state = self.predictor.predict(snapshot)
-            hud_payload = hud_state.to_dict()
+            prediction = self.predictor.predict(snapshot)
+            hud_payload = prediction.hud.to_dict()
             hud_hash = self.hasher.hash(hud_payload)
+            usercmd_payload = prediction.user_cmd
+            usercmd_hash = self.hasher.hash(usercmd_payload) if usercmd_payload else None
             yield PlaybackFrame(
                 sequence=snapshot.sequence,
                 server_time=snapshot.server_time,
-                hud=hud_state,
+                hud=prediction.hud,
                 hud_hash=hud_hash,
+                usercmd=usercmd_payload,
+                usercmd_hash=usercmd_hash,
             )
 
     def replay_to_payloads(self, snapshots: Iterable[Snapshot]) -> List[Dict[str, Any]]:

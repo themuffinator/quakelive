@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import json
+
 import pytest
 
 from tools.tests.client_regression import ClientPredictor, ClientRegressionHarness
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture()
@@ -17,6 +21,16 @@ def sample_snapshots_path() -> Path:
 @pytest.fixture()
 def regression_archive_dir() -> Path:
     return Path(__file__).parent / "client_regression"
+
+
+@pytest.fixture()
+def retail_netdump_path() -> Path:
+    return REPO_ROOT / "tests" / "netdumps" / "retail_duel.snap.json"
+
+
+@pytest.fixture()
+def retail_baseline_path() -> Path:
+    return Path(__file__).parent / "client_regression" / "retail_netdump_baseline.json"
 
 
 def test_load_snapshots(sample_snapshots_path: Path) -> None:
@@ -58,6 +72,28 @@ def test_replay_to_payloads_returns_json_ready_structures(sample_snapshots_path:
 
     assert payloads[0]["hud"]["weapon"] == "rocket_launcher"
     assert payloads[-1]["sequence"] == 3
+
+
+def test_retail_netdump_frames_match_baseline(
+    retail_netdump_path: Path, retail_baseline_path: Path
+) -> None:
+    harness = ClientRegressionHarness(ClientPredictor())
+    snapshots, metadata = harness.load_netdump(retail_netdump_path)
+    payloads = harness.replay_to_payloads(snapshots)
+
+    baseline = json.loads(retail_baseline_path.read_text(encoding="utf-8"))
+    expected = baseline["frames"]
+
+    assert metadata.get("source") == baseline["metadata"]["source"]
+    assert len(payloads) == len(expected)
+
+    for payload, expected_frame in zip(payloads, expected):
+        assert (payload["sequence"], payload["serverTime"]) == (
+            expected_frame["sequence"],
+            expected_frame["serverTime"],
+        )
+        assert payload["hash"] == expected_frame["hash"]
+        assert payload["usercmdHash"] == expected_frame["usercmdHash"]
 
 
 @pytest.mark.parametrize(

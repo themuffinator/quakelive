@@ -45,6 +45,8 @@ SNAPSHOT_ARCHIVES: dict[str, Path] = {
     "server_correction": SNAPSHOT_ROOT / "server_correction_snapshots.json",
     "round_overtime": SNAPSHOT_ROOT / "round_overtime_snapshots.json",
 }
+NETDUMP_ROOT = REPO_ROOT / "tests" / "netdumps"
+NETDUMP_BASELINE = SNAPSHOT_ROOT / "retail_netdump_baseline.json"
 HUD_ASPECT_RATIOS: tuple[str, ...] = ("4x3", "16x9", "21x9")
 COMPETITIVE_HUD_CONFIG: dict[str, object] = {
     "cg_useCompetitiveHud": True,
@@ -80,6 +82,7 @@ class HarnessBundleResult:
     artifact_root: Path
     match_summaries: list[dict[str, object]]
     client_regression_entries: list[dict[str, object]]
+    retail_netdump_entries: list[dict[str, object]]
     hud_captures: list[dict[str, object]]
     weapon_timings: dict[str, object]
     trace_result: TraceHarnessResult | None = None
@@ -214,6 +217,27 @@ def _parse_ammo_pickups(misc_path: Path) -> dict[str, dict[str, int]]:
     return ammo
 
 
+def _load_netdump_baseline(path: Path) -> dict[tuple[int, int], dict[str, object]]:
+    """Load hashed baselines keyed by (sequence, serverTime)."""
+
+    if not path.exists():
+        return {}
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    frames = payload.get("frames", [])
+    baseline: dict[tuple[int, int], dict[str, object]] = {}
+
+    for frame in frames:
+        seq = int(frame["sequence"])
+        server_time = int(frame["serverTime"])
+        baseline[(seq, server_time)] = {
+            "hash": str(frame.get("hash", "")),
+            "usercmdHash": str(frame.get("usercmdHash", "")),
+        }
+
+    return baseline
+
+
 def _run_weapon_timing_harness(target: str, artifact_root: Path, commit_hash: str) -> dict[str, object]:
     """Emit deterministic weapon timing baselines for CI parity checks."""
 
@@ -321,9 +345,9 @@ def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict
 
 
 def _run_client_harness(
-    target: str, artifact_root: Path
+    target: str, artifact_root: Path, harness: ClientRegressionHarness | None = None
 ) -> tuple[list[dict[str, object]], dict[str, dict[str, object]]]:
-    harness = ClientRegressionHarness(ClientPredictor())
+    harness = harness or ClientRegressionHarness(ClientPredictor())
 
     manifest: dict[str, dict[str, object]] = {}
     log_entries: list[dict[str, object]] = []
@@ -370,6 +394,73 @@ def _run_client_harness(
     _write_text(log_path, log_text)
 
     return log_entries, capture_payloads
+
+
+def _run_retail_netdump_harness(
+    target: str, artifact_root: Path, harness: ClientRegressionHarness
+) -> list[dict[str, object]]:
+    """Replay captured retail netdumps and emit hash comparisons."""
+
+    if not NETDUMP_ROOT.exists():
+        return []
+
+    baseline_map = _load_netdump_baseline(NETDUMP_BASELINE)
+    entries: list[dict[str, object]] = []
+    log_entries: list[dict[str, object]] = []
+
+    for netdump in sorted(NETDUMP_ROOT.glob("*.json")):
+        snapshots, metadata = harness.load_netdump(netdump)
+        frames = list(harness.replay(snapshots))
+        payloads = [harness.frame_to_payload(frame) for frame in frames]
+
+        frame_entries: list[dict[str, object]] = []
+        for payload in payloads:
+            key = (payload["sequence"], payload["serverTime"])
+            expected = baseline_map.get(key, {})
+            frame_entries.append(
+                {
+                    "sequence": payload["sequence"],
+                    "serverTime": payload["serverTime"],
+                    "hash": payload.get("hash"),
+                    "usercmdHash": payload.get("usercmdHash"),
+                    "matchesBaseline": (
+                        expected.get("hash") == payload.get("hash")
+                        and expected.get("usercmdHash") == payload.get("usercmdHash")
+                    ),
+                }
+            )
+
+        entries.append(
+            {
+                "netdump": str(netdump.relative_to(REPO_ROOT)),
+                "metadata": metadata,
+                "frames": frame_entries,
+            }
+        )
+
+        log_entries.append(
+            {
+                "netdump": str(netdump.relative_to(REPO_ROOT)),
+                "frameCount": len(frame_entries),
+                "metadata": metadata,
+                "hashes": [frame.get("hash") for frame in frame_entries],
+                "usercmdHashes": [frame.get("usercmdHash") for frame in frame_entries],
+                "baselineMatches": all(frame.get("matchesBaseline") for frame in frame_entries),
+            }
+        )
+
+    output_path = artifact_root / "client_regression" / target / "retail_netdump_hashes.json"
+    _write_json(output_path, {"entries": entries, "baseline": str(NETDUMP_BASELINE.relative_to(REPO_ROOT))})
+
+    log_path = artifact_root / "logs" / target / "retail_netdump.log"
+    _write_text(
+        log_path,
+        "Retail netdump harness captured HUD and usercmd hashes.\n"
+        + json.dumps(log_entries, indent=2)
+        + "\n",
+    )
+
+    return log_entries
 
 
 def _run_hud_capture_harness(
@@ -488,9 +579,11 @@ def run_harness_bundle(
     _ensure_reverse_build(target, reverse_build_root)
 
     commit_hash = _current_commit()
+    harness = ClientRegressionHarness(ClientPredictor())
     weapon_timings = _run_weapon_timing_harness(target, artifact_root, commit_hash)
     match_summaries = _run_match_harness(target, artifact_root, seed)
-    client_entries, capture_payloads = _run_client_harness(target, artifact_root)
+    client_entries, capture_payloads = _run_client_harness(target, artifact_root, harness)
+    netdump_entries = _run_retail_netdump_harness(target, artifact_root, harness)
     hud_captures = _run_hud_capture_harness(target, artifact_root, capture_payloads, commit_hash)
 
     trace_result: TraceHarnessResult | None = None
@@ -516,6 +609,7 @@ def run_harness_bundle(
         artifact_root=artifact_root,
         match_summaries=match_summaries,
         client_regression_entries=client_entries,
+        retail_netdump_entries=netdump_entries,
         hud_captures=hud_captures,
         weapon_timings=weapon_timings,
         trace_result=trace_result,
