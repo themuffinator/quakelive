@@ -857,6 +857,11 @@ typedef struct {
 	trRefEntity_t	*currentEntity;
 	qboolean	skyRenderedThisView;	// flag for drawing sun
 
+	qboolean	postProcessActive;
+	qboolean	bloomActive;
+	qboolean	colorCorrectActive;
+	qboolean	postProcessNeedsReset;
+
 	qboolean	projection2D;	// if qtrue, drawstretchpic doesn't need to change modes
 	byte		color2D[4];
 	qboolean	vertexes2D;		// shader needs to be finished
@@ -922,6 +927,11 @@ typedef struct {
 	orientationr_t			or;					// for current entity
 
 	trRefdef_t				refdef;
+
+	qboolean				postProcessActive;
+	qboolean				bloomActive;
+	qboolean				colorCorrectActive;
+	qboolean				postProcessNeedsReset;
 
 	int						viewCluster;
 

@@ -856,6 +856,27 @@ void GfxInfo_f( void )
 
 /*
 =============
+R_ClampPostProcessCvars
+
+Clamp post-process toggles to the Quake Live ranges observed in HLIL.
+=============
+*/
+static void R_ClampPostProcessCvars( void ) {
+	if ( r_enablePostProcess ) {
+		AssertCvarRange( r_enablePostProcess, 0, 1, qtrue );
+	}
+
+	if ( r_enableBloom ) {
+		AssertCvarRange( r_enableBloom, 0, 2, qtrue );
+	}
+
+	if ( r_enableColorCorrect ) {
+		AssertCvarRange( r_enableColorCorrect, 0, 1, qtrue );
+	}
+}
+
+/*
+=============
 R_UpdatePostProcessCvars
 
 Synchronize post-process state mirrors with the enable toggles.
@@ -865,10 +886,49 @@ void R_UpdatePostProcessCvars( void ) {
 	qboolean postProcessEnabled;
 	qboolean bloomEnabled;
 	qboolean colorCorrectEnabled;
+	qboolean triggerReset;
+
+	R_ClampPostProcessCvars();
 
 	postProcessEnabled = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer);
 	bloomEnabled = (qboolean)(postProcessEnabled && r_enableBloom && r_enableBloom->integer);
 	colorCorrectEnabled = (qboolean)(postProcessEnabled && r_enableColorCorrect && r_enableColorCorrect->integer);
+
+	triggerReset = (qboolean)(r_enablePostProcess && r_enablePostProcess->modified);
+	triggerReset = (qboolean)(triggerReset || (r_enableBloom && r_enableBloom->modified));
+	triggerReset = (qboolean)(triggerReset || (r_enableColorCorrect && r_enableColorCorrect->modified));
+
+	if ( tr.postProcessActive != postProcessEnabled ) {
+		triggerReset = qtrue;
+	}
+
+	if ( tr.bloomActive != bloomEnabled ) {
+		triggerReset = qtrue;
+	}
+
+	if ( tr.colorCorrectActive != colorCorrectEnabled ) {
+		triggerReset = qtrue;
+	}
+
+	tr.postProcessActive = postProcessEnabled;
+	tr.bloomActive = bloomEnabled;
+	tr.colorCorrectActive = colorCorrectEnabled;
+
+	if ( triggerReset ) {
+		tr.postProcessNeedsReset = qtrue;
+	}
+
+	if ( r_enablePostProcess ) {
+		r_enablePostProcess->modified = qfalse;
+	}
+
+	if ( r_enableBloom ) {
+		r_enableBloom->modified = qfalse;
+	}
+
+	if ( r_enableColorCorrect ) {
+		r_enableColorCorrect->modified = qfalse;
+	}
 
 	if ( r_postProcessActive ) {
 		ri.Cvar_Set( "r_postProcessActive", postProcessEnabled ? "1" : "0" );
@@ -898,13 +958,15 @@ void R_Register( void )
 	r_allowExtensions = ri.Cvar_Get( "r_allowExtensions", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_ext_compressed_textures = ri.Cvar_Get( "r_ext_compressed_textures", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_ext_gamma_control = ri.Cvar_Get( "r_ext_gamma_control", "1", CVAR_ARCHIVE | CVAR_LATCH );
-		r_ext_multitexture = ri.Cvar_Get( "r_ext_multitexture", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_ext_multitexture = ri.Cvar_Get( "r_ext_multitexture", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_ext_compiled_vertex_array = ri.Cvar_Get( "r_ext_compiled_vertex_array", "1", CVAR_ARCHIVE | CVAR_LATCH);
 #ifdef __linux__ // broken on linux
 	r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "0", CVAR_ARCHIVE | CVAR_LATCH);
 #else
 	r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "1", CVAR_ARCHIVE | CVAR_LATCH);
 #endif
+
+	// HLIL: post-processing/color-correct toggles are 0/1, bloom supports a second pass when set to 2.
 	r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_enableBloom = ri.Cvar_Get( "r_enableBloom", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_enableColorCorrect = ri.Cvar_Get( "r_enableColorCorrect", "1", CVAR_ARCHIVE | CVAR_LATCH );

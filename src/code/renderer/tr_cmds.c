@@ -267,10 +267,33 @@ void	RE_SetColor( const float *rgba ) {
 
 /*
 =============
+R_SyncPostProcessState
+
+Copy the evaluated post-process toggles to the backend and flag resets when they change.
+=============
+*/
+static void R_SyncPostProcessState( void ) {
+	if ( backEnd.postProcessActive != tr.postProcessActive || backEnd.bloomActive != tr.bloomActive || backEnd.colorCorrectActive != tr.colorCorrectActive ) {
+		backEnd.postProcessNeedsReset = qtrue;
+	}
+
+	if ( tr.postProcessNeedsReset ) {
+		backEnd.postProcessNeedsReset = qtrue;
+		tr.postProcessNeedsReset = qfalse;
+	}
+
+	backEnd.postProcessActive = tr.postProcessActive;
+	backEnd.bloomActive = tr.bloomActive;
+	backEnd.colorCorrectActive = tr.colorCorrectActive;
+}
+
+
+/*
+=============
 RE_StretchPic
 =============
 */
-void RE_StretchPic ( float x, float y, float w, float h, 
+void RE_StretchPic ( float x, float y, float w, float h,
 					  float s1, float t1, float s2, float t2, qhandle_t hShader ) {
 	stretchPicCommand_t	*cmd;
 
@@ -303,13 +326,14 @@ for each RE_EndFrame
 ====================
 */
 void RE_BeginFrame( stereoFrame_t stereoFrame ) {
-	drawBufferCommand_t	*cmd;
+	drawBufferCommand_t     *cmd;
 
 	if ( !tr.registered ) {
 		return;
 	}
 
 	R_UpdatePostProcessCvars();
+	R_SyncPostProcessState();
 	glState.finishCalled = qfalse;
 
 	tr.frameCount++;
