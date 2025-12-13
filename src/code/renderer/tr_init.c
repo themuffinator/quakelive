@@ -1337,6 +1337,8 @@ void R_Init( void ) {
 
 	InitOpenGL();
 
+	RB_InitRenderTargets();
+
 	R_InitImages();
 
 	R_InitShaders();
@@ -1378,6 +1380,7 @@ void RE_Shutdown( qboolean destroyWindow ) {
 	if ( tr.registered ) {
 		R_SyncRenderThread();
 		R_ShutdownCommandBuffers();
+		RB_ShutdownRenderTargets();
 		R_DeleteTextures();
 	}
 
