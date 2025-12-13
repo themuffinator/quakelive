@@ -25,6 +25,33 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/auth_credentials.h"
 #include <limits.h>
 
+/*
+=============
+CL_ShouldFilterConsoleText
+
+Returns whether console-originated text should be hidden based on cl_allowConsoleChat.
+=============
+*/
+qboolean CL_ShouldFilterConsoleText( const char *text ) {
+	if ( !text || !*text ) {
+		return qfalse;
+	}
+	
+	if ( cl_allowConsoleChat && cl_allowConsoleChat->integer ) {
+		return qfalse;
+	}
+	
+	while ( Q_IsColorString( text ) ) {
+		text += 2;
+	}
+	
+	if ( !Q_stricmpn( text, "console:", 8 ) ) {
+		return qtrue;
+	}
+	
+	return qfalse;
+}
+
 cvar_t	*cl_nodelta;
 cvar_t	*cl_debugMove;
 cvar_t	*cl_allowConsoleChat;
@@ -211,6 +238,10 @@ void CL_WriteDemoMessage ( msg_t *msg, int headerBytes ) {
 	swlen = LittleLong(len);
 	FS_Write (&swlen, 4, clc.demofile);
 	FS_Write ( msg->data + headerBytes, len, clc.demofile );
+	
+	if ( cl_demoRecordMessage->integer >= 2 ) {
+		Com_DPrintf( "demo: wrote %i bytes from server seq %i\n", len, clc.serverMessageSequence );
+	}
 }
 
 
@@ -237,7 +268,9 @@ void CL_StopRecord_f( void ) {
 	clc.demofile = 0;
 	clc.demorecording = qfalse;
 	clc.spDemoRecording = qfalse;
-	Com_Printf ("Stopped demo.\n");
+	if ( cl_demoRecordMessage->integer ) {
+		Com_Printf ("Stopped demo.\n");
+	}
 }
 
 /* 
@@ -328,7 +361,9 @@ void CL_Record_f( void ) {
 
 	// open the demo file
 
-	Com_Printf ("recording to %s.\n", name);
+	if ( cl_demoRecordMessage->integer ) {
+		Com_Printf ("recording to %s.\n", name);
+	}
 	clc.demofile = FS_FOpenFileWrite( name );
 	if ( !clc.demofile ) {
 		Com_Printf ("ERROR: couldn't open.\n");
@@ -1869,15 +1904,18 @@ void CL_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
 		CL_MotdPacket( from );
 		return;
 	}
-
+	
 	// echo request from server
 	if ( !Q_stricmp(c, "print") ) {
 		s = MSG_ReadString( msg );
+		if ( CL_ShouldFilterConsoleText( s ) ) {
+			return;
+		}
 		Q_strncpyz( clc.serverMessage, s, sizeof( clc.serverMessage ) );
 		Com_Printf( "%s", s );
 		return;
 	}
-
+	
 	// echo request from server
 	if ( !Q_strncmp(c, "getserversResponse", 18) ) {
 		CL_ServersResponsePacket( from, msg );
@@ -2350,7 +2388,7 @@ void CL_Init( void ) {
 	m_cpi = Cvar_Get ("m_cpi", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 
 	cl_motdString = Cvar_Get( "cl_motdString", "", CVAR_ROM );
-	cl_platform = Cvar_Get ("cl_platform", "1", CVAR_ROM );
+	cl_platform = Cvar_Get ("cl_platform", "1", CVAR_ROM | CVAR_SYSTEMINFO | CVAR_USERINFO );
 
 	Cvar_Get( "cl_maxPing", "800", CVAR_ARCHIVE );
 	Cvar_Get( "cl_downloadName", "", CVAR_TEMP );

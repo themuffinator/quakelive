@@ -350,6 +350,10 @@ rescan:
 	Cmd_TokenizeString( s );
 	cmd = Cmd_Argv(0);
 	argc = Cmd_Argc();
+	
+	if ( ( !strcmp( cmd, "chat" ) || !strcmp( cmd, "print" ) ) && CL_ShouldFilterConsoleText( Cmd_Argv( 1 ) ) ) {
+		return qfalse;
+	}
 
 	if ( !strcmp( cmd, "disconnect" ) ) {
 		// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=552

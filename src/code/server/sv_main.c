@@ -26,6 +26,9 @@ serverStatic_t	svs;				// persistant server info
 server_t		sv;					// local server
 vm_t			*gvm = NULL;				// game virtual machine // bk001212 init
 
+static qboolean SV_ClientEligibleForWarmupReady( const client_t *cl );
+static qboolean SV_ClientReadyForWarmup( const client_t *cl );
+
 cvar_t	*sv_fps;				// time rate for running non-clients
 cvar_t	*sv_timeout;			// seconds without any message
 cvar_t	*sv_zombietime;			// seconds to sink messages after disconnect
@@ -58,6 +61,33 @@ cvar_t	*sv_warmupReadyPercentage;
 cvar_t	*sv_vac;
 cvar_t	*sv_maskBots;
 cvar_t	*net_fakevacban;
+
+/*
+=============
+SV_HandleQuitOnExitLevel
+
+Checks sv_quitOnExitLevel and performs the shutdown or quit path.
+=============
+*/
+qboolean SV_HandleQuitOnExitLevel( const char *context ) {
+	const char	*actionContext;
+
+	if ( !sv_quitOnExitLevel || !sv_quitOnExitLevel->integer ) {
+		return qfalse;
+	}
+
+	actionContext = context ? context : "level exit";
+
+	if ( sv_quitOnExitLevel->integer > 1 ) {
+		Com_Printf( "sv_quitOnExitLevel %d: exiting after %s\n", sv_quitOnExitLevel->integer, actionContext );
+		Com_Quit_f();
+		return qtrue;
+	}
+
+	Com_Printf( "sv_quitOnExitLevel %d: shutting down after %s\n", sv_quitOnExitLevel->integer, actionContext );
+	SV_Shutdown( "Server quit on exit level\n" );
+	return qtrue;
+}
 
 /*
 =============================================================================
@@ -208,6 +238,21 @@ MASTER SERVER FUNCTIONS
 
 /*
 ================
+SV_LogMasterVACHeartbeat
+
+Annotates heartbeat telemetry with the current VAC enablement state.
+================
+*/
+static void SV_LogMasterVACHeartbeat( const netadr_t *adr, const char *masterName ) {
+	const char *state;
+
+	state = ( sv_vac && sv_vac->integer ) ? "enabled" : "disabled";
+
+	NET_LogAuthTelemetry( NS_SERVER, adr, NULL, "vac", state, "heartbeat", masterName );
+}
+
+/*
+================
 SV_MasterHeartbeat
 
 Send a message to the masters every few minutes to
@@ -217,11 +262,13 @@ changes from empty to non-empty, and full to non-full,
 but not on every player enter or exit.
 ================
 */
-#define	HEARTBEAT_MSEC	300*1000
-#define	HEARTBEAT_GAME	"QuakeArena-1"
+#define HEARTBEAT_MSEC	300*1000
+#define HEARTBEAT_GAME	"QuakeArena-1"
 void SV_MasterHeartbeat( void ) {
 	static netadr_t	adr[MAX_MASTER_SERVERS];
 	int			i;
+	int			visibleClients;
+	int			reportedBots;
 
 	// "dedicated 1" is for lan play, "dedicated 2" is for inet public play
 	if ( !com_dedicated || com_dedicated->integer != 2 ) {
@@ -235,6 +282,8 @@ void SV_MasterHeartbeat( void ) {
 	svs.nextHeartbeatTime = svs.time + HEARTBEAT_MSEC;
 
 
+	SV_ComputeDisplayedCounts( &visibleClients, &reportedBots );
+
 	// send to group masters
 	for ( i = 0 ; i < MAX_MASTER_SERVERS ; i++ ) {
 		if ( !sv_master[i]->string[0] ) {
@@ -246,7 +295,7 @@ void SV_MasterHeartbeat( void ) {
 		// do it when needed
 		if ( sv_master[i]->modified ) {
 			sv_master[i]->modified = qfalse;
-	
+
 			Com_Printf( "Resolving %s\n", sv_master[i]->string );
 			if ( !NET_StringToAdr( sv_master[i]->string, &adr[i] ) ) {
 				// if the address failed to resolve, clear it
@@ -260,15 +309,17 @@ void SV_MasterHeartbeat( void ) {
 				adr[i].port = BigShort( PORT_MASTER );
 			}
 			Com_Printf( "%s resolved to %i.%i.%i.%i:%i\n", sv_master[i]->string,
-				adr[i].ip[0], adr[i].ip[1], adr[i].ip[2], adr[i].ip[3],
-				BigShort( adr[i].port ) );
+					adr[i].ip[0], adr[i].ip[1], adr[i].ip[2], adr[i].ip[3],
+					BigShort( adr[i].port ) );
 		}
 
 
-		Com_Printf ("Sending heartbeat to %s\n", sv_master[i]->string );
+		Com_Printf ("Sending heartbeat to %s (players: %i, botPlayers: %i)\n", sv_master[i]->string, visibleClients, reportedBots );
 		// this command should be changed if the server info / status format
 		// ever incompatably changes
 		NET_OutOfBandPrint( NS_SERVER, adr[i], "heartbeat %s\n", HEARTBEAT_GAME );
+
+		SV_LogMasterVACHeartbeat( &adr[i], sv_master[i]->string );
 	}
 }
 
@@ -310,12 +361,12 @@ Calculates the reported player and bot totals, respecting bot masking.
 */
 static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {
 	int				i;
+	int				reportedBots;
 	int				players;
-	int				bots;
 	client_t	*cl;
 
 	players = 0;
-	bots = 0;
+	reportedBots = 0;
 
 	for ( i = sv_privateClients->integer ; i < sv_maxclients->integer ; i++ ) {
 		cl = &svs.clients[i];
@@ -325,11 +376,11 @@ static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {
 		}
 
 		if ( SV_ClientIsBot( cl ) ) {
-			bots++;
-
 			if ( sv_maskBots && sv_maskBots->integer ) {
 				continue;
 			}
+
+			reportedBots++;
 		}
 
 		players++;
@@ -340,9 +391,10 @@ static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {
 	}
 
 	if ( botCount ) {
-		*botCount = bots;
+		*botCount = reportedBots;
 	}
 }
+
 
 
 /*
@@ -379,7 +431,7 @@ void SVC_Status( netadr_t from ) {
 
 	SV_ComputeDisplayedCounts( &visibleClients, &botCount );
 	Info_SetValueForKey( infostring, "clients", va("%i", visibleClients) );
-	Info_SetValueForKey( infostring, "botPlayers", va("%i", sv_maskBots->integer ? 0 : botCount) );
+	Info_SetValueForKey( infostring, "botPlayers", va("%i", botCount) );
 	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
 
 	// add "demo" to the sv_keywords if restricted
@@ -447,7 +499,7 @@ void SVC_Info( netadr_t from ) {
 	Info_SetValueForKey( infostring, "hostname", sv_hostname->string );
 	Info_SetValueForKey( infostring, "mapname", sv_mapname->string );
 	Info_SetValueForKey( infostring, "clients", va("%i", count) );
-	Info_SetValueForKey( infostring, "botPlayers", va("%i", sv_maskBots->integer ? 0 : botCount) );
+	Info_SetValueForKey( infostring, "botPlayers", va("%i", botCount) );
 	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
 	Info_SetValueForKey( infostring, "sv_maxclients",
 		va("%i", sv_maxclients->integer - sv_privateClients->integer ) );
@@ -595,6 +647,107 @@ void SV_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
 		Com_DPrintf ("bad connectionless packet from %s:\n%s\n"
 		, NET_AdrToString (from), s);
 	}
+}
+
+/*
+=============
+SV_ClientEligibleForWarmupReady
+
+Checks whether a client counts toward the warmup ready threshold.
+=============
+*/
+static qboolean SV_ClientEligibleForWarmupReady( const client_t *cl ) {
+	const char	*team;
+
+	if ( cl->state < CS_CONNECTED ) {
+		return qfalse;
+	}
+
+	if ( SV_ClientIsBot( cl ) ) {
+		return qfalse;
+	}
+
+	team = Info_ValueForKey( cl->userinfo, "team" );
+	if ( !Q_stricmp( team, "spectator" ) || !Q_stricmp( team, "s" ) || !Q_stricmp( team, "scoreboard" ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+
+/*
+=============
+SV_ClientReadyForWarmup
+
+Determines if an eligible client has finished loading and entered the game.
+=============
+*/
+static qboolean SV_ClientReadyForWarmup( const client_t *cl ) {
+	if ( !SV_ClientEligibleForWarmupReady( cl ) ) {
+		return qfalse;
+	}
+
+	return ( cl->state == CS_ACTIVE );
+}
+
+
+/*
+=============
+SV_CheckWarmupReadiness
+
+Evaluates the warmup ready percentage and optionally announces deficiencies.
+=============
+*/
+qboolean SV_CheckWarmupReadiness( qboolean announce ) {
+	int		ready;
+	int		eligible;
+	int		percent;
+	int		index;
+	char	info[MAX_INFO_STRING];
+
+	ready = 0;
+	eligible = 0;
+
+	for ( index = 0; index < sv_maxclients->integer; index++ ) {
+		client_t *cl = svs.clients + index;
+
+		if ( SV_ClientReadyForWarmup( cl ) ) {
+			ready++;
+			eligible++;
+			continue;
+		}
+
+		if ( SV_ClientEligibleForWarmupReady( cl ) ) {
+			eligible++;
+		}
+	}
+
+	if ( eligible <= 0 ) {
+		percent = 100;
+	} else {
+		percent = ( ready * 100 ) / eligible;
+	}
+
+	info[0] = '\0';
+	Info_SetValueForKey( info, "pct", va( "%i", sv_warmupReadyPercentage->integer ) );
+	Info_SetValueForKey( info, "ready", va( "%i", ready ) );
+	Info_SetValueForKey( info, "eligible", va( "%i", eligible ) );
+	SV_SetConfigstring( CS_WARMUP_READY, info );
+
+	if ( sv_warmupReadyPercentage->integer <= 0 ) {
+		return qtrue;
+	}
+
+	if ( percent >= sv_warmupReadyPercentage->integer ) {
+		return qtrue;
+	}
+
+	if ( announce ) {
+		SV_SendServerCommand( NULL, va( "print \"Warmup waiting: %i of %i players ready (%i%% required).\\n\"", ready, eligible, sv_warmupReadyPercentage->integer ) );
+	}
+
+	return qfalse;
 }
 
 //============================================================================
@@ -850,18 +1003,31 @@ void SV_Frame( int msec ) {
 	// 2giga-milliseconds = 23 days, so it won't be too often
 	if ( svs.time > 0x70000000 ) {
 		SV_Shutdown( "Restarting server due to time wrapping" );
+		if ( SV_HandleQuitOnExitLevel( "time wrapping restart" ) ) {
+			return;
+		}
 		Cbuf_AddText( "vstr nextmap\n" );
 		return;
 	}
 	// this can happen considerably earlier when lots of clients play and the map doesn't change
 	if ( svs.nextSnapshotEntities >= 0x7FFFFFFE - svs.numSnapshotEntities ) {
 		SV_Shutdown( "Restarting server due to numSnapshotEntities wrapping" );
+		if ( SV_HandleQuitOnExitLevel( "numSnapshotEntities wrap restart" ) ) {
+			return;
+		}
 		Cbuf_AddText( "vstr nextmap\n" );
 		return;
 	}
 
 	if( sv.restartTime && svs.time >= sv.restartTime ) {
+		if ( !SV_CheckWarmupReadiness( qtrue ) ) {
+			sv.restartTime = svs.time + 1000;
+			return;
+		}
 		sv.restartTime = 0;
+		if ( SV_HandleQuitOnExitLevel( "scheduled map_restart" ) ) {
+			return;
+		}
 		Cbuf_AddText( "map_restart 0\n" );
 		return;
 	}

@@ -102,6 +102,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_FREEZE_TIP_SHOOT	(CS_TUTORIAL_TEXT + 4)
 #define CS_FREEZE_TIP_SUMMARY	(CS_TUTORIAL_TEXT + 5)
 #define CS_READYUP_STATUS		0x2C4		// millisecond deadline for the ready-up clock
+#define CS_WARMUP_READY		0x2C8		// warmup ready threshold and readiness snapshot
 
 //
 // Factory metadata configstrings provide clients with human-readable match factory data.
@@ -149,6 +150,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_SPAWN_HINTS_ALT		0x2C5		// floating-point spawn metadata for HUD hints
 #define CS_RACE_RECORDS		0x2C6		// race checkpoint history used by race_init
 #define CS_LOADOUT_FLAGS		0x2C7		// bitmask of forced loadout toggles
+#define CS_WARMUP_READY		0x2C8		// warmup ready threshold and readiness snapshot
 #define CS_LOADOUT_MASK		0x2C9		// bitmask of disabled loadout entries
 
 #define CS_MAX					(CS_LOADOUT_MASK + 1)

@@ -421,6 +421,7 @@ void CL_WritePacket( void );
 void IN_CenterView (void);
 
 void CL_VerifyCode( void );
+qboolean CL_ShouldFilterConsoleText( const char *text );
 
 float CL_KeyState (kbutton_t *key);
 char *Key_KeynumToString (int keynum);

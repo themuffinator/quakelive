@@ -1084,6 +1084,10 @@ static void SV_Map_f( void ) {
 		return;
 	}
 
+	if ( SV_HandleQuitOnExitLevel( map ) ) {
+		return;
+	}
+
 	// force latched values to get set
 	Cvar_Get ("g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH );
 
@@ -1180,6 +1184,10 @@ static void SV_MapRestart_f( void ) {
 		return;
 	}
 
+	if ( SV_HandleQuitOnExitLevel( "map_restart" ) ) {
+		return;
+	}
+
 	if (Cmd_Argc() > 1 ) {
 		delay = atoi( Cmd_Argv(1) );
 	}
@@ -1189,6 +1197,11 @@ static void SV_MapRestart_f( void ) {
 	if( delay && !Cvar_VariableValue("g_doWarmup") ) {
 		sv.restartTime = svs.time + delay * 1000;
 		SV_SetConfigstring( CS_WARMUP, va("%i", sv.restartTime) );
+		return;
+	}
+
+	if ( !SV_CheckWarmupReadiness( qtrue ) ) {
+		sv.restartTime = svs.time + 1000;
 		return;
 	}
 
