@@ -924,6 +924,8 @@ void Team_RegisterDominationPoint( gentity_t *pointEnt ) {
 	if ( teamgame.dominationNextScoreTime == 0 ) {
 		teamgame.dominationNextScoreTime = level.time + Team_DominationScoreInterval();
 	}
+}
+
 /*
 =============
 Team_RegisterDominationTrigger
@@ -957,8 +959,6 @@ qboolean Team_RegisterDominationTrigger( gentity_t *trigger ) {
 	point->trigger = trigger;
 	trigger->target_ent = point->pointEnt;
 	return qtrue;
-}
-
 }
 
 /*
@@ -1029,6 +1029,8 @@ static void Team_DominationAnnounceCapture( dominationPoint_t *point, team_t pre
 
 	if ( point->ownerTeam != TEAM_RED && point->ownerTeam != TEAM_BLUE ) {
 		return;
+	}
+
 	Team_DominationEventOrigin( point, origin );
 
 	te = G_TempEntity( origin, EV_GLOBAL_TEAM_SOUND );
@@ -1735,8 +1737,8 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 		attacker->client->pers.teamState.lastfraggedcarrier = level.time;
 		AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS);
 		attacker->client->pers.teamState.fragcarrier++;
-		PrintMsg(NULL, "%s" S_COLOR_WHITE " fragged %s's flag carrier!\n",
-			attacker->client->pers.netname, TeamName(team));
+		PrintMsg(NULL, "%s^3 fragged %s's %sflag carrier!\n",
+			attacker->client->pers.netname, TeamName(team), TeamColorString(team));
 
 		// the target had the flag, clear the hurt carrier
 		// field on the other team
@@ -1753,8 +1755,8 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 		attacker->client->pers.teamState.lastfraggedcarrier = level.time;
 		AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS * tokens * tokens);
 		attacker->client->pers.teamState.fragcarrier++;
-		PrintMsg(NULL, "%s" S_COLOR_WHITE " fragged %s's skull carrier!\n",
-			attacker->client->pers.netname, TeamName(team));
+		PrintMsg(NULL, "%s^3 fragged %s's %sskull carrier!\n",
+			attacker->client->pers.netname, TeamName(team), TeamColorString(team));
 
 		// the target had the flag, clear the hurt carrier
 		// field on the other team
@@ -1859,9 +1861,9 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 	VectorSubtract(targ->r.currentOrigin, flag->r.currentOrigin, v1);
 	VectorSubtract(attacker->r.currentOrigin, flag->r.currentOrigin, v2);
 
-	if ( ( ( VectorLength(v1) < CTF_TARGET_PROTECT_RADIUS &&
+	if ( ( ( VectorLength(v1) < 200.0f &&
 		trap_InPVS(flag->r.currentOrigin, targ->r.currentOrigin ) ) ||
-		( VectorLength(v2) < CTF_TARGET_PROTECT_RADIUS &&
+		( VectorLength(v2) < 200.0f &&
 		trap_InPVS(flag->r.currentOrigin, attacker->r.currentOrigin ) ) ) &&
 		attacker->client->sess.sessionTeam != targ->client->sess.sessionTeam) {
 
@@ -1876,28 +1878,6 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 		attacker->client->rewardTime = level.time + REWARD_SPRITE_TIME;
 
 		return;
-	}
-
-	if (carrier && carrier != attacker) {
-		VectorSubtract(targ->r.currentOrigin, carrier->r.currentOrigin, v1);
-		VectorSubtract(attacker->r.currentOrigin, carrier->r.currentOrigin, v1);
-
-		if ( ( ( VectorLength(v1) < CTF_ATTACKER_PROTECT_RADIUS &&
-			trap_InPVS(carrier->r.currentOrigin, targ->r.currentOrigin ) ) ||
-			( VectorLength(v2) < CTF_ATTACKER_PROTECT_RADIUS &&
-				trap_InPVS(carrier->r.currentOrigin, attacker->r.currentOrigin ) ) ) &&
-			attacker->client->sess.sessionTeam != targ->client->sess.sessionTeam) {
-			AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_PROTECT_BONUS);
-			attacker->client->pers.teamState.carrierdefense++;
-
-			attacker->client->ps.persistant[PERS_DEFEND_COUNT]++;
-			// add the sprite over the player's head
-			attacker->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
-			attacker->client->ps.eFlags |= EF_AWARD_DEFEND;
-			attacker->client->rewardTime = level.time + REWARD_SPRITE_TIME;
-
-			return;
-		}
 	}
 }
 
@@ -2057,7 +2037,7 @@ void Team_ReturnFlag( int team ) {
 		Team_AnnounceNeutralFlagEvent( NEUTRAL_FLAG_EVENT_RETURN, NULL );
 	}
 	else {
-		PrintMsg(NULL, "The %s flag has returned!\n", TeamName(team));
+		PrintMsg(NULL, "^3The %s flag^3 has returned!\n", TeamName(team));
 	}
 }
 
@@ -2077,7 +2057,7 @@ static void Team_AnnounceNeutralFlagEvent( neutralFlagEvent_t event, const genti
 	switch ( event ) {
 	case NEUTRAL_FLAG_EVENT_PICKUP:
 		if ( player && player->client ) {
-			PrintMsg( NULL, "%s" S_COLOR_WHITE " got the flag!\n", player->client->pers.netname );
+			PrintMsg( NULL, "%s^3 got the flag!\n", player->client->pers.netname );
 		}
 		break;
 
@@ -2221,7 +2201,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 		}
 
 		if ( tackleReturn ) {
-			PrintMsg( NULL, "%s" S_COLOR_WHITE " forced the %s flag to return!\n",
+			PrintMsg( NULL, "%s^3 forced the %s flag to return!\n",
 				cl->pers.netname, TeamName( team ) );
 			G_ClearDroppedFlagState( ent );
 			Team_ReturnFlagSound( Team_ResetFlag( team ), team );
@@ -2233,7 +2213,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 		}
 
 		// hey, its not home.  return it by teleporting it back
-		PrintMsg( NULL, "%s" S_COLOR_WHITE " returned the %s flag!\n",
+		PrintMsg( NULL, "%s^3 returned the %s flag!\n",
 				cl->pers.netname, TeamName(team));
 		AddScore(other, ent->r.currentOrigin, CTF_RECOVERY_BONUS);
 		if ( ent->flagDroppedByEnemy && g_flagConfig.droppedFlagBonus > 0 ) {
@@ -2252,10 +2232,14 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 	if (!cl->ps.powerups[enemy_flag])
 		return 0; // We don't have the flag
 	if( g_gametype.integer == GT_1FCTF ) {
-		PrintMsg( NULL, "%s" S_COLOR_WHITE " captured the flag!\n", cl->pers.netname );
+		float captureTime = (level.time - cl->pers.teamState.flagsince) / 1000.0f;
+		PrintMsg( NULL, "%s%s TEAM^3 CAPTURED the flag!^7 (%s captured in %d:%.03f)\n",
+			TeamColorString(team), TeamName(team), cl->pers.netname, (int)captureTime / 60, (float)((int)captureTime % 60 + (captureTime - (int)captureTime)) );
 	}
 	else {
-		PrintMsg( NULL, "%s" S_COLOR_WHITE " captured the %s flag!\n", cl->pers.netname, TeamName(OtherTeam(team)));
+		float heldTime = (level.time - cl->pers.teamState.flagsince) / 1000.0f;
+		PrintMsg( NULL, "%s%s TEAM^3 CAPTURED the flag!^7 (%s held for %d:%.03f)\n",
+			TeamColorString(team), TeamName(team), cl->pers.netname, (int)heldTime / 60, (float)((int)heldTime % 60 + (heldTime - (int)heldTime)) );
 	}
 
 	cl->ps.powerups[enemy_flag] = 0;
@@ -2341,7 +2325,7 @@ int Team_TouchEnemyFlag( gentity_t *ent, gentity_t *other, int team ) {
 		cl->ps.powerups[PW_NEUTRALFLAG] = INT_MAX; // flags never expire
 	}
 	else{
-		PrintMsg (NULL, "%s" S_COLOR_WHITE " got the %s flag!\n",
+		PrintMsg (NULL, "%s^3 got the %s flag!\n",
 			other->client->pers.netname, TeamName(team));
 
 		if (team == TEAM_RED)
@@ -2778,8 +2762,8 @@ static void ObeliskTouch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 		return;
 	}
 
-	PrintMsg(NULL, "%s" S_COLOR_WHITE " brought in %i skull%s.\n",
-					other->client->pers.netname, tokens, tokens ? "s" : "" );
+	PrintMsg(NULL, "%s%s TEAM^3 CAPTURED %i skull%s!^7 (brought by %s)\n",
+					TeamColorString(other->client->sess.sessionTeam), TeamName(other->client->sess.sessionTeam), tokens, tokens ? "s" : "", other->client->pers.netname );
 
 	AddTeamScore(self->s.pos.trBase, other->client->sess.sessionTeam, tokens);
 	Team_ForceGesture(other->client->sess.sessionTeam);
