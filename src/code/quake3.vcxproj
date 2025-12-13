@@ -118,6 +118,15 @@
     <PngLibDir>$(PngSdkDir)\lib\Win32</PngLibDir>
     <PngDependencies>libpng16.lib;zlib.lib</PngDependencies>
   </PropertyGroup>
+  <PropertyGroup Label="Steamworks">
+    <SteamworksSdkDir Condition="'$(SteamworksSdkDir)'==''">$(ProjectDir)..\steamworks</SteamworksSdkDir>
+    <SteamworksIncludeDir Condition="'$(QLBuildSteamworks)'=='1'">$(SteamworksSdkDir)\sdk\public</SteamworksIncludeDir>
+    <SteamworksIncludeDir Condition="'$(QLBuildSteamworks)'!='1'"></SteamworksIncludeDir>
+    <SteamworksLibDir Condition="'$(QLBuildSteamworks)'=='1'">$(SteamworksSdkDir)\sdk\redistributable_bin</SteamworksLibDir>
+    <SteamworksLibDir Condition="'$(QLBuildSteamworks)'!='1'"></SteamworksLibDir>
+    <SteamworksDependencies Condition="'$(QLBuildSteamworks)'=='1'">steam_api.lib</SteamworksDependencies>
+    <SteamworksDependencies Condition="'$(QLBuildSteamworks)'!='1'"></SteamworksDependencies>
+  </PropertyGroup>
   <PropertyGroup>
     <_ProjectFileVersion>17.0.34511.75</_ProjectFileVersion>
   </PropertyGroup>
@@ -158,12 +167,12 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(VorbisIncludeDir);$(PngIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VorbisIncludeDir);$(PngIncludeDir);$(SteamworksIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>QL_ENABLE_OGG=$(QLEnableOgg);%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(VorbisLibDir);$(PngLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(VorbisDependencies);$(PngDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VorbisLibDir);$(PngLibDir);$(SteamworksLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(VorbisDependencies);$(PngDependencies);$(SteamworksDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
@@ -794,6 +803,9 @@
       <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'">true</BrowseInformation>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='vector|Win32'">MaxSpeed</Optimization>
+    </ClCompile>
+    <ClCompile Include="..\common\platform\platform_steamworks.c">
+      <ExcludedFromBuild Condition="'$(QLBuildSteamworks)'=='0'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\common\platform\platform_services.c">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug TA DEMO|Win32'">Disabled</Optimization>

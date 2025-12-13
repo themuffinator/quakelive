@@ -92,6 +92,17 @@ endif
 
 PLATFORM_BACKEND_DEFS = -DQL_BUILD_STEAMWORKS=$(QL_BUILD_STEAMWORKS) -DQL_BUILD_OPEN_STEAM=$(QL_BUILD_OPEN_STEAM) -DQL_ENABLE_OGG=$(QL_ENABLE_OGG)
 
+ifeq ($(QL_BUILD_STEAMWORKS),1)
+  STEAMWORKS_SDK_DIR ?= $(MOUNT_DIR)/../steamworks
+  STEAMWORKS_INCLUDE_DIR ?= $(STEAMWORKS_SDK_DIR)/sdk/public
+  STEAMWORKS_LIB_DIR ?= $(STEAMWORKS_SDK_DIR)/sdk/redistributable_bin/linux32
+  STEAMWORKS_CFLAGS := -I$(STEAMWORKS_INCLUDE_DIR)
+  STEAMWORKS_LDFLAGS := -L$(STEAMWORKS_LIB_DIR) -lsteam_api
+else
+  STEAMWORKS_CFLAGS :=
+  STEAMWORKS_LDFLAGS :=
+endif
+
 PKG_CONFIG ?= pkg-config
 
 ifeq ($(QL_ENABLE_OGG),1)
@@ -372,16 +383,16 @@ endif #Linux
 endif #FreeBSD
 endif #IRIX
 
-DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -o $@ -c $<
-DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -o $@ -c $<
-DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -DSMP -o $@ -c $<
-DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
-DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -o $@ -c $<
-DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
+DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
+DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
+DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -DSMP -o $@ -c $<
+DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
+DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
+DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
 DO_NASM=nasm -f elf -o $@  $<
-DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -o $@ -c $<
+DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
 
 #DO_LCC=$(LCC) -o $@ -S -Wf-target=bytecode -Wf-g -DQ3_VM -I$(CGDIR) -I$(GDIR)  -I$(UIDIR)  $< 
 
@@ -602,10 +613,11 @@ Q3OBJ += $(B)/client/platform_backend_open_steam.o
 endif
 ifeq ($(QL_BUILD_STEAMWORKS),1)
 Q3OBJ += $(B)/client/platform_backend_steamworks.o
+Q3OBJ += $(B)/client/platform_steamworks.o
 endif
 
     ifeq ($(ARCH),i386)
-	  Q3OBJ += $(B)/client/vm_x86.o
+          Q3OBJ += $(B)/client/vm_x86.o
     endif
 
     ifeq ($(ARCH),ppc)
@@ -667,13 +679,13 @@ endif #FreeBSD
 endif #IRIX
 
 $(B)/$(PLATFORM)quake3 : $(Q3OBJ) $(Q3POBJ)
-	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) 
+	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) $(STEAMWORKS_LDFLAGS)
 # TTimo: splines code requires C++ linking, but splines have not been officially included in the codebase
 #	$(CXX)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) 
 
 $(B)/$(PLATFORM)quake3-smp : $(Q3OBJ) $(Q3POBJ_SMP)
 	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ_SMP) $(GLLDFLAGS) \
-		$(THREAD_LDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) 
+		$(THREAD_LDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) $(STEAMWORKS_LDFLAGS)
 
 $(B)/client/cl_cgame.o : $(CDIR)/cl_cgame.c; $(DO_CC)   
 $(B)/client/cl_cin.o : $(CDIR)/cl_cin.c; $(DO_CC)       
@@ -692,8 +704,9 @@ $(B)/client/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC)
 $(B)/client/platform_services.o : $(MOUNT_DIR)/common/platform/platform_services.c; $(DO_CC)
 $(B)/client/platform_backend_open_steam.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_open_steam.c; $(DO_CC)
 $(B)/client/platform_backend_steamworks.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_steamworks.c; $(DO_CC)
-$(B)/client/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC)   
-$(B)/client/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC)       
+$(B)/client/platform_steamworks.o : $(MOUNT_DIR)/common/platform/platform_steamworks.c; $(DO_CC)
+$(B)/client/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC)
+$(B)/client/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC)
 $(B)/client/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC)
 $(B)/client/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC)
 $(B)/client/snd_ogg_decode.o : $(CDIR)/snd_ogg_decode.c; $(DO_CC)
@@ -1714,6 +1727,7 @@ Q3SOBJ += $(B)/q3static/platform_backend_open_steam.o
 endif
 ifeq ($(QL_BUILD_STEAMWORKS),1)
 Q3SOBJ += $(B)/q3static/platform_backend_steamworks.o
+Q3SOBJ += $(B)/q3static/platform_steamworks.o
 endif
 ifeq ($(ARCH),i386)
   Q3SOBJ += $(B)/q3static/vm_x86.o
@@ -1743,8 +1757,9 @@ $(B)/q3static/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/platform_services.o : $(MOUNT_DIR)/common/platform/platform_services.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/platform_backend_open_steam.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_open_steam.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/platform_backend_steamworks.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_steamworks.c; $(DO_CC) -DQ3_STATIC
-$(B)/q3static/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC) -DQ3_STATIC   
-$(B)/q3static/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC) -DQ3_STATIC       
+$(B)/q3static/platform_steamworks.o : $(MOUNT_DIR)/common/platform/platform_steamworks.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_mix.o : $(CDIR)/snd_mix.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_ogg_decode.o : $(CDIR)/snd_ogg_decode.c; $(DO_CC) -DQ3_STATIC
@@ -2110,8 +2125,8 @@ $(B)/q3static/bg_slidemove.o : $(GDIR)/bg_slidemove.c; $(DO_CC) -DQ3_STATIC
 
 
 
-$(B)/$(PLATFORM)q3static : $(Q3SOBJ) 
-	$(CC) $(CFLAGS) -o $@ $(Q3SOBJ)  $(GLLDFLAGS) $(LDFLAGS) 
+$(B)/$(PLATFORM)q3static : $(Q3SOBJ)
+$(CC) $(CFLAGS) -o $@ $(Q3SOBJ)  $(GLLDFLAGS) $(LDFLAGS) $(STEAMWORKS_LDFLAGS)
 
 
 #############################################################################
