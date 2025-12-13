@@ -421,6 +421,7 @@ void CL_MouseMove( usercmd_t *cmd ) {
 	float	mx, my;
 	float	accelSensitivity;
 	float	rate;
+	float	cpiScale;
 
 	// allow mouse smoothing
 	if ( m_filter->integer ) {
@@ -434,14 +435,41 @@ void CL_MouseMove( usercmd_t *cmd ) {
 	cl.mouseDx[cl.mouseIndex] = 0;
 	cl.mouseDy[cl.mouseIndex] = 0;
 
+	cpiScale = m_cpi->value;
+	if ( cpiScale > 0.0f ) {
+		cpiScale = 1000.0f / cpiScale;
+		mx *= cpiScale;
+		my *= cpiScale;
+	}
+
 	rate = sqrt( mx * mx + my * my ) / (float)frame_msec;
-	accelSensitivity = cl_sensitivity->value + rate * cl_mouseAccel->value;
+
+	if ( cl_mouseAccelOffset->value < rate ) {
+		accelSensitivity = cl_mouseAccel->value * powf( rate - cl_mouseAccelOffset->value, cl_mouseAccelPower->value );
+	} else {
+		accelSensitivity = 0.0f;
+	}
+	accelSensitivity += cl_sensitivity->value;
+
+	if ( cl_mouseSensCap->value > 0.0f && accelSensitivity > cl_mouseSensCap->value ) {
+		accelSensitivity = cl_mouseSensCap->value;
+	}
 
 	// scale by FOV
 	accelSensitivity *= cl.cgameSensitivity;
 
 	if ( rate && cl_showMouseRate->integer ) {
 		Com_Printf( "%f : %f\n", rate, accelSensitivity );
+	}
+
+	if ( cl_mouseAccelDebug->integer ) {
+		Com_Printf( "mouse accel: rate %.3f offset %.3f power %.3f accel %.3f sens %.3f cap %.3f\n",
+			rate,
+			cl_mouseAccelOffset->value,
+			cl_mouseAccelPower->value,
+			cl_mouseAccel->value,
+			accelSensitivity,
+			cl_mouseSensCap->value );
 	}
 
 	mx *= accelSensitivity;
@@ -455,11 +483,11 @@ void CL_MouseMove( usercmd_t *cmd ) {
 	if ( in_strafe.active ) {
 		cmd->rightmove = ClampChar( cmd->rightmove + m_side->value * mx );
 	} else {
-		cl.viewangles[YAW] -= m_yaw->value * mx;
+		cl.viewangles[YAW] -= cl_viewAccel->value * m_yaw->value * mx;
 	}
 
 	if ( (in_mlooking || cl_freelook->integer) && !in_strafe.active ) {
-		cl.viewangles[PITCH] += m_pitch->value * my;
+		cl.viewangles[PITCH] += cl_viewAccel->value * m_pitch->value * my;
 	} else {
 		cmd->forwardmove = ClampChar( cmd->forwardmove - m_forward->value * my );
 	}
