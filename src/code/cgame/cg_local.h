@@ -1133,6 +1133,8 @@ typedef struct {
 	sfxHandle_t hitSoundLowArmor;
 	sfxHandle_t hitTeamSound;
 	sfxHandle_t impressiveSound;
+	sfxHandle_t impressiveSound2;
+	sfxHandle_t impressiveSound3;
 	sfxHandle_t excellentSound;
 	sfxHandle_t deniedSound;
 	sfxHandle_t humiliationSound;
@@ -1141,6 +1143,16 @@ typedef struct {
 	sfxHandle_t firstImpressiveSound;
 	sfxHandle_t firstExcellentSound;
 	sfxHandle_t firstHumiliationSound;
+	sfxHandle_t midairSound;
+	sfxHandle_t midairSound2;
+	sfxHandle_t midairSound3;
+	sfxHandle_t perfectSound;
+	sfxHandle_t quadGodSound;
+	sfxHandle_t rampageSound;
+	sfxHandle_t revengeSound;
+	sfxHandle_t perforatedSound;
+	sfxHandle_t headshotSound;
+	sfxHandle_t firstFragSound;
 
 	sfxHandle_t takenLeadSound;
 	sfxHandle_t tiedLeadSound;

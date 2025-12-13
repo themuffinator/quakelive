@@ -2273,6 +2273,8 @@ static void CG_RegisterSounds( void ) {
 	cgs.media.hitSoundLowArmor = trap_S_RegisterSound( "sound/feedback/hitlo.wav", qfalse );
 
 	cgs.media.impressiveSound = trap_S_RegisterSound( "sound/feedback/impressive.wav", qtrue );
+	cgs.media.impressiveSound2 = trap_S_RegisterSound( "sound/feedback/impressive2.wav", qtrue );
+	cgs.media.impressiveSound3 = trap_S_RegisterSound( "sound/feedback/impressive3.wav", qtrue );
 	cgs.media.excellentSound = trap_S_RegisterSound( "sound/feedback/excellent.wav", qtrue );
 	cgs.media.deniedSound = trap_S_RegisterSound( "sound/feedback/denied.wav", qtrue );
 	cgs.media.humiliationSound = trap_S_RegisterSound( "sound/feedback/humiliation.wav", qtrue );
@@ -2281,6 +2283,16 @@ static void CG_RegisterSounds( void ) {
 	cgs.media.firstImpressiveSound = trap_S_RegisterSound( "sound/feedback/first_impressive.wav", qtrue );
 	cgs.media.firstExcellentSound = trap_S_RegisterSound( "sound/feedback/first_excellent.wav", qtrue );
 	cgs.media.firstHumiliationSound = trap_S_RegisterSound( "sound/feedback/first_gauntlet.wav", qtrue );
+	cgs.media.midairSound = trap_S_RegisterSound( "sound/feedback/midair1.wav", qtrue );
+	cgs.media.midairSound2 = trap_S_RegisterSound( "sound/feedback/midair2.wav", qtrue );
+	cgs.media.midairSound3 = trap_S_RegisterSound( "sound/feedback/midair3.wav", qtrue );
+	cgs.media.perfectSound = trap_S_RegisterSound( "sound/feedback/perfect.wav", qtrue );
+	cgs.media.quadGodSound = trap_S_RegisterSound( "sound/feedback/quad_god.wav", qtrue );
+	cgs.media.rampageSound = trap_S_RegisterSound( "sound/feedback/rampage.wav", qtrue );
+	cgs.media.revengeSound = trap_S_RegisterSound( "sound/feedback/revenge.wav", qtrue );
+	cgs.media.perforatedSound = trap_S_RegisterSound( "sound/feedback/perforated.wav", qtrue );
+	cgs.media.headshotSound = trap_S_RegisterSound( "sound/feedback/headshot.wav", qtrue );
+	cgs.media.firstFragSound = trap_S_RegisterSound( "sound/feedback/first_frag.wav", qtrue );
 
 	cgs.media.takenLeadSound = trap_S_RegisterSound( "sound/feedback/takenlead.wav", qtrue);
 	cgs.media.tiedLeadSound = trap_S_RegisterSound( "sound/feedback/tiedlead.wav", qtrue);
@@ -2658,6 +2670,14 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.medalDefend = trap_R_RegisterShaderNoMip( "medal_defend" );
 	cgs.media.medalAssist = trap_R_RegisterShaderNoMip( "medal_assist" );
 	cgs.media.medalCapture = trap_R_RegisterShaderNoMip( "medal_capture" );
+	cgs.media.medalMidair = trap_R_RegisterShaderNoMip( "medal_midair" );
+	cgs.media.medalPerfect = trap_R_RegisterShaderNoMip( "medal_perfect" );
+	cgs.media.medalPerforated = trap_R_RegisterShaderNoMip( "medal_perforated" );
+	cgs.media.medalQuadGod = trap_R_RegisterShaderNoMip( "medal_quadgod" );
+	cgs.media.medalRampage = trap_R_RegisterShaderNoMip( "medal_rampage" );
+	cgs.media.medalRevenge = trap_R_RegisterShaderNoMip( "medal_revenge" );
+	cgs.media.medalHeadshot = trap_R_RegisterShaderNoMip( "medal_headshot" );
+	cgs.media.medalFirstFrag = trap_R_RegisterShaderNoMip( "medal_firstfrag" );
 
 
 	memset( cg_items, 0, sizeof( cg_items ) );

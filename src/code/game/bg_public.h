@@ -508,6 +508,14 @@ struct pmove_settings_s {
 #define	PLAYEREVENT_DENIEDREWARD		0x0001
 #define	PLAYEREVENT_GAUNTLETREWARD		0x0002
 #define PLAYEREVENT_HOLYSHIT			0x0004
+#define PLAYEREVENT_MIDAIR			0x0008
+#define PLAYEREVENT_PERFECT			0x0010
+#define PLAYEREVENT_QUADGOD			0x0020
+#define PLAYEREVENT_RAMPAGE			0x0040
+#define PLAYEREVENT_REVENGE			0x0080
+#define PLAYEREVENT_PERFORATED		0x0100
+#define PLAYEREVENT_HEADSHOT		0x0200
+#define PLAYEREVENT_FIRSTFRAG		0x0400
 
 // entityState_t->event values
 // entity events are for effects that take place reletive

@@ -83,7 +83,7 @@ void CG_CheckAmmo( void ) {
 		weapon = cg.snap->ps.weapon;
 		if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
 			ammo = cg.snap->ps.ammo[ weapon ];
-			if ( ammo == 0 ) {
+			if ( ammo == 0 && !cg_switchToEmpty.integer ) {
 				warning = 3;
 			}
 		}
@@ -369,7 +369,14 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 		if (ps->persistant[PERS_IMPRESSIVE_COUNT] == 1) {
 			sfx = cgs.media.firstImpressiveSound;
 		} else {
-			sfx = cgs.media.impressiveSound;
+			int r = random() * 3;
+			if ( r == 0 ) {
+				sfx = cgs.media.impressiveSound;
+			} else if ( r == 1 ) {
+				sfx = cgs.media.impressiveSound2;
+			} else {
+				sfx = cgs.media.impressiveSound3;
+			}
 		}
 		pushReward(sfx, cgs.media.medalImpressive, ps->persistant[PERS_IMPRESSIVE_COUNT]);
 		reward = qtrue;
@@ -424,6 +431,46 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 			if ( rewardVOEnabled ) {
 				trap_S_StartLocalSound( cgs.media.holyShitSound, CHAN_ANNOUNCER );
 			}
+		}
+		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_MIDAIR) !=
+				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_MIDAIR)) {
+			int r = random() * 3;
+			if ( r == 0 ) {
+				sfx = cgs.media.midairSound;
+			} else if ( r == 1 ) {
+				sfx = cgs.media.midairSound2;
+			} else {
+				sfx = cgs.media.midairSound3;
+			}
+			pushReward(sfx, cgs.media.medalMidair, 1);
+		}
+		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_PERFECT) !=
+				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_PERFECT)) {
+			pushReward(cgs.media.perfectSound, cgs.media.medalPerfect, 1);
+		}
+		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_QUADGOD) !=
+				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_QUADGOD)) {
+			pushReward(cgs.media.quadGodSound, cgs.media.medalQuadGod, 1);
+		}
+		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_RAMPAGE) !=
+				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_RAMPAGE)) {
+			pushReward(cgs.media.rampageSound, cgs.media.medalRampage, 1);
+		}
+		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_REVENGE) !=
+				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_REVENGE)) {
+			pushReward(cgs.media.revengeSound, cgs.media.medalRevenge, 1);
+		}
+		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_PERFORATED) !=
+				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_PERFORATED)) {
+			pushReward(cgs.media.perforatedSound, cgs.media.medalPerforated, 1);
+		}
+		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_HEADSHOT) !=
+				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_HEADSHOT)) {
+			pushReward(cgs.media.headshotSound, cgs.media.medalHeadshot, 1);
+		}
+		else if ((ps->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_FIRSTFRAG) !=
+				(ops->persistant[PERS_PLAYEREVENTS] & PLAYEREVENT_FIRSTFRAG)) {
+			pushReward(cgs.media.firstFragSound, cgs.media.medalFirstFrag, 1);
 		}
 		reward = qtrue;
 	}
