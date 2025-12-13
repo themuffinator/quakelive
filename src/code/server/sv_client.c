@@ -168,6 +168,23 @@ static void SV_LogPlatformAuth( const netadr_t *adr, const client_t *cl, const c
 
 /*
 =================
+SV_LogVACStatus
+
+Logs VAC acceptance or rejection alongside shared telemetry.
+=================
+*/
+static void SV_LogVACStatus( const netadr_t *adr, const char *status, const char *outcome, const char *message ) {
+	NET_LogAuthTelemetry( NS_SERVER, adr, NULL, "vac", status, outcome, message );
+
+	if ( message && message[0] ) {
+		Com_Printf( "VAC %s (%s) for %s\n", status, message, NET_AdrToString( *adr ) );
+	} else {
+		Com_Printf( "VAC %s for %s\n", status, NET_AdrToString( *adr ) );
+	}
+}
+
+/*
+=================
 SV_GetChallenge
 
 A "getchallenge" OOB command has been received
@@ -192,6 +209,15 @@ void SV_GetChallenge( netadr_t from ) {
 
 	// ignore if we are in single player
 	if ( Cvar_VariableValue( "g_gametype" ) == GT_SINGLE_PLAYER || Cvar_VariableValue("ui_singlePlayerActive")) {
+		return;
+	}
+
+	if ( !sv_vac || !sv_vac->integer ) {
+		const char *message;
+
+		message = "VAC is disabled on this server";
+		SV_LogVACStatus( &from, "rejected", "disabled", message );
+		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", message );
 		return;
 	}
 
@@ -397,6 +423,15 @@ void SV_DirectConnect( netadr_t from ) {
 	challenge = atoi( Info_ValueForKey( userinfo, "challenge" ) );
 	qport = atoi( Info_ValueForKey( userinfo, "qport" ) );
 
+	if ( !sv_vac || !sv_vac->integer ) {
+		const char *message;
+
+		message = "VAC is disabled on this server";
+		SV_LogVACStatus( &from, "rejected", "disabled", message );
+		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", message );
+		return;
+	}
+
 	// quick reject
 	for (i=0,cl=svs.clients ; i < sv_maxclients->integer ; i++,cl++) {
 		if ( cl->state == CS_FREE ) {
@@ -464,6 +499,8 @@ void SV_DirectConnect( netadr_t from ) {
 		NET_OutOfBandPrint( NS_SERVER, from, "print\nVAC ban on record\n" );
 		return;
 	}
+
+	SV_LogVACStatus( &from, "accepted", "enabled", "VAC is enabled on this server" );
 
 	newcl = &temp;
 	Com_Memset (newcl, 0, sizeof(client_t));

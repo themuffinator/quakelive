@@ -238,6 +238,21 @@ MASTER SERVER FUNCTIONS
 
 /*
 ================
+SV_LogMasterVACHeartbeat
+
+Annotates heartbeat telemetry with the current VAC enablement state.
+================
+*/
+static void SV_LogMasterVACHeartbeat( const netadr_t *adr, const char *masterName ) {
+	const char *state;
+
+	state = ( sv_vac && sv_vac->integer ) ? "enabled" : "disabled";
+
+	NET_LogAuthTelemetry( NS_SERVER, adr, NULL, "vac", state, "heartbeat", masterName );
+}
+
+/*
+================
 SV_MasterHeartbeat
 
 Send a message to the masters every few minutes to
@@ -247,8 +262,8 @@ changes from empty to non-empty, and full to non-full,
 but not on every player enter or exit.
 ================
 */
-#define	HEARTBEAT_MSEC	300*1000
-#define	HEARTBEAT_GAME	"QuakeArena-1"
+#define HEARTBEAT_MSEC	300*1000
+#define HEARTBEAT_GAME	"QuakeArena-1"
 void SV_MasterHeartbeat( void ) {
 	static netadr_t	adr[MAX_MASTER_SERVERS];
 	int			i;
@@ -280,7 +295,7 @@ void SV_MasterHeartbeat( void ) {
 		// do it when needed
 		if ( sv_master[i]->modified ) {
 			sv_master[i]->modified = qfalse;
-	
+
 			Com_Printf( "Resolving %s\n", sv_master[i]->string );
 			if ( !NET_StringToAdr( sv_master[i]->string, &adr[i] ) ) {
 				// if the address failed to resolve, clear it
@@ -294,8 +309,8 @@ void SV_MasterHeartbeat( void ) {
 				adr[i].port = BigShort( PORT_MASTER );
 			}
 			Com_Printf( "%s resolved to %i.%i.%i.%i:%i\n", sv_master[i]->string,
-				adr[i].ip[0], adr[i].ip[1], adr[i].ip[2], adr[i].ip[3],
-				BigShort( adr[i].port ) );
+					adr[i].ip[0], adr[i].ip[1], adr[i].ip[2], adr[i].ip[3],
+					BigShort( adr[i].port ) );
 		}
 
 
@@ -303,6 +318,8 @@ void SV_MasterHeartbeat( void ) {
 		// this command should be changed if the server info / status format
 		// ever incompatably changes
 		NET_OutOfBandPrint( NS_SERVER, adr[i], "heartbeat %s\n", HEARTBEAT_GAME );
+
+		SV_LogMasterVACHeartbeat( &adr[i], sv_master[i]->string );
 	}
 }
 
