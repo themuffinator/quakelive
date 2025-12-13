@@ -4010,7 +4010,7 @@ static void UI_RunMenuScript(char **args) {
 			Controls_SetConfig(qtrue);
 		} else if (Q_stricmp(name, "loadControls") == 0) {
 			Controls_GetConfig();
-		} else if (Q_stricmp(name, "clearError") == 0) {
+		} else if (Q_stricmp(name, "clearError") == 0 || Q_stricmp(name, "clearComError") == 0) {
 			trap_Cvar_Set("com_errorMessage", "");
 		} else if (Q_stricmp(name, "loadGameInfo") == 0) {
 #ifdef PRE_RELEASE_TADEMO
