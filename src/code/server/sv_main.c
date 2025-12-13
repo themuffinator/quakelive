@@ -222,6 +222,8 @@ but not on every player enter or exit.
 void SV_MasterHeartbeat( void ) {
 	static netadr_t	adr[MAX_MASTER_SERVERS];
 	int			i;
+	int			visibleClients;
+	int			reportedBots;
 
 	// "dedicated 1" is for lan play, "dedicated 2" is for inet public play
 	if ( !com_dedicated || com_dedicated->integer != 2 ) {
@@ -234,6 +236,8 @@ void SV_MasterHeartbeat( void ) {
 	}
 	svs.nextHeartbeatTime = svs.time + HEARTBEAT_MSEC;
 
+
+	SV_ComputeDisplayedCounts( &visibleClients, &reportedBots );
 
 	// send to group masters
 	for ( i = 0 ; i < MAX_MASTER_SERVERS ; i++ ) {
@@ -265,7 +269,7 @@ void SV_MasterHeartbeat( void ) {
 		}
 
 
-		Com_Printf ("Sending heartbeat to %s\n", sv_master[i]->string );
+		Com_Printf ("Sending heartbeat to %s (players: %i, botPlayers: %i)\n", sv_master[i]->string, visibleClients, reportedBots );
 		// this command should be changed if the server info / status format
 		// ever incompatably changes
 		NET_OutOfBandPrint( NS_SERVER, adr[i], "heartbeat %s\n", HEARTBEAT_GAME );
@@ -310,12 +314,12 @@ Calculates the reported player and bot totals, respecting bot masking.
 */
 static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {
 	int				i;
+	int				reportedBots;
 	int				players;
-	int				bots;
 	client_t	*cl;
 
 	players = 0;
-	bots = 0;
+	reportedBots = 0;
 
 	for ( i = sv_privateClients->integer ; i < sv_maxclients->integer ; i++ ) {
 		cl = &svs.clients[i];
@@ -325,11 +329,11 @@ static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {
 		}
 
 		if ( SV_ClientIsBot( cl ) ) {
-			bots++;
-
 			if ( sv_maskBots && sv_maskBots->integer ) {
 				continue;
 			}
+
+			reportedBots++;
 		}
 
 		players++;
@@ -340,9 +344,10 @@ static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {
 	}
 
 	if ( botCount ) {
-		*botCount = bots;
+		*botCount = reportedBots;
 	}
 }
+
 
 
 /*
@@ -379,7 +384,7 @@ void SVC_Status( netadr_t from ) {
 
 	SV_ComputeDisplayedCounts( &visibleClients, &botCount );
 	Info_SetValueForKey( infostring, "clients", va("%i", visibleClients) );
-	Info_SetValueForKey( infostring, "botPlayers", va("%i", sv_maskBots->integer ? 0 : botCount) );
+	Info_SetValueForKey( infostring, "botPlayers", va("%i", botCount) );
 	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
 
 	// add "demo" to the sv_keywords if restricted
@@ -447,7 +452,7 @@ void SVC_Info( netadr_t from ) {
 	Info_SetValueForKey( infostring, "hostname", sv_hostname->string );
 	Info_SetValueForKey( infostring, "mapname", sv_mapname->string );
 	Info_SetValueForKey( infostring, "clients", va("%i", count) );
-	Info_SetValueForKey( infostring, "botPlayers", va("%i", sv_maskBots->integer ? 0 : botCount) );
+	Info_SetValueForKey( infostring, "botPlayers", va("%i", botCount) );
 	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
 	Info_SetValueForKey( infostring, "sv_maxclients",
 		va("%i", sv_maxclients->integer - sv_privateClients->integer ) );
