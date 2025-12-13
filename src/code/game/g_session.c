@@ -44,14 +44,20 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	const char	*s;
 	const char	*var;
 
-	s = va("%i %i %i %i %i %i %i", 
+	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i",
 		client->sess.sessionTeam,
 		client->sess.spectatorTime,
 		client->sess.spectatorState,
 		client->sess.spectatorClient,
 		client->sess.wins,
 		client->sess.losses,
-		client->sess.teamLeader
+		client->sess.teamLeader,
+		client->sess.sessionState,
+		client->sess.privilege,
+		client->sess.roundState,
+		client->sess.skill1,
+		client->sess.skill2,
+		client->sess.skill3
 		);
 
 	var = va( "session%i", client - level.clients );
@@ -78,14 +84,20 @@ void G_ReadSessionData( gclient_t *client ) {
 	var = va( "session%i", client - level.clients );
 	trap_Cvar_VariableStringBuffer( var, s, sizeof(s) );
 
-	sscanf( s, "%i %i %i %i %i %i %i",
+	sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i",
 		&sessionTeam,                 // bk010221 - format
 		&client->sess.spectatorTime,
 		&spectatorState,              // bk010221 - format
 		&client->sess.spectatorClient,
 		&client->sess.wins,
 		&client->sess.losses,
-		&teamLeader                   // bk010221 - format
+		&teamLeader,                  // bk010221 - format
+		&client->sess.sessionState,
+		&client->sess.privilege,
+		&client->sess.roundState,
+		&client->sess.skill1,
+		&client->sess.skill2,
+		&client->sess.skill3
 		);
 
 	// bk001205 - format issues
@@ -95,7 +107,7 @@ void G_ReadSessionData( gclient_t *client ) {
 		client->sess.spectatorState = SPECTATOR_SCOREBOARD;
 	}
 	client->sess.teamLeader = (qboolean)teamLeader;
-	}
+}
 
 
 /*
@@ -150,6 +162,12 @@ void G_InitSessionData( gclient_t *client, char *userinfo ) {
 	}
 	sess->spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
 	sess->spectatorTime = level.time;
+
+	sess->privilege = G_AdminAccessForSteamID( Info_ValueForKey( userinfo, "steamid" ) );
+	sess->skill1 = 0;
+	if ( g_gametype.integer == GT_TOURNAMENT ) {
+		sess->roundState = 1;
+	}
 
 	G_WriteClientSessionData( client );
 }
