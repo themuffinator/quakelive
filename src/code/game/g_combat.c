@@ -1353,6 +1353,10 @@ static void G_ApplyVampiricReward( gentity_t *targ, gentity_t *attacker, int hea
 	attacker->client->ps.stats[STAT_HEALTH] = attacker->health;
 
 	trap_SendServerCommand( attacker->s.number, "cp \"Vampiric heal\"" );
+
+	if ( g_debugDamage.integer ) {
+		G_Printf( "%i: client:%i health:%i damage:%i leeched:%i\n", level.time, attacker->s.number, attacker->health, healthDamage, healAmount );
+	}
 }
 
 void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
@@ -1438,6 +1442,12 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	client = targ->client;
 
 	if ( client ) {
+		if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
+			if ( attacker && attacker->client ) {
+				trap_SendServerCommand( attacker->s.number, "print \"A spectator has been shot!\n\"" );
+			}
+		}
+
 		if ( client->noclip ) {
 			return;
 		}
@@ -1553,6 +1563,15 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		// if the attacker was on the same team
 		if ( mod != MOD_JUICED && targ != attacker && !(dflags & DAMAGE_NO_TEAM_PROTECTION) && OnSameTeam (targ, attacker)  ) {
 			if ( !g_friendlyFire.integer ) {
+				if ( level.trainingMapActive && attacker->client && targ->client ) {
+					static int lastTrainingComplaintTime = 0;
+
+					if ( level.time > lastTrainingComplaintTime + 2000 ) {
+						lastTrainingComplaintTime = level.time;
+						trap_SendServerCommand( targ->s.number, "say Stop wasting your ammo! I'm here to help you out!" );
+						trap_SendServerCommand( attacker->s.number, "playSound sound/vo/crash/40b.wav" );
+					}
+				}
 				return;
 			}
 		}
