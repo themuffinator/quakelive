@@ -193,6 +193,8 @@ extern vmCvar_t	ui_saveFragLimit;
 extern vmCvar_t	ui_recordSPDemoName;
 extern vmCvar_t	ui_glCustom;
 extern vmCvar_t	ui_country;
+extern vmCvar_t	ui_clanIndex;
+extern vmCvar_t	ui_clanName;
 extern vmCvar_t	ui_opponentModel;
 extern vmCvar_t	ui_cdkeyvalid;
 extern vmCvar_t ui_serverStatusTimeOut;
@@ -724,6 +726,7 @@ typedef struct {
 #define MAX_MODS 64
 #define MAX_DEMOS 256
 #define MAX_MOVIES 256
+#define MAX_CLANS 256
 #define MAX_PLAYERMODELS 256
 #define MAX_RULESETS 8
 
@@ -738,10 +741,18 @@ typedef struct {
 } characterInfo;
 
 typedef struct {
-	const char *name;
-	const char *ai;
-	const char *action;
+        const char *name;
+        const char *ai;
+        const char *action;
 } aliasInfo;
+
+typedef struct {
+	char id[MAX_QPATH];
+	char name[MAX_NAME_LENGTH];
+	char tag[MAX_NAME_LENGTH];
+	char emblemPath[MAX_QPATH];
+	qhandle_t emblemShader;
+} uiClanInfo_t;
 
 typedef struct {
   const char *teamName;
@@ -946,6 +957,11 @@ typedef struct {
 
 	int teamCount;
 	teamInfo teamList[MAX_TEAMS];
+
+	int clanCount;
+	uiClanInfo_t clanList[MAX_CLANS];
+	int currentClan;
+	qboolean clanListLoaded;
 
 	int countryCount;
 	const char *countryList[256];

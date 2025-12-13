@@ -138,39 +138,41 @@ static int UI_HeadCountByTeam( void );
 static void UI_ParseGameInfo(const char *teamFile);
 static void UI_ParseTeamInfo(const char *teamFile);
 static void UI_LoadCountries(void);
-static const char *UI_ValidateCountryCode(const char *code);
-static const char *UI_SelectedMap(int index, int *actual);
-static const char *UI_SelectedHead(int index, int *actual);
-static int UI_GetIndexFromSelection(int actual);
+static void UI_ResetClanList(void);
+	static void UI_LoadClanRoster(void);
+	static const char *UI_ValidateCountryCode(const char *code);
+	static const char *UI_SelectedMap(int index, int *actual);
+	static const char *UI_SelectedHead(int index, int *actual);
+	static int UI_GetIndexFromSelection(int actual);
 
-int ProcessNewUI( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6 );
+	int ProcessNewUI( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6 );
 
-/*
-================
-vmMain
+	/*
+	================
+	vmMain
 
-This is the only way control passes into the module.
-This must be the very first function compiled into the .qvm file
-================
-*/
-vmCvar_t  ui_new;
-vmCvar_t  ui_debug;
-vmCvar_t  ui_initialized;
-vmCvar_t  ui_teamArenaFirstRun;
-vmCvar_t  ui_menuFlow;
-vmCvar_t  ui_browserAwesomium;
+	This is the only way control passes into the module.
+	This must be the very first function compiled into the .qvm file
+	================
+	*/
+	vmCvar_t  ui_new;
+	vmCvar_t  ui_debug;
+	vmCvar_t  ui_initialized;
+	vmCvar_t  ui_teamArenaFirstRun;
+	vmCvar_t  ui_menuFlow;
+	vmCvar_t  ui_browserAwesomium;
 
-static uiMenuFlow_t ui_activeMenuFlow = UI_MENU_FLOW_QUAKELIVE;
-static qboolean ui_browserActiveKnown = qfalse;
-static qboolean ui_browserActiveState = qfalse;
-static const char *ui_browserRefreshCommand = "web_stopRefresh\n";
+	static uiMenuFlow_t ui_activeMenuFlow = UI_MENU_FLOW_QUAKELIVE;
+	static qboolean ui_browserActiveKnown = qfalse;
+	static qboolean ui_browserActiveState = qfalse;
+	static const char *ui_browserRefreshCommand = "web_stopRefresh\n";
 
-/*
-=============
-UI_MenuFileEquals
-=============
-*/
-static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
+	/*
+	=============
+	UI_MenuFileEquals
+	=============
+	*/
+	static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
 	return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
 }
 
@@ -3469,6 +3471,71 @@ static void UI_LoadCountries(void) {
 	}
 		}
 
+/*
+============
+UI_ResetClanList
+
+Clears the cached clan roster entries and resets the selection CVars.
+============
+*/
+static void UI_ResetClanList(void) {
+	int i;
+
+	uiInfo.clanCount = 0;
+	uiInfo.currentClan = -1;
+	uiInfo.clanListLoaded = qfalse;
+
+	for (i = 0; i < MAX_CLANS; i++) {
+		uiInfo.clanList[i].id[0] = '\0';
+		uiInfo.clanList[i].name[0] = '\0';
+		uiInfo.clanList[i].tag[0] = '\0';
+		uiInfo.clanList[i].emblemPath[0] = '\0';
+		uiInfo.clanList[i].emblemShader = -1;
+	}
+
+	trap_Cvar_Set("ui_clanIndex", "-1");
+	trap_Cvar_Set("ui_clanName", "");
+	ui_clanIndex.integer = -1;
+	ui_clanIndex.value = -1.0f;
+	ui_clanName.string[0] = "\0";
+}
+
+/*
+============
+UI_LoadClanRoster
+
+Seeds the clan roster cache from persistent storage or a stub placeholder
+until backend plumbing is available.
+============
+*/
+static void UI_LoadClanRoster(void) {
+	UI_ResetClanList();
+
+	Q_strncpyz(uiInfo.clanList[0].id, "pending", sizeof(uiInfo.clanList[0].id));
+	Q_strncpyz(uiInfo.clanList[0].name, "No clans available", sizeof(uiInfo.clanList[0].name));
+	Q_strncpyz(uiInfo.clanList[0].tag, "--", sizeof(uiInfo.clanList[0].tag));
+	uiInfo.clanList[0].emblemShader = -1;
+	uiInfo.clanCount = 1;
+	uiInfo.clanListLoaded = qtrue;
+
+	if (uiInfo.clanCount > 0) {
+		int index;
+
+		index = ui_clanIndex.integer;
+		if (index < 0 || index >= uiInfo.clanCount) {
+			index = 0;
+			trap_Cvar_Set("ui_clanIndex", "0");
+			ui_clanIndex.integer = 0;
+			ui_clanIndex.value = 0.0f;
+		}
+
+		uiInfo.currentClan = index;
+		trap_Cvar_Set("ui_clanName", uiInfo.clanList[index].name);
+		Q_strncpyz(ui_clanName.string, uiInfo.clanList[index].name, sizeof(ui_clanName.string));
+	}
+}
+
+
 
 /*
 ============
@@ -4927,15 +4994,23 @@ static int UI_FeederCount(float feederID) {
 		return uiInfo.countryCount;
 	}
 
+	if (feederID == FEEDER_CLANS) {
+		if (!uiInfo.clanListLoaded) {
+			UI_LoadClanRoster();
+		}
+
+		return uiInfo.clanCount;
+	}
+
 	if (feederID == FEEDER_MATCHSUMMARY_END
-			|| feederID == FEEDER_MATCHSUMMARY_RED
-			|| feederID == FEEDER_MATCHSUMMARY_BLUE
-			|| feederID == FEEDER_ENDSCOREBOARD
-			|| feederID == FEEDER_REDTEAM_STATS
-			|| feederID == FEEDER_BLUETEAM_STATS
-			|| feederID == FEEDER_REDTEAM_LIST
-			|| feederID == FEEDER_BLUETEAM_LIST
-			|| feederID == FEEDER_SCOREBOARD) {
+				|| feederID == FEEDER_MATCHSUMMARY_RED
+				|| feederID == FEEDER_MATCHSUMMARY_BLUE
+				|| feederID == FEEDER_ENDSCOREBOARD
+				|| feederID == FEEDER_REDTEAM_STATS
+				|| feederID == FEEDER_BLUETEAM_STATS
+				|| feederID == FEEDER_REDTEAM_LIST
+				|| feederID == FEEDER_BLUETEAM_LIST
+				|| feederID == FEEDER_SCOREBOARD) {
 		uiMatchPlayerList_t *list;
 
 		list = UI_MatchSummaryListForFeeder(feederID);
@@ -5597,7 +5672,7 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 if (index >= 0 && index < uiInfo.modCount) {
 if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
         return uiInfo.modList[index].modDescr;
-} else {
+		} else {
         return uiInfo.modList[index].modName;
 }
 }
@@ -5609,46 +5684,59 @@ if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
         if (index >= 0 && index < uiInfo.demoCount) {
         return uiInfo.demoList[index];
 }
-        } else if (feederID == FEEDER_COUNTRIES) {
-        if (index >= 0 && index < uiInfo.countryCount) {
-        return uiInfo.countryList[index];
-}
-        } else if (feederID == FEEDER_MATCHSUMMARY_END
-        || feederID == FEEDER_MATCHSUMMARY_RED
-        || feederID == FEEDER_MATCHSUMMARY_BLUE
-        || feederID == FEEDER_ENDSCOREBOARD
-        || feederID == FEEDER_REDTEAM_STATS
-        || feederID == FEEDER_BLUETEAM_STATS
-        || feederID == FEEDER_REDTEAM_LIST
-        || feederID == FEEDER_BLUETEAM_LIST
-        || feederID == FEEDER_SCOREBOARD) {
-        uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
-        if (list && index >= 0 && index < list->entryCount) {
-        uiMatchPlayerInfo_t *entry = &list->entries[index];
-        switch (column) {
-        case 0:
-        return entry->country;
-        case 1:
-Com_sprintf(matchSummaryScore, sizeof(matchSummaryScore), "%i", entry->score);
-return matchSummaryScore;
-case 2:
-Com_sprintf(matchSummaryRank, sizeof(matchSummaryRank), "%i", entry->rank);
-return matchSummaryRank;
-case 3:
-return UI_MatchSummaryTeamString(entry->team);
-case 4:
-Com_sprintf(matchSummaryClient, sizeof(matchSummaryClient), "%i", entry->clientNum);
-return matchSummaryClient;
-default:
-return entry->name;
-}
-}
-}
-        return "";
-                }
+	} else if (feederID == FEEDER_COUNTRIES) {
+		if (index >= 0 && index < uiInfo.countryCount) {
+			return uiInfo.countryList[index];
+		}
+	} else if (feederID == FEEDER_CLANS) {
+		if (!uiInfo.clanListLoaded) {
+			UI_LoadClanRoster();
+		}
 
-static qhandle_t UI_FeederItemImage(float feederID, int index) {
-  if (feederID == FEEDER_HEADS) {
+		if (index >= 0 && index < uiInfo.clanCount) {
+			switch (column) {
+				case 1:
+					return uiInfo.clanList[index].tag;
+				default:
+					return uiInfo.clanList[index].name;
+			}
+		}
+	} else if (feederID == FEEDER_MATCHSUMMARY_END
+	|| feederID == FEEDER_MATCHSUMMARY_RED
+	|| feederID == FEEDER_MATCHSUMMARY_BLUE
+	|| feederID == FEEDER_ENDSCOREBOARD
+	|| feederID == FEEDER_REDTEAM_STATS
+	|| feederID == FEEDER_BLUETEAM_STATS
+	|| feederID == FEEDER_REDTEAM_LIST
+	|| feederID == FEEDER_BLUETEAM_LIST
+	|| feederID == FEEDER_SCOREBOARD) {
+	uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
+	if (list && index >= 0 && index < list->entryCount) {
+	uiMatchPlayerInfo_t *entry = &list->entries[index];
+	switch (column) {
+	case 0:
+	return entry->country;
+	case 1:
+	Com_sprintf(matchSummaryScore, sizeof(matchSummaryScore), "%i", entry->score);
+	return matchSummaryScore;
+	case 2:
+	Com_sprintf(matchSummaryRank, sizeof(matchSummaryRank), "%i", entry->rank);
+	return matchSummaryRank;
+	case 3:
+	return UI_MatchSummaryTeamString(entry->team);
+	case 4:
+	Com_sprintf(matchSummaryClient, sizeof(matchSummaryClient), "%i", entry->clientNum);
+	return matchSummaryClient;
+	default:
+	return entry->name;
+	}
+	}
+	}
+	return "";
+	}
+
+	static qhandle_t UI_FeederItemImage(float feederID, int index) {
+	if (feederID == FEEDER_HEADS) {
 	int actual;
 	UI_SelectedHead(index, &actual);
 	index = actual;
@@ -5658,10 +5746,10 @@ static qhandle_t UI_FeederItemImage(float feederID, int index) {
 		}
 		return uiInfo.characterList[index].headImage;
 	}
-  } else if (feederID == FEEDER_Q3HEADS) {
-    if (index >= 0 && index < uiInfo.q3HeadCount) {
-      return uiInfo.q3HeadIcons[index];
-    }
+	} else if (feederID == FEEDER_Q3HEADS) {
+	if (index >= 0 && index < uiInfo.q3HeadCount) {
+	return uiInfo.q3HeadIcons[index];
+	}
 	} else if (feederID == FEEDER_ALLMAPS || feederID == FEEDER_MAPS) {
 		int actual;
 		UI_SelectedMap(index, &actual);
@@ -5680,20 +5768,33 @@ static qhandle_t UI_FeederItemImage(float feederID, int index) {
 			if (uiInfo.mapList[rotation->mapIndex].levelShot == -1) {
 				uiInfo.mapList[rotation->mapIndex].levelShot = trap_R_RegisterShaderNoMip(uiInfo.mapList[rotation->mapIndex].imageName);
 			}
-			return uiInfo.mapList[rotation->mapIndex].levelShot;
+	return uiInfo.mapList[rotation->mapIndex].levelShot;
+	}
+	} else if (feederID == FEEDER_CLANS) {
+		if (!uiInfo.clanListLoaded) {
+			UI_LoadClanRoster();
+		}
+
+		if (index >= 0 && index < uiInfo.clanCount) {
+			if (uiInfo.clanList[index].emblemShader == -1 && uiInfo.clanList[index].emblemPath[0]) {
+				uiInfo.clanList[index].emblemShader = trap_R_RegisterShaderNoMip(uiInfo.clanList[index].emblemPath);
+			}
+
+			return uiInfo.clanList[index].emblemShader;
 		}
 	}
-  return 0;
-		}
 
-/*
-=============
-UI_FeederSelection
+	return 0;
+	}
 
-Handles selection side effects when a feeder item is chosen.
-=============
-*/
-static void UI_FeederSelection(float feederID, int index) {
+	/*
+	=============
+	UI_FeederSelection
+
+	Handles selection side effects when a feeder item is chosen.
+	=============
+	*/
+	static void UI_FeederSelection(float feederID, int index) {
 	static char info[MAX_STRING_CHARS];
 	  if (feederID == FEEDER_HEADS) {
 	int actual;
@@ -5805,12 +5906,32 @@ static void UI_FeederSelection(float feederID, int index) {
 		}
 		uiInfo.previewMovie = -1;
 	} else if (feederID == FEEDER_DEMOS) {
-	uiInfo.demoIndex = index;
+		uiInfo.demoIndex = index;
 	} else if (feederID == FEEDER_COUNTRIES) {
-	if (index >= 0 && index < uiInfo.countryCount) {
-	trap_Cvar_Set("ui_country", uiInfo.countryList[index]);
+		if (index >= 0 && index < uiInfo.countryCount) {
+			trap_Cvar_Set("ui_country", uiInfo.countryList[index]);
 	}
-	} else if (feederID == FEEDER_MATCHSUMMARY_END
+	} else if (feederID == FEEDER_CLANS) {
+	if (!uiInfo.clanListLoaded) {
+	UI_LoadClanRoster();
+	}
+
+	if (index >= 0 && index < uiInfo.clanCount) {
+	uiInfo.currentClan = index;
+	trap_Cvar_Set("ui_clanIndex", va("%d", index));
+	ui_clanIndex.integer = index;
+	ui_clanIndex.value = (float) index;
+	trap_Cvar_Set("ui_clanName", uiInfo.clanList[index].name);
+	Q_strncpyz(ui_clanName.string, uiInfo.clanList[index].name, sizeof(ui_clanName.string));
+	} else {
+	uiInfo.currentClan = -1;
+	trap_Cvar_Set("ui_clanIndex", "-1");
+	trap_Cvar_Set("ui_clanName", "");
+	ui_clanIndex.integer = -1;
+	ui_clanIndex.value = -1.0f;
+	ui_clanName.string[0] = '\0';
+	}
+} else if (feederID == FEEDER_MATCHSUMMARY_END
 	|| feederID == FEEDER_MATCHSUMMARY_RED
 	|| feederID == FEEDER_MATCHSUMMARY_BLUE
 	|| feederID == FEEDER_ENDSCOREBOARD
@@ -6492,8 +6613,12 @@ void _UI_Init( qboolean inGameLoad ) {
 	uiInfo.characterCount = 0;
 	uiInfo.aliasCount = 0;
 	uiInfo.countryCount = 0;
+	uiInfo.clanCount = 0;
+	uiInfo.currentClan = -1;
+	uiInfo.clanListLoaded = qfalse;
 
 	UI_LoadCountries();
+	UI_LoadClanRoster();
 
 #ifdef PRE_RELEASE_TADEMO
 	UI_ParseTeamInfo("demoteaminfo.txt");
@@ -7150,6 +7275,8 @@ vmCvar_t	ui_saveFragLimit;
 vmCvar_t	ui_recordSPDemoName;
 vmCvar_t	ui_glCustom;
 vmCvar_t	ui_country;
+vmCvar_t	ui_clanIndex;
+vmCvar_t	ui_clanName;
 vmCvar_t	ui_opponentModel;
 vmCvar_t	ui_cdkeyvalid;
 
@@ -7337,6 +7464,8 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_recordSPDemoName, "ui_recordSPDemoName", "", CVAR_TEMP},
 	{ &ui_glCustom, "ui_glCustom", "0", CVAR_ARCHIVE},
 	{ &ui_country, "ui_country", "", CVAR_ARCHIVE},
+	{ &ui_clanIndex, "ui_clanIndex", "-1", CVAR_ARCHIVE},
+	{ &ui_clanName, "ui_clanName", "", CVAR_ARCHIVE},
 	{ &ui_opponentModel, "ui_opponentModel", "", CVAR_ARCHIVE},
 	{ &ui_cdkeyvalid, "ui_cdkeyvalid", "", CVAR_TEMP},
 	{ &ui_serverStatusTimeOut, "ui_serverStatusTimeOut", "7000", CVAR_ARCHIVE},
@@ -7387,12 +7516,12 @@ void UI_StopServerRefresh( void )
 {
         int count;
 
-        if (!UI_ServerBrowserEnabled()) {
-                uiInfo.serverStatus.refreshActive = qfalse;
-                return;
-        }
+if (!UI_ServerBrowserEnabled()) {
+uiInfo.serverStatus.refreshActive = qfalse;
+return;
+}
 
-        if (!uiInfo.serverStatus.refreshActive) {
+if (!uiInfo.serverStatus.refreshActive) {
                 // not currently refreshing
                 return;
         }
@@ -7469,18 +7598,22 @@ UI_StartServerRefresh
 =================
 */
 static void UI_StartServerRefresh(qboolean full)
-{
+	{
 	int		i;
 	char	*ptr;
 
 	if (!UI_ServerBrowserEnabled()) {
-		uiInfo.serverStatus.refreshActive = qfalse;
-		return;
+	uiInfo.serverStatus.refreshActive = qfalse;
+	return;
+	}
+
+	if (!uiInfo.clanListLoaded) {
+	UI_LoadClanRoster();
 	}
 
 	qtime_t q;
 	trap_RealTime(&q);
- 	trap_Cvar_Set( va("ui_lastServerRefresh_%i", ui_netSource.integer), va("%s-%i, %i at %i:%i", MonthAbbrev[q.tm_mon],q.tm_mday, 1900+q.tm_year,q.tm_hour,q.tm_min));
+	trap_Cvar_Set( va("ui_lastServerRefresh_%i", ui_netSource.integer), va("%s-%i, %i at %i:%i", MonthAbbrev[q.tm_mon],q.tm_mday, 1900+q.tm_year,q.tm_hour,q.tm_min));
 
 	if (!full) {
 		UI_UpdatePendingPings();
