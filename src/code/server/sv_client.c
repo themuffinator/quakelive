@@ -184,6 +184,37 @@ static void SV_LogVACStatus( const netadr_t *adr, const char *status, const char
 }
 
 /*
+=============
+SV_ServerTypeAllowsConnection
+
+Validates sv_serverType for incoming connection attempts.
+=============
+*/
+static qboolean SV_ServerTypeAllowsConnection( netadr_t from, char *reason, size_t reasonSize ) {
+	int	serverType;
+
+	serverType = sv_serverType ? sv_serverType->integer : 0;
+
+	if ( serverType < 0 || serverType > 2 ) {
+		if ( reason && reasonSize ) {
+			Com_sprintf( reason, reasonSize, "Invalid server type (%d)", serverType );
+		}
+
+		return qfalse;
+	}
+
+	if ( serverType == 2 && !NET_IsLocalAddress( from ) ) {
+		if ( reason && reasonSize ) {
+			Q_strncpyz( reason, "Server is not accepting external connections", reasonSize );
+		}
+
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
 =================
 SV_GetChallenge
 
@@ -408,6 +439,7 @@ void SV_DirectConnect( netadr_t from ) {
 	int			startIndex;
 	char		*denied;
 	int			count;
+	char		 serverTypeError[MAX_STRING_CHARS];
 
 	Com_DPrintf ("SVC_DirectConnect ()\n");
 
@@ -429,6 +461,16 @@ void SV_DirectConnect( netadr_t from ) {
 		message = "VAC is disabled on this server";
 		SV_LogVACStatus( &from, "rejected", "disabled", message );
 		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", message );
+		return;
+	}
+
+	serverTypeError[0] = '\0';
+
+	if ( !SV_ServerTypeAllowsConnection( from, serverTypeError, sizeof( serverTypeError ) ) ) {
+		const char *errorMessage;
+
+		errorMessage = serverTypeError[0] ? serverTypeError : "Server is not accepting connections";
+		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", errorMessage );
 		return;
 	}
 

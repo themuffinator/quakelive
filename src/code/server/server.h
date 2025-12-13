@@ -269,6 +269,10 @@ extern	cvar_t	*sv_pure;
 extern	cvar_t	*sv_floodProtect;
 extern	cvar_t	*sv_lanForceRate;
 extern	cvar_t	*sv_strictAuth;
+// sv_serverType governs public visibility and who may connect:
+// 0 - Public, listed on the master and accepts all clients.
+// 1 - Private/unlisted, allows direct connects but is not advertised.
+// 2 - Offline, rejects remote clients (local play or testing only).
 extern	cvar_t	*sv_serverType;
 extern	cvar_t	*sv_quitOnExitLevel;
 extern	cvar_t	*sv_warmupReadyPercentage;

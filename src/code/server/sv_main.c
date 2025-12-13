@@ -269,6 +269,7 @@ void SV_MasterHeartbeat( void ) {
 	int			i;
 	int			visibleClients;
 	int			reportedBots;
+	int			serverType;
 
 	// "dedicated 1" is for lan play, "dedicated 2" is for inet public play
 	if ( !com_dedicated || com_dedicated->integer != 2 ) {
@@ -283,6 +284,7 @@ void SV_MasterHeartbeat( void ) {
 
 
 	SV_ComputeDisplayedCounts( &visibleClients, &reportedBots );
+	serverType = sv_serverType ? sv_serverType->integer : 0;
 
 	// send to group masters
 	for ( i = 0 ; i < MAX_MASTER_SERVERS ; i++ ) {
@@ -314,7 +316,7 @@ void SV_MasterHeartbeat( void ) {
 		}
 
 
-		Com_Printf ("Sending heartbeat to %s (players: %i, botPlayers: %i)\n", sv_master[i]->string, visibleClients, reportedBots );
+		Com_Printf ("Sending heartbeat to %s (players: %i, botPlayers: %i, serverType: %i)\n", sv_master[i]->string, visibleClients, reportedBots, serverType );
 		// this command should be changed if the server info / status format
 		// ever incompatably changes
 		NET_OutOfBandPrint( NS_SERVER, adr[i], "heartbeat %s\n", HEARTBEAT_GAME );
@@ -433,6 +435,7 @@ void SVC_Status( netadr_t from ) {
 	Info_SetValueForKey( infostring, "clients", va("%i", visibleClients) );
 	Info_SetValueForKey( infostring, "botPlayers", va("%i", botCount) );
 	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
+	Info_SetValueForKey( infostring, "serverType", va("%i", sv_serverType->integer) );
 
 	// add "demo" to the sv_keywords if restricted
 	if ( Cvar_VariableValue( "fs_restrict" ) ) {
@@ -501,6 +504,7 @@ void SVC_Info( netadr_t from ) {
 	Info_SetValueForKey( infostring, "clients", va("%i", count) );
 	Info_SetValueForKey( infostring, "botPlayers", va("%i", botCount) );
 	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
+	Info_SetValueForKey( infostring, "serverType", va("%i", sv_serverType->integer) );
 	Info_SetValueForKey( infostring, "sv_maxclients",
 		va("%i", sv_maxclients->integer - sv_privateClients->integer ) );
 	Info_SetValueForKey( infostring, "gametype", va("%i", sv_gametype->integer ) );
