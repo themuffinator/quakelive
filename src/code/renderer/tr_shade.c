@@ -30,6 +30,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   This file deals with applying shaders to surface data in the tess struct.
 */
 
+#define SMALL_BATCH_INDEX_THRESHOLD	512
+#define LARGE_BATCH_INDEX_THRESHOLD	2000
+
+static int s_lastBatchSkipLogTime = -1;
+
 /*
 ================
 R_ArrayElementDiscrete
@@ -606,6 +611,41 @@ static void ProjectDlightTexture( void ) {
 		backEnd.pc.c_totalIndexes += numIndexes;
 		backEnd.pc.c_dlightIndexes += numIndexes;
 	}
+}
+
+
+/*
+=============
+RB_ShouldSkipBatch
+
+Skip draw submission based on cheat toggles and track diagnostics.
+=============
+*/
+static qboolean RB_ShouldSkipBatch( int numIndexes ) {
+	qboolean skipped;
+
+	skipped = qfalse;
+
+	if ( r_skipSmallBatches && r_skipSmallBatches->integer && numIndexes > 0 && numIndexes <= SMALL_BATCH_INDEX_THRESHOLD ) {
+		backEnd.pc.c_smallBatchSkips++;
+		skipped = qtrue;
+	}
+
+	if ( r_skipLargeBatches && r_skipLargeBatches->integer && numIndexes >= LARGE_BATCH_INDEX_THRESHOLD ) {
+		backEnd.pc.c_largeBatchSkips++;
+		skipped = qtrue;
+	}
+
+	if ( skipped ) {
+		backEnd.pc.c_skippedIndexes += numIndexes;
+
+		if ( backEnd.refdef.time != s_lastBatchSkipLogTime ) {
+			ri.Printf( PRINT_DEVELOPER, "QA: r_skip*Batches active (indexes=%d)\n", numIndexes );
+			s_lastBatchSkipLogTime = backEnd.refdef.time;
+		}
+	}
+
+	return skipped;
 }
 
 
@@ -1311,6 +1351,12 @@ void RB_EndSurface( void ) {
 	input = &tess;
 
 	if (input->numIndexes == 0) {
+		return;
+	}
+
+	if ( RB_ShouldSkipBatch( input->numIndexes ) ) {
+		input->numIndexes = 0;
+		input->numVertexes = 0;
 		return;
 	}
 

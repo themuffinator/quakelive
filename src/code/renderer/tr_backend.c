@@ -93,6 +93,7 @@ typedef struct {
 
 static glFramebufferProcs_t s_fboProcs;
 static renderTarget_t s_sceneRenderTarget;
+static int s_lastTeleporterFlashLogTime = -1;
 
 /*
 =============
@@ -1036,6 +1037,44 @@ static void RB_Hyperspace( void ) {
 }
 
 
+/*
+=============
+RB_DrawTeleporterFlash
+
+Render the teleport flash overlay when enabled.
+=============
+*/
+static void RB_DrawTeleporterFlash( void ) {
+	if ( !r_teleporterFlash || !r_teleporterFlash->integer ) {
+		return;
+	}
+
+	if ( !( backEnd.refdef.rdflags & RDF_HYPERSPACE ) ) {
+		return;
+	}
+
+	if ( !backEnd.projection2D ) {
+		RB_SetGL2D();
+	}
+
+	GL_State( GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE );
+	qglColor4f( 1.0f, 0.2f, 0.2f, 0.35f );
+
+	qglBegin( GL_QUADS );
+	qglVertex2f( 0, 0 );
+	qglVertex2f( glConfig.vidWidth, 0 );
+	qglVertex2f( glConfig.vidWidth, glConfig.vidHeight );
+	qglVertex2f( 0, glConfig.vidHeight );
+	qglEnd();
+
+	qglColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+
+	if ( backEnd.refdef.time != s_lastTeleporterFlashLogTime ) {
+		ri.Printf( PRINT_DEVELOPER, "QA: r_teleporterFlash overlay active\n" );
+		s_lastTeleporterFlashLogTime = backEnd.refdef.time;
+	}
+}
+
 static void SetViewportAndScissor( void ) {
 	qglMatrixMode(GL_PROJECTION);
 	qglLoadMatrixf( backEnd.viewParms.projectionMatrix );
@@ -1288,10 +1327,12 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	RB_DrawSun();
 #endif
 	// darken down any stencil shadows
-	RB_ShadowFinish();		
+	RB_ShadowFinish();
 
 	// add light flares on lights that aren't obscured
 	RB_RenderFlares();
+
+	RB_DrawTeleporterFlash();
 
 #ifdef __MACOS__
 	Sys_PumpEvents();		// crutch up the mac's limited buffer queue size

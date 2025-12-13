@@ -835,6 +835,10 @@ typedef struct {
 	int		c_surfaces, c_shaders, c_vertexes, c_indexes, c_totalIndexes;
 	float	c_overDraw;
 	
+	int		c_smallBatchSkips;
+	int		c_largeBatchSkips;
+	int		c_skippedIndexes;
+	
 	int		c_dlightVertexes;
 	int		c_dlightIndexes;
 
