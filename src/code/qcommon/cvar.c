@@ -372,31 +372,43 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
 	cvar_modifiedFlags |= var->flags;
 
-	if (!force)
+	if ( !force )
 	{
-		if (var->flags & CVAR_ROM)
+		if ( var->flags & CVAR_ROM )
 		{
 			Com_Printf ("%s is read only.\n", var_name);
 			return var;
 		}
 
-		if (var->flags & CVAR_INIT)
+		if ( var->flags & CVAR_INIT )
 		{
 			Com_Printf ("%s is write protected.\n", var_name);
 			return var;
 		}
 
-		if (var->flags & CVAR_LATCH)
+		if ( var->flags & CVAR_PROTECTED )
 		{
-			if (var->latchedString)
+			Com_Printf ("%s is protected and may only be set by the engine or VM.\n", var_name);
+			return var;
+		}
+
+		if ( var->flags & CVAR_VM_CREATED )
+		{
+			Com_Printf ("%s is protected and may only be set by the VM.\n", var_name);
+			return var;
+		}
+
+		if ( var->flags & CVAR_LATCH )
+		{
+			if ( var->latchedString )
 			{
-				if (strcmp(value, var->latchedString) == 0)
+				if ( strcmp( value, var->latchedString ) == 0 )
 					return var;
 				Z_Free (var->latchedString);
 			}
 			else
 			{
-				if (strcmp(value, var->string) == 0)
+				if ( strcmp( value, var->string ) == 0 )
 					return var;
 			}
 
@@ -472,6 +484,31 @@ void Cvar_SetValue( const char *var_name, float value) {
 	Cvar_Set (var_name, val);
 }
 
+/*
+=============
+Cvar_SetFromCloud
+
+Sets a CVAR_CLOUD cvar using forced semantics, warning when the target
+isn't cloud-enabled.
+=============
+*/
+static cvar_t *Cvar_SetFromCloud( const char *var_name, const char *value, qboolean warnIfMissingFlag ) {
+	cvar_t *var;
+
+	var = Cvar_FindVar (var_name);
+	if ( var && !( var->flags & CVAR_CLOUD ) ) {
+		if ( warnIfMissingFlag ) {
+			Com_Printf ("%s is not marked for cloud persistence.\n", var_name);
+		}
+		return var;
+	}
+
+	if ( !var ) {
+		return Cvar_Get( var_name, value ? value : "", CVAR_USER_CREATED | CVAR_CLOUD );
+	}
+
+	return Cvar_Set2( var_name, value, qtrue );
+}
 
 /*
 ============
@@ -663,6 +700,44 @@ void Cvar_SetA_f( void ) {
 }
 
 /*
+=============
+Cvar_SetCloud_f
+
+Sets a CVAR_CLOUD cvar with forced semantics for persisted profiles.
+=============
+*/
+void Cvar_SetCloud_f( void ) {
+	cvar_t	*v;
+	int		 i, c, l, len;
+	char	combined[MAX_STRING_TOKENS];
+
+	c = Cmd_Argc();
+	if ( c < 3 ) {
+		Com_Printf ("usage: setcloud <variable> <value>\n");
+		return;
+	}
+
+	combined[0] = 0;
+	l = 0;
+	for ( i = 2 ; i < c ; i++ ) {
+		len = strlen ( Cmd_Argv( i ) + 1 );
+		if ( l + len >= MAX_STRING_TOKENS - 2 ) {
+			break;
+		}
+		strcat( combined, Cmd_Argv( i ) );
+		if ( i != c-1 ) {
+			strcat( combined, " " );
+		}
+		l += len;
+	}
+
+	v = Cvar_SetFromCloud( Cmd_Argv( 1 ), combined, qtrue );
+	if ( v && !( v->flags & CVAR_CLOUD ) ) {
+		return;
+	}
+}
+
+/*
 ============
 Cvar_Reset_f
 ============
@@ -691,7 +766,7 @@ void Cvar_WriteVariables( fileHandle_t f ) {
 		if( Q_stricmp( var->name, "cl_cdkey" ) == 0 ) {
 			continue;
 		}
-		if( var->flags & CVAR_ARCHIVE ) {
+		if( ( var->flags & CVAR_ARCHIVE ) && !( var->flags & CVAR_CLOUD ) ) {
 			// write the latched value, even if it hasn't taken effect yet
 			if ( var->latchedString ) {
 				Com_sprintf (buffer, sizeof(buffer), "seta %s \"%s\"\n", var->name, var->latchedString);
@@ -701,6 +776,70 @@ void Cvar_WriteVariables( fileHandle_t f ) {
 			FS_Printf (f, "%s", buffer);
 		}
 	}
+}
+
+/*
+=============
+Cvar_WriteCloudVariables
+
+Appends lines containing setcloud commands for CVAR_CLOUD variables, using
+latched values when present.
+=============
+*/
+void Cvar_WriteCloudVariables( fileHandle_t f ) {
+	cvar_t	*var;
+	char	buffer[1024];
+
+	for ( var = cvar_vars ; var ; var = var->next ) {
+		if ( Q_stricmp( var->name, "cl_cdkey" ) == 0 ) {
+			continue;
+		}
+		if ( var->flags & CVAR_CLOUD ) {
+			if ( var->latchedString ) {
+				Com_sprintf (buffer, sizeof(buffer), "setcloud %s \"%s\"\n", var->name, var->latchedString);
+			} else {
+				Com_sprintf (buffer, sizeof(buffer), "setcloud %s \"%s\"\n", var->name, var->string);
+			}
+			FS_Printf (f, "%s", buffer);
+		}
+	}
+}
+
+/*
+=============
+Cvar_EnumerateCloudVariables
+
+Invokes a callback for each CVAR_CLOUD variable using the effective value.
+=============
+*/
+void Cvar_EnumerateCloudVariables( void (*callback)( const char *name, const char *value, void *userData ), void *userData ) {
+	cvar_t	*var;
+
+	if ( !callback ) {
+		return;
+	}
+
+	for ( var = cvar_vars ; var ; var = var->next ) {
+		const char *value;
+
+		if ( !( var->flags & CVAR_CLOUD ) ) {
+			continue;
+		}
+
+		value = var->latchedString ? var->latchedString : var->string;
+		callback( var->name, value, userData );
+	}
+}
+
+/*
+=============
+Cvar_ApplyCloudEntry
+
+Applies a cloud-synchronised value using forced semantics.
+=============
+*/
+void Cvar_ApplyCloudEntry( const char *var_name, const char *value ) {
+	Cvar_SetFromCloud( var_name, value, qtrue );
 }
 
 /*
@@ -787,7 +926,8 @@ void Cvar_Restart_f( void ) {
 
 		// don't mess with rom values, or some inter-module
 		// communication will get broken (com_cl_running, etc)
-		if ( var->flags & ( CVAR_ROM | CVAR_INIT | CVAR_NORESTART ) ) {
+		if ( var->flags & ( CVAR_ROM | CVAR_INIT | CVAR_NORESTART | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD ) ) {
+			Com_DPrintf( "Skipping restart of protected cvar %s\n", var->name );
 			prev = &var->next;
 			continue;
 		}
@@ -951,12 +1091,13 @@ void Cvar_Init (void) {
 
         cvar_cheats = Cvar_Get("sv_cheats", "1", CVAR_ROM | CVAR_SYSTEMINFO );
 
-	Cmd_AddCommand ("toggle", Cvar_Toggle_f);
-	Cmd_AddCommand ("set", Cvar_Set_f);
-	Cmd_AddCommand ("sets", Cvar_SetS_f);
-	Cmd_AddCommand ("setu", Cvar_SetU_f);
-	Cmd_AddCommand ("seta", Cvar_SetA_f);
-	Cmd_AddCommand ("reset", Cvar_Reset_f);
-	Cmd_AddCommand ("cvarlist", Cvar_List_f);
-	Cmd_AddCommand ("cvar_restart", Cvar_Restart_f);
+Cmd_AddCommand ("toggle", Cvar_Toggle_f);
+Cmd_AddCommand ("set", Cvar_Set_f);
+Cmd_AddCommand ("sets", Cvar_SetS_f);
+Cmd_AddCommand ("setu", Cvar_SetU_f);
+Cmd_AddCommand ("seta", Cvar_SetA_f);
+Cmd_AddCommand ("setcloud", Cvar_SetCloud_f);
+Cmd_AddCommand ("reset", Cvar_Reset_f);
+Cmd_AddCommand ("cvarlist", Cvar_List_f);
+Cmd_AddCommand ("cvar_restart", Cvar_Restart_f);
 }

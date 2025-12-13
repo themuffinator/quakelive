@@ -484,6 +484,9 @@ qboolean Cvar_Command( void );
 void 	Cvar_WriteVariables( fileHandle_t f );
 // writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
+void	Cvar_WriteCloudVariables( fileHandle_t f );
+void	Cvar_EnumerateCloudVariables( void (*callback)( const char *name, const char *value, void *userData ), void *userData );
+void	Cvar_ApplyCloudEntry( const char *var_name, const char *value );
 
 void	Cvar_Init( void );
 void	Cvar_BootstrapExpandedDefaults( void );
