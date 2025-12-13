@@ -368,6 +368,38 @@ A "connect" OOB command has been received
 				"and Enabled in order to join this server. An updated game patch can be downloaded from " \
 				"www.idsoftware.com"
 
+/*
+=============
+SV_IsServerTypeAllowed
+
+Validates connection attempts against the configured server type, mirroring the
+HLIL admission rules for public, private, and LAN-only sessions.
+=============
+*/
+static qboolean SV_IsServerTypeAllowed( netadr_t from, const char *password ) {
+	switch ( sv_serverType->integer ) {
+	case 0:
+		return qtrue;
+	case 1:
+		if ( sv_privatePassword->string[0] && strcmp( password, sv_privatePassword->string ) ) {
+			NET_OutOfBandPrint( NS_SERVER, from, "print\nServer is private.\n" );
+			return qfalse;
+		}
+
+		return qtrue;
+	case 2:
+		if ( NET_IsLocalAddress( from ) || Sys_IsLANAddress( from ) ) {
+			return qtrue;
+		}
+
+		NET_OutOfBandPrint( NS_SERVER, from, "print\nServer is LAN only.\n" );
+		return qfalse;
+	default:
+		NET_OutOfBandPrint( NS_SERVER, from, "print\nUnsupported server type.\n" );
+		return qfalse;
+	}
+}
+
 void SV_DirectConnect( netadr_t from ) {
 	char		userinfo[MAX_INFO_STRING];
 	int			i;
@@ -501,6 +533,11 @@ void SV_DirectConnect( netadr_t from ) {
 
 	// check for privateClient password
 	password = Info_ValueForKey( userinfo, "password" );
+	
+	if ( !SV_IsServerTypeAllowed( from, password ) ) {
+		return;
+	}
+	
 	if ( !strcmp( password, sv_privatePassword->string ) ) {
 		startIndex = 0;
 	} else {

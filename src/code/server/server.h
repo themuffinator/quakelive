@@ -263,6 +263,10 @@ extern	cvar_t	*sv_pure;
 extern	cvar_t	*sv_floodProtect;
 extern	cvar_t	*sv_lanForceRate;
 extern	cvar_t	*sv_strictAuth;
+// sv_serverType values:
+// 0 - public, internet-visible server advertised to the master and open to remote clients
+// 1 - private/unlisted server that expects the private password for outside connections
+// 2 - LAN-only session; master heartbeats report the LAN flag and remote clients are rejected
 extern	cvar_t	*sv_serverType;
 extern	cvar_t	*sv_quitOnExitLevel;
 extern	cvar_t	*sv_warmupReadyPercentage;

@@ -222,6 +222,11 @@ but not on every player enter or exit.
 void SV_MasterHeartbeat( void ) {
 	static netadr_t	adr[MAX_MASTER_SERVERS];
 	int			i;
+	int			clientCount;
+	int			botCount;
+	int			botPlayers;
+	int			serverType;
+
 
 	// "dedicated 1" is for lan play, "dedicated 2" is for inet public play
 	if ( !com_dedicated || com_dedicated->integer != 2 ) {
@@ -268,7 +273,12 @@ void SV_MasterHeartbeat( void ) {
 		Com_Printf ("Sending heartbeat to %s\n", sv_master[i]->string );
 		// this command should be changed if the server info / status format
 		// ever incompatably changes
-		NET_OutOfBandPrint( NS_SERVER, adr[i], "heartbeat %s\n", HEARTBEAT_GAME );
+		SV_ComputeDisplayedCounts( &clientCount, &botCount );
+		botPlayers = sv_maskBots->integer ? 0 : botCount;
+		serverType = sv_serverType ? sv_serverType->integer : 0;
+		NET_OutOfBandPrint( NS_SERVER, adr[i],
+			"heartbeat %s\\clients\\%i\\botPlayers\\%i\\vac\\%i\\serverType\\%i\n",
+			HEARTBEAT_GAME, clientCount, botPlayers, sv_vac->integer, serverType );
 	}
 }
 
@@ -310,6 +320,11 @@ Calculates the reported player and bot totals, respecting bot masking.
 */
 static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {
 	int				i;
+	int				clientCount;
+	int				botCount;
+	int				botPlayers;
+	int				serverType;
+
 	int				players;
 	int				bots;
 	client_t	*cl;
@@ -381,6 +396,7 @@ void SVC_Status( netadr_t from ) {
 	Info_SetValueForKey( infostring, "clients", va("%i", visibleClients) );
 	Info_SetValueForKey( infostring, "botPlayers", va("%i", sv_maskBots->integer ? 0 : botCount) );
 	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
+	Info_SetValueForKey( infostring, "serverType", va("%i", sv_serverType->integer) );
 
 	// add "demo" to the sv_keywords if restricted
 	if ( Cvar_VariableValue( "fs_restrict" ) ) {
@@ -449,6 +465,7 @@ void SVC_Info( netadr_t from ) {
 	Info_SetValueForKey( infostring, "clients", va("%i", count) );
 	Info_SetValueForKey( infostring, "botPlayers", va("%i", sv_maskBots->integer ? 0 : botCount) );
 	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
+	Info_SetValueForKey( infostring, "serverType", va("%i", sv_serverType->integer) );
 	Info_SetValueForKey( infostring, "sv_maxclients",
 		va("%i", sv_maxclients->integer - sv_privateClients->integer ) );
 	Info_SetValueForKey( infostring, "gametype", va("%i", sv_gametype->integer ) );
