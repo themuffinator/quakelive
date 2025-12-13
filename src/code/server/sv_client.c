@@ -458,6 +458,13 @@ void SV_DirectConnect( netadr_t from ) {
 		Info_SetValueForKey( userinfo, "ip", "localhost" );
 	}
 
+	if ( net_fakevacban->integer ) {
+		Com_Printf( "VAC ban on record (net_fakevacban) for %s\n", NET_AdrToString( from ) );
+		NET_LogAuthTelemetry( NS_SERVER, &from, NULL, "vac", "rejected", "fakevacban", "VAC ban on record" );
+		NET_OutOfBandPrint( NS_SERVER, from, "print\nVAC ban on record\n" );
+		return;
+	}
+
 	newcl = &temp;
 	Com_Memset (newcl, 0, sizeof(client_t));
 

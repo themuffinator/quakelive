@@ -572,6 +572,11 @@ void SV_Init (void) {
 	sv_minPing = Cvar_Get ("sv_minPing", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	sv_maxPing = Cvar_Get ("sv_maxPing", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	sv_floodProtect = Cvar_Get ("sv_floodProtect", "1", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	sv_serverType = Cvar_Get ("sv_serverType", "0", CVAR_SERVERINFO | CVAR_ARCHIVE );
+	sv_quitOnExitLevel = Cvar_Get ("sv_quitOnExitLevel", "0", CVAR_SERVERINFO | CVAR_ARCHIVE );
+	sv_warmupReadyPercentage = Cvar_Get ("sv_warmupReadyPercentage", "0", CVAR_SERVERINFO | CVAR_ARCHIVE );
+	sv_vac = Cvar_Get ("sv_vac", "1", CVAR_SERVERINFO | CVAR_ARCHIVE );
+	sv_maskBots = Cvar_Get ("sv_maskBots", "0", CVAR_ARCHIVE );
 
 	// systeminfo
 	Cvar_Get ("sv_cheats", "1", CVAR_SYSTEMINFO | CVAR_ROM );
@@ -603,10 +608,11 @@ void SV_Init (void) {
 	sv_reconnectlimit = Cvar_Get ("sv_reconnectlimit", "3", 0);
 	sv_showloss = Cvar_Get ("sv_showloss", "0", 0);
 	sv_padPackets = Cvar_Get ("sv_padPackets", "0", 0);
-	sv_killserver = Cvar_Get ("sv_killserver", "0", 0);
-	sv_mapChecksum = Cvar_Get ("sv_mapChecksum", "", CVAR_ROM);
-	sv_lanForceRate = Cvar_Get ("sv_lanForceRate", "1", CVAR_ARCHIVE );
-	sv_strictAuth = Cvar_Get ("sv_strictAuth", "1", CVAR_ARCHIVE );
+sv_killserver = Cvar_Get ("sv_killserver", "0", 0);
+sv_mapChecksum = Cvar_Get ("sv_mapChecksum", "", CVAR_ROM);
+sv_lanForceRate = Cvar_Get ("sv_lanForceRate", "1", CVAR_ARCHIVE );
+sv_strictAuth = Cvar_Get ("sv_strictAuth", "1", CVAR_ARCHIVE );
+net_fakevacban = Cvar_Get ("net_fakevacban", "0", CVAR_TEMP );
 
 	// initialize bot cvars so they are listed and can be set before loading the botlib
 	SV_BotInitCvars();

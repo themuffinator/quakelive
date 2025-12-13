@@ -263,6 +263,12 @@ extern	cvar_t	*sv_pure;
 extern	cvar_t	*sv_floodProtect;
 extern	cvar_t	*sv_lanForceRate;
 extern	cvar_t	*sv_strictAuth;
+extern	cvar_t	*sv_serverType;
+extern	cvar_t	*sv_quitOnExitLevel;
+extern	cvar_t	*sv_warmupReadyPercentage;
+extern	cvar_t	*sv_vac;
+extern	cvar_t	*sv_maskBots;
+extern	cvar_t	*net_fakevacban;
 
 //===========================================================
 

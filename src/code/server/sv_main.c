@@ -52,6 +52,12 @@ cvar_t	*sv_pure;
 cvar_t	*sv_floodProtect;
 cvar_t	*sv_lanForceRate; // dedicated 1 (LAN) server forces local client rates to 99999 (bug #491)
 cvar_t	*sv_strictAuth;
+cvar_t	*sv_serverType;
+cvar_t	*sv_quitOnExitLevel;
+cvar_t	*sv_warmupReadyPercentage;
+cvar_t	*sv_vac;
+cvar_t	*sv_maskBots;
+cvar_t	*net_fakevacban;
 
 /*
 =============================================================================
@@ -296,6 +302,50 @@ CONNECTIONLESS COMMANDS
 */
 
 /*
+===============
+SV_ComputeDisplayedCounts
+
+Calculates the reported player and bot totals, respecting bot masking.
+===============
+*/
+static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount ) {
+	int				i;
+	int				players;
+	int				bots;
+	client_t	*cl;
+
+	players = 0;
+	bots = 0;
+
+	for ( i = sv_privateClients->integer ; i < sv_maxclients->integer ; i++ ) {
+		cl = &svs.clients[i];
+
+		if ( cl->state < CS_CONNECTED ) {
+			continue;
+		}
+
+		if ( SV_ClientIsBot( cl ) ) {
+			bots++;
+
+			if ( sv_maskBots && sv_maskBots->integer ) {
+				continue;
+			}
+		}
+
+		players++;
+	}
+
+	if ( clientCount ) {
+		*clientCount = players;
+	}
+
+	if ( botCount ) {
+		*botCount = bots;
+	}
+}
+
+
+/*
 ================
 SVC_Status
 
@@ -308,6 +358,8 @@ void SVC_Status( netadr_t from ) {
 	char	player[1024];
 	char	status[MAX_MSGLEN];
 	int		i;
+	int		botCount;
+	int		visibleClients;
 	client_t	*cl;
 	playerState_t	*ps;
 	int		statusLength;
@@ -325,6 +377,11 @@ void SVC_Status( netadr_t from ) {
 	// to prevent timed spoofed reply packets that add ghost servers
 	Info_SetValueForKey( infostring, "challenge", Cmd_Argv(1) );
 
+	SV_ComputeDisplayedCounts( &visibleClients, &botCount );
+	Info_SetValueForKey( infostring, "clients", va("%i", visibleClients) );
+	Info_SetValueForKey( infostring, "botPlayers", va("%i", sv_maskBots->integer ? 0 : botCount) );
+	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
+
 	// add "demo" to the sv_keywords if restricted
 	if ( Cvar_VariableValue( "fs_restrict" ) ) {
 		char	keywords[MAX_INFO_STRING];
@@ -340,6 +397,9 @@ void SVC_Status( netadr_t from ) {
 	for (i=0 ; i < sv_maxclients->integer ; i++) {
 		cl = &svs.clients[i];
 		if ( cl->state >= CS_CONNECTED ) {
+			if ( sv_maskBots->integer && SV_ClientIsBot( cl ) ) {
+				continue;
+			}
 			ps = SV_GameClientNum( i );
 			Com_sprintf (player, sizeof(player), "%i %i \"%s\"\n", 
 				ps->persistant[PERS_SCORE], cl->ping, cl->name);
@@ -355,6 +415,7 @@ void SVC_Status( netadr_t from ) {
 	NET_OutOfBandPrint( NS_SERVER, from, "statusResponse\n%s\n%s", infostring, status );
 }
 
+
 /*
 ================
 SVC_Info
@@ -364,7 +425,8 @@ if a user is interested in a server to do a full status
 ================
 */
 void SVC_Info( netadr_t from ) {
-	int		i, count;
+	int			i, count;
+	int		botCount;
 	char	*gamedir;
 	char	infostring[MAX_INFO_STRING];
 
@@ -373,13 +435,7 @@ void SVC_Info( netadr_t from ) {
 		return;
 	}
 
-	// don't count privateclients
-	count = 0;
-	for ( i = sv_privateClients->integer ; i < sv_maxclients->integer ; i++ ) {
-		if ( svs.clients[i].state >= CS_CONNECTED ) {
-			count++;
-		}
-	}
+	SV_ComputeDisplayedCounts( &count, &botCount );
 
 	infostring[0] = 0;
 
@@ -391,24 +447,27 @@ void SVC_Info( netadr_t from ) {
 	Info_SetValueForKey( infostring, "hostname", sv_hostname->string );
 	Info_SetValueForKey( infostring, "mapname", sv_mapname->string );
 	Info_SetValueForKey( infostring, "clients", va("%i", count) );
-	Info_SetValueForKey( infostring, "sv_maxclients", 
+	Info_SetValueForKey( infostring, "botPlayers", va("%i", sv_maskBots->integer ? 0 : botCount) );
+	Info_SetValueForKey( infostring, "vac", va("%i", sv_vac->integer) );
+	Info_SetValueForKey( infostring, "sv_maxclients",
 		va("%i", sv_maxclients->integer - sv_privateClients->integer ) );
 	Info_SetValueForKey( infostring, "gametype", va("%i", sv_gametype->integer ) );
 	Info_SetValueForKey( infostring, "pure", va("%i", sv_pure->integer ) );
 
-	if( sv_minPing->integer ) {
+	if ( sv_minPing->integer ) {
 		Info_SetValueForKey( infostring, "minPing", va("%i", sv_minPing->integer) );
 	}
-	if( sv_maxPing->integer ) {
+	if ( sv_maxPing->integer ) {
 		Info_SetValueForKey( infostring, "maxPing", va("%i", sv_maxPing->integer) );
 	}
 	gamedir = Cvar_VariableString( "fs_game" );
-	if( *gamedir ) {
+	if ( *gamedir ) {
 		Info_SetValueForKey( infostring, "game", gamedir );
 	}
 
 	NET_OutOfBandPrint( NS_SERVER, from, "infoResponse\n%s", infostring );
 }
+
 
 /*
 ================
