@@ -26,15 +26,292 @@ backEndState_t	backEnd;
 
 
 static float	s_flipMatrix[16] = {
-	// convert from our coordinate system (looking down X)
-	// to OpenGL's coordinate system (looking down -Z)
-	0, 0, -1, 0,
-	-1, 0, 0, 0,
-	0, 1, 0, 0,
-	0, 0, 0, 1
+		// convert from our coordinate system (looking down X)
+		// to OpenGL's coordinate system (looking down -Z)
+		0, 0, -1, 0,
+		-1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 0, 1
 };
 
+#ifndef GL_FRAMEBUFFER_EXT
+#define GL_FRAMEBUFFER_EXT 0x8D40
+#define GL_COLOR_ATTACHMENT0_EXT 0x8CE0
+#define GL_DEPTH_ATTACHMENT_EXT 0x8D00
+#define GL_RENDERBUFFER_EXT 0x8D41
+#define GL_FRAMEBUFFER_COMPLETE_EXT 0x8CD5
+#endif
 
+#ifndef GL_DEPTH_COMPONENT24
+#define GL_DEPTH_COMPONENT24 0x81A6
+#endif
+
+#ifndef GL_RGBA8
+#define GL_RGBA8 0x8058
+#endif
+
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+
+#ifndef PFNGLGENFRAMEBUFFERSEXTPROC
+typedef void (APIENTRY * PFNGLGENFRAMEBUFFERSEXTPROC) (GLsizei, GLuint *);
+typedef void (APIENTRY * PFNGLDELETEFRAMEBUFFERSEXTPROC) (GLsizei, const GLuint *);
+typedef void (APIENTRY * PFNGLBINDFRAMEBUFFEREXTPROC) (GLenum, GLuint);
+typedef void (APIENTRY * PFNGLFRAMEBUFFERTEXTURE2DEXTPROC) (GLenum, GLenum, GLenum, GLuint, GLint);
+typedef GLenum (APIENTRY * PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC) (GLenum);
+typedef void (APIENTRY * PFNGLGENRENDERBUFFERSEXTPROC) (GLsizei, GLuint *);
+typedef void (APIENTRY * PFNGLBINDRENDERBUFFEREXTPROC) (GLenum, GLuint);
+typedef void (APIENTRY * PFNGLRENDERBUFFERSTORAGEEXTPROC) (GLenum, GLenum, GLsizei, GLsizei);
+typedef void (APIENTRY * PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC) (GLenum, GLenum, GLenum, GLuint);
+typedef void (APIENTRY * PFNGLDELETERENDERBUFFERSEXTPROC) (GLsizei, const GLuint *);
+#endif
+
+typedef struct {
+	PFNGLGENFRAMEBUFFERSEXTPROC qglGenFramebuffersEXTFunc;
+	PFNGLDELETEFRAMEBUFFERSEXTPROC qglDeleteFramebuffersEXTFunc;
+	PFNGLBINDFRAMEBUFFEREXTPROC qglBindFramebufferEXTFunc;
+	PFNGLFRAMEBUFFERTEXTURE2DEXTPROC qglFramebufferTexture2DEXTFunc;
+	PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC qglCheckFramebufferStatusEXTFunc;
+	PFNGLGENRENDERBUFFERSEXTPROC qglGenRenderbuffersEXTFunc;
+	PFNGLBINDRENDERBUFFEREXTPROC qglBindRenderbufferEXTFunc;
+	PFNGLRENDERBUFFERSTORAGEEXTPROC qglRenderbufferStorageEXTFunc;
+	PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC qglFramebufferRenderbufferEXTFunc;
+	PFNGLDELETERENDERBUFFERSEXTPROC qglDeleteRenderbuffersEXTFunc;
+} glFramebufferProcs_t;
+
+typedef struct {
+	GLuint framebuffer;
+	GLuint color;
+	GLuint depth;
+	int width;
+	int height;
+	qboolean loaded;
+	qboolean initialized;
+	qboolean bound;
+} renderTarget_t;
+
+static glFramebufferProcs_t s_fboProcs;
+static renderTarget_t s_sceneRenderTarget;
+
+static void *RB_GetFramebufferProc( const char *procName );
+static qboolean RB_LoadFramebufferProcs( void );
+static qboolean RB_CreateRenderTarget( void );
+static void RB_DestroyRenderTarget( void );
+static void RB_BindOffscreenRenderTarget( void );
+static void RB_ReleaseOffscreenRenderTarget( void );
+
+
+/*
+=============
+RB_InitRenderTargets
+
+Initialize framebuffer storage for post-process rendering.
+=============
+*/
+void RB_InitRenderTargets( void ) {
+	Com_Memset( &s_sceneRenderTarget, 0, sizeof( s_sceneRenderTarget ) );
+
+	if ( !r_enablePostProcess || !r_enablePostProcess->integer ) {
+		return;
+	}
+
+	if ( !RB_CreateRenderTarget() ) {
+		ri.Printf( PRINT_WARNING, "WARNING: failed to create offscreen render target\n" );
+	}
+}
+
+
+/*
+=============
+RB_ShutdownRenderTargets
+
+Release framebuffer storage used for post-process rendering.
+=============
+*/
+void RB_ShutdownRenderTargets( void ) {
+	RB_DestroyRenderTarget();
+}
+
+
+/*
+=============
+RB_GetFramebufferProc
+
+Resolve framebuffer extension entry points using the platform API.
+=============
+*/
+static void *RB_GetFramebufferProc( const char *procName ) {
+#if defined( _WIN32 )
+	if ( !qwglGetProcAddress ) {
+		return NULL;
+	}
+
+	return (void *)qwglGetProcAddress( procName );
+#elif defined( __linux__ ) || defined( __FreeBSD__ )
+	return (void *)glXGetProcAddressARB( (const GLubyte *)procName );
+#else
+	return NULL;
+#endif
+}
+
+
+/*
+=============
+RB_LoadFramebufferProcs
+
+Cache framebuffer extension entry points for later use.
+=============
+*/
+static qboolean RB_LoadFramebufferProcs( void ) {
+	Com_Memset( &s_fboProcs, 0, sizeof( s_fboProcs ) );
+
+	s_fboProcs.qglGenFramebuffersEXTFunc = (PFNGLGENFRAMEBUFFERSEXTPROC)RB_GetFramebufferProc( "glGenFramebuffersEXT" );
+	s_fboProcs.qglDeleteFramebuffersEXTFunc = (PFNGLDELETEFRAMEBUFFERSEXTPROC)RB_GetFramebufferProc( "glDeleteFramebuffersEXT" );
+	s_fboProcs.qglBindFramebufferEXTFunc = (PFNGLBINDFRAMEBUFFEREXTPROC)RB_GetFramebufferProc( "glBindFramebufferEXT" );
+	s_fboProcs.qglFramebufferTexture2DEXTFunc = (PFNGLFRAMEBUFFERTEXTURE2DEXTPROC)RB_GetFramebufferProc( "glFramebufferTexture2DEXT" );
+	s_fboProcs.qglCheckFramebufferStatusEXTFunc = (PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC)RB_GetFramebufferProc( "glCheckFramebufferStatusEXT" );
+	s_fboProcs.qglGenRenderbuffersEXTFunc = (PFNGLGENRENDERBUFFERSEXTPROC)RB_GetFramebufferProc( "glGenRenderbuffersEXT" );
+	s_fboProcs.qglBindRenderbufferEXTFunc = (PFNGLBINDRENDERBUFFEREXTPROC)RB_GetFramebufferProc( "glBindRenderbufferEXT" );
+	s_fboProcs.qglRenderbufferStorageEXTFunc = (PFNGLRENDERBUFFERSTORAGEEXTPROC)RB_GetFramebufferProc( "glRenderbufferStorageEXT" );
+	s_fboProcs.qglFramebufferRenderbufferEXTFunc = (PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC)RB_GetFramebufferProc( "glFramebufferRenderbufferEXT" );
+	s_fboProcs.qglDeleteRenderbuffersEXTFunc = (PFNGLDELETERENDERBUFFERSEXTPROC)RB_GetFramebufferProc( "glDeleteRenderbuffersEXT" );
+
+	s_sceneRenderTarget.loaded = (qboolean)(s_fboProcs.qglGenFramebuffersEXTFunc && s_fboProcs.qglDeleteFramebuffersEXTFunc &&
+		s_fboProcs.qglBindFramebufferEXTFunc && s_fboProcs.qglFramebufferTexture2DEXTFunc && s_fboProcs.qglCheckFramebufferStatusEXTFunc &&
+		s_fboProcs.qglGenRenderbuffersEXTFunc && s_fboProcs.qglBindRenderbufferEXTFunc && s_fboProcs.qglRenderbufferStorageEXTFunc &&
+		s_fboProcs.qglFramebufferRenderbufferEXTFunc && s_fboProcs.qglDeleteRenderbuffersEXTFunc);
+
+	return s_sceneRenderTarget.loaded;
+}
+
+
+/*
+=============
+RB_CreateRenderTarget
+
+Allocate a color texture and depth renderbuffer for offscreen scene rendering.
+=============
+*/
+static qboolean RB_CreateRenderTarget( void ) {
+	GLenum status;
+	int width;
+	int height;
+
+	RB_DestroyRenderTarget();
+
+	if ( !r_enablePostProcess || !r_enablePostProcess->integer ) {
+		return qfalse;
+	}
+
+	if ( !s_sceneRenderTarget.loaded && !RB_LoadFramebufferProcs() ) {
+		return qfalse;
+	}
+
+	width = glConfig.vidWidth;
+	height = glConfig.vidHeight;
+
+	s_sceneRenderTarget.width = width;
+	s_sceneRenderTarget.height = height;
+
+	s_fboProcs.qglGenFramebuffersEXTFunc( 1, &s_sceneRenderTarget.framebuffer );
+	s_fboProcs.qglGenRenderbuffersEXTFunc( 1, &s_sceneRenderTarget.depth );
+
+	qglGenTextures( 1, &s_sceneRenderTarget.color );
+	qglBindTexture( GL_TEXTURE_2D, s_sceneRenderTarget.color );
+	qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	qglTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
+
+	s_fboProcs.qglBindRenderbufferEXTFunc( GL_RENDERBUFFER_EXT, s_sceneRenderTarget.depth );
+	s_fboProcs.qglRenderbufferStorageEXTFunc( GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, width, height );
+
+	s_fboProcs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, s_sceneRenderTarget.framebuffer );
+	s_fboProcs.qglFramebufferTexture2DEXTFunc( GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, s_sceneRenderTarget.color, 0 );
+	s_fboProcs.qglFramebufferRenderbufferEXTFunc( GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, s_sceneRenderTarget.depth );
+
+	status = s_fboProcs.qglCheckFramebufferStatusEXTFunc( GL_FRAMEBUFFER_EXT );
+	if ( status != GL_FRAMEBUFFER_COMPLETE_EXT ) {
+		RB_DestroyRenderTarget();
+		return qfalse;
+	}
+
+	s_sceneRenderTarget.initialized = qtrue;
+	s_sceneRenderTarget.bound = qfalse;
+
+	s_fboProcs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, 0 );
+	qglBindTexture( GL_TEXTURE_2D, 0 );
+
+	return qtrue;
+}
+
+
+/*
+=============
+RB_DestroyRenderTarget
+
+Release framebuffer resources allocated for post-processing.
+=============
+*/
+static void RB_DestroyRenderTarget( void ) {
+	if ( s_sceneRenderTarget.bound && s_sceneRenderTarget.loaded ) {
+		s_fboProcs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, 0 );
+	}
+
+	if ( s_sceneRenderTarget.framebuffer && s_sceneRenderTarget.loaded ) {
+		s_fboProcs.qglDeleteFramebuffersEXTFunc( 1, &s_sceneRenderTarget.framebuffer );
+	}
+
+	if ( s_sceneRenderTarget.depth && s_sceneRenderTarget.loaded ) {
+		s_fboProcs.qglDeleteRenderbuffersEXTFunc( 1, &s_sceneRenderTarget.depth );
+	}
+
+	if ( s_sceneRenderTarget.color ) {
+		qglDeleteTextures( 1, &s_sceneRenderTarget.color );
+	}
+
+	Com_Memset( &s_sceneRenderTarget, 0, sizeof( s_sceneRenderTarget ) );
+}
+
+
+/*
+=============
+RB_BindOffscreenRenderTarget
+
+Make the offscreen framebuffer active for scene rendering when post-processing is enabled.
+=============
+*/
+static void RB_BindOffscreenRenderTarget( void ) {
+	if ( !backEnd.postProcessActive || !s_sceneRenderTarget.initialized || !s_sceneRenderTarget.loaded ) {
+		return;
+	}
+
+	if ( s_sceneRenderTarget.bound ) {
+		return;
+	}
+
+	s_fboProcs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, s_sceneRenderTarget.framebuffer );
+	s_sceneRenderTarget.bound = qtrue;
+}
+
+
+/*
+=============
+RB_ReleaseOffscreenRenderTarget
+
+Restore rendering to the default framebuffer.
+=============
+*/
+static void RB_ReleaseOffscreenRenderTarget( void ) {
+	if ( !s_sceneRenderTarget.bound || !s_sceneRenderTarget.loaded ) {
+		return;
+	}
+
+	s_fboProcs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, 0 );
+	s_sceneRenderTarget.bound = qfalse;
+}
 /*
 =============
 RB_ResetPostProcessState
@@ -572,6 +849,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	originalTime = backEnd.refdef.floatTime;
 
 	// clear the z buffer, set the modelview, etc
+	RB_BindOffscreenRenderTarget();
 	RB_BeginDrawingView ();
 
 	// draw everything
@@ -1056,6 +1334,8 @@ const void	*RB_SwapBuffers( const void *data ) {
 	if ( tess.numIndexes ) {
 		RB_EndSurface();
 	}
+
+	RB_ReleaseOffscreenRenderTarget();
 
 	// texture swapping test
 	if ( r_showImages->integer ) {
