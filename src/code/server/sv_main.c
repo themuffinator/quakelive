@@ -26,6 +26,9 @@ serverStatic_t	svs;				// persistant server info
 server_t		sv;					// local server
 vm_t			*gvm = NULL;				// game virtual machine // bk001212 init
 
+static qboolean SV_ClientEligibleForWarmupReady( const client_t *cl );
+static qboolean SV_ClientReadyForWarmup( const client_t *cl );
+
 cvar_t	*sv_fps;				// time rate for running non-clients
 cvar_t	*sv_timeout;			// seconds without any message
 cvar_t	*sv_zombietime;			// seconds to sink messages after disconnect
@@ -597,6 +600,107 @@ void SV_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
 	}
 }
 
+/*
+=============
+SV_ClientEligibleForWarmupReady
+
+Checks whether a client counts toward the warmup ready threshold.
+=============
+*/
+static qboolean SV_ClientEligibleForWarmupReady( const client_t *cl ) {
+	const char	*team;
+
+	if ( cl->state < CS_CONNECTED ) {
+		return qfalse;
+	}
+
+	if ( SV_ClientIsBot( cl ) ) {
+		return qfalse;
+	}
+
+	team = Info_ValueForKey( cl->userinfo, "team" );
+	if ( !Q_stricmp( team, "spectator" ) || !Q_stricmp( team, "s" ) || !Q_stricmp( team, "scoreboard" ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+
+/*
+=============
+SV_ClientReadyForWarmup
+
+Determines if an eligible client has finished loading and entered the game.
+=============
+*/
+static qboolean SV_ClientReadyForWarmup( const client_t *cl ) {
+	if ( !SV_ClientEligibleForWarmupReady( cl ) ) {
+		return qfalse;
+	}
+
+	return ( cl->state == CS_ACTIVE );
+}
+
+
+/*
+=============
+SV_CheckWarmupReadiness
+
+Evaluates the warmup ready percentage and optionally announces deficiencies.
+=============
+*/
+qboolean SV_CheckWarmupReadiness( qboolean announce ) {
+	int		ready;
+	int		eligible;
+	int		percent;
+	int		index;
+	char	info[MAX_INFO_STRING];
+
+	ready = 0;
+	eligible = 0;
+
+	for ( index = 0; index < sv_maxclients->integer; index++ ) {
+		client_t *cl = svs.clients + index;
+
+		if ( SV_ClientReadyForWarmup( cl ) ) {
+			ready++;
+			eligible++;
+			continue;
+		}
+
+		if ( SV_ClientEligibleForWarmupReady( cl ) ) {
+			eligible++;
+		}
+	}
+
+	if ( eligible <= 0 ) {
+		percent = 100;
+	} else {
+		percent = ( ready * 100 ) / eligible;
+	}
+
+	info[0] = '\0';
+	Info_SetValueForKey( info, "pct", va( "%i", sv_warmupReadyPercentage->integer ) );
+	Info_SetValueForKey( info, "ready", va( "%i", ready ) );
+	Info_SetValueForKey( info, "eligible", va( "%i", eligible ) );
+	SV_SetConfigstring( CS_WARMUP_READY, info );
+
+	if ( sv_warmupReadyPercentage->integer <= 0 ) {
+		return qtrue;
+	}
+
+	if ( percent >= sv_warmupReadyPercentage->integer ) {
+		return qtrue;
+	}
+
+	if ( announce ) {
+		SV_SendServerCommand( NULL, va( "print \"Warmup waiting: %i of %i players ready (%i%% required).\\n\"", ready, eligible, sv_warmupReadyPercentage->integer ) );
+	}
+
+	return qfalse;
+}
+
 //============================================================================
 
 /*
@@ -861,6 +965,10 @@ void SV_Frame( int msec ) {
 	}
 
 	if( sv.restartTime && svs.time >= sv.restartTime ) {
+		if ( !SV_CheckWarmupReadiness( qtrue ) ) {
+			sv.restartTime = svs.time + 1000;
+			return;
+		}
 		sv.restartTime = 0;
 		Cbuf_AddText( "map_restart 0\n" );
 		return;
