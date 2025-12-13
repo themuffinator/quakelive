@@ -1161,6 +1161,36 @@ static void CG_AddCEntity( centity_t *cent ) {
 }
 
 /*
+================
+CG_PredictItem
+================
+*/
+static void CG_PredictItem( centity_t *cent ) {
+	gitem_t	*item;
+
+	if ( !cg_predictItems.integer ) {
+		return;
+	}
+
+	if ( cent->currentState.modelindex >= bg_numItems ) {
+		return;
+	}
+
+	item = &bg_itemlist[ cent->currentState.modelindex ];
+
+	if ( !BG_PlayerTouchesItem( &cg.predictedPlayerState, &cent->currentState, cg.time ) ) {
+		return;
+	}
+
+	if ( !BG_CanItemBeGrabbed( cgs.gametype, cg.time, &cent->currentState, &cg.predictedPlayerState ) ) {
+		return;
+	}
+
+	cent->currentState.eFlags |= EF_NODRAW;
+}
+
+
+/*
 ===============
 CG_AddPacketEntities
 
@@ -1209,6 +1239,9 @@ void CG_AddPacketEntities( void ) {
 	// add each entity sent over by the server
 	for ( num = 0 ; num < cg.snap->numEntities ; num++ ) {
 		cent = &cg_entities[ cg.snap->entities[ num ].number ];
+		if ( cent->currentState.eType == ET_ITEM ) {
+			CG_PredictItem( cent );
+		}
 		CG_AddCEntity( cent );
 	}
 }
