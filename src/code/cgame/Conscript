@@ -57,6 +57,7 @@ $vm_env = new cons(
   cg_players.c
   cg_playerstate.c
   cg_predict.c
+  cg_screen.c
   cg_scoreboard.c
   cg_servercmds.c
   cg_snapshot.c

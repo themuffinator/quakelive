@@ -65,6 +65,9 @@
     <ClCompile Include="cg_predict.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="cg_screen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="cg_scoreboard.c">
       <Filter>Source Files</Filter>
     </ClCompile>

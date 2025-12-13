@@ -25,6 +25,7 @@ $CC ../cg_marks.c
 $CC ../cg_players.c
 $CC ../cg_playerstate.c
 $CC ../cg_predict.c
+$CC ../cg_screen.c
 $CC ../cg_scoreboard.c
 $CC ../cg_servercmds.c
 $CC ../cg_snapshot.c

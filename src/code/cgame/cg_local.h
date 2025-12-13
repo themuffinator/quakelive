@@ -1942,6 +1942,12 @@ void CG_LoadingClient( int clientNum );
 void CG_DrawInformation( void );
 
 //
+// cg_screen.c
+//
+void CG_DamageBlendBlob( void );
+void CG_DrawScreenDamage( void );
+
+//
 // cg_scoreboard.c
 //
 qboolean CG_DrawOldScoreboard( void );

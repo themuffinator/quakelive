@@ -2189,6 +2189,7 @@ static void CG_Draw2D( void ) {
 				CG_DrawWeaponSelect();
 				CG_DrawReward();
 			}
+			CG_DrawScreenDamage();
 			CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
 		}

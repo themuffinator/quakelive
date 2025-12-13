@@ -44,6 +44,8 @@ set cc=lcc -DQ3_VM -DCGAME -S -Wf-target=bytecode -Wf-g -I..\..\cgame -I..\..\ga
 @if errorlevel 1 goto quit
 %cc% ../cg_predict.c
 @if errorlevel 1 goto quit
+%cc% ../cg_screen.c
+@if errorlevel 1 goto quit
 %cc% ../cg_scoreboard.c
 @if errorlevel 1 goto quit
 %cc% ../cg_servercmds.c
