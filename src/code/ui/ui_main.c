@@ -4506,8 +4506,23 @@ UI_SortServerStatusInfo
 static void UI_SortServerStatusInfo( serverStatusInfo_t *info ) {
 	int i, j, index;
 	char *tmp1, *tmp2;
+	static const char *const qlGametypeNames[GT_MAX_GAME_TYPE] = {
+		"Free For All",
+		"Duel",
+		"Race",
+		"Team Deathmatch",
+		"Clan Arena",
+		"Capture the Flag",
+		"1-Flag CTF",
+		"Overload",
+		"Harvester",
+		"Freeze Tag",
+		"Domination",
+		"Attack & Defend",
+		"Red Rover",
+	};
 
-	// FIXME: if "gamename" == "baseq3" or "missionpack" then
+	// FIXME: if \"gamename\" == \"baseq3\" or \"missionpack\" then
 	// replace the gametype number by FFA, CTF etc.
 	//
 	index = 0;
@@ -4528,11 +4543,19 @@ static void UI_SortServerStatusInfo( serverStatusInfo_t *info ) {
 				if ( strlen(serverStatusCvars[i].altName) ) {
 					info->lines[index][0] = serverStatusCvars[i].altName;
 				}
+				if ( !Q_stricmp(serverStatusCvars[i].name, "g_gametype") ) {
+					int gametype;
+
+					gametype = atoi( info->lines[index][3] );
+					if ( gametype >= 0 && gametype < GT_MAX_GAME_TYPE && qlGametypeNames[gametype] ) {
+						info->lines[index][3] = qlGametypeNames[gametype];
+					}
+				}
 				index++;
 			}
 		}
 	}
-		}
+}
 
 /*
 ==================
