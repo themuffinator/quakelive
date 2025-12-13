@@ -111,6 +111,24 @@ else
   CLIENT_OGG_LDFLAGS :=
 endif
 
+ifeq ($(origin PNG_CFLAGS), undefined)
+  PNG_CFLAGS := $(shell $(PKG_CONFIG) --cflags libpng 2>/dev/null)
+  ifeq ($(strip $(PNG_CFLAGS)),)
+    PNG_CFLAGS := $(shell $(PKG_CONFIG) --cflags libpng16 2>/dev/null)
+  endif
+endif
+ifeq ($(origin PNG_LDFLAGS), undefined)
+  PNG_LDFLAGS := $(shell $(PKG_CONFIG) --libs libpng 2>/dev/null)
+  ifeq ($(strip $(PNG_LDFLAGS)),)
+    PNG_LDFLAGS := $(shell $(PKG_CONFIG) --libs libpng16 2>/dev/null)
+  endif
+endif
+ifeq ($(strip $(PNG_LDFLAGS)),)
+  $(error libpng development files were not found. Install libpng, set PNG_CFLAGS/PNG_LDFLAGS manually, or ensure pkg-config can locate the library.)
+endif
+CLIENT_PNG_CFLAGS := $(PNG_CFLAGS)
+CLIENT_PNG_LDFLAGS := $(PNG_LDFLAGS)
+
 
 ifeq ($(PLATFORM),linux)
 
@@ -354,16 +372,16 @@ endif #Linux
 endif #FreeBSD
 endif #IRIX
 
-DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
-DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
-DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DSMP -o $@ -c $<
-DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
-DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
-DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
+DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -o $@ -c $<
+DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -o $@ -c $<
+DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -DSMP -o $@ -c $<
+DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
+DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -o $@ -c $<
+DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
 DO_NASM=nasm -f elf -o $@  $<
-DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) -o $@ -c $<
+DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) -o $@ -c $<
 
 #DO_LCC=$(LCC) -o $@ -S -Wf-target=bytecode -Wf-g -DQ3_VM -I$(CGDIR) -I$(GDIR)  -I$(UIDIR)  $< 
 
@@ -649,13 +667,13 @@ endif #FreeBSD
 endif #IRIX
 
 $(B)/$(PLATFORM)quake3 : $(Q3OBJ) $(Q3POBJ)
-	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
+	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) 
 # TTimo: splines code requires C++ linking, but splines have not been officially included in the codebase
-#	$(CXX)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
+#	$(CXX)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) 
 
 $(B)/$(PLATFORM)quake3-smp : $(Q3OBJ) $(Q3POBJ_SMP)
 	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ_SMP) $(GLLDFLAGS) \
-		$(THREAD_LDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) 
+		$(THREAD_LDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) 
 
 $(B)/client/cl_cgame.o : $(CDIR)/cl_cgame.c; $(DO_CC)   
 $(B)/client/cl_cin.o : $(CDIR)/cl_cin.c; $(DO_CC)       
