@@ -173,7 +173,44 @@ static void UI_ResetClanList(void);
 	=============
 	*/
 	static qboolean UI_MenuFileEquals(const char *lhs, const char *rhs) {
-	return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
+        return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
+}
+
+/*
+=============
+UI_UpdateForceModelSettings
+
+Synchronizes the UI force model cvars with the current force model and skin
+state, while refreshing the head feeder selection.
+=============
+*/
+static void UI_UpdateForceModelSettings(qboolean team) {
+	char model[MAX_QPATH];
+	const char *modelCvar;
+	const char *skinCvar;
+	const char *uiModelCvar;
+	const char *uiSkinCvar;
+	const char *uiBrightCvar;
+	const char *modelValue;
+	char *slash;
+
+	modelCvar = team ? "cg_forceTeamModel" : "cg_forceEnemyModel";
+	skinCvar = team ? "cg_forceTeamSkin" : "cg_forceEnemySkin";
+	uiModelCvar = team ? "ui_forceTeamModel" : "ui_forceEnemyModel";
+	uiSkinCvar = team ? "ui_forceTeamSkin" : "ui_forceEnemySkin";
+	uiBrightCvar = team ? "ui_forceTeamModelBright" : "ui_forceEnemyModelBright";
+
+	trap_Cvar_VariableStringBuffer(modelCvar, model, sizeof(model));
+	slash = strchr(model, '/');
+	trap_Cvar_Set(uiBrightCvar, (slash && Q_stricmp(slash + 1, "bright") == 0) ? "1" : "0");
+	if (slash) {
+		*slash = '\0';
+	}
+	modelValue = (model[0]) ? model : "No";
+	trap_Cvar_Set(uiModelCvar, modelValue);
+	trap_Cvar_Set(uiSkinCvar, UI_Cvar_VariableString(skinCvar));
+	UI_FeederSelection(FEEDER_HEADS, 0);
+	Menu_SetFeederSelection(NULL, FEEDER_HEADS, 0, NULL);
 }
 
 /*
@@ -4131,11 +4168,29 @@ static void UI_RunMenuScript(char **args) {
 			Menus_ActivateByName("setup_menu2");
 		} else if (Q_stricmp(name, "Leave") == 0) {
 			UI_LeaveGame();
-		} else if (Q_stricmp(name, "ServerSort") == 0) {
-			int sortColumn;
-			if (Int_Parse(args, &sortColumn)) {
-				// if same column we're already sorting on then flip the direction
-				if (sortColumn == uiInfo.serverStatus.sortKey) {
+		} else if (Q_stricmp(name, "teamModelChanged") == 0) {
+			UI_UpdateForceModelSettings(qtrue);
+		} else if (Q_stricmp(name, "teamColorDefaults") == 0) {
+			trap_Cvar_Set("ui_teamHeadColor", "96");
+			trap_Cvar_Set("ui_teamUpperColor", "96");
+			trap_Cvar_Set("ui_teamLowerColor", "96");
+			trap_Cvar_Set("cg_teamHeadColor", "96");
+			trap_Cvar_Set("cg_teamUpperColor", "96");
+			trap_Cvar_Set("cg_teamLowerColor", "96");
+		} else if (Q_stricmp(name, "enemyModelChanged") == 0) {
+			UI_UpdateForceModelSettings(qfalse);
+		} else if (Q_stricmp(name, "enemyColorDefaults") == 0) {
+			trap_Cvar_Set("ui_enemyHeadColor", "27");
+			trap_Cvar_Set("ui_enemyUpperColor", "27");
+			trap_Cvar_Set("ui_enemyLowerColor", "27");
+			trap_Cvar_Set("cg_enemyHeadColor", "27");
+			trap_Cvar_Set("cg_enemyUpperColor", "27");
+			trap_Cvar_Set("cg_enemyLowerColor", "27");
+                } else if (Q_stricmp(name, "ServerSort") == 0) {
+                        int sortColumn;
+                        if (Int_Parse(args, &sortColumn)) {
+                                // if same column we're already sorting on then flip the direction
+                                if (sortColumn == uiInfo.serverStatus.sortKey) {
 					uiInfo.serverStatus.sortDir = !uiInfo.serverStatus.sortDir;
 				}
 				// make sure we sort again
