@@ -36,6 +36,38 @@ static float	s_flipMatrix[16] = {
 
 
 /*
+=============
+RB_ResetPostProcessState
+
+Clear pending post-process resets before executing backend work.
+=============
+*/
+static void RB_ResetPostProcessState( void ) {
+	if ( !backEnd.postProcessNeedsReset ) {
+		return;
+	}
+
+	backEnd.postProcessNeedsReset = qfalse;
+}
+
+
+/*
+=============
+RB_SubmitPostProcess
+
+Run any post-process work gated by the current enable flags.
+=============
+*/
+static void RB_SubmitPostProcess( void ) {
+	if ( !backEnd.postProcessActive ) {
+		return;
+	}
+
+	RB_ResetPostProcessState();
+}
+
+
+/*
 ** GL_Bind
 */
 void GL_Bind( image_t *image ) {
@@ -1051,6 +1083,8 @@ const void	*RB_SwapBuffers( const void *data ) {
 	}
 
 
+	RB_SubmitPostProcess();
+
 	if ( !glState.finishCalled ) {
 		qglFinish();
 	}
@@ -1082,6 +1116,8 @@ void RB_ExecuteRenderCommands( const void *data ) {
 	} else {
 		backEnd.smpFrame = 1;
 	}
+
+	RB_ResetPostProcessState();
 
 	while ( 1 ) {
 		switch ( *(const int *)data ) {
