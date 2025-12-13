@@ -13,9 +13,30 @@ _SERVICE_TABLE_PROBE = textwrap.dedent(
 
     #include "src/common/platform/platform_services.c"
 
+#ifndef QL_STEAMWORKS_INIT_RESULT
+#define QL_STEAMWORKS_INIT_RESULT 1
+#endif
+
+#if QL_BUILD_STEAMWORKS
+/*
+=============
+QL_Steamworks_Init
+=============
+*/
+qboolean QL_Steamworks_Init( void ) {
+    return QL_STEAMWORKS_INIT_RESULT;
+}
+#endif
+
     static void dump_descriptor(const char *label, const ql_platform_feature_descriptor *descriptor) {
         const char *provider = descriptor && descriptor->provider ? descriptor->provider : "<null>";
-        printf("%s|%s|%d\\n", label, provider, descriptor && descriptor->supported ? 1 : 0);
+        printf(
+            "%s|%s|%d|%d\\n",
+            label,
+            provider,
+            descriptor && descriptor->compiled ? 1 : 0,
+            descriptor && descriptor->initialised ? 1 : 0
+        );
     }
 
     int main(void) {
@@ -41,7 +62,59 @@ _HYBRID_FALLBACK_PROBE = textwrap.dedent(
     #include "src/common/platform/platform_services.c"
     #include "src/common/platform/backends/platform_backend_steamworks.c"
     #include "src/common/platform/backends/platform_backend_open_steam.c"
+    #include "src/common/auth_credentials.c"
     #include "src/code/client/ql_auth.c"
+
+#ifndef QL_STEAMWORKS_INIT_RESULT
+#define QL_STEAMWORKS_INIT_RESULT 1
+#endif
+
+/*
+=============
+QL_Steamworks_Init
+=============
+*/
+qboolean QL_Steamworks_Init( void ) {
+    return QL_STEAMWORKS_INIT_RESULT;
+}
+
+/*
+=============
+QL_Steamworks_RunCallbacks
+=============
+*/
+void QL_Steamworks_RunCallbacks( void ) {}
+
+/*
+=============
+QL_Steamworks_RequestAuthTicket
+=============
+*/
+qboolean QL_Steamworks_RequestAuthTicket( char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle ) {
+const char *stubTicket = "retry:TICKET-HYBRID-FALLBACK";
+
+if ( ticketBuffer && ticketBufferSize > 0 ) {
+Q_strncpyz( ticketBuffer, stubTicket, (int)ticketBufferSize );
+}
+
+if ( ticketLength && ticketBuffer ) {
+*ticketLength = (int)strlen( ticketBuffer );
+}
+
+(void)ticketHandle;
+return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_ValidateTicket
+=============
+*/
+qboolean QL_Steamworks_ValidateTicket( const char *ticketHex, ql_auth_response_t *response ) {
+(void)ticketHex;
+(void)response;
+return qfalse;
+}
 
     static int qlower(int ch) {
         return tolower(ch & 0xff);
@@ -130,23 +203,6 @@ _HYBRID_FALLBACK_PROBE = textwrap.dedent(
         return 0;
     }
 
-    const char *QL_GetCredentialLabel( const ql_auth_credential_t *credential ) {
-        if ( !credential ) {
-            return "unknown";
-        }
-
-        switch ( credential->kind ) {
-            case QL_AUTH_CREDENTIAL_LEGACY_CDKEY:
-                return "legacy_cdkey";
-            case QL_AUTH_CREDENTIAL_STEAM:
-                return "steam";
-            case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-                return "standalone";
-            default:
-                return "unknown";
-        }
-    }
-
     int main(void) {
         ql_auth_credential_t credential;
         memset(&credential, 0, sizeof(credential));
@@ -204,11 +260,11 @@ def _compile_and_run(
     return result.stdout
 
 
-def _parse_service_output(output: str) -> Dict[str, Tuple[str, bool]]:
-    services: Dict[str, Tuple[str, bool]] = {}
+def _parse_service_output(output: str) -> Dict[str, Tuple[str, bool, bool]]:
+    services: Dict[str, Tuple[str, bool, bool]] = {}
     for line in output.strip().splitlines():
-        label, provider, supported = line.split("|", 2)
-        services[label] = (provider, supported == "1")
+        label, provider, compiled, initialised = line.split("|", 3)
+        services[label] = (provider, compiled == "1", initialised == "1")
     return services
 
 
@@ -217,31 +273,51 @@ def test_platform_service_table_tracks_build_flags(tmp_path) -> None:
         (
             {"QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 0},
             {
-                "auth": ("Steamworks", True),
-                "matchmaking": ("Steamworks", True),
-                "workshop": ("Steam UGC", True),
-                "overlay": ("Steam Overlay", True),
-                "stats": ("Steam Stats", True),
+                "auth": ("Steamworks", True, True),
+                "matchmaking": ("Steamworks", True, True),
+                "workshop": ("Steam UGC", True, True),
+                "overlay": ("Steam Overlay", True, True),
+                "stats": ("Steam Stats", True, True),
             },
         ),
         (
             {"QL_BUILD_STEAMWORKS": 0, "QL_BUILD_OPEN_STEAM": 1},
             {
-                "auth": ("Open Steam Adapter", True),
-                "matchmaking": ("GameNetworkingSockets", True),
-                "workshop": ("REST UGC Service", True),
-                "overlay": ("In-Process UI Overlay", True),
-                "stats": ("Metrics REST Adapter", True),
+                "auth": ("Open Steam Adapter", True, True),
+                "matchmaking": ("GameNetworkingSockets", True, True),
+                "workshop": ("REST UGC Service", True, True),
+                "overlay": ("In-Process UI Overlay", True, True),
+                "stats": ("Metrics REST Adapter", True, True),
             },
         ),
         (
             {"QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
             {
-                "auth": ("Hybrid", True),
-                "matchmaking": ("Hybrid: Steamworks + GameNetworkingSockets", True),
-                "workshop": ("Hybrid: Steam UGC + REST Mirror", True),
-                "overlay": ("Hybrid: Steam Overlay + In-Process UI", True),
-                "stats": ("Hybrid: Steam Stats + Metrics REST", True),
+                "auth": ("Hybrid", True, True),
+                "matchmaking": ("Hybrid: Steamworks + GameNetworkingSockets", True, True),
+                "workshop": ("Hybrid: Steam UGC + REST Mirror", True, True),
+                "overlay": ("Hybrid: Steam Overlay + In-Process UI", True, True),
+                "stats": ("Hybrid: Steam Stats + Metrics REST", True, True),
+            },
+        ),
+        (
+            {"QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 0, "QL_STEAMWORKS_INIT_RESULT": 0},
+            {
+                "auth": ("Steamworks", True, False),
+                "matchmaking": ("Steamworks", True, False),
+                "workshop": ("Steam UGC", True, False),
+                "overlay": ("Steam Overlay", True, False),
+                "stats": ("Steam Stats", True, False),
+            },
+        ),
+        (
+            {"QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1, "QL_STEAMWORKS_INIT_RESULT": 0},
+            {
+                "auth": ("Hybrid", True, True),
+                "matchmaking": ("Hybrid: Steamworks + GameNetworkingSockets", True, True),
+                "workshop": ("Hybrid: Steam UGC + REST Mirror", True, True),
+                "overlay": ("Hybrid: Steam Overlay + In-Process UI", True, True),
+                "stats": ("Hybrid: Steam Stats + Metrics REST", True, True),
             },
         ),
     ]

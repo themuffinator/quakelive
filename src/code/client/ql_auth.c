@@ -364,6 +364,8 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 	}
 
 	const ql_platform_service_table *services = QL_GetPlatformServices();
+	const qboolean authCompiled = services && services->auth.compiled;
+	const qboolean authInitialised = services && services->auth.initialised;
 	const char *provider = services && services->auth.provider ? services->auth.provider : "dispatcher";
 	const char *endpoint = "<unroutable>";
 
@@ -383,7 +385,7 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 		provider
 	};
 
-	if ( !services || !services->auth.supported ) {
+	if ( !authInitialised ) {
 		transport.logPrefix = "dispatcher";
 	}
 
@@ -407,9 +409,9 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 		break;
 	}
 
-	if ( !services || !services->auth.supported ) {
+	if ( !authInitialised ) {
 		QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
-		"No authentication backend is compiled in." );
+		authCompiled ? "Authentication backend failed to initialise." : "No authentication backend is compiled in." );
 		QL_ClientAuth_LogResponse( &transport, response );
 		return qfalse;
 	}

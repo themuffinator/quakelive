@@ -4,8 +4,9 @@
 #include "../auth_credentials.h"
 
 typedef struct {
-    qboolean supported;
-    const char *provider;
+qboolean compiled;
+qboolean initialised;
+const char *provider;
 } ql_platform_feature_descriptor;
 
 typedef struct {
