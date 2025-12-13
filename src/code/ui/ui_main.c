@@ -217,7 +217,7 @@ Return the enforced Quake Live menu flow now that legacy scripts are retired.
 =============
 */
 static uiMenuFlow_t UI_RequestedMenuFlow(void) {
-return UI_MENU_FLOW_QUAKELIVE;
+	return UI_MENU_FLOW_QUAKELIVE;
 }
 
 /*
@@ -3784,8 +3784,16 @@ static void UI_Update(const char *name) {
 			trap_Cvar_SetValue( "m_pitch", -0.022f );
 		}
 	}
-		}
+}
+}
 
+/*
+=============
+UI_RunMenuScript
+
+Execute menu-driven script commands, including browser overlay hooks.
+=============
+*/
 static void UI_RunMenuScript(char **args) {
 	const char *name, *name2;
 	char buff[1024];
@@ -3795,22 +3803,36 @@ static void UI_RunMenuScript(char **args) {
 			UI_StopServerRefresh();
 			if (UI_BrowserOverlayAvailable() && ui_browserRefreshCommand && *ui_browserRefreshCommand) {
 				trap_Cmd_ExecuteText(EXEC_NOW, ui_browserRefreshCommand);
+			} else {
+				Com_DPrintf("UI: stopRefresh requested without browser overlay; only native refresh stopped.\n");
 			}
 			return;
 		}
 
 		if (Q_stricmp(name, "web_showBrowser") == 0) {
+			qboolean overlayAvailable;
+
 			if (String_Parse(args, &name2)) {
 				Com_sprintf(buff, sizeof(buff), "web_showBrowser %s\n", name2);
 			} else {
 				Com_sprintf(buff, sizeof(buff), "web_showBrowser\n");
 			}
 
+			overlayAvailable = UI_BrowserOverlayAvailable();
+			if (!overlayAvailable) {
+				if (UI_BrowserBridgeAvailable()) {
+					Com_Printf("UI: browser overlay unavailable; enabling bridge menus for web_showBrowser.\n");
+					UI_ApplyMenuFlowChange(UI_MENU_FLOW_BRIDGED, qtrue);
+				} else {
+					Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\n");
+				}
+				return;
+			}
+
 			UI_SetBrowserActive(qtrue);
 			trap_Cmd_ExecuteText(EXEC_NOW, buff);
 			return;
 		}
-
 		if (Q_stricmp(name, "StartServer") == 0) {
 			int i, clients, oldclients;
 			float skill;
