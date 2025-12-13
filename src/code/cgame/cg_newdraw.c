@@ -3687,16 +3687,23 @@ color[3] = 0.5f;
 CG_FillRect(rect->x, rect->y, rect->w, rect->h, color);
 }
 
+/*
+=============
+CG_DrawFollowPlayerNameEx
+
+Renders the spectator follow label for the primary target slot.
+=============
+*/
 static void CG_DrawFollowPlayerNameEx(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-const clientInfo_t *ci = CG_SpectatorClientInfo(0);
-char buffer[64];
+	const clientInfo_t *ci = CG_SpectatorClientInfo(0);
+	char buffer[64];
 
-if (!ci) {
-return;
-}
+	if (!ci) {
+		return;
+	}
 
-Com_sprintf(buffer, sizeof(buffer), "Following %s", ci->name);
-CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);
+	Com_sprintf(buffer, sizeof(buffer), "Following %s", ci->name);
+	CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);
 }
 
 /*
@@ -6599,9 +6606,12 @@ teamShader = cgs.media.scoreboxSpecShader;
     CG_DrawTeamColorized(&rect, teamShader);
                 break;
 }
+	case CG_FOLLOW_PLAYER_NAME:
+		CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle);
+		break;
 	case CG_FOLLOW_PLAYER_NAME_EX:
-	CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle);
-	break;
+		CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle);
+		break;
 	case CG_MATCH_WINNER:
 	CG_DrawGameStatus(&rect, scale, color, shader, textStyle);
 	break;
@@ -6625,7 +6635,7 @@ break;
   case CG_ENEMY_PLYR_COUNT:
 CG_DrawPlayerCount(&rect, scale, color, textStyle, qfalse);
 break;
-  case CG_FOLLOW_PLAYER_NAME_EX:
+  		case CG_FOLLOW_PLAYER_NAME_EX:
     CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle);
                 break;
   case CG_MATCH_WINNER:

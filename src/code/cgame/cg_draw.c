@@ -1874,11 +1874,10 @@ static qboolean CG_DrawActiveScoreboard( qboolean menuHudActive, qboolean forceD
 	CG_StartScoreboardTimer( cg.time );
 	CG_BuildHudScoreboard();
 
-	if ( cg.competitiveHudLoaded || !cg_useLegacyHud.integer ) {
 		drawn = CG_DrawScoreboard();
-	} else {
-		drawn = CG_DrawOldScoreboard();
-	}
+		if ( !drawn && cg_useLegacyHud.integer ) {
+			drawn = CG_DrawOldScoreboard();
+		}
 
 	if ( !drawn ) {
 		CG_StopScoreboardTimer( cg.time );
