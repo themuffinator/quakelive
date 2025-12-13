@@ -1256,6 +1256,8 @@ typedef struct {
 	char			loadout[MAX_INFO_VALUE];
 	char			redTeam[MAX_QPATH];
 	char			blueTeam[MAX_QPATH];
+	char			redTeamName[MAX_TEAMNAME];
+	char			blueTeamName[MAX_TEAMNAME];
 	char			playermodelOverride[MAX_QPATH];
 	char			playerheadmodelOverride[MAX_QPATH];
 
@@ -1760,6 +1762,7 @@ void CG_ShowResponseHead();
 void CG_SetPrintString(int type, const char *p);
 void CG_InitTeamChat();
 void CG_GetTeamColor(vec4_t *color);
+const char *CG_GetTeamName( team_t team );
 const char *CG_GetGameStatusText();
 const char *CG_GetKillerText();
 const char *CG_GetRaceStatusText( void );

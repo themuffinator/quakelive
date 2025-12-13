@@ -2003,20 +2003,47 @@ static clientInfo_t *CG_GetSelectedClientInfo( void ) {
 
 /*
 =============
+CG_GetTeamName
+
+Resolves the configured display name for the supplied team, preferring configstrings before cvars.
+=============
+*/
+const char *CG_GetTeamName( team_t team ) {
+	const char	*teamName;
+
+	switch ( team ) {
+	case TEAM_RED:
+		teamName = cgs.redTeamName;
+		if ( teamName && teamName[0] ) {
+			return teamName;
+		}
+		if ( cg_redTeamName.string[0] != '\0' ) {
+			return cg_redTeamName.string;
+		}
+		return DEFAULT_REDTEAM_NAME;
+	case TEAM_BLUE:
+		teamName = cgs.blueTeamName;
+		if ( teamName && teamName[0] ) {
+			return teamName;
+		}
+		if ( cg_blueTeamName.string[0] != '\0' ) {
+			return cg_blueTeamName.string;
+		}
+		return DEFAULT_BLUETEAM_NAME;
+	default:
+		return "Spectator";
+	}
+}
+
+/*
+=============
 CG_GetTeamLabel
 
 Provides a human readable label for the supplied team.
 =============
 */
 static const char *CG_GetTeamLabel( team_t team ) {
-	switch ( team ) {
-	case TEAM_RED:
-		return ( cg_redTeamName.string[0] != '\0' ) ? cg_redTeamName.string : DEFAULT_REDTEAM_NAME;
-	case TEAM_BLUE:
-		return ( cg_blueTeamName.string[0] != '\0' ) ? cg_blueTeamName.string : DEFAULT_BLUETEAM_NAME;
-	default:
-		return "Spectator";
-	}
+	return CG_GetTeamName( team );
 }
 
 /*
@@ -4595,13 +4622,36 @@ static void CG_DrawBlueScore(rectDef_t *rect, float scale, vec4_t color, qhandle
 	CG_Text_Paint(widescreenRect.x + widescreenRect.w - value, widescreenRect.y + widescreenRect.h, scale, color, num, 0, 0, textStyle);
 }
 
-// FIXME: team name support
+/*
+=============
+CG_DrawRedName
+
+Renders the red team name using configstring values with widescreen translation and cvar fallback.
+=============
+*/
 static void CG_DrawRedName(rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
-  CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, cg_redTeamName.string , 0, 0, textStyle);
+	rectDef_t	widescreenRect;
+	const char	*teamName;
+
+	teamName = CG_GetTeamName( TEAM_RED );
+	CG_TranslateHudRectForWidescreen(rect, &widescreenRect);
+	CG_Text_Paint(widescreenRect.x, widescreenRect.y + widescreenRect.h, scale, color, teamName, 0, 0, textStyle);
 }
 
+/*
+=============
+CG_DrawBlueName
+
+Renders the blue team name using configstring values with widescreen translation and cvar fallback.
+=============
+*/
 static void CG_DrawBlueName(rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
-  CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, cg_blueTeamName.string, 0, 0, textStyle);
+	rectDef_t	widescreenRect;
+	const char	*teamName;
+
+	teamName = CG_GetTeamName( TEAM_BLUE );
+	CG_TranslateHudRectForWidescreen(rect, &widescreenRect);
+	CG_Text_Paint(widescreenRect.x, widescreenRect.y + widescreenRect.h, scale, color, teamName, 0, 0, textStyle);
 }
 
 static void CG_DrawBlueFlagName(rectDef_t *rect, float scale, vec4_t color, int textStyle ) {

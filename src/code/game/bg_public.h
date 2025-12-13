@@ -116,6 +116,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_MAP_AUTHOR_ALT		0x2A7		// optional secondary author (author2 key)
 
 #define CS_ITEMS				27		// string of 0's and 1's that tell which items are present
+#define CS_RED_TEAM_NAME					28
+#define CS_BLUE_TEAM_NAME					29
 #define	ITEM_TIMER_DEFAULT_HEIGHT	20		// default fallback height for HUD timer spacing
 #define	ITEM_TIMER_MAX_HEIGHT		128		// prevent oversized HUD timer spacing from breaking layouts
 
