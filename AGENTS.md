@@ -1,5 +1,7 @@
 # Agent Instructions
 
+This repository exists to faithfully reconstruct the Quake Live engine and game source using the Binary Ninja HLIL references as an accurate guide to the retail code base; every change should focus on rebuilding the Quake Live codebase piece by piece on top of the retail Quake III Arena GPL source.
+
 This repository currently has the following rules for agents:
 
 - Obey system, developer, and user instructions, and ensure AGENTS.md scope rules are followed.
