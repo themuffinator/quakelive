@@ -5124,14 +5124,15 @@ sourceTree = "<group>";
 				0170304E00B4885DC697A10E,
 				0170304F00B4885DC697A10E,
 			);
-			buildSettings = {
-				DEBUGGING_SYMBOLS = NO;
-				GCC_VERSION = 3.3;
-				INSTALL_PATH = "";
-				LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/Quake3/code/macosx/GameRanger SDK/Libraries\"";
-				OPTIMIZATION_CFLAGS = "-O2";
-				OTHER_CFLAGS = "-DDEDICATED -DMACOS_X -DBOTLIB -force_cpusubtype_ALL -Wno-long-double";
-				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
+                        buildSettings = {
+                                DEBUGGING_SYMBOLS = NO;
+                                GCC_VERSION = 3.3;
+                                INSTALL_PATH = "";
+                                HEADER_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libs/vorbis/include\"";
+                                LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/Quake3/code/macosx/GameRanger SDK/Libraries\" \"$(PROJECT_DIR)/../libs/vorbis/lib\"";
+                                OPTIMIZATION_CFLAGS = "-O2";
+                                OTHER_CFLAGS = "-DDEDICATED -DMACOS_X -DBOTLIB -DQL_ENABLE_OGG=1 -force_cpusubtype_ALL -Wno-long-double";
+                                OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = Q3DedicatedServer;
 				REZ_EXECUTABLE = YES;
@@ -6424,12 +6425,14 @@ sourceTree = "<group>";
 			};
 		};
 		0170311C00B49352C697A10E = {
-			buildPhases = (
-			);
-			buildSettings = {
-				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
-				OTHER_REZFLAGS = "";
+                        buildPhases = (
+                        );
+                        buildSettings = {
+                                HEADER_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libs/vorbis/include\"";
+                                LIBRARY_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libs/vorbis/lib\"";
+                                OTHER_CFLAGS = "-DQL_ENABLE_OGG=1";
+                                OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
+                                OTHER_REZFLAGS = "";
 				PRODUCT_NAME = All;
 				SECTORDER_FLAGS = "";
 				WARNING_CFLAGS = "-Wmost -Wno-four-char-constants -Wno-unknown-pragmas";
@@ -7869,14 +7872,14 @@ settings = {
 				0654BA6BFE8ECEE0C697A12F,
 				0654BA70FE8ECEE0C697A12F,
 			);
-			buildSettings = {
-				FRAMEWORK_SEARCH_PATHS = "";
-				HEADER_SEARCH_PATHS = "";
-				INSTALL_PATH = "/Users/Shared/$(USER)/InstalledProducts";
-				LIBRARY_SEARCH_PATHS = "";
-				OPTIMIZATION_CFLAGS = "-O2";
-				OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -force_cpusubtype_ALL";
-				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
+                        buildSettings = {
+                                FRAMEWORK_SEARCH_PATHS = "";
+                                HEADER_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libs/vorbis/include\"";
+                                INSTALL_PATH = "/Users/Shared/$(USER)/InstalledProducts";
+                                LIBRARY_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libs/vorbis/lib\"";
+                                OPTIMIZATION_CFLAGS = "-O2";
+                                OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -DQL_ENABLE_OGG=1 -force_cpusubtype_ALL";
+                                OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = Quake3;
 				SECTORDER_FLAGS = "";
@@ -8859,15 +8862,15 @@ settings = {
 				4FF0911D04896C0E00030DA8,
 				4FF0912404896C0E00030DA8,
 			);
-			buildSettings = {
-				FRAMEWORK_SEARCH_PATHS = "";
-				GCC_VERSION = 3.3;
-				HEADER_SEARCH_PATHS = "";
-				INSTALL_PATH = "/Users/Shared/$(USER)/InstalledProducts";
-				LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/QUAKE3/CODE/macosx/GameRanger SDK/Libraries\"";
-				OPTIMIZATION_CFLAGS = "-O2";
-				OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -force_cpusubtype_ALL -faltivec";
-				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
+                        buildSettings = {
+                                FRAMEWORK_SEARCH_PATHS = "";
+                                GCC_VERSION = 3.3;
+                                HEADER_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libs/vorbis/include\"";
+                                INSTALL_PATH = "/Users/Shared/$(USER)/InstalledProducts";
+                                LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/QUAKE3/CODE/macosx/GameRanger SDK/Libraries\" \"$(PROJECT_DIR)/../libs/vorbis/lib\"";
+                                OPTIMIZATION_CFLAGS = "-O2";
+                                OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -DQL_ENABLE_OGG=1 -force_cpusubtype_ALL -faltivec";
+                                OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = "Quake3 G4";
 				SECTORDER_FLAGS = "";
@@ -10434,14 +10437,15 @@ settings = {
 				4FF091E004896C1600030DA8,
 				4FF091E704896C1600030DA8,
 			);
-			buildSettings = {
-				DEBUGGING_SYMBOLS = NO;
-				GCC_VERSION = 3.3;
-				INSTALL_PATH = "";
-				LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/Quake3/code/macosx/GameRanger SDK/Libraries\"";
-				OPTIMIZATION_CFLAGS = "-O2";
-				OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -force_cpusubtype_ALL -faltivec -falign-loops=16 -falign-jumps=16 -fstrict-aliasing ";
-				OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
+                        buildSettings = {
+                                DEBUGGING_SYMBOLS = NO;
+                                GCC_VERSION = 3.3;
+                                INSTALL_PATH = "";
+                                HEADER_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libs/vorbis/include\"";
+                                LIBRARY_SEARCH_PATHS = "\"/Users/zaphod/Quake3/code/macosx/GameRanger SDK/Libraries\" \"$(PROJECT_DIR)/../libs/vorbis/lib\"";
+                                OPTIMIZATION_CFLAGS = "-O2";
+                                OTHER_CFLAGS = "-DMACOS_X -DBOTLIB -DSMP -DQL_ENABLE_OGG=1 -force_cpusubtype_ALL -faltivec -falign-loops=16 -falign-jumps=16 -fstrict-aliasing ";
+                                OTHER_LDFLAGS = "-lvorbisfile -lvorbis -logg";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = Q3DedicatedServer;
 				REZ_EXECUTABLE = YES;
