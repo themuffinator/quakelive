@@ -1095,6 +1095,35 @@ extern	cvar_t	*r_debugSort;
 extern	cvar_t	*r_printShaders;
 extern	cvar_t	*r_saveFontData;
 
+extern	cvar_t	*r_ambientScale;
+extern	cvar_t	*r_aspectRatio;
+extern	cvar_t	*r_directedScale;
+extern	cvar_t	*r_debugLight;
+extern	cvar_t	*r_debugFontAtlas;
+extern	cvar_t	*r_enablePostProcess;
+extern	cvar_t	*r_enableBloom;
+extern	cvar_t	*r_enableColorCorrect;
+extern	cvar_t	*r_postProcessActive;
+extern	cvar_t	*r_bloomActive;
+extern	cvar_t	*r_bloomPasses;
+extern	cvar_t	*r_bloomIntensity;
+extern	cvar_t	*r_bloomBrightThreshold;
+extern	cvar_t	*r_bloomBlurScale;
+extern	cvar_t	*r_bloomBlurRadius;
+extern	cvar_t	*r_bloomBlurFalloff;
+extern	cvar_t	*r_bloomSaturation;
+extern	cvar_t	*r_bloomSceneIntensity;
+extern	cvar_t	*r_bloomSceneSaturation;
+extern	cvar_t	*r_colorCorrectActive;
+extern	cvar_t	*r_drawSkyFloor;
+extern	cvar_t	*r_noFastRestart;
+extern	cvar_t	*r_skipLargeBatches;
+extern	cvar_t	*r_skipSmallBatches;
+extern	cvar_t	*r_teleporterFlash;
+extern	cvar_t	*r_windowedMode;
+extern	cvar_t	*r_windowedWidth;
+extern	cvar_t	*r_windowedHeight;
+
 //====================================================================
 
 float R_NoiseGet4f( float x, float y, float z, float t );

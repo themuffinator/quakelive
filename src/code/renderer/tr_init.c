@@ -96,6 +96,15 @@ cvar_t	*r_enableBloom;
 cvar_t	*r_enableColorCorrect;
 cvar_t	*r_postProcessActive;
 cvar_t	*r_bloomActive;
+cvar_t	*r_bloomPasses;
+cvar_t	*r_bloomIntensity;
+cvar_t	*r_bloomBrightThreshold;
+cvar_t	*r_bloomBlurScale;
+cvar_t	*r_bloomBlurRadius;
+cvar_t	*r_bloomBlurFalloff;
+cvar_t	*r_bloomSaturation;
+cvar_t	*r_bloomSceneIntensity;
+cvar_t	*r_bloomSceneSaturation;
 cvar_t	*r_colorCorrectActive;
 
 cvar_t	*r_drawBuffer;
@@ -144,11 +153,22 @@ cvar_t	*r_simpleMipMaps;
 cvar_t	*r_showImages;
 
 cvar_t	*r_ambientScale;
+cvar_t	*r_aspectRatio;
 cvar_t	*r_directedScale;
 cvar_t	*r_debugLight;
+cvar_t	*r_debugFontAtlas;
 cvar_t	*r_debugSort;
 cvar_t	*r_printShaders;
 cvar_t	*r_saveFontData;
+
+cvar_t	*r_drawSkyFloor;
+cvar_t	*r_noFastRestart;
+cvar_t	*r_skipLargeBatches;
+cvar_t	*r_skipSmallBatches;
+cvar_t	*r_teleporterFlash;
+cvar_t	*r_windowedMode;
+cvar_t	*r_windowedWidth;
+cvar_t	*r_windowedHeight;
 
 cvar_t	*r_maxpolys;
 int		max_polys;
@@ -182,6 +202,112 @@ static void AssertCvarRange( cvar_t *cv, float minVal, float maxVal, qboolean sh
 	{
 		ri.Printf( PRINT_WARNING, "WARNING: cvar '%s' out of range (%f > %f)\n", cv->name, cv->value, maxVal );
 		ri.Cvar_Set( cv->name, va( "%f", maxVal ) );
+	}
+}
+
+
+/*
+=============
+R_ClampRendererCvars
+
+Apply HLIL-observed Quake Live ranges to renderer CVars.
+=============
+*/
+static void R_ClampRendererCvars( void )
+{
+	if ( r_picmip )
+	{
+		AssertCvarRange( r_picmip, 0, 16, qtrue );
+	}
+
+	if ( r_displayRefresh )
+	{
+		AssertCvarRange( r_displayRefresh, 0, 240, qtrue );
+	}
+
+	if ( r_znear )
+	{
+		AssertCvarRange( r_znear, 0.001f, 200, qtrue );
+	}
+
+	if ( r_ambientScale )
+	{
+		AssertCvarRange( r_ambientScale, 1, 100, qtrue );
+	}
+
+	if ( r_aspectRatio )
+	{
+		AssertCvarRange( r_aspectRatio, 0, 3, qtrue );
+	}
+
+	if ( r_bloomPasses )
+	{
+		AssertCvarRange( r_bloomPasses, 1, 2, qtrue );
+	}
+
+	if ( r_bloomIntensity )
+	{
+		AssertCvarRange( r_bloomIntensity, 0.0f, 10.0f, qfalse );
+	}
+
+	if ( r_bloomBrightThreshold )
+	{
+		AssertCvarRange( r_bloomBrightThreshold, 0.0f, 1.0f, qfalse );
+	}
+
+	if ( r_bloomBlurScale )
+	{
+		AssertCvarRange( r_bloomBlurScale, 1.0f, 2.0f, qfalse );
+	}
+
+	if ( r_bloomBlurRadius )
+	{
+		AssertCvarRange( r_bloomBlurRadius, 1, 12, qtrue );
+	}
+
+	if ( r_bloomBlurFalloff )
+	{
+		AssertCvarRange( r_bloomBlurFalloff, 0.75f, 1.0f, qfalse );
+	}
+
+	if ( r_bloomSaturation )
+	{
+		AssertCvarRange( r_bloomSaturation, 0.0f, 10.0f, qfalse );
+	}
+
+	if ( r_bloomSceneIntensity )
+	{
+		AssertCvarRange( r_bloomSceneIntensity, 0.0f, 10.0f, qfalse );
+	}
+
+	if ( r_bloomSceneSaturation )
+	{
+		AssertCvarRange( r_bloomSceneSaturation, 0.0f, 10.0f, qfalse );
+	}
+
+	if ( r_teleporterFlash )
+	{
+		AssertCvarRange( r_teleporterFlash, 0, 1, qtrue );
+	}
+
+	if ( r_skipLargeBatches )
+	{
+		AssertCvarRange( r_skipLargeBatches, 0, 1, qtrue );
+	}
+
+	if ( r_skipSmallBatches )
+	{
+		AssertCvarRange( r_skipSmallBatches, 0, 1, qtrue );
+	}
+
+	if ( r_noFastRestart )
+	{
+		AssertCvarRange( r_noFastRestart, 0, 1, qtrue );
+	}
+
+	if ( r_drawSkyFloor )
+	{
+		AssertCvarRange( r_drawSkyFloor, 0, 1, qtrue );
 	}
 }
 
@@ -889,6 +1015,7 @@ void R_UpdatePostProcessCvars( void ) {
 	qboolean triggerReset;
 
 	R_ClampPostProcessCvars();
+	R_ClampRendererCvars();
 
 	postProcessEnabled = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer);
 	bloomEnabled = (qboolean)(postProcessEnabled && r_enableBloom && r_enableBloom->integer);
@@ -966,18 +1093,27 @@ void R_Register( void )
 	r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "1", CVAR_ARCHIVE | CVAR_LATCH);
 #endif
 
-	// HLIL: post-processing/color-correct toggles are 0/1, bloom supports a second pass when set to 2.
-	r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH );
-	r_enableBloom = ri.Cvar_Get( "r_enableBloom", "1", CVAR_ARCHIVE | CVAR_LATCH );
-	r_enableColorCorrect = ri.Cvar_Get( "r_enableColorCorrect", "1", CVAR_ARCHIVE | CVAR_LATCH );
-	r_postProcessActive = ri.Cvar_Get( "r_postProcessActive", "0", CVAR_TEMP | CVAR_ROM );
-	r_bloomActive = ri.Cvar_Get( "r_bloomActive", "0", CVAR_TEMP | CVAR_ROM );
-	r_colorCorrectActive = ri.Cvar_Get( "r_colorCorrectActive", "0", CVAR_TEMP | CVAR_ROM );
+// HLIL: post-processing/color-correct toggles are 0/1, bloom supports a second pass when set to 2.
+r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH );
+r_enableBloom = ri.Cvar_Get( "r_enableBloom", "1", CVAR_ARCHIVE | CVAR_LATCH );
+r_enableColorCorrect = ri.Cvar_Get( "r_enableColorCorrect", "1", CVAR_ARCHIVE | CVAR_LATCH );
+r_postProcessActive = ri.Cvar_Get( "r_postProcessActive", "0", CVAR_TEMP | CVAR_ROM );
+r_bloomActive = ri.Cvar_Get( "r_bloomActive", "0", CVAR_TEMP | CVAR_ROM );
+r_colorCorrectActive = ri.Cvar_Get( "r_colorCorrectActive", "0", CVAR_TEMP | CVAR_ROM );
+// HLIL: bloom tuning mirrors Quake Live defaults; scene scalars stay within [0..10] and blur radius stays within [1..12].
+r_bloomPasses = ri.Cvar_Get( "r_bloomPasses", "1", CVAR_ARCHIVE | CVAR_LATCH );
+r_bloomIntensity = ri.Cvar_Get( "r_bloomIntensity", "0.5", CVAR_ARCHIVE | CVAR_LATCH );
+r_bloomBrightThreshold = ri.Cvar_Get( "r_bloomBrightThreshold", "0.25", CVAR_ARCHIVE | CVAR_LATCH );
+	r_bloomBlurScale = ri.Cvar_Get( "r_bloomBlurScale", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	r_bloomBlurRadius = ri.Cvar_Get( "r_bloomBlurRadius", "5", CVAR_ARCHIVE | CVAR_LATCH );
+	r_bloomBlurFalloff = ri.Cvar_Get( "r_bloomBlurFalloff", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	r_bloomSaturation = ri.Cvar_Get( "r_bloomSaturation", "0.8", CVAR_ARCHIVE | CVAR_LATCH );
+	r_bloomSceneIntensity = ri.Cvar_Get( "r_bloomSceneIntensity", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_bloomSceneSaturation = ri.Cvar_Get( "r_bloomSceneSaturation", "1", CVAR_ARCHIVE | CVAR_LATCH );
 
 	r_picmip = ri.Cvar_Get ("r_picmip", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_roundImagesDown = ri.Cvar_Get ("r_roundImagesDown", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_colorMipLevels = ri.Cvar_Get ("r_colorMipLevels", "0", CVAR_LATCH );
-	AssertCvarRange( r_picmip, 0, 16, qtrue );
 	r_detailTextures = ri.Cvar_Get( "r_detailtextures", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_texturebits = ri.Cvar_Get( "r_texturebits", "32", CVAR_ARCHIVE | CVAR_LATCH );
 	r_colorbits = ri.Cvar_Get( "r_colorbits", "0", CVAR_ARCHIVE | CVAR_LATCH );
@@ -992,9 +1128,13 @@ void R_Register( void )
 	r_ignorehwgamma = ri.Cvar_Get( "r_ignorehwgamma", "0", CVAR_ARCHIVE | CVAR_LATCH);
 	r_mode = ri.Cvar_Get( "r_mode", "3", CVAR_ARCHIVE | CVAR_LATCH );
 	r_fullscreen = ri.Cvar_Get( "r_fullscreen", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_windowedMode = ri.Cvar_Get( "r_windowedMode", "12", CVAR_ARCHIVE | CVAR_LATCH );
+	r_windowedWidth = ri.Cvar_Get( "r_windowedWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
+	r_windowedHeight = ri.Cvar_Get( "r_windowedHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customwidth = ri.Cvar_Get( "r_customwidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customheight = ri.Cvar_Get( "r_customheight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customaspect = ri.Cvar_Get( "r_customaspect", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_aspectRatio = ri.Cvar_Get( "r_aspectRatio", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_simpleMipMaps = ri.Cvar_Get( "r_simpleMipMaps", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_vertexLight = ri.Cvar_Get( "r_vertexLight", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_uiFullScreen = ri.Cvar_Get( "r_uifullscreen", "0", 0);
@@ -1011,7 +1151,6 @@ void R_Register( void )
 	// temporary latched variables that can only change over a restart
 	//
 	r_displayRefresh = ri.Cvar_Get( "r_displayRefresh", "0", CVAR_LATCH );
-	AssertCvarRange( r_displayRefresh, 0, 200, qtrue );
 	r_fullbright = ri.Cvar_Get ("r_fullbright", "0", CVAR_LATCH|CVAR_CHEAT );
 	r_mapOverBrightBits = ri.Cvar_Get ("r_mapOverBrightBits", "2", CVAR_LATCH );
 	r_intensity = ri.Cvar_Get ("r_intensity", "1", CVAR_LATCH );
@@ -1019,20 +1158,22 @@ void R_Register( void )
 
 	//
 	// archived variables that can change at any time
+	r_noFastRestart = ri.Cvar_Get( "r_noFastRestart", "0", CVAR_ARCHIVE );
 	//
 	r_lodCurveError = ri.Cvar_Get( "r_lodCurveError", "250", CVAR_ARCHIVE|CVAR_CHEAT );
 	r_lodbias = ri.Cvar_Get( "r_lodbias", "0", CVAR_ARCHIVE );
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE );
-r_znear = ri.Cvar_Get( "r_znear", "1", CVAR_CHEAT );
-	AssertCvarRange( r_znear, 0.001f, 200, qtrue );
+	r_znear = ri.Cvar_Get( "r_znear", "1", CVAR_CHEAT );
 	r_ignoreGLErrors = ri.Cvar_Get( "r_ignoreGLErrors", "1", CVAR_ARCHIVE );
 	r_fastsky = ri.Cvar_Get( "r_fastsky", "0", CVAR_ARCHIVE );
+	r_drawSkyFloor = ri.Cvar_Get( "r_drawSkyFloor", "1", CVAR_ARCHIVE );
 	r_inGameVideo = ri.Cvar_Get( "r_inGameVideo", "1", CVAR_ARCHIVE );
 	r_drawSun = ri.Cvar_Get( "r_drawSun", "0", CVAR_ARCHIVE );
 	r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE );
+	r_teleporterFlash = ri.Cvar_Get( "r_teleporterFlash", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_dlightBacks = ri.Cvar_Get( "r_dlightBacks", "1", CVAR_ARCHIVE );
 	r_finish = ri.Cvar_Get ("r_finish", "0", CVAR_ARCHIVE);
-r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
+	r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
 	r_swapInterval = ri.Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE );
 #ifdef __MACOS__
 	r_gamma = ri.Cvar_Get( "r_gamma", "1.2", CVAR_ARCHIVE );
@@ -1047,7 +1188,7 @@ r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_AR
 
 	r_primitives = ri.Cvar_Get( "r_primitives", "0", CVAR_ARCHIVE );
 
-	r_ambientScale = ri.Cvar_Get( "r_ambientScale", "0.6", CVAR_CHEAT );
+	r_ambientScale = ri.Cvar_Get( "r_ambientScale", "10", CVAR_CHEAT );
 	r_directedScale = ri.Cvar_Get( "r_directedScale", "1", CVAR_CHEAT );
 
 	//
@@ -1056,6 +1197,7 @@ r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_AR
 	r_showImages = ri.Cvar_Get( "r_showImages", "0", CVAR_TEMP );
 
 	r_debugLight = ri.Cvar_Get( "r_debuglight", "0", CVAR_TEMP );
+	r_debugFontAtlas = ri.Cvar_Get( "r_debugFontAtlas", "0", CVAR_TEMP );
 	r_debugSort = ri.Cvar_Get( "r_debugSort", "0", CVAR_CHEAT );
 	r_printShaders = ri.Cvar_Get( "r_printShaders", "0", 0 );
 	r_saveFontData = ri.Cvar_Get( "r_saveFontData", "0", 0 );
@@ -1070,6 +1212,8 @@ r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_AR
 
 	r_showSmp = ri.Cvar_Get ("r_showSmp", "0", CVAR_CHEAT);
 	r_skipBackEnd = ri.Cvar_Get ("r_skipBackEnd", "0", CVAR_CHEAT);
+	r_skipLargeBatches = ri.Cvar_Get( "r_skipLargeBatches", "0", CVAR_CHEAT );
+	r_skipSmallBatches = ri.Cvar_Get( "r_skipSmallBatches", "0", CVAR_CHEAT );
 
 	r_measureOverdraw = ri.Cvar_Get( "r_measureOverdraw", "0", CVAR_CHEAT );
 	r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
