@@ -318,12 +318,25 @@ static void RB_ReleaseOffscreenRenderTarget( void ) {
 =============
 RB_ResetPostProcessState
 
-Clear pending post-process resets before executing backend work.
+Rebuild post-process render targets when toggles change and clear the reset flag once handled.
 =============
 */
 static void RB_ResetPostProcessState( void ) {
 	if ( !backEnd.postProcessNeedsReset ) {
 		return;
+	}
+
+	if ( backEnd.postProcessActive ) {
+		RB_DestroyRenderTarget();
+
+		if ( !RB_CreateRenderTarget() ) {
+			backEnd.postProcessActive = qfalse;
+			backEnd.bloomActive = qfalse;
+			backEnd.colorCorrectActive = qfalse;
+			return;
+		}
+	} else {
+		RB_DestroyRenderTarget();
 	}
 
 	backEnd.postProcessNeedsReset = qfalse;
