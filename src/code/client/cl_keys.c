@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "client.h"
+#include "cl_input_translation.h"
 
 /*
 
@@ -882,6 +883,8 @@ void Key_Bind_f (void)
 {
 	int			i, c, b;
 	char		cmd[1024];
+	clTranslatedKey_t translated;
+	int		dispatchKey;
 	
 	c = Cmd_Argc();
 
@@ -978,6 +981,8 @@ void CL_AddKeyUpCommands( int key, char *kb ) {
 	int i;
 	char button[1024], *buttonPtr;
 	char	cmd[1024];
+	clTranslatedKey_t translated;
+	int		dispatchKey;
 	qboolean keyevent;
 
 	if ( !kb ) {
@@ -1014,15 +1019,20 @@ void CL_AddKeyUpCommands( int key, char *kb ) {
 }
 
 /*
-===================
+=============
 CL_KeyEvent
 
 Called by the system for both key up and key down events
-===================
+=============
 */
 void CL_KeyEvent (int key, qboolean down, unsigned time) {
 	char	*kb;
 	char	cmd[1024];
+	clTranslatedKey_t translated;
+	int		dispatchKey;
+
+	translated = CL_TranslateRetailKeycode( key );
+	dispatchKey = translated.dispatchKey;
 
 	// update auto-repeat status and BUTTON_ANY status
 	keys[key].down = down;
@@ -1112,7 +1122,7 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 			return;
 		}
 
-		VM_Call( uivm, UI_KEY_EVENT, key, down );
+		VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down );
 		return;
 	}
 
@@ -1128,9 +1138,9 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 		CL_AddKeyUpCommands( key, kb );
 
 		if ( cls.keyCatchers & KEYCATCH_UI && uivm ) {
-			VM_Call( uivm, UI_KEY_EVENT, key, down );
+			VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down );
 		} else if ( cls.keyCatchers & KEYCATCH_CGAME && cgvm ) {
-			VM_Call( cgvm, CG_KEY_EVENT, key, down );
+			VM_Call( cgvm, CG_KEY_EVENT, dispatchKey, down );
 		} 
 
 		return;
@@ -1142,11 +1152,11 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 		Console_Key( key );
 	} else if ( cls.keyCatchers & KEYCATCH_UI ) {
 		if ( uivm ) {
-			VM_Call( uivm, UI_KEY_EVENT, key, down );
+			VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down );
 		} 
 	} else if ( cls.keyCatchers & KEYCATCH_CGAME ) {
 		if ( cgvm ) {
-			VM_Call( cgvm, CG_KEY_EVENT, key, down );
+			VM_Call( cgvm, CG_KEY_EVENT, dispatchKey, down );
 		} 
 	} else if ( cls.keyCatchers & KEYCATCH_MESSAGE ) {
 		Message_Key( key );
@@ -1197,34 +1207,43 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 
 /*
-===================
+=============
 CL_CharEvent
 
 Normal keyboard characters, already shifted / capslocked / etc
-===================
+=============
 */
 void CL_CharEvent( int key ) {
-	// the console key should never be used as a char
+clTranslatedKey_t translated;
+
+// the console key should never be used as a char
 	if ( key == '`' || key == '~' ) {
-		return;
+	return;
 	}
+
+	translated = CL_TranslateRetailKeycode( key );
+	if ( !translated.hasChar ) {
+	return;
+	}
+
+	key = translated.charCode;
 
 	// distribute the key down event to the apropriate handler
 	if ( cls.keyCatchers & KEYCATCH_CONSOLE )
 	{
-		Field_CharEvent( &g_consoleField, key );
+	Field_CharEvent( &g_consoleField, key );
 	}
 	else if ( cls.keyCatchers & KEYCATCH_UI )
 	{
-		VM_Call( uivm, UI_KEY_EVENT, key | K_CHAR_FLAG, qtrue );
+	VM_Call( uivm, UI_KEY_EVENT, key | K_CHAR_FLAG, qtrue );
 	}
-	else if ( cls.keyCatchers & KEYCATCH_MESSAGE ) 
+	else if ( cls.keyCatchers & KEYCATCH_MESSAGE )
 	{
-		Field_CharEvent( &chatField, key );
+	Field_CharEvent( &chatField, key );
 	}
 	else if ( cls.state == CA_DISCONNECTED )
 	{
-		Field_CharEvent( &g_consoleField, key );
+	Field_CharEvent( &g_consoleField, key );
 	}
 }
 

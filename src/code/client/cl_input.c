@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl.input.c  -- builds an intended movement command to send to the server
 
 #include "client.h"
+#include "cl_input_translation.h"
 
 unsigned	frame_msec;
 int			old_com_frameTime;
@@ -334,32 +335,37 @@ void CL_KeyMove( usercmd_t *cmd ) {
 	side -= movespeed * CL_KeyState (&in_moveleft);
 
 
-	up += movespeed * CL_KeyState (&in_up);
-	up -= movespeed * CL_KeyState (&in_down);
+		up += movespeed * CL_KeyState (&in_up);
+		up -= movespeed * CL_KeyState (&in_down);
 
-	forward += movespeed * CL_KeyState (&in_forward);
-	forward -= movespeed * CL_KeyState (&in_back);
-
+		forward += movespeed * CL_KeyState (&in_forward);
+		forward -= movespeed * CL_KeyState (&in_back);
 	cmd->forwardmove = ClampChar( forward );
-	cmd->rightmove = ClampChar( side );
-	cmd->upmove = ClampChar( up );
+cmd->rightmove = ClampChar( side );
+cmd->upmove = ClampChar( up );
 }
-
 /*
-=================
+=============
 CL_MouseEvent
-=================
+Translate mouse motion into UI or client game handlers
+=============
 */
 void CL_MouseEvent( int dx, int dy, int time ) {
+	int		translatedDx;
+	int		translatedDy;
+	
+	translatedDx = CL_TranslateRetailMouseDelta( dx, m_cpi->value );
+	translatedDy = CL_TranslateRetailMouseDelta( dy, m_cpi->value );
+	
 	if ( cls.keyCatchers & KEYCATCH_UI ) {
-		VM_Call( uivm, UI_MOUSE_EVENT, dx, dy );
+	VM_Call( uivm, UI_MOUSE_EVENT, translatedDx, translatedDy );
 	} else if (cls.keyCatchers & KEYCATCH_CGAME) {
-		VM_Call (cgvm, CG_MOUSE_EVENT, dx, dy);
+	VM_Call (cgvm, CG_MOUSE_EVENT, translatedDx, translatedDy);
 	} else {
 		cl.mouseDx[cl.mouseIndex] += dx;
 		cl.mouseDy[cl.mouseIndex] += dy;
 	}
-}
+	}
 
 /*
 =================
@@ -432,8 +438,8 @@ void CL_MouseMove( usercmd_t *cmd ) {
 		my = cl.mouseDy[cl.mouseIndex];
 	}
 	cl.mouseIndex ^= 1;
-	cl.mouseDx[cl.mouseIndex] = 0;
-	cl.mouseDy[cl.mouseIndex] = 0;
+		cl.mouseDx[cl.mouseIndex] = 0;
+		cl.mouseDy[cl.mouseIndex] = 0;
 
 	cpiScale = m_cpi->value;
 	if ( cpiScale > 0.0f ) {
