@@ -100,6 +100,8 @@ static qboolean RB_CreateRenderTarget( void );
 static void RB_DestroyRenderTarget( void );
 static void RB_BindOffscreenRenderTarget( void );
 static void RB_ReleaseOffscreenRenderTarget( void );
+static byte RB_ClampColorComponent( float value );
+static void RB_ApplyColorCorrection( void );
 
 
 /*
@@ -330,6 +332,96 @@ static void RB_ResetPostProcessState( void ) {
 
 /*
 =============
+RB_ClampColorComponent
+
+Clamp a floating point color component to the 0-255 range.
+=============
+*/
+static byte RB_ClampColorComponent( float value ) {
+	if ( value < 0.0f ) {
+		value = 0.0f;
+	} else if ( value > 255.0f ) {
+		value = 255.0f;
+	}
+
+	return (byte)(value + 0.5f);
+}
+
+
+/*
+=============
+RB_ApplyColorCorrection
+
+Apply a color-correction matrix to the current framebuffer contents.
+=============
+*/
+static void RB_ApplyColorCorrection( void ) {
+	int			width;
+	int			height;
+	image_t		*sceneImage;
+	byte			*pixelData;
+	int			pixelCount;
+	int			pixelIndex;
+	const float	*matrix;
+
+	if ( !backEnd.colorCorrectActive || !tr.colorCorrectReady ) {
+		return;
+	}
+
+	width = glConfig.vidWidth;
+	height = glConfig.vidHeight;
+	sceneImage = RB_UploadBloomScratch( 1, width, height );
+
+	GL_Bind( sceneImage );
+
+	pixelData = ri.Hunk_AllocateTempMemory( width * height * 4 );
+
+	qglGetTexImage( GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixelData );
+
+	matrix = tr.colorCorrectMatrix;
+	pixelCount = width * height;
+
+	for ( pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++ ) {
+		byte	*rgba;
+		float	r;
+		float	g;
+		float	b;
+		float	correctedR;
+		float	correctedG;
+		float	correctedB;
+
+		rgba = pixelData + ( pixelIndex * 4 );
+		r = rgba[0];
+		g = rgba[1];
+		b = rgba[2];
+
+		correctedR = ( matrix[0] * r ) + ( matrix[4] * g ) + ( matrix[8] * b ) + ( matrix[12] * 255.0f );
+		correctedG = ( matrix[1] * r ) + ( matrix[5] * g ) + ( matrix[9] * b ) + ( matrix[13] * 255.0f );
+		correctedB = ( matrix[2] * r ) + ( matrix[6] * g ) + ( matrix[10] * b ) + ( matrix[14] * 255.0f );
+
+		rgba[0] = RB_ClampColorComponent( correctedR );
+		rgba[1] = RB_ClampColorComponent( correctedG );
+		rgba[2] = RB_ClampColorComponent( correctedB );
+	}
+
+	qglTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixelData );
+
+	ri.Hunk_FreeTempMemory( pixelData );
+
+	qglDisable( GL_DEPTH_TEST );
+	qglDisable( GL_CULL_FACE );
+	qglDisable( GL_SCISSOR_TEST );
+
+	qglViewport( 0, 0, width, height );
+	RB_SetGL2D();
+
+	qglTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
+	qglColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+
+	RB_DrawBloomSpread( 0.0f, 0.0f, width, height );
+}
+/*
+=============
 RB_UploadBloomScratch
 
 Make sure a scratch texture matches the current viewport and contains a copy of the scene.
@@ -533,6 +625,10 @@ static void RB_SubmitPostProcess( void ) {
 
 		qglDisable( GL_BLEND );
 		qglTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
+	}
+
+	if ( backEnd.colorCorrectActive ) {
+		RB_ApplyColorCorrection();
 	}
 }
 

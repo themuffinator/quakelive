@@ -107,6 +107,9 @@ cvar_t	*r_bloomSceneIntensity;
 cvar_t	*r_bloomSceneSaturation;
 cvar_t	*r_colorCorrectActive;
 
+static void R_InitColorCorrection( void );
+static void R_ShutdownColorCorrection( void );
+
 cvar_t	*r_drawBuffer;
 cvar_t  *r_glDriver;
 cvar_t	*r_lightmap;
@@ -181,6 +184,45 @@ void ( APIENTRY * qglClientActiveTextureARB )( GLenum texture );
 
 void ( APIENTRY * qglLockArraysEXT)( GLint, GLint);
 void ( APIENTRY * qglUnlockArraysEXT) ( void );
+
+/*
+=============
+R_InitColorCorrection
+
+Initialize an identity color-correction matrix for post-process rendering.
+=============
+*/
+static void R_InitColorCorrection( void ) {
+	int		index;
+	float	*matrix;
+
+	matrix = tr.colorCorrectMatrix;
+
+	for ( index = 0; index < 16; index++ ) {
+		matrix[index] = 0.0f;
+	}
+
+	matrix[0] = 1.0f;
+	matrix[5] = 1.0f;
+	matrix[10] = 1.0f;
+	matrix[15] = 1.0f;
+
+	tr.colorCorrectReady = qtrue;
+}
+
+
+/*
+=============
+R_ShutdownColorCorrection
+
+Reset color-correction resources tracked for post-process rendering.
+=============
+*/
+static void R_ShutdownColorCorrection( void ) {
+	Com_Memset( tr.colorCorrectMatrix, 0, sizeof( tr.colorCorrectMatrix ) );
+
+	tr.colorCorrectReady = qfalse;
+}
 
 static void AssertCvarRange( cvar_t *cv, float minVal, float maxVal, qboolean shouldBeIntegral )
 {
@@ -1021,6 +1063,10 @@ void R_UpdatePostProcessCvars( void ) {
 	bloomEnabled = (qboolean)(postProcessEnabled && r_enableBloom && r_enableBloom->integer);
 	colorCorrectEnabled = (qboolean)(postProcessEnabled && r_enableColorCorrect && r_enableColorCorrect->integer);
 
+	if ( colorCorrectEnabled && !tr.colorCorrectReady ) {
+		R_InitColorCorrection();
+	}
+
 	triggerReset = (qboolean)(r_enablePostProcess && r_enablePostProcess->modified);
 	triggerReset = (qboolean)(triggerReset || (r_enableBloom && r_enableBloom->modified));
 	triggerReset = (qboolean)(triggerReset || (r_enableColorCorrect && r_enableColorCorrect->modified));
@@ -1339,6 +1385,8 @@ void R_Init( void ) {
 
 	RB_InitRenderTargets();
 
+	R_InitColorCorrection();
+
 	R_InitImages();
 
 	R_InitShaders();
@@ -1380,6 +1428,7 @@ void RE_Shutdown( qboolean destroyWindow ) {
 	if ( tr.registered ) {
 		R_SyncRenderThread();
 		R_ShutdownCommandBuffers();
+		R_ShutdownColorCorrection();
 		RB_ShutdownRenderTargets();
 		R_DeleteTextures();
 	}

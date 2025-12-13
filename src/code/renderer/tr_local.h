@@ -932,6 +932,8 @@ typedef struct {
 	qboolean				bloomActive;
 	qboolean				colorCorrectActive;
 	qboolean				postProcessNeedsReset;
+	float				colorCorrectMatrix[16];
+	qboolean				colorCorrectReady;
 
 	int						viewCluster;
 
