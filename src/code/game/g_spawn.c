@@ -896,11 +896,8 @@ void SP_worldspawn( void ) {
 	char		*t;
 	char		*atmosphere;
 	char		*disableLoadout;
-	int		trainingFlag;
 	char		author[MAX_MAP_AUTHOR_STRING];
 	char		authorAlt[MAX_MAP_AUTHOR_STRING];
-	int			trainingFlag;
-	qboolean	trainingActive;
 
 
 	G_SpawnString( "classname", "", &s );
@@ -908,18 +905,10 @@ void SP_worldspawn( void ) {
 		G_Error( "SP_worldspawn: The first entity isn't 'worldspawn'" );
 	}
 
-	trainingFlag = 0;
-	if ( G_SpawnInt( "trainingMap", "0", &trainingFlag ) && trainingFlag ) {
-		trap_Cvar_Set( "g_training", "1" );
-	}
-	trap_Cvar_Update( &g_training );
-	trainingActive = ( g_training.integer != 0 ) ? qtrue : qfalse;
-	level.trainingMapActive = trainingActive;
-
 	// make some data visible to connecting client
 	trap_SetConfigstring( CS_GAME_VERSION, GAME_VERSION );
 
-	trap_SetConfigstring( CS_LEVEL_START_TIME, va("%i", level.startTime ) );
+	trap_SetConfigstring( CS_LEVEL_START_TIME, va( "%i", level.startTime ) );
 
 	G_SpawnString( "music", "", &s );
 	trap_SetConfigstring( CS_MUSIC, s );
@@ -936,6 +925,11 @@ void SP_worldspawn( void ) {
 	trap_SetConfigstring( CS_MAP_AUTHOR_ALT, authorAlt );
 	G_UpdateServerinfoMapAuthors( author, authorAlt );
 
+	G_SpawnString( "disable_loadout", "", &disableLoadout );
+	level.disableLoadoutMapMask = G_ParseDisableLoadoutString( disableLoadout );
+	trap_Cvar_Set( "g_disableLoadout", va( "%u", level.disableLoadoutMapMask ) );
+	G_UpdateDisableLoadoutConfigstrings();
+
 	trap_SetConfigstring( CS_MOTD, g_motd.string );	// message of the day
 
 	G_SpawnString( "gravity", "800", &s );
@@ -945,7 +939,12 @@ void SP_worldspawn( void ) {
 	trap_Cvar_Set( "g_enableDust", s );
 
 	G_SpawnString( "enableBreath", "0", &s );
-	trap_Cvar_Set( "g_enableBreath", s );
+	trap_SetConfigstring( CS_ENABLE_BREATH, s );
+
+	G_SpawnString( "trainingMap", "0", &s );
+	if ( atoi( s ) == 1 ) {
+		trap_Cvar_Set( "g_training", "1" );
+	}
 
 	G_SpawnString( "atmosphere", "", &atmosphere );
 	if ( atmosphere && atmosphere[0] ) {
@@ -955,11 +954,6 @@ void SP_worldspawn( void ) {
 		G_SetWorldspawnAtmosphere( g_forcedAtmosphere.string );
 	}
 
-	G_SpawnString( "disable_loadout", "", &disableLoadout );
-	level.disableLoadoutMapMask = G_ParseDisableLoadoutString( disableLoadout );
-	trap_Cvar_Set( "g_disableLoadout", va( "%u", level.disableLoadoutMapMask ) );
-	G_UpdateDisableLoadoutConfigstrings();
-
 	g_entities[ENTITYNUM_WORLD].s.number = ENTITYNUM_WORLD;
 	g_entities[ENTITYNUM_WORLD].classname = "worldspawn";
 
@@ -967,15 +961,19 @@ void SP_worldspawn( void ) {
 	trap_SetConfigstring( CS_WARMUP, "" );
 	G_UpdateReadyUpConfigstring();
 	trap_SetConfigstring( CS_MATCH_STATE, "" );
-	if ( trainingActive ) {
-		level.warmupTime = 0;
-	} else if ( g_restarted.integer ) {
+	trap_Cvar_Set( "g_gameState", "PRE_GAME" );
+
+	if ( g_restarted.integer ) {
 		trap_Cvar_Set( "g_restarted", "0" );
 		level.warmupTime = 0;
+		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+		G_UpdateReadyUpConfigstring();
+		trap_Cvar_Set( "g_gameState", "IN_PROGRESS" );
 	} else if ( g_doWarmup.integer ) { // Turn it on
 		level.warmupTime = -1;
-		trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+		trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
 		G_UpdateReadyUpConfigstring();
+		trap_Cvar_Set( "g_gameState", "PRE_GAME" );
 		G_LogPrintf( "Warmup:\n" );
 	}
 

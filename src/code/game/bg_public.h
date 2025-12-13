@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // because games can change separately from the main system version, we need a
 // second version that must match between game and cgame
 
-#define	GAME_VERSION		"baseqz-1"
+#define	GAME_VERSION		"baseqz"
 
 #define	DEFAULT_GRAVITY		800
 #define	GIB_HEALTH			-40
@@ -74,13 +74,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	CS_VOTE_YES				10
 #define	CS_VOTE_NO				11
 
-#define CS_TEAMVOTE_TIME		12
-#define CS_TEAMVOTE_STRING		14
-#define	CS_TEAMVOTE_YES			16
-#define	CS_TEAMVOTE_NO			18
+#define	CS_GAME_VERSION			12
+#define	CS_LEVEL_START_TIME		13		// so the timer only shows the current level
 
-#define	CS_GAME_VERSION			20
-#define	CS_LEVEL_START_TIME		21		// so the timer only shows the current level
+#define CS_TEAMVOTE_TIME		14
+#define CS_TEAMVOTE_STRING		16
+#define	CS_TEAMVOTE_YES			18
+#define	CS_TEAMVOTE_NO			20
 #define	CS_INTERMISSION			22		// when 1, fraglimit/timelimit has been hit and intermission will start in a second or two
 #define CS_FLAGSTATUS			23		// string indicating flag status in CTF
 #define CS_SHADERSTATE			24
@@ -111,6 +111,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 #define CS_FACTORY_TITLE		0x2A2		// descriptive title for the active match factory
 #define CS_FACTORY_FLAGS		0x2A3		// decimal bitmask describing customized factory settings
+#define CS_ENABLE_BREATH		0x2A4		// global breath effect toggle
 #define CS_SPAWN_HINTS		0x2A5	// info string exposing timeout and sudden death metadata
 #define CS_MAP_AUTHOR		0x2A6		// primary author name lifted from the worldspawn
 #define CS_MAP_AUTHOR_ALT		0x2A7		// optional secondary author (author2 key)
