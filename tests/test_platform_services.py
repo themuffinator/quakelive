@@ -12,10 +12,13 @@ _SERVICE_TABLE_PROBE = textwrap.dedent(
     #include <stdio.h>
 
     #include "src/common/platform/platform_services.c"
+    #include "src/common/platform/platform_steamworks.c"
 
     static void dump_descriptor(const char *label, const ql_platform_feature_descriptor *descriptor) {
         const char *provider = descriptor && descriptor->provider ? descriptor->provider : "<null>";
-        printf("%s|%s|%d\\n", label, provider, descriptor && descriptor->supported ? 1 : 0);
+        printf("%s|%s|%d|%d\\n", label, provider,
+            descriptor && descriptor->compiled ? 1 : 0,
+            descriptor && descriptor->initialised ? 1 : 0);
     }
 
     int main(void) {
@@ -38,7 +41,9 @@ _HYBRID_FALLBACK_PROBE = textwrap.dedent(
     #include <ctype.h>
 
     #include "client.h"
+
     #include "src/common/platform/platform_services.c"
+    #include "src/common/platform/platform_steamworks.c"
     #include "src/common/platform/backends/platform_backend_steamworks.c"
     #include "src/common/platform/backends/platform_backend_open_steam.c"
     #include "src/code/client/ql_auth.c"
@@ -65,7 +70,7 @@ _HYBRID_FALLBACK_PROBE = textwrap.dedent(
         (void)written;
         va_end(args);
 
-        dest[size - 1] = '\\0';
+        dest[size - 1] = 0;
     }
 
     void Q_strncpyz( char *dest, const char *src, int destsize ) {
@@ -74,18 +79,18 @@ _HYBRID_FALLBACK_PROBE = textwrap.dedent(
         }
 
         if ( !src ) {
-            dest[0] = '\\0';
+            dest[0] = 0;
             return;
         }
 
         size_t count = destsize > 1 ? (size_t)(destsize - 1) : (size_t)0;
         if ( count == 0 ) {
-            dest[0] = '\\0';
+            dest[0] = 0;
             return;
         }
 
         strncpy(dest, src, count);
-        dest[count] = '\\0';
+        dest[count] = 0;
     }
 
     int Q_stricmp( const char *s1, const char *s2 ) {
@@ -195,56 +200,60 @@ def _compile_and_run(
         *include_args,
         *macro_args,
         str(c_path),
+        "-ldl",
         "-o",
         str(exe_path),
     ]
+
+    if include_client_stub:
+        compile_cmd.insert(4, "-Wno-error")
 
     subprocess.run(compile_cmd, cwd=REPO_ROOT, check=True, capture_output=True)
     result = subprocess.run([str(exe_path)], cwd=REPO_ROOT, check=True, capture_output=True, text=True)
     return result.stdout
 
 
-def _parse_service_output(output: str) -> Dict[str, Tuple[str, bool]]:
-    services: Dict[str, Tuple[str, bool]] = {}
+def _parse_service_output(output: str) -> Dict[str, Tuple[str, bool, bool]]:
+    services: Dict[str, Tuple[str, bool, bool]] = {}
     for line in output.strip().splitlines():
-        label, provider, supported = line.split("|", 2)
-        services[label] = (provider, supported == "1")
+        label, provider, compiled, initialised = line.split("|", 3)
+        services[label] = (provider, compiled == "1", initialised == "1")
     return services
 
 
 def test_platform_service_table_tracks_build_flags(tmp_path) -> None:
     scenarios = [
-        (
-            {"QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 0},
-            {
-                "auth": ("Steamworks", True),
-                "matchmaking": ("Steamworks", True),
-                "workshop": ("Steam UGC", True),
-                "overlay": ("Steam Overlay", True),
-                "stats": ("Steam Stats", True),
-            },
-        ),
-        (
-            {"QL_BUILD_STEAMWORKS": 0, "QL_BUILD_OPEN_STEAM": 1},
-            {
-                "auth": ("Open Steam Adapter", True),
-                "matchmaking": ("GameNetworkingSockets", True),
-                "workshop": ("REST UGC Service", True),
-                "overlay": ("In-Process UI Overlay", True),
-                "stats": ("Metrics REST Adapter", True),
-            },
-        ),
-        (
-            {"QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
-            {
-                "auth": ("Hybrid", True),
-                "matchmaking": ("Hybrid: Steamworks + GameNetworkingSockets", True),
-                "workshop": ("Hybrid: Steam UGC + REST Mirror", True),
-                "overlay": ("Hybrid: Steam Overlay + In-Process UI", True),
-                "stats": ("Hybrid: Steam Stats + Metrics REST", True),
-            },
-        ),
-    ]
+            (
+                {"QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 0},
+                {
+                    "auth": ("Steamworks", True, False),
+                    "matchmaking": ("Steamworks", True, False),
+                    "workshop": ("Steam UGC", True, False),
+                    "overlay": ("Steam Overlay", True, False),
+                    "stats": ("Steam Stats", True, False),
+                },
+            ),
+            (
+                {"QL_BUILD_STEAMWORKS": 0, "QL_BUILD_OPEN_STEAM": 1},
+                {
+                    "auth": ("Open Steam Adapter", True, True),
+                    "matchmaking": ("GameNetworkingSockets", True, True),
+                    "workshop": ("REST UGC Service", True, True),
+                    "overlay": ("In-Process UI Overlay", True, True),
+                    "stats": ("Metrics REST Adapter", True, True),
+                },
+            ),
+            (
+                {"QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
+                {
+                    "auth": ("Hybrid", True, True),
+                    "matchmaking": ("Hybrid: Steamworks + GameNetworkingSockets", True, True),
+                    "workshop": ("Hybrid: Steam UGC + REST Mirror", True, True),
+                    "overlay": ("Hybrid: Steam Overlay + In-Process UI", True, True),
+                    "stats": ("Hybrid: Steam Stats + Metrics REST", True, True),
+                },
+            ),
+        ]
 
     for idx, (macros, expected) in enumerate(scenarios):
         workdir = tmp_path / f"service_probe_{idx}"

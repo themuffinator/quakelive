@@ -204,77 +204,77 @@ static qboolean QL_ClientAuth_DispatchSteam( const ql_client_auth_transport_t *t
 }
 
 qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
-    if ( !credential || !response ) {
-        return qfalse;
-    }
+	if ( !credential || !response ) {
+		return qfalse;
+	}
 
-    const ql_platform_service_table *services = QL_GetPlatformServices();
-    const char *provider = services && services->auth.provider ? services->auth.provider : "dispatcher";
-    const char *endpoint = "<unroutable>";
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+	const char *provider = services && services->auth.provider ? services->auth.provider : "dispatcher";
+	const char *endpoint = "<unroutable>";
 
-    switch ( credential->kind ) {
-        case QL_AUTH_CREDENTIAL_STEAM:
-            endpoint = "/steam/session/validate";
-            break;
-        case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-            endpoint = "/launcher/auth/verify";
-            break;
-        default:
-            break;
-    }
+	switch ( credential->kind ) {
+		case QL_AUTH_CREDENTIAL_STEAM:
+			endpoint = "/steam/session/validate";
+			break;
+		case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
+			endpoint = "/launcher/auth/verify";
+			break;
+		default:
+			break;
+	}
 
-    ql_client_auth_transport_t transport = {
-        { provider, endpoint },
-        provider
-    };
+	ql_client_auth_transport_t transport = {
+		{ provider, endpoint },
+		provider
+	};
 
-    if ( !services || !services->auth.supported ) {
-        transport.logPrefix = "dispatcher";
-    }
+	if ( !services || !services->auth.compiled ) {
+		transport.logPrefix = "dispatcher";
+	}
 
-    QL_ClientAuth_LogStage( &transport, "dispatch", "submitting credential" );
+	QL_ClientAuth_LogStage( &transport, "dispatch", "submitting credential" );
 
-    char preview[32];
-    QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
+	char preview[32];
+	QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
 
-    switch ( credential->kind ) {
-        case QL_AUTH_CREDENTIAL_STEAM:
-            Com_Printf( "[auth] %s payload summary: ticket=%s (len=%zu)\n",
-                transport.logPrefix, preview, credential->length );
-            break;
-        case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-            Com_Printf( "[auth] %s payload summary: token=%s (len=%zu)\n",
-                transport.logPrefix, preview, credential->length );
-            break;
-        default:
-            Com_Printf( "[auth] %s payload summary: credential=%s (len=%zu)\n",
-                transport.logPrefix, preview, credential->length );
-            break;
-    }
+	switch ( credential->kind ) {
+		case QL_AUTH_CREDENTIAL_STEAM:
+			Com_Printf( "[auth] %s payload summary: ticket=%s (len=%zu)\n",
+				transport.logPrefix, preview, credential->length );
+			break;
+		case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
+			Com_Printf( "[auth] %s payload summary: token=%s (len=%zu)\n",
+				transport.logPrefix, preview, credential->length );
+			break;
+		default:
+			Com_Printf( "[auth] %s payload summary: credential=%s (len=%zu)\n",
+				transport.logPrefix, preview, credential->length );
+			break;
+	}
 
-    if ( !services || !services->auth.supported ) {
-        QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
-            "No authentication backend is compiled in." );
-        QL_ClientAuth_LogResponse( &transport, response );
-        return qfalse;
-    }
+	if ( !services || !services->auth.compiled ) {
+		QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
+			"No authentication backend is compiled in." );
+		QL_ClientAuth_LogResponse( &transport, response );
+		return qfalse;
+	}
 
-    qboolean handled = qfalse;
+	qboolean handled = qfalse;
 
-    switch ( credential->kind ) {
-        case QL_AUTH_CREDENTIAL_STEAM:
-            handled = QL_ClientAuth_DispatchSteam( &transport, credential, response );
-            break;
-        case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-            handled = QL_ClientAuth_HandleStandaloneToken( credential, response );
-            break;
-        default:
-            QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
-                "No transport for credential kind %s", QL_GetCredentialLabel( credential ) );
-            handled = qfalse;
-            break;
-    }
+	switch ( credential->kind ) {
+		case QL_AUTH_CREDENTIAL_STEAM:
+			handled = QL_ClientAuth_DispatchSteam( &transport, credential, response );
+			break;
+		case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
+			handled = QL_ClientAuth_HandleStandaloneToken( credential, response );
+			break;
+		default:
+			QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
+				"No transport for credential kind %s", QL_GetCredentialLabel( credential ) );
+			handled = qfalse;
+			break;
+	}
 
-    QL_ClientAuth_LogResponse( &transport, response );
-    return handled;
+	QL_ClientAuth_LogResponse( &transport, response );
+	return handled;
 }
