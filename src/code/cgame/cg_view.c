@@ -693,6 +693,101 @@ static void CG_UpdateSpectatorCvar( void ) {
 	cg_spectating.value = (float)desired;
 }
 
+/*
+====================
+CG_CalcFov
+
+Fixed fov at intermissions, otherwise account for fov variable and zooms.
+====================
+*/
+#define	WAVE_AMPLITUDE	1
+#define	WAVE_FREQUENCY	0.4
+
+static int CG_CalcFov( void ) {
+	float	x;
+	float	phase;
+	float	v;
+	int		contents;
+	float	fov_x, fov_y;
+	float	zoomFov;
+	float	f;
+	int		inwater;
+
+	if ( cg.predictedPlayerState.pm_type == PM_INTERMISSION ) {
+		// if in intermission, use a fixed value
+		fov_x = 90;
+	} else {
+		// user selectable
+		if ( cgs.dmflags & DF_FIXED_FOV ) {
+			// dmflag to prevent wide fov for all clients
+			fov_x = 90;
+		} else {
+			fov_x = cg_fov.value;
+			if ( fov_x < 1 ) {
+				fov_x = 1;
+			} else if ( fov_x > 160 ) {
+				fov_x = 160;
+			}
+		}
+
+		// account for zooms
+		zoomFov = cg_zoomFov.value;
+		if ( zoomFov < 1 ) {
+			zoomFov = 1;
+		} else if ( zoomFov > 160 ) {
+			zoomFov = 160;
+		}
+
+		if ( cg.zoomed ) {
+			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
+			if ( f > 1.0 ) {
+				fov_x = zoomFov;
+			} else {
+				fov_x = fov_x + f * ( zoomFov - fov_x );
+			}
+		} else {
+			f = ( cg.time - cg.zoomTime ) / (float)ZOOM_TIME;
+			if ( f > 1.0 ) {
+				fov_x = fov_x;
+			} else {
+				fov_x = zoomFov + f * ( fov_x - zoomFov );
+			}
+		}
+	}
+
+	fov_x = CG_CalcHorPlusFov( fov_x );
+
+	x = cg.refdef.width / tan( fov_x / 360 * M_PI );
+	fov_y = atan2( cg.refdef.height, x );
+	fov_y = fov_y * 360 / M_PI;
+
+	// warp if underwater
+	contents = CG_PointContents( cg.refdef.vieworg, -1 );
+	if ( contents & ( CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA ) ){
+		phase = cg.time / 1000.0 * WAVE_FREQUENCY * M_PI * 2;
+		v = WAVE_AMPLITUDE * sin( phase );
+		fov_x += v;
+		fov_y -= v;
+		inwater = qtrue;
+	}
+	else {
+		inwater = qfalse;
+	}
+
+
+	// set it
+	cg.refdef.fov_x = fov_x;
+	cg.refdef.fov_y = fov_y;
+
+	if ( !cg.zoomed ) {
+		cg.zoomSensitivity = 1;
+	} else {
+		cg.zoomSensitivity = cg.refdef.fov_y / 75.0;
+	}
+
+	return inwater;
+}
+
 static int CG_CalcViewValues( void ) {
 	playerState_t	*ps;
 
@@ -970,6 +1065,11 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_Printf( "cg.clientFrame:%i\n", cg.clientFrame );
 	}
 
-
+	if ( cg.rageQuitTime == 1 ) {
+		trap_SendConsoleCommand( "quit" );
+	}
+	if ( cg.rageQuitTime > 0 ) {
+		cg.rageQuitTime--;
+	}
 }
 
