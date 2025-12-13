@@ -38,6 +38,42 @@ consumers under `src/code/` so the indices stay aligned with the retail DLL.
 Add additional entries here as more Quake Live configstrings are recovered or
 when future HLIL exports expose new payloads.
 
+## Rotation and loadout payload formats
+
+- **Rotation previews:** The HLIL builder walks the `nextmaps` info string and
+  writes `map_%i`, `title_%i`, and `gt_%i` keys into the `CS_ROTATION_TITLES`
+  info string while mirroring the `cfg_%i` payloads into `CS_ROTATION_CONFIGS`.
+  Both configstrings are flushed together after the loop finishes, mirroring
+  the retail DLL’s queue preview semantics.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L12692-L12747】
+- **Loadout flags/masks:** `CS_LOADOUT_FLAGS` and `CS_LOADOUT_MASK` start as
+  empty strings when the server boots, then `SP_worldspawn` parses the optional
+  `disable_loadout` key. The parsed bitmask is formatted with `va("%i")` and
+  pushed into `CS_LOADOUT_FLAGS` before mirroring the same string into the
+  `g_disableLoadout` CVar. No map-specific mask is published separately in the
+  HLIL traces, leaving `CS_LOADOUT_MASK` blank unless other codepaths are
+  discovered.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L10992-L11009】【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt†L23190-L23239】
+- **Timing expectations:** The rotation payloads and loadout flag updates are
+  emitted via `trap_SetConfigstring` immediately after their builders finish;
+  the HLIL does not defer publication to later frames. Any reconstruction
+  should ensure the configstrings update atomically alongside rotation changes
+  or `disable_loadout` edits.
+
+## Current gaps to close
+
+- The game module never populates `CS_ROTATION_TITLES` or
+  `CS_ROTATION_CONFIGS`; the HLIL shows both being emitted once the rotation
+  queue is parsed, so a server-side publisher is still needed.
+- `G_UpdateDisableLoadoutConfigstrings` currently merges the worldspawn mask
+  with the `g_disableLoadout` CVar and publishes the merged value plus a map
+  mask in `CS_LOADOUT_MASK`, which diverges from the HLIL’s single-mask
+  broadcast.【F:src/code/game/g_spawn.c†L171-L207】【F:src/code/game/g_spawn.c†L958-L962】
+- Client rotation feeders only parse UI CVars/files (`ui_mapRotation`,
+  `sv_mapRotation`, etc.) and have no consumer for the server-advertised
+  rotation preview fields.【F:src/code/ui/ui_gameinfo.c†L377-L660】
+- HUD/loadout gating is driven solely by `g_loadout` in the serverinfo string
+  and ignores the loadout configstrings that the HLIL publishes, so clients
+  cannot mirror per-slot disables today.【F:src/code/cgame/cg_newdraw.c†L5045-L5064】
+
 ## HLIL-derived gametype strings
 
 The Domination/Freeze tutorial payloads and the HUD gametype hints both reuse
