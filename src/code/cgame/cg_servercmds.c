@@ -1189,33 +1189,68 @@ static void CG_ParseFactoryMetadata( void ) {
 		Q_strncpyz( cgs.factorySpawnHints, info, sizeof( cgs.factorySpawnHints ) );
 	} else {
 		cgs.factorySpawnHints[0] = '\0';
+}
+}
+
+/*
+=============
+CG_SetTeamNameFromConfigString
+
+Caches the latest team name advertised in a configstring, clearing stale values when empty.
+=============
+*/
+static void CG_SetTeamNameFromConfigString( team_t team, const char *configstring ) {
+	char	*target;
+	int		targetSize;
+
+	target = NULL;
+	targetSize = 0;
+
+	switch ( team ) {
+	case TEAM_RED:
+		target = cgs.redTeamName;
+		targetSize = (int)sizeof( cgs.redTeamName );
+		break;
+	case TEAM_BLUE:
+		target = cgs.blueTeamName;
+		targetSize = (int)sizeof( cgs.blueTeamName );
+		break;
+	default:
+		return;
+	}
+
+	if ( configstring && configstring[0] ) {
+		Q_strncpyz( target, configstring, targetSize );
+	} else {
+		target[0] = '\0';
 	}
 }
 
 void CG_SetConfigValues( void ) {
-const char *s;
+	const char *s;
 
-cgs.scores1 = atoi( CG_ConfigString( CS_SCORES1 ) );
-cgs.scores2 = atoi( CG_ConfigString( CS_SCORES2 ) );
-cgs.levelStartTime = atoi( CG_ConfigString( CS_LEVEL_START_TIME ) );
-if( cgs.gametype == GT_CTF ) {
-s = CG_ConfigString( CS_FLAGSTATUS );
-cgs.redflag = s[0] - '0';
-cgs.blueflag = s[1] - '0';
-}
-else if( cgs.gametype == GT_1FCTF ) {
-s = CG_ConfigString( CS_FLAGSTATUS );
-cgs.flagStatus = s[0] - '0';
-}
-cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
-CG_ParseMatchState();
-CG_ParseForcedCosmetics();
-CG_ParseFactoryMetadata();
-CG_ParsePmoveConfigString( CG_ConfigString( CS_PMOVE_SETTINGS ) );
+	cgs.scores1 = atoi( CG_ConfigString( CS_SCORES1 ) );
+	cgs.scores2 = atoi( CG_ConfigString( CS_SCORES2 ) );
+	cgs.levelStartTime = atoi( CG_ConfigString( CS_LEVEL_START_TIME ) );
+	CG_SetTeamNameFromConfigString( TEAM_RED, CG_ConfigString( CS_RED_TEAM_NAME ) );
+	CG_SetTeamNameFromConfigString( TEAM_BLUE, CG_ConfigString( CS_BLUE_TEAM_NAME ) );
+	if( cgs.gametype == GT_CTF ) {
+		s = CG_ConfigString( CS_FLAGSTATUS );
+		cgs.redflag = s[0] - '0';
+		cgs.blueflag = s[1] - '0';
+	}
+	else if( cgs.gametype == GT_1FCTF ) {
+		s = CG_ConfigString( CS_FLAGSTATUS );
+		cgs.flagStatus = s[0] - '0';
+	}
+	cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
+	CG_ParseMatchState();
+	CG_ParseForcedCosmetics();
+	CG_ParseFactoryMetadata();
+	CG_ParsePmoveConfigString( CG_ConfigString( CS_PMOVE_SETTINGS ) );
 	CG_ParseRaceInfoString( CG_ConfigString( CS_RACE_INFO ) );
 	CG_ParseRaceStatusString( CG_ConfigString( CS_RACE_STATUS ) );
 }
-
 /*
 =====================
 CG_ShaderStateChanged
@@ -1288,6 +1323,10 @@ static void CG_ConfigStringModified( void ) {
 		cgs.scores1 = atoi( str );
 	} else if ( num == CS_SCORES2 ) {
 		cgs.scores2 = atoi( str );
+	} else if ( num == CS_RED_TEAM_NAME ) {
+		CG_SetTeamNameFromConfigString( TEAM_RED, str );
+	} else if ( num == CS_BLUE_TEAM_NAME ) {
+		CG_SetTeamNameFromConfigString( TEAM_BLUE, str );
 	} else if ( num == CS_LEVEL_START_TIME ) {
 		cgs.levelStartTime = atoi( str );
 	} else if ( num == CS_FACTORY_TITLE || num == CS_FACTORY_FLAGS || num == CS_SPAWN_HINTS ) {

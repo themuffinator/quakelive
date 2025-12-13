@@ -3511,10 +3511,10 @@ static int CG_OwnerDrawWidth(int ownerDraw, float scale) {
 		return width;
 	}
 	case CG_RED_NAME:
-		return CG_Text_Width( cg_redTeamName.string, scale, 0 );
+		return CG_Text_Width( CG_GetTeamName( TEAM_RED ), scale, 0 );
 		break;
 	case CG_BLUE_NAME:
-		return CG_Text_Width( cg_blueTeamName.string, scale, 0 );
+		return CG_Text_Width( CG_GetTeamName( TEAM_BLUE ), scale, 0 );
 		break;
 	}
 
