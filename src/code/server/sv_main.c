@@ -60,6 +60,33 @@ cvar_t	*sv_maskBots;
 cvar_t	*net_fakevacban;
 
 /*
+=============
+SV_HandleQuitOnExitLevel
+
+Checks sv_quitOnExitLevel and performs the shutdown or quit path.
+=============
+*/
+qboolean SV_HandleQuitOnExitLevel( const char *context ) {
+	const char	*actionContext;
+
+	if ( !sv_quitOnExitLevel || !sv_quitOnExitLevel->integer ) {
+		return qfalse;
+	}
+
+	actionContext = context ? context : "level exit";
+
+	if ( sv_quitOnExitLevel->integer > 1 ) {
+		Com_Printf( "sv_quitOnExitLevel %d: exiting after %s\n", sv_quitOnExitLevel->integer, actionContext );
+		Com_Quit_f();
+		return qtrue;
+	}
+
+	Com_Printf( "sv_quitOnExitLevel %d: shutting down after %s\n", sv_quitOnExitLevel->integer, actionContext );
+	SV_Shutdown( "Server quit on exit level\n" );
+	return qtrue;
+}
+
+/*
 =============================================================================
 
 EVENT MESSAGES
@@ -850,18 +877,27 @@ void SV_Frame( int msec ) {
 	// 2giga-milliseconds = 23 days, so it won't be too often
 	if ( svs.time > 0x70000000 ) {
 		SV_Shutdown( "Restarting server due to time wrapping" );
+		if ( SV_HandleQuitOnExitLevel( "time wrapping restart" ) ) {
+			return;
+		}
 		Cbuf_AddText( "vstr nextmap\n" );
 		return;
 	}
 	// this can happen considerably earlier when lots of clients play and the map doesn't change
 	if ( svs.nextSnapshotEntities >= 0x7FFFFFFE - svs.numSnapshotEntities ) {
 		SV_Shutdown( "Restarting server due to numSnapshotEntities wrapping" );
+		if ( SV_HandleQuitOnExitLevel( "numSnapshotEntities wrap restart" ) ) {
+			return;
+		}
 		Cbuf_AddText( "vstr nextmap\n" );
 		return;
 	}
 
 	if( sv.restartTime && svs.time >= sv.restartTime ) {
 		sv.restartTime = 0;
+		if ( SV_HandleQuitOnExitLevel( "scheduled map_restart" ) ) {
+			return;
+		}
 		Cbuf_AddText( "map_restart 0\n" );
 		return;
 	}

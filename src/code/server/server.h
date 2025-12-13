@@ -277,6 +277,7 @@ extern	cvar_t	*net_fakevacban;
 //
 void SV_FinalMessage (char *message);
 void QDECL SV_SendServerCommand( client_t *cl, const char *fmt, ...);
+qboolean SV_HandleQuitOnExitLevel( const char *context );
 
 
 void SV_AddOperatorCommands (void);
