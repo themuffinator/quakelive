@@ -94,6 +94,21 @@ typedef struct {
 static glFramebufferProcs_t s_fboProcs;
 static renderTarget_t s_sceneRenderTarget;
 
+/*
+=============
+RB_PostProcessEnabled
+
+Return qtrue when post-processing is allowed by the cvar toggle and backend state.
+=============
+*/
+static qboolean RB_PostProcessEnabled( void ) {
+	if ( !r_enablePostProcess || !r_enablePostProcess->integer ) {
+		return qfalse;
+	}
+
+	return backEnd.postProcessActive;
+}
+
 static void *RB_GetFramebufferProc( const char *procName );
 static qboolean RB_LoadFramebufferProcs( void );
 static qboolean RB_CreateRenderTarget( void );
@@ -286,7 +301,8 @@ Make the offscreen framebuffer active for scene rendering when post-processing i
 =============
 */
 static void RB_BindOffscreenRenderTarget( void ) {
-	if ( !backEnd.postProcessActive || !s_sceneRenderTarget.initialized || !s_sceneRenderTarget.loaded ) {
+	if ( !RB_PostProcessEnabled() || !s_sceneRenderTarget.initialized || !s_sceneRenderTarget.loaded ) {
+		RB_ReleaseOffscreenRenderTarget();
 		return;
 	}
 
@@ -314,6 +330,7 @@ static void RB_ReleaseOffscreenRenderTarget( void ) {
 	s_fboProcs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, 0 );
 	s_sceneRenderTarget.bound = qfalse;
 }
+
 /*
 =============
 RB_ResetPostProcessState
@@ -575,7 +592,7 @@ Run any post-process work gated by the current enable flags.
 =============
 */
 static void RB_SubmitPostProcess( void ) {
-	if ( !backEnd.postProcessActive ) {
+	if ( !RB_PostProcessEnabled() ) {
 		return;
 	}
 
