@@ -117,7 +117,7 @@ void Cmd_Ready_f( gentity_t *ent ) {
 		return;
 	}
 
-	if ( level.warmupTime <= 0 ) {
+	if ( level.warmupTime == 0 ) {
 		trap_SendServerCommand( ent-g_entities, "print \"The match has already started.\n\"" );
 		return;
 	}

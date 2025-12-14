@@ -3198,12 +3198,33 @@ void CheckTournament( void ) {
 
 		// if all players have arrived, start the countdown
 		if ( level.warmupTime < 0 ) {
-			// fudge by -1 to account for extra delays
-			level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
-			trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-			G_UpdateReadyUpConfigstring();
-			Team_ClampWarmupToShuffleCountdown();
-			return;
+			if ( g_doWarmup.integer ) {
+				int i, readyCount = 0;
+				for ( i = 0; i < level.maxclients; i++ ) {
+					gclient_t *cl = &level.clients[i];
+					if ( cl->pers.connected != CON_CONNECTED || cl->sess.sessionTeam == TEAM_SPECTATOR ) {
+						continue;
+					}
+					if ( !(cl->ps.eFlags & EF_READY) ) {
+						break;
+					}
+					readyCount++;
+				}
+				if ( i == level.maxclients && readyCount > 0 ) {
+					level.warmupTime = level.time + 10000;
+					trap_SendServerCommand( -1, "print \"All players ready! Match starting in 10 seconds.\n\"" );
+					trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+					G_UpdateReadyUpConfigstring();
+					return;
+				}
+			} else {
+				// fudge by -1 to account for extra delays
+				level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
+				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+				G_UpdateReadyUpConfigstring();
+				Team_ClampWarmupToShuffleCountdown();
+				return;
+			}
 		}
 
 		// check ready flags
@@ -3556,7 +3577,7 @@ static void G_UpdateGameStateForLevel( void ) {
 	int		countdownRemaining;
 
 	if ( level.intermissiontime || level.intermissionQueued ) {
-		state = GAME_STATE_PRE_GAME;
+		state = GAME_STATE_IN_PROGRESS;
 	} else if ( level.warmupTime > 0 ) {
 		countdownRemaining = level.warmupTime - level.time;
 		if ( countdownRemaining <= 0 ) {
