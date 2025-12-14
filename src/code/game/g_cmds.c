@@ -105,6 +105,169 @@ void Cmd_Score_f( gentity_t *ent ) {
 	DeathmatchScoreboardMessage( ent );
 }
 
+/*
+==================
+Cmd_Ready_f
+==================
+*/
+void Cmd_Ready_f( gentity_t *ent ) {
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Spectators cannot ready up.\n\"" );
+		return;
+	}
+
+	if ( level.warmupTime <= 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"The match has already started.\n\"" );
+		return;
+	}
+
+	if ( ent->client->ps.eFlags & EF_READY ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You are already ready.\n\"" );
+		return;
+	}
+
+	ent->client->ps.eFlags |= EF_READY;
+	trap_SendServerCommand( ent-g_entities, "print \"You are now ready.\n\"" );
+
+	// check if everyone is ready
+	// This logic might need to be in G_CheckWarmup or similar
+}
+
+/*
+==================
+Cmd_NotReady_f
+==================
+*/
+void Cmd_NotReady_f( gentity_t *ent ) {
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Spectators cannot ready up.\n\"" );
+		return;
+	}
+
+	if ( level.warmupTime <= 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"The match has already started.\n\"" );
+		return;
+	}
+
+	if ( !(ent->client->ps.eFlags & EF_READY) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You are already not ready.\n\"" );
+		return;
+	}
+
+	ent->client->ps.eFlags &= ~EF_READY;
+	trap_SendServerCommand( ent-g_entities, "print \"You are now not ready.\n\"" );
+}
+
+/*
+==================
+Cmd_Players_f
+==================
+*/
+void Cmd_Players_f( gentity_t *ent ) {
+	int		i;
+	gclient_t	*cl;
+	int		score;
+	int		ping;
+	char	*s;
+	char	cleanName[MAX_NETNAME];
+
+	trap_SendServerCommand( ent-g_entities, "print \"  ID Score Ping Name            \n\"" );
+	trap_SendServerCommand( ent-g_entities, "print \"------------------------------\n\"" );
+
+	for ( i=0 ; i < level.maxclients ; i++ ) {
+		cl = &level.clients[i];
+		if ( cl->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+
+		score = cl->ps.persistant[PERS_SCORE];
+		ping = cl->ps.ping < 999 ? cl->ps.ping : 999;
+
+		// QL style output
+		s = cl->pers.netname;
+		// sanitize name for display if needed
+		Q_strncpyz( cleanName, s, sizeof(cleanName) );
+		Q_CleanStr( cleanName );
+
+		trap_SendServerCommand( ent-g_entities, va("print \"  %2i %5i %4i %s\n\"",
+			i, score, ping, cleanName) );
+	}
+}
+
+/*
+==================
+Cmd_Teams_f
+==================
+*/
+void Cmd_Teams_f( gentity_t *ent ) {
+	char	*str;
+
+	if ( g_gametype.integer < GT_TEAM ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Teams are not enabled in this gametype.\n\"" );
+		return;
+	}
+
+	trap_SendServerCommand( ent-g_entities, va("print \"Red Team: %i\n\"", level.teamScores[TEAM_RED] ) );
+	trap_SendServerCommand( ent-g_entities, va("print \"Blue Team: %i\n\"", level.teamScores[TEAM_BLUE] ) );
+}
+
+/*
+=================
+Cmd_Acc_f
+=================
+*/
+void Cmd_Acc_f( gentity_t *ent ) {
+	int accuracy;
+
+	if ( !ent->client ) {
+		return;
+	}
+
+	if ( ent->client->accuracy_shots ) {
+		accuracy = ent->client->accuracy_hits * 100 / ent->client->accuracy_shots;
+	} else {
+		accuracy = 0;
+	}
+
+	trap_SendServerCommand( ent-g_entities, va("print \"Accuracy: %i%% (%i hits / %i shots)\n\"",
+		accuracy, ent->client->accuracy_hits, ent->client->accuracy_shots) );
+}
+
+/*
+=================
+Cmd_Cvar_f
+=================
+*/
+void Cmd_Cvar_f( gentity_t *ent ) {
+	char	arg[MAX_TOKEN_CHARS];
+	char	val[MAX_TOKEN_CHARS];
+
+	if ( trap_Argc() != 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: cvar <cvarname>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+
+	// only allow checking safe cvars
+	if ( Q_stricmp( arg, "g_gametype" ) &&
+		 Q_stricmp( arg, "timelimit" ) &&
+		 Q_stricmp( arg, "fraglimit" ) &&
+		 Q_stricmp( arg, "capturelimit" ) &&
+		 Q_stricmp( arg, "g_friendlyFire" ) &&
+		 Q_stricmp( arg, "g_gravity" ) &&
+		 Q_stricmp( arg, "g_speed" ) &&
+		 Q_stricmp( arg, "g_knockback" ) &&
+		 Q_stricmp( arg, "g_quadfactor" ) &&
+		 Q_stricmp( arg, "g_weaponRespawn" ) &&
+		 Q_stricmp( arg, "g_forcerespawn" ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Cvar is not public.\n\"" );
+		return;
+	}
+
+	trap_Cvar_VariableStringBuffer( arg, val, sizeof( val ) );
+	trap_SendServerCommand( ent-g_entities, va("print \"Cvar %s = %s\n\"", arg, val) );
+}
 
 
 /*
@@ -948,6 +1111,9 @@ void SetTeam( gentity_t *ent, char *s ) {
 			team = TEAM_RED;
 		} else if ( !Q_stricmp( s, "blue" ) || !Q_stricmp( s, "b" ) ) {
 			team = TEAM_BLUE;
+		} else if ( !Q_stricmp( s, "auto" ) ) {
+			// pick the team with the least number of players
+			team = PickTeam( clientNum );
 		} else {
 			// pick the team with the least number of players
 			team = PickTeam( clientNum );
@@ -1961,6 +2127,22 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_gametype %d", gametype );
 		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "g_gametype %s", gameNames[gametype] );
 		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "shuffle" ) ) {
+		if ( g_gametype.integer < GT_TEAM ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Shuffle is only available in team games.\\n\"" );
+			return;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "shuffle_teams" );
+		Q_strncpyz( level.voteDisplayString, "Shuffle Teams", sizeof( level.voteDisplayString ) );
+		voteSelection = G_VoteSelectionKey( arg1, NULL );
+	} else if ( !Q_stricmp( arg1, "teamsize" ) ) {
+		if ( g_gametype.integer < GT_TEAM ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Teamsize is only available in team games.\\n\"" );
+			return;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "teamsize %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "teamsize %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
 	} else if ( !Q_stricmp( arg1, "kick" ) ) {
 		int             clientNum;
 
@@ -2036,6 +2218,50 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 
 		Com_sprintf( level.voteString, sizeof( level.voteString ), "fraglimit %d", atoi( arg2 ) );
 		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "fraglimit %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "scorelimit" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "scorelimit %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "scorelimit %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "roundlimit" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "roundlimit %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "roundlimit %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "cointoss" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "cointoss" );
+		Q_strncpyz( level.voteDisplayString, "Coin Toss", sizeof( level.voteDisplayString ) );
+		voteSelection = G_VoteSelectionKey( arg1, NULL );
+	} else if ( !Q_stricmp( arg1, "randommap" ) ) {
+		if ( g_voteFlags.integer & VF_NO_MAP ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting to change the map being played is disabled on this server.\\n\"" );
+			return;
+		}
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "randommap" );
+		Q_strncpyz( level.voteDisplayString, "Random Map", sizeof( level.voteDisplayString ) );
+		voteSelection = G_VoteSelectionKey( arg1, NULL );
+	} else if ( !Q_stricmp( arg1, "ruleset" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "ruleset %s", arg2 );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "ruleset %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "mercylimit" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "mercylimit %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "mercylimit %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "floodprot" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_floodprot_maxcount %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "floodprot %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "g_friendlyFire" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_friendlyFire %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "g_friendlyFire %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "g_gravity" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_gravity %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "g_gravity %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "g_speed" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_speed %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "g_speed %s", arg2 );
 		voteSelection = G_VoteSelectionKey( arg1, arg2 );
 	} else if ( !Q_stricmp( arg1, "g_doWarmup" ) ) {
 		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_doWarmup %d", atoi( arg2 ) );
@@ -2372,20 +2598,23 @@ Cmd_Stats_f
 =================
 */
 void Cmd_Stats_f( gentity_t *ent ) {
-/*
-	int max, n, i;
+	int accuracy;
 
-	max = trap_AAS_PointReachabilityAreaIndex( NULL );
-
-	n = 0;
-	for ( i = 0; i < max; i++ ) {
-		if ( ent->client->areabits[i >> 3] & (1 << (i & 7)) )
-			n++;
+	if ( !ent->client ) {
+		return;
 	}
 
-	//trap_SendServerCommand( ent-g_entities, va("print \"visited %d of %d areas\n\"", n, max));
-	trap_SendServerCommand( ent-g_entities, va("print \"%d%% level coverage\n\"", n * 100 / max));
-*/
+	if ( ent->client->accuracy_shots ) {
+		accuracy = ent->client->accuracy_hits * 100 / ent->client->accuracy_shots;
+	} else {
+		accuracy = 0;
+	}
+
+	trap_SendServerCommand( ent-g_entities, va("print \"Weapon Stats for %s\n\"", ent->client->pers.netname) );
+	trap_SendServerCommand( ent-g_entities, va("print \"Accuracy: %i%% (%i hits / %i shots)\n\"",
+		accuracy, ent->client->accuracy_hits, ent->client->accuracy_shots) );
+	trap_SendServerCommand( ent-g_entities, va("print \"Score: %i\n\"", ent->client->ps.persistant[PERS_SCORE]) );
+	trap_SendServerCommand( ent-g_entities, va("print \"Ping: %i\n\"", ent->client->ps.ping) );
 }
 
 static qboolean G_ClientCanControlTimeouts( gentity_t *ent, team_t *teamOut ) {
@@ -2675,6 +2904,30 @@ void ClientCommand( int clientNum ) {
 	}
 	if (Q_stricmp (cmd, "score") == 0) {
 		Cmd_Score_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "ready") == 0) {
+		Cmd_Ready_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "notready") == 0) {
+		Cmd_NotReady_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "players") == 0) {
+		Cmd_Players_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "teams") == 0) {
+		Cmd_Teams_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "acc") == 0) {
+		Cmd_Acc_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "cvar") == 0) {
+		Cmd_Cvar_f (ent);
 		return;
 	}
 

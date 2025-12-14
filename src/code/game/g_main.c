@@ -3206,6 +3206,28 @@ void CheckTournament( void ) {
 			return;
 		}
 
+		// check ready flags
+		if ( g_doWarmup.integer && level.warmupTime > 0 ) {
+			int i, readyCount = 0;
+			for ( i = 0; i < level.maxclients; i++ ) {
+				gclient_t *cl = &level.clients[i];
+				if ( cl->pers.connected != CON_CONNECTED || cl->sess.sessionTeam == TEAM_SPECTATOR ) {
+					continue;
+				}
+				if ( !(cl->ps.eFlags & EF_READY) ) {
+					break;
+				}
+				readyCount++;
+			}
+			if ( i == level.maxclients && readyCount > 0 ) {
+				if ( level.warmupTime > level.time + 10000 ) {
+					level.warmupTime = level.time + 10000;
+					trap_SendServerCommand( -1, "print \"All players ready! Match starting in 10 seconds.\n\"" );
+					trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+				}
+			}
+		}
+
 		// if the warmup time has counted down, restart
 		if ( level.time > level.warmupTime ) {
 			level.warmupTime += 10000;
