@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	MISSILE_PRESTEP_TIME	50
 #define	GUIDED_ROCKET_TURN_FRACTION	0.2f
 
+
 /*
 =============
 G_IsMidAirEligibleTarget
@@ -314,6 +315,12 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	// check for bounce
 	if ( !other->takedamage &&
 		( ent->s.eFlags & ( EF_BOUNCE | EF_BOUNCE_HALF ) ) ) {
+		G_BounceMissile( ent, trace );
+		G_AddEvent( ent, EV_GRENADE_BOUNCE, 0 );
+		return;
+	}
+
+	if ( other->s.eType == ET_MOVER && ( !Q_stricmp( other->classname, "func_train" ) || !Q_stricmp( other->classname, "func_rotating" ) ) ) {
 		G_BounceMissile( ent, trace );
 		G_AddEvent( ent, EV_GRENADE_BOUNCE, 0 );
 		return;
@@ -701,8 +708,8 @@ void G_RunMissile( gentity_t *ent ) {
 			}
 		} else if ( ent->count ) {
 			ent->count = 0;
-}
-}
+		}
+	}
 
 	if ( ent->s.weapon == WP_ROCKET_LAUNCHER || ent->s.weapon == WP_PLASMAGUN || ent->s.weapon == WP_BFG ) {
 		G_UpdateMissileAcceleration( ent );
