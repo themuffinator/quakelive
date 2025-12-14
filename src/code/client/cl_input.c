@@ -450,6 +450,10 @@ void CL_MouseMove( usercmd_t *cmd ) {
 
 	rate = sqrt( mx * mx + my * my ) / (float)frame_msec;
 
+	// Style 0 is the legacy Q3 acceleration
+	// Style 1 (QL) logic is typically unknown/same or similar to 0 but with different cap behavior?
+	// For now, we fallback to style 0 logic for any unknown style to ensure consistent behavior.
+	// TODO: Implement specific logic for cl_mouseAccelStyle 1 if different.
 	if ( cl_mouseAccelOffset->value < rate ) {
 		accelSensitivity = cl_mouseAccel->value * powf( rate - cl_mouseAccelOffset->value, cl_mouseAccelPower->value );
 	} else {

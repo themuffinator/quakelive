@@ -373,6 +373,8 @@ void CL_ConsolePrint( char *txt ) {
 	int		color;
 	qboolean skipnotify = qfalse;		// NERVE - SMF
 	int prev;							// NERVE - SMF
+	char	timestamp[32];
+	qboolean	timestampPrinted = qfalse;
 
 	// TTimo - prefix for text that shows up in console but not in notify
 	// backported from RTCW
@@ -398,7 +400,66 @@ void CL_ConsolePrint( char *txt ) {
 
 	color = ColorIndex(COLOR_WHITE);
 
+	if ( cl_contimestamps->integer ) {
+		if ( cl_contimestamps->integer == 1 ) {
+			Com_sprintf( timestamp, sizeof( timestamp ), "^7[%i] ", cls.realtime / 1000 );
+		} else {
+			// server time is not always available or might be 0, falling back to game time logic or system time if we had it
+			// For parity with "2 = Server time", we use cl.serverTime if connected.
+			if ( cls.state >= CA_CONNECTED ) {
+				Com_sprintf( timestamp, sizeof( timestamp ), "^7[%i] ", cl.serverTime / 1000 );
+			} else {
+				Com_sprintf( timestamp, sizeof( timestamp ), "^7[%i] ", cls.realtime / 1000 );
+			}
+		}
+	}
+
 	while ( (c = *txt) != 0 ) {
+		if ( !timestampPrinted && cl_contimestamps->integer && con.x == 0 ) {
+			// Print timestamp at start of line
+			int ts_len = strlen(timestamp);
+			int i;
+			timestampPrinted = qtrue;
+
+			for ( i = 0; i < ts_len; i++ ) {
+				if ( Q_IsColorString( &timestamp[i] ) ) {
+					color = ColorIndex( timestamp[i+1] );
+					i++;
+					continue;
+				}
+				con.text[(con.current % con.totallines)*con.linewidth+con.x] = (color << 8) | timestamp[i];
+				con.x++;
+				if (con.x >= con.linewidth) {
+					Con_Linefeed(skipnotify);
+					con.x = 0;
+					// If we wrap inside the timestamp, we do NOT want to print the timestamp again immediately
+					// because we are technically still on the same "logical" line or at least we are in the middle of a print.
+					// However, if we wrap, we are on a new line.
+					// But usually timestamps are short. If they wrap, it's weird.
+					// But if they wrap, the next char will trigger this block again if we reset timestampPrinted.
+					// If we don't reset it, we continue printing the rest of timestamp.
+					// But if we wrap, we are at x=0.
+					// If we set timestampPrinted = qtrue, the check !timestampPrinted fails, so we won't recurse.
+					// But if we wrap during normal text, we set x=0.
+					// Then for next char, check !timestampPrinted.
+					// We need to ensure that when we wrap due to normal text, we DO print timestamp on next line if desired?
+					// Usually console wrapping implies continuation of same line. Timestamps usually only on new messages (start of print).
+					// CL_ConsolePrint handles a string. If the string contains \n, we reset.
+					// If the string is long and wraps, it is a continuation. We should NOT print timestamp again.
+					// So if we wrap here, we don't change timestampPrinted.
+					// Wait, if we wrap inside timestamp, we are still printing timestamp.
+					// The issue in previous code was: `timestampPrinted = qfalse;` inside the loop.
+					// If I remove that line, then `timestampPrinted` remains true until `\n`.
+					// This means wrapped lines (continuations) will NOT have timestamps.
+					// This is standard behavior (timestamp only at start of message).
+				}
+			}
+		}
+
+		if ( c == '\n' ) {
+			timestampPrinted = qfalse; // reset for next line
+		}
+
 		if ( Q_IsColorString( txt ) ) {
 			color = ColorIndex( *(txt+1) );
 			txt += 2;

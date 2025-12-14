@@ -362,6 +362,12 @@ extern	cvar_t	*cl_allowDownload;
 extern	cvar_t	*cl_conXOffset;
 extern	cvar_t	*cl_inGameVideo;
 
+extern	cvar_t	*cl_autoTimeNudge;
+extern	cvar_t	*cl_contimestamps;
+extern	cvar_t	*cl_mouseAccelStyle;
+extern	cvar_t	*cl_guid;
+extern	cvar_t	*cl_punkbuster;
+
 //=================================================
 
 //

@@ -112,6 +112,12 @@ cvar_t	*cl_allowDownload;
 cvar_t	*cl_conXOffset;
 cvar_t	*cl_inGameVideo;
 
+cvar_t	*cl_autoTimeNudge;
+cvar_t	*cl_contimestamps;
+cvar_t	*cl_mouseAccelStyle;
+cvar_t	*cl_guid;
+cvar_t	*cl_punkbuster;
+
 cvar_t	*cl_serverStatusResendTime;
 cvar_t	*cl_trn;
 clientActive_t		cl;
@@ -2339,7 +2345,7 @@ void CL_Init( void ) {
 	cl_allowConsoleChat = Cvar_Get ("cl_allowConsoleChat", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	rcon_client_password = Cvar_Get ("rconPassword", "", CVAR_TEMP );
 	cl_activeAction = Cvar_Get( "activeAction", "", CVAR_TEMP );
-	cl_demoRecordMessage = Cvar_Get ("cl_demoRecordMessage", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
+	cl_demoRecordMessage = Cvar_Get ("cl_demoRecordMessage", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 
 	cl_timedemo = Cvar_Get ("timedemo", "0", 0);
 	cl_avidemo = Cvar_Get ("cl_avidemo", "0", 0);
@@ -2354,7 +2360,7 @@ void CL_Init( void ) {
 	cl_pitchspeed = Cvar_Get ("cl_pitchspeed", "140", CVAR_CHEAT );
 	cl_anglespeedkey = Cvar_Get ("cl_anglespeedkey", "1.5", CVAR_CHEAT );
 
-	cl_maxpackets = Cvar_Get ("cl_maxpackets", "125", CVAR_CHEAT );
+	cl_maxpackets = Cvar_Get ("cl_maxpackets", "63", CVAR_CHEAT );
 	cl_packetdup = Cvar_Get ("cl_packetdup", "1", CVAR_ARCHIVE | CVAR_CLOUD );
 
 	cl_run = Cvar_Get ("cl_run", "1", CVAR_ARCHIVE);
@@ -2362,14 +2368,14 @@ void CL_Init( void ) {
 	cl_sensitivity = Cvar_Get ("sensitivity", "4", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_mouseAccel = Cvar_Get ("cl_mouseAccel", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_mouseAccelDebug = Cvar_Get ("cl_mouseAccelDebug", "0", 0 );
-	cl_mouseAccelOffset = Cvar_Get ("cl_mouseAccelOffset", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
+	cl_mouseAccelOffset = Cvar_Get ("cl_mouseAccelOffset", "5", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_mouseAccelPower = Cvar_Get ("cl_mouseAccelPower", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_mouseSensCap = Cvar_Get ("cl_mouseSensCap", "0", CVAR_ARCHIVE | CVAR_CLOUD );
 	cl_freelook = Cvar_Get( "cl_freelook", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 
 	cl_showMouseRate = Cvar_Get ("cl_showmouserate", "0", 0);
 
-	cl_allowDownload = Cvar_Get ("cl_allowDownload", "0", CVAR_ARCHIVE );
+	cl_allowDownload = Cvar_Get ("cl_allowDownload", "1", CVAR_ARCHIVE );
 
 	cl_conXOffset = Cvar_Get ("cl_conXOffset", "0", 0);
 	cl_inGameVideo = Cvar_Get ("r_inGameVideo", "1", CVAR_ARCHIVE);
@@ -2389,6 +2395,12 @@ void CL_Init( void ) {
 
 	cl_motdString = Cvar_Get( "cl_motdString", "", CVAR_ROM );
 	cl_platform = Cvar_Get ("cl_platform", "1", CVAR_ROM | CVAR_SYSTEMINFO | CVAR_USERINFO );
+
+	cl_autoTimeNudge = Cvar_Get ("cl_autoTimeNudge", "0", CVAR_ARCHIVE | CVAR_TEMP );
+	cl_contimestamps = Cvar_Get ("cl_contimestamps", "0", CVAR_ARCHIVE );
+	cl_mouseAccelStyle = Cvar_Get ("cl_mouseAccelStyle", "0", CVAR_ARCHIVE );
+	cl_guid = Cvar_Get ("cl_guid", "", CVAR_USERINFO | CVAR_ROM );
+	cl_punkbuster = Cvar_Get ("cl_punkbuster", "1", CVAR_ARCHIVE | CVAR_USERINFO );
 
 	Cvar_Get( "cl_maxPing", "800", CVAR_ARCHIVE );
 	Cvar_Get( "cl_downloadName", "", CVAR_TEMP );
