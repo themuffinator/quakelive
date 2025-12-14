@@ -342,6 +342,13 @@ void Bullet_Fire( gentity_t *ent, float spread, int damage, meansOfDeath_t mod )
 			tent->s.eventParm = traceEnt->s.number;
 			if( LogAccuracyHit( traceEnt, ent ) ) {
 				ent->client->accuracy_hits++;
+				if ( mod == MOD_HMG ) {
+					ent->client->pers.accuracy_hits[WP_HEAVY_MACHINEGUN]++;
+				} else if ( mod == MOD_CHAINGUN ) {
+					ent->client->pers.accuracy_hits[WP_CHAINGUN]++;
+				} else {
+					ent->client->pers.accuracy_hits[WP_MACHINEGUN]++;
+				}
 			}
 		} else {
 			tent = G_TempEntity( tr.endpos, EV_BULLET_HIT_WALL );
@@ -479,6 +486,7 @@ void ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, gentity_t *ent ) {
 		if( ShotgunPellet( origin, end, ent ) && !hitClient ) {
 			hitClient = qtrue;
 			ent->client->accuracy_hits++;
+			ent->client->pers.accuracy_hits[WP_SHOTGUN]++;
 		}
 	}
 }
@@ -697,6 +705,7 @@ void weapon_railgun_fire (gentity_t *ent) {
 			ent->client->rewardTime = level.time + REWARD_SPRITE_TIME;
 		}
 		ent->client->accuracy_hits++;
+		ent->client->pers.accuracy_hits[WP_RAILGUN]++;
 	}
 
 }
@@ -867,6 +876,7 @@ void Weapon_LightningFire( gentity_t *ent ) {
 			tent->s.weapon = ent->s.weapon;
 			if( LogAccuracyHit( traceEnt, ent ) ) {
 				ent->client->accuracy_hits++;
+				ent->client->pers.accuracy_hits[WP_LIGHTNING]++;
 			}
 		} else if ( !( tr.surfaceFlags & SURF_NOIMPACT ) ) {
 			tent = G_TempEntity( tr.endpos, EV_MISSILE_MISS );
@@ -1007,8 +1017,10 @@ void FireWeapon( gentity_t *ent ) {
 	if( ent->s.weapon != WP_GRAPPLING_HOOK && ent->s.weapon != WP_GAUNTLET ) {
 		if( ent->s.weapon == WP_NAILGUN ) {
 			ent->client->accuracy_shots += NUM_NAILSHOTS;
+			ent->client->pers.accuracy_shots[WP_NAILGUN] += NUM_NAILSHOTS;
 		} else {
 			ent->client->accuracy_shots++;
+			ent->client->pers.accuracy_shots[ent->s.weapon]++;
 		}
 	}
 

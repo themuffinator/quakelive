@@ -530,6 +530,30 @@ void Cmd_ShuffleTeams_f( void ) {
 
 /*
 =================
+Svcmd_TeamSize_f
+=================
+*/
+void Svcmd_TeamSize_f( void ) {
+	char	str[MAX_TOKEN_CHARS];
+	int		size;
+
+	if ( trap_Argc() < 2 ) {
+		G_Printf("Usage:  teamsize <size>\n");
+		return;
+	}
+
+	trap_Argv( 1, str, sizeof( str ) );
+	size = atoi( str );
+
+	if ( size < 0 ) {
+		size = 0;
+	}
+
+	trap_Cvar_Set( "g_teamSizeMin", va("%i", size) );
+}
+
+/*
+=================
 Cmd_CoinToss_f
 =================
 */
@@ -568,6 +592,10 @@ qboolean	ConsoleCommand( void ) {
 	}
 	if ( Q_stricmp (cmd, "shuffle_teams") == 0 ) {
 		Cmd_ShuffleTeams_f();
+		return qtrue;
+	}
+	if ( Q_stricmp (cmd, "teamsize") == 0 ) {
+		Svcmd_TeamSize_f();
 		return qtrue;
 	}
 	if ( Q_stricmp (cmd, "cointoss") == 0 ) {

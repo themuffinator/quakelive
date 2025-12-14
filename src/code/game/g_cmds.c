@@ -66,7 +66,7 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 		perfect = ( cl->ps.persistant[PERS_RANK] == 0 && cl->ps.persistant[PERS_KILLED] == 0 ) ? 1 : 0;
 
 		Com_sprintf (entry, sizeof(entry),
-			" %i %i %i %i %i %i %i %i %i %i %i %i %i %i", level.sortedClients[i],
+			" %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i", level.sortedClients[i],
 			cl->ps.persistant[PERS_SCORE], ping, (level.time - cl->pers.enterTime)/60000,
 			scoreFlags, g_entities[level.sortedClients[i]].s.powerups, accuracy, 
 			cl->ps.persistant[PERS_IMPRESSIVE_COUNT],
@@ -75,7 +75,8 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 			cl->ps.persistant[PERS_DEFEND_COUNT], 
 			cl->ps.persistant[PERS_ASSIST_COUNT], 
 			perfect,
-			cl->ps.persistant[PERS_CAPTURES]);
+			cl->ps.persistant[PERS_CAPTURES],
+			cl->pers.damageGiven);
 		j = strlen(entry);
 		if (stringlength + j > 1024)
 			break;
@@ -2598,23 +2599,57 @@ Cmd_Stats_f
 =================
 */
 void Cmd_Stats_f( gentity_t *ent ) {
-	int accuracy;
+	int i, shots, hits, accuracy;
+	int totalShots = 0, totalHits = 0;
+	gclient_t *client = ent->client;
+	char *weaponNames[] = {
+		"Gauntlet", "Machinegun", "HMG", "Shotgun", "Grenade", "Rocket",
+		"Lightning", "Railgun", "Plasma", "BFG", "Grapple", "Nailgun",
+		"Prox Mine", "Chaingun"
+	};
+	int weaponIndices[] = {
+		WP_GAUNTLET, WP_MACHINEGUN, WP_HEAVY_MACHINEGUN, WP_SHOTGUN, WP_GRENADE_LAUNCHER, WP_ROCKET_LAUNCHER,
+		WP_LIGHTNING, WP_RAILGUN, WP_PLASMAGUN, WP_BFG, WP_GRAPPLING_HOOK, WP_NAILGUN,
+		WP_PROX_LAUNCHER, WP_CHAINGUN
+	};
 
-	if ( !ent->client ) {
+	if ( !client ) {
 		return;
 	}
 
-	if ( ent->client->accuracy_shots ) {
-		accuracy = ent->client->accuracy_hits * 100 / ent->client->accuracy_shots;
+	trap_SendServerCommand( ent-g_entities, va("print \"\nWeapon Stats for %s\n\"", client->pers.netname) );
+	trap_SendServerCommand( ent-g_entities, "print \"Weapon     Accuracy   Hits   Shots\n\"" );
+	trap_SendServerCommand( ent-g_entities, "print \"----------------------------------\n\"" );
+
+	for ( i = 0; i < sizeof(weaponIndices) / sizeof(weaponIndices[0]); i++ ) {
+		int w = weaponIndices[i];
+		shots = client->pers.accuracy_shots[w];
+		hits = client->pers.accuracy_hits[w];
+		if ( shots > 0 ) {
+			accuracy = hits * 100 / shots;
+		} else {
+			accuracy = 0;
+		}
+
+		if ( shots > 0 ) {
+			trap_SendServerCommand( ent-g_entities, va("print \"%-10s %5i%% %6i %7i\n\"",
+				weaponNames[i], accuracy, hits, shots) );
+			totalShots += shots;
+			totalHits += hits;
+		}
+	}
+
+	if ( totalShots > 0 ) {
+		accuracy = totalHits * 100 / totalShots;
 	} else {
 		accuracy = 0;
 	}
 
-	trap_SendServerCommand( ent-g_entities, va("print \"Weapon Stats for %s\n\"", ent->client->pers.netname) );
-	trap_SendServerCommand( ent-g_entities, va("print \"Accuracy: %i%% (%i hits / %i shots)\n\"",
-		accuracy, ent->client->accuracy_hits, ent->client->accuracy_shots) );
-	trap_SendServerCommand( ent-g_entities, va("print \"Score: %i\n\"", ent->client->ps.persistant[PERS_SCORE]) );
-	trap_SendServerCommand( ent-g_entities, va("print \"Ping: %i\n\"", ent->client->ps.ping) );
+	trap_SendServerCommand( ent-g_entities, "print \"----------------------------------\n\"" );
+	trap_SendServerCommand( ent-g_entities, va("print \"Total      %5i%% %6i %7i\n\"",
+		accuracy, totalHits, totalShots) );
+	trap_SendServerCommand( ent-g_entities, va("print \"\nDamage Given: %i  Damage Received: %i\n\"",
+		client->pers.damageGiven, client->pers.damageReceived) );
 }
 
 static qboolean G_ClientCanControlTimeouts( gentity_t *ent, team_t *teamOut ) {

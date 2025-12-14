@@ -126,6 +126,7 @@ void G_ExplodeMissile( gentity_t *ent ) {
 		if( G_RadiusDamage( ent->r.currentOrigin, ent->parent, ent->splashDamage, ent->splashRadius, ent
 				, ent->splashMethodOfDeath, &splashMidAir ) ) {
 			g_entities[ent->r.ownerNum].client->accuracy_hits++;
+			g_entities[ent->r.ownerNum].client->pers.accuracy_hits[ent->s.weapon]++;
 		}
 	}
 
@@ -352,6 +353,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 
 			if( LogAccuracyHit( other, &g_entities[ent->r.ownerNum] ) ) {
 				g_entities[ent->r.ownerNum].client->accuracy_hits++;
+				g_entities[ent->r.ownerNum].client->pers.accuracy_hits[ent->s.weapon]++;
 				hitClient = qtrue;
 			}
 			BG_EvaluateTrajectoryDelta( &ent->s.pos, level.time, velocity );
@@ -510,6 +512,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 			other, ent->splashMethodOfDeath, &splashMidAir ) ) {
 			if( !hitClient ) {
 				g_entities[ent->r.ownerNum].client->accuracy_hits++;
+				g_entities[ent->r.ownerNum].client->pers.accuracy_hits[ent->s.weapon]++;
 			}
 		}
 	}
