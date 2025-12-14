@@ -2114,11 +2114,22 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.persistant[PERS_TEAM] = client->sess.sessionTeam;
 	G_FreezeInitClient( ent );
 
+	// set spawn protection time
+	if ( g_spawnProtect.integer > 0 && client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		client->invulnerabilityTime = level.time + g_spawnProtect.integer;
+	} else {
+		client->invulnerabilityTime = 0;
+	}
+
 	client->airOutTime = level.time + 12000;
 
 	trap_GetUserinfo( index, userinfo, sizeof(userinfo) );
 	// set max health
-	baseHealth = factoryConfig->startingHealth;
+	if ( g_startingHealth.integer > 0 ) {
+		baseHealth = g_startingHealth.integer;
+	} else {
+		baseHealth = factoryConfig->startingHealth;
+	}
 	if ( baseHealth < 1 ) {
 		baseHealth = 1;
 	}
@@ -2152,7 +2163,14 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.clientNum = index;
 
 	{
-		unsigned int startingMask = g_factoryCvarConfig.startingWeaponsStatMask;
+		unsigned int startingMask;
+
+		if ( g_startingWeapons.integer > 0 ) {
+			startingMask = g_startingWeapons.integer;
+		} else {
+			startingMask = g_factoryCvarConfig.startingWeaponsStatMask;
+		}
+
 		weapon_t weapon;
 		const int startingAmmoTable[WP_NUM_WEAPONS] = {
 			[WP_NONE] = 0,
@@ -2193,7 +2211,10 @@ void ClientSpawn(gentity_t *ent) {
 		spawnHealth = 1;
 	}
 	ent->health = client->ps.stats[STAT_HEALTH] = spawnHealth;
-	if ( factoryConfig->startingArmor > 0 ) {
+
+	if ( g_startingArmor.integer > 0 ) {
+		client->ps.stats[STAT_ARMOR] = g_startingArmor.integer;
+	} else if ( factoryConfig->startingArmor > 0 ) {
 		client->ps.stats[STAT_ARMOR] = factoryConfig->startingArmor;
 	}
 

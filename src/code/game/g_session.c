@@ -130,7 +130,18 @@ void G_InitSessionData( gclient_t *client, char *userinfo ) {
 			BroadcastTeamChange( client, -1 );
 		} else {
 			// always spawn as spectator in team games
-			sess->sessionTeam = TEAM_SPECTATOR;	
+			if ( g_maintainTeam.integer ) {
+				value = Info_ValueForKey( userinfo, "team" );
+				if ( value[0] == 'r' || value[0] == 'R' ) {
+					sess->sessionTeam = TEAM_RED;
+				} else if ( value[0] == 'b' || value[0] == 'B' ) {
+					sess->sessionTeam = TEAM_BLUE;
+				} else {
+					sess->sessionTeam = TEAM_SPECTATOR;
+				}
+			} else {
+				sess->sessionTeam = TEAM_SPECTATOR;
+			}
 		}
 	} else {
 		value = Info_ValueForKey( userinfo, "team" );
