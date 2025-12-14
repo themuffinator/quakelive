@@ -719,6 +719,11 @@ typedef struct {
 	qboolean	ratingMetadataLoaded;
 	int			itemProgressionTier;
 	unsigned int	progressionFlags;
+
+	int			damageGiven;
+	int			damageReceived;
+	int			accuracy_shots[WP_NUM_WEAPONS];
+	int			accuracy_hits[WP_NUM_WEAPONS];
 } clientPersistant_t;
 
 

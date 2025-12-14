@@ -1678,6 +1678,13 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 	// do the damage
 	if ( take ) {
+		if ( attacker && attacker->client ) {
+			attacker->client->pers.damageGiven += take;
+		}
+		if ( targ && targ->client ) {
+			targ->client->pers.damageReceived += take;
+		}
+
 		targ->health = targ->health - take;
 		if ( targ->client ) {
 			targ->client->ps.stats[STAT_HEALTH] = targ->health;

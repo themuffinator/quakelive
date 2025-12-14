@@ -3801,11 +3801,15 @@ void G_RunFrame( int levelTime ) {
 	G_UpdateCvars();
 	G_RefreshPmoveSettings();
 
-	G_DispatchScheduledThinks( ctx, msec );
-	G_StepEntities( ctx );
+	if ( !level.timeoutActive ) {
+		G_DispatchScheduledThinks( ctx, msec );
+		G_StepEntities( ctx );
+	}
 	G_DispatchEvents( ctx );
-	Team_RunDomination();
-	G_QuadHogFrame();
+	if ( !level.timeoutActive ) {
+		Team_RunDomination();
+		G_QuadHogFrame();
+	}
 	G_FinishClientFrames( ctx );
 	G_UpdateVoteThrottle();
 	G_Frame_UpdateRoundController();
