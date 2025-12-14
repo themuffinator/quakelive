@@ -641,7 +641,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_weaponPrimary, "cg_weaponPrimary", "", CVAR_ROM },
 	{ &cg_weaponPrimaryQueued, "cg_weaponPrimaryQueued", "", CVAR_TEMP },
 	{ &cg_preferredStartingWeapons, "cg_preferredStartingWeapons", "", 0x00080801 },
-	{ &cg_trueShotgun, "cg_trueShotgun", "0", 0x00081801 },
+	{ &cg_trueShotgun, "cg_trueShotgun", "1", 0x00081801 },
 	{ &cg_trackPlayer, "cg_trackPlayer", "-1", CVAR_CHEAT },
 	{ &cg_followKiller, "cg_followKiller", "0", CVAR_ARCHIVE },
 	{ &cg_followPowerup, "cg_followPowerup", "0", CVAR_ARCHIVE },

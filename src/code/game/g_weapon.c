@@ -478,8 +478,19 @@ void ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, gentity_t *ent ) {
 
 	// generate the "random" spread pattern
 	for ( i = 0 ; i < DEFAULT_SHOTGUN_COUNT ; i++ ) {
-		r = Q_crandom( &seed ) * DEFAULT_SHOTGUN_SPREAD * 16;
-		u = Q_crandom( &seed ) * DEFAULT_SHOTGUN_SPREAD * 16;
+		if ( i == 0 ) {
+			r = 0;
+			u = 0;
+		} else if ( i < 6 ) {
+			float angle = (i - 1) * 72.0f;
+			r = DEFAULT_SHOTGUN_SPREAD * 0.5f * 16.0f * cos( DEG2RAD( angle ) );
+			u = DEFAULT_SHOTGUN_SPREAD * 0.5f * 16.0f * sin( DEG2RAD( angle ) );
+		} else {
+			float angle = (i - 6) * 72.0f + 36.0f;
+			r = DEFAULT_SHOTGUN_SPREAD * 16.0f * cos( DEG2RAD( angle ) );
+			u = DEFAULT_SHOTGUN_SPREAD * 16.0f * sin( DEG2RAD( angle ) );
+		}
+
 		VectorMA( origin, 8192 * 16, forward, end);
 		VectorMA (end, r, right, end);
 		VectorMA (end, u, up, end);
