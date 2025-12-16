@@ -156,8 +156,7 @@ void Cmd_Ready_f( gentity_t *ent ) {
 	}
 
 	if ( ent->client->ps.eFlags & EF_READY ) {
-		ent->client->ps.eFlags &= ~EF_READY;
-		trap_SendServerCommand( ent-g_entities, "print \"You are now ^1NOT^7 ready.\n\"" );
+		trap_SendServerCommand( ent-g_entities, "print \"You are already ready.\n\"" );
 		return;
 	}
 
@@ -166,6 +165,32 @@ void Cmd_Ready_f( gentity_t *ent ) {
 
 	// check if everyone is ready
 	// This logic might need to be in G_CheckWarmup or similar
+}
+
+/*
+==================
+Cmd_ReadyUp_f
+==================
+*/
+void Cmd_ReadyUp_f( gentity_t *ent ) {
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Spectators cannot ready up.\n\"" );
+		return;
+	}
+
+	if ( level.warmupTime == 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"The match has already started.\n\"" );
+		return;
+	}
+
+	if ( ent->client->ps.eFlags & EF_READY ) {
+		ent->client->ps.eFlags &= ~EF_READY;
+		trap_SendServerCommand( ent-g_entities, "print \"You are now ^1NOT^7 ready.\n\"" );
+		return;
+	}
+
+	ent->client->ps.eFlags |= EF_READY;
+	trap_SendServerCommand( ent-g_entities, "print \"You are now ready.\n\"" );
 }
 
 /*
@@ -3014,8 +3039,12 @@ void ClientCommand( int clientNum ) {
 		Cmd_Score_f (ent);
 		return;
 	}
-	else if (Q_stricmp (cmd, "ready") == 0 || Q_stricmp (cmd, "readyup") == 0) {
+	else if (Q_stricmp (cmd, "ready") == 0) {
 		Cmd_Ready_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "readyup") == 0) {
+		Cmd_ReadyUp_f (ent);
 		return;
 	}
 	else if (Q_stricmp (cmd, "notready") == 0 || Q_stricmp (cmd, "unready") == 0) {
