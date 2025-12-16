@@ -156,7 +156,8 @@ void Cmd_Ready_f( gentity_t *ent ) {
 	}
 
 	if ( ent->client->ps.eFlags & EF_READY ) {
-		trap_SendServerCommand( ent-g_entities, "print \"You are already ready.\n\"" );
+		ent->client->ps.eFlags &= ~EF_READY;
+		trap_SendServerCommand( ent-g_entities, "print \"You are now ^1NOT^7 ready.\n\"" );
 		return;
 	}
 
