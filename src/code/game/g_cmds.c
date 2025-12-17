@@ -1543,6 +1543,11 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) 
 	char		text[MAX_SAY_TEXT];
 	char		location[64];
 
+	if ( ent->client && ent->client->sess.muted ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You are muted.\n\"" );
+		return;
+	}
+
 	if ( g_gametype.integer < GT_TEAM && mode == SAY_TEAM ) {
 		mode = SAY_ALL;
 	}
@@ -1705,6 +1710,11 @@ static void G_VoiceTo( gentity_t *ent, gentity_t *other, int mode, const char *i
 void G_Voice( gentity_t *ent, gentity_t *target, int mode, const char *id, qboolean voiceonly ) {
 	int			j;
 	gentity_t	*other;
+
+	if ( ent->client && ent->client->sess.muted ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You are muted.\n\"" );
+		return;
+	}
 
 	if ( g_gametype.integer < GT_TEAM && mode == SAY_TEAM ) {
 		mode = SAY_ALL;
@@ -2939,6 +2949,616 @@ void Cmd_Ruleset_f( gentity_t *ent ) {
 
 /*
 ==================
+Cmd_Invite_f
+==================
+*/
+void Cmd_Invite_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+	gentity_t *target;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	// This is a simplified implementation. Real invite logic would integrate with Steam/platform auth.
+	// For now, we allow admins to "invite" which just prints a message.
+	if ( G_AdminAccessForSteamID( NULL ) < PRIV_MOD ) { // Placeholder check
+		// Check privileges
+		char userinfo[MAX_INFO_STRING];
+		const char *steamId;
+		int priv;
+		trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+		steamId = Info_ValueForKey( userinfo, "steamid" );
+		priv = G_AdminAccessForSteamID( steamId );
+		if ( priv < PRIV_MOD ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+			return;
+		}
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: invite <client>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	clientNum = ClientNumberFromString( ent, arg );
+	if ( clientNum < 0 ) {
+		return;
+	}
+
+	target = &g_entities[clientNum];
+	trap_SendServerCommand( ent-g_entities, va("print \"Invitation sent to %s.\n\"", target->client->pers.netname) );
+	trap_SendServerCommand( target-g_entities, va("cp \"You have been invited by %s.\n\"", ent->client->pers.netname) );
+}
+
+/*
+==================
+Cmd_Revoke_f
+==================
+*/
+void Cmd_Revoke_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+	gentity_t *target;
+
+	if ( !ent || !ent->client ) return;
+
+	if ( G_AdminAccessForSteamID( NULL ) < PRIV_MOD ) {
+		// Check privileges
+		char userinfo[MAX_INFO_STRING];
+		const char *steamId;
+		int priv;
+		trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+		steamId = Info_ValueForKey( userinfo, "steamid" );
+		priv = G_AdminAccessForSteamID( steamId );
+		if ( priv < PRIV_MOD ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+			return;
+		}
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: revoke <client>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	clientNum = ClientNumberFromString( ent, arg );
+	if ( clientNum < 0 ) {
+		return;
+	}
+
+	target = &g_entities[clientNum];
+	// In a full implementation, this would remove the client from an invitation list or similar.
+	// For now, we simulate it.
+	trap_SendServerCommand( ent-g_entities, va("print \"Invitation revoked for %s.\n\"", target->client->pers.netname) );
+}
+
+/*
+==================
+Cmd_Whois_f
+==================
+*/
+void Cmd_Whois_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+	gentity_t *target;
+	char userinfo[MAX_INFO_STRING];
+	const char *ip;
+	const char *steamid;
+
+	if ( !ent || !ent->client ) return;
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: whois <client>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	clientNum = ClientNumberFromString( ent, arg );
+	if ( clientNum < 0 ) return;
+
+	target = &g_entities[clientNum];
+	trap_GetUserinfo( clientNum, userinfo, sizeof(userinfo) );
+	ip = Info_ValueForKey( userinfo, "ip" );
+	steamid = Info_ValueForKey( userinfo, "steamid" );
+
+	trap_SendServerCommand( ent-g_entities, va("print \"name: %s\nclient: %i\nIP: %s\nSteamID: %s\n\"",
+		target->client->pers.netname, clientNum, ip, steamid ) );
+}
+
+/*
+==================
+Cmd_Mute_f
+==================
+*/
+void Cmd_Mute_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+	gentity_t *target;
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: mute <client>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	clientNum = ClientNumberFromString( ent, arg );
+	if ( clientNum < 0 ) return;
+
+	target = &g_entities[clientNum];
+	target->client->sess.muted = qtrue;
+	trap_SendServerCommand( ent-g_entities, va("print \"%s muted.\n\"", target->client->pers.netname) );
+	trap_SendServerCommand( target-g_entities, "print \"You have been muted.\n\"" );
+}
+
+/*
+==================
+Cmd_Unmute_f
+==================
+*/
+void Cmd_Unmute_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+	gentity_t *target;
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: unmute <client>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	clientNum = ClientNumberFromString( ent, arg );
+	if ( clientNum < 0 ) return;
+
+	target = &g_entities[clientNum];
+	target->client->sess.muted = qfalse;
+	trap_SendServerCommand( ent-g_entities, va("print \"%s unmuted.\n\"", target->client->pers.netname) );
+	trap_SendServerCommand( target-g_entities, "print \"You have been unmuted.\n\"" );
+}
+
+/*
+==================
+Cmd_Lock_f
+==================
+*/
+void Cmd_Lock_f( gentity_t *ent ) {
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	trap_Cvar_Set( "g_teamSpawnAsSpec", "1" );
+	trap_SendServerCommand( -1, "print \"Teams locked by admin.\n\"" );
+}
+
+/*
+==================
+Cmd_Unlock_f
+==================
+*/
+void Cmd_Unlock_f( gentity_t *ent ) {
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	trap_Cvar_Set( "g_teamSpawnAsSpec", "0" );
+	trap_SendServerCommand( -1, "print \"Teams unlocked by admin.\n\"" );
+}
+
+/*
+==================
+Cmd_PutTeam_f
+==================
+*/
+void Cmd_PutTeam_f( gentity_t *ent ) {
+	char arg1[MAX_TOKEN_CHARS];
+	char arg2[MAX_TOKEN_CHARS];
+	int clientNum;
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 3 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: putteam <client> <team>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg1, sizeof( arg1 ) );
+	trap_Argv( 2, arg2, sizeof( arg2 ) );
+
+	clientNum = ClientNumberFromString( ent, arg1 );
+	if ( clientNum < 0 ) return;
+
+	SetTeam( &g_entities[clientNum], arg2 );
+}
+
+/*
+==================
+Cmd_AllReady_f
+==================
+*/
+void Cmd_AllReady_f( gentity_t *ent ) {
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+	int i;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	for ( i = 0; i < level.maxclients; i++ ) {
+		if ( level.clients[i].pers.connected == CON_CONNECTED && level.clients[i].sess.sessionTeam != TEAM_SPECTATOR ) {
+			level.clients[i].ps.eFlags |= EF_READY;
+		}
+	}
+	trap_SendServerCommand( -1, "print \"All players set to ready by admin.\n\"" );
+}
+
+/*
+==================
+Cmd_Map_f
+==================
+*/
+void Cmd_Map_f( gentity_t *ent ) {
+	char map[MAX_TOKEN_CHARS];
+	char factory[MAX_TOKEN_CHARS];
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_ADMIN ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: map <mapname> [factory]\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, map, sizeof( map ) );
+	trap_Argv( 2, factory, sizeof( factory ) );
+
+	// Sanitize map name to prevent command injection
+	if ( strchr( map, ';' ) || strchr( map, '\n' ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Invalid characters in map name.\n\"" );
+		return;
+	}
+	if ( factory[0] && ( strchr( factory, ';' ) || strchr( factory, '\n' ) ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Invalid characters in factory name.\n\"" );
+		return;
+	}
+
+	if ( factory[0] ) {
+		trap_SendConsoleCommand( EXEC_APPEND, va("map %s %s\n", map, factory) );
+	} else {
+		trap_SendConsoleCommand( EXEC_APPEND, va("map %s\n", map) );
+	}
+}
+
+/*
+==================
+Cmd_Restart_f
+==================
+*/
+void Cmd_Restart_f( gentity_t *ent ) {
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
+}
+
+/*
+==================
+Cmd_Shuffle_f
+==================
+*/
+void Cmd_Shuffle_f( gentity_t *ent ) {
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	Cmd_ShuffleTeams_f();
+}
+
+/*
+==================
+Cmd_Teamsize_f
+==================
+*/
+void Cmd_Teamsize_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: teamsize <size>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	trap_Cvar_Set( "g_teamSizeMin", arg );
+	trap_SendServerCommand( -1, va("print \"Teamsize set to %s by admin.\n\"", arg) );
+}
+
+/*
+==================
+Cmd_Clan_f
+==================
+*/
+void Cmd_Clan_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+
+	// QL uses this to set clan tag. In Q3 base we usually use userinfo "clan" or "team".
+	// Implementing as userinfo setter.
+	if ( !ent || !ent->client ) return;
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: clan <tag>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	// Just print for now as full clan system requires more userinfo handling
+	trap_SendServerCommand( ent-g_entities, "print \"Clan tag updated (simulated).\n\"" );
+}
+
+/*
+==================
+Cmd_Kick_f
+==================
+*/
+void Cmd_Kick_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: kick <player>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	clientNum = ClientNumberFromString( ent, arg );
+	if ( clientNum >= 0 ) {
+		trap_SendConsoleCommand( EXEC_APPEND, va("clientkick %d\n", clientNum) );
+	}
+}
+
+/*
+==================
+Cmd_Ban_f
+==================
+*/
+void Cmd_Ban_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_ADMIN ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: ban <player>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	clientNum = ClientNumberFromString( ent, arg );
+	if ( clientNum >= 0 ) {
+		char targetUserinfo[MAX_INFO_STRING];
+		char *ip;
+		trap_GetUserinfo( clientNum, targetUserinfo, sizeof(targetUserinfo) );
+		ip = Info_ValueForKey( targetUserinfo, "ip" );
+		trap_SendConsoleCommand( EXEC_APPEND, va("addip %s\n", ip) );
+		trap_SendConsoleCommand( EXEC_APPEND, va("clientkick %d\n", clientNum) );
+	}
+}
+
+/*
+==================
+Cmd_ClientKick_f
+==================
+*/
+void Cmd_ClientKick_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: clientkick <clientnum>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	clientNum = atoi( arg );
+	if ( clientNum >= 0 && clientNum < level.maxclients ) {
+		trap_SendConsoleCommand( EXEC_APPEND, va("clientkick %d\n", clientNum) );
+	}
+}
+
+/*
+==================
+Cmd_TimeLimit_f
+==================
+*/
+void Cmd_TimeLimit_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	char userinfo[MAX_INFO_STRING];
+	const char *steamId;
+	int priv;
+
+	if ( !ent || !ent->client ) return;
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
+	steamId = Info_ValueForKey( userinfo, "steamid" );
+	priv = G_AdminAccessForSteamID( steamId );
+
+	if ( priv < PRIV_ADMIN ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: timelimit <limit>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	trap_Cvar_Set( "timelimit", arg );
+	trap_SendServerCommand( -1, va("print \"Timelimit set to %s by admin.\n\"", arg) );
+}
+
+/*
+==================
 Cmd_Admin_f
 ==================
 */
@@ -3229,16 +3849,40 @@ void Cmd_Admin_f( gentity_t *ent ) {
 	}
 
 	if ( !Q_stricmp( arg, "mute" ) ) {
+		char targetStr[MAX_TOKEN_CHARS];
+		int clientNum;
 		if ( priv < PRIV_MOD ) { return; }
-		// TODO: Implement mute (requires muting flag in clientPersistant)
-		// For now just print not implemented
-		trap_SendServerCommand( ent - g_entities, "print \"Mute not fully implemented yet.\n\"" );
+
+		trap_Argv( 2, targetStr, sizeof( targetStr ) );
+		if ( !targetStr[0] ) {
+			trap_SendServerCommand( ent - g_entities, "print \"usage: admin mute <client>\n\"" );
+			return;
+		}
+		clientNum = ClientNumberFromString( ent, targetStr );
+		if ( clientNum >= 0 ) {
+			g_entities[clientNum].client->sess.muted = qtrue;
+			trap_SendServerCommand( ent-g_entities, va("print \"%s muted.\n\"", level.clients[clientNum].pers.netname) );
+			trap_SendServerCommand( clientNum, "print \"You have been muted.\n\"" );
+		}
 		return;
 	}
 
 	if ( !Q_stricmp( arg, "unmute" ) ) {
+		char targetStr[MAX_TOKEN_CHARS];
+		int clientNum;
 		if ( priv < PRIV_MOD ) { return; }
-		trap_SendServerCommand( ent - g_entities, "print \"Unmute not fully implemented yet.\n\"" );
+
+		trap_Argv( 2, targetStr, sizeof( targetStr ) );
+		if ( !targetStr[0] ) {
+			trap_SendServerCommand( ent - g_entities, "print \"usage: admin unmute <client>\n\"" );
+			return;
+		}
+		clientNum = ClientNumberFromString( ent, targetStr );
+		if ( clientNum >= 0 ) {
+			g_entities[clientNum].client->sess.muted = qfalse;
+			trap_SendServerCommand( ent-g_entities, va("print \"%s unmuted.\n\"", level.clients[clientNum].pers.netname) );
+			trap_SendServerCommand( clientNum, "print \"You have been unmuted.\n\"" );
+		}
 		return;
 	}
 
@@ -3426,6 +4070,42 @@ void ClientCommand( int clientNum ) {
 		Cmd_Admin_f( ent );
 	else if (Q_stricmp (cmd, "ruleset") == 0)
 		Cmd_Ruleset_f( ent );
+	else if (Q_stricmp (cmd, "invite") == 0)
+		Cmd_Invite_f( ent );
+	else if (Q_stricmp (cmd, "revoke") == 0)
+		Cmd_Revoke_f( ent );
+	else if (Q_stricmp (cmd, "whois") == 0)
+		Cmd_Whois_f( ent );
+	else if (Q_stricmp (cmd, "mute") == 0)
+		Cmd_Mute_f( ent );
+	else if (Q_stricmp (cmd, "unmute") == 0)
+		Cmd_Unmute_f( ent );
+	else if (Q_stricmp (cmd, "lock") == 0)
+		Cmd_Lock_f( ent );
+	else if (Q_stricmp (cmd, "unlock") == 0)
+		Cmd_Unlock_f( ent );
+	else if (Q_stricmp (cmd, "putteam") == 0)
+		Cmd_PutTeam_f( ent );
+	else if (Q_stricmp (cmd, "allready") == 0)
+		Cmd_AllReady_f( ent );
+	else if (Q_stricmp (cmd, "map") == 0)
+		Cmd_Map_f( ent );
+	else if (Q_stricmp (cmd, "restart") == 0)
+		Cmd_Restart_f( ent );
+	else if (Q_stricmp (cmd, "shuffle") == 0)
+		Cmd_Shuffle_f( ent );
+	else if (Q_stricmp (cmd, "teamsize") == 0)
+		Cmd_Teamsize_f( ent );
+	else if (Q_stricmp (cmd, "clan") == 0)
+		Cmd_Clan_f( ent );
+	else if (Q_stricmp (cmd, "kick") == 0)
+		Cmd_Kick_f( ent );
+	else if (Q_stricmp (cmd, "ban") == 0)
+		Cmd_Ban_f( ent );
+	else if (Q_stricmp (cmd, "clientkick") == 0)
+		Cmd_ClientKick_f( ent );
+	else if (Q_stricmp (cmd, "timelimit") == 0)
+		Cmd_TimeLimit_f( ent );
 	else
 		trap_SendServerCommand( clientNum, va("print \"unknown cmd %s\n\"", cmd ) );
 }

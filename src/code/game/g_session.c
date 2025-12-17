@@ -44,7 +44,7 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	const char	*s;
 	const char	*var;
 
-	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i",
+	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i %i",
 		client->sess.sessionTeam,
 		client->sess.spectatorTime,
 		client->sess.spectatorState,
@@ -57,7 +57,8 @@ void G_WriteClientSessionData( gclient_t *client ) {
 		client->sess.roundState,
 		client->sess.skill1,
 		client->sess.skill2,
-		client->sess.skill3
+		client->sess.skill3,
+		client->sess.muted
 		);
 
 	var = va( "session%i", client - level.clients );
@@ -84,7 +85,8 @@ void G_ReadSessionData( gclient_t *client ) {
 	var = va( "session%i", client - level.clients );
 	trap_Cvar_VariableStringBuffer( var, s, sizeof(s) );
 
-	sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i",
+	int muted = 0;
+	sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i",
 		&sessionTeam,                 // bk010221 - format
 		&client->sess.spectatorTime,
 		&spectatorState,              // bk010221 - format
@@ -97,8 +99,10 @@ void G_ReadSessionData( gclient_t *client ) {
 		&client->sess.roundState,
 		&client->sess.skill1,
 		&client->sess.skill2,
-		&client->sess.skill3
+		&client->sess.skill3,
+		&muted
 		);
+	client->sess.muted = (qboolean)muted;
 
 	// bk001205 - format issues
 	client->sess.sessionTeam = (team_t)sessionTeam;

@@ -692,6 +692,7 @@ typedef struct {
 	int			_pad1;
 	int			skill2;
 	int			skill3;
+	qboolean	muted;
 } clientSession_t;
 
 //
@@ -1078,6 +1079,24 @@ void G_BroadcastItemTimerState( int enabled, int height );
 qboolean G_GiveItemByName( gentity_t *ent, const char *name );
 void Cmd_Admin_f( gentity_t *ent );
 void Cmd_Ruleset_f( gentity_t *ent );
+void Cmd_Invite_f( gentity_t *ent );
+void Cmd_Revoke_f( gentity_t *ent );
+void Cmd_Whois_f( gentity_t *ent );
+void Cmd_Mute_f( gentity_t *ent );
+void Cmd_Unmute_f( gentity_t *ent );
+void Cmd_Lock_f( gentity_t *ent );
+void Cmd_Unlock_f( gentity_t *ent );
+void Cmd_PutTeam_f( gentity_t *ent );
+void Cmd_AllReady_f( gentity_t *ent );
+void Cmd_Map_f( gentity_t *ent );
+void Cmd_Restart_f( gentity_t *ent );
+void Cmd_Shuffle_f( gentity_t *ent );
+void Cmd_Teamsize_f( gentity_t *ent );
+void Cmd_Clan_f( gentity_t *ent );
+void Cmd_Kick_f( gentity_t *ent );
+void Cmd_Ban_f( gentity_t *ent );
+void Cmd_ClientKick_f( gentity_t *ent );
+void Cmd_TimeLimit_f( gentity_t *ent );
 
 //
 // g_items.c

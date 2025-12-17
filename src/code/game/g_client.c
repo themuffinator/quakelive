@@ -1854,6 +1854,16 @@ void ClientBegin( int clientNum ) {
 	// count current clients and rank for scoreboard
 	G_SendItemTimerState( clientNum, g_itemTimers.integer ? 1 : 0, g_itemHeight.integer );
 	CalculateRanks();
+
+	// Check g_motd
+	if ( g_motd.string[0] ) {
+		trap_SendServerCommand( clientNum, va("cp \"%s\"", g_motd.string ) );
+	}
+
+	// Check g_teamAutoJoin
+	if ( g_teamAutoJoin.integer && ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		SetTeam( ent, "auto" );
+	}
 }
 
 /*
