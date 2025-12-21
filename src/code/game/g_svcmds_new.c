@@ -29,7 +29,82 @@ Cmd_RandomMap_f
 =================
 */
 void Cmd_RandomMap_f( void ) {
-	// For now, this just restarts the map as we don't have a map list loaded
-	// Ideally this would pick from a map cycle
-	trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
+	fileHandle_t	f;
+	int				len;
+	char			*buf, *p, *next;
+	char			*maps[1024];
+	int				count;
+	int				i;
+	int				selection;
+
+	// Try to load mapcycle.txt
+	len = trap_FS_FOpenFile( "mapcycle.txt", &f, FS_READ );
+	count = 0;
+
+	if ( len > 0 ) {
+		buf = G_Alloc( len + 1 );
+		if ( !buf ) {
+			trap_FS_FCloseFile( f );
+			return;
+		}
+		trap_FS_Read( buf, len, f );
+		buf[len] = 0;
+		trap_FS_FCloseFile( f );
+
+		p = buf;
+		while ( *p ) {
+			// skip whitespace
+			while ( *p && *p <= ' ' ) {
+				p++;
+			}
+			if ( !*p ) {
+				break;
+			}
+
+			// find end of line
+			next = p;
+			while ( *next && *next != '\n' ) {
+				next++;
+			}
+			if ( *next ) {
+				*next++ = 0;
+			}
+
+			if ( count < 1024 ) {
+				maps[count] = p;
+				count++;
+			}
+
+			p = next;
+		}
+	}
+
+	if ( count == 0 ) {
+		// Fallback: list all maps
+		char	fileList[16384];
+		char	*file;
+		int		numFiles;
+
+		numFiles = trap_FS_GetFileList( "maps", ".bsp", fileList, sizeof( fileList ) );
+		file = fileList;
+		for ( i = 0; i < numFiles; i++, file += strlen(file) + 1 ) {
+			if ( count < 1024 ) {
+				char temp[MAX_QPATH];
+				COM_StripExtension( file, temp );
+				maps[count] = G_Alloc( strlen(temp) + 1 );
+				if ( maps[count] ) {
+					strcpy( maps[count], temp );
+					count++;
+				}
+			}
+		}
+	}
+
+	if ( count == 0 ) {
+		trap_SendServerCommand( -1, "print \"No maps found.\n\"" );
+		return;
+	}
+
+	selection = rand() % count;
+	trap_SendConsoleCommand( EXEC_APPEND, va( "map %s\n", maps[selection] ) );
 }
