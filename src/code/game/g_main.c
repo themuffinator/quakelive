@@ -454,6 +454,9 @@ vmCvar_t	g_singlePlayer;
 vmCvar_t	g_enableDust;
 vmCvar_t	g_enableBreath;
 vmCvar_t	g_proxMineTimeout;
+vmCvar_t	g_eloLimit;
+vmCvar_t	g_throughFloor;
+vmCvar_t	g_loadout;
 vmCvar_t	g_rrRoundScoreBonus;
 vmCvar_t	g_rrInfectedZombieSpeed;
 vmCvar_t	g_rrInfectedSurvivorScoreMethod;
@@ -741,6 +744,9 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_enableDust, "g_enableDust", "0", CVAR_SERVERINFO, 0, qtrue, qfalse },
 	{ &g_enableBreath, "g_enableBreath", "0", CVAR_SERVERINFO, 0, qtrue, qfalse },
 	{ &g_proxMineTimeout, "g_proxMineTimeout", "20000", 0, 0, qfalse },
+	{ &g_eloLimit, "g_eloLimit", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse, qfalse, "Minimum Elo rating required to join the server; 0 disables the check." },
+	{ &g_throughFloor, "g_throughFloor", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse, qfalse, "Allow hitscan weapons like Railgun and Lightning Gun to hit through floors/walls." },
+	{ &g_loadout, "g_loadout", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse, qfalse, "Enable loadout selection menu on spawn." },
 	{ &g_smoothClients, "g_smoothClients", "1", 0, 0, qfalse},
 	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO, 0, qfalse},
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
@@ -951,6 +957,7 @@ void G_InitWeaponConfig( void ) {
 	if ( g_weaponConfig.quadHogPingRateSeconds < 0 ) {
 		g_weaponConfig.quadHogPingRateSeconds = 0;
 	}
+	g_weaponConfig.chaingunDamage = G_ReadWeaponCvar( &g_damage_cg, 8, "g_damage_cg" );
 }
 
 void G_UpdateWeaponConfig( void ) {

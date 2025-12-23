@@ -613,7 +613,11 @@ void weapon_railgun_fire (gentity_t *ent) {
 	hits = 0;
 	passent = ent->s.number;
 	do {
-		trap_Trace (&trace, muzzle, NULL, NULL, end, passent, MASK_SHOT );
+		if ( g_throughFloor.integer ) {
+			trap_Trace (&trace, muzzle, NULL, NULL, end, passent, MASK_SHOT & ~CONTENTS_SOLID );
+		} else {
+			trap_Trace (&trace, muzzle, NULL, NULL, end, passent, MASK_SHOT );
+		}
 		if ( trace.entityNum >= ENTITYNUM_MAX_NORMAL ) {
 			break;
 		}
@@ -840,7 +844,11 @@ void Weapon_LightningFire( gentity_t *ent ) {
 			}
 		}
 
-		trap_Trace( &tr, muzzle, NULL, NULL, end, passent, MASK_SHOT );
+		if ( g_throughFloor.integer ) {
+			trap_Trace( &tr, muzzle, NULL, NULL, end, passent, MASK_SHOT & ~CONTENTS_SOLID );
+		} else {
+			trap_Trace( &tr, muzzle, NULL, NULL, end, passent, MASK_SHOT );
+		}
 
 		// if not the first trace (the lightning bounced of an invulnerability sphere)
 		if (i) {
@@ -908,13 +916,10 @@ NAILGUN
 
 void Weapon_Nailgun_Fire (gentity_t *ent) {
 	gentity_t	*m;
-	int			count;
 
-	for( count = 0; count < NUM_NAILSHOTS; count++ ) {
-		m = fire_nail (ent, muzzle, forward, right, up );
-		m->damage *= s_quadFactor;
-		m->splashDamage *= s_quadFactor;
-	}
+	m = fire_nail (ent, muzzle, forward, right, up );
+	m->damage *= s_quadFactor;
+	m->splashDamage *= s_quadFactor;
 
 //	VectorAdd( m->s.pos.trDelta, ent->client->ps.velocity, m->s.pos.trDelta );	// "real" physics
 }
@@ -1109,7 +1114,7 @@ void FireWeapon( gentity_t *ent ) {
 		weapon_proxlauncher_fire( ent );
 		break;
 	case WP_CHAINGUN:
-		Bullet_Fire( ent, CHAINGUN_SPREAD, MACHINEGUN_DAMAGE, MOD_CHAINGUN );
+		Bullet_Fire( ent, CHAINGUN_SPREAD, g_weaponConfig.chaingunDamage, MOD_CHAINGUN );
 		break;
 	default:
 // FIXME		G_Error( "Bad ent->s.weapon" );

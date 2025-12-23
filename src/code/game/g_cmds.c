@@ -2333,9 +2333,37 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_doWarmup %d", atoi( arg2 ) );
 		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "g_doWarmup %s", arg2 );
 		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "elo" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_eloLimit %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "elo %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "thrufloors" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_throughFloor %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "thrufloors %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "instagib" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_instaGib %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "instagib %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "loadouts" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_loadout %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "loadouts %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "teamdamage" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_friendlyFire %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "teamdamage %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "timer" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "timelimit %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "timelimit %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
+	} else if ( !Q_stricmp( arg1, "overtime" ) ) {
+		Com_sprintf( level.voteString, sizeof( level.voteString ), "g_overtime %d", atoi( arg2 ) );
+		Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ), "overtime %s", arg2 );
+		voteSelection = G_VoteSelectionKey( arg1, arg2 );
 	} else {
 		trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string.\\n\"" );
-		trap_SendServerCommand( ent-g_entities, "print \"Vote commands are: map_restart, nextmap, map <mapname>, g_gametype <n>, kick <player>, clientkick <clientnum>, g_doWarmup, timelimit <time>, fraglimit <frags>.\\n\"" );
+		trap_SendServerCommand( ent-g_entities, "print \"Vote commands are: map_restart, nextmap, map <mapname>, g_gametype <n>, kick <player>, clientkick <clientnum>, g_doWarmup, timelimit <time>, fraglimit <frags>, elo, thrufloors, instagib, loadouts, teamdamage, timer, overtime.\\n\"" );
 		return;
 	}
 

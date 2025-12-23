@@ -1419,6 +1419,13 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 		return "You are banned from this server.";
 	}
 
+	if ( g_eloLimit.integer > 0 ) {
+		int elo = atoi( Info_ValueForKey( userinfo, "elo" ) );
+		if ( elo < g_eloLimit.integer ) {
+			return va("You need an Elo rating of %d to join this server.", g_eloLimit.integer);
+		}
+	}
+
   // we don't check password for bots and local client
   // NOTE: local client <-> "ip" "localhost"
   //   this means this client is not running in our current process
@@ -2212,7 +2219,13 @@ void ClientSpawn(gentity_t *ent) {
 			}
 		}
 
-		spawnWeapon = G_SelectFactorySpawnWeapon( startingMask );
+		if ( g_instaGib.integer ) {
+			client->ps.stats[STAT_WEAPONS] = ( 1 << WP_RAILGUN ) | ( 1 << WP_GAUNTLET );
+			client->ps.ammo[WP_RAILGUN] = -1;
+			spawnWeapon = WP_RAILGUN;
+		} else {
+			spawnWeapon = G_SelectFactorySpawnWeapon( startingMask );
+		}
 	}
 
 	// health will count down towards max_health

@@ -1424,6 +1424,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		damage = damage * max / 100;
 	}
 
+	if ( g_instaGib.integer && damage > 0 && attacker && attacker->client && targ && targ->client ) {
+		damage = 10000;
+	}
+
 	if ( attacker->client ) {
 		float	ratingScale;
 		int		scaledDamage;

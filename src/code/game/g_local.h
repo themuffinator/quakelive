@@ -149,6 +149,7 @@ typedef struct weaponConfig_s {
 	int		quadHogIdleSeconds;
 	int		quadHogTimeSeconds;
 	int		quadHogPingRateSeconds;
+	int		chaingunDamage;
 } weaponConfig_t;
 
 extern weaponConfig_t g_weaponConfig;
@@ -1535,6 +1536,9 @@ extern	vmCvar_t	g_enableDust;
 extern	vmCvar_t	g_enableBreath;
 extern	vmCvar_t	g_singlePlayer;
 extern	vmCvar_t	g_proxMineTimeout;
+extern	vmCvar_t	g_eloLimit;
+extern	vmCvar_t	g_throughFloor;
+extern	vmCvar_t	g_loadout;
 
 extern	vmCvar_t	g_damage_cg;
 extern	vmCvar_t	g_damage_g;
