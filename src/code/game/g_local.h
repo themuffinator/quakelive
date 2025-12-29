@@ -699,12 +699,20 @@ typedef struct {
 #define MAX_NETNAME			36
 #define	MAX_VOTE_COUNT		3
 #define	VOTE_THROTTLE_MSEC	0x8CA
+#define MAX_POIS		128
 #define ITEM_UNLOCK_TIER_NONE	0x10
 #define ITEM_PROGRESSION_FLAG( tier )\
 	( 1u << (tier) )
 
 // client data that stays across multiple respawns, but is cleared
 // on each level change or team change at ClientBegin()
+typedef struct {
+	vec3_t		origin;
+	vec3_t		angles;
+	char		name[64];
+	qboolean	inuse;
+} poi_t;
+
 typedef struct {
 	clientConnected_t	connected;	
 	usercmd_t	cmd;				// we would lose angles if not persistant
@@ -1020,6 +1028,8 @@ typedef struct {
 	int			racePointCount;
 	gentity_t		*raceLastSpawnedPoint;
 	racePointInfo_t	racePointInfo[MAX_RACE_POINTS];
+	poi_t			pois[MAX_POIS];
+	int			numPois;
 } level_locals_t;
 
 
@@ -1097,6 +1107,9 @@ void Cmd_Kick_f( gentity_t *ent );
 void Cmd_Ban_f( gentity_t *ent );
 void Cmd_ClientKick_f( gentity_t *ent );
 void Cmd_TimeLimit_f( gentity_t *ent );
+void Cmd_AddPOI_f( gentity_t *ent );
+void Cmd_DelPOI_f( gentity_t *ent );
+void Cmd_POIs_f( gentity_t *ent );
 
 //
 // g_items.c
