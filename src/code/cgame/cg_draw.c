@@ -588,6 +588,168 @@ CG_DrawStatusBar
 
 /*
 ================
+CG_GetObituaryIcon
+================
+*/
+static qhandle_t CG_GetObituaryIcon( int mod ) {
+	switch ( mod ) {
+	case MOD_SHOTGUN:
+		return cg_weapons[WP_SHOTGUN].weaponIcon;
+	case MOD_GAUNTLET:
+		return cg_weapons[WP_GAUNTLET].weaponIcon;
+	case MOD_MACHINEGUN:
+		return cg_weapons[WP_MACHINEGUN].weaponIcon;
+	case MOD_HMG:
+		return cg_weapons[WP_HEAVY_MACHINEGUN].weaponIcon;
+	case MOD_GRENADE:
+	case MOD_GRENADE_SPLASH:
+		return cg_weapons[WP_GRENADE_LAUNCHER].weaponIcon;
+	case MOD_ROCKET:
+	case MOD_ROCKET_SPLASH:
+		return cg_weapons[WP_ROCKET_LAUNCHER].weaponIcon;
+	case MOD_PLASMA:
+	case MOD_PLASMA_SPLASH:
+		return cg_weapons[WP_PLASMAGUN].weaponIcon;
+	case MOD_RAILGUN:
+	case MOD_RAILGUN_HEADSHOT:
+		return cg_weapons[WP_RAILGUN].weaponIcon;
+	case MOD_LIGHTNING:
+	case MOD_LIGHTNING_DISCHARGE:
+		return cg_weapons[WP_LIGHTNING].weaponIcon;
+	case MOD_BFG:
+	case MOD_BFG_SPLASH:
+		return cg_weapons[WP_BFG].weaponIcon;
+	case MOD_NAIL:
+		return cg_weapons[WP_NAILGUN].weaponIcon;
+	case MOD_CHAINGUN:
+		return cg_weapons[WP_CHAINGUN].weaponIcon;
+	case MOD_PROXIMITY_MINE:
+		return cg_weapons[WP_PROX_LAUNCHER].weaponIcon;
+	case MOD_GRAPPLE:
+		return cg_weapons[WP_GRAPPLING_HOOK].weaponIcon;
+	case MOD_THAW:
+		return cg_weapons[WP_LIGHTNING].weaponIcon; // Use LG icon for thaw? Or a specific one? QL might use standard gauntlet or LG.
+	case MOD_KAMIKAZE:
+		return cgs.media.kamikazeIcon;
+	case MOD_JUICED:
+		return cgs.media.juicedIcon;
+	case MOD_WATER:
+		return cgs.media.waterIcon;
+	case MOD_SLIME:
+		return cgs.media.slimeIcon;
+	case MOD_LAVA:
+		return cgs.media.lavaIcon;
+	case MOD_CRUSH:
+		return cgs.media.crushIcon;
+	case MOD_TELEFRAG:
+		return cgs.media.telefragIcon;
+	case MOD_FALLING:
+		return cgs.media.fallingIcon;
+	case MOD_SUICIDE:
+	case MOD_SWITCHTEAM:
+		return cgs.media.suicideIcon;
+	case MOD_TARGET_LASER:
+	case MOD_TRIGGER_HURT:
+	case MOD_UNKNOWN:
+	default:
+		return cgs.media.suicideIcon;
+	}
+}
+
+/*
+================
+CG_DrawObituaries
+================
+*/
+static float CG_DrawObituaries( float y ) {
+	int i;
+	int attacker, target, mod;
+	const char *attackerName, *targetName;
+	qhandle_t icon;
+	float alpha;
+	vec4_t color;
+	int w, h;
+	int time;
+	float x;
+
+	if ( cg_drawFragMessages.integer == 0 ) {
+		return y;
+	}
+
+	for ( i = 0; i < MAX_OBITUARIES; i++ ) {
+		if ( !cg.obituaries[i].time ) {
+			continue;
+		}
+
+		time = cg.time - cg.obituaries[i].time;
+		if ( time > OBITUARY_TIME ) {
+			continue;
+		}
+
+		if ( time > OBITUARY_TIME - FADE_TIME ) {
+			alpha = (float)( OBITUARY_TIME - time ) / FADE_TIME;
+		} else {
+			alpha = 1.0f;
+		}
+
+		attacker = cg.obituaries[i].attacker;
+		target = cg.obituaries[i].target;
+		mod = cg.obituaries[i].mod;
+
+		if ( attacker < 0 || attacker >= MAX_CLIENTS ) {
+			attacker = -1;
+			attackerName = NULL;
+		} else {
+			attackerName = cgs.clientinfo[attacker].name;
+		}
+
+		if ( target < 0 || target >= MAX_CLIENTS ) {
+			targetName = NULL; // Should not happen
+		} else {
+			targetName = cgs.clientinfo[target].name;
+		}
+
+		icon = CG_GetObituaryIcon( mod );
+
+		color[0] = color[1] = color[2] = 1.0f;
+		color[3] = alpha;
+		trap_R_SetColor( color );
+
+		h = SMALLCHAR_HEIGHT;
+		w = SMALLCHAR_WIDTH;
+
+		// Draw Target Name
+		if ( targetName ) {
+			int nameWidth = CG_DrawStrlen( targetName ) * w;
+			x = 640 - nameWidth - 2;
+			CG_DrawStringExt( x, y, targetName, color, qfalse, qtrue, w, h, 0 );
+			x -= ( w + 2 );
+		} else {
+			x = 640 - 2;
+		}
+
+		// Draw Icon
+		if ( icon ) {
+			x -= 20; // Icon width
+			CG_DrawPic( x, y - 2, 20, 20, icon );
+			x -= 4;
+		}
+
+		// Draw Attacker Name
+		if ( attackerName && attacker != target ) {
+			int nameWidth = CG_DrawStrlen( attackerName ) * w;
+			x -= nameWidth;
+			CG_DrawStringExt( x, y, attackerName, color, qfalse, qtrue, w, h, 0 );
+		}
+
+		y += h + 4;
+	}
+
+	return y;
+}
+
+/*
+================
 CG_DrawAttacker
 
 ================
@@ -963,6 +1125,7 @@ static void CG_DrawUpperRight( void ) {
 		y = CG_DrawAttacker( y );
 	}
 
+	y = CG_DrawObituaries( y );
 }
 
 /*

@@ -1243,6 +1243,16 @@ typedef struct {
 	sfxHandle_t	wstbimpdSound;
 	sfxHandle_t	wstbactvSound;
 
+	qhandle_t	waterIcon;
+	qhandle_t	slimeIcon;
+	qhandle_t	lavaIcon;
+	qhandle_t	crushIcon;
+	qhandle_t	telefragIcon;
+	qhandle_t	fallingIcon;
+	qhandle_t	suicideIcon;
+	qhandle_t	kamikazeIcon;
+	qhandle_t	juicedIcon;
+
 } cgMedia_t;
 
 
