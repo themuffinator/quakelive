@@ -2730,6 +2730,16 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.wakeMarkShader = trap_R_RegisterShader( "wake" );
 	cgs.media.bloodMarkShader = trap_R_RegisterShader( "bloodMark" );
 
+	cgs.media.waterIcon = trap_R_RegisterShader( "gfx/hud/icons/water" );
+	cgs.media.slimeIcon = trap_R_RegisterShader( "gfx/hud/icons/slime" );
+	cgs.media.lavaIcon = trap_R_RegisterShader( "gfx/hud/icons/lava" );
+	cgs.media.crushIcon = trap_R_RegisterShader( "gfx/hud/icons/crush" );
+	cgs.media.telefragIcon = trap_R_RegisterShader( "gfx/hud/icons/telefrag" );
+	cgs.media.fallingIcon = trap_R_RegisterShader( "gfx/hud/icons/falling" );
+	cgs.media.suicideIcon = trap_R_RegisterShader( "gfx/hud/icons/skull" );
+	cgs.media.kamikazeIcon = trap_R_RegisterShader( "gfx/hud/icons/kamikaze" );
+	cgs.media.juicedIcon = trap_R_RegisterShader( "gfx/hud/icons/juiced" );
+
 	// register the inline models
 	cgs.numInlineModels = trap_CM_NumInlineModels();
 	for ( i = 1 ; i < cgs.numInlineModels ; i++ ) {
