@@ -1407,6 +1407,8 @@ Cmd_FollowCycle_f
 void Cmd_FollowCycle_f( gentity_t *ent, int dir ) {
 	int		clientnum;
 	int		original;
+	int		curr;
+	int		max;
 
 	if ( level.trainingMapActive ) {
 		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
@@ -1431,31 +1433,50 @@ void Cmd_FollowCycle_f( gentity_t *ent, int dir ) {
 	}
 
 	clientnum = ent->client->sess.spectatorClient;
-	original = clientnum;
+	max = level.maxclients + level.numPois;
+
+	// Map spectatorClient to linear index 0..max-1
+	if ( clientnum >= 0 && clientnum < level.maxclients ) {
+		curr = clientnum;
+	} else if ( clientnum <= -10 ) {
+		curr = level.maxclients + (-(clientnum + 10));
+	} else {
+		curr = 0; // Fallback
+	}
+
+	original = curr;
+
 	do {
-		clientnum += dir;
-		if ( clientnum >= level.maxclients ) {
-			clientnum = 0;
-		}
-		if ( clientnum < 0 ) {
-			clientnum = level.maxclients - 1;
-		}
-
-		// can only follow connected clients
-		if ( level.clients[ clientnum ].pers.connected != CON_CONNECTED ) {
-			continue;
+		curr += dir;
+		if ( curr >= max ) {
+			curr = 0;
+		} else if ( curr < 0 ) {
+			curr = max - 1;
 		}
 
-		// can't follow another spectator
-		if ( level.clients[ clientnum ].sess.sessionTeam == TEAM_SPECTATOR ) {
-			continue;
+		if ( curr < level.maxclients ) {
+			// Client logic
+			if ( level.clients[ curr ].pers.connected != CON_CONNECTED ) {
+				continue;
+			}
+			if ( level.clients[ curr ].sess.sessionTeam == TEAM_SPECTATOR ) {
+				continue;
+			}
+
+			ent->client->sess.spectatorClient = curr;
+			ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
+			return;
+		} else {
+			// POI logic
+			int poiIndex = curr - level.maxclients;
+			if ( poiIndex >= 0 && poiIndex < level.numPois && level.pois[poiIndex].inuse ) {
+				ent->client->sess.spectatorClient = -(poiIndex + 10);
+				ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
+				return;
+			}
 		}
 
-		// this is good, we can use it
-		ent->client->sess.spectatorClient = clientnum;
-		ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
-		return;
-	} while ( clientnum != original );
+	} while ( curr != original );
 
 	// leave it where it was
 }
@@ -4106,6 +4127,122 @@ void ClientCommand( int clientNum ) {
 		Cmd_ClientKick_f( ent );
 	else if (Q_stricmp (cmd, "timelimit") == 0)
 		Cmd_TimeLimit_f( ent );
+	else if (Q_stricmp (cmd, "addpoi") == 0)
+		Cmd_AddPOI_f( ent );
+	else if (Q_stricmp (cmd, "delpoi") == 0)
+		Cmd_DelPOI_f( ent );
+	else if (Q_stricmp (cmd, "pois") == 0)
+		Cmd_POIs_f( ent );
 	else
 		trap_SendServerCommand( clientNum, va("print \"unknown cmd %s\n\"", cmd ) );
+}
+
+/*
+==================
+Cmd_AddPOI_f
+==================
+*/
+void Cmd_AddPOI_f( gentity_t *ent ) {
+	char	arg[MAX_TOKEN_CHARS];
+	vec3_t	origin, angles;
+	int		i;
+
+	if ( !CheatsOk( ent ) ) {
+		return;
+	}
+
+	if ( level.numPois >= MAX_POIS ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Max POIs reached.\n\"" );
+		return;
+	}
+
+	if ( trap_Argc() > 1 ) {
+		// x y z yaw pitch roll name
+		if ( trap_Argc() < 5 ) {
+			trap_SendServerCommand( ent-g_entities, "print \"usage: addpoi [x y z [yaw pitch roll]] [name]\n\"" );
+			return;
+		}
+		for ( i=0 ; i<3 ; i++ ) {
+			trap_Argv( i+1, arg, sizeof( arg ) );
+			origin[i] = atof( arg );
+		}
+		if ( trap_Argc() >= 7 ) {
+			for ( i=0 ; i<3 ; i++ ) {
+				trap_Argv( i+4, arg, sizeof( arg ) );
+				angles[i] = atof( arg );
+			}
+		} else {
+			VectorClear( angles );
+		}
+		if ( trap_Argc() >= 8 ) {
+			trap_Argv( 7, level.pois[level.numPois].name, sizeof( level.pois[level.numPois].name ) );
+		} else {
+			Com_sprintf( level.pois[level.numPois].name, sizeof( level.pois[level.numPois].name ), "POI %d", level.numPois );
+		}
+	} else {
+		VectorCopy( ent->r.currentOrigin, origin );
+		VectorCopy( ent->client->ps.viewangles, angles );
+		Com_sprintf( level.pois[level.numPois].name, sizeof( level.pois[level.numPois].name ), "POI %d", level.numPois );
+	}
+
+	VectorCopy( origin, level.pois[level.numPois].origin );
+	VectorCopy( angles, level.pois[level.numPois].angles );
+	level.pois[level.numPois].inuse = qtrue;
+	level.numPois++;
+
+	trap_SendServerCommand( ent-g_entities, va("print \"Added POI %d at %s\n\"", level.numPois-1, vtos(origin) ) );
+}
+
+/*
+==================
+Cmd_DelPOI_f
+==================
+*/
+void Cmd_DelPOI_f( gentity_t *ent ) {
+	char	arg[MAX_TOKEN_CHARS];
+	int		index;
+
+	if ( !CheatsOk( ent ) ) {
+		return;
+	}
+
+	if ( trap_Argc() != 2 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"usage: delpoi <index>\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+	index = atoi( arg );
+
+	if ( index < 0 || index >= level.numPois || !level.pois[index].inuse ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Invalid POI index.\n\"" );
+		return;
+	}
+
+	// Remove by shifting
+	level.numPois--;
+	for ( ; index < level.numPois ; index++ ) {
+		level.pois[index] = level.pois[index+1];
+	}
+
+	trap_SendServerCommand( ent-g_entities, "print \"POI deleted.\n\"" );
+}
+
+/*
+==================
+Cmd_POIs_f
+==================
+*/
+void Cmd_POIs_f( gentity_t *ent ) {
+	int		i;
+
+	trap_SendServerCommand( ent-g_entities, "print \"Index Name                 Origin\n\"" );
+	trap_SendServerCommand( ent-g_entities, "print \"--------------------------------------------------\n\"" );
+
+	for ( i=0 ; i<level.numPois ; i++ ) {
+		if ( !level.pois[i].inuse ) {
+			continue;
+		}
+		trap_SendServerCommand( ent-g_entities, va("print \"  %3d %-20s %s\n\"", i, level.pois[i].name, vtos(level.pois[i].origin) ) );
+	}
 }

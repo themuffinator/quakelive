@@ -404,6 +404,16 @@ void SpectatorThink( gentity_t *ent, usercmd_t *ucmd ) {
 
 		G_TouchTriggers( ent );
 		trap_UnlinkEntity( ent );
+	} else {
+		// If following POI, ensure position is updated
+		if ( client->sess.spectatorClient <= -10 ) {
+			int poiIndex = -(client->sess.spectatorClient + 10);
+			if ( poiIndex >= 0 && poiIndex < level.numPois && level.pois[poiIndex].inuse ) {
+				VectorCopy( level.pois[poiIndex].origin, client->ps.origin );
+				VectorCopy( level.pois[poiIndex].angles, client->ps.viewangles );
+				SetClientViewAngle( ent, level.pois[poiIndex].angles );
+			}
+		}
 	}
 
 	client->oldbuttons = client->buttons;
@@ -1258,7 +1268,26 @@ void SpectatorClientEndFrame( gentity_t *ent ) {
 		} else if ( clientNum == -2 ) {
 			clientNum = level.follow2;
 		}
-		if ( clientNum >= 0 ) {
+
+		if ( clientNum <= -10 ) {
+			// POI following
+			int poiIndex = -(clientNum + 10);
+			if ( poiIndex >= 0 && poiIndex < level.numPois && level.pois[poiIndex].inuse ) {
+				ent->client->ps.pm_flags |= PMF_FOLLOW;
+				ent->client->ps.pm_type = PM_SPECTATOR;
+				ent->client->ps.clientNum = ent->s.number;
+				ent->client->ps.weapon = WP_NONE;
+				ent->client->ps.stats[STAT_HEALTH] = 1;
+				VectorCopy( level.pois[poiIndex].origin, ent->client->ps.origin );
+				VectorCopy( level.pois[poiIndex].angles, ent->client->ps.viewangles );
+				VectorCopy( level.pois[poiIndex].angles, ent->s.angles );
+				return;
+			} else {
+				// POI gone?
+				ent->client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
+				ClientBegin( ent->client - level.clients );
+			}
+		} else if ( clientNum >= 0 ) {
 			cl = &level.clients[ clientNum ];
 			if ( cl->pers.connected == CON_CONNECTED && cl->sess.sessionTeam != TEAM_SPECTATOR ) {
 				flags = (cl->ps.eFlags & ~(EF_VOTED | EF_TEAMVOTED)) | (ent->client->ps.eFlags & (EF_VOTED | EF_TEAMVOTED));
