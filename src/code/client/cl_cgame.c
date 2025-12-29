@@ -678,6 +678,9 @@ int CL_CgameSystemCalls( int *args ) {
   case CG_KEY_GETKEY:
 		return Key_GetKey( VMA(1) );
 
+	case CG_KEY_KEYNUMTOSTRINGBUF:
+		Q_strncpyz( VMA(2), Key_KeynumToString( args[1] ), args[3] );
+		return 0;
 
 
 	case CG_MEMSET:

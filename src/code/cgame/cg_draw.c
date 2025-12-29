@@ -2166,6 +2166,24 @@ static void CG_DrawProxWarning( void ) {
 
 /*
 =================
+CG_GetBindKeyName
+=================
+*/
+static const char *CG_GetBindKeyName( const char *cmd, char *buf, int len ) {
+	int key;
+
+	key = trap_Key_GetKey( cmd );
+	if ( key == -1 ) {
+		Q_strncpyz( buf, "???", len );
+	} else {
+		trap_Key_KeynumToStringBuf( key, buf, len );
+		Q_strupr( buf );
+	}
+	return buf;
+}
+
+/*
+=================
 CG_DrawWarmup
 =================
 */
@@ -2188,6 +2206,21 @@ static void CG_DrawWarmup( void ) {
 		w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
 		CG_DrawBigString(320 - w / 2, 24, s, 1.0F);
 		cg.warmupCount = 0;
+
+		// if local player is not ready, draw the ready string
+		if ( !( cg.snap->ps.eFlags & EF_READY ) ) {
+			char keyBuf[32];
+			const char *keyName;
+
+			keyName = CG_GetBindKeyName( "readyup", keyBuf, sizeof( keyBuf ) );
+			if ( !Q_stricmp( keyName, "???" ) ) {
+				keyName = CG_GetBindKeyName( "ready", keyBuf, sizeof( keyBuf ) );
+			}
+
+			s = va( "Press %s to ready yourself", keyName );
+			w = CG_Text_Width( s, 0.25f, 0 );
+			CG_Text_Paint( 320 - w / 2, 45, 0.25f, colorWhite, s, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+		}
 		return;
 	}
 
