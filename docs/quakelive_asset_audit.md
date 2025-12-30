@@ -4,11 +4,34 @@
 
 | Category | Reference Snapshot (present under `assets/quakelive/baseq3/`) | GPL Tree Coverage | Notes |
 | --- | --- | --- | --- |
-| Menu definitions | `.menu` and `.txt` files for competitive HUDs, scoreboards, ingame flows, intro, and front-end menus (for example `ui/comp_hud.menu`, `ui/end_scoreboard_duel.menu`, `ui/main.menu`).【68ce2a†L154-L208】 | `src/ui/` only carries legacy Quake III scripts (`hud.txt`, `hud2.txt`, `ingame.txt`, `menus.txt`) and the shared header.【b800fb†L1-L6】 | High-fidelity Quake Live UI requires importing the full `ui/*.menu` and `.txt` set. |
+| Menu definitions | `.menu` and `.txt` files for competitive HUDs, scoreboards, ingame flows, intro, and front-end menus (for example `ui/comp_hud.menu`, `ui/end_scoreboard_duel.menu`, `ui/main.menu`).【68ce2a†L154-L208】 | `src/ui/` mirrors the retail menu stack (`ui/menus.txt` loads `default.menu`, `main.menu`, `main_options.menu`, and other Quake Live front-end scripts; `hud3.menu` defines the competitive HUD globals).【F:src/ui/menus.txt†L1-L41】【F:src/ui/hud3.menu†L1-L24】 | Core scripts are in place, but layout drift and missing art bundles remain (see audit below). |
 | HUD shaders & materials | `scripts/ui.shader`, `scripts/ui_hud.shader`, and supporting shader script files.【68ce2a†L121-L152】 | No Quake Live-specific shader scripts reside in the source tree; only legacy shader assets referenced in the GPL release are available. | Shader packages must be generated from the reference `.shader` files and distributed with the new UI menus. |
 | Fonts | Droid Sans, Noto Sans, Handel Gothic font assets used by the Quake Live HUD (`fonts/*.ttf`).【68ce2a†L103-L120】 | Canonical TTFs continue to live under `assets/quakelive/baseq3/fonts/` so the original filenames (`handelgothic.ttf`, `notosans-regular.ttf`, `droidsansmono.ttf`, `droidsansfallbackfull.ttf`) stay intact. | `font`/`bigFont` pulls from Handel Gothic, `smallFont` text blocks come from Noto Sans, `mono` widgets use Droid Sans Mono, and multilingual fallbacks rely on Droid Sans Fallback. Package the TTFs alongside regenerated atlases and respect the licenses (Handel Gothic remains proprietary, while Droid/Noto stay under Apache 2.0). |
 | Icons & levelshots | Gameplay icons, rune art, ammo, and levelshot JPEGs are preserved in the snapshot (`icons/*.png`, `levelshots/*.jpg`).【68ce2a†L27-L102】 | Not present under `src/` because the GPL release depends on `.pk3` packages built from Q3 art. | Bulk art import or on-demand regeneration is required to surface Quake Live visuals. |
 | UI binary modules | `uix86.dll` and supporting VM binaries live in the reference tree.【68ce2a†L209-L214】 | GPL tree offers C sources in `src/code/ui/` but no native DLL build pipeline yet.【docs/reference-index.md†L9-L21】 | A native build step must output Quake Live-compatible DLLs once the asset pipeline is in place. |
+
+## UI Asset Audit (Retail Snapshot vs `src/ui`)
+
+This inventory compares the retail capture under `assets/quakelive/baseq3/ui` against the scripts currently mirrored in `src/ui`. The goal is to identify missing art/font bundles and layout drift that would diverge from retail UI captures.
+
+### Missing UI Art/Icon Coverage
+
+| Retail capture evidence | Gap in repo coverage | Notes |
+| --- | --- | --- |
+| The retail UI VM loads cursor, gradient bar, scrollbar, and slider textures from `ui/assets/*` during initialization (e.g., `ui/assets/gradientbar2.tga`, `ui/assets/scrollbar.tga`, `ui/assets/slider2.tga`).【F:references/hlil/quakelive/uix86.all/uix86.dll_hlil_split/uix86.dll_hlil_part01.txt†L2327-L2367】 | `src/ui/` contains only menu scripts and no `ui/assets` art payload, so these textures must come from packaged assets or the retail snapshot directory. | Without the `ui/assets` bundle, scrollbars, gradients, and cursor sprites fall back or render blank. |
+| Competitive HUD menus reference scorebox and ink-fade textures under `ui/assets/score/` (e.g., `scorebox_spec.tga`, `scorebox_follow.tga`, `ink_fade_left.tga`, `ink_fade_right.tga`).【F:assets/quakelive/baseq3/ui/comp_spectator_follow.menu†L163-L289】 | The scorebox textures are not present in `src/ui` and must be sourced from the retail `ui/assets` tree. | Missing textures remove the visible scorebox backgrounds, reducing HUD legibility. |
+
+### Font Coverage Notes
+
+The retail HUD scripts expect baked font atlases (`fonts/font`, `fonts/smallfont`, `fonts/bigfont`) defined in the competitive HUD asset globals.【F:assets/quakelive/baseq3/ui/hud3.menu†L7-L24】 The UI bundle manifest shows the Quake Live TTF sources that are required to generate these atlases (Handel Gothic, Noto Sans, Droid Sans Mono, and Droid Sans Fallback).【F:tools/packaging/ui_bundle_manifest.json†L1-L78】 Ensure the font bake step runs so the atlas files exist alongside the menu scripts; otherwise the HUD falls back to legacy fonts.
+
+### Layout & Script Drift vs Retail Snapshot
+
+| Area | Retail snapshot (`assets/quakelive/baseq3/ui`) | `src/ui` state | Impact |
+| --- | --- | --- | --- |
+| Spectator comparison health panels | Uses `CG_SPEC_COMPARE_PRIMARY` / `CG_SPEC_COMPARE_SECONDARY` in `comp_spectator.menu` to draw the two-player comparison bars.【F:assets/quakelive/baseq3/ui/comp_spectator.menu†L150-L161】 | Uses `CG_1ST_PLYR_HEALTH_ARMOR` / `CG_2ND_PLYR_HEALTH_ARMOR`, diverging from retail ownerdraw IDs.【F:src/ui/comp_spectator.menu†L150-L161】 | Mismatched ownerdraw IDs change which HUD data feeds the panel; retail comparison bars may not render as intended. |
+| Spectator follow highlight | Retail uses `CG_SPEC_FOLLOW_PRIMARY` / `CG_SPEC_FOLLOW_SECONDARY` for the follow badges on the scoreboxes.【F:assets/quakelive/baseq3/ui/comp_spectator_follow.menu†L202-L252】 | `src/ui` swaps to `CG_HEALTH_COLORIZED` with follow-specific ownerdraw flags (`CG_SHOW_IF_1ST_PLYR_FOLLOWED`, `CG_SHOW_IF_2ND_PLYR_FOLLOWED`).【F:src/ui/comp_spectator_follow.menu†L202-L254】 | The follow badges no longer map to the retail ownerdraw handlers, risking incorrect highlight behavior. |
+| In-game join panel | Retail `ingame_join.menu` omits a country dropdown panel in the join pop-up.【F:assets/quakelive/baseq3/ui/ingame_join.menu†L35-L100】 | `src/ui` inserts a country label/list fed by `FEEDER_COUNTRIES`.【F:src/ui/ingame_join.menu†L35-L122】 | Layout expands beyond the retail capture and depends on a feeder ID absent in the retail `menudef.h` list.【F:src/ui/menudef.h†L70-L86】【F:assets/quakelive/baseq3/ui/menudef.h†L70-L85】 |
 
 ## Configuration Defaults
 
