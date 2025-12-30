@@ -35,7 +35,7 @@ This report compares the repository's current cgame and UI implementations with 
 ### Required updates
 - Introduce the spectator-specific owner-draw definitions and backing cgame draw routines for follow target comparison, player obituaries, and gametype-specific team panels.【F:src/ui/menudef.h†L137-L212】【F:assets/quakelive/baseq3/ui/comp_spectator_follow.menu†L151-L308】
 - Port the spectator HUD menus and ensure the renderer registers the referenced scorebox and ink-fade assets from `assets/quakelive/baseq3/ui/assets/score`.【F:assets/quakelive/baseq3/ui/comp_spectator_follow.menu†L32-L251】
-- Update spectator input handling to match Quake Live’s follow-state expectations (e.g., next/previous target, camera lock) surfaced by the HLIL strings and menu scripts, replacing the Quake III order system in `cg_newdraw.c`.【F:src/code/cgame/cg_newdraw.c†L41-L104】【F:assets/quakelive/baseq3/ui/comp_spectator_follow.menu†L216-L308】
+- ✅ Updated spectator input handling to match Quake Live’s follow-state expectations (next/previous target selection now respects tracked targets and camera lock flow), replacing the Quake III order system in `cg_newdraw.c`.【F:src/code/cgame/cg_newdraw.c†L1589-L1670】【F:assets/quakelive/baseq3/ui/comp_spectator_follow.menu†L216-L308】
 
 ## Lobby and Menu Flow
 
@@ -62,4 +62,3 @@ This report compares the repository's current cgame and UI implementations with 
 | Timers & overtime | `g_overtime`, `g_timeoutCount`, `overtime.ogg` | HLIL strings confirm gameplay cues that must drive HUD state.【F:references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil_split/cgamex86.dll_hlil_part02.txt†L25940-L25985】【F:references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil_split/cgamex86.dll_hlil_part02.txt†L28860-L28904】 |
 | Spectator comparison | `CG_HEALTH_COLORIZED`, `CG_1ST_PLYR_SCORE`, `CG_2ND_PLYR_SCORE` owner-draw IDs | Need new drawing code plus menu definitions.【F:assets/quakelive/baseq3/ui/comp_spectator_follow.menu†L216-L308】 |
 | Lobby background | `ui/assets/backscreen_smoke` | Used by `main.menu` for animated background; ensure shader registration.【F:assets/quakelive/baseq3/ui/main.menu†L19-L134】 |
-
