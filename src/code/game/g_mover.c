@@ -389,6 +389,10 @@ qboolean G_MoverPush( gentity_t *pusher, vec3_t move, vec3_t amove, gentity_t **
 			continue;
 		}
 
+		// QL parity: movers always crush unless they have damage 0
+		if ( pusher->damage ) {
+			G_Damage( check, pusher, pusher, NULL, NULL, pusher->damage, 0, MOD_CRUSH );
+		}
 		
 		// save off the obstacle so we can call the block function (crush, etc)
 		*obstacle = check;

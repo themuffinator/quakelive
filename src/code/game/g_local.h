@@ -696,6 +696,8 @@ typedef struct {
 } clientSession_t;
 
 //
+// g_client.c
+//
 #define MAX_NETNAME			36
 #define	MAX_VOTE_COUNT		3
 #define	VOTE_THROTTLE_MSEC	0x8CA
@@ -1082,6 +1084,7 @@ void	G_AutoAction( autoActionEvent_t event, const gentity_t *subject, const char
 void Cmd_Score_f (gentity_t *ent);
 void Cmd_Timeout_f( gentity_t *ent );
 void Cmd_Timein_f( gentity_t *ent );
+void Cmd_ShuffleTeams_f( void );
 void StopFollowing( gentity_t *ent );
 void BroadcastTeamChange( gclient_t *client, int oldTeam );
 void SetTeam( gentity_t *ent, char *s );
@@ -1113,6 +1116,9 @@ void Cmd_TimeLimit_f( gentity_t *ent );
 void Cmd_AddPOI_f( gentity_t *ent );
 void Cmd_DelPOI_f( gentity_t *ent );
 void Cmd_POIs_f( gentity_t *ent );
+void Cmd_ReadyUp_f( gentity_t *ent );
+void Cmd_Elo_f( gentity_t *ent );
+void Cmd_Cointoss_f( gentity_t *ent );
 
 //
 // g_items.c

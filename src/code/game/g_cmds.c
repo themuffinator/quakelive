@@ -162,9 +162,31 @@ void Cmd_Ready_f( gentity_t *ent ) {
 
 	ent->client->ps.eFlags |= EF_READY;
 	trap_SendServerCommand( ent-g_entities, "print \"You are now ready.\n\"" );
+}
 
-	// check if everyone is ready
-	// This logic might need to be in G_CheckWarmup or similar
+/*
+==================
+Cmd_ReadyUp_f
+==================
+*/
+void Cmd_ReadyUp_f( gentity_t *ent ) {
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Spectators cannot ready up.\n\"" );
+		return;
+	}
+
+	if ( level.warmupTime == 0 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"The match has already started.\n\"" );
+		return;
+	}
+
+	if ( ent->client->ps.eFlags & EF_READY ) {
+		ent->client->ps.eFlags &= ~EF_READY;
+		trap_SendServerCommand( ent-g_entities, "print \"You are now ^1NOT ^7ready.\n\"" );
+	} else {
+		ent->client->ps.eFlags |= EF_READY;
+		trap_SendServerCommand( ent-g_entities, "print \"You are now ^2READY^7.\n\"" );
+	}
 }
 
 /*
@@ -2680,6 +2702,39 @@ void Cmd_SetViewpos_f( gentity_t *ent ) {
 
 
 /*
+==================
+Cmd_Elo_f
+==================
+*/
+void Cmd_Elo_f( gentity_t *ent ) {
+	int clientNum;
+	char arg[MAX_TOKEN_CHARS];
+	gclient_t *target;
+
+	if ( trap_Argc() < 2 ) {
+		clientNum = ent->s.number;
+	} else {
+		trap_Argv( 1, arg, sizeof( arg ) );
+		clientNum = ClientNumberFromString( ent, arg );
+	}
+
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return;
+	}
+
+	target = &level.clients[clientNum];
+	if ( target->pers.connected != CON_CONNECTED ) {
+		return;
+	}
+
+	trap_SendServerCommand( ent-g_entities, va( "print \"^7Elo for %s^7: %i (Skill1: %i, Skill2: %i)\n\"",
+		target->pers.netname,
+		target->sess.skill1,
+		target->sess.skill1,
+		target->sess.skill2 ) );
+}
+
+/*
 =================
 Cmd_Stats_f
 =================
@@ -3376,6 +3431,57 @@ void Cmd_Restart_f( gentity_t *ent ) {
 
 /*
 ==================
+Cmd_ShuffleTeams_f
+==================
+*/
+void Cmd_ShuffleTeams_f( void ) {
+	int clients[MAX_CLIENTS];
+	int numPlayers = 0;
+	int j, k, temp;
+	gclient_t	*cl;
+
+	if ( g_gametype.integer < GT_TEAM ) {
+		return;
+	}
+
+	for ( j = 0 ; j < level.maxclients ; j++ ) {
+		cl = &level.clients[j];
+		if ( cl->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+		if ( cl->sess.sessionTeam == TEAM_SPECTATOR ) {
+			continue;
+		}
+		clients[numPlayers++] = j;
+	}
+
+	// Shuffle
+	for ( j = 0 ; j < numPlayers ; j++ ) {
+		k = rand() % numPlayers;
+		temp = clients[j];
+		clients[j] = clients[k];
+		clients[k] = temp;
+	}
+
+	// Assign
+	for ( j = 0 ; j < numPlayers ; j++ ) {
+		gentity_t *ent = &g_entities[clients[j]];
+		// Alternate teams
+		if ( j % 2 == 0 ) {
+			ent->client->sess.sessionTeam = TEAM_RED;
+		} else {
+			ent->client->sess.sessionTeam = TEAM_BLUE;
+		}
+		ClientUserinfoChanged( clients[j] );
+		ClientBegin( clients[j] );
+	}
+
+	trap_SendServerCommand( -1, "cp \"Teams have been shuffled!\n\"" );
+	trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
+}
+
+/*
+==================
 Cmd_Shuffle_f
 ==================
 */
@@ -3560,6 +3666,23 @@ void Cmd_ClientKick_f( gentity_t *ent ) {
 	if ( clientNum >= 0 && clientNum < level.maxclients ) {
 		trap_SendConsoleCommand( EXEC_APPEND, va("clientkick %d\n", clientNum) );
 	}
+}
+
+/*
+==================
+Cmd_Cointoss_f
+==================
+*/
+void Cmd_Cointoss_f( gentity_t *ent ) {
+	char	*msg;
+
+	if ( rand() & 1 ) {
+		msg = "Heads";
+	} else {
+		msg = "Tails";
+	}
+
+	trap_SendServerCommand( -1, va( "print \"%s throws a coin... ^3%s!^7\n\"", ent->client->pers.netname, msg ) );
 }
 
 /*
@@ -3994,8 +4117,12 @@ void ClientCommand( int clientNum ) {
 		Cmd_Score_f (ent);
 		return;
 	}
-	else if (Q_stricmp (cmd, "ready") == 0 || Q_stricmp (cmd, "readyup") == 0 ) {
+	else if (Q_stricmp (cmd, "ready") == 0) {
 		Cmd_Ready_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "readyup") == 0) {
+		Cmd_ReadyUp_f (ent);
 		return;
 	}
 	else if (Q_stricmp (cmd, "notready") == 0 || Q_stricmp (cmd, "unready") == 0 ) {
@@ -4103,6 +4230,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)
 		Cmd_Stats_f( ent );
+	else if (Q_stricmp (cmd, "elo") == 0)
+		Cmd_Elo_f( ent );
 	else if (Q_stricmp (cmd, "admin") == 0)
 		Cmd_Admin_f( ent );
 	else if (Q_stricmp (cmd, "ruleset") == 0)

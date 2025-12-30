@@ -1026,6 +1026,8 @@ void ClientThink_real( gentity_t *ent ) {
 		client->ps.pm_type = PM_NOCLIP;
 	} else if ( client->ps.stats[STAT_HEALTH] <= 0 ) {
 		client->ps.pm_type = PM_DEAD;
+	} else if ( client->freezeFrozen ) {
+		client->ps.pm_type = PM_FREEZE;
 	} else {
 		client->ps.pm_type = PM_NORMAL;
 	}
@@ -1109,6 +1111,14 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 	if ( g_pmoveSettings.noPlayerClip ) {
 		pm.tracemask &= ~CONTENTS_BODY;
+	}
+	if ( g_playerCylinders.integer ) {
+		// Quake Live player cylinder approximation:
+		// When enabled, we slightly reduce the bbox size for certain checks
+		// or ensure the physics engine treats it as a cylinder.
+		// For now, we enforce the standard QL bbox sizes if they differ.
+		VectorSet( pm.mins, -15, -15, -24 );
+		VectorSet( pm.maxs, 15, 15, 32 );
 	}
 	pm.pmoveSettings = &g_pmoveSettings;
 	pm.trace = trap_Trace;

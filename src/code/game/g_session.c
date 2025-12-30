@@ -143,6 +143,13 @@ void G_InitSessionData( gclient_t *client, char *userinfo ) {
 				} else {
 					sess->sessionTeam = TEAM_SPECTATOR;
 				}
+	} else if ( g_gametype.integer >= GT_TEAM ) {
+		// QL parity: preserve team
+		if ( g_maintainTeam.integer && client->sess.sessionTeam != TEAM_SPECTATOR ) {
+			// keep current
+		} else {
+			client->sess.sessionTeam = TEAM_SPECTATOR;
+		}
 			} else {
 				sess->sessionTeam = TEAM_SPECTATOR;
 			}
