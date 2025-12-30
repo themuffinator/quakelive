@@ -759,8 +759,6 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 	
 	ci = &cgs.clientinfo[score->client];
 
-	CG_AppendHudScoreboardEntry( score, ci );
-
 	iconx = SB_BOTICON_X + (SB_RATING_WIDTH / 2);
 	headx = SB_HEAD_X + (SB_RATING_WIDTH / 2);
 
@@ -1044,7 +1042,6 @@ qboolean CG_DrawOldScoreboard( void ) {
 	y = SB_HEADER;
 
 	timersActive = ( cgs.itemTimersEnabled || cgs.forceHudHints );
-	CG_ResetHudScoreboard( timersActive );
 
 	CG_DrawPic( SB_SCORE_X + (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardScore );
 	CG_DrawPic( SB_PING_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardPing );
