@@ -3994,10 +3994,17 @@ static void CG_DrawRoundTimer(rectDef_t *rect, float scale, vec4_t color, int te
 CG_DrawLevelTimer(rect, scale, color, textStyle);
 }
 
+/*
+=============
+CG_DrawOvertime
+
+Displays the overtime banner label when the match enters overtime.
+=============
+*/
 static void CG_DrawOvertime(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-if (cg.timelimitWarnings & 4) {
-CG_Text_Paint(rect->x, rect->y, scale, color, "OVERTIME", 0, 0, textStyle);
-}
+	if ( ( cg.timelimitWarnings & 4 ) || cgs.matchOvertimeActive ) {
+		CG_Text_Paint(rect->x, rect->y, scale, color, "OVERTIME", 0, 0, textStyle);
+	}
 }
 
 static void CG_DrawPlayerObituary(rectDef_t *rect, float scale, vec4_t color, int textStyle) {

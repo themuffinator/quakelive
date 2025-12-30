@@ -2070,12 +2070,13 @@ static void CG_RegisterAnnouncerVoiceSet( cgAnnouncerProfile_t profile, const ch
 	}
 
 	set = &cgs.media.announcerSoundSets[profile];
-	set->oneMinute = CG_RegisterAnnouncerClip( folder, "1_minute" );
-	set->fiveMinute = CG_RegisterAnnouncerClip( folder, "5_minute" );
-	set->suddenDeath = CG_RegisterAnnouncerClip( folder, "sudden_death" );
-	set->oneFrag = CG_RegisterAnnouncerClip( folder, "1_frag" );
-	set->twoFrag = CG_RegisterAnnouncerClip( folder, "2_frags" );
-	set->threeFrag = CG_RegisterAnnouncerClip( folder, "3_frags" );
+	set->oneMinuteSound = CG_RegisterAnnouncerClip( folder, "1_minute" );
+	set->fiveMinuteSound = CG_RegisterAnnouncerClip( folder, "5_minute" );
+	set->suddenDeathSound = CG_RegisterAnnouncerClip( folder, "sudden_death" );
+	set->overtimeSound = CG_RegisterAnnouncerClip( folder, "overtime" );
+	set->oneFragSound = CG_RegisterAnnouncerClip( folder, "1_frag" );
+	set->twoFragSound = CG_RegisterAnnouncerClip( folder, "2_frags" );
+	set->threeFragSound = CG_RegisterAnnouncerClip( folder, "3_frags" );
 }
 
 /*
@@ -2131,6 +2132,7 @@ static void CG_SetActiveAnnouncerProfile( cgAnnouncerProfile_t profile ) {
 		cgs.media.oneMinuteSound = 0;
 		cgs.media.fiveMinuteSound = 0;
 		cgs.media.suddenDeathSound = 0;
+		cgs.media.overtimeSound = 0;
 		cgs.media.oneFragSound = 0;
 		cgs.media.twoFragSound = 0;
 		cgs.media.threeFragSound = 0;
@@ -2146,6 +2148,7 @@ static void CG_SetActiveAnnouncerProfile( cgAnnouncerProfile_t profile ) {
 	CG_APPLY_ANNOUNCER_HANDLE( oneMinuteSound );
 	CG_APPLY_ANNOUNCER_HANDLE( fiveMinuteSound );
 	CG_APPLY_ANNOUNCER_HANDLE( suddenDeathSound );
+	CG_APPLY_ANNOUNCER_HANDLE( overtimeSound );
 	CG_APPLY_ANNOUNCER_HANDLE( oneFragSound );
 	CG_APPLY_ANNOUNCER_HANDLE( twoFragSound );
 	CG_APPLY_ANNOUNCER_HANDLE( threeFragSound );
@@ -3538,7 +3541,18 @@ static int CG_RoundLabelWidth( float scale ) {
 	return CG_Text_Width( label, scale, 0 );
 }
 
-static int CG_OwnerDrawWidth(int ownerDraw, float scale) {
+/*
+=============
+CG_OwnerDrawWidth
+
+Calculates the width to reserve for a HUD owner-draw element.
+=============
+*/
+static int CG_OwnerDrawWidth( int ownerDraw, float scale ) {
+	qboolean overtimeActive;
+
+	overtimeActive = (qboolean)( ( cg.timelimitWarnings & 4 ) || cgs.matchOvertimeActive );
+
 	switch ( ownerDraw ) {
 	case CG_GAME_TYPE:
 		return CG_Text_Width( CG_GameTypeString(), scale, 0 );
@@ -3552,7 +3566,7 @@ static int CG_OwnerDrawWidth(int ownerDraw, float scale) {
 	case CG_ROUNDTIMER:
 		return CG_LevelTimerWidth( scale );
 	case CG_OVERTIME:
-		return ( cg.timelimitWarnings & 4 ) ? CG_Text_Width( "OVERTIME", scale, 0 ) : 0;
+		return overtimeActive ? CG_Text_Width( "OVERTIME", scale, 0 ) : 0;
 	case CG_ROUND:
 		return CG_RoundLabelWidth( scale );
 	case CG_HEALTH_COLORIZED:
@@ -4017,4 +4031,3 @@ CG_EventHandling
       2 - hud editor
 
 */
-

@@ -161,6 +161,7 @@ typedef struct {
 	sfxHandle_t	oneMinuteSound;
 	sfxHandle_t	fiveMinuteSound;
 	sfxHandle_t	suddenDeathSound;
+	sfxHandle_t	overtimeSound;
 	sfxHandle_t	oneFragSound;
 	sfxHandle_t	twoFragSound;
 	sfxHandle_t	threeFragSound;
@@ -1125,6 +1126,7 @@ typedef struct {
 	sfxHandle_t oneMinuteSound;
 	sfxHandle_t fiveMinuteSound;
 	sfxHandle_t suddenDeathSound;
+	sfxHandle_t overtimeSound;
 
 	sfxHandle_t threeFragSound;
 	sfxHandle_t twoFragSound;
@@ -2235,5 +2237,4 @@ void	CG_ParticleMisc (qhandle_t pshader, vec3_t origin, int size, int duration, 
 void	CG_ParticleExplosion (char *animStr, vec3_t origin, vec3_t vel, int duration, int sizeStart, int sizeEnd);
 extern qboolean		initparticles;
 int CG_NewParticleArea ( int num );
-
 

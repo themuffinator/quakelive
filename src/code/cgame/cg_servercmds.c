@@ -1049,6 +1049,11 @@ static void CG_ParseMatchState( void ) {
 	const char *info;
 	int timeoutRemaining;
 	int value;
+	qboolean wasOvertimeActive;
+	int previousOvertimeCount;
+
+	wasOvertimeActive = cgs.matchOvertimeActive;
+	previousOvertimeCount = cgs.matchOvertimeCount;
 
 	CG_ResetMatchStateFields();
 
@@ -1101,6 +1106,13 @@ static void CG_ParseMatchState( void ) {
 	}
 
 	CG_ParseMatchFactoryConfig( info );
+
+	if ( cgs.matchOvertimeActive ) {
+		cg.timelimitWarnings |= 4;
+		if ( ( !wasOvertimeActive || cgs.matchOvertimeCount > previousOvertimeCount ) && cgs.media.overtimeSound ) {
+			trap_S_StartLocalSound( cgs.media.overtimeSound, CHAN_ANNOUNCER );
+		}
+	}
 }
 
 /*
