@@ -52,18 +52,6 @@
       "license": "Quake Live profile snapshot packaged for tutorial flows."
     },
     {
-      "source_dir": "assets/quakelive/baseq3/icons",
-      "destination": "baseq3/icons",
-      "include": ["**/*"],
-      "description": "Gameplay icons and rune art used by menu scripts."
-    },
-    {
-      "source_dir": "assets/quakelive/baseq3/levelshots",
-      "destination": "baseq3/levelshots",
-      "include": ["**/*"],
-      "description": "Levelshot previews referenced by menu scripts."
-    },
-    {
       "source_dir": "assets/quakelive/baseq3/scripts",
       "destination": "scripts",
       "include": ["ui*.shader"],
