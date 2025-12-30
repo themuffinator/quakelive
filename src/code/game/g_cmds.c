@@ -2977,25 +2977,32 @@ void Cmd_Invite_f( gentity_t *ent ) {
 	char arg[MAX_TOKEN_CHARS];
 	int clientNum;
 	gentity_t *target;
+	unsigned int steamIdLow;
+	unsigned int steamIdHigh;
+	unsigned long long steamIdValue;
+	char steamIdString[MAX_ADMIN_STEAMID_LENGTH];
+	int priv;
 
 	if ( !ent || !ent->client ) {
 		return;
 	}
 
-	// This is a simplified implementation. Real invite logic would integrate with Steam/platform auth.
-	// For now, we allow admins to "invite" which just prints a message.
-	if ( G_AdminAccessForSteamID( NULL ) < PRIV_MOD ) { // Placeholder check
-		// Check privileges
-		char userinfo[MAX_INFO_STRING];
-		const char *steamId;
-		int priv;
-		trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
-		steamId = Info_ValueForKey( userinfo, "steamid" );
-		priv = G_AdminAccessForSteamID( steamId );
-		if ( priv < PRIV_MOD ) {
-			trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
-			return;
-		}
+	if ( !trap_VerifySteamAuth( ent->s.number ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Failed to verify Steam auth token\n\"" );
+		return;
+	}
+
+	if ( !trap_GetSteamId( ent->s.number, &steamIdLow, &steamIdHigh ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Failed to verify Steam auth token\n\"" );
+		return;
+	}
+
+	steamIdValue = ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;
+	Com_sprintf( steamIdString, sizeof( steamIdString ), "%llu", steamIdValue );
+	priv = G_AdminAccessForSteamID( steamIdString );
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
 	}
 
 	if ( trap_Argc() < 2 ) {
@@ -3023,21 +3030,30 @@ void Cmd_Revoke_f( gentity_t *ent ) {
 	char arg[MAX_TOKEN_CHARS];
 	int clientNum;
 	gentity_t *target;
+	unsigned int steamIdLow;
+	unsigned int steamIdHigh;
+	unsigned long long steamIdValue;
+	char steamIdString[MAX_ADMIN_STEAMID_LENGTH];
+	int priv;
 
 	if ( !ent || !ent->client ) return;
 
-	if ( G_AdminAccessForSteamID( NULL ) < PRIV_MOD ) {
-		// Check privileges
-		char userinfo[MAX_INFO_STRING];
-		const char *steamId;
-		int priv;
-		trap_GetUserinfo( ent->s.number, userinfo, sizeof(userinfo) );
-		steamId = Info_ValueForKey( userinfo, "steamid" );
-		priv = G_AdminAccessForSteamID( steamId );
-		if ( priv < PRIV_MOD ) {
-			trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
-			return;
-		}
+	if ( !trap_VerifySteamAuth( ent->s.number ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Failed to verify Steam auth token\n\"" );
+		return;
+	}
+
+	if ( !trap_GetSteamId( ent->s.number, &steamIdLow, &steamIdHigh ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Failed to verify Steam auth token\n\"" );
+		return;
+	}
+
+	steamIdValue = ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;
+	Com_sprintf( steamIdString, sizeof( steamIdString ), "%llu", steamIdValue );
+	priv = G_AdminAccessForSteamID( steamIdString );
+	if ( priv < PRIV_MOD ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Insufficient privileges.\n\"" );
+		return;
 	}
 
 	if ( trap_Argc() < 2 ) {
