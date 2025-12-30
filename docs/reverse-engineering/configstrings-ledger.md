@@ -59,11 +59,12 @@ when future HLIL exports expose new payloads.
   tutorial table; it is run during level init and whenever CVars refresh in
   `G_UpdateCvars()`.【F:src/code/game/g_main.c†L3803-L3838】【F:src/code/game/g_main.c†L1324-L1345】
 - The client draws the tutorial headline/body directly from
-  `CS_TUTORIAL_NAME`/`CS_TUTORIAL_TEXT` inside `CG_DrawPregameCoach()`, but the
-  Freeze Tag tip configstrings are not parsed anywhere yet, leaving those HLIL
-  payloads unused client-side. Aligning with HLIL would require adding
-  `CG_ConfigStringModified()` handlers for `CS_FREEZE_TIP_*` and plumbing the
-  strings into the HUD widgets that expect them.【F:src/code/cgame/cg_newdraw.c†L3505-L3546】【F:src/code/cgame/cg_servercmds.c†L1315-L1366】
+  `CS_TUTORIAL_NAME`/`CS_TUTORIAL_TEXT` inside `CG_DrawPregameCoach()`, keeping
+  the pregame coaching panel aligned with the server-provided strings.【F:src/code/cgame/cg_newdraw.c†L3505-L3546】
+- `CG_ParseFreezeTipConfigstrings()` now caches the `CS_FREEZE_TIP_*` strings
+  into `cgs.freezeTip*` on initial gamestate load and configstring updates, and
+  `CG_DrawFreezeTagTips()` renders the tips above the scoreboard whenever
+  Freeze Tag and forced HUD hints are active.【F:src/code/cgame/cg_local.h†L1343-L1351】【F:src/code/cgame/cg_servercmds.c†L1206-L1250】【F:src/code/cgame/cg_servercmds.c†L1432-L1435】【F:src/code/cgame/cg_scoreboard.c†L410-L529】
 
 ## HLIL-derived gametype strings
 

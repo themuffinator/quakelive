@@ -1344,6 +1344,11 @@ typedef struct {
 	qboolean	forceHudHints;
 	qboolean	forceDmgThroughSurface;
 	char		forcedAtmosphere[MAX_QPATH];
+	char		freezeTipObjective[MAX_STRING_CHARS];
+	char		freezeTipThaw[MAX_STRING_CHARS];
+	char		freezeTipFreeze[MAX_STRING_CHARS];
+	char		freezeTipShoot[MAX_STRING_CHARS];
+	char		freezeTipSummary[MAX_STRING_CHARS];
 
 	qboolean  newHud;
 
@@ -2235,5 +2240,4 @@ void	CG_ParticleMisc (qhandle_t pshader, vec3_t origin, int size, int duration, 
 void	CG_ParticleExplosion (char *animStr, vec3_t origin, vec3_t vel, int duration, int sizeStart, int sizeEnd);
 extern qboolean		initparticles;
 int CG_NewParticleArea ( int num );
-
 
