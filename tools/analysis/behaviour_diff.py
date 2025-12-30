@@ -72,6 +72,43 @@ def _load_json(path: Path) -> Mapping[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _resolve_match_timeline(root: Path, target: str) -> Path:
+    latest_root = root / "match_sim" / target / "latest"
+    index_path = latest_root / "index.json"
+    if index_path.exists():
+        entries = _load_json(index_path)
+        if isinstance(entries, Sequence):
+            duel_entry = next(
+                (entry for entry in entries if isinstance(entry, Mapping) and entry.get("slug") == "duel"),
+                None,
+            )
+            pick = duel_entry or (entries[0] if entries else None)
+            if isinstance(pick, Mapping):
+                slug = pick.get("slug")
+                if isinstance(slug, str):
+                    candidate = latest_root / slug / "timeline.json"
+                    if candidate.exists():
+                        return candidate
+    if latest_root.exists():
+        candidates = sorted(latest_root.glob("*/timeline.json"))
+        if candidates:
+            return candidates[0]
+    legacy = root / "match_sim" / target / "timeline.json"
+    if legacy.exists():
+        return legacy
+    raise FileNotFoundError(f"Missing match simulation timeline under {latest_root}")
+
+
+def _resolve_client_hashes(root: Path, target: str) -> Path:
+    latest = root / "client_regression" / target / "latest" / "hud_hashes.json"
+    if latest.exists():
+        return latest
+    legacy = root / "client_regression" / target / "hud_hashes.json"
+    if legacy.exists():
+        return legacy
+    raise FileNotFoundError(f"Missing client HUD hashes under {latest.parent}")
+
+
 def _summarise_match(frames: Sequence[Mapping[str, object]]) -> Dict[str, object]:
     event_counts: Counter[str] = Counter()
     score_totals: MutableMapping[str, float] = defaultdict(float)
@@ -135,12 +172,8 @@ def _summarise_client(frames: Sequence[Mapping[str, object]]) -> Dict[str, objec
 
 
 def summarise_run(root: Path, target: str) -> RunSummary:
-    match_path = root / "match_sim" / target / "timeline.json"
-    client_path = root / "client_regression" / target / "hud_hashes.json"
-    if not match_path.exists():
-        raise FileNotFoundError(f"Missing match simulation timeline: {match_path}")
-    if not client_path.exists():
-        raise FileNotFoundError(f"Missing client HUD hashes: {client_path}")
+    match_path = _resolve_match_timeline(root, target)
+    client_path = _resolve_client_hashes(root, target)
 
     timeline = _load_json(match_path)
     match_summary = _summarise_match(timeline.get("frames", []))

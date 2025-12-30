@@ -62,8 +62,8 @@ To support the gameplay testing strategy, CI must offer the following automation
 
 - **Dual-Target Build Matrix:** Configure workflows with a `target` axis (`qvm`, `dll`). The QVM leg invokes the existing `Construct` scripts, while the DLL leg drives MSBuild or CMake presets configured for the Visual Studio 2010 toolset.
 - **Harness Bootstrapping:** Before running tests, stage the shared harness utilities from `tests/` (Python dependencies, data packs) and compile the native/QVM fixture runners. Package the compiled shims (`tests/bin/qvm/*`, `tests/bin/dll/*`) for reuse across suites.
-- **Test Execution:** For each leg, run `python tests/run_all.py --target <target>` which fans out to the deterministic match, rules engine, client regression, and syscall verification suites. Failures must surface unified diff snippets plus a link to the archived artefacts.
-- **Artefact Publication:** Upload JSON logs, baseline diffs, and syscall traces to the CI job artefacts directory under `tests/<suite>/<target>/latest/`. These provide reviewers with parity evidence without reproducing the run locally.
+- **Test Execution:** For each leg, run `python tests/run_all.py --target <target>` which fans out to the deterministic match, rules engine, client regression, weapon timing, and syscall verification suites. Failures must surface unified diff snippets plus a link to the archived artefacts.
+- **Artefact Publication:** Upload JSON logs, baseline diffs, syscall traces, and weapon timing baselines to the CI job artefacts directory under `artifacts/tests/<suite>/<target>/latest/`. These provide reviewers with parity evidence without reproducing the run locally.
 - **Status Badges:** Expose separate build badges (e.g., `Tests (QVM)`, `Tests (DLL)`) so contributors can quickly see which target failed.
 
 ### Expected Contributor Outputs

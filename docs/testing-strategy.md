@@ -42,7 +42,13 @@ To ensure gameplay logic matches Quake Live behaviour throughout the transition 
   - Diff logs between QVM and DLL runs to confirm ordering and payload parity.
 - **Implementation Hooks:**
   - Introduce a shared `syscall_contract.expect` file enumerating required calls and argument schemas.
-  - Add a validator (`tools/tests/validate_syscall_contract.py`) that flags missing or unexpected syscalls and reports diffs.
+- Add a validator (`tools/tests/validate_syscall_contract.py`) that flags missing or unexpected syscalls and reports diffs.
+
+### 5. Weapon Timing Baselines
+- **Purpose:** Validate refire/reload durations and ammo pickup/max stack defaults against the HLIL reference tables.
+- **Harness:**
+  - Parse the HLIL timing tables and compare them against `bg_pmove.c`/`bg_misc.c` defaults.
+  - Emit a deterministic baseline JSON payload alongside a concise mismatch log for CI review.
 
 ## Tooling Requirements
 - Deterministic RNG seeding utilities shared across both build products.
@@ -53,7 +59,7 @@ To ensure gameplay logic matches Quake Live behaviour throughout the transition 
 ## CI Integration
 - Introduce a matrix job that builds both QVM (`make target=qvm`) and native DLLs (`msbuild /p:Configuration=Release /p:Platform=Win32`).
 - For each artefact set, run the deterministic match, rules engine, client prediction, and syscall verification suites.
-- Store harness outputs under `artifacts/tests/<suite>/<target>/` and publish them as CI artifacts for manual review when failures occur.
+- Store harness outputs under `artifacts/tests/<suite>/<target>/latest/` and publish them as CI artifacts for manual review when failures occur.
 
 ## Contributor Workflow
 1. Build the desired target (`make qvm-tests` or `cmake --build . --target dll-tests`).
