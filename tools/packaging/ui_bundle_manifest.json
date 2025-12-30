@@ -56,6 +56,7 @@
       "destination": "syncerror.cfg",
       "license": "Quake Live profile snapshot packaged for tutorial flows."
     },
+    {
       "source_dir": "assets/quakelive/baseq3/scripts",
       "destination": "scripts",
       "include": ["ui*.shader"],

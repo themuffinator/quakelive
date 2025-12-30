@@ -37,7 +37,7 @@ export REPO_ROOT="$(git rev-parse --show-toplevel)"
 bash tools/build_ui_bundle.sh
 ```
 
-The script copies `default.cfg`, the Quake Live TTF set (`fonts/*.ttf`), shader scripts (`scripts/ui*.shader`), and the entire `ui/*.menu`/`ui/*.txt` tree into `build/ui_bundle/staging/`. It then enforces the manifest-defined audit gates (required paths and globs) before invoking `zip`, causing the build to fail if any required file is missing or placed under the wrong PK3 path.
+The script copies `default.cfg`, the Quake Live TTF set (`fonts/*.ttf`), shader scripts (`scripts/ui*.shader`), and the entire `ui/*.menu`/`ui/*.txt` tree into `build/ui_bundle/staging/`. It then enforces the manifest-defined audit gates (including `scripts/ui.shader` and `scripts/ui_hud.shader` under `baseq3/scripts/`) before invoking `zip`, causing the build to fail if any required file is missing or placed under the wrong PK3 path.
 
 ## Configuration Alignment Plan
 
