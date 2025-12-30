@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../common/auth_credentials.h"
 #include "../../common/platform/platform_config.h"
-#include <limits.h>
 
 
 /*
@@ -79,6 +78,234 @@ static void G_LoadClientRatingMetadata( gclient_t *client, const char *userinfo 
 	client->pers.ratingDamageScale = G_ParseRatingScaleValue( damageScale );
 	client->pers.ratingScoreScale = G_ParseRatingScaleValue( scoreScale );
 	client->pers.ratingMetadataLoaded = qtrue;
+}
+
+// g_client.c -- client functions that don't happen every frame
+
+static vec3_t	playerMins = {-15, -15, -24};
+static vec3_t	playerMaxs = {15, 15, 32};
+
+/*
+=============
+G_FreezeHelperHasLineOfSight
+
+Ensures thaw credit can pass between a frozen client and a helper.
+=============
+*/
+static qboolean G_FreezeHelperHasLineOfSight( gentity_t *ent, gentity_t *helper ) {
+	trace_t		trace;
+	vec3_t		start;
+	vec3_t		end;
+
+	VectorCopy( helper->r.currentOrigin, start );
+	VectorCopy( ent->r.currentOrigin, end );
+	if ( helper->client ) {
+		start[2] += helper->client->ps.viewheight * 0.5f;
+	}
+	if ( ent->client ) {
+		end[2] += ent->client->ps.viewheight * 0.5f;
+	}
+
+	trap_Trace( &trace, start, NULL, NULL, end, helper->s.number, MASK_SOLID );
+	if ( trace.fraction < 1.0f && trace.entityNum != ent->s.number ) {
+		return qfalse;
+	}
+
+	trap_Trace( &trace, end, NULL, NULL, start, ent->s.number, MASK_SOLID );
+	if ( trace.fraction < 1.0f && trace.entityNum != helper->s.number ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_FreezeCountThawHelpers
+
+Counts allies able to thaw the specified client and returns the primary helper.
+=============
+*/
+static int G_FreezeCountThawHelpers( gentity_t *ent, gentity_t **primaryHelper ) {
+	float		radius;
+	float		radiusSq;
+	int		clientNum;
+	int		count;
+
+	if ( primaryHelper ) {
+		*primaryHelper = NULL;
+	}
+	if ( !ent || !ent->client ) {
+		return 0;
+	}
+
+	radius = (float)level.freezeConfig.thawRadius;
+	if ( radius <= 0.0f ) {
+		return 0;
+	}
+	radiusSq = radius * radius;
+	count = 0;
+
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gentity_t	*helper;
+		vec3_t		delta;
+
+		helper = &g_entities[clientNum];
+		if ( helper == ent || !helper->inuse || !helper->client ) {
+			continue;
+		}
+		if ( helper->client->sess.sessionTeam != ent->client->sess.sessionTeam ) {
+			continue;
+		}
+		if ( helper->client->sess.sessionTeam != TEAM_RED
+		&& helper->client->sess.sessionTeam != TEAM_BLUE ) {
+			continue;
+		}
+		if ( helper->client->freezeFrozen ) {
+			continue;
+		}
+		if ( helper->client->ps.pm_type == PM_DEAD ) {
+			continue;
+		}
+
+		VectorSubtract( helper->r.currentOrigin, ent->r.currentOrigin, delta );
+		if ( VectorLengthSquared( delta ) > radiusSq ) {
+			continue;
+		}
+
+		if ( !level.freezeConfig.thawThroughSurface && !G_FreezeHelperHasLineOfSight( ent, helper ) ) {
+			continue;
+		}
+
+		count++;
+		if ( primaryHelper && !*primaryHelper ) {
+			*primaryHelper = helper;
+		}
+	}
+
+	return count;
+}
+
+/*
+=============
+G_FreezeInitClient
+
+Clears the per-client freeze fields whenever a player spawns.
+=============
+*/
+void G_FreezeInitClient( gentity_t *ent ) {
+	gclient_t	*client;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	client = ent->client;
+	client->freezeFrozen = qfalse;
+	client->freezeTime = 0;
+	client->freezeNextThawTick = 0;
+	client->freezeAccumulatedThaw = 0;
+	client->freezeAutoThawTime = 0;
+	client->freezeProtectedUntil = 0;
+	client->freezeEnvironmentalRespawnTime = 0;
+	client->freezeLastHelper = -1;
+	if ( G_FreezeGametypeEnabled() && level.freezeConfig.protectedSpawnTime > 0 ) {
+		client->freezeProtectedUntil = level.time + level.freezeConfig.protectedSpawnTime;
+	}
+}
+
+/*
+=============
+G_FreezeApplyFreezeState
+
+Transitions the victim into the frozen state rather than allowing death.
+=============
+*/
+static void G_FreezeApplyFreezeState( gentity_t *self, qboolean environmental ) {
+	gclient_t	*client;
+	int		thawTick;
+
+	if ( !self || !self->client ) {
+		return;
+	}
+
+	client = self->client;
+	client->freezeFrozen = qtrue;
+	client->freezeTime = level.time;
+	client->freezeAccumulatedThaw = 0;
+	thawTick = level.freezeConfig.thawTick;
+	if ( thawTick <= 0 ) {
+		thawTick = level.freezeConfig.thawTime;
+	}
+	if ( thawTick <= 0 ) {
+		thawTick = 100;
+	}
+	client->freezeNextThawTick = level.time + thawTick;
+	client->freezeAutoThawTime = ( level.freezeConfig.autoThawTime > 0 )
+		? level.time + level.freezeConfig.autoThawTime : 0;
+	if ( environmental && level.freezeConfig.environmentalRespawnDelay > 0 ) {
+		client->freezeEnvironmentalRespawnTime = level.time + level.freezeConfig.environmentalRespawnDelay;
+	} else {
+		client->freezeEnvironmentalRespawnTime = 0;
+	}
+	client->freezeProtectedUntil = 0;
+	client->freezeLastHelper = -1;
+	self->takedamage = qfalse;
+	client->ps.pm_type = PM_FREEZE;
+	client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
+	client->ps.pm_time = 0;
+	VectorClear( client->ps.velocity );
+	self->health = 1;
+	client->ps.stats[STAT_HEALTH] = 1;
+	client->respawnTime = INT_MAX;
+	self->r.contents = CONTENTS_BODY;
+	trap_LinkEntity( self );
+}
+
+/*
+=============
+G_FreezeThawClient
+
+Restores a frozen player to the active state.
+=============
+*/
+void G_FreezeThawClient( gentity_t *ent, qboolean wasAuto, int helperNum ) {
+	gclient_t	*client;
+
+	(void)wasAuto;
+	(void)helperNum;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	client = ent->client;
+	client->freezeFrozen = qfalse;
+	client->freezeTime = 0;
+	client->freezeAccumulatedThaw = 0;
+	client->freezeNextThawTick = 0;
+	client->freezeAutoThawTime = 0;
+	client->freezeEnvironmentalRespawnTime = 0;
+	client->freezeLastHelper = -1;
+	client->ps.pm_type = PM_NORMAL;
+	ent->takedamage = qtrue;
+	if ( level.freezeConfig.resetHealth ) {
+		ent->health = client->ps.stats[STAT_MAX_HEALTH];
+		client->ps.stats[STAT_HEALTH] = ent->health;
+	}
+	if ( level.freezeConfig.resetArmor ) {
+		client->ps.stats[STAT_ARMOR] = g_factoryCvarConfig.startingArmor;
+	}
+	if ( level.freezeConfig.removePowerups ) {
+		memset( client->ps.powerups, 0, sizeof( client->ps.powerups ) );
+	}
+	if ( level.freezeConfig.protectedSpawnTime > 0 ) {
+		client->freezeProtectedUntil = level.time + level.freezeConfig.protectedSpawnTime;
+	} else {
+		client->freezeProtectedUntil = 0;
+	}
+	client->respawnTime = level.time;
+	trap_LinkEntity( ent );
 }
 
 /*
@@ -318,66 +545,82 @@ qboolean G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, genti
 
 
 
+#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
+static char g_clientAuthDenyMessage[QL_AUTH_MAX_RESPONSE_MESSAGE + 64];
+
+/*
+=============
+G_GetAuthResultString
+
+Formats the platform auth result for userinfo storage.
+=============
+*/
+static const char *G_GetAuthResultString( qlAuthResult result ) {
+	switch ( result ) {
+	case QL_AUTH_RESULT_PENDING:
+		return "pending";
+	case QL_AUTH_RESULT_ACCEPTED:
+		return "accepted";
+	case QL_AUTH_RESULT_DENIED:
+		return "denied";
+	case QL_AUTH_RESULT_ERROR:
+		return "error";
+	default:
+		break;
+	}
+
+	return "unknown";
+}
+#endif
+
+/*
+=============
+G_GetAuthOutcomeString
+
+Formats the auth outcome for userinfo storage.
+=============
+*/
 static const char *G_GetAuthOutcomeString( qlAuthOutcome outcome ) {
-        switch ( outcome ) {
-        case QL_AUTH_OUTCOME_SUCCESS:
-                return "success";
-        case QL_AUTH_OUTCOME_RETRY:
-                return "retry";
-        case QL_AUTH_OUTCOME_FAILURE:
-                return "failure";
-        default:
-                break;
-        }
+	switch ( outcome ) {
+	case QL_AUTH_OUTCOME_SUCCESS:
+		return "success";
+	case QL_AUTH_OUTCOME_RETRY:
+		return "retry";
+	case QL_AUTH_OUTCOME_FAILURE:
+		return "failure";
+	default:
+		break;
+	}
 
-        return "unknown";
+	return "unknown";
 }
 
+/*
+=============
+G_WritePlatformAuthUserinfo
+
+Stores platform auth results back into client userinfo.
+=============
+*/
 static void G_WritePlatformAuthUserinfo( int clientNum, char *userinfo, const char *result, const char *outcome, const char *message ) {
-        if ( !userinfo ) {
-                return;
-        }
+	if ( !userinfo ) {
+		return;
+	}
 
-        Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_RESULT, result ? result : "" );
-        Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_OUTCOME, outcome ? outcome : "" );
-        Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_MESSAGE, message ? message : "" );
+	Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_RESULT, result ? result : "" );
+	Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_OUTCOME, outcome ? outcome : "" );
+	Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_MESSAGE, message ? message : "" );
 
-        trap_SetUserinfo( clientNum, userinfo );
+	trap_SetUserinfo( clientNum, userinfo );
 }
 
-static qboolean G_ParseSteamId( const char *steamId, unsigned long long *outValue ) {
-        unsigned long long value;
-        const char *ch;
+/*
+=============
+G_BuildSteamAuthToken
 
-        if ( !steamId || !steamId[0] || !outValue ) {
-                return qfalse;
-        }
-
-        value = 0ull;
-
-        for ( ch = steamId; *ch; ++ch ) {
-                if ( *ch < '0' || *ch > '9' ) {
-                        return qfalse;
-                }
-
-                // Detect overflow before multiplying.
-                if ( value > (ULLONG_MAX / 10ull) ) {
-                        return qfalse;
-                }
-
-                value *= 10ull;
-
-                if ( value > (ULLONG_MAX - (unsigned long long)(*ch - '0')) ) {
-                        return qfalse;
-                }
-
-                value += (unsigned long long)(*ch - '0');
-        }
-
-        *outValue = value;
-        return qtrue;
-}
-
+Combines token fragments into a single Steam auth string.
+=============
+*/
 static void G_BuildSteamAuthToken( const char *userinfo, char *buffer, size_t bufferSize ) {
 	const char *auth;
 	const char *authPart1;
@@ -411,70 +654,83 @@ static void G_BuildSteamAuthToken( const char *userinfo, char *buffer, size_t bu
 	}
 }
 
+#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
+/*
+=============
+G_RunPlatformAuthChecks
+
+Validates platform credentials during client connect.
+=============
+*/
 static char *G_RunPlatformAuthChecks( int clientNum, char *userinfo, qboolean firstTime, qboolean isBot, gclient_t *client ) {
-        ql_auth_credential_t credential;
-        ql_auth_response_t response;
-        char token[QL_AUTH_MAX_CREDENTIAL_STORAGE];
-        const char *resultString;
-        const char *outcomeString;
+	ql_auth_credential_t credential;
+	ql_auth_response_t response;
+	char token[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+	const char *resultString;
+	const char *outcomeString;
 
-        if ( !firstTime || isBot || !userinfo || !client ) {
-                G_WritePlatformAuthUserinfo( clientNum, userinfo, NULL, NULL, NULL );
-                return NULL;
-        }
+	if ( !firstTime || isBot || !userinfo || !client ) {
+		G_WritePlatformAuthUserinfo( clientNum, userinfo, NULL, NULL, NULL );
+		return NULL;
+	}
 
-        G_BuildSteamAuthToken( userinfo, token, sizeof( token ) );
+	G_BuildSteamAuthToken( userinfo, token, sizeof( token ) );
 
-        if ( !token[0] ) {
-                G_WritePlatformAuthUserinfo( clientNum, userinfo, NULL, NULL, NULL );
-                return NULL;
-        }
+	if ( !token[0] ) {
+		G_WritePlatformAuthUserinfo( clientNum, userinfo, NULL, NULL, NULL );
+		return NULL;
+	}
 
-        QL_InitAuthCredential( &credential );
+	QL_InitAuthCredential( &credential );
 
-        if ( !QL_ParsePlatformToken( token, QL_AUTH_CREDENTIAL_STEAM, &credential ) ) {
-                Q_strncpyz( g_clientAuthDenyMessage, "Failed to verify Steam auth token", sizeof( g_clientAuthDenyMessage ) );
-                G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
-                G_WritePlatformAuthUserinfo( clientNum, userinfo, G_GetAuthResultString( QL_AUTH_RESULT_ERROR ), G_GetAuthOutcomeString( QL_AUTH_OUTCOME_FAILURE ), g_clientAuthDenyMessage );
-                return g_clientAuthDenyMessage;
-        }
+	if ( !QL_ParsePlatformToken( token, QL_AUTH_CREDENTIAL_STEAM, &credential ) ) {
+		Q_strncpyz( g_clientAuthDenyMessage, "Failed to verify Steam auth token", sizeof( g_clientAuthDenyMessage ) );
+		G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
+		G_WritePlatformAuthUserinfo( clientNum, userinfo, G_GetAuthResultString( QL_AUTH_RESULT_ERROR ), G_GetAuthOutcomeString( QL_AUTH_OUTCOME_FAILURE ), g_clientAuthDenyMessage );
+		return g_clientAuthDenyMessage;
+	}
 
-        if ( !QL_RequestExternalAuth( &credential, &response ) || response.result != QL_AUTH_RESULT_ACCEPTED ) {
-                const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
+	if ( !QL_RequestExternalAuth( &credential, &response ) || response.result != QL_AUTH_RESULT_ACCEPTED ) {
+		const char *message = response.message[0] ? response.message : "Failed to verify Steam auth token";
 
-                Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
+		Q_strncpyz( g_clientAuthDenyMessage, message, sizeof( g_clientAuthDenyMessage ) );
 
-                resultString = G_GetAuthResultString( response.result );
-                outcomeString = G_GetAuthOutcomeString( response.outcome );
+		resultString = G_GetAuthResultString( response.result );
+		outcomeString = G_GetAuthOutcomeString( response.outcome );
 
-                if ( response.outcome == QL_AUTH_OUTCOME_RETRY ) {
-                        G_LogPrintf( "SteamAuthRetry: %i %s\n", clientNum, g_clientAuthDenyMessage );
-                } else {
-                        G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
-                }
+		if ( response.outcome == QL_AUTH_OUTCOME_RETRY ) {
+			G_LogPrintf( "SteamAuthRetry: %i %s\n", clientNum, g_clientAuthDenyMessage );
+		} else {
+			G_LogPrintf( "SteamAuthRejected: %i %s\n", clientNum, g_clientAuthDenyMessage );
+		}
 
-                G_WritePlatformAuthUserinfo( clientNum, userinfo, resultString, outcomeString, g_clientAuthDenyMessage );
-                return g_clientAuthDenyMessage;
-        }
+		G_WritePlatformAuthUserinfo( clientNum, userinfo, resultString, outcomeString, g_clientAuthDenyMessage );
+		return g_clientAuthDenyMessage;
+	}
 
-        resultString = G_GetAuthResultString( response.result );
-        outcomeString = G_GetAuthOutcomeString( response.outcome );
+	resultString = G_GetAuthResultString( response.result );
+	outcomeString = G_GetAuthOutcomeString( response.outcome );
 
-        G_WritePlatformAuthUserinfo( clientNum, userinfo, resultString, outcomeString, response.message[0] ? response.message : NULL );
+	G_WritePlatformAuthUserinfo( clientNum, userinfo, resultString, outcomeString, response.message[0] ? response.message : NULL );
 
-        if ( response.message[0] ) {
-                G_LogPrintf( "SteamAuthAccepted: %i %s\n", clientNum, response.message );
-        }
+	if ( response.message[0] ) {
+		G_LogPrintf( "SteamAuthAccepted: %i %s\n", clientNum, response.message );
+	}
 
-        return NULL;
+	return NULL;
 }
 #else
+/*
+=============
+G_RunPlatformAuthChecks
+=============
+*/
 static char *G_RunPlatformAuthChecks( int clientNum, char *userinfo, qboolean firstTime, qboolean isBot, gclient_t *client ) {
-        (void)clientNum;
-        (void)userinfo;
-        (void)firstTime;
-        (void)isBot;
-        (void)client;
+	(void)clientNum;
+	(void)userinfo;
+	(void)firstTime;
+	(void)isBot;
+	(void)client;
 	return NULL;
 }
 #endif
@@ -1476,282 +1732,24 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	ClientUserinfoChanged( clientNum );
 
 	// don't do the "xxx connected" messages if they were caried over from previous level
-	if ( firstTime ) {
+	if ( firstTime && g_training.integer == 0 ) {
+		trap_SendServerCommand( clientNum, va( "priv %i", client->sess.privilege ) );
+
 		if ( level.time > 5000 ) {
-			trap_SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " connected\n\"", client->pers.netname) );
-		}
-		// TODO: investigate whether Quake Live's native code sends an additional "priv" handshake
-		// message here (sub_1003af1b). The HLIL dump suggests the engine verifies private-client
-		// access immediately after the bot/auth checks.
-	}
+			unsigned int	steamIdLow;
+			unsigned int	steamIdHigh;
 
-        if ( !isBot ) {
-                const char *steamId = Info_ValueForKey( userinfo, "steamid" );
+			trap_SendServerCommand( -1, va( "print \"%s" S_COLOR_WHITE " connected\n\"", client->pers.netname ) );
 
-                if ( steamId && steamId[0] ) {
+			if ( trap_GetSteamId( clientNum, &steamIdLow, &steamIdHigh ) ) {
+				if ( steamIdLow != 0 || steamIdHigh != 0 ) {
+					unsigned long long steamId = ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;
 
-#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
-
-// g_client.c -- client functions that don't happen every frame
-
-static vec3_t	playerMins = {-15, -15, -24};
-static vec3_t	playerMaxs = {15, 15, 32};
-
-/*
-=============
-G_FreezeHelperHasLineOfSight
-
-Ensures thaw credit can pass between a frozen client and a helper.
-=============
-*/
-static qboolean G_FreezeHelperHasLineOfSight( gentity_t *ent, gentity_t *helper ) {
-	trace_t		trace;
-	vec3_t		start;
-	vec3_t		end;
-
-	VectorCopy( helper->r.currentOrigin, start );
-	VectorCopy( ent->r.currentOrigin, end );
-	if ( helper->client ) {
-		start[2] += helper->client->ps.viewheight * 0.5f;
-	}
-	if ( ent->client ) {
-		end[2] += ent->client->ps.viewheight * 0.5f;
-	}
-
-	trap_Trace( &trace, start, NULL, NULL, end, helper->s.number, MASK_SOLID );
-	if ( trace.fraction < 1.0f && trace.entityNum != ent->s.number ) {
-		return qfalse;
-	}
-
-	trap_Trace( &trace, end, NULL, NULL, start, ent->s.number, MASK_SOLID );
-	if ( trace.fraction < 1.0f && trace.entityNum != helper->s.number ) {
-		return qfalse;
-	}
-
-	return qtrue;
-}
-
-/*
-=============
-G_FreezeCountThawHelpers
-
-Counts allies able to thaw the specified client and returns the primary helper.
-=============
-*/
-static int G_FreezeCountThawHelpers( gentity_t *ent, gentity_t **primaryHelper ) {
-	float		radius;
-	float		radiusSq;
-	int		clientNum;
-	int		count;
-
-	if ( primaryHelper ) {
-		*primaryHelper = NULL;
-	}
-	if ( !ent || !ent->client ) {
-		return 0;
-	}
-
-	radius = (float)level.freezeConfig.thawRadius;
-	if ( radius <= 0.0f ) {
-		return 0;
-	}
-	radiusSq = radius * radius;
-	count = 0;
-
-	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
-		gentity_t	*helper;
-		vec3_t		delta;
-
-		helper = &g_entities[clientNum];
-		if ( helper == ent || !helper->inuse || !helper->client ) {
-			continue;
-		}
-		if ( helper->client->sess.sessionTeam != ent->client->sess.sessionTeam ) {
-			continue;
-		}
-		if ( helper->client->sess.sessionTeam != TEAM_RED
-		&& helper->client->sess.sessionTeam != TEAM_BLUE ) {
-			continue;
-		}
-		if ( helper->client->freezeFrozen ) {
-			continue;
-		}
-		if ( helper->client->ps.pm_type == PM_DEAD ) {
-			continue;
-		}
-
-		VectorSubtract( helper->r.currentOrigin, ent->r.currentOrigin, delta );
-		if ( VectorLengthSquared( delta ) > radiusSq ) {
-			continue;
-		}
-
-		if ( !level.freezeConfig.thawThroughSurface && !G_FreezeHelperHasLineOfSight( ent, helper ) ) {
-			continue;
-		}
-
-		count++;
-		if ( primaryHelper && !*primaryHelper ) {
-			*primaryHelper = helper;
+					trap_Printf( va( "%s connected with Steam ID %llu\n", client->pers.netname, steamId ) );
+				}
+			}
 		}
 	}
-
-	return count;
-}
-
-/*
-=============
-G_FreezeInitClient
-
-Clears the per-client freeze fields whenever a player spawns.
-=============
-*/
-void G_FreezeInitClient( gentity_t *ent ) {
-	gclient_t	*client;
-
-	if ( !ent || !ent->client ) {
-		return;
-	}
-
-	client = ent->client;
-	client->freezeFrozen = qfalse;
-	client->freezeTime = 0;
-	client->freezeNextThawTick = 0;
-	client->freezeAccumulatedThaw = 0;
-	client->freezeAutoThawTime = 0;
-	client->freezeProtectedUntil = 0;
-	client->freezeEnvironmentalRespawnTime = 0;
-	client->freezeLastHelper = -1;
-	if ( G_FreezeGametypeEnabled() && level.freezeConfig.protectedSpawnTime > 0 ) {
-		client->freezeProtectedUntil = level.time + level.freezeConfig.protectedSpawnTime;
-	}
-}
-
-/*
-=============
-G_FreezeApplyFreezeState
-
-Transitions the victim into the frozen state rather than allowing death.
-=============
-*/
-static void G_FreezeApplyFreezeState( gentity_t *self, qboolean environmental ) {
-	gclient_t	*client;
-	int		thawTick;
-
-	if ( !self || !self->client ) {
-		return;
-	}
-
-	client = self->client;
-	client->freezeFrozen = qtrue;
-	client->freezeTime = level.time;
-	client->freezeAccumulatedThaw = 0;
-	thawTick = level.freezeConfig.thawTick;
-	if ( thawTick <= 0 ) {
-		thawTick = level.freezeConfig.thawTime;
-	}
-	if ( thawTick <= 0 ) {
-		thawTick = 100;
-	}
-	client->freezeNextThawTick = level.time + thawTick;
-	client->freezeAutoThawTime = ( level.freezeConfig.autoThawTime > 0 )
-		? level.time + level.freezeConfig.autoThawTime : 0;
-	if ( environmental && level.freezeConfig.environmentalRespawnDelay > 0 ) {
-		client->freezeEnvironmentalRespawnTime = level.time + level.freezeConfig.environmentalRespawnDelay;
-	} else {
-		client->freezeEnvironmentalRespawnTime = 0;
-	}
-	client->freezeProtectedUntil = 0;
-	client->freezeLastHelper = -1;
-	self->takedamage = qfalse;
-	client->ps.pm_type = PM_FREEZE;
-	client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
-	client->ps.pm_time = 0;
-	VectorClear( client->ps.velocity );
-	self->health = 1;
-	client->ps.stats[STAT_HEALTH] = 1;
-	client->respawnTime = INT_MAX;
-	self->r.contents = CONTENTS_BODY;
-	trap_LinkEntity( self );
-}
-
-/*
-=============
-G_FreezeThawClient
-
-Restores a frozen player to the active state.
-=============
-*/
-void G_FreezeThawClient( gentity_t *ent, qboolean wasAuto, int helperNum ) {
-	gclient_t	*client;
-
-	(void)wasAuto;
-	(void)helperNum;
-
-	if ( !ent || !ent->client ) {
-		return;
-	}
-
-	client = ent->client;
-	client->freezeFrozen = qfalse;
-	client->freezeTime = 0;
-	client->freezeAccumulatedThaw = 0;
-	client->freezeNextThawTick = 0;
-	client->freezeAutoThawTime = 0;
-	client->freezeEnvironmentalRespawnTime = 0;
-	client->freezeLastHelper = -1;
-	client->ps.pm_type = PM_NORMAL;
-	ent->takedamage = qtrue;
-	if ( level.freezeConfig.resetHealth ) {
-		ent->health = client->ps.stats[STAT_MAX_HEALTH];
-		client->ps.stats[STAT_HEALTH] = ent->health;
-	}
-	if ( level.freezeConfig.resetArmor ) {
-		client->ps.stats[STAT_ARMOR] = g_factoryCvarConfig.startingArmor;
-	}
-	if ( level.freezeConfig.removePowerups ) {
-		memset( client->ps.powerups, 0, sizeof( client->ps.powerups ) );
-	}
-	if ( level.freezeConfig.protectedSpawnTime > 0 ) {
-		client->freezeProtectedUntil = level.time + level.freezeConfig.protectedSpawnTime;
-	} else {
-		client->freezeProtectedUntil = 0;
-	}
-	client->respawnTime = level.time;
-	trap_LinkEntity( ent );
-}
-
-#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
-static char g_clientAuthDenyMessage[QL_AUTH_MAX_RESPONSE_MESSAGE + 64];
-
-static const char *G_GetAuthResultString( qlAuthResult result ) {
-        switch ( result ) {
-        case QL_AUTH_RESULT_PENDING:
-                return "pending";
-        case QL_AUTH_RESULT_ACCEPTED:
-                return "accepted";
-        case QL_AUTH_RESULT_DENIED:
-                return "denied";
-        case QL_AUTH_RESULT_ERROR:
-                return "error";
-        default:
-                break;
-        }
-
-        return "unknown";
-}
-#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
-                        unsigned long long parsedId;
-
-                        if ( G_ParseSteamId( steamId, &parsedId ) ) {
-                                trap_Printf( va( "%s connected with Steam ID %llu\n", client->pers.netname, parsedId ) );
-                        } else {
-                                trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
-                        }
-#else
-                        trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
-#endif
-                }
-        }
 
 	if ( g_gametype.integer >= GT_TEAM &&
 		client->sess.sessionTeam != TEAM_SPECTATOR ) {
@@ -2830,6 +2828,3 @@ void G_RRTrackRoundActivity( void ) {
 		G_UpdateMatchStateConfigString();
 	}
 }
-
-
-
