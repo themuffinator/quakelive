@@ -32,11 +32,6 @@
       "license": "Apache License 2.0 (Google Droid Sans Fallback)."
     },
     {
-      "source": "assets/quakelive/baseq3/default.cfg",
-      "destination": "default.cfg",
-      "license": "Quake Live retail configuration defaults required by engine bootstrap."
-    },
-    {
       "source": "assets/quakelive/baseq3/tim.cfg",
       "destination": "tim.cfg",
       "license": "Quake Live profile snapshot packaged for tutorial flows."
@@ -84,6 +79,10 @@
   "audit": {
     "required_paths": [
       "default.cfg",
+      "tim.cfg",
+      "sponge.cfg",
+      "ttimo.cfg",
+      "syncerror.cfg",
       "fonts/handelgothic.ttf",
       "fonts/notosans-regular.ttf",
       "fonts/droidsansmono.ttf",
