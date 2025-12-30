@@ -1744,6 +1744,29 @@ CG_Text_Paint(rect->x + 2, rect->y + rect->h - 2, scale, textColor, buffer, 0, 0
 
 /*
 =============
+CG_DrawSpectatorTimeoutCount
+
+Renders the timeout count string for the spectator target's team.
+=============
+*/
+static void CG_DrawSpectatorTimeoutCount( rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot ) {
+	const clientInfo_t	*ci;
+	char			buffer[64];
+
+	ci = CG_SpectatorClientInfo( slot );
+	if ( !ci ) {
+		return;
+	}
+
+	if ( !CG_BuildTimeoutCountLabel( ci->team, buffer, sizeof( buffer ) ) ) {
+		return;
+	}
+
+	CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
+}
+
+/*
+=============
 CG_GetProfileFallbackShader
 
 Resolves the shader used when a client icon is unavailable.
@@ -3126,6 +3149,47 @@ static void CG_DrawTeamPlayerCount(rectDef_t *rect, float scale, vec4_t color, i
 
 /*
 =============
+CG_BuildTimeoutCountLabel
+
+Formats the timeout count label for HUD displays.
+=============
+*/
+static qboolean CG_BuildTimeoutCountLabel( team_t team, char *buffer, size_t bufferSize ) {
+	int		remaining;
+	int		total;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	if ( team <= TEAM_FREE || team >= TEAM_NUM_TEAMS ) {
+		return qfalse;
+	}
+
+	remaining = cgs.matchTimeoutRemaining[team];
+	if ( remaining < 0 ) {
+		remaining = 0;
+	}
+
+	total = cgs.matchTimeoutCountPerTeam;
+	if ( total < 0 ) {
+		total = 0;
+	}
+
+	if ( total > 0 ) {
+		if ( remaining > total ) {
+			remaining = total;
+		}
+		Com_sprintf( buffer, bufferSize, "Timeouts %i/%i", remaining, total );
+	} else {
+		Com_sprintf( buffer, bufferSize, "Timeouts %i", remaining );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
 CG_DrawTeamTimeoutCount
 
 Displays the remaining timeout count for the given team if known.
@@ -3133,14 +3197,11 @@ Displays the remaining timeout count for the given team if known.
 */
 static void CG_DrawTeamTimeoutCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team) {
 	char	buffer[64];
-	int		remaining;
 
-	if ( team <= TEAM_FREE || team >= TEAM_NUM_TEAMS ) {
+	if ( !CG_BuildTimeoutCountLabel( team, buffer, sizeof( buffer ) ) ) {
 		return;
 	}
 
-	remaining = cgs.matchTimeoutRemaining[team];
-	Com_sprintf( buffer, sizeof( buffer ), "Timeouts %i", remaining );
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
@@ -3971,10 +4032,24 @@ static void CG_DrawRoundTimer(rectDef_t *rect, float scale, vec4_t color, int te
 CG_DrawLevelTimer(rect, scale, color, textStyle);
 }
 
+/*
+=============
+CG_DrawOvertime
+
+Paints the overtime label text using live match state data.
+=============
+*/
 static void CG_DrawOvertime(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-if (cg.timelimitWarnings & 4) {
-CG_Text_Paint(rect->x, rect->y, scale, color, "OVERTIME", 0, 0, textStyle);
-}
+	char	buffer[64];
+
+	if ( CG_BuildOvertimeLabel( buffer, sizeof( buffer ) ) ) {
+		CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );
+		return;
+	}
+
+	if ( cg.timelimitWarnings & 4 ) {
+		CG_Text_Paint( rect->x, rect->y, scale, color, "OVERTIME", 0, 0, textStyle );
+	}
 }
 
 static void CG_DrawPlayerObituary(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
@@ -6459,6 +6534,12 @@ break;
   case CG_BLUE_TIMEOUT_COUNT:
 		CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_BLUE);
 		break;
+  case CG_1ST_PLYR_TIMEOUT_COUNT:
+		CG_DrawSpectatorTimeoutCount( &rect, scale, color, textStyle, 0 );
+		break;
+  case CG_2ND_PLYR_TIMEOUT_COUNT:
+		CG_DrawSpectatorTimeoutCount( &rect, scale, color, textStyle, 1 );
+		break;
   case CG_RED_AVG_PING:
 		CG_DrawTeamAveragePing(&rect, scale, color, textStyle, TEAM_RED);
 		break;
@@ -7212,4 +7293,3 @@ void CG_GetTeamColor(vec4_t *color) {
     (*color)[3] = 0.25f;
 	}
 }
-

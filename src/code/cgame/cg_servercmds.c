@@ -853,6 +853,8 @@ void CG_ParseServerinfo( void ) {
 	cgs.fraglimit = atoi( Info_ValueForKey( info, "fraglimit" ) );
 	cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
+	cgs.matchOvertimeLengthSeconds = atoi( Info_ValueForKey( info, "g_overtime" ) );
+	cgs.matchTimeoutCountPerTeam = atoi( Info_ValueForKey( info, "g_timeoutCount" ) );
 	voteFlagsValue = Info_ValueForKey( info, "g_voteFlags" );
 	cgs.voteFlags = atoi( voteFlagsValue );
 	mapVotingDisabled = ( cgs.voteFlags & ( CG_VOTEFLAG_NO_MAP | CG_VOTEFLAG_NO_NEXTMAP ) ) ? qtrue : qfalse;

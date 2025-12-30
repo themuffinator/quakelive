@@ -3551,8 +3551,40 @@ static int CG_OwnerDrawWidth(int ownerDraw, float scale) {
 	case CG_LEVELTIMER:
 	case CG_ROUNDTIMER:
 		return CG_LevelTimerWidth( scale );
-	case CG_OVERTIME:
+	case CG_OVERTIME: {
+		char	buffer[64];
+		int		remaining;
+
+		if ( cgs.matchOvertimeActive ) {
+			remaining = -1;
+			if ( cgs.matchOvertimeStartTime > 0 ) {
+				int elapsed;
+
+				elapsed = ( cg.time - cgs.matchOvertimeStartTime + 500 ) / 1000;
+				if ( elapsed < 0 ) {
+					elapsed = 0;
+				}
+				if ( cgs.matchOvertimeLengthSeconds > 0 ) {
+					remaining = cgs.matchOvertimeLengthSeconds - elapsed;
+				} else if ( cgs.matchOvertimeEndTime > cg.time ) {
+					remaining = ( cgs.matchOvertimeEndTime - cg.time + 999 ) / 1000;
+				}
+			}
+
+			if ( remaining >= 0 ) {
+				if ( remaining < 0 ) {
+					remaining = 0;
+				}
+				Com_sprintf( buffer, sizeof( buffer ), "Overtime %i (%is)", cgs.matchOvertimeCount, remaining );
+			} else {
+				Com_sprintf( buffer, sizeof( buffer ), "Overtime %i", cgs.matchOvertimeCount );
+			}
+
+			return CG_Text_Width( buffer, scale, 0 );
+		}
+
 		return ( cg.timelimitWarnings & 4 ) ? CG_Text_Width( "OVERTIME", scale, 0 ) : 0;
+	}
 	case CG_ROUND:
 		return CG_RoundLabelWidth( scale );
 	case CG_HEALTH_COLORIZED:
@@ -4017,4 +4049,3 @@ CG_EventHandling
       2 - hud editor
 
 */
-
