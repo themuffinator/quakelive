@@ -42,7 +42,7 @@ This report compares the repository's current cgame and UI implementations with 
 ### Current implementation
 - Startup menus still load the entire Quake III Arena suite (join server, skirmish, mod configuration, etc.), which does not align with Quake Live’s streamlined web-integrated front end.【F:src/ui/menus.txt†L1-L39】
 - In-game menu loading includes legacy vote, system, and order menus absent from the Quake Live asset set (e.g., `ingame_orders.menu`).【F:src/ui/ingame.txt†L1-L16】
-- The `ui_menuFiles` default previously pointed at `ui/menus_quakelive.txt`, a file that does not ship in this repo, causing every boot to log the fallback path before loading `ui/menus.txt`—the HLIL shows Quake Live defaulting directly to `ui/menus.txt` instead.【F:src/code/ui/ui_main.c†L241-L275】【F:references/hlil/quakelive/uix86.all/uix86.dll_hlil_split/uix86.dll_hlil_part01.txt†L11070-L11102】
+- The `ui_menuFiles` default now points at `ui/menus.txt`, aligning with the HLIL reference and avoiding fallback warnings during menu bootstrap.【F:src/code/ui/ui_main.c†L241-L275】【F:references/hlil/quakelive/uix86.all/uix86.dll_hlil_split/uix86.dll_hlil_part01.txt†L11070-L11102】
 
 ### Quake Live reference behavior
 - Quake Live’s `menus.txt` only loads a minimal stack (default, main, main options, connect, quit, demo, ingame lower-nav, error), delegating server browsing to the embedded web/Awesomium layer and deferring other flows to new menus such as `main.menu` and `main_options.menu`.【F:assets/quakelive/baseq3/ui/menus.txt†L4-L12】

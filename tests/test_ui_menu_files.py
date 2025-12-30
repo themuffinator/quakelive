@@ -17,7 +17,7 @@ def _extract_define(text: str, name: str) -> str:
 
 def test_ui_menu_defaults_use_existing_assets() -> None:
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
-    assert '"ui_menuFiles", UI_MENU_FILE_LEGACY' in ui_main
+    assert '"ui_menuFiles", UI_MENU_FILE_QUAKELIVE' in ui_main
     assert '"ui_menuFlow", "0"' in ui_main
 
     ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
