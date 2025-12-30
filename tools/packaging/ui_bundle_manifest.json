@@ -56,6 +56,19 @@
       "destination": "syncerror.cfg",
       "license": "Quake Live profile snapshot packaged for tutorial flows."
     },
+    {
+      "source_dir": "assets/quakelive/baseq3/icons",
+      "destination": "baseq3/icons",
+      "include": ["**/*"],
+      "description": "Gameplay icons and rune art used by menu scripts."
+    },
+    {
+      "source_dir": "assets/quakelive/baseq3/levelshots",
+      "destination": "baseq3/levelshots",
+      "include": ["**/*"],
+      "description": "Levelshot previews referenced by menu scripts."
+    },
+    {
       "source_dir": "assets/quakelive/baseq3/scripts",
       "destination": "scripts",
       "include": ["ui*.shader"],
@@ -77,12 +90,16 @@
       "fonts/droidsansfallbackfull.ttf",
       "scripts/ui.shader",
       "scripts/ui_hud.shader",
-      "ui/main.menu"
+      "ui/main.menu",
+      "baseq3/icons",
+      "baseq3/levelshots"
     ],
     "required_globs": [
       "ui/**/*.menu",
       "ui/**/*.txt",
-      "scripts/ui*.shader"
+      "scripts/ui*.shader",
+      "baseq3/icons/**/*",
+      "baseq3/levelshots/**/*"
     ]
   }
 }
