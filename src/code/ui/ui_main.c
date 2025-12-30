@@ -1484,6 +1484,12 @@ void UI_Load() {
 
 	UI_LoadMenus(menuSet, qtrue);
 	UI_LoadMenus(ingameSet, qfalse);
+	if (UI_MenuFileExists("ui/comp_spectator.menu")) {
+		UI_ParseMenu("ui/comp_spectator.menu");
+	}
+	if (UI_MenuFileExists("ui/comp_spectator_follow.menu")) {
+		UI_ParseMenu("ui/comp_spectator_follow.menu");
+	}
 	Menus_CloseAll();
 	Menus_ActivateByName(lastName);
 
@@ -7835,4 +7841,3 @@ static void UI_StartServerRefresh(qboolean full)
 		}
 	}
 		}
-
