@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import math
 import pathlib
 import struct
 import sys
@@ -67,6 +69,18 @@ class FontMetrics:
     bbox: Tuple[int, int, int, int]
 
 
+@dataclass
+class GlyphBitmap:
+    codepoint: int
+    width: int
+    height: int
+    left: int
+    top: int
+    advance: int
+    pitch: int
+    buffer: bytes
+
+
 def parse_font_metrics(ttf_path: pathlib.Path) -> FontMetrics:
     data = ttf_path.read_bytes()
     reader = TrueTypeReader(data)
@@ -106,8 +120,70 @@ def write_metadata(dat_path: pathlib.Path, atlas_name: str, metrics: FontMetrics
     ]
     dat_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+def next_pow2(value: int) -> int:
+    if value < 1:
+        return 1
+    return 1 << (value - 1).bit_length()
 
-def write_blank_tga(tga_path: pathlib.Path, *, width: int = 256, height: int = 256) -> None:
+
+def ensure_freetype_available() -> None:
+    if importlib.util.find_spec("freetype") is None:
+        raise SystemExit(
+            "Missing freetype-py dependency. Install with `python3 -m pip install freetype-py`."
+        )
+
+
+def load_glyph_bitmaps(ttf_path: pathlib.Path, *, point_size: int) -> List[GlyphBitmap]:
+    ensure_freetype_available()
+    import freetype  # pylint: disable=import-error
+
+    face = freetype.Face(str(ttf_path))
+    face.set_char_size(point_size * 64)
+
+    glyphs: List[GlyphBitmap] = []
+    for charcode, _glyph_index in face.get_chars():
+        face.load_char(chr(charcode), freetype.FT_LOAD_RENDER | freetype.FT_LOAD_TARGET_NORMAL)
+        glyph = face.glyph
+        bitmap = glyph.bitmap
+        buffer = bytes(bitmap.buffer)
+        glyphs.append(
+            GlyphBitmap(
+                codepoint=charcode,
+                width=bitmap.width,
+                height=bitmap.rows,
+                left=glyph.bitmap_left,
+                top=glyph.bitmap_top,
+                advance=glyph.advance.x >> 6,
+                pitch=bitmap.pitch,
+                buffer=buffer,
+            )
+        )
+
+    if not glyphs:
+        raise SystemExit(f"No glyphs found in {ttf_path}")
+
+    return glyphs
+
+
+def compute_atlas_layout(glyphs: List[GlyphBitmap], *, padding: int) -> Tuple[int, int, int, int, int, int, int]:
+    max_top = max(glyph.top for glyph in glyphs)
+    max_bottom = max((glyph.height - glyph.top) for glyph in glyphs)
+    max_left = max(-glyph.left for glyph in glyphs)
+    max_right = max((glyph.width + max(glyph.left, 0)) for glyph in glyphs)
+
+    cell_width = max_left + max_right + padding * 2
+    cell_height = max_top + max_bottom + padding * 2
+
+    columns = int(math.ceil(math.sqrt(len(glyphs))))
+    rows = int(math.ceil(len(glyphs) / columns))
+
+    atlas_width = next_pow2(cell_width * columns)
+    atlas_height = next_pow2(cell_height * rows)
+
+    return atlas_width, atlas_height, cell_width, cell_height, max_top, max_left, columns
+
+
+def write_tga(tga_path: pathlib.Path, *, width: int, height: int, pixels: bytes) -> None:
     header = bytearray(18)
     header[2] = 2
     header[12:14] = width.to_bytes(2, "little")
@@ -115,10 +191,45 @@ def write_blank_tga(tga_path: pathlib.Path, *, width: int = 256, height: int = 2
     header[16] = 32
     header[17] = 0x20
 
-    pixel = (0, 0, 0, 0)
-    pixel_bytes = bytes(pixel)
-    body = pixel_bytes * (width * height)
-    tga_path.write_bytes(header + body)
+    tga_path.write_bytes(header + pixels)
+
+
+def rasterize_atlas(ttf_path: pathlib.Path, tga_path: pathlib.Path, *, point_size: int,
+                    padding: int = 2) -> Tuple[int, int, int]:
+    glyphs = load_glyph_bitmaps(ttf_path, point_size=point_size)
+    atlas_width, atlas_height, cell_width, cell_height, max_top, max_left, columns = compute_atlas_layout(
+        glyphs, padding=padding
+    )
+
+    atlas = bytearray(atlas_width * atlas_height * 4)
+    baseline = padding + max_top
+
+    for index, glyph in enumerate(glyphs):
+        col = index % columns
+        row = index // columns
+        cell_x = col * cell_width + padding + max_left
+        cell_y = row * cell_height + baseline - glyph.top
+
+        if glyph.width == 0 or glyph.height == 0:
+            continue
+
+        pitch = glyph.pitch
+        for y in range(glyph.height):
+            src_row = y if pitch >= 0 else (glyph.height - 1 - y)
+            row_start = src_row * abs(pitch)
+            for x in range(glyph.width):
+                alpha = glyph.buffer[row_start + x]
+                if alpha == 0:
+                    continue
+                dest_x = cell_x + glyph.left + x
+                dest_y = cell_y + y
+                if dest_x < 0 or dest_y < 0 or dest_x >= atlas_width or dest_y >= atlas_height:
+                    continue
+                offset = (dest_y * atlas_width + dest_x) * 4
+                atlas[offset:offset + 4] = bytes((255, 255, 255, alpha))
+
+    write_tga(tga_path, width=atlas_width, height=atlas_height, pixels=bytes(atlas))
+    return atlas_width, atlas_height, len(glyphs)
 
 
 def load_manifest(manifest_path: pathlib.Path) -> Dict:
@@ -167,7 +278,9 @@ def bake_fonts(manifest_path: pathlib.Path, output_root: pathlib.Path, log_path:
         except ValueError:
             source_display = source.as_posix()
         write_metadata(dat_path, atlas, metrics, point_size=point_size, source_display=source_display)
-        write_blank_tga(tga_path)
+        atlas_width, atlas_height, glyph_count = rasterize_atlas(
+            source, tga_path, point_size=point_size
+        )
 
         entry = {
             "role": role,
@@ -179,10 +292,19 @@ def bake_fonts(manifest_path: pathlib.Path, output_root: pathlib.Path, log_path:
             "descent": metrics.descent,
             "bbox": metrics.bbox,
             "source": source_display,
+            "atlasSize": [atlas_width, atlas_height],
         }
         metrics_payload[atlas] = entry
         logs.append(
-            f"Baked {role} -> fonts/{atlas}.dat (glyphs={metrics.glyphs}, unitsPerEm={metrics.units_per_em})"
+            "Baked {role} -> fonts/{atlas}.dat (glyphs={glyphs}, unitsPerEm={units}) "
+            "and fonts/{atlas}.tga ({width}x{height})".format(
+                role=role,
+                atlas=atlas,
+                glyphs=glyph_count,
+                units=metrics.units_per_em,
+                width=atlas_width,
+                height=atlas_height,
+            )
         )
 
     log_path.parent.mkdir(parents=True, exist_ok=True)
