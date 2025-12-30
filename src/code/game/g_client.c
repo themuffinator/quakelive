@@ -1406,7 +1406,11 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	gentity_t	*ent;
 
 	ent = &g_entities[ clientNum ];
-	ent->r.svFlags &= ~SVF_BOT;
+	if ( isBot ) {
+		ent->r.svFlags |= SVF_BOT;
+	} else {
+		ent->r.svFlags &= ~SVF_BOT;
+	}
 
 	trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 
@@ -1468,6 +1472,8 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 		if( !G_BotConnect( clientNum, !firstTime ) ) {
 			return "BotConnectfailed";
 		}
+	} else {
+		ent->r.svFlags &= ~SVF_BOT;
 	}
 
 	// get and distribute relevent paramters
@@ -2830,6 +2836,5 @@ void G_RRTrackRoundActivity( void ) {
 		G_UpdateMatchStateConfigString();
 	}
 }
-
 
 

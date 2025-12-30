@@ -20,6 +20,7 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 | Physics adjustments (air control, stair smoothing) | ✅ Complete | `src/code/game/bg_pmove.c` | `references/hlil/quakelive/qagamex86.dll_split/PmoveSingle_*.md` | Movement (@physics-guild) |
 | Domination capture volumes & metadata entities | ✅ Complete | `src/code/game/g_trigger.c`, `src/code/game/g_team.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part01.txt†L39210-L39410` | Modes (@mutator-crew) |
 | Matchmaking skill scaling hooks | ✅ Complete | `src/code/game/g_active.c`, `src/code/game/g_client.c` | `references/hlil/quakelive/qagamex86.dll_split/g_active.md` | Backend Integrations (@services-team) |
+| Bot admission masking & auth bypass | ⚠️ In Progress | `src/code/game/g_client.c`, `src/code/server/sv_bot.c` | `references/hlil/quakelive/qagamex86.dll/sully_interpreted/functions/g_client/ClientConnect.md` | AI/Co-op (S. Nakamura) |
 
 ### Weapon balance delta verification (2024-09-22)
 
