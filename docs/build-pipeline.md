@@ -23,6 +23,16 @@ In practice this means that reproducing Quake Live style binaries requires:
 - Access to the Visual Studio 2010 compiler, linker, and CRT import libraries (either via an actual VS2010 SP1 installation or the “v100 toolset” shipped with newer Visual Studio releases through the “Visual Studio 2010 Tools” components).
 - CRT deployment that links dynamically against `MSVCR100.dll`/`MSVCP100.dll`, mirroring the imports seen in the reference binaries.
 
+### Windows Runtime Packaging Decision
+
+The dependency audit confirms the launcher-side payload expects additional runtime DLLs beyond the gameplay modules. The packaging policy is:
+
+- **Ship:** the official Microsoft Visual C++ 2010 SP1 redistributable (`vcredist_x86.exe`) instead of copying `MSVCR100.dll`/`MSVCP100.dll` directly.
+- **Replace:** proprietary launcher dependencies (Awesomium/Chromium, Steamworks, bundled XInput shim) with open-source replacements or OS-provided equivalents in open-source builds.
+- **Replace:** bundled FFmpeg DLLs with the open-source FFmpeg build flow under `tools/ffmpeg/`.
+
+To support this, `tools/build_windows_runtime_bundle.sh` stages a Windows runtime bundle from `tools/packaging/windows_runtime_manifest.json`. By default it downloads the redistributable installer and skips proprietary DLLs unless `INCLUDE_PROPRIETARY=1` is supplied for parity testing.
+
 For a step-by-step walkthrough of the retargeting process (including the relevant `.vcxproj` files, `.def` exports, and verification commands), refer to [`docs/windows-native-pipeline.md`](windows-native-pipeline.md).
 
 ## Browser Overlay Runtime Requirements

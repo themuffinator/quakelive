@@ -1,0 +1,103 @@
+{
+  "package": "windows_runtime",
+  "files": [
+    {
+      "name": "vcredist_x86.exe",
+      "destination": "redist/vcredist_x86.exe",
+      "url": "https://download.microsoft.com/download/1/6/B/16B06A42-FE73-4E4A-9E7E-27ED41E0F0A3/vcredist_x86.exe",
+      "redistributable": true,
+      "category": "msvc-crt",
+      "notes": "Official Microsoft Visual C++ 2010 SP1 x86 redistributable; ship the installer instead of copying MSVCR100/MSVCP100 DLLs."
+    },
+    {
+      "name": "awesomium.dll",
+      "source": "assets/quakelive/awesomium.dll",
+      "destination": "proprietary/awesomium.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "awesomium",
+      "notes": "Proprietary Chromium/Awesomium runtime; stage only for parity testing."
+    },
+    {
+      "name": "awesomium_process.exe",
+      "source": "assets/quakelive/awesomium_process.exe",
+      "destination": "proprietary/awesomium_process.exe",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "awesomium",
+      "notes": "Proprietary Chromium/Awesomium runtime helper; stage only for parity testing."
+    },
+    {
+      "name": "libEGL.dll",
+      "source": "assets/quakelive/libEGL.dll",
+      "destination": "proprietary/libEGL.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "chromium",
+      "notes": "Chromium GPU shim; stage only for parity testing."
+    },
+    {
+      "name": "libGLESv2.dll",
+      "source": "assets/quakelive/libGLESv2.dll",
+      "destination": "proprietary/libGLESv2.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "chromium",
+      "notes": "Chromium GPU shim; stage only for parity testing."
+    },
+    {
+      "name": "icudt.dll",
+      "source": "assets/quakelive/icudt.dll",
+      "destination": "proprietary/icudt.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "chromium",
+      "notes": "ICU data for Chromium/Awesomium; stage only for parity testing."
+    },
+    {
+      "name": "steam_api.dll",
+      "source": "assets/quakelive/steam_api.dll",
+      "destination": "proprietary/steam_api.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "steamworks",
+      "notes": "Steamworks runtime; prefer the open Steam adapter for open-source builds."
+    },
+    {
+      "name": "xinput9_1_0.dll",
+      "source": "assets/quakelive/xinput9_1_0.dll",
+      "destination": "proprietary/xinput9_1_0.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "xinput",
+      "notes": "Legacy XInput shim bundled with the retail launcher; stage only for parity testing."
+    },
+    {
+      "name": "avcodec-53.dll",
+      "source": "assets/quakelive/avcodec-53.dll",
+      "destination": "proprietary/avcodec-53.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "ffmpeg",
+      "notes": "Legacy FFmpeg DLL from Awesomium bundle; replace with open-source builds in release packaging."
+    },
+    {
+      "name": "avformat-53.dll",
+      "source": "assets/quakelive/avformat-53.dll",
+      "destination": "proprietary/avformat-53.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "ffmpeg",
+      "notes": "Legacy FFmpeg DLL from Awesomium bundle; replace with open-source builds in release packaging."
+    },
+    {
+      "name": "avutil-51.dll",
+      "source": "assets/quakelive/avutil-51.dll",
+      "destination": "proprietary/avutil-51.dll",
+      "redistributable": false,
+      "proprietary": true,
+      "category": "ffmpeg",
+      "notes": "Legacy FFmpeg DLL from Awesomium bundle; replace with open-source builds in release packaging."
+    }
+  ]
+}

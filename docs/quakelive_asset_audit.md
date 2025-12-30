@@ -16,7 +16,20 @@ The Quake Live snapshot captures the full `default.cfg` bindings, movement, and 
 
 ## Platform DLL Dependencies
 
-The reference dump enumerates the Windows launcher (`quakelive_steam.exe`) and supporting DLLs for Chromium/Awesomium UI, FFmpeg codecs, Steam integration, and XInput.【ed6b1b†L1-L13】 Notably absent are the Visual C++ runtime redistributables (`MSVCR100.dll`, `MSVCP100.dll`) that the binary imports, implying they were provided by the system installer rather than bundled locally.【docs/build-pipeline.md†L20-L33】 Linux server shared objects (`qagamei386.so`, `qagamex64.so`) are preserved under `baseq3/` for parity testing.【68ce2a†L149-L214】 Any packaging workflow must account for these external dependencies or replace them with open-source equivalents when targeting new platforms.
+The reference dump enumerates the Windows launcher (`quakelive_steam.exe`) and supporting DLLs for Chromium/Awesomium UI, FFmpeg codecs, Steam integration, and XInput.【ed6b1b†L1-L13】 Notably absent are the Visual C++ runtime redistributables (`MSVCR100.dll`, `MSVCP100.dll`) that the binary imports, implying they were provided by the system installer rather than bundled locally.【docs/build-pipeline.md†L20-L33】 Linux server shared objects (`qagamei386.so`, `qagamex64.so`) are preserved under `baseq3/` for parity testing.【68ce2a†L149-L214】
+
+**Required Windows runtime dependencies identified in the asset snapshot:**
+
+| Dependency | Role | Ship vs replace policy |
+| --- | --- | --- |
+| `MSVCR100.dll`, `MSVCP100.dll` | Visual C++ 2010 CRT imported by native DLLs. | **Ship** the official `vcredist_x86.exe` installer (do not redistribute the DLLs directly). |
+| `awesomium.dll`, `awesomium_process.exe` | Awesomium WebView runtime used by the launcher. | **Replace** in open-source builds; stage only for parity testing. |
+| `libEGL.dll`, `libGLESv2.dll`, `icudt.dll` | Chromium/Awesomium GPU + ICU dependencies. | **Replace** in open-source builds; stage only for parity testing. |
+| `avcodec-53.dll`, `avformat-53.dll`, `avutil-51.dll` | FFmpeg 0.8-era codecs bundled with Awesomium. | **Replace** with open-source FFmpeg builds (see `tools/ffmpeg/`). |
+| `steam_api.dll` | Steamworks client API used by the retail launcher. | **Replace** with the open Steam adapter for open-source builds. |
+| `xinput9_1_0.dll` | Legacy XInput shim packaged with the launcher. | **Replace** with OS-provided XInput where available; stage only for parity testing. |
+
+To keep packaging deterministic without checking in binaries, the Windows runtime staging script (`tools/build_windows_runtime_bundle.sh`) consumes `tools/packaging/windows_runtime_manifest.json`. It always fetches the Microsoft redistributable installer and only stages proprietary DLLs when `INCLUDE_PROPRIETARY=1` is set, ensuring default builds stay free of proprietary payloads while still supporting parity audits.
 
 ## Packaging & Regeneration Process
 
