@@ -50,6 +50,10 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 - **Pickup gating + progression:** Item touches now block pickups unless the client carries the required unlock flag/tier and advance the persistent progression counters after a successful grab, matching the DLL’s reward flow.【F:src/code/game/g_items.c†L203-L265】【F:src/code/game/g_local.h†L686-L715】【F:src/code/game/g_client.c†L52-L82】
 - **Validation:** Factory loadout regression tests covering the practice and tournament presets (and spawn timing) pass in the deterministic match-sim harness, confirming loadout metadata still feeds inventories while unlock gating is active.【F:tests/test_match_sim_harness.py†L355-L405】【e8058e†L1-L9】
 
+### Loadout unlock verification refresh (2025-12-30)
+
+- **Unlock mapping update:** Added the HLIL tier for Proximity Mines (tier `0x0D`) so ammo pickups for the Prox Launcher follow the retail unlock progression gates.【F:references/hlil/quakelive/qagamex86.dll_split/g_items.md†L1-L55】【F:src/code/game/g_items.c†L146-L203】
+
 ### Race/CTF timer verification (2024-12-09)
 
 - **Evidence:** Replay notes in [`artifacts/tests/race-ctf-timer-verification.md`](../../artifacts/tests/race-ctf-timer-verification.md) capture scoreboard and HUD clocks staying aligned with race splits, CTF overtime rollovers, and sudden-death ticks.
