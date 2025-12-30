@@ -1437,6 +1437,13 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 			damage = scaledDamage;
 		}
+
+	//
+	// damage plum
+	//
+	if ( damage > 0 && targ && targ->client && attacker && attacker->client && attacker != targ ) {
+		G_AddEvent( targ, EV_DAMAGEPLUM, damage );
+	}
 	}
 
 	client = targ->client;

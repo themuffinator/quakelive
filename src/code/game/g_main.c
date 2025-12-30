@@ -2957,49 +2957,6 @@ void G_HandleForfeit( gentity_t *caller ) {
 	CalculateRanks();
 }
 
-/*
-=============
-G_TrackSuddenDeathAnnouncements
-
-Ensure sudden-death respawn messaging is delivered via center-print prompts.
-=============
-*/
-static void G_TrackSuddenDeathAnnouncements( void ) {
-	const matchFactoryConfig_t *config = &g_matchFactoryConfig;
-
-	if ( !level.overtimeActive ) {
-		return;
-	}
-	if ( g_suddenDeathRespawn.integer <= 0 || !config->suddenDeathRespawnsEnabled ) {
-		if ( !level.suddenDeathNoRespawnLogged ) {
-			level.suddenDeathNoRespawnLogged = qtrue;
-			level.suddenDeathLastDelay = -1;
-			G_LogPrintf( "match: sudden-death respawns disabled\n" );
-			if ( config->suddenDeathPrintAnnouncements ) {
-				trap_SendServerCommand( -1, "cp \"Sudden-death respawns disabled\n\"" );
-			}
-		}
-		return;
-	}
-	int delay = G_GetSuddenDeathRespawnDelay();
-	if ( delay < 0 ) {
-		delay = 0;
-	}
-	if ( level.suddenDeathLastDelay != delay ) {
-		level.suddenDeathLastDelay = delay;
-		level.suddenDeathNoRespawnLogged = qfalse;
-		G_LogPrintf( "match: sudden-death respawn delay %i ms\n", delay );
-		if ( config->suddenDeathPrintAnnouncements ) {
-			if ( delay > 0 ) {
-				trap_SendServerCommand( -1, va( "cp \"Sudden-death respawns available in %i seconds\n\"", delay / 1000 ) );
-			} else {
-				trap_SendServerCommand( -1, "cp \"Sudden-death respawns available now\n\"" );
-			}
-		}
-	}
-}
-
-
 static void LevelCheckTimers( void ) {
 	int team;
 	matchFactoryConfig_t previousConfig = matchFlow_lastConfig;
@@ -3077,7 +3034,7 @@ static void LevelCheckTimers( void ) {
 		if ( !ScoreIsTied() && ( level.overtimeEndTime == 0 || level.time >= level.overtimeStartTime ) ) {
 			G_StopOvertime();
 		}
-		G_TrackSuddenDeathAnnouncements();
+		G_SuddenDeathThink();
 	} else {
 		level.suddenDeathLastDelay = -1;
 		level.suddenDeathNoRespawnLogged = qfalse;
@@ -3141,6 +3098,34 @@ void CheckTournament( void ) {
 		if ( level.warmupTime == 0 ) {
 			return;
 		}
+
+	if ( level.warmupTime > 0 ) {
+		int remaining = ( level.warmupTime - level.time ) / 1000;
+		if ( remaining < 0 ) {
+			level.warmupTime = 0;
+			trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+			G_UpdateReadyUpConfigstring();
+			trap_Cvar_Set( "g_gameState", "IN_PROGRESS" );
+			return;
+		}
+		if ( remaining != level.warmupModificationCount ) {
+			level.warmupModificationCount = remaining;
+			if ( remaining == 3 ) {
+				trap_SendServerCommand( -1, "cp \"Match begins in 3...\"" );
+				G_GlobalSound( G_SoundIndex( "sound/world/3.wav" ) );
+			} else if ( remaining == 2 ) {
+				trap_SendServerCommand( -1, "cp \"Match begins in 2...\"" );
+				G_GlobalSound( G_SoundIndex( "sound/world/2.wav" ) );
+			} else if ( remaining == 1 ) {
+				trap_SendServerCommand( -1, "cp \"Match begins in 1...\"" );
+				G_GlobalSound( G_SoundIndex( "sound/world/1.wav" ) );
+			} else if ( remaining == 0 ) {
+				trap_SendServerCommand( -1, "cp \"Match begins!\"" );
+				G_GlobalSound( G_SoundIndex( "sound/world/go.wav" ) );
+			}
+		}
+		return;
+	}
 
 		// if the warmup is changed at the console, restart it
 		if ( g_warmup.modificationCount != level.warmupModificationCount ) {
@@ -3372,6 +3357,49 @@ void CheckTeamVote( int team ) {
 
 }
 
+
+/*
+================
+G_SuddenDeathThink
+================
+*/
+void G_SuddenDeathThink( void ) {
+	const matchFactoryConfig_t *config = &g_matchFactoryConfig;
+
+	if ( !level.suddenDeathActive ) {
+		return;
+	}
+
+	if ( g_suddenDeathRespawn.integer <= 0 || !config->suddenDeathRespawnsEnabled ) {
+		if ( !level.suddenDeathNoRespawnLogged ) {
+			level.suddenDeathNoRespawnLogged = qtrue;
+			level.suddenDeathLastDelay = -1;
+			G_LogPrintf( "match: sudden-death respawns disabled\n" );
+			if ( config->suddenDeathPrintAnnouncements ) {
+				trap_SendServerCommand( -1, "cp \"Sudden-death respawns disabled\n\"" );
+			}
+		}
+		return;
+	}
+
+	int delay = G_GetSuddenDeathRespawnDelay();
+	if ( delay < 0 ) {
+		delay = 0;
+	}
+
+	if ( level.suddenDeathLastDelay != delay ) {
+		level.suddenDeathLastDelay = delay;
+		level.suddenDeathNoRespawnLogged = qfalse;
+		G_LogPrintf( "match: sudden-death respawn delay %i ms\n", delay );
+		if ( config->suddenDeathPrintAnnouncements ) {
+			if ( delay > 0 ) {
+				trap_SendServerCommand( -1, va( "cp \"Sudden-death respawns available in %i seconds\n\"", delay / 1000 ) );
+			} else {
+				trap_SendServerCommand( -1, "cp \"Sudden-death respawns available now\n\"" );
+			}
+		}
+	}
+}
 
 /*
 ==================
