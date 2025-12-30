@@ -3599,7 +3599,6 @@ static void G_UpdateGameStateForLevel( void ) {
 }
 
 static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued ) {
-	CheckTournament();
 	CheckExitRules();
 	CheckTeamStatus();
 	CheckVote();
@@ -3825,6 +3824,7 @@ void G_RunFrame( int levelTime ) {
 
 	G_UpdateCvars();
 	G_RefreshPmoveSettings();
+	G_UpdateVoteThrottle();
 
 	if ( !level.timeoutActive ) {
 		G_DispatchScheduledThinks( ctx, msec );
@@ -3836,7 +3836,7 @@ void G_RunFrame( int levelTime ) {
 		G_QuadHogFrame();
 	}
 	G_FinishClientFrames( ctx );
-	G_UpdateVoteThrottle();
+	CheckTournament();
 	G_Frame_UpdateRoundController();
 	G_CheckLevelTimers( ctx, previousWarmupTime, previousIntermissionQueued );
 
