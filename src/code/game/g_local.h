@@ -736,6 +736,9 @@ typedef struct {
 	qboolean	ratingMetadataLoaded;
 	int			itemProgressionTier;
 	unsigned int	progressionFlags;
+	unsigned int	steamIdLow;
+	unsigned int	steamIdHigh;
+	qboolean	steamIdValid;
 
 	int			damageGiven;
 	int			damageReceived;
@@ -1824,4 +1827,3 @@ void G_PmoveClearConfigstring( void );
 int		trap_GeneticParentsAndChildSelection(int numranks, float *ranks, int *parent1, int *parent2, int *child);
 
 void	trap_SnapVector( float *v );
-

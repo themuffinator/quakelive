@@ -28,7 +28,7 @@ This planning document consolidates the Quake Live vs. Quake III Arena HLIL comp
 - [ ] Introduce Steam/OpenID token hooks in `code/game/g_client.c::ClientConnect` mirroring HLIL logging strings.
 - [ ] Add server-side verification shims within `code/server/sv_client.c` to surface auth failures before player instantiation.
 - [ ] Review `code/qcommon/net_chan.c` (and `code/server/sv_main.c` messaging) for broadcast formatting needed for Steam IDs / analytics prints.
-- [ ] Confirm bot flag masking aligns with Quake Live by adjusting `client_t` handling in `code/server/sv_bot.c` and related structs.
+- [x] Confirm bot flag masking aligns with Quake Live by setting/clearing `SVF_BOT` in `code/game/g_client.c::ClientConnect` and syncing `client_t` handling in `code/server/sv_bot.c` and related structs.
 
 ## Gameplay feature backlog
 

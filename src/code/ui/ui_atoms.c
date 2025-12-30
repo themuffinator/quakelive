@@ -575,12 +575,33 @@ qboolean UI_ConsoleCommand( int realTime ) {
 	//Menu_Cache();
 
 	if ( Q_stricmp(cmd, "web_showBrowser") == 0 ) {
-		if (!UI_BrowserOverlayAvailable()) {
-			Com_Printf("UI: browser overlay unavailable; browser overlay hooks are inert.\n");
+		char buff[1024];
+		const char *name2 = NULL;
+		qboolean overlayAvailable;
+
+		if (trap_Argc() > 1) {
+			name2 = UI_Argv(1);
+		}
+
+		if (name2 && *name2) {
+			Com_sprintf(buff, sizeof(buff), "web_showBrowser %s\n", name2);
+		} else {
+			Com_sprintf(buff, sizeof(buff), "web_showBrowser\n");
+		}
+
+		overlayAvailable = UI_BrowserOverlayAvailable();
+		if (!overlayAvailable) {
+			if (UI_BrowserBridgeAvailable()) {
+				Com_Printf("UI: browser overlay unavailable; enabling bridge menus for web_showBrowser.\n");
+				UI_ApplyMenuFlowChange(UI_MENU_FLOW_BRIDGED, qtrue);
+			} else {
+				Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\n");
+			}
 			return qfalse;
 		}
 
 		UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qfalse);
+		trap_Cmd_ExecuteText(EXEC_NOW, buff);
 		return qfalse;
 	}
 

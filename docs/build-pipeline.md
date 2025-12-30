@@ -19,7 +19,7 @@ Binary Ninja HLIL exports and the curated tooling documentation already highligh
 
 In practice this means that reproducing Quake Live style binaries requires:
 
-- A 32-bit (Win32) build of the modules so the produced DLLs mirror the shipped `qagamex86.dll` layout documented in the reference material.【F:docs/hlil_comparison.md†L1-L17】
+- A 32-bit (Win32) build of the modules so the produced DLLs mirror the shipped `qagamex86.dll`, `cgamex86.dll`, and `uix86.dll` layouts documented in the reference material.【F:docs/hlil_comparison.md†L1-L17】【F:docs/reference-mapping.md†L19-L21】
 - Access to the Visual Studio 2010 compiler, linker, and CRT import libraries (either via an actual VS2010 SP1 installation or the “v100 toolset” shipped with newer Visual Studio releases through the “Visual Studio 2010 Tools” components).
 - CRT deployment that links dynamically against `MSVCR100.dll`/`MSVCP100.dll`, mirroring the imports seen in the reference binaries.
 
@@ -38,19 +38,22 @@ The goal is to preserve the Quake III VM pipeline while layering in a native DLL
    - Capture minimal host requirements (Perl, GNU make, Microsoft CL for the Windows variant) in repository docs so contributors can continue producing `.qvm` artefacts.
 
 2. **Introduce a dedicated native build configuration.**
-   - Add a CMake or MSBuild definition under `build/native/` (or extend `src/code/quake3.sln`) that produces `qagamex86.dll` and `cgamex86.dll` with the `v100` toolset while leaving the existing VM projects untouched.
-   - Configure each target for Win32, `/MD` runtime linkage, and export lists consistent with the legacy DLLs.
+   - Add a CMake or MSBuild definition under `build/native/` (or extend `src/code/quake3.sln`) that produces `qagamex86.dll`, `cgamex86.dll`, and `uix86.dll` with the `v100` toolset while leaving the existing VM projects untouched.【F:src/code/quake3.sln†L1-L20】【F:src/code/ui/ui.vcxproj†L1-L63】
+   - Configure each target for Win32, `/MD` runtime linkage, and export lists consistent with the legacy DLLs; the UI project currently links with `/MT` and must be switched to `/MD` to match retail imports.【F:src/code/game/game.vcxproj†L285-L350】【F:src/code/cgame/cgame.vcxproj†L171-L206】【F:src/code/ui/ui.vcxproj†L126-L207】
    - Ensure the configuration sets the same preprocessor symbols used by the VM build (`Q3_VM`, platform macros) so source compatibility is maintained during the transition.
 
 3. **Share source and headers safely between pipelines.**
    - Refactor any VM-only glue (e.g., syscall stubs) into reusable headers so that both the bytecode and native projects consume the same implementation without divergence.
    - Keep VM-specific wrappers isolated (for example, continue invoking `q3asm` through the existing scripts) while the native build references the same `src/code/` tree directly.
 
-4. **Automate toolchain selection and validation.**
+4. **Stage UI DLLs alongside menu assets.**
+   - When assembling distribution layouts, place the freshly built `uix86.dll` next to the staged UI scripts under `baseq3/ui/` so the native module and menu definitions ship together.【F:docs/reference-mapping.md†L14-L21】
+
+5. **Automate toolchain selection and validation.**
    - Extend the top-level build instructions to include a Windows job that checks for the `v100` toolset and downloads/install instructions when missing.
    - Add CI targets or local scripts that can build both the `.qvm` set and the native DLLs, verifying symbol exports and CRT dependencies (e.g., via `dumpbin /imports`) against the Quake Live references. The initial guardrails for these checks are documented in [`docs/toolchain-ci.md`](toolchain-ci.md).
 
-5. **Gradually transition runtime testing.**
+6. **Gradually transition runtime testing.**
    - Retain `.qvm` builds as the default test vehicle while the native DLL path is under construction, using them for logic regression tests.
    - Once the native modules reach feature parity, gate new development on running the same test suite against both bytecode and DLL outputs to ensure behaviour stays aligned.
 
@@ -62,8 +65,8 @@ To support the gameplay testing strategy, CI must offer the following automation
 
 - **Dual-Target Build Matrix:** Configure workflows with a `target` axis (`qvm`, `dll`). The QVM leg invokes the existing `Construct` scripts, while the DLL leg drives MSBuild or CMake presets configured for the Visual Studio 2010 toolset.
 - **Harness Bootstrapping:** Before running tests, stage the shared harness utilities from `tests/` (Python dependencies, data packs) and compile the native/QVM fixture runners. Package the compiled shims (`tests/bin/qvm/*`, `tests/bin/dll/*`) for reuse across suites.
-- **Test Execution:** For each leg, run `python tests/run_all.py --target <target>` which fans out to the deterministic match, rules engine, client regression, and syscall verification suites. Failures must surface unified diff snippets plus a link to the archived artefacts.
-- **Artefact Publication:** Upload JSON logs, baseline diffs, and syscall traces to the CI job artefacts directory under `tests/<suite>/<target>/latest/`. These provide reviewers with parity evidence without reproducing the run locally.
+- **Test Execution:** For each leg, run `python tests/run_all.py --target <target>` which fans out to the deterministic match, rules engine, client regression, weapon timing, and syscall verification suites. Failures must surface unified diff snippets plus a link to the archived artefacts.
+- **Artefact Publication:** Upload JSON logs, baseline diffs, syscall traces, and weapon timing baselines to the CI job artefacts directory under `artifacts/tests/<suite>/<target>/latest/`. These provide reviewers with parity evidence without reproducing the run locally.
 - **Status Badges:** Expose separate build badges (e.g., `Tests (QVM)`, `Tests (DLL)`) so contributors can quickly see which target failed.
 
 ### Expected Contributor Outputs

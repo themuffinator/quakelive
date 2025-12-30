@@ -48,7 +48,7 @@ python tests/run_harnesses.py --target re --reverse-build-root build/re/linux
 
 The runner binds deterministic contexts into the shared objects, produces a
 normalised log (`logs/re/native-shim.log`), and stores artefacts under
-`artifacts/tests/trace/re/`. Pointer values are normalised to `0xPTR` so the log
+`artifacts/tests/trace/re/latest/`. Pointer values are normalised to `0xPTR` so the log
 remains stable across runs. Expectation data lives in
 `tests/expectations/re/native-shim.log` and is diffed against the observed log to
 highlight regressions.

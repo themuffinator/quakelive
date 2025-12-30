@@ -62,7 +62,12 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
    reproducing legacy toolchains.【F:docs/platform/toolchain-matrix.md†L1-L18】
 
 ## Controls & Configuration Defaults
-- **Reference bindings** – The Quake Live snapshot in `assets/quakelive/baseq3/default.cfg` captures the modernized control scheme (weapon toggle on `F`, dedicated drop bindings, vote shortcuts, etc.).【68ce2a†L215-L224】【fcaf97†L1-L86】 Ported builds should ship this file—alongside curated training configs such as `tim.cfg` and `sponge.cfg`—so the engine can execute `exec default.cfg` during bootstrap without diverging from retail expectations.【F:src/code/qcommon/common.c†L2389-L2405】【F:src/code/ui/ui_main.c†L3223-L3263】
+- **Reference bindings** – The Quake Live snapshot in `assets/quakelive/baseq3/default.cfg` captures the modernized control scheme and should ship with curated training configs (`tim.cfg`, `sponge.cfg`, `ttimo.cfg`, `syncerror.cfg`) so `exec default.cfg` during bootstrap mirrors retail expectations.【F:src/code/qcommon/common.c†L2389-L2405】【F:src/code/ui/ui_main.c†L3223-L3263】 Key Quake Live deltas from the Quake III baseline include:
+  - `F` bound to `weapon toggle`, with mouse wheel/`[`/`]` handling `weapprev`/`weapnext`.
+  - Arrow keys bound to item drops (`dropflag`, `dropweapon`, `droppowerup`, `droprune`).
+  - Dedicated vote/ready shortcuts (`F1` vote yes, `F2` vote no, `F3` readyup).
+  - `MOUSE2` for `+zoom`, `MOUSE3`/`ENTER` for `+button2`, `g` for `+button3`.
+  - Utility bindings like `+acc` on `p`, `+chat` on `h`, and `F11` for `screenshotJPEG`.
 - **Packaging requirement** – Ensure any PK3 or installer produced from this repo places the Quake Live `default.cfg` at the data root; the filesystem layer treats its absence as a fatal error.【F:src/code/qcommon/files.c†L3260-L3314】 The UI bundle recipe in `tools/packaging/ui_bundle_manifest.json` now stages `default.cfg`, `syncerror.cfg`, and the training profiles into `pak_uiql.pk3` via `tools/build_ui_bundle.sh`, keeping the `Cbuf_AddText("exec default.cfg\n")` bootstrap satisfied.【F:tools/packaging/ui_bundle_manifest.json†L3-L29】【F:tests/run_ui_validation.py†L16-L66】 Coordinate asset packaging with the workflow outlined in `docs/quakelive_asset_audit.md` so HUD/menu assets and configuration defaults stay in sync.
 
 ## Documentation Backlog

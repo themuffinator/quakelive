@@ -579,10 +579,10 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 	ent->trailTime = cg.time;
 
 	memset( &beam, 0, sizeof( beam ) );
-	//FIXME adjust for muzzle position
 	VectorCopy ( cg_entities[ ent->currentState.otherEntityNum ].lerpOrigin, beam.origin );
-	beam.origin[2] += 26;
+	beam.origin[2] += DEFAULT_VIEWHEIGHT;
 	AngleVectors( cg_entities[ ent->currentState.otherEntityNum ].lerpAngles, forward, NULL, up );
+	VectorMA( beam.origin, 14, forward, beam.origin );
 	VectorMA( beam.origin, -6, up, beam.origin );
 	VectorCopy( origin, beam.oldorigin );
 

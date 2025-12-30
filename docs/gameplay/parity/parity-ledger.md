@@ -18,8 +18,10 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 | Weapon balance deltas (damage, refire, ammo) | ✅ Complete | `src/code/game/bg_pmove.c`, `src/code/game/bg_misc.c` | `references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md` | Gameplay Systems (@gamedev-lead) |
 | Loadout unlock rules | ✅ Complete | `src/code/game/g_items.c`, `src/code/game/g_client.c`, `src/code/game/g_local.h` | `references/hlil/quakelive/qagamex86.dll_split/g_items.md` | Progression (@live-ops) |
 | Physics adjustments (air control, stair smoothing) | ✅ Complete | `src/code/game/bg_pmove.c` | `references/hlil/quakelive/qagamex86.dll_split/PmoveSingle_*.md` | Movement (@physics-guild) |
+| Kamikaze LE_10 local entity effect | ✅ Complete | `src/code/cgame/cg_localents.c` | `references/hlil/quakelive/cgamex86.dll/cgamex86.dll_hlil.txt` | Gameplay Systems (@gamedev-lead) |
 | Domination capture volumes & metadata entities | ✅ Complete | `src/code/game/g_trigger.c`, `src/code/game/g_team.c` | `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part01.txt†L39210-L39410` | Modes (@mutator-crew) |
 | Matchmaking skill scaling hooks | ✅ Complete | `src/code/game/g_active.c`, `src/code/game/g_client.c` | `references/hlil/quakelive/qagamex86.dll_split/g_active.md` | Backend Integrations (@services-team) |
+| Bot admission masking & auth bypass | ⚠️ In Progress | `src/code/game/g_client.c`, `src/code/server/sv_bot.c` | `references/hlil/quakelive/qagamex86.dll/sully_interpreted/functions/g_client/ClientConnect.md` | AI/Co-op (S. Nakamura) |
 
 ### Weapon balance delta verification (2024-09-22)
 
@@ -39,16 +41,32 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 - **Before/after snapshot**
   | Aspect | Before (2024-09-22 captures) | After (deterministic harness + refreshed scrims) |
   | --- | --- | --- |
-  | Reload timings | Parity validated by spot-checking the September scrims without CI publication. | Deterministic weapon timing harness now emits `weapon_timings/<target>/baseline.json` (seeded from the current commit) so CI can diff reload/refire values against the HLIL tables; initial baseline recorded for `qvm` target with all slots matching reference timings.【F:tests/run_harnesses.py†L98-L183】【F:artifacts/tests/weapon_timings/qvm/baseline.json†L1-L73】 |
-  | Ammo pickup + max stacks | Covered by the September demos only. | Harness baseline captures every pickup/max pair from `bg_weaponStats` and flags mismatches against the reference tables (none observed in the refreshed run).【F:tests/run_harnesses.py†L125-L183】【F:artifacts/tests/weapon_timings/qvm/baseline.json†L74-L162】 |
+  | Reload timings | Parity validated by spot-checking the September scrims without CI publication. | Deterministic weapon timing harness now emits `weapon_timings/<target>/latest/baseline.json` (seeded from the current commit) so CI can diff reload/refire values against the HLIL tables; initial baseline recorded for `qvm` target with all slots matching reference timings.【F:tests/run_harnesses.py†L98-L183】【F:artifacts/tests/weapon_timings/qvm/latest/baseline.json†L1-L73】 |
+  | Ammo pickup + max stacks | Covered by the September demos only. | Harness baseline captures every pickup/max pair from `bg_weaponStats` and flags mismatches against the reference tables (none observed in the refreshed run).【F:tests/run_harnesses.py†L125-L183】【F:artifacts/tests/weapon_timings/qvm/latest/baseline.json†L74-L162】 |
   | Capture set | `weapon-balance-2024-09-22-*` demos only. | Rocket, rail, and lightning scrims regenerated with documented seeds/commands for parity reviews.【F:artifacts/tests/weapon-balance-deltas.md†L1-L16】 |
 - **Approvals:** Gameplay Systems (@gamedev-lead) and QA Lead (@qa-automation) reviewed the harness baseline and refreshed scrim instructions on 2025-03-15; status remains ✅ with CI artefacts now attached for ongoing parity checks.
+
+### Weapon damage default alignment (2025-03-20)
+
+- **Before/after snapshot**
+  | Weapon | Before (reverse defaults) | After (HLIL defaults) |
+  | --- | --- | --- |
+  | Machinegun | 7 | 5 |
+  | Heavy Machinegun | 10 | 8 |
+  | Shotgun | 10 | 5 |
+  | Lightning Gun | 8 | 6 |
+  | Railgun | 100 | 80 |
+- **Validation notes:** The Quake Live HLIL cvar table maps the `g_damage_*` entries to default string constants (`data_10087340` = 5, `data_1007e004` = 8, `data_100872b8` = 6, `data_10087260` = 80), so `g_main.c` now mirrors those values in both the cvar defaults and the weapon config fallbacks.【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt†L724-L842】【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L90561-L90676】【F:references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt†L96174-L96214】【F:src/code/game/g_main.c†L676-L920】
 
 ### Loadout unlock verification (2025-05-17)
 
 - **Unlock mapping:** `g_items.c` mirrors the HLIL unlock tier table for all weapon and kamikaze entries so pickup gating uses the same progression thresholds as Quake Live.【F:references/hlil/quakelive/qagamex86.dll_split/g_items.md†L1-L55】【F:src/code/game/g_items.c†L146-L199】
 - **Pickup gating + progression:** Item touches now block pickups unless the client carries the required unlock flag/tier and advance the persistent progression counters after a successful grab, matching the DLL’s reward flow.【F:src/code/game/g_items.c†L203-L265】【F:src/code/game/g_local.h†L686-L715】【F:src/code/game/g_client.c†L52-L82】
 - **Validation:** Factory loadout regression tests covering the practice and tournament presets (and spawn timing) pass in the deterministic match-sim harness, confirming loadout metadata still feeds inventories while unlock gating is active.【F:tests/test_match_sim_harness.py†L355-L405】【e8058e†L1-L9】
+
+### Loadout unlock verification refresh (2025-12-30)
+
+- **Unlock mapping update:** Added the HLIL tier for Proximity Mines (tier `0x0D`) so ammo pickups for the Prox Launcher follow the retail unlock progression gates.【F:references/hlil/quakelive/qagamex86.dll_split/g_items.md†L1-L55】【F:src/code/game/g_items.c†L146-L203】
 
 ### Race/CTF timer verification (2024-12-09)
 

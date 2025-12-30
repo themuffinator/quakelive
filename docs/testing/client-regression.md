@@ -101,6 +101,6 @@ canonical ordering, making them suitable for direct comparison with previously
 recorded baselines via tools like `diff`.
 
 In continuous integration the harness aggregates the results under
-`artifacts/tests/client_regression/<target>/hud_hashes.json`. The file maps each
+`artifacts/tests/client_regression/<target>/latest/hud_hashes.json`. The file maps each
 scenario name to its metadata and ordered frame payloads, making it easy to
 compare archives across builds without having to re-run the harness locally.

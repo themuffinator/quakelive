@@ -1049,6 +1049,11 @@ static void CG_ParseMatchState( void ) {
 	const char *info;
 	int timeoutRemaining;
 	int value;
+	qboolean wasOvertimeActive;
+	int previousOvertimeCount;
+
+	wasOvertimeActive = cgs.matchOvertimeActive;
+	previousOvertimeCount = cgs.matchOvertimeCount;
 
 	CG_ResetMatchStateFields();
 
@@ -1101,6 +1106,13 @@ static void CG_ParseMatchState( void ) {
 	}
 
 	CG_ParseMatchFactoryConfig( info );
+
+	if ( cgs.matchOvertimeActive ) {
+		cg.timelimitWarnings |= 4;
+		if ( ( !wasOvertimeActive || cgs.matchOvertimeCount > previousOvertimeCount ) && cgs.media.overtimeSound ) {
+			trap_S_StartLocalSound( cgs.media.overtimeSound, CHAN_ANNOUNCER );
+		}
+	}
 }
 
 /*
@@ -1204,6 +1216,52 @@ static void CG_ParseForcedCosmetics( void ) {
 }
 
 /*
+=============
+CG_ParseFreezeTipConfigstrings
+
+Caches the Freeze Tag tutorial tips from configstrings.
+=============
+*/
+static void CG_ParseFreezeTipConfigstrings( void ) {
+	const char	*tip;
+
+	tip = CG_ConfigString( CS_FREEZE_TIP_OBJECTIVE );
+	if ( tip && *tip ) {
+		Q_strncpyz( cgs.freezeTipObjective, tip, sizeof( cgs.freezeTipObjective ) );
+	} else {
+		cgs.freezeTipObjective[0] = '\0';
+	}
+
+	tip = CG_ConfigString( CS_FREEZE_TIP_THAW );
+	if ( tip && *tip ) {
+		Q_strncpyz( cgs.freezeTipThaw, tip, sizeof( cgs.freezeTipThaw ) );
+	} else {
+		cgs.freezeTipThaw[0] = '\0';
+	}
+
+	tip = CG_ConfigString( CS_FREEZE_TIP_FREEZE );
+	if ( tip && *tip ) {
+		Q_strncpyz( cgs.freezeTipFreeze, tip, sizeof( cgs.freezeTipFreeze ) );
+	} else {
+		cgs.freezeTipFreeze[0] = '\0';
+	}
+
+	tip = CG_ConfigString( CS_FREEZE_TIP_SHOOT );
+	if ( tip && *tip ) {
+		Q_strncpyz( cgs.freezeTipShoot, tip, sizeof( cgs.freezeTipShoot ) );
+	} else {
+		cgs.freezeTipShoot[0] = '\0';
+	}
+
+	tip = CG_ConfigString( CS_FREEZE_TIP_SUMMARY );
+	if ( tip && *tip ) {
+		Q_strncpyz( cgs.freezeTipSummary, tip, sizeof( cgs.freezeTipSummary ) );
+	} else {
+		cgs.freezeTipSummary[0] = '\0';
+	}
+}
+
+/*
 ================
 CG_SetConfigValues
 
@@ -1297,6 +1355,7 @@ void CG_SetConfigValues( void ) {
 	cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
 	CG_ParseMatchState();
 	CG_ParseForcedCosmetics();
+	CG_ParseFreezeTipConfigstrings();
 	CG_ParseFactoryMetadata();
 	CG_ParsePmoveConfigString( CG_ConfigString( CS_PMOVE_SETTINGS ) );
 	CG_ParseRaceInfoString( CG_ConfigString( CS_RACE_INFO ) );
@@ -1384,6 +1443,8 @@ static void CG_ConfigStringModified( void ) {
 		CG_ParseFactoryMetadata();
 	} else if ( num == CS_FORCED_COSMETICS ) {
 		CG_ParseForcedCosmetics();
+	} else if ( num >= CS_FREEZE_TIP_OBJECTIVE && num <= CS_FREEZE_TIP_SUMMARY ) {
+		CG_ParseFreezeTipConfigstrings();
 	} else if ( num == CS_RACE_INFO ) {
 		CG_ParseRaceInfoString( str );
 	} else if ( num == CS_RACE_STATUS ) {

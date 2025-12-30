@@ -28,6 +28,8 @@ The client’s authorization path (`CL_RequestAuthorization`) now builds its pay
 
 On the server side, the authorize challenge code continues to expect raw strings returned by the master server (`SV_GetChallenge` / `SV_AuthorizeIpPacket`). Once external validation is available, these functions will be responsible for interpreting the credential labels and handling non-CD-key responses coming back from the backend.【F:src/code/server/sv_client.c†L52-L205】【F:src/code/server/sv_client.c†L142-L204】
 
+Gameplay admin commands that depend on Steam identity (such as the invite/revoke flow) call into the engine to verify Steam authentication and fetch the 64-bit SteamID before resolving privilege tiers via the cached access list helper, keeping the per-command gate aligned with the platform auth state.【F:src/code/game/g_cmds.c†L2976-L3066】
+
 ## Credential Consumers That Require Updates
 
 Several legacy code paths still assume CD-keys are the only credential format. Migrating them to the new abstraction will unblock platform tokens and reduce duplicated sanitization logic:

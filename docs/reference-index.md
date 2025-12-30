@@ -9,7 +9,7 @@ This document catalogs the material checked into the `references/` directory and
 | `references/hlil/quakelive/cgamex86.dll/` (`cgamex86.dll_hlil.txt` and split parts) | High Level IL disassembly of the Quake Live client game module. | Client Game VM | `src/code/cgame/` | **Covered** – source tree present, needs parity checks only. | Game VM reverse engineering |
 | `references/hlil/quakelive/qagamex86.dll/` (`qagamex86.dll.bndb_hlil_part*.txt`) | HLIL dump of the dedicated game logic VM used by the server. | Game VM (server) | `src/code/game/` | **Covered** – source available for comparison. | Game VM reverse engineering |
 | `references/hlil/quakelive/uix86.all/` (`uix86.dll_hlil.txt` and part files) | HLIL reconstruction of the UI dynamic library that drives menus/HUD. | UI VM | `src/code/ui/`, supplemental menu defs in `src/ui/` | **Covered** – sources mirror binary, diff audit recommended. | UI systems |
-| `references/hlil/quakelive/quakelive_steam.exe/` (`quakelive_steam.exe_hlil_part*.txt`) | HLIL export of the Windows launcher that hosts the game and Steam hooks. | Native launcher & platform glue | _No equivalent in `src/`_ | **Missing** – native host code absent from repo. | Platform integration (Windows/Steam) |
+| `references/hlil/quakelive/quakelive_steam.exe/` (`quakelive_steam.exe_hlil_part*.txt`) | HLIL export of the Windows launcher that hosts the game and Steam hooks. | Native launcher & platform glue | _No equivalent in `src/`_ | **Missing** – native host code absent from repo; see `docs/reverse-engineering/quakelive_steam_parity_plan.md` for subsystem mapping. | Platform integration (Windows/Steam) |
 | `references/hlil/quake3/quake3.exe/` (`quake3.exe_hlil_part*.txt`) | HLIL of the original Quake III Arena executable for historical parity. | Engine (client/server/renderer) | `src/code/client/`, `src/code/qcommon/`, `src/code/server/`, `src/code/renderer/` | **Covered** – open-source engine already imported. | Engine maintainers |
 
 ## Extracted assets
@@ -26,6 +26,6 @@ This document catalogs the material checked into the `references/` directory and
 
 ## Notable gaps & suggested actions
 
-- **Native launcher / platform services:** `quakelive_steam.exe` HLIL shows we lack the Windows host executable, Steam API bindings, and any anti-cheat/bootstrap logic. Recommend assigning to the Platform integration team to recover or reimplement the launcher layer.
+- **Native launcher / platform services:** `quakelive_steam.exe` HLIL shows we lack the Windows host executable, Steam API bindings (client + server), workshop/UGC glue, and any anti-cheat/bootstrap logic. See `docs/reverse-engineering/quakelive_steam_parity_plan.md` for the proposed subsystem mapping and integration points.
 - **Art & map source assets:** While compiled assets (`maps/`, `icons/`, fonts) are preserved, we do not have the editable source files (map `.map`, vector art, PSDs). Content pipeline owners should source original asset repositories or recreate tooling to regenerate them.
 - **Service-side integrations:** No references for Quake Live backend services (authentication, stats) were found. If these are required, coordination with LiveOps/Backend is needed to locate service definitions.

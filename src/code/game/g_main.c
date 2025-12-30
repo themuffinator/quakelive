@@ -676,11 +676,11 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_damage_cg, "g_damage_cg", "8", 0, 0, qtrue, qfalse, "Chaingun bullet damage per hit; 8 mirrors the Quake Live HLIL defaults." },
 	{ &g_damage_g, "g_damage_g", "50", 0, 0, qtrue },
 	{ &g_damage_gh, "g_damage_gh", "10", 0, 0, qtrue, qfalse, "Grappling Hook projectile impact damage; 10 matches the retail DLL export." },
-	{ &g_damage_mg, "g_damage_mg", "7", 0, 0, qtrue },
+	{ &g_damage_mg, "g_damage_mg", "5", 0, 0, qtrue },
 	{ &g_damage_mg_team, "g_damage_mg_team", "5", 0, 0, qtrue },
 	{ &g_damage_ng, "g_damage_ng", "12", 0, 0, qtrue, qfalse, "Nailgun projectile damage per bolt; 12 reproduces the HLIL tables." },
-	{ &g_damage_hmg, "g_damage_hmg", "10", 0, 0, qtrue },
-	{ &g_damage_sg, "g_damage_sg", "10", 0, 0, qtrue },
+	{ &g_damage_hmg, "g_damage_hmg", "8", 0, 0, qtrue },
+	{ &g_damage_sg, "g_damage_sg", "5", 0, 0, qtrue },
 	{ &g_damage_sg_outer, "g_damage_sg_outer", "5", 0, 0, qtrue, qfalse, "Shotgun outer-ring pellet damage when Quake Live's dual spread is active." },
 	{ &g_damage_gl, "g_damage_gl", "100", 0, 0, qtrue },
 	{ &g_splashDamage_gl, "g_splashDamage_gl", "100", 0, 0, qtrue },
@@ -692,8 +692,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_damage_pl, "g_damage_pl", "0", 0, 0, qtrue, qfalse, "Direct-hit damage applied by the proximity mine launcher before the mine arms." },
 	{ &g_splashDamage_pg, "g_splashDamage_pg", "15", 0, 0, qtrue },
 	{ &g_splashRadius_pg, "g_splashRadius_pg", "20", 0, 0, qtrue },
-	{ &g_damage_lg, "g_damage_lg", "8", 0, 0, qtrue },
-	{ &g_damage_rg, "g_damage_rg", "100", 0, 0, qtrue },
+	{ &g_damage_lg, "g_damage_lg", "6", 0, 0, qtrue },
+	{ &g_damage_rg, "g_damage_rg", "80", 0, 0, qtrue },
 	{ &g_damage_bfg, "g_damage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashDamage_bfg, "g_splashDamage_bfg", "100", 0, 0, qtrue },
 	{ &g_splashRadius_bfg, "g_splashRadius_bfg", "120", 0, 0, qtrue },
@@ -891,10 +891,10 @@ Refreshes the cached weapon config block from gameplay CVars.
 */
 void G_InitWeaponConfig( void ) {
 	g_weaponConfig.gauntletDamage = G_ReadWeaponCvar( &g_damage_g, 50, "g_damage_g" );
-	g_weaponConfig.machinegunDamage = G_ReadWeaponCvar( &g_damage_mg, 7, "g_damage_mg" );
+	g_weaponConfig.machinegunDamage = G_ReadWeaponCvar( &g_damage_mg, 5, "g_damage_mg" );
 	g_weaponConfig.machinegunTeamDamage = G_ReadWeaponCvar( &g_damage_mg_team, 5, "g_damage_mg_team" );
-	g_weaponConfig.heavyMachinegunDamage = G_ReadWeaponCvar( &g_damage_hmg, 10, "g_damage_hmg" );
-	g_weaponConfig.shotgunDamage = G_ReadWeaponCvar( &g_damage_sg, 10, "g_damage_sg" );
+	g_weaponConfig.heavyMachinegunDamage = G_ReadWeaponCvar( &g_damage_hmg, 8, "g_damage_hmg" );
+	g_weaponConfig.shotgunDamage = G_ReadWeaponCvar( &g_damage_sg, 5, "g_damage_sg" );
 	g_weaponConfig.shotgunFalloffScale = G_ReadWeaponFloatCvarNonNegative( &g_damage_sg_falloff, 0.0f, "g_damage_sg_falloff" );
 	g_weaponConfig.shotgunFalloffRange = G_ReadWeaponCvarNonNegative( &g_range_sg_falloff, 0, "g_range_sg_falloff" );
 	g_weaponConfig.grenadeDamage = G_ReadWeaponCvar( &g_damage_gl, 100, "g_damage_gl" );
@@ -914,10 +914,10 @@ void G_InitWeaponConfig( void ) {
 	g_weaponConfig.plasmaSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_pg, 2000, "g_velocity_pg", 1 );
 	g_weaponConfig.plasmaAccelerationFactor = G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_pg, 0.0f, "g_accelFactor_pg" );
 	g_weaponConfig.plasmaAccelerationRate = G_ReadWeaponCvarNonNegative( &g_accelRate_pg, 0, "g_accelRate_pg" );
-	g_weaponConfig.lightningDamage = G_ReadWeaponCvar( &g_damage_lg, 8, "g_damage_lg" );
+	g_weaponConfig.lightningDamage = G_ReadWeaponCvar( &g_damage_lg, 6, "g_damage_lg" );
 	g_weaponConfig.lightningFalloffScale = G_ReadWeaponFloatCvarNonNegative( &g_damage_lg_falloff, 0.0f, "g_damage_lg_falloff" );
 	g_weaponConfig.lightningFalloffRange = G_ReadWeaponCvarNonNegative( &g_range_lg_falloff, 0, "g_range_lg_falloff" );
-	g_weaponConfig.railgunDamage = G_ReadWeaponCvar( &g_damage_rg, 100, "g_damage_rg" );
+	g_weaponConfig.railgunDamage = G_ReadWeaponCvar( &g_damage_rg, 80, "g_damage_rg" );
 	g_weaponConfig.bfgDamage = G_ReadWeaponCvar( &g_damage_bfg, 100, "g_damage_bfg" );
 	g_weaponConfig.bfgSplashDamage = G_ReadWeaponCvar( &g_splashDamage_bfg, 100, "g_splashDamage_bfg" );
 	g_weaponConfig.bfgSplashRadius = G_ReadWeaponCvar( &g_splashRadius_bfg, 120, "g_splashRadius_bfg" );
@@ -3599,7 +3599,6 @@ static void G_UpdateGameStateForLevel( void ) {
 }
 
 static void G_CheckLevelTimers( qlr_game_frame_context_t *ctx, int previousWarmupTime, int previousIntermissionQueued ) {
-	CheckTournament();
 	CheckExitRules();
 	CheckTeamStatus();
 	CheckVote();
@@ -3825,6 +3824,7 @@ void G_RunFrame( int levelTime ) {
 
 	G_UpdateCvars();
 	G_RefreshPmoveSettings();
+	G_UpdateVoteThrottle();
 
 	if ( !level.timeoutActive ) {
 		G_DispatchScheduledThinks( ctx, msec );
@@ -3836,7 +3836,7 @@ void G_RunFrame( int levelTime ) {
 		G_QuadHogFrame();
 	}
 	G_FinishClientFrames( ctx );
-	G_UpdateVoteThrottle();
+	CheckTournament();
 	G_Frame_UpdateRoundController();
 	G_CheckLevelTimers( ctx, previousWarmupTime, previousIntermissionQueued );
 

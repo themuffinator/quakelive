@@ -191,6 +191,10 @@ static int G_GetItemUnlockTier( const gitem_t *item ) {
 		}
 	}
 
+	if ( item->giType == IT_AMMO && item->giTag == WP_PROX_LAUNCHER ) {
+		return 0x0D;
+	}
+
 	if ( item->giType == IT_HOLDABLE && item->giTag == HI_KAMIKAZE ) {
 		return 0x0C;
 	}
@@ -1614,4 +1618,3 @@ void G_RunItem( gentity_t *ent ) {
 
 	G_BounceItem( ent, &tr );
 }
-

@@ -76,7 +76,7 @@ Run the suite with::
     pytest tests/test_freeze_cvars.py -vv
 
 When executing the deterministic harness bundle via ``tests/run_harnesses.py``
-the freeze scenario contributes to ``artifacts/tests/logs/<target>/match_sim.log``.
+the freeze scenario contributes to ``artifacts/tests/logs/<target>/latest/match_sim.log``.
 The log lists the scenario slug, seed, and resulting frame count so any
 regression immediately stands out in CI artifacts.
 

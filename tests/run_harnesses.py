@@ -87,15 +87,18 @@ class HarnessBundleResult:
     weapon_timings: dict[str, object]
     trace_result: TraceHarnessResult | None = None
 
+    def _suite_root(self, suite: str) -> Path:
+        return self.artifact_root / suite / self.target / "latest"
+
     def match_timeline_path(self, slug: str) -> Path:
-        return self.artifact_root / "match_sim" / self.target / slug / "timeline.json"
+        return self._suite_root("match_sim") / slug / "timeline.json"
 
     def load_match_timeline(self, slug: str) -> dict[str, object]:
         timeline_path = self.match_timeline_path(slug)
         return json.loads(timeline_path.read_text(encoding="utf-8"))
 
     def log_path(self, harness_name: str) -> Path:
-        return self.artifact_root / "logs" / self.target / f"{harness_name}.log"
+        return self._suite_root("logs") / f"{harness_name}.log"
 
     def read_log(self, harness_name: str) -> str:
         return self.log_path(harness_name).read_text(encoding="utf-8")
@@ -108,6 +111,10 @@ def _write_text(path: Path, text: str) -> None:
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
     _write_text(path, json.dumps(payload, indent=2) + "\n")
+
+
+def _suite_root(artifact_root: Path, suite: str, target: str) -> Path:
+    return artifact_root / suite / target / "latest"
 
 
 def _current_commit() -> str:
@@ -131,7 +138,7 @@ def _weapon_to_enum_name(weapon: str) -> str:
 
 
 def _parse_reference_tables(reference_path: Path) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
-    """Extract reload and ammo pickup values from the HLIL reference tables."""
+    """Extract reload/refire and ammo pickup values from the HLIL reference tables."""
 
     reloads: dict[str, int] = {}
     ammo: dict[str, dict[str, int]] = {}
@@ -282,7 +289,7 @@ def _run_weapon_timing_harness(target: str, artifact_root: Path, commit_hash: st
         },
     }
 
-    output_path = artifact_root / "weapon_timings" / target / "baseline.json"
+    output_path = _suite_root(artifact_root, "weapon_timings", target) / "baseline.json"
     _write_json(output_path, payload)
 
     mismatches = [
@@ -304,7 +311,7 @@ def _run_weapon_timing_harness(target: str, artifact_root: Path, commit_hash: st
     if ammo_mismatches:
         log_lines.append(f"Ammo mismatches: {', '.join(sorted(ammo_mismatches))}")
 
-    log_path = artifact_root / "logs" / target / "weapon_timings.log"
+    log_path = _suite_root(artifact_root, "logs", target) / "weapon_timings.log"
     _write_text(log_path, "\n".join(log_lines) + "\n")
 
     return payload
@@ -313,7 +320,7 @@ def _run_weapon_timing_harness(target: str, artifact_root: Path, commit_hash: st
 def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict[str, object]]:
     summaries: list[dict[str, object]] = []
     for slug, scenario_path in SCENARIOS.items():
-        timeline_path = artifact_root / "match_sim" / target / slug / "timeline.json"
+        timeline_path = _suite_root(artifact_root, "match_sim", target) / slug / "timeline.json"
         result = run_from_file(scenario_path, seed=seed, output_path=timeline_path)
 
         summaries.append(
@@ -330,10 +337,10 @@ def _run_match_harness(target: str, artifact_root: Path, seed: int) -> list[dict
             }
         )
 
-    index_path = artifact_root / "match_sim" / target / "index.json"
+    index_path = _suite_root(artifact_root, "match_sim", target) / "index.json"
     _write_text(index_path, json.dumps(summaries, indent=2) + "\n")
 
-    summary_log = artifact_root / "logs" / target / "match_sim.log"
+    summary_log = _suite_root(artifact_root, "logs", target) / "match_sim.log"
     _write_text(
         summary_log,
         "Match simulation harness completed successfully.\n"
@@ -382,10 +389,10 @@ def _run_client_harness(
             }
         )
 
-    hashes_path = artifact_root / "client_regression" / target / "hud_hashes.json"
+    hashes_path = _suite_root(artifact_root, "client_regression", target) / "hud_hashes.json"
     _write_json(hashes_path, manifest)
 
-    log_path = artifact_root / "logs" / target / "client_regression.log"
+    log_path = _suite_root(artifact_root, "logs", target) / "client_regression.log"
     log_text = (
         "Client regression harness generated HUD hashes for captured scenarios.\n"
         + json.dumps(log_entries, indent=2)
@@ -449,10 +456,10 @@ def _run_retail_netdump_harness(
             }
         )
 
-    output_path = artifact_root / "client_regression" / target / "retail_netdump_hashes.json"
+    output_path = _suite_root(artifact_root, "client_regression", target) / "retail_netdump_hashes.json"
     _write_json(output_path, {"entries": entries, "baseline": str(NETDUMP_BASELINE.relative_to(REPO_ROOT))})
 
-    log_path = artifact_root / "logs" / target / "retail_netdump.log"
+    log_path = _suite_root(artifact_root, "logs", target) / "retail_netdump.log"
     _write_text(
         log_path,
         "Retail netdump harness captured HUD and usercmd hashes.\n"
@@ -469,7 +476,7 @@ def _run_hud_capture_harness(
     capture_payloads: dict[str, dict[str, object]],
     commit_hash: str,
 ) -> list[dict[str, object]]:
-    hud_root = artifact_root / "hud-captures" / target
+    hud_root = _suite_root(artifact_root, "hud-captures", target)
     hud_root.mkdir(parents=True, exist_ok=True)
 
     manifest_entries: list[dict[str, object]] = []
@@ -521,7 +528,7 @@ def _run_hud_capture_harness(
     manifest_path = hud_root / "manifest.json"
     _write_json(manifest_path, manifest)
 
-    log_path = artifact_root / "logs" / target / "hud_captures.log"
+    log_path = _suite_root(artifact_root, "logs", target) / "hud_captures.log"
     _write_text(
         log_path,
         "HUD capture harness produced competitive HUD baselines.\n"
@@ -588,11 +595,11 @@ def run_harness_bundle(
 
     trace_result: TraceHarnessResult | None = None
     if target == "re":
-        trace_artifact_root = artifact_root / "trace" / target
+        trace_artifact_root = _suite_root(artifact_root, "trace", target)
         expectation = REPO_ROOT / "tests" / "expectations" / "re" / "native-shim.log"
         trace_result = run_trace_harness(reverse_build_root, expectation, trace_artifact_root)
 
-        summary_log = artifact_root / "logs" / target / "trace_harness.log"
+        summary_log = _suite_root(artifact_root, "logs", target) / "trace_harness.log"
         status = "matched" if trace_result.matches_expectation else "differs"
         _write_text(
             summary_log,

@@ -11,7 +11,7 @@ ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "tests" / "client_regression"
 
 
 def _load_manifest(target: str) -> Dict[str, List[Mapping[str, object]]]:
-    path = ARTIFACT_ROOT / target / "hud_hashes.json"
+    path = ARTIFACT_ROOT / target / "latest" / "hud_hashes.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
 
     if isinstance(payload, list):
@@ -57,4 +57,3 @@ def test_client_hud_hashes_match_between_targets():
 
     for scenario in sorted(qvm_manifest):
         _assert_sequences_match(qvm_manifest[scenario], dll_manifest[scenario], scenario)
-

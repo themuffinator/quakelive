@@ -412,7 +412,7 @@ CG_DrawForcedScoreboardTip
 Draws the forced compact-scoreboard banner when the server enforces it.
 =============
 */
-static void CG_DrawForcedScoreboardTip( float fade ) {
+static int CG_DrawForcedScoreboardTip( float fade, int lineOffset ) {
 	vec4_t	color;
 	const char	*message;
 	int	width;
@@ -420,12 +420,12 @@ static void CG_DrawForcedScoreboardTip( float fade ) {
 	int	y;
 
 	if ( !cgs.forceSmallScoreboardMessage || fade <= 0.0f ) {
-		return;
+		return lineOffset;
 	}
 	message = "Compact scoreboard message forced by server";
 	width = CG_DrawStrlen( message ) * SMALLCHAR_WIDTH;
 	x = ( SCREEN_WIDTH - width ) / 2;
-	y = SB_TOP - SMALLCHAR_HEIGHT - 4;
+	y = SB_TOP - ( lineOffset * SMALLCHAR_HEIGHT ) - 4;
 
 	color[0] = 1.0f;
 	color[1] = 1.0f;
@@ -433,6 +433,8 @@ static void CG_DrawForcedScoreboardTip( float fade ) {
 	color[3] = fade;
 
 	CG_DrawSmallStringColor( x, y, message, color );
+
+	return lineOffset + 1;
 }
 
 /*
@@ -442,25 +444,24 @@ CG_DrawForcedGametypeHint
 Displays the gametype training hint when the server forces HUD widgets.
 =============
 */
-static void CG_DrawForcedGametypeHint( float fade ) {
+static int CG_DrawForcedGametypeHint( float fade, int lineOffset ) {
 	const char		*hint;
 	vec4_t	color;
 	int	width;
 	int	x;
 	int	y;
-	int	lineOffset;
 
 	if ( !cgs.forceHudHints || fade <= 0.0f ) {
-		return;
+		return lineOffset;
 	}
 
 	if ( cgs.gametype < 0 || cgs.gametype >= GT_MAX_GAME_TYPE ) {
-		return;
+		return lineOffset;
 	}
 
 	hint = QL_GametypeHudHint( cgs.gametype );
 	if ( !hint || !*hint ) {
-		return;
+		return lineOffset;
 	}
 
 	color[0] = 1.0f;
@@ -469,11 +470,63 @@ static void CG_DrawForcedGametypeHint( float fade ) {
 	color[3] = fade;
 
 	width = CG_DrawStrlen( hint ) * SMALLCHAR_WIDTH;
-	lineOffset = cgs.forceSmallScoreboardMessage ? 2 : 1;
 	y = SB_TOP - ( lineOffset * SMALLCHAR_HEIGHT ) - 4;
 	x = ( SCREEN_WIDTH - width ) / 2;
 
 	CG_DrawSmallStringColor( x, y, hint, color );
+
+	return lineOffset + 1;
+}
+
+/*
+=============
+CG_DrawFreezeTagTips
+
+Draws the Freeze Tag tutorial tips when forced HUD hints are active.
+=============
+*/
+static int CG_DrawFreezeTagTips( float fade, int lineOffset ) {
+	const char	*tip;
+	vec4_t	color;
+	int	width;
+	int	x;
+	int	y;
+	int	i;
+	const char *tips[] = {
+		cgs.freezeTipObjective,
+		cgs.freezeTipThaw,
+		cgs.freezeTipFreeze,
+		cgs.freezeTipShoot,
+		cgs.freezeTipSummary
+	};
+
+	if ( !cgs.forceHudHints || fade <= 0.0f ) {
+		return lineOffset;
+	}
+
+	if ( cgs.gametype != GT_FREEZE ) {
+		return lineOffset;
+	}
+
+	color[0] = 1.0f;
+	color[1] = 1.0f;
+	color[2] = 1.0f;
+	color[3] = fade;
+
+	for ( i = 0; i < (int)( sizeof( tips ) / sizeof( tips[0] ) ); i++ ) {
+		tip = tips[i];
+		if ( !tip || !*tip ) {
+			continue;
+		}
+
+		width = CG_DrawStrlen( tip ) * SMALLCHAR_WIDTH;
+		x = ( SCREEN_WIDTH - width ) / 2;
+		y = SB_TOP - ( lineOffset * SMALLCHAR_HEIGHT ) - 4;
+		CG_DrawSmallStringColor( x, y, tip, color );
+		lineOffset++;
+	}
+
+	return lineOffset;
 }
 
 
@@ -706,8 +759,6 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 	
 	ci = &cgs.clientinfo[score->client];
 
-	CG_AppendHudScoreboardEntry( score, ci );
-
 	iconx = SB_BOTICON_X + (SB_RATING_WIDTH / 2);
 	headx = SB_HEAD_X + (SB_RATING_WIDTH / 2);
 
@@ -912,6 +963,7 @@ qboolean CG_DrawOldScoreboard( void ) {
 	int topBorderSize, bottomBorderSize;
 	int			nameHeaderX;
 	qboolean		timersActive;
+	int			lineOffset;
 
 	// don't draw amuthing if the menu or console is up
 	if ( cg_paused.integer ) {
@@ -990,7 +1042,6 @@ qboolean CG_DrawOldScoreboard( void ) {
 	y = SB_HEADER;
 
 	timersActive = ( cgs.itemTimersEnabled || cgs.forceHudHints );
-	CG_ResetHudScoreboard( timersActive );
 
 	CG_DrawPic( SB_SCORE_X + (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardScore );
 	CG_DrawPic( SB_PING_X - (SB_RATING_WIDTH / 2), y, 64, 32, cgs.media.scoreboardPing );
@@ -1000,8 +1051,10 @@ qboolean CG_DrawOldScoreboard( void ) {
 	nameHeaderX = SB_SCORELINE_X + (SB_RATING_WIDTH / 2) + ( timersActive ? 16 : 11 ) * BIGCHAR_WIDTH;
 	CG_DrawPic( nameHeaderX, y, 64, 32, cgs.media.scoreboardName );
 
-	CG_DrawForcedScoreboardTip( fade );
-	CG_DrawForcedGametypeHint( fade );
+	lineOffset = 1;
+	lineOffset = CG_DrawForcedScoreboardTip( fade, lineOffset );
+	lineOffset = CG_DrawForcedGametypeHint( fade, lineOffset );
+	lineOffset = CG_DrawFreezeTagTips( fade, lineOffset );
 
 	y = SB_TOP;
 
