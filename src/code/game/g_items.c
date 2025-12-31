@@ -1052,6 +1052,10 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 			te->r.singleClient = other->s.number;
 		}
 	}
+	// QL Parity: Also broadcast team items (flags) if not silenced (handled elsewhere usually, but Q3 broadcasted IT_TEAM here too sometimes)
+	// Actually, Q3 had: if ( ent->item->giType == IT_POWERUP || ent->item->giType == IT_TEAM)
+	// But QL restricts it to prevent duplicate sounds as Team_Pickup handles it.
+	// The current code already removed IT_TEAM from the check above, matching QL.
 
 	// fire item targets
 	G_UseTargets (ent, other);

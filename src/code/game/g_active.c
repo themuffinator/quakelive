@@ -454,8 +454,16 @@ qboolean ClientInactivityTimer( gclient_t *client ) {
 		client->inactivityWarning = qfalse;
 	} else if ( !client->pers.localClient ) {
 		if ( level.time > client->inactivityTime ) {
-			trap_DropClient( client - level.clients, "Dropped due to inactivity" );
-			return qfalse;
+			if ( trap_Cvar_VariableIntegerValue( "g_dropInactive" ) ) {
+				trap_DropClient( client - level.clients, "Inactivity" );
+				return qfalse;
+			} else {
+				// Move to spec instead
+				SetTeam( &g_entities[client - level.clients], "spectator" );
+				trap_SendServerCommand( client - level.clients, "print \"You have been moved to spectators for inactivity.\n\"" );
+				client->inactivityTime = level.time + 60 * 1000; // Give them a minute in spec before kicking? No, spec timer usually different.
+				return qtrue;
+			}
 		}
 		if ( level.time > client->inactivityTime - 10000 && !client->inactivityWarning ) {
 			client->inactivityWarning = qtrue;

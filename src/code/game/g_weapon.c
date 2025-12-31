@@ -806,6 +806,7 @@ void Weapon_LightningFire( gentity_t *ent ) {
 	vec3_t impactpoint, bouncedir;
 	gentity_t	*traceEnt, *tent;
 	int			damage, i, passent;
+	vec3_t		dischargePoint; // Defined local variable
 
 	damage = g_weaponConfig.lightningDamage * s_quadFactor;
 
@@ -1034,6 +1035,9 @@ void FireWeapon( gentity_t *ent ) {
 			ent->client->pers.accuracy_shots[ent->s.weapon]++;
 		}
 	}
+
+	// fire weapon event to logs
+	G_LogPrintf( "Weapon_Fire: %i %i\n", ent->s.number, ent->s.weapon );
 
 	// set aiming directions
 	AngleVectors (ent->client->ps.viewangles, forward, right, up);

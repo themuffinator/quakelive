@@ -1306,6 +1306,7 @@ void SetLeader(int team, int client);
 void CheckTeamLeader( int team );
 void G_RunThink (gentity_t *ent);
 void QDECL G_LogPrintf( const char *fmt, ... );
+void LogExit( const char *string );
 void SendScoreboardMessageToAllClients( void );
 void G_UpdateMatchStateConfigString( void );
 void G_SetGameState( const char *state );

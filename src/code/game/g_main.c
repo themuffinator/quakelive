@@ -3137,10 +3137,14 @@ void CheckTournament( void ) {
 		// if all players have arrived, start the countdown
 		if ( level.warmupTime < 0 ) {
 			if ( level.numPlayingClients == 2 ) {
-				// fudge by -1 to account for extra delays
-				level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
-				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-				G_UpdateReadyUpConfigstring();
+				if ( g_doWarmup.integer ) {
+					// Wait for ready
+				} else {
+					// fudge by -1 to account for extra delays
+					level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
+					trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+					G_UpdateReadyUpConfigstring();
+				}
 			}
 			return;
 		}

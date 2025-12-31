@@ -892,6 +892,13 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 			AddScore( attacker, self->r.currentOrigin, 1 );
 			G_ADAwardBonus( attacker, self->r.currentOrigin, g_adElimScoreBonus.integer, S_COLOR_YELLOW "Elimination bonus" );
 
+			if ( trap_Cvar_VariableIntegerValue( "g_reportKiller" ) ) {
+				char *killerName = attacker->client->pers.netname;
+				int killerHealth = attacker->health;
+				int killerArmor = attacker->client->ps.stats[STAT_ARMOR];
+				trap_SendServerCommand( self->s.number, va("print \"Hit by %s^7 (H:%i A:%i)\n\"", killerName, killerHealth, killerArmor) );
+			}
+
 			if( meansOfDeath == MOD_GAUNTLET ) {
 				
 				// play humiliation on player
@@ -1644,6 +1651,11 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		if ( teamDamage > 0 ) {
 			G_ComplaintConsiderForDamage( attacker, targ, teamDamage );
 		}
+	}
+
+	if ( trap_Cvar_VariableIntegerValue( "g_awardPushing" ) && take > 0 && attacker && attacker->client && attacker != targ && !OnSameTeam( targ, attacker ) ) {
+		targ->client->lasthurt_client = attacker->s.number;
+		targ->client->lasthurt_mod = mod;
 	}
 
 	if ( g_debugDamage.integer ) {

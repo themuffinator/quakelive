@@ -1664,6 +1664,7 @@ static void Cmd_Say_f( gentity_t *ent, int mode, qboolean arg0 ) {
 		p = ConcatArgs( 1 );
 	}
 
+
 	if ( G_FloodLimited( ent, ( mode == SAY_TEAM ) ? "using team chat" : "chatting", qtrue ) ) {
 		return;
 	}
@@ -2123,8 +2124,12 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting on a map restart is disabled on this server.\\n\"" );
 			return;
 		}
+		// If 0x1000000 (VF_KEEP_TEAMS) is set, map_restart 0 is used implicitly in QL, or handled elsewhere.
+		// However, standard map_restart resets everything.
+		// If we want to preserve teams/scores via vote, we might need a custom command or argument.
+		// For now, standard behavior is map_restart.
 		Com_sprintf( level.voteString, sizeof( level.voteString ), "map_restart" );
-		Q_strncpyz( level.voteDisplayString, level.voteString, sizeof( level.voteDisplayString ) );
+		Q_strncpyz( level.voteDisplayString, "Map Restart", sizeof( level.voteDisplayString ) );
 		voteSelection = G_VoteSelectionKey( arg1, NULL );
 	} else if ( !Q_stricmp( arg1, "nextmap" ) ) {
 		if ( g_voteFlags.integer & VF_NO_NEXTMAP ) {
@@ -3431,6 +3436,38 @@ void Cmd_Restart_f( gentity_t *ent ) {
 
 /*
 ==================
+Cmd_InvertTeams_f
+==================
+*/
+void Cmd_InvertTeams_f( void ) {
+	int i;
+	gclient_t *cl;
+
+	if ( g_gametype.integer < GT_TEAM ) {
+		return;
+	}
+
+	for ( i = 0 ; i < level.maxclients ; i++ ) {
+		cl = &level.clients[i];
+		if ( cl->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+		if ( cl->sess.sessionTeam == TEAM_RED ) {
+			cl->sess.sessionTeam = TEAM_BLUE;
+		} else if ( cl->sess.sessionTeam == TEAM_BLUE ) {
+			cl->sess.sessionTeam = TEAM_RED;
+		} else {
+			continue;
+		}
+		ClientUserinfoChanged( i );
+	}
+
+	trap_SendServerCommand( -1, "cp \"Teams have been swapped!\n\"" );
+	trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
+}
+
+/*
+==================
 Cmd_ShuffleTeams_f
 ==================
 */
@@ -3543,9 +3580,8 @@ Cmd_Clan_f
 */
 void Cmd_Clan_f( gentity_t *ent ) {
 	char arg[MAX_TOKEN_CHARS];
+	char userinfo[MAX_INFO_STRING];
 
-	// QL uses this to set clan tag. In Q3 base we usually use userinfo "clan" or "team".
-	// Implementing as userinfo setter.
 	if ( !ent || !ent->client ) return;
 
 	if ( trap_Argc() < 2 ) {
@@ -3554,8 +3590,11 @@ void Cmd_Clan_f( gentity_t *ent ) {
 	}
 
 	trap_Argv( 1, arg, sizeof( arg ) );
-	// Just print for now as full clan system requires more userinfo handling
-	trap_SendServerCommand( ent-g_entities, "print \"Clan tag updated (simulated).\n\"" );
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof( userinfo ) );
+	Info_SetValueForKey( userinfo, "clan", arg ); // QL uses 'clan' key
+	trap_SetUserinfo( ent->s.number, userinfo );
+	ClientUserinfoChanged( ent->s.number );
+	trap_SendServerCommand( ent-g_entities, va("print \"Clan tag set to: %s\n\"", arg) );
 }
 
 /*
@@ -3675,6 +3714,10 @@ Cmd_Cointoss_f
 */
 void Cmd_Cointoss_f( gentity_t *ent ) {
 	char	*msg;
+
+	if ( G_FloodLimited( ent, "cointoss", qtrue ) ) {
+		return;
+	}
 
 	if ( rand() & 1 ) {
 		msg = "Heads";
@@ -3863,6 +3906,16 @@ void Cmd_Admin_f( gentity_t *ent ) {
 		}
 		Cmd_ShuffleTeams_f();
 		G_LogPrintf( "Admin %s shuffled teams\n", ent->client->pers.netname );
+		return;
+	}
+
+	if ( !Q_stricmp( arg, "invert" ) ) {
+		if ( priv < PRIV_MOD ) {
+			trap_SendServerCommand( ent - g_entities, "print \"Insufficient privileges.\n\"" );
+			return;
+		}
+		Cmd_InvertTeams_f();
+		G_LogPrintf( "Admin %s inverted teams\n", ent->client->pers.netname );
 		return;
 	}
 
