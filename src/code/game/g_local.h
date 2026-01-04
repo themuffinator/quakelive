@@ -322,6 +322,8 @@ extern vmCvar_t g_rrInfectedSpreadTime;
 extern vmCvar_t g_rrInfected;
 extern vmCvar_t g_rrDamageScoreBonus;
 extern vmCvar_t g_rrAllowNegativeScores;
+extern vmCvar_t g_referee;
+extern vmCvar_t g_electedReferee;
 extern vmCvar_t g_adTouchScoreBonus;
 extern vmCvar_t g_adElimScoreBonus;
 extern vmCvar_t g_adCaptureScoreBonus;
@@ -1119,6 +1121,7 @@ void Cmd_POIs_f( gentity_t *ent );
 void Cmd_ReadyUp_f( gentity_t *ent );
 void Cmd_Elo_f( gentity_t *ent );
 void Cmd_Cointoss_f( gentity_t *ent );
+void Cmd_Referee_f( gentity_t *ent );
 
 //
 // g_items.c

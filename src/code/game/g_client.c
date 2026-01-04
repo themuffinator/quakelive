@@ -2177,6 +2177,10 @@ void ClientDisconnect( int clientNum ) {
 		G_AutoAction( AUTOACTION_PLAYER_DISCONNECT, ent, autoDetail );
 	}
 
+	if ( g_electedReferee.integer == clientNum ) {
+		trap_Cvar_Set( "g_electedReferee", "-1" );
+	}
+
 	G_ComplaintClientDisconnected( clientNum );
 	G_ComplaintResetClient( ent->client, qtrue );
 	G_ResetClientVoteThrottle( ent->client );

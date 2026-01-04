@@ -631,6 +631,85 @@ void G_SetOrigin( gentity_t *ent, vec3_t origin ) {
 
 /*
 ================
+G_ParseMapPool
+
+Parses the g_mappool string into a structured list of maps and factories.
+Expects format: "mapname|factory mapname|factory ..."
+================
+*/
+void G_ParseMapPool( const char *poolString, char mapList[MAX_ARENAS][MAX_QPATH], char factoryList[MAX_ARENAS][MAX_QPATH], int *count ) {
+	const char *p;
+	char		token[MAX_QPATH];
+	char		*sep;
+
+	*count = 0;
+	if ( !poolString || !poolString[0] ) {
+		return;
+	}
+
+	p = poolString;
+	while ( *count < MAX_ARENAS ) {
+		p = COM_ParseExt( &p, qfalse );
+		if ( !p || !p[0] ) {
+			break;
+		}
+
+		Q_strncpyz( token, p, sizeof( token ) );
+		sep = strchr( token, '|' );
+		if ( sep ) {
+			*sep = '\0';
+			Q_strncpyz( mapList[*count], token, MAX_QPATH );
+			Q_strncpyz( factoryList[*count], sep + 1, MAX_QPATH );
+		} else {
+			Q_strncpyz( mapList[*count], token, MAX_QPATH );
+			factoryList[*count][0] = '\0';
+		}
+		(*count)++;
+	}
+}
+
+/*
+================
+G_GetNextMapFromPool
+
+Selects the next map from the pool based on the current mapCycle state.
+Updates the g_mapCycle cvar to reflect the new state.
+================
+*/
+void G_GetNextMapFromPool( char *mapOut, int mapOutSize, char *factoryOut, int factoryOutSize ) {
+	char		mapList[MAX_ARENAS][MAX_QPATH];
+	char		factoryList[MAX_ARENAS][MAX_QPATH];
+	int			count;
+	int			currentCycle;
+
+	if ( !g_mappool.string[0] ) {
+		return;
+	}
+
+	G_ParseMapPool( g_mappool.string, mapList, factoryList, &count );
+	if ( count == 0 ) {
+		return;
+	}
+
+	currentCycle = g_mapCycle.integer;
+	if ( currentCycle < 0 || currentCycle >= count ) {
+		currentCycle = 0;
+	}
+
+	Q_strncpyz( mapOut, mapList[currentCycle], mapOutSize );
+	if ( factoryOut ) {
+		Q_strncpyz( factoryOut, factoryList[currentCycle], factoryOutSize );
+	}
+
+	currentCycle++;
+	if ( currentCycle >= count ) {
+		currentCycle = 0;
+	}
+	trap_Cvar_Set( "g_mapCycle", va( "%i", currentCycle ) );
+}
+
+/*
+================
 DebugLine
 
   debug polygons only work when running a local game

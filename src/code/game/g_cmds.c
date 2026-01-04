@@ -2086,24 +2086,27 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 		}
 	}
 
-	if ( !g_allowVote.integer ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Public voting is not allowed here.\\n\"" );
-		return;
-	}
+	// Referees can call votes regardless of restrictions
+	if ( ent->client->sess.privilege == PRIV_NONE ) {
+		if ( !g_allowVote.integer ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Public voting is not allowed here.\\n\"" );
+			return;
+		}
 
-	if ( g_voteLimit.integer > 0 && client->pers.voteCount >= g_voteLimit.integer ) {
-		trap_SendServerCommand( ent-g_entities, "print \"You have called the maximum number of votes.\\n\"" );
-		return;
-	}
+		if ( g_voteLimit.integer > 0 && client->pers.voteCount >= g_voteLimit.integer ) {
+			trap_SendServerCommand( ent-g_entities, "print \"You have called the maximum number of votes.\\n\"" );
+			return;
+		}
 
-	if ( isSpectator && !g_allowSpecVote.integer ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Not allowed to call a vote as spectator.\\n\"" );
-		return;
-	}
+		if ( isSpectator && !g_allowSpecVote.integer ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Not allowed to call a vote as spectator.\\n\"" );
+			return;
+		}
 
-	if ( !g_allowVoteMidGame.integer && midGame ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Voting is only allowed during warmup.\\n\"" );
-		return;
+		if ( !g_allowVoteMidGame.integer && midGame ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Voting is only allowed during warmup.\\n\"" );
+			return;
+		}
 	}
 
 	if ( level.voteTime ) {
@@ -4286,6 +4289,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_DelPOI_f( ent );
 	else if (Q_stricmp (cmd, "pois") == 0)
 		Cmd_POIs_f( ent );
+	else if (Q_stricmp (cmd, "referee") == 0 || Q_stricmp (cmd, "ref") == 0)
+		Cmd_Referee_f( ent );
 	else
 		trap_SendServerCommand( clientNum, va("print \"unknown cmd %s\n\"", cmd ) );
 }
@@ -4398,4 +4403,60 @@ void Cmd_POIs_f( gentity_t *ent ) {
 		}
 		trap_SendServerCommand( ent-g_entities, va("print \"  %3d %-20s %s\n\"", i, level.pois[i].name, vtos(level.pois[i].origin) ) );
 	}
+}
+
+/*
+==================
+Cmd_Referee_f
+==================
+*/
+void Cmd_Referee_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int clientNum;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( trap_Argc() < 2 ) {
+		// Toggle status or print help
+		if ( ent->client->sess.privilege == PRIV_NONE ) {
+			trap_SendServerCommand( ent-g_entities, "print \"usage: referee <password>\n\"" );
+		} else {
+			ent->client->sess.privilege = PRIV_NONE;
+			if ( g_electedReferee.integer == ent->s.number ) {
+				trap_Cvar_Set( "g_electedReferee", "-1" );
+			}
+			trap_SendServerCommand( ent-g_entities, "print \"Referee status relinquished.\n\"" );
+			trap_SendServerCommand( -1, va("print \"%s relinquished referee status.\n\"", ent->client->pers.netname) );
+		}
+		return;
+	}
+
+	trap_Argv( 1, arg, sizeof( arg ) );
+
+	if ( !g_referee.string[0] || !Q_stricmp( g_referee.string, "none" ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Referee password is not set.\n\"" );
+		return;
+	}
+
+	if ( Q_stricmp( arg, g_referee.string ) ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Invalid referee password.\n\"" );
+		return;
+	}
+
+	// Demote any existing elected referee
+	if ( g_electedReferee.integer >= 0 && g_electedReferee.integer < level.maxclients ) {
+		gentity_t *prevRef = &g_entities[g_electedReferee.integer];
+		if ( prevRef->inuse && prevRef->client ) {
+			prevRef->client->sess.privilege = PRIV_NONE;
+			trap_SendServerCommand( prevRef->s.number, "print \"Your referee status has been revoked.\n\"" );
+		}
+	}
+
+	ent->client->sess.privilege = PRIV_MOD; // Referee treated as Moderator level
+	clientNum = ent->s.number;
+	trap_Cvar_Set( "g_electedReferee", va("%d", clientNum) );
+	trap_SendServerCommand( ent-g_entities, "print \"Referee status granted.\n\"" );
+	trap_SendServerCommand( -1, va("print \"%s became referee.\n\"", ent->client->pers.netname) );
 }

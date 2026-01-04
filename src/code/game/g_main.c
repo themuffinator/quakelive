@@ -478,6 +478,10 @@ vmCvar_t	g_returnFlagOnSuicide;
 vmCvar_t	g_droppedFlagBonus;
 vmCvar_t	g_flagDroppedTimeout;
 vmCvar_t	g_neutralFlagPingTime;
+vmCvar_t	g_mappool;
+vmCvar_t	g_mapCycle;
+vmCvar_t	g_referee;
+vmCvar_t	g_electedReferee;
 
 // bk001129 - made static to avoid aliasing
 static cvarTable_t		gameCvarTable[] = {
@@ -615,6 +619,11 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_droppedFlagBonus, "g_droppedFlagBonus", "10", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Score bonus granted to players that recover a dropped friendly flag." },
 	{ &g_flagDroppedTimeout, "g_flagDroppedTimeout", "30000", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Milliseconds a dropped flag can remain in play before automatically returning to base." },
 	{ &g_neutralFlagPingTime, "g_neutralFlagPingTime", "5000", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Milliseconds between neutral flag ping notifications while it sits on the ground; set to 0 to disable." },
+
+	{ &g_mappool, "g_mappool", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Map rotation pool definition in the format 'mapname|factory mapname|factory ...'." },
+	{ &g_mapCycle, "g_mapCycle", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Active map cycle list derived from g_mappool." },
+	{ &g_referee, "g_referee", "none", 0, 0, qfalse, qfalse, "Password required to claim referee status." },
+	{ &g_electedReferee, "g_electedReferee", "-1", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Client number of the currently elected referee." },
 
 	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
 
@@ -2379,6 +2388,38 @@ void ExitLevel (void) {
 		return;	
 	}
 
+	if ( g_mappool.string[0] ) {
+		char nextMap[MAX_QPATH];
+		char nextFactory[MAX_QPATH];
+
+		G_GetNextMapFromPool( nextMap, sizeof( nextMap ), nextFactory, sizeof( nextFactory ) );
+		if ( nextMap[0] ) {
+			if ( nextFactory[0] ) {
+				trap_SendConsoleCommand( EXEC_APPEND, va( "map %s %s\n", nextMap, nextFactory ) );
+			} else {
+				trap_SendConsoleCommand( EXEC_APPEND, va( "map %s\n", nextMap ) );
+			}
+			level.changemap = NULL;
+			level.intermissiontime = 0;
+			// reset all the scores so we don't enter the intermission again
+			level.teamScores[TEAM_RED] = 0;
+			level.teamScores[TEAM_BLUE] = 0;
+			for ( i=0 ; i< g_maxclients.integer ; i++ ) {
+				cl = level.clients + i;
+				if ( cl->pers.connected != CON_CONNECTED ) {
+					continue;
+				}
+				cl->ps.persistant[PERS_SCORE] = 0;
+			}
+			G_WriteSessionData();
+			for (i=0 ; i< g_maxclients.integer ; i++) {
+				if ( level.clients[i].pers.connected == CON_CONNECTED ) {
+					level.clients[i].pers.connected = CON_CONNECTING;
+				}
+			}
+			return;
+		}
+	}
 
 	trap_SendConsoleCommand( EXEC_APPEND, "vstr nextmap\n" );
 	level.changemap = NULL;
