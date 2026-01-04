@@ -2,7 +2,7 @@
 
 This plan outlines the steps required to close the parity gaps identified in `AUDIT.md`.
 
-## Task 1: Physics Parity (PQL Air Control)
+## Task 1: Physics Parity (PQL Air Control) [COMPLETED]
 **Priority:** Critical
 **File:** `src/code/game/bg_pmove.c`
 
@@ -18,7 +18,7 @@ The current `pm_aircontrol` implementation in `PM_Accelerate` is a simplified ap
     *   Alternatively, call it alongside `PM_Accelerate` if that matches QL's specific "Turbo" flavor (needs verification, but replacement is standard for CPMA).
 3.  **Clean up `PM_Accelerate`**: Remove the partial "soft" air control logic from `PM_Accelerate` to avoid double application or interference.
 
-## Task 2: UI & UX State
+## Task 2: UI & UX State [COMPLETED]
 **Priority:** Medium
 **File:** `src/code/ui/ui_quakelive_bridge.c`
 
@@ -28,7 +28,7 @@ With the removal of legacy menus, we must ensure the bridge handles basic naviga
 1.  **Console Helpers**: Ensure `Cmd_Map_f` provides clear feedback when factories are missing.
 2.  **Bridge Verification**: Review `ui_quakelive_bridge.c` to confirm it doesn't hard-crash when web UI is missing.
 
-## Task 3: Final Verification
+## Task 3: Final Verification [COMPLETED]
 **Priority:** Low
 
 1.  **Damage Timelines**: Run `tests/test_damage_timelines.py` to ensure weapon config changes didn't regress damage events.
