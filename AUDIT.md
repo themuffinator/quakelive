@@ -3,10 +3,10 @@
 This document outlines the current state of the codebase relative to the retail Quake Live version, based on HLIL references and source code inspection.
 
 ## 1. Physics & Movement (`bg_pmove.c`)
-**Status:** Partial / Simplified
-**Gap:** High
+**Status:** High Parity
+**Gap:** Low
 
-*   **Air Control**: The current implementation in `PM_Accelerate` uses a simplified "Project Velocity" model when `pm_aircontrol` is active. It adds velocity towards the wish direction but lacks the full CPMA-style `PM_AirControl` logic (velocity redirection without friction) required for authentic PQL/Turbo mode movement.
+*   **Air Control**: `PM_AirControl` is implemented in `bg_pmove.c`, mirroring the CPMA/PQL logic. `PM_AirMove` correctly prioritizes or integrates this logic when `pm_aircontrol` is non-zero.
 *   **Settings**: `pm_defaultSettings` correctly includes `airControl`, `airAccel`, and strafe settings, matching QL defaults.
 *   **Race**: `G_RaceInitLevel` and `SP_race_point` are present in `g_race.c`, ensuring server-side Race logic is robust. Physics interactions rely on standard triggers, which is generally correct for Q3A-based Race.
 
@@ -40,6 +40,5 @@ This document outlines the current state of the codebase relative to the retail 
 
 ## 5. Summary of Outstanding Work
 
-1.  **Physics**: **CRITICAL**. Implement full `PM_AirControl` in `bg_pmove.c` to achieve true PQL/CPMA movement parity. The current implementation is a "soft" approximation.
-2.  **UI**: **WARNING**. Provide a mechanism or documentation for starting matches, as the native UI is stripped.
-3.  **Verification**: Verify `pm_aircontrol` behavior in-game compared to Quake Live.
+1.  **UI**: **WARNING**. Provide a mechanism or documentation for starting matches, as the native UI is stripped. (Mitigated by console commands).
+2.  **Verification**: Ongoing regression testing.
