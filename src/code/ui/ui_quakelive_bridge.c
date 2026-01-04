@@ -510,6 +510,10 @@ static qboolean UI_WriteBridgeScripts(void) {
 		ok = UI_WriteBridgeFile("ui/ql_bridge_credentials.menu", uiBridgeCredentialsMenu) && ok;
 	}
 
+	if (!ok) {
+		trap_Print( "UI_WriteBridgeScripts: Failed to write bridge menu files.\n" );
+	}
+
 	return ok;
 }
 

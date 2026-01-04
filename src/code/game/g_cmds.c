@@ -3399,6 +3399,14 @@ void Cmd_Map_f( gentity_t *ent ) {
 	}
 
 	if ( factory[0] ) {
+		if ( !Factory_FindById( factory ) ) {
+			if ( ent ) {
+				trap_SendServerCommand( ent - g_entities, "print \"Invalid factory specified.\\n\"" );
+			} else {
+				G_Printf( "Invalid factory specified.\n" );
+			}
+			return;
+		}
 		trap_SendConsoleCommand( EXEC_APPEND, va("map %s %s\n", map, factory) );
 	} else {
 		trap_SendConsoleCommand( EXEC_APPEND, va("map %s\n", map) );
