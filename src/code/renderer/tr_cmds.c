@@ -82,6 +82,25 @@ void R_PerformanceCounters( void ) {
 
 /*
 ====================
+R_InitCommandBuffers
+====================
+*/
+void R_InitCommandBuffers( void ) {
+	glConfig.smpActive = qfalse;
+	renderThreadActive = qfalse;
+
+	if ( !r_smp->integer ) {
+		return;
+	}
+
+	if ( GLimp_SpawnRenderThread( RB_RenderThread ) ) {
+		glConfig.smpActive = qtrue;
+	}
+}
+
+
+/*
+====================
 R_ShutdownCommandBuffers
 ====================
 */

@@ -1,4 +1,4 @@
--o "\quake3\missionpack\vm\cgame"
+-o "\quakelive\missionpack\vm\cgame"
 cg_main
 ..\cg_syscalls
 cg_consolecmds

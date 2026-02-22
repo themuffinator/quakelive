@@ -1114,7 +1114,9 @@ static void CG_ApplyClientModelOverrides( clientInfo_t *ci, cgClientOverrideCont
 	allowHeadOverride = ( cgs.playerheadmodelOverride[0] == '\0' );
 	forcedModel[0] = '\0';
 	forcedSkin[0] = '\0';
-	modelValue = useTeam ? cg_teamModel.string : cg_enemyModel.string;
+	modelValue = useTeam ?
+		( cg_forceTeamModel.string[0] ? cg_forceTeamModel.string : cg_teamModel.string ) :
+		( cg_forceEnemyModel.string[0] ? cg_forceEnemyModel.string : cg_enemyModel.string );
 	skinValue = useTeam ? cg_forceTeamSkin.string : cg_forceEnemySkin.string;
 	if ( CG_ParseForcedModelString( modelValue, forcedModel, sizeof( forcedModel ), forcedSkin, sizeof( forcedSkin ) ) ) {
 		if ( allowBodyOverride ) {
@@ -1421,17 +1423,18 @@ void CG_NewClientInfo( int clientNum ) {
 			if ( slash ) {
 				Q_strncpyz( newInfo.headSkinName, slash + 1, sizeof( newInfo.headSkinName ) );
 			}
-			} else {
-		Q_strncpyz( newInfo.headModelName, v, sizeof( newInfo.headModelName ) );
-
-		slash = strchr( newInfo.headModelName, '/' );
-		if ( !slash ) {
-			// modelName didn not include a skin name
-			Q_strncpyz( newInfo.headSkinName, "default", sizeof( newInfo.headSkinName ) );
 		} else {
-			Q_strncpyz( newInfo.headSkinName, slash + 1, sizeof( newInfo.headSkinName ) );
-			// truncate modelName
-			*slash = 0;
+			Q_strncpyz( newInfo.headModelName, v, sizeof( newInfo.headModelName ) );
+
+			slash = strchr( newInfo.headModelName, '/' );
+			if ( !slash ) {
+				// modelName didn not include a skin name
+				Q_strncpyz( newInfo.headSkinName, "default", sizeof( newInfo.headSkinName ) );
+			} else {
+				Q_strncpyz( newInfo.headSkinName, slash + 1, sizeof( newInfo.headSkinName ) );
+				// truncate modelName
+				*slash = 0;
+			}
 		}
 	}
 

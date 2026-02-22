@@ -169,7 +169,7 @@ COMPILING ON WIN32
 ==================
 
 VC7 / Visual C++ 2003 project files are provided:
-code/quake3.sln
+code/quakelive.sln
 q3radiant/Radiant.sln
 
 To compile the qvms, you need to run some batch files:

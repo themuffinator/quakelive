@@ -1,9 +1,9 @@
 rmdir debug /s /q
 rmdir release /s /q
-del quake3.ncb
-del quake3.opt
-del quake3.plg
-del quake3.stt
+del quakelive_steam.ncb
+del quakelive_steam.opt
+del quakelive_steam.plg
+del quakelive_steam.stt
 rmdir cgame\debug /s /q
 rmdir cgame\release /s /q
 del cgame\cgame.ncb
@@ -48,9 +48,9 @@ del bspc\bspc.pdb
 del bspc\bspc.plg
 rmdir unix\debugi386-glibc /s /q
 rmdir unix\releasei386-glibc /s /q
-rmdir "mac\MacQuake3 Data" /s /q
-rmdir macosx\Client\Q3Test.app /s /q
-rmdir macosx\Client\Q3Test.build /s /q
+rmdir "mac\MacQuakeLive Data" /s /q
+rmdir macosx\Client\*.app /s /q
+rmdir macosx\Client\*.build /s /q
 del *.o /s
 del *.obj /s
 del *.lib /s

@@ -34,6 +34,15 @@ and one exported function: Perform
 */
 
 #include "vm_local.h"
+#include "../ui/ui_public.h"
+#include "../cgame/cg_public.h"
+#include "../cgame/tr_types.h"
+#include "../game/g_public.h"
+#include <stdint.h>
+
+#ifndef UI_OLD_API_VERSION
+#define UI_OLD_API_VERSION 4
+#endif
 
 
 vm_t	*currentVM = NULL; // bk001212
@@ -153,9 +162,9 @@ VM_Init
 ==============
 */
 void VM_Init( void ) {
-	Cvar_Get( "vm_cgame", "2", CVAR_ARCHIVE );	// !@# SHIP WITH SET TO 2
-	Cvar_Get( "vm_game", "2", CVAR_ARCHIVE );	// !@# SHIP WITH SET TO 2
-	Cvar_Get( "vm_ui", "2", CVAR_ARCHIVE );		// !@# SHIP WITH SET TO 2
+	Cvar_Get( "vm_cgame", "0", CVAR_ARCHIVE );	// Quake Live ships native modules by default.
+	Cvar_Get( "vm_game", "0", CVAR_ARCHIVE );	// Quake Live ships native modules by default.
+	Cvar_Get( "vm_ui", "0", CVAR_ARCHIVE );		// Quake Live ships native modules by default.
 	vm_trace = Cvar_Get( "vm_trace", "0", CVAR_TEMP );
 	vmTraceHandle = 0;
 	vmTraceOpenAttempted = qfalse;
@@ -466,13 +475,17 @@ vm_t *VM_Restart( vm_t *vm ) {
 	if ( vm->dllHandle ) {
 		char	name[MAX_QPATH];
 	    int			(*systemCall)( int *parms );
+		void		*dllImports;
+		int			dllApiVersion;
 		
-		systemCall = vm->systemCall;	
+		systemCall = vm->systemCall;
+		dllImports = vm->dllImports;
+		dllApiVersion = vm->dllApiVersion;
 		Q_strncpyz( name, vm->name, sizeof( name ) );
 
 		VM_Free( vm );
 
-		vm = VM_Create( name, systemCall, VMI_NATIVE );
+		vm = VM_Create( name, systemCall, VMI_NATIVE, dllImports, dllApiVersion );
 		return vm;
 	}
 
@@ -535,8 +548,8 @@ it will attempt to load as a system dll
 
 #define	STACK_SIZE	0x20000
 
-vm_t *VM_Create( const char *module, int (*systemCalls)(int *), 
-				vmInterpret_t interpret ) {
+vm_t *VM_Create( const char *module, int (*systemCalls)(int *),
+		vmInterpret_t interpret, void *dllImports, int dllApiVersion ) {
 	vm_t		*vm;
 	vmHeader_t	*header;
 	int			length;
@@ -573,6 +586,10 @@ vm_t *VM_Create( const char *module, int (*systemCalls)(int *),
 
 	Q_strncpyz( vm->name, module, sizeof( vm->name ) );
 	vm->systemCall = systemCalls;
+	vm->dllExports = NULL;
+	vm->dllImports = dllImports;
+	vm->dllApiVersion = dllApiVersion;
+	vm->dllInterface = qfalse;
 
 	// never allow dll loading with a demo
 	if ( interpret == VMI_NATIVE ) {
@@ -584,8 +601,23 @@ vm_t *VM_Create( const char *module, int (*systemCalls)(int *),
 	if ( interpret == VMI_NATIVE ) {
 		// try to load as a system dll
 		Com_Printf( "Loading dll file %s.\n", vm->name );
-		vm->dllHandle = Sys_LoadDll( module, vm->fqpath , &vm->entryPoint, VM_DllSyscall );
+		vm->dllHandle = Sys_LoadDll( module, vm->fqpath, &vm->entryPoint,
+			&vm->dllExports, vm->dllImports,
+			vm->dllImports ? &vm->dllApiVersion : NULL, VM_DllSyscall );
 		if ( vm->dllHandle ) {
+			if ( !Q_stricmp( module, "ui" ) && vm->entryPoint && !vm->dllExports && vm->dllImports ) {
+				int uiApi;
+
+				uiApi = vm->entryPoint( UI_GETAPIVERSION );
+				Com_Printf( "UI native vmMain API reported %d\n", uiApi );
+				if ( uiApi == UI_API_VERSION || uiApi == UI_OLD_API_VERSION || uiApi == dllApiVersion ) {
+					vm->dllApiVersion = uiApi;
+				}
+			}
+
+			if ( vm->dllExports ) {
+				vm->dllInterface = qtrue;
+			}
 			VM_LogTraceEvent( "create %s native %s", module, vm->fqpath );
 			return vm;
 		}
@@ -719,6 +751,9 @@ void *VM_ArgPtr( int intValue ) {
 	if ( currentVM==NULL )
 	  return NULL;
 
+	if ( currentVM->dllInterface ) {
+		return (void *)(intptr_t)intValue;
+	}
 	if ( currentVM->entryPoint ) {
 		return (void *)(currentVM->dataBase + intValue);
 	}
@@ -737,6 +772,9 @@ void *VM_ExplicitArgPtr( vm_t *vm, int intValue ) {
 	  return NULL;
 
 	//
+	if ( vm->dllInterface ) {
+		return (void *)(intptr_t)intValue;
+	}
 	if ( vm->entryPoint ) {
 		return (void *)(vm->dataBase + intValue);
 	}
@@ -772,13 +810,278 @@ locals from sp
 #define	MAX_STACK	256
 #define	STACK_MASK	(MAX_STACK-1)
 
+/*
+=================
+VM_CallNativeExports
+=================
+*/
+static int VM_CallNativeExports( vm_t *vm, int callnum, const int *args ) {
+	void	**dllExports;
+	void	*exportFunc;
+
+	if ( !vm->dllExports ) {
+		Com_Error( ERR_FATAL, "VM_CallNativeExports: no exports for %s", vm->name );
+	}
+
+	dllExports = (void **)vm->dllExports;
+
+	if ( !Q_stricmp( vm->name, "ui" ) ) {
+		int uiExportIndex = callnum;
+
+		Com_DPrintf( "VM_CallNativeExports(ui): callnum=%d api=%d iface=%d\n",
+			callnum, vm->dllApiVersion, vm->dllInterface );
+
+		if ( vm->dllInterface && vm->dllApiVersion > UI_API_VERSION ) {
+			if ( callnum == UI_GETAPIVERSION ) {
+				return vm->dllApiVersion;
+			}
+			uiExportIndex = callnum - 1;
+		}
+
+		switch ( callnum ) {
+		case UI_GETAPIVERSION:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			return ((int (QDECL *)( void ))exportFunc)();
+		case UI_INIT:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( qboolean ))exportFunc)( args[0] );
+			return 0;
+		case UI_SHUTDOWN:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( void ))exportFunc)();
+			return 0;
+		case UI_KEY_EVENT:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int, int, int ))exportFunc)( args[0], args[1], args[2] );
+			return 0;
+		case UI_MOUSE_EVENT:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int, int ))exportFunc)( args[0], args[1] );
+			return 0;
+		case UI_REFRESH:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		case UI_IS_FULLSCREEN:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			return ((qboolean (QDECL *)( void ))exportFunc)();
+		case UI_SET_ACTIVE_MENU:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( uiMenuCommand_t ))exportFunc)( args[0] );
+			return 0;
+		case UI_CONSOLE_COMMAND:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			return ((qboolean (QDECL *)( int ))exportFunc)( args[0] );
+		case UI_DRAW_CONNECT_SCREEN:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( qboolean ))exportFunc)( args[0] );
+			return 0;
+		case UI_HASUNIQUECDKEY:
+			exportFunc = dllExports[uiExportIndex];
+			if ( !exportFunc ) {
+				break;
+			}
+			return ((qboolean (QDECL *)( void ))exportFunc)();
+		default:
+			Com_Error( ERR_DROP, "VM_CallNativeExports: bad ui call %i", callnum );
+		}
+		Com_Error( ERR_DROP, "VM_CallNativeExports: missing ui export %i", callnum );
+		return 0;
+	}
+
+	if ( !Q_stricmp( vm->name, "cgame" ) ) {
+		switch ( callnum ) {
+		case CG_INIT:
+			exportFunc = dllExports[CG_INIT];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int, int, int ))exportFunc)( args[0], args[1], args[2] );
+			return 0;
+		case CG_SHUTDOWN:
+			exportFunc = dllExports[CG_SHUTDOWN];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( void ))exportFunc)();
+			return 0;
+		case CG_CONSOLE_COMMAND:
+			exportFunc = dllExports[CG_CONSOLE_COMMAND];
+			if ( !exportFunc ) {
+				break;
+			}
+			return ((qboolean (QDECL *)( void ))exportFunc)();
+		case CG_DRAW_ACTIVE_FRAME:
+			exportFunc = dllExports[CG_DRAW_ACTIVE_FRAME];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int, stereoFrame_t, qboolean ))exportFunc)( args[0], args[1], args[2] );
+			return 0;
+		case CG_CROSSHAIR_PLAYER:
+			exportFunc = dllExports[CG_CROSSHAIR_PLAYER];
+			if ( !exportFunc ) {
+				break;
+			}
+			return ((int (QDECL *)( void ))exportFunc)();
+		case CG_LAST_ATTACKER:
+			exportFunc = dllExports[CG_LAST_ATTACKER];
+			if ( !exportFunc ) {
+				break;
+			}
+			return ((int (QDECL *)( void ))exportFunc)();
+		case CG_KEY_EVENT:
+			exportFunc = dllExports[CG_KEY_EVENT];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int, qboolean ))exportFunc)( args[0], args[1] );
+			return 0;
+		case CG_MOUSE_EVENT:
+			exportFunc = dllExports[CG_MOUSE_EVENT];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int, int ))exportFunc)( args[0], args[1] );
+			return 0;
+		case CG_EVENT_HANDLING:
+			exportFunc = dllExports[CG_EVENT_HANDLING];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		default:
+			Com_Error( ERR_DROP, "VM_CallNativeExports: bad cgame call %i", callnum );
+		}
+		Com_Error( ERR_DROP, "VM_CallNativeExports: missing cgame export %i", callnum );
+		return 0;
+	}
+
+	if ( !Q_stricmp( vm->name, "qagame" ) ) {
+		switch ( callnum ) {
+		case GAME_INIT:
+			exportFunc = dllExports[GAME_INIT];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int, int, int ))exportFunc)( args[0], args[1], args[2] );
+			return 0;
+		case GAME_SHUTDOWN:
+			exportFunc = dllExports[GAME_SHUTDOWN];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( void ))exportFunc)();
+			return 0;
+		case GAME_CLIENT_CONNECT:
+			exportFunc = dllExports[GAME_CLIENT_CONNECT];
+			if ( !exportFunc ) {
+				break;
+			}
+			return (int)(intptr_t)((const char *(QDECL *)( int, qboolean, qboolean ))exportFunc)( args[0], args[1], args[2] );
+		case GAME_CLIENT_BEGIN:
+			exportFunc = dllExports[GAME_CLIENT_BEGIN];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		case GAME_CLIENT_USERINFO_CHANGED:
+			exportFunc = dllExports[GAME_CLIENT_USERINFO_CHANGED];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		case GAME_CLIENT_DISCONNECT:
+			exportFunc = dllExports[GAME_CLIENT_DISCONNECT];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		case GAME_CLIENT_COMMAND:
+			exportFunc = dllExports[GAME_CLIENT_COMMAND];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		case GAME_CLIENT_THINK:
+			exportFunc = dllExports[GAME_CLIENT_THINK];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		case GAME_RUN_FRAME:
+			exportFunc = dllExports[GAME_RUN_FRAME];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		case GAME_CONSOLE_COMMAND:
+			exportFunc = dllExports[GAME_CONSOLE_COMMAND];
+			if ( !exportFunc ) {
+				break;
+			}
+			return ((qboolean (QDECL *)( void ))exportFunc)();
+		case BOTAI_START_FRAME:
+			exportFunc = dllExports[BOTAI_START_FRAME];
+			if ( !exportFunc ) {
+				break;
+			}
+			((void (QDECL *)( int ))exportFunc)( args[0] );
+			return 0;
+		default:
+			Com_Error( ERR_DROP, "VM_CallNativeExports: bad game call %i", callnum );
+		}
+		Com_Error( ERR_DROP, "VM_CallNativeExports: missing game export %i", callnum );
+		return 0;
+	}
+
+	Com_Error( ERR_DROP, "VM_CallNativeExports: unknown module %s", vm->name );
+	return 0;
+}
+
 int	QDECL VM_Call( vm_t *vm, int callnum, ... ) {
 	vm_t	*oldVM;
 	int		r;
 	int i;
 	int args[16];
 	va_list ap;
-
 
 	if ( !vm ) {
 		Com_Error( ERR_FATAL, "VM_Call with NULL vm" );
@@ -794,18 +1097,22 @@ int	QDECL VM_Call( vm_t *vm, int callnum, ... ) {
 	}
 
 	// if we have a dll loaded, call it directly
-	if ( vm->entryPoint ) {
+	if ( vm->entryPoint || vm->dllExports ) {
 		//rcg010207 -  see dissertation at top of VM_DllSyscall() in this file.
 		va_start(ap, callnum);
 		for (i = 0; i < sizeof (args) / sizeof (args[i]); i++) {
 			args[i] = va_arg(ap, int);
 		}
 		va_end(ap);
+	}
 
+	if ( vm->entryPoint ) {
 		r = vm->entryPoint( callnum,  args[0],  args[1],  args[2], args[3],
                             args[4],  args[5],  args[6], args[7],
                             args[8],  args[9], args[10], args[11],
                             args[12], args[13], args[14], args[15]);
+	} else if ( vm->dllExports ) {
+		r = VM_CallNativeExports( vm, callnum, args );
 	} else if ( vm->compiled ) {
 		r = VM_CallCompiled( vm, &callnum );
 	} else {

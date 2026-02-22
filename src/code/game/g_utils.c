@@ -608,6 +608,19 @@ void G_Sound( gentity_t *ent, int channel, int soundIndex ) {
 	te->s.eventParm = soundIndex;
 }
 
+/*
+=============
+G_GlobalSound
+=============
+*/
+void G_GlobalSound( int soundIndex ) {
+	gentity_t	*te;
+
+	te = G_TempEntity( vec3_origin, EV_GLOBAL_SOUND );
+	te->s.eventParm = soundIndex;
+	te->r.svFlags = SVF_BROADCAST;
+}
+
 
 //==============================================================================
 

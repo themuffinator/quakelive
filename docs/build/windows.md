@@ -1,9 +1,9 @@
 # Windows Native Build Targets
 
-The Visual Studio solution under `src/code/quake3.sln` now ships with dedicated
+The Visual Studio solution under `src/code/quakelive.sln` now ships with dedicated
 native builds for the Quake Live gameplay modules. Each native project is a
 copy of its VM counterpart, but the output is redirected to
-`build/win32-native/` and the Visual Studio 2010 (`v100`) toolset is enforced so
+`build/win32/<Config>/modules/<ProjectName>/` and the Visual Studio 2010 (`v100`) toolset is enforced so
 the produced DLLs match the shipping runtime.【F:src/code/game/qagamex86.vcxproj†L2-L135】【F:src/code/cgame/cgamex86.vcxproj†L2-L110】
 
 For runtime prerequisites and validation steps on WOW64 hosts, see the
@@ -13,8 +13,8 @@ For runtime prerequisites and validation steps on WOW64 hosts, see the
 
 | Target name | Project file | Output artifact |
 |-------------|--------------|-----------------|
-| `qagamex86` | `src/code/game/qagamex86.vcxproj` | `build/win32-native/qagamex86/<Config>/qagamex86.dll` |
-| `cgamex86`  | `src/code/cgame/cgamex86.vcxproj` | `build/win32-native/cgamex86/<Config>/cgamex86.dll` |
+| `qagamex86` | `src/code/game/qagamex86.vcxproj` | `build/win32/<Config>/modules/qagamex86/qagamex86.dll` |
+| `cgamex86`  | `src/code/cgame/cgamex86.vcxproj` | `build/win32/<Config>/modules/cgamex86/cgamex86.dll` |
 
 ## Building from the command line
 
@@ -23,7 +23,7 @@ These `/t:` selectors are the switches that route MSBuild toward the
 corresponding pipeline:
 
 ```powershell
-msbuild src\code\quake3.sln /t:qagamex86;cgamex86 /p:Configuration=Release /p:Platform=Win32
+msbuild src\code\quakelive.sln /t:qagamex86;cgamex86 /p:Configuration=Release /p:Platform=Win32
 ```
 
 The original VM builds remain available under the historical target names. For
@@ -31,7 +31,7 @@ example, the following command rebuilds the interpreted modules while leaving
 the native DLLs untouched:
 
 ```powershell
-msbuild src\code\quake3.sln /t:game;cgame /p:Configuration=Release /p:Platform=Win32
+msbuild src\code\quakelive.sln /t:game;cgame /p:Configuration=Release /p:Platform=Win32
 ```
 
 ## Vorbis codec prerequisites
@@ -45,7 +45,7 @@ both Debug and Release outputs. If you keep the SDK somewhere else, define the
 `VorbisSdkDir` property when invoking MSBuild:
 
 ```powershell
-msbuild src\code\quake3.sln /t:quake3 /p:Configuration=Debug /p:VorbisSdkDir=C:\SDKs\vorbis-1.3.7
+msbuild src\code\quakelive.sln /t:quakelive_steam /p:Configuration=Debug /p:VorbisSdkDir=C:\SDKs\vorbis-1.3.7
 ```
 
 Without these libraries the linker fails fast, mirroring the Unix makefile’s
@@ -59,10 +59,10 @@ project is already up to date (look for "Project is up-to-date" or "Skipping
 project" in the output):
 
 ```powershell
-msbuild src\code\quake3.sln /t:qagamex86;cgamex86 /p:Configuration=Debug /p:Platform=Win32
-msbuild src\code\quake3.sln /t:qagamex86;cgamex86 /p:Configuration=Debug /p:Platform=Win32
-msbuild src\code\quake3.sln /t:game;cgame /p:Configuration=Debug /p:Platform=Win32
-msbuild src\code\quake3.sln /t:game;cgame /p:Configuration=Debug /p:Platform=Win32
+msbuild src\code\quakelive.sln /t:qagamex86;cgamex86 /p:Configuration=Debug /p:Platform=Win32
+msbuild src\code\quakelive.sln /t:qagamex86;cgamex86 /p:Configuration=Debug /p:Platform=Win32
+msbuild src\code\quakelive.sln /t:game;cgame /p:Configuration=Debug /p:Platform=Win32
+msbuild src\code\quakelive.sln /t:game;cgame /p:Configuration=Debug /p:Platform=Win32
 ```
 
 Successful “up-to-date” messages on the second pass confirm incremental builds

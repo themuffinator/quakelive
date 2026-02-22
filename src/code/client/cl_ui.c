@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../game/botlib.h"
 #include "../../common/auth_credentials.h"
+#include "../../common/platform/platform_steamworks.h"
 #include "../../../src-re/include/fs_imports.h"
 
 extern	botlib_export_t	*botlib_export;
@@ -804,6 +805,60 @@ void *VM_ArgPtr( int intValue );
 #define	VMA(x) VM_ArgPtr(args[x])
 #define	VMF(x)	((float *)args)[x]
 
+static fileHandle_t cl_uiFsLogHandle;
+static qboolean cl_uiFsLogInitialized;
+static qboolean cl_uiFsLogWarned;
+
+/*
+====================
+CL_UI_OpenFsLog
+====================
+*/
+static void CL_UI_OpenFsLog( void ) {
+	if ( cl_uiFsLogHandle ) {
+		return;
+	}
+
+	if ( !cl_uiFsLogInitialized ) {
+		cl_uiFsLogHandle = FS_FOpenFileWrite( "logs/ui_fs.log" );
+		cl_uiFsLogInitialized = qtrue;
+	} else {
+		cl_uiFsLogHandle = FS_FOpenFileAppend( "logs/ui_fs.log" );
+	}
+
+	if ( !cl_uiFsLogHandle && !cl_uiFsLogWarned ) {
+		cl_uiFsLogWarned = qtrue;
+		Com_Printf( "WARNING: unable to open logs/ui_fs.log for UI FS logging\n" );
+	}
+}
+
+/*
+====================
+CL_UI_LogFsOpen
+====================
+*/
+static void CL_UI_LogFsOpen( const char *request, int mode, int length, const char *resolved ) {
+	char buffer[MAXPRINTMSG];
+	int offset;
+
+	if ( !request || !request[0] ) {
+		return;
+	}
+
+	CL_UI_OpenFsLog();
+	if ( !cl_uiFsLogHandle ) {
+		return;
+	}
+
+	if ( !resolved ) {
+		resolved = "";
+	}
+
+	offset = Com_sprintf( buffer, sizeof( buffer ), "open mode=%d len=%d req=\"%s\" resolved=\"%s\"\n", mode, length, request, resolved );
+	FS_Write( buffer, offset, cl_uiFsLogHandle );
+	FS_Flush( cl_uiFsLogHandle );
+}
+
 /*
 ====================
 CL_UISystemCalls
@@ -841,6 +896,14 @@ int CL_UISystemCalls( int *args ) {
 		return FloatAsInt( Cvar_VariableValue( VMA(1) ) );
 
 	case UI_CVAR_VARIABLESTRINGBUFFER:
+		if ( args[3] <= 0 || args[3] > MAX_STRING_CHARS ) {
+			// Native UI import tables can be mis-ordered; treat this as a Cvar_Set call.
+			Cvar_Set( VMA(1), VMA(2) );
+			return 0;
+		}
+		if ( !VMA(2) ) {
+			return 0;
+		}
 		Cvar_VariableStringBuffer( VMA(1), VMA(2), args[3] );
 		return 0;
 
@@ -857,7 +920,24 @@ int CL_UISystemCalls( int *args ) {
 		return 0;
 
 	case UI_CVAR_INFOSTRINGBUFFER:
-		Cvar_InfoStringBuffer( args[1], VMA(2), args[3] );
+		if ( args[3] <= 0 || args[3] > MAX_INFO_STRING ) {
+			if ( VMA(2) ) {
+				((char *)VMA(2))[0] = '\0';
+			}
+			return 0;
+		}
+		if ( !VMA(2) ) {
+			return 0;
+		}
+		{
+			const int allowedBits = CVAR_USERINFO | CVAR_SERVERINFO | CVAR_SYSTEMINFO;
+			int bit = args[1] & allowedBits;
+			if ( bit == 0 ) {
+				((char *)VMA(2))[0] = '\0';
+				return 0;
+			}
+			Cvar_InfoStringBuffer( bit, VMA(2), args[3] );
+		}
 		return 0;
 
 	case UI_ARGC:
@@ -881,12 +961,16 @@ int CL_UISystemCalls( int *args ) {
 		request = VMA( 1 );
 		file = VMA( 2 );
 		length = qlr_fs_imports.fopen_file_by_mode( request, file, args[3] );
+		if ( length <= 0 && args[3] == FS_READ ) {
+			CL_UI_LogFsOpen( request, args[3], length, "" );
+		}
 		if ( length > 0 || args[3] != FS_READ ) {
 			return length;
 		}
 
 		Com_Memset( resolved, 0, sizeof( resolved ) );
 		if ( qlr_fs_imports.fopen_web_file_read( request, file, resolved, sizeof( resolved ) ) && *file ) {
+			CL_UI_LogFsOpen( request, args[3], qlr_fs_imports.filelength( *file ), resolved );
 			return qlr_fs_imports.filelength( *file );
 		}
 
@@ -1186,12 +1270,481 @@ int CL_UISystemCalls( int *args ) {
 
 /*
 ====================
+UI_Import_Syscall
+====================
+*/
+static int QDECL UI_Import_Syscall( int arg, ... ) {
+	int args[SYSCALL_CONTRACT_MAX_ARGS];
+	int i;
+	va_list ap;
+
+	args[0] = arg;
+
+	va_start(ap, arg);
+	for (i = 1; i < SYSCALL_CONTRACT_MAX_ARGS; i++) {
+		args[i] = va_arg(ap, int);
+	}
+	va_end(ap);
+
+	return CL_UISystemCalls( args );
+}
+
+#include "ql_ui_imports.inc"
+
+typedef void (QDECL *ql_import_f)( void );
+
+/*
+==============
+QL_UI_trap_Stub
+==============
+*/
+static int QDECL QL_UI_trap_Stub( void ) {
+	return 0;
+}
+
+/*
+==============
+QL_UI_trap_Cmd_ExecuteText_QL
+==============
+*/
+static void QDECL QL_UI_trap_Cmd_ExecuteText_QL( int maybeExec, const char *maybeText ) {
+	const char *text = maybeText;
+	int exec_when = maybeExec;
+
+	if ( exec_when < EXEC_NOW || exec_when > EXEC_APPEND ) {
+		text = (const char *)maybeExec;
+		exec_when = EXEC_APPEND;
+	}
+
+	if ( !text ) {
+		return;
+	}
+
+	Cbuf_ExecuteText( exec_when, text );
+}
+
+/*
+==============
+QL_UI_trap_Cmd_ArgsBuffer_QL
+==============
+*/
+static void QDECL QL_UI_trap_Cmd_ArgsBuffer_QL( char *buffer, int bufferLength ) {
+	Cmd_ArgsBuffer( buffer, bufferLength );
+}
+
+/*
+==============
+QL_UI_trap_S_RegisterSound_QL
+==============
+*/
+static sfxHandle_t QDECL QL_UI_trap_S_RegisterSound_QL( const char *sample, int compressed ) {
+	if ( compressed != qfalse && compressed != qtrue ) {
+		compressed = qfalse;
+	}
+
+	return S_RegisterSound( sample, compressed );
+}
+
+/*
+==============
+QL_UI_trap_SetCDKey_QL
+==============
+*/
+static int QDECL QL_UI_trap_SetCDKey_QL( char *buf ) {
+	QL_UI_trap_SetCDKey( buf );
+	return 0;
+}
+
+static vec4_t ql_ui_currentColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+static fontInfo_t ql_ui_defaultFont;
+static qboolean ql_ui_defaultFontLoaded;
+
+/*
+==============
+QL_UI_PackFloatBits64
+==============
+*/
+static unsigned long long QL_UI_PackFloatBits64( float lo, float hi ) {
+	unsigned long long result = (unsigned long long)(unsigned int)FloatAsInt( lo );
+	result |= (unsigned long long)(unsigned int)FloatAsInt( hi ) << 32;
+	return result;
+}
+
+/*
+==============
+QL_UI_GetDefaultFont
+==============
+*/
+static fontInfo_t *QL_UI_GetDefaultFont( void ) {
+	if ( !ql_ui_defaultFontLoaded ) {
+		re.RegisterFont( "fonts/notosans-regular.ttf", 48, &ql_ui_defaultFont );
+		ql_ui_defaultFontLoaded = qtrue;
+	}
+
+	return &ql_ui_defaultFont;
+}
+
+/*
+==============
+QL_UI_trap_R_SetColor_QL
+==============
+*/
+static void QDECL QL_UI_trap_R_SetColor_QL( const float *rgba ) {
+	if ( rgba ) {
+		ql_ui_currentColor[0] = rgba[0];
+		ql_ui_currentColor[1] = rgba[1];
+		ql_ui_currentColor[2] = rgba[2];
+		ql_ui_currentColor[3] = rgba[3];
+	} else {
+		ql_ui_currentColor[0] = 1.0f;
+		ql_ui_currentColor[1] = 1.0f;
+		ql_ui_currentColor[2] = 1.0f;
+		ql_ui_currentColor[3] = 1.0f;
+	}
+
+	re.SetColor( rgba );
+}
+
+/*
+==============
+QL_UI_DrawGlyph
+==============
+*/
+static void QL_UI_DrawGlyph( float x, float y, float scaleFactor, glyphInfo_t *glyph ) {
+	float w;
+	float h;
+
+	if ( !glyph ) {
+		return;
+	}
+
+	w = glyph->imageWidth * scaleFactor;
+	h = glyph->imageHeight * scaleFactor;
+
+	re.DrawStretchPic( x, y, w, h, glyph->s, glyph->t, glyph->s2, glyph->t2, glyph->glyph );
+}
+
+/*
+==============
+QL_UI_trap_Import82
+==============
+*/
+static void QDECL QL_UI_trap_Import82( void ) {
+	// uix86.dll HLIL: import[82] (offset 0x148) is invoked during UI init with no args.
+	// Quake Live retail thunks to an optional overlay hook and safely no-ops when absent.
+}
+
+/*
+==============
+QL_UI_trap_Import83
+==============
+*/
+static void QDECL QL_UI_trap_Import83( void *arg1, int arg2 ) {
+	// uix86.dll HLIL: import[83] (offset 0x14c) called with (arg1, arg2) in ownerdraw.
+	// Quake Live retail resolves this to a stub (sub_4d7980).
+	(void)arg1;
+	(void)arg2;
+}
+
+/*
+==============
+QL_UI_trap_Import93
+==============
+*/
+static int QDECL QL_UI_trap_Import93( int arg1 ) {
+	// uix86.dll HLIL: import[93] (offset 0x174) checks Steam subscription for app IDs.
+	return QL_Steamworks_IsSubscribedApp( (uint32_t)arg1 ) ? 1 : 0;
+}
+
+/*
+==============
+QL_UI_trap_Import94
+==============
+*/
+static void QDECL QL_UI_trap_Import94( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, int forceColor ) {
+	fontInfo_t *font;
+	const char *s;
+	vec4_t baseColor;
+	float drawX;
+	float scaleFactor;
+	qboolean hasMaxX;
+	float maxXf;
+
+	// uix86.dll HLIL: import[94] (offset 0x178) draws scaled text with maxX/outMaxX.
+	(void)fontHandle;
+
+	if ( !text || !text[0] ) {
+		if ( outMaxX ) {
+			*outMaxX = (float)x;
+		}
+		return;
+	}
+
+	Com_Memcpy( baseColor, ql_ui_currentColor, sizeof( baseColor ) );
+
+	font = QL_UI_GetDefaultFont();
+	if ( scale <= 0.0f ) {
+		scaleFactor = 1.0f;
+	} else {
+		scaleFactor = scale / 48.0f;
+	}
+
+	drawX = (float)x;
+	s = text;
+	hasMaxX = ( maxX > 0 );
+	maxXf = (float)maxX;
+
+	while ( *s ) {
+		unsigned char ch = (unsigned char)*s;
+
+		if ( !forceColor && Q_IsColorString( s ) ) {
+			vec4_t newColor;
+			Com_Memcpy( newColor, g_color_table[ColorIndex( *( s + 1 ) )], sizeof( newColor ) );
+			newColor[3] = baseColor[3];
+			re.SetColor( newColor );
+			s += 2;
+			continue;
+		}
+
+		if ( ch >= GLYPH_START && ch <= GLYPH_END ) {
+			glyphInfo_t *glyph = &font->glyphs[ch];
+			float yadj = glyph->top * scaleFactor;
+			float nextX = drawX + glyph->xSkip * scaleFactor;
+
+			if ( hasMaxX && nextX > maxXf ) {
+				if ( outMaxX ) {
+					*outMaxX = 0.0f;
+				}
+				break;
+			}
+
+			QL_UI_DrawGlyph( drawX, (float)y - yadj, scaleFactor, glyph );
+			drawX = nextX;
+			if ( outMaxX ) {
+				*outMaxX = drawX;
+			}
+		}
+
+		++s;
+	}
+
+	re.SetColor( baseColor );
+}
+
+/*
+==============
+QL_UI_trap_Import95
+==============
+*/
+static unsigned long long QDECL QL_UI_trap_Import95( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {
+	fontInfo_t *font;
+	const char *s;
+	float width;
+	float height;
+	float scaleFactor;
+	qboolean hasMaxX;
+	float maxXf;
+
+	// uix86.dll HLIL: import[95] (offset 0x17c) measures text and returns packed floats.
+	(void)fontHandle;
+
+	if ( outLeft ) {
+		*outLeft = 0.0f;
+	}
+
+	if ( !text ) {
+		return QL_UI_PackFloatBits64( 0.0f, 0.0f );
+	}
+
+	font = QL_UI_GetDefaultFont();
+	if ( scale <= 0.0f ) {
+		scaleFactor = 1.0f;
+	} else {
+		scaleFactor = scale / 48.0f;
+	}
+
+	width = 0.0f;
+	height = 0.0f;
+	hasMaxX = ( maxX > 0 );
+	maxXf = (float)maxX;
+
+	for ( s = text; *s && ( !end || s < end ); ++s ) {
+		unsigned char ch = (unsigned char)*s;
+
+		if ( Q_IsColorString( s ) ) {
+			++s;
+			if ( !*s ) {
+				break;
+			}
+			continue;
+		}
+
+		if ( ch >= GLYPH_START && ch <= GLYPH_END ) {
+			glyphInfo_t *glyph = &font->glyphs[ch];
+			float nextW = width + glyph->xSkip * scaleFactor;
+			float glyphH = glyph->height * scaleFactor;
+
+			if ( hasMaxX && nextW > maxXf ) {
+				break;
+			}
+
+			width = nextW;
+			if ( glyphH > height ) {
+				height = glyphH;
+			}
+		}
+	}
+
+	return QL_UI_PackFloatBits64( width, height );
+}
+
+/*
+==============
+QL_UI_trap_Import96
+==============
+*/
+static void QDECL QL_UI_trap_Import96( unsigned int arg1, unsigned int arg2, unsigned long long *outDownloaded, unsigned long long *outTotal ) {
+	unsigned long long downloaded = 0;
+	unsigned long long total = 0;
+
+	// uix86.dll HLIL: import[96] (offset 0x180) returns download stats for workshop items.
+	if ( !QL_Steamworks_GetItemDownloadInfo( arg1, arg2, &downloaded, &total ) ) {
+		downloaded = (unsigned long long)(unsigned int)clc.downloadCount;
+		total = (unsigned long long)(unsigned int)clc.downloadSize;
+	}
+
+	if ( outDownloaded ) {
+		*outDownloaded = downloaded;
+	}
+	if ( outTotal ) {
+		*outTotal = total;
+	}
+}
+
+#define QL_UI_IMPORT_COUNT 256
+
+static ql_import_f ql_ui_imports[QL_UI_IMPORT_COUNT];
+
+/*
+==============
+CL_InitUIImports
+==============
+*/
+static void CL_InitUIImports( void ) {
+	int i;
+
+	for ( i = 0; i < QL_UI_IMPORT_COUNT; ++i ) {
+		ql_ui_imports[i] = (ql_import_f)QL_UI_trap_Stub;
+	}
+
+	// uix86.dll HLIL: import[0] is Print, import[1] is Error.
+	ql_ui_imports[0] = (ql_import_f)QL_UI_trap_Print;
+	ql_ui_imports[1] = (ql_import_f)QL_UI_trap_Error;
+	ql_ui_imports[2] = (ql_import_f)QL_UI_trap_Milliseconds;
+	// uix86.dll HLIL: import[3] is RealTime, import[6] is Cvar_Update.
+	ql_ui_imports[3] = (ql_import_f)QL_UI_trap_RealTime;
+	ql_ui_imports[4] = (ql_import_f)QL_UI_trap_Cvar_Register;
+	ql_ui_imports[5] = (ql_import_f)QL_UI_trap_Cvar_Create;
+	ql_ui_imports[6] = (ql_import_f)QL_UI_trap_Cvar_Update;
+	ql_ui_imports[7] = (ql_import_f)QL_UI_trap_Cvar_Set;
+	ql_ui_imports[8] = (ql_import_f)QL_UI_trap_Cvar_SetValue;
+	ql_ui_imports[9] = (ql_import_f)QL_UI_trap_Cvar_VariableStringBuffer;
+	ql_ui_imports[10] = (ql_import_f)QL_UI_trap_Cvar_VariableValue;
+	ql_ui_imports[11] = (ql_import_f)QL_UI_trap_Argc;
+	ql_ui_imports[12] = (ql_import_f)QL_UI_trap_Argv;
+	ql_ui_imports[13] = (ql_import_f)QL_UI_trap_Cmd_ArgsBuffer_QL;
+	ql_ui_imports[14] = (ql_import_f)QL_UI_trap_FS_FOpenFile;
+	ql_ui_imports[15] = (ql_import_f)QL_UI_trap_FS_Read;
+	ql_ui_imports[16] = (ql_import_f)QL_UI_trap_FS_Write;
+	ql_ui_imports[17] = (ql_import_f)QL_UI_trap_FS_FCloseFile;
+	ql_ui_imports[18] = (ql_import_f)QL_UI_trap_FS_Seek;
+	ql_ui_imports[19] = (ql_import_f)QL_UI_trap_FS_GetFileList;
+	ql_ui_imports[20] = (ql_import_f)QL_UI_trap_Cmd_ExecuteText_QL;
+	// uix86.dll HLIL: no dedicated Cvar_Reset import appears (no data_106b40a8 + 0x20/0x2c usage).
+	// The "resetDefaults" command path uses Cmd_ExecuteText("cvar_restart\n") instead.
+	ql_ui_imports[21] = (ql_import_f)QL_UI_trap_R_RegisterModel;
+	ql_ui_imports[22] = (ql_import_f)QL_UI_trap_R_RegisterSkin;
+	ql_ui_imports[23] = (ql_import_f)QL_UI_trap_R_RegisterShaderNoMip;
+	ql_ui_imports[24] = (ql_import_f)QL_UI_trap_R_ClearScene;
+	ql_ui_imports[25] = (ql_import_f)QL_UI_trap_R_AddRefEntityToScene;
+	ql_ui_imports[26] = (ql_import_f)QL_UI_trap_R_AddPolyToScene;
+	ql_ui_imports[27] = (ql_import_f)QL_UI_trap_R_AddLightToScene;
+	ql_ui_imports[28] = (ql_import_f)QL_UI_trap_R_RenderScene;
+	ql_ui_imports[29] = (ql_import_f)QL_UI_trap_R_SetColor_QL;
+	ql_ui_imports[30] = (ql_import_f)QL_UI_trap_R_DrawStretchPic;
+	ql_ui_imports[31] = (ql_import_f)QL_UI_trap_R_ModelBounds;
+	ql_ui_imports[32] = (ql_import_f)QL_UI_trap_UpdateScreen;
+	ql_ui_imports[33] = (ql_import_f)QL_UI_trap_CM_LerpTag;
+	ql_ui_imports[34] = (ql_import_f)QL_UI_trap_S_StartLocalSound;
+	ql_ui_imports[35] = (ql_import_f)QL_UI_trap_S_RegisterSound_QL;
+	ql_ui_imports[36] = (ql_import_f)QL_UI_trap_Key_KeynumToStringBuf;
+	ql_ui_imports[37] = (ql_import_f)QL_UI_trap_Key_GetBindingBuf;
+	ql_ui_imports[38] = (ql_import_f)QL_UI_trap_Key_SetBinding;
+	ql_ui_imports[39] = (ql_import_f)QL_UI_trap_Key_IsDown;
+	ql_ui_imports[40] = (ql_import_f)QL_UI_trap_Key_GetOverstrikeMode;
+	ql_ui_imports[41] = (ql_import_f)QL_UI_trap_Key_SetOverstrikeMode;
+	ql_ui_imports[42] = (ql_import_f)QL_UI_trap_Key_ClearStates;
+	ql_ui_imports[43] = (ql_import_f)QL_UI_trap_Key_GetCatcher;
+	ql_ui_imports[44] = (ql_import_f)QL_UI_trap_Key_SetCatcher;
+	ql_ui_imports[45] = (ql_import_f)QL_UI_trap_GetClipboardData;
+	ql_ui_imports[46] = (ql_import_f)QL_UI_trap_GetClientState;
+	ql_ui_imports[47] = (ql_import_f)QL_UI_trap_GetGlconfig;
+	ql_ui_imports[48] = (ql_import_f)QL_UI_trap_GetConfigString;
+	ql_ui_imports[49] = (ql_import_f)QL_UI_trap_LAN_GetServerCount;
+	ql_ui_imports[50] = (ql_import_f)QL_UI_trap_LAN_GetServerAddressString;
+	ql_ui_imports[51] = (ql_import_f)QL_UI_trap_LAN_GetServerInfo;
+	ql_ui_imports[52] = (ql_import_f)QL_UI_trap_LAN_GetServerPing;
+	ql_ui_imports[57] = (ql_import_f)QL_UI_trap_LAN_LoadCachedServers;
+	ql_ui_imports[59] = (ql_import_f)QL_UI_trap_LAN_MarkServerVisible;
+	ql_ui_imports[60] = (ql_import_f)QL_UI_trap_LAN_ServerIsVisible;
+	ql_ui_imports[61] = (ql_import_f)QL_UI_trap_LAN_UpdateVisiblePings;
+	ql_ui_imports[63] = (ql_import_f)QL_UI_trap_LAN_RemoveServer;
+	ql_ui_imports[64] = (ql_import_f)QL_UI_trap_LAN_ResetPings;
+	ql_ui_imports[65] = (ql_import_f)QL_UI_trap_LAN_GetPingInfo;
+	ql_ui_imports[66] = (ql_import_f)QL_UI_trap_LAN_GetPing;
+
+	// uix86.dll HLIL: cdkey helpers at offsets 0x110..0x13c.
+	ql_ui_imports[68] = (ql_import_f)QL_UI_trap_GetCDKey;
+	ql_ui_imports[69] = (ql_import_f)QL_UI_trap_SetCDKey_QL;
+	ql_ui_imports[79] = (ql_import_f)QL_UI_trap_VerifyCDKey;
+
+	// uix86.dll HLIL: import[70] (offset 0x118) is trap_R_RegisterFont(fontName, pointSize, fontInfo*).
+	ql_ui_imports[70] = (ql_import_f)QL_UI_trap_R_RegisterFont;
+	ql_ui_imports[72] = (ql_import_f)QL_UI_trap_S_StartBackgroundTrack;
+	ql_ui_imports[73] = (ql_import_f)QL_UI_trap_CIN_PlayCinematic;
+	ql_ui_imports[74] = (ql_import_f)QL_UI_trap_CIN_StopCinematic;
+	ql_ui_imports[75] = (ql_import_f)QL_UI_trap_CIN_DrawCinematic;
+	ql_ui_imports[76] = (ql_import_f)QL_UI_trap_CIN_RunCinematic;
+	ql_ui_imports[77] = (ql_import_f)QL_UI_trap_CIN_SetExtents;
+	ql_ui_imports[85] = (ql_import_f)QL_UI_trap_S_StopBackgroundTrack;
+
+	// uix86.dll HLIL: parser imports at offsets 0x164..0x170 (indices 89-92).
+	ql_ui_imports[89] = (ql_import_f)QL_UI_trap_PC_LoadSource;
+	ql_ui_imports[90] = (ql_import_f)QL_UI_trap_PC_FreeSource;
+	ql_ui_imports[91] = (ql_import_f)QL_UI_trap_PC_ReadToken;
+	ql_ui_imports[92] = (ql_import_f)QL_UI_trap_PC_SourceFileAndLine;
+
+	// uix86.dll HLIL: Quake Live-specific imports at offsets 0x148..0x180.
+	ql_ui_imports[82] = (ql_import_f)QL_UI_trap_Import82;
+	ql_ui_imports[83] = (ql_import_f)QL_UI_trap_Import83;
+	ql_ui_imports[93] = (ql_import_f)QL_UI_trap_Import93;
+	ql_ui_imports[94] = (ql_import_f)QL_UI_trap_Import94;
+	ql_ui_imports[95] = (ql_import_f)QL_UI_trap_Import95;
+	ql_ui_imports[96] = (ql_import_f)QL_UI_trap_Import96;
+}
+
+/*
+====================
 CL_ShutdownUI
 ====================
 */
 void CL_ShutdownUI( void ) {
 	cls.keyCatchers &= ~KEYCATCH_UI;
 	cls.uiStarted = qfalse;
+	if ( cl_uiFsLogHandle ) {
+		FS_FCloseFile( cl_uiFsLogHandle );
+		cl_uiFsLogHandle = 0;
+	}
 	if ( !uivm ) {
 		return;
 	}
@@ -1206,39 +1759,37 @@ CL_InitUI
 ====================
 */
 #define UI_OLD_API_VERSION	4
+#define QL_UI_API_VERSION	8
 
 void CL_InitUI( void ) {
 	int		v;
 	vmInterpret_t		interpret;
 
+	Com_Printf( "----- UI Initialization -----\n" );
 	// load the dll or bytecode
-	if ( cl_connectedToPureServer != 0 ) {
-		// if sv_pure is set we only allow qvms to be loaded
-		interpret = VMI_COMPILED;
-	}
-	else {
-		interpret = Cvar_VariableValue( "vm_ui" );
-	}
-	uivm = VM_Create( "ui", CL_UISystemCalls, interpret );
+	interpret = Cvar_VariableValue( "vm_ui" );
+	CL_InitUIImports();
+
+	uivm = VM_Create( "ui", CL_UISystemCalls, interpret, ql_ui_imports, QL_UI_API_VERSION );
 	if ( !uivm ) {
 		Com_Error( ERR_FATAL, "VM_Create on UI failed" );
 	}
 
-	// sanity check
 	v = VM_Call( uivm, UI_GETAPIVERSION );
 	if (v == UI_OLD_API_VERSION) {
 //		Com_Printf(S_COLOR_YELLOW "WARNING: loading old Quake III Arena User Interface version %d\n", v );
 		// init for this gamestate
 		VM_Call( uivm, UI_INIT, (cls.state >= CA_AUTHORIZING && cls.state < CA_ACTIVE));
 	}
-	else if (v != UI_API_VERSION) {
-		Com_Error( ERR_DROP, "User Interface is version %d, expected %d", v, UI_API_VERSION );
+	else if (v != UI_API_VERSION && v != QL_UI_API_VERSION) {
+		Com_Error( ERR_DROP, "User Interface is version %d, expected %d", v, QL_UI_API_VERSION );
 		cls.uiStarted = qfalse;
 	}
 	else {
 		// init for this gamestate
 		VM_Call( uivm, UI_INIT, (cls.state >= CA_AUTHORIZING && cls.state < CA_ACTIVE) );
 	}
+	Com_Printf( "----- UI Initialization Complete -----\n" );
 }
 
 qboolean UI_usesUniqueCDKey() {

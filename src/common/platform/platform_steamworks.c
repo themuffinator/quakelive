@@ -46,6 +46,7 @@ typedef struct {
 	QL_SteamAPI_InterfaceFn SteamUser;
 	QL_SteamAPI_InterfaceFn SteamFriends;
 	QL_SteamAPI_InterfaceFn SteamMatchmaking;
+	QL_SteamAPI_InterfaceFn SteamApps;
 	QL_SteamAPI_InterfaceFn SteamUGC;
 	QL_SteamAPI_SteamGameServerFn SteamGameServer;
 	QL_SteamAPI_SteamGameServerRunCallbacksFn SteamGameServer_RunCallbacks;
@@ -161,6 +162,11 @@ qboolean QL_Steamworks_LoadLibrary( void ) {
 		return qfalse;
 	}
 
+	if ( !QL_Steamworks_LoadSymbol( (void **)&state.SteamApps, "SteamAPI_SteamApps" ) ) {
+		QL_Steamworks_UnloadLibrary();
+		return qfalse;
+	}
+
 	if ( !QL_Steamworks_LoadSymbol( (void **)&state.SteamUGC, "SteamAPI_SteamUGC" ) ) {
 		QL_Steamworks_UnloadLibrary();
 		return qfalse;
@@ -267,6 +273,70 @@ void QL_Steamworks_RunCallbacks( void ) {
 	}
 
 	state.SteamAPI_RunCallbacks();
+}
+
+/*
+=============
+QL_Steamworks_IsSubscribedApp
+=============
+*/
+qboolean QL_Steamworks_IsSubscribedApp( uint32_t appId ) {
+	void *apps;
+	void **vtable;
+
+	if ( !state.initialised || !state.SteamApps ) {
+		return qfalse;
+	}
+
+	apps = state.SteamApps();
+	if ( !apps ) {
+		return qfalse;
+	}
+
+	vtable = *(void ***)apps;
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	typedef int (__thiscall *QL_SteamApps_BIsSubscribedAppFn)( void *self, uint32_t appId );
+	QL_SteamApps_BIsSubscribedAppFn fn = (QL_SteamApps_BIsSubscribedAppFn)vtable[0x1c / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	return fn( apps, appId ) ? qtrue : qfalse;
+}
+
+/*
+=============
+QL_Steamworks_GetItemDownloadInfo
+=============
+*/
+qboolean QL_Steamworks_GetItemDownloadInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outDownloaded, uint64_t *outTotal ) {
+	void *ugc;
+	void **vtable;
+
+	if ( !state.initialised || !state.SteamUGC ) {
+		return qfalse;
+	}
+
+	ugc = state.SteamUGC();
+	if ( !ugc ) {
+		return qfalse;
+	}
+
+	vtable = *(void ***)ugc;
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	typedef int (__thiscall *QL_SteamUGC_GetItemDownloadInfoFn)( void *self, uint32_t idLow, uint32_t idHigh, uint64_t *outDownloaded, uint64_t *outTotal );
+	QL_SteamUGC_GetItemDownloadInfoFn fn = (QL_SteamUGC_GetItemDownloadInfoFn)vtable[0xd8 / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	return fn( ugc, idLow, idHigh, outDownloaded, outTotal ) ? qtrue : qfalse;
 }
 
 /*

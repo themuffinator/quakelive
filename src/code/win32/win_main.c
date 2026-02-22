@@ -29,9 +29,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <float.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <direct.h>
 #include <io.h>
 #include <conio.h>
+#include <dbghelp.h>
+#include <signal.h>
 
 #define	CD_BASEDIR	"quake3"
 #define	CD_EXE		"quake3.exe"
@@ -40,6 +44,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MEM_THRESHOLD 96*1024*1024
 
 static char		sys_cmdline[MAX_STRING_CHARS];
+static char		sys_dumpPath[MAX_OSPATH];
+static LONG		sys_crashHandled;
 
 // define this to use alternate spanking method
 // I found out that the regular way doesn't work on my box for some reason
@@ -526,15 +532,28 @@ extern char		*FS_BuildOSPath( const char *base, const char *game, const char *qp
 // fqpath param added 7/20/02 by T.Ray - Sys_LoadDll is only called in vm.c at this time
 // fqpath will be empty if dll not loaded, otherwise will hold fully qualified path of dll module loaded
 // fqpath buffersize must be at least MAX_QPATH+1 bytes long
-void * QDECL Sys_LoadDll( const char *name, char *fqpath , int (QDECL **entryPoint)(int, ...),
+void * QDECL Sys_LoadDll( const char *name, char *fqpath, int (QDECL **entryPoint)(int, ...),
+				  void **dllExports, void *imports, int *apiVersion,
 				  int (QDECL *systemcalls)(int, ...) ) {
 	static int	lastWarning = 0;
 	HINSTANCE	libHandle;
-	void	(QDECL *dllEntry)( int (QDECL *syscallptr)(int, ...) );
+	typedef int (QDECL *vmMain_t)( int, ... );
+	typedef void (QDECL *dllEntryVoid_t)( int (QDECL *syscallptr)(int, ...) );
+	typedef vmMain_t (QDECL *dllEntryRet_t)( int (QDECL *syscallptr)(int, ...) );
+	typedef void (QDECL *dllEntryQL_t)( void **exports, void *imports, int *apiVersion );
+	dllEntryVoid_t dllEntry;
+	dllEntryQL_t dllEntryQL;
+	vmMain_t vmMain;
+	dllEntryRet_t dllEntryRet;
 	char	*basepath;
 	char	*cdpath;
+	char	*cwdpath;
+	char	*homepath;
 	char	*gamedir;
+	char	*searchRoots[4];
 	char	*fn;
+	int		searchCount;
+	int		i;
 #ifdef NDEBUG
 	int		timestamp;
   int   ret;
@@ -542,6 +561,10 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath , int (QDECL **entryPoi
 	char	filename[MAX_QPATH];
 
 	*fqpath = 0 ;		// added 7/20/02 by T.Ray
+	*entryPoint = NULL;
+	if ( dllExports ) {
+		*dllExports = NULL;
+	}
 
 	Com_sprintf( filename, sizeof( filename ), "%sx86.dll", name );
 
@@ -552,7 +575,7 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath , int (QDECL **entryPoi
 		if (FS_FileExists(filename)) {
 			lastWarning = timestamp;
 			ret = MessageBoxEx( NULL, "You are about to load a .DLL executable that\n"
-				  "has not been verified for use with Quake III Arena.\n"
+				  "has not been verified for use with Quake Live.\n"
 				  "This type of file can compromise the security of\n"
 				  "your computer.\n\n"
 				  "Select 'OK' if you choose to load it anyway.",
@@ -565,57 +588,85 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath , int (QDECL **entryPoi
 	}
 #endif
 
-#ifndef NDEBUG
-	libHandle = LoadLibrary( filename );
-  if (libHandle)
-    Com_Printf("LoadLibrary '%s' ok\n", filename);
-  else
-    Com_Printf("LoadLibrary '%s' failed\n", filename);
-	if ( !libHandle ) {
-#endif
 	basepath = Cvar_VariableString( "fs_basepath" );
 	cdpath = Cvar_VariableString( "fs_cdpath" );
+	homepath = Cvar_VariableString( "fs_homepath" );
 	gamedir = Cvar_VariableString( "fs_game" );
+	cwdpath = Sys_Cwd();
 
-	fn = FS_BuildOSPath( basepath, gamedir, filename );
-	libHandle = LoadLibrary( fn );
+	searchCount = 0;
+	if ( cwdpath && cwdpath[0] ) {
+		searchRoots[searchCount++] = cwdpath;
+	}
+	if ( basepath && basepath[0] ) {
+		searchRoots[searchCount++] = basepath;
+	}
+	if ( homepath && homepath[0] ) {
+		searchRoots[searchCount++] = homepath;
+	}
+	if ( cdpath && cdpath[0] ) {
+		searchRoots[searchCount++] = cdpath;
+	}
+
+	for ( i = 0; i < searchCount; i++ ) {
+		fn = FS_BuildOSPath( searchRoots[i], gamedir, filename );
+		libHandle = LoadLibrary( fn );
 #ifndef NDEBUG
-  if (libHandle)
-    Com_Printf("LoadLibrary '%s' ok\n", fn);
-  else
-    Com_Printf("LoadLibrary '%s' failed\n", fn);
+		if (libHandle)
+			Com_Printf("LoadLibrary '%s' ok\n", fn);
+		else
+			Com_Printf("LoadLibrary '%s' failed\n", fn);
 #endif
-
-	if ( !libHandle ) {
-		if( cdpath[0] ) {
-			fn = FS_BuildOSPath( cdpath, gamedir, filename );
-			libHandle = LoadLibrary( fn );
-#ifndef NDEBUG
-      if (libHandle)
-        Com_Printf("LoadLibrary '%s' ok\n", fn);
-      else
-        Com_Printf("LoadLibrary '%s' failed\n", fn);
-#endif
-		}
-
 		if ( !libHandle ) {
-			return NULL;
+			continue;
 		}
-	}
+
+		dllEntry = ( dllEntryVoid_t )GetProcAddress( libHandle, "dllEntry" );
+		vmMain = ( vmMain_t )GetProcAddress( libHandle, "vmMain" );
+		if ( !dllEntry ) {
 #ifndef NDEBUG
-	}
+			Com_Printf("Rejected DLL '%s': missing dllEntry export\n", fn);
 #endif
+			FreeLibrary( libHandle );
+			libHandle = NULL;
+			continue;
+		}
+		if ( vmMain ) {
+			dllEntry( systemcalls );
+			*entryPoint = vmMain;
+			Q_strncpyz( fqpath, fn, MAX_QPATH );
+			return libHandle;
+		}
 
-	dllEntry = ( void (QDECL *)( int (QDECL *)( int, ... ) ) )GetProcAddress( libHandle, "dllEntry" ); 
-	*entryPoint = (int (QDECL *)(int,...))GetProcAddress( libHandle, "vmMain" );
-	if ( !*entryPoint || !dllEntry ) {
+		if ( dllExports && imports && apiVersion ) {
+			dllEntryQL = ( dllEntryQL_t )dllEntry;
+			dllEntryQL( dllExports, imports, apiVersion );
+			if ( dllExports && *dllExports ) {
+				Q_strncpyz( fqpath, fn, MAX_QPATH );
+				return libHandle;
+			}
+		}
+		if ( systemcalls ) {
+			dllEntryRet = ( dllEntryRet_t )dllEntry;
+			*entryPoint = dllEntryRet( systemcalls );
+			if ( *entryPoint ) {
+				Q_strncpyz( fqpath, fn, MAX_QPATH );
+				return libHandle;
+			}
+		}
+
+#ifndef NDEBUG
+		Com_Printf("Rejected DLL '%s': missing compatible VM exports\n", fn);
+#endif
+		if ( dllExports ) {
+			*dllExports = NULL;
+		}
+		*entryPoint = NULL;
 		FreeLibrary( libHandle );
-		return NULL;
+		libHandle = NULL;
 	}
-	dllEntry( systemcalls );
 
-	if ( libHandle ) Q_strncpyz ( fqpath , filename , MAX_QPATH ) ;		// added 7/20/02 by T.Ray
-	return libHandle;
+	return NULL;
 }
 
 
@@ -1032,6 +1083,162 @@ void Sys_Net_Restart_f( void ) {
 	NET_Restart();
 }
 
+/*
+==================
+Sys_UnhandledExceptionFilter
+==================
+*/
+static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *exceptionInfo ) {
+	HANDLE dumpFile;
+	SYSTEMTIME localTime;
+	MINIDUMP_EXCEPTION_INFORMATION dumpInfo;
+	MINIDUMP_TYPE dumpType;
+	char dumpName[MAX_OSPATH];
+
+	if ( !sys_dumpPath[0] ) {
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+
+	if ( InterlockedCompareExchange( &sys_crashHandled, 1, 0 ) != 0 ) {
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+
+	GetLocalTime( &localTime );
+	Com_sprintf( dumpName, sizeof( dumpName ),
+		"%s\\quakelive_steam_%04d%02d%02d_%02d%02d%02d_%03d.dmp",
+		sys_dumpPath,
+		localTime.wYear, localTime.wMonth, localTime.wDay,
+		localTime.wHour, localTime.wMinute, localTime.wSecond, localTime.wMilliseconds );
+
+	dumpFile = CreateFileA( dumpName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
+	if ( dumpFile == INVALID_HANDLE_VALUE ) {
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+
+	dumpInfo.ThreadId = GetCurrentThreadId();
+	dumpInfo.ExceptionPointers = exceptionInfo;
+	dumpInfo.ClientPointers = FALSE;
+
+	dumpType = (MINIDUMP_TYPE)( MiniDumpWithIndirectlyReferencedMemory | MiniDumpScanMemory );
+	MiniDumpWriteDump( GetCurrentProcess(), GetCurrentProcessId(), dumpFile, dumpType, &dumpInfo, NULL, NULL );
+	CloseHandle( dumpFile );
+
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+/*
+==================
+Sys_RaiseCrashException
+==================
+*/
+static void Sys_RaiseCrashException( DWORD code ) {
+	if ( InterlockedCompareExchange( &sys_crashHandled, 1, 1 ) != 0 ) {
+		TerminateProcess( GetCurrentProcess(), (UINT)code );
+	}
+
+	RaiseException( code, EXCEPTION_NONCONTINUABLE, 0, NULL );
+	TerminateProcess( GetCurrentProcess(), (UINT)code );
+}
+
+/*
+==================
+Sys_InvalidParameterHandler
+==================
+*/
+static void __cdecl Sys_InvalidParameterHandler( const wchar_t *expression, const wchar_t *function,
+	const wchar_t *file, unsigned int line, uintptr_t reserved ) {
+	Sys_RaiseCrashException( 0xE0000001 );
+}
+
+/*
+==================
+Sys_PureCallHandler
+==================
+*/
+static void __cdecl Sys_PureCallHandler( void ) {
+	Sys_RaiseCrashException( 0xE0000002 );
+}
+
+/*
+==================
+Sys_SignalHandler
+==================
+*/
+static void __cdecl Sys_SignalHandler( int signalCode ) {
+	DWORD exceptionCode;
+
+	switch ( signalCode ) {
+	case SIGABRT:
+		exceptionCode = 0xE0000101;
+		break;
+	case SIGSEGV:
+		exceptionCode = EXCEPTION_ACCESS_VIOLATION;
+		break;
+	case SIGILL:
+		exceptionCode = EXCEPTION_ILLEGAL_INSTRUCTION;
+		break;
+	case SIGFPE:
+		exceptionCode = EXCEPTION_FLT_INVALID_OPERATION;
+		break;
+	case SIGTERM:
+		exceptionCode = 0xE0000105;
+		break;
+	default:
+		exceptionCode = 0xE00001FF;
+		break;
+	}
+
+	signal( signalCode, SIG_DFL );
+	Sys_RaiseCrashException( exceptionCode );
+}
+
+/*
+==================
+Sys_InitCrashDumps
+==================
+*/
+static void Sys_InitCrashDumps( void ) {
+	const char *envPath;
+	const char *homePath;
+	const char *basePath;
+
+	sys_dumpPath[0] = '\0';
+
+	homePath = NULL;
+	basePath = NULL;
+	envPath = getenv( "QLR_DUMP_PATH" );
+	if ( envPath && envPath[0] ) {
+		Q_strncpyz( sys_dumpPath, envPath, sizeof( sys_dumpPath ) );
+	} else {
+		homePath = Cvar_VariableString( "fs_homepath" );
+		if ( homePath && homePath[0] ) {
+			Q_strncpyz( sys_dumpPath, FS_BuildOSPath( homePath, BASEGAME, "dumps" ), sizeof( sys_dumpPath ) );
+		} else {
+			basePath = Cvar_VariableString( "fs_basepath" );
+			if ( basePath && basePath[0] ) {
+				Q_strncpyz( sys_dumpPath, FS_BuildOSPath( basePath, BASEGAME, "dumps" ), sizeof( sys_dumpPath ) );
+			}
+		}
+	}
+
+	if ( sys_dumpPath[0] ) {
+		if ( homePath && homePath[0] ) {
+			Sys_Mkdir( FS_BuildOSPath( homePath, BASEGAME, "" ) );
+		}
+		Sys_Mkdir( sys_dumpPath );
+		sys_crashHandled = 0;
+		SetUnhandledExceptionFilter( Sys_UnhandledExceptionFilter );
+		_set_abort_behavior( 0, _CALL_REPORTFAULT | _WRITE_ABORT_MSG );
+		_set_invalid_parameter_handler( Sys_InvalidParameterHandler );
+		_set_purecall_handler( Sys_PureCallHandler );
+		signal( SIGABRT, Sys_SignalHandler );
+		signal( SIGSEGV, Sys_SignalHandler );
+		signal( SIGILL, Sys_SignalHandler );
+		signal( SIGFPE, Sys_SignalHandler );
+		signal( SIGTERM, Sys_SignalHandler );
+	}
+}
+
 
 /*
 ================
@@ -1091,6 +1298,8 @@ void Sys_Init( void ) {
 	// save out a couple things in rom cvars for the renderer to access
 	Cvar_Get( "win_hinstance", va("%i", (int)g_wv.hInstance), CVAR_ROM );
 	Cvar_Get( "win_wndproc", va("%i", (int)MainWndProc), CVAR_ROM );
+
+	Sys_InitCrashDumps();
 
 	//
 	// figure out our CPU
@@ -1249,5 +1458,3 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
 	// never gets here
 }
-
-

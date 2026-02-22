@@ -375,6 +375,7 @@ void CL_ConsolePrint( char *txt ) {
 	int prev;							// NERVE - SMF
 	char	timestamp[32];
 	qboolean	timestampPrinted = qfalse;
+	int		timestampMode;
 
 	// TTimo - prefix for text that shows up in console but not in notify
 	// backported from RTCW
@@ -400,8 +401,13 @@ void CL_ConsolePrint( char *txt ) {
 
 	color = ColorIndex(COLOR_WHITE);
 
-	if ( cl_contimestamps->integer ) {
-		if ( cl_contimestamps->integer == 1 ) {
+	timestampMode = 0;
+	if ( cl_contimestamps ) {
+		timestampMode = cl_contimestamps->integer;
+	}
+
+	if ( timestampMode ) {
+		if ( timestampMode == 1 ) {
 			Com_sprintf( timestamp, sizeof( timestamp ), "^7[%i] ", cls.realtime / 1000 );
 		} else {
 			// server time is not always available or might be 0, falling back to game time logic or system time if we had it
@@ -415,7 +421,7 @@ void CL_ConsolePrint( char *txt ) {
 	}
 
 	while ( (c = *txt) != 0 ) {
-		if ( !timestampPrinted && cl_contimestamps->integer && con.x == 0 ) {
+		if ( !timestampPrinted && timestampMode && con.x == 0 ) {
 			// Print timestamp at start of line
 			int ts_len = strlen(timestamp);
 			int i;

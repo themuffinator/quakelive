@@ -73,10 +73,11 @@ static void CG_CopyDefaultPmoveSettings( pmove_settings_t *settings ) {
 
 	defaults = PM_GetDefaultSettings();
 	if ( defaults ) {
-		Com_Memcpy( settings, defaults, sizeof( pmove_settings_t ) );
+		memcpy( settings, defaults, sizeof( pmove_settings_t ) );
 	} else {
-		Com_Memset( settings, 0, sizeof( pmove_settings_t ) );
+		memset( settings, 0, sizeof( pmove_settings_t ) );
 	}
+}
 
 /*
 =============
@@ -387,13 +388,13 @@ static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_setting
 
 	CG_CopyDefaultPmoveSettings( &parsed );
 	if ( !payload || !*payload ) {
-		Com_Memcpy( settings, &parsed, sizeof( parsed ) );
+		memcpy( settings, &parsed, sizeof( parsed ) );
 		return qfalse;
 	}
 
 	cursor = payload;
 	if ( !CG_ExpectPmoveChar( &cursor, '{' ) ) {
-		Com_Memcpy( settings, &parsed, sizeof( parsed ) );
+		memcpy( settings, &parsed, sizeof( parsed ) );
 		return qfalse;
 	}
 
@@ -529,7 +530,7 @@ static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_setting
 		CG_CopyDefaultPmoveSettings( &parsed );
 	}
 
-	Com_Memcpy( settings, &parsed, sizeof( parsed ) );
+	memcpy( settings, &parsed, sizeof( parsed ) );
 	return valid;
 }
 
@@ -544,7 +545,7 @@ void CG_ParsePmoveConfigString( const char *payload ) {
 	pmove_settings_t parsed;
 
 	CG_ParsePmoveSettingsPayload( payload, &parsed );
-	Com_Memcpy( &cg_pmoveSettings, &parsed, sizeof( cg_pmoveSettings ) );
+	memcpy( &cg_pmoveSettings, &parsed, sizeof( cg_pmoveSettings ) );
 }
 
 static int CG_ValidOrder(const char *p) {

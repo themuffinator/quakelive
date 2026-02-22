@@ -118,6 +118,9 @@ static void RB_BindOffscreenRenderTarget( void );
 static void RB_ReleaseOffscreenRenderTarget( void );
 static byte RB_ClampColorComponent( float value );
 static void RB_ApplyColorCorrection( void );
+static image_t *RB_UploadBloomScratch( int scratchIndex, int width, int height );
+static void RB_DrawBloomSpread( float xOffset, float yOffset, int width, int height );
+void RB_SetGL2D( void );
 
 
 /*

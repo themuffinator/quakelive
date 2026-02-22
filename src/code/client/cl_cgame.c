@@ -24,7 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 
 #include "../game/botlib.h"
+#include "../qcommon/vm_local.h"
 #include "../../../src-re/include/fs_imports.h"
+#include <stdlib.h>
 
 extern	botlib_export_t	*botlib_export;
 
@@ -37,17 +39,73 @@ static char cl_webBrowserHash[MAX_STRING_CHARS];
 
 /*
 =============
+CL_WebStringRepresentsTrue
+
+Returns qtrue when a text value should be treated as enabled.
+=============
+*/
+static qboolean CL_WebStringRepresentsTrue( const char *value ) {
+	if ( !value || !value[0] ) {
+		return qfalse;
+	}
+
+	if ( value[0] == '0' && value[1] == '\0' ) {
+		return qfalse;
+	}
+
+	if ( !Q_stricmp( value, "false" ) || !Q_stricmp( value, "no" ) || !Q_stricmp( value, "off" ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CL_WebExternalEcosystemsDisabled
+
+Checks runtime environment flags that disable browser/Steam integrations.
+=============
+*/
+static qboolean CL_WebExternalEcosystemsDisabled( void ) {
+	const char *value;
+
+	value = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );
+	if ( CL_WebStringRepresentsTrue( value ) ) {
+		return qtrue;
+	}
+
+	value = getenv( "QL_DISABLE_AWESOMIUM" );
+	if ( CL_WebStringRepresentsTrue( value ) ) {
+		return qtrue;
+	}
+
+	value = getenv( "QL_DISABLE_STEAMWORKS" );
+	return CL_WebStringRepresentsTrue( value );
+}
+
+/*
+=============
 CL_Web_ShowBrowser_f
 
 Marks the browser overlay as visible and records an optional hash target.
 =============
 */
 void CL_Web_ShowBrowser_f( void ) {
+	if ( CL_WebExternalEcosystemsDisabled() ) {
+		cl_webBrowserVisible = qfalse;
+		cl_webBrowserHash[0] = '\0';
+		Cvar_Set( "web_browserActive", "0" );
+		Com_DPrintf( "web_showBrowser ignored: external ecosystems disabled\n" );
+		return;
+	}
+
 	cl_webBrowserVisible = qtrue;
 	if ( Cmd_Argc() > 1 ) {
 		const char *hash = Cmd_ArgsFrom( 1 );
 		Q_strncpyz( cl_webBrowserHash, hash, sizeof( cl_webBrowserHash ) );
 	}
+	Cvar_Set( "web_browserActive", "1" );
 	Com_DPrintf( "web_showBrowser\n" );
 }
 
@@ -59,9 +117,18 @@ Updates the browser target and ensures the overlay remains visible.
 =============
 */
 void CL_Web_ChangeHash_f( void ) {
+	if ( CL_WebExternalEcosystemsDisabled() ) {
+		cl_webBrowserVisible = qfalse;
+		cl_webBrowserHash[0] = '\0';
+		Cvar_Set( "web_browserActive", "0" );
+		Com_DPrintf( "web_changeHash ignored: external ecosystems disabled\n" );
+		return;
+	}
+
 	const char *hash = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
 	Q_strncpyz( cl_webBrowserHash, hash, sizeof( cl_webBrowserHash ) );
 	cl_webBrowserVisible = qtrue;
+	Cvar_Set( "web_browserActive", "1" );
 	Com_DPrintf( "web_changeHash %s\n", cl_webBrowserHash );
 }
 
@@ -73,9 +140,18 @@ Stub for toggling the browser overlay active state used by the UI VM.
 =============
 */
 void CL_Web_BrowserActive_f( void ) {
+	if ( CL_WebExternalEcosystemsDisabled() ) {
+		cl_webBrowserVisible = qfalse;
+		cl_webBrowserHash[0] = '\0';
+		Cvar_Set( "web_browserActive", "0" );
+		Com_DPrintf( "web_browserActive ignored: external ecosystems disabled\n" );
+		return;
+	}
+
 	qboolean active = ( Cmd_Argc() > 1 && atoi( Cmd_Argv( 1 ) ) != 0 );
 
 	cl_webBrowserVisible = active;
+	Cvar_Set( "web_browserActive", active ? "1" : "0" );
 	Com_DPrintf( "web_browserActive %s\n", active ? "1" : "0" );
 }
 
@@ -87,6 +163,11 @@ Stub handler for stopping Awesomium refresh cycles triggered by UI scripts.
 =============
 */
 void CL_Web_StopRefresh_f( void ) {
+	if ( CL_WebExternalEcosystemsDisabled() ) {
+		Com_DPrintf( "web_stopRefresh ignored: external ecosystems disabled\n" );
+		return;
+	}
+
 	Com_DPrintf( "web_stopRefresh\n" );
 }
 
@@ -771,6 +852,139 @@ int CL_CgameSystemCalls( int *args ) {
 	return 0;
 }
 
+/*
+====================
+CG_Import_Syscall
+====================
+*/
+static int QDECL CG_Import_Syscall( int arg, ... ) {
+	int args[SYSCALL_CONTRACT_MAX_ARGS];
+	int i;
+	va_list ap;
+
+	args[0] = arg;
+
+	va_start(ap, arg);
+	for (i = 1; i < SYSCALL_CONTRACT_MAX_ARGS; i++) {
+		args[i] = va_arg(ap, int);
+	}
+	va_end(ap);
+
+	return CL_CgameSystemCalls( args );
+}
+
+#include "ql_cgame_imports.inc"
+
+typedef void (QDECL *ql_import_f)( void );
+
+#define QL_CGAME_IMPORT_COUNT (CG_ACOS + 1)
+
+static ql_import_f ql_cgame_imports[QL_CGAME_IMPORT_COUNT] = {
+	[CG_PRINT] = (ql_import_f)QL_CG_trap_Print,
+	[CG_ERROR] = (ql_import_f)QL_CG_trap_Error,
+	[CG_MILLISECONDS] = (ql_import_f)QL_CG_trap_Milliseconds,
+	[CG_CVAR_REGISTER] = (ql_import_f)QL_CG_trap_Cvar_Register,
+	[CG_CVAR_UPDATE] = (ql_import_f)QL_CG_trap_Cvar_Update,
+	[CG_CVAR_SET] = (ql_import_f)QL_CG_trap_Cvar_Set,
+	[CG_CVAR_VARIABLESTRINGBUFFER] = (ql_import_f)QL_CG_trap_Cvar_VariableStringBuffer,
+	[CG_ARGC] = (ql_import_f)QL_CG_trap_Argc,
+	[CG_ARGV] = (ql_import_f)QL_CG_trap_Argv,
+	[CG_ARGS] = (ql_import_f)QL_CG_trap_Args,
+	[CG_FS_FOPENFILE] = (ql_import_f)QL_CG_trap_FS_FOpenFile,
+	[CG_FS_READ] = (ql_import_f)QL_CG_trap_FS_Read,
+	[CG_FS_WRITE] = (ql_import_f)QL_CG_trap_FS_Write,
+	[CG_FS_FCLOSEFILE] = (ql_import_f)QL_CG_trap_FS_FCloseFile,
+	[CG_FS_SEEK] = (ql_import_f)QL_CG_trap_FS_Seek,
+	[CG_SENDCONSOLECOMMAND] = (ql_import_f)QL_CG_trap_SendConsoleCommand,
+	[CG_ADDCOMMAND] = (ql_import_f)QL_CG_trap_AddCommand,
+	[CG_REMOVECOMMAND] = (ql_import_f)QL_CG_trap_RemoveCommand,
+	[CG_SENDCLIENTCOMMAND] = (ql_import_f)QL_CG_trap_SendClientCommand,
+	[CG_UPDATESCREEN] = (ql_import_f)QL_CG_trap_UpdateScreen,
+	[CG_CM_LOADMAP] = (ql_import_f)QL_CG_trap_CM_LoadMap,
+	[CG_CM_NUMINLINEMODELS] = (ql_import_f)QL_CG_trap_CM_NumInlineModels,
+	[CG_CM_INLINEMODEL] = (ql_import_f)QL_CG_trap_CM_InlineModel,
+	[CG_CM_LOADMODEL] = (ql_import_f)QL_CG_trap_CM_LoadModel,
+	[CG_CM_TEMPBOXMODEL] = (ql_import_f)QL_CG_trap_CM_TempBoxModel,
+	[CG_CM_TEMPCAPSULEMODEL] = (ql_import_f)QL_CG_trap_CM_TempCapsuleModel,
+	[CG_CM_POINTCONTENTS] = (ql_import_f)QL_CG_trap_CM_PointContents,
+	[CG_CM_TRANSFORMEDPOINTCONTENTS] = (ql_import_f)QL_CG_trap_CM_TransformedPointContents,
+	[CG_CM_BOXTRACE] = (ql_import_f)QL_CG_trap_CM_BoxTrace,
+	[CG_CM_CAPSULETRACE] = (ql_import_f)QL_CG_trap_CM_CapsuleTrace,
+	[CG_CM_TRANSFORMEDBOXTRACE] = (ql_import_f)QL_CG_trap_CM_TransformedBoxTrace,
+	[CG_CM_TRANSFORMEDCAPSULETRACE] = (ql_import_f)QL_CG_trap_CM_TransformedCapsuleTrace,
+	[CG_CM_MARKFRAGMENTS] = (ql_import_f)QL_CG_trap_CM_MarkFragments,
+	[CG_S_STARTSOUND] = (ql_import_f)QL_CG_trap_S_StartSound,
+	[CG_S_STARTLOCALSOUND] = (ql_import_f)QL_CG_trap_S_StartLocalSound,
+	[CG_S_CLEARLOOPINGSOUNDS] = (ql_import_f)QL_CG_trap_S_ClearLoopingSounds,
+	[CG_S_ADDLOOPINGSOUND] = (ql_import_f)QL_CG_trap_S_AddLoopingSound,
+	[CG_S_ADDREALLOOPINGSOUND] = (ql_import_f)QL_CG_trap_S_AddRealLoopingSound,
+	[CG_S_STOPLOOPINGSOUND] = (ql_import_f)QL_CG_trap_S_StopLoopingSound,
+	[CG_S_UPDATEENTITYPOSITION] = (ql_import_f)QL_CG_trap_S_UpdateEntityPosition,
+	[CG_S_RESPATIALIZE] = (ql_import_f)QL_CG_trap_S_Respatialize,
+	[CG_S_REGISTERSOUND] = (ql_import_f)QL_CG_trap_S_RegisterSound,
+	[CG_S_STARTBACKGROUNDTRACK] = (ql_import_f)QL_CG_trap_S_StartBackgroundTrack,
+	[CG_R_LOADWORLDMAP] = (ql_import_f)QL_CG_trap_R_LoadWorldMap,
+	[CG_R_REGISTERMODEL] = (ql_import_f)QL_CG_trap_R_RegisterModel,
+	[CG_R_REGISTERSKIN] = (ql_import_f)QL_CG_trap_R_RegisterSkin,
+	[CG_R_REGISTERSHADER] = (ql_import_f)QL_CG_trap_R_RegisterShader,
+	[CG_R_REGISTERSHADERNOMIP] = (ql_import_f)QL_CG_trap_R_RegisterShaderNoMip,
+	[CG_R_REGISTERFONT] = (ql_import_f)QL_CG_trap_R_RegisterFont,
+	[CG_R_CLEARSCENE] = (ql_import_f)QL_CG_trap_R_ClearScene,
+	[CG_R_ADDREFENTITYTOSCENE] = (ql_import_f)QL_CG_trap_R_AddRefEntityToScene,
+	[CG_R_ADDPOLYTOSCENE] = (ql_import_f)QL_CG_trap_R_AddPolyToScene,
+	[CG_R_ADDPOLYSTOSCENE] = (ql_import_f)QL_CG_trap_R_AddPolysToScene,
+	[CG_R_LIGHTFORPOINT] = (ql_import_f)QL_CG_trap_R_LightForPoint,
+	[CG_R_ADDLIGHTTOSCENE] = (ql_import_f)QL_CG_trap_R_AddLightToScene,
+	[CG_R_ADDADDITIVELIGHTTOSCENE] = (ql_import_f)QL_CG_trap_R_AddAdditiveLightToScene,
+	[CG_R_RENDERSCENE] = (ql_import_f)QL_CG_trap_R_RenderScene,
+	[CG_R_SETCOLOR] = (ql_import_f)QL_CG_trap_R_SetColor,
+	[CG_R_DRAWSTRETCHPIC] = (ql_import_f)QL_CG_trap_R_DrawStretchPic,
+	[CG_R_MODELBOUNDS] = (ql_import_f)QL_CG_trap_R_ModelBounds,
+	[CG_R_LERPTAG] = (ql_import_f)QL_CG_trap_R_LerpTag,
+	[CG_R_REMAP_SHADER] = (ql_import_f)QL_CG_trap_R_RemapShader,
+	[CG_GETGLCONFIG] = (ql_import_f)QL_CG_trap_GetGlconfig,
+	[CG_GETGAMESTATE] = (ql_import_f)QL_CG_trap_GetGameState,
+	[CG_GETCURRENTSNAPSHOTNUMBER] = (ql_import_f)QL_CG_trap_GetCurrentSnapshotNumber,
+	[CG_GETSNAPSHOT] = (ql_import_f)QL_CG_trap_GetSnapshot,
+	[CG_GETSERVERCOMMAND] = (ql_import_f)QL_CG_trap_GetServerCommand,
+	[CG_GETCURRENTCMDNUMBER] = (ql_import_f)QL_CG_trap_GetCurrentCmdNumber,
+	[CG_GETUSERCMD] = (ql_import_f)QL_CG_trap_GetUserCmd,
+	[CG_SETUSERCMDVALUE] = (ql_import_f)QL_CG_trap_SetUserCmdValue,
+	[CG_MEMORY_REMAINING] = (ql_import_f)QL_CG_trap_MemoryRemaining,
+	[CG_KEY_ISDOWN] = (ql_import_f)QL_CG_trap_Key_IsDown,
+	[CG_KEY_GETCATCHER] = (ql_import_f)QL_CG_trap_Key_GetCatcher,
+	[CG_KEY_SETCATCHER] = (ql_import_f)QL_CG_trap_Key_SetCatcher,
+	[CG_KEY_GETKEY] = (ql_import_f)QL_CG_trap_Key_GetKey,
+	[CG_KEY_KEYNUMTOSTRINGBUF] = (ql_import_f)QL_CG_trap_Key_KeynumToStringBuf,
+	[CG_PC_ADD_GLOBAL_DEFINE] = (ql_import_f)QL_CG_trap_PC_AddGlobalDefine,
+	[CG_PC_LOAD_SOURCE] = (ql_import_f)QL_CG_trap_PC_LoadSource,
+	[CG_PC_FREE_SOURCE] = (ql_import_f)QL_CG_trap_PC_FreeSource,
+	[CG_PC_READ_TOKEN] = (ql_import_f)QL_CG_trap_PC_ReadToken,
+	[CG_PC_SOURCE_FILE_AND_LINE] = (ql_import_f)QL_CG_trap_PC_SourceFileAndLine,
+	[CG_S_STOPBACKGROUNDTRACK] = (ql_import_f)QL_CG_trap_S_StopBackgroundTrack,
+	[CG_REAL_TIME] = (ql_import_f)QL_CG_trap_RealTime,
+	[CG_SNAPVECTOR] = (ql_import_f)QL_CG_trap_SnapVector,
+	[CG_CIN_PLAYCINEMATIC] = (ql_import_f)QL_CG_trap_CIN_PlayCinematic,
+	[CG_CIN_STOPCINEMATIC] = (ql_import_f)QL_CG_trap_CIN_StopCinematic,
+	[CG_CIN_RUNCINEMATIC] = (ql_import_f)QL_CG_trap_CIN_RunCinematic,
+	[CG_CIN_DRAWCINEMATIC] = (ql_import_f)QL_CG_trap_CIN_DrawCinematic,
+	[CG_CIN_SETEXTENTS] = (ql_import_f)QL_CG_trap_CIN_SetExtents,
+	[CG_GET_ENTITY_TOKEN] = (ql_import_f)QL_CG_trap_GetEntityToken,
+	[CG_R_INPVS] = (ql_import_f)QL_CG_trap_R_inPVS,
+	[CG_MEMSET] = (ql_import_f)QL_CG_trap_Memset,
+	[CG_MEMCPY] = (ql_import_f)QL_CG_trap_Memcpy,
+	[CG_STRNCPY] = (ql_import_f)QL_CG_trap_Strncpy,
+	[CG_SIN] = (ql_import_f)QL_CG_trap_Sin,
+	[CG_COS] = (ql_import_f)QL_CG_trap_Cos,
+	[CG_ATAN2] = (ql_import_f)QL_CG_trap_Atan2,
+	[CG_SQRT] = (ql_import_f)QL_CG_trap_Sqrt,
+	[CG_FLOOR] = (ql_import_f)QL_CG_trap_Floor,
+	[CG_CEIL] = (ql_import_f)QL_CG_trap_Ceil,
+	[CG_TESTPRINTINT] = (ql_import_f)QL_CG_trap_TestPrintInt,
+	[CG_TESTPRINTFLOAT] = (ql_import_f)QL_CG_trap_TestPrintFloat,
+	[CG_ACOS] = (ql_import_f)QL_CG_trap_ACos,
+};
+
 
 /*
 ====================
@@ -785,7 +999,7 @@ static vm_t *CL_LoadCGameVM( vmInterpret_t interpret ) {
 	vm = NULL;
 
 	if ( interpret != VMI_COMPILED ) {
-		vm = VM_Create( "cgame", CL_CgameSystemCalls, VMI_NATIVE );
+		vm = VM_Create( "cgame", CL_CgameSystemCalls, VMI_NATIVE, ql_cgame_imports, CGAME_IMPORT_API_VERSION );
 		if ( vm ) {
 			if ( vm->dllHandle || interpret != VMI_BYTECODE || !vm->compiled ) {
 				return vm;
@@ -795,7 +1009,7 @@ static vm_t *CL_LoadCGameVM( vmInterpret_t interpret ) {
 		}
 	}
 
-	return VM_Create( "cgame", CL_CgameSystemCalls, interpret );
+	return VM_Create( "cgame", CL_CgameSystemCalls, interpret, ql_cgame_imports, CGAME_IMPORT_API_VERSION );
 }
 
 /*
@@ -822,13 +1036,7 @@ void CL_InitCGame( void ) {
 	Com_sprintf( cl.mapname, sizeof( cl.mapname ), "maps/%s.bsp", mapname );
 
 	// load the dll or bytecode
-	if ( cl_connectedToPureServer != 0 ) {
-		// if sv_pure is set we only allow qvms to be loaded
-		interpret = VMI_COMPILED;
-	}
-	else {
-		interpret = Cvar_VariableValue( "vm_cgame" );
-	}
+	interpret = Cvar_VariableValue( "vm_cgame" );
 	cgvm = CL_LoadCGameVM( interpret );
 	if ( !cgvm ) {
 		Com_Error( ERR_DROP, "VM_Create on cgame failed" );

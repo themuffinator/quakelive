@@ -32,6 +32,7 @@ USER INTERFACE MAIN
 //#define PRE_RELEASE_TADEMO
 
 #include "ui_local.h"
+#include <stdlib.h>
 
 uiInfo_t uiInfo;
 
@@ -169,6 +170,53 @@ static void UI_ResetClanList(void);
 
 	/*
 	=============
+	UI_StringRepresentsTrue
+
+	Returns qtrue when a text value should be interpreted as enabled.
+	=============
+	*/
+	static qboolean UI_StringRepresentsTrue(const char *value) {
+		if (!value || !value[0]) {
+			return qfalse;
+		}
+
+		if (value[0] == '0' && value[1] == '\0') {
+			return qfalse;
+		}
+
+		if (!Q_stricmp(value, "false") || !Q_stricmp(value, "no") || !Q_stricmp(value, "off")) {
+			return qfalse;
+		}
+
+		return qtrue;
+	}
+
+	/*
+	=============
+	UI_ExternalEcosystemsDisabled
+
+	Checks environment toggles that force external browser integration off.
+	=============
+	*/
+	static qboolean UI_ExternalEcosystemsDisabled(void) {
+		const char *value;
+
+		value = getenv("QL_DISABLE_EXTERNAL_ECOSYSTEMS");
+		if (UI_StringRepresentsTrue(value)) {
+			return qtrue;
+		}
+
+		value = getenv("QL_DISABLE_AWESOMIUM");
+		if (UI_StringRepresentsTrue(value)) {
+			return qtrue;
+		}
+
+		value = getenv("QL_DISABLE_STEAMWORKS");
+		return UI_StringRepresentsTrue(value);
+	}
+
+	/*
+	=============
 	UI_MenuFileEquals
 	=============
 	*/
@@ -245,6 +293,10 @@ Check whether the Awesomium overlay is enabled.
 =============
 */
 qboolean UI_BrowserOverlayAvailable(void) {
+	if (UI_ExternalEcosystemsDisabled()) {
+		return qfalse;
+	}
+
 	return ui_browserAwesomium.integer != 0;
 }
 
@@ -6713,6 +6765,14 @@ void _UI_Init( qboolean inGameLoad ) {
 
 	UI_RegisterCvars();
 	UI_UpdateCvars();
+	if (UI_ExternalEcosystemsDisabled()) {
+		if (ui_browserAwesomium.integer != 0) {
+			trap_Cvar_Set("ui_browserAwesomium", "0");
+			trap_Cvar_Update(&ui_browserAwesomium);
+		}
+		trap_Cvar_Set("web_browserActive", "0");
+		Com_Printf("UI: external ecosystems disabled (QL_DISABLE_EXTERNAL_ECOSYSTEMS/QL_DISABLE_AWESOMIUM/QL_DISABLE_STEAMWORKS).\n");
+	}
 	UI_InitMemory();
 	UI_ResetMatchSummaryCache();
 

@@ -325,6 +325,62 @@ float readFloat() {
 	return me.ffred;
 }
 
+/*
+=================
+RE_RegisterFontFallback
+=================
+*/
+static qboolean RE_RegisterFontFallback( const char *cacheName, float glyphScale, fontInfo_t *font ) {
+	const char *shaderName;
+	qhandle_t glyphShader;
+	float cell;
+	int i;
+
+	glyphShader = RE_RegisterShaderNoMip( "gfx/2d/bigchars" );
+	shaderName = "gfx/2d/bigchars";
+	if ( !glyphShader ) {
+		glyphShader = RE_RegisterShaderNoMip( "white" );
+		shaderName = "white";
+	}
+
+	if ( !glyphShader ) {
+		return qfalse;
+	}
+
+	Com_Memset( font, 0, sizeof( *font ) );
+	cell = 1.0f / 16.0f;
+
+	for ( i = GLYPH_START; i <= GLYPH_END; i++ ) {
+		glyphInfo_t *glyph;
+		int row;
+		int col;
+
+		glyph = &font->glyphs[i];
+		row = ( i >> 4 ) & 15;
+		col = i & 15;
+
+		glyph->height = 16;
+		glyph->top = 12;
+		glyph->bottom = -4;
+		glyph->pitch = 16;
+		glyph->xSkip = 16;
+		glyph->imageWidth = 16;
+		glyph->imageHeight = 16;
+		glyph->s = col * cell;
+		glyph->t = row * cell;
+		glyph->s2 = glyph->s + cell;
+		glyph->t2 = glyph->t + cell;
+		glyph->glyph = glyphShader;
+		Q_strncpyz( glyph->shaderName, shaderName, sizeof( glyph->shaderName ) );
+	}
+
+	font->glyphScale = glyphScale;
+	Q_strncpyz( font->name, cacheName, sizeof( font->name ) );
+	Com_Memcpy( &registeredFont[registeredFontCount++], font, sizeof( fontInfo_t ) );
+	ri.Printf( PRINT_ALL, "RE_RegisterFont: using built-in glyph fallback via '%s'\n", shaderName );
+	return qtrue;
+}
+
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 #ifdef BUILD_FREETYPE
   FT_Face face;
@@ -398,7 +454,11 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	}
 
 #ifndef BUILD_FREETYPE
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: FreeType code not available\n");
+    ri.Printf(PRINT_ALL, "RE_RegisterFont: FreeType code not available for %s (%i)\n", fontName, pointSize);
+	if ( RE_RegisterFontFallback( name, glyphScale, font ) ) {
+		return;
+	}
+    ri.Printf(PRINT_ALL, "RE_RegisterFont: built-in glyph fallback failed\n");
 #else
   if (ftLibrary == NULL) {
     ri.Printf(PRINT_ALL, "RE_RegisterFont: FreeType not initialized.\n");
@@ -539,4 +599,3 @@ void R_DoneFreeType() {
 #endif
 	registeredFontCount = 0;
 }
-

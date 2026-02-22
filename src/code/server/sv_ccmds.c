@@ -649,7 +649,7 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 																continue;
 															}
 
-															Com_sprint f( path, sizeof( path ), "scripts/%s", cursor );
+															Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
 															SV_FactoryLoadFile( path );
 															cursor += length + 1;
 														}
@@ -815,7 +815,7 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 																continue;
 															}
 
-															Com_sprint f( path, sizeof( path ), "scripts/%s", cursor );
+															Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
 															SV_LoadArenasFromFile( path );
 															cursor += length + 1;
 														}

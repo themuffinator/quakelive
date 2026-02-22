@@ -61,8 +61,11 @@ Mount web.pak from fs_homepath for launcher and menu assets.
 */
 void CL_WebPak_Init( void ) {
 	char			homePath[MAX_OSPATH];
+	char			basePath[MAX_OSPATH];
 	char			pakPath[MAX_OSPATH];
 	char			*osPath;
+	FILE			*fp;
+	unsigned char		header[4];
 
 	if ( cl_webPak ) {
 		FS_FreePak( cl_webPak );
@@ -75,7 +78,32 @@ void CL_WebPak_Init( void ) {
 
 	cl_webPak = FS_LoadPackExplicit( pakPath );
 	if ( cl_webPak ) {
-		Com_Printf( "web.pak mounted from %s (%i files)\n", cl_webPak->pakFilename, cl_webPak->numfiles );
+		Com_Printf( "web.pak mounted from %s\n", pakPath );
+		return;
+	}
+
+	// Retail Quake Live ships web.pak alongside the main executable under fs_basepath.
+	Cvar_VariableStringBuffer( "fs_basepath", basePath, sizeof( basePath ) );
+	osPath = FS_BuildOSPath( basePath, "", "web.pak" );
+	Q_strncpyz( pakPath, osPath, sizeof( pakPath ) );
+
+	cl_webPak = FS_LoadPackExplicit( pakPath );
+	if ( cl_webPak ) {
+		Com_Printf( "web.pak mounted from %s\n", pakPath );
+		return;
+	}
+
+	// Help debug incorrect assumptions: web.pak is not always a pk3/zip container.
+	fp = fopen( pakPath, "rb" );
+	if ( fp ) {
+		Com_Memset( header, 0, sizeof( header ) );
+		fread( header, 1, sizeof( header ), fp );
+		fclose( fp );
+
+		if ( header[0] != 'P' || header[1] != 'K' ) {
+			Com_DPrintf( "web.pak present at %s but is not a pk3/zip (header %02x %02x %02x %02x)\n",
+				pakPath, header[0], header[1], header[2], header[3] );
+		}
 	}
 }
 

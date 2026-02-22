@@ -883,8 +883,6 @@ void Key_Bind_f (void)
 {
 	int			i, c, b;
 	char		cmd[1024];
-	clTranslatedKey_t translated;
-	int		dispatchKey;
 	
 	c = Cmd_Argc();
 
@@ -981,8 +979,6 @@ void CL_AddKeyUpCommands( int key, char *kb ) {
 	int i;
 	char button[1024], *buttonPtr;
 	char	cmd[1024];
-	clTranslatedKey_t translated;
-	int		dispatchKey;
 	qboolean keyevent;
 
 	if ( !kb ) {
@@ -1122,7 +1118,7 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 			return;
 		}
 
-		VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down );
+		VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down, time );
 		return;
 	}
 
@@ -1138,7 +1134,7 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 		CL_AddKeyUpCommands( key, kb );
 
 		if ( cls.keyCatchers & KEYCATCH_UI && uivm ) {
-			VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down );
+			VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down, time );
 		} else if ( cls.keyCatchers & KEYCATCH_CGAME && cgvm ) {
 			VM_Call( cgvm, CG_KEY_EVENT, dispatchKey, down );
 		} 
@@ -1152,7 +1148,7 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 		Console_Key( key );
 	} else if ( cls.keyCatchers & KEYCATCH_UI ) {
 		if ( uivm ) {
-			VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down );
+			VM_Call( uivm, UI_KEY_EVENT, dispatchKey, down, time );
 		} 
 	} else if ( cls.keyCatchers & KEYCATCH_CGAME ) {
 		if ( cgvm ) {
@@ -1235,7 +1231,7 @@ clTranslatedKey_t translated;
 	}
 	else if ( cls.keyCatchers & KEYCATCH_UI )
 	{
-	VM_Call( uivm, UI_KEY_EVENT, key | K_CHAR_FLAG, qtrue );
+	VM_Call( uivm, UI_KEY_EVENT, key | K_CHAR_FLAG, qtrue, cls.realtime );
 	}
 	else if ( cls.keyCatchers & KEYCATCH_MESSAGE )
 	{

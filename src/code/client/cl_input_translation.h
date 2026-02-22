@@ -6,7 +6,7 @@ CL Input Translation Helpers
 #ifndef CL_INPUT_TRANSLATION_H
 #define CL_INPUT_TRANSLATION_H
 
-#include "q_shared.h"
+#include "../game/q_shared.h"
 
 typedef struct {
 	int key;

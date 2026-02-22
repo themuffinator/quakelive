@@ -255,7 +255,7 @@ AddScore
 Adds score to both the client and his team
 ============
 */
-void AddScore( gentity_t *ent, vec3_t origin, int score ) {
+void AddScore( gentity_t *ent, const vec3_t origin, int score ) {
 	if ( !ent->client ) {
 		return;
 	}

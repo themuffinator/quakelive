@@ -82,12 +82,24 @@ Used to load a development dll instead of a virtual machine
 */
 extern char		*FS_BuildOSPath( const char *base, const char *game, const char *qpath );
 
-void	* QDECL Sys_LoadDll( const char *name, char *fqpath , int (QDECL **entryPoint)(int, ...),
+void	* QDECL Sys_LoadDll( const char *name, char *fqpath, int (QDECL **entryPoint)(int, ...),
+				  void **dllExports, void *imports, int *apiVersion,
 				  int (QDECL *systemcalls)(int, ...) ) {
     void *libHandle;
-    void	(*dllEntry)( int (*syscallptr)(int, ...) );
+    typedef int (QDECL *vmMain_t)( int, ... );
+    typedef void (QDECL *dllEntryVoid_t)( int (*syscallptr)(int, ...) );
+    typedef vmMain_t (QDECL *dllEntryRet_t)( int (*syscallptr)(int, ...) );
+    typedef void (QDECL *dllEntryQL_t)( void **exports, void *imports, int *apiVersion );
+    dllEntryVoid_t dllEntry;
+    dllEntryRet_t dllEntryRet;
+    dllEntryQL_t dllEntryQL;
+    vmMain_t vmMain;
     NSString *bundlePath, *libraryPath;
     const char *path;
+    
+	if ( dllExports ) {
+		*dllExports = NULL;
+	}
     
 	// TTimo
 	// I don't understand the search strategy here. How can the Quake3 bundle know about the location
@@ -111,21 +123,37 @@ void	* QDECL Sys_LoadDll( const char *name, char *fqpath , int (QDECL **entryPoi
         }
     }
 
-    dllEntry = dlsym( libHandle, "_dllEntry" );
+    dllEntry = (dllEntryVoid_t)dlsym( libHandle, "_dllEntry" );
     if (!dllEntry) {
         Com_Printf("Error loading dll:  No dllEntry symbol.\n");
         dlclose(libHandle);
         return NULL;
     }
     
-    *entryPoint = dlsym( libHandle, "_vmMain" );
-    if (!*entryPoint) {
-        Com_Printf("Error loading dll:  No vmMain symbol.\n");
-        dlclose(libHandle);
-        return NULL;
+    vmMain = (vmMain_t)dlsym( libHandle, "_vmMain" );
+    if ( vmMain ) {
+		*entryPoint = vmMain;
+		dllEntry(systemcalls);
+		return libHandle;
     }
-    
-    dllEntry(systemcalls);
+
+	if ( dllExports && imports && apiVersion ) {
+		dllEntryQL = (dllEntryQL_t)dllEntry;
+		dllEntryQL( dllExports, imports, apiVersion );
+		if ( dllExports && *dllExports ) {
+			return libHandle;
+		}
+	}
+
+	if ( systemcalls ) {
+		dllEntryRet = (dllEntryRet_t)dllEntry;
+		*entryPoint = dllEntryRet( systemcalls );
+		if ( !*entryPoint ) {
+			Com_Printf("Error loading dll:  No vmMain symbol.\n");
+			dlclose(libHandle);
+			return NULL;
+		}
+	}
     return libHandle;
 }
 
@@ -534,4 +562,3 @@ unsigned int Sys_ProcessorCount()
     
     return _Sys_ProcessorCount;
 }
-

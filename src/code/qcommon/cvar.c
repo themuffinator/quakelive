@@ -335,8 +335,6 @@ Cvar_Set2
 cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	cvar_t	*var;
 
-	Com_DPrintf( "Cvar_Set2: %s %s\n", var_name, value );
-
 	if ( !Cvar_ValidateString( var_name ) ) {
 		Com_Printf("invalid cvar name string: %s\n", var_name );
 		var_name = "BADNAME";
@@ -354,6 +352,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		if ( !value ) {
 			return NULL;
 		}
+		Com_DPrintf( "Cvar_Set2: %s %s\n", var_name, value );
 		// create it
 		if ( !force ) {
 			return Cvar_Get( var_name, value, CVAR_USER_CREATED );
@@ -369,6 +368,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	if (!strcmp(value,var->string)) {
 		return var;
 	}
+	Com_DPrintf( "Cvar_Set2: %s %s\n", var_name, value );
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
 	cvar_modifiedFlags |= var->flags;
 

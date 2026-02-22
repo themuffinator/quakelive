@@ -701,35 +701,46 @@ changed the load procedure to match VFS logic, and allow developer use
 */
 extern char   *FS_BuildOSPath( const char *base, const char *game, const char *qpath );
 
-void *Sys_LoadDll( const char *name, char *fqpath ,
-                   int (**entryPoint)(int, ...),
-                   int (*systemcalls)(int, ...) ) 
+void *Sys_LoadDll( const char *name, char *fqpath,
+			   int (**entryPoint)(int, ...),
+			   void **dllExports, void *imports, int *apiVersion,
+			   int (*systemcalls)(int, ...) )
 {
-  void *libHandle;
-  void  (*dllEntry)( int (*syscallptr)(int, ...) );
-  char  curpath[MAX_OSPATH];
-  char  fname[MAX_OSPATH];
-  char  *basepath;
-  char  *homepath;
-  char  *pwdpath;
-  char  *gamedir;
-  char  *fn;
-  const char*  err = NULL;
+	void *libHandle;
+	typedef int (*vmMain_t)( int, ... );
+	typedef void (*dllEntryVoid_t)( int (*syscallptr)(int, ...) );
+	typedef vmMain_t (*dllEntryRet_t)( int (*syscallptr)(int, ...) );
+	typedef void (*dllEntryQL_t)( void **exports, void *imports, int *apiVersion );
+	dllEntryVoid_t dllEntry;
+	dllEntryRet_t dllEntryRet;
+	dllEntryQL_t dllEntryQL;
+	vmMain_t vmMain;
+	char  curpath[MAX_OSPATH];
+	char  fname[MAX_OSPATH];
+	char  *basepath;
+	char  *homepath;
+	char  *pwdpath;
+	char  *gamedir;
+	char  *fn;
+	const char*  err = NULL;
 	
 	*fqpath = 0;
+	if ( dllExports ) {
+		*dllExports = NULL;
+	}
 
-  // bk001206 - let's have some paranoia
-  assert( name );
+	// bk001206 - let's have some paranoia
+	assert( name );
 
-  getcwd(curpath, sizeof(curpath));
+	getcwd(curpath, sizeof(curpath));
 #if defined __i386__
-  snprintf (fname, sizeof(fname), "%si386.so", name);
+	snprintf (fname, sizeof(fname), "%si386.so", name);
 #elif defined __powerpc__   //rcg010207 - PPC support.
-  snprintf (fname, sizeof(fname), "%sppc.so", name);
+	snprintf (fname, sizeof(fname), "%sppc.so", name);
 #elif defined __axp__
-  snprintf (fname, sizeof(fname), "%saxp.so", name);
+	snprintf (fname, sizeof(fname), "%saxp.so", name);
 #elif defined __mips__
-  snprintf (fname, sizeof(fname), "%smips.so", name);
+	snprintf (fname, sizeof(fname), "%smips.so", name);
 #else
 #error Unknown arch
 #endif
@@ -737,69 +748,93 @@ void *Sys_LoadDll( const char *name, char *fqpath ,
 // bk001129 - was RTLD_LAZY 
 #define Q_RTLD    RTLD_NOW
 
-  pwdpath = Sys_Cwd();
-  basepath = Cvar_VariableString( "fs_basepath" );
-  homepath = Cvar_VariableString( "fs_homepath" );
-  gamedir = Cvar_VariableString( "fs_game" );
+	pwdpath = Sys_Cwd();
+	basepath = Cvar_VariableString( "fs_basepath" );
+	homepath = Cvar_VariableString( "fs_homepath" );
+	gamedir = Cvar_VariableString( "fs_game" );
 
-  // pwdpath
-  fn = FS_BuildOSPath( pwdpath, gamedir, fname );
-  Com_Printf( "Sys_LoadDll(%s)... \n", fn );
-  libHandle = dlopen( fn, Q_RTLD );
+	// pwdpath
+	fn = FS_BuildOSPath( pwdpath, gamedir, fname );
+	Com_Printf( "Sys_LoadDll(%s)... \n", fn );
+	libHandle = dlopen( fn, Q_RTLD );
 
-  if ( !libHandle )
-  {
-    Com_Printf( "Sys_LoadDll(%s) failed:\n\"%s\"\n", fn, dlerror() );
-    // fs_homepath
-    fn = FS_BuildOSPath( homepath, gamedir, fname );
-    Com_Printf( "Sys_LoadDll(%s)... \n", fn );
-    libHandle = dlopen( fn, Q_RTLD );
+	if ( !libHandle )
+	{
+		Com_Printf( "Sys_LoadDll(%s) failed:\n\"%s\"\n", fn, dlerror() );
+		// fs_homepath
+		fn = FS_BuildOSPath( homepath, gamedir, fname );
+		Com_Printf( "Sys_LoadDll(%s)... \n", fn );
+		libHandle = dlopen( fn, Q_RTLD );
 
-    if ( !libHandle )
-    {
-      Com_Printf( "Sys_LoadDll(%s) failed:\n\"%s\"\n", fn, dlerror() );
-      // fs_basepath
-      fn = FS_BuildOSPath( basepath, gamedir, fname );
-      Com_Printf( "Sys_LoadDll(%s)... \n", fn );
-      libHandle = dlopen( fn, Q_RTLD );
+		if ( !libHandle )
+		{
+			Com_Printf( "Sys_LoadDll(%s) failed:\n\"%s\"\n", fn, dlerror() );
+			// fs_basepath
+			fn = FS_BuildOSPath( basepath, gamedir, fname );
+			Com_Printf( "Sys_LoadDll(%s)... \n", fn );
+			libHandle = dlopen( fn, Q_RTLD );
 
-      if ( !libHandle )
-      {
+			if ( !libHandle )
+			{
 #ifndef NDEBUG // bk001206 - in debug abort on failure
-        Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlopen() completely!\n", name  );
+				Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlopen() completely!\n", name  );
 #else
-        Com_Printf ( "Sys_LoadDll(%s) failed dlopen() completely!\n", name );
+				Com_Printf ( "Sys_LoadDll(%s) failed dlopen() completely!\n", name );
 #endif
-        return NULL;
-      } else
-        Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
-    } else
-      Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
-  } else
-    Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn ); 
+				return NULL;
+			} else
+				Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
+		} else
+			Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
+	} else
+		Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn ); 
 
-  dllEntry = dlsym( libHandle, "dllEntry" ); 
-  *entryPoint = dlsym( libHandle, "vmMain" );
-  if ( !*entryPoint || !dllEntry )
-  {
-    err = dlerror();
+	dllEntry = (dllEntryVoid_t)dlsym( libHandle, "dllEntry" );
+	vmMain = (vmMain_t)dlsym( libHandle, "vmMain" );
+	if ( !dllEntry )
+	{
+		err = dlerror();
 #ifndef NDEBUG // bk001206 - in debug abort on failure
-    Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlsym(vmMain):\n\"%s\" !\n", name, err );
+		Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlsym(dllEntry):\n\"%s\" !\n", name, err );
 #else
-    Com_Printf ( "Sys_LoadDll(%s) failed dlsym(vmMain):\n\"%s\" !\n", name, err );
+		Com_Printf ( "Sys_LoadDll(%s) failed dlsym(dllEntry):\n\"%s\" !\n", name, err );
 #endif
-    dlclose( libHandle );
-    err = dlerror();
-    if ( err != NULL )
-      Com_Printf ( "Sys_LoadDll(%s) failed dlcose:\n\"%s\"\n", name, err );
-    return NULL;
-  }
-  Com_Printf ( "Sys_LoadDll(%s) found **vmMain** at  %p  \n", name, *entryPoint ); // bk001212
-  dllEntry( systemcalls );
-  Com_Printf ( "Sys_LoadDll(%s) succeeded!\n", name );
-  if ( libHandle ) Q_strncpyz ( fqpath , fn , MAX_QPATH ) ;		// added 7/20/02 by T.Ray
-  return libHandle;
+		dlclose( libHandle );
+		err = dlerror();
+		if ( err != NULL )
+			Com_Printf ( "Sys_LoadDll(%s) failed dlcose:\n\"%s\"\n", name, err );
+		return NULL;
+	}
+	if ( vmMain ) {
+		*entryPoint = vmMain;
+		Com_Printf ( "Sys_LoadDll(%s) found **vmMain** at  %p  \n", name, *entryPoint ); // bk001212
+		dllEntry( systemcalls );
+		Com_Printf ( "Sys_LoadDll(%s) succeeded!\n", name );
+	} else {
+		if ( dllExports && imports && apiVersion ) {
+			dllEntryQL = (dllEntryQL_t)dllEntry;
+			dllEntryQL( dllExports, imports, apiVersion );
+			if ( dllExports && *dllExports ) {
+				if ( libHandle ) Q_strncpyz ( fqpath , fn , MAX_QPATH ) ;
+				return libHandle;
+			}
+		}
+		if ( systemcalls ) {
+			dllEntryRet = (dllEntryRet_t)dllEntry;
+			*entryPoint = dllEntryRet( systemcalls );
+			if ( !*entryPoint ) {
+				dlclose( libHandle );
+				err = dlerror();
+				if ( err != NULL )
+					Com_Printf ( "Sys_LoadDll(%s) failed dlcose:\n\"%s\"\n", name, err );
+				return NULL;
+			}
+		}
+	}
+	if ( libHandle ) Q_strncpyz ( fqpath , fn , MAX_QPATH ) ;		// added 7/20/02 by T.Ray
+	return libHandle;
 }
+
 
 /*
 ========================================================================

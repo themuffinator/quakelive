@@ -301,6 +301,26 @@ char	*Sys_DefaultHomePath(void) {
 
 char *Sys_DefaultInstallPath(void)
 {
+	static char exeDir[MAX_OSPATH];
+	DWORD exePathLength;
+	char *separator;
+
+	exePathLength = GetModuleFileNameA( NULL, exeDir, sizeof( exeDir ) );
+	if ( exePathLength > 0 && exePathLength < sizeof( exeDir ) ) {
+		exeDir[exePathLength] = '\0';
+
+		separator = strrchr( exeDir, '\\' );
+		if ( !separator ) {
+			separator = strrchr( exeDir, '/' );
+		}
+		if ( separator ) {
+			*separator = '\0';
+		}
+
+		if ( exeDir[0] ) {
+			return exeDir;
+		}
+	}
+
 	return Sys_Cwd();
 }
-

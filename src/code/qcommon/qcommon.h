@@ -319,8 +319,8 @@ typedef enum {
 } sharedTraps_t;
 
 void	VM_Init( void );
-vm_t	*VM_Create( const char *module, int (*systemCalls)(int *), 
-				   vmInterpret_t interpret );
+vm_t	*VM_Create( const char *module, int (*systemCalls)(int *),
+		vmInterpret_t interpret, void *dllImports, int dllApiVersion );
 // module should be bare: "cgame", not "cgame.dll" or "vm/cgame.qvm"
 
 void	VM_Free( vm_t *vm );
@@ -562,6 +562,8 @@ int		FS_GetModList(  char *listbuf, int bufsize );
 
 fileHandle_t	FS_FOpenFileWrite( const char *qpath );
 // will properly create any needed paths and deal with seperater character issues
+fileHandle_t	FS_FOpenFileAppend( const char *filename );
+char			*FS_BuildOSPath( const char *base, const char *game, const char *qpath );
 
 int		FS_filelength( fileHandle_t f );
 fileHandle_t FS_SV_FOpenFileWrite( const char *filename );
@@ -694,11 +696,13 @@ MISC
 // TTimo
 // vsnprintf is ISO/IEC 9899:1999
 // abstracting this to make it portable
+#ifndef Q_vsnprintf
 #ifdef WIN32
 #define Q_vsnprintf _vsnprintf
 #else
 // TODO: do we need Mac define?
 #define Q_vsnprintf vsnprintf
+#endif
 #endif
 
 // centralizing the declarations for cl_cdkey
@@ -969,8 +973,9 @@ void	Sys_Init (void);
 
 // general development dll loading for virtual machine testing
 // fqpath param added 7/20/02 by T.Ray - Sys_LoadDll is only called in vm.c at this time
-void	* QDECL Sys_LoadDll( const char *name, char *fqpath , int (QDECL **entryPoint)(int, ...),
-				  int (QDECL *systemcalls)(int, ...) );
+void	* QDECL Sys_LoadDll( const char *name, char *fqpath, int (QDECL **entryPoint)(int, ...),
+							 void **dllExports, void *imports, int *apiVersion,
+							 int (QDECL *systemcalls)(int, ...) );
 void	Sys_UnloadDll( void *dllHandle );
 
 void	Sys_UnloadGame( void );

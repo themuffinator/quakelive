@@ -1053,6 +1053,8 @@ qboolean	G_FreezeGametypeEnabled( void );
 void	G_FreezeSyncCvars( void );
 void	G_FreezeInitClient( gentity_t *ent );
 void	G_FreezeThawClient( gentity_t *ent, qboolean wasAuto, int helperNum );
+int		G_FreezeCountThawHelpers( gentity_t *ent, gentity_t **helperOut );
+void	G_FreezeApplyFreezeState( gentity_t *self, qboolean environmental );
 void	G_FreezeClientEndFrame( gentity_t *ent );
 qboolean	G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath );
 void	G_FreezeRunFrame( void );
@@ -1159,6 +1161,7 @@ void	G_InitGentity( gentity_t *e );
 gentity_t	*G_Spawn (void);
 gentity_t *G_TempEntity( vec3_t origin, int event );
 void	G_Sound( gentity_t *ent, int channel, int soundIndex );
+void	G_GlobalSound( int soundIndex );
 void	G_FreeEntity( gentity_t *e );
 qboolean	G_EntitiesFree( void );
 
@@ -1187,6 +1190,8 @@ void body_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int d
 void TossClientItems( gentity_t *self, gentity_t *attacker, flagDropContext_t context, int meansOfDeath );
 void TossClientPersistantPowerups( gentity_t *self );
 void TossClientCubes( gentity_t *self );
+void CheckAlmostCapture( gentity_t *self, gentity_t *attacker );
+void CheckAlmostScored( gentity_t *self, gentity_t *attacker );
 
 // damage flags
 #define DAMAGE_RADIUS				0x00000001	// damage was indirect
@@ -1259,7 +1264,7 @@ void InitClientResp (gclient_t *client);
 void InitBodyQue (void);
 void ClientSpawn( gentity_t *ent );
 void player_die (gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod);
-void AddScore( gentity_t *ent, vec3_t origin, int score );
+void AddScore( gentity_t *ent, const vec3_t origin, int score );
 void CalculateRanks( void );
 void G_RRInitClient( gentity_t *ent );
 void G_RRProcessClient( gentity_t *ent );
@@ -1302,12 +1307,15 @@ void DeathmatchScoreboardMessage (gentity_t *client);
 // g_main.c
 //
 void FindIntermissionPoint( void );
+void PrintTeam( int team, char *message );
 void SetLeader(int team, int client);
 void CheckTeamLeader( int team );
 void G_RunThink (gentity_t *ent);
 void QDECL G_LogPrintf( const char *fmt, ... );
+void LogExit( const char *string );
 void SendScoreboardMessageToAllClients( void );
 void G_UpdateMatchStateConfigString( void );
+void G_UpdateMatchFactoryConfig( void );
 void G_SetGameState( const char *state );
 void G_ResetTimeoutState( void );
 void G_HandleForfeit( gentity_t *caller );
@@ -1354,6 +1362,7 @@ qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 );
 void Team_CheckDroppedItem( gentity_t *dropped );
 flagDropResult_t G_TossFlag( gentity_t *carrier, int flagPowerup, flagDropContext_t context, gentity_t *attacker, int meansOfDeath, gentity_t **dropped );
 qboolean CheckObeliskAttack( gentity_t *obelisk, gentity_t *attacker );
+void AddTeamScore( const vec3_t origin, int team, int score );
 void Team_InitDomination( void );
 void Team_RunDomination( void );
 void Team_RegisterDominationPoint( gentity_t *ent );

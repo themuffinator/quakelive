@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path,
-    [string]$Solution = 'src/code/quake3.sln',
+    [string]$Solution = 'src/code/quakelive.sln',
     [string]$Configuration = 'Release',
     [string]$Platform = 'Win32',
     [string]$PlatformToolset = 'v100'

@@ -57,7 +57,7 @@ typedef enum {
 #define TRY_PFD_FAIL_SOFT	1
 #define TRY_PFD_FAIL_HARD	2
 
-#define	WINDOW_CLASS_NAME	"Quake 3: Arena"
+#define	WINDOW_CLASS_NAME	"Quake Live"
 
 static void		GLW_InitExtensions( void );
 static rserr_t	GLW_SetMode( const char *drivername, 
@@ -117,23 +117,110 @@ static qboolean GLW_StartDriverAndSetMode( const char *drivername,
 */
 #define MAX_PFDS 256
 
+/*
+==================
+GLW_DescribePixelFormatSafe
+==================
+*/
+static int GLW_DescribePixelFormatSafe( HDC hDC, int index, UINT bytes, LPPIXELFORMATDESCRIPTOR pfd, qboolean useQWGL )
+{
+	int result = 0;
+
+	__try
+	{
+		if ( useQWGL )
+		{
+			result = qwglDescribePixelFormat( hDC, index, bytes, pfd );
+		}
+		else
+		{
+			result = DescribePixelFormat( hDC, index, bytes, pfd );
+		}
+	}
+	__except( EXCEPTION_EXECUTE_HANDLER )
+	{
+		ri.Printf( PRINT_WARNING, "...DescribePixelFormat exception (0x%lx)\n", GetExceptionCode() );
+		result = 0;
+	}
+
+	return result;
+}
+
+/*
+==================
+GLW_ChoosePixelFormatSafe
+==================
+*/
+static int GLW_ChoosePixelFormatSafe( HDC hDC, CONST PIXELFORMATDESCRIPTOR *pPFD, qboolean useQWGL )
+{
+	int result = 0;
+
+	if ( !useQWGL )
+	{
+		/*
+		** Avoid GDI ChoosePixelFormat entirely. Some modern drivers trigger
+		** debugger-hostile first-chance exceptions from this path.
+		*/
+		return 0;
+	}
+
+	__try
+	{
+		result = qwglChoosePixelFormat ? qwglChoosePixelFormat( hDC, pPFD ) : 0;
+	}
+	__except( EXCEPTION_EXECUTE_HANDLER )
+	{
+		ri.Printf( PRINT_WARNING, "...qwglChoosePixelFormat exception (0x%lx)\n", GetExceptionCode() );
+		result = 0;
+	}
+
+	return result;
+}
+
 static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 {
 	PIXELFORMATDESCRIPTOR pfds[MAX_PFDS+1];
 	int maxPFD = 0;
 	int i;
 	int bestMatch = 0;
+	qboolean useQWGL = ( glConfig.driverType > GLDRV_ICD ) ? qtrue : qfalse;
+	int autoPFD = 0;
+
+	/*
+	** On modern Windows ICDs, ChoosePixelFormat can raise a first-chance
+	** WinRT-originated exception under debuggers. Use the manual PFD scan
+	** path for ICDs and reserve wglChoosePixelFormat for minidrivers.
+	*/
+	if ( glConfig.driverType > GLDRV_ICD && qwglChoosePixelFormat )
+	{
+		autoPFD = GLW_ChoosePixelFormatSafe( hDC, pPFD, qtrue );
+	}
+	else if ( glConfig.driverType > GLDRV_ICD )
+	{
+		ri.Printf( PRINT_ALL, "... no qwglChoosePixelFormat ext...\n" );
+	}
+
+	if ( autoPFD )
+	{
+		ri.Printf( PRINT_ALL, "... auto selected PFD %d\n", autoPFD );
+		return autoPFD;
+	}
+
+	memset( pfds, 0, sizeof( pfds ) );
+	for ( i = 0; i <= MAX_PFDS; i++ )
+	{
+		pfds[i].nSize = sizeof( PIXELFORMATDESCRIPTOR );
+		pfds[i].nVersion = 1;
+	}
 
 	ri.Printf( PRINT_ALL, "...GLW_ChoosePFD( %d, %d, %d )\n", ( int ) pPFD->cColorBits, ( int ) pPFD->cDepthBits, ( int ) pPFD->cStencilBits );
 
 	// count number of PFDs
-	if ( glConfig.driverType > GLDRV_ICD )
+	maxPFD = GLW_DescribePixelFormatSafe( hDC, 1, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[0], useQWGL );
+	if ( maxPFD <= 0 )
 	{
-		maxPFD = qwglDescribePixelFormat( hDC, 1, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[0] );
-	}
-	else
-	{
-		maxPFD = DescribePixelFormat( hDC, 1, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[0] );
+		ri.Printf( PRINT_WARNING, "...DescribePixelFormat failed (err %lu)\n", GetLastError() );
+		return 0;
 	}
 	if ( maxPFD > MAX_PFDS )
 	{
@@ -146,13 +233,9 @@ static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 	// grab information
 	for ( i = 1; i <= maxPFD; i++ )
 	{
-		if ( glConfig.driverType > GLDRV_ICD )
+		if ( !GLW_DescribePixelFormatSafe( hDC, i, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[i], useQWGL ) )
 		{
-			qwglDescribePixelFormat( hDC, i, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[i] );
-		}
-		else
-		{
-			DescribePixelFormat( hDC, i, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[i] );
+			continue;
 		}
 	}
 
@@ -670,7 +753,7 @@ static qboolean GLW_CreateWindow( const char *drivername, int width, int height,
 		g_wv.hWnd = CreateWindowEx (
 			 exstyle, 
 			 WINDOW_CLASS_NAME,
-			 "Quake 3: Arena",
+			 "Quake Live",
 			 stylebits,
 			 x, y, w, h,
 			 NULL,

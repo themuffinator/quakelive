@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../../common/ql_auth_service.h"
@@ -13,6 +14,53 @@ typedef struct {
 	ql_auth_request_descriptor_t descriptor;
 	const char *logPrefix;
 } ql_client_auth_transport_t;
+
+/*
+=============
+QL_ClientAuth_StringRepresentsTrue
+
+Returns qtrue when a string value should be interpreted as enabled.
+=============
+*/
+static qboolean QL_ClientAuth_StringRepresentsTrue( const char *value ) {
+	if ( !value || !value[0] ) {
+		return qfalse;
+	}
+
+	if ( value[0] == '0' && value[1] == '\0' ) {
+		return qfalse;
+	}
+
+	if ( !Q_stricmp( value, "false" ) || !Q_stricmp( value, "no" ) || !Q_stricmp( value, "off" ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+QL_ClientAuth_ExternalEcosystemsDisabled
+
+Checks runtime toggles that disable Steam/Awesomium integrations.
+=============
+*/
+static qboolean QL_ClientAuth_ExternalEcosystemsDisabled( void ) {
+	const char *value;
+
+	value = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );
+	if ( QL_ClientAuth_StringRepresentsTrue( value ) ) {
+		return qtrue;
+	}
+
+	value = getenv( "QL_DISABLE_STEAMWORKS" );
+	if ( QL_ClientAuth_StringRepresentsTrue( value ) ) {
+		return qtrue;
+	}
+
+	value = getenv( "QL_DISABLE_AWESOMIUM" );
+	return QL_ClientAuth_StringRepresentsTrue( value );
+}
 
 /*
 =============
@@ -196,6 +244,10 @@ static qboolean QL_ClientAuth_RequestSteamTicket( ql_auth_credential_t *credenti
 		return qfalse;
 	}
 
+	if ( QL_ClientAuth_ExternalEcosystemsDisabled() ) {
+		return qfalse;
+	}
+
 	QL_Steamworks_RunCallbacks();
 
 	if ( !QL_Steamworks_RequestAuthTicket( credential->value, sizeof( credential->value ), &ticketLength, NULL ) ) {
@@ -222,6 +274,10 @@ Validates a Steam ticket using the native Steamworks APIs.
 */
 static qboolean QL_ClientAuth_HandleSteamworksTicket( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
 	(void)transport;
+
+	if ( QL_ClientAuth_ExternalEcosystemsDisabled() ) {
+		return qfalse;
+	}
 
 	QL_Steamworks_RunCallbacks();
 
@@ -351,6 +407,12 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 	steamHex[0] = '\0';
 
 	if ( credential->kind == QL_AUTH_CREDENTIAL_STEAM ) {
+		if ( QL_ClientAuth_ExternalEcosystemsDisabled() ) {
+			QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
+			"Steam authentication disabled by runtime flags" );
+			return qfalse;
+		}
+
 		QL_InitAuthCredential( &steamCredential );
 		steamCredential.kind = QL_AUTH_CREDENTIAL_STEAM;
 

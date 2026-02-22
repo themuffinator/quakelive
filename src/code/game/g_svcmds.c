@@ -517,19 +517,6 @@ char	*ConcatArgs( int start );
 
 /*
 =================
-Cmd_ShuffleTeams_f
-=================
-*/
-void Cmd_ShuffleTeams_f( void ) {
-	if ( !Team_IsAutoShuffleArmed() ) {
-		G_AutoShuffleCountdown_Arm( 5000 );
-		Team_ClampWarmupToShuffleCountdown();
-		trap_SendServerCommand( -1, "print \"Teams will be shuffled in 5 seconds.\n\"" );
-	}
-}
-
-/*
-=================
 Svcmd_TeamSize_f
 =================
 */

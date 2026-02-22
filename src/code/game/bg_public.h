@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 // bg_public.h -- definitions shared by both the server game and client game modules
 
+#ifndef __BG_PUBLIC_H__
+#define __BG_PUBLIC_H__
+
 // because games can change separately from the main system version, we need a
 // second version that must match between game and cgame
 
@@ -182,6 +185,7 @@ typedef enum {
 
 // Quake Live repurposes the single-player slot for Race.
 #define GT_RACE		GT_SINGLE_PLAYER
+#define GT_CA		GT_CLAN_ARENA
 
 typedef enum { GENDER_MALE, GENDER_FEMALE, GENDER_NEUTER } gender_t;
 
@@ -931,3 +935,5 @@ qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTim
 #define KAMI_SHOCKWAVE_MAXRADIUS		1320
 #define KAMI_BOOMSPHERE_MAXRADIUS		720
 #define KAMI_SHOCKWAVE2_MAXRADIUS		704
+
+#endif // __BG_PUBLIC_H__

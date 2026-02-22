@@ -29,6 +29,54 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../ui/menudef.h"
 
+// Quake Live retail menus define extra ownerdraw flags/ids not present in the GPL header.
+#ifndef CG_SHOW_IF_1ST_PLYR_TRACKED
+#define CG_SHOW_IF_1ST_PLYR_TRACKED 0x00800000
+#endif
+#ifndef CG_SHOW_IF_2ND_PLYR_TRACKED
+#define CG_SHOW_IF_2ND_PLYR_TRACKED 0x01000000
+#endif
+
+#ifndef CG_SPEC_FOLLOW_PRIMARY
+#define CG_SPEC_FOLLOW_PRIMARY 340
+#define CG_SPEC_FOLLOW_SECONDARY 341
+#define CG_SPEC_COMPARE_PRIMARY 342
+#define CG_SPEC_COMPARE_SECONDARY 343
+#endif
+
+#ifndef CG_SELECTEDPLAYER_HEAD
+#define CG_SELECTEDPLAYER_HEAD 344
+#define CG_SELECTEDPLAYER_NAME 345
+#define CG_SELECTEDPLAYER_LOCATION 346
+#define CG_SELECTEDPLAYER_STATUS 347
+#define CG_SELECTEDPLAYER_WEAPON 348
+#define CG_SELECTEDPLAYER_POWERUP 349
+#define CG_SELECTEDPLAYER_ARMOR 350
+#define CG_SELECTEDPLAYER_HEALTH 351
+#endif
+
+#ifndef CG_VOICE_HEAD
+#define CG_VOICE_HEAD 352
+#define CG_VOICE_NAME 353
+#endif
+
+#ifndef CG_ROUND_BACKGROUND
+#define CG_ROUND_BACKGROUND 354
+#define CG_OVERTIME_BACKGROUND 355
+#define CG_SCOREBOX_FOLLOW_BACKGROUND 356
+#define CG_SCOREBOX_SPEC_BACKGROUND 357
+#define CG_TEAMINFO 358
+#define CG_BLUE_FLAGHEAD 359
+#define CG_BLUE_FLAGNAME 360
+#define CG_RED_FLAGHEAD 361
+#define CG_RED_FLAGNAME 362
+#define CG_PLAYER_LOCATION 363
+#define CG_PLAYER_STATUS 364
+#define CG_AREA_SYSTEMCHAT 365
+#define CG_AREA_TEAMCHAT 366
+#define CG_AREA_CHAT 367
+#endif
+
 #define QL_FONT_NAME_TEXT "fonts/font"
 #define QL_FONT_NAME_SMALL "fonts/smallfont"
 #define QL_FONT_NAME_BIG "fonts/bigfont"
@@ -255,6 +303,8 @@ typedef struct itemDef_s {
 	colorRangeDef_t colorRanges[MAX_COLOR_RANGES];
 	float special;								 // used for feeder id's etc.. diff per type
   int cursorPos;                 // cursor position in characters
+	int widescreen;
+	qboolean widescreenSet;
 	void *typeData;								 // type specific data ptr's	
 } itemDef_t;
 
@@ -262,6 +312,7 @@ typedef struct {
   Window window;
   const char  *font;								// font
   qboolean fullScreen;							// covers entire screen 
+	int widescreen;
   int itemCount;										// number of items;
   int fontIndex;										// 
   int cursorItem;										// which item as the cursor

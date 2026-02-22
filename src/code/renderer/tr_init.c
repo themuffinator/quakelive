@@ -1381,20 +1381,28 @@ void R_Init( void ) {
 	}
 	R_ToggleSmpFrame();
 
+	ri.Printf( PRINT_ALL, "R_Init: InitOpenGL\n" );
 	InitOpenGL();
 
+	ri.Printf( PRINT_ALL, "R_Init: InitRenderTargets\n" );
 	RB_InitRenderTargets();
 
+	ri.Printf( PRINT_ALL, "R_Init: InitColorCorrection\n" );
 	R_InitColorCorrection();
 
+	ri.Printf( PRINT_ALL, "R_Init: InitImages\n" );
 	R_InitImages();
 
+	ri.Printf( PRINT_ALL, "R_Init: InitShaders\n" );
 	R_InitShaders();
 
+	ri.Printf( PRINT_ALL, "R_Init: InitSkins\n" );
 	R_InitSkins();
 
+	ri.Printf( PRINT_ALL, "R_Init: ModelInit\n" );
 	R_ModelInit();
 
+	ri.Printf( PRINT_ALL, "R_Init: InitFreeType\n" );
 	R_InitFreeType();
 
 

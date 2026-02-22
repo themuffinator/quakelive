@@ -174,7 +174,7 @@ Logs VAC acceptance or rejection alongside shared telemetry.
 =================
 */
 static void SV_LogVACStatus( const netadr_t *adr, const char *status, const char *outcome, const char *message ) {
-	NET_LogAuthTelemetry( NS_SERVER, adr, NULL, "vac", status, outcome, message );
+	NET_LogAuthTelemetry( NS_SERVER, adr, NULL, "vac", status, NULL, outcome, message );
 
 	if ( message && message[0] ) {
 		Com_Printf( "VAC %s (%s) for %s\n", status, message, NET_AdrToString( *adr ) );
@@ -537,7 +537,8 @@ void SV_DirectConnect( netadr_t from ) {
 
 	if ( net_fakevacban->integer ) {
 		Com_Printf( "VAC ban on record (net_fakevacban) for %s\n", NET_AdrToString( from ) );
-		NET_LogAuthTelemetry( NS_SERVER, &from, NULL, "vac", "rejected", "fakevacban", "VAC ban on record" );
+		NET_LogAuthTelemetry( NS_SERVER, &from, NULL, "vac", SV_FAKEVACBAN_STATUS, SV_FAKEVACBAN_RESULT_CODE,
+			SV_FAKEVACBAN_OUTCOME, SV_FAKEVACBAN_AUTH_MESSAGE );
 		NET_OutOfBandPrint( NS_SERVER, from, "print\nVAC ban on record\n" );
 		return;
 	}

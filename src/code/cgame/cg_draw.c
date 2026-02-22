@@ -1747,7 +1747,7 @@ CG_DrawCrosshairNames
 */
 static void CG_DrawCrosshairNames( void ) {
 	float		*color;
-	char		*name;
+	const char	*name;
 	float		w;
 	float		nameScale;
 	float		opacityScale;
@@ -1895,7 +1895,9 @@ static const char *CG_GetGametypeScoreboardName( void ) {
 	case GT_TOURNAMENT:
 		return "score_menu_duel";
 	case GT_SINGLE_PLAYER:
+#if GT_RACE != GT_SINGLE_PLAYER
 	case GT_RACE:
+#endif
 		return "score_menu_race";
 	case GT_RED_ROVER:
 		return "score_menu_rr";

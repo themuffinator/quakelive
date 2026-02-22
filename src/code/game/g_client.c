@@ -26,6 +26,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/platform/platform_config.h"
 #include <limits.h>
 
+static vec3_t	playerMins = { -15, -15, -24 };
+static vec3_t	playerMaxs = { 15, 15, 32 };
+
+extern char *modNames[];
+
 
 /*
 =============
@@ -214,7 +219,7 @@ qboolean G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, genti
 		killerName = "<world>";
 	}
 
-	if ( meansOfDeath < 0 || meansOfDeath >= (int)( sizeof( modNames ) / sizeof( modNames[0] ) ) ) {
+	if ( meansOfDeath < 0 || meansOfDeath >= ( MOD_RAILGUN_HEADSHOT + 1 ) ) {
 		obit = "<bad obituary>";
 	} else {
 		obit = modNames[ meansOfDeath ];
@@ -1769,7 +1774,7 @@ void G_RunGrantScript( gentity_t *ent, const char *script ) {
 			}
 			++cursor;
 		}
-		grantToken[tokenLength] = '\\0';
+		grantToken[tokenLength] = '\0';
 
 		if ( grantToken[0] ) {
 			G_GiveItemByName( ent, grantToken );

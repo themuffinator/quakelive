@@ -15,7 +15,7 @@ Additional background on the `code/qvmtools/` staging area—including the binar
 
 ## Native Quake Live Binary Observations
 
-Binary Ninja HLIL exports and the curated tooling documentation already highlight that the shipped Quake Live gameplay DLLs were produced with Microsoft’s Visual Studio 2010 SP1 toolchain and link against the Visual C++ 2010 CRT pair (`MSVCR100`, `MSVCP100`).【F:docs/hlil_comparison.md†L8-L17】 This aligns with the `MinimumVisualStudioVersion = 10.0.40219.1` metadata embedded in the stock Visual Studio solution files, confirming the expectation of the `v100` compiler and linker stack for native targets.【F:src/code/quake3.sln†L1-L4】
+Binary Ninja HLIL exports and the curated tooling documentation already highlight that the shipped Quake Live gameplay DLLs were produced with Microsoft’s Visual Studio 2010 SP1 toolchain and link against the Visual C++ 2010 CRT pair (`MSVCR100`, `MSVCP100`).【F:docs/hlil_comparison.md†L8-L17】 This aligns with the `MinimumVisualStudioVersion = 10.0.40219.1` metadata embedded in the stock Visual Studio solution files, confirming the expectation of the `v100` compiler and linker stack for native targets.【F:src/code/quakelive.sln†L1-L4】
 
 In practice this means that reproducing Quake Live style binaries requires:
 
@@ -38,7 +38,7 @@ The goal is to preserve the Quake III VM pipeline while layering in a native DLL
    - Capture minimal host requirements (Perl, GNU make, Microsoft CL for the Windows variant) in repository docs so contributors can continue producing `.qvm` artefacts.
 
 2. **Introduce a dedicated native build configuration.**
-   - Add a CMake or MSBuild definition under `build/native/` (or extend `src/code/quake3.sln`) that produces `qagamex86.dll`, `cgamex86.dll`, and `uix86.dll` with the `v100` toolset while leaving the existing VM projects untouched.【F:src/code/quake3.sln†L1-L20】【F:src/code/ui/ui.vcxproj†L1-L63】
+   - Add a CMake or MSBuild definition under `build/native/` (or extend `src/code/quakelive.sln`) that produces `qagamex86.dll`, `cgamex86.dll`, and `uix86.dll` with the `v100` toolset while leaving the existing VM projects untouched.【F:src/code/quakelive.sln†L1-L20】【F:src/code/ui/ui.vcxproj†L1-L63】
    - Configure each target for Win32, `/MD` runtime linkage, and export lists consistent with the legacy DLLs; the UI project currently links with `/MT` and must be switched to `/MD` to match retail imports.【F:src/code/game/game.vcxproj†L285-L350】【F:src/code/cgame/cgame.vcxproj†L171-L206】【F:src/code/ui/ui.vcxproj†L126-L207】
    - Ensure the configuration sets the same preprocessor symbols used by the VM build (`Q3_VM`, platform macros) so source compatibility is maintained during the transition.
 

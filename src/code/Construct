@@ -81,13 +81,13 @@ if ($DO_WIN32 eq 1)
         if($config eq 'debug')
         {
           $DIR = 'Debug';
-                system("cp -v $DIR/quake3.exe \$Q3BASE");
+                system("cp -v $DIR/quakelive_steam.exe \$Q3BASE");
                 system("cp -v $DIR/cgamex86.dll $DIR/qagamex86.dll \$Q3BASE/baseq3");
         }
         elsif ($config eq 'debug-TA')
         {
                 $DIR = 'Debug_TA';
-                system("cp -v $DIR/quake3.exe \$Q3BASE");
+                system("cp -v $DIR/quakelive_steam.exe \$Q3BASE");
                 system("cp -v $DIR/cgamex86.dll $DIR/qagamex86.dll \$Q3BASE/missionpack");
 	}
 	elsif($config eq 'release-TA')
@@ -95,7 +95,7 @@ if ($DO_WIN32 eq 1)
 		$DIR = 'Release_TA';
 		# spank!
 		system("./spank.sh");
-		system("cp -v $DIR/quake3.exe \$Q3BASE");
+		system("cp -v $DIR/quakelive_steam.exe \$Q3BASE");
 	}
 	else
 	{
@@ -105,7 +105,7 @@ if ($DO_WIN32 eq 1)
 
 	# copy selected stuff to shared media
 	$DESTDIR='/cygdrive/e/incoming/Id/q3-1.32';
-	system("cp -v $DIR/quake3.exe $DESTDIR");
+	system("cp -v $DIR/quakelive_steam.exe $DESTDIR");
 	system("cp -v /cygdrive/e/Q3SetupMedia/quake3/CHANGES-1.32.txt $DESTDIR");
 
 	exit;	

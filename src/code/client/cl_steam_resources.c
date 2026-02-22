@@ -168,13 +168,24 @@ Removes a transient cache file when persistence is disabled.
 =============
 */
 static void CL_SteamResources_CleanupTransient( const char *cachePath ) {
+	const char *homePath;
+	const char *gameDir;
 	char *ospath;
 
 	if ( !cachePath || !cachePath[0] ) {
 		return;
 	}
 
-	ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, cachePath );
+	homePath = Cvar_VariableString( "fs_homepath" );
+	gameDir = Cvar_VariableString( "fs_gamedirvar" );
+	if ( !gameDir || !gameDir[0] ) {
+		gameDir = Cvar_VariableString( "fs_game" );
+	}
+	if ( !gameDir || !gameDir[0] ) {
+		gameDir = BASEGAME;
+	}
+
+	ospath = FS_BuildOSPath( homePath, gameDir, cachePath );
 	remove( ospath );
 }
 

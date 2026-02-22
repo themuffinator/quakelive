@@ -85,6 +85,7 @@ static cgHudScoreboard_t cgHudScoreboard;
 
 static void CG_UpdateHudScoreboardSummary( void );
 static void CG_UpdateHudScoreboardBanners( void );
+static int CG_ScoreboardTimeSeconds( const score_t *score );
 
 /*
 =============

@@ -256,8 +256,6 @@ Cmd_Teams_f
 ==================
 */
 void Cmd_Teams_f( gentity_t *ent ) {
-	char	*str;
-
 	if ( g_gametype.integer < GT_TEAM ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Teams are not enabled in this gametype.\n\"" );
 		return;
@@ -1052,7 +1050,7 @@ void Cmd_Forfeit_f( gentity_t *ent ) {
 			return;
 		}
 
-		G_ApplyForfeit( ent );
+		G_HandleForfeit( ent );
 		return;
 	}
 
@@ -1094,7 +1092,7 @@ void Cmd_Forfeit_f( gentity_t *ent ) {
 			return;
 		}
 
-		G_ApplyForfeit( ent );
+		G_HandleForfeit( ent );
 		return;
 	}
 
@@ -2914,49 +2912,6 @@ void Cmd_Timein_f( gentity_t *ent ) {
 }
 
 /*
-=============
-Cmd_Forfeit_f
-
-Concedes the current match when permitted by the server configuration.
-=============
-*/
-void Cmd_Forfeit_f( gentity_t *ent ) {
-	team_t team;
-
-	if ( !ent || !ent->client ) {
-		return;
-	}
-
-	if ( g_allowForfeit.integer <= 0 ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Forfeit is not enabled on this server.\n\"" );
-		return;
-	}
-
-	if ( level.matchForfeited ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Match has already been forfeited.\n\"" );
-		return;
-	}
-
-	if ( g_gametype.integer != GT_TOURNAMENT && g_gametype.integer < GT_TEAM ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Forfeit is only available in duel or team modes.\n\"" );
-		return;
-	}
-
-	team = ent->client->sess.sessionTeam;
-	if ( g_gametype.integer >= GT_TEAM ) {
-		if ( team != TEAM_RED && team != TEAM_BLUE ) {
-			trap_SendServerCommand( ent-g_entities, "print \"Join a team before forfeiting the match.\n\"" );
-			return;
-		}
-	} else if ( team == TEAM_SPECTATOR ) {
-		trap_SendServerCommand( ent-g_entities, "print \"Spectators cannot forfeit matches.\n\"" );
-		return;
-	}
-
-	G_HandleForfeit( ent );
-}
-
-/*
 =================
 Cmd_Complaint_f
 
@@ -3443,49 +3398,11 @@ Cmd_ShuffleTeams_f
 ==================
 */
 void Cmd_ShuffleTeams_f( void ) {
-	int clients[MAX_CLIENTS];
-	int numPlayers = 0;
-	int j, k, temp;
-	gclient_t	*cl;
-
-	if ( g_gametype.integer < GT_TEAM ) {
-		return;
+	if ( !Team_IsAutoShuffleArmed() ) {
+		G_AutoShuffleCountdown_Arm( 5000 );
+		Team_ClampWarmupToShuffleCountdown();
+		trap_SendServerCommand( -1, "print \"Teams will be shuffled in 5 seconds.\n\"" );
 	}
-
-	for ( j = 0 ; j < level.maxclients ; j++ ) {
-		cl = &level.clients[j];
-		if ( cl->pers.connected != CON_CONNECTED ) {
-			continue;
-		}
-		if ( cl->sess.sessionTeam == TEAM_SPECTATOR ) {
-			continue;
-		}
-		clients[numPlayers++] = j;
-	}
-
-	// Shuffle
-	for ( j = 0 ; j < numPlayers ; j++ ) {
-		k = rand() % numPlayers;
-		temp = clients[j];
-		clients[j] = clients[k];
-		clients[k] = temp;
-	}
-
-	// Assign
-	for ( j = 0 ; j < numPlayers ; j++ ) {
-		gentity_t *ent = &g_entities[clients[j]];
-		// Alternate teams
-		if ( j % 2 == 0 ) {
-			ent->client->sess.sessionTeam = TEAM_RED;
-		} else {
-			ent->client->sess.sessionTeam = TEAM_BLUE;
-		}
-		ClientUserinfoChanged( clients[j] );
-		ClientBegin( clients[j] );
-	}
-
-	trap_SendServerCommand( -1, "cp \"Teams have been shuffled!\n\"" );
-	trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
 }
 
 /*

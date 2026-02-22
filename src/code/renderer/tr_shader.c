@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include <stdint.h>
 
 // tr_shader.c -- this file deals with the parsing and definition of shaders
 
@@ -1031,7 +1032,7 @@ static qboolean ParseStage( shaderStage_t *stage, char **text )
 	}
 
 	// decide which agens we can skip
-	if ( stage->alphaGen == CGEN_IDENTITY ) {
+	if ( stage->alphaGen == AGEN_IDENTITY ) {
 		if ( stage->rgbGen == CGEN_IDENTITY
 			|| stage->rgbGen == CGEN_LIGHTING_DIFFUSE ) {
 			stage->alphaGen = AGEN_SKIP;
@@ -1814,7 +1815,7 @@ static qboolean CollapseMultitexture( void ) {
 			return qfalse;
 		}
 	}
-	if ( stages[0].alphaGen == CGEN_WAVEFORM )
+	if ( stages[0].alphaGen == AGEN_WAVEFORM )
 	{
 		if ( memcmp( &stages[0].alphaWave,
 					 &stages[1].alphaWave,
@@ -2346,8 +2347,20 @@ shader_t *R_FindShaderByName( const char *name ) {
 	char		strippedName[MAX_QPATH];
 	int			hash;
 	shader_t	*sh;
+	static qboolean warnedInvalidName;
 
-	if ( (name==NULL) || (name[0] == 0) ) {  // bk001205
+	// Native UI imports can call into renderer helpers with bad pointers when
+	// an import index is mis-mapped. Guard against trivial invalid pointers to
+	// avoid dereferencing (e.g. 0x18).
+	if ( (name == NULL) || ( (uintptr_t)name < 0x10000u ) ) {
+		if ( name != NULL && !warnedInvalidName ) {
+			warnedInvalidName = qtrue;
+			ri.Printf( PRINT_WARNING, "R_FindShaderByName: invalid name pointer %p\n", name );
+		}
+		return tr.defaultShader;
+	}
+
+	if ( name[0] == 0 ) {  // bk001205
 		return tr.defaultShader;
 	}
 

@@ -25,7 +25,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <limits.h>
 #include <setjmp.h>
 
+#if QL_ENABLE_PNG
 #include <png.h>
+#endif
 
 /*
  * Include file for users of JPEG library.
@@ -798,6 +800,7 @@ image_t *R_CreateImage( const char *name, const byte *pic, int width, int height
 }
 
 
+#if QL_ENABLE_PNG
 /*
 =========================================================
 
@@ -968,7 +971,28 @@ static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
 	if ( fileData ) {
 		ri.FS_FreeFile( fileData );
 	}
+}
+#else
+/*
+============
+LoadPNG
+
+Stubbed when PNG support is disabled.
+============
+*/
+static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
+	if ( pic ) {
+		*pic = NULL;
 	}
+	if ( width ) {
+		*width = 0;
+	}
+	if ( height ) {
+		*height = 0;
+	}
+	ri.Printf( PRINT_WARNING, "LoadPNG: PNG support disabled (%s).\n", name );
+}
+#endif
 
 /*
 =========================================================
@@ -2023,15 +2047,14 @@ void R_LoadImage( const char *name, byte **pic, int *width, int *height ) {
 		if ( !*pic ) {
 			ri.Printf( PRINT_WARNING, "image not found (tga/jpg/png): %s\n", name );
 		}
-	} else if ( !Q_stricmp(name+len-4, ".pcx") ) {
-	LoadPCX32( name, pic, width, height );
-		} else if ( !Q_stricmp( name+len-4, ".bmp" ) ) {
-			LoadBMP( name, pic, width, height );
-		} else if ( !Q_stricmp( name+len-4, ".png" ) ) {
-			LoadPNG( name, pic, width, height );
-		} else if ( !Q_stricmp( name+len-4, ".jpg" ) ) {
-			LoadJPG( name, pic, width, height );
-		}
+	} else if ( !Q_stricmp( name + len - 4, ".pcx" ) ) {
+		LoadPCX32( name, pic, width, height );
+	} else if ( !Q_stricmp( name + len - 4, ".bmp" ) ) {
+		LoadBMP( name, pic, width, height );
+	} else if ( !Q_stricmp( name + len - 4, ".png" ) ) {
+		LoadPNG( name, pic, width, height );
+	} else if ( !Q_stricmp( name + len - 4, ".jpg" ) ) {
+		LoadJPG( name, pic, width, height );
 	}
 }
 

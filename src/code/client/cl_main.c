@@ -48,7 +48,25 @@ qboolean CL_ShouldFilterConsoleText( const char *text ) {
 	if ( !Q_stricmpn( text, "console:", 8 ) ) {
 		return qtrue;
 	}
-	
+
+	return qfalse;
+}
+
+/*
+=============
+CL_UseDisconnectedConsoleFallback
+
+Enables a console-first disconnected experience when launcher ecosystems are disabled.
+=============
+*/
+qboolean CL_UseDisconnectedConsoleFallback( void ) {
+	const char *value;
+
+	value = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );
+	if ( value && value[0] && atoi( value ) != 0 ) {
+		return qtrue;
+	}
+
 	return qfalse;
 }
 
@@ -969,9 +987,7 @@ void CL_RequestAuthorization( void ) {
 		return;
 	}
 
-	if ( Cvar_VariableValue( "fs_restrict" ) ) {
-		Q_strncpyz( authorizePayload, "demota", sizeof( authorizePayload ) );
-	} else if ( QL_ParseCredentialString( cl_cdkey, &credential ) ) {
+	if ( QL_ParseCredentialString( cl_cdkey, &credential ) ) {
 		QL_FormatCredentialForAuthorize( &credential, authorizePayload, sizeof( authorizePayload ) );
 	}
 
@@ -2048,6 +2064,7 @@ CL_Frame
 ==================
 */
 void CL_Frame ( int msec ) {
+	static qboolean	disconnectedFallbackLogged = qfalse;
 
 	if ( !com_cl_running->integer ) {
 		return;
@@ -2057,11 +2074,24 @@ void CL_Frame ( int msec ) {
 		// bring up the cd error dialog if needed
 		cls.cddialog = qfalse;
 		VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_NEED_CD );
-	} else	if ( cls.state == CA_DISCONNECTED && !( cls.keyCatchers & KEYCATCH_UI )
+	} else	if ( cls.state == CA_DISCONNECTED
 		&& !com_sv_running->integer ) {
-		// if disconnected, bring up the menu
-		S_StopAllSounds();
-		VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+		if ( CL_UseDisconnectedConsoleFallback() ) {
+			if ( uivm && ( cls.keyCatchers & KEYCATCH_UI ) ) {
+				VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_NONE );
+			}
+			S_StopBackgroundTrack();
+			cls.keyCatchers = KEYCATCH_CONSOLE;
+			if ( !disconnectedFallbackLogged ) {
+				Com_Printf( "CL_Frame: disconnected console fallback active (state=%d keyCatchers=%d)\n",
+					cls.state, cls.keyCatchers );
+				disconnectedFallbackLogged = qtrue;
+			}
+		} else if ( !( cls.keyCatchers & KEYCATCH_UI ) ) {
+			// if disconnected, bring up the menu
+			S_StopAllSounds();
+			VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+		}
 	}
 
 	// if recording an avi, lock to a fixed fps
@@ -2171,9 +2201,31 @@ void CL_InitRenderer( void ) {
 	re.BeginRegistration( &cls.glconfig );
 
 	// load character sets
-	cls.charSetShader = re.RegisterShader( "gfx/2d/bigchars" );
+	cls.charSetShader = re.RegisterShaderNoMip( "gfx/2d/bigchars" );
+	if ( !cls.charSetShader ) {
+		cls.charSetShader = re.RegisterShaderNoMip( "gfx/2d/bigchars.png" );
+	}
+	if ( !cls.charSetShader ) {
+		cls.charSetShader = re.RegisterShaderNoMip( "gfx/2d/bigchars.tga" );
+	}
+	if ( cls.charSetShader ) {
+		Com_Printf( "CL_InitRenderer: loaded charSetShader handle %d\n", cls.charSetShader );
+	} else {
+		Com_Printf( S_COLOR_YELLOW "WARNING: CL_InitRenderer failed to register charSetShader.\n" );
+	}
 	cls.whiteShader = re.RegisterShader( "white" );
-	cls.consoleShader = re.RegisterShader( "console" );
+	cls.consoleShader = re.RegisterShaderNoMip( "console" );
+	if ( !cls.consoleShader ) {
+		cls.consoleShader = re.RegisterShaderNoMip( "textures/effects2/console01.png" );
+	}
+	if ( !cls.consoleShader ) {
+		cls.consoleShader = re.RegisterShaderNoMip( "textures/effects2/console01.tga" );
+	}
+	if ( cls.consoleShader ) {
+		Com_Printf( "CL_InitRenderer: loaded consoleShader handle %d\n", cls.consoleShader );
+	} else {
+		Com_Printf( S_COLOR_YELLOW "WARNING: CL_InitRenderer failed to register consoleShader.\n" );
+	}
 	g_console_field_width = cls.glconfig.vidWidth / SMALLCHAR_WIDTH - 2;
 	g_consoleField.widthInChars = g_console_field_width;
 }
@@ -2343,6 +2395,7 @@ void CL_Init( void ) {
 	cl_freezeDemo = Cvar_Get ("cl_freezeDemo", "0", CVAR_TEMP );
 	cl_quitOnDemoCompleted = Cvar_Get ("cl_quitOnDemoCompleted", "0", 0 );
 	cl_allowConsoleChat = Cvar_Get ("cl_allowConsoleChat", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
+	Cvar_Get ("web_browserActive", "0", CVAR_TEMP );
 	rcon_client_password = Cvar_Get ("rconPassword", "", CVAR_TEMP );
 	cl_activeAction = Cvar_Get( "activeAction", "", CVAR_TEMP );
 	cl_demoRecordMessage = Cvar_Get ("cl_demoRecordMessage", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );

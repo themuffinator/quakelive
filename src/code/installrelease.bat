@@ -8,5 +8,5 @@ cd ..\ui
 call ui
 cd ..
 call closefiles
-copy release_ta\quake3.exe g:\quake3\quake3.exe
+copy Release_TA\quakelive_steam.exe g:\quakelive\quakelive_steam.exe
 call installvms

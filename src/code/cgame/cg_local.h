@@ -41,6 +41,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	POWERUP_BLINK_TIME	1000
 #define	FADE_TIME			200
+#define	OBITUARY_TIME		5000
+#define	MAX_OBITUARIES		8
 #define	PULSE_TIME			200
 #define	DAMAGE_DEFLECT_TIME	100
 #define	DAMAGE_RETURN_TIME	400
@@ -139,6 +141,13 @@ typedef enum {
 	CG_SPECTATOR_TRACK_POWERUP,
 	CG_SPECTATOR_TRACK_FLAG
 } cgSpectatorTrackType_t;
+
+typedef enum {
+	ROUNDSTATE_INACTIVE,
+	ROUNDSTATE_WARMUP,
+	ROUNDSTATE_ACTIVE,
+	ROUNDSTATE_COMPLETE
+} cgRoundState_t;
 
 typedef struct {
 	int		count;
@@ -602,6 +611,13 @@ typedef struct {
 // occurs, and they will have visible effects for #define STEP_TIME or whatever msec after
 
 #define MAX_PREDICTED_EVENTS	16
+
+typedef struct {
+	int		time;
+	int		attacker;
+	int		target;
+	int		mod;
+} cgObituary_t;
  
 typedef struct {
 	int			clientFrame;		// incremented each frame
@@ -718,6 +734,8 @@ typedef struct {
 	int			scoreboardTimerStopTime;
 	int			scoreFadeTime;
 	char		killerName[MAX_NAME_LENGTH];
+	cgObituary_t	obituaries[MAX_OBITUARIES];
+	int			obituaryIndex;
 	char			spectatorList[MAX_STRING_CHARS];		// list of names
 	int				spectatorLen;												// length of list
 	float			spectatorWidth;											// width in device units
@@ -1069,6 +1087,14 @@ typedef struct {
 	qhandle_t	medalDefend;
 	qhandle_t	medalAssist;
 	qhandle_t	medalCapture;
+	qhandle_t	medalMidair;
+	qhandle_t	medalPerfect;
+	qhandle_t	medalQuadGod;
+	qhandle_t	medalRampage;
+	qhandle_t	medalRevenge;
+	qhandle_t	medalPerforated;
+	qhandle_t	medalHeadshot;
+	qhandle_t	medalFirstFrag;
 
 	// sounds
 	sfxHandle_t	quadSound;
@@ -1384,7 +1410,7 @@ typedef struct {
 
 	int cursorX;
 	int cursorY;
-	qboolean eventHandling;
+	cgameEvent_t eventHandling;
 	qboolean mouseCaptured;
 	qboolean sizingHud;
 	void *capturedItem;
@@ -1554,10 +1580,12 @@ extern	vmCvar_t		cg_chatbeep;
 extern	vmCvar_t		cg_teamChatBeep;
 extern	vmCvar_t		cg_stats;
 extern	vmCvar_t 		cg_forceModel;
+extern	vmCvar_t		cg_forceTeamModel;
 extern	vmCvar_t 		cg_teamModel;
 extern	vmCvar_t 		cg_teamColors;
 extern	vmCvar_t 		cg_forceTeamSkin;
 extern	vmCvar_t 		cg_enemyModel;
+extern	vmCvar_t		cg_forceEnemyModel;
 extern	vmCvar_t 		cg_enemyColors;
 extern	vmCvar_t 		cg_forceEnemySkin;
 extern	vmCvar_t 		cg_forceTeamWeaponColor;
@@ -1579,6 +1607,8 @@ extern	vmCvar_t		cg_teammatePOIs;
 extern	vmCvar_t		cg_teammatePOIsMinWidth;
 extern	vmCvar_t		cg_teammatePOIsMaxWidth;
 extern	vmCvar_t		cg_teamChatsOnly;
+extern	vmCvar_t		cg_noVoiceChats;
+extern	vmCvar_t		cg_noVoiceText;
 extern	vmCvar_t		cg_playVoiceChats;
 extern	vmCvar_t		cg_showVoiceText;
 extern	vmCvar_t		cg_useItemMessage;

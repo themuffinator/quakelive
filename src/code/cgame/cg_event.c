@@ -327,6 +327,12 @@ static void CG_Obituary( entityState_t *ent ) {
 		attackerInfo = CG_ConfigString( CS_PLAYERS + attacker );
 	}
 
+	cg.obituaries[cg.obituaryIndex].time = cg.time;
+	cg.obituaries[cg.obituaryIndex].attacker = attacker;
+	cg.obituaries[cg.obituaryIndex].target = target;
+	cg.obituaries[cg.obituaryIndex].mod = mod;
+	cg.obituaryIndex = ( cg.obituaryIndex + 1 ) % MAX_OBITUARIES;
+
 	targetInfo = CG_ConfigString( CS_PLAYERS + target );
 	if ( !targetInfo ) {
 		return;

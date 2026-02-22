@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="quake3"
+	Name="quakelive_steam"
 	SccProjectName="&quot;$/MissionPack/code&quot;, CAAAAAAA"
 	SccAuxPath=""
 	SccLocalPath="."
@@ -30,7 +30,7 @@
 				RuntimeLibrary="4"
 				EnableFunctionLevelLinking="TRUE"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\Release_TA/quake3.pch"
+				PrecompiledHeaderFile=".\Release_TA/quakelive_steam.pch"
 				AssemblerListingLocation=".\Release_TA/"
 				ObjectFile=".\Release_TA/"
 				ProgramDataBaseFileName=".\Release_TA/"
@@ -43,12 +43,12 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="winmm.lib wsock32.lib vorbisfile.lib vorbis.lib ogg.lib libpng16.lib zlib.lib"
 				AdditionalLibraryDirectories="..\libs\libpng\lib\Win32"
-				OutputFile=".\Release_TA/quake3.exe"
+				OutputFile=".\Release_TA/quakelive_steam.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
-				ProgramDatabaseFile="Release_TA/quake3.pdb"
+				ProgramDatabaseFile="Release_TA/quakelive_steam.pdb"
 				GenerateMapFile="TRUE"
-				MapFileName="Release_TA/quake3.map"
+				MapFileName="Release_TA/quakelive_steam.map"
 				SubSystem="2"
 				StackReserveSize="8388608"
 				TargetMachine="1"/>
@@ -59,7 +59,7 @@
 				MkTypLibCompatible="TRUE"
 				SuppressStartupBanner="TRUE"
 				TargetEnvironment="1"
-				TypeLibraryName=".\Release_TA/quake3.tlb"
+				TypeLibraryName=".\Release_TA/quakelive_steam.tlb"
 				HeaderFileName=""/>
 			<Tool
 				Name="VCPostBuildEventTool"
@@ -100,7 +100,7 @@
 				AdditionalIncludeDirectories="..\libs\libpng\include"
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\Debug/quake3.pch"
+				PrecompiledHeaderFile=".\Debug/quakelive_steam.pch"
 				AssemblerListingLocation=".\Debug/"
 				ObjectFile=".\Debug/"
 				ProgramDataBaseFileName=".\Debug/"
@@ -115,13 +115,13 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="winmm.lib wsock32.lib vorbisfile.lib vorbis.lib ogg.lib libpng16.lib zlib.lib"
 				AdditionalLibraryDirectories="..\libs\libpng\lib\Win32"
-				OutputFile=".\Debug/quake3.exe"
+				OutputFile=".\Debug/quakelive_steam.exe"
 				LinkIncremental="2"
 				SuppressStartupBanner="TRUE"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile=".\Debug/quake3.pdb"
+				ProgramDatabaseFile=".\Debug/quakelive_steam.pdb"
 				GenerateMapFile="TRUE"
-				MapFileName=".\Debug/quake3.map"
+				MapFileName=".\Debug/quakelive_steam.map"
 				SubSystem="2"
 				StackReserveSize="8388608"
 				TargetMachine="1"/>
@@ -132,7 +132,7 @@
 				MkTypLibCompatible="TRUE"
 				SuppressStartupBanner="TRUE"
 				TargetEnvironment="1"
-				TypeLibraryName=".\Debug/quake3.tlb"
+				TypeLibraryName=".\Debug/quakelive_steam.tlb"
 				HeaderFileName=""/>
 			<Tool
 				Name="VCPostBuildEventTool"
@@ -161,8 +161,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release TA DEMO|Win32"
-			OutputDirectory=".\quake3___Win32_Release_TA_DEMO"
-			IntermediateDirectory=".\quake3___Win32_Release_TA_DEMO"
+			OutputDirectory=".\quakelive_steam___Win32_Release_TA_DEMO"
+			IntermediateDirectory=".\quakelive_steam___Win32_Release_TA_DEMO"
 			ConfigurationType="1"
 			UseOfMFC="0"
 			ATLMinimizesCRunTimeLibraryUsage="FALSE">
@@ -177,10 +177,10 @@
 				RuntimeLibrary="4"
 				EnableFunctionLevelLinking="TRUE"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\quake3___Win32_Release_TA_DEMO/quake3.pch"
-				AssemblerListingLocation=".\quake3___Win32_Release_TA_DEMO/"
-				ObjectFile=".\quake3___Win32_Release_TA_DEMO/"
-				ProgramDataBaseFileName=".\quake3___Win32_Release_TA_DEMO/"
+				PrecompiledHeaderFile=".\quakelive_steam___Win32_Release_TA_DEMO/quakelive_steam.pch"
+				AssemblerListingLocation=".\quakelive_steam___Win32_Release_TA_DEMO/"
+				ObjectFile=".\quakelive_steam___Win32_Release_TA_DEMO/"
+				ProgramDataBaseFileName=".\quakelive_steam___Win32_Release_TA_DEMO/"
 				WarningLevel="4"
 				SuppressStartupBanner="TRUE"
 				DebugInformationFormat="2"/>
@@ -190,13 +190,13 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="winmm.lib wsock32.lib vorbisfile.lib vorbis.lib ogg.lib libpng16.lib zlib.lib"
 				AdditionalLibraryDirectories="..\libs\libpng\lib\Win32"
-				OutputFile=".\quake3___Win32_Release_TA_DEMO/quake3.exe"
+				OutputFile=".\quakelive_steam___Win32_Release_TA_DEMO/quakelive_steam.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="Release_TA/quake3.pdb"
+				ProgramDatabaseFile="Release_TA/quakelive_steam.pdb"
 				GenerateMapFile="TRUE"
-				MapFileName="Release_TA/quake3.map"
+				MapFileName="Release_TA/quakelive_steam.map"
 				SubSystem="2"
 				StackReserveSize="8388608"
 				TargetMachine="1"/>
@@ -207,7 +207,7 @@
 				MkTypLibCompatible="TRUE"
 				SuppressStartupBanner="TRUE"
 				TargetEnvironment="1"
-				TypeLibraryName=".\quake3___Win32_Release_TA_DEMO/quake3.tlb"
+				TypeLibraryName=".\quakelive_steam___Win32_Release_TA_DEMO/quakelive_steam.tlb"
 				HeaderFileName=""/>
 			<Tool
 				Name="VCPostBuildEventTool"/>
@@ -249,7 +249,7 @@
 				RuntimeLibrary="4"
 				EnableFunctionLevelLinking="TRUE"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\Release/quake3.pch"
+				PrecompiledHeaderFile=".\Release/quakelive_steam.pch"
 				AssemblerListingLocation=".\Release/"
 				ObjectFile=".\Release/"
 				ProgramDataBaseFileName=".\Release/"
@@ -261,13 +261,13 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="winmm.lib wsock32.lib vorbisfile.lib vorbis.lib ogg.lib libpng16.lib zlib.lib"
 				AdditionalLibraryDirectories="..\libs\libpng\lib\Win32"
-				OutputFile=".\Release/quake3.exe"
+				OutputFile=".\Release/quakelive_steam.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile=".\Release/quake3.pdb"
+				ProgramDatabaseFile=".\Release/quakelive_steam.pdb"
 				GenerateMapFile="TRUE"
-				MapFileName=".\Release/quake3.map"
+				MapFileName=".\Release/quakelive_steam.map"
 				SubSystem="2"
 				StackReserveSize="8388608"
 				TargetMachine="1"/>
@@ -278,7 +278,7 @@
 				MkTypLibCompatible="TRUE"
 				SuppressStartupBanner="TRUE"
 				TargetEnvironment="1"
-				TypeLibraryName=".\Release/quake3.tlb"
+				TypeLibraryName=".\Release/quakelive_steam.tlb"
 				HeaderFileName=""/>
 			<Tool
 				Name="VCPostBuildEventTool"/>
@@ -304,8 +304,8 @@
 		</Configuration>
 		<Configuration
 			Name="Debug TA DEMO|Win32"
-			OutputDirectory=".\quake3___Win32_Debug_TA_DEMO"
-			IntermediateDirectory=".\quake3___Win32_Debug_TA_DEMO"
+			OutputDirectory=".\quakelive_steam___Win32_Debug_TA_DEMO"
+			IntermediateDirectory=".\quakelive_steam___Win32_Debug_TA_DEMO"
 			ConfigurationType="1"
 			UseOfMFC="0"
 			ATLMinimizesCRunTimeLibraryUsage="FALSE">
@@ -317,12 +317,12 @@
 				AdditionalIncludeDirectories="..\libs\libpng\include"
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\quake3___Win32_Debug_TA_DEMO/quake3.pch"
-				AssemblerListingLocation=".\quake3___Win32_Debug_TA_DEMO/"
-				ObjectFile=".\quake3___Win32_Debug_TA_DEMO/"
-				ProgramDataBaseFileName=".\quake3___Win32_Debug_TA_DEMO/"
+				PrecompiledHeaderFile=".\quakelive_steam___Win32_Debug_TA_DEMO/quakelive_steam.pch"
+				AssemblerListingLocation=".\quakelive_steam___Win32_Debug_TA_DEMO/"
+				ObjectFile=".\quakelive_steam___Win32_Debug_TA_DEMO/"
+				ProgramDataBaseFileName=".\quakelive_steam___Win32_Debug_TA_DEMO/"
 				BrowseInformation="1"
-				BrowseInformationFile=".\quake3___Win32_Debug_TA_DEMO/"
+				BrowseInformationFile=".\quakelive_steam___Win32_Debug_TA_DEMO/"
 				WarningLevel="3"
 				SuppressStartupBanner="TRUE"
 				DebugInformationFormat="4"/>
@@ -332,13 +332,13 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="winmm.lib wsock32.lib vorbisfile.lib vorbis.lib ogg.lib libpng16.lib zlib.lib"
 				AdditionalLibraryDirectories="..\libs\libpng\lib\Win32"
-				OutputFile=".\quake3___Win32_Debug_TA_DEMO/quake3.exe"
+				OutputFile=".\quakelive_steam___Win32_Debug_TA_DEMO/quakelive_steam.exe"
 				LinkIncremental="2"
 				SuppressStartupBanner="TRUE"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile=".\quake3___Win32_Debug_TA_DEMO/quake3.pdb"
+				ProgramDatabaseFile=".\quakelive_steam___Win32_Debug_TA_DEMO/quakelive_steam.pdb"
 				GenerateMapFile="TRUE"
-				MapFileName="Debug_TA/quake3.map"
+				MapFileName="Debug_TA/quakelive_steam.map"
 				SubSystem="2"
 				StackReserveSize="8388608"
 				TargetMachine="1"/>
@@ -349,7 +349,7 @@
 				MkTypLibCompatible="TRUE"
 				SuppressStartupBanner="TRUE"
 				TargetEnvironment="1"
-				TypeLibraryName=".\quake3___Win32_Debug_TA_DEMO/quake3.tlb"
+				TypeLibraryName=".\quakelive_steam___Win32_Debug_TA_DEMO/quakelive_steam.tlb"
 				HeaderFileName=""/>
 			<Tool
 				Name="VCPostBuildEventTool"/>
@@ -376,8 +376,8 @@
 		</Configuration>
 		<Configuration
 			Name="vector|Win32"
-			OutputDirectory=".\quake3___Win32_vector0"
-			IntermediateDirectory=".\quake3___Win32_vector0"
+			OutputDirectory=".\quakelive_steam___Win32_vector0"
+			IntermediateDirectory=".\quakelive_steam___Win32_vector0"
 			ConfigurationType="1"
 			UseOfMFC="0"
 			ATLMinimizesCRunTimeLibraryUsage="FALSE">
@@ -393,10 +393,10 @@
 				RuntimeLibrary="4"
 				EnableFunctionLevelLinking="TRUE"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\quake3___Win32_vector0/quake3.pch"
-				AssemblerListingLocation=".\quake3___Win32_vector0/"
-				ObjectFile=".\quake3___Win32_vector0/"
-				ProgramDataBaseFileName=".\quake3___Win32_vector0/"
+				PrecompiledHeaderFile=".\quakelive_steam___Win32_vector0/quakelive_steam.pch"
+				AssemblerListingLocation=".\quakelive_steam___Win32_vector0/"
+				ObjectFile=".\quakelive_steam___Win32_vector0/"
+				ProgramDataBaseFileName=".\quakelive_steam___Win32_vector0/"
 				WarningLevel="4"
 				SuppressStartupBanner="TRUE"
 				DebugInformationFormat="3"/>
@@ -406,13 +406,13 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="winmm.lib wsock32.lib vorbisfile.lib vorbis.lib ogg.lib libpng16.lib zlib.lib"
 				AdditionalLibraryDirectories="..\libs\libpng\lib\Win32"
-				OutputFile=".\quake3___Win32_vector0/quake3.exe"
+				OutputFile=".\quakelive_steam___Win32_vector0/quakelive_steam.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="Release_TA/quake3.pdb"
+				ProgramDatabaseFile="Release_TA/quakelive_steam.pdb"
 				GenerateMapFile="TRUE"
-				MapFileName="Release_TA/quake3.map"
+				MapFileName="Release_TA/quakelive_steam.map"
 				SubSystem="2"
 				StackReserveSize="8388608"
 				TargetMachine="1"/>
@@ -423,7 +423,7 @@
 				MkTypLibCompatible="TRUE"
 				SuppressStartupBanner="TRUE"
 				TargetEnvironment="1"
-				TypeLibraryName=".\quake3___Win32_vector0/quake3.tlb"
+				TypeLibraryName=".\quakelive_steam___Win32_vector0/quakelive_steam.tlb"
 				HeaderFileName=""/>
 			<Tool
 				Name="VCPostBuildEventTool"/>
@@ -462,7 +462,7 @@
 				AdditionalIncludeDirectories="..\libs\libpng\include"
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderFile=".\Debug_TA/quake3.pch"
+				PrecompiledHeaderFile=".\Debug_TA/quakelive_steam.pch"
 				AssemblerListingLocation=".\Debug_TA/"
 				ObjectFile=".\Debug_TA/"
 				ProgramDataBaseFileName=".\Debug_TA/"
@@ -477,13 +477,13 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="winmm.lib wsock32.lib vorbisfile.lib vorbis.lib ogg.lib libpng16.lib zlib.lib"
 				AdditionalLibraryDirectories="..\libs\libpng\lib\Win32"
-				OutputFile=".\Debug_TA/quake3.exe"
+				OutputFile=".\Debug_TA/quakelive_steam.exe"
 				LinkIncremental="2"
 				SuppressStartupBanner="TRUE"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile=".\Debug_TA/quake3.pdb"
+				ProgramDatabaseFile=".\Debug_TA/quakelive_steam.pdb"
 				GenerateMapFile="TRUE"
-				MapFileName="Debug_TA/quake3.map"
+				MapFileName="Debug_TA/quakelive_steam.map"
 				SubSystem="2"
 				StackReserveSize="8388608"
 				TargetMachine="1"/>
@@ -494,7 +494,7 @@
 				MkTypLibCompatible="TRUE"
 				SuppressStartupBanner="TRUE"
 				TargetEnvironment="1"
-				TypeLibraryName=".\Debug_TA/quake3.tlb"
+				TypeLibraryName=".\Debug_TA/quakelive_steam.tlb"
 				HeaderFileName=""/>
 			<Tool
 				Name="VCPostBuildEventTool"

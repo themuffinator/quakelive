@@ -1,0 +1,42 @@
+# Visual Studio / MSBuild build output
+src/code/**/Debug/
+src/code/**/Release/
+src/code/**/build/
+build/win32/
+
+# Native DLL staging / CI output
+build/win32-native/
+build/re/
+
+# Local third-party SDK drops
+src/libs/libpng/
+src/libs/vorbis/
+src/libs/_build/
+src/libs/_deps/
+
+# Local UI asset drops (read-only tree)
+src/ui/assets/
+
+# MSVC intermediate artifacts
+*.obj
+*.sbr
+*.pch
+*.ipch
+*.idb
+*.pdb
+*.ilk
+*.iobj
+*.ipdb
+*.res
+*.tlog
+*.lastbuildstate
+*.log
+*.tmp
+
+# Visual Studio user state
+.vs/
+*.suo
+*.user
+*.userosscache
+*.VC.db
+*.VC.VC.opendb

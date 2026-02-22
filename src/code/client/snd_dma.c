@@ -241,6 +241,7 @@ channel_t*	S_ChannelMalloc() {
 
 void S_ChannelSetup() {
 	channel_t *p, *q;
+	static qboolean s_channelInitPrinted = qfalse;
 
 	// clear all the sounds so they don't
 	Com_Memset( s_channels, 0, sizeof( s_channels ) );
@@ -253,7 +254,10 @@ void S_ChannelSetup() {
 	
 	*(channel_t **)q = NULL;
 	freelist = p + MAX_CHANNELS - 1;
-	Com_DPrintf("Channel memory manager started\n");
+	if ( !s_channelInitPrinted ) {
+		Com_DPrintf("Channel memory manager started\n");
+		s_channelInitPrinted = qtrue;
+	}
 }
 
 // =======================================================================

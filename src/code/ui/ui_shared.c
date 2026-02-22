@@ -767,69 +767,156 @@ void Window_Paint(Window *w, float fadeAmount, float fadeClamp, float fadeCycle)
 }
 
 
+/*
+==================
+UI_ResolveWidescreenMode
+==================
+*/
+static int UI_ResolveWidescreenMode(const menuDef_t *menu, const itemDef_t *item) {
+	if (item && item->widescreenSet) {
+		return item->widescreen;
+	}
+
+	if (menu) {
+		return menu->widescreen;
+	}
+
+	return WIDESCREEN_STRETCH;
+}
+
+/*
+==================
+UI_ApplyWidescreenRect
+==================
+*/
+static void UI_ApplyWidescreenRect(rectDef_t *rect, int widescreen) {
+	float ratio;
+	float extra;
+	float offset;
+
+	if (!rect) {
+		return;
+	}
+
+	if (widescreen == WIDESCREEN_STRETCH) {
+		return;
+	}
+
+	if (!DC || DC->xscale <= 0.0f) {
+		return;
+	}
+
+	if (DC->xscale <= DC->yscale) {
+		return;
+	}
+
+	ratio = DC->yscale / DC->xscale;
+	extra = (DC->xscale - DC->yscale) * (float)SCREEN_WIDTH;
+	if (extra <= 0.0f) {
+		return;
+	}
+
+	switch (widescreen) {
+	case WIDESCREEN_CENTER:
+		offset = extra * 0.5f;
+		break;
+	case WIDESCREEN_RIGHT:
+		offset = extra;
+		break;
+	case WIDESCREEN_LEFT:
+	default:
+		offset = 0.0f;
+		break;
+	}
+
+	rect->x = (rect->x * ratio) + (offset / DC->xscale);
+	rect->w *= ratio;
+}
+
 void Item_SetScreenCoords(itemDef_t *item, float x, float y) {
-  
-  if (item == NULL) {
-    return;
-  }
+	rectDef_t rect;
+	menuDef_t *menu;
+	int widescreen;
 
-  if (item->window.border != 0) {
-    x += item->window.borderSize;
-    y += item->window.borderSize;
-  }
+	if (item == NULL) {
+		return;
+	}
 
-  item->window.rect.x = x + item->window.rectClient.x;
-  item->window.rect.y = y + item->window.rectClient.y;
-  item->window.rect.w = item->window.rectClient.w;
-  item->window.rect.h = item->window.rectClient.h;
+	if (item->window.border != 0) {
+		x += item->window.borderSize;
+		y += item->window.borderSize;
+	}
 
-  // force the text rects to recompute
-  item->textRect.w = 0;
-  item->textRect.h = 0;
+	rect.x = x + item->window.rectClient.x;
+	rect.y = y + item->window.rectClient.y;
+	rect.w = item->window.rectClient.w;
+	rect.h = item->window.rectClient.h;
+
+	menu = (menuDef_t *)item->parent;
+	widescreen = UI_ResolveWidescreenMode(menu, item);
+	UI_ApplyWidescreenRect(&rect, widescreen);
+
+	item->window.rect.x = rect.x;
+	item->window.rect.y = rect.y;
+	item->window.rect.w = rect.w;
+	item->window.rect.h = rect.h;
+
+	// force the text rects to recompute
+	item->textRect.w = 0;
+	item->textRect.h = 0;
 }
 
 // FIXME: consolidate this with nearby stuff
 void Item_UpdatePosition(itemDef_t *item) {
-  float x, y;
-  menuDef_t *menu;
-  
-  if (item == NULL || item->parent == NULL) {
-    return;
-  }
+	float x, y;
+	menuDef_t *menu;
 
-  menu = item->parent;
+	if (item == NULL || item->parent == NULL) {
+		return;
+	}
 
-  x = menu->window.rect.x;
-  y = menu->window.rect.y;
-  
-  if (menu->window.border != 0) {
-    x += menu->window.borderSize;
-    y += menu->window.borderSize;
-  }
+	menu = item->parent;
 
-  Item_SetScreenCoords(item, x, y);
+	x = menu->window.rectClient.x;
+	y = menu->window.rectClient.y;
+
+	if (menu->window.border != 0) {
+		x += menu->window.borderSize;
+		y += menu->window.borderSize;
+	}
+
+	Item_SetScreenCoords(item, x, y);
 
 }
 
 // menus
 void Menu_UpdatePosition(menuDef_t *menu) {
-  int i;
-  float x, y;
+	int i;
+	float x, y;
+	rectDef_t rect;
 
-  if (menu == NULL) {
-    return;
-  }
-  
-  x = menu->window.rect.x;
-  y = menu->window.rect.y;
-  if (menu->window.border != 0) {
-    x += menu->window.borderSize;
-    y += menu->window.borderSize;
-  }
+	if (menu == NULL) {
+		return;
+	}
 
-  for (i = 0; i < menu->itemCount; i++) {
-    Item_SetScreenCoords(menu->items[i], x, y);
-  }
+	rect = menu->window.rectClient;
+	UI_ApplyWidescreenRect(&rect, menu->widescreen);
+
+	menu->window.rect.x = rect.x;
+	menu->window.rect.y = rect.y;
+	menu->window.rect.w = rect.w;
+	menu->window.rect.h = rect.h;
+
+	x = menu->window.rectClient.x;
+	y = menu->window.rectClient.y;
+	if (menu->window.border != 0) {
+		x += menu->window.borderSize;
+		y += menu->window.borderSize;
+	}
+
+	for (i = 0; i < menu->itemCount; i++) {
+		Item_SetScreenCoords(menu->items[i], x, y);
+	}
 }
 
 void Menu_PostParse(menuDef_t *menu) {
@@ -837,10 +924,10 @@ void Menu_PostParse(menuDef_t *menu) {
 		return;
 	}
 	if (menu->fullScreen) {
-		menu->window.rect.x = 0;
-		menu->window.rect.y = 0;
-		menu->window.rect.w = 640;
-		menu->window.rect.h = 480;
+		menu->window.rectClient.x = 0;
+		menu->window.rectClient.y = 0;
+		menu->window.rectClient.w = SCREEN_WIDTH;
+		menu->window.rectClient.h = SCREEN_HEIGHT;
 	}
 	Menu_UpdatePosition(menu);
 }
@@ -4178,6 +4265,7 @@ void Menu_Init(menuDef_t *menu) {
 	menu->fadeAmount = DC->Assets.fadeAmount;
 	menu->fadeClamp = DC->Assets.fadeClamp;
 	menu->fadeCycle = DC->Assets.fadeCycle;
+	menu->widescreen = WIDESCREEN_STRETCH;
 	Window_Init(&menu->window);
 }
 
@@ -4276,6 +4364,8 @@ menuDef_t *Menus_ActivateByName(const char *p) {
 void Item_Init(itemDef_t *item) {
 	memset(item, 0, sizeof(itemDef_t));
 	item->textscale = 0.55f;
+	item->widescreen = WIDESCREEN_STRETCH;
+	item->widescreenSet = qfalse;
 	Window_Init(&item->window);
 }
 
@@ -4615,6 +4705,27 @@ qboolean ItemParse_rect( itemDef_t *item, int handle ) {
 	if (!PC_Rect_Parse(handle, &item->window.rectClient)) {
 		return qfalse;
 	}
+	return qtrue;
+}
+
+/*
+===============
+ItemParse_widescreen
+===============
+*/
+qboolean ItemParse_widescreen( itemDef_t *item, int handle ) {
+	int widescreen;
+
+	if (!PC_Int_Parse(handle, &widescreen)) {
+		return qfalse;
+	}
+
+	if (widescreen < WIDESCREEN_STRETCH || widescreen > WIDESCREEN_RIGHT) {
+		return qfalse;
+	}
+
+	item->widescreen = widescreen;
+	item->widescreenSet = qtrue;
 	return qtrue;
 }
 
@@ -5201,6 +5312,7 @@ keywordHash_t itemParseKeywords[] = {
 	{"model_rotation", ItemParse_model_rotation, NULL},
 	{"model_angle", ItemParse_model_angle, NULL},
 	{"rect", ItemParse_rect, NULL},
+	{"widescreen", ItemParse_widescreen, NULL},
 	{"style", ItemParse_style, NULL},
 	{"decoration", ItemParse_decoration, NULL},
 	{"notselectable", ItemParse_notselectable, NULL},
@@ -5382,9 +5494,30 @@ qboolean MenuParse_fullscreen( itemDef_t *item, int handle ) {
 	return qtrue;
 }
 
+/*
+===============
+MenuParse_widescreen
+===============
+*/
+qboolean MenuParse_widescreen( itemDef_t *item, int handle ) {
+	menuDef_t *menu = (menuDef_t*)item;
+	int widescreen;
+
+	if (!PC_Int_Parse(handle, &widescreen)) {
+		return qfalse;
+	}
+
+	if (widescreen < WIDESCREEN_STRETCH || widescreen > WIDESCREEN_RIGHT) {
+		return qfalse;
+	}
+
+	menu->widescreen = widescreen;
+	return qtrue;
+}
+
 qboolean MenuParse_rect( itemDef_t *item, int handle ) {
 	menuDef_t *menu = (menuDef_t*)item;
-	if (!PC_Rect_Parse(handle, &menu->window.rect)) {
+	if (!PC_Rect_Parse(handle, &menu->window.rectClient)) {
 		return qfalse;
 	}
 	return qtrue;
@@ -5643,6 +5776,7 @@ qboolean MenuParse_itemDef( itemDef_t *item, int handle ) {
 keywordHash_t menuParseKeywords[] = {
 	{"font", MenuParse_font, NULL},
 	{"name", MenuParse_name, NULL},
+	{"widescreen", MenuParse_widescreen, NULL},
 	{"fullscreen", MenuParse_fullscreen, NULL},
 	{"rect", MenuParse_rect, NULL},
 	{"style", MenuParse_style, NULL},
@@ -5805,8 +5939,8 @@ qboolean Display_MouseMove(void *p, int x, int y) {
 			Menu_HandleMouseMove(&Menus[i], x, y);
 		}
 	} else {
-		menu->window.rect.x += x;
-		menu->window.rect.y += y;
+		menu->window.rectClient.x += x;
+		menu->window.rectClient.y += y;
 		Menu_UpdatePosition(menu);
 	}
  	return qtrue;

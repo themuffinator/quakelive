@@ -468,7 +468,7 @@ NET_IPSocket
 int NET_IPSocket( char *net_interface, int port ) {
 	SOCKET				newsocket;
 	struct sockaddr_in	address;
-	qboolean			_true = qtrue;
+	u_long				nonblocking = 1;
 	int					i = 1;
 	int					err;
 
@@ -488,7 +488,7 @@ int NET_IPSocket( char *net_interface, int port ) {
 	}
 
 	// make it non-blocking
-	if( ioctlsocket( newsocket, FIONBIO, &_true ) == SOCKET_ERROR ) {
+	if( ioctlsocket( newsocket, FIONBIO, &nonblocking ) == SOCKET_ERROR ) {
 		Com_Printf( "WARNING: UDP_OpenSocket: ioctl FIONBIO: %s\n", NET_ErrorString() );
 		return 0;
 	}

@@ -22,8 +22,91 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // sv_rankings.c -- global rankings interface
 
 #include "server.h"
-#include "..\rankings\1.0\gr\grapi.h"
-#include "..\rankings\1.0\gr\grlog.h"
+
+#if !QL_ENABLE_RANKINGS
+/*
+================
+SV_RankBegin
+================
+*/
+void SV_RankBegin( char *gamekey ) {
+	(void)gamekey;
+	Cvar_Set( "sv_rankingsActive", "0" );
+}
+
+/*
+================
+SV_RankCheckInit
+================
+*/
+qboolean SV_RankCheckInit( void ) {
+	return qfalse;
+}
+
+/*
+================
+SV_RankActive
+================
+*/
+qboolean SV_RankActive( void ) {
+	return qfalse;
+}
+
+/*
+================
+SV_RankPoll
+================
+*/
+void SV_RankPoll( void ) {
+}
+
+/*
+================
+SV_RankUserStatus
+================
+*/
+int SV_RankUserStatus( int index ) {
+	(void)index;
+	return 0;
+}
+
+/*
+================
+SV_RankUserReset
+================
+*/
+void SV_RankUserReset( int index ) {
+	(void)index;
+}
+
+/*
+================
+SV_RankReportInt
+================
+*/
+void SV_RankReportInt( int index1, int index2, int key, int value, qboolean accum ) {
+	(void)index1;
+	(void)index2;
+	(void)key;
+	(void)value;
+	(void)accum;
+}
+
+/*
+================
+SV_RankReportStr
+================
+*/
+void SV_RankReportStr( int index1, int index2, int key, char *value ) {
+	(void)index1;
+	(void)index2;
+	(void)key;
+	(void)value;
+}
+
+#else
+#include "..\\rankings\\1.0\\gr\\grapi.h"
+#include "..\\rankings\\1.0\\gr\\grlog.h"
 
 typedef struct
 {
@@ -1534,4 +1617,4 @@ static void SV_RankError( const char* fmt, ... )
 	Cvar_Set( "sv_rankingsActive", "0" );
 	// FIXME - attempt clean shutdown?
 }
-
+#endif

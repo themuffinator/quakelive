@@ -363,12 +363,10 @@ static void CG_ConfirmOrder_f (void ) {
 	if ( CG_IsSpectatorInput() ) {
 		return;
 	}
-	trap_SendConsoleCommand(va("cmd vtell %d %s
-", cgs.acceptLeader, VOICECHAT_YES));
+	trap_SendConsoleCommand( va( "cmd vtell %d %s\n", cgs.acceptLeader, VOICECHAT_YES ) );
 	trap_SendConsoleCommand("+button5; wait; -button5");
 	if (cg.time < cgs.acceptOrderTime) {
-		trap_SendClientCommand(va("teamtask %d
-", cgs.acceptTask));
+		trap_SendClientCommand( va( "teamtask %d\n", cgs.acceptTask ) );
 		cgs.acceptOrderTime = 0;
 	}
 }
@@ -377,20 +375,9 @@ static void CG_DenyOrder_f (void ) {
 	if ( CG_IsSpectatorInput() ) {
 		return;
 	}
-	trap_SendConsoleCommand(va("cmd vtell %d %s
-", cgs.acceptLeader, VOICECHAT_NO));
+	trap_SendConsoleCommand( va( "cmd vtell %d %s\n", cgs.acceptLeader, VOICECHAT_NO ) );
 	trap_SendConsoleCommand("+button6; wait; -button6");
 	if (cg.time < cgs.acceptOrderTime) {
-		cgs.acceptOrderTime = 0;
-	}
-}
-static void CG_DenyOrder_f (void ) {
-if ( CG_IsSpectatorInput() ) {
-return;
-}
-trap_SendConsoleCommand(va("cmd vtell %d %s\n", cgs.acceptLeader, VOICECHAT_NO));
-trap_SendConsoleCommand("+button6; wait; -button6");
-if (cg.time < cgs.acceptOrderTime) {
 		cgs.acceptOrderTime = 0;
 	}
 }

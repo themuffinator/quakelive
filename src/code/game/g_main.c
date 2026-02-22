@@ -36,6 +36,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define ARRAY_LEN( x ) ( sizeof( x ) / sizeof( (x)[0] ) )
 #endif
 
+#define MAX_ADMIN_ACCESS_FILE_BYTES	8192
+#define GAME_STATE_BUFFER_LENGTH		16
+
 level_locals_t	level;
 weaponConfig_t	g_weaponConfig;
 flagConfig_t	g_flagConfig;
@@ -85,8 +88,6 @@ static legacyCvarAlias_t	s_legacyCvarAliases[] = {
 	{ &g_damage_g, "g_damage_g", &g_damageGauntletLegacy, "g_damage_gauntlet", "50", 0, -1, -1 }
 };
 
-#define MAX_ADMIN_ACCESS_FILE_BYTES	8192
-#define GAME_STATE_BUFFER_LENGTH		16
 static qlr_game_frame_context_t *G_GetFrameContext( void );
 static void G_DispatchScheduledThinks( qlr_game_frame_context_t *ctx, int msec );
 static void G_StepEntities( qlr_game_frame_context_t *ctx );
@@ -105,6 +106,7 @@ static void G_LoadAdminAccessFile( void );
 static qboolean G_CustomSettingMatchesDefault( const cvarTable_t *cv );
 static uint64_t G_ComputeCustomSettingsMask( void );
 static void G_UpdateCustomSettingsConfigstring( qboolean forceBroadcast );
+void G_SuddenDeathThink( void );
 
 /*
 =============
@@ -234,6 +236,7 @@ void QLR_Game_BindFrameContext( qlr_game_frame_context_t *ctx ) {
 		g_qlr_frame_ctx->level = ( qlr_level_locals_t * )&level;
 		g_qlr_frame_ctx->entities = ( qlr_gentity_t * )g_entities;
 		g_qlr_frame_ctx->entity_count = level.num_entities;
+	}
 }
 
 void QLR_Game_UnbindFrameContext( void ) {
@@ -270,6 +273,7 @@ vmCvar_t	g_knockback;
 vmCvar_t	g_quadfactor;
 vmCvar_t	g_forcerespawn;
 vmCvar_t	g_inactivity;
+vmCvar_t	g_spawnProtect;
 vmCvar_t	g_debugMove;
 vmCvar_t	g_debugDamage;
 vmCvar_t	g_debugAlloc;
@@ -283,6 +287,7 @@ vmCvar_t	g_restarted;
 vmCvar_t	g_log;
 vmCvar_t	g_logSync;
 vmCvar_t	g_blood;
+vmCvar_t	g_pauseAudio;
 vmCvar_t	g_podiumDist;
 vmCvar_t	g_podiumDrop;
 vmCvar_t	g_allowSpecVote;
@@ -291,16 +296,14 @@ vmCvar_t	g_allowVoteMidGame;
 vmCvar_t	g_allowForfeit;
 vmCvar_t	g_allowKill;
 vmCvar_t	g_allowCustomHeadmodels;
-vmCvar_t	g_allowForfeit;
 vmCvar_t	g_complaintLimit;
 vmCvar_t	g_complaintDamageThreshold;
 vmCvar_t	g_voteFlags;
 vmCvar_t	g_voteDelay;
 vmCvar_t	g_voteLimit;
-vmCvar_t	g_complaintDamageThreshold;
-vmCvar_t	g_complaintLimit;
 vmCvar_t	g_teamAutoJoin;
 vmCvar_t	g_teamForceBalance;
+vmCvar_t	g_maintainTeam;
 vmCvar_t	g_banIPs;
 vmCvar_t	g_filterBan;
 vmCvar_t	g_instaGib;
@@ -353,8 +356,6 @@ vmCvar_t        g_factoryRespawnDelay;
 vmCvar_t        g_factoryWarmupSpawnDelay;
 vmCvar_t        g_factoryAllowItemDrops;
 vmCvar_t        g_factoryAllowItemBounce;
-vmCvar_t        g_itemTimers;
-vmCvar_t        g_itemHeight;
 vmCvar_t        g_vampiricDamage;
 vmCvar_t	g_suddenDeathRespawn;
 vmCvar_t	g_suddenDeathRespawnStart;
@@ -421,7 +422,6 @@ vmCvar_t	g_quadHog;
 vmCvar_t	g_quadHogIdle;
 vmCvar_t	g_quadHogTime;
 vmCvar_t	g_quadHogPingRate;
-vmCvar_t	g_training;
 vmCvar_t	g_forcedAtmosphere;
 vmCvar_t	g_adTouchScoreBonus;
 vmCvar_t	g_adElimScoreBonus;
@@ -766,7 +766,8 @@ void G_RefreshAllCvars( void ) {
 	for ( i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++ ) {
 		if ( cv->vmCvar ) {
 			trap_Cvar_Update( cv->vmCvar );
-}
+		}
+	}
 }
 
 static void G_RegisterCvarHelp( const cvarTable_t *cv ) {
@@ -2906,6 +2907,7 @@ static void G_StopOvertime( void ) {
 	level.suddenDeathNoRespawnLogged = qfalse;
 	G_LogPrintf( "match: overtime cleared\n" );
 	G_UpdateMatchStateConfigString();
+}
 
 
 /*
@@ -3247,7 +3249,53 @@ void CheckTournament( void ) {
 			return;
 		}
 	}
+}
 
+/*
+==================
+CheckVote
+==================
+*/
+void CheckVote( void ) {
+	if ( level.voteExecuteTime && level.voteExecuteTime < level.time ) {
+		level.voteExecuteTime = 0;
+		trap_SendConsoleCommand( EXEC_APPEND, va( "%s\n", level.voteString ) );
+	}
+	if ( !level.voteTime ) {
+		return;
+	}
+	if ( level.time - level.voteTime >= VOTE_TIME ) {
+		trap_SendServerCommand( -1, "print \"Vote failed.\n\"" );
+	} else {
+		if ( level.voteYes > level.numVotingClients / 2 ) {
+			// execute the command, then remove the vote
+			trap_SendServerCommand( -1, "print \"Vote passed.\n\"" );
+			level.voteExecuteTime = level.time + 3000;
+		} else if ( level.voteNo >= level.numVotingClients / 2 ) {
+			// same behavior as a timeout
+			trap_SendServerCommand( -1, "print \"Vote failed.\n\"" );
+		} else {
+			// still waiting for a majority
+			return;
+		}
+	}
+	level.voteTime = 0;
+	trap_SetConfigstring( CS_VOTE_TIME, "" );
+}
+
+/*
+==================
+PrintTeam
+==================
+*/
+void PrintTeam( int team, char *message ) {
+	int i;
+
+	for ( i = 0 ; i < level.maxclients ; i++ ) {
+		if ( level.clients[i].sess.sessionTeam != team ) {
+			continue;
+		}
+		trap_SendServerCommand( i, message );
 	}
 }
 

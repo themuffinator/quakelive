@@ -512,7 +512,7 @@ void CG_PredictPlayerState( void ) {
 
 	// prepare for pmove
 	cg_pmove.ps = &cg.predictedPlayerState;
-	Com_Memcpy( &localPmoveSettings, &cg_pmoveSettings, sizeof( localPmoveSettings ) );
+	memcpy( &localPmoveSettings, &cg_pmoveSettings, sizeof( localPmoveSettings ) );
 	if ( cg_autoHop.integer ) {
 		localPmoveSettings.autoHop = qtrue;
 	}

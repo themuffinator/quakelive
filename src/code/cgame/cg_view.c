@@ -41,9 +41,11 @@ corresponding width/height pair.
 */
 static qboolean CG_GetTargetAspectDimensions( float *targetWidth, float *targetHeight ) {
 	const char *ratioString;
+	char	ratioBuffer[MAX_CVAR_VALUE_STRING];
 	int ratio;
 
-	ratioString = trap_Cvar_VariableString( "r_aspectRatio" );
+	trap_Cvar_VariableStringBuffer( "r_aspectRatio", ratioBuffer, sizeof( ratioBuffer ) );
+	ratioString = ratioBuffer;
 	ratio = atoi( ratioString );
 	if ( ratio <= 0 ) {
 		return qfalse;
@@ -548,6 +550,37 @@ static void CG_SetZoomState( qboolean zoomState ) {
 
 	cg.zoomed = zoomState;
 	cg.zoomTime = cg.time;
+}
+
+/*
+=============
+CG_ZoomDown_f
+
+Starts or toggles zoom mode based on cg_zoomToggle.
+=============
+*/
+void CG_ZoomDown_f( void ) {
+	if ( cg.zoomToggle ) {
+		CG_SetZoomState( cg.zoomed ? qfalse : qtrue );
+		return;
+	}
+
+	CG_SetZoomState( qtrue );
+}
+
+/*
+=============
+CG_ZoomUp_f
+
+Ends zoom mode for hold-to-zoom bindings.
+=============
+*/
+void CG_ZoomUp_f( void ) {
+	if ( cg.zoomToggle ) {
+		return;
+	}
+
+	CG_SetZoomState( qfalse );
 }
 
 /*

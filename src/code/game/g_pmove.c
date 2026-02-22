@@ -342,13 +342,15 @@ static void G_PmoveCacheSettings( void ) {
 	g_pmoveSettings.stepJumpVelocity = g_pmove_stepJumpVelocity_cvar.value;
 	g_pmoveSettings.strafeAccel = g_pmove_strafeAccel_cvar.value;
 	{
+		const pmove_settings_t	*defaults;
 		float	grappleSpeed;
 
+		defaults = PM_GetDefaultSettings();
 		grappleSpeed = ( float )g_weaponConfig.grappleSpeed;
 		if ( grappleSpeed <= 0.0f ) {
 			grappleSpeed = g_pmove_velocityGh_cvar.value;
 			if ( grappleSpeed <= 0.0f ) {
-				grappleSpeed = pm_defaultSettings.velocityGh;
+				grappleSpeed = defaults ? defaults->velocityGh : 0.0f;
 			}
 		}
 

@@ -8,6 +8,10 @@
 
 #include "../auth_credentials.h"
 
+typedef struct {
+	uint64_t value;
+} CSteamID;
+
 #if QL_BUILD_STEAMWORKS
 
 #include "platform_backend_shared.h"
@@ -17,10 +21,6 @@ extern "C" {
 #endif
 
 typedef uint32_t HAuthTicket;
-
-typedef struct {
-	uint64_t value;
-} CSteamID;
 
 typedef enum {
 	k_EBeginAuthSessionResultOK = 0,
@@ -58,6 +58,10 @@ qboolean QL_Steamworks_HexDecode( const char *hex, uint8_t *out, size_t outSize,
 qboolean QL_Steamworks_RequestAuthTicket( char *ticketBuffer, size_t ticketBufferSize, int *ticketLength, uint32_t *ticketHandle );
 
 qboolean QL_Steamworks_ValidateTicket( const char *ticketHex, ql_auth_response_t *response );
+
+qboolean QL_Steamworks_IsSubscribedApp( uint32_t appId );
+
+qboolean QL_Steamworks_GetItemDownloadInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outDownloaded, uint64_t *outTotal );
 
 #ifdef __cplusplus
 }
@@ -214,6 +218,29 @@ QL_Steamworks_ValidateTicket
 static inline qboolean QL_Steamworks_ValidateTicket( const char *ticketHex, ql_auth_response_t *response ) {
 	(void)ticketHex;
 	(void)response;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_IsSubscribedApp
+=============
+*/
+static inline qboolean QL_Steamworks_IsSubscribedApp( uint32_t appId ) {
+	(void)appId;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_GetItemDownloadInfo
+=============
+*/
+static inline qboolean QL_Steamworks_GetItemDownloadInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outDownloaded, uint64_t *outTotal ) {
+	(void)idLow;
+	(void)idHigh;
+	(void)outDownloaded;
+	(void)outTotal;
 	return qfalse;
 }
 

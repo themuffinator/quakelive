@@ -136,6 +136,10 @@ struct vm_s {
 	// for dynamic linked modules
 	void		*dllHandle;
 	int			(QDECL *entryPoint)( int callNum, ... );
+	void		*dllExports;
+	void		*dllImports;
+	int			dllApiVersion;
+	qboolean	dllInterface;
 
 	// for interpreted modules
 	qboolean	currentlyInterpreting;
@@ -177,4 +181,3 @@ vmSymbol_t *VM_ValueToFunctionSymbol( vm_t *vm, int value );
 int VM_SymbolToValue( vm_t *vm, const char *symbol );
 const char *VM_ValueToSymbol( vm_t *vm, int value );
 void VM_LogSyscalls( int *args );
-

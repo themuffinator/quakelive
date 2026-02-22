@@ -14,8 +14,8 @@
 -e765	// external could be made static
 
 -d__LINT__
--ig:\quake3\bin_nt\supplement\ansi
--ig:\quake3\bin_nt\supplement
+-ig:\quakelive\bin_nt\supplement\ansi
+-ig:\quakelive\bin_nt\supplement
 -igame
 -ibotai
 -icgame

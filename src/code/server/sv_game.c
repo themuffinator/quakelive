@@ -24,7 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 
 #include "../game/botlib.h"
+#include "../qcommon/vm_local.h"
 #include <limits.h>
+#include <stdint.h>
 #include "../../../src-re/include/fs_imports.h"
 
 botlib_export_t	*botlib_export;
@@ -1047,6 +1049,247 @@ int SV_GameSystemCalls( int *args ) {
 }
 
 /*
+====================
+G_Import_Syscall
+====================
+*/
+static int QDECL G_Import_Syscall( int arg, ... ) {
+#if ((defined __linux__) && (defined __powerpc__))
+	int args[SYSCALL_CONTRACT_MAX_ARGS];
+	int i;
+	va_list ap;
+
+	args[0] = arg;
+
+	va_start(ap, arg);
+	for (i = 1; i < SYSCALL_CONTRACT_MAX_ARGS; i++) {
+		args[i] = va_arg(ap, int);
+	}
+	va_end(ap);
+
+	return SV_GameSystemCalls( args );
+#else
+	return SV_GameSystemCalls( &arg );
+#endif
+}
+
+#include "ql_game_imports.inc"
+
+typedef void (QDECL *ql_import_f)( void );
+
+#define QL_GAME_IMPORT_COUNT (G_RANK_REPORT_STR + 1)
+
+static ql_import_f ql_game_imports[QL_GAME_IMPORT_COUNT] = {
+	[G_PRINT] = (ql_import_f)QL_G_trap_Printf,
+	[G_ERROR] = (ql_import_f)QL_G_trap_Error,
+	[G_MILLISECONDS] = (ql_import_f)QL_G_trap_Milliseconds,
+	[G_ARGC] = (ql_import_f)QL_G_trap_Argc,
+	[G_ARGV] = (ql_import_f)QL_G_trap_Argv,
+	[G_FS_FOPEN_FILE] = (ql_import_f)QL_G_trap_FS_FOpenFile,
+	[G_FS_READ] = (ql_import_f)QL_G_trap_FS_Read,
+	[G_FS_WRITE] = (ql_import_f)QL_G_trap_FS_Write,
+	[G_FS_FCLOSE_FILE] = (ql_import_f)QL_G_trap_FS_FCloseFile,
+	[G_FS_GETFILELIST] = (ql_import_f)QL_G_trap_FS_GetFileList,
+	[G_FS_SEEK] = (ql_import_f)QL_G_trap_FS_Seek,
+	[G_SEND_CONSOLE_COMMAND] = (ql_import_f)QL_G_trap_SendConsoleCommand,
+	[G_CVAR_REGISTER] = (ql_import_f)QL_G_trap_Cvar_Register,
+	[G_CVAR_UPDATE] = (ql_import_f)QL_G_trap_Cvar_Update,
+	[G_CVAR_SET] = (ql_import_f)QL_G_trap_Cvar_Set,
+	[G_CVAR_VARIABLE_INTEGER_VALUE] = (ql_import_f)QL_G_trap_Cvar_VariableIntegerValue,
+	[G_CVAR_VARIABLE_STRING_BUFFER] = (ql_import_f)QL_G_trap_Cvar_VariableStringBuffer,
+	[G_LOCATE_GAME_DATA] = (ql_import_f)QL_G_trap_LocateGameData,
+	[G_DROP_CLIENT] = (ql_import_f)QL_G_trap_DropClient,
+	[G_SEND_SERVER_COMMAND] = (ql_import_f)QL_G_trap_SendServerCommand,
+	[G_SET_CONFIGSTRING] = (ql_import_f)QL_G_trap_SetConfigstring,
+	[G_GET_CONFIGSTRING] = (ql_import_f)QL_G_trap_GetConfigstring,
+	[G_GET_USERINFO] = (ql_import_f)QL_G_trap_GetUserinfo,
+	[G_SET_USERINFO] = (ql_import_f)QL_G_trap_SetUserinfo,
+	[G_GET_SERVERINFO] = (ql_import_f)QL_G_trap_GetServerinfo,
+	[G_STEAMID_QUERY] = (ql_import_f)QL_G_trap_GetSteamId,
+	[G_STEAM_AUTH_VALIDATE] = (ql_import_f)QL_G_trap_VerifySteamAuth,
+	[G_RANK_BEGIN] = (ql_import_f)QL_G_trap_RankBegin,
+	[G_RANK_POLL] = (ql_import_f)QL_G_trap_RankPoll,
+	[G_RANK_CHECK_INIT] = (ql_import_f)QL_G_trap_RankCheckInit,
+	[G_RANK_ACTIVE] = (ql_import_f)QL_G_trap_RankActive,
+	[G_RANK_USER_STATUS] = (ql_import_f)QL_G_trap_RankUserStatus,
+	[G_RANK_USER_RESET] = (ql_import_f)QL_G_trap_RankUserReset,
+	[G_RANK_REPORT_INT] = (ql_import_f)QL_G_trap_RankReportInt,
+	[G_RANK_REPORT_STR] = (ql_import_f)QL_G_trap_RankReportStr,
+	[G_SET_BRUSH_MODEL] = (ql_import_f)QL_G_trap_SetBrushModel,
+	[G_TRACE] = (ql_import_f)QL_G_trap_Trace,
+	[G_TRACECAPSULE] = (ql_import_f)QL_G_trap_TraceCapsule,
+	[G_POINT_CONTENTS] = (ql_import_f)QL_G_trap_PointContents,
+	[G_IN_PVS] = (ql_import_f)QL_G_trap_InPVS,
+	[G_IN_PVS_IGNORE_PORTALS] = (ql_import_f)QL_G_trap_InPVSIgnorePortals,
+	[G_ADJUST_AREA_PORTAL_STATE] = (ql_import_f)QL_G_trap_AdjustAreaPortalState,
+	[G_AREAS_CONNECTED] = (ql_import_f)QL_G_trap_AreasConnected,
+	[G_LINKENTITY] = (ql_import_f)QL_G_trap_LinkEntity,
+	[G_UNLINKENTITY] = (ql_import_f)QL_G_trap_UnlinkEntity,
+	[G_ENTITIES_IN_BOX] = (ql_import_f)QL_G_trap_EntitiesInBox,
+	[G_ENTITY_CONTACT] = (ql_import_f)QL_G_trap_EntityContact,
+	[G_ENTITY_CONTACTCAPSULE] = (ql_import_f)QL_G_trap_EntityContactCapsule,
+	[G_BOT_ALLOCATE_CLIENT] = (ql_import_f)QL_G_trap_BotAllocateClient,
+	[G_BOT_FREE_CLIENT] = (ql_import_f)QL_G_trap_BotFreeClient,
+	[G_GET_USERCMD] = (ql_import_f)QL_G_trap_GetUsercmd,
+	[G_GET_ENTITY_TOKEN] = (ql_import_f)QL_G_trap_GetEntityToken,
+	[G_DEBUG_POLYGON_CREATE] = (ql_import_f)QL_G_trap_DebugPolygonCreate,
+	[G_DEBUG_POLYGON_DELETE] = (ql_import_f)QL_G_trap_DebugPolygonDelete,
+	[G_REAL_TIME] = (ql_import_f)QL_G_trap_RealTime,
+	[G_SNAPVECTOR] = (ql_import_f)QL_G_trap_SnapVector,
+	[BOTLIB_SETUP] = (ql_import_f)QL_G_trap_BotLibSetup,
+	[BOTLIB_SHUTDOWN] = (ql_import_f)QL_G_trap_BotLibShutdown,
+	[BOTLIB_LIBVAR_SET] = (ql_import_f)QL_G_trap_BotLibVarSet,
+	[BOTLIB_LIBVAR_GET] = (ql_import_f)QL_G_trap_BotLibVarGet,
+	[BOTLIB_PC_ADD_GLOBAL_DEFINE] = (ql_import_f)QL_G_trap_BotLibDefine,
+	[BOTLIB_START_FRAME] = (ql_import_f)QL_G_trap_BotLibStartFrame,
+	[BOTLIB_LOAD_MAP] = (ql_import_f)QL_G_trap_BotLibLoadMap,
+	[BOTLIB_UPDATENTITY] = (ql_import_f)QL_G_trap_BotLibUpdateEntity,
+	[BOTLIB_TEST] = (ql_import_f)QL_G_trap_BotLibTest,
+	[BOTLIB_GET_SNAPSHOT_ENTITY] = (ql_import_f)QL_G_trap_BotGetSnapshotEntity,
+	[BOTLIB_GET_CONSOLE_MESSAGE] = (ql_import_f)QL_G_trap_BotGetServerCommand,
+	[BOTLIB_USER_COMMAND] = (ql_import_f)QL_G_trap_BotUserCommand,
+	[BOTLIB_AAS_ENTITY_INFO] = (ql_import_f)QL_G_trap_AAS_EntityInfo,
+	[BOTLIB_AAS_INITIALIZED] = (ql_import_f)QL_G_trap_AAS_Initialized,
+	[BOTLIB_AAS_PRESENCE_TYPE_BOUNDING_BOX] = (ql_import_f)QL_G_trap_AAS_PresenceTypeBoundingBox,
+	[BOTLIB_AAS_TIME] = (ql_import_f)QL_G_trap_AAS_Time,
+	[BOTLIB_AAS_POINT_AREA_NUM] = (ql_import_f)QL_G_trap_AAS_PointAreaNum,
+	[BOTLIB_AAS_POINT_REACHABILITY_AREA_INDEX] = (ql_import_f)QL_G_trap_AAS_PointReachabilityAreaIndex,
+	[BOTLIB_AAS_TRACE_AREAS] = (ql_import_f)QL_G_trap_AAS_TraceAreas,
+	[BOTLIB_AAS_BBOX_AREAS] = (ql_import_f)QL_G_trap_AAS_BBoxAreas,
+	[BOTLIB_AAS_AREA_INFO] = (ql_import_f)QL_G_trap_AAS_AreaInfo,
+	[BOTLIB_AAS_POINT_CONTENTS] = (ql_import_f)QL_G_trap_AAS_PointContents,
+	[BOTLIB_AAS_NEXT_BSP_ENTITY] = (ql_import_f)QL_G_trap_AAS_NextBSPEntity,
+	[BOTLIB_AAS_VALUE_FOR_BSP_EPAIR_KEY] = (ql_import_f)QL_G_trap_AAS_ValueForBSPEpairKey,
+	[BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY] = (ql_import_f)QL_G_trap_AAS_VectorForBSPEpairKey,
+	[BOTLIB_AAS_FLOAT_FOR_BSP_EPAIR_KEY] = (ql_import_f)QL_G_trap_AAS_FloatForBSPEpairKey,
+	[BOTLIB_AAS_INT_FOR_BSP_EPAIR_KEY] = (ql_import_f)QL_G_trap_AAS_IntForBSPEpairKey,
+	[BOTLIB_AAS_AREA_REACHABILITY] = (ql_import_f)QL_G_trap_AAS_AreaReachability,
+	[BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA] = (ql_import_f)QL_G_trap_AAS_AreaTravelTimeToGoalArea,
+	[BOTLIB_AAS_ENABLE_ROUTING_AREA] = (ql_import_f)QL_G_trap_AAS_EnableRoutingArea,
+	[BOTLIB_AAS_PREDICT_ROUTE] = (ql_import_f)QL_G_trap_AAS_PredictRoute,
+	[BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL] = (ql_import_f)QL_G_trap_AAS_AlternativeRouteGoals,
+	[BOTLIB_AAS_SWIMMING] = (ql_import_f)QL_G_trap_AAS_Swimming,
+	[BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT] = (ql_import_f)QL_G_trap_AAS_PredictClientMovement,
+	[BOTLIB_EA_SAY] = (ql_import_f)QL_G_trap_EA_Say,
+	[BOTLIB_EA_SAY_TEAM] = (ql_import_f)QL_G_trap_EA_SayTeam,
+	[BOTLIB_EA_COMMAND] = (ql_import_f)QL_G_trap_EA_Command,
+	[BOTLIB_EA_ACTION] = (ql_import_f)QL_G_trap_EA_Action,
+	[BOTLIB_EA_GESTURE] = (ql_import_f)QL_G_trap_EA_Gesture,
+	[BOTLIB_EA_TALK] = (ql_import_f)QL_G_trap_EA_Talk,
+	[BOTLIB_EA_ATTACK] = (ql_import_f)QL_G_trap_EA_Attack,
+	[BOTLIB_EA_USE] = (ql_import_f)QL_G_trap_EA_Use,
+	[BOTLIB_EA_RESPAWN] = (ql_import_f)QL_G_trap_EA_Respawn,
+	[BOTLIB_EA_CROUCH] = (ql_import_f)QL_G_trap_EA_Crouch,
+	[BOTLIB_EA_MOVE_UP] = (ql_import_f)QL_G_trap_EA_MoveUp,
+	[BOTLIB_EA_MOVE_DOWN] = (ql_import_f)QL_G_trap_EA_MoveDown,
+	[BOTLIB_EA_MOVE_FORWARD] = (ql_import_f)QL_G_trap_EA_MoveForward,
+	[BOTLIB_EA_MOVE_BACK] = (ql_import_f)QL_G_trap_EA_MoveBack,
+	[BOTLIB_EA_MOVE_LEFT] = (ql_import_f)QL_G_trap_EA_MoveLeft,
+	[BOTLIB_EA_MOVE_RIGHT] = (ql_import_f)QL_G_trap_EA_MoveRight,
+	[BOTLIB_EA_SELECT_WEAPON] = (ql_import_f)QL_G_trap_EA_SelectWeapon,
+	[BOTLIB_EA_JUMP] = (ql_import_f)QL_G_trap_EA_Jump,
+	[BOTLIB_EA_DELAYED_JUMP] = (ql_import_f)QL_G_trap_EA_DelayedJump,
+	[BOTLIB_EA_MOVE] = (ql_import_f)QL_G_trap_EA_Move,
+	[BOTLIB_EA_VIEW] = (ql_import_f)QL_G_trap_EA_View,
+	[BOTLIB_EA_END_REGULAR] = (ql_import_f)QL_G_trap_EA_EndRegular,
+	[BOTLIB_EA_GET_INPUT] = (ql_import_f)QL_G_trap_EA_GetInput,
+	[BOTLIB_EA_RESET_INPUT] = (ql_import_f)QL_G_trap_EA_ResetInput,
+	[BOTLIB_AI_LOAD_CHARACTER] = (ql_import_f)QL_G_trap_BotLoadCharacter,
+	[BOTLIB_AI_FREE_CHARACTER] = (ql_import_f)QL_G_trap_BotFreeCharacter,
+	[BOTLIB_AI_CHARACTERISTIC_FLOAT] = (ql_import_f)QL_G_trap_Characteristic_Float,
+	[BOTLIB_AI_CHARACTERISTIC_BFLOAT] = (ql_import_f)QL_G_trap_Characteristic_BFloat,
+	[BOTLIB_AI_CHARACTERISTIC_INTEGER] = (ql_import_f)QL_G_trap_Characteristic_Integer,
+	[BOTLIB_AI_CHARACTERISTIC_BINTEGER] = (ql_import_f)QL_G_trap_Characteristic_BInteger,
+	[BOTLIB_AI_CHARACTERISTIC_STRING] = (ql_import_f)QL_G_trap_Characteristic_String,
+	[BOTLIB_AI_ALLOC_CHAT_STATE] = (ql_import_f)QL_G_trap_BotAllocChatState,
+	[BOTLIB_AI_FREE_CHAT_STATE] = (ql_import_f)QL_G_trap_BotFreeChatState,
+	[BOTLIB_AI_QUEUE_CONSOLE_MESSAGE] = (ql_import_f)QL_G_trap_BotQueueConsoleMessage,
+	[BOTLIB_AI_REMOVE_CONSOLE_MESSAGE] = (ql_import_f)QL_G_trap_BotRemoveConsoleMessage,
+	[BOTLIB_AI_NEXT_CONSOLE_MESSAGE] = (ql_import_f)QL_G_trap_BotNextConsoleMessage,
+	[BOTLIB_AI_NUM_CONSOLE_MESSAGE] = (ql_import_f)QL_G_trap_BotNumConsoleMessages,
+	[BOTLIB_AI_INITIAL_CHAT] = (ql_import_f)QL_G_trap_BotInitialChat,
+	[BOTLIB_AI_NUM_INITIAL_CHATS] = (ql_import_f)QL_G_trap_BotNumInitialChats,
+	[BOTLIB_AI_REPLY_CHAT] = (ql_import_f)QL_G_trap_BotReplyChat,
+	[BOTLIB_AI_CHAT_LENGTH] = (ql_import_f)QL_G_trap_BotChatLength,
+	[BOTLIB_AI_ENTER_CHAT] = (ql_import_f)QL_G_trap_BotEnterChat,
+	[BOTLIB_AI_GET_CHAT_MESSAGE] = (ql_import_f)QL_G_trap_BotGetChatMessage,
+	[BOTLIB_AI_STRING_CONTAINS] = (ql_import_f)QL_G_trap_StringContains,
+	[BOTLIB_AI_FIND_MATCH] = (ql_import_f)QL_G_trap_BotFindMatch,
+	[BOTLIB_AI_MATCH_VARIABLE] = (ql_import_f)QL_G_trap_BotMatchVariable,
+	[BOTLIB_AI_UNIFY_WHITE_SPACES] = (ql_import_f)QL_G_trap_UnifyWhiteSpaces,
+	[BOTLIB_AI_REPLACE_SYNONYMS] = (ql_import_f)QL_G_trap_BotReplaceSynonyms,
+	[BOTLIB_AI_LOAD_CHAT_FILE] = (ql_import_f)QL_G_trap_BotLoadChatFile,
+	[BOTLIB_AI_SET_CHAT_GENDER] = (ql_import_f)QL_G_trap_BotSetChatGender,
+	[BOTLIB_AI_SET_CHAT_NAME] = (ql_import_f)QL_G_trap_BotSetChatName,
+	[BOTLIB_AI_RESET_GOAL_STATE] = (ql_import_f)QL_G_trap_BotResetGoalState,
+	[BOTLIB_AI_RESET_AVOID_GOALS] = (ql_import_f)QL_G_trap_BotResetAvoidGoals,
+	[BOTLIB_AI_REMOVE_FROM_AVOID_GOALS] = (ql_import_f)QL_G_trap_BotRemoveFromAvoidGoals,
+	[BOTLIB_AI_PUSH_GOAL] = (ql_import_f)QL_G_trap_BotPushGoal,
+	[BOTLIB_AI_POP_GOAL] = (ql_import_f)QL_G_trap_BotPopGoal,
+	[BOTLIB_AI_EMPTY_GOAL_STACK] = (ql_import_f)QL_G_trap_BotEmptyGoalStack,
+	[BOTLIB_AI_DUMP_AVOID_GOALS] = (ql_import_f)QL_G_trap_BotDumpAvoidGoals,
+	[BOTLIB_AI_DUMP_GOAL_STACK] = (ql_import_f)QL_G_trap_BotDumpGoalStack,
+	[BOTLIB_AI_GOAL_NAME] = (ql_import_f)QL_G_trap_BotGoalName,
+	[BOTLIB_AI_GET_TOP_GOAL] = (ql_import_f)QL_G_trap_BotGetTopGoal,
+	[BOTLIB_AI_GET_SECOND_GOAL] = (ql_import_f)QL_G_trap_BotGetSecondGoal,
+	[BOTLIB_AI_CHOOSE_LTG_ITEM] = (ql_import_f)QL_G_trap_BotChooseLTGItem,
+	[BOTLIB_AI_CHOOSE_NBG_ITEM] = (ql_import_f)QL_G_trap_BotChooseNBGItem,
+	[BOTLIB_AI_TOUCHING_GOAL] = (ql_import_f)QL_G_trap_BotTouchingGoal,
+	[BOTLIB_AI_ITEM_GOAL_IN_VIS_BUT_NOT_VISIBLE] = (ql_import_f)QL_G_trap_BotItemGoalInVisButNotVisible,
+	[BOTLIB_AI_GET_LEVEL_ITEM_GOAL] = (ql_import_f)QL_G_trap_BotGetLevelItemGoal,
+	[BOTLIB_AI_GET_NEXT_CAMP_SPOT_GOAL] = (ql_import_f)QL_G_trap_BotGetNextCampSpotGoal,
+	[BOTLIB_AI_GET_MAP_LOCATION_GOAL] = (ql_import_f)QL_G_trap_BotGetMapLocationGoal,
+	[BOTLIB_AI_AVOID_GOAL_TIME] = (ql_import_f)QL_G_trap_BotAvoidGoalTime,
+	[BOTLIB_AI_SET_AVOID_GOAL_TIME] = (ql_import_f)QL_G_trap_BotSetAvoidGoalTime,
+	[BOTLIB_AI_INIT_LEVEL_ITEMS] = (ql_import_f)QL_G_trap_BotInitLevelItems,
+	[BOTLIB_AI_UPDATE_ENTITY_ITEMS] = (ql_import_f)QL_G_trap_BotUpdateEntityItems,
+	[BOTLIB_AI_LOAD_ITEM_WEIGHTS] = (ql_import_f)QL_G_trap_BotLoadItemWeights,
+	[BOTLIB_AI_FREE_ITEM_WEIGHTS] = (ql_import_f)QL_G_trap_BotFreeItemWeights,
+	[BOTLIB_AI_INTERBREED_GOAL_FUZZY_LOGIC] = (ql_import_f)QL_G_trap_BotInterbreedGoalFuzzyLogic,
+	[BOTLIB_AI_SAVE_GOAL_FUZZY_LOGIC] = (ql_import_f)QL_G_trap_BotSaveGoalFuzzyLogic,
+	[BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC] = (ql_import_f)QL_G_trap_BotMutateGoalFuzzyLogic,
+	[BOTLIB_AI_ALLOC_GOAL_STATE] = (ql_import_f)QL_G_trap_BotAllocGoalState,
+	[BOTLIB_AI_FREE_GOAL_STATE] = (ql_import_f)QL_G_trap_BotFreeGoalState,
+	[BOTLIB_AI_RESET_MOVE_STATE] = (ql_import_f)QL_G_trap_BotResetMoveState,
+	[BOTLIB_AI_ADD_AVOID_SPOT] = (ql_import_f)QL_G_trap_BotAddAvoidSpot,
+	[BOTLIB_AI_MOVE_TO_GOAL] = (ql_import_f)QL_G_trap_BotMoveToGoal,
+	[BOTLIB_AI_MOVE_IN_DIRECTION] = (ql_import_f)QL_G_trap_BotMoveInDirection,
+	[BOTLIB_AI_RESET_AVOID_REACH] = (ql_import_f)QL_G_trap_BotResetAvoidReach,
+	[BOTLIB_AI_RESET_LAST_AVOID_REACH] = (ql_import_f)QL_G_trap_BotResetLastAvoidReach,
+	[BOTLIB_AI_REACHABILITY_AREA] = (ql_import_f)QL_G_trap_BotReachabilityArea,
+	[BOTLIB_AI_MOVEMENT_VIEW_TARGET] = (ql_import_f)QL_G_trap_BotMovementViewTarget,
+	[BOTLIB_AI_PREDICT_VISIBLE_POSITION] = (ql_import_f)QL_G_trap_BotPredictVisiblePosition,
+	[BOTLIB_AI_ALLOC_MOVE_STATE] = (ql_import_f)QL_G_trap_BotAllocMoveState,
+	[BOTLIB_AI_FREE_MOVE_STATE] = (ql_import_f)QL_G_trap_BotFreeMoveState,
+	[BOTLIB_AI_INIT_MOVE_STATE] = (ql_import_f)QL_G_trap_BotInitMoveState,
+	[BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON] = (ql_import_f)QL_G_trap_BotChooseBestFightWeapon,
+	[BOTLIB_AI_GET_WEAPON_INFO] = (ql_import_f)QL_G_trap_BotGetWeaponInfo,
+	[BOTLIB_AI_LOAD_WEAPON_WEIGHTS] = (ql_import_f)QL_G_trap_BotLoadWeaponWeights,
+	[BOTLIB_AI_ALLOC_WEAPON_STATE] = (ql_import_f)QL_G_trap_BotAllocWeaponState,
+	[BOTLIB_AI_FREE_WEAPON_STATE] = (ql_import_f)QL_G_trap_BotFreeWeaponState,
+	[BOTLIB_AI_RESET_WEAPON_STATE] = (ql_import_f)QL_G_trap_BotResetWeaponState,
+	[BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION] = (ql_import_f)QL_G_trap_GeneticParentsAndChildSelection,
+	[BOTLIB_PC_LOAD_SOURCE] = (ql_import_f)QL_G_trap_PC_LoadSource,
+	[BOTLIB_PC_FREE_SOURCE] = (ql_import_f)QL_G_trap_PC_FreeSource,
+	[BOTLIB_PC_READ_TOKEN] = (ql_import_f)QL_G_trap_PC_ReadToken,
+	[BOTLIB_PC_SOURCE_FILE_AND_LINE] = (ql_import_f)QL_G_trap_PC_SourceFileAndLine,
+	[TRAP_MEMSET] = (ql_import_f)QL_G_trap_Memset,
+	[TRAP_MEMCPY] = (ql_import_f)QL_G_trap_Memcpy,
+	[TRAP_STRNCPY] = (ql_import_f)QL_G_trap_Strncpy,
+	[TRAP_SIN] = (ql_import_f)QL_G_trap_Sin,
+	[TRAP_COS] = (ql_import_f)QL_G_trap_Cos,
+	[TRAP_ATAN2] = (ql_import_f)QL_G_trap_Atan2,
+	[TRAP_SQRT] = (ql_import_f)QL_G_trap_Sqrt,
+	[TRAP_MATRIXMULTIPLY] = (ql_import_f)QL_G_trap_MatrixMultiply,
+	[TRAP_ANGLEVECTORS] = (ql_import_f)QL_G_trap_AngleVectors,
+	[TRAP_PERPENDICULARVECTOR] = (ql_import_f)QL_G_trap_PerpendicularVector,
+	[TRAP_FLOOR] = (ql_import_f)QL_G_trap_Floor,
+	[TRAP_CEIL] = (ql_import_f)QL_G_trap_Ceil,
+	[TRAP_TESTPRINTINT] = (ql_import_f)QL_G_trap_TestPrintInt,
+	[TRAP_TESTPRINTFLOAT] = (ql_import_f)QL_G_trap_TestPrintFloat,
+};
+
+/*
 ===============
 SV_ShutdownGameProgs
 
@@ -1126,7 +1369,7 @@ static vm_t *SV_LoadGameModule( vmInterpret_t interpret ) {
 	vm = NULL;
 
 	if ( interpret != VMI_COMPILED ) {
-		vm = VM_Create( "qagame", SV_GameSystemCalls, VMI_NATIVE );
+		vm = VM_Create( "qagame", SV_GameSystemCalls, VMI_NATIVE, ql_game_imports, GAME_API_VERSION );
 		if ( vm ) {
 			if ( vm->dllHandle || interpret != VMI_BYTECODE || !vm->compiled ) {
 				return vm;
@@ -1136,7 +1379,7 @@ static vm_t *SV_LoadGameModule( vmInterpret_t interpret ) {
 		}
 	}
 
-	return VM_Create( "qagame", SV_GameSystemCalls, interpret );
+	return VM_Create( "qagame", SV_GameSystemCalls, interpret, ql_game_imports, GAME_API_VERSION );
 }
 
 /*

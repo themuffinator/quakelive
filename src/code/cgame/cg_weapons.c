@@ -40,6 +40,7 @@ static const cgLightningStyleDef_t cg_lightningStyleDefs[CG_MAX_LIGHTNING_STYLES
 
 static int		cg_lightningImpactFrameTime;
 static int		cg_lightningImpactCount;
+static qboolean	CG_GetStoredPredictedBeam( weapon_t weapon, vec3_t start, vec3_t end, qboolean *hitWorld );
 
 /*
 ==========================

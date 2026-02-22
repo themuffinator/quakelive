@@ -17,7 +17,7 @@ The `Native DLL (VS2010)` workflow runs on GitHub’s `windows-latest` image and
 
 1. `tools/ci/install-vs-v100.ps1` installs the optional Visual Studio 2010 component (`Microsoft.VisualStudio.Component.VC.v100.x86.x64`) if it is not already present on the runner.【F:tools/ci/install-vs-v100.ps1†L1-L63】
 2. `tools/ci/verify-vs-toolchain.ps1 -RequireV100` confirms that the `v100` toolset and `dumpbin.exe` are now available, failing the build if the prerequisites remain missing.【F:tools/ci/verify-vs-toolchain.ps1†L1-L74】
-3. `tools/ci/build-windows-dlls.ps1 -PlatformToolset v100` drives `msbuild` against `src/code/quake3.sln` with the Win32/Release configuration and forces the `v100` platform toolset so the produced DLLs match the historical binaries.【F:tools/ci/build-windows-dlls.ps1†L1-L36】【F:src/code/quake3.sln†L1-L4】
+3. `tools/ci/build-windows-dlls.ps1 -PlatformToolset v100` drives `msbuild` against `src/code/quakelive.sln` with the Win32/Release configuration and forces the `v100` platform toolset so the produced DLLs match the historical binaries.【F:tools/ci/build-windows-dlls.ps1†L1-L36】【F:src/code/quakelive.sln†L1-L4】
 4. `tools/ci/assert-dll-exports.ps1` scans the built artefacts, runs `dumpbin` (or `objdump` as a fallback) across each DLL, and compares the discovered exports against the manifest stored in `tools/ci/manifests/native-dll-exports.json` so regressions are surfaced immediately.【F:tools/ci/assert-dll-exports.ps1†L1-L152】【F:tools/ci/manifests/native-dll-exports.json†L1-L14】
 
 ### Runbook quick reference

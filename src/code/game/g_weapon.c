@@ -804,6 +804,7 @@ void Weapon_LightningFire( gentity_t *ent ) {
 	trace_t		tr;
 	vec3_t		end;
 	vec3_t impactpoint, bouncedir;
+	vec3_t		dischargePoint;
 	gentity_t	*traceEnt, *tent;
 	int			damage, i, passent;
 

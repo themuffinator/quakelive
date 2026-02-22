@@ -38,9 +38,11 @@ displayContextDef_t cgDC;
 #define CG_AUTOACTION_STATS_DELAY		1500
 
 int forceModelModificationCount = -1;
+int forceTeamModelModificationCount = -1;
 int teamModelModificationCount = -1;
 int teamColorsModificationCount = -1;
 int forceTeamSkinModificationCount = -1;
+int forceEnemyModelModificationCount = -1;
 int enemyModelModificationCount = -1;
 int enemyColorsModificationCount = -1;
 int forceEnemySkinModificationCount = -1;
@@ -271,10 +273,12 @@ vmCvar_t	cg_teamChatBeep;
 vmCvar_t 	cg_stats;
 vmCvar_t 	cg_buildScript;
 vmCvar_t 	cg_forceModel;
+vmCvar_t	cg_forceTeamModel;
 vmCvar_t	cg_teamModel;
 vmCvar_t	cg_teamColors;
 vmCvar_t	cg_forceTeamSkin;
 vmCvar_t	cg_enemyModel;
+vmCvar_t	cg_forceEnemyModel;
 vmCvar_t	cg_enemyColors;
 vmCvar_t	cg_forceEnemySkin;
 vmCvar_t	cg_forceTeamWeaponColor;
@@ -302,6 +306,8 @@ vmCvar_t	cg_teammatePOIs;
 vmCvar_t	cg_teammatePOIsMinWidth;
 vmCvar_t	cg_teammatePOIsMaxWidth;
 vmCvar_t	cg_teamChatsOnly;
+vmCvar_t	cg_noVoiceChats;
+vmCvar_t	cg_noVoiceText;
 vmCvar_t	cg_playVoiceChats;
 vmCvar_t	cg_showVoiceText;
 vmCvar_t	cg_useItemMessage;
@@ -546,10 +552,12 @@ static cvarTable_t cvarTable[] = { // bk001129
 { &cg_chatbeep, "cg_chatbeep", "1", CVAR_ARCHIVE },
 { &cg_teamChatBeep, "cg_teamChatBeep", "1", CVAR_ARCHIVE },
 	{ &cg_forceModel, "cg_forceModel", "0", CVAR_ARCHIVE  },
+	{ &cg_forceTeamModel, "cg_forceTeamModel", "", CVAR_ARCHIVE },
 	{ &cg_teamModel, "cg_teamModel", "", CVAR_ARCHIVE },
 	{ &cg_teamColors, "cg_teamColors", "", CVAR_ARCHIVE },
 	{ &cg_forceTeamSkin, "cg_forceTeamSkin", "", CVAR_ARCHIVE },
 	{ &cg_enemyModel, "cg_enemyModel", "", CVAR_ARCHIVE },
+	{ &cg_forceEnemyModel, "cg_forceEnemyModel", "", CVAR_ARCHIVE },
 	{ &cg_enemyColors, "cg_enemyColors", "", CVAR_ARCHIVE },
 	{ &cg_forceEnemySkin, "cg_forceEnemySkin", "", CVAR_ARCHIVE },
 	{ &cg_forceTeamWeaponColor, "cg_forceTeamWeaponColor", "0", CVAR_ARCHIVE },
@@ -1132,7 +1140,6 @@ CG_RegisterCvars
 void CG_RegisterCvars( void ) {
 	int			i;
 	cvarTable_t	*cv;
-	qboolean	refreshClients;
 	char		var[MAX_TOKEN_CHARS];
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
@@ -1628,6 +1635,10 @@ void CG_UpdateCvars( void ) {
 		forceModelModificationCount = cg_forceModel.modificationCount;
 		refreshClients = qtrue;
 	}
+	if ( forceTeamModelModificationCount != cg_forceTeamModel.modificationCount ) {
+		forceTeamModelModificationCount = cg_forceTeamModel.modificationCount;
+		refreshClients = qtrue;
+	}
 	if ( teamModelModificationCount != cg_teamModel.modificationCount ) {
 		teamModelModificationCount = cg_teamModel.modificationCount;
 		refreshClients = qtrue;
@@ -1642,6 +1653,10 @@ void CG_UpdateCvars( void ) {
 	}
 	if ( enemyModelModificationCount != cg_enemyModel.modificationCount ) {
 		enemyModelModificationCount = cg_enemyModel.modificationCount;
+		refreshClients = qtrue;
+	}
+	if ( forceEnemyModelModificationCount != cg_forceEnemyModel.modificationCount ) {
+		forceEnemyModelModificationCount = cg_forceEnemyModel.modificationCount;
 		refreshClients = qtrue;
 	}
 	if ( enemyColorsModificationCount != cg_enemyColors.modificationCount ) {
@@ -3266,7 +3281,8 @@ static int CG_FeederCount(float feederID) {
 		}
 	} else if (feederID == FEEDER_SCOREBOARD) {
 		if ( cg.competitiveHudLoaded ) {
-			return cgHudScoreboard.count;
+			const cgHudScoreboard_t *hud = CG_GetHudScoreboard();
+			return hud ? hud->count : 0;
 		}
 		return cg.numScores;
 	}
@@ -3821,6 +3837,14 @@ void CG_LoadHudMenu() {
 	cgDC.stopCinematic = &CG_StopCinematic;
 	cgDC.drawCinematic = &CG_DrawCinematic;
 	cgDC.runCinematicFrame = &CG_RunCinematicFrame;
+	cgDC.glconfig = cgs.glconfig;
+	cgDC.xscale = cgs.screenXScale;
+	cgDC.yscale = cgs.screenYScale;
+	if ( cgs.glconfig.vidWidth * SCREEN_HEIGHT > cgs.glconfig.vidHeight * SCREEN_WIDTH ) {
+		cgDC.bias = 0.5f * ( (float)cgs.glconfig.vidWidth - ( (float)cgs.glconfig.vidHeight * ( (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT ) ) );
+	} else {
+		cgDC.bias = 0.0f;
+	}
 
 	Init_Display(&cgDC);
 

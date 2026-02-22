@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../game/q_shared.h"
 #include "qcommon.h"
-#include "../../src-re/include/fs_imports.h"
+#include "../../../src-re/include/fs_imports.h"
 #include <setjmp.h>
 #include <ctype.h>
 #ifdef __linux__
@@ -2720,6 +2720,8 @@ Com_Init
 */
 void Com_Init( char *commandLine ) {
 	char	*s;
+	const char	*ecosystemDisabled;
+	qboolean	startupCinematicsDisabled;
 
 	Com_Printf( "%s %s %s\n", Q3_VERSION, CPUSTRING, __DATE__ );
 
@@ -2745,11 +2747,20 @@ void Com_Init( char *commandLine ) {
 
         Cvar_BootstrapExpandedDefaults();
 
+	// Make early filesystem/bootstrap diagnostics visible in qconsole.log.
+	com_developer = Cvar_Get( "developer", "0", CVAR_TEMP );
+	com_logfile = Cvar_Get( "logfile", "0", CVAR_TEMP );
+
         // override anything from the config files with command line args
         Com_StartupVariable( NULL );
 
 	// get the developer cvar set as early as possible
 	Com_StartupVariable( "developer" );
+	Com_StartupVariable( "logfile" );
+
+#if defined(_WIN32) && defined(_DEBUG)
+	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "0", 0 );
+#endif
 
 	// done early so bind command exists
 	CL_InitKeyCommands();
@@ -2813,10 +2824,6 @@ void Com_Init( char *commandLine ) {
 
 	com_introPlayed = Cvar_Get( "com_introplayed", "0", CVAR_ARCHIVE);
 
-#if defined(_WIN32) && defined(_DEBUG)
-	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "0", 0 );
-#endif
-
 	if ( com_dedicated->integer ) {
 		if ( !com_viewlog->integer ) {
 			Cvar_Set( "viewlog", "1" );
@@ -2850,15 +2857,21 @@ void Com_Init( char *commandLine ) {
 	// command line it will still be able to count on com_frameTime
 	// being random enough for a serverid
 	com_frameTime = Com_Milliseconds();
+	ecosystemDisabled = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );
+	startupCinematicsDisabled = ecosystemDisabled && ecosystemDisabled[0] && atoi( ecosystemDisabled ) != 0;
 
 	// add + commands from command line
 	if ( !Com_AddStartupCommands() ) {
 		// if the user didn't give any commands, run default action
 		if ( !com_dedicated->integer ) {
-			Cbuf_AddText ("cinematic idlogo.RoQ\n");
-			if( !com_introPlayed->integer ) {
-				Cvar_Set( com_introPlayed->name, "1" );
-				Cvar_Set( "nextmap", "cinematic intro.RoQ" );
+			if ( startupCinematicsDisabled ) {
+				Cvar_Set( "nextmap", "" );
+			} else {
+				Cbuf_AddText ("cinematic idlogo.RoQ\n");
+				if( !com_introPlayed->integer ) {
+					Cvar_Set( com_introPlayed->name, "1" );
+					Cvar_Set( "nextmap", "cinematic intro.RoQ" );
+				}
 			}
 		}
 	}

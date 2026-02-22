@@ -31,6 +31,7 @@ vm_t			*gvm = NULL;				// game virtual machine // bk001212 init
 
 static qboolean SV_ClientEligibleForWarmupReady( const client_t *cl );
 static qboolean SV_ClientReadyForWarmup( const client_t *cl );
+static void SV_ComputeDisplayedCounts( int *clientCount, int *botCount );
 static int s_botMaskRefreshTime = 0;
 static int s_steamP2PKeepAliveTime = 0;
 
@@ -478,7 +479,7 @@ static void SV_LogMasterVACHeartbeat( const netadr_t *adr, const char *masterNam
 
 	state = ( sv_vac && sv_vac->integer ) ? "enabled" : "disabled";
 
-	NET_LogAuthTelemetry( NS_SERVER, adr, NULL, "vac", state, "heartbeat", masterName );
+	NET_LogAuthTelemetry( NS_SERVER, adr, NULL, "vac", state, "heartbeat", NULL, masterName );
 }
 
 /*
@@ -710,7 +711,7 @@ if a user is interested in a server to do a full status
 ================
 */
 void SVC_Info( netadr_t from ) {
-	int			i, count;
+	int			count;
 	int		botCount;
 	char	*gamedir;
 	char	infostring[MAX_INFO_STRING];

@@ -64,6 +64,7 @@ typedef struct teamgame_s {
 teamgame_t teamgame;
 
 gentity_t	*neutralObelisk;
+static qboolean s_teamAutoShuffleArmed;
 
 typedef struct teamBalanceInfo_s {
 	int		redCount;
@@ -99,6 +100,9 @@ static void Team_AnnounceNeutralFlagEvent( neutralFlagEvent_t event, const genti
 static qboolean Team_FlagPickupBlockedByTackle( const gentity_t *flag, const gentity_t *player );
 static team_t Team_FlagPickupStatusTeam( int gametype, team_t team );
 static flagStatus_t Team_FlagPickupStatusValue( int gametype, team_t playerTeam );
+static qboolean Team_ShouldDeferAutoShuffleAnnouncements( void );
+static void Team_HandleAutoShuffleCountdownComplete( void );
+static void Team_PerformAutomaticShuffle( void );
 
 /*
 =============
@@ -1329,7 +1333,7 @@ AddTeamScore
  for gametype GT_TEAM the level.teamScores is updated in AddScore in g_combat.c
 ==============
 */
-void AddTeamScore(vec3_t origin, int team, int score) {
+void AddTeamScore(const vec3_t origin, int team, int score) {
 	gentity_t	*te;
 
 	te = G_TempEntity(origin, EV_GLOBAL_TEAM_SOUND );

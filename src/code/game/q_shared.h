@@ -27,6 +27,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define QL_ENABLE_OGG 1
 #endif
 
+#ifndef QL_ENABLE_PNG
+#define QL_ENABLE_PNG 1
+#endif
+
+#ifndef QL_ENABLE_RANKINGS
+#define QL_ENABLE_RANKINGS 0
+#endif
+
+#ifndef ARRAY_LEN
+#define ARRAY_LEN(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
@@ -92,6 +104,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <ctype.h>
 #include <limits.h>
 
+#endif
+
+#ifndef Q_vsnprintf
+#ifdef _WIN32
+#define Q_vsnprintf _vsnprintf
+#else
+#define Q_vsnprintf vsnprintf
+#endif
 #endif
 
 #ifdef _WIN32
@@ -750,6 +770,7 @@ float Q_acos(float c);
 int		Q_rand( int *seed );
 float	Q_random( int *seed );
 float	Q_crandom( int *seed );
+int		Q_irand( int value1, int value2 );
 
 #define random()	((rand () & 0x7fff) / ((float)0x7fff))
 #define crandom()	(2.0 * (random() - 0.5))
@@ -834,7 +855,7 @@ void Parse1DMatrix (char **buf_p, int x, float *m);
 void Parse2DMatrix (char **buf_p, int y, int x, float *m);
 void Parse3DMatrix (char **buf_p, int z, int y, int x, float *m);
 
-void	QDECL Com_sprintf (char *dest, int size, const char *fmt, ...);
+int		QDECL Com_sprintf (char *dest, int size, const char *fmt, ...);
 
 
 // mode parm for FS_FOpenFile
@@ -862,6 +883,7 @@ int Q_isalpha( int c );
 int		Q_stricmp (const char *s1, const char *s2);
 int		Q_strncmp (const char *s1, const char *s2, int n);
 int		Q_stricmpn (const char *s1, const char *s2, int n);
+int		Q_strnicmp (const char *s1, const char *s2, int n);
 char	*Q_strlwr( char *s1 );
 char	*Q_strupr( char *s1 );
 char	*Q_strrchr( const char* string, int c );
@@ -869,6 +891,7 @@ char	*Q_strrchr( const char* string, int c );
 // buffer size safe library replacements
 void	Q_strncpyz( char *dest, const char *src, int destsize );
 void	Q_strcat( char *dest, int size, const char *src );
+int		Q_strlen( const char *string );
 
 // strlen that discounts Quake color sequences
 int Q_PrintStrlen( const char *string );

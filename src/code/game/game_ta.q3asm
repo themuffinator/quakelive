@@ -1,4 +1,4 @@
--o "\quake3\missionpack\vm\qagame"
+-o "\quakelive\missionpack\vm\qagame"
 g_main
 ..\g_syscalls
 bg_misc

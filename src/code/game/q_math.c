@@ -153,6 +153,26 @@ float	Q_crandom( int *seed ) {
 	return 2.0 * ( Q_random( seed ) - 0.5 );
 }
 
+/*
+==================
+Q_irand
+==================
+*/
+int Q_irand( int value1, int value2 ) {
+	int low;
+	int high;
+
+	if ( value1 <= value2 ) {
+		low = value1;
+		high = value2;
+	} else {
+		low = value2;
+		high = value1;
+	}
+
+	return low + ( rand() % ( high - low + 1 ) );
+}
+
 #ifdef __LCC__
 
 int VectorCompare( const vec3_t v1, const vec3_t v2 ) {
@@ -1304,5 +1324,4 @@ void PerpendicularVector( vec3_t dst, const vec3_t src )
 	*/
 	VectorNormalize( dst );
 }
-
 

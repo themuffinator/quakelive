@@ -763,6 +763,24 @@ int Q_stricmpn (const char *s1, const char *s2, int n) {
 	return 0;		// strings are equal
 }
 
+/*
+=============
+Q_strnicmp
+=============
+*/
+int Q_strnicmp( const char *s1, const char *s2, int n ) {
+	return Q_stricmpn( s1, s2, n );
+}
+
+/*
+============
+Q_strlen
+============
+*/
+int Q_strlen( const char *string ) {
+	return string ? (int)strlen( string ) : 0;
+}
+
 int Q_strncmp (const char *s1, const char *s2, int n) {
 	int		c1, c2;
 	
@@ -867,7 +885,7 @@ char *Q_CleanStr( char *string ) {
 }
 
 
-void QDECL Com_sprintf( char *dest, int size, const char *fmt, ...) {
+int QDECL Com_sprintf( char *dest, int size, const char *fmt, ...) {
 	int		len;
 	va_list		argptr;
 	char	bigbuffer[32000];	// big, but small enough to fit in PPC stack
@@ -887,6 +905,8 @@ void QDECL Com_sprintf( char *dest, int size, const char *fmt, ...) {
 #endif
 	}
 	Q_strncpyz (dest, bigbuffer, size );
+
+	return len;
 }
 
 
