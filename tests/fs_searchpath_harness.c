@@ -113,11 +113,13 @@ void Com_DPrintf( const char *fmt, ... ) {
 Com_sprintf
 =============
 */
-void Com_sprintf( char *dest, int size, const char *fmt, ... ) {
+int Com_sprintf( char *dest, int size, const char *fmt, ... ) {
 	va_list args;
+	int len;
 	va_start( args, fmt );
-	vsnprintf( dest, size, fmt, args );
+	len = vsnprintf( dest, size, fmt, args );
 	va_end( args );
+	return len;
 }
 
 /*
@@ -189,6 +191,30 @@ Q_stricmpn
 */
 int Q_stricmpn( const char *s1, const char *s2, int n ) {
 	return strncasecmp( s1, s2, n );
+}
+
+/*
+=============
+Q_strnicmp
+=============
+*/
+int Q_strnicmp( const char *s1, const char *s2, int n ) {
+	return Q_stricmpn( s1, s2, n );
+}
+
+/*
+=============
+COM_SkipPath
+=============
+*/
+char *COM_SkipPath( char *pathname ) {
+	char *last = pathname;
+	while ( *pathname ) {
+		if ( *pathname == '/' )
+			last = pathname + 1;
+		pathname++;
+	}
+	return last;
 }
 
 /*

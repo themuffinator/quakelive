@@ -11,7 +11,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [qvm, dll, re]
         include:
           - target: qvm
             os: ubuntu-latest
@@ -20,7 +19,7 @@ jobs:
             python: python
             harness_args: ""
           - target: dll
-            os: windows-latest
+            os: windows-2019
             label: DLL
             shell: pwsh
             python: python
