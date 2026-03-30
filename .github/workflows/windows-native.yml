@@ -5,12 +5,9 @@ on:
     branches: ['**']
   pull_request:
 
-permissions:
-  contents: read
-
 jobs:
   native-dll:
-    runs-on: windows-2019
+    runs-on: windows-latest
     defaults:
       run:
         shell: pwsh

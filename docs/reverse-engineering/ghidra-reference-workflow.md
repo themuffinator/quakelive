@@ -76,10 +76,30 @@ Precedence rule:
 - Treat live MCP output and ad-hoc decompiler sessions as advisory until they are
   revalidated against committed corpus files and, when needed, the HLIL dumps.
 
-## UI Module: Symbol-Annotated Reference and Source Recreation
+## UI Module: Ghidra-Readable Reference and Separate Source Recreation
 
-The UI module has a dedicated two-step workflow built on top of the standard
-Ghidra export:
+The UI module has a dedicated workflow built on top of the standard Ghidra
+export:
+
+### Step 0 — Build the committed Ghidra-readable reference
+
+```
+python3 scripts/ghidra/build_ui_ghidra_reference.py
+```
+
+This generates:
+
+```
+references/reverse-engineering/ghidra/uix86/ui_ghidra_reference.h
+```
+
+The header is self-contained on purpose so Ghidra and the generated C export can
+consume it without depending on the production include graph. It combines:
+
+- the committed `ui.json` symbol-address catalog
+- curated exact prototypes recovered in `src-re/ui/`
+- the retail syscall-slot constants already bounded through the committed UI
+  reverse-engineering work
 
 ### Step 1 — Apply symbol map to a live Ghidra project
 
@@ -102,20 +122,44 @@ Run after Step 1:
 analyzeHeadless <project_dir> <project_name> \
     -process uix86.dll \
     -postScript ghidra_scripts/ExportUISourceRecreation.py \
-    [<output_root>]
+    [<output_root>] [<reference_path>]
 ```
 
-`ExportUISourceRecreation.py` decompiles every non-external function and
-writes the result to:
+`ExportUISourceRecreation.py` decompiles every non-external function and writes
+the result to:
 
 ```
-<output_root>/ui/
+<output_root>/
     ui_reconstruction.c   -- full annotated decompile of all 348 functions
     include/
-        ui_prototypes.h   -- forward declarations for all decompiled functions
+        ui_ghidra_reference.h -- copied committed reference header
+        ui_prototypes.h       -- forward declarations for all decompiled functions
 ```
 
-`<output_root>` defaults to `src-re/ui/`.
+`<output_root>` defaults to
+`references/reverse-engineering/ghidra/uix86/source-recreation/`.
+
+`<reference_path>` defaults to
+`references/reverse-engineering/ghidra/uix86/ui_ghidra_reference.h`.
+
+The generated source recreation now stays separate from the hand-authored
+`src-re/ui/` workspace. `src-re/ui/` remains the manual reconstruction area;
+the machine-generated Ghidra export lives under the committed Ghidra corpus.
+
+### One-shot wrapper
+
+For the UI-only flow, run:
+
+```powershell
+scripts\ghidra\run_ui_source_recreation.ps1
+```
+
+This wrapper:
+
+1. regenerates `ui_ghidra_reference.h`
+2. imports `uix86.dll` into a temporary headless project
+3. applies `ApplyUISymbolMap.py`
+4. exports the separate C recreation with `ExportUISourceRecreation.py`
 
 ### Offline annotation (no Ghidra required)
 
@@ -137,10 +181,15 @@ This regenerates `references/reverse-engineering/ghidra/uix86/decompile_annotate
 - `ui_main.c` — Initial reconstruction stubs for the module entry point
   and all `_UI_*` engine-facing API functions.
 
+Machine-generated Ghidra exports are intentionally kept out of this tree and now
+live in `references/reverse-engineering/ghidra/uix86/source-recreation/`.
+
 ## Tooling
 
 - Headless exporter script: `scripts/ghidra/ExportQuakeLiveReference.java`
 - Runner wrapper: `scripts/ghidra/run_quakelive_reference.ps1`
+- UI reference builder: `scripts/ghidra/build_ui_ghidra_reference.py`
+- UI-only recreation wrapper: `scripts/ghidra/run_ui_source_recreation.ps1`
 - UI symbol-map application: `ghidra_scripts/ApplyUISymbolMap.py`
 - UI source-recreation export: `ghidra_scripts/ExportUISourceRecreation.py`
 - Offline UI annotation helper: `scripts/ghidra/build_ui_annotated.py`

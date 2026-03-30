@@ -30,96 +30,87 @@ The script resolves ``<repo_root>`` relative to its own location
 import json
 import os
 
-from ghidra.app.script import GhidraScript
 from ghidra.program.model.symbol import SourceType
 
 
-class ApplyUISymbolMap(GhidraScript):
+def main():
+	program = currentProgram
+	if program is None:
+		printerr("No program is active; aborting")
+		return
 
-	def run(self):
-		program = self.currentProgram
-		if program is None:
-			self.printerr("No program is active; aborting")
-			return
+	script_dir = os.path.dirname(os.path.abspath(str(sourceFile)))
+	repo_root = os.path.dirname(script_dir)
+	default_map = os.path.join(repo_root, "references", "symbol-maps", "ui.json")
 
-		# Resolve default symbol map path relative to this script's directory.
-		script_dir = os.path.dirname(os.path.abspath(str(sourceFile)))
-		repo_root = os.path.dirname(script_dir)
-		default_map = os.path.join(repo_root, "references", "symbol-maps", "ui.json")
+	args = list(getScriptArgs())
+	map_path = args[0] if args else default_map
 
-		args = list(self.getScriptArgs())
-		map_path = args[0] if args else default_map
+	if not os.path.isfile(map_path):
+		printerr("Symbol map not found: %s" % map_path)
+		return
 
-		if not os.path.isfile(map_path):
-			self.printerr("Symbol map not found: %s" % map_path)
-			return
+	with open(map_path, "r") as fh:
+		manifest = json.load(fh)
 
-		with open(map_path, "r") as fh:
-			manifest = json.load(fh)
+	functions = manifest.get("functions", [])
+	if not functions:
+		printerr("No functions found in symbol map: %s" % map_path)
+		return
 
-		functions = manifest.get("functions", [])
-		if not functions:
-			self.printerr("No functions found in symbol map: %s" % map_path)
-			return
+	println("Loaded %d function entries from %s" % (len(functions), map_path))
 
-		self.println("Loaded %d function entries from %s" % (len(functions), map_path))
+	func_manager = program.getFunctionManager()
+	addr_factory = program.getAddressFactory()
+	listing = program.getListing()
 
-		func_manager = program.getFunctionManager()
-		addr_factory = program.getAddressFactory()
-		listing = program.getListing()
+	renamed = 0
+	commented = 0
+	skipped = 0
+	transaction_id = program.startTransaction("Apply UI Symbol Map")
+	try:
+		for entry in functions:
+			addr_str = entry.get("address", "")
+			normalized = entry.get("normalized_name", "")
+			comment = entry.get("comment", "")
 
-		renamed = 0
-		commented = 0
-		skipped = 0
-		transaction_id = program.startTransaction("Apply UI Symbol Map")
-		try:
-			for entry in functions:
-				addr_str = entry.get("address", "")
-				normalized = entry.get("normalized_name", "")
-				comment = entry.get("comment", "")
-				status = entry.get("status", "")
+			if not addr_str or not normalized:
+				skipped += 1
+				continue
 
-				if not addr_str or not normalized:
-					skipped += 1
-					continue
+			try:
+				addr = addr_factory.getAddress(addr_str)
+			except Exception:
+				printerr("Could not parse address: %s" % addr_str)
+				skipped += 1
+				continue
 
-				# Parse the hex address (e.g. "0x10001000").
+			func = func_manager.getFunctionAt(addr)
+			if func is None:
+				skipped += 1
+				continue
+
+			current_name = func.getName()
+			if current_name != normalized:
 				try:
-					addr = addr_factory.getAddress(addr_str)
-				except Exception:
-					self.printerr("Could not parse address: %s" % addr_str)
+					func.setName(normalized, SourceType.USER_DEFINED)
+					renamed += 1
+				except Exception as exc:
+					printerr("Could not rename %s -> %s: %s" % (current_name, normalized, exc))
 					skipped += 1
 					continue
 
-				func = func_manager.getFunctionAt(addr)
-				if func is None:
-					skipped += 1
-					continue
+			if comment:
+				existing = listing.getComment(0, addr)
+				if not existing:
+					listing.setComment(addr, 0, comment)
+					commented += 1
+	finally:
+		program.endTransaction(transaction_id, True)
 
-				# Rename only when the current name is a raw Ghidra auto-name.
-				current_name = func.getName()
-				if current_name != normalized:
-					try:
-						func.setName(normalized, SourceType.USER_DEFINED)
-						renamed += 1
-					except Exception as exc:
-						self.printerr("Could not rename %s -> %s: %s" % (current_name, normalized, exc))
-						skipped += 1
-						continue
-
-				# Apply plate comment when the map entry carries one.
-				if comment:
-					existing = listing.getComment(0, addr)
-					if not existing:
-						listing.setComment(addr, 0, comment)
-						commented += 1
-
-		finally:
-			program.endTransaction(transaction_id, True)
-
-		self.println(
-			"ApplyUISymbolMap: renamed=%d commented=%d skipped=%d" % (renamed, commented, skipped)
-		)
+	println(
+		"ApplyUISymbolMap: renamed=%d commented=%d skipped=%d" % (renamed, commented, skipped)
+	)
 
 
-ApplyUISymbolMap().run()
+main()

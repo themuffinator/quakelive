@@ -20,6 +20,9 @@ between:
 Keeping those roles separate avoids mixing evidence, prototypes, and promoted
 runtime code into one directory.
 
+Machine-generated Ghidra exports belong with the reference corpus under
+`references/reverse-engineering/ghidra/`, not in `src-re/`.
+
 ## What each subdirectory does
 
 ### `src-re/include/`

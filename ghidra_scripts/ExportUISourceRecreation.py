@@ -9,11 +9,12 @@
 Run *after* ``ApplyUISymbolMap.py`` so that function names reflect the committed
 symbol map before the C output is generated.
 
-Output layout under ``<output_root>/ui/``::
+Output layout under ``<output_root>/``::
 
-    <output_root>/ui/
+    <output_root>/
         ui_reconstruction.c   -- full annotated decompile, all functions
         include/
+            ui_ghidra_reference.h -- copied committed reference header
             ui_prototypes.h   -- forward declarations for all decompiled functions
 
 Run via the Ghidra GUI or headless::
@@ -21,17 +22,20 @@ Run via the Ghidra GUI or headless::
     analyzeHeadless <project_dir> <project_name> \
         -process uix86.dll \
         -postScript ExportUISourceRecreation.py \
-        [<output_root>]
+        [<output_root>] [<reference_path>]
 
-``<output_root>`` defaults to ``<repo_root>/src-re/ui``.  The script resolves
-``<repo_root>`` relative to its own location (``<repo_root>/ghidra_scripts/``).
+``<output_root>`` defaults to
+``<repo_root>/references/reverse-engineering/ghidra/uix86/source-recreation``.
+``<reference_path>`` defaults to
+``<repo_root>/references/reverse-engineering/ghidra/uix86/ui_ghidra_reference.h``.
+The script resolves ``<repo_root>`` relative to its own location
+(``<repo_root>/ghidra_scripts/``).
 """
 
 import os
+import shutil
 
 from ghidra.app.decompiler import DecompInterface
-from ghidra.app.script import GhidraScript
-from ghidra.program.model.listing import FunctionIterator
 
 
 _HEADER = """\
@@ -54,6 +58,7 @@ _HEADER = """\
  *   ExportUISourceRecreation.py  (export pass)
  */
 
+#include "include/ui_ghidra_reference.h"
 #include "include/ui_prototypes.h"
 
 """
@@ -74,79 +79,91 @@ _PROTO_HEADER = """\
 _PROTO_FOOTER = "\n#endif /* UI_PROTOTYPES_H */\n"
 
 
-class ExportUISourceRecreation(GhidraScript):
+def _ensure_dir(path):
+	if not os.path.isdir(path):
+		os.makedirs(path)
 
-	# ------------------------------------------------------------------
-	# Helpers
-	# ------------------------------------------------------------------
 
-	@staticmethod
-	def _ensure_dir(path):
-		if not os.path.isdir(path):
-			os.makedirs(path)
+def _write(path, text):
+	with open(path, "w") as fh:
+		fh.write(text)
 
-	@staticmethod
-	def _write(path, text):
-		with open(path, "w") as fh:
-			fh.write(text)
 
-	# ------------------------------------------------------------------
+def main():
+	program = currentProgram
+	if program is None:
+		printerr("No program is active; aborting")
+		return
 
-	def run(self):
-		program = self.currentProgram
-		if program is None:
-			self.printerr("No program is active; aborting")
-			return
+	script_dir = os.path.dirname(os.path.abspath(str(sourceFile)))
+	repo_root = os.path.dirname(script_dir)
+	default_out = os.path.join(
+		repo_root,
+		"references",
+		"reverse-engineering",
+		"ghidra",
+		"uix86",
+		"source-recreation",
+	)
+	default_reference = os.path.join(
+		repo_root,
+		"references",
+		"reverse-engineering",
+		"ghidra",
+		"uix86",
+		"ui_ghidra_reference.h",
+	)
 
-		script_dir = os.path.dirname(os.path.abspath(str(sourceFile)))
-		repo_root = os.path.dirname(script_dir)
-		default_out = os.path.join(repo_root, "src-re", "ui")
+	args = list(getScriptArgs())
+	output_root = args[0] if args else default_out
+	reference_path = args[1] if len(args) > 1 else default_reference
 
-		args = list(self.getScriptArgs())
-		output_root = args[0] if args else default_out
+	recon_dir = output_root
+	include_dir = os.path.join(output_root, "include")
+	_ensure_dir(recon_dir)
+	_ensure_dir(include_dir)
 
-		recon_dir = output_root
-		include_dir = os.path.join(output_root, "include")
-		self._ensure_dir(recon_dir)
-		self._ensure_dir(include_dir)
+	if not os.path.isfile(reference_path):
+		printerr("Reference header not found: %s" % reference_path)
+		return
 
-		func_manager = program.getFunctionManager()
+	shutil.copyfile(
+		reference_path,
+		os.path.join(include_dir, "ui_ghidra_reference.h")
+	)
 
-		# Collect all non-external functions sorted by entry address for
-		# deterministic output ordering.
-		funcs = []
-		func_iter = func_manager.getFunctions(True)
-		while func_iter.hasNext():
-			func = func_iter.next()
-			if not func.isExternal():
-				funcs.append(func)
-		funcs.sort(key=lambda f: f.getEntryPoint().getOffset())
+	func_manager = program.getFunctionManager()
 
-		self.println(
-			"ExportUISourceRecreation: decompiling %d functions..." % len(funcs)
-		)
+	funcs = []
+	func_iter = func_manager.getFunctions(True)
+	while func_iter.hasNext():
+		func = func_iter.next()
+		if not func.isExternal():
+			funcs.append(func)
+	funcs.sort(key=lambda f: f.getEntryPoint().getOffset())
 
-		decompiler = DecompInterface()
-		decompiler.openProgram(program)
+	println("ExportUISourceRecreation: decompiling %d functions..." % len(funcs))
 
-		recon_lines = [_HEADER]
-		proto_lines = [_PROTO_HEADER]
-		succeeded = 0
-		failed = 0
+	decompiler = DecompInterface()
+	decompiler.openProgram(program)
 
+	recon_lines = [_HEADER]
+	proto_lines = [_PROTO_HEADER]
+	succeeded = 0
+	failed = 0
+
+	try:
 		for func in funcs:
-			if self.monitor.isCancelled():
+			if monitor.isCancelled():
 				break
 
 			name = func.getName()
 			addr = func.getEntryPoint()
 			size = func.getBody().getNumAddresses()
 
-			recon_lines.append(
-				"/* %s @ %s  size %d */" % (name, addr, size)
-			)
+			recon_lines.append("/* %s @ %s  size %d */" % (name, addr, size))
 
-			results = decompiler.decompileFunction(func, 90, self.monitor)
+			results = decompiler.decompileFunction(func, 90, monitor)
 			if results is None or not results.decompileCompleted() or results.getDecompiledFunction() is None:
 				recon_lines.append("/* decompile failed */\n")
 				failed += 1
@@ -157,28 +174,27 @@ class ExportUISourceRecreation(GhidraScript):
 			recon_lines.append("")
 			succeeded += 1
 
-			# Collect a prototype for the header.
 			proto = results.getDecompiledFunction().getSignature()
 			if proto:
 				proto_lines.append("%s;" % proto)
-
+	finally:
 		decompiler.dispose()
 
-		self._write(
-			os.path.join(recon_dir, "ui_reconstruction.c"),
-			"\n".join(recon_lines)
-		)
+	_write(
+		os.path.join(recon_dir, "ui_reconstruction.c"),
+		"\n".join(recon_lines)
+	)
 
-		proto_lines.append(_PROTO_FOOTER)
-		self._write(
-			os.path.join(include_dir, "ui_prototypes.h"),
-			"\n".join(proto_lines)
-		)
+	proto_lines.append(_PROTO_FOOTER)
+	_write(
+		os.path.join(include_dir, "ui_prototypes.h"),
+		"\n".join(proto_lines)
+	)
 
-		self.println(
-			"ExportUISourceRecreation: succeeded=%d failed=%d -> %s"
-			% (succeeded, failed, output_root)
-		)
+	println(
+		"ExportUISourceRecreation: succeeded=%d failed=%d -> %s"
+		% (succeeded, failed, output_root)
+	)
 
 
-ExportUISourceRecreation().run()
+main()
