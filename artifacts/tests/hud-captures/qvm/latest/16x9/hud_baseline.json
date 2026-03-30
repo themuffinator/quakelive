@@ -9,7 +9,7 @@
       ],
       "description": "Competitive HUD assets enabled for captures"
     },
-    "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be",
+    "commit": "42b511bff5b4109893a29f815eb90811cf927b01",
     "scenario": "hud_baseline",
     "archive": "tools/tests/client_regression/sample_snapshots.json",
     "frames": 3,

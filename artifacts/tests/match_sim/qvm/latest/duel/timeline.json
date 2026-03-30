@@ -175,9 +175,6 @@
       }
     ]
   },
-  "bot_profiles": {},
-  "spawn_schedule": [],
-  "access_permissions": {},
   "frames": [
     {
       "tick": 0,
@@ -237,18 +234,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "look",
           "last_message": null
         },
@@ -277,17 +263,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "look",
           "last_message": null
         }
@@ -343,18 +319,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -383,17 +348,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "look",
           "last_message": null
         }
@@ -449,18 +404,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -489,17 +433,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         }
@@ -536,18 +470,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -576,17 +499,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         }
@@ -623,18 +536,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -663,17 +565,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         }
@@ -710,18 +602,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -750,17 +631,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         }
@@ -797,18 +668,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -837,17 +697,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         }
@@ -884,18 +734,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -924,17 +763,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         }
@@ -982,18 +811,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -1022,17 +840,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1069,18 +877,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "move",
           "last_message": null
         },
@@ -1109,17 +906,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1167,18 +954,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1207,17 +983,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1254,18 +1020,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1294,17 +1049,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1341,18 +1086,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1381,17 +1115,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1428,18 +1152,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1468,17 +1181,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1515,18 +1218,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1555,17 +1247,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1602,18 +1284,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1642,17 +1313,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1689,18 +1350,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1729,17 +1379,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1776,18 +1416,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1816,17 +1445,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1863,18 +1482,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1903,17 +1511,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -1950,18 +1548,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -1990,17 +1577,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2037,18 +1614,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -2077,17 +1643,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2124,18 +1680,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -2164,17 +1709,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2211,18 +1746,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -2251,17 +1775,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2298,18 +1812,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -2338,17 +1841,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2385,18 +1878,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         },
@@ -2425,17 +1907,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2482,18 +1954,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -2522,17 +1983,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2569,18 +2020,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -2609,17 +2049,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2656,18 +2086,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -2696,17 +2115,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2743,18 +2152,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -2783,17 +2181,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2830,18 +2218,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -2870,17 +2247,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "shoot",
           "last_message": null
         }
@@ -2928,18 +2295,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -2968,17 +2324,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "damage",
           "last_message": null
         }
@@ -3015,18 +2361,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3055,17 +2390,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "damage",
           "last_message": null
         }
@@ -3102,18 +2427,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3142,17 +2456,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "damage",
           "last_message": null
         }
@@ -3189,18 +2493,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3229,17 +2522,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "damage",
           "last_message": null
         }
@@ -3276,18 +2559,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3316,17 +2588,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "damage",
           "last_message": null
         }
@@ -3374,18 +2636,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3414,17 +2665,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -3461,18 +2702,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3501,17 +2731,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -3548,18 +2768,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3588,17 +2797,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -3635,18 +2834,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3675,17 +2863,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -3722,18 +2900,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3762,17 +2929,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -3809,18 +2966,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3849,17 +2995,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -3896,18 +3032,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -3936,17 +3061,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -3983,18 +3098,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -4023,17 +3127,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4070,18 +3164,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -4110,17 +3193,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4157,18 +3230,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -4197,17 +3259,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4244,18 +3296,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -4284,17 +3325,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4331,18 +3362,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -4371,17 +3391,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4418,18 +3428,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -4458,17 +3457,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4505,18 +3494,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -4545,17 +3523,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4592,18 +3560,7 @@
           "inventory": {
             "armor": 50
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "say",
           "last_message": "Need more rockets!"
         },
@@ -4632,17 +3589,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4691,18 +3638,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -4731,17 +3667,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4779,18 +3705,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -4819,17 +3734,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4867,18 +3772,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -4907,17 +3801,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -4955,18 +3839,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -4995,17 +3868,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -5043,18 +3906,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5083,17 +3935,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -5131,18 +3973,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5171,17 +4002,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -5219,18 +4040,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5259,17 +4069,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -5307,18 +4107,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5347,17 +4136,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -5395,18 +4174,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5435,17 +4203,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -5483,18 +4241,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5523,17 +4270,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "heal",
           "last_message": null
         }
@@ -5585,18 +4322,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5625,17 +4351,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -5673,18 +4389,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5713,17 +4418,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -5761,18 +4456,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5801,17 +4485,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -5849,18 +4523,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5889,17 +4552,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -5937,18 +4590,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -5977,17 +4619,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6025,18 +4657,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6065,17 +4686,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6113,18 +4724,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6153,17 +4753,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6201,18 +4791,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6241,17 +4820,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6289,18 +4858,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6329,17 +4887,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6377,18 +4925,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6417,17 +4954,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6465,18 +4992,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6505,17 +5021,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6553,18 +5059,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6593,17 +5088,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6641,18 +5126,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6681,17 +5155,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6729,18 +5193,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6769,17 +5222,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6817,18 +5260,7 @@
             "armor": 50,
             "megahealth": 1
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            }
-          },
+          "custom": {},
           "last_action": "item",
           "last_message": "Need more rockets!"
         },
@@ -6857,17 +5289,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -6884,16 +5306,6 @@
           "action": "custom",
           "details": {
             "custom": {
-              "factory_defaults": {
-                "health": 125.0,
-                "ammo": {
-                  "rocket": 10.0,
-                  "machinegun": 50.0
-                },
-                "inventory": {
-                  "armor": 50
-                }
-              },
               "stack": 175
             }
           }
@@ -6928,16 +5340,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -6968,17 +5370,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7017,16 +5409,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7057,17 +5439,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7106,16 +5478,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7146,17 +5508,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7195,16 +5547,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7235,17 +5577,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7284,16 +5616,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7324,17 +5646,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7373,16 +5685,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7413,17 +5715,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7462,16 +5754,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7502,17 +5784,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7551,16 +5823,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7591,17 +5853,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7640,16 +5892,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7680,17 +5922,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7729,16 +5961,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7769,17 +5991,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7818,16 +6030,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7858,17 +6060,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7907,16 +6099,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -7947,17 +6129,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -7996,16 +6168,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8036,17 +6198,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8085,16 +6237,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8125,17 +6267,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8174,16 +6306,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8214,17 +6336,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8263,16 +6375,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8303,17 +6405,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8352,16 +6444,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8392,17 +6474,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8441,16 +6513,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8481,17 +6543,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8530,16 +6582,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8570,17 +6612,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8619,16 +6651,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8659,17 +6681,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8708,16 +6720,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8748,17 +6750,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8797,16 +6789,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8837,17 +6819,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8886,16 +6858,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -8926,17 +6888,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -8975,16 +6927,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -9015,17 +6957,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -9064,16 +6996,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -9104,17 +7026,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }
@@ -9153,16 +7065,6 @@
             "megahealth": 1
           },
           "custom": {
-            "factory_defaults": {
-              "health": 125.0,
-              "ammo": {
-                "rocket": 10.0,
-                "machinegun": 50.0
-              },
-              "inventory": {
-                "armor": 50
-              }
-            },
             "stack": 175
           },
           "last_action": "custom",
@@ -9193,17 +7095,7 @@
           "inventory": {
             "armor": 0
           },
-          "custom": {
-            "factory_defaults": {
-              "health": 100.0,
-              "ammo": {
-                "rail": 5.0
-              },
-              "inventory": {
-                "armor": 0
-              }
-            }
-          },
+          "custom": {},
           "last_action": "teleport",
           "last_message": null
         }

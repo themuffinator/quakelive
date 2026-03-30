@@ -1,5 +1,5 @@
 {
-  "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be",
+  "commit": "42b511bff5b4109893a29f815eb90811cf927b01",
   "hudConfig": {
     "cg_useCompetitiveHud": true,
     "hudFiles": [
@@ -19,7 +19,7 @@
         "638c3a5679231de7caf143f388431effe769e912152bbd56f75a019ee5ab0e56",
         "fc456828d2c7d69712cee52bec1faa968bf274d60442ca33ef7f412badd2d1de"
       ],
-      "path": "hud-captures/qvm/latest/4x3/hud_baseline.json",
+      "path": "hud-captures/qvm/4x3/hud_baseline.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -28,7 +28,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -42,7 +42,7 @@
         "f50331e421913018229f3c6bbf140f48347162d8a2bac38d24ef00b7d0e1e4eb",
         "abcf77c69e98c7792800435c09229ea664e912cde7376742e11ddcb4f614b94c"
       ],
-      "path": "hud-captures/qvm/latest/4x3/resource_drain.json",
+      "path": "hud-captures/qvm/4x3/resource_drain.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -51,29 +51,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
-    },
-    {
-      "target": "qvm",
-      "aspect": "4x3",
-      "scenario": "round_overtime",
-      "frames": 4,
-      "hashes": [
-        "732daf636458f70ba05260b9702280a693dc5415943dddcf7c9e57309d7edf15",
-        "3d1b0a9601c00641628da1af805575c78ea819ee6125be7270084ee0b95a14a8",
-        "9e90d31e687d6affd6adc91a35f5fcaf42383c1c7242a8338586b0ff50b60311",
-        "03153233b04ae9607839fea613ffc8f3b15adca8b2498ef3a99e553da352b135"
-      ],
-      "path": "hud-captures/qvm/latest/4x3/round_overtime.json",
-      "hudConfig": {
-        "cg_useCompetitiveHud": true,
-        "hudFiles": [
-          "ui/hud.txt",
-          "ui/hud3.menu"
-        ],
-        "description": "Competitive HUD assets enabled for captures"
-      },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -87,7 +65,7 @@
         "eb79d52ca2a24dd508f66a0a538b68b13e2e5e42df845222c7e66cfc8151d9e5",
         "b03c5b2c6821be17da30c244636ddc65ed2f4d6b5df0004130a9d768ac7e314f"
       ],
-      "path": "hud-captures/qvm/latest/4x3/server_correction.json",
+      "path": "hud-captures/qvm/4x3/server_correction.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -96,7 +74,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -109,7 +87,7 @@
         "b0d4bc9d00594d0e65346d309f2cec2733a6d8d80c2801576f836f50378d3af1",
         "822dc1c14922b22b10010c58e9356d09fc37455599208f1509d5e02cff22db98"
       ],
-      "path": "hud-captures/qvm/latest/4x3/weapons_and_items.json",
+      "path": "hud-captures/qvm/4x3/weapons_and_items.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -118,7 +96,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -130,7 +108,7 @@
         "638c3a5679231de7caf143f388431effe769e912152bbd56f75a019ee5ab0e56",
         "fc456828d2c7d69712cee52bec1faa968bf274d60442ca33ef7f412badd2d1de"
       ],
-      "path": "hud-captures/qvm/latest/16x9/hud_baseline.json",
+      "path": "hud-captures/qvm/16x9/hud_baseline.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -139,7 +117,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -153,7 +131,7 @@
         "f50331e421913018229f3c6bbf140f48347162d8a2bac38d24ef00b7d0e1e4eb",
         "abcf77c69e98c7792800435c09229ea664e912cde7376742e11ddcb4f614b94c"
       ],
-      "path": "hud-captures/qvm/latest/16x9/resource_drain.json",
+      "path": "hud-captures/qvm/16x9/resource_drain.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -162,29 +140,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
-    },
-    {
-      "target": "qvm",
-      "aspect": "16x9",
-      "scenario": "round_overtime",
-      "frames": 4,
-      "hashes": [
-        "732daf636458f70ba05260b9702280a693dc5415943dddcf7c9e57309d7edf15",
-        "3d1b0a9601c00641628da1af805575c78ea819ee6125be7270084ee0b95a14a8",
-        "9e90d31e687d6affd6adc91a35f5fcaf42383c1c7242a8338586b0ff50b60311",
-        "03153233b04ae9607839fea613ffc8f3b15adca8b2498ef3a99e553da352b135"
-      ],
-      "path": "hud-captures/qvm/latest/16x9/round_overtime.json",
-      "hudConfig": {
-        "cg_useCompetitiveHud": true,
-        "hudFiles": [
-          "ui/hud.txt",
-          "ui/hud3.menu"
-        ],
-        "description": "Competitive HUD assets enabled for captures"
-      },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -198,7 +154,7 @@
         "eb79d52ca2a24dd508f66a0a538b68b13e2e5e42df845222c7e66cfc8151d9e5",
         "b03c5b2c6821be17da30c244636ddc65ed2f4d6b5df0004130a9d768ac7e314f"
       ],
-      "path": "hud-captures/qvm/latest/16x9/server_correction.json",
+      "path": "hud-captures/qvm/16x9/server_correction.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -207,7 +163,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -220,7 +176,7 @@
         "b0d4bc9d00594d0e65346d309f2cec2733a6d8d80c2801576f836f50378d3af1",
         "822dc1c14922b22b10010c58e9356d09fc37455599208f1509d5e02cff22db98"
       ],
-      "path": "hud-captures/qvm/latest/16x9/weapons_and_items.json",
+      "path": "hud-captures/qvm/16x9/weapons_and_items.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -229,7 +185,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -241,7 +197,7 @@
         "638c3a5679231de7caf143f388431effe769e912152bbd56f75a019ee5ab0e56",
         "fc456828d2c7d69712cee52bec1faa968bf274d60442ca33ef7f412badd2d1de"
       ],
-      "path": "hud-captures/qvm/latest/21x9/hud_baseline.json",
+      "path": "hud-captures/qvm/21x9/hud_baseline.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -250,7 +206,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -264,7 +220,7 @@
         "f50331e421913018229f3c6bbf140f48347162d8a2bac38d24ef00b7d0e1e4eb",
         "abcf77c69e98c7792800435c09229ea664e912cde7376742e11ddcb4f614b94c"
       ],
-      "path": "hud-captures/qvm/latest/21x9/resource_drain.json",
+      "path": "hud-captures/qvm/21x9/resource_drain.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -273,29 +229,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
-    },
-    {
-      "target": "qvm",
-      "aspect": "21x9",
-      "scenario": "round_overtime",
-      "frames": 4,
-      "hashes": [
-        "732daf636458f70ba05260b9702280a693dc5415943dddcf7c9e57309d7edf15",
-        "3d1b0a9601c00641628da1af805575c78ea819ee6125be7270084ee0b95a14a8",
-        "9e90d31e687d6affd6adc91a35f5fcaf42383c1c7242a8338586b0ff50b60311",
-        "03153233b04ae9607839fea613ffc8f3b15adca8b2498ef3a99e553da352b135"
-      ],
-      "path": "hud-captures/qvm/latest/21x9/round_overtime.json",
-      "hudConfig": {
-        "cg_useCompetitiveHud": true,
-        "hudFiles": [
-          "ui/hud.txt",
-          "ui/hud3.menu"
-        ],
-        "description": "Competitive HUD assets enabled for captures"
-      },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -309,7 +243,7 @@
         "eb79d52ca2a24dd508f66a0a538b68b13e2e5e42df845222c7e66cfc8151d9e5",
         "b03c5b2c6821be17da30c244636ddc65ed2f4d6b5df0004130a9d768ac7e314f"
       ],
-      "path": "hud-captures/qvm/latest/21x9/server_correction.json",
+      "path": "hud-captures/qvm/21x9/server_correction.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -318,7 +252,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     },
     {
       "target": "qvm",
@@ -331,7 +265,7 @@
         "b0d4bc9d00594d0e65346d309f2cec2733a6d8d80c2801576f836f50378d3af1",
         "822dc1c14922b22b10010c58e9356d09fc37455599208f1509d5e02cff22db98"
       ],
-      "path": "hud-captures/qvm/latest/21x9/weapons_and_items.json",
+      "path": "hud-captures/qvm/21x9/weapons_and_items.json",
       "hudConfig": {
         "cg_useCompetitiveHud": true,
         "hudFiles": [
@@ -340,7 +274,7 @@
         ],
         "description": "Competitive HUD assets enabled for captures"
       },
-      "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be"
+      "commit": "42b511bff5b4109893a29f815eb90811cf927b01"
     }
   ]
 }

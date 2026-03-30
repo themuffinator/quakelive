@@ -1,3 +1,2 @@
 Weapon timing harness completed successfully.
-Baseline path: artifacts/tests/weapon_timings/qvm/latest/baseline.json
-Reload mismatches: Grappling Hook, Heavy Machinegun
+Baseline path: artifacts/tests/weapon_timings/qvm/baseline.json

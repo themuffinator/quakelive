@@ -1,6 +1,6 @@
 {
   "target": "qvm",
-  "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be",
+  "commit": "538d820e8dd869e20ba599250394a370a30017ed",
   "reference": "references/hlil/quakelive/qagamex86.dll_split/bg_pmove.md",
   "reload_times": {
     "BFG": {
@@ -20,8 +20,8 @@
     },
     "Grappling Hook": {
       "reference_ms": 100,
-      "repo_ms": 200,
-      "matches": false
+      "repo_ms": 100,
+      "matches": true
     },
     "Grenade Launcher": {
       "reference_ms": 800,
@@ -30,8 +30,8 @@
     },
     "Heavy Machinegun": {
       "reference_ms": 75,
-      "repo_ms": 80,
-      "matches": false
+      "repo_ms": 75,
+      "matches": true
     },
     "Lightning Gun": {
       "reference_ms": 50,
