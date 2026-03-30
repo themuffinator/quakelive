@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "aspect": "16x9",
+    "hudConfig": {
+      "cg_useCompetitiveHud": true,
+      "hudFiles": [
+        "ui/hud.txt",
+        "ui/hud3.menu"
+      ],
+      "description": "Competitive HUD assets enabled for captures"
+    },
+    "commit": "7a5f4c89e060ec7d5e9f208877f2a70e56d2c2be",
+    "scenario": "round_overtime",
+    "archive": "tools/tests/client_regression/round_overtime_snapshots.json",
+    "frames": 4,
+    "snapshotMetadata": {
+      "description": "Synthetic snapshots focusing on round flow and overtime banners",
+      "map": "qztourney7",
+      "ruleset": "competitive",
+      "notes": [
+        "Frames reflect regulation clock, sudden-death, and chained overtime banners",
+        "Competitive HUD config is expected to surface round and overtime text blocks"
+      ]
+    }
+  },
+  "frames": [
+    {
+      "sequence": 1,
+      "serverTime": 120000,
+      "hash": "732daf636458f70ba05260b9702280a693dc5415943dddcf7c9e57309d7edf15",
+      "hud": {
+        "health": 100,
+        "armor": 50,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "rocket_launcher": 15
+        },
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "matchState": {
+          "clock": "02:00",
+          "overtime": false,
+          "overtimeCount": 0,
+          "phase": "regulation",
+          "round": 1,
+          "roundLimit": 3,
+          "state": "LIVE"
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "serverTime": 121000,
+      "hash": "3d1b0a9601c00641628da1af805575c78ea819ee6125be7270084ee0b95a14a8",
+      "hud": {
+        "health": 95,
+        "armor": 45,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "rocket_launcher": 13
+        },
+        "position": [
+          4.0,
+          1.0,
+          0.0
+        ],
+        "matchState": {
+          "clock": "00:05",
+          "overtime": false,
+          "overtimeCount": 0,
+          "phase": "sudden_death",
+          "round": 1,
+          "roundLimit": 3,
+          "state": "TIED"
+        }
+      }
+    },
+    {
+      "sequence": 3,
+      "serverTime": 122000,
+      "hash": "9e90d31e687d6affd6adc91a35f5fcaf42383c1c7242a8338586b0ff50b60311",
+      "hud": {
+        "health": 105,
+        "armor": 60,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "rocket_launcher": 12
+        },
+        "position": [
+          4.5,
+          1.25,
+          0.0
+        ],
+        "matchState": {
+          "clock": "01:59",
+          "overtime": true,
+          "overtimeCount": 1,
+          "overtimeLengthSeconds": 120,
+          "phase": "overtime",
+          "round": 1,
+          "roundLimit": 3,
+          "state": "OVERTIME"
+        }
+      }
+    },
+    {
+      "sequence": 4,
+      "serverTime": 124000,
+      "hash": "03153233b04ae9607839fea613ffc8f3b15adca8b2498ef3a99e553da352b135",
+      "hud": {
+        "health": 90,
+        "armor": 35,
+        "weapon": "rocket_launcher",
+        "ammo": {
+          "rocket_launcher": 9
+        },
+        "position": [
+          5.0,
+          1.5,
+          0.0
+        ],
+        "matchState": {
+          "clock": "00:12",
+          "overtime": true,
+          "overtimeCount": 2,
+          "overtimeLengthSeconds": 120,
+          "phase": "overtime",
+          "round": 1,
+          "roundLimit": 3,
+          "state": "OVERTIME"
+        }
+      }
+    }
+  ]
+}

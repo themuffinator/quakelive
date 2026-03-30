@@ -1,0 +1,1623 @@
+{
+  "config": {
+    "map": "campgrounds",
+    "duration": 2.0,
+    "tick_rate": 10,
+    "seed": 2024,
+    "metadata": {
+      "description": "Two bots trading scripted damage for parity checks"
+    },
+    "bots": [
+      {
+        "name": "uriel",
+        "team": "red",
+        "initial_state": {
+          "health": 125
+        },
+        "spawn": {},
+        "script": [
+          {
+            "time": 0.2,
+            "action": "damage",
+            "params": {
+              "amount": 30,
+              "target": "stripe"
+            }
+          },
+          {
+            "time": 0.7,
+            "action": "damage",
+            "params": {
+              "amount": 45,
+              "target": "stripe"
+            }
+          },
+          {
+            "time": 1.4,
+            "action": "heal",
+            "params": {
+              "amount": 15
+            }
+          }
+        ]
+      },
+      {
+        "name": "stripe",
+        "team": "blue",
+        "initial_state": {
+          "health": 110
+        },
+        "spawn": {},
+        "script": [
+          {
+            "time": 0.1,
+            "action": "damage",
+            "params": {
+              "amount": 20,
+              "target": "uriel"
+            }
+          },
+          {
+            "time": 0.6,
+            "action": "damage",
+            "params": {
+              "amount": 65,
+              "target": "uriel"
+            }
+          },
+          {
+            "time": 1.2,
+            "action": "damage",
+            "params": {
+              "amount": 50,
+              "target": "uriel"
+            }
+          },
+          {
+            "time": 1.6,
+            "action": "heal",
+            "params": {
+              "amount": 10
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "bot_profiles": {},
+  "spawn_schedule": [],
+  "access_permissions": {},
+  "frames": [
+    {
+      "tick": 0,
+      "time": 0.0,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 125.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": null,
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 110.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": null,
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 1,
+      "time": 0.1,
+      "events": [
+        {
+          "bot": "stripe",
+          "team": "blue",
+          "time": 0.1,
+          "action": "damage",
+          "details": {
+            "health": 105.0,
+            "amount": 20.0,
+            "target": "uriel"
+          }
+        }
+      ],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 105.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": null,
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 110.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 2,
+      "time": 0.2,
+      "events": [
+        {
+          "bot": "uriel",
+          "team": "red",
+          "time": 0.2,
+          "action": "damage",
+          "details": {
+            "health": 80.0,
+            "amount": 30.0,
+            "target": "stripe"
+          }
+        }
+      ],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 105.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 80.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 3,
+      "time": 0.3,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 105.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 80.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 4,
+      "time": 0.4,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 105.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 80.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 5,
+      "time": 0.5,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 105.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 80.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 6,
+      "time": 0.6,
+      "events": [
+        {
+          "bot": "stripe",
+          "team": "blue",
+          "time": 0.6,
+          "action": "damage",
+          "details": {
+            "health": 40.0,
+            "amount": 65.0,
+            "target": "uriel"
+          }
+        }
+      ],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 40.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 80.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 7,
+      "time": 0.7,
+      "events": [
+        {
+          "bot": "uriel",
+          "team": "red",
+          "time": 0.7,
+          "action": "damage",
+          "details": {
+            "health": 35.0,
+            "amount": 45.0,
+            "target": "stripe"
+          }
+        }
+      ],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 40.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 8,
+      "time": 0.8,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 40.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 9,
+      "time": 0.9,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 40.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 10,
+      "time": 1.0,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 40.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 11,
+      "time": 1.1,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 40.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 12,
+      "time": 1.2,
+      "events": [
+        {
+          "bot": "stripe",
+          "team": "blue",
+          "time": 1.2,
+          "action": "damage",
+          "details": {
+            "health": 0.0,
+            "amount": 50.0,
+            "target": "uriel"
+          }
+        }
+      ],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 0.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 13,
+      "time": 1.3,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 0.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 14,
+      "time": 1.4,
+      "events": [
+        {
+          "bot": "uriel",
+          "team": "red",
+          "time": 1.4,
+          "action": "heal",
+          "details": {
+            "health": 15.0,
+            "amount": 15.0
+          }
+        }
+      ],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 15.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 15,
+      "time": 1.5,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 15.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 35.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "damage",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 16,
+      "time": 1.6,
+      "events": [
+        {
+          "bot": "stripe",
+          "team": "blue",
+          "time": 1.6,
+          "action": "heal",
+          "details": {
+            "health": 45.0,
+            "amount": 10.0
+          }
+        }
+      ],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 15.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 45.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 17,
+      "time": 1.7,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 15.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 45.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 18,
+      "time": 1.8,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 15.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 45.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 19,
+      "time": 1.9,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 15.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 45.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        }
+      }
+    },
+    {
+      "tick": 20,
+      "time": 2.0,
+      "events": [],
+      "bots": {
+        "uriel": {
+          "name": "uriel",
+          "team": "red",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 15.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 125.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        },
+        "stripe": {
+          "name": "stripe",
+          "team": "blue",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "velocity": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "facing": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "health": 45.0,
+          "ammo": {},
+          "inventory": {},
+          "custom": {
+            "factory_defaults": {
+              "health": 110.0,
+              "ammo": {},
+              "inventory": {}
+            }
+          },
+          "last_action": "heal",
+          "last_message": null
+        }
+      }
+    }
+  ]
+}

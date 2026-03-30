@@ -1,12 +1,452 @@
 Match simulation harness completed successfully.
-{
-  "target": "qvm",
-  "scenario": "tools/tests/match_sim/sample_scenario.json",
-  "seed": 2024,
-  "frame_count": 101,
-  "duration_seconds": 10.0,
-  "bots": [
-    "anarki",
-    "sarge"
-  ]
-}
+[
+  {
+    "target": "qvm",
+    "slug": "duel",
+    "scenario": "tools/tests/match_sim/sample_scenario.json",
+    "seed": 2024,
+    "frame_count": 101,
+    "duration_seconds": 10.0,
+    "bots": [
+      "anarki",
+      "sarge"
+    ],
+    "metadata": {
+      "description": "Sample scripted duel"
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "overtime",
+    "scenario": "tools/tests/match_sim/overtime_scenario.json",
+    "seed": 2024,
+    "frame_count": 126,
+    "duration_seconds": 12.5,
+    "bots": [
+      "keel",
+      "visor"
+    ],
+    "metadata": {
+      "description": "Overtime sudden-death duel",
+      "regulation_duration": 10.0,
+      "overtime": true
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "loadouts",
+    "scenario": "tools/tests/match_sim/complex_loadouts.json",
+    "seed": 2024,
+    "frame_count": 161,
+    "duration_seconds": 8.0,
+    "bots": [
+      "ranger",
+      "slash",
+      "sorlag"
+    ],
+    "metadata": {
+      "description": "Tri-bot loadout stress test",
+      "mode": "ffa"
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "factory",
+    "scenario": "tools/tests/match_sim/factory_cvars.json",
+    "seed": 2024,
+    "frame_count": 161,
+    "duration_seconds": 8.0,
+    "bots": [
+      "anarki",
+      "visor"
+    ],
+    "metadata": {
+      "description": "Factory cvar toggle coverage",
+      "mode": "ffa",
+      "factory": {
+        "active_loadout": "practice",
+        "loadouts": {
+          "practice": {
+            "ammo": {
+              "machinegun": 100,
+              "lightning": 75
+            },
+            "inventory": {
+              "armor": 25,
+              "gauntlet": 1
+            }
+          },
+          "tournament": {
+            "ammo": {
+              "rocket": 15,
+              "rail": 5
+            },
+            "inventory": {
+              "armor": 50,
+              "mega": 1
+            }
+          }
+        },
+        "spawn_delays": {
+          "warmup_ms": 500,
+          "live_ms": 1500
+        },
+        "items": {
+          "allow_drops": true,
+          "allow_bounce": false,
+          "respawn_seconds": 2.0,
+          "return_seconds": 0.5
+        }
+      }
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "rotation",
+    "scenario": "tools/tests/match_sim/rotation_vote.json",
+    "seed": 2024,
+    "frame_count": 121,
+    "duration_seconds": 6.0,
+    "bots": [
+      "sarge",
+      "slash"
+    ],
+    "metadata": {
+      "description": "Rotation vote selects the power preset for TDM",
+      "mode": "tdm",
+      "rotation": {
+        "next_map": "purgatory",
+        "factory_id": "power-tdm",
+        "vote_command": "map purgatory power-tdm",
+        "g_factoryTitle": "Power Preset"
+      },
+      "factory": {
+        "title": "Power Preset",
+        "active_loadout": "power",
+        "bot_loadouts": {
+          "sarge": "power",
+          "slash": "power"
+        },
+        "loadouts": {
+          "power": {
+            "ammo": {
+              "rocket": 20,
+              "lightning": 60
+            },
+            "inventory": {
+              "armor": 75,
+              "gauntlet": 1
+            }
+          }
+        },
+        "items": {
+          "allow_drops": true,
+          "allow_bounce": false
+        }
+      }
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "bot_resources",
+    "scenario": "tools/tests/match_sim/bot_resource_schedule.json",
+    "seed": 2024,
+    "frame_count": 41,
+    "duration_seconds": 4.0,
+    "bots": [
+      "anarki",
+      "sarge"
+    ],
+    "metadata": {
+      "bot_resources": {
+        "g_botsFile": [
+          {
+            "alias": "scripted_sarge",
+            "name": "sarge",
+            "team": "red"
+          },
+          {
+            "alias": "scripted_anarki",
+            "name": "anarki",
+            "team": "blue"
+          }
+        ],
+        "g_botSpawnList": [
+          {
+            "bot": "scripted_sarge",
+            "delay_ms": 0,
+            "warmup": true,
+            "reason": "initial",
+            "issuer": "script"
+          },
+          {
+            "bot": "scripted_anarki",
+            "delay_ms": 1500,
+            "reason": "staggered",
+            "issuer": "script"
+          },
+          {
+            "bot": "scripted_sarge",
+            "delay_ms": 500,
+            "reason": "respawn",
+            "issuer": "script"
+          }
+        ],
+        "g_accessFile": {
+          "commands": {
+            "addbot": {
+              "allow": [
+                "admin",
+                "script"
+              ]
+            },
+            "removebot": {
+              "allow": [
+                "admin"
+              ]
+            },
+            "request_spawn": {
+              "allow": [
+                "admin",
+                "ref",
+                "script"
+              ]
+            }
+          },
+          "spawns": {
+            "sarge": {
+              "allow": [
+                "admin",
+                "script"
+              ]
+            },
+            "anarki": {
+              "allow": [
+                "ref",
+                "script"
+              ]
+            },
+            "*": {
+              "allow": [
+                "script"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "freeze",
+    "scenario": "tools/tests/match_sim/freeze_cvars.json",
+    "seed": 2024,
+    "frame_count": 281,
+    "duration_seconds": 14.0,
+    "bots": [
+      "ember",
+      "forge",
+      "referee",
+      "shade"
+    ],
+    "metadata": {
+      "description": "Freeze tag CVar coverage scenario",
+      "mode": "freeze",
+      "factory": {
+        "active_loadout": "freeze_defaults",
+        "loadouts": {
+          "freeze_defaults": {
+            "ammo": {
+              "rocket": 10,
+              "rail": 5
+            },
+            "inventory": {
+              "armor": 50,
+              "grenade": 1
+            }
+          }
+        }
+      },
+      "freeze": {
+        "enabled": true,
+        "cvars": {
+          "g_freezeProtectedSpawnTime": 3000,
+          "g_freezeAutoThawTime": 4000,
+          "g_freezeEnvironmentalRespawnDelay": 6000,
+          "g_freezeThawTime": 2000,
+          "g_freezeThawTick": 500,
+          "g_freezeThawRadius": 128,
+          "g_freezeThawThroughSurface": 0,
+          "g_freezeThawWinningTeam": 1,
+          "g_freezeResetWeaponsOnRound": 1,
+          "g_freezeResetHealthOnRound": 1,
+          "g_freezeResetArmorOnRound": 1,
+          "g_freezeRemovePowerupsOnRound": 1
+        }
+      }
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "ctf_flag_cvars",
+    "scenario": "tools/tests/match_sim/ctf_flag_cvars.json",
+    "seed": 2024,
+    "frame_count": 281,
+    "duration_seconds": 14.0,
+    "bots": [
+      "nyx",
+      "ranger",
+      "slash"
+    ],
+    "metadata": {
+      "description": "CTF flag physics and timeout scenario",
+      "mode": "ctf",
+      "ctf": {
+        "enabled": true,
+        "cvars": {
+          "g_flagPhysics": 1,
+          "g_flagBounce": 0.65,
+          "g_flagDroppedTimeout": 6000,
+          "g_returnFlagOnSuicide": 1,
+          "g_throwFlagForwardMult": 275,
+          "g_throwFlagVelocity": 240
+        }
+      }
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "clanarena_shuffle",
+    "scenario": "tools/tests/match_sim/clanarena_shuffle.json",
+    "seed": 2024,
+    "frame_count": 121,
+    "duration_seconds": 12.0,
+    "bots": [
+      "marshal"
+    ],
+    "metadata": {
+      "description": "Clan Arena shuffle and warmup gating",
+      "mode": "clanarena",
+      "clanarena": {
+        "enabled": true,
+        "cvars": {
+          "g_shuffleAutomatic": 1,
+          "g_shuffleTimedelay": 4,
+          "g_shuffleMinPlayers": 4,
+          "g_shuffleAutomaticMinPlayers": 4,
+          "g_teamSizeMin": 2,
+          "g_teamForcePresent": 1,
+          "g_floodprot_maxcount": 3,
+          "g_floodprot_decay": 1000,
+          "g_floodprot_penalty": 2000
+        }
+      }
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "duel_cvars",
+    "scenario": "tools/tests/match_sim/duel_cvars.json",
+    "seed": 2024,
+    "frame_count": 101,
+    "duration_seconds": 5.0,
+    "bots": [
+      "anarki",
+      "sarge"
+    ],
+    "metadata": {
+      "description": "Duel CVars and configstring coverage",
+      "duel": {
+        "loadout_grant": "weapon_gauntlet weapon_machinegun ammo_bullets 100",
+        "ready_up": {
+          "warmup_time": -1,
+          "min_players": 2,
+          "countdown_seconds": 20,
+          "ready_configstring": "ready:0"
+        },
+        "sudden_death": {
+          "respawn": 0,
+          "start_seconds": 3,
+          "tick_seconds": 60,
+          "max_seconds": 10,
+          "increment_seconds": 1,
+          "print_announcements": 1
+        }
+      }
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "rating_metadata",
+    "scenario": "tools/tests/match_sim/rating_metadata.json",
+    "seed": 2024,
+    "frame_count": 61,
+    "duration_seconds": 3.0,
+    "bots": [
+      "anarki",
+      "visor"
+    ],
+    "metadata": {
+      "description": "Rating scale parity coverage",
+      "rating": {
+        "default": {
+          "damage_scale": 1.0,
+          "score_scale": 1.0
+        },
+        "bots": {
+          "anarki": {
+            "damage_scale": 0.9,
+            "score_scale": 1.1
+          },
+          "visor": {
+            "damage_scale": 1.25,
+            "score_scale": 0.8
+          }
+        }
+      }
+    },
+    "ruleset": null
+  },
+  {
+    "target": "qvm",
+    "slug": "ruleset_pql",
+    "scenario": "tools/tests/match_sim/ruleset_pql.json",
+    "seed": 2024,
+    "frame_count": 21,
+    "duration_seconds": 2.0,
+    "bots": [
+      "sarge"
+    ],
+    "metadata": {
+      "description": "Ruleset propagation sanity check",
+      "ruleset": "pql"
+    },
+    "ruleset": "pql"
+  },
+  {
+    "target": "qvm",
+    "slug": "damage_timeline",
+    "scenario": "tools/tests/match_sim/damage_timeline.json",
+    "seed": 2024,
+    "frame_count": 21,
+    "duration_seconds": 2.0,
+    "bots": [
+      "stripe",
+      "uriel"
+    ],
+    "metadata": {
+      "description": "Two bots trading scripted damage for parity checks"
+    },
+    "ruleset": null
+  }
+]

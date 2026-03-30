@@ -31,6 +31,26 @@ Client regression harness generated HUD hashes for captured scenarios.
     ]
   },
   {
+    "scenario": "round_overtime",
+    "archive": "tools/tests/client_regression/round_overtime_snapshots.json",
+    "metadata": {
+      "description": "Synthetic snapshots focusing on round flow and overtime banners",
+      "map": "qztourney7",
+      "ruleset": "competitive",
+      "notes": [
+        "Frames reflect regulation clock, sudden-death, and chained overtime banners",
+        "Competitive HUD config is expected to surface round and overtime text blocks"
+      ]
+    },
+    "frameCount": 4,
+    "hashes": [
+      "732daf636458f70ba05260b9702280a693dc5415943dddcf7c9e57309d7edf15",
+      "3d1b0a9601c00641628da1af805575c78ea819ee6125be7270084ee0b95a14a8",
+      "9e90d31e687d6affd6adc91a35f5fcaf42383c1c7242a8338586b0ff50b60311",
+      "03153233b04ae9607839fea613ffc8f3b15adca8b2498ef3a99e553da352b135"
+    ]
+  },
+  {
     "scenario": "server_correction",
     "archive": "tools/tests/client_regression/server_correction_snapshots.json",
     "metadata": {
