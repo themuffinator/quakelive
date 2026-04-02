@@ -1,7 +1,0 @@
-{
-	map		"qzwarmup"
-	timelimit	"15"
-	fraglimit	"15"
-	bot_skill 	"5"
-	bots		"trainer"	
-}
