@@ -56,15 +56,10 @@ jobs:
         shell: pwsh
         run: tools/ci/verify-vs-toolchain.ps1 -RequireV100
 
-      - name: Build Win32 gameplay DLLs
+      - name: Validate retail-aligned Windows native pipeline
         if: matrix.target == 'dll'
         shell: pwsh
-        run: tools/ci/build-windows-dlls.ps1
-
-      - name: Assert gameplay DLL exports
-        if: matrix.target == 'dll'
-        shell: pwsh
-        run: tools/ci/assert-dll-exports.ps1
+        run: tools/ci/validate-windows-native.ps1
 
       - name: Set up Python
         uses: actions/setup-python@v5

@@ -31,15 +31,16 @@ migration-era tooling that now lives alongside the legacy Quake III sources.
   evidence without reproducing runs locally.【F:docs/reverse-engineering/handbook.md†L11-L27】【F:docs/devops/ci-matrix.md†L11-L18】
 
 ## Migration-stage workflows
-- **Toolchain guard CI** – The `Toolchain (QVM)` workflow validates the legacy QVM toolchain on every
-  push/PR by exercising `tools/ci/verify-qvm-toolchain.sh`, keeping the historical makefiles and wrapper
-  scripts reproducible.【F:.github/workflows/toolchain.yml†L1-L15】【F:tools/ci/verify-qvm-toolchain.sh†L1-L45】
-- **Native build staging** – The `Native DLL (VS2010)` workflow provisions the Visual Studio 2010 toolset,
-  builds the Win32 gameplay DLLs, and checks their export surface using the shared CI scripts under
-  `tools/ci/` so native artefacts remain aligned with the Quake Live references.【F:.github/workflows/windows-native.yml†L1-L27】【F:tools/ci/install-vs-v100.ps1†L1-L63】【F:tools/ci/build-windows-dlls.ps1†L1-L36】【F:tools/ci/assert-dll-exports.ps1†L1-L152】
 - **Deterministic harness matrix** – The `Deterministic Harnesses` workflow fans out across QVM, DLL, and
-  reverse clean-room builds. It reuses the clean-room compiler helper, runs `tests/run_harnesses.py`, and
-  publishes match timelines, HUD hashes, and trace diffs for every target.【F:.github/workflows/deterministic-harnesses.yml†L10-L93】【F:tools/ci/build-cleanroom.sh†L1-L44】【F:tests/run_harnesses.py†L27-L111】
+  reverse clean-room builds. Its QVM lane validates the legacy toolchain, its DLL lane validates the
+  retail-aligned Windows native pipeline, and every target runs `tests/run_harnesses.py` before
+  publishing match timelines, HUD hashes, and trace diffs.【F:.github/workflows/deterministic-harnesses.yml†L10-L89】【F:tools/ci/build-cleanroom.sh†L1-L44】【F:tests/run_harnesses.py†L27-L111】
+- **Filesystem regression guard** – The `Filesystem Search Paths` workflow runs the dedicated
+  `FS_FOpenFileRead` regression test so PK3-vs-directory precedence changes fail fast on Ubuntu.【F:.github/workflows/filesystem-search.yml†L1-L20】【F:tests/test_fs_search_paths.py†L1-L115】
+- **UI freeze guard** – The `UI Freeze Guard` workflow blocks writes to the retail `src/ui/` tree, keeping
+  the read-only asset baseline intact during normal reconstruction work.【F:.github/workflows/ui-freeze.yml†L1-L17】
+- **UI validation** – The `UI Validation` workflow builds the staged UI bundle, runs the headless bundle
+  validator, and publishes the generated artefacts for inspection when UI-adjacent changes land.【F:.github/workflows/ui-validation.yml†L1-L37】【F:tests/run_ui_validation.py†L1-L66】
 - **Reverse clean-room iterations** – Reverse targets compile the `src-re/prototypes/` shims into
   loadable modules, replay them through the trace harness, and diff the output against committed
   expectations so reconstruction work stays deterministic.【F:tools/ci/build-cleanroom.sh†L1-L44】【F:docs/reverse-engineering/handbook.md†L12-L27】【F:docs/devops/ci-matrix.md†L7-L18】
@@ -75,9 +76,10 @@ migration-era tooling that now lives alongside the legacy Quake III sources.
    under `src/libs/vorbis` (or override the `VorbisSdkDir` property). Dedicated-only builds can set
    `QL_ENABLE_OGG=0` to skip the dependency entirely.
 3. **Run the tooling checks** – Execute the CI helpers (`tools/ci/verify-qvm-toolchain.sh`,
-   `tools/ci/install-vs-v100.ps1`, `tools/ci/verify-vs-toolchain.ps1`, and `tools/ci/build-cleanroom.sh`) or
-   inspect the `Toolchain (QVM)`, `Native DLL (VS2010)`, and `Deterministic Harnesses` workflows to confirm
-   your host matches the enforced prerequisites.【F:tools/ci/verify-qvm-toolchain.sh†L1-L45】【F:tools/ci/install-vs-v100.ps1†L1-L63】【F:tools/ci/verify-vs-toolchain.ps1†L1-L74】【F:tools/ci/build-cleanroom.sh†L1-L44】【F:.github/workflows/toolchain.yml†L1-L15】【F:.github/workflows/windows-native.yml†L1-L27】【F:.github/workflows/deterministic-harnesses.yml†L10-L93】
+   `tools/ci/install-vs-v100.ps1`, `tools/ci/verify-vs-toolchain.ps1`, `tools/ci/validate-windows-native.ps1`,
+   and `tools/ci/build-cleanroom.sh`) or inspect the `Deterministic Harnesses`, `Filesystem Search Paths`,
+   `UI Freeze Guard`, and `UI Validation` workflows to confirm your host matches the enforced
+   prerequisites.【F:tools/ci/verify-qvm-toolchain.sh†L1-L45】【F:tools/ci/install-vs-v100.ps1†L1-L63】【F:tools/ci/verify-vs-toolchain.ps1†L1-L74】【F:tools/ci/validate-windows-native.ps1†L1-L124】【F:tools/ci/build-cleanroom.sh†L1-L44】【F:.github/workflows/deterministic-harnesses.yml†L10-L89】【F:.github/workflows/filesystem-search.yml†L1-L20】【F:.github/workflows/ui-freeze.yml†L1-L17】【F:.github/workflows/ui-validation.yml†L1-L37】
 4. **Exercise the test suites** – Drive the deterministic harness entry point (`python tests/run_harnesses.py`)
    alongside the match simulation, client regression, rules fixtures, and trace harness guides so bytecode,
    native DLL, and reverse builds stay in lockstep.【F:tests/run_harnesses.py†L27-L111】【F:docs/testing/match-sim.md†L1-L45】【F:docs/testing/client-regression.md†L1-L55】【F:docs/testing/rules-fixtures.md†L1-L33】【F:docs/testing/cosmetics-training.md†L1-L73】【F:docs/reverse-engineering/trace-harness.md†L1-L92】

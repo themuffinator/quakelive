@@ -43,14 +43,15 @@ This repository aims to reverse-engineer Quake Live by starting from the public 
 - Tests under `tests/` and automation under `tools/ci/` feed the deterministic
   harness workflow, publishing artefacts into `artifacts/` and `logs/` so
   reviewers can inspect parity evidence without rerunning the suites locally.【F:docs/devops/ci-matrix.md†L1-L34】【F:tests/run_harnesses.py†L27-L116】
-- CI workflows enforce the toolchain and harness guardrails on Linux and Windows
-  hosts, mirroring the scripts documented in the onboarding guide to keep the
-  reconstructed builds reproducible.【F:.github/workflows/toolchain.yml†L1-L15】【F:.github/workflows/windows-native.yml†L1-L27】【F:.github/workflows/deterministic-harnesses.yml†L10-L93】
+- CI workflows enforce the toolchain, filesystem, UI, and deterministic harness
+  guardrails on Linux and Windows hosts, mirroring the scripts documented in the
+  onboarding guide to keep the reconstructed builds reproducible.【F:.github/workflows/deterministic-harnesses.yml†L10-L89】【F:.github/workflows/filesystem-search.yml†L1-L20】【F:.github/workflows/ui-freeze.yml†L1-L17】【F:.github/workflows/ui-validation.yml†L1-L37】
 
 ## CI & Workflow References
-- **Toolchain (QVM):** Exercises the GPL-era QVM toolchain on every push/PR via `tools/ci/verify-qvm-toolchain.sh`, ensuring the legacy bytecode pipeline stays reproducible.【F:.github/workflows/toolchain.yml†L1-L15】【F:tools/ci/verify-qvm-toolchain.sh†L1-L45】
-- **Native DLL (VS2010):** Provisions Visual Studio 2010, rebuilds the Win32 gameplay DLLs, and validates their export surface with the shared PowerShell helpers.【F:.github/workflows/windows-native.yml†L1-L27】【F:tools/ci/build-windows-dlls.ps1†L1-L36】【F:tools/ci/assert-dll-exports.ps1†L1-L152】
-- **Deterministic Harnesses:** Fans out across QVM, DLL, and reverse targets, reusing the clean-room build helper and uploading artefacts/logs under `artifacts/` and `logs/` for review.【F:.github/workflows/deterministic-harnesses.yml†L10-L93】【F:docs/devops/ci-matrix.md†L15-L38】
+- **Deterministic Harnesses:** Fans out across QVM, DLL, and reverse targets, runs the QVM prerequisite guard plus the retail-aligned Windows native validation inside the matrix, and uploads artefacts/logs under `artifacts/` and `logs/` for review.【F:.github/workflows/deterministic-harnesses.yml†L10-L89】【F:docs/devops/ci-matrix.md†L15-L38】
+- **Filesystem Search Paths:** Runs the dedicated filesystem mount-order regression test on Ubuntu so `FS_FOpenFileRead` precedence stays stable across directory and PK3 search paths.【F:.github/workflows/filesystem-search.yml†L1-L20】【F:tests/test_fs_search_paths.py†L1-L115】
+- **UI Freeze Guard:** Enforces the repository rule that the retail `src/ui/` tree remains immutable during routine reconstruction work.【F:.github/workflows/ui-freeze.yml†L1-L17】
+- **UI Validation:** Builds the staged UI bundle, runs the headless validation pass, and publishes the resulting bundle/log artefacts for review.【F:.github/workflows/ui-validation.yml†L1-L37】【F:tests/run_ui_validation.py†L1-L66】
 
 ## Next Steps for Contributors
 1. Skim the onboarding overview and reverse-engineering handbook to understand the

@@ -5,8 +5,7 @@
 [![Implementation Plan](https://img.shields.io/badge/Work%20Queue-Implementation%20Plan-2ea44f)](IMPLEMENTATION_PLAN.md)
 [![Getting Started](https://img.shields.io/badge/Docs-Getting%20Started-6f42c1)](docs/onboarding/overview.md)
 
-[![Native DLL (VS2010)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/windows-native.yml/badge.svg?branch=main)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/windows-native.yml)
-[![QVM Toolchain](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/toolchain.yml/badge.svg?branch=main)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/toolchain.yml)
+[![Deterministic Harnesses](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/deterministic-harnesses.yml/badge.svg?branch=main)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/deterministic-harnesses.yml)
 
 This project aims to reconstruct the full Quake Live source code as faithfully as possible.
 It starts from the public Quake III Arena GPL source release and then rebuilds Quake Live

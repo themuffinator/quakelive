@@ -1318,6 +1318,30 @@ static qboolean PM_HasHeldInvulnerabilityItem( int *invulnerabilityItemNum ) {
 
 /*
 ===================
+PM_ShouldUseInvulnerabilityMove
+
+Returns whether the current frame still owns the retail invulnerability move
+path after the held-item and decay gates are applied.
+===================
+*/
+static qboolean PM_ShouldUseInvulnerabilityMove( void ) {
+	if ( !PM_HasHeldInvulnerabilityItem( NULL ) ) {
+		return qfalse;
+	}
+
+	if ( pm->ps->pm_type == PM_DEAD ) {
+		return qfalse;
+	}
+
+	if ( pm->ps->playerItemTimeMax > 0 && pm->ps->playerItemTime <= 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+===================
 PM_InvulnerabilityMove
 
 Only with the invulnerability powerup
@@ -1325,35 +1349,27 @@ Only with the invulnerability powerup
 */
 static void PM_InvulnerabilityMove( void ) {
 	int				invulnerabilityItemNum;
-	qboolean		invulnerabilityHeld;
 
-	invulnerabilityHeld = PM_HasHeldInvulnerabilityItem( &invulnerabilityItemNum );
+	PM_HasHeldInvulnerabilityItem( &invulnerabilityItemNum );
 
 	pm->cmd.forwardmove = 0;
 	pm->cmd.rightmove = 0;
 	pm->cmd.upmove = 0;
 	VectorClear( pm->ps->velocity );
 
-	if ( pm->ps->pm_type != PM_DEAD && ( invulnerabilityHeld || pm->ps->playerItemTime > 0 ) ) {
-		pm->ps->powerups[PW_INVULNERABILITY] = PM_INVULNERABILITY_ACTIVE_TIME;
+	pm->ps->powerups[PW_INVULNERABILITY] = PM_INVULNERABILITY_ACTIVE_TIME;
 
-		// Retail drives the shield's float/sink bias from view pitch while the holdable is active.
-		pm->ps->velocity[2] += (int)( -pm->ps->viewangles[PITCH] * pml.frametime );
-	}
+	// Retail drives the shield's float/sink bias from view pitch while the holdable is active.
+	pm->ps->velocity[2] += (int)( -pm->ps->viewangles[PITCH] * pml.frametime );
 
-	if ( pm->ps->playerItemTime > 0 && pm->ps->playerItemTime <= 32000 ) {
+	if ( pm->ps->playerItemTime <= 32000 ) {
 		pm->ps->playerItemTime -= pml.msec;
 		if ( pm->ps->playerItemTime < 0 ) {
 			pm->ps->playerItemTime = 0;
 		}
 	}
 
-	if ( pm->ps->playerItemTime <= 0 && !invulnerabilityHeld ) {
-		pm->ps->powerups[PW_INVULNERABILITY] = 0;
-		pm->ps->playerItemTimeMax = 0;
-	}
-
-	if ( pm->ps->playerItemTime <= 0 && invulnerabilityItemNum != 0 &&
+	if ( pm->ps->playerItemTime <= 0 && pm->ps->playerItemTimeMax <= 0 && invulnerabilityItemNum != 0 &&
 		pm->ps->stats[STAT_HOLDABLE_ITEM] == invulnerabilityItemNum ) {
 		pm->ps->stats[STAT_HOLDABLE_ITEM] = 0;
 	}
@@ -1477,6 +1493,9 @@ static void PM_AirMove( void ) {
 	}
 
 	PM_StepSlideMove( qtrue );
+	if ( PM_ShouldUseInvulnerabilityMove() ) {
+		PM_InvulnerabilityMove();
+	}
 
 	if ( settings && settings->doubleJump ) {
 		PM_CheckJump( qtrue );
@@ -1661,6 +1680,9 @@ static void PM_WalkMove( void ) {
 	}
 
 	PM_StepSlideMove( qfalse );
+	if ( PM_ShouldUseInvulnerabilityMove() ) {
+		PM_InvulnerabilityMove();
+	}
 
 	//Com_Printf("velocity2 = %1.1f\n", VectorLength(pm->ps->velocity));
 
@@ -2184,7 +2206,7 @@ static void PM_CheckDuck (void)
 	qboolean	wasDucked;
 
 	wasDucked = ( pm->ps->pm_flags & PMF_DUCKED ) ? qtrue : qfalse;
-	invulnerabilityActive = (qboolean)( PM_HasHeldInvulnerabilityItem( NULL ) || pm->ps->playerItemTime > 0 );
+	invulnerabilityActive = (qboolean)( pm->ps->powerups[PW_INVULNERABILITY] != 0 );
 
 	if ( invulnerabilityActive ) {
 		if ( pm->ps->pm_flags & PMF_INVULEXPAND ) {
@@ -2521,13 +2543,6 @@ static void PM_Weapon( void ) {
 				pm->ps->stats[STAT_HEALTH] < ( pm->ps->stats[STAT_MAX_HEALTH] + 25 ) ) ) {
 				PM_AddEvent( EV_USE_ITEM0 + holdableTag );
 				pm->ps->stats[STAT_HOLDABLE_ITEM] = 0;
-			} else if ( holdableTag == HI_INVULNERABILITY ) {
-				if ( pm->ps->playerItemTime <= 0 && pm->ps->playerItemTimeMax <= 0 ) {
-					PM_AddEvent( EV_USE_ITEM0 + holdableTag );
-					pm->ps->powerups[PW_INVULNERABILITY] = pm->cmd.serverTime;
-					pm->ps->playerItemTimeMax = 10000;
-					pm->ps->playerItemTime = pm->ps->playerItemTimeMax;
-				}
 			}
 			return;
 		}
@@ -2760,7 +2775,6 @@ void PmoveSingle (pmove_t *pmove) {
 	pm = pmove;
 	PM_LoadMoveTuningConstants();
 	settings = PM_GetActiveSettings();
-	pm->ps->powerups[PW_INVULNERABILITY] = 0;
 	if ( settings->crouchSlide ) {
 		pm->ps->pm_flags |= PMF_CROUCH_SLIDE;
 	} else {
@@ -2916,10 +2930,8 @@ void PmoveSingle (pmove_t *pmove) {
 
 	PM_DropTimers();
 	PM_CheckLadder();
+	pm->ps->powerups[PW_INVULNERABILITY] = 0;
 
-	if ( PM_HasHeldInvulnerabilityItem( NULL ) || pm->ps->playerItemTime > 0 ) {
-		PM_InvulnerabilityMove();
-	} else
 	if ( pm->ps->powerups[PW_FLIGHT] ) {
 		// flight powerup doesn't allow jump and has different friction
 		PM_FlyMove();
