@@ -277,7 +277,6 @@ extern vmCvar_t g_startingHealthBonus;
 extern vmCvar_t g_startingArmor;
 extern vmCvar_t g_armorTiered;
 extern vmCvar_t g_damage_hmg;
-extern vmCvar_t g_damageGauntletLegacy;
 extern vmCvar_t g_vampiricDamage;
 extern vmCvar_t g_training;
 extern vmCvar_t g_lagHaxHistory;
@@ -316,6 +315,9 @@ extern vmCvar_t g_log;
 extern vmCvar_t g_logSync;
 extern vmCvar_t g_listEntity;
 extern vmCvar_t g_rrRoundScoreBonus;
+extern vmCvar_t g_rrDeathScorePenalty;
+extern vmCvar_t g_rrInfectedZombieFragBonus;
+extern vmCvar_t g_rrInfectedZombieHealthBonus;
 extern vmCvar_t g_rrInfectedZombieSpeed;
 extern vmCvar_t g_rrInfectedSurvivorScoreMethod;
 extern vmCvar_t g_rrInfectedSurvivorScoreBonus;
@@ -330,6 +332,8 @@ extern vmCvar_t g_rrAllowNegativeScores;
 extern vmCvar_t g_adTouchScoreBonus;
 extern vmCvar_t g_adElimScoreBonus;
 extern vmCvar_t g_adCaptureScoreBonus;
+extern vmCvar_t g_lastManStandingWarning;
+extern vmCvar_t g_lastManStandingMessage;
 extern vmCvar_t g_roundWarmupDelay;
 extern vmCvar_t g_roundDrawLivingCount;
 extern vmCvar_t g_roundDrawHealthCount;
@@ -416,7 +420,6 @@ extern vmCvar_t g_flagDroppedTimeout;
 extern vmCvar_t g_neutralFlagPingTime;
 extern vmCvar_t g_rocketsplashOffset;
 extern vmCvar_t g_guidedRocket;
-extern vmCvar_t g_weaponRespawnLegacy;
 extern vmCvar_t g_podiumDist;
 extern vmCvar_t g_podiumDrop;
 
@@ -784,6 +787,36 @@ typedef enum {
 	RANK_MEDAL_COUNT
 } rankMedal_t;
 
+typedef enum {
+	RANK_PICKUP_QUAD = 0,
+	RANK_PICKUP_BATTLESUIT,
+	RANK_PICKUP_HASTE,
+	RANK_PICKUP_INVIS,
+	RANK_PICKUP_REGEN,
+	RANK_PICKUP_FLIGHT,
+	RANK_PICKUP_INVULNERABILITY,
+	RANK_PICKUP_SCOUT,
+	RANK_PICKUP_GUARD,
+	RANK_PICKUP_DOUBLER,
+	RANK_PICKUP_ARMOR_REGEN,
+	RANK_PICKUP_OTHER_POWERUP,
+	RANK_PICKUP_TELEPORTER,
+	RANK_PICKUP_MEDKIT,
+	RANK_PICKUP_KAMIKAZE,
+	RANK_PICKUP_PORTAL,
+	RANK_PICKUP_OTHER_HOLDABLE,
+	RANK_PICKUP_MEGA_HEALTH,
+	RANK_PICKUP_RED_ARMOR,
+	RANK_PICKUP_GREEN_ARMOR,
+	RANK_PICKUP_YELLOW_ARMOR,
+	RANK_PICKUP_HEALTH,
+	RANK_PICKUP_ARMOR,
+	RANK_PICKUP_RED_FLAG,
+	RANK_PICKUP_BLUE_FLAG,
+	RANK_PICKUP_NEUTRAL_FLAG,
+	RANK_PICKUP_COUNT
+} rankPickupStat_t;
+
 typedef struct {
 	clientConnected_t	connected;	
 	usercmd_t	cmd;				// we would lose angles if not persistant
@@ -825,6 +858,10 @@ typedef struct {
 	int			pickupLastTime[SCORESTAT_PICKUP_COUNT];
 	int			pickupIntervalTotalMs[SCORESTAT_PICKUP_COUNT];
 	int			pickupIntervalCount[SCORESTAT_PICKUP_COUNT];
+	int			rankPickupCounts[RANK_PICKUP_COUNT];
+	int			maxKillStreak;
+	int			holyShitCount;
+	int			teamJoinStartTime;
 } clientPersistant_t;
 
 typedef struct {
@@ -889,6 +926,7 @@ struct gclient_s {
 	int			rewardTime;			// clear the EF_AWARD_IMPRESSIVE, etc when time > this
 
 	int			airOutTime;
+	int			factoryRegenLastDamageTime;	// retail shared last-damage timestamp for the split factory regen helpers
 
 	int			lastKillTime;		// for multiple kill rewards
 	int			lastKillCommandTime;	// last time the player issued the kill command
@@ -905,6 +943,7 @@ struct gclient_s {
 	int			teamDamageEventsGiven;	// retail-style count of friendly-fire incidents inflicted
 	int			teamDamageEventsReceived;	// retail-style count of friendly-fire incidents suffered
 	int			environmentalDeaths;	// retail-style count of world/environment deaths tracked for intermission stats
+	int			currentKillStreak;	// current uninterrupted frag streak used to recover retail MAX_STREAK
 
 	qboolean	fireHeld;			// used for hook
 	gentity_t	*hook;				// grapple hook if out
@@ -918,12 +957,11 @@ struct gclient_s {
 	int			complaintDamage;
 	int			complaintLastDamageTime;
 
-	// timeResidual handles once-per-second timers; factory regeneration now
-	// tracks its own per-frame retail-style accumulators and damage latches.
+	// timeResidual handles once-per-second timers; retail keeps separate
+	// per-frame armor/health accumulators plus enable latches for factory regen.
 	int			timeResidual;
-	int			factoryRegenHealthAccumulatorMs;
 	int			factoryRegenArmorAccumulatorMs;
-	int			factoryRegenLastDamageTime;
+	int			factoryRegenHealthAccumulatorMs;
 	qboolean	factoryRegenHealthPending;
 	qboolean	factoryRegenArmorPending;
 
@@ -1132,6 +1170,11 @@ typedef struct {
 	qboolean		clientSpawnQueued[MAX_CLIENTS];
 	int			roundNumber;
 	int			roundStartTime;
+	int			rrSelectedInfectedClientNum;
+	int			rrCarryoverInfectedClientNum;
+	int			rrLastInfectionTime;
+	int			rrNextSurvivalBonusTime;
+	qboolean		rrPendingMatchExit;
 	qboolean		clientSpawnInitial[MAX_CLIENTS];
 	qboolean		clientSpawnNeedsEffect[MAX_CLIENTS];
 	qboolean		clientFactoryLoadoutQueued[MAX_CLIENTS];
@@ -1300,7 +1343,7 @@ void	G_SetMovedir ( vec3_t angles, vec3_t movedir);
 
 void	G_InitGentity( gentity_t *e );
 gentity_t	*G_Spawn (void);
-gentity_t *G_TempEntity( vec3_t origin, int event );
+gentity_t *G_TempEntity( const vec3_t origin, int event );
 void	G_Sound( gentity_t *ent, int channel, int soundIndex );
 void	G_GlobalSound( int soundIndex );
 void	G_FreeEntity( gentity_t *e );
@@ -1405,13 +1448,14 @@ void InitClientResp (gclient_t *client);
 void InitBodyQue (void);
 void ClientSpawn( gentity_t *ent );
 void player_die (gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod);
-void AddScore( gentity_t *ent, vec3_t origin, int score );
+void AddScore( gentity_t *ent, const vec3_t origin, int score );
 void CalculateRanks( void );
 void G_RRInitClient( gentity_t *ent );
 void G_RRProcessClient( gentity_t *ent );
 void G_RRHandlePlayerDeath( gentity_t *victim, gentity_t *attacker );
 void G_RRHandleDamageScore( gentity_t *attacker, gentity_t *targ, int damage );
 void G_RRResetRoundState( void );
+qboolean G_RRCheckExitRules( qboolean announce );
 void G_RRTrackRoundActivity( void );
 int G_ADResolveRoundState( void );
 qboolean G_ADHandleDamageScore( gentity_t *attacker, int announce, gentity_t *targ, int *take, int *asave );
@@ -1419,6 +1463,10 @@ qboolean G_ADCheckExitRules( qboolean announce );
 int AD_RoundStateTransition( qboolean announce );
 int G_ADResolveAttackingTeam( void );
 int G_ADResolveDefendingTeam( void );
+void G_ADNotifyLastAlivePlayer( team_t team );
+void G_CANotifyLastAlivePlayer( team_t team );
+void G_FreezeNotifyLastAlivePlayer( team_t team );
+void G_RRNotifyLastAlivePlayer( team_t team );
 int G_ADResetScoreHistory( void );
 int G_ADUpdateScoreHistory( void );
 void G_CAADRespawnAsSpectator( gentity_t *ent );
@@ -1469,6 +1517,7 @@ void QDECL G_LogPrintf( const char *fmt, ... );
 void LogExit( const char *string );
 void SendScoreboardMessageToAllClients( void );
 void G_UpdateMatchStateConfigString( void );
+qboolean ScoreIsTied( void );
 void G_UpdateMatchFactoryConfig( void );
 void G_SetGameState( const char *state );
 void G_ResetTimeoutState( void );
@@ -1558,7 +1607,6 @@ void Team_CheckDroppedItem( gentity_t *dropped );
 flagDropResult_t G_TossFlag( gentity_t *carrier, int flagPowerup, flagDropContext_t context, gentity_t *attacker, int meansOfDeath, gentity_t **dropped );
 qboolean CheckObeliskAttack( gentity_t *obelisk, gentity_t *attacker );
 void AddTeamScore( const vec3_t origin, int team, int score );
-void Team_InitDomination( void );
 void Team_RunDomination( void );
 void Team_RegisterDominationPoint( gentity_t *ent );
 qboolean Team_RegisterDominationTrigger( gentity_t *trigger );

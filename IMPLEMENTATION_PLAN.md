@@ -47,6 +47,22 @@ Completed work:
 4. Split native import-table dispatch from legacy syscall-contract logging so source-built native DLL traffic no longer looks like old VM syscall traffic.
 5. Added export-manifest validation and runtime verification proving the rebuilt engine loads source-built native `ui`, `qagame`, and `cgame` DLLs on the normal startup and map paths.
 
+### Task 27: Qagame Red Rover infection-mode reconstruction [COMPLETED]
+Priority: Medium
+Files: `src/code/game/g_active.c`, `src/code/game/g_client.c`, `src/code/game/g_cmds.c`, `src/code/game/g_local.h`, `src/code/game/g_main.c`, `src/code/game/g_team.c`
+
+Retail HLIL still diverged from the source Red Rover infection path on the core team-role split, the carryover infected-slot bookkeeping, and the private infection notification flow.
+
+Completed work:
+
+1. Restored the retail infection-team orientation so `TEAM_RED` is the infected side and `TEAM_BLUE` remains the survivor side across spawn, autojoin, and round seeding.
+2. Reconstructed the carryover infected-slot latches used by Red Rover seeding and `SetTeam`, including the retail-style round-start reseed back to one promoted infected client.
+3. Restored the local `QL_EV_INFECTED` temp-entity cue plus the death-path `ClientUserinfoChanged` refresh when survivors are converted.
+4. Reused the shared last-man-standing centerprint helper for Red Rover infection rounds and aligned the global infection-spread countdown ordering with the retail helper chain.
+5. Reconstructed the retail survival-bonus timer/forced-award helper, including the preserved per-round timer state, survivor-only bonus prints, and the score-only rank refresh path.
+6. Restored the Red Rover round-complete team-score increment and the delayed complete-state split between next-round restart and the retail tie-aware timelimit/roundlimit exit gate.
+7. Mirrored the remaining registered retail Red Rover cvars on the qagame side: `g_rrDeathScorePenalty`, `g_rrInfectedZombieFragBonus`, and `g_rrInfectedZombieHealthBonus`.
+
 ## Current highest-priority open work
 
 ### Task 21: Native launcher/platform host reconstruction [OPEN]
@@ -155,7 +171,7 @@ Large parts of the scorestats and ownerdraw pipeline are already in place. Remai
 
 Open subtasks:
 
-1. Finish any residual per-player/per-team field mappings still using placeholders or approximations.
+1. [x] Finish the high-confidence per-player/per-team field mappings that were still using placeholders or reduced proxy shapes in `PLAYER_STATS`, including `MAX_STREAK`, the nested `DAMAGE` object, the broader retail pickup taxonomy, `ITEM_TIMING`, flag-color pickup counts, `HOLY_SHITS`, `TEAM_JOIN_TIME`, the retail `WIN` / `LOSE` outcome fields, aborted-rank sentinels, and removal of the source-only `TIMEHELD` object.
 2. Compare additional runtime captures against retail-aligned expectations where HLIL alone is ambiguous.
 3. Keep the debug-ownerdraw assertion path current as payload shape evolves.
 

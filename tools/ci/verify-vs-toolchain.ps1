@@ -1,9 +1,17 @@
 [CmdletBinding()]
 param(
+    [ValidateSet('v100', 'v141')]
+    [string]$PlatformToolset = 'v141',
+    [switch]$RequireToolset,
     [switch]$RequireV100
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($RequireV100) {
+    $PlatformToolset = 'v100'
+    $RequireToolset = $true
+}
 
 function Get-VsWherePath {
     $candidates = @(
@@ -18,25 +26,58 @@ function Get-VsWherePath {
     return $null
 }
 
-function Test-V100Component {
+function Get-ToolsetSpec {
     param(
-        [string]$VsWhere
+        [string]$RequestedToolset
     )
 
-    if (-not $VsWhere) {
+    switch ($RequestedToolset) {
+        'v100' {
+            return @{
+                ComponentId = 'Microsoft.VisualStudio.Component.VC.v100.x86.x64'
+                DisplayName = 'Visual Studio 2010 (v100)'
+                LegacyRoots = @('C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\cl.exe')
+            }
+        }
+        'v141' {
+            return @{
+                ComponentId = 'Microsoft.VisualStudio.Component.VC.v141.x86.x64'
+                DisplayName = 'Visual Studio 2017 (v141)'
+                LegacyRoots = @()
+            }
+        }
+    }
+
+    throw "Unsupported PlatformToolset '$RequestedToolset'."
+}
+
+function Test-ToolsetComponent {
+    param(
+        [string]$VsWhere,
+        [hashtable]$ToolsetSpec
+    )
+
+    if (-not $ToolsetSpec) {
         return $false
     }
 
-    $json = & $VsWhere -products * -requires Microsoft.VisualStudio.Component.VC.v100.x86.x64 -format json 2>$null
-    if ($LASTEXITCODE -eq 0 -and $json) {
-        $data = $json | ConvertFrom-Json
-        if ($data -and $data.Count -gt 0) {
+    if ($VsWhere) {
+        $json = & $VsWhere -products * -requires $ToolsetSpec.ComponentId -format json 2>$null
+        if ($LASTEXITCODE -eq 0 -and $json) {
+            $data = $json | ConvertFrom-Json
+            if ($data -and $data.Count -gt 0) {
+                return $true
+            }
+        }
+    }
+
+    foreach ($legacyRoot in $ToolsetSpec.LegacyRoots) {
+        if (Test-Path $legacyRoot) {
             return $true
         }
     }
 
-    $legacyRoot = 'C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\cl.exe'
-    return (Test-Path $legacyRoot)
+    return $false
 }
 
 function Get-DumpbinPath {
@@ -71,16 +112,17 @@ function Get-DumpbinPath {
     return $null
 }
 
+$toolsetSpec = Get-ToolsetSpec -RequestedToolset $PlatformToolset
 $vsWherePath = Get-VsWherePath
-$v100Available = Test-V100Component -VsWhere $vsWherePath
-if (-not $v100Available -and $RequireV100) {
-    Write-Error 'Visual Studio 2010 (v100) toolset not found. Install VS2010 SP1 or add the "Visual Studio 2010 Tools" component to a newer Visual Studio instance.'
+$toolsetAvailable = Test-ToolsetComponent -VsWhere $vsWherePath -ToolsetSpec $toolsetSpec
+if (-not $toolsetAvailable -and $RequireToolset) {
+    Write-Error "$($toolsetSpec.DisplayName) toolset not found. Install the '$PlatformToolset' build tools or add component '$($toolsetSpec.ComponentId)' to a newer Visual Studio instance."
 }
-elseif (-not $v100Available) {
-    Write-Warning 'Visual Studio 2010 (v100) toolset not found; builds targeting Quake Live DLLs cannot be reproduced yet.'
+elseif (-not $toolsetAvailable) {
+    Write-Warning "$($toolsetSpec.DisplayName) toolset not found."
 }
 else {
-    Write-Host 'Detected Visual Studio installation with v100 toolset support.'
+    Write-Host "Detected Visual Studio installation with $($toolsetSpec.DisplayName) support."
 }
 
 $dumpbinPath = Get-DumpbinPath -VsWhere $vsWherePath

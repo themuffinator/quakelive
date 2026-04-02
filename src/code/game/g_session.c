@@ -137,7 +137,7 @@ Called on a first-time connect
 */
 void G_InitSessionData( gclient_t *client, char *userinfo ) {
 	clientSession_t	*sess;
-	const char		*value;
+	const char		*value = "";
 
 	sess = &client->sess;
 

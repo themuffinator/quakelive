@@ -568,24 +568,24 @@ void ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, gentity_t *ent ) {
 	int			i;
 	float		r, u;
 	vec3_t		end;
-	vec3_t		forward, right, up;
+	vec3_t		shotForward, shotRight, shotUp;
 	qboolean	hitClient = qfalse;
 
 	(void)seed;
 
 	// derive the right and up vectors from the forward vector, because
 	// the client won't have any other information
-	VectorNormalize2( origin2, forward );
-	PerpendicularVector( right, forward );
-	CrossProduct( forward, right, up );
+	VectorNormalize2( origin2, shotForward );
+	PerpendicularVector( shotRight, shotForward );
+	CrossProduct( shotForward, shotRight, shotUp );
 
 	// generate the "random" spread pattern
 	for ( i = 0 ; i < DEFAULT_SHOTGUN_COUNT ; i++ ) {
 		G_GetShotgunPelletOffsets( i, &r, &u );
 
-		VectorMA( origin, 8192 * 16, forward, end);
-		VectorMA (end, r, right, end);
-		VectorMA (end, u, up, end);
+		VectorMA( origin, 8192 * 16, shotForward, end);
+		VectorMA (end, r, shotRight, end);
+		VectorMA (end, u, shotUp, end);
 		if( ShotgunPellet( origin, end, ent ) && !hitClient ) {
 			hitClient = qtrue;
 			ent->client->accuracy_hits++;
@@ -1185,10 +1185,13 @@ CalcMuzzlePoint
 set muzzle location relative to pivoting eye
 ===============
 */
-void CalcMuzzlePoint ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint ) {
+void CalcMuzzlePoint ( gentity_t *ent, vec3_t muzzleForward, vec3_t muzzleRight, vec3_t muzzleUp, vec3_t muzzlePoint ) {
+	(void)muzzleRight;
+	(void)muzzleUp;
+
 	VectorCopy( ent->s.pos.trBase, muzzlePoint );
 	muzzlePoint[2] += ent->client->ps.viewheight;
-	VectorMA( muzzlePoint, G_GetMuzzleForwardOffset( ent ), forward, muzzlePoint );
+	VectorMA( muzzlePoint, G_GetMuzzleForwardOffset( ent ), muzzleForward, muzzlePoint );
 	// snap to integer coordinates for more efficient network bandwidth usage
 	SnapVector( muzzlePoint );
 }
@@ -1200,12 +1203,14 @@ CalcMuzzlePointOrigin
 set muzzle location relative to pivoting eye
 ===============
 */
-void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t origin, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint ) {
+void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t origin, vec3_t muzzleForward, vec3_t muzzleRight, vec3_t muzzleUp, vec3_t muzzlePoint ) {
 	(void)origin;
+	(void)muzzleRight;
+	(void)muzzleUp;
 
 	VectorCopy( ent->s.pos.trBase, muzzlePoint );
 	muzzlePoint[2] += ent->client->ps.viewheight;
-	VectorMA( muzzlePoint, G_GetMuzzleForwardOffset( ent ), forward, muzzlePoint );
+	VectorMA( muzzlePoint, G_GetMuzzleForwardOffset( ent ), muzzleForward, muzzlePoint );
 	// snap to integer coordinates for more efficient network bandwidth usage
 	SnapVector( muzzlePoint );
 }

@@ -3,7 +3,7 @@
 
 #include "../common/native_shim.h"
 
-#include "../include/ql_types.h"
+#include "../../include/ql_types.h"
 
 void QLR_ClientFrame_BindContext(qlr_client_frame_context_t *ctx);
 void QLR_ClientFrame_UnbindContext(void);

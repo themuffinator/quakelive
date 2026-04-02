@@ -80,6 +80,8 @@ assumptions. The canonical workflow is documented in
 
 - Read [`docs/onboarding/overview.md`](docs/onboarding/overview.md) for the quickest project
   orientation.
+- Read [`BUILDING.md`](BUILDING.md) for the top-level build guide and the most
+  common Windows and Linux build commands.
 - Read [`docs/repo-overview.md`](docs/repo-overview.md) for a fuller explanation of the
   repository layout.
 - Use [`docs/platform/toolchain-matrix.md`](docs/platform/toolchain-matrix.md) to understand

@@ -1193,7 +1193,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	qboolean		depthRange, oldDepthRange;
 	int				i;
 	drawSurf_t		*drawSurf;
-	int				oldSort;
+	unsigned int	oldSort;
 	float			originalTime;
 #ifdef __MACOS__
 	int				macEventTime;
@@ -1219,7 +1219,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	oldFogNum = -1;
 	oldDepthRange = qfalse;
 	oldDlighted = qfalse;
-	oldSort = -1;
+	oldSort = ~0u;
 	depthRange = qfalse;
 
 	backEnd.pc.c_surfaces += numDrawSurfs;

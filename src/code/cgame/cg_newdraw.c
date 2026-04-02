@@ -9374,7 +9374,7 @@ Mirrors the retail HUD key path that intercepts specific bound commands.
 */
 static qboolean CG_HandleHudBindingCommand( const char *binding ) {
 	char		command[MAX_STRING_CHARS];
-	const char	*cursor;
+	char		*cursor;
 	const char	*token;
 
 	if ( !binding || !binding[0] ) {

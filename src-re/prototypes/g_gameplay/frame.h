@@ -3,7 +3,7 @@
 
 #include "../common/native_shim.h"
 
-#include "../include/ql_types.h"
+#include "../../include/ql_types.h"
 
 void QLR_Game_BindFrameContext(qlr_game_frame_context_t *ctx);
 void QLR_Game_UnbindFrameContext(void);

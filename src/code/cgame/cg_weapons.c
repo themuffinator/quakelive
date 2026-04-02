@@ -1324,14 +1324,7 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 		angles[2] = rand() % 360;
 		AnglesToAxis( angles, beam.axis );
 		trap_R_AddRefEntityToScene( &beam );
-  }
-  
-	if ( trace.fraction < 1.0 ) {
-		vec3_t	dir;
-
-		VectorSubtract( beam.oldorigin, beam.origin, dir );
-		VectorNormalize( dir );
-		CG_DrawLightningImpact( trace.endpos, dir );
+		CG_DrawLightningImpact( impactPoint, dir );
 	}
 
 }

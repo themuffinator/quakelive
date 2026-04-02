@@ -21,9 +21,58 @@ if (-not $manifest -or -not $manifest.modules) {
 }
 
 function Get-ExportTool {
+    function Get-VsWherePath {
+        $candidates = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'),
+            (Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio/Installer/vswhere.exe')
+        )
+
+        foreach ($path in $candidates) {
+            if (Test-Path $path) {
+                return $path
+            }
+        }
+
+        return $null
+    }
+
     $dumpbin = Get-Command dumpbin.exe -ErrorAction SilentlyContinue
     if ($dumpbin) {
         return [pscustomobject]@{ Name = 'dumpbin'; Path = $dumpbin.Source; Mode = 'Dumpbin' }
+    }
+
+    $vsWhere = Get-VsWherePath
+    if ($vsWhere) {
+        $json = & $vsWhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json 2>$null
+        if ($LASTEXITCODE -eq 0 -and $json) {
+            $data = $json | ConvertFrom-Json
+            foreach ($install in $data) {
+                $searchRoot = Join-Path $install.installationPath 'VC/Tools/MSVC'
+                if (-not (Test-Path $searchRoot)) {
+                    continue
+                }
+
+                $versions = Get-ChildItem -Path $searchRoot -Directory | Sort-Object Name -Descending
+                foreach ($version in $versions) {
+                    $candidates = @(
+                        (Join-Path $version.FullName 'bin/HostX86/x86/dumpbin.exe'),
+                        (Join-Path $version.FullName 'bin/HostX64/x86/dumpbin.exe'),
+                        (Join-Path $version.FullName 'bin/HostX64/x64/dumpbin.exe')
+                    )
+
+                    foreach ($candidate in $candidates) {
+                        if (Test-Path $candidate) {
+                            return [pscustomobject]@{ Name = 'dumpbin'; Path = $candidate; Mode = 'Dumpbin' }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $legacyDumpbin = 'C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\dumpbin.exe'
+    if (Test-Path $legacyDumpbin) {
+        return [pscustomobject]@{ Name = 'dumpbin'; Path = $legacyDumpbin; Mode = 'Dumpbin' }
     }
 
     $objdump = Get-Command objdump.exe -ErrorAction SilentlyContinue
@@ -96,17 +145,27 @@ function Get-BuiltBinaryPath {
         [string[]]$SearchRoots
     )
 
+    $searchNames = @($ModuleName)
+    $extension = [System.IO.Path]::GetExtension($ModuleName)
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($ModuleName)
+    if ($baseName -and $extension) {
+        $searchNames += "${baseName}_new${extension}"
+    }
+
     foreach ($root in $SearchRoots) {
         if (-not (Test-Path $root)) {
             continue
         }
 
-        $candidates = Get-ChildItem -Path $root -Filter $ModuleName -File -Recurse -ErrorAction SilentlyContinue
+        $candidates = @()
+        foreach ($searchName in ($searchNames | Select-Object -Unique)) {
+            $candidates += Get-ChildItem -Path $root -Filter $searchName -File -Recurse -ErrorAction SilentlyContinue
+        }
         if (-not $candidates) {
             continue
         }
 
-        $releaseCandidates = $candidates | Where-Object { (Split-Path $_.DirectoryName -Leaf) -eq 'Release' }
+        $releaseCandidates = $candidates | Where-Object { $_.FullName -match '[\\/](Release|Release TA|Release TA DEMO|Release Alpha)[\\/]' }
         if ($releaseCandidates) {
             return $releaseCandidates[0].FullName
         }

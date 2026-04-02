@@ -5,6 +5,16 @@
 
 #include "q_shared.h"
 
+#if defined( _MSC_VER )
+#pragma function( memmove )
+#endif
+
+#if defined( _MSC_VER ) && !defined( Q3_VM ) && _MSC_VER >= 1900
+#define BG_LIB_USE_NATIVE_CRT_STDLIB 1
+#else
+#define BG_LIB_USE_NATIVE_CRT_STDLIB 0
+#endif
+
 /*-
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -44,6 +54,8 @@ static char sccsid[] = "@(#)qsort.c	8.1 (Berkeley) 6/4/93";
 #endif
 static const char rcsid[] =
 #endif /* LIBC_SCCS and not lint */
+
+#if !BG_LIB_USE_NATIVE_CRT_STDLIB
 
 // bk001127 - needed for DLL's
 #if !defined( Q3_VM )
@@ -187,6 +199,8 @@ loop:	SWAPINIT(a, es);
 /*		qsort(pn - r, r / es, es, cmp);*/
 }
 
+#endif
+
 //==================================================================================
 
 
@@ -291,6 +305,7 @@ int toupper( int c ) {
 #endif
 //#ifndef _MSC_VER
 
+#if !BG_LIB_USE_NATIVE_CRT_STDLIB
 void *memmove( void *dest, const void *src, size_t count ) {
 	int		i;
 
@@ -305,6 +320,7 @@ void *memmove( void *dest, const void *src, size_t count ) {
 	}
 	return dest;
 }
+#endif
 
 
 #if 0
@@ -769,6 +785,7 @@ double tan( double x ) {
 
 static int randSeed = 0;
 
+#if !BG_LIB_USE_NATIVE_CRT_STDLIB
 void	srand( unsigned seed ) {
 	randSeed = seed;
 }
@@ -844,6 +861,7 @@ double atof( const char *string ) {
 
 	return value * sign;
 }
+#endif
 
 double _atof( const char **stringPtr ) {
 	const char	*string;

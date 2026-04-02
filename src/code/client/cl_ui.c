@@ -1366,9 +1366,22 @@ static int QDECL QL_UI_trap_SetCDKey_QL( char *buf ) {
 	return 0;
 }
 
+typedef enum {
+	QL_UI_SCALED_FONT_NORMAL = 0,
+	QL_UI_SCALED_FONT_SANS,
+	QL_UI_SCALED_FONT_MONO,
+	QL_UI_SCALED_FONT_SANS_FALLBACK,
+	QL_UI_SCALED_FONT_SANS_WINDOWS_FALLBACK,
+	QL_UI_SCALED_FONT_COUNT
+} qlUiScaledFontHandle_t;
+
+typedef struct {
+	fontInfo_t	font;
+	qboolean	loaded;
+} qlUiScaledFont_t;
+
 static vec4_t ql_ui_currentColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-static fontInfo_t ql_ui_defaultFont;
-static qboolean ql_ui_defaultFontLoaded;
+static qlUiScaledFont_t ql_ui_scaledFonts[QL_UI_SCALED_FONT_COUNT];
 
 /*
 ==============
@@ -1383,16 +1396,96 @@ static unsigned long long QL_UI_PackFloatBits64( float lo, float hi ) {
 
 /*
 ==============
-QL_UI_GetDefaultFont
+QL_UI_NormalizeScaledFontHandle
 ==============
 */
-static fontInfo_t *QL_UI_GetDefaultFont( void ) {
-	if ( !ql_ui_defaultFontLoaded ) {
-		re.RegisterFont( "fonts/notosans-regular.ttf", 48, &ql_ui_defaultFont );
-		ql_ui_defaultFontLoaded = qtrue;
+static int QL_UI_NormalizeScaledFontHandle( int fontHandle ) {
+	if ( fontHandle < QL_UI_SCALED_FONT_NORMAL || fontHandle >= QL_UI_SCALED_FONT_COUNT ) {
+		return QL_UI_SCALED_FONT_NORMAL;
 	}
 
-	return &ql_ui_defaultFont;
+	return fontHandle;
+}
+
+/*
+==============
+QL_UI_ResolveWindowsFallbackFontPath
+==============
+*/
+static const char *QL_UI_ResolveWindowsFallbackFontPath( char *fontPath, int fontPathSize ) {
+#if defined( _WIN32 )
+	char windowsDirectory[MAX_OSPATH];
+	WIN32_FIND_DATAA findData;
+	HANDLE findHandle;
+
+	if ( GetWindowsDirectoryA( windowsDirectory, sizeof( windowsDirectory ) ) > 0 ) {
+		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\ARIALUNI.TTF", windowsDirectory );
+		findHandle = FindFirstFileA( fontPath, &findData );
+		if ( findHandle != INVALID_HANDLE_VALUE ) {
+			FindClose( findHandle );
+			return fontPath;
+		}
+
+		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\segoeui.ttf", windowsDirectory );
+		findHandle = FindFirstFileA( fontPath, &findData );
+		if ( findHandle != INVALID_HANDLE_VALUE ) {
+			FindClose( findHandle );
+			return fontPath;
+		}
+
+		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\l_10646.ttf", windowsDirectory );
+		return fontPath;
+	}
+#endif
+
+	Q_strncpyz( fontPath, "fonts/droidsansfallbackfull.ttf", fontPathSize );
+	return fontPath;
+}
+
+/*
+==============
+QL_UI_GetScaledFontName
+==============
+*/
+static const char *QL_UI_GetScaledFontName( int fontHandle, char *resolvedFontPath, int resolvedFontPathSize ) {
+	switch ( QL_UI_NormalizeScaledFontHandle( fontHandle ) ) {
+		case QL_UI_SCALED_FONT_SANS:
+			return "fonts/notosans-regular.ttf";
+
+		case QL_UI_SCALED_FONT_MONO:
+			return "fonts/droidsansmono.ttf";
+
+		case QL_UI_SCALED_FONT_SANS_FALLBACK:
+			return "fonts/droidsansfallbackfull.ttf";
+
+		case QL_UI_SCALED_FONT_SANS_WINDOWS_FALLBACK:
+			return QL_UI_ResolveWindowsFallbackFontPath( resolvedFontPath, resolvedFontPathSize );
+
+		case QL_UI_SCALED_FONT_NORMAL:
+		default:
+			return "fonts/handelgothic.ttf";
+	}
+}
+
+/*
+==============
+QL_UI_GetScaledFont
+==============
+*/
+static fontInfo_t *QL_UI_GetScaledFont( int fontHandle ) {
+	qlUiScaledFont_t *scaledFont;
+	char resolvedFontPath[MAX_OSPATH];
+	const char *fontName;
+
+	fontHandle = QL_UI_NormalizeScaledFontHandle( fontHandle );
+	scaledFont = &ql_ui_scaledFonts[fontHandle];
+	if ( !scaledFont->loaded ) {
+		fontName = QL_UI_GetScaledFontName( fontHandle, resolvedFontPath, sizeof( resolvedFontPath ) );
+		re.RegisterFont( fontName, 48, &scaledFont->font );
+		scaledFont->loaded = qtrue;
+	}
+
+	return &scaledFont->font;
 }
 
 /*
@@ -1598,7 +1691,6 @@ static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int
 	float maxXf;
 
 	// uix86.dll HLIL: import[94] (offset 0x178) draws scaled text with maxX/outMaxX.
-	(void)fontHandle;
 
 	if ( !text || !text[0] ) {
 		if ( outMaxX ) {
@@ -1609,7 +1701,7 @@ static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int
 
 	Com_Memcpy( baseColor, ql_ui_currentColor, sizeof( baseColor ) );
 
-	font = QL_UI_GetDefaultFont();
+	font = QL_UI_GetScaledFont( fontHandle );
 	if ( scale <= 0.0f ) {
 		scaleFactor = 1.0f;
 	} else {
@@ -1673,7 +1765,6 @@ static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const 
 	float maxXf;
 
 	// uix86.dll HLIL: import[95] (offset 0x17c) measures text and returns packed floats.
-	(void)fontHandle;
 
 	if ( outLeft ) {
 		*outLeft = 0.0f;
@@ -1683,7 +1774,7 @@ static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const 
 		return QL_UI_PackFloatBits64( 0.0f, 0.0f );
 	}
 
-	font = QL_UI_GetDefaultFont();
+	font = QL_UI_GetScaledFont( fontHandle );
 	if ( scale <= 0.0f ) {
 		scaleFactor = 1.0f;
 	} else {

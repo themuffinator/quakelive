@@ -1432,11 +1432,11 @@ ClientFromName
 int ClientFromName(char *name) {
 	int i;
 	char buf[MAX_INFO_STRING];
-	static int maxclients;
+	static int cachedMaxClients;
 
-	if (!maxclients)
-		maxclients = trap_Cvar_VariableIntegerValue("sv_maxclients");
-	for (i = 0; i < maxclients && i < MAX_CLIENTS; i++) {
+	if (!cachedMaxClients)
+		cachedMaxClients = trap_Cvar_VariableIntegerValue("sv_maxclients");
+	for (i = 0; i < cachedMaxClients && i < MAX_CLIENTS; i++) {
 		trap_GetConfigstring(CS_PLAYERS+i, buf, sizeof(buf));
 		Q_CleanStr( buf );
 		if (!Q_stricmp(Info_ValueForKey(buf, "n"), name)) return i;
@@ -1452,11 +1452,11 @@ ClientOnSameTeamFromName
 int ClientOnSameTeamFromName(bot_state_t *bs, char *name) {
 	int i;
 	char buf[MAX_INFO_STRING];
-	static int maxclients;
+	static int cachedMaxClients;
 
-	if (!maxclients)
-		maxclients = trap_Cvar_VariableIntegerValue("sv_maxclients");
-	for (i = 0; i < maxclients && i < MAX_CLIENTS; i++) {
+	if (!cachedMaxClients)
+		cachedMaxClients = trap_Cvar_VariableIntegerValue("sv_maxclients");
+	for (i = 0; i < cachedMaxClients && i < MAX_CLIENTS; i++) {
 		if (!BotSameTeam(bs, i))
 			continue;
 		trap_GetConfigstring(CS_PLAYERS+i, buf, sizeof(buf));

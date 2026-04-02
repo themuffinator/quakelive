@@ -2623,7 +2623,7 @@ Decodes the retail compact weapon-refire timing slab into the live pmove cache.
 */
 static void CG_ParseWeaponReloadConfigString( void ) {
 	const char	*payload;
-	const char	*cursor;
+	char		*cursor;
 	int		parsed[ARRAY_LEN( cg_retailWeaponReloadOrder )];
 	int		i;
 
@@ -2632,7 +2632,7 @@ static void CG_ParseWeaponReloadConfigString( void ) {
 		return;
 	}
 
-	cursor = payload;
+	cursor = (char *)payload;
 	for ( i = 0; i < ARRAY_LEN( parsed ); ++i ) {
 		const char *token;
 

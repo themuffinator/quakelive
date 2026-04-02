@@ -8,12 +8,18 @@ counterparts, but the output is redirected to
 `build/win32/<Config>/bin/`. The Visual Studio 2010 (`v100`) toolset is enforced so
 the produced binaries stay aligned with the shipping runtime.【F:src/code/game/qagamex86.vcxproj†L2-L135】【F:src/code/cgame/cgamex86.vcxproj†L2-L110】【F:src/code/awesomium_process.vcxproj†L1-L177】
 
+The checked-in project defaults stay on `v100` for parity, but the build scripts
+also support a `v141` override for contributors on modern Windows hosts who do
+not have a working VS2010-compatible toolchain installed.
+
 For runtime prerequisites and validation steps on WOW64 hosts, see the
 [Windows 32-bit Runtime Guide](../platform/windows-32bit-runtime.md).
 For the exact retail dependency matrix and a Steam-install verifier, see
 [Retail Windows Dependency Audit](../platform/retail-dependencies.md). For the
 retail compiler/linker configuration evidence, see
-[Retail Windows Toolchain Audit](../platform/retail-toolchain.md).
+[Retail Windows Toolchain Audit](../platform/retail-toolchain.md). For the
+retail font-system evidence and remaining source gaps, see
+[Retail Font Stack Audit](../platform/retail-font-stack.md).
 
 ## Available targets
 
@@ -40,6 +46,22 @@ the native DLLs untouched:
 ```powershell
 msbuild src\code\quakelive.sln /t:game;cgame /p:Configuration=Release /p:Platform=x86
 ```
+
+## Modern compatibility override
+
+If you want to keep the checked-in `v100` project defaults but build the native
+targets with the Visual Studio 2017 compiler on a newer host, install the
+optional `v141` toolset and pass it on the command line:
+
+```powershell
+pwsh tools\ci\install-vs-toolset.ps1 -PlatformToolset v141
+pwsh tools\ci\verify-vs-toolchain.ps1 -PlatformToolset v141 -RequireToolset
+msbuild src\code\quakelive.sln /t:qagamex86;cgamex86;awesomium_process /p:Configuration=Release /p:Platform=x86 /p:PlatformToolset=v141
+```
+
+This path is a deliberate compatibility exception. It improves buildability on
+modern systems, but it no longer reproduces the retail VC10 compiler/linker or
+CRT import surface.
 
 `awesomium_process.exe` respects the same online-services policy as the rest of
 the launcher stack. `QLBuildOnlineServices` defaults to `0`, which produces an
@@ -88,6 +110,13 @@ retail-facing project files still match the recovered VC10-era build settings
 and that the local machine actually has the `v100` toolset installed.
 Run `pwsh tools/ci/audit-retail-metadata.ps1` to verify that the launcher
 version resources and embedded manifests still match the retail executables.
+
+For a modern-host build verification pass that keeps the checked-in `v100`
+defaults intact but compiles with `v141`, run:
+
+```powershell
+pwsh tools\ci\validate-windows-native.ps1 -PlatformToolset v141 -RuntimeProfile modern
+```
 
 When you target a `.vcxproj` directly, keep using `/p:Platform=Win32`. The
 solution-level builds use `x86` because that is the platform name advertised by

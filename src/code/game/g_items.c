@@ -677,6 +677,159 @@ static void G_RecordPlacementPickupTelemetry( gentity_t *player, scorestatPickup
 
 /*
 =============
+G_RecordRetailPickupStat
+
+Increments one retail PLAYER_STATS pickup bucket mirrored in writable source.
+=============
+*/
+static void G_RecordRetailPickupStat( gentity_t *player, rankPickupStat_t pickupStat ) {
+	if ( !player || !player->client ) {
+		return;
+	}
+
+	if ( pickupStat < 0 || pickupStat >= RANK_PICKUP_COUNT ) {
+		return;
+	}
+
+	player->client->pers.rankPickupCounts[pickupStat]++;
+}
+
+/*
+=============
+G_RecordRetailPickupStats
+
+Tracks the broader retail PLAYER_STATS pickup taxonomy alongside the existing
+team-score and ownerdraw telemetry.
+=============
+*/
+static void G_RecordRetailPickupStats( gentity_t *player, const gentity_t *ent ) {
+	const gitem_t	*item;
+	rankPickupStat_t	pickupStat;
+	holdable_t		holdable;
+
+	if ( !player || !player->client || !ent || !ent->item ) {
+		return;
+	}
+
+	item = ent->item;
+	switch ( item->giType ) {
+	case IT_ARMOR:
+		G_RecordRetailPickupStat( player, RANK_PICKUP_ARMOR );
+		if ( item->classname && !Q_stricmp( item->classname, "item_armor_body" ) ) {
+			G_RecordRetailPickupStat( player, RANK_PICKUP_RED_ARMOR );
+		} else if ( item->classname && !Q_stricmp( item->classname, "item_armor_combat" ) ) {
+			G_RecordRetailPickupStat( player, RANK_PICKUP_YELLOW_ARMOR );
+		} else if ( item->classname && !Q_stricmp( item->classname, "item_armor_jacket" ) ) {
+			G_RecordRetailPickupStat( player, RANK_PICKUP_GREEN_ARMOR );
+		}
+		break;
+
+	case IT_HEALTH:
+		G_RecordRetailPickupStat( player, RANK_PICKUP_HEALTH );
+		if ( item->classname && !Q_stricmp( item->classname, "item_health_mega" ) ) {
+			G_RecordRetailPickupStat( player, RANK_PICKUP_MEGA_HEALTH );
+		}
+		break;
+
+	case IT_POWERUP:
+		pickupStat = RANK_PICKUP_OTHER_POWERUP;
+		switch ( item->giTag ) {
+		case PW_QUAD:
+			pickupStat = RANK_PICKUP_QUAD;
+			break;
+		case PW_BATTLESUIT:
+			pickupStat = RANK_PICKUP_BATTLESUIT;
+			break;
+		case PW_HASTE:
+			pickupStat = RANK_PICKUP_HASTE;
+			break;
+		case PW_INVIS:
+			pickupStat = RANK_PICKUP_INVIS;
+			break;
+		case PW_REGEN:
+			pickupStat = RANK_PICKUP_REGEN;
+			break;
+		case PW_FLIGHT:
+			pickupStat = RANK_PICKUP_FLIGHT;
+			break;
+		case PW_INVULNERABILITY:
+			pickupStat = RANK_PICKUP_INVULNERABILITY;
+			break;
+		default:
+			break;
+		}
+		G_RecordRetailPickupStat( player, pickupStat );
+		break;
+
+	case IT_PERSISTANT_POWERUP:
+		pickupStat = RANK_PICKUP_OTHER_POWERUP;
+		switch ( item->giTag ) {
+		case PW_SCOUT:
+			pickupStat = RANK_PICKUP_SCOUT;
+			break;
+		case PW_GUARD:
+			pickupStat = RANK_PICKUP_GUARD;
+			break;
+		case PW_DOUBLER:
+			pickupStat = RANK_PICKUP_DOUBLER;
+			break;
+		case PW_AMMOREGEN:
+			pickupStat = RANK_PICKUP_ARMOR_REGEN;
+			break;
+		default:
+			break;
+		}
+		G_RecordRetailPickupStat( player, pickupStat );
+		break;
+
+	case IT_HOLDABLE:
+		holdable = BG_HoldableForItemTag( item->giTag );
+		pickupStat = RANK_PICKUP_OTHER_HOLDABLE;
+		switch ( holdable ) {
+		case HI_TELEPORTER:
+			pickupStat = RANK_PICKUP_TELEPORTER;
+			break;
+		case HI_MEDKIT:
+			pickupStat = RANK_PICKUP_MEDKIT;
+			break;
+		case HI_KAMIKAZE:
+			pickupStat = RANK_PICKUP_KAMIKAZE;
+			break;
+		case HI_PORTAL:
+			pickupStat = RANK_PICKUP_PORTAL;
+			break;
+		case HI_INVULNERABILITY:
+			pickupStat = RANK_PICKUP_INVULNERABILITY;
+			break;
+		default:
+			break;
+		}
+		G_RecordRetailPickupStat( player, pickupStat );
+		break;
+
+	case IT_TEAM:
+		switch ( item->giTag ) {
+		case PW_REDFLAG:
+			G_RecordRetailPickupStat( player, RANK_PICKUP_RED_FLAG );
+			break;
+		case PW_BLUEFLAG:
+			G_RecordRetailPickupStat( player, RANK_PICKUP_BLUE_FLAG );
+			break;
+		case PW_NEUTRALFLAG:
+			G_RecordRetailPickupStat( player, RANK_PICKUP_NEUTRAL_FLAG );
+			break;
+		default:
+			break;
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
+/*
+=============
 G_GetTeamPickupStatForItem
 
 Classifies an item entity into a team pickup stat bucket when applicable.
@@ -1695,6 +1848,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		if ( G_GetPlacementPickupIndexForItem( ent, &pickupIndex ) ) {
 			G_RecordPlacementPickupTelemetry( other, pickupIndex );
 		}
+		G_RecordRetailPickupStats( other, ent );
 	}
 
 	G_UpdateClientItemUnlockProgress( other->client, ent->item );

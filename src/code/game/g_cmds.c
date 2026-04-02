@@ -630,7 +630,7 @@ static void G_BuildTeamScoreStatsFields( team_t team, int *fields, int fieldCoun
 
 	if ( fieldCount > TEAMSTAT_MAP_PICKUPS ) {
 		int mapPickups;
-		int i;
+		int sourceIndex;
 		static const teamScoreStatIndex_t mapPickupSources[] = {
 			TEAMSTAT_PICKUPS_RA,
 			TEAMSTAT_PICKUPS_YA,
@@ -646,10 +646,10 @@ static void G_BuildTeamScoreStatsFields( team_t team, int *fields, int fieldCoun
 		};
 
 		mapPickups = 0;
-		for ( i = 0; i < sizeof( mapPickupSources ) / sizeof( mapPickupSources[0] ); i++ ) {
+		for ( sourceIndex = 0; sourceIndex < sizeof( mapPickupSources ) / sizeof( mapPickupSources[0] ); sourceIndex++ ) {
 			int fieldIndex;
 
-			fieldIndex = mapPickupSources[i];
+			fieldIndex = mapPickupSources[sourceIndex];
 			if ( fieldIndex < fieldCount ) {
 				mapPickups += fields[fieldIndex];
 			}
@@ -2099,7 +2099,7 @@ DeathmatchScoreboardMessage
 */
 void DeathmatchScoreboardMessage( gentity_t *ent ) {
 	char		string[MAX_STRING_CHARS];
-	int			emittedCount;
+	int			emittedCount = 0;
 	qboolean	useCompact;
 	const char	*cmd;
 
@@ -2289,23 +2289,15 @@ Selects the retail Red Rover auto-join target while ensuring both infection team
 ==================
 */
 static team_t G_RRResolveAutoJoinTeam( int clientNum ) {
-	int		redCount;
-	int		blueCount;
-
 	if ( g_gametype.integer != GT_RED_ROVER || !g_rrInfected.integer ) {
 		return PickTeam( clientNum );
 	}
-
-	redCount = TeamCount( clientNum, TEAM_RED );
-	blueCount = TeamCount( clientNum, TEAM_BLUE );
-	if ( redCount <= 0 ) {
+	if ( clientNum == level.rrSelectedInfectedClientNum
+		|| clientNum == level.rrCarryoverInfectedClientNum ) {
 		return TEAM_RED;
 	}
-	if ( blueCount <= 0 ) {
-		return TEAM_BLUE;
-	}
 
-	return PickTeam( clientNum );
+	return TEAM_BLUE;
 }
 
 /*
@@ -3666,6 +3658,7 @@ void SetTeam( gentity_t *ent, char *s ) {
 	client->sess.sessionTeam = team;
 	client->sess.spectatorState = specState;
 	client->sess.spectatorClient = specClient;
+	client->pers.teamJoinStartTime = ( team == TEAM_SPECTATOR ) ? 0 : level.time;
 	if ( oldTeam != team ) {
 		G_RankSendPlayerSwitchTeam( ent, oldTeam, team );
 	}

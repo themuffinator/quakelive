@@ -556,6 +556,238 @@ void G_CAADResetClientForRound( gentity_t *ent ) {
 
 /*
 =============
+G_LastManStandingWarningsEnabled
+
+Returns qtrue when the recovered last-man-standing warning path may emit.
+=============
+*/
+static qboolean G_LastManStandingWarningsEnabled( void ) {
+	if ( !g_lastManStandingWarning.integer ) {
+		return qfalse;
+	}
+	if ( level.timeoutActive ) {
+		return qfalse;
+	}
+	if ( level.intermissionQueued || level.intermissiontime ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_LastManStandingMessage
+
+Returns the configured last-man-standing centerprint payload.
+=============
+*/
+static const char *G_LastManStandingMessage( void ) {
+	if ( g_lastManStandingMessage.string[0] ) {
+		return g_lastManStandingMessage.string;
+	}
+
+	return "You are the only one left";
+}
+
+/*
+=============
+G_FindLastAlivePlayer
+
+Returns the sole connected PM_NORMAL client on the requested team.
+=============
+*/
+static gentity_t *G_FindLastAlivePlayer( team_t team ) {
+	gentity_t	*lastAlive;
+	int		clientNum;
+
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return NULL;
+	}
+
+	lastAlive = NULL;
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gentity_t	*ent;
+		gclient_t	*client;
+
+		ent = &g_entities[clientNum];
+		client = ent->client;
+		if ( !ent->inuse || !client ) {
+			continue;
+		}
+		if ( client->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+		if ( client->sess.sessionTeam != team ) {
+			continue;
+		}
+		if ( client->ps.pm_type != PM_NORMAL ) {
+			continue;
+		}
+		if ( lastAlive ) {
+			return NULL;
+		}
+
+		lastAlive = ent;
+	}
+
+	return lastAlive;
+}
+
+/*
+=============
+G_NotifyLastAlivePlayer
+
+Sends the recovered private last-man-standing centerprint to the lone survivor.
+=============
+*/
+static void G_NotifyLastAlivePlayer( team_t team ) {
+	gentity_t	*lastAlive;
+
+	lastAlive = G_FindLastAlivePlayer( team );
+	if ( !lastAlive || !lastAlive->client ) {
+		return;
+	}
+
+	trap_SendServerCommand( lastAlive - g_entities,
+		va( "cp \"%s\\n\"", G_LastManStandingMessage() ) );
+}
+
+/*
+=============
+G_ADNotifyLastAlivePlayer
+
+Triggers the retail Attack & Defend lone-survivor warning once a side drops to one player.
+=============
+*/
+void G_ADNotifyLastAlivePlayer( team_t team ) {
+	int		counts[TEAM_NUM_TEAMS];
+	team_t	otherTeam;
+
+	if ( !G_ADModeActive() ) {
+		return;
+	}
+	if ( G_ADResolveRoundState() != AD_ROUNDSTATE_ACTIVE ) {
+		return;
+	}
+	if ( !G_LastManStandingWarningsEnabled() ) {
+		return;
+	}
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return;
+	}
+
+	otherTeam = ( team == TEAM_RED ) ? TEAM_BLUE : TEAM_RED;
+	G_CountActivePlayersByTeam( counts );
+	if ( counts[team] != 1 || counts[otherTeam] <= 0 ) {
+		return;
+	}
+
+	G_NotifyLastAlivePlayer( team );
+}
+
+/*
+=============
+G_CANotifyLastAlivePlayer
+
+Triggers the retail Clan Arena lone-survivor warning once a side drops to one player.
+=============
+*/
+void G_CANotifyLastAlivePlayer( team_t team ) {
+	int		counts[TEAM_NUM_TEAMS];
+	team_t	otherTeam;
+
+	if ( g_gametype.integer != GT_CLAN_ARENA ) {
+		return;
+	}
+	if ( level.roundState != ROUNDSTATE_ACTIVE ) {
+		return;
+	}
+	if ( !G_LastManStandingWarningsEnabled() ) {
+		return;
+	}
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return;
+	}
+
+	otherTeam = ( team == TEAM_RED ) ? TEAM_BLUE : TEAM_RED;
+	G_CountActivePlayersByTeam( counts );
+	if ( counts[team] != 1 || counts[otherTeam] <= 0 ) {
+		return;
+	}
+
+	G_NotifyLastAlivePlayer( team );
+}
+
+/*
+=============
+G_FreezeNotifyLastAlivePlayer
+
+Triggers the retail Freeze lone-survivor warning once a side is reduced to one thawed player.
+=============
+*/
+void G_FreezeNotifyLastAlivePlayer( team_t team ) {
+	int		counts[TEAM_NUM_TEAMS];
+	team_t	otherTeam;
+
+	if ( !G_FreezeGametypeEnabled() ) {
+		return;
+	}
+	if ( level.roundState != ROUNDSTATE_ACTIVE ) {
+		return;
+	}
+	if ( !G_LastManStandingWarningsEnabled() ) {
+		return;
+	}
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return;
+	}
+
+	otherTeam = ( team == TEAM_RED ) ? TEAM_BLUE : TEAM_RED;
+	G_CountActivePlayersByTeam( counts );
+	if ( counts[team] != 1 || counts[otherTeam] <= 0 ) {
+		return;
+	}
+
+	G_NotifyLastAlivePlayer( team );
+}
+
+/*
+=============
+G_RRNotifyLastAlivePlayer
+
+Triggers the retail Red Rover lone-survivor warning once infection mode leaves
+exactly one blue-team survivor alive.
+=============
+*/
+void G_RRNotifyLastAlivePlayer( team_t team ) {
+	int		counts[TEAM_NUM_TEAMS];
+	team_t	otherTeam;
+
+	if ( g_gametype.integer != GT_RED_ROVER || !g_rrInfected.integer ) {
+		return;
+	}
+	if ( level.roundState != ROUNDSTATE_ACTIVE ) {
+		return;
+	}
+	if ( !G_LastManStandingWarningsEnabled() ) {
+		return;
+	}
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return;
+	}
+
+	otherTeam = ( team == TEAM_RED ) ? TEAM_BLUE : TEAM_RED;
+	G_CountActivePlayersByTeam( counts );
+	if ( counts[team] != 1 || counts[otherTeam] <= 0 ) {
+		return;
+	}
+
+	G_NotifyLastAlivePlayer( team );
+}
+
+/*
+=============
 G_ADResolveRoundState
 
 Services any expired Attack & Defend transition and returns the live retail controller state.

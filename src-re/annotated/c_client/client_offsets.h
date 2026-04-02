@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "../include/ql_types.h"
+#include "../../include/ql_types.h"
 
 typedef struct {
     const char *fieldName;

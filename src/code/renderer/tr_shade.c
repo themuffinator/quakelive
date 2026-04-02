@@ -63,7 +63,7 @@ static int		c_vertexes;		// for seeing how long our average strips are
 static int		c_begins;
 static void R_DrawStripElements( int numIndexes, const glIndex_t *indexes, void ( APIENTRY *element )(GLint) ) {
 	int i;
-	int last[3] = { -1, -1, -1 };
+	glIndex_t last[3] = { 0, 0, 0 };
 	qboolean even;
 
 	c_begins++;

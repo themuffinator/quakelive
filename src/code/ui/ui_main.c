@@ -5748,7 +5748,7 @@ static void UI_SortServerStatusInfo( serverStatusInfo_t *info ) {
 
 					gametype = atoi( info->lines[index][3] );
 					if ( gametype >= 0 && gametype < GT_MAX_GAME_TYPE && qlGametypeNames[gametype] ) {
-						info->lines[index][3] = qlGametypeNames[gametype];
+						info->lines[index][3] = (char *)qlGametypeNames[gametype];
 					}
 				}
 				index++;

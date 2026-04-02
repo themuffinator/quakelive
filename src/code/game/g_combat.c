@@ -232,7 +232,7 @@ void G_ComplaintClientDisconnected( int clientNum ) {
 ScorePlum
 ============
 */
-void ScorePlum( gentity_t *ent, vec3_t origin, int score ) {
+void ScorePlum( gentity_t *ent, const vec3_t origin, int score ) {
 	gentity_t *plum;
 
 	plum = G_TempEntity( origin, EV_SCOREPLUM );
@@ -251,7 +251,7 @@ AddScore
 Adds score to both the client and his team
 ============
 */
-void AddScore( gentity_t *ent, vec3_t origin, int score ) {
+void AddScore( gentity_t *ent, const vec3_t origin, int score ) {
 	if ( !ent->client ) {
 		return;
 	}
@@ -766,6 +766,19 @@ void Kamikaze_DeathTimer( gentity_t *self ) {
 
 /*
 ==================
+G_RecordHolyShit
+==================
+*/
+static void G_RecordHolyShit( gentity_t *ent ) {
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	ent->client->pers.holyShitCount++;
+}
+
+/*
+==================
 CheckAlmostCapture
 ==================
 */
@@ -804,8 +817,12 @@ void CheckAlmostCapture( gentity_t *self, gentity_t *attacker ) {
 			VectorSubtract( self->client->ps.origin, ent->s.origin, dir );
 			if ( VectorLength(dir) < 200 ) {
 				self->client->ps.persistant[PERS_PLAYEREVENTS] ^= PLAYEREVENT_HOLYSHIT;
+				G_RecordHolyShit( self );
 				if ( attacker->client ) {
 					attacker->client->ps.persistant[PERS_PLAYEREVENTS] ^= PLAYEREVENT_HOLYSHIT;
+					if ( attacker != self ) {
+						G_RecordHolyShit( attacker );
+					}
 				}
 			}
 		}
@@ -837,8 +854,12 @@ void CheckAlmostScored( gentity_t *self, gentity_t *attacker ) {
 			VectorSubtract( self->client->ps.origin, ent->s.origin, dir );
 			if ( VectorLength(dir) < 200 ) {
 				self->client->ps.persistant[PERS_PLAYEREVENTS] ^= PLAYEREVENT_HOLYSHIT;
+				G_RecordHolyShit( self );
 				if ( attacker->client ) {
 					attacker->client->ps.persistant[PERS_PLAYEREVENTS] ^= PLAYEREVENT_HOLYSHIT;
+					if ( attacker != self ) {
+						G_RecordHolyShit( attacker );
+					}
 				}
 			}
 		}
@@ -1051,6 +1072,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	self->client->ps.persistant[PERS_KILLED]++;
 	self->client->deathCount++;
+	self->client->currentKillStreak = 0;
 	if ( ( !attacker || !attacker->client ) && self->client ) {
 		switch ( meansOfDeath ) {
 		case MOD_WATER:
@@ -1075,6 +1097,10 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 			AddScore( attacker, self->r.currentOrigin, -1 );
 		} else {
 			attacker->client->killCount++;
+			attacker->client->currentKillStreak++;
+			if ( attacker->client->currentKillStreak > attacker->client->pers.maxKillStreak ) {
+				attacker->client->pers.maxKillStreak = attacker->client->currentKillStreak;
+			}
 			AddScore( attacker, self->r.currentOrigin, 1 );
 			G_ADAwardBonus( attacker, self->r.currentOrigin, g_adElimScoreBonus.integer, S_COLOR_YELLOW "Elimination bonus" );
 
@@ -1124,6 +1150,13 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	// Add team bonuses
 	Team_FragBonuses(self, inflictor, attacker);
 	G_RRHandlePlayerDeath( self, attacker );
+	if ( self->client && self->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		if ( g_gametype.integer == GT_CLAN_ARENA ) {
+			G_CANotifyLastAlivePlayer( self->client->sess.sessionTeam );
+		} else if ( g_gametype.integer == GT_ATTACK_DEFEND ) {
+			G_ADNotifyLastAlivePlayer( self->client->sess.sessionTeam );
+		}
+	}
 	G_RankSendPlayerDeath( self, attacker, meansOfDeath );
 
 	// if client is in a nodrop area, don't drop anything (but return CTF flags!)
@@ -1205,9 +1238,9 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		GibEntity( self );
 	} else {
 		// normal death
-		static int i;
+		static int deathAnimIndex;
 
-		switch ( i ) {
+		switch ( deathAnimIndex ) {
 		case 0:
 			anim = BOTH_DEATH1;
 			break;
@@ -1231,13 +1264,13 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		self->client->ps.torsoAnim = 
 			( ( self->client->ps.torsoAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT ) | anim;
 
-		G_AddEvent( self, EV_DEATH1 + i, killer );
+		G_AddEvent( self, EV_DEATH1 + deathAnimIndex, killer );
 
 		// the body can still be gibbed
 		self->die = body_die;
 
 		// globally cycle through the different death animations
-		i = ( i + 1 ) % 3;
+		deathAnimIndex = ( deathAnimIndex + 1 ) % 3;
 
 		if (self->s.eFlags & EF_KAMIKAZE) {
 			Kamikaze_DeathTimer( self );

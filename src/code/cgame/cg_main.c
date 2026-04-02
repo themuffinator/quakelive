@@ -295,6 +295,8 @@ vmCvar_t	cg_cameraThirdPersonSmartMode;
 vmCvar_t	cg_centertime;
 vmCvar_t	cg_chatbeep;
 vmCvar_t	cg_chatHistoryLength;
+vmCvar_t	cg_playVoiceChats;
+vmCvar_t	cg_showVoiceText;
 vmCvar_t	cg_crosshairBrightness;
 vmCvar_t	cg_crosshairColor;
 vmCvar_t	cg_crosshairHealth;
@@ -585,6 +587,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_centertime, "cg_centertime", "3", CVAR_CHEAT },
 	{ &cg_chatbeep, "cg_chatbeep", "1", CVAR_ARCHIVE },
 	{ &cg_chatHistoryLength, "cg_chatHistoryLength", "0", CVAR_ARCHIVE },
+	{ &cg_playVoiceChats, "cg_playVoiceChats", "1", CVAR_ARCHIVE },
+	{ &cg_showVoiceText, "cg_showVoiceText", "1", CVAR_ARCHIVE },
 	{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1", CVAR_ARCHIVE },
 	{ &cg_crosshairColor, "cg_crosshairColor", "4", CVAR_ARCHIVE },
 	{ &cg_crosshairHealth, "cg_crosshairHealth", "1", CVAR_ARCHIVE },

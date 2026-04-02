@@ -72,6 +72,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "../qcommon/qcommon.h"
+#include <stdio.h>
 
 #ifdef BUILD_FREETYPE
 #include "../ft2/fterrors.h"
@@ -87,7 +88,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 FT_Library ftLibrary = NULL;  
 #endif
 
-#define MAX_FONTS 6
+#define MAX_FONTS 16
 static int registeredFontCount = 0;
 static fontInfo_t registeredFont[MAX_FONTS];
 
@@ -327,6 +328,251 @@ float readFloat() {
 
 /*
 =================
+R_FontPathIsAbsolute
+=================
+*/
+static qboolean R_FontPathIsAbsolute( const char *path ) {
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+
+	if ( path[0] == '\\' || path[0] == '/' ) {
+		return qtrue;
+	}
+
+	if ( path[1] == ':' && ( ( path[0] >= 'A' && path[0] <= 'Z' ) || ( path[0] >= 'a' && path[0] <= 'z' ) ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+R_NormalizeFontSourcePath
+=================
+*/
+static void R_NormalizeFontSourcePath( const char *fontName, char *resolvedPath, int resolvedPathSize ) {
+	if ( !resolvedPath || resolvedPathSize <= 0 ) {
+		return;
+	}
+
+	if ( !fontName || !fontName[0] ) {
+		Q_strncpyz( resolvedPath, "fonts/handelgothic.ttf", resolvedPathSize );
+		return;
+	}
+
+	if ( !Q_stricmp( fontName, "fonts/font" )
+		|| !Q_stricmp( fontName, "fonts/bigfont" )
+		|| !Q_stricmp( fontName, "normal" ) ) {
+		Q_strncpyz( resolvedPath, "fonts/handelgothic.ttf", resolvedPathSize );
+		return;
+	}
+
+	if ( !Q_stricmp( fontName, "fonts/smallfont" )
+		|| !Q_stricmp( fontName, "sans" ) ) {
+		Q_strncpyz( resolvedPath, "fonts/notosans-regular.ttf", resolvedPathSize );
+		return;
+	}
+
+	if ( !Q_stricmp( fontName, "fonts/monofont" )
+		|| !Q_stricmp( fontName, "mono" ) ) {
+		Q_strncpyz( resolvedPath, "fonts/droidsansmono.ttf", resolvedPathSize );
+		return;
+	}
+
+	if ( !Q_stricmp( fontName, "sans-fallback" )
+		|| !Q_stricmp( fontName, "sans-windows-fallback" ) ) {
+		Q_strncpyz( resolvedPath, "fonts/droidsansfallbackfull.ttf", resolvedPathSize );
+		return;
+	}
+
+	Q_strncpyz( resolvedPath, fontName, resolvedPathSize );
+}
+
+/*
+=================
+R_BuildFontCacheName
+=================
+*/
+static void R_BuildFontCacheName( const char *fontName, int pointSize, char *cacheName, int cacheNameSize ) {
+	char resolvedPath[MAX_QPATH];
+	char strippedName[MAX_QPATH];
+	char sanitizedName[MAX_QPATH];
+	const char *baseName;
+	int i;
+	int outIndex;
+
+	if ( !cacheName || cacheNameSize <= 0 ) {
+		return;
+	}
+
+	R_NormalizeFontSourcePath( fontName, resolvedPath, sizeof( resolvedPath ) );
+	baseName = COM_SkipPath( resolvedPath );
+	COM_StripExtension( baseName, strippedName );
+	Q_strlwr( strippedName );
+
+	if ( !strippedName[0] ) {
+		Com_sprintf( cacheName, cacheNameSize, "fonts/fontImage_%i.dat", pointSize );
+		return;
+	}
+
+	for ( i = 0, outIndex = 0; strippedName[i] && outIndex < cacheNameSize - 1; i++ ) {
+		char c = strippedName[i];
+
+		if ( ( c >= 'a' && c <= 'z' ) || ( c >= '0' && c <= '9' ) ) {
+			sanitizedName[outIndex++] = c;
+		} else {
+			sanitizedName[outIndex++] = '_';
+		}
+	}
+	sanitizedName[outIndex] = '\0';
+
+	Com_sprintf( cacheName, cacheNameSize, "fonts/fontImage_%s_%i.dat", sanitizedName, pointSize );
+}
+
+/*
+=================
+R_BuildFontPageName
+=================
+*/
+static void R_BuildFontPageName( const char *fontName, int pointSize, int imageNumber, char *pageName, int pageNameSize ) {
+	char resolvedPath[MAX_QPATH];
+	char strippedName[MAX_QPATH];
+	char sanitizedName[MAX_QPATH];
+	const char *baseName;
+	int i;
+	int outIndex;
+
+	if ( !pageName || pageNameSize <= 0 ) {
+		return;
+	}
+
+	R_NormalizeFontSourcePath( fontName, resolvedPath, sizeof( resolvedPath ) );
+	baseName = COM_SkipPath( resolvedPath );
+	COM_StripExtension( baseName, strippedName );
+	Q_strlwr( strippedName );
+
+	if ( !strippedName[0] ) {
+		Com_sprintf( pageName, pageNameSize, "fonts/fontImage_%i_%i.tga", imageNumber, pointSize );
+		return;
+	}
+
+	for ( i = 0, outIndex = 0; strippedName[i] && outIndex < pageNameSize - 1; i++ ) {
+		char c = strippedName[i];
+
+		if ( ( c >= 'a' && c <= 'z' ) || ( c >= '0' && c <= '9' ) ) {
+			sanitizedName[outIndex++] = c;
+		} else {
+			sanitizedName[outIndex++] = '_';
+		}
+	}
+	sanitizedName[outIndex] = '\0';
+
+	Com_sprintf( pageName, pageNameSize, "fonts/fontImage_%s_%i_%i.tga", sanitizedName, imageNumber, pointSize );
+}
+
+/*
+=================
+R_FindRegisteredFont
+=================
+*/
+static int R_FindRegisteredFont( const char *cacheName ) {
+	int i;
+
+	for ( i = 0; i < registeredFontCount; i++ ) {
+		if ( !Q_stricmp( cacheName, registeredFont[i].name ) ) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+/*
+=================
+R_ReadAbsoluteFontFile
+=================
+*/
+static int R_ReadAbsoluteFontFile( const char *fontName, void **buffer ) {
+	FILE *stream;
+	long fileSize;
+	byte *data;
+
+	if ( !buffer || !R_FontPathIsAbsolute( fontName ) ) {
+		return -1;
+	}
+
+	stream = fopen( fontName, "rb" );
+	if ( !stream ) {
+		return -1;
+	}
+
+	if ( fseek( stream, 0, SEEK_END ) != 0 ) {
+		fclose( stream );
+		return -1;
+	}
+
+	fileSize = ftell( stream );
+	if ( fileSize <= 0 || fseek( stream, 0, SEEK_SET ) != 0 ) {
+		fclose( stream );
+		return -1;
+	}
+
+	data = Z_Malloc( fileSize );
+	if ( fread( data, 1, fileSize, stream ) != (size_t)fileSize ) {
+		Z_Free( data );
+		fclose( stream );
+		return -1;
+	}
+
+	fclose( stream );
+	*buffer = data;
+	return (int)fileSize;
+}
+
+/*
+=================
+R_ReadFontFile
+=================
+*/
+static int R_ReadFontFile( const char *fontName, void **buffer, qboolean *fromFileSystem ) {
+	int len;
+
+	if ( fromFileSystem ) {
+		*fromFileSystem = qfalse;
+	}
+
+	len = ri.FS_ReadFile( fontName, buffer );
+	if ( len > 0 ) {
+		if ( fromFileSystem ) {
+			*fromFileSystem = qtrue;
+		}
+		return len;
+	}
+
+	return R_ReadAbsoluteFontFile( fontName, buffer );
+}
+
+/*
+=================
+R_FreeFontFileBuffer
+=================
+*/
+static void R_FreeFontFileBuffer( void *buffer, qboolean fromFileSystem ) {
+	if ( !buffer ) {
+		return;
+	}
+
+	if ( fromFileSystem ) {
+		ri.FS_FreeFile( buffer );
+	} else {
+		Z_Free( buffer );
+	}
+}
+
+/*
+=================
 RE_RegisterFontFallback
 =================
 */
@@ -381,200 +627,219 @@ static qboolean RE_RegisterFontFallback( const char *cacheName, float glyphScale
 	return qtrue;
 }
 
+/*
+=================
+RE_RegisterFont
+=================
+*/
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 #ifdef BUILD_FREETYPE
-  FT_Face face;
-  int j, k, xOut, yOut, lastStart, imageNumber;
-  int scaledSize, newSize, maxHeight, left, satLevels;
-  unsigned char *out, *imageBuff;
-  glyphInfo_t *glyph;
-  image_t *image;
-  qhandle_t h;
+	FT_Face face;
+	int j, k, xOut, yOut, lastStart, imageNumber;
+	int scaledSize, newSize, maxHeight, left;
+	unsigned char *out, *imageBuff;
+	glyphInfo_t *glyph;
+	image_t *image;
+	qhandle_t h;
+	char resolvedFontName[MAX_QPATH];
+	char pageName[MAX_QPATH];
+	qboolean faceDataFromFileSystem = qfalse;
 	float max;
 #endif
-  void *faceData;
+	void *faceData = NULL;
 	int i, len;
-  char name[1024];
-	float dpi = 72;											//
-	float glyphScale =  72.0f / dpi; 		// change the scale to be relative to 1 based on 72 dpi ( so dpi of 144 means a scale of .5 )
+	int registeredIndex;
+	const char *loadName = NULL;
+	char cacheName[MAX_QPATH];
+	char legacyCacheName[MAX_QPATH];
+	float dpi = 72;
+	float glyphScale = 72.0f / dpi;
 
-	if (pointSize <= 0) {
+	if ( !fontName || !fontName[0] ) {
+		fontName = "fonts/font";
+	}
+
+	if ( pointSize <= 0 ) {
 		pointSize = 12;
 	}
-	// we also need to adjust the scale based on point size relative to 48 points as the ui scaling is based on a 48 point font
+
 	glyphScale *= 48.0f / pointSize;
 
-	// make sure the render thread is stopped
 	R_SyncRenderThread();
 
-  if (registeredFontCount >= MAX_FONTS) {
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: Too many fonts registered already.\n");
-    return;
-  }
+	if ( registeredFontCount >= MAX_FONTS ) {
+		ri.Printf( PRINT_ALL, "RE_RegisterFont: Too many fonts registered already.\n" );
+		return;
+	}
 
-	Com_sprintf(name, sizeof(name), "fonts/fontImage_%i.dat",pointSize);
-	for (i = 0; i < registeredFontCount; i++) {
-		if (Q_stricmp(name, registeredFont[i].name) == 0) {
-			Com_Memcpy(font, &registeredFont[i], sizeof(fontInfo_t));
-			return;
+	R_BuildFontCacheName( fontName, pointSize, cacheName, sizeof( cacheName ) );
+	Com_sprintf( legacyCacheName, sizeof( legacyCacheName ), "fonts/fontImage_%i.dat", pointSize );
+
+	registeredIndex = R_FindRegisteredFont( cacheName );
+	if ( registeredIndex < 0 && Q_stricmp( cacheName, legacyCacheName ) ) {
+		registeredIndex = R_FindRegisteredFont( legacyCacheName );
+	}
+
+	if ( registeredIndex >= 0 ) {
+		Com_Memcpy( font, &registeredFont[registeredIndex], sizeof( fontInfo_t ) );
+		Q_strncpyz( font->name, cacheName, sizeof( font->name ) );
+		return;
+	}
+
+	len = ri.FS_ReadFile( cacheName, NULL );
+	if ( len == sizeof( fontInfo_t ) ) {
+		loadName = cacheName;
+	} else {
+		len = ri.FS_ReadFile( legacyCacheName, NULL );
+		if ( len == sizeof( fontInfo_t ) ) {
+			loadName = legacyCacheName;
 		}
 	}
 
-	len = ri.FS_ReadFile(name, NULL);
-	if (len == sizeof(fontInfo_t)) {
-		ri.FS_ReadFile(name, &faceData);
+	if ( loadName != NULL ) {
+		ri.FS_ReadFile( loadName, &faceData );
 		fdOffset = 0;
 		fdFile = faceData;
-		for(i=0; i<GLYPHS_PER_FONT; i++) {
-			font->glyphs[i].height		= readInt();
-			font->glyphs[i].top			= readInt();
-			font->glyphs[i].bottom		= readInt();
-			font->glyphs[i].pitch		= readInt();
-			font->glyphs[i].xSkip		= readInt();
-			font->glyphs[i].imageWidth	= readInt();
+		for ( i = 0; i < GLYPHS_PER_FONT; i++ ) {
+			font->glyphs[i].height = readInt();
+			font->glyphs[i].top = readInt();
+			font->glyphs[i].bottom = readInt();
+			font->glyphs[i].pitch = readInt();
+			font->glyphs[i].xSkip = readInt();
+			font->glyphs[i].imageWidth = readInt();
 			font->glyphs[i].imageHeight = readInt();
-			font->glyphs[i].s			= readFloat();
-			font->glyphs[i].t			= readFloat();
-			font->glyphs[i].s2			= readFloat();
-			font->glyphs[i].t2			= readFloat();
-			font->glyphs[i].glyph		= readInt();
-			Com_Memcpy(font->glyphs[i].shaderName, &fdFile[fdOffset], 32);
+			font->glyphs[i].s = readFloat();
+			font->glyphs[i].t = readFloat();
+			font->glyphs[i].s2 = readFloat();
+			font->glyphs[i].t2 = readFloat();
+			font->glyphs[i].glyph = readInt();
+			Com_Memcpy( font->glyphs[i].shaderName, &fdFile[fdOffset], 32 );
 			fdOffset += 32;
 		}
 		font->glyphScale = readFloat();
-		Com_Memcpy(font->name, &fdFile[fdOffset], MAX_QPATH);
-
-//		Com_Memcpy(font, faceData, sizeof(fontInfo_t));
-		Q_strncpyz(font->name, name, sizeof(font->name));
-		for (i = GLYPH_START; i < GLYPH_END; i++) {
-			font->glyphs[i].glyph = RE_RegisterShaderNoMip(font->glyphs[i].shaderName);
+		Com_Memcpy( font->name, &fdFile[fdOffset], MAX_QPATH );
+		Q_strncpyz( font->name, cacheName, sizeof( font->name ) );
+		for ( i = GLYPH_START; i < GLYPH_END; i++ ) {
+			font->glyphs[i].glyph = RE_RegisterShaderNoMip( font->glyphs[i].shaderName );
 		}
-	  Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
+		Com_Memcpy( &registeredFont[registeredFontCount++], font, sizeof( fontInfo_t ) );
+		ri.FS_FreeFile( faceData );
 		return;
 	}
 
 #ifndef BUILD_FREETYPE
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: FreeType code not available for %s (%i)\n", fontName, pointSize);
-	if ( RE_RegisterFontFallback( name, glyphScale, font ) ) {
+	ri.Printf( PRINT_ALL, "RE_RegisterFont: FreeType code not available for %s (%i)\n", fontName, pointSize );
+	if ( RE_RegisterFontFallback( cacheName, glyphScale, font ) ) {
 		return;
 	}
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: built-in glyph fallback failed\n");
+	ri.Printf( PRINT_ALL, "RE_RegisterFont: built-in glyph fallback failed\n" );
 #else
-  if (ftLibrary == NULL) {
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: FreeType not initialized.\n");
-    return;
-  }
-
-  len = ri.FS_ReadFile(fontName, &faceData);
-  if (len <= 0) {
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: Unable to read font file\n");
-    return;
-  }
-
-  // allocate on the stack first in case we fail
-  if (FT_New_Memory_Face( ftLibrary, faceData, len, 0, &face )) {
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: FreeType2, unable to allocate new face.\n");
-    return;
-  }
-
-
-  if (FT_Set_Char_Size( face, pointSize << 6, pointSize << 6, dpi, dpi)) {
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: FreeType2, Unable to set face char size.\n");
-    return;
-  }
-
-  //*font = &registeredFonts[registeredFontCount++];
-
-  // make a 256x256 image buffer, once it is full, register it, clean it and keep going 
-  // until all glyphs are rendered
-
-  out = Z_Malloc(1024*1024);
-  if (out == NULL) {
-    ri.Printf(PRINT_ALL, "RE_RegisterFont: Z_Malloc failure during output image creation.\n");
-    return;
-  }
-  Com_Memset(out, 0, 1024*1024);
-
-  maxHeight = 0;
-
-  for (i = GLYPH_START; i < GLYPH_END; i++) {
-    glyph = RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qtrue);
-  }
-
-  xOut = 0;
-  yOut = 0;
-  i = GLYPH_START;
-  lastStart = i;
-  imageNumber = 0;
-
-  while ( i <= GLYPH_END ) {
-
-    glyph = RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qfalse);
-
-    if (xOut == -1 || yOut == -1 || i == GLYPH_END)  {
-      // ran out of room
-      // we need to create an image from the bitmap, set all the handles in the glyphs to this point
-      // 
-
-      scaledSize = 256*256;
-      newSize = scaledSize * 4;
-      imageBuff = Z_Malloc(newSize);
-      left = 0;
-      max = 0;
-      satLevels = 255;
-      for ( k = 0; k < (scaledSize) ; k++ ) {
-        if (max < out[k]) {
-          max = out[k];
-        }
-      }
-
-			if (max > 0) {
-				max = 255/max;
-			}
-
-      for ( k = 0; k < (scaledSize) ; k++ ) {
-        imageBuff[left++] = 255;
-        imageBuff[left++] = 255;
-        imageBuff[left++] = 255;
-
-        imageBuff[left++] = ((float)out[k] * max);
-      }
-
-			Com_sprintf (name, sizeof(name), "fonts/fontImage_%i_%i.tga", imageNumber++, pointSize);
-			if (r_saveFontData->integer) { 
-			  WriteTGA(name, imageBuff, 256, 256);
-			}
-
-    	//Com_sprintf (name, sizeof(name), "fonts/fontImage_%i_%i", imageNumber++, pointSize);
-      image = R_CreateImage(name, imageBuff, 256, 256, qfalse, qfalse, GL_CLAMP);
-      h = RE_RegisterShaderFromImage(name, LIGHTMAP_2D, image, qfalse);
-      for (j = lastStart; j < i; j++) {
-        font->glyphs[j].glyph = h;
-				Q_strncpyz(font->glyphs[j].shaderName, name, sizeof(font->glyphs[j].shaderName));
-      }
-      lastStart = i;
-		  Com_Memset(out, 0, 1024*1024);
-      xOut = 0;
-      yOut = 0;
-      Z_Free(imageBuff);
-			i++;
-    } else {
-      Com_Memcpy(&font->glyphs[i], glyph, sizeof(glyphInfo_t));
-      i++;
-    }
-  }
-
-	registeredFont[registeredFontCount].glyphScale = glyphScale;
-	font->glyphScale = glyphScale;
-  Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
-
-	if (r_saveFontData->integer) { 
-		ri.FS_WriteFile(va("fonts/fontImage_%i.dat", pointSize), font, sizeof(fontInfo_t));
+	if ( ftLibrary == NULL ) {
+		ri.Printf( PRINT_ALL, "RE_RegisterFont: FreeType not initialized.\n" );
+		return;
 	}
 
-  Z_Free(out);
-  
-  ri.FS_FreeFile(faceData);
+	R_NormalizeFontSourcePath( fontName, resolvedFontName, sizeof( resolvedFontName ) );
+	len = R_ReadFontFile( resolvedFontName, &faceData, &faceDataFromFileSystem );
+	if ( len <= 0 ) {
+		ri.Printf( PRINT_ALL, "RE_RegisterFont: Unable to read font file '%s'\n", resolvedFontName );
+		return;
+	}
+
+	if ( FT_New_Memory_Face( ftLibrary, faceData, len, 0, &face ) ) {
+		ri.Printf( PRINT_ALL, "RE_RegisterFont: FreeType2, unable to allocate new face.\n" );
+		R_FreeFontFileBuffer( faceData, faceDataFromFileSystem );
+		return;
+	}
+
+	if ( FT_Set_Char_Size( face, pointSize << 6, pointSize << 6, dpi, dpi ) ) {
+		ri.Printf( PRINT_ALL, "RE_RegisterFont: FreeType2, Unable to set face char size.\n" );
+		FT_Done_Face( face );
+		R_FreeFontFileBuffer( faceData, faceDataFromFileSystem );
+		return;
+	}
+
+	out = Z_Malloc( 1024 * 1024 );
+	if ( out == NULL ) {
+		ri.Printf( PRINT_ALL, "RE_RegisterFont: Z_Malloc failure during output image creation.\n" );
+		FT_Done_Face( face );
+		R_FreeFontFileBuffer( faceData, faceDataFromFileSystem );
+		return;
+	}
+	Com_Memset( out, 0, 1024 * 1024 );
+
+	maxHeight = 0;
+
+	for ( i = GLYPH_START; i < GLYPH_END; i++ ) {
+		glyph = RE_ConstructGlyphInfo( out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qtrue );
+	}
+
+	xOut = 0;
+	yOut = 0;
+	i = GLYPH_START;
+	lastStart = i;
+	imageNumber = 0;
+
+	while ( i <= GLYPH_END ) {
+		glyph = RE_ConstructGlyphInfo( out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qfalse );
+
+		if ( xOut == -1 || yOut == -1 || i == GLYPH_END ) {
+			scaledSize = 256 * 256;
+			newSize = scaledSize * 4;
+			imageBuff = Z_Malloc( newSize );
+			left = 0;
+			max = 0;
+			for ( k = 0; k < scaledSize; k++ ) {
+				if ( max < out[k] ) {
+					max = out[k];
+				}
+			}
+
+			if ( max > 0 ) {
+				max = 255 / max;
+			}
+
+			for ( k = 0; k < scaledSize; k++ ) {
+				imageBuff[left++] = 255;
+				imageBuff[left++] = 255;
+				imageBuff[left++] = 255;
+				imageBuff[left++] = (byte)( (float)out[k] * max );
+			}
+
+			R_BuildFontPageName( fontName, pointSize, imageNumber++, pageName, sizeof( pageName ) );
+			if ( r_saveFontData->integer ) {
+				WriteTGA( pageName, imageBuff, 256, 256 );
+			}
+
+			image = R_CreateImage( pageName, imageBuff, 256, 256, qfalse, qfalse, GL_CLAMP );
+			h = RE_RegisterShaderFromImage( pageName, LIGHTMAP_2D, image, qfalse );
+			for ( j = lastStart; j < i; j++ ) {
+				font->glyphs[j].glyph = h;
+				Q_strncpyz( font->glyphs[j].shaderName, pageName, sizeof( font->glyphs[j].shaderName ) );
+			}
+			lastStart = i;
+			Com_Memset( out, 0, 1024 * 1024 );
+			xOut = 0;
+			yOut = 0;
+			Z_Free( imageBuff );
+			i++;
+		} else {
+			Com_Memcpy( &font->glyphs[i], glyph, sizeof( glyphInfo_t ) );
+			i++;
+		}
+	}
+
+	font->glyphScale = glyphScale;
+	Q_strncpyz( font->name, cacheName, sizeof( font->name ) );
+	Com_Memcpy( &registeredFont[registeredFontCount++], font, sizeof( fontInfo_t ) );
+
+	if ( r_saveFontData->integer ) {
+		ri.FS_WriteFile( cacheName, font, sizeof( fontInfo_t ) );
+	}
+
+	Z_Free( out );
+	FT_Done_Face( face );
+	R_FreeFontFileBuffer( faceData, faceDataFromFileSystem );
 #endif
 }
 

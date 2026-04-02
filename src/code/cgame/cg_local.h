@@ -1681,6 +1681,8 @@ extern	vmCvar_t		cg_cameraThirdPersonSmartMode;
 extern	vmCvar_t		cg_centertime;
 extern	vmCvar_t		cg_chatbeep;
 extern	vmCvar_t		cg_chatHistoryLength;
+extern	vmCvar_t		cg_playVoiceChats;
+extern	vmCvar_t		cg_showVoiceText;
 extern	vmCvar_t		cg_crosshairBrightness;
 extern	vmCvar_t		cg_crosshairColor;
 extern	vmCvar_t		cg_crosshairHealth;

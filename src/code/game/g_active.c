@@ -799,10 +799,6 @@ Returns whether retail-style factory health regeneration is configured.
 =============
 */
 static qboolean G_FactoryHealthRegenEnabled( void ) {
-	if ( !g_factory.string[0] ) {
-		return qfalse;
-	}
-
 	return ( g_factoryCvarConfig.regenHealthDelayMilliseconds > 0
 		&& g_factoryCvarConfig.regenHealthRateMilliseconds > 0 ) ? qtrue : qfalse;
 }
@@ -815,31 +811,8 @@ Returns whether retail-style factory armor regeneration is configured.
 =============
 */
 static qboolean G_FactoryArmorRegenEnabled( void ) {
-	if ( !g_factory.string[0] ) {
-		return qfalse;
-	}
-
 	return ( g_factoryCvarConfig.regenArmorDelayMilliseconds > 0
 		&& g_factoryCvarConfig.regenArmorRateMilliseconds > 0 ) ? qtrue : qfalse;
-}
-
-/*
-=============
-G_ResetFactoryRegenState
-
-Clears the retail-style regeneration accumulators and pending latches.
-=============
-*/
-static void G_ResetFactoryRegenState( gclient_t *client ) {
-	if ( !client ) {
-		return;
-	}
-
-	client->factoryRegenHealthAccumulatorMs = 0;
-	client->factoryRegenArmorAccumulatorMs = 0;
-	client->factoryRegenLastDamageTime = 0;
-	client->factoryRegenHealthPending = qfalse;
-	client->factoryRegenArmorPending = qfalse;
 }
 
 /*
@@ -858,37 +831,13 @@ static void G_RunFactoryHealthRegen( gentity_t *ent, int msec ) {
 	}
 
 	client = ent->client;
-	if ( client->ps.pm_type == PM_DEAD
-		|| client->ps.pm_type == PM_SPECTATOR
-		|| client->ps.pm_type == PM_FREEZE
-		|| client->ps.pm_type == PM_INTERMISSION ) {
-		return;
-	}
-
-	if ( client->sess.sessionTeam == TEAM_SPECTATOR || ent->health <= 0 ) {
-		G_ResetFactoryRegenState( client );
-		return;
-	}
-
 	if ( !G_FactoryHealthRegenEnabled() ) {
-		client->factoryRegenHealthAccumulatorMs = 0;
-		client->factoryRegenHealthPending = qfalse;
 		return;
 	}
 
 	healthTarget = client->ps.stats[STAT_MAX_HEALTH];
-	if ( healthTarget <= 0 ) {
-		client->factoryRegenHealthAccumulatorMs = 0;
-		client->factoryRegenHealthPending = qfalse;
-		return;
-	}
-
 	if ( ent->health >= healthTarget ) {
-		client->factoryRegenHealthAccumulatorMs = 0;
 		client->factoryRegenHealthPending = qfalse;
-		if ( client->ps.stats[STAT_HEALTH] > ent->health ) {
-			client->ps.stats[STAT_HEALTH] = ent->health;
-		}
 		return;
 	}
 
@@ -902,24 +851,8 @@ static void G_RunFactoryHealthRegen( gentity_t *ent, int msec ) {
 
 	client->factoryRegenHealthAccumulatorMs += msec;
 	while ( client->factoryRegenHealthAccumulatorMs >= g_factoryCvarConfig.regenHealthRateMilliseconds ) {
-		client->factoryRegenHealthAccumulatorMs -= g_factoryCvarConfig.regenHealthRateMilliseconds;
-
-		if ( ent->health >= healthTarget ) {
-			client->factoryRegenHealthPending = qfalse;
-			client->factoryRegenHealthAccumulatorMs = 0;
-			break;
-		}
-
 		ent->health += 1;
-		if ( ent->health > healthTarget ) {
-			ent->health = healthTarget;
-		}
-		client->ps.stats[STAT_HEALTH] = ent->health;
-	}
-
-	if ( ent->health >= healthTarget ) {
-		client->factoryRegenHealthPending = qfalse;
-		client->factoryRegenHealthAccumulatorMs = 0;
+		client->factoryRegenHealthAccumulatorMs -= g_factoryCvarConfig.regenHealthRateMilliseconds;
 	}
 }
 
@@ -939,44 +872,17 @@ static void G_RunFactoryArmorRegen( gentity_t *ent, int msec ) {
 	}
 
 	client = ent->client;
-	if ( client->ps.pm_type == PM_DEAD
-		|| client->ps.pm_type == PM_SPECTATOR
-		|| client->ps.pm_type == PM_FREEZE
-		|| client->ps.pm_type == PM_INTERMISSION ) {
-		return;
-	}
-
-	if ( client->sess.sessionTeam == TEAM_SPECTATOR || ent->health <= 0 ) {
-		G_ResetFactoryRegenState( client );
-		return;
-	}
-
 	if ( !G_FactoryArmorRegenEnabled() ) {
-		client->factoryRegenArmorAccumulatorMs = 0;
-		client->factoryRegenArmorPending = qfalse;
-		return;
-	}
-
-	if ( client->ps.stats[STAT_MAX_HEALTH] <= 0 ) {
-		client->factoryRegenArmorAccumulatorMs = 0;
-		client->factoryRegenArmorPending = qfalse;
 		return;
 	}
 
 	armorTarget = BG_GetArmorRegenTarget( &client->ps, g_armorTiered.integer ? qtrue : qfalse );
-	if ( armorTarget <= 0 ) {
-		client->factoryRegenArmorAccumulatorMs = 0;
-		client->factoryRegenArmorPending = qfalse;
-		return;
-	}
-
 	if ( client->ps.stats[STAT_ARMOR] >= armorTarget ) {
-		client->factoryRegenArmorAccumulatorMs = 0;
 		client->factoryRegenArmorPending = qfalse;
 		return;
 	}
 
-	if ( !client->factoryRegenArmorPending || client->factoryRegenLastDamageTime <= 0 ) {
+	if ( !client->factoryRegenArmorPending ) {
 		return;
 	}
 
@@ -990,23 +896,8 @@ static void G_RunFactoryArmorRegen( gentity_t *ent, int msec ) {
 
 	client->factoryRegenArmorAccumulatorMs += msec;
 	while ( client->factoryRegenArmorAccumulatorMs >= g_factoryCvarConfig.regenArmorRateMilliseconds ) {
-		client->factoryRegenArmorAccumulatorMs -= g_factoryCvarConfig.regenArmorRateMilliseconds;
-
-		if ( client->ps.stats[STAT_ARMOR] >= armorTarget ) {
-			client->factoryRegenArmorPending = qfalse;
-			client->factoryRegenArmorAccumulatorMs = 0;
-			break;
-		}
-
 		client->ps.stats[STAT_ARMOR] += 1;
-		if ( client->ps.stats[STAT_ARMOR] > armorTarget ) {
-			client->ps.stats[STAT_ARMOR] = armorTarget;
-		}
-	}
-
-	if ( client->ps.stats[STAT_ARMOR] >= armorTarget ) {
-		client->factoryRegenArmorPending = qfalse;
-		client->factoryRegenArmorAccumulatorMs = 0;
+		client->factoryRegenArmorAccumulatorMs -= g_factoryCvarConfig.regenArmorRateMilliseconds;
 	}
 }
 
@@ -2523,12 +2414,15 @@ Reapplies the retail Red Rover infection role split from the active team assignm
 =============
 */
 static void G_RRSeedInfectionTeams( void ) {
+	gentity_t	*infectedClient;
 	int		clientNum;
+	int		infectedClientNum;
 
 	if ( g_gametype.integer != GT_RED_ROVER || !g_rrInfected.integer ) {
 		return;
 	}
 
+	infectedClientNum = -1;
 	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
 		gentity_t	*ent;
 
@@ -2543,8 +2437,55 @@ static void G_RRSeedInfectionTeams( void ) {
 			continue;
 		}
 
-		G_RRInitClient( ent );
+		if ( ent->client->sess.sessionTeam == TEAM_RED ) {
+			ent->client->sess.sessionTeam = TEAM_BLUE;
+			ent->client->sess.teamLeader = qfalse;
+			G_RRInitClient( ent );
+			ClientUserinfoChanged( clientNum );
+		}
 	}
+
+	if ( level.rrCarryoverInfectedClientNum >= 0
+		&& level.rrCarryoverInfectedClientNum < level.maxclients ) {
+		gentity_t	*carryoverClient;
+
+		carryoverClient = &g_entities[level.rrCarryoverInfectedClientNum];
+		if ( carryoverClient->inuse && carryoverClient->client
+			&& carryoverClient->client->pers.connected == CON_CONNECTED
+			&& carryoverClient->client->sess.sessionTeam == TEAM_BLUE ) {
+			infectedClientNum = level.rrCarryoverInfectedClientNum;
+		}
+	}
+
+	if ( infectedClientNum < 0 && level.numPlayingClients > 0 ) {
+		infectedClientNum = level.sortedClients[rand() % level.numPlayingClients];
+	}
+
+	level.rrSelectedInfectedClientNum = infectedClientNum;
+	if ( infectedClientNum < 0 || infectedClientNum >= level.maxclients ) {
+		return;
+	}
+
+	infectedClient = &g_entities[infectedClientNum];
+	if ( !infectedClient->inuse || !infectedClient->client ) {
+		return;
+	}
+	if ( infectedClient->client->pers.connected == CON_DISCONNECTED ) {
+		return;
+	}
+	if ( infectedClient->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	if ( infectedClient->client->sess.sessionTeam != TEAM_RED ) {
+		infectedClient->client->sess.sessionTeam = TEAM_RED;
+		infectedClient->client->sess.teamLeader = qfalse;
+		G_RRInitClient( infectedClient );
+		ClientUserinfoChanged( infectedClientNum );
+		return;
+	}
+
+	G_RRInitClient( infectedClient );
 }
 
 /*
@@ -2561,6 +2502,10 @@ static void G_RRInitRoundController( void ) {
 
 	level.roundStartTime = level.time;
 	G_RRSeedInfectionTeams();
+	level.rrCarryoverInfectedClientNum = -1;
+	level.rrLastInfectionTime = level.time;
+	level.rrNextSurvivalBonusTime = 0;
+	level.rrPendingMatchExit = qfalse;
 }
 
 /*
@@ -2609,15 +2554,19 @@ static int RR_RoundStateTransition( qboolean announce ) {
 		break;
 
 	case ROUNDSTATE_COMPLETE:
-		if ( G_Frame_CheckRoundLimit() ) {
-			break;
-		}
 		if ( level.roundTransitionTime == 0 ) {
 			G_Frame_BeginRoundWarmup();
 			break;
 		}
 		if ( level.roundTransitionTime > 0 && level.time >= level.roundTransitionTime ) {
-			G_Frame_BeginRoundWarmup();
+			if ( level.rrPendingMatchExit ) {
+				if ( !G_RRCheckExitRules( qtrue ) ) {
+					level.rrPendingMatchExit = qfalse;
+					G_Frame_BeginRoundWarmup();
+				}
+			} else {
+				G_Frame_BeginRoundWarmup();
+			}
 		}
 		break;
 

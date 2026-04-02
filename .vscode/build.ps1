@@ -66,6 +66,28 @@ if (-not $msbuildPath) {
 	throw 'msbuild.exe was not found. Install Visual Studio Build Tools or ensure MSBuild is available.'
 }
 
+function Get-LatestWindowsSdkVersion {
+	$roots = @(
+		'C:\Program Files (x86)\Windows Kits\10\Include',
+		'C:\Program Files\Windows Kits\10\Include'
+	)
+
+	foreach ($root in $roots) {
+		if (-not (Test-Path $root)) {
+			continue
+		}
+
+		$versions = Get-ChildItem -Path $root -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+		foreach ($version in $versions) {
+			if (Test-Path (Join-Path $version.FullName 'um')) {
+				return $version.Name
+			}
+		}
+	}
+
+	return $null
+}
+
 $msbuildDir = Split-Path -Parent $msbuildPath
 $msbuildBase = $null
 $cursor = $msbuildDir
@@ -79,14 +101,20 @@ if ($cursor) {
 }
 $defaultToolset = $null
 
-# Read the installed toolset names from MSBuild so we can override v100 projects on modern setups.
+# Prefer the checked-in v141 default when it is installed; otherwise let the project files decide.
 $vcPropsRoot = Join-Path $msbuildBase 'Microsoft\VC'
 if (Test-Path $vcPropsRoot) {
-	$vcVersionDir = Get-ChildItem -Path $vcPropsRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1
-	if ($vcVersionDir) {
-		$toolsetRoot = Join-Path $vcVersionDir.FullName 'Platforms\Win32\PlatformToolsets'
-		if (Test-Path $toolsetRoot) {
-			$defaultToolset = Get-ChildItem -Path $toolsetRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty Name
+	$toolsetRoots = Get-ChildItem -Path $vcPropsRoot -Directory -ErrorAction SilentlyContinue |
+		ForEach-Object { Join-Path $_.FullName 'Platforms\Win32\PlatformToolsets' } |
+		Where-Object { Test-Path $_ }
+	if ($toolsetRoots) {
+		$installedToolsets = @(
+			$toolsetRoots |
+			ForEach-Object { Get-ChildItem -Path $_ -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name } |
+			Sort-Object -Unique
+		)
+		if ($installedToolsets -contains 'v141') {
+			$defaultToolset = 'v141'
 		}
 	}
 }
@@ -94,6 +122,10 @@ if (Test-Path $vcPropsRoot) {
 $toolset = $env:QLR_PLATFORM_TOOLSET
 if (-not $toolset) {
 	$toolset = $defaultToolset
+}
+$windowsTargetPlatformVersion = $env:QLR_WINDOWS_TARGET_PLATFORM_VERSION
+if (-not $windowsTargetPlatformVersion -and $toolset -eq 'v141') {
+	$windowsTargetPlatformVersion = Get-LatestWindowsSdkVersion
 }
 
 $solutionPath = Resolve-Path $Solution
@@ -147,6 +179,9 @@ $msbuildArgs = @(
 if ($toolset) {
 	$msbuildArgs += "/p:PlatformToolset=$toolset"
 }
+if ($windowsTargetPlatformVersion) {
+	$msbuildArgs += "/p:WindowsTargetPlatformVersion=$windowsTargetPlatformVersion"
+}
 if ($enableOgg -ne $null) {
 	$msbuildArgs += "/p:QLEnableOgg=$enableOgg"
 }
@@ -163,6 +198,9 @@ if ($env:PngSdkDir) {
 Write-Host "Using MSBuild: $msbuildPath"
 if ($toolset) {
 	Write-Host "Using PlatformToolset: $toolset"
+}
+if ($windowsTargetPlatformVersion) {
+	Write-Host "Using Windows SDK: $windowsTargetPlatformVersion"
 }
 Write-Host "QLEnableOgg: $enableOgg (available: $oggAvailable)"
 Write-Host "QLEnablePng: $enablePng (available: $pngAvailable)"
