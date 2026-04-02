@@ -23,11 +23,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 /*
 =======================================================================
 
-CD KEY / CREDENTIAL MENU
+CD KEY MENU
 
-The retail Quake Live tree still exposes the classic UI_CDKeyMenu entry
-points, but the Quake Live menu flow in this repo prefers the writable
-bridge-driven credential screen when available.
+The current reconstruction keeps the classic UI_CDKeyMenu entry points as
+compatibility helpers, but the committed retail Quake Live menu-script and
+dispatcher surface does not currently revalidate them as standalone owners.
+When available, the reconstructed menu flow prefers the writable bridge-driven
+CD-key screen.
 
 =======================================================================
 */
@@ -64,9 +66,9 @@ static cdkeyMenuInfo_t	cdkeyMenuInfo;
 ===============
 UI_CDKeyMenu_OpenBridge
 
-Prefer the bridge-generated Quake Live credential menu when the writable
-bridge scripts are available. This keeps the restored public entry points
-aligned with the menu flow already used by openCredentials.
+Prefer the bridge-generated Quake Live CD-key menu when the writable
+bridge scripts are available. This keeps the restored compatibility entry
+points aligned with the reconstructed retail script flow.
 ===============
 */
 static qboolean UI_CDKeyMenu_OpenBridge( void ) {
@@ -221,7 +223,7 @@ static void UI_CDKeyMenu_DrawKey( void *self ) {
 UI_CDKeyMenu_Init
 
 Fallback initialization for environments where the bridge-generated Quake Live
-credential menu cannot be emitted.
+CD-key menu cannot be emitted.
 ===============
 */
 #if !defined( UI_EXPORTS )
@@ -323,8 +325,8 @@ void UI_CDKeyMenu( void ) {
 
 #if defined( UI_EXPORTS )
 	trap_Cvar_Set( "ui_cdkeychecked", "1" );
-	trap_Cvar_Set( "ui_cdkeyvalid", "Credential menu unavailable in native UI build." );
-	Com_Printf( "UI: ql_bridge_credentials missing; native credential popup fallback not linked.\n" );
+	trap_Cvar_Set( "ui_cdkeyvalid", "CD key menu unavailable in native UI build." );
+	Com_Printf( "UI: ql_bridge_credentials missing; native CD-key popup fallback not linked.\n" );
 #else
 	UI_CDKeyMenu_Init();
 	UI_PushMenu( &cdkeyMenuInfo.menu );

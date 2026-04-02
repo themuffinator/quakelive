@@ -34,6 +34,7 @@ static void CG_UpdateSpectatorCvar( void );
 #define CG_VIEW_FILTER_MAX_CVAR_SAMPLES	( CG_VIEW_FILTER_MAX_SAMPLES - 1 )
 #define CG_BUFFERED_ANNOUNCER_COUNT	32
 #define CG_BUFFERED_ANNOUNCER_DELAY	1500
+#define CG_RETAIL_SELECTED_BOT_INFO_CONFIGSTRING	0x10
 
 static int cg_viewFilterTargetKey = CG_VIEW_FILTER_TARGET_NONE;
 static int cg_bufferedSoundHead;
@@ -1230,6 +1231,78 @@ static void CG_PlayBufferedSounds( void ) {
 
 /*
 =================
+CG_RunPendingFollowKiller
+
+Sends the deferred retail follow-killer command once the obituary hold expires.
+=================
+*/
+static void CG_RunPendingFollowKiller( void ) {
+	if ( cg.pendingFollowKillerClient < 0 || cg.time < cg.pendingFollowKillerTime ) {
+		return;
+	}
+
+	if ( cg.snap && ( cg.snap->ps.pm_flags & PMF_FOLLOW ) ) {
+		trap_SendClientCommand( va( "follow %d", cg.pendingFollowKillerClient ) );
+	}
+
+	cg.pendingFollowKillerClient = -1;
+	cg.pendingFollowKillerTime = 0;
+}
+
+/*
+====================
+CG_DrawBotAIDebugInfo
+====================
+*/
+static void CG_DrawBotAIDebugInfo( void ) {
+	static const char *const cgBotDebugKeys[] = {
+		"e", "ed",
+		"tg", "tgd",
+		"sg", "sgd",
+		"ainode", "ltg",
+		"ban", "gan",
+		"bh", "ba",
+		"sk", "eh"
+	};
+	static const char *const cgBotDebugLabels[] = {
+		"Enemy   = ", "Dist    = ",
+		"LTG     = ", "Dist    = ",
+		"NBG     = ", "Dist    = ",
+		"AI Node = ", "LTGType = ",
+		"Area#   = ", "G_Area# = ",
+		"Health  = ", "Armor   = ",
+		"Skill   = ", "Hear_E  = "
+	};
+	const char	*botInfo;
+	char		values[ARRAY_LEN( cgBotDebugKeys )][15];
+	char		line[64];
+	float		y;
+	int			i;
+
+	if ( !cg.snap || cg.snap->ps.stats[STAT_HEALTH] <= 0 ) {
+		return;
+	}
+
+	botInfo = CG_ConfigString( CG_RETAIL_SELECTED_BOT_INFO_CONFIGSTRING );
+	if ( !botInfo[0] || Q_strncmp( botInfo, "e\\", 2 ) ) {
+		return;
+	}
+
+	for ( i = 0; i < ARRAY_LEN( cgBotDebugKeys ); i++ ) {
+		Q_strncpyz( values[i], Info_ValueForKey( botInfo, cgBotDebugKeys[i] ), sizeof( values[i] ) );
+	}
+
+	y = 300.0f;
+	for ( i = 0; i < ARRAY_LEN( cgBotDebugKeys ); i += 2 ) {
+		Com_sprintf( line, sizeof( line ), "%s%15s | %s%15s",
+			cgBotDebugLabels[i], values[i], cgBotDebugLabels[i + 1], values[i + 1] );
+		y += 16.0f;
+		CG_Text_Paint( 140.0f, y, 0.12f, colorWhite, line, 0.0f, 0, 0 );
+	}
+}
+
+/*
+=================
 CG_DrawActiveFrame
 
 Generates and draws a game scene and status information at the given time.
@@ -1281,6 +1354,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	CG_PredictPlayerState();
 	CG_UpdateSpectatorTracking();
 	CG_UpdateSpectatorCvar();
+	CG_RunPendingFollowKiller();
 
 	// decide on third person view
 	cg.renderingThirdPerson = (qboolean)( ( cg.snap->ps.stats[STAT_HEALTH] <= 0 )
@@ -1334,6 +1408,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		}
 		cg.oldTime = cg.time;
 		CG_AddLagometerFrameInfo();
+		CG_UpdateSpectatorItemPickups();
 	}
 	if (cg_timescale.value != cg_timescaleFadeEnd.value) {
 		if (cg_timescale.value < cg_timescaleFadeEnd.value) {
@@ -1353,6 +1428,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// actually issue the rendering calls
 	CG_DrawActive( stereoView );
+	CG_DrawBotAIDebugInfo();
 
 	if ( cg_stats.integer ) {
 		CG_Printf( "cg.clientFrame:%i\n", cg.clientFrame );

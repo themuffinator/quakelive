@@ -145,10 +145,11 @@ def test_ui_cdkey_runtime_wrapper_restored() -> None:
     assert "UI_CDKeyMenu_OpenBridge" in ui_cdkey
     assert 'Menus_ActivateByName( "ql_bridge_credentials" );' in ui_cdkey
     assert "UI_PushMenu( &cdkeyMenuInfo.menu );" in ui_cdkey
+    assert "void UI_CDKeyMenu_f( void ) {" in ui_cdkey
 
     ui_atoms = (REPO_ROOT / "src/code/ui/ui_atoms.c").read_text(encoding="utf-8")
     assert "UI_CDKeyMenu_Cache();" in ui_atoms
-    assert "UI_CDKeyMenu_f();" in ui_atoms
+    assert 'Q_stricmp (cmd, "ui_cdkey")' not in ui_atoms
 
     q3asm = (REPO_ROOT / "src/code/ui/ui.q3asm").read_text(encoding="utf-8")
     assert "ui_cdkey" in q3asm
@@ -226,10 +227,12 @@ def test_ui_retail_gameinfo_paths_do_not_bootstrap_map_rotation_cache() -> None:
     assert 'UI_ParseGameInfo("gameinfo.txt");' in load_block
     assert "UI_LoadArenas();" in load_block
     assert "UI_LoadMapRotations();" not in load_block
+    assert "UI_LoadRulesets();" not in load_block
 
     init_block = _extract_function_block(ui_main, "void _UI_Init( qboolean inGameLoad ) {")
     assert 'UI_ParseGameInfo("gameinfo.txt");' not in init_block
     assert "UI_LoadMapRotations();" not in init_block
+    assert "UI_LoadRulesets();" not in init_block
 
     run_menu_script_block = _extract_function_block(
         ui_main, "static void UI_RunMenuScript(char **args) {"
@@ -242,6 +245,96 @@ def test_ui_retail_gameinfo_paths_do_not_bootstrap_map_rotation_cache() -> None:
         run_menu_script_block.index('} else if (Q_stricmp(name, "resetScores") == 0) {')
     ]
     assert "UI_LoadMapRotations();" not in load_gameinfo_slice
+
+
+def test_ui_retail_ruleset_cache_scaffolding_is_removed() -> None:
+    ui_gameinfo = (REPO_ROOT / "src/code/ui/ui_gameinfo.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+
+    for removed in (
+        "#define MAX_RULESETS 8",
+        "} rulesetInfo_t;",
+        "void UI_LoadRulesets( void );",
+        "int rulesetCount;",
+        "int rulesetIndex;",
+        "rulesetInfo_t rulesets[MAX_RULESETS];",
+        "char activeRuleset[MAX_CVAR_VALUE_STRING];",
+    ):
+        assert removed not in ui_local
+
+    for removed in (
+        "UI_ClearRulesets",
+        "UI_AddRulesetFromToken",
+        "UI_LoadRulesets",
+        "ui_rulesets",
+        "g_ruleset",
+        "defaultRulesets[]",
+        "uiInfo.rulesetCount",
+        "uiInfo.rulesetIndex",
+        "uiInfo.rulesets",
+        "uiInfo.activeRuleset",
+    ):
+        assert removed not in ui_gameinfo
+
+    load_block = _extract_function_block(ui_main, "void UI_Load() {")
+    assert "UI_LoadRulesets();" not in load_block
+
+
+def test_ui_dead_postgame_popup_helper_is_removed() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+
+    assert "UI_ActivateCompatibilityPostgame" not in ui_main
+    assert "void UI_ShowPostGame(qboolean newHigh);" not in ui_local
+    assert "void UI_ShowPostGame(qboolean newHigh) {" not in ui_main
+
+
+def test_ui_dead_legacy_helper_band_is_removed() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+
+    for removed in (
+        "static uiMenuFlow_t UI_RequestedMenuFlow(void) {",
+        "qboolean UI_UsingLegacyMenuFlow(void) {",
+        "static void UI_LoadTeams() {",
+        "static const char *UI_ValidateCountryCode(const char *code) {",
+    ):
+        assert removed not in ui_main
+
+    assert "qboolean UI_UsingLegacyMenuFlow(void);" not in ui_local
+
+    resolve_menu_flow_block = _extract_function_block(
+        ui_main, "static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {"
+    )
+    assert "UI_BrowserOverlayAvailable()" in resolve_menu_flow_block
+    assert "UI_BrowserBridgeAvailable()" in resolve_menu_flow_block
+    assert "UI_RequestedMenuFlow" not in resolve_menu_flow_block
+
+
+def test_ui_runtime_hides_source_only_ingame_join_country_dropdown() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    src_join = (REPO_ROOT / "src/ui/ingame_join.menu").read_text(encoding="utf-8")
+    retail_join = (REPO_ROOT / "assets/quakelive/baseq3/ui/ingame_join.menu").read_text(encoding="utf-8")
+
+    for expected in (
+        "name country_label",
+        "name country_list",
+        "feeder FEEDER_COUNTRIES",
+    ):
+        assert expected in src_join
+        assert expected not in retail_join
+
+    fixup_block = _extract_function_block(ui_main, "static void UI_ApplyRetailMenuFixups( void ) {")
+    assert 'menu = Menus_FindByName( "ingame_join" );' in fixup_block
+    assert 'Menu_ShowItemByName( menu, "country_label", qfalse );' in fixup_block
+    assert 'Menu_ShowItemByName( menu, "country_list", qfalse );' in fixup_block
+
+    load_block = _extract_function_block(ui_main, "void UI_Load() {")
+    assert "UI_ApplyRetailMenuFixups();" in load_block
+
+    init_block = _extract_function_block(ui_main, "void _UI_Init( qboolean inGameLoad ) {")
+    assert "UI_ApplyRetailMenuFixups();" in init_block
 
 
 def test_ui_best_score_loader_skips_unseeded_metadata_probes() -> None:
@@ -667,7 +760,16 @@ def test_ui_retail_server_settings_ownerdraw_restored() -> None:
     assert 'UI_QLGametypeName( gametype )' in ui_main
     assert 'trap_GetConfigString( CS_SERVER_SETTINGS_INFO_A, serverSettingsA, sizeof( serverSettingsA ) );' in ui_main
     assert 'trap_GetConfigString( CS_SERVER_SETTINGS_INFO_B, serverSettingsB, sizeof( serverSettingsB ) );' in ui_main
+    assert 'static qboolean UI_GetServerSettingInt( const char *serverInfo, const char *key, int *valueOut ) {' in ui_main
     assert 'static qboolean UI_GetInfoSettingInt( const char *settingsText, const char *key, int *valueOut ) {' in ui_main
+    assert "trap_Cvar_VariableStringBuffer( fallbackCvar, buffer, sizeof( buffer ) );" not in ui_main
+    assert 'UI_GetServerSettingInt( serverInfo, "g_gametype", &gametype )' in ui_main
+    assert 'UI_GetServerSettingInt( serverInfo, "timelimit", &value )' in ui_main
+    assert 'UI_GetServerSettingInt( serverInfo, "fraglimit", &value )' in ui_main
+    assert 'UI_GetServerSettingInt( serverInfo, "mercylimit", &value )' in ui_main
+    assert 'UI_GetServerSettingInt( serverInfo, "capturelimit", &value )' in ui_main
+    assert 'UI_GetServerSettingInt( serverInfo, "roundlimit", &value )' in ui_main
+    assert 'UI_GetServerSettingInt( serverInfo, "g_scorelimit", &value )' in ui_main
     assert '"Tiered Armor"' in ui_main
     assert '"Weapon Switching"' in ui_main
     assert '"Physics"' in ui_main
@@ -737,7 +839,7 @@ def test_ui_retail_nextmap_ownerdraw_restored() -> None:
     assert "trap_GetConfigString( CS_ROTATION_TITLES, rotationTitles, sizeof( rotationTitles ) );" in ui_main
     assert 'Info_ValueForKey( rotationTitles, "title_0" )' in ui_main
     assert 'Info_ValueForKey( rotationTitles, "map_0" )' in ui_main
-    assert "UI_MapRotationEntryForIndex( 0 )" in ui_main
+    assert "UI_MapRotationEntryForIndex" not in ui_main
     assert "static void UI_DrawNextMap( rectDef_t *rect, float scale, vec4_t color, int textStyle )" in ui_main
     assert "Text_Paint( rect->x, rect->y, scale, color, nextMapText, 0, 0, textStyle );" in ui_main
     assert "case UI_NEXTMAP:" in ui_main
@@ -793,10 +895,15 @@ def test_ui_retail_callvote_map_feeder_uses_active_map_slab() -> None:
 
     assert "static int UI_CVMapCountByGameType(void);" in ui_main
     assert "static void UI_SelectCallvoteMap(int index);" in ui_main
+    assert "applyCallvotePreset" not in ui_main
+    assert "ui_cvPresetRotation" not in ui_main
+    assert "ui_cvPresetGameType" not in ui_main
+    assert "ui_cvPresetActive" not in ui_main
 
     feeder_count_block = _extract_function_block(ui_main, "static int UI_FeederCount(float feederID) {")
     assert "if (feederID == FEEDER_CVMAPS) {" in feeder_count_block
     assert "return UI_CVMapCountByGameType();" in feeder_count_block
+    assert "FEEDER_MAP_ROTATIONS" not in feeder_count_block
 
     cv_count_block = _extract_function_block(ui_main, "static int UI_CVMapCountByGameType(void) {")
     for expected in (
@@ -815,22 +922,22 @@ def test_ui_retail_callvote_map_feeder_uses_active_map_slab() -> None:
     assert "available = UI_CVMapCountByGameType();" in select_callvote_map_block
     assert "UI_SelectedMap(index, &actual);" in select_callvote_map_block
     assert 'trap_Cvar_Set("ui_mapIndex", va("%d", index));' in select_callvote_map_block
-    assert "rotationIndex = UI_FindCallvoteRotationIndexForMap(actual, uiInfo.callvoteRotationIndex);" in select_callvote_map_block
     assert "UI_SetCurrentNetMap(actual);" in select_callvote_map_block
 
-    preview_block = _extract_function_block(
-        ui_main, "static void UI_HandleCallvoteMapPreviewScript(void) {"
+    run_menu_script_block = _extract_function_block(
+        ui_main, "static void UI_RunMenuScript(char **args) {"
     )
-    assert "available = UI_CVMapCountByGameType();" in preview_block
-    assert "displayRow = UI_GetIndexFromSelection(mapIndex);" in preview_block
-    assert "mapIndex = ui_currentNetMap.integer;" in preview_block
-    assert "UI_GetCallvoteDisplayRowForRotation" not in preview_block
+    assert 'Q_stricmp(name, "updateCallvoteMapPreview") == 0' in run_menu_script_block
+    assert "UI_FeederSelection(FEEDER_CVMAPS, ui_mapIndex.integer);" in run_menu_script_block
+    assert "UI_HandleCallvoteMapPreviewScript" not in ui_main
+    assert "applyCallvotePreset" not in run_menu_script_block
 
     feeder_text_block = _extract_function_block(
         ui_main, "static const char *UI_FeederItemText(float feederID, int index, int column, qhandle_t *handle) {"
     )
     assert "UI_CVMapCountByGameType();" in feeder_text_block
     assert "return UI_SelectedMap(index, &actual);" in feeder_text_block
+    assert "FEEDER_MAP_ROTATIONS" not in feeder_text_block
 
     feeder_image_block = _extract_function_block(
         ui_main, "static qhandle_t UI_FeederItemImage(float feederID, int index) {"
@@ -843,8 +950,95 @@ def test_ui_retail_callvote_map_feeder_uses_active_map_slab() -> None:
         ui_main, "static void UI_FeederSelection(float feederID, int index) {"
     )
     assert "UI_SelectCallvoteMap(index);" in feeder_selection_block
+    assert "FEEDER_MAP_ROTATIONS" not in feeder_selection_block
 
     assert "UI_CountVisibleCallvoteRotations" not in ui_main
     assert "UI_GetCallvoteRotationIndexFromDisplayRow" not in ui_main
     assert "UI_GetCallvoteDisplayRowForRotation" not in ui_main
     assert "UI_GetCallvoteRotationEntryForDisplay" not in ui_main
+
+
+def test_ui_retail_clan_feeder_scaffolding_is_removed() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+
+    for removed in (
+        "static void UI_ResetClanList(void);",
+        "static void UI_LoadClanRoster(void);",
+        "UI_ResetClanList",
+        "UI_LoadClanRoster",
+        "ui_clanIndex",
+        "ui_clanName",
+        "No clans available",
+    ):
+        assert removed not in ui_main
+
+    feeder_count_block = _extract_function_block(ui_main, "static int UI_FeederCount(float feederID) {")
+    feeder_text_block = _extract_function_block(
+        ui_main, "static const char *UI_FeederItemText(float feederID, int index, int column, qhandle_t *handle) {"
+    )
+    feeder_image_block = _extract_function_block(
+        ui_main, "static qhandle_t UI_FeederItemImage(float feederID, int index) {"
+    )
+    feeder_selection_block = _extract_function_block(
+        ui_main, "static void UI_FeederSelection(float feederID, int index) {"
+    )
+
+    assert "FEEDER_CLANS" not in feeder_count_block
+    assert "FEEDER_CLANS" not in feeder_text_block
+    assert "FEEDER_CLANS" not in feeder_image_block
+    assert "FEEDER_CLANS" not in feeder_selection_block
+
+    for removed in (
+        "#define MAX_CLANS 256",
+        "} uiClanInfo_t;",
+        "int clanCount;",
+        "uiClanInfo_t clanList[MAX_CLANS];",
+        "int currentClan;",
+        "qboolean clanListLoaded;",
+        "extern vmCvar_t\tui_clanIndex;",
+        "extern vmCvar_t\tui_clanName;",
+    ):
+        assert removed not in ui_local
+
+    assert "`FEEDER_CLANS` remains only as a shared `menudef.h` constant" in ui_local
+
+
+def test_ui_retail_matchsummary_cache_scaffolding_is_removed() -> None:
+    ui_atoms = (REPO_ROOT / "src/code/ui/ui_atoms.c").read_text(encoding="utf-8")
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+
+    for removed in (
+        "#define FEEDER_MATCHSUMMARY_END",
+        "#define FEEDER_MATCHSUMMARY_RED",
+        "#define FEEDER_MATCHSUMMARY_BLUE",
+        "#define MAX_MATCH_SUMMARY_PLAYERS",
+        "} uiMatchPlayerInfo_t;",
+        "} uiMatchPlayerList_t;",
+        "} uiMatchSummaryCache_t;",
+        "uiMatchSummaryCache_t matchSummary;",
+        "int currentMatchSummaryEnd;",
+        "int currentMatchSummaryRed;",
+        "int currentMatchSummaryBlue;",
+        "void UI_ResetMatchSummaryCache( void );",
+        "void UI_MatchSummaryParseFromPostgame( void );",
+    ):
+        assert removed not in ui_local
+
+    for removed in (
+        "UI_ClearMatchSummaryList",
+        "UI_MatchSummaryParseFromPostgame",
+        "UI_MatchSummaryListForFeeder",
+        "UI_MatchSummaryTeamString",
+        "uiInfo.matchSummary",
+        "currentMatchSummaryEnd",
+        "currentMatchSummaryRed",
+        "currentMatchSummaryBlue",
+        "FEEDER_MATCHSUMMARY_END",
+        "FEEDER_MATCHSUMMARY_RED",
+        "FEEDER_MATCHSUMMARY_BLUE",
+    ):
+        assert removed not in ui_main
+
+    assert "UI_MatchSummaryParseFromPostgame" not in ui_atoms

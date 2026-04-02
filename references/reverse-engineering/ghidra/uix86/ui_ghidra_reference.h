@@ -410,7 +410,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR_UI_CROSSHAIRCOLOR_HANDLEKEY                  0x1000A790u
 /* UI_OwnerDrawHandleKey: Routes ownerdraw key events to the retail per-widget handlers for handicap, gametype, team, bot, crosshair, and selected-player controls. */
 #define QLR_UI_ADDR_UI_OWNERDRAWHANDLEKEY                        0x1000A820u
-/* UI_GetValue: Stubbed display-context getValue callback currently returning 0 for retail ownerdraw value lookups. */
+/* UI_GetValue: Pure display-context getValue callback installed by `_UI_Init`; the committed retail body returns a hardcoded `0.0`, so shared ownerdraw color-range checks only ever evaluate against zero unless another layer replaces the callback. */
 #define QLR_UI_ADDR_UI_GETVALUE                                  0x1000A980u
 /* UI_LoadMods: Loads the retail $modlist pairs into the mod feeder, interns both mod names and descriptions, and stops at MAX_MODS. */
 #define QLR_UI_ADDR_UI_LOADMODS                                  0x1000A9D0u
@@ -420,9 +420,9 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR_UI_LOADDEMOS                                 0x1000ACF0u
 /* UI_Update: Handles retail UI script-side cvar synchronization for name, rate, colorbits, and mouse-pitch updates, exactly matching the current UI_Update helper. */
 #define QLR_UI_ADDR_UI_UPDATE                                    0x1000AE50u
-/* UI_RunMenuScript: Runs menu-script commands including the retail callvote-map preview and submission branches, vote/admin handlers, favorite management, and model-color synchronization, then logs unknown UI script handlers. */
+/* UI_RunMenuScript: Runs menu-script commands including the retail callvote-map preview and submission branches, the preserved legacy `getCDKey` and `verifyCDKey` cvar-state handlers, vote/admin handlers, favorite management, and model-color synchronization, then logs unknown UI script handlers. */
 #define QLR_UI_ADDR_UI_RUNMENUSCRIPT                             0x1000B0E0u
-/* UI_GetTeamColor: Stubbed display-context getTeamColor callback kept in the native callback table even though the retail body is presently empty. */
+/* UI_GetTeamColor: Pure no-op display-context getTeamColor callback installed by `_UI_Init`; shared team-color paint and script paths still call the slot, but the committed retail body does not populate a color. */
 #define QLR_UI_ADDR_UI_GETTEAMCOLOR                              0x1000D2F0u
 /* UI_CVMapCountByGameType: Marks maps active for the FEEDER_CVMAPS callvote filter using the active callvote-gametype state behind ui_cvGameType and returns the visible preview-row count. */
 #define QLR_UI_ADDR_UI_CVMAPCOUNTBYGAMETYPE                      0x1000D300u
@@ -484,7 +484,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR__UI_MOUSEEVENT                               0x10010000u
 /* UI_LoadNonIngame: Loads the non-ingame menu set and clears the ingame-load state flag. */
 #define QLR_UI_ADDR_UI_LOADNONINGAME                             0x10010080u
-/* _UI_SetActiveMenu: Switches on the native UIMENU command, updates key catcher and pause state, reloads menu sets when needed, and activates the named retail menus. */
+/* _UI_SetActiveMenu: Switches on the native UIMENU command, updates key catcher and pause state, reloads menu sets when needed, and activates the committed retail `main`, `error_popmenu`, `ingame`, `ingame_about`, and `joingame_menu` flows. */
 #define QLR_UI_ADDR__UI_SETACTIVEMENU                            0x100100D0u
 /* _UI_IsFullscreen: Returns whether any visible fullscreen menu is active. */
 #define QLR_UI_ADDR__UI_ISFULLSCREEN                             0x10010380u
@@ -662,13 +662,13 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR_SCRIPT_CLOSE                                 0x100164F0u
 /* Script_Toggle: Retail-only menu toggle command that alternates a named menu between the open and close helpers. */
 #define QLR_UI_ADDR_SCRIPT_TOGGLE                                0x10016580u
-/* Menu_TransitionItemByName: Finds matching items by name or group, marks them visible plus in-transition, seeds rectClient and rectEffects state, and refreshes their screen coordinates. */
+/* Menu_TransitionItemByName: Finds matching items by name or group, marks them visible plus in-transition, seeds `offsetTime`, copies the source rect into `rectClient`, copies the destination rect into `rectEffects`, derives the per-step X/Y/W/H deltas into `rectEffects2`, and refreshes screen coordinates. */
 #define QLR_UI_ADDR_MENU_TRANSITIONITEMBYNAME                    0x100165E0u
-/* Script_Transition: Parses a target name, source rect, destination rect, time, and step amount for transition setup. */
+/* Script_Transition: Parses a target name, source rect, destination rect, cadence time, and step divisor, then forwards the setup into `Menu_TransitionItemByName`. */
 #define QLR_UI_ADDR_SCRIPT_TRANSITION                            0x100167B0u
-/* Menu_OrbitItemByName: Finds matching items by name or group, marks them visible plus orbiting, seeds the orbit center and starting rectClient position, and refreshes their screen coordinates. */
+/* Menu_OrbitItemByName: Finds matching items by name or group, marks them visible plus orbiting, seeds `offsetTime`, stores the orbit center in `rectEffects.x/y`, seeds the starting `rectClient.x/y`, and refreshes screen coordinates. */
 #define QLR_UI_ADDR_MENU_ORBITITEMBYNAME                         0x100168A0u
-/* Script_Orbit: Parses orbit target, x/y position, center, and time, then schedules orbit motion for matching items. */
+/* Script_Orbit: Parses orbit target, start position, orbit center, and cadence time, then forwards the setup into `Menu_OrbitItemByName`. */
 #define QLR_UI_ADDR_SCRIPT_ORBIT                                 0x100169D0u
 /* Script_ActivateAdvert: Retail-only advert command that parses one integer token, invokes the advert activation callback, and clears the current item's focus bit. */
 #define QLR_UI_ADDR_SCRIPT_ACTIVATEADVERT                        0x10016AD0u
@@ -792,7 +792,7 @@ char *	va( const char *format, ... );
 #define QLR_UI_ADDR_ITEM_LISTBOX_PAINT                           0x1001BFB0u
 /* Item_OwnerDraw_Paint: Computes ownerdraw color and optional text-label state, then calls the retail ownerdraw callback for the item. */
 #define QLR_UI_ADDR_ITEM_OWNERDRAW_PAINT                         0x1001CA50u
-/* Item_Paint: Performs retail orbit and transition updates, visibility and show or hide cvar gating, Window_Paint, and the per-item type dispatch chain. */
+/* Item_Paint: Performs the retail per-item runtime chain: advances orbit and transition motion through `nextTime`, `offsetTime`, `rectEffects`, and `rectEffects2`, applies visibility/show-or-hide cvar gating, runs `Window_Paint`, and then dispatches the item-type-specific paint path. */
 #define QLR_UI_ADDR_ITEM_PAINT                                   0x1001CED0u
 /* Menu_GetFocused: Scans the global menu array and returns the first menu whose window carries both focus and visible flags. */
 #define QLR_UI_ADDR_MENU_GETFOCUSED                              0x1001D390u

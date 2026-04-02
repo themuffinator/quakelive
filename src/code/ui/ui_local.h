@@ -46,24 +46,6 @@ that `ui_main.c` still references for dormant compatibility paths. Define them
 locally so the native UI DLL can build against the retail menu tree.
 =============
 */
-#ifndef FEEDER_MATCHSUMMARY_END
-#define FEEDER_MATCHSUMMARY_END			0x15
-#endif
-#ifndef FEEDER_MATCHSUMMARY_RED
-#define FEEDER_MATCHSUMMARY_RED			0x16
-#endif
-#ifndef FEEDER_MATCHSUMMARY_BLUE
-#define FEEDER_MATCHSUMMARY_BLUE		0x17
-#endif
-
-#ifndef FEEDER_MAP_ROTATIONS
-#define FEEDER_MAP_ROTATIONS			0x18
-#endif
-
-#ifndef callvoteRotationIndex
-#define callvoteRotationIndex		currentMapRotation
-#endif
-
 #ifndef UI_EFFECTS
 #define UI_EFFECTS				600
 #endif
@@ -274,9 +256,7 @@ extern vmCvar_t	ui_mainmenu;
 extern vmCvar_t	ui_priv;
 extern vmCvar_t	ui_warmup;
 extern vmCvar_t	ui_doWarmup;
-extern vmCvar_t	ui_drawTimer;
 extern vmCvar_t	ui_friendlyFire;
-extern vmCvar_t	ui_maxClients;
 extern vmCvar_t	ui_Warmup;
 extern vmCvar_t	ui_pure;
 extern vmCvar_t	ui_saveCaptureLimit;
@@ -284,8 +264,6 @@ extern vmCvar_t	ui_saveFragLimit;
 extern vmCvar_t	ui_recordSPDemoName;
 extern vmCvar_t	ui_glCustom;
 extern vmCvar_t	ui_country;
-extern vmCvar_t	ui_clanIndex;
-extern vmCvar_t	ui_clanName;
 extern vmCvar_t	ui_opponentModel;
 extern vmCvar_t	ui_cdkeyvalid;
 extern vmCvar_t ui_serverStatusTimeOut;
@@ -309,7 +287,6 @@ void UI_BrowserBridge_SetActive(qboolean active);
 void UI_BrowserBridge_Init(void);
 const char *UI_BrowserBridgeMenuFile(void);
 const char *UI_BrowserBridgeIngameFile(void);
-qboolean UI_UsingLegacyMenuFlow(void);
 void UI_ApplyMenuFlowChange(uiMenuFlow_t flow, qboolean reload);
 qhandle_t UI_ImageCache_Register( const char *uri );
 void UI_ImageCache_Shutdown( void );
@@ -539,10 +516,8 @@ void UI_ListPlayerModels( void );
 void UI_LoadMenus(const char *menuFile, qboolean reset);
 void _UI_SetActiveMenu( uiMenuCommand_t menu );
 int UI_AdjustTimeByGame(int time);
-void UI_ShowPostGame(qboolean newHigh);
 void UI_ClearScores();
 void UI_LoadArenas(void);
-void UI_LoadRulesets( void );
 
 //
 // ui_menu.c
@@ -820,9 +795,7 @@ typedef struct {
 #define MAX_MODS 64
 #define MAX_DEMOS 256
 #define MAX_MOVIES 256
-#define MAX_CLANS 256
 #define MAX_PLAYERMODELS 256
-#define MAX_RULESETS 8
 
 
 typedef struct {
@@ -839,14 +812,6 @@ typedef struct {
         const char *ai;
         const char *action;
 } aliasInfo;
-
-typedef struct {
-	char id[MAX_QPATH];
-	char name[MAX_NAME_LENGTH];
-	char tag[MAX_NAME_LENGTH];
-	char emblemPath[MAX_QPATH];
-	qhandle_t emblemShader;
-} uiClanInfo_t;
 
 typedef struct {
   const char *teamName;
@@ -884,11 +849,6 @@ typedef struct {
 	char		factoryGameType[MAX_MAP_ROTATION_TOKEN];
 	int		mapIndex;
 } mapRotationInfo_t;
-
-typedef struct {
-	char		name[MAX_TOKEN_CHARS];
-	char		description[MAX_STRING_CHARS];
-} rulesetInfo_t;
 
 typedef struct {
 	const char *tierName;
@@ -959,34 +919,6 @@ typedef struct {
 	int numLines;
 } serverStatusInfo_t;
 
-#define MAX_MATCH_SUMMARY_PLAYERS MAX_CLIENTS
-
-typedef struct uiMatchPlayerInfo_s {
-	int clientNum;
-	team_t team;
-	int rank;
-	int score;
-	char name[MAX_NAME_LENGTH];
-	char country[16];
-} uiMatchPlayerInfo_t;
-
-typedef struct uiMatchPlayerList_s {
-	uiMatchPlayerInfo_t entries[MAX_MATCH_SUMMARY_PLAYERS];
-	int entryCount;
-} uiMatchPlayerList_t;
-
-typedef struct uiMatchSummaryCache_s {
-	qboolean valid;
-	int totalClients;
-	int localClientNum;
-	int redScore;
-	int blueScore;
-	int matchTimeSeconds;
-	uiMatchPlayerList_t endOfMatch;
-	uiMatchPlayerList_t redTeam;
-	uiMatchPlayerList_t blueTeam;
-} uiMatchSummaryCache_t;
-
 typedef struct {
 	const char *modName;
 	const char *modDescr;
@@ -1012,8 +944,6 @@ and the committed retail path resolves that selection through
 `UI_CVMapCountByGameType`, `UI_SelectedMap`, and `UI_FeederSelection`, while
 the paired retail `voteMap` submit token comes from `ui_cvGameType` through
 `UI_GetCallvoteGametypeToken` rather than from feeder-row factory metadata.
-- `FEEDER_MAP_ROTATIONS` surfaces the parsed `mapRotations[]` cache so rotation
-pool menus can inspect the resolved map/factory metadata.
 - `FEEDER_SERVERS` uses `serverStatus.displayServers[]`, while
 `FEEDER_SERVERSTATUS` and `FEEDER_FINDPLAYER` rely on `serverStatusInfo` and
 `foundPlayerServerNames[]` to paint MOTDs and search results.
@@ -1022,30 +952,22 @@ pool menus can inspect the resolved map/factory metadata.
 with the live client list.
 - `FEEDER_MODS`, `FEEDER_CINEMATICS`, and `FEEDER_DEMOS` are powered by
 `modList[]`, `movieList[]`, and `demoList[]` respectively.
-- `FEEDER_MATCHSUMMARY_END`, `FEEDER_MATCHSUMMARY_RED`, and
-`FEEDER_MATCHSUMMARY_BLUE` read from the cached `matchSummary` player lists
-populated from the `postgame` command through the current
-`UI_CalcPostGameStats` sidecar cache path.
 - `FEEDER_ENDSCOREBOARD`, `FEEDER_REDTEAM_STATS`, `FEEDER_BLUETEAM_STATS`,
-`FEEDER_REDTEAM_LIST`, `FEEDER_BLUETEAM_LIST`, and `FEEDER_SCOREBOARD` reuse
-the `matchSummary` caches as a current-source compatibility path, but retail
-ownership of that scoreboard/team feeder family sits in the cgame `cgDC`
-bridge rather than the UI DLL; the retail `end_scoreboard_*.menu`,
-`endscore*.menu`, and `ingame_scoreboard_*.menu` files even include
-`CG_FeederSelection in cg_main.c` comments on the team-list items.
+`FEEDER_REDTEAM_LIST`, `FEEDER_BLUETEAM_LIST`, and `FEEDER_SCOREBOARD` are
+retail cgame-owned scoreboard feeders rather than UI-owned listboxes. The
+retail `end_scoreboard_*.menu`, `endscore*.menu`, and
+`ingame_scoreboard_*.menu` files even include `CG_FeederSelection in
+cg_main.c` comments on the team-list items, so the UI DLL no longer exposes a
+local postgame row-cache feeder layer for those scoreboard ids.
 - `FEEDER_COUNTRIES` enumerates `countryList[]` loaded from `ui/country.txt` so
 UI scripts can expose locale dropdowns; the current source menu tree uses it in
 `ingame_join.menu`, but the retail asset audit shows that dropdown block and
 the local `FEEDER_COUNTRIES` define are not present in the retail UI files.
-- `FEEDER_CLANS` uses `clanList[]`, including the current placeholder roster
-and lazy emblem-image registration path, although neither the committed source
-menu tree nor the retail asset tree currently references the feeder outside the
-shared `menudef.h` constant; the committed host `qz_instance` method table at
-`0x0055C008-0x0055C17C` exposes `GetMapList`, `GetFactoryList`, `GetDemoList`,
-`GetConfig`, lobby helpers, friend-list helpers, `GetAllUGC`, and related
-browser utilities but no clan-roster method; the bounded browser publish
-surface likewise exposes lobby/game/web events but no clan event family, and
-the misleading `UI_CLANNAME` / `UI_CLANLOGO` labels are older `teamList[]`
+- `FEEDER_CLANS` remains only as a shared `menudef.h` constant; the local UI
+DLL no longer exposes a clan-roster feeder because neither the committed
+source menu tree nor the retail asset tree consumes it, the bounded host
+`qz_instance` / browser export surfaces expose no clan-roster bridge, and the
+misleading `UI_CLANNAME` / `UI_CLANLOGO` labels are older `teamList[]`
 team-branding ownerdraws rather than clan-roster consumers.
 =============
 */
@@ -1069,11 +991,6 @@ typedef struct {
 
 	int teamCount;
 	teamInfo teamList[MAX_TEAMS];
-
-	int clanCount;
-	uiClanInfo_t clanList[MAX_CLANS];
-	int currentClan;
-	qboolean clanListLoaded;
 
 	int countryCount;
 	const char *countryList[256];
@@ -1102,12 +1019,6 @@ typedef struct {
 	int mapRotationCount;
 	mapRotationInfo_t mapRotations[MAX_MAP_ROTATIONS];
 	int currentMapRotation;
-	int rulesetCount;
-	int rulesetIndex;
-	rulesetInfo_t rulesets[MAX_RULESETS];
-	char activeRuleset[MAX_CVAR_VALUE_STRING];
-
-
 	int tierCount;
 	tierInfo tierList[MAX_TIERS];
 
@@ -1154,10 +1065,6 @@ typedef struct {
 	int effectsColor;
 
 	qboolean inGameLoad;
-	uiMatchSummaryCache_t matchSummary;
-	int currentMatchSummaryEnd;
-	int currentMatchSummaryRed;
-	int currentMatchSummaryBlue;
 
 }	uiInfo_t;
 
@@ -1424,8 +1331,6 @@ void UI_SPUnlock_f( void );
 void UI_SPUnlockMedals_f( void );
 
 void UI_InitGameinfo( void );
-void UI_ResetMatchSummaryCache( void );
-void UI_MatchSummaryParseFromPostgame( void );
 
 //
 // ui_login.c

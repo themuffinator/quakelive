@@ -27,6 +27,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "cg_local.h"
 
+int	cg_crosshairHitFeedbackTime;
+int	cg_crosshairHitFeedbackValue = 1;
+
 /*
 ==============
 CG_CheckAmmo
@@ -300,6 +303,8 @@ A respawn happened this snapshot
 void CG_Respawn( void ) {
 	// no error decay on player movement
 	cg.thisFrameTeleport = qtrue;
+	cg_crosshairHitFeedbackTime = 0;
+	cg_crosshairHitFeedbackValue = 1;
 
 	// display weapons available
 	cg.weaponSelectTime = cg.time;
@@ -404,6 +409,38 @@ void pushReward(sfxHandle_t sfx, qhandle_t shader, int rewardCount) {
 		cg.rewardSound[cg.rewardStack] = sfx;
 		cg.rewardShader[cg.rewardStack] = shader;
 		cg.rewardCount[cg.rewardStack] = rewardCount;
+	}
+}
+
+/*
+==================
+CG_RecordCrosshairHitFeedback
+
+Stamps the retail-style crosshair-hit feedback latch for the next draw pass.
+==================
+*/
+static void CG_RecordCrosshairHitFeedback( const playerState_t *ps, const playerState_t *ops ) {
+	int	armor;
+
+	if ( !ps || !ops ) {
+		return;
+	}
+
+	if ( ps->persistant[PERS_TEAM] != ops->persistant[PERS_TEAM] ) {
+		return;
+	}
+
+	if ( ps->persistant[PERS_HITS] <= ops->persistant[PERS_HITS] ) {
+		return;
+	}
+
+	armor = ps->persistant[PERS_ATTACKEE_ARMOR] & 0xff;
+	cg_crosshairHitFeedbackTime = cg.time;
+	cg_crosshairHitFeedbackValue = ( armor >> 6 ) + 1;
+	if ( cg_crosshairHitFeedbackValue < 1 ) {
+		cg_crosshairHitFeedbackValue = 1;
+	} else if ( cg_crosshairHitFeedbackValue > 4 ) {
+		cg_crosshairHitFeedbackValue = 4;
 	}
 }
 
@@ -665,6 +702,7 @@ void CG_TransitionPlayerState( playerState_t *ps, playerState_t *ops ) {
 
 	if ( cg.snap->ps.pm_type != PM_INTERMISSION
 		&& ps->persistant[PERS_TEAM] != TEAM_SPECTATOR ) {
+		CG_RecordCrosshairHitFeedback( ps, ops );
 		CG_CheckLocalSounds( ps, ops );
 	}
 

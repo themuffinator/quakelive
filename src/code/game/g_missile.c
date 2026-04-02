@@ -251,6 +251,7 @@ static void ProximityMine_ExplodeOnPlayer( gentity_t *mine ) {
 	if ( player->client->invulnerabilityTime > level.time ) {
 		G_Damage( player, mine->parent, mine->parent, vec3_origin, mine->s.origin, 1000, DAMAGE_NO_KNOCKBACK, MOD_JUICED );
 		player->client->invulnerabilityTime = 0;
+		player->client->holdableInvulnerabilityTime = 0;
 		G_TempEntity( player->client->ps.origin, EV_JUICED );
 	}
 	else {

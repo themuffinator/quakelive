@@ -2930,6 +2930,36 @@
       "comment": "Exact pure team-color helper from g_team.c::TeamColorString. Retail returns `^1` for red, `^4` for blue, and `^7` for every other team value, including spectators."
     },
     {
+      "address": "0x1002C950",
+      "raw_name": "FUN_1002c950",
+      "normalized_name": "G_PowerupCarrierKillUsesWhitePrefix",
+      "status": "matched",
+      "signature": "static qboolean G_PowerupCarrierKillUsesWhitePrefix(int gametype)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only split predicate beneath `G_PowerupCarrierKillColorPrefix`. HLIL reduces it to the tiny objective-gametype classifier the adjacent carrier-kill announcer uses to decide whether the printed powerup label should keep the white prefix instead of the yellow fallback."
+    },
+    {
+      "address": "0x1002C9A0",
+      "raw_name": "FUN_1002c9a0",
+      "normalized_name": "G_RoundControllerGametypeEnabled",
+      "status": "matched",
+      "signature": "static qboolean G_RoundControllerGametypeEnabled(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact round-controller gametype predicate from the retail CA/A&D/Freeze/Red Rover seam. The binary keeps it as a tiny pure classifier over the current `g_gametype` value, and multiple callers reuse it to gate round-based spawn, AFK, and rankings behavior."
+    },
+    {
+      "address": "0x1002C980",
+      "raw_name": "FUN_1002c980",
+      "normalized_name": "BG_IsTeamFlagItem",
+      "status": "matched",
+      "signature": "static qboolean BG_IsTeamFlagItem(const gitem_t *item)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only shared flag-item predicate. HLIL reduces the body to a null/type guard on `IT_TEAM` plus a three-way `PW_REDFLAG` / `PW_BLUEFLAG` / `PW_NEUTRALFLAG` tag check, and retail reuses it in both the dropped-flag pickup reach logic and the team-item spawn/configstring path."
+    },
+    {
       "address": "0x1002CAF0",
       "raw_name": "FUN_1002caf0",
       "normalized_name": "OtherTeam",
@@ -2978,6 +3008,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact pickup-name lookup helper from bg_misc.c::BG_FindItem. Retail walks `bg_itemlist`, compares the requested pickup name against each item's display name with `Q_stricmp`, and returns the matching `gitem_t *` or NULL."
+    },
+    {
+      "address": "0x1002CD10",
+      "raw_name": "FUN_1002cd10",
+      "normalized_name": "BG_WeaponName",
+      "status": "matched",
+      "signature": "const char *BG_WeaponName(weapon_t weapon)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only weapon-name string helper. HLIL reduces the body to a bounds check over the shared weapon-name table with a `None` fallback, and the adjacent `G_ExpandChatTokens` path uses it to expand the `#w` token into the current weapon label plus ammo count."
     },
     {
       "address": "0x1002CD30",
@@ -3040,6 +3080,16 @@
       "comment": "Exact playerstate-to-entitystate bridge from bg_misc.c::BG_PlayerStateToEntityState. The body mirrors the pm_type and health driven eType selection, the origin and velocity copies, and the full event, animation, powerup, and client-state replication."
     },
     {
+      "address": "0x1002D500",
+      "raw_name": "FUN_1002d500",
+      "normalized_name": "G_GametypeSkipsSpawnPointTargets",
+      "status": "matched",
+      "signature": "qboolean G_GametypeSkipsSpawnPointTargets(int gametype)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive tiny gametype predicate used by the ClientSpawn-side bootstrap before the late `G_UseTargets` spawn-point dispatch. HLIL preserves the full truth table: it returns false only for `GT_RACE`, `GT_CLAN_ARENA`, `GT_DOMINATION`, and `GT_RED_ROVER`, and true for every other retail gametype value."
+    },
+    {
       "address": "0x1002D540",
       "raw_name": "FUN_1002d540",
       "normalized_name": "BG_TouchJumpPad",
@@ -3048,6 +3098,46 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact jump-pad touch helper from bg_misc.c::BG_TouchJumpPad. Retail keeps the spectator and flight early-outs, suppresses duplicate triggers for the same pad, emits the shared jump-pad predictable event with parm 0, and then copies the pad velocity into the playerstate."
+    },
+    {
+      "address": "0x1002D810",
+      "raw_name": "FUN_1002d810",
+      "normalized_name": "vtos",
+      "status": "matched",
+      "signature": "char *vtos(const vec3_t v)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact vector-printer helper from g_utils.c::vtos. Retail rotates through the same eight-slot static buffer ring and formats the incoming vector as `(%.2f %.2f %.2f)`, which is slightly more precise than the current GPL integer formatter."
+    },
+    {
+      "address": "0x1002D870",
+      "raw_name": "FUN_1002d870",
+      "normalized_name": "G_ParseSpawnGametypeMask",
+      "status": "matched",
+      "signature": "static unsigned int G_ParseSpawnGametypeMask(const char *value)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only spawn-filter parser. HLIL shows it tokenizing the incoming `gametype` / `not_gametype` string, matching each token against the Quake Live gametype name table from `FFA` through `RR`, and accumulating the per-gametype bitmask later tested by the worldspawn entity gate."
+    },
+    {
+      "address": "0x1002D980",
+      "raw_name": "FUN_1002d980",
+      "normalized_name": "G_ParseDisableLoadoutString",
+      "status": "matched",
+      "signature": "static unsigned int G_ParseDisableLoadoutString(const char *value)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact disable-loadout parser from g_spawn.c::G_ParseDisableLoadoutString. Retail tokenizes the map or cvar string, walks the shared loadout-token table, and ORs the corresponding weapon/item bits into the final mask before publishing configstrings."
+    },
+    {
+      "address": "0x1002D9F0",
+      "raw_name": "FUN_1002d9f0",
+      "normalized_name": "PM_LoadMoveTuningConstants",
+      "status": "matched",
+      "signature": "static void PM_LoadMoveTuningConstants(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Deliberate synthetic retail helper at the top of `PmoveSingle`. The body selects one of two small constant bundles based on the current movement flag profile and seeds the shared pmove globals consumed by jump, air, and water movement later in the frame."
     },
     {
       "address": "0x1002DAF0",
@@ -3078,6 +3168,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact torso-animation starter from bg_pmove.c::PM_StartTorsoAnim. The retail helper only checks `pm_type < PM_DEAD`, then flips the toggle bit and writes the requested torso animation."
+    },
+    {
+      "address": "0x1002DB80",
+      "raw_name": "FUN_1002db80",
+      "normalized_name": "PM_TorsoAnimation",
+      "status": "matched",
+      "signature": "static void PM_TorsoAnimation(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact ready-weapon torso idler from bg_pmove.c::PM_TorsoAnimation. HLIL shows the ready-state gate, the gauntlet-specific `TORSO_STAND2` selection, and the default `TORSO_STAND` continuation for the remaining weapons."
     },
     {
       "address": "0x1002DBE0",
@@ -3140,6 +3240,16 @@
       "comment": "Exact command-scaling helper from bg_pmove.c::PM_CmdScale. It finds the largest axial input component, computes the total movement vector length, and returns the speed-preserving scale factor for the `-127..127` command range."
     },
     {
+      "address": "0x1002E110",
+      "raw_name": "FUN_1002e110",
+      "normalized_name": "PM_BuildWishMove3D",
+      "status": "matched",
+      "signature": "static qboolean PM_BuildWishMove3D(vec3_t wishdir, float *wishspeed)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Deliberate synthetic retail helper shared by the fly, water, ladder, and noclip paths. HLIL applies the active command scale to the current forward/right/up basis, adds the vertical input component, normalizes the resulting 3D wish vector in place, and returns the derived wishspeed."
+    },
+    {
       "address": "0x1002E1F0",
       "raw_name": "FUN_1002e1f0",
       "normalized_name": "PM_SetMovementDir",
@@ -3148,6 +3258,36 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact legs-facing helper from bg_pmove.c::PM_SetMovementDir. The retail ladder maps forward and strafe combinations to the eight movement directions and snaps idle sideways cases back to the diagonal poses."
+    },
+    {
+      "address": "0x1002E2C0",
+      "raw_name": "FUN_1002e2c0",
+      "normalized_name": "PM_ApplyJumpTakeoff",
+      "status": "matched",
+      "signature": "static void PM_ApplyJumpTakeoff(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only jump takeoff body shared by PM_CheckJump and the step-jump seam. HLIL shows it latching the jump flags, deriving the final vertical takeoff velocity from the active jump-mode globals, emitting `EV_JUMP`, selecting the forward or backward legs animation, and refreshing the jump timestamp used by the surrounding gates."
+    },
+    {
+      "address": "0x1002E4C0",
+      "raw_name": "FUN_1002e4c0",
+      "normalized_name": "PM_CanCrouchStepJump",
+      "status": "matched",
+      "signature": "static qboolean PM_CanCrouchStepJump(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only crouch step-jump gate checked from the PM_StepSlideMove seam. The leaf requires the ducked movement flag, rejects the pending step-jump suppression latch, keeps only non-descending vertical velocity, and reuses the same jump-cooldown timing threshold as the adjacent jump helpers before reporting success."
+    },
+    {
+      "address": "0x1002E510",
+      "raw_name": "FUN_1002e510",
+      "normalized_name": "PM_CanStepJump",
+      "status": "matched",
+      "signature": "static qboolean PM_CanStepJump(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only step-jump precheck beneath PM_StepSlideMove. It enforces the retail upmove, jump-delay, and jump-held restrictions around the step-jump modes, clearing the queued jump state on rejected attempts before the surrounding movement code decides whether to run the takeoff body."
     },
     {
       "address": "0x1002E590",
@@ -3228,6 +3368,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact match for bg_pmove.c::PM_FlyMove. It applies normal friction, builds a wish direction from the command axes, accelerates with flight thrust, and then steps through PM_StepSlideMove without gravity."
+    },
+    {
+      "address": "0x1002FA80",
+      "raw_name": "FUN_1002fa80",
+      "normalized_name": "PM_InvulnerabilityMove",
+      "status": "matched",
+      "signature": "static void PM_InvulnerabilityMove(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact invulnerability-holdable movement helper from bg_pmove.c. Retail zeroes the command and velocity vectors, applies pitch-driven float or sink while the shield is held or decaying, decrements `playerItemTime`, clears the holdable slot when the timer expires, and forces the holdable legs-animation bits."
     },
     {
       "address": "0x1002FBA0",
@@ -3480,6 +3630,16 @@
       "comment": "Exact match for bg_pmove.c::Pmove. It bounds the server-time delta, advances the command time in 66 ms slices, and repeatedly invokes PmoveSingle to cover the whole movement window."
     },
     {
+      "address": "0x10032430",
+      "raw_name": "FUN_10032430",
+      "normalized_name": "StdBadAllocDestroy",
+      "status": "matched",
+      "signature": "void *StdBadAllocDestroy(void *exceptionObject, unsigned int deleteFlags)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact retained MSVC scalar-deleting destructor for `std::bad_alloc`. It restores the `std::bad_alloc` vftable, runs the base `std::exception` destructor, and conditionally frees the object when the compiler-supplied delete flag is set."
+    },
+    {
       "address": "0x10032460",
       "raw_name": "FUN_10032460",
       "normalized_name": "G_AdminAccessForCurrentClient",
@@ -3566,6 +3726,146 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Retail-only access-tree erase helper. It removes the iterator range returned by the matching SteamID lookup, rebalances the tree, updates the first/last sentinels, and decrements the cached access-entry count used by list and reload flows."
+    },
+    {
+      "address": "0x10032D20",
+      "raw_name": "FUN_10032d20",
+      "normalized_name": "G_AdminAccessDestroyNodes",
+      "status": "matched",
+      "signature": "void G_AdminAccessDestroyNodes(void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal access-tree node destructor. It recursively descends the SteamID-ordered admin-access tree and frees every non-sentinel node during reset and shutdown cleanup."
+    },
+    {
+      "address": "0x10032D60",
+      "raw_name": "FUN_10032d60",
+      "normalized_name": "G_AdminAccessCacheDestroy",
+      "status": "matched",
+      "signature": "void G_AdminAccessCacheDestroy(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained shutdown leaf for the global admin-access cache. After the paired tree-clear path has already removed every cached admin-access node, this helper only frees the 0x28-byte sentinel header allocation."
+    },
+    {
+      "address": "0x10032D70",
+      "raw_name": "FUN_10032d70",
+      "normalized_name": "G_AdminAccessKeyLess",
+      "status": "matched",
+      "signature": "qboolean G_AdminAccessKeyLess(const unsigned long long *lhs, const unsigned long long *rhs)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal SteamID ordering predicate for the cached admin-access tree. It compares the 64-bit key fields exactly the way the adjacent lookup and insert helpers expect."
+    },
+    {
+      "address": "0x10032D90",
+      "raw_name": "FUN_10032d90",
+      "normalized_name": "G_AdminAccessEraseNode",
+      "status": "matched",
+      "signature": "void G_AdminAccessEraseNode(void **nextNode, void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal red-black-tree erase helper for the cached admin-access table. It unlinks the selected node, updates the cached first and last iterators, performs the standard rebalance rotations, and returns the successor iterator through the out slot."
+    },
+    {
+      "address": "0x10033080",
+      "raw_name": "FUN_10033080",
+      "normalized_name": "G_AdminAccessNodeNext",
+      "status": "matched",
+      "signature": "void G_AdminAccessNodeNext(void **node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal in-order successor helper for the cached admin-access tree. It advances an iterator node pointer to the next SteamID entry in sorted order."
+    },
+    {
+      "address": "0x100330D0",
+      "raw_name": "FUN_100330d0",
+      "normalized_name": "G_AdminAccessRotateLeft",
+      "status": "matched",
+      "signature": "void *G_AdminAccessRotateLeft(void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal left-rotation helper for the cached admin-access red-black tree. It promotes the current node's right child and rewires the parent and sentinel-root links."
+    },
+    {
+      "address": "0x10033120",
+      "raw_name": "FUN_10033120",
+      "normalized_name": "G_AdminAccessRotateRight",
+      "status": "matched",
+      "signature": "void *G_AdminAccessRotateRight(void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal right-rotation helper for the cached admin-access red-black tree. It promotes the current node's left child and rewires the parent and sentinel-root links."
+    },
+    {
+      "address": "0x10033170",
+      "raw_name": "FUN_10033170",
+      "normalized_name": "G_AdminAccessSubtreeRightmost",
+      "status": "matched",
+      "signature": "void *G_AdminAccessSubtreeRightmost(void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal rightmost-node walk for the cached admin-access tree. The erase path uses it when it needs to rebuild the sentinel's cached last-entry pointer from a replacement subtree."
+    },
+    {
+      "address": "0x100331B0",
+      "raw_name": "FUN_100331b0",
+      "normalized_name": "G_AdminAccessInsertUniqueWithHint",
+      "status": "matched",
+      "signature": "void *G_AdminAccessInsertUniqueWithHint(void *result, void *hint, void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal hinted-insert helper for the cached admin-access tree. It checks the supplied iterator hint against the pending SteamID key and either links immediately or falls back to the general unique-insert walk."
+    },
+    {
+      "address": "0x10033360",
+      "raw_name": "FUN_10033360",
+      "normalized_name": "G_AdminAccessInsertUnique",
+      "status": "matched",
+      "signature": "void *G_AdminAccessInsertUnique(void *result, void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal unique-insert helper for the cached admin-access tree. It walks the SteamID order, links the pending node on misses, or frees that pending node and returns the existing iterator on duplicates."
+    },
+    {
+      "address": "0x10033430",
+      "raw_name": "FUN_10033430",
+      "normalized_name": "G_AdminAccessLinkNode",
+      "status": "matched",
+      "signature": "void *G_AdminAccessLinkNode(void *parent, void *result, qboolean insertLeft, void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal link-and-rebalance helper for the cached admin-access tree. It attaches the supplied node as the requested child, updates the cached first and last iterators plus entry count, and performs the standard red-black-tree insert fixup."
+    },
+    {
+      "address": "0x10033660",
+      "raw_name": "FUN_10033660",
+      "normalized_name": "G_AdminAccessNodePrev",
+      "status": "matched",
+      "signature": "void G_AdminAccessNodePrev(void **node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal in-order predecessor helper for the cached admin-access tree. It supports both normal iterator decrement and the sentinel-end fallback used by the insert-hint path."
+    },
+    {
+      "address": "0x100336C0",
+      "raw_name": "FUN_100336c0",
+      "normalized_name": "G_AdminAccessAdvance",
+      "status": "matched",
+      "signature": "void G_AdminAccessAdvance(int offset, void **node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal iterator-advance helper for the cached admin-access tree. It walks a node pointer forward or backward by a signed count and is reused by the paged access-list printer."
+    },
+    {
+      "address": "0x10033780",
+      "raw_name": "FUN_10033780",
+      "normalized_name": "G_AdminAccessNodeConstruct",
+      "status": "matched",
+      "signature": "void *G_AdminAccessNodeConstruct(const void *source)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal constructor for cached admin-access nodes. It allocates the 0x28-byte node, seeds the sentinel-linked tree pointers, and copies the SteamID plus privilege-mode payload fields from the source tuple."
     },
     {
       "address": "0x10032FE0",
@@ -4226,6 +4526,16 @@
       "comment": "Descriptive retail-only duel helper that gathers eligible spectator queue clients, sorts them by spectatorTime, and updates their one-based pq userinfo field while marking changed positions dirty for republish."
     },
     {
+      "address": "0x1003A350",
+      "raw_name": "FUN_1003a350",
+      "normalized_name": "ClientNameAvailable",
+      "status": "matched",
+      "signature": "static qboolean ClientNameAvailable(int ignoreClientNum, const char *cleanName)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only client-name uniqueness helper underneath `ClientUserinfoChanged`. It copies the candidate into a scratch buffer, reuses the adjacent clean-name normalizer, scans connected clients while skipping the ignored slot, and returns false when another active client already owns the same normalized name."
+    },
+    {
       "address": "0x1003A450",
       "raw_name": "FUN_1003a450",
       "normalized_name": "ClientUserinfoChanged",
@@ -4306,12 +4616,12 @@
     {
       "address": "0x1003B6C0",
       "raw_name": "FUN_1003b6c0",
-      "normalized_name": "RegisterItem",
+      "normalized_name": "G_InitClientSpawnState",
       "status": "matched",
-      "signature": "void RegisterItem(gitem_t *item)",
+      "signature": "static void G_InitClientSpawnState(gentity_t *ent)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Simple item-registration helper anchored by the exact RegisterItem: NULL error and the matching g_items.c logic that marks the bg_itemlist slot as precached."
+      "comment": "Descriptive retail-only ClientSpawn-side bootstrap helper. It resets the fresh playerstate weapon/ammo slab, registers the baseline spawn weapons for configstring publication, applies the player-cylinder and default-weapon selection rules, seeds and optionally suppresses spawn ammo through the adjacent helpers, conditionally fires the spawn targets, and then tailcalls `G_FinalizeSpawnLoadout`."
     },
     {
       "address": "0x1003BB90",
@@ -4622,6 +4932,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact levelshot helper from g_cmds.c::Cmd_LevelShot_f. It enforces cheats and single-player, forces an intermission frame, and sends the `clientLevelShot` server command to the caller."
+    },
+    {
+      "address": "0x100401D0",
+      "raw_name": "FUN_100401d0",
+      "normalized_name": "Cmd_Kill_f",
+      "status": "matched",
+      "signature": "void Cmd_Kill_f(gentity_t *ent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact self-kill command handler from g_cmds.c::Cmd_Kill_f. HLIL shows the spectator/dead early-outs, the exact `Kill is not enabled on this server.\\n` print, and the final self-directed `player_die` call with the retail fixed damage and means-of-death constants."
     },
     {
       "address": "0x10040260",
@@ -5055,6 +5375,26 @@
       "comment": "HLIL-visible client command dispatcher for chat, voice, follow/team, give/god/noclip/kill, vote, and callvote command families."
     },
     {
+      "address": "0x10046370",
+      "raw_name": "FUN_10046370",
+      "normalized_name": "G_DistanceToEntityBounds",
+      "status": "matched",
+      "signature": "float G_DistanceToEntityBounds(const gentity_t *ent, const vec3_t point)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only distance helper reused by the splash-damage seam. It clamps a point against `ent->r.absmin` and `ent->r.absmax`, accumulates the per-axis gap outside the box, and returns the Euclidean distance from the point to the entity bounds."
+    },
+    {
+      "address": "0x100464A0",
+      "raw_name": "FUN_100464a0",
+      "normalized_name": "G_AddDamagePlum",
+      "status": "matched",
+      "signature": "static void G_AddDamagePlum(gentity_t *attacker, vec3_t origin, int damage, int mod)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only `EV_DAMAGEPLUM` temp-entity emitter paired with the recovered cgame damage-plum seam. HLIL shows it spawning the QL-only damage-plum event at the caller-staged origin, restricting delivery to the attacking client, storing the raw damage payload, and translating the incoming MOD into the staged retail weapon field consumed by cgame."
+    },
+    {
       "address": "0x10046510",
       "raw_name": "FUN_10046510",
       "normalized_name": "ScorePlum",
@@ -5063,6 +5403,26 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact score-plum temp-entity helper from g_combat.c. The retail body spawns `EV_SCOREPLUM` at the supplied origin, restricts it to the scoring client with `SVF_SINGLECLIENT`, and stores both the client number and score payload in the event state."
+    },
+    {
+      "address": "0x10046550",
+      "raw_name": "FUN_10046550",
+      "normalized_name": "G_AddAwardEntity",
+      "status": "matched",
+      "signature": "static void G_AddAwardEntity(gentity_t *ent, int award)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only `EV_AWARD` temp-entity emitter behind the Quake Live medal taxonomy. It spawns the QL-only award event at the scoring client's origin, increments the per-award count slab for the requested award id, stages the recipient client number plus award count/id payload for cgame, and refreshes the player's reward timer."
+    },
+    {
+      "address": "0x100465D0",
+      "raw_name": "FUN_100465d0",
+      "normalized_name": "G_GrantPlayerReward",
+      "status": "matched",
+      "signature": "static void G_GrantPlayerReward(gentity_t *ent, int persIndex, int eFlag)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only reward-state helper reused by gauntlet, excellent, objective, and round-award paths. The leaf increments the requested persistant reward counter, clears the competing `EF_AWARD_*` bits, sets the supplied award flag, and refreshes `rewardTime` for the medal sprite display."
     },
     {
       "address": "0x10046620",
@@ -5186,6 +5546,16 @@
       "comment": "Exact invulnerability impact helper from g_combat.c. It reverses the incoming damage direction, intersects it against the target's 42-unit sphere, emits `EV_INVUL_IMPACT`, and optionally returns both the impact point and normalized bounce direction."
     },
     {
+      "address": "0x10048A10",
+      "raw_name": "FUN_10048a10",
+      "normalized_name": "G_KnockbackScaleForMOD",
+      "status": "matched",
+      "signature": "static float G_KnockbackScaleForMOD(int mod, qboolean selfInflicted)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact knockback-scale selector from g_combat.c::G_KnockbackScaleForMOD. HLIL preserves the MOD-to-weapon switch, the `g_knockback_%s` cvar lookup path, and the self-damage overrides for rocket and plasma knockback before the final float scale is returned to G_Damage."
+    },
+    {
       "address": "0x10048B50",
       "raw_name": "FUN_10048b50",
       "normalized_name": "CheckArmor",
@@ -5196,6 +5566,16 @@
       "comment": "Exact armor-save helper from g_combat.c. The retail body rejects null clients plus `DAMAGE_NO_ARMOR`, applies the active armor-protection scale, clamps the saved amount to the remaining armor total, and subtracts the final save from `STAT_ARMOR`."
     },
     {
+      "address": "0x10048C00",
+      "raw_name": "FUN_10048c00",
+      "normalized_name": "G_TeamDamageSeverityBucket",
+      "status": "matched",
+      "signature": "static int G_TeamDamageSeverityBucket(int damage)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive pure friendly-fire severity classifier beneath `G_Damage`. Retail buckets one team-damage incident into four levels using `<25`, `<50`, `<75`, and `>=75` thresholds before packing that level into the per-client team-damage status field."
+    },
+    {
       "address": "0x10048C30",
       "raw_name": "FUN_10048c30",
       "normalized_name": "G_Damage",
@@ -5204,6 +5584,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Main damage routine identified by the preserved g_knockback_cripple, g_knockback_pg_self, and g_knockback_rl_self cvar reads, the friendly-fire training warning, and the exact damage and armor debug prints used by the retail combat path."
+    },
+    {
+      "address": "0x10049D20",
+      "raw_name": "FUN_10049d20",
+      "normalized_name": "G_WarnIfSpectatorShot",
+      "status": "matched",
+      "signature": "static void G_WarnIfSpectatorShot(int entityNum)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only spectator-warning leaf reused by the splash/trace damage seam. It resolves the supplied entity slot to a client, checks the spectator session-state gate, and emits the preserved `A spectator has been shot!` print only for spectator hits; the current source keeps the same message inline under `G_Damage` rather than as a standalone helper."
     },
     {
       "address": "0x10049D80",
@@ -5244,6 +5634,56 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact lightning-water discharge splash helper from g_weapon.c. It scans the radius box, reuses CanDamage, and applies MOD_LIGHTNING_DISCHARGE damage to each valid client in the discharge volume."
+    },
+    {
+      "address": "0x1004AA80",
+      "raw_name": "FUN_1004aa80",
+      "normalized_name": "G_DominationRewardCaptureParticipants",
+      "status": "matched",
+      "signature": "static void G_DominationRewardCaptureParticipants(gentity_t **participants, gentity_t *point, int participantCount)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only Domination reward fan-out used by the point capture controller. HLIL shows it iterating the captured point's participant list, comparing each client against the primary-capturer pointer stored on the point entity, then awarding either `CAPTURE` or `ASSIST` score/eFlag/reward-time credit before printing the shared reward message."
+    },
+    {
+      "address": "0x1004ABF0",
+      "raw_name": "FUN_1004abf0",
+      "normalized_name": "G_DominationSelectPrimaryCapturer",
+      "status": "matched",
+      "signature": "static void G_DominationSelectPrimaryCapturer(gentity_t *point, int firstCount, int secondCount, gentity_t **firstTeam, gentity_t **secondTeam)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only Domination owner-selection helper beneath the point capture controller. It chooses or stabilizes the point entity's primary-capturer pointer from the opposing participant lists, preferring the side that currently has uncontested presence while preserving an existing owner when that client is still present."
+    },
+    {
+      "address": "0x1004B720",
+      "raw_name": "FUN_1004b720",
+      "normalized_name": "G_DominationPointActivate",
+      "status": "matched",
+      "signature": "static void G_DominationPointActivate(gentity_t *ent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only delayed Domination point activation leaf queued by SP_team_dom_point. The helper traces down from the metadata entity origin, retries with the fallback probe when needed, snaps the settled position into both `s.origin` and `r.currentOrigin`, clears the local bounds, and then arms the point's live callbacks and first think time."
+    },
+    {
+      "address": "0x1004B900",
+      "raw_name": "FUN_1004b900",
+      "normalized_name": "G_UpdateDominationPointCountConfigstrings",
+      "status": "matched",
+      "signature": "static void G_UpdateDominationPointCountConfigstrings(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only Domination configstring updater. HLIL shows it recounting red-owned and blue-owned control points across the Domination metadata slab and publishing the totals through configstrings `0x2BC` and `0x2BD`."
+    },
+    {
+      "address": "0x1004B980",
+      "raw_name": "FUN_1004b980",
+      "normalized_name": "G_DominationCheckDefenseBonus",
+      "status": "matched",
+      "signature": "static void G_DominationCheckDefenseBonus(gentity_t *attacker, gentity_t *targ)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only Domination defense-bonus helper reached from the team frag-reward path. It scans active control points owned by the attacker's team, requires the victim to be within the 500-unit and PVS protection envelope of one of those points, and then awards the preserved `DEFENSE` score, stat, eFlag, and reward-time credit."
     },
     {
       "address": "0x1004BC30",
@@ -5296,6 +5736,16 @@
       "comment": "Descriptive retail-only Freeze result helper. It compares the PM_NORMAL living-player tallies and, when the configured draw delay expires, the corresponding living-health totals, then stores the winning team latch used by the adjacent round-state controller."
     },
     {
+      "address": "0x1004C070",
+      "raw_name": "FUN_1004c070",
+      "normalized_name": "G_FreezeCheckExitRules",
+      "status": "matched",
+      "signature": "static qboolean G_FreezeCheckExitRules(qboolean announce)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only Freeze exit-rule checker used by the round-state controller. It evaluates the timelimit, roundlimit, and mercylimit conditions for the active Freeze round, optionally broadcasting the corresponding `... hit.` message before returning whether the round should end."
+    },
+    {
       "address": "0x1004C1B0",
       "raw_name": "FUN_1004c1b0",
       "normalized_name": "Freeze_RoundStateTransition",
@@ -5328,6 +5778,16 @@
       "comment": "Descriptive retail-only Freeze round helper. It services deferred Freeze_RoundStateTransition work, counts active players by team during the live round, and triggers the shared last-alive notification path when the queried side is down to one thawed survivor."
     },
     {
+      "address": "0x1004CD00",
+      "raw_name": "FUN_1004cd00",
+      "normalized_name": "G_FreezeFindThawHelperByClientNum",
+      "status": "matched",
+      "signature": "static gentity_t *G_FreezeFindThawHelperByClientNum(const int *clientNums, int clientCount, int helperClientNum)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only Freeze thaw-helper lookup beneath `G_FreezeClientEndFrame`. It walks the supplied helper-client list, resolves each live client entity, and returns the first helper whose clientNum matches the requested thaw-progress target."
+    },
+    {
       "address": "0x1004CD40",
       "raw_name": "FUN_1004cd40",
       "normalized_name": "G_FreezeClientEndFrame",
@@ -5336,6 +5796,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Source-faithful frozen-client end-frame handler. It tracks thaw progress, scans nearby allies with line-of-sight and distance gates, applies auto-thaw timing, and eventually fans into the shared retail Freeze state mutator when the client should thaw."
+    },
+    {
+      "address": "0x1004D270",
+      "raw_name": "FUN_1004d270",
+      "normalized_name": "G_ModCountsAsEnvironmentalDeath",
+      "status": "matched",
+      "signature": "qboolean G_ModCountsAsEnvironmentalDeath(int mod)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive gameplay MOD classifier used by the kill/death bookkeeping seam. HLIL shows it returning true only for `MOD_CRUSH`, `MOD_TELEFRAG`, and the retail Freeze thaw kill mode `MOD_THAW`."
     },
     {
       "address": "0x1004D290",
@@ -5500,6 +5970,36 @@
       "comment": "Exact weapon pickup helper from g_items.c, anchored by `Pickup_Weapon: item has infinite ammo`. Retail grants the weapon bit, applies the dropped-versus-map ammo split, preserves the grappling-hook infinite-ammo path, and returns the team or duel weapon respawn cvar."
     },
     {
+      "address": "0x1004EAC0",
+      "raw_name": "FUN_1004eac0",
+      "normalized_name": "G_SendSpectatorItemStateToClient",
+      "status": "matched",
+      "signature": "static void G_SendSpectatorItemStateToClient(int clientNum, gentity_t *itemEnt, qboolean initialSync)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only spectator-overlay event builder beneath the major-item timer path. It validates the requested spectator recipient and tracked item entity, spawns the synthetic `QL_EV_ITEM_PICKUP_SPEC` temp entity, and fills the player, item, remaining-time, palette, and layout fields consumed by cgame's spectator pickup cache."
+    },
+    {
+      "address": "0x1004ED10",
+      "raw_name": "FUN_1004ed10",
+      "normalized_name": "G_BroadcastSpectatorItemState",
+      "status": "matched",
+      "signature": "static void G_BroadcastSpectatorItemState(gentity_t *itemEnt)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only spectator-overlay broadcaster. It verifies that the supplied entity is one of the tracked major-item classes and then fans the synthetic `QL_EV_ITEM_PICKUP_SPEC` state event out to every active spectator client when the overlay path is enabled."
+    },
+    {
+      "address": "0x1004ED70",
+      "raw_name": "FUN_1004ed70",
+      "normalized_name": "G_SyncSpectatorItemStatesForClient",
+      "status": "matched",
+      "signature": "static void G_SyncSpectatorItemStatesForClient(int clientNum)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only spectator-overlay resync helper. When a client enters the spectator observer path, it walks the live major-item set and pushes the current synthetic item-timer state for each tracked item back to that client."
+    },
+    {
       "address": "0x1004EE20",
       "raw_name": "FUN_1004ee20",
       "normalized_name": "RespawnItem",
@@ -5600,6 +6100,16 @@
       ],
       "relocation_refs": [],
       "comment": "Exact item-registration helper from g_items.c, anchored by `RegisterItem: NULL`. It validates the `gitem_t *` and marks the corresponding `itemRegistered` slot for later configstring publication."
+    },
+    {
+      "address": "0x10050320",
+      "raw_name": "FUN_10050320",
+      "normalized_name": "BG_PlayerCarryingFlag",
+      "status": "matched",
+      "signature": "qboolean BG_PlayerCarryingFlag(const playerState_t *ps)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact shared flag-carrier predicate from `bg_misc.c`. The helper returns true as soon as any of `PW_REDFLAG`, `PW_BLUEFLAG`, or `PW_NEUTRALFLAG` is active in the leading `playerState_t` slab."
     },
     {
       "address": "0x10050350",
@@ -5762,6 +6272,36 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact retail restore pass paired with `G_TimeShiftAllClients`. It walks the saved client slab, restores any slot stamped with the current `level.time` back into `r.currentOrigin`, `r.mins`, and `r.maxs`, and relinks each restored client."
+    },
+    {
+      "address": "0x10052090",
+      "raw_name": "FUN_10052090",
+      "normalized_name": "G_InactivityWarningCvarChanged",
+      "status": "matched",
+      "signature": "void G_InactivityWarningCvarChanged(cvarTable_t *cv)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained cvar callback for `g_inactivityWarning`. It resets the live per-client inactivity warning latch through `G_ResetClientInactivityWarnings`, then emits the standard tracked-cvar change broadcast when the server is configured to surface those updates."
+    },
+    {
+      "address": "0x100520E0",
+      "raw_name": "FUN_100520e0",
+      "normalized_name": "G_InstaGibCvarChanged",
+      "status": "matched",
+      "signature": "void G_InstaGibCvarChanged(cvarTable_t *cv)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained cvar callback for `g_instaGib`. HLIL shows it refreshing the live client ammo slab through the adjacent instagib/infinite-ammo sync helper before optionally broadcasting the normal `Server: ... changed to ...` line."
+    },
+    {
+      "address": "0x10052330",
+      "raw_name": "FUN_10052330",
+      "normalized_name": "G_PlayerScaleCvarsChanged",
+      "status": "matched",
+      "signature": "void G_PlayerScaleCvarsChanged(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained callback shared by `g_playerheadScale` and `g_playerModelScale`. It walks connected clients and reruns `ClientUserinfoChanged` so the forced-appearance userinfo fields and downstream player-appearance config consumers pick up the new scale values immediately."
     },
     {
       "address": "0x10052DC0",
@@ -6055,6 +6595,16 @@
       "comment": "qsort comparator for the scoreboard ordering that keeps scoreboard/follow spectators last and otherwise sorts active clients by session, score, and race-specific tiebreak state."
     },
     {
+      "address": "0x10055FA0",
+      "raw_name": "FUN_10055fa0",
+      "normalized_name": "G_CountAndSortConnectedClients",
+      "status": "matched",
+      "signature": "void G_CountAndSortConnectedClients(int *numNonSpectatorClients, int *numConnectedClients, int *follow1, int *follow2, int *numPlayingClients, int *sortedClients)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only client-list builder split out of the round-results controller. It counts connected, non-spectator, and actively playing clients, seeds the first two follow targets, writes the discovered client numbers into the caller array, and qsorts that list through the adjacent team/score comparator."
+    },
+    {
       "address": "0x10056070",
       "raw_name": "FUN_10056070",
       "normalized_name": "CalculateRanks",
@@ -6334,6 +6884,16 @@
       "comment": "Exact missile runner from g_missile.c. The retail body handles guided-rocket steering, plasma/rocket/BFG acceleration updates, collision traces, sky cleanup, nail ricochet gating, impact dispatch, prox owner-exit logic, and the final `G_RunThink`."
     },
     {
+      "address": "0x1005CB30",
+      "raw_name": "FUN_1005cb30",
+      "normalized_name": "G_SpawnConfiguredMissile",
+      "status": "matched",
+      "signature": "gentity_t *G_SpawnConfiguredMissile(gentity_t *owner, vec3_t start, vec3_t dir, float speed)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only shared missile allocator beneath the grenade, rocket, plasma, and BFG constructors. It spawns an `ET_MISSILE`, binds `G_ExplodeMissile` as the default think, stores the owner pointer and owner number, snaps the launch origin and delta to network-friendly integers, and seeds the prestep timestamp before the caller fills in the weapon-specific fields."
+    },
+    {
       "address": "0x1005CCD0",
       "raw_name": "FUN_1005ccd0",
       "normalized_name": "fire_grenade",
@@ -6342,6 +6902,26 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact grenade projectile constructor. It spawns the `grenade` missile with `EF_BOUNCE_HALF`, gravity movement, grenade damage fields, and the standard prestep timestamp."
+    },
+    {
+      "address": "0x1005CD70",
+      "raw_name": "FUN_1005cd70",
+      "normalized_name": "G_RunRocketAccelerationThink",
+      "status": "matched",
+      "signature": "void G_RunRocketAccelerationThink(gentity_t *ent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only rocket acceleration callback used when the configured rocket acceleration factor differs from `1.0`. It scales the missile velocity by the stored rocket factor and rearms the next acceleration tick from the retail rocket interval."
+    },
+    {
+      "address": "0x1005CDC0",
+      "raw_name": "FUN_1005cdc0",
+      "normalized_name": "G_RunGuidedRocketThink",
+      "status": "matched",
+      "signature": "void G_RunGuidedRocketThink(gentity_t *ent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only guided-rocket steering callback. It reads the owning player's current view angles, rebuilds the forward steering vector, rewrites the missile's snapped base and linear delta from the current position, and rearms the short guidance think cadence used by the retail rocket guidance path."
     },
     {
       "address": "0x1005CF20",
@@ -6354,6 +6934,16 @@
       "comment": "Retail rocket constructor. The body spawns the `rocket` missile, seeds direct and splash damage, enables optional guided-rocket think state, and applies the rocket acceleration settings."
     },
     {
+      "address": "0x1005D020",
+      "raw_name": "FUN_1005d020",
+      "normalized_name": "G_RunPlasmaAccelerationThink",
+      "status": "matched",
+      "signature": "void G_RunPlasmaAccelerationThink(gentity_t *ent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only plasma acceleration callback. It scales the plasma bolt velocity by the stored plasma acceleration factor and rearms the next acceleration tick from the retail plasma interval."
+    },
+    {
       "address": "0x1005D070",
       "raw_name": "FUN_1005d070",
       "normalized_name": "fire_plasma",
@@ -6362,6 +6952,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact plasma projectile constructor. It spawns the `plasma` missile, seeds the plasma damage fields, launches the bolt linearly from the prestep timestamp, and stores the plasma acceleration configuration."
+    },
+    {
+      "address": "0x1005D150",
+      "raw_name": "FUN_1005d150",
+      "normalized_name": "G_RunBfgAccelerationThink",
+      "status": "matched",
+      "signature": "void G_RunBfgAccelerationThink(gentity_t *ent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only BFG acceleration callback. It scales the BFG projectile velocity by the stored BFG acceleration factor and rearms the next acceleration tick from the retail BFG interval."
     },
     {
       "address": "0x1005D1A0",
@@ -6422,6 +7022,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact mover-side proxmine push helper. The retail body derives the inverse angular basis from `amove`, applies the translational and rotational displacement to the mine, and then validates the new placement through `G_CheckProxMinePosition` before relinking."
+    },
+    {
+      "address": "0x1005D660",
+      "raw_name": "FUN_1005d660",
+      "normalized_name": "G_RotatePoint",
+      "status": "matched",
+      "signature": "void G_RotatePoint(vec3_t point, vec3_t matrix[3])",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact mover-space point rotator from g_mover.c. Retail copies the incoming point into a temporary vector and then overwrites the point in place with the three row dot-products against the supplied 3x3 basis."
     },
     {
       "address": "0x1005DDE0",
@@ -6990,6 +7600,19 @@
       "comment": "Descriptive retail-only auto-record controller. It reacts to the live warmup and match-start latches by arming or clearing the record state, starts per-client recording once the match timer becomes active, and emits the delayed end-of-match `screenshot \"%s\"\\n` captures after stopping active recording."
     },
     {
+      "address": "0x100632EA",
+      "raw_name": "FUN_100632ea",
+      "normalized_name": "G_CheckAutoRecordActiveBody",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [
+        "0x100891F8",
+        "0x10089208"
+      ],
+      "relocation_refs": [],
+      "comment": "Standalone `functions.csv` body row carved out of `G_CheckAutoRecord` after the one-time sentinel initialization return. It contains the active record-start, delayed stop, and end-of-match screenshot path that the parent helper reuses once auto-recording is armed."
+    },
+    {
       "address": "0x10063450",
       "raw_name": "FUN_10063450",
       "normalized_name": "G_UpdateTimeoutConfigStrings",
@@ -7023,6 +7646,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Retail race checkpoint touch handler anchored by the exact personal-best and finished-the-race prints, the point-to-point target-chain bookkeeping, and the matching split/final event emission used when a player advances or completes a run."
+    },
+    {
+      "address": "0x10063E50",
+      "raw_name": "FUN_10063e50",
+      "normalized_name": "Cmd_RaceInit_f",
+      "status": "matched",
+      "signature": "void Cmd_RaceInit_f(gentity_t *ent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only `raceinit` client-command leaf. Its only preserved caller is the client command dispatcher, and the body itself clears `ent->client->raceState.active`, `startTime`, `nextCheckpoint`, and the in-progress split buffer so a player can restart a run without rebuilding the broader race metadata."
     },
     {
       "address": "0x10063EC0",
@@ -7376,6 +8009,26 @@
       "comment": "High-confidence retail shuffle implementation reached both from gameplay vote/admin paths and directly from ConsoleCommand on `forceshuffle`. The body prints `Shuffling Teams.\\n`, gathers active players, sorts them through the shared balance comparator, redistributes teams, and forces the same respawn/reset flow exposed by the current shuffle command surface."
     },
     {
+      "address": "0x10067E20",
+      "raw_name": "FUN_10067e20",
+      "normalized_name": "G_FreezeRoundActive",
+      "status": "matched",
+      "signature": "static qboolean G_FreezeRoundActive(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive Freeze-state predicate used across the retail Freeze controller seam. It returns true only when the active gametype is Freeze, the shared intermission latches are clear, and `level.warmupTime` has reached the live-round `0` state."
+    },
+    {
+      "address": "0x10067E50",
+      "raw_name": "FUN_10067e50",
+      "normalized_name": "G_FreezeWarmupActive",
+      "status": "matched",
+      "signature": "static qboolean G_FreezeWarmupActive(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive Freeze-state predicate paired with `G_FreezeRoundActive`. It returns true only while Freeze is the active gametype, the shared intermission latches are clear, and `level.warmupTime` is still nonzero."
+    },
+    {
       "address": "0x10067E80",
       "raw_name": "FUN_10067e80",
       "normalized_name": "Team_ForceGesture",
@@ -7588,6 +8241,16 @@
       "comment": "Team objective frag bonus helper backed by the exact flag/skull carrier frag messages, the Quad/Invis/Haste/Regen powerup strings, and the source-faithful g_team.c bonus path."
     },
     {
+      "address": "0x100692B0",
+      "raw_name": "FUN_100692b0",
+      "normalized_name": "Team_ReturnFlagIfMissing",
+      "status": "matched",
+      "signature": "void *Team_ReturnFlagIfMissing(int team)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only CTF flag-sanity helper reached from the per-frame GT_CTF branch in G_RunFrame. It accepts the red or blue team, looks for any dropped or visible flag entity, falls back to a live enemy carrier with an active flag powerup, and only invokes Team_ReturnFlag when the flag has no surviving world or carrier representation."
+    },
+    {
       "address": "0x10069380",
       "raw_name": "FUN_10069380",
       "normalized_name": "Team_ResetFlag",
@@ -7700,6 +8363,16 @@
       "comment": "Overload and obelisk spawn helper anchored by the startsolid diagnostic."
     },
     {
+      "address": "0x1006B050",
+      "raw_name": "FUN_1006b050",
+      "normalized_name": "CheckObeliskAttack",
+      "status": "matched",
+      "signature": "qboolean CheckObeliskAttack(gentity_t *obelisk, gentity_t *attacker)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact Overload obelisk-attack gate from g_team.c. The body verifies the target still uses `ObeliskDie`, rejects non-client attackers, returns early for same-team touches, and throttles the matching red or blue under-attack `EV_GLOBAL_TEAM_SOUND` announcement before allowing damage."
+    },
+    {
       "address": "0x1006B110",
       "raw_name": "FUN_1006b110",
       "normalized_name": "G_TotalLivingHealthByTeam",
@@ -7738,6 +8411,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Descriptive retail-only shared round alert helper. It locates the sole surviving PM_NORMAL client on the selected team, emits the paired temp-entity/event, and sends that client the preserved centerprint notification used by the A/D, CA, Freeze, and Red Rover last-alive paths."
+    },
+    {
+      "address": "0x1006B2B0",
+      "raw_name": "FUN_1006b2b0",
+      "normalized_name": "InitTrigger",
+      "status": "matched",
+      "signature": "void InitTrigger(gentity_t *self)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact trigger bootstrap from g_trigger.c. It applies `G_SetMovedir` when `s.angles` is nonzero, calls `trap_SetBrushModel`, and then restores the standard trigger contents and no-client server flags."
     },
     {
       "address": "0x1006CA70",
@@ -7910,6 +8593,16 @@
       "comment": "Retail prox-launcher wrapper. It adds the upward pitch bias, renormalizes `forward`, spawns the prox projectile, and scales direct and splash damage."
     },
     {
+      "address": "0x1006F240",
+      "raw_name": "FUN_1006f240",
+      "normalized_name": "LogAccuracyHit",
+      "status": "matched",
+      "signature": "qboolean LogAccuracyHit(gentity_t *target, gentity_t *attacker)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact shared accuracy-hit predicate from g_weapon.c::LogAccuracyHit. Retail rejects non-damageable, self, non-client, same-team, and dead-or-frozen targets before callers increment accuracy stats."
+    },
+    {
       "address": "0x1006F290",
       "raw_name": "FUN_1006f290",
       "normalized_name": "FireWeapon",
@@ -7958,6 +8651,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Retail Kamikaze bootstrapper. It spawns the `kamikaze` event entity, seeds `KamikazeDamage` as the periodic think, resolves the activator from the live player or body queue, kills the user when appropriate, and emits the broadcast Kamikaze global sound."
+    },
+    {
+      "address": "0x100709A0",
+      "raw_name": "FUN_100709a0",
+      "normalized_name": "G_VoteArgumentIsNumericValue",
+      "status": "matched",
+      "signature": "static qboolean G_VoteArgumentIsNumericValue(const char *text)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only callvote numeric validator. The helper is only reached from `Cmd_CallVote_f`, where it accepts a non-empty decimal token with at most one `.` and rejects longer or mixed-text inputs before timelimit and weapon-respawn votes proceed."
     },
     {
       "address": "0x100709F0",
@@ -8090,6 +8793,16 @@
       "comment": "Descriptive retail-only rankings publisher anchored by the PLAYER_RACECOMPLETE event name and the RACE_TIME, WEAPONS_USED, and STEAM_ID payload keys. The retail race-finish path calls it immediately after storing the completed run time."
     },
     {
+      "address": "0x10072320",
+      "raw_name": "FUN_10072320",
+      "normalized_name": "trap_RankReportInt",
+      "status": "matched",
+      "signature": "void trap_RankReportInt(int index1, int index2, int key, int value, qboolean accum)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact rankings syscall wrapper from `g_syscalls.c::trap_RankReportInt`. Retail short-circuits when the rankings bridge is unavailable and otherwise forwards the integer-report payload through the native dispatch slot at offset `0x324`."
+    },
+    {
       "address": "0x10072350",
       "raw_name": "FUN_10072350",
       "normalized_name": "G_RankSendPlayerSwitchTeam",
@@ -8150,6 +8863,36 @@
       "comment": "Exact QL-only G_CallSpawn dispatch-table constructor from g_team.c::SP_team_dom_point."
     },
     {
+      "address": "0x10059C10",
+      "raw_name": "FUN_10059c10",
+      "normalized_name": "G_SetWarmupTime",
+      "status": "matched",
+      "signature": "static void G_SetWarmupTime(int warmupTime)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only warmup-deadline helper. It stores the new warmup timestamp, republishes `CS_WARMUP`, refreshes the adjacent auto-record controller, and drives `g_gameState` to `PRE_GAME`, `COUNT_DOWN`, or `IN_PROGRESS` based on the sign of the supplied deadline."
+    },
+    {
+      "address": "0x10059C70",
+      "raw_name": "FUN_10059c70",
+      "normalized_name": "G_ResetClientInactivityWarnings",
+      "status": "matched",
+      "signature": "static void G_ResetClientInactivityWarnings(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only inactivity helper wired to the `g_inactivityWarning` cvar callback. It walks connected clients and clears their per-client inactivity-warning latch so the countdown warning can be reissued under the new setting."
+    },
+    {
+      "address": "0x10059CB0",
+      "raw_name": "FUN_10059cb0",
+      "normalized_name": "G_SyncConnectedClientInfiniteAmmoState",
+      "status": "matched",
+      "signature": "static void G_SyncConnectedClientInfiniteAmmoState(qboolean infiniteAmmo)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained ammo-slab sync helper behind the `g_instaGib` callback. It walks connected live clients and rewrites the playerstate ammo array either from the retail starting-ammo defaults or to `-1` sentinels, depending on whether the current infinite-ammo path is active."
+    },
+    {
       "address": "0x10059D40",
       "raw_name": "FUN_10059d40",
       "normalized_name": "G_AnnouncePowerupCarrierKill",
@@ -8164,12 +8907,25 @@
     {
       "address": "0x10059E50",
       "raw_name": "FUN_10059e50",
-      "normalized_name": "G_PowerupCarrierKillUsesWhitePrefix",
+      "normalized_name": "G_CurrentGametypeUsesObjectivePowerupPrefix",
       "status": "matched",
-      "signature": "static qboolean G_PowerupCarrierKillUsesWhitePrefix(int gametype)",
+      "signature": "static qboolean G_CurrentGametypeUsesObjectivePowerupPrefix(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only carrier-banner color predicate. HLIL shows this compact helper returning true only for CTF, 1FCTF, Overload, Harvester, and Attack and Defend so the kill banner keeps the white prefix there and falls back to `^3` elsewhere."
+      "comment": "Descriptive retail-only current-gametype wrapper around the shared objective-mode powerup-prefix predicate. HLIL reduces it to the no-arg classifier over `g_gametype` that the persistant-powerup pickup banner uses before choosing between neutral white and team-colored prefixes."
+    },
+    {
+      "address": "0x10059E70",
+      "raw_name": "FUN_10059e70",
+      "normalized_name": "G_Alloc",
+      "status": "matched",
+      "signature": "void *G_Alloc(int size)",
+      "string_refs": [
+        "0x10087EC0",
+        "0x10087EE0"
+      ],
+      "relocation_refs": [],
+      "comment": "Exact slab allocator from g_mem.c::G_Alloc. Retail preserves the debug print and allocation-failure diagnostics, aligns every request to 32 bytes, advances the shared 4 MB game pool cursor, and returns the previous pool base on success."
     },
     {
       "address": "0x10059EE0",
@@ -8630,6 +9386,16 @@
       "comment": "Exact QL race-point constructor from g_race.c::SP_race_point recovered through the retail spawn table."
     },
     {
+      "address": "0x10066F60",
+      "raw_name": "sub_10066f60",
+      "normalized_name": "Use_Target_Give",
+      "status": "matched",
+      "signature": "void Use_Target_Give(gentity_t *ent, gentity_t *other, gentity_t *activator)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact target-give use callback from g_target.c::Use_Target_Give. It validates the activator client and targetname, walks every matched target entity, routes item targets through `Touch_Item`, then suppresses any residual respawn or event state before unlinking the consumed item."
+    },
+    {
       "address": "0x10066FE0",
       "raw_name": "sub_10066fe0",
       "normalized_name": "SP_target_give",
@@ -8648,6 +9414,26 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact G_CallSpawn dispatch-table constructor from g_target.c::SP_target_remove_keys."
+    },
+    {
+      "address": "0x10066FF0",
+      "raw_name": "sub_10066ff0",
+      "normalized_name": "Use_Target_RemoveKeys",
+      "status": "matched",
+      "signature": "void Use_Target_RemoveKeys(gentity_t *ent, gentity_t *other, gentity_t *activator)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact key-removal target callback from g_target.c::Use_Target_RemoveKeys. It validates the activator client, drops any carried silver, gold, or master key through `G_ResetKeyItem`, and clears the activator key mask."
+    },
+    {
+      "address": "0x10067070",
+      "raw_name": "sub_10067070",
+      "normalized_name": "Use_target_remove_powerups",
+      "status": "matched",
+      "signature": "void Use_target_remove_powerups(gentity_t *ent, gentity_t *other, gentity_t *activator)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact powerup-removal target callback from g_target.c::Use_target_remove_powerups. It validates the activator client, returns any carried red, blue, or neutral flag through the team flag reset path, and then clears the full player powerup slab."
     },
     {
       "address": "0x100671B0",
@@ -8920,6 +9706,16 @@
       "comment": "Exact QL-only G_CallSpawn dispatch-table constructor from g_target.c::SP_target_achievement."
     },
     {
+      "address": "0x1006A530",
+      "raw_name": "FUN_1006a530",
+      "normalized_name": "Team_GetLocationMsg",
+      "status": "matched",
+      "signature": "qboolean Team_GetLocationMsg(gentity_t *ent, char *loc, int loclen)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact location-string helper from g_team.c::Team_GetLocationMsg. It resolves the nearest target_location through `Team_GetLocation`, formats the optional colored count prefix plus message text into the supplied buffer, and returns whether a location was available."
+    },
+    {
       "address": "0x1006A560",
       "raw_name": "FUN_1006a560",
       "normalized_name": "SP_info_player_intermission",
@@ -9150,6 +9946,16 @@
       "comment": "Exact G_CallSpawn dispatch-table constructor from g_trigger.c::SP_func_timer."
     },
     {
+      "address": "0x1006BDA0",
+      "raw_name": "FUN_1006bda0",
+      "normalized_name": "G_DroppedPowerupTouchCaptureZone",
+      "status": "matched",
+      "signature": "int G_DroppedPowerupTouchCaptureZone(gentity_t *trigger, gentity_t *ent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only dropped-powerup trigger bridge for legacy `trigger_capturezone` volumes. It resolves the red or blue base flag from the trigger-side team token, falls back through the linked owner entity when the powerup is proxied through a client-backed wrapper, and then routes the touch through `Team_TouchOurFlag`."
+    },
+    {
       "address": "0x1006BE70",
       "raw_name": "FUN_1006be70",
       "normalized_name": "SP_trigger_capturezone",
@@ -9168,6 +9974,16 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Exact configstring-slot resolver from g_utils.c. Retail skips empty names, scans the requested configstring range for an existing match, preserves the overflow error, and optionally publishes a new slot through `trap_SetConfigstring`."
+    },
+    {
+      "address": "0x1006BF80",
+      "raw_name": "FUN_1006bf80",
+      "normalized_name": "G_Sound",
+      "status": "matched",
+      "signature": "void G_Sound(gentity_t *ent, int channel, int soundIndex)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact temp-entity sound helper from g_utils.c. Retail emits `EV_GENERAL_SOUND` at `ent->r.currentOrigin` through `G_TempEntity` and stores `soundIndex` in `s.eventParm`; the `channel` parameter is preserved but unused."
     },
     {
       "address": "0x1006BFA0",
@@ -9200,6 +10016,26 @@
       "comment": "Exact g_utils.c target-dispatch loop. Retail iterates matching targetname entities through G_Find, warns on self-use, invokes each use callback, and preserves the entity-was-removed diagnostic."
     },
     {
+      "address": "0x1006C1A0",
+      "raw_name": "FUN_1006c1a0",
+      "normalized_name": "G_SetMovedir",
+      "status": "matched",
+      "signature": "void G_SetMovedir(vec3_t angles, vec3_t movedir)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact movedir helper from g_utils.c. Retail preserves the same special `VEC_UP` and `VEC_DOWN` angle sentinels, falls back to `AngleVectors` for ordinary yaw input, and clears the source angles after converting them into a direction."
+    },
+    {
+      "address": "0x1006C2A0",
+      "raw_name": "FUN_1006c2a0",
+      "normalized_name": "vectoyaw",
+      "status": "matched",
+      "signature": "float vectoyaw(const vec3_t vec)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact yaw extractor from g_utils.c. It handles the zero-vector fast path, the straight-left and straight-right special cases, the `atan2( vec[YAW], vec[PITCH] ) * 180 / M_PI` conversion, and the final wrap into the `[0, 360)` range."
+    },
+    {
       "address": "0x1006C340",
       "raw_name": "FUN_1006c340",
       "normalized_name": "G_Spawn",
@@ -9230,6 +10066,96 @@
       "comment": "Exact telefrag helper from g_utils.c. It builds the destination bounds from the client's origin plus entity mins/maxs, enumerates touches through `trap_EntitiesInBox`, and applies unconditional telefrag damage to overlapping clients."
     },
     {
+      "address": "0x1006C630",
+      "raw_name": "FUN_1006c630",
+      "normalized_name": "G_AddPredictableEvent",
+      "status": "matched",
+      "signature": "void G_AddPredictableEvent(gentity_t *ent, int event, int eventParm)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact predictable-event helper from g_utils.c. Retail bails when the entity has no client and otherwise forwards the event plus parm into `BG_AddPredictableEventToPlayerstate` against that client's playerstate."
+    },
+    {
+      "address": "0x1006C660",
+      "raw_name": "FUN_1006c660",
+      "normalized_name": "G_AddEvent",
+      "status": "matched",
+      "signature": "void G_AddEvent(gentity_t *ent, int event, int eventParm)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact event helper core from g_utils.c. Retail preserves the same event-bit rollover and client-vs-entity storage split as source, publishing into `client->ps.externalEvent` / `externalEventParm` or `ent->s.event` / `eventParm` and stamping `ent->eventTime = level.time`; the source-side zero-event warning is hoisted out of this leaf."
+    },
+    {
+      "address": "0x1006C6E0",
+      "raw_name": "FUN_1006c6e0",
+      "normalized_name": "G_SetOrigin",
+      "status": "matched",
+      "signature": "void G_SetOrigin(gentity_t *ent, vec3_t origin)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact fixed-position helper from g_utils.c. It copies the supplied origin into `s.pos.trBase`, marks the trajectory stationary with zeroed time and delta, and mirrors the same coordinates into `r.currentOrigin`."
+    },
+    {
+      "address": "0x1006C730",
+      "raw_name": "FUN_1006c730",
+      "normalized_name": "G_CleanClientNameFromClientNum",
+      "status": "matched",
+      "signature": "char *G_CleanClientNameFromClientNum(int clientNum, char *dest)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only cleaned-name helper keyed by client number. It reads `CS_PLAYERS + clientNum`, extracts the `n` field, strips color formatting through `Q_CleanStr`, and copies the result into the fixed 40-byte destination buffer used by retail capture and rankings messages."
+    },
+    {
+      "address": "0x1006C7C0",
+      "raw_name": "FUN_1006c7c0",
+      "normalized_name": "G_CleanClientNameFromClient",
+      "status": "matched",
+      "signature": "char *G_CleanClientNameFromClient(char *dest, gclient_t *client)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only cleaned-name wrapper keyed by `gclient_t *`. It derives the client index from `level.clients`, then follows the same `CS_PLAYERS` -> `Info_ValueForKey( ..., \"n\" )` -> `Q_CleanStr` copy path as `G_CleanClientNameFromClientNum`."
+    },
+    {
+      "address": "0x1006C870",
+      "raw_name": "FUN_1006c870",
+      "normalized_name": "G_ClientNetname",
+      "status": "matched",
+      "signature": "char *G_ClientNetname(int clientNum)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only netname accessor. It copies `level.clients[clientNum].pers.netname` into a shared static buffer and returns that buffer without color stripping, matching the retail helper used by rename, chat, timeout, and flag-announcement prints."
+    },
+    {
+      "address": "0x1006C8D0",
+      "raw_name": "FUN_1006c8d0",
+      "normalized_name": "CalcMuzzlePoint",
+      "status": "matched",
+      "signature": "void CalcMuzzlePoint(gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact muzzle-point helper from g_weapon.c. Retail derives forward vectors from `client->ps.viewangles`, seeds the muzzle from `ent->s.pos.trBase`, adds `client->ps.viewheight`, and applies the same crouched-vs-standing forward offset before publishing the shared muzzle vector; this leaf also covers the no-op `CalcMuzzlePointOrigin` variant folded into the same implementation."
+    },
+    {
+      "address": "0x1006C9A0",
+      "raw_name": "FUN_1006c9a0",
+      "normalized_name": "G_BounceProjectile",
+      "status": "matched",
+      "signature": "void G_BounceProjectile(vec3_t start, vec3_t impact, vec3_t dir, vec3_t endout)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact bounce-reflection helper from g_weapon.c. The body reconstructs `impact - start`, reflects that vector across the supplied direction with the same `-2 * dot` term, normalizes the result, and projects the bounced endpoint 8192 units from the impact point."
+    },
+    {
+      "address": "0x1006CC20",
+      "raw_name": "FUN_1006cc20",
+      "normalized_name": "SnapVectorTowards",
+      "status": "matched",
+      "signature": "void SnapVectorTowards(vec3_t v, vec3_t to)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact network-rounding helper from g_weapon.c. It walks the three vector components, truncates each coordinate toward zero, and bumps the result upward when needed so the snapped endpoint stays on the `to` side of the reference vector."
+    },
+    {
       "address": "0x1004DC20",
       "raw_name": "FUN_1004dc20",
       "normalized_name": "G_AnnouncePersistantPowerupPickup",
@@ -9238,6 +10164,26 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Descriptive retail-only persistent-powerup pickup-message helper. It compares the picked-up rune against the cached red and blue base origins, chooses the matching color prefix, and emits either the global pickup announcement or the opponent-side-only pickup notice used by the retail Pickup_PersistantPowerup flow."
+    },
+    {
+      "address": "0x10069080",
+      "raw_name": "FUN_10069080",
+      "normalized_name": "Team_CheckHurtCarrier",
+      "status": "matched",
+      "signature": "void Team_CheckHurtCarrier(gentity_t *targ, gentity_t *attacker)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact team helper from g_team.c. The leaf requires live target and attacker clients, derives the opposing flag powerup from the target team, and stamps `attacker->client->pers.teamState.lasthurtcarrier = level.time` when the target is carrying either the enemy flag or Harvester skulls."
+    },
+    {
+      "address": "0x100690F0",
+      "raw_name": "FUN_100690f0",
+      "normalized_name": "G_FindPersistantPowerupFlagBaseByTeam",
+      "status": "matched",
+      "signature": "gentity_t *G_FindPersistantPowerupFlagBaseByTeam(team_t team)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only persistent-powerup helper used by G_InitItemPowerupState. It maps the requested team to the neutral, red, or blue CTF base classname, scans active entities for that classname, skips dropped copies, and returns the surviving home-base flag entity."
     },
     {
       "address": "0x10069190",
@@ -9300,54 +10246,324 @@
       "comment": "Descriptive retail-only rankings helper. It picks the preferred-weapon index from the enabled-weapon mask and the accumulated per-weapon time totals, then feeds that result into the extended ranked score-message builders."
     },
     {
-      "address": "0x100793A0",
-      "raw_name": "FUN_100793a0",
-      "normalized_name": "JsonValueDestroy",
+      "address": "0x10078A40",
+      "raw_name": "FUN_10078a40",
+      "normalized_name": "StdStringAssignRange",
       "status": "matched",
-      "signature": "void JsonValueDestroy(void *value)",
+      "signature": "void *StdStringAssignRange(void *str, const char *text, unsigned int length)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only Json value destructor. HLIL shows it switching on the tagged Json payload kind, releasing allocator-owned strings, recursively freeing map-backed array/object storage through the adjacent tree clear helper, and then freeing the optional comment array."
+      "comment": "Descriptive retained string-runtime helper. It assigns a raw character range into the destination string, handles self-aliasing by falling back to the substring path when the source overlaps the current buffer, grows storage when needed, and always restores the trailing NUL."
+    },
+    {
+      "address": "0x10078B10",
+      "raw_name": "FUN_10078b10",
+      "normalized_name": "StdStringAssignSubstr",
+      "status": "matched",
+      "signature": "void *StdStringAssignSubstr(void *dest, const void *source, unsigned int startIndex, unsigned int count)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained string-runtime helper. It assigns a substring from the source string into the destination, validates the requested start offset, clamps the copied count to the remaining source length, and uses the adjacent erase path when the assignment aliases the same string object."
+    },
+    {
+      "address": "0x10078CA3",
+      "raw_name": "Catch_All@10078ca3",
+      "normalized_name": "StdStringGrowAllocateBuffer",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Standalone retained string-runtime fragment split out of `StdStringGrow`. It computes the requested buffer length plus the NUL terminator, records that temporary size in the EH frame, calls the retained throwing `operator_new`, and hands the new heap buffer back to the parent growth helper."
+    },
+    {
+      "address": "0x10078CC7",
+      "raw_name": "FUN_10078cc7",
+      "normalized_name": "StdStringGrowCommitBuffer",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Standalone retained string-runtime fragment split out of `StdStringGrow`. It copies the preserved prefix into the replacement allocation when needed, releases the prior heap buffer, installs the new buffer/capacity/length triplet, and rewrites the trailing NUL terminator."
+    },
+    {
+      "address": "0x10078BF0",
+      "raw_name": "FUN_10078bf0",
+      "normalized_name": "StdStringGrow",
+      "status": "matched",
+      "signature": "void *StdStringGrow(void *str, unsigned int requestedSize, unsigned int preserveLength)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained string-runtime growth helper. It picks a new capacity using the MSVC small-string and 1.5x growth rules, allocates a replacement buffer, preserves the requested prefix length, frees the old heap storage when necessary, and terminates the resized string."
+    },
+    {
+      "address": "0x10078D27",
+      "raw_name": "Catch_All@10078d27",
+      "normalized_name": "CatchAllStdStringGrow",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated catch-all funclet for `StdStringGrow`. It releases the temporary heap buffer captured in the EH frame, restores the destination string to the empty small-string state, and then rethrows."
+    },
+    {
+      "address": "0x10078D60",
+      "raw_name": "FUN_10078d60",
+      "normalized_name": "StdStringErase",
+      "status": "matched",
+      "signature": "void *StdStringErase(void *str, unsigned int offset, unsigned int count)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained string-runtime erase helper. It validates the erase offset, clamps the removal count to the remaining string length, slides the surviving suffix down with `memmove`, updates the stored length, and rewrites the trailing NUL."
+    },
+    {
+      "address": "0x10078DE0",
+      "raw_name": "FUN_10078de0",
+      "normalized_name": "operator_new",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact retained throwing scalar `operator new` wrapper. It delegates to the underlying allocation path and, on failure, constructs `std::bad_alloc` and throws through `_CxxThrowException`."
+    },
+    {
+      "address": "0x10078E30",
+      "raw_name": "FUN_10078e30",
+      "normalized_name": "StdRuntimeErrorDestroy",
+      "status": "matched",
+      "signature": "void *StdRuntimeErrorDestroy(void *exceptionObject, unsigned int deleteFlags)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact retained MSVC scalar-deleting destructor for `std::runtime_error`. It destroys the inherited `std::exception` state and conditionally frees the object when the compiler-supplied delete flag is set."
+    },
+    {
+      "address": "0x10078E70",
+      "raw_name": "FUN_10078e70",
+      "normalized_name": "StdRuntimeErrorCopyConstruct",
+      "status": "matched",
+      "signature": "void *StdRuntimeErrorCopyConstruct(void *dest, const void *source)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact retained MSVC copy constructor for `std::runtime_error`. It copy-constructs the base `std::exception` payload and then restores the `std::runtime_error` vftable reused by the adjacent throw-info record."
+    },
+    {
+      "address": "0x10078E90",
+      "raw_name": "FUN_10078e90",
+      "normalized_name": "JsonValueAllocatorMakeMemberName",
+      "status": "matched",
+      "signature": "char *JsonValueAllocatorMakeMemberName(void *allocator, const char *memberName)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact JsonCpp allocator wrapper for `Json::ValueAllocator::makeMemberName`. The default allocator forwards member-name duplication to the adjacent `duplicateStringValue` virtual with a sentinel `-1` length so the helper measures the incoming C string itself."
+    },
+    {
+      "address": "0x10078EB0",
+      "raw_name": "FUN_10078eb0",
+      "normalized_name": "JsonValueAllocatorReleaseMemberName",
+      "status": "matched",
+      "signature": "void JsonValueAllocatorReleaseMemberName(void *allocator, char *memberName)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact JsonCpp allocator wrapper for `Json::ValueAllocator::releaseMemberName`. The default allocator simply reuses the adjacent string-release virtual to free duplicated member-name storage."
+    },
+    {
+      "address": "0x10078EC0",
+      "raw_name": "FUN_10078ec0",
+      "normalized_name": "duplicateStringValue",
+      "status": "matched",
+      "signature": "char *duplicateStringValue(const char *value, unsigned int length)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact JsonCpp string helper from `json_value.cpp`. It resolves the sentinel `-1` length into `strlen`, allocates `length + 1` bytes, copies the requested slice, and appends a terminating NUL."
+    },
+    {
+      "address": "0x10078F10",
+      "raw_name": "FUN_10078f10",
+      "normalized_name": "releaseStringValue",
+      "status": "matched",
+      "signature": "void releaseStringValue(char *value)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact JsonCpp string-release helper from `json_value.cpp`. The body returns immediately for null pointers and otherwise frees the supplied heap buffer."
+    },
+    {
+      "address": "0x10078F30",
+      "raw_name": "FUN_10078f30",
+      "normalized_name": "JsonValueAllocatorDestroy",
+      "status": "matched",
+      "signature": "void *JsonValueAllocatorDestroy(void *allocator, unsigned int deleteFlags)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact retained scalar-deleting destructor for `Json::ValueAllocator`. The abstract base restores its own vftable and conditionally deletes the object when the compiler-supplied delete flag requests it."
+    },
+    {
+      "address": "0x10078F60",
+      "raw_name": "FUN_10078f60",
+      "normalized_name": "JsonValueGetAllocator",
+      "status": "matched",
+      "signature": "void *JsonValueGetAllocator(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive allocator accessor for the embedded Json runtime. It lazily installs the process-global `Json::DefaultValueAllocator` singleton, registers the shared atexit cleanup, and returns the allocator object reused by the adjacent duplicate and release vtable calls."
+    },
+    {
+      "address": "0x10078F90",
+      "raw_name": "FUN_10078f90",
+      "normalized_name": "JsonValueCommentInfoInit",
+      "status": "matched",
+      "signature": "void *JsonValueCommentInfoInit(void *commentInfo)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact default constructor for `Json::Value::CommentInfo`. The retail leaf only clears the stored comment pointer and returns the same slot."
+    },
+    {
+      "address": "0x10078FA0",
+      "raw_name": "FUN_10078fa0",
+      "normalized_name": "JsonValueCommentInfoDestroy",
+      "status": "matched",
+      "signature": "void JsonValueCommentInfoDestroy(void *commentInfo)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact destructor for `Json::Value::CommentInfo`. It checks for a live comment pointer and releases that buffer through the shared Json allocator path."
+    },
+    {
+      "address": "0x10079000",
+      "raw_name": "FUN_10079000",
+      "normalized_name": "JsonValueCommentInfoSetComment",
+      "status": "matched",
+      "signature": "void JsonValueCommentInfoSetComment(void *commentInfo, const char *text)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `Json::Value::CommentInfo` setter from `json_value.cpp`. Retail releases any previous buffer, enforces the retained `Comments must start with /` assertion, and duplicates the new text through the shared allocator."
+    },
+    {
+      "address": "0x100790C0",
+      "raw_name": "FUN_100790c0",
+      "normalized_name": "JsonValueCZStringCopyConstruct",
+      "status": "matched",
+      "signature": "void *JsonValueCZStringCopyConstruct(void *dest, const void *source)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact copy constructor for `Json::Value::CZString`. It duplicates allocator-owned member-name strings, preserves non-owned static references without copying, and normalizes the duplication-policy tag in the destination."
+    },
+    {
+      "address": "0x10079130",
+      "raw_name": "FUN_10079130",
+      "normalized_name": "JsonValueCZStringDestroy",
+      "status": "matched",
+      "signature": "void JsonValueCZStringDestroy(void *czString)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact destructor for `Json::Value::CZString`. The leaf only releases the stored key string when the duplication-policy field marks that string as allocator-owned."
+    },
+    {
+      "address": "0x10079180",
+      "raw_name": "FUN_10079180",
+      "normalized_name": "JsonValueConstructCString",
+      "status": "matched",
+      "signature": "void *JsonValueConstructCString(void *value, const char *text)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `Json::Value( const char * )` string constructor from `json_value.cpp`. It tags the destination as an allocated string value, clears the optional comment pointer, and duplicates the incoming NUL-terminated text through the shared Json allocator."
+    },
+    {
+      "address": "0x100791E0",
+      "raw_name": "FUN_100791e0",
+      "normalized_name": "JsonValueSetCString",
+      "status": "matched",
+      "signature": "char *JsonValueSetCString(void *value, const char *text)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only Json string-slot setter. It tags the target value as an allocated string, clears the optional comment pointer, duplicates the incoming NUL-terminated text through the shared Json allocator, and returns the duplicated buffer pointer."
+    },
+    {
+      "address": "0x10079240",
+      "raw_name": "FUN_10079240",
+      "normalized_name": "JsonValueCopyConstruct",
+      "status": "matched",
+      "signature": "void *JsonValueCopyConstruct(void *dest, const void *source)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact Json value copy constructor from the embedded JsonCpp runtime. It copies scalar payloads directly, duplicates owned strings, clones map-backed array and object storage through `JsonValueCopyMapStorage`, and deep-copies the optional three-slot comment array."
+    },
+    {
+      "address": "0x100793A0",
+      "raw_name": "FUN_100793a0",
+      "normalized_name": "JsonValueDestructor",
+      "status": "matched",
+      "signature": "void JsonValueDestructor(void *value)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `Json::Value::~Value()` body from the embedded JsonCpp runtime. HLIL shows it switching on the tagged Json payload kind, releasing allocator-owned strings through the default allocator vtable, recursively tearing down map-backed array/object storage, and then freeing the optional three-slot comment array."
     },
     {
       "address": "0x10079490",
       "raw_name": "FUN_10079490",
-      "normalized_name": "JsonValueAssign",
+      "normalized_name": "JsonValueOperatorAssign",
       "status": "matched",
-      "signature": "void JsonValueAssign(void *dest, void *src)",
+      "signature": "void *JsonValueOperatorAssign(void *value, const void *other)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only Json value assignment helper. The body copy-constructs a temporary value from the source, swaps payload/tag/comment fields into the destination, and then destroys the displaced temporary value."
+      "comment": "Exact `Json::Value::operator=( const Value & )` body from `json_value.cpp`. Retail copy-constructs the temporary `Value other`, swaps payload/tag/comment state into the destination, and then destroys the displaced temporary value."
     },
     {
       "address": "0x10079510",
       "raw_name": "FUN_10079510",
-      "normalized_name": "JsonValueEquals",
+      "normalized_name": "JsonValueOperatorEquals",
       "status": "matched",
-      "signature": "qboolean JsonValueEquals(const void *lhs, const void *rhs)",
+      "signature": "qboolean JsonValueOperatorEquals(const void *lhs, const void *rhs)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only Json equality predicate. HLIL compares the tagged value kinds first, then handles int/uint/real/string/bool directly and falls through to the map-backed array/object comparison path for the container kinds."
+      "comment": "Exact `Json::Value::operator==( const Value & ) const` predicate from `json_value.cpp`. HLIL compares the tagged value kinds first, then handles int/uint/real/string/bool directly and falls through to the map-backed array/object comparison path for the container kinds."
+    },
+    {
+      "address": "0x100795E0",
+      "raw_name": "FUN_100795e0",
+      "normalized_name": "JsonValueOperatorIndexArrayIndex",
+      "status": "matched",
+      "signature": "void *JsonValueOperatorIndexArrayIndex(void *value, unsigned int index)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `Json::Value::operator[]( ArrayIndex )` body from `json_value.cpp`. Retail promotes null values to `arrayValue`, performs the numeric `CZString` lower-bound lookup in the backing map, inserts a default null element on misses, and returns the referenced element slot."
+    },
+    {
+      "address": "0x100797A0",
+      "raw_name": "FUN_100797a0",
+      "normalized_name": "JsonValueMapNodeDestroyThunk",
+      "status": "matched",
+      "signature": "void *JsonValueMapNodeDestroyThunk(void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Tiny regparm forwarding thunk that immediately tailcalls `JsonValueMapNodeDestroy`."
+    },
+    {
+      "address": "0x100797B0",
+      "raw_name": "FUN_100797b0",
+      "normalized_name": "JsonValueMapNodeDestroy",
+      "status": "matched",
+      "signature": "void JsonValueMapNodeDestroy(void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal Json map-node destructor. It destroys the embedded `Json::Value` payload, then releases the duplicated `CZString` key when the node owns that key storage."
     },
     {
       "address": "0x10079850",
       "raw_name": "FUN_10079850",
-      "normalized_name": "JsonValueResolveMemberReference",
+      "normalized_name": "JsonValueOperatorIndexCString",
       "status": "matched",
-      "signature": "void *JsonValueResolveMemberReference(void *value, const char *key)",
+      "signature": "void *JsonValueOperatorIndexCString(void *value, const char *key)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only object-member resolver. When the incoming value is null it promotes it to the map-backed object kind, then performs the CZString-style key lookup/insert path and returns the nested member slot for the requested key."
+      "comment": "Exact `Json::Value::operator[]( const char * )` body from `json_value.cpp`, with the private `resolveReference( key, false )` helper inlined by retail optimization. When the incoming value is null it promotes it to the map-backed object kind, then performs the CZString-style key lookup/insert path and returns the nested member slot for the requested key."
     },
     {
       "address": "0x10079A10",
       "raw_name": "FUN_10079a10",
-      "normalized_name": "JsonValueGetSize",
+      "normalized_name": "JsonValueAppend",
       "status": "matched",
-      "signature": "int JsonValueGetSize(const void *value)",
+      "signature": "void *JsonValueAppend(void *value, const void *element)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only Json size helper. The array path walks to the highest indexed sparse entry and returns index-plus-one, while the object path returns the stored member count from the backing map header."
+      "comment": "Exact `Json::Value::append` helper from `json_value.cpp`. It computes the current array size, resolves the next numeric slot through `JsonValueOperatorIndexArrayIndex`, assigns the incoming element into that slot, and returns the inserted element reference."
     },
     {
       "address": "0x10079A90",
@@ -9380,6 +10596,16 @@
       "comment": "Descriptive retail-only copy-constructor helper for the map-backed Json storage used by array/object values. It allocates a fresh sentinel node, initializes the empty tree header, and then clones the source member tree through the adjacent iterator/copy path."
     },
     {
+      "address": "0x10079E37",
+      "raw_name": "Catch_All@10079e37",
+      "normalized_name": "CatchAllJsonValueClearMapRange",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated catch-all funclet for `JsonValueClearMapRange`. It resumes range destruction from the current iterator state through the parent clear helper and then rethrows."
+    },
+    {
       "address": "0x10079E80",
       "raw_name": "FUN_10079e80",
       "normalized_name": "JsonValueClearMapRange",
@@ -9398,6 +10624,186 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Descriptive retail-only recursive node destructor for the map-backed Json container. It descends the tree, destroys each embedded Json value plus allocator-owned key storage, and frees every non-sentinel node."
+    },
+    {
+      "address": "0x1007A010",
+      "raw_name": "FUN_1007a010",
+      "normalized_name": "JsonValueMapLowerBound",
+      "status": "matched",
+      "signature": "void *JsonValueMapLowerBound(void *storage, const void *key)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal lower-bound search for the map-backed Json storage. It walks the red-black tree in `CZString` key order and returns the first node whose key is not less than the requested member/index key, or the sentinel when the search runs off the tree."
+    },
+    {
+      "address": "0x1007A080",
+      "raw_name": "FUN_1007a080",
+      "normalized_name": "JsonValueMapRotateLeft",
+      "status": "matched",
+      "signature": "void *JsonValueMapRotateLeft(void *node, void *storage)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal left-rotation helper for the map-backed Json red-black tree. It promotes the current node's right child, rewires parent and root links through the storage header, and returns the rotated subtree root."
+    },
+    {
+      "address": "0x1007A0E0",
+      "raw_name": "FUN_1007a0e0",
+      "normalized_name": "JsonValueMapRotateRight",
+      "status": "matched",
+      "signature": "void *JsonValueMapRotateRight(void *node, void *storage)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal right-rotation helper for the map-backed Json red-black tree. It promotes the current node's left child, rewires parent and root links through the storage header, and returns the rotated subtree root."
+    },
+    {
+      "address": "0x1007A140",
+      "raw_name": "FUN_1007a140",
+      "normalized_name": "JsonValueFreeMapStorageSentinel",
+      "status": "matched",
+      "signature": "void JsonValueFreeMapStorageSentinel(void *storage)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive tiny helper for the map-backed Json storage header. It frees the sentinel-node allocation stored at `storage + 4`; the owning caller handles any member-node teardown separately."
+    },
+    {
+      "address": "0x1007A150",
+      "raw_name": "FUN_1007a150",
+      "normalized_name": "JsonValueMapSubtreeRightmost",
+      "status": "matched",
+      "signature": "void *JsonValueMapSubtreeRightmost(void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal rightmost-node walk for the map-backed Json tree. The erase helper uses it when it needs to rebuild the sentinel's cached end-iterator predecessor from a replacement subtree."
+    },
+    {
+      "address": "0x1007A170",
+      "raw_name": "FUN_1007a170",
+      "normalized_name": "JsonValueMapKeyLess",
+      "status": "matched",
+      "signature": "qboolean JsonValueMapKeyLess(const void *lhs, const void *rhs)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal `CZString` ordering predicate for the map-backed Json storage. It applies the same string-versus-index ordering used by the lower-bound and insert helpers so hinted inserts and duplicate-key checks stay aligned."
+    },
+    {
+      "address": "0x1007A1C0",
+      "raw_name": "FUN_1007a1c0",
+      "normalized_name": "JsonValueMapNodeNext",
+      "status": "matched",
+      "signature": "void JsonValueMapNodeNext(void **node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal in-order successor helper for the map-backed Json tree. It advances an iterator node pointer to the next key in sorted order, descending into the right subtree or climbing parents as needed."
+    },
+    {
+      "address": "0x1007A210",
+      "raw_name": "FUN_1007a210",
+      "normalized_name": "JsonValueMapNodePrev",
+      "status": "matched",
+      "signature": "void JsonValueMapNodePrev(void **node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal in-order predecessor helper for the map-backed Json tree. It supports both normal iterator decrement and the `end()` case by falling back to the cached rightmost node in the storage sentinel."
+    },
+    {
+      "address": "0x1007A270",
+      "raw_name": "FUN_1007a270",
+      "normalized_name": "JsonValueMapCloneTree",
+      "status": "matched",
+      "signature": "void *JsonValueMapCloneTree(void *storage, const void *source)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal whole-tree clone helper for the map-backed Json storage. It duplicates the source root through the recursive subtree copier, copies the stored member count, and then rebuilds the leftmost and rightmost boundary links cached in the destination sentinel."
+    },
+    {
+      "address": "0x1007A2E0",
+      "raw_name": "FUN_1007a2e0",
+      "normalized_name": "JsonValueMapCloneSubtree",
+      "status": "matched",
+      "signature": "void *JsonValueMapCloneSubtree(void *storage, const void *sourceNode, void *parent)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal recursive subtree clone for the map-backed Json storage. It constructs a destination node from the source key/value pair, preserves the source color bit, and recursively recreates the left and right child links under the supplied parent."
+    },
+    {
+      "address": "0x1007A37D",
+      "raw_name": "Catch_All@1007a37d",
+      "normalized_name": "CatchAllJsonValueMapCloneSubtree",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated catch-all funclet for `JsonValueMapCloneSubtree`. When recursive child construction throws, it destroys the partially cloned subtree through `JsonValueDestroyMapNodes` and then rethrows."
+    },
+    {
+      "address": "0x1007A3A0",
+      "raw_name": "FUN_1007a3a0",
+      "normalized_name": "JsonValueMapNodeConstruct",
+      "status": "matched",
+      "signature": "void *JsonValueMapNodeConstruct(const void *source, void *sentinel)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal Json map-node constructor. It allocates a 0x30-byte tree node, seeds the left/right/parent links from the map sentinel, copy-constructs the embedded `CZString` key, and copy-constructs the sibling `Json::Value` payload."
+    },
+    {
+      "address": "0x1007A436",
+      "raw_name": "Catch_All@1007a436",
+      "normalized_name": "CatchAllJsonValueMapNodeConstruct",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated catch-all funclet for `JsonValueMapNodeConstruct`. It frees the 0x30-byte node allocation recorded in the EH frame and then rethrows after key or value construction fails."
+    },
+    {
+      "address": "0x1007A480",
+      "raw_name": "FUN_1007a480",
+      "normalized_name": "JsonValueMapInsertUniqueWithHint",
+      "status": "matched",
+      "signature": "void *JsonValueMapInsertUniqueWithHint(void *result, void *storage, void *hint, void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal hinted-insert helper for the map-backed Json storage. It checks the supplied iterator hint against the pending node key, routes good hints into the red-black-tree link path, and otherwise falls back to the general unique-insert helper."
+    },
+    {
+      "address": "0x1007A610",
+      "raw_name": "FUN_1007a610",
+      "normalized_name": "JsonValueMapInsertUnique",
+      "status": "matched",
+      "signature": "void *JsonValueMapInsertUnique(void *storage, void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal unique-insert helper for the map-backed Json storage. It walks the `CZString` key order, inserts the pending node when no equivalent key exists, or destroys and frees that pending node before returning the existing node on duplicates."
+    },
+    {
+      "address": "0x1007A780",
+      "raw_name": "FUN_1007a780",
+      "normalized_name": "JsonValueMapLinkNode",
+      "status": "matched",
+      "signature": "void *JsonValueMapLinkNode(void *parent, void *storage, void *out, qboolean insertLeft, void *node)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal red-black-tree link helper for the map-backed Json storage. It attaches the supplied node as the requested child, updates the map size and boundary links, and performs the standard insert recolor and rotation fixup before returning the inserted node."
+    },
+    {
+      "address": "0x1007A9B0",
+      "raw_name": "FUN_1007a9b0",
+      "normalized_name": "JsonValueMapNodesEqual",
+      "status": "matched",
+      "signature": "qboolean JsonValueMapNodesEqual(const void *lhs, const void *lhsEnd, const void *rhs)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal equality walk for the map-backed Json storage. It advances both trees in key order and requires each paired node payload to satisfy the adjacent key-plus-value equality helper."
+    },
+    {
+      "address": "0x1007AA90",
+      "raw_name": "FUN_1007aa90",
+      "normalized_name": "JsonValueMapNodePayloadEqual",
+      "status": "matched",
+      "signature": "qboolean JsonValueMapNodePayloadEqual(const void *lhs, const void *rhs)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive internal node-payload equality helper for the map-backed Json storage. It compares the embedded `CZString` keys first and then delegates the `Json::Value` payload comparison to `JsonValueOperatorEquals`."
     },
     {
       "address": "0x10070110",
@@ -9520,6 +10926,16 @@
       "comment": "Descriptive retail-only rankings powerup-name helper anchored by the explicit RED_FLAG / BLUE_FLAG / QUAD / BATTLESUIT / HASTE / INVULNERABILITY / GUARD / DOUBLER / ARMOR_REGEN literals and the OTHER_POWERUP fallback."
     },
     {
+      "address": "0x10071520",
+      "raw_name": "FUN_10071520",
+      "normalized_name": "G_RankCountAliveDeadByTeam",
+      "status": "matched",
+      "signature": "static void G_RankCountAliveDeadByTeam(int deadCounts[TEAM_NUM_TEAMS], int aliveCounts[TEAM_NUM_TEAMS])",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retail-only rankings helper. It zeroes the dead and alive team-count arrays, scans connected client entities by `sessionTeam`, and feeds the `TEAM_ALIVE`, `TEAM_DEAD`, `OTHER_TEAM_ALIVE`, and `OTHER_TEAM_DEAD` payload fields used by the retail kill and death publishers."
+    },
+    {
       "address": "0x10071580",
       "raw_name": "FUN_10071580",
       "normalized_name": "G_RankAccumulateDamage",
@@ -9538,6 +10954,646 @@
       "string_refs": [],
       "relocation_refs": [],
       "comment": "Descriptive retail-only rankings publisher anchored by the explicit ROUND_OVER event name and the TIME, WARMUP, MATCH_GUID, ROUND, and TEAM_WON payload keys. Retail round-resolution paths pass the round index, winning team, and draw flag into this helper at round end."
+    },
+    {
+      "address": "0x1007AB08",
+      "raw_name": "what",
+      "normalized_name": "StdExceptionWhat",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `std::exception::what` thunk."
+    },
+    {
+      "address": "0x1007AAF9",
+      "raw_name": "__security_check_cookie",
+      "normalized_name": "__security_check_cookie",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact MSVC GS cookie verifier used by the protected retail stack-frame epilog and wired into the EH4 exception path."
+    },
+    {
+      "address": "0x1007AB14",
+      "raw_name": "__onexit",
+      "normalized_name": "__onexit",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Registers an atexit callback through the encoded CRT onexit tables, falling back to `_onexit` when the DLL CRT is not initialized."
+    },
+    {
+      "address": "0x1007ABB5",
+      "raw_name": "_atexit",
+      "normalized_name": "_atexit",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Thin wrapper over `__onexit` that returns `0` on success and `-1` on failure."
+    },
+    {
+      "address": "0x1007ABAC",
+      "raw_name": "FUN_1007abac",
+      "normalized_name": "CRT_UnlockOnExitTable",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Tiny CRT cleanup stub that releases lock `8` after `__dllonexit` updates the encoded onexit tables."
+    },
+    {
+      "address": "0x1007ABCC",
+      "raw_name": "operator_delete",
+      "normalized_name": "operator_delete",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Imported `operator delete` thunk."
+    },
+    {
+      "address": "0x1007ABD2",
+      "raw_name": "FID_conflict:`vector_deleting_destructor'",
+      "normalized_name": "TypeInfoVectorDeletingDestructor",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `type_info` vector-deleting destructor. It optionally walks array elements through `EhVectorDestructorIterator`, frees the backing allocation when the delete flag is set, and returns the adjusted object pointer."
+    },
+    {
+      "address": "0x1007AC6C",
+      "raw_name": "__CRT_INIT@12",
+      "normalized_name": "__CRT_INIT@12",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Runs the CRT process-attach and process-detach initializer, including constructor or destructor dispatch around the native DLL entrypoint."
+    },
+    {
+      "address": "0x1007AE76",
+      "raw_name": "___DllMainCRTStartup",
+      "normalized_name": "___DllMainCRTStartup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact MSVC DLL startup wrapper that initializes the CRT, forwards into `_DllMain@12`, and handles attach-failure unwind paths."
+    },
+    {
+      "address": "0x1007AF81",
+      "raw_name": "FUN_1007af81",
+      "normalized_name": "CRT_ResetNativeDllMainReason",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Resets the cached DLL startup reason to `-1` after `___DllMainCRTStartup` finishes its attach or detach path."
+    },
+    {
+      "address": "0x1007AF8C",
+      "raw_name": "entry",
+      "normalized_name": "_start",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Module start stub that runs `___security_init_cookie` on process attach and then tail-calls `___DllMainCRTStartup`."
+    },
+    {
+      "address": "0x1007AFAF",
+      "raw_name": "__ArrayUnwind",
+      "normalized_name": "__ArrayUnwind",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "MSVC exception unwinder that walks backward over an array construction range and invokes the supplied destructor callback for each completed element."
+    },
+    {
+      "address": "0x1007B058",
+      "raw_name": "FUN_1007b058",
+      "normalized_name": "EhVectorDestructorIteratorCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet paired with `EhVectorDestructorIterator`. It forwards the in-flight constructor range into `__ArrayUnwind` when the protected destructor walk faults before completion."
+    },
+    {
+      "address": "0x1007B00D",
+      "raw_name": "`eh_vector_destructor_iterator'",
+      "normalized_name": "EhVectorDestructorIterator",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact MSVC EH-protected array destructor walker. It steps backward across the constructed element range, invokes the supplied destructor for each slot, and routes failure cleanup through `__ArrayUnwind`."
+    },
+    {
+      "address": "0x1007B070",
+      "raw_name": "`eh_vector_constructor_iterator'",
+      "normalized_name": "EhVectorConstructorIterator",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact MSVC EH-protected array constructor walker. It steps forward across the destination range, invokes the supplied constructor for each element, and unwinds through `__ArrayUnwind` if construction throws."
+    },
+    {
+      "address": "0x1007B0BD",
+      "raw_name": "FUN_1007b0bd",
+      "normalized_name": "EhVectorConstructorIteratorCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet paired with `EhVectorConstructorIterator`. It routes the partially constructed element span into `__ArrayUnwind` before the exception is rethrown."
+    },
+    {
+      "address": "0x1007B0D6",
+      "raw_name": "purecall",
+      "normalized_name": "_purecall",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `_purecall` thunk."
+    },
+    {
+      "address": "0x1007B0DC",
+      "raw_name": "___report_gsfailure",
+      "normalized_name": "___report_gsfailure",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "GS failure reporter that captures processor state and terminates through the Windows unhandled-exception path."
+    },
+    {
+      "address": "0x1007B1E2",
+      "raw_name": "_unlock",
+      "normalized_name": "_unlock",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "CRT lock-release thunk."
+    },
+    {
+      "address": "0x1007B1E8",
+      "raw_name": "__dllonexit",
+      "normalized_name": "__dllonexit",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "CRT DLL onexit registration thunk."
+    },
+    {
+      "address": "0x1007B1EE",
+      "raw_name": "_lock",
+      "normalized_name": "_lock",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "CRT lock-acquire thunk."
+    },
+    {
+      "address": "0x1007B200",
+      "raw_name": "__SEH_prolog4",
+      "normalized_name": "__SEH_prolog4",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact MSVC SEH frame prolog helper for GS-protected functions."
+    },
+    {
+      "address": "0x1007B245",
+      "raw_name": "__SEH_epilog4",
+      "normalized_name": "__SEH_epilog4",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact MSVC SEH frame epilog helper for GS-protected functions."
+    },
+    {
+      "address": "0x1007B259",
+      "raw_name": "FUN_1007b259",
+      "normalized_name": "__except_handler4",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact EH4 exception handler wrapper that forwards into `_except_handler4_common` with the security-cookie callbacks."
+    },
+    {
+      "address": "0x1007B2E0",
+      "raw_name": "__ValidateImageBase",
+      "normalized_name": "__ValidateImageBase",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Checks the DOS and PE signatures for a candidate module image before CRT section scanning."
+    },
+    {
+      "address": "0x1007B320",
+      "raw_name": "__FindPESection",
+      "normalized_name": "__FindPESection",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Finds the PE section record that covers a candidate RVA inside the current image."
+    },
+    {
+      "address": "0x1007B370",
+      "raw_name": "__IsNonwritableInCurrentImage",
+      "normalized_name": "__IsNonwritableInCurrentImage",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Uses `__ValidateImageBase` and `__FindPESection` to test whether a pointer lies in a non-writable section of the current module image."
+    },
+    {
+      "address": "0x1007B42C",
+      "raw_name": "initterm",
+      "normalized_name": "initterm",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "CRT thunk that tail-calls the `initterm` constructor walker."
+    },
+    {
+      "address": "0x1007B432",
+      "raw_name": "initterm_e",
+      "normalized_name": "initterm_e",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "CRT thunk that tail-calls the `initterm_e` constructor walker."
+    },
+    {
+      "address": "0x1007B438",
+      "raw_name": "_amsg_exit",
+      "normalized_name": "_amsg_exit",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "CRT fatal-startup message exit thunk."
+    },
+    {
+      "address": "0x1007B444",
+      "raw_name": "_DllMain@12",
+      "normalized_name": "_DllMain@12",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Small DLL entry helper that disables thread library calls on process attach and otherwise returns success."
+    },
+    {
+      "address": "0x1007B468",
+      "raw_name": "___security_init_cookie",
+      "normalized_name": "___security_init_cookie",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "MSVC GS cookie initializer that seeds `__security_cookie` and its complement from time, pid, tid, tickcount, and performance-counter state."
+    },
+    {
+      "address": "0x1007B50A",
+      "raw_name": "_crt_debugger_hook",
+      "normalized_name": "_crt_debugger_hook",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "CRT debugger hook thunk."
+    },
+    {
+      "address": "0x1007B510",
+      "raw_name": "except_handler4_common",
+      "normalized_name": "except_handler4_common",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "CRT EH4 common-handler thunk."
+    },
+    {
+      "address": "0x1007B516",
+      "raw_name": "_type_info_dtor_internal_method",
+      "normalized_name": "_type_info_dtor_internal_method",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `type_info::_type_info_dtor_internal_method` thunk."
+    },
+    {
+      "address": "0x1007B530",
+      "raw_name": "memcpy",
+      "normalized_name": "memcpy",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Imported `memcpy` thunk."
+    },
+    {
+      "address": "0x1007B536",
+      "raw_name": "memset",
+      "normalized_name": "memset",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Imported `memset` thunk."
+    },
+    {
+      "address": "0x1007B53C",
+      "raw_name": "_CIsqrt",
+      "normalized_name": "_CIsqrt",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler intrinsic square-root thunk."
+    },
+    {
+      "address": "0x1007B542",
+      "raw_name": "_CIcos",
+      "normalized_name": "_CIcos",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler intrinsic cosine thunk."
+    },
+    {
+      "address": "0x1007B548",
+      "raw_name": "_CIsin",
+      "normalized_name": "_CIsin",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler intrinsic sine thunk."
+    },
+    {
+      "address": "0x1007B550",
+      "raw_name": "FUN_1007b550",
+      "normalized_name": "__ftol2",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler x87 long-double-to-int helper used by retail color, layout, and coordinate conversion code."
+    },
+    {
+      "address": "0x1007B5FC",
+      "raw_name": "_CIatan2",
+      "normalized_name": "_CIatan2",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler intrinsic `atan2` thunk."
+    },
+    {
+      "address": "0x1007B610",
+      "raw_name": "__alloca_probe",
+      "normalized_name": "__alloca_probe",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Stack probing helper used before large local allocations."
+    },
+    {
+      "address": "0x1007B63C",
+      "raw_name": "_CxxThrowException",
+      "normalized_name": "_CxxThrowException",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Exact `_CxxThrowException` thunk."
+    },
+    {
+      "address": "0x1007B660",
+      "raw_name": "Unwind@1007b660",
+      "normalized_name": "JsonValueCZStringDestroyCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet that tailcalls `JsonValueCZStringDestroy` for the protected EH local captured at `ebp-0x14`."
+    },
+    {
+      "address": "0x1007B6B0",
+      "raw_name": "Unwind@1007b6b0",
+      "normalized_name": "JsonValueFreeMapStorageSentinelLocalCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet that loads the protected local storage pointer from `ebp-0x10` and tailcalls `JsonValueFreeMapStorageSentinel`."
+    },
+    {
+      "address": "0x1007B6E0",
+      "raw_name": "Unwind@1007b6e0",
+      "normalized_name": "JsonValueMapNodeDestroyArgKeyCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet for `JsonValueMapNodeDestroy`. It reloads the node argument from `ebp+8` and tailcalls `JsonValueCZStringDestroy` on the leading `CZString` key subobject when payload destruction unwinds."
+    },
+    {
+      "address": "0x1007B710",
+      "raw_name": "Unwind@1007b710",
+      "normalized_name": "JsonValueMapNodeConstructNoOpCleanupThunk",
+      "status": "matched",
+      "signature": "void JsonValueMapNodeConstructNoOpCleanupThunk(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Tiny compiler-generated EH no-op thunk used by `JsonValueMapNodeConstruct`. The first protected unwind state jumps through the shared empty marker body currently mapped as `SP_info_player_intermission`, so the thunk immediately returns without touching locals."
+    },
+    {
+      "address": "0x1007B715",
+      "raw_name": "Unwind@1007b715",
+      "normalized_name": "JsonValueMapNodeConstructKeyCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet for `JsonValueMapNodeConstruct`. It reloads the partially constructed stack `CZString` key from `ebp-0x18` and tailcalls `JsonValueCZStringDestroy` before unwinding past the later value-copy stage."
+    },
+    {
+      "address": "0x1007B740",
+      "raw_name": "Unwind@1007b740",
+      "normalized_name": "JsonValueDestroyMapNodesArgKeyCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet for `JsonValueDestroyMapNodes`. It reloads the current node argument from `ebp+8` and tailcalls `JsonValueCZStringDestroy` on that node's leading key fields when recursive subtree teardown unwinds."
+    },
+    {
+      "address": "0x1007B790",
+      "raw_name": "Unwind@1007b790",
+      "normalized_name": "JsonValueFreeMapStorageSentinelArgCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet that reloads the protected storage argument from `ebp+8` and tailcalls `JsonValueFreeMapStorageSentinel`."
+    },
+    {
+      "address": "0x1007B7C0",
+      "raw_name": "Unwind@1007b7c0",
+      "normalized_name": "JsonValueCopyConstructCommentStorageCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet for `JsonValueCopyConstruct`. It frees the raw comment-array allocation captured at `ebp-0x10` with scalar `operator delete` when construction fails before the final `delete[]` ownership state is established."
+    },
+    {
+      "address": "0x1007B7CC",
+      "raw_name": "Unwind@1007b7cc",
+      "normalized_name": "JsonValueCopyConstructCommentsCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet for `JsonValueCopyConstruct`. It reloads the partially constructed comment-array pointer from `ebp-0x10` and frees it through `operator delete[]` while unwinding the optional three-slot comment copy path."
+    },
+    {
+      "address": "0x1007B800",
+      "raw_name": "Unwind@1007b800",
+      "normalized_name": "JsonValueResolveReferenceMapStorageCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet shared by the Json reference resolvers. It frees the raw 0x10-byte map-storage allocation recorded at `ebp-0x10` with scalar `operator delete` if null-to-array/object promotion throws before full construction completes."
+    },
+    {
+      "address": "0x1007B80C",
+      "raw_name": "Unwind@1007b80c",
+      "normalized_name": "JsonValueDestructorCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet that tailcalls `JsonValueDestructor` for the protected stack `Json::Value` local at `ebp-0x28`."
+    },
+    {
+      "address": "0x1007B814",
+      "raw_name": "Unwind@1007b814",
+      "normalized_name": "JsonValueResolveReferenceLookupKeyCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet shared by the Json reference resolvers. It reloads the stack `CZString` lookup key from `ebp-0x14` and tailcalls `JsonValueCZStringDestroy` before unwinding past the lower-bound and insertion path."
+    },
+    {
+      "address": "0x1007B81C",
+      "raw_name": "Unwind@1007b81c",
+      "normalized_name": "JsonValueResolveReferenceInsertPairKeyCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet shared by the Json reference resolvers. In the shared six-state unwind map it is the state-3 action: after the stack insertion-pair `CZString` key has been copy-constructed but before the sibling `Json::Value` payload is fully live, unwinding tailcalls `JsonValueCZStringDestroy` on that pair key."
+    },
+    {
+      "address": "0x1007B824",
+      "raw_name": "Unwind@1007b824",
+      "normalized_name": "JsonValueMapNodeDestroyCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet that tailcalls `JsonValueMapNodeDestroyThunk` for the protected stack map-node local at `ebp-0x40`."
+    },
+    {
+      "address": "0x1007B82C",
+      "raw_name": "Unwind@1007b82c",
+      "normalized_name": "JsonValueResolveReferenceInsertPairKeyTeardownCleanup",
+      "status": "matched",
+      "signature": null,
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Compiler-generated cleanup funclet shared by the Json reference resolvers. In the same unwind map it is the later state-5 action set immediately before the explicit `JsonValueDestructor` teardown of the stack insertion-pair payload, so a fault during that destroy only needs to release the remaining pair `CZString` key."
+    },
+    {
+      "address": "0x1007B850",
+      "raw_name": "Unwind@1007b850",
+      "normalized_name": "G_AdminAccessCacheDestroyThunk",
+      "status": "matched",
+      "signature": "void G_AdminAccessCacheDestroyThunk(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Tiny retained thunk that immediately tailcalls `G_AdminAccessCacheDestroy`."
+    },
+    {
+      "address": "0x1007B870",
+      "raw_name": "sub_1007b870",
+      "normalized_name": "G_AdminAccessCacheStaticInit",
+      "status": "matched",
+      "signature": "int G_AdminAccessCacheStaticInit(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained CRT-style static initializer for the global admin-access cache. It allocates the 0x28-byte sentinel header, self-links the root pointers, marks the sentinel flags, stores the header in the shared cache slot, and registers the paired atexit cleanup."
+    },
+    {
+      "address": "0x1007B910",
+      "raw_name": "sub_1007b910",
+      "normalized_name": "JsonDefaultValueAllocatorStaticInit",
+      "status": "matched",
+      "signature": "int JsonDefaultValueAllocatorStaticInit(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained CRT-style static initializer for the process-global Json default allocator singleton. On first use it installs the `Json::DefaultValueAllocator` vftable into the shared global slot and registers the paired atexit cleanup stub."
+    },
+    {
+      "address": "0x1007B940",
+      "raw_name": "FUN_1007b940",
+      "normalized_name": "G_AdminAccessCacheAtExit",
+      "status": "matched",
+      "signature": "void G_AdminAccessCacheAtExit(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained atexit cleanup for the global admin-access cache. On shutdown it clears the full cached SteamID range through the shared tree-erase path and then frees the sentinel header allocated for the access tree."
+    },
+    {
+      "address": "0x1007B9B0",
+      "raw_name": "FUN_1007b9b0",
+      "normalized_name": "JsonDefaultValueAllocatorAtExit",
+      "status": "matched",
+      "signature": "void JsonDefaultValueAllocatorAtExit(void)",
+      "string_refs": [],
+      "relocation_refs": [],
+      "comment": "Descriptive retained atexit cleanup stub for the process-global `Json::DefaultValueAllocator` singleton. The shutdown leaf restores the singleton object's base `Json::ValueAllocator` vftable, which is the only work left after the empty derived destructor is inlined away."
     }
   ],
   "strings": [
@@ -10464,8 +12520,8 @@
   ],
   "relocations": [],
   "stats": {
-    "function_total": 923,
-    "function_matched": 923,
+    "function_total": 1128,
+    "function_matched": 1128,
     "string_total": 102,
     "string_resolved": 102,
     "relocation_total": 0

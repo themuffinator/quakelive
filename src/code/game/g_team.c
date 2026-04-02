@@ -86,6 +86,8 @@ static dominationPoint_t *Team_DominationPointForTargetName( const char *targetn
 static void Team_DominationBuildSpawnList( dominationPoint_t *point );
 static void Team_DominationPointThink( gentity_t *ent );
 static void Team_DominationEventOrigin( const dominationPoint_t *point, vec3_t origin );
+static int Team_DominationCaptureRadius( const dominationPoint_t *point );
+static void Team_DominationPublishPointState( dominationPoint_t *point, int pointIndex, int playerCount, qboolean contested );
 static void Team_DominationUpdatePointState( dominationPoint_t *point, int captureTime );
 static int Team_DominationCaptureTime( void );
 static int Team_DominationScoreInterval( void );
@@ -122,6 +124,17 @@ void SP_team_dom_point( gentity_t *ent ) {
 		G_FreeEntity( ent );
 		return;
 	}
+
+	ent->s.eType = ET_TEAM;
+	ent->s.modelindex = TEAM_FREE;
+	ent->s.modelindex2 = TEAM_FREE;
+	ent->s.frame = 0;
+	ent->s.clientNum = 0;
+	ent->s.otherEntityNum = 0;
+	ent->s.constantLight = 0;
+	ent->s.generic1 = 0;
+	ent->s.time2 = 0;
+	trap_LinkEntity( ent );
 
 	Team_RegisterDominationPoint( ent );
 }
@@ -1600,6 +1613,59 @@ static void Team_DominationEventOrigin( const dominationPoint_t *point, vec3_t o
 
 /*
 =============
+Team_DominationCaptureRadius
+
+Approximates the Domination trigger volume as the retail HUD radius sphere.
+=============
+*/
+static int Team_DominationCaptureRadius( const dominationPoint_t *point ) {
+	vec3_t	size;
+	float	radius;
+
+	if ( !point || !point->trigger ) {
+		return 0;
+	}
+
+	VectorSubtract( point->trigger->r.absmax, point->trigger->r.absmin, size );
+	radius = VectorLength( size ) * 0.5f;
+	if ( radius <= 0.0f ) {
+		return 0;
+	}
+
+	return (int)( radius + 0.5f );
+}
+
+/*
+=============
+Team_DominationPublishPointState
+
+Publishes the Domination point HUD state through the linked point entity.
+=============
+*/
+static void Team_DominationPublishPointState( dominationPoint_t *point, int pointIndex, int playerCount, qboolean contested ) {
+	int		progressByte;
+	int		radius;
+
+	if ( !point || !point->pointEnt ) {
+		return;
+	}
+
+	progressByte = (int)( Com_Clamp( 0.0f, 100.0f, point->progress ) * 255.0f / 100.0f + 0.5f );
+	radius = Team_DominationCaptureRadius( point );
+
+	point->pointEnt->s.eType = ET_TEAM;
+	point->pointEnt->s.modelindex = point->ownerTeam;
+	point->pointEnt->s.modelindex2 = point->capturingTeam;
+	point->pointEnt->s.frame = progressByte;
+	point->pointEnt->s.clientNum = pointIndex + 1;
+	point->pointEnt->s.otherEntityNum = radius;
+	point->pointEnt->s.constantLight = playerCount;
+	point->pointEnt->s.generic1 = contested ? 2 : 0;
+	point->pointEnt->s.time2 = point->lastDistressTime;
+}
+
+/*
+=============
 Team_DominationCaptureTime
 
 Returns the Domination capture time in milliseconds.
@@ -1704,6 +1770,8 @@ void Team_RegisterDominationPoint( gentity_t *pointEnt ) {
 	if ( teamgame.dominationNextScoreTime == 0 ) {
 		teamgame.dominationNextScoreTime = level.time + Team_DominationScoreInterval();
 	}
+
+	Team_DominationPublishPointState( point, index, 0, qfalse );
 }
 
 /*
@@ -1715,6 +1783,7 @@ Binds a Domination capture trigger to its metadata entity.
 */
 qboolean Team_RegisterDominationTrigger( gentity_t *trigger ) {
 	dominationPoint_t	*point;
+	int		pointIndex;
 
 	if ( g_gametype.integer != GT_DOMINATION ) {
 		G_FreeEntity( trigger );
@@ -1738,6 +1807,10 @@ qboolean Team_RegisterDominationTrigger( gentity_t *trigger ) {
 
 	point->trigger = trigger;
 	trigger->target_ent = point->pointEnt;
+	pointIndex = point - teamgame.dominationPoints;
+	if ( pointIndex >= 0 && pointIndex < DOMINATION_MAX_POINTS ) {
+		Team_DominationPublishPointState( point, pointIndex, 0, qfalse );
+	}
 	return qtrue;
 }
 
@@ -1883,8 +1956,15 @@ static void Team_DominationUpdatePointState( dominationPoint_t *point, int captu
 	int		blueOccupants = 0;
 	team_t	advanceTeam = TEAM_FREE;
 	int		playerCount = 0;
+	int		pointIndex;
 	float		delta;
 	float		threshold;
+	qboolean	contested = qfalse;
+
+	pointIndex = point - teamgame.dominationPoints;
+	if ( pointIndex < 0 || pointIndex >= DOMINATION_MAX_POINTS ) {
+		return;
+	}
 
 	if ( point->lastOccupancyFrame == level.framenum ) {
 		redOccupants = point->redOccupants;
@@ -1893,6 +1973,10 @@ static void Team_DominationUpdatePointState( dominationPoint_t *point, int captu
 
 	if ( redOccupants > 0 || blueOccupants > 0 ) {
 		if ( redOccupants > 0 && blueOccupants > 0 ) {
+			if ( !g_domEnableContention.integer || redOccupants == blueOccupants ) {
+				contested = qtrue;
+			}
+
 			if ( g_domEnableContention.integer ) {
 				if ( redOccupants != blueOccupants ) {
 					advanceTeam = ( redOccupants > blueOccupants ) ? TEAM_RED : TEAM_BLUE;
@@ -1920,6 +2004,7 @@ static void Team_DominationUpdatePointState( dominationPoint_t *point, int captu
 		}
 		point->redOccupants = 0;
 		point->blueOccupants = 0;
+		Team_DominationPublishPointState( point, pointIndex, playerCount, contested );
 		return;
 	}
 
@@ -1928,6 +2013,7 @@ static void Team_DominationUpdatePointState( dominationPoint_t *point, int captu
 	if ( delta <= 0.0f ) {
 		point->redOccupants = 0;
 		point->blueOccupants = 0;
+		Team_DominationPublishPointState( point, pointIndex, playerCount, contested );
 		return;
 	}
 
@@ -1948,6 +2034,7 @@ static void Team_DominationUpdatePointState( dominationPoint_t *point, int captu
 		}
 		point->redOccupants = 0;
 		point->blueOccupants = 0;
+		Team_DominationPublishPointState( point, pointIndex, playerCount, contested );
 		return;
 	}
 
@@ -1984,6 +2071,7 @@ static void Team_DominationUpdatePointState( dominationPoint_t *point, int captu
 
 	point->redOccupants = 0;
 	point->blueOccupants = 0;
+	Team_DominationPublishPointState( point, pointIndex, playerCount, contested );
 }
 
 /*
@@ -2823,6 +2911,7 @@ void Team_SetFlagStatus( int team, flagStatus_t status ) {
 		}
 
 		trap_SetConfigstring( CS_FLAGSTATUS, st );
+		G_RankSendFlagStatus( NULL, team, status );
 	}
 }
 
@@ -2974,6 +3063,7 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 		targ->client->pers.teamState.lasthurtcarrier = 0;
 
 		attacker->client->ps.persistant[PERS_DEFEND_COUNT]++;
+		G_RankSendPlayerMedal( attacker, "DEFENDS" );
 		team = attacker->client->sess.sessionTeam;
 		// add the sprite over the player's head
 		attacker->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
@@ -2997,6 +3087,7 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 		targ->client->pers.teamState.lasthurtcarrier = 0;
 
 		attacker->client->ps.persistant[PERS_DEFEND_COUNT]++;
+		G_RankSendPlayerMedal( attacker, "DEFENDS" );
 		team = attacker->client->sess.sessionTeam;
 		// add the sprite over the player's head
 		attacker->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
@@ -3076,6 +3167,7 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 		attacker->client->pers.teamState.basedefense++;
 
 		attacker->client->ps.persistant[PERS_DEFEND_COUNT]++;
+		G_RankSendPlayerMedal( attacker, "DEFENDS" );
 		// add the sprite over the player's head
 		attacker->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
 		attacker->client->ps.eFlags |= EF_AWARD_DEFEND;
@@ -3475,6 +3567,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 	other->client->ps.eFlags |= EF_AWARD_CAP;
 	other->client->rewardTime = level.time + REWARD_SPRITE_TIME;
 	other->client->ps.persistant[PERS_CAPTURES]++;
+	G_RankSendPlayerMedal( other, "CAPTURES" );
 
 	// other gets another 10 frag bonus
 	AddScore(other, ent->r.currentOrigin, CTF_CAPTURE_BONUS);
@@ -3502,6 +3595,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 				other->client->pers.teamState.assists++;
 
 				player->client->ps.persistant[PERS_ASSIST_COUNT]++;
+				G_RankSendPlayerMedal( player, "ASSISTS" );
 				// add the sprite over the player's head
 				player->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
 				player->client->ps.eFlags |= EF_AWARD_ASSIST;
@@ -3512,6 +3606,7 @@ int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team ) {
 				AddScore(player, ent->r.currentOrigin, CTF_FRAG_CARRIER_ASSIST_BONUS);
 				other->client->pers.teamState.assists++;
 				player->client->ps.persistant[PERS_ASSIST_COUNT]++;
+				G_RankSendPlayerMedal( player, "ASSISTS" );
 				// add the sprite over the player's head
 				player->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
 				player->client->ps.eFlags |= EF_AWARD_ASSIST;
@@ -4002,6 +4097,7 @@ static void ObeliskDie( gentity_t *self, gentity_t *inflictor, gentity_t *attack
 	attacker->client->ps.eFlags |= EF_AWARD_CAP;
 	attacker->client->rewardTime = level.time + REWARD_SPRITE_TIME;
 	attacker->client->ps.persistant[PERS_CAPTURES]++;
+	G_RankSendPlayerMedal( attacker, "CAPTURES" );
 
 	teamgame.redObeliskAttackedTime = 0;
 	teamgame.blueObeliskAttackedTime = 0;
@@ -4037,6 +4133,7 @@ static void ObeliskTouch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 	other->client->ps.eFlags |= EF_AWARD_CAP;
 	other->client->rewardTime = level.time + REWARD_SPRITE_TIME;
 	other->client->ps.persistant[PERS_CAPTURES] += tokens;
+	G_RankSendPlayerMedal( other, "CAPTURES" );
 	
 	other->client->ps.generic1 = 0;
 	CalculateRanks();

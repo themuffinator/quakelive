@@ -121,6 +121,55 @@ int G_SoundIndex( char *name ) {
 	return G_FindConfigstringIndex (name, CS_SOUNDS, MAX_SOUNDS, qtrue);
 }
 
+/*
+================
+G_CleanClientNameFromClientNum
+
+Reads the current client configstring name field and strips color codes into the
+fixed destination buffer shape reused by retail rankings messages.
+================
+*/
+char *G_CleanClientNameFromClientNum( int clientNum, char *dest ) {
+	char configstring[MAX_STRING_CHARS];
+	const char *name;
+
+	if ( !dest ) {
+		return NULL;
+	}
+
+	dest[0] = '\0';
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return dest;
+	}
+
+	trap_GetConfigstring( CS_PLAYERS + clientNum, configstring, sizeof( configstring ) );
+	name = Info_ValueForKey( configstring, "n" );
+	Q_strncpyz( dest, name ? name : "", 40 );
+	Q_CleanStr( dest );
+	return dest;
+}
+
+/*
+================
+G_CleanClientNameFromClient
+
+Resolves the level-clients index for a client pointer and forwards through the
+client-number cleaned-name helper.
+================
+*/
+char *G_CleanClientNameFromClient( char *dest, gclient_t *client ) {
+	if ( !dest ) {
+		return NULL;
+	}
+
+	dest[0] = '\0';
+	if ( !client ) {
+		return dest;
+	}
+
+	return G_CleanClientNameFromClientNum( (int)( client - level.clients ), dest );
+}
+
 //=====================================================================
 
 

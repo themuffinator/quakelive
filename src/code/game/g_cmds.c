@@ -768,32 +768,33 @@ static void G_AppendScoreStatsWeaponValues( char *buffer, size_t bufferSize, con
 ==================
 G_GetPlacementPickupAverageSeconds
 
-Returns the rounded average interval in seconds between matching pickup events.
+Returns the retail pickup-average interval in seconds between matching pickup
+events.
 ==================
 */
-static int G_GetPlacementPickupAverageSeconds( const gclient_t *cl, scorestatPickupIndex_t pickupIndex ) {
+static float G_GetPlacementPickupAverageSeconds( const gclient_t *cl, scorestatPickupIndex_t pickupIndex ) {
 	int intervalCount;
 	int totalIntervalMs;
 
 	if ( !cl ) {
-		return 0;
+		return 0.0f;
 	}
 
 	if ( pickupIndex < 0 || pickupIndex >= SCORESTAT_PICKUP_COUNT ) {
-		return 0;
+		return 0.0f;
 	}
 
 	intervalCount = cl->pers.pickupIntervalCount[pickupIndex];
 	if ( intervalCount <= 0 ) {
-		return 0;
+		return 0.0f;
 	}
 
 	totalIntervalMs = cl->pers.pickupIntervalTotalMs[pickupIndex];
 	if ( totalIntervalMs <= 0 ) {
-		return 0;
+		return 0.0f;
 	}
 
-	return ( totalIntervalMs + ( intervalCount * 500 ) ) / ( intervalCount * 1000 );
+	return ( (float)totalIntervalMs / 1000.0f ) / (float)intervalCount;
 }
 
 /*
@@ -900,11 +901,11 @@ static void G_SendScoreStatsMessage( gentity_t *ent ) {
 			}
 
 			for ( pickupIndex = 0; pickupIndex < SCORESTAT_PICKUP_COUNT; pickupIndex++ ) {
-				int avgSeconds;
+				float avgSeconds;
 				char valueEntry[32];
 
 				avgSeconds = G_GetPlacementPickupAverageSeconds( cl, (scorestatPickupIndex_t)pickupIndex );
-				Com_sprintf( valueEntry, sizeof( valueEntry ), " %i", avgSeconds );
+				Com_sprintf( valueEntry, sizeof( valueEntry ), " %3.2f", avgSeconds );
 				Q_strcat( payload, sizeof( payload ), valueEntry );
 			}
 
@@ -2928,22 +2929,27 @@ qboolean G_GiveItemByName( gentity_t *ent, const char *name ) {
 
 	if ( Q_stricmp( name, "excellent" ) == 0 ) {
 		ent->client->ps.persistant[PERS_EXCELLENT_COUNT]++;
+		G_RankSendPlayerMedal( ent, "EXCELLENT" );
 		return qtrue;
 	}
 	if ( Q_stricmp( name, "impressive" ) == 0 ) {
 		ent->client->ps.persistant[PERS_IMPRESSIVE_COUNT]++;
+		G_RankSendPlayerMedal( ent, "IMPRESSIVE" );
 		return qtrue;
 	}
 	if ( Q_stricmp( name, "gauntletaward" ) == 0 ) {
 		ent->client->ps.persistant[PERS_GAUNTLET_FRAG_COUNT]++;
+		G_RankSendPlayerMedal( ent, "GAUNTLET" );
 		return qtrue;
 	}
 	if ( Q_stricmp( name, "defend" ) == 0 ) {
 		ent->client->ps.persistant[PERS_DEFEND_COUNT]++;
+		G_RankSendPlayerMedal( ent, "DEFENDS" );
 		return qtrue;
 	}
 	if ( Q_stricmp( name, "assist" ) == 0 ) {
 		ent->client->ps.persistant[PERS_ASSIST_COUNT]++;
+		G_RankSendPlayerMedal( ent, "ASSISTS" );
 		return qtrue;
 	}
 
@@ -3644,6 +3650,8 @@ void SetTeam( gentity_t *ent, char *s ) {
 	client->pers.teamState.state = TEAM_BEGIN;
 	G_SetClientReadyState( client, qfalse );
 	if ( oldTeam != TEAM_SPECTATOR ) {
+		G_RankSendPlayerStats( ent, qtrue );
+
 		// Kill him (makes sure he loses flags, etc)
 		ent->flags &= ~FL_GODMODE;
 		ent->client->ps.stats[STAT_HEALTH] = ent->health = 0;
@@ -3658,6 +3666,9 @@ void SetTeam( gentity_t *ent, char *s ) {
 	client->sess.sessionTeam = team;
 	client->sess.spectatorState = specState;
 	client->sess.spectatorClient = specClient;
+	if ( oldTeam != team ) {
+		G_RankSendPlayerSwitchTeam( ent, oldTeam, team );
+	}
 
 	client->lastKillCommandTime = 0;
 	client->killCommandCooldownExpires = 0;

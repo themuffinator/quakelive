@@ -502,8 +502,8 @@ void G_RegisterPmoveCvars( void ) {
 	G_PmoveRegisterCvar( &g_pmove_velocityGh_cvar, "pmove_velocity_gh", "800" );
 	G_PmoveRegisterCvar( &g_pmove_walkAccel_cvar, "pmove_WalkAccel", "10.0f" );
 	G_PmoveRegisterCvar( &g_pmove_walkFriction_cvar, "pmove_WalkFriction", "6.0f" );
-	G_PmoveRegisterCvar( &g_pmove_waterSwimScale_cvar, "pmove_WaterSwimScale", "0.5f" );
-	G_PmoveRegisterCvar( &g_pmove_waterWadeScale_cvar, "pmove_WaterWadeScale", "0.75f" );
+	G_PmoveRegisterCvar( &g_pmove_waterSwimScale_cvar, "pmove_WaterSwimScale", "0.6f" );
+	G_PmoveRegisterCvar( &g_pmove_waterWadeScale_cvar, "pmove_WaterWadeScale", "0.8f" );
 	G_PmoveRegisterCvar( &g_pmove_weaponDropTime_cvar, "pmove_WeaponDropTime", "200" );
 	G_PmoveRegisterCvar( &g_pmove_weaponRaiseTime_cvar, "pmove_WeaponRaiseTime", "200" );
 	G_PmoveRegisterCvar( &g_pmove_wishSpeed_cvar, "pmove_WishSpeed", "400.0f" );

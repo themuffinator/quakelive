@@ -89,7 +89,7 @@ void PM_AddTouchEnt( int entityNum );
 void PM_AddEvent( int newEvent );
 
 qboolean	PM_SlideMove( qboolean gravity );
-void		PM_StepSlideMove( qboolean gravity, float stepHeight );
+void		PM_StepSlideMove( qboolean gravity );
 void		PM_ApplyStepJump( float stepDelta, qboolean fromCrouchSlide );
 
 

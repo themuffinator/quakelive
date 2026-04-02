@@ -6,8 +6,11 @@ This note maps the shared UI window primitives declared in
 These records sit below the menu/item layer and are reused almost everywhere in
 the shared UI runtime. Their x86 layout is stable across the Team Arena
 baseline and the current Quake Live-compatible tree. The strongest evidence
-here comes from the current shared UI runtime, because the committed retail
-`uix86.dll` corpus does not yet expose promoted raw `Window_*` helper names.
+here now comes from both the current shared UI runtime and the committed retail
+`uix86.dll` map: the core shared-window/runtime slab is already promoted around
+`Fade`, `Window_Paint`, `Item_SetScreenCoords`, `Menu_UpdatePosition`,
+`Rect_ContainsPoint`, `Menu_FindItemByName`, `Menu_ShowItemByName`,
+`Script_FadeIn`, `Script_FadeOut`, `Item_Paint`, and `Menu_Paint`.
 
 ## Method
 
@@ -17,15 +20,24 @@ here comes from the current shared UI runtime, because the committed retail
 - Legacy comparison comes from the Team Arena-era
   `assets/quake3/src/code/ui/ui_shared.h`.
 - Current member roles were cross-checked against:
-  - `Window_Init`, `Fade`, `Window_Paint`, `Item_SetScreenCoords`,
-    `Item_UpdatePosition`, `Menu_UpdatePosition`, `Rect_ContainsPoint`, and
-    `Window_CacheContents` in `src/code/ui/ui_shared.c`
+  - the already-mapped retail/shared helpers `Fade`, `Window_Paint`,
+    `Item_SetScreenCoords`, `Menu_UpdatePosition`, `Rect_ContainsPoint`,
+    `Menu_FindItemByName`, `Menu_ShowItemByName`, `Script_FadeIn`,
+    `Script_FadeOut`, `Menu_TransitionItemByName`, `Script_Transition`,
+    `Menu_OrbitItemByName`, `Script_Orbit`, `Item_Paint`, and `Menu_Paint`
+  - `Window_Init`, `Item_UpdatePosition`, and `Window_CacheContents` in
+    `src/code/ui/ui_shared.c`
   - the item/menu parser helpers in `src/code/ui/ui_shared.c`
   - `UI_LauncherPlayCinematic` handoff consumers in the shared script path
-- Retail parity is weaker than for `displayContextDef_t`: the window runtime is
-  clearly still present in `uix86.dll`, but the committed corpus does not yet
-  provide promoted helper names for the raw `Window_*` functions. The member
-  roles below are therefore source-backed rather than directly retail-named.
+- Retail parity is now materially stronger than when this note was first
+  written. The committed corpus already names the central paint, hit-test,
+  focus/visibility, fade, and transition/orbit helpers for this struct. The
+  effect-field ownership is now mostly direct-retail-backed as well:
+  `Menu_TransitionItemByName` seeds the transition target and per-step deltas,
+  `Menu_OrbitItemByName` seeds the orbit center and cadence, and `Item_Paint`
+  consumes those fields through the `nextTime` gate. The remaining uncertainty
+  is now narrower and mostly about secondary carry-over details such as the
+  retained outline-related color path.
 
 ## Hard Layout Facts
 
@@ -84,10 +96,10 @@ optional cinematic handle.
 | `0x3C` | `ownerDrawFlags` | `int` | Owning visibility/filter flags passed to the ownerdraw visibility and key handlers. |
 | `0x40` | `borderSize` | `float` | Border thickness. `Window_Init` defaults it to `1`, `Window_Paint` uses it to inset the fill region, and parent border presence also shifts child layout in the menu/item position helpers. |
 | `0x44` | `flags` | `int` | Window runtime flag word: visibility, focus, decoration, fading, wrapping, popup, etc. `Fade`, visibility checks, and many interaction paths read and modify this field. |
-| `0x48` | `rectEffects` | `Rectangle` | Effect target/anchor rectangle used by scripted transition and orbit paths. For timed transitions it holds the destination rectangle; for orbit-style motion it stores the center point around which the item rotates. |
-| `0x58` | `rectEffects2` | `Rectangle` | Per-step effect deltas derived from the difference between `rectClient` and `rectEffects`. The timed transition path uses these as incremental X/Y/W/H steps. |
-| `0x68` | `offsetTime` | `int` | Effect/fade cadence in milliseconds. Shared fade and transition/orbit paths reuse this as the update interval. |
-| `0x6C` | `nextTime` | `int` | Next scheduled tick time for fades, transitions, orbit motion, and model rotation updates. |
+| `0x48` | `rectEffects` | `Rectangle` | Retail effect target/anchor rectangle. `Menu_TransitionItemByName` copies the destination rect here for timed transitions, while `Menu_OrbitItemByName` stores the orbit center in `x/y` and `Item_Paint` consumes the same field as the live orbit anchor. |
+| `0x58` | `rectEffects2` | `Rectangle` | Retail per-step transition deltas. `Menu_TransitionItemByName` derives the absolute X/Y/W/H increments from the source and destination rects, and `Item_Paint` consumes them to walk `rectClient` toward `rectEffects`. |
+| `0x68` | `offsetTime` | `int` | Effect/fade cadence in milliseconds. `Menu_TransitionItemByName` and `Menu_OrbitItemByName` seed it for scripted motion, and shared fade/orbit/transition paths reuse it as the update interval. |
+| `0x6C` | `nextTime` | `int` | Next scheduled tick time for fades, transitions, orbit motion, and model rotation updates. `Item_Paint` advances transition/orbit work only when `DC->realTime > nextTime`, then rewrites the gate to `realTime + offsetTime`. |
 | `0x70` | `foreColor` | `vec4_t` | Foreground tint. `Window_Paint` uses it for shader-style windows when `WINDOW_FORECOLORSET` is present; item text fades also drive its alpha component. |
 | `0x80` | `backColor` | `vec4_t` | Background/fill tint. Used by filled windows and gradient bars; `Fade` drives `backColor[3]` for fading filled windows with shaders. |
 | `0x90` | `borderColor` | `vec4_t` | Border tint used by all explicit border paint paths. |
@@ -106,22 +118,23 @@ optional cinematic handle.
     `borderSize`, colors, `background`, `ownerDraw`, and `ownerDrawFlags`
 - `Menu_UpdatePosition` and `Item_SetScreenCoords` own the projection from
   `rectClient` into the live `rect` field.
-- `Fade`, `Window_Paint`, and the transition/orbit helpers own the runtime
-  fields:
+- the already-mapped retail/runtime helpers `Fade`, `Window_Paint`,
+  `Menu_TransitionItemByName`, `Script_Transition`, `Menu_OrbitItemByName`,
+  `Script_Orbit`, `Script_FadeIn`, `Script_FadeOut`, and `Item_Paint` own the
+  runtime fields with a narrower split than before:
   - `flags`
-  - `rectEffects`
-  - `rectEffects2`
-  - `offsetTime`
-  - `nextTime`
   - `cinematic`
+  - `Menu_TransitionItemByName` seeds `WINDOW_INTRANSITION`, `WINDOW_VISIBLE`,
+    `offsetTime`, `rectClient`, `rectEffects`, and `rectEffects2`
+  - `Menu_OrbitItemByName` seeds `WINDOW_ORBITING`, `WINDOW_VISIBLE`,
+    `offsetTime`, `rectEffects.x/y`, and the starting `rectClient.x/y`
+  - `Item_Paint` consumes `nextTime`, `offsetTime`, `rectEffects`, and
+    `rectEffects2` to advance orbit or transition motion and then refreshes the
+    resolved screen coordinates
 
 ## Open Questions
 
-1. Promote the raw retail `uix86.dll` shared-window helpers so the runtime
-   ownership of the effect fields (`rectEffects`, `rectEffects2`,
-   `offsetTime`, `nextTime`) can be marked as directly retail-backed instead of
-   only source-backed.
-2. Revisit whether the retained `outlineColor` text-outline path is truly live
+1. Revisit whether the retained `outlineColor` text-outline path is truly live
    in retail or just a preserved carry-over surface; the current tree has a
    live listbox-selection use, but the text-outline draw path remains commented
    out.

@@ -56,7 +56,6 @@ $ta_env = new cons(%ta_env_hash);
   g_mover.c
   g_pmove.c
   g_race.c
-  g_rr.c
   g_session.c
   g_spawn.c
   g_svcmds.c

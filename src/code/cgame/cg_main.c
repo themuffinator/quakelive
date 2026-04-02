@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // display context for new ui stuff
 displayContextDef_t cgDC;
 extern menuDef_t *menuScoreboard;
+extern menuDef_t *menuStats;
 static menuDef_t *cgScoreboardSelectionMenus[2];
 
 #define DEFAULT_WEAPON_BAR_GRENADE_COLOR	"0x007000FF"
@@ -274,13 +275,13 @@ vmCvar_t	cg_bobroll;
 vmCvar_t	cg_bob;
 vmCvar_t	cg_swingSpeed;
 vmCvar_t	cg_shadows;
-vmCvar_t	cg_gibs;
 vmCvar_t	cg_drawTimer;
 vmCvar_t	cg_drawFPS;
 vmCvar_t	cg_drawSnapshot;
 vmCvar_t	cg_draw3dIcons;
 vmCvar_t	cg_drawIcons;
 vmCvar_t	cg_drawAmmoWarning;
+vmCvar_t	cg_lowAmmoWeaponBarWarning;
 vmCvar_t	cg_drawCrosshair;
 vmCvar_t	cg_drawCrosshairNames;
 vmCvar_t	cg_drawRewards;
@@ -366,7 +367,6 @@ vmCvar_t	cg_autoswitch;
 vmCvar_t	cg_projectileNudge;
 vmCvar_t	cg_switchOnEmpty;
 vmCvar_t	cg_switchToEmpty;
-vmCvar_t	cg_ignore;
 vmCvar_t	cg_simpleItems;
 vmCvar_t	cg_simpleItemsHeightOffset;
 vmCvar_t	cg_simpleItemsBob;
@@ -428,8 +428,6 @@ vmCvar_t	cg_teammatePOIs;
 vmCvar_t	cg_teammatePOIsMinWidth;
 vmCvar_t	cg_teammatePOIsMaxWidth;
 vmCvar_t	cg_teamChatsOnly;
-vmCvar_t	cg_noVoiceChats;
-vmCvar_t	cg_noVoiceText;
 vmCvar_t	cg_playVoiceChats;
 vmCvar_t	cg_showVoiceText;
 vmCvar_t	cg_useItemMessage;
@@ -520,7 +518,6 @@ vmCvar_t	cg_gameInfo3;
 vmCvar_t	cg_gameInfo4;
 vmCvar_t	cg_gameInfo5;
 vmCvar_t	cg_gameInfo6;
-vmCvar_t	cg_useLegacyHud;
 vmCvar_t	cg_vignette;
 vmCvar_t	cg_voiceChatIndicator;
 vmCvar_t	cg_autoHop;
@@ -549,7 +546,9 @@ typedef struct {
 	int			cvarFlags;
 } cvarTable_t;
 
-static unsigned int CG_ParseDamagePlumWeaponValue( const char *value, damagePlumPreset_t *preset );
+int CG_StartingWeaponIndexFromToken( const char *value );
+static unsigned int CG_ParseDamagePlumWeaponMask( const char *value );
+static damagePlumPreset_t CG_ClassifyDamagePlumPreset( const char *value, unsigned int mask );
 static damagePlumColorStyle_t CG_ParseDamagePlumColorStyleValue( int rawValue );
 static void CG_UpdateDamagePlumSettings( void );
 static const char *CG_RetailAnnouncerFolderForProfile( cgAnnouncerProfile_t profile );
@@ -564,7 +563,6 @@ static void CG_WriteLastMessageCvar( int timestamp, const char *message );
 static void CG_ReplayLastMessageFromCvar( void );
 
 static cvarTable_t cvarTable[] = { // bk001129
-	{ &cg_ignore, "cg_ignore", "0", 0 },	// used for debugging
 	{ &cg_autoHop, "cg_autoHop", "1", CVAR_ARCHIVE | CVAR_LATCH },
 	{ &cg_autoProjectileNudge, "cg_autoProjectileNudge", "0", CVAR_ARCHIVE | CVAR_LATCH },
 	{ &cg_projectileNudge, "cg_projectileNudge", "0", CVAR_ARCHIVE | CVAR_LATCH },
@@ -583,10 +581,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_viewsize, "cg_viewsize", "100", CVAR_ARCHIVE },
 	{ &cg_stereoSeparation, "cg_stereoSeparation", "0.4", CVAR_ARCHIVE  },
 	{ &cg_shadows, "cg_shadows", "1", CVAR_ARCHIVE  },
-	{ &cg_gibs, "cg_gibs", "1", CVAR_ARCHIVE  },
 	{ &cg_draw2D, "cg_draw2D", "1", CVAR_ARCHIVE  },
 	{ &cg_drawStatus, "cg_drawStatus", "1", CVAR_ARCHIVE  },
-	{ &cg_useLegacyHud, "cg_useLegacyHud", "0", CVAR_ARCHIVE },
 	{ &cg_vignette, "cg_vignette", "1", CVAR_ARCHIVE },
 	{ &cg_drawTimer, "cg_drawTimer", "0", CVAR_ARCHIVE  },
 	{ &cg_levelTimerDirection, "cg_levelTimerDirection", "up", CVAR_ARCHIVE },
@@ -595,6 +591,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawIcons, "cg_drawIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawAmmoWarning, "cg_drawAmmoWarning", "1", CVAR_ARCHIVE  },
+	{ &cg_lowAmmoWeaponBarWarning, "cg_lowAmmoWeaponBarWarning", "2", CVAR_ARCHIVE },
 	{ &cg_lowAmmoWarningPercentile, "cg_lowAmmoWarningPercentile", "0.20", CVAR_ARCHIVE },
 	{ &cg_drawAttacker, "cg_drawAttacker", "1", CVAR_ARCHIVE  },
 	{ &cg_drawCrosshair, "cg_drawCrosshair", "4", CVAR_ARCHIVE },
@@ -712,8 +709,6 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_teammatePOIsMinWidth, "cg_teammatePOIsMinWidth", "4.0", CVAR_ARCHIVE },
 	{ &cg_teammatePOIsMaxWidth, "cg_teammatePOIsMaxWidth", "24.0", CVAR_ARCHIVE },
 	{ &cg_teamChatsOnly, "cg_teamChatsOnly", "0", CVAR_ARCHIVE },
-	{ &cg_noVoiceChats, "cg_noVoiceChats", "0", CVAR_ARCHIVE },
-	{ &cg_noVoiceText, "cg_noVoiceText", "0", CVAR_ARCHIVE },
 	{ &cg_voiceChatIndicator, "cg_voiceChatIndicator", "1", CVAR_ARCHIVE },
 	{ &cg_autoAction, "cg_autoAction", "0", CVAR_ARCHIVE | CVAR_LATCH },
 	// the following variables are created in other parts of the system,
@@ -861,12 +856,12 @@ static cvarTable_t cvarTable[] = { // bk001129
 	DAMAGE_PLUM_WEAPON_BIT( WP_PLASMAGUN ) | \
 	DAMAGE_PLUM_WEAPON_BIT( WP_BFG ) )
 
-typedef struct damagePlumWeaponToken_s {
+typedef struct cgRetailWeaponToken_s {
 	const char		*token;
 	weapon_t	weapon;
-} damagePlumWeaponToken_t;
+} cgRetailWeaponToken_t;
 
-static const damagePlumWeaponToken_t damagePlumWeaponTokens[] = {
+static const cgRetailWeaponToken_t cgRetailWeaponTokens[] = {
 	{ "g", WP_GAUNTLET },
 	{ "gauntlet", WP_GAUNTLET },
 	{ "mg", WP_MACHINEGUN },
@@ -878,9 +873,11 @@ static const damagePlumWeaponToken_t damagePlumWeaponTokens[] = {
 	{ "shotgun", WP_SHOTGUN },
 	{ "gl", WP_GRENADE_LAUNCHER },
 	{ "grenade", WP_GRENADE_LAUNCHER },
+	{ "grenade_launcher", WP_GRENADE_LAUNCHER },
 	{ "grenadelauncher", WP_GRENADE_LAUNCHER },
 	{ "rl", WP_ROCKET_LAUNCHER },
 	{ "rocket", WP_ROCKET_LAUNCHER },
+	{ "rocket_launcher", WP_ROCKET_LAUNCHER },
 	{ "rocketlauncher", WP_ROCKET_LAUNCHER },
 	{ "lg", WP_LIGHTNING },
 	{ "lightning", WP_LIGHTNING },
@@ -893,6 +890,7 @@ static const damagePlumWeaponToken_t damagePlumWeaponTokens[] = {
 	{ "bfg", WP_BFG },
 	{ "gh", WP_GRAPPLING_HOOK },
 	{ "grapple", WP_GRAPPLING_HOOK },
+	{ "grappling_hook", WP_GRAPPLING_HOOK },
 	{ "hook", WP_GRAPPLING_HOOK },
 	{ "cg", WP_CHAINGUN },
 	{ "chaingun", WP_CHAINGUN },
@@ -900,37 +898,135 @@ static const damagePlumWeaponToken_t damagePlumWeaponTokens[] = {
 	{ "nailgun", WP_NAILGUN },
 	{ "pl", WP_PROX_LAUNCHER },
 	{ "prox", WP_PROX_LAUNCHER },
+	{ "proxlauncher", WP_PROX_LAUNCHER },
+	{ "prox_launcher", WP_PROX_LAUNCHER },
 	{ "proximity", WP_PROX_LAUNCHER },
 	{ "proximitymine", WP_PROX_LAUNCHER }
 };
 
 /*
 =============
-CG_ParseDamagePlumWeaponValue
+CG_RetailWeaponFromToken
 
-Parses the cg_damagePlum string into a weapon mask and preset.
+Resolves a retail weapon-token alias into its weapon enum.
 =============
 */
-static unsigned int CG_ParseDamagePlumWeaponValue( const char *value, damagePlumPreset_t *preset ) {
+static weapon_t CG_RetailWeaponFromToken( const char *token ) {
+	int	i;
+
+	if ( !token || !token[0] ) {
+		return WP_NONE;
+	}
+
+	for ( i = 0; i < (int)( sizeof( cgRetailWeaponTokens ) / sizeof( cgRetailWeaponTokens[0] ) ); i++ ) {
+		if ( !Q_stricmp( token, cgRetailWeaponTokens[i].token ) ) {
+			return cgRetailWeaponTokens[i].weapon;
+		}
+	}
+
+	return WP_NONE;
+}
+
+/*
+=============
+CG_StartingWeaponIconIndexForWeapon
+
+Maps a weapon enum onto the retail starting-weapon icon strip order.
+=============
+*/
+static int CG_StartingWeaponIconIndexForWeapon( weapon_t weapon ) {
+	switch ( weapon ) {
+	case WP_GAUNTLET:
+		return 1;
+	case WP_MACHINEGUN:
+		return 2;
+	case WP_SHOTGUN:
+		return 3;
+	case WP_GRENADE_LAUNCHER:
+		return 4;
+	case WP_ROCKET_LAUNCHER:
+		return 5;
+	case WP_LIGHTNING:
+		return 6;
+	case WP_RAILGUN:
+		return 7;
+	case WP_PLASMAGUN:
+		return 8;
+	case WP_BFG:
+		return 9;
+	case WP_GRAPPLING_HOOK:
+		return 10;
+	case WP_NAILGUN:
+		return 11;
+	case WP_PROX_LAUNCHER:
+		return 12;
+	case WP_CHAINGUN:
+		return 13;
+	case WP_HEAVY_MACHINEGUN:
+		return 14;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/*
+=============
+CG_StartingWeaponIndexFromToken
+
+Parses the queued-primary string into the retail 1-based icon-strip index.
+=============
+*/
+int CG_StartingWeaponIndexFromToken( const char *value ) {
+	char		buffer[128];
+	char		*cursor;
+	char		*token;
+	weapon_t	weapon;
+
+	if ( !value || !value[0] ) {
+		return 0;
+	}
+
+	Q_strncpyz( buffer, value, sizeof( buffer ) );
+	cursor = buffer;
+	token = COM_ParseExt( &cursor, qtrue );
+	if ( !token[0] ) {
+		return 0;
+	}
+
+	weapon = CG_RetailWeaponFromToken( token );
+	if ( weapon == WP_NONE ) {
+		return 0;
+	}
+
+	return CG_StartingWeaponIconIndexForWeapon( weapon );
+}
+
+/*
+=============
+CG_ParseDamagePlumWeaponMask
+
+Parses the cg_damagePlum string into the retail weapon-bit mask.
+=============
+*/
+static unsigned int CG_ParseDamagePlumWeaponMask( const char *value ) {
 	char buffer[MAX_CVAR_VALUE_STRING];
-	char token[MAX_TOKEN_CHARS];
 	char *cursor;
+	char *token;
 	unsigned int mask;
 	qboolean foundToken;
-	int i;
+	weapon_t weapon;
 
 	if ( !value || !*value || !Q_stricmp( value, "0" ) || !Q_stricmp( value, "off" ) || !Q_stricmp( value, "none" ) ) {
-		*preset = DAMAGE_PLUM_PRESET_OFF;
 		return 0u;
 	}
 
 	if ( !Q_stricmp( value, "1" ) || !Q_stricmp( value, "on" ) || !Q_stricmp( value, "all" ) ) {
-		*preset = DAMAGE_PLUM_PRESET_ALL_WEAPONS;
 		return DAMAGE_PLUM_ALL_WEAPONS_MASK;
 	}
 
 	if ( !Q_stricmp( value, "2" ) || !Q_stricmp( value, "aoe" ) ) {
-		*preset = DAMAGE_PLUM_PRESET_AOE_WEAPONS;
 		return DAMAGE_PLUM_AOE_WEAPONS_MASK;
 	}
 
@@ -939,32 +1035,13 @@ static unsigned int CG_ParseDamagePlumWeaponValue( const char *value, damagePlum
 	mask = 0u;
 	foundToken = qfalse;
 
-	while ( *cursor ) {
-		int length = 0;
-
-		while ( *cursor && *cursor <= ' ' ) {
-			cursor++;
-		}
-
-		if ( !*cursor ) {
+	while ( qtrue ) {
+		token = COM_ParseExt( &cursor, qtrue );
+		if ( !token[0] ) {
 			break;
 		}
 
-		while ( *cursor && *cursor > ' ' && length < MAX_TOKEN_CHARS - 1 ) {
-			token[length++] = *cursor++;
-		}
-		token[length] = '\0';
-
-		while ( *cursor && *cursor > ' ' ) {
-			cursor++;
-		}
-
-		if ( !token[0] ) {
-			continue;
-		}
-
 		if ( !Q_stricmp( token, "all" ) ) {
-			*preset = DAMAGE_PLUM_PRESET_ALL_WEAPONS;
 			return DAMAGE_PLUM_ALL_WEAPONS_MASK;
 		}
 
@@ -974,32 +1051,43 @@ static unsigned int CG_ParseDamagePlumWeaponValue( const char *value, damagePlum
 			continue;
 		}
 
-		for ( i = 0; i < (int)( sizeof( damagePlumWeaponTokens ) / sizeof( damagePlumWeaponTokens[0] ) ); i++ ) {
-			if ( !Q_stricmp( token, damagePlumWeaponTokens[i].token ) ) {
-				mask |= DAMAGE_PLUM_WEAPON_BIT( damagePlumWeaponTokens[i].weapon );
-				foundToken = qtrue;
-				break;
-			}
+		weapon = CG_RetailWeaponFromToken( token );
+		if ( weapon != WP_NONE ) {
+			mask |= DAMAGE_PLUM_WEAPON_BIT( weapon );
+			foundToken = qtrue;
 		}
 	}
 
-	if ( !foundToken || mask == 0u ) {
-		*preset = DAMAGE_PLUM_PRESET_OFF;
+	if ( !foundToken ) {
 		return 0u;
 	}
 
-	if ( mask == DAMAGE_PLUM_ALL_WEAPONS_MASK ) {
-		*preset = DAMAGE_PLUM_PRESET_ALL_WEAPONS;
-		return mask;
-	}
-
-	if ( mask == DAMAGE_PLUM_AOE_WEAPONS_MASK ) {
-		*preset = DAMAGE_PLUM_PRESET_AOE_WEAPONS;
-		return mask;
-	}
-
-	*preset = DAMAGE_PLUM_PRESET_CUSTOM;
 	return mask;
+}
+
+/*
+=============
+CG_ClassifyDamagePlumPreset
+
+Normalizes the mask-backed damage-plum configuration to a preset enum.
+=============
+*/
+static damagePlumPreset_t CG_ClassifyDamagePlumPreset( const char *value, unsigned int mask ) {
+	if ( mask == 0u ) {
+		return DAMAGE_PLUM_PRESET_OFF;
+	}
+
+	if ( !Q_stricmp( value, "1" ) || !Q_stricmp( value, "on" ) || !Q_stricmp( value, "all" ) ||
+		mask == DAMAGE_PLUM_ALL_WEAPONS_MASK ) {
+		return DAMAGE_PLUM_PRESET_ALL_WEAPONS;
+	}
+
+	if ( !Q_stricmp( value, "2" ) || !Q_stricmp( value, "aoe" ) ||
+		mask == DAMAGE_PLUM_AOE_WEAPONS_MASK ) {
+		return DAMAGE_PLUM_PRESET_AOE_WEAPONS;
+	}
+
+	return DAMAGE_PLUM_PRESET_CUSTOM;
 }
 
 /*
@@ -1029,8 +1117,12 @@ Refreshes the cached damage plum configuration.
 */
 static void CG_UpdateDamagePlumSettings( void ) {
 	if ( damagePlumModificationCount != cg_damagePlum.modificationCount ) {
+		unsigned int mask;
+
 		damagePlumModificationCount = cg_damagePlum.modificationCount;
-		cg.damagePlumWeaponBits = CG_ParseDamagePlumWeaponValue( cg_damagePlum.string, &cg.damagePlumPreset );
+		mask = CG_ParseDamagePlumWeaponMask( cg_damagePlum.string );
+		cg.damagePlumWeaponBits = mask;
+		cg.damagePlumPreset = CG_ClassifyDamagePlumPreset( cg_damagePlum.string, mask );
 	}
 
 	if ( damagePlumColorStyleModificationCount != cg_damagePlumColorStyle.modificationCount ) {
@@ -1893,8 +1985,8 @@ void CG_UpdateCvars( void ) {
 		CG_UpdateScreenDamageAlphaFromCvar( &cg_screenDamageAlpha_Team, &cg.screenDamageAlphaTeam, &screenDamageAlphaTeamModificationCount );
 	}
 	cg.zoomToggle = (qboolean)( cg_zoomToggle.integer != 0 );
-cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
-CG_UpdateDamagePlumSettings();
+	cg.zoomOutOnDeath = (qboolean)( cg_zoomOutOnDeath.integer != 0 );
+	CG_UpdateDamagePlumSettings();
 
 	CG_UpdateSimpleItemsSettings();
 	CG_UpdateCrosshairColorSettings();
@@ -2514,6 +2606,9 @@ Synchronizes the active announcer set with the cg_announcer cvar.
 */
 static void CG_UpdateAnnouncerProfileFromCvar( qboolean force ) {
 	cgAnnouncerProfile_t	profile;
+	qboolean			repairCvar;
+
+	repairCvar = qfalse;
 
 	switch ( cg_announcer.integer ) {
 		case 0:
@@ -2527,7 +2622,12 @@ static void CG_UpdateAnnouncerProfileFromCvar( qboolean force ) {
 			break;
 		default:
 			profile = ANNOUNCER_PROFILE_DEFAULT;
+			repairCvar = qtrue;
 			break;
+	}
+
+	if ( repairCvar ) {
+		trap_Cvar_Set( "cg_announcer", "1" );
 	}
 
 	if ( !force && profile == cgs.announcerProfile ) {
@@ -2952,6 +3052,7 @@ static void CG_RegisterGraphics( void ) {
 
 	cgs.media.backTileShader = trap_R_RegisterShader( "gfx/2d/backtile" );
 	cgs.media.noammoShader = trap_R_RegisterShader( "icons/noammo" );
+	cgs.media.infiniteAmmoShader = trap_R_RegisterShader( "icons/infinite" );
 	cgs.media.healthBar200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h200.tga" );
 	cgs.media.healthBar100 = trap_R_RegisterShaderNoMip( "ui/assets/hud/h100.tga" );
 	cgs.media.armorBar200 = trap_R_RegisterShaderNoMip( "ui/assets/hud/a200.tga" );
@@ -3713,13 +3814,50 @@ Clears the shared browser/menu state and drops cached cgame overlay pointers.
 void CG_ResetBrowserOverlayState( void ) {
 	Menu_Reset();
 	menuScoreboard = NULL;
+	menuStats = NULL;
 }
 
-
+static const char *const cgRetailSupplementalMenuFiles[] = {
+	"ui/intro.menu",
+	"ui/ingamescoreteam.menu",
+	"ui/ingamescorenoteam.menu",
+	"ui/endscoreteam.menu",
+	"ui/endscorenoteam.menu",
+	"ui/spectator.menu",
+	"ui/spectator_follow.menu",
+	"ui/comp_spectator.menu",
+	"ui/comp_spectator_follow.menu",
+	"ui/ingamestats.menu",
+	"ui/ingame_scoreboard_ffa.menu",
+	"ui/ingame_scoreboard_duel.menu",
+	"ui/ingame_scoreboard_race.menu",
+	"ui/ingame_scoreboard_tdm.menu",
+	"ui/ingame_scoreboard_ca.menu",
+	"ui/ingame_scoreboard_ctf.menu",
+	"ui/ingame_scoreboard_1fctf.menu",
+	"ui/ingame_scoreboard_har.menu",
+	"ui/ingame_scoreboard_ft.menu",
+	"ui/ingame_scoreboard_dom.menu",
+	"ui/ingame_scoreboard_ad.menu",
+	"ui/ingame_scoreboard_rr.menu",
+	"ui/end_scoreboard_ffa.menu",
+	"ui/end_scoreboard_duel.menu",
+	"ui/end_scoreboard_race.menu",
+	"ui/end_scoreboard_tdm.menu",
+	"ui/end_scoreboard_ca.menu",
+	"ui/end_scoreboard_ctf.menu",
+	"ui/end_scoreboard_1fctf.menu",
+	"ui/end_scoreboard_har.menu",
+	"ui/end_scoreboard_ft.menu",
+	"ui/end_scoreboard_dom.menu",
+	"ui/end_scoreboard_ad.menu",
+	"ui/end_scoreboard_rr.menu"
+};
 
 void CG_LoadMenus(const char *menuFile) {
 	char	*token;
 	char *p;
+	int	i;
 	int	len, start;
 	fileHandle_t	f;
 	static char buf[MAX_MENUDEFFILE];
@@ -3748,6 +3886,16 @@ void CG_LoadMenus(const char *menuFile) {
 	COM_Compress(buf);
 
 	CG_ResetBrowserOverlayState();
+
+	for ( i = 0; i < ARRAY_LEN( cgRetailSupplementalMenuFiles ); i++ ) {
+		// Current public HUD scripts already inline part of the retail set.
+		// Skip any supplemental file already named in the selected HUD script.
+		if ( strstr( buf, cgRetailSupplementalMenuFiles[i] ) ) {
+			continue;
+		}
+
+		CG_ParseMenu( cgRetailSupplementalMenuFiles[i] );
+	}
 
 	p = buf;
 
@@ -5014,7 +5162,7 @@ Tracks the retail compact-HUD discriminator used by the native chat helpers.
 =============
 */
 static qboolean CG_IsCompactChatHudActive( void ) {
-	return (qboolean)( cgs.newHud && !cg_useLegacyHud.integer );
+	return cgs.newHud;
 }
 
 /*
@@ -5741,10 +5889,13 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	cg.trackedPlayerClientNum = -1;
 	cg.trackedPlayerPriority = CG_SPECTATOR_TRACK_NONE;
 	cg.trackedPlayerExpireTime = 0;
+	cg.pendingFollowKillerClient = -1;
+	cg.pendingFollowKillerTime = 0;
 	cg.viewFilter.count = 0;
 	cg.viewFilter.index = 0;
 	cg.viewFilter.lastYaw = 0.0f;
 	cg.viewFilter.lastPitch = 0.0f;
+	CG_ClearSpectatorItemPickups();
 	CG_ParsePmoveConfigString( NULL );
 
 

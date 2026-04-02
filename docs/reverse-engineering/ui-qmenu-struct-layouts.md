@@ -17,10 +17,30 @@ the small qmenu framework family:
 
 The goal is to pin exact x86 offsets first, then attach the strongest source
 semantics that still explain how these members are used. The committed retail
-`uix86.dll` symbol map does not yet expose promoted qmenu helper names such as
-`Menu_AddItem`, `Menu_Draw`, `Menu_DefaultKey`, `MField_Draw`, or
-`ScrollList_Key`, so this note treats layout as hard fact and the per-member
-roles as source-backed until those raw retail helpers are named.
+`uix86.dll` symbol map still does not expose one-to-one qmenu core helpers such
+as `Menu_AddItem`, `Menu_Draw`, `Menu_DefaultKey`, `MField_Draw`, or
+`ScrollList_Key`. The outer UI ownership around `_UI_KeyEvent`,
+`_UI_MouseEvent`, and `_UI_SetActiveMenu` is now retail-mapped, but the inner
+legacy qmenu widget core remains source-backed, so this note treats layout as
+hard fact and keeps the per-member roles conservative.
+
+The current negative-result evidence is also meaningful here. Broad committed
+corpus searches still do not surface bounded retail `UI_PushMenu`,
+`UI_PopMenu`, `Menu_AddItem`, `Menu_Draw`, `Menu_DefaultKey`, `MField_Draw`,
+`ScrollList_Key`, or `UI_CDKeyMenu` helpers. What the retail corpus *does*
+still show is the outer dispatcher layer plus a legacy CD-key script/cvar band:
+`_UI_SetActiveMenu`, `UI_HasUniqueCDKey`, the retained `UIMENU_NEED_CD` /
+`UIMENU_BAD_CD_KEY` enum values, and `UI_RunMenuScript` branches that service
+`getCDKey` / `verifyCDKey` by reading or writing the `cdkey*`, `cdkey`,
+`cdkeychecksum`, and `ui_cdkeyvalid` cvars. The committed `_UI_SetActiveMenu`
+jump table also matters here: it routes case `5` (`UIMENU_TEAM`) to
+`joingame_menu`, does not activate standalone branches for `UIMENU_NEED_CD` or
+`UIMENU_BAD_CD_KEY`, and does not expose a separate committed
+`UIMENU_POSTGAME` branch. The best current reading is therefore not simply
+"qmenu is unmapped yet"; it is that the inner qmenu widget core is not
+presently bounded as a standalone retail helper family in the committed
+corpus, and several source-side menu routes remain compatibility carry-overs
+rather than currently revalidated retail owners.
 
 ## Method
 
@@ -33,9 +53,24 @@ roles as source-backed until those raw retail helpers are named.
   `assets/quake3/src/code/q3_ui/ui_atoms.c`.
 - Legacy comparison comes from `assets/quake3/src/code/q3_ui/ui_local.h`.
 - Retail revalidation status was checked against the committed `uix86` HLIL and
-  Ghidra corpus. No stable raw qmenu helper names have been promoted there yet,
-  so this pass lands the type map first rather than forcing weak function-name
-  guesses.
+  Ghidra corpus. The outer stack owners `_UI_KeyEvent`, `_UI_MouseEvent`, and
+  `_UI_SetActiveMenu` are promoted there, but no stable raw qmenu widget-core
+  helper names have been recovered yet, so this pass lands the type map first
+  rather than forcing weak function-name guesses.
+- Additional negative-result validation checked the committed corpus for
+  `UI_PushMenu`, `UI_PopMenu`, `Menu_AddItem`, `Menu_Draw`, `Menu_DefaultKey`,
+  `MField_Draw`, `ScrollList_Key`, and `UI_CDKeyMenu`, and only the outer
+  dispatcher / CD-key cvar-script band surfaced cleanly.
+- The same check also confirmed a narrower retail script/dispatcher surface
+  than the current source tree:
+  - `_UI_SetActiveMenu` reaches `main`, `error_popmenu`, `ingame`,
+    `ingame_about`, and `joingame_menu`, with case `5` (`UIMENU_TEAM`) landing
+    on `joingame_menu`
+  - no committed retail `_UI_SetActiveMenu` branch surfaced for
+    `UIMENU_POSTGAME`
+  - `UI_RunMenuScript` exposes `getCDKey`, `verifyCDKey`, and then
+    `loadArenas`, but no separate committed `openCredentials` token or
+    bounded `UI_CDKeyMenu` owner
 
 ## Hard Layout Facts
 
@@ -234,13 +269,13 @@ string width.
 
 ## Open Questions
 
-1. Promote the raw retail qmenu helper names in `uix86.dll` so these member
-   roles can be backed by named retail functions instead of only the GPL qmenu
-   owners.
-2. Revalidate directly against a recovered retail `Menu_AddItem` boundary that
-   the Quake Live binary really uses the widened `MAX_MENUITEMS = 96` contract,
-   although the current reconstruction and x86 layout probe already do.
-3. Recover the retail qmenu-side menu stack owners (`UI_PushMenu`,
-   `UI_KeyEvent`, `UI_MouseEvent`, and the active-menu refresh path) as a
-   dedicated function pass so the old framework and the newer `ui_shared`
+1. Determine whether a bounded retail qmenu widget-core slab actually still
+   exists in the committed corpus or whether the current retail evidence really
+   stops at the outer dispatcher plus the CD-key cvar/script band.
+2. Revalidate directly against any future retail evidence for a concrete
+   `Menu_AddItem`-style boundary before treating the widened
+   `MAX_MENUITEMS = 96` contract as retail-backed rather than source-compatible.
+3. Recover any remaining qmenu-side stack owners beneath the already-mapped
+   `_UI_KeyEvent`, `_UI_MouseEvent`, `_UI_SetActiveMenu`, and
+   `UI_RunMenuScript` surface so the old framework and the newer `ui_shared`
    system are documented side-by-side rather than piecemeal.

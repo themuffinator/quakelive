@@ -193,6 +193,7 @@ static void G_FreezeSetClientFrozenState( gentity_t *ent, qboolean frozen, qbool
 		client->invulnerabilityTime = 0;
 		client->freezeProtectedUntil = 0;
 	}
+	client->holdableInvulnerabilityTime = 0;
 
 	// Effect
 	tent = G_TempEntity( client->ps.origin, EV_PLAYER_TELEPORT_IN );
@@ -210,6 +211,7 @@ static void G_FreezeSetClientFrozenState( gentity_t *ent, qboolean frozen, qbool
 			AddScore( helper, ent->r.currentOrigin, 1 ); // Score for thawing
 			trap_SendServerCommand( -1, va( "cp \"%s thawed %s!\"\n", helper->client->pers.netname, client->pers.netname ) );
 			helper->client->ps.persistant[PERS_ASSIST_COUNT]++;
+			G_RankSendPlayerMedal( helper, "ASSISTS" );
 		}
 	}
 }

@@ -299,6 +299,7 @@ qboolean G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, genti
 
 			if ( meansOfDeath == MOD_GAUNTLET ) {
 				attacker->client->ps.persistant[PERS_GAUNTLET_FRAG_COUNT]++;
+				G_RankSendPlayerMedal( attacker, "GAUNTLET" );
 				attacker->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP);
 				attacker->client->ps.eFlags |= EF_AWARD_GAUNTLET;
 				attacker->client->rewardTime = level.time + REWARD_SPRITE_TIME;
@@ -307,6 +308,7 @@ qboolean G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, genti
 
 			if ( level.time - attacker->client->lastKillTime < CARNAGE_REWARD_TIME ) {
 				attacker->client->ps.persistant[PERS_EXCELLENT_COUNT]++;
+				G_RankSendPlayerMedal( attacker, "EXCELLENT" );
 				attacker->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP);
 				attacker->client->ps.eFlags |= EF_AWARD_EXCELLENT;
 				attacker->client->rewardTime = level.time + REWARD_SPRITE_TIME;
@@ -367,6 +369,7 @@ qboolean G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, genti
 	} else {
 		G_FreezeApplyFreezeState( self, qtrue );
 	}
+	G_RankSendPlayerDeath( self, attacker, meansOfDeath );
 
 	return qtrue;
 }
@@ -2436,6 +2439,7 @@ void ClientSpawn(gentity_t *ent) {
 	} else {
 		client->invulnerabilityTime = 0;
 	}
+	client->holdableInvulnerabilityTime = 0;
 
 	client->airOutTime = level.time + 12000;
 

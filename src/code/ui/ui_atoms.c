@@ -584,7 +584,6 @@ static void UI_CalcPostGameStats() {
 	newInfo.blueScore = atoi(UI_Argv(12));
 	time = atoi(UI_Argv(13));
 	newInfo.captures = atoi(UI_Argv(14));
-	UI_MatchSummaryParseFromPostgame();
 
 	newInfo.time = (time - trap_Cvar_VariableValue("ui_matchStartTime")) / 1000;
 	adjustedTime = uiInfo.mapList[ui_currentMap.integer].timeToBeat[game];
@@ -628,15 +627,12 @@ static void UI_CalcPostGameStats() {
 	// put back all the ui overrides
 	trap_Cvar_Set("capturelimit", UI_Cvar_VariableString("ui_saveCaptureLimit"));
 	trap_Cvar_Set("fraglimit", UI_Cvar_VariableString("ui_saveFragLimit"));
-	trap_Cvar_Set("cg_drawTimer", UI_Cvar_VariableString("ui_drawTimer"));
 	trap_Cvar_Set("g_doWarmup", UI_Cvar_VariableString("ui_doWarmup"));
 	trap_Cvar_Set("g_Warmup", UI_Cvar_VariableString("ui_Warmup"));
 	trap_Cvar_Set("sv_pure", UI_Cvar_VariableString("ui_pure"));
 	trap_Cvar_Set("g_friendlyFire", UI_Cvar_VariableString("ui_friendlyFire"));
 
 	UI_SetBestScores(&newInfo, qtrue);
-	UI_ShowPostGame(newHigh);
-
 
 }
 
@@ -712,10 +708,6 @@ qboolean UI_ConsoleCommand( int realTime ) {
 		return qtrue;
 	}
 
-	if ( Q_stricmp (cmd, "ui_test") == 0 ) {
-		UI_ShowPostGame(qtrue);
-	}
-
 	if ( Q_stricmp (cmd, "ui_report") == 0 ) {
 		UI_Report();
 		return qtrue;
@@ -729,17 +721,6 @@ qboolean UI_ConsoleCommand( int realTime ) {
 	if ( Q_stricmp (cmd, "ui_load") == 0 ) {
 		UI_Load();
 		return qtrue;
-	}
-
-	if ( Q_stricmp (cmd, "remapShader") == 0 ) {
-		if (trap_Argc() == 4) {
-			char shader1[MAX_QPATH];
-			char shader2[MAX_QPATH];
-			Q_strncpyz(shader1, UI_Argv(1), sizeof(shader1));
-			Q_strncpyz(shader2, UI_Argv(2), sizeof(shader2));
-			trap_R_RemapShader(shader1, shader2, UI_Argv(3));
-			return qtrue;
-		}
 	}
 
 	if ( Q_stricmp (cmd, "postgame") == 0 ) {
@@ -759,16 +740,6 @@ qboolean UI_ConsoleCommand( int realTime ) {
 
 	if ( Q_stricmp (cmd, "menu_open") == 0 ) {
 		UI_ConsoleCommand_MenuOpen();
-		return qtrue;
-	}
-
-	if ( Q_stricmp (cmd, "ui_teamOrders") == 0 ) {
-		//UI_TeamOrdersMenu_f();
-		return qtrue;
-	}
-
-	if ( Q_stricmp (cmd, "ui_cdkey") == 0 ) {
-		UI_CDKeyMenu_f();
 		return qtrue;
 	}
 

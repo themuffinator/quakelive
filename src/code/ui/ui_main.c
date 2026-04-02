@@ -148,24 +148,19 @@ static void UI_GetTeamColor(vec4_t *color);
 static void UI_ParseGameInfo(const char *teamFile);
 static void UI_ParseTeamInfo(const char *teamFile);
 static void UI_LoadCountries(void);
-static void UI_ResetClanList(void);
-	static void UI_LoadClanRoster(void);
-	static const char *UI_ValidateCountryCode(const char *code);
 	static const char *UI_SelectedMap(int index, int *actual);
 	static const char *UI_SelectedHead(int index, int *actual);
 	static int UI_GetIndexFromSelection(int actual);
 	static const char *UI_GetCallvoteGametypeToken(int gametype);
 	static int UI_GetCallvoteRotationGametype(const mapRotationInfo_t *rotation);
 	static int UI_CVMapCountByGameType(void);
-	static int UI_FindCallvoteRotationIndexForMap(int mapIndex, int preferredRotationIndex);
 	static void UI_SelectCallvoteMap(int index);
 	static void UI_SetCurrentNetMap(int mapIndex);
-	static void UI_HandleCallvoteMapPreviewScript(void);
-	static void UI_HandleCallvotePresetScript(void);
 	int Text_Width(const char *text, float scale, int limit);
 	void Text_Paint(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style);
 	void _UI_Init( qboolean inGameLoad );
 	void _UI_Shutdown( void );
+	void UI_LoadNonIngame( void );
 
 	int ProcessNewUI( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6 );
 
@@ -184,9 +179,6 @@ static void UI_ResetClanList(void);
 	vmCvar_t  ui_menuFlow;
 	vmCvar_t  ui_browserAwesomium;
 	extern vmCvar_t ui_cvGameType;
-	extern vmCvar_t ui_cvPresetRotation;
-	extern vmCvar_t ui_cvPresetGametype;
-	extern vmCvar_t ui_cvPresetActive;
 
 	static uiMenuFlow_t ui_activeMenuFlow = UI_MENU_FLOW_QUAKELIVE;
 	static qboolean ui_browserActiveKnown = qfalse;
@@ -327,17 +319,6 @@ qboolean UI_BrowserOverlayAvailable(void) {
 
 /*
 =============
-UI_RequestedMenuFlow
-
-Return the enforced Quake Live menu flow now that legacy scripts are retired.
-=============
-*/
-static uiMenuFlow_t UI_RequestedMenuFlow(void) {
-	return UI_MENU_FLOW_QUAKELIVE;
-}
-
-/*
-=============
 UI_ResolveMenuFlowInternal
 
 Resolve which menu flow should be active, preferring the browser overlay and
@@ -345,9 +326,7 @@ falling back to bridge scripts when the overlay is unavailable.
 =============
 */
 static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {
-	uiMenuFlow_t requested = UI_RequestedMenuFlow();
-
-	if (requested == UI_MENU_FLOW_QUAKELIVE && UI_BrowserOverlayAvailable()) {
+	if (UI_BrowserOverlayAvailable()) {
 		return UI_MENU_FLOW_QUAKELIVE;
 	}
 
@@ -387,17 +366,6 @@ static void UI_SetActiveMenuFlow(uiMenuFlow_t flow) {
 	ui_new.integer = (flow != UI_MENU_FLOW_LEGACY);
 	UI_SetBrowserActive(flow == UI_MENU_FLOW_QUAKELIVE);
 	UI_BrowserBridge_SetActive(flow == UI_MENU_FLOW_BRIDGED);
-}
-
-/*
-=============
-UI_UsingLegacyMenuFlow
-
-Check whether the legacy menu flow flag is active.
-=============
-*/
-qboolean UI_UsingLegacyMenuFlow(void) {
-	return (ui_activeMenuFlow == UI_MENU_FLOW_LEGACY);
 }
 
 /*
@@ -1400,13 +1368,24 @@ static void Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t 
 		}
 
 
-void UI_ShowPostGame(qboolean newHigh) {
-	trap_Cvar_Set ("cg_cameraOrbit", "0");
-	trap_Cvar_Set("cg_thirdPerson", "0");
-	trap_Cvar_Set( "sv_killserver", "1" );
-	uiInfo.soundHighScore = newHigh;
-  _UI_SetActiveMenu(UIMENU_POSTGAME);
-		}
+/*
+=================
+UI_SyncMenuStateFromCvars
+=================
+*/
+static void UI_SyncMenuStateFromCvars( void ) {
+	int colorIndex;
+
+	colorIndex = (int)trap_Cvar_VariableValue( "color1" );
+	if ( colorIndex < 1 || colorIndex > ARRAY_LEN( gamecodetoui ) ) {
+		colorIndex = 1;
+	}
+
+	uiInfo.effectsColor = gamecodetoui[colorIndex - 1];
+	uiInfo.currentCrosshair = (int)trap_Cvar_VariableValue( "cg_drawCrosshair" );
+	trap_Cvar_Set( "ui_mousePitch", ( trap_Cvar_VariableValue( "m_pitch" ) >= 0 ) ? "0" : "1" );
+}
+
 /*
 =================
 _UI_Refresh
@@ -1871,6 +1850,24 @@ int start;
 
 /*
 =============
+UI_ApplyRetailMenuFixups
+
+Hide source-only widgets from drifted read-only menu files so the active
+runtime stays aligned with the shipped retail menu set.
+=============
+*/
+static void UI_ApplyRetailMenuFixups( void ) {
+	menuDef_t *menu;
+
+	menu = Menus_FindByName( "ingame_join" );
+	if ( menu != NULL ) {
+		Menu_ShowItemByName( menu, "country_label", qfalse );
+		Menu_ShowItemByName( menu, "country_list", qfalse );
+	}
+}
+
+/*
+=============
 UI_Load
 
 Reload menu definitions and supporting data, respecting the active menu flow.
@@ -1897,7 +1894,6 @@ void UI_Load() {
 #else
 	UI_ParseGameInfo("gameinfo.txt");
 	UI_LoadArenas();
-	UI_LoadRulesets();
 #endif
 
 	ingameSet = UI_DefaultIngameFile();
@@ -1911,6 +1907,7 @@ void UI_Load() {
 	if (UI_MenuFileExists("ui/comp_spectator_follow.menu")) {
 		UI_ParseMenu("ui/comp_spectator_follow.menu");
 	}
+	UI_ApplyRetailMenuFixups();
 	Menus_CloseAll();
 	Menus_ActivateByName(lastName);
 
@@ -2902,12 +2899,10 @@ static const char *UI_QLGametypeName( int gametype ) {
 =============
 UI_GetServerSettingInt
 
-Looks up an integer setting from the current serverinfo payload and falls back
-to the local cvar when the server did not publish a value.
+Parses an integer field from the current serverinfo configstring payload.
 =============
 */
-static qboolean UI_GetServerSettingInt( const char *serverInfo, const char *key, const char *fallbackCvar, int *valueOut ) {
-	char buffer[MAX_CVAR_VALUE_STRING];
+static qboolean UI_GetServerSettingInt( const char *serverInfo, const char *key, int *valueOut ) {
 	const char *valueText;
 
 	if ( valueOut == NULL || key == NULL || key[0] == '\0' ) {
@@ -2915,14 +2910,6 @@ static qboolean UI_GetServerSettingInt( const char *serverInfo, const char *key,
 	}
 
 	valueText = ( serverInfo != NULL ) ? Info_ValueForKey( serverInfo, key ) : "";
-	if ( valueText == NULL || valueText[0] == '\0' ) {
-		buffer[0] = '\0';
-		if ( fallbackCvar != NULL && fallbackCvar[0] != '\0' ) {
-			trap_Cvar_VariableStringBuffer( fallbackCvar, buffer, sizeof( buffer ) );
-		}
-		valueText = buffer;
-	}
-
 	if ( valueText == NULL || valueText[0] == '\0' ) {
 		return qfalse;
 	}
@@ -3104,44 +3091,44 @@ static void UI_DrawServerSettings( rectDef_t *rect, float scale, vec4_t color, i
 	rowCount = 0;
 	customSettingsMask = strtoull( customSettings, NULL, 10 );
 
-	if ( !UI_GetServerSettingInt( serverInfo, "g_gametype", "g_gametype", &gametype ) ) {
+	if ( !UI_GetServerSettingInt( serverInfo, "g_gametype", &gametype ) ) {
 		gametype = -1;
 	}
 	UI_DrawServerSettingsEntry( &x, &y, &rowCount, scale, color, textStyle, UI_QLGametypeName( gametype ) );
 
-	if ( UI_GetServerSettingInt( serverInfo, "timelimit", "timelimit", &value ) ) {
+	if ( UI_GetServerSettingInt( serverInfo, "timelimit", &value ) ) {
 		Com_sprintf( text, sizeof( text ), "Time Limit: %i", value );
 		UI_DrawServerSettingsEntry( &x, &y, &rowCount, scale, color, textStyle, text );
 	}
 
 	if ( gametype >= 0 && gametype < GT_CLAN_ARENA &&
-		UI_GetServerSettingInt( serverInfo, "fraglimit", "fraglimit", &value ) ) {
+		UI_GetServerSettingInt( serverInfo, "fraglimit", &value ) ) {
 		Com_sprintf( text, sizeof( text ), "Frag Limit: %i", value );
 		UI_DrawServerSettingsEntry( &x, &y, &rowCount, scale, color, textStyle, text );
 	}
 
 	if ( gametype >= GT_TEAM &&
-		UI_GetServerSettingInt( serverInfo, "mercylimit", "mercylimit", &value ) &&
+		UI_GetServerSettingInt( serverInfo, "mercylimit", &value ) &&
 		value != 0 ) {
 		Com_sprintf( text, sizeof( text ), "Mercy Limit: %i", value );
 		UI_DrawServerSettingsEntry( &x, &y, &rowCount, scale, color, textStyle, text );
 	}
 
 	if ( gametype == GT_CTF &&
-		UI_GetServerSettingInt( serverInfo, "capturelimit", "capturelimit", &value ) ) {
+		UI_GetServerSettingInt( serverInfo, "capturelimit", &value ) ) {
 		Com_sprintf( text, sizeof( text ), "Capture Limit: %i", value );
 		UI_DrawServerSettingsEntry( &x, &y, &rowCount, scale, color, textStyle, text );
 	}
 
 	if ( ( gametype == GT_CLAN_ARENA || gametype == GT_FREEZE ||
 		gametype == GT_ATTACK_DEFEND || gametype == GT_RED_ROVER ) &&
-		UI_GetServerSettingInt( serverInfo, "roundlimit", "roundlimit", &value ) ) {
+		UI_GetServerSettingInt( serverInfo, "roundlimit", &value ) ) {
 		Com_sprintf( text, sizeof( text ), "Round Limit: %i", value );
 		UI_DrawServerSettingsEntry( &x, &y, &rowCount, scale, color, textStyle, text );
 	}
 
 	if ( ( gametype == GT_DOMINATION || gametype == GT_ATTACK_DEFEND ) &&
-		UI_GetServerSettingInt( serverInfo, "g_scorelimit", "g_scorelimit", &value ) ) {
+		UI_GetServerSettingInt( serverInfo, "g_scorelimit", &value ) ) {
 		Com_sprintf( text, sizeof( text ), "Score Limit: %i", value );
 		UI_DrawServerSettingsEntry( &x, &y, &rowCount, scale, color, textStyle, text );
 	}
@@ -3380,183 +3367,6 @@ static void UI_DrawStartingWeapons( rectDef_t *rect, float scale, vec4_t color, 
 	}
 }
 
-/*
-=============
-UI_ClearMatchSummaryList
-
-Resets a cached match summary list so new data can be appended safely.
-=============
-*/
-static void UI_ClearMatchSummaryList(uiMatchPlayerList_t *list) {
-	if (!list) {
-		return;
-	}
-	memset(list, 0, sizeof(*list));
-		}
-
-/*
-=============
-UI_ResetMatchSummaryCache
-
-Clears the cached match summary payload exposed to the scoreboards.
-=============
-*/
-void UI_ResetMatchSummaryCache(void) {
-	memset(&uiInfo.matchSummary, 0, sizeof(uiInfo.matchSummary));
-	uiInfo.currentMatchSummaryEnd = 0;
-	uiInfo.currentMatchSummaryRed = 0;
-	uiInfo.currentMatchSummaryBlue = 0;
-		}
-
-/*
-=============
-UI_MatchSummaryAppend
-
-Appends a player row to the specified list without exceeding the cap.
-=============
-*/
-static void UI_MatchSummaryAppend(uiMatchPlayerList_t *list, const uiMatchPlayerInfo_t *entry) {
-	if (!list || !entry) {
-		return;
-	}
-	if (list->entryCount >= MAX_MATCH_SUMMARY_PLAYERS) {
-		return;
-	}
-	list->entries[list->entryCount++] = *entry;
-		}
-
-/*
-=============
-UI_MatchSummaryParseFromPostgame
-
-Parses the `postgame` console command payload emitted by the game module to
-refresh the end-of-match, red team, and blue team caches.
-=============
-*/
-void UI_MatchSummaryParseFromPostgame(void) {
-	char info[MAX_INFO_STRING];
-	int argc;
-	int playerTriples;
-	int argOffset;
-	int i;
-	uiMatchPlayerInfo_t entry;
-	const char *rawName;
-	uiMatchSummaryCache_t *cache = &uiInfo.matchSummary;
-
-	UI_ResetMatchSummaryCache();
-	argc = trap_Argc();
-	if (argc < 3) {
-		return;
-	}
-
-	cache->totalClients = atoi(UI_Argv(1));
-	cache->localClientNum = atoi(UI_Argv(2));
-	cache->redScore = (argc > 11) ? atoi(UI_Argv(11)) : 0;
-	cache->blueScore = (argc > 12) ? atoi(UI_Argv(12)) : 0;
-	cache->matchTimeSeconds = (argc > 13) ? (atoi(UI_Argv(13)) / 1000) : 0;
-
-	UI_ClearMatchSummaryList(&cache->endOfMatch);
-	UI_ClearMatchSummaryList(&cache->redTeam);
-	UI_ClearMatchSummaryList(&cache->blueTeam);
-
-	playerTriples = cache->totalClients;
-	argOffset = 15;
-	for (i = 0; i < playerTriples && (argOffset + 2) < argc; i++, argOffset += 3) {
-		int clientNum = atoi(UI_Argv(argOffset));
-		int rank = atoi(UI_Argv(argOffset + 1));
-		int score = atoi(UI_Argv(argOffset + 2));
-
-		if (clientNum < 0 || clientNum >= MAX_CLIENTS) {
-			continue;
-		}
-
-		trap_GetConfigString(CS_PLAYERS + clientNum, info, sizeof(info));
-		memset(&entry, 0, sizeof(entry));
-		entry.clientNum = clientNum;
-		entry.rank = rank;
-		entry.score = score;
-		entry.team = (team_t)atoi(Info_ValueForKey(info, "t"));
-		rawName = Info_ValueForKey(info, "n");
-		if (!rawName || !rawName[0]) {
-		rawName = va("Player %i", clientNum);
-		}
-		Q_strncpyz(entry.name, rawName, sizeof(entry.name));
-		Q_CleanStr(entry.name);
-
-		Q_strncpyz(entry.country, UI_ValidateCountryCode(Info_ValueForKey(info, "country")), sizeof(entry.country));
-
-		UI_MatchSummaryAppend(&cache->endOfMatch, &entry);
-		if (entry.team == TEAM_RED) {
-		UI_MatchSummaryAppend(&cache->redTeam, &entry);
-		} else if (entry.team == TEAM_BLUE) {
-			UI_MatchSummaryAppend(&cache->blueTeam, &entry);
-		}
-	}
-
-	cache->valid = (cache->endOfMatch.entryCount > 0) ? qtrue : qfalse;
-		}
-
-/*
-=============
-UI_MatchSummaryListForFeeder
-
-Routes match summary feeder IDs to their cached player lists.
-=============
-*/
-static uiMatchPlayerList_t *UI_MatchSummaryListForFeeder(float feederID) {
-	uiMatchSummaryCache_t *cache = &uiInfo.matchSummary;
-
-	if (!cache->valid) {
-		return NULL;
-	}
-
-	if (feederID == FEEDER_MATCHSUMMARY_END || feederID == FEEDER_ENDSCOREBOARD || feederID == FEEDER_SCOREBOARD) {
-	return &cache->endOfMatch;
-	} else if (feederID == FEEDER_MATCHSUMMARY_RED || feederID == FEEDER_REDTEAM_STATS || feederID == FEEDER_REDTEAM_LIST) {
-	return &cache->redTeam;
-	} else if (feederID == FEEDER_MATCHSUMMARY_BLUE || feederID == FEEDER_BLUETEAM_STATS || feederID == FEEDER_BLUETEAM_LIST) {
-	return &cache->blueTeam;
-	}
-
-	return NULL;
-	}
-
-/*
-=============
-UI_MatchSummaryTeamString
-
-Returns the localized team label for cached match summary entries.
-=============
-*/
-static const char *UI_MatchSummaryTeamString(team_t team) {
-	switch (team) {
-		case TEAM_RED:
-			return "RED";
-		case TEAM_BLUE:
-			return "BLUE";
-		case TEAM_SPECTATOR:
-			return "SPECTATOR";
-		default:
-			return "FREE";
-	}
-		}
-
-/*
-=============
-UI_MapRotationEntryForIndex
-
-Returns the cached map rotation entry for the provided index, or NULL if the
-row is unavailable.
-=============
-*/
-static mapRotationInfo_t *UI_MapRotationEntryForIndex(int index) {
-	if (index < 0 || index >= uiInfo.mapRotationCount) {
-		return NULL;
-	}
-
-	return &uiInfo.mapRotations[index];
-		}
-
 #define UI_NEXTMAP_CONFIGSTRING	0x29A
 
 /*
@@ -3564,16 +3374,14 @@ static mapRotationInfo_t *UI_MapRotationEntryForIndex(int index) {
 UI_GetNextMapText
 
 Fetches the retail next-map label from the undocumented configstring slot used
-by `UI_DrawNextMap`, then falls back to the mirrored rotation preview payload or
-cached rotation metadata when the current source tree has not published that
-slot yet.
+by `UI_DrawNextMap`, then falls back to the mirrored rotation preview payload
+when the direct slot is not populated yet.
 =============
 */
 static const char *UI_GetNextMapText( void ) {
 	static char nextMapText[MAX_INFO_STRING];
 	char rotationTitles[MAX_INFO_STRING];
 	const char *valueText;
-	mapRotationInfo_t *rotation;
 
 	nextMapText[0] = '\0';
 	trap_GetConfigString( UI_NEXTMAP_CONFIGSTRING, nextMapText, sizeof( nextMapText ) );
@@ -3591,16 +3399,6 @@ static const char *UI_GetNextMapText( void ) {
 		return nextMapText;
 	}
 
-	rotation = UI_MapRotationEntryForIndex( 0 );
-	if ( rotation != NULL ) {
-		if ( rotation->mapTitle[0] != '\0' ) {
-			return rotation->mapTitle;
-		}
-		if ( rotation->mapName[0] != '\0' ) {
-			return rotation->mapName;
-		}
-	}
-
 	return "";
 }
 
@@ -3609,8 +3407,8 @@ static const char *UI_GetNextMapText( void ) {
 UI_DrawNextMap
 
 Restores the retail `UI_NEXTMAP` ownerdraw by painting the next-map label from
-the same configstring seam used by the native UI, with bounded fallbacks for the
-currently reconstructed source tree.
+the same configstring seam used by the native UI, with the mirrored rotation
+payload as the only compatibility fallback.
 =============
 */
 static void UI_DrawNextMap( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
@@ -4740,30 +4538,6 @@ static void UI_LoadMods() {
 
 
 /*
-===============
-UI_LoadTeams
-===============
-*/
-static void UI_LoadTeams() {
-	char	teamList[4096];
-	char	*teamName;
-	int		i, len, count;
-
-	count = trap_FS_GetFileList( "", "team", teamList, 4096 );
-
-	if (count) {
-		teamName = teamList;
-		for ( i = 0; i < count; i++ ) {
-			len = strlen( teamName );
-			UI_ParseTeamInfo(teamName);
-			teamName += len + 1;
-		}
-	}
-
-		}
-
-
-/*
 =============
 UI_LoadCountries
 
@@ -4795,97 +4569,6 @@ static void UI_LoadCountries(void) {
 		uiInfo.countryList[uiInfo.countryCount++] = String_Alloc(token);
 	}
 		}
-
-/*
-============
-UI_ResetClanList
-
-Clears the cached clan roster entries and resets the selection CVars.
-============
-*/
-static void UI_ResetClanList(void) {
-	int i;
-
-	uiInfo.clanCount = 0;
-	uiInfo.currentClan = -1;
-	uiInfo.clanListLoaded = qfalse;
-
-	for (i = 0; i < MAX_CLANS; i++) {
-		uiInfo.clanList[i].id[0] = '\0';
-		uiInfo.clanList[i].name[0] = '\0';
-		uiInfo.clanList[i].tag[0] = '\0';
-		uiInfo.clanList[i].emblemPath[0] = '\0';
-		uiInfo.clanList[i].emblemShader = -1;
-	}
-
-	trap_Cvar_Set("ui_clanIndex", "-1");
-	trap_Cvar_Set("ui_clanName", "");
-	ui_clanIndex.integer = -1;
-	ui_clanIndex.value = -1.0f;
-	ui_clanName.string[0] = "\0";
-}
-
-/*
-============
-UI_LoadClanRoster
-
-Seeds the clan roster cache from persistent storage or a stub placeholder
-until backend plumbing is available.
-============
-*/
-static void UI_LoadClanRoster(void) {
-	UI_ResetClanList();
-
-	Q_strncpyz(uiInfo.clanList[0].id, "pending", sizeof(uiInfo.clanList[0].id));
-	Q_strncpyz(uiInfo.clanList[0].name, "No clans available", sizeof(uiInfo.clanList[0].name));
-	Q_strncpyz(uiInfo.clanList[0].tag, "--", sizeof(uiInfo.clanList[0].tag));
-	uiInfo.clanList[0].emblemShader = -1;
-	uiInfo.clanCount = 1;
-	uiInfo.clanListLoaded = qtrue;
-
-	if (uiInfo.clanCount > 0) {
-		int index;
-
-		index = ui_clanIndex.integer;
-		if (index < 0 || index >= uiInfo.clanCount) {
-			index = 0;
-			trap_Cvar_Set("ui_clanIndex", "0");
-			ui_clanIndex.integer = 0;
-			ui_clanIndex.value = 0.0f;
-		}
-
-		uiInfo.currentClan = index;
-		trap_Cvar_Set("ui_clanName", uiInfo.clanList[index].name);
-		Q_strncpyz(ui_clanName.string, uiInfo.clanList[index].name, sizeof(ui_clanName.string));
-	}
-}
-
-
-
-/*
-============
-UI_ValidateCountryCode
-
-Returns a table-backed country code or a safe default when the provided code
-is empty or unknown.
-============
-*/
-static const char *UI_ValidateCountryCode(const char *code) {
-	int i;
-
-	if (!code || !code[0]) {
-		return (uiInfo.countryCount > 0) ? uiInfo.countryList[0] : "";
-	}
-
-	for (i = 0; i < uiInfo.countryCount; i++) {
-		if (Q_stricmp(code, uiInfo.countryList[i]) == 0) {
-			return uiInfo.countryList[i];
-		}
-	}
-
-	return (uiInfo.countryCount > 0) ? uiInfo.countryList[0] : code;
-		}
-
 
 /*
 ===============
@@ -5003,14 +4686,10 @@ static void UI_StartSkirmish(qboolean next) {
 
 	UI_SetCapFragLimits(qfalse);
 
-	temp = trap_Cvar_VariableValue( "cg_drawTimer" );
-	trap_Cvar_Set("ui_drawTimer", va("%i", temp));
 	temp = trap_Cvar_VariableValue( "g_doWarmup" );
 	trap_Cvar_Set("ui_doWarmup", va("%i", temp));
 	temp = trap_Cvar_VariableValue( "g_friendlyFire" );
 	trap_Cvar_Set("ui_friendlyFire", va("%i", temp));
-	temp = trap_Cvar_VariableValue( "sv_maxClients" );
-	trap_Cvar_Set("ui_maxClients", va("%i", temp));
 	temp = trap_Cvar_VariableValue( "g_warmup" );
 	trap_Cvar_Set("ui_Warmup", va("%i", temp));
 	temp = trap_Cvar_VariableValue( "sv_pure" );
@@ -5018,7 +4697,6 @@ static void UI_StartSkirmish(qboolean next) {
 
 	trap_Cvar_Set("cg_cameraOrbit", "0");
 	trap_Cvar_Set("cg_thirdPerson", "0");
-	trap_Cvar_Set("cg_drawTimer", "1");
 	trap_Cvar_Set("g_doWarmup", "1");
 	trap_Cvar_Set("g_warmup", "15");
 	trap_Cvar_Set("sv_pure", "0");
@@ -5346,15 +5024,13 @@ static void UI_RunMenuScript(char **args) {
 			Q_strcat(buff, 1024, UI_Cvar_VariableString("cdkey3")); 
 			Q_strcat(buff, 1024, UI_Cvar_VariableString("cdkey4")); 
 			trap_Cvar_Set("cdkey", buff);
-                        if (trap_VerifyCDKey(buff, UI_Cvar_VariableString("cdkeychecksum"))) {
-                                trap_Cvar_Set("ui_cdkeyvalid", "Credential appears to be valid.");
-                                trap_SetCDKey(buff);
-                        } else {
-                                trap_Cvar_Set("ui_cdkeyvalid", "Credential does not appear to be valid.");
-                        }
-                } else if (Q_stricmp(name, "openCredentials") == 0) {
-                        UI_CDKeyMenu();
-                } else if (Q_stricmp(name, "loadArenas") == 0) {
+			if (trap_VerifyCDKey(buff, UI_Cvar_VariableString("cdkeychecksum"))) {
+				trap_Cvar_Set("ui_cdkeyvalid", "CD Key Appears to be valid.");
+				trap_SetCDKey(buff);
+			} else {
+				trap_Cvar_Set("ui_cdkeyvalid", "CD Key does not appear to be valid.");
+			}
+		} else if (Q_stricmp(name, "loadArenas") == 0) {
 			UI_LoadArenas();
 			UI_MapCountByGameType(qfalse);
 			Menu_SetFeederSelection(NULL, FEEDER_ALLMAPS, 0, "createserver");
@@ -5597,9 +5273,7 @@ static void UI_RunMenuScript(char **args) {
 				trap_Cmd_ExecuteText(EXEC_APPEND, va("callvote map %s %s\n", mapName, gametypeToken));
 			}
 		} else if (Q_stricmp(name, "updateCallvoteMapPreview") == 0) {
-			UI_HandleCallvoteMapPreviewScript();
-		} else if (Q_stricmp(name, "applyCallvotePreset") == 0) {
-			UI_HandleCallvotePresetScript();
+			UI_FeederSelection(FEEDER_CVMAPS, ui_mapIndex.integer);
 		} else if (Q_stricmp(name, "voteKick") == 0) {
 			if (uiInfo.playerIndex >= 0 && uiInfo.playerIndex < uiInfo.playerCount) {
 				trap_Cmd_ExecuteText( EXEC_APPEND, va("callvote kick %s\n",uiInfo.playerNames[uiInfo.playerIndex]) );
@@ -6399,10 +6073,6 @@ static int UI_FeederCount(float feederID) {
 		return UI_CVMapCountByGameType();
 	}
 
-	if (feederID == FEEDER_MAP_ROTATIONS) {
-		return uiInfo.mapRotationCount;
-	}
-
 	if (feederID == FEEDER_SERVERS) {
 		if (!UI_ServerBrowserEnabled()) {
 			return 0;
@@ -6451,31 +6121,6 @@ static int UI_FeederCount(float feederID) {
 
 	if (feederID == FEEDER_COUNTRIES) {
 		return uiInfo.countryCount;
-	}
-
-	if (feederID == FEEDER_CLANS) {
-		if (!uiInfo.clanListLoaded) {
-			UI_LoadClanRoster();
-		}
-
-		return uiInfo.clanCount;
-	}
-
-	if (feederID == FEEDER_MATCHSUMMARY_END
-				|| feederID == FEEDER_MATCHSUMMARY_RED
-				|| feederID == FEEDER_MATCHSUMMARY_BLUE
-				|| feederID == FEEDER_ENDSCOREBOARD
-				|| feederID == FEEDER_REDTEAM_STATS
-				|| feederID == FEEDER_BLUETEAM_STATS
-				|| feederID == FEEDER_REDTEAM_LIST
-				|| feederID == FEEDER_BLUETEAM_LIST
-				|| feederID == FEEDER_SCOREBOARD) {
-		uiMatchPlayerList_t *list;
-
-		list = UI_MatchSummaryListForFeeder(feederID);
-		if (list) {
-			return list->entryCount;
-		}
 	}
 
 	return 0;
@@ -6548,66 +6193,6 @@ static int UI_GetIndexFromSelection(int actual) {
 	return 0;
 		}
 
-static qboolean ui_callvotePresetInFlight = qfalse;
-
-/*
-=============
-UI_ClearCallvotePresetState
-
-Resets the preset-related CVars when manual selections override them.
-=============
-*/
-static void UI_ClearCallvotePresetState(void) {
-	trap_Cvar_Set("ui_cvPresetRotation", "-1");
-	trap_Cvar_Set("ui_cvPresetGameType", "-1");
-	trap_Cvar_Set("ui_cvPresetActive", "0");
-	ui_cvPresetRotation.integer = -1;
-	ui_cvPresetGametype.integer = -1;
-	ui_cvPresetActive.integer = 0;
-		}
-
-/*
-=============
-UI_SetCallvotePresetState
-
-Synchronizes the preset CVars with the selected rotation metadata.
-=============
-*/
-static void UI_SetCallvotePresetState(int rotationIndex, const mapRotationInfo_t *rotation) {
-	int gametype;
-
-	if (!rotation) {
-		UI_ClearCallvotePresetState();
-		return;
-	}
-
-	gametype = UI_GetCallvoteRotationGametype(rotation);
-	trap_Cvar_Set("ui_cvPresetRotation", va("%d", rotationIndex));
-	trap_Cvar_Set("ui_cvPresetGameType", va("%d", gametype));
-	trap_Cvar_Set("ui_cvPresetActive", "1");
-	ui_cvPresetRotation.integer = rotationIndex;
-	ui_cvPresetGametype.integer = gametype;
-	ui_cvPresetActive.integer = 1;
-		}
-
-/*
-=============
-UI_GetPresetRotationIndex
-
-Returns the preset rotation index when it is still valid for the cache.
-=============
-*/
-static int UI_GetPresetRotationIndex(void) {
-	int index;
-
-	index = ui_cvPresetRotation.integer;
-	if (index < 0 || index >= uiInfo.mapRotationCount) {
-			return -1;
-	}
-
-	return index;
-		}
-
 /*
 =============
 UI_GetCallvoteGametypeToken
@@ -6655,20 +6240,6 @@ Normalizes the callvote gametype filter so out-of-range values fall back to Defa
 */
 static int UI_GetFilteredCallvoteGametype(void) {
 	int gametype;
-	int presetIndex;
-	mapRotationInfo_t *rotation;
-
-	if (ui_cvPresetActive.integer > 0) {
-		presetIndex = UI_GetPresetRotationIndex();
-		rotation = UI_MapRotationEntryForIndex(presetIndex);
-		if (rotation) {
-			gametype = UI_GetCallvoteRotationGametype(rotation);
-			if (gametype >= -1 && gametype < GT_MAX_GAME_TYPE) {
-				return gametype;
-			}
-		}
-		UI_ClearCallvotePresetState();
-	}
 
 	gametype = ui_cvGameType.integer;
 	if (gametype < -1 || gametype >= GT_MAX_GAME_TYPE) {
@@ -6845,75 +6416,28 @@ static int UI_CVMapCountByGameType(void) {
 
 /*
 =============
-UI_FindCallvoteRotationIndexForMap
-
-Finds a filtered rotation entry backing the provided active map selection.
-=============
-*/
-static int UI_FindCallvoteRotationIndexForMap(int mapIndex, int preferredRotationIndex) {
-	int gametype;
-	int i;
-
-	if (mapIndex < 0 || mapIndex >= uiInfo.mapCount) {
-			return -1;
-	}
-
-	gametype = UI_GetFilteredCallvoteGametype();
-	if (preferredRotationIndex >= 0 && preferredRotationIndex < uiInfo.mapRotationCount) {
-		if (uiInfo.mapRotations[preferredRotationIndex].mapIndex == mapIndex &&
-			UI_RotationMatchesGametype(&uiInfo.mapRotations[preferredRotationIndex], gametype)) {
-			return preferredRotationIndex;
-		}
-	}
-
-	for (i = 0; i < uiInfo.mapRotationCount; i++) {
-		if (!UI_RotationMatchesGametype(&uiInfo.mapRotations[i], gametype)) {
-			continue;
-		}
-		if (uiInfo.mapRotations[i].mapIndex == mapIndex) {
-			return i;
-		}
-	}
-
-		return -1;
-		}
-
-/*
-=============
 UI_SelectCallvoteMap
 
-Updates the retail callvote-map feeder selection while preserving the source-side
-rotation metadata used by preset helpers.
+Applies the retail FEEDER_CVMAPS selection side effects after rebuilding the
+callvote-visible map set for the current filter.
 =============
 */
 static void UI_SelectCallvoteMap(int index) {
 	int actual;
 	int available;
-	int rotationIndex;
 
 	available = UI_CVMapCountByGameType();
 	if (index < 0 || index >= available) {
-		uiInfo.callvoteRotationIndex = -1;
 		return;
 	}
 
 	UI_SelectedMap(index, &actual);
 	if (actual < 0 || actual >= uiInfo.mapCount || !uiInfo.mapList[actual].active) {
-		uiInfo.callvoteRotationIndex = -1;
 		return;
 	}
 
 	trap_Cvar_Set("ui_mapIndex", va("%d", index));
 	ui_mapIndex.integer = index;
-
-	if (ui_callvotePresetInFlight) {
-		ui_callvotePresetInFlight = qfalse;
-	} else {
-		UI_ClearCallvotePresetState();
-	}
-
-	rotationIndex = UI_FindCallvoteRotationIndexForMap(actual, uiInfo.callvoteRotationIndex);
-	uiInfo.callvoteRotationIndex = rotationIndex;
 	UI_SetCurrentNetMap(actual);
 }
 
@@ -6951,86 +6475,6 @@ static void UI_SetCurrentNetMap(int mapIndex) {
 		va("%s.roq", uiInfo.mapList[mapIndex].mapLoadName), 0, 0, 0, 0, (CIN_loop | CIN_silent));
 		}
 
-/*
-=============
-UI_HandleCallvoteMapPreviewScript
-
-Rebuilds the callvote map preview when gametype filters change.
-=============
-*/
-static void UI_HandleCallvoteMapPreviewScript(void) {
-	int available;
-	int mapIndex;
-	int rotationIndex;
-	int displayRow;
-	mapRotationInfo_t *rotation;
-
-	available = UI_CVMapCountByGameType();
-	if (available <= 0) {
-		uiInfo.callvoteRotationIndex = -1;
-		return;
-	}
-
-	rotationIndex = uiInfo.callvoteRotationIndex;
-	rotation = UI_MapRotationEntryForIndex(rotationIndex);
-	if (rotation) {
-		mapIndex = rotation->mapIndex;
-		if (mapIndex >= 0 && mapIndex < uiInfo.mapCount && uiInfo.mapList[mapIndex].active) {
-			displayRow = UI_GetIndexFromSelection(mapIndex);
-			Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, displayRow, NULL);
-			return;
-		}
-	}
-
-	mapIndex = ui_currentNetMap.integer;
-	if (mapIndex >= 0 && mapIndex < uiInfo.mapCount && uiInfo.mapList[mapIndex].active) {
-		displayRow = UI_GetIndexFromSelection(mapIndex);
-		Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, displayRow, NULL);
-		return;
-	}
-
-	if (ui_cvPresetActive.integer > 0) {
-		rotationIndex = UI_GetPresetRotationIndex();
-		rotation = UI_MapRotationEntryForIndex(rotationIndex);
-		if (rotation) {
-			mapIndex = rotation->mapIndex;
-			if (mapIndex >= 0 && mapIndex < uiInfo.mapCount && uiInfo.mapList[mapIndex].active) {
-				displayRow = UI_GetIndexFromSelection(mapIndex);
-				ui_callvotePresetInFlight = qtrue;
-				Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, displayRow, NULL);
-				return;
-			}
-		}
-		UI_ClearCallvotePresetState();
-	}
-
-	Menu_SetFeederSelection(NULL, FEEDER_CVMAPS, 0, NULL);
-		}
-
-
-/*
-=============
-UI_HandleCallvotePresetScript
-
-Captures the currently highlighted rotation list entry and activates the preset state.
-=============
-*/
-static void UI_HandleCallvotePresetScript(void) {
-	int rotationIndex;
-	mapRotationInfo_t *rotation;
-
-	rotationIndex = uiInfo.currentMapRotation;
-	rotation = UI_MapRotationEntryForIndex(rotationIndex);
-	if (!rotation) {
-		UI_ClearCallvotePresetState();
-		return;
-	}
-
-	UI_SetCallvotePresetState(rotationIndex, rotation);
-		}
-
-
-
 static void UI_UpdatePendingPings() { 
 	if (!UI_ServerBrowserEnabled()) {
 		return;
@@ -7055,9 +6499,6 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
         static char clientBuff[32];
         static int lastColumn = -1;
         static int lastTime = 0;
-        static char matchSummaryScore[16];
-        static char matchSummaryRank[16];
-        static char matchSummaryClient[16];
         *handle = -1;
         if (feederID == FEEDER_HEADS) {
                 int actual;
@@ -7074,25 +6515,6 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 
 				UI_CVMapCountByGameType();
 				return UI_SelectedMap(index, &actual);
-        } else if (feederID == FEEDER_MAP_ROTATIONS) {
-                mapRotationInfo_t *entry = UI_MapRotationEntryForIndex(index);
-                if (entry) {
-                        switch (column) {
-                                case 1:
-                                        return (entry->mapName[0]) ? entry->mapName : entry->mapTitle;
-                                case 2:
-                                        return entry->factoryId;
-                                case 3:
-                                        return entry->factoryConfig;
-                                case 4:
-                                        return entry->factoryGameType;
-                                default:
-                                        if (entry->mapTitle[0]) {
-                                                return entry->mapTitle;
-                                        }
-                                        return entry->mapName;
-                        }
-                }
         } else if (feederID == FEEDER_SERVERS) {
                 if (!UI_ServerBrowserEnabled()) {
                         return "";
@@ -7190,49 +6612,6 @@ if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
 		if (index >= 0 && index < uiInfo.countryCount) {
 			return uiInfo.countryList[index];
 		}
-	} else if (feederID == FEEDER_CLANS) {
-		if (!uiInfo.clanListLoaded) {
-			UI_LoadClanRoster();
-		}
-
-		if (index >= 0 && index < uiInfo.clanCount) {
-			switch (column) {
-				case 1:
-					return uiInfo.clanList[index].tag;
-				default:
-					return uiInfo.clanList[index].name;
-			}
-		}
-	} else if (feederID == FEEDER_MATCHSUMMARY_END
-	|| feederID == FEEDER_MATCHSUMMARY_RED
-	|| feederID == FEEDER_MATCHSUMMARY_BLUE
-	|| feederID == FEEDER_ENDSCOREBOARD
-	|| feederID == FEEDER_REDTEAM_STATS
-	|| feederID == FEEDER_BLUETEAM_STATS
-	|| feederID == FEEDER_REDTEAM_LIST
-	|| feederID == FEEDER_BLUETEAM_LIST
-	|| feederID == FEEDER_SCOREBOARD) {
-	uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
-	if (list && index >= 0 && index < list->entryCount) {
-	uiMatchPlayerInfo_t *entry = &list->entries[index];
-	switch (column) {
-	case 0:
-	return entry->country;
-	case 1:
-	Com_sprintf(matchSummaryScore, sizeof(matchSummaryScore), "%i", entry->score);
-	return matchSummaryScore;
-	case 2:
-	Com_sprintf(matchSummaryRank, sizeof(matchSummaryRank), "%i", entry->rank);
-	return matchSummaryRank;
-	case 3:
-	return UI_MatchSummaryTeamString(entry->team);
-	case 4:
-	Com_sprintf(matchSummaryClient, sizeof(matchSummaryClient), "%i", entry->clientNum);
-	return matchSummaryClient;
-	default:
-	return entry->name;
-	}
-	}
 	}
 	return "";
 	}
@@ -7273,18 +6652,6 @@ if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
 			}
 	return uiInfo.mapList[actual].levelShot;
 	}
-	} else if (feederID == FEEDER_CLANS) {
-		if (!uiInfo.clanListLoaded) {
-			UI_LoadClanRoster();
-		}
-
-		if (index >= 0 && index < uiInfo.clanCount) {
-			if (uiInfo.clanList[index].emblemShader == -1 && uiInfo.clanList[index].emblemPath[0]) {
-				uiInfo.clanList[index].emblemShader = trap_R_RegisterShaderNoMip(uiInfo.clanList[index].emblemPath);
-			}
-
-			return uiInfo.clanList[index].emblemShader;
-		}
 	}
 
 	return 0;
@@ -7343,14 +6710,9 @@ if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
 			updateOpponentModel = qtrue;
 		} else {
 			UI_SetCurrentNetMap(actual);
-			uiInfo.callvoteRotationIndex = -1;
 		}
 	} else if (feederID == FEEDER_CVMAPS) {
 		UI_SelectCallvoteMap(index);
-	} else if (feederID == FEEDER_MAP_ROTATIONS) {
-	if (UI_MapRotationEntryForIndex(index)) {
-	uiInfo.currentMapRotation = index;
-	}
 	} else if (feederID == FEEDER_SERVERS) {
 	const char *mapName = NULL;
 
@@ -7401,45 +6763,6 @@ if (uiInfo.modList[index].modDescr && *uiInfo.modList[index].modDescr) {
 	} else if (feederID == FEEDER_COUNTRIES) {
 		if (index >= 0 && index < uiInfo.countryCount) {
 			trap_Cvar_Set("ui_country", uiInfo.countryList[index]);
-	}
-	} else if (feederID == FEEDER_CLANS) {
-	if (!uiInfo.clanListLoaded) {
-	UI_LoadClanRoster();
-	}
-
-	if (index >= 0 && index < uiInfo.clanCount) {
-	uiInfo.currentClan = index;
-	trap_Cvar_Set("ui_clanIndex", va("%d", index));
-	ui_clanIndex.integer = index;
-	ui_clanIndex.value = (float) index;
-	trap_Cvar_Set("ui_clanName", uiInfo.clanList[index].name);
-	Q_strncpyz(ui_clanName.string, uiInfo.clanList[index].name, sizeof(ui_clanName.string));
-	} else {
-	uiInfo.currentClan = -1;
-	trap_Cvar_Set("ui_clanIndex", "-1");
-	trap_Cvar_Set("ui_clanName", "");
-	ui_clanIndex.integer = -1;
-	ui_clanIndex.value = -1.0f;
-	ui_clanName.string[0] = '\0';
-	}
-} else if (feederID == FEEDER_MATCHSUMMARY_END
-	|| feederID == FEEDER_MATCHSUMMARY_RED
-	|| feederID == FEEDER_MATCHSUMMARY_BLUE
-	|| feederID == FEEDER_ENDSCOREBOARD
-	|| feederID == FEEDER_REDTEAM_STATS
-	|| feederID == FEEDER_BLUETEAM_STATS
-	|| feederID == FEEDER_REDTEAM_LIST
-	|| feederID == FEEDER_BLUETEAM_LIST
-	|| feederID == FEEDER_SCOREBOARD) {
-	uiMatchPlayerList_t *list = UI_MatchSummaryListForFeeder(feederID);
-	if (list && index >= 0 && index < list->entryCount) {
-	if (feederID == FEEDER_MATCHSUMMARY_END) {
-	uiInfo.currentMatchSummaryEnd = index;
-	} else if (feederID == FEEDER_MATCHSUMMARY_RED) {
-	uiInfo.currentMatchSummaryRed = index;
-	} else {
-	uiInfo.currentMatchSummaryBlue = index;
-	}
 	}
 	}
 		}
@@ -8177,7 +7500,6 @@ void _UI_Init( qboolean inGameLoad ) {
 		Com_Printf("UI: external ecosystems disabled (QL_DISABLE_EXTERNAL_ECOSYSTEMS/QL_DISABLE_AWESOMIUM/QL_DISABLE_STEAMWORKS).\n");
 	}
 	UI_InitMemory();
-	UI_ResetMatchSummaryCache();
 
 	// cache redundant calulations
 	UI_RefreshDisplayContextScale();
@@ -8264,12 +7586,8 @@ void _UI_Init( qboolean inGameLoad ) {
 	uiInfo.characterCount = 0;
 	uiInfo.aliasCount = 0;
 	uiInfo.countryCount = 0;
-	uiInfo.clanCount = 0;
-	uiInfo.currentClan = -1;
-	uiInfo.clanListLoaded = qfalse;
 
 	UI_LoadCountries();
-	UI_LoadClanRoster();
 
 #ifdef PRE_RELEASE_TADEMO
 	UI_ParseTeamInfo("demoteaminfo.txt");
@@ -8293,6 +7611,7 @@ void _UI_Init( qboolean inGameLoad ) {
         UI_LoadMenus(menuSet, qtrue);
         UI_LoadMenus(UI_DefaultIngameFile(), qfalse);
 #endif
+	UI_ApplyRetailMenuFixups();
 	
 	Menus_CloseAll();
 
@@ -8303,9 +7622,7 @@ void _UI_Init( qboolean inGameLoad ) {
 	UI_LoadBots();
 
 	// sets defaults for ui temp cvars
-	uiInfo.effectsColor = gamecodetoui[(int)trap_Cvar_VariableValue("color1")-1];
-	uiInfo.currentCrosshair = (int)trap_Cvar_VariableValue("cg_drawCrosshair");
-	trap_Cvar_Set("ui_mousePitch", (trap_Cvar_VariableValue("m_pitch") >= 0) ? "0" : "1");
+	UI_SyncMenuStateFromCvars();
 
 	uiInfo.serverStatus.currentServerCinematic = -1;
 	uiInfo.previewMovie = -1;
@@ -8410,14 +7727,14 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 	  case UIMENU_MAIN:
 			//trap_Cvar_Set( "sv_killserver", "1" );
 			trap_Key_SetCatcher( KEYCATCH_UI );
-			//trap_S_StartLocalSound( trap_S_RegisterSound("sound/misc/menu_background.wav", qfalse) , CHAN_LOCAL_SOUND );
-			//trap_S_StartBackgroundTrack("sound/misc/menu_background.wav", NULL);
+			UI_SyncMenuStateFromCvars();
 			if (uiInfo.inGameLoad) {
 				UI_LoadNonIngame();
 			}
 			Menus_CloseAll();
 			Menus_ActivateByName("main");
 			trap_Cvar_VariableStringBuffer("com_errorMessage", buf, sizeof(buf));
+			trap_S_StartBackgroundTrack( "music/fla_mp05", NULL );
 			if (strlen(buf)) {
 				if (!ui_singlePlayerActive.integer) {
 					Menus_ActivateByName("error_popmenu");
@@ -8428,7 +7745,7 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		  return;
 	  case UIMENU_TEAM:
 			trap_Key_SetCatcher( KEYCATCH_UI );
-      Menus_ActivateByName("team");
+			Menus_ActivateByName("joingame_menu");
 		  return;
 	  case UIMENU_NEED_CD:
 			// no cd check in TA
@@ -8440,20 +7757,11 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 			// no cd check in TA
 			//trap_Key_SetCatcher( KEYCATCH_UI );
       //Menus_ActivateByName("badcd");
-//UI_ConfirmMenu( "Credential Error", NULL, NeedCDKeyAction );
-		  return;
-	  case UIMENU_POSTGAME:
-			//trap_Cvar_Set( "sv_killserver", "1" );
-			trap_Key_SetCatcher( KEYCATCH_UI );
-			if (uiInfo.inGameLoad) {
-				UI_LoadNonIngame();
-			}
-			Menus_CloseAll();
-			Menus_ActivateByName("endofgame");
-//UI_ConfirmMenu( "Credential Error", NULL, NeedCDKeyAction );
+//UI_ConfirmMenu( "CD Key Error", NULL, NeedCDKeyAction );
 		  return;
 	  case UIMENU_INGAME:
 		  trap_Cvar_Set( "cl_paused", "1" );
+			UI_SyncMenuStateFromCvars();
 			// Retail resets the ingame callvote filter each time the menu is reopened.
 			trap_Cvar_Set( "ui_cvGameType", "-1" );
 			trap_Cvar_Update( &ui_cvGameType );
@@ -8822,9 +8130,6 @@ vmCvar_t	ui_gameType;
 vmCvar_t	ui_netGameType;
 vmCvar_t	ui_actualNetGameType;
 vmCvar_t	ui_cvGameType;
-vmCvar_t	ui_cvPresetRotation;
-vmCvar_t	ui_cvPresetGametype;
-vmCvar_t	ui_cvPresetActive;
 vmCvar_t	ui_joinGameType;
 vmCvar_t	ui_netSource;
 vmCvar_t	ui_serverFilterType;
@@ -8915,9 +8220,7 @@ vmCvar_t	ui_mainmenu;
 vmCvar_t	ui_priv;
 vmCvar_t	ui_warmup;
 vmCvar_t	ui_doWarmup;
-vmCvar_t	ui_drawTimer;
 vmCvar_t	ui_friendlyFire;
-vmCvar_t	ui_maxClients;
 vmCvar_t	ui_Warmup;
 vmCvar_t	ui_pure;
 vmCvar_t	ui_saveCaptureLimit;
@@ -8925,8 +8228,6 @@ vmCvar_t	ui_saveFragLimit;
 vmCvar_t	ui_recordSPDemoName;
 vmCvar_t	ui_glCustom;
 vmCvar_t	ui_country;
-vmCvar_t	ui_clanIndex;
-vmCvar_t	ui_clanName;
 vmCvar_t	ui_opponentModel;
 vmCvar_t	ui_cdkeyvalid;
 
@@ -9001,9 +8302,6 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_netGameType, "ui_netGameType", "3", CVAR_ARCHIVE },
 	{ &ui_actualNetGameType, "ui_actualNetGameType", "3", CVAR_ARCHIVE },
 	{ &ui_cvGameType, "ui_cvGameType", "-1", CVAR_ARCHIVE },
-	{ &ui_cvPresetRotation, "ui_cvPresetRotation", "-1", CVAR_ARCHIVE },
-	{ &ui_cvPresetGametype, "ui_cvPresetGameType", "-1", CVAR_ARCHIVE },
-	{ &ui_cvPresetActive, "ui_cvPresetActive", "0", CVAR_ARCHIVE },
 	{ &ui_redteam1, "ui_redteam1", "0", CVAR_ARCHIVE },
 	{ &ui_redteam2, "ui_redteam2", "0", CVAR_ARCHIVE },
 	{ &ui_redteam3, "ui_redteam3", "0", CVAR_ARCHIVE },
@@ -9104,9 +8402,7 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_priv, "ui_priv", "0", CVAR_TEMP},
 	{ &ui_warmup, "ui_warmup", "0", CVAR_TEMP},
 	{ &ui_doWarmup, "ui_doWarmup", "0", CVAR_TEMP},
-	{ &ui_drawTimer, "ui_drawTimer", "0", CVAR_TEMP},
 	{ &ui_friendlyFire, "ui_friendlyFire", "0", CVAR_TEMP},
-	{ &ui_maxClients, "ui_maxClients", "0", CVAR_TEMP},
 	{ &ui_Warmup, "ui_Warmup", "0", CVAR_TEMP},
 	{ &ui_pure, "ui_pure", "0", CVAR_TEMP},
 	{ &ui_saveCaptureLimit, "ui_saveCaptureLimit", "0", CVAR_TEMP},
@@ -9114,8 +8410,6 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_recordSPDemoName, "ui_recordSPDemoName", "", CVAR_TEMP},
 	{ &ui_glCustom, "ui_glCustom", "0", CVAR_ARCHIVE},
 	{ &ui_country, "ui_country", "", CVAR_ARCHIVE},
-	{ &ui_clanIndex, "ui_clanIndex", "-1", CVAR_ARCHIVE},
-	{ &ui_clanName, "ui_clanName", "", CVAR_ARCHIVE},
 	{ &ui_opponentModel, "ui_opponentModel", "", CVAR_ARCHIVE},
 	{ &ui_cdkeyvalid, "ui_cdkeyvalid", "", CVAR_TEMP},
 	{ &ui_serverStatusTimeOut, "ui_serverStatusTimeOut", "7000", CVAR_ARCHIVE},
@@ -9255,10 +8549,6 @@ static void UI_StartServerRefresh(qboolean full)
 	if (!UI_ServerBrowserEnabled()) {
 	uiInfo.serverStatus.refreshActive = qfalse;
 	return;
-	}
-
-	if (!uiInfo.clanListLoaded) {
-	UI_LoadClanRoster();
 	}
 
 	qtime_t q;

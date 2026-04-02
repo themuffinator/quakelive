@@ -16,16 +16,22 @@ Team Arena baseline and the current Quake Live-compatible tree.
 - Legacy comparison comes from the Team Arena-era
   `assets/quake3/src/code/ui/ui_shared.h`.
 - Current member roles were cross-checked against:
+  - the already-mapped retail/shared helpers `Menu_SetupKeywordHash`,
+    `Menu_Parse`, `Menu_UpdatePosition`, `Menu_ClearFocus`,
+    `Menu_SetFeederSelection`, `Menus_ActivateByName`, `Menus_CloseByName`,
+    `Menus_CloseAll`, `Menu_SetPrevCursorItem`, `Menu_SetNextCursorItem`,
+    `Menu_HandleMouseMove`, `Menu_Paint`, `Menu_PaintAll`, and
+    `Menu_OverActiveItem`
   - `Menu_Init`, `Menu_PostParse`, `Menu_GetFocusedItem`,
-    `Menu_ScrollFeeder`, `Menu_SetFeederSelection`, `Menus_AnyFullScreenVisible`,
-    `Menus_ActivateByName`, `Menus_Activate`, `Menu_HandleMouseMove`, and
-    `Menu_Paint` in `src/code/ui/ui_shared.c`
+    `Menu_ScrollFeeder`, `Menus_AnyFullScreenVisible`, and `Menus_Activate` in
+    `src/code/ui/ui_shared.c`
   - the menu parser helpers in `src/code/ui/ui_shared.c`
   - the child append path in `MenuParse_itemDef`
-- Retail parity is moderate here: the menu runtime is clearly preserved in the
-  retail `uix86.dll` binary, but the committed corpus does not yet expose
-  promoted raw `Menu_*` helper names. The member roles below are therefore
-  source-backed rather than directly retail-named.
+- Retail parity is now stronger than when this note was first written. The
+  committed corpus already exposes the core parser, visibility, focus, and
+  paint slab for shared menus. `Menu_PostParse` and a few init-side defaults
+  still rely more heavily on the preserved source tree, but most member roles
+  below are directly retail-backed.
 
 ## Hard Layout Facts
 
@@ -97,16 +103,19 @@ Current x86 size: `0x288`
 - `Menu_PostParse` owns the initial resolved geometry:
   - force fullscreen menu bounds when `fullScreen`
   - call `Menu_UpdatePosition`
-- `Menus_Activate`, `Menu_HandleMouseMove`, `Menu_ScrollFeeder`,
-  `Menu_SetFeederSelection`, and keyboard-navigation helpers own the live
-  focus/selection state centered on `cursorItem`.
-- `Menu_Paint` owns the outer render pass for the menu window plus its child
-  item loop.
+- the already-mapped retail/shared helpers `Menus_ActivateByName`,
+  `Menus_CloseByName`, `Menus_CloseAll`, `Menu_HandleMouseMove`,
+  `Menu_SetFeederSelection`, `Menu_SetPrevCursorItem`,
+  `Menu_SetNextCursorItem`, `Menu_OverActiveItem`, `Menu_Paint`, and
+  `Menu_PaintAll` own the live focus/selection/render state centered on
+  `cursorItem` and `items[]`.
 
 ## Open Questions
 
-1. Promote the raw retail `uix86.dll` `Menu_*` helpers so this struct can be
-   marked as directly retail-backed rather than only source-backed.
+1. Revisit the remaining init-only ownership around `Menu_PostParse` and any
+   adjacent defaults if future retail evidence exposes cleaner boundaries. The
+   core parser, visibility, focus, and paint slab for this struct is already
+   directly retail-backed.
 2. Revisit `fontIndex` if later retail evidence surfaces a removed or dormant
    font-selection path; the slot is structurally stable, but no active consumer
    was found in the committed trees.

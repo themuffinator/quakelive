@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cg_local.h"
 
 static qhandle_t	cg_screenDamageBlendShader;
+static qboolean	cg_joinGameMenuActive;
 
 /*
 ================
@@ -175,11 +176,70 @@ void CG_DamageBlendBlob( void ) {
 
 /*
 ================
-CG_DrawScreenDamage
+CG_ShouldDrawJoinGameMenu
 
-2D screen damage feedback
+Returns qtrue when the retail spectator-only `joingame_menu` overlay should
+be painted through the old screen-damage slot.
 ================
 */
-void CG_DrawScreenDamage( void ) {
-	// Retail cgame keeps damage-screen feedback on the first-person sprite path.
+static qboolean CG_ShouldDrawJoinGameMenu( void ) {
+	if ( !cg.snap || cg.demoPlayback ) {
+		return qfalse;
+	}
+
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		return qfalse;
+	}
+
+	if ( cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR ) {
+		return qfalse;
+	}
+
+	if ( cg.snap->ps.pm_flags & PMF_FOLLOW ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+================
+CG_DrawJoinGameMenu
+
+Paints the retail spectator-only `joingame_menu` root and dismisses its
+capture state once the local client stops spectating.
+================
+*/
+void CG_DrawJoinGameMenu( void ) {
+	menuDef_t	*menu;
+	int		catcher;
+
+	if ( !CG_ShouldDrawJoinGameMenu() ) {
+		if ( cg_joinGameMenuActive ) {
+			cg_joinGameMenuActive = qfalse;
+			cgs.capturedItem = NULL;
+			cgs.activeCursor = 0;
+			CG_EventHandling( CGAME_EVENT_NONE );
+
+			catcher = trap_Key_GetCatcher();
+			if ( catcher & KEYCATCH_CGAME ) {
+				trap_Key_SetCatcher( catcher & ~KEYCATCH_CGAME );
+			}
+		}
+		return;
+	}
+
+	menu = Menus_FindByName( "joingame_menu" );
+	if ( !menu ) {
+		return;
+	}
+
+	catcher = trap_Key_GetCatcher();
+	if ( !( catcher & KEYCATCH_CGAME ) ) {
+		trap_Key_SetCatcher( catcher | KEYCATCH_CGAME );
+	}
+
+	menu->window.flags &= ~WINDOW_FORCED;
+	Menu_Paint( menu, qtrue );
+	cg_joinGameMenuActive = qtrue;
 }

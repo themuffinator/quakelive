@@ -34,8 +34,8 @@ pml_t		pml;
 // movement parameters
 float	pm_stopspeed = 100.0f;
 float	pm_duckScale = 0.25f;
-float	pm_swimScale = 0.50f;
-float	pm_wadeScale = 0.75f;
+float	pm_swimScale = 0.60f;
+float	pm_wadeScale = 0.80f;
 
 float	pm_accelerate = 10.0f;
 float	pm_airaccelerate = 1.0f;
@@ -60,20 +60,21 @@ float	pm_spectatorfriction = 5.0f;
 
 int		c_pmove = 0;
 
-static const pmoveParams_t	pm_defaultParams = {
-	400.0f,	// wishSpeed
-	10.0f,	// walkAccel
-	6.0f,	// walkFriction
-	1.0f,	// airAccel
-	0.0f,	// airControl
-	0.03f,	// airStepFriction
-	1,	// airSteps
-	1.0f,	// airStopAccel
-	1.0f,	// strafeAccel
-	6.0f,	// circleStrafeFriction
-	qtrue,	// bunnyHop
-	qtrue	// autoHop
-};
+static float	pm_jumpTakeoffVelocity;
+static qboolean	pm_jumpTakeoffDoubleJumpActive;
+static qboolean	pm_jumpTakeoffChainJumpActive;
+static qboolean	pm_jumpTakeoffRampJumpActive;
+
+typedef struct {
+	float	airControl;
+	float	airAccel;
+	float	airStopAccel;
+	float	circleStrafeFriction;
+	float	strafeAccel;
+	float	walkAccel;
+	int	airSteps;
+	float	wishSpeed;
+} pmove_tuning_constants_t;
 
 // HLIL parity: qagamex86.dll initialises these defaults at 0x1008f800 (pmove_AirStepFriction = 0.03f),
 // 0x1008f82c (pmove_AirStopAccel = 1.0f), 0x1008f844/0x1008f85c/0x1008f874 (AutoHop/BunnyHop/ChainJump = 1),
@@ -111,8 +112,8 @@ static const pmove_settings_t	pm_defaultSettings = {
 	.velocityGh = 800.0f,
 	.walkAccel = 10.0f,
 	.walkFriction = 6.0f,
-	.waterSwimScale = 0.50f,
-	.waterWadeScale = 0.75f,
+	.waterSwimScale = 0.60f,
+	.waterWadeScale = 0.80f,
 	.weaponDropTime = 200,
 	.weaponRaiseTime = 200,
 	.wishSpeed = 400.0f,
@@ -143,13 +144,40 @@ static const pmove_settings_t	pm_defaultSettings = {
 	[WP_RAILGUN] = 1500,
 	[WP_PLASMAGUN] = 100,
 	[WP_BFG] = 300,
-	[WP_GRAPPLING_HOOK] = 200,
-	[WP_HEAVY_MACHINEGUN] = 80,
+	[WP_GRAPPLING_HOOK] = 100,
+	[WP_HEAVY_MACHINEGUN] = 75,
 	[WP_NAILGUN] = 1000,
 	[WP_PROX_LAUNCHER] = 800,
 	[WP_CHAINGUN] = 50,
 	}
 };
+
+static const pmove_tuning_constants_t	pm_retailDefaultTuning = {
+	.airControl = 0.0f,
+	.airAccel = 1.0f,
+	.airStopAccel = 1.0f,
+	.circleStrafeFriction = 6.0f,
+	.strafeAccel = 1.0f,
+	.walkAccel = 10.0f,
+	.airSteps = 1,
+	.wishSpeed = 400.0f,
+};
+
+// HLIL parity: 0x10001ec0 / 0x1002d9f0 switches to the retail air-control bundle
+// (`150 / 1.1 / 2.5 / 5.5 / 70 / 15 / 3 / 35`) whenever the active movement
+// profile enables the alternate strafe path.
+static const pmove_tuning_constants_t	pm_retailAirControlTuning = {
+	.airControl = 150.0f,
+	.airAccel = 1.1f,
+	.airStopAccel = 2.5f,
+	.circleStrafeFriction = 5.5f,
+	.strafeAccel = 70.0f,
+	.walkAccel = 15.0f,
+	.airSteps = 3,
+	.wishSpeed = 35.0f,
+};
+
+#define PM_INVULNERABILITY_ACTIVE_TIME	0x7fffffff
 
 /*
 =============
@@ -213,71 +241,57 @@ static void PM_LoadMoveSettings( void ) {
 
 /*
 =============
-PM_LoadMoveParams
+PM_FloatMatchesValue
 
-Synchronises the active pmove parameter block with the legacy globals so
-movement helpers can consume Quake Live style tuning knobs without drifting
-from vanilla defaults when no overrides are supplied.
+Returns qtrue when two pmove tuning values match closely enough to treat the
+current value as the stock retail baseline.
 =============
 */
-static void PM_LoadMoveParams( const pmoveParams_t *params ) {
-	const pmoveParams_t	*cfg;
-	const pmove_settings_t	*settings;
-	pmoveParams_t	derived;
+static qboolean PM_FloatMatchesValue( float value, float reference ) {
+	return ( fabs( value - reference ) <= 0.001f ) ? qtrue : qfalse;
+}
 
-	if ( params ) {
-		cfg = params;
+/*
+=============
+PM_LoadMoveTuningFloat
+
+Seeds one retail pmove tuning float, preserving non-stock custom overrides when
+the caller intentionally diverges from the active retail bundle.
+=============
+*/
+static float PM_LoadMoveTuningFloat( float configuredValue, float stockValue, float retailValue, qboolean useRetailValue, qboolean nonNegativeValue ) {
+	float	resolvedValue;
+
+	if ( nonNegativeValue ) {
+		resolvedValue = ( configuredValue >= 0.0f ) ? configuredValue : stockValue;
 	} else {
-		settings = PM_GetActiveSettings();
-		derived = pm_defaultParams;
-		if ( settings ) {
-			if ( settings->wishSpeed >= 0.0f ) {
-				derived.wishSpeed = settings->wishSpeed;
-			}
-			if ( settings->walkAccel > 0.0f ) {
-				derived.walkAccel = settings->walkAccel;
-			}
-			if ( settings->walkFriction > 0.0f ) {
-				derived.walkFriction = settings->walkFriction;
-			}
-			if ( settings->airAccel > 0.0f ) {
-				derived.airAccel = settings->airAccel;
-			}
-			derived.airControl = settings->airControl;
-			if ( settings->airStepFriction >= 0.0f ) {
-				derived.airStepFriction = settings->airStepFriction;
-			}
-			if ( settings->airSteps >= 0 ) {
-				derived.airSteps = settings->airSteps;
-			}
-			if ( settings->airStopAccel >= 0.0f ) {
-				derived.airStopAccel = settings->airStopAccel;
-			}
-			if ( settings->strafeAccel >= 0.0f ) {
-				derived.strafeAccel = settings->strafeAccel;
-			}
-			if ( settings->circleStrafeFriction >= 0.0f ) {
-				derived.circleStrafeFriction = settings->circleStrafeFriction;
-			}
-			derived.bunnyHop = settings->bunnyHop;
-			derived.autoHop = settings->autoHop;
-		}
-
-		cfg = &derived;
+		resolvedValue = ( configuredValue > 0.0f ) ? configuredValue : stockValue;
 	}
 
-	pm_wishspeed = ( cfg->wishSpeed >= 0.0f ) ? cfg->wishSpeed : pm_defaultParams.wishSpeed;
-	pm_accelerate = ( cfg->walkAccel > 0.0f ) ? cfg->walkAccel : pm_defaultParams.walkAccel;
-	pm_friction = ( cfg->walkFriction > 0.0f ) ? cfg->walkFriction : pm_defaultParams.walkFriction;
-	pm_airaccelerate = ( cfg->airAccel > 0.0f ) ? cfg->airAccel : pm_defaultParams.airAccel;
-	pm_aircontrol = cfg->airControl;
-	pm_airstepfriction = ( cfg->airStepFriction >= 0.0f ) ? cfg->airStepFriction : pm_defaultParams.airStepFriction;
-	pm_airsteps = ( cfg->airSteps >= 0 ) ? cfg->airSteps : pm_defaultParams.airSteps;
-	pm_airstopaccelerate = ( cfg->airStopAccel >= 0.0f ) ? cfg->airStopAccel : pm_defaultParams.airStopAccel;
-	pm_strafeaccelerate = ( cfg->strafeAccel >= 0.0f ) ? cfg->strafeAccel : pm_defaultParams.strafeAccel;
-	pm_circlestrafe_friction = ( cfg->circleStrafeFriction >= 0.0f ) ? cfg->circleStrafeFriction : pm_defaultParams.circleStrafeFriction;
-	pm_bunnyhop = cfg->bunnyHop;
-	pm_autohop = cfg->autoHop;
+	if ( useRetailValue && PM_FloatMatchesValue( resolvedValue, stockValue ) ) {
+		return retailValue;
+	}
+
+	return resolvedValue;
+}
+
+/*
+=============
+PM_LoadMoveTuningInt
+
+Seeds one retail pmove tuning integer, preserving non-stock custom overrides
+when the caller intentionally diverges from the active retail bundle.
+=============
+*/
+static int PM_LoadMoveTuningInt( int configuredValue, int stockValue, int retailValue ) {
+	int	resolvedValue;
+
+	resolvedValue = ( configuredValue >= 0 ) ? configuredValue : stockValue;
+	if ( resolvedValue == stockValue ) {
+		return retailValue;
+	}
+
+	return resolvedValue;
 }
 
 
@@ -352,6 +366,87 @@ static qboolean PM_ShouldRequireJumpRelease( const pmove_settings_t *settings ) 
 }
 
 static qboolean PM_CheckJump( qboolean allowAirDoubleJump );
+static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump );
+static void PM_ApplyJumpTakeoff( void );
+
+/*
+=============
+PM_LoadMoveTuningConstants
+
+Seeds the legacy pmove globals from the active Quake Live settings bundle.
+=============
+*/
+static void PM_LoadMoveTuningConstants( void ) {
+	const pmove_settings_t	*settings;
+	qboolean		airControlTuning;
+
+	settings = PM_GetActiveSettings();
+	airControlTuning = ( settings->airControl > 0.0f ) ? qtrue : qfalse;
+
+	pm_accelerate = PM_LoadMoveTuningFloat(
+		settings->walkAccel,
+		pm_retailDefaultTuning.walkAccel,
+		pm_retailAirControlTuning.walkAccel,
+		airControlTuning,
+		qfalse
+	);
+	pm_airaccelerate = PM_LoadMoveTuningFloat(
+		settings->airAccel,
+		pm_retailDefaultTuning.airAccel,
+		pm_retailAirControlTuning.airAccel,
+		airControlTuning,
+		qfalse
+	);
+	pm_aircontrol = PM_LoadMoveTuningFloat(
+		settings->airControl,
+		pm_retailDefaultTuning.airControl,
+		pm_retailAirControlTuning.airControl,
+		qfalse,
+		qfalse
+	);
+	pm_airstepfriction = PM_LoadMoveTuningFloat(
+		settings->airStepFriction,
+		pm_defaultSettings.airStepFriction,
+		pm_defaultSettings.airStepFriction,
+		qfalse,
+		qtrue
+	);
+	pm_airsteps = airControlTuning
+		? PM_LoadMoveTuningInt( settings->airSteps, pm_retailDefaultTuning.airSteps, pm_retailAirControlTuning.airSteps )
+		: PM_LoadMoveTuningInt( settings->airSteps, pm_retailDefaultTuning.airSteps, pm_retailDefaultTuning.airSteps );
+	pm_airstopaccelerate = PM_LoadMoveTuningFloat(
+		settings->airStopAccel,
+		pm_retailDefaultTuning.airStopAccel,
+		pm_retailAirControlTuning.airStopAccel,
+		airControlTuning,
+		qtrue
+	);
+	pm_strafeaccelerate = PM_LoadMoveTuningFloat(
+		settings->strafeAccel,
+		pm_retailDefaultTuning.strafeAccel,
+		pm_retailAirControlTuning.strafeAccel,
+		airControlTuning,
+		qtrue
+	);
+	pm_circlestrafe_friction = PM_LoadMoveTuningFloat(
+		settings->circleStrafeFriction,
+		pm_retailDefaultTuning.circleStrafeFriction,
+		pm_retailAirControlTuning.circleStrafeFriction,
+		airControlTuning,
+		qtrue
+	);
+	pm_wishspeed = PM_LoadMoveTuningFloat(
+		settings->wishSpeed,
+		pm_retailDefaultTuning.wishSpeed,
+		pm_retailAirControlTuning.wishSpeed,
+		airControlTuning,
+		qtrue
+	);
+	pm_friction = ( settings->walkFriction > 0.0f ) ? settings->walkFriction : pm_defaultSettings.walkFriction;
+	pm_bunnyhop = settings->bunnyHop;
+	pm_autohop = settings->autoHop;
+	PM_LoadMoveSettings();
+}
 
 /*
 =============
@@ -388,9 +483,10 @@ void PM_ApplyStepJump( float stepDelta, qboolean fromCrouchSlide ) {
 		return;
 	}
 
-	if ( !PM_CheckJump( qfalse ) ) {
+	if ( !PM_PrepareJumpTakeoff( qfalse ) ) {
 		return;
 	}
+	PM_ApplyJumpTakeoff();
 
 	stepJumpVelocity = settings->stepJumpVelocity;
 	if ( stepJumpVelocity > 0.0f ) {
@@ -528,7 +624,7 @@ static void PM_Friction( void ) {
 	float	speed, newspeed, control;
 	float	drop;
 	const pmove_settings_t	*settings;
-	float	frictionScale;
+	float	friction;
 	
 	vel = pm->ps->velocity;
 	settings = PM_GetActiveSettings();
@@ -553,23 +649,22 @@ static void PM_Friction( void ) {
 		if ( pml.walking && !(pml.groundTrace.surfaceFlags & SURF_SLICK) ) {
 			if ( !( pm->ps->pm_flags & PMF_TIME_KNOCKBACK ) ) {
 				control = speed < pm_stopspeed ? pm_stopspeed : speed;
-				frictionScale = 1.0f;
+				friction = pm_friction;
 
 				if ( ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) && settings->crouchSlide
 					&& pm->cmd.upmove < 0 && pm->ps->crouchSlideTime > 0 ) {
-					float targetScale = settings->crouchSlideFriction;
+					friction = settings->crouchSlideFriction;
 
-					if ( targetScale < 0.0f ) {
-						targetScale = 0.0f;
+					if ( friction < 0.0f ) {
+						friction = 0.0f;
 					}
-					frictionScale = targetScale;
-
-					if ( frictionScale < 0.0f ) {
-						frictionScale = 0.0f;
-					}
+				} else if ( pm_aircontrol > 0.0f && pm->cmd.forwardmove && pm->cmd.rightmove
+					&& ( pm->ps->movementDir == 1 || pm->ps->movementDir == 3
+						|| pm->ps->movementDir == 5 || pm->ps->movementDir == 7 ) ) {
+					friction = pm_circlestrafe_friction;
 				}
 
-				drop += control * pm_friction * frictionScale * pml.frametime;
+				drop += control * friction * pml.frametime;
 			}
 		}
 	}
@@ -609,43 +704,18 @@ Handles user intended acceleration
 ==============
 */
 static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) {
-	float	cappedWishSpeed = wishspeed;
 	float	currentSpeed;
 	float	addSpeed;
 	float	accelSpeed;
-	float	effectiveAccel = accel;
-	qboolean	airborneMove = qfalse;
 	int		i;
 
-	if ( pm_wishspeed > 0.0f && cappedWishSpeed > pm_wishspeed ) {
-		cappedWishSpeed = pm_wishspeed;
-	}
-
 	currentSpeed = DotProduct( pm->ps->velocity, wishdir );
-
-	if ( pm && pm->ps && pm->ps->pm_type == PM_NORMAL && !pml.walking && pm->waterlevel <= 1 ) {
-		airborneMove = qtrue;
-	}
-
-	if ( airborneMove && ( pm_bunnyhop || pm_autohop ) ) {
-		if ( pm_airstopaccelerate > 0.0f && currentSpeed < 0.0f ) {
-			effectiveAccel = pm_airstopaccelerate;
-		} else if ( pm_strafeaccelerate > 0.0f ) {
-			int forwardMove = pm->cmd.forwardmove;
-			int rightMove = pm->cmd.rightmove;
-
-			if ( abs( rightMove ) > abs( forwardMove ) && abs( rightMove ) > 0 ) {
-				effectiveAccel = pm_strafeaccelerate;
-			}
-		}
-	}
-
-	addSpeed = cappedWishSpeed - currentSpeed;
+	addSpeed = wishspeed - currentSpeed;
 	if ( addSpeed <= 0.0f ) {
 		return;
 	}
 
-	accelSpeed = effectiveAccel * pml.frametime * cappedWishSpeed;
+	accelSpeed = accel * pml.frametime * wishspeed;
 	if ( accelSpeed > addSpeed ) {
 		accelSpeed = addSpeed;
 	}
@@ -725,6 +795,42 @@ static float PM_CmdScale( usercmd_t *cmd ) {
 	scale = (float)pm->ps->speed * max / ( 127.0 * total );
 
 	return scale;
+}
+
+/*
+=============
+PM_BuildWishMove3D
+
+Builds the active 3D wish direction from the current command axes and
+returns the derived wishspeed.
+=============
+*/
+static qboolean PM_BuildWishMove3D( vec3_t wishdir, float *wishspeed ) {
+	vec3_t	wishvel;
+	float	scale;
+	int		i;
+
+	if ( !wishdir || !wishspeed ) {
+		return qfalse;
+	}
+
+	VectorClear( wishdir );
+	*wishspeed = 0.0f;
+
+	scale = PM_CmdScale( &pm->cmd );
+	if ( !scale ) {
+		return qfalse;
+	}
+
+	for ( i = 0 ; i < 3 ; i++ ) {
+		wishvel[i] = scale * pml.forward[i] * pm->cmd.forwardmove + scale * pml.right[i] * pm->cmd.rightmove;
+	}
+	wishvel[2] += scale * pm->cmd.upmove;
+
+	VectorCopy( wishvel, wishdir );
+	*wishspeed = VectorNormalize( wishdir );
+
+	return qtrue;
 }
 
 
@@ -832,10 +938,64 @@ static void PM_ApplyJumpPlanarVelocity( qboolean chainJumpActive, qboolean rampJ
 
 /*
 =============
-PM_CheckJump
+PM_ApplyJumpTakeoff
+
+Applies the retail jump takeoff state once the active jump-mode globals
+have been prepared by the surrounding jump gate.
 =============
 */
-static qboolean PM_CheckJump( qboolean allowAirDoubleJump ) {
+static void PM_ApplyJumpTakeoff( void ) {
+	pml.groundPlane = qfalse;		// jumping away
+	pml.walking = qfalse;
+	pm->ps->pm_flags |= PMF_JUMP_HELD;
+	if ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) {
+		pm->ps->crouchSlideTime = 0;
+	}
+
+	pm->ps->groundEntityNum = ENTITYNUM_NONE;
+	pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;
+	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
+	pm->ps->jumpTime = pm->cmd.serverTime;
+	VectorClear( pm->ps->groundTraceLatestNormal );
+	pm->ps->velocity[2] = pm_jumpTakeoffVelocity;
+
+	if ( pm_jumpTakeoffDoubleJumpActive ) {
+		PM_AddEvent( EV_DOUBLE_JUMP );
+		pm->ps->doubleJumped = qtrue;
+	} else {
+		PM_AddEvent( EV_JUMP );
+	}
+
+	if ( pm_jumpTakeoffChainJumpActive ) {
+		pm->ps->pm_flags |= PMF_CHAIN_JUMP;
+	} else {
+		pm->ps->pm_flags &= ~PMF_CHAIN_JUMP;
+	}
+
+	if ( pm_jumpTakeoffRampJumpActive ) {
+		pm->ps->pm_flags |= PMF_RAMP_JUMP;
+	} else {
+		pm->ps->pm_flags &= ~PMF_RAMP_JUMP;
+	}
+
+	if ( pm->cmd.forwardmove >= 0 ) {
+		PM_ForceLegsAnim( LEGS_JUMP );
+		pm->ps->pm_flags &= ~PMF_BACKWARDS_JUMP;
+	} else {
+		PM_ForceLegsAnim( LEGS_JUMPB );
+		pm->ps->pm_flags |= PMF_BACKWARDS_JUMP;
+	}
+}
+
+/*
+=============
+PM_PrepareJumpTakeoff
+
+Prepares the shared retail jump takeoff state used by both PM_CheckJump and
+the step-jump seam before the final takeoff leaf runs.
+=============
+*/
+static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump ) {
 	const pmove_settings_t	*settings;
 	float			jumpVelocity;
 	float			jumpVelocityScale;
@@ -914,47 +1074,25 @@ static qboolean PM_CheckJump( qboolean allowAirDoubleJump ) {
 	}
 
 	PM_ApplyJumpPlanarVelocity( chainJumpActive, rampJumpActive, settings );
+	pm_jumpTakeoffVelocity = jumpVelocity;
+	pm_jumpTakeoffDoubleJumpActive = doubleJumpActive;
+	pm_jumpTakeoffChainJumpActive = chainJumpActive;
+	pm_jumpTakeoffRampJumpActive = rampJumpActive;
 
-	pml.groundPlane = qfalse;		// jumping away
-	pml.walking = qfalse;
-	pm->ps->pm_flags |= PMF_JUMP_HELD;
-	if ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) {
-		pm->ps->crouchSlideTime = 0;
+	return qtrue;
+}
+
+/*
+=============
+PM_CheckJump
+=============
+*/
+static qboolean PM_CheckJump( qboolean allowAirDoubleJump ) {
+	if ( !PM_PrepareJumpTakeoff( allowAirDoubleJump ) ) {
+		return qfalse;
 	}
 
-	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;
-	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
-	pm->ps->jumpTime = pm->cmd.serverTime;
-	VectorClear( pm->ps->groundTraceLatestNormal );
-	pm->ps->velocity[2] = jumpVelocity;
-
-	if ( doubleJumpActive ) {
-		PM_AddEvent( EV_DOUBLE_JUMP );
-		pm->ps->doubleJumped = qtrue;
-	} else {
-		PM_AddEvent( EV_JUMP );
-	}
-
-	if ( chainJumpActive ) {
-		pm->ps->pm_flags |= PMF_CHAIN_JUMP;
-	} else {
-		pm->ps->pm_flags &= ~PMF_CHAIN_JUMP;
-	}
-
-	if ( rampJumpActive ) {
-		pm->ps->pm_flags |= PMF_RAMP_JUMP;
-	} else {
-		pm->ps->pm_flags &= ~PMF_RAMP_JUMP;
-	}
-
-	if ( pm->cmd.forwardmove >= 0 ) {
-		PM_ForceLegsAnim( LEGS_JUMP );
-		pm->ps->pm_flags &= ~PMF_BACKWARDS_JUMP;
-	} else {
-		PM_ForceLegsAnim( LEGS_JUMPB );
-		pm->ps->pm_flags |= PMF_BACKWARDS_JUMP;
-	}
+	PM_ApplyJumpTakeoff();
 
 	return qtrue;
 }
@@ -1019,7 +1157,7 @@ Flying out of the water
 static void PM_WaterJumpMove( void ) {
 	// waterjump has no control, but falls
 
-	PM_StepSlideMove( qtrue, pm_stepHeight );
+	PM_StepSlideMove( qtrue );
 
 	pm->ps->velocity[2] -= pm->ps->gravity * pml.frametime;
 	if (pm->ps->velocity[2] < 0) {
@@ -1036,11 +1174,8 @@ PM_WaterMove
 ===================
 */
 static void PM_WaterMove( void ) {
-	int		i;
-	vec3_t	wishvel;
 	float	wishspeed;
 	vec3_t	wishdir;
-	float	scale;
 	float	vel;
 
 	if ( PM_CheckWaterJump() ) {
@@ -1063,23 +1198,10 @@ static void PM_WaterMove( void ) {
 #endif
 	PM_Friction ();
 
-	scale = PM_CmdScale( &pm->cmd );
-	//
-	// user intentions
-	//
-	if ( !scale ) {
-		wishvel[0] = 0;
-		wishvel[1] = 0;
-		wishvel[2] = -60;		// sink towards bottom
-	} else {
-		for (i=0 ; i<3 ; i++)
-			wishvel[i] = scale * pml.forward[i]*pm->cmd.forwardmove + scale * pml.right[i]*pm->cmd.rightmove;
-
-		wishvel[2] += scale * pm->cmd.upmove;
+	if ( !PM_BuildWishMove3D( wishdir, &wishspeed ) ) {
+		VectorSet( wishdir, 0.0f, 0.0f, -1.0f );		// sink towards bottom
+		wishspeed = 60.0f;
 	}
-
-	VectorCopy (wishvel, wishdir);
-	wishspeed = VectorNormalize(wishdir);
 
 	if ( wishspeed > pm->ps->speed * pm_swimScale ) {
 		wishspeed = pm->ps->speed * pm_swimScale;
@@ -1133,23 +1255,17 @@ PM_LadderMove
 ===================
 */
 static void PM_LadderMove( void ) {
-	int		i;
 	vec3_t	wishvel;
 	vec3_t	wishdir;
 	float	wishspeed;
-	float	scale;
 	float	vel;
 
 	PM_Friction();
 
-	scale = PM_CmdScale( &pm->cmd );
-	if ( !scale ) {
-		VectorClear( wishvel );
+	if ( PM_BuildWishMove3D( wishdir, &wishspeed ) ) {
+		VectorScale( wishdir, wishspeed, wishvel );
 	} else {
-		for ( i = 0 ; i < 3 ; i++ ) {
-			wishvel[i] = scale * pml.forward[i] * pm->cmd.forwardmove + scale * pml.right[i] * pm->cmd.rightmove;
-		}
-		wishvel[2] += scale * pm->cmd.upmove;
+		VectorClear( wishvel );
 	}
 
 	if ( pm->cmd.upmove > 0 ) {
@@ -1179,16 +1295,74 @@ static void PM_LadderMove( void ) {
 
 /*
 ===================
+PM_HasHeldInvulnerabilityItem
+
+Synthetic parity helper that reuses the retail held-item gate for invulnerability.
+===================
+*/
+static qboolean PM_HasHeldInvulnerabilityItem( int *invulnerabilityItemNum ) {
+	const gitem_t	*invulnerabilityItem;
+	int				itemNum;
+
+	invulnerabilityItem = BG_FindItemForHoldable( HI_INVULNERABILITY );
+	itemNum = invulnerabilityItem ? (int)( invulnerabilityItem - bg_itemlist ) : 0;
+
+	if ( invulnerabilityItemNum ) {
+		*invulnerabilityItemNum = itemNum;
+	}
+
+	return (qboolean)( itemNum != 0 &&
+		pm->ps->stats[STAT_HOLDABLE_ITEM] == itemNum &&
+		( pm->ps->pm_flags & PMF_USE_ITEM_HELD ) );
+}
+
+/*
+===================
 PM_InvulnerabilityMove
 
 Only with the invulnerability powerup
 ===================
 */
 static void PM_InvulnerabilityMove( void ) {
+	int				invulnerabilityItemNum;
+	qboolean		invulnerabilityHeld;
+
+	invulnerabilityHeld = PM_HasHeldInvulnerabilityItem( &invulnerabilityItemNum );
+
 	pm->cmd.forwardmove = 0;
 	pm->cmd.rightmove = 0;
 	pm->cmd.upmove = 0;
-	VectorClear(pm->ps->velocity);
+	VectorClear( pm->ps->velocity );
+
+	if ( pm->ps->pm_type != PM_DEAD && ( invulnerabilityHeld || pm->ps->playerItemTime > 0 ) ) {
+		pm->ps->powerups[PW_INVULNERABILITY] = PM_INVULNERABILITY_ACTIVE_TIME;
+
+		// Retail drives the shield's float/sink bias from view pitch while the holdable is active.
+		pm->ps->velocity[2] += (int)( -pm->ps->viewangles[PITCH] * pml.frametime );
+	}
+
+	if ( pm->ps->playerItemTime > 0 && pm->ps->playerItemTime <= 32000 ) {
+		pm->ps->playerItemTime -= pml.msec;
+		if ( pm->ps->playerItemTime < 0 ) {
+			pm->ps->playerItemTime = 0;
+		}
+	}
+
+	if ( pm->ps->playerItemTime <= 0 && !invulnerabilityHeld ) {
+		pm->ps->powerups[PW_INVULNERABILITY] = 0;
+		pm->ps->playerItemTimeMax = 0;
+	}
+
+	if ( pm->ps->playerItemTime <= 0 && invulnerabilityItemNum != 0 &&
+		pm->ps->stats[STAT_HOLDABLE_ITEM] == invulnerabilityItemNum ) {
+		pm->ps->stats[STAT_HOLDABLE_ITEM] = 0;
+	}
+
+	if ( pm->ps->pm_flags & PMF_DUCKED ) {
+		PM_ForceLegsAnim( LEGS_IDLECR );
+	} else {
+		PM_ForceLegsAnim( LEGS_JUMP );
+	}
 }
 
 /*
@@ -1199,11 +1373,9 @@ Only with the flight powerup
 ===================
 */
 static void PM_FlyMove( void ) {
-	int		i;
 	vec3_t	wishvel;
 	float	wishspeed;
 	vec3_t	wishdir;
-	float	scale;
 	const pmove_settings_t	*settings;
 	float	flightThrust;
 	float	upFraction;
@@ -1211,40 +1383,30 @@ static void PM_FlyMove( void ) {
 	// normal slowdown
 	PM_Friction ();
 
-	scale = PM_CmdScale( &pm->cmd );
 	settings = PM_GetActiveSettings();
 	flightThrust = ( settings && settings->flightThrust > 0.0f ) ? settings->flightThrust : 0.0f;
-	//
-	// user intentions
-	//
-	if ( !scale ) {
-		wishvel[0] = 0;
-		wishvel[1] = 0;
-		wishvel[2] = 0;
+	if ( PM_BuildWishMove3D( wishdir, &wishspeed ) ) {
+		VectorScale( wishdir, wishspeed, wishvel );
 	} else {
-		for (i=0 ; i<3 ; i++) {
-			wishvel[i] = scale * pml.forward[i]*pm->cmd.forwardmove + scale * pml.right[i]*pm->cmd.rightmove;
-		}
-
-		if ( flightThrust > 0.0f ) {
-			upFraction = (float)pm->cmd.upmove / 127.0f;
-			if ( upFraction > 1.0f ) {
-				upFraction = 1.0f;
-			} else if ( upFraction < -1.0f ) {
-				upFraction = -1.0f;
-			}
-			wishvel[2] += upFraction * flightThrust;
-		} else {
-			wishvel[2] += scale * pm->cmd.upmove;
-		}
+		VectorClear( wishvel );
 	}
 
-	VectorCopy (wishvel, wishdir);
-	wishspeed = VectorNormalize(wishdir);
+	if ( flightThrust > 0.0f ) {
+		upFraction = (float)pm->cmd.upmove / 127.0f;
+		if ( upFraction > 1.0f ) {
+			upFraction = 1.0f;
+		} else if ( upFraction < -1.0f ) {
+			upFraction = -1.0f;
+		}
+		wishvel[2] = upFraction * flightThrust;
+	}
+
+	VectorCopy( wishvel, wishdir );
+	wishspeed = VectorNormalize( wishdir );
 
 	PM_Accelerate (wishdir, wishspeed, pm_flyaccelerate);
 
-	PM_StepSlideMove( qfalse, pm_stepHeight );
+	PM_StepSlideMove( qfalse );
 }
 
 
@@ -1261,6 +1423,8 @@ static void PM_AirMove( void ) {
 	float	fmove, smove;
 	vec3_t	wishdir;
 	float	wishspeed;
+	float	accelerate;
+	float	currentSpeed;
 	float	scale;
 	usercmd_t	cmd;
 
@@ -1289,31 +1453,30 @@ static void PM_AirMove( void ) {
 	wishspeed = VectorNormalize( wishdir );
 	wishspeed *= scale;
 
-	if ( pm_wishspeed > 0.0f && wishspeed > pm_wishspeed ) {
-		wishspeed = pm_wishspeed;
+	accelerate = pm_airaccelerate;
+	if ( pm_aircontrol > 0.0f ) {
+		currentSpeed = DotProduct( pm->ps->velocity, wishdir );
+		if ( currentSpeed < 0.0f ) {
+			accelerate = pm_airstopaccelerate;
+		} else if ( pm->ps->movementDir == 2 || pm->ps->movementDir == 6 ) {
+			if ( pm_wishspeed > 0.0f && wishspeed > pm_wishspeed ) {
+				wishspeed = pm_wishspeed;
+			}
+			accelerate = pm_strafeaccelerate;
+		}
 	}
+
+	PM_Accelerate( wishdir, wishspeed, accelerate );
 
 	if ( pm_aircontrol > 0.0f ) {
 		PM_AirControl( wishdir, wishspeed );
-	}
-	PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
-
-	if ( pm_circlestrafe_friction > 0.0f && pm->cmd.forwardmove && pm->cmd.rightmove ) {
-		float friction = 1.0f - ( pm_circlestrafe_friction * pml.frametime );
-
-		if ( friction < 0.0f ) {
-			friction = 0.0f;
-		}
-
-		pm->ps->velocity[0] *= friction;
-		pm->ps->velocity[1] *= friction;
 	}
 
 	if ( pml.groundPlane ) {
 		PM_ClipVelocity( pm->ps->velocity, pml.groundTrace.plane.normal, pm->ps->velocity, OVERCLIP );
 	}
 
-	PM_StepSlideMove( qtrue, pm_stepHeight );
+	PM_StepSlideMove( qtrue );
 
 	if ( settings && settings->doubleJump ) {
 		PM_CheckJump( qtrue );
@@ -1497,7 +1660,7 @@ static void PM_WalkMove( void ) {
 		return;
 	}
 
-	PM_StepSlideMove( qfalse, pm_stepHeight );
+	PM_StepSlideMove( qfalse );
 
 	//Com_Printf("velocity2 = %1.1f\n", VectorLength(pm->ps->velocity));
 
@@ -1536,12 +1699,8 @@ PM_NoclipMove
 */
 static void PM_NoclipMove( void ) {
 	float	speed, drop, friction, control, newspeed;
-	int			i;
-	vec3_t		wishvel;
-	float		fmove, smove;
 	vec3_t		wishdir;
 	float		wishspeed;
-	float		scale;
 
 	pm->ps->viewheight = DEFAULT_VIEWHEIGHT;
 
@@ -1570,18 +1729,7 @@ static void PM_NoclipMove( void ) {
 	}
 
 	// accelerate
-	scale = PM_CmdScale( &pm->cmd );
-
-	fmove = pm->cmd.forwardmove;
-	smove = pm->cmd.rightmove;
-	
-	for (i=0 ; i<3 ; i++)
-		wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
-	wishvel[2] += pm->cmd.upmove;
-
-	VectorCopy (wishvel, wishdir);
-	wishspeed = VectorNormalize(wishdir);
-	wishspeed *= scale;
+	PM_BuildWishMove3D( wishdir, &wishspeed );
 
 	PM_Accelerate( wishdir, wishspeed, pm_accelerate );
 
@@ -2032,11 +2180,13 @@ Sets mins, maxs, and pm->ps->viewheight
 static void PM_CheckDuck (void)
 {
 	trace_t	trace;
+	qboolean	invulnerabilityActive;
 	qboolean	wasDucked;
 
 	wasDucked = ( pm->ps->pm_flags & PMF_DUCKED ) ? qtrue : qfalse;
+	invulnerabilityActive = (qboolean)( PM_HasHeldInvulnerabilityItem( NULL ) || pm->ps->playerItemTime > 0 );
 
-	if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
+	if ( invulnerabilityActive ) {
 		if ( pm->ps->pm_flags & PMF_INVULEXPAND ) {
 			// invulnerability sphere has a 42 units radius
 			VectorSet( pm->mins, -42, -42, -42 );
@@ -2339,6 +2489,8 @@ Generates weapon events and modifes the weapon counter
 */
 static void PM_Weapon( void ) {
 	int		addTime;
+	int		holdable;
+	int		holdableTag;
 
 	// don't allow attack until all buttons are up
 	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
@@ -2356,16 +2508,26 @@ static void PM_Weapon( void ) {
 		return;
 	}
 
+	holdable = pm->ps->stats[STAT_HOLDABLE_ITEM];
+	holdableTag = BG_HoldableForItemTag( bg_itemlist[ holdable ].giTag );
+
 	// check for item using
 	if ( pm->cmd.buttons & BUTTON_USE_HOLDABLE ) {
 		if ( ! ( pm->ps->pm_flags & PMF_USE_ITEM_HELD ) ) {
-			if ( bg_itemlist[pm->ps->stats[STAT_HOLDABLE_ITEM]].giTag == HI_MEDKIT
-				&& pm->ps->stats[STAT_HEALTH] >= (pm->ps->stats[STAT_MAX_HEALTH] + 25) ) {
-				// don't use medkit if at max health
-			} else {
-				pm->ps->pm_flags |= PMF_USE_ITEM_HELD;
-				PM_AddEvent( EV_USE_ITEM0 + bg_itemlist[pm->ps->stats[STAT_HOLDABLE_ITEM]].giTag );
+			pm->ps->pm_flags |= PMF_USE_ITEM_HELD;
+
+			if ( holdableTag != HI_INVULNERABILITY &&
+				( holdableTag != HI_MEDKIT ||
+				pm->ps->stats[STAT_HEALTH] < ( pm->ps->stats[STAT_MAX_HEALTH] + 25 ) ) ) {
+				PM_AddEvent( EV_USE_ITEM0 + holdableTag );
 				pm->ps->stats[STAT_HOLDABLE_ITEM] = 0;
+			} else if ( holdableTag == HI_INVULNERABILITY ) {
+				if ( pm->ps->playerItemTime <= 0 && pm->ps->playerItemTimeMax <= 0 ) {
+					PM_AddEvent( EV_USE_ITEM0 + holdableTag );
+					pm->ps->powerups[PW_INVULNERABILITY] = pm->cmd.serverTime;
+					pm->ps->playerItemTimeMax = 10000;
+					pm->ps->playerItemTime = pm->ps->playerItemTimeMax;
+				}
 			}
 			return;
 		}
@@ -2596,9 +2758,9 @@ void PmoveSingle (pmove_t *pmove) {
 	const pmove_settings_t	*settings;
 
 	pm = pmove;
-	PM_LoadMoveParams( pm->pmoveParams );
-	PM_LoadMoveSettings();
+	PM_LoadMoveTuningConstants();
 	settings = PM_GetActiveSettings();
+	pm->ps->powerups[PW_INVULNERABILITY] = 0;
 	if ( settings->crouchSlide ) {
 		pm->ps->pm_flags |= PMF_CROUCH_SLIDE;
 	} else {
@@ -2755,7 +2917,7 @@ void PmoveSingle (pmove_t *pmove) {
 	PM_DropTimers();
 	PM_CheckLadder();
 
-	if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
+	if ( PM_HasHeldInvulnerabilityItem( NULL ) || pm->ps->playerItemTime > 0 ) {
 		PM_InvulnerabilityMove();
 	} else
 	if ( pm->ps->powerups[PW_FLIGHT] ) {

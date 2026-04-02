@@ -60,22 +60,34 @@ def test_air_move_probes_retail_double_jump_path() -> None:
 	)
 
 	assert "settings = PM_GetActiveSettings();" in body
+	assert "accelerate = pm_airaccelerate;" in body
+	assert "currentSpeed = DotProduct( pm->ps->velocity, wishdir );" in body
+	assert "accelerate = pm_airstopaccelerate;" in body
+	assert "pm->ps->movementDir == 2 || pm->ps->movementDir == 6" in body
+	assert "accelerate = pm_strafeaccelerate;" in body
+	assert "PM_Accelerate( wishdir, wishspeed, accelerate );" in body
+	assert body.index("PM_Accelerate( wishdir, wishspeed, accelerate );") < body.index("PM_AirControl( wishdir, wishspeed );")
+	assert "pm_circlestrafe_friction" not in body
 	assert "if ( settings && settings->doubleJump ) {" in body
 	assert "PM_CheckJump( qtrue );" in body
 
 
-def test_checkjump_uses_jump_time_gate_and_retail_double_jump_latch() -> None:
-	body = _function_body(
+def test_jump_takeoff_split_keeps_retail_jump_time_gate_and_double_jump_latch() -> None:
+	prepare_body = _function_body(
 		BG_PMOVE_PATH,
-		r"static qboolean PM_CheckJump\( qboolean allowAirDoubleJump \)\s*\{(?P<body>.*?)^\}",
+		r"static qboolean PM_PrepareJumpTakeoff\( qboolean allowAirDoubleJump \)\s*\{(?P<body>.*?)^\}",
+	)
+	takeoff_body = _function_body(
+		BG_PMOVE_PATH,
+		r"static void PM_ApplyJumpTakeoff\( void \)\s*\{(?P<body>.*?)^\}",
 	)
 
-	assert "timeDelta < settings->jumpTimeDeltaMin" in body
-	assert "pm->cmd.upmove = 0;" in body
-	assert "pm->ps->jumpTime = pm->cmd.serverTime;" in body
-	assert "pm->ps->doubleJumped = qtrue;" in body
-	assert "PM_CanTriggerDoubleJump" not in body
-	assert "PM_ResetDoubleJumpSupport" not in body
+	assert "timeDelta < settings->jumpTimeDeltaMin" in prepare_body
+	assert "pm->cmd.upmove = 0;" in prepare_body
+	assert "pm->ps->jumpTime = pm->cmd.serverTime;" in takeoff_body
+	assert "pm->ps->doubleJumped = qtrue;" in takeoff_body
+	assert "PM_CanTriggerDoubleJump" not in prepare_body
+	assert "PM_ResetDoubleJumpSupport" not in takeoff_body
 
 
 def test_ground_trace_clears_double_jump_latch_on_ground_contact() -> None:

@@ -1108,6 +1108,32 @@ static void CG_DebugAppendIntCsv( char *buffer, int bufferSize, const int *value
 
 /*
 =================
+CG_DebugAppendFloatCsv
+
+Builds a comma-separated float list used by ownerdraw debug logging.
+=================
+*/
+static void CG_DebugAppendFloatCsv( char *buffer, int bufferSize, const float *values, int count ) {
+	int	i;
+	char	entry[24];
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	if ( !values || count <= 0 ) {
+		return;
+	}
+
+	for ( i = 0; i < count; i++ ) {
+		Com_sprintf( entry, sizeof( entry ), "%s%3.2f", ( i > 0 ) ? "," : "", values[i] );
+		Q_strcat( buffer, bufferSize, entry );
+	}
+}
+
+/*
+=================
 CG_DebugDumpPlacementOwnerdrawScoreStats
 
 Dumps parsed first/second placement ownerdraw inputs for validation harnesses.
@@ -1134,7 +1160,7 @@ static void CG_DebugDumpPlacementOwnerdrawScoreStats( void ) {
 		int			shotValues[CG_SCORESTAT_ACCURACY_WEAPON_COUNT];
 		int			damageValues[CG_SCORESTAT_DMG_WEAPON_COUNT];
 		int			pickupValues[CG_SCORESTAT_PICKUP_COUNT];
-		int			pickupAvgValues[CG_SCORESTAT_PICKUP_COUNT];
+		float			pickupAvgValues[CG_SCORESTAT_PICKUP_COUNT];
 		char			fragCsv[256];
 		char			hitCsv[256];
 		char			shotCsv[256];
@@ -1179,7 +1205,7 @@ static void CG_DebugDumpPlacementOwnerdrawScoreStats( void ) {
 		CG_DebugAppendIntCsv( shotCsv, sizeof( shotCsv ), shotValues, CG_SCORESTAT_ACCURACY_WEAPON_COUNT );
 		CG_DebugAppendIntCsv( damageCsv, sizeof( damageCsv ), damageValues, CG_SCORESTAT_DMG_WEAPON_COUNT );
 		CG_DebugAppendIntCsv( pickupCsv, sizeof( pickupCsv ), pickupValues, CG_SCORESTAT_PICKUP_COUNT );
-		CG_DebugAppendIntCsv( pickupAvgCsv, sizeof( pickupAvgCsv ), pickupAvgValues, CG_SCORESTAT_PICKUP_COUNT );
+		CG_DebugAppendFloatCsv( pickupAvgCsv, sizeof( pickupAvgCsv ), pickupAvgValues, CG_SCORESTAT_PICKUP_COUNT );
 
 		CG_Printf(
 			"ownerdraw_stats: place=%i client=%i valid=%i frags=%s hits=%s shots=%s dmg=%s pickups=%s pickupAvg=%s pr=%i tier=%i\n",
@@ -1647,11 +1673,11 @@ static void CG_ParseScoreStats( void ) {
 		}
 
 		for ( j = 0; j < CG_SCORESTAT_PICKUP_COUNT && arg < argc; j++ ) {
-			int value;
+			float value;
 
-			value = atoi( CG_Argv( arg++ ) );
-			if ( value < 0 ) {
-				value = 0;
+			value = (float)atof( CG_Argv( arg++ ) );
+			if ( value < 0.0f ) {
+				value = 0.0f;
 			}
 			if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
 				cg.scoreStats[clientNum].pickupAvgSeconds[j] = value;
@@ -2973,9 +2999,9 @@ static void CG_ParseForcedCosmetics( void ) {
 	cgs.forceDmgThroughSurface = forceDamage;
 
 	if ( forceScoreboard && !previousScoreboard ) {
-		CG_CenterPrint( "Server enforced the compact scoreboard message.", SCREEN_HEIGHT * 0.30f, SMALLCHAR_WIDTH );
+		CG_CenterPrint( "Server enforced the compact scoreboard message.", SCREEN_HEIGHT * 0.30f, 0.25f );
 	} else if ( !forceScoreboard && previousScoreboard ) {
-		CG_CenterPrint( "Server restored your scoreboard message preference.", SCREEN_HEIGHT * 0.30f, SMALLCHAR_WIDTH );
+		CG_CenterPrint( "Server restored your scoreboard message preference.", SCREEN_HEIGHT * 0.30f, 0.25f );
 	}
 
 	if ( forceHud && !previousHud ) {
@@ -3450,6 +3476,10 @@ static void CG_MapRestart( void ) {
 	cg.timelimitWarnings = 0;
 
 	cg.intermissionStarted = qfalse;
+	cg.intermissionLetterboxChangeTime = 0;
+	cg.intermissionLetterboxDuration = 0;
+	cg.intermissionLetterboxStartHeight = 0.0f;
+	cg.intermissionLetterboxTargetHeight = 0.0f;
 
 	cgs.voteTime = 0;
 	cgs.voteYes = 0;
@@ -3469,7 +3499,7 @@ static void CG_MapRestart( void ) {
 	// play the "fight" sound if this is a restart without warmup
 	if ( cg.warmup == 0 /* && cgs.gametype == GT_TOURNAMENT */) {
 		trap_S_StartLocalSound( cgs.media.countFightSound, CHAN_ANNOUNCER );
-		CG_CenterPrint( "FIGHT!", 120, GIANTCHAR_WIDTH*2 );
+		CG_CenterPrint( "FIGHT!", 120, 0.5f );
 	}
 	if (cg_singlePlayerActive.integer) {
 		trap_Cvar_Set("ui_matchStartTime", va("%i", cg.time));
@@ -4048,7 +4078,7 @@ static void CG_ServerCommand( void ) {
 	}
 
 	if ( !strcmp( cmd, "cp" ) ) {
-		CG_CenterPrint( CG_Argv(1), SCREEN_HEIGHT * 0.30, BIGCHAR_WIDTH );
+		CG_CenterPrint( CG_Argv(1), SCREEN_HEIGHT * 0.30f, 0.4f );
 		return;
 	}
 

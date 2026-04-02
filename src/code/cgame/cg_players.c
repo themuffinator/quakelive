@@ -1091,6 +1091,29 @@ static team_t CG_GetLocalPlayerTeam( void ) {
 
 /*
 =============
+CG_IsFriendlyClientTeam
+
+Collapses the retail team-gametype and team-match checks into one predicate.
+=============
+*/
+static qboolean CG_IsFriendlyClientTeam( int viewerTeam, int targetTeam ) {
+	if ( cgs.gametype < GT_TEAM ) {
+		return qfalse;
+	}
+
+	if ( viewerTeam <= TEAM_FREE || viewerTeam == TEAM_SPECTATOR ) {
+		return qfalse;
+	}
+
+	if ( targetTeam <= TEAM_FREE || targetTeam == TEAM_SPECTATOR ) {
+		return qfalse;
+	}
+
+	return (qboolean)( viewerTeam == targetTeam );
+}
+
+/*
+=============
 CG_GetClientOverrideContext
 
 Determines which override category should be used for the provided client.
@@ -1109,7 +1132,7 @@ static cgClientOverrideContext_t CG_GetClientOverrideContext( int clientNum, con
 		return CG_CLIENT_OVERRIDE_FFA;
 	}
 	localTeam = CG_GetLocalPlayerTeam();
-	if ( localTeam != TEAM_FREE && localTeam != TEAM_SPECTATOR && ci->team == localTeam ) {
+	if ( CG_IsFriendlyClientTeam( localTeam, ci->team ) ) {
 		return CG_CLIENT_OVERRIDE_TEAMMATE;
 	}
 	return CG_CLIENT_OVERRIDE_ENEMY;
@@ -1430,6 +1453,29 @@ static int CG_GetPlayerColorScale( void ) {
 
 /*
 =============
+CG_SetScaledPackedRGBA
+
+Scales a packed RGBA color into shader bytes using the retail player-color gain.
+=============
+*/
+static void CG_SetScaledPackedRGBA( byte *rgba, unsigned packedColor, int colorScale ) {
+	int value;
+
+	if ( !rgba ) {
+		return;
+	}
+
+	value = (int)( ( packedColor >> 24 ) & 0xFF ) * colorScale;
+	rgba[0] = (byte)( value > 255 ? 255 : value );
+	value = (int)( ( packedColor >> 16 ) & 0xFF ) * colorScale;
+	rgba[1] = (byte)( value > 255 ? 255 : value );
+	value = (int)( ( packedColor >> 8 ) & 0xFF ) * colorScale;
+	rgba[2] = (byte)( value > 255 ? 255 : value );
+	rgba[3] = (byte)( packedColor & 0xFF );
+}
+
+/*
+=============
 CG_SetScaledShaderRGBA
 
 Copies a normalized color into shader RGBA bytes using the retail player
@@ -1437,6 +1483,7 @@ color scale.
 =============
 */
 static void CG_SetScaledShaderRGBA( byte *rgba, const vec4_t color, int colorScale ) {
+	unsigned	packedColor;
 	int		component;
 	int		value;
 	float	clamped;
@@ -1445,17 +1492,14 @@ static void CG_SetScaledShaderRGBA( byte *rgba, const vec4_t color, int colorSca
 		return;
 	}
 
-	for ( component = 0 ; component < 3 ; component++ ) {
+	packedColor = 0;
+	for ( component = 0 ; component < 4 ; component++ ) {
 		clamped = Com_Clamp( 0.0f, 1.0f, color[component] );
-		value = (int)( clamped * 255.0f ) * colorScale;
-		if ( value > 255 ) {
-			value = 255;
-		}
-		rgba[component] = (byte)value;
+		value = (int)( clamped * 255.0f );
+		packedColor = ( packedColor << 8 ) | (unsigned)( value & 0xFF );
 	}
 
-	clamped = Com_Clamp( 0.0f, 1.0f, color[3] );
-	rgba[3] = (byte)( clamped * 255.0f );
+	CG_SetScaledPackedRGBA( rgba, packedColor, colorScale );
 }
 
 /*
@@ -1479,7 +1523,7 @@ CG_SetRefEntityColor
 Applies a custom RGB color to the reference entity.
 =============
 */
-static void CG_SetRefEntityColor( refEntity_t *ent, vec3_t color, int colorScale ) {
+static void CG_SetRefEntityColor( refEntity_t *ent, const vec3_t color, int colorScale ) {
 	vec4_t	shaderColor;
 
 	shaderColor[0] = color[0];

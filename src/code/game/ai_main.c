@@ -56,6 +56,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "syn.h"
 
 #define MAX_PATH		144
+#define RETAIL_SELECTED_BOT_INFO_CONFIGSTRING	0x10
 
 
 //bot states
@@ -86,6 +87,174 @@ vmCvar_t bot_interbreedwrite;
 
 
 void ExitLevel( void );
+
+/*
+==================
+BotDebugAINodeName
+==================
+*/
+static const char *BotDebugAINodeName( bot_state_t *bs ) {
+	if ( bs->ainode == AINode_Intermission ) {
+		return "intermission";
+	}
+	if ( bs->ainode == AINode_Observer ) {
+		return "observer";
+	}
+	if ( bs->ainode == AINode_Respawn ) {
+		return "respawn";
+	}
+	if ( bs->ainode == AINode_Stand ) {
+		return "stand";
+	}
+	if ( bs->ainode == AINode_Seek_ActivateEntity ) {
+		return "activate entity";
+	}
+	if ( bs->ainode == AINode_Seek_NBG ) {
+		return "seek NBG";
+	}
+	if ( bs->ainode == AINode_Seek_LTG ) {
+		return "seek LTG";
+	}
+	if ( bs->ainode == AINode_Battle_Fight ) {
+		return "battle fight";
+	}
+	if ( bs->ainode == AINode_Battle_Chase ) {
+		return "battle chase";
+	}
+	if ( bs->ainode == AINode_Battle_Retreat ) {
+		return "battle retreat";
+	}
+	if ( bs->ainode == AINode_Battle_NBG ) {
+		return "battle NBG";
+	}
+
+	return "";
+}
+
+/*
+==================
+BotDebugLTGTypeName
+==================
+*/
+static const char *BotDebugLTGTypeName( int ltgtype ) {
+	switch ( ltgtype ) {
+		case LTG_TEAMHELP:
+			return "helping";
+		case LTG_TEAMACCOMPANY:
+			return "escorting";
+		case LTG_DEFENDKEYAREA:
+			return "defending";
+		case LTG_GETFLAG:
+			return "get flag";
+		case LTG_RUSHBASE:
+			return "rush base";
+		case LTG_RETURNFLAG:
+			return "return flag";
+		case LTG_CAMP:
+		case LTG_CAMPORDER:
+			return "camping";
+		case LTG_PATROL:
+			return "patroling";
+		case LTG_GETITEM:
+			return "get item";
+		case LTG_KILL:
+			return "kill";
+		case LTG_HARVEST:
+			return "harvest";
+		case LTG_ATTACKENEMYBASE:
+			return "attack base";
+		case 0x10:
+			return "following";
+		case 0x11:
+			return "training";
+		case 0x12:
+			return "touring";
+		case 0x13:
+			return "tormenting";
+		case 0x14:
+			return "target";
+		case 0x15:
+			return "insta-gibbing";
+		default:
+			return "roaming";
+	}
+}
+
+/*
+=========================
+BotPublishDebugInfoString
+=========================
+*/
+static int BotPublishDebugInfoString( bot_state_t *bs ) {
+	vec3_t		delta;
+	bot_goal_t	topGoal;
+	bot_goal_t	secondGoal;
+	char		enemyName[40];
+	char		topGoalName[MAX_PATH];
+	char		secondGoalName[MAX_PATH];
+	char		ltgTypeName[MAX_PATH];
+	float		enemyDistance;
+	float		topGoalDistance;
+	float		secondGoalDistance;
+	int			goalAreaNum;
+	int			heardEnemy;
+
+	memset( &topGoal, 0, sizeof( topGoal ) );
+	memset( &secondGoal, 0, sizeof( secondGoal ) );
+	enemyName[0] = '\0';
+	topGoalName[0] = '\0';
+	secondGoalName[0] = '\0';
+	ltgTypeName[0] = '\0';
+	enemyDistance = 0.0f;
+	topGoalDistance = 0.0f;
+	secondGoalDistance = 0.0f;
+	goalAreaNum = -1;
+	heardEnemy = 0;
+
+	if ( trap_BotGetTopGoal( bs->gs, &topGoal ) ) {
+		trap_BotGoalName( topGoal.number, topGoalName, sizeof( topGoalName ) );
+		VectorSubtract( topGoal.origin, bs->origin, delta );
+		topGoalDistance = VectorLength( delta );
+		goalAreaNum = topGoal.areanum;
+	}
+
+	if ( trap_BotGetSecondGoal( bs->gs, &secondGoal ) ) {
+		trap_BotGoalName( secondGoal.number, secondGoalName, sizeof( secondGoalName ) );
+		VectorSubtract( secondGoal.origin, bs->origin, delta );
+		secondGoalDistance = VectorLength( delta );
+	}
+
+	if ( bs->enemy >= 0 && bs->enemy < MAX_CLIENTS && g_entities[bs->enemy].client &&
+		g_entities[bs->enemy].client->pers.connected == CON_CONNECTED ) {
+		ClientName( bs->enemy, enemyName, sizeof( enemyName ) );
+		VectorSubtract( g_entities[bs->enemy].r.currentOrigin, bs->origin, delta );
+		enemyDistance = VectorLength( delta );
+		goalAreaNum = BotPointAreaNum( g_entities[bs->enemy].r.currentOrigin );
+		if ( BotEntityVisible( bs->entitynum, bs->eye, bs->viewangles, 360.0f, bs->enemy ) <= 0.0f ) {
+			heardEnemy = 1;
+		}
+	}
+
+	Q_strncpyz( ltgTypeName, BotDebugLTGTypeName( bs->ltgtype ), sizeof( ltgTypeName ) );
+	trap_SetConfigstring( RETAIL_SELECTED_BOT_INFO_CONFIGSTRING,
+		va( "e\\%s\\ed\\%.1f\\tg\\%s\\tgd\\%.1f\\sg\\%s\\sgd\\%.1f\\ainode\\%s\\ltg\\%s\\ban\\%i\\gan\\%i\\bh\\%i\\ba\\%i\\sk\\%.1f\\eh\\%i\\",
+			enemyName,
+			enemyDistance,
+			topGoalName,
+			topGoalDistance,
+			secondGoalName,
+			secondGoalDistance,
+			BotDebugAINodeName( bs ),
+			ltgTypeName,
+			bs->areanum,
+			goalAreaNum,
+			bs->cur_ps.stats[STAT_HEALTH],
+			bs->cur_ps.stats[STAT_ARMOR],
+			bs->settings.skill,
+			heardEnemy ) );
+
+	return qtrue;
+}
 
 
 /*
@@ -1318,6 +1487,32 @@ int BotAIStartFrame(int time) {
 
 		BotUpdateInput(botstates[i], time, elapsed_time);
 		trap_BotUserCommand(botstates[i]->client, &botstates[i]->lastucmd);
+	}
+
+	if ( !bot_developer.integer || bot_report.integer < 0 ) {
+		trap_SetConfigstring( RETAIL_SELECTED_BOT_INFO_CONFIGSTRING, "" );
+	} else {
+		qboolean	published;
+
+		published = qfalse;
+		for ( i = 0; i < MAX_CLIENTS; i++ ) {
+			if ( i != bot_report.integer ) {
+				continue;
+			}
+			if ( !botstates[i] || !botstates[i]->inuse ) {
+				continue;
+			}
+			if ( !g_entities[i].client || g_entities[i].client->pers.connected != CON_CONNECTED ) {
+				continue;
+			}
+
+			BotPublishDebugInfoString( botstates[i] );
+			published = qtrue;
+		}
+
+		if ( !published ) {
+			trap_SetConfigstring( RETAIL_SELECTED_BOT_INFO_CONFIGSTRING, "" );
+		}
 	}
 
 	return qtrue;

@@ -61,3 +61,4 @@ build/ui_bundle/src_ui_retail_overlay/
 .codex/ralph/prompt.current.md
 .codex/ralph/.last-branch
 /src/build/win32/Debug/bin/baseq3
+/build

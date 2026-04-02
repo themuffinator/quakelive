@@ -87,9 +87,9 @@ def test_walkmove_uses_retail_crouch_slide_duck_speed_cap() -> None:
 	assert "wishspeed = pm->ps->speed * duckScale;" in body
 
 
-def test_checkjump_clears_crouch_slide_timer() -> None:
+def test_jump_takeoff_clears_crouch_slide_timer() -> None:
 	body = _function_body(
-		r"static qboolean PM_CheckJump\( qboolean allowAirDoubleJump \)\s*\{(?P<body>.*?)^\}",
+		r"static void PM_ApplyJumpTakeoff\( void \)\s*\{(?P<body>.*?)^\}",
 	)
 
 	assert "pm->ps->pm_flags & PMF_CROUCH_SLIDE" in body

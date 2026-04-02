@@ -50,6 +50,9 @@ static const char *CG_ResolveWeaponName( int weapon );
 static void CG_ParseActiveVoteCommand( char *command, size_t commandSize, char *argument, size_t argumentSize );
 static void CG_DrawVoteShot(rectDef_t *rect, int slot);
 static void CG_MenuScript_OpenScoreboard( void );
+static void CG_AlignTextX( float *x, const char *text, float scale, int align );
+static float CG_AlignTextInRectX( const rectDef_t *rect, float scale, const char *text, int align );
+static void CG_Text_Paint_Limit( float *maxX, float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit );
 
 #define CG_RACE_CHECKPOINT_HALF_WIDTH 24.0f
 #define CG_RACE_CHECKPOINT_HEIGHT 48.0f
@@ -508,7 +511,7 @@ static void CG_RacePlayCheckpointFeedback( const cgRaceClientProgress_t *progres
 		Q_strncpyz( statusText, "Finish", sizeof( statusText ) );
 	}
 
-	CG_CenterPrint( va( "Checkpoint\n%s", statusText ), SCREEN_HEIGHT * 0.30f, BIGCHAR_WIDTH );
+	CG_CenterPrint( va( "Checkpoint\n%s", statusText ), SCREEN_HEIGHT * 0.30f, 0.3f );
 	trap_S_StartLocalSound( cgs.media.selectSound, CHAN_LOCAL_SOUND );
 }
 
@@ -2542,79 +2545,6 @@ static void CG_DrawPlayerCounts(rectDef_t *rect, float scale, vec4_t color, int 
 
 /*
 =============
-CG_StartingWeaponFromToken
-
-Maps the queued-primary token onto the retail starting-weapon icon order.
-=============
-*/
-static weapon_t CG_StartingWeaponFromToken( const char *value ) {
-	char	buffer[128];
-	char	*cursor;
-	char	*token;
-	int		i;
-
-	if ( !value || !value[0] ) {
-		return WP_NONE;
-	}
-
-	Q_strncpyz( buffer, value, sizeof( buffer ) );
-	cursor = buffer;
-	token = COM_ParseExt( &cursor, qtrue );
-	if ( !token[0] ) {
-		return WP_NONE;
-	}
-
-	for ( i = 0; i < CG_STARTING_WEAPON_ICON_COUNT; i++ ) {
-		if ( !Q_stricmp( token, cgStartingWeaponIcons[i].token ) ) {
-			return cgStartingWeaponIcons[i].weapon;
-		}
-	}
-
-	if ( !Q_stricmp( token, "gauntlet" ) ) {
-		return WP_GAUNTLET;
-	}
-	if ( !Q_stricmp( token, "machinegun" ) ) {
-		return WP_MACHINEGUN;
-	}
-	if ( !Q_stricmp( token, "shotgun" ) ) {
-		return WP_SHOTGUN;
-	}
-	if ( !Q_stricmp( token, "grenade" ) || !Q_stricmp( token, "grenade_launcher" ) ) {
-		return WP_GRENADE_LAUNCHER;
-	}
-	if ( !Q_stricmp( token, "rocket" ) || !Q_stricmp( token, "rocket_launcher" ) ) {
-		return WP_ROCKET_LAUNCHER;
-	}
-	if ( !Q_stricmp( token, "lightning" ) ) {
-		return WP_LIGHTNING;
-	}
-	if ( !Q_stricmp( token, "railgun" ) ) {
-		return WP_RAILGUN;
-	}
-	if ( !Q_stricmp( token, "plasma" ) || !Q_stricmp( token, "plasmagun" ) ) {
-		return WP_PLASMAGUN;
-	}
-	if ( !Q_stricmp( token, "grapple" ) || !Q_stricmp( token, "grappling_hook" ) ) {
-		return WP_GRAPPLING_HOOK;
-	}
-	if ( !Q_stricmp( token, "nailgun" ) ) {
-		return WP_NAILGUN;
-	}
-	if ( !Q_stricmp( token, "prox" ) || !Q_stricmp( token, "proxlauncher" ) || !Q_stricmp( token, "prox_launcher" ) ) {
-		return WP_PROX_LAUNCHER;
-	}
-	if ( !Q_stricmp( token, "chaingun" ) ) {
-		return WP_CHAINGUN;
-	}
-	if ( !Q_stricmp( token, "heavy_machinegun" ) ) {
-		return WP_HEAVY_MACHINEGUN;
-	}
-
-	return WP_NONE;
-}
-
-/*
-=============
 CG_GetStartingWeaponPreviewMask
 
 Prefers the retail loadout-mask configstring and falls back to legacy
@@ -2945,6 +2875,7 @@ Draws the retail icon-strip loadout preview plus the queued primary weapon.
 */
 static void CG_DrawStartingWeapons(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
 	unsigned int	loadoutMask;
+	int		primaryIndex;
 	weapon_t	primaryWeapon;
 	int		i;
 	float		xOffset;
@@ -2975,7 +2906,11 @@ static void CG_DrawStartingWeapons(rectDef_t *rect, float text_x, float text_y, 
 		xOffset += rect->w * 1.5f;
 	}
 
-	primaryWeapon = CG_StartingWeaponFromToken( cg_weaponPrimaryQueued.string );
+	primaryIndex = CG_StartingWeaponIndexFromToken( cg_weaponPrimaryQueued.string );
+	primaryWeapon = WP_NONE;
+	if ( primaryIndex > 0 && primaryIndex <= CG_STARTING_WEAPON_ICON_COUNT ) {
+		primaryWeapon = cgStartingWeaponIcons[ primaryIndex - 1 ].weapon;
+	}
 	if ( primaryWeapon == WP_NONE && cg_weaponPrimary.integer > WP_NONE && cg_weaponPrimary.integer < WP_NUM_WEAPONS ) {
 		primaryWeapon = (weapon_t)cg_weaponPrimary.integer;
 	}
@@ -3046,7 +2981,7 @@ static void CG_DrawGameLimit(rectDef_t *rect, float text_x, float text_y, float 
 		break;
 
 	default:
-		if ( cgs.gametype >= GT_CTF ) {
+		if ( CG_HasObjectiveCountStat( cgs.gametype ) ) {
 			limitValue = cgs.capturelimit;
 			if ( limitValue > 0 ) {
 				Com_sprintf( buffer, sizeof( buffer ), "Cap Limit: %d", limitValue );
@@ -3474,7 +3409,7 @@ static const char *CG_GetEndGameScoreText( void ) {
 		return "";
 	}
 
-	if ( cgs.gametype < GT_TEAM || cgs.gametype == GT_RED_ROVER ) {
+	if ( !CG_IsTeamWinnerGametype( cgs.gametype ) ) {
 		if ( score == SCORE_NOT_PRESENT ) {
 			return "";
 		}
@@ -3539,7 +3474,7 @@ static const char *CG_GetMatchWinnerText( void ) {
 	buffer[0] = '\0';
 	byForfeit = qfalse;
 
-	if ( cgs.gametype >= GT_TEAM && cgs.gametype != GT_RED_ROVER ) {
+	if ( CG_IsTeamWinnerGametype( cgs.gametype ) ) {
 		if ( cg.teamScores[0] == cg.teamScores[1] ) {
 			return "Match tied";
 		}
@@ -3935,12 +3870,12 @@ static const weapon_t cgVerticalAccWeaponOrder[] = {
 
 /*
 =============
-CG_ShouldDrawAccVertical
+CG_ShouldDrawAccOverlay
 
 Mirrors the retail local-accuracy overlay gate and refresh cadence.
 =============
 */
-static qboolean CG_ShouldDrawAccVertical( void ) {
+qboolean CG_ShouldDrawAccOverlay( void ) {
 	if ( !cg.accRequestActive || !cg.snap ) {
 		return qfalse;
 	}
@@ -3968,7 +3903,7 @@ Draws the retail vertical weapon-icon strip paired with `+acc`.
 static void CG_DrawWeaponVertical( rectDef_t *rect, vec4_t color ) {
 	int i;
 
-	if ( !rect || !CG_ShouldDrawAccVertical() ) {
+	if ( !rect || !CG_ShouldDrawAccOverlay() ) {
 		return;
 	}
 
@@ -3998,7 +3933,7 @@ static void CG_DrawAccVertical( rectDef_t *rect, float scale, vec4_t color, int 
 	char buffer[16];
 	int i;
 
-	if ( !rect || !CG_ShouldDrawAccVertical() ) {
+	if ( !rect || !CG_ShouldDrawAccOverlay() ) {
 		return;
 	}
 
@@ -4436,6 +4371,247 @@ static qboolean CG_IsTeamTimeHeldOwnerDraw( int ownerDraw ) {
 	return CG_IsTeamTimeHeldStatIndex( statIndex );
 }
 
+typedef enum {
+	CG_TEAM_PICKUP_SUMMARY_ICON_RA = 0,
+	CG_TEAM_PICKUP_SUMMARY_ICON_YA,
+	CG_TEAM_PICKUP_SUMMARY_ICON_GA,
+	CG_TEAM_PICKUP_SUMMARY_ICON_MH,
+	CG_TEAM_PICKUP_SUMMARY_ICON_MEDKIT,
+	CG_TEAM_PICKUP_SUMMARY_ICON_FLAG,
+	CG_TEAM_PICKUP_SUMMARY_ICON_QUAD,
+	CG_TEAM_PICKUP_SUMMARY_ICON_BS,
+	CG_TEAM_PICKUP_SUMMARY_ICON_REGEN,
+	CG_TEAM_PICKUP_SUMMARY_ICON_HASTE,
+	CG_TEAM_PICKUP_SUMMARY_ICON_INVIS,
+	CG_TEAM_PICKUP_SUMMARY_ICON_COUNT
+} cgTeamPickupSummaryIcon_t;
+
+typedef struct {
+	int				statIndex;
+	int				timeHeldStatIndex;
+	cgTeamPickupSummaryIcon_t	icon;
+} cgTeamPickupSummaryEntry_t;
+
+static const cgTeamPickupSummaryEntry_t cgTeamPickupSummaryEntries[] = {
+	{ CG_TEAMSTAT_PICKUPS_RA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_RA },
+	{ CG_TEAMSTAT_PICKUPS_YA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_YA },
+	{ CG_TEAMSTAT_PICKUPS_GA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_GA },
+	{ CG_TEAMSTAT_PICKUPS_MH, -1, CG_TEAM_PICKUP_SUMMARY_ICON_MH },
+	{ CG_TEAMSTAT_PICKUPS_MEDKIT, -1, CG_TEAM_PICKUP_SUMMARY_ICON_MEDKIT },
+	{ CG_TEAMSTAT_PICKUPS_FLAG, CG_TEAMSTAT_TIMEHELD_FLAG, CG_TEAM_PICKUP_SUMMARY_ICON_FLAG },
+	{ CG_TEAMSTAT_PICKUPS_QUAD, CG_TEAMSTAT_TIMEHELD_QUAD, CG_TEAM_PICKUP_SUMMARY_ICON_QUAD },
+	{ CG_TEAMSTAT_PICKUPS_BS, CG_TEAMSTAT_TIMEHELD_BS, CG_TEAM_PICKUP_SUMMARY_ICON_BS },
+	{ CG_TEAMSTAT_PICKUPS_REGEN, CG_TEAMSTAT_TIMEHELD_REGEN, CG_TEAM_PICKUP_SUMMARY_ICON_REGEN },
+	{ CG_TEAMSTAT_PICKUPS_HASTE, CG_TEAMSTAT_TIMEHELD_HASTE, CG_TEAM_PICKUP_SUMMARY_ICON_HASTE },
+	{ CG_TEAMSTAT_PICKUPS_INVIS, CG_TEAMSTAT_TIMEHELD_INVIS, CG_TEAM_PICKUP_SUMMARY_ICON_INVIS }
+};
+
+static qhandle_t cgTeamPickupSummaryIconHandles[CG_TEAM_PICKUP_SUMMARY_ICON_COUNT];
+static qhandle_t cgTeamPickupSummaryBlueFlagHandle;
+static qhandle_t cgTeamPickupSummaryNeutralFlagHandle;
+static qhandle_t cgTeamPickupSummaryRedFlagHandle;
+
+/*
+=============
+CG_IsTeamPickupSummaryOwnerDraw
+
+Reports whether an ownerdraw is one of the retail aggregate team pickup rows.
+=============
+*/
+static qboolean CG_IsTeamPickupSummaryOwnerDraw( int ownerDraw ) {
+	return (qboolean)( ownerDraw == CG_RED_TEAM_MAP_PICKUPS || ownerDraw == CG_BLUE_TEAM_MAP_PICKUPS );
+}
+
+/*
+=============
+CG_GetTeamScoreStatValue
+
+Reads a parsed retail team scorestat field for the requested team/stat pair.
+=============
+*/
+static qboolean CG_GetTeamScoreStatValue( team_t team, int statIndex, int *value ) {
+	int	teamIndex;
+	int	resolvedValue;
+
+	if ( !value ) {
+		return qfalse;
+	}
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return qfalse;
+	}
+	if ( statIndex < 0 || statIndex >= CG_TEAMSTAT_COUNT ) {
+		return qfalse;
+	}
+	if ( !cg.teamScoreStats.valid ) {
+		return qfalse;
+	}
+	if ( cg.teamScoreStats.fieldCount <= 0 || statIndex >= cg.teamScoreStats.fieldCount ) {
+		return qfalse;
+	}
+
+	teamIndex = ( team == TEAM_RED ) ? 0 : 1;
+	resolvedValue = cg.teamScoreStats.values[teamIndex][statIndex];
+	if ( resolvedValue < 0 ) {
+		resolvedValue = 0;
+	}
+
+	*value = resolvedValue;
+	return qtrue;
+}
+
+/*
+=============
+CG_GetTeamPickupSummaryIconHandle
+
+Lazily resolves the retail scoreboard pickup-strip shader for the requested
+team/icon slot.
+=============
+*/
+static qhandle_t CG_GetTeamPickupSummaryIconHandle( team_t team, cgTeamPickupSummaryIcon_t icon ) {
+	const char	*shaderName;
+	qhandle_t	*handle;
+
+	shaderName = NULL;
+	handle = NULL;
+
+	switch ( icon ) {
+	case CG_TEAM_PICKUP_SUMMARY_ICON_RA:
+		shaderName = "pickup_RA";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_YA:
+		shaderName = "pickup_YA";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_GA:
+		shaderName = "pickup_GA";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_MH:
+		shaderName = "pickup_MH";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_MEDKIT:
+		shaderName = "pickup_MK";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_QUAD:
+		shaderName = "pickup_QUAD";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_BS:
+		shaderName = "pickup_BS";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_REGEN:
+		shaderName = "pickup_REGEN";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_HASTE:
+		shaderName = "pickup_HASTE";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_INVIS:
+		shaderName = "pickup_INVIS";
+		handle = &cgTeamPickupSummaryIconHandles[icon];
+		break;
+	case CG_TEAM_PICKUP_SUMMARY_ICON_FLAG:
+		if ( cgs.gametype == GT_1FCTF ) {
+			shaderName = "pickup_NTRLFLAG";
+			handle = &cgTeamPickupSummaryNeutralFlagHandle;
+		} else if ( team == TEAM_RED ) {
+			shaderName = "pickup_BLUEFLAG";
+			handle = &cgTeamPickupSummaryBlueFlagHandle;
+		} else if ( team == TEAM_BLUE ) {
+			shaderName = "pickup_REDFLAG";
+			handle = &cgTeamPickupSummaryRedFlagHandle;
+		}
+		break;
+	default:
+		break;
+	}
+
+	if ( !handle || !shaderName ) {
+		return 0;
+	}
+	if ( !*handle ) {
+		*handle = trap_R_RegisterShaderNoMip( shaderName );
+	}
+
+	return *handle;
+}
+
+/*
+=============
+CG_DrawTeamPickupSummaryOwnerDraw
+
+Reconstructs the retail aggregate pickup strip for `CG_RED_TEAM_MAP_PICKUPS`
+and `CG_BLUE_TEAM_MAP_PICKUPS`.
+=============
+*/
+static void CG_DrawTeamPickupSummaryOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	team_t	team;
+	float	drawX;
+	int	i;
+
+	if ( !rect ) {
+		return;
+	}
+	if ( ownerDraw == CG_RED_TEAM_MAP_PICKUPS ) {
+		team = TEAM_RED;
+	} else if ( ownerDraw == CG_BLUE_TEAM_MAP_PICKUPS ) {
+		team = TEAM_BLUE;
+	} else {
+		return;
+	}
+
+	drawX = rect->x;
+	trap_R_SetColor( NULL );
+
+	for ( i = 0; i < ARRAY_LEN( cgTeamPickupSummaryEntries ); i++ ) {
+		const cgTeamPickupSummaryEntry_t	*entry;
+		qhandle_t			iconHandle;
+		int				pickupCount;
+
+		entry = &cgTeamPickupSummaryEntries[i];
+		if ( !CG_GetTeamScoreStatValue( team, entry->statIndex, &pickupCount ) || pickupCount <= 0 ) {
+			continue;
+		}
+
+		iconHandle = CG_GetTeamPickupSummaryIconHandle( team, entry->icon );
+		if ( !iconHandle ) {
+			continue;
+		}
+
+		if ( entry->timeHeldStatIndex >= 0 ) {
+			char	countText[16];
+			char	timeText[16];
+			int	timeHeld;
+
+			timeHeld = 0;
+			CG_GetTeamScoreStatValue( team, entry->timeHeldStatIndex, &timeHeld );
+
+			CG_DrawPic( drawX, rect->y - 7.0f, rect->w, rect->h, iconHandle );
+			Com_sprintf( countText, sizeof( countText ), "%i", pickupCount );
+			CG_Text_Paint( drawX + 14.0f, rect->y + 8.0f, scale, color, countText, 0, 0, textStyle );
+			if ( timeHeld > 0 ) {
+				Com_sprintf( timeText, sizeof( timeText ), "%i:%i%i", timeHeld / 60, ( timeHeld % 60 ) / 10, timeHeld % 10 );
+			} else {
+				Q_strncpyz( timeText, "-", sizeof( timeText ) );
+			}
+			CG_Text_Paint( drawX + 2.0f, rect->y + 15.0f, scale, color, timeText, 0, 0, textStyle );
+			drawX += 28.0f;
+		} else {
+			char	countText[16];
+
+			CG_DrawPic( drawX, rect->y, rect->w, rect->h, iconHandle );
+			Com_sprintf( countText, sizeof( countText ), "%i", pickupCount );
+			CG_Text_Paint( drawX + 14.0f, rect->y + rect->h, scale, color, countText, 0, 0, textStyle );
+			drawX += 25.0f;
+		}
+	}
+}
+
 /*
 =============
 CG_BuildTeamPickupText
@@ -4445,7 +4621,6 @@ Builds team pickup-count ownerdraw text from parsed scorestats_team payloads.
 */
 static qboolean CG_BuildTeamPickupText( int ownerDraw, char *buffer, size_t bufferSize ) {
 	team_t	team;
-	int	teamIndex;
 	int	statIndex;
 	int	value;
 
@@ -4456,18 +4631,8 @@ static qboolean CG_BuildTeamPickupText( int ownerDraw, char *buffer, size_t buff
 	if ( !CG_GetTeamPickupOwnerDrawMeta( ownerDraw, &team, &statIndex ) ) {
 		return qfalse;
 	}
-
-	teamIndex = ( team == TEAM_RED ) ? 0 : 1;
-	if ( !cg.teamScoreStats.valid ) {
+	if ( !CG_GetTeamScoreStatValue( team, statIndex, &value ) ) {
 		return qfalse;
-	}
-	if ( cg.teamScoreStats.fieldCount <= 0 || statIndex >= cg.teamScoreStats.fieldCount ) {
-		return qfalse;
-	}
-
-	value = cg.teamScoreStats.values[teamIndex][statIndex];
-	if ( value < 0 ) {
-		value = 0;
 	}
 
 	Com_sprintf( buffer, bufferSize, "%i", value );
@@ -4483,6 +4648,11 @@ Draws the current team pickup-count value for team scoreboard ownerdraws.
 */
 static void CG_DrawTeamPickupOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
 	char	buffer[32];
+
+	if ( CG_IsTeamPickupSummaryOwnerDraw( ownerDraw ) ) {
+		CG_DrawTeamPickupSummaryOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return;
+	}
 
 	if ( !CG_BuildTeamPickupText( ownerDraw, buffer, sizeof( buffer ) ) ) {
 		return;
@@ -4500,7 +4670,6 @@ Formats retail team time-held stats as `m:ss`.
 */
 static qboolean CG_BuildTeamTimeHeldText( int ownerDraw, char *buffer, size_t bufferSize ) {
 	team_t	team;
-	int	teamIndex;
 	int	statIndex;
 	int	value;
 
@@ -4515,18 +4684,8 @@ static qboolean CG_BuildTeamTimeHeldText( int ownerDraw, char *buffer, size_t bu
 	if ( !CG_GetTeamPickupOwnerDrawMeta( ownerDraw, &team, &statIndex ) ) {
 		return qfalse;
 	}
-
-	teamIndex = ( team == TEAM_RED ) ? 0 : 1;
-	if ( !cg.teamScoreStats.valid ) {
+	if ( !CG_GetTeamScoreStatValue( team, statIndex, &value ) ) {
 		return qfalse;
-	}
-	if ( cg.teamScoreStats.fieldCount <= 0 || statIndex >= cg.teamScoreStats.fieldCount ) {
-		return qfalse;
-	}
-
-	value = cg.teamScoreStats.values[teamIndex][statIndex];
-	if ( value < 0 ) {
-		value = 0;
 	}
 
 	Com_sprintf( buffer, bufferSize, "%i:%i%i", value / 60, ( value % 60 ) / 10, value % 10 );
@@ -4805,10 +4964,10 @@ static qboolean CG_BuildPlacementPickupMetricText( int ownerDraw, const score_t 
 
 	if ( ownerDraw >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && ownerDraw <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH ) {
 		index = ownerDraw - CG_1ST_PLYR_AVG_PICKUP_TIME_RA;
-		if ( stats->pickupCounts[index] <= 1 || stats->pickupAvgSeconds[index] <= 0 ) {
+		if ( stats->pickupCounts[index] <= 0 ) {
 			Q_strncpyz( buffer, "-", bufferSize );
 		} else {
-			Com_sprintf( buffer, bufferSize, "%i", stats->pickupAvgSeconds[index] );
+			Com_sprintf( buffer, bufferSize, "%3.2f", stats->pickupAvgSeconds[index] );
 		}
 		return qtrue;
 	}
@@ -5584,11 +5743,7 @@ static void CG_DrawFollowPlayerNameEx(rectDef_t *rect, float scale, vec4_t color
 	}
 
 	x = rect->x;
-	if ( align == ITEM_ALIGN_CENTER ) {
-		x -= CG_Text_Width( buffer, scale, 0 ) * 0.5f;
-	} else if ( align == ITEM_ALIGN_RIGHT ) {
-		x -= CG_Text_Width( buffer, scale, 0 );
-	}
+	CG_AlignTextX( &x, buffer, scale, align );
 
 	CG_Text_Paint( x, rect->y, scale, drawColor, buffer, 0, 0, textStyle );
 }
@@ -5886,12 +6041,88 @@ static void CG_DrawOvertime(rectDef_t *rect, float scale, vec4_t color, int text
 	}
 }
 
-static void CG_DrawPlayerObituary(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-const char *text = CG_GetKillerText();
-if (!text || !*text) {
-return;
-}
-CG_Text_Paint(rect->x, rect->y, scale, color, text, 0, 0, textStyle);
+/*
+=============
+CG_DrawPlayerObituary
+
+Draws the compact obituary-feed stack used by the retail `CG_PLAYER_OBIT` slot.
+=============
+*/
+static void CG_DrawPlayerObituary( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
+	float	rowHeight;
+	float	y;
+	int		i;
+
+	(void)color;
+
+	if ( !rect ) {
+		return;
+	}
+
+	if ( !cg_drawFragMessages.integer ) {
+		return;
+	}
+
+	CG_PruneObituaryFeed();
+
+	rowHeight = (float)CG_Text_Height( "A", scale, 0 );
+	if ( rowHeight < 1.0f ) {
+		rowHeight = ( rect->h > 0.0f ) ? rect->h : SMALLCHAR_HEIGHT;
+	}
+
+	y = rect->y;
+	for ( i = 0; i < MAX_OBITUARIES; i++ ) {
+		const cgObituary_t	*entry;
+		vec4_t			targetColor;
+		vec4_t			attackerColor;
+		vec4_t			iconColor;
+		float			alpha;
+		float			x;
+		float			iconSize;
+		int			time;
+
+		entry = &cg.obituaries[i];
+		if ( !entry->active ) {
+			break;
+		}
+
+		time = cg.time - entry->time;
+		if ( time > OBITUARY_TIME - FADE_TIME ) {
+			alpha = (float)( OBITUARY_TIME - time ) / FADE_TIME;
+		} else {
+			alpha = 1.0f;
+		}
+
+		if ( alpha <= 0.0f ) {
+			continue;
+		}
+
+		x = rect->x;
+		if ( entry->targetName[0] ) {
+			CG_ObituaryColorForIndex( entry->targetColorIndex, alpha, targetColor );
+			CG_Text_Paint( x, y, scale, targetColor, entry->targetName, 0, 0, textStyle );
+			x += CG_Text_Width( entry->targetName, scale, 0 );
+		}
+
+		iconSize = rowHeight;
+		if ( entry->icon ) {
+			iconColor[0] = 1.0f;
+			iconColor[1] = 1.0f;
+			iconColor[2] = 1.0f;
+			iconColor[3] = alpha;
+			trap_R_SetColor( iconColor );
+			CG_DrawPic( x, y - iconSize, iconSize, iconSize, entry->icon );
+			trap_R_SetColor( NULL );
+			x += iconSize + 2.0f;
+		}
+
+		if ( entry->hasAttacker && entry->attackerName[0] ) {
+			CG_ObituaryColorForIndex( entry->attackerColorIndex, alpha, attackerColor );
+			CG_Text_Paint( x, y, scale, attackerColor, entry->attackerName, 0, 0, textStyle );
+		}
+
+		y += rowHeight + 2.0f;
+	}
 }
 
 void CG_InitTeamChat() {
@@ -6103,30 +6334,51 @@ static void CG_DrawPlayerAmmoIcon( rectDef_t *rect, qboolean draw2D ) {
   }
 }
 
+/*
+=============
+CG_DrawPlayerAmmoValue
+
+Draws the local ammo count or the retail infinite-ammo fallback icon.
+=============
+*/
 static void CG_DrawPlayerAmmoValue(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle) {
 	char	num[16];
-	int value;
+	int	ammo;
 	centity_t	*cent;
 	playerState_t	*ps;
+
+	if ( !rect || !cg.snap ) {
+		return;
+	}
 
 	cent = &cg_entities[cg.snap->ps.clientNum];
 	ps = &cg.snap->ps;
 
-	if ( cent->currentState.weapon ) {
-		value = ps->ammo[cent->currentState.weapon];
-		if ( value > -1 ) {
-			if (shader) {
-		    trap_R_SetColor( color );
-				CG_DrawPic(rect->x, rect->y, rect->w, rect->h, shader);
-			  trap_R_SetColor( NULL );
-			} else {
-				Com_sprintf (num, sizeof(num), "%i", value);
-				value = CG_Text_Width(num, scale, 0);
-				CG_Text_Paint(rect->x + (rect->w - value) / 2, rect->y + rect->h, scale, color, num, 0, 0, textStyle);
-			}
-		}
+	if ( cent->currentState.weapon <= WP_NONE || cent->currentState.weapon >= WP_NUM_WEAPONS ) {
+		return;
 	}
 
+	ammo = ps->ammo[cent->currentState.weapon];
+	if ( ammo == -1 ) {
+		if ( !shader && cgs.media.infiniteAmmoShader ) {
+			trap_R_SetColor( color );
+			CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cgs.media.infiniteAmmoShader );
+			trap_R_SetColor( NULL );
+		}
+		return;
+	}
+
+	if ( ammo > -1 ) {
+		if ( shader ) {
+			trap_R_SetColor( color );
+			CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );
+			trap_R_SetColor( NULL );
+		} else {
+			Com_sprintf( num, sizeof( num ), "%i", ammo );
+			ammo = CG_Text_Width( num, scale, 0 );
+			CG_Text_Paint( rect->x + ( rect->w - ammo ) / 2, rect->y + rect->h, scale, color, num, 0, 0, textStyle );
+		}
+	}
 }
 
 
@@ -6354,22 +6606,43 @@ static void CG_DrawPlayerScore( rectDef_t *rect, float scale, vec4_t color, qhan
 
 static void CG_DrawPlayerItem( rectDef_t *rect, float scale, qboolean draw2D) {
 	int		value;
-  vec3_t origin, angles;
+	char	progressText[16];
+	float	progressScale;
+	float	progressWidth;
+	int		progressPercent;
+	vec3_t	origin, angles;
 
 	value = cg.snap->ps.stats[STAT_HOLDABLE_ITEM];
 	if ( value ) {
 		CG_RegisterItemVisuals( value );
 
-		if (qtrue) {
-		  CG_RegisterItemVisuals( value );
-		  CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cg_items[ value ].icon );
+		if ( draw2D ) {
+			CG_RegisterItemVisuals( value );
+			CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cg_items[ value ].icon );
 		} else {
- 			VectorClear( angles );
+			VectorClear( angles );
 			origin[0] = 90;
-  		origin[1] = 0;
-   		origin[2] = -10;
-  		angles[YAW] = ( cg.time & 2047 ) * 360 / 2048.0;
+			origin[1] = 0;
+			origin[2] = -10;
+			angles[YAW] = ( cg.time & 2047 ) * 360 / 2048.0;
 			CG_Draw3DModel(rect->x, rect->y, rect->w, rect->h, cg_items[ value ].models[0], 0, origin, angles );
+		}
+
+		if ( BG_HoldableForItemTag( bg_itemlist[ value ].giTag ) == HI_INVULNERABILITY &&
+			cg.snap->ps.playerItemTime > 0 &&
+			cg.snap->ps.playerItemTimeMax > 0 ) {
+			progressPercent = (int)( ( cg.snap->ps.playerItemTime * 100.0f ) / cg.snap->ps.playerItemTimeMax + 0.5f );
+			if ( progressPercent < 0 ) {
+				progressPercent = 0;
+			} else if ( progressPercent > 100 ) {
+				progressPercent = 100;
+			}
+
+			Com_sprintf( progressText, sizeof( progressText ), "%d%%", progressPercent );
+			progressScale = scale * 0.25f;
+			progressWidth = CG_Text_Width( progressText, progressScale, 0 );
+			CG_Text_Paint( rect->x + ( rect->w - progressWidth ) * 0.5f, rect->y + rect->h, progressScale,
+				colorWhite, progressText, 0.0f, 0, ITEM_TEXTSTYLE_NORMAL );
 		}
 	}
 
@@ -6577,27 +6850,50 @@ static void CG_DrawPlayerHealth(rectDef_t *rect, float scale, vec4_t color, qhan
 
 /*
 =============
+CG_AlignTextX
+
+Mutates the supplied x anchor to account for center and right aligned text.
+=============
+*/
+static void CG_AlignTextX( float *x, const char *text, float scale, int align ) {
+	int textWidth;
+
+	if ( !x ) {
+		return;
+	}
+
+	textWidth = CG_Text_Width( text ? text : "", scale, 0 );
+	if ( align == ITEM_ALIGN_CENTER ) {
+		*x -= textWidth * 0.5f;
+	} else if ( align == ITEM_ALIGN_RIGHT ) {
+		*x -= textWidth;
+	}
+}
+
+/*
+=============
 CG_AlignTextInRectX
 
 Returns the x coordinate needed to paint the supplied text with the requested alignment.
 =============
 */
 static float CG_AlignTextInRectX( const rectDef_t *rect, float scale, const char *text, int align ) {
-	int	textWidth;
+	float	x;
 
 	if ( !rect ) {
 		return 0.0f;
 	}
 
-	textWidth = CG_Text_Width( text ? text : "", scale, 0 );
 	if ( align == ITEM_ALIGN_CENTER ) {
-		return rect->x + ( rect->w - textWidth ) * 0.5f;
-	}
-	if ( align == ITEM_ALIGN_RIGHT ) {
-		return rect->x + rect->w - textWidth;
+		x = rect->x + rect->w * 0.5f;
+	} else if ( align == ITEM_ALIGN_RIGHT ) {
+		x = rect->x + rect->w;
+	} else {
+		x = rect->x;
 	}
 
-	return rect->x;
+	CG_AlignTextX( &x, text, scale, align );
+	return x;
 }
 
 /*
@@ -7632,7 +7928,7 @@ static void CG_DrawKiller(rectDef_t *rect, float scale, vec4_t color, qhandle_t 
 
 
 static void CG_DrawCapFragLimit(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle) {
-	int limit = (cgs.gametype >= GT_CTF) ? cgs.capturelimit : cgs.fraglimit;
+	int limit = CG_HasObjectiveCountStat( cgs.gametype ) ? cgs.capturelimit : cgs.fraglimit;
 	CG_Text_Paint(rect->x, rect->y, scale, color, va("%2i", limit),0, 0, textStyle); 
 }
 
@@ -7739,7 +8035,7 @@ static void CG_Draw1stPlaceScore( rectDef_t *rect, float scale, vec4_t color, in
 	team_t			leaderTeam;
 	int			value;
 
-	if ( cgs.gametype >= GT_TEAM && cgs.gametype != GT_RED_ROVER ) {
+	if ( CG_IsTeamWinnerGametype( cgs.gametype ) ) {
 		leaderTeam = ( cgs.scores2 != SCORE_NOT_PRESENT && cgs.scores1 < cgs.scores2 ) ? TEAM_BLUE : TEAM_RED;
 		value = ( leaderTeam == TEAM_RED ) ? cgs.scores1 : cgs.scores2;
 		if ( !CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ) ) ) {
@@ -7786,7 +8082,7 @@ static void CG_Draw2ndPlaceScore( rectDef_t *rect, float scale, vec4_t color, in
 	int			localRank;
 	int			value;
 
-	if ( cgs.gametype >= GT_TEAM && cgs.gametype != GT_RED_ROVER ) {
+	if ( CG_IsTeamWinnerGametype( cgs.gametype ) ) {
 		trailingTeam = ( cgs.scores1 < cgs.scores2 ) ? TEAM_RED : TEAM_BLUE;
 		value = ( trailingTeam == TEAM_RED ) ? cgs.scores1 : cgs.scores2;
 		if ( !CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ) ) ) {
@@ -8980,6 +9276,28 @@ void CG_HideTeamMenu() {
 }
 
 /*
+=============
+CG_CloseRetailCommandCaptureOverlay
+
+Closes the active cgame-owned command overlay without resetting the broader
+event-handling latch.
+=============
+*/
+static void CG_CloseRetailCommandCaptureOverlay( void ) {
+	int catcher;
+
+	if ( cgs.eventHandling == CGAME_EVENT_TEAMMENU ||
+			cgs.eventHandling == CGAME_EVENT_EDITHUD ) {
+		CG_HideTeamMenu();
+	}
+
+	catcher = trap_Key_GetCatcher();
+	if ( catcher & KEYCATCH_CGAME ) {
+		trap_Key_SetCatcher( catcher & ~KEYCATCH_CGAME );
+	}
+}
+
+/*
 ==================
 CG_ShowTeamMenus
 ==================
@@ -9021,13 +9339,19 @@ CG_EventHandling
 ==================
  type 0 - no event handling
       1 - team menu
-      2 - hud editor
+      2 - scoreboard
+      3 - hud editor
       4 - refresh display context
+      5 - close command overlay
 
 */
 void CG_EventHandling(int type) {
 	if ( type == CGAME_EVENT_REFRESH_DISPLAY_CONTEXT ) {
 		CG_RefreshDisplayContext();
+		return;
+	}
+	if ( type == CGAME_EVENT_CLOSECOMMANDOVERLAY ) {
+		CG_CloseRetailCommandCaptureOverlay();
 		return;
 	}
 

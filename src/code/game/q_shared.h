@@ -1251,6 +1251,8 @@ typedef struct playerState_s {
 	int			doubleJumped;
 	int			crouchTime;
 	int			crouchSlideTime;
+	int			playerItemTimeMax;	// retail CG_PLAYER_ITEM progress-backed holdable maximum
+	int			playerItemTime;		// retail CG_PLAYER_ITEM progress-backed holdable current value
 
 	// not communicated over the net at all
 	int			ping;			// server to game info for scoreboard

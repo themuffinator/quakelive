@@ -8,10 +8,10 @@ These records are structurally stable across the Team Arena baseline and the
 current Quake Live-compatible tree. The strongest retail anchors come from the
 already-promoted `uix86.dll` loaders and selection helpers around
 `UI_LoadArenasFromFile`, `UI_LoadArenas`, `UI_LoadBotsFromFile`,
-`UI_LoadBots`, `UI_ParseGameInfo`, and `UI_DrawSelectedPlayer`. A few
-single-player carry-over fields remain best explained by the preserved
-Team Arena-era menu logic because the current tree still carries the layout and
-consumers but does not yet expose a fully recovered retail-side producer.
+`UI_LoadBots`, `Character_Parse`, `UI_ParseTeamInfo`, `GameType_Parse`,
+`MapList_Parse`, `UI_ParseGameInfo`, and `UI_DrawSelectedPlayer`. The main
+remaining weak band is the older team/alias/tier side; the character, gametype,
+and map producers are now directly retail-backed.
 
 ## Method
 
@@ -26,10 +26,12 @@ consumers but does not yet expose a fully recovered retail-side producer.
   `assets/quake3/src/code/q3_ui/ui_gameinfo.c`.
 - Retail parity is strongest for the already-mapped `uix86.dll` helpers
   `UI_LoadArenasFromFile`, `UI_LoadArenas`, `UI_LoadBotsFromFile`,
-  `UI_LoadBots`, `UI_ParseGameInfo`, and `UI_DrawSelectedPlayer`.
-- `UI_LoadTeams`, the team/alias/character parser helpers, and the `tierInfo`
-  producer path are currently source-backed rather than directly retail-mapped,
-  so those role descriptions are weaker and called out as such where needed.
+  `UI_LoadBots`, `Character_Parse`, `UI_ParseTeamInfo`, `GameType_Parse`,
+  `MapList_Parse`, `UI_ParseGameInfo`, and `UI_DrawSelectedPlayer`.
+- `UI_LoadTeams`, the team/alias loaders outside the character band, and the
+  `tierInfo` producer path are currently source-backed rather than directly
+  retail-mapped, so those role descriptions are weaker and called out as such
+  where needed.
 
 ## Hard Layout Facts
 
@@ -148,6 +150,6 @@ and map-selection launch path.
    Team Arena carry-overs with only residual consumers.
 2. Revisit `aliasInfo.action` if later retail evidence or menu logic shows it
    still participates in bot-role selection.
-3. Tighten the observed precedence between `UI_ParseGameInfo` and `UI_LoadArenas`
-   for `mapInfo.imageName`, `mapInfo.teamMembers`, and `mapInfo.timeToBeat`
-   during the various menu reload paths.
+3. Tighten the observed precedence between `MapList_Parse` / `UI_ParseGameInfo`
+   and `UI_LoadArenas` for `mapInfo.imageName`, `mapInfo.teamMembers`, and
+   `mapInfo.timeToBeat` during the various menu reload paths.

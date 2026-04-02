@@ -12,6 +12,488 @@ behavior and source analogue align cleanly.
 ## Latest Coverage Update
 
 - Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: unchanged at `1128` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: unchanged at `1027/1027` mapped functions (`100.00%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+0` coverage, but `2` retained Json helpers were tightened from descriptive cleanup labels to source-faithful JsonCpp destructor identities.
+- Note: curated overhang stays flat at `101`.
+- Note: this was a mapping-only rename pass, so no source-side parity code changed; the embedded `qagame.json` stats block remains `1128/1128`.
+
+## Newly Mapped In This Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Source-faithful JsonCpp destructor rename | `JsonValueDestructor` and `JsonValueDestructorCleanup` |
+
+This was another quality pass over the retained Json overhang after coverage had
+already reached `1027/1027`. The old labels `JsonValueDestroy` and
+`JsonValueDestroyCleanup` were behaviorally accurate, but the committed HLIL and
+the surrounding unwind states show that they are specifically the old JsonCpp
+`Json::Value::~Value()` body and its paired EH cleanup leaf.
+
+At `0x100793A0` the helper switches on the tagged `Json::Value` kind, releases
+allocator-owned strings through the default allocator vtable, recursively tears
+down map-backed array/object storage, and frees the optional comment array. The
+paired `0x1007B80C` funclet tailcalls that same body for the protected stack
+`Json::Value` local used in the resolver seam, which pins it as destructor
+cleanup rather than a generic destroy helper.
+
+## Immediate Previous Pass
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: unchanged at `1128` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: unchanged at `1027/1027` mapped functions (`100.00%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+0` coverage, but `4` retained Json helpers were tightened from descriptive labels to source-faithful JsonCpp method names.
+- Note: curated overhang stays flat at `101`.
+- Note: this was a mapping-only rename pass, so no source-side parity code changed; the embedded `qagame.json` stats block remains `1128/1128`.
+
+## Newly Mapped In The Immediate Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Source-faithful JsonCpp method renames | `JsonValueOperatorAssign`, `JsonValueOperatorEquals`, `JsonValueOperatorIndexArrayIndex`, and `JsonValueOperatorIndexCString` |
+
+This was a quality pass over the retained Json overhang after coverage had
+already reached `1027/1027`. The old labels for these four entries were
+behaviorally accurate but still descriptive. Cross-checking the committed HLIL
+against the upstream `json_value.cpp` operator bodies shows that they match the
+old JsonCpp source exactly: the assignment helper is the `Value temp(other);
+swap(temp);` body of `Json::Value::operator=`, the equality predicate is
+`Json::Value::operator==`, and the two resolver leaves are the non-const
+`Json::Value::operator[]` overloads for `ArrayIndex` and `const char *`.
+
+The CString member path deserves the extra note that retail optimization has
+inlined the private `resolveReference( key, false )` helper into the emitted
+`operator[]( const char * )` body. That leaves the compiled helper with the
+full promotion/lower-bound/insert sequence rather than the tiny source wrapper,
+but the source-level identity is still exact.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `1126` -> `1128` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `1025/1027` -> `1027/1027` mapped functions (`99.81%` -> `100.00%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+2` curated names, `+2` corpus-overlap matches, and `+0.19` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `101` because every promoted helper in this round already has a standalone `functions.csv` row.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `1128/1128`.
+
+## Newly Mapped In The Previous Coverage Update
+
+| Area | Recovered functions |
+| --- | --- |
+| Final Json resolver cleanup seam | `JsonValueResolveReferenceInsertPairKeyCleanup` and `JsonValueResolveReferenceInsertPairKeyTeardownCleanup` |
+
+This pass closed the last two anonymous `functions.csv` rows in the embedded
+JsonCpp resolver seam. The key evidence was the committed FuncInfo block at
+`0x1008BD20`: its six-state unwind map shows `0x1007B81C`, `0x1007B824`, and
+`0x1007B82C` all unwinding back to state `2`, with the middle state using the
+already-mapped full pair destructor `JsonValueMapNodeDestroyCleanup`. That pins
+the two remaining leaves as key-only cleanup states on the same stack
+insertion-pair local rather than separate source-level helpers.
+
+The stage split is explicit in HLIL. State `3` is active after the pair
+`CZString` key has been copy-constructed but before the sibling `Json::Value`
+payload is fully live, so `0x1007B81C` only destroys that pair key. State `5`
+is set immediately before the explicit `JsonValueDestructor` teardown of the
+stack pair payload after insertion returns, so `0x1007B82C` is the later
+key-only cleanup that runs if that teardown path itself unwinds.
+
+## Earlier Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `1086` -> `1091` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `987/1027` -> `990/1027` mapped functions (`96.11%` -> `96.40%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+5` curated names, `+3` corpus-overlap matches, and `+0.29` percentage points on full-corpus parity.
+- Note: curated overhang rose from `99` to `101` because the retained `g_inactivityWarning` and `g_instaGib` callback stubs do not have standalone rows in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `1091/1091`.
+
+## Newly Mapped In This Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Shared gameplay classifiers | `G_PowerupCarrierKillUsesWhitePrefix` and `G_RoundControllerGametypeEnabled` |
+| Retained qagame cvar callbacks | `G_InactivityWarningCvarChanged`, `G_InstaGibCvarChanged`, and `G_PlayerScaleCvarsChanged` |
+
+This sweep stayed on small gameplay and callback leaves where the owning seam is
+already mapped. `G_RoundControllerGametypeEnabled` is exact: its truth table is
+the same `CA` / `Attack & Defend` / `Freeze` / `Red Rover` classifier used by
+the reconstructed round-controller source. `G_PowerupCarrierKillUsesWhitePrefix`
+is a descriptive split helper under the already mapped carrier-kill announcer,
+with the HLIL showing the dedicated objective-gametype branch that selects the
+white versus fallback yellow prefix.
+
+The other three promotions come directly from the retained cvar table in the
+HLIL. `G_InactivityWarningCvarChanged` hangs off `g_inactivityWarning` and
+immediately fans into the already mapped `G_ResetClientInactivityWarnings`.
+`G_InstaGibCvarChanged` is the adjacent `g_instaGib` callback that refreshes
+the live ammo slab through the nearby instagib/infinite-ammo sync helper.
+`G_PlayerScaleCvarsChanged` is shared by `g_playerheadScale` and
+`g_playerModelScale` and simply reruns `ClientUserinfoChanged` for connected
+clients so forced-appearance state updates in-place.
+
+I rechecked the neighboring player-appearance, Freeze, and startup/runtime
+helpers in the same pass, but left them unnamed where the source analogue or
+retained implementation boundary was still less explicit than the five entries
+promoted here.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `1078` -> `1086` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `979/1027` -> `987/1027` mapped functions (`95.33%` -> `96.11%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+8` curated names, `+8` corpus-overlap matches, and `+0.78` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `99` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `1086/1086`.
+
+## Newly Mapped In The Immediate Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Shared gameplay helper | `BG_PlayerCarryingFlag` |
+| Json and MSVC EH funclets | `JsonValueMapNodeDestroyThunk`, `CatchAllStdStringGrow`, `CatchAllJsonValueClearMapRange`, `CatchAllJsonValueMapCloneSubtree`, `CatchAllJsonValueMapNodeConstruct`, `EhVectorDestructorIteratorCleanup`, and `EhVectorConstructorIteratorCleanup` |
+
+This sweep stayed on high-confidence leaves only, but widened from the prior
+runtime pass into two adjacent seams. The gameplay-side addition is exact:
+`BG_PlayerCarryingFlag` is the same three-flag predicate still present as a
+static helper in `bg_misc.c`, and the qagame callers pass the leading
+`playerState_t` slab through client pointers exactly as the HLIL suggests.
+
+The rest of the round promoted compiler-generated helpers whose owning
+functions were already mapped. `CatchAllStdStringGrow`,
+`CatchAllJsonValueClearMapRange`, `CatchAllJsonValueMapCloneSubtree`, and
+`CatchAllJsonValueMapNodeConstruct` all preserve explicit cleanup-and-rethrow
+behavior in HLIL, while `EhVectorDestructorIteratorCleanup` and
+`EhVectorConstructorIteratorCleanup` are the paired MSVC `__ArrayUnwind`
+cleanup funclets under the two previously landed EH vector iterators. I also
+named the tiny `JsonValueMapNodeDestroyThunk` forwarder at `0x100797A0`
+because it is a one-step regparm tailcall into the already mapped node
+destructor.
+
+I left the remaining `Catch_All@...`, `Unwind@...`, and gameplay-side `FUN_...`
+rows untouched where the parent relationship or source analogue was still less
+explicit than the entries promoted here.
+
+## Earlier Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `1019` -> `1025` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `922/1027` -> `928/1027` mapped functions (`89.78%` -> `90.36%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+6` curated names, `+6` corpus-overlap matches, and `+0.58` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `97` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `1025/1025`.
+
+## Newly Mapped In The Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Retained string assignment and growth seam | `StdStringAssignRange`, `StdStringAssignSubstr`, `StdStringGrow`, and `StdStringErase` |
+| Json string and map-tail seam | `JsonValueSetCString` and `JsonValueMapSubtreeRightmost` |
+
+This sweep stayed in the retained C++ runtime and the embedded JsonCpp support
+layer that sits immediately beneath the already mapped Json value/object
+helpers. The retail HLIL preserved the string length/capacity layout, the
+small-string and growth rules, the alias-safe substring path, and the sentinel
+tree footer handling strongly enough to promote these leaves without forcing
+broader STL implementation guesses elsewhere in the runtime seam.
+
+`StdStringAssignRange`, `StdStringAssignSubstr`, `StdStringGrow`, and
+`StdStringErase` close the small retained-string corridor adjacent to the
+already mapped Json string constructors and copy paths. Retail shows the exact
+offset validation, self-alias fallback, 1.5x growth heuristic, suffix-preserve
+copy, `memmove`-based erase path, and trailing-NUL maintenance expected from
+the old MSVC string runtime used by the binary.
+
+`JsonValueSetCString` and `JsonValueMapSubtreeRightmost` close two remaining
+Json internals that were still unnamed beside the previously mapped string and
+tree helpers. The first tags a value as an allocated string, clears the
+optional comment pointer, duplicates the incoming C string, and returns the new
+buffer. The second walks to the rightmost descendant of a map subtree and is
+reused by the erase/relink corridor to rebuild the sentinel's cached end
+predecessor.
+
+## Earlier Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `974` -> `976` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `878/1027` -> `880/1027` mapped functions (`85.49%` -> `85.69%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+2` curated names, `+2` corpus-overlap matches, and `+0.19` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `96` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `976/976`.
+
+## Newly Mapped In The Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Shared muzzle-point seam | `CalcMuzzlePoint` |
+| Shared network snap seam | `SnapVectorTowards` |
+
+This sweep focused on the remaining small `g_weapon` helpers adjacent to the
+already-mapped projectile and muzzle corridors. Two exact source leaves cleared
+the promotion bar; the nearby player-name and team-location wrappers were left
+unmapped because they no longer match source signatures cleanly enough.
+
+`CalcMuzzlePoint` is exact `g_weapon.c` recovery. HLIL preserves the forward
+derivation from `client->ps.viewangles`, the `ent->s.pos.trBase` seed, the
+`client->ps.viewheight` lift, and the crouched-versus-standing forward offset.
+Retail folds the source-equivalent `CalcMuzzlePointOrigin` no-op variant into
+the same leaf.
+
+`SnapVectorTowards` is exact `g_weapon.c` recovery. The HLIL body matches the
+three-component truncate-and-bias loop that snaps each coordinate toward the
+reference vector so impact endpoints stay on the intended side for networked
+missile events.
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `963` -> `964` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `867/1027` -> `868/1027` mapped functions (`84.42%` -> `84.52%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+1` curated name, `+1` corpus-overlap match, and `+0.10` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `96` because this promotion already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `964/964`.
+
+## Newly Mapped In This Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Team objective bonus seam | `Team_CheckHurtCarrier` |
+
+This round spent most of its time sweeping adjacent unmapped `g_team`,
+`g_items`, and cvar-callback leaves beneath already-mapped callers. Only one
+candidate cleared the exact-match bar.
+
+`Team_CheckHurtCarrier` is exact `g_team.c` recovery. HLIL preserves the null
+client guards, the target-team switch that chooses the opposing flag powerup,
+and the mirrored `lasthurtcarrier = level.time` stamp for both enemy flag
+carriers and Harvester skull carriers.
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `960` -> `963` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `864/1027` -> `867/1027` mapped functions (`84.13%` -> `84.42%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+3` curated names, `+3` corpus-overlap matches, and `+0.29` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `96` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `963/963`.
+
+## Newly Mapped In This Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Warmup deadline seam | `G_SetWarmupTime` |
+| Inactivity warning seam | `G_ResetClientInactivityWarnings` |
+| Memory allocator seam | `G_Alloc` |
+
+This pass focused on two small shared-state helpers in the match-state and
+memory-management seam, plus one small cvar-driven client-state reset.
+`G_SetWarmupTime` is intentionally descriptive rather than source-exact: HLIL
+shows it writing the live warmup deadline, publishing `CS_WARMUP`, refreshing
+the adjacent auto-record controller, and then deriving `g_gameState` from the
+sign of that deadline.
+
+`G_ResetClientInactivityWarnings` is likewise descriptive. The owning callback
+table ties it directly to `g_inactivityWarning`, and the leaf itself only walks
+connected clients to clear the per-client inactivity-warning latch so the
+warning countdown can be reissued under the updated setting.
+
+`G_Alloc` is exact `g_mem.c` recovery. The retained
+`G_Alloc of %i bytes (%i left)\n` and allocation-failure diagnostics, together
+with the shared 32-byte alignment math and the 4 MB slab cursor, make the
+allocator boundary unambiguous even though retail folds `G_InitMemory` into the
+larger init corridor.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `952` -> `960` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `859/1027` -> `864/1027` mapped functions (`83.64%` -> `84.13%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+8` curated names, `+5` corpus-overlap matches, and `+0.49` percentage points on full-corpus parity.
+- Note: curated overhang rises from `93` to `96` because the retail rocket, plasma, and BFG acceleration think leaves promoted in this pass are folded into surrounding constructors in the committed `functions.csv` export rather than emitted as standalone rows.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `960/960`.
+
+## Newly Mapped In The Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Shared missile / acceleration seam | `G_SpawnConfiguredMissile`, `G_RunGuidedRocketThink`, `G_RunRocketAccelerationThink`, `G_RunPlasmaAccelerationThink`, and `G_RunBfgAccelerationThink` |
+| Target use callbacks | `Use_Target_Give`, `Use_Target_RemoveKeys`, and `Use_target_remove_powerups` |
+
+This pass focused on two small retail-only helper families that already had
+their owning callers mapped. The missile batch closes the shared projectile
+setup seam beneath `fire_grenade`, `fire_rocket`, `fire_plasma`, and `fire_bfg`,
+plus the older think-driven guided-rocket and acceleration sidecars that the
+current tree now expresses through `G_RunMissile` and inline helper calls.
+
+The target batch is source-faithful recovery from `g_target.c`. HLIL preserves
+the `target_give` loop that forwards matching item targets through `Touch_Item`
+and then unlinks them, the key-removal callback that drops carried keys through
+`G_ResetKeyItem`, and the powerup-removal callback that returns any carried CTF
+flags before clearing the activator's powerup array.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `949` -> `952` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `856/1027` -> `859/1027` mapped functions (`83.35%` -> `83.64%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+3` curated names, `+3` corpus-overlap matches, and `+0.29` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `93` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `952/952`.
+
+## Newly Mapped In The Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Persistent-powerup flag-base seam | `G_FindPersistantPowerupFlagBaseByTeam` |
+| CTF flag sanity seam | `Team_ReturnFlagIfMissing` |
+| Round-results client-list seam | `G_CountAndSortConnectedClients` |
+
+This pass focused on small remaining helpers whose ownership was already pinned
+down by adjacent mapped callers. The persistent-powerup helper is a team-indexed
+mirror of the existing string-keyed flag-base resolver and is only used to seed
+the cached red and blue base origins in `G_InitItemPowerupState`.
+
+The CTF helper is the per-frame flag-sanity guard reached from the `GT_CTF`
+branch in `G_RunFrame`: it scans for a surviving dropped or visible flag entity,
+falls back to a live enemy carrier with an active flag powerup, and auto-calls
+`Team_ReturnFlag` only when the flag has vanished entirely. The client-list
+helper closes a small round-results split under the Red Rover controller by
+counting connected/non-spectator/playing clients, seeding the first two follow
+slots, and sorting the emitted client list through the adjacent retail
+team/score comparator.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `943` -> `949` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `850/1027` -> `856/1027` mapped functions (`82.77%` -> `83.35%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+6` curated names, `+6` corpus-overlap matches, and `+0.58` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `93` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `949/949`.
+
+## Newly Mapped In The Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| PMove tuning / wish-move seam | `PM_LoadMoveTuningConstants` and `PM_BuildWishMove3D` |
+| Combat knockback seam | `G_KnockbackScaleForMOD` |
+| Retail damage / award temp-entity seam | `G_AddDamagePlum`, `G_AddAwardEntity`, and `G_GrantPlayerReward` |
+
+This pass focused on the remaining shared pmove sidecar leaves and the Quake
+Live-only reward telemetry seam under `G_Damage` and the kill/round bonus
+paths. The PMove pair is backed by the previously mapped cgame movement corridor:
+the qagame bodies match the same retail constant-loader and 3D wish-vector
+builder already recovered on the client binary.
+
+The combat batch closes the next reward transport boundary. HLIL preserves the
+weapon-specific `g_knockback_%s` selector used by `G_Damage`, the local-client
+`EV_DAMAGEPLUM` emitter that stages damage and weapon payloads for cgame, the
+paired `EV_AWARD` medal emitter used by the Quake Live award taxonomy, and the
+small helper that increments medal counters while latching the corresponding
+`EF_AWARD_*` display state.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `936` -> `943` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `843/1027` -> `850/1027` mapped functions (`82.08%` -> `82.77%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+7` curated names, `+7` corpus-overlap matches, and `+0.68` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `93` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `943/943`.
+
+## Newly Mapped In The Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| PMove jump / step-jump seam | `PM_ApplyJumpTakeoff`, `PM_CanCrouchStepJump`, and `PM_CanStepJump` |
+| Domination capture / reward seam | `G_DominationRewardCaptureParticipants`, `G_DominationSelectPrimaryCapturer`, and `G_DominationCheckDefenseBonus` |
+| Domination point bootstrap seam | `G_DominationPointActivate` |
+
+This pass focused on the retail-only PMove step-jump split and the adjacent
+Domination capture controller. The PMove trio remains descriptive because the
+current tree expresses the same behavior across `PM_CheckJump` and the newer
+`PM_ApplyStepJump` wrapper, while the retail binary keeps the step-jump gates
+and jump takeoff body as separate adjacent leaves.
+
+The Domination batch is likewise retail-only boundary recovery. HLIL preserves
+the delayed point activation callback queued by `SP_team_dom_point`, the helper
+that chooses the primary capturing client from the active participant lists, the
+capture/assist reward fan-out, and the nearby defense-bonus checker called from
+the team frag-reward path.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `932` -> `936` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `839/1027` -> `843/1027` mapped functions (`81.69%` -> `82.08%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+4` curated names, `+4` corpus-overlap matches, and `+0.39` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `93` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `936/936`.
+
+## Newly Mapped In The Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| Spawn/filter parsing seam | `G_ParseDisableLoadoutString` and `G_ParseSpawnGametypeMask` |
+| Shared `bg_` / item helpers | `BG_IsTeamFlagItem` |
+| Combat spectator-warning seam | `G_WarnIfSpectatorShot` |
+
+This pass focused on the remaining high-confidence helpers sitting between
+`SP_worldspawn`, the item spawn filters, and the splash-damage trace seam. The
+strongest exact recovery is `G_ParseDisableLoadoutString`, which the committed
+source still exposes verbatim in `g_spawn.c`; the paired gametype parser and
+flag-item predicate remain descriptive retail-only names because the current
+tree keeps the same behavior inlined or expressed through different helper
+boundaries.
+
+`G_WarnIfSpectatorShot` is also intentionally descriptive rather than source
+exact. HLIL shows a tiny standalone leaf that resolves an entity slot, checks
+for a spectator client, and emits the preserved `A spectator has been shot!`
+message from the splash/trace damage seam. The current GPL-derived tree keeps
+that text inline under `G_Damage` instead of as a reusable helper.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
+- Curated symbol-map totals: `923` -> `932` matched functions, with string coverage unchanged at `102/102`.
+- Corpus-overlap parity: `830/1027` -> `839/1027` mapped functions (`80.82%` -> `81.69%`) when measured against the committed `functions.csv` retail corpus.
+- Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
+- Delta from this pass: `+9` curated names, `+9` corpus-overlap matches, and `+0.88` percentage points on full-corpus parity.
+- Note: curated overhang stays flat at `93` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
+- Note: this was a mapping-only pass, so no source-side parity code changed; the embedded `qagame.json` stats block is now realigned to `932/932`.
+
+## Newly Mapped In The Previous Pass
+
+| Area | Recovered functions |
+| --- | --- |
+| `g_cmds` and client-info seam | `Cmd_Kill_f` and `ClientNameAvailable` |
+| Shared `bg_` / gameplay helpers | `BG_WeaponName`, `vtos`, `PM_TorsoAnimation`, and `G_DistanceToEntityBounds` |
+| Freeze / Domination round helpers | `G_FreezeCheckExitRules`, `G_FreezeFindThawHelperByClientNum`, and `G_UpdateDominationPointCountConfigstrings` |
+
+This pass closes a thin but high-confidence slab of pure helpers that the
+retail binary keeps as standalone bodies even though the current source tree
+either inlines the same behavior or has not split it back out yet. The new
+names cover the missing `kill` command leaf in the `ClientCommand` ladder, the
+client-name deconfliction helper under `ClientUserinfoChanged`, the shared
+weapon-name / vector-print / torso-idle utilities, the splash-distance helper
+under `G_RadiusDamage`, and two Freeze / one Domination controller sidecars.
+
+The Freeze / Domination promotions are descriptive retail-only names rather
+than exact source exports. HLIL and the committed corpus agree on the owning
+controller paths and side effects, but the current GPL-derived tree does not
+yet expose those helpers as identical standalone functions.
+
+## Previous Coverage Update
+
+- Reference totals: `1027` functions in `functions.csv` and `180` unique decompiled entries in `decompile_top_functions.c`.
 - Curated symbol-map totals: `918` -> `923` matched functions, with string coverage unchanged at `102/102`.
 - Corpus-overlap parity: `825/1027` -> `830/1027` mapped functions (`80.33%` -> `80.82%`) when measured against the committed `functions.csv` retail corpus.
 - Top decompiled slice: unchanged at `180/180` mapped functions (`100.00%`).
@@ -19,7 +501,7 @@ behavior and source analogue align cleanly.
 - Note: curated overhang stays flat at `93` because every promoted helper in this pass already has a standalone row in the committed `functions.csv` export.
 - Note: the embedded `qagame.json` stats block is now realigned to the live curated total of `923/923`.
 
-## Newly Mapped In This Pass
+## Newly Mapped In The Previous Pass
 
 | Area | Recovered functions |
 | --- | --- |

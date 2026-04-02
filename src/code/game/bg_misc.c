@@ -70,6 +70,79 @@ static const int bg_weaponMaxAmmo[WP_NUM_WEAPONS] = {
 	400		// WP_CHAINGUN
 };
 
+static const int bg_weaponToItemTag[WP_NUM_WEAPONS] = {
+	0,
+	ITEMTAG_WEAPON_GAUNTLET,
+	ITEMTAG_WEAPON_MACHINEGUN,
+	ITEMTAG_WEAPON_HEAVY_MACHINEGUN,
+	ITEMTAG_WEAPON_SHOTGUN,
+	ITEMTAG_WEAPON_GRENADE_LAUNCHER,
+	ITEMTAG_WEAPON_ROCKET_LAUNCHER,
+	ITEMTAG_WEAPON_LIGHTNING,
+	ITEMTAG_WEAPON_RAILGUN,
+	ITEMTAG_WEAPON_PLASMAGUN,
+	ITEMTAG_WEAPON_BFG,
+	ITEMTAG_WEAPON_GRAPPLING_HOOK,
+	ITEMTAG_WEAPON_NAILGUN,
+	ITEMTAG_WEAPON_PROX_LAUNCHER,
+	ITEMTAG_WEAPON_CHAINGUN
+};
+
+static const weapon_t bg_itemTagToWeapon[WP_NUM_WEAPONS] = {
+	WP_NONE,
+	WP_GAUNTLET,
+	WP_MACHINEGUN,
+	WP_SHOTGUN,
+	WP_GRENADE_LAUNCHER,
+	WP_ROCKET_LAUNCHER,
+	WP_LIGHTNING,
+	WP_RAILGUN,
+	WP_PLASMAGUN,
+	WP_BFG,
+	WP_GRAPPLING_HOOK,
+	WP_NAILGUN,
+	WP_PROX_LAUNCHER,
+	WP_CHAINGUN,
+	WP_HEAVY_MACHINEGUN
+};
+
+static const int bg_holdableToItemTag[HI_NUM_HOLDABLE] = {
+	0,
+	ITEMTAG_HOLDABLE_TELEPORTER,
+	ITEMTAG_HOLDABLE_MEDKIT,
+	ITEMTAG_HOLDABLE_KAMIKAZE,
+	ITEMTAG_HOLDABLE_PORTAL,
+	ITEMTAG_HOLDABLE_INVULNERABILITY
+};
+
+static const holdable_t bg_itemTagToHoldable[ITEMTAG_HOLDABLE_INVULNERABILITY + 1] = {
+	HI_NONE,
+	HI_TELEPORTER,
+	HI_MEDKIT,
+	HI_KAMIKAZE,
+	HI_PORTAL,
+	HI_NONE,
+	HI_INVULNERABILITY
+};
+
+static const char *const bg_retailWeaponNames[WP_NUM_WEAPONS] = {
+	[WP_NONE] = "None",
+	[ITEMTAG_WEAPON_GAUNTLET] = "Gauntlet",
+	[ITEMTAG_WEAPON_MACHINEGUN] = "Machine Gun",
+	[ITEMTAG_WEAPON_SHOTGUN] = "Shotgun",
+	[ITEMTAG_WEAPON_GRENADE_LAUNCHER] = "Grenade Launcher",
+	[ITEMTAG_WEAPON_ROCKET_LAUNCHER] = "Rocket Launcher",
+	[ITEMTAG_WEAPON_LIGHTNING] = "Lightning Gun",
+	[ITEMTAG_WEAPON_RAILGUN] = "Railgun",
+	[ITEMTAG_WEAPON_PLASMAGUN] = "Plasma Gun",
+	[ITEMTAG_WEAPON_BFG] = "BFG10K",
+	[ITEMTAG_WEAPON_GRAPPLING_HOOK] = "Grappling Hook",
+	[ITEMTAG_WEAPON_NAILGUN] = "Nailgun",
+	[ITEMTAG_WEAPON_PROX_LAUNCHER] = "Prox Launcher",
+	[ITEMTAG_WEAPON_CHAINGUN] = "Chaingun",
+	[ITEMTAG_WEAPON_HEAVY_MACHINEGUN] = "Heavy Machinegun"
+};
+
 /*
 =============
 BG_GetWeaponStats
@@ -107,6 +180,73 @@ int BG_GetWeaponMaxAmmo( weapon_t weapon ) {
 	}
 
 	return bg_weaponMaxAmmo[weapon];
+}
+
+/*
+=============
+BG_ItemTagForWeapon
+
+Returns the retail bg_itemlist weapon/ammo tag for the supplied weapon enum.
+=============
+*/
+int BG_ItemTagForWeapon( weapon_t weapon ) {
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		if ( weapon == WP_NUM_WEAPONS ) {
+			return WP_NUM_WEAPONS;
+		}
+		return WP_NONE;
+	}
+
+	return bg_weaponToItemTag[weapon];
+}
+
+/*
+=============
+BG_WeaponForItemTag
+
+Maps a retail bg_itemlist weapon/ammo tag back to the local weapon enum.
+=============
+*/
+weapon_t BG_WeaponForItemTag( int itemTag ) {
+	if ( itemTag == WP_NUM_WEAPONS ) {
+		return WP_NUM_WEAPONS;
+	}
+
+	if ( itemTag <= WP_NONE || itemTag >= WP_NUM_WEAPONS ) {
+		return WP_NONE;
+	}
+
+	return bg_itemTagToWeapon[itemTag];
+}
+
+/*
+=============
+BG_ItemTagForHoldable
+
+Returns the retail bg_itemlist holdable tag for the supplied holdable enum.
+=============
+*/
+int BG_ItemTagForHoldable( holdable_t holdable ) {
+	if ( holdable <= HI_NONE || holdable >= HI_NUM_HOLDABLE ) {
+		return HI_NONE;
+	}
+
+	return bg_holdableToItemTag[holdable];
+}
+
+/*
+=============
+BG_HoldableForItemTag
+
+Maps a retail bg_itemlist holdable tag back to the local holdable enum.
+=============
+*/
+holdable_t BG_HoldableForItemTag( int itemTag ) {
+	if ( itemTag <= HI_NONE || itemTag > ITEMTAG_HOLDABLE_INVULNERABILITY ) {
+		return HI_NONE;
+	}
+
+	return bg_itemTagToHoldable[itemTag];
 }
 
 /*
@@ -420,7 +560,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Armor Shard",
 		5,
 		IT_ARMOR,
-		0,
+		4,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -433,7 +573,7 @@ gitem_t	bg_itemlist[] =
         { "models/powerups/armor/armor_yel.md3",
 		0, 0, 0},
 /* icon */		"icons/iconr_yellow",
-/* pickup */	"Armor",
+/* pickup */	"Yellow Armor",
 		50,
 		IT_ARMOR,
 		2,
@@ -449,7 +589,7 @@ gitem_t	bg_itemlist[] =
         { "models/powerups/armor/armor_red.md3",
 		0, 0, 0},
 /* icon */		"icons/iconr_red",
-/* pickup */	"Heavy Armor",
+/* pickup */	"Red Armor",
 		100,
 		IT_ARMOR,
 		1,
@@ -488,7 +628,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"5 Health",
 		5,
 		IT_HEALTH,
-		0,
+		4,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -505,7 +645,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"25 Health",
 		25,
 		IT_HEALTH,
-		0,
+		3,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -522,7 +662,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"50 Health",
 		50,
 		IT_HEALTH,
-		0,
+		2,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -539,7 +679,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Mega Health",
 		100,
 		IT_HEALTH,
-		0,
+		1,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -560,7 +700,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Gauntlet",
 		0,
 		IT_WEAPON,
-		WP_GAUNTLET,
+		ITEMTAG_WEAPON_GAUNTLET,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -576,7 +716,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Shotgun",
 		10,
 		IT_WEAPON,
-		WP_SHOTGUN,
+		ITEMTAG_WEAPON_SHOTGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -589,10 +729,10 @@ gitem_t	bg_itemlist[] =
         { "models/weapons2/machinegun/machinegun.md3", 
 		0, 0, 0},
 /* icon */		"icons/iconw_machinegun",
-/* pickup */	"Machinegun",
-		50,	// QL ammo pickup (Q3 default: 40)
+/* pickup */	"Machine Gun",
+		100,
 		IT_WEAPON,
-		WP_MACHINEGUN,
+		ITEMTAG_WEAPON_MACHINEGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -606,9 +746,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_grenade",
 /* pickup */	"Grenade Launcher",
-		5,	// QL ammo pickup (Q3 default: 10)
+		10,
 		IT_WEAPON,
-		WP_GRENADE_LAUNCHER,
+		ITEMTAG_WEAPON_GRENADE_LAUNCHER,
 /* precache */ "",
 /* sounds */ "sound/weapons/grenade/hgrenb1a.wav sound/weapons/grenade/hgrenb2a.wav"
 	},
@@ -622,9 +762,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_rocket",
 /* pickup */	"Rocket Launcher",
-		5,	// QL ammo pickup (Q3 default: 10)
+		10,
 		IT_WEAPON,
-		WP_ROCKET_LAUNCHER,
+		ITEMTAG_WEAPON_ROCKET_LAUNCHER,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -638,9 +778,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_lightning",
 /* pickup */	"Lightning Gun",
-		60,	// QL ammo pickup (Q3 default: 100)
+		100,
 		IT_WEAPON,
-		WP_LIGHTNING,
+		ITEMTAG_WEAPON_LIGHTNING,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -656,7 +796,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Railgun",
 		10,
 		IT_WEAPON,
-		WP_RAILGUN,
+		ITEMTAG_WEAPON_RAILGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -670,9 +810,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_plasma",
 /* pickup */	"Plasma Gun",
-		30,	// QL ammo pickup (Q3 default: 50)
+		50,
 		IT_WEAPON,
-		WP_PLASMAGUN,
+		ITEMTAG_WEAPON_PLASMAGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -686,9 +826,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/iconw_bfg",
 /* pickup */	"BFG10K",
-		15,	// QL ammo pickup (Q3 default: 20)
+		10,
 		IT_WEAPON,
-		WP_BFG,
+		ITEMTAG_WEAPON_BFG,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -704,7 +844,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Grappling Hook",
 		0,
 		IT_WEAPON,
-		WP_GRAPPLING_HOOK,
+		ITEMTAG_WEAPON_GRAPPLING_HOOK,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -722,9 +862,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/icona_shotgun",
 /* pickup */	"Shells",
-		10,
+		5,
 		IT_AMMO,
-		WP_SHOTGUN,
+		ITEMTAG_WEAPON_SHOTGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -740,7 +880,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Bullets",
 		50,
 		IT_AMMO,
-		WP_MACHINEGUN,
+		ITEMTAG_WEAPON_MACHINEGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -756,7 +896,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Grenades",
 		5,
 		IT_AMMO,
-		WP_GRENADE_LAUNCHER,
+		ITEMTAG_WEAPON_GRENADE_LAUNCHER,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -770,9 +910,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/icona_plasma",
 /* pickup */	"Cells",
-		30,
+		50,
 		IT_AMMO,
-		WP_PLASMAGUN,
+		ITEMTAG_WEAPON_PLASMAGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -786,9 +926,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/icona_lightning",
 /* pickup */	"Lightning",
-		60,
+		50,
 		IT_AMMO,
-		WP_LIGHTNING,
+		ITEMTAG_WEAPON_LIGHTNING,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -804,7 +944,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Rockets",
 		5,
 		IT_AMMO,
-		WP_ROCKET_LAUNCHER,
+		ITEMTAG_WEAPON_ROCKET_LAUNCHER,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -818,9 +958,9 @@ gitem_t	bg_itemlist[] =
 		0, 0, 0},
 /* icon */		"icons/icona_railgun",
 /* pickup */	"Slugs",
-		10,
+		5,
 		IT_AMMO,
-		WP_RAILGUN,
+		ITEMTAG_WEAPON_RAILGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -833,10 +973,10 @@ gitem_t	bg_itemlist[] =
         { "models/powerups/ammo/bfgam.md3", 
 		0, 0, 0},
 /* icon */		"icons/icona_bfg",
-/* pickup */	"Bfg Ammo",
-		15,
+/* pickup */	"BFG Ammo",
+		5,
 		IT_AMMO,
-		WP_BFG,
+		ITEMTAG_WEAPON_BFG,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -855,7 +995,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Personal Teleporter",
 		60,
 		IT_HOLDABLE,
-		HI_TELEPORTER,
+		ITEMTAG_HOLDABLE_TELEPORTER,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -872,7 +1012,7 @@ gitem_t	bg_itemlist[] =
 /* pickup */	"Medkit",
 		60,
 		IT_HOLDABLE,
-		HI_MEDKIT,
+		ITEMTAG_HOLDABLE_MEDKIT,
 /* precache */ "",
 /* sounds */ "sound/items/use_medkit.wav"
 	},
@@ -990,8 +1130,8 @@ Only in CTF games
 		"team_CTF_redflag",
 		NULL,
         { "models/flags/r_flag.md3",
-		0, 0, 0 },
-/* icon */		"icons/iconf_red1",
+		0, "models/flag3/r_flag3.md3", 0 },
+/* icon */		"gfx/2d/flag_status/red_flag_at_base",
 /* pickup */	"Red Flag",
 		0,
 		IT_TEAM,
@@ -1007,8 +1147,8 @@ Only in CTF games
 		"team_CTF_blueflag",
 		NULL,
         { "models/flags/b_flag.md3",
-		0, 0, 0 },
-/* icon */		"icons/iconf_blu1",
+		0, "models/flag3/b_flag3.md3", 0 },
+/* icon */		"gfx/2d/flag_status/blue_flag_at_base",
 /* pickup */	"Blue Flag",
 		0,
 		IT_TEAM,
@@ -1028,7 +1168,7 @@ Only in CTF games
 /* pickup */	"Kamikaze",
 		60,
 		IT_HOLDABLE,
-		HI_KAMIKAZE,
+		ITEMTAG_HOLDABLE_KAMIKAZE,
 /* precache */ "",
 /* sounds */ "sound/items/kamikazerespawn.wav"
 	},
@@ -1044,7 +1184,7 @@ Only in CTF games
 /* pickup */	"Portal",
 		60,
 		IT_HOLDABLE,
-		HI_PORTAL,
+		ITEMTAG_HOLDABLE_PORTAL,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -1060,7 +1200,7 @@ Only in CTF games
 /* pickup */	"Invulnerability",
 		60,
 		IT_HOLDABLE,
-		HI_INVULNERABILITY,
+		ITEMTAG_HOLDABLE_INVULNERABILITY,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -1074,9 +1214,9 @@ Only in CTF games
 		0, 0, 0},
 /* icon */		"icons/icona_nailgun",
 /* pickup */	"Nails",
-		20,
+		5,
 		IT_AMMO,
-		WP_NAILGUN,
+		ITEMTAG_WEAPON_NAILGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -1090,9 +1230,9 @@ Only in CTF games
 		0, 0, 0},
 /* icon */		"icons/icona_proxlauncher",
 /* pickup */	"Proximity Mines",
-		10,
+		5,
 		IT_AMMO,
-		WP_PROX_LAUNCHER,
+		ITEMTAG_WEAPON_PROX_LAUNCHER,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -1108,7 +1248,7 @@ Only in CTF games
 /* pickup */	"Chaingun Belt",
 		100,
 		IT_AMMO,
-		WP_CHAINGUN,
+		ITEMTAG_WEAPON_CHAINGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -1125,7 +1265,7 @@ Only in CTF games
 		0, 0, 0 },
 /* icon */		"icons/scout",
 /* pickup */	"Scout",
-		30,
+		0,
 		IT_PERSISTANT_POWERUP,
 		PW_SCOUT,
 /* precache */ "",
@@ -1141,7 +1281,7 @@ Only in CTF games
 		0, 0, 0 },
 /* icon */		"icons/guard",
 /* pickup */	"Guard",
-		30,
+		0,
 		IT_PERSISTANT_POWERUP,
 		PW_GUARD,
 /* precache */ "",
@@ -1157,14 +1297,14 @@ Only in CTF games
 		0, 0, 0 },
 /* icon */		"icons/doubler",
 /* pickup */	"Damage",
-		30,
+		0,
 		IT_PERSISTANT_POWERUP,
 		PW_DOUBLER,
 /* precache */ "",
 /* sounds */ ""
 	},
 
-/*QUAKED item_doubler (.3 .3 1) (-16 -16 -16) (16 16 16) suspended redTeam blueTeam
+/*QUAKED item_armorregen (.3 .3 1) (-16 -16 -16) (16 16 16) suspended redTeam blueTeam
 */
 	{
 		"item_armorregen",
@@ -1173,7 +1313,7 @@ Only in CTF games
 		0, 0, 0 },
 /* icon */		"icons/armor_regen",
 /* pickup */	"Armor Regen",
-		30,
+		0,
 		IT_PERSISTANT_POWERUP,
 		PW_AMMOREGEN,
 /* precache */ "",
@@ -1187,8 +1327,8 @@ Only in One Flag CTF games
 		"team_CTF_neutralflag",
 		NULL,
         { "models/flags/n_flag.md3",
-		0, 0, 0 },
-/* icon */		"icons/iconf_neutral1",
+		0, "models/flag3/n_flag3.md3", 0 },
+/* icon */		"gfx/2d/flag_status/flag_at_base",
 /* pickup */	"Neutral Flag",
 		0,
 		IT_TEAM,
@@ -1203,7 +1343,7 @@ Only in One Flag CTF games
         { "models/powerups/orb/r_orb.md3",
 		0, 0, 0 },
 /* icon */		"icons/iconh_rorb",
-/* pickup */	"Red Cube",
+/* pickup */	"Red Skull",
 		0,
 		IT_TEAM,
 		0,
@@ -1217,7 +1357,7 @@ Only in One Flag CTF games
         { "models/powerups/orb/b_orb.md3",
 		0, 0, 0 },
 /* icon */		"icons/iconh_borb",
-/* pickup */	"Blue Cube",
+/* pickup */	"Blue Skull",
 		0,
 		IT_TEAM,
 		0,
@@ -1233,9 +1373,9 @@ Only in One Flag CTF games
 		0, 0, 0},
 /* icon */		"icons/iconw_nailgun",
 /* pickup */	"Nailgun",
-		20,	// QL ammo pickup (Q3 default: 10)
+		10,
 		IT_WEAPON,
-		WP_NAILGUN,
+		ITEMTAG_WEAPON_NAILGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -1249,9 +1389,9 @@ Only in One Flag CTF games
 		0, 0, 0},
 /* icon */		"icons/iconw_proxlauncher",
 /* pickup */	"Prox Launcher",
-		10,	// QL ammo pickup (Q3 default: 5)
+		5,
 		IT_WEAPON,
-		WP_PROX_LAUNCHER,
+		ITEMTAG_WEAPON_PROX_LAUNCHER,
 /* precache */ "",
 /* sounds */ "sound/weapons/proxmine/wstbtick.wav "
 			"sound/weapons/proxmine/wstbactv.wav "
@@ -1272,7 +1412,7 @@ Only in One Flag CTF games
 /* pickup */	"Chaingun",
 		100,	// QL ammo pickup (Q3 default: 80)
 		IT_WEAPON,
-		WP_CHAINGUN,
+		ITEMTAG_WEAPON_CHAINGUN,
 /* precache */ "",
 /* sounds */ "sound/weapons/vulcan/wvulwind.wav"
 	},
@@ -1301,7 +1441,7 @@ Only in One Flag CTF games
 /* pickup */	"Heavy Machinegun",
 		100,
 		IT_WEAPON,
-		WP_HEAVY_MACHINEGUN,
+		ITEMTAG_WEAPON_HEAVY_MACHINEGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -1317,7 +1457,7 @@ Only in One Flag CTF games
 /* pickup */	"Heavy Bullets",
 		50,
 		IT_AMMO,
-		WP_HEAVY_MACHINEGUN,
+		ITEMTAG_WEAPON_HEAVY_MACHINEGUN,
 /* precache */ "",
 /* sounds */ ""
 	},
@@ -1348,7 +1488,7 @@ Only in One Flag CTF games
 		0, 0, 0},
 /* icon */		"icons/key_silver",
 /* pickup */	"Silver Key",
-		0,
+		1,
 		IT_KEY,
 		KEY_FLAG_SILVER,
 /* precache */ "",
@@ -1363,7 +1503,7 @@ Only in One Flag CTF games
 		0, 0, 0},
 /* icon */		"icons/key_gold",
 /* pickup */	"Gold Key",
-		0,
+		1,
 		IT_KEY,
 		KEY_FLAG_GOLD,
 /* precache */ "",
@@ -1378,7 +1518,7 @@ Only in One Flag CTF games
 		0, 0, 0},
 /* icon */		"icons/key_master",
 /* pickup */	"Master Key",
-		0,
+		1,
 		IT_KEY,
 		KEY_FLAG_MASTER,
 /* precache */ "",
@@ -1391,6 +1531,44 @@ Only in One Flag CTF games
 
 int		bg_numItems = sizeof(bg_itemlist) / sizeof(bg_itemlist[0]) - 1;
 
+/*
+==============
+BG_IsTeamFlagItem
+
+Returns qtrue when the supplied item row is one of the three CTF flag items.
+==============
+*/
+static qboolean BG_IsTeamFlagItem( const gitem_t *item ) {
+	if ( !item ) {
+		return qfalse;
+	}
+
+	if ( item->giType != IT_TEAM ) {
+		return qfalse;
+	}
+
+	return (qboolean)( item->giTag == PW_REDFLAG || item->giTag == PW_BLUEFLAG || item->giTag == PW_NEUTRALFLAG );
+}
+
+/*
+==============
+BG_FindItemByTypeAndTag
+
+Shared retail item-table lookup keyed by item type and tag.
+==============
+*/
+gitem_t	*BG_FindItemByTypeAndTag( itemType_t type, int tag ) {
+	gitem_t	*it;
+
+	for ( it = bg_itemlist + 1 ; it->classname ; it++ ) {
+		if ( it->giType == type && it->giTag == tag ) {
+			return it;
+		}
+	}
+
+	Com_Error( ERR_DROP, "Couldn't find item for type %i tag %i", type, tag );
+	return NULL;
+}
 
 /*
 ==============
@@ -1437,17 +1615,11 @@ BG_FindItemForHoldable
 ==============
 */
 gitem_t	*BG_FindItemForHoldable( holdable_t pw ) {
-	int		i;
+	int	holdableTag;
 
-	for ( i = 0 ; i < bg_numItems ; i++ ) {
-		if ( bg_itemlist[i].giType == IT_HOLDABLE && bg_itemlist[i].giTag == pw ) {
-			return &bg_itemlist[i];
-		}
-	}
+	holdableTag = BG_ItemTagForHoldable( pw );
 
-	Com_Error( ERR_DROP, "HoldableItem not found" );
-
-	return NULL;
+	return BG_FindItemByTypeAndTag( IT_HOLDABLE, holdableTag );
 }
 
 
@@ -1458,16 +1630,11 @@ BG_FindItemForWeapon
 ===============
 */
 gitem_t	*BG_FindItemForWeapon( weapon_t weapon ) {
-	gitem_t	*it;
-	
-	for ( it = bg_itemlist + 1 ; it->classname ; it++) {
-		if ( it->giType == IT_WEAPON && it->giTag == weapon ) {
-			return it;
-		}
-	}
+	int	weaponTag;
 
-	Com_Error( ERR_DROP, "Couldn't find item for weapon %i", weapon);
-	return NULL;
+	weaponTag = BG_ItemTagForWeapon( weapon );
+
+	return BG_FindItemByTypeAndTag( IT_WEAPON, weaponTag );
 }
 
 /*
@@ -1509,6 +1676,28 @@ gitem_t *BG_FindItemByClassname( const char *className ) {
 }
 
 /*
+===============
+BG_WeaponName
+
+Returns the retail user-facing label for the supplied weapon enum.
+===============
+*/
+const char *BG_WeaponName( weapon_t weapon ) {
+	int	weaponTag;
+
+	weaponTag = BG_ItemTagForWeapon( weapon );
+	if ( weaponTag <= WP_NONE || weaponTag >= WP_NUM_WEAPONS ) {
+		return bg_retailWeaponNames[WP_NONE];
+	}
+
+	if ( !bg_retailWeaponNames[weaponTag] ) {
+		return bg_retailWeaponNames[WP_NONE];
+	}
+
+	return bg_retailWeaponNames[weaponTag];
+}
+
+/*
 ============
 BG_PlayerTouchesItem
 
@@ -1528,8 +1717,7 @@ qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTim
 	if ( item->modelindex > 0 && item->modelindex < bg_numItems ) {
 		itemDef = &bg_itemlist[item->modelindex];
 
-		if ( itemDef->giType == IT_TEAM &&
-			( itemDef->giTag == PW_REDFLAG || itemDef->giTag == PW_BLUEFLAG || itemDef->giTag == PW_NEUTRALFLAG ) ) {
+		if ( BG_IsTeamFlagItem( itemDef ) ) {
 			maxZDelta = 64.0f;
 		}
 	}
@@ -1561,9 +1749,6 @@ map-spawned instance.
 static qboolean BG_IsDroppedItem( const entityState_t *ent ) {
 	return ( ent->modelindex2 != 0 );
 }
-
-
-typedef qboolean (*bgItemGrabFunc_t)( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped );
 
 /*
 =============
@@ -1605,7 +1790,7 @@ static qboolean BG_CanGrabWeaponItem( int gametype, int currentTime, const entit
 		return qtrue;
 	}
 
-	weapon = item->giTag;
+	weapon = BG_WeaponForItemTag( item->giTag );
 	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
 		return qtrue;
 	}
@@ -1619,56 +1804,6 @@ static qboolean BG_CanGrabWeaponItem( int gametype, int currentTime, const entit
 	}
 
 	return qfalse;
-}
-
-/*
-=============
-BG_CanGrabAmmoItem
-
-Table-driven version of the legacy ammo branch in BG_CanItemBeGrabbed.
-=============
-*/
-static qboolean BG_CanGrabAmmoItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
-{
-	int weapon;
-
-	if ( gametype == GT_DOMINATION ) {
-		return qtrue;
-	}
-
-	if ( dropped ) {
-		return qtrue;
-	}
-
-	if ( item->giTag == WP_NUM_WEAPONS ) {
-		for ( weapon = WP_MACHINEGUN; weapon < WP_NUM_WEAPONS; weapon++ ) {
-			const int maxAmmo = BG_GetWeaponMaxAmmo( weapon );
-
-			if ( maxAmmo <= 0 ) {
-				continue;
-			}
-
-			if ( !( ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
-				continue;
-			}
-
-			if ( ps->ammo[weapon] < maxAmmo ) {
-				return qtrue;
-			}
-		}
-
-		return qfalse;
-	}
-
-	if ( item->giTag <= WP_NONE || item->giTag >= WP_NUM_WEAPONS ) {
-		return qfalse;
-	}
-
-	if ( ps->ammo[item->giTag] >= BG_GetWeaponMaxAmmo( item->giTag ) ) {
-		return qfalse;
-	}
-
-	return qtrue;
 }
 
 /*
@@ -1726,11 +1861,10 @@ static qboolean BG_CanGrabArmorItem( int gametype, int currentTime, const entity
 =============
 BG_CanGrabHealthItem
 
-Shared translation of the DLL helper sub_1002ce00 for health pickups.
+Shared retail health-pickup helper called from BG_CanItemBeGrabbed.
 =============
 */
-static qboolean BG_CanGrabHealthItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
-{
+static qboolean BG_CanGrabHealthItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped ) {
 	int	upperBound;
 
 	upperBound = BG_GetHealthUpperBound( ps, item->quantity );
@@ -1738,94 +1872,17 @@ static qboolean BG_CanGrabHealthItem( int gametype, int currentTime, const entit
 		return qfalse;
 	}
 
-	if ( ps->stats[STAT_HEALTH] >= upperBound ) {
-		return qfalse;
-	}
-
-	return qtrue;
+	return ( ps->stats[STAT_HEALTH] < upperBound ) ? qtrue : qfalse;
 }
 
 /*
 =============
-BG_CanGrabPowerupItem
+BG_PlayerCarryingFlag
+
+Returns qtrue when the player currently carries any team-flag powerup.
 =============
 */
-static qboolean BG_CanGrabPowerupItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
-{
-	return qtrue;
-}
-
-/*
-=============
-BG_CanGrabPersistantPowerupItem
-=============
-*/
-static qboolean BG_CanGrabPersistantPowerupItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
-{
-	if ( ps->stats[STAT_PERSISTANT_POWERUP] ) {
-		return qfalse;
-	}
-
-	if ( ( ent->generic1 & 2 ) && ( ps->persistant[PERS_TEAM] != TEAM_RED ) ) {
-		return qfalse;
-	}
-	if ( ( ent->generic1 & 4 ) && ( ps->persistant[PERS_TEAM] != TEAM_BLUE ) ) {
-		return qfalse;
-	}
-
-	return qtrue;
-}
-
-/*
-=============
-BG_CanGrabHoldableItem
-=============
-*/
-static qboolean BG_CanGrabHoldableItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
-{
-	if ( ps->stats[STAT_HOLDABLE_ITEM] ) {
-		return qfalse;
-	}
-
-	return qtrue;
-}
-
-/*
-=============
-BG_CanGrabKeyItem
-=============
-*/
-static qboolean BG_CanGrabKeyItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
-{
-return qtrue;
-}
-
-static qboolean BG_TeamFlagCanBeGrabbed( int gametype, const gitem_t *item, const entityState_t *ent, const playerState_t *ps );
-
-/*
-=============
-BG_CanGrabTeamItem
-=============
-*/
-static qboolean BG_CanGrabTeamItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
-{
-	return BG_TeamFlagCanBeGrabbed( gametype, item, ent, ps );
-}
-
-static const bgItemGrabFunc_t bg_itemGrabHandlers[IT_KEY + 1] = {
-	NULL,						// IT_BAD
-	BG_CanGrabWeaponItem,		// IT_WEAPON
-	BG_CanGrabAmmoItem,		// IT_AMMO
-	BG_CanGrabArmorItem,		// IT_ARMOR
-	BG_CanGrabHealthItem,		// IT_HEALTH
-	BG_CanGrabPowerupItem,		// IT_POWERUP
-	BG_CanGrabHoldableItem,		// IT_HOLDABLE
-	BG_CanGrabPersistantPowerupItem,	// IT_PERSISTANT_POWERUP
-	BG_CanGrabTeamItem,		// IT_TEAM
-	BG_CanGrabKeyItem		// IT_KEY
-};
-
-static qboolean BG_PlayerCarryingFlag( const playerState_t *ps ) {
+qboolean BG_PlayerCarryingFlag( const playerState_t *ps ) {
 	if ( ps->powerups[PW_REDFLAG] ) {
 		return qtrue;
 	}
@@ -1840,120 +1897,6 @@ static qboolean BG_PlayerCarryingFlag( const playerState_t *ps ) {
 }
 
 /*
-=============
-BG_TeamFlagCanBeGrabbed
-
-Validates CTF-style item grabs for CTF, 1FCTF, and Harvester based on the
-player team, carried flags, and whether the item was dropped in the field.
-=============
-*/
-static qboolean BG_TeamFlagCanBeGrabbed( int gametype, const gitem_t *item, const entityState_t *ent, const playerState_t *ps ) {
-	const qboolean dropped = BG_IsDroppedItem( ent );
-	const team_t playerTeam = ps->persistant[PERS_TEAM];
-	const int flagTag = item->giTag;
-	const qboolean carryingAnyFlag = BG_PlayerCarryingFlag( ps );
-
-	switch ( gametype ) {
-	case GT_CTF:
-		if ( playerTeam == TEAM_RED ) {
-			if ( flagTag == PW_BLUEFLAG ) {
-				return carryingAnyFlag ? qfalse : qtrue;
-			}
-
-			if ( flagTag == PW_REDFLAG ) {
-				if ( ps->powerups[PW_BLUEFLAG] ) {
-					return qtrue;
-				}
-
-				return dropped && !ps->powerups[PW_NEUTRALFLAG] && !ps->powerups[PW_REDFLAG];
-			}
-		}
-		else if ( playerTeam == TEAM_BLUE ) {
-			if ( flagTag == PW_REDFLAG ) {
-				return carryingAnyFlag ? qfalse : qtrue;
-			}
-
-			if ( flagTag == PW_BLUEFLAG ) {
-				if ( ps->powerups[PW_REDFLAG] ) {
-					return qtrue;
-				}
-
-				return dropped && !ps->powerups[PW_NEUTRALFLAG] && !ps->powerups[PW_BLUEFLAG];
-			}
-		}
-		break;
-
-	case GT_1FCTF:
-		if ( flagTag == PW_NEUTRALFLAG ) {
-			return carryingAnyFlag ? qfalse : qtrue;
-		}
-
-		if ( playerTeam == TEAM_RED ) {
-			if ( flagTag == PW_BLUEFLAG ) {
-				return ps->powerups[PW_NEUTRALFLAG] != 0;
-			}
-
-			if ( flagTag == PW_REDFLAG ) {
-				if ( dropped ) {
-					return qtrue;
-				}
-
-				return ps->powerups[PW_NEUTRALFLAG] != 0;
-			}
-		}
-		else if ( playerTeam == TEAM_BLUE ) {
-			if ( flagTag == PW_REDFLAG ) {
-				return ps->powerups[PW_NEUTRALFLAG] != 0;
-			}
-
-			if ( flagTag == PW_BLUEFLAG ) {
-				if ( dropped ) {
-					return qtrue;
-				}
-
-				return ps->powerups[PW_NEUTRALFLAG] != 0;
-			}
-		}
-		break;
-
-	case GT_HARVESTER:
-		return qtrue;
-
-	case GT_ATTACK_DEFEND:
-		if ( dropped ) {
-			return qfalse;
-		}
-
-		if ( playerTeam == TEAM_RED ) {
-			if ( flagTag == PW_BLUEFLAG ) {
-				return qtrue;
-			}
-
-			if ( flagTag == PW_REDFLAG ) {
-				return ps->powerups[PW_BLUEFLAG] != 0;
-			}
-		}
-		else if ( playerTeam == TEAM_BLUE ) {
-			if ( flagTag == PW_REDFLAG ) {
-				return qtrue;
-			}
-
-			if ( flagTag == PW_BLUEFLAG ) {
-				return ps->powerups[PW_REDFLAG] != 0;
-			}
-		}
-		break;
-
-	default:
-		break;
-	}
-
-	return qfalse;
-}
-
-
-
-/*
 ================
 BG_CanItemBeGrabbed
 
@@ -1962,9 +1905,11 @@ This needs to be the same for client side prediction and server use.
 ================
 */
 qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps ) {
-	gitem_t *item;
+	gitem_t		*item;
+	int		weapon;
+	int		maxAmmo;
+	qboolean	carryingAnyFlag;
 	const qboolean dropped = BG_IsDroppedItem( ent );
-	bgItemGrabFunc_t handler;
 
 	if ( ent->modelindex < 1 || ent->modelindex >= bg_numItems ) {
 		Com_Error( ERR_DROP, "BG_CanItemBeGrabbed: index out of range" );
@@ -1979,18 +1924,179 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 	if ( item->giType < IT_BAD || item->giType > IT_KEY ) {
 		Com_Error( ERR_DROP, "BG_CanItemBeGrabbed: invalid item type %d", item->giType );
 	}
-  
-	handler = bg_itemGrabHandlers[item->giType];
-	if ( handler ) {
-		return handler( gametype, currentTime, ent, ps, item, dropped );
+
+	switch ( item->giType ) {
+	case IT_WEAPON:
+		return BG_CanGrabWeaponItem( gametype, currentTime, ent, ps, item, dropped );
+
+	case IT_AMMO:
+		if ( gametype == GT_DOMINATION ) {
+			return qtrue;
+		}
+
+		if ( dropped ) {
+			return qtrue;
+		}
+
+		if ( item->giTag == WP_NUM_WEAPONS ) {
+			for ( weapon = WP_MACHINEGUN ; weapon < WP_NUM_WEAPONS ; weapon++ ) {
+				maxAmmo = BG_GetWeaponMaxAmmo( weapon );
+				if ( maxAmmo <= 0 ) {
+					continue;
+				}
+
+				if ( !( ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
+					continue;
+				}
+
+				if ( ps->ammo[weapon] < maxAmmo ) {
+					return qtrue;
+				}
+			}
+
+			return qfalse;
+		}
+
+		weapon = BG_WeaponForItemTag( item->giTag );
+		if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+			return qfalse;
+		}
+
+		return ( ps->ammo[weapon] < BG_GetWeaponMaxAmmo( weapon ) ) ? qtrue : qfalse;
+
+	case IT_ARMOR:
+		return BG_CanGrabArmorItem( gametype, currentTime, ent, ps, item, dropped );
+
+	case IT_HEALTH:
+		return BG_CanGrabHealthItem( gametype, currentTime, ent, ps, item, dropped );
+
+	case IT_POWERUP:
+		return qtrue;
+
+	case IT_HOLDABLE:
+		return ( ps->stats[STAT_HOLDABLE_ITEM] == 0 ) ? qtrue : qfalse;
+
+	case IT_PERSISTANT_POWERUP:
+		if ( ps->stats[STAT_PERSISTANT_POWERUP] ) {
+			return qfalse;
+		}
+
+		if ( ( ent->generic1 & 2 ) && ( ps->persistant[PERS_TEAM] != TEAM_RED ) ) {
+			return qfalse;
+		}
+		if ( ( ent->generic1 & 4 ) && ( ps->persistant[PERS_TEAM] != TEAM_BLUE ) ) {
+			return qfalse;
+		}
+
+		return qtrue;
+
+	case IT_TEAM:
+		carryingAnyFlag = BG_PlayerCarryingFlag( ps );
+
+		switch ( gametype ) {
+		case GT_CTF:
+			if ( ps->persistant[PERS_TEAM] == TEAM_RED ) {
+				if ( item->giTag == PW_BLUEFLAG ) {
+					return carryingAnyFlag ? qfalse : qtrue;
+				}
+
+				if ( item->giTag == PW_REDFLAG ) {
+					if ( ps->powerups[PW_BLUEFLAG] ) {
+						return qtrue;
+					}
+
+					return dropped && !ps->powerups[PW_NEUTRALFLAG] && !ps->powerups[PW_REDFLAG];
+				}
+			}
+			else if ( ps->persistant[PERS_TEAM] == TEAM_BLUE ) {
+				if ( item->giTag == PW_REDFLAG ) {
+					return carryingAnyFlag ? qfalse : qtrue;
+				}
+
+				if ( item->giTag == PW_BLUEFLAG ) {
+					if ( ps->powerups[PW_REDFLAG] ) {
+						return qtrue;
+					}
+
+					return dropped && !ps->powerups[PW_NEUTRALFLAG] && !ps->powerups[PW_BLUEFLAG];
+				}
+			}
+			break;
+
+		case GT_1FCTF:
+			if ( item->giTag == PW_NEUTRALFLAG ) {
+				return carryingAnyFlag ? qfalse : qtrue;
+			}
+
+			if ( ps->persistant[PERS_TEAM] == TEAM_RED ) {
+				if ( item->giTag == PW_BLUEFLAG ) {
+					return ps->powerups[PW_NEUTRALFLAG] ? qtrue : qfalse;
+				}
+
+				if ( item->giTag == PW_REDFLAG ) {
+					if ( dropped ) {
+						return qtrue;
+					}
+
+					return ps->powerups[PW_NEUTRALFLAG] ? qtrue : qfalse;
+				}
+			}
+			else if ( ps->persistant[PERS_TEAM] == TEAM_BLUE ) {
+				if ( item->giTag == PW_REDFLAG ) {
+					return ps->powerups[PW_NEUTRALFLAG] ? qtrue : qfalse;
+				}
+
+				if ( item->giTag == PW_BLUEFLAG ) {
+					if ( dropped ) {
+						return qtrue;
+					}
+
+					return ps->powerups[PW_NEUTRALFLAG] ? qtrue : qfalse;
+				}
+			}
+			break;
+
+		case GT_HARVESTER:
+			return qtrue;
+
+		case GT_ATTACK_DEFEND:
+			if ( dropped ) {
+				return qfalse;
+			}
+
+			if ( ps->persistant[PERS_TEAM] == TEAM_RED ) {
+				if ( item->giTag == PW_BLUEFLAG ) {
+					return qtrue;
+				}
+
+				if ( item->giTag == PW_REDFLAG ) {
+					return ps->powerups[PW_BLUEFLAG] ? qtrue : qfalse;
+				}
+			}
+			else if ( ps->persistant[PERS_TEAM] == TEAM_BLUE ) {
+				if ( item->giTag == PW_REDFLAG ) {
+					return qtrue;
+				}
+
+				if ( item->giTag == PW_BLUEFLAG ) {
+					return ps->powerups[PW_REDFLAG] ? qtrue : qfalse;
+				}
+			}
+			break;
+
+		default:
+			break;
+		}
+
+		return qfalse;
+
+	case IT_KEY:
+		return qtrue;
+
+	default:
+		break;
 	}
 
-
-#ifndef Q3_VM
-#ifndef NDEBUG
-	Com_Printf( "BG_CanItemBeGrabbed: unknown enum %d\n", item->giType );
-#endif
-#endif
 	return qfalse;
 }
 
@@ -2271,86 +2377,6 @@ void BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, qboolean 
 	}
 	// set the trDelta for flag direction
 	VectorCopy( ps->velocity, s->pos.trDelta );
-
-	s->apos.trType = TR_INTERPOLATE;
-	VectorCopy( ps->viewangles, s->apos.trBase );
-	if ( snap ) {
-		SnapVector( s->apos.trBase );
-	}
-
-	s->angles2[YAW] = ps->movementDir;
-	s->legsAnim = ps->legsAnim;
-	s->torsoAnim = ps->torsoAnim;
-	s->clientNum = ps->clientNum;		// ET_PLAYER looks here instead of at number
-										// so corpses can also reference the proper config
-	s->eFlags = ps->eFlags;
-	if ( ps->stats[STAT_HEALTH] <= 0 ) {
-		s->eFlags |= EF_DEAD;
-	} else {
-		s->eFlags &= ~EF_DEAD;
-	}
-
-	if ( ps->externalEvent ) {
-		s->event = ps->externalEvent;
-		s->eventParm = ps->externalEventParm;
-	} else if ( ps->entityEventSequence < ps->eventSequence ) {
-		int		seq;
-
-		if ( ps->entityEventSequence < ps->eventSequence - MAX_PS_EVENTS) {
-			ps->entityEventSequence = ps->eventSequence - MAX_PS_EVENTS;
-		}
-		seq = ps->entityEventSequence & (MAX_PS_EVENTS-1);
-		s->event = ps->events[ seq ] | ( ( ps->entityEventSequence & 3 ) << 8 );
-		s->eventParm = ps->eventParms[ seq ];
-		ps->entityEventSequence++;
-	}
-
-	s->weapon = ps->weapon;
-	s->groundEntityNum = ps->groundEntityNum;
-
-	s->powerups = 0;
-	for ( i = 0 ; i < MAX_POWERUPS ; i++ ) {
-		if ( ps->powerups[ i ] ) {
-			s->powerups |= 1 << i;
-		}
-	}
-
-	s->loopSound = ps->loopSound;
-	s->generic1 = ps->generic1;
-}
-
-/*
-========================
-BG_PlayerStateToEntityStateExtraPolate
-
-This is done after each set of usercmd_t on the server,
-and after local prediction on the client
-========================
-*/
-void BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s, int time, qboolean snap ) {
-	int		i;
-
-	if ( ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR ) {
-		s->eType = ET_INVISIBLE;
-	} else if ( ps->stats[STAT_HEALTH] <= GIB_HEALTH ) {
-		s->eType = ET_INVISIBLE;
-	} else {
-		s->eType = ET_PLAYER;
-	}
-
-	s->number = ps->clientNum;
-
-	s->pos.trType = TR_LINEAR_STOP;
-	VectorCopy( ps->origin, s->pos.trBase );
-	if ( snap ) {
-		SnapVector( s->pos.trBase );
-	}
-	// set the trDelta for flag direction and linear prediction
-	VectorCopy( ps->velocity, s->pos.trDelta );
-	// set the time for linear prediction
-	s->pos.trTime = time;
-	// set maximum extra polation time
-	s->pos.trDuration = 50; // 1000 / sv_fps (default = 20)
 
 	s->apos.trType = TR_INTERPOLATE;
 	VectorCopy( ps->viewangles, s->apos.trBase );

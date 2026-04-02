@@ -764,6 +764,26 @@ typedef enum {
 	VOTE_STATE_FORCE_VETO
 } voteState_t;
 
+typedef enum {
+	RANK_MEDAL_IMPRESSIVE,
+	RANK_MEDAL_EXCELLENT,
+	RANK_MEDAL_HUMILIATION,
+	RANK_MEDAL_REVENGE,
+	RANK_MEDAL_COMBOKILL,
+	RANK_MEDAL_RAMPAGE,
+	RANK_MEDAL_MIDAIR,
+	RANK_MEDAL_PERFORATED,
+	RANK_MEDAL_HEADSHOT,
+	RANK_MEDAL_ACCURACY,
+	RANK_MEDAL_QUADGOD,
+	RANK_MEDAL_FIRSTFRAG,
+	RANK_MEDAL_PERFECT,
+	RANK_MEDAL_DEFENDS,
+	RANK_MEDAL_ASSISTS,
+	RANK_MEDAL_CAPTURES,
+	RANK_MEDAL_COUNT
+} rankMedal_t;
+
 typedef struct {
 	clientConnected_t	connected;	
 	usercmd_t	cmd;				// we would lose angles if not persistant
@@ -799,6 +819,7 @@ typedef struct {
 	int			weaponDamage[WP_NUM_WEAPONS];
 	int			accuracy_shots[WP_NUM_WEAPONS];
 	int			accuracy_hits[WP_NUM_WEAPONS];
+	int			rankMedalCounts[RANK_MEDAL_COUNT];
 	int			teamScoreStats[TEAMSTAT_COUNT];
 	int			teamHoldStartTime[TEAMSTAT_COUNT];
 	int			pickupLastTime[SCORESTAT_PICKUP_COUNT];
@@ -812,6 +833,9 @@ typedef struct {
 	unsigned int	steamIdLow;
 	unsigned int	steamIdHigh;
 	char			sessionToken[32];
+	int			lastUpdateTime;
+	int			totalActiveTimeMs;
+	int			weaponTimeMs[WP_NUM_WEAPONS];
 } rankClientStats_t;
 
 
@@ -908,6 +932,7 @@ struct gclient_s {
 	int			portalID;
 	int			ammoTimes[WP_NUM_WEAPONS];
 	int			invulnerabilityTime;
+	int			holdableInvulnerabilityTime;
 	qboolean	freezeFrozen;
 	int			freezeTime;
 	int			freezeNextThawTick;
@@ -1015,6 +1040,9 @@ typedef struct {
 	char			rankMatchGuid[32];
 	qboolean		rankMatchStartedSent;
 	qboolean		rankMatchReportSent;
+	char			rankExitMessage[128];
+	int			rankLastScorer;
+	int			rankLastTeamScorer;
 
 	int			teamScores[TEAM_NUM_TEAMS];
 	int			lastTeamLocationTime;		// last time of client team location update
@@ -1182,6 +1210,8 @@ qboolean	G_RaceSendPointMetadataCommand( int clientNum, int index );
 void	G_RaceServerClearPoints( void );
 void	G_RaceServerDumpPoints( void );
 void	G_AutoAction( autoActionEvent_t event, const gentity_t *subject, const char *details );
+char	*G_CleanClientNameFromClientNum( int clientNum, char *dest );
+char	*G_CleanClientNameFromClient( char *dest, gclient_t *client );
 
 //
 // g_cmds.c
@@ -1477,6 +1507,14 @@ void G_RunGrantScript( gentity_t *ent, const char *script );
 void G_RankResetClientStats( gclient_t *client );
 void G_RankClientConnect( gentity_t *ent );
 void G_RankClientDisconnect( gentity_t *ent );
+void G_RankAccumulateWeaponTime( gentity_t *ent );
+void G_RankAccumulateDamage( gentity_t *victim, gentity_t *attacker, int meansOfDeath, int damage );
+void G_RankSendPlayerMedal( gentity_t *ent, const char *medal );
+void G_RankSendFlagStatus( gentity_t *ent, int team, int status );
+void G_RankSendPlayerSwitchTeam( gentity_t *ent, int oldTeam, int newTeam );
+void G_RankSendPlayerRaceComplete( gentity_t *ent, int raceTime );
+void G_RankSendPlayerDeath( gentity_t *victim, gentity_t *killer, int meansOfDeath );
+void G_RankSendPlayerStats( gentity_t *ent, qboolean aborted );
 void G_RankSendMatchStarted( void );
 void G_RankSubmitMatchReport( qboolean aborted );
 qboolean G_WarmupReadyToStart( void );
@@ -1720,7 +1758,6 @@ extern	vmCvar_t	g_obeliskRespawnDelay;
 extern	vmCvar_t	g_cubeTimeout;
 extern	vmCvar_t	g_redteam;
 extern	vmCvar_t	g_blueteam;
-extern	vmCvar_t	g_smoothClients;
 extern	vmCvar_t	pmove_fixed;
 extern	vmCvar_t	pmove_msec;
 extern	vmCvar_t	g_rankings;

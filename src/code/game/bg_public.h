@@ -294,21 +294,6 @@ typedef enum {
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
 #define	MAXTOUCH	32
-typedef struct pmoveParams_s {
-	float	wishSpeed;
-	float	walkAccel;
-	float	walkFriction;
-	float	airAccel;
-	float	airControl;
-	float	airStepFriction;
-	int	airSteps;
-	float	airStopAccel;
-	float	strafeAccel;
-	float	circleStrafeFriction;
-	qboolean	bunnyHop;
-	qboolean	autoHop;
-} pmoveParams_t;
-
 typedef struct pmove_settings_s pmove_settings_t;
 
 
@@ -340,7 +325,6 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
-	const pmoveParams_t	*pmoveParams;
 	const pmove_settings_t	*pmoveSettings;
 
 	float		stepUp;				// positive stair delta accumulated during this Pmove
@@ -481,6 +465,28 @@ typedef enum {
        WP_NUM_WEAPONS
 } weapon_t;
 
+// Retail bg_itemlist weapon/ammo rows keep the classic Quake III ordering and
+// append the Quake Live-exclusive heavy machinegun at the end.
+#define ITEMTAG_WEAPON_GAUNTLET				1
+#define ITEMTAG_WEAPON_MACHINEGUN			2
+#define ITEMTAG_WEAPON_SHOTGUN				3
+#define ITEMTAG_WEAPON_GRENADE_LAUNCHER		4
+#define ITEMTAG_WEAPON_ROCKET_LAUNCHER		5
+#define ITEMTAG_WEAPON_LIGHTNING			6
+#define ITEMTAG_WEAPON_RAILGUN				7
+#define ITEMTAG_WEAPON_PLASMAGUN			8
+#define ITEMTAG_WEAPON_BFG					9
+#define ITEMTAG_WEAPON_GRAPPLING_HOOK		10
+#define ITEMTAG_WEAPON_NAILGUN				11
+#define ITEMTAG_WEAPON_PROX_LAUNCHER		12
+#define ITEMTAG_WEAPON_CHAINGUN				13
+#define ITEMTAG_WEAPON_HEAVY_MACHINEGUN		14
+#define ITEMTAG_HOLDABLE_TELEPORTER			1
+#define ITEMTAG_HOLDABLE_MEDKIT				2
+#define ITEMTAG_HOLDABLE_KAMIKAZE			3
+#define ITEMTAG_HOLDABLE_PORTAL				4
+#define ITEMTAG_HOLDABLE_INVULNERABILITY	6
+
 typedef struct bgWeaponStats_s {
 	weapon_t	weapon;
 	int		pickupQuantity;
@@ -510,6 +516,10 @@ int BG_GetWeaponMaxAmmo( weapon_t weapon );
 float BG_GetHandicapScalar( handicap_type_t type, weapon_t weapon );
 int BG_GetWeaponAmmoPackSize( weapon_t weapon );
 int BG_GetWeaponAmmoPackMaxStack( weapon_t weapon );
+int BG_ItemTagForWeapon( weapon_t weapon );
+weapon_t BG_WeaponForItemTag( int itemTag );
+int BG_ItemTagForHoldable( holdable_t holdable );
+holdable_t BG_HoldableForItemTag( int itemTag );
 qboolean BG_PlayerHasPersistantPowerup( const playerState_t *ps, powerup_t powerup );
 int BG_GetArmorUpperBound( const playerState_t *ps );
 int BG_GetHealthUpperBound( const playerState_t *ps, int pickupQuantity );
@@ -910,9 +920,12 @@ extern	int		bg_numItems;
 
 gitem_t	*BG_FindItem( const char *pickupName );
 gitem_t	*BG_FindItemByClassname( const char *className );
+gitem_t	*BG_FindItemByTypeAndTag( itemType_t type, int tag );
 gitem_t	*BG_FindItemForWeapon( weapon_t weapon );
 gitem_t	*BG_FindItemForPowerup( powerup_t pw );
 gitem_t	*BG_FindItemForHoldable( holdable_t pw );
+qboolean	BG_PlayerCarryingFlag( const playerState_t *ps );
+const char *BG_WeaponName( weapon_t weapon );
 #define	ITEM_INDEX(x) ((x)-bg_itemlist)
 
 qboolean	BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps );
@@ -966,7 +979,6 @@ void	BG_AddPredictableEventToPlayerstate( int newEvent, int eventParm, playerSta
 void	BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad );
 
 void	BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, qboolean snap );
-void	BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s, int time, qboolean snap );
 
 qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTime );
 

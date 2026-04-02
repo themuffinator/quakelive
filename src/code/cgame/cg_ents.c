@@ -290,7 +290,7 @@ static void CG_Item( centity_t *cent ) {
 	// models, so we need to offset them or they will rotate
 	// eccentricly
 	if ( item->giType == IT_WEAPON ) {
-		wi = &cg_weapons[item->giTag];
+		wi = &cg_weapons[BG_WeaponForItemTag( item->giTag )];
 		cent->lerpOrigin[0] -= 
 			wi->weaponMidpoint[0] * ent.axis[0][0] +
 			wi->weaponMidpoint[1] * ent.axis[1][0] +
@@ -342,7 +342,7 @@ static void CG_Item( centity_t *cent ) {
 		trap_S_AddLoopingSound( cent->currentState.number, cent->lerpOrigin, vec3_origin, cgs.media.weaponHoverSound );
 	}
 
-	if ( item->giType == IT_HOLDABLE && item->giTag == HI_KAMIKAZE ) {
+	if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_KAMIKAZE ) {
 		VectorScale( ent.axis[0], 2, ent.axis[0] );
 		VectorScale( ent.axis[1], 2, ent.axis[1] );
 		VectorScale( ent.axis[2], 2, ent.axis[2] );
@@ -875,13 +875,12 @@ static void CG_DominationAddBillboard( const centity_t *cent, qhandle_t shader, 
 
 /*
 =============
-CG_DominationPoint
+CG_QueueDominationPointBillboard
 
-Renders Domination capture points and their icon overlays.
+Queues the retail Domination point overlay marker beneath the main model.
 =============
 */
-static void CG_DominationPoint( centity_t *cent ) {
-	refEntity_t	model;
+static void CG_QueueDominationPointBillboard( centity_t *cent ) {
 	team_t		owner;
 	team_t		capturing;
 	team_t		viewerTeam;
@@ -893,6 +892,61 @@ static void CG_DominationPoint( centity_t *cent ) {
 	vec3_t	delta;
 	float		distance;
 	float		radius;
+
+	if ( !cent ) {
+		return;
+	}
+
+	owner = CG_DominationClampTeam( cent->currentState.modelindex );
+	capturing = CG_DominationClampTeam( cent->currentState.modelindex2 );
+	if ( capturing == TEAM_FREE ) {
+		return;
+	}
+
+	viewerTeam = TEAM_FREE;
+	if ( cg.snap ) {
+		viewerTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+	}
+
+	progress = (float)cent->currentState.frame / 255.0f;
+	progressIndex = CG_DominationProgressIndex( progress );
+	distress = qfalse;
+	if ( cent->currentState.time2 > 0 ) {
+		distress = ( cg.time - cent->currentState.time2 ) <= DOMINATION_DISTRESS_REPEAT_TIME;
+	}
+
+	captureIcon = qtrue;
+	if ( viewerTeam == owner && owner != TEAM_FREE ) {
+		captureIcon = qfalse;
+	} else if ( viewerTeam == TEAM_FREE || viewerTeam == TEAM_SPECTATOR || owner == TEAM_FREE ) {
+		captureIcon = qtrue;
+	}
+
+	shader = CG_DominationSelectShader( captureIcon, distress, progressIndex );
+	if ( !shader ) {
+		return;
+	}
+
+	VectorSubtract( cg.refdef.vieworg, cent->lerpOrigin, delta );
+	distance = VectorLength( delta );
+	radius = ( distance < 512.0f ) ? DOM_POINT_NEAR_RADIUS : DOM_POINT_FAR_RADIUS;
+
+	CG_DominationAddBillboard( cent, shader, DOM_POINT_ICON_HEIGHT, radius );
+}
+
+/*
+=============
+CG_DominationPoint
+
+Renders Domination capture points and their icon overlays.
+=============
+*/
+static void CG_DominationPoint( centity_t *cent ) {
+	refEntity_t	model;
+	team_t		owner;
+	team_t		capturing;
+	team_t		viewerTeam;
+	qboolean	distress;
 
 	if ( !cgs.media.domPointModel ) {
 		return;
@@ -931,31 +985,12 @@ static void CG_DominationPoint( centity_t *cent ) {
 		return;
 	}
 
-	progress = (float)cent->currentState.frame / 255.0f;
-	progressIndex = CG_DominationProgressIndex( progress );
-
 	distress = qfalse;
 	if ( cent->currentState.time2 > 0 ) {
 		distress = ( cg.time - cent->currentState.time2 ) <= DOMINATION_DISTRESS_REPEAT_TIME;
 	}
 
-	captureIcon = qtrue;
-	if ( viewerTeam == owner && owner != TEAM_FREE ) {
-		captureIcon = qfalse;
-	} else if ( viewerTeam == TEAM_FREE || viewerTeam == TEAM_SPECTATOR || owner == TEAM_FREE ) {
-		captureIcon = qtrue;
-	}
-
-	shader = CG_DominationSelectShader( captureIcon, distress, progressIndex );
-	if ( !shader ) {
-		return;
-	}
-
-	VectorSubtract( cg.refdef.vieworg, cent->lerpOrigin, delta );
-	distance = VectorLength( delta );
-	radius = ( distance < 512.0f ) ? DOM_POINT_NEAR_RADIUS : DOM_POINT_FAR_RADIUS;
-
-	CG_DominationAddBillboard( cent, shader, DOM_POINT_ICON_HEIGHT, radius );
+	CG_QueueDominationPointBillboard( cent );
 
 	if ( distress && viewerTeam == owner && owner != TEAM_FREE && cgs.media.dominationDistressSound ) {
 		if ( cg.time - cent->miscTime >= DOMINATION_DISTRESS_REPEAT_TIME ) {
@@ -1250,7 +1285,7 @@ void CG_AddPacketEntities( void ) {
 
 	// generate and add the entity from the playerstate
 	ps = &cg.predictedPlayerState;
-	BG_PlayerStateToEntityStateExtraPolate( ps, &cg.predictedPlayerEntity.currentState, cg.time, qfalse );
+	BG_PlayerStateToEntityState( ps, &cg.predictedPlayerEntity.currentState, qfalse );
 	if ( !( ps->pm_flags & PMF_FOLLOW ) || ps->stats[STAT_HEALTH] <= GIB_HEALTH ) {
 		CG_AddCEntity( &cg.predictedPlayerEntity );
 	} else {

@@ -136,21 +136,17 @@ static void CG_AccUp_f( void ) {
 	cg.accRequestActive = qfalse;
 }
 
-static void CG_LoadHud_f( void) {
-	char buff[1024];
-	const char *hudSet;
+/*
+=============
+CG_LoadHud_f
 
-	memset(buff, 0, sizeof(buff));
-
+Replays the retail HUD bootstrap on demand, including supplemental overlays and
+scoreboard-menu caches.
+=============
+*/
+static void CG_LoadHud_f( void ) {
 	CG_InitBrowserRuntime();
-
-	trap_Cvar_VariableStringBuffer("cg_hudFiles", buff, sizeof(buff));
-	hudSet = buff;
-	if (hudSet[0] == '\0') {
-		hudSet = CG_DEFAULT_HUD_FILE;
-	}
-
-	CG_LoadMenus(hudSet);
+	CG_LoadHudMenu();
 }
 
 static void CG_scrollScoresDown_f( void) {
@@ -179,7 +175,7 @@ static void CG_spWin_f( void) {
 	trap_Cvar_Set("cg_thirdPersonRange", "100");
 	CG_AddBufferedSound(cgs.media.winnerSound);
 	//trap_S_StartLocalSound(cgs.media.winnerSound, CHAN_ANNOUNCER);
-	CG_CenterPrint("YOU WIN!", SCREEN_HEIGHT * .30, 0);
+	CG_CenterPrint( "YOU WIN!", SCREEN_HEIGHT * .30f, 0.5f );
 }
 
 static void CG_spLose_f( void) {
@@ -190,7 +186,7 @@ static void CG_spLose_f( void) {
 	trap_Cvar_Set("cg_thirdPersonRange", "100");
 	CG_AddBufferedSound(cgs.media.loserSound);
 	//trap_S_StartLocalSound(cgs.media.loserSound, CHAN_ANNOUNCER);
-	CG_CenterPrint("YOU LOSE...", SCREEN_HEIGHT * .30, 0);
+	CG_CenterPrint( "YOU LOSE...", SCREEN_HEIGHT * .30f, 0.5f );
 }
 
 

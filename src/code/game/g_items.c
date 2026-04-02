@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_rankings.h"
 #include <limits.h>
 
+#define QL_EV_ITEM_PICKUP_SPEC	0x53
+
 /*
 
   Items are any object that a player can touch to gain some effect.
@@ -191,12 +193,16 @@ ITEM_UNLOCK_TIER_NONE indicates that no unlock is required.
 =============
 */
 static int G_GetItemUnlockTier( const gitem_t *item ) {
+	weapon_t	weapon;
+
 	if ( !item ) {
 		return ITEM_UNLOCK_TIER_NONE;
 	}
 
 	if ( item->giType == IT_WEAPON ) {
-		switch ( item->giTag ) {
+		weapon = BG_WeaponForItemTag( item->giTag );
+
+		switch ( weapon ) {
 		case WP_SHOTGUN:
 			return 0;
 		case WP_GAUNTLET:
@@ -230,11 +236,11 @@ static int G_GetItemUnlockTier( const gitem_t *item ) {
 		}
 	}
 
-	if ( item->giType == IT_AMMO && item->giTag == WP_PROX_LAUNCHER ) {
+	if ( item->giType == IT_AMMO && BG_WeaponForItemTag( item->giTag ) == WP_PROX_LAUNCHER ) {
 		return 0x0D;
 	}
 
-	if ( item->giType == IT_HOLDABLE && item->giTag == HI_KAMIKAZE ) {
+	if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_KAMIKAZE ) {
 		return 0x0C;
 	}
 
@@ -730,7 +736,7 @@ static qboolean G_GetTeamPickupStatForItem( const gentity_t *ent, teamScoreStatI
 			return qfalse;
 		}
 	case IT_HOLDABLE:
-		if ( item->giTag == HI_MEDKIT ) {
+		if ( BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
 			*statIndex = TEAMSTAT_PICKUPS_MEDKIT;
 			return qtrue;
 		}
@@ -998,14 +1004,13 @@ int Pickup_PersistantPowerup( gentity_t *ent, gentity_t *other ) {
 //======================================================================
 
 int Pickup_Holdable( gentity_t *ent, gentity_t *other ) {
+	other->client->ps.stats[STAT_HOLDABLE_ITEM] = ent->item - bg_itemlist;
 
-        other->client->ps.stats[STAT_HOLDABLE_ITEM] = ent->item - bg_itemlist;
+	if ( BG_HoldableForItemTag( ent->item->giTag ) == HI_KAMIKAZE ) {
+		other->client->ps.eFlags |= EF_KAMIKAZE;
+	}
 
-        if( ent->item->giTag == HI_KAMIKAZE ) {
-                other->client->ps.eFlags |= EF_KAMIKAZE;
-        }
-
-        return RESPAWN_HOLDABLE;
+	return RESPAWN_HOLDABLE;
 }
 
 /*
@@ -1169,6 +1174,7 @@ account.
 */
 static int G_ResolveAmmoPickupAmount( const gentity_t *ent ) {
 	int	fallback;
+	weapon_t	weapon;
 
 	if ( !ent || !ent->item ) {
 		return 0;
@@ -1182,12 +1188,13 @@ static int G_ResolveAmmoPickupAmount( const gentity_t *ent ) {
 		return ent->count;
 	}
 
+	weapon = BG_WeaponForItemTag( ent->item->giTag );
 	fallback = ent->item->quantity;
 	if ( fallback <= 0 ) {
-		fallback = BG_GetWeaponAmmoPackSize( ent->item->giTag );
+		fallback = BG_GetWeaponAmmoPackSize( weapon );
 	}
 
-	return G_GetAmmoPackPickupCount( ent->item->giTag, fallback );
+	return G_GetAmmoPackPickupCount( weapon, fallback );
 }
 
 /*
@@ -1269,7 +1276,7 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 			quantity = 0;
 		}
 
-		Add_Ammo( other, ent->item->giTag, quantity );
+		Add_Ammo( other, BG_WeaponForItemTag( ent->item->giTag ), quantity );
 	}
 
 	respawn = G_GetConfiguredAmmoRespawnSeconds();
@@ -1299,7 +1306,7 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 	weapon_t	weapon;
 	int		basePickup;
 
-	weapon = ent->item ? (weapon_t)ent->item->giTag : WP_NONE;
+	weapon = ent->item ? BG_WeaponForItemTag( ent->item->giTag ) : WP_NONE;
 	basePickup = G_GetAmmoPackPickupCount( weapon, ent->item ? ent->item->quantity : 0 );
 
 	if ( ent->count < 0 ) {
@@ -1328,12 +1335,12 @@ int Pickup_Weapon (gentity_t *ent, gentity_t *other) {
 	}
 
 	// add the weapon
-	other->client->ps.stats[STAT_WEAPONS] |= ( 1 << ent->item->giTag );
+	other->client->ps.stats[STAT_WEAPONS] |= ( 1 << weapon );
 
-	Add_Ammo( other, ent->item->giTag, quantity );
+	Add_Ammo( other, weapon, quantity );
 
-	if ( ent->item->giTag == WP_GRAPPLING_HOOK ) {
-		other->client->ps.ammo[ent->item->giTag] = -1; // unlimited ammo
+	if ( weapon == WP_GRAPPLING_HOOK ) {
+		other->client->ps.ammo[weapon] = -1; // unlimited ammo
 	}
 
 	// team deathmatch has slow weapon respawns
@@ -1463,7 +1470,7 @@ void RespawnItem( gentity_t *ent ) {
 		te->r.svFlags |= SVF_BROADCAST;
 	}
 
-	if ( ent->item->giType == IT_HOLDABLE && ent->item->giTag == HI_KAMIKAZE ) {
+	if ( ent->item->giType == IT_HOLDABLE && BG_HoldableForItemTag( ent->item->giTag ) == HI_KAMIKAZE ) {
 		// play powerup spawn sound to all clients
 		gentity_t	*te;
 
@@ -1482,6 +1489,127 @@ void RespawnItem( gentity_t *ent ) {
 	G_AddEvent( ent, EV_ITEM_RESPAWN, 0 );
 
 	ent->nextthink = 0;
+}
+
+/*
+===============
+G_IsSpectatorItemPickupItem
+
+Returns qtrue for the major-item classes used by the retail spectator timer
+overlay.
+===============
+*/
+static qboolean G_IsSpectatorItemPickupItem( const gitem_t *item ) {
+	if ( !item ) {
+		return qfalse;
+	}
+
+	if ( item->giType == IT_POWERUP ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_ARMOR && item->quantity >= 50 ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+===============
+G_GetSpectatorItemPickupPalette
+
+Picks the compact retail palette id used by the spectator pickup overlay.
+===============
+*/
+static int G_GetSpectatorItemPickupPalette( const gentity_t *player ) {
+	int	rank;
+
+	if ( !player || !player->client ) {
+		return 0;
+	}
+
+	if ( g_gametype.integer == GT_TOURNAMENT ) {
+		rank = player->client->ps.persistant[PERS_RANK] & ~RANK_TIED_FLAG;
+		if ( rank == 0 ) {
+			return 1;
+		}
+
+		if ( rank == 1 ) {
+			return 2;
+		}
+	}
+
+	if ( player->client->sess.sessionTeam == TEAM_RED ) {
+		return 1;
+	}
+
+	if ( player->client->sess.sessionTeam == TEAM_BLUE ) {
+		return 2;
+	}
+
+	return 0;
+}
+
+/*
+===============
+G_GetSpectatorItemPickupLayoutOrder
+
+Builds the duel-side ordering hint consumed by the retail spectator overlay.
+===============
+*/
+static int G_GetSpectatorItemPickupLayoutOrder( const gentity_t *player ) {
+	int	rank;
+
+	if ( !player || !player->client || g_gametype.integer != GT_TOURNAMENT ) {
+		return 0;
+	}
+
+	rank = player->client->ps.persistant[PERS_RANK] & ~RANK_TIED_FLAG;
+	if ( rank < 0 ) {
+		rank = 0;
+	}
+
+	return rank + 1;
+}
+
+/*
+===============
+G_RecordSpectatorItemPickup
+
+Publishes the synthetic retail major-item pickup event consumed by the
+spectator timer overlay.
+===============
+*/
+static void G_RecordSpectatorItemPickup( gentity_t *itemEnt, gentity_t *player, int respawn ) {
+	gentity_t	*te;
+
+	if ( !itemEnt || !player || !player->client ) {
+		return;
+	}
+
+	if ( respawn <= 0 || ( itemEnt->flags & FL_DROPPED_ITEM ) ) {
+		return;
+	}
+
+	if ( !G_IsSpectatorItemPickupItem( itemEnt->item ) ) {
+		return;
+	}
+
+	te = G_TempEntity( itemEnt->s.pos.trBase, QL_EV_ITEM_PICKUP_SPEC );
+	te->r.svFlags |= SVF_BROADCAST;
+	te->s.groundEntityNum = player->s.number + 1;
+	te->s.constantLight = G_GetSpectatorItemPickupPalette( player );
+	te->s.origin[0] = (float)( level.time + respawn * 1000 );
+	te->s.origin[1] = (float)( g_gametype.integer == GT_TOURNAMENT );
+	te->s.clientNum = itemEnt->s.modelindex;
+	te->s.frame = G_GetSpectatorItemPickupLayoutOrder( player );
+	te->s.loopSound = 0;
+	te->s.modelindex2 = 0;
 }
 
 
@@ -1624,6 +1752,8 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	}
 
 	respawn = G_ApplyPowerupRespawnOverride( ent, respawn );
+
+	G_RecordSpectatorItemPickup( ent, other, respawn );
 
 	// dropped items will not respawn
 	if ( ent->flags & FL_DROPPED_ITEM ) {

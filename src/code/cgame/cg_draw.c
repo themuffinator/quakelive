@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // used for scoreboard
 extern displayContextDef_t cgDC;
 menuDef_t *menuScoreboard = NULL;
+menuDef_t *menuStats = NULL;
 
 int sortedTeamPlayers[TEAM_MAXOVERLAY];
 int	numSortedTeamPlayers;
@@ -49,6 +50,7 @@ static qhandle_t	cg_inputCmdUpShader;
 static qhandle_t	cg_inputCmdDownShader;
 static qhandle_t	cg_inputCmdRightShader;
 static qhandle_t	cg_inputCmdLeftShader;
+static float	cg_spectatorItemPickupBaseY;
 
 
 /*
@@ -248,14 +250,10 @@ static void CG_DrawInputCmds( void ) {
 =============
 CG_IsMenuHudActive
 
-Reports if the Quake Live HUD menus should be drawn instead of legacy elements.
+Reports if the Quake Live HUD menus should be drawn.
 =============
 */
 static qboolean CG_IsMenuHudActive( void ) {
-	if ( cg_useLegacyHud.integer ) {
-		return qfalse;
-	}
-
 	return cg.competitiveHudLoaded;
 }
 
@@ -336,6 +334,24 @@ int CG_Text_Height(const char *text, float scale, int limit) {
   return max * useScale;
 }
 
+/*
+=============
+CG_Text_GetExtents
+
+Measures the rendered text bounds through the shared width and height helpers.
+=============
+*/
+static void CG_Text_GetExtents( const char *text, float scale, int limit, int style, int *outWidth, int *outHeight ) {
+	(void)style;
+
+	if ( outWidth ) {
+		*outWidth = CG_Text_Width( text, scale, limit );
+	}
+	if ( outHeight ) {
+		*outHeight = CG_Text_Height( text, scale, limit );
+	}
+}
+
 void CG_Text_PaintChar(float x, float y, float width, float height, float scale, float s, float t, float s2, float t2, qhandle_t hShader) {
   float w, h;
   w = width * scale;
@@ -412,6 +428,17 @@ void CG_Text_Paint(float x, float y, float scale, vec4_t color, const char *text
     }
 	  trap_R_SetColor( NULL );
   }
+}
+
+/*
+=============
+CG_Text_PaintNoAdjust
+
+Forwards to the shared text painter with zero glyph adjustment.
+=============
+*/
+static void CG_Text_PaintNoAdjust( float x, float y, float scale, vec4_t color, const char *text, int limit, int style ) {
+	CG_Text_Paint( x, y, scale, color, text, 0.0f, limit, style );
 }
 
 
@@ -1290,7 +1317,7 @@ CG_ObituaryColorForIndex
 Maps the retail obituary palette index to the draw color for one name column.
 =============
 */
-static void CG_ObituaryColorForIndex( int colorIndex, float alpha, vec4_t color ) {
+void CG_ObituaryColorForIndex( int colorIndex, float alpha, vec4_t color ) {
 	switch ( colorIndex ) {
 	case 1:
 		color[0] = 1.0f;
@@ -1739,6 +1766,398 @@ static float CG_DrawTeamOverlay( float y, qboolean right, qboolean upper ) {
 //#endif
 }
 
+/*
+=============
+CG_GetSpectatorItemPickupMask
+
+Maps an item definition onto the retail spectator-item filter mask.
+=============
+*/
+static int CG_GetSpectatorItemPickupMask( const gitem_t *item ) {
+	if ( !item ) {
+		return 0;
+	}
+
+	if ( item->giType == IT_POWERUP ) {
+		return 1;
+	}
+
+	if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {
+		return 2;
+	}
+
+	if ( item->giType == IT_ARMOR ) {
+		if ( item->quantity >= 100 ) {
+			return 4;
+		}
+
+		if ( item->quantity >= 50 ) {
+			return 8;
+		}
+	}
+
+	return 0;
+}
+
+/*
+=============
+CG_IsSpectatorItemPickupModeActive
+
+Returns qtrue when the retail spectator pickup overlay should stay live.
+=============
+*/
+static qboolean CG_IsSpectatorItemPickupModeActive( void ) {
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+
+	if ( cg.demoPlayback ) {
+		return qtrue;
+	}
+
+	if ( cg.snap->ps.pm_flags & PMF_FOLLOW ) {
+		return qtrue;
+	}
+
+	return ( qboolean )( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
+}
+
+/*
+=============
+CG_IsSpectatorItemPickupVisible
+
+Applies the spectator timer cvar mask to a cached retail pickup row.
+=============
+*/
+static qboolean CG_IsSpectatorItemPickupVisible( const cgSpectatorItemPickup_t *pickup ) {
+	const gitem_t	*item;
+	int		mask;
+
+	if ( !pickup || pickup->clientNum < 0 || pickup->remainingTime <= 0 ) {
+		return qfalse;
+	}
+
+	if ( pickup->itemNum <= 0 || pickup->itemNum >= bg_numItems ) {
+		return qfalse;
+	}
+
+	item = &bg_itemlist[pickup->itemNum];
+	mask = CG_GetSpectatorItemPickupMask( item );
+	if ( mask == 0 ) {
+		return qfalse;
+	}
+
+	return ( ( cg_specItemTimers.integer & mask ) != 0 );
+}
+
+/*
+=============
+CG_GetSpectatorItemPickupPaletteColor
+
+Resolves the compact retail tint used by the duel-side item timer overlay.
+=============
+*/
+static void CG_GetSpectatorItemPickupPaletteColor( int palette, vec4_t color ) {
+	switch ( palette ) {
+	case 1:
+		color[0] = 1.0f;
+		color[1] = 0.2f;
+		color[2] = 0.1f;
+		color[3] = 1.0f;
+		break;
+	case 2:
+		color[0] = 0.2f;
+		color[1] = 0.4f;
+		color[2] = 1.0f;
+		color[3] = 1.0f;
+		break;
+	default:
+		Vector4Copy( colorWhite, color );
+		break;
+	}
+}
+
+/*
+=============
+CG_CompareSpectatorItemPickups
+
+Orders the cached spectator pickup rows for the classic HUD drawer.
+=============
+*/
+static int QDECL CG_CompareSpectatorItemPickups( const void *a, const void *b ) {
+	const cgSpectatorItemPickup_t	*pickupA;
+	const cgSpectatorItemPickup_t	*pickupB;
+	int			result;
+
+	pickupA = (const cgSpectatorItemPickup_t *)a;
+	pickupB = (const cgSpectatorItemPickup_t *)b;
+
+	if ( cgs.gametype == GT_TOURNAMENT ) {
+		result = pickupB->palette - pickupA->palette;
+		if ( result != 0 ) {
+			return result;
+		}
+
+		result = pickupA->duelLayout - pickupB->duelLayout;
+		if ( result != 0 ) {
+			return result;
+		}
+
+		if ( pickupA->layoutOrder != 0 && pickupB->layoutOrder != 0 ) {
+			result = pickupB->layoutOrder - pickupA->layoutOrder;
+			if ( result != 0 ) {
+				return result;
+			}
+		}
+	}
+
+	result = (int)pickupB->origin[2] - (int)pickupA->origin[2];
+	if ( result != 0 ) {
+		return result;
+	}
+
+	result = (int)pickupB->origin[1] - (int)pickupA->origin[1];
+	if ( result != 0 ) {
+		return result;
+	}
+
+	result = (int)pickupB->origin[0] - (int)pickupA->origin[0];
+	if ( result != 0 ) {
+		return result;
+	}
+
+	return pickupB->clientNum - pickupA->clientNum;
+}
+
+/*
+=============
+CG_ClearSpectatorItemPickups
+
+Resets the retail spectator pickup overlay cache.
+=============
+*/
+void CG_ClearSpectatorItemPickups( void ) {
+	int	i;
+
+	memset( cg.spectatorItemPickups, 0, sizeof( cg.spectatorItemPickups ) );
+	for ( i = 0; i < CG_SPECTATOR_ITEM_PICKUP_COUNT; i++ ) {
+		cg.spectatorItemPickups[i].clientNum = -1;
+	}
+
+	cg.spectatorItemPickupCount = 0;
+}
+
+/*
+=============
+CG_RecordSpectatorItemPickup
+
+Caches a retail-style spectator item timer row keyed by the pickup owner.
+=============
+*/
+void CG_RecordSpectatorItemPickup( const entityState_t *es ) {
+	cgSpectatorItemPickup_t	*pickup;
+	int			clientNum;
+	int			itemNum;
+	int			freeSlot;
+	int			i;
+
+	if ( !es ) {
+		return;
+	}
+
+	clientNum = es->groundEntityNum - 1;
+	itemNum = es->clientNum;
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+
+	if ( itemNum <= 0 || itemNum >= bg_numItems ) {
+		return;
+	}
+
+	if ( CG_GetSpectatorItemPickupMask( &bg_itemlist[itemNum] ) == 0 ) {
+		return;
+	}
+
+	pickup = NULL;
+	freeSlot = -1;
+	for ( i = 0; i < CG_SPECTATOR_ITEM_PICKUP_COUNT; i++ ) {
+		if ( cg.spectatorItemPickups[i].clientNum == clientNum ) {
+			pickup = &cg.spectatorItemPickups[i];
+			break;
+		}
+
+		if ( freeSlot < 0 && cg.spectatorItemPickups[i].clientNum < 0 ) {
+			freeSlot = i;
+		}
+	}
+
+	if ( !pickup ) {
+		if ( freeSlot < 0 ) {
+			return;
+		}
+
+		pickup = &cg.spectatorItemPickups[freeSlot];
+		cg.spectatorItemPickupCount++;
+	}
+
+	pickup->clientNum = clientNum;
+	pickup->palette = es->constantLight;
+	pickup->itemNum = itemNum;
+	pickup->remainingTime = (int)es->origin[0] - cg.time;
+	pickup->duelLayout = (int)es->origin[1];
+	pickup->layoutOrder = es->frame * ( ( es->loopSound > 0 ) ? 2 : 1 );
+	VectorCopy( es->pos.trBase, pickup->origin );
+	if ( pickup->remainingTime < 0 ) {
+		pickup->remainingTime = 0;
+	}
+}
+
+/*
+=============
+CG_UpdateSpectatorItemPickups
+
+Maintains and sorts the cached spectator pickup rows once per frame.
+=============
+*/
+void CG_UpdateSpectatorItemPickups( void ) {
+	int			i;
+	int			liveCount;
+	cgSpectatorItemPickup_t	activePickups[CG_SPECTATOR_ITEM_PICKUP_COUNT];
+
+	if ( !CG_IsSpectatorItemPickupModeActive() ) {
+		CG_ClearSpectatorItemPickups();
+		return;
+	}
+
+	liveCount = 0;
+	for ( i = 0; i < CG_SPECTATOR_ITEM_PICKUP_COUNT; i++ ) {
+		cgSpectatorItemPickup_t	pickup;
+
+		if ( cg.spectatorItemPickups[i].clientNum < 0 ) {
+			continue;
+		}
+
+		pickup = cg.spectatorItemPickups[i];
+		if ( !cg_paused.integer ) {
+			pickup.remainingTime -= cg.frametime;
+		}
+
+		if ( pickup.remainingTime <= 0 ) {
+			continue;
+		}
+
+		activePickups[liveCount++] = pickup;
+	}
+
+	CG_ClearSpectatorItemPickups();
+	if ( liveCount == 0 ) {
+		return;
+	}
+
+	if ( liveCount > 1 ) {
+		qsort( activePickups, liveCount, sizeof( activePickups[0] ), CG_CompareSpectatorItemPickups );
+	}
+
+	memcpy( cg.spectatorItemPickups, activePickups, sizeof( activePickups[0] ) * liveCount );
+	cg.spectatorItemPickupCount = liveCount;
+	for ( i = liveCount; i < CG_SPECTATOR_ITEM_PICKUP_COUNT; i++ ) {
+		cg.spectatorItemPickups[i].clientNum = -1;
+	}
+}
+
+/*
+=============
+CG_DrawSpectatorItemPickups
+
+Draws the retail spectator major-item timer overlay beneath the upper-right slab.
+=============
+*/
+static void CG_DrawSpectatorItemPickups( void ) {
+	int			i;
+	int			leftIndex;
+	int			rightIndex;
+	float		x;
+	float		y;
+	float		size;
+	float		scale;
+	char		timerText[16];
+
+	if ( cg_specItemTimers.integer <= 0 || cg.spectatorItemPickupCount <= 0 ) {
+		return;
+	}
+
+	if ( !CG_IsSpectatorItemPickupModeActive() ) {
+		return;
+	}
+
+	size = cg_specItemTimersSize.value * 100.0f;
+	if ( size < 1.0f ) {
+		size = 1.0f;
+	}
+
+	scale = cg_specItemTimersSize.value;
+	if ( scale <= 0.0f ) {
+		scale = 0.24f;
+	}
+
+	x = cg_specItemTimersX.value;
+	if ( x == 0.0f ) {
+		x = 640.0f - size - 4.0f;
+	}
+
+	y = cg_specItemTimersY.value;
+	if ( y == 0.0f ) {
+		y = cg_spectatorItemPickupBaseY;
+	}
+
+	leftIndex = 0;
+	rightIndex = 0;
+	for ( i = 0; i < cg.spectatorItemPickupCount; i++ ) {
+		const cgSpectatorItemPickup_t	*pickup;
+		const gitem_t			*item;
+		qhandle_t			icon;
+		float				drawX;
+		float				drawY;
+		int				seconds;
+
+		pickup = &cg.spectatorItemPickups[i];
+		if ( !CG_IsSpectatorItemPickupVisible( pickup ) ) {
+			continue;
+		}
+
+		item = &bg_itemlist[pickup->itemNum];
+		icon = item->icon ? trap_R_RegisterShader( item->icon ) : 0;
+		if ( !icon ) {
+			icon = cgs.media.deferShader;
+		}
+
+		drawX = x;
+		drawY = y;
+		if ( pickup->duelLayout && ( pickup->palette == 1 || pickup->palette == 2 ) ) {
+			vec4_t	color;
+			int	columnIndex;
+
+			columnIndex = ( pickup->palette == 1 ) ? leftIndex++ : rightIndex++;
+			drawX = ( pickup->palette == 1 ) ? ( x - size * 1.2f ) : x;
+			drawY = y + columnIndex * ( size * 1.1f );
+			CG_GetSpectatorItemPickupPaletteColor( pickup->palette, color );
+			CG_FillRect( drawX, drawY, size, size, color );
+		} else {
+			y += size + 4.0f;
+		}
+
+		CG_DrawPic( drawX, drawY, size, size, icon );
+
+		seconds = ( pickup->remainingTime + 999 ) / 1000;
+		if ( seconds > 0 ) {
+			Com_sprintf( timerText, sizeof( timerText ), "%d", seconds );
+			CG_Text_PaintNoAdjust( drawX + size + 4.0f, drawY + size - 5.0f, scale, colorWhite,
+				timerText, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+		}
+	}
+}
+
 
 /*
 =====================
@@ -1768,6 +2187,7 @@ static void CG_DrawUpperRight( void ) {
 	}
 
 	y = CG_DrawObituaries( y );
+	cg_spectatorItemPickupBaseY = y;
 }
 
 /*
@@ -2063,6 +2483,106 @@ static void CG_DrawLowerRight( void ) {
 CG_DrawPickupItem
 ===================
 */
+/*
+=============
+CG_FormatPickupTimestamp
+
+Formats the timestamped pickup prefix as the retail notify/chat `m:ss.mmm`
+clock wrapped in brackets.
+=============
+*/
+static void CG_FormatPickupTimestamp( int milliseconds, char *buffer, size_t bufferSize ) {
+	int	minutes;
+	int	seconds;
+	int	ms;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	if ( milliseconds < 0 ) {
+		milliseconds = 0;
+	}
+
+	minutes = milliseconds / 60000;
+	seconds = ( milliseconds % 60000 ) / 1000;
+	ms = milliseconds % 1000;
+	Com_sprintf( buffer, bufferSize, "[%i:%02i.%03i]", minutes, seconds, ms );
+}
+
+/*
+=============
+CG_DrawPickupItem
+
+Restores the Quake Live pickup notification bitmask controlled by
+`cg_drawItemPickups`: icon, text, and optional timestamp prefix.
+=============
+*/
+static int CG_DrawPickupItem( int y ) {
+	int			value;
+	float		*fadeColor;
+	const gitem_t	*item;
+	qboolean		drawIcon;
+	qboolean		drawText;
+	qboolean		drawTimestamp;
+	int			x;
+	char			timestampText[32];
+
+	if ( cg.snap->ps.stats[STAT_HEALTH] <= 0 ) {
+		return y;
+	}
+
+	if ( cg_drawItemPickups.integer <= 0 ) {
+		return y;
+	}
+
+	value = cg.itemPickup;
+	if ( value <= 0 || value >= bg_numItems ) {
+		return y;
+	}
+
+	item = &bg_itemlist[value];
+	if ( !item->pickup_name || !item->pickup_name[0] ) {
+		return y;
+	}
+
+	fadeColor = CG_FadeColor( cg.itemPickupTime, 3000 );
+	if ( !fadeColor ) {
+		return y;
+	}
+
+	drawIcon = (qboolean)( ( cg_drawItemPickups.integer & 1 ) != 0 );
+	drawText = (qboolean)( ( cg_drawItemPickups.integer & 2 ) != 0 );
+	drawTimestamp = (qboolean)( ( cg_drawItemPickups.integer & 4 ) != 0 );
+	if ( !drawIcon && !drawText && !drawTimestamp ) {
+		return y;
+	}
+
+	y -= ICON_SIZE;
+	x = 8;
+
+	if ( drawTimestamp ) {
+		CG_FormatPickupTimestamp( cg.itemPickupTime, timestampText, sizeof( timestampText ) );
+		CG_DrawSmallStringColor( x, y + ( ICON_SIZE - SMALLCHAR_HEIGHT ) / 2, timestampText, fadeColor );
+		x += CG_DrawStrlen( timestampText ) * SMALLCHAR_WIDTH + 8;
+	}
+
+	if ( drawIcon ) {
+		CG_RegisterItemVisuals( value );
+		if ( cg_items[value].icon ) {
+			trap_R_SetColor( fadeColor );
+			CG_DrawPic( x, y, ICON_SIZE, ICON_SIZE, cg_items[value].icon );
+			trap_R_SetColor( NULL );
+		}
+		x += ICON_SIZE + 8;
+	}
+
+	if ( drawText ) {
+		CG_DrawBigStringColor( x, y + ( ICON_SIZE / 2 - BIGCHAR_HEIGHT / 2 ), item->pickup_name, fadeColor );
+	}
+
+	return y;
+}
 
 /*
 =====================
@@ -2070,6 +2590,20 @@ CG_DrawLowerLeft
 
 =====================
 */
+/*
+=============
+CG_DrawLowerLeft
+
+Draws the retail pickup notification stack in the lower-left corner when the
+classic HUD path is active.
+=============
+*/
+static void CG_DrawLowerLeft( void ) {
+	int	y;
+
+	y = 480 - ICON_SIZE;
+	CG_DrawPickupItem( y );
+}
 
 
 //===========================================================================================
@@ -2371,8 +2905,8 @@ static void CG_DrawTeamInfoRow( const clientInfo_t *ci, team_t team, float y ) {
 		CG_DrawRect( iconX - 1.0f, y - 1.0f, 18.0f, 18.0f, 1.0f, colorWhite );
 	}
 
-	CG_Text_Paint( nameX, y + 18.0f, 0.18f, textColor, nameText, 0, 0, ITEM_TEXTSTYLE_SHADOWED );
-	CG_Text_Paint( locationX, y + 18.0f, 0.18f, textColor, locationText, 0, 0, ITEM_TEXTSTYLE_SHADOWED );
+	CG_Text_PaintNoAdjust( nameX, y + 18.0f, 0.18f, textColor, nameText, 0, ITEM_TEXTSTYLE_SHADOWED );
+	CG_Text_PaintNoAdjust( locationX, y + 18.0f, 0.18f, textColor, locationText, 0, ITEM_TEXTSTYLE_SHADOWED );
 }
 
 /*
@@ -2759,17 +3293,17 @@ CENTER PRINTING
 CG_CenterPrint
 
 Called for important messages that should stay in the center of the screen
-for a few moments
+for a few moments.
 ==============
 */
-void CG_CenterPrint( const char *str, int y, int charWidth ) {
+void CG_CenterPrint( const char *str, int y, float scale ) {
 	char	*s;
 
 	Q_strncpyz( cg.centerPrint, str, sizeof(cg.centerPrint) );
 
 	cg.centerPrintTime = cg.time;
 	cg.centerPrintY = y;
-	cg.centerPrintCharWidth = charWidth;
+	cg.centerPrintScale = scale;
 
 	// count the number of lines for centering
 	cg.centerPrintLines = 1;
@@ -2791,7 +3325,8 @@ static void CG_DrawCenterString( void ) {
 	char	*start;
 	int		l;
 	int		x, y, w;
-  int h;
+	int		h;
+	float		scale;
 	float	*color;
 
 	if ( !cg.centerPrintTime ) {
@@ -2806,8 +3341,12 @@ static void CG_DrawCenterString( void ) {
 	trap_R_SetColor( color );
 
 	start = cg.centerPrint;
+	scale = cg.centerPrintScale;
+	if ( scale <= 0.0f ) {
+		scale = 0.5f;
+	}
 
-	y = cg.centerPrintY - cg.centerPrintLines * BIGCHAR_HEIGHT / 2;
+	y = cg.centerPrintY - (int)( (float)( cg.centerPrintLines * BIGCHAR_HEIGHT ) * scale );
 
 	while ( 1 ) {
 		char linebuffer[1024];
@@ -2820,10 +3359,10 @@ static void CG_DrawCenterString( void ) {
 		}
 		linebuffer[l] = 0;
 
-		w = CG_Text_Width(linebuffer, 0.5, 0);
-		h = CG_Text_Height(linebuffer, 0.5, 0);
+		w = CG_Text_Width( linebuffer, scale, 0 );
+		h = CG_Text_Height( linebuffer, scale, 0 );
 		x = (SCREEN_WIDTH - w) / 2;
-		CG_Text_Paint(x, y + h, 0.5, color, linebuffer, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE);
+		CG_Text_Paint( x, y + h, scale, color, linebuffer, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
 		y += h + 6;
 		while ( *start && ( *start != '\n' ) ) {
 			start++;
@@ -2847,6 +3386,148 @@ CROSSHAIR
 ================================================================================
 */
 
+
+/*
+=================
+CG_DrawScreenVignette
+
+Draws the retail fullscreen vignette overlay when the cached cvar allows it.
+=================
+*/
+static void CG_DrawScreenVignette( void ) {
+	static qhandle_t	vignetteShader;
+	char			browserActive[16];
+
+	if ( !cg.vignetteEnabled ) {
+		return;
+	}
+
+	trap_Cvar_VariableStringBuffer( "web_browserActive", browserActive, sizeof( browserActive ) );
+	if ( atoi( browserActive ) != 0 ) {
+		return;
+	}
+
+	if ( vignetteShader == 0 ) {
+		vignetteShader = trap_R_RegisterShader( "gfx/misc/vignette" );
+	}
+
+	if ( vignetteShader == 0 ) {
+		return;
+	}
+
+	CG_DrawPic( 0.0f, 0.0f, 640.0f, 480.0f, vignetteShader );
+}
+
+/*
+=================
+CG_ApplyCrosshairHitFeedback
+
+Applies the retail hit-window scale and color override to the active crosshair.
+=================
+*/
+static void CG_ApplyCrosshairHitFeedback( float *width, float *height ) {
+	static const vec4_t builtInColors[4] = {
+		{ 0.25f, 0.50f, 1.00f, 1.00f },
+		{ 1.00f, 1.00f, 1.00f, 1.00f },
+		{ 1.00f, 0.50f, 1.00f, 1.00f },
+		{ 1.00f, 0.00f, 1.00f, 1.00f }
+	};
+	float		elapsed;
+	float		fraction;
+	float		scaleAmount;
+	float		scaleFactor;
+	vec4_t		color;
+	int			style;
+	int			hitValue;
+	qboolean	useColor;
+	qboolean	useScale;
+	qboolean	useCustomColor;
+	qboolean	useConstantScale;
+
+	if ( !width || !height ) {
+		return;
+	}
+
+	style = cg.crosshairHitStyle;
+	if ( style < 1 || style > 8 || cg.crosshairHitTime <= 0 ) {
+		return;
+	}
+
+	elapsed = (float)( cg.time - cg_crosshairHitFeedbackTime );
+	if ( elapsed <= 0.0f || elapsed >= (float)cg.crosshairHitTime ) {
+		return;
+	}
+
+	useColor = qfalse;
+	useScale = qfalse;
+	useCustomColor = qfalse;
+	useConstantScale = qfalse;
+
+	switch ( style ) {
+	case 1:
+		useColor = qtrue;
+		break;
+	case 2:
+		useColor = qtrue;
+		useCustomColor = qtrue;
+		break;
+	case 3:
+		useScale = qtrue;
+		break;
+	case 4:
+		useColor = qtrue;
+		useScale = qtrue;
+		break;
+	case 5:
+		useColor = qtrue;
+		useScale = qtrue;
+		useCustomColor = qtrue;
+		break;
+	case 6:
+		useScale = qtrue;
+		useConstantScale = qtrue;
+		break;
+	case 7:
+		useColor = qtrue;
+		useScale = qtrue;
+		useConstantScale = qtrue;
+		break;
+	case 8:
+		useColor = qtrue;
+		useScale = qtrue;
+		useCustomColor = qtrue;
+		useConstantScale = qtrue;
+		break;
+	default:
+		return;
+	}
+
+	fraction = elapsed / (float)cg.crosshairHitTime;
+	hitValue = cg_crosshairHitFeedbackValue;
+	if ( hitValue < 1 || hitValue > 4 ) {
+		hitValue = 1;
+	}
+
+	if ( useScale ) {
+		scaleAmount = useConstantScale ? 1.0f : (float)hitValue;
+		scaleFactor = 1.0f + scaleAmount * fraction;
+		*width *= scaleFactor;
+		*height *= scaleFactor;
+	}
+
+	if ( !useColor ) {
+		return;
+	}
+
+	if ( useCustomColor ) {
+		Vector4Copy( cg.crosshairHitColor, color );
+		color[3] = 1.0f;
+	} else {
+		Vector4Copy( builtInColors[hitValue - 1], color );
+	}
+
+	trap_R_SetColor( color );
+}
 
 /*
 =================
@@ -2893,6 +3574,8 @@ static void CG_DrawCrosshair(void) {
 			h *= ( 1 + f );
 		}
 	}
+
+	CG_ApplyCrosshairHitFeedback( &w, &h );
 
 	x = cg_crosshairX.integer;
 	y = cg_crosshairY.integer;
@@ -3061,9 +3744,9 @@ static void CG_DrawCrosshairTeamVitals( const clientInfo_t *ci, const vec4_t bas
 	healthWidth = CG_Text_Width( healthText, textScale, 0 );
 	textY = 198.0f + textScale * 16.0f;
 
-	CG_Text_Paint( 320.0f - healthWidth, textY, textScale, healthColor, healthText, 0, 0, ITEM_TEXTSTYLE_SHADOWED );
-	CG_Text_Paint( 320.0f, textY, textScale, slashColor, "/", 0, 0, ITEM_TEXTSTYLE_SHADOWED );
-	CG_Text_Paint( 325.0f, textY, textScale, armorColor, armorText, 0, 0, ITEM_TEXTSTYLE_SHADOWED );
+	CG_Text_PaintNoAdjust( 320.0f - healthWidth, textY, textScale, healthColor, healthText, 0, ITEM_TEXTSTYLE_SHADOWED );
+	CG_Text_PaintNoAdjust( 320.0f, textY, textScale, slashColor, "/", 0, ITEM_TEXTSTYLE_SHADOWED );
+	CG_Text_PaintNoAdjust( 325.0f, textY, textScale, armorColor, armorText, 0, ITEM_TEXTSTYLE_SHADOWED );
 }
 
 /*
@@ -3407,10 +4090,10 @@ static qboolean CG_DrawActiveScoreboard( qboolean menuHudActive, qboolean forceD
 	CG_StartScoreboardTimer( cg.time );
 	CG_BuildHudScoreboard();
 
-		drawn = CG_DrawScoreboard();
-		if ( !drawn && cg_useLegacyHud.integer ) {
-			drawn = CG_DrawOldScoreboard();
-		}
+	drawn = CG_DrawScoreboard();
+	if ( !drawn ) {
+		drawn = CG_DrawOldScoreboard();
+	}
 
 	if ( !drawn ) {
 		CG_StopScoreboardTimer( cg.time );
@@ -3473,6 +4156,8 @@ CG_DrawAmmoWarning
 */
 static void CG_DrawAmmoWarning( void ) {
 	const char	*s;
+	float		scale;
+	float		y;
 	int			w;
 
 	if ( cg_drawAmmoWarning.integer == 0 ) {
@@ -3485,13 +4170,20 @@ static void CG_DrawAmmoWarning( void ) {
 
 	if ( cg.lowAmmoWarning == 2 ) {
 		s = "OUT OF AMMO";
-	} else if ( cg.lowAmmoWarning == 3 ) {
-		s = "NO AMMO FOR THIS WEAPON";
 	} else {
 		s = "LOW AMMO WARNING";
 	}
-	w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
-	CG_DrawBigString(320 - w / 2, 64, s, 1.0F);
+
+	if ( cg_drawAmmoWarning.integer == 1 ) {
+		scale = 0.35f;
+		y = 55.0f;
+	} else {
+		scale = 0.24f;
+		y = 52.0f;
+	}
+
+	w = CG_Text_Width( s, scale, 0 );
+	CG_Text_Paint( 320.0f - (float)w * 0.5f, y, scale, colorWhite, s, 0.0f, 0, 0 );
 }
 
 
@@ -3554,16 +4246,373 @@ static const char *CG_GetBindKeyName( const char *cmd, char *buf, int len ) {
 
 /*
 =================
+CG_DrawWarmupStartBanner
+=================
+*/
+static void CG_DrawWarmupStartBanner( void ) {
+	const char	*text;
+	team_t		localTeam;
+	team_t		attackingTeam;
+	sfxHandle_t	sound;
+
+	text = "FIGHT!";
+	sound = cgs.media.countFightSound;
+
+	if ( cgs.gametype == GT_ATTACK_DEFEND ) {
+		attackingTeam = ( cgs.matchRoundTurn != 0 ) ? TEAM_BLUE : TEAM_RED;
+		localTeam = TEAM_SPECTATOR;
+		if ( cg.snap ) {
+			localTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+		}
+
+		if ( localTeam == TEAM_RED || localTeam == TEAM_BLUE ) {
+			text = ( localTeam == attackingTeam ) ? "ATTACK THE FLAG" : "DEFEND THE FLAG";
+		} else {
+			text = ( attackingTeam == TEAM_RED ) ? "Red is on offense" : "Blue is on offense";
+		}
+	} else if ( cgs.gametype == GT_RED_ROVER && ( cgs.customSettingsMask & CUSTOM_SETTING_INFECTED ) ) {
+		text = "BITE!";
+		if ( cgs.media.infectedSound ) {
+			sound = cgs.media.infectedSound;
+		}
+	}
+
+	if ( sound ) {
+		trap_S_StartLocalSound( sound, CHAN_ANNOUNCER );
+	}
+
+	CG_CenterPrint( text, 120, 0.5f );
+}
+
+/*
+=================
+CG_PlayWarmupCountSound
+=================
+*/
+static void CG_PlayWarmupCountSound( int countdown ) {
+	switch ( countdown ) {
+	case 3:
+		if ( cgs.media.count3Sound ) {
+			trap_S_StartLocalSound( cgs.media.count3Sound, CHAN_ANNOUNCER );
+		}
+		break;
+
+	case 2:
+		if ( cgs.media.count2Sound ) {
+			trap_S_StartLocalSound( cgs.media.count2Sound, CHAN_ANNOUNCER );
+		}
+		break;
+
+	case 1:
+		if ( cgs.media.count1Sound ) {
+			trap_S_StartLocalSound( cgs.media.count1Sound, CHAN_ANNOUNCER );
+		}
+		break;
+
+	case 0:
+		CG_DrawWarmupStartBanner();
+		break;
+
+	default:
+		if ( countdown > 3 && cgs.matchTimeoutActive && cgs.media.countPrepareSound ) {
+			trap_S_StartLocalSound( cgs.media.countPrepareSound, CHAN_ANNOUNCER );
+		}
+		break;
+	}
+}
+
+/*
+=================
+CG_DrawWarmupStatusText
+=================
+*/
+static void CG_DrawWarmupStatusText( int gametype ) {
+	int				i;
+	int				w;
+	int				countdown;
+	float			titleY;
+	float			countdownY;
+	float			countdownScale;
+	float			verticalOffset;
+	qboolean			shortCountdown;
+	clientInfo_t		*ci1;
+	clientInfo_t		*ci2;
+	team_t			localTeam;
+	team_t			attackingTeam;
+	const char		*title;
+	const char		*countdownText;
+
+	title = "";
+	titleY = 90.0f;
+	countdownY = 125.0f;
+	verticalOffset = ( gametype == GT_RACE ) ? 30.0f : 0.0f;
+	shortCountdown = qfalse;
+
+	if ( gametype == GT_TOURNAMENT ) {
+		ci1 = NULL;
+		ci2 = NULL;
+		for ( i = 0; i < cgs.maxclients; i++ ) {
+			if ( cgs.clientinfo[i].infoValid && cgs.clientinfo[i].team == TEAM_FREE ) {
+				if ( !ci1 ) {
+					ci1 = &cgs.clientinfo[i];
+				} else {
+					ci2 = &cgs.clientinfo[i];
+				}
+			}
+		}
+
+		if ( ci1 && ci2 ) {
+			title = va( "%s vs %s", ci1->name, ci2->name );
+		}
+		titleY = 60.0f;
+	} else if ( gametype == GT_FFA && ( cgs.customSettingsMask & CUSTOM_SETTING_QUAD_HOG ) ) {
+		title = "Quad Hog";
+	} else if ( gametype == GT_RED_ROVER &&
+		( cgs.customSettingsMask & CUSTOM_SETTING_INFECTED ) &&
+		cgs.matchRoundNumber <= 0 ) {
+		title = "Infected";
+	} else if ( gametype == GT_ATTACK_DEFEND && cgs.matchRoundState == ROUNDSTATE_WARMUP ) {
+		attackingTeam = ( cgs.matchRoundTurn != 0 ) ? TEAM_BLUE : TEAM_RED;
+		localTeam = TEAM_SPECTATOR;
+		if ( cg.snap ) {
+			localTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+		}
+
+		if ( localTeam == TEAM_RED || localTeam == TEAM_BLUE ) {
+			title = ( localTeam == attackingTeam ) ? "ATTACK THE FLAG" : "DEFEND THE FLAG";
+		} else {
+			title = ( attackingTeam == TEAM_RED ) ? "Red is on offense" : "Blue is on offense";
+		}
+		shortCountdown = qtrue;
+	} else {
+		switch ( gametype ) {
+		case GT_CLAN_ARENA:
+		case GT_FREEZE:
+		case GT_ATTACK_DEFEND:
+		case GT_RED_ROVER:
+			if ( cgs.matchRoundNumber > 0 ) {
+				title = cgs.matchSuddenDeathActive ? "Sudden Death" : "Round Begins in";
+				shortCountdown = qtrue;
+				break;
+			}
+			break;
+
+		default:
+			break;
+		}
+
+		if ( !title[0] ) {
+			title = CG_GameTypeString();
+		}
+	}
+
+	if ( title[0] ) {
+		CG_Text_GetExtents( title, 0.6f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+		CG_Text_PaintNoAdjust( 320 - w / 2, titleY + verticalOffset, 0.6f, colorWhite,
+			title, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	}
+
+	countdown = cg.warmupCount;
+	if ( countdown <= 0 ) {
+		return;
+	}
+
+	countdownText = va( shortCountdown ? "%i" : "Starts in: %i", countdown );
+	countdownScale = 0.45f;
+	switch ( countdown ) {
+	case 1:
+		countdownScale = 0.51f;
+		break;
+
+	case 2:
+		countdownScale = 0.48f;
+		break;
+
+	default:
+		break;
+	}
+
+	CG_Text_GetExtents( countdownText, countdownScale, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+	CG_Text_PaintNoAdjust( 320 - w / 2, countdownY + verticalOffset, countdownScale, colorWhite,
+		countdownText, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+}
+
+/*
+=================
+CG_DrawMatchPauseStatus
+=================
+*/
+static void CG_DrawMatchPauseStatus( void ) {
+	int			remaining;
+	int			w;
+	const char		*text;
+
+	if ( !cgs.matchTimeoutActive ) {
+		return;
+	}
+
+	text = "Match Paused";
+	if ( cgs.matchTimeoutExpireTime > 0 ) {
+		remaining = ( ( cgs.matchTimeoutExpireTime - cg.time ) + 1000 ) / 1000;
+		if ( remaining < 0 ) {
+			remaining = 0;
+		}
+
+		if ( remaining <= 5 ) {
+			if ( remaining != cg.warmupCount ) {
+				cg.warmupCount = remaining;
+				CG_PlayWarmupCountSound( remaining );
+			}
+
+			if ( remaining <= 0 ) {
+				return;
+			}
+
+			text = va( "Match resuming in ^5%d^7 seconds", remaining );
+		} else {
+			cg.warmupCount = -1;
+		}
+	} else {
+		cg.warmupCount = -1;
+	}
+
+	CG_Text_GetExtents( text, 0.45f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+	CG_Text_PaintNoAdjust( 320 - w / 2, 105.0f, 0.45f, colorWhite, text, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+}
+
+/*
+=================
+CG_DominationPointLabel
+=================
+*/
+static const char *CG_DominationPointLabel( int pointIndex ) {
+	switch ( pointIndex ) {
+	case 1:
+		return "A";
+	case 2:
+		return "B";
+	case 3:
+		return "C";
+	case 4:
+		return "D";
+	case 5:
+		return "E";
+	default:
+		return "?";
+	}
+}
+
+/*
+=================
+CG_DrawDominationPointStatus
+=================
+*/
+static void CG_DrawDominationPointStatus( void ) {
+	centity_t	*cent;
+	team_t		viewerTeam;
+	team_t		owner;
+	team_t		capturing;
+	team_t		activeTeam;
+	vec3_t		delta;
+	vec4_t		barColor;
+	const char	*text;
+	const char	*pointLabel;
+	float		progress;
+	float		radius;
+	int			i;
+	int			textWidth;
+	int			captureCount;
+
+	if ( cgs.gametype != GT_DOMINATION || !cg.snap || cg.showScores ) {
+		return;
+	}
+
+	if ( cg.snap->ps.stats[STAT_HEALTH] <= 0 || cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		return;
+	}
+
+	if ( cg.snap->ps.pm_flags & PMF_FOLLOW ) {
+		return;
+	}
+
+	viewerTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+	if ( viewerTeam != TEAM_RED && viewerTeam != TEAM_BLUE ) {
+		return;
+	}
+
+	for ( i = 0; i < ENTITYNUM_NONE; i++ ) {
+		cent = &cg_entities[i];
+		if ( !cent->currentValid || cent->currentState.eType != ET_TEAM ) {
+			continue;
+		}
+
+		radius = (float)cent->currentState.otherEntityNum;
+		if ( radius <= 0.0f ) {
+			continue;
+		}
+
+		owner = ( cent->currentState.modelindex == TEAM_RED || cent->currentState.modelindex == TEAM_BLUE ) ?
+			(team_t)cent->currentState.modelindex : TEAM_FREE;
+		capturing = ( cent->currentState.modelindex2 == TEAM_RED || cent->currentState.modelindex2 == TEAM_BLUE ) ?
+			(team_t)cent->currentState.modelindex2 : TEAM_FREE;
+		if ( owner == TEAM_FREE && capturing == TEAM_FREE && cent->currentState.frame <= 0 &&
+				cent->currentState.constantLight <= 0 && cent->currentState.generic1 != 2 ) {
+			continue;
+		}
+
+		VectorSubtract( cg.refdef.vieworg, cent->lerpOrigin, delta );
+		if ( DotProduct( delta, delta ) > radius * radius ) {
+			continue;
+		}
+
+		pointLabel = CG_DominationPointLabel( cent->currentState.clientNum );
+		captureCount = cent->currentState.constantLight;
+		if ( captureCount < 0 ) {
+			captureCount = 0;
+		}
+
+		if ( cent->currentState.generic1 == 2 ) {
+			text = va( "Contesting %s", pointLabel );
+		} else if ( owner == viewerTeam ) {
+			text = va( "Defending %s", pointLabel );
+		} else if ( captureCount >= 2 ) {
+			text = va( "Capturing %s (%dx)", pointLabel, captureCount );
+		} else {
+			text = va( "Capturing %s", pointLabel );
+		}
+
+		progress = Com_Clamp( 0.0f, 1.0f, (float)cent->currentState.frame / 255.0f );
+		activeTeam = ( capturing != TEAM_FREE ) ? capturing : owner;
+		if ( activeTeam == TEAM_RED ) {
+			barColor[0] = 1.0f;
+			barColor[1] = 0.0f;
+			barColor[2] = 0.0f;
+			barColor[3] = 1.0f;
+		} else {
+			barColor[0] = 0.0f;
+			barColor[1] = 0.5f;
+			barColor[2] = 1.0f;
+			barColor[3] = 1.0f;
+		}
+
+		CG_Text_GetExtents( text, 0.25f, 0, 0, &textWidth, NULL );
+		CG_Text_PaintNoAdjust( 320.0f - textWidth / 2.0f, 360.0f, 0.25f, colorWhite, text, 0, 0 );
+		CG_FillRect( 258.0f, 365.0f, 125.0f, 12.0f, colorBlack );
+		if ( progress > 0.0f ) {
+			CG_FillRect( 258.0f, 365.0f, 125.0f * progress, 12.0f, barColor );
+		}
+		return;
+	}
+}
+
+/*
+=================
 CG_DrawWarmup
 =================
 */
 static void CG_DrawWarmup( void ) {
 	int			w;
 	int			sec;
-	int			i;
-	float scale;
-	clientInfo_t	*ci1, *ci2;
-	int			cw;
 	const char	*s;
 
 	sec = cg.warmup;
@@ -3597,8 +4646,8 @@ static void CG_DrawWarmup( void ) {
 					cgs.matchWarmupReadyEligible );
 			}
 
-			w = CG_Text_Width( status, 0.25f, 0 );
-			CG_Text_Paint( 320 - w / 2, promptY, 0.25f, colorWhite, status, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+			CG_Text_GetExtents( status, 0.25f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+			CG_Text_PaintNoAdjust( 320 - w / 2, promptY, 0.25f, colorWhite, status, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
 			promptY += 15.0f;
 		}
 
@@ -3613,95 +4662,28 @@ static void CG_DrawWarmup( void ) {
 			}
 
 			s = va( "Press %s to ready yourself", keyName );
-			w = CG_Text_Width( s, 0.25f, 0 );
-			CG_Text_Paint( 320 - w / 2, promptY, 0.25f, colorWhite, s, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+			CG_Text_GetExtents( s, 0.25f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+			CG_Text_PaintNoAdjust( 320 - w / 2, promptY, 0.25f, colorWhite, s, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
 		}
 		return;
 	}
 
-	if (cgs.gametype == GT_TOURNAMENT) {
-		// find the two active players
-		ci1 = NULL;
-		ci2 = NULL;
-		for ( i = 0 ; i < cgs.maxclients ; i++ ) {
-			if ( cgs.clientinfo[i].infoValid && cgs.clientinfo[i].team == TEAM_FREE ) {
-				if ( !ci1 ) {
-					ci1 = &cgs.clientinfo[i];
-				} else {
-					ci2 = &cgs.clientinfo[i];
-				}
-			}
-		}
-
-		if ( ci1 && ci2 ) {
-			s = va( "%s vs %s", ci1->name, ci2->name );
-			w = CG_Text_Width(s, 0.6f, 0);
-			CG_Text_Paint(320 - w / 2, 60, 0.6f, colorWhite, s, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE);
-		}
-	} else {
-		if ( cgs.gametype == GT_FFA ) {
-			s = "Free For All";
-		} else if ( cgs.gametype == GT_TEAM ) {
-			s = "Team Deathmatch";
-		} else if ( cgs.gametype == GT_CTF ) {
-			s = "Capture the Flag";
-		} else if ( cgs.gametype == GT_1FCTF ) {
-			s = "One Flag CTF";
-		} else if ( cgs.gametype == GT_OBELISK ) {
-			s = "Overload";
-		} else if ( cgs.gametype == GT_HARVESTER ) {
-			s = "Harvester";
-		} else {
-			s = "";
-		}
-		w = CG_Text_Width(s, 0.6f, 0);
-		CG_Text_Paint(320 - w / 2, 90, 0.6f, colorWhite, s, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE);
-	}
-
-	sec = ( sec - cg.time ) / 1000;
+	sec = ( ( sec - cg.time ) + 1000 ) / 1000;
 	if ( sec < 0 ) {
 		cg.warmup = 0;
 		sec = 0;
 	}
-	s = va( "Starts in: %i", sec + 1 );
+
 	if ( sec != cg.warmupCount ) {
 		cg.warmupCount = sec;
-		switch ( sec ) {
-		case 0:
-			trap_S_StartLocalSound( cgs.media.count1Sound, CHAN_ANNOUNCER );
-			break;
-		case 1:
-			trap_S_StartLocalSound( cgs.media.count2Sound, CHAN_ANNOUNCER );
-			break;
-		case 2:
-			trap_S_StartLocalSound( cgs.media.count3Sound, CHAN_ANNOUNCER );
-			break;
-		default:
-			break;
-		}
-	}
-	scale = 0.45f;
-	switch ( cg.warmupCount ) {
-	case 0:
-		cw = 28;
-		scale = 0.54f;
-		break;
-	case 1:
-		cw = 24;
-		scale = 0.51f;
-		break;
-	case 2:
-		cw = 20;
-		scale = 0.48f;
-		break;
-	default:
-		cw = 16;
-		scale = 0.45f;
-		break;
+		CG_PlayWarmupCountSound( sec );
 	}
 
-		w = CG_Text_Width(s, scale, 0);
-		CG_Text_Paint(320 - w / 2, 125, scale, colorWhite, s, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE);
+	if ( sec <= 0 ) {
+		return;
+	}
+
+	CG_DrawWarmupStatusText( cgs.gametype );
 }
 
 //==================================================================================
@@ -3720,6 +4702,104 @@ void CG_DrawTimedMenus() {
 		}
 	}
 }
+
+/*
+=============
+CG_DrawStatsMenu
+
+Paints the retail `stats_menu` overlay that backs the `+acc` HUD request.
+=============
+*/
+static qboolean CG_DrawStatsMenu( void ) {
+	if ( !menuStats ) {
+		menuStats = Menus_FindByName( "stats_menu" );
+	}
+
+	if ( menuStats ) {
+		menuStats->window.flags &= ~WINDOW_FORCED;
+	}
+
+	if ( !CG_ShouldDrawAccOverlay() || !menuStats ) {
+		return qfalse;
+	}
+
+	Menu_Paint( menuStats, qtrue );
+	return qtrue;
+}
+
+/*
+=============================
+CG_ComputeIntermissionLetterboxHeight
+
+Evaluates the current retail intermission letterbox height from the cached
+transition state.
+=============================
+*/
+static float CG_ComputeIntermissionLetterboxHeight( void ) {
+	int		elapsed;
+	float	fraction;
+
+	if ( cg.intermissionLetterboxDuration <= 0 ||
+		 cg.intermissionLetterboxStartHeight == cg.intermissionLetterboxTargetHeight ) {
+		cg.intermissionLetterboxStartHeight = cg.intermissionLetterboxTargetHeight;
+		cg.intermissionLetterboxDuration = 0;
+		return cg.intermissionLetterboxTargetHeight;
+	}
+
+	elapsed = cg.time - cg.intermissionLetterboxChangeTime;
+	if ( elapsed <= 0 ) {
+		return cg.intermissionLetterboxStartHeight;
+	}
+	if ( elapsed >= cg.intermissionLetterboxDuration ) {
+		cg.intermissionLetterboxStartHeight = cg.intermissionLetterboxTargetHeight;
+		cg.intermissionLetterboxDuration = 0;
+		return cg.intermissionLetterboxTargetHeight;
+	}
+
+	fraction = (float)elapsed / (float)cg.intermissionLetterboxDuration;
+	return cg.intermissionLetterboxStartHeight +
+		( cg.intermissionLetterboxTargetHeight - cg.intermissionLetterboxStartHeight ) * fraction;
+}
+
+/*
+============================
+CG_DrawIntermissionLetterbox
+
+Draws the retail top/bottom intermission letterbox transition beneath CG_Draw2D.
+============================
+*/
+static void CG_DrawIntermissionLetterbox( void ) {
+	qboolean	intermissionLatched;
+	float		targetHeight;
+	float		height;
+
+	intermissionLatched = qfalse;
+	if ( cg.intermissionStarted ) {
+		intermissionLatched = qtrue;
+	}
+	if ( cg.snap && cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		intermissionLatched = qtrue;
+	}
+
+	targetHeight = intermissionLatched ? 84.0f : 0.0f;
+	if ( targetHeight != cg.intermissionLetterboxTargetHeight ) {
+		cg.intermissionLetterboxStartHeight = CG_ComputeIntermissionLetterboxHeight();
+		cg.intermissionLetterboxTargetHeight = targetHeight;
+		cg.intermissionLetterboxChangeTime = cg.time;
+		cg.intermissionLetterboxDuration = 1000;
+	}
+
+	height = CG_ComputeIntermissionLetterboxHeight();
+	if ( height > 0.0f && height < 1.0f ) {
+		height = 1.0f;
+	}
+	if ( height <= 0.0f ) {
+		return;
+	}
+
+	CG_FillRect( 0, 0, 640, height, colorBlack );
+	CG_FillRect( 0, 480 - height, 640, height, colorBlack );
+}
 /*
 =================
 CG_Draw2D
@@ -3737,6 +4817,8 @@ static void CG_Draw2D( void ) {
 	if ( cg_draw2D.integer == 0 ) {
 		return;
 	}
+
+	CG_DrawIntermissionLetterbox();
 
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		CG_DrawIntermission();
@@ -3760,6 +4842,7 @@ static void CG_Draw2D( void ) {
 	}
 	canShowStatus = ( qboolean )( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 );
 	menuScoreboardHandled = qfalse;
+	cg_spectatorItemPickupBaseY = 0.0f;
 
 	if ( menuHudActive && cg_drawStatus.integer && ( spectator || canShowStatus ) ) {
 		Menu_PaintAll();
@@ -3777,10 +4860,9 @@ static void CG_Draw2D( void ) {
 			if ( !menuHudActive ) {
 				CG_DrawAmmoWarning();
 				CG_DrawProxWarning();
-				CG_DrawWeaponSelect();
 				CG_DrawReward();
 			}
-			CG_DrawScreenDamage();
+			CG_DrawWeaponSelect();
 			CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
 		}
@@ -3789,6 +4871,8 @@ static void CG_Draw2D( void ) {
 			CG_DrawTeammatePOIs();
 		}
 	}
+
+	CG_DrawJoinGameMenu();
 
 	if ( menuHudActive ) {
 		if ( cg.showScores ) {
@@ -3813,12 +4897,18 @@ static void CG_Draw2D( void ) {
 			CG_DrawInputCmds();
 			CG_DrawSpeedometer();
 			CG_DrawLowerRight();
+			CG_DrawLowerLeft();
 		}
 		CG_DrawUpperRight();
+		if ( !menuHudActive ) {
+			CG_DrawSpectatorItemPickups();
+		}
 	}
 
 
 	if ( !CG_DrawFollow() ) {
+		CG_DrawDominationPointStatus();
+		CG_DrawMatchPauseStatus();
 		CG_DrawWarmup();
 	}
 	CG_DrawTeamInfo();
@@ -3834,6 +4924,8 @@ static void CG_Draw2D( void ) {
 			CG_DrawCenterString();
 		}
 	}
+
+	CG_DrawStatsMenu();
 }
 
 
@@ -3898,7 +4990,8 @@ void CG_DrawActive( stereoFrame_t stereoView ) {
 	}
 
 	// draw status bar and other floating elements
- 	CG_Draw2D();
+	CG_DrawScreenVignette();
+	CG_Draw2D();
 }
 
 

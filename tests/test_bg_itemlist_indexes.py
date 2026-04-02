@@ -158,10 +158,7 @@ def test_player_touch_bounds_match_retail_flag_behavior():
 
 	assert "maxZDelta = 29.0f;" in body
 	assert "maxZDelta = 64.0f;" in body
-	assert "itemDef->giType == IT_TEAM" in body
-	assert "PW_REDFLAG" in body
-	assert "PW_BLUEFLAG" in body
-	assert "PW_NEUTRALFLAG" in body
+	assert "BG_IsTeamFlagItem( itemDef )" in body
 	assert "ps->origin[0] - origin[0] > 36" in body
 	assert "ps->origin[0] - origin[0] < -36" in body
 	assert "ps->origin[2] - origin[2] > maxZDelta" in body

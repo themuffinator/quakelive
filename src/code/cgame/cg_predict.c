@@ -55,13 +55,10 @@ static void CG_LocalProjectileNudge( vec3_t origin, int *msec ) {
 		return;
 	}
 
-	manual = cg_projectileNudge.value;
-	if ( manual < 0.0f ) {
-		manual = 0.0f;
-	}
+	manual = cg.projectileNudgeAmount;
 
 	autoComponent = 0.0f;
-	if ( cg_autoProjectileNudge.integer && cg.snap ) {
+	if ( cg.autoProjectileNudgeEnabled && cg.snap ) {
 		autoComponent = (float)cg.snap->ping * 0.5f;
 		if ( autoComponent < 0.0f ) {
 			autoComponent = 0.0f;
@@ -471,11 +468,31 @@ static void CG_InterpolatePlayerState( qboolean grabAngles ) {
 
 /*
 ===================
+BG_IsRedBlueFlagItem
+
+Returns qtrue when the supplied item row is one of the colored CTF flags.
+===================
+*/
+static qboolean BG_IsRedBlueFlagItem( const gitem_t *item ) {
+	if ( !item ) {
+		return qfalse;
+	}
+
+	if ( item->giType != IT_TEAM ) {
+		return qfalse;
+	}
+
+	return (qboolean)( item->giTag == PW_REDFLAG || item->giTag == PW_BLUEFLAG );
+}
+
+/*
+===================
 CG_TouchItem
 ===================
 */
 static void CG_TouchItem( centity_t *cent ) {
 	gitem_t		*item;
+	weapon_t	weapon;
 
 	if ( !cg_predictItems.integer ) {
 		return;
@@ -502,7 +519,7 @@ static void CG_TouchItem( centity_t *cent ) {
 			return;
 		}
 	}
-	if( cgs.gametype == GT_CTF || cgs.gametype == GT_HARVESTER ) {
+	if( ( cgs.gametype == GT_CTF || cgs.gametype == GT_HARVESTER ) && BG_IsRedBlueFlagItem( item ) ) {
 		if (cg.predictedPlayerState.persistant[PERS_TEAM] == TEAM_RED &&
 			item->giTag == PW_REDFLAG)
 			return;
@@ -522,9 +539,11 @@ static void CG_TouchItem( centity_t *cent ) {
 
 	// if its a weapon, give them some predicted ammo so the autoswitch will work
 	if ( item->giType == IT_WEAPON ) {
-		cg.predictedPlayerState.stats[ STAT_WEAPONS ] |= 1 << item->giTag;
-		if ( !cg.predictedPlayerState.ammo[ item->giTag ] ) {
-			cg.predictedPlayerState.ammo[ item->giTag ] = 1;
+		weapon = BG_WeaponForItemTag( item->giTag );
+
+		cg.predictedPlayerState.stats[ STAT_WEAPONS ] |= 1 << weapon;
+		if ( !cg.predictedPlayerState.ammo[ weapon ] ) {
+			cg.predictedPlayerState.ammo[ weapon ] = 1;
 		}
 	}
 }
@@ -666,7 +685,7 @@ void CG_PredictPlayerState( void ) {
 	// prepare for pmove
 	cg_pmove.ps = &cg.predictedPlayerState;
 	memcpy( &localPmoveSettings, &cg_pmoveSettings, sizeof( localPmoveSettings ) );
-	if ( cg_autoHop.integer ) {
+	if ( cg.autoHopEnabled ) {
 		localPmoveSettings.autoHop = qtrue;
 	}
 	cg_pmove.pmoveSettings = &localPmoveSettings;

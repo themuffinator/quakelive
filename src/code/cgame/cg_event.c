@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //==========================================================================
 
 enum {
+	QL_EV_ITEM_PICKUP_SPEC = 0x53,
 	QL_EV_OVERTIME = 0x54,
 	QL_EV_GAMEOVER = 0x55,
 	QL_EV_LIGHTNING_DISCHARGE = 0x5c,
@@ -489,7 +490,7 @@ static qboolean CG_IsLocalPlayerWinner( void ) {
 		return qfalse;
 	}
 
-	if ( cgs.gametype < GT_TEAM || cgs.gametype == GT_RED_ROVER ) {
+	if ( !CG_IsTeamWinnerGametype( cgs.gametype ) ) {
 		rank = cg.snap->ps.persistant[PERS_RANK];
 		if ( rank & RANK_TIED_FLAG ) {
 			return qfalse;
@@ -745,7 +746,8 @@ static void CG_HandleRetailAwardEvent( const entityState_t *es ) {
 =============
 CG_TryFollowKiller
 
-Issues a follow command for the killer when the spectator was viewing the victim.
+Queues the retail delayed follow-killer command when the spectator was viewing
+the victim.
 =============
 */
 static void CG_TryFollowKiller( int target, int attacker ) {
@@ -771,7 +773,23 @@ static void CG_TryFollowKiller( int target, int attacker ) {
 		return;
 	}
 
-	trap_SendClientCommand( va( "follow %d", attacker ) );
+	cg.pendingFollowKillerClient = attacker;
+	cg.pendingFollowKillerTime = cg.time + 400;
+}
+
+/*
+=============
+CG_UseItemCenterPrintScale
+
+Maps the retail use-item cvar modes onto the cached centerprint scale.
+=============
+*/
+static float CG_UseItemCenterPrintScale( int mode ) {
+	if ( mode == 2 ) {
+		return 0.25f;
+	}
+
+	return 0.5f;
 }
 
 /*
@@ -1211,7 +1229,7 @@ static void CG_Obituary( entityState_t *ent ) {
 			s = va("You fragged %s", targetName );
 		}
 		if (!(cg_singlePlayerActive.integer && cg_cameraOrbit.integer)) {
-			CG_CenterPrint( s, SCREEN_HEIGHT * 0.30, BIGCHAR_WIDTH );
+			CG_CenterPrint( s, SCREEN_HEIGHT * 0.30f, 0.3f );
 		} 
 
 		// print the text message as well
@@ -1344,11 +1362,13 @@ static void CG_UseItem( centity_t *cent ) {
 	if ( es->number == cg.snap->ps.clientNum ) {
 		if ( !itemNum ) {
 			if ( cg_useItemWarning.integer ) {
-				CG_CenterPrint( "No item to use", SCREEN_HEIGHT * 0.30, BIGCHAR_WIDTH );
+				CG_CenterPrint( "No item to use", SCREEN_HEIGHT * 0.30f,
+					CG_UseItemCenterPrintScale( cg_useItemWarning.integer ) );
 			}
 		} else if ( cg_useItemMessage.integer ) {
 			item = BG_FindItemForHoldable( itemNum );
-			CG_CenterPrint( va("Use %s", item->pickup_name), SCREEN_HEIGHT * 0.30, BIGCHAR_WIDTH );
+			CG_CenterPrint( va( "Use %s", item->pickup_name ), SCREEN_HEIGHT * 0.30f,
+				CG_UseItemCenterPrintScale( cg_useItemMessage.integer ) );
 		}
 	}
 
@@ -1395,10 +1415,14 @@ static void CG_ItemPickup( int itemNum ) {
 	cg.itemPickupBlendTime = cg.time;
 	// see if it should be the grabbed weapon
 	if ( bg_itemlist[itemNum].giType == IT_WEAPON ) {
+		weapon_t weapon;
+
+		weapon = BG_WeaponForItemTag( bg_itemlist[itemNum].giTag );
+
 		// select it immediately
-		if ( cg_autoswitch.integer && bg_itemlist[itemNum].giTag != WP_MACHINEGUN ) {
+		if ( cg_autoswitch.integer && weapon != WP_MACHINEGUN ) {
 			cg.weaponSelectTime = cg.time;
-			CG_SetWeaponSelect( bg_itemlist[itemNum].giTag );
+			CG_SetWeaponSelect( weapon );
 		}
 	}
 
@@ -1437,6 +1461,64 @@ void CG_PainEvent( centity_t *cent, int health ) {
 	cent->pe.painDirection ^= 1;
 }
 
+/*
+=============
+CG_IsSpectatorItemPickupEvent
+
+Detects the synthetic retail spectator pickup event that shares the GPL
+taunt value in the public enum path.
+=============
+*/
+static qboolean CG_IsSpectatorItemPickupEvent( const entityState_t *es ) {
+	if ( !es || es->eType <= ET_EVENTS ) {
+		return qfalse;
+	}
+
+	if ( es->groundEntityNum <= 0 || es->groundEntityNum > MAX_CLIENTS ) {
+		return qfalse;
+	}
+
+	if ( es->clientNum <= 0 || es->clientNum >= bg_numItems ) {
+		return qfalse;
+	}
+
+	switch ( bg_itemlist[es->clientNum].giType ) {
+	case IT_POWERUP:
+		return qtrue;
+	case IT_HEALTH:
+		return ( qboolean )( bg_itemlist[es->clientNum].quantity >= 100 );
+	case IT_ARMOR:
+		return ( qboolean )( bg_itemlist[es->clientNum].quantity >= 50 );
+	default:
+		break;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CG_HandleRetailOvertimeEvent
+
+Processes the retail overtime temp-entity event outside the GPL taunt switch
+value overlap.
+=============
+*/
+static void CG_HandleRetailOvertimeEvent( void ) {
+	if ( cg.snap ) {
+		trap_S_StartSound( NULL, cg.snap->ps.clientNum, CHAN_AUTO,
+			trap_S_RegisterSound( "sound/world/klaxon2.ogg", qfalse ) );
+	}
+	{
+		int secondsAdded = ( cgs.matchOvertimeLengthSeconds > 0 ) ? cgs.matchOvertimeLengthSeconds : 90;
+
+		CG_CenterPrint( va( "Overtime! %d seconds added", secondsAdded ), 90, 0.5f );
+	}
+	if ( CG_GetOvertimeCount() == 0 && cgs.media.overtimeSound ) {
+		CG_AddBufferedSound( cgs.media.overtimeSound );
+	}
+}
+
 
 
 /*
@@ -1465,6 +1547,18 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 
 	if ( !event ) {
 		DEBUGNAME("ZEROEVENT");
+		return;
+	}
+
+	if ( event == QL_EV_ITEM_PICKUP_SPEC && CG_IsSpectatorItemPickupEvent( es ) ) {
+		DEBUGNAME("EV_ITEM_PICKUP_SPEC");
+		CG_RecordSpectatorItemPickup( es );
+		return;
+	}
+
+	if ( event == QL_EV_OVERTIME && es->eType > ET_EVENTS ) {
+		DEBUGNAME("EV_OVERTIME");
+		CG_HandleRetailOvertimeEvent();
 		return;
 	}
 
@@ -2154,22 +2248,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	case EV_DEBUG_LINE:
 		DEBUGNAME("EV_DEBUG_LINE");
 		CG_Beam( cent );
-		break;
-
-	case QL_EV_OVERTIME:
-		DEBUGNAME("EV_OVERTIME");
-		if ( cg.snap ) {
-			trap_S_StartSound( NULL, cg.snap->ps.clientNum, CHAN_AUTO,
-				trap_S_RegisterSound( "sound/world/klaxon2.ogg", qfalse ) );
-		}
-		{
-			int secondsAdded = ( cgs.matchOvertimeLengthSeconds > 0 ) ? cgs.matchOvertimeLengthSeconds : 90;
-
-			CG_CenterPrint( va( "Overtime! %d seconds added", secondsAdded ), 90, BIGCHAR_WIDTH );
-		}
-		if ( CG_GetOvertimeCount() == 0 && cgs.media.overtimeSound ) {
-			CG_AddBufferedSound( cgs.media.overtimeSound );
-		}
 		break;
 
 	case QL_EV_GAMEOVER:

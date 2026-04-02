@@ -1152,7 +1152,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Stubbed display-context getValue callback currently returning 0 for retail ownerdraw value lookups."
+      "comment": "Pure display-context getValue callback installed by `_UI_Init`; the committed retail body returns a hardcoded `0.0`, so shared ownerdraw color-range checks only ever evaluate against zero unless another layer replaces the callback."
     },
     {
       "address": "0x1000A9D0",
@@ -1213,7 +1213,7 @@
         "voteGame"
       ],
       "relocation_refs": [],
-      "comment": "Runs menu-script commands including the retail callvote-map preview and submission branches, vote/admin handlers, favorite management, and model-color synchronization, then logs unknown UI script handlers. The retail `ingame_callvote.menu` file binds this same path through `ui_cvGameType`, `updateCallvoteMapPreview`, `FEEDER_CVMAPS`, and `voteMap`; in the committed HLIL, the preview branch calls straight into `UI_FeederSelection` for feeder `19`, and the submit branch formats `callvote map %s %s\\n` inline from the selected net map plus `UI_GetCallvoteGametypeToken(ui_cvGameType)` or an empty fallback."
+      "comment": "Runs menu-script commands including the retail callvote-map preview and submission branches, the preserved legacy `getCDKey` and `verifyCDKey` cvar-state handlers, vote/admin handlers, favorite management, and model-color synchronization, then logs unknown UI script handlers. The retail `ingame_callvote.menu` file binds this same path through `ui_cvGameType`, `updateCallvoteMapPreview`, `FEEDER_CVMAPS`, and `voteMap`; in the committed HLIL, the preview branch calls straight into `UI_FeederSelection` for feeder `19`, the submit branch formats `callvote map %s %s\\n` inline from the selected net map plus `UI_GetCallvoteGametypeToken(ui_cvGameType)` or an empty fallback, and the CD-key branches read and write `cdkey1..4`, `cdkey`, `cdkeychecksum`, and `ui_cdkeyvalid` without surfacing a bounded standalone popup owner. The committed branch chain then advances directly to `loadArenas`; the source-side `openCredentials` / `UI_CDKeyMenu` path is therefore currently reconstruction-side compatibility rather than a separately bounded retail branch."
     },
     {
       "address": "0x1000D2F0",
@@ -1223,7 +1223,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Stubbed display-context getTeamColor callback kept in the native callback table even though the retail body is presently empty."
+      "comment": "Pure no-op display-context getTeamColor callback installed by `_UI_Init`; shared team-color paint and script paths still call the slot, but the committed retail body does not populate a color."
     },
     {
       "address": "0x1000D300",
@@ -1535,7 +1535,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Switches on the native UIMENU command, updates key catcher and pause state, reloads menu sets when needed, and activates the named retail menus. The ingame-menu branch also rebuilds the player list and resets the retail `ui_cvGameType` callvote filter cvar to `-1` before activating the ingame menu set."
+      "comment": "Switches on the native UIMENU command, updates key catcher and pause state, reloads menu sets when needed, and activates the committed retail `main`, `error_popmenu`, `ingame`, `ingame_about`, and `joingame_menu` flows. In the current jump table, case `5` (`UIMENU_TEAM`) lands on `joingame_menu`, the retained `UIMENU_NEED_CD` and `UIMENU_BAD_CD_KEY` values do not resolve to standalone menu-activation branches, and no separate committed `UIMENU_POSTGAME` branch is exposed. The ingame-menu branch also rebuilds the player list and resets the retail `ui_cvGameType` callvote filter cvar to `-1` before activating the ingame menu set."
     },
     {
       "address": "0x10010380",
@@ -2425,7 +2425,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Finds matching items by name or group, marks them visible plus in-transition, seeds rectClient and rectEffects state, and refreshes their screen coordinates."
+      "comment": "Finds matching items by name or group, marks them visible plus in-transition, seeds `offsetTime`, copies the source rect into `rectClient`, copies the destination rect into `rectEffects`, derives the per-step X/Y/W/H deltas into `rectEffects2`, and refreshes screen coordinates."
     },
     {
       "address": "0x100167B0",
@@ -2435,7 +2435,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Parses a target name, source rect, destination rect, time, and step amount for transition setup."
+      "comment": "Parses a target name, source rect, destination rect, cadence time, and step divisor, then forwards the setup into `Menu_TransitionItemByName`."
     },
     {
       "address": "0x100168A0",
@@ -2445,7 +2445,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Finds matching items by name or group, marks them visible plus orbiting, seeds the orbit center and starting rectClient position, and refreshes their screen coordinates."
+      "comment": "Finds matching items by name or group, marks them visible plus orbiting, seeds `offsetTime`, stores the orbit center in `rectEffects.x/y`, seeds the starting `rectClient.x/y`, and refreshes screen coordinates."
     },
     {
       "address": "0x100169D0",
@@ -2455,7 +2455,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Parses orbit target, x/y position, center, and time, then schedules orbit motion for matching items."
+      "comment": "Parses orbit target, start position, orbit center, and cadence time, then forwards the setup into `Menu_OrbitItemByName`."
     },
     {
       "address": "0x10016AD0",
@@ -3075,7 +3075,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Performs retail orbit and transition updates, visibility and show or hide cvar gating, Window_Paint, and the per-item type dispatch chain."
+      "comment": "Performs the retail per-item runtime chain: advances orbit and transition motion through `nextTime`, `offsetTime`, `rectEffects`, and `rectEffects2`, applies visibility/show-or-hide cvar gating, runs `Window_Paint`, and then dispatches the item-type-specific paint path."
     },
     {
       "address": "0x1001D390",

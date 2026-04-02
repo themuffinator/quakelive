@@ -107,6 +107,37 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CG_AUTOACTION_SCREENSHOT	( 1 << 1 )
 #define CG_AUTOACTION_STATS_UPLOAD	( 1 << 2 )
 
+/*
+=============
+CG_HasObjectiveCountStat
+
+Retail gametype predicate for the shared objective-count stat seams.
+=============
+*/
+static ID_INLINE qboolean CG_HasObjectiveCountStat( gametype_t gametype ) {
+	switch ( gametype ) {
+	case GT_CTF:
+	case GT_1FCTF:
+	case GT_OBELISK:
+	case GT_HARVESTER:
+	case GT_DOMINATION:
+		return qtrue;
+	default:
+		return qfalse;
+	}
+}
+
+/*
+=============
+CG_IsTeamWinnerGametype
+
+Retail gametype predicate for the shared endgame winner seams.
+=============
+*/
+static ID_INLINE qboolean CG_IsTeamWinnerGametype( gametype_t gametype ) {
+	return (qboolean)( gametype >= GT_TEAM && gametype != GT_RED_ROVER );
+}
+
 typedef enum {
 	FOOTSTEP_NORMAL,
 	FOOTSTEP_BOOT,
@@ -434,7 +465,7 @@ typedef struct {
 	int			weaponShots[WP_NUM_WEAPONS];
 	int			weaponDamage[WP_NUM_WEAPONS];
 	int			pickupCounts[CG_SCORESTAT_PICKUP_COUNT];
-	int			pickupAvgSeconds[CG_SCORESTAT_PICKUP_COUNT];
+	float			pickupAvgSeconds[CG_SCORESTAT_PICKUP_COUNT];
 	int			progressionPr;
 	int			progressionTier;
 } cgScoreStats_t;
@@ -718,6 +749,18 @@ typedef struct {
 	int		target;
 	int		mod;
 } cgObituary_t;
+
+#define CG_SPECTATOR_ITEM_PICKUP_COUNT	10
+
+typedef struct {
+	int		clientNum;
+	int		palette;
+	int		itemNum;
+	int		remainingTime;
+	int		duelLayout;
+	int		layoutOrder;
+	vec3_t	origin;
+} cgSpectatorItemPickup_t;
  
 typedef struct {
 	int			clientFrame;		// incremented each frame
@@ -733,6 +776,10 @@ typedef struct {
 	qboolean	voiceChatIndicatorEnabled;	// caches cg_voiceChatIndicator state
 	qboolean	vignetteEnabled;	// caches cg_vignette state
 	qboolean	intermissionStarted;	// don't play voice rewards, because game will end shortly
+	int			intermissionLetterboxChangeTime;
+	int			intermissionLetterboxDuration;
+	float		intermissionLetterboxStartHeight;
+	float		intermissionLetterboxTargetHeight;
 
 	// there are only one or two snapshot_t that are relevent at a time
 	int			latestSnapshotNum;	// the number of snapshots the client system has received
@@ -844,6 +891,8 @@ typedef struct {
 	int			scoreboardTimerStopTime;
 	int			scoreFadeTime;
 	char		killerName[MAX_NAME_LENGTH];
+	int			pendingFollowKillerClient;
+	int			pendingFollowKillerTime;
 	cgObituary_t	obituaries[MAX_OBITUARIES];
 	int			obituaryIndex;
 	char			spectatorList[MAX_STRING_CHARS];		// list of names
@@ -865,6 +914,8 @@ typedef struct {
 	int				spectatorTrackedClient;
 	int				spectatorSlotTrackedTime[2];
 	qboolean		spectatorCameraLocked;
+	cgSpectatorItemPickup_t	spectatorItemPickups[CG_SPECTATOR_ITEM_PICKUP_COUNT];
+	int				spectatorItemPickupCount;
 	int				trackedPlayerClientNum;
 	int				trackedPlayerExpireTime;
 	cgSpectatorTrackType_t	trackedPlayerPriority;
@@ -874,7 +925,7 @@ typedef struct {
 
 	// centerprinting
 	int			centerPrintTime;
-	int			centerPrintCharWidth;
+	float			centerPrintScale;
 	int			centerPrintY;
 	char		centerPrint[1024];
 	int			centerPrintLines;
@@ -1109,6 +1160,7 @@ typedef struct {
 	qhandle_t	lagometerShader;
 	qhandle_t	backTileShader;
 	qhandle_t	noammoShader;
+	qhandle_t	infiniteAmmoShader;
 	qhandle_t	healthBar100;
 	qhandle_t	healthBar200;
 	qhandle_t	armorBar100;
@@ -1608,13 +1660,13 @@ extern	vmCvar_t		cg_bobroll;
 extern	vmCvar_t		cg_bob;
 extern	vmCvar_t		cg_swingSpeed;
 extern	vmCvar_t		cg_shadows;
-extern	vmCvar_t		cg_gibs;
 extern	vmCvar_t		cg_drawTimer;
 extern	vmCvar_t		cg_drawFPS;
 extern	vmCvar_t		cg_drawSnapshot;
 extern	vmCvar_t		cg_draw3dIcons;
 extern	vmCvar_t		cg_drawIcons;
 extern	vmCvar_t		cg_drawAmmoWarning;
+extern	vmCvar_t		cg_lowAmmoWeaponBarWarning;
 extern	vmCvar_t		cg_drawCrosshair;
 extern	vmCvar_t		cg_drawCrosshairNames;
 extern	vmCvar_t		cg_drawRewards;
@@ -1624,7 +1676,6 @@ extern	vmCvar_t		cg_announcerRewardsVO;
 extern	vmCvar_t		cg_raceBeep;
 extern	vmCvar_t		cg_drawCheckpointRemaining;
 extern	vmCvar_t		cg_levelTimerDirection;
-extern	vmCvar_t		cg_raceBeep;
 extern	vmCvar_t		cg_drawProfileImages;
 extern	vmCvar_t		cg_drawSprites;
 extern	vmCvar_t		cg_drawPregameMessages;
@@ -1673,6 +1724,8 @@ extern	vmCvar_t		cg_crosshairPulse;
 extern	vmCvar_t		cg_crosshairHitStyle;
 extern	vmCvar_t		cg_crosshairHitTime;
 extern	vmCvar_t		cg_crosshairHitColor;
+extern	int			cg_crosshairHitFeedbackTime;
+extern	int			cg_crosshairHitFeedbackValue;
 extern	vmCvar_t		cg_enemyCrosshairNames;
 extern	vmCvar_t		cg_enemyCrosshairNamesOpacity;
 extern	vmCvar_t		cg_teammateCrosshairNames;
@@ -1709,7 +1762,6 @@ extern	vmCvar_t		cg_projectileNudge;
 extern	vmCvar_t		cg_autoswitch;
 extern	vmCvar_t		cg_switchOnEmpty;
 extern	vmCvar_t		cg_switchToEmpty;
-extern	vmCvar_t		cg_ignore;
 extern	vmCvar_t		cg_simpleItems;
 extern	vmCvar_t		cg_simpleItemsHeightOffset;
 extern	vmCvar_t		cg_simpleItemsBob;
@@ -1764,8 +1816,6 @@ extern	vmCvar_t		cg_teammatePOIs;
 extern	vmCvar_t		cg_teammatePOIsMinWidth;
 extern	vmCvar_t		cg_teammatePOIsMaxWidth;
 extern	vmCvar_t		cg_teamChatsOnly;
-extern	vmCvar_t		cg_noVoiceChats;
-extern	vmCvar_t		cg_noVoiceText;
 extern	vmCvar_t		cg_playVoiceChats;
 extern	vmCvar_t		cg_showVoiceText;
 extern	vmCvar_t		cg_useItemMessage;
@@ -1854,7 +1904,6 @@ extern	vmCvar_t		cg_gameInfo3;
 extern	vmCvar_t		cg_gameInfo4;
 extern	vmCvar_t		cg_gameInfo5;
 extern	vmCvar_t		cg_gameInfo6;
-extern	vmCvar_t		cg_useLegacyHud;
 extern	vmCvar_t		cg_vignette;
 extern	vmCvar_t		cg_voiceChatIndicator;
 extern	vmCvar_t		cg_autoHop;
@@ -1895,6 +1944,7 @@ void CG_InitBrowserRuntime( void );
 void CG_ResetBrowserOverlayState( void );
 void CG_SetBrowserFeederSelection( void *overlay, int feeder, int index );
 void CG_LoadMenus(const char *menuFile);
+void CG_LoadHudMenu( void );
 qhandle_t CG_RegisterCountryFlag( const char *countryCode );
 void CG_KeyEvent(int key, qboolean down);
 void CG_MouseEvent(int x, int y);
@@ -1971,11 +2021,12 @@ void CG_RacePlayCue( cgRaceCue_t cue );
 
 void CG_AddLagometerFrameInfo( void );
 void CG_AddLagometerSnapshotInfo( snapshot_t *snap );
-void CG_CenterPrint( const char *str, int y, int charWidth );
+void CG_CenterPrint( const char *str, int y, float scale );
 void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles );
 void CG_DrawActive( stereoFrame_t stereoView );
 void CG_DrawFlagModel( float x, float y, float w, float h, int team, qboolean force2D );
 qhandle_t CG_GetObituaryIcon( int mod );
+void CG_ObituaryColorForIndex( int colorIndex, float alpha, vec4_t color );
 void CG_DrawTeamBackground( int x, int y, int w, int h, float alpha, int team );
 void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle);
 void CG_Text_Paint(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style);
@@ -1986,6 +2037,9 @@ void CG_SelectNextPlayer();
 void CG_SpectatorFollowCycle(int dir);
 void CG_SpectatorTrackEvent( int clientNum, cgSpectatorTrackType_t trackType );
 void CG_UpdateSpectatorTracking( void );
+void CG_RecordSpectatorItemPickup( const entityState_t *es );
+void CG_ClearSpectatorItemPickups( void );
+void CG_UpdateSpectatorItemPickups( void );
 qboolean CG_IsSpectatorCamera( void );
 qboolean CG_SpectatorFollowRequest( int clientNum );
 void CG_StopSpectatorFollow( void );
@@ -2015,6 +2069,7 @@ void CG_RegisterGameTypeIcons( void );
 qboolean CG_YourTeamHasFlag();
 qboolean CG_OtherTeamHasFlag();
 qhandle_t CG_StatusHandle(int task);
+qboolean CG_ShouldDrawAccOverlay( void );
 
 /*
 =============
@@ -2081,6 +2136,7 @@ void CG_PruneObituaryFeed( void );
 qboolean CG_DamagePlumsEnabled( void );
 qboolean CG_ShouldRenderDamagePlumForWeapon( weapon_t weapon );
 damagePlumColorStyle_t CG_GetDamagePlumColorStyle( void );
+int CG_StartingWeaponIndexFromToken( const char *value );
 
 
 //
@@ -2202,7 +2258,7 @@ void CG_DrawInformation( void );
 // cg_screen.c
 //
 void CG_DamageBlendBlob( void );
-void CG_DrawScreenDamage( void );
+void CG_DrawJoinGameMenu( void );
 
 //
 // cg_scoreboard.c

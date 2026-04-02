@@ -1252,6 +1252,7 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 		case EV_USE_ITEM3:		// kamikaze
 			// make sure the invulnerability is off
 			ent->client->invulnerabilityTime = 0;
+			ent->client->holdableInvulnerabilityTime = 0;
 			// start the kamikze
 			G_StartKamikaze( ent );
 			break;
@@ -1266,6 +1267,7 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			break;
 		case EV_USE_ITEM5:		// invulnerability
 			ent->client->invulnerabilityTime = level.time + 10000;
+			ent->client->holdableInvulnerabilityTime = ent->client->invulnerabilityTime;
 			break;
 
 default:
@@ -1576,12 +1578,7 @@ void ClientThink_real( gentity_t *ent ) {
 	if ( ent->client->ps.eventSequence != oldEventSequence ) {
 		ent->eventTime = level.time;
 	}
-	if (g_smoothClients.integer) {
-		BG_PlayerStateToEntityStateExtraPolate( &ent->client->ps, &ent->s, ent->client->ps.commandTime, qtrue );
-	}
-	else {
-		BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
-	}
+	BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
 	SendPendingPredictableEvents( &ent->client->ps );
 
 	if ( !( ent->client->ps.eFlags & EF_FIRING ) ) {
@@ -1784,6 +1781,7 @@ void ClientEndFrame( gentity_t *ent ) {
 		G_RefreshClientRatingModifiers( ent->client );
 	}
 	G_FreezeClientEndFrame( ent );
+	G_RankAccumulateWeaponTime( ent );
 
 	// turn off any expired powerups
 	for ( i = 0 ; i < MAX_POWERUPS ; i++ ) {
@@ -1807,6 +1805,30 @@ void ClientEndFrame( gentity_t *ent ) {
 	}
 	if ( ent->client->invulnerabilityTime > level.time ) {
 		ent->client->ps.powerups[PW_INVULNERABILITY] = level.time;
+	}
+	{
+		const gitem_t	*invulnerabilityItem;
+		int				invulnerabilityItemNum;
+
+		invulnerabilityItem = BG_FindItemForHoldable( HI_INVULNERABILITY );
+		invulnerabilityItemNum = invulnerabilityItem ? (int)( invulnerabilityItem - bg_itemlist ) : 0;
+
+		if ( ent->client->holdableInvulnerabilityTime > level.time ) {
+			ent->client->ps.playerItemTimeMax = 10000;
+			ent->client->ps.playerItemTime = ent->client->holdableInvulnerabilityTime - level.time;
+			if ( invulnerabilityItemNum != 0 && ent->client->ps.stats[STAT_HOLDABLE_ITEM] == 0 ) {
+				ent->client->ps.stats[STAT_HOLDABLE_ITEM] = invulnerabilityItemNum;
+			}
+		} else {
+			if ( invulnerabilityItemNum != 0 &&
+				ent->client->ps.stats[STAT_HOLDABLE_ITEM] == invulnerabilityItemNum &&
+				ent->client->ps.playerItemTimeMax > 0 ) {
+				ent->client->ps.stats[STAT_HOLDABLE_ITEM] = 0;
+			}
+			ent->client->holdableInvulnerabilityTime = 0;
+			ent->client->ps.playerItemTimeMax = 0;
+			ent->client->ps.playerItemTime = 0;
+		}
 	}
 
 	// save network bandwidth
@@ -1843,12 +1865,7 @@ void ClientEndFrame( gentity_t *ent ) {
 	G_SetClientSound (ent);
 
 	// set the latest infor
-	if (g_smoothClients.integer) {
-		BG_PlayerStateToEntityStateExtraPolate( &ent->client->ps, &ent->s, ent->client->ps.commandTime, qtrue );
-	}
-	else {
-		BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
-	}
+	BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
 	SendPendingPredictableEvents( &ent->client->ps );
 
 	// set the bit for the reachability area the client is currently in

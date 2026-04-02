@@ -24,10 +24,10 @@ def _function_body(path: Path, pattern: str) -> str:
 def test_shared_water_scale_defaults_match_retail() -> None:
 	source = BG_PMOVE_PATH.read_text(encoding="utf-8")
 
-	assert "float\tpm_swimScale = 0.50f;" in source
-	assert "float\tpm_wadeScale = 0.75f;" in source
-	assert "\t.waterSwimScale = 0.50f," in source
-	assert "\t.waterWadeScale = 0.75f," in source
+	assert "float\tpm_swimScale = 0.60f;" in source
+	assert "float\tpm_wadeScale = 0.80f;" in source
+	assert "\t.waterSwimScale = 0.60f," in source
+	assert "\t.waterWadeScale = 0.80f," in source
 
 
 def test_walkmove_uses_retail_wade_interpolation() -> None:
@@ -57,5 +57,5 @@ def test_friction_does_not_scale_water_drag_by_wade_swim_cvars() -> None:
 def test_game_cvar_defaults_match_retail_water_scales() -> None:
 	source = G_PMOVE_PATH.read_text(encoding="utf-8")
 
-	assert '"pmove_WaterSwimScale", "0.5f"' in source
-	assert '"pmove_WaterWadeScale", "0.75f"' in source
+	assert '"pmove_WaterSwimScale", "0.6f"' in source
+	assert '"pmove_WaterWadeScale", "0.8f"' in source

@@ -380,7 +380,6 @@ vmCvar_t	g_factoryTitle;
 vmCvar_t	g_factory;
 vmCvar_t	g_ruleset;
 vmCvar_t	g_dropInactive;
-vmCvar_t	g_smoothClients;
 vmCvar_t	pmove_fixed;
 vmCvar_t	pmove_msec;
 vmCvar_t	g_rankings;
@@ -782,7 +781,6 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_enableDust, "g_enableDust", "0", CVAR_SERVERINFO, 0, qtrue, qfalse },
 	{ &g_enableBreath, "g_enableBreath", "0", CVAR_SERVERINFO, 0, qtrue, qfalse },
 	{ &g_proxMineTimeout, "g_proxMineTimeout", "20000", 0, 0, qfalse },
-	{ &g_smoothClients, "g_smoothClients", "1", 0, 0, qfalse},
 	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO, 0, qfalse},
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
 
@@ -2184,6 +2182,9 @@ G_UpdateTrainingState();
 		(unsigned int)level.startTime, (unsigned int)( randomSeed ^ rand() ) );
 	level.rankMatchStartedSent = qfalse;
 	level.rankMatchReportSent = qfalse;
+	level.rankExitMessage[0] = '\0';
+	level.rankLastScorer = -1;
+	level.rankLastTeamScorer = -1;
 	level.roundState = ROUNDSTATE_INACTIVE;
 	level.roundTransitionTime = ROUND_TRANSITION_NONE;
 	level.adRoundState = AD_ROUNDSTATE_INACTIVE;
@@ -3494,6 +3495,1308 @@ static qboolean G_RankBuildMatchStartedPayload( char *buffer, size_t bufferSize 
 
 /*
 ================
+G_RankAppendJsonFieldPrefix
+
+Appends the `,"KEY":` or `"KEY":` prefix used by the source-side JSON proxy
+builders.
+================
+*/
+static qboolean G_RankAppendJsonFieldPrefix( char *buffer, size_t bufferSize, size_t *length,
+	qboolean *firstField, const char *fieldName ) {
+	if ( !buffer || !length || !firstField || !fieldName ) {
+		return qfalse;
+	}
+
+	if ( !*firstField ) {
+		if ( !G_RankAppendPayload( buffer, bufferSize, length, "," ) ) {
+			return qfalse;
+		}
+	} else {
+		*firstField = qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, length, "\"%s\":", fieldName );
+}
+
+/*
+================
+G_RankAppendJsonStringField
+
+Appends one quoted JSON string field to the active payload buffer.
+================
+*/
+static qboolean G_RankAppendJsonStringField( char *buffer, size_t bufferSize, size_t *length,
+	qboolean *firstField, const char *fieldName, const char *fieldValue ) {
+	char escapedValue[MAX_STRING_CHARS * 2 + 1];
+
+	if ( !G_RankAppendJsonFieldPrefix( buffer, bufferSize, length, firstField, fieldName ) ) {
+		return qfalse;
+	}
+
+	G_RankEscapeJsonString( fieldValue ? fieldValue : "", escapedValue, sizeof( escapedValue ) );
+	return G_RankAppendPayload( buffer, bufferSize, length, "\"%s\"", escapedValue );
+}
+
+/*
+================
+G_RankAppendJsonIntField
+
+Appends one integer JSON field to the active payload buffer.
+================
+*/
+static qboolean G_RankAppendJsonIntField( char *buffer, size_t bufferSize, size_t *length,
+	qboolean *firstField, const char *fieldName, int fieldValue ) {
+	if ( !G_RankAppendJsonFieldPrefix( buffer, bufferSize, length, firstField, fieldName ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, length, "%i", fieldValue );
+}
+
+/*
+================
+G_RankAppendJsonBoolField
+
+Appends one boolean JSON field to the active payload buffer.
+================
+*/
+static qboolean G_RankAppendJsonBoolField( char *buffer, size_t bufferSize, size_t *length,
+	qboolean *firstField, const char *fieldName, qboolean fieldValue ) {
+	if ( !G_RankAppendJsonFieldPrefix( buffer, bufferSize, length, firstField, fieldName ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, length, "%s", fieldValue ? "true" : "false" );
+}
+
+/*
+================
+G_RankAppendJsonFloatField
+
+Appends one float JSON field to the active payload buffer.
+================
+*/
+static qboolean G_RankAppendJsonFloatField( char *buffer, size_t bufferSize, size_t *length,
+	qboolean *firstField, const char *fieldName, float fieldValue ) {
+	if ( !G_RankAppendJsonFieldPrefix( buffer, bufferSize, length, firstField, fieldName ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, length, "%.3f", fieldValue );
+}
+
+/*
+================
+G_RankAppendJsonRawField
+
+Appends one prebuilt JSON object or scalar field to the active payload buffer.
+================
+*/
+static qboolean G_RankAppendJsonRawField( char *buffer, size_t bufferSize, size_t *length,
+	qboolean *firstField, const char *fieldName, const char *fieldValue ) {
+	if ( !G_RankAppendJsonFieldPrefix( buffer, bufferSize, length, firstField, fieldName ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, length, "%s", fieldValue ? fieldValue : "null" );
+}
+
+/*
+================
+G_RankWeaponName
+
+Maps a gameplay weapon enum to the uppercase retail-style key used in the
+rankings payload proxies.
+================
+*/
+static const char *G_RankWeaponName( weapon_t weapon ) {
+	switch ( weapon ) {
+	case WP_GAUNTLET:
+		return "GAUNTLET";
+	case WP_MACHINEGUN:
+		return "MACHINEGUN";
+	case WP_SHOTGUN:
+		return "SHOTGUN";
+	case WP_GRENADE_LAUNCHER:
+		return "GRENADE";
+	case WP_ROCKET_LAUNCHER:
+		return "ROCKET";
+	case WP_LIGHTNING:
+		return "LIGHTNING";
+	case WP_RAILGUN:
+		return "RAILGUN";
+	case WP_PLASMAGUN:
+		return "PLASMA";
+	case WP_BFG:
+		return "BFG10K";
+	case WP_GRAPPLING_HOOK:
+		return "GRAPPLE";
+	case WP_NAILGUN:
+		return "NAILGUN";
+	case WP_PROX_LAUNCHER:
+		return "PROXMINE";
+	case WP_CHAINGUN:
+		return "CHAINGUN";
+	case WP_HEAVY_MACHINEGUN:
+		return "HMG";
+	default:
+		break;
+	}
+
+	return "OTHER_WEAPON";
+}
+
+/*
+================
+G_RankMeansOfDeathName
+
+Resolves the retail death-name token used by PLAYER_KILL and PLAYER_DEATH.
+================
+*/
+static const char *G_RankMeansOfDeathName( int meansOfDeath ) {
+	switch ( meansOfDeath ) {
+	case MOD_GAUNTLET:
+		return "GAUNTLET";
+	case MOD_MACHINEGUN:
+		return "MACHINEGUN";
+	case MOD_SHOTGUN:
+		return "SHOTGUN";
+	case MOD_GRENADE:
+	case MOD_GRENADE_SPLASH:
+		return "GRENADE";
+	case MOD_ROCKET:
+	case MOD_ROCKET_SPLASH:
+		return "ROCKET";
+	case MOD_PLASMA:
+	case MOD_PLASMA_SPLASH:
+		return "PLASMA";
+	case MOD_RAILGUN:
+	case MOD_RAILGUN_HEADSHOT:
+		return "RAILGUN";
+	case MOD_LIGHTNING:
+		return "LIGHTNING";
+	case MOD_BFG:
+	case MOD_BFG_SPLASH:
+		return "BFG10K";
+	case MOD_NAIL:
+		return "NAILGUN";
+	case MOD_CHAINGUN:
+		return "CHAINGUN";
+	case MOD_PROXIMITY_MINE:
+		return "PROXMINE";
+	case MOD_GRAPPLE:
+		return "GRAPPLE";
+	case MOD_SWITCHTEAM:
+		return "SWITCHTEAM";
+	case MOD_THAW:
+		return "THAW";
+	case MOD_LIGHTNING_DISCHARGE:
+		return "LIGHTNING_DISCHARGE";
+	case MOD_HMG:
+		return "HMG";
+	default:
+		break;
+	}
+
+	return "OTHER_DEATH";
+}
+
+/*
+================
+G_RankMeansOfDeathWeapon
+
+Maps a means-of-death enum back to the owning weapon slot for payload naming
+and reduced damage buckets.
+================
+*/
+static weapon_t G_RankMeansOfDeathWeapon( int meansOfDeath ) {
+	switch ( meansOfDeath ) {
+	case MOD_GAUNTLET:
+		return WP_GAUNTLET;
+	case MOD_MACHINEGUN:
+		return WP_MACHINEGUN;
+	case MOD_SHOTGUN:
+		return WP_SHOTGUN;
+	case MOD_GRENADE:
+	case MOD_GRENADE_SPLASH:
+		return WP_GRENADE_LAUNCHER;
+	case MOD_ROCKET:
+	case MOD_ROCKET_SPLASH:
+		return WP_ROCKET_LAUNCHER;
+	case MOD_PLASMA:
+	case MOD_PLASMA_SPLASH:
+		return WP_PLASMAGUN;
+	case MOD_RAILGUN:
+	case MOD_RAILGUN_HEADSHOT:
+		return WP_RAILGUN;
+	case MOD_LIGHTNING:
+	case MOD_LIGHTNING_DISCHARGE:
+		return WP_LIGHTNING;
+	case MOD_BFG:
+	case MOD_BFG_SPLASH:
+		return WP_BFG;
+	case MOD_NAIL:
+		return WP_NAILGUN;
+	case MOD_CHAINGUN:
+		return WP_CHAINGUN;
+	case MOD_PROXIMITY_MINE:
+		return WP_PROX_LAUNCHER;
+	case MOD_GRAPPLE:
+		return WP_GRAPPLING_HOOK;
+	case MOD_HMG:
+		return WP_HEAVY_MACHINEGUN;
+	default:
+		break;
+	}
+
+	return WP_NONE;
+}
+
+/*
+================
+G_RankTeamName
+
+Maps a session team enum to the retail string token used by FLAG_STATUS.
+================
+*/
+static const char *G_RankTeamName( int team ) {
+	switch ( team ) {
+	case TEAM_RED:
+		return "RED";
+	case TEAM_BLUE:
+		return "BLUE";
+	case TEAM_SPECTATOR:
+		return "SPECTATOR";
+	default:
+		break;
+	}
+
+	return "FREE";
+}
+
+/*
+================
+G_RankFlagStatusName
+
+Collapses the internal flag-status enum onto the string values recovered from
+the retail FLAG_STATUS publisher.
+================
+*/
+static const char *G_RankFlagStatusName( int status ) {
+	switch ( status ) {
+	case FLAG_ATBASE:
+		return "FLAG_ATBASE";
+	case FLAG_DROPPED:
+		return "FLAG_DROPPED";
+	case FLAG_TAKEN:
+	case FLAG_TAKEN_RED:
+	case FLAG_TAKEN_BLUE:
+		return "FLAG_TAKEN";
+	default:
+		break;
+	}
+
+	return "FLAG_UNKNOWN";
+}
+
+/*
+================
+G_RankGametypePublishesRound
+
+Returns whether the active gametype carries the retail round metadata inside
+PLAYER_KILL and PLAYER_DEATH.
+================
+*/
+static qboolean G_RankGametypePublishesRound( void ) {
+	switch ( g_gametype.integer ) {
+	case GT_CLAN_ARENA:
+	case GT_FREEZE:
+	case GT_ATTACK_DEFEND:
+	case GT_RED_ROVER:
+		return qtrue;
+	default:
+		break;
+	}
+
+	return qfalse;
+}
+
+/*
+================
+G_RankCountAliveDeadByTeam
+
+Builds the reduced team alive/dead counts consumed by the retail round-aware
+kill and death payloads.
+================
+*/
+static void G_RankCountAliveDeadByTeam( int deadCounts[TEAM_NUM_TEAMS], int aliveCounts[TEAM_NUM_TEAMS] ) {
+	int clientNum;
+
+	if ( !deadCounts || !aliveCounts ) {
+		return;
+	}
+
+	memset( deadCounts, 0, sizeof( int ) * TEAM_NUM_TEAMS );
+	memset( aliveCounts, 0, sizeof( int ) * TEAM_NUM_TEAMS );
+
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gclient_t *client;
+		team_t team;
+
+		client = &level.clients[clientNum];
+		if ( client->pers.connected == CON_DISCONNECTED ) {
+			continue;
+		}
+
+		team = client->sess.sessionTeam;
+		if ( team < TEAM_FREE || team >= TEAM_NUM_TEAMS ) {
+			continue;
+		}
+
+		if ( client->ps.pm_type == PM_NORMAL ) {
+			aliveCounts[team]++;
+		} else {
+			deadCounts[team]++;
+		}
+	}
+}
+
+/*
+================
+G_RankBuildWeaponsUsedMask
+
+Builds a compact bitmask of weapons the client held or used during the current
+session, matching the payload style recovered for ranked race and match stats.
+================
+*/
+static unsigned int G_RankBuildWeaponsUsedMask( const gclient_t *client ) {
+	unsigned int weaponsUsed;
+	weapon_t weapon;
+
+	if ( !client ) {
+		return 0u;
+	}
+
+	weaponsUsed = (unsigned int)client->ps.stats[STAT_WEAPONS];
+	for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
+		if ( weapon >= 32 ) {
+			break;
+		}
+
+		if ( client->pers.weaponFrags[weapon] > 0
+			|| client->pers.weaponDamage[weapon] > 0
+			|| client->pers.accuracy_hits[weapon] > 0
+			|| client->pers.accuracy_shots[weapon] > 0 ) {
+			weaponsUsed |= ( 1u << weapon );
+		}
+	}
+
+	return weaponsUsed;
+}
+
+/*
+================
+G_RankGetClientModel
+
+Extracts the current userinfo model string used by the retail PLAYER_STATS
+payload.
+================
+*/
+static void G_RankGetClientModel( const gentity_t *ent, char *buffer, size_t bufferSize ) {
+	char userinfo[MAX_INFO_STRING];
+	const char *model;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	trap_GetUserinfo( ent->s.number, userinfo, sizeof( userinfo ) );
+	model = Info_ValueForKey( userinfo, "model" );
+	if ( !model || !model[0] ) {
+		model = "default";
+	}
+
+	Q_strncpyz( buffer, model, bufferSize );
+}
+
+/*
+================
+G_RankResolveEventSteamIds
+
+Feeds the native event bridge the same zeroed SteamID pair retail uses for bot
+participants.
+================
+*/
+static void G_RankResolveEventSteamIds( const gentity_t *ent, uint32_t *steamIdLow, uint32_t *steamIdHigh ) {
+	if ( steamIdLow ) {
+		*steamIdLow = 0;
+	}
+	if ( steamIdHigh ) {
+		*steamIdHigh = 0;
+	}
+
+	if ( !ent || !ent->client || ( ent->r.svFlags & SVF_BOT ) ) {
+		return;
+	}
+
+	if ( steamIdLow ) {
+		*steamIdLow = ent->client->pers.steamIdLow;
+	}
+	if ( steamIdHigh ) {
+		*steamIdHigh = ent->client->pers.steamIdHigh;
+	}
+}
+
+/*
+================
+G_RankBuildVectorObject
+
+Formats one `{"X":...,"Y":...,"Z":...}` object for the JSON proxy payloads.
+================
+*/
+static qboolean G_RankBuildVectorObject( const vec3_t value, char *buffer, size_t bufferSize ) {
+	size_t length;
+	qboolean firstField;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonFloatField( buffer, bufferSize, &length, &firstField, "X", value[0] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonFloatField( buffer, bufferSize, &length, &firstField, "Y", value[1] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonFloatField( buffer, bufferSize, &length, &firstField, "Z", value[2] ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "}" );
+}
+
+/*
+================
+G_RankResolveMedalIndex
+
+Maps the retail medal tokens onto the reduced source-side medal counters.
+================
+*/
+static rankMedal_t G_RankResolveMedalIndex( const char *medal ) {
+	if ( !medal || !medal[0] ) {
+		return RANK_MEDAL_COUNT;
+	}
+	if ( Q_stricmp( medal, "IMPRESSIVE" ) == 0 ) {
+		return RANK_MEDAL_IMPRESSIVE;
+	}
+	if ( Q_stricmp( medal, "EXCELLENT" ) == 0 ) {
+		return RANK_MEDAL_EXCELLENT;
+	}
+	if ( Q_stricmp( medal, "GAUNTLET" ) == 0 || Q_stricmp( medal, "HUMILIATION" ) == 0 ) {
+		return RANK_MEDAL_HUMILIATION;
+	}
+	if ( Q_stricmp( medal, "REVENGE" ) == 0 ) {
+		return RANK_MEDAL_REVENGE;
+	}
+	if ( Q_stricmp( medal, "COMBOKILL" ) == 0 ) {
+		return RANK_MEDAL_COMBOKILL;
+	}
+	if ( Q_stricmp( medal, "RAMPAGE" ) == 0 ) {
+		return RANK_MEDAL_RAMPAGE;
+	}
+	if ( Q_stricmp( medal, "MIDAIR" ) == 0 ) {
+		return RANK_MEDAL_MIDAIR;
+	}
+	if ( Q_stricmp( medal, "PERFORATED" ) == 0 ) {
+		return RANK_MEDAL_PERFORATED;
+	}
+	if ( Q_stricmp( medal, "HEADSHOT" ) == 0 ) {
+		return RANK_MEDAL_HEADSHOT;
+	}
+	if ( Q_stricmp( medal, "ACCURACY" ) == 0 ) {
+		return RANK_MEDAL_ACCURACY;
+	}
+	if ( Q_stricmp( medal, "QUADGOD" ) == 0 ) {
+		return RANK_MEDAL_QUADGOD;
+	}
+	if ( Q_stricmp( medal, "FIRSTFRAG" ) == 0 ) {
+		return RANK_MEDAL_FIRSTFRAG;
+	}
+	if ( Q_stricmp( medal, "PERFECT" ) == 0 ) {
+		return RANK_MEDAL_PERFECT;
+	}
+	if ( Q_stricmp( medal, "DEFENDS" ) == 0 || Q_stricmp( medal, "DEFEND" ) == 0 ) {
+		return RANK_MEDAL_DEFENDS;
+	}
+	if ( Q_stricmp( medal, "ASSISTS" ) == 0 || Q_stricmp( medal, "ASSIST" ) == 0 ) {
+		return RANK_MEDAL_ASSISTS;
+	}
+	if ( Q_stricmp( medal, "CAPTURES" ) == 0 || Q_stricmp( medal, "CAPTURE" ) == 0 ) {
+		return RANK_MEDAL_CAPTURES;
+	}
+
+	return RANK_MEDAL_COUNT;
+}
+
+/*
+================
+G_RankMedalPersistantTotal
+
+Returns the medal totals still tracked by legacy replicated playerstate or
+existing per-client gameplay counters.
+================
+*/
+static int G_RankMedalPersistantTotal( const gclient_t *client, rankMedal_t medalIndex ) {
+	if ( !client ) {
+		return 0;
+	}
+
+	switch ( medalIndex ) {
+	case RANK_MEDAL_IMPRESSIVE:
+		return client->ps.persistant[PERS_IMPRESSIVE_COUNT];
+	case RANK_MEDAL_EXCELLENT:
+		return client->ps.persistant[PERS_EXCELLENT_COUNT];
+	case RANK_MEDAL_HUMILIATION:
+		return client->ps.persistant[PERS_GAUNTLET_FRAG_COUNT];
+	case RANK_MEDAL_DEFENDS:
+		return client->ps.persistant[PERS_DEFEND_COUNT];
+	case RANK_MEDAL_ASSISTS:
+		return client->ps.persistant[PERS_ASSIST_COUNT];
+	case RANK_MEDAL_CAPTURES:
+		return client->ps.persistant[PERS_CAPTURES];
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/*
+================
+G_RankGetMedalTotal
+
+Returns the best source-side total available for one retail medal bucket.
+================
+*/
+static int G_RankGetMedalTotal( const gclient_t *client, rankMedal_t medalIndex ) {
+	int total;
+	int persTotal;
+
+	if ( !client || medalIndex < 0 || medalIndex >= RANK_MEDAL_COUNT ) {
+		return 0;
+	}
+
+	total = client->pers.rankMedalCounts[medalIndex];
+	persTotal = G_RankMedalPersistantTotal( client, medalIndex );
+	if ( persTotal > total ) {
+		total = persTotal;
+	}
+
+	return total;
+}
+
+/*
+================
+G_RankBuildMedalsObject
+
+Serializes the medal counters carried in the replicated playerstate.
+================
+*/
+static qboolean G_RankBuildMedalsObject( const gclient_t *client, char *buffer, size_t bufferSize ) {
+	size_t length;
+	qboolean firstField;
+
+	if ( !client || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "IMPRESSIVE",
+		G_RankGetMedalTotal( client, RANK_MEDAL_IMPRESSIVE ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "EXCELLENT",
+		G_RankGetMedalTotal( client, RANK_MEDAL_EXCELLENT ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "HUMILIATION",
+		G_RankGetMedalTotal( client, RANK_MEDAL_HUMILIATION ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "REVENGE",
+		G_RankGetMedalTotal( client, RANK_MEDAL_REVENGE ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "COMBOKILL",
+		G_RankGetMedalTotal( client, RANK_MEDAL_COMBOKILL ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "RAMPAGE",
+		G_RankGetMedalTotal( client, RANK_MEDAL_RAMPAGE ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "MIDAIR",
+		G_RankGetMedalTotal( client, RANK_MEDAL_MIDAIR ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "PERFORATED",
+		G_RankGetMedalTotal( client, RANK_MEDAL_PERFORATED ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "HEADSHOT",
+		G_RankGetMedalTotal( client, RANK_MEDAL_HEADSHOT ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "ACCURACY",
+		G_RankGetMedalTotal( client, RANK_MEDAL_ACCURACY ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "QUADGOD",
+		G_RankGetMedalTotal( client, RANK_MEDAL_QUADGOD ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "FIRSTFRAG",
+		G_RankGetMedalTotal( client, RANK_MEDAL_FIRSTFRAG ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "PERFECT",
+		G_RankGetMedalTotal( client, RANK_MEDAL_PERFECT ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "DEFENDS",
+		G_RankGetMedalTotal( client, RANK_MEDAL_DEFENDS ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "ASSISTS",
+		G_RankGetMedalTotal( client, RANK_MEDAL_ASSISTS ) ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "CAPTURES",
+		G_RankGetMedalTotal( client, RANK_MEDAL_CAPTURES ) ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "}" );
+}
+
+/*
+================
+G_RankBuildPickupsObject
+
+Serializes the tracked pickup counters already mirrored for ownerdraw and rich
+scoreboard output.
+================
+*/
+static qboolean G_RankBuildPickupsObject( const gclient_t *client, char *buffer, size_t bufferSize ) {
+	size_t length;
+	qboolean firstField;
+
+	if ( !client || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "RA",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_RA] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "YA",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_YA] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "GA",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_GA] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "MH",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_MH] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "QUAD",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_QUAD] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "BATTLESUIT",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_BS] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "FLAG",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_FLAG] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "MEDKIT",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_MEDKIT] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "REGEN",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_REGEN] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "HASTE",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_HASTE] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "INVIS",
+		client->pers.teamScoreStats[TEAMSTAT_PICKUPS_INVIS] ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "}" );
+}
+
+/*
+================
+G_RankBuildTimeHeldObject
+
+Serializes the mirrored powerup-hold timers in whole seconds.
+================
+*/
+static qboolean G_RankBuildTimeHeldObject( const gclient_t *client, char *buffer, size_t bufferSize ) {
+	size_t length;
+	qboolean firstField;
+
+	if ( !client || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "FLAG",
+		client->pers.teamScoreStats[TEAMSTAT_TIMEHELD_FLAG] / 1000 ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "QUAD",
+		client->pers.teamScoreStats[TEAMSTAT_TIMEHELD_QUAD] / 1000 ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "BATTLESUIT",
+		client->pers.teamScoreStats[TEAMSTAT_TIMEHELD_BS] / 1000 ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "REGEN",
+		client->pers.teamScoreStats[TEAMSTAT_TIMEHELD_REGEN] / 1000 ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "HASTE",
+		client->pers.teamScoreStats[TEAMSTAT_TIMEHELD_HASTE] / 1000 ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "INVIS",
+		client->pers.teamScoreStats[TEAMSTAT_TIMEHELD_INVIS] / 1000 ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "}" );
+}
+
+/*
+================
+G_RankBuildWeaponsObject
+
+Serializes the tracked per-weapon frag, damage, and accuracy slabs.
+================
+*/
+static qboolean G_RankBuildWeaponsObject( const gclient_t *client, char *buffer, size_t bufferSize ) {
+	size_t length;
+	qboolean firstField;
+	weapon_t weapon;
+
+	if ( !client || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+
+	for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; weapon++ ) {
+		char weaponPayload[256];
+		size_t weaponLength;
+		qboolean firstWeaponField;
+		const char *weaponName;
+		int shots;
+		int hits;
+		int accuracy;
+
+		weaponName = G_RankWeaponName( weapon );
+		shots = client->pers.accuracy_shots[weapon];
+		hits = client->pers.accuracy_hits[weapon];
+		accuracy = ( shots > 0 ) ? ( hits * 100 / shots ) : 0;
+
+		weaponPayload[0] = '\0';
+		weaponLength = 0;
+		firstWeaponField = qtrue;
+
+		if ( !G_RankAppendPayload( weaponPayload, sizeof( weaponPayload ), &weaponLength, "{" ) ) {
+			return qfalse;
+		}
+		if ( !G_RankAppendJsonIntField( weaponPayload, sizeof( weaponPayload ), &weaponLength, &firstWeaponField,
+			"FRAGS", client->pers.weaponFrags[weapon] ) ) {
+			return qfalse;
+		}
+		if ( !G_RankAppendJsonIntField( weaponPayload, sizeof( weaponPayload ), &weaponLength, &firstWeaponField,
+			"DAMAGE", client->pers.weaponDamage[weapon] ) ) {
+			return qfalse;
+		}
+		if ( !G_RankAppendJsonIntField( weaponPayload, sizeof( weaponPayload ), &weaponLength, &firstWeaponField,
+			"TIME", client->rankStats.weaponTimeMs[weapon] / 1000 ) ) {
+			return qfalse;
+		}
+		if ( !G_RankAppendJsonIntField( weaponPayload, sizeof( weaponPayload ), &weaponLength, &firstWeaponField,
+			"HITS", hits ) ) {
+			return qfalse;
+		}
+		if ( !G_RankAppendJsonIntField( weaponPayload, sizeof( weaponPayload ), &weaponLength, &firstWeaponField,
+			"SHOTS", shots ) ) {
+			return qfalse;
+		}
+		if ( !G_RankAppendJsonIntField( weaponPayload, sizeof( weaponPayload ), &weaponLength, &firstWeaponField,
+			"ACCURACY", accuracy ) ) {
+			return qfalse;
+		}
+		if ( !G_RankAppendPayload( weaponPayload, sizeof( weaponPayload ), &weaponLength, "}" ) ) {
+			return qfalse;
+		}
+		if ( !G_RankAppendJsonRawField( buffer, bufferSize, &length, &firstField, weaponName, weaponPayload ) ) {
+			return qfalse;
+		}
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "}" );
+}
+
+/*
+================
+G_RankBuildPlayerSummaryObject
+
+Builds the reduced per-player object reused by the PLAYER_KILL and PLAYER_DEATH
+payloads.
+================
+*/
+static qboolean G_RankBuildPlayerSummaryObject( const gentity_t *ent, char *buffer, size_t bufferSize ) {
+	char steamId[32];
+	char positionPayload[128];
+	size_t length;
+	qboolean firstField;
+	vec3_t planarVelocity;
+	float speed;
+
+	if ( !ent || !ent->client || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	VectorCopy( ent->client->ps.velocity, planarVelocity );
+	planarVelocity[2] = 0.0f;
+	speed = VectorLength( planarVelocity );
+
+	if ( !G_RankBuildVectorObject( ent->r.currentOrigin, positionPayload, sizeof( positionPayload ) ) ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+	G_RankFormatSteamId( ent, steamId, sizeof( steamId ) );
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "NAME",
+		ent->client->pers.netname ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "STEAM_ID", steamId ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "TEAM",
+		ent->client->sess.sessionTeam ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "SCORE",
+		ent->client->ps.persistant[PERS_SCORE] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "HEALTH",
+		ent->health ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "ARMOR",
+		ent->client->ps.stats[STAT_ARMOR] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonBoolField( buffer, bufferSize, &length, &firstField, "SUBMERGED",
+		( ent->waterlevel > 1 ) ? qtrue : qfalse ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonFloatField( buffer, bufferSize, &length, &firstField, "SPEED", speed ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonRawField( buffer, bufferSize, &length, &firstField, "POSITION", positionPayload ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "}" );
+}
+
+/*
+================
+G_RankBuildPlayerStatsPayload
+
+Builds the source-side PLAYER_STATS JSON proxy using the field names recovered
+from the retail qagame rankings publisher.
+================
+*/
+static qboolean G_RankBuildPlayerStatsPayload( gentity_t *ent, qboolean aborted,
+	char *buffer, size_t bufferSize ) {
+	char steamId[32];
+	char model[MAX_QPATH];
+	char medalsPayload[256];
+	char pickupsPayload[256];
+	char timeHeldPayload[256];
+	char weaponsPayload[4096];
+	size_t length;
+	qboolean firstField;
+	int playTime;
+	int accuracy;
+	qboolean isBot;
+	float botSkill;
+	char userinfo[MAX_INFO_STRING];
+	const char *skillValue;
+
+	if ( !ent || !ent->client || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	if ( ent->client->pers.connected != CON_CONNECTED ) {
+		return qfalse;
+	}
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return qfalse;
+	}
+
+	G_RankAccumulateWeaponTime( ent );
+
+	if ( !G_RankBuildMedalsObject( ent->client, medalsPayload, sizeof( medalsPayload ) ) ) {
+		Q_strncpyz( medalsPayload, "{}", sizeof( medalsPayload ) );
+	}
+	if ( !G_RankBuildPickupsObject( ent->client, pickupsPayload, sizeof( pickupsPayload ) ) ) {
+		Q_strncpyz( pickupsPayload, "{}", sizeof( pickupsPayload ) );
+	}
+	if ( !G_RankBuildTimeHeldObject( ent->client, timeHeldPayload, sizeof( timeHeldPayload ) ) ) {
+		Q_strncpyz( timeHeldPayload, "{}", sizeof( timeHeldPayload ) );
+	}
+	if ( !G_RankBuildWeaponsObject( ent->client, weaponsPayload, sizeof( weaponsPayload ) ) ) {
+		Q_strncpyz( weaponsPayload, "{}", sizeof( weaponsPayload ) );
+	}
+
+	G_RankFormatSteamId( ent, steamId, sizeof( steamId ) );
+	G_RankGetClientModel( ent, model, sizeof( model ) );
+
+	playTime = ent->client->rankStats.totalActiveTimeMs / 1000;
+	if ( playTime <= 0 ) {
+		playTime = ( ent->client->rankStats.sessionStartTime > 0 )
+			? ( level.time - ent->client->rankStats.sessionStartTime ) / 1000
+			: ( level.time - level.startTime ) / 1000;
+	}
+	if ( playTime < 0 ) {
+		playTime = 0;
+	}
+
+	accuracy = ( ent->client->accuracy_shots > 0 )
+		? ( ent->client->accuracy_hits * 100 / ent->client->accuracy_shots )
+		: 0;
+	isBot = ( ent->r.svFlags & SVF_BOT ) ? qtrue : qfalse;
+	botSkill = 0.0f;
+	if ( isBot ) {
+		trap_GetUserinfo( ent->s.number, userinfo, sizeof( userinfo ) );
+		skillValue = Info_ValueForKey( userinfo, "skill" );
+		if ( skillValue && skillValue[0] ) {
+			botSkill = (float)atof( skillValue );
+		}
+	}
+
+	buffer[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "TIME",
+		( level.time - level.startTime ) / 1000 ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonBoolField( buffer, bufferSize, &length, &firstField, "WARMUP",
+		( level.warmupTime != 0 ) ? qtrue : qfalse ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonBoolField( buffer, bufferSize, &length, &firstField, "ABORTED", aborted ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "MATCH_GUID",
+		level.rankMatchGuid ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "NAME",
+		ent->client->pers.netname ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "STEAM_ID",
+		steamId ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "TEAM",
+		ent->client->sess.sessionTeam ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "MODEL",
+		model ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "PLAY_TIME",
+		playTime ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "SCORE",
+		ent->client->ps.persistant[PERS_SCORE] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "KILLS",
+		ent->client->killCount ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "DEATHS",
+		ent->client->deathCount ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "ACCURACY",
+		accuracy ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "DAMAGE_GIVEN",
+		ent->client->pers.damageGiven ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "DAMAGE_RECEIVED",
+		ent->client->pers.damageReceived ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "TEAM_DAMAGE_GIVEN",
+		ent->client->teamDamageEventsGiven ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "TEAM_DAMAGE_RECEIVED",
+		ent->client->teamDamageEventsReceived ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "ENVIRONMENTAL_DEATHS",
+		ent->client->environmentalDeaths ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "WEAPONS_USED",
+		(int)G_RankBuildWeaponsUsedMask( ent->client ) ) ) {
+		return qfalse;
+	}
+	/*
+	 * Retail emits a dedicated max-streak field. The exact per-life streak owner
+	 * is still under reconstruction in writable C, so this proxy currently reuses
+	 * the running kill total as the closest persisted gameplay signal.
+	 */
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "MAX_STREAK",
+		ent->client->killCount ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonBoolField( buffer, bufferSize, &length, &firstField, "BOT", isBot ) ) {
+		return qfalse;
+	}
+	if ( isBot && !G_RankAppendJsonFloatField( buffer, bufferSize, &length, &firstField, "BOT_SKILL",
+		botSkill ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonRawField( buffer, bufferSize, &length, &firstField, "MEDALS",
+		medalsPayload ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonRawField( buffer, bufferSize, &length, &firstField, "PICKUPS",
+		pickupsPayload ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonRawField( buffer, bufferSize, &length, &firstField, "TIMEHELD",
+		timeHeldPayload ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonRawField( buffer, bufferSize, &length, &firstField, "WEAPONS",
+		weaponsPayload ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "}" );
+}
+
+/*
+================
+G_RankResolveScorerName
+
+Resolves one cached scoring client slot into the printable name string used by
+the match-report proxy.
+================
+*/
+static void G_RankResolveScorerName( int clientNum, char *buffer, size_t bufferSize ) {
+	char cleanedName[40];
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return;
+	}
+	if ( level.clients[clientNum].pers.connected == CON_DISCONNECTED ) {
+		return;
+	}
+
+	G_CleanClientNameFromClientNum( clientNum, cleanedName );
+	Q_strncpyz( buffer, cleanedName, bufferSize );
+}
+
+/*
+================
+G_RankBuildMatchReportPayload
+
+Reconstructs the recovered high-signal match-report fields into the writable
+JSON proxy format used by the native import bridge.
+================
+*/
+static qboolean G_RankBuildMatchReportPayload( qboolean aborted, char *buffer, size_t bufferSize ) {
+	char hostname[MAX_CVAR_VALUE_STRING];
+	char lastScorer[40];
+	char lastTeamScorer[40];
+	size_t length;
+	qboolean firstField;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	trap_Cvar_VariableStringBuffer( "sv_hostname", hostname, sizeof( hostname ) );
+	G_RankResolveScorerName( level.rankLastScorer, lastScorer, sizeof( lastScorer ) );
+	G_RankResolveScorerName( level.rankLastTeamScorer, lastTeamScorer, sizeof( lastTeamScorer ) );
+
+	buffer[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( buffer, bufferSize, &length, "{" ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "TIME",
+		( level.time - level.startTime ) / 1000 ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonBoolField( buffer, bufferSize, &length, &firstField, "WARMUP",
+		( level.warmupTime != 0 ) ? qtrue : qfalse ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonBoolField( buffer, bufferSize, &length, &firstField, "ABORTED", aborted ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "EXIT_MSG",
+		level.rankExitMessage ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "MATCH_GUID",
+		level.rankMatchGuid ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "SERVER_TITLE",
+		hostname ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "LAST_SCORER",
+		lastScorer ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonStringField( buffer, bufferSize, &length, &firstField, "LAST_TEAMSCORER",
+		lastTeamScorer ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "GAMETYPE",
+		g_gametype.integer ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "TIMELIMIT",
+		g_timelimit.integer ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "FRAGLIMIT",
+		g_fraglimit.integer ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonBoolField( buffer, bufferSize, &length, &firstField, "TRAINING",
+		level.trainingMapActive ? qtrue : qfalse ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "PRACTICEFLAGS",
+		practiceflags.integer ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonBoolField( buffer, bufferSize, &length, &firstField, "INSTAGIB",
+		g_instaGib.integer ? qtrue : qfalse ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "NUM_PLAYERS",
+		level.numPlayingClients ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "RED_SCORE",
+		level.teamScores[TEAM_RED] ) ) {
+		return qfalse;
+	}
+	if ( !G_RankAppendJsonIntField( buffer, bufferSize, &length, &firstField, "BLUE_SCORE",
+		level.teamScores[TEAM_BLUE] ) ) {
+		return qfalse;
+	}
+
+	return G_RankAppendPayload( buffer, bufferSize, &length, "}" );
+}
+
+/*
+================
 G_RankResetClientStats
 
 Reinitializes the lightweight source-side rankings/report bridge state. Retail
@@ -3509,6 +4812,7 @@ void G_RankResetClientStats( gclient_t *client ) {
 	memset( &client->rankStats, 0, sizeof( client->rankStats ) );
 	client->rankStats.sessionStartTime = level.time;
 	client->rankStats.matchStartTime = level.startTime;
+	client->rankStats.lastUpdateTime = level.time;
 	client->rankStats.steamIdLow = client->pers.steamIdLow;
 	client->rankStats.steamIdHigh = client->pers.steamIdHigh;
 	Com_sprintf( client->rankStats.sessionToken, sizeof( client->rankStats.sessionToken ),
@@ -3560,9 +4864,523 @@ void G_RankClientDisconnect( gentity_t *ent ) {
 	}
 
 	client = ent->client;
+	G_RankAccumulateWeaponTime( ent );
 	payloadPtr = G_RankBuildClientEventPayload( ent, payload, sizeof( payload ) ) ? payload : NULL;
 	trap_ReportPlayerEvent( client->pers.steamIdLow, client->pers.steamIdHigh,
 		&client->rankStats, "PLAYER_DISCONNECT", payloadPtr );
+}
+
+/*
+================
+G_RankAccumulateWeaponTime
+
+Accumulates active weapon time into the reduced source-side rankings proxy.
+================
+*/
+void G_RankAccumulateWeaponTime( gentity_t *ent ) {
+	gclient_t *client;
+	int delta;
+	int weapon;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	client = ent->client;
+	if ( client->rankStats.lastUpdateTime <= 0 ) {
+		client->rankStats.lastUpdateTime = level.time;
+		return;
+	}
+
+	delta = level.time - client->rankStats.lastUpdateTime;
+	client->rankStats.lastUpdateTime = level.time;
+	if ( delta <= 0 ) {
+		return;
+	}
+	if ( client->pers.connected != CON_CONNECTED ) {
+		return;
+	}
+	if ( client->sess.sessionTeam == TEAM_SPECTATOR || client->ps.pm_type != PM_NORMAL ) {
+		return;
+	}
+
+	client->rankStats.totalActiveTimeMs += delta;
+	weapon = client->ps.weapon;
+	if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
+		client->rankStats.weaponTimeMs[weapon] += delta;
+	}
+}
+
+/*
+================
+G_RankAccumulateDamage
+
+Accumulates the reduced damage buckets used by PLAYER_STATS.
+================
+*/
+void G_RankAccumulateDamage( gentity_t *victim, gentity_t *attacker, int meansOfDeath, int damage ) {
+	weapon_t weapon;
+
+	if ( damage <= 0 ) {
+		return;
+	}
+
+	if ( victim && victim->client ) {
+		victim->client->pers.damageReceived += damage;
+	}
+
+	if ( !attacker || !attacker->client ) {
+		return;
+	}
+	if ( attacker == victim ) {
+		return;
+	}
+	if ( victim && victim->client && OnSameTeam( victim, attacker ) ) {
+		return;
+	}
+
+	attacker->client->pers.damageGiven += damage;
+	weapon = G_RankMeansOfDeathWeapon( meansOfDeath );
+	if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
+		attacker->client->pers.weaponDamage[weapon] += damage;
+	}
+}
+
+/*
+================
+G_RankSendPlayerMedal
+
+Publishes the recovered PLAYER_MEDAL event and tracks the source-side running
+medal total used by later PLAYER_STATS snapshots.
+================
+*/
+void G_RankSendPlayerMedal( gentity_t *ent, const char *medal ) {
+	char		payload[RANK_EVENT_PAYLOAD_MAX];
+	char		steamId[32];
+	uint32_t	steamIdLow;
+	uint32_t	steamIdHigh;
+	size_t		length;
+	qboolean	firstField;
+	rankMedal_t	medalIndex;
+	int		total;
+
+	if ( !ent || !ent->client || !medal || !medal[0] ) {
+		return;
+	}
+
+	medalIndex = G_RankResolveMedalIndex( medal );
+	if ( medalIndex >= 0 && medalIndex < RANK_MEDAL_COUNT ) {
+		ent->client->pers.rankMedalCounts[medalIndex]++;
+	}
+	total = G_RankGetMedalTotal( ent->client, medalIndex );
+
+	G_RankResolveEventSteamIds( ent, &steamIdLow, &steamIdHigh );
+	G_RankFormatSteamId( ent, steamId, sizeof( steamId ) );
+
+	payload[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "{" ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "TIME",
+		( level.time - level.startTime ) / 1000 ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonBoolField( payload, sizeof( payload ), &length, &firstField, "WARMUP",
+		( level.warmupTime != 0 ) ? qtrue : qfalse ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "MATCH_GUID",
+		level.rankMatchGuid ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "NAME",
+		ent->client->pers.netname ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "STEAM_ID",
+		steamId ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "MEDAL",
+		medal ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "TOTAL",
+		total ) ) {
+		return;
+	}
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "}" ) ) {
+		return;
+	}
+
+	trap_ReportPlayerEvent( steamIdLow, steamIdHigh, &ent->client->rankStats, "PLAYER_MEDAL", payload );
+}
+
+/*
+================
+G_RankSendFlagStatus
+
+Publishes the recovered FLAG_STATUS event whenever the server-side flag state
+changes.
+================
+*/
+void G_RankSendFlagStatus( gentity_t *ent, int team, int status ) {
+	char		payload[RANK_EVENT_PAYLOAD_MAX];
+	size_t		length;
+	qboolean	firstField;
+	uint32_t	steamIdLow;
+	uint32_t	steamIdHigh;
+
+	payload[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+	G_RankResolveEventSteamIds( ent, &steamIdLow, &steamIdHigh );
+
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "{" ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "TIME",
+		( level.time - level.startTime ) / 1000 ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonBoolField( payload, sizeof( payload ), &length, &firstField, "WARMUP",
+		( level.warmupTime != 0 ) ? qtrue : qfalse ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "MATCH_GUID",
+		level.rankMatchGuid ) ) {
+		return;
+	}
+	if ( ent && ent->client ) {
+		char steamId[32];
+
+		G_RankFormatSteamId( ent, steamId, sizeof( steamId ) );
+		if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "STEAM_ID",
+			steamId ) ) {
+			return;
+		}
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "TEAM",
+		G_RankTeamName( team ) ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "STATUS",
+		G_RankFlagStatusName( status ) ) ) {
+		return;
+	}
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "}" ) ) {
+		return;
+	}
+
+	trap_ReportPlayerEvent( steamIdLow, steamIdHigh,
+		( ent && ent->client ) ? &ent->client->rankStats : NULL, "FLAG_STATUS", payload );
+}
+
+/*
+================
+G_RankSendPlayerSwitchTeam
+
+Publishes the recovered PLAYER_SWITCHTEAM event after the session team mutates.
+================
+*/
+void G_RankSendPlayerSwitchTeam( gentity_t *ent, int oldTeam, int newTeam ) {
+	char		payload[RANK_EVENT_PAYLOAD_MAX];
+	uint32_t	steamIdLow;
+	uint32_t	steamIdHigh;
+	size_t		length;
+	qboolean	firstField;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	G_RankResolveEventSteamIds( ent, &steamIdLow, &steamIdHigh );
+	payload[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "{" ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "TIME",
+		( level.time - level.startTime ) / 1000 ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonBoolField( payload, sizeof( payload ), &length, &firstField, "WARMUP",
+		( level.warmupTime != 0 ) ? qtrue : qfalse ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "MATCH_GUID",
+		level.rankMatchGuid ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "NAME",
+		ent->client->pers.netname ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "STEAM_ID",
+		( ( ent->r.svFlags & SVF_BOT ) != 0 ) ? "0" : va( "%llu",
+			( (unsigned long long)ent->client->pers.steamIdHigh << 32 ) | ent->client->pers.steamIdLow ) ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "OLD_TEAM",
+		oldTeam ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "NEW_TEAM",
+		newTeam ) ) {
+		return;
+	}
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "}" ) ) {
+		return;
+	}
+
+	trap_ReportPlayerEvent( steamIdLow, steamIdHigh, &ent->client->rankStats, "PLAYER_SWITCHTEAM", payload );
+}
+
+/*
+================
+G_RankSendPlayerRaceComplete
+
+Publishes the recovered PLAYER_RACECOMPLETE event once a run time is finalized.
+================
+*/
+void G_RankSendPlayerRaceComplete( gentity_t *ent, int raceTime ) {
+	char		payload[RANK_EVENT_PAYLOAD_MAX];
+	uint32_t	steamIdLow;
+	uint32_t	steamIdHigh;
+	size_t		length;
+	qboolean	firstField;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	G_RankResolveEventSteamIds( ent, &steamIdLow, &steamIdHigh );
+	payload[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "{" ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "TIME",
+		( level.time - level.startTime ) / 1000 ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonBoolField( payload, sizeof( payload ), &length, &firstField, "WARMUP",
+		( level.warmupTime != 0 ) ? qtrue : qfalse ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "MATCH_GUID",
+		level.rankMatchGuid ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "NAME",
+		ent->client->pers.netname ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "STEAM_ID",
+		( ( ent->r.svFlags & SVF_BOT ) != 0 ) ? "0" : va( "%llu",
+			( (unsigned long long)ent->client->pers.steamIdHigh << 32 ) | ent->client->pers.steamIdLow ) ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "RACE_TIME",
+		raceTime ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "WEAPONS_USED",
+		(int)G_RankBuildWeaponsUsedMask( ent->client ) ) ) {
+		return;
+	}
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "}" ) ) {
+		return;
+	}
+
+	trap_ReportPlayerEvent( steamIdLow, steamIdHigh, &ent->client->rankStats, "PLAYER_RACECOMPLETE", payload );
+}
+
+/*
+================
+G_RankSendPlayerDeath
+
+Publishes the shared PLAYER_KILL / PLAYER_DEATH payload pair recovered from the
+retail death path.
+================
+*/
+void G_RankSendPlayerDeath( gentity_t *victim, gentity_t *killer, int meansOfDeath ) {
+	char		payload[RANK_EVENT_PAYLOAD_MAX];
+	char		killerPayload[512];
+	char		victimPayload[512];
+	size_t		length;
+	qboolean	firstField;
+	uint32_t	killerSteamIdLow;
+	uint32_t	killerSteamIdHigh;
+	uint32_t	victimSteamIdLow;
+	uint32_t	victimSteamIdHigh;
+	weapon_t	weapon;
+	int		aliveCounts[TEAM_NUM_TEAMS];
+	int		deadCounts[TEAM_NUM_TEAMS];
+	const char	*weaponName;
+	qboolean	teamkill;
+	qboolean	suicide;
+	qboolean	airborne;
+
+	if ( !victim || !victim->client ) {
+		return;
+	}
+
+	if ( !G_RankBuildPlayerSummaryObject( victim, victimPayload, sizeof( victimPayload ) ) ) {
+		Q_strncpyz( victimPayload, "{}", sizeof( victimPayload ) );
+	}
+	if ( killer && killer->client && G_RankBuildPlayerSummaryObject( killer, killerPayload, sizeof( killerPayload ) ) ) {
+		/* keep killerPayload as built */
+	} else {
+		Q_strncpyz( killerPayload, "{}", sizeof( killerPayload ) );
+	}
+
+	weapon = G_RankMeansOfDeathWeapon( meansOfDeath );
+	weaponName = ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS )
+		? G_RankWeaponName( weapon )
+		: G_RankMeansOfDeathName( meansOfDeath );
+	teamkill = ( killer && killer->client && killer != victim
+		&& G_ClientsOnSameTeam( killer->client, victim->client ) ) ? qtrue : qfalse;
+	suicide = ( !killer || killer == victim || !killer->client ) ? qtrue : qfalse;
+	airborne = ( killer && killer->client && killer->client->ps.groundEntityNum == ENTITYNUM_NONE ) ? qtrue : qfalse;
+	memset( aliveCounts, 0, sizeof( aliveCounts ) );
+	memset( deadCounts, 0, sizeof( deadCounts ) );
+	if ( G_RankGametypePublishesRound() ) {
+		G_RankCountAliveDeadByTeam( deadCounts, aliveCounts );
+	}
+
+	payload[0] = '\0';
+	length = 0;
+	firstField = qtrue;
+
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "{" ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "TIME",
+		( level.time - level.startTime ) / 1000 ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonBoolField( payload, sizeof( payload ), &length, &firstField, "WARMUP",
+		( level.warmupTime != 0 ) ? qtrue : qfalse ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "MATCH_GUID",
+		level.rankMatchGuid ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonBoolField( payload, sizeof( payload ), &length, &firstField, "TEAMKILL",
+		teamkill ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonBoolField( payload, sizeof( payload ), &length, &firstField, "SUICIDE",
+		suicide ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonStringField( payload, sizeof( payload ), &length, &firstField, "WEAPON",
+		weaponName ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonBoolField( payload, sizeof( payload ), &length, &firstField, "AIRBORNE",
+		airborne ) ) {
+		return;
+	}
+	if ( G_RankGametypePublishesRound() ) {
+		team_t victimTeam;
+		team_t otherTeam;
+
+		victimTeam = victim->client->sess.sessionTeam;
+		otherTeam = TEAM_FREE;
+		if ( victimTeam == TEAM_RED ) {
+			otherTeam = TEAM_BLUE;
+		} else if ( victimTeam == TEAM_BLUE ) {
+			otherTeam = TEAM_RED;
+		}
+
+		if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "ROUND",
+			level.roundNumber ) ) {
+			return;
+		}
+		if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "TEAM_ALIVE",
+			( victimTeam >= TEAM_FREE && victimTeam < TEAM_NUM_TEAMS ) ? aliveCounts[victimTeam] : 0 ) ) {
+			return;
+		}
+		if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "TEAM_DEAD",
+			( victimTeam >= TEAM_FREE && victimTeam < TEAM_NUM_TEAMS ) ? deadCounts[victimTeam] : 0 ) ) {
+			return;
+		}
+		if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "OTHER_TEAM_ALIVE",
+			( otherTeam >= TEAM_FREE && otherTeam < TEAM_NUM_TEAMS ) ? aliveCounts[otherTeam] : 0 ) ) {
+			return;
+		}
+		if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "OTHER_TEAM_DEAD",
+			( otherTeam >= TEAM_FREE && otherTeam < TEAM_NUM_TEAMS ) ? deadCounts[otherTeam] : 0 ) ) {
+			return;
+		}
+	}
+	if ( !G_RankAppendJsonIntField( payload, sizeof( payload ), &length, &firstField, "STREAK",
+		( killer && killer->client ) ? killer->client->killCount : 0 ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonRawField( payload, sizeof( payload ), &length, &firstField, "KILLER",
+		killerPayload ) ) {
+		return;
+	}
+	if ( !G_RankAppendJsonRawField( payload, sizeof( payload ), &length, &firstField, "VICTIM",
+		victimPayload ) ) {
+		return;
+	}
+	if ( !G_RankAppendPayload( payload, sizeof( payload ), &length, "}" ) ) {
+		return;
+	}
+
+	G_RankResolveEventSteamIds( killer, &killerSteamIdLow, &killerSteamIdHigh );
+	G_RankResolveEventSteamIds( victim, &victimSteamIdLow, &victimSteamIdHigh );
+
+	if ( killer && killer->client && meansOfDeath == MOD_RAILGUN_HEADSHOT ) {
+		G_RankSendPlayerMedal( killer, "HEADSHOT" );
+	}
+
+	if ( killer && killer->client ) {
+		trap_ReportPlayerEvent( killerSteamIdLow, killerSteamIdHigh, &killer->client->rankStats,
+			"PLAYER_KILL", payload );
+	}
+
+	trap_ReportPlayerEvent( victimSteamIdLow, victimSteamIdHigh, &victim->client->rankStats,
+		"PLAYER_DEATH", payload );
+}
+
+/*
+================
+G_RankSendPlayerStats
+
+Publishes the reconstructed PLAYER_STATS payload used at match end and during
+team-switch teardown.
+================
+*/
+void G_RankSendPlayerStats( gentity_t *ent, qboolean aborted ) {
+	char		payload[RANK_EVENT_PAYLOAD_MAX];
+	void		*payloadPtr;
+	uint32_t	steamIdLow;
+	uint32_t	steamIdHigh;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	G_RankResolveEventSteamIds( ent, &steamIdLow, &steamIdHigh );
+	payloadPtr = G_RankBuildPlayerStatsPayload( ent, aborted, payload, sizeof( payload ) ) ? payload : NULL;
+	if ( !payloadPtr ) {
+		return;
+	}
+
+	trap_ReportPlayerEvent( steamIdLow, steamIdHigh, &ent->client->rankStats, "PLAYER_STATS", payloadPtr );
 }
 
 /*
@@ -3589,20 +5407,21 @@ void G_RankSendMatchStarted( void ) {
 ================
 G_RankSubmitMatchReport
 
-Claims the retail match-report submission point from LogExit. The full payload
-builder is still under reconstruction, so the current bridge holds the submit
-timing and single-fire semantics while routing a stub report object.
+Submits the reconstructed match-report payload once after LogExit finishes the
+per-player stats pass.
 ================
 */
 void G_RankSubmitMatchReport( qboolean aborted ) {
-	(void)aborted;
+	char	payload[RANK_EVENT_PAYLOAD_MAX];
+	void	*payloadPtr;
 
 	if ( level.rankMatchReportSent ) {
 		return;
 	}
 
 	level.rankMatchReportSent = qtrue;
-	trap_SubmitMatchReport( NULL );
+	payloadPtr = G_RankBuildMatchReportPayload( aborted, payload, sizeof( payload ) ) ? payload : NULL;
+	trap_SubmitMatchReport( payloadPtr );
 }
 
 /*
@@ -3615,8 +5434,12 @@ Append information about this game to the log file
 void LogExit( const char *string ) {
 	int				i, numSorted;
 	gclient_t		*cl;
+	const char		*exitMessage;
 	qboolean won = qtrue;
-	G_LogPrintf( "Exit: %s\n", string );
+
+	exitMessage = string ? string : "";
+	Q_strncpyz( level.rankExitMessage, exitMessage, sizeof( level.rankExitMessage ) );
+	G_LogPrintf( "Exit: %s\n", exitMessage );
 
 	level.intermissionQueued = level.time;
 
@@ -3666,6 +5489,23 @@ void LogExit( const char *string ) {
 	}
 
 	if ( !level.rankMatchReportSent && !trap_Cvar_VariableIntegerValue( "g_restarted" ) ) {
+		for ( i = 0; i < level.maxclients; i++ ) {
+			gentity_t *ent;
+
+			ent = &g_entities[i];
+			if ( !ent->client ) {
+				continue;
+			}
+			if ( ent->client->pers.connected != CON_CONNECTED ) {
+				continue;
+			}
+			if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+				continue;
+			}
+
+			G_RankSendPlayerStats( ent, qfalse );
+		}
+
 		G_RankSubmitMatchReport( qfalse );
 	}
 

@@ -692,7 +692,7 @@ void CG_RegisterWeapon( int weaponNum ) {
 	weaponInfo->registered = qtrue;
 
 	for ( item = bg_itemlist + 1 ; item->classname ; item++ ) {
-		if ( item->giType == IT_WEAPON && item->giTag == weaponNum ) {
+		if ( item->giType == IT_WEAPON && BG_WeaponForItemTag( item->giTag ) == weaponNum ) {
 			weaponInfo->item = item;
 			break;
 		}
@@ -715,7 +715,7 @@ void CG_RegisterWeapon( int weaponNum ) {
 	weaponInfo->ammoIcon = trap_R_RegisterShader( item->icon );
 
 	for ( ammo = bg_itemlist + 1 ; ammo->classname ; ammo++ ) {
-		if ( ammo->giType == IT_AMMO && ammo->giTag == weaponNum ) {
+		if ( ammo->giType == IT_AMMO && BG_WeaponForItemTag( ammo->giTag ) == weaponNum ) {
 			break;
 		}
 	}
@@ -950,7 +950,7 @@ void CG_RegisterItemVisuals( int itemNum ) {
 	itemInfo->icon = trap_R_RegisterShader( item->icon );
 
 	if ( item->giType == IT_WEAPON ) {
-		CG_RegisterWeapon( item->giTag );
+		CG_RegisterWeapon( BG_WeaponForItemTag( item->giTag ) );
 	}
 
 	//
@@ -1979,11 +1979,13 @@ WEAPON SELECTION
 */
 
 /*
-===================
-CG_DrawWeaponSelect
-===================
+========================
+CG_DrawWeaponSelectStrip
+
+Draws the centered retail weapon-strip branch shared by the recovered wrapper.
+========================
 */
-void CG_DrawWeaponSelect( void ) {
+static void CG_DrawWeaponSelectStrip( void ) {
 	int		i;
 	int		bits;
 	int		count;
@@ -2008,7 +2010,7 @@ void CG_DrawWeaponSelect( void ) {
 	// count the number of weapons owned
 	bits = cg.snap->ps.stats[ STAT_WEAPONS ];
 	count = 0;
-	for ( i = 1 ; i < 16 ; i++ ) {
+	for ( i = WP_MACHINEGUN ; i < WP_NUM_WEAPONS ; i++ ) {
 		if ( bits & ( 1 << i ) ) {
 			count++;
 		}
@@ -2017,7 +2019,7 @@ void CG_DrawWeaponSelect( void ) {
 	x = 320 - count * 20;
 	y = 380;
 
-	for ( i = 1 ; i < 16 ; i++ ) {
+	for ( i = WP_MACHINEGUN ; i < WP_NUM_WEAPONS ; i++ ) {
 		if ( !( bits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -2051,6 +2053,264 @@ void CG_DrawWeaponSelect( void ) {
 	}
 
 	trap_R_SetColor( NULL );
+}
+
+/*
+==========================
+CG_ShouldDrawFullWeaponBarEntry
+
+Returns qtrue when the legacy menu-HUD bar should include an unowned weapon
+that is already registered for the current map.
+==========================
+*/
+static qboolean CG_ShouldDrawFullWeaponBarEntry( int weapon ) {
+	if ( !cg_drawFullWeaponBar.integer ) {
+		return qfalse;
+	}
+	if ( weapon < WP_MACHINEGUN || weapon >= WP_NUM_WEAPONS ) {
+		return qfalse;
+	}
+
+	return (qboolean)( cg_weapons[weapon].registered && cg_weapons[weapon].weaponIcon != 0 );
+}
+
+/*
+==========================
+CG_ShouldDrawLegacyWeaponBarEntry
+
+Matches the retail entry filter for the left, right, and centered menu-HUD
+weapon-bar layouts.
+==========================
+*/
+static qboolean CG_ShouldDrawLegacyWeaponBarEntry( int weapon, int ownedBits ) {
+	if ( weapon < WP_MACHINEGUN || weapon >= WP_NUM_WEAPONS ) {
+		return qfalse;
+	}
+
+	if ( ownedBits & ( 1 << weapon ) ) {
+		CG_RegisterWeapon( weapon );
+		return (qboolean)( cg_weapons[weapon].weaponIcon != 0 );
+	}
+
+	return CG_ShouldDrawFullWeaponBarEntry( weapon );
+}
+
+/*
+==========================
+CG_CountLegacyWeaponBarEntries
+
+Counts the visible entries for the retail left, right, and centered menu-HUD
+weapon-bar layouts.
+==========================
+*/
+static int CG_CountLegacyWeaponBarEntries( int ownedBits ) {
+	int		count;
+	int		weapon;
+
+	count = 0;
+	for ( weapon = WP_MACHINEGUN; weapon < WP_NUM_WEAPONS; weapon++ ) {
+		if ( CG_ShouldDrawLegacyWeaponBarEntry( weapon, ownedBits ) ) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
+/*
+==========================
+CG_GetLegacyWeaponBarLayout
+
+Builds the retail position and offset constants for the left, right, and
+centered menu-HUD weapon-bar styles.
+==========================
+*/
+static void CG_GetLegacyWeaponBarLayout( int count, float *x, float *y, float *stepX, float *stepY, float *ammoX, float *selectX, float *infiniteAmmoX ) {
+	switch ( cg_weaponBar.integer ) {
+	case 2:
+		*x = 623.0f;
+		*y = 94.0f;
+		*stepX = 0.0f;
+		*stepY = 22.0f;
+		*ammoX = -3.0f;
+		*selectX = -33.0f;
+		*infiniteAmmoX = -19.0f;
+		break;
+
+	case 3:
+		*x = 320.0f - count * 55.0f * 0.5f;
+		*y = 413.0f;
+		*stepX = 55.0f;
+		*stepY = 0.0f;
+		*ammoX = 20.0f;
+		*selectX = -4.0f;
+		*infiniteAmmoX = 12.0f;
+		break;
+
+	case 1:
+	default:
+		*x = 1.0f;
+		*y = 94.0f;
+		*stepX = 0.0f;
+		*stepY = 22.0f;
+		*ammoX = 20.0f;
+		*selectX = -4.0f;
+		*infiniteAmmoX = 18.0f;
+		break;
+	}
+}
+
+/*
+==========================
+CG_GetLegacyWeaponBarAmmoColor
+
+Applies the retail empty-ammo and subtle low-ammo text tinting used by the
+legacy menu-HUD weapon bar.
+==========================
+*/
+static void CG_GetLegacyWeaponBarAmmoColor( int weapon, vec4_t color ) {
+	int		ammo;
+	int		threshold;
+
+	ammo = cg.snap->ps.ammo[weapon];
+	color[0] = 1.0f;
+	color[1] = 1.0f;
+	color[2] = 1.0f;
+	color[3] = 1.0f;
+
+	if ( ammo == 0 && cg_lowAmmoWeaponBarWarning.integer != 0 ) {
+		color[0] = 1.0f;
+		color[1] = 0.0f;
+		color[2] = 0.0f;
+		color[3] = 0.8f;
+		return;
+	}
+
+	if ( ammo <= 0 || cg_lowAmmoWeaponBarWarning.integer < 2 ) {
+		return;
+	}
+
+	threshold = (int)( BG_GetWeaponMaxAmmo( (weapon_t)weapon ) * cg.lowAmmoWarningPercentile );
+	if ( ammo < threshold ) {
+		color[0] = 1.0f;
+		color[1] = 0.8f;
+		color[2] = 0.2f;
+		color[3] = 1.0f;
+	}
+}
+
+/*
+==========================
+CG_DrawLegacyWeaponBarAmmo
+
+Draws the retail ammo label used by the left, right, and centered menu-HUD
+weapon-bar styles.
+==========================
+*/
+static void CG_DrawLegacyWeaponBarAmmo( float x, float y, float ammoX, float infiniteAmmoX, int weapon ) {
+	char		buffer[8];
+	vec4_t		color;
+	float		textX;
+	int		ammo;
+
+	ammo = cg.snap->ps.ammo[weapon];
+	if ( ammo < 0 ) {
+		if ( cgs.media.infiniteAmmoShader ) {
+			CG_DrawPic( x + infiniteAmmoX, y, 16.0f, 16.0f, cgs.media.infiniteAmmoShader );
+		}
+		return;
+	}
+
+	Com_sprintf( buffer, sizeof( buffer ), "%d", ammo );
+	CG_GetLegacyWeaponBarAmmoColor( weapon, color );
+
+	if ( cg_weaponBar.integer == 2 ) {
+		textX = x + ammoX - (float)CG_Text_Width( buffer, 0.24f, 0 );
+	} else {
+		textX = x + ammoX;
+	}
+
+	CG_Text_Paint( textX, y + 13.0f, 0.24f, color, buffer, 0.0f, 0, ITEM_TEXTSTYLE_NORMAL );
+}
+
+/*
+==========================
+CG_DrawLegacyWeaponSelect
+
+Restores the retail left, right, and centered menu-HUD weapon-bar layouts
+behind `cg_weaponBar` values 1-3.
+==========================
+*/
+static void CG_DrawLegacyWeaponSelect( void ) {
+	int		count;
+	int		ownedBits;
+	int		weapon;
+	float		x;
+	float		y;
+	float		stepX;
+	float		stepY;
+	float		ammoX;
+	float		selectX;
+	float		infiniteAmmoX;
+
+	ownedBits = cg.snap->ps.stats[STAT_WEAPONS];
+	count = CG_CountLegacyWeaponBarEntries( ownedBits );
+	if ( count <= 0 ) {
+		return;
+	}
+
+	CG_GetLegacyWeaponBarLayout( count, &x, &y, &stepX, &stepY, &ammoX, &selectX, &infiniteAmmoX );
+
+	for ( weapon = WP_MACHINEGUN; weapon < WP_NUM_WEAPONS; weapon++ ) {
+		if ( !CG_ShouldDrawLegacyWeaponBarEntry( weapon, ownedBits ) ) {
+			continue;
+		}
+
+		CG_DrawPic( x, y, 16.0f, 16.0f, cg_weapons[weapon].weaponIcon );
+
+		if ( weapon == cg.weaponSelect ) {
+			CG_DrawPic( x + selectX, y - 2.0f, 52.0f, 20.0f, cgs.media.selectShader );
+		}
+
+		if ( ownedBits & ( 1 << weapon ) ) {
+			CG_DrawLegacyWeaponBarAmmo( x, y, ammoX, infiniteAmmoX, weapon );
+		}
+
+		x += stepX;
+		y += stepY;
+	}
+}
+
+/*
+==========================
+CG_DrawMenuHudWeaponSelect
+
+Retail outer wrapper for the menu-HUD weapon-select seam.
+==========================
+*/
+static void CG_DrawMenuHudWeaponSelect( void ) {
+	if ( !cg.snap || cg.weaponSelectTime <= 0 || cg_weaponBar.integer == 0 ) {
+		return;
+	}
+	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
+		return;
+	}
+
+	if ( cg_weaponBar.integer == 4 ) {
+		CG_DrawWeaponSelectStrip();
+		return;
+	}
+
+	CG_DrawLegacyWeaponSelect();
+}
+
+/*
+===================
+CG_DrawWeaponSelect
+===================
+*/
+void CG_DrawWeaponSelect( void ) {
+	CG_DrawMenuHudWeaponSelect();
 }
 
 

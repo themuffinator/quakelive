@@ -140,5 +140,5 @@ def test_retail_weapon_reload_defaults_match_recovered_cgame_table() -> None:
     bg_pmove_c = _read("src/code/game/bg_pmove.c")
 
     assert "[WP_BFG] = 300," in bg_pmove_c
-    assert "[WP_GRAPPLING_HOOK] = 200," in bg_pmove_c
-    assert "[WP_HEAVY_MACHINEGUN] = 80," in bg_pmove_c
+    assert "[WP_GRAPPLING_HOOK] = 100," in bg_pmove_c
+    assert "[WP_HEAVY_MACHINEGUN] = 75," in bg_pmove_c

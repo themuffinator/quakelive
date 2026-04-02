@@ -489,6 +489,7 @@ static void G_RaceFinishRun( gentity_t *point, gentity_t *player, int elapsed ) 
 	}
 
 	G_RaceAnnounceFinish( player, elapsed, personalBest );
+	G_RankSendPlayerRaceComplete( player, elapsed );
 	G_RaceClearClientRunState( client );
 	G_RaceUpdateConfigstrings();
 }

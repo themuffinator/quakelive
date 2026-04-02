@@ -18,14 +18,22 @@ each slot does.
 - The historical baseline comes from the Team Arena-era
   `assets/quake3/src/code/ui/ui_shared.h`.
 - Current member roles were cross-checked against:
-  - `UI_Init`, `AssetCache`, and the asset-global parser in
-    `src/code/ui/ui_main.c`
+  - the already-mapped retail helpers `_UI_Init`, `AssetCache`, `Text_Width`,
+    `Text_Height`, `Text_Paint`, `Text_PaintWithCursor`, `Text_Paint_Limit`,
+    `UI_OwnerDraw`, `UI_OwnerDrawVisible`, `UI_OwnerDrawHandleKey`,
+    `UI_FeederCount`, `UI_FeederItemText`, `UI_FeederItemImage`,
+    `UI_FeederSelection`, `UI_Pause`, `UI_ReadableSize`, `UI_PrintTime`,
+    `Display_MouseMove`, and `Menu_PaintAll`
+  - the asset-global parser in `src/code/ui/ui_main.c`
   - `Init_Display`, `Display_GetContext`, the scripted menu runtime, and the
     item/menu paint paths in `src/code/ui/ui_shared.c`
-- Retail parity is strongest for `_UI_Init` (`FUN_1000fab0`) in the committed
-  `uix86` Ghidra corpus. That body writes a contiguous global block from the
-  engine import table and local UI helpers, matching the current
-  `displayContextDef_t` callback layout.
+- Retail parity is strongest for `_UI_Init` (`FUN_1000fab0`) plus the mapped
+  callback owners it installs into this block. The committed `uix86` corpus now
+  directly names most of the callback table and the main ownerdraw/feeder/text
+  consumers, and the remaining uncertainty is narrower than before:
+  `UI_GetValue` and `UI_GetTeamColor` are now revalidated as pure stub
+  callbacks, while the unresolved asset side is concentrated in a small set of
+  parser-visible-but-unconsumed or clearly dormant carry-over slots.
 
 ## Hard Layout Facts
 
@@ -57,9 +65,9 @@ is a compact shader/sound/tuning tail.
 
 | Offset | Member | Type | Role |
 | --- | --- | --- | --- |
-| `0x0000` | `fontStr` | `const char *` | Legacy parser-facing font path slot. Structurally present, but no active current-tree producer or consumer was found. |
+| `0x0000` | `fontStr` | `const char *` | Retained legacy font-path slot. The current asset-global parser and the committed retail token set both go straight through `font`, `smallFont`, and `bigFont` registration paths instead of storing through this field, and no active consumer was found. |
 | `0x0004` | `cursorStr` | `const char *` | Parsed cursor-shader path. The asset-global parser fills it before registering `Assets.cursor`. |
-| `0x0008` | `gradientStr` | `const char *` | Legacy parser-facing gradient path slot. Structurally present, but the current parser writes `gradientBar` directly instead. |
+| `0x0008` | `gradientStr` | `const char *` | Retained legacy gradient-path slot. The live parser path and committed retail token set use `gradientbar` and register `Assets.gradientBar` directly instead of storing through this field, and no active consumer was found. |
 | `0x000C` | `textFont` | `fontInfo_t` | Primary UI font. Populated by `AssetCache` or the asset-global `font` directive and used by the text paint helpers. |
 | `0x5050` | `smallFont` | `fontInfo_t` | Small-font variant used by the text paint helpers when `scale <= ui_smallFont`. |
 | `0xA094` | `bigFont` | `fontInfo_t` | Large-font variant used by the text paint helpers when `scale >= ui_bigFont`. |
@@ -76,9 +84,9 @@ is a compact shader/sound/tuning tail.
 | `0xF100` | `solidBox` | `qhandle_t` | Legacy filled-box shader slot. Structurally present, but no active current-tree producer or consumer was found. |
 | `0xF104` | `sliderBar` | `qhandle_t` | Slider track shader used by `Item_Slider_Paint`. |
 | `0xF108` | `sliderThumb` | `qhandle_t` | Slider thumb shader used by `Item_Slider_Paint`. |
-| `0xF10C` | `menuEnterSound` | `sfxHandle_t` | Parsed menu-enter sound handle. The current tree exposes parser support, but no stable active consumer was found. |
-| `0xF110` | `menuExitSound` | `sfxHandle_t` | Parsed menu-exit sound handle. The current tree exposes parser support, but no stable active consumer was found. |
-| `0xF114` | `menuBuzzSound` | `sfxHandle_t` | Parsed menu-buzz sound handle. The current tree exposes parser support, but no stable active consumer was found. |
+| `0xF10C` | `menuEnterSound` | `sfxHandle_t` | Parser-visible menu-enter sound handle. Both the current asset-global parser and the committed retail token set still recognize it, but no stable active runtime consumer was found. |
+| `0xF110` | `menuExitSound` | `sfxHandle_t` | Parser-visible menu-exit sound handle. Both the current asset-global parser and the committed retail token set still recognize it, but no stable active runtime consumer was found. |
+| `0xF114` | `menuBuzzSound` | `sfxHandle_t` | Parser-visible menu-buzz sound handle. Both the current asset-global parser and the committed retail token set still recognize it, but no stable active runtime consumer was found. |
 | `0xF118` | `itemFocusSound` | `sfxHandle_t` | Default focus sound used by `Item_SetFocus` when an item does not supply its own `focusSound`. |
 | `0xF11C` | `fadeClamp` | `float` | Shared menu fade alpha clamp copied into menus during post-parse setup and used by fade helpers. |
 | `0xF120` | `fadeCycle` | `int` | Shared fade timing period copied into menus during post-parse setup. |
@@ -128,10 +136,10 @@ menu runtime.
 
 | Offset | Member | Type | Role |
 | --- | --- | --- | --- |
-| `0x0048` | `getValue` | `float (*)(int)` | Numeric ownerdraw query hook used by shared value displays. |
+| `0x0048` | `getValue` | `float (*)(int)` | Numeric ownerdraw query hook installed by `_UI_Init`. The committed retail callback body is a pure hardcoded `0.0` return, so ownerdraw color-range selection in `Item_Paint` only ever evaluates against zero unless another layer replaces the slot. |
 | `0x004C` | `ownerDrawVisible` | `qboolean (*)(int)` | Visibility predicate for ownerdraw-backed widgets. |
 | `0x0050` | `runScript` | `void (*)(char **)` | Menu script dispatcher used by item/menu events. |
-| `0x0054` | `getTeamColor` | `void (*)(vec4_t *)` | Team-color query used by ownerdraw and menu paint helpers. |
+| `0x0054` | `getTeamColor` | `void (*)(vec4_t *)` | Team-color callback installed by `_UI_Init`. Shared `WINDOW_STYLE_TEAMCOLOR` paint and `Script_SetTeamColor` still call through it, but the committed retail body is a pure no-op that does not populate the color buffer. |
 | `0x0058` | `getCVarString` | `void (*)(const char *, char *, int)` | Cvar-string query hook used by parser/runtime bindings. |
 | `0x005C` | `getCVarValue` | `float (*)(const char *)` | Numeric cvar query hook used by ownerdraws and edit/list widgets. |
 | `0x0060` | `setCVar` | `void (*)(const char *, const char *)` | Cvar write hook used by menu scripts and widget commit paths. |
@@ -181,8 +189,8 @@ menu runtime.
 | `0x00E8` | `Assets` | `cachedAssets_t` | Embedded asset bank holding fonts, shared shaders, sound handles, fade tuning, and Quake Live-specific cosmetics/crosshair assets. |
 | `0xF278` | `glconfig` | `glconfig_t` | Cached renderer configuration copied in `UI_Init` and used by widescreen scaling and the GL-info ownerdraw. |
 | `0x11EBC` | `whiteShader` | `qhandle_t` | Shared white shader used by primitive border/fill helpers. |
-| `0x11EC0` | `gradientImage` | `qhandle_t` | Legacy gradient shader slot. Structurally present, but no active current-tree producer or consumer was found. |
-| `0x11EC4` | `cursor` | `qhandle_t` | Legacy top-level cursor shader slot assigned during `UI_Init`. The live cursor draw path currently uses `Assets.cursor` instead. |
+| `0x11EC0` | `gradientImage` | `qhandle_t` | Legacy gradient shader slot. The live gradient style path paints through `Assets.gradientBar`, and no active producer or consumer was found for this tail slot in the current tree or the committed retail token set. |
+| `0x11EC4` | `cursor` | `qhandle_t` | Legacy top-level cursor shader slot assigned during `_UI_Init` from `"menu/art/3_cursor2"`. The live visible cursor draw path uses `Assets.cursor`, and no separate committed retail draw consumer for this tail slot has been revalidated yet. |
 | `0x11EC8` | `FPS` | `float` | Rolling UI FPS estimate updated by `UI_Refresh`; shown by the shared debug overlay when `debugMode` is enabled. |
 
 ## Current Ownership Split
@@ -196,14 +204,26 @@ menu runtime.
 - The asset-global parser in `ui_main.c` owns the configurable
   `cachedAssets_t` fields such as fonts, cursor shader, sounds, fade values,
   and shadow parameters.
+- The same parser-visible asset band now splits more cleanly:
+  - live fields: `Assets.cursor`, `Assets.gradientBar`, and `Assets.itemFocusSound`
+  - parser-visible but currently unconsumed fields: `menuEnterSound`,
+    `menuExitSound`, `menuBuzzSound`
+  - retained carry-over slots with no active producer/consumer in current
+    evidence: `fontStr`, `gradientStr`, `buttonMiddle`, `buttonInside`,
+    `solidBox`, `gradientImage`, and the tail `cursor` as a live draw input
 - `AssetCache` owns the fixed Quake Live-compatible shared textures and fonts:
   gradient bar, scrollbar assets, slider assets, effects-color strip assets,
   and the crosshair preview bank.
 
 ## Open Questions
 
-1. Promote the raw retail helper names around the shared menu runtime so the
-   remaining weak legacy slots such as `fontStr`, `gradientStr`,
-   `buttonMiddle`, `buttonInside`, `solidBox`, `gradientImage`, and the tail
-   `cursor` can be classified more confidently as either dormant carry-overs or
-   still-live retail compatibility fields.
+1. The remaining weak asset band is smaller now:
+   `buttonMiddle`, `buttonInside`, and `solidBox` still have no active
+   producer/consumer in the current tree or committed retail evidence, while
+   `gradientImage` and the tail `cursor` are currently only init/layout-visible
+   rather than revalidated as live draw inputs.
+2. `menuEnterSound`, `menuExitSound`, and `menuBuzzSound` are now clearly
+   parser-visible in both the current tree and committed retail token set, but
+   they still lack a stable active consumer. Revisit them if future retail
+   runtime evidence surfaces a menu-open, menu-close, or buzz path that still
+   uses the cached handles.

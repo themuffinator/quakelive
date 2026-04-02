@@ -25,13 +25,13 @@ typedef struct pmove_s {
 } pmove_t;
 
 pmove_t	*pm;
-float	pm_swimScale = 0.50f;
-float	pm_wadeScale = 0.75f;
+float	pm_swimScale = 0.60f;
+float	pm_wadeScale = 0.80f;
 float	pm_stepHeight = 22.0f;
 
 static const pmove_settings_t pm_defaultSettings = {
-	.waterSwimScale = 0.50f,
-	.waterWadeScale = 0.75f,
+	.waterSwimScale = 0.60f,
+	.waterWadeScale = 0.80f,
 	.stepHeight = 22.0f,
 };
 
@@ -183,8 +183,8 @@ def test_water_scale_defaults(tmp_path: Path) -> None:
         ctypes.byref(wade),
     )
 
-    assert swim.value == pytest.approx(0.50, rel=1e-6)
-    assert wade.value == pytest.approx(0.75, rel=1e-6)
+    assert swim.value == pytest.approx(0.60, rel=1e-6)
+    assert wade.value == pytest.approx(0.80, rel=1e-6)
 
     library.qlr_load_water_scales_for_test(
         ctypes.c_float(0.5),
@@ -203,5 +203,5 @@ def test_water_scale_defaults(tmp_path: Path) -> None:
         ctypes.byref(wade),
     )
 
-    assert swim.value == pytest.approx(0.50, rel=1e-6)
-    assert wade.value == pytest.approx(0.75, rel=1e-6)
+    assert swim.value == pytest.approx(0.60, rel=1e-6)
+    assert wade.value == pytest.approx(0.80, rel=1e-6)
