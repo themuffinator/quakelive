@@ -8,6 +8,17 @@ The long-term parity target is that this engine should, in theory, be able to re
 
 ## Recently closed
 
+### Task 54: Qagame full parity audit and closure-plan publication [COMPLETED]
+Priority: High
+Files: `AUDIT.md`, `IMPLEMENTATION_PLAN.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`
+Parity estimate: **before 76% -> after 78%** (confidence/documentation uplift; runtime behavior unchanged)
+
+Completed work:
+
+1. Performed a full `qagame` parity audit against the committed HLIL/Ghidra references, the live `qagame` mapping ledger, and the current gameplay/transport seams in writable source.
+2. Published a dedicated qagame closure plan document that enumerates the full remaining gap register (`QG-G01`..`QG-G10`) and ties each gap to evidence-backed retail helper families (round controllers, alerts, score serializers, Red Rover, tournament queue, spawn/loadout, and timer-layout tails).
+3. Broke the closure path into six execution phases (`QG-P1`..`QG-P6`) with explicit exit criteria and tranche-by-tranche parity uplift targets, so qagame parity can be closed deterministically instead of by ad-hoc mapping passes.
+
 ### Task 53: UI full parity audit and closure-plan publication [COMPLETED]
 Priority: High
 Files: `AUDIT.md`, `IMPLEMENTATION_PLAN.md`, `docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md`
@@ -506,6 +517,19 @@ Subtasks:
 3. Re-run focused Race checks after major gameplay-side changes.
 4. Continue verifying match-flow sequencing against HLIL whenever state-machine code changes.
 5. [x] Capture the shared `pmove` regressions with focused tests instead of relying on broad manual inspection, including jump timing, circle-strafe friction, step-jump gating, unsupported air-step suppression, and double-jump reuse.
+
+### Task 25: Qagame behavioral parity closure execution [OPEN]
+Priority: High
+Primary areas: `src/code/game/*`, qagame↔cgame transport boundaries, focused gameplay fixtures
+
+The dedicated qagame audit and plan is now published in `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`. The remaining qagame parity risk is no longer symbol coverage; it is behavioral and boundary exactness in retail-only helper families.
+
+Open subtasks:
+
+1. Execute `QG-P1` + `QG-P2`: close controller-state helper exactness and shared last-alive public event transport.
+2. Execute `QG-P3`: restore retail scoreboard/intermission serializer-family boundaries and ordering.
+3. Execute `QG-P4`: close Red Rover strict controller/death-path interface differences.
+4. Execute `QG-P5` + `QG-P6`: finish tournament queue sidecar, spawn/loadout finalizer, and residual timer/debug/training tails.
 
 ## Verification expectations after gameplay/client changes
 
