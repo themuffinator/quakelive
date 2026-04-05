@@ -80,23 +80,7 @@ CG_RefreshClientInfoContext
 ===========================
 */
 static void CG_RefreshClientInfoContext( void ) {
-	int			i;
-
-	for ( i = 0; i < cgs.maxclients; i++ ) {
-		const char	*clientInfo;
-
-		if ( i == cg.clientNum ) {
-			continue;
-		}
-
-		clientInfo = CG_ConfigString( CS_PLAYERS + i );
-		if ( !clientInfo[0] ) {
-			continue;
-		}
-
-		CG_NewClientInfo( i );
-	}
-
+	CG_ApplyModelOverrides();
 	CG_LoadDeferredPlayers();
 }
 
@@ -106,11 +90,6 @@ CG_QueueClientInfoContextRefresh
 =================================
 */
 void CG_QueueClientInfoContextRefresh( void ) {
-	if ( cg.snap ) {
-		CG_RefreshClientInfoContext();
-		return;
-	}
-
 	cg_refreshClientInfoContextQueued = qtrue;
 }
 
@@ -158,10 +137,6 @@ void CG_SetInitialSnapshot( snapshot_t *snap ) {
 		CG_CheckEvents( cent );
 	}
 
-	if ( cg_refreshClientInfoContextQueued ) {
-		cg_refreshClientInfoContextQueued = qfalse;
-		CG_RefreshClientInfoContext();
-	}
 }
 
 
@@ -226,10 +201,6 @@ static void CG_TransitionSnapshot( void ) {
 			CG_TransitionPlayerState( ps, ops );
 		}
 
-		if ( ps->clientNum != ops->clientNum
-			|| ps->persistant[ PERS_TEAM ] != ops->persistant[ PERS_TEAM ] ) {
-			cg_refreshClientInfoContextQueued = qtrue;
-		}
 	}
 
 	if ( cg_refreshClientInfoContextQueued ) {

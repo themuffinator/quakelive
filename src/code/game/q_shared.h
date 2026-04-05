@@ -1375,6 +1375,11 @@ typedef struct entityState_s {
 	int		torsoAnim;		// mask off ANIM_TOGGLEBIT
 
 	int		generic1;
+
+	// Retail temp-entity payloads also consume a recovered 0xE0 data slot
+	// beyond the classic GPL entityState_t tail.
+	int		retailEventPadding[4];
+	int		retailEventData;
 } entityState_t;
 
 typedef enum {

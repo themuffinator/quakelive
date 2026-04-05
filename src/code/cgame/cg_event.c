@@ -597,35 +597,54 @@ int CG_GetOvertimeCount( void ) {
 =============
 CG_GetRetailEventClientNum
 
-Bridges retail temp-entity recipient payloads through the current source
-entityState_t layout until qagame parity restores the original field offsets.
+Returns the recovered retail recipient slot used by Quake Live temp entities.
 =============
 */
 static int CG_GetRetailEventClientNum( const entityState_t *es ) {
 	if ( !es ) {
 		return -1;
 	}
-	if ( es->clientNum >= 0 && es->clientNum < MAX_CLIENTS ) {
-		return es->clientNum;
+	if ( es->solid >= 0 && es->solid < MAX_CLIENTS ) {
+		return es->solid;
+	}
+	if ( es->number >= 0 && es->number < MAX_CLIENTS ) {
+		return es->number;
 	}
 
-	return es->number;
+	return -1;
+}
+
+/*
+=============
+CG_GetGlobalTeamSound
+
+Returns the recovered retail global-team-sound code.
+=============
+*/
+static int CG_GetGlobalTeamSound( const entityState_t *es ) {
+	if ( !es ) {
+		return -1;
+	}
+	if ( es->weapon < GTS_RED_CAPTURE || es->weapon > GTS_SURVIVOR_WARNING ) {
+		return -1;
+	}
+
+	return es->weapon;
 }
 
 /*
 =============
 CG_GetGlobalTeamSoundTrackedClientNum
 
-Bridges the retail global-team-sound tracked-client payload through the current
-source entityState_t staging while qagame parity is still using source slots.
+Returns the recovered retail global-team-sound tracked-client payload.
 =============
 */
 static int CG_GetGlobalTeamSoundTrackedClientNum( const entityState_t *es ) {
 	if ( !es ) {
 		return -1;
 	}
-	if ( es->otherEntityNum >= 0 && es->otherEntityNum < MAX_CLIENTS ) {
-		return es->otherEntityNum;
+	if ( es->groundEntityNum >= 0 && es->groundEntityNum < MAX_CLIENTS ) {
+		return es->groundEntityNum;
 	}
 
 	return -1;
@@ -635,16 +654,15 @@ static int CG_GetGlobalTeamSoundTrackedClientNum( const entityState_t *es ) {
 =============
 CG_GetGlobalTeamSoundTeam
 
-Bridges the retail global-team-sound team payload through the current source
-entityState_t layout until the original field slots are restored.
+Returns the recovered retail global-team-sound team payload.
 =============
 */
 static team_t CG_GetGlobalTeamSoundTeam( const entityState_t *es ) {
 	if ( !es ) {
 		return TEAM_FREE;
 	}
-	if ( es->clientNum >= TEAM_FREE && es->clientNum < TEAM_NUM_TEAMS ) {
-		return (team_t)es->clientNum;
+	if ( es->frame >= TEAM_FREE && es->frame < TEAM_NUM_TEAMS ) {
+		return (team_t)es->frame;
 	}
 
 	return TEAM_FREE;
@@ -662,7 +680,7 @@ static int CG_GetGlobalTeamSoundIndex( const entityState_t *es ) {
 		return 0;
 	}
 
-	return es->generic1;
+	return es->legsAnim;
 }
 
 /*
@@ -714,157 +732,40 @@ static void CG_PlayDominationPointAnnouncement( const entityState_t *es ) {
 =============
 CG_GetRetailDamagePlumDamage
 
-Bridges the recovered retail damage payload through the current source
-entityState_t layout until qagame parity restores the original field slot.
+Returns the staged retail damage-plum damage payload.
 =============
 */
 static int CG_GetRetailDamagePlumDamage( const entityState_t *es ) {
+	int	damage;
+
 	if ( !es ) {
 		return 0;
 	}
-	if ( es->time > 0 ) {
-		return es->time;
-	}
 
-	return es->eventParm;
+	Com_Memcpy( &damage, &es->origin[0], sizeof( damage ) );
+	return damage;
 }
 
 /*
 =============
 CG_GetRetailDamagePlumWeapon
 
-Bridges the recovered retail weapon payload, falling back to the live local
-weapon while the qagame emitter still follows the GPL event path.
+Returns the staged retail damage-plum weapon payload.
 =============
 */
 static weapon_t CG_GetRetailDamagePlumWeapon( const entityState_t *es ) {
 	weapon_t	weapon;
 
-	if ( es ) {
-		weapon = (weapon_t)es->weapon;
-		if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
-			return weapon;
-		}
+	if ( !es ) {
+		return WP_NONE;
 	}
 
-	weapon = (weapon_t)cg.predictedPlayerState.weapon;
+	weapon = (weapon_t)es->retailEventData;
 	if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
 		return weapon;
 	}
-	if ( cg.snap ) {
-		weapon = (weapon_t)cg.snap->ps.weapon;
-		if ( weapon > WP_NONE && weapon < WP_NUM_WEAPONS ) {
-			return weapon;
-		}
-	}
 
 	return WP_NONE;
-}
-
-/*
-=============
-CG_GetRetailShotgunKillBurstCount
-
-Bridges the retail shotgun-kill gore count through the current source
-entityState_t layout until qagame restores the original payload slot.
-=============
-*/
-static int CG_GetRetailShotgunKillBurstCount( const entityState_t *es ) {
-	int	count;
-
-	count = 10;
-	if ( es ) {
-		if ( es->time > 0 ) {
-			count = es->time;
-		} else if ( es->eventParm > 0 ) {
-			count = es->eventParm;
-		}
-	}
-
-	count /= 5;
-	if ( count < 1 ) {
-		count = 1;
-	} else if ( count > 8 ) {
-		count = 8;
-	}
-
-	return count;
-}
-
-/*
-=============
-CG_ShotgunKillEffect
-
-Reconstructs the retail shotgun finisher gore burst around the victim origin.
-=============
-*/
-static void CG_ShotgunKillEffect( centity_t *cent, const entityState_t *es ) {
-	localEntity_t	*blood;
-	qhandle_t		bloodShader;
-	vec3_t			puffOrigin;
-	int				entityNum;
-	int				burstCount;
-	int				i;
-
-	if ( !cent ) {
-		return;
-	}
-	if ( !cg_blood.integer || !cgs.media.bloodSprayShaders[0] ) {
-		return;
-	}
-
-	entityNum = ENTITYNUM_NONE;
-	if ( es && es->otherEntityNum >= 0 && es->otherEntityNum < MAX_GENTITIES ) {
-		entityNum = es->otherEntityNum;
-	}
-
-	burstCount = CG_GetRetailShotgunKillBurstCount( es );
-	for ( i = 0; i < burstCount; i++ ) {
-		VectorCopy( cent->lerpOrigin, puffOrigin );
-		puffOrigin[0] += crandom() * 16.0f;
-		puffOrigin[1] += crandom() * 16.0f;
-		puffOrigin[2] += 8.0f + random() * 24.0f;
-		CG_Bleed( puffOrigin, entityNum );
-
-		puffOrigin[0] += crandom() * 6.0f;
-		puffOrigin[1] += crandom() * 6.0f;
-		puffOrigin[2] += crandom() * 6.0f;
-		CG_Bleed( puffOrigin, entityNum );
-
-		bloodShader = cgs.media.bloodSprayShaders[rand() & 3];
-		blood = CG_SmokePuff( puffOrigin, vec3_origin,
-			24.0f,
-			1.0f, 1.0f, 1.0f, 1.0f,
-			400,
-			cg.time,
-			0,
-			0,
-			bloodShader );
-		blood->leType = LE_FALL_SCALE_FADE;
-		blood->pos.trDelta[2] = 20.0f;
-		if ( cg.snap && entityNum == cg.snap->ps.clientNum ) {
-			blood->refEntity.renderfx |= RF_THIRD_PERSON;
-		}
-	}
-}
-
-/*
-=========================
-CG_MissileHitWallDmgThrough
-
-Restores the stable retail fallthrough from EV_MISSILE_MISS_DMGTHROUGH into the
-shared missile-impact wall helper.
-=========================
-*/
-static void CG_MissileHitWallDmgThrough( const entityState_t *es, vec3_t origin, vec3_t dir ) {
-	int	clientNum;
-
-	clientNum = 0;
-	if ( es && es->clientNum >= 0 && es->clientNum < MAX_CLIENTS ) {
-		clientNum = es->clientNum;
-	}
-
-	CG_MissileHitWall( es ? es->weapon : WP_NONE, clientNum, origin, dir, IMPACTSOUND_DEFAULT );
 }
 
 /*
@@ -878,11 +779,11 @@ static int CG_GetRetailAwardType( const entityState_t *es ) {
 	if ( !es ) {
 		return -1;
 	}
-	if ( es->generic1 >= 0 && es->generic1 <= 9 ) {
-		return es->generic1;
+	if ( es->retailEventData >= 0 && es->retailEventData <= 9 ) {
+		return es->retailEventData;
 	}
 
-	return es->eventParm;
+	return -1;
 }
 
 /*
@@ -1085,7 +986,7 @@ static void CG_TrackFlagCarrierForEvent( const entityState_t *es ) {
 		return;
 	}
 
-	switch ( es->eventParm ) {
+	switch ( CG_GetGlobalTeamSound( es ) ) {
 		case GTS_RED_TAKEN:
 			powerup = ( cgs.gametype == GT_1FCTF ) ? PW_NEUTRALFLAG : PW_BLUEFLAG;
 			break;
@@ -2226,12 +2127,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		break;
 	case EV_JUICED:
 		DEBUGNAME("EV_JUICED");
-		if ( cgs.media.haveDlcGibs ) {
-			CG_InvulnerabilityJuiced( cent->lerpOrigin );
-		}
-		else {
-			CG_BigExplode( cent->lerpOrigin );
-		}
+		CG_InvulnerabilityJuiced( cent->lerpOrigin );
 		break;
 	case EV_LIGHTNINGBOLT:
 		DEBUGNAME("EV_LIGHTNINGBOLT");
@@ -2268,7 +2164,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	case EV_MISSILE_MISS_DMGTHROUGH:
 		DEBUGNAME("EV_MISSILE_MISS_DMGTHROUGH");
 		ByteToDir( es->eventParm, dir );
-		CG_MissileHitWallDmgThrough( es, position, dir );
+		CG_MissileHitWallDmgThrough( position, dir, es->weapon );
 		break;
 
 	case EV_MISSILE_HIT:
@@ -2347,8 +2243,11 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 
 	case EV_GLOBAL_TEAM_SOUND:	// play from the player's head so it never diminishes
 		{
+			int	globalTeamSound;
+
 			DEBUGNAME("EV_GLOBAL_TEAM_SOUND");
-			switch( es->eventParm ) {
+			globalTeamSound = CG_GetGlobalTeamSound( es );
+			switch( globalTeamSound ) {
 				case GTS_RED_CAPTURE: // CTF: red team captured the blue flag, 1FCTF: red team captured the neutral flag
 					if ( cgs.clientinfo[cg.clientNum].team == TEAM_RED )
 						CG_AddBufferedSound( cgs.media.captureYourTeamSound );

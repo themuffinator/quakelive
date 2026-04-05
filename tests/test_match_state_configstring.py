@@ -83,7 +83,6 @@ static char qlr_timeoutStartConfig[32];
 static char qlr_timeoutExpireConfig[32];
 static char qlr_timeoutCountRedConfig[32];
 static char qlr_timeoutCountBlueConfig[32];
-static char qlr_factoryTitleConfig[MAX_STRING_CHARS];
 static char qlr_factoryFlagsConfig[32];
 static char qlr_factorySpawnHintsConfig[MAX_INFO_STRING];
 
@@ -245,9 +244,6 @@ void trap_SetConfigstring( int num, const char *string ) {
 @TAB@case CS_TIMEOUT_COUNT_BLUE:
 @TAB@@TAB@Q_strncpyz( qlr_timeoutCountBlueConfig, value, sizeof( qlr_timeoutCountBlueConfig ) );
 @TAB@@TAB@break;
-@TAB@case CS_FACTORY_TITLE:
-@TAB@@TAB@Q_strncpyz( qlr_factoryTitleConfig, value, sizeof( qlr_factoryTitleConfig ) );
-@TAB@@TAB@break;
 @TAB@case CS_FACTORY_FLAGS:
 @TAB@@TAB@Q_strncpyz( qlr_factoryFlagsConfig, value, sizeof( qlr_factoryFlagsConfig ) );
 @TAB@@TAB@break;
@@ -285,7 +281,6 @@ static void QLR_ClearMatchStateConfig( void ) {
 @TAB@memset( qlr_timeoutExpireConfig, 0, sizeof( qlr_timeoutExpireConfig ) );
 @TAB@memset( qlr_timeoutCountRedConfig, 0, sizeof( qlr_timeoutCountRedConfig ) );
 @TAB@memset( qlr_timeoutCountBlueConfig, 0, sizeof( qlr_timeoutCountBlueConfig ) );
-@TAB@memset( qlr_factoryTitleConfig, 0, sizeof( qlr_factoryTitleConfig ) );
 @TAB@memset( qlr_factoryFlagsConfig, 0, sizeof( qlr_factoryFlagsConfig ) );
 @TAB@memset( qlr_factorySpawnHintsConfig, 0, sizeof( qlr_factorySpawnHintsConfig ) );
 }

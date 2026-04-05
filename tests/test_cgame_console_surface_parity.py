@@ -7,7 +7,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CG_CONSOLECMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_consolecmds.c"
+CG_DRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_draw.c"
+CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
 CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
+CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 
 
 def _block_from_marker(source: str, marker: str) -> str:
@@ -27,7 +30,6 @@ def _block_from_marker(source: str, marker: str) -> str:
 
 def test_local_console_surface_stays_narrower_like_retail() -> None:
 	console_source = CG_CONSOLECMDS.read_text(encoding="utf-8")
-	menu_source = CG_NEWDRAW.read_text(encoding="utf-8")
 
 	for unexpected in (
 		"static void CG_SpectatorFollowNext_f",
@@ -46,13 +48,8 @@ def test_local_console_surface_stays_narrower_like_retail() -> None:
 	for expected in (
 		'{ "nextTeamMember", CG_NextTeamMember_f },',
 		'{ "prevTeamMember", CG_PrevTeamMember_f },',
-		'spectatorFollowNext',
-		'spectatorFollowPrev',
-		'spectatorFollowStop',
-		'spectatorCameraLock',
-		'spectatorCameraUnlock',
 	):
-		assert expected in (menu_source if expected.startswith("spectator") else console_source)
+		assert expected in console_source
 
 
 def test_forwarded_server_command_registry_matches_retail_tail() -> None:
@@ -178,40 +175,116 @@ def test_retail_local_readyup_wrapper_remains_in_console_surface() -> None:
 
 	for expected in (
 		'{ "readyup", CG_ReadyUp_f },',
+		'static pmtype_t CG_GetRetailReadyUpPmType( void ) {',
+		'return (pmtype_t)cg.snap->ps.pm_type;',
+		'return (pmtype_t)cg.predictedPlayerState.pm_type;',
+		'static qboolean CG_IsRetailReadyUpIntermissionBypassActive( void ) {',
+		'CG_GetRetailReadyUpPmType() == PM_INTERMISSION',
+		'static void CG_ReadyUp_f( void ) {',
+		'allowIntermissionBypass = CG_IsRetailReadyUpIntermissionBypassActive();',
+		'if ( cg.warmup == 0 && cgs.matchReadyUpDeadline <= 0 && !allowIntermissionBypass ) {',
+		'if ( !ps ) {',
+		'ps->persistant[PERS_TEAM] == TEAM_SPECTATOR',
+		'trap_SendClientCommand( "readyup" );',
+	):
+		assert expected in source
+
+	for unexpected in (
 		'static qboolean CG_IsRetailReadyUpPregameBypassActive( void ) {',
 		'Info_ValueForKey( info, "g_training" );',
 		'CG_ConfigString( CS_TUTORIAL_NAME )',
 		'CG_ConfigString( CS_TUTORIAL_TEXT )',
-		'static void CG_ReadyUp_f( void ) {',
-		'if ( !cg.snap ) {',
-		'if ( cg.warmup == 0 && cgs.matchReadyUpDeadline <= 0 && !allowPregameBypass ) {',
-		'cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR',
-		'trap_SendClientCommand( "readyup" );',
 	):
-		assert expected in source
+		assert unexpected not in source
 
 
 def test_browser_input_bridge_wraps_shared_display_dispatch() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	cursor_block = _block_from_marker(source, "static int CG_BrowserDisplayCursorType")
 	move_block = _block_from_marker(source, "static qboolean CG_BrowserDisplayMouseMove")
+	text_rect_block = _block_from_marker(source, "static rectDef_t *CG_BrowserCorrectedTextRect")
+	active_block = _block_from_marker(source, "static qboolean CG_BrowserOverActiveItem")
+	focused_block = _block_from_marker(source, "static void *CG_GetFocusedBrowserOverlay")
+	handle_block = _block_from_marker(source, "static void CG_BrowserHandleKey")
 	key_block = _block_from_marker(source, "static void CG_BrowserDisplayHandleKey")
-	capture_block = _block_from_marker(source, "static void *CG_BrowserDisplayCaptureItem")
 	mouse_event_block = _block_from_marker(source, "void CG_MouseEvent")
 	key_event_block = _block_from_marker(source, "void CG_KeyEvent")
 
 	assert "return Display_CursorType( x, y );" in cursor_block
 	assert "return Display_MouseMove( overlay, x, y );" in move_block
-	assert "Display_HandleKey( key, down, x, y );" in key_block
-	assert "return Display_CaptureItem( x, y );" in capture_block
+	assert "rect = item->textRect;" in text_rect_block
+	assert "rect.y -= rect.h;" in text_rect_block
+	assert "Rect_ContainsPoint( &menu->window.rect, x, y )" in active_block
+	assert "item->window.flags & WINDOW_DECORATION" in active_block
+	assert "Rect_ContainsPoint( CG_BrowserCorrectedTextRect( item ), x, y )" in active_block
+	assert "return Menu_GetFocused();" in focused_block
+	assert "Menus_HandleOOBClick( menu, key, down );" in handle_block
+	assert "if ( down && key == K_F11 ) {" in handle_block
+	assert 'trap_SendConsoleCommand( "screenshotJPEG\\n" );' in handle_block
+	assert "Menu_HandleKey( menu, key, down );" in handle_block
+	assert "cgDC.cursorx = x;" in key_block
+	assert "cgDC.cursory = y;" in key_block
+	assert "overlay = CG_GetFocusedBrowserOverlay();" in key_block
+	assert "CG_BrowserHandleKey( overlay, key, down, 0 );" in key_block
 
+	assert "cgDC.cursorx = cgs.cursorX;" in mouse_event_block
+	assert "cgDC.cursory = cgs.cursorY;" in mouse_event_block
 	assert "n = CG_BrowserDisplayCursorType( cgs.cursorX, cgs.cursorY );" in mouse_event_block
-	assert "CG_BrowserDisplayMouseMove( cgs.capturedItem, x, y );" in mouse_event_block
 	assert "CG_BrowserDisplayMouseMove( NULL, cgs.cursorX, cgs.cursorY );" in mouse_event_block
+	assert "cgs.capturedItem" not in mouse_event_block
 	assert "Display_CursorType(" not in mouse_event_block
 	assert "Display_MouseMove(" not in mouse_event_block
 
-	assert "CG_BrowserDisplayHandleKey(key, down, cgs.cursorX, cgs.cursorY);" in key_event_block
-	assert "cgs.capturedItem = CG_BrowserDisplayCaptureItem( cgs.cursorX, cgs.cursorY );" in key_event_block
-	assert "Display_HandleKey(key, down, cgs.cursorX, cgs.cursorY);" not in key_event_block
+	assert "CG_BrowserDisplayHandleKey( key, down, cgs.cursorX, cgs.cursorY );" in key_event_block
+	assert "Display_HandleKey(" not in key_event_block
 	assert "Display_CaptureItem(" not in key_event_block
+	assert "cgs.capturedItem =" not in key_event_block
+
+
+def test_cgame_menu_script_stays_fullscreen_only_like_retail() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	run_block = _block_from_marker(source, "void CG_RunMenuScript")
+	assert "CG_MenuScript_OpenScoreboard" not in source
+	assert "CG_RequestScoreboard" not in source
+
+	for expected in (
+		'"setFullScreen"',
+		'"setWindowed"',
+		'"toggleFullscreen"',
+		'trap_Cvar_Set( "r_fullScreen", "1" );',
+		'trap_Cvar_Set( "r_fullScreen", "0" );',
+		'fullscreen = ( trap_Cvar_VariableValue( "r_fullScreen" ) != 0.0f ) ? qtrue : qfalse;',
+		'trap_SendConsoleCommand( "vid_restart fast\\n" );',
+	):
+		assert expected in run_block
+
+	for unexpected in (
+		"openScoreboard",
+		"closeScoreboard",
+		"spectatorFollow",
+		"spectatorCamera",
+		"hud_editToggle",
+		"stopRefresh",
+		"web_",
+		"Unknown cgame menu script",
+	):
+		assert unexpected not in run_block
+
+
+def test_voice_menu_timer_uses_retail_separate_latch() -> None:
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	draw_block = _block_from_marker(draw_source, "void CG_DrawTimedMenus")
+	play_block = _block_from_marker(servercmds_source, "void CG_PlayVoiceChat")
+
+	assert "int\t\t\tvoiceMenuTime;" in local_source
+	assert "CG_ShowResponseHead" not in newdraw_source
+	assert "if ( cg.voiceMenuTime ) {" in draw_block
+	assert "int t = cg.time - cg.voiceMenuTime;" in draw_block
+	assert 'Menus_CloseByName( "voiceMenu" );' in draw_block
+	assert "cg.voiceMenuTime = 0;" in draw_block
+	assert "cl_conXOffset" not in draw_block
+	assert 'Menus_OpenByName( "voiceMenu" );' in play_block
+	assert "cg.voiceMenuTime = cg.time;" in play_block

@@ -45,6 +45,284 @@ static int		cg_weaponToggleFallback;
 static qboolean	CG_GetStoredPredictedBeam( weapon_t weapon, vec3_t start, vec3_t end, qboolean *hitWorld );
 
 /*
+==========================
+CG_GetLocalPlayerWeaponTeam
+
+Resolves the local team the same way the retail weapon-color helpers do.
+==========================
+*/
+static team_t CG_GetLocalPlayerWeaponTeam( void ) {
+	if ( cg.snap ) {
+		return (team_t)cg.snap->ps.persistant[PERS_TEAM];
+	}
+	if ( cg.clientNum >= 0 && cg.clientNum < MAX_CLIENTS ) {
+		const clientInfo_t	*selfInfo;
+
+		selfInfo = &cgs.clientinfo[cg.clientNum];
+		if ( selfInfo->infoValid ) {
+			return selfInfo->team;
+		}
+	}
+
+	return TEAM_FREE;
+}
+
+/*
+==========================
+CG_ClientInfoToClientNum
+
+Converts a clientInfo pointer back into a stable client index when possible.
+==========================
+*/
+static int CG_ClientInfoToClientNum( const clientInfo_t *ci ) {
+	if ( !ci ) {
+		return -1;
+	}
+	if ( ci < cgs.clientinfo || ci >= cgs.clientinfo + MAX_CLIENTS ) {
+		return -1;
+	}
+
+	return (int)( ci - cgs.clientinfo );
+}
+
+/*
+==========================
+CG_CopyBaseWeaponColor
+
+Retail falls back to the raw user weapon colors for the local player and for
+non-overridden clients.
+==========================
+*/
+static void CG_CopyBaseWeaponColor( const clientInfo_t *ci, qboolean secondary, vec3_t colorOut ) {
+	if ( !colorOut ) {
+		return;
+	}
+	if ( !ci ) {
+		VectorSet( colorOut, 1.0f, 1.0f, 1.0f );
+		return;
+	}
+
+	if ( secondary ) {
+		VectorCopy( ci->color2, colorOut );
+	} else {
+		VectorCopy( ci->color1, colorOut );
+	}
+}
+
+/*
+==========================
+CG_PackWeaponColorBytes
+
+Stores a normalized RGB triplet as packed render bytes, optionally dimmed by
+the retail rail-ring tint scale.
+==========================
+*/
+static void CG_PackWeaponColorBytes( const vec3_t color, float scale, byte *rgbOut ) {
+	int		i;
+	float	channel;
+
+	if ( !rgbOut ) {
+		return;
+	}
+	if ( !color ) {
+		rgbOut[0] = 255;
+		rgbOut[1] = 255;
+		rgbOut[2] = 255;
+		return;
+	}
+
+	for ( i = 0; i < 3; i++ ) {
+		channel = color[i] * scale * 255.0f;
+		if ( channel < 0.0f ) {
+			channel = 0.0f;
+		} else if ( channel > 255.0f ) {
+			channel = 255.0f;
+		}
+		rgbOut[i] = (byte)channel;
+	}
+}
+
+/*
+==========================
+CG_ShouldOverrideWeaponColor
+
+Retail only applies team/enemy weapon-color forcing to other clients. The local
+player always falls back to the raw weapon colors.
+==========================
+*/
+static qboolean CG_ShouldOverrideWeaponColor( const clientInfo_t *ci ) {
+	team_t	localTeam;
+	int		clientNum;
+
+	clientNum = CG_ClientInfoToClientNum( ci );
+	if ( clientNum < 0 || clientNum == cg.clientNum ) {
+		return qfalse;
+	}
+
+	if ( cgs.gametype < GT_TEAM ) {
+		return (qboolean)cg_forceEnemyWeaponColor.integer;
+	}
+
+	localTeam = CG_GetLocalPlayerWeaponTeam();
+	if ( localTeam > TEAM_FREE && localTeam != TEAM_SPECTATOR &&
+		ci->team > TEAM_FREE && ci->team != TEAM_SPECTATOR &&
+		localTeam == ci->team ) {
+		return (qboolean)cg_forceTeamWeaponColor.integer;
+	}
+
+	return (qboolean)cg_forceEnemyWeaponColor.integer;
+}
+
+/*
+==========================
+CG_ResolveClientWeaponColor
+
+Retail override helper shared by the rail core, flash, and impact-mark paths.
+The byte output remains full-bright while the paired float tint is pre-scaled
+for the local-entity fade users.
+==========================
+*/
+static qboolean CG_ResolveClientWeaponColor( const clientInfo_t *ci, byte *rgbOut, vec3_t colorOut ) {
+	if ( !ci || !CG_ShouldOverrideWeaponColor( ci ) ) {
+		return qfalse;
+	}
+
+	CG_PackWeaponColorBytes( ci->upperColor, 1.0f, rgbOut );
+	if ( colorOut ) {
+		VectorScale( ci->upperColor, 0.75f, colorOut );
+	}
+
+	return qtrue;
+}
+
+/*
+===============================
+CG_ResolveClientWeaponColorBytes
+
+Retail byte-only sibling used by the rail-ring path, which stores the dimmed
+ring tint directly in the render RGBA bytes.
+===============================
+*/
+static qboolean CG_ResolveClientWeaponColorBytes( const clientInfo_t *ci, byte *rgbOut ) {
+	if ( !ci || !CG_ShouldOverrideWeaponColor( ci ) ) {
+		return qfalse;
+	}
+
+	CG_PackWeaponColorBytes( ci->upperColor, 0.75f, rgbOut );
+	return qtrue;
+}
+
+/*
+===========================
+CG_GetViewWeaponFovOffset
+
+Retail shares this FOV-driven vertical gun offset between the first-person
+weapon placement path and the local rail-start adjustment.
+===========================
+*/
+static float CG_GetViewWeaponFovOffset( void ) {
+	if ( cg_fov.integer > 90 ) {
+		return -0.2f * ( cg_fov.integer - 90 );
+	}
+
+	return 0.0f;
+}
+
+/*
+=========================================
+CG_GetLocalRailThirdPersonVerticalOffset
+
+Retail uses model-specific vertical nudges for the local third-person rail
+origin. The promoted names come directly from the HLIL string comparisons.
+=========================================
+*/
+static float CG_GetLocalRailThirdPersonVerticalOffset( const clientInfo_t *ci ) {
+	static const char *const raisedModels[] = {
+		"bitterman",
+		"major",
+		"orbb",
+		"razor",
+		"sarge",
+		"slash",
+		"visor",
+		"xaero"
+	};
+	int	i;
+
+	if ( ci ) {
+		for ( i = 0; i < ARRAY_LEN( raisedModels ); i++ ) {
+			if ( !Q_stricmp( ci->modelName, raisedModels[i] ) ) {
+				return 1.0f;
+			}
+		}
+		if ( !Q_stricmp( ci->modelName, "ranger" ) ) {
+			return -4.0f;
+		}
+		if ( !Q_stricmp( ci->modelName, "uriel" ) ) {
+			return -8.0f;
+		}
+	}
+
+	return -3.5f;
+}
+
+/*
+==========================
+CG_AdjustRailTrailStart
+
+Retail offsets the recovered muzzle origin differently for remote shooters, the
+local first-person weapon view, and the local third-person chasecam path.
+==========================
+*/
+static void CG_AdjustRailTrailStart( const clientInfo_t *ci, vec3_t start ) {
+	int		clientNum;
+	float	fovOffset;
+
+	clientNum = CG_ClientInfoToClientNum( ci );
+	if ( clientNum != cg.clientNum ) {
+		VectorMA( start, 5.0f, cg.refdef.viewaxis[1], start );
+		VectorMA( start, -4.0f, cg.refdef.viewaxis[2], start );
+		return;
+	}
+
+	if ( cg.renderingThirdPerson ) {
+		VectorMA( start, -5.5f, cg.refdef.viewaxis[1], start );
+		VectorMA( start, CG_GetLocalRailThirdPersonVerticalOffset( ci ), cg.refdef.viewaxis[2], start );
+		return;
+	}
+
+	fovOffset = CG_GetViewWeaponFovOffset();
+	VectorMA( start, cg_gun_x.value + 5.0f, cg.refdef.viewaxis[0], start );
+	VectorMA( start, cg_gun_y.value * 0.75f, cg.refdef.viewaxis[1], start );
+	VectorMA( start, cg_gun_z.value + fovOffset - 5.0f, cg.refdef.viewaxis[2], start );
+}
+
+/*
+===========================
+CG_GetDamageThroughProbeDistance
+
+Retail parses the backside damage-through probe distance from configstring
+`0x2A5`; the reconstructed source names that slot
+`CS_DOMINATION_CAPTURE_TIME`, and it still defaults to `5`.
+===========================
+*/
+static float CG_GetDamageThroughProbeDistance( void ) {
+	const char	*value;
+	float		probeDistance;
+
+	probeDistance = 5.0f;
+	value = CG_ConfigString( CS_DOMINATION_CAPTURE_TIME );
+	if ( value && *value ) {
+		probeDistance = (float)atof( value );
+	}
+	if ( probeDistance <= 0.0f ) {
+		probeDistance = 5.0f;
+	}
+
+	return probeDistance;
+}
+
+/*
 ===============
 CG_GetWeaponReloadTime
 
@@ -275,13 +553,62 @@ static void CG_NailgunEjectBrass( centity_t *cent ) {
 
 /*
 ==========================
+CG_SpawnRailRing
+
+Retail `cg_railStyle 1` uses the renderer-side `RT_RAIL_RINGS` beam instead of
+the older sprite spiral.
+==========================
+*/
+static void CG_SpawnRailRing( const vec3_t start, const vec3_t end, const clientInfo_t *ci ) {
+	localEntity_t	*le;
+	refEntity_t	*re;
+	vec3_t		color;
+	byte		rgb[3];
+
+	le = CG_AllocLocalEntity();
+	re = &le->refEntity;
+
+	le->leType = LE_FADE_RGB;
+	le->startTime = cg.time;
+	le->endTime = cg.time + cg_railTrailTime.value;
+	if ( le->endTime <= le->startTime ) {
+		le->endTime = le->startTime + 1;
+	}
+	le->lifeRate = 1.0f / ( le->endTime - le->startTime );
+
+	re->shaderTime = cg.time / 1000.0f;
+	re->reType = RT_RAIL_RINGS;
+	re->customShader = cgs.media.railRingsShader;
+	VectorCopy( start, re->origin );
+	VectorCopy( end, re->oldorigin );
+
+	if ( !CG_ResolveClientWeaponColorBytes( ci, rgb ) ) {
+		CG_CopyBaseWeaponColor( ci, qtrue, color );
+		CG_PackWeaponColorBytes( color, 1.0f, rgb );
+	}
+	re->shaderRGBA[0] = rgb[0];
+	re->shaderRGBA[1] = rgb[1];
+	re->shaderRGBA[2] = rgb[2];
+	re->shaderRGBA[3] = 255;
+
+	if ( !CG_ResolveClientWeaponColor( ci, NULL, le->color ) ) {
+		CG_CopyBaseWeaponColor( ci, qtrue, color );
+		VectorScale( color, 0.75f, le->color );
+	}
+	le->color[3] = 1.0f;
+}
+
+/*
+==========================
 CG_RailTrail
 ==========================
 */
 void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
 	vec3_t axis[36], move, move2, next_move, vec, temp;
+	vec3_t color;
 	float  len;
 	int    i, j, skip;
+	byte	rgb[3];
  
 	localEntity_t *le;
 	refEntity_t   *re;
@@ -290,7 +617,7 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
 #define ROTATION 1
 #define SPACING  5
  
-	start[2] -= 4;
+	CG_AdjustRailTrailStart( ci, start );
 	VectorCopy (start, move);
 	VectorSubtract (end, start, vec);
 	len = VectorNormalize (vec);
@@ -313,15 +640,16 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
  
 	VectorCopy(start, re->origin);
 	VectorCopy(end, re->oldorigin);
- 
-		re->shaderRGBA[0] = ci->weaponPrimaryColor[0] * 255;
-		re->shaderRGBA[1] = ci->weaponPrimaryColor[1] * 255;
-		re->shaderRGBA[2] = ci->weaponPrimaryColor[2] * 255;
-		re->shaderRGBA[3] = 255;
 
-		le->color[0] = ci->weaponPrimaryColor[0] * 0.75;
-		le->color[1] = ci->weaponPrimaryColor[1] * 0.75;
-		le->color[2] = ci->weaponPrimaryColor[2] * 0.75;
+	if ( !CG_ResolveClientWeaponColor( ci, rgb, le->color ) ) {
+		CG_CopyBaseWeaponColor( ci, qfalse, color );
+		CG_PackWeaponColorBytes( color, 1.0f, rgb );
+		VectorScale( color, 0.75f, le->color );
+	}
+	re->shaderRGBA[0] = rgb[0];
+	re->shaderRGBA[1] = rgb[1];
+	re->shaderRGBA[2] = rgb[2];
+	re->shaderRGBA[3] = 255;
 	le->color[3] = 1.0f;
 
 	AxisClear( re->axis );
@@ -330,10 +658,8 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
 	VectorCopy(move, next_move);
 	VectorScale (vec, SPACING, vec);
 
-	if (cg_oldRail.integer != 0) {
-		// nudge down a bit so it isn't exactly in center
-		re->origin[2] -= 8;
-		re->oldorigin[2] -= 8;
+	if ( cg_railStyle.integer != 2 ) {
+		CG_SpawnRailRing( start, end, ci );
 		return;
 	}
 	skip = -1;
@@ -355,14 +681,19 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
             re->radius = 1.1f;
 			re->customShader = cgs.media.railRingsShader;
 
-		re->shaderRGBA[0] = ci->weaponSecondaryColor[0] * 255;
-		re->shaderRGBA[1] = ci->weaponSecondaryColor[1] * 255;
-		re->shaderRGBA[2] = ci->weaponSecondaryColor[2] * 255;
-		re->shaderRGBA[3] = 255;
+			if ( !CG_ResolveClientWeaponColorBytes( ci, rgb ) ) {
+				CG_CopyBaseWeaponColor( ci, qtrue, color );
+				CG_PackWeaponColorBytes( color, 1.0f, rgb );
+			}
+			re->shaderRGBA[0] = rgb[0];
+			re->shaderRGBA[1] = rgb[1];
+			re->shaderRGBA[2] = rgb[2];
+			re->shaderRGBA[3] = 255;
 
-		le->color[0] = ci->weaponSecondaryColor[0] * 0.75;
-		le->color[1] = ci->weaponSecondaryColor[1] * 0.75;
-		le->color[2] = ci->weaponSecondaryColor[2] * 0.75;
+			if ( !CG_ResolveClientWeaponColor( ci, NULL, le->color ) ) {
+				CG_CopyBaseWeaponColor( ci, qtrue, color );
+				VectorScale( color, 0.75f, le->color );
+			}
             le->color[3] = 1.0f;
 
             le->pos.trType = TR_LINEAR;
@@ -1846,11 +2177,17 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	// colorize the railgun blast
 	if ( weaponNum == WP_RAILGUN ) {
 		clientInfo_t	*ci;
+		byte		rgb[3];
+		vec3_t		color;
 
 		ci = &cgs.clientinfo[ cent->currentState.clientNum ];
-		flash.shaderRGBA[0] = 255 * ci->weaponPrimaryColor[0];
-		flash.shaderRGBA[1] = 255 * ci->weaponPrimaryColor[1];
-		flash.shaderRGBA[2] = 255 * ci->weaponPrimaryColor[2];
+		if ( !CG_ResolveClientWeaponColor( ci, rgb, NULL ) ) {
+			CG_CopyBaseWeaponColor( ci, qfalse, color );
+			CG_PackWeaponColorBytes( color, 1.0f, rgb );
+		}
+		flash.shaderRGBA[0] = rgb[0];
+		flash.shaderRGBA[1] = rgb[1];
+		flash.shaderRGBA[2] = rgb[2];
 	}
 
 	CG_PositionRotatedEntityOnTag( &flash, &gun, weapon->weaponModel, "tag_flash");
@@ -1921,12 +2258,7 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 		return;
 	}
 
-	// drop gun lower at higher fov
-	if ( cg_fov.integer > 90 ) {
-		fovOffset = -0.2 * ( cg_fov.integer - 90 );
-	} else {
-		fovOffset = 0;
-	}
+	fovOffset = CG_GetViewWeaponFovOffset();
 
 	cent = &cg.predictedPlayerEntity;	// &cg_entities[cg.snap->ps.clientNum];
 	CG_RegisterWeapon( ps->weapon );
@@ -2794,9 +3126,9 @@ void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, im
 							   duration, isSprite );
 		le->light = light;
 		VectorCopy( lightColor, le->lightColor );
-		if ( weapon == WP_RAILGUN ) {
+		if ( weapon == WP_RAILGUN && clientNum >= 0 && clientNum < MAX_CLIENTS ) {
 			// colorize with client color
-			VectorCopy( cgs.clientinfo[clientNum].weaponPrimaryColor, le->color );
+			VectorCopy( cgs.clientinfo[clientNum].color1, le->color );
 		}
 	}
 
@@ -2805,10 +3137,16 @@ void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, im
 	//
 	alphaFade = (mark == cgs.media.energyMarkShader);	// plasma fades alpha, all others fade color
 	if ( weapon == WP_RAILGUN ) {
-		float	*color;
+		clientInfo_t	*ci;
+		vec3_t		color;
 
-		// colorize with client color
-		color = cgs.clientinfo[clientNum].weaponSecondaryColor;
+		ci = NULL;
+		if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
+			ci = &cgs.clientinfo[clientNum];
+		}
+		if ( !CG_ResolveClientWeaponColor( ci, NULL, color ) ) {
+			CG_CopyBaseWeaponColor( ci, qfalse, color );
+		}
 		CG_ImpactMark( mark, origin, dir, random()*360, color[0],color[1], color[2],1, alphaFade, radius, qfalse );
 	} else {
 		CG_ImpactMark( mark, origin, dir, random()*360, 1,1,1,1, alphaFade, radius, qfalse );
@@ -2837,6 +3175,59 @@ void CG_MissileHitPlayer( int weapon, vec3_t origin, vec3_t dir, int entityNum )
 	default:
 		break;
 	}
+}
+
+/*
+=========================
+CG_MissileHitWallDmgThrough
+
+Retail damage-through impacts probe slightly beyond the original hit, project a
+second burn mark on the backside face, and throw ten `surfacePuff` debris
+sprites before falling through to the normal wall-impact path.
+=========================
+*/
+void CG_MissileHitWallDmgThrough( vec3_t origin, vec3_t dir, int weapon ) {
+	trace_t		trace;
+	vec3_t		probeOrigin;
+	vec3_t		puffOrigin;
+	vec3_t		velocity;
+	float		probeDistance;
+	float		speed;
+	int		i;
+
+	probeDistance = CG_GetDamageThroughProbeDistance();
+	VectorMA( origin, probeDistance, dir, probeOrigin );
+	CG_Trace( &trace, probeOrigin, NULL, NULL, origin, ENTITYNUM_NONE, CONTENTS_SOLID );
+
+	if ( trace.fraction < 1.0f && !trace.startsolid ) {
+		if ( cg_addMarks.integer && cgs.media.burnMarkShader ) {
+			CG_ImpactMark( cgs.media.burnMarkShader, trace.endpos, trace.plane.normal,
+				random() * 360.0f, 1.0f, 1.0f, 1.0f, 1.0f, qfalse, 64.0f, qfalse );
+		}
+
+		if ( cgs.media.surfacePuffShader ) {
+			VectorAdd( trace.endpos, trace.plane.normal, puffOrigin );
+
+			for ( i = 0; i < 10; i++ ) {
+				speed = 250.0f + ( ( random() - 0.5f ) * 300.0f );
+				VectorScale( trace.plane.normal, speed, velocity );
+				velocity[0] += 50.0f - ( ( random() - 0.5f ) * 100.0f );
+				velocity[1] += 50.0f - ( ( random() - 0.5f ) * 100.0f );
+				velocity[2] += 50.0f - ( ( random() - 0.5f ) * 100.0f );
+
+				CG_SmokePuff( puffOrigin, velocity,
+					24.0f,
+					0.8f, 0.8f, 0.7f, 1.0f,
+					400.0f - ( speed / 500.0f ) * 200.0f,
+					cg.time,
+					0,
+					0,
+					cgs.media.surfacePuffShader );
+			}
+		}
+	}
+
+	CG_MissileHitWall( weapon, 0, origin, dir, IMPACTSOUND_DEFAULT );
 }
 
 
@@ -2972,6 +3363,78 @@ void CG_ShotgunFire( entityState_t *es ) {
 		}
 	}
 	CG_ShotgunPattern( es->pos.trBase, es->origin2, es->eventParm, es->otherEntityNum );
+}
+
+/*
+===================
+CG_ShotgunKillEffect
+
+Reconstructs the retail shotgun finisher gore burst around the victim origin.
+===================
+*/
+void CG_ShotgunKillEffect( centity_t *cent, const entityState_t *es ) {
+	localEntity_t	*blood;
+	qhandle_t		bloodShader;
+	vec3_t			puffOrigin;
+	int			entityNum;
+	int			burstCount;
+	int			i;
+
+	if ( !cent ) {
+		return;
+	}
+	if ( !cg_blood.integer || !cgs.media.bloodSprayShaders[0] ) {
+		return;
+	}
+
+	entityNum = ENTITYNUM_NONE;
+	if ( es && es->otherEntityNum >= 0 && es->otherEntityNum < MAX_GENTITIES ) {
+		entityNum = es->otherEntityNum;
+	}
+
+	burstCount = 10;
+	if ( es ) {
+		if ( es->time > 0 ) {
+			burstCount = es->time;
+		} else if ( es->eventParm > 0 ) {
+			burstCount = es->eventParm;
+		}
+	}
+
+	burstCount /= 5;
+	if ( burstCount < 1 ) {
+		burstCount = 1;
+	} else if ( burstCount > 8 ) {
+		burstCount = 8;
+	}
+
+	for ( i = 0; i < burstCount; i++ ) {
+		VectorCopy( cent->lerpOrigin, puffOrigin );
+		puffOrigin[0] += crandom() * 16.0f;
+		puffOrigin[1] += crandom() * 16.0f;
+		puffOrigin[2] += 8.0f + random() * 24.0f;
+		CG_Bleed( puffOrigin, entityNum );
+
+		puffOrigin[0] += crandom() * 6.0f;
+		puffOrigin[1] += crandom() * 6.0f;
+		puffOrigin[2] += crandom() * 6.0f;
+		CG_Bleed( puffOrigin, entityNum );
+
+		bloodShader = cgs.media.bloodSprayShaders[rand() & 3];
+		blood = CG_SmokePuff( puffOrigin, vec3_origin,
+			24.0f,
+			1.0f, 1.0f, 1.0f, 1.0f,
+			400,
+			cg.time,
+			0,
+			0,
+			bloodShader );
+		blood->leType = LE_FALL_SCALE_FADE;
+		blood->pos.trDelta[2] = 20.0f;
+		if ( cg.snap && entityNum == cg.snap->ps.clientNum ) {
+			blood->refEntity.renderfx |= RF_THIRD_PERSON;
+		}
+	}
 }
 
 /*

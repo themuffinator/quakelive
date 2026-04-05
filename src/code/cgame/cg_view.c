@@ -25,7 +25,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cg_local.h"
 
 static void CG_SetZoomState( qboolean zoomState );
-static void CG_HandleZoomOutOnDeath( void );
 static void CG_ResetViewAngleFilter( const vec3_t angles );
 static void CG_FilterViewAngles( vec3_t angles );
 static void CG_UpdateSpectatorCvar( void );
@@ -412,7 +411,6 @@ static void CG_OffsetThirdPersonView( void ) {
 	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
 		focusAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
 		cg.refdefViewAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
-		CG_HandleZoomOutOnDeath();
 
 		if ( focusAngles[PITCH] > 45.0f ) {
 			focusAngles[PITCH] = 45.0f;		// don't go too far overhead
@@ -528,7 +526,6 @@ static void CG_OffsetFirstPersonView( void ) {
 	int				timeDelta;
 	
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
-		CG_HandleZoomOutOnDeath();
 		return;
 	}
 
@@ -543,7 +540,6 @@ static void CG_OffsetFirstPersonView( void ) {
 		angles[PITCH] = -15;
 		angles[YAW] = cg.snap->ps.stats[STAT_DEAD_YAW];
 		origin[2] += cg.predictedPlayerState.viewheight;
-		CG_HandleZoomOutOnDeath();
 		return;
 	}
 
@@ -678,7 +674,7 @@ Starts or toggles zoom mode based on cg_zoomToggle.
 =============
 */
 void CG_ZoomDown_f( void ) {
-	int pmType = cg.snap ? cg.snap->ps.pm_type : cg.predictedPlayerState.pm_type;
+	int pmType = cg.predictedPlayerState.pm_type;
 
 	if ( pmType == PM_DEAD || pmType == PM_FREEZE ) {
 		return;
@@ -706,26 +702,6 @@ void CG_ZoomUp_f( void ) {
 
 	CG_SetZoomState( qfalse );
 }
-
-/*
-=============
-CG_HandleZoomOutOnDeath
-
-Releases the zoom when required by cg_zoomOutOnDeath.
-=============
-*/
-static void CG_HandleZoomOutOnDeath( void ) {
-	if ( !cg.zoomOutOnDeath ) {
-		return;
-	}
-
-	if ( !cg.zoomed ) {
-		return;
-	}
-
-	CG_SetZoomState( qfalse );
-}
-
 
 /*
 =============
@@ -1398,6 +1374,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		}
 		cg.oldTime = cg.time;
 		CG_AddLagometerFrameInfo();
+		CG_UpdateSpectatorItemPickups();
 	}
 	if (cg_timescale.value != cg_timescaleFadeEnd.value) {
 		if (cg_timescale.value < cg_timescaleFadeEnd.value) {

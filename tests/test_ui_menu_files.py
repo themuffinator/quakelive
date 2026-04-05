@@ -792,6 +792,26 @@ def test_ui_retail_server_settings_ownerdraw_restored() -> None:
     assert "UI_DrawServerSettings(&rect, scale, color, textStyle);" in ui_main
 
 
+def test_game_retail_player_cylinders_configstring_restored() -> None:
+    bg_public = (REPO_ROOT / "src/code/game/bg_public.h").read_text(encoding="utf-8")
+    g_main = (REPO_ROOT / "src/code/game/g_main.c").read_text(encoding="utf-8")
+
+    assert "#define CS_PLAYER_CYLINDERS\t\t0x2A2" in bg_public
+    assert "static char\ts_playerCylindersPayload[32];" in g_main
+    assert "static void G_UpdatePlayerCylindersConfigstring( qboolean forceBroadcast );" in g_main
+    assert "static void G_UpdatePlayerCylindersConfigstring( qboolean forceBroadcast ) {" in g_main
+
+    for expected in (
+        'Com_sprintf( payload, sizeof( payload ), "%i", g_playerCylinders.integer );',
+        "!forceBroadcast && !Q_stricmp( payload, s_playerCylindersPayload )",
+        "trap_SetConfigstring( CS_PLAYER_CYLINDERS, payload );",
+        "Q_strncpyz( s_playerCylindersPayload, payload, sizeof( s_playerCylindersPayload ) );",
+        "G_UpdatePlayerCylindersConfigstring( qtrue );",
+        "G_UpdatePlayerCylindersConfigstring( qfalse );",
+    ):
+        assert expected in g_main
+
+
 def test_game_retail_player_appearance_configstring_restored() -> None:
     bg_public = (REPO_ROOT / "src/code/game/bg_public.h").read_text(encoding="utf-8")
     g_main = (REPO_ROOT / "src/code/game/g_main.c").read_text(encoding="utf-8")

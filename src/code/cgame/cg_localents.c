@@ -404,6 +404,17 @@ static void CG_AddFragmentTrail( localEntity_t *le, qhandle_t shader ) {
 }
 
 /*
+=========================
+CG_AddTracerFragmentTrail
+
+Retail peels the tracer-shader fragment trail into its own helper.
+=========================
+*/
+static void CG_AddTracerFragmentTrail( localEntity_t *le ) {
+	CG_AddFragmentTrail( le, cgs.media.tracerShader );
+}
+
+/*
 ================
 CG_AddFragmentImpl
 ================
@@ -490,10 +501,12 @@ CG_AddFragment
 ================
 */
 void CG_AddFragment( localEntity_t *le ) {
-	(void)CG_AddFragmentImpl( le );
+	if ( le->leType == LE_FRAGMENT_16 ) {
+		CG_AddFragmentTrail( le, cgs.media.iceballShader );
+	}
 
-	if ( le->leType == LE_FRAGMENT_14 ) {
-		CG_AddFragmentTrail( le, cgs.media.tracerShader );
+	if ( CG_AddFragmentImpl( le ) && le->leType == LE_FRAGMENT_14 ) {
+		CG_AddTracerFragmentTrail( le );
 	}
 }
 
@@ -955,12 +968,7 @@ void CG_AddInvulnerabilityJuiced( localEntity_t *le ) {
 	}
 	if ( t > 5000 ) {
 		le->endTime = 0;
-		if ( cgs.media.haveDlcGibs ) {
-			CG_GibPlayer( le->refEntity.origin );
-		}
-		else {
-			CG_BigExplodeJuiced( le->refEntity.origin );
-		}
+		CG_DetonateJuicedPlayer( le->refEntity.origin, qfalse );
 	}
 	else {
 		trap_R_AddRefEntityToScene( &le->refEntity );
@@ -990,22 +998,14 @@ CG_AddScorePlum
 void CG_AddScorePlum( localEntity_t *le ) {
 	refEntity_t	*re;
 	vec3_t		origin, delta, dir, vec, up = {0, 0, 1};
-	float		alphaScale;
 	float		c, len;
 	int			i, score, digits[10], numdigits, negative;
 
 	re = &le->refEntity;
 
 	c = ( le->endTime - cg.time ) * le->lifeRate;
-	alphaScale = Com_Clamp( 0.0f, 1.0f, le->color[3] );
-
 	score = le->radius;
-	if ( le->leFlags & LEF_SCOREPLUM_CUSTOMCOLOR ) {
-		re->shaderRGBA[0] = (byte)( 0xff * Com_Clamp( 0.0f, 1.0f, le->color[0] ) );
-		re->shaderRGBA[1] = (byte)( 0xff * Com_Clamp( 0.0f, 1.0f, le->color[1] ) );
-		re->shaderRGBA[2] = (byte)( 0xff * Com_Clamp( 0.0f, 1.0f, le->color[2] ) );
-	}
-	else if (score < 0) {
+	if ( score < 0 ) {
 		re->shaderRGBA[0] = 0xff;
 		re->shaderRGBA[1] = 0x11;
 		re->shaderRGBA[2] = 0x11;
@@ -1014,34 +1014,37 @@ void CG_AddScorePlum( localEntity_t *le ) {
 		re->shaderRGBA[0] = 0xff;
 		re->shaderRGBA[1] = 0xff;
 		re->shaderRGBA[2] = 0xff;
-		if (score >= 50) {
+		if ( score >= 50 ) {
 			re->shaderRGBA[1] = 0;
-		} else if (score >= 20) {
+		}
+		else if ( score >= 20 ) {
 			re->shaderRGBA[0] = re->shaderRGBA[1] = 0;
-		} else if (score >= 10) {
+		}
+		else if ( score >= 10 ) {
 			re->shaderRGBA[2] = 0;
-		} else if (score >= 2) {
+		}
+		else if ( score >= 2 ) {
 			re->shaderRGBA[0] = re->shaderRGBA[2] = 0;
 		}
-
 	}
-	if (c < 0.25) {
-		re->shaderRGBA[3] = (byte)( 0xff * alphaScale * 4 * c );
+
+	if ( c < 0.25 ) {
+		re->shaderRGBA[3] = (byte)( 0xff * 4 * c );
 	}
 	else {
-		re->shaderRGBA[3] = (byte)( 0xff * alphaScale );
+		re->shaderRGBA[3] = 0xff;
 	}
 
 	re->radius = NUMBER_SIZE / 2;
 
-	VectorCopy(le->pos.trBase, origin);
+	VectorCopy( le->pos.trBase, origin );
 	origin[2] += 110 - c * 100;
 
-	VectorSubtract(cg.refdef.vieworg, origin, dir);
-	CrossProduct(dir, up, vec);
-	VectorNormalize(vec);
+	VectorSubtract( cg.refdef.vieworg, origin, dir );
+	CrossProduct( dir, up, vec );
+	VectorNormalize( vec );
 
-	VectorMA(origin, -10 + 20 * sin(c * 2 * M_PI), vec, origin);
+	VectorMA( origin, -10 + 20 * sin( c * 2 * M_PI ), vec, origin );
 
 	// if the view would be "inside" the sprite, kill the sprite
 	// so it doesn't add too much overdraw
@@ -1053,23 +1056,23 @@ void CG_AddScorePlum( localEntity_t *le ) {
 	}
 
 	negative = qfalse;
-	if (score < 0) {
+	if ( score < 0 ) {
 		negative = qtrue;
 		score = -score;
 	}
 
-	for (numdigits = 0; !(numdigits && !score); numdigits++) {
+	for ( numdigits = 0; !( numdigits && !score ); numdigits++ ) {
 		digits[numdigits] = score % 10;
 		score = score / 10;
 	}
 
-	if (negative) {
+	if ( negative ) {
 		digits[numdigits] = 10;
 		numdigits++;
 	}
 
-	for (i = 0; i < numdigits; i++) {
-		VectorMA(origin, (float) (((float) numdigits / 2) - i) * NUMBER_SIZE, vec, re->origin);
+	for ( i = 0; i < numdigits; i++ ) {
+		VectorMA( origin, (float)( ( (float)numdigits / 2 ) - i ) * NUMBER_SIZE, vec, re->origin );
 		re->customShader = cgs.media.numberShaders[digits[numdigits-1-i]];
 		trap_R_AddRefEntityToScene( re );
 	}

@@ -2826,7 +2826,7 @@ static void G_RREmitInfectedEvent( gentity_t *ent ) {
 	tent = G_TempEntity( ent->client->ps.origin, EV_INFECTED );
 	tent->r.svFlags |= SVF_SINGLECLIENT;
 	tent->r.singleClient = ent->s.number;
-	tent->s.clientNum = ent->s.number;
+	G_SetRetailEventRecipient( tent, ent->s.number );
 }
 
 /*
@@ -2983,9 +2983,7 @@ static void G_RRApplySurvivalBonus( qboolean forceAward ) {
 		return;
 	}
 
-	// Retail also emits a broadcast temp entity here; defer that until the
-	// matching cgame consumer is reconstructed so qagame does not publish a
-	// malformed EV_SCOREPLUM payload to the current client module.
+	G_BroadcastGlobalTeamSound( vec3_origin, GTS_SURVIVOR_WARNING, -1, TEAM_BLUE, 0 );
 	CalculateRanks();
 }
 

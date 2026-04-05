@@ -739,6 +739,31 @@ def test_client_overlay_commands_reconstruct_retail_steam_surface() -> None:
     assert "QL_Steamworks_CombineIdentityWords( idLow, idHigh )" in platform_block
 
 
+def test_client_voice_commands_reconstruct_retail_binding_surface() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+
+    state_block = _extract_function_block(cl_main, "static void CL_SetLocalSpeakingState( qboolean speaking )")
+    start_block = _extract_function_block(cl_main, "static void CL_VoiceStartRecording_f( void )")
+    stop_block = _extract_function_block(cl_main, "static void CL_VoiceStopRecording_f( void )")
+    disconnect_block = _extract_function_block(cl_main, "void CL_Disconnect( qboolean showMainMenu )")
+    init_block = _extract_function_block(cl_main, "void CL_Init( void )")
+    shutdown_block = _extract_function_block(cl_main, "void CL_Shutdown( void )")
+
+    assert "if ( !cgvm || cls.state != CA_ACTIVE || !cl.snap.valid ) {" in state_block
+    assert "VM_Call( cgvm, CG_SET_CLIENT_SPEAKING_STATE, cl.snap.ps.clientNum, speaking ? 1 : 0 );" in state_block
+    assert "if ( cl_voiceRecordingActive ) {" in start_block
+    assert "cl_voiceRecordingActive = qtrue;" in start_block
+    assert "CL_SetLocalSpeakingState( qtrue );" in start_block
+    assert "if ( !cl_voiceRecordingActive ) {" in stop_block
+    assert "cl_voiceRecordingActive = qfalse;" in stop_block
+    assert "CL_SetLocalSpeakingState( qfalse );" in stop_block
+    assert "cl_voiceRecordingActive = qfalse;" in disconnect_block
+    assert 'Cmd_AddCommand ("+voice", CL_VoiceStartRecording_f );' in init_block
+    assert 'Cmd_AddCommand ("-voice", CL_VoiceStopRecording_f );' in init_block
+    assert 'Cmd_RemoveCommand ("+voice");' in shutdown_block
+    assert 'Cmd_RemoveCommand ("-voice");' in shutdown_block
+
+
 def test_client_lobby_bootstrap_reconstructs_retail_connect_surface() -> None:
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
 

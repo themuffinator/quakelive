@@ -14,6 +14,8 @@ CG_PLAYERS = REPO_ROOT / "src" / "code" / "cgame" / "cg_players.c"
 CG_SCOREBOARD = REPO_ROOT / "src" / "code" / "cgame" / "cg_scoreboard.c"
 CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 CG_DRAWTOOLS = REPO_ROOT / "src" / "code" / "cgame" / "cg_drawtools.c"
+CG_ENTS = REPO_ROOT / "src" / "code" / "cgame" / "cg_ents.c"
+CG_DRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_draw.c"
 CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
 CG_PREDICT = REPO_ROOT / "src" / "code" / "cgame" / "cg_predict.c"
 CG_VIEW = REPO_ROOT / "src" / "code" / "cgame" / "cg_view.c"
@@ -22,9 +24,13 @@ CG_MARKS = REPO_ROOT / "src" / "code" / "cgame" / "cg_marks.c"
 CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
 CG_LOCALENTS = REPO_ROOT / "src" / "code" / "cgame" / "cg_localents.c"
 CG_PUBLIC = REPO_ROOT / "src" / "code" / "cgame" / "cg_public.h"
+CG_SCREEN = REPO_ROOT / "src" / "code" / "cgame" / "cg_screen.c"
 CG_SYSCALLS = REPO_ROOT / "src" / "code" / "cgame" / "cg_syscalls.c"
+CG_BG_PLAN = REPO_ROOT / "docs" / "reverse-engineering" / "cgame-bg-parity-implementation-plan.md"
 CL_CGAME = REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c"
 G_CLIENT = REPO_ROOT / "src" / "code" / "game" / "g_client.c"
+G_ITEMS = REPO_ROOT / "src" / "code" / "game" / "g_items.c"
+G_MAIN = REPO_ROOT / "src" / "code" / "game" / "g_main.c"
 QL_CGAME_IMPORTS = REPO_ROOT / "src" / "code" / "client" / "ql_cgame_imports.inc"
 UI_MAIN = REPO_ROOT / "src" / "code" / "ui" / "ui_main.c"
 UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
@@ -266,9 +272,13 @@ def test_cgame_overtime_ownerdraw_reconstruction_matches_retail_label_family() -
 
 def test_scoreboard_and_race_server_command_wrappers_match_retail_dispatch() -> None:
 	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	ffa_block = _block_from_marker(servercmds_source, "static void CG_ParseFFAScores( void )")
+	rich_payload_block = _block_from_marker(servercmds_source, "static void CG_ParseRichScoreboardPayload( void )")
 	compact_block = _block_from_marker(servercmds_source, "static void CG_ParseCompactScores( void )")
 	race_info_block = _block_from_marker(servercmds_source, "static void CG_ParseRaceInfo( void )")
 
+	assert 'if ( !strcmp( cmd, "scores_ffa" ) ) {' in servercmds_source
+	assert "\t\tCG_ParseFFAScores();" in servercmds_source
 	assert 'if ( !strcmp( cmd, "scores" ) ) {' in servercmds_source
 	assert "\t\tCG_ParseScores();" in servercmds_source
 	assert 'if ( !strcmp( cmd, "smscores" ) ) {' in servercmds_source
@@ -278,6 +288,15 @@ def test_scoreboard_and_race_server_command_wrappers_match_retail_dispatch() -> 
 	assert 'if ( !strcmp( cmd, "race_info" ) ) {' in servercmds_source
 	assert "\t\tCG_ParseRaceInfo();" in servercmds_source
 	assert "CG_ParseRaceInfoCommand" not in servercmds_source
+
+	assert "CG_ParseRichScoreboardPayload();" in ffa_block
+	for expected in (
+		"cg.numScores = atoi( CG_Argv( 1 ) );",
+		"cg.teamScores[0] = atoi( CG_Argv( 2 ) );",
+		"cg.teamScores[1] = atoi( CG_Argv( 3 ) );",
+		"CG_ParseGenericScoreRows( 4, 16 );",
+	):
+		assert expected in rich_payload_block
 
 	assert "cg.scores[i].scoreFlags = 0;" in compact_block
 	assert "cg.scores[i].activePlayer = atoi( CG_Argv( i * 8 + 9 ) ) ? qtrue : qfalse;" in compact_block
@@ -291,6 +310,79 @@ def test_scoreboard_and_race_server_command_wrappers_match_retail_dispatch() -> 
 		"cgs.raceLeaderSplits[i] = atoi( CG_Argv( i + 2 ) );",
 	):
 		assert expected in race_info_block
+
+
+def test_cgame_attack_defend_round_scoreboard_owner_matches_retail_warmup_panel() -> None:
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	status_block = _block_from_marker(draw_source, "static const char *CG_ADRoundScoreboardStatusText( void )")
+	scoreboard_block = _block_from_marker(draw_source, "static void CG_DrawADRoundScoreboard( void )")
+	warmup_block = _block_from_marker(draw_source, "static void CG_DrawWarmupStatusText( int gametype )")
+
+	for expected in (
+		'value = Info_ValueForKey( info, "g_scorelimit" );',
+		'value = Info_ValueForKey( info, "roundlimit" );',
+		"if ( cgs.matchRoundTurn != 0 ) {",
+		'return "Red Wins! Good Game";',
+		'return "Last Chance";',
+		'return "Match Point";',
+	):
+		assert expected in status_block
+
+	for expected in (
+		"if ( cgs.matchRoundNumber <= 0 ) {",
+		"CG_FillRect( 200.0f, 150.0f, 240.0f, 48.0f, panelColor );",
+		"roundWindowStart = ( cgs.matchRoundNumber > ( CG_AD_SCORE_HISTORY_LENGTH / 2 ) ) ?",
+		"activeColumn = cgs.matchRoundNumber - roundWindowStart;",
+		"activeRowY = 182.0f;",
+		"activeRowY = 166.0f;",
+		"CG_FillRect( 200.0f, activeRowY, 40.0f, 16.0f, *activeTeamFillColor );",
+		"CG_FillRect( 240.0f + activeColumn * 16.0f, activeRowY, 16.0f, 16.0f, *activeRoundFillColor );",
+		'CG_Text_PaintNoAdjust( 204.0f, 162.0f, 0.20f, colorWhite, "Round", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );',
+		'CG_Text_PaintNoAdjust( 204.0f, 178.0f, 0.25f, colorRed, "Red", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );',
+		'CG_Text_PaintNoAdjust( 204.0f, 194.0f, 0.25f, colorBlue, "Blue", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );',
+		"historyIndex = column * 2;",
+		"if ( cg.adScoreHistory[historyIndex] >= 0 ) {",
+		"if ( cg.adScoreHistory[historyIndex + 1] >= 0 ) {",
+		'CG_Text_PaintNoAdjust( 404.0f, 162.0f, 0.25f, colorWhite, "Score", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );',
+		"statusText = CG_ADRoundScoreboardStatusText();",
+		'if ( !Q_stricmp( statusText, "Red Wins! Good Game" ) ) {',
+	):
+		assert expected in scoreboard_block
+
+	assert "} else if ( gametype == GT_ATTACK_DEFEND && cgs.matchRoundState == ROUNDSTATE_WARMUP ) {" in warmup_block
+	assert "CG_DrawADRoundScoreboard();" in warmup_block
+
+
+def test_bg_plan_marks_cg_b3_closed_after_ad_round_scoreboard_validation() -> None:
+	plan = CG_BG_PLAN.read_text(encoding="utf-8")
+	assert "| `CG-B3a` | `CG-B` | Boundary-only |" in plan
+
+	cg_b3_rows = [line for line in plan.splitlines() if line.startswith("| `CG-B3` |")]
+	assert cg_b3_rows
+	cg_b3_row = cg_b3_rows[-1]
+	assert "Completed 2026-04-05" in cg_b3_row
+	assert "`cg_draw.c`" in cg_b3_row
+	assert "`CG_DrawADRoundScoreboard`" in cg_b3_row
+	assert "Completed." in cg_b3_row
+
+	cg_b_lane_rows = [line for line in plan.splitlines() if line.startswith("| `CG-B` |")]
+	assert cg_b_lane_rows
+	assert cg_b_lane_rows[-1].strip().endswith("None |")
+
+
+def test_bg_plan_marks_cg_b1_closed_after_teamsize_transport_validation() -> None:
+	plan = CG_BG_PLAN.read_text(encoding="utf-8")
+	assert "| `CG-B1a` | `CG-B` | Transport |" in plan
+
+	cg_b1_rows = [line for line in plan.splitlines() if line.startswith("| `CG-B1` |")]
+	assert cg_b1_rows
+	cg_b1_row = cg_b1_rows[-1]
+	assert "Completed 2026-04-05" in cg_b1_row
+	assert "`teamsize` alias" in cg_b1_row
+	assert "Completed." in cg_b1_row
+	assert "g_playerCylinders" not in cg_b1_row
+
+	assert any("| `CG-B` | `CLOSED` |" in line for line in plan.splitlines())
 
 
 def test_cgame_acc_vertical_overlay_reconstruction_uses_retail_acc_parser_and_sender() -> None:
@@ -441,6 +533,73 @@ def test_cgame_placement_scorebox_widgets_match_retail_split_ownerdraws() -> Non
 	assert "CG_DrawPlacementAvatarOwnerDraw( &rect, 0 );" in source
 	assert "case CG_2ND_PLYR_AVATAR:" in source
 	assert "CG_DrawPlacementAvatarOwnerDraw( &rect, 1 );" in source
+
+
+def test_cgame_placement_metric_wrappers_restore_retail_direct_owners() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	resolve_block = _block_from_marker(source, "static qboolean CG_ResolvePlacementMetricOwnerDraw")
+	text_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricTextOwnerDraw")
+	ping_block = _block_from_marker(source, "static void CG_DrawPlacementPingOwnerDraw")
+	accuracy_block = _block_from_marker(source, "static void CG_DrawPlacementAccuracyOwnerDraw")
+	weapon_frags_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponFragsOwnerDraw")
+	weapon_hits_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponHitsOwnerDraw")
+	weapon_shots_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponShotsOwnerDraw")
+	weapon_damage_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponDamageOwnerDraw")
+	weapon_accuracy_block = _block_from_marker(source, "static void CG_DrawPlacementWeaponAccuracyOwnerDraw")
+	pickup_count_block = _block_from_marker(source, "static void CG_DrawPlacementPickupCountOwnerDraw")
+	pickup_average_block = _block_from_marker(source, "static void CG_DrawPlacementPickupAverageOwnerDraw")
+	award_count_block = _block_from_marker(source, "static void CG_DrawPlacementAwardCountOwnerDraw")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+
+	for expected in (
+		"if ( ownerDraw >= CG_1ST_PLYR_READY && ownerDraw <= CG_1ST_PLYR_TIER ) {",
+		"} else if ( ownerDraw >= CG_2ND_PLYR_READY && ownerDraw <= CG_2ND_PLYR_TIER ) {",
+		"resolvedOwnerDraw = ownerDraw - ( CG_2ND_PLYR - CG_1ST_PLYR );",
+	):
+		assert expected in resolve_block
+
+	for expected in (
+		"score = CG_GetPlacementScore( slot );",
+		"ci = CG_GetPlacementClientInfo( score );",
+		"CG_BuildPlacementMetricText( normalized, score, ci, buffer, sizeof( buffer ) )",
+		"CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
+	):
+		assert expected in text_block
+
+	for expected in (
+		"if ( score->ping >= 80 ) {",
+		"} else if ( score->ping >= 40 ) {",
+		"(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, drawColor, textStyle, ownerDraw );",
+	):
+		assert expected in ping_block
+
+	for wrapper_block in (
+		accuracy_block,
+		weapon_frags_block,
+		weapon_hits_block,
+		weapon_shots_block,
+		weapon_damage_block,
+		weapon_accuracy_block,
+		pickup_count_block,
+		pickup_average_block,
+		award_count_block,
+	):
+		assert "(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );" in wrapper_block
+
+	for expected in (
+		"CG_DrawPlacementPingOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementAccuracyOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementWeaponFragsOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementWeaponHitsOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementWeaponShotsOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementWeaponDamageOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementWeaponAccuracyOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementPickupCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementPickupAverageOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"CG_DrawPlacementAwardCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+		"return CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );",
+	):
+		assert expected in dispatch_block
 
 
 def test_cgame_country_flag_cache_restores_retail_player_configstring_transport() -> None:
@@ -770,6 +929,7 @@ def test_cgame_team_score_name_playercount_and_match_phase_ownerdraws_follow_ret
 def test_cgame_intro_panel_and_player_count_widgets_restore_retail_detail_and_cap_rules() -> None:
 	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
 	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_source = G_MAIN.read_text(encoding="utf-8")
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
 	player_limit_block = _block_from_marker(newdraw_source, "static int CG_GetConfiguredPlayerCountLimit")
 	player_counts_block = _block_from_marker(newdraw_source, "static void CG_DrawPlayerCounts")
@@ -819,13 +979,16 @@ def test_cgame_intro_panel_and_player_count_widgets_restore_retail_detail_and_ca
 	assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in match_details_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s",' in match_details_block
 
+	assert '&g_teamSizeMin, "g_teamSizeMin", &g_teamSizeLegacy, "teamsize", "0", CVAR_SERVERINFO | CVAR_NORESTART' in game_source
+
 	for expected in (
 		'playerCountTeamSizeValue = Info_ValueForKey( info, "teamsize" );',
-		'playerCountTeamSizeValue = Info_ValueForKey( info, "g_teamSizeMin" );',
 		"cgs.playerCountTeamSize = playerCountTeamSizeValue[0] ? atoi( playerCountTeamSizeValue ) : 0;",
 		"if ( cgs.playerCountTeamSize < 0 ) {",
 	):
 		assert expected in parse_serverinfo_block
+
+	assert 'Info_ValueForKey( info, "g_teamSizeMin" )' not in parse_serverinfo_block
 
 
 def test_cgame_hud_ownerdraw_reconstruction_keeps_retail_medal_spectator_advert_and_team_pickup_seam() -> None:
@@ -1032,7 +1195,12 @@ def test_cgame_browser_runtime_wrappers_drive_hud_reload_and_score_feeders() -> 
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
 
 	init_block = _block_from_marker(main_source, "void CG_InitBrowserRuntime")
+	init_overlay_block = _block_from_marker(main_source, "void CG_InitBrowserOverlay")
 	reset_block = _block_from_marker(main_source, "void CG_ResetBrowserOverlayState")
+	item_hash_block = _block_from_marker(main_source, "void CG_SetupBrowserItemKeywordHash")
+	parse_item_block = _block_from_marker(main_source, "qboolean CG_ParseBrowserItem")
+	menu_hash_block = _block_from_marker(main_source, "void CG_SetupBrowserMenuKeywordHash")
+	parse_menu_block = _block_from_marker(main_source, "qboolean CG_ParseBrowserMenu")
 	feeder_block = _block_from_marker(main_source, "void CG_SetBrowserFeederSelection")
 	load_menus_block = _block_from_marker(main_source, "void CG_LoadMenus")
 	score_block = _block_from_marker(main_source, "void CG_SetScoreSelection")
@@ -1040,12 +1208,26 @@ def test_cgame_browser_runtime_wrappers_drive_hud_reload_and_score_feeders() -> 
 	cgame_init_block = _block_from_marker(main_source, "void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum )")
 
 	assert "void CG_InitBrowserRuntime( void );" in local_source
+	assert "void CG_InitBrowserOverlay( void *overlay );" in local_source
 	assert "void CG_ResetBrowserOverlayState( void );" in local_source
+	assert "void CG_SetupBrowserItemKeywordHash( void );" in local_source
+	assert "qboolean CG_ParseBrowserItem( int handle, void *item );" in local_source
+	assert "void CG_SetupBrowserMenuKeywordHash( void );" in local_source
+	assert "qboolean CG_ParseBrowserMenu( int handle, void *menu );" in local_source
 	assert "void CG_SetBrowserFeederSelection( void *overlay, int feeder, int index );" in local_source
 
 	assert "String_Init();" in init_block
+	assert "CG_SetupBrowserItemKeywordHash();" in init_block
+	assert "CG_SetupBrowserMenuKeywordHash();" in init_block
 	assert "Menu_Reset();" in reset_block
-	assert "menuScoreboard = NULL;" in reset_block
+	assert "CG_ResetDraw2DMenuCache();" in reset_block
+	assert "CG_ResetJoinGameMenuCaptureState();" in reset_block
+	assert "menuScoreboard = NULL;" not in reset_block
+	assert "Menu_Init( (menuDef_t *)overlay );" in init_overlay_block
+	assert "Item_SetupKeywordHash();" in item_hash_block
+	assert "return Item_Parse( handle, (itemDef_t *)item );" in parse_item_block
+	assert "Menu_SetupKeywordHash();" in menu_hash_block
+	assert "return Menu_Parse( handle, (menuDef_t *)menu );" in parse_menu_block
 	assert "Menu_SetFeederSelection( (menuDef_t *)overlay, feeder, index, NULL );" in feeder_block
 
 	assert "CG_ResetBrowserOverlayState();" in load_menus_block
@@ -1063,8 +1245,433 @@ def test_cgame_browser_runtime_wrappers_drive_hud_reload_and_score_feeders() -> 
 	assert "CG_InitBrowserRuntime();" in cgame_init_block
 
 
+def test_cgame_browser_overlay_focus_wrappers_restore_retail_direct_owner_slice() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	screen_source = CG_SCREEN.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+
+	update_presets_block = _block_from_marker(main_source, "void CG_UpdateBrowserPresetLists")
+	update_positions_block = _block_from_marker(main_source, "void CG_UpdateBrowserWidgetPositions")
+	find_overlay_block = _block_from_marker(main_source, "void *CG_FindBrowserOverlayByName")
+	open_overlay_block = _block_from_marker(main_source, "void *CG_OpenBrowserOverlayByName")
+	close_overlay_block = _block_from_marker(main_source, "void *CG_CloseBrowserOverlayByName")
+	cache_block = _block_from_marker(main_source, "static void CG_CacheScoreboardSelectionMenus")
+	handle_mouse_block = _block_from_marker(newdraw_source, "static void CG_BrowserHandleMouseMove")
+	clear_focus_block = _block_from_marker(newdraw_source, "static void *CG_ClearBrowserFocus")
+	set_focus_block = _block_from_marker(newdraw_source, "static qboolean CG_SetBrowserFocus")
+	set_mouse_over_block = _block_from_marker(newdraw_source, "static void CG_SetBrowserMouseOver")
+	mouse_enter_block = _block_from_marker(newdraw_source, "static void CG_BrowserMouseEnter")
+	mouse_leave_block = _block_from_marker(newdraw_source, "static void CG_BrowserMouseLeave")
+	prev_cursor_block = _block_from_marker(newdraw_source, "static void *CG_SetPrevBrowserCursorItem")
+	next_cursor_block = _block_from_marker(newdraw_source, "static void *CG_SetNextBrowserCursorItem")
+	open_join_block = _block_from_marker(screen_source, "static menuDef_t *CG_OpenJoinGameMenu")
+	close_join_block = _block_from_marker(screen_source, "void CG_CloseJoinGameMenu")
+
+	for expected in (
+		"void *CG_FindBrowserOverlayByName( const char *name );",
+		"void *CG_OpenBrowserOverlayByName( const char *name );",
+		"void *CG_CloseBrowserOverlayByName( const char *name );",
+		"void CG_UpdateBrowserPresetLists( void *overlay );",
+		"void CG_UpdateBrowserWidgetPositions( void *overlay );",
+		"void CG_ActivateBrowserOverlay( void *overlay );",
+	):
+		assert expected in local_source
+
+	for expected in (
+		'trap_Cvar_VariableStringBuffer( item->cvar, currentPreset, sizeof( currentPreset ) );',
+		'trap_Cvar_Set( item->cvar, "Custom" );',
+	):
+		assert expected in update_presets_block
+
+	assert "Menu_UpdatePosition( (menuDef_t *)overlay );" in update_positions_block
+	assert "return Menus_FindByName( name );" in find_overlay_block
+
+	for expected in (
+		"CG_UpdateBrowserWidgetPositions( menu );",
+		"CG_UpdateBrowserPresetLists( menu );",
+		"CG_ActivateBrowserOverlay( menu );",
+	):
+		assert expected in open_overlay_block
+
+	assert "Menus_OpenByName( name );" not in open_overlay_block
+
+	for expected in (
+		"Menus_CloseByName( name );",
+		"menu->window.flags &= ~WINDOW_FORCED;",
+	):
+		assert expected in close_overlay_block
+
+	for expected in (
+		"cgScoreboardSelectionMenus[0] = CG_FindBrowserOverlayByName( liveMenuName );",
+		"cgScoreboardSelectionMenus[1] = CG_FindBrowserOverlayByName( endMenuName );",
+	):
+		assert expected in cache_block
+
+	assert "Menu_HandleMouseMove( (menuDef_t *)overlay, x, y );" in handle_mouse_block
+	assert "return Menu_ClearFocus( (menuDef_t *)overlay );" in clear_focus_block
+	for expected in (
+		"!CG_BrowserWidgetEnableShowViaCvar( item, CVAR_ENABLE )",
+		"!CG_BrowserWidgetEnableShowViaCvar( item, CVAR_SHOW )",
+		"oldFocus = CG_ClearBrowserFocus( item->parent );",
+		"CG_BrowserRectContainsPoint( CG_BrowserCorrectedTextRect( item ), x, y )",
+		"CG_RunBrowserScript( oldFocus, oldFocus->onFocus );",
+		"CG_RunBrowserScript( item, item->onFocus );",
+		"cgDC.startLocalSound( *sfx, CHAN_LOCAL_SOUND );",
+	):
+		assert expected in set_focus_block
+	assert "Item_SetMouseOver( (itemDef_t *)widget, focus );" in set_mouse_over_block
+	for expected in (
+		"!CG_BrowserWidgetEnableShowViaCvar( item, CVAR_ENABLE )",
+		"!CG_BrowserWidgetEnableShowViaCvar( item, CVAR_SHOW )",
+		"CG_BrowserRectContainsPoint( CG_BrowserCorrectedTextRect( item ), x, y )",
+		"CG_RunBrowserScript( item, item->mouseEnterText );",
+		"CG_RunBrowserScript( item, item->mouseEnter );",
+		"Item_ListBox_MouseEnter( item, x, y );",
+	):
+		assert expected in mouse_enter_block
+	for expected in (
+		"CG_RunBrowserScript( item, item->mouseExitText );",
+		"CG_RunBrowserScript( item, item->mouseExit );",
+		"item->window.flags &= ~( WINDOW_LB_RIGHTARROW | WINDOW_LB_LEFTARROW );",
+		"CG_SetBrowserMouseOver( widget, qfalse );",
+	):
+		assert expected in mouse_leave_block
+
+	assert "Item_SetFocus( (itemDef_t *)widget, x, y )" not in set_focus_block
+	assert "Item_MouseEnter( (itemDef_t *)widget, x, y )" not in mouse_enter_block
+	assert "Item_MouseLeave( (itemDef_t *)widget )" not in mouse_leave_block
+
+	for expected in (
+		"CG_SetBrowserFocus( menu->items[menu->cursorItem], (float)cgDC.cursorx, (float)cgDC.cursory )",
+		"CG_BrowserHandleMouseMove( menu, menu->items[menu->cursorItem]->window.rect.x + 1, menu->items[menu->cursorItem]->window.rect.y + 1 );",
+	):
+		assert expected in prev_cursor_block
+		assert expected in next_cursor_block
+
+	for expected in (
+		'menu = CG_FindBrowserOverlayByName( "joingame_menu" );',
+		'menu = CG_OpenBrowserOverlayByName( "joingame_menu" );',
+	):
+		assert expected in open_join_block
+
+	assert 'CG_CloseBrowserOverlayByName( "joingame_menu" );' in close_join_block
+	assert 'Menus_OpenByName( "joingame_menu" );' not in open_join_block
+	assert 'Menus_CloseByName( "joingame_menu" );' not in close_join_block
+
+
+def test_cgame_browser_runtime_state_and_simple_script_wrappers_restore_retail_owner_slice() -> None:
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+
+	rect_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserRectContainsPoint")
+	items_group_block = _block_from_marker(newdraw_source, "static int CG_BrowserItemsMatchingGroup")
+	get_matching_block = _block_from_marker(newdraw_source, "static void *CG_BrowserGetMatchingItemByNumber")
+	find_widget_block = _block_from_marker(newdraw_source, "static void *CG_FindBrowserWidgetByName")
+	run_script_block = _block_from_marker(newdraw_source, "static void CG_RunBrowserScript")
+	enable_show_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserWidgetEnableShowViaCvar")
+	show_items_block = _block_from_marker(newdraw_source, "static void CG_ShowBrowserItemsByName")
+	script_show_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptShow")
+	script_hide_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptHide")
+	script_open_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptOpen")
+	script_conditional_open_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptConditionalOpen")
+	script_close_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptClose")
+	script_toggle_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptToggle")
+	script_set_focus_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptSetFocus")
+	over_active_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserOverActiveItem")
+
+	assert "return Rect_ContainsPoint( (rectDef_t *)rect, x, y );" in rect_block
+	assert "return Menu_ItemsMatchingGroup( (menuDef_t *)overlay, name );" in items_group_block
+	assert "return Menu_GetMatchingItemByNumber( (menuDef_t *)overlay, index, name );" in get_matching_block
+	assert "return Menu_FindItemByName( (menuDef_t *)overlay, name );" in find_widget_block
+	assert "Item_RunScript( (itemDef_t *)widget, script );" in run_script_block
+	assert "return Item_EnableShowViaCvar( (itemDef_t *)widget, flag );" in enable_show_block
+
+	for expected in (
+		"count = CG_BrowserItemsMatchingGroup( menu, name );",
+		"item = CG_BrowserGetMatchingItemByNumber( name, menu, i );",
+		"item->window.flags |= WINDOW_VISIBLE;",
+		"item->window.flags &= ~WINDOW_VISIBLE;",
+		"cgDC.stopCinematic( item->window.cinematic );",
+	):
+		assert expected in show_items_block
+
+	assert "CG_ShowBrowserItemsByName( name, item->parent, qtrue );" in script_show_block
+	assert "CG_ShowBrowserItemsByName( name, item->parent, qfalse );" in script_hide_block
+	assert "CG_OpenBrowserOverlayByName( name );" in script_open_block
+
+	for expected in (
+		"value = trap_Cvar_VariableValue( cvar );",
+		"CG_OpenBrowserOverlayByName( name2 );",
+		"CG_OpenBrowserOverlayByName( name1 );",
+	):
+		assert expected in script_conditional_open_block
+
+	assert "CG_CloseBrowserOverlayByName( name );" in script_close_block
+
+	for expected in (
+		"menu = CG_FindBrowserOverlayByName( name );",
+		"if ( menu->window.flags & WINDOW_VISIBLE ) {",
+		"CG_CloseBrowserOverlayByName( name );",
+		"CG_OpenBrowserOverlayByName( name );",
+	):
+		assert expected in script_toggle_block
+
+	for expected in (
+		"focusItem = CG_FindBrowserWidgetByName( item->parent, name );",
+		"CG_ClearBrowserFocus( item->parent );",
+		"CG_RunBrowserScript( focusItem, focusItem->onFocus );",
+		"cgDC.startLocalSound( cgDC.Assets.itemFocusSound, CHAN_LOCAL_SOUND );",
+	):
+		assert expected in script_set_focus_block
+
+	for expected in (
+		"CG_BrowserRectContainsPoint( &menu->window.rect, x, y )",
+		"CG_BrowserRectContainsPoint( &item->window.rect, x, y )",
+		"CG_BrowserRectContainsPoint( CG_BrowserCorrectedTextRect( item ), x, y )",
+	):
+		assert expected in over_active_block
+
+
+def test_cgame_browser_runtime_surface_restores_overlay_draw_and_capture_owners() -> None:
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	screen_source = CG_SCREEN.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+
+	capture_block = _block_from_marker(newdraw_source, "static void *CG_BrowserDisplayCaptureItem")
+	alloc_block = _block_from_marker(newdraw_source, "static void CG_AllocBrowserWidgetState")
+	frame_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserWidgetFrame")
+	widget_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserWidget")
+	overlay_tree_block = _block_from_marker(newdraw_source, "void CG_DrawBrowserOverlayTree")
+	overlays_block = _block_from_marker(newdraw_source, "void CG_DrawBrowserOverlays")
+	oob_block = _block_from_marker(newdraw_source, "static void CG_BrowserHandleOOBClick")
+	handle_key_block = _block_from_marker(newdraw_source, "static void CG_BrowserHandleKey")
+	display_handle_block = _block_from_marker(newdraw_source, "static void CG_BrowserDisplayHandleKey")
+	cached_menu_block = _block_from_marker(draw_source, "static qboolean CG_DrawCachedOverlayMenu")
+	scoreboard_block = _block_from_marker(draw_source, "static qboolean CG_DrawScoreboard")
+	stats_block = _block_from_marker(draw_source, "static qboolean CG_DrawStatsMenu")
+	draw_2d_block = _block_from_marker(draw_source, "static void CG_Draw2D")
+	join_menu_block = _block_from_marker(screen_source, "void CG_DrawJoinGameMenu( void )")
+
+	for expected in (
+		"void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint );",
+		"void CG_DrawBrowserOverlays( void );",
+	):
+		assert expected in local_source
+
+	assert "return Display_CaptureItem( x, y );" in capture_block
+	assert "Item_ValidateTypeData( (itemDef_t *)widget );" in alloc_block
+	assert "Window_Paint( window, fadeAmount, fadeClamp, fadeCycle );" in frame_block
+	assert "CG_AllocBrowserWidgetState( item );" in widget_block
+	assert "Item_Paint( item );" in widget_block
+	assert "Menus_HandleOOBClick( (menuDef_t *)overlay, key, down );" in oob_block
+
+	for expected in (
+		"CG_UpdateBrowserPresetLists( menu );",
+		"CG_DrawBrowserWidgetFrame( &menu->window, menu->fadeAmount, menu->fadeClamp, menu->fadeCycle );",
+		"CG_DrawBrowserWidget( menu->items[i] );",
+		"cgDC.setAdjustFrom640Mode( WIDESCREEN_STRETCH );",
+	):
+		assert expected in overlay_tree_block
+
+	assert "Menu_PaintAll();" in overlays_block
+	assert "CG_BrowserHandleOOBClick( menu, key, down );" in handle_key_block
+	assert "overlay = CG_BrowserDisplayCaptureItem( x, y );" in display_handle_block
+	assert "overlay = CG_GetFocusedBrowserOverlay();" in display_handle_block
+
+	assert "CG_DrawBrowserOverlayTree( menu, qtrue );" in cached_menu_block
+	assert "Menu_Paint( menu, qtrue );" not in cached_menu_block
+
+	for expected in (
+		"menuScoreboard = CG_FindBrowserOverlayByName( menuName );",
+		"menuScoreboard = CG_FindBrowserOverlayByName( fallback );",
+		"CG_DrawBrowserOverlayTree( menuScoreboard, qtrue );",
+	):
+		assert expected in scoreboard_block
+
+	assert 'menuStats = CG_FindBrowserOverlayByName( "stats_menu" );' in stats_block
+	assert "CG_DrawBrowserOverlayTree( menuStats, qtrue );" in stats_block
+	assert "CG_DrawBrowserOverlays();" in draw_2d_block
+	assert "Menu_PaintAll();" not in draw_2d_block
+
+	assert "CG_DrawBrowserOverlayTree( menu, qtrue );" in join_menu_block
+	assert "Menu_Paint( menu, qtrue );" not in join_menu_block
+
+
+def test_cgame_browser_leaf_wrappers_restore_remaining_retail_owner_slice() -> None:
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+
+	list_max_block = _block_from_marker(newdraw_source, "static int CG_BrowserListMaxScroll")
+	list_thumb_block = _block_from_marker(newdraw_source, "static int CG_BrowserListThumbPosition")
+	list_thumb_draw_block = _block_from_marker(newdraw_source, "static int CG_BrowserListThumbDrawPosition")
+	list_over_block = _block_from_marker(newdraw_source, "static int CG_BrowserListOverLB")
+	textfield_key_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserTextFieldHandleKey")
+	script_fade_in_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptFadeIn")
+	script_fade_out_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptFadeOut")
+	script_set_background_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptSetBackground")
+	script_set_color_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptSetColor")
+	script_set_team_color_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptSetTeamColor")
+	script_set_item_color_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptSetItemColor")
+	transition_items_block = _block_from_marker(newdraw_source, "static void CG_TransitionBrowserItemsByName")
+	script_transition_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptTransition")
+	orbit_items_block = _block_from_marker(newdraw_source, "static void CG_OrbitBrowserItemsByName")
+	script_orbit_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptOrbit")
+	script_activate_advert_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptActivateAdvert")
+	script_set_model_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptSetPlayerModel")
+	script_set_head_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptSetPlayerHead")
+	script_set_cvar_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptSetCvar")
+	script_exec_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptExec")
+	script_play_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptPlay( void *widget, char **args )")
+	script_play_looped_block = _block_from_marker(newdraw_source, "static void CG_BrowserScriptPlayLooped( void *widget, char **args )")
+	multi_find_block = _block_from_marker(newdraw_source, "static int CG_BrowserMultiFindCvarByValue")
+	multi_setting_block = _block_from_marker(newdraw_source, "static const char *CG_BrowserMultiSetting")
+	preset_setting_block = _block_from_marker(newdraw_source, "static const char *CG_BrowserPresetListSetting")
+	preset_find_block = _block_from_marker(newdraw_source, "static int CG_BrowserPresetListFindCvarByValue")
+	yesno_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserYesNoControl")
+	multi_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserMultiControl")
+	preset_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserPresetList")
+	controls_get_block = _block_from_marker(newdraw_source, "static void CG_BrowserControlsGetConfig")
+	controls_set_block = _block_from_marker(newdraw_source, "static void CG_BrowserControlsSetConfig")
+	binding_id_block = _block_from_marker(newdraw_source, "static int CG_BrowserBindingIDFromName")
+	binding_from_block = _block_from_marker(newdraw_source, "static void CG_BrowserBindingFromName")
+	bind_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserBindControl")
+	bind_key_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserBindHandleKey")
+	slider_thumb_block = _block_from_marker(newdraw_source, "static float CG_BrowserSliderThumbPosition")
+	text_extents_block = _block_from_marker(newdraw_source, "static void CG_BrowserSetTextExtents")
+	slider_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserSliderControl")
+	slider_color_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserSliderColorControl")
+	text_color_block = _block_from_marker(newdraw_source, "static void CG_BrowserTextColor")
+	auto_text_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserAutoWrappedText")
+	wrapped_text_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserWrappedText")
+	text_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserText( void *widget )")
+	editfield_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserEditFieldControl")
+	model_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserModelPreview")
+	list_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserListWidget")
+	textfield_draw_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserTextField")
+	close_cinematics_block = _block_from_marker(newdraw_source, "static void CG_CloseBrowserCinematics")
+	activate_overlay_block = _block_from_marker(newdraw_source, "void CG_ActivateBrowserOverlay")
+	multi_key_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserMultiHandleKey")
+	preset_key_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserPresetListHandleKey")
+	list_repeat_block = _block_from_marker(newdraw_source, "static void CG_BrowserListRepeatScroll")
+	list_drag_block = _block_from_marker(newdraw_source, "static void CG_BrowserListDragThumb")
+	slider_apply_block = _block_from_marker(newdraw_source, "static void CG_BrowserSliderApplyFromCursor")
+	start_capture_block = _block_from_marker(newdraw_source, "static void CG_BrowserStartCapture")
+	slider_key_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserSliderHandleKey")
+	slider_over_block = _block_from_marker(newdraw_source, "static int CG_BrowserSliderOverControl")
+	widget_key_block = _block_from_marker(newdraw_source, "static qboolean CG_BrowserWidgetHandleKey")
+	widget_block = _block_from_marker(newdraw_source, "static void CG_DrawBrowserWidget")
+	open_overlay_block = _block_from_marker(main_source, "void *CG_OpenBrowserOverlayByName")
+
+	for expected in (
+		"void CG_UpdateBrowserPresetLists( void *overlay );",
+		"void CG_UpdateBrowserWidgetPositions( void *overlay );",
+		"void CG_ActivateBrowserOverlay( void *overlay );",
+	):
+		assert expected in local_source
+
+	assert "return Item_ListBox_MaxScroll( (itemDef_t *)widget );" in list_max_block
+	assert "return Item_ListBox_ThumbPosition( (itemDef_t *)widget );" in list_thumb_block
+	assert "return Item_ListBox_ThumbDrawPosition( (itemDef_t *)widget );" in list_thumb_draw_block
+	assert "return Item_ListBox_OverLB( (itemDef_t *)widget, x, y );" in list_over_block
+	assert "return Item_TextField_HandleKey( (itemDef_t *)widget, key );" in textfield_key_block
+
+	assert "Menu_FadeItemByName( (menuDef_t *)item->parent, name, qfalse );" in script_fade_in_block
+	assert "Menu_FadeItemByName( (menuDef_t *)item->parent, name, qtrue );" in script_fade_out_block
+	assert "Script_SetBackground( (itemDef_t *)widget, args );" in script_set_background_block
+	assert "Script_SetColor( (itemDef_t *)widget, args );" in script_set_color_block
+	assert "Script_SetTeamColor( (itemDef_t *)widget, args );" in script_set_team_color_block
+	assert "Script_SetItemColor( (itemDef_t *)widget, args );" in script_set_item_color_block
+	assert "Menu_TransitionItemByName( (menuDef_t *)overlay, name, rectFrom, rectTo, time, amount );" in transition_items_block
+	assert "CG_TransitionBrowserItemsByName( item->parent, name, rectFrom, rectTo, time, amount );" in script_transition_block
+	assert "Menu_OrbitItemByName( (menuDef_t *)overlay, name, x, y, cx, cy, time );" in orbit_items_block
+	assert "CG_OrbitBrowserItemsByName( item->parent, name, x, y, cx, cy, time );" in script_orbit_block
+	assert "cgDC.activateAdvert( atoi( cellIdToken ) );" in script_activate_advert_block
+	assert "item->window.flags &= ~WINDOW_HASFOCUS;" in script_activate_advert_block
+	assert "Script_SetPlayerModel( (itemDef_t *)widget, args );" in script_set_model_block
+	assert "Script_SetPlayerHead( (itemDef_t *)widget, args );" in script_set_head_block
+	assert "Script_SetCvar( (itemDef_t *)widget, args );" in script_set_cvar_block
+	assert "Script_Exec( (itemDef_t *)widget, args );" in script_exec_block
+	assert "Script_Play( (itemDef_t *)widget, args );" in script_play_block
+	assert "Script_playLooped( (itemDef_t *)widget, args );" in script_play_looped_block
+
+	assert "return Item_Multi_FindCvarByValue( (itemDef_t *)widget );" in multi_find_block
+	assert "return Item_Multi_Setting( (itemDef_t *)widget );" in multi_setting_block
+	assert "return Item_PresetList_Setting( (itemDef_t *)widget );" in preset_setting_block
+	assert "return Item_PresetList_FindCvarByValue( (itemDef_t *)widget );" in preset_find_block
+	assert "Item_YesNo_Paint( (itemDef_t *)widget );" in yesno_draw_block
+	assert "Item_Multi_Paint( (itemDef_t *)widget );" in multi_draw_block
+	assert "Item_PresetList_Paint( (itemDef_t *)widget );" in preset_draw_block
+	assert "Controls_GetConfig();" in controls_get_block
+	assert "Controls_SetConfig( restart );" in controls_set_block
+	assert "return BindingIDFromName( name );" in binding_id_block
+	assert "BindingFromName( name );" in binding_from_block
+	assert "Item_Bind_Paint( (itemDef_t *)widget );" in bind_draw_block
+	assert "return Item_Bind_HandleKey( (itemDef_t *)widget, key, down );" in bind_key_block
+	assert "return Item_Slider_ThumbPosition( (itemDef_t *)widget );" in slider_thumb_block
+	assert "Item_SetTextExtents( (itemDef_t *)widget, width, height, text );" in text_extents_block
+	assert "Item_Slider_Paint( (itemDef_t *)widget );" in slider_draw_block
+	assert "Item_SliderColor_Paint( (itemDef_t *)widget );" in slider_color_draw_block
+	assert "Item_TextColor( (itemDef_t *)widget, newColor );" in text_color_block
+	assert "Item_Text_AutoWrapped_Paint( (itemDef_t *)widget );" in auto_text_block
+	assert "Item_Text_Wrapped_Paint( (itemDef_t *)widget );" in wrapped_text_block
+	assert "Item_Text_Paint( item );" in text_draw_block
+	assert "Item_TextField_Paint( (itemDef_t *)widget );" in editfield_draw_block
+	assert "Item_Model_Paint( (itemDef_t *)widget );" in model_draw_block
+	assert "Item_ListBox_Paint( (itemDef_t *)widget );" in list_draw_block
+	assert "CG_DrawBrowserEditFieldControl( widget );" in textfield_draw_block
+
+	assert "CG_CloseBrowserMenuCinematics( &Menus[i] );" in close_cinematics_block
+	assert "Menus_Activate( (menuDef_t *)overlay );" in activate_overlay_block
+	assert "return Item_Multi_HandleKey( (itemDef_t *)widget, key );" in multi_key_block
+	assert "return Item_PresetList_HandleKey( (itemDef_t *)widget, key );" in preset_key_block
+	assert "Item_ListBox_HandleKey( (itemDef_t *)widget, key, qtrue, qfalse );" in list_repeat_block
+	assert "listPtr->startPos = pos;" in list_drag_block
+	assert "cgDC.setCVar( item->cvar, buffer );" in slider_apply_block
+	assert "Item_StartCapture( (itemDef_t *)widget, key );" in start_capture_block
+	assert "return Item_Slider_HandleKey( (itemDef_t *)widget, key, down );" in slider_key_block
+	assert "return Item_Slider_OverSlider( (itemDef_t *)widget, x, y );" in slider_over_block
+
+	for expected in (
+		"return Item_ListBox_HandleKey( item, key, down, qfalse );",
+		"return Item_YesNo_HandleKey( item, key );",
+		"return CG_BrowserMultiHandleKey( item, key );",
+		"return CG_BrowserBindHandleKey( item, key, down );",
+		"return CG_BrowserSliderHandleKey( item, key, down );",
+		"return CG_BrowserPresetListHandleKey( item, key );",
+	):
+		assert expected in widget_key_block
+
+	for expected in (
+		"CG_DrawBrowserModelPreview( item );",
+		"CG_DrawBrowserListWidget( item );",
+		"CG_DrawBrowserText( item );",
+		"CG_DrawBrowserTextField( item );",
+		"CG_DrawBrowserYesNoControl( item );",
+		"CG_DrawBrowserMultiControl( item );",
+		"CG_DrawBrowserBindControl( item );",
+		"CG_DrawBrowserSliderControl( item );",
+		"CG_DrawBrowserSliderColorControl( item );",
+		"CG_DrawBrowserPresetList( item );",
+	):
+		assert expected in widget_block
+
+	for expected in (
+		"CG_UpdateBrowserWidgetPositions( menu );",
+		"CG_UpdateBrowserPresetLists( menu );",
+		"CG_ActivateBrowserOverlay( menu );",
+	):
+		assert expected in open_overlay_block
+
+	assert "Menus_OpenByName( name );" not in open_overlay_block
+
+
 def test_cgame_menu_parser_and_score_selection_restore_retail_parser_and_cursor_seam() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	parse_menu_start = source.index("void CG_ParseMenu(const char *menuFile)")
+	load_menu_start = source.index("qboolean CG_Load_Menu(char **p)")
+	parse_menu_block = source[parse_menu_start:load_menu_start]
 	score_block = _block_from_marker(source, "void CG_SetScoreSelection")
 	selection_block = _block_from_marker(source, "static void CG_FeederSelection")
 
@@ -1073,9 +1680,15 @@ def test_cgame_menu_parser_and_score_selection_restore_retail_parser_and_cursor_
 		'if (Q_stricmp(token.string, "assetGlobalDef") == 0) {',
 		"if (CG_Asset_Parse(handle)) {",
 		'if (Q_stricmp(token.string, "menudef") == 0) {',
-		"Menu_New(handle);",
+		"menu = &Menus[menuCount];",
+		"CG_InitBrowserOverlay( menu );",
+		"if ( CG_ParseBrowserMenu( handle, menu ) ) {",
+		"Menu_PostParse( menu );",
+		"menuCount++;",
 	):
-		assert expected in source
+		assert expected in parse_menu_block
+
+	assert "Menu_New(handle);" not in parse_menu_block
 
 	for expected in (
 		"token = COM_ParseExt(p, qtrue);",
@@ -1273,10 +1886,13 @@ def test_cgame_scoreboard_selection_callbacks_restore_cached_team_list_menu_seam
 		assert expected in menu_name_block
 
 	for expected in (
-		"cgScoreboardSelectionMenus[0] = Menus_FindByName( liveMenuName );",
-		"cgScoreboardSelectionMenus[1] = Menus_FindByName( endMenuName );",
+		"cgScoreboardSelectionMenus[0] = CG_FindBrowserOverlayByName( liveMenuName );",
+		"cgScoreboardSelectionMenus[1] = CG_FindBrowserOverlayByName( endMenuName );",
 	):
 		assert expected in cache_block
+
+	assert "Menus_FindByName( liveMenuName );" not in cache_block
+	assert "Menus_FindByName( endMenuName );" not in cache_block
 
 	for expected in (
 		'selectedItemName = ( team == TEAM_RED ) ? "playerlistRED" : "playerlistBLUE";',
@@ -1657,17 +2273,24 @@ def test_cgame_event_reconstruction_keeps_retail_damage_plum_bridge() -> None:
 		"if ( damage <= 0 || !CG_DamagePlumsEnabled() ) {",
 		"if ( !CG_ShouldRenderDamagePlumForWeapon( weapon ) ) {",
 		"CG_GetDamagePlumColor( damage, weapon, color );",
-		"le->leFlags = LEF_SCOREPLUM_CUSTOMCOLOR;",
-		"le->leType = LE_SCOREPLUM;",
+		"marker = CG_AllocQueuedWorldMarker();",
+		"marker->origin[0] += crandom() * 10.0f;",
+		"marker->duration = 2000;",
+		"marker->fadeDelay = 1000;",
+		"marker->rise = 100.0f;",
+		"marker->textScale = 0.18f;",
+		"Vector4Copy( color, marker->color );",
+		'Com_sprintf( marker->text, sizeof( marker->text ), "%d", damage );',
 	):
 		assert expected in damage_plum_block
 
 	assert "CG_IsRetailLocalEventClient( CG_GetRetailEventClientNum( es ) )" in event_source
 	assert "return es->eventParm;" in event_source
 	assert "return WP_NONE;" in event_source
-	assert "LEF_SCOREPLUM_CUSTOMCOLOR = 0x0010" in local_source
-	assert "if ( le->leFlags & LEF_SCOREPLUM_CUSTOMCOLOR ) {" in localents_source
-	assert "re->shaderRGBA[0] = (byte)( 0xff * Com_Clamp( 0.0f, 1.0f, le->color[0] ) );" in localents_source
+	assert "LEF_SCOREPLUM_CUSTOMCOLOR" not in local_source
+	assert "LEF_SCOREPLUM_CUSTOMCOLOR" not in localents_source
+	assert "re->shaderRGBA[3] = (byte)( 0xff * 4 * c );" in localents_source
+	assert "re->shaderRGBA[3] = 0xff;" in localents_source
 
 
 def test_cgame_server_settings_panel_reconstruction_uses_retail_custom_setting_configstrings() -> None:
@@ -1675,6 +2298,8 @@ def test_cgame_server_settings_panel_reconstruction_uses_retail_custom_setting_c
 	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
 	parse_custom_block = _block_from_marker(servercmds_source, "static void CG_ParseCustomSettingsConfigString")
+	parse_serverinfo_block = _block_from_marker(servercmds_source, "void CG_ParseServerinfo")
+	parse_armor_block = _block_from_marker(servercmds_source, "static void CG_ParseArmorTieredConfigString")
 	parse_info_block = _block_from_marker(servercmds_source, "static void CG_ParseServerSettingsInfoConfigStrings")
 	draw_block = _block_from_marker(newdraw_source, "static void CG_DrawServerSettings")
 	set_config_values_block = _block_from_marker(servercmds_source, "void CG_SetConfigValues")
@@ -1694,19 +2319,32 @@ def test_cgame_server_settings_panel_reconstruction_uses_retail_custom_setting_c
 	for expected in (
 		'info = CG_ConfigString( CS_SERVER_SETTINGS_INFO_A );',
 		'Info_ValueForKey( info, "armor_tiered" )',
+		'value = "0";',
+		"cgs.serverSettingsArmorTiered = (qboolean)( atoi( value ) != 0 );",
+		"cg.armorTieredEnabled = cgs.serverSettingsArmorTiered;",
+		'trap_Cvar_Set( "cg_armorTiered", value );',
+		"trap_Cvar_Update( &cg_armorTiered );",
+	):
+		assert expected in parse_armor_block
+
+	assert 'Info_ValueForKey( info, "g_armorTiered" )' not in parse_serverinfo_block
+	assert 'trap_Cvar_Set( "cg_armorTiered", armorTieredValue );' not in parse_serverinfo_block
+
+	for expected in (
 		'info = CG_ConfigString( CS_SERVER_SETTINGS_INFO_B );',
 		'Info_ValueForKey( info, "g_quadDamageFactor" )',
 		'Info_ValueForKey( info, "g_gravity" )',
-		"cgs.serverSettingsArmorTiered = (qboolean)( value[0] && atoi( value ) != 0 );",
 		"cgs.serverSettingsQuadFactor = value[0] ? atoi( value ) : 3;",
 		"cgs.serverSettingsGravity = value[0] ? atoi( value ) : 800;",
 	):
 		assert expected in parse_info_block
 
 	assert "CG_ParseCustomSettingsConfigString();" in set_config_values_block
+	assert "CG_ParseArmorTieredConfigString();" in set_config_values_block
 	assert "CG_ParseServerSettingsInfoConfigStrings();" in set_config_values_block
 	assert "num == CS_CUSTOM_SETTINGS" in servercmds_source
-	assert "num == CS_SERVER_SETTINGS_INFO_A || num == CS_SERVER_SETTINGS_INFO_B" in servercmds_source
+	assert "num == CS_SERVER_SETTINGS_INFO_A" in servercmds_source
+	assert "num == CS_SERVER_SETTINGS_INFO_B" in servercmds_source
 
 	for expected in (
 		'"AIR CONTROL"',
@@ -1733,6 +2371,65 @@ def test_cgame_server_settings_panel_reconstruction_uses_retail_custom_setting_c
 		"CG_DrawPic( iconX, iconY, iconSize, iconSize, icon );",
 	):
 		assert expected in draw_block
+
+
+def test_cgame_armor_tiered_configstring_retains_direct_retail_parser_boundary() -> None:
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	parse_block = _block_from_marker(servercmds_source, "static void CG_ParseArmorTieredConfigString")
+	set_config_values_block = _block_from_marker(servercmds_source, "void CG_SetConfigValues")
+	configstring_modified_block = _block_from_marker(servercmds_source, "static void CG_ConfigStringModified")
+	parse_serverinfo_block = _block_from_marker(servercmds_source, "void CG_ParseServerinfo")
+
+	assert 'info = CG_ConfigString( CS_SERVER_SETTINGS_INFO_A );' in parse_block
+	assert 'Info_ValueForKey( info, "armor_tiered" )' in parse_block
+	assert 'trap_Cvar_Set( "cg_armorTiered", value );' in parse_block
+	assert "trap_Cvar_Update( &cg_armorTiered );" in parse_block
+
+	assert "CG_ParseArmorTieredConfigString();" in set_config_values_block
+	assert "num == CS_SERVER_SETTINGS_INFO_A" in configstring_modified_block
+	assert "CG_ParseArmorTieredConfigString();" in configstring_modified_block
+
+	assert 'Info_ValueForKey( info, "armor_tiered" )' not in parse_serverinfo_block
+	assert 'trap_Cvar_Set( "cg_armorTiered", value );' not in parse_serverinfo_block
+
+
+def test_cgame_player_cylinders_configstring_retains_direct_retail_parser_boundary() -> None:
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	parse_block = _block_from_marker(servercmds_source, "static void CG_ParsePlayerCylindersConfigString")
+	set_config_values_block = _block_from_marker(servercmds_source, "void CG_SetConfigValues")
+	configstring_modified_block = _block_from_marker(servercmds_source, "static void CG_ConfigStringModified")
+	parse_serverinfo_block = _block_from_marker(servercmds_source, "void CG_ParseServerinfo")
+
+	assert "info = CG_ConfigString( CS_PLAYER_CYLINDERS );" in parse_block
+	assert 'value = ( info && info[0] ) ? va( "%i", atoi( info ) ) : "0";' in parse_block
+	assert "cgs.playerCylindersEnabled = (qboolean)( atoi( value ) != 0 );" in parse_block
+	assert 'trap_Cvar_Set( "cg_playerCylinders", value );' in parse_block
+	assert "trap_Cvar_Update( &cg_playerCylinders );" in parse_block
+
+	assert "CG_ParsePlayerCylindersConfigString();" in set_config_values_block
+	assert "num == CS_PLAYER_CYLINDERS" in configstring_modified_block
+	assert "CG_ParsePlayerCylindersConfigString();" in configstring_modified_block
+
+	assert 'Info_ValueForKey( info, "g_playerCylinders" )' not in parse_serverinfo_block
+	assert 'trap_Cvar_Set( "cg_playerCylinders", playerCylindersValue );' not in parse_serverinfo_block
+
+
+def test_cgame_factory_title_reconstruction_uses_serverinfo_and_factory_flags_split() -> None:
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	parse_title_block = _block_from_marker(servercmds_source, "static void CG_ParseFactoryTitleServerinfo")
+	parse_serverinfo_block = _block_from_marker(servercmds_source, "void CG_ParseServerinfo")
+	parse_factory_block = _block_from_marker(servercmds_source, "static void CG_ParseFactoryMetadata")
+	configstring_modified_block = _block_from_marker(servercmds_source, "static void CG_ConfigStringModified")
+
+	assert 'Info_ValueForKey( info, "g_factoryTitle" )' in parse_title_block
+	assert 'Com_sprintf( cgs.factoryTitle, sizeof( cgs.factoryTitle ), "%.*s", length, value + start );' in parse_title_block
+	assert "CG_ParseFactoryTitleServerinfo( info );" in parse_serverinfo_block
+
+	assert 'info = CG_ConfigString( CS_FACTORY_FLAGS );' in parse_factory_block
+	assert "cgs.factoryTitle" not in parse_factory_block
+
+	assert "num == CS_FACTORY_FLAGS" in configstring_modified_block
+	assert "num == CS_FACTORY_TITLE" not in configstring_modified_block
 
 
 def test_cgame_player_appearance_configstring_reconstruction_uses_retail_parser_and_head_gate() -> None:
@@ -1769,6 +2466,13 @@ def test_cgame_player_appearance_configstring_reconstruction_uses_retail_parser_
 		"CG_ApplyModelOverrides();",
 	):
 		assert expected in parse_block
+
+	for unexpected in (
+		"fallbackInfo = CG_ConfigString( CS_SERVERINFO );",
+		'Info_ValueForKey( fallbackInfo, "g_playermodelOverride" )',
+		'Info_ValueForKey( fallbackInfo, "g_playerheadmodelOverride" )',
+	):
+		assert unexpected not in parse_block
 
 	assert "CG_ParsePlayerAppearanceConfigString();" in set_config_values_block
 	assert "num == CS_PLAYER_APPEARANCE" in servercmds_source
@@ -1821,6 +2525,7 @@ def test_cgame_player_color_helper_restores_retail_shared_color_scale_seam() -> 
 	scale_block = _block_from_marker(players_source, "static int CG_GetPlayerColorScale")
 	tint_block = _block_from_marker(players_source, "static void CG_ApplyDeadBodyTint")
 	set_color_block = _block_from_marker(players_source, "static void CG_SetRefEntityColor")
+	resolve_block = _block_from_marker(players_source, "static void CG_ResolveClientModelColorBytes")
 	apply_block = _block_from_marker(players_source, "static void CG_ApplyPlayerColors")
 	player_block = _block_from_marker(players_source, "void CG_Player( centity_t *cent )")
 
@@ -1838,11 +2543,21 @@ def test_cgame_player_color_helper_restores_retail_shared_color_scale_seam() -> 
 		assert expected in tint_block + set_color_block
 
 	for expected in (
+		"ci = &cgs.clientinfo[cent->currentState.clientNum];",
 		"colorScale = CG_GetPlayerColorScale();",
 		"CG_ShouldTintDeadBody( cent, ci )",
+		"CG_SetScaledShaderRGBA( rgba, cg.deadBodyColor, colorScale );",
+		"VectorCopy( ci->upperColor, shaderColor );",
+		"CG_SetScaledShaderRGBA( rgba, shaderColor, colorScale );",
+	):
+		assert expected in resolve_block
+
+	for expected in (
+		"colorScale = CG_GetPlayerColorScale();",
+		"CG_ResolveClientModelColorBytes( cent, torso->shaderRGBA );",
 		"legs->shaderRGBA[0] = 255;",
-		"CG_ApplyDeadBodyTint( legs, colorScale );",
-		"CG_SetRefEntityColor( torso, ci->upperColor, colorScale );",
+		"memcpy( legs->shaderRGBA, torso->shaderRGBA, sizeof( legs->shaderRGBA ) );",
+		"memcpy( head->shaderRGBA, torso->shaderRGBA, sizeof( head->shaderRGBA ) );",
 		"CG_SetRefEntityColor( head, ci->headColor, colorScale );",
 	):
 		assert expected in apply_block
@@ -1962,6 +2677,7 @@ def test_cgame_local_entity_dispatch_restores_retail_fragment_and_effect_split()
 	effects_source = CG_EFFECTS.read_text(encoding="utf-8")
 	localents_source = CG_LOCALENTS.read_text(encoding="utf-8")
 	fragment_block = _block_from_marker(localents_source, "void CG_AddFragment( localEntity_t *le )")
+	tracer_fragment_block = _block_from_marker(localents_source, "static void CG_AddTracerFragmentTrail")
 	tracer_block = _block_from_marker(localents_source, "static void CG_AddBigExplodeTracer")
 	death_block = _block_from_marker(localents_source, "static void CG_AddDeathEffect")
 	dispatch_block = _block_from_marker(localents_source, "void CG_AddLocalEntities( void )")
@@ -1982,12 +2698,14 @@ def test_cgame_local_entity_dispatch_restores_retail_fragment_and_effect_split()
 		assert expected in effects_source
 
 	for expected in (
-		"(void)CG_AddFragmentImpl( le );",
-		"if ( le->leType == LE_FRAGMENT_14 ) {",
-		"CG_AddFragmentTrail( le, cgs.media.tracerShader );",
+		"if ( le->leType == LE_FRAGMENT_16 ) {",
+		"CG_AddFragmentTrail( le, cgs.media.iceballShader );",
+		"if ( CG_AddFragmentImpl( le ) && le->leType == LE_FRAGMENT_14 ) {",
+		"CG_AddTracerFragmentTrail( le );",
 	):
 		assert expected in fragment_block
 
+	assert "CG_AddFragmentTrail( le, cgs.media.tracerShader );" in tracer_fragment_block
 	assert "(void)CG_AddSpriteEffectCommon( le );" in tracer_block
 	assert "if ( CG_AddSpriteEffectCommon( le ) && le->light ) {" in death_block
 
@@ -2009,6 +2727,130 @@ def test_cgame_local_entity_dispatch_restores_retail_fragment_and_effect_split()
 		"CG_AddType0F",
 	):
 		assert unexpected not in localents_source
+
+
+def test_cgame_juiced_and_bigexplode_helpers_restore_retail_owner_split() -> None:
+	effects_source = CG_EFFECTS.read_text(encoding="utf-8")
+	event_source = CG_EVENT.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	localents_source = CG_LOCALENTS.read_text(encoding="utf-8")
+	juiced_event_block = event_source.split("case EV_JUICED:")[1].split("break;", 1)[0]
+	spawn_effects_block = _block_from_marker(effects_source, "static void CG_SpawnBigExplodeEffects")
+	juiced_effect_block = _block_from_marker(effects_source, "void CG_InvulnerabilityJuiced")
+	detonate_block = _block_from_marker(effects_source, "void CG_DetonateJuicedPlayer")
+	bigexplode_block = _block_from_marker(effects_source, "void CG_BigExplode( vec3_t playerOrigin )")
+	bigexplode_juiced_block = _block_from_marker(effects_source, "void CG_BigExplodeJuiced( vec3_t playerOrigin )")
+	juiced_update_block = _block_from_marker(localents_source, "void CG_AddInvulnerabilityJuiced( localEntity_t *le )")
+
+	assert "void CG_DetonateJuicedPlayer( const vec3_t playerOrigin, qboolean immediateFallback );" in local_source
+
+	for expected in (
+		"CG_SpawnDeathEffect( origin, elevatedShell );",
+		"CG_SpawnBigExplodeTracer( tracerOrigin, cg.time + crandom() * 500.0f,",
+	):
+		assert expected in spawn_effects_block
+
+	for expected in (
+		"if ( cgs.media.haveDlcGibs ) {",
+		"CG_GibPlayer( origin );",
+		"CG_LaunchBigExplodeFragments( playerOrigin, !immediateFallback );",
+		"CG_SpawnBigExplodeEffects( playerOrigin, !immediateFallback );",
+	):
+		assert expected in detonate_block
+
+	assert "CG_DetonateJuicedPlayer( org, qtrue );" in juiced_effect_block
+	assert "CG_DetonateJuicedPlayer( le->refEntity.origin, qfalse );" in juiced_update_block
+
+	for expected in (
+		"CG_LaunchBigExplodeFragments( playerOrigin, qfalse );",
+		"CG_SpawnBigExplodeEffects( playerOrigin, qfalse );",
+	):
+		assert expected in bigexplode_block
+
+	for expected in (
+		"CG_LaunchBigExplodeFragments( playerOrigin, qtrue );",
+		"CG_SpawnBigExplodeEffects( playerOrigin, qtrue );",
+	):
+		assert expected in bigexplode_juiced_block
+
+	assert "CG_SpawnBigExplodeTracers" not in effects_source
+	assert "if ( cgs.media.haveDlcGibs ) {" not in juiced_event_block
+	assert "CG_InvulnerabilityJuiced( cent->lerpOrigin );" in juiced_event_block
+
+
+def test_cgame_item_respawn_timer_helper_restores_retail_world_item_boundary() -> None:
+	ents_source = CG_ENTS.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	game_items_source = G_ITEMS.read_text(encoding="utf-8")
+	item_block = _block_from_marker(ents_source, "static void CG_Item( centity_t *cent )")
+	duration_block = _block_from_marker(ents_source, "static int CG_ItemRespawnTimerDuration")
+	icon_block = _block_from_marker(ents_source, "static qhandle_t CG_ItemRespawnTimerIcon")
+	slices_block = _block_from_marker(ents_source, "static void CG_ItemRespawnTimerSlices")
+	timer_block = _block_from_marker(ents_source, "static void CG_DrawItemRespawnTimer")
+	uses_block = _block_from_marker(game_items_source, "static qboolean G_ItemUsesRespawnTimer")
+	publisher_block = _block_from_marker(game_items_source, "static void G_SetItemRespawnTimerState")
+
+	for expected in (
+		"qhandle_t\titemTimerArmorShader;",
+		"qhandle_t\titemTimerUnknownShader;",
+		"qhandle_t\titemTimerSlice24CurrentShader;",
+	):
+		assert expected in local_source
+
+	for expected in (
+		'cgs.media.itemTimerArmorShader = trap_R_RegisterShader( "gfx/2d/timer/armor" );',
+		'cgs.media.itemTimerMedkitShader = trap_R_RegisterShader( "gfx/2d/timer/medkit" );',
+		'cgs.media.itemTimerSlice24CurrentShader = trap_R_RegisterShader( "gfx/2d/timer/slice24_current" );',
+	):
+		assert expected in main_source
+
+	for expected in (
+		"if ( item->giType == IT_ARMOR ) {",
+		"if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {",
+		"if ( item->giType == IT_POWERUP ) {",
+		"if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {",
+	):
+		assert expected in uses_block
+
+	for expected in (
+		"ent->s.time = markerTime;",
+		"ent->s.time2 = respawnDuration;",
+		"G_SetItemRespawnTimerState( ent, level.time, 0 );",
+		"G_SetItemRespawnTimerState( ent, ( respawn > 0 ) ? ent->nextthink : level.time,",
+		"G_SetItemRespawnTimerState( ent, ent->nextthink, (int)( respawn * 1000.0f ) );",
+	):
+		assert expected in game_items_source
+	assert "if ( !ent || !G_ItemUsesRespawnTimer( ent->item ) ) {" in publisher_block
+
+	for expected in (
+		"if ( hiddenItem ) {",
+		"return cgs.media.itemTimerUnknownShader;",
+	):
+		assert expected in icon_block
+
+	assert "durationBuckets = respawnDuration / 5000;" in slices_block
+	assert "respawnDuration = CG_ItemRespawnTimerDuration( item );" in item_block
+	assert "return 120 * 1000;" in duration_block
+
+	for expected in (
+		"if ( !item || !origin || !cg_itemTimers.integer ) {",
+		"alpha = ( 768.0f - distance ) * ( 1.0f / 512.0f );",
+		"CG_ItemRespawnTimerSlices( respawnDuration, &sliceShader, &currentSliceShader, &sliceCount );",
+		"elapsedSlice = ( ( respawnDuration - respawnRemaining ) / 5000 ) + 1;",
+		"CG_DrawItemRespawnTimerSprite( iconShader, timerOrigin, alpha, 180.0f );",
+		"rotation = -( 180 / sliceCount );",
+	):
+		assert expected in timer_block
+
+	for expected in (
+		"if ( CG_ItemUsesRespawnTimer( item ) && es->time > cg.time ) {",
+		"respawnDuration = es->time2;",
+		"respawnRemaining = es->time - cg.time;",
+		"CG_DrawItemRespawnTimer( item, respawnRemaining, respawnDuration, cent->lerpOrigin, 0,",
+		"(qboolean)( ( es->eFlags & EF_NODRAW ) != 0 ) );",
+	):
+		assert expected in item_block
 
 
 def test_cgame_vote_widget_reconstruction_uses_retail_vote_cvar_and_text_paths() -> None:

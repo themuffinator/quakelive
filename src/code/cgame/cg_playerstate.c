@@ -295,20 +295,16 @@ A respawn happened this snapshot
 void CG_Respawn( void ) {
 	// no error decay on player movement
 	cg.thisFrameTeleport = qtrue;
-	cg_crosshairHitFeedbackTime = 0;
-	cg_crosshairHitFeedbackValue = 1;
+	cg.itemPickup = 0;
+	cg.itemPickupTime = 0;
+	cg.itemPickupBlendTime = 0;
+	cg.attackerTime = 0;
 
 	// display weapons available
 	cg.weaponSelectTime = cg.time;
 
 	// prefer the retail primary-weapon list before falling back to the server weapon
 	CG_SelectRespawnWeapon();
-
-	cg.autoActionFired = qfalse;
-	cg.autoActionScreenshotQueued = qfalse;
-	cg.autoActionStatsQueued = qfalse;
-	cg.autoActionScreenshotTime = 0;
-	cg.autoActionStatsTime = 0;
 
 	if ( cgs.gametype == GT_RACE ) {
 		trap_SendClientCommand( "raceinit" );
@@ -521,7 +517,7 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 		//Com_Printf("excellent\n");
 	}
 	if (ps->persistant[PERS_GAUNTLET_FRAG_COUNT] != ops->persistant[PERS_GAUNTLET_FRAG_COUNT]) {
-		if (ops->persistant[PERS_GAUNTLET_FRAG_COUNT] == 1) {
+		if (ps->persistant[PERS_GAUNTLET_FRAG_COUNT] == 1) {
 			sfx = cgs.media.firstHumiliationSound;
 		} else {
 			sfx = cgs.media.humiliationSound;

@@ -390,7 +390,7 @@ void CG_InvulnerabilityJuiced( vec3_t org ) {
 	vec3_t			angles;
 
 	if ( !cgs.media.haveDlcGibs ) {
-		CG_BigExplode( org );
+		CG_DetonateJuicedPlayer( org, qtrue );
 		return;
 	}
 
@@ -648,12 +648,16 @@ static void CG_SpawnBigExplodeTracer( const vec3_t origin, int startTime, int li
 
 /*
 ==================
-CG_SpawnBigExplodeTracers
+CG_SpawnBigExplodeEffects
+
+Retail fuses the death-effect shell and delayed tracer family under one owner.
 ==================
 */
-static void CG_SpawnBigExplodeTracers( const vec3_t origin, qboolean elevatedShell ) {
+static void CG_SpawnBigExplodeEffects( const vec3_t origin, qboolean elevatedShell ) {
 	vec3_t	tracerOrigin;
 	int		i;
+
+	CG_SpawnDeathEffect( origin, elevatedShell );
 
 	for ( i = 0; i < 36; i++ ) {
 		tracerOrigin[0] = origin[0] + crandom() * 16.0f;
@@ -732,20 +736,6 @@ static void CG_LaunchBigExplodeFragments( const vec3_t playerOrigin, qboolean el
 
 		CG_LaunchExplode( origin, velocity, cg_gibSphereModel );
 	}
-}
-
-/*
-==================
-CG_BigExplodeImpl
-==================
-*/
-static void CG_BigExplodeImpl( const vec3_t playerOrigin, qboolean elevatedShell ) {
-	if ( cg_gibSphereModel ) {
-		CG_LaunchBigExplodeFragments( playerOrigin, elevatedShell );
-	}
-
-	CG_SpawnDeathEffect( playerOrigin, elevatedShell );
-	CG_SpawnBigExplodeTracers( playerOrigin, elevatedShell );
 }
 
 /*
@@ -901,6 +891,30 @@ void CG_GibPlayer( vec3_t playerOrigin ) {
 }
 
 /*
+===================
+CG_DetonateJuicedPlayer
+
+Retail shares the juiced detonation wrapper between the event fallback and the
+later invulnerability timeout.
+===================
+*/
+void CG_DetonateJuicedPlayer( const vec3_t playerOrigin, qboolean immediateFallback ) {
+	if ( cgs.media.haveDlcGibs ) {
+		vec3_t	origin;
+
+		VectorCopy( playerOrigin, origin );
+		CG_GibPlayer( origin );
+		return;
+	}
+
+	if ( cg_gibSphereModel ) {
+		CG_LaunchBigExplodeFragments( playerOrigin, !immediateFallback );
+	}
+
+	CG_SpawnBigExplodeEffects( playerOrigin, !immediateFallback );
+}
+
+/*
 ==================
 CG_LaunchExplode
 ==================
@@ -924,7 +938,11 @@ Retail no-DLC gib fallback using sphere fragments and the death-effect sprite.
 ===================
 */
 void CG_BigExplode( vec3_t playerOrigin ) {
-	CG_BigExplodeImpl( playerOrigin, qfalse );
+	if ( cg_gibSphereModel ) {
+		CG_LaunchBigExplodeFragments( playerOrigin, qfalse );
+	}
+
+	CG_SpawnBigExplodeEffects( playerOrigin, qfalse );
 }
 
 /*
@@ -935,6 +953,10 @@ Retail invulnerability fallback keeps the deathEffect/tracer shell elevated.
 ===================
 */
 void CG_BigExplodeJuiced( vec3_t playerOrigin ) {
-	CG_BigExplodeImpl( playerOrigin, qtrue );
+	if ( cg_gibSphereModel ) {
+		CG_LaunchBigExplodeFragments( playerOrigin, qtrue );
+	}
+
+	CG_SpawnBigExplodeEffects( playerOrigin, qtrue );
 }
 

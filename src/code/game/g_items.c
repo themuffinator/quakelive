@@ -405,6 +405,59 @@ static void G_SetPowerupPOITime( gentity_t *ent, int markerTime ) {
 
 /*
 =============
+G_ItemUsesRespawnTimer
+
+Returns qtrue when the item mirrors retail respawn-timer transport through
+entityState_t time fields.
+=============
+*/
+static qboolean G_ItemUsesRespawnTimer( const gitem_t *item ) {
+	if ( !item ) {
+		return qfalse;
+	}
+
+	if ( item->giType == IT_ARMOR ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_POWERUP ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+G_SetItemRespawnTimerState
+
+Publishes the retail respawn deadline and duration consumed by cgame's world
+item timer helper.
+=============
+*/
+static void G_SetItemRespawnTimerState( gentity_t *ent, int markerTime, int respawnDuration ) {
+	if ( !ent || !G_ItemUsesRespawnTimer( ent->item ) ) {
+		return;
+	}
+
+	if ( respawnDuration < 0 ) {
+		respawnDuration = 0;
+	}
+
+	ent->s.time = markerTime;
+	ent->s.time2 = respawnDuration;
+}
+
+/*
+=============
 G_ShouldUseDroppedHealthCount
 
 Returns qtrue when a dropped health pickup should use its stored count.
@@ -1623,6 +1676,7 @@ void RespawnItem( gentity_t *ent ) {
 	ent->s.eFlags &= ~EF_NODRAW;
 	ent->r.svFlags &= ~SVF_NOCLIENT;
 	G_SetPowerupPOITime( ent, level.time );
+	G_SetItemRespawnTimerState( ent, level.time, 0 );
 	trap_LinkEntity (ent);
 
 	if ( ent->item->giType == IT_POWERUP ) {
@@ -1998,6 +2052,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		ent->s.eFlags |= EF_NODRAW;
 		ent->r.contents = 0;
 		G_SetPowerupPOITime( ent, level.time );
+		G_SetItemRespawnTimerState( ent, level.time, 0 );
 		ent->unlinkAfterEvent = qtrue;
 		return;
 	}
@@ -2042,6 +2097,8 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		ent->nextthink = level.time + respawn * 1000;
 		ent->think = RespawnItem;
 	}
+	G_SetItemRespawnTimerState( ent, ( respawn > 0 ) ? ent->nextthink : level.time,
+		( respawn > 0 ) ? respawn * 1000 : 0 );
 	if ( ent->item->giType == IT_POWERUP ) {
 		G_SetPowerupPOITime( ent, ( respawn > 0 ) ? ent->nextthink : level.time );
 	}
@@ -2173,6 +2230,8 @@ static gentity_t *LaunchQuadHogItem( gitem_t *item, vec3_t origin, vec3_t veloci
 	G_SetOrigin( dropped, origin );
 	dropped->s.pos.trType = TR_GRAVITY;
 	dropped->s.pos.trTime = level.time;
+	G_SetPowerupPOITime( dropped, level.time );
+	G_SetItemRespawnTimerState( dropped, level.time, 0 );
 	VectorCopy( velocity, dropped->s.pos.trDelta );
 	dropped->s.eFlags |= EF_BOUNCE_HALF;
 	dropped->physicsBounce = 0.50f;
@@ -2506,6 +2565,7 @@ void FinishSpawningItem( gentity_t *ent ) {
 		ent->nextthink = level.time + respawn * 1000;
 		ent->think = RespawnItem;
 		G_SetPowerupPOITime( ent, ent->nextthink );
+		G_SetItemRespawnTimerState( ent, ent->nextthink, (int)( respawn * 1000.0f ) );
 		return;
 	}
 

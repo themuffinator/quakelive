@@ -86,6 +86,17 @@ def test_step_slide_move_call_sites_stop_passing_step_height() -> None:
 	assert pmove_source.count("PM_StepSlideMove( qfalse );") >= 1
 
 
+def test_step_slide_move_keeps_the_configurable_step_helper_private() -> None:
+	slidemove_source = BG_SLIDEMOVE_PATH.read_text(encoding="utf-8")
+	pmove_source = BG_PMOVE_PATH.read_text(encoding="utf-8")
+	local_source = BG_LOCAL_PATH.read_text(encoding="utf-8")
+
+	assert slidemove_source.count("PM_StepSlideMoveWithStepHeight(") == 2
+	assert "static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight ) {" in slidemove_source
+	assert "PM_StepSlideMoveWithStepHeight(" not in pmove_source
+	assert "PM_StepSlideMoveWithStepHeight" not in local_source
+
+
 def test_step_slide_move_rechecks_the_general_step_jump_gate_before_takeoff() -> None:
 	source = BG_SLIDEMOVE_PATH.read_text(encoding="utf-8")
 

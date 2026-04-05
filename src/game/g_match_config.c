@@ -72,7 +72,8 @@ return qtrue;
 =============
 G_MatchConfig_BuildMetadataStrings
 
-Prepares the human-readable factory metadata strings that are sent through configstrings.
+Prepares the human-readable factory metadata strings used by the serverinfo and
+configstring publishers.
 =============
 */
 static void G_MatchConfig_BuildMetadataStrings( char *title, int titleSize, char *flags, int flagsSize ) {
@@ -136,7 +137,8 @@ static void G_MatchConfig_BuildMetadataStrings( char *title, int titleSize, char
 =============
 G_MatchConfig_UpdateConfigstrings
 
-Publishes the cached match factory metadata into configstrings for clients.
+Publishes the cached match factory flag metadata into configstrings for clients.
+The matching title remains serverinfo-backed through g_factoryTitle.
 =============
 */
 void G_MatchConfig_UpdateConfigstrings( void ) {
@@ -145,7 +147,6 @@ void G_MatchConfig_UpdateConfigstrings( void ) {
 
 	G_MatchConfig_BuildMetadataStrings( title, sizeof( title ), flags, sizeof( flags ) );
 
-	trap_SetConfigstring( CS_FACTORY_TITLE, title );
 	trap_SetConfigstring( CS_FACTORY_FLAGS, flags );
 }
 /*

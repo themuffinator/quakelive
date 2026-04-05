@@ -25,7 +25,34 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cg_local.h"
 
 static qhandle_t	cg_screenDamageBlendShader;
-static qboolean	cg_joinGameMenuActive;
+static qboolean		cg_joinGameMenuCaptureActive;
+
+/*
+================
+CG_OpenJoinGameMenu
+
+Ensures the shared retail `joingame_menu` root is visible and interactive.
+================
+*/
+static menuDef_t *CG_OpenJoinGameMenu( void ) {
+	menuDef_t	*menu;
+	int		catcher;
+
+	menu = CG_FindBrowserOverlayByName( "joingame_menu" );
+	if ( !menu ) {
+		return NULL;
+	}
+
+	if ( !( menu->window.flags & WINDOW_VISIBLE ) ) {
+		catcher = trap_Key_GetCatcher();
+		if ( !( catcher & KEYCATCH_CGAME ) ) {
+			trap_Key_SetCatcher( catcher | KEYCATCH_CGAME );
+		}
+		menu = CG_OpenBrowserOverlayByName( "joingame_menu" );
+	}
+
+	return menu;
+}
 
 /*
 ================
@@ -39,11 +66,7 @@ static qhandle_t CG_GetScreenDamageBlendShader( void ) {
 		cg_screenDamageBlendShader = trap_R_RegisterShader( "viewDamageBlend" );
 	}
 
-	if ( cg_screenDamageBlendShader ) {
-		return cg_screenDamageBlendShader;
-	}
-
-	return cgs.media.whiteShader;
+	return cg_screenDamageBlendShader;
 }
 
 /*
@@ -158,13 +181,10 @@ void CG_DamageBlendBlob( void ) {
 	VectorMA( ent.origin, cg.damageX * -8, cg.refdef.viewaxis[1], ent.origin );
 	VectorMA( ent.origin, cg.damageY * 8, cg.refdef.viewaxis[2], ent.origin );
 
-	ent.radius = cg.damageValue * 2.0f * fade;
+	ent.radius = cg.damageValue * 2.0f;
 
 	useColorAlpha = CG_GetScreenDamageColor( color, &alphaScale );
 	CG_SetScreenDamageEntityColor( &ent, color, alphaScale, fade, useColorAlpha );
-	if ( ent.shaderRGBA[3] == 0 ) {
-		return;
-	}
 
 	if ( cgs.media.viewBloodShader ) {
 		ent.customShader = cgs.media.viewBloodShader;
@@ -176,6 +196,39 @@ void CG_DamageBlendBlob( void ) {
 
 /*
 ================
+CG_IsJoinGameMenuCaptureActive
+
+Returns whether the retail spectator join-game capture latch is still armed.
+================
+*/
+qboolean CG_IsJoinGameMenuCaptureActive( void ) {
+	return cg_joinGameMenuCaptureActive;
+}
+
+/*
+================
+CG_ResetJoinGameMenuCaptureState
+
+Re-arms the retail spectator join-game capture latch during cgame resets.
+================
+*/
+void CG_ResetJoinGameMenuCaptureState( void ) {
+	cg_joinGameMenuCaptureActive = qtrue;
+}
+
+/*
+================
+CG_ClearJoinGameMenuCaptureState
+
+Drops the retail spectator join-game capture latch after the overlay closes.
+================
+*/
+static void CG_ClearJoinGameMenuCaptureState( void ) {
+	cg_joinGameMenuCaptureActive = qfalse;
+}
+
+/*
+================
 CG_ShouldDrawJoinGameMenu
 
 Returns qtrue when the retail spectator-only `joingame_menu` overlay should
@@ -183,23 +236,62 @@ be painted through the old screen-damage slot.
 ================
 */
 static qboolean CG_ShouldDrawJoinGameMenu( void ) {
-	if ( !cg.snap || cg.demoPlayback ) {
+	if ( !cg.snap ) {
 		return qfalse;
 	}
 
-	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+	if ( !CG_IsJoinGameMenuCaptureActive() ) {
 		return qfalse;
 	}
 
-	if ( cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR ) {
+	if ( cg.scoreBoardShowing ) {
 		return qfalse;
 	}
 
-	if ( cg.snap->ps.pm_flags & PMF_FOLLOW ) {
-		return qfalse;
+	return ( qboolean )( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
+}
+
+/*
+================
+CG_CloseJoinGameMenu
+
+Closes the retail spectator-only `joingame_menu` root and clears its capture
+latch.
+================
+*/
+void CG_CloseJoinGameMenu( void ) {
+	int		catcher;
+
+	CG_CloseBrowserOverlayByName( "joingame_menu" );
+
+	CG_ClearJoinGameMenuCaptureState();
+	cgs.capturedItem = NULL;
+	cgs.activeCursor = 0;
+
+	catcher = trap_Key_GetCatcher();
+	if ( catcher & KEYCATCH_CGAME ) {
+		trap_Key_SetCatcher( catcher & ~KEYCATCH_CGAME );
+	}
+}
+
+/*
+================
+CG_DrawPregameJoinGameMenu
+
+Paints the retail intro/placement overlay through the shared `joingame_menu`
+root during SP intermission.
+================
+*/
+void CG_DrawPregameJoinGameMenu( void ) {
+	menuDef_t	*menu;
+
+	menu = CG_OpenJoinGameMenu();
+	if ( !menu ) {
+		return;
 	}
 
-	return qtrue;
+	menu->window.flags &= ~WINDOW_FORCED;
+	CG_DrawBrowserOverlayTree( menu, qtrue );
 }
 
 /*
@@ -212,34 +304,17 @@ capture state once the local client stops spectating.
 */
 void CG_DrawJoinGameMenu( void ) {
 	menuDef_t	*menu;
-	int		catcher;
 
 	if ( !CG_ShouldDrawJoinGameMenu() ) {
-		if ( cg_joinGameMenuActive ) {
-			cg_joinGameMenuActive = qfalse;
-			cgs.capturedItem = NULL;
-			cgs.activeCursor = 0;
-			CG_EventHandling( CGAME_EVENT_NONE );
-
-			catcher = trap_Key_GetCatcher();
-			if ( catcher & KEYCATCH_CGAME ) {
-				trap_Key_SetCatcher( catcher & ~KEYCATCH_CGAME );
-			}
-		}
+		CG_CloseJoinGameMenu();
 		return;
 	}
 
-	menu = Menus_FindByName( "joingame_menu" );
+	menu = CG_OpenJoinGameMenu();
 	if ( !menu ) {
 		return;
 	}
 
-	catcher = trap_Key_GetCatcher();
-	if ( !( catcher & KEYCATCH_CGAME ) ) {
-		trap_Key_SetCatcher( catcher | KEYCATCH_CGAME );
-	}
-
 	menu->window.flags &= ~WINDOW_FORCED;
-	Menu_Paint( menu, qtrue );
-	cg_joinGameMenuActive = qtrue;
+	CG_DrawBrowserOverlayTree( menu, qtrue );
 }

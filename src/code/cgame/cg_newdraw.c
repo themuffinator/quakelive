@@ -49,10 +49,74 @@ typedef struct cgServerSettingsWeaponIcon_s {
 static const char *CG_ResolveWeaponName( int weapon );
 static void CG_ParseActiveVoteCommand( char *command, size_t commandSize, char *argument, size_t argumentSize );
 static void CG_DrawVoteShot(rectDef_t *rect, int slot);
-static void CG_MenuScript_OpenScoreboard( void );
 static void CG_AlignTextX( float *x, const char *text, float scale, int align );
 static float CG_AlignTextInRectX( const rectDef_t *rect, float scale, const char *text, int align );
 static void CG_Text_Paint_Limit( float *maxX, float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit );
+
+void Menus_HandleOOBClick( menuDef_t *menu, int key, qboolean down );
+int Menu_ItemsMatchingGroup( menuDef_t *menu, const char *name );
+itemDef_t *Menu_GetMatchingItemByNumber( menuDef_t *menu, int index, const char *name );
+itemDef_t *Menu_FindItemByName( menuDef_t *menu, const char *p );
+itemDef_t *Menu_ClearFocus( menuDef_t *menu );
+void Item_ValidateTypeData( itemDef_t *item );
+void Window_Paint( Window *w, float fadeAmount, float fadeClamp, float fadeCycle );
+void Item_Paint( itemDef_t *item );
+void Item_SetMouseOver( itemDef_t *item, qboolean focus );
+void Item_RunScript( itemDef_t *item, const char *s );
+qboolean Item_EnableShowViaCvar( itemDef_t *item, int flag );
+qboolean Item_HandleKey( itemDef_t *item, int key, qboolean down );
+int Item_ListBox_MaxScroll( itemDef_t *item );
+int Item_ListBox_ThumbPosition( itemDef_t *item );
+int Item_ListBox_ThumbDrawPosition( itemDef_t *item );
+int Item_ListBox_OverLB( itemDef_t *item, float x, float y );
+qboolean Item_ListBox_HandleKey( itemDef_t *item, int key, qboolean down, qboolean force );
+void Item_ListBox_MouseEnter( itemDef_t *item, float x, float y );
+qboolean Item_TextField_HandleKey( itemDef_t *item, int key );
+qboolean Item_YesNo_HandleKey( itemDef_t *item, int key );
+int Item_Multi_FindCvarByValue( itemDef_t *item );
+const char *Item_Multi_Setting( itemDef_t *item );
+qboolean Item_Multi_HandleKey( itemDef_t *item, int key );
+const char *Item_PresetList_Setting( itemDef_t *item );
+int Item_PresetList_FindCvarByValue( itemDef_t *item );
+qboolean Item_PresetList_HandleKey( itemDef_t *item, int key );
+void Controls_GetConfig( void );
+void Controls_SetConfig( qboolean restart );
+int BindingIDFromName( const char *name );
+void BindingFromName( const char *cvar );
+float Item_Slider_ThumbPosition( itemDef_t *item );
+int Item_Slider_OverSlider( itemDef_t *item, float x, float y );
+qboolean Item_Slider_HandleKey( itemDef_t *item, int key, qboolean down );
+void Item_StartCapture( itemDef_t *item, int key );
+qboolean Display_KeyBindPending( void );
+void Item_TextColor( itemDef_t *item, vec4_t *newColor );
+void Item_SetTextExtents( itemDef_t *item, int *width, int *height, const char *text );
+void Item_Text_AutoWrapped_Paint( itemDef_t *item );
+void Item_Text_Wrapped_Paint( itemDef_t *item );
+void Item_Text_Paint( itemDef_t *item );
+void Item_TextField_Paint( itemDef_t *item );
+void Item_YesNo_Paint( itemDef_t *item );
+void Item_Multi_Paint( itemDef_t *item );
+void Item_PresetList_Paint( itemDef_t *item );
+void Item_Slider_Paint( itemDef_t *item );
+void Item_SliderColor_Paint( itemDef_t *item );
+void Item_Bind_Paint( itemDef_t *item );
+qboolean Item_Bind_HandleKey( itemDef_t *item, int key, qboolean down );
+void Item_Model_Paint( itemDef_t *item );
+void Item_ListBox_Paint( itemDef_t *item );
+void Menu_FadeItemByName( menuDef_t *menu, const char *p, qboolean fadeOut );
+void Menu_TransitionItemByName( menuDef_t *menu, const char *p, rectDef_t rectFrom, rectDef_t rectTo, int time, float amt );
+void Menu_OrbitItemByName( menuDef_t *menu, const char *p, float x, float y, float cx, float cy, int time );
+void Menus_Activate( menuDef_t *menu );
+void Script_SetColor( itemDef_t *item, char **args );
+void Script_SetBackground( itemDef_t *item, char **args );
+void Script_SetTeamColor( itemDef_t *item, char **args );
+void Script_SetItemColor( itemDef_t *item, char **args );
+void Script_SetPlayerModel( itemDef_t *item, char **args );
+void Script_SetPlayerHead( itemDef_t *item, char **args );
+void Script_SetCvar( itemDef_t *item, char **args );
+void Script_Exec( itemDef_t *item, char **args );
+void Script_Play( itemDef_t *item, char **args );
+void Script_playLooped( itemDef_t *item, char **args );
 
 #define CG_RACE_CHECKPOINT_HALF_WIDTH 24.0f
 #define CG_RACE_CHECKPOINT_HEIGHT 48.0f
@@ -112,6 +176,49 @@ Returns the plural suffix used by retail endgame summary strings.
 */
 static const char *CG_PluralSuffix( int count ) {
 	return ( count == 1 ) ? "" : "s";
+}
+
+/*
+=============
+CG_FormatMinutesSeconds
+
+Formats a whole-second clock value into the retail `m:ss` ownerdraw string.
+=============
+*/
+static const char *CG_FormatMinutesSeconds( int seconds ) {
+	if ( seconds < 0 ) {
+		seconds = 0;
+	}
+
+	return va( "%i:%i%i", seconds / 60, ( seconds % 60 ) / 10, seconds % 10 );
+}
+
+/*
+=============
+CG_FormatSignedWholeSeconds
+
+Formats a signed millisecond delta into the retail coarse `[-]Ns` string.
+=============
+*/
+static const char *CG_FormatSignedWholeSeconds( int milliseconds ) {
+	unsigned int	absoluteMilliseconds;
+	const char	*signPrefix;
+	int		wholeSeconds;
+
+	signPrefix = "";
+	absoluteMilliseconds = (unsigned int)milliseconds;
+
+	if ( milliseconds < 0 ) {
+		signPrefix = "-";
+		absoluteMilliseconds = (unsigned int)( -( milliseconds + 1 ) ) + 1u;
+	}
+
+	wholeSeconds = (int)( ( absoluteMilliseconds + 500u ) / 1000u );
+	if ( wholeSeconds < 1 ) {
+		wholeSeconds = 1;
+	}
+
+	return va( "%s%1.0fs", signPrefix, (double)wholeSeconds );
 }
 
 static void CG_DrawServerSettings(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
@@ -4299,6 +4406,253 @@ static void CG_DrawProfileModel( rectDef_t *rect, int clientNum, qboolean active
 
 /*
 =============
+CG_ClientPreviewWeapon
+
+Resolves the weapon used by the retail tracked-client preview scene.
+=============
+*/
+static int CG_ClientPreviewWeapon( int clientNum ) {
+	if ( clientNum == cg.clientNum && cg.snap && cg.snap->ps.clientNum == clientNum ) {
+		if ( cg.snap->ps.weapon > WP_NONE && cg.snap->ps.weapon < WP_NUM_WEAPONS ) {
+			return cg.snap->ps.weapon;
+		}
+	}
+
+	if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
+		const centity_t	*cent;
+
+		cent = &cg_entities[clientNum];
+		if ( cent->currentState.weapon > WP_NONE && cent->currentState.weapon < WP_NUM_WEAPONS ) {
+			return cent->currentState.weapon;
+		}
+	}
+
+	return WP_NONE;
+}
+
+/*
+=============
+CG_ClientPreviewTorsoAnimation
+
+Retail uses the alternate torso-attack pose for unarmed or gauntlet previews.
+=============
+*/
+static int CG_ClientPreviewTorsoAnimation( int weapon ) {
+	if ( weapon == WP_NONE || weapon == WP_GAUNTLET ) {
+		return TORSO_ATTACK2;
+	}
+
+	return TORSO_ATTACK;
+}
+
+/*
+=============
+CG_ClientPreviewAnimationFrame
+
+Returns the first frame for a preview animation, falling back to a safe idle
+pose when the requested animation is unavailable.
+=============
+*/
+static int CG_ClientPreviewAnimationFrame( const clientInfo_t *ci, int animationNumber, int fallbackAnimationNumber ) {
+	if ( !ci ) {
+		return 0;
+	}
+
+	if ( animationNumber < 0 || animationNumber >= MAX_TOTALANIMATIONS ||
+		ci->animations[animationNumber].numFrames <= 0 ) {
+		animationNumber = fallbackAnimationNumber;
+		if ( animationNumber < 0 || animationNumber >= MAX_TOTALANIMATIONS ||
+			ci->animations[animationNumber].numFrames <= 0 ) {
+			return 0;
+		}
+	}
+
+	return ci->animations[animationNumber].firstFrame;
+}
+
+/*
+=============
+CG_InitClientPreviewEntity
+
+Initializes the shared render-entity state used by the client preview scene.
+=============
+*/
+static void CG_InitClientPreviewEntity( refEntity_t *ent, const vec3_t origin, int renderfx ) {
+	if ( !ent ) {
+		return;
+	}
+
+	memset( ent, 0, sizeof( *ent ) );
+	VectorCopy( origin, ent->origin );
+	VectorCopy( origin, ent->oldorigin );
+	VectorCopy( origin, ent->lightingOrigin );
+	ent->renderfx = renderfx;
+	ent->shaderRGBA[0] = 255;
+	ent->shaderRGBA[1] = 255;
+	ent->shaderRGBA[2] = 255;
+	ent->shaderRGBA[3] = 255;
+}
+
+/*
+=============
+CG_DrawClientModelPreview
+
+Builds the retail first-place or tracked-player preview scene with the full
+tagged client model, attached weapon, and preview-only lighting.
+=============
+*/
+static void CG_DrawClientModelPreview( rectDef_t *rect, int clientNum, int weaponNum, const vec3_t previewAngles, qboolean active ) {
+	const clientInfo_t	*ci;
+	const weaponInfo_t	*weapon;
+	refdef_t		refdef;
+	refEntity_t		legs;
+	refEntity_t		torso;
+	refEntity_t		head;
+	refEntity_t		gun;
+	refEntity_t		barrel;
+	refEntity_t		ammo;
+	vec3_t			origin;
+	vec3_t			lightOrigin;
+	float			heightScale;
+	float			previewHeight;
+	float			screenDistance;
+	int			renderfx;
+	int			torsoFrame;
+	int			legsFrame;
+
+	if ( !rect ) {
+		return;
+	}
+
+	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+		return;
+	}
+
+	ci = &cgs.clientinfo[clientNum];
+	if ( !ci->infoValid || !ci->legsModel || !ci->torsoModel || !ci->headModel ) {
+		CG_DrawProfileModel( rect, clientNum, active );
+		return;
+	}
+
+	if ( rect->w <= 0.0f || rect->h <= 0.0f ) {
+		return;
+	}
+
+	heightScale = ( ci->headOffset[0] > 0.0f ) ? ci->headOffset[0] : 1.0f;
+	previewHeight = 32.0f;
+	if ( heightScale > 0.0f ) {
+		previewHeight = 32.0f / ( heightScale * 0.85f );
+	}
+
+	memset( &refdef, 0, sizeof( refdef ) );
+	refdef.rdflags = RDF_NOWORLDMODEL;
+	AxisClear( refdef.viewaxis );
+	refdef.x = (int)rect->x;
+	refdef.y = (int)rect->y;
+	refdef.width = (int)rect->w;
+	refdef.height = (int)rect->h;
+	if ( refdef.width <= 0 || refdef.height <= 0 ) {
+		return;
+	}
+
+	refdef.fov_x = (float)refdef.width / 640.0f * 90.0f;
+	screenDistance = refdef.width / tan( DEG2RAD( refdef.fov_x ) * 0.5f );
+	refdef.fov_y = atan2( (float)refdef.height, screenDistance ) * ( 180.0f / (float)M_PI );
+	refdef.time = cg.time;
+
+	origin[0] = ( ( previewHeight + 24.0f ) * 1.1f ) / tan( DEG2RAD( refdef.fov_x ) * 0.5f );
+	origin[1] = 0.0f;
+	origin[2] = ( previewHeight - 24.0f ) * -0.5f;
+
+	renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
+	legsFrame = CG_ClientPreviewAnimationFrame( ci, LEGS_IDLE, TORSO_STAND );
+	torsoFrame = CG_ClientPreviewAnimationFrame( ci, CG_ClientPreviewTorsoAnimation( weaponNum ), TORSO_STAND );
+
+	CG_InitClientPreviewEntity( &legs, origin, renderfx );
+	legs.hModel = ci->legsModel;
+	legs.customSkin = ci->legsSkin;
+	AnglesToAxis( previewAngles, legs.axis );
+	if ( heightScale != 1.0f ) {
+		VectorScale( legs.axis[0], heightScale, legs.axis[0] );
+		VectorScale( legs.axis[1], heightScale, legs.axis[1] );
+		VectorScale( legs.axis[2], heightScale, legs.axis[2] );
+		legs.nonNormalizedAxes = qtrue;
+	}
+	legs.frame = legsFrame;
+	legs.oldframe = legsFrame;
+	trap_R_ClearScene();
+	trap_R_AddRefEntityToScene( &legs );
+
+	CG_InitClientPreviewEntity( &torso, origin, renderfx );
+	torso.hModel = ci->torsoModel;
+	torso.customSkin = ci->torsoSkin;
+	AxisClear( torso.axis );
+	torso.frame = torsoFrame;
+	torso.oldframe = torsoFrame;
+	CG_PositionRotatedEntityOnTag( &torso, &legs, ci->legsModel, "tag_torso" );
+	torso.nonNormalizedAxes = legs.nonNormalizedAxes;
+	trap_R_AddRefEntityToScene( &torso );
+
+	CG_InitClientPreviewEntity( &head, origin, renderfx );
+	head.hModel = ci->headModel;
+	head.customSkin = ci->headSkin;
+	AxisClear( head.axis );
+	CG_PositionRotatedEntityOnTag( &head, &torso, ci->torsoModel, "tag_head" );
+	head.nonNormalizedAxes = torso.nonNormalizedAxes;
+	trap_R_AddRefEntityToScene( &head );
+
+	weapon = NULL;
+	if ( weaponNum > WP_NONE && weaponNum < WP_NUM_WEAPONS ) {
+		CG_RegisterWeapon( weaponNum );
+		weapon = &cg_weapons[weaponNum];
+	}
+
+	if ( weapon && weapon->weaponModel ) {
+		CG_InitClientPreviewEntity( &gun, origin, renderfx );
+		gun.hModel = weapon->weaponModel;
+		AxisClear( gun.axis );
+		CG_PositionEntityOnTag( &gun, &torso, ci->torsoModel, "tag_weapon" );
+		gun.nonNormalizedAxes = torso.nonNormalizedAxes;
+		trap_R_AddRefEntityToScene( &gun );
+
+		if ( weapon->barrelModel ) {
+			vec3_t barrelAngles;
+
+			CG_InitClientPreviewEntity( &barrel, origin, renderfx );
+			barrel.hModel = weapon->barrelModel;
+			VectorSet( barrelAngles, 0.0f, 0.0f, 0.0f );
+			AnglesToAxis( barrelAngles, barrel.axis );
+			CG_PositionRotatedEntityOnTag( &barrel, &gun, weapon->weaponModel, "tag_barrel" );
+			barrel.nonNormalizedAxes = gun.nonNormalizedAxes;
+			trap_R_AddRefEntityToScene( &barrel );
+		}
+
+		if ( weaponNum == WP_GRAPPLING_HOOK && weapon->ammoModel ) {
+			CG_InitClientPreviewEntity( &ammo, origin, renderfx );
+			ammo.hModel = weapon->ammoModel;
+			AxisClear( ammo.axis );
+			CG_PositionRotatedEntityOnTag( &ammo, &gun, weapon->weaponModel, "tag_ammo" );
+			ammo.nonNormalizedAxes = gun.nonNormalizedAxes;
+			trap_R_AddRefEntityToScene( &ammo );
+		}
+	}
+
+	VectorCopy( origin, lightOrigin );
+	lightOrigin[0] -= 100.0f;
+	lightOrigin[1] += 100.0f;
+	lightOrigin[2] += 100.0f;
+	trap_R_AddLightToScene( lightOrigin, 500.0f, 1.0f, 1.0f, 1.0f );
+
+	lightOrigin[0] -= 100.0f;
+	lightOrigin[1] -= 100.0f;
+	lightOrigin[2] -= 100.0f;
+	trap_R_AddLightToScene( lightOrigin, 500.0f, 1.0f, 0.0f, 0.0f );
+
+	trap_R_RenderScene( &refdef );
+}
+
+/*
+=============
 CG_DrawFirstPlaceModel
 
 Draws the first-place player profile image for endgame scoreboards.
@@ -4306,13 +4660,21 @@ Draws the first-place player profile image for endgame scoreboards.
 */
 static void CG_DrawFirstPlaceModel( rectDef_t *rect, qboolean active ) {
 	const score_t		*score;
+	vec3_t			previewAngles;
+	int			weaponNum;
 
 	score = CG_GetActiveScoreByIndex( 0 );
 	if ( !score || score->client < 0 || score->client >= cgs.maxclients ) {
 		return;
 	}
 
-	CG_DrawProfileModel( rect, score->client, active );
+	weaponNum = score->bestWeapon;
+	if ( weaponNum <= WP_NONE || weaponNum >= WP_NUM_WEAPONS ) {
+		weaponNum = CG_ClientPreviewWeapon( score->client );
+	}
+
+	VectorSet( previewAngles, 5.0f, 160.0f, 0.0f );
+	CG_DrawClientModelPreview( rect, score->client, weaponNum, previewAngles, active );
 }
 
 /*
@@ -4323,14 +4685,18 @@ Mirrors the retail player-model ownerdraw wrapper for the tracked/local client.
 =============
 */
 static void CG_DrawPlayerModel( rectDef_t *rect ) {
-	int clientNum;
+	int	clientNum;
+	int	weaponNum;
+	vec3_t	previewAngles;
 
 	clientNum = cg.spectatorTrackedClient;
 	if ( clientNum < 0 && cg.snap ) {
 		clientNum = cg.snap->ps.clientNum;
 	}
 
-	CG_DrawProfileModel( rect, clientNum, qtrue );
+	weaponNum = CG_ClientPreviewWeapon( clientNum );
+	VectorSet( previewAngles, 5.0f, 210.0f, 0.0f );
+	CG_DrawClientModelPreview( rect, clientNum, weaponNum, previewAngles, qtrue );
 }
 
 /*
@@ -4642,7 +5008,7 @@ static void CG_DrawTeamPickupSummaryOwnerDraw( rectDef_t *rect, float scale, vec
 			Com_sprintf( countText, sizeof( countText ), "%i", pickupCount );
 			CG_Text_Paint( drawX + 14.0f, rect->y + 8.0f, scale, color, countText, 0, 0, textStyle );
 			if ( timeHeld > 0 ) {
-				Com_sprintf( timeText, sizeof( timeText ), "%i:%i%i", timeHeld / 60, ( timeHeld % 60 ) / 10, timeHeld % 10 );
+				Q_strncpyz( timeText, CG_FormatMinutesSeconds( timeHeld ), sizeof( timeText ) );
 			} else {
 				Q_strncpyz( timeText, "-", sizeof( timeText ) );
 			}
@@ -4735,7 +5101,7 @@ static qboolean CG_BuildTeamTimeHeldText( int ownerDraw, char *buffer, size_t bu
 		return qfalse;
 	}
 
-	Com_sprintf( buffer, bufferSize, "%i:%i%i", value / 60, ( value % 60 ) / 10, value % 10 );
+	Q_strncpyz( buffer, CG_FormatMinutesSeconds( value ), bufferSize );
 	return qtrue;
 }
 
@@ -4784,6 +5150,38 @@ static const clientInfo_t *CG_GetPlacementClientInfo( const score_t *score ) {
 	}
 
 	return &cgs.clientinfo[score->client];
+}
+
+/*
+=============
+CG_ResolvePlacementMetricOwnerDraw
+
+Maps first/second-place placement ownerdraw ids to a score slot and normalized
+ownerdraw family.
+=============
+*/
+static qboolean CG_ResolvePlacementMetricOwnerDraw( int ownerDraw, int *slot, int *normalized ) {
+	int	resolvedSlot;
+	int	resolvedOwnerDraw;
+
+	resolvedSlot = -1;
+	resolvedOwnerDraw = ownerDraw;
+
+	if ( ownerDraw >= CG_1ST_PLYR_READY && ownerDraw <= CG_1ST_PLYR_TIER ) {
+		resolvedSlot = 0;
+	} else if ( ownerDraw >= CG_2ND_PLYR_READY && ownerDraw <= CG_2ND_PLYR_TIER ) {
+		resolvedSlot = 1;
+		resolvedOwnerDraw = ownerDraw - ( CG_2ND_PLYR - CG_1ST_PLYR );
+	}
+
+	if ( slot ) {
+		*slot = resolvedSlot;
+	}
+	if ( normalized ) {
+		*normalized = resolvedOwnerDraw;
+	}
+
+	return ( resolvedSlot >= 0 ) ? qtrue : qfalse;
 }
 
 /*
@@ -5104,6 +5502,96 @@ static qboolean CG_ClientReadyOnIntermission( int clientNum ) {
 
 /*
 =============
+CG_BuildSpectatorStatusText
+
+Builds the retail duel scorebox status text and tint for the requested slot.
+=============
+*/
+static qboolean CG_BuildSpectatorStatusText( int slot, char *buffer, size_t bufferSize, vec4_t color ) {
+	const score_t	*score;
+	qboolean	liveDuel;
+
+	if ( !buffer || bufferSize <= 0 || !color ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	score = CG_SpectatorClientScore( slot );
+	if ( !score ) {
+		return qfalse;
+	}
+
+	liveDuel = ( cgs.gametype == GT_TOURNAMENT && cg.snap && cg.snap->ps.pm_type != PM_INTERMISSION ) ? qtrue : qfalse;
+	if ( liveDuel ) {
+		if ( cgs.scores1 == cgs.scores2 ) {
+			Q_strncpyz( buffer, "TIED", bufferSize );
+			Vector4Set( color, 1.0f, 1.0f, 1.0f, 1.0f );
+		} else if ( ( slot == 0 && cgs.scores1 > cgs.scores2 ) || ( slot == 1 && cgs.scores2 > cgs.scores1 ) ) {
+			Q_strncpyz( buffer, "LEADS", bufferSize );
+			Vector4Set( color, 0.55f, 0.9f, 0.55f, 1.0f );
+		} else {
+			Q_strncpyz( buffer, "TRAILS", bufferSize );
+			Vector4Set( color, 1.0f, 0.45f, 0.45f, 1.0f );
+		}
+
+		return qtrue;
+	}
+
+	if ( CG_ClientReadyOnIntermission( score->client ) ) {
+		Q_strncpyz( buffer, "READY", bufferSize );
+		Vector4Set( color, 0.55f, 0.9f, 0.55f, 1.0f );
+	} else {
+		Q_strncpyz( buffer, "NOT READY", bufferSize );
+		Vector4Set( color, 0.8f, 0.8f, 0.8f, 1.0f );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_DrawSpectatorStatusLabel
+
+Paints the retail duel scorebox status label for the requested tracked slot.
+=============
+*/
+static void CG_DrawSpectatorStatusLabel( rectDef_t *rect, int slot ) {
+	char	buffer[16];
+	vec4_t	color;
+	float	x;
+
+	if ( !rect || !CG_BuildSpectatorStatusText( slot, buffer, sizeof( buffer ), color ) ) {
+		return;
+	}
+
+	x = rect->x + ( rect->w - CG_Text_Width( buffer, 0.16f, 0 ) ) * 0.5f;
+	CG_Text_Paint( x, rect->y + rect->h, 0.16f, color, buffer, 0, 0, 3 );
+}
+
+/*
+=============
+CG_DrawSpectatorPrimaryStatus
+
+Draws the retail primary duel scorebox status label.
+=============
+*/
+static void CG_DrawSpectatorPrimaryStatus( rectDef_t *rect ) {
+	CG_DrawSpectatorStatusLabel( rect, 0 );
+}
+
+/*
+=============
+CG_DrawSpectatorSecondaryStatus
+
+Draws the retail secondary duel scorebox status label.
+=============
+*/
+static void CG_DrawSpectatorSecondaryStatus( rectDef_t *rect ) {
+	CG_DrawSpectatorStatusLabel( rect, 1 );
+}
+
+/*
+=============
 CG_BuildPlacementMetricText
 
 Builds a text payload for first/second place metric ownerdraws.
@@ -5124,8 +5612,7 @@ static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score
 	case CG_1ST_PLYR_HEALTH_ARMOR:
 		return qfalse;
 	case CG_1ST_PLYR_READY:
-		Q_strncpyz( buffer, CG_ClientReadyOnIntermission( score->client ) ? "Ready" : "-", bufferSize );
-		return qtrue;
+		return qfalse;
 	case CG_1ST_PLYR_FRAGS:
 		Com_sprintf( buffer, bufferSize, "%i", CG_GetPlacementFragCount( score ) );
 		return qtrue;
@@ -5183,6 +5670,39 @@ static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score
 	}
 
 	return qfalse;
+}
+
+/*
+=============
+CG_DrawPlacementMetricTextOwnerDraw
+
+Paints a retail placement metric ownerdraw through the shared scorebox text
+builder.
+=============
+*/
+static qboolean CG_DrawPlacementMetricTextOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	const score_t		*score;
+	const clientInfo_t	*ci;
+	char			buffer[64];
+	int			normalized;
+	int			slot;
+
+	if ( !CG_ResolvePlacementMetricOwnerDraw( ownerDraw, &slot, &normalized ) ) {
+		return qfalse;
+	}
+
+	score = CG_GetPlacementScore( slot );
+	ci = CG_GetPlacementClientInfo( score );
+	if ( !score || !ci ) {
+		return qfalse;
+	}
+
+	if ( !CG_BuildPlacementMetricText( normalized, score, ci, buffer, sizeof( buffer ) ) ) {
+		return qfalse;
+	}
+
+	CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
+	return qtrue;
 }
 
 /*
@@ -5273,29 +5793,219 @@ static qboolean CG_DrawPlacementWinsOwnerDraw( rectDef_t *rect, float scale, vec
 
 /*
 =============
+CG_DrawPlacementPingOwnerDraw
+
+Draws the retail first/second placement ping ownerdraw with the recovered ping
+warning color thresholds.
+=============
+*/
+static void CG_DrawPlacementPingOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	const score_t	*score;
+	vec4_t		drawColor;
+	int		slot;
+
+	if ( !CG_ResolvePlacementMetricOwnerDraw( ownerDraw, &slot, NULL ) ) {
+		return;
+	}
+
+	score = CG_GetPlacementScore( slot );
+	if ( !score ) {
+		return;
+	}
+
+	Vector4Copy( color, drawColor );
+	if ( score->ping >= 80 ) {
+		drawColor[0] = 1.0f;
+		drawColor[1] = 0.2f;
+		drawColor[2] = 0.2f;
+	} else if ( score->ping >= 40 ) {
+		drawColor[0] = 1.0f;
+		drawColor[1] = 0.85f;
+		drawColor[2] = 0.2f;
+	}
+
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, drawColor, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementAccuracyOwnerDraw
+
+Draws the retail first/second placement accuracy ownerdraw.
+=============
+*/
+static void CG_DrawPlacementAccuracyOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementWeaponFragsOwnerDraw
+
+Draws the retail first/second placement per-weapon frag ownerdraws.
+=============
+*/
+static void CG_DrawPlacementWeaponFragsOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementWeaponHitsOwnerDraw
+
+Draws the retail first/second placement per-weapon hit ownerdraws.
+=============
+*/
+static void CG_DrawPlacementWeaponHitsOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementWeaponShotsOwnerDraw
+
+Draws the retail first/second placement per-weapon shot ownerdraws.
+=============
+*/
+static void CG_DrawPlacementWeaponShotsOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementWeaponDamageOwnerDraw
+
+Draws the retail first/second placement per-weapon damage ownerdraws.
+=============
+*/
+static void CG_DrawPlacementWeaponDamageOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementWeaponAccuracyOwnerDraw
+
+Draws the retail first/second placement per-weapon accuracy ownerdraws.
+=============
+*/
+static void CG_DrawPlacementWeaponAccuracyOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementPickupCountOwnerDraw
+
+Draws the retail first/second placement pickup-count ownerdraw family.
+=============
+*/
+static void CG_DrawPlacementPickupCountOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementPickupAverageOwnerDraw
+
+Draws the retail first/second placement pickup-average ownerdraw family.
+=============
+*/
+static void CG_DrawPlacementPickupAverageOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
+CG_DrawPlacementAwardCountOwnerDraw
+
+Draws the retail first/second placement medal-count ownerdraw family.
+=============
+*/
+static void CG_DrawPlacementAwardCountOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
+	(void)CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+}
+
+/*
+=============
 CG_DrawPlacementMetricOwnerDraw
 
 Renders first/second place metric ownerdraws from available scoreboard fields.
 =============
 */
 static qboolean CG_DrawPlacementMetricOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
-	const score_t		*score;
-	const clientInfo_t	*ci;
-	char			buffer[64];
 	int			normalized;
 	int			slot;
 
-	slot = -1;
-	normalized = ownerDraw;
-
-	if ( ownerDraw >= CG_1ST_PLYR_READY && ownerDraw <= CG_1ST_PLYR_TIER ) {
-		slot = 0;
-	} else if ( ownerDraw >= CG_2ND_PLYR_READY && ownerDraw <= CG_2ND_PLYR_TIER ) {
-		slot = 1;
-		normalized = ownerDraw - ( CG_2ND_PLYR - CG_1ST_PLYR );
+	if ( ownerDraw == CG_1ST_PLYR_READY ) {
+		CG_DrawSpectatorPrimaryStatus( rect );
+		return qtrue;
 	}
 
-	if ( slot < 0 ) {
+	if ( ownerDraw == CG_2ND_PLYR_READY ) {
+		CG_DrawSpectatorSecondaryStatus( rect );
+		return qtrue;
+	}
+
+	if ( ownerDraw == CG_1ST_PLYR_PING || ownerDraw == CG_2ND_PLYR_PING ) {
+		CG_DrawPlacementPingOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ownerDraw == CG_1ST_PLYR_ACC || ownerDraw == CG_2ND_PLYR_ACC ) {
+		CG_DrawPlacementAccuracyOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_FRAGS_G && ownerDraw <= CG_1ST_PLYR_FRAGS_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_FRAGS_G && ownerDraw <= CG_2ND_PLYR_FRAGS_HMG ) ) {
+		CG_DrawPlacementWeaponFragsOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_HITS_MG && ownerDraw <= CG_1ST_PLYR_HITS_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_HITS_MG && ownerDraw <= CG_2ND_PLYR_HITS_HMG ) ) {
+		CG_DrawPlacementWeaponHitsOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_SHOTS_MG && ownerDraw <= CG_1ST_PLYR_SHOTS_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_SHOTS_MG && ownerDraw <= CG_2ND_PLYR_SHOTS_HMG ) ) {
+		CG_DrawPlacementWeaponShotsOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_DMG_G && ownerDraw <= CG_1ST_PLYR_DMG_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_DMG_G && ownerDraw <= CG_2ND_PLYR_DMG_HMG ) ) {
+		CG_DrawPlacementWeaponDamageOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_ACC_MG && ownerDraw <= CG_1ST_PLYR_ACC_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_ACC_MG && ownerDraw <= CG_2ND_PLYR_ACC_HMG ) ) {
+		CG_DrawPlacementWeaponAccuracyOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_PICKUPS && ownerDraw <= CG_1ST_PLYR_PICKUPS_MH ) ||
+		( ownerDraw >= CG_2ND_PLYR_PICKUPS && ownerDraw <= CG_2ND_PLYR_PICKUPS_MH ) ) {
+		CG_DrawPlacementPickupCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && ownerDraw <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH ) ||
+		( ownerDraw >= CG_2ND_PLYR_AVG_PICKUP_TIME_RA && ownerDraw <= CG_2ND_PLYR_AVG_PICKUP_TIME_MH ) ) {
+		CG_DrawPlacementPickupAverageOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_EXCELLENT && ownerDraw <= CG_1ST_PLYR_HUMILIATION ) ||
+		( ownerDraw >= CG_2ND_PLYR_EXCELLENT && ownerDraw <= CG_2ND_PLYR_HUMILIATION ) ) {
+		CG_DrawPlacementAwardCountOwnerDraw( rect, scale, color, textStyle, ownerDraw );
+		return qtrue;
+	}
+
+	if ( !CG_ResolvePlacementMetricOwnerDraw( ownerDraw, &slot, &normalized ) ) {
 		return qfalse;
 	}
 
@@ -5315,18 +6025,7 @@ static qboolean CG_DrawPlacementMetricOwnerDraw( rectDef_t *rect, float scale, v
 		break;
 	}
 
-	score = CG_GetPlacementScore( slot );
-	ci = CG_GetPlacementClientInfo( score );
-	if ( !score || !ci ) {
-		return qfalse;
-	}
-
-	if ( !CG_BuildPlacementMetricText( normalized, score, ci, buffer, sizeof( buffer ) ) ) {
-		return qfalse;
-	}
-
-	CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
-	return qtrue;
+	return CG_DrawPlacementMetricTextOwnerDraw( rect, scale, color, textStyle, ownerDraw );
 }
 
 /*
@@ -6027,7 +6726,7 @@ static void CG_DrawLevelTimer(rectDef_t *rect, float scale, vec4_t color, int te
 		seconds = 0;
 	}
 
-	Com_sprintf( buffer, sizeof( buffer ), "%i:%i%i", seconds / 60, ( seconds % 60 ) / 10, seconds % 10 );
+	Q_strncpyz( buffer, CG_FormatMinutesSeconds( seconds ), sizeof( buffer ) );
 	width = CG_Text_Width( buffer, scale, 0 );
 	x = rect->x + ( rect->w - width ) * 0.5f;
 	CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
@@ -6059,7 +6758,7 @@ static void CG_DrawRoundTimer(rectDef_t *rect, float scale, vec4_t color, int te
 		seconds = 0;
 	}
 
-	Com_sprintf( buffer, sizeof( buffer ), "%i:%i%i", seconds / 60, ( seconds % 60 ) / 10, seconds % 10 );
+	Q_strncpyz( buffer, CG_FormatMinutesSeconds( seconds ), sizeof( buffer ) );
 	width = CG_Text_Width( buffer, scale, 0 );
 	x = rect->x + ( rect->w - width ) * 0.5f;
 	CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
@@ -6987,6 +7686,29 @@ static void CG_DrawTeamScore( rectDef_t *rect, float scale, vec4_t color, int te
 	CG_TranslateHudRectForWidescreen( rect, &widescreenRect );
 	x = CG_AlignTextInRectX( &widescreenRect, scale, buffer, align );
 	CG_Text_Paint( x, widescreenRect.y + widescreenRect.h, scale, color, buffer, 0, 0, textStyle );
+}
+
+/*
+=============
+CG_DrawScoreValue
+
+Restores the retail wrapper over the local and team score ownerdraw slots.
+=============
+*/
+static void CG_DrawScoreValue( rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle, int ownerDraw ) {
+	switch ( ownerDraw ) {
+	case CG_PLAYER_SCORE:
+		CG_DrawPlayerScore( rect, scale, color, shader, textStyle );
+		return;
+	case CG_RED_SCORE:
+		CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_RED, ITEM_ALIGN_CENTER );
+		return;
+	case CG_BLUE_SCORE:
+		CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_BLUE, ITEM_ALIGN_CENTER );
+		return;
+	default:
+		return;
+	}
 }
 
 /*
@@ -8856,7 +9578,7 @@ rect.y = y;
 		CG_DrawPlayerItem( &rect, scale, ownerDrawFlags & CG_SHOW_2DONLY );
 		break;
 	case CG_PLAYER_SCORE:
-		CG_DrawPlayerScore( &rect, scale, color, shader, textStyle );
+		CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );
 		break;
 	case CG_PLAYER_HEALTH:
 		CG_DrawPlayerHealth( &rect, scale, color, shader, textStyle );
@@ -8868,10 +9590,10 @@ rect.y = y;
 		CG_DrawPlayerHealthBar200( &rect, shader );
 		break;
   case CG_RED_SCORE:
-		CG_DrawTeamScore( &rect, scale, color, textStyle, TEAM_RED, align );
+		CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );
 		break;
   case CG_BLUE_SCORE:
-		CG_DrawTeamScore( &rect, scale, color, textStyle, TEAM_BLUE, align );
+		CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );
 		break;
   case CG_RED_PLAYER_COUNT:
 		CG_DrawTeamPlayerCount(&rect, scale, color, textStyle, TEAM_RED, align);
@@ -9228,35 +9950,1755 @@ static int CG_BrowserDisplayCursorType( int x, int y ) {
 
 /*
 =============
+CG_BrowserHandleMouseMove
+
+Routes retail browser mouse motion through one focused overlay root.
+=============
+*/
+static void CG_BrowserHandleMouseMove( void *overlay, float x, float y ) {
+	Menu_HandleMouseMove( (menuDef_t *)overlay, x, y );
+}
+
+/*
+=============
 CG_BrowserDisplayMouseMove
 
 Routes browser mouse motion through the shared display runtime.
 =============
 */
 static qboolean CG_BrowserDisplayMouseMove( void *overlay, int x, int y ) {
+	if ( overlay != NULL ) {
+		CG_BrowserHandleMouseMove( overlay, (float)x, (float)y );
+		return qtrue;
+	}
+
 	return Display_MouseMove( overlay, x, y );
-}
-
-/*
-=============
-CG_BrowserDisplayHandleKey
-
-Routes browser key handling through the shared display runtime.
-=============
-*/
-static void CG_BrowserDisplayHandleKey( int key, qboolean down, int x, int y ) {
-	Display_HandleKey( key, down, x, y );
 }
 
 /*
 =============
 CG_BrowserDisplayCaptureItem
 
-Routes browser capture hit-testing through the shared display runtime.
+Routes browser key dispatch through the retail display capture hit test before
+falling back to the focused overlay root.
 =============
 */
 static void *CG_BrowserDisplayCaptureItem( int x, int y ) {
 	return Display_CaptureItem( x, y );
+}
+
+/*
+=============
+CG_AllocBrowserWidgetState
+
+Ensures the retail browser widget owns the shared type-data slab needed by the
+draw and input helpers.
+=============
+*/
+static void CG_AllocBrowserWidgetState( void *widget ) {
+	if ( widget == NULL ) {
+		return;
+	}
+
+	Item_ValidateTypeData( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserListMaxScroll
+
+Routes retail browser list max-scroll queries through the shared list-box helper.
+=============
+*/
+static int CG_BrowserListMaxScroll( void *widget ) {
+	return Item_ListBox_MaxScroll( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserListThumbPosition
+
+Routes retail browser list thumb-position queries through the shared list-box helper.
+=============
+*/
+static int CG_BrowserListThumbPosition( void *widget ) {
+	return Item_ListBox_ThumbPosition( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserListThumbDrawPosition
+
+Routes retail browser list drag-position queries through the shared list-box helper.
+=============
+*/
+static int CG_BrowserListThumbDrawPosition( void *widget ) {
+	return Item_ListBox_ThumbDrawPosition( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserListOverLB
+
+Routes retail browser list hit tests through the shared list-box helper.
+=============
+*/
+static int CG_BrowserListOverLB( void *widget, float x, float y ) {
+	return Item_ListBox_OverLB( (itemDef_t *)widget, x, y );
+}
+
+/*
+=============
+CG_BrowserTextFieldHandleKey
+
+Routes retail browser edit-field key handling through the shared text-field helper.
+=============
+*/
+static qboolean CG_BrowserTextFieldHandleKey( void *widget, int key ) {
+	return Item_TextField_HandleKey( (itemDef_t *)widget, key );
+}
+
+/*
+=============
+CG_BrowserScriptFadeIn
+
+Runs the retail browser `fadein` verb through the shared fade helper.
+=============
+*/
+static void CG_BrowserScriptFadeIn( void *widget, char **args ) {
+	const char	*name;
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return;
+	}
+
+	if ( String_Parse( args, &name ) ) {
+		Menu_FadeItemByName( (menuDef_t *)item->parent, name, qfalse );
+	}
+}
+
+/*
+=============
+CG_BrowserScriptFadeOut
+
+Runs the retail browser `fadeout` verb through the shared fade helper.
+=============
+*/
+static void CG_BrowserScriptFadeOut( void *widget, char **args ) {
+	const char	*name;
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return;
+	}
+
+	if ( String_Parse( args, &name ) ) {
+		Menu_FadeItemByName( (menuDef_t *)item->parent, name, qtrue );
+	}
+}
+
+/*
+=============
+CG_BrowserScriptSetBackground
+
+Runs the retail browser `setbackground` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptSetBackground( void *widget, char **args ) {
+	Script_SetBackground( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserScriptSetColor
+
+Runs the retail browser `setcolor` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptSetColor( void *widget, char **args ) {
+	Script_SetColor( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserScriptSetTeamColor
+
+Runs the retail browser `setteamcolor` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptSetTeamColor( void *widget, char **args ) {
+	Script_SetTeamColor( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserScriptSetItemColor
+
+Runs the retail browser `setitemcolor` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptSetItemColor( void *widget, char **args ) {
+	Script_SetItemColor( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_TransitionBrowserItemsByName
+
+Routes retail browser transition requests through the shared grouped-item helper.
+=============
+*/
+static void CG_TransitionBrowserItemsByName( void *overlay, const char *name, rectDef_t rectFrom, rectDef_t rectTo, int time, float amount ) {
+	Menu_TransitionItemByName( (menuDef_t *)overlay, name, rectFrom, rectTo, time, amount );
+}
+
+/*
+=============
+CG_BrowserScriptTransition
+
+Runs the retail browser `transition` verb through the cgame-owned grouped-item wrapper.
+=============
+*/
+static void CG_BrowserScriptTransition( void *widget, char **args ) {
+	const char	*name;
+	rectDef_t	rectFrom;
+	rectDef_t	rectTo;
+	int		time;
+	float		amount;
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return;
+	}
+
+	if ( String_Parse( args, &name ) &&
+		Rect_Parse( args, &rectFrom ) &&
+		Rect_Parse( args, &rectTo ) &&
+		Int_Parse( args, &time ) &&
+		Float_Parse( args, &amount ) ) {
+		CG_TransitionBrowserItemsByName( item->parent, name, rectFrom, rectTo, time, amount );
+	}
+}
+
+/*
+=============
+CG_OrbitBrowserItemsByName
+
+Routes retail browser orbit requests through the shared grouped-item helper.
+=============
+*/
+static void CG_OrbitBrowserItemsByName( void *overlay, const char *name, float x, float y, float cx, float cy, int time ) {
+	Menu_OrbitItemByName( (menuDef_t *)overlay, name, x, y, cx, cy, time );
+}
+
+/*
+=============
+CG_BrowserScriptOrbit
+
+Runs the retail browser `orbit` verb through the cgame-owned grouped-item wrapper.
+=============
+*/
+static void CG_BrowserScriptOrbit( void *widget, char **args ) {
+	const char	*name;
+	float		x;
+	float		y;
+	float		cx;
+	float		cy;
+	int		time;
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return;
+	}
+
+	if ( String_Parse( args, &name ) &&
+		Float_Parse( args, &x ) &&
+		Float_Parse( args, &y ) &&
+		Float_Parse( args, &cx ) &&
+		Float_Parse( args, &cy ) &&
+		Int_Parse( args, &time ) ) {
+		CG_OrbitBrowserItemsByName( item->parent, name, x, y, cx, cy, time );
+	}
+}
+
+/*
+=============
+CG_BrowserScriptActivateAdvert
+
+Runs the retail browser advert-activation verb through the cgame display context.
+=============
+*/
+static void CG_BrowserScriptActivateAdvert( void *widget, char **args ) {
+	const char	*cellIdToken;
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( !String_Parse( args, &cellIdToken ) ) {
+		return;
+	}
+
+	if ( cgDC.activateAdvert ) {
+		cgDC.activateAdvert( atoi( cellIdToken ) );
+	}
+
+	if ( item ) {
+		item->window.flags &= ~WINDOW_HASFOCUS;
+	}
+}
+
+/*
+=============
+CG_BrowserScriptSetPlayerModel
+
+Runs the retail browser `setplayermodel` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptSetPlayerModel( void *widget, char **args ) {
+	Script_SetPlayerModel( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserScriptSetPlayerHead
+
+Runs the retail browser `setplayerhead` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptSetPlayerHead( void *widget, char **args ) {
+	Script_SetPlayerHead( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserScriptSetCvar
+
+Runs the retail browser `setcvar` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptSetCvar( void *widget, char **args ) {
+	Script_SetCvar( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserScriptExec
+
+Runs the retail browser `exec` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptExec( void *widget, char **args ) {
+	Script_Exec( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserScriptPlay
+
+Runs the retail browser `play` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptPlay( void *widget, char **args ) {
+	Script_Play( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserScriptPlayLooped
+
+Runs the retail browser `playlooped` verb through the shared script helper.
+=============
+*/
+static void CG_BrowserScriptPlayLooped( void *widget, char **args ) {
+	Script_playLooped( (itemDef_t *)widget, args );
+}
+
+/*
+=============
+CG_BrowserMultiFindCvarByValue
+
+Routes retail browser multi-choice cvar resolution through the shared helper.
+=============
+*/
+static int CG_BrowserMultiFindCvarByValue( void *widget ) {
+	return Item_Multi_FindCvarByValue( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserMultiSetting
+
+Routes retail browser multi-choice label resolution through the shared helper.
+=============
+*/
+static const char *CG_BrowserMultiSetting( void *widget ) {
+	return Item_Multi_Setting( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserPresetListSetting
+
+Routes retail browser preset-list label resolution through the shared helper.
+=============
+*/
+static const char *CG_BrowserPresetListSetting( void *widget ) {
+	return Item_PresetList_Setting( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserPresetListFindCvarByValue
+
+Routes retail browser preset-list cvar resolution through the shared helper.
+=============
+*/
+static int CG_BrowserPresetListFindCvarByValue( void *widget ) {
+	return Item_PresetList_FindCvarByValue( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserYesNoControl
+
+Paints one retail browser yes-no control through the shared painter.
+=============
+*/
+static void CG_DrawBrowserYesNoControl( void *widget ) {
+	Item_YesNo_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserMultiControl
+
+Paints one retail browser multi-choice control through the shared painter.
+=============
+*/
+static void CG_DrawBrowserMultiControl( void *widget ) {
+	Item_Multi_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserPresetList
+
+Paints one retail browser preset-list control through the shared painter.
+=============
+*/
+static void CG_DrawBrowserPresetList( void *widget ) {
+	Item_PresetList_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserControlsGetConfig
+
+Routes retail browser binding-cache refreshes through the shared controls helper.
+=============
+*/
+static void CG_BrowserControlsGetConfig( void ) {
+	Controls_GetConfig();
+}
+
+/*
+=============
+CG_BrowserControlsSetConfig
+
+Routes retail browser binding writes through the shared controls helper.
+=============
+*/
+static void CG_BrowserControlsSetConfig( qboolean restart ) {
+	Controls_SetConfig( restart );
+}
+
+/*
+=============
+CG_BrowserBindingIDFromName
+
+Routes retail browser command-binding lookup through the shared controls helper.
+=============
+*/
+static int CG_BrowserBindingIDFromName( const char *name ) {
+	return BindingIDFromName( name );
+}
+
+/*
+=============
+CG_BrowserBindingFromName
+
+Routes retail browser binding-label resolution through the shared controls helper.
+=============
+*/
+static void CG_BrowserBindingFromName( const char *name ) {
+	BindingFromName( name );
+}
+
+/*
+=============
+CG_DrawBrowserBindControl
+
+Paints one retail browser bind control through the shared painter.
+=============
+*/
+static void CG_DrawBrowserBindControl( void *widget ) {
+	Item_Bind_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserBindHandleKey
+
+Routes retail browser bind-control key handling through the shared helper.
+=============
+*/
+static qboolean CG_BrowserBindHandleKey( void *widget, int key, qboolean down ) {
+	return Item_Bind_HandleKey( (itemDef_t *)widget, key, down );
+}
+
+/*
+=============
+CG_BrowserSliderThumbPosition
+
+Routes retail browser slider-thumb positioning through the shared helper.
+=============
+*/
+static float CG_BrowserSliderThumbPosition( void *widget ) {
+	return Item_Slider_ThumbPosition( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserSetTextExtents
+
+Routes retail browser text-extent updates through the shared helper.
+=============
+*/
+static void CG_BrowserSetTextExtents( void *widget, int *width, int *height, const char *text ) {
+	Item_SetTextExtents( (itemDef_t *)widget, width, height, text );
+}
+
+/*
+=============
+CG_DrawBrowserSliderControl
+
+Paints one retail browser slider through the shared painter.
+=============
+*/
+static void CG_DrawBrowserSliderControl( void *widget ) {
+	Item_Slider_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserSliderColorControl
+
+Paints one retail browser color-slider through the shared painter.
+=============
+*/
+static void CG_DrawBrowserSliderColorControl( void *widget ) {
+	Item_SliderColor_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_BrowserTextColor
+
+Routes retail browser text-color resolution through the shared helper.
+=============
+*/
+static void CG_BrowserTextColor( void *widget, vec4_t *newColor ) {
+	Item_TextColor( (itemDef_t *)widget, newColor );
+}
+
+/*
+=============
+CG_DrawBrowserAutoWrappedText
+
+Paints one retail browser auto-wrapped text widget through the shared painter.
+=============
+*/
+static void CG_DrawBrowserAutoWrappedText( void *widget ) {
+	Item_Text_AutoWrapped_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserWrappedText
+
+Paints one retail browser wrapped text widget through the shared painter.
+=============
+*/
+static void CG_DrawBrowserWrappedText( void *widget ) {
+	Item_Text_Wrapped_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserText
+
+Paints one retail browser text widget through the cgame-owned wrapper chain.
+=============
+*/
+static void CG_DrawBrowserText( void *widget ) {
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return;
+	}
+
+	if ( item->window.flags & WINDOW_WRAPPED ) {
+		CG_DrawBrowserWrappedText( item );
+		return;
+	}
+
+	if ( item->window.flags & WINDOW_AUTOWRAPPED ) {
+		CG_DrawBrowserAutoWrappedText( item );
+		return;
+	}
+
+	Item_Text_Paint( item );
+}
+
+/*
+=============
+CG_DrawBrowserEditFieldControl
+
+Paints one retail browser edit-field control through the shared painter.
+=============
+*/
+static void CG_DrawBrowserEditFieldControl( void *widget ) {
+	Item_TextField_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserModelPreview
+
+Paints one retail browser model preview through the shared painter.
+=============
+*/
+static void CG_DrawBrowserModelPreview( void *widget ) {
+	Item_Model_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserListWidget
+
+Paints one retail browser list widget through the shared painter.
+=============
+*/
+static void CG_DrawBrowserListWidget( void *widget ) {
+	Item_ListBox_Paint( (itemDef_t *)widget );
+}
+
+/*
+=============
+CG_DrawBrowserTextField
+
+Paints one retail browser text field through the cgame-owned edit-field wrapper.
+=============
+*/
+static void CG_DrawBrowserTextField( void *widget ) {
+	CG_DrawBrowserEditFieldControl( widget );
+}
+
+/*
+=============
+CG_CloseBrowserWindowCinematic
+
+Stops one active retail browser cinematic window.
+=============
+*/
+static void CG_CloseBrowserWindowCinematic( Window *window ) {
+	if ( window == NULL ) {
+		return;
+	}
+
+	if ( window->style == WINDOW_STYLE_CINEMATIC && window->cinematic >= 0 && cgDC.stopCinematic ) {
+		cgDC.stopCinematic( window->cinematic );
+		window->cinematic = -1;
+	}
+}
+
+/*
+=============
+CG_CloseBrowserMenuCinematics
+
+Stops one retail browser overlay's active cinematics.
+=============
+*/
+static void CG_CloseBrowserMenuCinematics( menuDef_t *menu ) {
+	int	i;
+
+	if ( menu == NULL ) {
+		return;
+	}
+
+	CG_CloseBrowserWindowCinematic( &menu->window );
+	for ( i = 0; i < menu->itemCount; i++ ) {
+		CG_CloseBrowserWindowCinematic( &menu->items[i]->window );
+		if ( menu->items[i]->type == ITEM_TYPE_OWNERDRAW && cgDC.stopCinematic ) {
+			cgDC.stopCinematic( 0 - menu->items[i]->window.ownerDraw );
+		}
+	}
+}
+
+/*
+=============
+CG_CloseBrowserCinematics
+
+Stops active retail browser cinematics through a cgame-owned display pass.
+=============
+*/
+static void CG_CloseBrowserCinematics( void ) {
+	int	i;
+
+	for ( i = 0; i < menuCount; i++ ) {
+		CG_CloseBrowserMenuCinematics( &Menus[i] );
+	}
+}
+
+/*
+=============
+CG_ActivateBrowserOverlay
+
+Activates one retail browser overlay through a cgame-owned wrapper.
+=============
+*/
+void CG_ActivateBrowserOverlay( void *overlay ) {
+	if ( overlay == NULL ) {
+		return;
+	}
+
+	Menus_Activate( (menuDef_t *)overlay );
+}
+
+/*
+=============
+CG_BrowserMultiHandleKey
+
+Routes retail browser multi-choice key handling through the shared helper.
+=============
+*/
+static qboolean CG_BrowserMultiHandleKey( void *widget, int key ) {
+	return Item_Multi_HandleKey( (itemDef_t *)widget, key );
+}
+
+/*
+=============
+CG_BrowserPresetListHandleKey
+
+Routes retail browser preset-list key handling through the shared helper.
+=============
+*/
+static qboolean CG_BrowserPresetListHandleKey( void *widget, int key ) {
+	return Item_PresetList_HandleKey( (itemDef_t *)widget, key );
+}
+
+/*
+=============
+CG_BrowserListRepeatScroll
+
+Routes retail browser list auto-scroll repeats through the shared list-box helper.
+=============
+*/
+static void CG_BrowserListRepeatScroll( void *widget, int key ) {
+	Item_ListBox_HandleKey( (itemDef_t *)widget, key, qtrue, qfalse );
+}
+
+/*
+=============
+CG_BrowserListDragThumb
+
+Applies one retail browser list-thumb drag sample through the shared list geometry.
+=============
+*/
+static void CG_BrowserListDragThumb( void *widget, float x, float y ) {
+	int		pos;
+	int		max;
+	itemDef_t	*item;
+	listBoxDef_t	*listPtr;
+	rectDef_t	r;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL || item->typeData == NULL ) {
+		return;
+	}
+
+	listPtr = (listBoxDef_t *)item->typeData;
+	max = CG_BrowserListMaxScroll( item );
+	if ( item->window.flags & WINDOW_HORIZONTAL ) {
+		r.x = item->window.rect.x + SCROLLBAR_SIZE + 1;
+		r.y = item->window.rect.y + item->window.rect.h - SCROLLBAR_SIZE - 1;
+		r.h = SCROLLBAR_SIZE;
+		r.w = item->window.rect.w - ( SCROLLBAR_SIZE * 2 ) - 2;
+		pos = ( (int)x - r.x - SCROLLBAR_SIZE / 2 ) * max / ( r.w - SCROLLBAR_SIZE );
+	} else {
+		r.x = item->window.rect.x + item->window.rect.w - SCROLLBAR_SIZE - 1;
+		r.y = item->window.rect.y + SCROLLBAR_SIZE + 1;
+		r.h = item->window.rect.h - ( SCROLLBAR_SIZE * 2 ) - 2;
+		r.w = SCROLLBAR_SIZE;
+		pos = ( (int)y - r.y - SCROLLBAR_SIZE / 2 ) * max / ( r.h - SCROLLBAR_SIZE );
+	}
+
+	if ( pos < 0 ) {
+		pos = 0;
+	} else if ( pos > max ) {
+		pos = max;
+	}
+
+	listPtr->startPos = pos;
+}
+
+/*
+=============
+CG_BrowserSliderApplyFromCursor
+
+Applies one retail browser slider sample through the cgame-owned value wrapper.
+=============
+*/
+static void CG_BrowserSliderApplyFromCursor( void *widget, float x ) {
+	char		buffer[64];
+	char		format[16];
+	float		baseX;
+	float		value;
+	itemDef_t	*item;
+	editFieldDef_t	*editPtr;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL || item->typeData == NULL || item->cvar == NULL || cgDC.setCVar == NULL ) {
+		return;
+	}
+
+	editPtr = (editFieldDef_t *)item->typeData;
+	if ( item->text ) {
+		baseX = item->textRect.x + item->textRect.w + 8;
+	} else {
+		baseX = item->window.rect.x;
+	}
+
+	if ( x < baseX ) {
+		x = baseX;
+	} else if ( x > baseX + SLIDER_WIDTH ) {
+		x = baseX + SLIDER_WIDTH;
+	}
+
+	value = ( x - baseX ) / SLIDER_WIDTH;
+	value *= ( editPtr->maxVal - editPtr->minVal );
+	value += editPtr->minVal;
+
+	if ( item->integer ) {
+		Com_sprintf( buffer, sizeof( buffer ), "%i", (int)ceil( value ) );
+	} else if ( item->precision > 0 ) {
+		Com_sprintf( format, sizeof( format ), "%%.%df", item->precision );
+		Com_sprintf( buffer, sizeof( buffer ), format, value );
+	} else {
+		Com_sprintf( buffer, sizeof( buffer ), "%f", value );
+	}
+
+	cgDC.setCVar( item->cvar, buffer );
+}
+
+/*
+=============
+CG_BrowserStartCapture
+
+Routes retail browser capture-start requests through the shared item-capture helper.
+=============
+*/
+static void CG_BrowserStartCapture( void *widget, int key ) {
+	Item_StartCapture( (itemDef_t *)widget, key );
+}
+
+/*
+=============
+CG_BrowserSliderHandleKey
+
+Routes retail browser slider key handling through the shared helper.
+=============
+*/
+static qboolean CG_BrowserSliderHandleKey( void *widget, int key, qboolean down ) {
+	return Item_Slider_HandleKey( (itemDef_t *)widget, key, down );
+}
+
+/*
+=============
+CG_BrowserSliderOverControl
+
+Routes retail browser slider hit tests through the shared helper.
+=============
+*/
+static int CG_BrowserSliderOverControl( void *widget, float x, float y ) {
+	return Item_Slider_OverSlider( (itemDef_t *)widget, x, y );
+}
+
+/*
+=============
+CG_BrowserWidgetHandleKey
+
+Routes focused retail browser control keys through the shared per-widget handlers.
+=============
+*/
+static qboolean CG_BrowserWidgetHandleKey( void *widget, int key, qboolean down ) {
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return qfalse;
+	}
+
+	switch ( item->type ) {
+	case ITEM_TYPE_LISTBOX:
+		return Item_ListBox_HandleKey( item, key, down, qfalse );
+	case ITEM_TYPE_YESNO:
+		return Item_YesNo_HandleKey( item, key );
+	case ITEM_TYPE_MULTI:
+		return CG_BrowserMultiHandleKey( item, key );
+	case ITEM_TYPE_BIND:
+		return CG_BrowserBindHandleKey( item, key, down );
+	case ITEM_TYPE_SLIDER:
+	case ITEM_TYPE_SLIDER_COLOR:
+		return CG_BrowserSliderHandleKey( item, key, down );
+	case ITEM_TYPE_PRESETLIST:
+		return CG_BrowserPresetListHandleKey( item, key );
+	default:
+		return qfalse;
+	}
+}
+
+/*
+=============
+CG_DrawBrowserWidgetFrame
+
+Paints one retail browser root or widget frame through the shared window
+runtime.
+=============
+*/
+static void CG_DrawBrowserWidgetFrame( Window *window, float fadeAmount, float fadeClamp, float fadeCycle ) {
+	if ( window == NULL ) {
+		return;
+	}
+
+	Window_Paint( window, fadeAmount, fadeClamp, fadeCycle );
+}
+
+/*
+=============
+CG_DrawBrowserWidget
+
+Runs one retail browser widget through the cgame-owned draw dispatcher while
+reusing the shared widget painters underneath.
+=============
+*/
+static void CG_DrawBrowserWidget( void *widget ) {
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return;
+	}
+
+	CG_AllocBrowserWidgetState( item );
+
+	switch ( item->type ) {
+	case ITEM_TYPE_MODEL:
+		CG_DrawBrowserModelPreview( item );
+		break;
+	case ITEM_TYPE_LISTBOX:
+		CG_DrawBrowserListWidget( item );
+		break;
+	case ITEM_TYPE_TEXT:
+		CG_DrawBrowserText( item );
+		break;
+	case ITEM_TYPE_EDITFIELD:
+	case ITEM_TYPE_NUMERICFIELD:
+		CG_DrawBrowserTextField( item );
+		break;
+	case ITEM_TYPE_YESNO:
+		CG_DrawBrowserYesNoControl( item );
+		break;
+	case ITEM_TYPE_MULTI:
+		CG_DrawBrowserMultiControl( item );
+		break;
+	case ITEM_TYPE_BIND:
+		CG_DrawBrowserBindControl( item );
+		break;
+	case ITEM_TYPE_SLIDER:
+		CG_DrawBrowserSliderControl( item );
+		break;
+	case ITEM_TYPE_SLIDER_COLOR:
+		CG_DrawBrowserSliderColorControl( item );
+		break;
+	case ITEM_TYPE_PRESETLIST:
+		CG_DrawBrowserPresetList( item );
+		break;
+	default:
+		Item_Paint( item );
+		break;
+	}
+}
+
+/*
+=============
+CG_DrawBrowserOverlayTree
+
+Paints one retail browser overlay root through the cgame-owned draw dispatcher.
+=============
+*/
+void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint ) {
+	int			i;
+	menuDef_t		*menu;
+
+	menu = (menuDef_t *)overlay;
+	if ( menu == NULL ) {
+		return;
+	}
+
+	if ( !( menu->window.flags & WINDOW_VISIBLE ) && !forcePaint ) {
+		return;
+	}
+
+	if ( menu->window.ownerDrawFlags && cgDC.ownerDrawVisible &&
+		!cgDC.ownerDrawVisible( menu->window.ownerDrawFlags ) ) {
+		return;
+	}
+
+	if ( forcePaint ) {
+		menu->window.flags |= WINDOW_FORCED;
+	}
+
+	CG_UpdateBrowserPresetLists( menu );
+
+	if ( cgDC.setAdjustFrom640Mode ) {
+		cgDC.setAdjustFrom640Mode( menu->widescreen );
+	}
+
+	if ( menu->fullScreen ) {
+		rectDef_t	backgroundRect;
+
+		backgroundRect.x = 0;
+		backgroundRect.y = 0;
+		backgroundRect.w = SCREEN_WIDTH;
+		backgroundRect.h = SCREEN_HEIGHT;
+
+		if ( menu->backgroundSizeSet ) {
+			backgroundRect = menu->backgroundRect;
+		}
+
+		cgDC.drawHandlePic( backgroundRect.x, backgroundRect.y, backgroundRect.w, backgroundRect.h, menu->window.background );
+	}
+
+	CG_DrawBrowserWidgetFrame( &menu->window, menu->fadeAmount, menu->fadeClamp, menu->fadeCycle );
+
+	for ( i = 0; i < menu->itemCount; i++ ) {
+		CG_DrawBrowserWidget( menu->items[i] );
+	}
+
+	if ( cgDC.setAdjustFrom640Mode ) {
+		cgDC.setAdjustFrom640Mode( WIDESCREEN_STRETCH );
+	}
+}
+
+/*
+=============
+CG_DrawBrowserOverlays
+
+Runs the active retail browser overlay frame pump through a cgame-owned entry
+point while preserving the shared capture-repeat runtime underneath.
+=============
+*/
+void CG_DrawBrowserOverlays( void ) {
+	Menu_PaintAll();
+}
+
+/*
+=============
+CG_BrowserRectContainsPoint
+
+Routes the retail browser rect hit-test through the shared menu helper.
+=============
+*/
+static qboolean CG_BrowserRectContainsPoint( const rectDef_t *rect, float x, float y ) {
+	return Rect_ContainsPoint( (rectDef_t *)rect, x, y );
+}
+
+/*
+=============
+CG_BrowserItemsMatchingGroup
+
+Counts retail browser widgets that match one name or group token.
+=============
+*/
+static int CG_BrowserItemsMatchingGroup( void *overlay, const char *name ) {
+	return Menu_ItemsMatchingGroup( (menuDef_t *)overlay, name );
+}
+
+/*
+=============
+CG_BrowserGetMatchingItemByNumber
+
+Returns the Nth retail browser widget matching one name or group token.
+=============
+*/
+static void *CG_BrowserGetMatchingItemByNumber( const char *name, void *overlay, int index ) {
+	return Menu_GetMatchingItemByNumber( (menuDef_t *)overlay, index, name );
+}
+
+/*
+=============
+CG_FindBrowserWidgetByName
+
+Finds one retail browser widget by name inside an overlay root.
+=============
+*/
+static void *CG_FindBrowserWidgetByName( void *overlay, const char *name ) {
+	return Menu_FindItemByName( (menuDef_t *)overlay, name );
+}
+
+/*
+=============
+CG_RunBrowserScript
+
+Runs one retail browser widget script through the shared script-command table.
+=============
+*/
+static void CG_RunBrowserScript( void *widget, const char *script ) {
+	Item_RunScript( (itemDef_t *)widget, script );
+}
+
+/*
+=============
+CG_BrowserWidgetEnableShowViaCvar
+
+Gates one retail browser widget through its enable/show cvar conditions.
+=============
+*/
+static qboolean CG_BrowserWidgetEnableShowViaCvar( void *widget, int flag ) {
+	return Item_EnableShowViaCvar( (itemDef_t *)widget, flag );
+}
+
+/*
+=============
+CG_ShowBrowserItemsByName
+
+Shows or hides retail browser widgets by name or group and stops hidden
+cinematics.
+=============
+*/
+static void CG_ShowBrowserItemsByName( const char *name, void *overlay, qboolean show ) {
+	int			count;
+	int			i;
+	menuDef_t		*menu;
+	itemDef_t		*item;
+
+	menu = (menuDef_t *)overlay;
+	if ( menu == NULL || name == NULL || !name[0] ) {
+		return;
+	}
+
+	count = CG_BrowserItemsMatchingGroup( menu, name );
+	for ( i = 0; i < count; i++ ) {
+		item = CG_BrowserGetMatchingItemByNumber( name, menu, i );
+		if ( item == NULL ) {
+			continue;
+		}
+
+		if ( show ) {
+			item->window.flags |= WINDOW_VISIBLE;
+			continue;
+		}
+
+		item->window.flags &= ~WINDOW_VISIBLE;
+		if ( cgDC.stopCinematic && item->window.cinematic >= 0 ) {
+			cgDC.stopCinematic( item->window.cinematic );
+			item->window.cinematic = -1;
+		}
+	}
+}
+
+/*
+=============
+CG_BrowserScriptShow
+
+Runs the retail browser `show` verb through the cgame-owned item visibility
+wrapper.
+=============
+*/
+static void CG_BrowserScriptShow( void *widget, char **args ) {
+	const char	*name;
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item && String_Parse( args, &name ) ) {
+		CG_ShowBrowserItemsByName( name, item->parent, qtrue );
+	}
+}
+
+/*
+=============
+CG_BrowserScriptHide
+
+Runs the retail browser `hide` verb through the cgame-owned item visibility
+wrapper.
+=============
+*/
+static void CG_BrowserScriptHide( void *widget, char **args ) {
+	const char	*name;
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item && String_Parse( args, &name ) ) {
+		CG_ShowBrowserItemsByName( name, item->parent, qfalse );
+	}
+}
+
+/*
+=============
+CG_BrowserScriptOpen
+
+Runs the retail browser `open` verb through the cgame-owned overlay open
+wrapper.
+=============
+*/
+static void CG_BrowserScriptOpen( void *widget, char **args ) {
+	const char	*name;
+
+	(void)widget;
+
+	if ( String_Parse( args, &name ) ) {
+		CG_OpenBrowserOverlayByName( name );
+	}
+}
+
+/*
+=============
+CG_BrowserScriptConditionalOpen
+
+Runs the retail browser `conditionalopen` verb through the cgame-owned overlay
+open wrapper.
+=============
+*/
+static void CG_BrowserScriptConditionalOpen( void *widget, char **args ) {
+	const char	*cvar;
+	const char	*name1;
+	const char	*name2;
+	float		value;
+
+	(void)widget;
+
+	if ( String_Parse( args, &cvar ) && String_Parse( args, &name1 ) && String_Parse( args, &name2 ) ) {
+		value = trap_Cvar_VariableValue( cvar );
+		if ( value == 0.0f ) {
+			CG_OpenBrowserOverlayByName( name2 );
+		} else {
+			CG_OpenBrowserOverlayByName( name1 );
+		}
+	}
+}
+
+/*
+=============
+CG_BrowserScriptClose
+
+Runs the retail browser `close` verb through the cgame-owned overlay close
+wrapper.
+=============
+*/
+static void CG_BrowserScriptClose( void *widget, char **args ) {
+	const char	*name;
+
+	(void)widget;
+
+	if ( String_Parse( args, &name ) ) {
+		CG_CloseBrowserOverlayByName( name );
+	}
+}
+
+/*
+=============
+CG_BrowserScriptToggle
+
+Runs the retail browser `toggle` verb by closing visible overlays and opening
+hidden ones through the cgame-owned overlay wrappers.
+=============
+*/
+static void CG_BrowserScriptToggle( void *widget, char **args ) {
+	const char	*name;
+	menuDef_t	*menu;
+
+	(void)widget;
+
+	if ( !String_Parse( args, &name ) ) {
+		return;
+	}
+
+	menu = CG_FindBrowserOverlayByName( name );
+	if ( menu == NULL ) {
+		return;
+	}
+
+	if ( menu->window.flags & WINDOW_VISIBLE ) {
+		CG_CloseBrowserOverlayByName( name );
+		return;
+	}
+
+	CG_OpenBrowserOverlayByName( name );
+}
+
+/*
+=============
+CG_BrowserScriptSetFocus
+
+Runs the retail browser `setfocus` verb through the cgame-owned widget lookup
+and focus helpers.
+=============
+*/
+static void CG_BrowserScriptSetFocus( void *widget, char **args ) {
+	const char	*name;
+	itemDef_t	*focusItem;
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL || !String_Parse( args, &name ) ) {
+		return;
+	}
+
+	focusItem = CG_FindBrowserWidgetByName( item->parent, name );
+	if ( focusItem && !( focusItem->window.flags & WINDOW_DECORATION ) &&
+		!( focusItem->window.flags & WINDOW_HASFOCUS ) ) {
+		CG_ClearBrowserFocus( item->parent );
+		focusItem->window.flags |= WINDOW_HASFOCUS;
+		if ( focusItem->onFocus ) {
+			CG_RunBrowserScript( focusItem, focusItem->onFocus );
+		}
+		if ( cgDC.Assets.itemFocusSound && cgDC.startLocalSound ) {
+			cgDC.startLocalSound( cgDC.Assets.itemFocusSound, CHAN_LOCAL_SOUND );
+		}
+	}
+}
+
+/*
+=============
+CG_BrowserCorrectedTextRect
+
+Returns the retail browser text bounds used for active-item hit tests.
+=============
+*/
+static rectDef_t *CG_BrowserCorrectedTextRect( void *widget ) {
+	itemDef_t		*item;
+	static rectDef_t rect;
+
+	item = widget;
+	memset( &rect, 0, sizeof( rect ) );
+	if ( item ) {
+		rect = item->textRect;
+		if ( rect.w ) {
+			rect.y -= rect.h;
+		}
+	}
+
+	return &rect;
+}
+
+/*
+=============
+CG_BrowserOverActiveItem
+
+Mirrors the retail browser active-item hit test used before OOB clicks.
+=============
+*/
+static qboolean CG_BrowserOverActiveItem( void *overlay, float x, float y ) {
+	int			i;
+	menuDef_t		*menu;
+	itemDef_t		*item;
+
+	menu = overlay;
+	if ( !menu ) {
+		return qfalse;
+	}
+
+	if ( !( menu->window.flags & ( WINDOW_VISIBLE | WINDOW_FORCED ) ) ) {
+		return qfalse;
+	}
+
+	if ( !CG_BrowserRectContainsPoint( &menu->window.rect, x, y ) ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < menu->itemCount; i++ ) {
+		item = menu->items[i];
+		if ( !( item->window.flags & ( WINDOW_VISIBLE | WINDOW_FORCED ) ) ) {
+			continue;
+		}
+
+		if ( item->window.flags & WINDOW_DECORATION ) {
+			continue;
+		}
+
+		if ( !CG_BrowserRectContainsPoint( &item->window.rect, x, y ) ) {
+			continue;
+		}
+
+		if ( item->type == ITEM_TYPE_TEXT && item->text ) {
+			if ( CG_BrowserRectContainsPoint( CG_BrowserCorrectedTextRect( item ), x, y ) ) {
+				return qtrue;
+			}
+			continue;
+		}
+
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CG_GetFocusedBrowserOverlay
+
+Returns the focused browser overlay used by the retail key path.
+=============
+*/
+static void *CG_GetFocusedBrowserOverlay( void ) {
+	return Menu_GetFocused();
+}
+
+/*
+=============
+CG_ClearBrowserFocus
+
+Clears focus from the current retail browser overlay root.
+=============
+*/
+static void *CG_ClearBrowserFocus( void *overlay ) {
+	return Menu_ClearFocus( (menuDef_t *)overlay );
+}
+
+/*
+=============
+CG_BrowserHandleOOBClick
+
+Routes the retail browser out-of-bounds click path through the shared overlay
+activation helper.
+=============
+*/
+static void CG_BrowserHandleOOBClick( void *overlay, int key, qboolean down ) {
+	Menus_HandleOOBClick( (menuDef_t *)overlay, key, down );
+}
+
+/*
+=============
+CG_SetBrowserFocus
+
+Assigns focus to one retail browser widget through the cgame-owned runtime
+helper chain.
+=============
+*/
+static qboolean CG_SetBrowserFocus( void *widget, float x, float y ) {
+	int			i;
+	itemDef_t		*item;
+	itemDef_t		*oldFocus;
+	sfxHandle_t		*sfx;
+	qboolean		playSound;
+	menuDef_t		*parent;
+
+	item = (itemDef_t *)widget;
+	sfx = &cgDC.Assets.itemFocusSound;
+	playSound = qfalse;
+
+	if ( item == NULL || item->window.flags & WINDOW_DECORATION || item->window.flags & WINDOW_HASFOCUS ||
+		!( item->window.flags & WINDOW_VISIBLE ) ) {
+		return qfalse;
+	}
+
+	parent = (menuDef_t *)item->parent;
+	if ( !CG_BrowserWidgetEnableShowViaCvar( item, CVAR_ENABLE ) ) {
+		return qfalse;
+	}
+
+	if ( !CG_BrowserWidgetEnableShowViaCvar( item, CVAR_SHOW ) ) {
+		return qfalse;
+	}
+
+	oldFocus = CG_ClearBrowserFocus( item->parent );
+
+	if ( item->type == ITEM_TYPE_TEXT ) {
+		if ( CG_BrowserRectContainsPoint( CG_BrowserCorrectedTextRect( item ), x, y ) ) {
+			item->window.flags |= WINDOW_HASFOCUS;
+			if ( item->focusSound ) {
+				sfx = &item->focusSound;
+			}
+			playSound = qtrue;
+		} else if ( oldFocus ) {
+			oldFocus->window.flags |= WINDOW_HASFOCUS;
+			if ( oldFocus->onFocus ) {
+				CG_RunBrowserScript( oldFocus, oldFocus->onFocus );
+			}
+		}
+	} else {
+		item->window.flags |= WINDOW_HASFOCUS;
+		if ( item->onFocus ) {
+			CG_RunBrowserScript( item, item->onFocus );
+		}
+		if ( item->focusSound ) {
+			sfx = &item->focusSound;
+		}
+		playSound = qtrue;
+	}
+
+	if ( playSound && sfx && cgDC.startLocalSound ) {
+		cgDC.startLocalSound( *sfx, CHAN_LOCAL_SOUND );
+	}
+
+	if ( parent ) {
+		for ( i = 0; i < parent->itemCount; i++ ) {
+			if ( parent->items[i] == item ) {
+				parent->cursorItem = i;
+				break;
+			}
+		}
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_SetBrowserMouseOver
+
+Updates the retail browser widget hover bit through the shared menu runtime.
+=============
+*/
+static void CG_SetBrowserMouseOver( void *widget, qboolean focus ) {
+	Item_SetMouseOver( (itemDef_t *)widget, focus );
+}
+
+/*
+=============
+CG_BrowserMouseEnter
+
+Routes one retail browser mouse-enter transition through the cgame-owned
+runtime helper chain.
+=============
+*/
+static void CG_BrowserMouseEnter( void *widget, float x, float y ) {
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return;
+	}
+
+	if ( !CG_BrowserWidgetEnableShowViaCvar( item, CVAR_ENABLE ) ) {
+		return;
+	}
+
+	if ( !CG_BrowserWidgetEnableShowViaCvar( item, CVAR_SHOW ) ) {
+		return;
+	}
+
+	if ( CG_BrowserRectContainsPoint( CG_BrowserCorrectedTextRect( item ), x, y ) ) {
+		if ( !( item->window.flags & WINDOW_MOUSEOVERTEXT ) ) {
+			CG_RunBrowserScript( item, item->mouseEnterText );
+			item->window.flags |= WINDOW_MOUSEOVERTEXT;
+		}
+		if ( !( item->window.flags & WINDOW_MOUSEOVER ) ) {
+			CG_RunBrowserScript( item, item->mouseEnter );
+			CG_SetBrowserMouseOver( item, qtrue );
+		}
+		return;
+	}
+
+	if ( item->window.flags & WINDOW_MOUSEOVERTEXT ) {
+		CG_RunBrowserScript( item, item->mouseExitText );
+		item->window.flags &= ~WINDOW_MOUSEOVERTEXT;
+	}
+
+	if ( !( item->window.flags & WINDOW_MOUSEOVER ) ) {
+		CG_RunBrowserScript( item, item->mouseEnter );
+		CG_SetBrowserMouseOver( item, qtrue );
+	}
+
+	if ( item->type == ITEM_TYPE_LISTBOX ) {
+		Item_ListBox_MouseEnter( item, x, y );
+	}
+}
+
+/*
+=============
+CG_BrowserMouseLeave
+
+Routes one retail browser mouse-leave transition through the cgame-owned
+runtime helper chain and clears the widget hover bit.
+=============
+*/
+static void CG_BrowserMouseLeave( void *widget ) {
+	itemDef_t	*item;
+
+	item = (itemDef_t *)widget;
+	if ( item == NULL ) {
+		return;
+	}
+
+	if ( item->window.flags & WINDOW_MOUSEOVERTEXT ) {
+		CG_RunBrowserScript( item, item->mouseExitText );
+		item->window.flags &= ~WINDOW_MOUSEOVERTEXT;
+	}
+
+	CG_RunBrowserScript( item, item->mouseExit );
+	item->window.flags &= ~( WINDOW_LB_RIGHTARROW | WINDOW_LB_LEFTARROW );
+	CG_SetBrowserMouseOver( widget, qfalse );
+}
+
+/*
+=============
+CG_SetPrevBrowserCursorItem
+
+Walks focus to the previous retail browser widget and refreshes hover state on
+the newly focused control.
+=============
+*/
+static void *CG_SetPrevBrowserCursorItem( void *overlay ) {
+	qboolean	wrapped;
+	int		oldCursor;
+	menuDef_t	*menu;
+
+	menu = (menuDef_t *)overlay;
+	if ( menu == NULL ) {
+		return NULL;
+	}
+
+	wrapped = qfalse;
+	oldCursor = menu->cursorItem;
+	if ( menu->cursorItem < 0 ) {
+		menu->cursorItem = menu->itemCount - 1;
+		wrapped = qtrue;
+	}
+
+	while ( menu->cursorItem > -1 ) {
+		menu->cursorItem--;
+		if ( menu->cursorItem < 0 && !wrapped ) {
+			wrapped = qtrue;
+			menu->cursorItem = menu->itemCount - 1;
+		}
+
+		if ( CG_SetBrowserFocus( menu->items[menu->cursorItem], (float)cgDC.cursorx, (float)cgDC.cursory ) ) {
+			CG_BrowserHandleMouseMove( menu, menu->items[menu->cursorItem]->window.rect.x + 1, menu->items[menu->cursorItem]->window.rect.y + 1 );
+			return menu->items[menu->cursorItem];
+		}
+	}
+
+	menu->cursorItem = oldCursor;
+	return NULL;
+}
+
+/*
+=============
+CG_SetNextBrowserCursorItem
+
+Walks focus to the next retail browser widget and refreshes hover state on the
+newly focused control.
+=============
+*/
+static void *CG_SetNextBrowserCursorItem( void *overlay ) {
+	qboolean	wrapped;
+	int		oldCursor;
+	menuDef_t	*menu;
+
+	menu = (menuDef_t *)overlay;
+	if ( menu == NULL ) {
+		return NULL;
+	}
+
+	wrapped = qfalse;
+	oldCursor = menu->cursorItem;
+	if ( menu->cursorItem == -1 ) {
+		menu->cursorItem = 0;
+		wrapped = qtrue;
+	}
+
+	while ( menu->cursorItem < menu->itemCount ) {
+		menu->cursorItem++;
+		if ( menu->cursorItem >= menu->itemCount && !wrapped ) {
+			wrapped = qtrue;
+			menu->cursorItem = 0;
+		}
+
+		if ( CG_SetBrowserFocus( menu->items[menu->cursorItem], (float)cgDC.cursorx, (float)cgDC.cursory ) ) {
+			CG_BrowserHandleMouseMove( menu, menu->items[menu->cursorItem]->window.rect.x + 1, menu->items[menu->cursorItem]->window.rect.y + 1 );
+			return menu->items[menu->cursorItem];
+		}
+	}
+
+	menu->cursorItem = oldCursor;
+	return NULL;
+}
+
+/*
+=============
+CG_BrowserHandleKey
+
+Routes retail browser key handling through the focused overlay.
+=============
+*/
+static void CG_BrowserHandleKey( void *overlay, int key, qboolean down, unsigned int time ) {
+	menuDef_t *menu;
+
+	(void)time;
+
+	menu = overlay;
+	if ( !menu ) {
+		return;
+	}
+
+	if ( down && !( menu->window.flags & WINDOW_POPUP ) &&
+		!CG_BrowserOverActiveItem( menu, (float)cgDC.cursorx, (float)cgDC.cursory ) &&
+		( key == K_MOUSE1 || key == K_MOUSE2 || key == K_MOUSE3 ) ) {
+		CG_BrowserHandleOOBClick( menu, key, down );
+		return;
+	}
+
+	if ( down && key == K_F11 ) {
+		return;
+	}
+
+	if ( down && key == K_F12 ) {
+		trap_SendConsoleCommand( "screenshotJPEG\n" );
+		return;
+	}
+
+	Menu_HandleKey( menu, key, down );
+}
+
+/*
+=============
+CG_BrowserDisplayHandleKey
+
+Routes browser key handling through the focused retail overlay.
+=============
+*/
+static void CG_BrowserDisplayHandleKey( int key, qboolean down, int x, int y ) {
+	void *overlay;
+
+	cgDC.cursorx = x;
+	cgDC.cursory = y;
+
+	overlay = CG_BrowserDisplayCaptureItem( x, y );
+	if ( !overlay ) {
+		overlay = CG_GetFocusedBrowserOverlay();
+	}
+	if ( !overlay ) {
+		return;
+	}
+
+	CG_BrowserHandleKey( overlay, key, down, 0 );
 }
 
 /*
@@ -9296,6 +11738,9 @@ void CG_MouseEvent( int x, int y ) {
 		cgs.cursorY = 480;
 	}
 
+	cgDC.cursorx = cgs.cursorX;
+	cgDC.cursory = cgs.cursorY;
+
 	n = CG_BrowserDisplayCursorType( cgs.cursorX, cgs.cursorY );
 	cgs.activeCursor = 0;
 	if ( n == CURSOR_ARROW ) {
@@ -9304,11 +11749,7 @@ void CG_MouseEvent( int x, int y ) {
 		cgs.activeCursor = cgs.media.sizeCursor;
 	}
 
-	if ( cgs.capturedItem ) {
-		CG_BrowserDisplayMouseMove( cgs.capturedItem, x, y );
-	} else {
-		CG_BrowserDisplayMouseMove( NULL, cgs.cursorX, cgs.cursorY );
-	}
+	CG_BrowserDisplayMouseMove( NULL, cgs.cursorX, cgs.cursorY );
 }
 
 /*
@@ -9337,6 +11778,8 @@ static void CG_CloseRetailCommandCaptureOverlay( void ) {
 			cgs.eventHandling == CGAME_EVENT_EDITHUD ) {
 		CG_HideTeamMenu();
 	}
+
+	CG_CloseJoinGameMenu();
 
 	catcher = trap_Key_GetCatcher();
 	if ( catcher & KEYCATCH_CGAME ) {
@@ -9405,6 +11848,7 @@ void CG_EventHandling(int type) {
 	cgs.eventHandling = type;
   if (type == CGAME_EVENT_NONE) {
     CG_HideTeamMenu();
+	CG_CloseJoinGameMenu();
   } else if (type == CGAME_EVENT_TEAMMENU) {
     //CG_ShowTeamMenu();
   } else if (type == CGAME_EVENT_SCOREBOARD) {
@@ -9420,35 +11864,24 @@ Mirrors the retail HUD key path that intercepts specific bound commands.
 =============
 */
 static qboolean CG_HandleHudBindingCommand( const char *binding ) {
-	char		command[MAX_STRING_CHARS];
-	char		*cursor;
-	const char	*token;
-
 	if ( !binding || !binding[0] ) {
 		return qfalse;
 	}
 
-	Q_strncpyz( command, binding, sizeof( command ) );
-	cursor = command;
-	token = COM_ParseExt( &cursor, qtrue );
-	if ( !token || !token[0] ) {
-		return qfalse;
-	}
-
-	if ( !Q_stricmp( token, "messagemode" ) ||
-		!Q_stricmp( token, "screenshot" ) ||
-		!Q_stricmp( token, "screenshotJPEG" ) ) {
-		trap_Cmd_ExecuteText( EXEC_APPEND, va( "%s\n", binding ) );
+	if ( Q_stricmpn( binding, "messagemode", sizeof( "messagemode" ) - 1 ) == 0 ||
+		Q_stricmpn( binding, "screenshot", sizeof( "screenshot" ) - 1 ) == 0 ||
+		Q_stricmpn( binding, "screenshotJPEG", sizeof( "screenshotJPEG" ) - 1 ) == 0 ) {
+		trap_SendConsoleCommand( binding );
 		return qtrue;
 	}
 
-	if ( !Q_stricmp( token, "+voice" ) ) {
-		CG_ShowResponseHead();
+	if ( Q_stricmpn( binding, "+voice", sizeof( "+voice" ) - 1 ) == 0 ) {
+		trap_SendConsoleCommand( "+voice\n" );
 		return qtrue;
 	}
 
-	if ( !Q_stricmp( token, "+scores" ) ) {
-		CG_MenuScript_OpenScoreboard();
+	if ( Q_stricmpn( binding, "+scores", sizeof( "+scores" ) - 1 ) == 0 ) {
+		CG_ScoresDown_f();
 		return qtrue;
 	}
 
@@ -9459,22 +11892,13 @@ static qboolean CG_HandleHudBindingCommand( const char *binding ) {
 =============
 CG_KeyEvent
 
-Forwards key input to the HUD when the spectator UI is visible.
+Mirrors the retail focused-overlay key dispatcher.
 =============
 */
 void CG_KeyEvent(int key, qboolean down) {
-	qboolean allowSpectatorUi;
-	char bindingBuf[MAX_STRING_CHARS];
+	char bindingBuf[0x20] = { 0 };
 
 	if ( !down ) {
-		return;
-	}
-
-	allowSpectatorUi = CG_ShouldCaptureSpectatorUi();
-
-	if ( cg.predictedPlayerState.pm_type == PM_NORMAL || ( cg.predictedPlayerState.pm_type == PM_SPECTATOR && !allowSpectatorUi && cg.showScores == qfalse ) ) {
-		CG_EventHandling(CGAME_EVENT_NONE);
-		trap_Key_SetCatcher(0);
 		return;
 	}
 
@@ -9483,254 +11907,19 @@ void CG_KeyEvent(int key, qboolean down) {
 		return;
 	}
 
-	//if (key == trap_Key_GetKey("teamMenu") || !CG_BrowserDisplayCaptureItem( cgs.cursorX, cgs.cursorY )) {
-	// if we see this then we should always be visible
-	//  CG_EventHandling(CGAME_EVENT_NONE);
-	//  trap_Key_SetCatcher(0);
-	//}
-
-	CG_BrowserDisplayHandleKey(key, down, cgs.cursorX, cgs.cursorY);
-
-	if (cgs.capturedItem) {
-		cgs.capturedItem = NULL;
-	} else {
-		if (key == K_MOUSE2 && down) {
-			cgs.capturedItem = CG_BrowserDisplayCaptureItem( cgs.cursorX, cgs.cursorY );
-		}
-	}
-}
-
-int CG_ClientNumFromName(const char *p) {
-	int i;
-
-	for ( i = 0; i < cgs.maxclients; i++ ) {
-		if ( cgs.clientinfo[i].infoValid && Q_stricmp( cgs.clientinfo[i].name, p ) == 0 ) {
-			return i;
-		}
-	}
-
-	return -1;
-}
-
-void CG_ShowResponseHead() {
-	Menus_OpenByName("voiceMenu");
-	trap_Cvar_Set("cl_conXOffset", "72");
-	cg.voiceTime = cg.time;
+	CG_BrowserDisplayHandleKey( key, down, cgs.cursorX, cgs.cursorY );
 }
 
 /*
 =============
-CG_MenuScript_OpenScoreboard
+CG_RunMenuScript
 
-Requests fresh scoreboard data and forces the HUD overlay to appear.
+Executes the retained retail cgame menu-script commands.
 =============
 */
-static void CG_MenuScript_OpenScoreboard( void ) {
-	CG_BuildSpectatorString();
-	if ( cg.scoresRequestTime + 2000 < cg.time ) {
-		cg.scoresRequestTime = cg.time;
-		trap_SendClientCommand( "score" );
-		if ( !cg.showScores ) {
-			cg.showScores = qtrue;
-			cg.numScores = 0;
-		}
-	} else {
-		cg.showScores = qtrue;
-	}
-	CG_EventHandling( CGAME_EVENT_SCOREBOARD );
-}
-
-/*
-=============
-CG_MenuScript_CloseScoreboard
-
-Hides the Quake Live scoreboard overlay.
-=============
-*/
-static void CG_MenuScript_CloseScoreboard( void ) {
-	if ( cg.showScores ) {
-		cg.showScores = qfalse;
-		cg.scoreFadeTime = cg.time;
-	}
-	if ( cgs.eventHandling == CGAME_EVENT_SCOREBOARD ) {
-		CG_EventHandling( CGAME_EVENT_NONE );
-	}
-}
-
-/*
-=============
-CG_MenuScript_WebCommand
-
-Dispatches browser-related console commands on behalf of HUD scripts.
-=============
-*/
-static void CG_MenuScript_WebCommand( const char *command, const char *argument ) {
-	char buffer[MAX_STRING_CHARS];
-
-	if ( !command || !*command ) {
-		return;
-	}
-
-	if ( argument && *argument ) {
-		Com_sprintf( buffer, sizeof( buffer ), "%s %s\n", command, argument );
-	} else {
-		Com_sprintf( buffer, sizeof( buffer ), "%s\n", command );
-	}
-
-	trap_SendConsoleCommand( buffer );
-}
-
-
-/*
-=============
-CG_MenuScript_FollowClient
-
-Follows the specified client if they are valid.
-=============
-*/
-static void CG_MenuScript_FollowClient( int clientNum ) {
-	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
-		return;
-	}
-	if ( !cgs.clientinfo[clientNum].infoValid ) {
-		return;
-	}
-
-	CG_SpectatorFollowRequest( clientNum );
-}
-
-/*
-=============
-CG_MenuScript_FollowSlot
-/*
-=============
-CG_MenuScript_FollowSlot
-
-Follows the player occupying a spectator slot (0 = primary, 1 = secondary).
-=============
-*/
-static void CG_MenuScript_FollowSlot( int slot ) {
-	int clientNum;
-
-	CG_UpdateSpectatorTargets();
-	if ( slot < 0 || slot >= cg.spectatorClientCount ) {
-		return;
-	}
-
-	clientNum = cg.spectatorClientOrder[slot];
-	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
-		return;
-	}
-
-	CG_MenuScript_FollowClient( clientNum );
-}
-
-
-/*
-=============
-CG_MenuScript_StopFollowing
-
-Releases the spectator camera from any follow target.
-=============
-*/
-static void CG_MenuScript_StopFollowing( void ) {
-	CG_StopSpectatorFollow();
-}
-
-/*
-=============
-CG_MenuScript_LockCamera
-
-Locks the spectator camera onto the current follow target.
-=============
-*/
-static void CG_MenuScript_LockCamera( void ) {
-	CG_SetSpectatorCameraLock( qtrue );
-}
-
-/*
-=============
-CG_MenuScript_UnlockCamera
-
-Releases the spectator camera lock so targets can be changed.
-=============
-*/
-static void CG_MenuScript_UnlockCamera( void ) {
-	CG_SetSpectatorCameraLock( qfalse );
-}
-
-/*
-=============
-CG_MenuScript_ToggleHudEditor
-/*
-=============
-CG_MenuScript_ToggleHudEditor
-
-Toggles the HUD editor event catcher used by Quake Live.
-=============
-*/
-static void CG_MenuScript_ToggleHudEditor( void ) {
-	int catcher;
-	qboolean enable;
-
-	enable = ( cgs.eventHandling != CGAME_EVENT_EDITHUD );
-	catcher = trap_Key_GetCatcher();
-	if ( enable ) {
-		CG_EventHandling( CGAME_EVENT_EDITHUD );
-		trap_Key_SetCatcher( catcher | KEYCATCH_CGAME );
-	} else {
-		CG_EventHandling( CGAME_EVENT_NONE );
-		trap_Key_SetCatcher( catcher & ~KEYCATCH_CGAME );
-	}
-}
-
-/*
-=============
-CG_MenuScript_ParseOptionalToken
-
-Reads the next token if one exists without permanently advancing on failure.
-=============
-*/
-static qboolean CG_MenuScript_ParseOptionalToken( char **args, const char **out ) {
-	char *backup;
-
-	if ( !args || !out ) {
-		return qfalse;
-	}
-
-	backup = *args;
-	if ( String_Parse( args, out ) ) {
-		return qtrue;
-	}
-
-	*out = NULL;
-	*args = backup;
-	return qfalse;
-}
-
-/*
-=============
-CG_MenuScript_FollowName
-
-Follows the player whose name was provided by a menu script.
-=============
-*/
-static void CG_MenuScript_FollowName( const char *playerName ) {
-	int clientNum;
-
-	if ( !playerName || !*playerName ) {
-		return;
-	}
-
-	clientNum = CG_ClientNumFromName( playerName );
-	if ( clientNum >= 0 ) {
-		CG_MenuScript_FollowClient( clientNum );
-	}
-}
-
-void CG_RunMenuScript(char **args) {
+void CG_RunMenuScript( char **args ) {
 	const char *name;
-	const char *argument;
+	qboolean fullscreen;
 
 	if ( !args ) {
 		return;
@@ -9740,98 +11929,23 @@ void CG_RunMenuScript(char **args) {
 		return;
 	}
 
-	if ( !Q_stricmp( name, "openScoreboard" ) ) {
-		CG_MenuScript_OpenScoreboard();
+	if ( !Q_stricmp( name, "setFullScreen" ) ) {
+		trap_Cvar_Set( "r_fullScreen", "1" );
+		trap_SendConsoleCommand( "vid_restart fast\n" );
 		return;
 	}
 
-	if ( !Q_stricmp( name, "closeScoreboard" ) ) {
-		CG_MenuScript_CloseScoreboard();
+	if ( !Q_stricmp( name, "setWindowed" ) ) {
+		trap_Cvar_Set( "r_fullScreen", "0" );
+		trap_SendConsoleCommand( "vid_restart fast\n" );
 		return;
 	}
 
-	if ( !Q_stricmp( name, "spectatorFollowNext" ) ) {
-		CG_SpectatorFollowCycle( 1 );
-		return;
+	if ( !Q_stricmp( name, "toggleFullscreen" ) ) {
+		fullscreen = ( trap_Cvar_VariableValue( "r_fullScreen" ) != 0.0f ) ? qtrue : qfalse;
+		trap_Cvar_Set( "r_fullScreen", fullscreen ? "0" : "1" );
+		trap_SendConsoleCommand( "vid_restart fast\n" );
 	}
-
-	if ( !Q_stricmp( name, "spectatorFollowPrev" ) ) {
-		CG_SpectatorFollowCycle( -1 );
-		return;
-	}
-
-	if ( !Q_stricmp( name, "spectatorFollowPrimary" ) ) {
-		CG_MenuScript_FollowSlot( 0 );
-		return;
-	}
-
-	if ( !Q_stricmp( name, "spectatorFollowSecondary" ) ) {
-		CG_MenuScript_FollowSlot( 1 );
-		return;
-	}
-
-	if ( !Q_stricmp( name, "spectatorFollowSlot" ) ) {
-		if ( String_Parse( args, &argument ) ) {
-			CG_MenuScript_FollowSlot( atoi( argument ) );
-		}
-		return;
-	}
-
-	if ( !Q_stricmp( name, "spectatorFollowClient" ) ) {
-		if ( String_Parse( args, &argument ) ) {
-			CG_MenuScript_FollowClient( atoi( argument ) );
-		}
-		return;
-	}
-
-	if ( !Q_stricmp( name, "spectatorFollowName" ) || !Q_stricmp( name, "spectatorFollowPlayer" ) ) {
-		if ( String_Parse( args, &argument ) ) {
-			CG_MenuScript_FollowName( argument );
-		}
-		return;
-	}
-
-
-	if ( !Q_stricmp( name, "spectatorFollowStop" ) ) {
-		CG_MenuScript_StopFollowing();
-		return;
-	}
-
-	if ( !Q_stricmp( name, "spectatorCameraLock" ) ) {
-		CG_MenuScript_LockCamera();
-		return;
-	}
-
-	if ( !Q_stricmp( name, "spectatorCameraUnlock" ) || !Q_stricmp( name, "spectatorCameraFree" ) ) {
-		CG_MenuScript_UnlockCamera();
-		return;
-	}
-
-	if ( !Q_stricmp( name, "hud_editToggle" ) ) {
-		CG_MenuScript_ToggleHudEditor();
-		return;
-	}
-
-	if ( !Q_stricmp( name, "stopRefresh" ) ) {
-		CG_MenuScript_WebCommand( "web_stopRefresh", NULL );
-		return;
-	}
-
-	if ( !Q_stricmp( name, "web_showBrowserHash" ) ) {
-		argument = NULL;
-		CG_MenuScript_ParseOptionalToken( args, &argument );
-		CG_MenuScript_WebCommand( "web_showBrowser", argument );
-		return;
-	}
-
-	if ( !Q_strnicmp( name, "web_", 4 ) ) {
-		argument = NULL;
-		CG_MenuScript_ParseOptionalToken( args, &argument );
-		CG_MenuScript_WebCommand( name, argument );
-		return;
-	}
-
-	Com_Printf( "Unknown cgame menu script '%s'\n", name );
 }
 
 

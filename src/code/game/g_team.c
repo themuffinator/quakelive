@@ -648,10 +648,7 @@ void G_BroadcastGlobalTeamSound( const vec3_t origin, global_team_sound_t sound,
 
 	te = G_TempEntity( origin, EV_GLOBAL_TEAM_SOUND );
 	te->r.svFlags |= SVF_BROADCAST;
-	te->s.eventParm = sound;
-	te->s.otherEntityNum = ( trackedClientNum >= 0 && trackedClientNum < MAX_CLIENTS ) ? trackedClientNum : ENTITYNUM_NONE;
-	te->s.clientNum = team;
-	te->s.generic1 = index;
+	G_SetRetailGlobalTeamSoundPayload( te, sound, trackedClientNum, team, index );
 }
 
 /*
@@ -2453,6 +2450,7 @@ AddTeamScore
 */
 void AddTeamScore(const vec3_t origin, int team, int score) {
 	gentity_t	*te;
+	global_team_sound_t sound;
 
 	te = G_TempEntity(origin, EV_GLOBAL_TEAM_SOUND );
 	te->r.svFlags |= SVF_BROADCAST;
@@ -2460,33 +2458,35 @@ void AddTeamScore(const vec3_t origin, int team, int score) {
 	if ( team == TEAM_RED ) {
 		if ( level.teamScores[ TEAM_RED ] + score == level.teamScores[ TEAM_BLUE ] ) {
 			//teams are tied sound
-			te->s.eventParm = GTS_TEAMS_ARE_TIED;
+			sound = GTS_TEAMS_ARE_TIED;
 		}
 		else if ( level.teamScores[ TEAM_RED ] <= level.teamScores[ TEAM_BLUE ] &&
 					level.teamScores[ TEAM_RED ] + score > level.teamScores[ TEAM_BLUE ]) {
 			// red took the lead sound
-			te->s.eventParm = GTS_REDTEAM_TOOK_LEAD;
+			sound = GTS_REDTEAM_TOOK_LEAD;
 		}
 		else {
 			// red scored sound
-			te->s.eventParm = GTS_REDTEAM_SCORED;
+			sound = GTS_REDTEAM_SCORED;
 		}
 	}
 	else {
 		if ( level.teamScores[ TEAM_BLUE ] + score == level.teamScores[ TEAM_RED ] ) {
 			//teams are tied sound
-			te->s.eventParm = GTS_TEAMS_ARE_TIED;
+			sound = GTS_TEAMS_ARE_TIED;
 		}
 		else if ( level.teamScores[ TEAM_BLUE ] <= level.teamScores[ TEAM_RED ] &&
 					level.teamScores[ TEAM_BLUE ] + score > level.teamScores[ TEAM_RED ]) {
 			// blue took the lead sound
-			te->s.eventParm = GTS_BLUETEAM_TOOK_LEAD;
+			sound = GTS_BLUETEAM_TOOK_LEAD;
 		}
 		else {
 			// blue scored sound
-			te->s.eventParm = GTS_BLUETEAM_SCORED;
+			sound = GTS_BLUETEAM_SCORED;
 		}
 	}
+
+	G_SetRetailGlobalTeamSoundPayload( te, sound, -1, TEAM_FREE, 0 );
 	level.teamScores[ team ] += score;
 }
 
@@ -3518,13 +3518,10 @@ void Team_ReturnFlagSound( gentity_t *ent, int team ) {
 	}
 
 	te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_TEAM_SOUND );
-	if( team == TEAM_BLUE ) {
-		te->s.eventParm = GTS_RED_RETURN;
-	}
-	else {
-		te->s.eventParm = GTS_BLUE_RETURN;
-	}
 	te->r.svFlags |= SVF_BROADCAST;
+	G_SetRetailGlobalTeamSoundPayload( te,
+		( team == TEAM_BLUE ) ? GTS_RED_RETURN : GTS_BLUE_RETURN,
+		-1, TEAM_FREE, 0 );
 }
 
 void Team_TakeFlagSound( gentity_t *ent, int team, int trackedClientNum ) {
@@ -3567,13 +3564,10 @@ void Team_CaptureFlagSound( gentity_t *ent, int team ) {
 	}
 
 	te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_TEAM_SOUND );
-	if( team == TEAM_BLUE ) {
-		te->s.eventParm = GTS_BLUE_CAPTURE;
-	}
-	else {
-		te->s.eventParm = GTS_RED_CAPTURE;
-	}
 	te->r.svFlags |= SVF_BROADCAST;
+	G_SetRetailGlobalTeamSoundPayload( te,
+		( team == TEAM_BLUE ) ? GTS_BLUE_CAPTURE : GTS_RED_CAPTURE,
+		-1, TEAM_FREE, 0 );
 }
 
 void Team_ReturnFlag( int team ) {
@@ -4562,11 +4556,11 @@ qboolean CheckObeliskAttack( gentity_t *obelisk, gentity_t *attacker ) {
 		// tell which obelisk is under attack
 		te = G_TempEntity( obelisk->s.pos.trBase, EV_GLOBAL_TEAM_SOUND );
 		if( obelisk->spawnflags == TEAM_RED ) {
-			te->s.eventParm = GTS_REDOBELISK_ATTACKED;
+			G_SetRetailGlobalTeamSoundPayload( te, GTS_REDOBELISK_ATTACKED, -1, TEAM_FREE, 0 );
 			teamgame.redObeliskAttackedTime = level.time;
 		}
 		else {
-			te->s.eventParm = GTS_BLUEOBELISK_ATTACKED;
+			G_SetRetailGlobalTeamSoundPayload( te, GTS_BLUEOBELISK_ATTACKED, -1, TEAM_FREE, 0 );
 			teamgame.blueObeliskAttackedTime = level.time;
 		}
 		te->r.svFlags |= SVF_BROADCAST;

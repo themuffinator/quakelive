@@ -82,7 +82,6 @@
 #define FEEDER_REDTEAM_STATS                0x11            // premium statistics board for red team
 #define FEEDER_BLUETEAM_STATS               0x12            // premium statistics board for blue team
 #define FEEDER_CVMAPS						0x13			// maps for the gametype you wish to cv to
-#define FEEDER_COUNTRIES					0x14						// country.txt backed dropdowns
 
 // display flags
 #define CG_SHOW_BLUE_TEAM_HAS_REDFLAG		0x00000001
@@ -142,8 +141,6 @@
 #define CG_SHOW_IF_LOADOUT_DISABLED			0x00100000
 #define CG_SHOW_IF_1ST_PLYR_FOLLOWED		0x00200000
 #define CG_SHOW_IF_2ND_PLYR_FOLLOWED		0x00400000
-#define CG_SHOW_IF_1ST_PLYR_TRACKED		0x00800000
-#define CG_SHOW_IF_2ND_PLYR_TRACKED		0x01000000
 
 #define UI_SHOW_LEADER				        0x00000001
 #define UI_SHOW_NOTLEADER			        0x00000002
@@ -453,7 +450,6 @@
 #define	CG_RED_FLAGSTATUS					283						
 #define	CG_RED_SCORE						284						
 #define	CG_RED_NAME							285						
-// Quake Live round-based and Domination HUD overlays
 #define	CG_RED_OWNED_FLAGS					286						
 #define	CG_RED_AVG_PING						287						
 #define	CG_RED_BASESTATUS					288						
@@ -508,36 +504,7 @@
 #define	CG_FLAG_STATUS						337
 #define CG_HEALTH_COLORIZED					338
 #define	CG_MATCH_STATE						339		// Game State
-#define CG_SPEC_FOLLOW_PRIMARY						  340
-#define CG_SPEC_FOLLOW_SECONDARY					  341
-#define CG_SPEC_COMPARE_PRIMARY					  342
-#define CG_SPEC_COMPARE_SECONDARY				  343
-#define CG_SCOREBOX_FOLLOW_BACKGROUND				344
-#define CG_SCOREBOX_SPEC_BACKGROUND				345
-#define CG_ROUND_BACKGROUND					346
-#define CG_OVERTIME_BACKGROUND					347
 
-
-#define CG_SELECTEDPLAYER_HEAD			348
-#define CG_SELECTEDPLAYER_NAME			349
-#define CG_SELECTEDPLAYER_LOCATION		350
-#define CG_SELECTEDPLAYER_STATUS		351
-#define CG_SELECTEDPLAYER_WEAPON		352
-#define CG_SELECTEDPLAYER_POWERUP		353
-#define CG_SELECTEDPLAYER_ARMOR			354
-#define CG_SELECTEDPLAYER_HEALTH			355
-#define CG_PLAYER_STATUS				356
-#define CG_PLAYER_LOCATION			357
-#define CG_BLUE_FLAGHEAD				358
-#define CG_BLUE_FLAGNAME				359
-#define CG_RED_FLAGHEAD				360
-#define CG_RED_FLAGNAME				361
-#define CG_TEAMINFO					362
-#define CG_VOICE_HEAD					363
-#define CG_VOICE_NAME					364
-#define CG_AREA_SYSTEMCHAT				365
-#define CG_AREA_TEAMCHAT				366
-#define CG_AREA_CHAT					367
 #define UI_OWNERDRAW_BASE				512
 #define UI_HANDICAP						513
 #define UI_PLAYERMODEL					514

@@ -75,11 +75,17 @@ def test_vmMain_and_native_dispatch_expose_retail_tail_slots() -> None:
 		assert expected in vm_source
 
 	assert "return CG_CopyClientIdentity( arg0, (void *)(intptr_t)arg1 );" in vm_main_block
-	assert "return (int)CG_GetChatFieldY();" in vm_main_block
-	assert "return (int)CG_GetChatFieldPixelWidth();" in vm_main_block
+	assert "return CG_NativeGetChatFieldY();" in vm_main_block
+	assert "return CG_NativeGetChatFieldPixelWidth();" in vm_main_block
 	assert "return CG_GetChatFieldWidthInChars();" in vm_main_block
-	assert "return (int)(intptr_t)CG_SetClientSpeakingState( arg0, arg1 );" in vm_main_block
+	assert "return CG_NativeSetClientSpeakingState( arg0, arg1 );" in vm_main_block
 	assert "return CG_GetPhysicsTime();" in vm_main_block
+	assert "static int CG_NativeGetChatFieldY( void ) {" in cg_main_source
+	assert "return (int)CG_GetChatFieldY();" in cg_main_source
+	assert "static int CG_NativeGetChatFieldPixelWidth( void ) {" in cg_main_source
+	assert "return (int)CG_GetChatFieldPixelWidth();" in cg_main_source
+	assert "static int CG_NativeSetClientSpeakingState( int clientNum, int speaking ) {" in cg_main_source
+	assert "return (int)(intptr_t)CG_SetClientSpeakingState( clientNum, speaking );" in cg_main_source
 
 
 def test_cgame_copy_client_identity_uses_reconstructed_sidecar_contract() -> None:
@@ -88,6 +94,9 @@ def test_cgame_copy_client_identity_uses_reconstructed_sidecar_contract() -> Non
 
 	assert "cgameClientIdentity_t\t*identity;" in block
 	assert "identity->clientNum = clientNum;" in block
+	assert "identity->identityTransport = 0;" in block
+	assert "identity->identityLow = ci->identityLow;" in block
+	assert "identity->identityHigh = ci->identityHigh;" in block
 	assert "Q_strncpyz( identity->displayName, ci->name, sizeof( identity->displayName ) );" in block
 	assert "Q_CleanStr( cleanName );" in block
 	assert 'cleanName[0] ? cleanName : ci->name' in block

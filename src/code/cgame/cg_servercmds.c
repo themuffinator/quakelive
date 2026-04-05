@@ -2043,11 +2043,11 @@ static void CG_ParseCompactScores( void ) {
 
 /*
 =================
-CG_ParseScores
+CG_ParseRichScoreboardPayload
 
 =================
 */
-static void CG_ParseScores( void ) {
+static void CG_ParseRichScoreboardPayload( void ) {
 	cg.numScores = atoi( CG_Argv( 1 ) );
 	if ( cg.numScores > MAX_CLIENTS ) {
 		cg.numScores = MAX_CLIENTS;
@@ -2059,7 +2059,30 @@ static void CG_ParseScores( void ) {
 	CG_ResetParsedScoreboardCaches();
 	CG_ParseGenericScoreRows( 4, 16 );
 	CG_SetScoreSelection(NULL);
+}
 
+/*
+=================
+CG_ParseFFAScores
+
+Consumes the retail dedicated `scores_ffa` scoreboard transport while
+preserving the shared rich-score payload layout.
+=================
+*/
+static void CG_ParseFFAScores( void ) {
+	CG_ParseRichScoreboardPayload();
+}
+
+/*
+=================
+CG_ParseScores
+
+Consumes the retail generic `scores` scoreboard transport, which shares the
+same rich per-client payload layout as `scores_ffa`.
+=================
+*/
+static void CG_ParseScores( void ) {
+	CG_ParseRichScoreboardPayload();
 }
 
 /*
@@ -2522,6 +2545,47 @@ static const char *CG_NormalizeMapFilename( const char *mapname ) {
 
 /*
 ================
+CG_ParseFactoryTitleServerinfo
+
+Refreshes the cached factory title from the serverinfo-backed g_factoryTitle key.
+================
+*/
+static void CG_ParseFactoryTitleServerinfo( const char *info ) {
+	const char	*value;
+	int		start;
+	int		end;
+	int		length;
+
+	cgs.factoryTitle[0] = '\0';
+	value = info ? Info_ValueForKey( info, "g_factoryTitle" ) : "";
+	if ( !value ) {
+		return;
+	}
+
+	start = 0;
+	while ( value[start] && (unsigned char)value[start] <= ' ' ) {
+		start++;
+	}
+
+	end = (int)strlen( value );
+	while ( end > start && (unsigned char)value[end - 1] <= ' ' ) {
+		end--;
+	}
+
+	length = end - start;
+	if ( length <= 0 ) {
+		return;
+	}
+
+	if ( length >= (int)sizeof( cgs.factoryTitle ) ) {
+		length = (int)sizeof( cgs.factoryTitle ) - 1;
+	}
+
+	Com_sprintf( cgs.factoryTitle, sizeof( cgs.factoryTitle ), "%.*s", length, value + start );
+}
+
+/*
+================
 CG_ParseServerinfo
 
 This is called explicitly when the gamestate is first received,
@@ -2577,17 +2641,11 @@ void CG_ParseServerinfo( void ) {
 		const char	*playerCountTeamSizeValue;
 
 		/*
-		 * Retail `CG_PLAYER_COUNTS` / `CG_RED_PLAYER_COUNT` / `CG_BLUE_PLAYER_COUNT`
-		 * consume a shared serverinfo-side per-side cap rather than the live
-		 * round-team counters. The exact retail key name is still unresolved in the
-		 * current source tree, so mirror the strongest local candidates and keep the
-		 * fallback at zero when the server does not advertise one.
+		 * The player-count ownerdraws consume the serverinfo-facing `teamsize`
+		 * transport. qagame now mirrors the internal `g_teamSizeMin` state through
+		 * that alias so live admin and vote changes stay visible to cgame.
 		 */
 		playerCountTeamSizeValue = Info_ValueForKey( info, "teamsize" );
-		if ( !playerCountTeamSizeValue[0] ) {
-			playerCountTeamSizeValue = Info_ValueForKey( info, "g_teamSizeMin" );
-		}
-
 		cgs.playerCountTeamSize = playerCountTeamSizeValue[0] ? atoi( playerCountTeamSizeValue ) : 0;
 		if ( cgs.playerCountTeamSize < 0 ) {
 			cgs.playerCountTeamSize = 0;
@@ -2603,38 +2661,7 @@ void CG_ParseServerinfo( void ) {
 	}
 	Q_strncpyz( cgs.loadout, serverLoadout, sizeof( cgs.loadout ) );
 	trap_Cvar_Set( "cg_loadout", cgs.loadout );
-  
-	{
-		const char	*armorTieredValue;
-
-		armorTieredValue = Info_ValueForKey( info, "g_armorTiered" );
-		if ( !armorTieredValue[0] ) {
-			armorTieredValue = "0";
-		}
-
-		cg.armorTieredEnabled = (qboolean)( atoi( armorTieredValue ) != 0 );
-		trap_Cvar_Set( "cg_armorTiered", armorTieredValue );
-	}
-
-	{
-		const char	*playerCylindersValue;
-
-		/*
-		 * Retail cgame loads the shared box-vs-capsule trace gate into
-		 * `data_10a5fd9c` from configstring slot 0x2a2 in the 0x10049420 /
-		 * 0x10049d20 update path, and retail qagame publishes that same 0x2a2 slot
-		 * from the literal `g_playerCylinders` cvar. The remaining divergence here
-		 * is transport, not identity: source still mirrors the value through
-		 * `CS_SERVERINFO` instead of a dedicated 0x2a2 configstring.
-		 */
-		playerCylindersValue = Info_ValueForKey( info, "g_playerCylinders" );
-		if ( !playerCylindersValue[0] ) {
-			playerCylindersValue = "0";
-		}
-
-		cgs.playerCylindersEnabled = (qboolean)( atoi( playerCylindersValue ) != 0 );
-		trap_Cvar_Set( "cg_playerCylinders", playerCylindersValue );
-	}
+	CG_ParseFactoryTitleServerinfo( info );
 
 	mapname = CG_NormalizeMapFilename( Info_ValueForKey( info, "mapname" ) );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
@@ -2681,6 +2708,50 @@ static void CG_ParseWarmup( void ) {
 
 /*
 =============
+CG_ParsePlayerCylindersConfigString
+
+Restores the retail dedicated player-cylinder configstring parser and mirrors
+the shared collision-shape gate through cg_playerCylinders.
+=============
+*/
+static void CG_ParsePlayerCylindersConfigString( void ) {
+	const char	*info;
+	const char	*value;
+
+	info = CG_ConfigString( CS_PLAYER_CYLINDERS );
+	value = ( info && info[0] ) ? va( "%i", atoi( info ) ) : "0";
+
+	cgs.playerCylindersEnabled = (qboolean)( atoi( value ) != 0 );
+	trap_Cvar_Set( "cg_playerCylinders", value );
+	trap_Cvar_Update( &cg_playerCylinders );
+}
+
+/*
+=============
+CG_ParseArmorTieredConfigString
+
+Restores the retail armor-tiering parser boundary and mirrors the reconstructed
+server-settings payload through cg_armorTiered for shared gameplay consumers.
+=============
+*/
+static void CG_ParseArmorTieredConfigString( void ) {
+	const char	*info;
+	const char	*value;
+
+	info = CG_ConfigString( CS_SERVER_SETTINGS_INFO_A );
+	value = ( info && info[0] ) ? Info_ValueForKey( info, "armor_tiered" ) : "";
+	if ( !value[0] ) {
+		value = "0";
+	}
+
+	cgs.serverSettingsArmorTiered = (qboolean)( atoi( value ) != 0 );
+	cg.armorTieredEnabled = cgs.serverSettingsArmorTiered;
+	trap_Cvar_Set( "cg_armorTiered", value );
+	trap_Cvar_Update( &cg_armorTiered );
+}
+
+/*
+=============
 CG_ResetPlayerAppearanceState
 
 Restores the retail forced-player appearance cache to the current defaults.
@@ -2706,7 +2777,6 @@ head overrides plus the shared head/model scale controls.
 static void CG_ParsePlayerAppearanceConfigString( void ) {
 	const char	*info;
 	const char	*value;
-	const char	*fallbackInfo;
 	char		oldModelOverride[MAX_QPATH];
 	char		oldHeadOverride[MAX_QPATH];
 	qboolean	oldAllowCustomHeadmodels;
@@ -2749,23 +2819,6 @@ static void CG_ParsePlayerAppearanceConfigString( void ) {
 		value = Info_ValueForKey( info, "g_playerModelScale" );
 		if ( value && value[0] ) {
 			cgs.playerModelScale = (float)atof( value );
-		}
-	} else {
-		/*
-		 * Older source builds carried the override strings through CS_SERVERINFO.
-		 * Keep that fallback until every path is fully migrated to the retail
-		 * configstring slab.
-		 */
-		fallbackInfo = CG_ConfigString( CS_SERVERINFO );
-
-		value = Info_ValueForKey( fallbackInfo, "g_playermodelOverride" );
-		if ( value && value[0] ) {
-			Q_strncpyz( cgs.playermodelOverride, value, sizeof( cgs.playermodelOverride ) );
-		}
-
-		value = Info_ValueForKey( fallbackInfo, "g_playerheadmodelOverride" );
-		if ( value && value[0] ) {
-			Q_strncpyz( cgs.playerheadmodelOverride, value, sizeof( cgs.playerheadmodelOverride ) );
 		}
 	}
 
@@ -3309,18 +3362,12 @@ Called on load to set the initial values from configure strings
 ==================
 CG_ParseFactoryMetadata
 
-Refreshes the cached factory metadata strings from the latest configstrings.
+Refreshes the cached factory flag metadata from the latest configstrings. The
+matching title remains serverinfo-backed.
 ==================
 */
 static void CG_ParseFactoryMetadata( void ) {
 	const char *info;
-
-	info = CG_ConfigString( CS_FACTORY_TITLE );
-	if ( info && *info ) {
-		Q_strncpyz( cgs.factoryTitle, info, sizeof( cgs.factoryTitle ) );
-	} else {
-		cgs.factoryTitle[0] = '\0';
-	}
 
 	info = CG_ConfigString( CS_FACTORY_FLAGS );
 	if ( info && *info ) {
@@ -3364,15 +3411,12 @@ static void CG_ParseCustomSettingsConfigString( void ) {
 CG_ParseServerSettingsInfoConfigStrings
 
 Refreshes the retail server-settings scalar payloads used by the settings ownerdraw.
+The adjacent armor-tiering toggle keeps its dedicated retail parser boundary.
 ==================
 */
 static void CG_ParseServerSettingsInfoConfigStrings( void ) {
 	const char	*info;
 	const char	*value;
-
-	info = CG_ConfigString( CS_SERVER_SETTINGS_INFO_A );
-	value = ( info && info[0] ) ? Info_ValueForKey( info, "armor_tiered" ) : "";
-	cgs.serverSettingsArmorTiered = (qboolean)( value[0] && atoi( value ) != 0 );
 
 	info = CG_ConfigString( CS_SERVER_SETTINGS_INFO_B );
 	value = ( info && info[0] ) ? Info_ValueForKey( info, "g_quadDamageFactor" ) : "";
@@ -3466,8 +3510,10 @@ void CG_SetConfigValues( void ) {
 	CG_ParseWarmupReadyStatus();
 	CG_ParseForcedCosmetics();
 	CG_ParseFreezeTipConfigstrings();
+	CG_ParsePlayerCylindersConfigString();
 	CG_ParseFactoryMetadata();
 	CG_ParseCustomSettingsConfigString();
+	CG_ParseArmorTieredConfigString();
 	CG_ParseServerSettingsInfoConfigStrings();
 	CG_ParsePlayerAppearanceConfigString();
 	CG_ParsePmoveConfigString( CG_ConfigString( CS_PMOVE_SETTINGS ) );
@@ -3568,11 +3614,15 @@ static void CG_ConfigStringModified( void ) {
 		CG_ParseDisableLoadoutConfigString( str );
 	} else if ( num == CS_ENABLE_BREATH ) {
 		CG_ParseEnableBreathConfigString( str );
-	} else if ( num == CS_FACTORY_TITLE || num == CS_FACTORY_FLAGS ) {
+	} else if ( num == CS_PLAYER_CYLINDERS ) {
+		CG_ParsePlayerCylindersConfigString();
+	} else if ( num == CS_FACTORY_FLAGS ) {
 		CG_ParseFactoryMetadata();
 	} else if ( num == CS_CUSTOM_SETTINGS ) {
 		CG_ParseCustomSettingsConfigString();
-	} else if ( num == CS_SERVER_SETTINGS_INFO_A || num == CS_SERVER_SETTINGS_INFO_B ) {
+	} else if ( num == CS_SERVER_SETTINGS_INFO_A ) {
+		CG_ParseArmorTieredConfigString();
+	} else if ( num == CS_SERVER_SETTINGS_INFO_B ) {
 		CG_ParseServerSettingsInfoConfigStrings();
 	} else if ( num == CS_PLAYER_APPEARANCE ) {
 		CG_ParsePlayerAppearanceConfigString();
@@ -3732,6 +3782,10 @@ static void CG_MapRestart( void ) {
 	cg.fraglimitWarnings = 0;
 
 	cg.timelimitWarnings = 0;
+	cg.itemPickup = 0;
+	cg.itemPickupTime = 0;
+	cg.itemPickupBlendTime = 0;
+	cg.attackerTime = 0;
 
 	cg.intermissionStarted = qfalse;
 	cg.intermissionLetterboxChangeTime = 0;
@@ -4118,7 +4172,8 @@ void CG_PlayVoiceChat( bufferedVoiceChat_t *vchat ) {
 				cgs.acceptLeader = vchat->clientNum;
 			}
 			// see if this was an order
-			CG_ShowResponseHead();
+			Menus_OpenByName( "voiceMenu" );
+			cg.voiceMenuTime = cg.time;
 		}
 	}
 	if ( !vchat->voiceOnly && cg_showVoiceText.integer ) {
@@ -4750,7 +4805,7 @@ static void CG_ServerCommand( void ) {
 	}
 
 	if ( !strcmp( cmd, "scores_ffa" ) ) {
-		CG_ParseScores();
+		CG_ParseFFAScores();
 		return;
 	}
 

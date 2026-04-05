@@ -78,6 +78,7 @@ static int	s_roundWarmupDelayModCount = 0;
 static int	s_teamSizeMinModCount = 0;
 static char	s_worldspawnAtmosphere[MAX_QPATH];
 static char	s_lastForcedCosmeticsPayload[MAX_INFO_STRING];
+static char	s_playerCylindersPayload[32];
 static char	s_serverSettingsInfoPayloadA[MAX_INFO_STRING];
 static char	s_serverSettingsInfoPayloadB[MAX_INFO_STRING];
 static char	s_weaponReloadPayload[MAX_INFO_STRING];
@@ -91,9 +92,11 @@ static uint64_t s_lastCustomSettingsMask = 0;
 static const char *s_duelSpawnGrantScript = "weapon_gauntlet weapon_machinegun ammo_bullets 100";
 static vmCvar_t	g_weaponRespawnLegacy;
 static vmCvar_t	g_damageGauntletLegacy;
+static vmCvar_t	g_teamSizeLegacy;
 static legacyCvarAlias_t	s_legacyCvarAliases[] = {
 	{ &g_weaponRespawn, "g_weaponRespawn", &g_weaponRespawnLegacy, "g_weaponrespawn", "5", 0, -1, -1 },
-	{ &g_damage_g, "g_damage_g", &g_damageGauntletLegacy, "g_damage_gauntlet", "50", 0, -1, -1 }
+	{ &g_damage_g, "g_damage_g", &g_damageGauntletLegacy, "g_damage_gauntlet", "50", 0, -1, -1 },
+	{ &g_teamSizeMin, "g_teamSizeMin", &g_teamSizeLegacy, "teamsize", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, -1, -1 }
 };
 
 static qlr_game_frame_context_t *G_GetFrameContext( void );
@@ -114,6 +117,7 @@ static const char *G_AdminAccessTierToken( int tier );
 static void G_InsertAdminAccessEntry( const char *steamId, int tier );
 static void G_LoadAdminAccessFile( void );
 static void G_WriteAdminAccessFile( void );
+static void G_UpdatePlayerCylindersConfigstring( qboolean forceBroadcast );
 static void G_UpdateServerSettingsInfoConfigstrings( qboolean forceBroadcast );
 static void G_UpdateWeaponReloadConfigstring( qboolean forceBroadcast );
 static void G_UpdatePlayerAppearanceConfigstring( qboolean forceBroadcast );
@@ -1382,6 +1386,7 @@ LegacyCvar_UpdateAliases( s_legacyCvarAliases, ARRAY_LEN( s_legacyCvarAliases ) 
 
 	G_SyncAdminConfig();
 	G_RefreshPmoveSettings();
+	G_UpdatePlayerCylindersConfigstring( qtrue );
 	G_UpdateServerSettingsInfoConfigstrings( qtrue );
 	G_UpdateWeaponReloadConfigstring( qtrue );
 	G_UpdatePlayerAppearanceConfigstring( qtrue );
@@ -1484,6 +1489,7 @@ void G_UpdateCvars( void ) {
 	G_UpdateTrainingState();
 	G_UpdateGametypeTutorialText();
 	G_RefreshPmoveSettings();
+	G_UpdatePlayerCylindersConfigstring( qfalse );
 	G_UpdateServerSettingsInfoConfigstrings( qfalse );
 	G_UpdateWeaponReloadConfigstring( qfalse );
 	G_UpdatePlayerAppearanceConfigstring( qfalse );
@@ -1513,6 +1519,25 @@ for additional gameplay overrides before rebuilding the string.
 */
 void G_ClearCustomSettingsDirtyFlag( void ) {
 	s_customSettingsDirty = qfalse;
+}
+
+/*
+=============
+G_UpdatePlayerCylindersConfigstring
+
+Publishes the retail dedicated numeric player-cylinder toggle configstring.
+=============
+*/
+static void G_UpdatePlayerCylindersConfigstring( qboolean forceBroadcast ) {
+	char	payload[32];
+
+	Com_sprintf( payload, sizeof( payload ), "%i", g_playerCylinders.integer );
+	if ( !forceBroadcast && !Q_stricmp( payload, s_playerCylindersPayload ) ) {
+		return;
+	}
+
+	trap_SetConfigstring( CS_PLAYER_CYLINDERS, payload );
+	Q_strncpyz( s_playerCylindersPayload, payload, sizeof( s_playerCylindersPayload ) );
 }
 
 /*
@@ -4141,6 +4166,114 @@ static int G_RankGetMedalTotal( const gclient_t *client, rankMedal_t medalIndex 
 
 /*
 ================
+G_RankResolveAwardEventId
+
+Maps retail medal counters onto the Quake Live EV_AWARD taxonomy.
+================
+*/
+static int G_RankResolveAwardEventId( rankMedal_t medalIndex ) {
+	switch ( medalIndex ) {
+	case RANK_MEDAL_COMBOKILL:
+		return 0;
+	case RANK_MEDAL_RAMPAGE:
+		return 1;
+	case RANK_MEDAL_MIDAIR:
+		return 2;
+	case RANK_MEDAL_REVENGE:
+		return 3;
+	case RANK_MEDAL_PERFORATED:
+		return 4;
+	case RANK_MEDAL_HEADSHOT:
+		return 5;
+	case RANK_MEDAL_ACCURACY:
+		return 6;
+	case RANK_MEDAL_QUADGOD:
+		return 7;
+	case RANK_MEDAL_FIRSTFRAG:
+		return 8;
+	case RANK_MEDAL_PERFECT:
+		return 9;
+	default:
+		break;
+	}
+
+	return -1;
+}
+
+/*
+================
+G_RankResolveAwardMedalIndex
+
+Maps a Quake Live EV_AWARD identifier back to the owning medal counter.
+================
+*/
+static rankMedal_t G_RankResolveAwardMedalIndex( int award ) {
+	switch ( award ) {
+	case 0:
+		return RANK_MEDAL_COMBOKILL;
+	case 1:
+		return RANK_MEDAL_RAMPAGE;
+	case 2:
+		return RANK_MEDAL_MIDAIR;
+	case 3:
+		return RANK_MEDAL_REVENGE;
+	case 4:
+		return RANK_MEDAL_PERFORATED;
+	case 5:
+		return RANK_MEDAL_HEADSHOT;
+	case 6:
+		return RANK_MEDAL_ACCURACY;
+	case 7:
+		return RANK_MEDAL_QUADGOD;
+	case 8:
+		return RANK_MEDAL_FIRSTFRAG;
+	case 9:
+		return RANK_MEDAL_PERFECT;
+	default:
+		break;
+	}
+
+	return RANK_MEDAL_COUNT;
+}
+
+/*
+================
+G_AddAwardEntity
+
+Publishes the recovered retail EV_AWARD temp entity for the scoring client.
+================
+*/
+static void G_AddAwardEntity( gentity_t *ent, int award ) {
+	gentity_t	*tent;
+	rankMedal_t	medalIndex;
+	int		awardCount;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	medalIndex = G_RankResolveAwardMedalIndex( award );
+	if ( medalIndex < 0 || medalIndex >= RANK_MEDAL_COUNT ) {
+		return;
+	}
+
+	awardCount = G_RankGetMedalTotal( ent->client, medalIndex );
+	if ( awardCount <= 0 ) {
+		return;
+	}
+
+	tent = G_TempEntity( ent->client->ps.origin, EV_AWARD );
+	tent->r.svFlags |= SVF_SINGLECLIENT;
+	tent->r.singleClient = ent->s.number;
+	G_SetRetailEventRecipient( tent, ent->s.number );
+	tent->s.frame = awardCount;
+	G_SetRetailEventData( &tent->s, award );
+
+	ent->client->rewardTime = level.time + REWARD_SPRITE_TIME;
+}
+
+/*
+================
 G_RankGetPlayerRank
 
 Rebuilds the per-player scoreboard placement emitted by retail PLAYER_STATS,
@@ -5343,6 +5476,7 @@ void G_RankSendPlayerMedal( gentity_t *ent, const char *medal ) {
 	size_t		length;
 	qboolean	firstField;
 	rankMedal_t	medalIndex;
+	int		awardEventId;
 	int		total;
 
 	if ( !ent || !ent->client || !medal || !medal[0] ) {
@@ -5354,6 +5488,10 @@ void G_RankSendPlayerMedal( gentity_t *ent, const char *medal ) {
 		ent->client->pers.rankMedalCounts[medalIndex]++;
 	}
 	total = G_RankGetMedalTotal( ent->client, medalIndex );
+	awardEventId = G_RankResolveAwardEventId( medalIndex );
+	if ( awardEventId >= 0 ) {
+		G_AddAwardEntity( ent, awardEventId );
+	}
 
 	G_RankResolveEventSteamIds( ent, &steamIdLow, &steamIdHigh );
 	G_RankFormatSteamId( ent, steamId, sizeof( steamId ) );

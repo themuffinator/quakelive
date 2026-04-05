@@ -29,8 +29,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // used for scoreboard
 extern displayContextDef_t cgDC;
+extern menuDef_t Menus[MAX_MENUS];
 menuDef_t *menuScoreboard = NULL;
 menuDef_t *menuStats = NULL;
+static menuDef_t	*cgSpectatorMenu;
+static menuDef_t	*cgSpectatorFollowMenu;
+static menuDef_t	*cgSpectatorRedTopMenu;
+static menuDef_t	*cgSpectatorRedBottomMenu;
+static menuDef_t	*cgSpectatorBlueTopMenu;
+static menuDef_t	*cgSpectatorBlueBottomMenu;
 
 int sortedTeamPlayers[TEAM_MAXOVERLAY];
 int	numSortedTeamPlayers;
@@ -51,6 +58,11 @@ static qhandle_t	cg_inputCmdDownShader;
 static qhandle_t	cg_inputCmdRightShader;
 static qhandle_t	cg_inputCmdLeftShader;
 static float	cg_spectatorItemPickupBaseY;
+static int	cg_drawActiveMilliseconds;
+
+static float CG_DrawSnapshot( float y );
+static void CG_DrawCrosshair( void );
+static void CG_DrawCrosshairNames( void );
 
 
 /*
@@ -599,7 +611,7 @@ cgQueuedWorldMarker_t *CG_AllocQueuedWorldMarkerForKey( int kind, int key ) {
 ====================
 CG_POIMarkerSizeForOrigin
 
-Approximates the retail POI width clamp from the hidden cg_poi* cvars.
+Applies the retail POI width clamp from the hidden cg_poi* cvars.
 ====================
 */
 float CG_POIMarkerSizeForOrigin( const vec3_t origin ) {
@@ -656,7 +668,7 @@ qboolean CG_ShouldDrawPOIMarkerMode( int mode, const vec3_t origin ) {
 	}
 
 	CG_Trace( &trace, cg.refdef.vieworg, vec3_origin, vec3_origin, origin, skipNum, MASK_OPAQUE );
-	return (qboolean)( trace.fraction >= 1.0f );
+	return (qboolean)( trace.fraction < 1.0f );
 }
 
 /*
@@ -2428,33 +2440,35 @@ static void CG_DrawSpectatorItemPickups( void ) {
 
 /*
 =====================
-CG_DrawUpperRight
+CG_DrawUpperRightStack
 
 =====================
 */
-static void CG_DrawUpperRight( void ) {
-	float	y;
-
-	y = 0;
-
+static float CG_DrawUpperRightStack( float y ) {
 	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 1 ) {
 		y = CG_DrawTeamOverlay( y, qtrue, qtrue );
-	} 
+	}
 	if ( cg_drawSnapshot.integer ) {
 		y = CG_DrawSnapshot( y );
 	}
 	if ( cg_drawFPS.integer ) {
 		y = CG_DrawFPS( y );
 	}
-	if ( cg_drawTimer.integer ) {
-		y = CG_DrawTimer( y );
-	}
 	if ( cg_drawAttacker.integer ) {
 		y = CG_DrawAttacker( y );
 	}
 
-	y = CG_DrawObituaries( y );
-	cg_spectatorItemPickupBaseY = y;
+	return y;
+}
+
+/*
+=====================
+CG_DrawUpperRight
+
+=====================
+*/
+static void CG_DrawUpperRight( void ) {
+	cg_spectatorItemPickupBaseY = CG_DrawUpperRightStack( 0.0f );
 }
 
 /*
@@ -4114,17 +4128,101 @@ static void CG_DrawCrosshairNames( void ) {
 //==============================================================================
 
 /*
-=================
-CG_DrawSpectator
-=================
+=============
+CG_ResetDraw2DMenuCache
+
+Clears the cached retail 2D overlay roots rebuilt when HUD menus reload.
+=============
 */
-static void CG_DrawSpectator(void) {
+void CG_ResetDraw2DMenuCache( void ) {
+	menuScoreboard = NULL;
+	menuStats = NULL;
+	cgSpectatorMenu = NULL;
+	cgSpectatorFollowMenu = NULL;
+	cgSpectatorRedTopMenu = NULL;
+	cgSpectatorRedBottomMenu = NULL;
+	cgSpectatorBlueTopMenu = NULL;
+	cgSpectatorBlueBottomMenu = NULL;
+}
+
+/*
+=============
+CG_CacheDraw2DMenuCache
+
+Resolves the retail 2D overlay roots that `CG_Draw2D()` reuses each frame.
+=============
+*/
+void CG_CacheDraw2DMenuCache( void ) {
+	menuStats = Menus_FindByName( "stats_menu" );
+	cgSpectatorMenu = Menus_FindByName( "comp_spechud_menu" );
+	cgSpectatorFollowMenu = Menus_FindByName( "comp_specfollowhud_menu" );
+	cgSpectatorRedTopMenu = Menus_FindByName( "comp_specred_top" );
+	cgSpectatorRedBottomMenu = Menus_FindByName( "comp_specred_bottom" );
+	cgSpectatorBlueTopMenu = Menus_FindByName( "comp_specblue_top" );
+	cgSpectatorBlueBottomMenu = Menus_FindByName( "comp_specblue_bottom" );
+}
+
+/*
+=============
+CG_DrawCachedOverlayMenu
+
+Paints one cached retail browser/menu root when it exists.
+=============
+*/
+static qboolean CG_DrawCachedOverlayMenu( menuDef_t *menu ) {
+	if ( !menu ) {
+		return qfalse;
+	}
+
+	menu->window.flags &= ~WINDOW_FORCED;
+	CG_DrawBrowserOverlayTree( menu, qtrue );
+	return qtrue;
+}
+
+/*
+=============
+CG_DrawSpectatorFallback
+
+Preserves the source-side spectator text when retail menu roots are absent.
+=============
+*/
+static void CG_DrawSpectatorFallback( void ) {
 	CG_DrawBigString(320 - 9 * 8, 440, "SPECTATOR", 1.0F);
 	if ( cgs.gametype == GT_TOURNAMENT ) {
 		CG_DrawBigString(320 - 15 * 8, 460, "waiting to play", 1.0F);
 	}
 	else if ( cgs.gametype >= GT_TEAM ) {
 		CG_DrawBigString(320 - 39 * 8, 460, "press ESC and use the JOIN menu to play", 1.0F);
+	}
+}
+
+/*
+=================
+CG_DrawSpectator
+=================
+*/
+static void CG_DrawSpectator( void ) {
+	menuDef_t	*menu;
+	qboolean	drewOverlay;
+
+	if ( cg.scoreBoardShowing ) {
+		return;
+	}
+
+	drewOverlay = qfalse;
+	menu = cgSpectatorMenu;
+	if ( cg.snap && ( cg.snap->ps.pm_flags & PMF_FOLLOW ) && cgSpectatorFollowMenu ) {
+		menu = cgSpectatorFollowMenu;
+	}
+
+	drewOverlay = (qboolean)( CG_DrawCachedOverlayMenu( menu ) || drewOverlay );
+	drewOverlay = (qboolean)( CG_DrawCachedOverlayMenu( cgSpectatorRedTopMenu ) || drewOverlay );
+	drewOverlay = (qboolean)( CG_DrawCachedOverlayMenu( cgSpectatorRedBottomMenu ) || drewOverlay );
+	drewOverlay = (qboolean)( CG_DrawCachedOverlayMenu( cgSpectatorBlueTopMenu ) || drewOverlay );
+	drewOverlay = (qboolean)( CG_DrawCachedOverlayMenu( cgSpectatorBlueBottomMenu ) || drewOverlay );
+
+	if ( !drewOverlay ) {
+		CG_DrawSpectatorFallback();
 	}
 }
 
@@ -4297,12 +4395,12 @@ static qboolean CG_DrawScoreboard( void ) {
 	}
 
 	if ( !menuScoreboard && menuName ) {
-		menuScoreboard = Menus_FindByName( menuName );
+		menuScoreboard = CG_FindBrowserOverlayByName( menuName );
 	}
 
 	if ( !menuScoreboard ) {
 		const char *fallback = ( cgs.gametype >= GT_TEAM ) ? "teamscore_menu" : "score_menu";
-		menuScoreboard = Menus_FindByName( fallback );
+		menuScoreboard = CG_FindBrowserOverlayByName( fallback );
 	}
 
 	if ( !menuScoreboard ) {
@@ -4314,7 +4412,7 @@ static qboolean CG_DrawScoreboard( void ) {
 		firstTime = qfalse;
 	}
 
-	Menu_Paint( menuScoreboard, qtrue );
+	CG_DrawBrowserOverlayTree( menuScoreboard, qtrue );
 
 	// load any models that have been deferred
 	if ( ++cg.deferredPlayerLoading > 10 ) {
@@ -4593,6 +4691,172 @@ static void CG_PlayWarmupCountSound( int countdown ) {
 
 /*
 =================
+CG_ADRoundScoreboardStatusText
+
+Builds the retail Attack and Defend round-panel status banner from the
+available scorelimit and roundlimit transport.
+=================
+*/
+static const char *CG_ADRoundScoreboardStatusText( void ) {
+	const char	*info;
+	const char	*value;
+	int		scorelimit;
+	int		roundlimit;
+	int		redScore;
+	int		blueScore;
+
+	info = CG_ConfigString( CS_SERVERINFO );
+	scorelimit = 0;
+	roundlimit = 0;
+	if ( info && info[0] ) {
+		value = Info_ValueForKey( info, "g_scorelimit" );
+		scorelimit = value[0] ? atoi( value ) : 0;
+
+		value = Info_ValueForKey( info, "roundlimit" );
+		roundlimit = value[0] ? atoi( value ) : 0;
+	}
+
+	redScore = cg.teamScores[0];
+	blueScore = cg.teamScores[1];
+
+	if ( cgs.matchRoundTurn != 0 ) {
+		if ( scorelimit > 0 && redScore >= scorelimit && redScore > blueScore ) {
+			return "Red Wins! Good Game";
+		}
+
+		if ( ( scorelimit > 0 && redScore > blueScore && redScore + 1 >= scorelimit )
+			|| ( roundlimit > 0 && cgs.matchRoundNumber >= roundlimit && redScore > blueScore ) ) {
+			return "Last Chance";
+		}
+	}
+
+	if ( ( scorelimit > 0
+			&& ( ( cgs.matchRoundTurn != 0 ) ? blueScore : redScore ) + 1 >= scorelimit )
+		|| ( roundlimit > 0 && cgs.matchRoundNumber >= roundlimit ) ) {
+		return "Match Point";
+	}
+
+	return NULL;
+}
+
+/*
+=================
+CG_DrawADRoundScoreboard
+
+Mirrors the retail Attack and Defend round-score panel drawn beneath the
+warmup banner.
+=================
+*/
+static void CG_DrawADRoundScoreboard( void ) {
+	static const vec4_t panelColor = { 0.0f, 0.0f, 0.0f, 0.25f };
+	static const vec4_t activeTeamRedFillColor = { 0.5f, 0.1f, 0.1f, 0.5f };
+	static const vec4_t activeTeamBlueFillColor = { 0.1f, 0.1f, 0.5f, 0.5f };
+	static const vec4_t activeRoundRedFillColor = { 1.0f, 0.0f, 0.0f, 0.5f };
+	static const vec4_t activeRoundBlueFillColor = { 0.0f, 0.0f, 1.0f, 0.5f };
+	const vec4_t	*activeTeamFillColor;
+	const vec4_t	*activeRoundFillColor;
+	const char	*statusText;
+	float		activeRowY;
+	float		cellX;
+	int		column;
+	int		activeColumn;
+	int		roundWindowStart;
+
+	if ( cgs.matchRoundNumber <= 0 ) {
+		return;
+	}
+
+	CG_FillRect( 200.0f, 150.0f, 240.0f, 48.0f, panelColor );
+
+	roundWindowStart = ( cgs.matchRoundNumber > ( CG_AD_SCORE_HISTORY_LENGTH / 2 ) ) ?
+		( cgs.matchRoundNumber - ( CG_AD_SCORE_HISTORY_LENGTH / 2 ) + 1 ) : 1;
+	activeColumn = cgs.matchRoundNumber - roundWindowStart;
+	if ( activeColumn < 0 ) {
+		activeColumn = 0;
+	} else if ( activeColumn >= ( CG_AD_SCORE_HISTORY_LENGTH / 2 ) ) {
+		activeColumn = ( CG_AD_SCORE_HISTORY_LENGTH / 2 ) - 1;
+	}
+
+	if ( cgs.matchRoundTurn != 0 ) {
+		activeRowY = 182.0f;
+		activeTeamFillColor = &activeTeamBlueFillColor;
+		activeRoundFillColor = &activeRoundBlueFillColor;
+	} else {
+		activeRowY = 166.0f;
+		activeTeamFillColor = &activeTeamRedFillColor;
+		activeRoundFillColor = &activeRoundRedFillColor;
+	}
+
+	CG_FillRect( 200.0f, activeRowY, 40.0f, 16.0f, *activeTeamFillColor );
+	CG_FillRect( 240.0f + activeColumn * 16.0f, activeRowY, 16.0f, 16.0f, *activeRoundFillColor );
+
+	CG_Text_PaintNoAdjust( 204.0f, 162.0f, 0.20f, colorWhite, "Round", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	CG_Text_PaintNoAdjust( 204.0f, 178.0f, 0.25f, colorRed, "Red", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	CG_Text_PaintNoAdjust( 204.0f, 194.0f, 0.25f, colorBlue, "Blue", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+
+	for ( column = 0; column < ( CG_AD_SCORE_HISTORY_LENGTH / 2 ); column++ ) {
+		char	buffer[16];
+		int		historyIndex;
+		int		roundNumber;
+		int		textWidth;
+
+		cellX = 240.0f + column * 16.0f;
+		roundNumber = roundWindowStart + column;
+		Com_sprintf( buffer, sizeof( buffer ), "%i", roundNumber );
+		textWidth = CG_Text_Width( buffer, 0.20f, 0 );
+		CG_Text_PaintNoAdjust( cellX + ( 16.0f - (float)textWidth ) * 0.5f, 162.0f, 0.20f,
+			colorWhite, buffer, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+
+		historyIndex = column * 2;
+		if ( cg.adScoreHistory[historyIndex] >= 0 ) {
+			Com_sprintf( buffer, sizeof( buffer ), "%i", cg.adScoreHistory[historyIndex] );
+			textWidth = CG_Text_Width( buffer, 0.25f, 0 );
+			CG_Text_PaintNoAdjust( cellX + ( 16.0f - (float)textWidth ) * 0.5f, 178.0f, 0.25f,
+				colorRed, buffer, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+		}
+
+		if ( cg.adScoreHistory[historyIndex + 1] >= 0 ) {
+			Com_sprintf( buffer, sizeof( buffer ), "%i", cg.adScoreHistory[historyIndex + 1] );
+			textWidth = CG_Text_Width( buffer, 0.25f, 0 );
+			CG_Text_PaintNoAdjust( cellX + ( 16.0f - (float)textWidth ) * 0.5f, 194.0f, 0.25f,
+				colorBlue, buffer, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+		}
+	}
+
+	CG_Text_PaintNoAdjust( 404.0f, 162.0f, 0.25f, colorWhite, "Score", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	{
+		char	buffer[16];
+		int		textWidth;
+
+		Com_sprintf( buffer, sizeof( buffer ), "%i", cg.teamScores[0] );
+		textWidth = CG_Text_Width( buffer, 0.25f, 0 );
+		CG_Text_PaintNoAdjust( 416.0f + ( 16.0f - (float)textWidth ) * 0.5f, 178.0f, 0.25f,
+			colorRed, buffer, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+
+		Com_sprintf( buffer, sizeof( buffer ), "%i", cg.teamScores[1] );
+		textWidth = CG_Text_Width( buffer, 0.25f, 0 );
+		CG_Text_PaintNoAdjust( 416.0f + ( 16.0f - (float)textWidth ) * 0.5f, 194.0f, 0.25f,
+			colorBlue, buffer, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	}
+
+	statusText = CG_ADRoundScoreboardStatusText();
+	if ( statusText && statusText[0] ) {
+		int		textWidth;
+		const vec4_t	*statusColor;
+
+		statusColor = &colorWhite;
+		if ( !Q_stricmp( statusText, "Red Wins! Good Game" ) ) {
+			statusColor = &colorRed;
+		}
+
+		textWidth = CG_Text_Width( statusText, 0.30f, 0 );
+		CG_Text_PaintNoAdjust( 320.0f - (float)textWidth * 0.5f, 214.0f, 0.30f, *statusColor,
+			statusText, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	}
+}
+
+/*
+=================
 CG_DrawWarmupStatusText
 =================
 */
@@ -4642,6 +4906,7 @@ static void CG_DrawWarmupStatusText( int gametype ) {
 		cgs.matchRoundNumber <= 0 ) {
 		title = "Infected";
 	} else if ( gametype == GT_ATTACK_DEFEND && cgs.matchRoundState == ROUNDSTATE_WARMUP ) {
+		CG_DrawADRoundScoreboard();
 		attackingTeam = ( cgs.matchRoundTurn != 0 ) ? TEAM_BLUE : TEAM_RED;
 		localTeam = TEAM_SPECTATOR;
 		if ( cg.snap ) {
@@ -4885,6 +5150,10 @@ static void CG_DrawWarmup( void ) {
 	int			sec;
 	const char	*s;
 
+	if ( CG_IsJoinGameMenuCaptureActive() && !cg.scoreBoardShowing ) {
+		return;
+	}
+
 	sec = cg.warmup;
 	if ( sec == 0 && cgs.matchReadyUpDeadline > 0 ) {
 		sec = cgs.matchReadyUpDeadline;
@@ -4963,14 +5232,308 @@ CG_DrawTimedMenus
 =================
 */
 void CG_DrawTimedMenus() {
-	if (cg.voiceTime) {
-		int t = cg.time - cg.voiceTime;
+	if ( cg.voiceMenuTime ) {
+		int t = cg.time - cg.voiceMenuTime;
+
 		if ( t > 2500 ) {
-			Menus_CloseByName("voiceMenu");
-			trap_Cvar_Set("cl_conXOffset", "0");
-			cg.voiceTime = 0;
+			Menus_CloseByName( "voiceMenu" );
+			cg.voiceMenuTime = 0;
 		}
 	}
+}
+
+/*
+=============
+CG_FormatSignedMilliseconds
+
+Formats the retail signed millisecond delta as `[-]m:ss.mmm`.
+=============
+*/
+static const char *CG_FormatSignedMilliseconds( int milliseconds ) {
+	unsigned int	absoluteMilliseconds;
+	const char		*signPrefix;
+	const char		*secondPrefix;
+	int			minutes;
+	float			seconds;
+
+	signPrefix = "";
+	absoluteMilliseconds = (unsigned int)milliseconds;
+	if ( milliseconds < 0 ) {
+		signPrefix = "-";
+		absoluteMilliseconds = (unsigned int)( -( milliseconds + 1 ) ) + 1u;
+	}
+
+	minutes = absoluteMilliseconds / 60000u;
+	seconds = ( absoluteMilliseconds % 60000u ) / 1000.0f;
+	secondPrefix = ( seconds < 10.0f ) ? "0" : "";
+
+	return va( "%s%d:%s%.03f", signPrefix, minutes, secondPrefix, seconds );
+}
+
+/*
+=============
+CG_IsTrainingTutorialSession
+
+Returns qtrue when the current pregame prompt should use the retail training
+or tutorial wording.
+=============
+*/
+static qboolean CG_IsTrainingTutorialSession( void ) {
+	const char	*info;
+	const char	*trainingValue;
+	const char	*tutorialName;
+	const char	*tutorialText;
+
+	info = CG_ConfigString( CS_SERVERINFO );
+	if ( info && info[0] ) {
+		trainingValue = Info_ValueForKey( info, "g_training" );
+		if ( trainingValue && trainingValue[0] && atoi( trainingValue ) ) {
+			return qtrue;
+		}
+	}
+
+	tutorialName = CG_ConfigString( CS_TUTORIAL_NAME );
+	if ( tutorialName && tutorialName[0] ) {
+		return qtrue;
+	}
+
+	tutorialText = CG_ConfigString( CS_TUTORIAL_TEXT );
+	return ( tutorialText && tutorialText[0] ) ? qtrue : qfalse;
+}
+
+/*
+=============
+CG_DrawDemoControlPair
+
+Paints one retail demo-HUD label/key pair centered on the supplied x column.
+=============
+*/
+static void CG_DrawDemoControlPair( float centerX, const char *label, const char *key ) {
+	int	labelWidth;
+	int	keyWidth;
+
+	if ( label && label[0] ) {
+		labelWidth = CG_Text_Width( label, 0.25f, 0 );
+		CG_Text_PaintNoAdjust( centerX - labelWidth * 0.5f, 395.0f, 0.25f, colorWhite,
+			label, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	}
+
+	if ( key && key[0] ) {
+		keyWidth = CG_Text_Width( key, 0.15f, 0 );
+		CG_Text_PaintNoAdjust( centerX - keyWidth * 0.5f, 405.0f, 0.15f, colorWhite,
+			key, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	}
+}
+
+/*
+=============
+CG_SetIgnoreMouseInput
+
+Keeps the cached `cg_ignoreMouseInput` cvar aligned with the retail overlay
+ownership logic.
+=============
+*/
+static void CG_SetIgnoreMouseInput( qboolean ignoreMouseInput ) {
+	if ( cg_ignoreMouseInput.integer == (int)ignoreMouseInput ) {
+		return;
+	}
+
+	trap_Cvar_Set( "cg_ignoreMouseInput", ignoreMouseInput ? "1" : "0" );
+}
+
+/*
+=============
+CG_UpdateTimeoutMouseInput
+
+Mirrors the retail timeout path that suppresses classic-HUD mouse handling
+while leaving menu-HUD overlays interactive.
+=============
+*/
+static void CG_UpdateTimeoutMouseInput( qboolean menuHudActive ) {
+	if ( CG_GetMatchTimeoutStartTime() != 0 ) {
+		if ( cg_ignoreMouseInput.integer == (int)menuHudActive ) {
+			CG_SetIgnoreMouseInput( (qboolean)!menuHudActive );
+		}
+		return;
+	}
+
+	if ( cg_ignoreMouseInput.integer != 0 ) {
+		CG_SetIgnoreMouseInput( qfalse );
+	}
+}
+
+/*
+=============
+CG_HasVisibleMenu
+
+Reports whether any retail browser/menu root is currently visible.
+=============
+*/
+static qboolean CG_HasVisibleMenu( void ) {
+	int	i;
+
+	for ( i = 0; i < Menu_Count(); ++i ) {
+		if ( Menus[i].window.flags & WINDOW_VISIBLE ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CG_UpdateSpIntermissionMouseInput
+
+Matches the retail SP intermission path that only re-enables mouse movement
+when a visible browser/menu root owns the interaction.
+=============
+*/
+static void CG_UpdateSpIntermissionMouseInput( void ) {
+	if ( cg_ignoreMouseInput.integer == 1 ) {
+		return;
+	}
+
+	if ( CG_HasVisibleMenu() ) {
+		CG_SetIgnoreMouseInput( qfalse );
+	} else {
+		CG_SetIgnoreMouseInput( qtrue );
+	}
+}
+
+/*
+=============
+CG_DrawReduced2D
+
+Runs the retail reduced 2D path used while the classic HUD is disabled or the
+client is paused.
+=============
+*/
+static void CG_DrawReduced2D( void ) {
+	CG_DrawCrosshair();
+	CG_DrawCrosshairNames();
+
+	if ( cg_drawSnapshot.integer == 2 ) {
+		CG_DrawSnapshot( 0.0f );
+	}
+}
+
+/*
+=============
+CG_DrawPregamePlacementPrompt
+
+Draws the retail placement/tutorial prompt shown during the single-player
+pregame intermission path.
+=============
+*/
+static void CG_DrawPregamePlacementPrompt( void ) {
+	const char	*prompt;
+	const char	*keyName;
+	float		y;
+	char		keyBuf[32];
+	int			w;
+
+	if ( !cg.snap || cg.snap->ps.pm_type != PM_SPINTERMISSION ) {
+		return;
+	}
+
+	keyName = CG_GetBindKeyName( "readyup", keyBuf, sizeof( keyBuf ) );
+	if ( !Q_stricmp( keyName, "???" ) ) {
+		keyName = CG_GetBindKeyName( "ready", keyBuf, sizeof( keyBuf ) );
+	}
+
+	if ( CG_IsTrainingTutorialSession() ) {
+		prompt = va( "Press %s to skip the tutorial", keyName );
+		y = 30.0f;
+	} else {
+		if ( cg.intermissionStarted != 1 ) {
+			return;
+		}
+
+		CG_Text_GetExtents( "This match will determine", 0.35f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+		CG_Text_PaintNoAdjust( 320.0f - w * 0.5f, 35.0f, 0.35f, colorWhite,
+			"This match will determine", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+
+		CG_Text_GetExtents( "your skill placement", 0.35f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+		CG_Text_PaintNoAdjust( 320.0f - w * 0.5f, 55.0f, 0.35f, colorWhite,
+			"your skill placement", 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+
+		prompt = va( "Press %s to start the match", keyName );
+		y = 85.0f;
+	}
+
+	CG_Text_GetExtents( prompt, 0.25f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+	CG_Text_PaintNoAdjust( 320.0f - w * 0.5f, y, 0.25f, colorWhite, prompt, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+}
+
+/*
+=============
+CG_DrawDemoPlaybackControls
+
+Draws the retail playback key legend beneath the classic 2D HUD during demo
+playback.
+=============
+*/
+static void CG_DrawDemoPlaybackControls( int panelWidth ) {
+	static int	playbackStateDelayFrames;
+	const char	*deltaText;
+	const char	*stateLabel;
+	const char	*speedText;
+	float		freezeDemo;
+	float		columnOffset;
+	vec4_t		panelColor;
+	vec4_t		borderColor;
+	int			textWidth;
+	qboolean	showPlaybackControls;
+
+	freezeDemo = trap_Cvar_VariableValue( "cl_freezeDemo" );
+	if ( freezeDemo <= 0.0f ) {
+		playbackStateDelayFrames++;
+		if ( playbackStateDelayFrames >= 4 ) {
+			showPlaybackControls = qtrue;
+			stateLabel = "Pause";
+		} else {
+			showPlaybackControls = qfalse;
+			stateLabel = "Play";
+		}
+	} else {
+		playbackStateDelayFrames = 0;
+		showPlaybackControls = qfalse;
+		stateLabel = "Play";
+	}
+
+	panelColor[0] = 0.0f;
+	panelColor[1] = 0.0f;
+	panelColor[2] = 0.0f;
+	panelColor[3] = 0.45f;
+	borderColor[0] = 1.0f;
+	borderColor[1] = 1.0f;
+	borderColor[2] = 1.0f;
+	borderColor[3] = 0.18f;
+	CG_FillRect( 220.0f, 355.0f, 210.0f, 60.0f, panelColor );
+	CG_DrawRect( 220.0f, 355.0f, 210.0f, 60.0f, 1.0f, borderColor );
+
+	columnOffset = panelWidth * 0.5f;
+
+	deltaText = CG_FormatSignedMilliseconds( cg.time - cgs.levelStartTime );
+	textWidth = CG_Text_Width( deltaText, 0.30f, 0 );
+	CG_Text_PaintNoAdjust( 320.0f - textWidth * 0.5f, 375.0f, 0.30f, colorWhite,
+		deltaText, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+
+	CG_DrawDemoControlPair( 235.0f - columnOffset, stateLabel, "[SPACE]" );
+
+	if ( showPlaybackControls ) {
+		CG_DrawDemoControlPair( 275.0f - columnOffset, "-", "[LEFT]" );
+
+		speedText = va( "%0.1fx", cg_timescale.value );
+		CG_DrawDemoControlPair( 320.0f - columnOffset, speedText, NULL );
+		CG_DrawDemoControlPair( 330.0f - columnOffset, "+", "[RIGHT]" );
+		CG_DrawDemoControlPair( 370.0f - columnOffset, "1.0x", "[DOWN]" );
+	} else {
+		CG_DrawDemoControlPair( 320.0f - columnOffset, "Advance", "[RIGHT]" );
+	}
+
+	CG_DrawDemoControlPair( 410.0f - columnOffset, "Hide", "[DEL]" );
 }
 
 /*
@@ -4982,7 +5545,7 @@ Paints the retail `stats_menu` overlay that backs the `+acc` HUD request.
 */
 static qboolean CG_DrawStatsMenu( void ) {
 	if ( !menuStats ) {
-		menuStats = Menus_FindByName( "stats_menu" );
+		menuStats = CG_FindBrowserOverlayByName( "stats_menu" );
 	}
 
 	if ( menuStats ) {
@@ -4993,7 +5556,7 @@ static qboolean CG_DrawStatsMenu( void ) {
 		return qfalse;
 	}
 
-	Menu_Paint( menuStats, qtrue );
+	CG_DrawBrowserOverlayTree( menuStats, qtrue );
 	return qtrue;
 }
 
@@ -5076,52 +5639,77 @@ CG_Draw2D
 =================
 */
 static void CG_Draw2D( void ) {
+	int			freezeDemo;
+	qboolean		spectator;
+	qboolean		menuHudActive;
+	qboolean		canShowStatus;
+	qboolean		menuScoreboardHandled;
+	qboolean		joinGameCaptureActive;
+
 	if (cgs.orderPending && cg.time > cgs.orderTime) {
 		CG_CheckOrderPending();
 	}
+
+	freezeDemo = (int)trap_Cvar_VariableValue( "cl_freezeDemo" );
+
 	// if we are taking a levelshot for the menu, don't draw anything
 	if ( cg.levelShot ) {
 		return;
 	}
 
-	if ( cg_draw2D.integer == 0 ) {
+	menuHudActive = CG_IsMenuHudActive();
+	if ( cg.demoPlayback && !cg_drawDemoHUD.integer ) {
+		menuHudActive = qfalse;
+	}
+
+	CG_UpdateTimeoutMouseInput( menuHudActive );
+
+	if ( cg_draw2D.integer == 0 || cg_paused.integer ) {
+		CG_DrawReduced2D();
+		return;
+	}
+
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		if ( CG_IsJoinGameMenuCaptureActive() ) {
+			CG_CloseJoinGameMenu();
+		}
+		if ( cg_ignoreMouseInput.integer != 0 ) {
+			CG_SetIgnoreMouseInput( qfalse );
+		}
+		CG_DrawIntermissionLetterbox();
+		CG_DrawIntermission();
+		return;
+	}
+
+	if ( cg.snap->ps.pm_type == PM_SPINTERMISSION ) {
+		CG_DrawIntermissionLetterbox();
+		CG_DrawPregameJoinGameMenu();
+		CG_DrawCenterString();
+		CG_DrawPregamePlacementPrompt();
+		CG_UpdateSpIntermissionMouseInput();
 		return;
 	}
 
 	CG_DrawIntermissionLetterbox();
 
-	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
-		CG_DrawIntermission();
-		return;
-	}
-
-/*
-	if (cg.cameraMode) {
-		return;
-	}
-*/
-	qboolean	spectator;
-	qboolean	menuHudActive;
-	qboolean	canShowStatus;
-	qboolean	menuScoreboardHandled;
-
 	spectator = ( qboolean )( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR );
-	menuHudActive = CG_IsMenuHudActive();
-	if ( cg.demoPlayback && !cg_drawDemoHUD.integer ) {
-		menuHudActive = qfalse;
-	}
 	canShowStatus = ( qboolean )( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 );
 	menuScoreboardHandled = qfalse;
+	joinGameCaptureActive = (qboolean)( CG_IsJoinGameMenuCaptureActive() && !cg.scoreBoardShowing );
 	cg_spectatorItemPickupBaseY = 0.0f;
 
 	if ( menuHudActive && cg_drawStatus.integer && ( spectator || canShowStatus ) ) {
-		Menu_PaintAll();
+		CG_DrawBrowserOverlays();
 		CG_DrawTimedMenus();
 	}
 
-	CG_DrawQueuedWorldMarkers();
+	if ( !cg.demoPlayback || freezeDemo == 0 ) {
+		CG_DrawQueuedWorldMarkers();
+	}
 
-	if ( spectator ) {
+	if ( joinGameCaptureActive ) {
+		CG_DrawJoinGameMenu();
+	} else if ( spectator ) {
 		if ( !menuHudActive ) {
 			CG_DrawSpectator();
 		}
@@ -5144,17 +5732,17 @@ static void CG_Draw2D( void ) {
 		}
 	}
 
-	CG_DrawJoinGameMenu();
-
 	if ( menuHudActive ) {
 		if ( cg.showScores ) {
 			cg.scoreBoardShowing = CG_DrawActiveScoreboard( qtrue, qfalse );
-			if ( !cg.scoreBoardShowing ) {
+			if ( !cg.scoreBoardShowing && !CG_IsJoinGameMenuCaptureActive() ) {
 				CG_DrawCenterString();
 			}
 		} else {
 			cg.scoreBoardShowing = qfalse;
-			CG_DrawCenterString();
+			if ( !CG_IsJoinGameMenuCaptureActive() ) {
+				CG_DrawCenterString();
+			}
 		}
 		menuScoreboardHandled = qtrue;
 	}
@@ -5172,6 +5760,7 @@ static void CG_Draw2D( void ) {
 			CG_DrawLowerLeft();
 		}
 		CG_DrawUpperRight();
+		CG_DrawSpectatorItemPickups();
 	}
 
 
@@ -5189,12 +5778,17 @@ static void CG_Draw2D( void ) {
 	// don't draw center string if scoreboard is up
 	if ( !menuScoreboardHandled ) {
 		cg.scoreBoardShowing = CG_DrawActiveScoreboard( qfalse, qfalse );
-		if ( !cg.scoreBoardShowing) {
+		if ( !cg.scoreBoardShowing && !CG_IsJoinGameMenuCaptureActive() ) {
 			CG_DrawCenterString();
 		}
 	}
 
 	CG_DrawStatsMenu();
+	CG_DrawObituaries( 150.0f );
+
+	if ( cg.demoPlayback && cg_drawDemoHUD.integer ) {
+		CG_DrawDemoPlaybackControls( 0 );
+	}
 }
 
 /*
@@ -5206,8 +5800,11 @@ Perform all drawing needed to completely fill the screen
 */
 void CG_DrawActive( stereoFrame_t stereoView ) {
 	float		separation;
+	int		pmType;
 	vec3_t		baseOrg;
-	char		browserActive[16];
+	float		browserActive;
+
+	cg_drawActiveMilliseconds = trap_Milliseconds();
 
 	// optionally draw the info screen instead
 	if ( !cg.snap ) {
@@ -5234,6 +5831,12 @@ void CG_DrawActive( stereoFrame_t stereoView ) {
 	// clear around the rendered view if sized down
 	CG_TileClear();
 
+	pmType = cg.predictedPlayerState.pm_type;
+	if ( ( ( pmType == PM_DEAD || pmType == PM_FREEZE ) && cg.renderingThirdPerson )
+		|| pmType == PM_INTERMISSION ) {
+		cg.zoomed = qfalse;
+	}
+
 	// offset vieworg appropriately if we're doing stereo separation
 	VectorCopy( cg.refdef.vieworg, baseOrg );
 	if ( separation != 0 ) {
@@ -5251,8 +5854,8 @@ void CG_DrawActive( stereoFrame_t stereoView ) {
 	}
 
 	// draw status bar and other floating elements
-	trap_Cvar_VariableStringBuffer( "web_browserActive", browserActive, sizeof( browserActive ) );
-	if ( atoi( browserActive ) == 0 ) {
+	browserActive = trap_Cvar_VariableValue( "web_browserActive" );
+	if ( browserActive == 0.0f ) {
 		if ( !cg.renderingThirdPerson ) {
 			CG_DrawScreenVignette();
 		}

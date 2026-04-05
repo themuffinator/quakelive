@@ -82,11 +82,74 @@ def test_key_event_intercepts_retail_hud_binding_commands() -> None:
 		'"screenshotJPEG"',
 		'"+voice"',
 		'"+scores"',
-		'trap_Cmd_ExecuteText( EXEC_APPEND, va( "%s\\n", binding ) );',
-		"CG_ShowResponseHead();",
-		"CG_MenuScript_OpenScoreboard();",
+		'Q_stricmpn( binding, "messagemode", sizeof( "messagemode" ) - 1 ) == 0',
+		'trap_SendConsoleCommand( binding );',
+		'trap_SendConsoleCommand( "+voice\\n" );',
+		"CG_ScoresDown_f();",
 	):
 		assert expected in handler_block
 
+	assert "trap_Cmd_ExecuteText( EXEC_APPEND, binding );" not in handler_block
+	assert 'trap_Cmd_ExecuteText( EXEC_APPEND, "+voice\\n" );' not in handler_block
+	assert "CG_RequestScoreboard" not in source
+	assert "char bindingBuf[0x20] = { 0 };" in key_block
 	assert "trap_Key_GetBindingBuf( key, bindingBuf, sizeof( bindingBuf ) );" in key_block
 	assert "if ( CG_HandleHudBindingCommand( bindingBuf ) ) {" in key_block
+	assert "CG_BrowserDisplayHandleKey( key, down, cgs.cursorX, cgs.cursorY );" in key_block
+	assert "CG_EventHandling(CGAME_EVENT_NONE);" not in key_block
+	assert "trap_Key_SetCatcher(0);" not in key_block
+	assert "cgs.capturedItem =" not in key_block
+
+
+def test_duel_scorebox_status_ownerdraws_restore_retail_label_split() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	status_block = _block_from_marker(source, "static qboolean CG_BuildSpectatorStatusText")
+	primary_block = _block_from_marker(source, "static void CG_DrawSpectatorPrimaryStatus")
+	secondary_block = _block_from_marker(source, "static void CG_DrawSpectatorSecondaryStatus")
+	metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementMetricText")
+	placement_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+
+	for expected in (
+		"cgs.gametype == GT_TOURNAMENT",
+		"cg.snap->ps.pm_type != PM_INTERMISSION",
+		'Q_strncpyz( buffer, "LEADS", bufferSize );',
+		'Q_strncpyz( buffer, "TRAILS", bufferSize );',
+		'Q_strncpyz( buffer, "TIED", bufferSize );',
+		'Q_strncpyz( buffer, "READY", bufferSize );',
+		'Q_strncpyz( buffer, "NOT READY", bufferSize );',
+		"CG_ClientReadyOnIntermission( score->client )",
+	):
+		assert expected in status_block
+
+	assert "CG_DrawSpectatorStatusLabel( rect, 0 );" in primary_block
+	assert "CG_DrawSpectatorStatusLabel( rect, 1 );" in secondary_block
+	assert "case CG_1ST_PLYR_READY:" in metric_block
+	assert "return qfalse;" in metric_block
+	assert "if ( ownerDraw == CG_1ST_PLYR_READY ) {" in placement_block
+	assert "CG_DrawSpectatorPrimaryStatus( rect );" in placement_block
+	assert "if ( ownerDraw == CG_2ND_PLYR_READY ) {" in placement_block
+	assert "CG_DrawSpectatorSecondaryStatus( rect );" in placement_block
+	assert 'Q_strncpyz( buffer, CG_ClientReadyOnIntermission( score->client ) ? "Ready" : "-", bufferSize );' not in source
+
+
+def test_score_value_wrapper_restores_retail_competitive_score_owner() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	value_block = _block_from_marker(source, "static void CG_DrawScoreValue")
+
+	for expected in (
+		"case CG_PLAYER_SCORE:",
+		"CG_DrawPlayerScore( rect, scale, color, shader, textStyle );",
+		"case CG_RED_SCORE:",
+		"CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_RED, ITEM_ALIGN_CENTER );",
+		"case CG_BLUE_SCORE:",
+		"CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_BLUE, ITEM_ALIGN_CENTER );",
+	):
+		assert expected in value_block
+
+	for expected in (
+		"case CG_PLAYER_SCORE:",
+		"CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );",
+		"case CG_RED_SCORE:",
+		"case CG_BLUE_SCORE:",
+	):
+		assert expected in source

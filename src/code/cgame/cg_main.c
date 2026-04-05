@@ -102,6 +102,8 @@ static void CG_ShowTrackedPlayerSlot( int slot );
 static void CG_Show1stTrackedPlayer( void );
 static void CG_Show2ndTrackedPlayer( void );
 void CG_Cvar_GetString( const char *cvar, char *buffer, int bufsize );
+menuDef_t *Menu_FindItemByName( menuDef_t *menu, const char *p );
+void Menu_UpdatePosition( menuDef_t *menu );
 
 /*
 ================
@@ -259,6 +261,13 @@ centity_t			cg_entities[MAX_GENTITIES];
 weaponInfo_t		cg_weapons[MAX_WEAPONS];
 itemInfo_t			cg_items[MAX_ITEMS];
 pmove_settings_t		cg_pmoveSettings;
+
+typedef struct {
+	qboolean	speaking;
+	int		time;
+} cgClientSpeakingState_t;
+
+static cgClientSpeakingState_t	cgClientSpeakingState[MAX_CLIENTS];
 
 
 static int		weaponColorGrenadeModCount = -1;
@@ -439,7 +448,7 @@ vmCvar_t	cg_predictLocalRailshots;
 vmCvar_t	cg_projectileNudge;
 vmCvar_t	cg_noProjectileTrail;
 vmCvar_t	cg_raceBeep;
-vmCvar_t	cg_oldRail;
+vmCvar_t	cg_railStyle;
 vmCvar_t	cg_railTrailTime;
 vmCvar_t	cg_recordSPDemo;
 vmCvar_t	cg_recordSPDemoName;
@@ -735,8 +744,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_projectileNudge, "cg_projectileNudge", "0", CVAR_ARCHIVE | CVAR_LATCH },
 	{ &cg_noProjectileTrail, "cg_noProjectileTrail", "0", CVAR_ARCHIVE},
 	{ &cg_raceBeep, "cg_raceBeep", "1", CVAR_ARCHIVE },
-	{ &cg_oldRail, "cg_oldRail", "1", CVAR_ARCHIVE},
-	{ &cg_railTrailTime, "cg_railTrailTime", "400", CVAR_ARCHIVE  },
+	{ &cg_railStyle, "cg_railStyle", "1", CVAR_ARCHIVE},
+	{ &cg_railTrailTime, "cg_railTrailTime", "2000", CVAR_ARCHIVE  },
 	{ &cg_recordSPDemo, "ui_recordSPDemo", "0", CVAR_ARCHIVE},
 	{ &cg_recordSPDemoName, "ui_recordSPDemoName", "", CVAR_ARCHIVE},
 	{ &cg_redTeamName, "g_redteam", DEFAULT_REDTEAM_NAME, CVAR_ARCHIVE },
@@ -2428,6 +2437,54 @@ static const char *CG_RetailAnnouncerFolderForProfile( cgAnnouncerProfile_t prof
 
 /*
 ============
+CG_BuildAnnouncerSoundPathForProfile
+
+Builds the retail announcer sound stem for a specific announcer profile.
+============
+*/
+static const char *CG_BuildAnnouncerSoundPathForProfile( cgAnnouncerProfile_t profile, const char *sample ) {
+	const char	*folder;
+
+	folder = CG_RetailAnnouncerFolderForProfile( profile );
+	if ( !folder || !folder[0] || !sample || !sample[0] ) {
+		return NULL;
+	}
+
+	return va( "sound/%s/%s", folder, sample );
+}
+
+/*
+============
+CG_BuildAnnouncerSoundPath
+
+Builds the active retail announcer sound stem from the cg_announcer cvar.
+============
+*/
+static const char *CG_BuildAnnouncerSoundPath( const char *sample ) {
+	cgAnnouncerProfile_t	profile;
+
+	switch ( cg_announcer.integer ) {
+		case 0:
+			return NULL;
+		case 2:
+			profile = ANNOUNCER_PROFILE_VADRIGAR;
+			break;
+		case 3:
+			profile = ANNOUNCER_PROFILE_DAEMIA;
+			break;
+		default:
+			profile = ANNOUNCER_PROFILE_DEFAULT;
+			if ( cg_announcer.integer != 1 ) {
+				trap_Cvar_Set( "cg_announcer", "1" );
+			}
+			break;
+	}
+
+	return CG_BuildAnnouncerSoundPathForProfile( profile, sample );
+}
+
+/*
+============
 CG_RegisterRetailAnnouncerClip
 
 Tries the retail announcer folder layout before broader source-side fallbacks.
@@ -2435,18 +2492,18 @@ Tries the retail announcer folder layout before broader source-side fallbacks.
 */
 static sfxHandle_t CG_RegisterRetailAnnouncerClip( cgAnnouncerProfile_t profile, const char *sample ) {
 	static const char *const exts[] = { ".ogg", ".wav" };
-	const char	*folder;
+	const char	*pathStem;
 	char		path[MAX_QPATH];
 	sfxHandle_t	sfx;
 	int		i;
 
-	folder = CG_RetailAnnouncerFolderForProfile( profile );
-	if ( !folder || !folder[0] || !sample || !sample[0] ) {
+	pathStem = CG_BuildAnnouncerSoundPathForProfile( profile, sample );
+	if ( !pathStem ) {
 		return 0;
 	}
 
 	for ( i = 0; i < 2; i++ ) {
-		Com_sprintf( path, sizeof( path ), "sound/%s/%s%s", folder, sample, exts[i] );
+		Com_sprintf( path, sizeof( path ), "%s%s", pathStem, exts[i] );
 		sfx = trap_S_RegisterSound( path, qtrue );
 		if ( sfx ) {
 			return sfx;
@@ -3065,6 +3122,7 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.inkFadeRightShader = trap_R_RegisterShaderNoMip( "ui/assets/score/ink_fade_right.tga" );
 
 	cgs.media.smokePuffShader = trap_R_RegisterShader( "smokePuff" );
+	cgs.media.surfacePuffShader = trap_R_RegisterShader( "surfacePuff" );
 	cgs.media.smokePuffRageProShader = trap_R_RegisterShader( "smokePuffRagePro" );
 	cgs.media.shotgunSmokePuffShader = trap_R_RegisterShader( "shotgunSmokePuff" );
 	cgs.media.nailPuffShader = trap_R_RegisterShader( "nailtrail" );
@@ -3130,6 +3188,23 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.poiNeutralFlagCarrierShader = trap_R_RegisterShader( "sprites/neutralflagcarrier" );
 	cgs.media.poiInfectedShader = trap_R_RegisterShader( "gfx/2d/infected/bite" );
 	cgs.media.poiUnavailableShader = trap_R_RegisterShader( "gfx/2d/unavailable" );
+	cgs.media.itemTimerArmorShader = trap_R_RegisterShader( "gfx/2d/timer/armor" );
+	cgs.media.itemTimerBattleSuitShader = trap_R_RegisterShader( "gfx/2d/timer/bs" );
+	cgs.media.itemTimerHasteShader = trap_R_RegisterShader( "gfx/2d/timer/haste" );
+	cgs.media.itemTimerHealthShader = trap_R_RegisterShader( "gfx/2d/timer/health" );
+	cgs.media.itemTimerInvisShader = trap_R_RegisterShader( "gfx/2d/timer/invis" );
+	cgs.media.itemTimerMedkitShader = trap_R_RegisterShader( "gfx/2d/timer/medkit" );
+	cgs.media.itemTimerQuadShader = trap_R_RegisterShader( "gfx/2d/timer/quad" );
+	cgs.media.itemTimerRegenShader = trap_R_RegisterShader( "gfx/2d/timer/regen" );
+	cgs.media.itemTimerUnknownShader = trap_R_RegisterShader( "gfx/2d/timer/unknown" );
+	cgs.media.itemTimerSlice5Shader = trap_R_RegisterShader( "gfx/2d/timer/slice5" );
+	cgs.media.itemTimerSlice5CurrentShader = trap_R_RegisterShader( "gfx/2d/timer/slice5_current" );
+	cgs.media.itemTimerSlice7Shader = trap_R_RegisterShader( "gfx/2d/timer/slice7" );
+	cgs.media.itemTimerSlice7CurrentShader = trap_R_RegisterShader( "gfx/2d/timer/slice7_current" );
+	cgs.media.itemTimerSlice12Shader = trap_R_RegisterShader( "gfx/2d/timer/slice12" );
+	cgs.media.itemTimerSlice12CurrentShader = trap_R_RegisterShader( "gfx/2d/timer/slice12_current" );
+	cgs.media.itemTimerSlice24Shader = trap_R_RegisterShader( "gfx/2d/timer/slice24" );
+	cgs.media.itemTimerSlice24CurrentShader = trap_R_RegisterShader( "gfx/2d/timer/slice24_current" );
 
 	if ( cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF || cgs.gametype == GT_HARVESTER || cg_buildScript.integer ) {
 		cgs.media.redCubeModel = trap_R_RegisterModel( "models/powerups/orb/r_orb.md3" );
@@ -3826,8 +3901,18 @@ void CG_ParseMenu(const char *menuFile) {
 
 
 		if (Q_stricmp(token.string, "menudef") == 0) {
-			// start a new menu
-			Menu_New(handle);
+			menuDef_t	*menu;
+
+			if ( menuCount >= MAX_MENUS ) {
+				break;
+			}
+
+			menu = &Menus[menuCount];
+			CG_InitBrowserOverlay( menu );
+			if ( CG_ParseBrowserMenu( handle, menu ) ) {
+				Menu_PostParse( menu );
+				menuCount++;
+			}
 		}
 	}
 	trap_PC_FreeSource(handle);
@@ -3861,6 +3946,255 @@ qboolean CG_Load_Menu(char **p) {
 
 /*
 =============
+CG_BrowserValueIsNumeric
+
+Matches the retail numeric-string probe used by browser preset validation.
+=============
+*/
+static qboolean CG_BrowserValueIsNumeric( const char *text ) {
+	qboolean	sawDecimal;
+
+	if ( text == NULL || *text == '\0' ) {
+		return qfalse;
+	}
+
+	sawDecimal = qfalse;
+	while ( *text ) {
+		if ( *text >= '0' && *text <= '9' ) {
+			text++;
+			continue;
+		}
+
+		if ( *text == '.' ) {
+			if ( sawDecimal ) {
+				return qfalse;
+			}
+
+			sawDecimal = qtrue;
+			text++;
+			continue;
+		}
+
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CG_BrowserPresetValueMatchesCvar
+
+Compares a browser preset entry against the live cvar state, including the
+retail epsilon float fallback for numeric strings.
+=============
+*/
+static qboolean CG_BrowserPresetValueMatchesCvar( const char *cvarName, const char *presetValue, float presetNumericValue ) {
+	char	currentValue[64];
+
+	if ( cvarName == NULL || presetValue == NULL ) {
+		return qfalse;
+	}
+
+	trap_Cvar_VariableStringBuffer( cvarName, currentValue, sizeof( currentValue ) );
+	if ( Q_stricmp( currentValue, presetValue ) == 0 ) {
+		return qtrue;
+	}
+
+	if ( !CG_BrowserValueIsNumeric( currentValue ) || !CG_BrowserValueIsNumeric( presetValue ) ) {
+		return qfalse;
+	}
+
+	return fabs( trap_Cvar_VariableValue( cvarName ) - presetNumericValue ) <= 0.001f;
+}
+
+/*
+=============
+CG_UpdateBrowserPresetLists
+
+Refreshes retail browser preset-list labels against the linked live cvars.
+=============
+*/
+void CG_UpdateBrowserPresetLists( void *overlay ) {
+	char		currentPreset[1024];
+	int		i;
+	menuDef_t	*menu;
+
+	menu = (menuDef_t *)overlay;
+	if ( menu == NULL ) {
+		return;
+	}
+
+	for ( i = 0; i < menu->itemCount; i++ ) {
+		int		j;
+		int		presetIndex;
+		itemDef_t	*item;
+		itemDef_t	*presetItem;
+		multiDef_t	*presetList;
+		multiDef_t	*presetValues;
+
+		item = menu->items[i];
+		if ( item == NULL || item->type != ITEM_TYPE_PRESETLIST || item->cvar == NULL || item->typeData == NULL ) {
+			continue;
+		}
+
+		presetList = (multiDef_t *)item->typeData;
+		trap_Cvar_VariableStringBuffer( item->cvar, currentPreset, sizeof( currentPreset ) );
+
+		for ( presetIndex = 0; presetIndex < presetList->count; presetIndex++ ) {
+			if ( presetList->cvarList[presetIndex] == NULL ||
+				Q_stricmp( presetList->cvarList[presetIndex], currentPreset ) != 0 ) {
+				continue;
+			}
+
+			presetItem = Menu_FindItemByName( menu, presetList->cvarStr[presetIndex] );
+			if ( presetItem == NULL || presetItem->typeData == NULL ) {
+				break;
+			}
+
+			presetValues = (multiDef_t *)presetItem->typeData;
+			for ( j = 0; j < presetValues->count; j++ ) {
+				if ( !CG_BrowserPresetValueMatchesCvar( presetValues->cvarList[j], presetValues->cvarStr[j], presetValues->cvarValue[j] ) ) {
+					trap_Cvar_Set( item->cvar, "Custom" );
+					break;
+				}
+			}
+
+			break;
+		}
+	}
+}
+
+/*
+=============
+CG_UpdateBrowserWidgetPositions
+
+Refreshes retail browser widget screen-space rectangles through the shared menu
+layout helper.
+=============
+*/
+void CG_UpdateBrowserWidgetPositions( void *overlay ) {
+	if ( overlay == NULL ) {
+		return;
+	}
+
+	Menu_UpdatePosition( (menuDef_t *)overlay );
+}
+
+/*
+=============
+CG_FindBrowserOverlayByName
+
+Finds a retail browser overlay root by name through the shared menu registry.
+=============
+*/
+void *CG_FindBrowserOverlayByName( const char *name ) {
+	if ( name == NULL || !name[0] ) {
+		return NULL;
+	}
+
+	return Menus_FindByName( name );
+}
+
+/*
+=============
+CG_OpenBrowserOverlayByName
+
+Opens a retail browser overlay root and refreshes its live layout or preset
+state through the shared menu runtime.
+=============
+*/
+void *CG_OpenBrowserOverlayByName( const char *name ) {
+	menuDef_t	*menu;
+
+	menu = CG_FindBrowserOverlayByName( name );
+	if ( menu == NULL ) {
+		return NULL;
+	}
+
+	CG_ActivateBrowserOverlay( menu );
+	CG_UpdateBrowserWidgetPositions( menu );
+	CG_UpdateBrowserPresetLists( menu );
+	return menu;
+}
+
+/*
+=============
+CG_CloseBrowserOverlayByName
+
+Closes a retail browser overlay root and clears its forced-visibility latch.
+=============
+*/
+void *CG_CloseBrowserOverlayByName( const char *name ) {
+	menuDef_t	*menu;
+
+	menu = CG_FindBrowserOverlayByName( name );
+	if ( menu == NULL ) {
+		return NULL;
+	}
+
+	Menus_CloseByName( name );
+	menu->window.flags &= ~WINDOW_FORCED;
+	return menu;
+}
+
+/*
+=============
+CG_InitBrowserOverlay
+
+Initializes one browser overlay through the shared menu runtime entry point.
+=============
+*/
+void CG_InitBrowserOverlay( void *overlay ) {
+	Menu_Init( (menuDef_t *)overlay );
+}
+
+/*
+=============
+CG_SetupBrowserItemKeywordHash
+
+Rebuilds the retail browser item keyword hash through the shared parser table.
+=============
+*/
+void CG_SetupBrowserItemKeywordHash( void ) {
+	Item_SetupKeywordHash();
+}
+
+/*
+=============
+CG_ParseBrowserItem
+
+Routes the browser item parser through the shared menu runtime implementation.
+=============
+*/
+qboolean CG_ParseBrowserItem( int handle, void *item ) {
+	return Item_Parse( handle, (itemDef_t *)item );
+}
+
+/*
+=============
+CG_SetupBrowserMenuKeywordHash
+
+Rebuilds the retail browser menu keyword hash through the shared parser table.
+=============
+*/
+void CG_SetupBrowserMenuKeywordHash( void ) {
+	Menu_SetupKeywordHash();
+}
+
+/*
+=============
+CG_ParseBrowserMenu
+
+Routes the browser menu parser through the shared menu runtime implementation.
+=============
+*/
+qboolean CG_ParseBrowserMenu( int handle, void *menu ) {
+	return Menu_Parse( handle, (menuDef_t *)menu );
+}
+
+/*
+=============
 CG_InitBrowserRuntime
 
 Rebuilds the shared browser/menu parser runtime before HUD loads and reloads.
@@ -3868,6 +4202,8 @@ Rebuilds the shared browser/menu parser runtime before HUD loads and reloads.
 */
 void CG_InitBrowserRuntime( void ) {
 	String_Init();
+	CG_SetupBrowserItemKeywordHash();
+	CG_SetupBrowserMenuKeywordHash();
 }
 
 /*
@@ -3879,8 +4215,8 @@ Clears the shared browser/menu state and drops cached cgame overlay pointers.
 */
 void CG_ResetBrowserOverlayState( void ) {
 	Menu_Reset();
-	menuScoreboard = NULL;
-	menuStats = NULL;
+	CG_ResetDraw2DMenuCache();
+	CG_ResetJoinGameMenuCaptureState();
 }
 
 static const char *const cgRetailSupplementalMenuFiles[] = {
@@ -4278,10 +4614,10 @@ static void CG_CacheScoreboardSelectionMenus( void ) {
 	endMenuName = CG_GetScoreboardSelectionMenuName( qtrue );
 
 	if ( liveMenuName ) {
-		cgScoreboardSelectionMenus[0] = Menus_FindByName( liveMenuName );
+		cgScoreboardSelectionMenus[0] = CG_FindBrowserOverlayByName( liveMenuName );
 	}
 	if ( endMenuName ) {
-		cgScoreboardSelectionMenus[1] = Menus_FindByName( endMenuName );
+		cgScoreboardSelectionMenus[1] = CG_FindBrowserOverlayByName( endMenuName );
 	}
 }
 
@@ -4425,6 +4761,8 @@ Returns the retail-backed social overlay icon for a scoreboard client row.
 =============
 */
 static qhandle_t CG_FeederSocialHandle( int clientNum ) {
+	const cgClientSpeakingState_t	*speakingState;
+
 	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
 		return 0;
 	}
@@ -4436,13 +4774,14 @@ static qhandle_t CG_FeederSocialHandle( int clientNum ) {
 	if ( !CG_ShouldDisplayVoiceIndicator() ) {
 		return 0;
 	}
-	if ( cgs.currentVoiceClient != clientNum ) {
+	speakingState = &cgClientSpeakingState[clientNum];
+	if ( !speakingState->speaking ) {
 		return 0;
 	}
-	if ( cg.voiceTime <= 0 ) {
+	if ( speakingState->time <= 0 ) {
 		return 0;
 	}
-	if ( cg.time - cg.voiceTime > 2500 ) {
+	if ( cg.time - speakingState->time > 2500 ) {
 		return 0;
 	}
 
@@ -5349,14 +5688,17 @@ static qboolean CG_CopyClientIdentity( int clientNum, void *outIdentity ) {
 	identity = (cgameClientIdentity_t *)outIdentity;
 	memset( identity, 0, sizeof( *identity ) );
 	identity->clientNum = clientNum;
+	identity->identityTransport = 0;
 	identity->identityLow = ci->identityLow;
 	identity->identityHigh = ci->identityHigh;
 
 	/*
-	 * The retail transport discriminator still lives in the unrecovered native
-	 * social sidecar, so the transport slot remains zero until that enum path
-	 * is reconstructed. The Steam identity words are already mirrored from the
-	 * replicated player configstring for mute/avatar parity.
+	 * The committed retail corpus only observes this sidecar word being copied
+	 * back out through the native export. The retail player parser rebuilds the
+	 * Steam identity words and avatar cache, but it never materializes a
+	 * separate producer for the transport discriminator, and the recovered host
+	 * overlay consumer only branches on the identity words. Preserve that
+	 * observed ABI by keeping the exported transport word explicitly zero.
 	 */
 	Q_strncpyz( identity->displayName, ci->name, sizeof( identity->displayName ) );
 	Q_strncpyz( cleanName, ci->name, sizeof( cleanName ) );
@@ -5375,16 +5717,17 @@ Mirrors the retail voice-indicator sidecar on top of the existing HUD state.
 =============
 */
 void *CG_SetClientSpeakingState( int clientNum, int speaking ) {
-	clientInfo_t *ci;
+	clientInfo_t			*ci;
+	cgClientSpeakingState_t	*speakingState;
 
 	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
 		return NULL;
 	}
 
 	ci = &cgs.clientinfo[clientNum];
-	if ( !ci->infoValid ) {
-		return NULL;
-	}
+	speakingState = &cgClientSpeakingState[clientNum];
+	speakingState->speaking = speaking ? qtrue : qfalse;
+	speakingState->time = cg.time;
 
 	if ( speaking ) {
 		cgs.currentVoiceClient = clientNum;
@@ -5916,6 +6259,7 @@ void CG_LoadHudMenu() {
 	cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );
 	cgs.newHud = cg.competitiveHudLoaded;
 	CG_LoadMenus(hudSet);
+	CG_CacheDraw2DMenuCache();
 	CG_CacheScoreboardSelectionMenus();
 }
 
@@ -5971,6 +6315,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cg_entities, 0, sizeof(cg_entities) );
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );
+	memset( cgClientSpeakingState, 0, sizeof( cgClientSpeakingState ) );
   
 	CG_ClearAutomationState();
 	cg.spectatorPrimaryClient = -1;
@@ -6116,6 +6461,7 @@ void CG_Shutdown( void ) {
 	// some mods may need to do cleanup work here,
 	// like closing files or archiving session data
 	CG_ClearAutomationState();
+	memset( cgClientSpeakingState, 0, sizeof( cgClientSpeakingState ) );
 	trap_AdvertisementBridge_ShutdownCGame();
 	trap_Cvar_Set( "ui_mainmenu", "1" );
 }

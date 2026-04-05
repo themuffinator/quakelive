@@ -401,8 +401,7 @@ typedef enum {
 	LEF_PUFF_DONT_SCALE  = 0x0001,			// do not scale size over time
 	LEF_TUMBLE			 = 0x0002,			// tumble over time, used for ejecting shells
 	LEF_SOUND1			 = 0x0004,			// sound 1 for kamikaze
-	LEF_SOUND2			 = 0x0008,			// sound 2 for kamikaze
-	LEF_SCOREPLUM_CUSTOMCOLOR = 0x0010		// source-side retail damage-plum bridge
+	LEF_SOUND2			 = 0x0008			// sound 2 for kamikaze
 } leFlag_t;
 
 typedef enum {
@@ -993,6 +992,7 @@ typedef struct {
 	// attacking player
 	int			attackerTime;
 	int			voiceTime;
+	int			voiceMenuTime;
 	qboolean		chatHistoryVisible;
 
 	// reward medals
@@ -1211,6 +1211,7 @@ typedef struct {
 	qhandle_t	armorTick200;
 
 	qhandle_t	smokePuffShader;
+	qhandle_t	surfacePuffShader;
 	qhandle_t	smokePuffRageProShader;
 	qhandle_t	shotgunSmokePuffShader;
 	qhandle_t	plasmaBallShader;
@@ -1265,6 +1266,23 @@ typedef struct {
 	qhandle_t	poiCaptureShader;
 	qhandle_t	poiDefendShader;
 	qhandle_t	poiUnavailableShader;
+	qhandle_t	itemTimerArmorShader;
+	qhandle_t	itemTimerBattleSuitShader;
+	qhandle_t	itemTimerHasteShader;
+	qhandle_t	itemTimerHealthShader;
+	qhandle_t	itemTimerInvisShader;
+	qhandle_t	itemTimerMedkitShader;
+	qhandle_t	itemTimerQuadShader;
+	qhandle_t	itemTimerRegenShader;
+	qhandle_t	itemTimerUnknownShader;
+	qhandle_t	itemTimerSlice5Shader;
+	qhandle_t	itemTimerSlice5CurrentShader;
+	qhandle_t	itemTimerSlice7Shader;
+	qhandle_t	itemTimerSlice7CurrentShader;
+	qhandle_t	itemTimerSlice12Shader;
+	qhandle_t	itemTimerSlice12CurrentShader;
+	qhandle_t	itemTimerSlice24Shader;
+	qhandle_t	itemTimerSlice24CurrentShader;
 
 	// weapon effect models
 	qhandle_t	bulletFlashModel;
@@ -1900,7 +1918,7 @@ extern	vmCvar_t		cg_predictLocalRailshots;
 extern	vmCvar_t		cg_projectileNudge;
 extern	vmCvar_t		cg_noProjectileTrail;
 extern	vmCvar_t		cg_raceBeep;
-extern	vmCvar_t		cg_oldRail;
+extern	vmCvar_t		cg_railStyle;
 extern	vmCvar_t		cg_railTrailTime;
 extern	vmCvar_t		cg_recordSPDemo;
 extern	vmCvar_t		cg_recordSPDemoName;
@@ -2015,10 +2033,25 @@ int CG_LastAttacker( void );
 int CG_GetChatHistoryLength( void );
 qboolean CG_ShouldDisplayVoiceIndicator( void );
 void CG_InitBrowserRuntime( void );
+void CG_InitBrowserOverlay( void *overlay );
 void CG_ResetBrowserOverlayState( void );
+void CG_SetupBrowserItemKeywordHash( void );
+qboolean CG_ParseBrowserItem( int handle, void *item );
+void CG_SetupBrowserMenuKeywordHash( void );
+qboolean CG_ParseBrowserMenu( int handle, void *menu );
+void CG_UpdateBrowserPresetLists( void *overlay );
+void CG_UpdateBrowserWidgetPositions( void *overlay );
 void CG_SetBrowserFeederSelection( void *overlay, int feeder, int index );
+void *CG_FindBrowserOverlayByName( const char *name );
+void *CG_OpenBrowserOverlayByName( const char *name );
+void *CG_CloseBrowserOverlayByName( const char *name );
+void CG_ActivateBrowserOverlay( void *overlay );
+void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint );
+void CG_DrawBrowserOverlays( void );
 void CG_LoadMenus(const char *menuFile);
 void CG_LoadHudMenu( void );
+void CG_ResetDraw2DMenuCache( void );
+void CG_CacheDraw2DMenuCache( void );
 qhandle_t CG_RegisterCountryFlag( const char *countryCode );
 void CG_KeyEvent(int key, qboolean down);
 void CG_MouseEvent(int x, int y);
@@ -2059,6 +2092,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 void CG_AdjustFrom640( float *x, float *y, float *w, float *h );
 void CG_SetAdjustFrom640Mode( int widescreen );
 void CG_FillRect( float x, float y, float width, float height, const float *color );
+void CG_DrawPicST( float x, float y, float width, float height, float s1, float t1, float s2, float t2, qhandle_t hShader );
 void CG_DrawPic( float x, float y, float width, float height, qhandle_t hShader );
 void CG_DrawString( float x, float y, const char *string, 
 				   float charWidth, float charHeight, const float *modulate );
@@ -2128,8 +2162,8 @@ void CG_SetSpectatorCameraLock( qboolean locked );
 void *CG_SetClientSpeakingState( int clientNum, int speaking );
 float CG_GetValue(int ownerDraw);
 qboolean CG_OwnerDrawVisible(int flags);
+void CG_ScoresDown_f( void );
 void CG_RunMenuScript(char **args);
-void CG_ShowResponseHead();
 void CG_SetPrintString(int type, const char *p);
 void CG_InitTeamChat();
 void CG_PushPrintString( const char *text, int type, int holdTime );
@@ -2248,8 +2282,10 @@ void CG_RegisterItemVisuals( int itemNum );
 
 void CG_FireWeapon( centity_t *cent );
 void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, impactSound_t soundType );
+void CG_MissileHitWallDmgThrough( vec3_t origin, vec3_t dir, int weapon );
 void CG_MissileHitPlayer( int weapon, vec3_t origin, vec3_t dir, int entityNum );
 void CG_ShotgunFire( entityState_t *es );
+void CG_ShotgunKillEffect( centity_t *cent, const entityState_t *es );
 void CG_Bullet( vec3_t origin, int sourceEntityNum, vec3_t normal, qboolean flesh, int fleshEntityNum );
 
 void CG_RailTrail( clientInfo_t *ci, vec3_t start, vec3_t end );
@@ -2312,6 +2348,7 @@ void CG_ScorePlum( int client, vec3_t org, int score );
 
 void CG_ThawPlayer( vec3_t playerOrigin );
 void CG_GibPlayer( vec3_t playerOrigin );
+void CG_DetonateJuicedPlayer( const vec3_t playerOrigin, qboolean immediateFallback );
 void CG_BigExplode( vec3_t playerOrigin );
 void CG_BigExplodeJuiced( vec3_t playerOrigin );
 
@@ -2340,6 +2377,10 @@ void CG_DrawInformation( void );
 // cg_screen.c
 //
 void CG_DamageBlendBlob( void );
+qboolean CG_IsJoinGameMenuCaptureActive( void );
+void CG_ResetJoinGameMenuCaptureState( void );
+void CG_CloseJoinGameMenu( void );
+void CG_DrawPregameJoinGameMenu( void );
 void CG_DrawJoinGameMenu( void );
 
 //

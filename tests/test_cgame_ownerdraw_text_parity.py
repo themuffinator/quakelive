@@ -164,19 +164,45 @@ def test_match_status_uses_retail_status_text_family() -> None:
     assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GetMatchStateLabel(), CG_GetGameStatusText() );' not in draw_match_status
 
 
-def test_player_model_helper_reuses_shared_profile_draw_path() -> None:
+def test_player_model_helper_restores_retail_3d_preview_scene() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
     shared_block = _block_from_marker(source, "static void CG_DrawProfileModel")
+    preview_block = _block_from_marker(source, "static void CG_DrawClientModelPreview")
     first_place_block = _block_from_marker(source, "static void CG_DrawFirstPlaceModel")
     player_block = _block_from_marker(source, "static void CG_DrawPlayerModel")
 
     assert "shader = ci->modelIcon;" in shared_block
     assert "shader = CG_GetProfileFallbackShader();" in shared_block
     assert "Vector4Set( modulate, 1.0f, 1.0f, 1.0f, active ? 1.0f : 0.8f );" in shared_block
-    assert "CG_DrawProfileModel( rect, score->client, active );" in first_place_block
+
+    for expected in (
+        "heightScale = ( ci->headOffset[0] > 0.0f ) ? ci->headOffset[0] : 1.0f;",
+        "previewHeight = 32.0f / ( heightScale * 0.85f );",
+        "refdef.rdflags = RDF_NOWORLDMODEL;",
+        "CG_InitClientPreviewEntity( &legs, origin, renderfx );",
+        'CG_PositionRotatedEntityOnTag( &torso, &legs, ci->legsModel, "tag_torso" );',
+        'CG_PositionRotatedEntityOnTag( &head, &torso, ci->torsoModel, "tag_head" );',
+        'CG_PositionEntityOnTag( &gun, &torso, ci->torsoModel, "tag_weapon" );',
+        "trap_R_AddLightToScene( lightOrigin, 500.0f, 1.0f, 1.0f, 1.0f );",
+        "trap_R_AddLightToScene( lightOrigin, 500.0f, 1.0f, 0.0f, 0.0f );",
+        "trap_R_RenderScene( &refdef );",
+        "CG_DrawProfileModel( rect, clientNum, active );",
+    ):
+        assert expected in preview_block
+
+    for expected in (
+        "weaponNum = score->bestWeapon;",
+        "weaponNum = CG_ClientPreviewWeapon( score->client );",
+        "VectorSet( previewAngles, 5.0f, 160.0f, 0.0f );",
+        "CG_DrawClientModelPreview( rect, score->client, weaponNum, previewAngles, active );",
+    ):
+        assert expected in first_place_block
+
     assert "clientNum = cg.spectatorTrackedClient;" in player_block
     assert "clientNum = cg.snap->ps.clientNum;" in player_block
-    assert "CG_DrawProfileModel( rect, clientNum, qtrue );" in player_block
+    assert "weaponNum = CG_ClientPreviewWeapon( clientNum );" in player_block
+    assert "VectorSet( previewAngles, 5.0f, 210.0f, 0.0f );" in player_block
+    assert "CG_DrawClientModelPreview( rect, clientNum, weaponNum, previewAngles, qtrue );" in player_block
 
 
 def test_endgame_summary_uses_retail_message_family() -> None:

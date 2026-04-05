@@ -755,9 +755,12 @@ static void PM_AirControl( vec3_t wishdir, float wishspeed ) {
 			pm->ps->velocity[i] = pm->ps->velocity[i] * speed + wishdir[i] * k;
 		}
 		VectorNormalize( pm->ps->velocity );
-		for ( i = 0 ; i < 2 ; i++ ) {
-			pm->ps->velocity[i] *= speed;
-		}
+	}
+
+	// Retail preserves the original planar speed even when the steering dot is
+	// non-positive; only the direction correction is gated by the dot check.
+	for ( i = 0 ; i < 2 ; i++ ) {
+		pm->ps->velocity[i] *= speed;
 	}
 
 	pm->ps->velocity[2] = zspeed;

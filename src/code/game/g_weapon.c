@@ -1560,5 +1560,5 @@ void G_StartKamikaze( gentity_t *ent ) {
 	// play global sound at all clients
 	te = G_TempEntity(snapped, EV_GLOBAL_TEAM_SOUND );
 	te->r.svFlags |= SVF_BROADCAST;
-	te->s.eventParm = GTS_KAMIKAZE;
+	G_SetRetailGlobalTeamSoundPayload( te, GTS_KAMIKAZE, -1, TEAM_FREE, 0 );
 }

@@ -319,6 +319,30 @@ static qhandle_t CG_ItemPOIPowerupLiveShader( const gitem_t *item ) {
 
 /*
 ========================
+CG_ItemPOIIsQuadHogWorldQuad
+
+Returns qtrue for the retail Quad Hog dropped-world-quad seam that bypasses
+the generic dropped-powerup POI rejection.
+========================
+*/
+static qboolean CG_ItemPOIIsQuadHogWorldQuad( const centity_t *cent, const gitem_t *item ) {
+	if ( !cent || !item ) {
+		return qfalse;
+	}
+
+	if ( !cg_pmoveSettings.quadHogEnabled || cgs.gametype != GT_FFA ) {
+		return qfalse;
+	}
+
+	if ( item->giType != IT_POWERUP || item->giTag != PW_QUAD ) {
+		return qfalse;
+	}
+
+	return (qboolean)( cent->currentState.modelindex2 != 0 );
+}
+
+/*
+========================
 CG_ItemPOIPowerupMarker
 
 Builds the retail powerup POI state, including incoming icons and distance alpha.
@@ -331,6 +355,7 @@ static qboolean CG_ItemPOIPowerupMarker( const centity_t *cent, const gitem_t *i
 	float		farDistance;
 	float		distance;
 	vec3_t		distanceOrigin;
+	qboolean	quadHogWorldQuad;
 	qboolean	incoming;
 
 	if ( !shader || !alpha ) {
@@ -343,20 +368,25 @@ static qboolean CG_ItemPOIPowerupMarker( const centity_t *cent, const gitem_t *i
 		return qfalse;
 	}
 
-	*shader = CG_ItemPOIPowerupLiveShader( item );
+	quadHogWorldQuad = CG_ItemPOIIsQuadHogWorldQuad( cent, item );
+	if ( quadHogWorldQuad ) {
+		*shader = cgs.media.poiPowerupQuadShader;
+	} else {
+		*shader = CG_ItemPOIPowerupLiveShader( item );
+	}
 	if ( !*shader ) {
 		return qfalse;
 	}
 
 	markerTime = cent->currentState.time;
-	if ( cent->currentState.modelindex2 && markerTime < cg.time ) {
+	if ( !quadHogWorldQuad && cent->currentState.modelindex2 && markerTime < cg.time ) {
 		return qfalse;
 	}
-	if ( cg.time < markerTime - 10000 ) {
+	if ( !quadHogWorldQuad && cg.time < markerTime - 10000 ) {
 		return qfalse;
 	}
 
-	incoming = (qboolean)( cg.time <= markerTime );
+	incoming = (qboolean)( !quadHogWorldQuad && cg.time <= markerTime );
 	if ( ( cent->currentState.eFlags & EF_NODRAW ) && !incoming ) {
 		return qfalse;
 	}
@@ -372,7 +402,7 @@ static qboolean CG_ItemPOIPowerupMarker( const centity_t *cent, const gitem_t *i
 	VectorCopy( origin, distanceOrigin );
 	distanceOrigin[2] += 8.0f;
 	distance = Distance( cg.refdef.vieworg, distanceOrigin );
-	if ( incoming ) {
+	if ( cg.time <= markerTime ) {
 		nearDistance = 256.0f;
 		farDistance = 512.0f;
 	} else {
@@ -509,6 +539,285 @@ static void CG_QueueItemPOIMarker( centity_t *cent, const gitem_t *item, const v
 }
 
 /*
+========================
+CG_ItemUsesRespawnTimer
+
+Returns qtrue for retail world items that mirror respawn-timer state through
+entityState_t time fields.
+========================
+*/
+static qboolean CG_ItemUsesRespawnTimer( const gitem_t *item ) {
+	if ( !item ) {
+		return qfalse;
+	}
+
+	if ( item->giType == IT_ARMOR ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_POWERUP ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+========================
+CG_ItemRespawnTimerDuration
+
+Returns the retail respawn-duration bucket used by major-item timer wedges
+when qagame has not yet published an explicit duration.
+========================
+*/
+static int CG_ItemRespawnTimerDuration( const gitem_t *item ) {
+	if ( !item ) {
+		return 0;
+	}
+
+	switch ( item->giType ) {
+	case IT_ARMOR:
+		return 25 * 1000;
+	case IT_HEALTH:
+		if ( item->quantity >= 100 ) {
+			return 35 * 1000;
+		}
+		break;
+	case IT_POWERUP:
+		return 120 * 1000;
+	case IT_HOLDABLE:
+		if ( BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
+			return 60 * 1000;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/*
+========================
+CG_ItemRespawnTimerIcon
+
+Selects the retail timer icon family used by CG_DrawItemRespawnTimer.
+========================
+*/
+static qhandle_t CG_ItemRespawnTimerIcon( const gitem_t *item, qboolean hiddenItem ) {
+	if ( !item ) {
+		return 0;
+	}
+
+	if ( hiddenItem ) {
+		return cgs.media.itemTimerUnknownShader;
+	}
+
+	switch ( item->giType ) {
+	case IT_ARMOR:
+		return cgs.media.itemTimerArmorShader;
+	case IT_HEALTH:
+		if ( item->quantity >= 100 ) {
+			return cgs.media.itemTimerHealthShader;
+		}
+		break;
+	case IT_POWERUP:
+		switch ( item->giTag ) {
+		case PW_QUAD:
+			return cgs.media.itemTimerQuadShader;
+		case PW_BATTLESUIT:
+			return cgs.media.itemTimerBattleSuitShader;
+		case PW_HASTE:
+			return cgs.media.itemTimerHasteShader;
+		case PW_INVIS:
+			return cgs.media.itemTimerInvisShader;
+		case PW_REGEN:
+			return cgs.media.itemTimerRegenShader;
+		default:
+			return cgs.media.itemTimerUnknownShader;
+		}
+	case IT_HOLDABLE:
+		if ( BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
+			return cgs.media.itemTimerMedkitShader;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/*
+========================
+CG_ItemRespawnTimerSlices
+
+Maps the retail respawn duration buckets onto the matching timer wedge family.
+========================
+*/
+static void CG_ItemRespawnTimerSlices( int respawnDuration, qhandle_t *sliceShader, qhandle_t *currentSliceShader,
+	int *sliceCount ) {
+	int	durationBuckets;
+
+	if ( !sliceShader || !currentSliceShader || !sliceCount ) {
+		return;
+	}
+
+	*sliceShader = 0;
+	*currentSliceShader = 0;
+	*sliceCount = 0;
+	if ( respawnDuration <= 0 ) {
+		return;
+	}
+
+	durationBuckets = respawnDuration / 5000;
+	if ( durationBuckets <= 5 ) {
+		*sliceShader = cgs.media.itemTimerSlice5Shader;
+		*currentSliceShader = cgs.media.itemTimerSlice5CurrentShader;
+		*sliceCount = 5;
+		return;
+	}
+
+	if ( durationBuckets <= 7 ) {
+		*sliceShader = cgs.media.itemTimerSlice7Shader;
+		*currentSliceShader = cgs.media.itemTimerSlice7CurrentShader;
+		*sliceCount = 7;
+		return;
+	}
+
+	if ( durationBuckets <= 12 ) {
+		*sliceShader = cgs.media.itemTimerSlice12Shader;
+		*currentSliceShader = cgs.media.itemTimerSlice12CurrentShader;
+		*sliceCount = 12;
+		return;
+	}
+
+	*sliceShader = cgs.media.itemTimerSlice24Shader;
+	*currentSliceShader = cgs.media.itemTimerSlice24CurrentShader;
+	*sliceCount = 24;
+}
+
+/*
+========================
+CG_DrawItemRespawnTimerSprite
+
+Adds one timer icon or wedge sprite to the scene using the shared world-item
+origin.
+========================
+*/
+static void CG_DrawItemRespawnTimerSprite( qhandle_t shader, const vec3_t origin, float alpha, float rotation ) {
+	refEntity_t	ent;
+	int		alphaByte;
+
+	if ( !shader || alpha <= 0.0f ) {
+		return;
+	}
+
+	memset( &ent, 0, sizeof( ent ) );
+	ent.reType = RT_SPRITE;
+	VectorCopy( origin, ent.origin );
+	VectorCopy( origin, ent.oldorigin );
+	ent.radius = 16.0f;
+	ent.rotation = rotation;
+	ent.customShader = shader;
+
+	alphaByte = (int)( alpha * 255.0f );
+	if ( alphaByte < 0 ) {
+		alphaByte = 0;
+	} else if ( alphaByte > 255 ) {
+		alphaByte = 255;
+	}
+
+	ent.shaderRGBA[0] = 255;
+	ent.shaderRGBA[1] = 255;
+	ent.shaderRGBA[2] = 255;
+	ent.shaderRGBA[3] = alphaByte;
+	trap_R_AddRefEntityToScene( &ent );
+}
+
+/*
+========================
+CG_DrawItemRespawnTimer
+
+Draws the retail world-item respawn timer icon and wedge countdown around one
+major item.
+========================
+*/
+static void CG_DrawItemRespawnTimer( const gitem_t *item, int respawnRemaining, int respawnDuration,
+	const vec3_t origin, int elapsedSlice, qboolean hiddenItem ) {
+	vec3_t		timerOrigin;
+	float		distance;
+	float		alpha;
+	qhandle_t	iconShader;
+	qhandle_t	sliceShader;
+	qhandle_t	currentSliceShader;
+	int		sliceCount;
+	int		sliceStep;
+	int		rotation;
+	int		sliceIndex;
+
+	if ( !item || !origin || !cg_itemTimers.integer ) {
+		return;
+	}
+
+	if ( respawnRemaining <= 0 || respawnDuration <= 0 ) {
+		return;
+	}
+
+	if ( respawnRemaining > respawnDuration ) {
+		respawnRemaining = respawnDuration;
+	}
+
+	iconShader = CG_ItemRespawnTimerIcon( item, hiddenItem );
+	if ( !iconShader ) {
+		return;
+	}
+
+	VectorCopy( origin, timerOrigin );
+	timerOrigin[2] += 8.0f;
+	distance = Distance( cg.refdef.vieworg, timerOrigin );
+	if ( distance <= 256.0f ) {
+		alpha = 1.0f;
+	} else if ( distance < 768.0f ) {
+		alpha = ( 768.0f - distance ) * ( 1.0f / 512.0f );
+	} else {
+		return;
+	}
+
+	CG_ItemRespawnTimerSlices( respawnDuration, &sliceShader, &currentSliceShader, &sliceCount );
+	if ( !sliceShader || !currentSliceShader || sliceCount <= 0 ) {
+		return;
+	}
+
+	if ( elapsedSlice <= 0 ) {
+		elapsedSlice = ( ( respawnDuration - respawnRemaining ) / 5000 ) + 1;
+	}
+	if ( elapsedSlice < 1 ) {
+		elapsedSlice = 1;
+	} else if ( elapsedSlice > sliceCount ) {
+		elapsedSlice = sliceCount;
+	}
+
+	CG_DrawItemRespawnTimerSprite( iconShader, timerOrigin, alpha, 180.0f );
+
+	sliceStep = 360 / sliceCount;
+	rotation = -( 180 / sliceCount );
+	for ( sliceIndex = 1; sliceIndex <= elapsedSlice; sliceIndex++ ) {
+		rotation += sliceStep;
+		CG_DrawItemRespawnTimerSprite( ( sliceIndex == elapsedSlice ) ? currentSliceShader : sliceShader,
+			timerOrigin, alpha, (float)rotation );
+	}
+}
+
+/*
 ==================
 CG_Item
 ==================
@@ -520,6 +829,8 @@ static void CG_Item( centity_t *cent ) {
 	int				msec;
 	float			frac;
 	float			scale;
+	int				respawnDuration;
+	int				respawnRemaining;
 	weaponInfo_t	*wi;
 	char			skipItems[32];
 
@@ -533,6 +844,19 @@ static void CG_Item( centity_t *cent ) {
 	}
 
 	item = &bg_itemlist[ es->modelindex ];
+	if ( CG_ItemUsesRespawnTimer( item ) && es->time > cg.time ) {
+		respawnDuration = es->time2;
+		if ( respawnDuration <= 0 ) {
+			respawnDuration = CG_ItemRespawnTimerDuration( item );
+		}
+
+		if ( respawnDuration > 0 ) {
+			respawnRemaining = es->time - cg.time;
+			CG_DrawItemRespawnTimer( item, respawnRemaining, respawnDuration, cent->lerpOrigin, 0,
+				(qboolean)( ( es->eFlags & EF_NODRAW ) != 0 ) );
+		}
+	}
+
 	trap_Cvar_VariableStringBuffer( "cg_skipItems", skipItems, sizeof( skipItems ) );
 	if ( skipItems[0] == '1' ) {
 		return;

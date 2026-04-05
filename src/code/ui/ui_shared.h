@@ -490,6 +490,10 @@ qboolean PC_Int_Parse(int handle, int *i);
 qboolean PC_Rect_Parse(int handle, rectDef_t *r);
 qboolean PC_String_Parse(int handle, const char **out);
 qboolean PC_Script_Parse(int handle, const char **out);
+void Item_SetupKeywordHash(void);
+qboolean Item_Parse(int handle, itemDef_t *item);
+void Menu_SetupKeywordHash(void);
+qboolean Menu_Parse(int handle, menuDef_t *menu);
 int Menu_Count();
 void Menu_New(int handle);
 void Menu_PaintAll();
@@ -515,6 +519,9 @@ void Menus_CloseAll();
 void Menu_Paint(menuDef_t *menu, qboolean forcePaint);
 void Menu_SetFeederSelection(menuDef_t *menu, int feeder, int index, const char *name);
 void Display_CacheAll();
+
+extern menuDef_t Menus[MAX_MENUS];
+extern int menuCount;
 
 void *UI_Alloc( int size );
 void UI_InitMemory( void );

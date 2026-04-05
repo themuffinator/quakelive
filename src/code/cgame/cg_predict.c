@@ -33,6 +33,10 @@ static	int			cg_numSolidEntities;
 static	centity_t	*cg_solidEntities[MAX_ENTITIES_IN_SNAPSHOT];
 static	int			cg_numTriggerEntities;
 static	centity_t	*cg_triggerEntities[MAX_ENTITIES_IN_SNAPSHOT];
+static	qboolean	cg_clientInfoContextValid;
+static	qboolean	cg_clientInfoContextFollow;
+static	int			cg_clientInfoContextClientNum;
+static	int			cg_clientInfoContextTeam;
 
 /*
 =============
@@ -47,8 +51,8 @@ static void CG_LocalProjectileNudge( vec3_t origin, int *msec ) {
 	float		autoComponent;
 	float		totalMsec;
 	float		nudgeSeconds;
-	int		appliedMsec;
-	int		adjustedTime;
+	int			appliedMsec;
+	int			adjustedTime;
 	vec3_t		delta;
 
 	if ( !origin ) {
@@ -203,6 +207,40 @@ static void CG_UpdateStepChange( void ) {
 	}
 
 	cg.stepTime = cg.time;
+}
+
+/*
+==========================
+CG_UpdateClientInfoContext
+
+Retail prediction tracks follow/team context and queues a deferred client-info
+refresh for snapshot handoff whenever that context changes.
+==========================
+*/
+static void CG_UpdateClientInfoContext( void ) {
+	qboolean	following;
+	int			clientNum;
+	int			team;
+
+	following = (qboolean)( ( cg.predictedPlayerState.pm_flags & PMF_FOLLOW ) != 0 );
+	clientNum = cg.predictedPlayerState.clientNum;
+	team = cg.predictedPlayerState.persistant[ PERS_TEAM ];
+
+	if ( cg_clientInfoContextValid ) {
+		if ( cg_clientInfoContextFollow != following
+			|| cg_clientInfoContextTeam != team ) {
+			CG_QueueClientInfoContextRefresh();
+		}
+
+		if ( following && cg_clientInfoContextClientNum != clientNum ) {
+			CG_QueueClientInfoContextRefresh();
+		}
+	}
+
+	cg_clientInfoContextValid = qtrue;
+	cg_clientInfoContextFollow = following;
+	cg_clientInfoContextClientNum = clientNum;
+	cg_clientInfoContextTeam = team;
 }
 
 /*
@@ -667,7 +705,10 @@ void CG_PredictPlayerState( void ) {
 	if ( !cg.validPPS ) {
 		cg.validPPS = qtrue;
 		cg.predictedPlayerState = cg.snap->ps;
+		cg_clientInfoContextValid = qfalse;
 	}
+
+	CG_UpdateClientInfoContext();
 
 
 	// demo playback just copies the moves

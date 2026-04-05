@@ -84,7 +84,15 @@ static void CG_Viewpos_f (void) {
 }
 
 
-static void CG_ScoresDown_f( void ) {
+/*
+=============
+CG_ScoresDown_f
+
+Retail `+scores` handler shared by the console-command table and the cgame HUD
+binding intercept path.
+=============
+*/
+void CG_ScoresDown_f( void ) {
 
 		CG_BuildSpectatorString();
 	if ( cg.scoresRequestTime + 2000 < cg.time ) {
@@ -495,61 +503,57 @@ static void CG_Kill_f( void ) {
 
 /*
 =============
-CG_IsRetailReadyUpPregameBypassActive
+CG_GetRetailReadyUpPmType
 
-Returns qtrue for the special tutorial/training pregame path that retail gates through
-an unresolved match-phase discriminator.
+Returns the player movement mode that the retail readyup wrapper uses for its
+intermission bypass, falling back to the predicted state when no live snapshot
+is available.
 =============
 */
-static qboolean CG_IsRetailReadyUpPregameBypassActive( void ) {
-	const char	*info;
-	const char	*trainingValue;
-	const char	*tutorialName;
-	const char	*tutorialText;
-
-	info = CG_ConfigString( CS_SERVERINFO );
-	if ( info && *info ) {
-		trainingValue = Info_ValueForKey( info, "g_training" );
-		if ( trainingValue && trainingValue[0] && atoi( trainingValue ) ) {
-			return qtrue;
-		}
+static pmtype_t CG_GetRetailReadyUpPmType( void ) {
+	if ( cg.snap ) {
+		return (pmtype_t)cg.snap->ps.pm_type;
 	}
 
-	tutorialName = CG_ConfigString( CS_TUTORIAL_NAME );
-	if ( tutorialName && tutorialName[0] ) {
-		return qtrue;
-	}
+	return (pmtype_t)cg.predictedPlayerState.pm_type;
+}
 
-	tutorialText = CG_ConfigString( CS_TUTORIAL_TEXT );
-	return ( tutorialText && tutorialText[0] ) ? qtrue : qfalse;
+/*
+=============
+CG_IsRetailReadyUpIntermissionBypassActive
+
+Returns qtrue when the retail intermission-only readyup bypass is active.
+=============
+*/
+static qboolean CG_IsRetailReadyUpIntermissionBypassActive( void ) {
+	return ( qboolean )( CG_GetRetailReadyUpPmType() == PM_INTERMISSION );
 }
 
 /*
 =============
 CG_ReadyUp_f
 
-Mirrors the retail local readyup wrapper by requiring an active ready-up window and
-blocking spectators outside the special tutorial/training pregame path.
+Mirrors the retail local readyup wrapper by requiring an active warmup window
+and only bypassing the spectator gate during intermission.
 =============
 */
 static void CG_ReadyUp_f( void ) {
-	qboolean	allowPregameBypass;
+	const playerState_t	*ps;
+	qboolean		allowIntermissionBypass;
 
-	allowPregameBypass = CG_IsRetailReadyUpPregameBypassActive();
+	ps = cg.snap ? &cg.snap->ps : NULL;
+	allowIntermissionBypass = CG_IsRetailReadyUpIntermissionBypassActive();
 
-	if ( !cg.snap ) {
-		if ( !allowPregameBypass ) {
+	if ( cg.warmup == 0 && cgs.matchReadyUpDeadline <= 0 && !allowIntermissionBypass ) {
+		return;
+	}
+
+	if ( !ps ) {
+		if ( !allowIntermissionBypass ) {
 			return;
 		}
-	} else {
-		if ( cg.warmup == 0 && cgs.matchReadyUpDeadline <= 0 && !allowPregameBypass ) {
-			return;
-		}
-
-		if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR &&
-				!allowPregameBypass ) {
-			return;
-		}
+	} else if ( ps->persistant[PERS_TEAM] == TEAM_SPECTATOR && !allowIntermissionBypass ) {
+		return;
 	}
 
 	trap_SendClientCommand( "readyup" );

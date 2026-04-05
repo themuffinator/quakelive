@@ -38,15 +38,17 @@ def test_objective_classifier_covers_retail_flag_and_obelisk_paths() -> None:
 
 
 def test_freeze_visibility_helper_matches_retail_export_boundary() -> None:
+	public_h = _read("src/code/game/bg_public.h")
 	local_h = _read("src/code/game/g_local.h")
 	freeze_c = _read("src/code/game/g_freeze.c")
 
 	assert "qboolean\tG_FreezeCanSeeThawProgressEvent( int clientNum, int entNum );" in local_h
-	assert "#define QL_EV_FREEZE_THAW_PROGRESS\t0x58" in freeze_c
+	assert "EV_THAW_PLAYER = 57," in public_h
+	assert "EV_THAW_TICK = 58," in public_h
 	assert "static int G_FreezeResolveThawProgressTarget( const gentity_t *ent ) {" in freeze_c
 	assert "qboolean G_FreezeCanSeeThawProgressEvent( int clientNum, int entNum ) {" in freeze_c
 	assert "if ( level.roundState != ROUNDSTATE_ACTIVE ) {" in freeze_c
-	assert "if ( ent->s.eType != ET_EVENTS + QL_EV_FREEZE_THAW_PROGRESS ) {" in freeze_c
+	assert "if ( ent->s.eType != ET_EVENTS + EV_THAW_TICK ) {" in freeze_c
 	assert "targetClientNum = ent->s.otherEntityNum;" in freeze_c
 	assert "targetClientNum = ent->s.clientNum;" in freeze_c
 	assert "return G_ClientNumsOnSameTeam( clientNum, targetClientNum );" in freeze_c
@@ -56,5 +58,8 @@ def test_qagame_native_import_table_uses_public_header_count() -> None:
 	public_h = _read("src/code/game/g_public.h")
 	sv_game = _read("src/code/server/sv_game.c")
 
-	assert "#define GAME_NATIVE_IMPORT_COUNT\t(G_RANK_REPORT_STR + 1)" in public_h
-	assert "static ql_import_f ql_game_imports[GAME_NATIVE_IMPORT_COUNT] = {" in sv_game
+	assert "#define GAME_LEGACY_IMPORT_COUNT\t(G_RANK_REPORT_STR + 1)" in public_h
+	assert "#define GAME_NATIVE_IMPORT_COUNT\tG_QL_IMPORT_TOTAL_COUNT" in public_h
+	assert "static ql_import_f ql_game_imports[GAME_NATIVE_IMPORT_COUNT];" in sv_game
+	assert "Com_Memset( ql_game_imports, 0, sizeof( ql_game_imports ) );" in sv_game
+	assert "Com_Memcpy( &ql_game_imports[G_QL_IMPORT_COMPAT_BASE], ql_game_compat_imports, sizeof( ql_game_compat_imports ) );" in sv_game

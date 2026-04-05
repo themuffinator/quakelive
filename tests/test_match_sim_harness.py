@@ -63,7 +63,6 @@ vmCvar_t g_factoryAllowItemDrops;
 vmCvar_t g_factoryAllowItemBounce;
 vmCvar_t g_factoryTitle;
 
-static char qlr_factoryTitleConfig[MAX_STRING_CHARS];
 static char qlr_factoryFlagsConfig[32];
 static char qlr_factorySpawnHints[MAX_INFO_STRING];
 
@@ -142,9 +141,6 @@ Captures configstring updates for verification.
 void trap_SetConfigstring( int num, const char *string ) {
 @TAB@const char *value = string ? string : "";
 @TAB@switch ( num ) {
-@TAB@@TAB@case CS_FACTORY_TITLE:
-@TAB@@TAB@@TAB@Q_strncpyz( qlr_factoryTitleConfig, value, sizeof( qlr_factoryTitleConfig ) );
-@TAB@@TAB@@TAB@break;
 @TAB@@TAB@case CS_FACTORY_FLAGS:
 @TAB@@TAB@@TAB@Q_strncpyz( qlr_factoryFlagsConfig, value, sizeof( qlr_factoryFlagsConfig ) );
 @TAB@@TAB@@TAB@break;
@@ -175,7 +171,6 @@ Resets the captured configstring buffers between runs.
 =============
 */
 static void QLR_ClearCapturedConfigstrings( void ) {
-@TAB@memset( qlr_factoryTitleConfig, 0, sizeof( qlr_factoryTitleConfig ) );
 @TAB@memset( qlr_factoryFlagsConfig, 0, sizeof( qlr_factoryFlagsConfig ) );
 @TAB@memset( qlr_factorySpawnHints, 0, sizeof( qlr_factorySpawnHints ) );
 }
@@ -230,17 +225,6 @@ Tweaks the cached timeout length to trigger flag masks.
 */
 void QLR_SetTimeoutLength( int seconds ) {
 @TAB@g_matchFactoryConfig.timeoutLengthSeconds = seconds;
-}
-
-/*
-=============
-QLR_GetFactoryTitleConfigstring
-
-Exposes the most recent CS_FACTORY_TITLE payload.
-=============
-*/
-const char *QLR_GetFactoryTitleConfigstring( void ) {
-@TAB@return qlr_factoryTitleConfig;
 }
 
 /*
@@ -652,8 +636,6 @@ def _load_factory_metadata_library(lib_path: Path) -> ctypes.CDLL:
     library.QLR_SetTimeoutLength.restype = None
     library.QLR_BuildFactoryMetadata.argtypes = []
     library.QLR_BuildFactoryMetadata.restype = None
-    library.QLR_GetFactoryTitleConfigstring.argtypes = []
-    library.QLR_GetFactoryTitleConfigstring.restype = ctypes.c_char_p
     library.QLR_GetFactoryFlagsConfigstring.argtypes = []
     library.QLR_GetFactoryFlagsConfigstring.restype = ctypes.c_char_p
     return library
@@ -669,27 +651,20 @@ def factory_metadata_library(tmp_path_factory: pytest.TempPathFactory) -> ctypes
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Factory metadata harness requires a POSIX toolchain")
-def test_factory_title_configstring_matches_trimmed_preset(factory_metadata_library: ctypes.CDLL) -> None:
+def test_factory_flags_configstring_tracks_customised_preset(factory_metadata_library: ctypes.CDLL) -> None:
     library = factory_metadata_library
     library.QLR_ResetFactoryConfig()
-    library.QLR_SetFactoryTitle(b"  Practice Preset  ")
     library.QLR_BuildFactoryMetadata()
 
-    title = library.QLR_GetFactoryTitleConfigstring()
     flags = library.QLR_GetFactoryFlagsConfigstring()
 
-    assert title is not None
-    assert title.decode("utf-8") == "Practice Preset"
     assert flags is not None
     assert flags.decode("utf-8") == "0"
 
     library.QLR_SetTimeoutLength(90)
     library.QLR_BuildFactoryMetadata()
 
-    updated_title = library.QLR_GetFactoryTitleConfigstring()
     updated_flags = library.QLR_GetFactoryFlagsConfigstring()
 
-    assert updated_title is not None
-    assert updated_title.decode("utf-8") == "Practice Preset"
     assert updated_flags is not None
     assert updated_flags.decode("utf-8") == "1"

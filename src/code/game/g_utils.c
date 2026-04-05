@@ -553,6 +553,72 @@ gentity_t *G_TempEntity( const vec3_t origin, int event ) {
 	return e;
 }
 
+/*
+=================
+G_SetRetailEventRecipient
+
+Publishes the recovered retail single-recipient client slot at the 0xB0
+entityState offset used by Quake Live temp entities.
+=================
+*/
+void G_SetRetailEventRecipient( gentity_t *ent, int clientNum ) {
+	if ( !ent ) {
+		return;
+	}
+
+	ent->s.solid = ( clientNum >= 0 && clientNum < MAX_CLIENTS ) ? clientNum : ENTITYNUM_NONE;
+}
+
+/*
+=================
+G_SetRetailEventIntPayload
+
+Stores a raw integer payload in the recovered retail 0x5C temp-entity slot.
+=================
+*/
+void G_SetRetailEventIntPayload( entityState_t *state, int value ) {
+	if ( !state ) {
+		return;
+	}
+
+	Com_Memcpy( &state->origin[0], &value, sizeof( value ) );
+}
+
+/*
+=================
+G_SetRetailEventData
+
+Stores the recovered retail 0xE0 temp-entity payload slot shared by award and
+damage-plum events.
+=================
+*/
+void G_SetRetailEventData( entityState_t *state, int value ) {
+	if ( !state ) {
+		return;
+	}
+
+	state->retailEventData = value;
+}
+
+/*
+=================
+G_SetRetailGlobalTeamSoundPayload
+
+Publishes the recovered Quake Live global-team-sound payload fields without
+falling back to the older GPL eventParm bridge.
+=================
+*/
+void G_SetRetailGlobalTeamSoundPayload( gentity_t *ent, global_team_sound_t sound, int trackedClientNum, team_t team, int index ) {
+	if ( !ent ) {
+		return;
+	}
+
+	ent->s.weapon = sound;
+	ent->s.groundEntityNum = ( trackedClientNum >= 0 && trackedClientNum < MAX_CLIENTS ) ? trackedClientNum : ENTITYNUM_NONE;
+	ent->s.frame = team;
+	ent->s.legsAnim = index;
+}
+
 
 
 /*

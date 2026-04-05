@@ -111,11 +111,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_AWARD_MOST_VALUABLE_DEFENSIVE	0x2BA
 #define CS_AWARD_MOST_DAMAGEDEALT	0x2BB
 //
-// Factory metadata configstrings provide clients with human-readable match factory data.
-// Retail qagame mirrors timeout, overtime, and sudden-death metadata through
-// CS_MATCH_STATE; 0x2A5 and 0x2C5 remain mode-specific numeric configstrings.
+// Retail qagame uses 0x2A2 for the numeric player-cylinder toggle, 0x2A3 for
+// the factory-flags bitmask, and mirrors timeout, overtime, and sudden-death
+// metadata through CS_MATCH_STATE; 0x2A5 and 0x2C5 remain mode-specific
+// numeric configstrings.
 //
-#define CS_FACTORY_TITLE		0x2A2		// descriptive title for the active match factory
+#define CS_PLAYER_CYLINDERS		0x2A2		// retail numeric g_playerCylinders transport consumed by cgame
 #define CS_FACTORY_FLAGS		0x2A3		// decimal bitmask describing customized factory settings
 #define CS_ENABLE_BREATH		0x2A4		// global breath effect toggle
 #define CS_DOMINATION_CAPTURE_TIME	0x2A5		// floating-point g_domCapTime payload
@@ -682,8 +683,8 @@ typedef enum {
 	EV_DEATH1 = 54,
 	EV_DEATH2 = 55,
 	EV_DEATH3 = 56,
-	EV_DROWN = 57,
-	EV_OBITUARY = 58,
+	EV_THAW_PLAYER = 57,
+	EV_THAW_TICK = 58,
 
 	EV_POWERUP_QUAD = 59,
 	EV_POWERUP_BATTLESUIT = 60,
@@ -716,8 +717,6 @@ typedef enum {
 	EV_OVERTIME = 84,
 	EV_GAMEOVER = 85,
 	EV_MISSILE_MISS_DMGTHROUGH = 86,
-	EV_THAW_PLAYER = 87,
-	EV_THAW_TICK = 88,
 	EV_SHOTGUN_KILL = 89,
 	EV_POI = 90,
 	EV_UNUSED_5B = 91,

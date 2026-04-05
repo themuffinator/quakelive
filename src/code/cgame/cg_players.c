@@ -1597,6 +1597,56 @@ static void CG_SetRefEntityColor( refEntity_t *ent, const vec3_t color, int colo
 
 /*
 =============
+CG_ResolveClientModelColorBytes
+
+Resolves the packed torso/dead-body model color used by the shared player
+render path.
+=============
+*/
+static void CG_ResolveClientModelColorBytes( const centity_t *cent, byte *rgba ) {
+	const clientInfo_t	*ci;
+	vec4_t		shaderColor;
+	int		colorScale;
+
+	if ( !rgba ) {
+		return;
+	}
+
+	rgba[0] = 255;
+	rgba[1] = 255;
+	rgba[2] = 255;
+	rgba[3] = 255;
+
+	if ( !cent ) {
+		return;
+	}
+
+	if ( cent->currentState.clientNum < 0 || cent->currentState.clientNum >= cgs.maxclients ) {
+		return;
+	}
+
+	ci = &cgs.clientinfo[cent->currentState.clientNum];
+	if ( !ci->infoValid ) {
+		return;
+	}
+
+	colorScale = CG_GetPlayerColorScale();
+	if ( CG_ShouldTintDeadBody( cent, ci ) ) {
+		CG_SetScaledShaderRGBA( rgba, cg.deadBodyColor, colorScale );
+		return;
+	}
+
+	if ( !ci->upperColorForced ) {
+		return;
+	}
+
+	VectorCopy( ci->upperColor, shaderColor );
+	shaderColor[3] = 1.0f;
+	CG_SetScaledShaderRGBA( rgba, shaderColor, colorScale );
+}
+
+/*
+=============
 CG_ApplyPlayerColors
 
 Applies the retail shared player-color leaf across the legs, torso, and
@@ -1625,18 +1675,16 @@ static void CG_ApplyPlayerColors( centity_t *cent, const clientInfo_t *ci, refEn
 	head->shaderRGBA[2] = 255;
 	head->shaderRGBA[3] = 255;
 
+	CG_ResolveClientModelColorBytes( cent, torso->shaderRGBA );
+
 	if ( CG_ShouldTintDeadBody( cent, ci ) ) {
-		CG_ApplyDeadBodyTint( legs, colorScale );
-		CG_ApplyDeadBodyTint( torso, colorScale );
-		CG_ApplyDeadBodyTint( head, colorScale );
+		memcpy( legs->shaderRGBA, torso->shaderRGBA, sizeof( legs->shaderRGBA ) );
+		memcpy( head->shaderRGBA, torso->shaderRGBA, sizeof( head->shaderRGBA ) );
 		return;
 	}
 
 	if ( ci->lowerColorForced ) {
 		CG_SetRefEntityColor( legs, ci->lowerColor, colorScale );
-	}
-	if ( ci->upperColorForced ) {
-		CG_SetRefEntityColor( torso, ci->upperColor, colorScale );
 	}
 	if ( ci->headColorForced ) {
 		CG_SetRefEntityColor( head, ci->headColor, colorScale );

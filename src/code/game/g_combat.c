@@ -246,6 +246,29 @@ void ScorePlum( gentity_t *ent, const vec3_t origin, int score ) {
 
 /*
 ============
+G_AddDamagePlum
+
+Publishes the retail single-recipient damage-plum temp entity consumed by
+the Quake Live cgame event seam.
+============
+*/
+static void G_AddDamagePlum( gentity_t *attacker, const vec3_t origin, int damage, int mod ) {
+	gentity_t	*plum;
+
+	if ( !attacker || !attacker->client || !origin || damage <= 0 ) {
+		return;
+	}
+
+	plum = G_TempEntity( origin, EV_DAMAGEPLUM );
+	plum->r.svFlags |= SVF_SINGLECLIENT;
+	plum->r.singleClient = attacker->s.number;
+	G_SetRetailEventRecipient( plum, attacker->s.number );
+	G_SetRetailEventIntPayload( &plum->s, damage );
+	G_SetRetailEventData( &plum->s, G_ModToWeapon( mod ) );
+}
+
+/*
+============
 AddScore
 
 Adds score to both the client and his team
@@ -1674,7 +1697,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	// damage plum
 	//
 	if ( damage > 0 && targ && targ->client && attacker && attacker->client && attacker != targ ) {
-		G_AddEvent( targ, EV_DAMAGEPLUM, damage );
+		G_AddDamagePlum( attacker, point ? point : targ->r.currentOrigin, damage, mod );
 	}
 	}
 

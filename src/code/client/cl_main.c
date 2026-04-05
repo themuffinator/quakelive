@@ -261,6 +261,58 @@ static void CL_Steam_ClearStats_f( void ) {
 	Com_DPrintf( "stats_clear\n" );
 }
 
+static qboolean cl_voiceRecordingActive;
+
+/*
+=============
+CL_SetLocalSpeakingState
+
+Publishes the local speaking-state sidecar through the native cgame export
+used by the retail host voice path.
+=============
+*/
+static void CL_SetLocalSpeakingState( qboolean speaking ) {
+	if ( !cgvm || cls.state != CA_ACTIVE || !cl.snap.valid ) {
+		return;
+	}
+
+	VM_Call( cgvm, CG_SET_CLIENT_SPEAKING_STATE, cl.snap.ps.clientNum, speaking ? 1 : 0 );
+}
+
+/*
+=============
+CL_VoiceStartRecording_f
+
+Provides the retail `+voice` command surface, using the local speaking-state
+bridge as the current fallback when live voice services are unavailable.
+=============
+*/
+static void CL_VoiceStartRecording_f( void ) {
+	if ( cl_voiceRecordingActive ) {
+		return;
+	}
+
+	cl_voiceRecordingActive = qtrue;
+	CL_SetLocalSpeakingState( qtrue );
+}
+
+/*
+=============
+CL_VoiceStopRecording_f
+
+Provides the retail `-voice` command surface, clearing the local speaking-state
+fallback when the key is released.
+=============
+*/
+static void CL_VoiceStopRecording_f( void ) {
+	if ( !cl_voiceRecordingActive ) {
+		return;
+	}
+
+	cl_voiceRecordingActive = qfalse;
+	CL_SetLocalSpeakingState( qfalse );
+}
+
 /*
 =============
 CL_ParseSteamIdString
@@ -1177,6 +1229,8 @@ void CL_Disconnect( qboolean showMainMenu ) {
 		CL_WritePacket();
 		CL_WritePacket();
 	}
+
+	cl_voiceRecordingActive = qfalse;
 	
 	CL_ClearState ();
 
@@ -2878,6 +2932,8 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("web_reload", CL_Web_Reload_f );
 	Cmd_AddCommand ("web_browserActive", CL_Web_BrowserActive_f );
 	Cmd_AddCommand ("web_stopRefresh", CL_Web_StopRefresh_f );
+	Cmd_AddCommand ("+voice", CL_VoiceStartRecording_f );
+	Cmd_AddCommand ("-voice", CL_VoiceStopRecording_f );
 	Cmd_AddCommand ("connect_lobby", CL_Steam_ConnectLobby_f );
 	Cmd_AddCommand ("clientviewprofile", CL_Steam_OverlayCommand_f );
 	Cmd_AddCommand ("clientfriendinvite", CL_Steam_OverlayCommand_f );
@@ -2951,6 +3007,8 @@ void CL_Shutdown( void ) {
 	Cmd_RemoveCommand ("web_reload");
 	Cmd_RemoveCommand ("web_browserActive");
 	Cmd_RemoveCommand ("web_stopRefresh");
+	Cmd_RemoveCommand ("+voice");
+	Cmd_RemoveCommand ("-voice");
 	Cmd_RemoveCommand ("connect_lobby");
 	Cmd_RemoveCommand ("clientviewprofile");
 	Cmd_RemoveCommand ("clientfriendinvite");

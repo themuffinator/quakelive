@@ -305,7 +305,7 @@
 			style WINDOW_STYLE_FILLED 
 			visible 1 
 			type 1
-                   cvarTest "ui_singlePlayerActive"
+			cvarTest "ui_singleplayeractive"
 			showCvar { "1" }
 			action { open ingame_addbot
 				setitemcolor navbtn1t forecolor 1 1 1 1
@@ -335,7 +335,7 @@
 		itemDef {
 			name navbtn4o
 			rect 226 64 59 17
-                   cvarTest "ui_singlePlayerActive"
+			cvarTest "ui_singleplayeractive"
 			showCvar { "1" }
 			style WINDOW_STYLE_FILLED 
 			visible 1 
@@ -362,7 +362,7 @@
 			forecolor 1 1 1 1
 			visible 1 
 			decoration
-                   cvarTest "ui_singlePlayerActive"
+			cvarTest "ui_singleplayeractive"
 			hideCvar { "0" }
 		}
 		
