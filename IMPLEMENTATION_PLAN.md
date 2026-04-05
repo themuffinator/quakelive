@@ -8,6 +8,17 @@ The long-term parity target is that this engine should, in theory, be able to re
 
 ## Recently closed
 
+### Task 53: UI full parity audit and closure-plan publication [COMPLETED]
+Priority: High
+Files: `AUDIT.md`, `IMPLEMENTATION_PLAN.md`, `docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md`
+Parity estimate: **before 68% -> after 70%** (confidence/documentation uplift; runtime behavior unchanged)
+
+Completed work:
+
+1. Performed a full `ui` parity audit against the committed HLIL/Ghidra references, the current source/runtime UI surfaces, and the focused UI test/bundle suite.
+2. Published a dedicated closure plan document that enumerates the current UI gap register (`UI-G01`..`UI-G06`), execution phases, acceptance criteria, and tranche-by-tranche parity targets from 68% to 100%.
+3. Broke the closure path into small executable backlog tasks (`UI-P1`..`UI-P6`) so UI parity can be tracked and closed incrementally under repository constraints (read-only `src/ui`, service gating behind `QL_BUILD_ONLINE_SERVICES`).
+
 ### Task 52: Cgame browser leaf-owner closure [COMPLETED]
 Priority: Medium
 Files: `src/code/cgame/cg_newdraw.c`, `src/code/cgame/cg_main.c`, `src/code/cgame/cg_local.h`, `tests/test_cgame_displaycontext_parity.py`, `docs/reverse-engineering/cgame-mapping.md`, `docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`

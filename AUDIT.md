@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-03-26
+Last updated: 2026-04-05
 
 This audit reflects the current repository state against the retail Quake Live HLIL references and a fresh Windows `Debug|x86` build/runtime pass. The goal is not to score every file equally; it is to rank the gaps that still materially separate the repo from retail behavior.
 
@@ -140,3 +140,14 @@ The repo is no longer blocked on missing basic gameplay plumbing or on the basic
 - final ownerdraw/stat payload cleanup
 
 The strategic target is now explicit: the engine should, in theory, be capable of replacing the retail Quake Live engine once those remaining host, platform, asset, and strict retail-binary compatibility gaps are closed.
+
+
+## UI audit refresh (2026-04-05)
+
+A focused full-parity audit for `ui` is now published in `docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md`.
+
+Summary:
+
+- Current estimated `ui` parity is **68%** overall, with strongest alignment at the native ABI seam and weaker parity in retail UI corpus availability, overlay workflow hardening, and end-to-end parity gating.
+- The current environment has an empty `assets/quakelive/baseq3/ui` tree, which blocks strict source-vs-retail panel drift checks and causes bundle-generation preflight failures for missing retail base files.
+- A six-phase closure plan (`UI-P1`..`UI-P6`) now defines the complete path to 100% UI parity, including deterministic retail corpus preflight, overlay-first drift closure for read-only `src/ui`, service-disabled menu fallback validation, residual widget-core mapping, unified parity gate, and final runtime evidence pass.
