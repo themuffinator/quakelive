@@ -1,6 +1,6 @@
  qagamex86
 
- Timestamp is 69d18a8d (Sat Apr  4 23:02:53 2026)
+ Timestamp is 69d21986 (Sun Apr  5 09:12:54 2026)
 
  Preferred load address is 10000000
 
@@ -615,9 +615,9 @@
  0001:000637b0       _Pickup_Weapon             100647b0 f   g_items.obj
  0001:00063990       _Pickup_Health             10064990 f   g_items.obj
  0001:00063ad0       _Pickup_Armor              10064ad0 f   g_items.obj
- 0001:00064880       _Use_Item                  10065880 f   g_items.obj
- 0001:000648a0       _G_ItemDisabled            100658a0 f   g_items.obj
- 0001:000648f0       _G_BounceItem              100658f0 f   g_items.obj
+ 0001:00064890       _Use_Item                  10065890 f   g_items.obj
+ 0001:000648b0       _G_ItemDisabled            100658b0 f   g_items.obj
+ 0001:00064900       _G_BounceItem              10065900 f   g_items.obj
  0001:00064ea0       _Com_Error                 10065ea0 f   g_main.obj
  0001:00064f10       _Com_Printf                10065f10 f   g_main.obj
  0001:00064f80       _G_InitWeaponConfig        10065f80 f   g_main.obj

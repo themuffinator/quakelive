@@ -155,14 +155,25 @@ void CG_DrawRect( float x, float y, float width, float height, float size, const
 
 /*
 ================
+CG_DrawPicST
+
+Coordinates are 640*480 virtual values and preserve the supplied UVs.
+=================
+*/
+void CG_DrawPicST( float x, float y, float width, float height, float s1, float t1, float s2, float t2, qhandle_t hShader ) {
+	CG_AdjustFrom640( &x, &y, &width, &height );
+	trap_R_DrawStretchPic( x, y, width, height, s1, t1, s2, t2, hShader );
+}
+
+/*
+================
 CG_DrawPic
 
 Coordinates are 640*480 virtual values
 =================
 */
 void CG_DrawPic( float x, float y, float width, float height, qhandle_t hShader ) {
-	CG_AdjustFrom640( &x, &y, &width, &height );
-	trap_R_DrawStretchPic( x, y, width, height, 0, 0, 1, 1, hShader );
+	CG_DrawPicST( x, y, width, height, 0.0f, 0.0f, 1.0f, 1.0f, hShader );
 }
 
 
@@ -349,7 +360,7 @@ static void CG_TileClearBox( int x, int y, int w, int h, qhandle_t hShader ) {
 	t1 = y/64.0;
 	s2 = (x+w)/64.0;
 	t2 = (y+h)/64.0;
-	trap_R_DrawStretchPic( x, y, w, h, s1, t1, s2, t2, hShader );
+	CG_DrawPicST( x, y, w, h, s1, t1, s2, t2, hShader );
 }
 
 
