@@ -23,7 +23,8 @@ def test_cgame_parses_smscores_with_compact_row_stride() -> None:
 
 	assert "static void CG_ParseCompactScores( void ) {" in servercmds
 	assert "cg.scores[i].client = atoi( CG_Argv( i * 8 + 4 ) );" in servercmds
-	assert "cg.scores[i].scoreFlags = atoi( CG_Argv( i * 8 + 9 ) );" in servercmds
+	assert "cg.scores[i].scoreFlags = 0;" in servercmds
+	assert "cg.scores[i].activePlayer = atoi( CG_Argv( i * 8 + 9 ) ) ? qtrue : qfalse;" in servercmds
 	assert "cg.scores[i].damage = atoi( CG_Argv( i * 8 + 10 ) );" in servercmds
 	assert "cg.scores[i].deaths = atoi( CG_Argv( i * 8 + 11 ) );" in servercmds
 	assert 'if ( !strcmp( cmd, "smscores" ) ) {' in servercmds

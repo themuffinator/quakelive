@@ -4,7 +4,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 GAME_ROOT = REPO_ROOT / "src" / "code" / "game"
 
 def _read(rel_path: str) -> str:
-    return (REPO_ROOT / rel_path).read_text()
+    return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 def test_spawn_and_spectator_cvars_registered() -> None:
     main_text = _read("src/code/game/g_main.c")

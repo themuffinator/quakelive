@@ -169,17 +169,19 @@ typedef struct ql_clientSession_source_s {
 	int32_t spectatorTime;			// 0x04
 	int32_t spectatorState;			// 0x08
 	int32_t spectatorClient;		// 0x0C
-	int32_t wins;				// 0x10
-	int32_t losses;				// 0x14
-	int32_t teamLeader;			// 0x18
-	int32_t spectateOnly;			// 0x1C
+	int32_t selectedSpawnWeapon;		// 0x10
+	int32_t wins;				// 0x14
+	int32_t losses;				// 0x18
+	int32_t teamLeader;			// 0x1C
 	int32_t privilege;			// 0x20
-	int32_t spectatorQueuePosition;		// 0x24
-	int32_t skill1;				// 0x28
+	int32_t spectateOnly;			// 0x24
+	int32_t spectatorQueuePosition;		// 0x28
 	int32_t spectatorQueuePositionDirty;	// 0x2C (skipped by the source serializer)
-	int32_t skill2;				// 0x30
-	int32_t skill3;				// 0x34
-	int32_t muted;				// 0x38
+	int32_t muted;				// 0x30
+	int32_t sessionField34;			// 0x34
+	int32_t skill1;				// 0x38
+	int32_t skill2;				// 0x3C
+	int32_t skill3;				// 0x40
 } ql_clientSession_source_t;
 
 // Retail Quake Live still keeps a contiguous session-style block at
@@ -688,13 +690,14 @@ QL_STATIC_ASSERT(offsetof(ql_clientPersistant_t, inactivity_warning) == 0x0E0, "
 QL_STATIC_ASSERT(offsetof(ql_clientPersistant_t, flood_last_time) == 0x0E4, "clientPersistant_t.flood_last_time offset");
 QL_STATIC_ASSERT(offsetof(ql_clientPersistant_t, flood_count) == 0x0E8, "clientPersistant_t.flood_count offset");
 QL_STATIC_ASSERT(offsetof(ql_gclient_t, pers) == 0x250, "gclient_t.pers offset");
-QL_STATIC_ASSERT(sizeof(ql_clientSession_source_t) == 0x3C, "clientSession_source_t size");
-QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, wins) == 0x10, "clientSession_source_t.wins offset");
-QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, spectateOnly) == 0x1C, "clientSession_source_t.spectateOnly offset");
+QL_STATIC_ASSERT(sizeof(ql_clientSession_source_t) == 0x44, "clientSession_source_t size");
+QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, selectedSpawnWeapon) == 0x10, "clientSession_source_t.selectedSpawnWeapon offset");
+QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, wins) == 0x14, "clientSession_source_t.wins offset");
 QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, privilege) == 0x20, "clientSession_source_t.privilege offset");
-QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, spectatorQueuePosition) == 0x24, "clientSession_source_t.spectatorQueuePosition offset");
+QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, spectateOnly) == 0x24, "clientSession_source_t.spectateOnly offset");
+QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, spectatorQueuePosition) == 0x28, "clientSession_source_t.spectatorQueuePosition offset");
 QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, spectatorQueuePositionDirty) == 0x2C, "clientSession_source_t.spectatorQueuePositionDirty offset");
-QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, muted) == 0x38, "clientSession_source_t.muted offset");
+QL_STATIC_ASSERT(offsetof(ql_clientSession_source_t, muted) == 0x30, "clientSession_source_t.muted offset");
 QL_STATIC_ASSERT(sizeof(ql_clientSession_t) == 0x38, "clientSession_t size");
 QL_STATIC_ASSERT(offsetof(ql_clientSession_t, selected_spawn_weapon) == 0x10, "clientSession_t.selected_spawn_weapon offset");
 QL_STATIC_ASSERT(offsetof(ql_clientSession_t, wins) == 0x14, "clientSession_t.wins offset");

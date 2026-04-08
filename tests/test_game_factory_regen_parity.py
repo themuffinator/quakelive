@@ -34,6 +34,21 @@ def test_client_timer_actions_calls_factory_regen_sidecars_once_per_frame() -> N
 	assert "G_RunFactoryRegen( ent );" not in timer_actions
 
 
+def test_factory_regen_client_layout_uses_named_retail_sidecars() -> None:
+	local_h = _read("src/code/game/g_local.h")
+	client_c = _read("src/code/game/g_client.c")
+
+	assert "factoryRegenLastDamageTime;\t// retail shared last-damage timestamp for the split factory regen helpers" in local_h
+	assert "factoryRegenArmorAccumulatorMs;\t// retail per-frame factory armor regen accumulator" in local_h
+	assert "factoryRegenHealthAccumulatorMs;\t// retail per-frame factory health regen accumulator" in local_h
+	assert "factoryRegenHealthPending;\t// retail health-regen pending latch armed by spawn/damage paths" in local_h
+	assert "factoryRegenArmorPending;\t// retail armor-regen pending latch armed by spawn/damage paths" in local_h
+	assert "client->factoryRegenArmorAccumulatorMs = 0;" in client_c
+	assert "client->factoryRegenHealthAccumulatorMs = 0;" in client_c
+	assert "client->factoryRegenHealthPending = qfalse;" in client_c
+	assert "client->factoryRegenArmorPending = qfalse;" in client_c
+
+
 def test_damage_path_marks_factory_regen_pending_from_retail_damage_gate() -> None:
 	combat_c = _read("src/code/game/g_combat.c")
 

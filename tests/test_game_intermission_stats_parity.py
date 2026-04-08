@@ -79,6 +79,19 @@ def test_qagame_intermission_stat_rows_follow_retail_pickup_and_damage_order() -
 	assert "cl->pers.teamState." not in ctf_block
 
 
+def test_deathmatch_scoreboard_message_orders_intermission_publishers_after_score_payloads() -> None:
+	game_cmds = _read("src/code/game/g_cmds.c")
+	scoreboard_block = _block(
+		game_cmds,
+		"void DeathmatchScoreboardMessage( gentity_t *ent ) {",
+		"void Cmd_Score_f( gentity_t *ent ) {",
+	)
+
+	assert scoreboard_block.index("G_SendScoreStatsMessage( ent );") < scoreboard_block.index("G_SendTeamScoreStatsMessage( ent );")
+	assert scoreboard_block.index("G_SendTeamScoreStatsMessage( ent );") < scoreboard_block.index("if ( level.intermissiontime ) {")
+	assert scoreboard_block.index("if ( level.intermissiontime ) {") < scoreboard_block.index("G_SendAllClientKeyMasks( ent - g_entities );")
+
+
 def test_cgame_caches_and_parses_retail_tdm_and_ctf_intermission_stats() -> None:
 	servercmds = _read("src/code/cgame/cg_servercmds.c")
 	local = _read("src/code/cgame/cg_local.h")

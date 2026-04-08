@@ -49,7 +49,7 @@ def test_freeze_visibility_helper_matches_retail_export_boundary() -> None:
 	assert "EV_THAW_TICK = 88," in public_h
 	assert "static int G_FreezeResolveThawProgressTarget( const gentity_t *ent ) {" in freeze_c
 	assert "qboolean G_FreezeCanSeeThawProgressEvent( int clientNum, int entNum ) {" in freeze_c
-	assert "if ( level.roundState != ROUNDSTATE_ACTIVE ) {" in freeze_c
+	assert "if ( G_FreezeResolveRoundState() != ROUNDSTATE_ACTIVE ) {" in freeze_c
 	assert "if ( ent->s.eType != ET_EVENTS + EV_THAW_TICK ) {" in freeze_c
 	assert "targetClientNum = ent->s.otherEntityNum;" in freeze_c
 	assert "targetClientNum = ent->s.clientNum;" in freeze_c

@@ -1433,7 +1433,7 @@ void G_UpdateCvars( void ) {
 
 	if ( g_roundWarmupDelay.modificationCount != s_roundWarmupDelayModCount ) {
 		s_roundWarmupDelayModCount = g_roundWarmupDelay.modificationCount;
-		G_FreezeHandleWarmupDelayCvarUpdate();
+		G_RoundHandleWarmupDelayCvarUpdate();
 	}
 
 	if ( g_ruleset.modificationCount != s_rulesetModCount ) {
@@ -2222,6 +2222,10 @@ G_UpdateTrainingState();
 	level.rankLastTeamScorer = -1;
 	level.roundState = ROUNDSTATE_INACTIVE;
 	level.roundTransitionTime = ROUND_TRANSITION_NONE;
+	level.roundPendingExit = qfalse;
+	level.rrRoundState = RR_ROUNDSTATE_INACTIVE;
+	level.rrPendingRoundState = RR_ROUNDSTATE_INACTIVE;
+	level.rrStateChangeTime = levelTime;
 	level.rrSelectedInfectedClientNum = -1;
 	level.rrCarryoverInfectedClientNum = -1;
 	level.rrLastInfectionTime = -1;
@@ -2446,6 +2450,35 @@ PLAYER COUNTING / SCORE SORTING
 
 /*
 =============
+G_IsTournamentQueueEligibleClient
+
+Returns qtrue for spectators who are actually eligible to occupy a duel
+queue slot.
+=============
+*/
+static qboolean G_IsTournamentQueueEligibleClient( const gclient_t *client ) {
+	if ( !client ) {
+		return qfalse;
+	}
+	if ( client->pers.connected != CON_CONNECTED ) {
+		return qfalse;
+	}
+	if ( client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		return qfalse;
+	}
+	if ( client->sess.spectateOnly ) {
+		return qfalse;
+	}
+	if ( client->sess.spectatorState == SPECTATOR_SCOREBOARD ||
+		client->sess.spectatorClient < 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
 G_FindNextTournamentPlayer
 
 Returns the oldest eligible waiting spectator for duel queue promotion.
@@ -2461,18 +2494,7 @@ gentity_t *G_FindNextTournamentPlayer( void ) {
 		gclient_t	*client;
 
 		client = &level.clients[i];
-		if ( client->pers.connected != CON_CONNECTED ) {
-			continue;
-		}
-		if ( client->sess.sessionTeam != TEAM_SPECTATOR ) {
-			continue;
-		}
-		if ( client->sess.spectateOnly ) {
-			continue;
-		}
-		// never select the dedicated follow or scoreboard clients
-		if ( client->sess.spectatorState == SPECTATOR_SCOREBOARD ||
-			client->sess.spectatorClient < 0 ) {
+		if ( !G_IsTournamentQueueEligibleClient( client ) ) {
 			continue;
 		}
 
@@ -2529,11 +2551,11 @@ void G_UpdateTournamentQueuePositions( void ) {
 
 		clientNum = level.sortedClients[i];
 		client = &level.clients[clientNum];
-
-		if ( client->sess.sessionTeam != TEAM_SPECTATOR ) {
-			continue;
-		}
-		if ( client->sess.spectateOnly ) {
+		if ( !G_IsTournamentQueueEligibleClient( client ) ) {
+			if ( client->sess.spectatorQueuePosition != 0 ) {
+				client->sess.spectatorQueuePosition = 0;
+				client->sess.spectatorQueuePositionDirty = qtrue;
+			}
 			continue;
 		}
 
@@ -2594,10 +2616,8 @@ void G_SyncTournamentQueueTeamTasks( void ) {
 		clientNum = level.sortedClients[i];
 		client = &level.clients[clientNum];
 
-		if ( client->sess.spectateOnly ) {
-			continue;
-		}
-		if ( client->sess.spectatorQueuePosition == 0 ) {
+		if ( !G_IsTournamentQueueEligibleClient( client ) ||
+			client->sess.spectatorQueuePosition == 0 ) {
 			continue;
 		}
 
@@ -6726,6 +6746,56 @@ static void G_CheckReadyUpDelayAction( void ) {
 void G_ApplyTimeoutPauseDelta( int msec ) {
 	if ( msec <= 0 ) {
 		return;
+	}
+
+	if ( level.roundTransitionTime > 0 ) {
+		level.roundTransitionTime += msec;
+	}
+
+	if ( level.roundStartTime > 0 ) {
+		level.roundStartTime += msec;
+	}
+
+	if ( level.adStateChangeTime > 0 ) {
+		level.adStateChangeTime += msec;
+	}
+
+	if ( level.rrStateChangeTime > 0 ) {
+		level.rrStateChangeTime += msec;
+	}
+
+	if ( level.rrLastInfectionTime > 0 ) {
+		level.rrLastInfectionTime += msec;
+	}
+
+	if ( level.rrNextSurvivalBonusTime > 0 ) {
+		level.rrNextSurvivalBonusTime += msec;
+	}
+
+	if ( G_FreezeGametypeEnabled() ) {
+		int			clientNum;
+
+		for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+			gclient_t	*client;
+
+			client = &level.clients[clientNum];
+			if ( client->pers.connected == CON_DISCONNECTED ) {
+				continue;
+			}
+
+			if ( client->freezeNextThawTick > 0 ) {
+				client->freezeNextThawTick += msec;
+			}
+			if ( client->freezeAutoThawTime > 0 ) {
+				client->freezeAutoThawTime += msec;
+			}
+			if ( client->freezeEnvironmentalRespawnTime > 0 ) {
+				client->freezeEnvironmentalRespawnTime += msec;
+			}
+			if ( client->freezeProtectedUntil > 0 ) {
+				client->freezeProtectedUntil += msec;
+			}
+		}
 	}
 
 	if ( level.warmupTime > 0 ) {

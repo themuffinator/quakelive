@@ -1779,23 +1779,46 @@ G_Frame_BeginRoundWarmup
 Transitions the round controller into the warmup state.
 =============
 */
-static void G_FreezeScheduleWarmupDelay( void );
+static void G_RoundScheduleWarmupDelay( void );
+int G_CAResolveRoundState( void );
+static int CA_RoundStateTransition( qboolean announce );
 static void G_FreezeResetClientsForRound( qboolean warmup );
-static int G_FreezeResolveRoundState( void );
+int G_FreezeResolveRoundState( void );
+static qboolean G_FreezeTeamIsFullyFrozen( team_t team );
 static int Freeze_RoundStateTransition( qboolean announce );
+static int G_TotalLivingHealthByTeam( team_t team );
 static void G_RRSeedInfectionTeams( void );
 static void G_RRInitRoundController( void );
 static int RR_RoundStateTransition( qboolean announce );
-static qboolean G_Frame_CheckRoundLimit( void );
+int G_RRResolveRoundState( void );
+static qboolean G_RoundTimeLimitExpired( int startTime );
+static qboolean G_CAFZCheckExitRules( qboolean announce );
 void G_Frame_BeginRoundWarmup( void ) {
 	level.roundState = ROUNDSTATE_WARMUP;
 	level.roundTransitionTime = ROUND_TRANSITION_NONE;
+	level.roundPendingExit = qfalse;
 	level.roundStartTime = level.time;
 	G_RRResetRoundState();
-	if ( G_FreezeGametypeEnabled() ) {
+	if ( g_gametype.integer == GT_CLAN_ARENA ) {
+		int		clientNum;
+
+		for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+			gentity_t	*ent;
+
+			ent = &g_entities[clientNum];
+			if ( !ent->inuse || !ent->client ) {
+				continue;
+			}
+
+			G_CAADResetClientForRound( ent );
+		}
+		G_RoundScheduleWarmupDelay();
+	} else if ( G_FreezeGametypeEnabled() ) {
 		G_FreezeSyncCvars();
 		G_FreezeResetClientsForRound( qtrue );
-		G_FreezeScheduleWarmupDelay();
+		G_RoundScheduleWarmupDelay();
+	} else if ( g_gametype.integer == GT_RED_ROVER ) {
+		G_RoundScheduleWarmupDelay();
 	}
 	G_UpdateMatchStateConfigString();
 }
@@ -1817,6 +1840,107 @@ static qboolean G_RoundControllerGametypeEnabled( void ) {
 	default:
 		return qfalse;
 	}
+}
+
+/*
+=============
+G_RoundTimeLimitExpired
+
+Returns qtrue once the active round has consumed the configured roundtimelimit.
+=============
+*/
+static qboolean G_RoundTimeLimitExpired( int startTime ) {
+	if ( roundtimelimit.integer <= 0 || startTime <= 0 ) {
+		return qfalse;
+	}
+
+	return ( level.time - startTime ) >= roundtimelimit.integer * 1000;
+}
+
+/*
+=============
+G_CAFZCheckExitRules
+
+Applies the retail tie-aware Clan Arena or Freeze timelimit, roundlimit, and mercylimit gate.
+=============
+*/
+static qboolean G_CAFZCheckExitRules( qboolean announce ) {
+	int		elapsed;
+	int		scoreDelta;
+	int		mercyWindowMinutes;
+	int		mercyWindowMsec;
+	const char	*leaderName;
+
+	if ( g_gametype.integer != GT_CLAN_ARENA && !G_FreezeGametypeEnabled() ) {
+		return qfalse;
+	}
+
+	if ( level.teamScores[TEAM_RED] == level.teamScores[TEAM_BLUE] ) {
+		return qfalse;
+	}
+
+	elapsed = level.time - level.startTime;
+	if ( g_timelimit.integer > 0 && elapsed >= g_timelimit.integer * 60000 ) {
+		if ( announce ) {
+			trap_SendServerCommand( -1, "print \"Timelimit hit.\n\"" );
+			LogExit( "Timelimit hit." );
+		}
+		return qtrue;
+	}
+
+	if ( roundlimit.integer > 0 ) {
+		if ( level.teamScores[TEAM_RED] >= roundlimit.integer
+			&& level.teamScores[TEAM_RED] > level.teamScores[TEAM_BLUE] ) {
+			if ( announce ) {
+				trap_SendServerCommand( -1, "print \"Red hit the roundlimit.\n\"" );
+				LogExit( "Roundlimit hit." );
+			}
+			return qtrue;
+		}
+
+		if ( level.teamScores[TEAM_BLUE] >= roundlimit.integer
+			&& level.teamScores[TEAM_BLUE] > level.teamScores[TEAM_RED] ) {
+			if ( announce ) {
+				trap_SendServerCommand( -1, "print \"Blue hit the roundlimit.\n\"" );
+				LogExit( "Roundlimit hit." );
+			}
+			return qtrue;
+		}
+	}
+
+	if ( mercylimit.integer <= 0 ) {
+		return qfalse;
+	}
+
+	mercyWindowMinutes = g_mercytime.integer;
+	if ( mercyWindowMinutes < 0 ) {
+		mercyWindowMinutes = 0;
+	}
+	if ( mercyWindowMinutes > 0 && mercyWindowMinutes > INT_MAX / 60000 ) {
+		mercyWindowMsec = INT_MAX;
+	} else {
+		mercyWindowMsec = mercyWindowMinutes * 60000;
+	}
+
+	if ( elapsed < mercyWindowMsec ) {
+		return qfalse;
+	}
+
+	scoreDelta = level.teamScores[TEAM_RED] - level.teamScores[TEAM_BLUE];
+	if ( scoreDelta >= mercylimit.integer ) {
+		leaderName = "Red";
+	} else if ( -scoreDelta >= mercylimit.integer ) {
+		leaderName = "Blue";
+	} else {
+		return qfalse;
+	}
+
+	if ( announce ) {
+		trap_SendServerCommand( -1, va( "print \"%s hit the mercylimit.\n\"", leaderName ) );
+		LogExit( "Mercylimit hit." );
+	}
+
+	return qtrue;
 }
 
 /*
@@ -1854,6 +1978,197 @@ static qboolean G_ADShouldTimeoutActiveRound( const int counts[TEAM_NUM_TEAMS] )
 	}
 
 	return ( level.time - level.adStateChangeTime ) >= roundtimelimit.integer * 1000;
+}
+
+/*
+=============
+G_CAFillRoundTallies
+
+Collects the live Clan Arena round counts and health totals used by the retail controller.
+=============
+*/
+static void G_CAFillRoundTallies( int counts[TEAM_NUM_TEAMS], int health[TEAM_NUM_TEAMS] ) {
+	if ( counts ) {
+		G_CountActivePlayersByTeam( counts );
+	}
+
+	if ( health ) {
+		memset( health, 0, sizeof( int ) * TEAM_NUM_TEAMS );
+		health[TEAM_RED] = G_TotalLivingHealthByTeam( TEAM_RED );
+		health[TEAM_BLUE] = G_TotalLivingHealthByTeam( TEAM_BLUE );
+	}
+}
+
+/*
+=============
+G_CAResolveRoundWinner
+
+Chooses the retail Clan Arena round winner once elimination or roundtimelimit forces resolution.
+=============
+*/
+static team_t G_CAResolveRoundWinner( const int counts[TEAM_NUM_TEAMS], const int health[TEAM_NUM_TEAMS] ) {
+	if ( !counts ) {
+		return TEAM_FREE;
+	}
+
+	if ( counts[TEAM_RED] <= 0 && counts[TEAM_BLUE] > 0 ) {
+		return TEAM_BLUE;
+	}
+
+	if ( counts[TEAM_BLUE] <= 0 && counts[TEAM_RED] > 0 ) {
+		return TEAM_RED;
+	}
+
+	if ( !G_RoundTimeLimitExpired( level.roundStartTime ) ) {
+		return TEAM_FREE;
+	}
+
+	if ( g_roundDrawLivingCount.integer && counts[TEAM_RED] != counts[TEAM_BLUE] ) {
+		return ( counts[TEAM_RED] > counts[TEAM_BLUE] ) ? TEAM_RED : TEAM_BLUE;
+	}
+
+	if ( health && g_roundDrawHealthCount.integer && health[TEAM_RED] != health[TEAM_BLUE] ) {
+		return ( health[TEAM_RED] > health[TEAM_BLUE] ) ? TEAM_RED : TEAM_BLUE;
+	}
+
+	return TEAM_FREE;
+}
+
+/*
+=============
+G_CAShouldCompleteActiveRound
+
+Returns qtrue once Clan Arena should leave the active phase because of elimination or timeout.
+=============
+*/
+static qboolean G_CAShouldCompleteActiveRound( const int counts[TEAM_NUM_TEAMS] ) {
+	if ( !counts ) {
+		return qfalse;
+	}
+
+	if ( counts[TEAM_RED] <= 0 || counts[TEAM_BLUE] <= 0 ) {
+		return qtrue;
+	}
+
+	return G_RoundTimeLimitExpired( level.roundStartTime );
+}
+
+/*
+=============
+G_CAResolveRoundState
+
+Services any expired Clan Arena warmup or round transition and returns the live controller state.
+=============
+*/
+int G_CAResolveRoundState( void ) {
+	if ( g_gametype.integer != GT_CLAN_ARENA ) {
+		return ROUNDSTATE_INACTIVE;
+	}
+
+	if ( level.roundState == ROUNDSTATE_WARMUP ) {
+		if ( level.warmupTime == 0 || ( level.warmupTime > 0 && level.time >= level.warmupTime ) ) {
+			CA_RoundStateTransition( qfalse );
+		}
+	} else if ( level.roundTransitionTime != ROUND_TRANSITION_NONE && level.time >= level.roundTransitionTime ) {
+		CA_RoundStateTransition( qfalse );
+	}
+
+	return level.roundState;
+}
+
+/*
+=============
+CA_RoundStateTransition
+
+Runs the retail-style Clan Arena controller transition for the current round state.
+=============
+*/
+static int CA_RoundStateTransition( qboolean announce ) {
+	int		counts[TEAM_NUM_TEAMS];
+	int		health[TEAM_NUM_TEAMS];
+	team_t	winner;
+
+	(void)announce;
+
+	if ( g_gametype.integer != GT_CLAN_ARENA ) {
+		return level.roundState;
+	}
+
+	switch ( level.roundState ) {
+	case ROUNDSTATE_INACTIVE:
+		G_Frame_BeginRoundWarmup();
+		break;
+
+	case ROUNDSTATE_WARMUP:
+		if ( g_gametype.integer >= GT_TEAM && !Team_HasMinimumPlayersForWarmup() ) {
+			if ( level.warmupTime != -1 ) {
+				level.warmupTime = -1;
+				trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
+				G_UpdateReadyUpConfigstring();
+				G_LogPrintf( "Warmup:\n" );
+			}
+			break;
+		}
+
+		if ( level.warmupTime < 0 ) {
+			G_RoundScheduleWarmupDelay();
+			break;
+		}
+
+		Team_ClampWarmupToShuffleCountdown();
+		if ( level.warmupTime == 0 ) {
+			G_Frame_BeginRoundActive();
+		}
+		break;
+
+	case ROUNDSTATE_ACTIVE:
+		G_CAFillRoundTallies( counts, health );
+		if ( !G_CAShouldCompleteActiveRound( counts ) ) {
+			break;
+		}
+
+		winner = G_CAResolveRoundWinner( counts, health );
+		level.roundState = ROUNDSTATE_COMPLETE;
+
+		if ( winner == TEAM_RED || winner == TEAM_BLUE ) {
+			level.teamScores[winner]++;
+			trap_SetConfigstring( CS_SCORES1, va( "%i", level.teamScores[TEAM_RED] ) );
+			trap_SetConfigstring( CS_SCORES2, va( "%i", level.teamScores[TEAM_BLUE] ) );
+			G_BroadcastGlobalTeamSound( vec3_origin,
+				( winner == TEAM_RED ) ? GTS_REDTEAM_WINS_ROUND : GTS_BLUETEAM_WINS_ROUND,
+				-1, winner, 0 );
+			trap_SendServerCommand( -1,
+				va( "cp \"%s team wins the round\\n\"", ( winner == TEAM_RED ) ? "Red" : "Blue" ) );
+		} else {
+			G_BroadcastGlobalTeamSound( vec3_origin, GTS_ROUND_DRAW, -1, TEAM_FREE, 0 );
+		}
+
+		CalculateRanks();
+		level.roundPendingExit = G_CAFZCheckExitRules( qfalse );
+		level.roundTransitionTime = level.time + ( level.roundPendingExit ? 1500 : 3500 );
+		G_UpdateMatchStateConfigString();
+		break;
+
+	case ROUNDSTATE_COMPLETE:
+		if ( level.roundTransitionTime == ROUND_TRANSITION_NONE
+			|| level.time >= level.roundTransitionTime ) {
+			if ( level.roundPendingExit ) {
+				if ( G_CAFZCheckExitRules( qtrue ) ) {
+					break;
+				}
+
+				level.roundPendingExit = qfalse;
+			}
+
+			G_Frame_BeginRoundWarmup();
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	return level.roundState;
 }
 
 /*
@@ -1939,11 +2254,25 @@ Transitions the controller into the active state and records timing data.
 =============
 */
 static void G_Frame_BeginRoundActive( void ) {
+	int		clientNum;
+
 	level.roundState = ROUNDSTATE_ACTIVE;
 	level.roundTransitionTime = ROUND_TRANSITION_NONE;
+	level.roundPendingExit = qfalse;
 	level.roundStartTime = level.time;
 	level.roundNumber++;
-	if ( G_FreezeGametypeEnabled() ) {
+	if ( g_gametype.integer == GT_CLAN_ARENA ) {
+		for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+			gentity_t	*ent;
+
+			ent = &g_entities[clientNum];
+			if ( !ent->inuse || !ent->client ) {
+				continue;
+			}
+
+			G_CAADReleaseClientForRound( ent );
+		}
+	} else if ( G_FreezeGametypeEnabled() ) {
 		G_FreezeSyncCvars();
 		G_FreezeResetClientsForRound( qfalse );
 	}
@@ -1968,9 +2297,17 @@ G_FreezeResolveRoundState
 Returns the active Freeze round-state view consumed by the retail controller helpers.
 ============
 */
-static int G_FreezeResolveRoundState( void ) {
+int G_FreezeResolveRoundState( void ) {
 	if ( !G_FreezeGametypeEnabled() ) {
 		return ROUNDSTATE_INACTIVE;
+	}
+
+	if ( level.roundState == ROUNDSTATE_WARMUP ) {
+		if ( level.warmupTime == 0 || ( level.warmupTime > 0 && level.time >= level.warmupTime ) ) {
+			Freeze_RoundStateTransition( qfalse );
+		}
+	} else if ( level.roundTransitionTime != ROUND_TRANSITION_NONE && level.time >= level.roundTransitionTime ) {
+		Freeze_RoundStateTransition( qfalse );
 	}
 
 	return level.roundState;
@@ -2022,17 +2359,13 @@ void G_FreezeSyncCvars( void ) {
 
 /*
 ============
-G_FreezeScheduleWarmupDelay
+G_RoundScheduleWarmupDelay
 
-Applies the configured warmup delay ahead of the next active freeze round.
+Applies the configured warmup delay ahead of the next round-controller release.
 ============
 */
-static void G_FreezeScheduleWarmupDelay( void ) {
+static void G_RoundScheduleWarmupDelay( void ) {
 	int			delay;
-
-	if ( !G_FreezeGametypeEnabled() ) {
-		return;
-	}
 
 	delay = g_roundWarmupDelay.integer;
 	if ( delay > 0 ) {
@@ -2049,25 +2382,40 @@ static void G_FreezeScheduleWarmupDelay( void ) {
 
 /*
 =============
-G_FreezeHandleWarmupDelayCvarUpdate
+G_RoundHandleWarmupDelayCvarUpdate
 
 Reschedules the warmup countdown whenever g_roundWarmupDelay changes mid-warmup.
 =============
 */
-void G_FreezeHandleWarmupDelayCvarUpdate( void ) {
-	if ( !G_FreezeGametypeEnabled() ) {
+void G_RoundHandleWarmupDelayCvarUpdate( void ) {
+	int			delay;
+
+	if ( !G_RoundControllerGametypeEnabled() ) {
 		return;
 	}
 
-	if ( level.roundState != ROUNDSTATE_WARMUP ) {
+	if ( g_gametype.integer == GT_ATTACK_DEFEND ) {
+		if ( level.adRoundState != AD_ROUNDSTATE_WARMUP
+			|| level.adPendingRoundState != AD_ROUNDSTATE_ACTIVE
+			|| level.roundTransitionTime == ROUND_TRANSITION_NONE ) {
+			return;
+		}
+
+		delay = g_roundWarmupDelay.integer;
+		if ( delay < 0 ) {
+			delay = 0;
+		}
+
+		level.roundTransitionTime = ( delay > 0 ) ? level.time + delay : level.time;
+		G_UpdateMatchStateConfigString();
 		return;
 	}
 
-	if ( level.warmupTime <= 0 ) {
+	if ( level.roundState != ROUNDSTATE_WARMUP || level.warmupTime <= 0 ) {
 		return;
 	}
 
-	G_FreezeScheduleWarmupDelay();
+	G_RoundScheduleWarmupDelay();
 }
 
 /*
@@ -2198,6 +2546,35 @@ static void G_FreezeRecountLivingClients( void ) {
 
 /*
 ============
+G_FreezeShouldCompleteRound
+
+Returns qtrue once Freeze should leave the active phase because of elimination,
+full-team freezing, or roundtimelimit expiry.
+============
+*/
+static qboolean G_FreezeShouldCompleteRound( const int counts[TEAM_NUM_TEAMS] ) {
+	qboolean	redFrozen;
+	qboolean	blueFrozen;
+
+	if ( !counts ) {
+		return qfalse;
+	}
+
+	if ( counts[TEAM_RED] <= 0 || counts[TEAM_BLUE] <= 0 ) {
+		return qtrue;
+	}
+
+	redFrozen = G_FreezeTeamIsFullyFrozen( TEAM_RED );
+	blueFrozen = G_FreezeTeamIsFullyFrozen( TEAM_BLUE );
+	if ( redFrozen || blueFrozen ) {
+		return qtrue;
+	}
+
+	return G_RoundTimeLimitExpired( level.roundStartTime );
+}
+
+/*
+============
 G_FreezeTeamIsFullyFrozen
 
 Returns qtrue once a Freeze team no longer has any unfrozen live members.
@@ -2240,25 +2617,71 @@ static qboolean G_FreezeTeamIsFullyFrozen( team_t team ) {
 ============
 G_FreezeEvaluateRoundWinner
 
-Returns the winning team once only one side has living players left.
+Returns the winning team once Freeze completion has been forced by elimination,
+full-team freezing, or roundtimelimit expiry.
 ============
 */
-static team_t G_FreezeEvaluateRoundWinner( void ) {
+static team_t G_FreezeEvaluateRoundWinner( const int counts[TEAM_NUM_TEAMS], const int health[TEAM_NUM_TEAMS] ) {
 	qboolean	redFrozen;
 	qboolean	blueFrozen;
 	team_t		winner;
 
-	G_FreezeRecountLivingClients();
+	if ( !counts ) {
+		return TEAM_FREE;
+	}
+
+	if ( counts[TEAM_RED] <= 0 && counts[TEAM_BLUE] <= 0 ) {
+		return TEAM_FREE;
+	}
+
+	if ( counts[TEAM_RED] <= 0 ) {
+		winner = TEAM_BLUE;
+		if ( level.freezeConfig.thawWinningTeam ) {
+			G_FreezeThawWinningPlayers( winner );
+		}
+		return winner;
+	}
+
+	if ( counts[TEAM_BLUE] <= 0 ) {
+		winner = TEAM_RED;
+		if ( level.freezeConfig.thawWinningTeam ) {
+			G_FreezeThawWinningPlayers( winner );
+		}
+		return winner;
+	}
+
+	if ( G_RoundTimeLimitExpired( level.roundStartTime ) ) {
+		if ( g_roundDrawLivingCount.integer && counts[TEAM_RED] != counts[TEAM_BLUE] ) {
+			winner = ( counts[TEAM_RED] > counts[TEAM_BLUE] ) ? TEAM_RED : TEAM_BLUE;
+			if ( level.freezeConfig.thawWinningTeam ) {
+				G_FreezeThawWinningPlayers( winner );
+			}
+			return winner;
+		}
+
+		if ( health && g_roundDrawHealthCount.integer && health[TEAM_RED] != health[TEAM_BLUE] ) {
+			winner = ( health[TEAM_RED] > health[TEAM_BLUE] ) ? TEAM_RED : TEAM_BLUE;
+			if ( level.freezeConfig.thawWinningTeam ) {
+				G_FreezeThawWinningPlayers( winner );
+			}
+			return winner;
+		}
+
+		return TEAM_FREE;
+	}
+
 	redFrozen = G_FreezeTeamIsFullyFrozen( TEAM_RED );
 	blueFrozen = G_FreezeTeamIsFullyFrozen( TEAM_BLUE );
 
 	if ( redFrozen == blueFrozen ) {
 		return TEAM_FREE;
 	}
+
 	winner = redFrozen ? TEAM_BLUE : TEAM_RED;
 	if ( level.freezeConfig.thawWinningTeam ) {
 		G_FreezeThawWinningPlayers( winner );
 	}
+
 	return winner;
 }
 
@@ -2307,18 +2730,19 @@ static void G_FreezeHandleRoundEnd( team_t winner ) {
 	int			delay;
 	const char	*winnerName;
 
-	if ( winner != TEAM_RED && winner != TEAM_BLUE ) {
-		return;
+	if ( winner == TEAM_RED || winner == TEAM_BLUE ) {
+		level.teamScores[winner]++;
+		trap_SetConfigstring( CS_SCORES1, va( "%i", level.teamScores[TEAM_RED] ) );
+		trap_SetConfigstring( CS_SCORES2, va( "%i", level.teamScores[TEAM_BLUE] ) );
+		G_BroadcastGlobalTeamSound( vec3_origin,
+			( winner == TEAM_RED ) ? GTS_REDTEAM_WINS_ROUND : GTS_BLUETEAM_WINS_ROUND,
+			-1, winner, 0 );
+		winnerName = ( winner == TEAM_RED ) ? "Red" : "Blue";
+		trap_SendServerCommand( -1, va( "cp \"%s team wins the round\\n\"", winnerName ) );
+	} else {
+		G_BroadcastGlobalTeamSound( vec3_origin, GTS_ROUND_DRAW, -1, TEAM_FREE, 0 );
 	}
 
-	level.teamScores[winner]++;
-	trap_SetConfigstring( CS_SCORES1, va( "%i", level.teamScores[TEAM_RED] ) );
-	trap_SetConfigstring( CS_SCORES2, va( "%i", level.teamScores[TEAM_BLUE] ) );
-	G_BroadcastGlobalTeamSound( vec3_origin,
-		( winner == TEAM_RED ) ? GTS_REDTEAM_WINS_ROUND : GTS_BLUETEAM_WINS_ROUND,
-		-1, winner, 0 );
-	winnerName = ( winner == TEAM_RED ) ? "Red" : "Blue";
-	trap_SendServerCommand( -1, va( "cp \"%s team wins the round\\n\"", winnerName ) );
 	if ( g_roundDrawLivingCount.integer ) {
 		trap_SendServerCommand( -1, va( "print \"Living players - Red: %i  Blue: %i\\n\"",
 			level.freezeLivingCount[TEAM_RED], level.freezeLivingCount[TEAM_BLUE] ) );
@@ -2327,9 +2751,15 @@ static void G_FreezeHandleRoundEnd( team_t winner ) {
 		trap_SendServerCommand( -1, va( "print \"Total health - Red: %i  Blue: %i\\n\"",
 			level.freezeLivingHealth[TEAM_RED], level.freezeLivingHealth[TEAM_BLUE] ) );
 	}
+
 	level.roundState = ROUNDSTATE_COMPLETE;
-	delay = level.freezeConfig.roundDelay;
-	level.roundTransitionTime = ( delay > 0 ) ? level.time + delay : level.time;
+	level.roundPendingExit = G_CAFZCheckExitRules( qfalse );
+	if ( level.roundPendingExit ) {
+		level.roundTransitionTime = level.time + 1500;
+	} else {
+		delay = level.freezeConfig.roundDelay;
+		level.roundTransitionTime = ( delay > 0 ) ? level.time + delay : level.time;
+	}
 	G_UpdateMatchStateConfigString();
 }
 
@@ -2347,7 +2777,7 @@ static int Freeze_RoundStateTransition( qboolean announce ) {
 		return level.roundState;
 	}
 
-	switch ( G_FreezeResolveRoundState() ) {
+	switch ( level.roundState ) {
 	case ROUNDSTATE_INACTIVE:
 		G_Frame_BeginRoundWarmup();
 		break;
@@ -2364,7 +2794,7 @@ static int Freeze_RoundStateTransition( qboolean announce ) {
 		}
 
 		if ( level.warmupTime < 0 ) {
-			G_FreezeScheduleWarmupDelay();
+			G_RoundScheduleWarmupDelay();
 			break;
 		}
 
@@ -2375,14 +2805,16 @@ static int Freeze_RoundStateTransition( qboolean announce ) {
 		break;
 
 	case ROUNDSTATE_COMPLETE:
-		if ( G_Frame_CheckRoundLimit() ) {
-			break;
-		}
-		if ( level.roundTransitionTime == 0 ) {
-			G_Frame_BeginRoundWarmup();
-			break;
-		}
-		if ( level.roundTransitionTime > 0 && level.time >= level.roundTransitionTime ) {
+		if ( level.roundTransitionTime == ROUND_TRANSITION_NONE
+			|| level.time >= level.roundTransitionTime ) {
+			if ( level.roundPendingExit ) {
+				if ( G_CAFZCheckExitRules( qtrue ) ) {
+					break;
+				}
+
+				level.roundPendingExit = qfalse;
+			}
+
 			G_Frame_BeginRoundWarmup();
 		}
 		break;
@@ -2499,6 +2931,18 @@ static void G_RRSeedInfectionTeams( void ) {
 
 /*
 =============
+G_RRNextRestartState
+
+Returns the next non-exit retail Red Rover controller state after a completed
+round.
+=============
+*/
+static rrRoundState_t G_RRNextRestartState( void ) {
+	return g_rrInfected.integer ? RR_ROUNDSTATE_INFECTION_SEED : RR_ROUNDSTATE_WARMUP;
+}
+
+/*
+=============
 G_RRInitRoundController
 
 Initializes the Red Rover round controller whenever the mode enters a new round phase.
@@ -2509,12 +2953,53 @@ static void G_RRInitRoundController( void ) {
 		return;
 	}
 
-	level.roundStartTime = level.time;
-	G_RRSeedInfectionTeams();
-	level.rrCarryoverInfectedClientNum = -1;
-	level.rrLastInfectionTime = level.time;
-	level.rrNextSurvivalBonusTime = 0;
+	level.roundPendingExit = qfalse;
 	level.rrPendingMatchExit = qfalse;
+	level.rrSelectedInfectedClientNum = -1;
+	level.rrLastInfectionTime = -1;
+	level.rrNextSurvivalBonusTime = 0;
+	level.rrPendingRoundState = G_RRNextRestartState();
+	if ( g_rrInfected.integer ) {
+		level.rrRoundState = RR_ROUNDSTATE_INACTIVE;
+		level.rrStateChangeTime = level.time;
+		level.roundState = ROUNDSTATE_WARMUP;
+		level.roundTransitionTime = level.time + 500;
+		G_UpdateMatchStateConfigString();
+		return;
+	}
+
+	level.rrRoundState = RR_ROUNDSTATE_WARMUP;
+	level.rrStateChangeTime = level.time;
+	RR_RoundStateTransition( qfalse );
+}
+
+/*
+=============
+G_RRResolveRoundState
+
+Returns the active Red Rover round-state latch after servicing any expired
+deferred controller transition.
+=============
+*/
+int G_RRResolveRoundState( void ) {
+	if ( g_gametype.integer != GT_RED_ROVER ) {
+		return RR_ROUNDSTATE_INACTIVE;
+	}
+
+	if ( level.rrRoundState == RR_ROUNDSTATE_INACTIVE
+		&& level.roundTransitionTime == ROUND_TRANSITION_NONE
+		&& level.roundState == ROUNDSTATE_WARMUP ) {
+		if ( level.warmupTime == 0 || ( level.warmupTime > 0 && level.time >= level.warmupTime ) ) {
+			RR_RoundStateTransition( qfalse );
+		}
+	} else if ( level.roundTransitionTime != ROUND_TRANSITION_NONE && level.time >= level.roundTransitionTime ) {
+		level.roundTransitionTime = ROUND_TRANSITION_NONE;
+		level.rrRoundState = level.rrPendingRoundState;
+		level.rrStateChangeTime = level.time;
+		RR_RoundStateTransition( qfalse );
+	}
+
+	return level.rrRoundState;
 }
 
 /*
@@ -2525,18 +3010,25 @@ Runs the retail-style Red Rover round controller for the current state.
 =============
 */
 static int RR_RoundStateTransition( qboolean announce ) {
+	int		delayMs;
+
 	(void)announce;
 
 	if ( g_gametype.integer != GT_RED_ROVER ) {
-		return level.roundState;
+		return level.rrRoundState;
 	}
 
-	switch ( level.roundState ) {
-	case ROUNDSTATE_INACTIVE:
-		G_Frame_BeginRoundWarmup();
-		break;
+	switch ( level.rrRoundState ) {
+	case RR_ROUNDSTATE_INACTIVE:
+		if ( level.roundState == ROUNDSTATE_INACTIVE ) {
+			G_Frame_BeginRoundWarmup();
+			break;
+		}
 
-	case ROUNDSTATE_WARMUP:
+		if ( level.roundState != ROUNDSTATE_WARMUP ) {
+			break;
+		}
+
 		if ( g_gametype.integer >= GT_TEAM && !Team_HasMinimumPlayersForWarmup() ) {
 			if ( level.warmupTime != -1 ) {
 				level.warmupTime = -1;
@@ -2548,42 +3040,85 @@ static int RR_RoundStateTransition( qboolean announce ) {
 		}
 
 		if ( level.warmupTime < 0 ) {
+			G_RoundScheduleWarmupDelay();
 			break;
 		}
 
 		Team_ClampWarmupToShuffleCountdown();
 		if ( level.warmupTime == 0 ) {
-			G_Frame_BeginRoundActive();
 			G_RRInitRoundController();
 		}
 		break;
 
-	case ROUNDSTATE_ACTIVE:
-		G_RRTrackRoundActivity();
-		break;
-
-	case ROUNDSTATE_COMPLETE:
-		if ( level.roundTransitionTime == 0 ) {
-			G_Frame_BeginRoundWarmup();
+	case RR_ROUNDSTATE_WARMUP:
+		level.roundState = ROUNDSTATE_WARMUP;
+		level.roundTransitionTime = ROUND_TRANSITION_NONE;
+		level.roundPendingExit = qfalse;
+		level.rrPendingMatchExit = qfalse;
+		level.roundStartTime = level.time;
+		level.roundNumber = level.teamScores[TEAM_RED] + level.teamScores[TEAM_BLUE] + 1;
+		G_RRResetRoundState();
+		delayMs = g_roundWarmupDelay.integer;
+		if ( delayMs < 0 ) {
+			delayMs = 0;
+		}
+		if ( delayMs > 0 ) {
+			level.roundTransitionTime = level.time + delayMs;
+			level.rrPendingRoundState = RR_ROUNDSTATE_ACTIVE;
+			G_UpdateMatchStateConfigString();
 			break;
 		}
-		if ( level.roundTransitionTime > 0 && level.time >= level.roundTransitionTime ) {
-			if ( level.rrPendingMatchExit ) {
-				if ( !G_RRCheckExitRules( qtrue ) ) {
-					level.rrPendingMatchExit = qfalse;
-					G_Frame_BeginRoundWarmup();
-				}
-			} else {
-				G_Frame_BeginRoundWarmup();
-			}
+
+		level.rrRoundState = RR_ROUNDSTATE_ACTIVE;
+		level.rrStateChangeTime = level.time;
+		return RR_RoundStateTransition( announce );
+
+	case RR_ROUNDSTATE_INFECTION_SEED:
+		level.roundState = ROUNDSTATE_WARMUP;
+		level.roundPendingExit = qfalse;
+		level.roundStartTime = level.time;
+		G_RRSeedInfectionTeams();
+		level.roundTransitionTime = level.time + 1;
+		level.rrPendingRoundState = RR_ROUNDSTATE_WARMUP;
+		G_UpdateMatchStateConfigString();
+		break;
+
+	case RR_ROUNDSTATE_ACTIVE:
+		level.roundState = ROUNDSTATE_ACTIVE;
+		level.roundTransitionTime = ROUND_TRANSITION_NONE;
+		level.roundPendingExit = qfalse;
+		level.roundStartTime = level.time;
+		level.roundNumber = level.teamScores[TEAM_RED] + level.teamScores[TEAM_BLUE] + 1;
+		level.rrCarryoverInfectedClientNum = -1;
+		level.rrLastInfectionTime = level.time;
+		level.rrNextSurvivalBonusTime = 0;
+		level.rrPendingRoundState = RR_ROUNDSTATE_ACTIVE;
+		G_UpdateMatchStateConfigString();
+		break;
+
+	case RR_ROUNDSTATE_COMPLETE:
+		level.roundState = ROUNDSTATE_COMPLETE;
+		if ( level.rrPendingMatchExit ) {
+			level.rrPendingRoundState = RR_ROUNDSTATE_EXIT;
+		} else {
+			level.rrPendingRoundState = G_RRNextRestartState();
 		}
+		G_UpdateMatchStateConfigString();
+		break;
+
+	case RR_ROUNDSTATE_EXIT:
+		level.roundState = ROUNDSTATE_COMPLETE;
+		level.roundTransitionTime = ROUND_TRANSITION_NONE;
+		level.rrPendingRoundState = RR_ROUNDSTATE_EXIT;
+		G_UpdateMatchStateConfigString();
+		G_RRCheckExitRules( qtrue );
 		break;
 
 	default:
 		break;
 	}
 
-	return level.roundState;
+	return level.rrRoundState;
 }
 
 /*
@@ -2598,8 +3133,13 @@ void G_Frame_UpdateRoundController( void ) {
 		if ( level.roundState != ROUNDSTATE_INACTIVE || level.roundTransitionTime != ROUND_TRANSITION_NONE ) {
 			level.roundState = ROUNDSTATE_INACTIVE;
 			level.roundTransitionTime = ROUND_TRANSITION_NONE;
+			level.roundPendingExit = qfalse;
 			G_UpdateMatchStateConfigString();
 		}
+		return;
+	}
+
+	if ( level.timeoutActive ) {
 		return;
 	}
 
@@ -2609,8 +3149,44 @@ void G_Frame_UpdateRoundController( void ) {
 		return;
 	}
 
+	if ( g_gametype.integer == GT_CLAN_ARENA ) {
+		CA_RoundStateTransition( qtrue );
+		return;
+	}
+
 	if ( g_gametype.integer == GT_RED_ROVER ) {
-		RR_RoundStateTransition( qtrue );
+		int		state;
+
+		if ( !Team_HasMinimumPlayersForWarmup() ) {
+			if ( level.rrRoundState != RR_ROUNDSTATE_INACTIVE
+				|| level.roundState != ROUNDSTATE_INACTIVE
+				|| level.roundTransitionTime != ROUND_TRANSITION_NONE ) {
+				level.roundState = ROUNDSTATE_INACTIVE;
+				level.roundTransitionTime = ROUND_TRANSITION_NONE;
+				level.roundPendingExit = qfalse;
+				level.rrRoundState = RR_ROUNDSTATE_INACTIVE;
+				level.rrPendingRoundState = RR_ROUNDSTATE_INACTIVE;
+				level.rrStateChangeTime = level.time;
+				level.rrSelectedInfectedClientNum = -1;
+				level.rrCarryoverInfectedClientNum = -1;
+				level.rrLastInfectionTime = -1;
+				level.rrNextSurvivalBonusTime = 0;
+				level.rrPendingMatchExit = qfalse;
+				G_UpdateMatchStateConfigString();
+			}
+			G_FreezeRunFrame();
+			return;
+		}
+
+		state = G_RRResolveRoundState();
+		if ( state == RR_ROUNDSTATE_INACTIVE && level.roundTransitionTime == ROUND_TRANSITION_NONE ) {
+			RR_RoundStateTransition( qtrue );
+			state = G_RRResolveRoundState();
+		}
+
+		if ( state == RR_ROUNDSTATE_ACTIVE || state == RR_ROUNDSTATE_INFECTION_SEED ) {
+			G_RRTrackRoundActivity();
+		}
 		G_FreezeRunFrame();
 		return;
 	}
@@ -2638,7 +3214,7 @@ void G_Frame_UpdateRoundController( void ) {
 		}
 
 		if ( level.warmupTime < 0 ) {
-			G_FreezeScheduleWarmupDelay();
+			G_RoundScheduleWarmupDelay();
 			break;
 		}
 
@@ -2683,13 +3259,15 @@ Monitors freeze-specific timers and round completion.
 ============
 */
 void G_FreezeRunFrame( void ) {
+	int		state;
 	team_t	winner;
 
 	if ( !G_FreezeGametypeEnabled() ) {
 		return;
 	}
 
-	if ( G_FreezeResolveRoundState() == ROUNDSTATE_WARMUP ) {
+	state = G_FreezeResolveRoundState();
+	if ( state == ROUNDSTATE_WARMUP ) {
 		if ( level.warmupTime > 0 && level.time >= level.warmupTime ) {
 			level.warmupTime = 0;
 			trap_SetConfigstring( CS_WARMUP, va( "%i", level.warmupTime ) );
@@ -2698,15 +3276,16 @@ void G_FreezeRunFrame( void ) {
 		return;
 	}
 
-	if ( G_FreezeResolveRoundState() != ROUNDSTATE_ACTIVE ) {
+	if ( state != ROUNDSTATE_ACTIVE ) {
 		return;
 	}
 
-	winner = G_FreezeEvaluateRoundWinner();
-	if ( winner == TEAM_FREE ) {
+	G_FreezeRecountLivingClients();
+	if ( !G_FreezeShouldCompleteRound( level.freezeLivingCount ) ) {
 		return;
 	}
 
+	winner = G_FreezeEvaluateRoundWinner( level.freezeLivingCount, level.freezeLivingHealth );
 	G_FreezeHandleRoundEnd( winner );
 }
 

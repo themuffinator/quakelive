@@ -131,6 +131,27 @@ def test_red_rover_survival_bonus_emits_retail_global_team_sound() -> None:
 	assert "CG_AddBufferedSound( cgs.media.survivorWarningSound );" in global_team_sound_case
 
 
+def test_last_alive_shared_helper_emits_retail_last_standing_sound() -> None:
+	game_source = G_TEAM.read_text(encoding="utf-8")
+	cgame_source = CG_EVENT.read_text(encoding="utf-8")
+	shared_block = _block_from_marker(game_source, "static qboolean G_NotifyLastAlivePlayer")
+	ad_block = _block_from_marker(game_source, "qboolean G_ADNotifyLastAlivePlayer")
+	ca_block = _block_from_marker(game_source, "qboolean G_CANotifyLastAlivePlayer")
+	freeze_block = _block_from_marker(game_source, "qboolean G_FreezeNotifyLastAlivePlayer")
+	rr_block = _block_from_marker(game_source, "qboolean G_RRNotifyLastAlivePlayer")
+	global_team_sound_case = _block_from_marker(cgame_source, "case EV_GLOBAL_TEAM_SOUND:")
+
+	assert "G_BroadcastGlobalTeamSound( vec3_origin, GTS_LAST_STANDING, -1, team, 0 );" in shared_block
+	assert "return G_NotifyLastAlivePlayer( team );" in ad_block
+	assert "return G_NotifyLastAlivePlayer( team );" in ca_block
+	assert "return G_NotifyLastAlivePlayer( team );" in freeze_block
+	assert "return G_NotifyLastAlivePlayer( team );" in rr_block
+	assert "GTS_SURVIVOR_WARNING" not in rr_block
+
+	assert "case GTS_LAST_STANDING:" in global_team_sound_case
+	assert "CG_AddBufferedSound( cgs.media.lastStandingSound );" in global_team_sound_case
+
+
 def test_qagame_award_entity_restores_retail_temp_entity_payload() -> None:
 	source = G_MAIN.read_text(encoding="utf-8")
 	award_block = _block_from_marker(source, "static void G_AddAwardEntity")

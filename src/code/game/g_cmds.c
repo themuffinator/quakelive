@@ -151,12 +151,14 @@ static const teamScoreStatIndex_t retailCtfTeamStatOrder[RETAIL_CTF_TEAMSTAT_COU
 static qboolean G_BuildRichScoreboardMessage( char *payload, int payloadSize, int *emittedCount );
 static qboolean G_BuildObeliskScoreboardMessage( char *payload, int payloadSize, int *emittedCount );
 static qboolean G_BuildFFAScoreboardMessage( char *payload, int payloadSize, int *emittedCount );
-static char *G_BuildDuelScoreboardMessage( gentity_t *viewer );
+static qboolean G_BuildDuelScoreboardMessage( char *payload, int payloadSize, int *emittedCount );
 static qboolean G_BuildClanArenaScoreboardMessage( char *payload, int payloadSize, int *emittedCount );
 static qboolean G_BuildRedRoverScoreboardMessage( char *payload, int payloadSize, int *emittedCount );
 static qboolean G_BuildTdmScoreboardRows( char *payload, int payloadSize, int *emittedCount );
 static qboolean G_BuildCtfScoreboardRows( char *payload, int payloadSize, int *emittedCount );
 static qboolean G_BuildFreezeScoreboardRows( char *payload, int payloadSize, int *emittedCount );
+
+static const gentity_t	*g_duelScoreboardViewer;
 
 /*
 ==================
@@ -1961,7 +1963,7 @@ Caches the retail low/high duel client pair, applies the per-viewer pickup
 timing visibility split, and builds the retail scores_duel payload.
 ==================
 */
-static char *G_BuildDuelScoreboardMessage( gentity_t *viewer ) {
+static qboolean G_BuildDuelScoreboardMessage( char *payload, int payloadSize, int *emittedCount ) {
 	int		numRows;
 	int		firstClientNum;
 	int		secondClientNum;
@@ -1974,13 +1976,20 @@ static char *G_BuildDuelScoreboardMessage( gentity_t *viewer ) {
 
 	level.duelScoreboardLowClientNum = -1;
 	level.duelScoreboardHighClientNum = -1;
+	if ( emittedCount ) {
+		*emittedCount = 0;
+	}
+	if ( !payload || payloadSize <= 0 ) {
+		return qfalse;
+	}
 
 	numRows = level.numPlayingClients;
 	if ( numRows > 2 ) {
 		numRows = 2;
 	}
+	payload[0] = '\0';
 	if ( numRows <= 0 ) {
-		return va( "scores_duel %i %s", 0, "" );
+		return qtrue;
 	}
 
 	firstClientNum = level.sortedClients[0];
@@ -1989,27 +1998,45 @@ static char *G_BuildDuelScoreboardMessage( gentity_t *viewer ) {
 		secondClientNum = level.sortedClients[1];
 	}
 
-	if ( firstClientNum < secondClientNum ) {
-		level.duelScoreboardLowClientNum = firstClientNum;
-		level.duelScoreboardHighClientNum = secondClientNum;
-	} else {
-		level.duelScoreboardLowClientNum = secondClientNum;
-		level.duelScoreboardHighClientNum = firstClientNum;
+	if ( firstClientNum > secondClientNum ) {
+		int swapClientNum;
+
+		swapClientNum = firstClientNum;
+		firstClientNum = secondClientNum;
+		secondClientNum = swapClientNum;
 	}
+
+	level.duelScoreboardLowClientNum = firstClientNum;
+	level.duelScoreboardHighClientNum = secondClientNum;
 
 	G_BuildDuelScoreboardRow( lowPublic, sizeof( lowPublic ), level.duelScoreboardLowClientNum, qfalse );
 	G_BuildDuelScoreboardRow( lowPrivate, sizeof( lowPrivate ), level.duelScoreboardLowClientNum, qtrue );
-	lowRow = G_ShouldRevealDuelScoreboardDetails( viewer, level.duelScoreboardLowClientNum ) ? lowPrivate : lowPublic;
+	lowRow = G_ShouldRevealDuelScoreboardDetails( g_duelScoreboardViewer, level.duelScoreboardLowClientNum ) ? lowPrivate : lowPublic;
 
 	if ( numRows <= 1 ) {
-		return va( "scores_duel %i %s", 1, lowRow );
+		if ( strlen( lowRow ) + 2 >= payloadSize ) {
+			return qfalse;
+		}
+		Com_sprintf( payload, payloadSize, " %s", lowRow );
+		if ( emittedCount ) {
+			*emittedCount = 1;
+		}
+		return qtrue;
 	}
 
 	G_BuildDuelScoreboardRow( highPublic, sizeof( highPublic ), level.duelScoreboardHighClientNum, qfalse );
 	G_BuildDuelScoreboardRow( highPrivate, sizeof( highPrivate ), level.duelScoreboardHighClientNum, qtrue );
-	highRow = G_ShouldRevealDuelScoreboardDetails( viewer, level.duelScoreboardHighClientNum ) ? highPrivate : highPublic;
+	highRow = G_ShouldRevealDuelScoreboardDetails( g_duelScoreboardViewer, level.duelScoreboardHighClientNum ) ? highPrivate : highPublic;
 
-	return va( "scores_duel %i %s %s", numRows, lowRow, highRow );
+	if ( strlen( lowRow ) + strlen( highRow ) + 3 >= payloadSize ) {
+		return qfalse;
+	}
+	Com_sprintf( payload, payloadSize, " %s %s", lowRow, highRow );
+	if ( emittedCount ) {
+		*emittedCount = 2;
+	}
+
+	return qtrue;
 }
 
 /*
@@ -2221,6 +2248,8 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 		return;
 	}
 
+	g_duelScoreboardViewer = ent;
+
 	switch ( g_gametype.integer ) {
 	case GT_FFA:
 		cmd = "scores_ffa";
@@ -2264,10 +2293,7 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 			useCompact = G_BuildFFAScoreboardMessage( string, sizeof( string ), &emittedCount ) ? qfalse : qtrue;
 			break;
 		case GT_TOURNAMENT:
-			emittedCount = level.numPlayingClients;
-			if ( emittedCount > 2 ) {
-				emittedCount = 2;
-			}
+			useCompact = G_BuildDuelScoreboardMessage( string, sizeof( string ), &emittedCount ) ? qfalse : qtrue;
 			break;
 		case GT_OBELISK:
 			useCompact = G_BuildObeliskScoreboardMessage( string, sizeof( string ), &emittedCount ) ? qfalse : qtrue;
@@ -2305,10 +2331,10 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 			level.teamScores[TEAM_BLUE],
 			string ) );
 	} else {
-		if ( g_gametype.integer == GT_TOURNAMENT ) {
-			trap_SendServerCommand( ent-g_entities, G_BuildDuelScoreboardMessage( ent ) );
-		} else if ( g_gametype.integer == GT_TEAM || g_gametype.integer == GT_FREEZE || G_IsCTFStyleScoreboardGametype() ) {
+		if ( g_gametype.integer == GT_TEAM || g_gametype.integer == GT_FREEZE || G_IsCTFStyleScoreboardGametype() ) {
 			trap_SendServerCommand( ent-g_entities, va( "%s%s", cmd, string ) );
+		} else if ( g_gametype.integer == GT_TOURNAMENT ) {
+			trap_SendServerCommand( ent-g_entities, va( "%s %i%s", cmd, emittedCount, string ) );
 		} else {
 			trap_SendServerCommand( ent-g_entities, va( "%s %i %i %i%s",
 				cmd,
@@ -2333,6 +2359,7 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 		}
 	}
 	G_SendAllClientKeyMasks( ent - g_entities );
+	g_duelScoreboardViewer = NULL;
 }
 
 
@@ -2405,6 +2432,8 @@ static team_t G_RRResolveAutoJoinTeam( int clientNum ) {
 	if ( g_gametype.integer != GT_RED_ROVER || !g_rrInfected.integer ) {
 		return PickTeam( clientNum );
 	}
+
+	G_RRResolveRoundState();
 	if ( clientNum == level.rrSelectedInfectedClientNum
 		|| clientNum == level.rrCarryoverInfectedClientNum ) {
 		return TEAM_RED;

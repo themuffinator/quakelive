@@ -44,21 +44,23 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	const char	*s;
 	const char	*var;
 
-	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i %i",
+	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
 		client->sess.sessionTeam,
 		client->sess.spectatorTime,
 		client->sess.spectatorState,
 		client->sess.spectatorClient,
+		client->sess.selectedSpawnWeapon,
 		client->sess.wins,
 		client->sess.losses,
 		client->sess.teamLeader,
-		client->sess.spectateOnly,
 		client->sess.privilege,
+		client->sess.spectateOnly,
 		client->sess.spectatorQueuePosition,
+		client->sess.muted,
+		client->sess.sessionField34,
 		client->sess.skill1,
 		client->sess.skill2,
-		client->sess.skill3,
-		client->sess.muted
+		client->sess.skill3
 		);
 
 	var = va( "session%i", client - level.clients );
@@ -81,27 +83,76 @@ void G_ReadSessionData( gclient_t *client, qboolean firstTime ) {
 	int teamLeader;
 	int spectatorState;
 	int sessionTeam;
+	int privilege;
+	int spectateOnly;
+	int spectatorQueuePosition;
+	int muted;
+	int selectedSpawnWeapon;
+	int sessionField34;
+	int skill1;
+	int skill2;
+	int skill3;
+	int parsed;
 
 	var = va( "session%i", client - level.clients );
 	trap_Cvar_VariableStringBuffer( var, s, sizeof(s) );
 
-	int muted = 0;
-	sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i",
+	privilege = 0;
+	spectateOnly = 0;
+	spectatorQueuePosition = 0;
+	muted = 0;
+	selectedSpawnWeapon = 0;
+	sessionField34 = 0;
+	skill1 = 0;
+	skill2 = 0;
+	skill3 = 0;
+	parsed = sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
 		&sessionTeam,                 // bk010221 - format
 		&client->sess.spectatorTime,
 		&spectatorState,              // bk010221 - format
 		&client->sess.spectatorClient,
+		&selectedSpawnWeapon,
 		&client->sess.wins,
 		&client->sess.losses,
 		&teamLeader,                  // bk010221 - format
-		&client->sess.spectateOnly,
-		&client->sess.privilege,
-		&client->sess.spectatorQueuePosition,
-		&client->sess.skill1,
-		&client->sess.skill2,
-		&client->sess.skill3,
-		&muted
+		&privilege,
+		&spectateOnly,
+		&spectatorQueuePosition,
+		&muted,
+		&sessionField34,
+		&skill1,
+		&skill2,
+		&skill3
 		);
+	if ( parsed < 16 ) {
+		muted = 0;
+		sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i",
+			&sessionTeam,                 // bk010221 - format
+			&client->sess.spectatorTime,
+			&spectatorState,              // bk010221 - format
+			&client->sess.spectatorClient,
+			&client->sess.wins,
+			&client->sess.losses,
+			&teamLeader,                  // bk010221 - format
+			&spectateOnly,
+			&privilege,
+			&spectatorQueuePosition,
+			&skill1,
+			&skill2,
+			&skill3,
+			&muted
+			);
+		selectedSpawnWeapon = 0;
+		sessionField34 = 0;
+	}
+	client->sess.selectedSpawnWeapon = selectedSpawnWeapon;
+	client->sess.privilege = privilege;
+	client->sess.spectateOnly = spectateOnly;
+	client->sess.spectatorQueuePosition = spectatorQueuePosition;
+	client->sess.sessionField34 = sessionField34;
+	client->sess.skill1 = skill1;
+	client->sess.skill2 = skill2;
+	client->sess.skill3 = skill3;
 	client->sess.muted = (qboolean)muted;
 	client->sess.spectatorQueuePositionDirty = qfalse;
 
@@ -180,12 +231,17 @@ void G_InitSessionData( gclient_t *client, char *userinfo ) {
 	}
 	sess->spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
 	sess->spectatorTime = level.time;
+	sess->selectedSpawnWeapon = 0;
 	sess->spectateOnly = qfalse;
 	sess->spectatorQueuePosition = 0;
 	sess->spectatorQueuePositionDirty = qfalse;
+	sess->muted = qfalse;
+	sess->sessionField34 = 0;
 
 	sess->privilege = G_AdminAccessForSteamID( Info_ValueForKey( userinfo, "steamid" ) );
 	sess->skill1 = 0;
+	sess->skill2 = 0;
+	sess->skill3 = 0;
 	if ( g_gametype.integer == GT_TOURNAMENT && value[0] == 's' ) {
 		sess->spectateOnly = qtrue;
 	}

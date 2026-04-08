@@ -894,6 +894,28 @@ void Svcmd_BotList_f( void ) {
 
 /*
 ===============
+G_AddTrainerBot
+===============
+*/
+static void G_AddTrainerBot( void ) {
+	float		skill;
+
+	skill = trap_Cvar_VariableValue( "g_spSkill" );
+	if( skill < 1 ) {
+		trap_Cvar_Set( "g_spSkill", "1" );
+		skill = 1;
+	}
+	else if ( skill > 5 ) {
+		trap_Cvar_Set( "g_spSkill", "5" );
+		skill = 5;
+	}
+
+	G_AddBot( "Trainer", skill, "", 5000, "" );
+	trap_SendServerCommand( -1, "loaddeferred\n" );
+}
+
+/*
+===============
 G_SpawnBots
 ===============
 */
@@ -1061,7 +1083,6 @@ void G_InitBots( qboolean restart ) {
 	int			timeLimit;
 	const char	*arenainfo;
 	char		*strValue;
-	int			basedelay;
 	char		map[MAX_QPATH];
 	char		serverinfo[MAX_INFO_STRING];
 
@@ -1101,14 +1122,14 @@ void G_InitBots( qboolean restart ) {
 			trap_Cvar_Set( "timelimit", "0" );
 		}
 
-		basedelay = BOT_BEGIN_DELAY_BASE;
 		strValue = Info_ValueForKey( arenainfo, "special" );
-		if( Q_stricmp( strValue, "training" ) == 0 ) {
-			basedelay += 10000;
-		}
-
 		if( !restart ) {
-			G_SpawnBots( Info_ValueForKey( arenainfo, "bots" ), basedelay );
+			if( Q_stricmp( strValue, "training" ) == 0 ) {
+				G_AddTrainerBot();
+			}
+			else {
+				G_SpawnBots( Info_ValueForKey( arenainfo, "bots" ), BOT_BEGIN_DELAY_BASE );
+			}
 		}
 	}
 }

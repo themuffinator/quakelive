@@ -58,7 +58,7 @@ qboolean G_FreezeCanSeeThawProgressEvent( int clientNum, int entNum ) {
 		return qfalse;
 	}
 
-	if ( level.roundState != ROUNDSTATE_ACTIVE ) {
+	if ( G_FreezeResolveRoundState() != ROUNDSTATE_ACTIVE ) {
 		return qfalse;
 	}
 

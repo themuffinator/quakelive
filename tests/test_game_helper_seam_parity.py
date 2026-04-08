@@ -8,6 +8,23 @@ def _read(rel_path: str) -> str:
 	return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def _block_from_marker(source: str, marker: str) -> str:
+	start = source.rindex(marker)
+	brace_start = source.index("{", start)
+	depth = 0
+
+	for index in range(brace_start, len(source)):
+		char = source[index]
+		if char == "{":
+			depth += 1
+		elif char == "}":
+			depth -= 1
+			if depth == 0:
+				return source[start:index + 1]
+
+	raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
 def test_cgame_binding_bridge_uses_direct_retail_copy_path() -> None:
 	client = _read("src/code/client/cl_cgame.c")
 
@@ -28,10 +45,16 @@ def test_client_spawn_uses_recovered_loadout_and_rr_helpers() -> None:
 	game_team = _read("src/code/game/g_team.c")
 	game_local = _read("src/code/game/g_local.h")
 
+	assert "static weapon_t G_SelectConfiguredSpawnWeapon( gclient_t *client, unsigned int startingMask ) {" in game_client
 	assert "static weapon_t G_FinalizeSpawnLoadout( gentity_t *ent, const factoryCvarConfig_t *factoryConfig ) {" in game_client
+	assert "client->sess.selectedSpawnWeapon = (int)spawnWeapon;" in game_client
+	assert "if ( client->rrInfectionState == RR_STATE_INFECTED ) {" in game_client
 	assert "spawnWeapon = G_FinalizeSpawnLoadout( ent, factoryConfig );" in game_client
 	assert "static void G_RRFinalizeSpawnLoadout( gentity_t *ent ) {" in game_client
+	assert "client->ps.stats[STAT_WEAPONS] = 1u << WP_GAUNTLET;" in game_client
+	assert "client->pers.maxHealth = client->ps.stats[STAT_MAX_HEALTH] + g_rrInfectedZombieHealthBonus.integer;" in game_client
 	assert "G_RRFinalizeSpawnLoadout( ent );" in game_client
+	assert game_client.index("G_RRFinalizeSpawnLoadout( ent );") < game_client.index("spawnWeapon = G_FinalizeSpawnLoadout( ent, factoryConfig );")
 	assert "gentity_t *G_SelectRankedSpawnPoint( gentity_t *spots[], int spotCount, vec3_t origin, vec3_t angles ) {" in game_client
 	assert "static gentity_t *G_SelectClientSpawnPoint( gentity_t *ent, vec3_t origin, vec3_t angles ) {" in game_client
 	assert "spawnPoint = G_SelectClientSpawnPoint( ent, spawn_origin, spawn_angles );" in game_client
@@ -60,12 +83,51 @@ def test_freeze_helpers_match_recovered_retail_boundaries() -> None:
 
 
 def test_red_rover_helpers_match_recovered_retail_boundaries() -> None:
+	game_active = _read("src/code/game/g_active.c")
 	game_client = _read("src/code/game/g_client.c")
+	game_local = _read("src/code/game/g_local.h")
+	reset_block = _block_from_marker(game_client, "static void G_RRResetClientForRound")
 
-	assert "static int G_RRResolveRoundState( void ) {" in game_client
+	assert "int G_RRResolveRoundState( void ) {" in game_active
 	assert "if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {" in game_client
 	assert "static void G_RRResetClientForRound( gentity_t *ent ) {" in game_client
 	assert "G_RRResetClientForRound( ent );" in game_client
+	assert "ClientSpawn( ent );" in reset_block
+	assert "void G_RRHandleCompletedRound( void );" in game_local
+	assert "void G_RRHandlePlayerDeath( team_t oldTeam, gentity_t *victim, int meansOfDeath );" in game_local
+	assert "void G_RRHandleCompletedRound( void ) {" in game_client
+	assert "void G_RRHandlePlayerDeath( team_t oldTeam, gentity_t *victim, int meansOfDeath ) {" in game_client
+	assert "G_RRHandlePlayerDeath( client->sess.sessionTeam, self, meansOfDeath );" in game_client
+	assert "G_CountConnectedClientsByTeam( counts );" in game_client
+	assert "if ( G_RRCheckRoundCompletion( counts ) ) {" in game_client
+	assert "level.roundTransitionTime = level.time + ( level.rrPendingMatchExit ? 1500 : 3500 );" in game_client
+	assert "level.roundPendingExit = level.rrPendingMatchExit;" in game_client
+	assert "if ( ScoreIsTied() ) {" in game_client
+
+
+def test_last_alive_alert_helpers_match_recovered_retail_boundaries() -> None:
+	game_team = _read("src/code/game/g_team.c")
+	game_local = _read("src/code/game/g_local.h")
+	shared_block = _block_from_marker(game_team, "static qboolean G_NotifyLastAlivePlayer")
+	ad_block = _block_from_marker(game_team, "qboolean G_ADNotifyLastAlivePlayer")
+	ca_block = _block_from_marker(game_team, "qboolean G_CANotifyLastAlivePlayer")
+	freeze_block = _block_from_marker(game_team, "qboolean G_FreezeNotifyLastAlivePlayer")
+	rr_block = _block_from_marker(game_team, "qboolean G_RRNotifyLastAlivePlayer")
+
+	assert "G_BroadcastGlobalTeamSound( vec3_origin, GTS_LAST_STANDING, -1, team, 0 );" in shared_block
+	assert 'va( "cp \\"%s\\\\n\\"", G_LastManStandingMessage() )' in shared_block
+
+	for expected in (
+		"qboolean G_ADNotifyLastAlivePlayer( team_t team );",
+		"qboolean G_CANotifyLastAlivePlayer( team_t team );",
+		"qboolean G_FreezeNotifyLastAlivePlayer( team_t team );",
+		"qboolean G_RRNotifyLastAlivePlayer( team_t team );",
+	):
+		assert expected in game_local
+
+	for block in (ad_block, ca_block, freeze_block, rr_block):
+		assert "return G_NotifyLastAlivePlayer( team );" in block
+		assert "G_BroadcastGlobalTeamSound(" not in block
 
 
 def test_timeout_race_and_direct_command_helpers_match_recovered_boundaries() -> None:
@@ -136,3 +198,24 @@ def test_timeout_race_and_direct_command_helpers_match_recovered_boundaries() ->
 	assert "Svcmd_GameCrash_f();" in game_svcmds
 	assert "Svcmd_DumpVars_f();" in game_svcmds
 	assert "Svcmd_ReloadAccess_f();" in game_svcmds
+
+
+def test_console_tail_and_training_bootstrap_helpers_match_recovered_boundaries() -> None:
+	game_svcmds = _read("src/code/game/g_svcmds.c")
+	game_bot = _read("src/code/game/g_bot.c")
+	init_bots = _block_from_marker(game_bot, "void G_InitBots")
+
+	assert 'Q_stricmp( cmd, "markstate" ) == 0 ||' in game_svcmds
+	assert 'Q_stricmp( cmd, "diffstate" ) == 0 ||' in game_svcmds
+	assert 'Q_stricmp( cmd, "dumpentities" ) == 0 ||' in game_svcmds
+	assert 'Q_stricmp( cmd, "printentitystates" ) == 0 ) {' in game_svcmds
+	assert 'if ( Q_stricmp( cmd, "floodstatus" ) == 0 ) {' in game_svcmds
+	assert "Svcmd_FloodStatus_f();" in game_svcmds
+
+	assert "static void G_AddTrainerBot( void ) {" in game_bot
+	assert 'G_AddBot( "Trainer", skill, "", 5000, "" );' in game_bot
+	assert 'trap_SendServerCommand( -1, "loaddeferred\\n" );' in game_bot
+	assert 'if( Q_stricmp( strValue, "training" ) == 0 ) {' in init_bots
+	assert "G_AddTrainerBot();" in init_bots
+	assert 'G_SpawnBots( Info_ValueForKey( arenainfo, "bots" ), BOT_BEGIN_DELAY_BASE );' in init_bots
+	assert "basedelay += 10000;" not in game_bot

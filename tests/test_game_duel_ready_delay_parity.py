@@ -42,6 +42,7 @@ def test_checktournament_gates_duel_countdown_on_ready_state() -> None:
 def test_session_serializer_persists_duel_queue_fields() -> None:
 	session_c = _read("src/code/game/g_session.c")
 
+	assert "client->sess.selectedSpawnWeapon" in session_c
 	assert "client->sess.spectateOnly" in session_c
 	assert "client->sess.spectatorQueuePosition" in session_c
 	assert "sess->spectateOnly = qtrue;" in session_c

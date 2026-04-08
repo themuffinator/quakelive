@@ -8,6 +8,97 @@ The long-term parity target is that this engine should, in theory, be able to re
 
 ## Recently closed
 
+### Task 67: Qagame residual timer/debug/training tail closure [COMPLETED]
+Priority: High
+Files: `src/code/game/g_bot.c`, `src/code/game/g_local.h`, `tests/test_game_factory_regen_parity.py`, `tests/test_game_helper_seam_parity.py`, `docs/reverse-engineering/qagame-mapping.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 98%** (`QG-P6` complete)
+
+`QG-G08`, `QG-G09`, and `QG-G10` from the dedicated qagame closure plan are now closed, which completes `QG-P6` and the qagame closure plan as a whole.
+
+Completed work:
+
+1. Finalized the adjacent factory-regen client-state naming so the split health/armor regen helpers now sit on explicitly named retail timer-side accumulators and pending latches instead of partially described layout placeholders.
+2. Locked the recovered `ConsoleCommand` legacy debug/admin tail with focused seam coverage, keeping the dangerous `game_crash` path developer-gated while preserving the handled no-op tokens and the remaining safe helper routes.
+3. Restored the dedicated `G_AddTrainerBot` bootstrap wrapper in the bot init flow so training maps now use the retail fixed `Trainer` / `5000 ms` / `loaddeferred` sequence rather than the older generic delayed spawn approximation.
+
+### Task 66: Qagame queue sidecar and spawn-finalizer closure [COMPLETED]
+Priority: High
+Files: `src/code/game/g_client.c`, `src/code/game/g_main.c`, `src/code/game/g_session.c`, `src/code/game/g_local.h`, `src/game/ql_game_types.h`, `tests/test_game_tournament_queue_parity.py`, `tests/test_game_helper_seam_parity.py`, `tests/test_game_duel_ready_delay_parity.py`, `docs/reverse-engineering/qagame-mapping.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 93% -> after 96%** (tournament queue sidecar + spawn/loadout finalizer exactness; `QG-P5` complete)
+
+`QG-G06` and `QG-G07` from the dedicated qagame closure plan are now closed, which completes `QG-P5`. The remaining open qagame parity work is the residual timer/debug/training tail grouped under `QG-P6`.
+
+Completed work:
+
+1. Restored the retail duel queue sidecar around a shared waiting-spectator eligibility helper so queue selection, queue sorting, and `teamtask` mirroring now exclude scoreboard/follow spectators and stay aligned with the published `rp` / `p` / `so` / `pq` configstring slab.
+2. Recovered the session-side selected-spawn-weapon lane and wired it into `G_FinalizeSpawnLoadout`, so the spawn finalizer now latches retail fallback weapon choices back into the session block instead of hardwiring the generic factory default every spawn.
+3. Moved the Red Rover infected override ahead of the generic finalizer, routed `G_RRResetClientForRound` back through `ClientSpawn`, and refreshed the focused queue/loadout parity fixtures plus the qagame mapping/closure docs to remove the remaining `QG-P5` caveats.
+
+### Task 65: Qagame Red Rover strict controller recovery [COMPLETED]
+Priority: High
+Files: `src/code/game/g_active.c`, `src/code/game/g_client.c`, `src/code/game/g_local.h`, `src/code/game/g_main.c`, `tests/test_game_round_controller_helper_parity.py`, `tests/test_game_helper_seam_parity.py`, `docs/reverse-engineering/qagame-mapping.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 90% -> after 93%** (Red Rover strict controller/death-path closure; `QG-P4` complete)
+
+`QG-G04` from the dedicated qagame closure plan is now closed, which completes `QG-P4`. The remaining open qagame parity work is focused on tournament queue/spawn-finalizer recovery (`QG-P5`) and the residual low-risk tails (`QG-P6`).
+
+Completed work:
+
+1. Rebuilt Red Rover around a dedicated internal `RR_ROUNDSTATE_*` lane so the controller now preserves the recovered `0..5` state split, pending-transition timers, infection seeding handoff, and delayed complete-state restart versus exit scheduling while still publishing the shared coarse `ROUNDSTATE_*` view.
+2. Switched `G_RRCheckRoundCompletion` onto the caller-supplied counts contract and roundtimelimit gate recovered from HLIL, then routed both the death path and per-frame activity monitor through the same completion helper plus the delayed `1500 ms` / `3500 ms` post-round schedule.
+3. Aligned `G_RRHandlePlayerDeath` with the recovered pre-mutation team interface, refreshed the RR parity fixtures around the new enum/helper surface and delayed-complete behavior, and updated the qagame mapping/closure docs to remove the remaining RR controller caveats.
+
+### Task 64: Qagame scoreboard serializer-family closure [COMPLETED]
+Priority: High
+Files: `src/code/game/g_cmds.c`, `tests/test_game_nonteam_scoreboard_helper_parity.py`, `tests/test_game_compact_scoreboard_parity.py`, `tests/test_game_intermission_stats_parity.py`, `tests/test_game_team_scoreboard_header_parity.py`, `tests/test_cgame_displaycontext_parity.py`, `docs/reverse-engineering/qagame-mapping.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 86% -> after 90%** (scoreboard/intermission serializer exactness; `QG-P3` complete)
+
+`QG-G03` from the dedicated qagame closure plan is now closed, which completes `QG-P3`. The remaining open qagame parity work is focused on the deeper Red Rover controller/death-path tranche (`QG-G04`) and the later queue/spawn/residual tails.
+
+Completed work:
+
+1. Moved the duel scoreboard branch onto the same retail payload-builder contract used by the other scoreboard serializers, while preserving the viewer-specific pickup-timing visibility split and the cached low/high duel client ordering in the `level` tail.
+2. Revalidated the existing rich, compact, team-family, and intermission-only scoreboard/stat publishers and locked the ordering under `DeathmatchScoreboardMessage` so `scorestats`, `scoreteam`, and the intermission-only stat publishers stay sequenced on the recovered retail path.
+3. Refreshed the focused qagame/cgame scoreboard tests so compact `smscores`, duel serializer dispatch, helper-family decomposition, and intermission publisher ordering are all pinned together.
+
+### Task 63: Qagame last-alive public alert transport closure [COMPLETED]
+Priority: High
+Files: `src/code/game/g_team.c`, `src/code/game/g_local.h`, `tests/test_game_helper_seam_parity.py`, `tests/test_cgame_event_transport_parity.py`, `docs/reverse-engineering/qagame-mapping.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 83% -> after 86%** (shared last-alive alert transport closure; `QG-P2` complete)
+
+`QG-G02` from the dedicated qagame closure plan is now closed, which completes `QG-P2`. The remaining open qagame parity work is focused on scoreboard/intermission serializer recovery (`QG-G03`), the deeper Red Rover controller/death-path tranche (`QG-G04`), and the later queue/spawn/residual tails.
+
+Completed work:
+
+1. Moved ownership of the retail last-alive public alert into the shared `G_NotifyLastAlivePlayer` helper so it now emits the recovered `EV_GLOBAL_TEAM_SOUND` / `GTS_LAST_STANDING` temp entity before sending the lone-survivor centerprint.
+2. Routed the A/D, Clan Arena, Freeze, and Red Rover mode-local last-alive wrappers through that shared helper after their mode/state/player-count gates, while leaving `GTS_SURVIVOR_WARNING` attached only to the separate Red Rover survival-bonus broadcast.
+3. Tightened the focused qagame/cgame event fixtures so they now pin the shared helper boundary, the per-mode wrapper fan-in, and the existing `lastStandingSound` consumer.
+
+### Task 62: Qagame Freeze round-resolution helper decomposition closure [COMPLETED]
+Priority: High
+Files: `src/code/game/g_active.c`, `src/code/game/g_client.c`, `src/code/game/g_main.c`, `src/code/game/g_local.h`, `tests/test_game_round_controller_helper_parity.py`, `tests/test_game_native_export_helper_parity.py`, `tests/test_game_helper_seam_parity.py`, `docs/reverse-engineering/qagame-mapping.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 80% -> after 83%** (Freeze helper decomposition and timeout-edge closure; `QG-P1` complete)
+
+`QG-G05` from the dedicated qagame closure plan is now closed, which completes `QG-P1` as a whole. The remaining open controller-heavy qagame work is now the broader Red Rover machine/interface tranche `QG-G04`, not the shared round-controller core.
+
+Completed work:
+
+1. Fixed the remaining Freeze controller reentrancy hazard by keeping `Freeze_RoundStateTransition` on the raw controller latch while leaving the public `G_FreezeResolveRoundState` helper responsible for expired pending-transition servicing.
+2. Cut off thaw accumulation and auto-thaw processing outside the active Freeze round, renamed the warmup-delay cvar update hook to the now-shared `G_RoundHandleWarmupDelayCvarUpdate`, and paused the Freeze-side thaw and spawn-protection timers across timeout resume deltas.
+3. Tightened the focused qagame parity fixtures so they now pin the Freeze winner-resolution ordering, the thaw-cutoff edge, the shared warmup-delay rescheduler, the timeout-paused Freeze client timers, and the relocated Red Rover resolver boundary.
+
+### Task 61: Qagame round-controller helper exactness closure [COMPLETED]
+Priority: High
+Files: `src/code/game/g_active.c`, `src/code/game/g_client.c`, `src/code/game/g_cmds.c`, `src/code/game/g_freeze.c`, `src/code/game/g_team.c`, `src/code/game/g_main.c`, `src/code/game/g_local.h`, `tests/test_game_round_controller_helper_parity.py`, `tests/test_game_native_export_helper_parity.py`, `docs/reverse-engineering/qagame-mapping.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 78% -> after 80%** (controller helper/readback closure; deeper RR and Freeze decomposition work remains open)
+
+`QG-G01` from the dedicated qagame closure plan is now closed. This task landed the first half of `QG-P1`; the Freeze-side follow-up was completed separately in Task 62, while the deeper Red Rover controller machine and death-path interface still remain under `QG-G04`.
+
+Completed work:
+
+1. Restored standalone Clan Arena, Freeze, and Red Rover pending-transition resolvers, exported the new helper surface through `g_local.h`, and routed the affected CA/FZ/RR helper callers plus the Freeze thaw-progress visibility export through those readback helpers instead of raw `level.roundState`.
+2. Added a dedicated Clan Arena controller transition lane, shared CA/Freeze pending-exit latching, and timeout-pause coverage for round-controller timers so deciding-round roundlimit/timelimit/mercylimit checks now evaluate after the score update instead of before it.
+3. Aligned Freeze active-round timeout resolution with the committed HLIL living-count and living-health tiebreak path, refreshed the qagame mapping/closure-plan notes, and tightened the focused controller/native-export parity regressions around the recovered helper boundaries.
+
 ### Task 60: UI final runtime confirmation closure [COMPLETED]
 Priority: High
 Files: `src/code/cgame/cg_main.c`, `tools/packaging/ui_bundle_manifest.json`, `scripts/ui/retail_ui_corpus.py`, `tests/test_ui_menu_files.py`, `tests/test_ui_src_panel_parity.py`, `tests/test_cgame_displaycontext_parity.py`, `IMPLEMENTATION_PLAN.md`, `docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md`, `docs/build-pipeline.md`, `docs/ui/scripting-guide.md`, `artifacts/ui_validation/logs/ui_runtime_evidence_20260406.json`
@@ -597,18 +688,15 @@ Subtasks:
 4. Continue verifying match-flow sequencing against HLIL whenever state-machine code changes.
 5. [x] Capture the shared `pmove` regressions with focused tests instead of relying on broad manual inspection, including jump timing, circle-strafe friction, step-jump gating, unsupported air-step suppression, and double-jump reuse.
 
-### Task 25: Qagame behavioral parity closure execution [OPEN]
+### Task 25: Qagame behavioral parity closure execution [COMPLETED]
 Priority: High
 Primary areas: `src/code/game/*`, qagame↔cgame transport boundaries, focused gameplay fixtures
 
-The dedicated qagame audit and plan is now published in `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`. The remaining qagame parity risk is no longer symbol coverage; it is behavioral and boundary exactness in retail-only helper families.
+The dedicated qagame audit and plan in `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md` is now fully closed. The remaining qagame work is no longer in the active gap register; it is runtime verification and lower-confidence annotation cleanup.
 
-Open subtasks:
+Completed subtasks:
 
-1. Execute `QG-P1` + `QG-P2`: close controller-state helper exactness and shared last-alive public event transport.
-2. Execute `QG-P3`: restore retail scoreboard/intermission serializer-family boundaries and ordering.
-3. Execute `QG-P4`: close Red Rover strict controller/death-path interface differences.
-4. Execute `QG-P5` + `QG-P6`: finish tournament queue sidecar, spawn/loadout finalizer, and residual timer/debug/training tails.
+1. Executed `QG-P1` through `QG-P6` and closed the full `QG-G01`..`QG-G10` gap register.
 
 ## Verification expectations after gameplay/client changes
 

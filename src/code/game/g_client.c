@@ -146,6 +146,7 @@ Runs the thaw and auto-respawn timers for frozen players.
 void G_FreezeClientEndFrame( gentity_t *ent ) {
 	gclient_t	*client;
 	gentity_t	*helper;
+	int		roundState;
 	int		thawTick;
 	int		thawTotal;
 	int		helperCount;
@@ -159,6 +160,7 @@ void G_FreezeClientEndFrame( gentity_t *ent ) {
 	}
 
 	client = ent->client;
+	roundState = G_FreezeResolveRoundState();
 	thawTick = level.freezeConfig.thawTick;
 	thawTotal = level.freezeConfig.thawTime;
 	if ( thawTick <= 0 ) {
@@ -172,6 +174,15 @@ void G_FreezeClientEndFrame( gentity_t *ent ) {
 	}
 
 	if ( client->freezeFrozen ) {
+		if ( roundState != ROUNDSTATE_ACTIVE ) {
+			client->freezeAccumulatedThaw = 0;
+			client->freezeNextThawTick = 0;
+			client->freezeAutoThawTime = 0;
+			client->freezeEnvironmentalRespawnTime = 0;
+			client->freezeLastHelper = -1;
+			return;
+		}
+
 		helper = NULL;
 		helperCount = G_FreezeCountThawHelpers( ent, &helper );
 		if ( helperCount > 0 ) {
@@ -244,7 +255,7 @@ qboolean G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, genti
 		return qtrue;
 	}
 
-	if ( level.roundState != ROUNDSTATE_ACTIVE ) {
+	if ( G_FreezeResolveRoundState() != ROUNDSTATE_ACTIVE ) {
 		return qfalse;
 	}
 
@@ -331,7 +342,7 @@ qboolean G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, genti
 	}
 
 	Team_FragBonuses( self, inflictor, attacker );
-	G_RRHandlePlayerDeath( self, attacker );
+	G_RRHandlePlayerDeath( client->sess.sessionTeam, self, meansOfDeath );
 
 	if ( meansOfDeath == MOD_SUICIDE ) {
 		if ( client->ps.powerups[PW_NEUTRALFLAG] ) {
@@ -1253,7 +1264,10 @@ void respawn( gentity_t *ent ) {
 		adState = G_ADResolveRoundState();
 		useRoundFollowReset = ( adState != AD_ROUNDSTATE_INACTIVE && adState != AD_ROUNDSTATE_WARMUP ) ? qtrue : qfalse;
 	} else if ( g_gametype.integer == GT_CLAN_ARENA ) {
-		useRoundFollowReset = ( level.roundState != ROUNDSTATE_INACTIVE && level.roundState != ROUNDSTATE_WARMUP ) ? qtrue : qfalse;
+		int caState;
+
+		caState = G_CAResolveRoundState();
+		useRoundFollowReset = ( caState != ROUNDSTATE_INACTIVE && caState != ROUNDSTATE_WARMUP ) ? qtrue : qfalse;
 	}
 
 	if ( useRoundFollowReset ) {
@@ -1688,15 +1702,17 @@ void ClientUserinfoChanged( int clientNum ) {
 	// send over a subset of the userinfo keys so other clients can
 	// print scoreboards, display models, and play custom sounds
 	if ( ent->r.svFlags & SVF_BOT ) {
-		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\country\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\skill\\%s\\tt\\%d\\tl\\%d\\so\\%i\\pq\\%i",
+		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\country\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\skill\\%s\\tt\\%d\\tl\\%d\\rp\\%d\\p\\%d\\so\\%i\\pq\\%i",
 			client->pers.netname, team, model, headModel, country, c1, c2,
 			client->pers.maxHealth, client->sess.wins, client->sess.losses,
 			Info_ValueForKey( userinfo, "skill" ), teamTask, teamLeader,
+			G_GetClientReadyState( client ), client->sess.privilege,
 			client->sess.spectateOnly, client->sess.spectatorQueuePosition );
 	} else {
-		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\g_redteam\\%s\\g_blueteam\\%s\\country\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d\\so\\%i\\pq\\%i",
+		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\g_redteam\\%s\\g_blueteam\\%s\\country\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d\\rp\\%d\\p\\%d\\so\\%i\\pq\\%i",
 			client->pers.netname, client->sess.sessionTeam, model, headModel, redTeam, blueTeam, country, c1, c2,
 			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader,
+			G_GetClientReadyState( client ), client->sess.privilege,
 			client->sess.spectateOnly, client->sess.spectatorQueuePosition );
 	}
 
@@ -2187,6 +2203,32 @@ static weapon_t G_SelectFactorySpawnWeapon( unsigned int statMask ) {
 
 /*
 =============
+G_SelectConfiguredSpawnWeapon
+
+Prefers the persisted session-side spawn selection when it is still legal,
+then latches the retail fallback choice back into the session block.
+=============
+*/
+static weapon_t G_SelectConfiguredSpawnWeapon( gclient_t *client, unsigned int startingMask ) {
+	weapon_t spawnWeapon;
+
+	if ( !client ) {
+		return WP_MACHINEGUN;
+	}
+
+	spawnWeapon = (weapon_t)client->sess.selectedSpawnWeapon;
+	if ( spawnWeapon > WP_NONE && spawnWeapon < WP_NUM_WEAPONS &&
+		( startingMask & ( 1u << spawnWeapon ) ) ) {
+		return spawnWeapon;
+	}
+
+	spawnWeapon = G_SelectFactorySpawnWeapon( startingMask );
+	client->sess.selectedSpawnWeapon = (int)spawnWeapon;
+	return spawnWeapon;
+}
+
+/*
+=============
 G_ApplySpawnHealth
 
 Applies the retail spawn-health clamp and mirrors the value into both entity
@@ -2231,6 +2273,12 @@ static weapon_t G_FinalizeSpawnLoadout( gentity_t *ent, const factoryCvarConfig_
 	}
 
 	client = ent->client;
+	if ( client->rrInfectionState == RR_STATE_INFECTED ) {
+		client->sess.selectedSpawnWeapon = WP_GAUNTLET;
+		client->ps.weapon = WP_GAUNTLET;
+		return WP_GAUNTLET;
+	}
+
 	startingAmmoTable[WP_GAUNTLET] = g_startingAmmoConfig.gauntlet;
 	startingAmmoTable[WP_MACHINEGUN] = g_startingAmmoConfig.machinegun;
 	startingAmmoTable[WP_SHOTGUN] = g_startingAmmoConfig.shotgun;
@@ -2264,7 +2312,7 @@ static weapon_t G_FinalizeSpawnLoadout( gentity_t *ent, const factoryCvarConfig_
 		}
 	}
 
-	spawnWeapon = G_SelectFactorySpawnWeapon( startingMask );
+	spawnWeapon = G_SelectConfiguredSpawnWeapon( client, startingMask );
 	G_ApplySpawnHealth( ent, factoryConfig );
 	if ( g_startingArmor.integer > 0 ) {
 		client->ps.stats[STAT_ARMOR] = g_startingArmor.integer;
@@ -2281,11 +2329,37 @@ static weapon_t G_FinalizeSpawnLoadout( gentity_t *ent, const factoryCvarConfig_
 =============
 G_RRFinalizeSpawnLoadout
 
-Applies the retail Red Rover spawn-side infection finalization after the base loadout is ready.
+Applies the retail Red Rover spawn-side infection finalization before the
+generic spawn loadout selects the live weapon.
 =============
 */
 static void G_RRFinalizeSpawnLoadout( gentity_t *ent ) {
+	gclient_t	*client;
+
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
 	G_RRInitClient( ent );
+	client = ent->client;
+	if ( client->rrInfectionState != RR_STATE_INFECTED ) {
+		return;
+	}
+
+	client->ps.stats[STAT_WEAPONS] = 1u << WP_GAUNTLET;
+	client->ps.stats[STAT_ARMOR] = 0;
+	client->ps.weapon = WP_GAUNTLET;
+	client->ps.weaponstate = WEAPON_READY;
+	client->sess.selectedSpawnWeapon = WP_GAUNTLET;
+	client->pers.maxHealth = client->ps.stats[STAT_MAX_HEALTH] + g_rrInfectedZombieHealthBonus.integer;
+	if ( client->pers.maxHealth <= 0 ) {
+		client->pers.maxHealth = client->ps.stats[STAT_MAX_HEALTH];
+	} else if ( client->pers.maxHealth > 999 ) {
+		client->pers.maxHealth = 999;
+	}
+	client->ps.stats[STAT_MAX_HEALTH] = client->pers.maxHealth;
+	ent->health = client->ps.stats[STAT_HEALTH] = client->pers.maxHealth;
+	BG_UpdateArmorTierFromCurrentArmor( &client->ps, g_armorTiered.integer ? qtrue : qfalse );
 }
 
 /*
@@ -2515,6 +2589,7 @@ void ClientSpawn(gentity_t *ent) {
 	VectorCopy (playerMaxs, ent->r.maxs);
 
 	client->ps.clientNum = index;
+	G_RRFinalizeSpawnLoadout( ent );
 	spawnWeapon = G_FinalizeSpawnLoadout( ent, factoryConfig );
 
 	G_SetOrigin( ent, spawn_origin );
@@ -2576,7 +2651,6 @@ void ClientSpawn(gentity_t *ent) {
 	// run the presend to set anything else
 	G_GametypeClientSpawn( ent );
 	G_GrantConfiguredItems( ent );
-	G_RRFinalizeSpawnLoadout( ent );
 	G_ClearLagHaxHistory( ent );
 	ClientEndFrame( ent );
 
@@ -2717,21 +2791,6 @@ static qboolean G_RRIsActive( void ) {
 	}
 
 	return qtrue;
-}
-
-/*
-=============
-G_RRResolveRoundState
-
-Returns the active Red Rover round-state view used by the infection helpers.
-=============
-*/
-static int G_RRResolveRoundState( void ) {
-	if ( !G_RRIsActive() ) {
-		return ROUNDSTATE_INACTIVE;
-	}
-
-	return level.roundState;
 }
 
 /*
@@ -3045,7 +3104,7 @@ static void G_RRResetClientForRound( gentity_t *ent ) {
 		return;
 	}
 
-	G_RRFinalizeSpawnLoadout( ent );
+	ClientSpawn( ent );
 }
 
 /*
@@ -3206,6 +3265,38 @@ void G_RRProcessClient( gentity_t *ent ) {
 
 /*
 =============
+G_RRResolveCompletedRoundWinner
+
+Returns the retail Red Rover round winner once elimination or roundtimelimit
+forces the controller into its complete state.
+=============
+*/
+static team_t G_RRResolveCompletedRoundWinner( const int counts[TEAM_NUM_TEAMS] ) {
+	if ( !counts ) {
+		return TEAM_FREE;
+	}
+
+	if ( counts[TEAM_RED] <= 0 && counts[TEAM_BLUE] <= 0 ) {
+		return TEAM_FREE;
+	}
+
+	if ( counts[TEAM_RED] <= 0 ) {
+		return TEAM_BLUE;
+	}
+
+	if ( counts[TEAM_BLUE] <= 0 ) {
+		return TEAM_RED;
+	}
+
+	if ( g_rrInfected.integer || level.teamScores[TEAM_RED] > level.teamScores[TEAM_BLUE] ) {
+		return TEAM_BLUE;
+	}
+
+	return TEAM_RED;
+}
+
+/*
+=============
 G_RRGrantRoundBonus
 
 Awards the retail Red Rover round-completion bonus to connected non-spectators.
@@ -3270,39 +3361,75 @@ static qboolean G_RRShouldExitMatch( void ) {
 =============
 G_RRCheckRoundCompletion
 
-Evaluates whether an active round has a winner yet.
+Evaluates the retail Red Rover round-completion gate for the caller-supplied
+team counts.
 =============
 */
-static void G_RRCheckRoundCompletion( void ) {
-	int			counts[TEAM_NUM_TEAMS];
+static qboolean G_RRCheckRoundCompletion( const int counts[TEAM_NUM_TEAMS] ) {
 	int			carryoverClientNum;
-	team_t		winner;
 
 	if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {
+		return qfalse;
+	}
+
+	if ( !counts ) {
+		return qfalse;
+	}
+
+	if ( counts[TEAM_RED] <= 0 || counts[TEAM_BLUE] <= 0 ) {
+		return qtrue;
+	}
+
+	if ( roundtimelimit.integer <= 0 || level.roundStartTime <= 0 ) {
+		return qfalse;
+	}
+
+	if ( level.time - level.roundStartTime < roundtimelimit.integer * 1000 ) {
+		return qfalse;
+	}
+
+	if ( g_rrInfected.integer && counts[TEAM_BLUE] == 1 ) {
+		carryoverClientNum = G_RRFindLastActiveClientNum( TEAM_BLUE );
+		if ( carryoverClientNum >= 0 ) {
+			level.rrCarryoverInfectedClientNum = carryoverClientNum;
+		}
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_RRHandleCompletedRound
+
+Applies the retail Red Rover scoring and exit latches once the controller
+enters its complete state.
+=============
+*/
+void G_RRHandleCompletedRound( void ) {
+	int			counts[TEAM_NUM_TEAMS];
+	team_t		winner;
+	rrRoundState_t	nextState;
+
+	if ( g_gametype.integer != GT_RED_ROVER ) {
 		return;
 	}
 
 	G_CountActivePlayersByTeam( counts );
-	if ( counts[TEAM_RED] > 0 && counts[TEAM_BLUE] > 0 ) {
-		if ( counts[TEAM_BLUE] == 1 ) {
-			carryoverClientNum = G_RRFindLastActiveClientNum( TEAM_BLUE );
-			if ( carryoverClientNum >= 0 ) {
-				level.rrCarryoverInfectedClientNum = carryoverClientNum;
-			}
-		}
-		return;
-	}
-
-	if ( counts[TEAM_RED] <= 0 && counts[TEAM_BLUE] <= 0 ) {
-		return;
-	}
-
-	winner = ( counts[TEAM_BLUE] > 0 ) ? TEAM_BLUE : TEAM_RED;
+	winner = G_RRResolveCompletedRoundWinner( counts );
 	G_RRGrantRoundBonus();
-	level.teamScores[winner]++;
+	if ( winner == TEAM_RED || winner == TEAM_BLUE ) {
+		level.teamScores[winner]++;
+	}
+
 	CalculateRanks();
+	nextState = g_rrInfected.integer ? RR_ROUNDSTATE_INFECTION_SEED : RR_ROUNDSTATE_WARMUP;
 	level.rrPendingMatchExit = G_RRShouldExitMatch();
+	level.roundPendingExit = level.rrPendingMatchExit;
 	level.roundState = ROUNDSTATE_COMPLETE;
+	level.rrRoundState = RR_ROUNDSTATE_COMPLETE;
+	level.rrPendingRoundState = level.rrPendingMatchExit ? RR_ROUNDSTATE_EXIT : nextState;
+	level.rrStateChangeTime = level.time;
 	level.roundTransitionTime = level.time + ( level.rrPendingMatchExit ? 1500 : 3500 );
 	G_UpdateMatchStateConfigString();
 }
@@ -3311,38 +3438,57 @@ static void G_RRCheckRoundCompletion( void ) {
 =============
 G_RRHandlePlayerDeath
 
-Injects infection conversion logic when a client dies.
+Injects the retail Red Rover death-path conversion flow using the victim's
+pre-mutation team.
 =============
 */
-void G_RRHandlePlayerDeath( gentity_t *victim, gentity_t *attacker ) {
+void G_RRHandlePlayerDeath( team_t oldTeam, gentity_t *victim, int meansOfDeath ) {
 	int		counts[TEAM_NUM_TEAMS];
-	team_t	victimTeam;
+	team_t	otherTeam;
+	qboolean	roundComplete;
 
-	(void)attacker;
+	(void)meansOfDeath;
 
-	if ( !G_RRIsActive() || !victim || !victim->client ) {
+	if ( g_gametype.integer != GT_RED_ROVER || !victim || !victim->client ) {
 		return;
 	}
 
-	victimTeam = victim->client->sess.sessionTeam;
-	if ( victimTeam == TEAM_SPECTATOR ) {
+	G_RRResolveRoundState();
+	if ( level.rrRoundState != RR_ROUNDSTATE_ACTIVE || level.timeoutActive || level.warmupTime != 0 ) {
 		return;
 	}
 
-	if ( victimTeam == TEAM_BLUE ) {
-		G_RRMoveClientToTeam( victim, TEAM_RED, qtrue, qtrue );
+	if ( oldTeam != TEAM_RED && oldTeam != TEAM_BLUE ) {
+		return;
+	}
+
+	if ( !g_rrInfected.integer || oldTeam == TEAM_BLUE ) {
+		G_RRMoveClientToTeam( victim, ( oldTeam == TEAM_RED ) ? TEAM_BLUE : TEAM_RED,
+			qtrue, g_rrInfected.integer ? qtrue : qfalse );
+	}
+
+	G_CountActivePlayersByTeam( counts );
+	if ( g_rrInfected.integer && oldTeam == TEAM_BLUE ) {
 		level.rrLastInfectionTime = level.time;
 		G_RRApplySurvivalBonus( qtrue );
 
-		G_CountActivePlayersByTeam( counts );
 		if ( counts[TEAM_BLUE] == 0 ) {
 			level.rrCarryoverInfectedClientNum = victim->s.number;
-		} else {
-			G_RRNotifyLastAlivePlayer( TEAM_BLUE );
 		}
 	}
 
-	G_RRCheckRoundCompletion();
+	roundComplete = G_RRCheckRoundCompletion( counts );
+	otherTeam = ( oldTeam == TEAM_RED ) ? TEAM_BLUE : TEAM_RED;
+	if ( !roundComplete && G_LastManStandingWarningsEnabled()
+		&& counts[otherTeam] > 0
+		&& ( !g_rrInfected.integer || oldTeam == TEAM_BLUE )
+		&& counts[oldTeam] == 1 ) {
+		G_RRNotifyLastAlivePlayer( oldTeam );
+	}
+
+	if ( roundComplete ) {
+		G_RRHandleCompletedRound();
+	}
 }
 
 /*
@@ -3400,11 +3546,13 @@ Clears per-round state whenever the controller enters warmup.
 void G_RRResetRoundState( void ) {
 	int			clientNum;
 
-	if ( !G_RRIsActive() ) {
+	if ( g_gametype.integer != GT_RED_ROVER ) {
 		return;
 	}
 
 	level.roundStartTime = level.time;
+	level.rrSelectedInfectedClientNum = -1;
+	level.rrLastInfectionTime = -1;
 	level.rrNextSurvivalBonusTime = 0;
 	level.rrPendingMatchExit = qfalse;
 	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
@@ -3424,7 +3572,7 @@ Applies the retail Red Rover tie-aware timelimit and roundlimit exit gate.
 =============
 */
 qboolean G_RRCheckExitRules( qboolean announce ) {
-	if ( !G_RRIsActive() || !G_RRShouldExitMatch() ) {
+	if ( g_gametype.integer != GT_RED_ROVER || !G_RRShouldExitMatch() ) {
 		return qfalse;
 	}
 
@@ -3451,10 +3599,19 @@ Monitors round timers and completion state each frame.
 =============
 */
 void G_RRTrackRoundActivity( void ) {
-	if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {
+	int			counts[TEAM_NUM_TEAMS];
+	int			state;
+
+	state = G_RRResolveRoundState();
+	if ( state == RR_ROUNDSTATE_INFECTION_SEED ) {
 		return;
 	}
 
+	if ( state != RR_ROUNDSTATE_ACTIVE ) {
+		return;
+	}
+
+	G_CountConnectedClientsByTeam( counts );
 	G_RRApplySurvivalBonus( qfalse );
 	if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {
 		return;
@@ -3465,7 +3622,9 @@ void G_RRTrackRoundActivity( void ) {
 		return;
 	}
 
-	G_RRCheckRoundCompletion();
+	if ( G_RRCheckRoundCompletion( counts ) ) {
+		G_RRHandleCompletedRound();
+	}
 }
 
 

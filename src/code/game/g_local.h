@@ -660,6 +660,15 @@ typedef enum {
 	AD_ROUNDSTATE_EXIT = 5
 } adRoundState_t;
 
+typedef enum {
+	RR_ROUNDSTATE_INACTIVE = 0,
+	RR_ROUNDSTATE_WARMUP = 1,
+	RR_ROUNDSTATE_INFECTION_SEED = 2,
+	RR_ROUNDSTATE_ACTIVE = 3,
+	RR_ROUNDSTATE_COMPLETE = 4,
+	RR_ROUNDSTATE_EXIT = 5
+} rrRoundState_t;
+
 #define ROUND_TRANSITION_NONE	-1
 
 typedef enum {
@@ -699,16 +708,18 @@ typedef struct {
 	int			spectatorTime;		// for determining next-in-line to play
 	spectatorState_t	spectatorState;
 	int			spectatorClient;	// for chasecam and follow mode
+	int			selectedSpawnWeapon;	// retail selected-spawn-weapon session slot
 	int			wins, losses;		// tournament stats
 	qboolean	teamLeader;			// true when this client is a team leader
-	qboolean	spectateOnly;		// retail-style duel "so" latch for opt-out spectators
 	int			privilege;
+	qboolean	spectateOnly;		// retail-style duel "so" latch for opt-out spectators
 	int			spectatorQueuePosition;	// retail-style duel "pq" slot
-	int			skill1;
 	qboolean	spectatorQueuePositionDirty;
+	qboolean	muted;
+	int			sessionField34;		// retail serialized session tail remains descriptive
+	int			skill1;
 	int			skill2;
 	int			skill3;
-	qboolean	muted;
 } clientSession_t;
 
 //
@@ -961,12 +972,12 @@ struct gclient_s {
 	int			complaintLastDamageTime;
 
 	// timeResidual handles once-per-second timers; retail keeps separate
-	// per-frame armor/health accumulators plus enable latches for factory regen.
+	// per-frame factory regen accumulators plus pending latches alongside it.
 	int			timeResidual;
-	int			factoryRegenArmorAccumulatorMs;
-	int			factoryRegenHealthAccumulatorMs;
-	qboolean	factoryRegenHealthPending;
-	qboolean	factoryRegenArmorPending;
+	int			factoryRegenArmorAccumulatorMs;	// retail per-frame factory armor regen accumulator
+	int			factoryRegenHealthAccumulatorMs;	// retail per-frame factory health regen accumulator
+	qboolean	factoryRegenHealthPending;	// retail health-regen pending latch armed by spawn/damage paths
+	qboolean	factoryRegenArmorPending;	// retail armor-regen pending latch armed by spawn/damage paths
 
 	int		dominationTouchFrame[DOMINATION_MAX_POINTS];
 	gentity_t	*persistantPowerup;
@@ -1055,9 +1066,13 @@ typedef struct {
 	int			warmupTime;			// restart match at this time
 	roundState_t	roundState;
 	int			roundTransitionTime;
+	qboolean		roundPendingExit;
 	adRoundState_t	adRoundState;
 	adRoundState_t	adPendingRoundState;
 	int			adStateChangeTime;
+	rrRoundState_t	rrRoundState;
+	rrRoundState_t	rrPendingRoundState;
+	int			rrStateChangeTime;
 	int			adTurnIndex;
 	int			adLastTurnBaseScore[2];
 	int			adCurrentTurnScoreDelta[2];
@@ -1232,7 +1247,7 @@ qboolean	G_FreezeCanSeeThawProgressEvent( int clientNum, int entNum );
 void	G_FreezeClientEndFrame( gentity_t *ent );
 qboolean	G_FreezeHandlePlayerDeath( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath );
 void	G_FreezeRunFrame( void );
-void	G_FreezeHandleWarmupDelayCvarUpdate( void );
+void	G_RoundHandleWarmupDelayCvarUpdate( void );
 void	G_UpdateReadyUpConfigstring( void );
 qboolean	G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean initialSpawn );
 void	G_SpawnEntitiesFromString( void );
@@ -1460,26 +1475,31 @@ void AddScore( gentity_t *ent, const vec3_t origin, int score );
 void CalculateRanks( void );
 void G_RRInitClient( gentity_t *ent );
 void G_RRProcessClient( gentity_t *ent );
-void G_RRHandlePlayerDeath( gentity_t *victim, gentity_t *attacker );
+void G_RRHandlePlayerDeath( team_t oldTeam, gentity_t *victim, int meansOfDeath );
 void G_RRHandleDamageScore( gentity_t *attacker, gentity_t *targ, int damage );
+void G_RRHandleCompletedRound( void );
 void G_RRResetRoundState( void );
 qboolean G_RRCheckExitRules( qboolean announce );
 void G_RRTrackRoundActivity( void );
+int G_RRResolveRoundState( void );
 int G_ADResolveRoundState( void );
+int G_CAResolveRoundState( void );
+int G_FreezeResolveRoundState( void );
 qboolean G_ADHandleDamageScore( gentity_t *attacker, int announce, gentity_t *targ, int *take, int *asave );
 qboolean G_ADCheckExitRules( qboolean announce );
 int AD_RoundStateTransition( qboolean announce );
 int G_ADResolveAttackingTeam( void );
 int G_ADResolveDefendingTeam( void );
-void G_ADNotifyLastAlivePlayer( team_t team );
-void G_CANotifyLastAlivePlayer( team_t team );
-void G_FreezeNotifyLastAlivePlayer( team_t team );
-void G_RRNotifyLastAlivePlayer( team_t team );
+qboolean G_ADNotifyLastAlivePlayer( team_t team );
+qboolean G_CANotifyLastAlivePlayer( team_t team );
+qboolean G_FreezeNotifyLastAlivePlayer( team_t team );
+qboolean G_RRNotifyLastAlivePlayer( team_t team );
 void G_BroadcastGlobalTeamSound( const vec3_t origin, global_team_sound_t sound, int trackedClientNum, team_t team, int index );
 int G_ADResetScoreHistory( void );
 int G_ADUpdateScoreHistory( void );
 void G_CAADRespawnAsSpectator( gentity_t *ent );
 void G_CAADResetClientForRound( gentity_t *ent );
+void G_CAADReleaseClientForRound( gentity_t *ent );
 qboolean SpotWouldTelefrag( gentity_t *spot );
 
 //
