@@ -41,9 +41,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define EDIT_ID			100
 #define INPUT_ID		101
 
+#define CONSOLE_WINDOW_CLASS	"Q3 WinConsole"
+#define LOADING_WINDOW_TITLE	"Loading Quake Live"
+#define LOADING_WINDOW_WIDTH	0x200
+#define LOADING_WINDOW_HEIGHT	0x100
+#define LOADING_WINDOW_TAG		( ( LONG_PTR )1 )
+
 typedef struct
 {
 	HWND		hWnd;
+	HWND		hWndLoading;
 	HWND		hwndBuffer;
 
 	HWND		hwndButtonClear;
@@ -76,15 +83,76 @@ typedef struct
 } WinConData;
 
 static WinConData s_wcd;
+static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+/*
+==================
+Sys_IsLoadingWindow
+==================
+*/
+static qboolean Sys_IsLoadingWindow( HWND hWnd )
+{
+	return (qboolean)( GetWindowLongPtr( hWnd, GWLP_USERDATA ) == LOADING_WINDOW_TAG );
+}
+
+/*
+==================
+Sys_RegisterConsoleWindowClass
+==================
+*/
+static qboolean Sys_RegisterConsoleWindowClass( void )
+{
+	WNDCLASS	wc;
+
+	if ( GetClassInfo( g_wv.hInstance, CONSOLE_WINDOW_CLASS, &wc ) ) {
+		return qtrue;
+	}
+
+	memset( &wc, 0, sizeof( wc ) );
+
+	wc.style         = 0;
+	wc.lpfnWndProc   = (WNDPROC) ConWndProc;
+	wc.cbClsExtra    = 0;
+	wc.cbWndExtra    = 0;
+	wc.hInstance     = g_wv.hInstance;
+	wc.hIcon         = LoadIcon( g_wv.hInstance, MAKEINTRESOURCE( IDI_ICON1 ) );
+	wc.hCursor       = LoadCursor( NULL, IDC_ARROW );
+	wc.hbrBackground = (void *)COLOR_WINDOW;
+	wc.lpszMenuName  = 0;
+	wc.lpszClassName = CONSOLE_WINDOW_CLASS;
+
+	return (qboolean)( RegisterClass( &wc ) != 0 );
+}
+
+/*
+==================
+Sys_UnregisterConsoleWindowClass
+==================
+*/
+static void Sys_UnregisterConsoleWindowClass( void )
+{
+	if ( s_wcd.hWnd || s_wcd.hWndLoading ) {
+		return;
+	}
+
+	UnregisterClass( CONSOLE_WINDOW_CLASS, g_wv.hInstance );
+}
 
 static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	char *cmdString;
 	static qboolean s_timePolarity;
+	qboolean loadingWindow;
+
+	loadingWindow = Sys_IsLoadingWindow( hWnd );
 
 	switch (uMsg)
 	{
 	case WM_ACTIVATE:
+		if ( loadingWindow ) {
+			return 0;
+		}
+
 		if ( LOWORD( wParam ) != WA_INACTIVE )
 		{
 			SetFocus( s_wcd.hwndInputLine );
@@ -111,6 +179,10 @@ static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		break;
 
 	case WM_CLOSE:
+		if ( loadingWindow ) {
+			return 0;
+		}
+
 		if ( ( com_dedicated && com_dedicated->integer ) )
 		{
 			cmdString = CopyString( "quit" );
@@ -127,6 +199,10 @@ static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		return 0;
 	case WM_CTLCOLORSTATIC:
+		if ( loadingWindow ) {
+			break;
+		}
+
 		if ( ( HWND ) lParam == s_wcd.hwndBuffer )
 		{
 			SetBkColor( ( HDC ) wParam, RGB( 0x00, 0x00, 0xB0 ) );
@@ -163,6 +239,10 @@ static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		break;
 
 	case WM_COMMAND:
+		if ( loadingWindow ) {
+			break;
+		}
+
 		if ( wParam == COPY_ID )
 		{
 			SendMessage( s_wcd.hwndBuffer, EM_SETSEL, 0, -1 );
@@ -188,11 +268,53 @@ static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		break;
 	case WM_CREATE:
+		if ( ( ( CREATESTRUCT * )lParam )->lpCreateParams ) {
+			SetWindowLongPtr( hWnd, GWLP_USERDATA, LOADING_WINDOW_TAG );
+			if ( !s_wcd.hbmLogo ) {
+				s_wcd.hbmLogo = ( HBITMAP )LoadImage( NULL, "splash.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE );
+			}
+		}
 //		s_wcd.hbmLogo = LoadBitmap( g_wv.hInstance, MAKEINTRESOURCE( IDB_BITMAP1 ) );
 //		s_wcd.hbmClearBitmap = LoadBitmap( g_wv.hInstance, MAKEINTRESOURCE( IDB_BITMAP2 ) );
-		s_wcd.hbrEditBackground = CreateSolidBrush( RGB( 0x00, 0x00, 0xB0 ) );
-		s_wcd.hbrErrorBackground = CreateSolidBrush( RGB( 0x80, 0x80, 0x80 ) );
+		if ( !s_wcd.hbrEditBackground ) {
+			s_wcd.hbrEditBackground = CreateSolidBrush( RGB( 0x00, 0x00, 0xB0 ) );
+		}
+		if ( !s_wcd.hbrErrorBackground ) {
+			s_wcd.hbrErrorBackground = CreateSolidBrush( RGB( 0x80, 0x80, 0x80 ) );
+		}
 		SetTimer( hWnd, 1, 1000, NULL );
+		break;
+	case WM_PAINT:
+		if ( loadingWindow ) {
+			PAINTSTRUCT	paint;
+			HDC			hdc;
+			RECT		rect;
+
+			hdc = BeginPaint( hWnd, &paint );
+			GetClientRect( hWnd, &rect );
+
+			if ( s_wcd.hbmLogo ) {
+				HDC		hdcBitmap;
+				HGDIOBJ	oldObject;
+				BITMAP	bitmap;
+
+				hdcBitmap = CreateCompatibleDC( hdc );
+				if ( hdcBitmap ) {
+					oldObject = SelectObject( hdcBitmap, s_wcd.hbmLogo );
+					if ( oldObject && GetObject( s_wcd.hbmLogo, sizeof( bitmap ), &bitmap ) ) {
+						StretchBlt( hdc, 0, 0, rect.right - rect.left, rect.bottom - rect.top,
+							hdcBitmap, 0, 0, bitmap.bmWidth, bitmap.bmHeight, SRCCOPY );
+					}
+					SelectObject( hdcBitmap, oldObject );
+					DeleteDC( hdcBitmap );
+				}
+			} else {
+				FillRect( hdc, &rect, ( HBRUSH )GetStockObject( BLACK_BRUSH ) );
+			}
+
+			EndPaint( hWnd, &paint );
+			return 0;
+		}
 		break;
 	case WM_ERASEBKGND:
 #if 0
@@ -295,28 +417,14 @@ LONG WINAPI InputLineWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 void Sys_CreateConsole( void )
 {
 	HDC hDC;
-	WNDCLASS wc;
 	RECT rect;
-	const char *DEDCLASS = "Q3 WinConsole";
 	int nHeight;
 	int swidth, sheight;
 	int DEDSTYLE = WS_POPUPWINDOW | WS_CAPTION | WS_MINIMIZEBOX;
 
-	memset( &wc, 0, sizeof( wc ) );
-
-	wc.style         = 0;
-	wc.lpfnWndProc   = (WNDPROC) ConWndProc;
-	wc.cbClsExtra    = 0;
-	wc.cbWndExtra    = 0;
-	wc.hInstance     = g_wv.hInstance;
-	wc.hIcon         = LoadIcon( g_wv.hInstance, MAKEINTRESOURCE(IDI_ICON1));
-	wc.hCursor       = LoadCursor (NULL,IDC_ARROW);
-	wc.hbrBackground = (void *)COLOR_WINDOW;
-	wc.lpszMenuName  = 0;
-	wc.lpszClassName = DEDCLASS;
-
-	if ( !RegisterClass (&wc) )
+	if ( !Sys_RegisterConsoleWindowClass() ) {
 		return;
+	}
 
 	rect.left = 0;
 	rect.right = 540;
@@ -333,7 +441,7 @@ void Sys_CreateConsole( void )
 	s_wcd.windowHeight = rect.bottom - rect.top + 1;
 
 	s_wcd.hWnd = CreateWindowEx( 0,
-							   DEDCLASS,
+							   CONSOLE_WINDOW_CLASS,
 							   "Quake Live Console",
 							   DEDSTYLE,
 							   ( swidth - 600 ) / 2, ( sheight - 450 ) / 2 , rect.right - rect.left + 1, rect.bottom - rect.top + 1,
@@ -428,6 +536,70 @@ void Sys_CreateConsole( void )
 }
 
 /*
+** Sys_CreateLoadingWindow
+*/
+void Sys_CreateLoadingWindow( void )
+{
+	HDC		hDC;
+	RECT	rect;
+	int		swidth, sheight;
+
+	if ( !Sys_RegisterConsoleWindowClass() ) {
+		return;
+	}
+
+	rect.left = 0;
+	rect.right = LOADING_WINDOW_WIDTH;
+	rect.top = 0;
+	rect.bottom = LOADING_WINDOW_HEIGHT;
+	AdjustWindowRect( &rect, WS_POPUP, FALSE );
+
+	hDC = GetDC( GetDesktopWindow() );
+	swidth = GetDeviceCaps( hDC, HORZRES );
+	sheight = GetDeviceCaps( hDC, VERTRES );
+	ReleaseDC( GetDesktopWindow(), hDC );
+
+	s_wcd.hWndLoading = CreateWindowEx( 0,
+							   CONSOLE_WINDOW_CLASS,
+							   LOADING_WINDOW_TITLE,
+							   WS_POPUP,
+							   ( swidth - rect.right ) / 2, ( sheight - rect.bottom ) / 2,
+							   rect.right - rect.left, rect.bottom - rect.top,
+							   NULL,
+							   NULL,
+							   g_wv.hInstance,
+							   ( LPVOID )1 );
+
+	if ( !s_wcd.hWndLoading ) {
+		return;
+	}
+
+	ShowWindow( s_wcd.hWndLoading, SW_SHOWDEFAULT );
+	UpdateWindow( s_wcd.hWndLoading );
+	SetForegroundWindow( s_wcd.hWndLoading );
+}
+
+/*
+** Sys_DestroyLoadingWindow
+*/
+void Sys_DestroyLoadingWindow( void )
+{
+	if ( s_wcd.hWndLoading ) {
+		ShowWindow( s_wcd.hWndLoading, SW_HIDE );
+		CloseWindow( s_wcd.hWndLoading );
+		DestroyWindow( s_wcd.hWndLoading );
+		s_wcd.hWndLoading = 0;
+	}
+
+	if ( s_wcd.hbmLogo ) {
+		DeleteObject( s_wcd.hbmLogo );
+		s_wcd.hbmLogo = 0;
+	}
+
+	Sys_UnregisterConsoleWindowClass();
+}
+
+/*
 ** Sys_DestroyConsole
 */
 void Sys_DestroyConsole( void ) {
@@ -437,6 +609,8 @@ void Sys_DestroyConsole( void ) {
 		DestroyWindow( s_wcd.hWnd );
 		s_wcd.hWnd = 0;
 	}
+
+	Sys_UnregisterConsoleWindowClass();
 }
 
 /*

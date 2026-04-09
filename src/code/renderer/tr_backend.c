@@ -121,6 +121,12 @@ static void RB_ApplyColorCorrection( void );
 static image_t *RB_UploadBloomScratch( int scratchIndex, int width, int height );
 static void RB_DrawBloomSpread( float xOffset, float yOffset, int width, int height );
 void RB_SetGL2D( void );
+static void RBPP_Init( void );
+static void RBPP_Shutdown( void );
+static void RBPP_BindSceneRenderTarget( void );
+static void RBPP_ReleaseSceneRenderTarget( void );
+static void RBPP_ResetIfNeeded( void );
+static void RBPP_Submit( void );
 
 
 /*
@@ -131,15 +137,7 @@ Initialize framebuffer storage for post-process rendering.
 =============
 */
 void RB_InitRenderTargets( void ) {
-	Com_Memset( &s_sceneRenderTarget, 0, sizeof( s_sceneRenderTarget ) );
-
-	if ( !r_enablePostProcess || !r_enablePostProcess->integer ) {
-		return;
-	}
-
-	if ( !RB_CreateRenderTarget() ) {
-		ri.Printf( PRINT_WARNING, "WARNING: failed to create offscreen render target\n" );
-	}
+	RBPP_Init();
 }
 
 
@@ -151,7 +149,7 @@ Release framebuffer storage used for post-process rendering.
 =============
 */
 void RB_ShutdownRenderTargets( void ) {
-	RB_DestroyRenderTarget();
+	RBPP_Shutdown();
 }
 
 
@@ -305,17 +303,7 @@ Make the offscreen framebuffer active for scene rendering when post-processing i
 =============
 */
 static void RB_BindOffscreenRenderTarget( void ) {
-	if ( !RB_PostProcessEnabled() || !s_sceneRenderTarget.initialized || !s_sceneRenderTarget.loaded ) {
-		RB_ReleaseOffscreenRenderTarget();
-		return;
-	}
-
-	if ( s_sceneRenderTarget.bound ) {
-		return;
-	}
-
-	s_fboProcs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, s_sceneRenderTarget.framebuffer );
-	s_sceneRenderTarget.bound = qtrue;
+	RBPP_BindSceneRenderTarget();
 }
 
 
@@ -327,12 +315,7 @@ Restore rendering to the default framebuffer.
 =============
 */
 static void RB_ReleaseOffscreenRenderTarget( void ) {
-	if ( !s_sceneRenderTarget.bound || !s_sceneRenderTarget.loaded ) {
-		return;
-	}
-
-	s_fboProcs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, 0 );
-	s_sceneRenderTarget.bound = qfalse;
+	RBPP_ReleaseSceneRenderTarget();
 }
 
 /*
@@ -343,24 +326,7 @@ Rebuild post-process render targets when toggles change and clear the reset flag
 =============
 */
 static void RB_ResetPostProcessState( void ) {
-	if ( !backEnd.postProcessNeedsReset ) {
-		return;
-	}
-
-	if ( backEnd.postProcessActive ) {
-		RB_DestroyRenderTarget();
-
-		if ( !RB_CreateRenderTarget() ) {
-			backEnd.postProcessActive = qfalse;
-			backEnd.bloomActive = qfalse;
-			backEnd.colorCorrectActive = qfalse;
-			return;
-		}
-	} else {
-		RB_DestroyRenderTarget();
-	}
-
-	backEnd.postProcessNeedsReset = qfalse;
+	RBPP_ResetIfNeeded();
 }
 
 
@@ -386,73 +352,11 @@ static byte RB_ClampColorComponent( float value ) {
 =============
 RB_ApplyColorCorrection
 
-Apply a color-correction matrix to the current framebuffer contents.
+Legacy compatibility hook kept until the shader-backed post-process path fully retires the old helper family.
 =============
 */
 static void RB_ApplyColorCorrection( void ) {
-	int			width;
-	int			height;
-	image_t		*sceneImage;
-	byte			*pixelData;
-	int			pixelCount;
-	int			pixelIndex;
-	const float	*matrix;
-
-	if ( !backEnd.colorCorrectActive || !tr.colorCorrectReady ) {
-		return;
-	}
-
-	width = glConfig.vidWidth;
-	height = glConfig.vidHeight;
-	sceneImage = RB_UploadBloomScratch( 1, width, height );
-
-	GL_Bind( sceneImage );
-
-	pixelData = ri.Hunk_AllocateTempMemory( width * height * 4 );
-
-	qglGetTexImage( GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixelData );
-
-	matrix = tr.colorCorrectMatrix;
-	pixelCount = width * height;
-
-	for ( pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++ ) {
-		byte	*rgba;
-		float	r;
-		float	g;
-		float	b;
-		float	correctedR;
-		float	correctedG;
-		float	correctedB;
-
-		rgba = pixelData + ( pixelIndex * 4 );
-		r = rgba[0];
-		g = rgba[1];
-		b = rgba[2];
-
-		correctedR = ( matrix[0] * r ) + ( matrix[4] * g ) + ( matrix[8] * b ) + ( matrix[12] * 255.0f );
-		correctedG = ( matrix[1] * r ) + ( matrix[5] * g ) + ( matrix[9] * b ) + ( matrix[13] * 255.0f );
-		correctedB = ( matrix[2] * r ) + ( matrix[6] * g ) + ( matrix[10] * b ) + ( matrix[14] * 255.0f );
-
-		rgba[0] = RB_ClampColorComponent( correctedR );
-		rgba[1] = RB_ClampColorComponent( correctedG );
-		rgba[2] = RB_ClampColorComponent( correctedB );
-	}
-
-	qglTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixelData );
-
-	ri.Hunk_FreeTempMemory( pixelData );
-
-	qglDisable( GL_DEPTH_TEST );
-	qglDisable( GL_CULL_FACE );
-	qglDisable( GL_SCISSOR_TEST );
-
-	qglViewport( 0, 0, width, height );
-	RB_SetGL2D();
-
-	qglTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
-	qglColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
-
-	RB_DrawBloomSpread( 0.0f, 0.0f, width, height );
+	return;
 }
 /*
 =============
@@ -488,7 +392,7 @@ static image_t *RB_UploadBloomScratch( int scratchIndex, int width, int height )
 =============
 RB_ConfigureBloomStage
 
-Set texture environment to approximate Quake Live's bright-pass, saturation, and intensity controls.
+Set texture environment controls for the legacy scratch bloom stage.
 =============
 */
 static void RB_ConfigureBloomStage( float threshold, float saturation, float intensity ) {
@@ -530,7 +434,7 @@ static void RB_ConfigureBloomStage( float threshold, float saturation, float int
 =============
 RB_DrawBloomSpread
 
-Render a textured quad with offsets to approximate the separable blur used by Quake Live.
+Render a textured quad with offsets for the legacy scratch bloom stage.
 =============
 */
 static void RB_DrawBloomSpread( float xOffset, float yOffset, int width, int height ) {
@@ -596,73 +500,1481 @@ Run any post-process work gated by the current enable flags.
 =============
 */
 static void RB_SubmitPostProcess( void ) {
-	if ( !RB_PostProcessEnabled() ) {
+	RBPP_Submit();
+}
+
+#ifndef GL_TEXTURE_RECTANGLE_ARB
+#define GL_TEXTURE_RECTANGLE_ARB 0x84F5
+#endif
+
+#ifndef GL_MAX_RECTANGLE_TEXTURE_SIZE_ARB
+#define GL_MAX_RECTANGLE_TEXTURE_SIZE_ARB 0x84F8
+#endif
+
+#ifndef GL_FRAGMENT_SHADER_ARB
+#define GL_FRAGMENT_SHADER_ARB 0x8B30
+#endif
+
+#ifndef GL_VERTEX_SHADER_ARB
+#define GL_VERTEX_SHADER_ARB 0x8B31
+#endif
+
+#ifndef GL_OBJECT_COMPILE_STATUS_ARB
+#define GL_OBJECT_COMPILE_STATUS_ARB 0x8B81
+#endif
+
+#ifndef GL_OBJECT_LINK_STATUS_ARB
+#define GL_OBJECT_LINK_STATUS_ARB 0x8B82
+#endif
+
+#ifndef GL_OBJECT_INFO_LOG_LENGTH_ARB
+#define GL_OBJECT_INFO_LOG_LENGTH_ARB 0x8B84
+#endif
+
+#ifndef GL_STENCIL_ATTACHMENT_EXT
+#define GL_STENCIL_ATTACHMENT_EXT 0x8D20
+#endif
+
+#ifndef GL_DEPTH24_STENCIL8_EXT
+#define GL_DEPTH24_STENCIL8_EXT 0x88F0
+#endif
+
+#ifndef GLcharARB
+typedef char GLcharARB;
+#endif
+
+#ifndef GLhandleARB
+typedef unsigned int GLhandleARB;
+#endif
+
+#ifndef PFNGLCREATESHADEROBJECTARBPROC
+typedef GLhandleARB (APIENTRY * PFNGLCREATESHADEROBJECTARBPROC) (GLenum);
+typedef void (APIENTRY * PFNGLSHADERSOURCEARBPROC) (GLhandleARB, GLsizei, const GLcharARB **, const GLint *);
+typedef void (APIENTRY * PFNGLCOMPILESHADERARBPROC) (GLhandleARB);
+typedef void (APIENTRY * PFNGLGETOBJECTPARAMETERIVARBPROC) (GLhandleARB, GLenum, GLint *);
+typedef void (APIENTRY * PFNGLGETINFOLOGARBPROC) (GLhandleARB, GLsizei, GLsizei *, GLcharARB *);
+typedef void (APIENTRY * PFNGLDELETEOBJECTARBPROC) (GLhandleARB);
+typedef GLhandleARB (APIENTRY * PFNGLCREATEPROGRAMOBJECTARBPROC) (void);
+typedef void (APIENTRY * PFNGLATTACHOBJECTARBPROC) (GLhandleARB, GLhandleARB);
+typedef void (APIENTRY * PFNGLLINKPROGRAMARBPROC) (GLhandleARB);
+typedef void (APIENTRY * PFNGLUSEPROGRAMOBJECTARBPROC) (GLhandleARB);
+typedef GLint (APIENTRY * PFNGLGETUNIFORMLOCATIONARBPROC) (GLhandleARB, const GLcharARB *);
+typedef void (APIENTRY * PFNGLUNIFORM1IARBPROC) (GLint, GLint);
+typedef void (APIENTRY * PFNGLUNIFORM1FARBPROC) (GLint, GLfloat);
+#endif
+
+typedef struct {
+	PFNGLGENFRAMEBUFFERSEXTPROC qglGenFramebuffersEXTFunc;
+	PFNGLDELETEFRAMEBUFFERSEXTPROC qglDeleteFramebuffersEXTFunc;
+	PFNGLBINDFRAMEBUFFEREXTPROC qglBindFramebufferEXTFunc;
+	PFNGLFRAMEBUFFERTEXTURE2DEXTPROC qglFramebufferTexture2DEXTFunc;
+	PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC qglCheckFramebufferStatusEXTFunc;
+	PFNGLGENRENDERBUFFERSEXTPROC qglGenRenderbuffersEXTFunc;
+	PFNGLBINDRENDERBUFFEREXTPROC qglBindRenderbufferEXTFunc;
+	PFNGLRENDERBUFFERSTORAGEEXTPROC qglRenderbufferStorageEXTFunc;
+	PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC qglFramebufferRenderbufferEXTFunc;
+	PFNGLDELETERENDERBUFFERSEXTPROC qglDeleteRenderbuffersEXTFunc;
+	PFNGLCREATESHADEROBJECTARBPROC qglCreateShaderObjectARBFunc;
+	PFNGLSHADERSOURCEARBPROC qglShaderSourceARBFunc;
+	PFNGLCOMPILESHADERARBPROC qglCompileShaderARBFunc;
+	PFNGLGETOBJECTPARAMETERIVARBPROC qglGetObjectParameterivARBFunc;
+	PFNGLGETINFOLOGARBPROC qglGetInfoLogARBFunc;
+	PFNGLDELETEOBJECTARBPROC qglDeleteObjectARBFunc;
+	PFNGLCREATEPROGRAMOBJECTARBPROC qglCreateProgramObjectARBFunc;
+	PFNGLATTACHOBJECTARBPROC qglAttachObjectARBFunc;
+	PFNGLLINKPROGRAMARBPROC qglLinkProgramARBFunc;
+	PFNGLUSEPROGRAMOBJECTARBPROC qglUseProgramObjectARBFunc;
+	PFNGLGETUNIFORMLOCATIONARBPROC qglGetUniformLocationARBFunc;
+	PFNGLUNIFORM1IARBPROC qglUniform1iARBFunc;
+	PFNGLUNIFORM1FARBPROC qglUniform1fARBFunc;
+} ppProcs_t;
+
+typedef struct {
+	GLuint framebuffer;
+	GLuint texture;
+	GLuint depthBuffer;
+	int width;
+	int height;
+	qboolean initialized;
+} ppRenderTarget_t;
+
+typedef struct {
+	const char *name;
+	const char *fragmentPath;
+	const char *vertexPath;
+	GLhandleARB fragmentObject;
+	GLhandleARB vertexObject;
+	GLhandleARB programObject;
+	GLint backBufferTexUniform;
+	GLint bloomTexUniform;
+	GLint brightThresholdUniform;
+	GLint bloomSaturationUniform;
+	GLint bloomIntensityUniform;
+	GLint sceneIntensityUniform;
+	GLint sceneSaturationUniform;
+	GLint gammaRecipUniform;
+	GLint overbrightUniform;
+	GLint contrastUniform;
+	GLint blurStepUniform;
+	GLint blurFalloffUniform;
+} ppProgram_t;
+
+typedef struct {
+	ppProcs_t procs;
+	qboolean procsLoaded;
+	qboolean supported;
+	int maxRectangleTextureSize;
+	ppRenderTarget_t sceneTarget;
+	ppRenderTarget_t bloomBrightTarget;
+	ppRenderTarget_t bloomHalfTarget;
+	ppRenderTarget_t bloomPingTarget;
+	ppRenderTarget_t bloomPongTarget;
+	GLuint colorCorrectTexture;
+	int colorCorrectWidth;
+	int colorCorrectHeight;
+	ppProgram_t brightPassProgram;
+	ppProgram_t downsampleProgram;
+	ppProgram_t blurVerticalProgram;
+	ppProgram_t blurHorizontalProgram;
+	ppProgram_t combineProgram;
+	ppProgram_t colorCorrectProgram;
+} ppState_t;
+
+static const GLcharARB *s_postEffectVertexShaderSource =
+	"#extension GL_ARB_texture_rectangle : enable\n"
+	"void main(void)\n"
+	"{\n"
+	"	gl_Position = ftransform();\n"
+	"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
+	"	gl_TexCoord[1] = gl_MultiTexCoord1;\n"
+	"}\n";
+
+static const GLcharARB *s_brightPassFragmentShaderSource =
+	"#extension GL_ARB_texture_rectangle : enable\n"
+	"uniform sampler2DRect backBufferTex;\n"
+	"uniform float p_brightthreshold;\n"
+	"void main(void)\n"
+	"{\n"
+	"	vec3 color = texture2DRect(backBufferTex, gl_TexCoord[0].st).rgb;\n"
+	"	float brightness = max(max(color.r, color.g), color.b);\n"
+	"	float scale = max(brightness - p_brightthreshold, 0.0);\n"
+	"	if (brightness > 0.0)\n"
+	"	{\n"
+	"		scale /= brightness;\n"
+	"	}\n"
+	"	gl_FragColor = vec4(color * scale, 1.0);\n"
+	"}\n";
+
+static const GLcharARB *s_downsampleFragmentShaderSource =
+	"#extension GL_ARB_texture_rectangle : enable\n"
+	"uniform sampler2DRect backBufferTex;\n"
+	"void main(void)\n"
+	"{\n"
+	"	vec2 coord = gl_TexCoord[0].st;\n"
+	"	vec4 color = texture2DRect(backBufferTex, coord);\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(1.0, 0.0));\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(0.0, 1.0));\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(1.0, 1.0));\n"
+	"	gl_FragColor = color * 0.25;\n"
+	"}\n";
+
+static const GLcharARB *s_blurVerticalFragmentShaderSource =
+	"#extension GL_ARB_texture_rectangle : enable\n"
+	"uniform sampler2DRect backBufferTex;\n"
+	"uniform float p_blurStep;\n"
+	"uniform float p_blurFalloff;\n"
+	"void main(void)\n"
+	"{\n"
+	"	vec2 coord = gl_TexCoord[0].st;\n"
+	"	float stepSize = max(p_blurStep, 1.0);\n"
+	"	float falloff = clamp(p_blurFalloff, 0.0, 1.0);\n"
+	"	float centerWeight = 0.40 + (falloff * 0.20);\n"
+	"	float nearWeight = 0.22 * falloff;\n"
+	"	float midWeight = 0.10 * falloff;\n"
+	"	float farWeight = 0.04 * falloff;\n"
+	"	vec4 color = texture2DRect(backBufferTex, coord) * centerWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(0.0, stepSize)) * nearWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord - vec2(0.0, stepSize)) * nearWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(0.0, stepSize * 2.0)) * midWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord - vec2(0.0, stepSize * 2.0)) * midWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(0.0, stepSize * 3.0)) * farWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord - vec2(0.0, stepSize * 3.0)) * farWeight;\n"
+	"	gl_FragColor = color / (centerWeight + (2.0 * (nearWeight + midWeight + farWeight)));\n"
+	"}\n";
+
+static const GLcharARB *s_blurHorizontalFragmentShaderSource =
+	"#extension GL_ARB_texture_rectangle : enable\n"
+	"uniform sampler2DRect backBufferTex;\n"
+	"uniform float p_blurStep;\n"
+	"uniform float p_blurFalloff;\n"
+	"void main(void)\n"
+	"{\n"
+	"	vec2 coord = gl_TexCoord[0].st;\n"
+	"	float stepSize = max(p_blurStep, 1.0);\n"
+	"	float falloff = clamp(p_blurFalloff, 0.0, 1.0);\n"
+	"	float centerWeight = 0.40 + (falloff * 0.20);\n"
+	"	float nearWeight = 0.22 * falloff;\n"
+	"	float midWeight = 0.10 * falloff;\n"
+	"	float farWeight = 0.04 * falloff;\n"
+	"	vec4 color = texture2DRect(backBufferTex, coord) * centerWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(stepSize, 0.0)) * nearWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord - vec2(stepSize, 0.0)) * nearWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(stepSize * 2.0, 0.0)) * midWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord - vec2(stepSize * 2.0, 0.0)) * midWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord + vec2(stepSize * 3.0, 0.0)) * farWeight;\n"
+	"	color += texture2DRect(backBufferTex, coord - vec2(stepSize * 3.0, 0.0)) * farWeight;\n"
+	"	gl_FragColor = color / (centerWeight + (2.0 * (nearWeight + midWeight + farWeight)));\n"
+	"}\n";
+
+static const GLcharARB *s_combineFragmentShaderSource =
+	"#extension GL_ARB_texture_rectangle : enable\n"
+	"uniform sampler2DRect backBufferTex;\n"
+	"uniform sampler2DRect bloomTex;\n"
+	"uniform float p_bloomsaturation;\n"
+	"uniform float p_bloomintensity;\n"
+	"uniform float p_sceneintensity;\n"
+	"uniform float p_scenesaturation;\n"
+	"vec3 Saturate(vec3 color, float saturation)\n"
+	"{\n"
+	"	float grey = dot(color, vec3(0.2126, 0.7152, 0.0722));\n"
+	"	return mix(vec3(grey), color, saturation);\n"
+	"}\n"
+	"void main(void)\n"
+	"{\n"
+	"	vec3 sceneColor = texture2DRect(backBufferTex, gl_TexCoord[0].st).rgb;\n"
+	"	vec3 bloomColor = texture2DRect(bloomTex, gl_TexCoord[1].st).rgb;\n"
+	"	sceneColor = Saturate(sceneColor, p_scenesaturation) * p_sceneintensity;\n"
+	"	bloomColor = Saturate(bloomColor, p_bloomsaturation) * p_bloomintensity;\n"
+	"	gl_FragColor = vec4(clamp(sceneColor + bloomColor, 0.0, 1.0), 1.0);\n"
+	"}\n";
+
+static const GLcharARB *s_colorCorrectFragmentShaderSource =
+	"#extension GL_ARB_texture_rectangle : enable\n"
+	"uniform sampler2DRect backBufferTex;\n"
+	"uniform float p_gammaRecip;\n"
+	"uniform float p_overbright;\n"
+	"uniform float p_contrast;\n"
+	"void main(void)\n"
+	"{\n"
+	"	vec3 color = texture2DRect(backBufferTex, gl_TexCoord[0].st).rgb;\n"
+	"	color = pow(max(color, vec3(0.0)), vec3(p_gammaRecip));\n"
+	"	color *= (1.0 + p_overbright);\n"
+	"	color = ((color - 0.5) * max(p_contrast, 0.0)) + 0.5;\n"
+	"	gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);\n"
+	"}\n";
+
+static ppState_t s_postProcess;
+
+static qboolean RBPP_LoadProcs( void );
+static void RBPP_DestroyRenderTarget( ppRenderTarget_t *target );
+static qboolean RBPP_CreateRenderTarget( ppRenderTarget_t *target, int width, int height, qboolean linearFilter, qboolean withDepth );
+static void RBPP_BindRenderTarget( ppRenderTarget_t *target );
+static void RBPP_Set2DState( int width, int height );
+static void RBPP_BindRectangleTexture( int unit, GLuint texture );
+static void RBPP_DrawQuad( int width, int height, float s0Max, float t0Max, float s1Max, float t1Max );
+static const GLcharARB *RBPP_GetShaderSource( const char *sourcePath );
+static void RBPP_PrintInfoLog( GLhandleARB objectHandle );
+static qboolean RBPP_CompileShader( GLenum shaderType, const char *sourcePath, GLhandleARB *shaderObject );
+static void RBPP_DestroyProgram( ppProgram_t *program );
+static qboolean RBPP_LoadProgram( ppProgram_t *program, const char *name, const char *fragmentPath, const char *vertexPath );
+static qboolean RBPP_LoadBloomPrograms( void );
+static void RBPP_DestroyBloomPrograms( void );
+static qboolean RBPP_LoadColorCorrectProgram( void );
+static void RBPP_DestroyColorCorrectProgram( void );
+static qboolean RBPP_CreateColorCorrectTexture( void );
+static void RBPP_DestroyColorCorrectTexture( void );
+static qboolean RBPP_InitBloomResources( void );
+static void RBPP_ShutdownBloomResources( void );
+static qboolean RBPP_InitColorCorrectResources( void );
+static void RBPP_ShutdownColorCorrectResources( void );
+static void RBPP_MirrorState( void );
+static void RBPP_RebuildState( void );
+static void RBPP_BlitSceneTarget( void );
+static qboolean RBPP_ApplyBloom( void );
+static void RBPP_ApplyColorCorrectPass( void );
+
+/*
+=============
+RBPP_LoadProcs
+
+Load the rectangle-texture, framebuffer, and shader-object entry points used by the retail post-process pipeline.
+=============
+*/
+static qboolean RBPP_LoadProcs( void ) {
+	if ( s_postProcess.procsLoaded ) {
+		return s_postProcess.supported;
+	}
+
+	Com_Memset( &s_postProcess.procs, 0, sizeof( s_postProcess.procs ) );
+	s_postProcess.procsLoaded = qtrue;
+	s_postProcess.supported = qfalse;
+
+	if ( !glConfig.extensions_string ) {
+		return qfalse;
+	}
+
+	if ( !strstr( glConfig.extensions_string, "GL_EXT_framebuffer_object" ) ) {
+		return qfalse;
+	}
+
+	if ( !strstr( glConfig.extensions_string, "GL_ARB_texture_rectangle" ) ) {
+		return qfalse;
+	}
+
+	if ( !strstr( glConfig.extensions_string, "GL_ARB_shader_objects" ) ||
+		!strstr( glConfig.extensions_string, "GL_ARB_vertex_shader" ) ||
+		!strstr( glConfig.extensions_string, "GL_ARB_fragment_shader" ) ) {
+		return qfalse;
+	}
+
+	s_postProcess.procs.qglGenFramebuffersEXTFunc = (PFNGLGENFRAMEBUFFERSEXTPROC)RB_GetFramebufferProc( "glGenFramebuffersEXT" );
+	s_postProcess.procs.qglDeleteFramebuffersEXTFunc = (PFNGLDELETEFRAMEBUFFERSEXTPROC)RB_GetFramebufferProc( "glDeleteFramebuffersEXT" );
+	s_postProcess.procs.qglBindFramebufferEXTFunc = (PFNGLBINDFRAMEBUFFEREXTPROC)RB_GetFramebufferProc( "glBindFramebufferEXT" );
+	s_postProcess.procs.qglFramebufferTexture2DEXTFunc = (PFNGLFRAMEBUFFERTEXTURE2DEXTPROC)RB_GetFramebufferProc( "glFramebufferTexture2DEXT" );
+	s_postProcess.procs.qglCheckFramebufferStatusEXTFunc = (PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC)RB_GetFramebufferProc( "glCheckFramebufferStatusEXT" );
+	s_postProcess.procs.qglGenRenderbuffersEXTFunc = (PFNGLGENRENDERBUFFERSEXTPROC)RB_GetFramebufferProc( "glGenRenderbuffersEXT" );
+	s_postProcess.procs.qglBindRenderbufferEXTFunc = (PFNGLBINDRENDERBUFFEREXTPROC)RB_GetFramebufferProc( "glBindRenderbufferEXT" );
+	s_postProcess.procs.qglRenderbufferStorageEXTFunc = (PFNGLRENDERBUFFERSTORAGEEXTPROC)RB_GetFramebufferProc( "glRenderbufferStorageEXT" );
+	s_postProcess.procs.qglFramebufferRenderbufferEXTFunc = (PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC)RB_GetFramebufferProc( "glFramebufferRenderbufferEXT" );
+	s_postProcess.procs.qglDeleteRenderbuffersEXTFunc = (PFNGLDELETERENDERBUFFERSEXTPROC)RB_GetFramebufferProc( "glDeleteRenderbuffersEXT" );
+	s_postProcess.procs.qglCreateShaderObjectARBFunc = (PFNGLCREATESHADEROBJECTARBPROC)RB_GetFramebufferProc( "glCreateShaderObjectARB" );
+	s_postProcess.procs.qglShaderSourceARBFunc = (PFNGLSHADERSOURCEARBPROC)RB_GetFramebufferProc( "glShaderSourceARB" );
+	s_postProcess.procs.qglCompileShaderARBFunc = (PFNGLCOMPILESHADERARBPROC)RB_GetFramebufferProc( "glCompileShaderARB" );
+	s_postProcess.procs.qglGetObjectParameterivARBFunc = (PFNGLGETOBJECTPARAMETERIVARBPROC)RB_GetFramebufferProc( "glGetObjectParameterivARB" );
+	s_postProcess.procs.qglGetInfoLogARBFunc = (PFNGLGETINFOLOGARBPROC)RB_GetFramebufferProc( "glGetInfoLogARB" );
+	s_postProcess.procs.qglDeleteObjectARBFunc = (PFNGLDELETEOBJECTARBPROC)RB_GetFramebufferProc( "glDeleteObjectARB" );
+	s_postProcess.procs.qglCreateProgramObjectARBFunc = (PFNGLCREATEPROGRAMOBJECTARBPROC)RB_GetFramebufferProc( "glCreateProgramObjectARB" );
+	s_postProcess.procs.qglAttachObjectARBFunc = (PFNGLATTACHOBJECTARBPROC)RB_GetFramebufferProc( "glAttachObjectARB" );
+	s_postProcess.procs.qglLinkProgramARBFunc = (PFNGLLINKPROGRAMARBPROC)RB_GetFramebufferProc( "glLinkProgramARB" );
+	s_postProcess.procs.qglUseProgramObjectARBFunc = (PFNGLUSEPROGRAMOBJECTARBPROC)RB_GetFramebufferProc( "glUseProgramObjectARB" );
+	s_postProcess.procs.qglGetUniformLocationARBFunc = (PFNGLGETUNIFORMLOCATIONARBPROC)RB_GetFramebufferProc( "glGetUniformLocationARB" );
+	s_postProcess.procs.qglUniform1iARBFunc = (PFNGLUNIFORM1IARBPROC)RB_GetFramebufferProc( "glUniform1iARB" );
+	s_postProcess.procs.qglUniform1fARBFunc = (PFNGLUNIFORM1FARBPROC)RB_GetFramebufferProc( "glUniform1fARB" );
+
+	if ( !s_postProcess.procs.qglGenFramebuffersEXTFunc || !s_postProcess.procs.qglDeleteFramebuffersEXTFunc ||
+		!s_postProcess.procs.qglBindFramebufferEXTFunc || !s_postProcess.procs.qglFramebufferTexture2DEXTFunc ||
+		!s_postProcess.procs.qglCheckFramebufferStatusEXTFunc || !s_postProcess.procs.qglGenRenderbuffersEXTFunc ||
+		!s_postProcess.procs.qglBindRenderbufferEXTFunc || !s_postProcess.procs.qglRenderbufferStorageEXTFunc ||
+		!s_postProcess.procs.qglFramebufferRenderbufferEXTFunc || !s_postProcess.procs.qglDeleteRenderbuffersEXTFunc ||
+		!s_postProcess.procs.qglCreateShaderObjectARBFunc || !s_postProcess.procs.qglShaderSourceARBFunc ||
+		!s_postProcess.procs.qglCompileShaderARBFunc || !s_postProcess.procs.qglGetObjectParameterivARBFunc ||
+		!s_postProcess.procs.qglGetInfoLogARBFunc || !s_postProcess.procs.qglDeleteObjectARBFunc ||
+		!s_postProcess.procs.qglCreateProgramObjectARBFunc || !s_postProcess.procs.qglAttachObjectARBFunc ||
+		!s_postProcess.procs.qglLinkProgramARBFunc || !s_postProcess.procs.qglUseProgramObjectARBFunc ||
+		!s_postProcess.procs.qglGetUniformLocationARBFunc || !s_postProcess.procs.qglUniform1iARBFunc ||
+		!s_postProcess.procs.qglUniform1fARBFunc ) {
+		return qfalse;
+	}
+
+	qglGetIntegerv( GL_MAX_RECTANGLE_TEXTURE_SIZE_ARB, &s_postProcess.maxRectangleTextureSize );
+	if ( s_postProcess.maxRectangleTextureSize <= 0 ) {
+		return qfalse;
+	}
+
+	s_postProcess.supported = qtrue;
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_DestroyRenderTarget
+
+Release one rectangle-texture render target and any attached depth-stencil storage.
+=============
+*/
+static void RBPP_DestroyRenderTarget( ppRenderTarget_t *target ) {
+	if ( !target ) {
 		return;
 	}
 
-	RB_ResetPostProcessState();
+	if ( target->framebuffer && s_postProcess.procs.qglDeleteFramebuffersEXTFunc ) {
+		s_postProcess.procs.qglDeleteFramebuffersEXTFunc( 1, &target->framebuffer );
+	}
 
-	if ( backEnd.bloomActive && r_bloomIntensity && r_bloomBrightThreshold && r_bloomPasses ) {
-		int		width, height;
-		int		passes;
-		float	bloomIntensity;
-		float	brightThreshold;
-		float	blurScale;
-		int		blurRadius;
-		float	bloomSaturation;
-		float	sceneIntensity;
-		float	sceneSaturation;
-		image_t	*sceneImage;
+	if ( target->depthBuffer && s_postProcess.procs.qglDeleteRenderbuffersEXTFunc ) {
+		s_postProcess.procs.qglDeleteRenderbuffersEXTFunc( 1, &target->depthBuffer );
+	}
 
-		width = glConfig.vidWidth;
-		height = glConfig.vidHeight;
+	if ( target->texture ) {
+		qglDeleteTextures( 1, &target->texture );
+	}
 
-		brightThreshold = r_bloomBrightThreshold->value;
-		bloomIntensity = r_bloomIntensity->value;
-		passes = r_bloomPasses->integer;
-		blurScale = ( r_bloomBlurScale && r_bloomBlurScale->value > 0.0f ) ? r_bloomBlurScale->value : 1.0f;
-		blurRadius = ( r_bloomBlurRadius && r_bloomBlurRadius->integer > 0 ) ? r_bloomBlurRadius->integer : 1;
-		bloomSaturation = ( r_bloomSaturation ? r_bloomSaturation->value : 1.0f );
-		sceneIntensity = ( r_bloomSceneIntensity ? r_bloomSceneIntensity->value : 1.0f );
-		sceneSaturation = ( r_bloomSceneSaturation ? r_bloomSceneSaturation->value : 1.0f );
+	Com_Memset( target, 0, sizeof( *target ) );
+}
 
-		if ( passes < 1 ) {
-			passes = 1;
-		} else if ( passes > 2 ) {
-			passes = 2;
+
+/*
+=============
+RBPP_CreateRenderTarget
+
+Allocate one retail-style rectangle-texture render target and optional depth-stencil attachment.
+=============
+*/
+static qboolean RBPP_CreateRenderTarget( ppRenderTarget_t *target, int width, int height, qboolean linearFilter, qboolean withDepth ) {
+	GLenum status;
+	GLenum errorCode;
+
+	if ( !target || width <= 0 || height <= 0 || !RBPP_LoadProcs() ) {
+		return qfalse;
+	}
+
+	if ( width > s_postProcess.maxRectangleTextureSize || height > s_postProcess.maxRectangleTextureSize ) {
+		return qfalse;
+	}
+
+	RBPP_DestroyRenderTarget( target );
+	target->width = width;
+	target->height = height;
+
+	s_postProcess.procs.qglGenFramebuffersEXTFunc( 1, &target->framebuffer );
+	qglGenTextures( 1, &target->texture );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, target->texture );
+	qglTexParameteri( GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	qglTexParameteri( GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	qglTexParameteri( GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, linearFilter ? GL_LINEAR : GL_NEAREST );
+	qglTexParameteri( GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, linearFilter ? GL_LINEAR : GL_NEAREST );
+	qglTexImage2D( GL_TEXTURE_RECTANGLE_ARB, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
+
+	errorCode = qglGetError();
+	if ( errorCode != GL_NO_ERROR ) {
+		RBPP_DestroyRenderTarget( target );
+		return qfalse;
+	}
+
+	s_postProcess.procs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, target->framebuffer );
+	s_postProcess.procs.qglFramebufferTexture2DEXTFunc( GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, target->texture, 0 );
+
+	if ( withDepth ) {
+		s_postProcess.procs.qglGenRenderbuffersEXTFunc( 1, &target->depthBuffer );
+		s_postProcess.procs.qglBindRenderbufferEXTFunc( GL_RENDERBUFFER_EXT, target->depthBuffer );
+		s_postProcess.procs.qglRenderbufferStorageEXTFunc( GL_RENDERBUFFER_EXT, GL_DEPTH24_STENCIL8_EXT, width, height );
+		s_postProcess.procs.qglFramebufferRenderbufferEXTFunc( GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, target->depthBuffer );
+		s_postProcess.procs.qglFramebufferRenderbufferEXTFunc( GL_FRAMEBUFFER_EXT, GL_STENCIL_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, target->depthBuffer );
+	}
+
+	status = s_postProcess.procs.qglCheckFramebufferStatusEXTFunc( GL_FRAMEBUFFER_EXT );
+	s_postProcess.procs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, 0 );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+
+	if ( status != GL_FRAMEBUFFER_COMPLETE_EXT ) {
+		ri.Printf( PRINT_WARNING, "Post Process Failure - unable to create FBO : %d (%x)\n", status, status );
+		RBPP_DestroyRenderTarget( target );
+		return qfalse;
+	}
+
+	target->initialized = qtrue;
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_BindRenderTarget
+
+Bind one post-process framebuffer for the next rectangle-texture draw.
+=============
+*/
+static void RBPP_BindRenderTarget( ppRenderTarget_t *target ) {
+	if ( !target || !target->initialized || !s_postProcess.procs.qglBindFramebufferEXTFunc ) {
+		return;
+	}
+
+	s_postProcess.procs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, target->framebuffer );
+}
+
+
+/*
+=============
+RBPP_Set2DState
+
+Set the 2D state block used by the shader-backed rectangle-texture passes.
+=============
+*/
+static void RBPP_Set2DState( int width, int height ) {
+	qglDisable( GL_DEPTH_TEST );
+	qglDisable( GL_CULL_FACE );
+	qglDisable( GL_SCISSOR_TEST );
+	qglDisable( GL_BLEND );
+	qglViewport( 0, 0, width, height );
+	RB_SetGL2D();
+	qglColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	qglTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
+}
+
+
+/*
+=============
+RBPP_BindRectangleTexture
+
+Bind one rectangle-texture source on the requested multitexture unit.
+=============
+*/
+static void RBPP_BindRectangleTexture( int unit, GLuint texture ) {
+	if ( qglActiveTextureARB ) {
+		qglActiveTextureARB( GL_TEXTURE0_ARB + unit );
+	}
+
+	qglDisable( GL_TEXTURE_2D );
+	qglEnable( GL_TEXTURE_RECTANGLE_ARB );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, texture );
+}
+
+
+/*
+=============
+RBPP_DrawQuad
+
+Draw a fullscreen quad with explicit rectangle-texture coordinates for both multitexture units.
+=============
+*/
+static void RBPP_DrawQuad( int width, int height, float s0Max, float t0Max, float s1Max, float t1Max ) {
+	qglBegin( GL_QUADS );
+
+	if ( qglMultiTexCoord2fARB ) {
+		qglMultiTexCoord2fARB( GL_TEXTURE0_ARB, 0.0f, 0.0f );
+		qglMultiTexCoord2fARB( GL_TEXTURE1_ARB, 0.0f, 0.0f );
+	}
+	qglTexCoord2f( 0.0f, 0.0f );
+	qglVertex2f( 0.0f, 0.0f );
+
+	if ( qglMultiTexCoord2fARB ) {
+		qglMultiTexCoord2fARB( GL_TEXTURE0_ARB, s0Max, 0.0f );
+		qglMultiTexCoord2fARB( GL_TEXTURE1_ARB, s1Max, 0.0f );
+	}
+	qglTexCoord2f( s0Max, 0.0f );
+	qglVertex2f( width, 0.0f );
+
+	if ( qglMultiTexCoord2fARB ) {
+		qglMultiTexCoord2fARB( GL_TEXTURE0_ARB, s0Max, t0Max );
+		qglMultiTexCoord2fARB( GL_TEXTURE1_ARB, s1Max, t1Max );
+	}
+	qglTexCoord2f( s0Max, t0Max );
+	qglVertex2f( width, height );
+
+	if ( qglMultiTexCoord2fARB ) {
+		qglMultiTexCoord2fARB( GL_TEXTURE0_ARB, 0.0f, t0Max );
+		qglMultiTexCoord2fARB( GL_TEXTURE1_ARB, 0.0f, t1Max );
+	}
+	qglTexCoord2f( 0.0f, t0Max );
+	qglVertex2f( 0.0f, height );
+
+	qglEnd();
+}
+
+
+/*
+=============
+RBPP_GetShaderSource
+
+Return the embedded GLSL source that corresponds to the recovered retail script path.
+=============
+*/
+static const GLcharARB *RBPP_GetShaderSource( const char *sourcePath ) {
+	if ( !sourcePath ) {
+		return NULL;
+	}
+
+	if ( !Q_stricmp( sourcePath, "scripts/posteffect.vs" ) ) {
+		return s_postEffectVertexShaderSource;
+	}
+
+	if ( !Q_stricmp( sourcePath, "scripts/brightpass.fs" ) ) {
+		return s_brightPassFragmentShaderSource;
+	}
+
+	if ( !Q_stricmp( sourcePath, "scripts/downsample1.fs" ) ) {
+		return s_downsampleFragmentShaderSource;
+	}
+
+	if ( !Q_stricmp( sourcePath, "scripts/blurvertical.fs" ) ) {
+		return s_blurVerticalFragmentShaderSource;
+	}
+
+	if ( !Q_stricmp( sourcePath, "scripts/blurhoriz.fs" ) ) {
+		return s_blurHorizontalFragmentShaderSource;
+	}
+
+	if ( !Q_stricmp( sourcePath, "scripts/combine.fs" ) ) {
+		return s_combineFragmentShaderSource;
+	}
+
+	if ( !Q_stricmp( sourcePath, "scripts/colorcorrect.fs" ) ) {
+		return s_colorCorrectFragmentShaderSource;
+	}
+
+	return NULL;
+}
+
+
+/*
+=============
+RBPP_PrintInfoLog
+
+Emit the GL info log for one shader or program object.
+=============
+*/
+static void RBPP_PrintInfoLog( GLhandleARB objectHandle ) {
+	GLint logLength;
+	GLsizei actualLength;
+	char *logBuffer;
+
+	if ( !objectHandle ) {
+		return;
+	}
+
+	logLength = 0;
+	s_postProcess.procs.qglGetObjectParameterivARBFunc( objectHandle, GL_OBJECT_INFO_LOG_LENGTH_ARB, &logLength );
+	if ( logLength <= 1 ) {
+		return;
+	}
+
+	logBuffer = ri.Hunk_AllocateTempMemory( logLength );
+	if ( !logBuffer ) {
+		return;
+	}
+
+	actualLength = 0;
+	s_postProcess.procs.qglGetInfoLogARBFunc( objectHandle, logLength, &actualLength, logBuffer );
+	if ( actualLength > 0 ) {
+		ri.Printf( PRINT_WARNING, "%s", logBuffer );
+	}
+
+	ri.Hunk_FreeTempMemory( logBuffer );
+}
+
+
+/*
+=============
+RBPP_CompileShader
+
+Compile one embedded post-process shader and emit the recovered retail failure strings on error.
+=============
+*/
+static qboolean RBPP_CompileShader( GLenum shaderType, const char *sourcePath, GLhandleARB *shaderObject ) {
+	const GLcharARB *shaderSource;
+	GLint compileStatus;
+
+	if ( shaderObject ) {
+		*shaderObject = 0;
+	}
+
+	shaderSource = RBPP_GetShaderSource( sourcePath );
+	if ( !shaderSource ) {
+		if ( shaderType == GL_FRAGMENT_SHADER_ARB ) {
+			ri.Printf( PRINT_WARNING, "Unable to load post effect fragment shader source: %s\n", sourcePath );
+		} else {
+			ri.Printf( PRINT_WARNING, "Unable to load post effect vertex shader source: %s\n", sourcePath );
 		}
+		return qfalse;
+	}
 
-		qglDisable( GL_DEPTH_TEST );
-		qglDisable( GL_CULL_FACE );
-		qglDisable( GL_SCISSOR_TEST );
+	if ( !shaderObject ) {
+		return qfalse;
+	}
 
-		qglViewport( 0, 0, width, height );
-		RB_SetGL2D();
+	*shaderObject = s_postProcess.procs.qglCreateShaderObjectARBFunc( shaderType );
+	s_postProcess.procs.qglShaderSourceARBFunc( *shaderObject, 1, &shaderSource, NULL );
+	s_postProcess.procs.qglCompileShaderARBFunc( *shaderObject );
 
-		sceneImage = RB_UploadBloomScratch( 0, width, height );
-		GL_Bind( sceneImage );
-
-		qglTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
-		qglColor4f( sceneIntensity, sceneIntensity, sceneIntensity, 1.0f );
-		RB_DrawBloomSpread( 0.0f, 0.0f, width, height );
-
-		qglTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE );
-		qglTexEnvi( GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE );
-		qglTexEnvi( GL_TEXTURE_ENV, GL_SOURCE0_RGB, GL_TEXTURE );
-		qglTexEnvi( GL_TEXTURE_ENV, GL_SOURCE1_RGB, GL_PRIMARY_COLOR );
-		qglColor4f( sceneSaturation, sceneSaturation, sceneSaturation, 1.0f );
-		RB_DrawBloomSpread( 0.0f, 0.0f, width, height );
-
-		while ( passes-- ) {
-			RB_DrawBloomPass( width, height, blurRadius, blurScale, bloomSaturation, bloomIntensity, brightThreshold );
+	compileStatus = 0;
+	s_postProcess.procs.qglGetObjectParameterivARBFunc( *shaderObject, GL_OBJECT_COMPILE_STATUS_ARB, &compileStatus );
+	if ( !compileStatus ) {
+		if ( shaderType == GL_FRAGMENT_SHADER_ARB ) {
+			ri.Printf( PRINT_WARNING, "Compilation of post effect fragment shader (%s) failed. Shader log follows:\n\n", sourcePath );
+		} else {
+			ri.Printf( PRINT_WARNING, "Compilation of post effect vertex shader (%s) failed. Shader log follows:\n\n", sourcePath );
 		}
+		RBPP_PrintInfoLog( *shaderObject );
+		ri.Printf( PRINT_WARNING, "\nPost effects disabled.\n" );
+		s_postProcess.procs.qglDeleteObjectARBFunc( *shaderObject );
+		*shaderObject = 0;
+		return qfalse;
+	}
 
-		qglDisable( GL_BLEND );
-		qglTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_DestroyProgram
+
+Release the fragment shader, vertex shader, and linked program backing one post effect.
+=============
+*/
+static void RBPP_DestroyProgram( ppProgram_t *program ) {
+	if ( !program ) {
+		return;
+	}
+
+	if ( program->programObject && s_postProcess.procs.qglDeleteObjectARBFunc ) {
+		s_postProcess.procs.qglDeleteObjectARBFunc( program->programObject );
+	}
+
+	if ( program->fragmentObject && s_postProcess.procs.qglDeleteObjectARBFunc ) {
+		s_postProcess.procs.qglDeleteObjectARBFunc( program->fragmentObject );
+	}
+
+	if ( program->vertexObject && s_postProcess.procs.qglDeleteObjectARBFunc ) {
+		s_postProcess.procs.qglDeleteObjectARBFunc( program->vertexObject );
+	}
+
+	Com_Memset( program, 0, sizeof( *program ) );
+}
+
+
+/*
+=============
+RBPP_LoadProgram
+
+Compile and link one recovered retail post effect program pair.
+=============
+*/
+static qboolean RBPP_LoadProgram( ppProgram_t *program, const char *name, const char *fragmentPath, const char *vertexPath ) {
+	GLint linkStatus;
+
+	if ( !program || !RBPP_LoadProcs() ) {
+		return qfalse;
+	}
+
+	Com_Memset( program, 0, sizeof( *program ) );
+	program->name = name;
+	program->fragmentPath = fragmentPath;
+	program->vertexPath = vertexPath;
+	program->backBufferTexUniform = -1;
+	program->bloomTexUniform = -1;
+	program->brightThresholdUniform = -1;
+	program->bloomSaturationUniform = -1;
+	program->bloomIntensityUniform = -1;
+	program->sceneIntensityUniform = -1;
+	program->sceneSaturationUniform = -1;
+	program->gammaRecipUniform = -1;
+	program->overbrightUniform = -1;
+	program->contrastUniform = -1;
+	program->blurStepUniform = -1;
+	program->blurFalloffUniform = -1;
+
+	if ( !RBPP_CompileShader( GL_FRAGMENT_SHADER_ARB, fragmentPath, &program->fragmentObject ) ||
+		!RBPP_CompileShader( GL_VERTEX_SHADER_ARB, vertexPath, &program->vertexObject ) ) {
+		RBPP_DestroyProgram( program );
+		return qfalse;
+	}
+
+	program->programObject = s_postProcess.procs.qglCreateProgramObjectARBFunc();
+	s_postProcess.procs.qglAttachObjectARBFunc( program->programObject, program->fragmentObject );
+	s_postProcess.procs.qglAttachObjectARBFunc( program->programObject, program->vertexObject );
+	s_postProcess.procs.qglLinkProgramARBFunc( program->programObject );
+
+	linkStatus = 0;
+	s_postProcess.procs.qglGetObjectParameterivARBFunc( program->programObject, GL_OBJECT_LINK_STATUS_ARB, &linkStatus );
+	if ( !linkStatus ) {
+		RBPP_PrintInfoLog( program->programObject );
+		ri.Printf( PRINT_WARNING, "\nPost effects disabled.\n" );
+		RBPP_DestroyProgram( program );
+		return qfalse;
+	}
+
+	s_postProcess.procs.qglUseProgramObjectARBFunc( program->programObject );
+	program->backBufferTexUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "backBufferTex" );
+	program->bloomTexUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "bloomTex" );
+	program->brightThresholdUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_brightthreshold" );
+	program->bloomSaturationUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_bloomsaturation" );
+	program->bloomIntensityUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_bloomintensity" );
+	program->sceneIntensityUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_sceneintensity" );
+	program->sceneSaturationUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_scenesaturation" );
+	program->gammaRecipUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_gammaRecip" );
+	program->overbrightUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_overbright" );
+	program->contrastUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_contrast" );
+	program->blurStepUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_blurStep" );
+	program->blurFalloffUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_blurFalloff" );
+
+	if ( program->backBufferTexUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1iARBFunc( program->backBufferTexUniform, 0 );
+	}
+
+	if ( program->bloomTexUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1iARBFunc( program->bloomTexUniform, 1 );
+	}
+
+	s_postProcess.procs.qglUseProgramObjectARBFunc( 0 );
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_LoadBloomPrograms
+
+Compile the recovered bloom program family.
+=============
+*/
+static qboolean RBPP_LoadBloomPrograms( void ) {
+	if ( !RBPP_LoadProgram( &s_postProcess.brightPassProgram, "brightpass", "scripts/brightpass.fs", "scripts/posteffect.vs" ) ) {
+		return qfalse;
+	}
+
+	if ( !RBPP_LoadProgram( &s_postProcess.downsampleProgram, "downsample", "scripts/downsample1.fs", "scripts/posteffect.vs" ) ) {
+		return qfalse;
+	}
+
+	if ( !RBPP_LoadProgram( &s_postProcess.blurVerticalProgram, "blurvertical", "scripts/blurvertical.fs", "scripts/posteffect.vs" ) ) {
+		return qfalse;
+	}
+
+	if ( !RBPP_LoadProgram( &s_postProcess.blurHorizontalProgram, "blurhoriz", "scripts/blurhoriz.fs", "scripts/posteffect.vs" ) ) {
+		return qfalse;
+	}
+
+	if ( !RBPP_LoadProgram( &s_postProcess.combineProgram, "combine", "scripts/combine.fs", "scripts/posteffect.vs" ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_DestroyBloomPrograms
+
+Release every bloom shader program.
+=============
+*/
+static void RBPP_DestroyBloomPrograms( void ) {
+	RBPP_DestroyProgram( &s_postProcess.combineProgram );
+	RBPP_DestroyProgram( &s_postProcess.blurHorizontalProgram );
+	RBPP_DestroyProgram( &s_postProcess.blurVerticalProgram );
+	RBPP_DestroyProgram( &s_postProcess.downsampleProgram );
+	RBPP_DestroyProgram( &s_postProcess.brightPassProgram );
+}
+
+
+/*
+=============
+RBPP_LoadColorCorrectProgram
+
+Compile the recovered retail color-correct program pair.
+=============
+*/
+static qboolean RBPP_LoadColorCorrectProgram( void ) {
+	return RBPP_LoadProgram( &s_postProcess.colorCorrectProgram, "colorCorrect", "scripts/colorcorrect.fs", "scripts/posteffect.vs" );
+}
+
+
+/*
+=============
+RBPP_DestroyColorCorrectProgram
+
+Release the linked retail color-correct program.
+=============
+*/
+static void RBPP_DestroyColorCorrectProgram( void ) {
+	RBPP_DestroyProgram( &s_postProcess.colorCorrectProgram );
+}
+
+
+/*
+=============
+RBPP_CreateColorCorrectTexture
+
+Allocate the retail color-correct rectangle texture that caches the final backbuffer copy.
+=============
+*/
+static qboolean RBPP_CreateColorCorrectTexture( void ) {
+	GLenum errorCode;
+	int width;
+	int height;
+
+	RBPP_DestroyColorCorrectTexture();
+
+	if ( !RBPP_LoadProcs() ) {
+		return qfalse;
+	}
+
+	width = glConfig.vidWidth;
+	height = glConfig.vidHeight;
+	if ( width > s_postProcess.maxRectangleTextureSize || height > s_postProcess.maxRectangleTextureSize ) {
+		ri.Printf( PRINT_WARNING, "Color Correct Failure - unable to create backbuffer texture. Color Correct effect disabled\n" );
+		return qfalse;
+	}
+
+	qglGenTextures( 1, &s_postProcess.colorCorrectTexture );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, s_postProcess.colorCorrectTexture );
+	qglTexParameteri( GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	qglTexParameteri( GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	qglTexParameteri( GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+	qglTexParameteri( GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+	qglTexImage2D( GL_TEXTURE_RECTANGLE_ARB, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+
+	errorCode = qglGetError();
+	if ( errorCode != GL_NO_ERROR ) {
+		ri.Printf( PRINT_WARNING, "Color Correct Failure - unable to create backbuffer texture. Color Correct effect disabled\n" );
+		RBPP_DestroyColorCorrectTexture();
+		return qfalse;
+	}
+
+	s_postProcess.colorCorrectWidth = width;
+	s_postProcess.colorCorrectHeight = height;
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_DestroyColorCorrectTexture
+
+Release the cached color-correct rectangle texture.
+=============
+*/
+static void RBPP_DestroyColorCorrectTexture( void ) {
+	if ( s_postProcess.colorCorrectTexture ) {
+		qglDeleteTextures( 1, &s_postProcess.colorCorrectTexture );
+	}
+
+	s_postProcess.colorCorrectTexture = 0;
+	s_postProcess.colorCorrectWidth = 0;
+	s_postProcess.colorCorrectHeight = 0;
+}
+
+
+/*
+=============
+RBPP_InitBloomResources
+
+Allocate the bloom render-target chain and compile the recovered bloom programs.
+=============
+*/
+static qboolean RBPP_InitBloomResources( void ) {
+	int width;
+	int height;
+	int halfWidth;
+	int halfHeight;
+	int quarterWidth;
+	int quarterHeight;
+
+	width = glConfig.vidWidth;
+	height = glConfig.vidHeight;
+	if ( width > s_postProcess.maxRectangleTextureSize || height > s_postProcess.maxRectangleTextureSize ) {
+		ri.Printf( PRINT_WARNING, "Bloom Failure - unable to create backbuffer texture. Bloom effect disabled\n" );
+		return qfalse;
+	}
+
+	halfWidth = width >> 1;
+	halfHeight = height >> 1;
+	if ( halfWidth < 1 ) {
+		halfWidth = 1;
+	}
+
+	if ( halfHeight < 1 ) {
+		halfHeight = 1;
+	}
+
+	quarterWidth = width >> 2;
+	quarterHeight = height >> 2;
+	if ( quarterWidth < 1 ) {
+		quarterWidth = 1;
+	}
+
+	if ( quarterHeight < 1 ) {
+		quarterHeight = 1;
+	}
+
+	if ( !RBPP_CreateRenderTarget( &s_postProcess.bloomBrightTarget, width, height, qfalse, qfalse ) ||
+		!RBPP_CreateRenderTarget( &s_postProcess.bloomHalfTarget, halfWidth, halfHeight, qtrue, qfalse ) ||
+		!RBPP_CreateRenderTarget( &s_postProcess.bloomPingTarget, quarterWidth, quarterHeight, qtrue, qfalse ) ||
+		!RBPP_CreateRenderTarget( &s_postProcess.bloomPongTarget, quarterWidth, quarterHeight, qtrue, qfalse ) ) {
+		ri.Printf( PRINT_WARNING, "Bloom Failure - unable to create FBO. Bloom effect disabled\n" );
+		RBPP_ShutdownBloomResources();
+		return qfalse;
+	}
+
+	if ( !RBPP_LoadBloomPrograms() ) {
+		RBPP_ShutdownBloomResources();
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_ShutdownBloomResources
+
+Release the bloom targets and shader programs.
+=============
+*/
+static void RBPP_ShutdownBloomResources( void ) {
+	RBPP_DestroyBloomPrograms();
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomPongTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomPingTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomHalfTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomBrightTarget );
+}
+
+
+/*
+=============
+RBPP_InitColorCorrectResources
+
+Allocate the retail color-correct texture and load its shader program.
+=============
+*/
+static qboolean RBPP_InitColorCorrectResources( void ) {
+	if ( !RBPP_LoadColorCorrectProgram() ) {
+		RBPP_ShutdownColorCorrectResources();
+		return qfalse;
+	}
+
+	if ( !RBPP_CreateColorCorrectTexture() ) {
+		RBPP_ShutdownColorCorrectResources();
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_ShutdownColorCorrectResources
+
+Release the retail color-correct texture and linked shader program.
+=============
+*/
+static void RBPP_ShutdownColorCorrectResources( void ) {
+	RBPP_DestroyColorCorrectTexture();
+	RBPP_DestroyColorCorrectProgram();
+}
+
+
+/*
+=============
+RBPP_MirrorState
+
+Publish the backend-validated post-process active flags back to the renderer globals and ROM mirrors.
+=============
+*/
+static void RBPP_MirrorState( void ) {
+	tr.postProcessActive = backEnd.postProcessActive;
+	tr.bloomActive = backEnd.bloomActive;
+	tr.colorCorrectActive = backEnd.colorCorrectActive;
+
+	if ( r_postProcessActive ) {
+		ri.Cvar_Set( "r_postProcessActive", backEnd.postProcessActive ? "1" : "0" );
+	}
+
+	if ( r_bloomActive ) {
+		ri.Cvar_Set( "r_bloomActive", backEnd.bloomActive ? "1" : "0" );
+	}
+
+	if ( r_colorCorrectActive ) {
+		ri.Cvar_Set( "r_colorCorrectActive", backEnd.colorCorrectActive ? "1" : "0" );
+	}
+}
+
+
+/*
+=============
+RBPP_RebuildState
+
+Evaluate the post-process enable cvars, rebuild the retail resource/program set, and update the active mirrors.
+=============
+*/
+static void RBPP_RebuildState( void ) {
+	qboolean wantPostProcess;
+	qboolean wantBloom;
+	qboolean wantColorCorrect;
+
+	RBPP_ShutdownColorCorrectResources();
+	RBPP_ShutdownBloomResources();
+	RBPP_DestroyRenderTarget( &s_postProcess.sceneTarget );
+
+	backEnd.postProcessActive = qfalse;
+	backEnd.bloomActive = qfalse;
+	backEnd.colorCorrectActive = qfalse;
+
+	wantPostProcess = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer);
+	wantBloom = (qboolean)(wantPostProcess && r_enableBloom && r_enableBloom->integer);
+	wantColorCorrect = (qboolean)(wantPostProcess && r_enableColorCorrect && r_enableColorCorrect->integer);
+
+	if ( !wantPostProcess ) {
+		RBPP_MirrorState();
+		return;
+	}
+
+	if ( !qglActiveTextureARB || !qglMultiTexCoord2fARB ) {
+		ri.Printf( PRINT_WARNING, "GL_ARB_Multitexture is either not supported, or is disabled by r_ext_multiTexture. Post processing is disabled.\n" );
+		RBPP_MirrorState();
+		return;
+	}
+
+	if ( !RBPP_LoadProcs() ) {
+		RBPP_MirrorState();
+		return;
+	}
+
+	if ( !RBPP_CreateRenderTarget( &s_postProcess.sceneTarget, glConfig.vidWidth, glConfig.vidHeight, qfalse, qtrue ) ) {
+		RBPP_MirrorState();
+		return;
+	}
+
+	backEnd.postProcessActive = qtrue;
+
+	if ( wantBloom ) {
+		backEnd.bloomActive = RBPP_InitBloomResources();
+	}
+
+	if ( wantColorCorrect ) {
+		backEnd.colorCorrectActive = RBPP_InitColorCorrectResources();
+	}
+
+	RBPP_MirrorState();
+}
+
+
+/*
+=============
+RBPP_Init
+
+Initialize the shared retail post-process state at renderer startup.
+=============
+*/
+static void RBPP_Init( void ) {
+	Com_Memset( &s_postProcess, 0, sizeof( s_postProcess ) );
+	RBPP_RebuildState();
+	backEnd.postProcessNeedsReset = qfalse;
+}
+
+
+/*
+=============
+RBPP_Shutdown
+
+Release the full post-process resource set.
+=============
+*/
+static void RBPP_Shutdown( void ) {
+	RBPP_ShutdownColorCorrectResources();
+	RBPP_ShutdownBloomResources();
+	RBPP_DestroyRenderTarget( &s_postProcess.sceneTarget );
+	backEnd.postProcessActive = qfalse;
+	backEnd.bloomActive = qfalse;
+	backEnd.colorCorrectActive = qfalse;
+	backEnd.postProcessNeedsReset = qfalse;
+	RBPP_MirrorState();
+}
+
+
+/*
+=============
+RBPP_BindSceneRenderTarget
+
+Route scene rendering into the rectangle-texture scene target whenever post-processing is active.
+=============
+*/
+static void RBPP_BindSceneRenderTarget( void ) {
+	if ( !RB_PostProcessEnabled() || !s_postProcess.sceneTarget.initialized ) {
+		RBPP_ReleaseSceneRenderTarget();
+		return;
+	}
+
+	RBPP_BindRenderTarget( &s_postProcess.sceneTarget );
+}
+
+
+/*
+=============
+RBPP_ReleaseSceneRenderTarget
+
+Restore rendering to the default framebuffer.
+=============
+*/
+static void RBPP_ReleaseSceneRenderTarget( void ) {
+	if ( s_postProcess.procs.qglBindFramebufferEXTFunc ) {
+		s_postProcess.procs.qglBindFramebufferEXTFunc( GL_FRAMEBUFFER_EXT, 0 );
+	}
+}
+
+
+/*
+=============
+RBPP_ResetIfNeeded
+
+Apply any queued post-process restart request after the current frame has been presented.
+=============
+*/
+static void RBPP_ResetIfNeeded( void ) {
+	if ( !backEnd.postProcessNeedsReset ) {
+		return;
+	}
+
+	RBPP_RebuildState();
+	backEnd.postProcessNeedsReset = qfalse;
+	tr.postProcessNeedsReset = qfalse;
+}
+
+
+/*
+=============
+RBPP_BlitSceneTarget
+
+Present the scene rectangle texture directly to the default framebuffer.
+=============
+*/
+static void RBPP_BlitSceneTarget( void ) {
+	if ( !s_postProcess.sceneTarget.initialized ) {
+		return;
+	}
+
+	RBPP_Set2DState( glConfig.vidWidth, glConfig.vidHeight );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( 0 );
+	RBPP_BindRectangleTexture( 0, s_postProcess.sceneTarget.texture );
+	RBPP_DrawQuad( glConfig.vidWidth, glConfig.vidHeight, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height );
+
+	if ( qglActiveTextureARB ) {
+		qglActiveTextureARB( GL_TEXTURE1_ARB );
+		qglDisable( GL_TEXTURE_RECTANGLE_ARB );
+		qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+		qglActiveTextureARB( GL_TEXTURE0_ARB );
+	}
+
+	qglDisable( GL_TEXTURE_RECTANGLE_ARB );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+	qglEnable( GL_TEXTURE_2D );
+}
+
+
+/*
+=============
+RBPP_ApplyBloom
+
+Run the recovered bright-pass, downsample, separable blur, and combine chain on rectangle textures.
+=============
+*/
+static qboolean RBPP_ApplyBloom( void ) {
+	int passes;
+	int passIndex;
+	int blurRadius;
+	float blurScale;
+	float blurFalloff;
+	float blurStep;
+	float brightThreshold;
+	float bloomIntensity;
+	float bloomSaturation;
+	float sceneIntensity;
+	float sceneSaturation;
+	ppRenderTarget_t *finalBloom;
+
+	if ( !backEnd.bloomActive || !s_postProcess.sceneTarget.initialized ||
+		!s_postProcess.bloomBrightTarget.initialized || !s_postProcess.bloomHalfTarget.initialized ||
+		!s_postProcess.bloomPingTarget.initialized || !s_postProcess.bloomPongTarget.initialized ) {
+		return qfalse;
+	}
+
+	passes = ( r_bloomPasses && r_bloomPasses->integer > 0 ) ? r_bloomPasses->integer : 1;
+	if ( passes > 2 ) {
+		passes = 2;
+	}
+
+	blurRadius = ( r_bloomBlurRadius && r_bloomBlurRadius->integer > 0 ) ? r_bloomBlurRadius->integer : 1;
+	blurScale = ( r_bloomBlurScale && r_bloomBlurScale->value > 0.0f ) ? r_bloomBlurScale->value : 1.0f;
+	blurFalloff = ( r_bloomBlurFalloff && r_bloomBlurFalloff->value > 0.0f ) ? r_bloomBlurFalloff->value : 0.75f;
+	blurStep = blurScale * (float)blurRadius * 0.25f;
+	if ( blurStep < 1.0f ) {
+		blurStep = 1.0f;
+	}
+
+	brightThreshold = r_bloomBrightThreshold ? r_bloomBrightThreshold->value : 0.25f;
+	bloomIntensity = r_bloomIntensity ? r_bloomIntensity->value : 0.5f;
+	bloomSaturation = r_bloomSaturation ? r_bloomSaturation->value : 0.8f;
+	sceneIntensity = r_bloomSceneIntensity ? r_bloomSceneIntensity->value : 1.0f;
+	sceneSaturation = r_bloomSceneSaturation ? r_bloomSceneSaturation->value : 1.0f;
+
+	RBPP_BindRenderTarget( &s_postProcess.bloomBrightTarget );
+	RBPP_Set2DState( s_postProcess.bloomBrightTarget.width, s_postProcess.bloomBrightTarget.height );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.brightPassProgram.programObject );
+	if ( s_postProcess.brightPassProgram.brightThresholdUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.brightPassProgram.brightThresholdUniform, brightThreshold );
+	}
+	RBPP_BindRectangleTexture( 0, s_postProcess.sceneTarget.texture );
+	RBPP_DrawQuad( s_postProcess.bloomBrightTarget.width, s_postProcess.bloomBrightTarget.height, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height );
+
+	RBPP_BindRenderTarget( &s_postProcess.bloomHalfTarget );
+	RBPP_Set2DState( s_postProcess.bloomHalfTarget.width, s_postProcess.bloomHalfTarget.height );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.downsampleProgram.programObject );
+	RBPP_BindRectangleTexture( 0, s_postProcess.bloomBrightTarget.texture );
+	RBPP_DrawQuad( s_postProcess.bloomHalfTarget.width, s_postProcess.bloomHalfTarget.height, (float)s_postProcess.bloomBrightTarget.width, (float)s_postProcess.bloomBrightTarget.height, (float)s_postProcess.bloomBrightTarget.width, (float)s_postProcess.bloomBrightTarget.height );
+
+	RBPP_BindRenderTarget( &s_postProcess.bloomPingTarget );
+	RBPP_Set2DState( s_postProcess.bloomPingTarget.width, s_postProcess.bloomPingTarget.height );
+	RBPP_BindRectangleTexture( 0, s_postProcess.bloomHalfTarget.texture );
+	RBPP_DrawQuad( s_postProcess.bloomPingTarget.width, s_postProcess.bloomPingTarget.height, (float)s_postProcess.bloomHalfTarget.width, (float)s_postProcess.bloomHalfTarget.height, (float)s_postProcess.bloomHalfTarget.width, (float)s_postProcess.bloomHalfTarget.height );
+
+	finalBloom = &s_postProcess.bloomPingTarget;
+
+	for ( passIndex = 0; passIndex < passes; passIndex++ ) {
+		RBPP_BindRenderTarget( &s_postProcess.bloomPongTarget );
+		RBPP_Set2DState( s_postProcess.bloomPongTarget.width, s_postProcess.bloomPongTarget.height );
+		s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.blurVerticalProgram.programObject );
+		if ( s_postProcess.blurVerticalProgram.blurStepUniform >= 0 ) {
+			s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.blurVerticalProgram.blurStepUniform, blurStep );
+		}
+		if ( s_postProcess.blurVerticalProgram.blurFalloffUniform >= 0 ) {
+			s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.blurVerticalProgram.blurFalloffUniform, blurFalloff );
+		}
+		RBPP_BindRectangleTexture( 0, finalBloom->texture );
+		RBPP_DrawQuad( s_postProcess.bloomPongTarget.width, s_postProcess.bloomPongTarget.height, (float)finalBloom->width, (float)finalBloom->height, (float)finalBloom->width, (float)finalBloom->height );
+
+		RBPP_BindRenderTarget( &s_postProcess.bloomPingTarget );
+		RBPP_Set2DState( s_postProcess.bloomPingTarget.width, s_postProcess.bloomPingTarget.height );
+		s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.blurHorizontalProgram.programObject );
+		if ( s_postProcess.blurHorizontalProgram.blurStepUniform >= 0 ) {
+			s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.blurHorizontalProgram.blurStepUniform, blurStep );
+		}
+		if ( s_postProcess.blurHorizontalProgram.blurFalloffUniform >= 0 ) {
+			s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.blurHorizontalProgram.blurFalloffUniform, blurFalloff );
+		}
+		RBPP_BindRectangleTexture( 0, s_postProcess.bloomPongTarget.texture );
+		RBPP_DrawQuad( s_postProcess.bloomPingTarget.width, s_postProcess.bloomPingTarget.height, (float)s_postProcess.bloomPongTarget.width, (float)s_postProcess.bloomPongTarget.height, (float)s_postProcess.bloomPongTarget.width, (float)s_postProcess.bloomPongTarget.height );
+		finalBloom = &s_postProcess.bloomPingTarget;
+	}
+
+	RBPP_ReleaseSceneRenderTarget();
+	RBPP_Set2DState( glConfig.vidWidth, glConfig.vidHeight );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.combineProgram.programObject );
+	if ( s_postProcess.combineProgram.bloomSaturationUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.combineProgram.bloomSaturationUniform, bloomSaturation );
+	}
+	if ( s_postProcess.combineProgram.bloomIntensityUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.combineProgram.bloomIntensityUniform, bloomIntensity );
+	}
+	if ( s_postProcess.combineProgram.sceneIntensityUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.combineProgram.sceneIntensityUniform, sceneIntensity );
+	}
+	if ( s_postProcess.combineProgram.sceneSaturationUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.combineProgram.sceneSaturationUniform, sceneSaturation );
+	}
+	RBPP_BindRectangleTexture( 0, s_postProcess.sceneTarget.texture );
+	RBPP_BindRectangleTexture( 1, finalBloom->texture );
+	RBPP_DrawQuad( glConfig.vidWidth, glConfig.vidHeight, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height, (float)finalBloom->width, (float)finalBloom->height );
+
+	s_postProcess.procs.qglUseProgramObjectARBFunc( 0 );
+	if ( qglActiveTextureARB ) {
+		qglActiveTextureARB( GL_TEXTURE1_ARB );
+		qglDisable( GL_TEXTURE_RECTANGLE_ARB );
+		qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+		qglActiveTextureARB( GL_TEXTURE0_ARB );
+	}
+
+	qglDisable( GL_TEXTURE_RECTANGLE_ARB );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+	qglEnable( GL_TEXTURE_2D );
+	return qtrue;
+}
+
+
+/*
+=============
+RBPP_ApplyColorCorrectPass
+
+Copy the current default framebuffer into the retail color-correct texture and run the shader-backed correction pass.
+=============
+*/
+static void RBPP_ApplyColorCorrectPass( void ) {
+	float gammaRecip;
+	float overbright;
+	float contrast;
+
+	if ( !backEnd.colorCorrectActive || !s_postProcess.colorCorrectTexture || !s_postProcess.colorCorrectProgram.programObject ) {
+		return;
+	}
+
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, s_postProcess.colorCorrectTexture );
+	qglCopyTexSubImage2D( GL_TEXTURE_RECTANGLE_ARB, 0, 0, 0, 0, 0, glConfig.vidWidth, glConfig.vidHeight );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+
+	gammaRecip = 1.0f;
+	if ( !glConfig.deviceSupportsGamma && r_gamma && r_gamma->value > 0.0f ) {
+		gammaRecip = 1.0f / r_gamma->value;
+	}
+
+	overbright = 0.0f;
+	if ( r_overBrightBits ) {
+		overbright = 2.0f * r_overBrightBits->value;
+		if ( overbright > 1.0f ) {
+			overbright = 1.0f;
+		}
+	}
+
+	contrast = r_contrast ? r_contrast->value : 1.0f;
+
+	RBPP_Set2DState( glConfig.vidWidth, glConfig.vidHeight );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.colorCorrectProgram.programObject );
+	if ( s_postProcess.colorCorrectProgram.gammaRecipUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.colorCorrectProgram.gammaRecipUniform, gammaRecip );
+	}
+	if ( s_postProcess.colorCorrectProgram.overbrightUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.colorCorrectProgram.overbrightUniform, overbright );
+	}
+	if ( s_postProcess.colorCorrectProgram.contrastUniform >= 0 ) {
+		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.colorCorrectProgram.contrastUniform, contrast );
+	}
+	RBPP_BindRectangleTexture( 0, s_postProcess.colorCorrectTexture );
+	RBPP_DrawQuad( glConfig.vidWidth, glConfig.vidHeight, (float)s_postProcess.colorCorrectWidth, (float)s_postProcess.colorCorrectHeight, (float)s_postProcess.colorCorrectWidth, (float)s_postProcess.colorCorrectHeight );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( 0 );
+
+	if ( qglActiveTextureARB ) {
+		qglActiveTextureARB( GL_TEXTURE1_ARB );
+		qglDisable( GL_TEXTURE_RECTANGLE_ARB );
+		qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+		qglActiveTextureARB( GL_TEXTURE0_ARB );
+	}
+
+	qglDisable( GL_TEXTURE_RECTANGLE_ARB );
+	qglBindTexture( GL_TEXTURE_RECTANGLE_ARB, 0 );
+	qglEnable( GL_TEXTURE_2D );
+}
+
+
+/*
+=============
+RBPP_Submit
+
+Present the offscreen scene target through the recovered retail bloom and color-correct pipeline.
+=============
+*/
+static void RBPP_Submit( void ) {
+	qboolean wasActive;
+
+	wasActive = backEnd.postProcessActive;
+	if ( backEnd.postProcessNeedsReset && !wasActive ) {
+		RBPP_ResetIfNeeded();
+		return;
+	}
+
+	if ( !RB_PostProcessEnabled() || !s_postProcess.sceneTarget.initialized ) {
+		return;
+	}
+
+	if ( backEnd.bloomActive ) {
+		if ( !RBPP_ApplyBloom() ) {
+			RBPP_ReleaseSceneRenderTarget();
+			RBPP_BlitSceneTarget();
+		}
+	} else {
+		RBPP_ReleaseSceneRenderTarget();
+		RBPP_BlitSceneTarget();
 	}
 
 	if ( backEnd.colorCorrectActive ) {
-		RB_ApplyColorCorrection();
+		RBPP_ApplyColorCorrectPass();
+	}
+
+	if ( backEnd.postProcessNeedsReset ) {
+		RBPP_ResetIfNeeded();
 	}
 }
 

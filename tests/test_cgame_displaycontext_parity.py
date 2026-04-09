@@ -437,15 +437,22 @@ def test_cgame_acc_vertical_overlay_reconstruction_uses_retail_acc_parser_and_se
 	game_source = (REPO_ROOT / "src" / "code" / "game" / "g_cmds.c").read_text(encoding="utf-8")
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
 
+	shared_parse_block = _block_from_marker(servercmds_source, "static void CG_ParseRetailAccuracyCommand( void )")
 	parse_block = _block_from_marker(servercmds_source, "static void CG_ParseAcc( void )")
+	pstats_parse_block = _block_from_marker(servercmds_source, "static void CG_ParsePStats( void )")
 	acc_down_block = _block_from_marker(console_source, "static void CG_AccDown_f( void )")
 	acc_up_block = _block_from_marker(console_source, "static void CG_AccUp_f( void )")
+	pstats_down_block = _block_from_marker(console_source, "static void CG_PStatsDown_f( void )")
+	pstats_up_block = _block_from_marker(console_source, "static void CG_PStatsUp_f( void )")
 	draw_gate_block = _block_from_marker(newdraw_source, "static qboolean CG_ShouldDrawAccVertical( void )")
 	draw_weapon_block = _block_from_marker(newdraw_source, "static void CG_DrawWeaponVertical( rectDef_t *rect, vec4_t color )")
 	draw_acc_block = _block_from_marker(newdraw_source, "static void CG_DrawAccVertical( rectDef_t *rect, float scale, vec4_t color, int textStyle )")
 	source_client_block = _block_from_marker(game_source, "static gclient_t *G_RetailAccuracySourceClient( gentity_t *ent )")
+	shared_sender_block = _block_from_marker(game_source, "static void G_SendRetailAccuracyPayloadCommand( gentity_t *ent, const char *command )")
 	sender_block = _block_from_marker(game_source, "static void G_SendRetailAccuracyCommand( gentity_t *ent )")
+	pstats_sender_block = _block_from_marker(game_source, "static void G_SendRetailPStatsCommand( gentity_t *ent )")
 	cmd_acc_block = _block_from_marker(game_source, "void Cmd_Acc_f( gentity_t *ent )")
+	cmd_pstats_block = _block_from_marker(game_source, "void Cmd_PStats_f( gentity_t *ent )")
 
 	for expected in (
 		"int\t\t\tweaponAccuracies[WP_NUM_WEAPONS];",
@@ -459,23 +466,36 @@ def test_cgame_acc_vertical_overlay_reconstruction_uses_retail_acc_parser_and_se
 		"WP_NONE,",
 		"WP_GAUNTLET,",
 		"WP_HEAVY_MACHINEGUN",
+	):
+		assert expected in servercmds_source
+
+	for expected in (
 		"memset( cg.weaponAccuracies, 0, sizeof( cg.weaponAccuracies ) );",
 		"weapon = cg_retailAccuracyCommandOrder[i];",
 		"value = atoi( CG_Argv( i + 1 ) );",
 		"cg.weaponAccuracies[weapon] = value;",
 	):
-		assert expected in servercmds_source
+		assert expected in shared_parse_block
 
 	assert 'if ( !strcmp( cmd, "acc" ) ) {' in servercmds_source
 	assert "\t\tCG_ParseAcc();" in servercmds_source
+	assert 'if ( !strcmp( cmd, "pstats" ) ) {' in servercmds_source
+	assert "\t\tCG_ParsePStats();" in servercmds_source
+	assert "CG_ParseRetailAccuracyCommand();" in parse_block
+	assert "CG_ParseRetailAccuracyCommand();" in pstats_parse_block
 
 	assert '"+acc"' in console_source
 	assert '"-acc"' in console_source
+	assert '"+pstats"' in console_source
+	assert '"-pstats"' in console_source
 	assert 'trap_AddCommand ("acc");' in console_source
 	assert "cg.accRequestActive = qtrue;" in acc_down_block
 	assert "cg.accRequestTime = 0;" in acc_down_block
 	assert 'trap_SendClientCommand( "acc" );' in acc_down_block
 	assert "cg.accRequestActive = qfalse;" in acc_up_block
+	assert 'trap_SendClientCommand( "pstats" );' in pstats_down_block
+	assert "cg_pstatsRequestActive = qtrue;" in pstats_down_block
+	assert "cg_pstatsRequestActive = qfalse;" in pstats_up_block
 
 	for expected in (
 		"static const weapon_t cgVerticalAccWeaponOrder[] = {",
@@ -513,11 +533,15 @@ def test_cgame_acc_vertical_overlay_reconstruction_uses_retail_acc_parser_and_se
 	assert "ent->client->sess.spectatorClient" in source_client_block
 	assert "level.clients[clientNum].pers.connected == CON_CONNECTED" in source_client_block
 
-	assert "client = G_RetailAccuracySourceClient( ent );" in sender_block
-	assert "client->pers.accuracy_hits[weapon]" in sender_block
-	assert "client->pers.accuracy_shots[weapon]" in sender_block
-	assert 'trap_SendServerCommand( ent-g_entities, va( "acc %s", payload ) );' in sender_block
+	assert "client = G_RetailAccuracySourceClient( ent );" in shared_sender_block
+	assert "client->pers.accuracy_hits[weapon]" in shared_sender_block
+	assert "client->pers.accuracy_shots[weapon]" in shared_sender_block
+	assert 'trap_SendServerCommand( ent-g_entities, va( "%s %s", command, payload ) );' in shared_sender_block
+	assert 'G_SendRetailAccuracyPayloadCommand( ent, "acc" );' in sender_block
+	assert 'G_SendRetailAccuracyPayloadCommand( ent, "pstats" );' in pstats_sender_block
 	assert "G_SendRetailAccuracyCommand( ent );" in cmd_acc_block
+	assert "G_SendRetailPStatsCommand( ent );" in cmd_pstats_block
+	assert 'else if (Q_stricmp (cmd, "pstats") == 0) {' in game_source
 
 
 def test_cgame_placement_scorebox_widgets_match_retail_split_ownerdraws() -> None:
@@ -2570,6 +2594,28 @@ def test_cgame_head_offset_refresh_restores_retail_model_scale_seam() -> None:
 	assert "CG_UpdateClientHeadOffset( ci );" in refresh_block
 
 
+def test_cgame_player_head_world_transform_restores_retail_scale_offset_seam() -> None:
+	players_source = ( REPO_ROOT / "src" / "code" / "cgame" / "cg_players.c" ).read_text(encoding="utf-8")
+	transform_block = _block_from_marker(players_source, "static void CG_ApplyPlayerHeadWorldTransform")
+	player_block = _block_from_marker(players_source, "void CG_Player( centity_t *cent )")
+
+	for expected in (
+		"if ( !head || cg.renderingThirdPerson ) {",
+		"head->nonNormalizedAxes = qtrue;",
+		"head->origin[2] -= ( cgs.playerHeadScaleOffset * -0.1875f ) + 24.0f;",
+		"VectorScale( head->axis[0], cgs.playerHeadScale, head->axis[0] );",
+		"VectorScale( head->axis[1], cgs.playerHeadScale, head->axis[1] );",
+		"VectorScale( head->axis[2], cgs.playerHeadScale, head->axis[2] );",
+	):
+		assert expected in transform_block
+
+	tag_index = player_block.index('CG_PositionRotatedEntityOnTag( &head, &torso, ci->torsoModel, "tag_head");')
+	transform_index = player_block.index("CG_ApplyPlayerHeadWorldTransform( &head );")
+	shadow_index = player_block.index("head.shadowPlane = shadowPlane;")
+
+	assert tag_index < transform_index < shadow_index
+
+
 def test_cgame_player_color_helper_restores_retail_shared_color_scale_seam() -> None:
 	players_source = ( REPO_ROOT / "src" / "code" / "cgame" / "cg_players.c" ).read_text(encoding="utf-8")
 	scale_block = _block_from_marker(players_source, "static int CG_GetPlayerColorScale")
@@ -3027,9 +3073,9 @@ def test_cgame_syscall_bridge_handles_binding_and_execute_ops() -> None:
 		"void trap_Key_SetBinding( int keynum, const char *binding ) {",
 		"syscall( CG_KEY_SETBINDING, keynum, binding );",
 		"qboolean trap_Key_GetOverstrikeMode( void ) {",
-		"return syscall( CG_KEY_GETOVERSTRIKEMODE );",
+		"return syscall( CG_KEY_GETOVERSTRIKEMODE ) ? qtrue : qfalse;",
 		"void trap_Key_SetOverstrikeMode( qboolean state ) {",
-		"syscall( CG_KEY_SETOVERSTRIKEMODE, state );",
+		"syscall( CG_KEY_SETOVERSTRIKEMODE, state ? qtrue : qfalse );",
 		"void trap_AdvertisementBridge_InitCGame( void ) {",
 		"syscall( CG_ADVERTISEMENTBRIDGE_INITCGAME );",
 		"void trap_AdvertisementBridge_ShutdownCGame( void ) {",

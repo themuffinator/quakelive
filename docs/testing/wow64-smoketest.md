@@ -37,7 +37,7 @@ powershell -ExecutionPolicy Bypass -File tools\ci\wow64-smoketest.ps1
 The harness:
 - Downloads the Visual C++ 2010 SP1 x86 redistributable if missing and installs it quietly.
 - Copies `qagamex86.dll`, `cgamex86.dll`, and `uix86.dll` into `artifacts\wow64-smoketest`.
-- Loads `qagamex86.dll` and `cgamex86.dll`, probing for `dllEntry` and `vmMain`, and logs outcomes to `artifacts\wow64-smoketest\wow64-smoketest.log`.
+- Loads `qagamex86.dll`, `cgamex86.dll`, and `uix86.dll`, probing for `dllEntry` and `vmMain`, and logs outcomes to `artifacts\wow64-smoketest\wow64-smoketest.log`.
 
 ## CI / manual integration
 - **GitHub Actions / Azure Pipelines:** add a Windows Server 2019 or Windows 7-compatible self-hosted runner that can launch 32-bit PowerShell. Invoke `tools\ci\wow64-smoketest.ps1` as a job step and publish the resulting log as an artifact.

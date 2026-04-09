@@ -3165,6 +3165,26 @@ int CG_LightVerts( vec3_t normal, int numVerts, polyVert_t *verts )
 }
 
 /*
+=============
+CG_ApplyPlayerHeadWorldTransform
+
+Applies the retail post-tag head scale and origin offset used by the
+world-space player render path when first-person rendering is active.
+=============
+*/
+static void CG_ApplyPlayerHeadWorldTransform( refEntity_t *head ) {
+	if ( !head || cg.renderingThirdPerson ) {
+		return;
+	}
+
+	head->nonNormalizedAxes = qtrue;
+	head->origin[2] -= ( cgs.playerHeadScaleOffset * -0.1875f ) + 24.0f;
+	VectorScale( head->axis[0], cgs.playerHeadScale, head->axis[0] );
+	VectorScale( head->axis[1], cgs.playerHeadScale, head->axis[1] );
+	VectorScale( head->axis[2], cgs.playerHeadScale, head->axis[2] );
+}
+
+/*
 ===============
 CG_Player
 ===============
@@ -3497,6 +3517,7 @@ void CG_Player( centity_t *cent ) {
 	VectorCopy( cent->lerpOrigin, head.lightingOrigin );
 
 	CG_PositionRotatedEntityOnTag( &head, &torso, ci->torsoModel, "tag_head");
+	CG_ApplyPlayerHeadWorldTransform( &head );
 
 	head.shadowPlane = shadowPlane;
 	head.renderfx = renderfx;

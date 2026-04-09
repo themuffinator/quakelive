@@ -44,6 +44,8 @@ void Sys_QueEvent( int time, sysEventType_t type, int value, int value2, int ptr
 
 void	Sys_CreateConsole( void );
 void	Sys_DestroyConsole( void );
+void	Sys_CreateLoadingWindow( void );
+void	Sys_DestroyLoadingWindow( void );
 
 char	*Sys_ConsoleInput (void);
 
@@ -87,6 +89,7 @@ typedef struct
 	HINSTANCE		hInstance;
 	qboolean		activeApp;
 	qboolean		isMinimized;
+	qboolean		isMaximized;
 	OSVERSIONINFO	osversion;
 
 	// when we get a windows message, we store the time off so keyboard processing

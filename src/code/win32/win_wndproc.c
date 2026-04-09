@@ -41,6 +41,141 @@ cvar_t		*r_fullscreen;
 LONG WINAPI MainWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam );
 
 static qboolean s_alttab_disabled;
+static qboolean s_pendingWindowedModeSync;
+
+/*
+==================
+WIN_GetNearestAspectValue
+==================
+*/
+static int WIN_GetNearestAspectValue( int primary, int secondary, int current )
+{
+	int	primaryDelta;
+	int	secondaryDelta;
+
+	primaryDelta = current - primary;
+	if ( primaryDelta < 0 ) {
+		primaryDelta = -primaryDelta;
+	}
+
+	secondaryDelta = current - secondary;
+	if ( secondaryDelta < 0 ) {
+		secondaryDelta = -secondaryDelta;
+	}
+
+	return ( primaryDelta <= secondaryDelta ) ? primary : secondary;
+}
+
+/*
+==================
+WIN_SyncWindowedModeFromClientRect
+==================
+*/
+static void WIN_SyncWindowedModeFromClientRect( void )
+{
+	RECT	rect;
+	cvar_t	*r_windowedHeight;
+	cvar_t	*r_windowedWidth;
+
+	if ( !g_wv.hWnd || ( r_fullscreen && r_fullscreen->integer ) ) {
+		return;
+	}
+
+	if ( !GetClientRect( g_wv.hWnd, &rect ) ) {
+		return;
+	}
+
+	r_windowedWidth = Cvar_Get( "r_windowedWidth", "0", CVAR_ARCHIVE );
+	r_windowedHeight = Cvar_Get( "r_windowedHeight", "0", CVAR_ARCHIVE );
+
+	if ( r_windowedWidth->integer != rect.right || r_windowedHeight->integer != rect.bottom ) {
+		Cvar_SetValue( "r_windowedMode", -1 );
+		Cvar_SetValue( "r_windowedWidth", rect.right );
+		Cvar_SetValue( "r_windowedHeight", rect.bottom );
+		Cbuf_AddText( "vid_restart fast\n" );
+	}
+}
+
+/*
+==================
+WIN_AdjustWindowSizingRect
+==================
+*/
+static void WIN_AdjustWindowSizingRect( WPARAM edge, RECT *rect )
+{
+	RECT	frameRect;
+	int		frameHeight;
+	int		frameWidth;
+	int		heightFromWide;
+	int		heightFromStandard;
+	int		newClientHeight;
+	int		newClientWidth;
+	int		widthFromWide;
+	int		widthFromStandard;
+
+	if ( !rect ) {
+		return;
+	}
+
+	frameRect.left = 0;
+	frameRect.top = 0;
+	frameRect.right = 0;
+	frameRect.bottom = 0;
+	AdjustWindowRect( &frameRect, WS_OVERLAPPEDWINDOW | WS_VISIBLE, FALSE );
+
+	frameWidth = frameRect.right - frameRect.left;
+	frameHeight = frameRect.bottom - frameRect.top;
+
+	newClientWidth = ( rect->right - rect->left ) - frameWidth;
+	newClientHeight = ( rect->bottom - rect->top ) - frameHeight;
+
+	if ( newClientWidth < 1024 ) {
+		newClientWidth = 1024;
+	}
+	if ( newClientHeight < 768 ) {
+		newClientHeight = 768;
+	}
+
+	widthFromStandard = ( newClientHeight * 4 ) / 3;
+	heightFromStandard = ( newClientWidth * 3 ) / 4;
+	widthFromWide = ( newClientHeight * 16 ) / 9;
+	heightFromWide = ( newClientWidth * 9 ) / 16;
+
+	switch ( edge )
+	{
+	case WMSZ_LEFT:
+		rect->left = rect->right - frameWidth - newClientWidth;
+		rect->bottom = rect->top + frameHeight + WIN_GetNearestAspectValue( heightFromWide, heightFromStandard, newClientHeight );
+		break;
+
+	case WMSZ_RIGHT:
+		rect->right = rect->left + frameWidth + newClientWidth;
+		rect->bottom = rect->top + frameHeight + WIN_GetNearestAspectValue( heightFromWide, heightFromStandard, newClientHeight );
+		break;
+
+	case WMSZ_TOP:
+	case WMSZ_TOPRIGHT:
+		rect->top = rect->bottom - frameHeight - newClientHeight;
+		rect->right = rect->left + frameWidth + WIN_GetNearestAspectValue( widthFromStandard, widthFromWide, newClientWidth );
+		break;
+
+	case WMSZ_TOPLEFT:
+		rect->top = rect->bottom - frameHeight - newClientHeight;
+		rect->left = rect->right - frameWidth - WIN_GetNearestAspectValue( widthFromStandard, widthFromWide, newClientWidth );
+		break;
+
+	case WMSZ_BOTTOM:
+	case WMSZ_BOTTOMRIGHT:
+		rect->bottom = rect->top + frameHeight + newClientHeight;
+		rect->right = rect->left + frameWidth + WIN_GetNearestAspectValue( widthFromStandard, widthFromWide, newClientWidth );
+		break;
+
+	case WMSZ_BOTTOMLEFT:
+		rect->bottom = rect->top + frameHeight + newClientHeight;
+		rect->left = rect->right - frameWidth - WIN_GetNearestAspectValue( widthFromStandard, widthFromWide, newClientWidth );
+		break;
+	}
+}
 
 static void WIN_DisableAltTab( void )
 {
@@ -325,6 +460,7 @@ LONG WINAPI MainWndProc (
 	case WM_CREATE:
 
 		g_wv.hWnd = hWnd;
+		g_wv.isMaximized = qfalse;
 
 		vid_xpos = Cvar_Get ("vid_xpos", "3", CVAR_ARCHIVE);
 		vid_ypos = Cvar_Get ("vid_ypos", "22", CVAR_ARCHIVE);
@@ -380,6 +516,16 @@ LONG WINAPI MainWndProc (
 		}
 		break;
 
+	case WM_SIZE:
+		g_wv.isMinimized = (qboolean)( wParam == SIZE_MINIMIZED );
+		g_wv.isMaximized = (qboolean)( wParam == SIZE_MAXIMIZED );
+		if ( s_pendingWindowedModeSync || ( g_wv.isMaximized && r_fullscreen && !r_fullscreen->integer ) )
+		{
+			WIN_SyncWindowedModeFromClientRect();
+			s_pendingWindowedModeSync = qfalse;
+		}
+		break;
+
 	case WM_MOVE:
 		{
 			int		xPos, yPos;
@@ -411,6 +557,17 @@ LONG WINAPI MainWndProc (
 		}
 		break;
 
+	case WM_SIZING:
+		if ( r_fullscreen && !r_fullscreen->integer ) {
+			WIN_AdjustWindowSizingRect( wParam, ( RECT * )lParam );
+		}
+		break;
+
+	case WM_EXITSIZEMOVE:
+		WIN_SyncWindowedModeFromClientRect();
+		s_pendingWindowedModeSync = qfalse;
+		break;
+
 // this is complicated because Win32 seems to pack multiple mouse events into
 // one update sometimes, so we always check all states and look for events
 	case WM_LBUTTONDOWN:
@@ -439,8 +596,21 @@ LONG WINAPI MainWndProc (
 		break;
 
 	case WM_SYSCOMMAND:
-		if ( wParam == SC_SCREENSAVE )
-			return 0;
+		{
+			WPARAM command;
+
+			command = ( wParam & 0xFFF0 );
+
+			if ( command == SC_SCREENSAVE )
+				return 0;
+
+			if ( command == SC_KEYMENU && ( lParam & 0xffff0000 ) <= 0 )
+				return 0;
+
+			if ( command == SC_RESTORE || command == SC_MAXIMIZE ) {
+				s_pendingWindowedModeSync = qtrue;
+			}
+		}
 		break;
 
 	case WM_SYSKEYDOWN:

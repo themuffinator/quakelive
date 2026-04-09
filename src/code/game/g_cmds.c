@@ -2273,7 +2273,7 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 		cmd = "scores_ctf";
 		break;
 	case GT_ATTACK_DEFEND:
-		cmd = "scores_ctf";
+		cmd = "scores_ad";
 		break;
 	case GT_FREEZE:
 		cmd = "scores_ft";
@@ -2693,7 +2693,7 @@ void Cmd_Teams_f( gentity_t *ent ) {
 G_RetailAccuracySourceClient
 
 Resolves the retail accuracy source, following the chased client when a
-spectator requests `acc`.
+spectator requests `acc` or `pstats`.
 =================
 */
 static gclient_t *G_RetailAccuracySourceClient( gentity_t *ent ) {
@@ -2717,12 +2717,13 @@ static gclient_t *G_RetailAccuracySourceClient( gentity_t *ent ) {
 
 /*
 =================
-G_SendRetailAccuracyCommand
+G_SendRetailAccuracyPayloadCommand
 
-Builds the retail compact `acc` payload across the fixed weapon-order slab.
+Builds the retail compact `acc` / `pstats` payload across the fixed
+weapon-order slab.
 =================
 */
-static void G_SendRetailAccuracyCommand( gentity_t *ent ) {
+static void G_SendRetailAccuracyPayloadCommand( gentity_t *ent, const char *command ) {
 	gclient_t	*client;
 	char		payload[256];
 	char		entry[16];
@@ -2758,7 +2759,25 @@ static void G_SendRetailAccuracyCommand( gentity_t *ent ) {
 		Q_strcat( payload, sizeof( payload ), entry );
 	}
 
-	trap_SendServerCommand( ent-g_entities, va( "acc %s", payload ) );
+	trap_SendServerCommand( ent-g_entities, va( "%s %s", command, payload ) );
+}
+
+/*
+=================
+G_SendRetailAccuracyCommand
+=================
+*/
+static void G_SendRetailAccuracyCommand( gentity_t *ent ) {
+	G_SendRetailAccuracyPayloadCommand( ent, "acc" );
+}
+
+/*
+=================
+G_SendRetailPStatsCommand
+=================
+*/
+static void G_SendRetailPStatsCommand( gentity_t *ent ) {
+	G_SendRetailAccuracyPayloadCommand( ent, "pstats" );
 }
 
 /*
@@ -2768,6 +2787,15 @@ Cmd_Acc_f
 */
 void Cmd_Acc_f( gentity_t *ent ) {
 	G_SendRetailAccuracyCommand( ent );
+}
+
+/*
+=================
+Cmd_PStats_f
+=================
+*/
+void Cmd_PStats_f( gentity_t *ent ) {
+	G_SendRetailPStatsCommand( ent );
 }
 
 /*
@@ -4671,7 +4699,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 	int             remaining;
 	qboolean        isSpectator;
 	qboolean        privilegedCallVote;
-	qboolean        warmupReady;
+	qboolean        midGame;
 
 	if ( !ent || !ent->client ) {
 		return;
@@ -4691,7 +4719,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 	delayMsec = g_voteDelay.integer > 0 ? g_voteDelay.integer * 1000 : 0;
 	isSpectator = ( client->sess.sessionTeam == TEAM_SPECTATOR );
 	privilegedCallVote = G_ClientBypassesCallVoteRestrictions( client );
-	warmupReady = G_WarmupReadyToStart();
+	midGame = G_WarmupReadyToStart();
 
 	if ( delayMsec > 0 ) {
 		int             startWindow;
@@ -4732,7 +4760,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 		return;
 	}
 
-	if ( !g_allowVoteMidGame.integer && warmupReady && !privilegedCallVote ) {
+	if ( !g_allowVoteMidGame.integer && midGame && !privilegedCallVote ) {
 		trap_SendServerCommand( ent-g_entities, "print \"Voting is only allowed during the warm up period.\\n\"" );
 		return;
 	}
@@ -4855,7 +4883,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to shuffle the teams is disabled on this server.\\n\"" );
 			return;
 		}
-		if ( warmupReady ) {
+		if ( midGame ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to shuffle the teams is only permitted during warmup.\\n\"" );
 			return;
 		}
@@ -5076,7 +5104,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to alter loadouts is disabled on this server.\\n\"" );
 			return;
 		}
-		if ( warmupReady ) {
+		if ( midGame ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to alter loadouts is only allowed during the warm up period.\\n\"" );
 			return;
 		}
@@ -5093,7 +5121,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to alter the ammo system is disabled on this server.\\n\"" );
 			return;
 		}
-		if ( warmupReady ) {
+		if ( midGame ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to alter the ammo system is only allowed during the warm up period.\\n\"" );
 			return;
 		}
@@ -5110,7 +5138,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to alter the item timers is disabled on this server.\\n\"" );
 			return;
 		}
-		if ( warmupReady ) {
+		if ( midGame ) {
 			trap_SendServerCommand( ent-g_entities, "print \"Voting to alter the item timers is only allowed during the warm up period.\\n\"" );
 			return;
 		}
@@ -7043,6 +7071,10 @@ void ClientCommand( int clientNum ) {
 	}
 	else if (Q_stricmp (cmd, "acc") == 0) {
 		Cmd_Acc_f (ent);
+		return;
+	}
+	else if (Q_stricmp (cmd, "pstats") == 0) {
+		Cmd_PStats_f (ent);
 		return;
 	}
 	else if (Q_stricmp (cmd, "cvar") == 0) {

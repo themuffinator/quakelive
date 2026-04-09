@@ -961,7 +961,7 @@ trap_Key_GetOverstrikeMode
 =================
 */
 qboolean trap_Key_GetOverstrikeMode( void ) {
-	return syscall( CG_KEY_GETOVERSTRIKEMODE );
+	return syscall( CG_KEY_GETOVERSTRIKEMODE ) ? qtrue : qfalse;
 }
 
 /*
@@ -970,7 +970,7 @@ trap_Key_SetOverstrikeMode
 =================
 */
 void trap_Key_SetOverstrikeMode( qboolean state ) {
-	syscall( CG_KEY_SETOVERSTRIKEMODE, state );
+	syscall( CG_KEY_SETOVERSTRIKEMODE, state ? qtrue : qfalse );
 }
 
 int trap_PC_AddGlobalDefine( char *define ) {

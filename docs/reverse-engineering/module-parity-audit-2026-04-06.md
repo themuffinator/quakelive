@@ -1,5 +1,18 @@
 # Module Parity Audit (2026-04-06)
 
+Superseded note:
+
+- This document is preserved as the historical 2026-04-06 snapshot only.
+- The current combined module audit is
+  `docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-09.md`.
+- Current module-layer validation baseline on 2026-04-09:
+  - `cgame`: `170 passed`
+  - `qagame`: `91 passed`, `5 skipped`
+  - `ui`: `49 passed`, `6 skipped`
+  - shared platform-service seam: `41 passed`
+- The residual `GM-G01`..`GM-G05` register is now closed, and current
+  source-built module parity is treated as effectively `100%`.
+
 ## Scope
 
 This audit summarizes current parity for the three source-built gameplay/UI DLLs:

@@ -18,11 +18,11 @@ def test_qagame_uses_retail_team_scoreboard_headers_without_legacy_outer_prefix(
 	assert 'trap_SendServerCommand( ent-g_entities, va( "%s %i %i %i%s",' in game_cmds
 
 
-def test_attack_and_defend_uses_shared_ctf_scoreboard_command() -> None:
+def test_attack_and_defend_uses_dedicated_scoreboard_command() -> None:
 	game_cmds = _read("src/code/game/g_cmds.c")
 
 	assert "case GT_ATTACK_DEFEND:" in game_cmds
-	assert 'cmd = "scores_ctf";' in game_cmds
+	assert 'cmd = "scores_ad";' in game_cmds
 
 
 def test_ctf_scoreboard_hides_opposing_team_header_for_live_team_viewers() -> None:

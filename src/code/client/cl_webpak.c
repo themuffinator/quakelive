@@ -115,7 +115,8 @@ static qboolean CL_WebRequestReadMappedFile( const char *request, void **outBuff
 =============
 CL_WebPak_Init
 
-Mount web.pak from fs_homepath for launcher and menu assets.
+Mount web.pak from fs_homepath for launcher and menu assets. Local launcher
+fallback assets remain valid even when live online services are disabled.
 =============
 */
 void CL_WebPak_Init( void ) {
@@ -129,11 +130,6 @@ void CL_WebPak_Init( void ) {
 	if ( cl_webPak ) {
 		FS_FreePak( cl_webPak );
 		cl_webPak = NULL;
-	}
-
-	if ( !CL_OnlineServicesEnabled() ) {
-		Com_Printf( "web.pak mount skipped: online services disabled by build/runtime policy\n" );
-		return;
 	}
 
 	Cvar_VariableStringBuffer( "fs_homepath", homePath, sizeof( homePath ) );
@@ -191,7 +187,7 @@ CL_WebPak_Available
 =============
 */
 qboolean CL_WebPak_Available( void ) {
-	return ( CL_OnlineServicesEnabled() && cl_webPak != NULL );
+	return ( cl_webPak != NULL );
 }
 
 /*
@@ -204,10 +200,6 @@ freed with Z_Free.
 */
 qboolean CL_WebPak_Fetch( const char *virtualPath, void **outBuffer, int *outLength ) {
 	char			normalized[MAX_QPATH];
-
-	if ( !CL_OnlineServicesEnabled() ) {
-		return qfalse;
-	}
 
 	if ( !CL_WebPak_NormalizePath( virtualPath, normalized, sizeof( normalized ) ) ) {
 		return qfalse;
@@ -233,10 +225,6 @@ qboolean CL_WebRequestResolve( const char *virtualPath, void **outBuffer, int *o
 
 	if ( outBuffer ) {
 		*outBuffer = NULL;
-	}
-
-	if ( !CL_OnlineServicesEnabled() ) {
-		return qfalse;
 	}
 
 	normalizedValid = CL_WebPak_NormalizePath( virtualPath, normalized, sizeof( normalized ) );
@@ -282,9 +270,5 @@ retail-style mapped filesystem interceptor path.
 =============
 */
 qboolean CL_LauncherRequestData( const char *virtualPath, void **outBuffer, int *outLength ) {
-	if ( !CL_OnlineServicesEnabled() ) {
-		return qfalse;
-	}
-
 	return CL_WebRequestResolve( virtualPath, outBuffer, outLength );
 }

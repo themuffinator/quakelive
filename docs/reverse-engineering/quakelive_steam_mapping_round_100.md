@@ -2,122 +2,118 @@
 
 ## Scope
 
-This round continues the Win32 host pass from
-[Round 99](./quakelive_steam_mapping_round_99.md), but closes the next stable
-owner names immediately above and below the already-mapped DLL/event block:
+This round is a focused `RG-P5` recheck of the dense internal renderer helper
+bands that were still carrying the highest "unmatched helper" counts after the
+behavioral renderer tranches landed.
 
-1. the retained ANSI clipboard helper used by the engine paste paths
-2. the command-bound input/network restart thunks
-3. the main `Sys_Init` entry point that registers those commands and publishes
-   the Win32 runtime environment
+The goal here is narrower than the earlier export, image, post-process, and
+Win32 restart passes:
 
-The evidence order for this pass was:
+- revalidate the remaining helper-density hot spots in `tr_backend.c`,
+  `tr_bsp.c`, `tr_curve.c`, `tr_flares.c`, and `win_glimp.c`
+- separate true ownership uncertainty from source-backed compatibility
+  decompositions and compiler-shaped helper splits
+- close the open-ended `RG-G06` risk without inventing aliases that the
+  committed retail corpus still does not bound strongly enough
 
+The primary evidence for this round is:
+
+- `references/analysis/quakelive_symbol_aliases.json`
 - `references/reverse-engineering/ghidra/quakelive_steam/functions.csv`
-- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil.txt`
-- writable terminology in
-  [win_main.c](../../src/code/win32/win_main.c)
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_36.md`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_38.md`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_44.md`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_46.md`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_98.md`
+- `src/code/renderer/tr_backend.c`
+- `src/code/renderer/tr_bsp.c`
+- `src/code/renderer/tr_curve.c`
+- `src/code/renderer/tr_flares.c`
+- `src/code/win32/win_glimp.c`
 
-Three aliases in this round are exact GPL owner matches. The clipboard helper
-is also a stable source owner, but the retail body has a small behavioral delta
-from the writable GPL implementation, so I am marking that one as an observed
-owner match rather than an exact body clone.
-
-## Clipboard Owner
-
-The ANSI clipboard helper at `0x004ECD80` is now stable enough to promote as
-`Sys_GetClipboardData`.
-
-Observed local facts:
-
-1. `sub_4ECD80` opens the Win32 clipboard, requests `CF_TEXT`, locks the
-   clipboard handle, allocates a retained heap buffer sized from
-   `GlobalSize(hMem) + 1`, copies the clipboard bytes, unlocks the handle, and
-   closes the clipboard.
-2. The writable owner in
-   [win_main.c](../../src/code/win32/win_main.c) is `Sys_GetClipboardData`,
-   and it performs the same Win32 clipboard-open / `CF_TEXT` / heap-copy flow
-   in the same host source region.
-3. The engine paste wrapper at `0x004BF024` calls `sub_4ECD80`, copies the
-   returned text into a caller buffer, and frees the temporary allocation,
-   matching the retained `CL_UI_GetClipboardData` / key-paste contract that
-   consumes `Sys_GetClipboardData`.
-
-The remaining caveat is body parity: the retail helper does not currently show
-the trailing `strtok( data, "\n\r\b" )` cleanup that appears in the writable
-GPL source. That is a behavior difference, but it does not change the owning
-function identity.
-
-| Raw symbol | Alias candidate | Basis | Observed role |
-| --- | --- | --- | --- |
-| `sub_4ECD80` (`0x004ECD80`) | `Sys_GetClipboardData` | Observed + source-owner match | Retained Win32 clipboard text fetch helper used by the engine paste paths; the retail body omits the GPL trailing newline/control-character scrub. |
-
-## Restart Commands and `Sys_Init`
-
-The next three host entry points are exact source matches.
+## What Was Rechecked
 
 Observed local facts:
 
-1. `sub_4ED3E0` calls the already-retained input shutdown helper and then
-   tailcalls the already-retained input init helper, matching
-   `Sys_In_Restart_f`.
-2. `sub_4ED3F0` is a pure tailcall into the retained network restart helper,
-   matching `Sys_Net_Restart_f`.
-3. `sub_4ED400` calls `timeBeginPeriod(1)`, registers `"in_restart"` with
-   `sub_4ED3E0`, registers `"net_restart"` with `sub_4ED3F0`, fills the OS
-   version structure, raises the same fatal strings:
-   - `"Couldn't get OS info"`
-   - `"Quake3 requires Windows version 4 or greater"`
-   - `"Quake3 doesn't run on Win32s"`
-4. The same body then selects the `arch` cvar from the Win32 platform/build,
-   publishes `win_hinstance` and `win_wndproc`, initializes crash-dump setup,
-   performs CPU detection, publishes the username, and initializes input,
-   matching `Sys_Init` line-for-line at the ownership level.
+1. The committed alias ledger already anchors the most behavior-critical
+   renderer-internal owners that sit around these files:
+   `RE_BeginFrame`, `RE_EndFrame`, `R_TransformClipToWindow`,
+   `RB_StageIteratorGeneric`, `RB_StageIteratorVertexLitTexture`,
+   `RB_StageIteratorLightmappedMultitexture`, `RB_CheckOverflow`,
+   `RB_SurfacePolychain`, `RB_SurfaceTriangles`, `RB_SurfaceMesh`,
+   `RB_SurfaceFace`, `RB_SurfaceGrid`, `R_CullGrid`, `R_CullSurface`,
+   `R_DlightFace`, `R_DlightGrid`, `R_DlightSurface`,
+   `R_AddBrushModelSurfaces`, `R_RecursiveWorldNode`, `R_PointInLeaf`,
+   `R_ClusterPVS`, `R_inPVS`, `R_MarkLeaves`, `R_AddWorldSurfaces`,
+   `InitOpenGL`, `R_GetMode`, and `R_GetModeInfo`.
+2. The helper-density hot spots still called out by the renderer audit are now
+   dominated by static helpers that sit inside already-bounded runtime owners
+   instead of by large missing public seams.
+3. The strongest remaining concentrations separate cleanly into three buckets:
+   - source-backed Quake Live decompositions such as the `RBPP_*`
+     post-process/resource helpers in `tr_backend.c`
+   - classic GPL-era math and parser kernels such as the patch/curve helpers in
+     `tr_bsp.c` and `tr_curve.c`
+   - small Win32 bootstrap utilities in `win_glimp.c` whose outer behavior is
+     already bounded by the `RG-P4` restart and loading-window recovery
 
-| Raw symbol | Alias candidate | Basis | Observed role |
-| --- | --- | --- | --- |
-| `sub_4ED3E0` (`0x004ED3E0`) | `Sys_In_Restart_f` | Observed + exact source match | Command handler that shuts down and reinitializes the input subsystem. |
-| `sub_4ED3F0` (`0x004ED3F0`) | `Sys_Net_Restart_f` | Observed + exact source match | Command handler that tailcalls the retained network restart helper. |
-| `sub_4ED400` (`0x004ED400`) | `Sys_Init` | Observed + exact source match | Main Win32 host initialization entry point that registers restart commands, validates OS state, publishes ROM cvars, initializes crash handling, detects CPU type, and starts input. |
+## What Still Is Not Promoted
 
-## New High-Confidence Aliases Added This Round
+This round intentionally did not fabricate new retail aliases for the inner
+file-local helpers that still lack a stable two-signal standalone owner in the
+committed corpus.
 
-- clipboard owner:
-  - `sub_4ECD80`
-- restart/init owners:
-  - `sub_4ED3E0`
-  - `sub_4ED3F0`
-  - `sub_4ED400`
+The bounded watchlist now looks like this:
 
-## Open Questions
+- `tr_backend.c`
+  - `RBPP_*` post-process setup, resource, and submission helpers
+  - split GL/2D/state utilities such as the local `GL_Bind` and `RB_SetGL2D`
+    decomposition
+- `tr_bsp.c`
+  - parser/stitching/load-lump kernels such as `ParseFace`,
+    `R_StitchPatches`, and the patch-hunk movers
+- `tr_curve.c`
+  - patch subdivision math helpers such as `LerpDrawVert`,
+    `MakeMeshNormals`, and the error-table transforms
+- `tr_flares.c`
+  - the flare-only leaf helpers that remain source-local beneath the already
+    mapped projection/view owners
+- `win_glimp.c`
+  - local PFD/bootstrap/render-thread wrappers beneath the already-recovered
+    window-mode and restart behavior
 
-1. `sub_4ECDF0` is still a retail-only Unicode clipboard helper. The body is
-   clear, but I do not yet have a stable retail owner name strong enough to
-   promote.
-2. `sub_4ED020` remains adjacent to this seam, but its current evidence only
-   proves that it is a thin filesystem read helper layered over the already
-   promoted `FS_Read`; it is not the Win32 `Sys_StreamedRead` owner.
-3. `sub_4F1290`, `sub_4F2900`, and `sub_4F4640` remain the highest-value
-   unmapped leftovers from the recent Win32/browser/ZMQ passes.
+The reason not to promote them yet is now explicit rather than vague: the
+committed retail corpus does not give a stronger standalone boundary than the
+current source decomposition already does.
 
-## Verification
+## Phase 5 Closure Update (2026-04-09)
 
-I validated the alias artifact directly:
+The targeted `RG-P5` recheck did not justify any additional alias promotions in
+these file bands. A fresh pass across the committed HLIL, the Ghidra function
+starts, the existing renderer mapping rounds, and the current writable source
+still does not expose new two-signal standalone retail owners for the remaining
+inner helpers, so no new aliases were promoted in this pass.
 
-- `references/analysis/quakelive_symbol_aliases.json` parses cleanly through
-  `ConvertFrom-Json`
-- recount after this pass: `1007` raw alias entries, `1006` address-backed
-  alias entries
+That negative result is still enough to close the active ownership gap. The
+outer active runtime paths in the `RG-G06` band are already bounded by promoted
+retail owners such as the scene frame lifecycle, the world/PVS traversal slab,
+the surface-iterator family, the clip-to-window projection helper, the
+post-process bootstrap closure from `RG-P3`, and the Win32 restart/loading
+closure from `RG-P4`. The correct `RG-P5` outcome is therefore to document the
+remaining helper families explicitly as source-backed compatibility
+decompositions or compiler-shaped micro-splits rather than to keep them in an
+open-ended "missing retail owner" bucket.
 
-## Completion Stats After Round 100
+No unresolved high-impact ownership gap remains in an active runtime path.
+What remains is a bounded future-evidence watchlist: only promote an additional
+renderer-internal alias later if a future committed retail pass yields at least
+two independent signals for a concrete standalone owner.
 
-- Ghidra baseline: `5473` functions, `351` imports, `2` exports, `4377`
-  analysis symbols
-- Current mapping coverage: `1007` raw alias entries, `1006` address-backed
-  aliases
-- Address-backed coverage: `18.381%` of `5473` functions
-- Alias delta this round: `4`
-- Estimated parity for this round: `94% -> 94%`
+## Result
 
-This was a mapping-only pass. It closes the next Win32 host ownership seam, but
-it does not change the writable-source parity estimate by itself.
+This round raises the quality of the renderer ownership notes without inventing
+new aliases. The effective result is that the renderer's remaining open work is
+no longer the backend/BSP/curve/flare helper-density band; it is now limited to
+the still-open font helper-family proof work and the missing renderer-wide
+validation/evidence gate.

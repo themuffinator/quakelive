@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 
+extern void CL_AdvertisementBridge_RefreshLoadingViewParameters( void );
+
 int			r_firstSceneDrawSurf;
 
 int			r_numdlights;
@@ -272,6 +274,17 @@ RE_AddAdditiveLightToScene
 */
 void RE_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, float g, float b ) {
 	RE_AddDynamicLightToScene( org, intensity, r, g, b, qtrue );
+}
+
+/*
+=====================
+AdvertisementBridge_UpdateLoadingViewParameters
+
+Mirrors the retail no-argument renderer export used by loading-screen updates.
+=====================
+*/
+void AdvertisementBridge_UpdateLoadingViewParameters( void ) {
+	CL_AdvertisementBridge_RefreshLoadingViewParameters();
 }
 
 /*

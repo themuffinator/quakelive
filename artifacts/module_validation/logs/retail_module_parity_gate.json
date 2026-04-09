@@ -1,0 +1,67 @@
+{
+  "artifact_version": 2,
+  "phase": "GMR-P5",
+  "parity_estimate": {
+    "before": 99.7,
+    "after": 100.0
+  },
+  "gap_order": [
+    "GMR-G01",
+    "GMR-G02",
+    "GMR-G05"
+  ],
+  "tranches": {
+    "GMR-G01": {
+      "gap_id": "GMR-G01",
+      "status": "pass",
+      "summary": "Retail DLL host validation remains backed by the tracked runtime probe, static edge-contract checks, and the archived runtime artifact.",
+      "details": {
+        "runtime_probe_present": true,
+        "runtime_evidence_present": true,
+        "runtime_evidence_sufficient": true,
+        "workflow_references_gate": true,
+        "workflow_runs_platform_services": true,
+        "workflow_mentions_runtime_probe": true,
+        "build_pipeline_mentions_runtime_artifact": true,
+        "native_pipeline_mentions_runtime_artifact": true,
+        "wow64_ui_export_probe_present": true,
+        "retail_plan_marks_gap_closed": true
+      }
+    },
+    "GMR-G02": {
+      "gap_id": "GMR-G02",
+      "status": "pass",
+      "summary": "Audited offline launcher-resource fallbacks stay available without enabling live services, and the closure is locked by the focused platform-service regression surface.",
+      "details": {
+        "filesystem_gate_removed": true,
+        "webpak_remains_available_offline": true,
+        "steam_only_uri_gate_preserved": true,
+        "platform_service_coverage_present": true,
+        "scripting_guide_mentions_offline_resource_fallbacks": true,
+        "retail_plan_marks_gap_closed": true
+      }
+    },
+    "GMR-G05": {
+      "gap_id": "GMR-G05",
+      "status": "pass",
+      "summary": "Parity ledgers, the final module gate, and the pipeline notes now agree on a fully closed strict-retail game-module register.",
+      "details": {
+        "retail_plan_current_parity_is_100": true,
+        "retail_plan_marks_gmr_g05_closed": true,
+        "retail_plan_marks_gmr_p5_completed": true,
+        "audit_marks_full_module_closure": true,
+        "implementation_plan_marks_task_31_completed": true,
+        "pipeline_docs_reference_final_gate": true,
+        "ui_plan_marks_combined_closure_alignment": true,
+        "current_suite_counts_synced": true
+      }
+    }
+  },
+  "overall_status": "pass",
+  "non_passing_gap_ids": [],
+  "summary": {
+    "passing_count": 3,
+    "blocked_count": 0,
+    "failing_count": 0
+  }
+}

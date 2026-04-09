@@ -1,0 +1,84 @@
+name: Module Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/module-validation.yml'
+      - 'tests/test_platform_services.py'
+      - 'tests/test_game_module_retail_parity_gate.py'
+      - 'tools/ci/wow64-smoketest.ps1'
+      - 'tools/modules/run_retail_module_runtime_probe.ps1'
+      - 'tools/modules/**'
+      - 'docs/build-pipeline.md'
+      - 'docs/architecture/native-pipeline.md'
+      - 'docs/testing/wow64-smoketest.md'
+      - 'docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-09.md'
+      - 'docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md'
+      - 'docs/ui/scripting-guide.md'
+      - 'AUDIT.md'
+      - 'IMPLEMENTATION_PLAN.md'
+      - 'artifacts/module_validation/**'
+      - 'src/code/client/cl_steam_resources.c'
+      - 'src/code/client/cl_webpak.c'
+      - 'src/code/client/cl_cgame.c'
+      - 'src/code/client/cl_ui.c'
+      - 'src/code/qcommon/files.c'
+      - 'src/code/server/sv_game.c'
+      - 'src/code/qcommon/vm.c'
+  pull_request:
+    paths:
+      - '.github/workflows/module-validation.yml'
+      - 'tests/test_platform_services.py'
+      - 'tests/test_game_module_retail_parity_gate.py'
+      - 'tools/ci/wow64-smoketest.ps1'
+      - 'tools/modules/run_retail_module_runtime_probe.ps1'
+      - 'tools/modules/**'
+      - 'docs/build-pipeline.md'
+      - 'docs/architecture/native-pipeline.md'
+      - 'docs/testing/wow64-smoketest.md'
+      - 'docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-09.md'
+      - 'docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md'
+      - 'docs/ui/scripting-guide.md'
+      - 'AUDIT.md'
+      - 'IMPLEMENTATION_PLAN.md'
+      - 'artifacts/module_validation/**'
+      - 'src/code/client/cl_steam_resources.c'
+      - 'src/code/client/cl_webpak.c'
+      - 'src/code/client/cl_cgame.c'
+      - 'src/code/client/cl_ui.c'
+      - 'src/code/qcommon/files.c'
+      - 'src/code/server/sv_game.c'
+      - 'src/code/qcommon/vm.c'
+
+jobs:
+  module-validation:
+    runs-on: ubuntu-latest
+    env:
+      MODULE_VALIDATION_ROOT: artifacts/module_validation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run module parity tests
+        run: |
+          pytest tests/test_platform_services.py tests/test_game_module_retail_parity_gate.py -q
+
+      - name: Upload module artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-validation
+          path: |
+            ${{ env.MODULE_VALIDATION_ROOT }}/**
+          if-no-files-found: warn
+          retention-days: 7

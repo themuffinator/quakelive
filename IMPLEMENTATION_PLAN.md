@@ -8,6 +8,105 @@ The long-term parity target is that this engine should, in theory, be able to re
 
 ## Recently closed
 
+### Task 76: Client full parity audit and closure-plan publication [COMPLETED]
+Priority: High
+Files: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `IMPLEMENTATION_PLAN.md`, `AUDIT.md`
+Parity estimate: **before 92% -> after 90%** (confidence correction; runtime behavior unchanged)
+
+Completed work:
+
+1. Re-audited the native `client` host against the committed retail `quakelive_steam.exe` HLIL/Ghidra corpus, the recent host mapping rounds, the launcher/browser notes, and the current writable source under `src/code/client`, `src/common/platform`, and the adjacent client-owned `common.c` seams.
+2. Published a dedicated client parity document that separates the strong retained client/runtime story from the still-open Quake Live launcher/platform work, records the refreshed strict client estimate as **90%**, and turns the remaining debt into an explicit gap register (`CL-G01`..`CL-G05`) instead of leaving it spread across mapping rounds and top-level host notes.
+3. Broke the remaining client closure work into six executable phases (`CL-P1`..`CL-P6`) covering retail config/bootstrap persistence, Steam callback lifecycle, workshop-aware download bootstrap, browser-host core reconstruction, JS/data/event publication, and a dedicated client parity gate plus runtime evidence lane.
+
+### Task 75: Renderer strict retail-font-stack re-audit and closure-plan refresh [COMPLETED]
+Priority: High
+Files: `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `tests/test_renderer_full_parity_gate.py`, `artifacts/renderer_validation/logs/renderer_full_parity_gate.json`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 98% -> after 94%** (confidence correction; runtime behavior unchanged)
+
+Completed work:
+
+1. Re-audited the renderer against the committed retail HLIL/Ghidra corpus, the tracked runtime evidence, and the dedicated retail font-stack note/audit, then corrected the strict renderer estimate from the earlier post-`RG-P6` public **98%** figure down to **94%** because the old estimate undercounted the unresolved retail text-host debt.
+2. Expanded the renderer gap register beyond the old single open tranche `RG-G05`. The refreshed report now keeps `RG-G05` for classic `tr_font.c` proof work, adds `RG-G08` for the still-missing retail host FontStash text engine (`*fontstash`, `R_fonsErrorCallback`, direct host `DrawScaledText` / `MeasureText`), and adds `RG-G09` for the missing in-tree `src/code/ft2/` source lane plus unfinished strict text/debug-atlas validation.
+3. Updated the machine-readable renderer parity gate and the top-level audit summaries so repo-wide status now reflects the refreshed strict renderer story instead of continuing to report that only the old font helper-family proof tranche remained.
+
+### Task 74: Renderer parity-gate and runtime-evidence closure tranche [COMPLETED]
+Priority: High
+Files: `tests/test_renderer_full_parity_gate.py`, `tools/renderer/run_renderer_runtime_probe.ps1`, `.github/workflows/renderer-validation.yml`, `artifacts/renderer_validation/logs/renderer_full_parity_gate.json`, `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260409.json`, `docs/build-pipeline.md`, `docs/hud_render_baseline.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 98%** (`RG-P6` complete; `RG-G07` closed)
+
+Completed work:
+
+1. Added the unified renderer parity gate in `tests/test_renderer_full_parity_gate.py`, which writes `artifacts/renderer_validation/logs/renderer_full_parity_gate.json` and makes the current renderer gap register (`RG-G01`..`RG-G07`) machine-readable instead of leaving it only in prose.
+2. Added the tracked Windows runtime probe at `tools/renderer/run_renderer_runtime_probe.ps1` and refreshed `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260409.json`, which now records forced-windowed main-menu and live `bloodrun` captures, archived `qconsole.log` evidence, and process-bound window metadata for the current renderer milestone.
+3. Wired the renderer validation surface into `.github/workflows/renderer-validation.yml`, updated the renderer audit/docs to point at the new gate and runtime artifact, and narrowed the remaining renderer gap register to the still-open font helper-family proof work.
+
+### Task 73: Renderer internal helper-family ownership closure tranche [COMPLETED]
+Priority: High
+Files: `docs/reverse-engineering/quakelive_steam_mapping_round_100.md`, `docs/reverse-engineering/renderer-internal-helper-ownership-2026-04-09.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `tests/test_renderer_internal_helper_mapping_parity.py`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 93% -> after 96%** (`RG-P5` complete; `RG-G06` closed)
+
+Completed work:
+
+1. Rechecked the dense helper bands in `tr_backend.c`, `tr_bsp.c`, `tr_curve.c`, `tr_flares.c`, and `win_glimp.c` against the committed alias ledger, HLIL, Ghidra function starts, and prior renderer mapping rounds, then recorded that pass in `quakelive_steam_mapping_round_100.md`.
+2. Published `renderer-internal-helper-ownership-2026-04-09.md` to bound the remaining file-local helpers explicitly as source-backed compatibility decompositions or compiler-shaped micro-splits beneath already-mapped runtime owners, instead of leaving those files in an open-ended missing-owner bucket.
+3. Updated the renderer audit/summary documents and added `tests/test_renderer_internal_helper_mapping_parity.py` so the `RG-G06` file band stays closed unless a future change reopens a high-impact active-runtime ownership gap.
+
+### Task 72: Renderer Win32 host-glue closure tranche [COMPLETED]
+Priority: High
+Files: `src/code/win32/win_glimp.c`, `src/code/win32/win_main.c`, `src/code/win32/win_syscon.c`, `src/code/win32/win_wndproc.c`, `src/code/win32/win_local.h`, `tests/test_renderer_win32_host_glue_parity.py`, `docs/renderer_cvar_matrix.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 90% -> after 93%** (`RG-P4` complete; `RG-G04` closed)
+
+Completed work:
+
+1. Restored the retail Win32 live client-rect sync seam in `win_wndproc.c`, so `WM_SIZE` / `WM_EXITSIZEMOVE` now re-read the retained windowed client rect, switch `r_windowedMode` to `-1`, refresh `r_windowedWidth` / `r_windowedHeight`, and queue `vid_restart fast` when the live window size changes.
+2. Recovered the adjacent host-side resize behavior by adding the retail `WM_SIZING` constraint helper and by teaching `win_glimp.c` to preserve the retained maximized-window state across fast fullscreen->windowed restarts, instead of always dropping back to the plain GPL window style.
+3. Added the shared loading-window wrapper family (`Sys_CreateLoadingWindow` / `Sys_DestroyLoadingWindow`) around the `Q3 WinConsole` class, wired the retail startup order into `win_main.c`, documented the missing-asset fallback for `splash.bmp`, and pinned the whole host-glue tranche with `tests/test_renderer_win32_host_glue_parity.py`.
+
+### Task 71: Renderer post-process and color-correction closure tranche [COMPLETED]
+Priority: High
+Files: `src/code/renderer/tr_backend.c`, `src/code/renderer/tr_init.c`, `src/code/renderer/tr_local.h`, `tests/test_renderer_post_process_parity.py`, `docs/renderer_cvar_matrix.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 85% -> after 90%** (`RG-P3` complete; `RG-G03` closed)
+
+Completed work:
+
+1. Replaced the approximation-backed post-process layer with a shader-backed rectangle-texture/FBO pipeline keyed to the retail Quake Live shader family (`posteffect`, `brightpass`, `downsample1`, `blurvertical`, `blurhoriz`, `combine`, and `colorcorrect`) recovered from the committed HLIL corpus.
+2. Removed the CPU `qglGetTexImage` color-correction path, restored backend-owned active-state mirroring for `r_postProcessActive` / `r_bloomActive` / `r_colorCorrectActive`, tightened `r_enableBloom` back to the retail `0/1` toggle contract, and registered the missing `r_contrast` surface consumed by the recovered color-correct shader.
+3. Added `tests/test_renderer_post_process_parity.py` and refreshed the renderer audit/CVar notes so the post-process shader family, rectangle-texture copy path, active-mirror ownership, and recovered CVar surface are now pinned by focused parity checks.
+
+### Task 70: Renderer memory-image and live resource-ingestion closure tranche [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_main.c`, `src/code/client/cl_steam_resources.c`, `src/code/client/client.h`, `src/code/renderer/tr_image.c`, `src/code/renderer/tr_local.h`, `tests/test_renderer_memory_image_parity.py`, `tests/test_platform_services.py`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 81% -> after 85%** (`RG-P2` complete; `RG-G02` closed)
+
+Completed work:
+
+1. Restored the retail renderer memory-image helper family by introducing `R_CreateImageWithTarget`, `R_DetectImageTypeFromMemory`, `R_LoadImageFromMemory`, and the adjoining buffer-backed BMP/TGA/JPG/PNG decode cores in `tr_image.c`, with the public `R_CreateImage` entry point now wrapping the target-aware internal constructor.
+2. Added explicit client compatibility wrappers (`CL_RegisterShaderFromRGBA` and `CL_RegisterShaderFromMemory`) so live image payloads can enter the renderer directly without claiming a new retail export slot, while still reusing the normal shader-registration path.
+3. Rewrote the Steam/launcher resource bridge to stop writing temporary cache files purely to reach `re.RegisterShaderNoMip`; avatars now register directly from live RGBA data, launcher/browser image payloads now register through the new renderer memory-loader lane, and the static parity gates were updated to lock that path in place.
+
+### Task 69: Renderer export-tail and font-contract closure tranche [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_cgame.c`, `src/code/client/cl_main.c`, `src/code/client/cl_ui.c`, `src/code/client/client.h`, `src/code/renderer/tr_font.c`, `src/code/renderer/tr_init.c`, `src/code/renderer/tr_local.h`, `src/code/renderer/tr_public.h`, `src/code/renderer/tr_scene.c`, `tests/test_renderer_export_tail_parity.py`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 76% -> after 81%** (`RG-P1` complete; `RG-G01` closed, `RG-G05` narrowed)
+
+Completed work:
+
+1. Restored the retail renderer export-tail ABI by removing `RegisterFont` from `refexport_t`, inserting the no-argument `AdvertisementBridge_UpdateLoadingViewParameters` slot immediately after `RenderScene`, and reordering the `GetRefAPI` tail assignments to match the retail contract.
+2. Moved UI/cgame font registration onto a dedicated client compatibility wrapper (`CL_RegisterFont`) so `R_RegisterFont` remains reachable through the proven syscall/native-import lanes without continuing to claim ownership of a retail renderer export slot.
+3. Routed the loading-view bridge through the new renderer export seam, documented the remaining `tr_font.c` compatibility scaffolding explicitly, and added `tests/test_renderer_export_tail_parity.py` to pin the export order, the font registration lane, and the loading-view bridge dispatch.
+
+### Task 68: Renderer full parity audit and closure-plan publication [COMPLETED]
+Priority: High
+Files: `AUDIT.md`, `IMPLEMENTATION_PLAN.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 74% -> after 76%** (confidence/documentation uplift; runtime behavior unchanged)
+
+Completed work:
+
+1. Performed a full renderer parity audit against the committed Quake Live host HLIL/Ghidra corpus, the existing renderer mapping rounds, and the current renderer-facing source tree across `src/code/renderer`, `src/code/win32`, and the adjacent client-side image/resource bridge.
+2. Published a dedicated renderer closure-plan document that records the remaining gap register (`RG-G01`..`RG-G07`), including the retail export-tail ABI mismatch, missing in-memory image/target-aware texture path, approximation-backed post-process band, Win32 host-glue drift, font/internal-helper ownership gaps, and the missing renderer parity gate.
+3. Broke the closure path into six executable renderer phases (`RG-P1`..`RG-P6`) with explicit deliverables, exit criteria, and projected parity uplift targets, so renderer parity can now be tracked and closed deliberately instead of through isolated mapping passes.
+
 ### Task 67: Qagame residual timer/debug/training tail closure [COMPLETED]
 Priority: High
 Files: `src/code/game/g_bot.c`, `src/code/game/g_local.h`, `tests/test_game_factory_regen_parity.py`, `tests/test_game_helper_seam_parity.py`, `docs/reverse-engineering/qagame-mapping.md`, `docs/reverse-engineering/qagame-full-parity-audit-and-implementation-plan-2026-04-05.md`, `IMPLEMENTATION_PLAN.md`
@@ -698,6 +797,72 @@ Completed subtasks:
 
 1. Executed `QG-P1` through `QG-P6` and closed the full `QG-G01`..`QG-G10` gap register.
 
+### Task 30: Source-built game-module residual parity closure [COMPLETED]
+Priority: High
+Primary areas: `tools/build_ui_bundle.py`, `tools/build_ui_bundle.sh`, `tests/test_ui_src_panel_parity.py`, parity docs
+Parity estimate: **before 99.5% -> after 100%** (`GM-P3` and `GM-P4` complete; `GM-G05` closed)
+
+The refreshed combined audit in `docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-09.md` now shows the source-built module layer at a fully green baseline. `GM-P1` through `GM-P4` are complete: the shared native-wrapper seam passes `tests/test_platform_services.py` (`41 passed`), cgame is `170 passed`, qagame is `91 passed, 5 skipped`, UI is `49 passed, 6 skipped`, and the tracked UI parity-gate artifact reports `overall_status: pass`.
+
+This task only closes the source-built DLL lane. Strict retail-facing module
+parity is tracked separately under Task 31.
+
+Completed work:
+
+1. Added a portable Python UI bundle runner at `tools/build_ui_bundle.py`, kept the existing Python corpus/overlay/font tools as the build source of truth, and converted `tools/build_ui_bundle.sh` into a thin compatibility shim.
+2. Updated the clean-artifact rebuild parity test to call the portable entry point directly, which closes the Windows Microsoft-Bash-launcher failure mode without changing bundle contents.
+3. Rebuilt the bundle artifacts, reran the full four-command module validation set, refreshed the UI full-parity gate artifact to `pass`, and closed the module-layer residual gap register.
+
+### Task 31: Strict retail game-module parity closure [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/*`, `src/code/game/*`, `src/code/ui/*`, `src/code/client/*`, `src/code/server/*`, parity docs
+Parity estimate: **before 96.5% -> after 100%** (`GMR-P1`..`GMR-P5` complete)
+
+The refreshed retail-facing audit in
+`docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-09.md`
+now closes the combined module layer at **100%** strict retail parity for the
+module register. The source-built DLL lane is green, and the remaining
+live-map blocker is explicitly delegated to the renderer audit rather than left
+as an open module gap.
+
+`GMR-P1` retail DLL validation is now closed. The tracked retail probe loads
+retail `uix86.dll`, `qagamex86.dll`, and `cgamex86.dll` from the Steam profile
+root under the reconstructed host, and the remaining live-map shortfall is
+explicitly bounded to the renderer-owned `R_LoadMD3` failure on retail
+`models/weapons3/hmg/hmg.md3`.
+
+`GMR-P2` is now closed as well. Retail qagame/cgame `pstats` transport is
+mirrored end to end in writable source, with qagame accepting `pstats` and
+cgame routing both `acc` and `pstats` through the recovered shared 15-slot
+cache path.
+
+`GMR-P3` is now closed too. The retail `CG_Player` path applies a post-`tag_head`
+world transform driven by `g_playerheadScale` and `g_playerheadScaleOffset`,
+and writable source now mirrors that origin/axis math under the same
+first-person guard while the focused cgame parity suite locks the helper and
+call-site placement structurally.
+
+`GMR-P4` is now closed as well. The retained launcher/resource fallback owner
+chain stays available for audited offline `ui`/`cgame` flows even when live
+online services are disabled, so local `web.pak`, `fs_webpath`, screenshot,
+and non-Steam URI resource loads no longer depend on the missing retail
+launcher host.
+
+`GMR-P5` is now closed too. The final module parity gate, the top-level
+ledgers, the dedicated UI audit, and the native/build pipeline notes now all
+agree on the same strict-retail module closure state, and the live validation
+baseline has been refreshed on the current tree.
+
+Completed work in this task:
+
+1. Closed `GMR-P1` through `GMR-P4`, removing every active runtime and
+   host-adjacent module gap from the strict-retail register.
+2. Re-ran the source-built module suites, the shared platform-service seam, and
+   the tracked retail runtime probe on the current tree.
+3. Reconciled the module parity ledgers so the repo consistently distinguishes
+   source-built DLL closure from strict retail module parity closure while now
+   marking the strict-retail module layer closed as well.
+
 ## Verification expectations after gameplay/client changes
 
 When code changes can affect startup or runtime stability:
@@ -711,6 +876,6 @@ When code changes can affect startup or runtime stability:
 ## Working priority order
 
 1. Native launcher/platform host reconstruction.
-2. UI/menu asset and compatibility remediation within repository constraints.
+2. Strict retail game-module validation and residual `cgame` exactness closure.
 3. Ownerdraw/stat payload completion and runtime validation.
 4. Targeted gameplay validation sweeps.

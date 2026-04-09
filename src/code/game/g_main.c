@@ -1117,7 +1117,7 @@ static void G_NativeShutdown( qboolean restart ) {
 G_NativeClientConnect
 ================
 */
-static char *G_NativeClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
+static const char *G_NativeClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	return ClientConnect( clientNum, firstTime, isBot );
 }
 

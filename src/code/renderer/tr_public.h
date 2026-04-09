@@ -68,6 +68,7 @@ typedef struct {
 	void	(*AddLightToScene)( const vec3_t org, float intensity, float r, float g, float b );
 	void	(*AddAdditiveLightToScene)( const vec3_t org, float intensity, float r, float g, float b );
 	void	(*RenderScene)( const refdef_t *fd );
+	void	(*AdvertisementBridge_UpdateLoadingViewParameters)( void );
 
 	void	(*SetColor)( const float *rgba );	// NULL = 1,1,1,1
 	void	(*DrawStretchPic) ( float x, float y, float w, float h, 
@@ -93,7 +94,6 @@ typedef struct {
 #ifdef __USEA3D
 	void    (*A3D_RenderGeometry) (void *pVoidA3D, void *pVoidGeom, void *pVoidMat, void *pVoidGeomStatus);
 #endif
-	void	(*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);
 	void	(*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
 	qboolean (*GetEntityToken)( char *buffer, int size );
 	qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );

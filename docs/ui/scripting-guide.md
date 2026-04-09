@@ -48,6 +48,7 @@ This guide documents how to stage Quake Live HUD and menu assets inside the GPL 
 - `exec web_showBrowser`: if invoked from the retail main menu, the writable runtime now opens the generated `ql_bridge_browser` surface instead of dispatching into the inert host stub; if the bridge cannot be loaded, the UI raises `error_popmenu` with a native fallback message.
 - `exec web_showBrowser` from in-game lower-nav panels and `exec web_changeHash ...` from `intro.menu` or `ingame.menu` are swallowed locally when the overlay is unavailable, leaving the companion native menus (`ingame_about`, join controls, settings panels) active instead of hard-stopping on dead service commands.
 - `uiScript stopRefresh` always stops the native server refresh path. The overlay-specific `web_stopRefresh` console command is only forwarded when the browser layer exists; otherwise the UI logs the offline-native fallback and keeps the browser list usable.
+- Launcher-compatible local resource loads stay available even when live online services are disabled: the retained owner chain still checks `web.pak`, the mapped `fs_webpath` / `screenshots` fallback roots, and the non-Steam URI bridge before reporting a resource miss, so offline bridge menus and default advert content do not depend on the missing retail launcher host.
 - `activateAdvert` stays implemented in offline builds through the advert shader fallback path and the advertisement wait-screen text export, so advert panels and wait states remain drawable even with online services disabled.
 
 ## Accessibility Considerations

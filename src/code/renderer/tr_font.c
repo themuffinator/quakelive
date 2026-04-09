@@ -574,6 +574,8 @@ static void R_FreeFontFileBuffer( void *buffer, qboolean fromFileSystem ) {
 /*
 =================
 RE_RegisterFontFallback
+
+Source-compatibility fallback used when cached or FreeType-backed font data is unavailable.
 =================
 */
 static qboolean RE_RegisterFontFallback( const char *cacheName, float glyphScale, fontInfo_t *font ) {
@@ -630,9 +632,12 @@ static qboolean RE_RegisterFontFallback( const char *cacheName, float glyphScale
 /*
 =================
 RE_RegisterFont
+
+Renderer font registration implementation used by the UI/cgame import lanes.
+Retail Quake Live no longer proves this function as part of the GetRefAPI export tail.
 =================
 */
-void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {
 #ifdef BUILD_FREETYPE
 	FT_Face face;
 	int j, k, xOut, yOut, lastStart, imageNumber;
@@ -677,6 +682,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 	registeredIndex = R_FindRegisteredFont( cacheName );
 	if ( registeredIndex < 0 && Q_stricmp( cacheName, legacyCacheName ) ) {
+		// Preserve the point-size-only cache probe as explicit compatibility scaffolding until the retail cache helpers are fully mapped.
 		registeredIndex = R_FindRegisteredFont( legacyCacheName );
 	}
 

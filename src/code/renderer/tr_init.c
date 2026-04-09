@@ -133,6 +133,7 @@ cvar_t	*r_textureMode;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
 cvar_t	*r_gamma;
+cvar_t	*r_contrast;
 cvar_t	*r_intensity;
 cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
@@ -1149,7 +1150,7 @@ static void R_ClampPostProcessCvars( void ) {
 	}
 
 	if ( r_enableBloom ) {
-		AssertCvarRange( r_enableBloom, 0, 2, qtrue );
+		AssertCvarRange( r_enableBloom, 0, 1, qtrue );
 	}
 
 	if ( r_enableColorCorrect ) {
@@ -1165,17 +1166,14 @@ Synchronize post-process state mirrors with the enable toggles.
 =============
 */
 void R_UpdatePostProcessCvars( void ) {
-	qboolean postProcessEnabled;
-	qboolean bloomEnabled;
 	qboolean colorCorrectEnabled;
 	qboolean triggerReset;
 
 	R_ClampPostProcessCvars();
 	R_ClampRendererCvars();
 
-	postProcessEnabled = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer);
-	bloomEnabled = (qboolean)(postProcessEnabled && r_enableBloom && r_enableBloom->integer);
-	colorCorrectEnabled = (qboolean)(postProcessEnabled && r_enableColorCorrect && r_enableColorCorrect->integer);
+	colorCorrectEnabled = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer &&
+		r_enableColorCorrect && r_enableColorCorrect->integer);
 
 	if ( colorCorrectEnabled && !tr.colorCorrectReady ) {
 		R_InitColorCorrection();
@@ -1184,22 +1182,6 @@ void R_UpdatePostProcessCvars( void ) {
 	triggerReset = (qboolean)(r_enablePostProcess && r_enablePostProcess->modified);
 	triggerReset = (qboolean)(triggerReset || (r_enableBloom && r_enableBloom->modified));
 	triggerReset = (qboolean)(triggerReset || (r_enableColorCorrect && r_enableColorCorrect->modified));
-
-	if ( tr.postProcessActive != postProcessEnabled ) {
-		triggerReset = qtrue;
-	}
-
-	if ( tr.bloomActive != bloomEnabled ) {
-		triggerReset = qtrue;
-	}
-
-	if ( tr.colorCorrectActive != colorCorrectEnabled ) {
-		triggerReset = qtrue;
-	}
-
-	tr.postProcessActive = postProcessEnabled;
-	tr.bloomActive = bloomEnabled;
-	tr.colorCorrectActive = colorCorrectEnabled;
 
 	if ( triggerReset ) {
 		tr.postProcessNeedsReset = qtrue;
@@ -1218,15 +1200,15 @@ void R_UpdatePostProcessCvars( void ) {
 	}
 
 	if ( r_postProcessActive ) {
-		ri.Cvar_Set( "r_postProcessActive", postProcessEnabled ? "1" : "0" );
+		ri.Cvar_Set( "r_postProcessActive", tr.postProcessActive ? "1" : "0" );
 	}
 
 	if ( r_bloomActive ) {
-		ri.Cvar_Set( "r_bloomActive", bloomEnabled ? "1" : "0" );
+		ri.Cvar_Set( "r_bloomActive", tr.bloomActive ? "1" : "0" );
 	}
 
 	if ( r_colorCorrectActive ) {
-		ri.Cvar_Set( "r_colorCorrectActive", colorCorrectEnabled ? "1" : "0" );
+		ri.Cvar_Set( "r_colorCorrectActive", tr.colorCorrectActive ? "1" : "0" );
 	}
 }
 
@@ -1263,7 +1245,7 @@ void R_Register( void )
 	r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "1", CVAR_ARCHIVE | CVAR_LATCH);
 #endif
 
-// HLIL: post-processing/color-correct toggles are 0/1, bloom supports a second pass when set to 2.
+// HLIL: post-processing, bloom, and color-correct toggles are all 0/1 gates.
 r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH );
 r_enableBloom = ri.Cvar_Get( "r_enableBloom", "1", CVAR_ARCHIVE | CVAR_LATCH );
 r_enableColorCorrect = ri.Cvar_Get( "r_enableColorCorrect", "1", CVAR_ARCHIVE | CVAR_LATCH );
@@ -1351,6 +1333,7 @@ r_bloomBrightThreshold = ri.Cvar_Get( "r_bloomBrightThreshold", "0.25", CVAR_ARC
 #else
 	r_gamma = ri.Cvar_Get( "r_gamma", "1", CVAR_ARCHIVE );
 #endif
+	r_contrast = ri.Cvar_Get( "r_contrast", "1", CVAR_ARCHIVE );
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE );
 
 	r_railWidth = ri.Cvar_Get( "r_railWidth", "16", CVAR_ARCHIVE );
@@ -1626,13 +1609,6 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.SetWorldVisData = RE_SetWorldVisData;
 	re.EndRegistration = RE_EndRegistration;
 
-	re.BeginFrame = RE_BeginFrame;
-	re.EndFrame = RE_EndFrame;
-
-	re.MarkFragments = R_MarkFragments;
-	re.LerpTag = R_LerpTag;
-	re.ModelBounds = R_ModelBounds;
-
 	re.ClearScene = RE_ClearScene;
 	re.AddRefEntityToScene = RE_AddRefEntityToScene;
 	re.AddPolyToScene = RE_AddPolyToScene;
@@ -1640,13 +1616,17 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.AddLightToScene = RE_AddLightToScene;
 	re.AddAdditiveLightToScene = RE_AddAdditiveLightToScene;
 	re.RenderScene = RE_RenderScene;
-
+	re.AdvertisementBridge_UpdateLoadingViewParameters = AdvertisementBridge_UpdateLoadingViewParameters;
 	re.SetColor = RE_SetColor;
 	re.DrawStretchPic = RE_StretchPic;
 	re.DrawStretchRaw = RE_StretchRaw;
 	re.UploadCinematic = RE_UploadCinematic;
+	re.BeginFrame = RE_BeginFrame;
+	re.EndFrame = RE_EndFrame;
+	re.MarkFragments = R_MarkFragments;
+	re.LerpTag = R_LerpTag;
+	re.ModelBounds = R_ModelBounds;
 
-	re.RegisterFont = RE_RegisterFont;
 	re.RemapShader = R_RemapShader;
 	re.GetEntityToken = R_GetEntityToken;
 	re.inPVS = R_inPVS;

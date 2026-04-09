@@ -77,7 +77,7 @@
     "UI-G05": {
       "gap_id": "UI-G05",
       "status": "pass",
-      "summary": "Service-disabled menu routing stays explicit in source and in the focused platform-service regression surface.",
+      "summary": "Service-disabled menu and launcher-resource routing stay explicit in source and in the focused platform-service regression surface.",
       "details": {
         "deferred_exec_seam_present": true,
         "script_exec_hook_present": true,

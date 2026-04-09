@@ -1038,6 +1038,7 @@ extern	cvar_t	*r_showcluster;
 extern cvar_t	*r_mode;				// video mode
 extern cvar_t	*r_fullscreen;
 extern cvar_t	*r_gamma;
+extern cvar_t	*r_contrast;
 extern cvar_t	*r_displayRefresh;		// optional display refresh option
 extern cvar_t	*r_ignorehwgamma;		// overrides hardware gamma capabilities
 
@@ -1230,8 +1231,13 @@ model_t		*R_AllocModel( void );
 void    	R_Init( void );
 image_t		*R_FindImageFile( const char *name, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode );
 
+image_t		*R_CreateImageWithTarget( const char *name, const byte *pic, int width, int height, qboolean mipmap
+					, qboolean allowPicmip, int wrapClampMode, int glTarget );
 image_t		*R_CreateImage( const char *name, const byte *pic, int width, int height, qboolean mipmap
 					, qboolean allowPicmip, int wrapClampMode );
+int			R_DetectImageTypeFromMemory( const byte *buffer, int bufferLength );
+image_t		*R_LoadImageFromMemory( const char *name, const byte *buffer, int bufferLength, qboolean mipmap
+					, qboolean allowPicmip, int glWrapClampMode );
 int			R_GetMode( void );
 qboolean	R_GetModeInfo( int *width, int *height, float *windowAspect, int mode, qboolean fullscreen );
 
@@ -1467,6 +1473,7 @@ void RE_AddPolyToScene( qhandle_t hShader , int numVerts, const polyVert_t *vert
 void RE_AddLightToScene( const vec3_t org, float intensity, float r, float g, float b );
 void RE_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, float g, float b );
 void RE_RenderScene( const refdef_t *fd );
+void AdvertisementBridge_UpdateLoadingViewParameters( void );
 
 /*
 =============================================================
@@ -1654,7 +1661,7 @@ void SaveJPG(char * filename, int quality, int image_width, int image_height, un
 // font stuff
 void R_InitFreeType();
 void R_DoneFreeType();
-void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
+void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font );
 
 
 #endif //TR_LOCAL_H

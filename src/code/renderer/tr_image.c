@@ -41,9 +41,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../jpeg-6/jpeglib.h"
 
 
+typedef enum {
+	IMAGETYPE_MEMORY_UNKNOWN,
+	IMAGETYPE_MEMORY_JPG,
+	IMAGETYPE_MEMORY_BMP,
+	IMAGETYPE_MEMORY_TGA,
+	IMAGETYPE_MEMORY_PNG
+} imageMemoryType_t;
+
+static void LoadBMPFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height );
 static void LoadBMP( const char *name, byte **pic, int *width, int *height );
+static void LoadTGAFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height );
 static void LoadTGA( const char *name, byte **pic, int *width, int *height );
+static void LoadJPGFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height );
 static void LoadJPG( const char *name, byte **pic, int *width, int *height );
+static void LoadPNGFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height );
 static void LoadPNG( const char *name, byte **pic, int *width, int *height );
 
 static byte			 s_intensitytable[256];
@@ -512,6 +524,7 @@ static void Upload32( unsigned *data,
 						  qboolean mipmap, 
 						  qboolean picmip, 
 							qboolean lightMap,
+						  int glTarget,
 						  int *format, 
 						  int *pUploadWidth, int *pUploadHeight )
 {
@@ -646,7 +659,7 @@ static void Upload32( unsigned *data,
 		( scaled_height == height ) ) {
 		if (!mipmap)
 		{
-			qglTexImage2D (GL_TEXTURE_2D, 0, internalFormat, scaled_width, scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+			qglTexImage2D (glTarget, 0, internalFormat, scaled_width, scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 			*pUploadWidth = scaled_width;
 			*pUploadHeight = scaled_height;
 			*format = internalFormat;
@@ -678,7 +691,7 @@ static void Upload32( unsigned *data,
 	*pUploadHeight = scaled_height;
 	*format = internalFormat;
 
-	qglTexImage2D (GL_TEXTURE_2D, 0, internalFormat, scaled_width, scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaledBuffer );
+	qglTexImage2D (glTarget, 0, internalFormat, scaled_width, scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaledBuffer );
 
 	if (mipmap)
 	{
@@ -700,20 +713,20 @@ static void Upload32( unsigned *data,
 				R_BlendOverTexture( (byte *)scaledBuffer, scaled_width * scaled_height, mipBlendColors[miplevel] );
 			}
 
-			qglTexImage2D (GL_TEXTURE_2D, miplevel, internalFormat, scaled_width, scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaledBuffer );
+			qglTexImage2D (glTarget, miplevel, internalFormat, scaled_width, scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaledBuffer );
 		}
 	}
 done:
 
 	if (mipmap)
 	{
-		qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, gl_filter_min);
-		qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, gl_filter_max);
+		qglTexParameterf(glTarget, GL_TEXTURE_MIN_FILTER, gl_filter_min);
+		qglTexParameterf(glTarget, GL_TEXTURE_MAG_FILTER, gl_filter_max);
 	}
 	else
 	{
-		qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-		qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+		qglTexParameterf(glTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+		qglTexParameterf(glTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 	}
 
 	GL_CheckErrors();
@@ -726,17 +739,22 @@ done:
 
 
 /*
-================
-R_CreateImage
+======================
+R_CreateImageWithTarget
 
-This is the only way any image_t are created
-================
+Retail Quake Live routes the public seven-argument constructor through this
+target-aware internal helper.
+======================
 */
-image_t *R_CreateImage( const char *name, const byte *pic, int width, int height, 
-					   qboolean mipmap, qboolean allowPicmip, int glWrapClampMode ) {
+image_t *R_CreateImageWithTarget( const char *name, const byte *pic, int width, int height,
+					   qboolean mipmap, qboolean allowPicmip, int glWrapClampMode, int glTarget ) {
 	image_t		*image;
 	qboolean	isLightmap = qfalse;
 	long		hash;
+
+	if ( glTarget == 0 ) {
+		glTarget = GL_TEXTURE_2D;
+	}
 
 	if (strlen(name) >= MAX_QPATH ) {
 		ri.Error (ERR_DROP, "R_CreateImage: \"%s\" is too long\n", name);
@@ -779,14 +797,15 @@ image_t *R_CreateImage( const char *name, const byte *pic, int width, int height
 								image->mipmap,
 								allowPicmip,
 								isLightmap,
+								glTarget,
 								&image->internalFormat,
 								&image->uploadWidth,
 								&image->uploadHeight );
 
-	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, glWrapClampMode );
-	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, glWrapClampMode );
+	qglTexParameterf( glTarget, GL_TEXTURE_WRAP_S, glWrapClampMode );
+	qglTexParameterf( glTarget, GL_TEXTURE_WRAP_T, glWrapClampMode );
 
-	qglBindTexture( GL_TEXTURE_2D, 0 );
+	qglBindTexture( glTarget, 0 );
 
 	if ( image->TMU == 1 ) {
 		GL_SelectTexture( 0 );
@@ -797,6 +816,18 @@ image_t *R_CreateImage( const char *name, const byte *pic, int width, int height
 	hashTable[hash] = image;
 
 	return image;
+}
+
+/*
+================
+R_CreateImage
+
+This is the public seven-argument image construction entry point.
+================
+*/
+image_t *R_CreateImage( const char *name, const byte *pic, int width, int height,
+					   qboolean mipmap, qboolean allowPicmip, int glWrapClampMode ) {
+	return R_CreateImageWithTarget( name, pic, width, height, mipmap, allowPicmip, glWrapClampMode, GL_TEXTURE_2D );
 }
 
 
@@ -836,15 +867,14 @@ static void PNGReadData( png_structp png_ptr, png_bytep data, png_size_t length 
 }
 
 /*
-=============
-LoadPNG
+=================
+LoadPNGFromBuffer
 
-Loads PNG files and converts them to 32-bit RGBA pixel data.
-=============
+Loads a PNG payload already resident in memory and converts it to 32-bit
+RGBA pixel data.
+=================
 */
-static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
-	int					len;
-	byte				*fileData;
+static void LoadPNGFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height ) {
 	png_structp		png_ptr;
 	png_infop			info_ptr;
 	png_bytep			*row_pointers;
@@ -863,9 +893,13 @@ static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
 	png_uint_32		row;
 
 	*pic = NULL;
-
-	len = ri.FS_ReadFile( name, (void **)&fileData );
-	if ( len <= 0 || !fileData ) {
+	if ( width ) {
+		*width = 0;
+	}
+	if ( height ) {
+		*height = 0;
+	}
+	if ( !buffer || bufferLength <= 0 ) {
 		return;
 	}
 
@@ -874,7 +908,7 @@ static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
 	png_ptr = NULL;
 	info_ptr = NULL;
 
-	if ( len < 8 || png_sig_cmp( fileData, 0, 8 ) ) {
+	if ( bufferLength < 8 || png_sig_cmp( (png_bytep)buffer, 0, 8 ) ) {
 		goto done;
 	}
 
@@ -893,8 +927,8 @@ static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
 		goto done;
 	}
 
-	pngMem.data = fileData;
-	pngMem.size = len;
+	pngMem.data = buffer;
+	pngMem.size = bufferLength;
 	pngMem.offset = 0;
 	png_set_read_fn( png_ptr, &pngMem, PNGReadData );
 
@@ -968,19 +1002,48 @@ static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
 	if ( png_ptr ) {
 		png_destroy_read_struct( &png_ptr, info_ptr ? &info_ptr : NULL, NULL );
 	}
-	if ( fileData ) {
-		ri.FS_FreeFile( fileData );
+}
+
+/*
+=============
+LoadPNG
+
+Loads PNG files and converts them to 32-bit RGBA pixel data.
+=============
+*/
+static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
+	int len;
+	byte *fileData;
+
+	len = ri.FS_ReadFile( name, (void **)&fileData );
+	if ( len <= 0 || !fileData ) {
+		if ( pic ) {
+			*pic = NULL;
+		}
+		if ( width ) {
+			*width = 0;
+		}
+		if ( height ) {
+			*height = 0;
+		}
+		return;
 	}
+
+	LoadPNGFromBuffer( name, fileData, len, pic, width, height );
+	ri.FS_FreeFile( fileData );
 }
 #else
 /*
-============
-LoadPNG
+=================
+LoadPNGFromBuffer
 
 Stubbed when PNG support is disabled.
-============
+=================
 */
-static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
+static void LoadPNGFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height ) {
+	(void)buffer;
+	(void)bufferLength;
+
 	if ( pic ) {
 		*pic = NULL;
 	}
@@ -991,6 +1054,17 @@ static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
 		*height = 0;
 	}
 	ri.Printf( PRINT_WARNING, "LoadPNG: PNG support disabled (%s).\n", name );
+}
+
+/*
+============
+LoadPNG
+
+Stubbed when PNG support is disabled.
+============
+*/
+static void LoadPNG( const char *name, byte **pic, int *width, int *height ) {
+	LoadPNGFromBuffer( name, NULL, 0, pic, width, height );
 }
 #endif
 
@@ -1021,24 +1095,30 @@ typedef struct
 	unsigned char palette[256][4];
 } BMPHeader_t;
 
-static void LoadBMP( const char *name, byte **pic, int *width, int *height )
-{
-	int		columns, rows, numPixels;
-	byte	*pixbuf;
-	int		row, column;
-	byte	*buf_p;
-	byte	*buffer;
-	int		length;
-	BMPHeader_t bmpHeader;
+/*
+=================
+LoadBMPFromBuffer
+
+Loads a BMP payload already resident in memory and converts it to 32-bit RGBA
+pixel data.
+=================
+*/
+static void LoadBMPFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height ) {
+	int			columns, rows, numPixels;
+	byte		*pixbuf;
+	int			row, column;
+	const byte	*buf_p;
+	BMPHeader_t	bmpHeader;
 	byte		*bmpRGBA;
 
 	*pic = NULL;
-
-	//
-	// load the file
-	//
-	length = ri.FS_ReadFile( ( char * ) name, (void **)&buffer);
-	if (!buffer) {
+	if ( width ) {
+		*width = 0;
+	}
+	if ( height ) {
+		*height = 0;
+	}
+	if ( !buffer || bufferLength < 54 ) {
 		return;
 	}
 
@@ -1080,21 +1160,21 @@ static void LoadBMP( const char *name, byte **pic, int *width, int *height )
 	if ( bmpHeader.bitsPerPixel == 8 )
 		buf_p += 1024;
 
-	if ( bmpHeader.id[0] != 'B' && bmpHeader.id[1] != 'M' ) 
+	if ( bmpHeader.id[0] != 'B' || bmpHeader.id[1] != 'M' )
 	{
-		ri.Error( ERR_DROP, "LoadBMP: only Windows-style BMP files supported (%s)\n", name );
+		ri.Error( ERR_DROP, "LoadBMPFromBuffer: only Windows-style BMP files supported (%s)\n", name );
 	}
-	if ( length < 0 || bmpHeader.fileSize != (unsigned int)length )
+	if ( bufferLength < 0 || bmpHeader.fileSize != (unsigned int)bufferLength )
 	{
-		ri.Error( ERR_DROP, "LoadBMP: header size does not match file size (%d vs. %d) (%s)\n", bmpHeader.fileSize, length, name );
+		ri.Error( ERR_DROP, "LoadBMPFromBuffer: header size does not match file size (%d vs. %d) (%s)\n", bmpHeader.fileSize, bufferLength, name );
 	}
 	if ( bmpHeader.compression != 0 )
 	{
-		ri.Error( ERR_DROP, "LoadBMP: only uncompressed BMP files supported (%s)\n", name );
+		ri.Error( ERR_DROP, "LoadBMPFromBuffer: only uncompressed BMP files supported (%s)\n", name );
 	}
 	if ( bmpHeader.bitsPerPixel < 8 )
 	{
-		ri.Error( ERR_DROP, "LoadBMP: monochrome and 4-bit BMP files not supported (%s)\n", name );
+		ri.Error( ERR_DROP, "LoadBMPFromBuffer: monochrome and 4-bit BMP files not supported (%s)\n", name );
 	}
 
 	columns = bmpHeader.width;
@@ -1132,8 +1212,8 @@ static void LoadBMP( const char *name, byte **pic, int *width, int *height )
 				*pixbuf++ = 0xff;
 				break;
 			case 16:
-				shortPixel = * ( unsigned short * ) pixbuf;
-				pixbuf += 2;
+				shortPixel = LittleShort( * ( unsigned short * ) buf_p );
+				buf_p += 2;
 				*pixbuf++ = ( shortPixel & ( 31 << 10 ) ) >> 7;
 				*pixbuf++ = ( shortPixel & ( 31 << 5 ) ) >> 2;
 				*pixbuf++ = ( shortPixel & ( 31 ) ) << 3;
@@ -1165,9 +1245,35 @@ static void LoadBMP( const char *name, byte **pic, int *width, int *height )
 			}
 		}
 	}
+}
 
+/*
+=============
+LoadBMP
+
+Loads BMP files from disk and forwards them through the memory decode core.
+=============
+*/
+static void LoadBMP( const char *name, byte **pic, int *width, int *height ) {
+	byte	*buffer;
+	int		length;
+
+	length = ri.FS_ReadFile( (char *)name, (void **)&buffer );
+	if ( length <= 0 || !buffer ) {
+		if ( pic ) {
+			*pic = NULL;
+		}
+		if ( width ) {
+			*width = 0;
+		}
+		if ( height ) {
+			*height = 0;
+		}
+		return;
+	}
+
+	LoadBMPFromBuffer( name, buffer, length, pic, width, height );
 	ri.FS_FreeFile( buffer );
-
 }
 
 
@@ -1316,27 +1422,29 @@ TARGA LOADING
 */
 
 /*
-=============
-LoadTGA
-=============
+=================
+LoadTGAFromBuffer
+
+Loads a TGA payload already resident in memory and converts it to 32-bit RGBA
+pixel data.
+=================
 */
-static void LoadTGA ( const char *name, byte **pic, int *width, int *height)
-{
-	int		columns, rows, numPixels;
-	byte	*pixbuf;
-	int		row, column;
-	byte	*buf_p;
-	byte	*buffer;
+static void LoadTGAFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height ) {
+	int			columns, rows, numPixels;
+	byte		*pixbuf;
+	int			row, column;
+	const byte	*buf_p;
 	TargaHeader	targa_header;
 	byte		*targa_rgba;
 
 	*pic = NULL;
-
-	//
-	// load the file
-	//
-	ri.FS_ReadFile ( ( char * ) name, (void **)&buffer);
-	if (!buffer) {
+	if ( width ) {
+		*width = 0;
+	}
+	if ( height ) {
+		*height = 0;
+	}
+	if ( !buffer || bufferLength < 18 ) {
 		return;
 	}
 
@@ -1555,152 +1663,256 @@ static void LoadTGA ( const char *name, byte **pic, int *width, int *height)
   if (targa_header.attributes & 0x20) {
     ri.Printf( PRINT_WARNING, "WARNING: '%s' TGA file header declares top-down image, ignoring\n", name);
   }
-
-  ri.FS_FreeFile (buffer);
 }
 
+/*
+=============
+LoadTGA
+=============
+*/
+static void LoadTGA ( const char *name, byte **pic, int *width, int *height) {
+	byte	*buffer;
+	int		length;
+
+	length = ri.FS_ReadFile( (char *)name, (void **)&buffer );
+	if ( length <= 0 || !buffer ) {
+		if ( pic ) {
+			*pic = NULL;
+		}
+		if ( width ) {
+			*width = 0;
+		}
+		if ( height ) {
+			*height = 0;
+		}
+		return;
+	}
+
+	LoadTGAFromBuffer( name, buffer, length, pic, width, height );
+	ri.FS_FreeFile( buffer );
+}
+
+typedef struct {
+	struct jpeg_error_mgr	pub;
+	jmp_buf					setjmpBuffer;
+} qlJpegErrorMgr_t;
+
+typedef struct {
+	struct jpeg_source_mgr	pub;
+	JOCTET					eoiBuffer[2];
+} qlJpegSourceMgr_t;
+
+/*
+================
+JPG_ErrorExit
+================
+*/
+static void JPG_ErrorExit( j_common_ptr cinfo ) {
+	qlJpegErrorMgr_t *errorMgr;
+
+	errorMgr = (qlJpegErrorMgr_t *)cinfo->err;
+	longjmp( errorMgr->setjmpBuffer, 1 );
+}
+
+/*
+================
+JPG_InitSource
+================
+*/
+static void JPG_InitSource( j_decompress_ptr cinfo ) {
+	(void)cinfo;
+}
+
+/*
+======================
+JPG_FillInputBuffer
+======================
+*/
+static boolean JPG_FillInputBuffer( j_decompress_ptr cinfo ) {
+	qlJpegSourceMgr_t *src;
+
+	src = (qlJpegSourceMgr_t *)cinfo->src;
+	src->eoiBuffer[0] = 0xFF;
+	src->eoiBuffer[1] = 0xD9;
+	src->pub.next_input_byte = src->eoiBuffer;
+	src->pub.bytes_in_buffer = 2;
+	return TRUE;
+}
+
+/*
+=================
+JPG_SkipInputData
+=================
+*/
+static void JPG_SkipInputData( j_decompress_ptr cinfo, long num_bytes ) {
+	if ( num_bytes > 0 ) {
+		while ( num_bytes > (long)cinfo->src->bytes_in_buffer ) {
+			num_bytes -= (long)cinfo->src->bytes_in_buffer;
+			JPG_FillInputBuffer( cinfo );
+		}
+
+		cinfo->src->next_input_byte += (size_t)num_bytes;
+		cinfo->src->bytes_in_buffer -= (size_t)num_bytes;
+	}
+}
+
+/*
+================
+JPG_TermSource
+================
+*/
+static void JPG_TermSource( j_decompress_ptr cinfo ) {
+	(void)cinfo;
+}
+
+/*
+==================
+JPG_SetMemorySource
+==================
+*/
+static void JPG_SetMemorySource( j_decompress_ptr cinfo, const byte *buffer, size_t bufferLength ) {
+	qlJpegSourceMgr_t *src;
+
+	if ( cinfo->src == NULL ) {
+		cinfo->src = (struct jpeg_source_mgr *)(*cinfo->mem->alloc_small)( (j_common_ptr)cinfo, JPOOL_PERMANENT, sizeof( qlJpegSourceMgr_t ) );
+	}
+
+	src = (qlJpegSourceMgr_t *)cinfo->src;
+	src->pub.init_source = JPG_InitSource;
+	src->pub.fill_input_buffer = JPG_FillInputBuffer;
+	src->pub.skip_input_data = JPG_SkipInputData;
+	src->pub.resync_to_restart = jpeg_resync_to_restart;
+	src->pub.term_source = JPG_TermSource;
+	src->pub.bytes_in_buffer = bufferLength;
+	src->pub.next_input_byte = buffer;
+}
+
+/*
+=================
+LoadJPGFromBuffer
+=================
+*/
+static void LoadJPGFromBuffer( const char *name, const byte *buffer, int bufferLength, byte **pic, int *width, int *height ) {
+	struct jpeg_decompress_struct	cinfo;
+	qlJpegErrorMgr_t				jerr;
+	JSAMPROW						scanline;
+	byte							*decoded;
+	byte							*rowBuffer;
+	size_t							pixelCount;
+	size_t							rowStride;
+	size_t							outputRowStride;
+	unsigned int					x;
+	int								imageWidth;
+	int								imageHeight;
+
+	(void)name;
+
+	*pic = NULL;
+	if ( width ) {
+		*width = 0;
+	}
+	if ( height ) {
+		*height = 0;
+	}
+	if ( !buffer || bufferLength <= 0 ) {
+		return;
+	}
+
+	cinfo.err = jpeg_std_error( &jerr.pub );
+	jerr.pub.error_exit = JPG_ErrorExit;
+	if ( setjmp( jerr.setjmpBuffer ) ) {
+		jpeg_destroy_decompress( &cinfo );
+		return;
+	}
+
+	jpeg_create_decompress( &cinfo );
+	JPG_SetMemorySource( &cinfo, buffer, (size_t)bufferLength );
+	(void)jpeg_read_header( &cinfo, TRUE );
+	(void)jpeg_start_decompress( &cinfo );
+	imageWidth = cinfo.output_width;
+	imageHeight = cinfo.output_height;
+
+	pixelCount = (size_t)imageWidth * (size_t)imageHeight;
+	if ( pixelCount == 0 || pixelCount > (size_t)( INT_MAX / 4 ) ) {
+		jpeg_destroy_decompress( &cinfo );
+		return;
+	}
+
+	rowStride = (size_t)imageWidth * 4;
+	outputRowStride = (size_t)imageWidth * cinfo.output_components;
+	decoded = ri.Malloc( (int)( pixelCount * 4 ) );
+	rowBuffer = ri.Malloc( (int)outputRowStride );
+	if ( !decoded || !rowBuffer ) {
+		if ( decoded ) {
+			ri.Free( decoded );
+		}
+		if ( rowBuffer ) {
+			ri.Free( rowBuffer );
+		}
+		jpeg_destroy_decompress( &cinfo );
+		return;
+	}
+
+	while ( cinfo.output_scanline < cinfo.output_height ) {
+		byte *dst;
+
+		scanline = rowBuffer;
+		(void)jpeg_read_scanlines( &cinfo, &scanline, 1 );
+
+		dst = decoded + (size_t)( cinfo.output_scanline - 1 ) * rowStride;
+		for ( x = 0; x < (unsigned int)imageWidth; x++ ) {
+			if ( cinfo.output_components >= 3 ) {
+				dst[x * 4 + 0] = rowBuffer[x * cinfo.output_components + 0];
+				dst[x * 4 + 1] = rowBuffer[x * cinfo.output_components + 1];
+				dst[x * 4 + 2] = rowBuffer[x * cinfo.output_components + 2];
+			} else {
+				dst[x * 4 + 0] = rowBuffer[x];
+				dst[x * 4 + 1] = rowBuffer[x];
+				dst[x * 4 + 2] = rowBuffer[x];
+			}
+			dst[x * 4 + 3] = 255;
+		}
+	}
+
+	(void)jpeg_finish_decompress( &cinfo );
+	jpeg_destroy_decompress( &cinfo );
+
+	ri.Free( rowBuffer );
+
+	*pic = decoded;
+	if ( width ) {
+		*width = imageWidth;
+	}
+	if ( height ) {
+		*height = imageHeight;
+	}
+}
+
+/*
+=============
+LoadJPG
+=============
+*/
 static void LoadJPG( const char *filename, unsigned char **pic, int *width, int *height ) {
-  /* This struct contains the JPEG decompression parameters and pointers to
-   * working space (which is allocated as needed by the JPEG library).
-   */
-  struct jpeg_decompress_struct cinfo;
-  /* We use our private extension JPEG error handler.
-   * Note that this struct must live as long as the main JPEG parameter
-   * struct, to avoid dangling-pointer problems.
-   */
-  /* This struct represents a JPEG error handler.  It is declared separately
-   * because applications often want to supply a specialized error handler
-   * (see the second half of this file for an example).  But here we just
-   * take the easy way out and use the standard error handler, which will
-   * print a message on stderr and call exit() if compression fails.
-   * Note that this struct must live as long as the main JPEG parameter
-   * struct, to avoid dangling-pointer problems.
-   */
-  struct jpeg_error_mgr jerr;
-  /* More stuff */
-  JSAMPARRAY buffer;		/* Output row buffer */
-  int row_stride;		/* physical row width in output buffer */
-  unsigned char *out;
-  byte	*fbuffer;
-  byte  *bbuf;
+	byte	*fbuffer;
+	int		length;
 
-  /* In this example we want to open the input file before doing anything else,
-   * so that the setjmp() error recovery below can assume the file is open.
-   * VERY IMPORTANT: use "b" option to fopen() if you are on a machine that
-   * requires it in order to read binary files.
-   */
+	length = ri.FS_ReadFile( (char *)filename, (void **)&fbuffer );
+	if ( length <= 0 || !fbuffer ) {
+		if ( pic ) {
+			*pic = NULL;
+		}
+		if ( width ) {
+			*width = 0;
+		}
+		if ( height ) {
+			*height = 0;
+		}
+		return;
+	}
 
-  ri.FS_ReadFile ( ( char * ) filename, (void **)&fbuffer);
-  if (!fbuffer) {
-	return;
-  }
-
-  /* Step 1: allocate and initialize JPEG decompression object */
-
-  /* We have to set up the error handler first, in case the initialization
-   * step fails.  (Unlikely, but it could happen if you are out of memory.)
-   * This routine fills in the contents of struct jerr, and returns jerr's
-   * address which we place into the link field in cinfo.
-   */
-  cinfo.err = jpeg_std_error(&jerr);
-
-  /* Now we can initialize the JPEG decompression object. */
-  jpeg_create_decompress(&cinfo);
-
-  /* Step 2: specify data source (eg, a file) */
-
-  jpeg_stdio_src(&cinfo, fbuffer);
-
-  /* Step 3: read file parameters with jpeg_read_header() */
-
-  (void) jpeg_read_header(&cinfo, TRUE);
-  /* We can ignore the return value from jpeg_read_header since
-   *   (a) suspension is not possible with the stdio data source, and
-   *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
-   * See libjpeg.doc for more info.
-   */
-
-  /* Step 4: set parameters for decompression */
-
-  /* In this example, we don't need to change any of the defaults set by
-   * jpeg_read_header(), so we do nothing here.
-   */
-
-  /* Step 5: Start decompressor */
-
-  (void) jpeg_start_decompress(&cinfo);
-  /* We can ignore the return value since suspension is not possible
-   * with the stdio data source.
-   */
-
-  /* We may need to do some setup of our own at this point before reading
-   * the data.  After jpeg_start_decompress() we have the correct scaled
-   * output image dimensions available, as well as the output colormap
-   * if we asked for color quantization.
-   * In this example, we need to make an output work buffer of the right size.
-   */ 
-  /* JSAMPLEs per row in output buffer */
-  row_stride = cinfo.output_width * cinfo.output_components;
-
-  out = ri.Malloc(cinfo.output_width*cinfo.output_height*cinfo.output_components);
-
-  *pic = out;
-  *width = cinfo.output_width;
-  *height = cinfo.output_height;
-
-  /* Step 6: while (scan lines remain to be read) */
-  /*           jpeg_read_scanlines(...); */
-
-  /* Here we use the library's state variable cinfo.output_scanline as the
-   * loop counter, so that we don't have to keep track ourselves.
-   */
-  while (cinfo.output_scanline < cinfo.output_height) {
-    /* jpeg_read_scanlines expects an array of pointers to scanlines.
-     * Here the array is only one element long, but you could ask for
-     * more than one scanline at a time if that's more convenient.
-     */
-	bbuf = ((out+(row_stride*cinfo.output_scanline)));
-	buffer = &bbuf;
-    (void) jpeg_read_scanlines(&cinfo, buffer, 1);
-  }
-
-  // clear all the alphas to 255
-  {
-	  int	i, j;
-		byte	*buf;
-
-		buf = *pic;
-
-	  j = cinfo.output_width * cinfo.output_height * 4;
-	  for ( i = 3 ; i < j ; i+=4 ) {
-		  buf[i] = 255;
-	  }
-  }
-
-  /* Step 7: Finish decompression */
-
-  (void) jpeg_finish_decompress(&cinfo);
-  /* We can ignore the return value since suspension is not possible
-   * with the stdio data source.
-   */
-
-  /* Step 8: Release JPEG decompression object */
-
-  /* This is an important step since it will release a good deal of memory. */
-  jpeg_destroy_decompress(&cinfo);
-
-  /* After finish_decompress, we can close the input file.
-   * Here we postpone it until after no more JPEG errors are possible,
-   * so as to simplify the setjmp error logic above.  (Actually, I don't
-   * think that jpeg_destroy can do an error exit, but why assume anything...)
-   */
-  ri.FS_FreeFile (fbuffer);
-
-  /* At this point you may want to check to see whether any corrupt-data
-   * warnings occurred (test whether jerr.pub.num_warnings is nonzero).
-   */
-
-  /* And we're done! */
+	LoadJPGFromBuffer( filename, fbuffer, length, pic, width, height );
+	ri.FS_FreeFile( fbuffer );
 }
 
 
@@ -2007,6 +2219,151 @@ void SaveJPG(char * filename, int quality, int image_width, int image_height, un
 //===================================================================
 
 /*
+==================
+R_FindLoadedImage
+==================
+*/
+static image_t *R_FindLoadedImage( const char *name, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode ) {
+	image_t	*image;
+	long	hash;
+
+	if ( !name ) {
+		return NULL;
+	}
+
+	hash = generateHashValue( name );
+	for ( image = hashTable[hash]; image; image = image->next ) {
+		if ( !strcmp( name, image->imgName ) ) {
+			if ( strcmp( name, "*white" ) ) {
+				if ( image->mipmap != mipmap ) {
+					ri.Printf( PRINT_DEVELOPER, "WARNING: reused image %s with mixed mipmap parm\n", name );
+				}
+				if ( image->allowPicmip != allowPicmip ) {
+					ri.Printf( PRINT_DEVELOPER, "WARNING: reused image %s with mixed allowPicmip parm\n", name );
+				}
+				if ( image->wrapClampMode != glWrapClampMode ) {
+					ri.Printf( PRINT_ALL, "WARNING: reused image %s with mixed glWrapClampMode parm\n", name );
+				}
+			}
+			return image;
+		}
+	}
+
+	return NULL;
+}
+
+/*
+==========================
+R_DetectImageTypeFromMemory
+==========================
+*/
+int R_DetectImageTypeFromMemory( const byte *buffer, int bufferLength ) {
+	static const byte pngSignature[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
+	const byte *buf_p;
+	TargaHeader targaHeader;
+
+	if ( !buffer || bufferLength < 2 ) {
+		return IMAGETYPE_MEMORY_UNKNOWN;
+	}
+
+	if ( bufferLength >= 3 && buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF ) {
+		return IMAGETYPE_MEMORY_JPG;
+	}
+
+	if ( buffer[0] == 'B' && buffer[1] == 'M' ) {
+		return IMAGETYPE_MEMORY_BMP;
+	}
+
+	if ( bufferLength >= 8 && !memcmp( buffer, pngSignature, sizeof( pngSignature ) ) ) {
+		return IMAGETYPE_MEMORY_PNG;
+	}
+
+	if ( bufferLength < 18 ) {
+		return IMAGETYPE_MEMORY_UNKNOWN;
+	}
+
+	buf_p = buffer;
+	targaHeader.id_length = *buf_p++;
+	targaHeader.colormap_type = *buf_p++;
+	targaHeader.image_type = *buf_p++;
+	targaHeader.colormap_index = LittleShort( *(short *)buf_p );
+	buf_p += 2;
+	targaHeader.colormap_length = LittleShort( *(short *)buf_p );
+	buf_p += 2;
+	targaHeader.colormap_size = *buf_p++;
+	targaHeader.x_origin = LittleShort( *(short *)buf_p );
+	buf_p += 2;
+	targaHeader.y_origin = LittleShort( *(short *)buf_p );
+	buf_p += 2;
+	targaHeader.width = LittleShort( *(short *)buf_p );
+	buf_p += 2;
+	targaHeader.height = LittleShort( *(short *)buf_p );
+	buf_p += 2;
+	targaHeader.pixel_size = *buf_p++;
+	targaHeader.attributes = *buf_p++;
+
+	if ( targaHeader.colormap_type == 0 &&
+		( targaHeader.image_type == 2 || targaHeader.image_type == 3 || targaHeader.image_type == 10 ) &&
+		( ( targaHeader.image_type == 3 && targaHeader.pixel_size == 8 ) || targaHeader.pixel_size == 24 || targaHeader.pixel_size == 32 ) &&
+		targaHeader.width > 0 && targaHeader.height > 0 ) {
+		return IMAGETYPE_MEMORY_TGA;
+	}
+
+	return IMAGETYPE_MEMORY_UNKNOWN;
+}
+
+/*
+====================
+R_LoadImageFromMemory
+====================
+*/
+image_t *R_LoadImageFromMemory( const char *name, const byte *buffer, int bufferLength, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode ) {
+	image_t	*image;
+	byte	*pic;
+	int		width;
+	int		height;
+
+	if ( !name || !buffer || bufferLength <= 0 ) {
+		return NULL;
+	}
+
+	image = R_FindLoadedImage( name, mipmap, allowPicmip, glWrapClampMode );
+	if ( image ) {
+		return image;
+	}
+
+	pic = NULL;
+	width = 0;
+	height = 0;
+
+	switch ( R_DetectImageTypeFromMemory( buffer, bufferLength ) ) {
+	case IMAGETYPE_MEMORY_JPG:
+		LoadJPGFromBuffer( name, buffer, bufferLength, &pic, &width, &height );
+		break;
+	case IMAGETYPE_MEMORY_BMP:
+		LoadBMPFromBuffer( name, buffer, bufferLength, &pic, &width, &height );
+		break;
+	case IMAGETYPE_MEMORY_TGA:
+		LoadTGAFromBuffer( name, buffer, bufferLength, &pic, &width, &height );
+		break;
+	case IMAGETYPE_MEMORY_PNG:
+		LoadPNGFromBuffer( name, buffer, bufferLength, &pic, &width, &height );
+		break;
+	default:
+		ri.Printf( PRINT_WARNING, "WARNING: R_LoadImageFromMemory() Unable to detect image type.\n" );
+		return NULL;
+	}
+
+	if ( !pic ) {
+		return NULL;
+	}
+
+	image = R_CreateImageWithTarget( name, pic, width, height, mipmap, allowPicmip, glWrapClampMode, GL_TEXTURE_2D );
+	ri.Free( pic );
+	return image;
+}
+
+/*
 =================
 R_LoadImage
 
@@ -2071,33 +2428,14 @@ image_t	*R_FindImageFile( const char *name, qboolean mipmap, qboolean allowPicmi
 	image_t	*image;
 	int		width, height;
 	byte	*pic;
-	long	hash;
 
 	if (!name) {
 		return NULL;
 	}
 
-	hash = generateHashValue(name);
-
-	//
-	// see if the image is already loaded
-	//
-	for (image=hashTable[hash]; image; image=image->next) {
-		if ( !strcmp( name, image->imgName ) ) {
-			// the white image can be used with any set of parms, but other mismatches are errors
-			if ( strcmp( name, "*white" ) ) {
-				if ( image->mipmap != mipmap ) {
-					ri.Printf( PRINT_DEVELOPER, "WARNING: reused image %s with mixed mipmap parm\n", name );
-				}
-				if ( image->allowPicmip != allowPicmip ) {
-					ri.Printf( PRINT_DEVELOPER, "WARNING: reused image %s with mixed allowPicmip parm\n", name );
-				}
-				if ( image->wrapClampMode != glWrapClampMode ) {
-					ri.Printf( PRINT_ALL, "WARNING: reused image %s with mixed glWrapClampMode parm\n", name );
-				}
-			}
-			return image;
-		}
+	image = R_FindLoadedImage( name, mipmap, allowPicmip, glWrapClampMode );
+	if ( image ) {
+		return image;
 	}
 
 	//

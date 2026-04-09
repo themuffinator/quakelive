@@ -879,14 +879,21 @@ static qboolean GLW_ChangeWindowMode( void )
 	}
 	else
 	{
+		LONG	windowStyle;
+
 		cdsRet = ChangeDisplaySettings( NULL, 0 );
 		if ( cdsRet != DISP_CHANGE_SUCCESSFUL )
 		{
 			ri.Printf( PRINT_ALL, "CDS back to window mode failed: %d\n", cdsRet );
 		}
 
+		windowStyle = WINDOW_STYLE;
+		if ( g_wv.isMaximized ) {
+			windowStyle |= WS_MAXIMIZE;
+		}
+
 		SetLastError( NO_ERROR );
-		if ( SetWindowLongA( g_wv.hWnd, GWL_STYLE, WINDOW_STYLE ) == 0
+		if ( SetWindowLongA( g_wv.hWnd, GWL_STYLE, windowStyle ) == 0
 			&& GetLastError() != NO_ERROR )
 		{
 			ri.Printf( PRINT_ALL, "SetWindowLong WS_CHILD|WS_VISIBLE|WS_SYSMENU failed\n" );
@@ -900,7 +907,7 @@ static qboolean GLW_ChangeWindowMode( void )
 		rect.top = 0;
 		rect.right = glConfig.vidWidth;
 		rect.bottom = glConfig.vidHeight;
-		AdjustWindowRect( &rect, WINDOW_STYLE, FALSE );
+		AdjustWindowRect( &rect, windowStyle, FALSE );
 
 		if ( !SetWindowPos( g_wv.hWnd, HWND_NOTOPMOST, vid_xpos->integer, vid_ypos->integer,
 			rect.right - rect.left, rect.bottom - rect.top, SWP_NOSENDCHANGING ) )

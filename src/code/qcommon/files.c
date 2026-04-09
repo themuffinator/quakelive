@@ -31,7 +31,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../game/q_shared.h"
 #include "qcommon.h"
-#include "../../common/platform/platform_config.h"
 #include "vm_local.h"
 #include "unzip.h"
 #include <stdlib.h>
@@ -574,43 +573,12 @@ static qboolean FS_StringRepresentsTrue( const char *value ) {
 
 /*
 =============
-FS_OnlineServicesEnabled
-
-Returns qtrue when launcher-style web fallbacks are permitted in the current build and runtime.
-=============
-*/
-static qboolean FS_OnlineServicesEnabled( void ) {
-	const char *value;
-
-	if ( !QL_PLATFORM_HAS_ONLINE_SERVICES ) {
-		return qfalse;
-	}
-
-	value = getenv( "QL_DISABLE_EXTERNAL_ECOSYSTEMS" );
-	if ( FS_StringRepresentsTrue( value ) ) {
-		return qfalse;
-	}
-
-	value = getenv( "QL_DISABLE_AWESOMIUM" );
-	if ( FS_StringRepresentsTrue( value ) ) {
-		return qfalse;
-	}
-
-	value = getenv( "QL_DISABLE_STEAMWORKS" );
-	if ( FS_StringRepresentsTrue( value ) ) {
-		return qfalse;
-	}
-
-	return qtrue;
-}
-
-/*
-=============
 FS_RewriteWebPath
 
 Normalize an intercepted URI into a quake path. Screenshots are forced to
 resolve under fs_homepath/screenshots, other requests are prefixed with
-fs_webpath.
+fs_webpath. These local launcher-style fallbacks stay available even when
+live online services are disabled by build or runtime policy.
 =============
 */
 qboolean FS_RewriteWebPath( const char *uri, char *outPath, int outSize ) {
@@ -642,10 +610,6 @@ qboolean FS_RewriteWebPath( const char *uri, char *outPath, int outSize ) {
 	if ( !Q_stricmpn( localPath, "screenshots/", 12 ) ) {
 		Q_strncpyz( outPath, localPath, outSize );
 		return qtrue;
-	}
-
-	if ( !FS_OnlineServicesEnabled() ) {
-		return qfalse;
 	}
 
 	if ( !fs_webpath || !fs_webpath->string[0] ) {
@@ -1077,17 +1041,14 @@ static int FS_FOpenFileReadForRoot( const char *root, const char *filename, file
 	=============
 	FS_FOpenWebFileRead
 
-	Retries failed HTTP/resource requests using mapped filesystem paths.
+	Retries failed HTTP/resource requests using mapped filesystem paths, even in
+	service-disabled builds where only the local fallback roots remain valid.
 	=============
 */
 	qboolean FS_FOpenWebFileRead( const char *request, fileHandle_t *file, char *resolvedPath, size_t resolvedSize ) {
 	int index;
 
 	if ( !request || !file ) {
-	return qfalse;
-	}
-
-	if ( !FS_OnlineServicesEnabled() ) {
 	return qfalse;
 	}
 

@@ -1,7 +1,6 @@
 #include "client.h"
 
 #include <limits.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "../../common/platform/platform_steamworks.h"
@@ -11,18 +10,15 @@
 
 typedef struct {
 	char		url[MAX_QPATH];
-	char		cachePath[MAX_QPATH];
+	char		rendererName[MAX_QPATH];
 	qhandle_t	shader;
-	qboolean	persisted;
 } clSteamResource_t;
 
 static clSteamResource_t cl_steamResources[MAX_STEAM_RESOURCES];
-static cvar_t *cl_steamCachePersist;
-static cvar_t *cl_steamCachePath;
+static unsigned int cl_steamResourceGeneration = 1;
 
 qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize );
 void Sys_Steam_FreeRequestBuffer( byte *buffer );
-char *FS_BuildOSPath( const char *base, const char *game, const char *qpath );
 
 /*
 =============
@@ -44,7 +40,8 @@ static qboolean CL_SteamResources_IsSteamURL( const char *url ) {
 CL_SteamResources_IsURIResource
 
 Returns qtrue when the provided resource uses a URI scheme and should route
-through the launcher/Steam cache bridge instead of the normal shader loader.
+through the launcher/Steam live-resource bridge instead of the normal shader
+loader.
 =============
 */
 static qboolean CL_SteamResources_IsURIResource( const char *url ) {
@@ -203,147 +200,58 @@ static clSteamResource_t *CL_SteamResources_FindSlot( const char *url ) {
 =============
 CL_SteamResources_AssignSlot
 
-Stores the resolved shader and cache path for a Steam resource.
+Stores the resolved shader and renderer-owned resource name for a Steam
+resource.
 =============
 */
-static void CL_SteamResources_AssignSlot( clSteamResource_t *slot, const char *url, const char *cachePath, qhandle_t shader, qboolean persisted ) {
+static void CL_SteamResources_AssignSlot( clSteamResource_t *slot, const char *url, const char *rendererName, qhandle_t shader ) {
 	if ( !slot ) {
 		return;
 	}
 
 	Q_strncpyz( slot->url, url, sizeof( slot->url ) );
-	Q_strncpyz( slot->cachePath, cachePath, sizeof( slot->cachePath ) );
+	Q_strncpyz( slot->rendererName, rendererName, sizeof( slot->rendererName ) );
 	slot->shader = shader;
-	slot->persisted = persisted;
 }
 
 /*
 =============
-CL_SteamResources_SanitizeCacheName
+CL_SteamResources_BuildRendererName
 
-Builds a cache file path under fs_homepath for the provided cached resource URL.
+Builds a short, renderer-owned name for one retained live resource slot. The
+generation counter keeps reloads from silently reusing stale renderer images
+after the client-side resource table is cleared.
 =============
 */
-static void CL_SteamResources_SanitizeCacheName( const char *url, char *cachePath, size_t cachePathSize ) {
-	const char *payload;
-	const char *suffix;
-	char sanitized[MAX_QPATH];
+static void CL_SteamResources_BuildRendererName( const char *url, const clSteamResource_t *slot, char *rendererName, size_t rendererNameSize ) {
 	unsigned checksum;
-	int i;
-	const char *cacheFolder;
+	int slotIndex;
 
-	if ( !cachePath || cachePathSize == 0 || !url ) {
+	if ( !rendererName || rendererNameSize == 0 || !url ) {
 		return;
 	}
 
-	payload = url;
-	if ( CL_SteamResources_IsSteamURL( url ) ) {
-		payload = url + strlen( STEAM_URL_PREFIX );
+	slotIndex = 0;
+	if ( slot ) {
+		slotIndex = (int)( slot - cl_steamResources );
 	}
 
-	Q_strncpyz( sanitized, payload, sizeof( sanitized ) );
-	for ( i = 0; sanitized[i]; i++ ) {
-		char ch = sanitized[i];
-		if ( !( ( ch >= 'a' && ch <= 'z' ) || ( ch >= 'A' && ch <= 'Z' ) || ( ch >= '0' && ch <= '9' ) || ch == '.' || ch == '-' || ch == '_' ) ) {
-			sanitized[i] = '_';
-		}
-	}
-
-	cacheFolder = ( cl_steamCachePath && cl_steamCachePath->string[0] ) ? cl_steamCachePath->string : "steamcache";
 	checksum = Com_BlockChecksum( url, strlen( url ) );
-	suffix = CL_SteamResources_IsAvatarURL( url ) ? ".tga" : "";
-	Com_sprintf( cachePath, cachePathSize, "%s/%08x_%s%s", cacheFolder, checksum, sanitized, suffix );
-}
-
-
-/*
-=============
-CL_SteamResources_RegisterCachedShader
-
-Registers a shader from an existing cache file if one is present.
-=============
-*/
-static qboolean CL_SteamResources_RegisterCachedShader( const char *cachePath, qhandle_t *shader ) {
-	if ( !cachePath || !cachePath[0] || !shader ) {
-		return qfalse;
-	}
-
-	if ( !FS_FileExists( cachePath ) ) {
-		return qfalse;
-	}
-
-	*shader = re.RegisterShaderNoMip( cachePath );
-	return ( *shader != 0 );
-}
-
-/*
-=============
-CL_SteamResources_WriteCacheFile
-
-Writes downloaded image bytes to a cache file under fs_homepath.
-=============
-*/
-static qboolean CL_SteamResources_WriteCacheFile( const char *cachePath, const byte *buffer, int length ) {
-	fileHandle_t handle;
-
-	if ( !cachePath || !cachePath[0] || !buffer || length <= 0 ) {
-		return qfalse;
-	}
-
-	handle = FS_FOpenFileWrite( cachePath );
-	if ( !handle ) {
-		return qfalse;
-	}
-
-	FS_Write( buffer, length, handle );
-	FS_FCloseFile( handle );
-	return qtrue;
-}
-
-/*
-=============
-CL_SteamResources_RemoveCacheFile
-
-Removes a cached launcher/Steam resource file from fs_homepath.
-=============
-*/
-static void CL_SteamResources_RemoveCacheFile( const char *cachePath ) {
-	const char *homePath;
-	const char *gameDir;
-	char *ospath;
-
-	if ( !cachePath || !cachePath[0] ) {
-		return;
-	}
-
-	homePath = Cvar_VariableString( "fs_homepath" );
-	gameDir = Cvar_VariableString( "fs_gamedirvar" );
-	if ( !gameDir || !gameDir[0] ) {
-		gameDir = Cvar_VariableString( "fs_game" );
-	}
-	if ( !gameDir || !gameDir[0] ) {
-		gameDir = BASEGAME;
-	}
-
-	ospath = FS_BuildOSPath( homePath, gameDir, cachePath );
-	remove( ospath );
+	Com_sprintf( rendererName, rendererNameSize, "*steamres/%u/%02d/%08x", cl_steamResourceGeneration, slotIndex, checksum );
 }
 
 /*
 =============
 CL_SteamResources_ClearSlot
 
-Drops one cached resource slot and removes any session-owned files that should
-not survive the current invalidation request.
+Drops one cached live-resource slot.
 =============
 */
 static void CL_SteamResources_ClearSlot( clSteamResource_t *slot, qboolean clearPersisted ) {
+	(void)clearPersisted;
+
 	if ( !slot ) {
 		return;
-	}
-
-	if ( slot->cachePath[0] && ( clearPersisted || !slot->persisted ) ) {
-		CL_SteamResources_RemoveCacheFile( slot->cachePath );
 	}
 
 	Com_Memset( slot, 0, sizeof( *slot ) );
@@ -351,120 +259,29 @@ static void CL_SteamResources_ClearSlot( clSteamResource_t *slot, qboolean clear
 
 /*
 =============
-CL_SteamResources_RequestAndCache
+CL_SteamResources_RequestAvatarRGBA
 
-Downloads a Steam resource, stores it to disk when requested, and registers a shader for UI use.
+Resolves a steam://avatar URL through the Steamworks avatar APIs and returns
+the live RGBA payload directly for renderer-owned image creation.
 =============
 */
-static qboolean CL_SteamResources_RequestAndCache( const char *url, const char *cachePath, qboolean persist, qhandle_t *shader ) {
-	byte *buffer = NULL;
-	int length = 0;
-	qboolean wroteCache;
-
-	if ( !shader ) {
-		return qfalse;
-	}
-
-	if ( !Sys_Steam_RequestURL( url, &buffer, &length ) || !buffer || length <= 0 ) {
-		return qfalse;
-	}
-
-	wroteCache = CL_SteamResources_WriteCacheFile( cachePath, buffer, length );
-	Sys_Steam_FreeRequestBuffer( buffer );
-
-	if ( !wroteCache ) {
-		return qfalse;
-	}
-
-	*shader = re.RegisterShaderNoMip( cachePath );
-	if ( *shader && !persist ) {
-		CL_SteamResources_RemoveCacheFile( cachePath );
-	}
-
-	return ( *shader != 0 );
-}
-
-/*
-=============
-CL_SteamResources_EncodeAvatarTGA
-
-Converts Steam RGBA avatar pixels into a bottom-up BGRA TGA payload for the renderer cache.
-=============
-*/
-static qboolean CL_SteamResources_EncodeAvatarTGA( const uint8_t *rgbaPixels, uint32_t width, uint32_t height, byte **outBuffer, int *outSize ) {
-	size_t pixelCount;
-	size_t imageSize;
-	size_t totalSize;
-	byte *buffer;
-	byte *dst;
-	uint32_t y;
-	uint32_t x;
-
-	if ( outBuffer ) {
-		*outBuffer = NULL;
-	}
-	if ( outSize ) {
-		*outSize = 0;
-	}
-
-	if ( !rgbaPixels || width == 0 || height == 0 || !outBuffer || !outSize ) {
-		return qfalse;
-	}
-
-	pixelCount = (size_t)width * (size_t)height;
-	if ( pixelCount > ( (size_t)( INT_MAX - 18 ) / 4 ) ) {
-		return qfalse;
-	}
-
-	imageSize = pixelCount * 4;
-	totalSize = imageSize + 18;
-	buffer = (byte *)Z_Malloc( (int)totalSize );
-	if ( !buffer ) {
-		return qfalse;
-	}
-
-	Com_Memset( buffer, 0, (int)totalSize );
-	buffer[2] = 2;
-	buffer[12] = (byte)( width & 0xff );
-	buffer[13] = (byte)( ( width >> 8 ) & 0xff );
-	buffer[14] = (byte)( height & 0xff );
-	buffer[15] = (byte)( ( height >> 8 ) & 0xff );
-	buffer[16] = 32;
-	buffer[17] = 8;
-
-	dst = buffer + 18;
-	for ( y = 0; y < height; ++y ) {
-		const uint8_t *srcRow = rgbaPixels + ( (size_t)( height - y - 1 ) * width * 4 );
-
-		for ( x = 0; x < width; ++x ) {
-			const uint8_t *srcPixel = srcRow + (size_t)x * 4;
-
-			*dst++ = srcPixel[2];
-			*dst++ = srcPixel[1];
-			*dst++ = srcPixel[0];
-			*dst++ = srcPixel[3];
-		}
-	}
-
-	*outBuffer = buffer;
-	*outSize = (int)totalSize;
-	return qtrue;
-}
-
-/*
-=============
-CL_SteamResources_RequestAvatar
-
-Resolves a steam://avatar URL through the Steamworks avatar APIs and emits a cacheable TGA payload.
-=============
-*/
-static qboolean CL_SteamResources_RequestAvatar( const char *url, byte **outBuffer, int *outSize ) {
+static qboolean CL_SteamResources_RequestAvatarRGBA( const char *url, byte **outPixels, int *outWidth, int *outHeight ) {
 	ql_steam_avatar_size_t size;
 	uint32_t idLow;
 	uint32_t idHigh;
 	uint8_t *rgbaPixels;
 	uint32_t width;
 	uint32_t height;
+
+	if ( outPixels ) {
+		*outPixels = NULL;
+	}
+	if ( outWidth ) {
+		*outWidth = 0;
+	}
+	if ( outHeight ) {
+		*outHeight = 0;
+	}
 
 	if ( !CL_SteamResources_ParseAvatarURL( url, &size, &idLow, &idHigh ) ) {
 		return qfalse;
@@ -477,12 +294,21 @@ static qboolean CL_SteamResources_RequestAvatar( const char *url, byte **outBuff
 		return qfalse;
 	}
 
-	if ( !CL_SteamResources_EncodeAvatarTGA( rgbaPixels, width, height, outBuffer, outSize ) ) {
+	if ( width == 0 || height == 0 || width > INT_MAX || height > INT_MAX ) {
 		QL_Steamworks_FreeBuffer( rgbaPixels );
 		return qfalse;
 	}
 
-	QL_Steamworks_FreeBuffer( rgbaPixels );
+	if ( outPixels ) {
+		*outPixels = rgbaPixels;
+	}
+	if ( outWidth ) {
+		*outWidth = (int)width;
+	}
+	if ( outHeight ) {
+		*outHeight = (int)height;
+	}
+
 	return qtrue;
 }
 
@@ -490,14 +316,19 @@ static qboolean CL_SteamResources_RequestAvatar( const char *url, byte **outBuff
 =============
 CL_Steam_RegisterShader
 
-Resolves a Steam-backed resource into a renderer handle compatible with the menu image cache.
+Resolves a live Steam- or launcher-backed image resource into a renderer
+handle compatible with the menu image cache.
 =============
 */
 qhandle_t CL_Steam_RegisterShader( const char *url ) {
 	clSteamResource_t *slot;
-	char cachePath[MAX_QPATH];
+	char rendererName[MAX_QPATH];
+	byte *buffer;
+	int bufferLength;
+	byte *rgbaPixels;
+	int width;
+	int height;
 	qhandle_t shader = 0;
-	qboolean persist;
 
 	if ( !CL_SteamResources_IsURIResource( url ) ) {
 		return re.RegisterShaderNoMip( url );
@@ -508,31 +339,52 @@ qhandle_t CL_Steam_RegisterShader( const char *url ) {
 			Com_DPrintf( "UI: Steam resource request stubbed for %s\n", url ? url : "<null>" );
 			return 0;
 		}
-	} else if ( !CL_OnlineServicesEnabled() ) {
-		Com_DPrintf( "UI: launcher resource request stubbed for %s\n", url ? url : "<null>" );
-		return 0;
 	}
 
 	slot = CL_SteamResources_FindSlot( url );
-	persist = ( cl_steamCachePersist && cl_steamCachePersist->integer );
-	CL_SteamResources_SanitizeCacheName( url, cachePath, sizeof( cachePath ) );
+	if ( !slot ) {
+		Com_Printf( "UI: unable to allocate live resource slot for %s\n", url );
+		return 0;
+	}
 
-	if ( slot && slot->shader ) {
+	if ( slot->shader ) {
 		return slot->shader;
 	}
 
-	if ( CL_SteamResources_RegisterCachedShader( cachePath, &shader ) ) {
-		CL_SteamResources_AssignSlot( slot, url, cachePath, shader, qtrue );
-		return shader;
+	CL_SteamResources_BuildRendererName( url, slot, rendererName, sizeof( rendererName ) );
+
+	if ( CL_SteamResources_IsAvatarURL( url ) ) {
+		rgbaPixels = NULL;
+		width = 0;
+		height = 0;
+
+		if ( !CL_SteamResources_RequestAvatarRGBA( url, &rgbaPixels, &width, &height ) ) {
+			Com_Printf( "UI: unable to satisfy in-memory avatar request for %s\n", url );
+			return 0;
+		}
+
+		shader = CL_RegisterShaderFromRGBA( rendererName, rgbaPixels, width, height, qfalse );
+		QL_Steamworks_FreeBuffer( rgbaPixels );
+	} else {
+		buffer = NULL;
+		bufferLength = 0;
+
+		if ( !Sys_Steam_RequestURL( url, &buffer, &bufferLength ) || !buffer || bufferLength <= 0 ) {
+			Com_Printf( "UI: unable to satisfy in-memory resource request for %s\n", url );
+			return 0;
+		}
+
+		shader = CL_RegisterShaderFromMemory( rendererName, buffer, bufferLength, qfalse );
+		Sys_Steam_FreeRequestBuffer( buffer );
 	}
 
-	if ( CL_SteamResources_RequestAndCache( url, cachePath, persist, &shader ) ) {
-		CL_SteamResources_AssignSlot( slot, url, cachePath, shader, persist );
-		return shader;
+	if ( !shader ) {
+		Com_Printf( "UI: unable to register live resource image for %s\n", url );
+		return 0;
 	}
 
-	Com_Printf( "UI: unable to satisfy cached resource request for %s\n", url );
-	return 0;
+	CL_SteamResources_AssignSlot( slot, url, rendererName, shader );
+	return shader;
 }
 
 
@@ -540,7 +392,8 @@ qhandle_t CL_Steam_RegisterShader( const char *url ) {
 =============
 CL_ClearSteamResourceCache
 
-Clears the retained URI cache bookkeeping and removes session-owned cache files.
+Clears the retained live-resource bookkeeping and forces future registrations
+onto fresh renderer-owned names.
 =============
 */
 void CL_ClearSteamResourceCache( qboolean clearPersisted ) {
@@ -548,6 +401,11 @@ void CL_ClearSteamResourceCache( qboolean clearPersisted ) {
 
 	for ( i = 0; i < MAX_STEAM_RESOURCES; i++ ) {
 		CL_SteamResources_ClearSlot( &cl_steamResources[i], clearPersisted );
+	}
+
+	cl_steamResourceGeneration++;
+	if ( cl_steamResourceGeneration == 0 ) {
+		cl_steamResourceGeneration = 1;
 	}
 }
 
@@ -560,8 +418,7 @@ Initialises the Steam resource bridge and related configuration.
 */
 void CL_InitSteamResources( void ) {
 	Com_Memset( cl_steamResources, 0, sizeof( cl_steamResources ) );
-	cl_steamCachePersist = Cvar_Get( "cl_steamCachePersist", CL_SteamServicesEnabled() ? "1" : "0", CVAR_ARCHIVE );
-	cl_steamCachePath = Cvar_Get( "cl_steamCachePath", "steamcache", CVAR_ARCHIVE );
+	cl_steamResourceGeneration = 1;
 
 	if ( !CL_SteamServicesEnabled() ) {
 		Com_Printf( "Steam resource bridge disabled by build/runtime policy\n" );
@@ -572,7 +429,7 @@ void CL_InitSteamResources( void ) {
 =============
 CL_ShutdownSteamResources
 
-Clears any cached Steam resource bookkeeping.
+Clears any retained Steam resource bookkeeping.
 =============
 */
 void CL_ShutdownSteamResources( void ) {
@@ -583,7 +440,8 @@ void CL_ShutdownSteamResources( void ) {
 =============
 Sys_Steam_RequestURL
 
-Retrieves a Steam-backed or launcher-backed URL payload for the UI image cache.
+Retrieves an encoded Steam-backed or launcher-backed URL payload for the live
+renderer image bridge.
 =============
 */
 qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize ) {
@@ -593,20 +451,6 @@ qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize )
 
 	if ( outSize ) {
 		*outSize = 0;
-	}
-
-	if ( CL_SteamResources_IsAvatarURL( url ) ) {
-		if ( !CL_SteamServicesEnabled() ) {
-			Com_Printf( "Steam backend disabled by build/runtime policy for %s\n", url ? url : "<null>" );
-			return qfalse;
-		}
-
-		if ( CL_SteamResources_RequestAvatar( url, outBuffer, outSize ) ) {
-			return qtrue;
-		}
-
-		Com_Printf( "Steam avatar backend unavailable for %s\n", url ? url : "<null>" );
-		return qfalse;
 	}
 
 	if ( CL_LauncherRequestData( url, (void **)outBuffer, outSize ) ) {
@@ -619,8 +463,6 @@ qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize )
 		} else {
 			Com_Printf( "Steam backend unavailable for %s\n", url ? url : "<null>" );
 		}
-	} else if ( !CL_OnlineServicesEnabled() ) {
-		Com_Printf( "Launcher backend disabled by build/runtime policy for %s\n", url ? url : "<null>" );
 	} else {
 		Com_Printf( "Launcher resource backend unavailable for %s\n", url ? url : "<null>" );
 	}

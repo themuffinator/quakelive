@@ -278,14 +278,15 @@ def _build_ui_full_parity_gate_report(
 	service_routing_ok = service_routing_ok and "if ( UI_HandleDeferredScriptExec( item, val ) ) {" in ui_shared
 	service_routing_ok = service_routing_ok and "test_online_service_bridge_only_hard_stubs_when_build_disabled" in platform_tests
 	service_routing_ok = service_routing_ok and "test_service_disabled_menu_verb_matrix_stays_explicit" in platform_tests
+	service_routing_ok = service_routing_ok and "test_launcher_resource_fallbacks_survive_service_disabled_policy" in platform_tests
 
 	report["tranches"]["UI-G05"] = _entry(
 		"UI-G05",
 		"pass" if service_routing_ok else "fail",
 		(
-			"Service-disabled menu routing stays explicit in source and in the focused platform-service regression surface."
+			"Service-disabled menu and launcher-resource routing stay explicit in source and in the focused platform-service regression surface."
 			if service_routing_ok
-			else "Service-disabled menu routing no longer matches the documented explicit fallback matrix."
+			else "Service-disabled menu or launcher-resource routing no longer matches the documented explicit fallback matrix."
 		),
 		{
 			"deferred_exec_seam_present": "UI_HandleDeferredScriptExec" in ui_main,
@@ -293,6 +294,7 @@ def _build_ui_full_parity_gate_report(
 			"platform_service_coverage_present": (
 				"test_online_service_bridge_only_hard_stubs_when_build_disabled" in platform_tests
 				and "test_service_disabled_menu_verb_matrix_stays_explicit" in platform_tests
+				and "test_launcher_resource_fallbacks_survive_service_disabled_policy" in platform_tests
 			),
 		},
 	)

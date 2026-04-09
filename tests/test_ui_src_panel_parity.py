@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import subprocess
 import sys
 import zipfile
@@ -345,10 +344,6 @@ def test_retail_ui_override_script_supports_pk3_overlay_prefix(
 def test_ui_bundle_build_emits_src_ui_overlay_package(
 	retail_ui_corpus_inventory: dict[str, object],
 ) -> None:
-	bash = shutil.which("bash")
-	if not bash:
-		pytest.skip("bash is required for the UI bundle script")
-
 	overlay_package = REPO_ROOT / "build" / "ui_bundle" / "pak_ui_src_retail_overlay.pk3"
 	overlay_manifest = REPO_ROOT / "artifacts" / "ui_bundle" / "ui_src_retail_overlay.json"
 	main_package = REPO_ROOT / "build" / "ui_bundle" / "pak_uiql.pk3"
@@ -377,7 +372,7 @@ def test_ui_bundle_build_emits_src_ui_overlay_package(
 			inventory_manifest.unlink()
 
 		result = subprocess.run(
-			[bash, "tools/build_ui_bundle.sh"],
+			[sys.executable, str(REPO_ROOT / "tools" / "build_ui_bundle.py")],
 			cwd=REPO_ROOT,
 			check=False,
 			text=True,

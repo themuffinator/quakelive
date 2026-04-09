@@ -55,7 +55,7 @@ function Stage-Modules {
     $sources = @(
         @{ Name = 'qagamex86.dll'; Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/qagamex86.dll'; Exports = @('dllEntry', 'vmMain') },
         @{ Name = 'cgamex86.dll'; Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/cgamex86.dll'; Exports = @('dllEntry', 'vmMain') },
-        @{ Name = 'uix86.dll'; Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/uix86.dll'; Exports = @() }
+        @{ Name = 'uix86.dll'; Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/uix86.dll'; Exports = @('dllEntry', 'vmMain') }
     )
 
     foreach ($item in $sources) {
@@ -123,8 +123,7 @@ Ensure-Redist
 $modules = Stage-Modules
 Add-NativeHelpers
 
-$probeTargets = $modules | Where-Object { $_.Exports.Count -gt 0 }
-foreach ($module in $probeTargets) {
+foreach ($module in $modules) {
     $path = Join-Path $stagingRoot $module.Name
     Test-NativeModule -Path $path -Exports $module.Exports
 }

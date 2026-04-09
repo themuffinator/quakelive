@@ -552,29 +552,40 @@ def test_native_cgame_avatar_import_routes_through_steam_shader_cache() -> None:
 def test_steam_resource_bridge_reconstructs_avatar_url_fetches() -> None:
     steam_resources = (REPO_ROOT / "src/code/client/cl_steam_resources.c").read_text(encoding="utf-8")
     steamworks = (REPO_ROOT / "src/common/platform/platform_steamworks.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    client_h = (REPO_ROOT / "src/code/client/client.h").read_text(encoding="utf-8")
 
-    request_block = _extract_function_block(
-        steam_resources,
-        "qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize ) {",
-    )
     avatar_block = _extract_function_block(
         steam_resources,
-        "static qboolean CL_SteamResources_RequestAvatar( const char *url, byte **outBuffer, int *outSize )",
+        "static qboolean CL_SteamResources_RequestAvatarRGBA( const char *url, byte **outPixels, int *outWidth, int *outHeight )",
+    )
+    shader_block = _extract_function_block(
+        steam_resources,
+        "qhandle_t CL_Steam_RegisterShader( const char *url ) {",
     )
     load_avatar_block = _extract_function_block(
         steamworks,
         "qboolean QL_Steamworks_LoadAvatarRGBA( uint32_t idLow, uint32_t idHigh, ql_steam_avatar_size_t size, uint8_t **outPixels, uint32_t *outWidth, uint32_t *outHeight )",
     )
 
-    assert "CL_SteamResources_IsAvatarURL( url )" in request_block
-    assert "CL_SteamResources_RequestAvatar( url, outBuffer, outSize )" in request_block
-    assert 'Com_Printf( "Steam avatar backend unavailable for %s\\n"' in request_block
-
     assert "CL_SteamResources_ParseAvatarURL( url, &size, &idLow, &idHigh )" in avatar_block
     assert "QL_Steamworks_LoadAvatarRGBA( idLow, idHigh, size, &rgbaPixels, &width, &height )" in avatar_block
-    assert "CL_SteamResources_EncodeAvatarTGA( rgbaPixels, width, height, outBuffer, outSize )" in avatar_block
-    assert "QL_Steamworks_FreeBuffer( rgbaPixels );" in avatar_block
-    assert '".tga"' in steam_resources
+    assert "width == 0 || height == 0 || width > INT_MAX || height > INT_MAX" in avatar_block
+    assert "*outPixels = rgbaPixels;" in avatar_block
+    assert "*outWidth = (int)width;" in avatar_block
+    assert "*outHeight = (int)height;" in avatar_block
+    assert "CL_SteamResources_EncodeAvatarTGA" not in avatar_block
+
+    assert "qhandle_t CL_RegisterShaderFromRGBA( const char *name, const byte *pic, int width, int height, qboolean mipRawImage );" in client_h
+    assert "qhandle_t CL_RegisterShaderFromRGBA( const char *name, const byte *pic, int width, int height, qboolean mipRawImage ) {" in cl_main
+    assert "image = R_CreateImage( name, pic, width, height, mipRawImage, mipRawImage, mipRawImage ? GL_REPEAT : GL_CLAMP );" in cl_main
+
+    assert "if ( CL_SteamResources_IsAvatarURL( url ) ) {" in shader_block
+    assert "CL_SteamResources_RequestAvatarRGBA( url, &rgbaPixels, &width, &height )" in shader_block
+    assert "shader = CL_RegisterShaderFromRGBA( rendererName, rgbaPixels, width, height, qfalse );" in shader_block
+    assert "QL_Steamworks_FreeBuffer( rgbaPixels );" in shader_block
+    assert "CL_SteamResources_EncodeAvatarTGA" not in shader_block
+    assert '".tga"' not in steam_resources
 
     assert "friendsVTable" in load_avatar_block
     assert "utilsVTable" in load_avatar_block
@@ -586,6 +597,8 @@ def test_steam_resource_bridge_reconstructs_avatar_url_fetches() -> None:
 def test_launcher_resource_bridge_reconstructs_retail_web_fallback_owner() -> None:
     cl_webpak = (REPO_ROOT / "src/code/client/cl_webpak.c").read_text(encoding="utf-8")
     steam_resources = (REPO_ROOT / "src/code/client/cl_steam_resources.c").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    client_h = (REPO_ROOT / "src/code/client/client.h").read_text(encoding="utf-8")
 
     request_block = _extract_function_block(
         cl_webpak,
@@ -617,8 +630,77 @@ def test_launcher_resource_bridge_reconstructs_retail_web_fallback_owner() -> No
 
     assert "static qboolean CL_SteamResources_IsURIResource( const char *url ) {" in steam_resources
     assert 'return ( strstr( url, "://" ) != NULL ) ? qtrue : qfalse;' in steam_resources
+    assert "static void CL_SteamResources_BuildRendererName( const char *url, const clSteamResource_t *slot, char *rendererName, size_t rendererNameSize ) {" in steam_resources
     assert "if ( !CL_SteamResources_IsURIResource( url ) ) {" in shader_block
+    assert "CL_SteamResources_BuildRendererName( url, slot, rendererName, sizeof( rendererName ) );" in shader_block
+    assert "shader = CL_RegisterShaderFromMemory( rendererName, buffer, bufferLength, qfalse );" in shader_block
+    assert "CL_SteamResources_SanitizeCacheName" not in steam_resources
+    assert "CL_SteamResources_RegisterCachedShader" not in steam_resources
+    assert "CL_SteamResources_WriteCacheFile" not in steam_resources
+    assert "CL_SteamResources_RemoveCacheFile" not in steam_resources
+    assert "cachePath" not in steam_resources
+    assert "persisted" not in steam_resources
+    assert "qhandle_t CL_RegisterShaderFromMemory( const char *name, const byte *buffer, int bufferLength, qboolean mipRawImage );" in client_h
+    assert "qhandle_t CL_RegisterShaderFromMemory( const char *name, const byte *buffer, int bufferLength, qboolean mipRawImage ) {" in cl_main
+    assert "image = R_LoadImageFromMemory( name, buffer, bufferLength, mipRawImage, mipRawImage, mipRawImage ? GL_REPEAT : GL_CLAMP );" in cl_main
     assert "if ( CL_LauncherRequestData( url, (void **)outBuffer, outSize ) ) {" in url_block
+    assert 'Com_Printf( "Launcher resource backend unavailable for %s\\n"' in url_block
+
+
+def test_launcher_resource_fallbacks_survive_service_disabled_policy() -> None:
+    files_c = (REPO_ROOT / "src/code/qcommon/files.c").read_text(encoding="utf-8")
+    cl_webpak = (REPO_ROOT / "src/code/client/cl_webpak.c").read_text(encoding="utf-8")
+    steam_resources = (REPO_ROOT / "src/code/client/cl_steam_resources.c").read_text(encoding="utf-8")
+
+    rewrite_block = _extract_function_block(
+        files_c,
+        "qboolean FS_RewriteWebPath( const char *uri, char *outPath, int outSize ) {",
+    )
+    open_block = _extract_function_block(
+        files_c,
+        "qboolean FS_FOpenWebFileRead( const char *request, fileHandle_t *file, char *resolvedPath, size_t resolvedSize ) {",
+    )
+    init_block = _extract_function_block(cl_webpak, "void CL_WebPak_Init( void ) {")
+    available_block = _extract_function_block(cl_webpak, "qboolean CL_WebPak_Available( void ) {")
+    fetch_block = _extract_function_block(
+        cl_webpak,
+        "qboolean CL_WebPak_Fetch( const char *virtualPath, void **outBuffer, int *outLength ) {",
+    )
+    request_block = _extract_function_block(
+        cl_webpak,
+        "qboolean CL_WebRequestResolve( const char *virtualPath, void **outBuffer, int *outLength ) {",
+    )
+    launcher_block = _extract_function_block(
+        cl_webpak,
+        "qboolean CL_LauncherRequestData( const char *virtualPath, void **outBuffer, int *outLength ) {",
+    )
+    shader_block = _extract_function_block(
+        steam_resources,
+        "qhandle_t CL_Steam_RegisterShader( const char *url ) {",
+    )
+    url_block = _extract_function_block(
+        steam_resources,
+        "qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize ) {",
+    )
+
+    assert "FS_OnlineServicesEnabled" not in files_c
+    assert 'Com_sprintf( outPath, outSize, "%s/%s", fs_webpath->string, localPath );' in rewrite_block
+    assert "if ( !FS_RewriteWebPath( request, qpath, sizeof( qpath ) ) ) {" not in open_block
+    assert "if ( !FS_OnlineServicesEnabled() ) {" not in open_block
+
+    assert "web.pak mount skipped: online services disabled by build/runtime policy" not in init_block
+    assert "CL_OnlineServicesEnabled()" not in init_block
+    assert "return ( cl_webPak != NULL );" in available_block
+    assert "CL_OnlineServicesEnabled()" not in fetch_block
+    assert "CL_OnlineServicesEnabled()" not in request_block
+    assert "CL_OnlineServicesEnabled()" not in launcher_block
+
+    assert "if ( CL_SteamResources_IsSteamURL( url ) ) {" in shader_block
+    assert "if ( !CL_SteamServicesEnabled() ) {" in shader_block
+    assert "UI: launcher resource request stubbed" not in shader_block
+    assert "CL_OnlineServicesEnabled()" not in shader_block
+    assert "if ( CL_LauncherRequestData( url, (void **)outBuffer, outSize ) ) {" in url_block
+    assert "Launcher backend disabled by build/runtime policy" not in url_block
     assert 'Com_Printf( "Launcher resource backend unavailable for %s\\n"' in url_block
 
 
@@ -695,8 +777,9 @@ def test_browser_cache_reload_owner_restores_retail_command_and_cvar_surface() -
     assert "CL_Web_ClearSessionState();" in reload_block
     assert "for ( i = 0; i < MAX_STEAM_RESOURCES; i++ ) {" in clear_resource_block
     assert "CL_SteamResources_ClearSlot( &cl_steamResources[i], clearPersisted );" in clear_resource_block
-    assert "if ( slot->cachePath[0] && ( clearPersisted || !slot->persisted ) ) {" in clear_slot_block
-    assert "CL_SteamResources_RemoveCacheFile( slot->cachePath );" in clear_slot_block
+    assert "cl_steamResourceGeneration++;" in clear_resource_block
+    assert "(void)clearPersisted;" in clear_slot_block
+    assert "Com_Memset( slot, 0, sizeof( *slot ) );" in clear_slot_block
 
 
 def test_advert_bridge_callbacks_track_retail_ui_and_cgame_state_paths() -> None:
@@ -1226,6 +1309,21 @@ def test_native_import_dispatch_normalizes_qboolean_contracts() -> None:
     assert "return SV_GetClientSteamId( args[1], (uint32_t *)VMA(2), (uint32_t *)VMA(3) ) ? qtrue : qfalse;" in game_block
     assert "return SV_VerifyClientSteamAuth( args[1] ) ? qtrue : qfalse;" in game_block
     assert "SV_AdjustAreaPortalState( VMA(1), args[2] ? qtrue : qfalse );" in game_block
+
+
+def test_loopback_steam_auth_verify_falls_back_for_local_clients() -> None:
+    sv_game = (REPO_ROOT / "src/code/server/sv_game.c").read_text(encoding="utf-8")
+    verify_block = _extract_function_block(sv_game, "static qboolean SV_VerifyClientSteamAuth( int clientNum )")
+
+    assert "#if !SV_HAS_PLATFORM_AUTH" in verify_block
+    assert "cl = &svs.clients[clientNum];" in verify_block
+    assert "if ( NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {" in verify_block
+    assert "return qtrue;" in verify_block
+
+    assert "if ( !cl->platformAuthToken[0] ) {" in verify_block
+    assert "if ( NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {" in verify_block
+    assert "cl->platformAuthSucceeded = qtrue;" in verify_block
+    assert "return qtrue;" in verify_block
 
 
 def test_ui_and_cgame_native_import_slabs_leave_unrecovered_retail_gaps_null() -> None:

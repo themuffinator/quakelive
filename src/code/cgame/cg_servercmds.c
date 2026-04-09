@@ -1033,13 +1033,13 @@ static void CG_ParseRaceScores( void ) {
 
 /*
 =============
-CG_ParseAcc
+CG_ParseRetailAccuracyCommand
 
-Decodes the retail `acc` payload into the live per-weapon percentage cache used
-by the vertical local accuracy overlay.
+Retail routes both `acc` and `pstats` through the same compact 15-slot
+per-weapon percentage slab.
 =============
 */
-static void CG_ParseAcc( void ) {
+static void CG_ParseRetailAccuracyCommand( void ) {
 	int argc;
 	int i;
 
@@ -1064,6 +1064,18 @@ static void CG_ParseAcc( void ) {
 
 		cg.weaponAccuracies[weapon] = value;
 	}
+}
+
+/*
+=============
+CG_ParseAcc
+
+Decodes the retail `acc` payload into the live per-weapon percentage cache used
+by the vertical local accuracy overlay.
+=============
+*/
+static void CG_ParseAcc( void ) {
+	CG_ParseRetailAccuracyCommand();
 }
 
 #define CG_SCORESTAT_FRAG_WEAPON_COUNT		13
@@ -4518,8 +4530,7 @@ CG_ParsePStats
 =================
 */
 static void CG_ParsePStats( void ) {
-	// Retail consumes the servercmd token here, but the committed corpus does not
-	// yet expose a distinct cgame-side payload consumer beyond the request latch.
+	CG_ParseRetailAccuracyCommand();
 }
 
 /*

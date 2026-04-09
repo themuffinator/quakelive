@@ -1,8 +1,8 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-04-05
+Last updated: 2026-04-09
 
-This audit reflects the current repository state against the retail Quake Live HLIL references and a fresh Windows `Debug|x86` build/runtime pass. The goal is not to score every file equally; it is to rank the gaps that still materially separate the repo from retail behavior.
+This audit reflects the current repository state against the retail Quake Live HLIL references and the latest recorded Windows `Debug|x86` build/runtime pass. The goal is not to score every file equally; it is to rank the gaps that still materially separate the repo from retail behavior.
 
 ## Overall assessment
 
@@ -162,13 +162,55 @@ Summary:
 - Mapping coverage is effectively saturated for the committed corpus (`1027/1027` overlap), so the remaining gap profile is now dominated by behavioral/boundary exactness rather than symbol discovery.
 - A six-phase closure plan (`QG-P1`..`QG-P6`) now defines the path to full qagame parity in theory, covering round-controller helper exactness, shared last-alive event transport, scoreboard/intermission serializer decomposition, strict Red Rover controller behavior, tournament queue/spawn-finalizer sidecars, and residual timer/debug/training tails.
 
-## Module parity refresh (2026-04-06)
+## Module parity refresh (2026-04-09)
 
-A combined module audit is now published in `docs/reverse-engineering/module-parity-audit-2026-04-06.md`.
+A refreshed combined module audit is now published in `docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-09.md`.
 
 Summary:
 
-- Current estimated parity by module is **92%** for `cgame`, **78%** for `qagame`, and **100%** for `ui`.
-- Combined committed retail mapping coverage for those three DLLs is effectively saturated at **2426 / 2426** normalized anchors, with the remaining gap now dominated by live source drift, behavioral exactness, and packaging/evidence-state drift rather than by missing symbol recovery.
-- Fresh targeted verification on 2026-04-06 recorded `cgame` at `142 / 168` passed (`84.5%`), `qagame` at `77 / 84` passed with `4` skips (`91.7%` on executed tests), and the pure `ui` suite at `49 / 49` passed with `6` skips. The tracked UI parity-gate artifact is now fully green, including `UI-G03`.
-- Weighted by retail Ghidra function counts, the current combined source-built DLL parity estimate is **86.5%**. Including the still-low launcher/platform host and retail-binary host-compatibility gaps, the broader full-source estimate is approximately **82%**.
+- The source-built DLL lane is fully green on 2026-04-09: `cgame` is `170 / 170` passed, `qagame` is `91 / 91` passed with `5` skips, `ui` is `49 / 49` passed with `6` skips, the shared platform-service seam is `41 / 41` passed, and the tracked UI parity-gate artifact is fully green.
+- Strict retail-facing module parity is now assessed separately from that source-built lane. Strict retail module parity is now treated as **100%** overall for the module layer.
+- `GMR-P1` is now closed: the tracked retail runtime probe loads retail `uix86.dll`, `qagamex86.dll`, and `cgamex86.dll` from the Steam profile root under the reconstructed host, and the remaining live-map shortfall is explicitly bounded to the renderer-owned `R_LoadMD3` failure on `models/weapons3/hmg/hmg.md3`.
+- `GMR-P2` is now closed: retail qagame/cgame `pstats` transport is mirrored in writable source, with qagame now accepting `pstats` and cgame routing it through the same recovered 15-slot cache path as `acc`.
+- `GMR-P3` is now closed: the retail `CG_Player` post-`tag_head` origin/axis transform is mirrored in writable source, so `g_playerheadScale` and `g_playerheadScaleOffset` are no longer preview-only scalars.
+- `GMR-P4` is now closed: the retained launcher-resource fallback chain (`web.pak`, `fs_webpath`, screenshot mapping, and non-Steam URI resource registration) now stays available for audited offline `ui`/`cgame` flows even when live online services are disabled.
+- `GMR-P5` is now closed: the final module parity gate, the top-level ledgers, the dedicated UI audit, and the native/build pipeline notes now all agree on the same strict-retail module closure state.
+- Combined committed retail mapping coverage for the three DLLs remains saturated at **2426 / 2426** normalized anchors, so no open game-module debt remains inside the module layer; the remaining live-map shortfall is explicitly renderer-owned.
+- No confirmed source-owned or host-adjacent game-module behavior gap remains after `GMR-P5`.
+
+## Renderer audit refresh (2026-04-09)
+
+A focused full-parity audit for the renderer is now published in `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`.
+
+Summary:
+
+- The earlier renderer closure work remains valid, but the previous post-`RG-P6` public estimate of **98%** was too optimistic for strict retail parity because it only counted the classic renderer core and not the still-missing retail host text engine/build lane.
+- The refreshed strict `renderer` estimate is now **94%**, not **98%**. This is a confidence correction driven by the committed retail font-stack evidence, not a runtime regression in the already-closed renderer phases.
+- The renderer-focused validation surface is still healthy on 2026-04-09: `pytest tests/test_renderer_*.py -q --tb=no` is `20 passed, 1 skipped`, and the tracked runtime artifact for the main menu plus live `bloodrun` remains clean.
+- The open renderer gap register is now wider than the old single-tranche `RG-G05` story. The remaining strict gaps are:
+  - `RG-G05`: classic renderer font/cache/atlas exactness in `tr_font.c` is still partially source-biased
+  - `RG-G08`: the retail host FontStash text engine (`*fontstash`, `R_fonsErrorCallback`, direct host `DrawScaledText` / `MeasureText`) is still unreconstructed
+  - `RG-G09`: renderer font build reproducibility and strict text validation remain incomplete because the project files still point at a missing `src/code/ft2/` tree and `r_debugFontAtlas` still has no draw implementation
+- The renderer closure plan now continues beyond the earlier six phases with a font/text-specific tail (`RG-P7`..`RG-P9`) covering classic font exactness, host FontStash reconstruction, and final font-build/validation closure.
+- `RG-P1` is now complete. The renderer export tail matches the retail `GetRefAPI` contract again, font registration has been moved onto an explicit client compatibility lane instead of the export ABI, and the current estimated renderer parity is **81%**.
+- `RG-P2` is now complete. The recovered in-memory renderer image helper family is back in writable source, live Steam/launcher image resources now register through direct renderer-owned memory ingestion instead of temporary cache files, and the current estimated renderer parity is **85%**.
+- `RG-P3` is now complete. The renderer post-process path is shader-backed again using the retail rectangle-texture/shader-family structure, CPU color-correction readback has been removed, `r_contrast` is registered and consumed by the recovered color-correct pass, and the current estimated renderer parity is **90%**.
+- `RG-P4` is now complete. The Win32 host once again mirrors the retail live client-rect resize/restart helper, fast restarts retain the maximized-window state, the shared loading-window wrappers are present in writable source, and the current estimated renderer parity is **93%**.
+- `RG-P5` is now complete. The dense backend/BSP/curve/flare/Win32 helper bands are explicitly bounded by the new ownership note and mapping-round closure, so they are no longer treated as an open-ended active-runtime parity gap, and the current estimated renderer parity is **96%**.
+- `RG-P6` is now complete. The renderer has a dedicated parity gate, a tracked windowed runtime evidence artifact for the current milestone, and a CI-visible validation workflow, but that no longer implies strict end-to-end renderer closure because the retail font/text host remains open.
+
+## Client audit refresh (2026-04-09)
+
+A focused full-parity audit for the native `client` host is now published in `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`.
+
+Summary:
+
+- The refreshed strict `client` estimate is now **90%**. This is a confidence correction from an implicit low-90s reading of the recent host reconstruction work, not a runtime regression.
+- The classic client/runtime story is materially strong: recent mapping rounds now bound the retained input/key path, resend/connect/disconnect lifecycle, server-browser helpers, packet/frame spine, sound core, native `ui`/`cgame` bridge, and live renderer-resource ingestion well enough that the client should no longer be treated as uniformly “low parity”.
+- The remaining strict client gaps are concentrated in Quake Live-only host behavior:
+  - the missing browser/Awesomium runtime (`WebCore`, `WebSession`, `WebView`, JS bridge, `EnginePublish`, `SteamDataSource`)
+  - missing async Steam callback bundle ownership and the normal client-side callback pump
+  - incomplete workshop-aware join/download bootstrap
+  - still-source-biased config/bootstrap persistence (`q3config.cfg` vs retail `qzconfig.cfg` / `repconfig.cfg`, plus the missing `writeClientConfig` owner)
+  - no dedicated client parity gate or tracked runtime evidence artifact yet
+- The new client closure plan groups that remaining work into six executable phases (`CL-P1`..`CL-P6`) covering retail config/bootstrap recovery, Steam callback lifetime, workshop-aware download handling, browser-host core reconstruction, JS/data/event publication, and final client parity gating.

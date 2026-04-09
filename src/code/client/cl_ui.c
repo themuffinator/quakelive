@@ -1191,7 +1191,7 @@ static int CL_UISystemCallsImpl( int *args, qboolean logContract ) {
 		return 0;	
 
 	case UI_R_REGISTERFONT:
-		re.RegisterFont( VMA(1), args[2], VMA(3));
+		CL_RegisterFont( VMA(1), args[2], VMA(3) );
 		return 0;
 
 	case UI_MEMSET:
@@ -1481,7 +1481,7 @@ static fontInfo_t *QL_UI_GetScaledFont( int fontHandle ) {
 	scaledFont = &ql_ui_scaledFonts[fontHandle];
 	if ( !scaledFont->loaded ) {
 		fontName = QL_UI_GetScaledFontName( fontHandle, resolvedFontPath, sizeof( resolvedFontPath ) );
-		re.RegisterFont( fontName, 48, &scaledFont->font );
+		CL_RegisterFont( fontName, 48, &scaledFont->font );
 		scaledFont->loaded = qtrue;
 	}
 

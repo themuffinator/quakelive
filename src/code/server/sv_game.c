@@ -405,7 +405,17 @@ Validates the Steam authentication token captured from the client.
 */
 static qboolean SV_VerifyClientSteamAuth( int clientNum ) {
 	#if !SV_HAS_PLATFORM_AUTH
-	(void)clientNum;
+	client_t *cl;
+
+	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
+		return qfalse;
+	}
+
+	cl = &svs.clients[clientNum];
+	if ( NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {
+		return qtrue;
+	}
+
 	return qfalse;
 	#else
 	ql_auth_credential_t credential;
@@ -419,6 +429,10 @@ static qboolean SV_VerifyClientSteamAuth( int clientNum ) {
 	cl = &svs.clients[clientNum];
 
 	if ( !cl->platformAuthToken[0] ) {
+		if ( NET_IsLocalAddress( cl->netchan.remoteAddress ) ) {
+			cl->platformAuthSucceeded = qtrue;
+			return qtrue;
+		}
 		return qfalse;
 	}
 
@@ -1464,12 +1478,36 @@ static void SV_InitGameImports( void ) {
 	ql_game_imports[G_QL_IMPORT_BOTLIB_SETUP] = (ql_import_f)QL_G_trap_BotLibSetup;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_SHUTDOWN] = (ql_import_f)QL_G_trap_BotLibShutdown;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_LIBVAR_SET] = (ql_import_f)QL_G_trap_BotLibVarSet;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_LIBVAR_GET] = (ql_import_f)QL_G_trap_BotLibVarGet;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_PC_ADD_GLOBAL_DEFINE] = (ql_import_f)QL_G_trap_BotLibDefine;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_START_FRAME] = (ql_import_f)QL_G_trap_BotLibStartFrame;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_LOAD_MAP] = (ql_import_f)QL_G_trap_BotLibLoadMap;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_UPDATE_ENTITY] = (ql_import_f)QL_G_trap_BotLibUpdateEntity;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_TEST] = (ql_import_f)QL_G_trap_BotLibTest;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_GET_SNAPSHOT_ENTITY] = (ql_import_f)QL_G_trap_BotGetSnapshotEntity;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_GET_CONSOLE_MESSAGE] = (ql_import_f)QL_G_trap_BotGetServerCommand;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_USER_COMMAND] = (ql_import_f)QL_G_trap_BotUserCommand;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_BBOX_AREAS] = (ql_import_f)QL_G_trap_AAS_BBoxAreas;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_AREA_INFO] = (ql_import_f)QL_G_trap_AAS_AreaInfo;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_ENTITY_INFO] = (ql_import_f)QL_G_trap_AAS_EntityInfo;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_INITIALIZED] = (ql_import_f)QL_G_trap_AAS_Initialized;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_PRESENCE_TYPE_BOUNDING_BOX] = (ql_import_f)QL_G_trap_AAS_PresenceTypeBoundingBox;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_TIME] = (ql_import_f)QL_G_trap_AAS_Time;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_POINT_AREA_NUM] = (ql_import_f)QL_G_trap_AAS_PointAreaNum;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_POINT_REACHABILITY_AREA_INDEX] = (ql_import_f)QL_G_trap_AAS_PointReachabilityAreaIndex;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_TRACE_AREAS] = (ql_import_f)QL_G_trap_AAS_TraceAreas;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_POINT_CONTENTS] = (ql_import_f)QL_G_trap_AAS_PointContents;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_NEXT_BSP_ENTITY] = (ql_import_f)QL_G_trap_AAS_NextBSPEntity;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_VALUE_FOR_BSP_EPAIR_KEY] = (ql_import_f)QL_G_trap_AAS_ValueForBSPEpairKey;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY] = (ql_import_f)QL_G_trap_AAS_VectorForBSPEpairKey;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_FLOAT_FOR_BSP_EPAIR_KEY] = (ql_import_f)QL_G_trap_AAS_FloatForBSPEpairKey;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_INT_FOR_BSP_EPAIR_KEY] = (ql_import_f)QL_G_trap_AAS_IntForBSPEpairKey;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_AREA_REACHABILITY] = (ql_import_f)QL_G_trap_AAS_AreaReachability;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA] = (ql_import_f)QL_G_trap_AAS_AreaTravelTimeToGoalArea;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_ENABLE_ROUTING_AREA] = (ql_import_f)QL_G_trap_AAS_EnableRoutingArea;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL] = (ql_import_f)QL_G_trap_AAS_AlternativeRouteGoals;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_SWIMMING] = (ql_import_f)QL_G_trap_AAS_Swimming;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AAS_PREDICT_ROUTE] = (ql_import_f)QL_G_trap_AAS_PredictRoute;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_CHARACTERISTIC_BFLOAT] = (ql_import_f)QL_G_trap_Characteristic_BFloat;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_CHARACTERISTIC_BINTEGER] = (ql_import_f)QL_G_trap_Characteristic_BInteger;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_CHARACTERISTIC_STRING] = (ql_import_f)QL_G_trap_Characteristic_String;
@@ -1504,6 +1542,7 @@ static void SV_InitGameImports( void ) {
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_GET_NEXT_CAMP_SPOT_GOAL] = (ql_import_f)QL_G_trap_BotGetNextCampSpotGoal;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_GET_LEVEL_ITEM_GOAL] = (ql_import_f)QL_G_trap_BotGetLevelItemGoal;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_SET_AVOID_GOAL_TIME] = (ql_import_f)QL_G_trap_BotSetAvoidGoalTime;
+	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_UPDATE_ENTITY_ITEMS] = (ql_import_f)QL_G_trap_BotUpdateEntityItems;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_MOVE_TO_GOAL] = (ql_import_f)QL_G_trap_BotMoveToGoal;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_MOVE_IN_DIRECTION] = (ql_import_f)QL_G_trap_BotMoveInDirection;
 	ql_game_imports[G_QL_IMPORT_BOTLIB_AI_RESET_AVOID_REACH] = (ql_import_f)QL_G_trap_BotResetAvoidReach;

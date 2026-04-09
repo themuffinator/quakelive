@@ -393,17 +393,33 @@ static void CL_AdvertisementBridge_ShutdownCGame( void ) {
 
 /*
 ====================
-CL_AdvertisementBridge_UpdateLoadingViewParameters
+CL_AdvertisementBridge_RefreshLoadingViewParameters
 
 Mirrors the retail loading-text bridge tail when a host implementation exists.
 ====================
 */
-static void CL_AdvertisementBridge_UpdateLoadingViewParameters( void ) {
+void CL_AdvertisementBridge_RefreshLoadingViewParameters( void ) {
 	if ( !cl_advertisementBridge.initialised ) {
 		return;
 	}
 
 	CL_RefreshOnlineServicesBridgeState();
+}
+
+/*
+====================
+CL_AdvertisementBridge_UpdateLoadingViewParameters
+
+Routes the loading-view update through the retail renderer export slot when available.
+====================
+*/
+void CL_AdvertisementBridge_UpdateLoadingViewParameters( void ) {
+	if ( re.AdvertisementBridge_UpdateLoadingViewParameters ) {
+		re.AdvertisementBridge_UpdateLoadingViewParameters();
+		return;
+	}
+
+	CL_AdvertisementBridge_RefreshLoadingViewParameters();
 }
 
 /*
@@ -961,7 +977,7 @@ static int CL_CgameSystemCallsImpl( int *args, qboolean logContract ) {
 	case CG_R_REGISTERSHADERNOMIP:
 		return re.RegisterShaderNoMip( VMA(1) );
 	case CG_R_REGISTERFONT:
-		re.RegisterFont( VMA(1), args[2], VMA(3));
+		CL_RegisterFont( VMA(1), args[2], VMA(3) );
 	case CG_R_CLEARSCENE:
 		re.ClearScene();
 		return 0;
@@ -1344,7 +1360,7 @@ static fontInfo_t *QL_CG_GetScaledFont( int fontHandle ) {
 	scaledFont = &ql_cgame_scaledFonts[fontHandle];
 	if ( !scaledFont->loaded ) {
 		fontName = QL_CG_GetScaledFontName( fontHandle, resolvedFontPath, sizeof( resolvedFontPath ) );
-		re.RegisterFont( fontName, 48, &scaledFont->font );
+		CL_RegisterFont( fontName, 48, &scaledFont->font );
 		scaledFont->loaded = qtrue;
 	}
 

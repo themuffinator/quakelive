@@ -13,6 +13,25 @@ The source-built native DLL ABI slice is now largely in place:
 
 That closes the core import/export replication work for the reconstructed source-built gameplay DLLs. The remaining work in this area is strict compatibility validation against the retail DLLs themselves, plus the host/platform/bootstrap surfaces those binaries expect from the retail engine.
 
+That retail-binary validation lane now has a dedicated tracked probe:
+`tools/modules/run_retail_module_runtime_probe.ps1`, with the current evidence
+captured in
+`artifacts/module_validation/logs/retail_module_runtime_evidence_20260409.json`.
+The latest pass loads retail `uix86.dll`, `qagamex86.dll`, and `cgamex86.dll`
+from the Steam profile root under the reconstructed host. The remaining
+live-map shortfall is no longer an ambiguous module-host failure; it is the
+renderer-owned `R_LoadMD3` rejection of retail
+`models/weapons3/hmg/hmg.md3`, which belongs to the renderer audit rather than
+to the native module ABI slice.
+
+The final strict-retail module closure state is tracked separately by
+`tests/test_game_module_retail_parity_gate.py`, which writes
+`artifacts/module_validation/logs/retail_module_parity_gate.json` as the
+current `GMR-P5` artifact. That gate consumes the archived runtime probe above
+together with the launcher/resource fallback closure and the synced parity
+ledgers, so the module layer can close without claiming ownership of the
+remaining renderer blocker.
+
 ## Client UI VM (`uivm`)
 | Lifecycle | Location(s) | Current invocation | Proposed native entry (signature) | Notes / blockers |
 | --- | --- | --- | --- | --- |

@@ -207,6 +207,25 @@ vm_t				*cgvm;
 // Structure containing functions exported from refresh DLL
 refexport_t	re;
 
+typedef struct image_s image_t;
+
+#ifndef GL_REPEAT
+#define GL_REPEAT 0x2901
+#endif
+
+#ifndef GL_CLAMP
+#define GL_CLAMP 0x2900
+#endif
+
+#ifndef LIGHTMAP_2D
+#define LIGHTMAP_2D -4
+#endif
+
+void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font );
+image_t *R_CreateImage( const char *name, const byte *pic, int width, int height, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode );
+image_t *R_LoadImageFromMemory( const char *name, const byte *buffer, int bufferLength, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode );
+qhandle_t RE_RegisterShaderFromImage( const char *name, int lightmapIndex, image_t *image, qboolean mipRawImage );
+
 ping_t	cl_pinglist[MAX_PINGREQUESTS];
 
 typedef struct serverStatus_s
@@ -2684,6 +2703,64 @@ void *CL_RefMalloc( int size ) {
 
 int CL_ScaledMilliseconds(void) {
 	return Sys_Milliseconds()*com_timescale->value;
+}
+
+/*
+============
+CL_RegisterFont
+
+Keeps source-era font registration on a compatibility lane outside the retail renderer ABI tail.
+============
+*/
+void CL_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {
+	RE_RegisterFont( fontName, pointSize, font );
+}
+
+/*
+============
+CL_RegisterShaderFromRGBA
+
+Keeps direct renderer image creation for live RGBA payloads on an explicit
+client compatibility lane outside the retail renderer export ABI.
+============
+*/
+qhandle_t CL_RegisterShaderFromRGBA( const char *name, const byte *pic, int width, int height, qboolean mipRawImage ) {
+	image_t *image;
+
+	if ( !name || !pic || width <= 0 || height <= 0 || strlen( name ) >= MAX_QPATH ) {
+		return 0;
+	}
+
+	image = R_CreateImage( name, pic, width, height, mipRawImage, mipRawImage, mipRawImage ? GL_REPEAT : GL_CLAMP );
+	if ( !image ) {
+		return 0;
+	}
+
+	return RE_RegisterShaderFromImage( name, LIGHTMAP_2D, image, mipRawImage );
+}
+
+/*
+============
+CL_RegisterShaderFromMemory
+
+Routes encoded image payloads through the retail Quake Live in-memory image
+loader, then wraps the decoded image in the normal 2D shader registration
+path.
+============
+*/
+qhandle_t CL_RegisterShaderFromMemory( const char *name, const byte *buffer, int bufferLength, qboolean mipRawImage ) {
+	image_t *image;
+
+	if ( !name || !buffer || bufferLength <= 0 || strlen( name ) >= MAX_QPATH ) {
+		return 0;
+	}
+
+	image = R_LoadImageFromMemory( name, buffer, bufferLength, mipRawImage, mipRawImage, mipRawImage ? GL_REPEAT : GL_CLAMP );
+	if ( !image ) {
+		return 0;
+	}
+
+	return RE_RegisterShaderFromImage( name, LIGHTMAP_2D, image, mipRawImage );
 }
 
 /*
