@@ -334,7 +334,7 @@ void Field_KeyDownEvent( field_t *edit, int key ) {
 
 	len = strlen( edit->buffer );
 
-	if ( key == K_DEL ) {
+	if ( key == K_DEL || key == K_KP_DEL ) {
 		if ( edit->cursor < len ) {
 			memmove( edit->buffer + edit->cursor, 
 				edit->buffer + edit->cursor + 1, len - edit->cursor );
@@ -342,7 +342,7 @@ void Field_KeyDownEvent( field_t *edit, int key ) {
 		return;
 	}
 
-	if ( key == K_RIGHTARROW ) 
+	if ( key == K_RIGHTARROW || key == K_KP_RIGHTARROW ) 
 	{
 		if ( edit->cursor < len ) {
 			edit->cursor++;
@@ -355,7 +355,7 @@ void Field_KeyDownEvent( field_t *edit, int key ) {
 		return;
 	}
 
-	if ( key == K_LEFTARROW ) 
+	if ( key == K_LEFTARROW || key == K_KP_LEFTARROW ) 
 	{
 		if ( edit->cursor > 0 ) {
 			edit->cursor--;
@@ -367,17 +367,17 @@ void Field_KeyDownEvent( field_t *edit, int key ) {
 		return;
 	}
 
-	if ( key == K_HOME || ( tolower(key) == 'a' && keys[K_CTRL].down ) ) {
+	if ( key == K_HOME || key == K_KP_HOME || ( tolower(key) == 'a' && keys[K_CTRL].down ) ) {
 		edit->cursor = 0;
 		return;
 	}
 
-	if ( key == K_END || ( tolower(key) == 'e' && keys[K_CTRL].down ) ) {
+	if ( key == K_END || key == K_KP_END || ( tolower(key) == 'e' && keys[K_CTRL].down ) ) {
 		edit->cursor = len;
 		return;
 	}
 
-	if ( key == K_INS ) {
+	if ( key == K_INS || key == K_KP_INS ) {
 		key_overstrikeMode = !key_overstrikeMode;
 		return;
 	}

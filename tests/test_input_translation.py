@@ -71,6 +71,14 @@ def test_unicode_key_preserves_codepoint_for_char_payload(input_translation_lib:
     assert translated.hasChar == 1
 
 
+def test_control_character_key_preserves_backspace_payload(input_translation_lib: ctypes.CDLL) -> None:
+    translated = input_translation_lib.QLR_TranslateKey(8)
+
+    assert translated.dispatchKey == 8
+    assert translated.charCode == 8
+    assert translated.hasChar == 1
+
+
 def test_negative_key_drops_character_payload(input_translation_lib: ctypes.CDLL) -> None:
     translated = input_translation_lib.QLR_TranslateKey(-5)
 

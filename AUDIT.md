@@ -2,6 +2,14 @@
 
 Last updated: 2026-04-10
 
+Current ledger note:
+
+- The opening sections below are preserved as historical context from the
+  earlier broad audit. The authoritative current engine-wide state is now the
+  consolidated report in
+  `docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`
+  plus the dedicated subsystem audits referenced later in this file.
+
 This audit reflects the current repository state against the retail Quake Live HLIL references and the latest recorded Windows `Debug|x86` build/runtime pass. The goal is not to score every file equally; it is to rank the gaps that still materially separate the repo from retail behavior.
 
 ## Overall assessment
@@ -316,3 +324,30 @@ Summary:
 - `EH-P5` is now complete. `EH-G03` and `EH-G05` are now closed as documented compatibility-only divergences rather than left as blocked parity debt.
 - `platform_services.c`, the open/hybrid auth backends, and the Unix/null trees are now treated explicitly as compatibility or policy lanes rather than as silent retail closures, and the dedicated host/support gate now reports `overall_status: pass`.
 - No open gap remains in the audited remaining engine host/support register.
+
+## Engine-wide audit refresh (2026-04-10)
+
+A consolidated full-parity audit for the engine-owned executable surface is now
+published in
+`docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`.
+
+Summary:
+
+- The current strict engine-owned estimate is now **100%** across the five
+  audited engine registers: `qcommon`, `client`, `server`, `renderer`, and the
+  remaining engine host/support scope.
+- The machine-readable engine gate surface is fully green: **31 / 31** engine
+  gap IDs pass, and **29 / 29** strict-retail-counted gap IDs pass once the
+  two compatibility-only host/support exclusions (`EH-G03`, `EH-G05`) are
+  removed per the boundary contract.
+- All five engine-owned gate artifacts report `overall_status: pass`, and all
+  five engine-owned registers now have either a dedicated runtime bundle or a
+  focused evidence bundle accepted by the owning audit.
+- No open engine-owned parity gap remains in the current audited register. The
+  remaining active repo work sits outside this engine audit in ownerdraw/stat
+  validation, gameplay validation sweeps, and normal gate/runtime maintenance.
+- The module dependency layer remains separately closed at **100%**, with
+  `artifacts/module_validation/logs/retail_module_parity_gate.json` and
+  `artifacts/ui_validation/logs/ui_full_parity_gate.json` both passing and the
+  archived retail-DLL runtime probe still providing direct retail-binary host
+  evidence.

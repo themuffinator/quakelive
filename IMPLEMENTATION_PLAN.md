@@ -6,7 +6,28 @@ This plan tracks the highest-value parity work remaining after the 2026-03-06 au
 
 The long-term parity target is that this engine should, in theory, be able to replace the retail Quake Live engine: load retail `cgamex86.dll`, `qagamex86.dll`, and `uix86.dll`, present the retail main menu, and interoperate with retail Quake Live server/platform flows. Quake Live-only online services remain behind `QL_BUILD_ONLINE_SERVICES`, default disabled, until an open replacement path exists.
 
+## Current ledger note
+
+The authoritative current engine-owned closure state is now published in
+`docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`.
+The historical pre-closure narratives for Task 21, Task 22, and the older
+server-host Task 24 remain below for traceability, but they are superseded by
+the dedicated 2026-04-09/10 subsystem audits and should not be read as current
+open engine-owned gaps. Active remaining work now begins with Task 23 and the
+gameplay-validation Task 24 later in this file.
+
 ## Recently closed
+
+### Task 110: Engine-wide parity audit and implementation plan publication [COMPLETED]
+Priority: High
+Files: `docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 100% -> after 100%** (evidence consolidation; runtime behavior unchanged)
+
+Completed work:
+
+1. Re-audited the engine-owned executable surface against retail `quakelive_steam.exe` by aggregating the committed HLIL/Ghidra corpus, mapping rounds, dedicated subsystem audits, machine-readable gates, and tracked runtime artifacts across `qcommon`, `client`, `server`, `renderer`, and the remaining engine host/support scope.
+2. Published the authoritative consolidated engine-wide audit at `docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`, recording **31 / 31** passing engine gap IDs, **29 / 29** passing strict-retail-counted engine gap IDs after host/support compatibility exclusions, and no open engine-owned gap remaining in the current audited register.
+3. Refreshed the top-level ledgers so the current worktree now points at the consolidated engine-wide audit, distinguishes historical pre-closure task narratives from the current closure state, and keeps the active remaining repo priorities focused on gameplay/ownerdraw validation rather than already-closed engine-host work.
 
 ### Task 109: Remaining engine host/support EH-P1 boundary formalisation closure [COMPLETED]
 Priority: High
@@ -1308,7 +1329,7 @@ When code changes can affect startup or runtime stability:
 
 ## Working priority order
 
-1. Native launcher/platform host reconstruction.
-2. Residual `cgame` exactness closure.
-3. Ownerdraw/stat payload completion and runtime validation.
-4. Targeted gameplay validation sweeps.
+1. Ownerdraw/stat payload completion and runtime validation.
+2. Targeted gameplay validation sweeps.
+3. Refresh engine/module parity gates and runtime evidence whenever audited host contracts change.
+4. Reopen only the owning subsystem register when new retail evidence or a failing gate justifies it.

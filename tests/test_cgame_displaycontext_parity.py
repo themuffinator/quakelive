@@ -33,6 +33,7 @@ G_ITEMS = REPO_ROOT / "src" / "code" / "game" / "g_items.c"
 G_MAIN = REPO_ROOT / "src" / "code" / "game" / "g_main.c"
 QL_CGAME_IMPORTS = REPO_ROOT / "src" / "code" / "client" / "ql_cgame_imports.inc"
 UI_MAIN = REPO_ROOT / "src" / "code" / "ui" / "ui_main.c"
+UI_ATOMS = REPO_ROOT / "src" / "code" / "ui" / "ui_atoms.c"
 UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
 UI_SHARED_H = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.h"
 
@@ -3024,6 +3025,25 @@ def test_shared_ui_widescreen_flow_uses_retail_adjust_callbacks() -> None:
 		"uiInfo.uiDC.initAdvertisementBridge = &UI_InitAdvertisementBridge;",
 	):
 		assert expected in ui_main_source
+
+
+def test_ui_adjust_from_640_uses_retail_bias_and_null_guards() -> None:
+	source = UI_ATOMS.read_text(encoding="utf-8")
+	adjust_block = _block_from_marker(source, "void UI_AdjustFrom640")
+
+	for expected in (
+		"if ( x ) {",
+		"*x = ( *x * uiInfo.uiDC.xscale ) + uiInfo.uiDC.bias;",
+		"if ( y ) {",
+		"*y *= uiInfo.uiDC.yscale;",
+		"if ( w ) {",
+		"*w *= uiInfo.uiDC.xscale;",
+		"if ( h ) {",
+		"*h *= uiInfo.uiDC.yscale;",
+	):
+		assert expected in adjust_block
+
+	assert "*x *= uiInfo.uiDC.xscale;" not in adjust_block
 
 
 def test_cgame_public_and_local_headers_expose_bridge_imports() -> None:

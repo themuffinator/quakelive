@@ -30,18 +30,18 @@ clTranslatedKey_t CL_TranslateRetailKeycode( int key ) {
 	translated.hasChar = qfalse;
 
 	if ( key < 0 ) {
-	translated.key = 0;
-	translated.dispatchKey = 0;
-	return translated;
+		translated.key = 0;
+		translated.dispatchKey = 0;
+		return translated;
 	}
 
 	if ( key >= 'A' && key <= 'Z' ) {
-	translated.dispatchKey = tolower( key );
+		translated.dispatchKey = tolower( key );
 	}
 
-	if ( key >= ' ' && key <= 0x10FFFF ) {
-	translated.charCode = key;
-	translated.hasChar = qtrue;
+	if ( key > 0 && key <= 0x10FFFF ) {
+		translated.charCode = key;
+		translated.hasChar = qtrue;
 	}
 
 	return translated;
@@ -61,9 +61,9 @@ int CL_TranslateRetailMouseDelta( int delta, float cpiValue ) {
 	float scale;
 
 	if ( cpiValue > 0.0f ) {
-	scale = 1000.0f / cpiValue;
-	delta = (int)lrintf( (float)delta * scale );
-}
+		scale = 1000.0f / cpiValue;
+		delta = (int)lrintf( (float)delta * scale );
+	}
 
 	return delta;
 }

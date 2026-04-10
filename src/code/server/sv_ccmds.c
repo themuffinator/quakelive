@@ -35,15 +35,25 @@ typedef struct svFactoryParseState_s {
 	int line;
 } svFactoryParseState_t;
 
+typedef struct svFactoryOverride_s {
+	char *name;
+	char *value;
+	struct svFactoryOverride_s *next;
+} svFactoryOverride_t;
+
 typedef struct svFactoryDefinition_s {
 	char *id;
+	char *title;
 	gametype_t baseGametype;
 	char *sourceFile;
+	svFactoryOverride_t *overrides;
+	int overrideCount;
 	struct svFactoryDefinition_s *next;
 } svFactoryDefinition_t;
 
 static qboolean s_svFactoryRegistryLoaded = qfalse;
 static svFactoryDefinition_t *s_svFactoryList = NULL;
+static const svFactoryDefinition_t *s_svCurrentFactory = NULL;
 static qboolean s_svArenaRegistryLoaded = qfalse;
 static int s_svNumArenaInfos = 0;
 static char *s_svArenaInfos[MAX_ARENAS];
@@ -70,6 +80,55 @@ static char *SV_FactoryCopyString( const char *value ) {
 	}
 
 	return copy;
+}
+
+/*
+=============
+SV_FactoryFreeOverrides
+
+Releases a linked list of parsed factory CVar overrides.
+=============
+*/
+static void SV_FactoryFreeOverrides( svFactoryOverride_t *override ) {
+	svFactoryOverride_t *next;
+
+	while ( override ) {
+		next = override->next;
+		if ( override->name ) {
+			Z_Free( override->name );
+		}
+		if ( override->value ) {
+			Z_Free( override->value );
+		}
+		Z_Free( override );
+		override = next;
+	}
+}
+
+/*
+=============
+SV_FactoryFreeDefinition
+
+Releases a parsed factory definition that is not retained by the registry.
+=============
+*/
+static void SV_FactoryFreeDefinition( svFactoryDefinition_t *definition ) {
+	if ( !definition ) {
+		return;
+	}
+
+	if ( definition->id ) {
+		Z_Free( definition->id );
+	}
+	if ( definition->title ) {
+		Z_Free( definition->title );
+	}
+	if ( definition->sourceFile ) {
+		Z_Free( definition->sourceFile );
+	}
+
+	SV_FactoryFreeOverrides( definition->overrides );
+	Z_Free( definition );
 }
 
 /*
@@ -365,6 +424,107 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 
 													/*
 													=============
+													SV_FactoryParseCvarOverrides
+
+													Parses the "cvars" object for a factory definition.
+													=============
+													*/
+													static qboolean SV_FactoryParseCvarOverrides( svFactoryParseState_t *state, svFactoryDefinition_t *definition ) {
+														svFactoryOverride_t *tail = NULL;
+
+														if ( !definition || !SV_FactoryParseExpectedChar( state, '{' ) ) {
+															return qfalse;
+														}
+
+														SV_FactorySkipWhitespace( state );
+														if ( state->cursor < state->end && *state->cursor == '}' ) {
+															state->cursor++;
+															return qtrue;
+														}
+
+														while ( state->cursor < state->end ) {
+															char *name = SV_FactoryParseJsonString( state );
+															char *value;
+															svFactoryOverride_t *override;
+
+															if ( !name ) {
+																return qfalse;
+															}
+
+															if ( !SV_FactoryParseExpectedChar( state, ':' ) ) {
+																Z_Free( name );
+																return qfalse;
+															}
+
+															SV_FactorySkipWhitespace( state );
+															if ( state->cursor >= state->end ) {
+																Z_Free( name );
+																SV_FactoryReportParseError( state, "unexpected end of cvars" );
+																return qfalse;
+															}
+
+															if ( *state->cursor == '"' ) {
+																value = SV_FactoryParseJsonString( state );
+															} else {
+																value = SV_FactoryParseLiteralString( state );
+															}
+
+															if ( !value ) {
+																Z_Free( name );
+																return qfalse;
+															}
+
+															override = ( svFactoryOverride_t * )Z_Malloc( sizeof( svFactoryOverride_t ) );
+															if ( !override ) {
+																Z_Free( name );
+																Z_Free( value );
+																return qfalse;
+															}
+
+															override->name = name;
+															override->value = value;
+															override->next = NULL;
+
+															if ( tail ) {
+																tail->next = override;
+															} else {
+																definition->overrides = override;
+															}
+
+															tail = override;
+															definition->overrideCount++;
+
+															SV_FactorySkipWhitespace( state );
+															if ( state->cursor >= state->end ) {
+																SV_FactoryReportParseError( state, "unterminated cvars object" );
+																return qfalse;
+															}
+
+															if ( *state->cursor == ',' ) {
+																state->cursor++;
+																SV_FactorySkipWhitespace( state );
+																if ( state->cursor < state->end && *state->cursor == '}' ) {
+																	state->cursor++;
+																	return qtrue;
+																}
+																continue;
+															}
+
+															if ( *state->cursor == '}' ) {
+																state->cursor++;
+																return qtrue;
+															}
+
+															SV_FactoryReportParseError( state, "expected ',' or '}'" );
+															return qfalse;
+														}
+
+														SV_FactoryReportParseError( state, "unterminated cvars object" );
+														return qfalse;
+													}
+
+													/*
+													=============
 													SV_FactoryMapBaseGametype
 
 													Translates textual base gametype tokens int o gametype_t values.
@@ -417,6 +577,7 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 													static svFactoryDefinition_t *SV_FactoryParseDefinition( svFactoryParseState_t *state, const char *sourceFile ) {
 														svFactoryDefinition_t *definition;
 														char *id;
+														char *title;
 														char *basegt;
 
 														if ( !SV_FactoryParseExpectedChar( state, '{' ) ) {
@@ -430,10 +591,14 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 
 														definition->sourceFile = sourceFile ? SV_FactoryCopyString( sourceFile ) : NULL;
 														definition->id = NULL;
+														definition->title = NULL;
 														definition->baseGametype = GT_FFA;
+														definition->overrides = NULL;
+														definition->overrideCount = 0;
 														definition->next = NULL;
 
 														id = NULL;
+														title = NULL;
 														basegt = NULL;
 
 														while ( state && state->cursor < state->end ) {
@@ -463,11 +628,21 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 																	Z_Free( id );
 																}
 																id = SV_FactoryParseJsonString( state );
+															} else if ( !Q_stricmp( key, "title" ) ) {
+																if ( title ) {
+																	Z_Free( title );
+																}
+																title = SV_FactoryParseJsonString( state );
 															} else if ( !Q_stricmp( key, "basegt" ) ) {
 																if ( basegt ) {
 																	Z_Free( basegt );
 																}
 																basegt = SV_FactoryParseJsonString( state );
+															} else if ( !Q_stricmp( key, "cvars" ) ) {
+																if ( !SV_FactoryParseCvarOverrides( state, definition ) ) {
+																	Z_Free( key );
+																	goto fail;
+																}
 															} else {
 																if ( !SV_FactorySkipValue( state ) ) {
 																	Z_Free( key );
@@ -508,6 +683,7 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 														}
 
 														definition->id = id;
+														definition->title = title;
 														Z_Free( basegt );
 														return definition;
 
@@ -515,15 +691,13 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 														if ( id ) {
 															Z_Free( id );
 														}
+														if ( title ) {
+															Z_Free( title );
+														}
 														if ( basegt ) {
 															Z_Free( basegt );
 														}
-														if ( definition ) {
-															if ( definition->sourceFile ) {
-																Z_Free( definition->sourceFile );
-															}
-															Z_Free( definition );
-														}
+														SV_FactoryFreeDefinition( definition );
 														return NULL;
 													}
 
@@ -547,6 +721,7 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 																definition->id,
 																definition->sourceFile ? definition->sourceFile : "<unknown>",
 																iter->sourceFile ? iter->sourceFile : "<unknown>" );
+																SV_FactoryFreeDefinition( definition );
 																return qfalse;
 															}
 														}
@@ -748,6 +923,84 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 														}
 
 														return NULL;
+													}
+
+													/*
+													=============
+													SV_FactoryPrintValidList
+
+													Prints the retail host factory list used by the map usage path.
+													=============
+													*/
+													static void SV_FactoryPrintValidList( void ) {
+														const svFactoryDefinition_t *factory;
+
+														SV_FactoryEnsureRegistryLoaded();
+
+														Com_Printf( "Valid factories: " );
+														for ( factory = s_svFactoryList; factory; factory = factory->next ) {
+															if ( factory->id && factory->id[0] && factory->id[0] != '_' ) {
+																Com_Printf( "%s ", factory->id );
+															}
+														}
+														Com_Printf( "\n" );
+													}
+
+													/*
+													=============
+													SV_FactoryResetOverrides
+
+													Resets every override contributed by the supplied host-side factory selection.
+													=============
+													*/
+													static void SV_FactoryResetOverrides( const svFactoryDefinition_t *factory ) {
+														const svFactoryOverride_t *override;
+
+														if ( !factory ) {
+															return;
+														}
+
+														for ( override = factory->overrides; override; override = override->next ) {
+															if ( override->name && override->name[0] ) {
+																Cvar_Reset( override->name );
+															}
+														}
+													}
+
+													/*
+													=============
+													SV_FactoryApplySelection
+
+													Applies the selected host-side factory before the next map bootstraps qagame.
+													=============
+													*/
+													static void SV_FactoryApplySelection( const svFactoryDefinition_t *factory ) {
+														const svFactoryOverride_t *override;
+														char gametypeBuffer[8];
+
+														if ( s_svCurrentFactory == factory ) {
+															return;
+														}
+
+														SV_FactoryResetOverrides( s_svCurrentFactory );
+
+														for ( override = factory ? factory->overrides : NULL; override; override = override->next ) {
+															if ( override->name && override->value ) {
+																Cvar_Set( override->name, override->value );
+															}
+														}
+
+														if ( factory ) {
+															Com_sprintf( gametypeBuffer, sizeof( gametypeBuffer ), "%i", factory->baseGametype );
+															Cvar_Set( "g_gametype", gametypeBuffer );
+															Cvar_Set( "g_factory", factory->id ? factory->id : "" );
+															Cvar_Set( "g_factoryTitle", factory->title ? factory->title : "" );
+														} else {
+															Cvar_Set( "g_factory", "" );
+															Cvar_Set( "g_factoryTitle", "" );
+														}
+
+														s_svCurrentFactory = factory;
 													}
 
 													/*
@@ -1124,9 +1377,18 @@ static void SV_Map_f( void ) {
 	char		mapname[MAX_QPATH];
 	const svFactoryDefinition_t	*factoryOverride;
 	const char		*factoryId;
+	int		requiredArgs;
+
+	cmd = Cmd_Argv(0);
+	requiredArgs = s_svCurrentFactory ? 2 : 3;
+	if ( Cmd_Argc() < requiredArgs ) {
+		Com_Printf( "%s (map) (factory)\n", cmd );
+		SV_FactoryPrintValidList();
+		return;
+	}
 
 	map = Cmd_Argv(1);
-	if ( !map ) {
+	if ( !map || !*map ) {
 		return;
 	}
 
@@ -1148,7 +1410,6 @@ static void SV_Map_f( void ) {
 	factoryOverride = NULL;
 	factoryId = NULL;
 
-	cmd = Cmd_Argv(0);
 	if( Q_stricmpn( cmd, "sp", 2 ) == 0 ) {
 		Cvar_SetValue( "g_gametype", GT_SINGLE_PLAYER );
 		Cvar_SetValue( "g_doWarmup", 0 );
@@ -1171,28 +1432,31 @@ static void SV_Map_f( void ) {
 		}
 	}
 
+	factoryOverride = s_svCurrentFactory;
 	if ( Cmd_Argc() > 2 ) {
 		factoryId = Cmd_Argv( 2 );
-		if ( factoryId && *factoryId ) {
+		if ( !factoryId || !*factoryId ) {
+			factoryOverride = NULL;
+		} else {
 			factoryOverride = SV_FactoryFindById( factoryId );
-			if ( !factoryOverride ) {
-				Com_Printf( "Invalid factory specified.\n" );
-				return;
-			}
-			if ( !cheat && !SV_MapSupportsGametype( map, factoryOverride->baseGametype ) ) {
-				Com_Printf( "Map not supported for this gametype.\n" );
-				return;
-			}
 		}
+	}
+
+	if ( !factoryOverride ) {
+		Com_Printf( "Invalid factory specified.\n" );
+		return;
+	}
+
+	if ( !cheat && !SV_MapSupportsGametype( map, factoryOverride->baseGametype ) ) {
+		Com_Printf( "Map not supported for this gametype.\n" );
+		return;
 	}
 
 	// save the map name here cause on a map restart we reload the q3config.cfg
 	// and thus nuke the arguments of the map command
 	Q_strncpyz(mapname, map, sizeof(mapname));
 
-	if ( factoryOverride ) {
-		Cvar_Set( "g_factory", factoryOverride->id );
-	}
+	SV_FactoryApplySelection( factoryOverride );
 
 	// start up the map
 	SV_SpawnServer( mapname, killBots );

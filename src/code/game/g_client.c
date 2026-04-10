@@ -1033,7 +1033,8 @@ static gentity_t *G_SelectClientSpawnPoint( gentity_t *ent, vec3_t origin, vec3_
 
 	useInitialSpawn = qfalse;
 	if ( !client->pers.initialSpawn ) {
-		if ( client->pers.localClient || g_gametype.integer == GT_TOURNAMENT || level.trainingMapActive ) {
+		if ( g_gametype.integer == GT_TOURNAMENT
+			|| ( level.trainingMapActive && client->pers.localClient ) ) {
 			client->pers.initialSpawn = qtrue;
 			useInitialSpawn = qtrue;
 		}

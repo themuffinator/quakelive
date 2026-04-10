@@ -34,19 +34,21 @@ way that stays grounded in evidence instead of guesswork.
 
 ## Current status
 
-The project is well past initial bring-up. The strict retail-facing module register for
-`cgame`, `qagame`, and `ui` is closed, and the dedicated `client` and `renderer` engine
-audits are also fully closed.
+The project is now in the final exactness and validation phase for the current audited
+register. The strict retail-facing module register for `cgame`, `qagame`, and `ui` is
+closed, and the consolidated 2026-04-10 engine audit now records `qcommon`, `client`,
+`server`, `renderer`, and the remaining engine host/support surface as closed too.
 
-The remaining work is concentrated in `server`, `qcommon`, and the broader native
-launcher/platform host. So while the repo is not yet a finished drop-in replacement for the
-retail Windows host, most gameplay-side reconstruction is now in the "close the last gaps"
-phase rather than the "discover the system" phase.
+That does not mean the repository is "done." The active work queue is now narrower:
+ownerdraw/stat payload completion, targeted gameplay validation, and normal refresh of the
+subsystem parity gates and runtime evidence whenever audited contracts change. The biggest
+remaining repo work is no longer broad engine-host reconstruction.
 
-Based on the focused parity audits published between 2026-04-05 and 2026-04-10:
+Based on the focused parity audits published between 2026-04-05 and 2026-04-10 and the
+consolidated engine-wide audit published on 2026-04-10:
 
-Legend: `🟢` closed or effectively complete, `🟡` strong but still open, `🔴` major open
-reconstruction lane.
+Legend: `🟢` closed or effectively complete in the current audited register, `🟡`
+strong but still open, `🔴` major open reconstruction lane.
 
 ### Game reconstruction
 
@@ -62,16 +64,17 @@ reconstruction lane.
 | --- | --- | ---: | --- |
 | `client` | 🟢 Closed | `100%` | Dedicated parity gate and tracked runtime evidence are both closed. |
 | `renderer` | 🟢 Closed | `100%` | Final text/font/runtime closure landed in the `RG-P11` audit pass. |
-| `qcommon` | 🟡 Strong, open | `90%` | Active runtime is strong; remaining work is concentrated in filesystem/homepath exactness, collision leaves, fallback QVM paths, and ledger cleanup. |
-| `server` | 🟡 Strong, open | `81%` | Classic server spine is strong; remaining work is `idZMQ`, report/stat publication, rankings, control-plane CVars, and a dedicated parity gate. |
-| `other` | 🔴 Major open work | `Not yet percentage-scored` | Native launcher/platform host, Windows bootstrap glue, and the broader browser/Awesomium replacement track remain the biggest engine-side gap. |
+| `qcommon` | 🟢 Closed | `100%` | Dedicated gate and runtime evidence now close bootstrap, filesystem, collision-leaf, fallback-VM, and ledger/runtime proof work. |
+| `server` | 🟢 Closed | `100%` | Steam GameServer lifecycle, `idZMQ`, stat/achievement ownership, control-plane CVars, rankings compatibility, and dedicated runtime evidence are closed. |
+| `engine host/support` | 🟢 Closed | `100%` | Win32 clipboard/raw-input recovery, botlib internal proof, and host/support boundary formalisation are closed; compatibility-only lanes are explicit exclusions. |
 
-`other` is intentionally qualitative here: the top-level audit still treats the
-launcher/platform host as the largest remaining engine-side gap, but it does not yet have a
-dedicated strict-parity percentage of its own.
+Compatibility-only surfaces are still called out explicitly rather than being counted as open
+strict-retail engine debt: `platform_services.c`, the open/hybrid auth backends, the
+`unix`/`null` ports, and live online-service activation behind `QL_BUILD_ONLINE_SERVICES`.
 
-For the detailed parity breakdown and current task queue, see [`AUDIT.md`](AUDIT.md) and
-[`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md).
+For the detailed parity breakdown and current task queue, see [`AUDIT.md`](AUDIT.md),
+[`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md), and
+[`docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`](docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md).
 
 ## Repository guide
 

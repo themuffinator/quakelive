@@ -65,6 +65,67 @@ def test_client_spawn_uses_recovered_loadout_and_rr_helpers() -> None:
 	assert "gentity_t *Team_SelectDominationSpawnPoint( gentity_t *ent, vec3_t origin, vec3_t angles );" in game_local
 
 
+def test_input_spawn_and_host_map_paths_keep_retail_factory_gates() -> None:
+	cl_keys = _read("src/code/client/cl_keys.c")
+	game_client = _read("src/code/game/g_client.c")
+	server_cmds = _read("src/code/server/sv_ccmds.c")
+	field_block = _block_from_marker(cl_keys, "void Field_KeyDownEvent")
+	spawn_block = _block_from_marker(game_client, "static gentity_t *G_SelectClientSpawnPoint")
+	list_block = _block_from_marker(server_cmds, "static void SV_FactoryPrintValidList")
+	apply_block = _block_from_marker(server_cmds, "static void SV_FactoryApplySelection")
+	map_block = _block_from_marker(server_cmds, "static void SV_Map_f")
+
+	for expected in (
+		"if ( key == K_DEL || key == K_KP_DEL ) {",
+		"if ( key == K_RIGHTARROW || key == K_KP_RIGHTARROW )",
+		"if ( key == K_LEFTARROW || key == K_KP_LEFTARROW )",
+		"if ( key == K_HOME || key == K_KP_HOME || ( tolower(key) == 'a' && keys[K_CTRL].down ) ) {",
+		"if ( key == K_END || key == K_KP_END || ( tolower(key) == 'e' && keys[K_CTRL].down ) ) {",
+		"if ( key == K_INS || key == K_KP_INS ) {",
+	):
+		assert expected in field_block
+
+	assert "g_gametype.integer == GT_TOURNAMENT" in spawn_block
+	assert "level.trainingMapActive && client->pers.localClient" in spawn_block
+	assert "client->pers.localClient || g_gametype.integer == GT_TOURNAMENT || level.trainingMapActive" not in spawn_block
+
+	for expected in (
+		'} else if ( !Q_stricmp( key, "title" ) ) {',
+		"title = SV_FactoryParseJsonString( state );",
+		'} else if ( !Q_stricmp( key, "cvars" ) ) {',
+		"if ( !SV_FactoryParseCvarOverrides( state, definition ) ) {",
+		"definition->title = title;",
+	):
+		assert expected in server_cmds
+
+	for expected in (
+		'Com_Printf( "Valid factories: " );',
+		"factory->id[0] != '_'",
+		'Com_Printf( "%s ", factory->id );',
+	):
+		assert expected in list_block
+
+	for expected in (
+		"if ( s_svCurrentFactory == factory ) {",
+		'Cvar_Set( "g_gametype", gametypeBuffer );',
+		'Cvar_Set( "g_factory", factory->id ? factory->id : "" );',
+		'Cvar_Set( "g_factoryTitle", factory->title ? factory->title : "" );',
+	):
+		assert expected in apply_block
+
+	assert "Cvar_Reset( override->name );" in server_cmds
+
+	assert "static const svFactoryDefinition_t *s_svCurrentFactory = NULL;" in server_cmds
+	for expected in (
+		"requiredArgs = s_svCurrentFactory ? 2 : 3;",
+		'Com_Printf( "%s (map) (factory)\\n", cmd );',
+		"SV_FactoryPrintValidList();",
+		"factoryOverride = s_svCurrentFactory;",
+		"SV_FactoryApplySelection( factoryOverride );",
+	):
+		assert expected in map_block
+
+
 def test_freeze_helpers_match_recovered_retail_boundaries() -> None:
 	freeze_c = _read("src/code/game/g_freeze.c")
 	active_c = _read("src/code/game/g_active.c")
