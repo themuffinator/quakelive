@@ -8,6 +8,141 @@ The long-term parity target is that this engine should, in theory, be able to re
 
 ## Recently closed
 
+### Task 87: Client CL-P6 parity gate and runtime-evidence closure [COMPLETED]
+Priority: High
+Files: `tools/client/run_client_runtime_probe.ps1`, `tests/test_client_full_parity_gate.py`, `.github/workflows/client-validation.yml`, `artifacts/client_validation/logs/client_runtime_evidence_20260410.json`, `artifacts/client_validation/logs/client_full_parity_gate.json`, `docs/build-pipeline.md`, `docs/windows-native-pipeline.md`, `docs/reverse-engineering/client-validation-and-runtime-evidence-2026-04-10.md`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 99% -> after 100%** (`CL-P6` complete; `CL-G05` closed)
+
+Completed work:
+
+1. Added a focused client runtime probe at `tools/client/run_client_runtime_probe.ps1` and published the tracked runtime bundle `artifacts/client_validation/logs/client_runtime_evidence_20260410.json`, covering main-menu bootstrap/config writes, service-disabled browser-policy behavior, and live `bloodrun` client runtime with engine/window captures plus a flushed demo artifact.
+2. Added `tests/test_client_full_parity_gate.py`, which now writes `artifacts/client_validation/logs/client_full_parity_gate.json` as the single machine-readable status artifact across the full client gap register (`CL-G01`..`CL-G05`).
+3. Added `.github/workflows/client-validation.yml` and refreshed the client-ledger docs so the client host now has the same dedicated CI/runtime-evidence closure lane as the renderer and strict-retail module layers.
+
+### Task 86: Client CL-P5 JS bridge, data-source, and event-publication closure [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_cgame.c`, `src/code/client/cl_main.c`, `src/code/client/cl_keys.c`, `src/code/client/cl_steam_resources.c`, `src/code/client/client.h`, `src/code/client/keys.h`, `src/code/null/null_client.c`, `src/code/qcommon/cvar.c`, `src/code/qcommon/qcommon.h`, `src/common/platform/platform_steamworks.c`, `src/common/platform/platform_steamworks.h`, `tests/test_platform_services.py`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 97% -> after 99%** (`CL-P5` complete; browser-facing side of `CL-G01` closed)
+
+Completed work:
+
+1. Reconstructed the retained `qz_instance` bridge in `cl_cgame.c`, including method lookup and dispatch, bootstrap properties, returning JSON helpers, and the recovered browser-facing method surface for cvars, files, favorites, URLs, key capture, and launcher/social queries.
+2. Restored the outbound browser-event lane across `cl_main.c`, `cl_keys.c`, `cvar.c`, and `cl_cgame.c`, so `EnginePublish`-style events now flow through explicit client owners for `web.object.ready`, `game.*`, `game.key`, `bind.changed`, and `cvar.*`.
+3. Reconstructed `SteamDataSource` avatar/resource handling plus the retained `QLResourceInterceptor` / `Sys_Steam_RequestURL` fallback owner in `cl_steam_resources.c`, keeping URI-backed resources on the in-memory renderer ingestion path instead of the old cache-file-only compatibility lane.
+4. Extended the client/platform parity suite and refreshed the top-level client ledgers so the JS/data/event publication closure is now machine-validated and recorded as complete.
+
+### Task 85: Client CL-P4 browser-host core reconstruction behind policy gates [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_cgame.c`, `src/code/client/cl_main.c`, `src/code/client/client.h`, `tests/test_platform_services.py`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 95% -> after 97%** (`CL-P4` complete; retained browser-host core of `CL-G01` closed)
+
+Completed work:
+
+1. Reconstructed a retained browser-host core in `cl_cgame.c` behind the online-services policy gate, including the recovered `QLWebHost_EnsureRuntime`, `QLWebHost_OpenURL`, `QLWebHost_NavigateOrOpen`, `QLWebHost_HideBrowser`, `QLWebCore_Update`, and `QLWebHost_PumpFrame` ownership plus deterministic init or frame or shutdown lifetime.
+2. Restored real command ownership for `web_showBrowser`, `web_changeHash`, `web_browserActive`, `web_hideBrowser`, `web_showError`, `web_clearCache`, `web_reload`, and `web_stopRefresh`, so those commands now drive retained browser lifetime instead of only toggling fallback state.
+3. Wired the retained browser-host lifecycle through `CL_Init`, `CL_Frame`, and `CL_Shutdown`, and refreshed the parity notes so the repo now records explicit live-host behavior versus default-disabled offline fallbacks.
+
+### Task 84: Renderer RG-P11 strict validation and final runtime evidence [COMPLETED]
+Priority: High
+Files: `tools/renderer/run_renderer_runtime_probe.ps1`, `tools/ci/audit-retail-font-stack.ps1`, `tests/test_renderer_text_runtime_validation_parity.py`, `tests/test_renderer_full_parity_gate.py`, `.github/workflows/renderer-validation.yml`, `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`, `artifacts/renderer_validation/logs/renderer_full_parity_gate.json`, `docs/build-pipeline.md`, `docs/hud_render_baseline.md`, `docs/platform/retail-font-stack.md`, `docs/reverse-engineering/renderer-text-strict-validation-and-runtime-evidence-2026-04-10.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 99% -> after 100%** (`RG-P11` complete; `RG-G09` closed)
+
+Completed work:
+
+1. Upgraded the tracked renderer runtime probe so it now captures a windowed UI-bootstrap pass, retained-atlas debug rendering under `r_debugFontAtlas 1`, and live `bloodrun` runtime in one `RG-P11` artifact with distinct engine and window screenshot hashes.
+2. Tightened the renderer validation surface by upgrading the font-stack audit and unified parity gate to treat the final text/build/runtime conditions as strict closure checks instead of warning-backed notes.
+3. Closed the remaining runtime blocker in the classic `RE_RegisterFont` atlas builder by rejecting out-of-bounds glyph copies before they can overrun the 256x256 page buffer during uncached UI font generation.
+4. Published `renderer-text-strict-validation-and-runtime-evidence-2026-04-10.md` and refreshed the renderer ledgers so the renderer now reports no open gaps and a strict parity estimate of **100%**.
+
+### Task 83: Renderer RG-P10 font build-lane recovery [COMPLETED]
+Priority: High
+Files: `src/code/renderer/tr_font.c`, `src/code/renderer/renderer.vcxproj`, `src/code/renderer/renderer.vcxproj.filters`, `src/code/renderer/renderer.vcproj`, `src/code/quakelive_steam.vcxproj`, `src/code/unix/Makefile`, `.vscode/build.ps1`, `tests/test_renderer_font_build_lane_parity.py`, `tests/test_renderer_full_parity_gate.py`, `docs/platform/retail-font-stack.md`, `docs/reverse-engineering/renderer-freetype-build-lane-recovery-2026-04-10.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 98% -> after 99%** (`RG-P10` complete; build-lane half of `RG-G09` closed)
+
+Completed work:
+
+1. Replaced the dead in-tree `ft2` vendor assumptions with an explicit external FreeType SDK lane on Windows and a `pkg-config freetype2` lane on Unix, with `BUILD_FREETYPE` now tied to that replacement path instead of to missing source files.
+2. Removed the stale `..\ft2\*` entries from the legacy renderer project descriptions and wired the active game build plus local build script to the same FreeType toggle and validation path.
+3. Published `renderer-freetype-build-lane-recovery-2026-04-10.md` and added focused tests so the committed renderer build story can no longer drift back to a missing vendor-tree description.
+
+### Task 82: Client CL-P3 workshop-aware join/bootstrap closure [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_main.c`, `src/code/client/cl_ui.c`, `src/code/client/client.h`, `src/code/qcommon/files.c`, `src/code/qcommon/qcommon.h`, `src/code/server/sv_init.c`, `src/common/platform/platform_steamworks.c`, `src/common/platform/platform_steamworks.h`, `tests/steamworks_harness.c`, `tests/test_client_workshop_bootstrap_parity.py`, `tests/test_platform_services.py`, `tests/test_steamworks_harness.py`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 94% -> after 95%** (`CL-P3` complete; `CL-G03` closed)
+
+Completed work:
+
+1. Restored the retail server publication seam for workshop-backed joins by adding `FS_ReferencedSteamworks()` in `files.c` and wiring `SV_SteamServerPublishIdentity()` to publish the referenced workshop-item list through `sv_referencedSteamworks` and configstring `0x2CB` instead of incorrectly mirroring the server SteamID into both slots.
+2. Reconstructed the retained workshop bootstrap owner in `cl_main.c`: `CL_InitDownloads` now parses the published workshop requirement list, stages retained active/queued workshop download state, seeds the retail-facing `cl_downloadItem` / `cl_downloadName` / byte-count cvars, and `CL_Frame` now runs the adjacent workshop completion/restart helper before the resend path.
+3. Reconstructed the missing retail workshop mount leg in `platform_steamworks.c` and `files.c`: startup/restart now enumerate subscribed SteamUGC items, query install folders through the recovered vtable slots, remount subscribed workshop install roots, and stamp mounted packs with the retail per-pack workshop item IDs that drive `FS_ReferencedSteamworks()`.
+4. Tightened the UI workshop-progress import in `cl_ui.c`, extended the Steamworks harness/parity tests, and refreshed the top-level client parity ledgers so workshop-aware join/download exactness is now machine-checked and recorded as closed.
+
+### Task 81: Renderer RG-P9 native import switchover and debug-atlas closure [COMPLETED]
+Priority: High
+Files: `src/code/renderer/tr_font.c`, `src/code/renderer/tr_backend.c`, `src/code/renderer/tr_local.h`, `src/code/client/cl_ui.c`, `src/code/client/cl_cgame.c`, `src/code/client/client.h`, `tests/test_renderer_export_tail_parity.py`, `tests/test_renderer_host_text_import_parity.py`, `tests/test_renderer_full_parity_gate.py`, `tools/ci/audit-retail-font-stack.ps1`, `.github/workflows/renderer-validation.yml`, `docs/platform/retail-font-stack.md`, `docs/reverse-engineering/renderer-host-text-import-switchover-and-debug-atlas-2026-04-10.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`, `artifacts/renderer_validation/logs/renderer_full_parity_gate.json`
+Parity estimate: **before 97% -> after 98%** (`RG-P9` complete; `RG-G08` closed)
+
+Completed work:
+
+1. Added shared renderer host-text helpers in `tr_font.c` and switched the native `ui` and `cgame` `DrawScaledText` / `MeasureText` imports onto those helpers instead of leaving duplicated client-side `fontInfo_t` glyph loops in `cl_ui.c` and `cl_cgame.c`.
+2. Added the retained `r_debugFontAtlas` draw path in `tr_backend.c`, published `renderer-host-text-import-switchover-and-debug-atlas-2026-04-10.md`, and added `tests/test_renderer_host_text_import_parity.py` so the import switchover plus debug-atlas surface is now pinned in source.
+3. Updated the renderer parity gate, font-stack audit script, workflow, and top-level renderer ledgers so `RG-G08` is now machine-readable as closed and `RG-G09` is the only remaining open renderer gap.
+
+### Task 80: Renderer RG-P8 host text-engine core recovery [COMPLETED]
+Priority: High
+Files: `src/code/renderer/tr_font.c`, `src/code/renderer/tr_init.c`, `src/code/renderer/tr_local.h`, `tests/test_renderer_host_text_core_parity.py`, `tests/test_renderer_full_parity_gate.py`, `tools/ci/audit-retail-font-stack.ps1`, `.github/workflows/renderer-validation.yml`, `docs/platform/retail-font-stack.md`, `docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`, `artifacts/renderer_validation/logs/renderer_full_parity_gate.json`
+Parity estimate: **before 95% -> after 97%** (`RG-P8` complete; retained host-text core landed, `RG-G08` narrowed)
+
+Completed work:
+
+1. Added the retained renderer-side host text core in `tr_font.c`, including the renderer-owned `*fontstash` atlas, the retail `R_fonsErrorCallback` expansion-or-flush path, and the recovered five-face table for `normal`, `sans`, `mono`, `sans-fallback`, and `sans-windows-fallback`.
+2. Wired the new host-text lifetime through `R_Init` / `RE_Shutdown`, published `renderer-host-text-core-ownership-2026-04-10.md`, and added `tests/test_renderer_host_text_core_parity.py` so the recovered atlas constants, callback surface, face-table ownership, and init/shutdown wiring are now pinned.
+3. Updated the renderer parity gate, font-stack audit script, workflow, and top-level renderer ledgers so the remaining open renderer debt is now explicitly the `RG-P9` switchover/debug-atlas tail plus `RG-G09` build or validation work rather than the old “no host text core exists” state.
+
+### Task 79: Renderer RG-P7 classic font exactness and atlas proof [COMPLETED]
+Priority: High
+Files: `src/code/renderer/tr_font.c`, `tests/test_renderer_font_exactness_parity.py`, `tests/test_renderer_full_parity_gate.py`, `tools/ci/audit-retail-font-stack.ps1`, `.github/workflows/renderer-validation.yml`, `docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md`, `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`, `artifacts/renderer_validation/logs/renderer_full_parity_gate.json`
+Parity estimate: **before 94% -> after 95%** (`RG-P7` complete; `RG-G05` closed)
+
+Completed work:
+
+1. Tightened the classic renderer font lane in `tr_font.c` by adding explicit cache-stem, legacy-cache, cached-font-rebind, and atlas-flush helpers, and by fixing the inclusive glyph-range handling so cached-font reloads and final atlas-page assignment now cover the full `GLYPH_START..GLYPH_END` range.
+2. Published `renderer-font-cache-and-atlas-ownership-2026-04-10.md` and added `tests/test_renderer_font_exactness_parity.py`, which together separate retail-backed cache/page/atlas behavior from compatibility-only fallbacks and pin representative cache names, page names, atlas ownership, and fallback glyph metrics.
+3. Updated the renderer parity gate, font-stack audit script, CI workflow, and top-level renderer ledgers so `RG-G05` is now machine-readable as closed while `RG-G08` and `RG-G09` remain the only open renderer gaps.
+
+### Task 78: Renderer exhaustive parity re-audit and closure-plan expansion [COMPLETED]
+Priority: High
+Files: `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 94% -> after 94%** (evidence refresh; runtime behavior unchanged)
+
+Completed work:
+
+1. Re-audited the renderer against the committed retail `quakelive_steam.exe` HLIL and Ghidra corpus, the promoted alias ledger, the renderer mapping rounds, the tracked runtime artifact, and a fresh rerun of the low-cost renderer validation surface.
+2. Replaced the earlier renderer audit body with a subsystem coverage matrix that makes the closure state explicit: the core export, image-ingestion, post-process, Win32 host-glue, helper-ownership, and runtime-gate tranches remain closed, while all confirmed remaining renderer debt stays concentrated in the font or text stack (`RG-G05`, `RG-G08`, `RG-G09`).
+3. Expanded the remaining renderer closure plan into a dependency-aware four-step execution tail (`RG-P7`..`RG-P11`) covering classic font exactness, host FontStash core recovery, import switchover plus debug-atlas closure, font build-lane recovery, and final strict validation/runtime evidence.
+
+### Task 77: Client CL-P1 retail config/bootstrap persistence closure [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_main.c`, `src/code/client/cl_ui.c`, `src/code/qcommon/common.c`, `src/code/qcommon/cvar.c`, `src/code/qcommon/files.c`, `src/code/qcommon/qcommon.h`, `tests/test_client_config_parity.py`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 90% -> after 92%** (`CL-P1` complete; `CL-G04` closed)
+
+Completed work:
+
+1. Reconciled the client/common bootstrap and write path with the retail `qzconfig.cfg` / `repconfig.cfg` contract by updating `Com_Init`, `Com_WriteConfiguration`, `Com_WriteConfig_f`, `FS_Restart`, and the recovered `Cvar_WriteQLConfigVariables` owner to use the retail hardware-vs-replicate split instead of the older Quake III-only `q3config.cfg` lane.
+2. Reconstructed the retail `writeClientConfig` command in writable source and tightened the config writer to the recovered protected/cloud-CVar routing recovered from the committed HLIL and mapping-round evidence.
+3. Restored the retail legacy CD-key/q3key surface by reverting `Com_ReadCDKey`, `Com_WriteCDKey`, `CL_CDKeyValidate`, `CLUI_GetCDKey`, and `CLUI_SetCDKey` away from the richer token/migration storage path and by adding `tests/test_client_config_parity.py` to pin the recovered bootstrap, write, restart, and UI/client credential behavior.
+
+### Task 78: Client CL-P2 Steam callback-bundle and frame-pump reconstruction [COMPLETED]
+Priority: High
+Files: `src/common/platform/platform_steamworks.c`, `src/common/platform/platform_steamworks.h`, `src/code/client/cl_main.c`, `tests/steamworks_harness.c`, `tests/test_steamworks_harness.py`, `tests/test_platform_services.py`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 92% -> after 94%** (`CL-P2` complete; `CL-G02` closed)
+
+Completed work:
+
+1. Reconstructed the retained Steam callback surface in `platform_steamworks.c` and `platform_steamworks.h`, including the recovered retail client/lobby/micro callback IDs, optional `SteamAPI_RegisterCallback` / `SteamAPI_RegisterCallResult` export loading, callback lifetime teardown, friend-summary helpers, and the UGC call-result binding seam.
+2. Reconstructed the client-owned Steam callback lifecycle in `cl_main.c` so `CL_Init` registers the callback bundles, `CL_Frame` pumps `QL_Steamworks_RunCallbacks()`, `CL_Shutdown` tears the bundles down, and the retail `stats_clear` command gate is tied to the recovered Steam app ID instead of always registering unconditionally.
+3. Routed the recovered callback payloads into explicit client/browser event owners and extended the Steamworks harness plus parity tests so callback registration, queued dispatch, and UGC call-result binding are now machine-validated instead of only described in notes.
+
 ### Task 76: Client full parity audit and closure-plan publication [COMPLETED]
 Priority: High
 Files: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `IMPLEMENTATION_PLAN.md`, `AUDIT.md`
@@ -684,7 +819,7 @@ Completed in this task:
 5. Reconstructed the mapped Steam rich-presence/connect handoff seam in the writable host layers by adding the shared SteamFriends `SetRichPresence` wrapper, restoring the retail main-menu `status = "At the main menu"` bootstrap write, and adding the client-owned rich-presence join and game-server-change handoff helpers that route through the immediate `connect` path and password cvar.
 6. Reconstructed the mapped Steam lobby control and game-start status seam in the writable host layers by adding shared SteamMatchmaking wrappers for `LeaveLobby` and owner-gated `SetLobbyServer`, and by restoring the retail `status = "Playing a match"` rich-presence transition on the first active client snapshot.
 7. Reconstructed the mapped Steam game-server frame seam in the writable host layers by adding shared `SteamGameServer` heartbeat/public-IP wrappers and routing `SV_Frame` through the existing `SV_SteamServerNetworkingFrame` owner instead of the client callback pump.
-8. Reconstructed the mapped Steam game-server bootstrap identity seam in the writable host layers by adding the shared `SteamGameServer` get-SteamID wrapper, restoring `sv_referencedSteamworks` plus the `0x2CA` / `0x2CB` server SteamID publication path in `SV_SpawnServer`, and restoring heartbeat enable/disable ownership in `SV_SpawnServer` / `SV_Shutdown`.
+8. Reconstructed the mapped Steam game-server bootstrap identity seam in the writable host layers by adding the shared `SteamGameServer` get-SteamID wrapper, restoring the `0x2CA` server SteamID publication slot plus the `sv_referencedSteamworks` / `0x2CB` workshop-reference publication seam in `SV_SpawnServer`, and restoring heartbeat enable/disable ownership in `SV_SpawnServer` / `SV_Shutdown`.
 9. Reconstructed the mapped Steam game-server metadata publication seam in the writable host layers by adding the shared `SteamGameServer` `SetKeyValue` wrapper, restoring the spawn-time serverinfo publication path in `SV_SpawnServer`, and restoring the dirty-`CVAR_SERVERINFO` Steam republish order in `SV_Frame`.
 10. Reconstructed the mapped Steam game-server bootstrap hostname/account seam in the writable host layers by restoring the Steam persona-based `sv_hostname` default path, registering `sv_setSteamAccount`, and adding shared `SteamGameServer` wrappers for the dedicated, logon, product, and game-dir bootstrap slots.
 11. Reconstructed the mapped Steam game-server published-state seam in the writable host layers by adding shared `SteamGameServer` wrappers for game description, max slots, bot count, server/map name, passworded state, single-key rule writes, and per-player Steam user-data publication, then restoring the `SteamServer_UpdatePublishedState` owner across `SV_SpawnServer` and `SV_Frame`.

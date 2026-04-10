@@ -37,6 +37,11 @@ void CL_MouseEvent( int dx, int dy, int time ) {
 void Key_WriteBindings( fileHandle_t f ) {
 }
 
+void Key_EnumerateBindings( keyBindingEnumCallback_t callback, void *userData ) {
+	(void)callback;
+	(void)userData;
+}
+
 void CL_Frame ( int msec ) {
 }
 
@@ -61,6 +66,69 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 qboolean UI_GameCommand( void ) {
 	return qfalse;
+}
+
+void CL_WebHost_Init( void ) {
+}
+
+void CL_WebHost_Shutdown( void ) {
+}
+
+void CL_WebHost_Frame( void ) {
+}
+
+qboolean CL_WebHost_HasLiveView( void ) {
+	return qfalse;
+}
+
+qboolean CL_WebHost_HasBoundWindowObject( void ) {
+	return qfalse;
+}
+
+void CL_WebView_PublishEvent( const char *name, const char *payload ) {
+	(void)name;
+	(void)payload;
+}
+
+void CL_WebView_InvokeCommNotice( const char *channel, const char *message ) {
+	(void)channel;
+	(void)message;
+}
+
+void CL_WebView_PublishGameError( const char *message ) {
+	(void)message;
+}
+
+void CL_WebView_PublishGameEnd( void ) {
+}
+
+void CL_WebView_PublishCvarChange( const char *name, const char *value, qboolean replicate ) {
+	(void)name;
+	(void)value;
+	(void)replicate;
+}
+
+void CL_WebView_PublishBindChanged( const char *name, const char *value ) {
+	(void)name;
+	(void)value;
+}
+
+void CL_WebView_PublishGameStart( void ) {
+}
+
+void CL_WebView_PublishGameDemo( const char *id, const char *name ) {
+	(void)id;
+	(void)name;
+}
+
+void CL_WebView_PublishGameScreenshot( const char *id, const char *name ) {
+	(void)id;
+	(void)name;
+}
+
+void CL_WebView_OnKeyEvent( int key, qboolean down ) {
+	(void)key;
+	(void)down;
 }
 
 void CL_ForwardCommandToServer( const char *string ) {

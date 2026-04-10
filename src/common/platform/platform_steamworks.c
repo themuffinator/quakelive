@@ -25,6 +25,10 @@
 typedef qboolean (*QL_SteamAPI_InitFn)( void );
 typedef void (*QL_SteamAPI_ShutdownFn)( void );
 typedef void (*QL_SteamAPI_RunCallbacksFn)( void );
+typedef void (*QL_SteamAPI_RegisterCallbackFn)( void *, int );
+typedef void (*QL_SteamAPI_UnregisterCallbackFn)( void * );
+typedef void (*QL_SteamAPI_RegisterCallResultFn)( void *, SteamAPICall_t );
+typedef void (*QL_SteamAPI_UnregisterCallResultFn)( void *, SteamAPICall_t );
 typedef void *(*QL_SteamAPI_InterfaceFn)( void );
 typedef qboolean (*QL_SteamAPI_SteamGameServerInitFn)( uint32_t, uint16_t, uint16_t, uint16_t, int, const char * );
 typedef void *(*QL_SteamAPI_SteamGameServerFn)( void );
@@ -50,12 +54,184 @@ typedef void (*QL_SteamGameServer_SetIntFn)( void *, int );
 typedef void (*QL_SteamGameServer_SetKeyValueFn)( void *, const char *, const char * );
 typedef int (*QL_SteamGameServer_UpdateUserDataFn)( void *, uint32_t, uint32_t, const char *, uint32_t );
 
+#if defined(_MSC_VER) && defined(_M_IX86)
+#define QL_STEAMWORKS_THISCALL __thiscall
+#elif defined(__GNUC__) && defined(__i386__)
+#define QL_STEAMWORKS_THISCALL __attribute__((thiscall))
+#else
+#define QL_STEAMWORKS_THISCALL
+#endif
+
+typedef struct {
+	CSteamID steamIDFriend;
+	char connect[QL_STEAM_COMMAND_LENGTH];
+} ql_steam_game_rich_presence_join_requested_raw_t;
+
+typedef struct {
+	uint64_t gameId;
+	int result;
+	CSteamID steamIDUser;
+} ql_steam_user_stats_received_raw_t;
+
+typedef struct {
+	CSteamID steamID;
+	uint32_t changeFlags;
+} ql_steam_persona_state_change_raw_t;
+
+typedef struct {
+	CSteamID remoteId;
+} ql_steam_p2p_session_request_raw_t;
+
+typedef struct {
+	char server[64];
+	char password[64];
+} ql_steam_game_server_change_requested_raw_t;
+
+typedef struct {
+	CSteamID steamIDFriend;
+	uint32_t appId;
+} ql_steam_friend_rich_presence_update_raw_t;
+
+typedef struct {
+	uint64_t queryHandle;
+	int result;
+	uint32_t numResultsReturned;
+	uint32_t totalMatchingResults;
+	qboolean cachedData;
+	char nextCursor[256];
+} ql_steam_ugc_query_completed_raw_t;
+
+typedef struct {
+	int result;
+	CSteamID lobbyId;
+} ql_steam_lobby_created_raw_t;
+
+typedef struct {
+	CSteamID lobbyId;
+	uint32_t chatPermissions;
+	qboolean locked;
+	uint32_t response;
+} ql_steam_lobby_enter_raw_t;
+
+typedef struct {
+	CSteamID lobbyId;
+	CSteamID changedUser;
+	CSteamID makingChangeUser;
+	uint32_t stateChange;
+} ql_steam_lobby_chat_update_raw_t;
+
+typedef struct {
+	CSteamID lobbyId;
+	CSteamID chatter;
+	int chatEntryType;
+	int chatId;
+} ql_steam_lobby_chat_message_raw_t;
+
+typedef struct {
+	CSteamID lobbyId;
+	CSteamID memberId;
+	qboolean success;
+} ql_steam_lobby_data_update_raw_t;
+
+typedef struct {
+	CSteamID lobbyId;
+	CSteamID serverId;
+	uint32_t serverIp;
+	uint16_t serverPort;
+} ql_steam_lobby_game_created_raw_t;
+
+typedef struct {
+	CSteamID lobbyId;
+	CSteamID adminId;
+	qboolean disconnected;
+} ql_steam_lobby_kicked_raw_t;
+
+typedef struct {
+	CSteamID lobbyId;
+	CSteamID friendId;
+} ql_steam_game_lobby_join_requested_raw_t;
+
+typedef struct {
+	uint32_t appId;
+	uint64_t orderId;
+	qboolean authorized;
+} ql_steam_microtxn_authorization_response_raw_t;
+
+typedef struct {
+	uint64_t gameId;
+	uint32_t gameIp;
+	uint16_t gamePort;
+	uint16_t queryPort;
+	CSteamID lobbyId;
+	CSteamID gameServerId;
+} ql_steam_friend_game_info_t;
+
+typedef struct ql_steam_callback_base_s ql_steam_callback_base_t;
+
+typedef void (QL_STEAMWORKS_THISCALL *ql_steam_callback_run_fn)( ql_steam_callback_base_t *self, void *payload );
+typedef void (QL_STEAMWORKS_THISCALL *ql_steam_callback_run_call_result_fn)( ql_steam_callback_base_t *self, void *payload, qboolean ioFailure, SteamAPICall_t callHandle );
+typedef int (QL_STEAMWORKS_THISCALL *ql_steam_callback_get_size_fn)( ql_steam_callback_base_t *self );
+
+typedef struct {
+	ql_steam_callback_run_fn run;
+	ql_steam_callback_run_call_result_fn runCallResult;
+	ql_steam_callback_get_size_fn getSize;
+} ql_steam_callback_vtable_t;
+
+struct ql_steam_callback_base_s {
+	const ql_steam_callback_vtable_t *vtable;
+	uint8_t callbackFlags;
+	uint8_t reserved[3];
+	int callbackId;
+	int payloadSize;
+	void *context;
+	void (*dispatch)( void *context, const void *payload );
+	void (*dispatchCallResult)( void *context, const void *payload, qboolean ioFailure, SteamAPICall_t callHandle );
+};
+
+typedef struct {
+	ql_steam_client_callback_bindings_t bindings;
+	qboolean registered;
+	SteamAPICall_t ugcCallHandle;
+	qboolean ugcCallBound;
+	ql_steam_callback_base_t richPresenceJoinRequested;
+	ql_steam_callback_base_t userStatsReceived;
+	ql_steam_callback_base_t personaStateChange;
+	ql_steam_callback_base_t p2pSessionRequest;
+	ql_steam_callback_base_t gameServerChangeRequested;
+	ql_steam_callback_base_t friendRichPresenceUpdate;
+	ql_steam_callback_base_t ugcQueryCompleted;
+} ql_steam_client_callback_state_t;
+
+typedef struct {
+	ql_steam_lobby_callback_bindings_t bindings;
+	qboolean registered;
+	ql_steam_callback_base_t lobbyCreated;
+	ql_steam_callback_base_t lobbyEnter;
+	ql_steam_callback_base_t lobbyChatUpdate;
+	ql_steam_callback_base_t lobbyChatMessage;
+	ql_steam_callback_base_t lobbyDataUpdate;
+	ql_steam_callback_base_t lobbyGameCreated;
+	ql_steam_callback_base_t lobbyKicked;
+	ql_steam_callback_base_t gameLobbyJoinRequested;
+} ql_steam_lobby_callback_state_t;
+
+typedef struct {
+	ql_steam_micro_callback_bindings_t bindings;
+	qboolean registered;
+	ql_steam_callback_base_t authorizationResponse;
+} ql_steam_micro_callback_state_t;
+
 typedef struct {
 	void *library;
 	qboolean initialised;
 	QL_SteamAPI_InitFn SteamAPI_Init;
 	QL_SteamAPI_ShutdownFn SteamAPI_Shutdown;
 	QL_SteamAPI_RunCallbacksFn SteamAPI_RunCallbacks;
+	QL_SteamAPI_RegisterCallbackFn SteamAPI_RegisterCallback;
+	QL_SteamAPI_UnregisterCallbackFn SteamAPI_UnregisterCallback;
+	QL_SteamAPI_RegisterCallResultFn SteamAPI_RegisterCallResult;
+	QL_SteamAPI_UnregisterCallResultFn SteamAPI_UnregisterCallResult;
 	QL_SteamAPI_InterfaceFn SteamUser;
 	QL_SteamAPI_InterfaceFn SteamFriends;
 	QL_SteamAPI_InterfaceFn SteamUtils;
@@ -76,6 +252,9 @@ typedef struct {
 	QL_SteamAPI_GetSteamIDFn GetSteamID;
 	qboolean gameServerInitialised;
 	qboolean useGameServerUGC;
+	ql_steam_client_callback_state_t clientCallbacks;
+	ql_steam_lobby_callback_state_t lobbyCallbacks;
+	ql_steam_micro_callback_state_t microCallbacks;
 } ql_steamworks_state_t;
 
 static ql_steamworks_state_t state;
@@ -83,6 +262,178 @@ static ql_steamworks_state_t state;
 #define QL_STEAM_GAMESERVER_VERSION "1069"
 #define QL_STEAM_GAMESERVER_MODE_NO_AUTH 2
 #define QL_STEAM_GAMESERVER_MODE_AUTH_SECURE 3
+
+#define QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED 0x151
+#define QL_STEAM_CALLBACK_USER_STATS_RECEIVED 0x44d
+#define QL_STEAM_CALLBACK_PERSONA_STATE_CHANGE 0x130
+#define QL_STEAM_CALLBACK_P2P_SESSION_REQUEST 0x4b2
+#define QL_STEAM_CALLBACK_GAME_SERVER_CHANGE_REQUESTED 0x14c
+#define QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE 0x150
+#define QL_STEAM_CALLBACK_UGC_QUERY_COMPLETED 0xd49
+#define QL_STEAM_CALLBACK_LOBBY_CREATED 0x201
+#define QL_STEAM_CALLBACK_LOBBY_ENTER 0x1f8
+#define QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE 0x1fa
+#define QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE 0x1fb
+#define QL_STEAM_CALLBACK_LOBBY_DATA_UPDATE 0x1f9
+#define QL_STEAM_CALLBACK_LOBBY_GAME_CREATED 0x1fd
+#define QL_STEAM_CALLBACK_LOBBY_KICKED 0x200
+#define QL_STEAM_CALLBACK_GAME_LOBBY_JOIN_REQUESTED 0x14d
+#define QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE 0x98
+
+/*
+=============
+QL_Steamworks_CallbackRun
+
+Dispatches a normal Steam callback into the retained binding owner.
+=============
+*/
+static void QL_STEAMWORKS_THISCALL QL_Steamworks_CallbackRun( ql_steam_callback_base_t *self, void *payload ) {
+	if ( !self || !self->dispatch ) {
+		return;
+	}
+
+	self->dispatch( self->context, payload );
+}
+
+/*
+=============
+QL_Steamworks_CallbackRunCallResult
+
+Dispatches a Steam call-result into the retained binding owner.
+=============
+*/
+static void QL_STEAMWORKS_THISCALL QL_Steamworks_CallbackRunCallResult( ql_steam_callback_base_t *self, void *payload, qboolean ioFailure, SteamAPICall_t callHandle ) {
+	if ( !self ) {
+		return;
+	}
+
+	if ( self->dispatchCallResult ) {
+		self->dispatchCallResult( self->context, payload, ioFailure, callHandle );
+		return;
+	}
+
+	if ( !ioFailure && self->dispatch ) {
+		self->dispatch( self->context, payload );
+	}
+}
+
+/*
+=============
+QL_Steamworks_CallbackGetSize
+
+Returns the payload size expected by the Steam callback object.
+=============
+*/
+static int QL_STEAMWORKS_THISCALL QL_Steamworks_CallbackGetSize( ql_steam_callback_base_t *self ) {
+	if ( !self ) {
+		return 0;
+	}
+
+	return self->payloadSize;
+}
+
+static const ql_steam_callback_vtable_t ql_steam_callback_vtable = {
+	QL_Steamworks_CallbackRun,
+	QL_Steamworks_CallbackRunCallResult,
+	QL_Steamworks_CallbackGetSize
+};
+
+/*
+=============
+QL_Steamworks_CopySteamString
+
+Copies a Steam-owned UTF-8 string into a bounded local buffer.
+=============
+*/
+static void QL_Steamworks_CopySteamString( char *buffer, size_t bufferSize, const char *value ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	if ( !value || !value[0] ) {
+		return;
+	}
+
+	Q_strncpyz( buffer, value, bufferSize );
+}
+
+/*
+=============
+QL_Steamworks_PrepareCallbackObject
+
+Initialises a CCallbackBase-compatible object with the retained binding owner.
+=============
+*/
+static void QL_Steamworks_PrepareCallbackObject( ql_steam_callback_base_t *object, int callbackId, int payloadSize, void *context,
+	void (*dispatch)( void *context, const void *payload ),
+	void (*dispatchCallResult)( void *context, const void *payload, qboolean ioFailure, SteamAPICall_t callHandle ) ) {
+	if ( !object ) {
+		return;
+	}
+
+	memset( object, 0, sizeof( *object ) );
+	object->vtable = &ql_steam_callback_vtable;
+	object->callbackId = callbackId;
+	object->payloadSize = payloadSize;
+	object->context = context;
+	object->dispatch = dispatch;
+	object->dispatchCallResult = dispatchCallResult;
+}
+
+/*
+=============
+QL_Steamworks_RegisterCallbackObject
+
+Registers one retained callback object with the Steam runtime.
+=============
+*/
+static qboolean QL_Steamworks_RegisterCallbackObject( ql_steam_callback_base_t *object ) {
+	if ( !object || !state.SteamAPI_RegisterCallback ) {
+		return qfalse;
+	}
+
+	state.SteamAPI_RegisterCallback( object, object->callbackId );
+	object->callbackFlags |= 0x01;
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_UnregisterCallbackObject
+
+Unregisters one retained callback object from the Steam runtime.
+=============
+*/
+static void QL_Steamworks_UnregisterCallbackObject( ql_steam_callback_base_t *object ) {
+	if ( !object || !state.SteamAPI_UnregisterCallback ) {
+		return;
+	}
+
+	if ( !( object->callbackFlags & 0x01 ) ) {
+		return;
+	}
+
+	state.SteamAPI_UnregisterCallback( object );
+	object->callbackFlags &= ~0x01;
+}
+
+/*
+=============
+QL_Steamworks_UnbindCallResultObject
+
+Unregisters one retained call-result object from the Steam runtime.
+=============
+*/
+static void QL_Steamworks_UnbindCallResultObject( ql_steam_callback_base_t *object, SteamAPICall_t *callHandle, qboolean *bound ) {
+	if ( !object || !callHandle || !bound || !*bound || !state.SteamAPI_UnregisterCallResult ) {
+		return;
+	}
+
+	state.SteamAPI_UnregisterCallResult( object, *callHandle );
+	*callHandle = 0;
+	*bound = qfalse;
+}
 
 /*
 =============
@@ -170,6 +521,11 @@ qboolean QL_Steamworks_LoadLibrary( void ) {
 		QL_Steamworks_UnloadLibrary();
 		return qfalse;
 	}
+
+	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallback, "SteamAPI_RegisterCallback" );
+	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallback, "SteamAPI_UnregisterCallback" );
+	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_RegisterCallResult, "SteamAPI_RegisterCallResult" );
+	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamAPI_UnregisterCallResult, "SteamAPI_UnregisterCallResult" );
 
 	if ( !QL_Steamworks_LoadSymbol( (void **)&state.SteamUser, "SteamAPI_SteamUser" ) ) {
 		QL_Steamworks_UnloadLibrary();
@@ -285,6 +641,10 @@ void QL_Steamworks_Shutdown( void ) {
 	if ( !state.initialised && !state.gameServerInitialised ) {
 		return;
 	}
+
+	QL_Steamworks_UnregisterMicroCallbacks();
+	QL_Steamworks_UnregisterLobbyCallbacks();
+	QL_Steamworks_UnregisterClientCallbacks();
 
 	if ( state.initialised && state.SteamAPI_Shutdown ) {
 		state.SteamAPI_Shutdown();
@@ -505,6 +865,882 @@ static void *QL_Steamworks_GetUserStatsInterface( void ) {
 	}
 
 	return state.SteamUserStats();
+}
+
+/*
+=============
+QL_Steamworks_GetUtilsInterface
+=============
+*/
+static void *QL_Steamworks_GetUtilsInterface( void ) {
+	if ( !QL_Steamworks_Init() || !state.SteamUtils ) {
+		return NULL;
+	}
+
+	return state.SteamUtils();
+}
+
+/*
+=============
+QL_Steamworks_GetAppID
+=============
+*/
+uint32_t QL_Steamworks_GetAppID( void ) {
+	void *utils;
+	void **vtable;
+	typedef uint32_t (__fastcall *QL_SteamUtils_GetAppIDFn)( void *self, void *unused );
+	QL_SteamUtils_GetAppIDFn fn;
+
+	utils = QL_Steamworks_GetUtilsInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( utils );
+	if ( !vtable ) {
+		return 0u;
+	}
+
+	fn = (QL_SteamUtils_GetAppIDFn)vtable[0x24 / 4];
+	if ( !fn ) {
+		return 0u;
+	}
+
+	return fn( utils, NULL );
+}
+
+/*
+=============
+QL_Steamworks_GetUserSteamID
+=============
+*/
+qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_t *outIdHigh ) {
+	void *user;
+	void **vtable;
+	CSteamID steamId;
+	typedef CSteamID *(__fastcall *QL_SteamUser_GetSteamIDFn)( void *self, void *unused, CSteamID *outSteamId );
+	QL_SteamUser_GetSteamIDFn fn;
+
+	if ( outIdLow ) {
+		*outIdLow = 0u;
+	}
+	if ( outIdHigh ) {
+		*outIdHigh = 0u;
+	}
+
+	user = QL_Steamworks_GetUserInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( user );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamUser_GetSteamIDFn)vtable[0x08 / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	steamId.value = 0ull;
+	fn( user, NULL, &steamId );
+	if ( steamId.value == 0ull ) {
+		return qfalse;
+	}
+
+	if ( outIdLow ) {
+		*outIdLow = (uint32_t)( steamId.value & 0xffffffffu );
+	}
+	if ( outIdHigh ) {
+		*outIdHigh = (uint32_t)( ( steamId.value >> 32 ) & 0xffffffffu );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_GetFriendCount
+=============
+*/
+int QL_Steamworks_GetFriendCount( int flags ) {
+	void *friends;
+	void **vtable;
+	typedef int (__fastcall *QL_SteamFriends_GetFriendCountFn)( void *self, void *unused, int flags );
+	QL_SteamFriends_GetFriendCountFn fn;
+
+	friends = QL_Steamworks_GetFriendsInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( friends );
+	if ( !vtable ) {
+		return 0;
+	}
+
+	fn = (QL_SteamFriends_GetFriendCountFn)vtable[0x0c / 4];
+	if ( !fn ) {
+		return 0;
+	}
+
+	return fn( friends, NULL, flags );
+}
+
+/*
+=============
+QL_Steamworks_GetFriendByIndex
+=============
+*/
+qboolean QL_Steamworks_GetFriendByIndex( int index, int flags, uint32_t *outIdLow, uint32_t *outIdHigh ) {
+	void *friends;
+	void **vtable;
+	CSteamID steamId;
+	typedef CSteamID *(__fastcall *QL_SteamFriends_GetFriendByIndexFn)( void *self, void *unused, CSteamID *outSteamId, int index, int flags );
+	QL_SteamFriends_GetFriendByIndexFn fn;
+
+	if ( outIdLow ) {
+		*outIdLow = 0u;
+	}
+	if ( outIdHigh ) {
+		*outIdHigh = 0u;
+	}
+
+	friends = QL_Steamworks_GetFriendsInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( friends );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamFriends_GetFriendByIndexFn)vtable[0x10 / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	steamId.value = 0ull;
+	fn( friends, NULL, &steamId, index, flags );
+	if ( steamId.value == 0ull ) {
+		return qfalse;
+	}
+
+	if ( outIdLow ) {
+		*outIdLow = (uint32_t)( steamId.value & 0xffffffffu );
+	}
+	if ( outIdHigh ) {
+		*outIdHigh = (uint32_t)( ( steamId.value >> 32 ) & 0xffffffffu );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_GetFriendSummary
+=============
+*/
+qboolean QL_Steamworks_GetFriendSummary( uint32_t idLow, uint32_t idHigh, ql_steam_friend_summary_t *outSummary ) {
+	void *friends;
+	void **vtable;
+	CSteamID steamId;
+	uint32_t currentAppId;
+	typedef int (__fastcall *QL_SteamFriends_GetFriendRelationshipFn)( void *self, void *unused, CSteamID steamId );
+	typedef int (__fastcall *QL_SteamFriends_GetFriendPersonaStateFn)( void *self, void *unused, CSteamID steamId );
+	typedef const char *(__fastcall *QL_SteamFriends_GetFriendPersonaNameFn)( void *self, void *unused, CSteamID steamId );
+	typedef int (__fastcall *QL_SteamFriends_GetFriendGamePlayedFn)( void *self, void *unused, CSteamID steamId, ql_steam_friend_game_info_t *outGameInfo );
+	typedef const char *(__fastcall *QL_SteamFriends_GetPlayerNicknameFn)( void *self, void *unused, CSteamID steamId );
+	typedef const char *(__fastcall *QL_SteamFriends_GetFriendRichPresenceFn)( void *self, void *unused, CSteamID steamId, const char *key );
+	QL_SteamFriends_GetFriendRelationshipFn getRelationshipFn;
+	QL_SteamFriends_GetFriendPersonaStateFn getPersonaStateFn;
+	QL_SteamFriends_GetFriendPersonaNameFn getFriendNameFn;
+	QL_SteamFriends_GetFriendGamePlayedFn getFriendGamePlayedFn;
+	QL_SteamFriends_GetPlayerNicknameFn getPlayerNicknameFn;
+	QL_SteamFriends_GetFriendRichPresenceFn getFriendRichPresenceFn;
+	ql_steam_friend_game_info_t gameInfo;
+
+	if ( !outSummary ) {
+		return qfalse;
+	}
+
+	memset( outSummary, 0, sizeof( *outSummary ) );
+	friends = QL_Steamworks_GetFriendsInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( friends );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	getRelationshipFn = (QL_SteamFriends_GetFriendRelationshipFn)vtable[0x14 / 4];
+	getPersonaStateFn = (QL_SteamFriends_GetFriendPersonaStateFn)vtable[0x18 / 4];
+	getFriendNameFn = (QL_SteamFriends_GetFriendPersonaNameFn)vtable[0x1c / 4];
+	getFriendGamePlayedFn = (QL_SteamFriends_GetFriendGamePlayedFn)vtable[0x20 / 4];
+	getPlayerNicknameFn = (QL_SteamFriends_GetPlayerNicknameFn)vtable[0x2c / 4];
+	getFriendRichPresenceFn = (QL_SteamFriends_GetFriendRichPresenceFn)vtable[0xb4 / 4];
+	if ( !getRelationshipFn || !getPersonaStateFn || !getFriendNameFn || !getPlayerNicknameFn || !getFriendRichPresenceFn ) {
+		return qfalse;
+	}
+
+	steamId = QL_Steamworks_CombineIdentityWords( idLow, idHigh );
+	outSummary->steamId = steamId;
+	outSummary->relationship = getRelationshipFn( friends, NULL, steamId );
+	outSummary->personaState = getPersonaStateFn( friends, NULL, steamId );
+	QL_Steamworks_CopySteamString( outSummary->name, sizeof( outSummary->name ), getFriendNameFn( friends, NULL, steamId ) );
+	QL_Steamworks_CopySteamString( outSummary->nickname, sizeof( outSummary->nickname ), getPlayerNicknameFn( friends, NULL, steamId ) );
+	QL_Steamworks_CopySteamString( outSummary->status, sizeof( outSummary->status ), getFriendRichPresenceFn( friends, NULL, steamId, "status" ) );
+	QL_Steamworks_CopySteamString( outSummary->lanIp, sizeof( outSummary->lanIp ), getFriendRichPresenceFn( friends, NULL, steamId, "lanIp" ) );
+
+	currentAppId = QL_Steamworks_GetAppID();
+	memset( &gameInfo, 0, sizeof( gameInfo ) );
+	if ( getFriendGamePlayedFn && getFriendGamePlayedFn( friends, NULL, steamId, &gameInfo ) ) {
+		outSummary->gameId = gameInfo.gameId;
+		outSummary->serverIp = gameInfo.gameIp;
+		outSummary->serverPort = gameInfo.gamePort;
+		outSummary->queryPort = gameInfo.queryPort;
+		outSummary->lobbyId = gameInfo.lobbyId;
+		outSummary->gameServerId = gameInfo.gameServerId;
+		if ( currentAppId != 0u && (uint32_t)( gameInfo.gameId & 0x00ffffffull ) == currentAppId ) {
+			outSummary->playingQuake = qtrue;
+		}
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_ReadLobbyChatMessage
+
+Reads a lobby chat message payload through the mapped matchmaking slot.
+=============
+*/
+static qboolean QL_Steamworks_ReadLobbyChatMessage( uint32_t idLow, uint32_t idHigh, int chatId, CSteamID *outChatter, int *outEntryType, char *buffer, size_t bufferSize ) {
+	void *matchmaking;
+	void **vtable;
+	typedef int (__fastcall *QL_SteamMatchmaking_GetLobbyChatEntryFn)( void *self, void *unused, uint32_t idLow, uint32_t idHigh, int chatId, CSteamID *outChatter, void *buffer, int bufferSize, int *outEntryType );
+	QL_SteamMatchmaking_GetLobbyChatEntryFn fn;
+	int readLength;
+
+	if ( outChatter ) {
+		outChatter->value = 0ull;
+	}
+	if ( outEntryType ) {
+		*outEntryType = 0;
+	}
+	if ( buffer && bufferSize > 0 ) {
+		buffer[0] = '\0';
+	}
+
+	if ( !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	matchmaking = QL_Steamworks_GetMatchmakingInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( matchmaking );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamMatchmaking_GetLobbyChatEntryFn)vtable[0x6c / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	readLength = fn( matchmaking, NULL, idLow, idHigh, chatId, outChatter, buffer, (int)bufferSize, outEntryType );
+	if ( readLength <= 0 ) {
+		return qfalse;
+	}
+
+	buffer[bufferSize - 1] = '\0';
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_DispatchRichPresenceJoinRequested
+=============
+*/
+static void QL_Steamworks_DispatchRichPresenceJoinRequested( void *context, const void *payload ) {
+	ql_steam_client_callback_state_t *callbackState;
+	const ql_steam_game_rich_presence_join_requested_raw_t *raw;
+	ql_steam_rich_presence_join_requested_t event;
+
+	callbackState = (ql_steam_client_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onRichPresenceJoinRequested || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_game_rich_presence_join_requested_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.requester.steamId = raw->steamIDFriend;
+	QL_Steamworks_GetFriendSummary( (uint32_t)( raw->steamIDFriend.value & 0xffffffffu ), (uint32_t)( raw->steamIDFriend.value >> 32 ), &event.requester );
+	QL_Steamworks_CopySteamString( event.command, sizeof( event.command ), raw->connect );
+	callbackState->bindings.onRichPresenceJoinRequested( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchUserStatsReceived
+=============
+*/
+static void QL_Steamworks_DispatchUserStatsReceived( void *context, const void *payload ) {
+	ql_steam_client_callback_state_t *callbackState;
+	const ql_steam_user_stats_received_raw_t *raw;
+	ql_steam_user_stats_received_t event;
+	ql_steam_friend_summary_t summary;
+
+	callbackState = (ql_steam_client_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onUserStatsReceived || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_user_stats_received_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	memset( &summary, 0, sizeof( summary ) );
+	event.steamId = raw->steamIDUser;
+	event.gameId = (uint32_t)( raw->gameId & 0xffffffffu );
+	event.result = raw->result;
+	if ( QL_Steamworks_GetFriendSummary( (uint32_t)( raw->steamIDUser.value & 0xffffffffu ), (uint32_t)( raw->steamIDUser.value >> 32 ), &summary ) ) {
+		Q_strncpyz( event.name, summary.name, sizeof( event.name ) );
+	}
+
+	callbackState->bindings.onUserStatsReceived( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchPersonaStateChange
+=============
+*/
+static void QL_Steamworks_DispatchPersonaStateChange( void *context, const void *payload ) {
+	ql_steam_client_callback_state_t *callbackState;
+	const ql_steam_persona_state_change_raw_t *raw;
+	ql_steam_persona_state_change_t event;
+
+	callbackState = (ql_steam_client_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onPersonaStateChange || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_persona_state_change_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.steamId = raw->steamID;
+	event.changeFlags = raw->changeFlags;
+	QL_Steamworks_GetFriendSummary( (uint32_t)( raw->steamID.value & 0xffffffffu ), (uint32_t)( raw->steamID.value >> 32 ), &event.summary );
+	callbackState->bindings.onPersonaStateChange( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchP2PSessionRequest
+=============
+*/
+static void QL_Steamworks_DispatchP2PSessionRequest( void *context, const void *payload ) {
+	ql_steam_client_callback_state_t *callbackState;
+	const ql_steam_p2p_session_request_raw_t *raw;
+	ql_steam_p2p_session_request_t event;
+
+	callbackState = (ql_steam_client_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onP2PSessionRequest || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_p2p_session_request_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.remoteId = raw->remoteId;
+	callbackState->bindings.onP2PSessionRequest( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchGameServerChangeRequested
+=============
+*/
+static void QL_Steamworks_DispatchGameServerChangeRequested( void *context, const void *payload ) {
+	ql_steam_client_callback_state_t *callbackState;
+	const ql_steam_game_server_change_requested_raw_t *raw;
+	ql_steam_game_server_change_requested_t event;
+
+	callbackState = (ql_steam_client_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onGameServerChangeRequested || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_game_server_change_requested_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	QL_Steamworks_CopySteamString( event.server, sizeof( event.server ), raw->server );
+	QL_Steamworks_CopySteamString( event.password, sizeof( event.password ), raw->password );
+	callbackState->bindings.onGameServerChangeRequested( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchFriendRichPresenceUpdate
+=============
+*/
+static void QL_Steamworks_DispatchFriendRichPresenceUpdate( void *context, const void *payload ) {
+	ql_steam_client_callback_state_t *callbackState;
+	const ql_steam_friend_rich_presence_update_raw_t *raw;
+	ql_steam_friend_rich_presence_update_t event;
+
+	callbackState = (ql_steam_client_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onFriendRichPresenceUpdate || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_friend_rich_presence_update_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.steamId = raw->steamIDFriend;
+	event.appId = raw->appId;
+	QL_Steamworks_GetFriendSummary( (uint32_t)( raw->steamIDFriend.value & 0xffffffffu ), (uint32_t)( raw->steamIDFriend.value >> 32 ), &event.summary );
+	callbackState->bindings.onFriendRichPresenceUpdate( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchUGCQueryCompleted
+=============
+*/
+static void QL_Steamworks_DispatchUGCQueryCompleted( void *context, const void *payload, qboolean ioFailure, SteamAPICall_t callHandle ) {
+	ql_steam_client_callback_state_t *callbackState;
+	const ql_steam_ugc_query_completed_raw_t *raw;
+	ql_steam_ugc_query_completed_t event;
+
+	callbackState = (ql_steam_client_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onUGCQueryCompleted ) {
+		return;
+	}
+
+	memset( &event, 0, sizeof( event ) );
+	event.callHandle = callHandle;
+	if ( payload ) {
+		raw = (const ql_steam_ugc_query_completed_raw_t *)payload;
+		event.queryHandle = raw->queryHandle;
+		event.result = ioFailure ? -1 : raw->result;
+		event.numResultsReturned = raw->numResultsReturned;
+		event.totalMatchingResults = raw->totalMatchingResults;
+		event.cachedData = raw->cachedData ? qtrue : qfalse;
+	} else {
+		event.result = ioFailure ? -1 : 0;
+	}
+
+	callbackState->bindings.onUGCQueryCompleted( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchLobbyCreated
+=============
+*/
+static void QL_Steamworks_DispatchLobbyCreated( void *context, const void *payload ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+	const ql_steam_lobby_created_raw_t *raw;
+	ql_steam_lobby_created_t event;
+
+	callbackState = (ql_steam_lobby_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onLobbyCreated || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_lobby_created_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId = raw->lobbyId;
+	event.result = raw->result;
+	callbackState->bindings.onLobbyCreated( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchLobbyEnter
+=============
+*/
+static void QL_Steamworks_DispatchLobbyEnter( void *context, const void *payload ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+	const ql_steam_lobby_enter_raw_t *raw;
+	ql_steam_lobby_enter_t event;
+
+	callbackState = (ql_steam_lobby_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onLobbyEnter || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_lobby_enter_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId = raw->lobbyId;
+	event.chatPermissions = raw->chatPermissions;
+	event.permissions = raw->chatPermissions;
+	event.locked = raw->locked ? qtrue : qfalse;
+	event.response = raw->response;
+	callbackState->bindings.onLobbyEnter( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchLobbyChatUpdate
+=============
+*/
+static void QL_Steamworks_DispatchLobbyChatUpdate( void *context, const void *payload ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+	const ql_steam_lobby_chat_update_raw_t *raw;
+	ql_steam_lobby_chat_update_t event;
+
+	callbackState = (ql_steam_lobby_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onLobbyChatUpdate || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_lobby_chat_update_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId = raw->lobbyId;
+	event.changedUser = raw->changedUser;
+	event.makingChangeUser = raw->makingChangeUser;
+	event.stateChange = raw->stateChange;
+	callbackState->bindings.onLobbyChatUpdate( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchLobbyChatMessage
+=============
+*/
+static void QL_Steamworks_DispatchLobbyChatMessage( void *context, const void *payload ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+	const ql_steam_lobby_chat_message_raw_t *raw;
+	ql_steam_lobby_chat_message_t event;
+	CSteamID chatter;
+	int entryType;
+
+	callbackState = (ql_steam_lobby_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onLobbyChatMessage || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_lobby_chat_message_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId = raw->lobbyId;
+	event.chatter = raw->chatter;
+	event.chatEntryType = raw->chatEntryType;
+	event.chatId = raw->chatId;
+
+	chatter.value = raw->chatter.value;
+	entryType = raw->chatEntryType;
+	QL_Steamworks_ReadLobbyChatMessage(
+		(uint32_t)( raw->lobbyId.value & 0xffffffffu ),
+		(uint32_t)( raw->lobbyId.value >> 32 ),
+		raw->chatId,
+		&chatter,
+		&entryType,
+		event.message,
+		sizeof( event.message )
+	);
+	event.chatter = chatter;
+	event.chatEntryType = entryType;
+	callbackState->bindings.onLobbyChatMessage( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchLobbyDataUpdate
+=============
+*/
+static void QL_Steamworks_DispatchLobbyDataUpdate( void *context, const void *payload ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+	const ql_steam_lobby_data_update_raw_t *raw;
+	ql_steam_lobby_data_update_t event;
+
+	callbackState = (ql_steam_lobby_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onLobbyDataUpdate || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_lobby_data_update_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId = raw->lobbyId;
+	event.memberId = raw->memberId;
+	event.success = raw->success ? qtrue : qfalse;
+	callbackState->bindings.onLobbyDataUpdate( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchLobbyGameCreated
+=============
+*/
+static void QL_Steamworks_DispatchLobbyGameCreated( void *context, const void *payload ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+	const ql_steam_lobby_game_created_raw_t *raw;
+	ql_steam_lobby_game_created_t event;
+
+	callbackState = (ql_steam_lobby_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onLobbyGameCreated || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_lobby_game_created_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId = raw->lobbyId;
+	event.serverId = raw->serverId;
+	event.serverIp = raw->serverIp;
+	event.serverPort = raw->serverPort;
+	callbackState->bindings.onLobbyGameCreated( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchLobbyKicked
+=============
+*/
+static void QL_Steamworks_DispatchLobbyKicked( void *context, const void *payload ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+	const ql_steam_lobby_kicked_raw_t *raw;
+	ql_steam_lobby_kicked_t event;
+
+	callbackState = (ql_steam_lobby_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onLobbyKicked || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_lobby_kicked_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId = raw->lobbyId;
+	event.adminId = raw->adminId;
+	event.disconnected = raw->disconnected ? qtrue : qfalse;
+	callbackState->bindings.onLobbyKicked( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchGameLobbyJoinRequested
+=============
+*/
+static void QL_Steamworks_DispatchGameLobbyJoinRequested( void *context, const void *payload ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+	const ql_steam_game_lobby_join_requested_raw_t *raw;
+	ql_steam_game_lobby_join_requested_t event;
+
+	callbackState = (ql_steam_lobby_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onGameLobbyJoinRequested || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_game_lobby_join_requested_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId = raw->lobbyId;
+	event.friendId = raw->friendId;
+	callbackState->bindings.onGameLobbyJoinRequested( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchMicroAuthorizationResponse
+=============
+*/
+static void QL_Steamworks_DispatchMicroAuthorizationResponse( void *context, const void *payload ) {
+	ql_steam_micro_callback_state_t *callbackState;
+	const ql_steam_microtxn_authorization_response_raw_t *raw;
+	ql_steam_microtxn_authorization_response_t event;
+
+	callbackState = (ql_steam_micro_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onAuthorizationResponse || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_microtxn_authorization_response_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.appId = raw->appId;
+	event.orderId = raw->orderId;
+	event.authorized = raw->authorized ? qtrue : qfalse;
+	callbackState->bindings.onAuthorizationResponse( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_RegisterClientCallbacks
+=============
+*/
+qboolean QL_Steamworks_RegisterClientCallbacks( const ql_steam_client_callback_bindings_t *bindings ) {
+	ql_steam_client_callback_state_t *callbackState;
+
+	if ( !bindings ) {
+		return qfalse;
+	}
+
+	if ( !QL_Steamworks_Init() || !state.SteamAPI_RegisterCallback ) {
+		return qfalse;
+	}
+
+	callbackState = &state.clientCallbacks;
+	if ( callbackState->registered ) {
+		QL_Steamworks_UnregisterClientCallbacks();
+	}
+
+	memset( callbackState, 0, sizeof( *callbackState ) );
+	memcpy( &callbackState->bindings, bindings, sizeof( callbackState->bindings ) );
+
+	QL_Steamworks_PrepareCallbackObject( &callbackState->richPresenceJoinRequested, QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED, sizeof( ql_steam_game_rich_presence_join_requested_raw_t ), callbackState, QL_Steamworks_DispatchRichPresenceJoinRequested, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->userStatsReceived, QL_STEAM_CALLBACK_USER_STATS_RECEIVED, sizeof( ql_steam_user_stats_received_raw_t ), callbackState, QL_Steamworks_DispatchUserStatsReceived, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->personaStateChange, QL_STEAM_CALLBACK_PERSONA_STATE_CHANGE, sizeof( ql_steam_persona_state_change_raw_t ), callbackState, QL_Steamworks_DispatchPersonaStateChange, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->p2pSessionRequest, QL_STEAM_CALLBACK_P2P_SESSION_REQUEST, sizeof( ql_steam_p2p_session_request_raw_t ), callbackState, QL_Steamworks_DispatchP2PSessionRequest, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->gameServerChangeRequested, QL_STEAM_CALLBACK_GAME_SERVER_CHANGE_REQUESTED, sizeof( ql_steam_game_server_change_requested_raw_t ), callbackState, QL_Steamworks_DispatchGameServerChangeRequested, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->friendRichPresenceUpdate, QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE, sizeof( ql_steam_friend_rich_presence_update_raw_t ), callbackState, QL_Steamworks_DispatchFriendRichPresenceUpdate, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->ugcQueryCompleted, QL_STEAM_CALLBACK_UGC_QUERY_COMPLETED, sizeof( ql_steam_ugc_query_completed_raw_t ), callbackState, NULL, QL_Steamworks_DispatchUGCQueryCompleted );
+
+	if ( !QL_Steamworks_RegisterCallbackObject( &callbackState->richPresenceJoinRequested ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->userStatsReceived ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->personaStateChange ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->p2pSessionRequest ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->gameServerChangeRequested ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->friendRichPresenceUpdate ) ) {
+		QL_Steamworks_UnregisterClientCallbacks();
+		return qfalse;
+	}
+
+	callbackState->registered = qtrue;
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_UnregisterClientCallbacks
+=============
+*/
+void QL_Steamworks_UnregisterClientCallbacks( void ) {
+	ql_steam_client_callback_state_t *callbackState;
+
+	callbackState = &state.clientCallbacks;
+	QL_Steamworks_UnbindCallResultObject( &callbackState->ugcQueryCompleted, &callbackState->ugcCallHandle, &callbackState->ugcCallBound );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->friendRichPresenceUpdate );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->gameServerChangeRequested );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->p2pSessionRequest );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->personaStateChange );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->userStatsReceived );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->richPresenceJoinRequested );
+	memset( callbackState, 0, sizeof( *callbackState ) );
+}
+
+/*
+=============
+QL_Steamworks_RegisterLobbyCallbacks
+=============
+*/
+qboolean QL_Steamworks_RegisterLobbyCallbacks( const ql_steam_lobby_callback_bindings_t *bindings ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+
+	if ( !bindings ) {
+		return qfalse;
+	}
+
+	if ( !QL_Steamworks_Init() || !state.SteamAPI_RegisterCallback ) {
+		return qfalse;
+	}
+
+	callbackState = &state.lobbyCallbacks;
+	if ( callbackState->registered ) {
+		QL_Steamworks_UnregisterLobbyCallbacks();
+	}
+
+	memset( callbackState, 0, sizeof( *callbackState ) );
+	memcpy( &callbackState->bindings, bindings, sizeof( callbackState->bindings ) );
+
+	QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyCreated, QL_STEAM_CALLBACK_LOBBY_CREATED, sizeof( ql_steam_lobby_created_raw_t ), callbackState, QL_Steamworks_DispatchLobbyCreated, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyEnter, QL_STEAM_CALLBACK_LOBBY_ENTER, sizeof( ql_steam_lobby_enter_raw_t ), callbackState, QL_Steamworks_DispatchLobbyEnter, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatUpdate, QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE, sizeof( ql_steam_lobby_chat_update_raw_t ), callbackState, QL_Steamworks_DispatchLobbyChatUpdate, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyChatMessage, QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE, sizeof( ql_steam_lobby_chat_message_raw_t ), callbackState, QL_Steamworks_DispatchLobbyChatMessage, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyDataUpdate, QL_STEAM_CALLBACK_LOBBY_DATA_UPDATE, sizeof( ql_steam_lobby_data_update_raw_t ), callbackState, QL_Steamworks_DispatchLobbyDataUpdate, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyGameCreated, QL_STEAM_CALLBACK_LOBBY_GAME_CREATED, sizeof( ql_steam_lobby_game_created_raw_t ), callbackState, QL_Steamworks_DispatchLobbyGameCreated, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->lobbyKicked, QL_STEAM_CALLBACK_LOBBY_KICKED, sizeof( ql_steam_lobby_kicked_raw_t ), callbackState, QL_Steamworks_DispatchLobbyKicked, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->gameLobbyJoinRequested, QL_STEAM_CALLBACK_GAME_LOBBY_JOIN_REQUESTED, sizeof( ql_steam_game_lobby_join_requested_raw_t ), callbackState, QL_Steamworks_DispatchGameLobbyJoinRequested, NULL );
+
+	if ( !QL_Steamworks_RegisterCallbackObject( &callbackState->lobbyCreated ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->lobbyEnter ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->lobbyChatUpdate ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->lobbyChatMessage ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->lobbyDataUpdate ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->lobbyGameCreated ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->lobbyKicked ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->gameLobbyJoinRequested ) ) {
+		QL_Steamworks_UnregisterLobbyCallbacks();
+		return qfalse;
+	}
+
+	callbackState->registered = qtrue;
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_UnregisterLobbyCallbacks
+=============
+*/
+void QL_Steamworks_UnregisterLobbyCallbacks( void ) {
+	ql_steam_lobby_callback_state_t *callbackState;
+
+	callbackState = &state.lobbyCallbacks;
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->gameLobbyJoinRequested );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->lobbyKicked );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->lobbyGameCreated );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->lobbyDataUpdate );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->lobbyChatMessage );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->lobbyChatUpdate );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->lobbyEnter );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->lobbyCreated );
+	memset( callbackState, 0, sizeof( *callbackState ) );
+}
+
+/*
+=============
+QL_Steamworks_RegisterMicroCallbacks
+=============
+*/
+qboolean QL_Steamworks_RegisterMicroCallbacks( const ql_steam_micro_callback_bindings_t *bindings ) {
+	ql_steam_micro_callback_state_t *callbackState;
+
+	if ( !bindings ) {
+		return qfalse;
+	}
+
+	if ( !QL_Steamworks_Init() || !state.SteamAPI_RegisterCallback ) {
+		return qfalse;
+	}
+
+	callbackState = &state.microCallbacks;
+	if ( callbackState->registered ) {
+		QL_Steamworks_UnregisterMicroCallbacks();
+	}
+
+	memset( callbackState, 0, sizeof( *callbackState ) );
+	memcpy( &callbackState->bindings, bindings, sizeof( callbackState->bindings ) );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->authorizationResponse, QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE, sizeof( ql_steam_microtxn_authorization_response_raw_t ), callbackState, QL_Steamworks_DispatchMicroAuthorizationResponse, NULL );
+	if ( !QL_Steamworks_RegisterCallbackObject( &callbackState->authorizationResponse ) ) {
+		QL_Steamworks_UnregisterMicroCallbacks();
+		return qfalse;
+	}
+
+	callbackState->registered = qtrue;
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_UnregisterMicroCallbacks
+=============
+*/
+void QL_Steamworks_UnregisterMicroCallbacks( void ) {
+	ql_steam_micro_callback_state_t *callbackState;
+
+	callbackState = &state.microCallbacks;
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->authorizationResponse );
+	memset( callbackState, 0, sizeof( *callbackState ) );
+}
+
+/*
+=============
+QL_Steamworks_BindUGCQueryCallResult
+=============
+*/
+qboolean QL_Steamworks_BindUGCQueryCallResult( SteamAPICall_t callHandle ) {
+	ql_steam_client_callback_state_t *callbackState;
+
+	if ( callHandle == 0 || !state.SteamAPI_RegisterCallResult ) {
+		return qfalse;
+	}
+
+	callbackState = &state.clientCallbacks;
+	if ( !callbackState->registered ) {
+		return qfalse;
+	}
+
+	QL_Steamworks_UnbindCallResultObject( &callbackState->ugcQueryCompleted, &callbackState->ugcCallHandle, &callbackState->ugcCallBound );
+	state.SteamAPI_RegisterCallResult( &callbackState->ugcQueryCompleted, callHandle );
+	callbackState->ugcCallHandle = callHandle;
+	callbackState->ugcCallBound = qtrue;
+	return qtrue;
 }
 
 /*
@@ -817,6 +2053,125 @@ static void *QL_Steamworks_GetUGCInterface( void ) {
 	}
 
 	return state.SteamUGC();
+}
+
+/*
+=============
+QL_Steamworks_GetNumSubscribedItems
+
+Maps the retail SteamUGC subscribed-item count slot used by workshop startup.
+=============
+*/
+uint32_t QL_Steamworks_GetNumSubscribedItems( void ) {
+	void *ugc;
+	void **vtable;
+	typedef uint32_t (__fastcall *QL_SteamUGC_GetNumSubscribedItemsFn)( void *self, void *unused );
+	QL_SteamUGC_GetNumSubscribedItemsFn fn;
+
+	ugc = QL_Steamworks_GetUGCInterface();
+	if ( !ugc ) {
+		return 0u;
+	}
+
+	vtable = QL_Steamworks_GetInterfaceVTable( ugc );
+	if ( !vtable ) {
+		return 0u;
+	}
+
+	fn = (QL_SteamUGC_GetNumSubscribedItemsFn)vtable[0xc8 / 4];
+	if ( !fn ) {
+		return 0u;
+	}
+
+	return fn( ugc, NULL );
+}
+
+/*
+=============
+QL_Steamworks_GetSubscribedItems
+
+Copies the subscribed workshop item IDs through the mapped retail SteamUGC slot.
+=============
+*/
+uint32_t QL_Steamworks_GetSubscribedItems( uint64_t *outItemIds, uint32_t maxItems ) {
+	void *ugc;
+	void **vtable;
+	typedef uint32_t (__fastcall *QL_SteamUGC_GetSubscribedItemsFn)( void *self, void *unused, uint64_t *outItemIds, uint32_t maxItems );
+	QL_SteamUGC_GetSubscribedItemsFn fn;
+
+	if ( !outItemIds || maxItems == 0u ) {
+		return 0u;
+	}
+
+	ugc = QL_Steamworks_GetUGCInterface();
+	if ( !ugc ) {
+		return 0u;
+	}
+
+	vtable = QL_Steamworks_GetInterfaceVTable( ugc );
+	if ( !vtable ) {
+		return 0u;
+	}
+
+	fn = (QL_SteamUGC_GetSubscribedItemsFn)vtable[0xcc / 4];
+	if ( !fn ) {
+		return 0u;
+	}
+
+	return fn( ugc, NULL, outItemIds, maxItems );
+}
+
+/*
+=============
+QL_Steamworks_GetItemInstallInfo
+
+Returns the install folder and metadata for one subscribed workshop item.
+=============
+*/
+qboolean QL_Steamworks_GetItemInstallInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outSizeOnDisk, char *folder, size_t folderSize, uint32_t *outTimestamp ) {
+	void *ugc;
+	void **vtable;
+	typedef int (__fastcall *QL_SteamUGC_GetItemInstallInfoFn)( void *self, void *unused, uint32_t idLow, uint32_t idHigh, uint64_t *outSizeOnDisk, char *folder, uint32_t folderSize, uint32_t *outTimestamp );
+	QL_SteamUGC_GetItemInstallInfoFn fn;
+
+	if ( outSizeOnDisk ) {
+		*outSizeOnDisk = 0ull;
+	}
+	if ( folder && folderSize > 0 ) {
+		folder[0] = '\0';
+	}
+	if ( outTimestamp ) {
+		*outTimestamp = 0u;
+	}
+
+	if ( !folder || folderSize == 0 ) {
+		return qfalse;
+	}
+
+	ugc = QL_Steamworks_GetUGCInterface();
+	if ( !ugc ) {
+		return qfalse;
+	}
+
+	vtable = QL_Steamworks_GetInterfaceVTable( ugc );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamUGC_GetItemInstallInfoFn)vtable[0xd4 / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	if ( !fn( ugc, NULL, idLow, idHigh, outSizeOnDisk, folder, (uint32_t)folderSize, outTimestamp ) ) {
+		if ( folderSize > 0 ) {
+			folder[0] = '\0';
+		}
+		return qfalse;
+	}
+
+	folder[folderSize - 1] = '\0';
+	return qtrue;
 }
 
 /*

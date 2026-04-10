@@ -47,6 +47,8 @@ extern	qboolean	anykeydown;
 extern	qboolean	chat_team;
 extern	int			chat_playerNum;
 
+typedef void (*keyBindingEnumCallback_t)( int keynum, const char *keyName, const char *binding, void *userData );
+
 void Key_WriteBindings( fileHandle_t f );
 void Key_SetBinding( int keynum, const char *binding );
 char *Key_GetBinding( int keynum );
@@ -55,3 +57,4 @@ qboolean Key_GetOverstrikeMode( void );
 void Key_SetOverstrikeMode( qboolean state );
 void Key_ClearStates( void );
 int Key_GetKey(const char *binding);
+void Key_EnumerateBindings( keyBindingEnumCallback_t callback, void *userData );

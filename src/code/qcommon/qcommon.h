@@ -485,7 +485,9 @@ void 	Cvar_WriteVariables( fileHandle_t f );
 // writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
 void	Cvar_WriteCloudVariables( fileHandle_t f );
+void	Cvar_WriteQLConfigVariables( fileHandle_t hardwareFile, fileHandle_t replicateFile, qboolean clientConfigOnly );
 void	Cvar_EnumerateCloudVariables( void (*callback)( const char *name, const char *value, void *userData ), void *userData );
+void	Cvar_EnumerateVariables( void (*callback)( const cvar_t *var, void *userData ), void *userData );
 void	Cvar_ApplyCloudEntry( const char *var_name, const char *value );
 
 void	Cvar_Init( void );
@@ -647,6 +649,7 @@ const char *FS_LoadedPakPureChecksums( void );
 const char *FS_ReferencedPakNames( void );
 const char *FS_ReferencedPakChecksums( void );
 const char *FS_ReferencedPakPureChecksums( void );
+const char *FS_ReferencedSteamworks( void );
 // Returns a space separated string containing the checksums of all loaded 
 // AND referenced pk3 files. Servers with sv_pure set will get this string 
 // back from clients for pure validation 

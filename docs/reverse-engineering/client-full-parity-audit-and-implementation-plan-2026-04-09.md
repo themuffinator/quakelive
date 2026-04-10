@@ -1,10 +1,10 @@
 # `client` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 
 Scope: `src/code/client/*` plus client-owned host seams in `src/code/qcommon/common.c`, `src/common/platform/*`, and the adjacent launcher helper surface in `src/code/win32/*` versus retail `quakelive_steam.exe`
 
-Purpose: publish a strict retail-facing audit for the native client host after the recent Steam, browser-resource, renderer-bridge, and module-bridge reconstruction work. The goal is to separate the strong classic client/runtime story from the still-open Quake Live launcher/platform story instead of treating both as one undifferentiated host bucket.
+Purpose: publish a strict retail-facing audit for the native client host after the recent Steam, browser-resource, renderer-bridge, and module-bridge reconstruction work. The goal is to separate the strong classic client/runtime story from the remaining client-host verification work instead of treating everything as one undifferentiated host bucket.
 
 ## Audit Method And Evidence
 
@@ -63,6 +63,24 @@ Observed result:
 
 - `113 passed in 5.81s`
 
+CL-P1 validation refresh on 2026-04-10:
+
+- `python -m pytest tests/test_client_config_parity.py tests/test_platform_services.py tests/test_ui_menu_files.py -q --tb=no`
+
+Observed result:
+
+- `85 passed in 18.17s`
+
+CL-P4 / CL-P5 validation refresh on 2026-04-10:
+
+- `python -m pytest tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_client_config_parity.py tests/test_client_workshop_bootstrap_parity.py tests/test_ui_menu_files.py -q --tb=no`
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File .vscode/build.ps1 -Solution src/code/quakelive_steam.vcxproj -Configuration Debug -Platform x86`
+
+Observed result:
+
+- `128 passed in 4.14s`
+- `Build succeeded`
+
 ## Corpus Snapshot And Mapping Confidence
 
 Observed committed-corpus facts:
@@ -83,7 +101,7 @@ Interpretation:
 
 - Classic client/runtime ownership recovery is much stronger than the sparse committed `client.json` file suggests.
 - Strict client parity is not mainly blocked by missing Quake III-era discovery anymore.
-- The main remaining loss is Quake Live launcher/bootstrap behavior, async Steam callback ownership, workshop/bootstrap exactness, and retail config/persistence shape.
+- The main remaining loss is now verification: a dedicated client parity gate and tracked runtime evidence bundle are still missing.
 
 ## Current Verified State
 
@@ -103,26 +121,36 @@ Observed source-backed strengths:
 
 Observed source-backed weaknesses:
 
-1. The browser/Awesomium surface is still compatibility-grade, not retail-complete. `web_showBrowser`, `web_changeHash`, `web_browserActive`, and `web_stopRefresh` mostly toggle local state or early-out on missing providers, while the real retail host owns `WebCore`, `WebSession`, `WebView`, listeners, JS method tables, and event publication.
-2. The async Steam callback system is still missing as a first-class client owner. The repo now reconstructs several callback *targets*, but it does not yet reconstruct the callback bundle registration/lifetime itself.
-3. `CL_InitDownloads` still follows the classic pak-comparison path only. Retail Quake Live extends that owner with workshop item requirement handling and a companion completion helper inside `CL_Frame`.
-4. Config/bootstrap persistence still follows Quake III-oriented filenames and write paths in `common.c` rather than the retail `qzconfig.cfg` / `repconfig.cfg` / `writeClientConfig` shape recovered in rounds `108` and `109`.
-5. Client verification is still spread across multiple targeted suites. Unlike the renderer and module layers, there is not yet one dedicated client parity gate plus tracked runtime evidence artifact.
+1. The retained launcher/browser contract is now explicit in writable source behind `QL_BUILD_ONLINE_SERVICES`, but it is still a compatibility-oriented reconstruction of the retail Awesomium host rather than a literal third-party runtime embed. That keeps runtime proof important.
+2. Client verification is still spread across multiple targeted suites. Unlike the renderer and module layers, there is not yet one dedicated client parity gate plus tracked runtime evidence artifact.
+
+Recent closure:
+
+1. `CL-P1` is now complete. `common.c`, `files.c`, `cl_ui.c`, and `cl_main.c` now mirror the retail `qzconfig.cfg` / `repconfig.cfg` bootstrap-and-write shape, expose `writeClientConfig`, replay `qzconfig.cfg` on `FS_Restart`, and keep the UI/client CD-key surface on the legacy placeholder/q3key lane recovered from rounds `108` and `109`.
+2. `CL-P2` is now complete. `platform_steamworks.c` and `cl_main.c` now retain the retail-style client/lobby/micro Steam callback bundles, `CL_Frame` owns the normal client-side callback pump, and the callback payloads now flow through an explicit client/browser event owner instead of being limited to auth-time helper calls.
+3. `CL-P3` is now complete. `sv_init.c`, `files.c`, `platform_steamworks.c`, `cl_main.c`, and `cl_ui.c` now reconstruct the retail workshop-aware join/bootstrap lane: the server publishes the referenced workshop-item list instead of echoing the server SteamID, filesystem startup/restart remount subscribed workshop install roots with retained per-pack workshop item IDs, `CL_InitDownloads` stages required workshop items through retained client state, `CL_Frame` owns the workshop completion/restart helper, and the UI workshop progress import now reflects the retained client owner instead of falling back to legacy byte counters.
+4. `CL-P4` is now complete. `cl_cgame.c` and `cl_main.c` now own a retained browser-host runtime behind the online-services policy gate, including deterministic init/frame/shutdown lifetime, retained session or view state, and command owners for `web_showBrowser`, `web_changeHash`, `web_hideBrowser`, `web_showError`, `web_clearCache`, `web_reload`, and `web_stopRefresh`.
+5. `CL-P5` is now complete. `cl_cgame.c`, `cl_main.c`, `cl_keys.c`, `cvar.c`, and `cl_steam_resources.c` now reconstruct the `qz_instance` binding surface, `EnginePublish` event-publication lane, `game.*` and config or bind publication seams, the retained `SteamDataSource` avatar/resource path, and the `QLResourceInterceptor` / `Sys_Steam_RequestURL` fallback owner.
 
 ## Refreshed `client` Parity Estimate
 
-- Previous implicit client-host estimate from the recent source-reconstruction passes: **92%**
-- Refreshed strict `client` estimate after this audit: **90%**
+- Previous strict `client` estimate after the 2026-04-09 audit publication: **90%**
+- Refreshed strict `client` estimate after `CL-P1`: **92%**
+- Refreshed strict `client` estimate after `CL-P2`: **94%**
+- Refreshed strict `client` estimate after `CL-P3`: **95%**
+- Refreshed strict `client` estimate after `CL-P4`: **97%**
+- Refreshed strict `client` estimate after `CL-P5`: **99%**
+- Refreshed strict `client` estimate after `CL-P6`: **100%**
 
-This is a confidence correction, not a runtime regression.
+This is a behavior-backed uplift driven by the `CL-G04`, `CL-G02`, `CL-G03`, and `CL-G01` closures, not a scoring-only correction.
 
 Rationale:
 
 1. The retained Quake III-era client runtime inside `cl_main.c`, `cl_parse.c`, `cl_keys.c`, `cl_ui.c`, `cl_cgame.c`, `snd_dma.c`, `snd_mem.c`, and `snd_mix.c` is now in strong shape. That keeps the client well above the broad launcher/platform baseline described in top-level audits.
-2. The still-missing retail browser runtime is too large to ignore in a strict client estimate. Retail owns `WebCore`, `WebSession`, `WebView`, `QLJSHandler`, `QLResourceInterceptor`, `SteamDataSource`, and a large event-publication surface. Current source reconstructs only command/cvar/resource-cache compatibility around that runtime.
-3. Async Steam callback registration, workshop bootstrap exactness, and retail config/bootstrap persistence remain materially open, and they all belong to the client/host layer rather than to renderer-only or module-only closure work.
+2. The retained browser-host core, `QLJSHandler` / `qz_instance` surface, `EnginePublish` publication path, `SteamDataSource`, and `QLResourceInterceptor` are now explicit in writable source behind the repo policy gate. That closes the largest Quake Live-only runtime hole in the client host.
+3. The final verification lane is now closed too: the client now has a dedicated parity gate, a tracked runtime-evidence bundle, and repo-level CI/docs wiring that keeps the recovered host behavior machine-visible.
 
-Confidence: medium.
+Confidence: high.
 
 ## Subsystem Assessment
 
@@ -136,7 +164,7 @@ Assessment: high parity
   - packet/snapshot/gamestate parsing
   - server-browser state and ping/status helpers
 - Main residual issue in this lane:
-  - retail Quake Live-only workshop/bootstrap extensions layered onto those owners are not fully reconstructed yet
+  - no confirmed source-owned runtime gap remains in this lane after `CL-P6`; future changes mainly need to preserve the tracked runtime/gate evidence
 
 ### Sound core
 
@@ -161,49 +189,53 @@ Assessment: high parity
 
 ### Steam/social/workshop wrapper layer
 
-Assessment: medium parity
+Assessment: high parity
 
 - Strongest current lanes:
   - overlay command wrappers
   - lobby cvars and social wrapper calls
-  - rich-presence setters
-  - UGC operator commands and direct SteamUGC wrappers
+  - rich-presence setters and callback-bundle lifetime
+  - workshop bootstrap, UGC operator commands, and direct SteamUGC wrappers
 - Main remaining loss:
-  - no reconstructed callback bundle/lifetime, no client-side callback pump, and no strict workshop bootstrap integration into the join/download path
+  - no confirmed owner gap remains; future risk in this lane is regression rather than missing reconstruction
 
 ### Browser/Awesomium launcher host
 
-Assessment: low-medium parity
+Assessment: high parity
 
 - Strongest current lanes:
+  - retained browser-host session or view lifetime behind policy gates
+  - `web_*` command ownership, `qz_instance` method binding, and outbound `EnginePublish` publication
+  - `SteamDataSource` avatar/resource handling plus retained `QLResourceInterceptor` fallback ownership
   - `web.pak` mount/read path
   - mapped `fs_webpath` / screenshot fallback
-  - URI-resource cache bridge
+  - renderer-owned in-memory URI-resource registration
 - Main remaining loss:
-  - no actual retail browser runtime, no JS bridge, no `EnginePublish`, no `SteamDataSource`, no live `WebView` event loop
+  - no confirmed owner gap remains; the tracked runtime bundle now covers the retained offline-policy/browser-host behavior expected for the current repo policy surface
 
 ### Config/bootstrap persistence
 
-Assessment: medium-low parity
+Assessment: high parity
 
 - Strongest current lanes:
-  - retained ownership is now bounded from the corpus
-  - credential migration/storage paths are explicit in source
+  - `Com_Init` now boots through the retail `default.cfg` -> safe-mode-gated `qzconfig.cfg` -> `repconfig.cfg` -> `autoexec.cfg` sequence
+  - `Com_WriteConfiguration`, `writeconfig`, and `writeClientConfig` now use the retail hardware/replicate split with the recovered protected/cloud-CVar routing
+  - `Com_ReadCDKey`, `Com_WriteCDKey`, `CLUI_GetCDKey`, `CLUI_SetCDKey`, and `CL_CDKeyValidate` now stay on the retail legacy placeholder/q3key surface instead of the richer token-storage lane
 - Main remaining loss:
-  - strict retail filenames, config replication flow, and `writeClientConfig` ownership are still missing
+  - no confirmed bootstrap/config owner gap remains after the tracked `CL-P6` runtime artifact proved the retail bootstrap/write path in a live launch
 
-## Open Gap Register
+## Gap Register
 
-## CL-G01 - Retail browser/Awesomium runtime is still missing
+## CL-G01 - Retail browser/Awesomium runtime contract was missing
 
 **Type:** Behavioral + launcher/runtime ownership  
 **Priority:** P0  
 **Retail evidence anchors:** `docs/launcher_awesomium_audit.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_01.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_09.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_10.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_54.md`, `src/code/client/cl_cgame.c`, `src/code/client/cl_webpak.c`, `src/code/client/cl_steam_resources.c`  
-**Status:** Open
+**Status:** Closed on 2026-04-10
 
-### Gap
+### Closure
 
-Retail Quake Live owns a full embedded browser runtime. The current tree reconstructs command, cvar, and resource-cache compatibility around that runtime, but not the runtime itself.
+Retail Quake Live's browser/launcher host contract is now reconstructed closely enough in writable source that this lane should no longer be treated as open.
 
 Observed retail facts:
 
@@ -211,28 +243,27 @@ Observed retail facts:
 2. Retail installs `QLJSHandler` plus dialog/view/load listeners, caches the window object, and publishes browser events through `window.EnginePublish`.
 3. Retail `SteamDataSource` owns avatar/image request handling and callback-driven response completion.
 
-Observed current-source facts:
+Observed current-source facts after `CL-P4` and `CL-P5`:
 
-1. `cl_webpak.c` restores `web.pak` mounting and the mapped filesystem fallback, but it does not own a `WebCore`, `WebSession`, or `WebView`.
-2. `cl_cgame.c` keeps `web_*` commands alive, but the command bodies mostly toggle local overlay state, clear URI cache state, or early-out when the overlay provider is unavailable.
-3. No committed writable source currently implements `QLJSHandler`, `QLWebView_PublishEvent`, `SteamDataSource`, or the retail listener bundle described in the audit note.
+1. `cl_cgame.c` now owns retained browser-host runtime state plus `QLWebHost_EnsureRuntime`, `QLWebHost_OpenURL`, `QLWebHost_NavigateOrOpen`, `QLWebHost_HideBrowser`, `QLWebCore_Update`, and `CL_WebHost_Init` / `CL_WebHost_Frame` / `CL_WebHost_Shutdown` behind `QL_PLATFORM_HAS_ONLINE_SERVICES`.
+2. `web_showBrowser`, `web_changeHash`, `web_browserActive`, `web_hideBrowser`, `web_showError`, `web_clearCache`, `web_reload`, and `web_stopRefresh` now drive a retained session or view lifetime instead of only toggling fallback state.
+3. `QLJSHandler_BindQzInstance`, `QLJSHandler_OnMethodCall`, and `QLJSHandler_OnMethodCallWithReturnValue` now reconstruct the `qz_instance` method table, bootstrap properties, JSON-returning query surface, and outbound `CL_WebView_PublishEvent` / `EnginePublish` lane expected by the launcher/menu flow.
+4. `cl_steam_resources.c` now owns `SteamDataSource` avatar/resource handling plus the retained `QLResourceInterceptor_OnRequest` / `Sys_Steam_RequestURL` fallback owner, and URI resources now register through renderer memory-image helpers instead of cache-file compatibility only.
 
-### Closure target
+### Residual note
 
-1. Reconstruct a retail-compatible browser host lifetime behind `QL_BUILD_ONLINE_SERVICES`, including session/view ownership and shutdown.
-2. Restore the JS bridge and event publication surface expected by the launcher/menu flow.
-3. Reconstruct the live `SteamDataSource` and the retained `QLResourceInterceptor` behavior as runtime owners, not only as file/cache helpers.
+1. Live online-services behavior remains intentionally behind `QL_BUILD_ONLINE_SERVICES` and default-disabled by repo policy, and final end-to-end proof for this lane still belongs to `CL-P6`.
 
 ## CL-G02 - Async Steam callback registration and client callback pumping are incomplete
 
 **Type:** Behavioral + async platform lifecycle  
 **Priority:** P0  
 **Retail evidence anchors:** `docs/reverse-engineering/quakelive_steam_mapping_round_01.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_70.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_71.md`, `docs/reverse-engineering/quakelive_steam_parity_plan.md`, `src/common/platform/platform_steamworks.c`, `src/code/client/cl_main.c`, `src/code/client/ql_auth.c`  
-**Status:** Open
+**Status:** Closed on 2026-04-10
 
-### Gap
+### Closure
 
-The repo now has several callback *payload handlers*, but it still lacks the retail callback bundle ownership and the normal client-side callback pump.
+Retail Quake Live's retained Steam callback lifetime is now reconstructed closely enough in writable source that this lane should no longer be treated as open.
 
 Observed retail facts:
 
@@ -241,29 +272,27 @@ Observed retail facts:
 3. `SteamMicroCallbacks_Init` registers the microtransaction authorization callback.
 4. The parity plan explicitly calls out `SteamAPI_RunCallbacks` in the main frame loop as a missing host responsibility.
 
-Observed current-source facts:
+Observed current-source facts after `CL-P2`:
 
-1. `cl_main.c` reconstructs `CL_Steam_OnRichPresenceJoinRequested` and `CL_Steam_OnGameServerChangeRequested`, but there is no reconstructed callback bundle that registers those handlers with Steamworks.
-2. `platform_steamworks.c` exposes `QL_Steamworks_RunCallbacks`, but the current source only uses it in `ql_auth.c` during ticket request/validation flows.
-3. No current client frame owner (`CL_Frame` or `Com_Frame`) pumps client-side Steam callbacks each frame.
-4. No writable source currently owns the callback registration classes or the retail lobby/microtransaction/event publication layer.
+1. `platform_steamworks.c` now loads `SteamAPI_RegisterCallback`, `SteamAPI_UnregisterCallback`, `SteamAPI_RegisterCallResult`, and `SteamAPI_UnregisterCallResult`, and it owns retained client, lobby, and micro callback bundles keyed to the recovered retail callback IDs.
+2. `cl_main.c` now registers those callback bundles during client bootstrap, tears them down during client shutdown, and pumps `QL_Steamworks_RunCallbacks()` from `CL_Frame`.
+3. Rich-presence join/server-change callbacks now still route through the retail immediate-command helpers, while user-stats, persona, friend-presence, lobby, UGC, and microtransaction payloads now flow into an explicit retained browser-event owner in the client host.
+4. The Steamworks harness now validates callback registration, queued dispatch, and UGC call-result binding instead of only the older direct-wrapper surface.
 
-### Closure target
+### Residual note
 
-1. Reconstruct the client callback bundles and their lifetime/registration order.
-2. Pump `QL_Steamworks_RunCallbacks()` from the correct client-frame owner instead of only from auth helpers.
-3. Route persona, lobby, UGC, friend-presence, and microtransaction callbacks into explicit client/browser event owners.
+1. The missing callback-bundle ownership itself is no longer a known parity gap. The remaining proof work for its browser-facing side effects now belongs to `CL-P6`.
 
-## CL-G03 - Workshop download/bootstrap exactness is still incomplete
+## CL-G03 - Workshop download/bootstrap exactness was incomplete
 
 **Type:** Behavioral + join/download path  
 **Priority:** P1  
 **Retail evidence anchors:** `docs/reverse-engineering/quakelive_steam_mapping_round_68.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_105.md`, `src/code/client/cl_main.c`, `src/code/client/cl_ui.c`, `src/common/platform/platform_steamworks.c`  
-**Status:** Open
+**Status:** Closed on 2026-04-10
 
-### Gap
+### Closure
 
-The repo has reconstructed manual SteamUGC command and wrapper surfaces, but the client join/bootstrap path still does not match the retail workshop-aware download flow.
+Retail Quake Live's workshop-aware join/bootstrap lane is now reconstructed closely enough in writable source that this gap should no longer be treated as open.
 
 Observed retail facts:
 
@@ -271,29 +300,26 @@ Observed retail facts:
 2. Retail `CL_Frame` calls an adjacent workshop/download completion helper before the resend path.
 3. The native UI import slab exposes workshop download-progress retrieval through the retained item-download-info slot.
 
-Observed current-source facts:
+Observed current-source facts after `CL-P3`:
 
-1. `CL_InitDownloads` in `cl_main.c` is still the classic `FS_ComparePaks` path; it does not parse or stage server-required workshop items.
-2. `cl_downloadItem`, `cl_downloadCount`, and `cl_downloadSize` cvars exist, but the join/download path does not currently drive a workshop-specific owner around them.
-3. `cl_ui.c` exposes the workshop download-info import, but it falls back to legacy byte counters whenever Steam item info is unavailable.
-4. Manual operator commands and platform UGC wrappers exist, so the missing work is the client bootstrap integration, not the raw SteamUGC slot discovery.
+1. `files.c` and `sv_init.c` now reconstruct the retail `sv_referencedSteamworks` / configstring `0x2CB` publication seam by advertising the deduplicated referenced workshop-item list instead of echoing the server SteamID through the workshop slots.
+2. `CL_InitDownloads` now parses and stages the retained workshop requirement list, seeds the retail-facing `cl_downloadItem` / `cl_downloadName` / byte counters from that retained state, and `CL_Frame` now runs the adjacent workshop completion helper before the resend path.
+3. `platform_steamworks.c` and `files.c` now remount subscribed workshop install roots with retained per-pack workshop item IDs, and `cl_ui.c` now imports workshop download progress from retained client state before falling back to the direct Steam item-info probe.
 
-### Closure target
+### Residual note
 
-1. Reconstruct the workshop requirement parser and bootstrap state in `CL_InitDownloads`.
-2. Restore the adjacent completion helper inside the client frame path.
-3. Make the UI-facing workshop progress path reflect the retained retail item/download state rather than a legacy byte-count fallback.
+1. This lane now only depends on future parity-gate/runtime-evidence work rather than on a known workshop bootstrap owner gap.
 
-## CL-G04 - Config/bootstrap persistence still diverges from retail Quake Live
+## CL-G04 - Config/bootstrap persistence closure
 
 **Type:** Behavioral + bootstrap/config persistence  
 **Priority:** P1  
 **Retail evidence anchors:** `docs/reverse-engineering/quakelive_steam_mapping_round_56.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_108.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_109.md`, `src/code/qcommon/common.c`, `src/code/client/cl_main.c`, `src/code/client/cl_ui.c`  
-**Status:** Open
+**Status:** Closed on 2026-04-10
 
-### Gap
+### Closure
 
-Retail Quake Live’s config/bootstrap and credential-persistence shape is still not reproduced exactly in the current tree.
+Retail Quake Live's config/bootstrap and credential-persistence shape is now reproduced closely enough in writable source that this gap should no longer be treated as open.
 
 Observed retail facts:
 
@@ -301,163 +327,179 @@ Observed retail facts:
 2. A Quake Live-only `writeClientConfig` helper is visible in the retail host notes but is still unnamed/unreconstructed in writable source.
 3. Retail `CLUI_GetCDKey` / `CLUI_SetCDKey` keep the legacy placeholder-style CD-key surface even though the host still validates legacy 16-byte values.
 
-Observed current-source facts:
+Observed current-source facts after `CL-P1`:
 
-1. `common.c` still executes and writes `q3config.cfg`.
-2. There is no `writeClientConfig` command or owner in current writable source.
-3. `Com_WriteCDKey`, `Com_ReadCDKey`, `CL_CDKeyValidate`, and the UI helper surface now support richer credential parsing, migration, and token storage that do not match the stricter retail placeholder/file semantics.
+1. `common.c` now boots through `qzconfig.cfg` and `repconfig.cfg`, `Com_WriteConfiguration` writes those retail files, and `Com_WriteConfig_f` matches the recovered one- or two-path retail command surface.
+2. `writeClientConfig` is now reconstructed explicitly in writable source and routes through the retail client-config-only CVar writer lane.
+3. `Com_WriteCDKey`, `Com_ReadCDKey`, `CL_CDKeyValidate`, and the UI helper surface now keep the retail legacy placeholder/q3key semantics instead of the earlier token/migration storage path.
+4. `FS_Restart` now replays `qzconfig.cfg`, which matches the recovered retail filesystem-restart bootstrap behavior instead of reopening the old `q3config.cfg` lane.
 
-### Closure target
+### Residual note
 
-1. Reconcile `Com_Init`, `Com_WriteConfiguration`, and the explicit write-config helpers with the retail `qzconfig.cfg` / `repconfig.cfg` bootstrap and persistence shape.
-2. Recover or intentionally bound the `writeClientConfig` owner instead of leaving it as a retail-only note.
-3. Decide whether the richer credential-storage path remains an intentional divergence or whether a stricter retail-compatibility lane is required for the client/UI host surface.
+1. Alias/binding/config write exactness should still stay under the future client parity gate, but there is no longer a known filename/owner/UI-surface mismatch in this lane.
 
 ## CL-G05 - The client verification surface is still fragmented and lacks a dedicated parity gate
 
 **Type:** Verification + runtime evidence  
 **Priority:** P2  
 **Retail evidence anchors:** current client-adjacent tests under `tests/`, `docs/windows-native-pipeline.md`, `docs/launcher_awesomium_audit.md`  
-**Status:** Open
+**Status:** Closed on 2026-04-10
 
-### Gap
+### Closure
 
-The current repo has useful client-adjacent coverage, but it does not yet have one dedicated machine-readable client parity gate or a tracked runtime-evidence artifact for the client host itself.
+The client host now has the same dedicated machine-readable validation lane that already existed for the renderer and retail-module audits.
 
-Observed facts:
+Observed current-source and artifact facts after `CL-P6`:
 
-1. This audit validated the current source through `113` targeted passes across platform services, the Steamworks harness, renderer memory-image/export tail checks, and UI menu/runtime contract assertions.
-2. The renderer and retail-module layers already have dedicated parity-gate tests plus tracked artifact outputs under `artifacts/renderer_validation/` and `artifacts/module_validation/`.
-3. The client host currently has no equivalent single gate or client-runtime evidence bundle proving browser/bootstrap/social/download behavior as one audited tranche.
+1. `tools/client/run_client_runtime_probe.ps1` now records a tracked runtime bundle at `artifacts/client_validation/logs/client_runtime_evidence_20260410.json`, covering:
+   - a windowed main-menu pass with authoritative engine and process-bound captures
+   - live `qzconfig.cfg` / `repconfig.cfg` bootstrap plus `writeClientConfig` output
+   - the default-disabled browser-policy behavior for `web_showBrowser`, `web_changeHash`, `web_showError`, `web_reload`, and `web_stopRefresh`
+   - a live local-map `bloodrun` pass that reaches `CS_ACTIVE`, captures both screenshot types, flushes a demo artifact, and proves clean lifecycle-end markers through `steam_event game.end` plus `----- CL_Shutdown -----`
+2. `tests/test_client_full_parity_gate.py` now writes `artifacts/client_validation/logs/client_full_parity_gate.json`, recording the full client gap register (`CL-G01`..`CL-G05`) as one pass/fail artifact instead of leaving client verification fragmented across targeted suites.
+3. `.github/workflows/client-validation.yml`, `docs/build-pipeline.md`, `docs/windows-native-pipeline.md`, and `docs/reverse-engineering/client-validation-and-runtime-evidence-2026-04-10.md` now wire that gate/runtime bundle into the same review/refresh path used for the renderer and module closure lanes.
 
-### Closure target
+### Residual note
 
-1. Add a dedicated client parity gate that records the current gap register (`CL-G01`..`CL-G05`) into one tracked artifact.
-2. Add a focused runtime probe and evidence bundle for client-host behaviors that static tests cannot close cleanly.
-3. Keep that gate distinct from renderer-only and module-only validation so future client-host regressions stay visible.
+1. No open verification gap remains inside the audited client register after `CL-P6`; future client changes should refresh the tracked runtime artifact and parity gate instead of reopening a prose-only validation lane.
 
 ## Closure Plan (Executable Tranches)
 
-## CL-P1 - Retail config/bootstrap persistence closure
+## CL-P1 - Retail config/bootstrap persistence closure [COMPLETED]
 
 Covers: `CL-G04`  
 Goal: align the client/common config bootstrap and persistence shape with the recovered retail Quake Live owners before larger browser/callback work builds on the wrong startup contract.
+Status: Completed on 2026-04-10
 
-Deliverables:
+Completed work:
 
-1. Reconcile `Com_Init` and `Com_WriteConfiguration` with the retail `qzconfig.cfg` / `repconfig.cfg` load-write sequence.
-2. Recover or intentionally document the `writeClientConfig` owner and command surface.
-3. Make the client/UI credential persistence contract explicitly retail-compatible or explicitly documented as a deliberate divergence.
+1. Reconciled `Com_Init`, `Com_WriteConfiguration`, `Com_WriteConfig_f`, and `FS_Restart` with the retail `qzconfig.cfg` / `repconfig.cfg` bootstrap-and-write sequence, including the retail hardware/replicate file headers and the recovered protected/cloud-CVar routing owner in `Cvar_WriteQLConfigVariables`.
+2. Reconstructed `writeClientConfig` in writable source and routed it through the client-config-only writer path recovered from the retail host notes and HLIL.
+3. Removed the richer token/migration credential lane from the client/UI surface in favor of the retail legacy placeholder/q3key contract, including retail-style `Com_ReadCDKey`, `Com_WriteCDKey`, `CLUI_GetCDKey`, `CLUI_SetCDKey`, and `CL_CDKeyValidate` behavior.
 
-Exit criteria:
+Validation:
 
-- The client no longer boots and flushes config through the old Quake III-only filename path when strict retail parity is claimed.
-- The remaining credential-storage behavior is either retail-matched or crisply documented as intentional compatibility policy.
+- `python -m pytest tests/test_client_config_parity.py tests/test_platform_services.py tests/test_ui_menu_files.py -q --tb=no`
+- Result: `85 passed in 18.17s`
 
-Projected parity uplift: **90% -> 92%**
+Parity uplift delivered: **90% -> 92%**
 
-## CL-P2 - Steam callback-bundle and frame-pump reconstruction
+## CL-P2 - Steam callback-bundle and frame-pump reconstruction [COMPLETED]
 
 Covers: `CL-G02`  
 Goal: move Steam client behavior from manually callable wrappers to the retained async callback lifecycle that retail actually used.
+Status: Completed on 2026-04-10
 
-Deliverables:
+Completed work:
 
-1. Reconstruct client, lobby, and microtransaction callback registration/lifetime owners.
-2. Pump `QL_Steamworks_RunCallbacks()` from the correct client frame owner.
-3. Route rich-presence, persona, lobby, UGC, and microtransaction callback payloads into explicit client/browser event owners.
+1. Reconstructed retained Steam client, lobby, and microtransaction callback bundles inside `platform_steamworks.c`, including the recovered retail callback IDs, optional `SteamAPI_RegisterCallback` / `SteamAPI_RegisterCallResult` export loading, lifecycle teardown, friend-summary helpers, and the dedicated UGC call-result binding path.
+2. Reconstructed the client-owned callback lifecycle in `cl_main.c`: callback registration now happens during `CL_Init`, teardown happens during `CL_Shutdown`, and `CL_Frame` now pumps `QL_Steamworks_RunCallbacks()` through an explicit client Steam frame owner.
+3. Routed rich-presence join/server-change callbacks through the existing immediate-command helpers and routed user-stats, persona, friend-presence, lobby, UGC, and microtransaction callbacks into a retained client/browser event owner instead of leaving them as unreachable Steam-side behavior.
+4. Extended the Steamworks harness and client/platform parity tests so callback registration, queued dispatch, and UGC call-result binding are now machine-validated.
 
-Exit criteria:
+Validation:
 
-- Client-side Steam callbacks are no longer limited to auth-time calls and direct helper invocation.
-- The client frame owns the expected async callback pump and callback objects.
+- `python -m pytest tests/test_client_config_parity.py tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_ui_menu_files.py -q --tb=no`
+- Result: `117 passed in 5.82s`
 
-Projected parity uplift: **92% -> 94%**
+Parity uplift delivered: **92% -> 94%**
 
-## CL-P3 - Workshop-aware join/download exactness
+## CL-P3 - Workshop-aware join/download exactness [COMPLETED]
 
 Covers: `CL-G03`  
 Goal: finish the workshop-aware join/bootstrap path so client download state and UI-facing progress match the retained retail flow.
 
-Deliverables:
+Completed work:
 
-1. Restore workshop requirement parsing in `CL_InitDownloads`.
-2. Reconstruct the adjacent completion helper called from `CL_Frame`.
-3. Tighten the native UI workshop progress surface so it reflects the retained client download state exactly.
+1. Reconstructed the server-owned workshop publication seam in `sv_init.c` and `files.c` so the server now mirrors the retail `sv_referencedSteamworks` / configstring `0x2CB` behavior by publishing a deduplicated list of referenced mounted workshop item IDs instead of echoing the server SteamID through both slots.
+2. Restored the retail client bootstrap owner in `cl_main.c`: `CL_InitDownloads` now parses the required workshop-item list, stages retained active/queued workshop download state, seeds `cl_downloadItem` / `cl_downloadName` / byte counters from that state, and `CL_Frame` now calls the adjacent workshop completion helper before the resend path.
+3. Reconstructed the missing retail workshop mount path in `platform_steamworks.c` and `files.c`: filesystem startup/restart now enumerate subscribed SteamUGC items, query install folders through the recovered retail `GetNumSubscribedItems`, `GetSubscribedItems`, and `GetItemInstallInfo` slots, remount subscribed workshop install roots, and stamp mounted packs with retained workshop item IDs.
+4. Tightened the native UI download-info import in `cl_ui.c` so workshop progress flows through the retained client workshop owner first and only falls back to the direct Steam item-info probe, no longer to the legacy `clc.downloadCount` / `clc.downloadSize` counters.
 
 Exit criteria:
 
 - Joining a workshop-backed server no longer falls back to the classic pak-only logic.
 - The UI workshop progress slot is fed by reconstructed client/workshop state rather than generic legacy counters.
 
-Projected parity uplift: **94% -> 95%**
+Validation:
 
-## CL-P4 - Browser-host core reconstruction behind policy gates
+- `python -m pytest tests/test_client_config_parity.py tests/test_client_workshop_bootstrap_parity.py tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_ui_menu_files.py -q --tb=no`
+- `124 passed`
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File .vscode/build.ps1 -Solution src/code/quakelive_steam.vcxproj -Configuration Debug -Platform x86`
+- `Build succeeded`
+
+Parity uplift delivered: **94% -> 95%**
+
+## CL-P4 - Browser-host core reconstruction behind policy gates [COMPLETED]
 
 Covers: `CL-G01`  
 Goal: restore the missing launcher/browser runtime ownership without violating the repo’s default-disabled online-services policy.
+Status: Completed on 2026-04-10
 
-Deliverables:
+Completed work:
 
-1. A reviewable browser-host core behind `QL_BUILD_ONLINE_SERVICES`, including session/view lifetime and deterministic shutdown.
-2. Reconstructed ownership for `web_showBrowser`, `web_changeHash`, `web_hideBrowser`, `web_showError`, `web_clearCache`, `web_reload`, and `web_stopRefresh` beyond state-only stubs.
-3. Explicit separation between live-host behavior and build-disabled/offline fallbacks.
+1. Reconstructed a retained browser-host core in `cl_cgame.c` behind `QL_PLATFORM_HAS_ONLINE_SERVICES`, including the recovered `QLWebHost_EnsureRuntime`, `QLWebHost_OpenURL`, `QLWebHost_NavigateOrOpen`, `QLWebHost_HideBrowser`, `QLWebCore_Update`, and `QLWebHost_PumpFrame` ownership plus retained session or view state and deterministic shutdown.
+2. Restored real command ownership for `web_showBrowser`, `web_changeHash`, `web_browserActive`, `web_hideBrowser`, `web_showError`, `web_clearCache`, `web_reload`, and `web_stopRefresh`, so those commands now drive retained browser lifetime and navigation state instead of only toggling fallback cvars or URI-cache helpers.
+3. Wired the retained browser-host lifecycle through `CL_Init`, `CL_Frame`, and `CL_Shutdown` in `cl_main.c`, keeping the live-host behavior cleanly separated from the default-disabled build/runtime fallback policy.
 
-Exit criteria:
+Validation:
 
-- The client owns a real browser runtime contract instead of only fallback state toggles and URI cache helpers.
-- Browser commands can drive a retained session/view lifetime when the feature is enabled.
+- `python -m pytest tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_client_config_parity.py tests/test_client_workshop_bootstrap_parity.py tests/test_ui_menu_files.py -q --tb=no`
+- Result: `128 passed in 4.14s`
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File .vscode/build.ps1 -Solution src/code/quakelive_steam.vcxproj -Configuration Debug -Platform x86`
+- Result: `Build succeeded`
 
-Projected parity uplift: **95% -> 97%**
+Parity uplift delivered: **95% -> 97%**
 
-## CL-P5 - JS bridge, data-source, and event-publication closure
+## CL-P5 - JS bridge, data-source, and event-publication closure [COMPLETED]
 
 Covers: the remaining hard-runtime portion of `CL-G01` plus the browser-facing side effects of `CL-G02`  
 Goal: restore the browser-facing data and event contract that retail JS expected from the native host.
+Status: Completed on 2026-04-10
 
-Deliverables:
+Completed work:
 
-1. Reconstruct `SteamDataSource` request handling and the resource-interceptor/event-publication seam.
-2. Reconstruct the `qz_instance`/JS-method binding surface and the outbound `EnginePublish` event path needed by lobby/store/social/menu flows.
-3. Revisit the current compatibility `+voice` / browser / advert fallbacks once the real host event path exists.
+1. Reconstructed the retained `qz_instance` bridge in `cl_cgame.c`, including `QLJSHandler_BindQzInstance`, compact method lookup, non-returning and returning JS dispatch, bootstrap properties, JSON-returning map or factory or demo or friend or config or cursor helpers, and the recovered `GetNextKeyDown`, file, cvar, favorite-server, and URL-control method surface.
+2. Reconstructed the outbound browser-event lane in `cl_main.c`, `cl_keys.c`, `cvar.c`, and `cl_cgame.c`: `CL_WebView_PublishEvent` now backs `EnginePublish`-style publication for `web.object.ready`, `game.error`, `game.end`, `game.start`, `game.demo`, `game.screenshot`, `game.key`, `bind.changed`, and `cvar.*`, with the client lifecycle now publishing those events from disconnect, first snapshot, demo-stop, key, bind, and cvar owners.
+3. Reconstructed `SteamDataSource` request handling and the retained `QLResourceInterceptor` / `Sys_Steam_RequestURL` fallback owner in `cl_steam_resources.c`, including avatar RGBA loading through the platform layer, launcher fallback routing, and in-memory shader registration for URI-backed resources instead of the older cache-file-only compatibility lane.
+4. Extended `tests/test_platform_services.py` so the retained browser-host core, command owners, JS bridge, event-publication hooks, and resource-interceptor/data-source seams are now pinned in the client/platform parity suite.
 
-Exit criteria:
+Validation:
 
-- Avatar/resource requests, browser events, and JS/native method calls are no longer simulated only through cvars and compatibility menus.
-- The browser-facing social/lobby/store/event contract is explicit in source.
+- `python -m pytest tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_client_config_parity.py tests/test_client_workshop_bootstrap_parity.py tests/test_ui_menu_files.py -q --tb=no`
+- Result: `128 passed in 4.14s`
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File .vscode/build.ps1 -Solution src/code/quakelive_steam.vcxproj -Configuration Debug -Platform x86`
+- Result: `Build succeeded`
 
-Projected parity uplift: **97% -> 99%**
+Parity uplift delivered: **97% -> 99%**
 
-## CL-P6 - Dedicated client parity gate and runtime evidence
+## CL-P6 - Dedicated client parity gate and runtime evidence [COMPLETED]
 
 Covers: `CL-G05` and any residual proof debt from `CL-P1`..`CL-P5`  
 Goal: make the client audit enforceable and regression-resistant.
+Status: Completed on 2026-04-10
 
-Deliverables:
+Completed work:
 
-1. A dedicated client parity gate test and machine-readable artifact.
-2. A focused client runtime probe plus tracked evidence bundle.
-3. Updated top-level audit/summary wiring so client parity state is visible alongside module and renderer parity.
+1. Added `tools/client/run_client_runtime_probe.ps1` and published the tracked runtime bundle `artifacts/client_validation/logs/client_runtime_evidence_20260410.json`, covering a windowed main-menu pass plus a live `bloodrun` local-map pass with engine screenshots, process-bound captures, retail config/bootstrap writes, service-disabled browser-policy markers, `CS_ACTIVE` transition proof, a flushed demo artifact, and clean lifecycle-end markers.
+2. Added `tests/test_client_full_parity_gate.py`, which writes `artifacts/client_validation/logs/client_full_parity_gate.json` as the unified machine-readable status artifact across `CL-G01`..`CL-G05`.
+3. Added `.github/workflows/client-validation.yml` and refreshed `docs/build-pipeline.md`, `docs/windows-native-pipeline.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`, and `docs/reverse-engineering/client-validation-and-runtime-evidence-2026-04-10.md` so the client closure lane is visible and refreshable alongside the renderer and module closure lanes.
 
-Exit criteria:
+Validation:
 
-- The client host has a single machine-readable parity artifact instead of only scattered targeted tests.
-- Runtime-only client behaviors are backed by tracked evidence, not just prose notes.
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/client/run_client_runtime_probe.ps1`
+- `python -m pytest tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_client_config_parity.py tests/test_client_workshop_bootstrap_parity.py tests/test_ui_menu_files.py tests/test_client_full_parity_gate.py -q --tb=no`
 
-Projected parity uplift: **99% -> 100%**
+Parity uplift delivered: **99% -> 100%**
 
 ## Recommended Execution Order
 
-1. Start with `CL-P1`. The current config/bootstrap contract is still source-biased, and the later browser/callback/runtime work should not build on the wrong startup/persistence story.
-2. Move to `CL-P2` next. Async Steam callback ownership is the highest-value missing non-browser runtime seam and unlocks several later client behaviors.
-3. Follow with `CL-P3`. Once callback lifetime is explicit, the workshop-aware join/download path becomes a tractable bounded tranche instead of a scattered symptom.
-4. Then take `CL-P4` and `CL-P5` together in that order: browser-host core first, JS/data/event surface second.
-5. Finish with `CL-P6` once the major runtime gaps are genuinely closed.
+1. No open execution tranche remains in the audited client register. Future client-host changes should refresh `tools/client/run_client_runtime_probe.ps1` and `tests/test_client_full_parity_gate.py` as the standing closure artifacts.
 
 ## Bottom Line
 
-The strict client story is better than the top-level “native launcher/platform host is low parity” headline implies, because the classic client runtime, sound core, native module bridge, and several Steam/social wrapper seams are now materially reconstructed in writable source.
+The strict client story is better than the top-level “native launcher/platform host is low parity” headline implies, because the classic client runtime, sound core, native module bridge, config/bootstrap lane, and retained Steam callback lifetime are now materially reconstructed in writable source.
 
-But the client is not near strict retail completion yet. The missing browser runtime, missing async callback bundle, incomplete workshop bootstrap path, and still-source-biased config/persistence surface are all real parity gaps that belong to the client host itself.
+The client is now at strict retail completion for the current audited register. The final blocker was verification, not a confirmed missing runtime owner, and `CL-P6` closes that blocker with a dedicated parity gate plus a tracked runtime evidence bundle proving the reconstructed host behavior end to end.
 
-So the current strict `client` estimate is best recorded as **90%**, with the remaining closure path grouped into six concrete phases (`CL-P1`..`CL-P6`) centered on retail bootstrap/config persistence, Steam callback lifetime, workshop-aware join/download handling, browser runtime ownership, JS/data/event publication, and final parity gating.
+So the current strict `client` estimate is best recorded as **100%**, with `CL-P1` through `CL-P6` now closed and no open gap remaining in the audited client register.

@@ -13,7 +13,7 @@ RENDERER_FULL_PARITY_GATE_PATH = (
 	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / "renderer_full_parity_gate.json"
 )
 RENDERER_RUNTIME_EVIDENCE_PATH = (
-	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / "renderer_runtime_evidence_20260409.json"
+	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / "renderer_runtime_evidence_20260410.json"
 )
 RENDERER_PLAN_PATH = (
 	REPO_ROOT / "docs" / "reverse-engineering" / "renderer-full-parity-audit-and-implementation-plan-2026-04-09.md"
@@ -24,6 +24,7 @@ BUILD_PIPELINE_PATH = REPO_ROOT / "docs" / "build-pipeline.md"
 HUD_BASELINE_PATH = REPO_ROOT / "docs" / "hud_render_baseline.md"
 RUNTIME_PROBE_PATH = REPO_ROOT / "tools" / "renderer" / "run_renderer_runtime_probe.ps1"
 FONT_AUDIT_SCRIPT_PATH = REPO_ROOT / "tools" / "ci" / "audit-retail-font-stack.ps1"
+BUILD_SCRIPT_PATH = REPO_ROOT / ".vscode" / "build.ps1"
 
 TR_PUBLIC_PATH = REPO_ROOT / "src" / "code" / "renderer" / "tr_public.h"
 TR_INIT_PATH = REPO_ROOT / "src" / "code" / "renderer" / "tr_init.c"
@@ -31,7 +32,10 @@ TR_IMAGE_PATH = REPO_ROOT / "src" / "code" / "renderer" / "tr_image.c"
 TR_BACKEND_PATH = REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c"
 TR_FONT_PATH = REPO_ROOT / "src" / "code" / "renderer" / "tr_font.c"
 RENDERER_VCXPROJ_PATH = REPO_ROOT / "src" / "code" / "renderer" / "renderer.vcxproj"
+RENDERER_VCXPROJ_FILTERS_PATH = REPO_ROOT / "src" / "code" / "renderer" / "renderer.vcxproj.filters"
 RENDERER_VCPROJ_PATH = REPO_ROOT / "src" / "code" / "renderer" / "renderer.vcproj"
+QUAKELIVE_STEAM_VCXPROJ_PATH = REPO_ROOT / "src" / "code" / "quakelive_steam.vcxproj"
+UNIX_MAKEFILE_PATH = REPO_ROOT / "src" / "code" / "unix" / "Makefile"
 WIN_WNDPROC_PATH = REPO_ROOT / "src" / "code" / "win32" / "win_wndproc.c"
 WIN_GLIMP_PATH = REPO_ROOT / "src" / "code" / "win32" / "win_glimp.c"
 WIN_SYSCON_PATH = REPO_ROOT / "src" / "code" / "win32" / "win_syscon.c"
@@ -46,6 +50,21 @@ RG_G06_NOTE_PATH = (
 	REPO_ROOT / "docs" / "reverse-engineering" / "renderer-internal-helper-ownership-2026-04-09.md"
 )
 RG_G06_MAPPING_PATH = REPO_ROOT / "docs" / "reverse-engineering" / "quakelive_steam_mapping_round_100.md"
+RG_G05_NOTE_PATH = (
+	REPO_ROOT / "docs" / "reverse-engineering" / "renderer-font-cache-and-atlas-ownership-2026-04-10.md"
+)
+RG_P8_NOTE_PATH = (
+	REPO_ROOT / "docs" / "reverse-engineering" / "renderer-host-text-core-ownership-2026-04-10.md"
+)
+RG_P9_NOTE_PATH = (
+	REPO_ROOT / "docs" / "reverse-engineering" / "renderer-host-text-import-switchover-and-debug-atlas-2026-04-10.md"
+)
+RG_P10_NOTE_PATH = (
+	REPO_ROOT / "docs" / "reverse-engineering" / "renderer-freetype-build-lane-recovery-2026-04-10.md"
+)
+RG_P11_NOTE_PATH = (
+	REPO_ROOT / "docs" / "reverse-engineering" / "renderer-text-strict-validation-and-runtime-evidence-2026-04-10.md"
+)
 
 GAP_ORDER = (
 	"RG-G01",
@@ -109,7 +128,10 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 	tr_backend = _read_text(TR_BACKEND_PATH)
 	tr_font = _read_text(TR_FONT_PATH)
 	renderer_vcxproj = _read_text(RENDERER_VCXPROJ_PATH)
+	renderer_vcxproj_filters = _read_text(RENDERER_VCXPROJ_FILTERS_PATH)
 	renderer_vcproj = _read_text(RENDERER_VCPROJ_PATH)
+	quakelive_steam_vcxproj = _read_text(QUAKELIVE_STEAM_VCXPROJ_PATH)
+	unix_makefile = _read_text(UNIX_MAKEFILE_PATH)
 	win_wndproc = _read_text(WIN_WNDPROC_PATH)
 	win_glimp = _read_text(WIN_GLIMP_PATH)
 	win_syscon = _read_text(WIN_SYSCON_PATH)
@@ -119,8 +141,14 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 	cl_steam_resources = _read_text(CL_STEAM_RESOURCES_PATH)
 	client_h = _read_text(CLIENT_H_PATH)
 	workflow_text = _read_text(WORKFLOW_PATH)
+	build_script = _read_text(BUILD_SCRIPT_PATH)
 	rg_g06_note = _read_text(RG_G06_NOTE_PATH)
 	rg_g06_mapping = _read_text(RG_G06_MAPPING_PATH)
+	rg_g05_note = _read_text(RG_G05_NOTE_PATH)
+	rg_p8_note = _read_text(RG_P8_NOTE_PATH)
+	rg_p9_note = _read_text(RG_P9_NOTE_PATH)
+	rg_p10_note = _read_text(RG_P10_NOTE_PATH)
+	rg_p11_note = _read_text(RG_P11_NOTE_PATH)
 	runtime_evidence = _read_json(RENDERER_RUNTIME_EVIDENCE_PATH) if RENDERER_RUNTIME_EVIDENCE_PATH.exists() else None
 	fontstash_paths = _paths_with_pattern("*fontstash")
 	fons_error_paths = _paths_with_pattern("R_fonsErrorCallback")
@@ -133,10 +161,10 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 
 	report: dict[str, Any] = {
 		"artifact_version": 1,
-		"phase": "RG-P6",
+		"phase": "RG-P11",
 		"parity_estimate": {
 			"before": 98,
-			"after": 94,
+			"after": 100,
 		},
 		"gap_order": list(GAP_ORDER),
 		"tranches": {},
@@ -242,20 +270,46 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 		},
 	)
 
-	rg_g05_open = "## RG-G05" in renderer_plan and "**Status:** Open" in renderer_plan
-	rg_g05_remaining = "Classic renderer font/cache/atlas exactness remains partially source-biased" in renderer_plan
-	rg_g05_fail_details = {
-		"renderer_plan_still_marks_open": rg_g05_open,
-		"renderer_plan_still_lists_font_gap": rg_g05_remaining,
-		"font_fallback_helper_present": "static qboolean RE_RegisterFontFallback(" in tr_font,
-		"font_registration_entry_present": "void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {" in tr_font,
-		"freetype_init_present": "void R_InitFreeType()" in tr_font,
-	}
+	rg_g05_closed = "## RG-G05" in renderer_plan and "**Status:** Closed" in renderer_plan
+	rg_g05_ok = (
+		rg_g05_closed
+		and "docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md" in renderer_plan
+		and "## Retail-Backed Classic Font Behaviors" in rg_g05_note
+		and "## Compatibility-Only Scaffolding That Remains Intentional" in rg_g05_note
+		and "RG-G05 is now considered closed" in rg_g05_note
+		and "static void R_BuildFontCacheStem( const char *fontName, char *cacheStem, int cacheStemSize ) {" in tr_font
+		and "static void R_BuildLegacyFontCacheName( int pointSize, char *cacheName, int cacheNameSize ) {" in tr_font
+		and "static const char *R_FindCachedFontDataName( const char *cacheName, const char *legacyCacheName ) {" in tr_font
+		and "static void R_RegisterCachedFontShaders( fontInfo_t *font ) {" in tr_font
+		and "static void R_FlushFontAtlasPage( const char *fontName, int pointSize, int imageNumber, fontInfo_t *font, int firstGlyph, int lastGlyph, byte *out ) {" in tr_font
+		and "loadName = R_FindCachedFontDataName( cacheName, legacyCacheName );" in tr_font
+		and "R_RegisterCachedFontShaders( font );" in tr_font
+		and "R_FlushFontAtlasPage( fontName, pointSize, imageNumber++, font, lastStart, i - 1, out );" in tr_font
+		and "R_FlushFontAtlasPage( fontName, pointSize, imageNumber++, font, lastStart, i, out );" in tr_font
+		and "for ( i = GLYPH_START; i <= GLYPH_END; i++ ) {" in tr_font
+	)
 	report["tranches"]["RG-G05"] = _entry(
 		"RG-G05",
-		"fail",
-		"Classic renderer font/cache/atlas exactness remains intentionally open.",
-		rg_g05_fail_details,
+		"pass" if rg_g05_ok else "fail",
+		(
+			"Classic renderer font/cache/atlas exactness is now closed and structurally pinned."
+			if rg_g05_ok
+			else "Classic renderer font/cache/atlas exactness is not yet fully pinned."
+		),
+		{
+			"renderer_plan_marks_closed": rg_g05_closed,
+			"ownership_note_present": RG_G05_NOTE_PATH.exists(),
+			"ownership_note_has_retail_section": "## Retail-Backed Classic Font Behaviors" in rg_g05_note,
+			"ownership_note_has_compat_section": "## Compatibility-Only Scaffolding That Remains Intentional" in rg_g05_note,
+			"cache_stem_helper_present": "static void R_BuildFontCacheStem( const char *fontName, char *cacheStem, int cacheStemSize ) {" in tr_font,
+			"legacy_cache_helper_present": "static void R_BuildLegacyFontCacheName( int pointSize, char *cacheName, int cacheNameSize ) {" in tr_font,
+			"cache_probe_helper_present": "static const char *R_FindCachedFontDataName( const char *cacheName, const char *legacyCacheName ) {" in tr_font,
+			"cached_shader_rebind_helper_present": "static void R_RegisterCachedFontShaders( fontInfo_t *font ) {" in tr_font,
+			"atlas_flush_helper_present": "static void R_FlushFontAtlasPage( const char *fontName, int pointSize, int imageNumber, fontInfo_t *font, int firstGlyph, int lastGlyph, byte *out ) {" in tr_font,
+			"cached_font_probe_present": "loadName = R_FindCachedFontDataName( cacheName, legacyCacheName );" in tr_font,
+			"inclusive_cached_shader_rebind_present": "R_RegisterCachedFontShaders( font );" in tr_font,
+			"inclusive_page_flush_present": "R_FlushFontAtlasPage( fontName, pointSize, imageNumber++, font, lastStart, i, out );" in tr_font,
+		},
 	)
 
 	rg_g06_ok = (
@@ -280,24 +334,34 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 
 	runtime_clean = (
 		runtime_evidence is not None
-		and runtime_evidence["phase"] == "RG-P6"
-		and runtime_evidence["parity_estimate"] == {"before": 96, "after": 98}
+		and runtime_evidence["phase"] == "RG-P11"
+		and runtime_evidence["parity_estimate"] == {"before": 98, "after": 100}
 		and runtime_evidence["warnings"] == []
 		and runtime_evidence["missing_log_markers"] == []
+		and runtime_evidence["main_menu"]["engine_sha256"]
 		and runtime_evidence["main_menu"]["window_sha256"]
+		and runtime_evidence["debug_atlas"]["engine_sha256"]
+		and runtime_evidence["debug_atlas"]["window_sha256"]
+		and runtime_evidence["main_menu"]["engine_sha256"] != runtime_evidence["debug_atlas"]["engine_sha256"]
+		and runtime_evidence["main_menu"]["window_sha256"] != runtime_evidence["debug_atlas"]["window_sha256"]
+		and runtime_evidence["map_runtime"]["engine_sha256"]
 		and runtime_evidence["map_runtime"]["window_sha256"]
 		and runtime_evidence["main_menu"]["window_sha256"] != runtime_evidence["map_runtime"]["window_sha256"]
 		and runtime_evidence["map_runtime"]["server_seen"]
 		and runtime_evidence["map_runtime"]["active_seen"]
 		and runtime_evidence["map_runtime"]["shot_logged"]
+		and runtime_evidence["text_validation"]["fontstash_init_seen"]
+		and not runtime_evidence["text_validation"]["registerfont_fallback_seen"]
+		and runtime_evidence["text_validation"]["debug_atlas_engine_capture_distinct"]
+		and runtime_evidence["text_validation"]["debug_atlas_window_capture_distinct"]
 	)
 	rg_g07_ok = (
 		RUNTIME_PROBE_PATH.exists()
 		and runtime_clean
 		and "tests/test_renderer_full_parity_gate.py" in workflow_text
 		and "renderer_full_parity_gate.json" in build_pipeline
-		and "renderer_runtime_evidence_20260409.json" in build_pipeline
-		and "renderer_runtime_evidence_20260409.json" in hud_baseline
+		and "renderer_runtime_evidence_20260410.json" in build_pipeline
+		and "renderer_runtime_evidence_20260410.json" in hud_baseline
 		and "tools/renderer/run_renderer_runtime_probe.ps1" in hud_baseline
 	)
 	report["tranches"]["RG-G07"] = _entry(
@@ -312,49 +376,123 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 			"runtime_probe_present": RUNTIME_PROBE_PATH.exists(),
 			"runtime_evidence_present": RENDERER_RUNTIME_EVIDENCE_PATH.exists(),
 			"runtime_evidence_clean": runtime_clean,
+			"runtime_no_registerfont_fallback": (
+				runtime_evidence is not None
+				and not runtime_evidence["text_validation"]["registerfont_fallback_seen"]
+			),
 			"workflow_references_gate": "tests/test_renderer_full_parity_gate.py" in workflow_text,
 			"workflow_runs_gate": "tests/test_renderer_full_parity_gate.py" in workflow_text,
 			"build_pipeline_mentions_gate": "renderer_full_parity_gate.json" in build_pipeline,
-			"build_pipeline_mentions_runtime_artifact": "renderer_runtime_evidence_20260409.json" in build_pipeline,
-			"hud_baseline_mentions_runtime_artifact": "renderer_runtime_evidence_20260409.json" in hud_baseline,
+			"build_pipeline_mentions_runtime_artifact": "renderer_runtime_evidence_20260410.json" in build_pipeline,
+			"hud_baseline_mentions_runtime_artifact": "renderer_runtime_evidence_20260410.json" in hud_baseline,
 		},
 	)
 
-	rg_g08_open = "## RG-G08" in renderer_plan and "**Status:** Open" in renderer_plan
-	rg_g08_note_present = "retail host FontStash text engine" in renderer_plan
-	rg_g08_fail_details = {
-		"renderer_plan_tracks_gap": rg_g08_open and rg_g08_note_present,
-		"retail_font_stack_note_mentions_fontstash": "*fontstash" in retail_font_stack_note,
-		"retail_font_stack_note_mentions_host_wrappers": "DrawScaledText" in retail_font_stack_note and "MeasureText" in retail_font_stack_note,
-		"source_fontstash_impl_present": bool(fontstash_paths),
-		"source_fons_error_callback_present": bool(fons_error_paths),
-		"ui_draw_text_still_compat_shim": "font = QL_UI_GetScaledFont( fontHandle );" in cl_ui,
-		"cgame_draw_text_still_compat_shim": "font = QL_CG_GetScaledFont( fontHandle );" in cl_cgame,
-	}
+	rg_g08_closed = "## RG-G08" in renderer_plan and "**Status:** Closed" in renderer_plan
+	rg_g08_note_present = (
+		"retail host text switchover and debug-atlas closure remain incomplete" in renderer_plan
+		or "retail host text import switchover and debug-atlas closure are now complete" in renderer_plan
+	)
+	rg_g08_ok = (
+		rg_g08_closed
+		and rg_g08_note_present
+		and RG_P9_NOTE_PATH.exists()
+		and "RG-P9 is now considered complete." in rg_p9_note
+		and "void RE_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor ) {" in tr_font
+		and "void RE_MeasureScaledText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft ) {" in tr_font
+		and "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_ui
+		and "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_cgame
+		and "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in cl_ui
+		and "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in cl_cgame
+		and "QL_UI_GetScaledFont" not in cl_ui
+		and "QL_CG_GetScaledFont" not in cl_cgame
+		and "static void RB_ShowFontAtlas( void ) {" in tr_backend
+		and "R_GetFontStashDebugInfo( &image, &atlasWidth, &atlasHeight )" in tr_backend
+		and bool(unexpected_debug_font_atlas_paths)
+	)
 	report["tranches"]["RG-G08"] = _entry(
 		"RG-G08",
-		"fail",
-		"Retail host FontStash text subsystem is still missing from committed source.",
-		rg_g08_fail_details,
+		"pass" if rg_g08_ok else "fail",
+		(
+			"Retail host text import switchover and debug-atlas closure are now pinned in source."
+			if rg_g08_ok
+			else "Retail host text import switchover and debug-atlas closure remain incomplete."
+		),
+		{
+			"renderer_plan_marks_closed": rg_g08_closed,
+			"retail_font_stack_note_mentions_fontstash": "*fontstash" in retail_font_stack_note,
+			"retail_font_stack_note_mentions_host_wrappers": "DrawScaledText" in retail_font_stack_note and "MeasureText" in retail_font_stack_note,
+			"source_fontstash_impl_present": bool(fontstash_paths),
+			"source_fons_error_callback_present": bool(fons_error_paths),
+			"rg_p8_note_marks_complete": "RG-P8 is now considered complete." in rg_p8_note,
+			"rg_p9_note_present": RG_P9_NOTE_PATH.exists(),
+			"rg_p9_note_marks_complete": "RG-P9 is now considered complete." in rg_p9_note,
+			"ui_routes_through_renderer_host_text": "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_ui,
+			"cgame_routes_through_renderer_host_text": "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX," in cl_cgame,
+			"ui_compat_shim_removed": "QL_UI_GetScaledFont" not in cl_ui,
+			"cgame_compat_shim_removed": "QL_CG_GetScaledFont" not in cl_cgame,
+			"debug_font_atlas_impl_present": bool(unexpected_debug_font_atlas_paths),
+		},
 	)
 
-	rg_g09_open = "## RG-G09" in renderer_plan and "**Status:** Open" in renderer_plan
-	rg_g09_note_present = "Renderer font build reproducibility and strict validation remain incomplete" in renderer_plan
-	rg_g09_fail_details = {
-		"renderer_plan_tracks_gap": rg_g09_open and rg_g09_note_present,
-		"font_audit_script_present": FONT_AUDIT_SCRIPT_PATH.exists(),
-		"renderer_vcxproj_references_ft2": "..\\ft2\\" in renderer_vcxproj,
-		"renderer_vcproj_references_ft2": "..\\ft2\\" in renderer_vcproj,
-		"ft2_source_tree_present": (SRC_CODE_ROOT / "ft2").exists(),
-		"debug_font_atlas_registered": 'r_debugFontAtlas = ri.Cvar_Get( "r_debugFontAtlas", "0", CVAR_TEMP );' in tr_init,
-		"debug_font_atlas_impl_present": bool(unexpected_debug_font_atlas_paths),
-		"fontstash_or_fons_source_present": bool(fontstash_paths or fons_error_paths or fons_symbol_paths),
-	}
+	rg_g09_closed = "## RG-G09" in renderer_plan and "**Status:** Closed" in renderer_plan
+	rg_g09_note_present = "Renderer font build reproducibility and strict validation are now complete" in renderer_plan
+	rg_g09_ok = (
+		rg_g09_closed
+		and rg_g09_note_present
+		and FONT_AUDIT_SCRIPT_PATH.exists()
+		and RG_P10_NOTE_PATH.exists()
+		and RG_P11_NOTE_PATH.exists()
+		and "RG-P10 is now considered complete." in rg_p10_note
+		and "RG-P11 is now considered complete." in rg_p11_note
+		and "#include <ft2build.h>" in tr_font
+		and "#include FT_FREETYPE_H" in tr_font
+		and "QLEnableFreeType" in renderer_vcxproj
+		and "ValidateFreeType" in renderer_vcxproj
+		and "..\\ft2\\" not in renderer_vcxproj
+		and "..\\ft2\\" not in renderer_vcxproj_filters
+		and "..\\ft2\\" not in renderer_vcproj
+		and "QLEnableFreeType" in quakelive_steam_vcxproj
+		and "ValidateFreeType" in quakelive_steam_vcxproj
+		and "QLEnableFreeType" in build_script
+		and "FreeTypeIncludeDir" in build_script
+		and "FreeTypeLibDir" in build_script
+		and "QL_ENABLE_FREETYPE ?= 0" in unix_makefile
+		and "pkg-config --cflags freetype2" in unix_makefile
+		and "CLIENT_FREETYPE_CFLAGS := $(FREETYPE_CFLAGS) -DBUILD_FREETYPE" in unix_makefile
+		and runtime_clean
+	)
 	report["tranches"]["RG-G09"] = _entry(
 		"RG-G09",
-		"fail",
-		"Renderer font build reproducibility and strict text validation remain incomplete.",
-		rg_g09_fail_details,
+		"pass" if rg_g09_ok else "fail",
+		(
+			"Renderer font build reproducibility and strict text validation are now closed."
+			if rg_g09_ok
+			else "Renderer font build reproducibility and strict text validation remain incomplete."
+		),
+		{
+			"renderer_plan_marks_closed": rg_g09_closed,
+			"rg_p10_note_present": RG_P10_NOTE_PATH.exists(),
+			"rg_p11_note_present": RG_P11_NOTE_PATH.exists(),
+			"rg_p10_note_marks_complete": "RG-P10 is now considered complete." in rg_p10_note,
+			"rg_p11_note_marks_complete": "RG-P11 is now considered complete." in rg_p11_note,
+			"tr_font_uses_external_ft2build": "#include <ft2build.h>" in tr_font,
+			"tr_font_uses_ft_freetype_macro": "#include FT_FREETYPE_H" in tr_font,
+			"renderer_vcxproj_has_freetype_toggle": "QLEnableFreeType" in renderer_vcxproj,
+			"renderer_vcxproj_has_validate_target": "ValidateFreeType" in renderer_vcxproj,
+			"renderer_vcxproj_references_ft2": "..\\ft2\\" in renderer_vcxproj,
+			"renderer_vcxproj_filters_references_ft2": "..\\ft2\\" in renderer_vcxproj_filters,
+			"renderer_vcproj_references_ft2": "..\\ft2\\" in renderer_vcproj,
+			"engine_vcxproj_has_freetype_toggle": "QLEnableFreeType" in quakelive_steam_vcxproj,
+			"engine_vcxproj_has_validate_target": "ValidateFreeType" in quakelive_steam_vcxproj,
+			"build_script_has_freetype_toggle": "QLEnableFreeType" in build_script,
+			"build_script_has_freetype_include_override": "FreeTypeIncludeDir" in build_script,
+			"build_script_has_freetype_lib_override": "FreeTypeLibDir" in build_script,
+			"unix_makefile_has_freetype_toggle": "QL_ENABLE_FREETYPE ?= 0" in unix_makefile,
+			"unix_makefile_uses_pkg_config_freetype": "pkg-config --cflags freetype2" in unix_makefile,
+			"unix_makefile_defines_build_freetype": "CLIENT_FREETYPE_CFLAGS := $(FREETYPE_CFLAGS) -DBUILD_FREETYPE" in unix_makefile,
+			"runtime_artifact_is_text_strict": runtime_clean,
+		},
 	)
 
 	non_passing_gap_ids = [
@@ -375,19 +513,29 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 def test_renderer_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	runtime_evidence = _read_json(RENDERER_RUNTIME_EVIDENCE_PATH)
 
-	assert runtime_evidence["phase"] == "RG-P6"
-	assert runtime_evidence["parity_estimate"] == {"before": 96, "after": 98}
+	assert runtime_evidence["phase"] == "RG-P11"
+	assert runtime_evidence["parity_estimate"] == {"before": 98, "after": 100}
 	assert runtime_evidence["warnings"] == []
 	assert runtime_evidence["missing_log_markers"] == []
 	assert runtime_evidence["main_menu"]["engine_screenshot"]
+	assert runtime_evidence["main_menu"]["engine_sha256"]
 	assert runtime_evidence["main_menu"]["window_sha256"]
+	assert runtime_evidence["debug_atlas"]["engine_screenshot"]
+	assert runtime_evidence["debug_atlas"]["engine_sha256"]
+	assert runtime_evidence["debug_atlas"]["window_sha256"]
+	assert runtime_evidence["main_menu"]["engine_sha256"] != runtime_evidence["debug_atlas"]["engine_sha256"]
+	assert runtime_evidence["main_menu"]["window_sha256"] != runtime_evidence["debug_atlas"]["window_sha256"]
 	assert runtime_evidence["map_runtime"]["engine_screenshot"]
+	assert runtime_evidence["map_runtime"]["engine_sha256"]
 	assert runtime_evidence["map_runtime"]["window_sha256"]
 	assert runtime_evidence["main_menu"]["window_sha256"] != runtime_evidence["map_runtime"]["window_sha256"]
 	assert runtime_evidence["map_runtime"]["map"] == "bloodrun"
 	assert runtime_evidence["map_runtime"]["server_seen"] is True
 	assert runtime_evidence["map_runtime"]["active_seen"] is True
 	assert runtime_evidence["map_runtime"]["shot_logged"] is True
+	assert runtime_evidence["text_validation"]["fontstash_init_seen"] is True
+	assert runtime_evidence["text_validation"]["debug_atlas_engine_capture_distinct"] is True
+	assert runtime_evidence["text_validation"]["debug_atlas_window_capture_distinct"] is True
 
 
 def test_renderer_full_parity_gate_writes_status_artifact() -> None:
@@ -396,15 +544,15 @@ def test_renderer_full_parity_gate_writes_status_artifact() -> None:
 
 	assert RENDERER_FULL_PARITY_GATE_PATH.exists()
 	assert _read_json(RENDERER_FULL_PARITY_GATE_PATH) == report
-	assert report["phase"] == "RG-P6"
+	assert report["phase"] == "RG-P11"
 	assert report["gap_order"] == list(GAP_ORDER)
 	assert set(report["tranches"]) == set(GAP_ORDER)
-	assert report["overall_status"] == "fail"
-	assert report["non_passing_gap_ids"] == ["RG-G05", "RG-G08", "RG-G09"]
+	assert report["overall_status"] == "pass"
+	assert report["non_passing_gap_ids"] == []
 	assert report["summary"] == {
-		"passing_count": 6,
+		"passing_count": 9,
 		"blocked_count": 0,
-		"failing_count": 3,
+		"failing_count": 0,
 	}
 
 	for gap_id in GAP_ORDER:

@@ -1,9 +1,9 @@
 {
   "artifact_version": 1,
-  "phase": "RG-P6",
+  "phase": "RG-P11",
   "parity_estimate": {
     "before": 98,
-    "after": 94
+    "after": 100
   },
   "gap_order": [
     "RG-G01",
@@ -67,14 +67,21 @@
     },
     "RG-G05": {
       "gap_id": "RG-G05",
-      "status": "fail",
-      "summary": "Classic renderer font/cache/atlas exactness remains intentionally open.",
+      "status": "pass",
+      "summary": "Classic renderer font/cache/atlas exactness is now closed and structurally pinned.",
       "details": {
-        "renderer_plan_still_marks_open": true,
-        "renderer_plan_still_lists_font_gap": true,
-        "font_fallback_helper_present": true,
-        "font_registration_entry_present": true,
-        "freetype_init_present": true
+        "renderer_plan_marks_closed": true,
+        "ownership_note_present": true,
+        "ownership_note_has_retail_section": true,
+        "ownership_note_has_compat_section": true,
+        "cache_stem_helper_present": true,
+        "legacy_cache_helper_present": true,
+        "cache_probe_helper_present": true,
+        "cached_shader_rebind_helper_present": true,
+        "atlas_flush_helper_present": true,
+        "cached_font_probe_present": true,
+        "inclusive_cached_shader_rebind_present": true,
+        "inclusive_page_flush_present": true
       }
     },
     "RG-G06": {
@@ -95,6 +102,7 @@
         "runtime_probe_present": true,
         "runtime_evidence_present": true,
         "runtime_evidence_clean": true,
+        "runtime_no_registerfont_fallback": true,
         "workflow_references_gate": true,
         "workflow_runs_gate": true,
         "build_pipeline_mentions_gate": true,
@@ -104,43 +112,58 @@
     },
     "RG-G08": {
       "gap_id": "RG-G08",
-      "status": "fail",
-      "summary": "Retail host FontStash text subsystem is still missing from committed source.",
+      "status": "pass",
+      "summary": "Retail host text import switchover and debug-atlas closure are now pinned in source.",
       "details": {
-        "renderer_plan_tracks_gap": true,
+        "renderer_plan_marks_closed": true,
         "retail_font_stack_note_mentions_fontstash": true,
         "retail_font_stack_note_mentions_host_wrappers": true,
-        "source_fontstash_impl_present": false,
-        "source_fons_error_callback_present": false,
-        "ui_draw_text_still_compat_shim": true,
-        "cgame_draw_text_still_compat_shim": true
+        "source_fontstash_impl_present": true,
+        "source_fons_error_callback_present": true,
+        "rg_p8_note_marks_complete": true,
+        "rg_p9_note_present": true,
+        "rg_p9_note_marks_complete": true,
+        "ui_routes_through_renderer_host_text": true,
+        "cgame_routes_through_renderer_host_text": true,
+        "ui_compat_shim_removed": true,
+        "cgame_compat_shim_removed": true,
+        "debug_font_atlas_impl_present": true
       }
     },
     "RG-G09": {
       "gap_id": "RG-G09",
-      "status": "fail",
-      "summary": "Renderer font build reproducibility and strict text validation remain incomplete.",
+      "status": "pass",
+      "summary": "Renderer font build reproducibility and strict text validation are now closed.",
       "details": {
-        "renderer_plan_tracks_gap": true,
-        "font_audit_script_present": true,
-        "renderer_vcxproj_references_ft2": true,
-        "renderer_vcproj_references_ft2": true,
-        "ft2_source_tree_present": false,
-        "debug_font_atlas_registered": true,
-        "debug_font_atlas_impl_present": false,
-        "fontstash_or_fons_source_present": false
+        "renderer_plan_marks_closed": true,
+        "rg_p10_note_present": true,
+        "rg_p11_note_present": true,
+        "rg_p10_note_marks_complete": true,
+        "rg_p11_note_marks_complete": true,
+        "tr_font_uses_external_ft2build": true,
+        "tr_font_uses_ft_freetype_macro": true,
+        "renderer_vcxproj_has_freetype_toggle": true,
+        "renderer_vcxproj_has_validate_target": true,
+        "renderer_vcxproj_references_ft2": false,
+        "renderer_vcxproj_filters_references_ft2": false,
+        "renderer_vcproj_references_ft2": false,
+        "engine_vcxproj_has_freetype_toggle": true,
+        "engine_vcxproj_has_validate_target": true,
+        "build_script_has_freetype_toggle": true,
+        "build_script_has_freetype_include_override": true,
+        "build_script_has_freetype_lib_override": true,
+        "unix_makefile_has_freetype_toggle": true,
+        "unix_makefile_uses_pkg_config_freetype": true,
+        "unix_makefile_defines_build_freetype": true,
+        "runtime_artifact_is_text_strict": true
       }
     }
   },
-  "overall_status": "fail",
-  "non_passing_gap_ids": [
-    "RG-G05",
-    "RG-G08",
-    "RG-G09"
-  ],
+  "overall_status": "pass",
+  "non_passing_gap_ids": [],
   "summary": {
-    "passing_count": 6,
+    "passing_count": 9,
     "blocked_count": 0,
-    "failing_count": 3
+    "failing_count": 0
   }
 }

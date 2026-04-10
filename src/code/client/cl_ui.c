@@ -693,30 +693,48 @@ CLUI_SyncCredentialCvars
 ====================
 */
 static void CLUI_SyncCredentialCvars( const char *rawValue ) {
-	ql_auth_credential_t credential;
-	qboolean parsed;
-	qboolean autoProvisioned;
-	qlAuthCredentialKind kind;
+	(void)rawValue;
 
-	if ( !rawValue ) {
-		rawValue = "";
+	Cvar_SetValue( "ui_credentialKind", (float)QL_AUTH_CREDENTIAL_LEGACY_CDKEY );
+	Cvar_Set( "ui_credentialAuto", "0" );
+	Cvar_Set( "ui_credentialManualHidden", "0" );
+}
+
+/*
+====================
+CLUI_CopyCDKeyValue
+====================
+*/
+static void CLUI_CopyCDKeyValue( char *dest, size_t destSize, const char *src ) {
+	int	i;
+
+	if ( !dest || destSize == 0 ) {
+		return;
 	}
 
-	parsed = QL_ParseCredentialString( rawValue, &credential );
-	if ( !parsed ) {
-		QL_InitAuthCredential( &credential );
+	for ( i = 0; i < CDKEY_LEN && i + 1 < (int)destSize; i++ ) {
+		dest[i] = ' ';
 	}
 
-	kind = credential.kind;
-	if ( kind == QL_AUTH_CREDENTIAL_EMPTY ) {
-		kind = QL_AUTH_CREDENTIAL_LEGACY_CDKEY;
+	if ( destSize > CDKEY_LEN ) {
+		dest[CDKEY_LEN] = '\0';
+	} else {
+		dest[destSize - 1] = '\0';
 	}
 
-	autoProvisioned = ( credential.length > 0 && kind != QL_AUTH_CREDENTIAL_LEGACY_CDKEY );
+	if ( !src ) {
+		return;
+	}
 
-	Cvar_SetValue( "ui_credentialKind", (float)kind );
-	Cvar_Set( "ui_credentialAuto", autoProvisioned ? "1" : "0" );
-	Cvar_Set( "ui_credentialManualHidden", autoProvisioned ? "1" : "0" );
+	for ( i = 0; i < CDKEY_LEN && src[i] && i + 1 < (int)destSize; i++ ) {
+		dest[i] = src[i];
+	}
+
+	if ( destSize > CDKEY_LEN ) {
+		dest[CDKEY_LEN] = '\0';
+	} else {
+		dest[destSize - 1] = '\0';
+	}
 }
 
 /*
@@ -739,7 +757,7 @@ static void CLUI_GetCDKey( char *buf, int buflen ) {
 		}
 	}
 
-	Q_strncpyz( buf, source, buflen );
+	CLUI_CopyCDKeyValue( buf, (size_t)buflen, source );
 
 	CLUI_SyncCredentialCvars( source );
 }
@@ -756,9 +774,9 @@ static void CLUI_SetCDKey( char *buf ) {
 
 	fs = Cvar_Get ("fs_game", "", CVAR_INIT|CVAR_SYSTEMINFO );
 	if (UI_usesUniqueCDKey() && fs && fs->string[0] != 0) {
-		Q_strncpyz( cl_cdkey_mod, input, sizeof( cl_cdkey_mod ) );
+		CLUI_CopyCDKeyValue( cl_cdkey_mod, sizeof( cl_cdkey_mod ), input );
 	} else {
-		Q_strncpyz( cl_cdkey, input, sizeof( cl_cdkey ) );
+		CLUI_CopyCDKeyValue( cl_cdkey, sizeof( cl_cdkey ), input );
 	}
 	// set the flag so the file will be written at the next opportunity
 	cvar_modifiedFlags |= CVAR_ARCHIVE;
@@ -1366,22 +1384,7 @@ static int QDECL QL_UI_trap_SetCDKey_QL( char *buf ) {
 	return 0;
 }
 
-typedef enum {
-	QL_UI_SCALED_FONT_NORMAL = 0,
-	QL_UI_SCALED_FONT_SANS,
-	QL_UI_SCALED_FONT_MONO,
-	QL_UI_SCALED_FONT_SANS_FALLBACK,
-	QL_UI_SCALED_FONT_SANS_WINDOWS_FALLBACK,
-	QL_UI_SCALED_FONT_COUNT
-} qlUiScaledFontHandle_t;
-
-typedef struct {
-	fontInfo_t	font;
-	qboolean	loaded;
-} qlUiScaledFont_t;
-
 static vec4_t ql_ui_currentColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-static qlUiScaledFont_t ql_ui_scaledFonts[QL_UI_SCALED_FONT_COUNT];
 
 /*
 ==============
@@ -1392,100 +1395,6 @@ static unsigned long long QL_UI_PackFloatBits64( float lo, float hi ) {
 	unsigned long long result = (unsigned long long)(unsigned int)FloatAsInt( lo );
 	result |= (unsigned long long)(unsigned int)FloatAsInt( hi ) << 32;
 	return result;
-}
-
-/*
-==============
-QL_UI_NormalizeScaledFontHandle
-==============
-*/
-static int QL_UI_NormalizeScaledFontHandle( int fontHandle ) {
-	if ( fontHandle < QL_UI_SCALED_FONT_NORMAL || fontHandle >= QL_UI_SCALED_FONT_COUNT ) {
-		return QL_UI_SCALED_FONT_NORMAL;
-	}
-
-	return fontHandle;
-}
-
-/*
-==============
-QL_UI_ResolveWindowsFallbackFontPath
-==============
-*/
-static const char *QL_UI_ResolveWindowsFallbackFontPath( char *fontPath, int fontPathSize ) {
-#if defined( _WIN32 )
-	char windowsDirectory[MAX_OSPATH];
-	WIN32_FIND_DATAA findData;
-	HANDLE findHandle;
-
-	if ( GetWindowsDirectoryA( windowsDirectory, sizeof( windowsDirectory ) ) > 0 ) {
-		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\ARIALUNI.TTF", windowsDirectory );
-		findHandle = FindFirstFileA( fontPath, &findData );
-		if ( findHandle != INVALID_HANDLE_VALUE ) {
-			FindClose( findHandle );
-			return fontPath;
-		}
-
-		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\segoeui.ttf", windowsDirectory );
-		findHandle = FindFirstFileA( fontPath, &findData );
-		if ( findHandle != INVALID_HANDLE_VALUE ) {
-			FindClose( findHandle );
-			return fontPath;
-		}
-
-		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\l_10646.ttf", windowsDirectory );
-		return fontPath;
-	}
-#endif
-
-	Q_strncpyz( fontPath, "fonts/droidsansfallbackfull.ttf", fontPathSize );
-	return fontPath;
-}
-
-/*
-==============
-QL_UI_GetScaledFontName
-==============
-*/
-static const char *QL_UI_GetScaledFontName( int fontHandle, char *resolvedFontPath, int resolvedFontPathSize ) {
-	switch ( QL_UI_NormalizeScaledFontHandle( fontHandle ) ) {
-		case QL_UI_SCALED_FONT_SANS:
-			return "fonts/notosans-regular.ttf";
-
-		case QL_UI_SCALED_FONT_MONO:
-			return "fonts/droidsansmono.ttf";
-
-		case QL_UI_SCALED_FONT_SANS_FALLBACK:
-			return "fonts/droidsansfallbackfull.ttf";
-
-		case QL_UI_SCALED_FONT_SANS_WINDOWS_FALLBACK:
-			return QL_UI_ResolveWindowsFallbackFontPath( resolvedFontPath, resolvedFontPathSize );
-
-		case QL_UI_SCALED_FONT_NORMAL:
-		default:
-			return "fonts/handelgothic.ttf";
-	}
-}
-
-/*
-==============
-QL_UI_GetScaledFont
-==============
-*/
-static fontInfo_t *QL_UI_GetScaledFont( int fontHandle ) {
-	qlUiScaledFont_t *scaledFont;
-	char resolvedFontPath[MAX_OSPATH];
-	const char *fontName;
-
-	fontHandle = QL_UI_NormalizeScaledFontHandle( fontHandle );
-	scaledFont = &ql_ui_scaledFonts[fontHandle];
-	if ( !scaledFont->loaded ) {
-		fontName = QL_UI_GetScaledFontName( fontHandle, resolvedFontPath, sizeof( resolvedFontPath ) );
-		CL_RegisterFont( fontName, 48, &scaledFont->font );
-		scaledFont->loaded = qtrue;
-	}
-
-	return &scaledFont->font;
 }
 
 /*
@@ -1508,26 +1417,6 @@ static void QDECL QL_UI_trap_R_SetColor_QL( const float *rgba ) {
 
 	re.SetColor( rgba );
 }
-
-/*
-==============
-QL_UI_DrawGlyph
-==============
-*/
-static void QL_UI_DrawGlyph( float x, float y, float scaleFactor, glyphInfo_t *glyph ) {
-	float w;
-	float h;
-
-	if ( !glyph ) {
-		return;
-	}
-
-	w = glyph->imageWidth * scaleFactor;
-	h = glyph->imageHeight * scaleFactor;
-
-	re.DrawStretchPic( x, y, w, h, glyph->s, glyph->t, glyph->s2, glyph->t2, glyph->glyph );
-}
-
 /*
 ==============
 QL_UI_RegisterDefaultAdvertCellShader
@@ -1682,72 +1571,8 @@ QL_UI_trap_DrawScaledText
 ==============
 */
 static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, int forceColor ) {
-	fontInfo_t *font;
-	const char *s;
-	vec4_t baseColor;
-	float drawX;
-	float scaleFactor;
-	qboolean hasMaxX;
-	float maxXf;
-
 	// uix86.dll HLIL: import[94] (offset 0x178) draws scaled text with maxX/outMaxX.
-
-	if ( !text || !text[0] ) {
-		if ( outMaxX ) {
-			*outMaxX = (float)x;
-		}
-		return;
-	}
-
-	Com_Memcpy( baseColor, ql_ui_currentColor, sizeof( baseColor ) );
-
-	font = QL_UI_GetScaledFont( fontHandle );
-	if ( scale <= 0.0f ) {
-		scaleFactor = 1.0f;
-	} else {
-		scaleFactor = scale / 48.0f;
-	}
-
-	drawX = (float)x;
-	s = text;
-	hasMaxX = ( maxX > 0 );
-	maxXf = (float)maxX;
-
-	while ( *s ) {
-		unsigned char ch = (unsigned char)*s;
-
-		if ( !forceColor && Q_IsColorString( s ) ) {
-			vec4_t newColor;
-			Com_Memcpy( newColor, g_color_table[ColorIndex( *( s + 1 ) )], sizeof( newColor ) );
-			newColor[3] = baseColor[3];
-			re.SetColor( newColor );
-			s += 2;
-			continue;
-		}
-
-		if ( ch >= GLYPH_START && ch <= GLYPH_END ) {
-			glyphInfo_t *glyph = &font->glyphs[ch];
-			float yadj = glyph->top * scaleFactor;
-			float nextX = drawX + glyph->xSkip * scaleFactor;
-
-			if ( hasMaxX && nextX > maxXf ) {
-				if ( outMaxX ) {
-					*outMaxX = 0.0f;
-				}
-				break;
-			}
-
-			QL_UI_DrawGlyph( drawX, (float)y - yadj, scaleFactor, glyph );
-			drawX = nextX;
-			if ( outMaxX ) {
-				*outMaxX = drawX;
-			}
-		}
-
-		++s;
-	}
-
-	re.SetColor( baseColor );
+	RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor != qfalse ? qtrue : qfalse, ql_ui_currentColor );
 }
 
 /*
@@ -1756,62 +1581,12 @@ QL_UI_trap_MeasureText
 ==============
 */
 static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {
-	fontInfo_t *font;
-	const char *s;
 	float width;
 	float height;
-	float scaleFactor;
-	qboolean hasMaxX;
-	float maxXf;
 
 	// uix86.dll HLIL: import[95] (offset 0x17c) measures text and returns packed floats.
 
-	if ( outLeft ) {
-		*outLeft = 0.0f;
-	}
-
-	if ( !text ) {
-		return QL_UI_PackFloatBits64( 0.0f, 0.0f );
-	}
-
-	font = QL_UI_GetScaledFont( fontHandle );
-	if ( scale <= 0.0f ) {
-		scaleFactor = 1.0f;
-	} else {
-		scaleFactor = scale / 48.0f;
-	}
-
-	width = 0.0f;
-	height = 0.0f;
-	hasMaxX = ( maxX > 0 );
-	maxXf = (float)maxX;
-
-	for ( s = text; *s && ( !end || s < end ); ++s ) {
-		unsigned char ch = (unsigned char)*s;
-
-		if ( Q_IsColorString( s ) ) {
-			++s;
-			if ( !*s ) {
-				break;
-			}
-			continue;
-		}
-
-		if ( ch >= GLYPH_START && ch <= GLYPH_END ) {
-			glyphInfo_t *glyph = &font->glyphs[ch];
-			float nextW = width + glyph->xSkip * scaleFactor;
-			float glyphH = glyph->height * scaleFactor;
-
-			if ( hasMaxX && nextW > maxXf ) {
-				break;
-			}
-
-			width = nextW;
-			if ( glyphH > height ) {
-				height = glyphH;
-			}
-		}
-	}
+	RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );
 
 	return QL_UI_PackFloatBits64( width, height );
 }
@@ -1826,9 +1601,8 @@ static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int arg1, unsigned in
 	unsigned long long total = 0;
 
 	// uix86.dll HLIL: import[96] (offset 0x180) returns download stats for workshop items.
-	if ( !QL_Steamworks_GetItemDownloadInfo( arg1, arg2, &downloaded, &total ) ) {
-		downloaded = (unsigned long long)(unsigned int)clc.downloadCount;
-		total = (unsigned long long)(unsigned int)clc.downloadSize;
+	if ( !CL_GetWorkshopDownloadInfo( arg1, arg2, &downloaded, &total ) ) {
+		QL_Steamworks_GetItemDownloadInfo( arg1, arg2, &downloaded, &total );
 	}
 
 	if ( outDownloaded ) {

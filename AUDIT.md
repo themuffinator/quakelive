@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 
 This audit reflects the current repository state against the retail Quake Live HLIL references and the latest recorded Windows `Debug|x86` build/runtime pass. The goal is not to score every file equally; it is to rank the gaps that still materially separate the repo from retail behavior.
 
@@ -178,39 +178,46 @@ Summary:
 - Combined committed retail mapping coverage for the three DLLs remains saturated at **2426 / 2426** normalized anchors, so no open game-module debt remains inside the module layer; the remaining live-map shortfall is explicitly renderer-owned.
 - No confirmed source-owned or host-adjacent game-module behavior gap remains after `GMR-P5`.
 
-## Renderer audit refresh (2026-04-09)
+## Renderer audit refresh (2026-04-10)
 
 A focused full-parity audit for the renderer is now published in `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`.
 
 Summary:
 
-- The earlier renderer closure work remains valid, but the previous post-`RG-P6` public estimate of **98%** was too optimistic for strict retail parity because it only counted the classic renderer core and not the still-missing retail host text engine/build lane.
-- The refreshed strict `renderer` estimate is now **94%**, not **98%**. This is a confidence correction driven by the committed retail font-stack evidence, not a runtime regression in the already-closed renderer phases.
-- The renderer-focused validation surface is still healthy on 2026-04-09: `pytest tests/test_renderer_*.py -q --tb=no` is `20 passed, 1 skipped`, and the tracked runtime artifact for the main menu plus live `bloodrun` remains clean.
-- The open renderer gap register is now wider than the old single-tranche `RG-G05` story. The remaining strict gaps are:
-  - `RG-G05`: classic renderer font/cache/atlas exactness in `tr_font.c` is still partially source-biased
-  - `RG-G08`: the retail host FontStash text engine (`*fontstash`, `R_fonsErrorCallback`, direct host `DrawScaledText` / `MeasureText`) is still unreconstructed
-  - `RG-G09`: renderer font build reproducibility and strict text validation remain incomplete because the project files still point at a missing `src/code/ft2/` tree and `r_debugFontAtlas` still has no draw implementation
-- The renderer closure plan now continues beyond the earlier six phases with a font/text-specific tail (`RG-P7`..`RG-P9`) covering classic font exactness, host FontStash reconstruction, and final font-build/validation closure.
+- The refreshed renderer report now confirms full renderer closure instead of only re-stating the 2026-04-09 font-stack correction. No new renderer-core gap reopened during the final `RG-P10` or `RG-P11` pass.
+- The open renderer gap register is now wider than the old single-tranche `RG-G05` story. That historical correction still holds even though the final `RG-P10` and `RG-P11` passes have now closed the remaining `RG-G09` tail as well.
+- `RG-P7` is complete. The classic `tr_font.c` lane has an explicit ownership note, explicit retail-vs-compatibility helper splits, inclusive cached-font/atlas coverage, and deterministic renderer tests that keep the old mixed “probably retail” bucket from reopening.
+- `RG-P8` is complete. The renderer now owns a retained `*fontstash` atlas, the retail `R_fonsErrorCallback` expansion-or-flush path, and the recovered five-face host text table.
+- `RG-P9` is complete. Native `ui` and `cgame` host text imports now route through shared renderer host-text helpers, and `r_debugFontAtlas` now has a retained-atlas draw path in writable source.
+- `RG-P10` is complete. The stale in-tree `ft2` project ownership has been replaced with an explicit external FreeType SDK or `pkg-config freetype2` build lane, and the renderer project metadata no longer points at missing source files.
+- `RG-P11` is complete. The tracked runtime artifact is now `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`, and it proves a windowed UI-bootstrap pass, retained-atlas debug rendering, and live `bloodrun` runtime with distinct engine or window capture hashes while rejecting `RE_RegisterFont` fallback-lane logs.
+- The current strict `renderer` estimate is now **100%**.
+- The renderer-focused validation surface is fully green on 2026-04-10: the unified gate reports no open renderer gaps, the font-stack audit runs clean, and the tracked runtime bundle is now text-specific instead of generic renderer-only evidence.
+- No confirmed renderer gap remains after `RG-P11`.
 - `RG-P1` is now complete. The renderer export tail matches the retail `GetRefAPI` contract again, font registration has been moved onto an explicit client compatibility lane instead of the export ABI, and the current estimated renderer parity is **81%**.
 - `RG-P2` is now complete. The recovered in-memory renderer image helper family is back in writable source, live Steam/launcher image resources now register through direct renderer-owned memory ingestion instead of temporary cache files, and the current estimated renderer parity is **85%**.
 - `RG-P3` is now complete. The renderer post-process path is shader-backed again using the retail rectangle-texture/shader-family structure, CPU color-correction readback has been removed, `r_contrast` is registered and consumed by the recovered color-correct pass, and the current estimated renderer parity is **90%**.
 - `RG-P4` is now complete. The Win32 host once again mirrors the retail live client-rect resize/restart helper, fast restarts retain the maximized-window state, the shared loading-window wrappers are present in writable source, and the current estimated renderer parity is **93%**.
 - `RG-P5` is now complete. The dense backend/BSP/curve/flare/Win32 helper bands are explicitly bounded by the new ownership note and mapping-round closure, so they are no longer treated as an open-ended active-runtime parity gap, and the current estimated renderer parity is **96%**.
 - `RG-P6` is now complete. The renderer has a dedicated parity gate, a tracked windowed runtime evidence artifact for the current milestone, and a CI-visible validation workflow, but that no longer implies strict end-to-end renderer closure because the retail font/text host remains open.
+- `RG-P7` is now complete. The classic renderer font/cache/atlas lane is no longer treated as an open parity gap, and the current estimated renderer parity is **95%**.
+- `RG-P8` is now complete. The renderer-owned retained host text core is in writable source, and the current estimated renderer parity is **97%**.
+- `RG-P9` is now complete. The retained host text core is now the active native import path and the current estimated renderer parity is **98%**.
+- `RG-P10` is now complete. The recovered external FreeType replacement lane is now the committed renderer build story, and the current estimated renderer parity is **99%**.
+- `RG-P11` is now complete. The final strict renderer parity gate and text-specific runtime artifact are now green, and the current estimated renderer parity is **100%**.
 
-## Client audit refresh (2026-04-09)
+## Client audit refresh (2026-04-10)
 
 A focused full-parity audit for the native `client` host is now published in `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`.
 
 Summary:
 
-- The refreshed strict `client` estimate is now **90%**. This is a confidence correction from an implicit low-90s reading of the recent host reconstruction work, not a runtime regression.
+- `CL-P1` is now complete. The client/common bootstrap and write path now follows the retail `qzconfig.cfg` / `repconfig.cfg` contract, `writeClientConfig` is reconstructed in writable source, `FS_Restart` replays `qzconfig.cfg`, and the client/UI CD-key surface is back on the retail legacy placeholder/q3key lane.
+- `CL-P2` is now complete. The Steam client/lobby/micro callback bundles are retained in writable source, `CL_Frame` owns the normal client-side Steam callback pump, and the callback payloads now flow into an explicit client/browser event owner instead of remaining limited to auth-time helper paths.
+- `CL-P3` is now complete. The server now publishes the referenced workshop-item list instead of echoing the server SteamID through the workshop slots, filesystem startup/restart now remount subscribed workshop install roots with retained per-pack item IDs, `CL_InitDownloads` and `CL_Frame` now own the retail workshop-aware join/bootstrap path, and the UI workshop progress import now reflects retained client state instead of generic legacy counters.
+- `CL-P4` is now complete. The client now owns a retained browser-host runtime behind the online-services policy gate, including explicit init or frame or shutdown lifetime and reconstructed command owners for the `web_*` browser-control surface.
+- `CL-P5` is now complete. The retained `qz_instance` JS bridge, `EnginePublish` event-publication lane, `SteamDataSource` avatar/resource owner, and `QLResourceInterceptor` / `Sys_Steam_RequestURL` fallback seam are now explicit in writable source and covered by the parity suite.
+- `CL-P6` is now complete. The client now has a dedicated parity gate (`artifacts/client_validation/logs/client_full_parity_gate.json`) plus a tracked runtime-evidence bundle (`artifacts/client_validation/logs/client_runtime_evidence_20260410.json`) covering retail config/bootstrap writes, service-disabled browser-policy behavior, live `bloodrun` runtime, authoritative engine/window captures, and a flushed demo artifact.
+- The refreshed strict `client` estimate is now **100%**. This is a behavior-backed uplift from the post-audit **90%** figure because the retail config/bootstrap persistence gap (`CL-G04`), the async Steam callback lifetime gap (`CL-G02`), the workshop bootstrap gap (`CL-G03`), the browser/JS/runtime ownership gap (`CL-G01`), and the final verification gap (`CL-G05`) are now closed.
 - The classic client/runtime story is materially strong: recent mapping rounds now bound the retained input/key path, resend/connect/disconnect lifecycle, server-browser helpers, packet/frame spine, sound core, native `ui`/`cgame` bridge, and live renderer-resource ingestion well enough that the client should no longer be treated as uniformly “low parity”.
-- The remaining strict client gaps are concentrated in Quake Live-only host behavior:
-  - the missing browser/Awesomium runtime (`WebCore`, `WebSession`, `WebView`, JS bridge, `EnginePublish`, `SteamDataSource`)
-  - missing async Steam callback bundle ownership and the normal client-side callback pump
-  - incomplete workshop-aware join/download bootstrap
-  - still-source-biased config/bootstrap persistence (`q3config.cfg` vs retail `qzconfig.cfg` / `repconfig.cfg`, plus the missing `writeClientConfig` owner)
-  - no dedicated client parity gate or tracked runtime evidence artifact yet
-- The new client closure plan groups that remaining work into six executable phases (`CL-P1`..`CL-P6`) covering retail config/bootstrap recovery, Steam callback lifetime, workshop-aware download handling, browser-host core reconstruction, JS/data/event publication, and final client parity gating.
+- No open gap remains in the audited client register.

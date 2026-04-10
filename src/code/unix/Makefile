@@ -59,7 +59,6 @@ BAIDIR=$(GDIR)
 BLIBDIR=$(MOUNT_DIR)/botlib
 NDIR=$(MOUNT_DIR)/null
 UIDIR=$(MOUNT_DIR)/ui
-FTDIR=$(MOUNT_DIR)/ft2
 JPDIR=$(MOUNT_DIR)/jpeg-6
 SPLNDIR=$(MOUNT_DIR)/splines
 
@@ -84,6 +83,7 @@ QL_BUILD_ONLINE_SERVICES ?= 0
 QL_BUILD_STEAMWORKS ?= 0
 QL_BUILD_OPEN_STEAM ?= 0
 QL_ENABLE_OGG ?= 1
+QL_ENABLE_FREETYPE ?= 0
 
 ifeq ($(QL_BUILD_ONLINE_SERVICES),0)
 override QL_BUILD_STEAMWORKS := 0
@@ -139,6 +139,26 @@ ifeq ($(strip $(PNG_LDFLAGS)),)
 endif
 CLIENT_PNG_CFLAGS := $(PNG_CFLAGS)
 CLIENT_PNG_LDFLAGS := $(PNG_LDFLAGS)
+
+ifeq ($(QL_ENABLE_FREETYPE),1)
+  # Reference pkg-config lane:
+  # pkg-config --cflags freetype2
+  # pkg-config --libs freetype2
+  ifeq ($(origin FREETYPE_CFLAGS), undefined)
+    FREETYPE_CFLAGS := $(shell $(PKG_CONFIG) --cflags freetype2 2>/dev/null)
+  endif
+  ifeq ($(origin FREETYPE_LDFLAGS), undefined)
+    FREETYPE_LDFLAGS := $(shell $(PKG_CONFIG) --libs freetype2 2>/dev/null)
+  endif
+  ifeq ($(strip $(FREETYPE_LDFLAGS)),)
+    $(error FreeType support enabled but freetype2 development files were not found. Install FreeType, set FREETYPE_CFLAGS/FREETYPE_LDFLAGS manually, or rebuild with QL_ENABLE_FREETYPE=0.)
+  endif
+  CLIENT_FREETYPE_CFLAGS := $(FREETYPE_CFLAGS) -DBUILD_FREETYPE
+  CLIENT_FREETYPE_LDFLAGS := $(FREETYPE_LDFLAGS)
+else
+  CLIENT_FREETYPE_CFLAGS :=
+  CLIENT_FREETYPE_LDFLAGS :=
+endif
 
 
 ifeq ($(PLATFORM),linux)
@@ -383,16 +403,16 @@ endif #Linux
 endif #FreeBSD
 endif #IRIX
 
-DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
-DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
-DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -DSMP -o $@ -c $<
-DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
-DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
-DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
-DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
+DO_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
+DO_CXX=$(CXX) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
+DO_SMP_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) -DSMP -o $@ -c $<
+DO_BOT_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) -DBOTLIB  -o $@ -c $<   # $(SHLIBCFLAGS) # bk001212
+DO_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
+DO_SHLIB_CC=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_SHLIB_DEBUG_CC=$(CC) $(DEBUG_CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+DO_AS=$(CC) $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
 DO_NASM=nasm -f elf -o $@  $<
-DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
+DO_DED_CC=$(CC) -DDEDICATED -DC_ONLY $(CFLAGS) $(PLATFORM_BACKEND_DEFS) $(CLIENT_OGG_CFLAGS) $(CLIENT_PNG_CFLAGS) $(CLIENT_FREETYPE_CFLAGS) $(STEAMWORKS_CFLAGS) -o $@ -c $<
 
 #DO_LCC=$(LCC) -o $@ -S -Wf-target=bytecode -Wf-g -DQ3_VM -I$(CGDIR) -I$(GDIR)  -I$(UIDIR)  $< 
 
@@ -418,7 +438,6 @@ makedirs:
 	@if [ ! -d $(B)/client ];then mkdir $(B)/client;fi
 	@if [ ! -d $(B)/ded ];then mkdir $(B)/ded;fi
 	@if [ ! -d $(B)/ref ];then mkdir $(B)/ref;fi
-	@if [ ! -d $(B)/ft2 ];then mkdir $(B)/ft2;fi
 	@if [ ! -d $(B)/baseq3 ];then mkdir $(B)/baseq3;fi
 	@if [ ! -d $(B)/baseq3/cgame ];then mkdir $(B)/baseq3/cgame;fi
 	@if [ ! -d $(B)/baseq3/game ];then mkdir $(B)/baseq3/game;fi
@@ -582,21 +601,7 @@ $(B)/client/snd_wavelet.o \
 	\
 	$(B)/client/unix_main.o \
 	$(B)/client/unix_net.o \
-	$(B)/client/unix_shared.o \
-	\
-	$(B)/client/ahoptim.o  \
-	$(B)/client/autohint.o \
-	$(B)/client/ftbase.o   \
-	$(B)/client/ftdebug.o  \
-	$(B)/client/ftglyph.o  \
-	$(B)/client/ftinit.o   \
-	$(B)/client/ftmm.o     \
-	$(B)/client/ftsystem.o \
-	$(B)/client/raster1.o  \
-	$(B)/client/sfnt.o     \
-	$(B)/client/sfobjs.o   \
-	$(B)/client/smooth.o   \
-	$(B)/client/truetype.o
+	$(B)/client/unix_shared.o
 #	\
 #	$(B)/client/q_parse.o \
 #	$(B)/client/math_quaternion.o \
@@ -679,13 +684,13 @@ endif #FreeBSD
 endif #IRIX
 
 $(B)/$(PLATFORM)quake3 : $(Q3OBJ) $(Q3POBJ)
-	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) $(STEAMWORKS_LDFLAGS)
+	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) $(CLIENT_FREETYPE_LDFLAGS) $(STEAMWORKS_LDFLAGS)
 # TTimo: splines code requires C++ linking, but splines have not been officially included in the codebase
 #	$(CXX)  -o $@ $(Q3OBJ) $(Q3POBJ) $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) 
 
 $(B)/$(PLATFORM)quake3-smp : $(Q3OBJ) $(Q3POBJ_SMP)
 	$(CC)  -o $@ $(Q3OBJ) $(Q3POBJ_SMP) $(GLLDFLAGS) \
-		$(THREAD_LDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) $(STEAMWORKS_LDFLAGS)
+		$(THREAD_LDFLAGS) $(LDFLAGS) $(CLIENT_OGG_LDFLAGS) $(CLIENT_PNG_LDFLAGS) $(CLIENT_FREETYPE_LDFLAGS) $(STEAMWORKS_LDFLAGS)
 
 $(B)/client/cl_cgame.o : $(CDIR)/cl_cgame.c; $(DO_CC)   
 $(B)/client/cl_cin.o : $(CDIR)/cl_cin.c; $(DO_CC)       
@@ -863,20 +868,6 @@ $(B)/client/unzip.o : $(CMDIR)/unzip.c; $(DO_CC)
 $(B)/client/vm.o : $(CMDIR)/vm.c; $(DO_CC) 
 $(B)/client/vm_interpreted.o : $(CMDIR)/vm_interpreted.c; $(DO_CC) 
 
-$(B)/client/ahoptim.o  : $(FTDIR)/ahoptim.c;   $(DO_CC)
-$(B)/client/autohint.o : $(FTDIR)/autohint.c;  $(DO_CC)
-$(B)/client/ftbase.o   : $(FTDIR)/ftbase.c;    $(DO_CC)
-$(B)/client/ftdebug.o  : $(FTDIR)/ftdebug.c;   $(DO_CC)
-$(B)/client/ftglyph.o  : $(FTDIR)/ftglyph.c;   $(DO_CC)
-$(B)/client/ftinit.o   : $(FTDIR)/ftinit.c;    $(DO_CC)
-$(B)/client/ftmm.o     : $(FTDIR)/ftmm.c;      $(DO_CC)
-$(B)/client/ftsystem.o : $(FTDIR)/ftsystem.c;  $(DO_CC)
-$(B)/client/raster1.o  : $(FTDIR)/raster1.c;   $(DO_CC) -DFT_FLAT_COMPILE
-$(B)/client/sfnt.o     : $(FTDIR)/sfnt.c;      $(DO_CC)
-$(B)/client/sfobjs.o   : $(FTDIR)/sfobjs.c;    $(DO_CC)
-$(B)/client/smooth.o   : $(FTDIR)/smooth.c;    $(DO_CC) -DFT_FLAT_COMPILE
-$(B)/client/truetype.o : $(FTDIR)/truetype.c;  $(DO_CC)
-
 # TTimo: took out splines code
 #$(B)/client/q_parse.o : $(SPLNDIR)/q_parse.cpp; $(DO_CXX)
 #$(B)/client/math_quaternion.o : $(SPLNDIR)/math_quaternion.cpp; $(DO_CXX)
@@ -887,47 +878,6 @@ $(B)/client/truetype.o : $(FTDIR)/truetype.c;  $(DO_CC)
 #$(B)/client/math_vector.o : $(SPLNDIR)/math_vector.cpp; $(DO_CXX)
 #$(B)/client/splines.o : $(SPLNDIR)/splines.cpp; $(DO_CXX)
 #$(B)/client/math_matrix.o : $(SPLNDIR)/math_matrix.cpp; $(DO_CXX)
-
-## Included by raster1.c
-# $(B)/client/ftraster.o : $(FTDIR)/ftraster.c;  $(DO_CC)
-# $(B)/client/ftrend1.o  : $(FTDIR)/ftrend1.c;   $(DO_CC)
-
-## Included by autohint.c
-# $(B)/client/ahangles.o : $(FTDIR)/ahangles.c;  $(DO_CC)
-# $(B)/client/ahglyph.o  : $(FTDIR)/ahglyph.c;   $(DO_CC)
-# $(B)/client/ahglobal.o : $(FTDIR)/ahglobal.c;  $(DO_CC)
-# $(B)/client/ahhint.o   : $(FTDIR)/ahhint.c;    $(DO_CC)
-# $(B)/client/ahmodule.o : $(FTDIR)/ahmodule.c;  $(DO_CC)
-
-## Included by ftcalc.c
-# $(B)/client/ftcalc.o   : $(FTDIR)/ftcalc.c;    $(DO_CC)
-# $(B)/client/ftobjs.o   : $(FTDIR)/ftobjs.c;    $(DO_CC)
-# $(B)/client/ftstream.o : $(FTDIR)/ftstream.c;  $(DO_CC)
-# $(B)/client/ftlist.o   : $(FTDIR)/ftlist.c;    $(DO_CC)
-# $(B)/client/ftoutln.o  : $(FTDIR)/ftoutln.c;   $(DO_CC)
-# $(B)/client/ftextend.o : $(FTDIR)/ftextend.c;  $(DO_CC)
-# $(B)/client/ftnames.o  : $(FTDIR)/ftnames.c;   $(DO_CC)
-
-## Included by sfnt.c
-# $(B)/client/ttload.o   : $(FTDIR)/ttload.c;    $(DO_CC)
-# $(B)/client/ttcmap.o   : $(FTDIR)/ttcmap.c;    $(DO_CC)
-# $(B)/client/sfobjs.o   : $(FTDIR)/sfobjs.c;    $(DO_CC)
-# $(B)/client/sfdriver.o : $(FTDIR)/sfdriver.c;  $(DO_CC)
-## Unused in sfnt.c
-# $(B)/client/ttpost.o   : $(FTDIR)/ttpost.c;    $(DO_CC)
-# $(B)/client/ttsbit.o   : $(FTDIR)/ttsbit.c;    $(DO_CC)
-
-## Included by truetype.c
-# $(B)/client/ttdriver.o : $(FTDIR)/ttdriver.c;  $(DO_CC)
-# $(B)/client/ttgload.o  : $(FTDIR)/ttgload.c;   $(DO_CC)
-# $(B)/client/ttobjs.o   : $(FTDIR)/ttobjs.c;    $(DO_CC)
-# $(B)/client/ttpload.o  : $(FTDIR)/ttpload.c;   $(DO_CC)
-## Unused in truetype.c
-# $(B)/client/ttinterp.o : $(FTDIR)/ttinterp.c;  $(DO_CC)
-
-## Included by smooth.c
-# $(B)/client/ftsmooth.o : $(FTDIR)/ftsmooth.c;  $(DO_CC) -DFT_FLAT_COMPILE
-# $(B)/client/ftgrays.o  : $(FTDIR)/ftgrays.c;   $(DO_CC)
 
 #############################################################################
 # DEDICATED SERVER                        
@@ -1701,20 +1651,6 @@ $(B)/q3static/snd_wavelet.o \
 	$(B)/q3static/unix_net.o \
 	$(B)/q3static/unix_shared.o \
 	\
-	$(B)/q3static/ahoptim.o  \
-	$(B)/q3static/autohint.o \
-	$(B)/q3static/ftbase.o   \
-	$(B)/q3static/ftdebug.o  \
-	$(B)/q3static/ftglyph.o  \
-	$(B)/q3static/ftinit.o   \
-	$(B)/q3static/ftmm.o     \
-	$(B)/q3static/ftsystem.o \
-	$(B)/q3static/raster1.o  \
-	$(B)/q3static/sfnt.o     \
-	$(B)/q3static/sfobjs.o   \
-	$(B)/q3static/smooth.o   \
-	$(B)/q3static/truetype.o \
-	\
 	$(B)/q3static/linux_qgl.o \
 	$(B)/q3static/linux_glimp.o \
 	$(B)/q3static/linux_joystick.o \
@@ -1903,20 +1839,6 @@ ifeq ($(DLL_ONLY),false)
 $(B)/q3static/vm_ppc.o : $(CMDIR)/vm_ppc.c; $(DO_CC) -DQ3_STATIC
 endif
 endif
-
-$(B)/q3static/ahoptim.o  : $(FTDIR)/ahoptim.c;   $(DO_CC) -DQ3_STATIC
-$(B)/q3static/autohint.o : $(FTDIR)/autohint.c;  $(DO_CC) -DQ3_STATIC
-$(B)/q3static/ftbase.o   : $(FTDIR)/ftbase.c;    $(DO_CC) -DQ3_STATIC
-$(B)/q3static/ftdebug.o  : $(FTDIR)/ftdebug.c;   $(DO_CC) -DQ3_STATIC
-$(B)/q3static/ftglyph.o  : $(FTDIR)/ftglyph.c;   $(DO_CC) -DQ3_STATIC
-$(B)/q3static/ftinit.o   : $(FTDIR)/ftinit.c;    $(DO_CC) -DQ3_STATIC
-$(B)/q3static/ftmm.o     : $(FTDIR)/ftmm.c;      $(DO_CC) -DQ3_STATIC
-$(B)/q3static/ftsystem.o : $(FTDIR)/ftsystem.c;  $(DO_CC) -DQ3_STATIC
-$(B)/q3static/raster1.o  : $(FTDIR)/raster1.c;   $(DO_CC) -DQ3_STATIC -DFT_FLAT_COMPILE
-$(B)/q3static/sfnt.o     : $(FTDIR)/sfnt.c;      $(DO_CC) -DQ3_STATIC
-$(B)/q3static/sfobjs.o   : $(FTDIR)/sfobjs.c;    $(DO_CC) -DQ3_STATIC
-$(B)/q3static/smooth.o   : $(FTDIR)/smooth.c;    $(DO_CC) -DQ3_STATIC -DFT_FLAT_COMPILE
-$(B)/q3static/truetype.o : $(FTDIR)/truetype.c;  $(DO_CC) -DQ3_STATIC
 
 ## add BASEQ3 CGAME
 Q3SOBJ += \
@@ -2126,7 +2048,7 @@ $(B)/q3static/bg_slidemove.o : $(GDIR)/bg_slidemove.c; $(DO_CC) -DQ3_STATIC
 
 
 $(B)/$(PLATFORM)q3static : $(Q3SOBJ)
-	$(CC) $(CFLAGS) -o $@ $(Q3SOBJ)  $(GLLDFLAGS) $(LDFLAGS) $(STEAMWORKS_LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(Q3SOBJ)  $(GLLDFLAGS) $(LDFLAGS) $(CLIENT_FREETYPE_LDFLAGS) $(STEAMWORKS_LDFLAGS)
 
 
 #############################################################################

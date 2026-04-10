@@ -105,6 +105,7 @@
     <QLBuildOpenSteam Condition="'$(QLBuildOpenSteam)'==''">0</QLBuildOpenSteam>
     <QLEnableOgg Condition="'$(QLEnableOgg)'==''">1</QLEnableOgg>
     <QLEnablePng Condition="'$(QLEnablePng)'==''">1</QLEnablePng>
+    <QLEnableFreeType Condition="'$(QLEnableFreeType)'==''">0</QLEnableFreeType>
   </PropertyGroup>
   <PropertyGroup Label="VorbisSdk">
     <VorbisSdkDir Condition="'$(VorbisSdkDir)'==''">$(ProjectDir)..\libs\vorbis</VorbisSdkDir>
@@ -123,6 +124,16 @@
     <PngLibDir Condition="'$(QLEnablePng)'=='0'"></PngLibDir>
     <PngDependencies Condition="'$(QLEnablePng)'!='0'">libpng16.lib;zlib.lib</PngDependencies>
     <PngDependencies Condition="'$(QLEnablePng)'=='0'"></PngDependencies>
+  </PropertyGroup>
+  <PropertyGroup Label="FreeTypeSdk">
+    <FreeTypeSdkDir Condition="'$(FreeTypeSdkDir)'==''">$(ProjectDir)..\libs\freetype</FreeTypeSdkDir>
+    <FreeTypeIncludeDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeIncludeDir)'==''">$(FreeTypeSdkDir)\include</FreeTypeIncludeDir>
+    <FreeTypeIncludeDir Condition="'$(QLEnableFreeType)'=='0' and '$(FreeTypeIncludeDir)'==''"></FreeTypeIncludeDir>
+    <FreeTypeLibDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeLibDir)'==''">$(FreeTypeSdkDir)\lib\Win32</FreeTypeLibDir>
+    <FreeTypeLibDir Condition="'$(QLEnableFreeType)'=='0' and '$(FreeTypeLibDir)'==''"></FreeTypeLibDir>
+    <FreeTypeDependencies Condition="'$(QLEnableFreeType)'!='0' and Exists('$(FreeTypeLibDir)\freetype.lib')">freetype.lib</FreeTypeDependencies>
+    <FreeTypeDependencies Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeDependencies)'=='' and Exists('$(FreeTypeLibDir)\libfreetype.lib')">libfreetype.lib</FreeTypeDependencies>
+    <FreeTypeDependencies Condition="'$(QLEnableFreeType)'=='0'"></FreeTypeDependencies>
   </PropertyGroup>
   <PropertyGroup Label="Steamworks">
     <SteamworksSdkDir Condition="'$(SteamworksSdkDir)'==''">$(ProjectDir)..\steamworks</SteamworksSdkDir>
@@ -186,8 +197,8 @@
       <PreprocessorDefinitions>QL_BUILD_ONLINE_SERVICES=$(QLBuildOnlineServices);QL_ENABLE_OGG=$(QLEnableOgg);QL_ENABLE_PNG=$(QLEnablePng);QL_AUTH_HAS_CLIENT_BACKEND=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(VorbisLibDir);$(PngLibDir);$(SteamworksLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(VorbisDependencies);$(PngDependencies);$(SteamworksDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VorbisLibDir);$(PngLibDir);$(FreeTypeLibDir);$(SteamworksLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(VorbisDependencies);$(PngDependencies);$(FreeTypeDependencies);$(SteamworksDependencies);%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateManifest>false</GenerateManifest>
       <AdditionalOptions>/MANIFEST:NO /IGNORE:4075 %(AdditionalOptions)</AdditionalOptions>
       <MinimumRequiredVersion>5.01</MinimumRequiredVersion>
@@ -210,6 +221,13 @@
     <Error Condition="!Exists('$(PngLibDir)')" Text="PNG SDK library path '$(PngLibDir)' was not found. Install libpng/zlib import libraries or set QLEnablePng=0." />
     <Error Condition="!Exists('$(PngLibDir)\\libpng16.lib') or !Exists('$(PngLibDir)\\zlib.lib')" Text="PNG support enabled but libpng16.lib/zlib.lib were not found in $(PngLibDir). Provide the SDK import libraries or build with QLEnablePng=0." />
     <Message Text="libpng decoding enabled (include: $(PngIncludeDir), lib: $(PngLibDir))" Importance="High" />
+  </Target>
+  <Target Name="ValidateFreeType" BeforeTargets="Link" Condition="'$(QLEnableFreeType)'=='1'">
+    <Error Condition="!Exists('$(FreeTypeIncludeDir)')" Text="FreeType SDK include path '$(FreeTypeIncludeDir)' was not found. Either install FreeType, override FreeTypeSdkDir, or set QLEnableFreeType=0." />
+    <Error Condition="!Exists('$(FreeTypeIncludeDir)\\ft2build.h')" Text="FreeType headers missing under $(FreeTypeIncludeDir). Install FreeType development headers or set QLEnableFreeType=0." />
+    <Error Condition="!Exists('$(FreeTypeLibDir)')" Text="FreeType SDK library path '$(FreeTypeLibDir)' was not found. Install FreeType import libraries, override FreeTypeSdkDir, or set QLEnableFreeType=0." />
+    <Error Condition="'$(FreeTypeDependencies)'==''" Text="FreeType support enabled but neither freetype.lib nor libfreetype.lib was found in $(FreeTypeLibDir). Provide the import library or set QLEnableFreeType=0." />
+    <Message Text="FreeType support enabled (include: $(FreeTypeIncludeDir), lib: $(FreeTypeLibDir)\\$(FreeTypeDependencies))" Importance="High" />
   </Target>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'">
     <ClCompile>

@@ -2994,6 +2994,59 @@ void RB_ShowImages( void ) {
 
 }
 
+/*
+===============
+RB_ShowFontAtlas
+===============
+*/
+static void RB_ShowFontAtlas( void ) {
+	image_t	*image;
+	float	x;
+	float	y;
+	float	w;
+	float	h;
+	float	scale;
+	float	maxWidth;
+	float	maxHeight;
+	int		atlasWidth;
+	int		atlasHeight;
+
+	if ( !R_GetFontStashDebugInfo( &image, &atlasWidth, &atlasHeight ) || !image ) {
+		return;
+	}
+
+	if ( !backEnd.projection2D ) {
+		RB_SetGL2D();
+	}
+
+	maxWidth = glConfig.vidWidth - 32.0f;
+	maxHeight = glConfig.vidHeight - 32.0f;
+	scale = 1.0f;
+	if ( atlasWidth > 0 && atlasWidth > maxWidth ) {
+		scale = maxWidth / atlasWidth;
+	}
+	if ( atlasHeight > 0 && atlasHeight * scale > maxHeight ) {
+		scale = maxHeight / atlasHeight;
+	}
+
+	x = 16.0f;
+	y = 16.0f;
+	w = atlasWidth * scale;
+	h = atlasHeight * scale;
+
+	GL_Bind( image );
+	qglColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	qglBegin( GL_QUADS );
+	qglTexCoord2f( 0, 0 );
+	qglVertex2f( x, y );
+	qglTexCoord2f( 1, 0 );
+	qglVertex2f( x + w, y );
+	qglTexCoord2f( 1, 1 );
+	qglVertex2f( x + w, y + h );
+	qglTexCoord2f( 0, 1 );
+	qglVertex2f( x, y + h );
+	qglEnd();
+}
 
 /*
 =============
@@ -3014,6 +3067,9 @@ const void	*RB_SwapBuffers( const void *data ) {
 	// texture swapping test
 	if ( r_showImages->integer ) {
 		RB_ShowImages();
+	}
+	if ( r_debugFontAtlas->integer ) {
+		RB_ShowFontAtlas();
 	}
 
 	cmd = (const swapBuffersCommand_t *)data;

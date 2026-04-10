@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/q_shared.h"
 #include "qcommon.h"
 
+void CL_WebView_PublishCvarChange( const char *name, const char *value, qboolean replicate );
+
 cvar_t		*cvar_vars;
 cvar_t		*cvar_cheats;
 int			cvar_modifiedFlags;
@@ -446,6 +448,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	var->string = CopyString(value);
 	var->value = atof (var->string);
 	var->integer = atoi (var->string);
+	CL_WebView_PublishCvarChange( var->name, var->string, ( ( var->flags & CVAR_PROTECTED ) || ( (unsigned int)var->flags & 0x80000000u ) ) ? qtrue : qfalse );
 
 	return var;
 }
@@ -807,6 +810,63 @@ void Cvar_WriteCloudVariables( fileHandle_t f ) {
 
 /*
 =============
+Cvar_WriteQLConfigVariables
+
+Writes the retail Quake Live config split, routing protected/replicated
+variables to the replicate file and optionally restricting output to modified
+cloud-backed client config entries.
+=============
+*/
+void Cvar_WriteQLConfigVariables( fileHandle_t hardwareFile, fileHandle_t replicateFile, qboolean clientConfigOnly ) {
+	cvar_t		*var;
+	char		buffer[1024];
+	fileHandle_t	targetFile;
+	const char	*value;
+
+	if ( !hardwareFile ) {
+		return;
+	}
+
+	if ( !replicateFile ) {
+		replicateFile = hardwareFile;
+	}
+
+	for ( var = cvar_vars ; var ; var = var->next ) {
+		if ( !Q_stricmp( var->name, "cl_cdkey" ) || !Q_stricmp( var->name, "password" ) ) {
+			continue;
+		}
+
+		if ( !( var->flags & ( CVAR_ARCHIVE | CVAR_PROTECTED ) ) ) {
+			continue;
+		}
+
+		value = var->latchedString ? var->latchedString : var->string;
+		if ( !value ) {
+			value = "";
+		}
+
+		if ( clientConfigOnly ) {
+			if ( !( var->flags & CVAR_CLOUD ) ) {
+				continue;
+			}
+
+			if ( !Q_stricmp( value, var->resetString ? var->resetString : "" ) ) {
+				continue;
+			}
+		}
+
+		targetFile = hardwareFile;
+		if ( ( var->flags & CVAR_PROTECTED ) || ( (unsigned int)var->flags & 0x80000000u ) ) {
+			targetFile = replicateFile;
+		}
+
+		Com_sprintf( buffer, sizeof( buffer ), "seta %s \"%s\"\n", var->name, value );
+		FS_Printf( targetFile, "%s", buffer );
+	}
+}
+
+/*
+=============
 Cvar_EnumerateCloudVariables
 
 Invokes a callback for each CVAR_CLOUD variable using the effective value.
@@ -828,6 +888,25 @@ void Cvar_EnumerateCloudVariables( void (*callback)( const char *name, const cha
 
 		value = var->latchedString ? var->latchedString : var->string;
 		callback( var->name, value, userData );
+	}
+}
+
+/*
+=============
+Cvar_EnumerateVariables
+
+Invokes a callback for each registered cvar using the retained global list.
+=============
+*/
+void Cvar_EnumerateVariables( void (*callback)( const cvar_t *var, void *userData ), void *userData ) {
+	cvar_t *var;
+
+	if ( !callback ) {
+		return;
+	}
+
+	for ( var = cvar_vars; var; var = var->next ) {
+		callback( var, userData );
 	}
 }
 

@@ -79,6 +79,20 @@ project metadata still matches the recovered retail VC10-era settings.
 Run `pwsh tools/ci/audit-retail-metadata.ps1` to confirm the executable version
 resources and embedded manifests still mirror the retail launcher and helper.
 
+The native client host now also has a dedicated closure lane. Refresh the
+tracked client runtime bundle with:
+
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/client/run_client_runtime_probe.ps1`
+
+This writes `artifacts/client_validation/logs/client_runtime_evidence_20260410.json`.
+Then run:
+
+- `pytest tests/test_client_full_parity_gate.py -q`
+
+to publish `artifacts/client_validation/logs/client_full_parity_gate.json`,
+which is the machine-readable `CL-P6` closure artifact consumed by the client
+validation workflow.
+
 ## Validating against the reference DLLs
 
 The repository ships Quake Live’s original binaries under `assets/quakelive/baseq3/`. Compare the newly built artefacts against those DLLs using `dumpbin /exports` and `dumpbin /imports` to ensure the export table is identical (`dllEntry`, `vmMain`) and that the only CRT dependencies are `MSVCR100.dll`/`MSVCP100.dll`. The CI helpers described in [`docs/toolchain-ci.md`](toolchain-ci.md) automate these checks for pull requests, including an export manifest enforced by `tools/ci/assert-dll-exports.ps1`.

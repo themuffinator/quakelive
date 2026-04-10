@@ -1514,6 +1514,9 @@ void R_Init( void ) {
 	ri.Printf( PRINT_ALL, "R_Init: InitFreeType\n" );
 	R_InitFreeType();
 
+	ri.Printf( PRINT_ALL, "R_Init: InitFontStash\n" );
+	R_InitFontStash();
+
 
 	err = qglGetError();
 	if ( err != GL_NO_ERROR )
@@ -1542,6 +1545,7 @@ void RE_Shutdown( qboolean destroyWindow ) {
 	ri.Cmd_RemoveCommand( "postprocess_restart" );
 	ri.Cmd_RemoveCommand( "shaderstate" );
 
+	R_DoneFontStash();
 
 	if ( tr.registered ) {
 		R_SyncRenderThread();

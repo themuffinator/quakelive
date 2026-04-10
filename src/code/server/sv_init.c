@@ -392,16 +392,18 @@ static void SV_SteamServerPublishIdentity( void ) {
 	uint32_t			steamIdHigh;
 	unsigned long long	steamIdValue;
 	char				steamIdString[32];
+	const char			*referencedSteamworks;
 
 	if ( !QL_Steamworks_ServerGetSteamID( &steamIdLow, &steamIdHigh ) ) {
 		return;
 	}
 
 	steamIdValue = ( (unsigned long long)steamIdHigh << 32 ) | steamIdLow;
+	referencedSteamworks = FS_ReferencedSteamworks();
 	Com_sprintf( steamIdString, sizeof( steamIdString ), "%llu", steamIdValue );
 	SV_SetConfigstring( 0x2ca, steamIdString );
-	Cvar_Set( "sv_referencedSteamworks", steamIdString );
-	SV_SetConfigstring( 0x2cb, steamIdString );
+	Cvar_Set( "sv_referencedSteamworks", referencedSteamworks );
+	SV_SetConfigstring( 0x2cb, referencedSteamworks );
 }
 
 /*

@@ -14,6 +14,16 @@ typedef struct {
 	qhandle_t	shader;
 } clSteamResource_t;
 
+typedef struct {
+	byte		*buffer;
+	int			bufferLength;
+	byte		*rgbaPixels;
+	int			width;
+	int			height;
+	char		mimeType[64];
+	qboolean	fromSteamDataSource;
+} clSteamDataSourceResponse_t;
+
 static clSteamResource_t cl_steamResources[MAX_STEAM_RESOURCES];
 static unsigned int cl_steamResourceGeneration = 1;
 
@@ -314,6 +324,136 @@ static qboolean CL_SteamResources_RequestAvatarRGBA( const char *url, byte **out
 
 /*
 =============
+CL_SteamDataSource_ClearResponse
+=============
+*/
+static void CL_SteamDataSource_ClearResponse( clSteamDataSourceResponse_t *response ) {
+	if ( !response ) {
+		return;
+	}
+
+	Com_Memset( response, 0, sizeof( *response ) );
+}
+
+/*
+=============
+CL_SteamDataSource_GuessMimeType
+=============
+*/
+static const char *CL_SteamDataSource_GuessMimeType( const char *url ) {
+	const char *extension;
+
+	if ( !url ) {
+		return "application/octet-stream";
+	}
+
+	extension = strrchr( url, '.' );
+	if ( !extension ) {
+		return "application/octet-stream";
+	}
+
+	if ( !Q_stricmp( extension, ".jpg" ) || !Q_stricmp( extension, ".jpeg" ) ) {
+		return "image/jpeg";
+	}
+
+	if ( !Q_stricmp( extension, ".png" ) ) {
+		return "image/png";
+	}
+
+	if ( !Q_stricmp( extension, ".gif" ) ) {
+		return "image/gif";
+	}
+
+	if ( !Q_stricmp( extension, ".html" ) || !Q_stricmp( extension, ".htm" ) ) {
+		return "text/html";
+	}
+
+	if ( !Q_stricmp( extension, ".js" ) ) {
+		return "application/javascript";
+	}
+
+	if ( !Q_stricmp( extension, ".css" ) ) {
+		return "text/css";
+	}
+
+	if ( !Q_stricmp( extension, ".json" ) ) {
+		return "application/json";
+	}
+
+	return "application/octet-stream";
+}
+
+/*
+=============
+CL_SteamDataSource_Request
+
+Reconstructs the retail SteamDataSource owner by servicing `steam://` resource
+requests through the retained avatar/image bridge and launcher-compatible URL
+loader surface.
+=============
+*/
+static qboolean CL_SteamDataSource_Request( const char *url, clSteamDataSourceResponse_t *response ) {
+	if ( !url || !response || !CL_SteamResources_IsSteamURL( url ) ) {
+		return qfalse;
+	}
+
+	CL_SteamDataSource_ClearResponse( response );
+	response->fromSteamDataSource = qtrue;
+
+	if ( CL_SteamResources_IsAvatarURL( url ) ) {
+		if ( !CL_SteamServicesEnabled() ) {
+			Com_Printf( "Steam backend disabled by build/runtime policy for %s\n", url ? url : "<null>" );
+			return qfalse;
+		}
+
+		if ( !CL_SteamResources_RequestAvatarRGBA( url, &response->rgbaPixels, &response->width, &response->height ) ) {
+			Com_Printf( "Steam backend unavailable for %s\n", url ? url : "<null>" );
+			return qfalse;
+		}
+
+		Q_strncpyz( response->mimeType, "image/rgba", sizeof( response->mimeType ) );
+		return qtrue;
+	}
+
+	if ( !CL_SteamServicesEnabled() ) {
+		Com_Printf( "Steam backend disabled by build/runtime policy for %s\n", url ? url : "<null>" );
+		return qfalse;
+	}
+
+	Com_Printf( "Steam backend unavailable for %s\n", url ? url : "<null>" );
+	return qfalse;
+}
+
+/*
+=============
+QLResourceInterceptor_OnRequest
+
+Reconstructs the retained browser-resource interceptor by routing `steam://`
+requests through SteamDataSource and every other URI through the launcher/web
+filesystem fallback owner.
+=============
+*/
+static qboolean QLResourceInterceptor_OnRequest( const char *url, clSteamDataSourceResponse_t *response ) {
+	if ( !url || !response ) {
+		return qfalse;
+	}
+
+	if ( CL_SteamDataSource_Request( url, response ) ) {
+		return qtrue;
+	}
+
+	CL_SteamDataSource_ClearResponse( response );
+	if ( CL_LauncherRequestData( url, (void **)&response->buffer, &response->bufferLength ) ) {
+		Q_strncpyz( response->mimeType, CL_SteamDataSource_GuessMimeType( url ), sizeof( response->mimeType ) );
+		return qtrue;
+	}
+
+	Com_Printf( "Launcher resource backend unavailable for %s\n", url ? url : "<null>" );
+	return qfalse;
+}
+
+/*
+=============
 CL_Steam_RegisterShader
 
 Resolves a live Steam- or launcher-backed image resource into a renderer
@@ -354,28 +494,37 @@ qhandle_t CL_Steam_RegisterShader( const char *url ) {
 	CL_SteamResources_BuildRendererName( url, slot, rendererName, sizeof( rendererName ) );
 
 	if ( CL_SteamResources_IsAvatarURL( url ) ) {
-		rgbaPixels = NULL;
-		width = 0;
-		height = 0;
-
 		if ( !CL_SteamResources_RequestAvatarRGBA( url, &rgbaPixels, &width, &height ) ) {
-			Com_Printf( "UI: unable to satisfy in-memory avatar request for %s\n", url );
+			Com_Printf( "UI: unable to satisfy avatar resource request for %s\n", url );
 			return 0;
 		}
 
 		shader = CL_RegisterShaderFromRGBA( rendererName, rgbaPixels, width, height, qfalse );
 		QL_Steamworks_FreeBuffer( rgbaPixels );
 	} else {
-		buffer = NULL;
-		bufferLength = 0;
+		clSteamDataSourceResponse_t response;
 
-		if ( !Sys_Steam_RequestURL( url, &buffer, &bufferLength ) || !buffer || bufferLength <= 0 ) {
+		CL_SteamDataSource_ClearResponse( &response );
+		if ( !QLResourceInterceptor_OnRequest( url, &response ) ) {
 			Com_Printf( "UI: unable to satisfy in-memory resource request for %s\n", url );
 			return 0;
 		}
 
-		shader = CL_RegisterShaderFromMemory( rendererName, buffer, bufferLength, qfalse );
-		Sys_Steam_FreeRequestBuffer( buffer );
+		rgbaPixels = response.rgbaPixels;
+		width = response.width;
+		height = response.height;
+		buffer = response.buffer;
+		bufferLength = response.bufferLength;
+
+		if ( buffer && bufferLength > 0 ) {
+			shader = CL_RegisterShaderFromMemory( rendererName, buffer, bufferLength, qfalse );
+			Sys_Steam_FreeRequestBuffer( buffer );
+		} else if ( rgbaPixels ) {
+			shader = CL_RegisterShaderFromRGBA( rendererName, rgbaPixels, width, height, qfalse );
+			QL_Steamworks_FreeBuffer( rgbaPixels );
+		} else {
+			return 0;
+		}
 	}
 
 	if ( !shader ) {
@@ -445,6 +594,8 @@ renderer image bridge.
 =============
 */
 qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize ) {
+	clSteamDataSourceResponse_t response;
+
 	if ( outBuffer ) {
 		*outBuffer = NULL;
 	}
@@ -453,21 +604,28 @@ qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize )
 		*outSize = 0;
 	}
 
-	if ( CL_LauncherRequestData( url, (void **)outBuffer, outSize ) ) {
-		return qtrue;
-	}
-
-	if ( CL_SteamResources_IsSteamURL( url ) ) {
-		if ( !CL_SteamServicesEnabled() ) {
-			Com_Printf( "Steam backend disabled by build/runtime policy for %s\n", url ? url : "<null>" );
-		} else {
-			Com_Printf( "Steam backend unavailable for %s\n", url ? url : "<null>" );
-		}
-	} else {
+	CL_SteamDataSource_ClearResponse( &response );
+	if ( !QLResourceInterceptor_OnRequest( url, &response ) ) {
 		Com_Printf( "Launcher resource backend unavailable for %s\n", url ? url : "<null>" );
+		return qfalse;
 	}
 
-	return qfalse;
+	if ( !response.buffer || response.bufferLength <= 0 ) {
+		if ( response.rgbaPixels ) {
+			QL_Steamworks_FreeBuffer( response.rgbaPixels );
+		}
+		Com_Printf( "Launcher resource backend unavailable for %s\n", url ? url : "<null>" );
+		return qfalse;
+	}
+
+	if ( outBuffer ) {
+		*outBuffer = response.buffer;
+	}
+	if ( outSize ) {
+		*outSize = response.bufferLength;
+	}
+
+	return qtrue;
 }
 
 /*

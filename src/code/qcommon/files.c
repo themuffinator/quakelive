@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "vm_local.h"
 #include "unzip.h"
+#include "../../common/platform/platform_steamworks.h"
 #include <stdlib.h>
 #include <stdint.h>
 #if defined(_WIN32)
@@ -214,11 +215,14 @@ typedef struct pack_s {
 	int				hashSize;					// hash table size (power of 2)
 	fileInPack_t*	*hashTable;					// hash table
 	fileInPack_t*	buildBuffer;				// buffer with the filenames etc.
+	unsigned int	steamItemIdLow;				// retail searchpath metadata for workshop-backed packs
+	unsigned int	steamItemIdHigh;
 } pack_t;
 
 typedef struct {
 	char		path[MAX_OSPATH];		// c:\quake3
 	char		gamedir[MAX_OSPATH];	// baseq3
+	qboolean	rawPath;				// retail workshop install roots already include their full mount path
 } directory_t;
 
 typedef struct searchpath_s {
@@ -239,6 +243,7 @@ static	cvar_t		*fs_copyfiles;
 static	cvar_t		*fs_webpath;
 static	cvar_t		*fs_gamedirvar;
 static	cvar_t		*fs_restrict;
+static	cvar_t		*fs_skipWorkshop;
 static	cvar_t		*fs_webMappings;
 static	searchpath_t	*fs_searchpaths;
 static	int			fs_readCount;			// total bytes read
@@ -514,6 +519,82 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 	return ospath[toggle];
 }
 
+/*
+===================
+FS_BuildSearchPathOSPath
+
+Builds an OS path for either a normal game directory or a retail workshop
+install root that already contains its full mount path.
+===================
+*/
+static char *FS_BuildSearchPathOSPath( const directory_t *dir, const char *qpath ) {
+	char		temp[MAX_OSPATH];
+	static char	ospath[2][MAX_OSPATH];
+	static int	toggle;
+
+	if ( !dir ) {
+		return NULL;
+	}
+
+	if ( !dir->rawPath ) {
+		return FS_BuildOSPath( dir->path, dir->gamedir, qpath ? qpath : "" );
+	}
+
+	toggle ^= 1;
+	if ( !qpath || !qpath[0] ) {
+		Q_strncpyz( ospath[toggle], dir->path, sizeof( ospath[0] ) );
+		return ospath[toggle];
+	}
+
+	Com_sprintf( temp, sizeof( temp ), "/%s", qpath );
+	FS_ReplaceSeparators( temp );
+	Com_sprintf( ospath[toggle], sizeof( ospath[0] ), "%s%s", dir->path, temp );
+
+	return ospath[toggle];
+}
+
+/*
+===================
+FS_SearchPathMatchesDirectory
+===================
+*/
+static qboolean FS_SearchPathMatchesDirectory( const searchpath_t *search, const char *path, const char *dir, qboolean rawPath ) {
+	if ( !search || !search->dir || !path ) {
+		return qfalse;
+	}
+
+	if ( search->dir->rawPath != rawPath ) {
+		return qfalse;
+	}
+
+	if ( Q_stricmp( search->dir->path, path ) ) {
+		return qfalse;
+	}
+
+	return !Q_stricmp( search->dir->gamedir, dir ? dir : "" );
+}
+
+/*
+===================
+FS_SearchPathHasPack
+===================
+*/
+static qboolean FS_SearchPathHasPack( const char *pakFilename ) {
+	searchpath_t	*search;
+
+	if ( !pakFilename || !pakFilename[0] ) {
+		return qfalse;
+	}
+
+	for ( search = fs_searchpaths ; search ; search = search->next ) {
+		if ( search->pack && !Q_stricmp( search->pack->pakFilename, pakFilename ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
 
 /*
 =============
@@ -731,6 +812,8 @@ qboolean FS_FileExists( const char *file )
 	}
 	return qfalse;
 }
+
+static qboolean FS_FileExistsOnDisk( const char *path );
 
 static qboolean FS_PathHasPrefix( const char *path, const char *prefix );
 
@@ -1545,7 +1628,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 			} else if ( search->dir ) {
 				dir = search->dir;
 
-				netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
+				netpath = FS_BuildSearchPathOSPath( dir, filename );
 				temp = fopen (netpath, "rb");
 				if ( !temp ) {
 					continue;
@@ -1699,7 +1782,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 
 			dir = search->dir;
 
-			netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
+			netpath = FS_BuildSearchPathOSPath( dir, filename );
 			fsh[*file].handleFiles.file.o = fopen (netpath, "rb");
 			if ( !fsh[*file].handleFiles.file.o ) {
 				continue;
@@ -1716,8 +1799,12 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 			Q_strncpyz( fsh[*file].name, filename, sizeof( fsh[*file].name ) );
 			fsh[*file].zipFile = qfalse;
 			if ( fs_debug->integer ) {
-				Com_Printf( "FS_FOpenFileRead: %s (found in '%s/%s')\n", filename,
-					dir->path, dir->gamedir );
+				if ( dir->rawPath ) {
+					Com_Printf( "FS_FOpenFileRead: %s (found in '%s')\n", filename, dir->path );
+				} else {
+					Com_Printf( "FS_FOpenFileRead: %s (found in '%s/%s')\n", filename,
+						dir->path, dir->gamedir );
+				}
 			}
 
 			// if we are getting it from the cdpath, optionally copy it
@@ -1725,8 +1812,10 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 			if ( fs_copyfiles->integer && !Q_stricmp( dir->path, fs_cdpath->string ) ) {
 				char	*copypath;
 
-				copypath = FS_BuildOSPath( fs_basepath->string, dir->gamedir, filename );
-				FS_CopyFile( netpath, copypath );
+				if ( !dir->rawPath ) {
+					copypath = FS_BuildOSPath( fs_basepath->string, dir->gamedir, filename );
+					FS_CopyFile( netpath, copypath );
+				}
 			}
 
 			return FS_filelength (*file);
@@ -2671,7 +2760,7 @@ char **FS_ListFilteredFiles( const char *path, const char *extension, char *filt
 			if ( fs_restrict->integer || fs_numServerPaks ) {
 		        continue;
 		    } else {
-				netpath = FS_BuildOSPath( search->dir->path, search->dir->gamedir, path );
+				netpath = FS_BuildSearchPathOSPath( search->dir, path );
 				sysFiles = Sys_ListFiles( netpath, extension, filter, &numSysFiles, qfalse );
 				for ( i = 0 ; i < numSysFiles ; i++ ) {
 					// unique the match
@@ -3193,7 +3282,11 @@ void FS_Path_f( void ) {
 				}
 			}
 		} else {
-			Com_Printf ("%s/%s\n", s->dir->path, s->dir->gamedir );
+			if ( s->dir->rawPath ) {
+				Com_Printf( "%s\n", s->dir->path );
+			} else {
+				Com_Printf ("%s/%s\n", s->dir->path, s->dir->gamedir );
+			}
 		}
 	}
 
@@ -3249,7 +3342,7 @@ then loads the zip headers
 ================
 */
 #define	MAX_PAKFILES	1024
-static void FS_AddGameDirectory( const char *path, const char *dir ) {
+static void FS_AddGameDirectoryInternal( const char *path, const char *dir, qboolean rawPath, unsigned int steamItemIdLow, unsigned int steamItemIdHigh ) {
 	searchpath_t	*sp;
 	int				i;
 	searchpath_t	*search;
@@ -3258,33 +3351,54 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	int				numfiles;
 	char			**pakfiles;
 	char			*sorted[MAX_PAKFILES];
+	const char		*gameDir;
+	char			pakRoot[MAX_OSPATH];
+	char			pakPath[MAX_OSPATH];
+	qboolean		haveDirectory;
 
-	// this fixes the case where fs_basepath is the same as fs_cdpath
-	// which happens on full installs
+	if ( !path || !path[0] ) {
+		return;
+	}
+
+	gameDir = dir ? dir : "";
+	haveDirectory = qfalse;
+
 	for ( sp = fs_searchpaths ; sp ; sp = sp->next ) {
-		if ( sp->dir && !Q_stricmp(sp->dir->path, path) && !Q_stricmp(sp->dir->gamedir, dir)) {
-			return;			// we've already got this one
+		if ( FS_SearchPathMatchesDirectory( sp, path, gameDir, rawPath ) ) {
+			haveDirectory = qtrue;
+			break;
 		}
 	}
 
-	Q_strncpyz( fs_gamedir, dir, sizeof( fs_gamedir ) );
+	if ( !rawPath ) {
+		Q_strncpyz( fs_gamedir, gameDir, sizeof( fs_gamedir ) );
+	}
 
-	//
-	// add the directory to the search path
-	//
-	search = Z_Malloc (sizeof(searchpath_t));
-	search->dir = Z_Malloc( sizeof( *search->dir ) );
+	if ( !haveDirectory ) {
+		search = Z_Malloc (sizeof(searchpath_t));
+		search->dir = Z_Malloc( sizeof( *search->dir ) );
 
-	Q_strncpyz( search->dir->path, path, sizeof( search->dir->path ) );
-	Q_strncpyz( search->dir->gamedir, dir, sizeof( search->dir->gamedir ) );
-	search->next = fs_searchpaths;
-	fs_searchpaths = search;
+		Q_strncpyz( search->dir->path, path, sizeof( search->dir->path ) );
+		Q_strncpyz( search->dir->gamedir, gameDir, sizeof( search->dir->gamedir ) );
+		search->dir->rawPath = rawPath;
+		search->next = fs_searchpaths;
+		fs_searchpaths = search;
+	}
 
-	// find all pak files in this directory
-	pakfile = FS_BuildOSPath( path, dir, "" );
-	pakfile[ strlen(pakfile) - 1 ] = 0;	// strip the trailing slash
+	if ( rawPath ) {
+		Q_strncpyz( pakRoot, path, sizeof( pakRoot ) );
+	} else {
+		pakfile = FS_BuildOSPath( path, gameDir, "" );
+		Q_strncpyz( pakRoot, pakfile, sizeof( pakRoot ) );
+		if ( pakRoot[0] ) {
+			pakRoot[ strlen( pakRoot ) - 1 ] = 0;
+		}
+	}
 
-	pakfiles = Sys_ListFiles( pakfile, ".pk3", NULL, &numfiles, qfalse );
+	pakfiles = Sys_ListFiles( pakRoot, ".pk3", NULL, &numfiles, qfalse );
+	if ( !pakfiles ) {
+		return;
+	}
 
 	// sort them so that later alphabetic matches override
 	// earlier ones.  This makes pak01.pk3 override pak00.pk3
@@ -3298,11 +3412,21 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	qsort( sorted, numfiles, 4, paksort );
 
 	for ( i = 0 ; i < numfiles ; i++ ) {
-		pakfile = FS_BuildOSPath( path, dir, sorted[i] );
-		if ( ( pak = FS_LoadZipFile( pakfile, sorted[i] ) ) == 0 )
+		if ( rawPath ) {
+			Com_sprintf( pakPath, sizeof( pakPath ), "%s%c%s", pakRoot, PATH_SEP, sorted[i] );
+		} else {
+			Q_strncpyz( pakPath, FS_BuildOSPath( path, gameDir, sorted[i] ), sizeof( pakPath ) );
+		}
+
+		if ( FS_SearchPathHasPack( pakPath ) ) {
 			continue;
-		// store the game name for downloading
-		strcpy(pak->pakGamename, dir);
+		}
+
+		if ( ( pak = FS_LoadZipFile( pakPath, sorted[i] ) ) == 0 )
+			continue;
+		Q_strncpyz( pak->pakGamename, gameDir, sizeof( pak->pakGamename ) );
+		pak->steamItemIdLow = steamItemIdLow;
+		pak->steamItemIdHigh = steamItemIdHigh;
 
 		search = Z_Malloc (sizeof(searchpath_t));
 		search->pack = pak;
@@ -3312,6 +3436,110 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 
 	// done
 	Sys_FreeFileList( pakfiles );
+}
+
+/*
+================
+FS_AddGameDirectory
+================
+*/
+static void FS_AddGameDirectory( const char *path, const char *dir ) {
+	FS_AddGameDirectoryInternal( path, dir, qfalse, 0u, 0u );
+}
+
+/*
+================
+FS_HasBasePak0
+================
+*/
+static qboolean FS_HasBasePak0( const char *gameName ) {
+	const char	*roots[3];
+	int			i;
+
+	roots[0] = fs_homepath ? fs_homepath->string : "";
+	roots[1] = fs_basepath ? fs_basepath->string : "";
+	roots[2] = fs_cdpath ? fs_cdpath->string : "";
+
+	for ( i = 0 ; i < 3 ; i++ ) {
+		if ( !roots[i] || !roots[i][0] ) {
+			continue;
+		}
+
+		if ( FS_FileExistsOnDisk( FS_BuildOSPath( roots[i], gameName, "pak00.pk3" ) ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+================
+FS_SteamWorkshopInit
+
+Mirrors the retail workshop startup pass by enumerating subscribed items,
+querying their install folders, and mounting their pk3 payloads with retained
+workshop item IDs.
+================
+*/
+static void FS_SteamWorkshopInit( const char *gameName ) {
+	uint32_t	i;
+	uint32_t	subscribedCount;
+	uint32_t	mountedCount;
+	uint64_t	*itemIds;
+
+	if ( !gameName || Q_stricmp( gameName, BASEGAME ) ) {
+		return;
+	}
+
+	if ( fs_skipWorkshop && fs_skipWorkshop->integer ) {
+		return;
+	}
+
+	if ( com_buildScript && com_buildScript->integer ) {
+		return;
+	}
+
+	if ( !FS_HasBasePak0( gameName ) ) {
+		return;
+	}
+
+	subscribedCount = QL_Steamworks_GetNumSubscribedItems();
+	if ( subscribedCount == 0u ) {
+		return;
+	}
+
+	itemIds = Z_Malloc( subscribedCount * sizeof( *itemIds ) );
+	mountedCount = QL_Steamworks_GetSubscribedItems( itemIds, subscribedCount );
+	if ( mountedCount > subscribedCount ) {
+		mountedCount = subscribedCount;
+	}
+
+	for ( i = 0 ; i < mountedCount ; i++ ) {
+		uint32_t	idLow;
+		uint32_t	idHigh;
+		uint64_t	sizeOnDisk;
+		uint32_t	timestamp;
+		char		installFolder[MAX_OSPATH];
+
+		idLow = (uint32_t)( itemIds[i] & 0xffffffffu );
+		idHigh = (uint32_t)( itemIds[i] >> 32 );
+		sizeOnDisk = 0ull;
+		timestamp = 0u;
+		installFolder[0] = '\0';
+
+		if ( !QL_Steamworks_GetItemInstallInfo( idLow, idHigh, &sizeOnDisk, installFolder, sizeof( installFolder ), &timestamp ) ) {
+			continue;
+		}
+
+		if ( !installFolder[0] ) {
+			continue;
+		}
+
+		FS_AddGameDirectoryInternal( installFolder, "", qtrue, idLow, idHigh );
+	}
+
+	Z_Free( itemIds );
 }
 
 /*
@@ -3638,6 +3866,7 @@ static void FS_Startup( const char *gameName ) {
 	fs_webMappings = Cvar_Get ("fs_webMappings", fs_defaultFallbackMappings, CVAR_ARCHIVE );
 	fs_gamedirvar = Cvar_Get ("fs_game", "", CVAR_INIT|CVAR_SYSTEMINFO );
 	fs_restrict = Cvar_Get ("fs_restrict", "", CVAR_INIT );
+	fs_skipWorkshop = Cvar_Get( "fs_skipWorkshop", "0", CVAR_ARCHIVE );
 
 	FS_ParseFallbackMappings( fs_webMappings->string );
 
@@ -3679,6 +3908,8 @@ static void FS_Startup( const char *gameName ) {
 			FS_AddGameDirectory(fs_homepath->string, fs_gamedirvar->string);
 		}
 	}
+
+	FS_SteamWorkshopInit( gameName );
 
 	Com_ReadCDKey( "baseq3" );
 	fs = Cvar_Get ("fs_game", "", CVAR_INIT|CVAR_SYSTEMINFO );
@@ -3949,6 +4180,44 @@ const char *FS_ReferencedPakNames( void ) {
 
 /*
 =====================
+FS_ReferencedSteamworks
+
+Returns a deduplicated space separated string containing the workshop item IDs
+for referenced mounted packs.
+=====================
+*/
+const char *FS_ReferencedSteamworks( void ) {
+	static char		info[BIG_INFO_STRING];
+	searchpath_t	*search;
+
+	info[0] = 0;
+
+	for ( search = fs_searchpaths ; search ; search = search->next ) {
+		unsigned long long	itemId;
+		char				itemString[32];
+
+		if ( !search->pack || !search->pack->referenced ) {
+			continue;
+		}
+
+		if ( ( search->pack->steamItemIdLow | search->pack->steamItemIdHigh ) == 0 ) {
+			continue;
+		}
+
+		itemId = ( (unsigned long long)search->pack->steamItemIdHigh << 32 ) | search->pack->steamItemIdLow;
+		Com_sprintf( itemString, sizeof( itemString ), "%llu", itemId );
+		if ( strstr( info, itemString ) ) {
+			continue;
+		}
+
+		Q_strcat( info, sizeof( info ), va( "%llu ", itemId ) );
+	}
+
+	return info;
+}
+
+/*
+=====================
 FS_ClearPakReferences
 =====================
 */
@@ -4161,9 +4430,9 @@ void FS_Restart( int checksumFeed ) {
 
 	// bk010116 - new check before safeMode
 	if ( Q_stricmp(fs_gamedirvar->string, lastValidGame) ) {
-		// skip the q3config.cfg if "safe" is on the command line
+		// skip the qzconfig.cfg bootstrap if "safe" is on the command line
 		if ( !Com_SafeMode() ) {
-			Cbuf_AddText ("exec q3config.cfg\n");
+			Cbuf_AddText ("exec qzconfig.cfg\n");
 		}
 	}
 

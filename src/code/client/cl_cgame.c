@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdlib.h>
 #ifdef _WIN32
 #include <windows.h>
+#include "../win32/win_local.h"
 #endif
 
 extern	botlib_export_t	*botlib_export;
@@ -58,6 +59,1252 @@ typedef struct {
 
 static clAdvertisementBridgeState_t cl_advertisementBridge;
 
+#define CL_WEB_FRIEND_FLAGS 4
+#define CL_WEB_MAX_QZ_METHODS 20
+#define CL_WEB_JSON_BUFFER_SIZE 32768
+
+typedef enum {
+	CL_WEB_METHOD_IS_PAK_FILE_PRESENT = 1,
+	CL_WEB_METHOD_IS_GAME_RUNNING,
+	CL_WEB_METHOD_SEND_GAME_COMMAND,
+	CL_WEB_METHOD_WRITE_TEXT_FILE,
+	CL_WEB_METHOD_GET_CVAR,
+	CL_WEB_METHOD_SET_CVAR,
+	CL_WEB_METHOD_RESET_CVAR,
+	CL_WEB_METHOD_GET_MAP_LIST,
+	CL_WEB_METHOD_GET_FACTORY_LIST,
+	CL_WEB_METHOD_GET_DEMO_LIST,
+	CL_WEB_METHOD_OPEN_URL,
+	CL_WEB_METHOD_GET_FRIEND_LIST,
+	CL_WEB_METHOD_GET_CONFIG,
+	CL_WEB_METHOD_GET_ALL_UGC,
+	CL_WEB_METHOD_GET_NEXT_KEY_DOWN,
+	CL_WEB_METHOD_SET_FAVORITE_SERVER,
+	CL_WEB_METHOD_FILE_EXISTS,
+	CL_WEB_METHOD_GET_CURSOR_POSITION,
+	CL_WEB_METHOD_GET_CLIPBOARD_TEXT
+} clWebMethodId_t;
+
+typedef struct {
+	const char	*name;
+	int			methodId;
+	qboolean	returnsValue;
+} clWebMethodBinding_t;
+
+typedef struct {
+	qboolean	coreInitialised;
+	qboolean	sessionInitialised;
+	qboolean	viewInitialised;
+	qboolean	windowObjectBound;
+	qboolean	qzInstanceBound;
+	qboolean	browserVisible;
+	qboolean	browserActive;
+	qboolean	refreshStopped;
+	qboolean	surfaceImageInitialised;
+	qboolean	keyCaptureArmed;
+	qboolean	focused;
+	int			viewWidth;
+	int			viewHeight;
+	int			surfaceWidth;
+	int			surfaceHeight;
+	int			frameSequence;
+	uint32_t	appId;
+	uint32_t	steamIdLow;
+	uint32_t	steamIdHigh;
+	char		currentUrl[MAX_STRING_CHARS];
+	char		pendingHash[MAX_STRING_CHARS];
+	char		playerName[MAX_NAME_LENGTH];
+	char		tooltip[MAX_QPATH];
+} clWebHostState_t;
+
+typedef struct {
+	char		*buffer;
+	size_t		bufferSize;
+	int			count;
+} clWebJsonBuilder_t;
+
+static clWebHostState_t cl_webHost;
+
+static void CL_Web_ClearSessionState( void );
+
+static const clWebMethodBinding_t cl_webMethodBindings[CL_WEB_MAX_QZ_METHODS] = {
+	{ "IsPakFilePresent", CL_WEB_METHOD_IS_PAK_FILE_PRESENT, qtrue },
+	{ "IsGameRunning", CL_WEB_METHOD_IS_GAME_RUNNING, qtrue },
+	{ "SendGameCommand", CL_WEB_METHOD_SEND_GAME_COMMAND, qfalse },
+	{ "WriteTextFile", CL_WEB_METHOD_WRITE_TEXT_FILE, qfalse },
+	{ "GetCvar", CL_WEB_METHOD_GET_CVAR, qtrue },
+	{ "SetCvar", CL_WEB_METHOD_SET_CVAR, qfalse },
+	{ "ResetCvar", CL_WEB_METHOD_RESET_CVAR, qfalse },
+	{ "GetMapList", CL_WEB_METHOD_GET_MAP_LIST, qtrue },
+	{ "GetFactoryList", CL_WEB_METHOD_GET_FACTORY_LIST, qtrue },
+	{ "GetDemoList", CL_WEB_METHOD_GET_DEMO_LIST, qtrue },
+	{ "OpenURL", CL_WEB_METHOD_OPEN_URL, qfalse },
+	{ "GetFriendList", CL_WEB_METHOD_GET_FRIEND_LIST, qtrue },
+	{ "GetConfig", CL_WEB_METHOD_GET_CONFIG, qtrue },
+	{ "GetAllUGC", CL_WEB_METHOD_GET_ALL_UGC, qfalse },
+	{ "GetNextKeyDown", CL_WEB_METHOD_GET_NEXT_KEY_DOWN, qfalse },
+	{ "SetFavoriteServer", CL_WEB_METHOD_SET_FAVORITE_SERVER, qfalse },
+	{ "FileExists", CL_WEB_METHOD_FILE_EXISTS, qtrue },
+	{ "GetCursorPosition", CL_WEB_METHOD_GET_CURSOR_POSITION, qtrue },
+	{ "GetClipboardText", CL_WEB_METHOD_GET_CLIPBOARD_TEXT, qtrue },
+	{ NULL, 0, qfalse }
+};
+
+/*
+=============
+CL_WebHost_JsonEscape
+=============
+*/
+static void CL_WebHost_JsonEscape( const char *value, char *buffer, size_t bufferSize ) {
+	const char	*cursor;
+	char		*out;
+	char		*limit;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	if ( !value ) {
+		return;
+	}
+
+	out = buffer;
+	limit = buffer + bufferSize - 1;
+	for ( cursor = value; *cursor && out < limit; ++cursor ) {
+		unsigned char ch;
+
+		ch = (unsigned char)*cursor;
+		if ( ch == '\\' || ch == '"' ) {
+			if ( out + 2 > limit ) {
+				break;
+			}
+			*out++ = '\\';
+			*out++ = (char)ch;
+			continue;
+		}
+
+		if ( ch == '\n' || ch == '\r' || ch == '\t' ) {
+			if ( out + 2 > limit ) {
+				break;
+			}
+			*out++ = '\\';
+			*out++ = ( ch == '\n' ) ? 'n' : ( ch == '\r' ) ? 'r' : 't';
+			continue;
+		}
+
+		if ( ch < 0x20 ) {
+			continue;
+		}
+
+		*out++ = (char)ch;
+	}
+
+	*out = '\0';
+}
+
+/*
+=============
+CL_WebHost_AppendJsonEscaped
+=============
+*/
+static void CL_WebHost_AppendJsonEscaped( char *buffer, size_t bufferSize, const char *value ) {
+	char escaped[MAX_STRING_CHARS * 2];
+
+	CL_WebHost_JsonEscape( value ? value : "", escaped, sizeof( escaped ) );
+	Q_strcat( buffer, bufferSize, escaped );
+}
+
+/*
+=============
+CL_WebHost_BeginJsonItem
+=============
+*/
+static void CL_WebHost_BeginJsonItem( clWebJsonBuilder_t *builder ) {
+	if ( !builder || !builder->buffer ) {
+		return;
+	}
+
+	if ( builder->count > 0 ) {
+		Q_strcat( builder->buffer, builder->bufferSize, "," );
+	}
+	builder->count++;
+}
+
+/*
+=============
+CL_WebHost_FormatSteamId
+=============
+*/
+static void CL_WebHost_FormatSteamId( uint32_t idLow, uint32_t idHigh, char *buffer, size_t bufferSize ) {
+	unsigned long long value;
+
+	value = ( (unsigned long long)idHigh << 32 ) | idLow;
+	Com_sprintf( buffer, bufferSize, "%llu", value );
+}
+
+/*
+=============
+CL_WebHost_BuildCurrentURL
+=============
+*/
+static void CL_WebHost_BuildCurrentURL( const char *hash, char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	if ( hash && hash[0] ) {
+		Com_sprintf( buffer, bufferSize, "ql://quakelive#%s", hash );
+		return;
+	}
+
+	Q_strncpyz( buffer, "ql://quakelive", bufferSize );
+}
+
+/*
+=============
+CL_WebHost_RefreshBootstrapProperties
+=============
+*/
+static void CL_WebHost_RefreshBootstrapProperties( void ) {
+	char playerName[MAX_NAME_LENGTH];
+
+	cl_webHost.appId = QL_Steamworks_GetAppID();
+	cl_webHost.steamIdLow = 0u;
+	cl_webHost.steamIdHigh = 0u;
+	QL_Steamworks_GetUserSteamID( &cl_webHost.steamIdLow, &cl_webHost.steamIdHigh );
+
+	playerName[0] = '\0';
+	if ( !QL_Steamworks_GetPersonaName( playerName, sizeof( playerName ) ) || !playerName[0] ) {
+		Cvar_VariableStringBuffer( "name", playerName, sizeof( playerName ) );
+	}
+	Q_strncpyz( cl_webHost.playerName, playerName, sizeof( cl_webHost.playerName ) );
+}
+
+/*
+=============
+CL_WebHost_ResetRuntime
+=============
+*/
+static void CL_WebHost_ResetRuntime( qboolean clearVisibility ) {
+	cl_webHost.coreInitialised = qfalse;
+	cl_webHost.sessionInitialised = qfalse;
+	cl_webHost.viewInitialised = qfalse;
+	cl_webHost.windowObjectBound = qfalse;
+	cl_webHost.qzInstanceBound = qfalse;
+	cl_webHost.browserActive = qfalse;
+	cl_webHost.refreshStopped = qfalse;
+	cl_webHost.surfaceImageInitialised = qfalse;
+	cl_webHost.keyCaptureArmed = qfalse;
+	cl_webHost.focused = qfalse;
+	cl_webHost.viewWidth = 0;
+	cl_webHost.viewHeight = 0;
+	cl_webHost.surfaceWidth = 0;
+	cl_webHost.surfaceHeight = 0;
+	cl_webHost.frameSequence = 0;
+	cl_webHost.currentUrl[0] = '\0';
+	cl_webHost.pendingHash[0] = '\0';
+	cl_webHost.tooltip[0] = '\0';
+
+	if ( clearVisibility ) {
+		cl_webHost.browserVisible = qfalse;
+	}
+}
+
+/*
+=============
+QLJSHandler_LookupMethodBinding
+=============
+*/
+static const clWebMethodBinding_t *QLJSHandler_LookupMethodBinding( const char *methodName ) {
+	int i;
+
+	if ( !methodName || !methodName[0] ) {
+		return NULL;
+	}
+
+	for ( i = 0; i < CL_WEB_MAX_QZ_METHODS && cl_webMethodBindings[i].name; i++ ) {
+		if ( !Q_stricmp( cl_webMethodBindings[i].name, methodName ) ) {
+			return &cl_webMethodBindings[i];
+		}
+	}
+
+	return NULL;
+}
+
+/*
+=============
+QLJSHandler_BindQzInstance
+=============
+*/
+static void QLJSHandler_BindQzInstance( void ) {
+	int i;
+
+	if ( cl_webHost.qzInstanceBound ) {
+		return;
+	}
+
+	for ( i = 0; i < CL_WEB_MAX_QZ_METHODS && cl_webMethodBindings[i].name; i++ ) {
+		(void)cl_webMethodBindings[i].returnsValue;
+	}
+
+	CL_WebHost_RefreshBootstrapProperties();
+	cl_webHost.qzInstanceBound = qtrue;
+	cl_webHost.windowObjectBound = qtrue;
+	CL_WebView_PublishEvent( "web.object.ready", NULL );
+}
+
+/*
+=============
+QLWebView_SetLocationHash
+=============
+*/
+static void QLWebView_SetLocationHash( const char *hash ) {
+	Q_strncpyz( cl_webHost.pendingHash, hash ? hash : "", sizeof( cl_webHost.pendingHash ) );
+	CL_WebHost_BuildCurrentURL( cl_webHost.pendingHash, cl_webHost.currentUrl, sizeof( cl_webHost.currentUrl ) );
+}
+
+/*
+=============
+QLWebView_Resize
+=============
+*/
+static void QLWebView_Resize( int width, int height ) {
+	cl_webHost.viewWidth = width;
+	cl_webHost.viewHeight = height;
+}
+
+/*
+=============
+QLWebView_RebuildSurfaceImage
+=============
+*/
+static void QLWebView_RebuildSurfaceImage( void ) {
+	cl_webHost.surfaceWidth = cl_webHost.viewWidth;
+	cl_webHost.surfaceHeight = cl_webHost.viewHeight;
+	cl_webHost.surfaceImageInitialised = qtrue;
+}
+
+/*
+=============
+QLWebHost_EnsureRuntime
+=============
+*/
+static qboolean QLWebHost_EnsureRuntime( void ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	return qfalse;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return qfalse;
+	}
+
+	if ( !cl_webHost.coreInitialised ) {
+		cl_webHost.coreInitialised = qtrue;
+		cl_webHost.sessionInitialised = qtrue;
+		cl_webHost.viewInitialised = qtrue;
+		QLWebView_Resize( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
+		QLWebView_RebuildSurfaceImage();
+		QLJSHandler_BindQzInstance();
+	}
+
+	return qtrue;
+#endif
+}
+
+/*
+=============
+QLWebHost_OpenURL
+=============
+*/
+static qboolean QLWebHost_OpenURL( const char *url ) {
+	if ( !QLWebHost_EnsureRuntime() ) {
+		return qfalse;
+	}
+
+	CL_WebHost_RefreshBootstrapProperties();
+	Q_strncpyz( cl_webHost.currentUrl, url ? url : "ql://quakelive", sizeof( cl_webHost.currentUrl ) );
+	cl_webHost.browserVisible = qtrue;
+	cl_webHost.browserActive = qtrue;
+	cl_webHost.refreshStopped = qfalse;
+	cl_webHost.focused = qtrue;
+	cl_webHost.windowObjectBound = qtrue;
+	return qtrue;
+}
+
+/*
+=============
+QLWebHost_OpenRelativeURL
+=============
+*/
+static qboolean QLWebHost_OpenRelativeURL( const char *hash ) {
+	char url[MAX_STRING_CHARS];
+
+	Q_strncpyz( cl_webHost.pendingHash, hash ? hash : "", sizeof( cl_webHost.pendingHash ) );
+	CL_WebHost_BuildCurrentURL( hash, url, sizeof( url ) );
+	return QLWebHost_OpenURL( url );
+}
+
+/*
+=============
+QLWebHost_NavigateOrOpen
+=============
+*/
+static qboolean QLWebHost_NavigateOrOpen( const char *hash ) {
+	if ( cl_webHost.viewInitialised && cl_webHost.windowObjectBound ) {
+		QLWebView_SetLocationHash( hash );
+		cl_webHost.browserVisible = qtrue;
+		cl_webHost.browserActive = qtrue;
+		cl_webHost.focused = qtrue;
+		return qtrue;
+	}
+
+	return QLWebHost_OpenRelativeURL( hash );
+}
+
+/*
+=============
+QLWebHost_HideBrowser
+=============
+*/
+static void QLWebHost_HideBrowser( void ) {
+	cl_webHost.browserVisible = qfalse;
+	cl_webHost.browserActive = qfalse;
+	cl_webHost.focused = qfalse;
+}
+
+/*
+=============
+QLWebCore_Update
+=============
+*/
+static void QLWebCore_Update( void ) {
+	if ( !cl_webHost.coreInitialised || cl_webHost.refreshStopped ) {
+		return;
+	}
+
+	cl_webHost.frameSequence++;
+}
+
+/*
+=============
+QLWebHost_PumpFrame
+=============
+*/
+static void QLWebHost_PumpFrame( void ) {
+	if ( !cl_webHost.viewInitialised ) {
+		return;
+	}
+
+	if ( cl_webHost.viewWidth != cls.glconfig.vidWidth || cl_webHost.viewHeight != cls.glconfig.vidHeight ) {
+		QLWebView_Resize( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
+		QLWebView_RebuildSurfaceImage();
+	}
+}
+
+/*
+=============
+CL_WebHost_JsonAppendDemoCallback
+=============
+*/
+static void CL_WebHost_JsonAppendDemoCallback( clWebJsonBuilder_t *builder, const char *name ) {
+	if ( !builder || !builder->buffer || !name || !name[0] ) {
+		return;
+	}
+
+	CL_WebHost_BeginJsonItem( builder );
+	Q_strcat( builder->buffer, builder->bufferSize, "\"" );
+	CL_WebHost_AppendJsonEscaped( builder->buffer, builder->bufferSize, name );
+	Q_strcat( builder->buffer, builder->bufferSize, "\"" );
+}
+
+/*
+=============
+CL_WebHost_AppendGametypeAvailability
+=============
+*/
+static void CL_WebHost_AppendGametypeAvailability( char *buffer, size_t bufferSize ) {
+	int i;
+
+	Q_strcat( buffer, bufferSize, "[" );
+	for ( i = 0; i < 13; i++ ) {
+		if ( i > 0 ) {
+			Q_strcat( buffer, bufferSize, "," );
+		}
+		Q_strcat( buffer, bufferSize, "0" );
+	}
+	Q_strcat( buffer, bufferSize, "]" );
+}
+
+/*
+=============
+CL_WebHost_BuildMapListJson
+=============
+*/
+static void CL_WebHost_BuildMapListJson( char *buffer, size_t bufferSize ) {
+	char fileList[32768];
+	char *cursor;
+	int count;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	Q_strcat( buffer, bufferSize, "[" );
+	count = FS_GetFileList( "maps", ".bsp", fileList, sizeof( fileList ) );
+	cursor = fileList;
+	for ( ; count > 0 && *cursor; count-- ) {
+		char mapName[MAX_QPATH];
+		const char *extension;
+		clWebJsonBuilder_t builder;
+
+		Q_strncpyz( mapName, cursor, sizeof( mapName ) );
+		extension = strrchr( mapName, '.' );
+		if ( extension ) {
+			*strrchr( mapName, '.' ) = '\0';
+		}
+
+		builder.buffer = buffer;
+		builder.bufferSize = bufferSize;
+		builder.count = ( buffer[1] != '\0' ) ? 1 : 0;
+		CL_WebHost_BeginJsonItem( &builder );
+		Q_strcat( buffer, bufferSize, "{\"sysname\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, mapName );
+		Q_strcat( buffer, bufferSize, "\",\"name\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, mapName );
+		Q_strcat( buffer, bufferSize, "\",\"gametypes\":" );
+		CL_WebHost_AppendGametypeAvailability( buffer, bufferSize );
+		Q_strcat( buffer, bufferSize, "}" );
+		cursor += strlen( cursor ) + 1;
+	}
+	Q_strcat( buffer, bufferSize, "]" );
+}
+
+/*
+=============
+CL_WebHost_BuildFactoryListJson
+=============
+*/
+static void CL_WebHost_BuildFactoryListJson( char *buffer, size_t bufferSize ) {
+	char fileList[32768];
+	char *cursor;
+	int count;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	Q_strcat( buffer, bufferSize, "[" );
+	count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
+	if ( count <= 0 ) {
+		count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );
+	}
+
+	cursor = fileList;
+	for ( ; count > 0 && *cursor; count-- ) {
+		char factoryName[MAX_QPATH];
+		const char *extension;
+		clWebJsonBuilder_t builder;
+
+		Q_strncpyz( factoryName, cursor, sizeof( factoryName ) );
+		extension = strrchr( factoryName, '.' );
+		if ( extension ) {
+			*strrchr( factoryName, '.' ) = '\0';
+		}
+
+		builder.buffer = buffer;
+		builder.bufferSize = bufferSize;
+		builder.count = ( buffer[1] != '\0' ) ? 1 : 0;
+		CL_WebHost_BeginJsonItem( &builder );
+		Q_strcat( buffer, bufferSize, "{\"sysname\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, factoryName );
+		Q_strcat( buffer, bufferSize, "\",\"title\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, factoryName );
+		Q_strcat( buffer, bufferSize, "\",\"basegt\":\"\",\"settings\":{}}" );
+		cursor += strlen( cursor ) + 1;
+	}
+	Q_strcat( buffer, bufferSize, "]" );
+}
+
+/*
+=============
+CL_WebHost_BuildDemoListJson
+=============
+*/
+static void CL_WebHost_BuildDemoListJson( char *buffer, size_t bufferSize ) {
+	char fileList[32768];
+	char demoExt[32];
+	char fullDemoExt[32];
+	char *cursor;
+	int count;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	Q_strcat( buffer, bufferSize, "[" );
+	Com_sprintf( demoExt, sizeof( demoExt ), "dm_%d", PROTOCOL_VERSION );
+	Com_sprintf( fullDemoExt, sizeof( fullDemoExt ), ".dm_%d", PROTOCOL_VERSION );
+	count = FS_GetFileList( "demos", demoExt, fileList, sizeof( fileList ) );
+	cursor = fileList;
+	for ( ; count > 0 && *cursor; count-- ) {
+		char demoName[MAX_QPATH];
+		size_t length;
+		clWebJsonBuilder_t builder;
+
+		Q_strncpyz( demoName, cursor, sizeof( demoName ) );
+		length = strlen( demoName );
+		if ( length > strlen( fullDemoExt ) && !Q_stricmp( demoName + length - strlen( fullDemoExt ), fullDemoExt ) ) {
+			demoName[length - strlen( fullDemoExt )] = '\0';
+		}
+
+		builder.buffer = buffer;
+		builder.bufferSize = bufferSize;
+		builder.count = ( buffer[1] != '\0' ) ? 1 : 0;
+		CL_WebHost_JsonAppendDemoCallback( &builder, demoName );
+		cursor += strlen( cursor ) + 1;
+	}
+	Q_strcat( buffer, bufferSize, "]" );
+}
+
+/*
+=============
+CL_WebHost_BuildFriendListJson
+=============
+*/
+static void CL_WebHost_BuildFriendListJson( char *buffer, size_t bufferSize ) {
+	int friendCount;
+	int index;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	Q_strcat( buffer, bufferSize, "[" );
+
+	friendCount = QL_Steamworks_GetFriendCount( CL_WEB_FRIEND_FLAGS );
+	for ( index = 0; index < friendCount; index++ ) {
+		uint32_t idLow;
+		uint32_t idHigh;
+		uint32_t lobbyLow;
+		uint32_t lobbyHigh;
+		uint32_t gameServerLow;
+		uint32_t gameServerHigh;
+		ql_steam_friend_summary_t summary;
+		char friendId[32];
+		char lobbyId[32];
+		char gameServerId[32];
+		clWebJsonBuilder_t builder;
+
+		if ( !QL_Steamworks_GetFriendByIndex( index, CL_WEB_FRIEND_FLAGS, &idLow, &idHigh ) ) {
+			continue;
+		}
+		if ( !QL_Steamworks_GetFriendSummary( idLow, idHigh, &summary ) ) {
+			continue;
+		}
+
+		CL_WebHost_FormatSteamId( idLow, idHigh, friendId, sizeof( friendId ) );
+		lobbyLow = (uint32_t)( summary.lobbyId.value & 0xffffffffu );
+		lobbyHigh = (uint32_t)( summary.lobbyId.value >> 32 );
+		gameServerLow = (uint32_t)( summary.gameServerId.value & 0xffffffffu );
+		gameServerHigh = (uint32_t)( summary.gameServerId.value >> 32 );
+		CL_WebHost_FormatSteamId( lobbyLow, lobbyHigh, lobbyId, sizeof( lobbyId ) );
+		CL_WebHost_FormatSteamId( gameServerLow, gameServerHigh, gameServerId, sizeof( gameServerId ) );
+
+		builder.buffer = buffer;
+		builder.bufferSize = bufferSize;
+		builder.count = ( buffer[1] != '\0' ) ? 1 : 0;
+		CL_WebHost_BeginJsonItem( &builder );
+		Q_strcat( buffer, bufferSize, "{\"id\":\"" );
+		Q_strcat( buffer, bufferSize, friendId );
+		Q_strcat( buffer, bufferSize, "\",\"name\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, summary.name );
+		Q_strcat( buffer, bufferSize, "\",\"state\":" );
+		Q_strcat( buffer, bufferSize, va( "%d", summary.personaState ) );
+		Q_strcat( buffer, bufferSize, ",\"relationship\":" );
+		Q_strcat( buffer, bufferSize, va( "%d", summary.relationship ) );
+		Q_strcat( buffer, bufferSize, ",\"nickname\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, summary.nickname );
+		Q_strcat( buffer, bufferSize, "\",\"status\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, summary.status );
+		Q_strcat( buffer, bufferSize, "\",\"lanIp\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, summary.lanIp );
+		Q_strcat( buffer, bufferSize, "\",\"playingQuake\":" );
+		Q_strcat( buffer, bufferSize, summary.playingQuake ? "1" : "0" );
+		if ( summary.playingQuake || summary.serverIp || summary.serverPort || summary.lobbyId.value != 0ull ) {
+			Q_strcat( buffer, bufferSize, ",\"game\":{\"id\":" );
+			Q_strcat( buffer, bufferSize, va( "%llu", (unsigned long long)summary.gameId ) );
+			Q_strcat( buffer, bufferSize, ",\"serverIp\":" );
+			Q_strcat( buffer, bufferSize, va( "%u", summary.serverIp ) );
+			Q_strcat( buffer, bufferSize, ",\"port\":" );
+			Q_strcat( buffer, bufferSize, va( "%u", summary.serverPort ) );
+			Q_strcat( buffer, bufferSize, ",\"queryPort\":" );
+			Q_strcat( buffer, bufferSize, va( "%u", summary.queryPort ) );
+			Q_strcat( buffer, bufferSize, ",\"lobby\":\"" );
+			Q_strcat( buffer, bufferSize, lobbyId );
+			Q_strcat( buffer, bufferSize, "\",\"gameServer\":\"" );
+			Q_strcat( buffer, bufferSize, gameServerId );
+			Q_strcat( buffer, bufferSize, "\"}" );
+		}
+		Q_strcat( buffer, bufferSize, "}" );
+	}
+
+	Q_strcat( buffer, bufferSize, "]" );
+}
+
+typedef struct {
+	char	*buffer;
+	size_t	bufferSize;
+	int		count;
+} clWebConfigArrayContext_t;
+
+/*
+=============
+CL_WebHost_ConfigCvarCallback
+=============
+*/
+static void CL_WebHost_ConfigCvarCallback( const cvar_t *var, void *userData ) {
+	clWebConfigArrayContext_t *context;
+	char value[MAX_CVAR_VALUE_STRING];
+
+	context = (clWebConfigArrayContext_t *)userData;
+	if ( !var || !context || !context->buffer ) {
+		return;
+	}
+
+	if ( !var->name || !var->name[0] ) {
+		return;
+	}
+
+	if ( context->count > 0 ) {
+		Q_strcat( context->buffer, context->bufferSize, "," );
+	}
+	context->count++;
+
+	value[0] = '\0';
+	if ( var->latchedString && var->latchedString[0] ) {
+		Q_strncpyz( value, var->latchedString, sizeof( value ) );
+	} else if ( var->string ) {
+		Q_strncpyz( value, var->string, sizeof( value ) );
+	}
+
+	Q_strcat( context->buffer, context->bufferSize, "{\"name\":\"" );
+	CL_WebHost_AppendJsonEscaped( context->buffer, context->bufferSize, var->name );
+	Q_strcat( context->buffer, context->bufferSize, "\",\"value\":\"" );
+	CL_WebHost_AppendJsonEscaped( context->buffer, context->bufferSize, value );
+	Q_strcat( context->buffer, context->bufferSize, "\",\"flags\":" );
+	Q_strcat( context->buffer, context->bufferSize, va( "%d", var->flags ) );
+	Q_strcat( context->buffer, context->bufferSize, "}" );
+}
+
+/*
+=============
+CL_WebHost_ConfigBindCallback
+=============
+*/
+static void CL_WebHost_ConfigBindCallback( int keynum, const char *keyName, const char *binding, void *userData ) {
+	clWebConfigArrayContext_t *context;
+
+	context = (clWebConfigArrayContext_t *)userData;
+	if ( !context || !context->buffer || !binding || !binding[0] ) {
+		return;
+	}
+
+	if ( context->count > 0 ) {
+		Q_strcat( context->buffer, context->bufferSize, "," );
+	}
+	context->count++;
+
+	Q_strcat( context->buffer, context->bufferSize, "{\"id\":" );
+	Q_strcat( context->buffer, context->bufferSize, va( "%d", keynum ) );
+	Q_strcat( context->buffer, context->bufferSize, ",\"name\":\"" );
+	CL_WebHost_AppendJsonEscaped( context->buffer, context->bufferSize, keyName ? keyName : "" );
+	Q_strcat( context->buffer, context->bufferSize, "\",\"value\":\"" );
+	CL_WebHost_AppendJsonEscaped( context->buffer, context->bufferSize, binding );
+	Q_strcat( context->buffer, context->bufferSize, "\"}" );
+}
+
+/*
+=============
+CL_WebHost_BuildConfigJson
+=============
+*/
+static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {
+	char cvarJson[CL_WEB_JSON_BUFFER_SIZE];
+	char bindJson[CL_WEB_JSON_BUFFER_SIZE];
+	char steamId[32];
+	clWebConfigArrayContext_t cvarContext;
+	clWebConfigArrayContext_t bindContext;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	CL_WebHost_RefreshBootstrapProperties();
+	CL_WebHost_FormatSteamId( cl_webHost.steamIdLow, cl_webHost.steamIdHigh, steamId, sizeof( steamId ) );
+
+	cvarJson[0] = '\0';
+	bindJson[0] = '\0';
+
+	cvarContext.buffer = cvarJson;
+	cvarContext.bufferSize = sizeof( cvarJson );
+	cvarContext.count = 0;
+	Cvar_EnumerateVariables( CL_WebHost_ConfigCvarCallback, &cvarContext );
+
+	bindContext.buffer = bindJson;
+	bindContext.bufferSize = sizeof( bindJson );
+	bindContext.count = 0;
+	Key_EnumerateBindings( CL_WebHost_ConfigBindCallback, &bindContext );
+
+	Com_sprintf(
+		buffer,
+		bufferSize,
+		"{\"version\":\"%s\",\"steamId\":\"%s\",\"playerName\":\"",
+		Q3_VERSION,
+		steamId
+	);
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerName );
+	Q_strcat( buffer, bufferSize, "\",\"appId\":" );
+	Q_strcat( buffer, bufferSize, va( "%u", cl_webHost.appId ) );
+	Q_strcat( buffer, bufferSize, ",\"browserVisible\":" );
+	Q_strcat( buffer, bufferSize, cl_webHost.browserVisible ? "1" : "0" );
+	Q_strcat( buffer, bufferSize, ",\"browserActive\":" );
+	Q_strcat( buffer, bufferSize, cl_webHost.browserActive ? "1" : "0" );
+	Q_strcat( buffer, bufferSize, ",\"url\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.currentUrl );
+	Q_strcat( buffer, bufferSize, "\",\"cvars\":[" );
+	Q_strcat( buffer, bufferSize, cvarJson );
+	Q_strcat( buffer, bufferSize, "],\"binds\":[" );
+	Q_strcat( buffer, bufferSize, bindJson );
+	Q_strcat( buffer, bufferSize, "]}" );
+}
+
+/*
+=============
+CL_WebHost_BuildUGCResultsJson
+=============
+*/
+static void CL_WebHost_BuildUGCResultsJson( char *buffer, size_t bufferSize ) {
+	uint32_t subscribedCount;
+	uint32_t copiedCount;
+	uint64_t itemIds[128];
+	uint32_t index;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	Q_strcat( buffer, bufferSize, "[" );
+
+	subscribedCount = QL_Steamworks_GetNumSubscribedItems();
+	if ( subscribedCount > ARRAY_LEN( itemIds ) ) {
+		subscribedCount = ARRAY_LEN( itemIds );
+	}
+
+	copiedCount = QL_Steamworks_GetSubscribedItems( itemIds, subscribedCount );
+	for ( index = 0; index < copiedCount; index++ ) {
+		uint32_t idLow;
+		uint32_t idHigh;
+		uint64_t sizeOnDisk;
+		uint32_t timestamp;
+		char installFolder[MAX_OSPATH];
+		char itemId[32];
+		const char *folderLeaf;
+		clWebJsonBuilder_t builder;
+
+		idLow = (uint32_t)( itemIds[index] & 0xffffffffu );
+		idHigh = (uint32_t)( itemIds[index] >> 32 );
+		sizeOnDisk = 0ull;
+		timestamp = 0u;
+		installFolder[0] = '\0';
+		QL_Steamworks_GetItemInstallInfo( idLow, idHigh, &sizeOnDisk, installFolder, sizeof( installFolder ), &timestamp );
+		CL_WebHost_FormatSteamId( idLow, idHigh, itemId, sizeof( itemId ) );
+		folderLeaf = strrchr( installFolder, '\\' );
+		if ( !folderLeaf ) {
+			folderLeaf = strrchr( installFolder, '/' );
+		}
+		if ( folderLeaf ) {
+			folderLeaf++;
+		} else {
+			folderLeaf = installFolder;
+		}
+
+		builder.buffer = buffer;
+		builder.bufferSize = bufferSize;
+		builder.count = ( buffer[1] != '\0' ) ? 1 : 0;
+		CL_WebHost_BeginJsonItem( &builder );
+		Q_strcat( buffer, bufferSize, "{\"title\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, folderLeaf && folderLeaf[0] ? folderLeaf : itemId );
+		Q_strcat( buffer, bufferSize, "\",\"description\":\"\",\"id\":\"" );
+		Q_strcat( buffer, bufferSize, itemId );
+		Q_strcat( buffer, bufferSize, "\",\"image\":\"\",\"sizeOnDisk\":" );
+		Q_strcat( buffer, bufferSize, va( "%llu", (unsigned long long)sizeOnDisk ) );
+		Q_strcat( buffer, bufferSize, ",\"timestamp\":" );
+		Q_strcat( buffer, bufferSize, va( "%u", timestamp ) );
+		Q_strcat( buffer, bufferSize, "}" );
+	}
+
+	Q_strcat( buffer, bufferSize, "]" );
+}
+
+/*
+=============
+CL_WebHost_RequestCursorPosition
+=============
+*/
+static qboolean CL_WebHost_RequestCursorPosition( int *x, int *y ) {
+#if defined( _WIN32 )
+	POINT point;
+
+	if ( x ) {
+		*x = 0;
+	}
+	if ( y ) {
+		*y = 0;
+	}
+
+	if ( !GetCursorPos( &point ) ) {
+		return qfalse;
+	}
+
+	if ( g_wv.hWnd ) {
+		ScreenToClient( g_wv.hWnd, &point );
+	}
+
+	if ( x ) {
+		*x = point.x;
+	}
+	if ( y ) {
+		*y = point.y;
+	}
+
+	return qtrue;
+#else
+	if ( x ) {
+		*x = 0;
+	}
+	if ( y ) {
+		*y = 0;
+	}
+	return qfalse;
+#endif
+}
+
+/*
+=============
+CL_WebHost_PathIsSafeRelative
+=============
+*/
+static qboolean CL_WebHost_PathIsSafeRelative( const char *path ) {
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+
+	if ( strstr( path, ".." ) || strstr( path, "::" ) || strchr( path, ':' ) ) {
+		return qfalse;
+	}
+
+	if ( path[0] == '/' || path[0] == '\\' ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CL_WebHost_WriteTextFile
+=============
+*/
+static qboolean CL_WebHost_WriteTextFile( const char *path, const char *contents ) {
+	if ( !CL_WebHost_PathIsSafeRelative( path ) ) {
+		return qfalse;
+	}
+
+	FS_WriteFile( path, contents ? contents : "", (int)strlen( contents ? contents : "" ) );
+	return qtrue;
+}
+
+/*
+=============
+CL_WebHost_BuildFavoriteAddress
+=============
+*/
+static void CL_WebHost_BuildFavoriteAddress( uint32_t ip, uint16_t port, char *buffer, size_t bufferSize ) {
+	Com_sprintf(
+		buffer,
+		bufferSize,
+		"%u.%u.%u.%u:%u",
+		ip & 0xffu,
+		( ip >> 8 ) & 0xffu,
+		( ip >> 16 ) & 0xffu,
+		( ip >> 24 ) & 0xffu,
+		(unsigned int)port
+	);
+}
+
+/*
+=============
+CL_WebHost_FindFavoriteServerIndex
+=============
+*/
+static int CL_WebHost_FindFavoriteServerIndex( const netadr_t *address ) {
+	int i;
+
+	if ( !address ) {
+		return -1;
+	}
+
+	for ( i = 0; i < cls.numfavoriteservers; i++ ) {
+		if ( NET_CompareAdr( cls.favoriteServers[i].adr, *address ) ) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+/*
+=============
+CL_WebHost_SetFavoriteServer
+=============
+*/
+static qboolean CL_WebHost_SetFavoriteServer( uint32_t ip, uint16_t port, qboolean add ) {
+	char addressString[64];
+	netadr_t address;
+	int index;
+
+	CL_WebHost_BuildFavoriteAddress( ip, port, addressString, sizeof( addressString ) );
+	if ( !NET_StringToAdr( addressString, &address ) ) {
+		return qfalse;
+	}
+
+	index = CL_WebHost_FindFavoriteServerIndex( &address );
+	if ( add ) {
+		if ( index >= 0 ) {
+			return qtrue;
+		}
+		if ( cls.numfavoriteservers >= MAX_OTHER_SERVERS ) {
+			return qfalse;
+		}
+
+		index = cls.numfavoriteservers++;
+		Com_Memset( &cls.favoriteServers[index], 0, sizeof( cls.favoriteServers[index] ) );
+		cls.favoriteServers[index].adr = address;
+		cls.favoriteServers[index].visible = qtrue;
+		Q_strncpyz( cls.favoriteServers[index].hostName, addressString, sizeof( cls.favoriteServers[index].hostName ) );
+		LAN_SaveServersToCache();
+		return qtrue;
+	}
+
+	if ( index < 0 ) {
+		return qfalse;
+	}
+
+	for ( ; index < cls.numfavoriteservers - 1; index++ ) {
+		Com_Memcpy( &cls.favoriteServers[index], &cls.favoriteServers[index + 1], sizeof( cls.favoriteServers[index] ) );
+	}
+	cls.numfavoriteservers--;
+	LAN_SaveServersToCache();
+	return qtrue;
+}
+
+/*
+=============
+QLWebView_PublishGameKey
+=============
+*/
+static void QLWebView_PublishGameKey( int key ) {
+	char payload[128];
+	const char *keyName;
+
+	keyName = Key_KeynumToString( key );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":%d,\"key\":\"%s\"}", key, keyName ? keyName : "" );
+	CL_WebView_PublishEvent( "game.key", payload );
+}
+
+/*
+=============
+QLJSHandler_OnMethodCall
+=============
+*/
+static qboolean QLJSHandler_OnMethodCall( const char *methodName, const char **arguments, int argumentCount ) {
+	const clWebMethodBinding_t *binding;
+
+	binding = QLJSHandler_LookupMethodBinding( methodName );
+	if ( !binding || binding->returnsValue ) {
+		return qfalse;
+	}
+
+	switch ( binding->methodId ) {
+		case CL_WEB_METHOD_SEND_GAME_COMMAND:
+			if ( argumentCount > 0 && arguments[0] && arguments[0][0] ) {
+				Cbuf_ExecuteText( EXEC_APPEND, va( "%s\n", arguments[0] ) );
+				return qtrue;
+			}
+			return qfalse;
+
+		case CL_WEB_METHOD_WRITE_TEXT_FILE:
+			if ( argumentCount < 2 ) {
+				return qfalse;
+			}
+			return CL_WebHost_WriteTextFile( arguments[0], arguments[1] );
+
+		case CL_WEB_METHOD_SET_CVAR:
+			if ( argumentCount < 2 || !arguments[0] || !arguments[0][0] ) {
+				return qfalse;
+			}
+			Cvar_Set( arguments[0], arguments[1] ? arguments[1] : "" );
+			return qtrue;
+
+		case CL_WEB_METHOD_RESET_CVAR:
+			if ( argumentCount < 1 || !arguments[0] || !arguments[0][0] ) {
+				return qfalse;
+			}
+			Cvar_Reset( arguments[0] );
+			return qtrue;
+
+		case CL_WEB_METHOD_OPEN_URL:
+			if ( argumentCount < 1 || !arguments[0] || !arguments[0][0] ) {
+				return qfalse;
+			}
+			if ( strstr( arguments[0], "://" ) != NULL ) {
+				return QLWebHost_OpenURL( arguments[0] );
+			}
+			return QLWebHost_NavigateOrOpen( arguments[0] );
+
+		case CL_WEB_METHOD_GET_ALL_UGC:
+			{
+				char ugcJson[CL_WEB_JSON_BUFFER_SIZE];
+
+				CL_WebHost_BuildUGCResultsJson( ugcJson, sizeof( ugcJson ) );
+				if ( ugcJson[1] != '\0' ) {
+					CL_WebView_PublishEvent( "web.ugc.results", ugcJson );
+				} else {
+					CL_WebView_PublishEvent( "web.ugc.failed", "{\"result\":0}" );
+				}
+				return qtrue;
+			}
+
+		case CL_WEB_METHOD_GET_NEXT_KEY_DOWN:
+			if ( argumentCount <= 0 || !arguments[0] || !arguments[0][0] ) {
+				cl_webHost.keyCaptureArmed = qtrue;
+			} else {
+				cl_webHost.keyCaptureArmed = atoi( arguments[0] ) != 0 ? qtrue : qfalse;
+			}
+			return qtrue;
+
+		case CL_WEB_METHOD_SET_FAVORITE_SERVER:
+			if ( argumentCount < 3 ) {
+				return qfalse;
+			}
+			return CL_WebHost_SetFavoriteServer(
+				(uint32_t)strtoul( arguments[0], NULL, 10 ),
+				(uint16_t)atoi( arguments[1] ),
+				atoi( arguments[2] ) != 0 ? qtrue : qfalse
+			);
+
+		default:
+			break;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+QLJSHandler_OnMethodCallWithReturnValue
+=============
+*/
+static qboolean QLJSHandler_OnMethodCallWithReturnValue( const char *methodName, const char **arguments, int argumentCount, char *outValue, size_t outValueSize ) {
+	const clWebMethodBinding_t *binding;
+	char clipboardBuffer[MAX_STRING_CHARS];
+
+	if ( outValue && outValueSize > 0 ) {
+		outValue[0] = '\0';
+	}
+
+	binding = QLJSHandler_LookupMethodBinding( methodName );
+	if ( !binding || !binding->returnsValue || !outValue || outValueSize == 0 ) {
+		return qfalse;
+	}
+
+	switch ( binding->methodId ) {
+		case CL_WEB_METHOD_IS_PAK_FILE_PRESENT:
+		case CL_WEB_METHOD_FILE_EXISTS:
+			if ( argumentCount < 1 || !arguments[0] || !arguments[0][0] ) {
+				Q_strncpyz( outValue, "0", outValueSize );
+				return qtrue;
+			}
+			Q_strncpyz( outValue, FS_FileExists( arguments[0] ) ? "1" : "0", outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_IS_GAME_RUNNING:
+			Q_strncpyz( outValue, ( cls.state >= CA_CONNECTED && cls.state < CA_CINEMATIC ) ? "1" : "0", outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_GET_CVAR:
+			if ( argumentCount < 1 || !arguments[0] || !arguments[0][0] ) {
+				return qfalse;
+			}
+			Cvar_VariableStringBuffer( arguments[0], outValue, (int)outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_GET_MAP_LIST:
+			CL_WebHost_BuildMapListJson( outValue, outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_GET_FACTORY_LIST:
+			CL_WebHost_BuildFactoryListJson( outValue, outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_GET_DEMO_LIST:
+			CL_WebHost_BuildDemoListJson( outValue, outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_GET_FRIEND_LIST:
+			CL_WebHost_BuildFriendListJson( outValue, outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_GET_CONFIG:
+			CL_WebHost_BuildConfigJson( outValue, outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_GET_CURSOR_POSITION:
+			{
+				int x;
+				int y;
+
+				CL_WebHost_RequestCursorPosition( &x, &y );
+				Com_sprintf( outValue, outValueSize, "{\"x\":%d,\"y\":%d}", x, y );
+				return qtrue;
+			}
+
+		case CL_WEB_METHOD_GET_CLIPBOARD_TEXT:
+			clipboardBuffer[0] = '\0';
+			{
+				char *clipboardData;
+
+				clipboardData = Sys_GetClipboardData();
+				if ( clipboardData ) {
+					Q_strncpyz( clipboardBuffer, clipboardData, sizeof( clipboardBuffer ) );
+					Z_Free( clipboardData );
+				}
+			}
+			Q_strncpyz( outValue, clipboardBuffer, outValueSize );
+			return qtrue;
+
+		default:
+			break;
+	}
+
+	return qfalse;
+}
+
 /*
 =============
 CL_ResetBrowserOverlayState
@@ -68,6 +1315,9 @@ Clears the browser overlay state when the online service bridge is unavailable.
 static void CL_ResetBrowserOverlayState( void ) {
 	cl_webBrowserVisible = qfalse;
 	cl_webBrowserHash[0] = '\0';
+	cl_webHost.browserVisible = qfalse;
+	cl_webHost.browserActive = qfalse;
+	cl_webHost.focused = qfalse;
 	Cvar_Set( "web_browserActive", "0" );
 }
 
@@ -115,6 +1365,7 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 	cl_advertisementBridge.viewWidth = 0;
 	cl_advertisementBridge.viewHeight = 0;
 	Cvar_Set( "ui_browserAwesomium", "0" );
+	CL_WebHost_ResetRuntime( qtrue );
 	CL_ResetBrowserOverlayState();
 #else
 	const ql_platform_feature_descriptor *overlay = CL_GetOverlayServiceDescriptor();
@@ -127,6 +1378,7 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 
 	Cvar_Set( "ui_browserAwesomium", overlayAvailable ? "1" : "0" );
 	if ( !overlayAvailable ) {
+		CL_WebHost_ResetRuntime( qtrue );
 		CL_ResetBrowserOverlayState();
 	}
 #endif
@@ -197,6 +1449,7 @@ void CL_Web_ShowBrowser_f( void ) {
 	} else {
 		cl_webBrowserHash[0] = '\0';
 	}
+	QLWebHost_NavigateOrOpen( cl_webBrowserHash );
 	Cvar_Set( "web_browserActive", "1" );
 	Com_DPrintf( "web_showBrowser\n" );
 #endif
@@ -224,6 +1477,7 @@ void CL_Web_ChangeHash_f( void ) {
 	const char *hash = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
 	Q_strncpyz( cl_webBrowserHash, hash, sizeof( cl_webBrowserHash ) );
 	cl_webBrowserVisible = qtrue;
+	QLWebHost_NavigateOrOpen( cl_webBrowserHash );
 	Cvar_Set( "web_browserActive", "1" );
 	Com_DPrintf( "web_changeHash %s\n", cl_webBrowserHash );
 #endif
@@ -251,6 +1505,11 @@ void CL_Web_BrowserActive_f( void ) {
 	qboolean active = ( Cmd_Argc() > 1 && atoi( Cmd_Argv( 1 ) ) != 0 );
 
 	cl_webBrowserVisible = active;
+	if ( active ) {
+		QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+	} else {
+		QLWebHost_HideBrowser();
+	}
 	Cvar_Set( "web_browserActive", active ? "1" : "0" );
 	Com_DPrintf( "web_browserActive %s\n", active ? "1" : "0" );
 #endif
@@ -265,6 +1524,7 @@ Hides the browser overlay and clears the active cvar latch.
 */
 void CL_Web_HideBrowser_f( void ) {
 	cl_webBrowserVisible = qfalse;
+	QLWebHost_HideBrowser();
 	Cvar_Set( "web_browserActive", "0" );
 	Com_DPrintf( "web_hideBrowser\n" );
 }
@@ -301,6 +1561,8 @@ void CL_Web_ShowError_f( void ) {
 	CL_RefreshOnlineServicesBridgeState();
 	if ( CL_OverlayServiceAvailable() ) {
 		cl_webBrowserVisible = qtrue;
+		QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+		CL_WebView_PublishGameError( message );
 		Cvar_Set( "web_browserActive", "1" );
 	}
 #endif
@@ -332,7 +1594,13 @@ void CL_Web_Reload_f( void ) {
 
 #if QL_PLATFORM_HAS_ONLINE_SERVICES
 	CL_RefreshOnlineServicesBridgeState();
+	cl_webHost.refreshStopped = qfalse;
 	if ( CL_OverlayServiceAvailable() && cl_webBrowserVisible ) {
+		if ( cl_webHost.currentUrl[0] ) {
+			QLWebHost_OpenURL( cl_webHost.currentUrl );
+		} else {
+			QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+		}
 		Cvar_Set( "web_browserActive", "1" );
 	}
 #endif
@@ -358,7 +1626,153 @@ void CL_Web_StopRefresh_f( void ) {
 		return;
 	}
 
+	cl_webHost.refreshStopped = qtrue;
 	Com_DPrintf( "web_stopRefresh\n" );
+#endif
+}
+
+/*
+=============
+CL_WebHost_Init
+
+Initialises the retained browser-host shim from the client owner state.
+=============
+*/
+void CL_WebHost_Init( void ) {
+	cl_webBrowserVisible = qfalse;
+	cl_webBrowserHash[0] = '\0';
+	CL_WebHost_ResetRuntime( qtrue );
+	CL_RefreshOnlineServicesBridgeState();
+}
+
+/*
+=============
+CL_WebHost_Shutdown
+
+Releases the retained browser-host shim and clears the client-visible state.
+=============
+*/
+void CL_WebHost_Shutdown( void ) {
+	QLWebHost_HideBrowser();
+	CL_Web_ClearSessionState();
+	CL_WebHost_ResetRuntime( qtrue );
+	CL_ResetBrowserOverlayState();
+}
+
+/*
+=============
+CL_WebHost_Frame
+
+Pumps the retained browser-host shim so the overlay-facing state stays in sync.
+=============
+*/
+void CL_WebHost_Frame( void ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	CL_WebHost_ResetRuntime( qtrue );
+	return;
+#else
+	CL_RefreshOnlineServicesBridgeState();
+	if ( !CL_OverlayServiceAvailable() ) {
+		CL_WebHost_ResetRuntime( qtrue );
+		return;
+	}
+
+	if ( cl_webBrowserVisible ) {
+		char expectedUrl[MAX_STRING_CHARS];
+
+		CL_WebHost_BuildCurrentURL( cl_webBrowserHash, expectedUrl, sizeof( expectedUrl ) );
+		if ( !cl_webHost.viewInitialised ) {
+			if ( cl_webBrowserHash[0] ) {
+				QLWebHost_OpenRelativeURL( cl_webBrowserHash );
+			} else {
+				QLWebHost_OpenURL( "ql://quakelive" );
+			}
+		} else if ( Q_stricmp( cl_webHost.currentUrl, expectedUrl ) ) {
+			QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+		} else {
+			cl_webHost.browserVisible = qtrue;
+			cl_webHost.browserActive = qtrue;
+			cl_webHost.focused = qtrue;
+		}
+
+		Cvar_Set( "web_browserActive", "1" );
+	} else if ( cl_webHost.browserVisible || cl_webHost.browserActive ) {
+		QLWebHost_HideBrowser();
+		Cvar_Set( "web_browserActive", "0" );
+	}
+
+	QLWebCore_Update();
+	QLWebHost_PumpFrame();
+#endif
+}
+
+/*
+=============
+CL_WebHost_HasLiveView
+
+Reports whether the retained browser host owns an active view surface.
+=============
+*/
+qboolean CL_WebHost_HasLiveView( void ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	return qfalse;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return qfalse;
+	}
+
+	return cl_webHost.viewInitialised;
+#endif
+}
+
+/*
+=============
+CL_WebHost_HasBoundWindowObject
+
+Reports whether the retained browser host published the qz window object.
+=============
+*/
+qboolean CL_WebHost_HasBoundWindowObject( void ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	return qfalse;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return qfalse;
+	}
+
+	return cl_webHost.windowObjectBound;
+#endif
+}
+
+/*
+=============
+CL_WebView_OnKeyEvent
+
+Records browser-directed key activity for the retained host-text/browser seam.
+=============
+*/
+void CL_WebView_OnKeyEvent( int key, qboolean down ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	(void)key;
+	(void)down;
+	return;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return;
+	}
+
+	if ( !cl_webHost.browserVisible && !cl_webHost.browserActive ) {
+		return;
+	}
+
+	if ( !down && cl_webHost.keyCaptureArmed ) {
+		QLWebView_PublishGameKey( key );
+		cl_webHost.keyCaptureArmed = qfalse;
+	}
+
+	if ( down ) {
+		cl_webHost.focused = qtrue;
+	}
 #endif
 }
 
@@ -1214,20 +2628,6 @@ static int QDECL CG_Import_Syscall( int arg, ... ) {
 
 typedef void (QDECL *ql_import_f)( void );
 
-typedef enum {
-	QL_CG_SCALED_FONT_NORMAL = 0,
-	QL_CG_SCALED_FONT_SANS,
-	QL_CG_SCALED_FONT_MONO,
-	QL_CG_SCALED_FONT_SANS_FALLBACK,
-	QL_CG_SCALED_FONT_SANS_WINDOWS_FALLBACK,
-	QL_CG_SCALED_FONT_COUNT
-} qlCgScaledFontHandle_t;
-
-typedef struct {
-	fontInfo_t	font;
-	qboolean	loaded;
-} qlCgScaledFont_t;
-
 static void QDECL QL_CG_trap_Key_GetBindingBuf( int keynum, char *buf, int buflen );
 static void QDECL QL_CG_trap_Key_SetBinding( int keynum, const char *binding );
 static qboolean QDECL QL_CG_trap_Key_GetOverstrikeMode( void );
@@ -1239,7 +2639,6 @@ static void QDECL QL_CG_trap_AdvertisementBridge_UpdateLoadingViewParameters( vo
 static void QDECL QL_CG_trap_AdvertisementBridge_SetFrameTime( int frameTime );
 
 static vec4_t ql_cgame_currentColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-static qlCgScaledFont_t ql_cgame_scaledFonts[QL_CG_SCALED_FONT_COUNT];
 static uint64_t ql_cgame_mutedIdentitySet[MAX_CLIENTS];
 static int ql_cgame_mutedIdentityCount = 0;
 static ql_import_f ql_cgame_imports[CGAME_NATIVE_IMPORT_COUNT] = {
@@ -1271,119 +2670,6 @@ static unsigned long long QL_CG_PackFloatBits64( float lo, float hi ) {
 	packed.parts.lo = lo;
 	packed.parts.hi = hi;
 	return packed.value;
-}
-
-/*
-==============
-QL_CG_NormalizeScaledFontHandle
-==============
-*/
-static int QL_CG_NormalizeScaledFontHandle( int fontHandle ) {
-	if ( fontHandle < QL_CG_SCALED_FONT_NORMAL || fontHandle >= QL_CG_SCALED_FONT_COUNT ) {
-		return QL_CG_SCALED_FONT_NORMAL;
-	}
-
-	return fontHandle;
-}
-
-/*
-==============
-QL_CG_ResolveWindowsFallbackFontPath
-==============
-*/
-static const char *QL_CG_ResolveWindowsFallbackFontPath( char *fontPath, int fontPathSize ) {
-#if defined( _WIN32 )
-	char windowsDirectory[MAX_OSPATH];
-	WIN32_FIND_DATAA findData;
-	HANDLE findHandle;
-
-	if ( GetWindowsDirectoryA( windowsDirectory, sizeof( windowsDirectory ) ) > 0 ) {
-		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\ARIALUNI.TTF", windowsDirectory );
-		findHandle = FindFirstFileA( fontPath, &findData );
-		if ( findHandle != INVALID_HANDLE_VALUE ) {
-			FindClose( findHandle );
-			return fontPath;
-		}
-
-		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\segoeui.ttf", windowsDirectory );
-		findHandle = FindFirstFileA( fontPath, &findData );
-		if ( findHandle != INVALID_HANDLE_VALUE ) {
-			FindClose( findHandle );
-			return fontPath;
-		}
-
-		Com_sprintf( fontPath, fontPathSize, "%s\\fonts\\l_10646.ttf", windowsDirectory );
-		return fontPath;
-	}
-#endif
-
-	Q_strncpyz( fontPath, "fonts/droidsansfallbackfull.ttf", fontPathSize );
-	return fontPath;
-}
-
-/*
-==============
-QL_CG_GetScaledFontName
-==============
-*/
-static const char *QL_CG_GetScaledFontName( int fontHandle, char *resolvedFontPath, int resolvedFontPathSize ) {
-	switch ( QL_CG_NormalizeScaledFontHandle( fontHandle ) ) {
-		case QL_CG_SCALED_FONT_SANS:
-			return "fonts/notosans-regular.ttf";
-
-		case QL_CG_SCALED_FONT_MONO:
-			return "fonts/droidsansmono.ttf";
-
-		case QL_CG_SCALED_FONT_SANS_FALLBACK:
-			return "fonts/droidsansfallbackfull.ttf";
-
-		case QL_CG_SCALED_FONT_SANS_WINDOWS_FALLBACK:
-			return QL_CG_ResolveWindowsFallbackFontPath( resolvedFontPath, resolvedFontPathSize );
-
-		case QL_CG_SCALED_FONT_NORMAL:
-		default:
-			return "fonts/handelgothic.ttf";
-	}
-}
-
-/*
-==============
-QL_CG_GetScaledFont
-==============
-*/
-static fontInfo_t *QL_CG_GetScaledFont( int fontHandle ) {
-	qlCgScaledFont_t *scaledFont;
-	char resolvedFontPath[MAX_OSPATH];
-	const char *fontName;
-
-	fontHandle = QL_CG_NormalizeScaledFontHandle( fontHandle );
-	scaledFont = &ql_cgame_scaledFonts[fontHandle];
-	if ( !scaledFont->loaded ) {
-		fontName = QL_CG_GetScaledFontName( fontHandle, resolvedFontPath, sizeof( resolvedFontPath ) );
-		CL_RegisterFont( fontName, 48, &scaledFont->font );
-		scaledFont->loaded = qtrue;
-	}
-
-	return &scaledFont->font;
-}
-
-/*
-==============
-QL_CG_DrawGlyph
-==============
-*/
-static void QL_CG_DrawGlyph( float x, float y, float scaleFactor, glyphInfo_t *glyph ) {
-	float w;
-	float h;
-
-	if ( !glyph ) {
-		return;
-	}
-
-	w = glyph->imageWidth * scaleFactor;
-	h = glyph->imageHeight * scaleFactor;
-
-	re.DrawStretchPic( x, y, w, h, glyph->s, glyph->t, glyph->s2, glyph->t2, glyph->glyph );
 }
 
 /*
@@ -1620,66 +2906,7 @@ QL_CG_trap_DrawScaledText
 ==============
 */
 static void QDECL QL_CG_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, int forceColor ) {
-	fontInfo_t *font;
-	const char *s;
-	vec4_t baseColor;
-	float drawX;
-	float scaleFactor;
-	qboolean hasMaxX;
-	float maxXf;
-
-	if ( !text || !text[0] ) {
-		if ( outMaxX ) {
-			*outMaxX = (float)x;
-		}
-		return;
-	}
-
-	Com_Memcpy( baseColor, ql_cgame_currentColor, sizeof( baseColor ) );
-
-	font = QL_CG_GetScaledFont( fontHandle );
-	scaleFactor = ( scale <= 0.0f ) ? 1.0f : scale / 48.0f;
-	drawX = (float)x;
-	s = text;
-	hasMaxX = ( maxX > 0 );
-	maxXf = (float)maxX;
-
-	while ( *s ) {
-		unsigned char ch = (unsigned char)*s;
-
-		if ( !forceColor && Q_IsColorString( s ) ) {
-			vec4_t newColor;
-
-			Com_Memcpy( newColor, g_color_table[ColorIndex( *( s + 1 ) )], sizeof( newColor ) );
-			newColor[3] = baseColor[3];
-			re.SetColor( newColor );
-			s += 2;
-			continue;
-		}
-
-		if ( ch >= GLYPH_START && ch <= GLYPH_END ) {
-			glyphInfo_t *glyph = &font->glyphs[ch];
-			float yadj = glyph->top * scaleFactor;
-			float nextX = drawX + glyph->xSkip * scaleFactor;
-
-			if ( hasMaxX && nextX > maxXf ) {
-				if ( outMaxX ) {
-					*outMaxX = 0.0f;
-				}
-				break;
-			}
-
-			QL_CG_DrawGlyph( drawX, (float)y - yadj, scaleFactor, glyph );
-			drawX = nextX;
-			if ( outMaxX ) {
-				*outMaxX = drawX;
-			}
-		}
-
-		++s;
-	}
-
-	re.SetColor( baseColor );
+	RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor != qfalse ? qtrue : qfalse, ql_cgame_currentColor );
 }
 
 /*
@@ -1688,55 +2915,10 @@ QL_CG_trap_MeasureText
 ==============
 */
 static unsigned long long QDECL QL_CG_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {
-	fontInfo_t *font;
-	const char *s;
 	float width;
 	float height;
-	float scaleFactor;
-	qboolean hasMaxX;
-	float maxXf;
 
-	if ( outLeft ) {
-		*outLeft = 0.0f;
-	}
-
-	if ( !text ) {
-		return QL_CG_PackFloatBits64( 0.0f, 0.0f );
-	}
-
-	font = QL_CG_GetScaledFont( fontHandle );
-	scaleFactor = ( scale <= 0.0f ) ? 1.0f : scale / 48.0f;
-	width = 0.0f;
-	height = 0.0f;
-	hasMaxX = ( maxX > 0 );
-	maxXf = (float)maxX;
-
-	for ( s = text; *s && ( !end || s < end ); ++s ) {
-		unsigned char ch = (unsigned char)*s;
-
-		if ( Q_IsColorString( s ) ) {
-			++s;
-			if ( !*s ) {
-				break;
-			}
-			continue;
-		}
-
-		if ( ch >= GLYPH_START && ch <= GLYPH_END ) {
-			glyphInfo_t *glyph = &font->glyphs[ch];
-			float nextW = width + glyph->xSkip * scaleFactor;
-			float glyphH = glyph->height * scaleFactor;
-
-			if ( hasMaxX && nextW > maxXf ) {
-				break;
-			}
-
-			width = nextW;
-			if ( glyphH > height ) {
-				height = glyphH;
-			}
-		}
-	}
+	RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );
 
 	return QL_CG_PackFloatBits64( width, height );
 }
@@ -2188,6 +3370,7 @@ void CL_FirstSnapshot( void ) {
 
 	clc.timeDemoBaseTime = cl.snap.serverTime;
 	CL_Steam_SetMatchRichPresence();
+	CL_WebView_PublishGameStart();
 
 	// if this is the first frame of active play,
 	// execute the contents of activeAction now

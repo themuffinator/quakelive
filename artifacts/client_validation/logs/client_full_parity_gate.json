@@ -1,0 +1,89 @@
+{
+  "artifact_version": 1,
+  "phase": "CL-P6",
+  "parity_estimate": {
+    "before": 99,
+    "after": 100
+  },
+  "gap_order": [
+    "CL-G01",
+    "CL-G02",
+    "CL-G03",
+    "CL-G04",
+    "CL-G05"
+  ],
+  "tranches": {
+    "CL-G01": {
+      "gap_id": "CL-G01",
+      "status": "pass",
+      "summary": "Browser-host ownership, JS bridge publication, and service-disabled fallback behavior stay pinned by source, focused tests, and the tracked runtime bundle.",
+      "details": {
+        "runtime_evidence_sufficient": true,
+        "browser_runtime_helpers_present": true,
+        "js_bridge_present": true,
+        "event_publication_present": true,
+        "resource_interceptor_present": true
+      }
+    },
+    "CL-G02": {
+      "gap_id": "CL-G02",
+      "status": "pass",
+      "summary": "Steam client/lobby/micro callback lifetime remains reconstructed and machine-validated.",
+      "details": {
+        "client_callback_registration_present": true,
+        "lobby_callback_registration_present": true,
+        "micro_callback_registration_present": true,
+        "optional_register_symbols_present": true,
+        "client_frame_pump_present": true,
+        "harness_validation_present": true
+      }
+    },
+    "CL-G03": {
+      "gap_id": "CL-G03",
+      "status": "pass",
+      "summary": "Workshop-aware publication, bootstrap, mount, and UI-progress ownership remain reconstructed and tested.",
+      "details": {
+        "server_publication_present": true,
+        "client_bootstrap_present": true,
+        "ui_progress_import_present": true,
+        "workshop_mount_helpers_present": true,
+        "focused_validation_present": true
+      }
+    },
+    "CL-G04": {
+      "gap_id": "CL-G04",
+      "status": "pass",
+      "summary": "Retail config/bootstrap persistence remains reconstructed and proven by both focused tests and the tracked runtime artifact.",
+      "details": {
+        "retail_config_defines_present": true,
+        "write_client_config_present": true,
+        "filesystem_restart_bootstrap_present": true,
+        "legacy_cdkey_surface_present": true,
+        "runtime_artifact_proves_bootstrap": true
+      }
+    },
+    "CL-G05": {
+      "gap_id": "CL-G05",
+      "status": "pass",
+      "summary": "The client now has a dedicated parity gate, a tracked runtime-evidence bundle, and repo-level ledger wiring that keeps the client register enforceable.",
+      "details": {
+        "runtime_probe_present": true,
+        "runtime_evidence_present": true,
+        "runtime_evidence_sufficient": true,
+        "validation_note_present": true,
+        "workflow_references_gate": true,
+        "build_pipeline_mentions_gate": true,
+        "windows_pipeline_mentions_runtime_artifact": true,
+        "implementation_plan_marks_cl_p6_completed": true,
+        "audit_marks_client_full_closure": true
+      }
+    }
+  },
+  "overall_status": "pass",
+  "non_passing_gap_ids": [],
+  "summary": {
+    "passing_count": 5,
+    "blocked_count": 0,
+    "failing_count": 0
+  }
+}

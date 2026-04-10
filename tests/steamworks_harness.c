@@ -19,11 +19,53 @@
 
 #if defined(_MSC_VER)
 #define QLR_FASTCALL __fastcall
+#define QLR_THISCALL __thiscall
 #elif defined(__GNUC__) && defined(__i386__)
 #define QLR_FASTCALL __attribute__((fastcall))
+#define QLR_THISCALL __attribute__((thiscall))
 #else
 #define QLR_FASTCALL
+#define QLR_THISCALL
 #endif
+
+#define QLR_MAX_CALLBACK_REGISTRATIONS 32
+#define QLR_MAX_PENDING_CALLBACKS 32
+#define QLR_MAX_SUBSCRIBED_ITEMS 32
+
+typedef struct qlr_callback_base_s qlr_callback_base_t;
+
+typedef void (QLR_THISCALL *qlr_callback_run_fn)( qlr_callback_base_t *self, void *payload );
+typedef void (QLR_THISCALL *qlr_callback_run_call_result_fn)( qlr_callback_base_t *self, void *payload, qboolean ioFailure, SteamAPICall_t callHandle );
+typedef int (QLR_THISCALL *qlr_callback_get_size_fn)( qlr_callback_base_t *self );
+
+typedef struct {
+	qlr_callback_run_fn run;
+	qlr_callback_run_call_result_fn runCallResult;
+	qlr_callback_get_size_fn getSize;
+} qlr_callback_vtable_t;
+
+struct qlr_callback_base_s {
+	const qlr_callback_vtable_t *vtable;
+	uint8_t callbackFlags;
+	uint8_t reserved[3];
+	int callbackId;
+};
+
+typedef struct {
+	qboolean callResult;
+	void *object;
+	int callbackId;
+	SteamAPICall_t callHandle;
+} qlr_callback_registration_t;
+
+typedef struct {
+	qboolean callResult;
+	int callbackId;
+	SteamAPICall_t callHandle;
+	qboolean ioFailure;
+	uint32_t payloadSize;
+	uint8_t payload[512];
+} qlr_pending_callback_t;
 
 typedef struct {
 	qboolean library_available;
@@ -35,8 +77,20 @@ typedef struct {
 	HAuthTicket ticket_handle;
 	HAuthTicket cancelled_ticket_handle;
 	int cancel_auth_ticket_calls;
+	uint32_t app_id;
 	uint64_t steam_id_value;
 	const char *persona_name;
+	const char *friend_nickname;
+	const char *friend_status;
+	const char *friend_lan_ip;
+	int friend_relationship;
+	int friend_persona_state;
+	uint64_t friend_game_id;
+	uint32_t friend_game_ip;
+	uint16_t friend_game_port;
+	uint16_t friend_query_port;
+	uint64_t friend_lobby_id;
+	uint64_t friend_game_server_id;
 	const char *ip_country;
 	int avatar_handle_small;
 	int avatar_handle_medium;
@@ -123,6 +177,12 @@ typedef struct {
 	uint32_t ugc_item_state;
 	uint64_t ugc_downloaded;
 	uint64_t ugc_total;
+	uint32_t ugc_subscribed_item_count;
+	uint64_t ugc_subscribed_items[QLR_MAX_SUBSCRIBED_ITEMS];
+	uint64_t ugc_install_item_id;
+	uint64_t ugc_install_size_on_disk;
+	char ugc_install_folder[MAX_OSPATH];
+	uint32_t ugc_install_timestamp;
 	int ugc_subscribe_calls;
 	int ugc_unsubscribe_calls;
 	int ugc_download_calls;
@@ -133,6 +193,22 @@ typedef struct {
 	int steam_game_server_ugc_download_calls;
 	uint64_t steam_game_server_ugc_last_item_id;
 	int steam_game_server_ugc_last_high_priority;
+	char lobby_chat_entry_message[QL_STEAM_LOBBY_MESSAGE_LENGTH];
+	int register_callback_calls;
+	int unregister_callback_calls;
+	int register_call_result_calls;
+	int unregister_call_result_calls;
+	int client_callback_capture_count;
+	char last_callback_kind[64];
+	char last_callback_text[256];
+	uint64_t last_callback_id;
+	uint64_t last_callback_aux_id;
+	uint32_t last_callback_app_id;
+	int last_callback_result;
+	int registered_callback_count;
+	int pending_callback_count;
+	qlr_callback_registration_t registrations[QLR_MAX_CALLBACK_REGISTRATIONS];
+	qlr_pending_callback_t pending_callbacks[QLR_MAX_PENDING_CALLBACKS];
 } qlr_steamworks_mock_state_t;
 
 typedef struct {
@@ -149,8 +225,20 @@ static qlr_steamworks_mock_state_t qlr_mock_state = {
 	.ticket_handle = 1,
 	.cancelled_ticket_handle = 0,
 	.cancel_auth_ticket_calls = 0,
+	.app_id = 0x54100,
 	.steam_id_value = 0xDEADBEEFULL,
 	.persona_name = "QLR Persona",
+	.friend_nickname = "QLR Nick",
+	.friend_status = "At the main menu",
+	.friend_lan_ip = "",
+	.friend_relationship = 3,
+	.friend_persona_state = 1,
+	.friend_game_id = 0x54100,
+	.friend_game_ip = 0,
+	.friend_game_port = 0,
+	.friend_query_port = 0,
+	.friend_lobby_id = 0,
+	.friend_game_server_id = 0,
 	.ip_country = "US",
 	.avatar_handle_small = 11,
 	.avatar_handle_medium = 12,
@@ -242,6 +330,12 @@ static qlr_steamworks_mock_state_t qlr_mock_state = {
 	.ugc_item_state = 0,
 	.ugc_downloaded = 0,
 	.ugc_total = 0,
+	.ugc_subscribed_item_count = 0,
+	.ugc_subscribed_items = { 0 },
+	.ugc_install_item_id = 0,
+	.ugc_install_size_on_disk = 0,
+	.ugc_install_folder = "",
+	.ugc_install_timestamp = 0,
 	.ugc_subscribe_calls = 0,
 	.ugc_unsubscribe_calls = 0,
 	.ugc_download_calls = 0,
@@ -251,7 +345,21 @@ static qlr_steamworks_mock_state_t qlr_mock_state = {
 	.steam_game_server_ugc_unsubscribe_calls = 0,
 	.steam_game_server_ugc_download_calls = 0,
 	.steam_game_server_ugc_last_item_id = 0,
-	.steam_game_server_ugc_last_high_priority = 0
+	.steam_game_server_ugc_last_high_priority = 0,
+	.lobby_chat_entry_message = "",
+	.register_callback_calls = 0,
+	.unregister_callback_calls = 0,
+	.register_call_result_calls = 0,
+	.unregister_call_result_calls = 0,
+	.client_callback_capture_count = 0,
+	.last_callback_kind = "",
+	.last_callback_text = "",
+	.last_callback_id = 0,
+	.last_callback_aux_id = 0,
+	.last_callback_app_id = 0,
+	.last_callback_result = 0,
+	.registered_callback_count = 0,
+	.pending_callback_count = 0
 };
 
 qboolean QLR_SteamAPI_Init( void );
@@ -259,6 +367,14 @@ qboolean QLR_SteamAPI_Init( void );
 void QLR_SteamAPI_Shutdown( void );
 
 void QLR_SteamAPI_RunCallbacks( void );
+
+void QLR_SteamAPI_RegisterCallback( void *object, int callbackId );
+
+void QLR_SteamAPI_UnregisterCallback( void *object );
+
+void QLR_SteamAPI_RegisterCallResult( void *object, SteamAPICall_t callHandle );
+
+void QLR_SteamAPI_UnregisterCallResult( void *object, SteamAPICall_t callHandle );
 
 void *QLR_SteamAPI_SteamUser( void );
 
@@ -307,6 +423,29 @@ static int qlower( int ch ) {
 
 /*
 =============
+QLR_SteamworksMock_ClearCallbackState
+=============
+*/
+static void QLR_SteamworksMock_ClearCallbackState( void ) {
+	qlr_mock_state.register_callback_calls = 0;
+	qlr_mock_state.unregister_callback_calls = 0;
+	qlr_mock_state.register_call_result_calls = 0;
+	qlr_mock_state.unregister_call_result_calls = 0;
+	qlr_mock_state.client_callback_capture_count = 0;
+	qlr_mock_state.last_callback_kind[0] = '\0';
+	qlr_mock_state.last_callback_text[0] = '\0';
+	qlr_mock_state.last_callback_id = 0ull;
+	qlr_mock_state.last_callback_aux_id = 0ull;
+	qlr_mock_state.last_callback_app_id = 0u;
+	qlr_mock_state.last_callback_result = 0;
+	qlr_mock_state.registered_callback_count = 0;
+	qlr_mock_state.pending_callback_count = 0;
+	memset( qlr_mock_state.registrations, 0, sizeof( qlr_mock_state.registrations ) );
+	memset( qlr_mock_state.pending_callbacks, 0, sizeof( qlr_mock_state.pending_callbacks ) );
+}
+
+/*
+=============
 QLR_SteamworksMock_Reset
 
 Restore default mock state for Steamworks entry points.
@@ -322,8 +461,20 @@ QLR_EXPORT void QLR_SteamworksMock_Reset( void ) {
 	qlr_mock_state.ticket_handle = 1;
 	qlr_mock_state.cancelled_ticket_handle = 0;
 	qlr_mock_state.cancel_auth_ticket_calls = 0;
+	qlr_mock_state.app_id = 0x54100;
 	qlr_mock_state.steam_id_value = 0xDEADBEEFULL;
 	qlr_mock_state.persona_name = "QLR Persona";
+	qlr_mock_state.friend_nickname = "QLR Nick";
+	qlr_mock_state.friend_status = "At the main menu";
+	qlr_mock_state.friend_lan_ip = "";
+	qlr_mock_state.friend_relationship = 3;
+	qlr_mock_state.friend_persona_state = 1;
+	qlr_mock_state.friend_game_id = 0x54100;
+	qlr_mock_state.friend_game_ip = 0;
+	qlr_mock_state.friend_game_port = 0;
+	qlr_mock_state.friend_query_port = 0;
+	qlr_mock_state.friend_lobby_id = 0;
+	qlr_mock_state.friend_game_server_id = 0;
 	qlr_mock_state.ip_country = "US";
 	qlr_mock_state.avatar_handle_small = 11;
 	qlr_mock_state.avatar_handle_medium = 12;
@@ -415,6 +566,12 @@ QLR_EXPORT void QLR_SteamworksMock_Reset( void ) {
 	qlr_mock_state.ugc_item_state = 0;
 	qlr_mock_state.ugc_downloaded = 0;
 	qlr_mock_state.ugc_total = 0;
+	qlr_mock_state.ugc_subscribed_item_count = 0u;
+	memset( qlr_mock_state.ugc_subscribed_items, 0, sizeof( qlr_mock_state.ugc_subscribed_items ) );
+	qlr_mock_state.ugc_install_item_id = 0ull;
+	qlr_mock_state.ugc_install_size_on_disk = 0ull;
+	qlr_mock_state.ugc_install_folder[0] = '\0';
+	qlr_mock_state.ugc_install_timestamp = 0u;
 	qlr_mock_state.ugc_subscribe_calls = 0;
 	qlr_mock_state.ugc_unsubscribe_calls = 0;
 	qlr_mock_state.ugc_download_calls = 0;
@@ -425,6 +582,8 @@ QLR_EXPORT void QLR_SteamworksMock_Reset( void ) {
 	qlr_mock_state.steam_game_server_ugc_download_calls = 0;
 	qlr_mock_state.steam_game_server_ugc_last_item_id = 0;
 	qlr_mock_state.steam_game_server_ugc_last_high_priority = 0;
+	qlr_mock_state.lobby_chat_entry_message[0] = '\0';
+	QLR_SteamworksMock_ClearCallbackState();
 }
 
 /*
@@ -509,11 +668,29 @@ QLR_EXPORT void QLR_SteamworksMock_SetSteamId( uint64_t steamId ) {
 
 /*
 =============
+QLR_SteamworksMock_SetAppId
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetAppId( uint32_t appId ) {
+	qlr_mock_state.app_id = appId;
+}
+
+/*
+=============
 QLR_SteamworksMock_SetLobbyOwnerId
 =============
 */
 QLR_EXPORT void QLR_SteamworksMock_SetLobbyOwnerId( uint64_t steamId ) {
 	qlr_mock_state.lobby_owner_id = steamId;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetLobbyChatEntryMessage
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetLobbyChatEntryMessage( const char *message ) {
+	Q_strncpyz( qlr_mock_state.lobby_chat_entry_message, message ? message : "", sizeof( qlr_mock_state.lobby_chat_entry_message ) );
 }
 
 /*
@@ -588,6 +765,39 @@ QLR_SteamworksMock_SetUGCDownloadInfo
 QLR_EXPORT void QLR_SteamworksMock_SetUGCDownloadInfo( uint64_t downloaded, uint64_t total ) {
 	qlr_mock_state.ugc_downloaded = downloaded;
 	qlr_mock_state.ugc_total = total;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetSubscribedItems
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetSubscribedItems( const uint64_t *itemIds, uint32_t count ) {
+	qlr_mock_state.ugc_subscribed_item_count = 0u;
+	memset( qlr_mock_state.ugc_subscribed_items, 0, sizeof( qlr_mock_state.ugc_subscribed_items ) );
+
+	if ( !itemIds || count == 0u ) {
+		return;
+	}
+
+	if ( count > QLR_MAX_SUBSCRIBED_ITEMS ) {
+		count = QLR_MAX_SUBSCRIBED_ITEMS;
+	}
+
+	memcpy( qlr_mock_state.ugc_subscribed_items, itemIds, count * sizeof( qlr_mock_state.ugc_subscribed_items[0] ) );
+	qlr_mock_state.ugc_subscribed_item_count = count;
+}
+
+/*
+=============
+QLR_SteamworksMock_SetUGCInstallInfo
+=============
+*/
+QLR_EXPORT void QLR_SteamworksMock_SetUGCInstallInfo( uint64_t itemId, uint64_t sizeOnDisk, const char *folder, uint32_t timestamp ) {
+	qlr_mock_state.ugc_install_item_id = itemId;
+	qlr_mock_state.ugc_install_size_on_disk = sizeOnDisk;
+	Q_strncpyz( qlr_mock_state.ugc_install_folder, folder ? folder : "", sizeof( qlr_mock_state.ugc_install_folder ) );
+	qlr_mock_state.ugc_install_timestamp = timestamp;
 }
 
 /*
@@ -1431,6 +1641,22 @@ void *dlsym( void *handle, const char *symbol ) {
 		return QLR_SteamAPI_RunCallbacks;
 	}
 
+	if ( strcmp( symbol, "SteamAPI_RegisterCallback" ) == 0 ) {
+		return QLR_SteamAPI_RegisterCallback;
+	}
+
+	if ( strcmp( symbol, "SteamAPI_UnregisterCallback" ) == 0 ) {
+		return QLR_SteamAPI_UnregisterCallback;
+	}
+
+	if ( strcmp( symbol, "SteamAPI_RegisterCallResult" ) == 0 ) {
+		return QLR_SteamAPI_RegisterCallResult;
+	}
+
+	if ( strcmp( symbol, "SteamAPI_UnregisterCallResult" ) == 0 ) {
+		return QLR_SteamAPI_UnregisterCallResult;
+	}
+
 	if ( strcmp( symbol, "SteamAPI_SteamUser" ) == 0 ) {
 		return QLR_SteamAPI_SteamUser;
 	}
@@ -1487,7 +1713,7 @@ void *dlsym( void *handle, const char *symbol ) {
 		return QLR_SteamAPI_GetSteamID;
 	}
 
-	return QLR_SteamAPI_Init;
+	return NULL;
 }
 
 /*
@@ -1519,10 +1745,151 @@ void QLR_SteamAPI_Shutdown( void ) {
 
 /*
 =============
+QLR_SteamAPI_RegisterCallback
+=============
+*/
+void QLR_SteamAPI_RegisterCallback( void *object, int callbackId ) {
+	qlr_callback_registration_t *registration;
+
+	if ( !object || qlr_mock_state.registered_callback_count >= QLR_MAX_CALLBACK_REGISTRATIONS ) {
+		return;
+	}
+
+	registration = &qlr_mock_state.registrations[qlr_mock_state.registered_callback_count++];
+	memset( registration, 0, sizeof( *registration ) );
+	registration->callResult = qfalse;
+	registration->object = object;
+	registration->callbackId = callbackId;
+	qlr_mock_state.register_callback_calls++;
+}
+
+/*
+=============
+QLR_SteamAPI_UnregisterCallback
+=============
+*/
+void QLR_SteamAPI_UnregisterCallback( void *object ) {
+	int index;
+
+	if ( !object ) {
+		return;
+	}
+
+	for ( index = 0; index < qlr_mock_state.registered_callback_count; ++index ) {
+		qlr_callback_registration_t *registration;
+
+		registration = &qlr_mock_state.registrations[index];
+		if ( registration->object != object || registration->callResult ) {
+			continue;
+		}
+
+		if ( index + 1 < qlr_mock_state.registered_callback_count ) {
+			memmove( registration, registration + 1, (size_t)( qlr_mock_state.registered_callback_count - index - 1 ) * sizeof( *registration ) );
+		}
+		qlr_mock_state.registered_callback_count--;
+		memset( &qlr_mock_state.registrations[qlr_mock_state.registered_callback_count], 0, sizeof( qlr_mock_state.registrations[0] ) );
+		qlr_mock_state.unregister_callback_calls++;
+		return;
+	}
+}
+
+/*
+=============
+QLR_SteamAPI_RegisterCallResult
+=============
+*/
+void QLR_SteamAPI_RegisterCallResult( void *object, SteamAPICall_t callHandle ) {
+	qlr_callback_registration_t *registration;
+
+	if ( !object || callHandle == 0 || qlr_mock_state.registered_callback_count >= QLR_MAX_CALLBACK_REGISTRATIONS ) {
+		return;
+	}
+
+	registration = &qlr_mock_state.registrations[qlr_mock_state.registered_callback_count++];
+	memset( registration, 0, sizeof( *registration ) );
+	registration->callResult = qtrue;
+	registration->object = object;
+	registration->callHandle = callHandle;
+	qlr_mock_state.register_call_result_calls++;
+}
+
+/*
+=============
+QLR_SteamAPI_UnregisterCallResult
+=============
+*/
+void QLR_SteamAPI_UnregisterCallResult( void *object, SteamAPICall_t callHandle ) {
+	int index;
+
+	if ( !object || callHandle == 0 ) {
+		return;
+	}
+
+	for ( index = 0; index < qlr_mock_state.registered_callback_count; ++index ) {
+		qlr_callback_registration_t *registration;
+
+		registration = &qlr_mock_state.registrations[index];
+		if ( registration->object != object || !registration->callResult || registration->callHandle != callHandle ) {
+			continue;
+		}
+
+		if ( index + 1 < qlr_mock_state.registered_callback_count ) {
+			memmove( registration, registration + 1, (size_t)( qlr_mock_state.registered_callback_count - index - 1 ) * sizeof( *registration ) );
+		}
+		qlr_mock_state.registered_callback_count--;
+		memset( &qlr_mock_state.registrations[qlr_mock_state.registered_callback_count], 0, sizeof( qlr_mock_state.registrations[0] ) );
+		qlr_mock_state.unregister_call_result_calls++;
+		return;
+	}
+}
+
+/*
+=============
 QLR_SteamAPI_RunCallbacks
 =============
 */
 void QLR_SteamAPI_RunCallbacks( void ) {
+	int pendingIndex;
+
+	for ( pendingIndex = 0; pendingIndex < qlr_mock_state.pending_callback_count; ++pendingIndex ) {
+		qlr_pending_callback_t *pending;
+		int registrationIndex;
+
+		pending = &qlr_mock_state.pending_callbacks[pendingIndex];
+		for ( registrationIndex = 0; registrationIndex < qlr_mock_state.registered_callback_count; ++registrationIndex ) {
+			qlr_callback_registration_t *registration;
+			qlr_callback_base_t *callbackBase;
+
+			registration = &qlr_mock_state.registrations[registrationIndex];
+			if ( pending->callResult != registration->callResult ) {
+				continue;
+			}
+
+			if ( pending->callResult ) {
+				if ( registration->callHandle != pending->callHandle ) {
+					continue;
+				}
+			} else if ( registration->callbackId != pending->callbackId ) {
+				continue;
+			}
+
+			callbackBase = (qlr_callback_base_t *)registration->object;
+			if ( !callbackBase || !callbackBase->vtable ) {
+				continue;
+			}
+
+			if ( pending->callResult ) {
+				if ( callbackBase->vtable->runCallResult ) {
+					callbackBase->vtable->runCallResult( callbackBase, pending->payload, pending->ioFailure, pending->callHandle );
+				}
+			} else if ( callbackBase->vtable->run ) {
+				callbackBase->vtable->run( callbackBase, pending->payload );
+			}
+		}
+	}
+
+	qlr_mock_state.pending_callback_count = 0;
+	memset( qlr_mock_state.pending_callbacks, 0, sizeof( qlr_mock_state.pending_callbacks ) );
 }
 
 /*
@@ -1836,6 +2203,114 @@ static const char *QLR_FASTCALL QLR_SteamFriends_GetPersonaName( void *self, voi
 
 /*
 =============
+QLR_SteamFriends_GetFriendRelationship
+=============
+*/
+static int QLR_FASTCALL QLR_SteamFriends_GetFriendRelationship( void *self, void *unused, CSteamID steamId ) {
+	(void)self;
+	(void)unused;
+	(void)steamId;
+	return qlr_mock_state.friend_relationship;
+}
+
+/*
+=============
+QLR_SteamFriends_GetFriendPersonaState
+=============
+*/
+static int QLR_FASTCALL QLR_SteamFriends_GetFriendPersonaState( void *self, void *unused, CSteamID steamId ) {
+	(void)self;
+	(void)unused;
+	(void)steamId;
+	return qlr_mock_state.friend_persona_state;
+}
+
+/*
+=============
+QLR_SteamFriends_GetFriendPersonaName
+=============
+*/
+static const char *QLR_FASTCALL QLR_SteamFriends_GetFriendPersonaName( void *self, void *unused, CSteamID steamId ) {
+	(void)self;
+	(void)unused;
+	(void)steamId;
+	return qlr_mock_state.persona_name;
+}
+
+/*
+=============
+QLR_SteamFriends_GetFriendGamePlayed
+=============
+*/
+static int QLR_FASTCALL QLR_SteamFriends_GetFriendGamePlayed( void *self, void *unused, CSteamID steamId, void *outGameInfo ) {
+	typedef struct {
+		uint64_t gameId;
+		uint32_t gameIp;
+		uint16_t gamePort;
+		uint16_t queryPort;
+		CSteamID lobbyId;
+		CSteamID gameServerId;
+	} qlr_friend_game_info_t;
+	qlr_friend_game_info_t *gameInfo;
+
+	(void)self;
+	(void)unused;
+	(void)steamId;
+
+	if ( !outGameInfo || qlr_mock_state.friend_game_id == 0ull ) {
+		return 0;
+	}
+
+	gameInfo = (qlr_friend_game_info_t *)outGameInfo;
+	memset( gameInfo, 0, sizeof( *gameInfo ) );
+	gameInfo->gameId = qlr_mock_state.friend_game_id;
+	gameInfo->gameIp = qlr_mock_state.friend_game_ip;
+	gameInfo->gamePort = qlr_mock_state.friend_game_port;
+	gameInfo->queryPort = qlr_mock_state.friend_query_port;
+	gameInfo->lobbyId.value = qlr_mock_state.friend_lobby_id;
+	gameInfo->gameServerId.value = qlr_mock_state.friend_game_server_id;
+	return 1;
+}
+
+/*
+=============
+QLR_SteamFriends_GetPlayerNickname
+=============
+*/
+static const char *QLR_FASTCALL QLR_SteamFriends_GetPlayerNickname( void *self, void *unused, CSteamID steamId ) {
+	(void)self;
+	(void)unused;
+	(void)steamId;
+	return qlr_mock_state.friend_nickname;
+}
+
+/*
+=============
+QLR_SteamFriends_GetFriendRichPresence
+=============
+*/
+static const char *QLR_FASTCALL QLR_SteamFriends_GetFriendRichPresence( void *self, void *unused, CSteamID steamId, const char *key ) {
+	(void)self;
+	(void)unused;
+	(void)steamId;
+
+	if ( !key ) {
+		return "";
+	}
+
+	if ( strcmp( key, "status" ) == 0 ) {
+		return qlr_mock_state.friend_status;
+	}
+
+	if ( strcmp( key, "lanIp" ) == 0 ) {
+		return qlr_mock_state.friend_lan_ip;
+	}
+
+	return "";
+}
+
+/*
+=============
 QLR_SteamFriends_ActivateGameOverlayToUser
 =============
 */
@@ -1921,6 +2396,17 @@ static const char *QLR_FASTCALL QLR_SteamUtils_GetIPCountry( void *self, void *u
 	(void)self;
 	(void)unused;
 	return qlr_mock_state.ip_country;
+}
+
+/*
+=============
+QLR_SteamUtils_GetAppID
+=============
+*/
+static uint32_t QLR_FASTCALL QLR_SteamUtils_GetAppID( void *self, void *unused ) {
+	(void)self;
+	(void)unused;
+	return qlr_mock_state.app_id;
 }
 
 /*
@@ -2065,6 +2551,35 @@ static int QLR_FASTCALL QLR_SteamMatchmaking_SendLobbyChatMsg( void *self, void 
 
 /*
 =============
+QLR_SteamMatchmaking_GetLobbyChatEntry
+=============
+*/
+static int QLR_FASTCALL QLR_SteamMatchmaking_GetLobbyChatEntry( void *self, void *unused, uint32_t idLow, uint32_t idHigh, int chatId, CSteamID *outChatter, void *buffer, int bufferSize, int *outEntryType ) {
+	size_t length;
+
+	(void)self;
+	(void)unused;
+	(void)idLow;
+	(void)idHigh;
+	(void)chatId;
+
+	if ( outChatter ) {
+		outChatter->value = qlr_mock_state.steam_id_value;
+	}
+	if ( outEntryType ) {
+		*outEntryType = 1;
+	}
+	if ( !buffer || bufferSize <= 0 ) {
+		return 0;
+	}
+
+	Q_strncpyz( (char *)buffer, qlr_mock_state.lobby_chat_entry_message, bufferSize );
+	length = strlen( (const char *)buffer ) + 1;
+	return (int)length;
+}
+
+/*
+=============
 QLR_SteamUserStats_RequestUserStats
 =============
 */
@@ -2125,6 +2640,42 @@ static int QLR_FASTCALL QLR_SteamUGC_UnsubscribeItem( void *self, void *unused, 
 
 /*
 =============
+QLR_SteamUGC_GetNumSubscribedItems
+=============
+*/
+static uint32_t QLR_FASTCALL QLR_SteamUGC_GetNumSubscribedItems( void *self, void *unused ) {
+	(void)self;
+	(void)unused;
+
+	return qlr_mock_state.ugc_subscribed_item_count;
+}
+
+/*
+=============
+QLR_SteamUGC_GetSubscribedItems
+=============
+*/
+static uint32_t QLR_FASTCALL QLR_SteamUGC_GetSubscribedItems( void *self, void *unused, uint64_t *outItemIds, uint32_t maxItems ) {
+	uint32_t copyCount;
+
+	(void)self;
+	(void)unused;
+
+	if ( !outItemIds || maxItems == 0u ) {
+		return 0u;
+	}
+
+	copyCount = qlr_mock_state.ugc_subscribed_item_count;
+	if ( copyCount > maxItems ) {
+		copyCount = maxItems;
+	}
+
+	memcpy( outItemIds, qlr_mock_state.ugc_subscribed_items, copyCount * sizeof( qlr_mock_state.ugc_subscribed_items[0] ) );
+	return copyCount;
+}
+
+/*
+=============
 QLR_SteamUGC_GetItemState
 =============
 */
@@ -2135,6 +2686,47 @@ static uint32_t QLR_FASTCALL QLR_SteamUGC_GetItemState( void *self, void *unused
 	(void)idHigh;
 
 	return qlr_mock_state.ugc_item_state;
+}
+
+/*
+=============
+QLR_SteamUGC_GetItemInstallInfo
+=============
+*/
+static int QLR_FASTCALL QLR_SteamUGC_GetItemInstallInfo( void *self, void *unused, uint32_t idLow, uint32_t idHigh, uint64_t *outSizeOnDisk, char *folder, uint32_t folderSize, uint32_t *outTimestamp ) {
+	uint64_t itemId;
+
+	(void)self;
+	(void)unused;
+
+	if ( outSizeOnDisk ) {
+		*outSizeOnDisk = 0ull;
+	}
+	if ( folder && folderSize > 0u ) {
+		folder[0] = '\0';
+	}
+	if ( outTimestamp ) {
+		*outTimestamp = 0u;
+	}
+
+	if ( !folder || folderSize == 0u ) {
+		return 0;
+	}
+
+	itemId = QLR_SteamworksMock_CombineItemWords( idLow, idHigh );
+	if ( itemId != qlr_mock_state.ugc_install_item_id || !qlr_mock_state.ugc_install_folder[0] ) {
+		return 0;
+	}
+
+	if ( outSizeOnDisk ) {
+		*outSizeOnDisk = qlr_mock_state.ugc_install_size_on_disk;
+	}
+	if ( outTimestamp ) {
+		*outTimestamp = qlr_mock_state.ugc_install_timestamp;
+	}
+
+	Q_strncpyz( folder, qlr_mock_state.ugc_install_folder, folderSize );
+	return 1;
 }
 
 /*
@@ -2257,16 +2849,22 @@ QLR_SteamAPI_SteamFriends
 =============
 */
 void *QLR_SteamAPI_SteamFriends( void ) {
-	static void *vtable[0xac / 4 + 1];
+	static void *vtable[0xb4 / 4 + 1];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
 	vtable[0] = QLR_SteamFriends_GetPersonaName;
+	vtable[0x14 / 4] = QLR_SteamFriends_GetFriendRelationship;
+	vtable[0x18 / 4] = QLR_SteamFriends_GetFriendPersonaState;
+	vtable[0x1c / 4] = QLR_SteamFriends_GetFriendPersonaName;
+	vtable[0x20 / 4] = QLR_SteamFriends_GetFriendGamePlayed;
+	vtable[0x2c / 4] = QLR_SteamFriends_GetPlayerNickname;
 	vtable[0x74 / 4] = QLR_SteamFriends_ActivateGameOverlayToUser;
 	vtable[0x84 / 4] = QLR_SteamFriends_ActivateGameOverlayInviteDialog;
 	vtable[0x88 / 4] = QLR_SteamFriends_GetSmallFriendAvatar;
 	vtable[0x8c / 4] = QLR_SteamFriends_GetMediumFriendAvatar;
 	vtable[0x90 / 4] = QLR_SteamFriends_GetLargeFriendAvatar;
 	vtable[0xac / 4] = QLR_SteamFriends_SetRichPresence;
+	vtable[0xb4 / 4] = QLR_SteamFriends_GetFriendRichPresence;
 	return &iface;
 }
 
@@ -2276,12 +2874,13 @@ QLR_SteamAPI_SteamUtils
 =============
 */
 void *QLR_SteamAPI_SteamUtils( void ) {
-	static void *vtable[0x18 / 4 + 1];
+	static void *vtable[0x24 / 4 + 1];
 	static qlr_steamworks_mock_interface_t iface = { vtable };
 
 	vtable[0x10 / 4] = QLR_SteamUtils_GetIPCountry;
 	vtable[0x14 / 4] = QLR_SteamUtils_GetImageSize;
 	vtable[0x18 / 4] = QLR_SteamUtils_GetImageRGBA;
+	vtable[0x24 / 4] = QLR_SteamUtils_GetAppID;
 	return &iface;
 }
 
@@ -2311,6 +2910,7 @@ void *QLR_SteamAPI_SteamMatchmaking( void ) {
 	vtable[0x3c / 4] = QLR_SteamMatchmaking_LeaveLobby;
 	vtable[0x38 / 4] = QLR_SteamMatchmaking_JoinLobby;
 	vtable[0x68 / 4] = QLR_SteamMatchmaking_SendLobbyChatMsg;
+	vtable[0x6c / 4] = QLR_SteamMatchmaking_GetLobbyChatEntry;
 	vtable[0x74 / 4] = QLR_SteamMatchmaking_SetLobbyGameServer;
 	vtable[0x8c / 4] = QLR_SteamMatchmaking_GetLobbyOwner;
 	return &iface;
@@ -2366,7 +2966,10 @@ void *QLR_SteamAPI_SteamUGC( void ) {
 
 	vtable[0xc0 / 4] = QLR_SteamUGC_SubscribeItem;
 	vtable[0xc4 / 4] = QLR_SteamUGC_UnsubscribeItem;
+	vtable[0xc8 / 4] = QLR_SteamUGC_GetNumSubscribedItems;
+	vtable[0xcc / 4] = QLR_SteamUGC_GetSubscribedItems;
 	vtable[0xd0 / 4] = QLR_SteamUGC_GetItemState;
+	vtable[0xd4 / 4] = QLR_SteamUGC_GetItemInstallInfo;
 	vtable[0xd8 / 4] = QLR_SteamUGC_GetItemDownloadInfo;
 	vtable[0xdc / 4] = QLR_SteamUGC_DownloadItem;
 	return &iface;
@@ -2383,7 +2986,10 @@ void *QLR_SteamAPI_SteamGameServerUGC( void ) {
 
 	vtable[0xc0 / 4] = QLR_SteamGameServerUGC_SubscribeItem;
 	vtable[0xc4 / 4] = QLR_SteamGameServerUGC_UnsubscribeItem;
+	vtable[0xc8 / 4] = QLR_SteamUGC_GetNumSubscribedItems;
+	vtable[0xcc / 4] = QLR_SteamUGC_GetSubscribedItems;
 	vtable[0xd0 / 4] = QLR_SteamGameServerUGC_GetItemState;
+	vtable[0xd4 / 4] = QLR_SteamUGC_GetItemInstallInfo;
 	vtable[0xd8 / 4] = QLR_SteamGameServerUGC_GetItemDownloadInfo;
 	vtable[0xdc / 4] = QLR_SteamGameServerUGC_DownloadItem;
 	return &iface;
@@ -2473,6 +3079,10 @@ QLR_EXPORT void QLR_SteamworksMock_PrimeState( void ) {
 	state.SteamAPI_Init = QLR_SteamAPI_Init;
 	state.SteamAPI_Shutdown = QLR_SteamAPI_Shutdown;
 	state.SteamAPI_RunCallbacks = QLR_SteamAPI_RunCallbacks;
+	state.SteamAPI_RegisterCallback = QLR_SteamAPI_RegisterCallback;
+	state.SteamAPI_UnregisterCallback = QLR_SteamAPI_UnregisterCallback;
+	state.SteamAPI_RegisterCallResult = QLR_SteamAPI_RegisterCallResult;
+	state.SteamAPI_UnregisterCallResult = QLR_SteamAPI_UnregisterCallResult;
 	state.SteamUser = QLR_SteamAPI_SteamUser;
 	state.SteamFriends = QLR_SteamAPI_SteamFriends;
 	state.SteamUtils = QLR_SteamAPI_SteamUtils;
@@ -2490,6 +3100,338 @@ QLR_EXPORT void QLR_SteamworksMock_PrimeState( void ) {
 	state.CancelAuthTicket = QLR_SteamAPI_CancelAuthTicket;
 	state.EndAuthSession = QLR_SteamAPI_EndAuthSession;
 	state.GetSteamID = QLR_SteamAPI_GetSteamID;
+	QLR_SteamworksMock_ClearCallbackState();
+}
+
+/*
+=============
+QLR_SteamworksMock_Capture
+=============
+*/
+static void QLR_SteamworksMock_Capture( const char *kind, const char *text, uint64_t id, uint64_t auxId, uint32_t appId, int result ) {
+	qlr_mock_state.client_callback_capture_count++;
+	Q_strncpyz( qlr_mock_state.last_callback_kind, kind ? kind : "", sizeof( qlr_mock_state.last_callback_kind ) );
+	Q_strncpyz( qlr_mock_state.last_callback_text, text ? text : "", sizeof( qlr_mock_state.last_callback_text ) );
+	qlr_mock_state.last_callback_id = id;
+	qlr_mock_state.last_callback_aux_id = auxId;
+	qlr_mock_state.last_callback_app_id = appId;
+	qlr_mock_state.last_callback_result = result;
+}
+
+/*
+=============
+QLR_SteamworksHarness_OnRichPresenceJoinRequested
+=============
+*/
+static void QLR_SteamworksHarness_OnRichPresenceJoinRequested( void *context, const ql_steam_rich_presence_join_requested_t *event ) {
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	QLR_SteamworksMock_Capture( "rich_presence", event->command, event->requester.steamId.value, 0ull, 0u, 0 );
+}
+
+/*
+=============
+QLR_SteamworksHarness_OnLobbyEnter
+=============
+*/
+static void QLR_SteamworksHarness_OnLobbyEnter( void *context, const ql_steam_lobby_enter_t *event ) {
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	QLR_SteamworksMock_Capture( "lobby_enter", "", event->lobbyId.value, 0ull, event->chatPermissions, event->response );
+}
+
+/*
+=============
+QLR_SteamworksHarness_OnMicroAuthorizationResponse
+=============
+*/
+static void QLR_SteamworksHarness_OnMicroAuthorizationResponse( void *context, const ql_steam_microtxn_authorization_response_t *event ) {
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	QLR_SteamworksMock_Capture( "microtxn", "", event->orderId, 0ull, event->appId, event->authorized ? 1 : 0 );
+}
+
+/*
+=============
+QLR_SteamworksHarness_OnUGCQueryCompleted
+=============
+*/
+static void QLR_SteamworksHarness_OnUGCQueryCompleted( void *context, const ql_steam_ugc_query_completed_t *event ) {
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	QLR_SteamworksMock_Capture( "ugc", "", event->callHandle, event->queryHandle, event->numResultsReturned, event->result );
+}
+
+/*
+=============
+QLR_SteamworksMock_QueueCallback
+=============
+*/
+static qboolean QLR_SteamworksMock_QueueCallback( qboolean callResult, int callbackId, SteamAPICall_t callHandle, const void *payload, uint32_t payloadSize, qboolean ioFailure ) {
+	qlr_pending_callback_t *pending;
+
+	if ( qlr_mock_state.pending_callback_count >= QLR_MAX_PENDING_CALLBACKS ) {
+		return qfalse;
+	}
+
+	pending = &qlr_mock_state.pending_callbacks[qlr_mock_state.pending_callback_count++];
+	memset( pending, 0, sizeof( *pending ) );
+	pending->callResult = callResult;
+	pending->callbackId = callbackId;
+	pending->callHandle = callHandle;
+	pending->ioFailure = ioFailure;
+	pending->payloadSize = payloadSize;
+	if ( payload && payloadSize > 0 ) {
+		if ( payloadSize > sizeof( pending->payload ) ) {
+			qlr_mock_state.pending_callback_count--;
+			memset( pending, 0, sizeof( *pending ) );
+			return qfalse;
+		}
+		memcpy( pending->payload, payload, payloadSize );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+QLR_Steamworks_RegisterHarnessCallbacks
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_RegisterHarnessCallbacks( void ) {
+	ql_steam_client_callback_bindings_t clientBindings;
+	ql_steam_lobby_callback_bindings_t lobbyBindings;
+	ql_steam_micro_callback_bindings_t microBindings;
+
+	memset( &clientBindings, 0, sizeof( clientBindings ) );
+	memset( &lobbyBindings, 0, sizeof( lobbyBindings ) );
+	memset( &microBindings, 0, sizeof( microBindings ) );
+
+	clientBindings.onRichPresenceJoinRequested = QLR_SteamworksHarness_OnRichPresenceJoinRequested;
+	clientBindings.onUGCQueryCompleted = QLR_SteamworksHarness_OnUGCQueryCompleted;
+	lobbyBindings.onLobbyEnter = QLR_SteamworksHarness_OnLobbyEnter;
+	microBindings.onAuthorizationResponse = QLR_SteamworksHarness_OnMicroAuthorizationResponse;
+
+	if ( !QL_Steamworks_RegisterClientCallbacks( &clientBindings ) ) {
+		return qfalse;
+	}
+	if ( !QL_Steamworks_RegisterLobbyCallbacks( &lobbyBindings ) ) {
+		QL_Steamworks_UnregisterClientCallbacks();
+		return qfalse;
+	}
+	if ( !QL_Steamworks_RegisterMicroCallbacks( &microBindings ) ) {
+		QL_Steamworks_UnregisterLobbyCallbacks();
+		QL_Steamworks_UnregisterClientCallbacks();
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+QLR_Steamworks_UnregisterHarnessCallbacks
+=============
+*/
+QLR_EXPORT void QLR_Steamworks_UnregisterHarnessCallbacks( void ) {
+	QL_Steamworks_UnregisterMicroCallbacks();
+	QL_Steamworks_UnregisterLobbyCallbacks();
+	QL_Steamworks_UnregisterClientCallbacks();
+}
+
+/*
+=============
+QLR_Steamworks_BindUGCQueryCallResult
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_BindUGCQueryCallResult( uint64_t callHandle ) {
+	return QL_Steamworks_BindUGCQueryCallResult( (SteamAPICall_t)callHandle );
+}
+
+/*
+=============
+QLR_Steamworks_RunCallbackPump
+=============
+*/
+QLR_EXPORT void QLR_Steamworks_RunCallbackPump( void ) {
+	QL_Steamworks_RunCallbacks();
+}
+
+/*
+=============
+QLR_SteamworksMock_QueueRichPresenceJoinRequested
+=============
+*/
+QLR_EXPORT qboolean QLR_SteamworksMock_QueueRichPresenceJoinRequested( uint64_t friendId, const char *command ) {
+	ql_steam_game_rich_presence_join_requested_raw_t event;
+
+	memset( &event, 0, sizeof( event ) );
+	event.steamIDFriend.value = friendId;
+	Q_strncpyz( event.connect, command ? command : "", sizeof( event.connect ) );
+	return QLR_SteamworksMock_QueueCallback( qfalse, 0x151, 0ull, &event, sizeof( event ), qfalse );
+}
+
+/*
+=============
+QLR_SteamworksMock_QueueLobbyEnter
+=============
+*/
+QLR_EXPORT qboolean QLR_SteamworksMock_QueueLobbyEnter( uint64_t lobbyId, uint32_t chatPermissions, int locked, uint32_t response ) {
+	ql_steam_lobby_enter_raw_t event;
+
+	memset( &event, 0, sizeof( event ) );
+	event.lobbyId.value = lobbyId;
+	event.chatPermissions = chatPermissions;
+	event.locked = locked ? qtrue : qfalse;
+	event.response = response;
+	return QLR_SteamworksMock_QueueCallback( qfalse, 0x1f8, 0ull, &event, sizeof( event ), qfalse );
+}
+
+/*
+=============
+QLR_SteamworksMock_QueueMicroAuthorizationResponse
+=============
+*/
+QLR_EXPORT qboolean QLR_SteamworksMock_QueueMicroAuthorizationResponse( uint32_t appId, uint64_t orderId, int authorized ) {
+	ql_steam_microtxn_authorization_response_raw_t event;
+
+	memset( &event, 0, sizeof( event ) );
+	event.appId = appId;
+	event.orderId = orderId;
+	event.authorized = authorized ? qtrue : qfalse;
+	return QLR_SteamworksMock_QueueCallback( qfalse, 0x98, 0ull, &event, sizeof( event ), qfalse );
+}
+
+/*
+=============
+QLR_SteamworksMock_QueueUGCQueryCompleted
+=============
+*/
+QLR_EXPORT qboolean QLR_SteamworksMock_QueueUGCQueryCompleted( uint64_t callHandle, uint64_t queryHandle, int result, uint32_t numResultsReturned, uint32_t totalMatchingResults, int cachedData ) {
+	ql_steam_ugc_query_completed_raw_t event;
+
+	memset( &event, 0, sizeof( event ) );
+	event.queryHandle = queryHandle;
+	event.result = result;
+	event.numResultsReturned = numResultsReturned;
+	event.totalMatchingResults = totalMatchingResults;
+	event.cachedData = cachedData ? qtrue : qfalse;
+	return QLR_SteamworksMock_QueueCallback( qtrue, 0xd49, (SteamAPICall_t)callHandle, &event, sizeof( event ), qfalse );
+}
+
+/*
+=============
+QLR_SteamworksMock_GetRegisterCallbackCalls
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetRegisterCallbackCalls( void ) {
+	return qlr_mock_state.register_callback_calls;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetUnregisterCallbackCalls
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetUnregisterCallbackCalls( void ) {
+	return qlr_mock_state.unregister_callback_calls;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetRegisterCallResultCalls
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetRegisterCallResultCalls( void ) {
+	return qlr_mock_state.register_call_result_calls;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetUnregisterCallResultCalls
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetUnregisterCallResultCalls( void ) {
+	return qlr_mock_state.unregister_call_result_calls;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetClientCallbackCaptureCount
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetClientCallbackCaptureCount( void ) {
+	return qlr_mock_state.client_callback_capture_count;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetLastCallbackKind
+=============
+*/
+QLR_EXPORT const char *QLR_SteamworksMock_GetLastCallbackKind( void ) {
+	return qlr_mock_state.last_callback_kind;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetLastCallbackText
+=============
+*/
+QLR_EXPORT const char *QLR_SteamworksMock_GetLastCallbackText( void ) {
+	return qlr_mock_state.last_callback_text;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetLastCallbackId
+=============
+*/
+QLR_EXPORT uint64_t QLR_SteamworksMock_GetLastCallbackId( void ) {
+	return qlr_mock_state.last_callback_id;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetLastCallbackAuxId
+=============
+*/
+QLR_EXPORT uint64_t QLR_SteamworksMock_GetLastCallbackAuxId( void ) {
+	return qlr_mock_state.last_callback_aux_id;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetLastCallbackAppId
+=============
+*/
+QLR_EXPORT uint32_t QLR_SteamworksMock_GetLastCallbackAppId( void ) {
+	return qlr_mock_state.last_callback_app_id;
+}
+
+/*
+=============
+QLR_SteamworksMock_GetLastCallbackResult
+=============
+*/
+QLR_EXPORT int QLR_SteamworksMock_GetLastCallbackResult( void ) {
+	return qlr_mock_state.last_callback_result;
 }
 
 /*
@@ -2683,6 +3625,33 @@ QLR_Steamworks_RequestUserStats
 */
 QLR_EXPORT qboolean QLR_Steamworks_RequestUserStats( uint32_t idLow, uint32_t idHigh ) {
 	return QL_Steamworks_RequestUserStats( idLow, idHigh );
+}
+
+/*
+=============
+QLR_Steamworks_GetNumSubscribedItems
+=============
+*/
+QLR_EXPORT uint32_t QLR_Steamworks_GetNumSubscribedItems( void ) {
+	return QL_Steamworks_GetNumSubscribedItems();
+}
+
+/*
+=============
+QLR_Steamworks_GetSubscribedItems
+=============
+*/
+QLR_EXPORT uint32_t QLR_Steamworks_GetSubscribedItems( uint64_t *outItemIds, uint32_t maxItems ) {
+	return QL_Steamworks_GetSubscribedItems( outItemIds, maxItems );
+}
+
+/*
+=============
+QLR_Steamworks_GetItemInstallInfo
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_GetItemInstallInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outSizeOnDisk, char *folder, uint32_t folderSize, uint32_t *outTimestamp ) {
+	return QL_Steamworks_GetItemInstallInfo( idLow, idHigh, outSizeOnDisk, folder, (size_t)folderSize, outTimestamp );
 }
 
 /*
@@ -3104,6 +4073,46 @@ QLR_Steamworks_RequestUserStats
 QLR_EXPORT qboolean QLR_Steamworks_RequestUserStats( uint32_t idLow, uint32_t idHigh ) {
 	(void)idLow;
 	(void)idHigh;
+	return qfalse;
+}
+
+/*
+=============
+QLR_Steamworks_GetNumSubscribedItems
+=============
+*/
+QLR_EXPORT uint32_t QLR_Steamworks_GetNumSubscribedItems( void ) {
+	return 0u;
+}
+
+/*
+=============
+QLR_Steamworks_GetSubscribedItems
+=============
+*/
+QLR_EXPORT uint32_t QLR_Steamworks_GetSubscribedItems( uint64_t *outItemIds, uint32_t maxItems ) {
+	(void)outItemIds;
+	(void)maxItems;
+	return 0u;
+}
+
+/*
+=============
+QLR_Steamworks_GetItemInstallInfo
+=============
+*/
+QLR_EXPORT qboolean QLR_Steamworks_GetItemInstallInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outSizeOnDisk, char *folder, uint32_t folderSize, uint32_t *outTimestamp ) {
+	(void)idLow;
+	(void)idHigh;
+	if ( outSizeOnDisk ) {
+		*outSizeOnDisk = 0ull;
+	}
+	if ( folder && folderSize > 0u ) {
+		folder[0] = '\0';
+	}
+	if ( outTimestamp ) {
+		*outTimestamp = 0u;
+	}
 	return qfalse;
 }
 

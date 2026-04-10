@@ -1,0 +1,84 @@
+name: Client Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/client-validation.yml'
+      - 'tests/test_platform_services.py'
+      - 'tests/test_steamworks_harness.py'
+      - 'tests/test_client_config_parity.py'
+      - 'tests/test_client_workshop_bootstrap_parity.py'
+      - 'tests/test_ui_menu_files.py'
+      - 'tests/test_client_full_parity_gate.py'
+      - 'tools/client/**'
+      - 'artifacts/client_validation/**'
+      - 'docs/build-pipeline.md'
+      - 'docs/windows-native-pipeline.md'
+      - 'docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md'
+      - 'docs/reverse-engineering/client-validation-and-runtime-evidence-2026-04-10.md'
+      - 'AUDIT.md'
+      - 'IMPLEMENTATION_PLAN.md'
+      - 'src/code/client/**'
+      - 'src/code/qcommon/common.c'
+      - 'src/code/qcommon/files.c'
+      - 'src/code/qcommon/cvar.c'
+      - 'src/code/server/sv_init.c'
+      - 'src/common/platform/platform_steamworks.c'
+      - 'src/common/platform/platform_steamworks.h'
+  pull_request:
+    paths:
+      - '.github/workflows/client-validation.yml'
+      - 'tests/test_platform_services.py'
+      - 'tests/test_steamworks_harness.py'
+      - 'tests/test_client_config_parity.py'
+      - 'tests/test_client_workshop_bootstrap_parity.py'
+      - 'tests/test_ui_menu_files.py'
+      - 'tests/test_client_full_parity_gate.py'
+      - 'tools/client/**'
+      - 'artifacts/client_validation/**'
+      - 'docs/build-pipeline.md'
+      - 'docs/windows-native-pipeline.md'
+      - 'docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md'
+      - 'docs/reverse-engineering/client-validation-and-runtime-evidence-2026-04-10.md'
+      - 'AUDIT.md'
+      - 'IMPLEMENTATION_PLAN.md'
+      - 'src/code/client/**'
+      - 'src/code/qcommon/common.c'
+      - 'src/code/qcommon/files.c'
+      - 'src/code/qcommon/cvar.c'
+      - 'src/code/server/sv_init.c'
+      - 'src/common/platform/platform_steamworks.c'
+      - 'src/common/platform/platform_steamworks.h'
+
+jobs:
+  client-validation:
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_VALIDATION_ROOT: artifacts/client_validation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run client parity tests
+        run: |
+          pytest tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_client_config_parity.py tests/test_client_workshop_bootstrap_parity.py tests/test_ui_menu_files.py tests/test_client_full_parity_gate.py -q
+
+      - name: Upload client artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-validation
+          path: |
+            ${{ env.CLIENT_VALIDATION_ROOT }}/**
+          if-no-files-found: warn
+          retention-days: 7

@@ -799,6 +799,7 @@ void Key_SetBinding( int keynum, const char *binding ) {
 	// consider this like modifying an archived cvar, so the
 	// file write will be triggered at the next oportunity
 	cvar_modifiedFlags |= CVAR_ARCHIVE;
+	CL_WebView_PublishBindChanged( Key_KeynumToString( keynum ), keys[keynum].binding );
 }
 
 
@@ -832,6 +833,27 @@ int Key_GetKey(const char *binding) {
     }
   }
   return -1;
+}
+
+/*
+===================
+Key_EnumerateBindings
+===================
+*/
+void Key_EnumerateBindings( keyBindingEnumCallback_t callback, void *userData ) {
+	int i;
+
+	if ( !callback ) {
+		return;
+	}
+
+	for ( i = 0; i < MAX_KEYS; i++ ) {
+		if ( !keys[i].binding || !keys[i].binding[0] ) {
+			continue;
+		}
+
+		callback( i, Key_KeynumToString( i ), keys[i].binding, userData );
+	}
 }
 
 /*
@@ -1034,6 +1056,7 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 	// update auto-repeat status and BUTTON_ANY status
 	keys[key].down = dispatchDown;
+	CL_WebView_OnKeyEvent( dispatchKey, dispatchDown );
 
 	if ( dispatchDown ) {
 		keys[key].repeats++;

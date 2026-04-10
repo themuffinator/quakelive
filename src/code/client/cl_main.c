@@ -281,6 +281,54 @@ static void CL_Steam_ClearStats_f( void ) {
 }
 
 static qboolean cl_voiceRecordingActive;
+static qboolean cl_statsClearRegistered;
+
+#define CL_STEAM_BROWSER_EVENT_COUNT 32
+#define CL_STEAM_BROWSER_EVENT_NAME_LENGTH 96
+#define CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH 2048
+#define CL_STEAM_WORKSHOP_ITEMS_CONFIGSTRING 0x2cb
+#define CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED 0x4u
+#define CL_STEAM_WORKSHOP_ITEM_DELIMS " \t\r\n"
+#define CL_STEAM_MAX_WORKSHOP_ITEMS 256
+
+typedef struct {
+	int sequence;
+	char name[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+} clSteamBrowserEvent_t;
+
+typedef struct {
+	qboolean callbackRegistrationActive;
+	qboolean currentLobbyValid;
+	uint64_t currentLobbyId;
+	int eventSequence;
+	int eventHead;
+	clSteamBrowserEvent_t events[CL_STEAM_BROWSER_EVENT_COUNT];
+} clSteamCallbackState_t;
+
+static clSteamCallbackState_t cl_steamCallbackState;
+
+typedef struct {
+	uint32_t	itemIdLow;
+	uint32_t	itemIdHigh;
+	int			requestNumber;
+	qboolean	downloadRequested;
+	qboolean	completed;
+} clSteamWorkshopItem_t;
+
+typedef struct {
+	qboolean				active;
+	qboolean				queueActive;
+	qboolean				downloadsRequested;
+	int						totalItems;
+	int						itemCount;
+	int						activeItemIndex;
+	uint64_t				downloadedBytes;
+	uint64_t				totalBytes;
+	clSteamWorkshopItem_t	items[CL_STEAM_MAX_WORKSHOP_ITEMS];
+} clSteamWorkshopDownloadState_t;
+
+static clSteamWorkshopDownloadState_t cl_steamWorkshopDownloadState;
 
 /*
 =============
@@ -372,6 +420,328 @@ static qboolean CL_ParseSteamIdString( const char *steamId, uint32_t *steamIdLow
 
 	*steamIdLow = (uint32_t)( value & 0xffffffffull );
 	*steamIdHigh = (uint32_t)( ( value >> 32 ) & 0xffffffffull );
+	return qtrue;
+}
+
+/*
+=============
+CL_ClearDownloadProgressCvars
+=============
+*/
+static void CL_ClearDownloadProgressCvars( void ) {
+	Cvar_Set( "cl_downloadName", "" );
+	Cvar_Set( "cl_downloadItem", "" );
+	Cvar_Set( "cl_downloadCount", "0" );
+	Cvar_Set( "cl_downloadSize", "0" );
+}
+
+/*
+=============
+CL_Workshop_ClearBootstrapState
+=============
+*/
+static void CL_Workshop_ClearBootstrapState( qboolean clearProgressCvars ) {
+	Com_Memset( &cl_steamWorkshopDownloadState, 0, sizeof( cl_steamWorkshopDownloadState ) );
+	cl_steamWorkshopDownloadState.activeItemIndex = -1;
+
+	if ( clearProgressCvars ) {
+		CL_ClearDownloadProgressCvars();
+	}
+}
+
+/*
+=============
+CL_GetConfigStringValue
+=============
+*/
+static const char *CL_GetConfigStringValue( int index ) {
+	int offset;
+
+	if ( index < 0 || index >= MAX_CONFIGSTRINGS ) {
+		return "";
+	}
+
+	offset = cl.gameState.stringOffsets[index];
+	if ( !offset ) {
+		return "";
+	}
+
+	return cl.gameState.stringData + offset;
+}
+
+/*
+=============
+CL_Workshop_UpdateProgressCvars
+=============
+*/
+static void CL_Workshop_UpdateProgressCvars( void ) {
+	char downloaded[32];
+	char total[32];
+
+	Com_sprintf( downloaded, sizeof( downloaded ), "%llu", (unsigned long long)cl_steamWorkshopDownloadState.downloadedBytes );
+	Com_sprintf( total, sizeof( total ), "%llu", (unsigned long long)cl_steamWorkshopDownloadState.totalBytes );
+	Cvar_Set( "cl_downloadCount", downloaded );
+	Cvar_Set( "cl_downloadSize", total );
+}
+
+/*
+=============
+CL_Workshop_RefreshProgress
+=============
+*/
+static qboolean CL_Workshop_RefreshProgress( int itemIndex ) {
+	clSteamWorkshopItem_t	*item;
+	uint64_t				downloaded;
+	uint64_t				total;
+
+	if ( itemIndex < 0 || itemIndex >= cl_steamWorkshopDownloadState.itemCount ) {
+		return qfalse;
+	}
+
+	item = &cl_steamWorkshopDownloadState.items[itemIndex];
+	downloaded = cl_steamWorkshopDownloadState.downloadedBytes;
+	total = cl_steamWorkshopDownloadState.totalBytes;
+
+	if ( !QL_Steamworks_GetItemDownloadInfo( item->itemIdLow, item->itemIdHigh, &downloaded, &total ) ) {
+		return qfalse;
+	}
+
+	cl_steamWorkshopDownloadState.downloadedBytes = downloaded;
+	cl_steamWorkshopDownloadState.totalBytes = total;
+	CL_Workshop_UpdateProgressCvars();
+	return qtrue;
+}
+
+/*
+=============
+CL_Workshop_SetActiveItem
+=============
+*/
+static void CL_Workshop_SetActiveItem( int itemIndex ) {
+	clSteamWorkshopItem_t	*item;
+	unsigned long long		itemId;
+	char					itemString[32];
+	char					downloadName[64];
+
+	if ( itemIndex < 0 || itemIndex >= cl_steamWorkshopDownloadState.itemCount ) {
+		return;
+	}
+
+	item = &cl_steamWorkshopDownloadState.items[itemIndex];
+	itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
+
+	cl_steamWorkshopDownloadState.activeItemIndex = itemIndex;
+	cl_steamWorkshopDownloadState.downloadedBytes = 0;
+	cl_steamWorkshopDownloadState.totalBytes = 0;
+
+	Com_sprintf( itemString, sizeof( itemString ), "%llu", itemId );
+	Com_sprintf( downloadName, sizeof( downloadName ), "Workshop item %i of %i", item->requestNumber, cl_steamWorkshopDownloadState.totalItems );
+	Cvar_Set( "cl_downloadItem", itemString );
+	Cvar_Set( "cl_downloadName", downloadName );
+	CL_Workshop_UpdateProgressCvars();
+	Cvar_SetValue( "cl_downloadTime", cls.realtime );
+	CL_Workshop_RefreshProgress( itemIndex );
+}
+
+/*
+=============
+CL_Workshop_StartDownload
+=============
+*/
+static qboolean CL_Workshop_StartDownload( int itemIndex ) {
+	clSteamWorkshopItem_t	*item;
+	unsigned long long		itemId;
+
+	if ( itemIndex < 0 || itemIndex >= cl_steamWorkshopDownloadState.itemCount ) {
+		return qfalse;
+	}
+
+	item = &cl_steamWorkshopDownloadState.items[itemIndex];
+	itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
+	if ( !QL_Steamworks_DownloadItem( item->itemIdLow, item->itemIdHigh, qtrue ) ) {
+		Com_Printf( "Workshop item %llu: download request failed.\n", itemId );
+		return qfalse;
+	}
+
+	item->downloadRequested = qtrue;
+	cl_steamWorkshopDownloadState.queueActive = qtrue;
+	cl_steamWorkshopDownloadState.downloadsRequested = qtrue;
+	CL_Workshop_SetActiveItem( itemIndex );
+	return qtrue;
+}
+
+/*
+=============
+CL_Workshop_AdvanceQueue
+=============
+*/
+static qboolean CL_Workshop_AdvanceQueue( void ) {
+	int						i;
+	clSteamWorkshopItem_t	*item;
+
+	for ( i = 0; i < cl_steamWorkshopDownloadState.itemCount; ++i ) {
+		item = &cl_steamWorkshopDownloadState.items[i];
+
+		if ( item->completed || item->downloadRequested ) {
+			continue;
+		}
+
+		if ( CL_Workshop_StartDownload( i ) ) {
+			return qtrue;
+		}
+
+		item->completed = qtrue;
+	}
+
+	cl_steamWorkshopDownloadState.activeItemIndex = -1;
+	cl_steamWorkshopDownloadState.downloadedBytes = 0;
+	cl_steamWorkshopDownloadState.totalBytes = 0;
+	return qfalse;
+}
+
+/*
+=============
+CL_Workshop_DownloadsSettled
+=============
+*/
+static qboolean CL_Workshop_DownloadsSettled( void ) {
+	if ( cl_steamWorkshopDownloadState.activeItemIndex >= 0 ) {
+		clSteamWorkshopItem_t *item = &cl_steamWorkshopDownloadState.items[cl_steamWorkshopDownloadState.activeItemIndex];
+
+		CL_Workshop_RefreshProgress( cl_steamWorkshopDownloadState.activeItemIndex );
+		if ( !( QL_Steamworks_GetItemState( item->itemIdLow, item->itemIdHigh ) & CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED ) ) {
+			return qfalse;
+		}
+
+		item->completed = qtrue;
+		cl_steamWorkshopDownloadState.activeItemIndex = -1;
+		cl_steamWorkshopDownloadState.downloadedBytes = 0;
+		cl_steamWorkshopDownloadState.totalBytes = 0;
+	}
+
+	if ( CL_Workshop_AdvanceQueue() ) {
+		return qfalse;
+	}
+
+	if ( cl_steamWorkshopDownloadState.queueActive ) {
+		Com_Printf( "Download completed for all steam workshop items.\n" );
+		cl_steamWorkshopDownloadState.queueActive = qfalse;
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CL_Workshop_BeginBootstrap
+=============
+*/
+static qboolean CL_Workshop_BeginBootstrap( void ) {
+	const char	*requiredItems;
+	char		workshopItems[BIG_INFO_STRING];
+	char		*token;
+	int			totalItems;
+	int			requestNumber;
+
+	requiredItems = CL_GetConfigStringValue( CL_STEAM_WORKSHOP_ITEMS_CONFIGSTRING );
+	if ( !requiredItems[0] ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( workshopItems, requiredItems, sizeof( workshopItems ) );
+	Com_Printf( "Server requires the following workshop items: %s\n", workshopItems );
+
+	totalItems = 0;
+	for ( token = strtok( workshopItems, CL_STEAM_WORKSHOP_ITEM_DELIMS ); token; token = strtok( NULL, CL_STEAM_WORKSHOP_ITEM_DELIMS ) ) {
+		totalItems++;
+	}
+
+	if ( totalItems <= 0 ) {
+		return qfalse;
+	}
+
+	CL_Workshop_ClearBootstrapState( qtrue );
+	cl_steamWorkshopDownloadState.active = qtrue;
+	cl_steamWorkshopDownloadState.totalItems = totalItems;
+
+	Q_strncpyz( workshopItems, requiredItems, sizeof( workshopItems ) );
+	requestNumber = 0;
+	for ( token = strtok( workshopItems, CL_STEAM_WORKSHOP_ITEM_DELIMS ); token; token = strtok( NULL, CL_STEAM_WORKSHOP_ITEM_DELIMS ) ) {
+		clSteamWorkshopItem_t	*item;
+		uint32_t				itemIdLow;
+		uint32_t				itemIdHigh;
+		int						itemIndex;
+
+		if ( cl_steamWorkshopDownloadState.itemCount >= CL_STEAM_MAX_WORKSHOP_ITEMS ) {
+			Com_Printf( "WARNING: ignoring workshop items beyond %i required entries.\n", CL_STEAM_MAX_WORKSHOP_ITEMS );
+			break;
+		}
+
+		if ( !CL_ParseSteamIdString( token, &itemIdLow, &itemIdHigh ) ) {
+			continue;
+		}
+
+		itemIndex = cl_steamWorkshopDownloadState.itemCount++;
+		item = &cl_steamWorkshopDownloadState.items[itemIndex];
+		item->itemIdLow = itemIdLow;
+		item->itemIdHigh = itemIdHigh;
+
+		if ( QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED ) {
+			item->completed = qtrue;
+			continue;
+		}
+
+		item->requestNumber = ++requestNumber;
+		if ( cl_steamWorkshopDownloadState.activeItemIndex < 0 ) {
+			if ( !CL_Workshop_StartDownload( itemIndex ) ) {
+				item->completed = qtrue;
+			}
+		}
+	}
+
+	if ( cl_steamWorkshopDownloadState.itemCount <= 0 ) {
+		CL_Workshop_ClearBootstrapState( qtrue );
+		return qfalse;
+	}
+
+	cls.state = CA_CONNECTED;
+	return qtrue;
+}
+
+/*
+=============
+CL_GetWorkshopDownloadInfo
+=============
+*/
+qboolean CL_GetWorkshopDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {
+	clSteamWorkshopItem_t *item;
+
+	if ( outDownloaded ) {
+		*outDownloaded = 0;
+	}
+	if ( outTotal ) {
+		*outTotal = 0;
+	}
+
+	if ( !cl_steamWorkshopDownloadState.active || cl_steamWorkshopDownloadState.activeItemIndex < 0 ) {
+		return qfalse;
+	}
+
+	if ( itemIdLow || itemIdHigh ) {
+		item = &cl_steamWorkshopDownloadState.items[cl_steamWorkshopDownloadState.activeItemIndex];
+		if ( item->itemIdLow != itemIdLow || item->itemIdHigh != itemIdHigh ) {
+			return qfalse;
+		}
+	}
+
+	if ( outDownloaded ) {
+		*outDownloaded = (unsigned long long)cl_steamWorkshopDownloadState.downloadedBytes;
+	}
+	if ( outTotal ) {
+		*outTotal = (unsigned long long)cl_steamWorkshopDownloadState.totalBytes;
+	}
+
 	return qtrue;
 }
 
@@ -494,6 +864,836 @@ void CL_Steam_OnGameServerChangeRequested( const char *server, const char *passw
 	}
 
 	CL_Steam_ExecuteImmediateCommand( va( "connect %s\n", server ) );
+}
+
+/*
+=============
+CL_Steam_FormatSteamId
+
+Formats a 64-bit Steam identity for event-name and JSON payload usage.
+=============
+*/
+static void CL_Steam_FormatSteamId( uint64_t steamId, char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	Com_sprintf( buffer, bufferSize, "%llu", (unsigned long long)steamId );
+}
+
+/*
+=============
+CL_Steam_JsonEscape
+
+Escapes a UTF-8 string for the retained browser-event payload cache.
+=============
+*/
+static void CL_Steam_JsonEscape( const char *value, char *buffer, size_t bufferSize ) {
+	const char *cursor;
+	char *out;
+	char *limit;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	if ( !value ) {
+		return;
+	}
+
+	out = buffer;
+	limit = buffer + bufferSize - 1;
+	for ( cursor = value; *cursor && out < limit; ++cursor ) {
+		unsigned char ch;
+
+		ch = (unsigned char)*cursor;
+		if ( ch == '\\' || ch == '"' ) {
+			if ( out + 2 > limit ) {
+				break;
+			}
+			*out++ = '\\';
+			*out++ = (char)ch;
+			continue;
+		}
+
+		if ( ch == '\n' ) {
+			if ( out + 2 > limit ) {
+				break;
+			}
+			*out++ = '\\';
+			*out++ = 'n';
+			continue;
+		}
+
+		if ( ch == '\r' ) {
+			if ( out + 2 > limit ) {
+				break;
+			}
+			*out++ = '\\';
+			*out++ = 'r';
+			continue;
+		}
+
+		if ( ch == '\t' ) {
+			if ( out + 2 > limit ) {
+				break;
+			}
+			*out++ = '\\';
+			*out++ = 't';
+			continue;
+		}
+
+		if ( ch < 0x20 ) {
+			continue;
+		}
+
+		*out++ = (char)ch;
+	}
+
+	*out = '\0';
+}
+
+/*
+=============
+CL_Steam_ClearBrowserEvents
+
+Resets the retained browser-event owner cache.
+=============
+*/
+static void CL_Steam_ClearBrowserEvents( void ) {
+	Com_Memset( cl_steamCallbackState.events, 0, sizeof( cl_steamCallbackState.events ) );
+	cl_steamCallbackState.eventSequence = 0;
+	cl_steamCallbackState.eventHead = 0;
+}
+
+/*
+=============
+CL_WebView_PublishEvent
+
+Queues one browser-facing event through the retained client owner lane.
+=============
+*/
+void CL_WebView_PublishEvent( const char *name, const char *payload ) {
+	clSteamBrowserEvent_t *event;
+	int slot;
+
+	if ( !name || !name[0] ) {
+		return;
+	}
+
+	if ( !CL_WebHost_HasLiveView() ) {
+		Com_DPrintf( "PublishEvent failed: no view\n" );
+	} else if ( !CL_WebHost_HasBoundWindowObject() ) {
+		Com_DPrintf( "PublishEvent failed: no window object\n" );
+	}
+
+	slot = cl_steamCallbackState.eventHead % CL_STEAM_BROWSER_EVENT_COUNT;
+	event = &cl_steamCallbackState.events[slot];
+	cl_steamCallbackState.eventHead++;
+	cl_steamCallbackState.eventSequence++;
+
+	event->sequence = cl_steamCallbackState.eventSequence;
+	Q_strncpyz( event->name, name, sizeof( event->name ) );
+	Q_strncpyz( event->payload, payload ? payload : "", sizeof( event->payload ) );
+
+	Com_DPrintf( "steam_event %s %s\n", event->name, event->payload );
+}
+
+/*
+=============
+CL_Steam_PublishBrowserEvent
+
+Queues a browser-facing Steam event through the retained client owner path.
+=============
+*/
+static void CL_Steam_PublishBrowserEvent( const char *name, const char *payload ) {
+	CL_WebView_PublishEvent( name, payload );
+}
+
+/*
+=============
+CL_WebView_InvokeCommNotice
+
+Routes the retained communication-notice callback through the browser event lane.
+=============
+*/
+void CL_WebView_InvokeCommNotice( const char *channel, const char *message ) {
+	char escapedChannel[256];
+	char escapedMessage[1024];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	CL_Steam_JsonEscape( channel ? channel : "", escapedChannel, sizeof( escapedChannel ) );
+	CL_Steam_JsonEscape( message ? message : "", escapedMessage, sizeof( escapedMessage ) );
+	Com_sprintf( payload, sizeof( payload ), "{\"channel\":\"%s\",\"message\":\"%s\"}", escapedChannel, escapedMessage );
+	CL_WebView_PublishEvent( "web.commNotice", payload );
+}
+
+/*
+=============
+CL_WebView_PublishGameError
+
+Packages the retail browser-visible game error payload and clears the latched
+error string after publication.
+=============
+*/
+void CL_WebView_PublishGameError( const char *message ) {
+	char escapedMessage[MAXPRINTMSG * 2];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	CL_Steam_JsonEscape( message ? message : "", escapedMessage, sizeof( escapedMessage ) );
+	Com_sprintf( payload, sizeof( payload ), "{\"text\":\"%s\"}", escapedMessage );
+	CL_WebView_PublishEvent( "game.error", payload );
+	Cvar_Set( "com_errorMessage", "" );
+}
+
+/*
+=============
+CL_WebView_PublishGameEnd
+=============
+*/
+void CL_WebView_PublishGameEnd( void ) {
+	CL_WebView_PublishEvent( "game.end", NULL );
+}
+
+/*
+=============
+CL_WebView_PublishCvarChange
+
+Publishes browser-facing cvar updates while preserving the retail exclusion
+for the video-window position cvars.
+=============
+*/
+void CL_WebView_PublishCvarChange( const char *name, const char *value, qboolean replicate ) {
+	char escapedName[128];
+	char escapedValue[MAX_CVAR_VALUE_STRING * 2];
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	if ( !name || !name[0] ) {
+		return;
+	}
+
+	if ( !Q_stricmp( name, "vid_xpos" ) || !Q_stricmp( name, "vid_ypos" ) ) {
+		return;
+	}
+
+	CL_Steam_JsonEscape( name, escapedName, sizeof( escapedName ) );
+	CL_Steam_JsonEscape( value ? value : "", escapedValue, sizeof( escapedValue ) );
+	Com_sprintf( eventName, sizeof( eventName ), "cvar.%s", name );
+	Com_sprintf( payload, sizeof( payload ), "{\"name\":\"%s\",\"value\":\"%s\",\"replicate\":%d}", escapedName, escapedValue, replicate ? 1 : 0 );
+	CL_WebView_PublishEvent( eventName, payload );
+}
+
+/*
+=============
+CL_WebView_PublishBindChanged
+=============
+*/
+void CL_WebView_PublishBindChanged( const char *name, const char *value ) {
+	char escapedName[128];
+	char escapedValue[1024];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	CL_Steam_JsonEscape( name ? name : "", escapedName, sizeof( escapedName ) );
+	CL_Steam_JsonEscape( value ? value : "", escapedValue, sizeof( escapedValue ) );
+	Com_sprintf( payload, sizeof( payload ), "{\"name\":\"%s\",\"value\":\"%s\"}", escapedName, escapedValue );
+	CL_WebView_PublishEvent( "bind.changed", payload );
+}
+
+/*
+=============
+CL_WebView_PublishGameStart
+=============
+*/
+void CL_WebView_PublishGameStart( void ) {
+	char address[128];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	netadr_t serverAddress;
+
+	serverAddress = clc.serverAddress;
+	if ( serverAddress.type == NA_BAD ) {
+		serverAddress = clc.netchan.remoteAddress;
+	}
+
+	Q_strncpyz( address, NET_AdrToString( serverAddress ), sizeof( address ) );
+	Com_sprintf( payload, sizeof( payload ), "{\"ip\":\"%s\",\"port\":%u}", address, (unsigned int)BigShort( serverAddress.port ) );
+	CL_WebView_PublishEvent( "game.start", payload );
+}
+
+/*
+=============
+CL_WebView_PublishGameDemo
+=============
+*/
+void CL_WebView_PublishGameDemo( const char *id, const char *name ) {
+	char escapedId[MAX_QPATH * 2];
+	char escapedName[MAX_QPATH * 2];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	CL_Steam_JsonEscape( id ? id : "", escapedId, sizeof( escapedId ) );
+	CL_Steam_JsonEscape( name ? name : "", escapedName, sizeof( escapedName ) );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"name\":\"%s\"}", escapedId, escapedName );
+	CL_WebView_PublishEvent( "game.demo", payload );
+}
+
+/*
+=============
+CL_WebView_PublishGameScreenshot
+=============
+*/
+void CL_WebView_PublishGameScreenshot( const char *id, const char *name ) {
+	char escapedId[MAX_QPATH * 2];
+	char escapedName[MAX_QPATH * 2];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	CL_Steam_JsonEscape( id ? id : "", escapedId, sizeof( escapedId ) );
+	CL_Steam_JsonEscape( name ? name : "", escapedName, sizeof( escapedName ) );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"name\":\"%s\"}", escapedId, escapedName );
+	CL_WebView_PublishEvent( "game.screenshot", payload );
+}
+
+/*
+=============
+CL_Steam_SetCurrentLobby
+
+Tracks the current Steam lobby identity through the retail client owner.
+=============
+*/
+static void CL_Steam_SetCurrentLobby( uint64_t lobbyId ) {
+	cl_steamCallbackState.currentLobbyValid = ( lobbyId != 0ull ) ? qtrue : qfalse;
+	cl_steamCallbackState.currentLobbyId = lobbyId;
+}
+
+/*
+=============
+CL_Steam_ClearCurrentLobby
+=============
+*/
+static void CL_Steam_ClearCurrentLobby( void ) {
+	cl_steamCallbackState.currentLobbyValid = qfalse;
+	cl_steamCallbackState.currentLobbyId = 0ull;
+}
+
+/*
+=============
+CL_Steam_FormatFriendSummaryJson
+
+Formats a Steam friend summary into the retained browser-event payload shape.
+=============
+*/
+static void CL_Steam_FormatFriendSummaryJson( const ql_steam_friend_summary_t *summary, char *buffer, size_t bufferSize ) {
+	char id[32];
+	char lobbyId[32];
+	char gameServerId[32];
+	char name[QL_STEAM_NAME_LENGTH * 2];
+	char nickname[QL_STEAM_NAME_LENGTH * 2];
+	char status[QL_STEAM_STATUS_LENGTH * 2];
+	char lanIp[128];
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	if ( !summary ) {
+		Q_strncpyz( buffer, "{}", bufferSize );
+		return;
+	}
+
+	CL_Steam_FormatSteamId( summary->steamId.value, id, sizeof( id ) );
+	CL_Steam_FormatSteamId( summary->lobbyId.value, lobbyId, sizeof( lobbyId ) );
+	CL_Steam_FormatSteamId( summary->gameServerId.value, gameServerId, sizeof( gameServerId ) );
+	CL_Steam_JsonEscape( summary->name, name, sizeof( name ) );
+	CL_Steam_JsonEscape( summary->nickname, nickname, sizeof( nickname ) );
+	CL_Steam_JsonEscape( summary->status, status, sizeof( status ) );
+	CL_Steam_JsonEscape( summary->lanIp, lanIp, sizeof( lanIp ) );
+
+	Com_sprintf(
+		buffer,
+		bufferSize,
+		"{\"id\":\"%s\",\"name\":\"%s\",\"nickname\":\"%s\",\"relationship\":%d,\"state\":%d,\"status\":\"%s\",\"lanIp\":\"%s\",\"playingQuake\":%d,\"game\":\"%llu\",\"lobby\":\"%s\",\"ip\":%u,\"port\":%u,\"queryport\":%u,\"server\":\"%s\"}",
+		id,
+		name,
+		nickname,
+		summary->relationship,
+		summary->personaState,
+		status,
+		lanIp,
+		summary->playingQuake ? 1 : 0,
+		(unsigned long long)summary->gameId,
+		lobbyId,
+		summary->serverIp,
+		(unsigned int)summary->serverPort,
+		(unsigned int)summary->queryPort,
+		gameServerId
+	);
+}
+
+/*
+=============
+CL_Steam_Client_OnRichPresenceJoinRequested
+=============
+*/
+static void CL_Steam_Client_OnRichPresenceJoinRequested( void *context, const ql_steam_rich_presence_join_requested_t *event ) {
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	CL_Steam_OnRichPresenceJoinRequested( event->command );
+}
+
+/*
+=============
+CL_Steam_Client_OnUserStatsReceived
+=============
+*/
+static void CL_Steam_Client_OnUserStatsReceived( void *context, const ql_steam_user_stats_received_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char steamId[32];
+	char name[QL_STEAM_NAME_LENGTH * 2];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	CL_Steam_FormatSteamId( event->steamId.value, steamId, sizeof( steamId ) );
+	CL_Steam_JsonEscape( event->name, name, sizeof( name ) );
+	Com_sprintf( eventName, sizeof( eventName ), "users.stats.%s.received", steamId );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"name\":\"%s\",\"gameId\":%u,\"result\":%d}", steamId, name, event->gameId, event->result );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Client_OnPersonaStateChange
+=============
+*/
+static void CL_Steam_Client_OnPersonaStateChange( void *context, const ql_steam_persona_state_change_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char steamId[32];
+	char summary[1024];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	CL_Steam_FormatSteamId( event->steamId.value, steamId, sizeof( steamId ) );
+	CL_Steam_FormatFriendSummaryJson( &event->summary, summary, sizeof( summary ) );
+	Com_sprintf( eventName, sizeof( eventName ), "users.persona.%s.change", steamId );
+	Com_sprintf( payload, sizeof( payload ), "{\"changeFlags\":%u,\"friend\":%s}", event->changeFlags, summary );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Client_OnP2PSessionRequest
+=============
+*/
+static void CL_Steam_Client_OnP2PSessionRequest( void *context, const ql_steam_p2p_session_request_t *event ) {
+	char remoteId[32];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	CL_Steam_FormatSteamId( event->remoteId.value, remoteId, sizeof( remoteId ) );
+	Com_DPrintf( "steam_p2p_session_request %s\n", remoteId );
+}
+
+/*
+=============
+CL_Steam_Client_OnGameServerChangeRequested
+=============
+*/
+static void CL_Steam_Client_OnGameServerChangeRequested( void *context, const ql_steam_game_server_change_requested_t *event ) {
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	CL_Steam_OnGameServerChangeRequested( event->server, event->password );
+}
+
+/*
+=============
+CL_Steam_Client_OnFriendRichPresenceUpdate
+=============
+*/
+static void CL_Steam_Client_OnFriendRichPresenceUpdate( void *context, const ql_steam_friend_rich_presence_update_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char steamId[32];
+	char summary[1024];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	CL_Steam_FormatSteamId( event->steamId.value, steamId, sizeof( steamId ) );
+	CL_Steam_FormatFriendSummaryJson( &event->summary, summary, sizeof( summary ) );
+	Com_sprintf( eventName, sizeof( eventName ), "users.presence.%s.change", steamId );
+	Com_sprintf( payload, sizeof( payload ), "{\"appId\":%u,\"friend\":%s}", event->appId, summary );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Client_OnUGCQueryCompleted
+=============
+*/
+static void CL_Steam_Client_OnUGCQueryCompleted( void *context, const ql_steam_ugc_query_completed_t *event ) {
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	const char *eventName;
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	eventName = ( event->result == 1 ) ? "web.ugc.results" : "web.ugc.failed";
+	Com_sprintf(
+		payload,
+		sizeof( payload ),
+		"{\"call\":\"%llu\",\"query\":\"%llu\",\"result\":%d,\"numResults\":%u,\"total\":%u,\"cached\":%d}",
+		(unsigned long long)event->callHandle,
+		(unsigned long long)event->queryHandle,
+		event->result,
+		event->numResultsReturned,
+		event->totalMatchingResults,
+		event->cachedData ? 1 : 0
+	);
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Lobby_OnLobbyCreated
+=============
+*/
+static void CL_Steam_Lobby_OnLobbyCreated( void *context, const ql_steam_lobby_created_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char lobbyId[32];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	CL_Steam_FormatSteamId( event->lobbyId.value, lobbyId, sizeof( lobbyId ) );
+	if ( event->result != 1 || event->lobbyId.value == 0ull ) {
+		Com_sprintf( payload, sizeof( payload ), "{\"result\":%d,\"id\":\"%s\"}", event->result, lobbyId );
+		CL_Steam_PublishBrowserEvent( "lobby.error", payload );
+		return;
+	}
+
+	Com_sprintf( eventName, sizeof( eventName ), "lobby.%s.create", lobbyId );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"result\":%d}", lobbyId, event->result );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Lobby_OnLobbyEnter
+=============
+*/
+static void CL_Steam_Lobby_OnLobbyEnter( void *context, const ql_steam_lobby_enter_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char lobbyId[32];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	CL_Steam_FormatSteamId( event->lobbyId.value, lobbyId, sizeof( lobbyId ) );
+	if ( event->response != 1 || event->lobbyId.value == 0ull ) {
+		Com_sprintf( payload, sizeof( payload ), "{\"response\":%d,\"permissions\":%u,\"id\":\"%s\"}", event->response, event->chatPermissions, lobbyId );
+		CL_Steam_PublishBrowserEvent( "lobby.error", payload );
+		return;
+	}
+
+	CL_Steam_SetCurrentLobby( event->lobbyId.value );
+	Com_sprintf( eventName, sizeof( eventName ), "lobby.%s.enter", lobbyId );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"permissions\":%u,\"locked\":%d,\"response\":%d}", lobbyId, event->chatPermissions, event->locked ? 1 : 0, event->response );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Lobby_OnLobbyChatUpdate
+=============
+*/
+static void CL_Steam_Lobby_OnLobbyChatUpdate( void *context, const ql_steam_lobby_chat_update_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char lobbyId[32];
+	char userId[32];
+	char name[QL_STEAM_NAME_LENGTH * 2];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	ql_steam_friend_summary_t summary;
+	const char *verb;
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	memset( &summary, 0, sizeof( summary ) );
+	QL_Steamworks_GetFriendSummary( (uint32_t)( event->changedUser.value & 0xffffffffu ), (uint32_t)( event->changedUser.value >> 32 ), &summary );
+	CL_Steam_FormatSteamId( event->lobbyId.value, lobbyId, sizeof( lobbyId ) );
+	CL_Steam_FormatSteamId( event->changedUser.value, userId, sizeof( userId ) );
+	CL_Steam_JsonEscape( summary.name, name, sizeof( name ) );
+	verb = ( event->stateChange & 0x01u ) ? "joined" : "left";
+	Com_sprintf( eventName, sizeof( eventName ), "lobby.%s.user.%s", lobbyId, verb );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"name\":\"%s\",\"stateChange\":%u}", userId, name, event->stateChange );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Lobby_OnLobbyChatMessage
+=============
+*/
+static void CL_Steam_Lobby_OnLobbyChatMessage( void *context, const ql_steam_lobby_chat_message_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char lobbyId[32];
+	char userId[32];
+	char name[QL_STEAM_NAME_LENGTH * 2];
+	char message[QL_STEAM_LOBBY_MESSAGE_LENGTH * 2];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	ql_steam_friend_summary_t summary;
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	memset( &summary, 0, sizeof( summary ) );
+	QL_Steamworks_GetFriendSummary( (uint32_t)( event->chatter.value & 0xffffffffu ), (uint32_t)( event->chatter.value >> 32 ), &summary );
+	CL_Steam_FormatSteamId( event->lobbyId.value, lobbyId, sizeof( lobbyId ) );
+	CL_Steam_FormatSteamId( event->chatter.value, userId, sizeof( userId ) );
+	CL_Steam_JsonEscape( summary.name, name, sizeof( name ) );
+	CL_Steam_JsonEscape( event->message, message, sizeof( message ) );
+	Com_sprintf( eventName, sizeof( eventName ), "lobby.%s.chat", lobbyId );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"name\":\"%s\",\"msg\":\"%s\",\"type\":%d}", userId, name, message, event->chatEntryType );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Lobby_OnLobbyDataUpdate
+=============
+*/
+static void CL_Steam_Lobby_OnLobbyDataUpdate( void *context, const ql_steam_lobby_data_update_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	Com_sprintf( eventName, sizeof( eventName ), "lobby.%llu.updated", (unsigned long long)event->lobbyId.value );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%llu\",\"member\":\"%llu\",\"success\":%d}", (unsigned long long)event->lobbyId.value, (unsigned long long)event->memberId.value, event->success ? 1 : 0 );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Lobby_OnLobbyGameCreated
+=============
+*/
+static void CL_Steam_Lobby_OnLobbyGameCreated( void *context, const ql_steam_lobby_game_created_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	Com_sprintf( eventName, sizeof( eventName ), "lobby.%llu.game_created", (unsigned long long)event->lobbyId.value );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%llu\",\"ip\":%u,\"port\":%u,\"server\":\"%llu\"}", (unsigned long long)event->lobbyId.value, event->serverIp, (unsigned int)event->serverPort, (unsigned long long)event->serverId.value );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Lobby_OnLobbyKicked
+=============
+*/
+static void CL_Steam_Lobby_OnLobbyKicked( void *context, const ql_steam_lobby_kicked_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	if ( cl_steamCallbackState.currentLobbyValid && cl_steamCallbackState.currentLobbyId == event->lobbyId.value ) {
+		CL_Steam_ClearCurrentLobby();
+	}
+
+	Com_sprintf( eventName, sizeof( eventName ), "lobby.%llu.kicked", (unsigned long long)event->lobbyId.value );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%llu\",\"admin\":\"%llu\",\"disconnected\":%d}", (unsigned long long)event->lobbyId.value, (unsigned long long)event->adminId.value, event->disconnected ? 1 : 0 );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Lobby_OnGameLobbyJoinRequested
+=============
+*/
+static void CL_Steam_Lobby_OnGameLobbyJoinRequested( void *context, const ql_steam_game_lobby_join_requested_t *event ) {
+	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	Com_sprintf( eventName, sizeof( eventName ), "lobby.%llu.join_requested", (unsigned long long)event->lobbyId.value );
+	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%llu\",\"friend\":\"%llu\"}", (unsigned long long)event->lobbyId.value, (unsigned long long)event->friendId.value );
+	CL_Steam_PublishBrowserEvent( eventName, payload );
+}
+
+/*
+=============
+CL_Steam_Micro_OnAuthorizationResponse
+=============
+*/
+static void CL_Steam_Micro_OnAuthorizationResponse( void *context, const ql_steam_microtxn_authorization_response_t *event ) {
+	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	Com_sprintf( payload, sizeof( payload ), "{\"appid\":%u,\"orderid\":\"%llu\",\"authorized\":%d}", event->appId, (unsigned long long)event->orderId, event->authorized ? 1 : 0 );
+	Com_DPrintf( "GOT MICRO RESPONSE: %s\n", payload );
+	CL_Steam_PublishBrowserEvent( "microtxn.authorization", payload );
+}
+
+/*
+=============
+CL_Steam_InitCallbacks
+=============
+*/
+static void CL_Steam_InitCallbacks( void ) {
+	ql_steam_client_callback_bindings_t clientBindings;
+	ql_steam_lobby_callback_bindings_t lobbyBindings;
+	ql_steam_micro_callback_bindings_t microBindings;
+
+	cl_steamCallbackState.callbackRegistrationActive = qfalse;
+	CL_Steam_ClearCurrentLobby();
+	CL_Steam_ClearBrowserEvents();
+	if ( !CL_SteamServicesEnabled() ) {
+		return;
+	}
+
+	memset( &clientBindings, 0, sizeof( clientBindings ) );
+	clientBindings.onRichPresenceJoinRequested = CL_Steam_Client_OnRichPresenceJoinRequested;
+	clientBindings.onUserStatsReceived = CL_Steam_Client_OnUserStatsReceived;
+	clientBindings.onPersonaStateChange = CL_Steam_Client_OnPersonaStateChange;
+	clientBindings.onP2PSessionRequest = CL_Steam_Client_OnP2PSessionRequest;
+	clientBindings.onGameServerChangeRequested = CL_Steam_Client_OnGameServerChangeRequested;
+	clientBindings.onFriendRichPresenceUpdate = CL_Steam_Client_OnFriendRichPresenceUpdate;
+	clientBindings.onUGCQueryCompleted = CL_Steam_Client_OnUGCQueryCompleted;
+
+	memset( &lobbyBindings, 0, sizeof( lobbyBindings ) );
+	lobbyBindings.onLobbyCreated = CL_Steam_Lobby_OnLobbyCreated;
+	lobbyBindings.onLobbyEnter = CL_Steam_Lobby_OnLobbyEnter;
+	lobbyBindings.onLobbyChatUpdate = CL_Steam_Lobby_OnLobbyChatUpdate;
+	lobbyBindings.onLobbyChatMessage = CL_Steam_Lobby_OnLobbyChatMessage;
+	lobbyBindings.onLobbyDataUpdate = CL_Steam_Lobby_OnLobbyDataUpdate;
+	lobbyBindings.onLobbyGameCreated = CL_Steam_Lobby_OnLobbyGameCreated;
+	lobbyBindings.onLobbyKicked = CL_Steam_Lobby_OnLobbyKicked;
+	lobbyBindings.onGameLobbyJoinRequested = CL_Steam_Lobby_OnGameLobbyJoinRequested;
+
+	memset( &microBindings, 0, sizeof( microBindings ) );
+	microBindings.onAuthorizationResponse = CL_Steam_Micro_OnAuthorizationResponse;
+
+	if ( !QL_Steamworks_RegisterClientCallbacks( &clientBindings ) ||
+		!QL_Steamworks_RegisterLobbyCallbacks( &lobbyBindings ) ||
+		!QL_Steamworks_RegisterMicroCallbacks( &microBindings ) ) {
+		QL_Steamworks_UnregisterMicroCallbacks();
+		QL_Steamworks_UnregisterLobbyCallbacks();
+		QL_Steamworks_UnregisterClientCallbacks();
+		return;
+	}
+
+	cl_steamCallbackState.callbackRegistrationActive = qtrue;
+}
+
+/*
+=============
+CL_Steam_ShutdownCallbacks
+=============
+*/
+static void CL_Steam_ShutdownCallbacks( void ) {
+	QL_Steamworks_UnregisterMicroCallbacks();
+	QL_Steamworks_UnregisterLobbyCallbacks();
+	QL_Steamworks_UnregisterClientCallbacks();
+	cl_steamCallbackState.callbackRegistrationActive = qfalse;
+	CL_Steam_ClearCurrentLobby();
+	CL_Steam_ClearBrowserEvents();
+}
+
+/*
+=============
+CL_Steam_Frame
+=============
+*/
+static void CL_Steam_Frame( void ) {
+	if ( !cl_steamCallbackState.callbackRegistrationActive ) {
+		return;
+	}
+
+	QL_Steamworks_RunCallbacks();
+}
+
+/*
+=============
+CL_Steam_ShouldRegisterStatsClear
+=============
+*/
+static qboolean CL_Steam_ShouldRegisterStatsClear( void ) {
+	if ( !CL_SteamServicesEnabled() ) {
+		return qfalse;
+	}
+
+	if ( !QL_Steamworks_Init() ) {
+		return qfalse;
+	}
+
+	return QL_Steamworks_GetAppID() == 0x54100u ? qtrue : qfalse;
 }
 
 /*
@@ -698,6 +1898,9 @@ void CL_StopRecord_f( void ) {
 	clc.demofile = 0;
 	clc.demorecording = qfalse;
 	clc.spDemoRecording = qfalse;
+	if ( clc.demoName[0] ) {
+		CL_WebView_PublishGameDemo( clc.demoName, clc.demoName );
+	}
 	if ( cl_demoRecordMessage->integer ) {
 		Com_Printf ("Stopped demo.\n");
 	}
@@ -1208,9 +2411,13 @@ This is also called on Com_Error and Com_Quit, so it shouldn't cause any errors
 =====================
 */
 void CL_Disconnect( qboolean showMainMenu ) {
+	qboolean publishGameEnd;
+
 	if ( !com_cl_running || !com_cl_running->integer ) {
 		return;
 	}
+
+	publishGameEnd = ( cls.state >= CA_CONNECTED || clc.demoplaying || clc.demorecording ) ? qtrue : qfalse;
 
 	// shutting down the client so enter full screen ui mode
 	Cvar_Set("r_uiFullScreen", "1");
@@ -1220,13 +2427,16 @@ void CL_Disconnect( qboolean showMainMenu ) {
 	}
 
 	QL_ClientAuth_CancelSteamTicket();
+	if ( publishGameEnd ) {
+		CL_WebView_PublishGameEnd();
+	}
 
 	if (clc.download) {
 		FS_FCloseFile( clc.download );
 		clc.download = 0;
 	}
 	*clc.downloadTempName = *clc.downloadName = 0;
-	Cvar_Set( "cl_downloadName", "" );
+	CL_Workshop_ClearBootstrapState( qtrue );
 
 	if ( clc.demofile ) {
 		FS_FCloseFile( clc.demofile );
@@ -1871,6 +3081,41 @@ void CL_DownloadsComplete( void ) {
 
 /*
 =================
+CL_Workshop_Frame
+
+Mirrors the retail workshop/download completion helper called from CL_Frame.
+=================
+*/
+static void CL_Workshop_Frame( void ) {
+	char missingfiles[2048];
+
+	if ( !cl_steamWorkshopDownloadState.active ) {
+		return;
+	}
+
+	if ( !CL_Workshop_DownloadsSettled() ) {
+		return;
+	}
+
+	if ( cl_steamWorkshopDownloadState.downloadsRequested ) {
+		Com_Printf( "Steamworks downloads complete - restarting filesystem.\n" );
+		FS_Restart( clc.checksumFeed );
+		cl_steamWorkshopDownloadState.downloadsRequested = qfalse;
+		return;
+	}
+
+	if ( FS_ComparePaks( missingfiles, sizeof( missingfiles ), qfalse ) ) {
+		Com_Printf( "\nWARNING: You are missing some files referenced by the server:\n%s"
+			"You might not be able to join the game\n"
+			"Go to the setting menu to turn on autodownload, or get the file elsewhere\n\n", missingfiles );
+	}
+
+	CL_Workshop_ClearBootstrapState( qtrue );
+	CL_DownloadsComplete();
+}
+
+/*
+=================
 CL_BeginDownload
 
 Requests a file to download from the server.  Stores it in the current
@@ -1955,24 +3200,29 @@ and determine if we need to download them
 =================
 */
 void CL_InitDownloads(void) {
-  char missingfiles[1024];
+	char missingfiles[1024];
 
-  if ( !cl_allowDownload->integer )
-  {
-    // autodownload is disabled on the client
-    // but it's possible that some referenced files on the server are missing
-    if (FS_ComparePaks( missingfiles, sizeof( missingfiles ), qfalse ) )
-    {      
-      // NOTE TTimo I would rather have that printed as a modal message box
-      //   but at this point while joining the game we don't know wether we will successfully join or not
-      Com_Printf( "\nWARNING: You are missing some files referenced by the server:\n%s"
-                  "You might not be able to join the game\n"
-                  "Go to the setting menu to turn on autodownload, or get the file elsewhere\n\n", missingfiles );
-    }
-  }
-  else if ( FS_ComparePaks( clc.downloadList, sizeof( clc.downloadList ) , qtrue ) ) {
+	CL_Workshop_ClearBootstrapState( qtrue );
+	if ( CL_Workshop_BeginBootstrap() ) {
+		return;
+	}
 
-    Com_Printf("Need paks: %s\n", clc.downloadList );
+	if ( !cl_allowDownload->integer )
+	{
+		// autodownload is disabled on the client
+		// but it's possible that some referenced files on the server are missing
+		if (FS_ComparePaks( missingfiles, sizeof( missingfiles ), qfalse ) )
+		{      
+			// NOTE TTimo I would rather have that printed as a modal message box
+			//   but at this point while joining the game we don't know wether we will successfully join or not
+			Com_Printf( "\nWARNING: You are missing some files referenced by the server:\n%s"
+					"You might not be able to join the game\n"
+					"Go to the setting menu to turn on autodownload, or get the file elsewhere\n\n", missingfiles );
+		}
+	}
+	else if ( FS_ComparePaks( clc.downloadList, sizeof( clc.downloadList ) , qtrue ) ) {
+
+		Com_Printf("Need paks: %s\n", clc.downloadList );
 
 		if ( *clc.downloadList ) {
 			// if autodownloading is not enabled on the server
@@ -2553,6 +3803,10 @@ void CL_Frame ( int msec ) {
 	// send intentions now
 	CL_SendCmd();
 
+	CL_Steam_Frame();
+	CL_Workshop_Frame();
+	CL_WebHost_Frame();
+
 	// resend a connection request if necessary
 	CL_CheckForResend();
 
@@ -2975,6 +4229,7 @@ void CL_Init( void ) {
 	Cvar_Get ("cg_viewsize", "100", CVAR_ARCHIVE | CVAR_CLOUD );
 	
 	CL_InitSteamResources();
+	CL_WebHost_Init();
 	
 	//
 	// register our commands
@@ -3014,7 +4269,12 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("connect_lobby", CL_Steam_ConnectLobby_f );
 	Cmd_AddCommand ("clientviewprofile", CL_Steam_OverlayCommand_f );
 	Cmd_AddCommand ("clientfriendinvite", CL_Steam_OverlayCommand_f );
-	Cmd_AddCommand ("stats_clear", CL_Steam_ClearStats_f );
+	cl_statsClearRegistered = qfalse;
+	if ( CL_Steam_ShouldRegisterStatsClear() ) {
+		Cmd_AddCommand ("stats_clear", CL_Steam_ClearStats_f );
+		cl_statsClearRegistered = qtrue;
+	}
+	CL_Steam_InitCallbacks();
 	CL_Steam_SetMainMenuRichPresence();
 	CL_Steam_SyncPersonaNameCvar();
 	CL_Steam_SeedCountryCvar();
@@ -3053,6 +4313,8 @@ void CL_Shutdown( void ) {
 	S_Shutdown();
 	CL_ShutdownRef();
 
+	CL_Steam_ShutdownCallbacks();
+	CL_WebHost_Shutdown();
 	CL_WebPak_Shutdown();
 	CL_ShutdownUI();
 	CL_ShutdownSteamResources();
@@ -3089,7 +4351,10 @@ void CL_Shutdown( void ) {
 	Cmd_RemoveCommand ("connect_lobby");
 	Cmd_RemoveCommand ("clientviewprofile");
 	Cmd_RemoveCommand ("clientfriendinvite");
-	Cmd_RemoveCommand ("stats_clear");
+	if ( cl_statsClearRegistered ) {
+		Cmd_RemoveCommand ("stats_clear");
+		cl_statsClearRegistered = qfalse;
+	}
 
 	Cvar_Set( "cl_running", "0" );
 
@@ -3967,43 +5232,6 @@ static qboolean CL_CDKeyValidateLegacyValue( const char *key, const char *checks
 	return qfalse;
 }
 
-static qboolean CL_CDKeyValidateTokenValue( const char *value ) {
-	const unsigned char *cursor;
-
-	if ( !value || !value[0] ) {
-		return qfalse;
-	}
-
-	for ( cursor = (const unsigned char *)value; *cursor; ++cursor ) {
-		if ( *cursor <= ' ' ) {
-			return qfalse;
-		}
-	}
-
-	return qtrue;
-}
-
 qboolean CL_CDKeyValidate( const char *key, const char *checksum ) {
-	ql_auth_credential_t	credential;
-
-	if ( !key ) {
-		return qfalse;
-	}
-
-	if ( !QL_ParseCredentialString( key, &credential ) ) {
-		return qfalse;
-	}
-
-        switch ( credential.kind ) {
-        case QL_AUTH_CREDENTIAL_LEGACY_CDKEY:
-                return CL_CDKeyValidateLegacyValue( credential.value, checksum );
-        case QL_AUTH_CREDENTIAL_STEAM:
-        case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-                if ( checksum && checksum[0] ) {
-                        return qfalse;
-                }
-                return CL_CDKeyValidateTokenValue( credential.value );
-        default:
-                return qfalse;
-        }
+	return CL_CDKeyValidateLegacyValue( key, checksum );
 }

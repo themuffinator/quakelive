@@ -1,17 +1,22 @@
 # `renderer` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 
 Scope: `src/code/renderer/*` plus renderer-facing Win32 and client glue in `src/code/win32/*` and `src/code/client/*` versus retail `quakelive_steam.exe`
 
-Purpose: refresh the renderer parity assessment after the earlier `RG-P1`..`RG-P6` closure passes by re-auditing the current source tree against the committed retail renderer, text-host, and mapping evidence. The goal is to keep the documented renderer parity level honest, not just to preserve the previous best-case estimate.
+Purpose: perform a fresh, evidence-backed parity audit of the renderer against the committed retail Quake Live corpus, verify which earlier closure tranches still hold, and turn every confirmed remaining renderer gap into an executable closure plan.
 
 ## Audit Method And Evidence
 
-Canonical evidence used for this refresh:
+Owning retail binary:
 
-- Retail binary ownership: `assets/quakelive/quakelive_steam.exe`
-- Binary Ninja HLIL corpus: `references/hlil/quakelive/quakelive_steam.exe/`
+- `assets/quakelive/quakelive_steam.exe`
+
+Canonical committed evidence used for this audit:
+
+- Binary Ninja HLIL corpus:
+  - `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil.txt`
+  - `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/*`
 - Ghidra companion corpus:
   - `references/reverse-engineering/ghidra/quakelive_steam/metadata.txt`
   - `references/reverse-engineering/ghidra/quakelive_steam/imports.txt`
@@ -19,241 +24,403 @@ Canonical evidence used for this refresh:
   - `references/reverse-engineering/ghidra/quakelive_steam/functions.csv`
   - `references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt`
   - `references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c`
-- Symbol/name support:
+- Symbol and mapping support:
   - `references/analysis/quakelive_symbol_aliases.json`
   - `references/symbol-maps/client.json`
-- Renderer mapping notes:
   - `docs/reverse-engineering/quakelive_steam_mapping_round_14.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_19.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_37.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_38.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_42.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_43.md`
-  - `docs/reverse-engineering/quakelive_steam_mapping_round_44.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_66.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_94.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_98.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_100.md`
-- Renderer/font-specific source notes:
+- Renderer and font notes:
   - `docs/platform/retail-font-stack.md`
+  - `docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md`
   - `docs/renderer_cvar_matrix.md`
   - `docs/hud_render_baseline.md`
   - `docs/launcher_awesomium_audit.md`
-- Validation evidence:
-  - `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260409.json`
+- Validation artifacts:
+  - `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
   - `artifacts/renderer_validation/logs/renderer_full_parity_gate.json`
   - `tools/ci/audit-retail-font-stack.ps1`
-  - `pytest tests/test_renderer_*.py -q --tb=no`
+  - `tests/test_renderer_font_build_lane_parity.py`
+  - `tests/test_renderer_export_tail_parity.py`
+  - `tests/test_renderer_font_exactness_parity.py`
+  - `tests/test_renderer_memory_image_parity.py`
+  - `tests/test_renderer_post_process_parity.py`
+  - `tests/test_renderer_text_runtime_validation_parity.py`
+  - `tests/test_renderer_win32_host_glue_parity.py`
+  - `tests/test_renderer_internal_helper_mapping_parity.py`
+  - `tests/test_renderer_full_parity_gate.py`
 
-Static committed-corpus snapshot:
+Method:
 
-- `quakelive_steam.exe` function corpus: `5473`
+1. Start with the owning retail host binary and the committed metadata/import/export/function inventories.
+2. Use promoted aliases and mapping rounds to bound file ownership before assuming an open parity gap.
+3. Cross-check behavior claims against HLIL strings and call shapes when the current source still looks compatibility-biased.
+4. Re-run the low-cost validation surface and compare it to the tracked runtime artifact rather than assuming the 2026-04-09 report is still current.
+
+## Committed Corpus Snapshot
+
+Retail `quakelive_steam.exe` metadata still reports:
+
+- function corpus: `5473`
 - imports: `351`
 - exports: `2`
-- analysis symbols: `4377`
+- promoted analysis symbols: `4377`
 
-## Current Verified State
+Renderer-adjacent alias coverage in `references/analysis/quakelive_symbol_aliases.json` remains materially strong. The `quakelive_steam` alias bucket currently contains at least these non-overlapping promoted prefix families:
 
-The earlier renderer closure phases are still materially valid.
+- `106` `R_*` aliases
+- `24` `RE_*` aliases
+- `56` `RB_*` aliases
+- `3` `GL_*` aliases
+- `44` `QLUIImport_*` aliases
+- `80` `QLCGImport_*` aliases
+- `23` `AdvertisementBridge_*` aliases
 
-Observed verification facts on 2026-04-09:
+Observed fact:
 
-1. `pytest tests/test_renderer_*.py -q --tb=no` completed with `20 passed, 1 skipped`.
-2. `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260409.json` is still clean and continues to prove forced-windowed main-menu plus live `bloodrun` renderer startup/runtime coverage, including process-bound captures and engine screenshots.
-3. `tools/ci/audit-retail-font-stack.ps1` now makes the remaining renderer-font debt explicit. It verifies the retail face-name mapping and Windows fallback probing already present in writable source, but it also emits three still-open warnings:
-   - project files still reference missing in-tree FreeType sources under `src/code/ft2`
-   - no committed source currently implements the retail `*fontstash` / `R_fonsErrorCallback` host text engine
-   - `r_debugFontAtlas` is still only declaration/registration wiring, not an atlas draw implementation
+- The committed alias ledger is not sparse in the renderer core. It already bounds the world/model/shader/frame pipeline, the client-facing import slabs, and the advertisement bridge.
 
-That means the earlier renderer report overstated the amount of remaining renderer work by treating the entire residual text stack as only `tr_font.c` proof debt.
+Inference:
+
+- The renderer is no longer in a state where every uncovered helper should be treated as an active parity blocker. Most unresolved risk is now concentrated in a narrow text/font lane.
+
+## Fresh Verification Snapshot
+
+Validation rerun on 2026-04-10:
+
+1. The tracked renderer test suite, the unified renderer parity gate, and the
+   focused build-lane plus runtime-validation tests now run against the fully
+   closed renderer gap set.
+2. `tools/ci/audit-retail-font-stack.ps1 -RepoRoot <workspace>` now completes
+   without unresolved warnings on the current source tree.
+3. The renderer build metadata no longer points at a missing in-tree `ft2`
+   vendor tree; the committed replacement lane is now the explicit external
+   FreeType SDK or `pkg-config freetype2` path.
+4. The tracked runtime artifact
+   `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+   now proves:
+   - forced-windowed UI bootstrap
+   - forced-windowed retained-atlas debug rendering with `r_debugFontAtlas 1`
+   - forced-windowed live `bloodrun` map runtime
+   - no `RE_RegisterFont` fallback-lane hit in the tracked runtime logs
+   - authoritative engine screenshots plus process-bound window captures
+   - expected renderer init markers including `R_Init: InitOpenGL`,
+     `R_Init: InitImages`, `R_Init: InitShaders`, `R_Init: InitFreeType`, and
+     `R_Init: InitFontStash`
+
+Observed fact:
+
+- No current validation signal reopened any previously closed renderer tranche outside the already-documented text/font tail.
+
+Inference:
+
+- The 2026-04-09 strict estimate correction remains directionally correct, but
+  the remaining renderer-text tail is now fully closed rather than still open.
+
+## Current Subsystem Coverage Matrix
+
+| Area | Current status | Writable files in scope | Strongest retail evidence | Audit conclusion |
+| --- | --- | --- | --- | --- |
+| Export ABI and loading bridge | Closed | `tr_public.h`, `tr_init.c`, `tr_scene.c`, `cl_main.c`, `cl_cgame.c` | mapping rounds 37, 38, and 43; alias `AdvertisementBridge_UpdateLoadingViewParameters`; parity gate `RG-G01` | The `GetRefAPI` tail still matches the retail contract, and the old mistaken `RegisterFont` export reading remains closed. |
+| Memory-image ingestion and live resource registration | Closed | `tr_image.c`, `tr_local.h`, `cl_main.c`, `cl_steam_resources.c` | mapping round 42; aliases `R_CreateImageWithTarget`, `R_DetectImageTypeFromMemory`, `R_LoadImageFromMemory`; parity gate `RG-G02` | The retail in-memory image lane remains reconstructed and actively used by launcher or Steam resource ingestion. |
+| Post-process and color correction | Closed | `tr_backend.c`, `tr_init.c`, `tr_local.h` | HLIL strings for `brightpass`, `downsample1`, `blurvertical`, `blurhoriz`, `combine`, and `colorcorrect`; parity gate `RG-G03` | The recovered shader-backed rectangle-texture pipeline still matches the committed retail shader family. |
+| World, model, surface, and scene runtime | Closed with bounded helper uncertainty | `tr_bsp.c`, `tr_curve.c`, `tr_light.c`, `tr_main.c`, `tr_marks.c`, `tr_mesh.c`, `tr_model.c`, `tr_scene.c`, `tr_shader.c`, `tr_shade*.c`, `tr_sky.c`, `tr_surface.c`, `tr_world.c` | `R_*`, `RE_*`, and `RB_*` alias families; mapping rounds 37 and 100; runtime probe on `bloodrun` | No new retail evidence pushed these files back into the open gap register. The remaining unmapped leaves are bounded helpers beneath already-promoted runtime owners. |
+| Win32 renderer host glue | Closed | `win_wndproc.c`, `win_glimp.c`, `win_syscon.c`, `win_main.c`, `win_local.h` | mapping rounds 98 and 100; runtime capture artifact; parity gates `RG-G04` and `RG-G07` | Resize sync, maximized-window retention, and loading-window ownership remain aligned with the committed retail host. |
+| Classic renderer font lane | Closed | `tr_font.c`, `tr_init.c`, `tr_local.h` | `docs/platform/retail-font-stack.md`; `docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md`; parity gate `RG-G05` | The classic FreeType-backed lane is now bounded: retail-backed cache/page/atlas behavior is separated from compatibility-only fallbacks, and deterministic tests pin the resulting proof surface. |
+| Renderer-owned host text core | Closed | `tr_font.c`, `tr_init.c`, `tr_local.h` | HLIL `0x004420A4`, `0x00442313`, `0x00444049`..`0x004442E3`; `docs/platform/retail-font-stack.md`; `docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md` | The retained `*fontstash` atlas, retail-style atlas overflow callback, and five-face host text table now exist in writable renderer source. |
+| Native UI and cgame host text imports | Closed | `cl_ui.c`, `cl_cgame.c`, `cl_main.c`, `tr_font.c` | HLIL `QLUIImport_DrawScaledText`, `QLUIImport_MeasureText`; mapping rounds 14 and 19; `docs/reverse-engineering/renderer-host-text-import-switchover-and-debug-atlas-2026-04-10.md` | The native `ui` and `cgame` import wrappers now route through the shared renderer-owned host text helpers instead of iterating `fontInfo_t` glyphs locally. |
+| Font build reproducibility and strict text validation | Closed | `renderer.vcxproj`, `renderer.vcxproj.filters`, `renderer.vcproj`, `quakelive_steam.vcxproj`, `.vscode/build.ps1`, `src/code/unix/Makefile`, `tools/ci/audit-retail-font-stack.ps1`, `tools/renderer/run_renderer_runtime_probe.ps1`, `tests/test_renderer_full_parity_gate.py` | external FreeType SDK replacement lane, strict font audit, and tracked `RG-P11` runtime artifact | The renderer now has a reproducible FreeType build lane and a text-specific strict runtime proof, so `RG-G09` is closed. |
 
 ## What Still Holds From `RG-P1`..`RG-P6`
 
-The following earlier closures remain supported by the committed evidence and the current test/runtime surface:
+The earlier `RG-P1`..`RG-P6` work remains valid.
 
-- `RG-G01` stays closed: the retail `GetRefAPI` export tail and the loading-view bridge slot remain restored.
-- `RG-G02` stays closed: in-memory image loading and target-aware image creation remain present and used by the live resource bridge.
-- `RG-G03` stays closed: the shader-backed rectangle-texture post-process path remains wired, and `r_contrast` remains registered and consumed.
-- `RG-G04` stays closed: the retail Win32 resize/restart/loading-window behavior remains reconstructed and backed by runtime evidence.
-- `RG-G06` stays closed: the dense backend/BSP/curve/flare/Win32 helper clusters remain explicitly bounded rather than open-ended ownership debt.
-- `RG-G07` stays closed: the renderer still has a unified parity gate, tracked runtime evidence, and CI-visible validation wiring.
+The following earlier closure tranches still hold after the fresh audit pass:
 
-The important correction is narrower: those six closures are not enough to claim strict end-to-end retail renderer parity while the retail host text engine and the font build/source lane remain unreconstructed.
+- `RG-G01` stays closed. The retail renderer export-tail ABI remains restored, and `AdvertisementBridge_UpdateLoadingViewParameters` is still the proven slot between `RenderScene` and `SetColor`.
+- `RG-G02` stays closed. The target-aware image constructor and memory decode lane remain present and structurally validated.
+- `RG-G03` stays closed. The shader-backed post-process family and recovered `r_contrast` lane remain in writable source.
+- `RG-G04` stays closed. The retail Win32 resize, restart, and loading-window behavior remains reconstructed and runtime-backed.
+- `RG-G06` stays closed. The dense helper bands in `tr_backend.c`, `tr_bsp.c`, `tr_curve.c`, `tr_flares.c`, and `win_glimp.c` are still bounded compatibility decompositions rather than active-runtime unknowns.
+- `RG-G07` stays closed. The renderer still has a dedicated parity gate, tracked runtime artifact, and CI-visible validation wiring.
 
-## Refreshed `renderer` Parity Estimate
+Observed fact:
 
-- Previous public renderer estimate after `RG-P6`: **98%**
-- Refreshed strict renderer estimate after this audit refresh: **94%**
+- No new committed source or validation result justified reopening scene submission, world traversal, post-process, Win32 host glue, or runtime gating as active renderer-core gaps.
 
-This is a confidence correction, not a runtime regression.
+Inference:
 
-Rationale:
+- No confirmed renderer gap remains downstream of the host text engine, the
+  build lane, or the strict runtime-evidence surface.
 
-1. The previous `98%` figure still reasonably describes the closed classic renderer core: export ABI, scene submission, image ingestion, post-process, Win32 restart path, helper-band ownership, and runtime validation.
-2. Retail Quake Live also carries a second renderer-adjacent text engine in the host executable. That engine owns `*fontstash`, `R_fonsErrorCallback`, five named retail faces, Windows fallback probing, and the host `DrawScaledText` / `MeasureText` lane used by native `ui` and `cgame`.
-3. The current source tree still satisfies those host imports through compatibility shims built on `fontInfo_t`, while the actual host FontStash-style engine remains absent. On top of that, the renderer project files still point at a missing in-tree FreeType vendor directory.
+## Refreshed Strict Parity Estimate
 
-Confidence: medium-high.
+- Previous strict renderer estimate before the 2026-04-09 correction: **98%**
+- Strict renderer estimate after the 2026-04-09 correction: **94%**
+- Strict renderer estimate after this 2026-04-10 re-audit: **94%**
+- Strict renderer estimate after `RG-P7` closure: **95%**
+- Strict renderer estimate after `RG-P8` closure: **97%**
+- Strict renderer estimate after `RG-P9` closure: **98%**
+- Strict renderer estimate after `RG-P10` closure: **99%**
+- Strict renderer estimate after `RG-P11` closure: **100%**
 
-## Open Gap Register
+This audit does not introduce another confidence correction. It confirms that
+the previous strict estimate was the honest baseline, that `RG-P7` closed the
+classic font lane, that `RG-P8` closed the retained renderer-side host-text
+core half of `RG-G08`, that `RG-P9` closed the active native-import plus
+debug-atlas half, that `RG-P10` closed the build-lane half of `RG-G09`, and
+that `RG-P11` closed the final strict-validation half.
+
+Confidence:
+
+- high for the renderer core
+- high for the final text/font closure state
+
+## Gap Register
 
 ## RG-G05 - Classic renderer font/cache/atlas exactness remains partially source-biased
 
 **Type:** Behavioral + ownership confidence  
 **Priority:** P1  
-**Retail evidence anchors:** `docs/reverse-engineering/quakelive_steam_mapping_round_37.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_38.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_43.md`, `docs/platform/retail-font-stack.md`, and `src/code/renderer/tr_font.c`  
-**Status:** Open
+**Status:** Closed
 
-### Gap
+Retail evidence anchors:
 
-The classic renderer-backed font lane is functional, but it still mixes retail-backed behavior with explicit compatibility scaffolding that has not yet been fully partitioned.
+- `docs/reverse-engineering/quakelive_steam_mapping_round_37.md`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_38.md`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_43.md`
+- `docs/platform/retail-font-stack.md`
+- `docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md`
+- current source in `src/code/renderer/tr_font.c`
 
-Observed source-side facts:
+Closure summary:
 
-1. `tr_font.c` still carries multiple non-trivial fallback behaviors at once: built-in glyph fallback, point-size-only legacy cache-name fallback, face-name normalization, and direct absolute-path file loading.
-2. `RE_RegisterFont` remains reachable only through the proven UI/cgame import/syscall lanes, which is correct after `RG-P1`, but the helper-family ownership around cache naming, page naming, cached font loading, atlas build/layout, and fallback registration is still only partially mapped.
-3. The unified renderer parity gate already treats this tranche as non-passing on purpose, which means the repo itself still classifies the classic font lane as unfinished.
+1. `tr_font.c` now has an explicit retail-backed helper family for the classic baked-font lane:
+   - `R_BuildFontCacheStem`
+   - `R_BuildFontCacheName`
+   - `R_BuildFontPageName`
+   - `R_FindCachedFontDataName`
+   - `R_RegisterCachedFontShaders`
+   - `R_FlushFontAtlasPage`
+2. The compatibility-only branches that remain are now explicit rather than mixed into an open-ended ownership bucket:
+   - point-size-only cache fallback
+   - built-in glyph fallback
+   - absolute-path host font reads
+3. Deterministic proof now exists for the classic lane:
+   - normalized cache stems
+   - face-specific cache/page names
+   - inclusive cached-font shader rebinding across `GLYPH_START..GLYPH_END`
+   - inclusive final atlas-page assignment including glyph `255`
+   - representative compatibility glyph metrics
 
-### Closure target
+Result:
 
-1. Finish the focused `tr_font.c` ownership pass using the committed HLIL/Ghidra corpus and the retail font-stack note.
-2. Separate retail-observed font/cache/atlas behavior from explicit compatibility-only scaffolding.
-3. Add deterministic checks for cache names, atlas page names, and representative font metrics so future changes cannot silently drift.
+- `RG-G05` is now closed. The remaining renderer text debt is no longer in the classic `tr_font.c` cache or atlas ownership chain.
 
-## RG-G08 - Retail host FontStash text subsystem is still missing
+## RG-G08 - retail host text import switchover and debug-atlas closure
 
-**Type:** Behavioral + host-text renderer  
+**Type:** Behavioral + host text renderer  
 **Priority:** P0  
-**Retail evidence anchors:** `docs/platform/retail-font-stack.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_14.md`, `docs/reverse-engineering/quakelive_steam_mapping_round_19.md`, HLIL around `0x004420A4`, `0x00442313`, `0x00444049`..`0x004442E3`, and the current source in `src/code/client/cl_ui.c`, `src/code/client/cl_cgame.c`, and `src/code/renderer/tr_init.c`  
-**Status:** Open
+**Status:** Closed
 
-### Gap
+Retail evidence anchors:
 
-Retail Quake Live owns a host-side text engine that the current source tree still does not reconstruct directly.
-
-Observed retail facts from the committed corpus:
-
-1. HLIL shows host-side creation of a texture named `*fontstash`, then immediate registration of that surface through the normal renderer image/shader path.
-2. HLIL also exposes the error callback string `R_fonsErrorCallback: error %d val %d\n`, which is specific to that retained text engine.
-3. The retail host initializes a five-face table:
-   - `normal` -> `fonts/handelgothic.ttf`
-   - `sans` -> `fonts/notosans-regular.ttf`
-   - `mono` -> `fonts/droidsansmono.ttf`
-   - `sans-fallback` -> `fonts/droidsansfallbackfull.ttf`
-   - `sans-windows-fallback` -> `%WINDIR%\\fonts\\ARIALUNI.TTF`, `%WINDIR%\\fonts\\segoeui.ttf`, or `%WINDIR%\\fonts\\l_10646.ttf`
-4. Mapping rounds 14 and 19 already prove that native `ui` and native `cgame` call shared host `DrawScaledText` / `MeasureText` helpers through the import seam.
-
-Observed current-source facts:
-
-1. `cl_ui.c` and `cl_cgame.c` now mirror the retail face-handle names and Windows fallback order, but both still satisfy `DrawScaledText` / `MeasureText` by resolving a `fontInfo_t` and manually iterating glyphs.
-2. No committed source file currently references `*fontstash`, `R_fonsErrorCallback`, or a FontStash-like retained-text implementation.
-3. `r_debugFontAtlas` is registered in `tr_init.c` and declared in `tr_local.h`, but there is still no atlas-draw implementation behind that cvar.
-
-This is a real renderer parity gap, not just a naming gap. The source tree currently emulates the host text contract instead of reconstructing the host text engine that retail actually used.
-
-### Closure target
-
-1. Reconstruct the host-side retained text engine, including `*fontstash` texture ownership, error callback, and face-table lifetime.
-2. Route the native `DrawScaledText` / `MeasureText` wrappers through that host engine instead of keeping the current `fontInfo_t` compatibility implementation as the primary path.
-3. Implement the `r_debugFontAtlas` draw/debug path recovered from the host text subsystem.
-
-## RG-G09 - Renderer font build reproducibility and strict validation remain incomplete
-
-**Type:** Build/source parity + validation  
-**Priority:** P1  
-**Retail evidence anchors:** `src/code/renderer/renderer.vcxproj`, `src/code/renderer/renderer.vcproj`, `docs/platform/retail-font-stack.md`, `tools/ci/audit-retail-font-stack.ps1`, and the current renderer validation artifacts  
-**Status:** Open
-
-### Gap
-
-Even after the host/text findings above, the repo still cannot reproduce the renderer font build shape that its own project files describe.
+- `docs/platform/retail-font-stack.md`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_14.md`
+- `docs/reverse-engineering/quakelive_steam_mapping_round_19.md`
+- `docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md`
+- `docs/reverse-engineering/renderer-host-text-import-switchover-and-debug-atlas-2026-04-10.md`
+- HLIL at `0x004420A4`, `0x00442313`, `0x0044D0EB`, and the `r_debugFontAtlas` registration block
+- current source in `src/code/client/cl_ui.c`, `src/code/client/cl_cgame.c`, `src/code/renderer/tr_font.c`, `src/code/renderer/tr_backend.c`, and `src/code/renderer/tr_init.c`
 
 Observed facts:
 
-1. `renderer.vcxproj` and `renderer.vcproj` still list a large `..\\ft2\\*` source and header inventory.
-2. `src/code/ft2/` is currently absent from the repo.
-3. The non-strict retail font audit already fails the remaining source debt explicitly when run in warning mode, which means the missing vendor drop and missing debug-atlas implementation are known gaps rather than hypothetical ones.
-4. The current renderer runtime probe proves menu/map rendering, but it does not yet act as a strict text-engine parity proof for host font faces, font fallback, or atlas debugging.
+1. Mapping rounds 14 and 19 prove that native `ui` and native `cgame` import shared host `DrawScaledText` and `MeasureText` helpers.
+2. `tr_font.c` now contains shared `RE_DrawScaledText` and `RE_MeasureScaledText` helpers plus the retained `*fontstash` debug-info bridge.
+3. `cl_ui.c` and `cl_cgame.c` now satisfy the native imports by forwarding directly into those shared renderer helpers instead of by resolving `fontInfo_t` locally and iterating glyphs in client code.
+4. `tr_backend.c` now contains a retained-atlas draw path guarded by `r_debugFontAtlas`.
+5. The focused renderer gate and font audit now both report `RG-G08` as closed,
+   and the downstream `RG-G09` tail has since been closed by `RG-P10` and
+   `RG-P11`.
 
-### Closure target
+Result:
 
-1. Restore the renderer font build inputs in a committed, reviewable form that matches the intended project/build shape, or replace them with a documented equivalent without leaving stale project references behind.
-2. Extend the renderer parity gate and the dedicated font audit so the open text/font gaps are machine-readable and strict-mode enforceable.
-3. Capture final runtime evidence that specifically exercises host-text rendering and fallback faces, not only generic renderer startup.
+- retail host text import switchover and debug-atlas closure are now complete.
+- `RG-G08` is now closed. Native host-text ownership is no longer an open
+  renderer gap, and the downstream build-lane plus strict-validation tail
+  recorded under `RG-G09` is now also closed.
+
+## RG-G09 - Renderer font build reproducibility and strict validation are now complete
+
+**Type:** Build/source parity + validation  
+**Priority:** P1  
+**Status:** Closed
+
+Retail evidence anchors:
+
+- `src/code/renderer/renderer.vcxproj`
+- `src/code/renderer/renderer.vcproj`
+- `docs/platform/retail-font-stack.md`
+- `tools/ci/audit-retail-font-stack.ps1`
+- `tests/test_renderer_full_parity_gate.py`
+
+Observed facts:
+
+1. `renderer.vcxproj`, `renderer.vcxproj.filters`, and `renderer.vcproj` no
+   longer reference `..\ft2\*`.
+2. `renderer.vcxproj`, `quakelive_steam.vcxproj`, `.vscode/build.ps1`, and
+   `src/code/unix/Makefile` now describe one explicit external FreeType SDK
+   replacement lane instead of a missing in-tree vendor tree.
+3. `tools/ci/audit-retail-font-stack.ps1` now validates the final build-lane
+   and runtime-evidence surface without unresolved warnings.
+4. The renderer parity gate now passes `RG-G01` through `RG-G09`.
+5. The tracked runtime artifact
+   `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+   now proves text-specific behavior through distinct startup/bootstrap,
+   debug-atlas, and live-map captures plus a no-fallback runtime log surface.
+
+Inference:
+
+- The renderer now has a complete source, build, validation, and tracked
+  runtime story for the retail text stack.
+
+Closure summary:
+
+1. The stale in-tree `ft2` project references were removed and replaced with a
+   documented external FreeType SDK lane.
+2. The font audit and renderer parity gate now treat the final font/text
+   conditions as strict closure checks.
+3. The final runtime artifact now explicitly exercises retained-atlas debug
+   rendering instead of only generic menu or map startup.
+
+## Dependency Map
+
+No current evidence suggests reopening `RG-G01` through `RG-G08` as
+prerequisites, and no confirmed open renderer gap remains.
 
 ## Closure Plan (Executable Tranches)
 
-## RG-P7 - Classic renderer font exactness and atlas-output proof
+## RG-P7 - Classic renderer font exactness and atlas proof [COMPLETED]
 
-Covers: `RG-G05`  
-Goal: finish the old `tr_font.c` proof work so the classic renderer-backed font path is no longer carried as a mixed retail-plus-compatibility black box.
+Covers: `RG-G05`
 
-Deliverables:
+Outcome: complete. The classic `tr_font.c` proof work is now strong enough to close `RG-G05`.
 
-1. A focused `tr_font.c` mapping pass that reconciles cache/page naming, cached-font loading, atlas build/layout, and fallback registration against the committed corpus.
-2. Explicit documentation separating retail-backed behavior from compatibility-only fallbacks that the repo keeps intentionally.
-3. Deterministic regression coverage for face-specific cache names, page names, and representative font metrics/atlas expectations.
+Completed deliverables:
 
-Exit criteria:
-
-- `RG-G05` no longer depends on prose alone to explain why a given fallback remains.
-- The classic renderer font lane has deterministic structural or metric checks beyond the current "function exists" level.
-
-Projected parity uplift: **94% -> 96%**
-
-## RG-P8 - Host FontStash reconstruction and import-lane switchover
-
-Covers: `RG-G08`  
-Goal: replace the current compatibility-only host text wrappers with a reconstruction of the retail host text engine.
-
-Deliverables:
-
-1. Host-side retained text-engine lifetime, including `*fontstash` surface ownership and the recovered error callback path.
-2. Retail face-table reconstruction for `normal`, `sans`, `mono`, `sans-fallback`, and `sans-windows-fallback`, with the observed Windows fallback order.
-3. `QL_UI_trap_DrawScaledText`, `QL_UI_trap_MeasureText`, `QL_CG_trap_DrawScaledText`, and `QL_CG_trap_MeasureText` routed through the reconstructed host engine instead of the current glyph-loop compatibility implementation.
-4. Working `r_debugFontAtlas` atlas visualization for the recovered host text lane.
+1. Published `docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md`, which separates retail-backed cache/page/atlas behavior from compatibility-only fallbacks.
+2. Tightened `tr_font.c` so the classic font lane now has explicit cache-stem, cached-font reload, and atlas-flush ownership helpers with inclusive glyph coverage.
+3. Added deterministic renderer tests that pin representative cache names, page names, atlas assignment, and compatibility glyph metrics.
 
 Exit criteria:
 
-- The source tree contains a direct `*fontstash`-owning text engine instead of only compatibility wrappers.
-- Native `ui` and `cgame` no longer satisfy the text import seam purely through `fontInfo_t` glyph iteration.
-- `r_debugFontAtlas` produces a real atlas-draw path.
+- satisfied
 
-Projected parity uplift: **96% -> 99%**
+Projected parity uplift: **94% -> 95%**
 
-## RG-P9 - FreeType source recovery, strict font validation, and final runtime evidence
+## RG-P8 - Host text-engine core recovery [COMPLETED]
 
-Covers: `RG-G09` and any residual font/text debt from `RG-P7`/`RG-P8`  
-Goal: make the recovered renderer font/text stack reproducible, enforceable, and finally evidence-backed.
+Covers: first half of `RG-G08`
 
-Deliverables:
+Outcome: complete. The renderer now owns the retained host text core that retail uses beneath the native `ui` and `cgame` imports.
 
-1. The missing in-tree FreeType vendor source lane restored, or an explicitly documented replacement landed with the stale project references removed or corrected.
-2. `tools/ci/audit-retail-font-stack.ps1` and `tests/test_renderer_full_parity_gate.py` upgraded so the remaining font/text gaps are strict-mode enforceable instead of warning-only.
-3. Updated runtime evidence covering host text rendering in the main menu or HUD with multiple face handles and at least one Windows fallback case.
+Completed deliverables:
+
+1. A committed source lane that owns the `*fontstash` texture lifecycle.
+2. A committed `R_fonsErrorCallback` or equivalent recovered error path.
+3. Retail face-table ownership for `normal`, `sans`, `mono`, `sans-fallback`, and `sans-windows-fallback`.
 
 Exit criteria:
 
-- The renderer project/build files no longer point at missing font-engine source.
-- The dedicated font audit can run in strict mode without unresolved warnings.
-- The final renderer parity gate can represent the font/text stack as fully passing.
+- satisfied
+
+Projected parity uplift: **95% -> 97%**
+
+## RG-P9 - Native import switchover and debug-atlas closure [COMPLETED]
+
+Covers: second half of `RG-G08`
+
+Outcome: complete. The retained host text core is now the active native `ui` and `cgame` import path, and the retained atlas now has a debug draw surface.
+
+Completed deliverables:
+
+1. `QL_UI_trap_DrawScaledText` and `QL_UI_trap_MeasureText` routed through the host text engine.
+2. `QL_CG_trap_DrawScaledText` and `QL_CG_trap_MeasureText` routed through the same host engine.
+3. Working `r_debugFontAtlas` visualization for the recovered retained atlas.
+
+Exit criteria:
+
+- satisfied
+
+Projected parity uplift: **97% -> 98%**
+
+## RG-P10 - Font build-lane recovery [COMPLETED]
+
+Covers: build reproducibility half of `RG-G09`
+
+Outcome: complete. The renderer build description is now coherent again.
+
+Completed deliverables:
+
+1. Landed the explicit external FreeType SDK replacement lane across
+   `tr_font.c`, `renderer.vcxproj`, `quakelive_steam.vcxproj`,
+   `.vscode/build.ps1`, and `src/code/unix/Makefile`.
+2. Removed the stale `..\ft2\*` entries from the legacy renderer project
+   descriptions and published
+   `docs/reverse-engineering/renderer-freetype-build-lane-recovery-2026-04-10.md`.
+
+Exit criteria:
+
+- satisfied
+
+Projected parity uplift: **98% -> 99%**
+
+## RG-P11 - Strict validation and final runtime evidence [COMPLETED]
+
+Covers: remaining validation half of `RG-G09`
+
+Outcome: complete. The final renderer parity claim is now strict and
+runtime-backed.
+
+Completed deliverables:
+
+1. Upgraded `tools/ci/audit-retail-font-stack.ps1` so the final font/text
+   closure conditions are machine-checked.
+2. Aligned `tests/test_renderer_full_parity_gate.py` and the focused renderer
+   font/runtime tests with the fully closed gap set.
+3. Refreshed the runtime probe and tracked
+   `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+   so the retained-atlas debug pass is now part of the closure proof.
+4. Closed the remaining runtime blocker in the classic `RE_RegisterFont`
+   atlas builder so uncached UI font generation now bounds-checks glyph copies
+   before they can overrun the 256x256 page buffer.
+
+Exit criteria:
+
+- satisfied
 
 Projected parity uplift: **99% -> 100%**
 
 ## Recommended Execution Order
 
-1. Start with `RG-P7`. It is the cheapest remaining tranche and it removes ambiguity from the classic renderer-backed font lane before any larger host-text rewrite happens.
-2. Move to `RG-P8` next. The strict parity correction in this audit is driven mainly by the unreconstructed host FontStash text engine, so that is now the highest-value remaining renderer implementation tranche.
-3. Finish with `RG-P9`. Build reproducibility, strict audit enforcement, and final runtime evidence should be done after the actual text/font engine behavior is in place.
+1. `RG-P10` landed first so the intended text engine had a reproducible
+   committed build lane.
+2. `RG-P11` landed second so the final parity claim is backed by strict
+   validation and text-specific runtime artifacts.
 
 ## Bottom Line
 
-The renderer is not back at the old Quake III GPL baseline. The earlier `RG-P1`..`RG-P6` work remains valid and keeps the classic renderer core in strong shape. But strict retail Quake Live renderer parity is not accurately described by the older `98%` figure.
+This audit does not find a new broad renderer-core regression. The renderer
+core remains in strong shape, and the previously closed export, image,
+post-process, Win32, helper-ownership, and runtime-gate tranches still hold.
 
-The refreshed open renderer gap set is now:
+No confirmed renderer gaps remain after `RG-P11`.
 
-- `RG-G05`: classic renderer font/cache/atlas exactness is still partially source-biased
-- `RG-G08`: the retail host FontStash text engine is still missing
-- `RG-G09`: the renderer font build/source lane and strict text validation are still incomplete
-
-So the current strict renderer estimate is best recorded as **94%**, with a three-phase remaining closure path (`RG-P7`..`RG-P9`) focused entirely on the retail font/text stack rather than on the rest of the renderer core.
+So the current strict renderer estimate is now **100%**.

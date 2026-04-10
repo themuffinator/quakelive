@@ -170,6 +170,83 @@ if ($enablePng -eq 0 -and $pngAvailable) {
 	$enablePng = 1
 }
 
+$freeTypeSdkDir = $env:FreeTypeSdkDir
+$freeTypeIncludeDir = $env:FreeTypeIncludeDir
+$freeTypeLibDir = $env:FreeTypeLibDir
+$enableFreeType = $env:QLEnableFreeType
+$freeTypeLibraryCandidates = @('freetype.lib', 'libfreetype.lib')
+$freeTypeCandidates = New-Object 'System.Collections.Generic.List[object]'
+
+if ($freeTypeIncludeDir -or $freeTypeLibDir) {
+	$freeTypeCandidates.Add([pscustomobject]@{
+		sdk = $freeTypeSdkDir
+		include = if ($freeTypeIncludeDir) { $freeTypeIncludeDir } elseif ($freeTypeSdkDir) { Join-Path $freeTypeSdkDir 'include' } else { '' }
+		lib = if ($freeTypeLibDir) { $freeTypeLibDir } elseif ($freeTypeSdkDir) { Join-Path $freeTypeSdkDir 'lib\Win32' } else { '' }
+		source = 'explicit FreeType include/lib override'
+	})
+}
+
+$defaultFreeTypeSdkDir = if ($freeTypeSdkDir) { $freeTypeSdkDir } else { Join-Path $solutionDir '..\libs\freetype' }
+foreach ($candidate in @(
+	[pscustomobject]@{
+		sdk = $defaultFreeTypeSdkDir
+		include = Join-Path $defaultFreeTypeSdkDir 'include'
+		lib = Join-Path $defaultFreeTypeSdkDir 'lib\Win32'
+		source = 'repo-style FreeType SDK root'
+	},
+	[pscustomobject]@{
+		sdk = $defaultFreeTypeSdkDir
+		include = Join-Path $defaultFreeTypeSdkDir 'include'
+		lib = Join-Path $defaultFreeTypeSdkDir 'lib'
+		source = 'flat FreeType SDK root'
+	}
+)) {
+	$freeTypeCandidates.Add($candidate)
+}
+
+$vcpkgRoot = $env:VCPKG_ROOT
+if (-not $vcpkgRoot -and (Test-Path 'C:\vcpkg')) {
+	$vcpkgRoot = 'C:\vcpkg'
+}
+if ($vcpkgRoot) {
+	$vcpkgTripletDir = Join-Path $vcpkgRoot 'installed\x86-windows'
+	$freeTypeCandidates.Add([pscustomobject]@{
+		sdk = $vcpkgTripletDir
+		include = Join-Path $vcpkgTripletDir 'include'
+		lib = Join-Path $vcpkgTripletDir 'lib'
+		source = 'vcpkg x86-windows installed tree'
+	})
+}
+
+$freeTypeLibrary = $null
+$freeTypeSource = ''
+foreach ($candidate in $freeTypeCandidates) {
+	if (-not $candidate.include -or -not $candidate.lib) {
+		continue
+	}
+
+	$header = Join-Path $candidate.include 'ft2build.h'
+	$library = $freeTypeLibraryCandidates |
+		Where-Object { Test-Path (Join-Path $candidate.lib $_) } |
+		Select-Object -First 1
+	if ((Test-Path $header) -and $null -ne $library) {
+		$freeTypeSdkDir = $candidate.sdk
+		$freeTypeIncludeDir = $candidate.include
+		$freeTypeLibDir = $candidate.lib
+		$freeTypeLibrary = $library
+		$freeTypeSource = $candidate.source
+		break
+	}
+}
+
+$freeTypeHeader = if ($freeTypeIncludeDir) { Join-Path $freeTypeIncludeDir 'ft2build.h' } else { '' }
+$freeTypeAvailable = ($freeTypeHeader -and (Test-Path $freeTypeHeader) -and ($null -ne $freeTypeLibrary))
+if (-not $enableFreeType) {
+	$enableFreeType = if ($freeTypeAvailable) { 1 } else { 0 }
+} else {
+	$enableFreeType = [int]$enableFreeType
+}
+
 $msbuildArgs = @(
 	$solutionPath,
 	'/m',
@@ -188,11 +265,23 @@ if ($enableOgg -ne $null) {
 if ($enablePng -ne $null) {
 	$msbuildArgs += "/p:QLEnablePng=$enablePng"
 }
+if ($enableFreeType -ne $null) {
+	$msbuildArgs += "/p:QLEnableFreeType=$enableFreeType"
+}
 if ($env:VorbisSdkDir) {
 	$msbuildArgs += "/p:VorbisSdkDir=$vorbisSdkDir"
 }
 if ($env:PngSdkDir) {
 	$msbuildArgs += "/p:PngSdkDir=$pngSdkDir"
+}
+if ($freeTypeSdkDir) {
+	$msbuildArgs += "/p:FreeTypeSdkDir=$freeTypeSdkDir"
+}
+if ($freeTypeIncludeDir) {
+	$msbuildArgs += "/p:FreeTypeIncludeDir=$freeTypeIncludeDir"
+}
+if ($freeTypeLibDir) {
+	$msbuildArgs += "/p:FreeTypeLibDir=$freeTypeLibDir"
 }
 
 Write-Host "Using MSBuild: $msbuildPath"
@@ -204,5 +293,52 @@ if ($windowsTargetPlatformVersion) {
 }
 Write-Host "QLEnableOgg: $enableOgg (available: $oggAvailable)"
 Write-Host "QLEnablePng: $enablePng (available: $pngAvailable)"
+Write-Host "QLEnableFreeType: $enableFreeType (available: $freeTypeAvailable)"
+if ($freeTypeAvailable) {
+	Write-Host "FreeType SDK source: $freeTypeSource"
+	Write-Host "FreeType include: $freeTypeIncludeDir"
+	Write-Host "FreeType library: $(Join-Path $freeTypeLibDir $freeTypeLibrary)"
+}
 
 & $msbuildPath @msbuildArgs
+$buildExitCode = $LASTEXITCODE
+if ($buildExitCode -ne 0) {
+	exit $buildExitCode
+}
+
+if ($enableFreeType -ne 0 -and $freeTypeAvailable) {
+	$freeTypeBinDirCandidates = @()
+	if ($freeTypeSdkDir) {
+		$freeTypeBinDirCandidates += (Join-Path $freeTypeSdkDir 'bin')
+		$freeTypeBinDirCandidates += (Join-Path $freeTypeSdkDir 'bin\Win32')
+	}
+	if ($freeTypeLibDir) {
+		$freeTypeLibParent = Split-Path -Parent $freeTypeLibDir
+		if ($freeTypeLibParent) {
+			$freeTypeBinDirCandidates += (Join-Path $freeTypeLibParent 'bin')
+			$freeTypeLibGrandParent = Split-Path -Parent $freeTypeLibParent
+			if ($freeTypeLibGrandParent) {
+				$freeTypeBinDirCandidates += (Join-Path $freeTypeLibGrandParent 'bin')
+			}
+		}
+	}
+
+	$freeTypeBinDir = $freeTypeBinDirCandidates |
+		Where-Object { $_ -and (Test-Path $_) } |
+		Select-Object -First 1
+	if ($freeTypeBinDir) {
+		$runtimeBinDir = Join-Path $solutionDir "..\..\build\win32\$Configuration\bin"
+		$freeTypeRuntimeDependencies = @(
+			'freetype.dll',
+			'brotlidec.dll',
+			'brotlicommon.dll',
+			'bz2.dll'
+		)
+		foreach ($dll in $freeTypeRuntimeDependencies) {
+			$sourceDll = Join-Path $freeTypeBinDir $dll
+			if (Test-Path $sourceDll) {
+				Copy-Item -Path $sourceDll -Destination (Join-Path $runtimeBinDir $dll) -Force
+			}
+		}
+	}
+}
