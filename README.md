@@ -58,19 +58,19 @@ strong but still open, `🔴` major open reconstruction lane.
 
 | Area | Status | Strict retail parity | Current snapshot |
 | --- | --- | ---: | --- |
-| `cgame` | 🟢 Closed | `100%` | Closed in the combined strict-retail module audit; the direct `cgame` suite is green (`170 passed`). |
-| `qagame` | 🟢 Closed | `100%` | Closed in the combined strict-retail module audit; retail `qagamex86.dll` hosting is validated. |
-| `ui` | 🟢 Closed | `100%` | UI parity gate, retail corpus parity, bundle reproducibility, and runtime evidence are all green. |
+| `cgame` | 🟢 | `100%` | Closed in the combined strict-retail module audit; the direct `cgame` suite is green (`170 passed`). |
+| `qagame` | 🟢 | `100%` | Closed in the combined strict-retail module audit; retail `qagamex86.dll` hosting is validated. |
+| `ui` | 🟢 | `100%` | UI parity gate, retail corpus parity, bundle reproducibility, and runtime evidence are all green. |
 
 ### Engine reconstruction
 
 | Area | Status | Strict retail parity | Current snapshot |
 | --- | --- | ---: | --- |
-| `client` | 🟢 Closed | `100%` | Dedicated parity gate and tracked runtime evidence are both closed. |
-| `renderer` | 🟢 Closed | `100%` | Final text/font/runtime closure landed in the `RG-P11` audit pass. |
-| `qcommon` | 🟢 Closed | `100%` | Dedicated gate and runtime evidence now close bootstrap, filesystem, collision-leaf, fallback-VM, and ledger/runtime proof work. |
-| `server` | 🟢 Closed | `100%` | Steam GameServer lifecycle, `idZMQ`, stat/achievement ownership, control-plane CVars, rankings compatibility, and dedicated runtime evidence are closed. |
-| `engine host/support` | 🟢 Closed | `100%` | Win32 clipboard/raw-input recovery, botlib internal proof, and host/support boundary formalisation are closed; compatibility-only lanes are explicit exclusions. |
+| `client` | 🟢 | `100%` | Dedicated parity gate and tracked runtime evidence are both closed. |
+| `renderer` | 🟢 | `100%` | Final text/font/runtime closure landed in the `RG-P11` audit pass. |
+| `qcommon` | 🟢 | `100%` | Dedicated gate and runtime evidence now close bootstrap, filesystem, collision-leaf, fallback-VM, and ledger/runtime proof work. |
+| `server` | 🟢 | `100%` | Steam GameServer lifecycle, `idZMQ`, stat/achievement ownership, control-plane CVars, rankings compatibility, and dedicated runtime evidence are closed. |
+| `engine host/support` | 🟢 | `100%` | Win32 clipboard/raw-input recovery, botlib internal proof, and host/support boundary formalisation are closed; compatibility-only lanes are explicit exclusions. |
 
 Compatibility-only surfaces are still called out explicitly rather than being counted as open
 strict-retail engine debt: `platform_services.c`, the open/hybrid auth backends, the
