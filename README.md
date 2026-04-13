@@ -7,6 +7,12 @@
 
 [![Deterministic Harnesses](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/deterministic-harnesses.yml/badge.svg?branch=main)](https://github.com/quakelive-reverse/quakelive-reverse/actions/workflows/deterministic-harnesses.yml)
 
+> **Note:** The parity audit figures shown below reflect a coarse-level review of module
+> boundaries and subsystem registration. They do not imply the reconstruction is finished or
+> production-ready. At a granular level — individual functions, edge-case behaviour, data
+> layout, and runtime correctness — a great deal of testing and fixing remains to be done
+> before the reconstruction can be considered truly complete.
+
 This project reconstructs the full Quake Live source code as faithfully as possible.
 It starts from the public Quake III Arena GPL source release and then rebuilds the
 retail engine and game code piece by piece using retail binaries, committed HLIL and
