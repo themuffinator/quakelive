@@ -2,7 +2,6 @@
 param(
 	[string]$RepoRoot = '',
 	[string]$RetailBasePath = '',
-	[string]$AssetCdPath = '',
 	[string]$MapName = 'bloodrun',
 	[int]$NetPort = 27970,
 	[int]$StartupTimeoutSeconds = 30
@@ -50,29 +49,6 @@ function Resolve-RetailBasePath {
 	throw 'Unable to resolve a retail Quake Live base path. Pass -RetailBasePath explicitly.'
 }
 
-function Resolve-AssetCdPath {
-	param(
-		[string]$ExplicitPath,
-		[string]$RepoRootPath
-	)
-
-	if ( -not [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) {
-		$resolved = Resolve-ExistingPath -Path $ExplicitPath
-		if ( Test-Path -LiteralPath $resolved ) {
-			return $resolved
-		}
-		throw "Asset cdpath does not exist: $resolved"
-	}
-
-	$defaultPath = Join-Path $RepoRootPath 'assets\quakelive'
-	$resolvedDefault = Resolve-ExistingPath -Path $defaultPath
-	if ( Test-Path -LiteralPath $resolvedDefault ) {
-		return $resolvedDefault
-	}
-
-	throw 'Unable to resolve a repository asset cdpath. Pass -AssetCdPath explicitly.'
-}
-
 function To-RepoPath {
 	param([string]$Path)
 
@@ -107,6 +83,14 @@ function Reset-LiveLog {
 	}
 	if ( Test-Path -LiteralPath $script:TranscriptPath ) {
 		Remove-Item -LiteralPath $script:TranscriptPath -Force
+	}
+	foreach ( $stalePak in @(
+			( Join-Path $script:RuntimeRoot 'pak_uiql.pk3' ),
+			( Join-Path $script:RuntimeRoot 'pak_ui_src_retail_overlay.pk3' )
+		) ) {
+		if ( Test-Path -LiteralPath $stalePak ) {
+			Remove-Item -LiteralPath $stalePak -Force
+		}
 	}
 }
 
@@ -186,7 +170,6 @@ if ( [string]::IsNullOrWhiteSpace( $RepoRoot ) ) {
 
 $script:RepoRoot = $RepoRoot
 $script:RetailBasePath = Resolve-RetailBasePath -ExplicitPath $RetailBasePath
-$script:AssetCdPath = Resolve-AssetCdPath -ExplicitPath $AssetCdPath -RepoRootPath $RepoRoot
 $script:QlHome = Join-Path $RepoRoot 'build\win32\Debug\bin'
 $script:RuntimeRoot = Join-Path $script:QlHome 'baseq3'
 $script:DumpsRoot = Join-Path $RepoRoot 'build\win32\Debug\dumps'
@@ -243,14 +226,13 @@ $launchArgs = @(
 	'+set', 's_initsound', '0',
 	'+set', 'net_port', $NetPort,
 	'+set', 'fs_basepath', ( '"' + $script:RetailBasePath + '"' ),
-	'+set', 'fs_cdpath', ( '"' + $script:AssetCdPath + '"' ),
 	'+set', 'fs_homepath', ( '"' + $script:QlHome + '"' ),
 	'+exec', $cfgName
 )
 $environment = @{
 	'QLR_DUMP_PATH' = $script:DumpsRoot
 }
-$process = Start-Process -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:RepoRoot -PassThru -Environment $environment
+$process = Start-Process -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:QlHome -PassThru -Environment $environment
 
 $queryResponse = ''
 $queryFields = [ordered]@{}
@@ -361,7 +343,6 @@ $artifact = [ordered]@{
 	probe_script = 'tools/server/run_server_runtime_probe.ps1'
 	runtime_root = To-RepoPath -Path $script:RuntimeRoot
 	retail_basepath = To-RepoPath -Path $script:RetailBasePath
-	asset_cdpath = To-RepoPath -Path $script:AssetCdPath
 	startup = [ordered]@{
 		map = $MapName
 		common_init_complete = $requiredMarkers.common_init_complete

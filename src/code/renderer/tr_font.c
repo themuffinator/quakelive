@@ -66,7 +66,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //    touch the font bitmaps.
 // 
 // Currently a define in the project turns on or off the FreeType code which is currently
-// defined out. To pre-render new fonts you need to enable the external FreeType SDK lane
+// defined out. To pre-render new fonts you need to enable the repo-managed FreeType lane
 // so BUILD_FREETYPE is defined for the renderer build.
 
 
@@ -1411,12 +1411,6 @@ static glyphInfo_t *R_GetFontStashGlyph( rFontStashFace_t *face, unsigned char g
 		return NULL;
 	}
 
-	// Prefer the working FreeType compatibility atlases until retained *fontstash
-	// rendering reaches the same output parity.
-	if ( R_EnsureFontStashCompatibilityFont( face ) ) {
-		return &face->compatFont.glyphs[glyphIndex];
-	}
-
 #ifdef BUILD_FREETYPE
 	if ( face->ftFace && r_fontStash.shader ) {
 		if ( !face->hostGlyphLoaded[glyphIndex] ) {
@@ -1428,6 +1422,15 @@ static glyphInfo_t *R_GetFontStashGlyph( rFontStashFace_t *face, unsigned char g
 		}
 	}
 #endif
+
+	/*
+	 * Retail host DrawScaledText/MeasureText resolve glyphs from the retained
+	 * *fontstash face table first and only fall back to the classic cached-font
+	 * lane when the retained atlas path is unavailable for the requested face.
+	 */
+	if ( R_EnsureFontStashCompatibilityFont( face ) ) {
+		return &face->compatFont.glyphs[glyphIndex];
+	}
 
 	return NULL;
 }

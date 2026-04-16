@@ -169,6 +169,8 @@ static qboolean G_ItemFactorySpawnAllowed( const gitem_t *item ) {
 		return g_factoryCvarConfig.spawnItemWeapons ? qtrue : qfalse;
 	case IT_POWERUP:
 		return g_factoryCvarConfig.spawnItemPowerup ? qtrue : qfalse;
+	case IT_PERSISTANT_POWERUP:
+		return g_runes.integer ? qtrue : qfalse;
 	case IT_HOLDABLE:
 		return g_factoryCvarConfig.spawnItemHoldable ? qtrue : qfalse;
 	case IT_HEALTH:
@@ -176,7 +178,15 @@ static qboolean G_ItemFactorySpawnAllowed( const gitem_t *item ) {
 	case IT_ARMOR:
 		return g_factoryCvarConfig.spawnItemArmor ? qtrue : qfalse;
 	case IT_AMMO:
-		return g_factoryCvarConfig.spawnItemAmmo ? qtrue : qfalse;
+		if ( !g_factoryCvarConfig.spawnItemAmmo ) {
+			return qfalse;
+		}
+
+		if ( item->giTag == WP_NUM_WEAPONS ) {
+			return ( g_factoryCvarConfig.ammoPackEnabled || g_factoryCvarConfig.ammoPackHackEnabled ) ? qtrue : qfalse;
+		}
+
+		return ( g_factoryCvarConfig.ammoPackEnabled || g_factoryCvarConfig.ammoPackHackEnabled ) ? qfalse : qtrue;
 	default:
 		return qtrue;
 	}
@@ -549,7 +559,7 @@ static gentity_t *G_SpawnItemPowerup( powerup_t powerup, team_t preferredTeam ) 
 	int		candidateCount;
 	int		i;
 
-	if ( !g_factoryCvarConfig.spawnItemPowerup ) {
+	if ( !g_runes.integer ) {
 		return NULL;
 	}
 
@@ -641,7 +651,7 @@ static void G_RespawnItemPowerup( gentity_t *ent ) {
 	}
 
 	G_FreeEntity( ent );
-	if ( !g_factoryCvarConfig.spawnItemPowerup ) {
+	if ( !g_runes.integer ) {
 		return;
 	}
 
@@ -661,7 +671,7 @@ void G_SpawnItemPowerups( void ) {
 
 	memset( g_spawnItemPowerupSpots, 0, sizeof( g_spawnItemPowerupSpots ) );
 
-	if ( !g_factoryCvarConfig.spawnItemPowerup ) {
+	if ( !g_runes.integer ) {
 		return;
 	}
 
@@ -2676,7 +2686,7 @@ void ClearRegisteredItems( void ) {
 		RegisterItem( BG_FindItem( "Blue Cube" ) );
 	}
 
-	if ( g_factoryCvarConfig.spawnItemPowerup ) {
+	if ( g_runes.integer ) {
 		for ( i = 0; i < ARRAY_LEN( g_spawnItemPowerupTags ); i++ ) {
 			RegisterItem( BG_FindItemForPowerup( g_spawnItemPowerupTags[i] ) );
 		}

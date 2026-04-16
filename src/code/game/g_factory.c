@@ -34,6 +34,8 @@ static qboolean Factory_RegisterDefinition( factoryDefinition_t *definition );
 static qboolean Factory_MapBaseGametype( const char *token, gametype_t *outType );
 static void Factory_RefreshMatchConfig( void );
 static void Factory_LogSelection( const factoryDefinition_t *factory );
+static const char *Factory_GetDefaultIdForGametype( gametype_t gametype );
+static qboolean Factory_ApplyDefaultSelection( qboolean forceReapply );
 static void Factory_ResetRegistry( void );
 static void Factory_LoadAllDefinitions( void );
 
@@ -787,7 +789,7 @@ static qboolean Factory_LoadFile( const char *filename ) {
 =============
 Factory_LoadSupplementalFiles
 
-Loads any *.factories supplements under scripts/.
+Loads any *.factories or *.factory supplements under scripts/.
 =============
 */
 static void Factory_LoadSupplementalFiles( void ) {
@@ -797,6 +799,9 @@ static void Factory_LoadSupplementalFiles( void ) {
 	int     i;
 
 	total = trap_FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
+	if ( total <= 0 ) {
+		total = trap_FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );
+	}
 	cursor = fileList;
 	for ( i = 0; i < total; i++ ) {
 		int length = strlen( cursor );
@@ -881,6 +886,82 @@ static void Factory_LogSelection( const factoryDefinition_t *factory ) {
 
 /*
 =============
+Factory_GetDefaultIdForGametype
+
+Maps a gametype to the retail factory id shipped for that mode.
+=============
+*/
+static const char *Factory_GetDefaultIdForGametype( gametype_t gametype ) {
+	switch ( gametype ) {
+	case GT_FFA:
+		return "ffa";
+	case GT_TOURNAMENT:
+		return "duel";
+	case GT_SINGLE_PLAYER:
+		return "race";
+	case GT_TEAM:
+		return "tdm";
+	case GT_CLAN_ARENA:
+		return "ca";
+	case GT_CTF:
+		return "ctf";
+	case GT_1FCTF:
+		return "oneflag";
+	case GT_OBELISK:
+		return "ovl";
+	case GT_HARVESTER:
+		return "har";
+	case GT_FREEZE:
+		return "ft";
+	case GT_DOMINATION:
+		return "dom";
+	case GT_ATTACK_DEFEND:
+		return "ad";
+	case GT_RED_ROVER:
+		return "rr";
+	default:
+		return NULL;
+	}
+}
+
+/*
+=============
+Factory_ApplyDefaultSelection
+
+Falls back to the retail factory for the active gametype when no valid selection exists.
+=============
+*/
+static qboolean Factory_ApplyDefaultSelection( qboolean forceReapply ) {
+	const factoryDefinition_t	*factory;
+	const char			*defaultId;
+
+	trap_Cvar_Update( &g_gametype );
+
+	defaultId = Factory_GetDefaultIdForGametype( g_gametype.integer );
+	if ( !defaultId || !defaultId[0] ) {
+		G_Printf( "factories: no retail default for g_gametype %i\n", g_gametype.integer );
+		Factory_Apply( NULL, qtrue );
+		return qfalse;
+	}
+
+	factory = Factory_FindById( defaultId );
+	if ( !factory ) {
+		G_Printf( "factories: missing retail default id %s for g_gametype %i\n", defaultId, g_gametype.integer );
+		Factory_Apply( NULL, qtrue );
+		return qfalse;
+	}
+
+	if ( Q_stricmp( g_factory.string, defaultId ) ) {
+		trap_Cvar_Set( "g_factory", defaultId );
+		trap_Cvar_Update( &g_factory );
+	}
+
+	Factory_Apply( factory, forceReapply );
+	return qtrue;
+}
+
+/*
+=============
 Factory_ResetRegistry
 
 Drops the cached factory list so the loader can rebuild the registry.
@@ -955,6 +1036,7 @@ qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReappl
 	if ( !factory ) {
 		Factory_LogSelection( NULL );
 		s_activeFactory = NULL;
+		G_Config_ResetFactoryManagedCvars();
 		trap_Cvar_Set( "g_factoryTitle", "" );
 		trap_Cvar_Update( &g_factoryTitle );
 		G_RefreshAllCvars();
@@ -970,6 +1052,7 @@ qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReappl
 
 	s_activeFactory = factory;
 	Factory_LogSelection( factory );
+	G_Config_ResetFactoryManagedCvars();
 
 	for ( override = factory->overrides; override; override = override->next ) {
 		if ( override->name && override->value ) {
@@ -992,15 +1075,15 @@ qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReappl
 =============
 Factory_ApplyCurrentSelection
 
-Applies the factory referenced by the g_factory CVar.
+Applies the factory referenced by the g_factory CVar, falling back to the active gametype's retail default when needed.
 =============
 */
 void Factory_ApplyCurrentSelection( qboolean forceReapply ) {
-	const factoryDefinition_t *factory;
+	const factoryDefinition_t	*factory;
 
 	trap_Cvar_Update( &g_factory );
 	if ( !g_factory.string[0] ) {
-		Factory_Apply( NULL, qtrue );
+		Factory_ApplyDefaultSelection( forceReapply );
 		return;
 	}
 
@@ -1009,7 +1092,11 @@ void Factory_ApplyCurrentSelection( qboolean forceReapply ) {
 		G_Printf( "factories: unknown id %s\n", g_factory.string );
 		if ( s_activeFactory && s_activeFactory->id ) {
 			trap_Cvar_Set( "g_factory", s_activeFactory->id );
+			trap_Cvar_Update( &g_factory );
+			return;
 		}
+
+		Factory_ApplyDefaultSelection( forceReapply );
 		return;
 	}
 

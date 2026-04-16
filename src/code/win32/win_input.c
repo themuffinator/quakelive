@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../client/client.h"
 #include "win_local.h"
 #include "win_rawinput_shared.h"
+#include <math.h>
 #include <stdlib.h>
 
 
@@ -79,6 +80,7 @@ typedef struct {
 
 	int			oldbuttonstate;
 	int			oldpovstate;
+	int			oldmoveaxisstate[2];
 
 	JOYINFOEX	ji;
 } joystickInfo_t;
@@ -99,9 +101,16 @@ cvar_t  *in_logitechbug;
 cvar_t	*in_nograb;
 cvar_t	*in_raw_useWindowHandle;
 cvar_t	*in_joystick;
+cvar_t	*in_joystickInverted;
 cvar_t	*in_joyBallScale;
 cvar_t	*in_debugJoystick;
 cvar_t	*joy_threshold;
+cvar_t	*in_joyHorizViewSensitivity;
+cvar_t	*in_joyVertViewSensitivity;
+cvar_t	*in_joyHorizViewDeadzone;
+cvar_t	*in_joyVertViewDeadzone;
+cvar_t	*in_joyHorizMoveDeadzone;
+cvar_t	*in_joyVertMoveDeadzone;
 
 qboolean	in_appactive;
 
@@ -602,6 +611,7 @@ qboolean IN_InitDIMouse( void ) {
 	IN_DIMouse( &x, &y );
 	IN_DIMouse( &x, &y );
 
+	IN_SetMouseMode( "DirectInput" );
 	Com_Printf( "DirectInput initialized.\n");
 	return qtrue;
 }
@@ -1017,19 +1027,25 @@ void IN_Init( void ) {
 	Cmd_AddCommand( "ListInputDevices", ListInputDevices_f );
 
 	// mouse variables
-	in_mouse				= Cvar_Get ("in_mouse",					"2",		CVAR_ARCHIVE|CVAR_LATCH);
+	in_mouse				= Cvar_Get ("in_mouse",					"2",		CVAR_ARCHIVE|CVAR_LATCH|CVAR_CLOUD);
 	in_debugMouse			= Cvar_Get ("in_debugMouse",			"0",		CVAR_TEMP);
-	in_mouseMode			= Cvar_Get ("in_mouseMode",				"undefined",	CVAR_ROM);
+	in_mouseMode			= Cvar_Get ("in_mouseMode",				"undefined",	CVAR_ROM | CVAR_TEMP | CVAR_CLOUD);
 	in_logitechbug  = Cvar_Get ("in_logitechbug", "0", CVAR_ARCHIVE);
 	in_nograb				= Cvar_Get ("in_nograb",				"0",		CVAR_TEMP);
 	in_raw_useWindowHandle	= Cvar_Get ("in_raw_useWindowHandle",	"0",		CVAR_ARCHIVE);
 
 	// joystick variables
-	in_joystick				= Cvar_Get ("in_joystick",				"0",		CVAR_ARCHIVE|CVAR_LATCH);
-	in_joyBallScale			= Cvar_Get ("in_joyBallScale",			"0.02",		CVAR_ARCHIVE);
+	in_joystick				= Cvar_Get ("in_joystick",				"1",		CVAR_ARCHIVE|CVAR_LATCH);
+	in_joystickInverted		= Cvar_Get ("in_joystick_inverted",		"0",		CVAR_ARCHIVE);
+	in_joyBallScale			= Cvar_Get ("in_joyBallScale",			"1.0",		CVAR_ARCHIVE);
 	in_debugJoystick		= Cvar_Get ("in_debugjoystick",			"0",		CVAR_TEMP);
-
 	joy_threshold			= Cvar_Get ("joy_threshold",			"0.15",		CVAR_ARCHIVE);
+	in_joyHorizViewSensitivity = Cvar_Get ("in_joyHorizViewSensitivity",	"20.0",	CVAR_ARCHIVE);
+	in_joyVertViewSensitivity = Cvar_Get ("in_joyVertViewSensitivity",	"15.0",	CVAR_ARCHIVE);
+	in_joyHorizViewDeadzone	= Cvar_Get ("in_joyHorizViewDeadzone",	"0.15",	CVAR_ARCHIVE);
+	in_joyVertViewDeadzone	= Cvar_Get ("in_joyVertViewDeadzone",	"0.15",	CVAR_ARCHIVE);
+	in_joyHorizMoveDeadzone	= Cvar_Get ("in_joyHorizMoveDeadzone",	"0.50",	CVAR_ARCHIVE);
+	in_joyVertMoveDeadzone	= Cvar_Get ("in_joyVertMoveDeadzone",	"0.15",	CVAR_ARCHIVE);
 
 	IN_Startup();
 }
@@ -1135,6 +1151,11 @@ void IN_StartupJoystick (void) {
 
 	// assume no joystick
 	joy.avail = qfalse; 
+	joy.oldbuttonstate = 0;
+	joy.oldpovstate = 0;
+	joy.oldmoveaxisstate[AXIS_SIDE] = 0;
+	joy.oldmoveaxisstate[AXIS_FORWARD] = 0;
+	Cvar_Set( "ui_joyavail", "0" );
 
 	if (! in_joystick->integer ) {
 		Com_Printf ("Joystick is not active.\n");
@@ -1190,12 +1211,9 @@ void IN_StartupJoystick (void) {
 		Com_Printf( "no POV\n" );
 	}
 
-	// old button and POV states default to no buttons pressed
-	joy.oldbuttonstate = 0;
-	joy.oldpovstate = 0;
-
 	// mark the joystick as available
 	joy.avail = qtrue; 
+	Cvar_Set( "ui_joyavail", "1" );
 }
 
 /*
@@ -1228,6 +1246,70 @@ int JoyToI( int value ) {
 	return value;
 }
 
+/*
+================
+IN_JoyRoundToInt
+================
+*/
+static int IN_JoyRoundToInt( float value ) {
+	if ( value < 0.0f ) {
+		return (int)( value - 0.5f );
+	}
+
+	return (int)( value + 0.5f );
+}
+
+/*
+===================
+IN_QueueJoystickAxis
+===================
+*/
+static void IN_QueueJoystickAxis( int axis, int value ) {
+	value = (int)Com_Clamp( -127.0f, 127.0f, (float)value );
+
+	if ( joy.oldmoveaxisstate[axis] == value ) {
+		return;
+	}
+
+	Sys_QueEvent( g_wv.sysMsgTime, SE_JOYSTICK_AXIS, axis, value, 0, NULL );
+	joy.oldmoveaxisstate[axis] = value;
+}
+
+/*
+===============
+IN_JoyMouseMove
+===============
+*/
+static int IN_JoyMouseMove( float axisValue, float deadzone, float sensitivity, qboolean invert ) {
+	float	accel;
+	float	move;
+	float	sign;
+
+	axisValue = Com_Clamp( -1.0f, 1.0f, axisValue );
+	if ( fabsf( axisValue ) <= deadzone ) {
+		return 0;
+	}
+
+	move = (float)IN_JoyRoundToInt( axisValue * sensitivity );
+	if ( move == 0.0f ) {
+		return 0;
+	}
+
+	sign = 1.0f;
+	if ( move < 0.0f ) {
+		sign = -1.0f;
+	}
+
+	accel = cl_viewAccel ? cl_viewAccel->value : 1.0f;
+	move = powf( fabsf( move ), accel ) * sign;
+
+	if ( invert ) {
+		move = -move;
+	}
+
+	return IN_JoyRoundToInt( move );
+}
+
 int	joyDirectionKeys[16] = {
 	K_LEFTARROW, K_RIGHTARROW,
 	K_UPARROW, K_DOWNARROW,
@@ -1249,6 +1331,8 @@ void IN_JoyMove( void ) {
 	float	fAxisValue;
 	int		i;
 	DWORD	buttonstate, povstate;
+	int		forward;
+	int		side;
 	int		x, y;
 
 	// verify joystick is available and that the user wants to use it
@@ -1294,8 +1378,26 @@ void IN_JoyMove( void ) {
 
 	povstate = 0;
 
-	// convert main joystick motion into 6 direction button bits
-	for (i = 0; i < joy.jc.wNumAxes && i < 4 ; i++) {
+	side = 0;
+	if ( joy.jc.wNumAxes > 0 ) {
+		fAxisValue = JoyToF( joy.ji.dwXpos );
+		if ( fabsf( fAxisValue ) > in_joyHorizMoveDeadzone->value ) {
+			side = IN_JoyRoundToInt( fAxisValue * in_joyBallScale->value * 127.0f );
+		}
+	}
+	IN_QueueJoystickAxis( AXIS_SIDE, side );
+
+	forward = 0;
+	if ( joy.jc.wNumAxes > 1 ) {
+		fAxisValue = JoyToF( joy.ji.dwYpos );
+		if ( fabsf( fAxisValue ) > in_joyVertMoveDeadzone->value ) {
+			forward = IN_JoyRoundToInt( fAxisValue * in_joyBallScale->value * 127.0f );
+		}
+	}
+	IN_QueueJoystickAxis( AXIS_FORWARD, forward );
+
+	// convert the remaining primary joystick axes into direction button bits
+	for (i = 2; i < joy.jc.wNumAxes && i < 4 ; i++) {
 		// get the floating point zero-centered, potentially-inverted data for the current axis
 		fAxisValue = JoyToF( (&joy.ji.dwXpos)[i] );
 
@@ -1332,10 +1434,10 @@ void IN_JoyMove( void ) {
 	}
 	joy.oldpovstate = povstate;
 
-	// if there is a trackball like interface, simulate mouse moves
-	if ( joy.jc.wNumAxes >= 6 ) {
-		x = JoyToI( joy.ji.dwUpos ) * in_joyBallScale->value;
-		y = JoyToI( joy.ji.dwVpos ) * in_joyBallScale->value;
+	// retail Quake Live treats the R/U axes as analog look input.
+	if ( joy.jc.wNumAxes >= 5 ) {
+		x = IN_JoyMouseMove( JoyToF( joy.ji.dwRpos ), in_joyHorizViewDeadzone->value, in_joyHorizViewSensitivity->value, qfalse );
+		y = IN_JoyMouseMove( JoyToF( joy.ji.dwUpos ), in_joyVertViewDeadzone->value, in_joyVertViewSensitivity->value, in_joystickInverted && in_joystickInverted->integer );
 		if ( x || y ) {
 			Sys_QueEvent( g_wv.sysMsgTime, SE_MOUSE, x, y, 0, NULL );
 		}

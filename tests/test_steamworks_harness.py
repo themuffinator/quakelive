@@ -542,6 +542,17 @@ def steamworks_harness(request: pytest.FixtureRequest, tmp_path_factory: pytest.
         lib.QLR_SteamworksMock_QueueMicroAuthorizationResponse.argtypes = [ctypes.c_uint32, ctypes.c_uint64, ctypes.c_int]
         lib.QLR_SteamworksMock_QueueMicroAuthorizationResponse.restype = ctypes.c_int
 
+        lib.QLR_SteamworksMock_QueueItemInstalled.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32]
+        lib.QLR_SteamworksMock_QueueItemInstalled.restype = ctypes.c_int
+
+        lib.QLR_SteamworksMock_QueueDownloadItemResult.argtypes = [
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_int,
+        ]
+        lib.QLR_SteamworksMock_QueueDownloadItemResult.restype = ctypes.c_int
+
         lib.QLR_SteamworksMock_QueueUGCQueryCompleted.argtypes = [
             ctypes.c_uint64,
             ctypes.c_uint64,
@@ -1120,7 +1131,7 @@ def test_callback_bundle_registration_and_dispatch_reconstructs_retail_client_ow
     lib.QLR_SteamworksMock_SetLobbyChatEntryMessage(b"queued lobby chat")
 
     assert lib.QLR_Steamworks_RegisterHarnessCallbacks()
-    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 15
+    assert lib.QLR_SteamworksMock_GetRegisterCallbackCalls() == 17
 
     assert lib.QLR_SteamworksMock_QueueRichPresenceJoinRequested(0x0123456789ABCDEF, b"connect 127.0.0.1")
     lib.QLR_Steamworks_RunCallbackPump()
@@ -1148,8 +1159,26 @@ def test_callback_bundle_registration_and_dispatch_reconstructs_retail_client_ow
     assert lib.QLR_SteamworksMock_GetLastCallbackAppId() == 0x54100
     assert lib.QLR_SteamworksMock_GetLastCallbackResult() == 1
 
+    assert lib.QLR_SteamworksMock_QueueItemInstalled(0x54100, 0x89ABCDEF, 0x01234567)
+    lib.QLR_Steamworks_RunCallbackPump()
+
+    assert lib.QLR_SteamworksMock_GetClientCallbackCaptureCount() == 4
+    assert lib.QLR_SteamworksMock_GetLastCallbackKind() == b"workshop_installed"
+    assert lib.QLR_SteamworksMock_GetLastCallbackId() == 0x0123456789ABCDEF
+    assert lib.QLR_SteamworksMock_GetLastCallbackAppId() == 0x54100
+    assert lib.QLR_SteamworksMock_GetLastCallbackResult() == 0
+
+    assert lib.QLR_SteamworksMock_QueueDownloadItemResult(0x54100, 0x89ABCDEF, 0x01234567, 1)
+    lib.QLR_Steamworks_RunCallbackPump()
+
+    assert lib.QLR_SteamworksMock_GetClientCallbackCaptureCount() == 5
+    assert lib.QLR_SteamworksMock_GetLastCallbackKind() == b"workshop_download_result"
+    assert lib.QLR_SteamworksMock_GetLastCallbackId() == 0x0123456789ABCDEF
+    assert lib.QLR_SteamworksMock_GetLastCallbackAppId() == 0x54100
+    assert lib.QLR_SteamworksMock_GetLastCallbackResult() == 1
+
     lib.QLR_Steamworks_UnregisterHarnessCallbacks()
-    assert lib.QLR_SteamworksMock_GetUnregisterCallbackCalls() == 15
+    assert lib.QLR_SteamworksMock_GetUnregisterCallbackCalls() == 17
 
 
 def test_ugc_call_result_binding_routes_through_registered_client_bundle(

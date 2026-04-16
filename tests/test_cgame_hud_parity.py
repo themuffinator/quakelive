@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CG_DRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_draw.c"
 CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
+CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
+HUD_MENU = REPO_ROOT / "src" / "ui" / "hud.menu"
+UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
 Q_SHARED = REPO_ROOT / "src" / "code" / "game" / "q_shared.h"
 MSG = REPO_ROOT / "src" / "code" / "qcommon" / "msg.c"
 G_ACTIVE = REPO_ROOT / "src" / "code" / "game" / "g_active.c"
@@ -28,6 +32,39 @@ def _block_from_marker(source: str, marker: str) -> str:
 				return source[start:index + 1]
 
 	raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
+def _menu_item_keys(source: str) -> set[str]:
+	text = re.sub(r"//.*", "", source)
+	lines = [line.strip() for line in text.splitlines() if line.strip()]
+	keys: set[str] = set()
+	in_item = False
+
+	for line in lines:
+		if line.startswith("itemDef"):
+			in_item = True
+			continue
+		if in_item and line == "}":
+			in_item = False
+			continue
+		if not in_item:
+			continue
+
+		token = line.split()[0]
+		if token not in {"{", "}"}:
+			keys.add(token.lower())
+
+	return keys
+
+
+def _menu_ownerdraw_tokens(source: str) -> set[str]:
+	text = re.sub(r"//.*", "", source)
+	return set(re.findall(r"\bownerdraw\s+([A-Z0-9_]+)", text))
+
+
+def _menu_ownerdrawflag_tokens(source: str) -> set[str]:
+	text = re.sub(r"//.*", "", source)
+	return set(re.findall(r"\bownerdrawflag\s+([A-Z0-9_]+)", text))
 
 
 def test_teammate_poi_overlay_uses_retail_projection_and_status_markers() -> None:
@@ -92,6 +129,28 @@ def test_crosshair_team_health_default_matches_retail_mode_cvar() -> None:
 
 	assert '{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "2", CVAR_ARCHIVE },' in source
 	assert '{ &cg_drawCrosshairTeamHealthSize, "cg_drawCrosshairTeamHealthSize", "0.12", CVAR_ARCHIVE },' in source
+
+
+def test_crosshair_draw_uses_retail_vertical_scaler_and_numeric_shader_names() -> None:
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	local_header = (REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h").read_text(encoding="utf-8")
+	draw_block = _block_from_marker(draw_source, "static void CG_DrawCrosshair(void)")
+	register_block = _block_from_marker(main_source, "static void CG_RegisterGraphics( void )")
+
+	assert "#define\tNUM_CROSSHAIRS\t\t30" in local_header
+	assert "x *= cgs.screenYScale;" in draw_block
+	assert "y *= cgs.screenYScale;" in draw_block
+	assert "w *= cgs.screenYScale;" in draw_block
+	assert "h *= cgs.screenYScale;" in draw_block
+	assert "CG_AdjustFrom640( &x, &y, &w, &h );" not in draw_block
+	assert "if ( ca <= 0 || ( ca % NUM_CROSSHAIRS ) == 0 ) {" in draw_block
+	assert "0.5 * (cg.refdef.width - w)" in draw_block
+	assert "0.5 * (cg.refdef.height - h)" in draw_block
+
+	assert "for ( i = 1 ; i < NUM_CROSSHAIRS ; i++ ) {" in register_block
+	assert 'trap_R_RegisterShader( va( "gfx/2d/crosshair%d", i ) );' in register_block
+	assert 'crosshair%c' not in register_block
 
 
 def test_team_info_overlay_restores_fixed_retail_row_renderer() -> None:
@@ -211,3 +270,45 @@ def test_classic_input_cmd_overlay_restores_retail_follow_and_arrow_icon_path() 
 	assert "CG_DrawInputCmds();" in draw2d_block
 	assert draw2d_block.index( "CG_DrawInputCmds();" ) < draw2d_block.index( "CG_DrawSpeedometer();" )
 	assert draw2d_block.index( "CG_DrawSpeedometer();" ) < draw2d_block.index( "CG_DrawLowerRight();" )
+
+
+def test_default_hud_item_keywords_are_backed_by_item_parsers() -> None:
+	hud_source = HUD_MENU.read_text(encoding="utf-8")
+	ui_shared_source = UI_SHARED.read_text(encoding="utf-8")
+	hud_keys = _menu_item_keys(hud_source)
+	parser_names = {
+		name.lower()
+		for name in re.findall(r"qboolean\s+ItemParse_([A-Za-z0-9_]+)\s*\(", ui_shared_source)
+	}
+
+	missing = sorted(hud_keys - parser_names)
+	assert not missing, f"hud.menu item keys lack ItemParse_ coverage: {missing}"
+
+
+def test_default_hud_ownerdraws_and_visibility_flags_are_backed_by_cgame() -> None:
+	hud_source = HUD_MENU.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	visible_block = _block_from_marker(newdraw_source, "qboolean CG_OwnerDrawVisible")
+
+	missing_ownerdraws = sorted(
+		name for name in _menu_ownerdraw_tokens(hud_source) if f"case {name}:" not in newdraw_source
+	)
+	missing_flags = sorted(
+		name for name in _menu_ownerdrawflag_tokens(hud_source) if name not in visible_block
+	)
+
+	assert not missing_ownerdraws, f"hud.menu ownerdraws lack CG_OwnerDraw cases: {missing_ownerdraws}"
+	assert not missing_flags, f"hud.menu ownerdraw flags lack CG_OwnerDrawVisible coverage: {missing_flags}"
+
+
+def test_default_hud_score_widgets_refresh_the_competitive_score_cache() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	refresh_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
+
+	for ownerdraw in (
+		"CG_1ST_PLACE_SCORE",
+		"CG_2ND_PLACE_SCORE",
+		"CG_TEAM_PLYR_COUNT",
+		"CG_ENEMY_PLYR_COUNT",
+	):
+		assert ownerdraw in refresh_block

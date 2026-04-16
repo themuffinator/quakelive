@@ -128,6 +128,7 @@ typedef struct {
 	void	(*Free)( void *buf );
 
 	cvar_t	*(*Cvar_Get)( const char *name, const char *value, int flags );
+	cvar_t	*(*Cvar_GetBounded)( const char *name, const char *value, const char *minValue, const char *maxValue, int flags );
 	void	(*Cvar_Set)( const char *name, const char *value );
 
 	void	(*Cmd_AddCommand)( const char *name, void(*cmd)(void) );

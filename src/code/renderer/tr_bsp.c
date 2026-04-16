@@ -39,6 +39,16 @@ static	byte		*fileBase;
 int			c_subdivisions;
 int			c_gridVerts;
 
+#define	LUMP_ADVERTISEMENTS_QL	17
+#define	MAX_MAP_ADVERTISEMENTS	30
+
+typedef struct {
+	int		cellId;
+	float	normal[3];
+	float	points[4][3];
+	char	model[MAX_QPATH];
+} dAdvertisement_t;
+
 //===============================================================================
 
 static void HSVtoRGB( float h, float s, float v, float rgb[3] )
@@ -1293,6 +1303,81 @@ static	void R_LoadSurfaces( lump_t *surfs, lump_t *verts, lump_t *indexLump ) {
 		numFaces, numMeshes, numTriSurfs, numFlares );
 }
 
+/*
+=================
+R_LoadAdvertisements
+=================
+*/
+static void R_LoadAdvertisements( lump_t *l ) {
+	dAdvertisement_t	*in;
+	qlAdvertisement_t	*out;
+	model_t				*model;
+	bmodel_t			*bmodel;
+	int					count;
+	int					i;
+	int					j;
+	int					modelNum;
+
+	s_worldData.numAdvertisements = 0;
+	s_worldData.advertisements = NULL;
+
+	if ( !l->filelen ) {
+		return;
+	}
+
+	if ( l->filelen % sizeof( *in ) ) {
+		ri.Error( ERR_DROP, "R_LoadAdvertisements: funny lump size\n" );
+	}
+
+	count = l->filelen / sizeof( *in );
+	if ( count >= MAX_MAP_ADVERTISEMENTS ) {
+		ri.Error( ERR_DROP, "R_LoadAdvertisements: number of advertisements exceeds level limit.\n" );
+	}
+
+	in = (void *)( fileBase + l->fileofs );
+	out = ri.Hunk_Alloc( count * sizeof( *out ), h_low );
+	s_worldData.advertisements = out;
+
+	for ( i = 0 ; i < count ; i++, in++ ) {
+		modelNum = atoi( in->model + 1 );
+		if ( modelNum < 0 || modelNum >= s_worldData.numBmodels ) {
+			bmodel = NULL;
+		} else {
+			model = R_GetModelByHandle( s_worldData.bmodelHandleBase + modelNum );
+			bmodel = model ? model->bmodel : NULL;
+		}
+
+		if ( !bmodel ) {
+			ri.Printf( PRINT_DEVELOPER,
+				"cell ID %d has no brush model. It has been ignored.\n",
+				LittleLong( in->cellId ) );
+			continue;
+		}
+
+		if ( bmodel->numSurfaces > 1 ) {
+			ri.Printf( PRINT_DEVELOPER,
+				"cell ID %d has multiple surfaces. It has been ignored.\n",
+				LittleLong( in->cellId ) );
+			continue;
+		}
+
+		out[s_worldData.numAdvertisements].cellId = LittleLong( in->cellId );
+		out[s_worldData.numAdvertisements].bmodel = bmodel;
+		VectorAdd( bmodel->bounds[0], bmodel->bounds[1], out[s_worldData.numAdvertisements].center );
+		VectorScale( out[s_worldData.numAdvertisements].center, 0.5f, out[s_worldData.numAdvertisements].center );
+		for ( j = 0 ; j < 3 ; j++ ) {
+			out[s_worldData.numAdvertisements].normal[j] = LittleFloat( in->normal[j] );
+		}
+		for ( j = 0 ; j < 4 ; j++ ) {
+			out[s_worldData.numAdvertisements].points[j][0] = LittleFloat( in->points[j][0] );
+			out[s_worldData.numAdvertisements].points[j][1] = LittleFloat( in->points[j][1] );
+			out[s_worldData.numAdvertisements].points[j][2] = LittleFloat( in->points[j][2] );
+		}
+		out[s_worldData.numAdvertisements].sourceIndex = i;
+		s_worldData.numAdvertisements++;
+	}
+}
+
 
 
 /*
@@ -1310,6 +1395,8 @@ static	void R_LoadSubmodels( lump_t *l ) {
 		ri.Error (ERR_DROP, "LoadMap: funny lump size in %s",s_worldData.name);
 	count = l->filelen / sizeof(*in);
 
+	s_worldData.bmodelHandleBase = tr.numModels;
+	s_worldData.numBmodels = count;
 	s_worldData.bmodels = out = ri.Hunk_Alloc( count * sizeof(*out), h_low );
 
 	for ( i=0 ; i<count ; i++, in++, out++ ) {
@@ -1788,9 +1875,11 @@ Called directly from cgame
 */
 void RE_LoadWorldMap( const char *name ) {
 	int			i;
+	int			version;
 	dheader_t	*header;
 	byte		*buffer;
 	byte		*startMarker;
+	lump_t		qlAdvertisementsLump;
 
 	if ( tr.worldMapLoaded ) {
 		ri.Error( ERR_DROP, "ERROR: attempted to redundantly load world map\n" );
@@ -1828,15 +1917,23 @@ void RE_LoadWorldMap( const char *name ) {
 	header = (dheader_t *)buffer;
 	fileBase = (byte *)header;
 
-	i = LittleLong (header->version);
-	if ( i != BSP_VERSION && i != BSP_VERSION_QL ) {
+	version = LittleLong (header->version);
+	if ( version != BSP_VERSION && version != BSP_VERSION_QL ) {
 		ri.Error (ERR_DROP, "RE_LoadWorldMap: %s has wrong version number (%i should be %i or %i)", 
-			name, i, BSP_VERSION, BSP_VERSION_QL);
+			name, version, BSP_VERSION, BSP_VERSION_QL);
 	}
 
 	// swap all the lumps
 	for (i=0 ; i<sizeof(dheader_t)/4 ; i++) {
 		((int *)header)[i] = LittleLong ( ((int *)header)[i]);
+	}
+
+	if ( version == BSP_VERSION_QL ) {
+		lump_t	*extraLump;
+
+		extraLump = (lump_t *)( (byte *)header + sizeof( dheader_t ) );
+		qlAdvertisementsLump.fileofs = LittleLong( extraLump[0].fileofs );
+		qlAdvertisementsLump.filelen = LittleLong( extraLump[0].filelen );
 	}
 
 	// load into heap
@@ -1848,6 +1945,9 @@ void RE_LoadWorldMap( const char *name ) {
 	R_LoadMarksurfaces (&header->lumps[LUMP_LEAFSURFACES]);
 	R_LoadNodesAndLeafs (&header->lumps[LUMP_NODES], &header->lumps[LUMP_LEAFS]);
 	R_LoadSubmodels (&header->lumps[LUMP_MODELS]);
+	if ( version == BSP_VERSION_QL ) {
+		R_LoadAdvertisements( &qlAdvertisementsLump );
+	}
 	R_LoadVisibility( &header->lumps[LUMP_VISIBILITY] );
 	R_LoadEntities( &header->lumps[LUMP_ENTITIES] );
 	R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID] );

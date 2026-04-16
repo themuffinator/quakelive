@@ -50,3 +50,38 @@ def test_fast_restart_preserves_windowed_maximize_state() -> None:
 	assert "if ( g_wv.isMaximized ) {" in win_glimp
 	assert "windowStyle |= WS_MAXIMIZE;" in win_glimp
 	assert "AdjustWindowRect( &rect, windowStyle, FALSE );" in win_glimp
+
+
+def test_mode_switches_publish_retail_aspect_ratio_presets() -> None:
+	win_glimp = WIN_GLIMP.read_text()
+
+	assert "static int GLW_GetModeAspectRatioPreset( int width, int height )" in win_glimp
+	assert "aspectRatio = (float)width / (float)height;" in win_glimp
+	assert "if ( aspectRatio == 1.77777779f )" in win_glimp
+	assert "if ( aspectRatio == 1.60000002f )" in win_glimp
+	assert "if ( aspectRatio == 1.33333337f )" in win_glimp
+	assert "return 3;" in win_glimp
+	assert 'ri.Cvar_Set( "r_aspectRatio", "0" );' not in win_glimp
+	assert 'ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( width, height ) ) );' in win_glimp
+	assert 'ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( glConfig.vidWidth, glConfig.vidHeight ) ) );' in win_glimp
+
+
+def test_pfd_auto_select_restores_retail_icd_and_wgl_owner_split() -> None:
+	win_glimp = WIN_GLIMP.read_text()
+
+	assert 'ri.Printf( PRINT_ALL, "...GLW_AutoSelectPFD( %d, %d, %d )\\n", ( int ) pPFD->cColorBits, ( int ) pPFD->cDepthBits, ( int ) pPFD->cStencilBits );' in win_glimp
+	assert "useQWGL = (qboolean)( glConfig.driverType > GLDRV_ICD );" in win_glimp
+	assert "autoPFD = GLW_ChoosePixelFormatSafe( hDC, pPFD, qtrue );" in win_glimp
+	assert "autoPFD = GLW_ChoosePixelFormatSafe( hDC, pPFD, qfalse );" in win_glimp
+	assert "result = qwglChoosePixelFormat ? qwglChoosePixelFormat( hDC, pPFD ) : 0;" in win_glimp
+	assert "result = ChoosePixelFormat( hDC, pPFD );" in win_glimp
+
+
+def test_pfd_enumeration_uses_retail_gdi_vs_wgl_describe_owner() -> None:
+	win_glimp = WIN_GLIMP.read_text()
+
+	assert "result = qwglDescribePixelFormat ? qwglDescribePixelFormat( hDC, index, bytes, pfd ) : 0;" in win_glimp
+	assert "result = DescribePixelFormat( hDC, index, bytes, pfd );" in win_glimp
+	assert "maxPFD = GLW_DescribePixelFormatSafe( hDC, 1, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[0], useQWGL );" in win_glimp
+	assert "if ( !GLW_DescribePixelFormatSafe( hDC, i, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[i], useQWGL ) )" in win_glimp
+	assert "if ( !GLW_DescribePixelFormatSafe( glw_state.hDC, pixelformat, sizeof( *pPFD ), pPFD, glConfig.driverType > GLDRV_ICD ) )" in win_glimp

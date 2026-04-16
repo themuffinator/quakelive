@@ -19,6 +19,17 @@ QLR_TEST_EXPORT clTranslatedKey_t QLR_TranslateKey( int key ) {
 
 /*
 =============
+QLR_EncodeUtf8Codepoint
+
+Wrapper used by the Python harness to exercise CL_EncodeUtf8Codepoint.
+=============
+*/
+QLR_TEST_EXPORT int QLR_EncodeUtf8Codepoint( int codepoint, char *buffer, int bufferSize ) {
+	return CL_EncodeUtf8Codepoint( codepoint, buffer, bufferSize );
+}
+
+/*
+=============
 QLR_TranslateMouse
 
 Wrapper used by the Python harness to exercise CL_TranslateRetailMouseDelta.

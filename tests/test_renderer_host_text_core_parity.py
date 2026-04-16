@@ -45,6 +45,7 @@ def test_renderer_host_text_core_matches_retail_surface() -> None:
 	assert "r_fontStash.primarySansFace = R_GetFontStashFace( R_FONTSTASH_FACE_SANS );" in tr_font
 	assert "r_fontStash.fallbackSansFace = R_GetFontStashFace( R_FONTSTASH_FACE_SANS_FALLBACK );" in tr_font
 	assert "r_fontStash.windowsFallbackFace = R_GetFontStashFace( R_FONTSTASH_FACE_SANS_WINDOWS_FALLBACK );" in tr_font
+	assert "static qboolean R_EnsureFontStashCompatibilityFont( rFontStashFace_t *face ) {" in tr_font
 	assert "r_fontStash.errorCallback = R_fonsErrorCallback;" in tr_font
 	assert "void R_InitFontStash( void ) {" in tr_font
 	assert "void R_DoneFontStash( void ) {" in tr_font
@@ -53,6 +54,14 @@ def test_renderer_host_text_core_matches_retail_surface() -> None:
 	assert 'ri.Printf( PRINT_ALL, "R_Init: InitFontStash\\n" );' in tr_init
 	assert "R_InitFontStash();" in tr_init
 	assert "R_DoneFontStash();" in tr_init
+
+	r_get_glyph_block = tr_font.split("static glyphInfo_t *R_GetFontStashGlyph", 1)[1]
+	assert "if ( face->ftFace && r_fontStash.shader ) {" in r_get_glyph_block
+	assert "if ( R_EnsureFontStashCompatibilityFont( face ) ) {" in r_get_glyph_block
+	assert r_get_glyph_block.index("if ( face->ftFace && r_fontStash.shader ) {") < r_get_glyph_block.index(
+		"if ( R_EnsureFontStashCompatibilityFont( face ) ) {"
+	)
+	assert "Retail host DrawScaledText/MeasureText resolve glyphs from the retained" in r_get_glyph_block
 
 
 def test_renderer_host_text_core_docs_track_rg_p8_completion() -> None:

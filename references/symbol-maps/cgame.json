@@ -4876,7 +4876,7 @@
       "signature": "static void CG_DrawTeamPickupOwnerDraw(rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail team-pickup ownerdraw shared by the red/blue pickup-count block (`0x124..0x12A`, `0x12D..0x131`, `0x13F..0x145`, `0x148..0x14C`). The current source now matches the per-slot numeric path directly, while the dedicated time-held slots are recovered separately at `0x10039AE0`. HLIL still shows an additional summary-row composition branch for the top-level `CG_RED_TEAM_MAP_PICKUPS` / `CG_BLUE_TEAM_MAP_PICKUPS` slots, so that richer aggregate format remains an explicit follow-up rather than a hidden assumption."
+      "comment": "Retail team-pickup ownerdraw shared by the red/blue pickup-count block (`0x124..0x12A`, `0x12D..0x131`, `0x13F..0x145`, `0x148..0x14C`) plus the top-level `CG_RED_TEAM_MAP_PICKUPS` / `CG_BLUE_TEAM_MAP_PICKUPS` summary strip. The current source now mirrors both the per-slot numeric path and the aggregate summary-row composition preserved in HLIL, while the dedicated time-held slots remain recovered separately at `0x10039AE0`."
     },
     {
       "address": "0x10039AE0",

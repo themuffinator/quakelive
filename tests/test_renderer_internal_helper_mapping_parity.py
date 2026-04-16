@@ -71,3 +71,62 @@ def test_representative_rg_g06_helper_seams_remain_present_in_source() -> None:
 	assert "void RB_TestFlare( flare_t *f ) {" in tr_flares
 	assert "static void GLW_StartOpenGL( void )" in win_glimp
 	assert "void GLimp_Init( void )" in win_glimp
+
+
+def test_renderer_bsp_loader_tracks_quakelive_advertisement_brush_models() -> None:
+	tr_bsp = _read("src/code/renderer/tr_bsp.c")
+	tr_local = _read("src/code/renderer/tr_local.h")
+	tr_init = _read("src/code/renderer/tr_init.c")
+	tr_world = _read("src/code/renderer/tr_world.c")
+
+	assert "#define\tLUMP_ADVERTISEMENTS_QL\t17" in tr_bsp
+	assert "static void R_LoadAdvertisements( lump_t *l ) {" in tr_bsp
+	assert '"R_LoadAdvertisements: funny lump size\\n"' in tr_bsp
+	assert '"R_LoadAdvertisements: number of advertisements exceeds level limit.\\n"' in tr_bsp
+	assert '"cell ID %d has no brush model. It has been ignored.\\n"' in tr_bsp
+	assert '"cell ID %d has multiple surfaces. It has been ignored.\\n"' in tr_bsp
+	assert "R_LoadAdvertisements( &qlAdvertisementsLump );" in tr_bsp
+	assert "int\t\t\tnumAdvertisements;" in tr_local
+	assert "qlAdvertisement_t\t*advertisements;" in tr_local
+	assert "int\t\t\tbmodelHandleBase;" in tr_local
+	assert "int\t\t\tnumBmodels;" in tr_local
+	assert "bmodel_t\t*bmodel;" in tr_local
+	assert "vec3_t\t\tnormal;" in tr_local
+	assert "vec3_t\t\tpoints[4];" in tr_local
+	assert "int\t\t\tsourceIndex;" in tr_local
+	assert "void\t\tR_AdvertisementList_f( void );" in tr_local
+	assert "static void R_AddAdvertisementSurfaces( void ) {" in tr_world
+	assert "void R_AdvertisementList_f( void ) {" in tr_world
+	assert 'ri.Printf( PRINT_ALL, "advertlist: world=%s loaded=%d\\n",' in tr_world
+	assert '"advertlist: [%d] cellId=%d sourceIndex=%d model=*%d surfaces=%d shader=%s center=(%.1f %.1f %.1f) normal=(%.3f %.3f %.3f)\\n"' in tr_world
+	assert '"advertlist:      points=(%.1f %.1f %.1f) (%.1f %.1f %.1f) (%.1f %.1f %.1f) (%.1f %.1f %.1f)\\n"' in tr_world
+	assert "static int R_CullAdvertisementQuad( const qlAdvertisement_t *advertisement ) {" in tr_world
+	assert "s_worldData.bmodelHandleBase = tr.numModels;" in tr_bsp
+	assert "s_worldData.numBmodels = count;" in tr_bsp
+	assert "model = R_GetModelByHandle( s_worldData.bmodelHandleBase + modelNum );" in tr_bsp
+	assert "bmodel = model ? model->bmodel : NULL;" in tr_bsp
+	assert "out[s_worldData.numAdvertisements].bmodel = bmodel;" in tr_bsp
+	assert "out[s_worldData.numAdvertisements].sourceIndex = i;" in tr_bsp
+	assert "for ( j = 0 ; j < 4 ; j++ ) {" in tr_bsp
+	assert "tr.currentEntity = &tr.worldEntity;" in tr_world
+	assert "VectorSubtract( tr.refdef.vieworg, advertisement->center, viewDelta );" in tr_world
+	assert "if ( DotProduct( advertisement->normal, viewDelta ) <= 0.0f ) {" in tr_world
+	assert "if ( R_CullAdvertisementQuad( advertisement ) == CULL_OUT ) {" in tr_world
+	assert "R_DlightBmodel( bmodel );" in tr_world
+	assert "R_AddWorldSurface( bmodel->firstSurface, tr.currentEntity->needDlights );" in tr_world
+	assert "R_AddAdvertisementSurfaces();" in tr_world
+	assert 'ri.Cmd_AddCommand( "advertlist", R_AdvertisementList_f );' in tr_init
+	assert 'ri.Cmd_RemoveCommand( "advertlist" );' in tr_init
+
+
+def test_renderer_model_surface_limits_match_retail_quakelive_loader_caps() -> None:
+	qcommon_qfiles = _read("src/code/qcommon/qfiles.h")
+	bspc_q3files = _read("src/code/bspc/q3files.h")
+	tr_model = _read("src/code/renderer/tr_model.c")
+
+	assert "#define\tSHADER_MAX_VERTEXES\t2000" in qcommon_qfiles
+	assert "#define\tSHADER_MAX_INDEXES\t(6*SHADER_MAX_VERTEXES)" in qcommon_qfiles
+	assert "#define\tSHADER_MAX_VERTEXES\t2000" in bspc_q3files
+	assert "#define\tSHADER_MAX_INDEXES\t(6*SHADER_MAX_VERTEXES)" in bspc_q3files
+	assert 'ri.Error (ERR_DROP, "R_LoadMD3: %s has more than %i verts on a surface (%i)",' in tr_model
+	assert 'ri.Error (ERR_DROP, "R_LoadMD3: %s has more than %i triangles on a surface (%i)",' in tr_model

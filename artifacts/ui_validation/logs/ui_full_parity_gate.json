@@ -33,7 +33,7 @@
       "details": {
         "overlay_manifest_path": "artifacts/ui_bundle/ui_src_retail_overlay.json",
         "overlay_manifest_present": true,
-        "overlay_policy_mode": "overlay-first-read-only-src-ui",
+        "overlay_policy_mode": "retail-install-first-read-only-src-ui",
         "overlay_manifest_retail_ui_corpus_available": true,
         "overlay_manifest_drift_files": [],
         "missing_in_source": [],
@@ -46,12 +46,13 @@
     "UI-G03": {
       "gap_id": "UI-G03",
       "status": "pass",
-      "summary": "Bundle and validation artifacts are present and the tracked validation summary is clean.",
+      "summary": "Validation artifacts are present, no retail UI packages were emitted, and the tracked validation summary is clean.",
       "details": {
-        "bundle_artifact_present": true,
-        "overlay_bundle_artifact_present": true,
+        "retail_ui_bundle_artifact_present": false,
+        "retail_ui_overlay_artifact_present": false,
         "font_metrics_present": true,
         "ui_validation_summary_present": true,
+        "overlay_manifest_present": true,
         "glyph_drift_count": 0,
         "missing_shader_groups": [],
         "missing_configs": []

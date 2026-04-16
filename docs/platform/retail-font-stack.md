@@ -22,14 +22,17 @@ Observed facts from the committed retail launcher HLIL:
     `%WINDIR%\fonts\segoeui.ttf`, or `%WINDIR%\fonts\l_10646.ttf`
 - Retail host `DrawScaledText` / `MeasureText` wrappers index that handle table
   directly, instead of collapsing every call to a single baked `fontInfo_t`.
+- UI HLIL `sub_10003d90` / `sub_10003ec0` computes host text scale as
+  `(vidHeight / 768) * 96`. Against the source UI/cgame `yscale =
+  vidHeight / 480`, that matches a `QL_FONT_HOST_POINT_SIZE` baseline of
+  `60.0f`.
 
 Observed facts from the writable source tree:
 
 - The classic renderer FreeType path still lives in `src/code/renderer/tr_font.c`.
 - The renderer no longer depends on a missing in-tree `src/code/ft2/` vendor
-  drop. The build now uses an explicit external FreeType SDK replacement lane
-  on Windows and `pkg-config freetype2` on Unix when `BUILD_FREETYPE` is
-  enabled.
+  drop. The build now uses a repo-managed FreeType replacement lane on Windows
+  and `pkg-config freetype2` on Unix when `BUILD_FREETYPE` is enabled.
 - `src/code/renderer/tr_font.c` now contains a renderer-owned retained host text
   core that creates `*fontstash`, installs `R_fonsErrorCallback`, and retains
   the five recovered host-text faces plus the preferred sans/fallback face
@@ -51,6 +54,9 @@ Observed facts from the writable source tree:
   `sans-windows-fallback` in one face table.
 - `src/code/renderer/tr_font.c` now also owns the shared host draw/measure
   helpers used by the native `ui` and `cgame` import wrappers.
+- Those shared helpers now resolve glyphs from the retained `*fontstash` face
+  table first and only fall back to the classic `RE_RegisterFont` cache lane
+  when the retained atlas path is unavailable for the requested face.
 - `src/code/client/cl_ui.c` and `src/code/client/cl_cgame.c` now route native
   `DrawScaledText` / `MeasureText` through the shared renderer host-text
   helpers instead of resolving `fontInfo_t` locally.
@@ -68,9 +74,9 @@ Inference:
 
 - `RG-P10` is now complete:
   - the renderer build metadata no longer points at `..\ft2\*`
-  - `BUILD_FREETYPE` is now tied to an explicit external FreeType SDK lane,
-    with the local Windows build script able to forward explicit include/lib
-    overrides or auto-discover `vcpkg`'s `x86-windows` FreeType install
+  - `BUILD_FREETYPE` is now tied to a repo-managed FreeType lane, while the
+    non-retail codec stack is bootstrapped from repo-managed sources instead of
+    from system SDK or Vcpkg discovery
 - `RG-P11` is now complete:
   - the tracked runtime artifact is
     `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`

@@ -35,6 +35,7 @@
       "details": {
         "filesystem_gate_removed": true,
         "webpak_remains_available_offline": true,
+        "datapack_bridge_present": true,
         "steam_only_uri_gate_preserved": true,
         "platform_service_coverage_present": true,
         "scripting_guide_mentions_offline_resource_fallbacks": true,

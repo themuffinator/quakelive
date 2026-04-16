@@ -97,17 +97,6 @@ static int S_VorbisBufferSeek( void *datasource, ogg_int64_t offset, int whence 
 
 /*
 =============
-S_VorbisBufferClose
-
-Provided for the callback table even though there is no resource to free.
-=============
-*/
-static int S_VorbisBufferClose( void *datasource ) {
-	return 0;
-}
-
-/*
-=============
 S_VorbisBufferTell
 
 Reports the decoder's current position inside the memory buffer.
@@ -144,9 +133,7 @@ qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, w
 	ogg_int64_t			totalSamples;
 	int					channels;
 	int					rate;
-	int					i;
-	int					samplePairs;
-	short					*chunkSamples;
+	int					sampleCount;
 
 	if ( !info || !outPcm ) {
 		return qfalse;
@@ -167,7 +154,6 @@ qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, w
 	Com_Memset( &callbacks, 0, sizeof( callbacks ) );
 	callbacks.read_func = S_VorbisBufferRead;
 	callbacks.seek_func = S_VorbisBufferSeek;
-	callbacks.close_func = S_VorbisBufferClose;
 	callbacks.tell_func = S_VorbisBufferTell;
 
 	if ( ov_open_callbacks( &stream, &vorbisFile, NULL, 0, callbacks ) < 0 ) {
@@ -187,8 +173,8 @@ qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, w
 		return qfalse;
 	}
 
-	if ( channels > 2 ) {
-		Com_Printf( S_COLOR_YELLOW "WARNING: %s has %d channels and cannot be decoded\n", name ? name : "<unnamed>", channels );
+	if ( channels != 1 ) {
+		Com_Printf( "%s is not a mono file\n", name ? name : "<unnamed>" );
 		ov_clear( &vorbisFile );
 		return qfalse;
 	}
@@ -215,23 +201,16 @@ qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, w
 			break;
 		}
 		if ( bytesRead < 0 ) {
+			Com_Printf( S_COLOR_YELLOW "OGG_Decode: %s: %i\n", name ? name : "<unnamed>", bytesRead );
 			Hunk_FreeTempMemory( pcm );
 			ov_clear( &vorbisFile );
 			return qfalse;
 		}
 
-		samplePairs = bytesRead / ( channels * sizeof( short ) );
-		chunkSamples = (short *)decodeChunk;
-
-		for ( i = 0; i < samplePairs; i++ ) {
-			if ( channels == 2 ) {
-				*writePtr = (short)( ( (int)chunkSamples[i * 2] + (int)chunkSamples[i * 2 + 1] ) / 2 );
-			} else {
-				*writePtr = chunkSamples[i];
-			}
-			writePtr++;
-			info->samples++;
-		}
+		sampleCount = bytesRead / sizeof( short );
+		Com_Memcpy( writePtr, decodeChunk, sampleCount * sizeof( short ) );
+		writePtr += sampleCount;
+		info->samples += sampleCount;
 	}
 
 	ov_clear( &vorbisFile );
@@ -239,10 +218,6 @@ qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, w
 	if ( info->samples <= 0 ) {
 		Hunk_FreeTempMemory( pcm );
 		return qfalse;
-	}
-
-	if ( channels == 2 ) {
-		Com_DPrintf( S_COLOR_YELLOW "WARNING: %s is a stereo Vorbis file and was downmixed to mono\n", name ? name : "<unnamed>" );
 	}
 
 	info->format = WAV_FORMAT_PCM;

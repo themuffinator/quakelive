@@ -37,6 +37,9 @@
         "stats_publisher_owner_present": true,
         "rcon_pump_owner_present": true,
         "runtime_shutdown_owner_present": true,
+        "password_apply_owner_present": true,
+        "zap_domain_wiring_present": true,
+        "auth_pump_present": true,
         "typed_publication_present": true,
         "focused_validation_present": true
       }
@@ -73,6 +76,8 @@
         "plan_marks_closed": true,
         "control_plane_cvars_present": true,
         "shutdown_policy_owner_present": true,
+        "empty_server_policy_present": true,
+        "idle_restart_owner_present": true,
         "alt_entity_owner_present": true,
         "focused_validation_present": true
       }

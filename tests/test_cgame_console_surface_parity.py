@@ -229,11 +229,15 @@ def test_browser_input_bridge_wraps_shared_display_dispatch() -> None:
 
 	assert "cgDC.cursorx = cgs.cursorX;" in mouse_event_block
 	assert "cgDC.cursory = cgs.cursorY;" in mouse_event_block
+	assert "cgs.cursorX = CG_ConvertScreenCursorXToVirtual( x );" in mouse_event_block
+	assert "cgs.cursorY = CG_ConvertScreenCursorYToVirtual( y );" in mouse_event_block
 	assert "n = CG_BrowserDisplayCursorType( cgs.cursorX, cgs.cursorY );" in mouse_event_block
 	assert "CG_BrowserDisplayMouseMove( NULL, cgs.cursorX, cgs.cursorY );" in mouse_event_block
 	assert "cgs.capturedItem" not in mouse_event_block
 	assert "Display_CursorType(" not in mouse_event_block
 	assert "Display_MouseMove(" not in mouse_event_block
+	assert "cgs.cursorX += x;" not in mouse_event_block
+	assert "cgs.cursorY += y;" not in mouse_event_block
 
 	assert "CG_BrowserDisplayHandleKey( key, down, cgs.cursorX, cgs.cursorY );" in key_event_block
 	assert "Display_HandleKey(" not in key_event_block

@@ -86,7 +86,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Label="VorbisSdk">
-    <VorbisSdkDir Condition="'$(VorbisSdkDir)'==''">$(ProjectDir)..\..\libs\vorbis</VorbisSdkDir>
+    <VorbisSdkDir>$(ProjectDir)..\..\libs\vorbis</VorbisSdkDir>
     <VorbisIncludeDir>$(VorbisSdkDir)\include</VorbisIncludeDir>
     <VorbisLibDir>$(VorbisSdkDir)\lib\Win32</VorbisLibDir>
     <VorbisDependencies></VorbisDependencies>

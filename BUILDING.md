@@ -19,8 +19,10 @@ Requirements:
 - Modern-host compatibility path: a newer Visual Studio install with the
   Visual Studio 2017 `v141` toolset available
 - MSBuild on `PATH`
-- Vorbis headers and libraries under `src/libs/vorbis/`, or a custom
-  `VorbisSdkDir` passed to MSBuild when building targets that need them
+- CMake on `PATH` for the repo-managed codec bootstrap
+- Repo-managed third-party codec sources under `src/libs/_deps/`
+  The Windows projects now bootstrap `libogg`, `libvorbis`, `zlib`, and
+  `libpng` from that tree instead of probing system SDK or Vcpkg installs.
 
 Build the recovered native gameplay modules and helper executable with the
 retail-default toolset:
@@ -70,6 +72,10 @@ Notes:
 - The checked-in project defaults remain on `v100` for parity. `v141` is a
   deliberate command-line override for contributor compatibility on modern
   Windows hosts.
+- On Windows, non-retail third-party dependencies are now expected to come from
+  the repo-managed bootstrap flow only. The retail DLL payload remains a
+  runtime concern under `assets/quakelive/`; it is no longer part of the
+  non-retail codec build detection story.
 - `QLBuildOnlineServices` defaults to `0`. Keep it disabled unless you are
   explicitly validating online-service parity or the Awesomium helper path.
 

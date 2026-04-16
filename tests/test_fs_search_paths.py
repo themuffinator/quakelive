@@ -288,20 +288,20 @@ def test_unique_file_reopens_zip_handle(fs_environment: Tuple[ctypes.CDLL, Path,
     assert shared_handle != unique_handle
 
 
-def test_homepath_overlay_pk3_precedes_base_bundle_and_logs_source(
+def test_homepath_overlay_pk3_precedes_lower_priority_base_pk3_and_logs_source(
     fs_environment: Tuple[ctypes.CDLL, Path, Path],
 ) -> None:
     lib, basepath, homepath = fs_environment
 
-    _write_named_pk3(basepath, "pak_uiql.pk3", "ui/hud.txt", "base-bundle")
-    _write_named_pk3(homepath, "pak_ui_src_retail_overlay.pk3", "ui/hud.txt", "overlay-bundle")
+    _write_named_pk3(basepath, "pak00.pk3", "ui/hud.txt", "base-bundle")
+    _write_named_pk3(homepath, "overlay.pk3", "ui/hud.txt", "overlay-bundle")
 
     lib.QLR_FS_TestSetDebug(1)
     lib.QLR_FS_TestAddGameDirectory(str(basepath).encode(), b"baseq3")
     lib.QLR_FS_TestAddGameDirectory(str(homepath).encode(), b"baseq3")
 
     loaded_paks = lib.QLR_FS_TestLoadedPakNames().decode()
-    assert loaded_paks.split()[:2] == ["pak_ui_src_retail_overlay", "pak_uiql"]
+    assert loaded_paks.split()[:2] == ["overlay", "pak00"]
 
     lib.QLR_FS_TestClearCapturedLog()
     length, content, _ = _read_file(lib, "ui/hud.txt")
@@ -310,5 +310,5 @@ def test_homepath_overlay_pk3_precedes_base_bundle_and_logs_source(
     assert length == len("overlay-bundle")
     assert content == "overlay-bundle"
     assert "FS_FOpenFileRead: ui/hud.txt" in captured
-    assert str(homepath / "baseq3" / "pak_ui_src_retail_overlay.pk3") in captured
+    assert str(homepath / "baseq3" / "overlay.pk3") in captured
 

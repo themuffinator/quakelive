@@ -266,7 +266,7 @@ Reports if the Quake Live HUD menus should be drawn.
 =============
 */
 static qboolean CG_IsMenuHudActive( void ) {
-	return cg.competitiveHudLoaded;
+	return cg.hudMenusLoaded;
 }
 
 /*
@@ -299,11 +299,24 @@ static void CG_UnpackFloatBits64( unsigned long long packed, float *lo, float *h
 =============
 CG_SelectTextFontHandle
 
-Matches the retail cgame text lane by mapping the legacy small-font threshold
-onto the retained renderer host-text faces.
+Maps the retail per-item font bucket onto the renderer host-text face table.
 =============
 */
-static int CG_SelectTextFontHandle( float scale ) {
+int CG_SelectTextFontHandle( float scale, int fontIndex ) {
+	if ( fontIndex != ITEM_FONT_INHERIT ) {
+		switch ( fontIndex ) {
+			case FONT_SANS:
+				return FONT_SANS;
+
+			case FONT_MONO:
+				return FONT_MONO;
+
+			case FONT_DEFAULT:
+			default:
+				return FONT_DEFAULT;
+		}
+	}
+
 	if ( scale <= cg_smallFont.value ) {
 		return FONT_SANS;
 	}
@@ -391,7 +404,7 @@ Measures retail host text in screen space, then converts the result back into
 virtual 640-space bounds for caller-side layout.
 =============
 */
-static void CG_GetHostTextMetrics( const char *text, float scale, int limit, int *outWidth, int *outHeight ) {
+static void CG_GetHostTextMetrics( const char *text, float scale, int limit, int fontIndex, int *outWidth, int *outHeight ) {
 	const char *limitEnd;
 	unsigned long long packed;
 	float width;
@@ -417,7 +430,7 @@ static void CG_GetHostTextMetrics( const char *text, float scale, int limit, int
 	packed = trap_QL_MeasureText(
 		text,
 		limitEnd,
-		CG_SelectTextFontHandle( scale ),
+		CG_SelectTextFontHandle( scale, fontIndex ),
 		scale * QL_FONT_HOST_POINT_SIZE * yScale,
 		0,
 		NULL );
@@ -439,9 +452,10 @@ Projects 640-space HUD coordinates into screen space and routes through the
 renderer-owned host text painter that retail cgame uses.
 =============
 */
-static void CG_DrawHostTextSpan( float x, float y, float scale, const vec4_t color, const char *text, int style, qboolean forceColor ) {
+static void CG_DrawHostTextSpan( float x, float y, float scale, const vec4_t color, const char *text, int fontIndex, int style, qboolean forceColor ) {
 	float screenX;
 	float screenY;
+	float hostScale;
 	float yScale;
 	int fontHandle;
 
@@ -453,36 +467,73 @@ static void CG_DrawHostTextSpan( float x, float y, float scale, const vec4_t col
 	screenY = y;
 	yScale = 1.0f;
 	CG_AdjustFrom640( &screenX, &screenY, NULL, &yScale );
-	fontHandle = CG_SelectTextFontHandle( scale );
+	hostScale = scale * QL_FONT_HOST_POINT_SIZE * yScale;
+	fontHandle = CG_SelectTextFontHandle( scale, fontIndex );
 
 	if ( style == ITEM_TEXTSTYLE_SHADOWED || style == ITEM_TEXTSTYLE_SHADOWEDMORE ) {
-		int ofs;
+		float shadowOffset;
+		float shadowX;
+		float shadowY;
 
-		ofs = ( style == ITEM_TEXTSTYLE_SHADOWED ) ? 1 : 2;
+		shadowOffset = ( style == ITEM_TEXTSTYLE_SHADOWED ) ? 1.0f : 2.0f;
+		shadowX = x + shadowOffset;
+		shadowY = y + shadowOffset;
+		CG_AdjustFrom640( &shadowX, &shadowY, NULL, NULL );
 		colorBlack[3] = color[3];
 		trap_R_SetColor( colorBlack );
-		trap_QL_DrawScaledText( (int)screenX + ofs, (int)screenY + ofs, text, fontHandle, scale * QL_FONT_HOST_POINT_SIZE * yScale, 0, NULL, qtrue );
+		trap_QL_DrawScaledText( (int)shadowX, (int)shadowY, text, fontHandle, hostScale, 0, NULL, qtrue );
 		colorBlack[3] = 1.0f;
 	}
 
 	trap_R_SetColor( color );
-	trap_QL_DrawScaledText( (int)screenX, (int)screenY, text, fontHandle, scale * QL_FONT_HOST_POINT_SIZE * yScale, 0, NULL, forceColor );
+	trap_QL_DrawScaledText( (int)screenX, (int)screenY, text, fontHandle, hostScale, 0, NULL, forceColor );
 	trap_R_SetColor( NULL );
 }
 
+/*
+=============
+CG_Text_WidthExt
 
-int CG_Text_Width(const char *text, float scale, int limit) {
+Measures retail host text with an explicit cgame font bucket override.
+=============
+*/
+int CG_Text_WidthExt( const char *text, float scale, int limit, int fontIndex ) {
 	int width;
 
-	CG_GetHostTextMetrics( text, scale, limit, &width, NULL );
+	CG_GetHostTextMetrics( text, scale, limit, fontIndex, &width, NULL );
 	return width;
 }
 
-int CG_Text_Height(const char *text, float scale, int limit) {
+/*
+=============
+CG_Text_Width
+=============
+*/
+int CG_Text_Width(const char *text, float scale, int limit) {
+	return CG_Text_WidthExt( text, scale, limit, ITEM_FONT_INHERIT );
+}
+
+/*
+=============
+CG_Text_HeightExt
+
+Measures retail host text height with an explicit cgame font bucket override.
+=============
+*/
+int CG_Text_HeightExt( const char *text, float scale, int limit, int fontIndex ) {
 	int height;
 
-	CG_GetHostTextMetrics( text, scale, limit, NULL, &height );
+	CG_GetHostTextMetrics( text, scale, limit, fontIndex, NULL, &height );
 	return height;
+}
+
+/*
+=============
+CG_Text_Height
+=============
+*/
+int CG_Text_Height(const char *text, float scale, int limit) {
+	return CG_Text_HeightExt( text, scale, limit, ITEM_FONT_INHERIT );
 }
 
 /*
@@ -495,7 +546,7 @@ Measures the rendered text bounds through the shared width and height helpers.
 static void CG_Text_GetExtents( const char *text, float scale, int limit, int style, int *outWidth, int *outHeight ) {
 	(void)style;
 
-	CG_GetHostTextMetrics( text, scale, limit, outWidth, outHeight );
+	CG_GetHostTextMetrics( text, scale, limit, ITEM_FONT_INHERIT, outWidth, outHeight );
 }
 
 void CG_Text_PaintChar(float x, float y, float width, float height, float scale, float s, float t, float s2, float t2, qhandle_t hShader) {
@@ -506,7 +557,15 @@ void CG_Text_PaintChar(float x, float y, float width, float height, float scale,
   trap_R_DrawStretchPic( x, y, w, h, s, t, s2, t2, hShader );
 }
 
-void CG_Text_Paint(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style) {
+/*
+=============
+CG_Text_PaintExt
+
+Routes cgame text painting through the retail host-text lane with an explicit
+font bucket override.
+=============
+*/
+void CG_Text_PaintExt( float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style, int fontIndex ) {
 	char limitedText[1024];
 	const char *drawText;
 	const char *limitEnd;
@@ -525,7 +584,16 @@ void CG_Text_Paint(float x, float y, float scale, vec4_t color, const char *text
 		drawText = limitedText;
 	}
 
-	CG_DrawHostTextSpan( x, y, scale, color, drawText, style, qfalse );
+	CG_DrawHostTextSpan( x, y, scale, color, drawText, fontIndex, style, qfalse );
+}
+
+/*
+=============
+CG_Text_Paint
+=============
+*/
+void CG_Text_Paint(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style) {
+	CG_Text_PaintExt( x, y, scale, color, text, adjust, limit, style, ITEM_FONT_INHERIT );
 }
 
 /*
@@ -3940,17 +4008,23 @@ static void CG_DrawCrosshair(void) {
 
 	x = cg_crosshairX.integer;
 	y = cg_crosshairY.integer;
-	CG_AdjustFrom640( &x, &y, &w, &h );
+	// Retail scales crosshair size and offsets from the vertical 480-space axis
+	// so the shader stays square regardless of widescreen HUD mode state.
+	x *= cgs.screenYScale;
+	y *= cgs.screenYScale;
+	w *= cgs.screenYScale;
+	h *= cgs.screenYScale;
 
 	ca = cg_drawCrosshair.integer;
-	if (ca < 0) {
-		ca = 0;
+	if ( ca <= 0 || ( ca % NUM_CROSSHAIRS ) == 0 ) {
+		return;
 	}
 	hShader = cgs.media.crosshairShader[ ca % NUM_CROSSHAIRS ];
 
 	trap_R_DrawStretchPic( x + cg.refdef.x + 0.5 * (cg.refdef.width - w), 
 		y + cg.refdef.y + 0.5 * (cg.refdef.height - h), 
 		w, h, 0, 0, 1, 1, hShader );
+	trap_R_SetColor( NULL );
 }
 
 

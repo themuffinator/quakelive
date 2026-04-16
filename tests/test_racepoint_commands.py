@@ -1,9 +1,14 @@
-"""Tests for the racepoint admin command metadata pipeline."""
+"""Tests for the retail-style racepoint admin command flow."""
 from __future__ import annotations
 
+import os
 import subprocess
 import textwrap
 from pathlib import Path
+
+import pytest
+
+from tests.compiler_support import compile_c_binary, executable_name, find_c_compiler
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -11,30 +16,32 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 def _compile_and_run(source: str, workdir: Path) -> str:
     workdir.mkdir(parents=True, exist_ok=True)
     c_path = workdir / "probe.c"
-    exe_path = workdir / "probe"
+    exe_path = workdir / executable_name("probe")
     c_path.write_text(source, encoding="utf-8")
 
-    include_args = [
-        f"-I{REPO_ROOT}",
-        "-Isrc",  # ensure q_shared and friends resolve like the engine build.
-        "-Isrc/code",
-        "-Isrc/code/game",
-        "-Isrc/code/qcommon",
-        "-Isrc/code/botlib",
-    ]
+    compiler = find_c_compiler()
+    if compiler is None:
+        pytest.skip("No supported C compiler is available for racepoint probe compilation.")
 
-    compile_cmd = [
-        "gcc",
-        "-std=c99",
-        "-Wall",
-        "-Werror",
-        *include_args,
-        str(c_path),
-        "src/code/game/g_race.c",
-        "-o",
-        str(exe_path),
-    ]
-    subprocess.run(compile_cmd, check=True, cwd=REPO_ROOT)
+    compile_c_binary(
+        compiler,
+        [c_path, REPO_ROOT / "src" / "code" / "game" / "g_race.c"],
+        exe_path,
+        include_dirs=[
+            REPO_ROOT,
+            REPO_ROOT / "src",
+            REPO_ROOT / "src" / "code",
+            REPO_ROOT / "src" / "code" / "game",
+            REPO_ROOT / "src" / "code" / "qcommon",
+            REPO_ROOT / "src" / "code" / "botlib",
+        ],
+        extra_cflags=(
+            ["-Wall", "-Werror", "-Wno-return-type"]
+            if not compiler.is_msvc and os.name == "nt"
+            else (["-Wall", "-Werror"] if not compiler.is_msvc else ["/W3", "/WX"])
+        ),
+        workdir=REPO_ROOT,
+    )
 
     result = subprocess.run(
         [str(exe_path)],
@@ -109,11 +116,13 @@ def test_racepoint_command_emits_metadata(tmp_path: Path) -> None:
             return va("%.2f %.2f %.2f", v[0], v[1], v[2]);
         }
 
-        void QDECL Com_sprintf(char *dest, int size, const char *fmt, ...) {
+        int QDECL Com_sprintf(char *dest, int size, const char *fmt, ...) {
+            int written;
             va_list args;
             va_start(args, fmt);
-            vsnprintf(dest, size, fmt, args);
+            written = vsnprintf(dest, size, fmt, args);
             va_end(args);
+            return written;
         }
 
         void Q_strncpyz(char *dest, const char *src, int destsize) {
@@ -306,6 +315,64 @@ def test_racepoint_command_emits_metadata(tmp_path: Path) -> None:
             }
         }
 
+        void ClientSpawn(gentity_t *ent) {
+            (void)ent;
+        }
+
+        gentity_t *G_PickTarget(char *targetname) {
+            gentity_t *ent = NULL;
+
+            if (!targetname || !*targetname) {
+                return NULL;
+            }
+
+            while ((ent = G_Find(ent, FOFS(targetname), targetname)) != NULL) {
+                return ent;
+            }
+
+            return NULL;
+        }
+
+        gentity_t *G_TempEntity(const vec3_t origin, int event) {
+            gentity_t *ent = G_Spawn();
+            vec3_t snapped;
+
+            if (!ent) {
+                return NULL;
+            }
+
+            VectorCopy(origin, snapped);
+            G_SetOrigin(ent, snapped);
+            ent->s.event = event;
+            return ent;
+        }
+
+        void G_SetRetailEventRecipient(gentity_t *ent, int clientNum) {
+            if (!ent) {
+                return;
+            }
+            ent->s.solid = clientNum;
+        }
+
+        void G_SetRetailEventIntPayload(entityState_t *state, int value) {
+            if (!state) {
+                return;
+            }
+            memcpy(&state->origin[0], &value, sizeof(value));
+        }
+
+        void G_SetRetailEventData(entityState_t *state, int value) {
+            if (!state) {
+                return;
+            }
+            state->retailEventData = value;
+        }
+
+        void G_RankSendPlayerRaceComplete(gentity_t *ent, int raceTime) {
+            (void)ent;
+            (void)raceTime;
+        }
+
         int main(void) {
             gentity_t *admin;
             const char *spawnArgs[] = { "racepoint" };
@@ -343,12 +410,24 @@ def test_racepoint_command_emits_metadata(tmp_path: Path) -> None:
             Test_SetArgs(2, dumpArgs);
             G_RaceAdminCommand(admin);
 
-            G_RaceSendInfoCommand(-1);
+            g_clients[0].raceState.active = qtrue;
+            g_clients[0].raceState.startTime = 1337;
+            g_clients[0].raceState.lastFinishTime = -1;
+            g_clients[0].raceState.nextCheckpoint = 1;
+            g_clients[0].raceState.currentPoint = &g_entities[1];
+            g_clients[0].raceState.nextPoint = NULL;
+            G_RaceSendInfoCommand(0);
 
             Test_SetArgs(2, clearArgs);
             G_RaceAdminCommand(admin);
 
-            G_RaceSendInfoCommand(-1);
+            g_clients[0].raceState.active = qfalse;
+            g_clients[0].raceState.startTime = 0;
+            g_clients[0].raceState.lastFinishTime = -1;
+            g_clients[0].raceState.nextCheckpoint = 0;
+            g_clients[0].raceState.currentPoint = NULL;
+            g_clients[0].raceState.nextPoint = NULL;
+            G_RaceSendInfoCommand(0);
 
             printf("DONE\n");
             return 0;
@@ -361,21 +440,23 @@ def test_racepoint_command_emits_metadata(tmp_path: Path) -> None:
 
     cmd_lines = [line for line in lines if line.startswith("CMD:")]
 
-    # Spawning a point should print a helpful message, emit metadata, and broadcast race_init.
+    # Spawning a point should print a helpful message, rebroadcast race_init, and retain the
+    # retail arp-style targetname chain on the checkpoint metadata command.
     spawn_prints = [line for line in cmd_lines if 'print "spawning a race point' in line]
     assert spawn_prints, output
 
     admin_payloads = [line for line in cmd_lines if "admin_race_point_0" in line]
-    assert len(admin_payloads) >= 2, output
+    assert len(admin_payloads) == 1, output
+    assert admin_payloads[0] == "CMD:-1:admin_race_point_0 128.00 -64.00 248.00 - arp0", output
 
-    assert any(line == "CMD:-1:race_init 1" for line in cmd_lines), output
-    assert any(line.startswith("CMD:-1:race_info 1") for line in cmd_lines), output
+    assert any(line == "CMD:-1:race_init" for line in cmd_lines), output
+    assert "CMD:0:race_info 1 1337 -1 0 1 -1" in cmd_lines, output
 
-    dump_lines = [line for line in cmd_lines if "targetname=admin_race_point_0" in line]
-    assert dump_lines and dump_lines[0].startswith("CMD:0:print \"0:"), output
+    dump_lines = [line for line in cmd_lines if 'print "128.000000 -64.000000 248.000000' in line]
+    assert dump_lines, output
 
-    assert any(line.startswith("CMD:0:print \"clearing race points") for line in cmd_lines), output
-    assert any(line == "CMD:-1:race_init 0" for line in cmd_lines), output
-    assert any(line.startswith("CMD:-1:race_info 0") for line in cmd_lines), output
+    assert any(line.startswith("CMD:-1:print \"clearing race points") for line in cmd_lines), output
+    assert sum(1 for line in cmd_lines if line == "CMD:-1:race_init") >= 2, output
+    assert "CMD:0:race_info 0 0 -1 0 -1 -1" in cmd_lines, output
 
     assert lines[-1] == "DONE"

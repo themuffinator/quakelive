@@ -8,11 +8,13 @@ def _read(rel_path: str) -> str:
 	return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
-def test_renderer_build_lane_uses_external_freetype_sdk() -> None:
+def test_renderer_build_lane_uses_repo_managed_dependencies() -> None:
 	tr_font = _read("src/code/renderer/tr_font.c")
 	renderer_vcxproj = _read("src/code/renderer/renderer.vcxproj")
 	engine_vcxproj = _read("src/code/quakelive_steam.vcxproj")
 	build_script = _read(".vscode/build.ps1")
+	internal_deps_targets = _read("src/code/quakelive.internal-deps.targets")
+	internal_deps_script = _read("tools/build_internal_deps.ps1")
 	unix_makefile = _read("src/code/unix/Makefile")
 
 	assert "#include <ft2build.h>" in tr_font
@@ -25,15 +27,27 @@ def test_renderer_build_lane_uses_external_freetype_sdk() -> None:
 	assert "QLEnableFreeType" in renderer_vcxproj
 	assert "ValidateFreeType" in renderer_vcxproj
 	assert "BUILD_FREETYPE" in renderer_vcxproj
+	assert "quakelive.internal-deps.targets" in renderer_vcxproj
+	assert "VCPKG_ROOT" not in renderer_vcxproj
+	assert r"C:\vcpkg\installed\x86-windows" not in renderer_vcxproj
 
 	assert "QLEnableFreeType" in engine_vcxproj
 	assert "ValidateFreeType" in engine_vcxproj
 	assert "FreeTypeDependencies" in engine_vcxproj
+	assert "quakelive.internal-deps.targets" in engine_vcxproj
+	assert "VCPKG_ROOT" not in engine_vcxproj
+	assert r"C:\vcpkg\installed\x86-windows" not in engine_vcxproj
 
 	assert "QLEnableFreeType" in build_script
 	assert "FreeTypeSdkDir" in build_script
-	assert "FreeTypeIncludeDir" in build_script
-	assert "FreeTypeLibDir" in build_script
+	assert "build_internal_deps.ps1" in build_script
+	assert "VCPKG_ROOT" not in build_script
+	assert r"C:\vcpkg\installed\x86-windows" not in build_script
+
+	assert "QLBootstrapVorbis" in internal_deps_targets
+	assert "QLBootstrapPng" in internal_deps_targets
+	assert "Ensure-Vorbis" in internal_deps_script
+	assert "Ensure-Png" in internal_deps_script
 
 	assert "QL_ENABLE_FREETYPE ?= 0" in unix_makefile
 	assert "pkg-config --cflags freetype2" in unix_makefile
@@ -52,5 +66,5 @@ def test_renderer_project_metadata_no_longer_points_at_missing_ft2_vendor_tree()
 	assert "..\\ft2\\" not in renderer_vcxproj
 	assert "..\\ft2\\" not in renderer_vcxproj_filters
 	assert "..\\ft2\\" not in renderer_vcproj
-	assert "explicit external FreeType SDK replacement lane" in retail_font_stack
+	assert "repo-managed FreeType replacement lane" in retail_font_stack
 	assert "RG-P10 is now considered complete." in rg_p10_note

@@ -80,6 +80,39 @@ function Resolve-RetailBasePath {
 	throw 'Unable to resolve a retail Quake Live base path. Pass -RetailBasePath explicitly.'
 }
 
+function Resolve-RetailUiBundleRoot {
+	param(
+		[string]$ExplicitPath,
+		[string]$Root
+	)
+
+	$candidate = if ( [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) {
+		[System.IO.Path]::GetFullPath((Join-Path $Root 'build\ui_bundle\staging'))
+	} else {
+		Resolve-ExistingPath -Path $ExplicitPath
+	}
+	$baseq3Root = Join-Path $candidate 'baseq3'
+
+	foreach ( $requiredPath in @(
+			$baseq3Root,
+			( Join-Path $baseq3Root 'default.cfg' ),
+			( Join-Path $baseq3Root 'ui\\menudef.h' ),
+			( Join-Path $baseq3Root 'ui\hud3.txt' ),
+			( Join-Path $baseq3Root 'ui\ingame_scoreboard_ffa.menu' ),
+			( Join-Path $baseq3Root 'ui\assets\button_back.png' ),
+			( Join-Path $baseq3Root 'ui\assets\hud\ffa.png' ),
+			( Join-Path $baseq3Root 'ui\assets\score\scoretl.png' ),
+			( Join-Path $baseq3Root 'fonts\font.dat' ),
+			( Join-Path $baseq3Root 'fonts\font.tga' )
+		) ) {
+		if ( -not ( Test-Path -LiteralPath $requiredPath ) ) {
+			throw "Quake Live UI staging content was not found: $requiredPath. Run tools/build_ui_bundle.py before running the client probe so staging\\baseq3 contains the retail UI runtime tree."
+		}
+	}
+
+	return $candidate
+}
+
 function Get-LaunchSafePath {
 	param([string]$Path)
 
@@ -96,27 +129,33 @@ function Get-LaunchSafePath {
 	return $Path
 }
 
-function Resolve-AssetCdPath {
-	param(
-		[string]$ExplicitPath,
-		[string]$RepoRootPath
+function Sync-RuntimeUiPackages {
+	param([string]$RuntimeBaseq3Dir)
+
+	$uiBundleBuilder = Join-Path $script:RepoRoot 'tools\build_ui_bundle.py'
+	$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+	if (-not $pythonCmd) {
+		$pythonCmd = Get-Command py -ErrorAction SilentlyContinue
+	}
+
+	if (-not $pythonCmd) {
+		Write-Warning "Python was not found; skipping runtime UI PK3 refresh. Existing pak_uiql.pk3 artifacts will be reused if present."
+		return
+	}
+
+	$pythonArgs = @(
+		$uiBundleBuilder,
+		'--runtime-root',
+		$RuntimeBaseq3Dir
 	)
-
-	if ( -not [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) {
-		$resolved = Resolve-ExistingPath -Path $ExplicitPath
-		if ( Test-Path -LiteralPath $resolved ) {
-			return $resolved
-		}
-		throw "Asset cdpath does not exist: $resolved"
+	if ($pythonCmd.Name -ieq 'py.exe' -or $pythonCmd.Name -ieq 'py') {
+		$pythonArgs = @('-3') + $pythonArgs
 	}
 
-	$defaultPath = Join-Path $RepoRootPath 'assets\quakelive'
-	$resolvedDefault = Resolve-ExistingPath -Path $defaultPath
-	if ( Test-Path -LiteralPath $resolvedDefault ) {
-		return $resolvedDefault
+	& $pythonCmd.Source @pythonArgs
+	if ($LASTEXITCODE -ne 0) {
+		throw "tools/build_ui_bundle.py failed while refreshing runtime UI packages."
 	}
-
-	throw 'Unable to resolve a repository asset cdpath. Pass -AssetCdPath explicitly.'
 }
 
 function To-RepoPath {
@@ -151,6 +190,7 @@ function Reset-LiveLog {
 	if ( Test-Path -LiteralPath $script:RuntimeLog ) {
 		Remove-Item -LiteralPath $script:RuntimeLog -Force
 	}
+	Sync-RuntimeUiPackages -RuntimeBaseq3Dir $script:RuntimeRoot
 }
 
 function Remove-StaleMatches {
@@ -205,6 +245,34 @@ function Stop-ClientProcessesStartedAfter {
 		Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
+function Start-ProcessWithScopedEnvironment {
+	param(
+		[string]$FilePath,
+		[string[]]$ArgumentList,
+		[string]$WorkingDirectory,
+		[hashtable]$Environment
+	)
+
+	$startProcessCommand = Get-Command -Name Start-Process -ErrorAction Stop
+	if ( $startProcessCommand.Parameters.ContainsKey( 'Environment' ) ) {
+		return Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -PassThru -WindowStyle Normal -Environment $Environment
+	}
+
+	$previousValues = @{}
+	foreach ( $key in $Environment.Keys ) {
+		$previousValues[$key] = [System.Environment]::GetEnvironmentVariable( $key, 'Process' )
+		[System.Environment]::SetEnvironmentVariable( $key, $Environment[$key], 'Process' )
+	}
+
+	try {
+		return Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -PassThru -WindowStyle Normal
+	} finally {
+		foreach ( $key in $Environment.Keys ) {
+			[System.Environment]::SetEnvironmentVariable( $key, $previousValues[$key], 'Process' )
+		}
+	}
+}
+
 function Start-ClientProcess {
 	param(
 		[string]$ConfigName,
@@ -222,8 +290,8 @@ function Start-ClientProcess {
 		'+set', 'com_zoneMegs', '64',
 		'+set', 'com_hunkMegs', '256',
 		'+set', 'fs_basepath', $script:RetailBasePath,
+		'+set', 'fs_cdpath', $script:RetailUiBundleRoot,
 		'+set', 'fs_homepath', $script:QlHome,
-		'+set', 'fs_cdpath', $script:AssetCdPath,
 		'+set', 'r_fullscreen', '0',
 		'+set', 'r_mode', '-1',
 		'+set', 'r_customwidth', '1280',
@@ -250,7 +318,7 @@ function Start-ClientProcess {
 		'QL_DISABLE_AWESOMIUM' = '1'
 	}
 
-	$launchProcess = Start-Process -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:RepoRoot -PassThru -WindowStyle Normal -Environment $environment
+	$launchProcess = Start-ProcessWithScopedEnvironment -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:QlHome -Environment $environment
 	$process = Get-NewClientProcess -ExistingIds $existingIds -StartedAfter $launchStartTime
 	if ( -not $process ) {
 		$process = $launchProcess
@@ -529,7 +597,7 @@ if ( [string]::IsNullOrWhiteSpace( $RepoRoot ) ) {
 
 $script:RepoRoot = $RepoRoot
 $script:RetailBasePath = Get-LaunchSafePath -Path ( Resolve-RetailBasePath -ExplicitPath $RetailBasePath )
-$script:AssetCdPath = Resolve-AssetCdPath -ExplicitPath $AssetCdPath -RepoRootPath $RepoRoot
+$script:RetailUiBundleRoot = Resolve-RetailUiBundleRoot -ExplicitPath $AssetCdPath -Root $RepoRoot
 $script:QlHome = Join-Path $RepoRoot 'build\win32\Debug\bin'
 $script:RuntimeRoot = Join-Path $script:QlHome 'baseq3'
 $script:DumpsRoot = Join-Path $RepoRoot 'build\win32\Debug\dumps'
@@ -640,7 +708,7 @@ $artifact = [ordered]@{
 	probe_script = 'tools/client/run_client_runtime_probe.ps1'
 	runtime_root = To-RepoPath -Path $script:RuntimeRoot
 	retail_basepath = To-RepoPath -Path $script:RetailBasePath
-	asset_cdpath = To-RepoPath -Path $script:AssetCdPath
+	asset_cdpath = To-RepoPath -Path $script:RetailUiBundleRoot
 	main_menu = [ordered]@{
 		engine_screenshot = To-RepoPath -Path $mainEngineScreenshotPath
 		engine_sha256 = Get-ArtifactSha256 -Path $mainEngineScreenshotPath

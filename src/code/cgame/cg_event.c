@@ -628,6 +628,74 @@ static int CG_GetRetailEventClientNum( const entityState_t *es ) {
 
 /*
 =============
+CG_GetRetailEventIntPayload
+
+Returns the recovered retail integer payload stored in the temp-entity origin
+slot.
+=============
+*/
+static int CG_GetRetailEventIntPayload( const entityState_t *es ) {
+	int	value;
+
+	if ( !es ) {
+		return 0;
+	}
+
+	memcpy( &value, &es->origin[0], sizeof( value ) );
+	return value;
+}
+
+/*
+=============
+CG_GetRaceEventCheckpointCount
+
+Returns the recovered retail checkpoint-count payload for Race temp entities.
+=============
+*/
+static int CG_GetRaceEventCheckpointCount( const entityState_t *es ) {
+	if ( !es ) {
+		return 0;
+	}
+	if ( es->groundEntityNum < 0 ) {
+		return 0;
+	}
+
+	return es->groundEntityNum;
+}
+
+/*
+=============
+CG_GetRaceEventCurrentCheckpointEntityNum
+
+Returns the recovered retail current-target entity number for Race temp
+entities.
+=============
+*/
+static int CG_GetRaceEventCurrentCheckpointEntityNum( const entityState_t *es ) {
+	if ( !es ) {
+		return -1;
+	}
+
+	return es->constantLight;
+}
+
+/*
+=============
+CG_GetRaceEventNextCheckpointEntityNum
+
+Returns the recovered retail next-target entity number for Race temp entities.
+=============
+*/
+static int CG_GetRaceEventNextCheckpointEntityNum( const entityState_t *es ) {
+	if ( !es ) {
+		return -1;
+	}
+
+	return es->legsAnim;
+}
+
+/*
+=============
 CG_GetGlobalTeamSound
 
 Returns the recovered retail global-team-sound code.
@@ -2530,6 +2598,12 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	case QL_EV_RACE_START:
 		DEBUGNAME("QL_EV_RACE_START");
 		if ( CG_IsRetailLocalEventClient( CG_GetRetailEventClientNum( es ) ) ) {
+			CG_RaceResetRunState( qfalse );
+			cgs.raceInfoActive = qtrue;
+			cgs.raceInfoStartTime = CG_GetRetailEventIntPayload( es );
+			cgs.raceInfoCheckpointCount = CG_GetRaceEventCheckpointCount( es );
+			cgs.raceInfoCurrentCheckpointEntityNum = CG_GetRaceEventCurrentCheckpointEntityNum( es );
+			cgs.raceInfoNextCheckpointEntityNum = CG_GetRaceEventNextCheckpointEntityNum( es );
 			CG_RacePlayCue( CG_RACE_CUE_START );
 		}
 		break;
@@ -2537,6 +2611,10 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	case QL_EV_RACE_CHECKPOINT:
 		DEBUGNAME("QL_EV_RACE_CHECKPOINT");
 		if ( CG_IsRetailLocalEventClient( CG_GetRetailEventClientNum( es ) ) ) {
+			cgs.raceInfoActive = qtrue;
+			cgs.raceInfoCheckpointCount = CG_GetRaceEventCheckpointCount( es );
+			cgs.raceInfoCurrentCheckpointEntityNum = CG_GetRaceEventCurrentCheckpointEntityNum( es );
+			cgs.raceInfoNextCheckpointEntityNum = CG_GetRaceEventNextCheckpointEntityNum( es );
 			CG_RacePlayCue( CG_RACE_CUE_CHECKPOINT );
 		}
 		break;
@@ -2544,7 +2622,8 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	case QL_EV_RACE_FINISH:
 		DEBUGNAME("QL_EV_RACE_FINISH");
 		if ( CG_IsRetailLocalEventClient( CG_GetRetailEventClientNum( es ) ) ) {
-			CG_RaceResetState();
+			CG_RaceResetRunState( qfalse );
+			cgs.raceInfoLastTime = CG_GetRetailEventIntPayload( es );
 			CG_RacePlayCue( CG_RACE_CUE_FINISH );
 		}
 		break;

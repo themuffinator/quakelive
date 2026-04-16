@@ -73,6 +73,8 @@
 #define DEFAULT_AMMOPACK_SG                 10
 
 #define DEFAULT_STARTING_WEAPONS_MASK      ( ( 1 << ( WP_GAUNTLET - 1 ) ) | ( 1 << ( WP_MACHINEGUN - 1 ) ) )
+#define DEFAULT_FACTORY_LOADOUT            0
+#define DEFAULT_FACTORY_RUNES              0
 #define DEFAULT_INFINITE_AMMO              0
 #define DEFAULT_AMMO_PACK_TOGGLE           0
 #define DEFAULT_AMMO_PACK_HACK             0
@@ -87,17 +89,17 @@
 
 #define DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS      500
 #define DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS      3500
-#define DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS     1250
-#define DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS      133
-#define DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS      1250
-#define DEFAULT_REGEN_ARMOR_RATE_MILLISECONDS       133
-#define DEFAULT_REGEN_ARMOR_AFTER_HEALTH            1
-#define DEFAULT_SPAWN_ITEM_POWERUP                  0
-#define DEFAULT_SPAWN_ITEM_HOLDABLE                 0
-#define DEFAULT_SPAWN_ITEM_WEAPONS                  0
-#define DEFAULT_SPAWN_ITEM_HEALTH                   0
-#define DEFAULT_SPAWN_ITEM_ARMOR                    0
-#define DEFAULT_SPAWN_ITEM_AMMO                     0
+#define DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS     0
+#define DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS      100
+#define DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS      0
+#define DEFAULT_REGEN_ARMOR_RATE_MILLISECONDS       100
+#define DEFAULT_REGEN_ARMOR_AFTER_HEALTH            0
+#define DEFAULT_SPAWN_ITEM_POWERUP                  1
+#define DEFAULT_SPAWN_ITEM_HOLDABLE                 1
+#define DEFAULT_SPAWN_ITEM_WEAPONS                  1
+#define DEFAULT_SPAWN_ITEM_HEALTH                   1
+#define DEFAULT_SPAWN_ITEM_ARMOR                    1
+#define DEFAULT_SPAWN_ITEM_AMMO                     1
 
 #define DEFAULT_ALLOW_KILL_DELAY_MILLISECONDS      1000
 #define DEFAULT_COMPLAINT_DAMAGE_THRESHOLD        1
@@ -126,6 +128,8 @@ vmCvar_t        weapon_reload_cg;
 vmCvar_t        weapon_reload_hmg;
 
 vmCvar_t        g_startingWeapons;
+vmCvar_t        g_loadout;
+vmCvar_t        g_runes;
 vmCvar_t        g_infiniteAmmo;
 vmCvar_t        g_ammoPack;
 vmCvar_t        g_ammoPackHack;
@@ -223,6 +227,8 @@ static configCvarTable_t s_configCvarTable[] = {
         { &weapon_reload_cg,       "weapon_reload_cg",       "0", 0, "Chaingun refire delay override in milliseconds." },
         { &weapon_reload_hmg,      "weapon_reload_hmg",      "0", 0, "Heavy Machinegun refire delay override in milliseconds." },
 
+	{ &g_loadout,              "g_loadout",              STRINGIZE( DEFAULT_FACTORY_LOADOUT ), CVAR_SERVERINFO, "Advertise whether the active factory grants Quake Live loadouts." },
+	{ &g_runes,                "g_runes",                STRINGIZE( DEFAULT_FACTORY_RUNES ), 0, "Enable the retail random persistent powerup spawn lane for rune factories." },
         { &g_infiniteAmmo,         "g_infiniteAmmo",         STRINGIZE( DEFAULT_INFINITE_AMMO ), CVAR_ARCHIVE, "When non-zero, spawn loadouts grant infinite ammunition mirroring Quake Live practice factories." },
         { &g_ammoPack,             "g_ammoPack",             STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ), CVAR_ARCHIVE, "Enable Quake Live ammo pack sizing so pickups follow factory scripts instead of compiled defaults." },
         { &g_ammoPackHack,         "g_ammoPackHack",         STRINGIZE( DEFAULT_AMMO_PACK_HACK ), CVAR_ARCHIVE, "Legacy Quake Live ammo pack override used by classic map factories." },
@@ -236,12 +242,12 @@ static configCvarTable_t s_configCvarTable[] = {
 	{ &g_regenArmor,           "g_regenArmor",           STRINGIZE( DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS ), CVAR_ARCHIVE, "Milliseconds after taking damage before factory armor regeneration begins." },
 	{ &g_regenArmorRate,       "g_regenArmorRate",       STRINGIZE( DEFAULT_REGEN_ARMOR_RATE_MILLISECONDS ), CVAR_ARCHIVE, "Milliseconds per armor point while factory armor regeneration is active." },
 	{ &g_regenArmorAfterHealth, "g_regenArmorAfterHealth", STRINGIZE( DEFAULT_REGEN_ARMOR_AFTER_HEALTH ), CVAR_ARCHIVE, "When non-zero, armor regeneration waits for the health pool to refill before ticking." },
-	{ &g_spawnItemPowerup,     "g_spawnItemPowerup",     STRINGIZE( DEFAULT_SPAWN_ITEM_POWERUP ), CVAR_ARCHIVE, "Allow map-placed powerups to spawn when factories do not rely solely on loadouts." },
-	{ &g_spawnItemHoldable,    "g_spawnItemHoldable",    STRINGIZE( DEFAULT_SPAWN_ITEM_HOLDABLE ), CVAR_ARCHIVE, "Enable holdable item spawns in loadout modes when set to 1." },
-	{ &g_spawnItemWeapons,     "g_spawnItemWeapons",     STRINGIZE( DEFAULT_SPAWN_ITEM_WEAPONS ), CVAR_ARCHIVE, "Permit world weapons to spawn alongside loadouts in modes such as Domination when non-zero." },
-	{ &g_spawnItemHealth,      "g_spawnItemHealth",      STRINGIZE( DEFAULT_SPAWN_ITEM_HEALTH ), CVAR_ARCHIVE, "Toggle map health item spawns while factories prefer regen-driven play." },
-	{ &g_spawnItemArmor,       "g_spawnItemArmor",       STRINGIZE( DEFAULT_SPAWN_ITEM_ARMOR ), CVAR_ARCHIVE, "Enable map armor pickups when factory loadouts no longer want to suppress them." },
-	{ &g_spawnItemAmmo,        "g_spawnItemAmmo",        STRINGIZE( DEFAULT_SPAWN_ITEM_AMMO ), CVAR_ARCHIVE, "Allow ammo packs to spawn even when factories hand out fixed loadouts." },
+	{ &g_spawnItemPowerup,     "g_spawnItemPowerup",     STRINGIZE( DEFAULT_SPAWN_ITEM_POWERUP ), CVAR_SERVERINFO | CVAR_INIT, "Allow map-placed powerups to spawn when factories do not rely solely on loadouts." },
+	{ &g_spawnItemHoldable,    "g_spawnItemHoldable",    STRINGIZE( DEFAULT_SPAWN_ITEM_HOLDABLE ), CVAR_SERVERINFO | CVAR_INIT, "Enable holdable item spawns in loadout modes when set to 1." },
+	{ &g_spawnItemWeapons,     "g_spawnItemWeapons",     STRINGIZE( DEFAULT_SPAWN_ITEM_WEAPONS ), CVAR_SERVERINFO | CVAR_INIT, "Permit world weapons to spawn alongside loadouts in modes such as Domination when non-zero." },
+	{ &g_spawnItemHealth,      "g_spawnItemHealth",      STRINGIZE( DEFAULT_SPAWN_ITEM_HEALTH ), CVAR_SERVERINFO | CVAR_INIT, "Toggle map health item spawns while factories prefer regen-driven play." },
+	{ &g_spawnItemArmor,       "g_spawnItemArmor",       STRINGIZE( DEFAULT_SPAWN_ITEM_ARMOR ), CVAR_SERVERINFO | CVAR_INIT, "Enable map armor pickups when factory loadouts no longer want to suppress them." },
+	{ &g_spawnItemAmmo,        "g_spawnItemAmmo",        STRINGIZE( DEFAULT_SPAWN_ITEM_AMMO ), CVAR_SERVERINFO | CVAR_INIT, "Allow the active ammo pickup family to spawn when factories expose either global ammo packs or weapon-specific ammo." },
 
 	{ &g_ammoPack_bfg,         "g_ammoPack_bfg",         STRINGIZE( DEFAULT_AMMOPACK_BFG ), CVAR_ARCHIVE, "Cells granted when picking up a BFG ammo pack, matching Quake Live's default drop." },
         { &g_ammoPack_cg,          "g_ammoPack_cg",          STRINGIZE( DEFAULT_AMMOPACK_CG ), CVAR_ARCHIVE, "Chaingun bullets restored per ammo belt pickup." },
@@ -325,6 +331,30 @@ void G_Config_UpdateCvars( void ) {
                         trap_Cvar_Update( s_configCvarTable[i].vmCvar );
                 }
         }
+}
+
+/*
+=============
+G_Config_ResetFactoryManagedCvars
+
+Restores the factory-managed loadout, rune, regen, and item spawn toggles
+to their compiled defaults before a factory selection layers overrides.
+=============
+*/
+void G_Config_ResetFactoryManagedCvars( void ) {
+	trap_Cvar_Set( "g_loadout", STRINGIZE( DEFAULT_FACTORY_LOADOUT ) );
+	trap_Cvar_Set( "g_runes", STRINGIZE( DEFAULT_FACTORY_RUNES ) );
+	trap_Cvar_Set( "g_regenHealth", STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ) );
+	trap_Cvar_Set( "g_regenHealthRate", STRINGIZE( DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS ) );
+	trap_Cvar_Set( "g_regenArmor", STRINGIZE( DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS ) );
+	trap_Cvar_Set( "g_regenArmorRate", STRINGIZE( DEFAULT_REGEN_ARMOR_RATE_MILLISECONDS ) );
+	trap_Cvar_Set( "g_regenArmorAfterHealth", STRINGIZE( DEFAULT_REGEN_ARMOR_AFTER_HEALTH ) );
+	trap_Cvar_Set( "g_spawnItemPowerup", STRINGIZE( DEFAULT_SPAWN_ITEM_POWERUP ) );
+	trap_Cvar_Set( "g_spawnItemHoldable", STRINGIZE( DEFAULT_SPAWN_ITEM_HOLDABLE ) );
+	trap_Cvar_Set( "g_spawnItemWeapons", STRINGIZE( DEFAULT_SPAWN_ITEM_WEAPONS ) );
+	trap_Cvar_Set( "g_spawnItemHealth", STRINGIZE( DEFAULT_SPAWN_ITEM_HEALTH ) );
+	trap_Cvar_Set( "g_spawnItemArmor", STRINGIZE( DEFAULT_SPAWN_ITEM_ARMOR ) );
+	trap_Cvar_Set( "g_spawnItemAmmo", STRINGIZE( DEFAULT_SPAWN_ITEM_AMMO ) );
 }
 
 static void G_Config_ReportMissingCvar( const char *cvarName ) {

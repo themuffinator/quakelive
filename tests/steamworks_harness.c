@@ -3180,6 +3180,42 @@ static void QLR_SteamworksHarness_OnUGCQueryCompleted( void *context, const ql_s
 
 /*
 =============
+QLR_SteamworksHarness_OnItemInstalled
+=============
+*/
+static void QLR_SteamworksHarness_OnItemInstalled( void *context, const ql_steam_item_installed_t *event ) {
+	uint64_t itemId;
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	itemId = ( (uint64_t)event->itemIdHigh << 32 ) | event->itemIdLow;
+	QLR_SteamworksMock_Capture( "workshop_installed", "", itemId, 0ull, event->appId, 0 );
+}
+
+/*
+=============
+QLR_SteamworksHarness_OnDownloadItemResult
+=============
+*/
+static void QLR_SteamworksHarness_OnDownloadItemResult( void *context, const ql_steam_download_item_result_t *event ) {
+	uint64_t itemId;
+
+	(void)context;
+
+	if ( !event ) {
+		return;
+	}
+
+	itemId = ( (uint64_t)event->itemIdHigh << 32 ) | event->itemIdLow;
+	QLR_SteamworksMock_Capture( "workshop_download_result", "", itemId, 0ull, event->appId, event->result );
+}
+
+/*
+=============
 QLR_SteamworksMock_QueueCallback
 =============
 */
@@ -3218,15 +3254,19 @@ QLR_EXPORT qboolean QLR_Steamworks_RegisterHarnessCallbacks( void ) {
 	ql_steam_client_callback_bindings_t clientBindings;
 	ql_steam_lobby_callback_bindings_t lobbyBindings;
 	ql_steam_micro_callback_bindings_t microBindings;
+	ql_steam_workshop_callback_bindings_t workshopBindings;
 
 	memset( &clientBindings, 0, sizeof( clientBindings ) );
 	memset( &lobbyBindings, 0, sizeof( lobbyBindings ) );
 	memset( &microBindings, 0, sizeof( microBindings ) );
+	memset( &workshopBindings, 0, sizeof( workshopBindings ) );
 
 	clientBindings.onRichPresenceJoinRequested = QLR_SteamworksHarness_OnRichPresenceJoinRequested;
 	clientBindings.onUGCQueryCompleted = QLR_SteamworksHarness_OnUGCQueryCompleted;
 	lobbyBindings.onLobbyEnter = QLR_SteamworksHarness_OnLobbyEnter;
 	microBindings.onAuthorizationResponse = QLR_SteamworksHarness_OnMicroAuthorizationResponse;
+	workshopBindings.onItemInstalled = QLR_SteamworksHarness_OnItemInstalled;
+	workshopBindings.onDownloadItemResult = QLR_SteamworksHarness_OnDownloadItemResult;
 
 	if ( !QL_Steamworks_RegisterClientCallbacks( &clientBindings ) ) {
 		return qfalse;
@@ -3236,6 +3276,12 @@ QLR_EXPORT qboolean QLR_Steamworks_RegisterHarnessCallbacks( void ) {
 		return qfalse;
 	}
 	if ( !QL_Steamworks_RegisterMicroCallbacks( &microBindings ) ) {
+		QL_Steamworks_UnregisterLobbyCallbacks();
+		QL_Steamworks_UnregisterClientCallbacks();
+		return qfalse;
+	}
+	if ( !QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings ) ) {
+		QL_Steamworks_UnregisterMicroCallbacks();
 		QL_Steamworks_UnregisterLobbyCallbacks();
 		QL_Steamworks_UnregisterClientCallbacks();
 		return qfalse;
@@ -3250,6 +3296,7 @@ QLR_Steamworks_UnregisterHarnessCallbacks
 =============
 */
 QLR_EXPORT void QLR_Steamworks_UnregisterHarnessCallbacks( void ) {
+	QL_Steamworks_UnregisterWorkshopCallbacks();
 	QL_Steamworks_UnregisterMicroCallbacks();
 	QL_Steamworks_UnregisterLobbyCallbacks();
 	QL_Steamworks_UnregisterClientCallbacks();
@@ -3316,6 +3363,37 @@ QLR_EXPORT qboolean QLR_SteamworksMock_QueueMicroAuthorizationResponse( uint32_t
 	event.orderId = orderId;
 	event.authorized = authorized ? qtrue : qfalse;
 	return QLR_SteamworksMock_QueueCallback( qfalse, 0x98, 0ull, &event, sizeof( event ), qfalse );
+}
+
+/*
+=============
+QLR_SteamworksMock_QueueItemInstalled
+=============
+*/
+QLR_EXPORT qboolean QLR_SteamworksMock_QueueItemInstalled( uint32_t appId, uint32_t itemIdLow, uint32_t itemIdHigh ) {
+	ql_steam_item_installed_raw_t event;
+
+	memset( &event, 0, sizeof( event ) );
+	event.appId = appId;
+	event.itemIdLow = itemIdLow;
+	event.itemIdHigh = itemIdHigh;
+	return QLR_SteamworksMock_QueueCallback( qfalse, QL_STEAM_CALLBACK_ITEM_INSTALLED, 0ull, &event, sizeof( event ), qfalse );
+}
+
+/*
+=============
+QLR_SteamworksMock_QueueDownloadItemResult
+=============
+*/
+QLR_EXPORT qboolean QLR_SteamworksMock_QueueDownloadItemResult( uint32_t appId, uint32_t itemIdLow, uint32_t itemIdHigh, int result ) {
+	ql_steam_download_item_result_raw_t event;
+
+	memset( &event, 0, sizeof( event ) );
+	event.appId = appId;
+	event.itemIdLow = itemIdLow;
+	event.itemIdHigh = itemIdHigh;
+	event.result = result;
+	return QLR_SteamworksMock_QueueCallback( qfalse, QL_STEAM_CALLBACK_DOWNLOAD_ITEM_RESULT, 0ull, &event, sizeof( event ), qfalse );
 }
 
 /*

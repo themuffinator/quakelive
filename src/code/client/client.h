@@ -209,6 +209,8 @@ typedef struct {
 
 extern	clientConnection_t clc;
 
+qboolean CL_IsSteamIdentityMuted( unsigned int identityLow, unsigned int identityHigh );
+
 /*
 ==================================================================
 
@@ -344,7 +346,6 @@ extern	cvar_t	*cl_mouseAccelDebug;
 extern	cvar_t	*cl_mouseAccelOffset;
 extern	cvar_t	*cl_mouseAccelPower;
 extern	cvar_t	*cl_mouseSensCap;
-extern	cvar_t	*cl_showMouseRate;
 
 extern	cvar_t	*m_pitch;
 extern	cvar_t	*m_yaw;
@@ -436,6 +437,7 @@ qboolean CL_GetWorkshopDownloadInfo( unsigned int itemIdLow, unsigned int itemId
 
 float CL_KeyState (kbutton_t *key);
 char *Key_KeynumToString (int keynum);
+void CL_ToggleMenu_f( void );
 
 //
 // cl_parse.c
@@ -528,6 +530,7 @@ void CL_WebPak_Init( void );
 void CL_WebPak_Shutdown( void );
 qboolean CL_WebPak_Available( void );
 qboolean CL_WebPak_Fetch( const char *virtualPath, void **outBuffer, int *outLength );
+int CL_WebPak_GetFileList( const char *path, const char *extension, char *listbuf, int bufsize );
 qboolean CL_WebRequestResolve( const char *virtualPath, void **outBuffer, int *outLength );
 qboolean CL_LauncherRequestData( const char *virtualPath, void **outBuffer, int *outLength );
 void CL_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font );
@@ -541,6 +544,8 @@ void CL_WebHost_Shutdown( void );
 void CL_WebHost_Frame( void );
 qboolean CL_WebHost_HasLiveView( void );
 qboolean CL_WebHost_HasBoundWindowObject( void );
+void *CL_WebHost_GetCursorHandle( void );
+void CL_WebHost_NotifyAppActivation( qboolean active );
 void CL_WebView_PublishEvent( const char *name, const char *payload );
 void CL_WebView_InvokeCommNotice( const char *channel, const char *message );
 void CL_WebView_PublishGameError( const char *message );
@@ -550,6 +555,9 @@ void CL_WebView_PublishBindChanged( const char *name, const char *value );
 void CL_WebView_PublishGameStart( void );
 void CL_WebView_PublishGameDemo( const char *id, const char *name );
 void CL_WebView_PublishGameScreenshot( const char *id, const char *name );
+void CL_WebView_OnMouseMove( int x, int y );
+void CL_WebView_OnMouseButtonEvent( int key, qboolean down );
+void CL_WebView_OnMouseWheelEvent( int direction );
 void CL_WebView_OnKeyEvent( int key, qboolean down );
 void CL_AdvertisementBridge_RefreshLoadingViewParameters( void );
 void CL_AdvertisementBridge_UpdateLoadingViewParameters( void );

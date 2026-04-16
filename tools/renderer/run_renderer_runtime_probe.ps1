@@ -7,6 +7,30 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Resolve-RetailUiBundleRoot {
+	param([string]$Root)
+
+	$candidate = [System.IO.Path]::GetFullPath((Join-Path $Root 'build\ui_bundle\staging'))
+	$baseq3Root = Join-Path $candidate 'baseq3'
+	foreach ($requiredPath in @(
+			$baseq3Root,
+			(Join-Path $baseq3Root 'default.cfg'),
+			(Join-Path $baseq3Root 'ui\hud3.txt'),
+			(Join-Path $baseq3Root 'ui\ingame_scoreboard_ffa.menu'),
+			(Join-Path $baseq3Root 'ui\assets\button_back.png'),
+			(Join-Path $baseq3Root 'ui\assets\hud\ffa.png'),
+			(Join-Path $baseq3Root 'ui\assets\score\scoretl.png'),
+			(Join-Path $baseq3Root 'fonts\font.dat'),
+			(Join-Path $baseq3Root 'fonts\font.tga')
+		)) {
+		if (-not (Test-Path -LiteralPath $requiredPath)) {
+			throw "Quake Live UI staging content was not found: $requiredPath. Run tools/build_ui_bundle.py before running the renderer probe so staging\\baseq3 contains the retail UI runtime tree."
+		}
+	}
+
+	return $candidate
+}
+
 function Add-WaitLines {
 	param(
 		[System.Collections.Generic.List[string]]$Lines,
@@ -62,6 +86,14 @@ function Initialize-ProbeHome {
 	foreach ($moduleName in @('uix86.dll', 'cgamex86.dll', 'qagamex86.dll')) {
 		Copy-Item -Path (Join-Path $script:SourceBaseq3 $moduleName) -Destination (Join-Path $script:RuntimeRoot $moduleName) -Force
 	}
+	foreach ($stalePak in @(
+			(Join-Path $script:RuntimeRoot 'pak_uiql.pk3'),
+			(Join-Path $script:RuntimeRoot 'pak_ui_src_retail_overlay.pk3')
+		)) {
+		if (Test-Path -LiteralPath $stalePak) {
+			Remove-Item -LiteralPath $stalePak -Force
+		}
+	}
 }
 
 function Set-ProbeRuntimeContext {
@@ -100,7 +132,7 @@ function Start-RendererProcess {
 		'+set','com_zoneMegs','64',
 		'+set','com_hunkMegs','256',
 		'+set','fs_basepath',$script:RetailBasePath,
-		'+set','fs_cdpath',$script:CdPath,
+		'+set','fs_cdpath',$script:RetailUiBundleRoot,
 		'+set','fs_homepath',$script:QlHome
 	)
 	if ($ExtraArgs) {
@@ -108,7 +140,7 @@ function Start-RendererProcess {
 	}
 	$launchArgs += @('+exec', $ConfigName)
 
-	$process = Start-Process -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:RepoRoot -PassThru
+	$process = Start-Process -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:QlHome -PassThru
 	return [ordered]@{
 		process = $process
 		launch_args = $launchArgs
@@ -406,7 +438,7 @@ $script:QlHome = ''
 $script:RuntimeRoot = ''
 $script:Exe = Join-Path $BuildRoot 'bin\quakelive_steam.exe'
 $script:RetailBasePath = $RetailBasePath
-$script:CdPath = Join-Path $RepoRoot 'assets\quakelive'
+$script:RetailUiBundleRoot = Resolve-RetailUiBundleRoot -Root $RepoRoot
 $script:DumpRoot = Join-Path $BuildRoot 'dumps'
 $script:DumpShotRoot = Join-Path $DumpRoot 'screenshots'
 $script:DumpLogRoot = Join-Path $DumpRoot 'logs'
@@ -424,7 +456,7 @@ $mainArchivedLog = Join-Path $DumpLogRoot ("codex_renderer_p11_main_" + $stamp +
 $atlasArchivedLog = Join-Path $DumpLogRoot ("codex_renderer_p11_atlas_" + $stamp + '.log')
 $mapArchivedLog = Join-Path $DumpLogRoot ("codex_renderer_p11_map_" + $stamp + '.log')
 
-foreach ($requiredPath in @($Exe, $SourceBaseq3, $CdPath, $retailBaseq3Root)) {
+foreach ($requiredPath in @($Exe, $SourceBaseq3, $retailBaseq3Root)) {
 	if (-not (Test-Path $requiredPath)) {
 		throw "Required path missing: $requiredPath"
 	}

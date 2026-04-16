@@ -3667,6 +3667,32 @@ void BroadcastTeamChange( gclient_t *client, int oldTeam )
 
 /*
 =================
+G_TeamJoinAllowed
+
+Rejects locked live-team join requests while preserving the retail
+"The %s team is locked!" feedback path.
+=================
+*/
+static qboolean G_TeamJoinAllowed( team_t team, gentity_t *ent ) {
+	const char	*teamName;
+
+	if ( team == TEAM_SPECTATOR || team == TEAM_FREE || !g_teamSpawnAsSpec.integer ) {
+		return qtrue;
+	}
+
+	teamName = ( team == TEAM_RED ) ? "Red" : "Blue";
+	if ( !ent || !ent->client ) {
+		G_Printf( "The %s team is locked!\n", teamName );
+	} else {
+		trap_SendServerCommand( ent - g_entities,
+			va( "print \"The %s team is locked!\\n\"", teamName ) );
+	}
+
+	return qfalse;
+}
+
+/*
+=================
 SetTeam
 =================
 */
@@ -3730,8 +3756,8 @@ void SetTeam( gentity_t *ent, char *s ) {
 			int		nextRedCount;
 			int		nextBlueCount;
 
-			counts[TEAM_BLUE] = TeamCount( ent->client->ps.clientNum, TEAM_BLUE );
-			counts[TEAM_RED] = TeamCount( ent->client->ps.clientNum, TEAM_RED );
+			counts[TEAM_BLUE] = TeamCount( clientNum, TEAM_BLUE );
+			counts[TEAM_RED] = TeamCount( clientNum, TEAM_RED );
 			nextRedCount = counts[TEAM_RED] + ( team == TEAM_RED ? 1 : 0 );
 			nextBlueCount = counts[TEAM_BLUE] + ( team == TEAM_BLUE ? 1 : 0 );
 
@@ -3753,11 +3779,6 @@ void SetTeam( gentity_t *ent, char *s ) {
 		team = TEAM_FREE;
 	}
 
-	if ( g_teamSpawnAsSpec.integer && g_gametype.integer >= GT_TEAM && team != TEAM_SPECTATOR ) {
-		team = TEAM_SPECTATOR;
-		specState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
-	}
-
 	if ( team == TEAM_SPECTATOR && specState == SPECTATOR_FREE && !g_teamSpecFreeCam.integer ) {
 		specState = SPECTATOR_SCOREBOARD;
 	}
@@ -3776,6 +3797,9 @@ void SetTeam( gentity_t *ent, char *s ) {
 	//
 	oldTeam = client->sess.sessionTeam;
 	if ( team == oldTeam && team != TEAM_SPECTATOR ) {
+		return;
+	}
+	if ( !G_TeamJoinAllowed( (team_t)team, ent ) ) {
 		return;
 	}
 
@@ -4013,14 +4037,86 @@ void Cmd_Follow_f( gentity_t *ent ) {
 
 /*
 =================
-Cmd_FollowCycle_f
+FollowCycle
+
+Retail follow-cycle worker that rotates spectator targets and refreshes
+Race follow-state payloads when a player target is selected.
 =================
 */
-void Cmd_FollowCycle_f( gentity_t *ent, int dir ) {
+static qboolean FollowCycle( gentity_t *ent, int dir ) {
 	int		clientnum;
 	int		original;
 	int		curr;
 	int		max;
+
+	if ( dir != 1 && dir != -1 ) {
+		G_Error( "FollowCycle: bad dir %i", dir );
+	}
+
+	clientnum = ent->client->sess.spectatorClient;
+	max = level.maxclients + level.numPois;
+
+	// Map spectatorClient to linear index 0..max-1
+	if ( clientnum >= 0 && clientnum < level.maxclients ) {
+		curr = clientnum;
+	} else if ( clientnum <= -10 ) {
+		curr = level.maxclients + ( -( clientnum + 10 ) );
+	} else {
+		G_Printf( "FollowCycle: bad input clientnum value: %d, maxclients: %d\n", clientnum, level.maxclients );
+		curr = 0;
+	}
+
+	original = curr;
+
+	do {
+		curr += dir;
+		if ( curr >= max ) {
+			curr = 0;
+		} else if ( curr < 0 ) {
+			curr = max - 1;
+		}
+
+		if ( curr < level.maxclients ) {
+			// Client logic
+			if ( level.clients[curr].pers.connected != CON_CONNECTED ) {
+				continue;
+			}
+			if ( level.clients[curr].sess.sessionTeam == TEAM_SPECTATOR ) {
+				continue;
+			}
+
+			ent->client->sess.spectatorClient = curr;
+			ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
+			if ( g_gametype.integer == GT_RACE ) {
+				G_RaceSendInfoCommand( ent - g_entities );
+			}
+			return qtrue;
+		}
+
+		// POI logic
+		{
+			int poiIndex = curr - level.maxclients;
+			if ( poiIndex >= 0 && poiIndex < level.numPois && level.pois[poiIndex].inuse ) {
+				ent->client->sess.spectatorClient = -( poiIndex + 10 );
+				ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
+				return qtrue;
+			}
+		}
+
+	} while ( curr != original );
+
+	return qfalse;
+}
+
+/*
+=================
+Cmd_FollowCycle_f
+=================
+*/
+void Cmd_FollowCycle_f( gentity_t *ent, int dir ) {
+	if ( !ent || !ent->client ) {
+		return;
+	}
 
 	if ( level.trainingMapActive ) {
 		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
@@ -4040,57 +4136,7 @@ void Cmd_FollowCycle_f( gentity_t *ent, int dir ) {
 		SetTeam( ent, "spectator" );
 	}
 
-	if ( dir != 1 && dir != -1 ) {
-		G_Error( "Cmd_FollowCycle_f: bad dir %i", dir );
-	}
-
-	clientnum = ent->client->sess.spectatorClient;
-	max = level.maxclients + level.numPois;
-
-	// Map spectatorClient to linear index 0..max-1
-	if ( clientnum >= 0 && clientnum < level.maxclients ) {
-		curr = clientnum;
-	} else if ( clientnum <= -10 ) {
-		curr = level.maxclients + (-(clientnum + 10));
-	} else {
-		curr = 0; // Fallback
-	}
-
-	original = curr;
-
-	do {
-		curr += dir;
-		if ( curr >= max ) {
-			curr = 0;
-		} else if ( curr < 0 ) {
-			curr = max - 1;
-		}
-
-		if ( curr < level.maxclients ) {
-			// Client logic
-			if ( level.clients[ curr ].pers.connected != CON_CONNECTED ) {
-				continue;
-			}
-			if ( level.clients[ curr ].sess.sessionTeam == TEAM_SPECTATOR ) {
-				continue;
-			}
-
-			ent->client->sess.spectatorClient = curr;
-			ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
-			return;
-		} else {
-			// POI logic
-			int poiIndex = curr - level.maxclients;
-			if ( poiIndex >= 0 && poiIndex < level.numPois && level.pois[poiIndex].inuse ) {
-				ent->client->sess.spectatorClient = -(poiIndex + 10);
-				ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
-				return;
-			}
-		}
-
-	} while ( curr != original );
-
-	// leave it where it was
+	FollowCycle( ent, dir );
 }
 
 
@@ -7140,7 +7186,7 @@ void ClientCommand( int clientNum ) {
 		G_RaceAdminCommand( ent );
 	else if ( !Q_stricmp( cmd, "raceinit" ) || !Q_stricmp( cmd, "race_init" ) ) {
 		if ( g_gametype.integer == GT_RACE ) {
-			G_RaceBroadcastInitCommand( ent - g_entities );
+			Cmd_RaceInit_f( ent );
 		} else {
 			trap_SendServerCommand( clientNum, "print \"" GAMEPRINT_RACEPOINT_RACE_ONLY "\"" );
 			G_LogPrintf( "cmd: %s denied outside Race for client %i\n", cmd, clientNum );

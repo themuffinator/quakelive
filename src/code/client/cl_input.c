@@ -26,6 +26,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 unsigned	frame_msec;
 int			old_com_frameTime;
+static int		cl_mouseCursorX;
+static int		cl_mouseCursorY;
+static qboolean	cl_mouseCursorInitialized;
 
 /*
 ===============================================================================
@@ -346,6 +349,84 @@ cmd->upmove = ClampChar( up );
 }
 /*
 =============
+CL_ResetMouseCursorPosition
+
+Seeds the retail-style absolute cursor position from the current client
+resolution so UI and cgame mouse events can consume screen-space coordinates.
+=============
+*/
+static void CL_ResetMouseCursorPosition( void ) {
+	int		width;
+	int		height;
+
+	width = cls.glconfig.vidWidth;
+	height = cls.glconfig.vidHeight;
+
+	if ( width <= 0 ) {
+		width = SCREEN_WIDTH;
+	}
+
+	if ( height <= 0 ) {
+		height = SCREEN_HEIGHT;
+	}
+
+	cl_mouseCursorX = width / 2;
+	cl_mouseCursorY = height / 2;
+	cl_mouseCursorInitialized = qtrue;
+}
+
+/*
+=============
+CL_UpdateMouseCursorPosition
+
+Accumulates translated mouse deltas into the current absolute cursor position
+and clamps the result to the client render bounds before dispatch.
+=============
+*/
+static void CL_UpdateMouseCursorPosition( int dx, int dy, int *cursorX, int *cursorY ) {
+	int		width;
+	int		height;
+
+	if ( !cl_mouseCursorInitialized ) {
+		CL_ResetMouseCursorPosition();
+	}
+
+	width = cls.glconfig.vidWidth;
+	height = cls.glconfig.vidHeight;
+
+	if ( width <= 0 ) {
+		width = SCREEN_WIDTH;
+	}
+
+	if ( height <= 0 ) {
+		height = SCREEN_HEIGHT;
+	}
+
+	cl_mouseCursorX += dx;
+	if ( cl_mouseCursorX < 0 ) {
+		cl_mouseCursorX = 0;
+	} else if ( cl_mouseCursorX > width ) {
+		cl_mouseCursorX = width;
+	}
+
+	cl_mouseCursorY += dy;
+	if ( cl_mouseCursorY < 0 ) {
+		cl_mouseCursorY = 0;
+	} else if ( cl_mouseCursorY > height ) {
+		cl_mouseCursorY = height;
+	}
+
+	if ( cursorX ) {
+		*cursorX = cl_mouseCursorX;
+	}
+
+	if ( cursorY ) {
+		*cursorY = cl_mouseCursorY;
+	}
+}
+
+/*
+=============
 CL_MouseEvent
 Translate mouse motion into UI or client game handlers
 =============
@@ -353,19 +434,25 @@ Translate mouse motion into UI or client game handlers
 void CL_MouseEvent( int dx, int dy, int time ) {
 	int		translatedDx;
 	int		translatedDy;
-	
+	int		cursorX;
+	int		cursorY;
+
 	translatedDx = CL_TranslateRetailMouseDelta( dx, m_cpi->value );
 	translatedDy = CL_TranslateRetailMouseDelta( dy, m_cpi->value );
-	
+
 	if ( cls.keyCatchers & KEYCATCH_UI ) {
-	VM_Call( uivm, UI_MOUSE_EVENT, translatedDx, translatedDy );
-	} else if (cls.keyCatchers & KEYCATCH_CGAME) {
-	VM_Call (cgvm, CG_MOUSE_EVENT, translatedDx, translatedDy);
+		CL_UpdateMouseCursorPosition( translatedDx, translatedDy, &cursorX, &cursorY );
+		CL_WebView_OnMouseMove( cursorX, cursorY );
+		VM_Call( uivm, UI_MOUSE_EVENT, cursorX, cursorY );
+	} else if ( cls.keyCatchers & KEYCATCH_CGAME ) {
+		CL_UpdateMouseCursorPosition( translatedDx, translatedDy, &cursorX, &cursorY );
+		CL_WebView_OnMouseMove( cursorX, cursorY );
+		VM_Call( cgvm, CG_MOUSE_EVENT, cursorX, cursorY );
 	} else {
 		cl.mouseDx[cl.mouseIndex] += dx;
 		cl.mouseDy[cl.mouseIndex] += dy;
 	}
-	}
+}
 
 /*
 =================
@@ -467,10 +554,6 @@ void CL_MouseMove( usercmd_t *cmd ) {
 
 	// scale by FOV
 	accelSensitivity *= cl.cgameSensitivity;
-
-	if ( rate && cl_showMouseRate->integer ) {
-		Com_Printf( "%f : %f\n", rate, accelSensitivity );
-	}
 
 	if ( cl_mouseAccelDebug->integer ) {
 		Com_Printf( "mouse accel: rate %.3f offset %.3f power %.3f accel %.3f sens %.3f cap %.3f\n",

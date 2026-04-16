@@ -83,8 +83,8 @@ This ledger tracks the implementation status of Quake Live gameplay behaviours r
 
 ### Competitive ruleset + item timer verification (2025-01-09)
 
-- **Evidence:** `artifacts/tests/hud-captures/item-timers-ruleset-demos.md` documents side-by-side demos for the default and PQL rulesets, showing `g_factory` mirroring the active ruleset token and late-join `itemcfg` broadcasts clamping heights to the Quake Live default.【F:artifacts/tests/hud-captures/item-timers-ruleset-demos.md†L1-L14】
-- **Engine updates:** `g_ruleset` now seeds `g_factory` when unset so competitive configs resolve to the expected script namespace, and item timer CVars default to the HLIL-aligned enabled state with the `ITEM_TIMER_DEFAULT_HEIGHT` fallback.【F:src/code/game/g_main.c†L207-L223】【F:src/code/game/g_main.c†L574-L575】【F:src/code/game/g_main.c†L1002-L1021】
+- **Evidence:** `artifacts/tests/hud-captures/item-timers-ruleset-demos.md` documents side-by-side demos for the default and PQL rulesets, and late-join `itemcfg` broadcasts still clamp heights to the Quake Live default while the active factory selection is derived from the current gametype's retail mapping during startup recovery.【F:artifacts/tests/hud-captures/item-timers-ruleset-demos.md†L1-L14】【F:src/code/game/g_factory.c】【F:src/code/game/g_main.c】
+- **Engine updates:** `g_factory` now falls back to the retail factory id for the active `g_gametype` when unset or invalid, the singular legacy `g_spawnItemWeapon` alias mirrors the plural primary cvar used by the VM, and item timer CVars default to the HLIL-aligned enabled state with the `ITEM_TIMER_DEFAULT_HEIGHT` fallback.【F:src/code/game/g_factory.c】【F:src/code/game/g_main.c】
 - **Approvals:** Gameplay Systems (@gamedev-lead) and HUD Taskforce (@hud-taskforce) confirmed the broadcast/config defaults against the captured demos; QA Lead (@qa-automation) signed off on promoting both ledger entries to ✅.
 
 ## Entity Targets

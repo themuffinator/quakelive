@@ -360,7 +360,7 @@ static qboolean SV_SteamServerHasConfiguredMasters( void ) {
 ================
 SV_SteamServerInitDefaultHostname
 
-Mirrors the retail Steam hostname bootstrap, using com_buildScript as the closest retained build-harness gate.
+Mirrors the retail Steam hostname bootstrap and respects the retail com_build harness gate.
 ================
 */
 static void SV_SteamServerInitDefaultHostname( void ) {
@@ -650,16 +650,17 @@ void SV_Init (void) {
 	sv_maxRate = Cvar_Get ("sv_maxRate", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	sv_minPing = Cvar_Get ("sv_minPing", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	sv_maxPing = Cvar_Get ("sv_maxPing", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
-	sv_floodProtect = Cvar_Get ("sv_floodProtect", "1", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	sv_floodProtect = Cvar_Get ("sv_floodProtect", "10", CVAR_ARCHIVE );
 	sv_mapPoolFile = Cvar_Get ("sv_mapPoolFile", "mappool.txt", CVAR_ARCHIVE );
 	sv_includeCurrentMapInVote = Cvar_Get ("sv_includeCurrentMapInVote", "0", CVAR_TEMP );
 	sv_gtid = Cvar_Get ("sv_gtid", "", CVAR_SERVERINFO | CVAR_ROM );
-	sv_serverType = Cvar_Get ("sv_serverType", "0", CVAR_SERVERINFO | CVAR_ARCHIVE );
+	sv_serverType = Cvar_Get ("sv_serverType", "0", CVAR_ARCHIVE );
+	sv_ammoPack = Cvar_Get ("g_ammoPack", "1", CVAR_LATCH );
 	sv_idleRestart = Cvar_Get ("sv_idleRestart", "1", 0 );
 	sv_idleExit = Cvar_Get ("sv_idleExit", "120", 0 );
 	sv_errorExit = Cvar_Get ("sv_errorExit", "1", 0 );
 	sv_quitOnEmpty = Cvar_Get ("sv_quitOnEmpty", "0", 0 );
-	sv_quitOnExitLevel = Cvar_Get ("sv_quitOnExitLevel", "0", CVAR_SERVERINFO | CVAR_ARCHIVE );
+	sv_quitOnExitLevel = Cvar_Get ("sv_quitOnExitLevel", "0", 0 );
 	sv_altEntDir = Cvar_Get ("sv_altEntDir", "", 0 );
 	sv_dumpEntities = Cvar_Get ("sv_dumpEntities", "0", 0 );
 	sv_cylinderScale = Cvar_Get ("sv_cylinderScale", "1.1f", 0 );
@@ -674,7 +675,7 @@ void SV_Init (void) {
 	Cvar_Get ("sv_cheats", "1", CVAR_SYSTEMINFO | CVAR_ROM );
 	sv_serverid = Cvar_Get ("sv_serverid", "0", CVAR_SYSTEMINFO | CVAR_ROM );
 #ifndef DLL_ONLY // bk010216 - for DLL-only servers
-	sv_pure = Cvar_Get ("sv_pure", "1", CVAR_SYSTEMINFO );
+	sv_pure = Cvar_Get ("sv_pure", "1", CVAR_SYSTEMINFO | CVAR_INIT );
 #else
 	sv_pure = Cvar_Get ("sv_pure", "0", CVAR_SYSTEMINFO | CVAR_INIT | CVAR_ROM );
 #endif
@@ -687,8 +688,8 @@ void SV_Init (void) {
 	// server vars
 	sv_rconPassword = Cvar_Get ("rconPassword", "", CVAR_TEMP );
 	sv_privatePassword = Cvar_Get ("sv_privatePassword", "", CVAR_TEMP );
-	sv_fps = Cvar_Get ("sv_fps", "20", CVAR_TEMP );
-	sv_timeout = Cvar_Get ("sv_timeout", "200", CVAR_TEMP );
+	sv_fps = Cvar_Get ("sv_fps", "40", CVAR_ROM );
+	sv_timeout = Cvar_Get ("sv_timeout", "40", CVAR_TEMP );
 	sv_zombietime = Cvar_Get ("sv_zombietime", "2", CVAR_TEMP );
 	Cvar_Get ("nextmap", "", CVAR_TEMP );
 
@@ -700,9 +701,9 @@ void SV_Init (void) {
 	sv_master[4] = Cvar_Get ("sv_master5", "", CVAR_ARCHIVE );
 	sv_reconnectlimit = Cvar_Get ("sv_reconnectlimit", "3", 0);
 	sv_showloss = Cvar_Get ("sv_showloss", "0", 0);
-	sv_padPackets = Cvar_Get ("sv_padPackets", "0", 0);
-sv_killserver = Cvar_Get ("sv_killserver", "0", 0);
-sv_mapChecksum = Cvar_Get ("sv_mapChecksum", "", CVAR_ROM);
+	sv_padPackets = Cvar_GetBounded( "sv_padPackets", "0", "0", "0", CVAR_VM_CREATED );
+	sv_killserver = Cvar_Get ("sv_killserver", "0", 0);
+	sv_mapChecksum = Cvar_Get ("sv_mapChecksum", "", CVAR_ROM);
 	sv_lanForceRate = Cvar_Get ("sv_lanForceRate", "1", CVAR_ARCHIVE );
 	sv_strictAuth = Cvar_Get ("sv_strictAuth", "1", CVAR_ARCHIVE );
 	Cvar_Get ("sv_setSteamAccount", "", CVAR_ARCHIVE | CVAR_PROTECTED );

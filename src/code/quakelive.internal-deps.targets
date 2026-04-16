@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <QLRepoRoot>$(MSBuildThisFileDirectory)..\..</QLRepoRoot>
+    <QLInternalDepsScript>$(MSBuildThisFileDirectory)..\..\tools\build_internal_deps.ps1</QLInternalDepsScript>
+  </PropertyGroup>
+
+  <Target Name="QLBootstrapVorbis" BeforeTargets="ValidateVorbis" Condition="'$(QLEnableOgg)'=='1' and Exists('$(QLInternalDepsScript)')">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(QLInternalDepsScript)&quot; -RepoRoot &quot;$(QLRepoRoot)&quot; -Dependency vorbis -PlatformToolset &quot;$(PlatformToolset)&quot;" />
+  </Target>
+
+  <Target Name="QLBootstrapPng" BeforeTargets="ValidatePng" Condition="'$(QLEnablePng)'=='1' and Exists('$(QLInternalDepsScript)')">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(QLInternalDepsScript)&quot; -RepoRoot &quot;$(QLRepoRoot)&quot; -Dependency png -PlatformToolset &quot;$(PlatformToolset)&quot;" />
+  </Target>
+</Project>

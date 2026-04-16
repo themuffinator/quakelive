@@ -30,9 +30,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <setjmp.h>
 #include <ctype.h>
 #ifdef __linux__
+#include <unistd.h>
 #include <netinet/in.h>
 #else
 #if defined(MACOS_X)
+#include <unistd.h>
 #include <netinet/in.h>
 #else
 #include <winsock.h>
@@ -113,11 +115,16 @@ cvar_t	*com_sv_running;
 cvar_t	*com_cl_running;
 cvar_t	*com_allowConsole;
 cvar_t	*com_logfile;		// 1 = buffer log, 2 = flush after each print
+cvar_t	*com_appendlogfile;
 cvar_t	*com_showtrace;
 cvar_t	*com_version;
 cvar_t	*com_blood;
-cvar_t	*com_buildScript;	// for automated data building scripts
+cvar_t	*com_buildScript;	// retail com_build gate for automated data building scripts
 cvar_t	*com_introPlayed;
+cvar_t	*com_idleSleep;
+cvar_t	*com_ignorecrash;
+cvar_t	*com_crashed;
+cvar_t	*com_pid;
 cvar_t	*cl_paused;
 cvar_t	*sv_paused;
 cvar_t	*com_cameraMode;
@@ -144,6 +151,41 @@ void Com_WriteClientConfig_f( void );
 void CIN_CloseAllVideos();
 
 /*
+=================
+Com_IdleSleep
+
+Uses the retail frame-throttle sleep primitive for non-dedicated idle waits.
+=================
+*/
+static void Com_IdleSleep( int msec ) {
+	if ( msec <= 0 ) {
+		return;
+	}
+
+#ifdef _WIN32
+	{
+		HANDLE			timer;
+		LARGE_INTEGER	dueTime;
+
+		dueTime.QuadPart = -( (LONGLONG)msec * 10000 );
+		timer = CreateWaitableTimer( NULL, qtrue, NULL );
+		if ( !timer ) {
+			Sleep( msec );
+			return;
+		}
+
+		if ( SetWaitableTimer( timer, &dueTime, 0, NULL, NULL, qfalse ) ) {
+			WaitForSingleObject( timer, INFINITE );
+		}
+
+		CloseHandle( timer );
+	}
+#else
+	usleep( msec * 1000 );
+#endif
+}
+
+/*
 ================
 Com_ShouldDefaultDedicatedFromExecutable
 
@@ -162,6 +204,89 @@ static qboolean Com_ShouldDefaultDedicatedFromExecutable( void ) {
 	return !Q_stricmp( executableName, "qzeroded" )
 		|| !Q_stricmp( executableName, "qzeroded.exe" )
 		|| !Q_stricmp( executableName, "qzeroded.x86" );
+}
+
+/*
+================
+Com_CurrentProcessIdString
+
+Formats the live process id using the retained retail crash-marker contract.
+================
+*/
+static const char *Com_CurrentProcessIdString( void ) {
+	static char	pidString[32];
+
+#ifdef _WIN32
+	Com_sprintf( pidString, sizeof( pidString ), "%lu", (unsigned long)GetCurrentProcessId() );
+#else
+	Com_sprintf( pidString, sizeof( pidString ), "%lu", (unsigned long)getpid() );
+#endif
+
+	return pidString;
+}
+
+/*
+================
+Com_ProfilePidIsCurrentProcess
+
+Returns qfalse when the retained profile.pid marker points at a different live
+process and crash detection has not been suppressed.
+================
+*/
+static qboolean Com_ProfilePidIsCurrentProcess( void ) {
+	char		*pidBuffer;
+	int			pidLength;
+	const char	*ch;
+	int			retainedPid;
+
+	if ( com_ignorecrash && com_ignorecrash->integer ) {
+		return qtrue;
+	}
+
+	pidBuffer = NULL;
+	pidLength = FS_ReadFile( "profile.pid", (void **)&pidBuffer );
+	if ( pidLength < 0 || !pidBuffer ) {
+		return qtrue;
+	}
+
+	if ( pidLength <= 0 || pidLength >= 31 ) {
+		FS_FreeFile( pidBuffer );
+		return qfalse;
+	}
+
+	for ( ch = pidBuffer; *ch; ++ch ) {
+		if ( *ch < '0' || *ch > '9' ) {
+			FS_FreeFile( pidBuffer );
+			return qfalse;
+		}
+	}
+
+	retainedPid = atoi( pidBuffer );
+	FS_FreeFile( pidBuffer );
+
+	if ( retainedPid > 0 && com_pid && retainedPid != com_pid->integer ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+================
+Com_WriteProfilePidMarker
+
+Persists the retained retail crash marker into profile.pid.
+================
+*/
+static void Com_WriteProfilePidMarker( const char *pidValue ) {
+	const char	*value;
+
+	if ( !FS_Initialized() ) {
+		return;
+	}
+
+	value = pidValue ? pidValue : "0";
+	FS_WriteFile( "profile.pid", value, strlen( value ) );
 }
 
 //============================================================================
@@ -320,7 +445,11 @@ void QDECL Com_Printf( const char *fmt, ... ) {
 			time( &aclock );
 			newtime = localtime( &aclock );
 
-			logfile = FS_FOpenFileWrite( "qconsole.log" );
+			if ( com_appendlogfile && com_appendlogfile->integer ) {
+				logfile = FS_FOpenFileAppend( "qconsole.log" );
+			} else {
+				logfile = FS_FOpenFileWrite( "qconsole.log" );
+			}
 			Com_Printf( "logfile opened on %s\n", asctime( newtime ) );
 			if ( com_logfile->integer > 1 ) {
 				// force it to not buffer so we get valid
@@ -2682,19 +2811,18 @@ void Com_Init( char *commandLine ) {
         Cmd_Init ();
 
         Cvar_BootstrapExpandedDefaults();
+	com_ignorecrash = Cvar_Get( "com_ignorecrash", "0", 0 );
+	com_crashed = Cvar_Get( "com_crashed", "0", CVAR_TEMP );
+	com_pid = Cvar_Get( "com_pid", Com_CurrentProcessIdString(), CVAR_ROM );
 
 	if ( Com_ShouldDefaultDedicatedFromExecutable() ) {
 		Cvar_Get( "dedicated", "2", 0 );
 	}
 
-	// Make early filesystem/bootstrap diagnostics visible in qconsole.log.
-#ifdef _DEBUG
-	com_developer = Cvar_Get( "developer", "1", CVAR_TEMP );
-	com_logfile = Cvar_Get( "logfile", "2", CVAR_TEMP );
-#else
+	// Register logging cvars early so command-line overrides apply before bootstrap chatter.
 	com_developer = Cvar_Get( "developer", "0", CVAR_TEMP );
 	com_logfile = Cvar_Get( "logfile", "0", CVAR_TEMP );
-#endif
+	com_appendlogfile = Cvar_Get( "appendlogfile", "0", CVAR_TEMP );
 
         // override anything from the config files with command line args
         Com_StartupVariable( NULL );
@@ -2702,6 +2830,7 @@ void Com_Init( char *commandLine ) {
 	// get the developer cvar set as early as possible
 	Com_StartupVariable( "developer" );
 	Com_StartupVariable( "logfile" );
+	Com_StartupVariable( "appendlogfile" );
 
 #if defined(_WIN32) && defined(_DEBUG)
 	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "1", 0 );
@@ -2711,6 +2840,9 @@ void Com_Init( char *commandLine ) {
 	CL_InitKeyCommands();
 
 	FS_InitFilesystem ();
+	if ( !Com_ProfilePidIsCurrentProcess() ) {
+		Cvar_Set( "com_crashed", "1" );
+	}
 
 	SyscallContract_ResetLog();
 
@@ -2753,16 +2885,12 @@ void Com_Init( char *commandLine ) {
 	//
 	// init commands and vars
 	//
-	com_maxfps = Cvar_Get ("com_maxfps", "85", CVAR_ARCHIVE);
+	com_maxfps = Cvar_GetBounded( "com_maxfps", "125", "30", "250", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD );
 	com_blood = Cvar_Get ("com_blood", "1", CVAR_ARCHIVE);
 
-#ifdef _DEBUG
-	com_developer = Cvar_Get ("developer", "1", CVAR_TEMP );
-	com_logfile = Cvar_Get ("logfile", "2", CVAR_TEMP );
-#else
 	com_developer = Cvar_Get ("developer", "0", CVAR_TEMP );
 	com_logfile = Cvar_Get ("logfile", "0", CVAR_TEMP );
-#endif
+	com_appendlogfile = Cvar_Get( "appendlogfile", "0", CVAR_TEMP );
 
 	com_timescale = Cvar_Get ("timescale", "1", CVAR_CHEAT | CVAR_SYSTEMINFO );
 	com_fixedtime = Cvar_Get ("fixedtime", "0", CVAR_CHEAT);
@@ -2777,10 +2905,12 @@ void Com_Init( char *commandLine ) {
 	sv_paused = Cvar_Get ("sv_paused", "0", CVAR_ROM);
 	com_sv_running = Cvar_Get ("sv_running", "0", CVAR_ROM);
 	com_cl_running = Cvar_Get ("cl_running", "0", CVAR_ROM);
+	Cvar_Get( "web_browserActive", "0", CVAR_ROM );
 	com_allowConsole = Cvar_Get( "com_allowConsole", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
-	com_buildScript = Cvar_Get( "com_buildScript", "0", 0 );
+	com_buildScript = Cvar_Get( "com_build", "0", 0 );
 
 	com_introPlayed = Cvar_Get( "com_introplayed", "0", CVAR_ARCHIVE);
+	com_idleSleep = Cvar_Get( "com_idleSleep", "1", CVAR_ARCHIVE | CVAR_CLOUD );
 
 	if ( com_dedicated->integer ) {
 		if ( !com_viewlog->integer ) {
@@ -2842,6 +2972,7 @@ void Com_Init( char *commandLine ) {
 
 	// make sure single player is off by default
 	Cvar_Set("ui_singlePlayerActive", "0");
+	Com_WriteProfilePidMarker( com_pid ? com_pid->string : Com_CurrentProcessIdString() );
 
 	com_fullyInitialized = qtrue;
 	Com_Printf ("--- Common Initialization Complete ---\n");	
@@ -3121,6 +3252,15 @@ void Com_Frame( void ) {
 			lastTime = com_frameTime;		// possible on first frame
 		}
 		msec = com_frameTime - lastTime;
+		if ( msec >= minMsec ) {
+			break;
+		}
+
+		if ( com_dedicated->integer ) {
+			NET_Sleep( minMsec - msec );
+		} else if ( Cvar_VariableIntegerValue( "web_browserActive" ) == 1 || ( com_idleSleep && com_idleSleep->integer == 1 ) ) {
+			Com_IdleSleep( minMsec - msec );
+		}
 	} while ( msec < minMsec );
 	Cbuf_Execute ();
 
@@ -3240,6 +3380,7 @@ void Com_Shutdown (void) {
 		com_journalFile = 0;
 	}
 
+	Com_WriteProfilePidMarker( "0" );
 	Zmq_ShutdownRuntime();
 	QL_Steamworks_Shutdown();
 	SyscallContract_Shutdown();

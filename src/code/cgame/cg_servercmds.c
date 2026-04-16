@@ -875,20 +875,7 @@ Resets the cached race metadata when a race_init command arrives.
 =============
 */
 static void CG_ParseRaceInit( void ) {
-	int count = 0;
-
-	if ( trap_Argc() > 1 ) {
-		count = atoi( CG_Argv( 1 ) );
-	}
-
-	if ( count < 0 ) {
-		count = 0;
-	}
-	if ( count > MAX_RACE_POINTS ) {
-		count = MAX_RACE_POINTS;
-	}
-
-	cgs.racePointCount = count;
+	cgs.racePointCount = 0;
 	cgs.raceLeaderSplitCount = 0;
 	memset( cgs.racePoints, 0, sizeof( cgs.racePoints ) );
 	memset( cgs.raceLeaderSplits, 0, sizeof( cgs.raceLeaderSplits ) );
@@ -899,32 +886,16 @@ static void CG_ParseRaceInit( void ) {
 =============
 CG_ParseRaceInfo
 
-Stores the latest leader split data from the race_info command.
+Caches the retail six-field race follow payload from the race_info command.
 =============
 */
 static void CG_ParseRaceInfo( void ) {
-	int count = 0;
-	int argc;
-	int i;
-
-	argc = trap_Argc();
-	if ( argc > 1 ) {
-		count = atoi( CG_Argv( 1 ) );
-	}
-	if ( count < 0 ) {
-		count = 0;
-	}
-	if ( count > MAX_RACE_POINTS ) {
-		count = MAX_RACE_POINTS;
-	}
-
-	cgs.racePointCount = count;
-	cgs.raceLeaderSplitCount = 0;
-	memset( cgs.raceLeaderSplits, 0, sizeof( cgs.raceLeaderSplits ) );
-	for ( i = 0; i < count && ( i + 2 ) < argc; i++ ) {
-		cgs.raceLeaderSplits[i] = atoi( CG_Argv( i + 2 ) );
-		cgs.raceLeaderSplitCount++;
-	}
+	cgs.raceInfoActive = atoi( CG_Argv( 1 ) ) ? qtrue : qfalse;
+	cgs.raceInfoStartTime = atoi( CG_Argv( 2 ) );
+	cgs.raceInfoLastTime = atoi( CG_Argv( 3 ) );
+	cgs.raceInfoCheckpointCount = atoi( CG_Argv( 4 ) );
+	cgs.raceInfoCurrentCheckpointEntityNum = atoi( CG_Argv( 5 ) );
+	cgs.raceInfoNextCheckpointEntityNum = atoi( CG_Argv( 6 ) );
 }
 
 /*

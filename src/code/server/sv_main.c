@@ -45,6 +45,7 @@ static int s_steamPublishedTagQuadHog = 0;
 static char s_steamPublishedTagGravity[MAX_CVAR_VALUE_STRING];
 static char s_steamPublishedTagVampiric[MAX_CVAR_VALUE_STRING];
 static char s_steamPublishedTagCustom[MAX_CVAR_VALUE_STRING];
+static int s_svEmptyServerTime = -1;
 
 /*
 =============
@@ -302,6 +303,7 @@ cvar_t	*sv_mapPoolFile;
 cvar_t	*sv_includeCurrentMapInVote;
 cvar_t	*sv_gtid;
 cvar_t	*sv_serverType;
+cvar_t	*sv_ammoPack;
 cvar_t	*sv_idleRestart;
 cvar_t	*sv_idleExit;
 cvar_t	*sv_errorExit;
@@ -1525,6 +1527,28 @@ void SV_CalcPings( void ) {
 
 /*
 ==================
+SV_CountActiveHumanClients
+
+Counts connected non-bot clients for retained empty-server policies.
+==================
+*/
+static int SV_CountActiveHumanClients( void ) {
+	int			i;
+	int			count;
+	client_t	*cl;
+
+	count = 0;
+	for ( i = 0, cl = svs.clients ; i < sv_maxclients->integer ; i++, cl++ ) {
+		if ( cl->state >= CS_CONNECTED && !SV_ClientIsBot( cl ) ) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
+/*
+==================
 SV_CheckTimeouts
 
 If a packet has not been received from a client for timeout->integer 
@@ -1567,6 +1591,26 @@ void SV_CheckTimeouts( void ) {
 			}
 		} else {
 			cl->timeoutCount = 0;
+		}
+	}
+
+	if ( SV_CountActiveHumanClients() > 0 ) {
+		s_svEmptyServerTime = -1;
+		return;
+	}
+
+	if ( s_svEmptyServerTime == -1 ) {
+		s_svEmptyServerTime = svs.time;
+		return;
+	}
+
+	if ( sv_quitOnEmpty && sv_quitOnEmpty->integer > 0 ) {
+		int		quitPoint;
+
+		quitPoint = svs.time - sv_quitOnEmpty->integer * 1000;
+		if ( quitPoint > s_svEmptyServerTime ) {
+			Com_Printf( "server has been empty for %d seconds, quit\n", sv_quitOnEmpty->integer );
+			Cbuf_AddText( "quit\n" );
 		}
 	}
 }
@@ -1667,6 +1711,15 @@ void SV_Frame( int msec ) {
 		// NET_Sleep will give the OS time slices until either get a packet
 		// or time enough for a server frame has gone by
 		NET_Sleep(frameMsec - sv.timeResidual);
+		return;
+	}
+
+	if ( sv_idleRestart && sv_idleRestart->integer && svs.time > 0x5265c00 && SV_CountActiveHumanClients() == 0 ) {
+		SV_Shutdown( "Restarting idle server" );
+		if ( SV_HandleQuitOnExitLevel( "idle server restart" ) ) {
+			return;
+		}
+		Cbuf_AddText( "vstr nextmap\n" );
 		return;
 	}
 

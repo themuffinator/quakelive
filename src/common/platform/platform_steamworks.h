@@ -88,6 +88,19 @@ typedef struct {
 } ql_steam_ugc_query_completed_t;
 
 typedef struct {
+	uint32_t appId;
+	uint32_t itemIdLow;
+	uint32_t itemIdHigh;
+} ql_steam_item_installed_t;
+
+typedef struct {
+	uint32_t appId;
+	uint32_t itemIdLow;
+	uint32_t itemIdHigh;
+	int result;
+} ql_steam_download_item_result_t;
+
+typedef struct {
 	CSteamID lobbyId;
 	int result;
 } ql_steam_lobby_created_t;
@@ -207,6 +220,12 @@ typedef struct {
 
 typedef struct {
 	void *context;
+	void (*onItemInstalled)( void *context, const ql_steam_item_installed_t *event );
+	void (*onDownloadItemResult)( void *context, const ql_steam_download_item_result_t *event );
+} ql_steam_workshop_callback_bindings_t;
+
+typedef struct {
+	void *context;
 	void (*onServersConnected)( void *context, const ql_steam_server_connected_t *event );
 	void (*onConnectFailure)( void *context, const ql_steam_server_connect_failure_t *event );
 	void (*onServersDisconnected)( void *context, const ql_steam_server_disconnected_t *event );
@@ -301,6 +320,24 @@ qboolean QL_Steamworks_GetFriendByIndex( int index, int flags, uint32_t *outIdLo
 
 qboolean QL_Steamworks_GetFriendSummary( uint32_t idLow, uint32_t idHigh, ql_steam_friend_summary_t *outSummary );
 
+qboolean QL_Steamworks_SendP2PPacket( const CSteamID *steamId, const void *data, uint32_t length, int sendType, int channel );
+
+qboolean QL_Steamworks_IsP2PPacketAvailable( uint32_t *outSize, int channel );
+
+qboolean QL_Steamworks_ReadP2PPacket( void *data, uint32_t dataSize, uint32_t *outSize, CSteamID *outSteamId, int channel );
+
+qboolean QL_Steamworks_AcceptP2PSession( const CSteamID *steamId );
+
+qboolean QL_Steamworks_StartVoiceRecording( void );
+
+qboolean QL_Steamworks_StopVoiceRecording( void );
+
+qboolean QL_Steamworks_GetCompressedVoice( void *data, uint32_t dataSize, uint32_t *outSize );
+
+qboolean QL_Steamworks_DecompressVoice( const void *compressedData, uint32_t compressedSize, void *data, uint32_t dataSize, uint32_t *outSize, uint32_t sampleRate );
+
+uint32_t QL_Steamworks_GetVoiceOptimalSampleRate( void );
+
 qboolean QL_Steamworks_ServerSendP2PPacket( const CSteamID *steamId, const void *data, uint32_t length, int sendType, int channel );
 
 qboolean QL_Steamworks_ServerIsP2PPacketAvailable( uint32_t *outSize, int channel );
@@ -390,6 +427,10 @@ void QL_Steamworks_UnregisterLobbyCallbacks( void );
 qboolean QL_Steamworks_RegisterMicroCallbacks( const ql_steam_micro_callback_bindings_t *bindings );
 
 void QL_Steamworks_UnregisterMicroCallbacks( void );
+
+qboolean QL_Steamworks_RegisterWorkshopCallbacks( const ql_steam_workshop_callback_bindings_t *bindings );
+
+void QL_Steamworks_UnregisterWorkshopCallbacks( void );
 
 qboolean QL_Steamworks_BindUGCQueryCallResult( SteamAPICall_t callHandle );
 
@@ -766,6 +807,109 @@ static inline qboolean QL_Steamworks_SetRichPresence( const char *key, const cha
 	(void)key;
 	(void)value;
 	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_SendP2PPacket
+=============
+*/
+static inline qboolean QL_Steamworks_SendP2PPacket( const CSteamID *steamId, const void *data, uint32_t length, int sendType, int channel ) {
+	(void)steamId;
+	(void)data;
+	(void)length;
+	(void)sendType;
+	(void)channel;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_IsP2PPacketAvailable
+=============
+*/
+static inline qboolean QL_Steamworks_IsP2PPacketAvailable( uint32_t *outSize, int channel ) {
+	(void)outSize;
+	(void)channel;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_ReadP2PPacket
+=============
+*/
+static inline qboolean QL_Steamworks_ReadP2PPacket( void *data, uint32_t dataSize, uint32_t *outSize, CSteamID *outSteamId, int channel ) {
+	(void)data;
+	(void)dataSize;
+	(void)outSize;
+	(void)outSteamId;
+	(void)channel;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_AcceptP2PSession
+=============
+*/
+static inline qboolean QL_Steamworks_AcceptP2PSession( const CSteamID *steamId ) {
+	(void)steamId;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_StartVoiceRecording
+=============
+*/
+static inline qboolean QL_Steamworks_StartVoiceRecording( void ) {
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_StopVoiceRecording
+=============
+*/
+static inline qboolean QL_Steamworks_StopVoiceRecording( void ) {
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_GetCompressedVoice
+=============
+*/
+static inline qboolean QL_Steamworks_GetCompressedVoice( void *data, uint32_t dataSize, uint32_t *outSize ) {
+	(void)data;
+	(void)dataSize;
+	(void)outSize;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_DecompressVoice
+=============
+*/
+static inline qboolean QL_Steamworks_DecompressVoice( const void *compressedData, uint32_t compressedSize, void *data, uint32_t dataSize, uint32_t *outSize, uint32_t sampleRate ) {
+	(void)compressedData;
+	(void)compressedSize;
+	(void)data;
+	(void)dataSize;
+	(void)outSize;
+	(void)sampleRate;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_GetVoiceOptimalSampleRate
+=============
+*/
+static inline uint32_t QL_Steamworks_GetVoiceOptimalSampleRate( void ) {
+	return 0u;
 }
 
 /*
@@ -1272,6 +1416,24 @@ QL_Steamworks_UnregisterMicroCallbacks
 =============
 */
 static inline void QL_Steamworks_UnregisterMicroCallbacks( void ) {
+}
+
+/*
+=============
+QL_Steamworks_RegisterWorkshopCallbacks
+=============
+*/
+static inline qboolean QL_Steamworks_RegisterWorkshopCallbacks( const ql_steam_workshop_callback_bindings_t *bindings ) {
+	(void)bindings;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_UnregisterWorkshopCallbacks
+=============
+*/
+static inline void QL_Steamworks_UnregisterWorkshopCallbacks( void ) {
 }
 
 /*

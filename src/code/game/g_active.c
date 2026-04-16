@@ -1568,9 +1568,15 @@ void ClientThink( int clientNum ) {
 
 
 void G_RunClient( gentity_t *ent ) {
+	G_RunThink( ent );
+	if ( !ent->inuse || !ent->client ) {
+		return;
+	}
+
 	if ( !(ent->r.svFlags & SVF_BOT) && !g_synchronousClients.integer ) {
 		return;
 	}
+
 	ent->client->pers.cmd.serverTime = level.time;
 	ClientThink_real( ent );
 }
@@ -1784,7 +1790,7 @@ Transitions the round controller into the warmup state.
 static void G_RoundScheduleWarmupDelay( void );
 int G_CAResolveRoundState( void );
 static int CA_RoundStateTransition( qboolean announce );
-static void G_FreezeResetClientsForRound( qboolean warmup );
+static void G_FreezeResetClientsForRound( void );
 int G_FreezeResolveRoundState( void );
 static qboolean G_FreezeTeamIsFullyFrozen( team_t team );
 static int Freeze_RoundStateTransition( qboolean announce );
@@ -1817,7 +1823,7 @@ void G_Frame_BeginRoundWarmup( void ) {
 		G_RoundScheduleWarmupDelay();
 	} else if ( G_FreezeGametypeEnabled() ) {
 		G_FreezeSyncCvars();
-		G_FreezeResetClientsForRound( qtrue );
+		G_FreezeResetClientsForRound();
 		G_RoundScheduleWarmupDelay();
 	} else if ( g_gametype.integer == GT_RED_ROVER ) {
 		G_RoundScheduleWarmupDelay();
@@ -2276,7 +2282,7 @@ static void G_Frame_BeginRoundActive( void ) {
 		}
 	} else if ( G_FreezeGametypeEnabled() ) {
 		G_FreezeSyncCvars();
-		G_FreezeResetClientsForRound( qfalse );
+		G_FreezeResetClientsForRound();
 	}
 	G_UpdateMatchStateConfigString();
 }
@@ -2436,7 +2442,9 @@ G_FreezeResetClientForRound
 Respawns or restores one player before the next Freeze round begins.
 ============
 */
-static void G_FreezeResetClientForRound( gentity_t *ent, qboolean warmup ) {
+void G_FreezeResetClientForRound( gentity_t *ent ) {
+	qboolean	warmupSpawn;
+
 	if ( !ent || !ent->client ) {
 		return;
 	}
@@ -2445,8 +2453,9 @@ static void G_FreezeResetClientForRound( gentity_t *ent, qboolean warmup ) {
 		return;
 	}
 
+	warmupSpawn = ( level.roundState != ROUNDSTATE_ACTIVE ) ? qtrue : qfalse;
 	if ( level.freezeConfig.resetWeapons ) {
-		G_RequestClientSpawn( ent, warmup, qfalse );
+		G_RequestClientSpawn( ent, warmupSpawn, qfalse );
 		return;
 	}
 
@@ -2468,7 +2477,7 @@ static void G_FreezeResetClientForRound( gentity_t *ent, qboolean warmup ) {
 	}
 }
 
-static void G_FreezeResetClientsForRound( qboolean warmup ) {
+static void G_FreezeResetClientsForRound( void ) {
 	int			clientNum;
 
 	if ( !G_FreezeGametypeEnabled() ) {
@@ -2482,7 +2491,7 @@ static void G_FreezeResetClientsForRound( qboolean warmup ) {
 		if ( !ent->inuse || !ent->client ) {
 			continue;
 		}
-		G_FreezeResetClientForRound( ent, warmup );
+		G_FreezeResetClientForRound( ent );
 	}
 }
 

@@ -86,7 +86,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define QL_FONT_SMALL_POINT_SIZE 16
 #define QL_FONT_BIG_POINT_SIZE 48
 #define QL_FONT_MONO_POINT_SIZE 16
-#define QL_FONT_HOST_POINT_SIZE 48.0f
+/*
+ * Retail host DrawScaledText/MeasureText scale to (vidHeight / 768) * 96.
+ * The UI/cgame wrappers already multiply by 480-space yscale, so the matching
+ * virtual-space baseline is 60 points rather than the legacy 48-point glyph
+ * scale used by the classic baked-font lane.
+ */
+#define QL_FONT_HOST_POINT_SIZE 60.0f
 
 #define ITEM_FONT_INHERIT -1
 
@@ -164,7 +170,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SLIDER_HEIGHT 16.0
 #define SLIDER_THUMB_WIDTH 12.0
 #define SLIDER_THUMB_HEIGHT 20.0
-#define	NUM_CROSSHAIRS			10
+#define	NUM_CROSSHAIRS			30
 
 typedef struct {
   const char *command;

@@ -111,6 +111,35 @@ static qboolean GLW_StartDriverAndSetMode( const char *drivername,
 }
 
 /*
+==================
+GLW_GetModeAspectRatioPreset
+==================
+*/
+static int GLW_GetModeAspectRatioPreset( int width, int height )
+{
+	float aspectRatio;
+
+	aspectRatio = (float)width / (float)height;
+
+	if ( aspectRatio == 1.77777779f )
+	{
+		return 1;
+	}
+
+	if ( aspectRatio == 1.60000002f )
+	{
+		return 2;
+	}
+
+	if ( aspectRatio == 1.33333337f )
+	{
+		return 0;
+	}
+
+	return 3;
+}
+
+/*
 ** ChoosePFD
 **
 ** Helper function that replaces ChoosePixelFormat.
@@ -121,24 +150,37 @@ static qboolean GLW_StartDriverAndSetMode( const char *drivername,
 ==================
 GLW_DescribePixelFormatSafe
 
-Uses the Win32 pixel-format query instead of `wglDescribePixelFormat`. On
-current Windows stacks the WGL export can raise debugger-hostile
-`RoOriginateError( 0x8007007A )` first-chance notifications under `cppvsdbg`
-even when the query succeeds. `DescribePixelFormat` returns the same
-descriptor data without tripping that debugger path.
+Retail switches between the GDI and WGL pixel-format queries based on driver
+type: ICD drivers use `DescribePixelFormat`, while minidrivers use
+`wglDescribePixelFormat`. Keep that ownership split intact, but contain the
+first-chance exceptions some modern stacks raise under `cppvsdbg`.
 ==================
 */
-static int GLW_DescribePixelFormatSafe( HDC hDC, int index, UINT bytes, LPPIXELFORMATDESCRIPTOR pfd )
+static int GLW_DescribePixelFormatSafe( HDC hDC, int index, UINT bytes, LPPIXELFORMATDESCRIPTOR pfd, qboolean useQWGL )
 {
 	int result = 0;
 
 	__try
 	{
-		result = DescribePixelFormat( hDC, index, bytes, pfd );
+		if ( useQWGL )
+		{
+			result = qwglDescribePixelFormat ? qwglDescribePixelFormat( hDC, index, bytes, pfd ) : 0;
+		}
+		else
+		{
+			result = DescribePixelFormat( hDC, index, bytes, pfd );
+		}
 	}
 	__except( EXCEPTION_EXECUTE_HANDLER )
 	{
-		ri.Printf( PRINT_WARNING, "...DescribePixelFormat exception (0x%lx)\n", GetExceptionCode() );
+		if ( useQWGL )
+		{
+			ri.Printf( PRINT_WARNING, "...qwglDescribePixelFormat exception (0x%lx)\n", GetExceptionCode() );
+		}
+		else
+		{
+			ri.Printf( PRINT_WARNING, "...DescribePixelFormat exception (0x%lx)\n", GetExceptionCode() );
+		}
 		result = 0;
 	}
 
@@ -154,22 +196,27 @@ static int GLW_ChoosePixelFormatSafe( HDC hDC, CONST PIXELFORMATDESCRIPTOR *pPFD
 {
 	int result = 0;
 
-	if ( !useQWGL )
-	{
-		/*
-		** Avoid GDI ChoosePixelFormat entirely. Some modern Windows ICDs
-		** raise debugger-hostile first-chance exceptions from that path.
-		*/
-		return 0;
-	}
-
 	__try
 	{
-		result = qwglChoosePixelFormat ? qwglChoosePixelFormat( hDC, pPFD ) : 0;
+		if ( useQWGL )
+		{
+			result = qwglChoosePixelFormat ? qwglChoosePixelFormat( hDC, pPFD ) : 0;
+		}
+		else
+		{
+			result = ChoosePixelFormat( hDC, pPFD );
+		}
 	}
 	__except( EXCEPTION_EXECUTE_HANDLER )
 	{
-		ri.Printf( PRINT_WARNING, "...qwglChoosePixelFormat exception (0x%lx)\n", GetExceptionCode() );
+		if ( useQWGL )
+		{
+			ri.Printf( PRINT_WARNING, "...qwglChoosePixelFormat exception (0x%lx)\n", GetExceptionCode() );
+		}
+		else
+		{
+			ri.Printf( PRINT_WARNING, "...ChoosePixelFormat exception (0x%lx)\n", GetExceptionCode() );
+		}
 		result = 0;
 	}
 
@@ -183,8 +230,13 @@ static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 	int i;
 	int bestMatch = 0;
 	int autoPFD = 0;
+	qboolean useQWGL;
 
-	if ( glConfig.driverType > GLDRV_ICD )
+	useQWGL = (qboolean)( glConfig.driverType > GLDRV_ICD );
+
+	ri.Printf( PRINT_ALL, "...GLW_AutoSelectPFD( %d, %d, %d )\n", ( int ) pPFD->cColorBits, ( int ) pPFD->cDepthBits, ( int ) pPFD->cStencilBits );
+
+	if ( useQWGL )
 	{
 		if ( qwglChoosePixelFormat )
 		{
@@ -195,10 +247,14 @@ static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 			ri.Printf( PRINT_ALL, "... no qwglChoosePixelFormat extension found" );
 		}
 	}
+	else
+	{
+		autoPFD = GLW_ChoosePixelFormatSafe( hDC, pPFD, qfalse );
+	}
 
 	if ( autoPFD )
 	{
-		ri.Printf( PRINT_ALL, "... auto selected PFD %d\n", autoPFD );
+		ri.Printf( PRINT_ALL, "... auto selected PFD %d", autoPFD );
 		return autoPFD;
 	}
 
@@ -212,7 +268,7 @@ static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 	ri.Printf( PRINT_ALL, "...GLW_ChoosePFD( %d, %d, %d )\n", ( int ) pPFD->cColorBits, ( int ) pPFD->cDepthBits, ( int ) pPFD->cStencilBits );
 
 	// count number of PFDs
-	maxPFD = GLW_DescribePixelFormatSafe( hDC, 1, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[0] );
+	maxPFD = GLW_DescribePixelFormatSafe( hDC, 1, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[0], useQWGL );
 	if ( maxPFD <= 0 )
 	{
 		ri.Printf( PRINT_WARNING, "...DescribePixelFormat failed (err %lu)\n", GetLastError() );
@@ -229,7 +285,7 @@ static int GLW_ChoosePFD( HDC hDC, PIXELFORMATDESCRIPTOR *pPFD )
 	// grab information
 	for ( i = 1; i <= maxPFD; i++ )
 	{
-		if ( !GLW_DescribePixelFormatSafe( hDC, i, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[i] ) )
+		if ( !GLW_DescribePixelFormatSafe( hDC, i, sizeof( PIXELFORMATDESCRIPTOR ), &pfds[i], useQWGL ) )
 		{
 			continue;
 		}
@@ -454,9 +510,8 @@ static int GLW_MakeContext( PIXELFORMATDESCRIPTOR *pPFD )
 	if ( !glw_state.pixelFormatSet )
 	{
 		//
-		// choose, set, and describe our desired pixel format. Description is
-		// always queried through the Win32 helper above to avoid debugger-hostile
-		// first-chance notifications from the WGL export path.
+		// choose, set, and describe our desired pixel format while keeping the
+		// retail GDI-vs-WGL owner split intact.
 		//
 		if ( ( pixelformat = GLW_ChoosePFD( glw_state.hDC, pPFD ) ) == 0 )
 		{
@@ -464,7 +519,7 @@ static int GLW_MakeContext( PIXELFORMATDESCRIPTOR *pPFD )
 			return TRY_PFD_FAIL_SOFT;
 		}
 		ri.Printf( PRINT_ALL, "...PIXELFORMAT %d selected\n", pixelformat );
-		if ( !GLW_DescribePixelFormatSafe( glw_state.hDC, pixelformat, sizeof( *pPFD ), pPFD ) )
+		if ( !GLW_DescribePixelFormatSafe( glw_state.hDC, pixelformat, sizeof( *pPFD ), pPFD, glConfig.driverType > GLDRV_ICD ) )
 		{
 			ri.Printf( PRINT_ALL, "...DescribePixelFormat failed for selected format\n" );
 			return TRY_PFD_FAIL_SOFT;
@@ -811,13 +866,14 @@ static qboolean GLW_ChangeWindowMode( void )
 		return qfalse;
 	}
 
-	ri.Cvar_Set( "r_aspectRatio", "0" );
 	mode = R_GetMode();
 
 	if ( !R_GetModeInfo( &width, &height, &glConfig.windowAspect, mode, r_fullscreen->integer ) )
 	{
 		return qfalse;
 	}
+
+	ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( width, height ) ) );
 
 	if ( !r_fullscreen->integer && GetClientRect( g_wv.hWnd, &rect ) )
 	{
@@ -1023,6 +1079,8 @@ static rserr_t GLW_SetMode( const char *drivername,
 		ri.Printf( PRINT_ALL, " invalid mode\n" );
 		return RSERR_INVALID_MODE;
 	}
+
+	ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( glConfig.vidWidth, glConfig.vidHeight ) ) );
 	ri.Printf( PRINT_ALL, " %d %d %s\n", glConfig.vidWidth, glConfig.vidHeight, win_fs[cdsFullscreen] );
 
 	//

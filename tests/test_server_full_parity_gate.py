@@ -216,6 +216,13 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 		and "void Zmq_InitStatsPublisher( void ) {" in sv_zmq
 		and "void Zmq_PumpRcon( void ) {" in sv_zmq
 		and "void Zmq_ShutdownRuntime( void ) {" in sv_zmq
+		and 'static void idZMQ_ApplyPasswords( qboolean rconModeChanged, qboolean statsModeChanged ) {' in sv_zmq
+		and '#define QL_ZMQ_PASSFILE "zmqpass.txt"' in sv_zmq
+		and 'Com_sprintf( line, sizeof( line ), "stats_stats=%s\\n", s_zmq.statsPassword );' in sv_zmq
+		and 'Com_sprintf( line, sizeof( line ), "rcon_rcon=%s\\n", s_zmq.rconPassword );' in sv_zmq
+		and 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' in sv_zmq
+		and 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' in sv_zmq
+		and "idZMQ_PumpAuthSocket();" in sv_zmq
 		and 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq
 		and 'Com_Printf( "zmq RCON socket: %s\\n", s_zmq.rconEndpoint );' in sv_zmq
 		and 'Com_Printf( "zmq PUB socket: %s\\n", s_zmq.statsEndpoint );' in sv_zmq
@@ -235,6 +242,17 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 			"stats_publisher_owner_present": "void Zmq_InitStatsPublisher( void ) {" in sv_zmq,
 			"rcon_pump_owner_present": "void Zmq_PumpRcon( void ) {" in sv_zmq,
 			"runtime_shutdown_owner_present": "void Zmq_ShutdownRuntime( void ) {" in sv_zmq,
+			"password_apply_owner_present": (
+				'static void idZMQ_ApplyPasswords( qboolean rconModeChanged, qboolean statsModeChanged ) {' in sv_zmq
+				and '#define QL_ZMQ_PASSFILE "zmqpass.txt"' in sv_zmq
+				and 'Com_sprintf( line, sizeof( line ), "stats_stats=%s\\n", s_zmq.statsPassword );' in sv_zmq
+				and 'Com_sprintf( line, sizeof( line ), "rcon_rcon=%s\\n", s_zmq.rconPassword );' in sv_zmq
+			),
+			"zap_domain_wiring_present": (
+				'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' in sv_zmq
+				and 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' in sv_zmq
+			),
+			"auth_pump_present": "idZMQ_PumpAuthSocket();" in sv_zmq,
 			"typed_publication_present": 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq,
 			"focused_validation_present": "test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners" in platform_services_tests,
 		},
@@ -313,11 +331,25 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 	sv_g05_closed = "**Status:** Closed 2026-04-10" in _section_text_for_id(server_plan, "SV-G05")
 	sv_g05_ok = (
 		sv_g05_closed
+		and 'sv_floodProtect = Cvar_Get ("sv_floodProtect", "10", CVAR_ARCHIVE );' in sv_init
+		and 'sv_serverType = Cvar_Get ("sv_serverType", "0", CVAR_ARCHIVE );' in sv_init
+		and 'sv_ammoPack = Cvar_Get ("g_ammoPack", "1", CVAR_LATCH );' in sv_init
+		and 'sv_idleRestart = Cvar_Get ("sv_idleRestart", "1", 0 );' in sv_init
 		and 'sv_idleExit = Cvar_Get ("sv_idleExit", "120", 0 );' in sv_init
 		and 'sv_errorExit = Cvar_Get ("sv_errorExit", "1", 0 );' in sv_init
+		and 'sv_quitOnEmpty = Cvar_Get ("sv_quitOnEmpty", "0", 0 );' in sv_init
+		and 'sv_quitOnExitLevel = Cvar_Get ("sv_quitOnExitLevel", "0", 0 );' in sv_init
+		and 'sv_fps = Cvar_Get ("sv_fps", "40", CVAR_ROM );' in sv_init
+		and 'sv_timeout = Cvar_Get ("sv_timeout", "40", CVAR_TEMP );' in sv_init
+		and 'sv_padPackets = Cvar_GetBounded( "sv_padPackets", "0", "0", "0", CVAR_VM_CREATED );' in sv_init
 		and 'sv_cylinderScale = Cvar_Get ("sv_cylinderScale", "1.1f", 0 );' in sv_init
 		and "qboolean SV_ShouldErrorExit( errorParm_t code ) {" in sv_main
 		and "qboolean SV_CheckIdleServerExit( int currentTime ) {" in sv_main
+		and "void SV_CheckTimeouts( void ) {" in sv_main
+		and 'Com_Printf( "server has been empty for %d seconds, quit\\n", sv_quitOnEmpty->integer );' in sv_main
+		and 'if ( sv_idleRestart && sv_idleRestart->integer && svs.time > 0x5265c00 && SV_CountActiveHumanClients() == 0 ) {' in sv_main
+		and 'SV_Shutdown( "Restarting idle server" );' in sv_main
+		and 'Cbuf_AddText( "vstr nextmap\\n" );' in sv_main
 		and "static char *SV_GetGameEntityString( void ) {" in sv_game
 		and "void Com_InitSteamGameServer( void ) {" in common
 		and "test_server_control_plane_cvars_restore_retail_runtime_owners" in platform_services_tests
@@ -333,13 +365,31 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 		{
 			"plan_marks_closed": sv_g05_closed,
 			"control_plane_cvars_present": (
-				'sv_idleExit = Cvar_Get ("sv_idleExit", "120", 0 );' in sv_init
+				'sv_floodProtect = Cvar_Get ("sv_floodProtect", "10", CVAR_ARCHIVE );' in sv_init
+				and 'sv_serverType = Cvar_Get ("sv_serverType", "0", CVAR_ARCHIVE );' in sv_init
+				and 'sv_ammoPack = Cvar_Get ("g_ammoPack", "1", CVAR_LATCH );' in sv_init
+				and 'sv_idleRestart = Cvar_Get ("sv_idleRestart", "1", 0 );' in sv_init
+				and 'sv_idleExit = Cvar_Get ("sv_idleExit", "120", 0 );' in sv_init
 				and 'sv_errorExit = Cvar_Get ("sv_errorExit", "1", 0 );' in sv_init
+				and 'sv_quitOnEmpty = Cvar_Get ("sv_quitOnEmpty", "0", 0 );' in sv_init
+				and 'sv_quitOnExitLevel = Cvar_Get ("sv_quitOnExitLevel", "0", 0 );' in sv_init
+				and 'sv_fps = Cvar_Get ("sv_fps", "40", CVAR_ROM );' in sv_init
+				and 'sv_timeout = Cvar_Get ("sv_timeout", "40", CVAR_TEMP );' in sv_init
+				and 'sv_padPackets = Cvar_GetBounded( "sv_padPackets", "0", "0", "0", CVAR_VM_CREATED );' in sv_init
 				and 'sv_cylinderScale = Cvar_Get ("sv_cylinderScale", "1.1f", 0 );' in sv_init
 			),
 			"shutdown_policy_owner_present": (
 				"qboolean SV_ShouldErrorExit( errorParm_t code ) {" in sv_main
 				and "qboolean SV_CheckIdleServerExit( int currentTime ) {" in sv_main
+			),
+			"empty_server_policy_present": (
+				"void SV_CheckTimeouts( void ) {" in sv_main
+				and 'Com_Printf( "server has been empty for %d seconds, quit\\n", sv_quitOnEmpty->integer );' in sv_main
+			),
+			"idle_restart_owner_present": (
+				'if ( sv_idleRestart && sv_idleRestart->integer && svs.time > 0x5265c00 && SV_CountActiveHumanClients() == 0 ) {' in sv_main
+				and 'SV_Shutdown( "Restarting idle server" );' in sv_main
+				and 'Cbuf_AddText( "vstr nextmap\\n" );' in sv_main
 			),
 			"alt_entity_owner_present": "static char *SV_GetGameEntityString( void ) {" in sv_game,
 			"focused_validation_present": "test_server_control_plane_cvars_restore_retail_runtime_owners" in platform_services_tests,

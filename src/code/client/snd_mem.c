@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "snd_local.h"
 
-#define DEF_COMSOUNDMEGS "8"
+#define DEF_COMSOUNDMEGS "16"
 
 /*
 ===============================================================================
@@ -73,6 +73,34 @@ redo:
 	return v;
 }
 
+/*
+=============
+SND_shutdown
+=============
+*/
+void SND_shutdown( void ) {
+	if ( buffer ) {
+		free( buffer );
+		buffer = NULL;
+	}
+
+	if ( sfxScratchBuffer ) {
+		free( sfxScratchBuffer );
+		sfxScratchBuffer = NULL;
+	}
+
+	freelist = NULL;
+	inUse = 0;
+	totalInUse = 0;
+	sfxScratchPointer = NULL;
+	sfxScratchIndex = 0;
+}
+
+/*
+=============
+SND_setup
+=============
+*/
 void SND_setup() {
 	sndBuffer *p, *q;
 	cvar_t	*cv;
@@ -86,8 +114,10 @@ void SND_setup() {
 	// allocate the stack based hunk allocator
 	sfxScratchBuffer = malloc(SND_CHUNK_SIZE * sizeof(short) * 4);	//Hunk_Alloc(SND_CHUNK_SIZE * sizeof(short) * 4);
 	sfxScratchPointer = NULL;
+	sfxScratchIndex = 0;
 
 	inUse = scs*sizeof(sndBuffer);
+	totalInUse = 0;
 	p = buffer;;
 	q = p + scs;
 	while (--q > p)
@@ -295,6 +325,37 @@ static qboolean S_IsOggSound( const char *name, const byte *data, int length ) {
 }
 
 /*
+=============
+S_LoadSoundFile
+
+Loads the requested path and retries with a default `.ogg` extension when the
+original asset is missing, matching the retail Quake Live sound-load seam.
+=============
+*/
+static qboolean S_LoadSoundFile( const char *name, char *resolvedName, int resolvedNameSize, byte **outData, int *outSize ) {
+	if ( !name || !resolvedName || resolvedNameSize <= 0 || !outData || !outSize ) {
+		return qfalse;
+	}
+
+	*outData = NULL;
+	*outSize = 0;
+
+	Q_strncpyz( resolvedName, name, resolvedNameSize );
+	*outSize = FS_ReadFile( resolvedName, (void **)outData );
+	if ( *outData ) {
+		return qtrue;
+	}
+
+	COM_DefaultExtension( resolvedName, resolvedNameSize, ".ogg" );
+	if ( !Q_stricmp( resolvedName, name ) ) {
+		return qfalse;
+	}
+
+	*outSize = FS_ReadFile( resolvedName, (void **)outData );
+	return ( *outData != NULL );
+}
+
+/*
 ================
 ResampleSfx
 
@@ -398,6 +459,7 @@ qboolean S_LoadSound( sfx_t *sfx )
 	short	*oggPcm;
 	wavinfo_t	info;
 	int			 size;
+	char		loadName[MAX_QPATH];
 	qboolean	isOgg;
 
 	// player specific sounds are never directly loaded
@@ -406,25 +468,24 @@ qboolean S_LoadSound( sfx_t *sfx )
 	}
 
 	// load it in
-	size = FS_ReadFile( sfx->soundName, (void **)&data );
-	if ( !data ) {
+	if ( !S_LoadSoundFile( sfx->soundName, loadName, sizeof( loadName ), &data, &size ) ) {
 		return qfalse;
 	}
 
 	oggPcm = NULL;
 	source = NULL;
-	isOgg = S_IsOggSound( sfx->soundName, data, size );
+	isOgg = S_IsOggSound( loadName, data, size );
 
 	if ( isOgg ) {
-		if ( !S_VorbisDecodeMemory( sfx->soundName, data, size, &info, &oggPcm ) ) {
+		if ( !S_VorbisDecodeMemory( loadName, data, size, &info, &oggPcm ) ) {
 			FS_FreeFile( data );
 			return qfalse;
 		}
 		source = (byte *)oggPcm;
 	} else {
-		info = GetWavinfo( sfx->soundName, data, size );
+		info = GetWavinfo( loadName, data, size );
 		if ( info.channels != 1 ) {
-			Com_Printf ("%s is a stereo wav file\n", sfx->soundName);
+			Com_Printf ("%s is a stereo wav file\n", loadName);
 			FS_FreeFile (data);
 			return qfalse;
 		}
@@ -432,11 +493,11 @@ qboolean S_LoadSound( sfx_t *sfx )
 	}
 
 	if ( info.width == 1 ) {
-		Com_DPrintf(S_COLOR_YELLOW "WARNING: %s is a 8 bit wav file\n", sfx->soundName);
+		Com_DPrintf(S_COLOR_YELLOW "WARNING: %s is a 8 bit wav file\n", loadName);
 	}
 
 	if ( info.rate != 22050 ) {
-		Com_DPrintf(S_COLOR_YELLOW "WARNING: %s is not a 22kHz wav file\n", sfx->soundName);
+		Com_DPrintf(S_COLOR_YELLOW "WARNING: %s is not a 22kHz wav file\n", loadName);
 	}
 
 	if ( info.samples <= 0 || info.width <= 0 || !source ) {
@@ -491,5 +552,5 @@ qboolean S_LoadSound( sfx_t *sfx )
 }
 
 void S_DisplayFreeMemory() {
-	Com_Printf("%d bytes free sound buffer memory, %d total used\n", inUse, totalInUse);
+	Com_Printf("%d bytes sound buffer memory in use, %d free\n", totalInUse, inUse);
 }

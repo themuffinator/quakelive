@@ -311,22 +311,45 @@ static void CG_RaceFormatMilliseconds( int milliseconds, char *buffer, size_t bu
 
 /*
 =============
-CG_RaceResetState
+CG_RaceResetRunState
 
-Clears cached race HUD state so configstrings can repopulate it.
+Clears the cached current-run Race HUD state while optionally preserving the
+recorded best and last times.
 =============
 */
-void CG_RaceResetState( void ) {
+void CG_RaceResetRunState( qboolean clearRecordedTimes ) {
 	int i;
 
 	memset( cgs.raceProgress, 0, sizeof( cgs.raceProgress ) );
-	memset( cgs.raceStatus, 0, sizeof( cgs.raceStatus ) );
-	memset( cgs.raceLeaderSplits, 0, sizeof( cgs.raceLeaderSplits ) );
-	cgs.raceStatusSequence = 0;
-	cgs.raceLeaderClientNum = -1;
+	cgs.raceInfoActive = qfalse;
+	cgs.raceInfoStartTime = 0;
+	cgs.raceInfoCheckpointCount = 0;
+	cgs.raceInfoCurrentCheckpointEntityNum = -1;
+	cgs.raceInfoNextCheckpointEntityNum = -1;
 	for ( i = 0; i < MAX_CLIENTS; ++i ) {
 		cgs.raceProgress[i].currentCheckpoint = -1;
 	}
+
+	if ( clearRecordedTimes ) {
+		memset( cgs.raceStatus, 0, sizeof( cgs.raceStatus ) );
+		memset( cgs.raceLeaderSplits, 0, sizeof( cgs.raceLeaderSplits ) );
+		cgs.raceInfoLastTime = -1;
+		cgs.raceLeaderSplitCount = 0;
+		cgs.raceStatusSequence = 0;
+		cgs.raceLeaderClientNum = -1;
+	}
+}
+
+/*
+=============
+CG_RaceResetState
+
+Clears cached Race HUD state so configstrings can repopulate it.
+=============
+*/
+void CG_RaceResetState( void ) {
+	CG_RaceResetRunState( qtrue );
+
 	if ( cgs.gametype == GT_RACE ) {
 		trap_SendClientCommand( "raceinit" );
 	}
@@ -656,6 +679,45 @@ static void CG_RacePlayCheckpointFeedback( const cgRaceClientProgress_t *progres
 
 /*
 =============
+CG_RaceApplyObservedFollowProgress
+
+Uses the retail Race temp-entity and race_info payload instead of origin
+prediction while tracking the active local or followed runner.
+=============
+*/
+static qboolean CG_RaceApplyObservedFollowProgress( int clientNum, cgRaceClientProgress_t *progress ) {
+	if ( !progress || !cg.snap ) {
+		return qfalse;
+	}
+
+	if ( cg.snap->ps.pm_flags & PMF_FOLLOW ) {
+		if ( clientNum != cg.spectatorFollowClient ) {
+			return qfalse;
+		}
+	} else {
+		if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR || clientNum != cg.clientNum ) {
+			return qfalse;
+		}
+	}
+
+	progress->initialized = qtrue;
+	progress->runActive = cgs.raceInfoActive;
+	if ( cgs.raceInfoActive ) {
+		progress->currentCheckpoint = cgs.raceInfoCheckpointCount;
+		if ( progress->currentCheckpoint < 0 ) {
+			progress->currentCheckpoint = 0;
+		}
+	} else if ( cgs.raceInfoLastTime >= 0 && cgs.racePointCount > 0 ) {
+		progress->currentCheckpoint = cgs.racePointCount - 1;
+	} else {
+		progress->currentCheckpoint = -1;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
 CG_RaceUpdateClientProgress
 
 Updates the predicted checkpoint state for a specific client.
@@ -677,6 +739,10 @@ static void CG_RaceUpdateClientProgress( int clientNum, const vec3_t origin, con
 	if ( cgs.racePointCount <= 0 ) {
 		progress->runActive = qfalse;
 		progress->currentCheckpoint = -1;
+		return;
+	}
+
+	if ( CG_RaceApplyObservedFollowProgress( clientNum, progress ) ) {
 		return;
 	}
 
@@ -878,19 +944,28 @@ Computes the delta between the current split and the leader split.
 =============
 */
 static qboolean CG_RaceCheckpointDelta( const cgRaceClientStatus_t *status, const cgRaceClientProgress_t *progress, int *deltaOut ) {
-	int index;
+	int	index;
+	int	currentElapsed;
 
-	if ( !status || !progress || !deltaOut ) {
+	if ( !progress || !deltaOut ) {
 		return qfalse;
 	}
-	if ( !progress->runActive || status->currentElapsed < 0 ) {
+
+	currentElapsed = -1;
+	if ( cgs.raceInfoActive && cgs.raceInfoStartTime > 0 ) {
+		currentElapsed = cg.time - cgs.raceInfoStartTime;
+	} else if ( status && status->currentElapsed >= 0 ) {
+		currentElapsed = status->currentElapsed;
+	}
+
+	if ( !progress->runActive || currentElapsed < 0 ) {
 		return qfalse;
 	}
 	index = progress->currentCheckpoint;
 	if ( index <= 0 || index >= cgs.raceLeaderSplitCount ) {
 		return qfalse;
 	}
-	*deltaOut = status->currentElapsed - cgs.raceLeaderSplits[index];
+	*deltaOut = currentElapsed - cgs.raceLeaderSplits[index];
 	return qtrue;
 }
 
@@ -1005,6 +1080,8 @@ Builds the race timing ownerdraw text for the active client.
 static qboolean CG_RaceBuildTimesStrings( char *primary, size_t primarySize, char *secondary, size_t secondarySize ) {
 	const cgRaceClientStatus_t *status;
 	cgRaceClientProgress_t *progress;
+	int		currentElapsed;
+	int		lastTime;
 
 	if ( primary && primarySize > 0 ) {
 		primary[0] = '\0';
@@ -1024,11 +1101,22 @@ static qboolean CG_RaceBuildTimesStrings( char *primary, size_t primarySize, cha
 		return qtrue;
 	}
 
+	currentElapsed = -1;
+	if ( cgs.raceInfoActive && cgs.raceInfoStartTime > 0 ) {
+		currentElapsed = cg.time - cgs.raceInfoStartTime;
+	} else if ( status && status->currentElapsed >= 0 ) {
+		currentElapsed = status->currentElapsed;
+	}
+	lastTime = ( cgs.raceInfoLastTime >= 0 ) ? cgs.raceInfoLastTime : -1;
+	if ( lastTime < 0 && status && status->lastTime >= 0 ) {
+		lastTime = status->lastTime;
+	}
+
 	if ( primary && primarySize > 0 ) {
-		if ( status && status->currentElapsed >= 0 ) {
+		if ( currentElapsed >= 0 ) {
 			int delta;
 			char timeBuffer[32];
-			CG_RaceFormatMilliseconds( status->currentElapsed, timeBuffer, sizeof( timeBuffer ) );
+			CG_RaceFormatMilliseconds( currentElapsed, timeBuffer, sizeof( timeBuffer ) );
 			Com_sprintf( primary, primarySize, "Cur %s", timeBuffer );
 			if ( CG_RaceCheckpointDelta( status, progress, &delta ) ) {
 				char deltaText[32];
@@ -1037,9 +1125,9 @@ static qboolean CG_RaceBuildTimesStrings( char *primary, size_t primarySize, cha
 				Com_sprintf( extra, sizeof( extra ), "  d%s", deltaText );
 				Q_strcat( primary, primarySize, extra );
 			}
-		} else if ( status && status->lastTime >= 0 ) {
+		} else if ( lastTime >= 0 ) {
 			char timeBuffer[32];
-			CG_RaceFormatMilliseconds( status->lastTime, timeBuffer, sizeof( timeBuffer ) );
+			CG_RaceFormatMilliseconds( lastTime, timeBuffer, sizeof( timeBuffer ) );
 			Com_sprintf( primary, primarySize, "Last %s", timeBuffer );
 		} else {
 			Q_strncpyz( primary, "Ready", primarySize );
@@ -3089,6 +3177,7 @@ static void CG_DrawServerSettings(rectDef_t *rect, float text_x, float text_y, f
 			iconY = y - iconSize + 2.0f;
 
 			for ( i = 0; i < ARRAY_LEN( cgServerSettingsWeaponIcons ); i++ ) {
+				float		badgeSize;
 				qhandle_t	icon;
 				weapon_t	weapon;
 
@@ -3097,12 +3186,16 @@ static void CG_DrawServerSettings(rectDef_t *rect, float text_x, float text_y, f
 				}
 
 				weapon = cgServerSettingsWeaponIcons[i].weapon;
-				icon = cg_weapons[weapon].weaponIcon;
+				icon = CG_GetStartingWeaponIconHandle( weapon );
 				if ( !icon ) {
 					continue;
 				}
 
 				CG_DrawPic( iconX, iconY, iconSize, iconSize, icon );
+				badgeSize = iconSize * 0.5f;
+				if ( cgs.media.modifiedIcon != 0 ) {
+					CG_DrawPic( iconX + iconSize * 0.75f, iconY + iconSize * 0.5f, badgeSize, badgeSize, cgs.media.modifiedIcon );
+				}
 				iconX += iconSize + 2.0f;
 			}
 		}
@@ -4960,20 +5053,21 @@ typedef struct {
 	int				statIndex;
 	int				timeHeldStatIndex;
 	cgTeamPickupSummaryIcon_t	icon;
+	int				countTextOffsetX;
 } cgTeamPickupSummaryEntry_t;
 
 static const cgTeamPickupSummaryEntry_t cgTeamPickupSummaryEntries[] = {
-	{ CG_TEAMSTAT_PICKUPS_RA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_RA },
-	{ CG_TEAMSTAT_PICKUPS_YA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_YA },
-	{ CG_TEAMSTAT_PICKUPS_GA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_GA },
-	{ CG_TEAMSTAT_PICKUPS_MH, -1, CG_TEAM_PICKUP_SUMMARY_ICON_MH },
-	{ CG_TEAMSTAT_PICKUPS_MEDKIT, -1, CG_TEAM_PICKUP_SUMMARY_ICON_MEDKIT },
-	{ CG_TEAMSTAT_PICKUPS_FLAG, CG_TEAMSTAT_TIMEHELD_FLAG, CG_TEAM_PICKUP_SUMMARY_ICON_FLAG },
-	{ CG_TEAMSTAT_PICKUPS_QUAD, CG_TEAMSTAT_TIMEHELD_QUAD, CG_TEAM_PICKUP_SUMMARY_ICON_QUAD },
-	{ CG_TEAMSTAT_PICKUPS_BS, CG_TEAMSTAT_TIMEHELD_BS, CG_TEAM_PICKUP_SUMMARY_ICON_BS },
-	{ CG_TEAMSTAT_PICKUPS_REGEN, CG_TEAMSTAT_TIMEHELD_REGEN, CG_TEAM_PICKUP_SUMMARY_ICON_REGEN },
-	{ CG_TEAMSTAT_PICKUPS_HASTE, CG_TEAMSTAT_TIMEHELD_HASTE, CG_TEAM_PICKUP_SUMMARY_ICON_HASTE },
-	{ CG_TEAMSTAT_PICKUPS_INVIS, CG_TEAMSTAT_TIMEHELD_INVIS, CG_TEAM_PICKUP_SUMMARY_ICON_INVIS }
+	{ CG_TEAMSTAT_PICKUPS_RA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_RA, 14 },
+	{ CG_TEAMSTAT_PICKUPS_YA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_YA, 11 },
+	{ CG_TEAMSTAT_PICKUPS_GA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_GA, 14 },
+	{ CG_TEAMSTAT_PICKUPS_MH, -1, CG_TEAM_PICKUP_SUMMARY_ICON_MH, 14 },
+	{ CG_TEAMSTAT_PICKUPS_MEDKIT, -1, CG_TEAM_PICKUP_SUMMARY_ICON_MEDKIT, 14 },
+	{ CG_TEAMSTAT_PICKUPS_FLAG, CG_TEAMSTAT_TIMEHELD_FLAG, CG_TEAM_PICKUP_SUMMARY_ICON_FLAG, 14 },
+	{ CG_TEAMSTAT_PICKUPS_QUAD, CG_TEAMSTAT_TIMEHELD_QUAD, CG_TEAM_PICKUP_SUMMARY_ICON_QUAD, 14 },
+	{ CG_TEAMSTAT_PICKUPS_BS, CG_TEAMSTAT_TIMEHELD_BS, CG_TEAM_PICKUP_SUMMARY_ICON_BS, 14 },
+	{ CG_TEAMSTAT_PICKUPS_REGEN, CG_TEAMSTAT_TIMEHELD_REGEN, CG_TEAM_PICKUP_SUMMARY_ICON_REGEN, 14 },
+	{ CG_TEAMSTAT_PICKUPS_HASTE, CG_TEAMSTAT_TIMEHELD_HASTE, CG_TEAM_PICKUP_SUMMARY_ICON_HASTE, 14 },
+	{ CG_TEAMSTAT_PICKUPS_INVIS, CG_TEAMSTAT_TIMEHELD_INVIS, CG_TEAM_PICKUP_SUMMARY_ICON_INVIS, 14 }
 };
 
 static qhandle_t cgTeamPickupSummaryIconHandles[CG_TEAM_PICKUP_SUMMARY_ICON_COUNT];
@@ -5122,6 +5216,7 @@ and `CG_BLUE_TEAM_MAP_PICKUPS`.
 static void CG_DrawTeamPickupSummaryOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
 	team_t	team;
 	float	drawX;
+	float	drawY;
 	int	i;
 
 	if ( !rect ) {
@@ -5135,7 +5230,8 @@ static void CG_DrawTeamPickupSummaryOwnerDraw( rectDef_t *rect, float scale, vec
 		return;
 	}
 
-	drawX = rect->x;
+	drawX = (float)(int)rect->x;
+	drawY = (float)(int)rect->y;
 	trap_R_SetColor( NULL );
 
 	for ( i = 0; i < ARRAY_LEN( cgTeamPickupSummaryEntries ); i++ ) {
@@ -5161,22 +5257,22 @@ static void CG_DrawTeamPickupSummaryOwnerDraw( rectDef_t *rect, float scale, vec
 			timeHeld = 0;
 			CG_GetTeamScoreStatValue( team, entry->timeHeldStatIndex, &timeHeld );
 
-			CG_DrawPic( drawX, rect->y - 7.0f, rect->w, rect->h, iconHandle );
+			CG_DrawPic( drawX, drawY - 7.0f, rect->w, rect->h, iconHandle );
 			Com_sprintf( countText, sizeof( countText ), "%i", pickupCount );
-			CG_Text_Paint( drawX + 14.0f, rect->y + 8.0f, scale, color, countText, 0, 0, textStyle );
+			CG_Text_Paint( drawX + entry->countTextOffsetX, drawY + 8.0f, scale, color, countText, 0, 0, textStyle );
 			if ( timeHeld > 0 ) {
 				Q_strncpyz( timeText, CG_FormatMinutesSeconds( timeHeld ), sizeof( timeText ) );
 			} else {
 				Q_strncpyz( timeText, "-", sizeof( timeText ) );
 			}
-			CG_Text_Paint( drawX + 2.0f, rect->y + 15.0f, scale, color, timeText, 0, 0, textStyle );
+			CG_Text_Paint( drawX + 2.0f, drawY + 15.0f, scale, color, timeText, 0, 0, textStyle );
 			drawX += 28.0f;
 		} else {
 			char	countText[16];
 
-			CG_DrawPic( drawX, rect->y, rect->w, rect->h, iconHandle );
+			CG_DrawPic( drawX, drawY, rect->w, rect->h, iconHandle );
 			Com_sprintf( countText, sizeof( countText ), "%i", pickupCount );
-			CG_Text_Paint( drawX + 14.0f, rect->y + rect->h, scale, color, countText, 0, 0, textStyle );
+			CG_Text_Paint( drawX + entry->countTextOffsetX, drawY + 15.0f, scale, color, countText, 0, 0, textStyle );
 			drawX += 25.0f;
 		}
 	}
@@ -6361,10 +6457,13 @@ Reports whether an ownerdraw should refresh competitive scoreboard cache.
 */
 static qboolean CG_IsCompetitiveScoreOwnerDraw( int ownerDraw ) {
 	if ( ownerDraw == CG_ROUNDTIMER || ownerDraw == CG_OVERTIME ||
+		ownerDraw == CG_PLAYER_COUNTS ||
+		ownerDraw == CG_1ST_PLACE_SCORE || ownerDraw == CG_2ND_PLACE_SCORE ||
 		ownerDraw == CG_1ST_PLYR || ownerDraw == CG_1ST_PLYR_SCORE ||
 		ownerDraw == CG_1ST_PLYR_HEALTH_ARMOR || ownerDraw == CG_1ST_PLYR_AVATAR ||
 		ownerDraw == CG_2ND_PLYR || ownerDraw == CG_2ND_PLYR_SCORE ||
 		ownerDraw == CG_2ND_PLYR_HEALTH_ARMOR || ownerDraw == CG_2ND_PLYR_AVATAR ||
+		ownerDraw == CG_TEAM_PLYR_COUNT || ownerDraw == CG_ENEMY_PLYR_COUNT ||
 		ownerDraw == CG_MATCH_WINNER || ownerDraw == CG_PLYR_END_GAME_SCORE ||
 		ownerDraw == CG_1STPLACE_PLYR_MODEL || ownerDraw == CG_1STPLACE_PLYR_MODEL_ACTIVE ||
 		ownerDraw == CG_FLAG_STATUS || ownerDraw == CG_RED_BASESTATUS || ownerDraw == CG_BLUE_BASESTATUS ) {
@@ -8999,204 +9098,543 @@ static qboolean CG_ShowRedTeamHasBlueFlag( void ) {
 
 /*
 =============
+CG_HasHudNoticeMessage
+
+Reports whether the retail notice icon should be shown for the buffered
+system-message lane.
+=============
+*/
+static qboolean CG_HasHudNoticeMessage( void ) {
+	return ( systemChat[0] != '\0' ) ? qtrue : qfalse;
+}
+
+/*
+=============
+CG_HasHudPlayerMessage
+
+Reports whether the retail player-message indicator should be visible.
+=============
+*/
+static qboolean CG_HasHudPlayerMessage( void ) {
+	return ( teamChat1[0] != '\0' ) ? qtrue : qfalse;
+}
+
+/*
+=============
+CG_ShowPlayersRemaining
+
+Returns qtrue for the round-based team modes that drive the players-remaining
+HUD strips.
+=============
+*/
+static qboolean CG_ShowPlayersRemaining( void ) {
+	switch ( cgs.gametype ) {
+	case GT_CLAN_ARENA:
+	case GT_FREEZE:
+	case GT_ATTACK_DEFEND:
+	case GT_RED_ROVER:
+		return qtrue;
+	default:
+		return qfalse;
+	}
+}
+
+/*
+=============
+CG_GetLeadingHudTeam
+
+Resolves which team owns the leading placement slot for team HUD layouts.
+=============
+*/
+static team_t CG_GetLeadingHudTeam( void ) {
+	if ( cgs.gametype < GT_TEAM ) {
+		return TEAM_FREE;
+	}
+
+	if ( cgs.scores2 != SCORE_NOT_PRESENT && cgs.scores1 < cgs.scores2 ) {
+		return TEAM_BLUE;
+	}
+
+	return TEAM_RED;
+}
+
+/*
+=============
+CG_ShowPlayerIsFirstPlace
+
+Tracks whether the active local or followed player occupies the current top
+placement slot on the non-team HUD.
+=============
+*/
+static qboolean CG_ShowPlayerIsFirstPlace( void ) {
+	const score_t	*leader;
+	const score_t	*score;
+	int		clientNum;
+	int		rank;
+
+	if ( !cg.snap || cgs.gametype >= GT_TEAM ) {
+		return qfalse;
+	}
+
+	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR &&
+		!( cg.snap->ps.pm_flags & PMF_FOLLOW ) ) {
+		return qfalse;
+	}
+
+	clientNum = cg.snap->ps.clientNum;
+	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+		return qfalse;
+	}
+
+	leader = CG_GetActiveScoreByIndex( 0 );
+	score = CG_GetScoreForClientNum( clientNum );
+	if ( leader && score ) {
+		return ( leader->score == score->score ) ? qtrue : qfalse;
+	}
+
+	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
+		return qfalse;
+	}
+
+	rank = cg.snap->ps.persistant[PERS_RANK] & ~RANK_TIED_FLAG;
+	return ( rank == 0 ) ? qtrue : qfalse;
+}
+
+/*
+=============
 CG_OwnerDrawVisible
 
 Evaluates the ownerdraw visibility bitmasks for HUD and menu scripts.
 =============
 */
 qboolean CG_OwnerDrawVisible(int flags) {
+	qboolean vis = qtrue;
 
-	if (flags & CG_SHOW_TEAMINFO) {
-		return (cg_currentSelectedPlayer.integer == numSortedTeamPlayers);
-	}
-
-	if (flags & CG_SHOW_NOTEAMINFO) {
-		return !(cg_currentSelectedPlayer.integer == numSortedTeamPlayers);
-	}
-
-	if (flags & CG_SHOW_OTHERTEAMHASFLAG) {
-		return CG_OtherTeamHasFlag();
-	}
-
-	if (flags & CG_SHOW_YOURTEAMHASENEMYFLAG) {
-		return CG_YourTeamHasFlag();
-	}
-
-	if (flags & (CG_SHOW_BLUE_TEAM_HAS_REDFLAG | CG_SHOW_RED_TEAM_HAS_BLUEFLAG)) {
-		if (flags & CG_SHOW_BLUE_TEAM_HAS_REDFLAG && CG_ShowBlueTeamHasRedFlag()) {
-			return qtrue;
-		} else if (flags & CG_SHOW_RED_TEAM_HAS_BLUEFLAG && CG_ShowRedTeamHasBlueFlag()) {
-			return qtrue;
-		}
-		return qfalse;
-	}
-
-	if (flags & CG_SHOW_ANYTEAMGAME) {
-		if( cgs.gametype >= GT_TEAM) {
-			return qtrue;
-		}
-	}
-
-	if (flags & CG_SHOW_ANYNONTEAMGAME) {
-		if( cgs.gametype < GT_TEAM) {
-			return qtrue;
-		}
-	}
-
-	if (flags & CG_SHOW_HARVESTER) {
-		if( cgs.gametype == GT_HARVESTER ) {
-			return qtrue;
-    } else {
-      return qfalse;
-    }
-	}
-
-	if (flags & CG_SHOW_ONEFLAG) {
-		if( cgs.gametype == GT_1FCTF ) {
-			return qtrue;
-    } else {
-      return qfalse;
-    }
-	}
-
-	if (flags & CG_SHOW_CTF) {
-		if( cgs.gametype == GT_CTF ) {
-			return qtrue;
-		}
-	}
-
-	if (flags & CG_SHOW_OBELISK) {
-		if( cgs.gametype == GT_OBELISK ) {
-			return qtrue;
-    } else {
-      return qfalse;
-    }
-	}
-
-	if (flags & CG_SHOW_HEALTHCRITICAL) {
-		if (cg.snap->ps.stats[STAT_HEALTH] < 25) {
-			return qtrue;
-		}
-	}
-
-	if (flags & CG_SHOW_IF_PLAYER_HAS_FLAG) {
-		if (cg.snap->ps.powerups[PW_REDFLAG] || cg.snap->ps.powerups[PW_BLUEFLAG] || cg.snap->ps.powerups[PW_NEUTRALFLAG]) {
-			return qtrue;
-		}
-	}
-
-	if (flags & CG_SHOW_IF_PLYR1) {
-		return CG_SpectatorPlayerSlotActive( 0 );
-	}
-
-	if (flags & CG_SHOW_IF_PLYR2) {
-		return CG_SpectatorPlayerSlotActive( 1 );
-	}
-
-	if (flags & CG_SHOW_IF_G_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_GAUNTLET );
-	}
-
-	if (flags & CG_SHOW_IF_MG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_MACHINEGUN );
-	}
-
-	if (flags & CG_SHOW_IF_SG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_SHOTGUN );
-	}
-
-	if (flags & CG_SHOW_IF_GL_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_GRENADE_LAUNCHER );
-	}
-
-	if (flags & CG_SHOW_IF_RL_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_ROCKET_LAUNCHER );
-	}
-
-	if (flags & CG_SHOW_IF_LG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_LIGHTNING );
-	}
-
-	if (flags & CG_SHOW_IF_RG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_RAILGUN );
-	}
-
-	if (flags & CG_SHOW_IF_PG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_PLASMAGUN );
-	}
-
-	if (flags & CG_SHOW_IF_BFG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_BFG );
-	}
-
-	if (flags & CG_SHOW_IF_CG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_CHAINGUN );
-	}
-
-	if (flags & CG_SHOW_IF_NG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_NAILGUN );
-	}
-
-	if (flags & CG_SHOW_IF_PL_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_PROX_LAUNCHER );
-	}
-
-	if (flags & CG_SHOW_IF_HMG_FIRED) {
-		return CG_LocalPlayerHasWeapon( WP_HEAVY_MACHINEGUN );
-	}
-
-	if (flags & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED)) {
-		qboolean loadoutsEnabled = CG_LoadoutsEnabled();
-
-		if (flags & CG_SHOW_IF_LOADOUT_ENABLED) {
-			return loadoutsEnabled;
+	while ( flags ) {
+		if ( flags & CG_SHOW_TEAMINFO ) {
+			if ( cg_currentSelectedPlayer.integer != numSortedTeamPlayers ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_TEAMINFO;
 		}
 
-		return (loadoutsEnabled == qfalse);
-	}
-
-	if (flags & (CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC |
-		CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC)) {
-		team_t playerTeam = TEAM_FREE;
-		qboolean spectator = qfalse;
-
-		if (cg.snap) {
-			playerTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
-			spectator = (playerTeam == TEAM_SPECTATOR) || (cg.snap->ps.pm_type == PM_SPECTATOR) ||
-				(cg.snap->ps.pm_flags & PMF_FOLLOW);
+		if ( flags & CG_SHOW_NOTEAMINFO ) {
+			if ( cg_currentSelectedPlayer.integer == numSortedTeamPlayers ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_NOTEAMINFO;
 		}
 
-		if (flags & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC) {
-			return (playerTeam == TEAM_RED) || spectator;
+		if ( flags & CG_SHOW_OTHERTEAMHASFLAG ) {
+			if ( !CG_OtherTeamHasFlag() ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_OTHERTEAMHASFLAG;
 		}
 
-		if (flags & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC) {
-			return (playerTeam == TEAM_BLUE) || spectator;
+		if ( flags & CG_SHOW_YOURTEAMHASENEMYFLAG ) {
+			if ( !CG_YourTeamHasFlag() ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_YOURTEAMHASENEMYFLAG;
 		}
 
-		if (flags & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC) {
-			return (playerTeam == TEAM_RED) && !spectator;
+		if (flags & (CG_SHOW_BLUE_TEAM_HAS_REDFLAG | CG_SHOW_RED_TEAM_HAS_BLUEFLAG)) {
+			qboolean showFlagCarrier = qfalse;
+
+			if (flags & CG_SHOW_BLUE_TEAM_HAS_REDFLAG && CG_ShowBlueTeamHasRedFlag()) {
+				showFlagCarrier = qtrue;
+			} else if (flags & CG_SHOW_RED_TEAM_HAS_BLUEFLAG && CG_ShowRedTeamHasBlueFlag()) {
+				showFlagCarrier = qtrue;
+			}
+
+			if ( !showFlagCarrier ) {
+				vis = qfalse;
+			}
+			flags &= ~( CG_SHOW_BLUE_TEAM_HAS_REDFLAG | CG_SHOW_RED_TEAM_HAS_BLUEFLAG );
 		}
 
-		return (playerTeam == TEAM_BLUE) && !spectator;
+		if ( flags & CG_SHOW_DOMINATION ) {
+			if ( cgs.gametype != GT_DOMINATION ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_DOMINATION;
+		}
+
+		if ( flags & CG_SHOW_IF_NOTICE_PRESENT ) {
+			if ( !CG_HasHudNoticeMessage() ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_NOTICE_PRESENT;
+		}
+
+		if ( flags & CG_SHOW_IF_MSG_PRESENT ) {
+			if ( !CG_HasHudPlayerMessage() ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_MSG_PRESENT;
+		}
+
+		if (flags & (CG_SHOW_IF_RED_IS_FIRST_PLACE | CG_SHOW_IF_BLUE_IS_FIRST_PLACE)) {
+			team_t leadingTeam = CG_GetLeadingHudTeam();
+			qboolean showLeadingTeam = qfalse;
+
+			if ( flags & CG_SHOW_IF_RED_IS_FIRST_PLACE && leadingTeam == TEAM_RED ) {
+				showLeadingTeam = qtrue;
+			}
+
+			if ( flags & CG_SHOW_IF_BLUE_IS_FIRST_PLACE && leadingTeam == TEAM_BLUE ) {
+				showLeadingTeam = qtrue;
+			}
+
+			if ( !showLeadingTeam ) {
+				vis = qfalse;
+			}
+			flags &= ~( CG_SHOW_IF_RED_IS_FIRST_PLACE | CG_SHOW_IF_BLUE_IS_FIRST_PLACE );
+		}
+
+		if (flags & (CG_SHOW_IF_PLYR_IS_FIRST_PLACE | CG_SHOW_IF_PLYR_IS_NOT_FIRST_PLACE)) {
+			qboolean isFirstPlace = CG_ShowPlayerIsFirstPlace();
+			qboolean showPlayerRank = qfalse;
+
+			if ( flags & CG_SHOW_IF_PLYR_IS_FIRST_PLACE && isFirstPlace ) {
+				showPlayerRank = qtrue;
+			}
+
+			if ( flags & CG_SHOW_IF_PLYR_IS_NOT_FIRST_PLACE && !isFirstPlace ) {
+				showPlayerRank = qtrue;
+			}
+
+			if ( !showPlayerRank ) {
+				vis = qfalse;
+			}
+			flags &= ~( CG_SHOW_IF_PLYR_IS_FIRST_PLACE | CG_SHOW_IF_PLYR_IS_NOT_FIRST_PLACE );
+		}
+
+		if ( flags & ( CG_SHOW_ANYTEAMGAME | UI_SHOW_ANYTEAMGAME ) ) {
+			if ( cgs.gametype < GT_TEAM ) {
+				vis = qfalse;
+			}
+			flags &= ~( CG_SHOW_ANYTEAMGAME | UI_SHOW_ANYTEAMGAME );
+		}
+
+		if ( flags & CG_SHOW_ANYNONTEAMGAME ) {
+			if ( cgs.gametype >= GT_TEAM ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_ANYNONTEAMGAME;
+		}
+
+		if ( flags & CG_SHOW_HARVESTER ) {
+			if ( cgs.gametype != GT_HARVESTER ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_HARVESTER;
+		}
+
+		if ( flags & CG_SHOW_ONEFLAG ) {
+			if ( cgs.gametype != GT_1FCTF ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_ONEFLAG;
+		}
+
+		if ( flags & CG_SHOW_DUEL ) {
+			if ( cgs.gametype != GT_TOURNAMENT ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_DUEL;
+		}
+
+		if ( flags & CG_SHOW_CLAN_ARENA ) {
+			if ( cgs.gametype != GT_CLAN_ARENA ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_CLAN_ARENA;
+		}
+
+		if ( flags & CG_SHOW_CTF ) {
+			if ( cgs.gametype != GT_CTF ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_CTF;
+		}
+
+		if ( flags & CG_SHOW_OBELISK ) {
+			if ( cgs.gametype != GT_OBELISK ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_OBELISK;
+		}
+
+		if ( flags & CG_SHOW_HEALTHCRITICAL ) {
+			if ( cg.snap->ps.stats[STAT_HEALTH] >= 25 ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_HEALTHCRITICAL;
+		}
+
+		if ( flags & CG_SHOW_IF_PLAYER_HAS_FLAG ) {
+			if ( !cg.snap->ps.powerups[PW_REDFLAG] && !cg.snap->ps.powerups[PW_BLUEFLAG] &&
+				!cg.snap->ps.powerups[PW_NEUTRALFLAG] ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_PLAYER_HAS_FLAG;
+		}
+
+		if ( flags & CG_SHOW_PLAYERS_REMAINING ) {
+			if ( !CG_ShowPlayersRemaining() ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_PLAYERS_REMAINING;
+		}
+
+		if ( flags & CG_SHOW_IF_PLYR1 ) {
+			if ( !CG_SpectatorPlayerSlotActive( 0 ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_PLYR1;
+		}
+
+		if ( flags & CG_SHOW_IF_PLYR2 ) {
+			if ( !CG_SpectatorPlayerSlotActive( 1 ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_PLYR2;
+		}
+
+		if ( flags & CG_SHOW_IF_G_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_GAUNTLET ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_G_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_MG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_MACHINEGUN ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_MG_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_SG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_SHOTGUN ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_SG_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_GL_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_GRENADE_LAUNCHER ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_GL_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_RL_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_ROCKET_LAUNCHER ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_RL_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_LG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_LIGHTNING ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_LG_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_RG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_RAILGUN ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_RG_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_PG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_PLASMAGUN ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_PG_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_BFG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_BFG ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_BFG_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_CG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_CHAINGUN ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_CG_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_NG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_NAILGUN ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_NG_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_PL_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_PROX_LAUNCHER ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_PL_FIRED;
+		}
+
+		if ( flags & CG_SHOW_IF_HMG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_HEAVY_MACHINEGUN ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_HMG_FIRED;
+		}
+
+		if (flags & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED |
+			UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED)) {
+			qboolean loadoutsEnabled = CG_LoadoutsEnabled();
+			qboolean showLoadoutState = qfalse;
+
+			if ( ( flags & ( CG_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_ENABLED ) ) && loadoutsEnabled ) {
+				showLoadoutState = qtrue;
+			}
+
+			if ( ( flags & ( CG_SHOW_IF_LOADOUT_DISABLED | UI_SHOW_IF_LOADOUT_DISABLED ) ) && !loadoutsEnabled ) {
+				showLoadoutState = qtrue;
+			}
+
+			if ( !showLoadoutState ) {
+				vis = qfalse;
+			}
+			flags &= ~( CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED |
+				UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED );
+		}
+
+		if (flags & (CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP |
+			UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP)) {
+			qboolean warmupVisible = qfalse;
+			qboolean inWarmup = ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) ? qtrue : qfalse;
+
+			if ( ( flags & ( CG_SHOW_IF_WARMUP | UI_SHOW_IF_WARMUP ) ) && inWarmup ) {
+				warmupVisible = qtrue;
+			}
+
+			if ( ( flags & ( CG_SHOW_IF_NOT_WARMUP | UI_SHOW_IF_NOT_WARMUP ) ) && !inWarmup ) {
+				warmupVisible = qtrue;
+			}
+
+			if ( !warmupVisible ) {
+				vis = qfalse;
+			}
+			flags &= ~( CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP |
+				UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP );
+		}
+
+		if ( flags & CG_SHOW_IF_CHAT_VISIBLE ) {
+			if ( !cg.chatHistoryVisible ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_CHAT_VISIBLE;
+		}
+
+		if ( flags & CG_SHOW_INTERMISSION ) {
+			if ( cg.snap->ps.pm_type != PM_INTERMISSION && cg.snap->ps.pm_type != PM_SPINTERMISSION ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_INTERMISSION;
+		}
+
+		if ( flags & ( CG_SHOW_NOTINTERMISSION | UI_SHOW_IF_NOT_INTERMISSION ) ) {
+			if ( cg.snap->ps.pm_type == PM_INTERMISSION || cg.snap->ps.pm_type == PM_SPINTERMISSION ) {
+				vis = qfalse;
+			}
+			flags &= ~( CG_SHOW_NOTINTERMISSION | UI_SHOW_IF_NOT_INTERMISSION );
+		}
+
+		if (flags & (CG_SHOW_IF_PLYR_IS_ON_RED | CG_SHOW_IF_PLYR_IS_ON_BLUE |
+			CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC |
+			CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC)) {
+			team_t playerTeam = TEAM_FREE;
+			qboolean spectator = qfalse;
+			qboolean showPlayerTeam = qfalse;
+
+			if (cg.snap) {
+				playerTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+				spectator = (playerTeam == TEAM_SPECTATOR) || (cg.snap->ps.pm_type == PM_SPECTATOR) ||
+					(cg.snap->ps.pm_flags & PMF_FOLLOW);
+			}
+
+			if ( flags & CG_SHOW_IF_PLYR_IS_ON_RED && playerTeam == TEAM_RED ) {
+				showPlayerTeam = qtrue;
+			}
+
+			if ( flags & CG_SHOW_IF_PLYR_IS_ON_BLUE && playerTeam == TEAM_BLUE ) {
+				showPlayerTeam = qtrue;
+			}
+
+			if ( flags & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC && ( playerTeam == TEAM_RED || spectator ) ) {
+				showPlayerTeam = qtrue;
+			}
+
+			if ( flags & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC && ( playerTeam == TEAM_BLUE || spectator ) ) {
+				showPlayerTeam = qtrue;
+			}
+
+			if ( flags & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC && playerTeam == TEAM_RED && !spectator ) {
+				showPlayerTeam = qtrue;
+			}
+
+			if ( flags & CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC && playerTeam == TEAM_BLUE && !spectator ) {
+				showPlayerTeam = qtrue;
+			}
+
+			if ( !showPlayerTeam ) {
+				vis = qfalse;
+			}
+			flags &= ~( CG_SHOW_IF_PLYR_IS_ON_RED | CG_SHOW_IF_PLYR_IS_ON_BLUE |
+				CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC |
+				CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC );
+		}
+
+		if ( flags & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) {
+			if ( !CG_SpectatorSlotFollowed( 0 ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_1ST_PLYR_FOLLOWED;
+		}
+
+		if ( flags & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) {
+			if ( !CG_SpectatorSlotFollowed( 1 ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_2ND_PLYR_FOLLOWED;
+		}
+
+		if ( flags & CG_SHOW_IF_1ST_PLYR_TRACKED ) {
+			if ( !CG_SpectatorSlotTracked( 0 ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_1ST_PLYR_TRACKED;
+		}
+
+		if ( flags & CG_SHOW_IF_2ND_PLYR_TRACKED ) {
+			if ( !CG_SpectatorSlotTracked( 1 ) ) {
+				vis = qfalse;
+			}
+			flags &= ~CG_SHOW_IF_2ND_PLYR_TRACKED;
+		}
+
+		if ( flags ) {
+			vis = qfalse;
+			flags = 0;
+		}
 	}
 
-	if ( flags & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) {
-		return CG_SpectatorSlotFollowed( 0 );
-	}
-
-	if ( flags & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) {
-		return CG_SpectatorSlotFollowed( 1 );
-	}
-
-	if ( flags & CG_SHOW_IF_1ST_PLYR_TRACKED ) {
-		return CG_SpectatorSlotTracked( 0 );
-	}
-
-	if ( flags & CG_SHOW_IF_2ND_PLYR_TRACKED ) {
-		return CG_SpectatorSlotTracked( 1 );
-	}
-	return qfalse;
+	return vis;
 }
 
 
@@ -9629,7 +10067,7 @@ static void CG_Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4
 	CG_AdjustFrom640( &screenMaxX, NULL, NULL, NULL );
 	CG_AdjustFrom640( &xBias, NULL, &xScale, &yScale );
 
-	fontHandle = ( scale <= cg_smallFont.value ) ? FONT_SANS : FONT_DEFAULT;
+	fontHandle = CG_SelectTextFontHandle( scale, ITEM_FONT_INHERIT );
 
 	trap_R_SetColor( color );
 	trap_QL_DrawScaledText(
@@ -11521,42 +11959,34 @@ static void CG_DrawBrowserWidget( void *widget ) {
 
 	CG_AllocBrowserWidgetState( item );
 
-	switch ( item->type ) {
-	case ITEM_TYPE_MODEL:
-		CG_DrawBrowserModelPreview( item );
-		break;
-	case ITEM_TYPE_LISTBOX:
-		CG_DrawBrowserListWidget( item );
-		break;
-	case ITEM_TYPE_TEXT:
-		CG_DrawBrowserText( item );
-		break;
-	case ITEM_TYPE_EDITFIELD:
-	case ITEM_TYPE_NUMERICFIELD:
-		CG_DrawBrowserTextField( item );
-		break;
-	case ITEM_TYPE_YESNO:
-		CG_DrawBrowserYesNoControl( item );
-		break;
-	case ITEM_TYPE_MULTI:
-		CG_DrawBrowserMultiControl( item );
-		break;
-	case ITEM_TYPE_BIND:
-		CG_DrawBrowserBindControl( item );
-		break;
-	case ITEM_TYPE_SLIDER:
-		CG_DrawBrowserSliderControl( item );
-		break;
-	case ITEM_TYPE_SLIDER_COLOR:
-		CG_DrawBrowserSliderColorControl( item );
-		break;
-	case ITEM_TYPE_PRESETLIST:
-		CG_DrawBrowserPresetList( item );
-		break;
-	default:
-		Item_Paint( item );
-		break;
+	/*
+	=============
+	Retail browser overlays paint through the shared item dispatcher so every
+	widget receives its window/background pass before any type-specific body
+	paint. This keeps decorative scoreboard frames authored as default text items
+	visible in cgame just like they are in the UI module.
+	=============
+	*/
+	Item_Paint( item );
+}
+
+/*
+=============
+CG_NormalizeBrowserFullscreenBackgroundRect
+
+Normalizes retail browser fullscreen backgroundSize coordinates into the cgame
+640x480 menu space before the active widescreen draw mode is applied.
+=============
+*/
+static void CG_NormalizeBrowserFullscreenBackgroundRect( rectDef_t *rect ) {
+	if ( rect == NULL ) {
+		return;
 	}
+
+	rect->x *= (float)SCREEN_WIDTH / 1920.0f;
+	rect->y *= (float)SCREEN_HEIGHT / 1080.0f;
+	rect->w *= (float)SCREEN_WIDTH / 1920.0f;
+	rect->h *= (float)SCREEN_HEIGHT / 1080.0f;
 }
 
 /*
@@ -11584,6 +12014,11 @@ void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint ) {
 		return;
 	}
 
+	if ( menu->window.ownerDrawFlags2 && cgDC.ownerDrawVisible &&
+		!cgDC.ownerDrawVisible( menu->window.ownerDrawFlags2 ) ) {
+		return;
+	}
+
 	if ( forcePaint ) {
 		menu->window.flags |= WINDOW_FORCED;
 	}
@@ -11604,6 +12039,7 @@ void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint ) {
 
 		if ( menu->backgroundSizeSet ) {
 			backgroundRect = menu->backgroundRect;
+			CG_NormalizeBrowserFullscreenBackgroundRect( &backgroundRect );
 		}
 
 		cgDC.drawHandlePic( backgroundRect.x, backgroundRect.y, backgroundRect.w, backgroundRect.h, menu->window.background );
@@ -12321,6 +12757,64 @@ static void CG_BrowserDisplayHandleKey( int key, qboolean down, int x, int y ) {
 
 /*
 =============
+CG_RoundScreenCursorCoord
+
+Matches the retail cgame cursor-coordinate rounding used after projecting host
+screen-space mouse coordinates back into HUD virtual space.
+=============
+*/
+static int CG_RoundScreenCursorCoord( float value ) {
+	if ( value < 0.0f ) {
+		return (int)( value - 0.5f );
+	}
+
+	return (int)( value + 0.5f );
+}
+
+/*
+=============
+CG_ConvertScreenCursorXToVirtual
+
+Projects a host screen-space X coordinate into the retail cgame cursor space,
+including the centered 4:3 widescreen bias path used by cgamex86.
+=============
+*/
+static int CG_ConvertScreenCursorXToVirtual( int x ) {
+	float	virtualX;
+
+	if ( cgs.screenXBias > 0.0f && cgs.screenYScale > 0.0f ) {
+		virtualX = ( (float)x - cgs.screenXBias ) / cgs.screenYScale;
+		return CG_RoundScreenCursorCoord( virtualX );
+	}
+
+	if ( cgs.glconfig.vidWidth <= 0 ) {
+		return 0;
+	}
+
+	virtualX = (float)x * ( (float)SCREEN_WIDTH / (float)cgs.glconfig.vidWidth );
+	return CG_RoundScreenCursorCoord( virtualX );
+}
+
+/*
+=============
+CG_ConvertScreenCursorYToVirtual
+
+Projects a host screen-space Y coordinate into the retail cgame cursor space.
+=============
+*/
+static int CG_ConvertScreenCursorYToVirtual( int y ) {
+	float	virtualY;
+
+	if ( cgs.glconfig.vidHeight <= 0 ) {
+		return 0;
+	}
+
+	virtualY = (float)y * ( (float)SCREEN_HEIGHT / (float)cgs.glconfig.vidHeight );
+	return CG_RoundScreenCursorCoord( virtualY );
+}
+
+/*
+=============
 CG_MouseEvent
 
 Routes mouse movement through the HUD when spectator overlays are active.
@@ -12342,19 +12836,8 @@ void CG_MouseEvent( int x, int y ) {
 		return;
 	}
 
-	cgs.cursorX += x;
-	if ( cgs.cursorX < 0 ) {
-		cgs.cursorX = 0;
-	} else if ( cgs.cursorX > 640 ) {
-		cgs.cursorX = 640;
-	}
-
-	cgs.cursorY += y;
-	if ( cgs.cursorY < 0 ) {
-		cgs.cursorY = 0;
-	} else if ( cgs.cursorY > 480 ) {
-		cgs.cursorY = 480;
-	}
+	cgs.cursorX = CG_ConvertScreenCursorXToVirtual( x );
+	cgs.cursorY = CG_ConvertScreenCursorYToVirtual( y );
 
 	cgDC.cursorx = cgs.cursorX;
 	cgDC.cursory = cgs.cursorY;

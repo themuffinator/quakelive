@@ -7,19 +7,21 @@ verify the new flow works end-to-end.
 
 1. **Clear existing checkpoints** – use `racepoint clear` after enabling cheats
    (for example `/devmap` or `\nocheat`). This removes every `race_point` entity in the map and resets the
-   `race_init` broadcast. The server console prints `clearing race points` when
+   `race_init` broadcast. Every client receives `clearing race points` when
    the wipe succeeds.
-2. **Dump checkpoints** – run `racepoint dump` to emit each checkpoint index and
-   origin. This mirrors the `admin_race_point_%i` output sent to clients and is
-   useful when copying positions into a map script.
+2. **Dump checkpoints** – run `racepoint dump` to emit each checkpoint origin as
+   a plain `x y z` print. This mirrors the retail admin dump flow and
+   is useful when copying positions into a map script.
 3. **Spawn checkpoints** – issue `racepoint` with no arguments while standing at
    the desired location. Each spawn:
-   - Creates a `race_point` trigger.
-   - Assigns it an incrementing index (0 = start, last index = finish).
-   - Broadcasts `race_init <count>` so connected clients can rebuild their HUD
-     widgets.
-   - Sends `admin_race_point_%i <x> <y> <z>` to all clients so admins can copy
-     the latest origin.
+   - Creates a `race_point` trigger just below the admin's feet, matching the
+     retail `z - 8` placement path.
+   - Assigns it an `arpN` targetname and links the previously spawned admin
+     checkpoint to that target so the chain stays deterministic.
+   - Broadcasts bare `race_init` so connected clients rebuild their race HUD
+     state.
+   - Rebroadcasts the current checkpoint metadata with the retail `arpN`
+     target/targetname chain.
 4. **Map support** – checkpoints can also be authored directly in `.map` files
    via the `race_point` classname once `g_spawn.c` registers the entity. Mixing
    map-placed points and admin-spawned points is supported, though `racepoint
@@ -33,7 +35,7 @@ Follow these manual steps after touching any race-related code:
    map_restart`).
 2. Clear checkpoints (`racepoint clear`), spawn at least three points (start,
    mid, finish), and confirm that each spawn prints the `admin_race_point_%i`
-   line in the server console.
+   line with the expected `arpN` target chain.
 3. Run through the checkpoints. Watch for the console message
    `"<name> finished the race in <mm:ss.mmm>"` and ensure a second finish with a
    slower time does **not** print `^1Personal best!`.

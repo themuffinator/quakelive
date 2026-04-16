@@ -33,6 +33,7 @@ static qboolean networkingEnabled = qfalse;
 
 static cvar_t	*net_noudp;
 static cvar_t	*net_noipx;
+static cvar_t	*net_strict;
 
 static cvar_t	*net_socksEnabled;
 static cvar_t	*net_socksServer;
@@ -756,11 +757,26 @@ NET_OpenIP
 */
 void NET_OpenIP( void ) {
 	cvar_t	*ip;
+	cvar_t	*netPort;
 	int		port;
 	int		i;
 
 	ip = Cvar_Get( "net_ip", "localhost", CVAR_LATCH );
-	port = Cvar_Get( "net_port", va( "%i", PORT_SERVER ), CVAR_LATCH )->integer;
+	netPort = Cvar_Get( "net_port", va( "%i", PORT_SERVER ), CVAR_LATCH );
+	port = netPort->integer;
+	net_strict = Cvar_Get( "net_strict", "0", 0 );
+
+	if ( net_strict->integer ) {
+		ip_socket = NET_IPSocket( ip->string, port );
+		if ( !ip_socket ) {
+			Com_Error( ERR_FATAL, "net_strict enabled: couldn't allocate %s:%d", ip->string, port );
+		}
+		if ( net_socksEnabled->integer ) {
+			NET_OpenSocks( port );
+		}
+		NET_GetLocalAddress();
+		return;
+	}
 
 	// automatically scan for a valid port, so multiple
 	// dedicated servers can be started without requiring

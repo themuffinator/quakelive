@@ -77,3 +77,25 @@ def test_loading_view_bridge_routes_through_renderer_export_slot() -> None:
 
 	assert "void AdvertisementBridge_UpdateLoadingViewParameters( void ) {" in tr_scene
 	assert "CL_AdvertisementBridge_RefreshLoadingViewParameters();" in tr_scene
+
+
+def test_render_scene_preserves_retail_viewport_flip_handoff() -> None:
+	tr_scene = _read("src/code/renderer/tr_scene.c")
+
+	for expected in (
+		"parms.viewportX = tr.refdef.x;",
+		"parms.viewportY = glConfig.vidHeight - ( tr.refdef.y + tr.refdef.height );",
+		"parms.viewportWidth = tr.refdef.width;",
+		"parms.viewportHeight = tr.refdef.height;",
+		"parms.fovX = tr.refdef.fov_x;",
+		"parms.fovY = tr.refdef.fov_y;",
+	):
+		assert expected in tr_scene
+
+
+def test_render_view_rejects_zero_sized_viewports_before_incrementing_counts() -> None:
+	tr_main = _read("src/code/renderer/tr_main.c")
+
+	assert "if ( parms->viewportWidth <= 0 || parms->viewportHeight <= 0 ) {" in tr_main
+	assert "tr.viewCount++;" in tr_main
+	assert tr_main.index("if ( parms->viewportWidth <= 0 || parms->viewportHeight <= 0 ) {") < tr_main.index("tr.viewCount++;")

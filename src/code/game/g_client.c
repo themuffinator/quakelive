@@ -31,6 +31,8 @@ static vec3_t	playerMaxs = { 15, 15, 32 };
 
 extern char *modNames[];
 
+static void G_RRResetClientForRound( gentity_t *ent );
+
 
 /*
 =============
@@ -1230,8 +1232,10 @@ void respawn( gentity_t *ent ) {
 	qboolean	spawnedImmediately;
 	qboolean	warmupSpawn;
 	int		adState;
+	int		clientNum;
 	qboolean	useRoundFollowReset;
 
+	clientNum = ent - g_entities;
 	useRoundFollowReset = qfalse;
 	if ( g_gametype.integer == GT_ATTACK_DEFEND ) {
 		adState = G_ADResolveRoundState();
@@ -1253,6 +1257,12 @@ void respawn( gentity_t *ent ) {
 			spawnedImmediately = qtrue;
 		} else if ( g_gametype.integer == GT_ATTACK_DEFEND || g_gametype.integer == GT_CLAN_ARENA ) {
 			G_CAADResetClientForRound( ent );
+			spawnedImmediately = qtrue;
+		} else if ( g_gametype.integer == GT_FREEZE ) {
+			G_FreezeResetClientForRound( ent );
+			spawnedImmediately = level.clientSpawnQueued[clientNum] ? qfalse : qtrue;
+		} else if ( g_gametype.integer == GT_RED_ROVER ) {
+			G_RRResetClientForRound( ent );
 			spawnedImmediately = qtrue;
 		} else {
 			warmupSpawn = ( level.warmupTime > 0 ) ? qtrue : qfalse;
@@ -1925,7 +1935,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 		trap_SendServerCommand( clientNum, va( "priv %i", client->sess.privilege ) );
 	}
 
-	if ( g_gametype.integer >= GT_TEAM &&
+	if ( firstTime && g_gametype.integer >= GT_TEAM &&
 		client->sess.sessionTeam != TEAM_SPECTATOR ) {
 		BroadcastTeamChange( client, -1 );
 	}
@@ -2032,6 +2042,12 @@ void ClientBegin( int clientNum ) {
 		&& client->sess.sessionTeam != TEAM_SPECTATOR ) {
 		G_CAADResetClientForRound( ent );
 		spawnedImmediately = qtrue;
+	} else if ( g_gametype.integer == GT_FREEZE && client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		G_FreezeResetClientForRound( ent );
+		spawnedImmediately = level.clientSpawnQueued[clientNum] ? qfalse : qtrue;
+	} else if ( g_gametype.integer == GT_RED_ROVER && client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		G_RRResetClientForRound( ent );
+		spawnedImmediately = qtrue;
 	} else {
 		spawnedImmediately = G_RequestClientSpawn( ent, warmupSpawn, qtrue );
 	}
@@ -2046,6 +2062,7 @@ void ClientBegin( int clientNum ) {
 			trap_SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " entered the game\n\"", client->pers.netname) );
 		}
 	}
+	ClientUserinfoChanged( clientNum );
 	G_LogPrintf( "ClientBegin: %i\n", clientNum );
 
 	G_GametypeClientBegin( ent );
@@ -2389,12 +2406,6 @@ void ClientSpawn(gentity_t *ent) {
 	factoryConfig = &g_factoryCvarConfig;
 	level.clientFactoryLoadoutQueued[index] = qfalse;
 
-	if ( g_teamSpawnAsSpec.integer && g_gametype.integer >= GT_TEAM && client->sess.sessionTeam != TEAM_SPECTATOR ) {
-		client->sess.sessionTeam = TEAM_SPECTATOR;
-		client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
-		client->sess.spectatorClient = -1;
-	}
-
 	if ( client->sess.sessionTeam == TEAM_SPECTATOR && !g_teamSpecFreeCam.integer
 		&& client->sess.spectatorState == SPECTATOR_FREE ) {
 		client->sess.spectatorState = SPECTATOR_SCOREBOARD;
@@ -2648,6 +2659,8 @@ void ClientDisconnect( int clientNum ) {
 	gentity_t	*ent;
 	gentity_t	*tent;
 	int			i;
+
+	G_CancelQueuedClientSpawn( clientNum );
 
 	// cleanup if we are kicking a bot that
 	// hasn't spawned yet

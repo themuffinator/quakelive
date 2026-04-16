@@ -563,6 +563,7 @@ qboolean FS_FileExists( const char *file );
 int		FS_LoadStack();
 
 int		FS_GetFileList(  const char *path, const char *extension, char *listbuf, int bufsize );
+int		FS_GetPakFileList( const pack_t *pack, const char *path, const char *extension, char *listbuf, int bufsize );
 int		FS_GetModList(  char *listbuf, int bufsize );
 
 fileHandle_t	FS_FOpenFileWrite( const char *qpath );
@@ -769,7 +770,7 @@ extern	cvar_t	*com_allowConsole;
 extern	cvar_t	*com_viewlog;			// 0 = hidden, 1 = visible, 2 = minimized
 extern	cvar_t	*com_version;
 extern	cvar_t	*com_blood;
-extern	cvar_t	*com_buildScript;		// for building release pak files
+extern	cvar_t	*com_buildScript;		// retail com_build gate for release pak/build flows
 extern	cvar_t	*com_journal;
 extern	cvar_t	*com_cameraMode;
 

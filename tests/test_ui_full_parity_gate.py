@@ -165,7 +165,7 @@ def _build_ui_full_parity_gate_report(
 			overlay_manifest is not None
 			and overlay_manifest.get("drift_files") == drift_files
 			and overlay_manifest.get("overlay_policy", {}).get("mode")
-			== "overlay-first-read-only-src-ui"
+			== "retail-install-first-read-only-src-ui"
 		)
 		overlay_details.update(
 			{
@@ -187,11 +187,12 @@ def _build_ui_full_parity_gate_report(
 			overlay_details,
 		)
 
-	bundle_details: dict[str, Any] = {
-		"bundle_artifact_present": UI_BUNDLE_PATH.exists(),
-		"overlay_bundle_artifact_present": UI_OVERLAY_BUNDLE_PATH.exists(),
+	validation_details: dict[str, Any] = {
+		"retail_ui_bundle_artifact_present": UI_BUNDLE_PATH.exists(),
+		"retail_ui_overlay_artifact_present": UI_OVERLAY_BUNDLE_PATH.exists(),
 		"font_metrics_present": UI_METRICS_PATH.exists(),
 		"ui_validation_summary_present": UI_VALIDATION_SUMMARY_PATH.exists(),
+		"overlay_manifest_present": UI_OVERLAY_MANIFEST_PATH.exists(),
 	}
 
 	if UI_VALIDATION_SUMMARY_PATH.exists():
@@ -199,7 +200,7 @@ def _build_ui_full_parity_gate_report(
 		glyph_drifts = validation_summary.get("glyphMetrics", {}).get("drifts", [])
 		missing_shaders = validation_summary.get("shaderHandles", {}).get("missing", {})
 		missing_configs = validation_summary.get("configs", {}).get("missing", [])
-		bundle_details.update(
+		validation_details.update(
 			{
 				"glyph_drift_count": len(glyph_drifts),
 				"missing_shader_groups": sorted(missing_shaders),
@@ -214,25 +215,26 @@ def _build_ui_full_parity_gate_report(
 	summary_ok = not glyph_drifts and not missing_shaders and not missing_configs
 	artifacts_ok = all(
 		(
-			bundle_details["bundle_artifact_present"],
-			bundle_details["overlay_bundle_artifact_present"],
-			bundle_details["font_metrics_present"],
-			bundle_details["ui_validation_summary_present"],
+			not validation_details["retail_ui_bundle_artifact_present"],
+			not validation_details["retail_ui_overlay_artifact_present"],
+			validation_details["font_metrics_present"],
+			validation_details["ui_validation_summary_present"],
+			validation_details["overlay_manifest_present"],
 		)
 	)
 	if retail_ui_corpus_inventory["retail_ui_corpus_available"]:
 		status = "pass" if (artifacts_ok and summary_ok) else "fail"
 		summary = (
-			"Bundle and validation artifacts are present and the tracked validation summary is clean."
+			"Validation artifacts are present, no retail UI packages were emitted, and the tracked validation summary is clean."
 			if status == "pass"
-			else "Bundle or validation artifacts are missing or the tracked validation summary records drift."
+			else "Validation artifacts are missing or the tracked validation summary records drift."
 		)
 	else:
 		status = "fail"
 		summary = (
-			"Bundle reproducibility remains blocked by the missing retail baseq3 inputs, even though tracked UI artifacts exist."
+			"UI validation remains blocked by the missing retail baseq3 inputs, even though tracked UI artifacts exist."
 		)
-	report["tranches"]["UI-G03"] = _entry("UI-G03", status, summary, bundle_details)
+	report["tranches"]["UI-G03"] = _entry("UI-G03", status, summary, validation_details)
 
 	ui_local = _read_text(UI_LOCAL_PATH)
 	qmenu_note = _read_text(QMENU_NOTE_PATH)

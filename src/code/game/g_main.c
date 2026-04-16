@@ -93,10 +93,12 @@ static const char *s_duelSpawnGrantScript = "weapon_gauntlet weapon_machinegun a
 static vmCvar_t	g_weaponRespawnLegacy;
 static vmCvar_t	g_damageGauntletLegacy;
 static vmCvar_t	g_teamSizeLegacy;
+static vmCvar_t	g_spawnItemWeaponLegacy;
 static legacyCvarAlias_t	s_legacyCvarAliases[] = {
 	{ &g_weaponRespawn, "g_weaponRespawn", &g_weaponRespawnLegacy, "g_weaponrespawn", "5", 0, -1, -1 },
 	{ &g_damage_g, "g_damage_g", &g_damageGauntletLegacy, "g_damage_gauntlet", "50", 0, -1, -1 },
-	{ &g_teamSizeMin, "g_teamSizeMin", &g_teamSizeLegacy, "teamsize", "0", CVAR_SERVERINFO | CVAR_NORESTART, -1, -1 }
+	{ &g_teamSizeMin, "g_teamSizeMin", &g_teamSizeLegacy, "teamsize", "0", CVAR_SERVERINFO | CVAR_NORESTART, -1, -1 },
+	{ &g_spawnItemWeapons, "g_spawnItemWeapons", &g_spawnItemWeaponLegacy, "g_spawnItemWeapon", "1", CVAR_SERVERINFO | CVAR_INIT, -1, -1 }
 };
 
 static qlr_game_frame_context_t *G_GetFrameContext( void );
@@ -235,12 +237,6 @@ static void G_SyncRulesetCvar( void ) {
 
 	ruleset = g_ruleset.string[0] ? g_ruleset.string : "standard";
 	Q_strncpyz( level.rulesetName, ruleset, sizeof( level.rulesetName ) );
-
-	if ( !g_factory.string[0] ) {
-		trap_Cvar_Set( "g_factory", ruleset );
-		trap_Cvar_Update( &g_factory );
-		s_factoryModCount = g_factory.modificationCount;
-	}
 
 	if ( Q_stricmp( ruleset, "standard" ) ) {
 		s_customSettingsDirty = qtrue;
@@ -603,7 +599,7 @@ static cvarTable_t		gameCvarTable[] = {
         { &g_teamAutoJoin, "g_teamAutoJoin", "0", CVAR_ARCHIVE, 0, qfalse, qfalse },
         { &g_teamForceBalance, "g_teamForceBalance", "1", CVAR_ARCHIVE  },
         { &g_maintainTeam, "g_maintainTeam", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Preserve client team selection across map changes." },
-        { &g_teamSpawnAsSpec, "g_teamSpawnAsSpec", "0", 0, 0, qfalse, qfalse, "Force all join attempts into spectator slots until administrators clear the flag." },
+		{ &g_teamSpawnAsSpec, "g_teamSpawnAsSpec", "0", 0, 0, qfalse, qfalse, "Block live-team joins until administrators clear the lock; spectator and free joins remain allowed." },
         { &g_teamSpecFreeCam, "g_teamSpecFreeCam", "0", 0, 0, qfalse, qfalse, "Allow spectators to use free-flying cameras when non-zero; otherwise they stay in follow or scoreboard views." },
         { &g_teamSpecSayEnable, "g_teamSpecSayEnable", "1", 0, 0, qfalse, qfalse, "Permit spectators to chat while observing when enabled." },
 
@@ -631,10 +627,10 @@ static cvarTable_t		gameCvarTable[] = {
         { &g_forceDmgThroughSurface, "g_forceDmgThroughSurface", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow splash damage to pass through non-solid surfaces for testing when set." },
         { &g_grantItemOnSpawn, "g_grantItemOnSpawn", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Whitespace or comma separated list of `give` tokens handed to every spawn, mirroring Quake Live's server-only spawn grants." },
         { &g_disableLoadout, "g_disableLoadout", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Additional loadout restrictions expressed as a whitespace or comma separated list of weapon tokens (g, mg, sg, gl, rl, lg, rg, pg, bfg, gh, ng, pl, cg, hmg) or a numeric bitmask." },
-	{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional model path used to override every player's model selection server-wide." },
-	{ &g_playerheadmodelOverride, "g_playerheadmodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional head model override applied to all players for consistent visuals." },
+	{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional model path used to override every player's model selection server-wide." },
+	{ &g_playerheadmodelOverride, "g_playerheadmodelOverride", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional head model override applied to all players for consistent visuals." },
 	{ &g_allowCustomHeadmodels, "g_allowCustomHeadmodels", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow clients to request independent headmodel strings; disabling forces heads to track the enforced player model." },
-	{ &g_playerCylinders, "g_playerCylinders", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse, "Toggles the Quake Live player-cylinder collision volumes so forced cosmetics line up with the server's hitboxes." },
+	{ &g_playerCylinders, "g_playerCylinders", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Toggles the Quake Live player-cylinder collision volumes so forced cosmetics line up with the server's hitboxes." },
 	{ &g_playerheadScale, "g_playerheadScale", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Primary multiplier applied to forced head models for visibility parity." },
 	{ &g_playerheadScaleOffset, "g_playerheadScaleOffset", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Secondary head-model scalar layered on top of g_playerheadScale so admins can fine-tune the enforced size." },
 	{ &g_playerModelScale, "g_playerModelScale", "1.1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Applies a global scale multiplier to server-enforced player models." },
@@ -644,7 +640,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_floodprot_penalty, "g_floodprot_penalty", "4000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Legacy compatibility knob retained for configs; retail flood protection drops clients on overflow instead of muting commands." },
 	{ &g_startingHealth, "g_startingHealth", "100", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Health awarded to players when they spawn." },
 	{ &g_startingArmor, "g_startingArmor", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Armor awarded to players when they spawn." },
-	{ &g_armorTiered, "g_armorTiered", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable retail Quake Live tiered armor behaviour for pickups, regen, and HUD serverinfo." },
+	{ &g_armorTiered, "g_armorTiered", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable retail Quake Live tiered armor behaviour for pickups, regen, and the dedicated HUD settings transport." },
 	{ &g_startingWeapons, "g_startingWeapons", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Bitmask of weapons awarded to players when they spawn." },
         { &g_flightThrust, "g_flightThrust", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Overrides the upward thrust applied while the Flight powerup is active; 0 keeps the compiled movement behaviour." },
         { &g_flightRefuelRate, "g_flightRefuelRate", "1.0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Multiplier applied to the duration granted when refuelling the Flight powerup." },
@@ -714,7 +710,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_timeoutCount, "g_timeoutCount", "3", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },
 	{ &g_pauseAudio, "g_pauseAudio", "0", 0, 0, qfalse, qfalse, "Audio behavior during pauses." },
 { &g_factoryTitle, "g_factoryTitle", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Short factory title pushed via serverinfo for display on connected clients." },
-{ &g_factory, "g_factory", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Identifier of the active factory loaded from scripts/factories*, defaulting to the active ruleset token when unset." },
+{ &g_factory, "g_factory", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Identifier of the active factory loaded from scripts/factories*, defaulting to the current gametype's retail factory when unset or invalid." },
 	{ &g_factoryRespawnDelay, "g_factoryRespawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds before a defeated player respawns when factories schedule queues." },
 	{ &g_factoryWarmupSpawnDelay, "g_factoryWarmupSpawnDelay", "0", CVAR_NORESTART, 0, qfalse, qfalse, "Delay in milliseconds applied to warmup spawns when factories request staggered starts." },
 	{ &g_factoryAllowItemDrops, "g_factoryAllowItemDrops", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether item drop logic fires for weapons and powerups spawned from players." },
@@ -2346,7 +2342,7 @@ G_UpdateTrainingState();
 
 	G_Printf ("-----------------------------------\n");
 
-	if( g_gametype.integer == GT_SINGLE_PLAYER || trap_Cvar_VariableIntegerValue( "com_buildScript" ) ) {
+	if( g_gametype.integer == GT_SINGLE_PLAYER || trap_Cvar_VariableIntegerValue( "com_build" ) ) {
 		G_ModelIndex( SP_PODIUM_MODEL );
 		G_SoundIndex( "sound/player/gurp1.wav" );
 		G_SoundIndex( "sound/player/gurp2.wav" );

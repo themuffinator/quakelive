@@ -80,6 +80,38 @@ function Resolve-RetailBasePath {
 	throw 'Unable to resolve a retail Quake Live base path. Pass -RetailBasePath explicitly.'
 }
 
+function Resolve-RetailUiBundleRoot {
+	param(
+		[string]$ExplicitPath,
+		[string]$Root
+	)
+
+	$candidate = if ( [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) {
+		[System.IO.Path]::GetFullPath((Join-Path $Root 'build\ui_bundle\staging'))
+	} else {
+		Resolve-ExistingPath -Path $ExplicitPath
+	}
+	$baseq3Root = Join-Path $candidate 'baseq3'
+
+	foreach ( $requiredPath in @(
+			$baseq3Root,
+			( Join-Path $baseq3Root 'default.cfg' ),
+			( Join-Path $baseq3Root 'ui\hud3.txt' ),
+			( Join-Path $baseq3Root 'ui\ingame_scoreboard_ffa.menu' ),
+			( Join-Path $baseq3Root 'ui\assets\button_back.png' ),
+			( Join-Path $baseq3Root 'ui\assets\hud\ffa.png' ),
+			( Join-Path $baseq3Root 'ui\assets\score\scoretl.png' ),
+			( Join-Path $baseq3Root 'fonts\font.dat' ),
+			( Join-Path $baseq3Root 'fonts\font.tga' )
+		) ) {
+		if ( -not ( Test-Path -LiteralPath $requiredPath ) ) {
+			throw "Quake Live UI staging content was not found: $requiredPath. Run tools/build_ui_bundle.py before running the qcommon probe so staging\\baseq3 contains the retail UI runtime tree."
+		}
+	}
+
+	return $candidate
+}
+
 function Get-LaunchSafePath {
 	param([string]$Path)
 
@@ -94,29 +126,6 @@ function Get-LaunchSafePath {
 	}
 
 	return $Path
-}
-
-function Resolve-AssetCdPath {
-	param(
-		[string]$ExplicitPath,
-		[string]$RepoRootPath
-	)
-
-	if ( -not [string]::IsNullOrWhiteSpace( $ExplicitPath ) ) {
-		$resolved = Resolve-ExistingPath -Path $ExplicitPath
-		if ( Test-Path -LiteralPath $resolved ) {
-			return $resolved
-		}
-		throw "Asset cdpath does not exist: $resolved"
-	}
-
-	$defaultPath = Join-Path $RepoRootPath 'assets\quakelive'
-	$resolvedDefault = Resolve-ExistingPath -Path $defaultPath
-	if ( Test-Path -LiteralPath $resolvedDefault ) {
-		return $resolvedDefault
-	}
-
-	throw 'Unable to resolve a repository asset cdpath. Pass -AssetCdPath explicitly.'
 }
 
 function To-RepoPath {
@@ -160,6 +169,14 @@ function Reset-LiveLog {
 	Start-Sleep -Milliseconds 500
 	if ( Test-Path -LiteralPath $script:RuntimeLog ) {
 		Remove-Item -LiteralPath $script:RuntimeLog -Force
+	}
+	foreach ( $stalePak in @(
+			( Join-Path $script:RuntimeRoot 'pak_uiql.pk3' ),
+			( Join-Path $script:RuntimeRoot 'pak_ui_src_retail_overlay.pk3' )
+		) ) {
+		if ( Test-Path -LiteralPath $stalePak ) {
+			Remove-Item -LiteralPath $stalePak -Force
+		}
 	}
 }
 
@@ -245,8 +262,8 @@ function Start-ClientProcess {
 		'+set', 'com_zoneMegs', '64',
 		'+set', 'com_hunkMegs', '256',
 		'+set', 'fs_basepath', $script:RetailBasePath,
+		'+set', 'fs_cdpath', $script:RetailUiBundleRoot,
 		'+set', 'fs_homepath', $script:QlHome,
-		'+set', 'fs_cdpath', $script:AssetCdPath,
 		'+set', 'r_fullscreen', '0',
 		'+set', 'r_mode', '-1',
 		'+set', 'r_customwidth', '1280',
@@ -273,7 +290,7 @@ function Start-ClientProcess {
 		'QL_DISABLE_AWESOMIUM' = '1'
 	}
 
-	$launchProcess = Start-Process -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:RepoRoot -PassThru -WindowStyle Normal -Environment $environment
+	$launchProcess = Start-Process -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:QlHome -PassThru -WindowStyle Normal -Environment $environment
 	$process = Get-NewClientProcess -ExistingIds $existingIds -StartedAfter $launchStartTime
 	if ( -not $process ) {
 		$process = $launchProcess
@@ -615,7 +632,7 @@ if ( [string]::IsNullOrWhiteSpace( $RepoRoot ) ) {
 
 $script:RepoRoot = $RepoRoot
 $script:RetailBasePath = Get-LaunchSafePath -Path ( Resolve-RetailBasePath -ExplicitPath $RetailBasePath )
-$script:AssetCdPath = Resolve-AssetCdPath -ExplicitPath $AssetCdPath -RepoRootPath $RepoRoot
+$script:RetailUiBundleRoot = Resolve-RetailUiBundleRoot -ExplicitPath $AssetCdPath -Root $RepoRoot
 $script:QlHome = Join-Path $RepoRoot 'build\win32\Debug\bin'
 $script:RuntimeRoot = Join-Path $script:QlHome 'baseq3'
 $script:DumpsRoot = Join-Path $RepoRoot 'build\win32\Debug\dumps'
@@ -657,7 +674,6 @@ $searchPathLines = Get-SearchPathLines -LogText $mainLogText
 
 $runtimeRootNormalized = Normalize-PathLikeString -Path $script:RuntimeRoot
 $retailPak00Normalized = Normalize-PathLikeString -Path ( Join-Path $script:RetailBasePath 'baseq3\pak00.pk3' )
-$overlayPakNormalized = Normalize-PathLikeString -Path ( Join-Path $script:RuntimeRoot 'pak_ui_src_retail_overlay.pk3' )
 $uiRepoRootPath = Join-Path ( Join-Path $script:RepoRoot 'baseq3' ) 'uix86.dll'
 $uiRetailPath = Join-Path ( Join-Path $script:RetailBasePath 'baseq3' ) 'uix86.dll'
 $uiHomePath = Join-Path $script:RuntimeRoot 'uix86.dll'
@@ -729,7 +745,7 @@ $artifact = [ordered]@{
 	probe_script = 'tools/qcommon/run_qcommon_runtime_probe.ps1'
 	runtime_root = To-RepoPath -Path $script:RuntimeRoot
 	retail_basepath = To-RepoPath -Path $script:RetailBasePath
-	asset_cdpath = To-RepoPath -Path $script:AssetCdPath
+	asset_cdpath = To-RepoPath -Path $script:RetailUiBundleRoot
 	main_menu = [ordered]@{
 		engine_screenshot = To-RepoPath -Path $mainEngineScreenshotPath
 		engine_sha256 = Get-ArtifactSha256 -Path $mainEngineScreenshotPath
@@ -746,7 +762,10 @@ $artifact = [ordered]@{
 		execed_repconfig = $mainLogText -match [regex]::Escape( 'execing repconfig.cfg' )
 		current_search_path = $searchPathLines
 		search_path_contains_homepath_root = [bool]( $searchPathLines | Where-Object { (Normalize-PathLikeString -Path $_) -eq $runtimeRootNormalized } )
-		search_path_contains_home_overlay = [bool]( $searchPathLines | Where-Object { (Normalize-PathLikeString -Path $_).StartsWith( $overlayPakNormalized ) } )
+		search_path_contains_home_duplicate_ui_pk3 = [bool]( $searchPathLines | Where-Object {
+			$normalizedLine = Normalize-PathLikeString -Path $_
+			$normalizedLine.StartsWith( $runtimeRootNormalized ) -and $normalizedLine.Contains( 'pak_ui' )
+		} )
 		search_path_contains_retail_pak00 = [bool]( $searchPathLines | Where-Object { (Normalize-PathLikeString -Path $_).StartsWith( $retailPak00Normalized ) } )
 		service_disabled_policy = [ordered]@{
 			web_pak_skipped = $mainLogText -match [regex]::Escape( 'web.pak mount skipped: online services disabled by build/runtime policy' )

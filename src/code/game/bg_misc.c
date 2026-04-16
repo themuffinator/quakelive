@@ -1771,13 +1771,12 @@ static qboolean BG_IsArmorTieredModeEnabled( void ) {
 =============
 BG_CanGrabWeaponItem
 
-Shared translation of the DLL helper sub_1002d1c0 for weapon pickups.
+Keeps world weapons re-pickupable in normal play while still preserving the
+retail ironsights and dropped-self restrictions around the shared touch path.
 =============
 */
 static qboolean BG_CanGrabWeaponItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
 {
-	int weapon;
-
 	if ( !ps || !item ) {
 		return qfalse;
 	}
@@ -1790,20 +1789,11 @@ static qboolean BG_CanGrabWeaponItem( int gametype, int currentTime, const entit
 		return qtrue;
 	}
 
-	weapon = BG_WeaponForItemTag( item->giTag );
-	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
-		return qtrue;
-	}
+	(void)gametype;
+	(void)currentTime;
+	(void)ent;
 
-	if ( !( ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
-		return qtrue;
-	}
-
-	if ( ps->ammo[weapon] == 0 ) {
-		return qtrue;
-	}
-
-	return qfalse;
+	return qtrue;
 }
 
 /*

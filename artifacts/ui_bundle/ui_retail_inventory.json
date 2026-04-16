@@ -83,6 +83,12 @@
       "match_count": 65
     },
     {
+      "kind": "file",
+      "path": "src/ui/menudef.h",
+      "destination": "ui/menudef.h",
+      "exists": true
+    },
+    {
       "kind": "directory",
       "path": "ui/assets",
       "destination": "ui/assets",
@@ -185,6 +191,11 @@
       "exists": true
     },
     {
+      "staging_path": "ui/menudef.h",
+      "source_path": "src/ui/menudef.h",
+      "exists": true
+    },
+    {
       "staging_path": "icons",
       "source_path": "icons",
       "exists": true
@@ -233,7 +244,7 @@
     }
   ],
   "inventory_counts": {
-    "files": 931,
+    "files": 932,
     "ui_files": 65,
     "ui_asset_files": 454,
     "shader_files": 3,
@@ -241,7 +252,7 @@
     "config_files": 5,
     "icon_files": 63,
     "levelshot_files": 324,
-    "other_files": 13
+    "other_files": 14
   },
   "inventory_files": [
     {
@@ -2288,6 +2299,11 @@
       "path": "sponge.cfg",
       "size": 3644,
       "sha256": "d6dc6792138a92380401c52d5a5c4e6beda3b4b4c0de6158f5e7427352df3b32"
+    },
+    {
+      "path": "src/ui/menudef.h",
+      "size": 25940,
+      "sha256": "0d15a2dc177d13e0442db5ba0edd034d089467196f6a8172d01b98912f5a83fb"
     },
     {
       "path": "syncerror.cfg",

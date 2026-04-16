@@ -75,6 +75,7 @@ typedef struct matchFactoryConfig_s {
 
 void G_Config_RegisterCvars( void );
 void G_Config_UpdateCvars( void );
+void G_Config_ResetFactoryManagedCvars( void );
 uint64_t G_ComputeConfigCustomSettingsMask( void );
 
 #endif // G_CONFIG_H

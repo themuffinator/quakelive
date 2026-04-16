@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-04-10
+Last updated: 2026-04-16
 
 Current ledger note:
 
@@ -9,6 +9,11 @@ Current ledger note:
   consolidated report in
   `docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`
   plus the dedicated subsystem audits referenced later in this file.
+- The platform-specific engine closure state is additionally refreshed in
+  `docs/reverse-engineering/platform-specific-engine-parity-audit-and-implementation-plan-2026-04-16.md`,
+  which records the restored retail `GLW_AutoSelectPFD` owner split in
+  `src/code/win32/win_glimp.c` and keeps `unix`/`macosx`/`null` classified as
+  compatibility-only ports rather than open Windows retail debt.
 
 This audit reflects the current repository state against the retail Quake Live HLIL references and the latest recorded Windows `Debug|x86` build/runtime pass. The goal is not to score every file equally; it is to rank the gaps that still materially separate the repo from retail behavior.
 
@@ -257,13 +262,26 @@ Summary:
 
 - `CL-P1` is now complete. The client/common bootstrap and write path now follows the retail `qzconfig.cfg` / `repconfig.cfg` contract, `writeClientConfig` is reconstructed in writable source, `FS_Restart` replays `qzconfig.cfg`, and the client/UI CD-key surface is back on the retail legacy placeholder/q3key lane.
 - `CL-P2` is now complete. The Steam client/lobby/micro callback bundles are retained in writable source, `CL_Frame` owns the normal client-side Steam callback pump, and the callback payloads now flow into an explicit client/browser event owner instead of remaining limited to auth-time helper paths.
-- `CL-P3` is now complete. The server now publishes the referenced workshop-item list instead of echoing the server SteamID through the workshop slots, filesystem startup/restart now remount subscribed workshop install roots with retained per-pack item IDs, `CL_InitDownloads` and `CL_Frame` now own the retail workshop-aware join/bootstrap path, and the UI workshop progress import now reflects retained client state instead of generic legacy counters.
+- `CL-P3` is now complete. The server now publishes the referenced workshop-item list instead of echoing the server SteamID through the workshop slots, filesystem startup/restart now remount subscribed workshop install roots with retained per-pack item IDs, `CL_InitDownloads` and `CL_Frame` now own the retail workshop-aware join/bootstrap path, the retail workshop callback pair (`ItemInstalled`, `DownloadItemResult`) is now retained in writable source with polling fallback preserved, and the UI workshop progress import now reflects retained client state instead of generic legacy counters.
 - `CL-P4` is now complete. The client now owns a retained browser-host runtime behind the online-services policy gate, including explicit init or frame or shutdown lifetime and reconstructed command owners for the `web_*` browser-control surface.
 - `CL-P5` is now complete. The retained `qz_instance` JS bridge, `EnginePublish` event-publication lane, `SteamDataSource` avatar/resource owner, and `QLResourceInterceptor` / `Sys_Steam_RequestURL` fallback seam are now explicit in writable source and covered by the parity suite.
 - `CL-P6` is now complete. The client now has a dedicated parity gate (`artifacts/client_validation/logs/client_full_parity_gate.json`) plus a tracked runtime-evidence bundle (`artifacts/client_validation/logs/client_runtime_evidence_20260410.json`) covering retail config/bootstrap writes, service-disabled browser-policy behavior, live `bloodrun` runtime, authoritative engine/window captures, and a flushed demo artifact.
 - The refreshed strict `client` estimate is now **100%**. This is a behavior-backed uplift from the post-audit **90%** figure because the retail config/bootstrap persistence gap (`CL-G04`), the async Steam callback lifetime gap (`CL-G02`), the workshop bootstrap gap (`CL-G03`), the browser/JS/runtime ownership gap (`CL-G01`), and the final verification gap (`CL-G05`) are now closed.
 - The classic client/runtime story is materially strong: recent mapping rounds now bound the retained input/key path, resend/connect/disconnect lifecycle, server-browser helpers, packet/frame spine, sound core, native `ui`/`cgame` bridge, and live renderer-resource ingestion well enough that the client should no longer be treated as uniformly “low parity”.
+- A focused 2026-04-16 Steamworks source audit found one narrow callback-exactness omission inside the already-closed workshop lane and closed it in source: the retail workshop callback family is now retained in `platform_steamworks.c` / `cl_main.c`, and the focused Steamworks harness plus parity tests now pin that callback-owned completion path.
 - No open gap remains in the audited client register.
+
+## Engine netcode audit refresh (2026-04-16)
+
+A focused engine netcode audit is now published in `docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md`.
+
+Summary:
+
+- The low-level transport and socket lanes remain strongly bounded: `net_chan.c`, `cl_net_chan.c`, `sv_net_chan.c`, `win_net.c`, the client packet/event spine, and the retained ping or status helpers did not reveal a fresh source-owned mismatch in this pass.
+- The audit did find two remaining browser-side deltas inside the engine-owned network register: `CL_SetServerInfo()` was still parsing retail-absent `minping`, `maxping`, and `punkbuster` fields, and the native `QLUIImport_LAN_LoadCachedServers` / `QLUIImport_LAN_SaveCachedServers` slots still performed cache syscalls even though retail collapses both onto a shared no-op stub.
+- `src/code/client/cl_main.c` and `src/code/client/ql_ui_imports.inc` now match the recovered retail owners, and `tests/test_engine_netcode_parity.py` pins both corrections structurally.
+- The strict engine netcode estimate for this audited slice moves from **99%** to **100%**.
+- This refresh preserves the broader client and engine closure claims rather than reopening a lower-level transport/runtime gap.
 
 ## Server audit refresh (2026-04-10)
 
@@ -279,7 +297,7 @@ Summary:
 - `SV-G02` is now closed: the retained `idZMQ` stats publisher and remote-RCON runtime from mapping rounds `94` through `97` are now source-backed in writable server host code.
 - `SV-G03` is now closed: the qagame-facing Steam stat/achievement trio is source-backed through a retained server-owned session/cache owner in `sv_client.c` and `SteamGameServerStats` wrappers in `platform_steamworks.c`.
 - `SV-G04` is now closed: the retained rankings source body remains policy-disabled until a documented open backend exists, but the default runtime now exposes registered compatibility cvars and a validated per-server disabled-state contract instead of an ambiguous silent stub.
-- `SV-G05` is now closed: the missing retail server-only control-plane cvar surface is registered in `SV_Init()`, the retained `sv_errorExit`/`sv_idleExit` owners now route through `common.c` plus `sv_main.c`, the retained alternate-entity/dump boundary now lives in `sv_game.c`, `sv_cylinderScale` now applies in `cm_trace.c`, and the lower-confidence cvars that the committed corpus only proves as registrations are now explicit compatibility/publication surfaces instead of missing names.
+- `SV-G05` is now closed: the missing retail server-only control-plane cvar surface is registered in `SV_Init()`, the retained `sv_errorExit`/`sv_idleExit` owners now route through `common.c` plus `sv_main.c`, the retained alternate-entity/dump boundary now lives in `sv_game.c`, `sv_cylinderScale` now applies in `cm_trace.c`, and the current worktree now also matches the direct retail `sv_idleRestart` / `sv_quitOnEmpty` runtime owners recovered from `SV_Frame` and `SV_CheckTimeouts`.
 - `SV-G06` is now closed: the server now has `tests/test_server_full_parity_gate.py`, `artifacts/server_validation/logs/server_full_parity_gate.json`, `tools/server/run_server_runtime_probe.ps1`, `artifacts/server_validation/logs/server_runtime_evidence_20260410.json`, and `.github/workflows/server-validation.yml` as the dedicated verification/runtime-evidence lane.
 - `SV-P7` is now complete.
 - No open gap remains in the audited server register.
@@ -351,3 +369,18 @@ Summary:
   `artifacts/ui_validation/logs/ui_full_parity_gate.json` both passing and the
   archived retail-DLL runtime probe still providing direct retail-binary host
   evidence.
+
+## Awesomium / browser host audit refresh (2026-04-16)
+
+A focused engine-owned Awesomium/browser host audit is now published in
+`docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`.
+
+Summary:
+
+- The earlier blanket closure of the client browser/Awesomium lane was too coarse. A stricter reread of mapping rounds `01`, `02`, `09`, `10`, `11`, `54`, `94`, and `96` plus the shipped retail `baseq3/scripts/*.arena` and `factories*.json` catalogs found twelve concrete writable-source gaps in total across the eight 2026-04-16/17 closure tranches.
+- `AW-G01` through `AW-G12` are now closed in the current worktree. `cl_cgame.c` now canonicalises browser hash fragments, owns the mapped `web.tooltip` / `web_console` / Win32 cursor callback family, rebuilds `GetMapList` from the retail arena catalog, rebuilds `GetFactoryList` from `factories.txt` plus supplemental `*.factories` / `*.factory` files, hides/suppresses the retained browser host correctly across launcher-document load failure, owns the direct browser mouse/keyboard injection seam with retained cursor-position caching, mirrors the retail synthetic modifier-key injection from the Win32 app-activation path, keeps browser mouse button and wheel input out of the keyboard seam through dedicated retained pointer helpers, stages the retail launcher `js/*.js` bundle through the retained `web.pak`/filesystem bridge before publishing the browser object-ready event, rebuilds the retained browser surface plus cached mouse coordinates in browser-surface space instead of raw view space, and now owns the explicit session/provider/listener bootstrap inventory and dirty-surface frame pump below the retained backend boundary.
+- `win_wndproc.c` now consumes the retained browser cursor override through `WM_SETCURSOR`, which restores the mapped native cursor-owner seam instead of leaving the Win32 path cursor-agnostic.
+- The helper executable parity lane, the retained `web.pak` / `fs_webpath` resource bridge, and the `SteamDataSource` / `QLResourceInterceptor` ownership remain strong and were not reopened by this pass.
+- The current engine-owned Awesomium/browser host estimate is now **100%**, up from **82%** before the first closure tranche, **92%** before the cursor/load-failure refresh, **96%** before the direct-input refresh, **97%** before the activation-modifier refresh, **98%** before the pointer-button/wheel refresh, **99%** before the document-ready script-bundle refresh, **99.5%** before the retained-surface mouse-mapping refresh, and **99.7%** before the runtime-bootstrap/surface-pump refresh.
+- The focused Awesomium/platform-service validation surface is now green at `73 passed in 3.80s`, and a fresh `Debug|x86` build retry still only stops in unrelated pre-existing `src/code/client/snd_mix.c` errors after compiling the touched browser file.
+- No confirmed engine-owned Awesomium/browser host gap remains in writable source after this pass. The repo still keeps live online-services behind `QL_BUILD_ONLINE_SERVICES` and default-disabled, but the retained backend choice is now treated as a documented policy/runtime substitution rather than an open parity defect.

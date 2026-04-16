@@ -104,11 +104,13 @@
     <QLBuildSteamworks Condition="'$(QLBuildSteamworks)'==''">0</QLBuildSteamworks>
     <QLBuildOpenSteam Condition="'$(QLBuildOpenSteam)'==''">0</QLBuildOpenSteam>
     <QLEnableOgg Condition="'$(QLEnableOgg)'==''">1</QLEnableOgg>
-    <QLEnablePng Condition="'$(QLEnablePng)'==''">1</QLEnablePng>
+    <QLEnablePng Condition="'$(QLEnablePng)'=='' and Exists('$(ProjectDir)..\libs\libpng\include\png.h') and Exists('$(ProjectDir)..\libs\libpng\lib\Win32\libpng16.lib') and Exists('$(ProjectDir)..\libs\libpng\lib\Win32\zlib.lib')">1</QLEnablePng>
+    <QLEnablePng Condition="'$(QLEnablePng)'==''">0</QLEnablePng>
+    <QLEnableFreeType Condition="'$(QLEnableFreeType)'=='' and Exists('$(ProjectDir)..\libs\freetype\include\ft2build.h') and (Exists('$(ProjectDir)..\libs\freetype\lib\Win32\freetype.lib') or Exists('$(ProjectDir)..\libs\freetype\lib\Win32\libfreetype.lib') or Exists('$(ProjectDir)..\libs\freetype\lib\freetype.lib') or Exists('$(ProjectDir)..\libs\freetype\lib\libfreetype.lib'))">1</QLEnableFreeType>
     <QLEnableFreeType Condition="'$(QLEnableFreeType)'==''">0</QLEnableFreeType>
   </PropertyGroup>
   <PropertyGroup Label="VorbisSdk">
-    <VorbisSdkDir Condition="'$(VorbisSdkDir)'==''">$(ProjectDir)..\libs\vorbis</VorbisSdkDir>
+    <VorbisSdkDir>$(ProjectDir)..\libs\vorbis</VorbisSdkDir>
     <VorbisIncludeDir Condition="'$(QLEnableOgg)'!='0'">$(VorbisSdkDir)\include</VorbisIncludeDir>
     <VorbisIncludeDir Condition="'$(QLEnableOgg)'=='0'"></VorbisIncludeDir>
     <VorbisLibDir Condition="'$(QLEnableOgg)'!='0'">$(VorbisSdkDir)\lib\Win32</VorbisLibDir>
@@ -117,32 +119,25 @@
     <VorbisDependencies Condition="'$(QLEnableOgg)'=='0'"></VorbisDependencies>
   </PropertyGroup>
   <PropertyGroup Label="PngSdk">
-    <PngSdkDir Condition="'$(PngSdkDir)'==''">$(ProjectDir)..\libs\libpng</PngSdkDir>
+    <PngSdkDir>$(ProjectDir)..\libs\libpng</PngSdkDir>
     <PngIncludeDir Condition="'$(QLEnablePng)'!='0'">$(PngSdkDir)\include</PngIncludeDir>
     <PngIncludeDir Condition="'$(QLEnablePng)'=='0'"></PngIncludeDir>
-    <PngLibDir Condition="'$(QLEnablePng)'!='0'">$(PngSdkDir)\lib\Win32</PngLibDir>
-    <PngLibDir Condition="'$(QLEnablePng)'=='0'"></PngLibDir>
+    <PngLibDir Condition="'$(QLEnablePng)'!='0' and Exists('$(PngSdkDir)\lib\Win32')">$(PngSdkDir)\lib\Win32</PngLibDir>
+    <PngLibDir Condition="'$(QLEnablePng)'!='0' and '$(PngLibDir)'==''">$(PngSdkDir)\lib</PngLibDir>
+    <PngLibDir Condition="'$(QLEnablePng)'=='0' and '$(PngLibDir)'==''"></PngLibDir>
     <PngDependencies Condition="'$(QLEnablePng)'!='0'">libpng16.lib;zlib.lib</PngDependencies>
     <PngDependencies Condition="'$(QLEnablePng)'=='0'"></PngDependencies>
   </PropertyGroup>
   <PropertyGroup Label="FreeTypeSdk">
-    <FreeTypeSdkDir Condition="'$(FreeTypeSdkDir)'==''">$(ProjectDir)..\libs\freetype</FreeTypeSdkDir>
+    <FreeTypeSdkDir>$(ProjectDir)..\libs\freetype</FreeTypeSdkDir>
     <FreeTypeIncludeDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeIncludeDir)'==''">$(FreeTypeSdkDir)\include</FreeTypeIncludeDir>
     <FreeTypeIncludeDir Condition="'$(QLEnableFreeType)'=='0' and '$(FreeTypeIncludeDir)'==''"></FreeTypeIncludeDir>
-    <FreeTypeLibDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeLibDir)'==''">$(FreeTypeSdkDir)\lib\Win32</FreeTypeLibDir>
+    <FreeTypeLibDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeLibDir)'=='' and Exists('$(FreeTypeSdkDir)\lib\Win32')">$(FreeTypeSdkDir)\lib\Win32</FreeTypeLibDir>
+    <FreeTypeLibDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeLibDir)'==''">$(FreeTypeSdkDir)\lib</FreeTypeLibDir>
     <FreeTypeLibDir Condition="'$(QLEnableFreeType)'=='0' and '$(FreeTypeLibDir)'==''"></FreeTypeLibDir>
     <FreeTypeDependencies Condition="'$(QLEnableFreeType)'!='0' and Exists('$(FreeTypeLibDir)\freetype.lib')">freetype.lib</FreeTypeDependencies>
     <FreeTypeDependencies Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeDependencies)'=='' and Exists('$(FreeTypeLibDir)\libfreetype.lib')">libfreetype.lib</FreeTypeDependencies>
     <FreeTypeDependencies Condition="'$(QLEnableFreeType)'=='0'"></FreeTypeDependencies>
-  </PropertyGroup>
-  <PropertyGroup Label="Steamworks">
-    <SteamworksSdkDir Condition="'$(SteamworksSdkDir)'==''">$(ProjectDir)..\steamworks</SteamworksSdkDir>
-    <SteamworksIncludeDir Condition="'$(QLBuildOnlineServices)'=='1' and '$(QLBuildSteamworks)'=='1'">$(SteamworksSdkDir)\sdk\public</SteamworksIncludeDir>
-    <SteamworksIncludeDir Condition="'$(QLBuildOnlineServices)'!='1' or '$(QLBuildSteamworks)'!='1'"></SteamworksIncludeDir>
-    <SteamworksLibDir Condition="'$(QLBuildOnlineServices)'=='1' and '$(QLBuildSteamworks)'=='1'">$(SteamworksSdkDir)\sdk\redistributable_bin</SteamworksLibDir>
-    <SteamworksLibDir Condition="'$(QLBuildOnlineServices)'!='1' or '$(QLBuildSteamworks)'!='1'"></SteamworksLibDir>
-    <SteamworksDependencies Condition="'$(QLBuildOnlineServices)'=='1' and '$(QLBuildSteamworks)'=='1'">steam_api.lib</SteamworksDependencies>
-    <SteamworksDependencies Condition="'$(QLBuildOnlineServices)'!='1' or '$(QLBuildSteamworks)'!='1'"></SteamworksDependencies>
   </PropertyGroup>
   <PropertyGroup>
     <_ProjectFileVersion>17.0.34511.75</_ProjectFileVersion>
@@ -193,12 +188,12 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(VorbisIncludeDir);$(PngIncludeDir);$(SteamworksIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VorbisIncludeDir);$(PngIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>QL_BUILD_ONLINE_SERVICES=$(QLBuildOnlineServices);QL_ENABLE_OGG=$(QLEnableOgg);QL_ENABLE_PNG=$(QLEnablePng);QL_AUTH_HAS_CLIENT_BACKEND=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(VorbisLibDir);$(PngLibDir);$(FreeTypeLibDir);$(SteamworksLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(VorbisDependencies);$(PngDependencies);$(FreeTypeDependencies);$(SteamworksDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VorbisLibDir);$(PngLibDir);$(FreeTypeLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(VorbisDependencies);$(PngDependencies);$(FreeTypeDependencies);%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateManifest>false</GenerateManifest>
       <AdditionalOptions>/MANIFEST:NO /IGNORE:4075 %(AdditionalOptions)</AdditionalOptions>
       <MinimumRequiredVersion>5.01</MinimumRequiredVersion>
@@ -209,25 +204,25 @@
   </ItemDefinitionGroup>
 
   <Target Name="ValidateVorbis" BeforeTargets="ClCompile" Condition="'$(QLEnableOgg)'=='1'">
-    <Error Condition="!Exists('$(VorbisIncludeDir)')" Text="Vorbis SDK include path '$(VorbisIncludeDir)' was not found. Either install the SDK, override VorbisSdkDir, or set QLEnableOgg=0 for dedicated-only builds." />
-    <Error Condition="!Exists('$(VorbisIncludeDir)\\vorbis\\vorbisfile.h')" Text="Vorbis headers missing under $(VorbisIncludeDir). Install libvorbis/libogg development headers or set QLEnableOgg=0." />
-    <Error Condition="!Exists('$(VorbisLibDir)')" Text="Vorbis SDK library path '$(VorbisLibDir)' was not found. Install the codec SDK or set QLEnableOgg=0." />
-    <Error Condition="!Exists('$(VorbisLibDir)\\vorbisfile.lib') or !Exists('$(VorbisLibDir)\\vorbis.lib') or !Exists('$(VorbisLibDir)\\ogg.lib')" Text="Vorbis support enabled but vorbisfile.lib/vorbis.lib/ogg.lib were not found in $(VorbisLibDir). Provide the SDK import libraries or build with QLEnableOgg=0 for dedicated-only targets." />
-    <Message Text="Vorbis/OGG decoding enabled (include: $(VorbisIncludeDir), lib: $(VorbisLibDir))" Importance="High" />
+    <Error Condition="!Exists('$(VorbisIncludeDir)')" Text="Repo-managed Vorbis include path '$(VorbisIncludeDir)' was not found. Bootstrap the internal codec dependencies or set QLEnableOgg=0 for dedicated-only builds." />
+    <Error Condition="!Exists('$(VorbisIncludeDir)\\vorbis\\vorbisfile.h')" Text="Repo-managed Vorbis headers are missing under $(VorbisIncludeDir). Bootstrap the internal codec dependencies or set QLEnableOgg=0." />
+    <Error Condition="!Exists('$(VorbisLibDir)')" Text="Repo-managed Vorbis library path '$(VorbisLibDir)' was not found. Bootstrap the internal codec dependencies or set QLEnableOgg=0." />
+    <Error Condition="!Exists('$(VorbisLibDir)\\vorbisfile.lib') or !Exists('$(VorbisLibDir)\\vorbis.lib') or !Exists('$(VorbisLibDir)\\ogg.lib')" Text="Vorbis support enabled but repo-managed vorbisfile.lib/vorbis.lib/ogg.lib were not found in $(VorbisLibDir). Bootstrap the internal codec dependencies or build with QLEnableOgg=0 for dedicated-only targets." />
+    <Message Text="Vorbis/OGG decoding enabled from repo-managed libs (include: $(VorbisIncludeDir), lib: $(VorbisLibDir))" Importance="High" />
   </Target>
   <Target Name="ValidatePng" BeforeTargets="ClCompile" Condition="'$(QLEnablePng)'=='1'">
-    <Error Condition="!Exists('$(PngIncludeDir)')" Text="PNG SDK include path '$(PngIncludeDir)' was not found. Either install libpng, override PngSdkDir, or set QLEnablePng=0 for renderer-only fallback builds." />
-    <Error Condition="!Exists('$(PngIncludeDir)\\png.h')" Text="libpng headers missing under $(PngIncludeDir). Install libpng development headers or set QLEnablePng=0." />
-    <Error Condition="!Exists('$(PngLibDir)')" Text="PNG SDK library path '$(PngLibDir)' was not found. Install libpng/zlib import libraries or set QLEnablePng=0." />
-    <Error Condition="!Exists('$(PngLibDir)\\libpng16.lib') or !Exists('$(PngLibDir)\\zlib.lib')" Text="PNG support enabled but libpng16.lib/zlib.lib were not found in $(PngLibDir). Provide the SDK import libraries or build with QLEnablePng=0." />
-    <Message Text="libpng decoding enabled (include: $(PngIncludeDir), lib: $(PngLibDir))" Importance="High" />
+    <Error Condition="!Exists('$(PngIncludeDir)')" Text="Repo-managed PNG include path '$(PngIncludeDir)' was not found. Bootstrap the internal codec dependencies or set QLEnablePng=0 for renderer-only fallback builds." />
+    <Error Condition="!Exists('$(PngIncludeDir)\\png.h')" Text="Repo-managed libpng headers are missing under $(PngIncludeDir). Bootstrap the internal codec dependencies or set QLEnablePng=0." />
+    <Error Condition="!Exists('$(PngLibDir)')" Text="Repo-managed PNG library path '$(PngLibDir)' was not found. Bootstrap the internal codec dependencies or set QLEnablePng=0." />
+    <Error Condition="!Exists('$(PngLibDir)\\libpng16.lib') or !Exists('$(PngLibDir)\\zlib.lib')" Text="PNG support enabled but repo-managed libpng16.lib/zlib.lib were not found in $(PngLibDir). Bootstrap the internal codec dependencies or build with QLEnablePng=0." />
+    <Message Text="libpng decoding enabled from repo-managed libs (include: $(PngIncludeDir), lib: $(PngLibDir))" Importance="High" />
   </Target>
   <Target Name="ValidateFreeType" BeforeTargets="Link" Condition="'$(QLEnableFreeType)'=='1'">
-    <Error Condition="!Exists('$(FreeTypeIncludeDir)')" Text="FreeType SDK include path '$(FreeTypeIncludeDir)' was not found. Either install FreeType, override FreeTypeSdkDir, or set QLEnableFreeType=0." />
-    <Error Condition="!Exists('$(FreeTypeIncludeDir)\\ft2build.h')" Text="FreeType headers missing under $(FreeTypeIncludeDir). Install FreeType development headers or set QLEnableFreeType=0." />
-    <Error Condition="!Exists('$(FreeTypeLibDir)')" Text="FreeType SDK library path '$(FreeTypeLibDir)' was not found. Install FreeType import libraries, override FreeTypeSdkDir, or set QLEnableFreeType=0." />
-    <Error Condition="'$(FreeTypeDependencies)'==''" Text="FreeType support enabled but neither freetype.lib nor libfreetype.lib was found in $(FreeTypeLibDir). Provide the import library or set QLEnableFreeType=0." />
-    <Message Text="FreeType support enabled (include: $(FreeTypeIncludeDir), lib: $(FreeTypeLibDir)\\$(FreeTypeDependencies))" Importance="High" />
+    <Error Condition="!Exists('$(FreeTypeIncludeDir)')" Text="Repo-managed FreeType include path '$(FreeTypeIncludeDir)' was not found. Provide an in-repo FreeType tree or set QLEnableFreeType=0." />
+    <Error Condition="!Exists('$(FreeTypeIncludeDir)\\ft2build.h')" Text="Repo-managed FreeType headers are missing under $(FreeTypeIncludeDir). Provide an in-repo FreeType tree or set QLEnableFreeType=0." />
+    <Error Condition="!Exists('$(FreeTypeLibDir)')" Text="Repo-managed FreeType library path '$(FreeTypeLibDir)' was not found. Provide an in-repo FreeType tree or set QLEnableFreeType=0." />
+    <Error Condition="'$(FreeTypeDependencies)'==''" Text="FreeType support enabled but neither freetype.lib nor libfreetype.lib was found in $(FreeTypeLibDir). Provide an in-repo FreeType build or set QLEnableFreeType=0." />
+    <Message Text="FreeType support enabled from repo-managed libs (include: $(FreeTypeIncludeDir), lib: $(FreeTypeLibDir)\\$(FreeTypeDependencies))" Importance="High" />
   </Target>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'">
     <ClCompile>
@@ -315,8 +310,8 @@
     <PostBuildEvent>
       <Message>Post build processing..</Message>
       <Command>rem bash -c "perl ./unix/cons -- debug"
-if exist "$(ProjectDir)..\libs\vorbis\bin\*.dll" xcopy /y /d /i "$(ProjectDir)..\libs\vorbis\bin\*.dll" "$(OutDir)" &gt;nul
-if exist "$(ProjectDir)..\libs\libpng\bin\*.dll" xcopy /y /d /i "$(ProjectDir)..\libs\libpng\bin\*.dll" "$(OutDir)" &gt;nul</Command>
+if exist "$(VorbisSdkDir)\bin\*.dll" xcopy /y /d /i "$(VorbisSdkDir)\bin\*.dll" "$(OutDir)" &gt;nul
+if exist "$(PngSdkDir)\bin\*.dll" xcopy /y /d /i "$(PngSdkDir)\bin\*.dll" "$(OutDir)" &gt;nul</Command>
     </PostBuildEvent>
     <ResourceCompile>
       <PreprocessorDefinitions>_DEBUG;QL_BUILD_STEAMWORKS=$(QLBuildSteamworks);QL_BUILD_OPEN_STEAM=$(QLBuildOpenSteam);%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -1404,6 +1399,7 @@ if exist "$(ProjectDir)..\libs\libpng\bin\*.dll" xcopy /y /d /i "$(ProjectDir)..
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
+  <Import Project="$(MSBuildThisFileDirectory)quakelive.internal-deps.targets" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

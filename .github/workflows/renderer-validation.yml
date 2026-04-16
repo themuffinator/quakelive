@@ -1,0 +1,108 @@
+name: Renderer Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/renderer-validation.yml'
+      - '.vscode/build.ps1'
+      - 'tests/test_renderer_export_tail_parity.py'
+      - 'tests/test_renderer_font_build_lane_parity.py'
+      - 'tests/test_renderer_font_exactness_parity.py'
+      - 'tests/test_renderer_host_text_core_parity.py'
+      - 'tests/test_renderer_host_text_import_parity.py'
+      - 'tests/test_renderer_memory_image_parity.py'
+      - 'tests/test_renderer_post_process_parity.py'
+      - 'tests/test_renderer_text_runtime_validation_parity.py'
+      - 'tests/test_renderer_win32_host_glue_parity.py'
+      - 'tests/test_renderer_internal_helper_mapping_parity.py'
+      - 'tests/test_renderer_full_parity_gate.py'
+      - 'src/code/renderer/**'
+      - 'src/code/client/**'
+      - 'src/code/cgame/**'
+      - 'src/code/ui/**'
+      - 'src/code/win32/**'
+      - 'src/code/quakelive_steam.vcxproj'
+      - 'src/code/unix/Makefile'
+      - 'docs/platform/retail-font-stack.md'
+      - 'docs/renderer_cvar_matrix.md'
+      - 'docs/hud_render_baseline.md'
+      - 'docs/build-pipeline.md'
+      - 'docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md'
+      - 'docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md'
+      - 'docs/reverse-engineering/renderer-freetype-build-lane-recovery-2026-04-10.md'
+      - 'docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md'
+      - 'docs/reverse-engineering/renderer-host-text-import-switchover-and-debug-atlas-2026-04-10.md'
+      - 'docs/reverse-engineering/renderer-text-strict-validation-and-runtime-evidence-2026-04-10.md'
+      - 'docs/reverse-engineering/quakelive_steam_mapping_round_100.md'
+      - 'docs/reverse-engineering/renderer-internal-helper-ownership-2026-04-09.md'
+      - 'tools/renderer/**'
+      - 'artifacts/renderer_validation/**'
+  pull_request:
+    paths:
+      - '.github/workflows/renderer-validation.yml'
+      - '.vscode/build.ps1'
+      - 'tests/test_renderer_export_tail_parity.py'
+      - 'tests/test_renderer_font_build_lane_parity.py'
+      - 'tests/test_renderer_font_exactness_parity.py'
+      - 'tests/test_renderer_host_text_core_parity.py'
+      - 'tests/test_renderer_host_text_import_parity.py'
+      - 'tests/test_renderer_memory_image_parity.py'
+      - 'tests/test_renderer_post_process_parity.py'
+      - 'tests/test_renderer_text_runtime_validation_parity.py'
+      - 'tests/test_renderer_win32_host_glue_parity.py'
+      - 'tests/test_renderer_internal_helper_mapping_parity.py'
+      - 'tests/test_renderer_full_parity_gate.py'
+      - 'src/code/renderer/**'
+      - 'src/code/client/**'
+      - 'src/code/cgame/**'
+      - 'src/code/ui/**'
+      - 'src/code/win32/**'
+      - 'src/code/quakelive_steam.vcxproj'
+      - 'src/code/unix/Makefile'
+      - 'docs/platform/retail-font-stack.md'
+      - 'docs/renderer_cvar_matrix.md'
+      - 'docs/hud_render_baseline.md'
+      - 'docs/build-pipeline.md'
+      - 'docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md'
+      - 'docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md'
+      - 'docs/reverse-engineering/renderer-freetype-build-lane-recovery-2026-04-10.md'
+      - 'docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md'
+      - 'docs/reverse-engineering/renderer-host-text-import-switchover-and-debug-atlas-2026-04-10.md'
+      - 'docs/reverse-engineering/renderer-text-strict-validation-and-runtime-evidence-2026-04-10.md'
+      - 'docs/reverse-engineering/quakelive_steam_mapping_round_100.md'
+      - 'docs/reverse-engineering/renderer-internal-helper-ownership-2026-04-09.md'
+      - 'tools/renderer/**'
+      - 'artifacts/renderer_validation/**'
+
+jobs:
+  renderer-validation:
+    runs-on: ubuntu-latest
+    env:
+      RENDERER_VALIDATION_ROOT: artifacts/renderer_validation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run renderer parity tests
+        run: |
+          pytest tests/test_renderer_export_tail_parity.py tests/test_renderer_font_build_lane_parity.py tests/test_renderer_font_exactness_parity.py tests/test_renderer_host_text_core_parity.py tests/test_renderer_host_text_import_parity.py tests/test_renderer_memory_image_parity.py tests/test_renderer_post_process_parity.py tests/test_renderer_text_runtime_validation_parity.py tests/test_renderer_win32_host_glue_parity.py tests/test_renderer_internal_helper_mapping_parity.py tests/test_renderer_full_parity_gate.py -q
+
+      - name: Upload renderer artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderer-validation
+          path: |
+            ${{ env.RENDERER_VALIDATION_ROOT }}/**
+          if-no-files-found: warn
+          retention-days: 7

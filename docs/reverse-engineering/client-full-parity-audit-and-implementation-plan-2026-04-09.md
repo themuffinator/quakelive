@@ -1,10 +1,27 @@
 # `client` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-10
+Last updated: 2026-04-16
 
 Scope: `src/code/client/*` plus client-owned host seams in `src/code/qcommon/common.c`, `src/common/platform/*`, and the adjacent launcher helper surface in `src/code/win32/*` versus retail `quakelive_steam.exe`
 
 Purpose: publish a strict retail-facing audit for the native client host after the recent Steam, browser-resource, renderer-bridge, and module-bridge reconstruction work. The goal is to separate the strong classic client/runtime story from the remaining client-host verification work instead of treating everything as one undifferentiated host bucket.
+
+Current ledger note:
+
+- The broader native client-host story in this document remains useful for the
+  classic runtime, Steam/social/workshop wrappers, config/bootstrap, and the
+  retained browser-command/event bridge.
+- A stricter specialized reread of the engine-owned Awesomium/browser host on
+  `2026-04-16` is now published in
+  `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`.
+  That dedicated audit, including the later cursor/load-failure,
+  direct-input, app-activation, pointer-button/wheel, and
+  document-ready script-bundle, retained-surface mouse-mapping, and final
+  runtime-bootstrap or surface-pump closure
+  tranches
+  recorded the same day,
+  supersedes the older blanket-closure wording here for the browser-specific
+  sub-lane.
 
 ## Audit Method And Evidence
 
@@ -80,6 +97,14 @@ Observed result:
 
 - `128 passed in 4.14s`
 - `Build succeeded`
+
+Steamworks workshop callback exactness refresh on 2026-04-16:
+
+- `python -m pytest tests/test_steamworks_harness.py tests/test_client_workshop_bootstrap_parity.py tests/test_platform_services.py -q --tb=no`
+
+Observed result:
+
+- `96 passed in 4.11s`
 
 ## Corpus Snapshot And Mapping Confidence
 
@@ -211,7 +236,7 @@ Assessment: high parity
   - mapped `fs_webpath` / screenshot fallback
   - renderer-owned in-memory URI-resource registration
 - Main remaining loss:
-  - no confirmed owner gap remains; the tracked runtime bundle now covers the retained offline-policy/browser-host behavior expected for the current repo policy surface
+  - no current confirmed engine-owned gap remains in this lane; the retained backend choice stays policy-bounded, but the retail host-owned bootstrap, provider, listener, and surface-pump semantics are now explicit in writable source
 
 ### Config/bootstrap persistence
 
@@ -305,10 +330,11 @@ Observed current-source facts after `CL-P3`:
 1. `files.c` and `sv_init.c` now reconstruct the retail `sv_referencedSteamworks` / configstring `0x2CB` publication seam by advertising the deduplicated referenced workshop-item list instead of echoing the server SteamID through the workshop slots.
 2. `CL_InitDownloads` now parses and stages the retained workshop requirement list, seeds the retail-facing `cl_downloadItem` / `cl_downloadName` / byte counters from that retained state, and `CL_Frame` now runs the adjacent workshop completion helper before the resend path.
 3. `platform_steamworks.c` and `files.c` now remount subscribed workshop install roots with retained per-pack workshop item IDs, and `cl_ui.c` now imports workshop download progress from retained client state before falling back to the direct Steam item-info probe.
+4. A focused 2026-04-16 source audit closed one narrow callback-exactness miss inside the already-recovered workshop lane: `platform_steamworks.c` now retains the retail `SteamWorkshopCallbacks_Init` family (`ItemInstalled`, `DownloadItemResult`), `cl_main.c` now finalizes or advances the active workshop queue from those callbacks while keeping polling as a fallback, and the Steamworks harness now validates both workshop callback registrations and queued dispatch.
 
 ### Residual note
 
-1. This lane now only depends on future parity-gate/runtime-evidence work rather than on a known workshop bootstrap owner gap.
+1. No known source-owned workshop bootstrap gap remains in the current client register. The remaining risk in this lane is regression or stale final-runtime evidence, not missing workshop ownership.
 
 ## CL-G04 - Config/bootstrap persistence closure
 
@@ -415,6 +441,7 @@ Completed work:
 2. Restored the retail client bootstrap owner in `cl_main.c`: `CL_InitDownloads` now parses the required workshop-item list, stages retained active/queued workshop download state, seeds `cl_downloadItem` / `cl_downloadName` / byte counters from that state, and `CL_Frame` now calls the adjacent workshop completion helper before the resend path.
 3. Reconstructed the missing retail workshop mount path in `platform_steamworks.c` and `files.c`: filesystem startup/restart now enumerate subscribed SteamUGC items, query install folders through the recovered retail `GetNumSubscribedItems`, `GetSubscribedItems`, and `GetItemInstallInfo` slots, remount subscribed workshop install roots, and stamp mounted packs with retained workshop item IDs.
 4. Tightened the native UI download-info import in `cl_ui.c` so workshop progress flows through the retained client workshop owner first and only falls back to the direct Steam item-info probe, no longer to the legacy `clc.downloadCount` / `clc.downloadSize` counters.
+5. A focused 2026-04-16 Steamworks source audit then closed the remaining callback-exactness subgap: `platform_steamworks.c` now registers the retail workshop callback pair, `cl_main.c` now consumes `ItemInstalled` / `DownloadItemResult` for immediate queue advancement with polling fallback preserved, and `tests/test_steamworks_harness.py`, `tests/test_client_workshop_bootstrap_parity.py`, and `tests/test_platform_services.py` now pin that callback-owned completion path.
 
 Exit criteria:
 

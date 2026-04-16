@@ -9,6 +9,8 @@ from tests.compiler_support import compile_c_binary, find_c_compiler, shared_lib
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+CL_INPUT = REPO_ROOT / "src" / "code" / "client" / "cl_input.c"
+CL_KEYS = REPO_ROOT / "src" / "code" / "client" / "cl_keys.c"
 
 
 class TranslatedKey(ctypes.Structure):
@@ -18,6 +20,23 @@ class TranslatedKey(ctypes.Structure):
         ("charCode", ctypes.c_int),
         ("hasChar", ctypes.c_int),
     ]
+
+
+def _block_from_marker(source: str, marker: str) -> str:
+    start = source.rindex(marker)
+    brace_start = source.index("{", start)
+    depth = 0
+
+    for index in range(brace_start, len(source)):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:index + 1]
+
+    raise AssertionError(f"Unbalanced block for marker: {marker}")
 
 
 @pytest.fixture(scope="session")
@@ -49,6 +68,8 @@ def input_translation_lib(tmp_path_factory: pytest.TempPathFactory) -> ctypes.CD
     lib = ctypes.CDLL(str(lib_path))
     lib.QLR_TranslateKey.restype = TranslatedKey
     lib.QLR_TranslateKey.argtypes = [ctypes.c_int]
+    lib.QLR_EncodeUtf8Codepoint.restype = ctypes.c_int
+    lib.QLR_EncodeUtf8Codepoint.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char), ctypes.c_int]
     lib.QLR_TranslateMouse.restype = ctypes.c_int
     lib.QLR_TranslateMouse.argtypes = [ctypes.c_int, ctypes.c_float]
     return lib
@@ -71,6 +92,21 @@ def test_unicode_key_preserves_codepoint_for_char_payload(input_translation_lib:
     assert translated.hasChar == 1
 
 
+def test_codepoint_encoder_matches_retail_utf8_bytes(input_translation_lib: ctypes.CDLL) -> None:
+    buffer = ctypes.create_string_buffer(4)
+    written = input_translation_lib.QLR_EncodeUtf8Codepoint(0x20AC, buffer, len(buffer))
+
+    assert written == 3
+    assert buffer.raw[:written] == b"\xe2\x82\xac"
+
+
+def test_codepoint_encoder_rejects_utf16_surrogates(input_translation_lib: ctypes.CDLL) -> None:
+    buffer = ctypes.create_string_buffer(4)
+    written = input_translation_lib.QLR_EncodeUtf8Codepoint(0xD800, buffer, len(buffer))
+
+    assert written == 0
+
+
 def test_control_character_key_preserves_backspace_payload(input_translation_lib: ctypes.CDLL) -> None:
     translated = input_translation_lib.QLR_TranslateKey(8)
 
@@ -87,9 +123,76 @@ def test_negative_key_drops_character_payload(input_translation_lib: ctypes.CDLL
     assert translated.hasChar == 0
 
 
+def test_char_event_dispatch_encodes_utf8_before_routing() -> None:
+    source = CL_KEYS.read_text(encoding="utf-8")
+    block = _block_from_marker(source, "void CL_CharEvent( int key )")
+
+    for expected in (
+        "byteCount = CL_EncodeUtf8Codepoint( translated.charCode, utf8, sizeof( utf8 ) );",
+        "for ( i = 0 ; i < byteCount ; i++ ) {",
+        "utf8Byte = (unsigned char)utf8[i];",
+        "Field_CharEvent( &g_consoleField, utf8Byte );",
+        "VM_Call( uivm, UI_KEY_EVENT, utf8Byte | K_CHAR_FLAG, qtrue, cls.realtime );",
+        "Field_CharEvent( &chatField, utf8Byte );",
+    ):
+        assert expected in block
+
+    assert "key = translated.charCode;" not in block
+
+
+def test_key_string_to_keynum_lowercases_single_character_tokens() -> None:
+    source = CL_KEYS.read_text(encoding="utf-8")
+    block = _block_from_marker(source, "int Key_StringToKeynum( char *str )")
+
+    assert "return tolower( str[0] );" in block
+    assert "return str[0];" not in block
+
+
+def test_key_command_init_resets_retail_field_and_binding_state() -> None:
+    source = CL_KEYS.read_text(encoding="utf-8")
+    block = _block_from_marker(source, "void CL_InitKeyCommands( void )")
+
+    for expected in (
+        "Com_Memset( historyEditLines, 0, sizeof( historyEditLines ) );",
+        "nextHistoryLine = 0;",
+        "historyLine = 0;",
+        "Com_Memset( &g_consoleField, 0, sizeof( g_consoleField ) );",
+        "Com_Memset( &chatField, 0, sizeof( chatField ) );",
+        "chat_reply = qfalse;",
+        "chat_team = qfalse;",
+        "chat_playerNum = 0;",
+        "key_overstrikeMode = qfalse;",
+        "anykeydown = qfalse;",
+        "Com_Memset( keys, 0, sizeof( keys ) );",
+    ):
+        assert expected in block
+
+
 def test_mouse_delta_scales_with_cpi(input_translation_lib: ctypes.CDLL) -> None:
     scaled = input_translation_lib.QLR_TranslateMouse(1, ctypes.c_float(500.0))
     unchanged = input_translation_lib.QLR_TranslateMouse(4, ctypes.c_float(0.0))
 
     assert scaled == 2
     assert unchanged == 4
+
+
+def test_mouse_event_dispatch_tracks_absolute_cursor_position() -> None:
+    source = CL_INPUT.read_text(encoding="utf-8")
+
+    for expected in (
+        "static int\t\tcl_mouseCursorX;",
+        "static int\t\tcl_mouseCursorY;",
+        "static qboolean\tcl_mouseCursorInitialized;",
+        "static void CL_ResetMouseCursorPosition( void ) {",
+        "static void CL_UpdateMouseCursorPosition( int dx, int dy, int *cursorX, int *cursorY ) {",
+        "CL_UpdateMouseCursorPosition( translatedDx, translatedDy, &cursorX, &cursorY );",
+        "VM_Call( uivm, UI_MOUSE_EVENT, cursorX, cursorY );",
+        "VM_Call (cgvm, CG_MOUSE_EVENT, cursorX, cursorY);",
+    ):
+        assert expected in source
+
+    for unexpected in (
+        "VM_Call( uivm, UI_MOUSE_EVENT, translatedDx, translatedDy );",
+        "VM_Call (cgvm, CG_MOUSE_EVENT, translatedDx, translatedDy);",
+    ):
+        assert unexpected not in source

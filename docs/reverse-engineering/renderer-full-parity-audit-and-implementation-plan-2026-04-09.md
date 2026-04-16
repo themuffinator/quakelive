@@ -136,7 +136,7 @@ Inference:
 | Classic renderer font lane | Closed | `tr_font.c`, `tr_init.c`, `tr_local.h` | `docs/platform/retail-font-stack.md`; `docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md`; parity gate `RG-G05` | The classic FreeType-backed lane is now bounded: retail-backed cache/page/atlas behavior is separated from compatibility-only fallbacks, and deterministic tests pin the resulting proof surface. |
 | Renderer-owned host text core | Closed | `tr_font.c`, `tr_init.c`, `tr_local.h` | HLIL `0x004420A4`, `0x00442313`, `0x00444049`..`0x004442E3`; `docs/platform/retail-font-stack.md`; `docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md` | The retained `*fontstash` atlas, retail-style atlas overflow callback, and five-face host text table now exist in writable renderer source. |
 | Native UI and cgame host text imports | Closed | `cl_ui.c`, `cl_cgame.c`, `cl_main.c`, `tr_font.c` | HLIL `QLUIImport_DrawScaledText`, `QLUIImport_MeasureText`; mapping rounds 14 and 19; `docs/reverse-engineering/renderer-host-text-import-switchover-and-debug-atlas-2026-04-10.md` | The native `ui` and `cgame` import wrappers now route through the shared renderer-owned host text helpers instead of iterating `fontInfo_t` glyphs locally. |
-| Font build reproducibility and strict text validation | Closed | `renderer.vcxproj`, `renderer.vcxproj.filters`, `renderer.vcproj`, `quakelive_steam.vcxproj`, `.vscode/build.ps1`, `src/code/unix/Makefile`, `tools/ci/audit-retail-font-stack.ps1`, `tools/renderer/run_renderer_runtime_probe.ps1`, `tests/test_renderer_full_parity_gate.py` | external FreeType SDK replacement lane, strict font audit, and tracked `RG-P11` runtime artifact | The renderer now has a reproducible FreeType build lane and a text-specific strict runtime proof, so `RG-G09` is closed. |
+| Font build reproducibility and strict text validation | Closed | `renderer.vcxproj`, `renderer.vcxproj.filters`, `renderer.vcproj`, `quakelive_steam.vcxproj`, `.vscode/build.ps1`, `src/code/unix/Makefile`, `tools/ci/audit-retail-font-stack.ps1`, `tools/renderer/run_renderer_runtime_probe.ps1`, `tests/test_renderer_full_parity_gate.py` | repo-managed FreeType replacement lane, strict font audit, and tracked `RG-P11` runtime artifact | The renderer now has a reproducible FreeType build lane and a text-specific strict runtime proof, so `RG-G09` is closed. |
 
 ## What Still Holds From `RG-P1`..`RG-P6`
 
@@ -276,8 +276,9 @@ Observed facts:
 1. `renderer.vcxproj`, `renderer.vcxproj.filters`, and `renderer.vcproj` no
    longer reference `..\ft2\*`.
 2. `renderer.vcxproj`, `quakelive_steam.vcxproj`, `.vscode/build.ps1`, and
-   `src/code/unix/Makefile` now describe one explicit external FreeType SDK
-   replacement lane instead of a missing in-tree vendor tree.
+   `src/code/unix/Makefile` now describe one explicit repo-managed FreeType
+   replacement lane, with codec dependencies bootstrapped from
+   `src/libs/_deps`, instead of probing external SDK or Vcpkg installs.
 3. `tools/ci/audit-retail-font-stack.ps1` now validates the final build-lane
    and runtime-evidence surface without unresolved warnings.
 4. The renderer parity gate now passes `RG-G01` through `RG-G09`.
@@ -294,7 +295,7 @@ Inference:
 Closure summary:
 
 1. The stale in-tree `ft2` project references were removed and replaced with a
-   documented external FreeType SDK lane.
+   documented repo-managed FreeType lane plus repo-managed codec bootstrap.
 2. The font audit and renderer parity gate now treat the final font/text
    conditions as strict closure checks.
 3. The final runtime artifact now explicitly exercises retained-atlas debug
@@ -369,7 +370,7 @@ Outcome: complete. The renderer build description is now coherent again.
 
 Completed deliverables:
 
-1. Landed the explicit external FreeType SDK replacement lane across
+1. Landed the explicit repo-managed FreeType replacement lane across
    `tr_font.c`, `renderer.vcxproj`, `quakelive_steam.vcxproj`,
    `.vscode/build.ps1`, and `src/code/unix/Makefile`.
 2. Removed the stale `..\ft2\*` entries from the legacy renderer project

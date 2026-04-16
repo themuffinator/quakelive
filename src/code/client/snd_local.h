@@ -102,6 +102,16 @@ typedef struct
 	qboolean	doppler;
 } channel_t;
 
+#define MAX_VOICE_CHANNELS	5
+#define VOICE_BUFFER_SAMPLES	0x4000
+
+typedef struct {
+	int		clientNum;
+	int		startSample;
+	int		endSample;
+	short	samples[VOICE_BUFFER_SAMPLES];
+} voiceChannel_t;
+
 
 #define	WAV_FORMAT_PCM		1
 
@@ -143,6 +153,7 @@ void	SNDDMA_Submit(void);
 
 extern	channel_t   s_channels[MAX_CHANNELS];
 extern	channel_t   loop_channels[MAX_CHANNELS];
+extern	voiceChannel_t	s_voiceChannels[MAX_VOICE_CHANNELS];
 extern	int		numLoopChannels;
 
 extern	int		s_paintedtime;
@@ -163,6 +174,8 @@ extern cvar_t	*s_mixahead;
 
 extern cvar_t	*s_testsound;
 extern cvar_t	*s_separation;
+extern cvar_t	*s_pvs;
+extern cvar_t	*s_voiceStep;
 
 qboolean S_LoadSound( sfx_t *sfx );
 qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, wavinfo_t *info, short **outPcm );
@@ -170,6 +183,7 @@ qboolean S_VorbisDecodeMemory( const char *name, const byte *data, int length, w
 void		SND_free(sndBuffer *v);
 sndBuffer*	SND_malloc();
 void		SND_setup();
+void		SND_shutdown( void );
 
 void S_PaintChannels(int endtime);
 

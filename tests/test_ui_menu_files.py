@@ -117,6 +117,25 @@ def test_ui_bundle_manifest_stages_runtime_icon_roots_without_baseq3_prefixes() 
     assert "baseq3/levelshots/**/*" not in audit["required_globs"]
 
 
+def test_ui_bundle_manifest_stages_runtime_menudef_header() -> None:
+    manifest = json.loads((REPO_ROOT / "tools/packaging/ui_bundle_manifest.json").read_text(encoding="utf-8"))
+    files = manifest["files"]
+
+    header_entries = [
+        entry
+        for entry in files
+        if entry.get("source") == "src/ui/menudef.h"
+    ]
+    assert len(header_entries) == 1
+    assert header_entries[0]["destination"] == "ui/menudef.h"
+
+    audit = manifest["audit"]
+    assert "ui/menudef.h" in audit["required_paths"]
+
+    runtime_probe = (REPO_ROOT / "tools/client/run_client_runtime_probe.ps1").read_text(encoding="utf-8")
+    assert "( Join-Path $baseq3Root 'ui\\\\menudef.h' )" in runtime_probe
+
+
 def test_ui_extended_native_exports_match_retail_bridge_surface() -> None:
     ui_public = (REPO_ROOT / "src/code/ui/ui_public.h").read_text(encoding="utf-8")
     assert "#define UI_QL_API_VERSION\t8" in ui_public
@@ -238,6 +257,34 @@ def test_ui_player_model_catalog_matches_retail_skin_filtering() -> None:
     assert 'Q_stricmp( skinName, "sport_red" ) == 0' in ui_main
     assert "static qboolean UI_PlayerModelEntryHasSkin( int index )" in ui_main
     assert 'Com_sprintf( filename, sizeof( filename ), "models/players/%s/lower_%s.skin", entry->modelName, entry->skinName );' in ui_main
+
+
+def test_ui_ownerdraw_force_model_previews_match_retail_ql() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ownerdraw_block = _extract_function_block(
+        ui_main,
+        "static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle) {",
+    )
+
+    assert "case UI_TEAMPLAYERMODEL:" in ownerdraw_block
+    assert "case UI_ENEMYPLAYERMODEL:" in ownerdraw_block
+    assert "case UI_REDTEAMMODEL:" in ownerdraw_block
+    assert "case UI_BLUETEAMMODEL:" in ownerdraw_block
+
+    assert "static void UI_DrawTeamPlayerModel( rectDef_t *rect )" in ui_main
+    assert "static void UI_DrawEnemyPlayerModel( rectDef_t *rect )" in ui_main
+    assert "static void UI_DrawRedTeamModel( rectDef_t *rect )" in ui_main
+    assert "static void UI_DrawBlueTeamModel( rectDef_t *rect )" in ui_main
+
+    assert '"ui_forceTeamModel"' in ui_main
+    assert '"ui_forceEnemyModel"' in ui_main
+    assert '"ui_forceTeamModelBright"' in ui_main
+    assert '"ui_forceEnemyModelBright"' in ui_main
+    assert '"ui_teamModelBright"' not in ui_main
+    assert '"ui_enemyModelBright"' not in ui_main
+
+    assert 'UI_SyncRetailSliderColorCvar( &ui_teamHeadColor, "cg_teamHeadColor" );' in ui_main
+    assert 'UI_SyncRetailSliderColorCvar( &ui_enemyHeadColor, "cg_enemyHeadColor" );' in ui_main
     assert "static int UI_CountPlayerModelEntries( qboolean skipAliasSkins )" in ui_main
     assert "UI_AddPlayerModelEntry( dirptr, skinname + 5, iconShaderName );" in ui_main
     assert "if ( UI_PlayerModelSkinIsAlias( ui_playerModelEntries[i].skinName ) ) {" in ui_main
@@ -527,6 +574,10 @@ def test_ui_best_score_loader_skips_unseeded_metadata_probes() -> None:
 
 def test_ui_retail_ownerdraw_extensions_restored() -> None:
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_shared_h = (REPO_ROOT / "src/code/ui/ui_shared.h").read_text(encoding="utf-8")
+    asset_cache_block = _extract_function_block(ui_main, "void AssetCache() {")
+
+    assert "#define\tNUM_CROSSHAIRS\t\t\t30" in ui_shared_h
     assert "#define UI_CROSSHAIR_COLOR_COUNT\t27" in ui_main
     assert "static void UI_DrawCrosshairColor( rectDef_t *rect )" in ui_main
     assert 'trap_Cvar_VariableValue( "cg_crosshairColor" )' in ui_main
@@ -535,6 +586,9 @@ def test_ui_retail_ownerdraw_extensions_restored() -> None:
     assert "case UI_VOTESTRING:" in ui_main
     assert "UI_DrawVoteString(&rect, scale, color, textStyle);" in ui_main
     assert 'UI_Cvar_VariableString("ui_votestring")' in ui_main
+    assert "for ( n = 1; n < NUM_CROSSHAIRS; n++ ) {" in asset_cache_block
+    assert 'trap_R_RegisterShaderNoMip( va( "gfx/2d/crosshair%d", n ) );' in asset_cache_block
+    assert "crosshair%c" not in asset_cache_block
 
 
 def test_ui_retail_starting_weapons_ownerdraw_restored() -> None:
@@ -803,6 +857,30 @@ def test_ui_display_mousemove_matches_retail_routing_only() -> None:
     assert "Menu_UpdatePosition(menu);" not in block
 
 
+def test_ui_mouse_event_projects_screen_coords_like_retail() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    block = _extract_function_block(ui_main, "void _UI_MouseEvent( int x, int y )\n{")
+
+    for expected in (
+        "static int UI_ConvertScreenCursorXToVirtual( int x ) {",
+        "static int UI_ConvertScreenCursorYToVirtual( int y ) {",
+        "uiInfo.uiDC.cursorx = UI_ConvertScreenCursorXToVirtual( x );",
+        "uiInfo.uiDC.cursory = UI_ConvertScreenCursorYToVirtual( y );",
+        "Display_MouseMove( NULL, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory );",
+    ):
+        assert expected in ui_main
+
+    for unexpected in (
+        "uiInfo.uiDC.cursorx += dx;",
+        "uiInfo.uiDC.cursory += dy;",
+        "Display_MouseMove(NULL, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory);",
+    ):
+        assert unexpected not in ui_main
+
+    assert "(unsigned int)uiInfo.uiDC.cursorx <= SCREEN_WIDTH" in block
+    assert "(unsigned int)uiInfo.uiDC.cursory <= SCREEN_HEIGHT" in block
+
+
 def test_ui_retail_item_font_runtime_compatibility_restored() -> None:
     ui_shared_h = (REPO_ROOT / "src/code/ui/ui_shared.h").read_text(encoding="utf-8")
     assert "#define ITEM_FONT_INHERIT -1" in ui_shared_h
@@ -829,6 +907,14 @@ def test_ui_retail_item_font_runtime_compatibility_restored() -> None:
     assert "uiInfo.uiDC.textWidthExt = &Text_WidthExt;" in ui_main
     assert "uiInfo.uiDC.textHeightExt = &Text_HeightExt;" in ui_main
     assert "uiInfo.uiDC.drawTextWithCursorExt = &Text_PaintWithCursorExt;" in ui_main
+
+
+def test_ui_menu_font_parser_stores_resolved_font_token() -> None:
+    ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
+
+    assert "qboolean MenuParse_font( itemDef_t *item, int handle )" in ui_shared
+    assert "UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE );" in ui_shared
+    assert "menu->font = String_Alloc( fontPath );" in ui_shared
 
 
 def test_ui_retail_preset_and_precision_runtime_restored() -> None:
@@ -1120,6 +1206,8 @@ def test_ui_retail_callvote_map_token_path_restored() -> None:
     )
     assert 'trap_Cvar_Set( "ui_cvGameType", "-1" );' in active_menu_block
     assert "trap_Cvar_Update( &ui_cvGameType );" in active_menu_block
+    assert 'Menus_ActivateByName("ingame");' in active_menu_block
+    assert 'Menus_ActivateByName("ingame_about");' in active_menu_block
 
 
 def test_ui_retail_callvote_map_feeder_uses_active_map_slab() -> None:

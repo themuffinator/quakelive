@@ -63,6 +63,7 @@ def test_cgame_timer_format_helpers_drive_retail_ownerdraw_call_sites() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	minutes_block = _block_from_marker(source, "static const char *CG_FormatMinutesSeconds")
 	signed_block = _block_from_marker(source, "static const char *CG_FormatSignedWholeSeconds")
+	entries_block = _block_from_marker(source, "static const cgTeamPickupSummaryEntry_t cgTeamPickupSummaryEntries[] =")
 	summary_block = _block_from_marker(source, "static void CG_DrawTeamPickupSummaryOwnerDraw")
 	timeheld_block = _block_from_marker(source, "static qboolean CG_BuildTeamTimeHeldText")
 	level_timer_block = _block_from_marker(source, "static void CG_DrawLevelTimer")
@@ -82,6 +83,11 @@ def test_cgame_timer_format_helpers_drive_retail_ownerdraw_call_sites() -> None:
 	):
 		assert expected in signed_block
 
+	assert "{ CG_TEAMSTAT_PICKUPS_YA, -1, CG_TEAM_PICKUP_SUMMARY_ICON_YA, 11 }" in entries_block
+	assert "drawX = (float)(int)rect->x;" in summary_block
+	assert "drawY = (float)(int)rect->y;" in summary_block
+	assert "CG_Text_Paint( drawX + entry->countTextOffsetX, drawY + 8.0f, scale, color, countText, 0, 0, textStyle );" in summary_block
+	assert "CG_Text_Paint( drawX + entry->countTextOffsetX, drawY + 15.0f, scale, color, countText, 0, 0, textStyle );" in summary_block
 	assert 'Q_strncpyz( timeText, CG_FormatMinutesSeconds( timeHeld ), sizeof( timeText ) );' in summary_block
 	assert 'Q_strncpyz( buffer, CG_FormatMinutesSeconds( value ), bufferSize );' in timeheld_block
 	assert 'Q_strncpyz( buffer, CG_FormatMinutesSeconds( seconds ), sizeof( buffer ) );' in level_timer_block

@@ -25,27 +25,114 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 static char g_raceScores[MAX_STRING_CHARS];
 static char g_raceInfo[MAX_STRING_CHARS];
 
+static void G_RaceCachePointMetadata( gentity_t *ent );
 static void G_RaceUpdateInfoConfigString( void );
 static void G_RaceRegisterPoint( gentity_t *ent );
+static int G_RaceCheckpointCount( const gclient_t *client );
 
 /*
 =============
-G_RacePrintMessage
+G_RacePointEntityNum
 
-Sends a print message to a specific client or the server console when ent is NULL.
+Returns the entity number for a race checkpoint or -1 when absent.
 =============
 */
-static void G_RacePrintMessage( gentity_t *ent, const char *message ) {
+static int G_RacePointEntityNum( const gentity_t *point ) {
+	if ( !point || !point->inuse ) {
+		return -1;
+	}
+
+	return point->s.number;
+}
+
+/*
+=============
+G_RaceResolveInfoClient
+
+Resolves the player whose retail race_info payload should be sent to a client.
+=============
+*/
+static gclient_t *G_RaceResolveInfoClient( int clientNum ) {
+	gentity_t	*ent;
+	int		targetClientNum;
+
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return NULL;
+	}
+
+	ent = &g_entities[clientNum];
+	if ( !ent->inuse || !ent->client ) {
+		return NULL;
+	}
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR &&
+		ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
+		targetClientNum = ent->client->sess.spectatorClient;
+		if ( targetClientNum >= 0 && targetClientNum < level.maxclients &&
+			level.clients[targetClientNum].pers.connected == CON_CONNECTED &&
+			level.clients[targetClientNum].sess.sessionTeam != TEAM_SPECTATOR ) {
+			return &level.clients[targetClientNum];
+		}
+		return NULL;
+	}
+
+	return ent->client;
+}
+
+/*
+=============
+G_RaceBuildInfoCommand
+
+Builds the retail six-field race_info payload for one tracked race client.
+=============
+*/
+static void G_RaceBuildInfoCommand( const gclient_t *client, char *buffer, size_t bufferSize ) {
+	int	active;
+	int	startTime;
+	int	lastFinishTime;
+	int	checkpointCount;
+	int	currentCheckpointEntityNum;
+	int	nextCheckpointEntityNum;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	active = 0;
+	startTime = 0;
+	lastFinishTime = -1;
+	checkpointCount = 0;
+	currentCheckpointEntityNum = -1;
+	nextCheckpointEntityNum = -1;
+	if ( client ) {
+		active = client->raceState.active ? 1 : 0;
+		startTime = client->raceState.startTime;
+		lastFinishTime = client->raceState.lastFinishTime;
+		if ( client->raceState.active ) {
+			checkpointCount = G_RaceCheckpointCount( client );
+			currentCheckpointEntityNum = G_RacePointEntityNum( client->raceState.currentPoint );
+			nextCheckpointEntityNum = G_RacePointEntityNum( client->raceState.nextPoint );
+		}
+	}
+
+	Com_sprintf( buffer, bufferSize, "race_info %i %i %i %i %i %i",
+		active, startTime, lastFinishTime, checkpointCount,
+		currentCheckpointEntityNum, nextCheckpointEntityNum );
+}
+
+/*
+=============
+G_RaceBroadcastPrint
+
+Broadcasts a race admin print message to every connected client.
+=============
+*/
+static void G_RaceBroadcastPrint( const char *message ) {
 	if ( !message || !*message ) {
 		return;
 	}
 
-	if ( ent && ent->client ) {
-		trap_SendServerCommand( ent - g_entities, va( "print \"%s\"", message ) );
-		return;
-	}
-
-	G_Printf( "%s", message );
+	trap_SendServerCommand( -1, va( "print \"%s\"", message ) );
 }
 
 /*
@@ -86,7 +173,12 @@ static void FinishSpawningRacePoint( gentity_t *ent ) {
 	G_SetOrigin( ent, snapped );
 
 	trap_LinkEntity( ent );
-	G_RaceRegisterPoint( ent );
+	if ( ent->racePointIndex < 0 ) {
+		G_RaceRegisterPoint( ent );
+	} else {
+		G_RaceCachePointMetadata( ent );
+		G_RaceUpdateInfoConfigString();
+	}
 }
 
 /*
@@ -163,7 +255,7 @@ void G_RaceBroadcastInitCommand( int clientNum ) {
 		count = MAX_RACE_POINTS;
 	}
 
-	trap_SendServerCommand( clientNum, va( "race_init %i", level.racePointCount ) );
+	trap_SendServerCommand( clientNum, "race_init" );
 	for ( i = 0; i < count; i++ ) {
 		if ( level.racePointInfo[i].inUse ) {
 			G_RaceSendPointMetadataCommand( clientNum, i );
@@ -175,12 +267,23 @@ void G_RaceBroadcastInitCommand( int clientNum ) {
 =============
 G_RaceSendInfoCommand
 
-Flushes the race_info payload to a specific client.
+Flushes the retail race_info payload to one client, while preserving the
+broadcast configstring helper for admin/server probes.
 =============
 */
 void G_RaceSendInfoCommand( int clientNum ) {
-	G_RaceUpdateInfoConfigString();
-	trap_SendServerCommand( clientNum, g_raceInfo );
+	char		buffer[MAX_STRING_CHARS];
+	gclient_t	*client;
+
+	if ( clientNum < 0 ) {
+		G_RaceUpdateInfoConfigString();
+		trap_SendServerCommand( clientNum, g_raceInfo );
+		return;
+	}
+
+	client = G_RaceResolveInfoClient( clientNum );
+	G_RaceBuildInfoCommand( client, buffer, sizeof( buffer ) );
+	trap_SendServerCommand( clientNum, buffer );
 }
 
 /*
@@ -229,7 +332,24 @@ static void G_RaceClearClientRunState( gclient_t *client ) {
 	client->raceState.active = qfalse;
 	client->raceState.startTime = 0;
 	client->raceState.nextCheckpoint = 0;
+	client->raceState.currentPoint = NULL;
+	client->raceState.nextPoint = NULL;
 	memset( client->raceState.currentSplits, 0, sizeof( client->raceState.currentSplits ) );
+}
+
+/*
+=============
+Cmd_RaceInit_f
+
+Clears the invoking client's in-progress race state without rebuilding level metadata.
+=============
+*/
+void Cmd_RaceInit_f( gentity_t *ent ) {
+	if ( g_gametype.integer != GT_RACE || !ent || !ent->client ) {
+		return;
+	}
+
+	G_RaceClearClientRunState( ent->client );
 }
 
 /*
@@ -417,25 +537,200 @@ static void G_RaceUpdateConfigstrings( void ) {
 
 /*
 =============
-G_RaceStartRun
+G_RaceCheckpointCount
 
-Begins a new race attempt for the provided player.
+Returns the number of cleared checkpoints for the current run.
 =============
 */
-static void G_RaceStartRun( gentity_t *player ) {
-	gclient_t *client;
+static int G_RaceCheckpointCount( const gclient_t *client ) {
+	int	checkpointCount;
+
+	if ( !client ) {
+		return 0;
+	}
+
+	checkpointCount = client->raceState.nextCheckpoint - 1;
+	if ( checkpointCount < 0 ) {
+		checkpointCount = 0;
+	}
+
+	return checkpointCount;
+}
+
+/*
+=============
+G_RacePickPointTarget
+
+Resolves the next point in a race-point target chain.
+=============
+*/
+static gentity_t *G_RacePickPointTarget( const gentity_t *point ) {
+	if ( !point || !point->target || !point->target[0] ) {
+		return NULL;
+	}
+
+	return G_PickTarget( point->target );
+}
+
+/*
+=============
+G_RacePointIsStart
+
+Treats the first registered point as a valid start while preserving the retail
+targetname-free start-point behavior for authored maps.
+=============
+*/
+static qboolean G_RacePointIsStart( const gentity_t *point ) {
+	if ( !point ) {
+		return qfalse;
+	}
+
+	if ( point->racePointIndex == 0 ) {
+		return qtrue;
+	}
+
+	return ( qboolean )( !point->targetname || !point->targetname[0] );
+}
+
+/*
+=============
+G_RaceEmitClientEvent
+
+Spawns a retail-style single-client temp entity for Race events.
+=============
+*/
+static gentity_t *G_RaceEmitClientEvent( gentity_t *player, int event ) {
+	gentity_t	*tent;
+
+	if ( !player || !player->client ) {
+		return NULL;
+	}
+
+	tent = G_TempEntity( player->client->ps.origin, event );
+	tent->r.svFlags |= SVF_SINGLECLIENT;
+	tent->r.singleClient = player->s.number;
+	G_SetRetailEventRecipient( tent, player->s.number );
+	return tent;
+}
+
+/*
+=============
+G_RaceEmitStartEvent
+
+Publishes the retail EV_RACE_START payload for the local runner.
+=============
+*/
+static void G_RaceEmitStartEvent( gentity_t *player ) {
+	gentity_t	*tent;
+	gclient_t	*client;
 
 	if ( !player || !player->client ) {
 		return;
 	}
 
 	client = player->client;
+	tent = G_RaceEmitClientEvent( player, EV_RACE_START );
+	if ( !tent ) {
+		return;
+	}
+
+	tent->s.groundEntityNum = G_RaceCheckpointCount( client );
+	tent->s.constantLight = G_RacePointEntityNum( client->raceState.currentPoint );
+	tent->s.legsAnim = G_RacePointEntityNum( client->raceState.nextPoint );
+	G_SetRetailEventIntPayload( &tent->s, client->raceState.startTime );
+}
+
+/*
+=============
+G_RaceEmitCheckpointEvent
+
+Publishes the retail EV_RACE_CHECKPOINT payload for the local runner.
+=============
+*/
+static void G_RaceEmitCheckpointEvent( gentity_t *player, int splitDelta, qboolean hasBestSplit ) {
+	gentity_t	*tent;
+	gclient_t	*client;
+
+	if ( !player || !player->client ) {
+		return;
+	}
+
+	client = player->client;
+	tent = G_RaceEmitClientEvent( player, EV_RACE_CHECKPOINT );
+	if ( !tent ) {
+		return;
+	}
+
+	tent->s.groundEntityNum = G_RaceCheckpointCount( client );
+	tent->s.constantLight = G_RacePointEntityNum( client->raceState.currentPoint );
+	tent->s.legsAnim = G_RacePointEntityNum( client->raceState.nextPoint );
+	G_SetRetailEventIntPayload( &tent->s, splitDelta );
+	G_SetRetailEventData( &tent->s, hasBestSplit ? 1 : 0 );
+}
+
+/*
+=============
+G_RaceEmitFinishEvent
+
+Publishes the retail EV_RACE_FINISH payload for the local runner.
+=============
+*/
+static void G_RaceEmitFinishEvent( gentity_t *player, int elapsed ) {
+	gentity_t	*tent;
+
+	tent = G_RaceEmitClientEvent( player, EV_RACE_FINISH );
+	if ( !tent ) {
+		return;
+	}
+
+	G_SetRetailEventIntPayload( &tent->s, elapsed );
+	G_SetRetailEventData( &tent->s, 1 );
+}
+
+/*
+=============
+G_RaceEmitNewHighScoreEvent
+
+Publishes the retail EV_NEW_HIGH_SCORE cue for a new course record.
+=============
+*/
+static void G_RaceEmitNewHighScoreEvent( gentity_t *player ) {
+	(void)G_RaceEmitClientEvent( player, EV_NEW_HIGH_SCORE );
+}
+
+/*
+=============
+G_RaceStartRun
+
+Begins a new race attempt for the provided player.
+=============
+*/
+static void G_RaceStartRun( gentity_t *point, gentity_t *player ) {
+	gclient_t	*client;
+	gentity_t	*currentPoint;
+
+	if ( !point || !player || !player->client ) {
+		return;
+	}
+
+	client = player->client;
+	if ( client->raceState.active && level.time - client->raceState.startTime <= 999 ) {
+		return;
+	}
+
+	currentPoint = G_RacePickPointTarget( point );
+	if ( !currentPoint ) {
+		return;
+	}
+
 	G_RaceClearClientRunState( client );
 	client->raceState.active = qtrue;
 	client->raceState.startTime = level.time;
 	client->raceState.nextCheckpoint = 1;
-	client->raceState.lastFinishTime = -1;
+	client->raceState.currentPoint = currentPoint;
+	client->raceState.nextPoint = G_RacePickPointTarget( currentPoint );
 	client->raceState.currentSplits[0] = 0;
+	G_RaceEmitStartEvent( player );
 }
 
 /*
@@ -468,26 +763,38 @@ Handles the bookkeeping associated with completing the final checkpoint.
 =============
 */
 static void G_RaceFinishRun( gentity_t *point, gentity_t *player, int elapsed ) {
-	gclient_t *client;
-	qboolean personalBest;
-
-	(void)point;
+	gclient_t	*client;
+	gclient_t	*leader;
+	qboolean	personalBest;
+	qboolean	newHighScore;
 
 	if ( !player || !player->client ) {
 		return;
 	}
 
 	client = player->client;
-	client->raceState.active = qfalse;
-	client->raceState.nextCheckpoint = 0;
+	if ( !point || client->raceState.currentPoint != point ) {
+		return;
+	}
+
+	if ( client->raceState.nextCheckpoint >= 0 && client->raceState.nextCheckpoint < MAX_RACE_POINTS ) {
+		client->raceState.currentSplits[client->raceState.nextCheckpoint] = elapsed;
+	}
+
 	client->raceState.lastFinishTime = elapsed;
+	leader = G_RaceFindLeader();
 	personalBest = ( client->raceState.bestTime == RACE_INVALID_TIME || elapsed < client->raceState.bestTime );
+	newHighScore = ( leader == NULL || elapsed < leader->raceState.bestTime ) ? qtrue : qfalse;
 
 	if ( personalBest ) {
 		client->raceState.bestTime = elapsed;
 		memcpy( client->raceState.bestSplits, client->raceState.currentSplits, sizeof( client->raceState.bestSplits ) );
 	}
 
+	if ( newHighScore ) {
+		G_RaceEmitNewHighScoreEvent( player );
+	}
+	G_RaceEmitFinishEvent( player, elapsed );
 	G_RaceAnnounceFinish( player, elapsed, personalBest );
 	G_RankSendPlayerRaceComplete( player, elapsed );
 	G_RaceClearClientRunState( client );
@@ -502,29 +809,43 @@ Processes a touch event for checkpoints after the start line.
 =============
 */
 static void G_RaceAdvanceCheckpoint( gentity_t *point, gentity_t *player ) {
-	gclient_t *client;
-	int elapsed;
+	gclient_t	*client;
+	int		bestSplit;
+	int		elapsed;
+	int		splitDelta;
+	qboolean	hasBestSplit;
 
 	if ( !point || !player || !player->client ) {
 		return;
 	}
 
 	client = player->client;
-	if ( !client->raceState.active ) {
-		return;
-	}
-
-	if ( point->racePointIndex != client->raceState.nextCheckpoint ) {
+	if ( !client->raceState.active || client->raceState.currentPoint != point ) {
 		return;
 	}
 
 	elapsed = level.time - client->raceState.startTime;
-	client->raceState.currentSplits[point->racePointIndex] = elapsed;
-	client->raceState.nextCheckpoint++;
-
-	if ( point->racePointIndex == level.racePointCount - 1 ) {
+	if ( !point->target || !point->target[0] ) {
 		G_RaceFinishRun( point, player, elapsed );
+		return;
 	}
+
+	hasBestSplit = qfalse;
+	splitDelta = 0;
+	bestSplit = 0;
+	if ( client->raceState.nextCheckpoint >= 0 && client->raceState.nextCheckpoint < MAX_RACE_POINTS ) {
+		bestSplit = client->raceState.bestSplits[client->raceState.nextCheckpoint];
+		client->raceState.currentSplits[client->raceState.nextCheckpoint] = elapsed;
+		if ( bestSplit != 0 ) {
+			hasBestSplit = qtrue;
+			splitDelta = elapsed - bestSplit;
+		}
+	}
+
+	client->raceState.nextCheckpoint++;
+	client->raceState.currentPoint = G_RacePickPointTarget( point );
+	client->raceState.nextPoint = G_RacePickPointTarget( client->raceState.currentPoint );
+	G_RaceEmitCheckpointEvent( player, splitDelta, hasBestSplit );
 }
 
 /*
@@ -543,8 +864,8 @@ void G_RaceHandlePointTouch( gentity_t *point, gentity_t *player ) {
 		return;
 	}
 
-	if ( point->racePointIndex <= 0 ) {
-		G_RaceStartRun( player );
+	if ( G_RacePointIsStart( point ) ) {
+		G_RaceStartRun( point, player );
 		return;
 	}
 
@@ -567,7 +888,6 @@ static void G_RaceRegisterPoint( gentity_t *ent ) {
 
 	level.racePoints[level.racePointCount] = ent;
 	ent->racePointIndex = level.racePointCount;
-	ent->racePointAdminSpawned = qfalse;
 	level.racePointCount++;
 	level.raceLastSpawnedPoint = ent;
 	G_RaceCachePointMetadata( ent );
@@ -619,26 +939,29 @@ Removes all race points from the current level.
 =============
 */
 static void G_RaceAdminClearPoints( gentity_t *ent ) {
-	gentity_t *point;
-	int cleared;
+	gentity_t	*point;
+	int		i;
 
-	cleared = 0;
+	(void)ent;
 	point = NULL;
 	while ( ( point = G_Find( point, FOFS( classname ), "race_point" ) ) != NULL ) {
 		G_FreeEntity( point );
-		cleared++;
 	}
 
-	if ( cleared > 0 ) {
-		memset( level.racePoints, 0, sizeof( level.racePoints ) );
-		memset( level.racePointInfo, 0, sizeof( level.racePointInfo ) );
-		level.racePointCount = 0;
-		level.raceLastSpawnedPoint = NULL;
+	for ( i = 0; i < level.maxclients; ++i ) {
+		if ( level.clients[i].pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+		G_RaceClearClientRunState( &level.clients[i] );
 	}
 
+	memset( level.racePoints, 0, sizeof( level.racePoints ) );
+	memset( level.racePointInfo, 0, sizeof( level.racePointInfo ) );
+	level.racePointCount = 0;
+	level.raceLastSpawnedPoint = NULL;
 	G_RaceUpdateInfoConfigString();
 	G_RaceBroadcastInitCommand( -1 );
-	G_RacePrintMessage( ent, "clearing race points\n" );
+	G_RaceBroadcastPrint( "clearing race points\n" );
 }
 
 /*
@@ -652,13 +975,12 @@ static void G_RaceAdminDumpPoints( gentity_t *ent ) {
 	gentity_t *point;
 	char buffer[128];
 
+	(void)ent;
 	point = NULL;
 	while ( ( point = G_Find( point, FOFS( classname ), "race_point" ) ) != NULL ) {
-		const char *target = ( point->target && *point->target ) ? point->target : "-";
-		const char *targetName = ( point->targetname && *point->targetname ) ? point->targetname : "-";
-		Com_sprintf( buffer, sizeof( buffer ), "%i: %.2f %.2f %.2f target=%s targetname=%s\n",
-			point->racePointIndex, point->s.origin[0], point->s.origin[1], point->s.origin[2], target, targetName );
-		G_RacePrintMessage( ent, buffer );
+		Com_sprintf( buffer, sizeof( buffer ), "%f %f %f\n",
+			point->s.origin[0], point->s.origin[1], point->s.origin[2] );
+		G_RaceBroadcastPrint( buffer );
 	}
 }
 
@@ -671,10 +993,11 @@ Spawns a new checkpoint at the admin's current location.
 */
 static void G_RaceAdminSpawnPoint( gentity_t *ent ) {
 	gentity_t *point;
-	char targetName[32];
+	vec3_t	origin;
+	char targetName[16];
 
 	if ( level.racePointCount >= MAX_RACE_POINTS ) {
-		trap_SendServerCommand( ent - g_entities, va( "print \"too many race points (max %i)\n\"", MAX_RACE_POINTS ) );
+		G_RaceBroadcastPrint( "too many race points\n" );
 		return;
 	}
 
@@ -684,23 +1007,26 @@ static void G_RaceAdminSpawnPoint( gentity_t *ent ) {
 		return;
 	}
 
-	VectorCopy( ent->s.origin, point->s.origin );
-	VectorCopy( point->s.origin, point->r.currentOrigin );
+	VectorSet( origin, ent->s.origin[0], ent->s.origin[1], ent->s.origin[2] - 8.0f );
+	G_SetOrigin( point, origin );
 	point->classname = "race_point";
+	point->spawnflags = 0;
+	Com_sprintf( targetName, sizeof( targetName ), "arp%i", level.racePointCount );
+	point->targetname = G_NewString( targetName );
+	point->racePointAdminSpawned = qtrue;
+
+	if ( level.raceLastSpawnedPoint ) {
+		level.raceLastSpawnedPoint->target = G_NewString( targetName );
+		G_RaceCachePointMetadata( level.raceLastSpawnedPoint );
+	}
+
 	SP_race_point( point );
 	if ( !point->inuse ) {
 		return;
 	}
 
-	Com_sprintf( targetName, sizeof( targetName ), "admin_race_point_%i", point->racePointIndex );
-	point->targetname = G_NewString( targetName );
-	point->racePointAdminSpawned = qtrue;
-	G_RaceCachePointMetadata( point );
-	trap_SendServerCommand( -1, "print \"spawning a race point\n\"" );
-	trap_SendServerCommand( -1, va( "admin_race_point_%i %.2f %.2f %.2f %s %s",
-		point->racePointIndex, point->s.origin[0], point->s.origin[1], point->s.origin[2],
-		( point->target && *point->target ) ? point->target : "-",
-		point->targetname ? point->targetname : "-" ) );
+	G_RaceRegisterPoint( point );
+	G_RaceBroadcastPrint( "spawning a race point\n" );
 	G_RaceBroadcastInitCommand( -1 );
 }
 

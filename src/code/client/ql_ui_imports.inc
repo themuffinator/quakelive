@@ -533,7 +533,7 @@ QL_UI_trap_LAN_SaveCachedServers
 ==============
 */
 static void QDECL QL_UI_trap_LAN_SaveCachedServers(  ) {
-	UI_Import_Syscall( UI_LAN_SAVECACHEDSERVERS );
+	/* Retail native import slot is a no-op. */
 }
 
 /*
@@ -542,7 +542,7 @@ QL_UI_trap_LAN_LoadCachedServers
 ==============
 */
 static void QDECL QL_UI_trap_LAN_LoadCachedServers(  ) {
-	UI_Import_Syscall( UI_LAN_LOADCACHEDSERVERS );
+	/* Retail native import slot is a no-op. */
 }
 
 /*

@@ -239,10 +239,15 @@ def _build_client_full_parity_gate_report() -> dict[str, Any]:
 		and "const char *FS_ReferencedSteamworks( void ) {" in files_c
 		and 'Cvar_Set( "sv_referencedSteamworks", referencedSteamworks );' in sv_init
 		and "void CL_InitDownloads(void) {" in cl_main
+		and "qboolean QL_Steamworks_RegisterWorkshopCallbacks( const ql_steam_workshop_callback_bindings_t *bindings ) {" in platform_steamworks
+		and "static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_item_installed_t *event ) {" in cl_main
+		and "static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_steam_download_item_result_t *event ) {" in cl_main
+		and "QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings )" in cl_main
 		and "static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int arg1, unsigned int arg2, unsigned long long *outDownloaded, unsigned long long *outTotal ) {" in cl_ui
 		and "QL_Steamworks_GetSubscribedItems" in platform_steamworks
 		and "QL_Steamworks_GetItemInstallInfo" in platform_steamworks
 		and "test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owners" in client_workshop_tests
+		and "test_callback_bundle_registration_and_dispatch_reconstructs_retail_client_owner" in steamworks_harness_tests
 		and "test_ui_item_download_import_uses_retained_client_workshop_state" in client_workshop_tests
 		and "test_workshop_subscription_enumeration_uses_retail_ugc_mount_slots" in steamworks_harness_tests
 		and "test_workshop_mount_startup_reconstructs_retail_subscribed_item_import_path" in platform_services_tests
@@ -261,6 +266,12 @@ def _build_client_full_parity_gate_report() -> dict[str, Any]:
 				and 'Cvar_Set( "sv_referencedSteamworks", referencedSteamworks );' in sv_init
 			),
 			"client_bootstrap_present": "void CL_InitDownloads(void) {" in cl_main,
+			"workshop_callback_owner_present": (
+				"qboolean QL_Steamworks_RegisterWorkshopCallbacks( const ql_steam_workshop_callback_bindings_t *bindings ) {" in platform_steamworks
+				and "static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_item_installed_t *event ) {" in cl_main
+				and "static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_steam_download_item_result_t *event ) {" in cl_main
+				and "QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings )" in cl_main
+			),
 			"ui_progress_import_present": "static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int arg1, unsigned int arg2, unsigned long long *outDownloaded, unsigned long long *outTotal ) {" in cl_ui,
 			"workshop_mount_helpers_present": (
 				"QL_Steamworks_GetSubscribedItems" in platform_steamworks
@@ -268,6 +279,7 @@ def _build_client_full_parity_gate_report() -> dict[str, Any]:
 			),
 			"focused_validation_present": (
 				"test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owners" in client_workshop_tests
+				and "test_callback_bundle_registration_and_dispatch_reconstructs_retail_client_owner" in steamworks_harness_tests
 				and "test_workshop_mount_startup_reconstructs_retail_subscribed_item_import_path" in platform_services_tests
 			),
 		},

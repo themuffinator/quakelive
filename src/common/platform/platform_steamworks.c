@@ -102,6 +102,21 @@ typedef struct {
 } ql_steam_ugc_query_completed_raw_t;
 
 typedef struct {
+	uint32_t appId;
+	uint32_t reserved;
+	uint32_t itemIdLow;
+	uint32_t itemIdHigh;
+} ql_steam_item_installed_raw_t;
+
+typedef struct {
+	uint32_t appId;
+	uint32_t reserved;
+	uint32_t itemIdLow;
+	uint32_t itemIdHigh;
+	int result;
+} ql_steam_download_item_result_raw_t;
+
+typedef struct {
 	int result;
 	CSteamID lobbyId;
 } ql_steam_lobby_created_raw_t;
@@ -242,6 +257,13 @@ typedef struct {
 } ql_steam_micro_callback_state_t;
 
 typedef struct {
+	ql_steam_workshop_callback_bindings_t bindings;
+	qboolean registered;
+	ql_steam_callback_base_t itemInstalled;
+	ql_steam_callback_base_t downloadItemResult;
+} ql_steam_workshop_callback_state_t;
+
+typedef struct {
 	ql_steam_server_callback_bindings_t bindings;
 	qboolean registered;
 	ql_steam_callback_base_t serversConnected;
@@ -263,6 +285,7 @@ typedef struct {
 	QL_SteamAPI_UnregisterCallResultFn SteamAPI_UnregisterCallResult;
 	QL_SteamAPI_InterfaceFn SteamUser;
 	QL_SteamAPI_InterfaceFn SteamFriends;
+	QL_SteamAPI_InterfaceFn SteamNetworking;
 	QL_SteamAPI_InterfaceFn SteamUtils;
 	QL_SteamAPI_InterfaceFn SteamUserStats;
 	QL_SteamAPI_InterfaceFn SteamMatchmaking;
@@ -286,6 +309,7 @@ typedef struct {
 	ql_steam_server_callback_state_t serverCallbacks;
 	ql_steam_lobby_callback_state_t lobbyCallbacks;
 	ql_steam_micro_callback_state_t microCallbacks;
+	ql_steam_workshop_callback_state_t workshopCallbacks;
 } ql_steamworks_state_t;
 
 static ql_steamworks_state_t state;
@@ -305,6 +329,8 @@ static ql_steamworks_state_t state;
 #define QL_STEAM_CALLBACK_GAME_SERVER_CHANGE_REQUESTED 0x14c
 #define QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE 0x150
 #define QL_STEAM_CALLBACK_UGC_QUERY_COMPLETED 0xd49
+#define QL_STEAM_CALLBACK_ITEM_INSTALLED 0xd4d
+#define QL_STEAM_CALLBACK_DOWNLOAD_ITEM_RESULT 0xd4e
 #define QL_STEAM_CALLBACK_LOBBY_CREATED 0x201
 #define QL_STEAM_CALLBACK_LOBBY_ENTER 0x1f8
 #define QL_STEAM_CALLBACK_LOBBY_CHAT_UPDATE 0x1fa
@@ -574,6 +600,7 @@ qboolean QL_Steamworks_LoadLibrary( void ) {
 		return qfalse;
 	}
 
+	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamNetworking, "SteamAPI_SteamNetworking" );
 	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamUtils, "SteamAPI_SteamUtils" );
 	QL_Steamworks_LoadOptionalSymbol( (void **)&state.SteamUserStats, "SteamAPI_SteamUserStats" );
 
@@ -681,6 +708,7 @@ void QL_Steamworks_Shutdown( void ) {
 	}
 
 	QL_Steamworks_UnregisterServerCallbacks();
+	QL_Steamworks_UnregisterWorkshopCallbacks();
 	QL_Steamworks_UnregisterMicroCallbacks();
 	QL_Steamworks_UnregisterLobbyCallbacks();
 	QL_Steamworks_UnregisterClientCallbacks();
@@ -878,6 +906,19 @@ static void *QL_Steamworks_GetFriendsInterface( void ) {
 	}
 
 	return state.SteamFriends();
+}
+
+/*
+=============
+QL_Steamworks_GetNetworkingInterface
+=============
+*/
+static void *QL_Steamworks_GetNetworkingInterface( void ) {
+	if ( !QL_Steamworks_Init() || !state.SteamNetworking ) {
+		return NULL;
+	}
+
+	return state.SteamNetworking();
 }
 
 /*
@@ -1350,6 +1391,53 @@ static void QL_Steamworks_DispatchUGCQueryCompleted( void *context, const void *
 	}
 
 	callbackState->bindings.onUGCQueryCompleted( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchItemInstalled
+=============
+*/
+static void QL_Steamworks_DispatchItemInstalled( void *context, const void *payload ) {
+	ql_steam_workshop_callback_state_t *callbackState;
+	const ql_steam_item_installed_raw_t *raw;
+	ql_steam_item_installed_t event;
+
+	callbackState = (ql_steam_workshop_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onItemInstalled || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_item_installed_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.appId = raw->appId;
+	event.itemIdLow = raw->itemIdLow;
+	event.itemIdHigh = raw->itemIdHigh;
+	callbackState->bindings.onItemInstalled( callbackState->bindings.context, &event );
+}
+
+/*
+=============
+QL_Steamworks_DispatchDownloadItemResult
+=============
+*/
+static void QL_Steamworks_DispatchDownloadItemResult( void *context, const void *payload ) {
+	ql_steam_workshop_callback_state_t *callbackState;
+	const ql_steam_download_item_result_raw_t *raw;
+	ql_steam_download_item_result_t event;
+
+	callbackState = (ql_steam_workshop_callback_state_t *)context;
+	if ( !callbackState || !callbackState->bindings.onDownloadItemResult || !payload ) {
+		return;
+	}
+
+	raw = (const ql_steam_download_item_result_raw_t *)payload;
+	memset( &event, 0, sizeof( event ) );
+	event.appId = raw->appId;
+	event.itemIdLow = raw->itemIdLow;
+	event.itemIdHigh = raw->itemIdHigh;
+	event.result = raw->result;
+	callbackState->bindings.onDownloadItemResult( callbackState->bindings.context, &event );
 }
 
 /*
@@ -1922,6 +2010,55 @@ void QL_Steamworks_UnregisterMicroCallbacks( void ) {
 
 	callbackState = &state.microCallbacks;
 	QL_Steamworks_UnregisterCallbackObject( &callbackState->authorizationResponse );
+	memset( callbackState, 0, sizeof( *callbackState ) );
+}
+
+/*
+=============
+QL_Steamworks_RegisterWorkshopCallbacks
+=============
+*/
+qboolean QL_Steamworks_RegisterWorkshopCallbacks( const ql_steam_workshop_callback_bindings_t *bindings ) {
+	ql_steam_workshop_callback_state_t *callbackState;
+
+	if ( !bindings ) {
+		return qfalse;
+	}
+
+	if ( !QL_Steamworks_Init() || !state.SteamAPI_RegisterCallback ) {
+		return qfalse;
+	}
+
+	callbackState = &state.workshopCallbacks;
+	if ( callbackState->registered ) {
+		QL_Steamworks_UnregisterWorkshopCallbacks();
+	}
+
+	memset( callbackState, 0, sizeof( *callbackState ) );
+	memcpy( &callbackState->bindings, bindings, sizeof( callbackState->bindings ) );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->itemInstalled, QL_STEAM_CALLBACK_ITEM_INSTALLED, sizeof( ql_steam_item_installed_raw_t ), callbackState, QL_Steamworks_DispatchItemInstalled, NULL );
+	QL_Steamworks_PrepareCallbackObject( &callbackState->downloadItemResult, QL_STEAM_CALLBACK_DOWNLOAD_ITEM_RESULT, sizeof( ql_steam_download_item_result_raw_t ), callbackState, QL_Steamworks_DispatchDownloadItemResult, NULL );
+	if ( !QL_Steamworks_RegisterCallbackObject( &callbackState->itemInstalled ) ||
+		!QL_Steamworks_RegisterCallbackObject( &callbackState->downloadItemResult ) ) {
+		QL_Steamworks_UnregisterWorkshopCallbacks();
+		return qfalse;
+	}
+
+	callbackState->registered = qtrue;
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_UnregisterWorkshopCallbacks
+=============
+*/
+void QL_Steamworks_UnregisterWorkshopCallbacks( void ) {
+	ql_steam_workshop_callback_state_t *callbackState;
+
+	callbackState = &state.workshopCallbacks;
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->downloadItemResult );
+	QL_Steamworks_UnregisterCallbackObject( &callbackState->itemInstalled );
 	memset( callbackState, 0, sizeof( *callbackState ) );
 }
 
@@ -3633,6 +3770,300 @@ uint32_t QL_Steamworks_ServerGetPublicIP( void ) {
 	}
 
 	return fn( gameServer );
+}
+
+/*
+=============
+QL_Steamworks_SendP2PPacket
+
+Dispatches a client-side P2P packet through the Steam networking interface.
+=============
+*/
+qboolean QL_Steamworks_SendP2PPacket( const CSteamID *steamId, const void *data, uint32_t length, int sendType, int channel ) {
+	void *networking;
+	void **vtable;
+	QL_SteamNetworking_SendP2PPacketFn sendPacket;
+
+	if ( !steamId || !data || length == 0 ) {
+		return qfalse;
+	}
+
+	networking = QL_Steamworks_GetNetworkingInterface();
+	if ( !networking ) {
+		return qfalse;
+	}
+
+	vtable = *(void ***)networking;
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	sendPacket = (QL_SteamNetworking_SendP2PPacketFn)vtable[0];
+	if ( !sendPacket ) {
+		return qfalse;
+	}
+
+	return sendPacket( networking, *steamId, data, length, sendType, channel );
+}
+
+/*
+=============
+QL_Steamworks_IsP2PPacketAvailable
+
+Checks for pending client-side Steam P2P packets on the requested channel.
+=============
+*/
+qboolean QL_Steamworks_IsP2PPacketAvailable( uint32_t *outSize, int channel ) {
+	void *networking;
+	void **vtable;
+	QL_SteamNetworking_IsP2PPacketAvailableFn isAvailable;
+
+	if ( !outSize ) {
+		return qfalse;
+	}
+
+	networking = QL_Steamworks_GetNetworkingInterface();
+	if ( !networking ) {
+		return qfalse;
+	}
+
+	vtable = *(void ***)networking;
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	isAvailable = (QL_SteamNetworking_IsP2PPacketAvailableFn)vtable[1];
+	if ( !isAvailable ) {
+		return qfalse;
+	}
+
+	return isAvailable( networking, outSize, channel );
+}
+
+/*
+=============
+QL_Steamworks_ReadP2PPacket
+
+Reads a pending client-side Steam P2P packet from the requested channel.
+=============
+*/
+qboolean QL_Steamworks_ReadP2PPacket( void *data, uint32_t dataSize, uint32_t *outSize, CSteamID *outSteamId, int channel ) {
+	void *networking;
+	void **vtable;
+	QL_SteamNetworking_ReadP2PPacketFn readPacket;
+
+	if ( !data || dataSize == 0 || !outSize || !outSteamId ) {
+		return qfalse;
+	}
+
+	networking = QL_Steamworks_GetNetworkingInterface();
+	if ( !networking ) {
+		return qfalse;
+	}
+
+	vtable = *(void ***)networking;
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	readPacket = (QL_SteamNetworking_ReadP2PPacketFn)vtable[2];
+	if ( !readPacket ) {
+		return qfalse;
+	}
+
+	return readPacket( networking, data, dataSize, outSize, outSteamId, channel );
+}
+
+/*
+=============
+QL_Steamworks_AcceptP2PSession
+
+Accepts an incoming client-side Steam P2P session.
+=============
+*/
+qboolean QL_Steamworks_AcceptP2PSession( const CSteamID *steamId ) {
+	void *networking;
+	void **vtable;
+	typedef qboolean (*QL_SteamNetworking_AcceptP2PSessionWithUserFn)( void *self, CSteamID steamId );
+	QL_SteamNetworking_AcceptP2PSessionWithUserFn acceptSession;
+
+	if ( !steamId ) {
+		return qfalse;
+	}
+
+	networking = QL_Steamworks_GetNetworkingInterface();
+	if ( !networking ) {
+		return qfalse;
+	}
+
+	vtable = *(void ***)networking;
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	acceptSession = (QL_SteamNetworking_AcceptP2PSessionWithUserFn)vtable[0x0c / 4];
+	if ( !acceptSession ) {
+		return qfalse;
+	}
+
+	return acceptSession( networking, *steamId ) ? qtrue : qfalse;
+}
+
+/*
+=============
+QL_Steamworks_StartVoiceRecording
+
+Starts voice capture on the active Steam user interface.
+=============
+*/
+qboolean QL_Steamworks_StartVoiceRecording( void ) {
+	void *user;
+	void **vtable;
+	typedef void (__fastcall *QL_SteamUser_StartVoiceRecordingFn)( void *self, void *unused );
+	QL_SteamUser_StartVoiceRecordingFn fn;
+
+	user = QL_Steamworks_GetUserInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( user );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamUser_StartVoiceRecordingFn)vtable[0x1c / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	fn( user, NULL );
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_StopVoiceRecording
+
+Stops voice capture on the active Steam user interface.
+=============
+*/
+qboolean QL_Steamworks_StopVoiceRecording( void ) {
+	void *user;
+	void **vtable;
+	typedef void (__fastcall *QL_SteamUser_StopVoiceRecordingFn)( void *self, void *unused );
+	QL_SteamUser_StopVoiceRecordingFn fn;
+
+	user = QL_Steamworks_GetUserInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( user );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamUser_StopVoiceRecordingFn)vtable[0x20 / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	fn( user, NULL );
+	return qtrue;
+}
+
+/*
+=============
+QL_Steamworks_GetCompressedVoice
+
+Pulls compressed voice capture bytes from the active Steam user interface.
+=============
+*/
+qboolean QL_Steamworks_GetCompressedVoice( void *data, uint32_t dataSize, uint32_t *outSize ) {
+	void *user;
+	void **vtable;
+	int result;
+	typedef int (__fastcall *QL_SteamUser_GetVoiceFn)( void *self, void *unused, qboolean wantCompressed, void *destBuffer, uint32_t destBufferSize, uint32_t *outCompressedBytes, qboolean wantUncompressed, void *uncompressedBuffer, uint32_t uncompressedBufferSize, uint32_t *outUncompressedBytes, uint32_t uncompressedSampleRate );
+	QL_SteamUser_GetVoiceFn fn;
+
+	if ( outSize ) {
+		*outSize = 0u;
+	}
+
+	if ( !data || dataSize == 0 || !outSize ) {
+		return qfalse;
+	}
+
+	user = QL_Steamworks_GetUserInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( user );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamUser_GetVoiceFn)vtable[0x28 / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	result = fn( user, NULL, qtrue, data, dataSize, outSize, qfalse, NULL, 0u, NULL, 0u );
+	return result == 0 ? qtrue : qfalse;
+}
+
+/*
+=============
+QL_Steamworks_DecompressVoice
+
+Decompresses a Steam voice payload into 16-bit PCM at the requested rate.
+=============
+*/
+qboolean QL_Steamworks_DecompressVoice( const void *compressedData, uint32_t compressedSize, void *data, uint32_t dataSize, uint32_t *outSize, uint32_t sampleRate ) {
+	void *user;
+	void **vtable;
+	int result;
+	typedef int (__fastcall *QL_SteamUser_DecompressVoiceFn)( void *self, void *unused, const void *compressedData, uint32_t compressedSize, void *destBuffer, uint32_t destBufferSize, uint32_t *outBytesWritten, uint32_t sampleRate );
+	QL_SteamUser_DecompressVoiceFn fn;
+
+	if ( outSize ) {
+		*outSize = 0u;
+	}
+
+	if ( !compressedData || compressedSize == 0 || !data || dataSize == 0 || !outSize ) {
+		return qfalse;
+	}
+
+	user = QL_Steamworks_GetUserInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( user );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamUser_DecompressVoiceFn)vtable[0x2c / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	result = fn( user, NULL, compressedData, compressedSize, data, dataSize, outSize, sampleRate );
+	return result == 0 ? qtrue : qfalse;
+}
+
+/*
+=============
+QL_Steamworks_GetVoiceOptimalSampleRate
+
+Returns the Steam-reported preferred voice sample rate for the active user.
+=============
+*/
+uint32_t QL_Steamworks_GetVoiceOptimalSampleRate( void ) {
+	void *user;
+	void **vtable;
+	typedef uint32_t (__fastcall *QL_SteamUser_GetVoiceOptimalSampleRateFn)( void *self, void *unused );
+	QL_SteamUser_GetVoiceOptimalSampleRateFn fn;
+
+	user = QL_Steamworks_GetUserInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( user );
+	if ( !vtable ) {
+		return 0u;
+	}
+
+	fn = (QL_SteamUser_GetVoiceOptimalSampleRateFn)vtable[0x30 / 4];
+	if ( !fn ) {
+		return 0u;
+	}
+
+	return fn( user, NULL );
 }
 
 /*

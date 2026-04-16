@@ -31,6 +31,10 @@ int g_console_field_width = 78;
 
 #define		CON_TEXTSIZE	32768
 #define		CON_NOTIFY_TIME	3000
+#define		CONSOLE_CHAR_WIDTH	12
+#define		CONSOLE_CHAR_HEIGHT	24
+#define		CONSOLE_HOST_FONT_MONO	2
+#define		CONSOLE_HOST_SCALE_MULTIPLIER	2.1597f
 typedef struct {
 	qboolean	initialized;
 
@@ -99,10 +103,6 @@ static float Con_GetPixelScale( void ) {
 	float pixelScale;
 
 	pixelScale = Con_GetScale();
-	if ( cls.glconfig.vidHeight > 0 ) {
-		pixelScale *= (float)cls.glconfig.vidHeight / (float)SCREEN_HEIGHT;
-	}
-
 	if ( pixelScale <= 0.0f ) {
 		pixelScale = 1.0f;
 	}
@@ -118,7 +118,7 @@ Con_GetScaledSmallCharWidth
 static int Con_GetScaledSmallCharWidth( void ) {
 	int width;
 
-	width = (int)( SMALLCHAR_WIDTH * Con_GetPixelScale() + 0.5f );
+	width = (int)( CONSOLE_CHAR_WIDTH * Con_GetPixelScale() + 0.5f );
 	if ( width < 1 ) {
 		width = 1;
 	}
@@ -134,12 +134,200 @@ Con_GetScaledSmallCharHeight
 static int Con_GetScaledSmallCharHeight( void ) {
 	int height;
 
-	height = (int)( SMALLCHAR_HEIGHT * Con_GetPixelScale() + 0.5f );
+	height = (int)( CONSOLE_CHAR_HEIGHT * Con_GetPixelScale() + 0.5f );
 	if ( height < 1 ) {
 		height = 1;
 	}
 
 	return height;
+}
+
+/*
+================
+Con_GetHostTextScale
+================
+*/
+static float Con_GetHostTextScale( int charWidth ) {
+	return (float)charWidth * CONSOLE_HOST_SCALE_MULTIPLIER;
+}
+
+/*
+================
+Con_DrawHostText
+================
+*/
+static void Con_DrawHostText( int x, int y, int charWidth, int charHeight, const char *text, const float *color, qboolean forceColor ) {
+	float scale;
+	const float *drawColor;
+
+	if ( !text || !text[0] ) {
+		return;
+	}
+
+	scale = Con_GetHostTextScale( charWidth );
+	if ( scale <= 0.0f ) {
+		return;
+	}
+
+	drawColor = color ? color : g_color_table[ColorIndex( COLOR_WHITE )];
+	RE_DrawScaledText( x, y + charHeight, text, CONSOLE_HOST_FONT_MONO, scale, 0, NULL, forceColor, drawColor );
+}
+
+/*
+================
+Con_DrawHostChar
+================
+*/
+static void Con_DrawHostChar( int x, int y, int charWidth, int charHeight, int ch, const float *color, qboolean forceColor ) {
+	char text[2];
+
+	if ( ch == ' ' ) {
+		return;
+	}
+
+	text[0] = (char)ch;
+	text[1] = '\0';
+	Con_DrawHostText( x, y, charWidth, charHeight, text, color, forceColor );
+}
+
+/*
+================
+Con_IsUtf8ContinuationByte
+================
+*/
+static qboolean Con_IsUtf8ContinuationByte( unsigned char ch ) {
+	return ( ch & 0xC0 ) == 0x80;
+}
+
+/*
+================
+Con_ClampUtf8Boundary
+================
+*/
+static int Con_ClampUtf8Boundary( const char *text, int index ) {
+	int len;
+
+	if ( !text ) {
+		return 0;
+	}
+
+	len = strlen( text );
+	if ( index < 0 ) {
+		index = 0;
+	} else if ( index > len ) {
+		index = len;
+	}
+
+	while ( index > 0 && index < len && Con_IsUtf8ContinuationByte( (unsigned char)text[index] ) ) {
+		index--;
+	}
+
+	return index;
+}
+
+/*
+================
+Con_PrevUtf8CharStart
+================
+*/
+static int Con_PrevUtf8CharStart( const char *text, int index ) {
+	if ( !text || index <= 0 ) {
+		return 0;
+	}
+
+	index--;
+	while ( index > 0 && Con_IsUtf8ContinuationByte( (unsigned char)text[index] ) ) {
+		index--;
+	}
+
+	return index;
+}
+
+/*
+================
+Con_DrawHostField
+================
+*/
+static void Con_DrawHostField( field_t *edit, int x, int y, int charWidth, int charHeight, qboolean showCursor ) {
+	int		cursor;
+	int		cursorX;
+	int		drawBytes;
+	int		end;
+	int		len;
+	int		prefixBytes;
+	float	prefixWidth;
+	int		start;
+	int		visibleChars;
+	char	drawText[MAX_STRING_CHARS];
+
+	if ( !edit ) {
+		return;
+	}
+
+	if ( edit->widthInChars <= 0 ) {
+		return;
+	}
+
+	len = strlen( edit->buffer );
+	cursor = Con_ClampUtf8Boundary( edit->buffer, edit->cursor );
+	start = len;
+	end = len;
+	visibleChars = 0;
+
+	while ( visibleChars < edit->widthInChars && start > 0 ) {
+		start = Con_PrevUtf8CharStart( edit->buffer, start );
+		visibleChars++;
+
+		if ( visibleChars == edit->widthInChars && cursor < start ) {
+			end = Con_PrevUtf8CharStart( edit->buffer, end );
+			visibleChars--;
+		}
+
+		if ( start <= 0 ) {
+			break;
+		}
+	}
+
+	if ( end < start ) {
+		end = start;
+	}
+
+	drawBytes = end - start;
+	if ( drawBytes >= MAX_STRING_CHARS ) {
+		Com_Error( ERR_DROP, "drawBytes >= MAX_STRING_CHARS" );
+	}
+
+	Com_Memcpy( drawText, edit->buffer + start, drawBytes );
+	drawText[drawBytes] = '\0';
+
+	Con_DrawHostText( x, y, charWidth, charHeight, drawText, g_color_table[ColorIndex( COLOR_WHITE )], qfalse );
+
+	if ( !showCursor ) {
+		return;
+	}
+
+	if ( (int)( cls.realtime >> 8 ) & 1 ) {
+		return;
+	}
+
+	prefixBytes = cursor - start;
+	if ( prefixBytes < 0 ) {
+		prefixBytes = 0;
+	} else if ( prefixBytes > drawBytes ) {
+		prefixBytes = drawBytes;
+	}
+
+	prefixWidth = 0.0f;
+	if ( prefixBytes > 0 ) {
+		RE_MeasureScaledText( drawText, drawText + prefixBytes, CONSOLE_HOST_FONT_MONO, Con_GetHostTextScale( charWidth ), 0, &prefixWidth, NULL, NULL );
+	}
+
+	cursorX = x + (int)( prefixWidth + 0.5f );
+	if ( !Key_GetOverstrikeMode() ) {
+		cursorX -= charWidth / 2;
+	}
+
+	Con_DrawHostText( cursorX, y, charWidth, charHeight, Key_GetOverstrikeMode() ? "_" : "|", g_color_table[ColorIndex( COLOR_WHITE )], qtrue );
 }
 
 /*
@@ -205,10 +393,13 @@ Con_DrawConsoleLineText
 ================
 */
 static void Con_DrawConsoleLineText( int x, int y, const short *text, int count ) {
-	int	currentColor;
-	int	charWidth;
-	int	charHeight;
-	int	i;
+	int		currentColor;
+	int		charWidth;
+	int		charHeight;
+	int		i;
+	int		bufferIndex;
+	int		lastVisible;
+	char	buffer[2048];
 
 	if ( !text || count <= 0 ) {
 		return;
@@ -217,27 +408,33 @@ static void Con_DrawConsoleLineText( int x, int y, const short *text, int count 
 	charWidth = Con_GetScaledSmallCharWidth();
 	charHeight = Con_GetScaledSmallCharHeight();
 	currentColor = 7;
-	re.SetColor( g_color_table[currentColor] );
 
-	for ( i = 0 ; i < count ; i++ ) {
+	bufferIndex = 0;
+	lastVisible = 0;
+
+	for ( i = 0 ; i < count && bufferIndex < (int)sizeof( buffer ) - 1 ; i++ ) {
 		int colorIndex;
 		int ch;
 
 		ch = text[i] & 0xff;
 		if ( ch == ' ' ) {
+			buffer[bufferIndex++] = ' ';
 			continue;
 		}
 
 		colorIndex = ( text[i] >> 8 ) & 7;
-		if ( colorIndex != currentColor ) {
+		if ( colorIndex != currentColor && bufferIndex < (int)sizeof( buffer ) - 3 ) {
+			buffer[bufferIndex++] = '^';
+			buffer[bufferIndex++] = (char)( '0' + colorIndex );
 			currentColor = colorIndex;
-			re.SetColor( g_color_table[currentColor] );
 		}
 
-		Con_DrawScaledSmallChar( x + i * charWidth, y, charWidth, charHeight, ch );
+		buffer[bufferIndex++] = (char)ch;
+		lastVisible = bufferIndex;
 	}
 
-	re.SetColor( NULL );
+	buffer[lastVisible] = '\0';
+	Con_DrawHostText( x, y, charWidth, charHeight, buffer, g_color_table[ColorIndex( COLOR_WHITE )], qfalse );
 }
 
 /*
@@ -248,7 +445,7 @@ Returns the retail chat-field width, including the team-chat reduction.
 ================
 */
 static int Con_GetChatFieldWidthInChars( qboolean teamChat ) {
-	int width = 30;
+	int width = 73;
 
 	if ( cgvm ) {
 		int cgameWidth = VM_Call( cgvm, CG_GET_CHAT_FIELD_WIDTH_IN_CHARS );
@@ -380,7 +577,7 @@ Returns the retail live-chat prompt string and field skip width.
 ================
 */
 static const char *Con_GetChatPrompt( int *skip ) {
-	if ( chat_playerNum != -1 ) {
+	if ( chat_reply ) {
 		if ( skip ) {
 			*skip = 7;
 		}
@@ -432,10 +629,14 @@ Con_MessageMode_f
 */
 void Con_MessageMode_f (void) {
 	chat_playerNum = -1;
+	chat_reply = qfalse;
 	chat_team = qfalse;
 	Con_ResetChatField( qfalse );
 
 	cls.keyCatchers ^= KEYCATCH_MESSAGE;
+	if ( cgvm ) {
+		VM_Call( cgvm, CG_CHAT_DOWN );
+	}
 }
 
 /*
@@ -445,9 +646,13 @@ Con_MessageMode2_f
 */
 void Con_MessageMode2_f (void) {
 	chat_playerNum = -1;
+	chat_reply = qfalse;
 	chat_team = qtrue;
 	Con_ResetChatField( qtrue );
 	cls.keyCatchers ^= KEYCATCH_MESSAGE;
+	if ( cgvm ) {
+		VM_Call( cgvm, CG_CHAT_DOWN );
+	}
 }
 
 /*
@@ -461,9 +666,13 @@ void Con_MessageMode3_f (void) {
 		chat_playerNum = -1;
 		return;
 	}
+	chat_reply = qfalse;
 	chat_team = qfalse;
 	Con_ResetChatField( qfalse );
 	cls.keyCatchers ^= KEYCATCH_MESSAGE;
+	if ( cgvm ) {
+		VM_Call( cgvm, CG_CHAT_DOWN );
+	}
 }
 
 /*
@@ -477,9 +686,13 @@ void Con_MessageMode4_f (void) {
 		chat_playerNum = -1;
 		return;
 	}
+	chat_reply = qfalse;
 	chat_team = qfalse;
 	Con_ResetChatField( qfalse );
 	cls.keyCatchers ^= KEYCATCH_MESSAGE;
+	if ( cgvm ) {
+		VM_Call( cgvm, CG_CHAT_DOWN );
+	}
 }
 
 /*
@@ -657,7 +870,7 @@ void Con_CheckResize (void)
 	MAC_STATIC short	tbuf[CON_TEXTSIZE];
 
 	scale = Con_GetScale();
-	width = (int)( (float)SCREEN_WIDTH / ( scale * SMALLCHAR_WIDTH ) - 2.0f );
+	width = (int)( (float)cls.glconfig.vidWidth / ( scale * CONSOLE_CHAR_WIDTH ) - 2.0f );
 
 	if (width == con.linewidth)
 		return;
@@ -743,6 +956,8 @@ void Con_Init (void) {
 	Cmd_AddCommand ("toggleconsole", Con_ToggleConsole_f);
 	Cmd_AddCommand ("messagemode", Con_MessageMode_f);
 	Cmd_AddCommand ("messagemode2", Con_MessageMode2_f);
+	Cmd_AddCommand ("messagemode3", Con_MessageMode3_f);
+	Cmd_AddCommand ("messagemode4", Con_MessageMode4_f);
 	Cmd_AddCommand ("clear", Con_Clear_f);
 	Cmd_AddCommand ("condump", Con_Dump_f);
 	Cmd_AddCommand( "find", Con_Find_f );
@@ -961,16 +1176,8 @@ void Con_DrawInput (void) {
 	charHeight = Con_GetScaledSmallCharHeight();
 	y = con.vislines - ( charHeight * 2 );
 
-	re.SetColor( con.color );
-
-	if ( charWidth == SMALLCHAR_WIDTH && charHeight == SMALLCHAR_HEIGHT ) {
-		SCR_DrawSmallChar( con.xadjust + charWidth, y, ']' );
-	} else {
-		Con_DrawScaledSmallChar( con.xadjust + charWidth, y, charWidth, charHeight, ']' );
-	}
-
-	Field_VariableSizeDraw( &g_consoleField, con.xadjust + 2 * charWidth, y,
-		SCREEN_WIDTH - 3 * charWidth, charWidth, qtrue );
+	Con_DrawHostChar( con.xadjust + charWidth, y, charWidth, charHeight, ']', con.color, qtrue );
+	Con_DrawHostField( &g_consoleField, con.xadjust + 2 * charWidth, y, charWidth, charHeight, qtrue );
 }
 
 
@@ -1026,19 +1233,23 @@ void Con_DrawNotify (void)
 	{
 		const char *prompt;
 		int chatFieldY;
-		int chatFieldWidth;
-		int drawWidth;
+		float screenX;
+		float screenY;
+		int promptX;
+		int promptY;
+		int fieldX;
 
 		prompt = Con_GetChatPrompt( &skip );
 		chatFieldY = Con_GetChatFieldY();
-		chatFieldWidth = Con_GetChatFieldPixelWidth();
-		drawWidth = chatFieldWidth - ( skip + 1 ) * BIGCHAR_WIDTH;
-		if ( drawWidth < BIGCHAR_WIDTH ) {
-			drawWidth = BIGCHAR_WIDTH;
-		}
+		screenX = 8.0f;
+		screenY = (float)chatFieldY;
+		SCR_AdjustFrom640( &screenX, &screenY, NULL, NULL );
+		promptX = (int)( screenX + 0.5f );
+		promptY = (int)( screenY + 0.5f );
+		fieldX = promptX + skip * charWidth;
 
-		SCR_DrawBigString( 8, chatFieldY, prompt, 1.0f );
-		Field_BigDraw( &chatField, skip * BIGCHAR_WIDTH, chatFieldY, drawWidth, qtrue );
+		Con_DrawHostText( promptX, promptY, charWidth, charHeight, prompt, g_color_table[ColorIndex( COLOR_WHITE )], qtrue );
+		Con_DrawHostField( &chatField, fieldX, promptY, charWidth, charHeight, qtrue );
 	}
 
 }
@@ -1068,9 +1279,8 @@ void Con_DrawSolidConsole( float frac ) {
 	if (lines > cls.glconfig.vidHeight )
 		lines = cls.glconfig.vidHeight;
 
-	// on wide screens, we will center the text
+	// Retail Quake Live keeps the console anchored to the full screen width.
 	con.xadjust = 0;
-	SCR_AdjustFrom640( &con.xadjust, NULL, NULL, NULL );
 	charWidth = Con_GetScaledSmallCharWidth();
 	charHeight = Con_GetScaledSmallCharHeight();
 
@@ -1097,17 +1307,10 @@ void Con_DrawSolidConsole( float frac ) {
 
 
 	// draw the version number
-
-	re.SetColor( g_color_table[ColorIndex(COLOR_RED)] );
-
 	i = strlen( Q3_VERSION );
-	re.SetColor( g_color_table[ColorIndex(COLOR_RED)] );
-
-	for (x=0 ; x<i ; x++) {
-		Con_DrawScaledSmallChar( cls.glconfig.vidWidth - ( i - x ) * charWidth,
-			lines - ( charHeight + charHeight / 2 ),
-			charWidth, charHeight, Q3_VERSION[x] );
-	}
+	Con_DrawHostText( cls.glconfig.vidWidth - i * charWidth,
+		lines - ( charHeight + charHeight / 2 ),
+		charWidth, charHeight, Q3_VERSION, g_color_table[ColorIndex( COLOR_RED )], qtrue );
 
 
 	// draw the text
@@ -1120,9 +1323,8 @@ void Con_DrawSolidConsole( float frac ) {
 	if (con.display != con.current)
 	{
 	// draw arrows to show the buffer is backscrolled
-		re.SetColor( g_color_table[ColorIndex(COLOR_RED)] );
 		for (x=0 ; x<con.linewidth ; x+=4)
-			Con_DrawScaledSmallChar( con.xadjust + ( x + 1 ) * charWidth, y, charWidth, charHeight, '^' );
+			Con_DrawHostChar( con.xadjust + ( x + 1 ) * charWidth, y, charWidth, charHeight, '^', g_color_table[ColorIndex( COLOR_RED )], qtrue );
 		y -= charHeight;
 		rows--;
 	}

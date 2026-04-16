@@ -22,7 +22,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // sv_zmq.c -- retained Quake Live server-side ZMQ runtime and publication path
 
 #include "server.h"
-#include <ctype.h>
 
 #if defined(_WIN32)
 #include <winsock2.h>
@@ -43,6 +42,7 @@ typedef SOCKET ql_zmq_os_socket_t;
 typedef int ql_zmq_os_socket_t;
 #endif
 
+#define QL_ZMQ_REP 4
 #define QL_ZMQ_PUB 1
 #define QL_ZMQ_ROUTER 6
 #define QL_ZMQ_DONTWAIT 1
@@ -50,15 +50,15 @@ typedef int ql_zmq_os_socket_t;
 #define QL_ZMQ_POLLIN 1
 #define QL_ZMQ_RCVMORE 13
 #define QL_ZMQ_ROUTER_MANDATORY 33
-#define QL_ZMQ_IMMEDIATE 39
 #define QL_ZMQ_PLAIN_SERVER 44
-#define QL_ZMQ_ROUTER_HANDOVER 56
+#define QL_ZMQ_ZAP_DOMAIN 55
 
 #define QL_ZMQ_ENDPOINT_MAX 256
 #define QL_ZMQ_MAX_IDENTITY 256
-#define QL_ZMQ_MAX_LABEL ( QL_ZMQ_MAX_IDENTITY * 2 + 3 )
 #define QL_ZMQ_MAX_PUBLISH 32768
+#define QL_ZMQ_PASSFILE "zmqpass.txt"
 #define QL_ZMQ_STATS_TRANSCRIPT "zmq_stats.ndjson"
+#define QL_ZMQ_ZAP_ENDPOINT "inproc://zeromq.zap.01"
 
 typedef struct ql_zmq_pollitem_s {
 	void				*socket;
@@ -82,14 +82,16 @@ typedef const char *(*ql_zmq_strerror_fn)( int error );
 
 typedef struct zmqRconPeer_s {
 	int						identityLength;
-	byte					identity[QL_ZMQ_MAX_IDENTITY];
-	char					label[QL_ZMQ_MAX_LABEL];
+	char					identity[QL_ZMQ_MAX_IDENTITY];
+	char					label[QL_ZMQ_MAX_IDENTITY];
+	struct zmqRconPeer_s	*prev;
 	struct zmqRconPeer_s	*next;
 } zmqRconPeer_t;
 
 typedef struct {
 	void					*library;
 	void					*context;
+	void					*authSocket;
 	void					*pubSocket;
 	void					*rconSocket;
 	fileHandle_t			statsTranscript;
@@ -296,6 +298,15 @@ static void idZMQ_CloseStatsTranscript( void ) {
 
 /*
 ==================
+idZMQ_CloseAuthSocket
+==================
+*/
+static void idZMQ_CloseAuthSocket( void ) {
+	idZMQ_CloseSocket( &s_zmq.authSocket );
+}
+
+/*
+==================
 idZMQ_OpenStatsTranscript
 ==================
 */
@@ -309,58 +320,91 @@ static void idZMQ_OpenStatsTranscript( void ) {
 
 /*
 ==================
-idZMQ_IsPrintableIdentity
+idZMQ_WritePasswordFile
 ==================
 */
-static qboolean idZMQ_IsPrintableIdentity( const byte *identity, int identityLength ) {
-	int i;
+static void idZMQ_WritePasswordFile( void ) {
+	fileHandle_t passFile;
+	char line[MAX_STRING_CHARS + 32];
+	int lineLength;
 
-	if ( identityLength <= 0 ) {
-		return qfalse;
+	if ( !FS_Initialized() ) {
+		return;
 	}
 
-	for ( i = 0; i < identityLength; i++ ) {
-		if ( identity[i] == '\0' || !isprint( identity[i] ) ) {
-			return qfalse;
-		}
+	passFile = FS_FOpenFileWrite( QL_ZMQ_PASSFILE );
+	if ( !passFile ) {
+		Com_Printf( "Failed to open %s\n", QL_ZMQ_PASSFILE );
+		return;
 	}
 
-	return qtrue;
+	if ( s_zmq.statsPassword[0] ) {
+		Com_sprintf( line, sizeof( line ), "stats_stats=%s\n", s_zmq.statsPassword );
+		lineLength = strlen( line );
+		FS_Write( line, lineLength, passFile );
+	}
+
+	if ( s_zmq.rconPassword[0] ) {
+		Com_sprintf( line, sizeof( line ), "rcon_rcon=%s\n", s_zmq.rconPassword );
+		lineLength = strlen( line );
+		FS_Write( line, lineLength, passFile );
+	}
+
+	FS_FCloseFile( passFile );
 }
 
 /*
 ==================
-idZMQ_FormatPeerLabel
+idZMQ_ReadFrameString
 ==================
 */
-static void idZMQ_FormatPeerLabel( const byte *identity, int identityLength, char *label, size_t labelSize ) {
-	int i;
-	char *cursor;
-	size_t remaining;
+static int idZMQ_ReadFrameString( void *socket, char *buffer, size_t bufferSize, qboolean *more ) {
+	int length;
+	int moreValue;
+	size_t moreSize;
 
-	if ( idZMQ_IsPrintableIdentity( identity, identityLength ) ) {
-		if ( identityLength >= (int)labelSize ) {
-			identityLength = (int)labelSize - 1;
-		}
-		Com_Memcpy( label, identity, identityLength );
-		label[identityLength] = '\0';
-		return;
+	if ( bufferSize > 0 ) {
+		buffer[0] = '\0';
+	}
+	if ( more ) {
+		*more = qfalse;
 	}
 
-	if ( labelSize < 3 ) {
-		if ( labelSize > 0 ) {
-			label[0] = '\0';
+	length = s_zmq.zmq_recv( socket, buffer, bufferSize > 0 ? bufferSize - 1 : 0, QL_ZMQ_DONTWAIT );
+	if ( length < 0 ) {
+		return length;
+	}
+	if ( bufferSize > 0 ) {
+		if ( length >= (int)bufferSize ) {
+			length = (int)bufferSize - 1;
 		}
-		return;
+		buffer[length] = '\0';
+	}
+	if ( !more || !s_zmq.zmq_getsockopt ) {
+		return length;
 	}
 
-	Q_strncpyz( label, "0x", labelSize );
-	cursor = label + 2;
-	remaining = labelSize - 2;
-	for ( i = 0; i < identityLength && remaining > 2; i++ ) {
-		Com_sprintf( cursor, remaining, "%02x", identity[i] );
-		cursor += 2;
-		remaining -= 2;
+	moreValue = 0;
+	moreSize = sizeof( moreValue );
+	if ( s_zmq.zmq_getsockopt( socket, QL_ZMQ_RCVMORE, &moreValue, &moreSize ) == 0 && moreValue ) {
+		*more = qtrue;
+	}
+
+	return length;
+}
+
+/*
+==================
+idZMQ_DrainRemainingFrames
+==================
+*/
+static void idZMQ_DrainRemainingFrames( void *socket, qboolean more ) {
+	char scratch[MAX_STRING_CHARS];
+
+	while ( more ) {
+		if ( idZMQ_ReadFrameString( socket, scratch, sizeof( scratch ), &more ) < 0 ) {
+			break;
+		}
 	}
 }
 
@@ -369,12 +413,11 @@ static void idZMQ_FormatPeerLabel( const byte *identity, int identityLength, cha
 idZMQ_FindRconPeer
 ==================
 */
-static zmqRconPeer_t *idZMQ_FindRconPeer( const byte *identity, int identityLength ) {
+static zmqRconPeer_t *idZMQ_FindRconPeer( const char *identity ) {
 	zmqRconPeer_t *peer;
 
 	for ( peer = s_zmq.rconPeers; peer; peer = peer->next ) {
-		if ( peer->identityLength == identityLength &&
-			!memcmp( peer->identity, identity, identityLength ) ) {
+		if ( !Q_stricmp( peer->identity, identity ) ) {
 			return peer;
 		}
 	}
@@ -387,23 +430,43 @@ static zmqRconPeer_t *idZMQ_FindRconPeer( const byte *identity, int identityLeng
 idZMQ_InsertRconPeer
 ==================
 */
-static zmqRconPeer_t *idZMQ_InsertRconPeer( const byte *identity, int identityLength ) {
+static zmqRconPeer_t *idZMQ_InsertRconPeer( const char *identity ) {
 	zmqRconPeer_t *peer;
+	zmqRconPeer_t *cursor;
+	zmqRconPeer_t *previous;
 
-	if ( identityLength <= 0 ) {
+	if ( !identity || !identity[0] ) {
 		return NULL;
 	}
-	if ( identityLength > QL_ZMQ_MAX_IDENTITY ) {
-		identityLength = QL_ZMQ_MAX_IDENTITY;
+	if ( idZMQ_FindRconPeer( identity ) ) {
+		return NULL;
 	}
 
 	peer = Z_Malloc( sizeof( *peer ) );
 	Com_Memset( peer, 0, sizeof( *peer ) );
-	peer->identityLength = identityLength;
-	Com_Memcpy( peer->identity, identity, identityLength );
-	idZMQ_FormatPeerLabel( identity, identityLength, peer->label, sizeof( peer->label ) );
-	peer->next = s_zmq.rconPeers;
-	s_zmq.rconPeers = peer;
+	Q_strncpyz( peer->identity, identity, sizeof( peer->identity ) );
+	Q_strncpyz( peer->label, identity, sizeof( peer->label ) );
+	peer->identityLength = strlen( peer->identity );
+
+	previous = NULL;
+	for ( cursor = s_zmq.rconPeers; cursor; cursor = cursor->next ) {
+		if ( Q_stricmp( cursor->identity, peer->identity ) > 0 ) {
+			break;
+		}
+		previous = cursor;
+	}
+
+	peer->prev = previous;
+	peer->next = cursor;
+	if ( previous ) {
+		previous->next = peer;
+	} else {
+		s_zmq.rconPeers = peer;
+	}
+	if ( cursor ) {
+		cursor->prev = peer;
+	}
+
 	return peer;
 }
 
@@ -413,19 +476,20 @@ idZMQ_EraseRconPeer
 ==================
 */
 static void idZMQ_EraseRconPeer( zmqRconPeer_t *peer ) {
-	zmqRconPeer_t **cursor;
-
 	if ( !peer ) {
 		return;
 	}
 
-	for ( cursor = &s_zmq.rconPeers; *cursor; cursor = &( *cursor )->next ) {
-		if ( *cursor == peer ) {
-			*cursor = peer->next;
-			Z_Free( peer );
-			return;
-		}
+	if ( peer->prev ) {
+		peer->prev->next = peer->next;
+	} else {
+		s_zmq.rconPeers = peer->next;
 	}
+	if ( peer->next ) {
+		peer->next->prev = peer->prev;
+	}
+
+	Z_Free( peer );
 }
 
 /*
@@ -447,28 +511,69 @@ static void idZMQ_ClearRconPeers( void ) {
 
 /*
 ==================
-idZMQ_ResolveEndpoint
+idZMQ_ResolveStatsHost
 ==================
 */
-static void idZMQ_ResolveEndpoint( cvar_t *ipCvar, cvar_t *portCvar, int defaultPortOffset, char *endpoint, size_t endpointSize ) {
+static void idZMQ_ResolveStatsHost( char *resolvedAddress, size_t resolvedIpSize ) {
 	char resolvedIp[64];
-	cvar_t *netPort;
-	int resolvedPort;
+	netadr_t address;
 
-	if ( ipCvar && ipCvar->string[0] ) {
-		Q_strncpyz( resolvedIp, ipCvar->string, sizeof( resolvedIp ) );
-	} else {
-		Cvar_VariableStringBuffer( "net_ip", resolvedIp, sizeof( resolvedIp ) );
-		if ( !resolvedIp[0] ) {
-			Q_strncpyz( resolvedIp, "localhost", sizeof( resolvedIp ) );
-		}
+	if ( s_zmqStatsIp && s_zmqStatsIp->string[0] ) {
+		Q_strncpyz( resolvedAddress, s_zmqStatsIp->string, resolvedIpSize );
+		return;
 	}
 
-	if ( portCvar && portCvar->string[0] ) {
-		resolvedPort = portCvar->integer;
+	Cvar_VariableStringBuffer( "net_ip", resolvedIp, sizeof( resolvedIp ) );
+	if ( !resolvedIp[0] ) {
+		Q_strncpyz( resolvedIp, "localhost", sizeof( resolvedIp ) );
+	}
+
+	if ( NET_StringToAdr( resolvedIp, &address ) &&
+		( address.type == NA_IP || address.type == NA_LOOPBACK ) ) {
+		Com_sprintf( resolvedAddress, resolvedIpSize, "%u.%u.%u.%u",
+			address.ip[0], address.ip[1], address.ip[2], address.ip[3] );
+		return;
+	}
+
+	Q_strncpyz( resolvedAddress, resolvedIp, resolvedIpSize );
+}
+
+/*
+==================
+idZMQ_ResolveRconEndpoint
+==================
+*/
+static void idZMQ_ResolveRconEndpoint( char *endpoint, size_t endpointSize ) {
+	char resolvedIp[64];
+	int resolvedPort;
+
+	if ( s_zmqRconIp && s_zmqRconIp->string[0] ) {
+		Q_strncpyz( resolvedIp, s_zmqRconIp->string, sizeof( resolvedIp ) );
+	} else {
+		Q_strncpyz( resolvedIp, "0.0.0.0", sizeof( resolvedIp ) );
+	}
+
+	resolvedPort = ( s_zmqRconPort && s_zmqRconPort->string[0] ) ? s_zmqRconPort->integer : 28960;
+	Com_sprintf( endpoint, endpointSize, "tcp://%s:%i", resolvedIp, resolvedPort );
+}
+
+/*
+==================
+idZMQ_ResolveStatsEndpoint
+==================
+*/
+static void idZMQ_ResolveStatsEndpoint( char *endpoint, size_t endpointSize ) {
+	char resolvedIp[64];
+	int resolvedPort;
+	cvar_t *netPort;
+
+	idZMQ_ResolveStatsHost( resolvedIp, sizeof( resolvedIp ) );
+
+	if ( s_zmqStatsPort && s_zmqStatsPort->string[0] ) {
+		resolvedPort = s_zmqStatsPort->integer;
 	} else {
 		netPort = Cvar_Get( "net_port", va( "%i", PORT_SERVER ), CVAR_LATCH );
-		resolvedPort = netPort->integer + defaultPortOffset;
+		resolvedPort = netPort->integer;
 	}
 
 	Com_sprintf( endpoint, endpointSize, "tcp://%s:%i", resolvedIp, resolvedPort );
@@ -512,6 +617,302 @@ static void idZMQ_TrySetSocketInt( void *socket, int option, int value ) {
 
 /*
 ==================
+idZMQ_TrySetSocketString
+==================
+*/
+static void idZMQ_TrySetSocketString( void *socket, int option, const char *value ) {
+	if ( !socket || !s_zmq.zmq_setsockopt || !value ) {
+		return;
+	}
+
+	s_zmq.zmq_setsockopt( socket, option, value, strlen( value ) );
+}
+
+/*
+==================
+idZMQ_SendAuthFrame
+==================
+*/
+static int idZMQ_SendAuthFrame( void *socket, const char *value, qboolean more ) {
+	const char *frame;
+	int flags;
+
+	frame = value ? value : "";
+	flags = more ? QL_ZMQ_SNDMORE : 0;
+	return s_zmq.zmq_send( socket, frame, strlen( frame ), flags );
+}
+
+/*
+==================
+idZMQ_SendAuthResponse
+==================
+*/
+static void idZMQ_SendAuthResponse( const char *version, const char *requestId, const char *statusCode, const char *statusText, const char *userId ) {
+	if ( !s_zmq.authSocket || !s_zmq.zmq_send ) {
+		return;
+	}
+
+	if ( idZMQ_SendAuthFrame( s_zmq.authSocket, version, qtrue ) < 0 ||
+		idZMQ_SendAuthFrame( s_zmq.authSocket, requestId, qtrue ) < 0 ||
+		idZMQ_SendAuthFrame( s_zmq.authSocket, statusCode, qtrue ) < 0 ||
+		idZMQ_SendAuthFrame( s_zmq.authSocket, statusText, qtrue ) < 0 ||
+		idZMQ_SendAuthFrame( s_zmq.authSocket, userId, qtrue ) < 0 ) {
+		return;
+	}
+
+	idZMQ_SendAuthFrame( s_zmq.authSocket, "", qfalse );
+}
+
+/*
+==================
+idZMQ_ValidatePlainCredentials
+==================
+*/
+static qboolean idZMQ_ValidatePlainCredentials( const char *domain, const char *username, const char *password, const char **userId ) {
+	const char *expectedPassword;
+	const char *expectedUsername;
+
+	expectedPassword = "";
+	expectedUsername = "";
+	if ( userId ) {
+		*userId = "";
+	}
+
+	if ( !Q_stricmp( domain, "rcon" ) ) {
+		expectedUsername = "rcon";
+		expectedPassword = s_zmq.rconPassword;
+	} else if ( !Q_stricmp( domain, "stats" ) ) {
+		expectedUsername = "stats";
+		expectedPassword = s_zmq.statsPassword;
+	} else {
+		return qfalse;
+	}
+
+	if ( !expectedPassword[0] ) {
+		return qfalse;
+	}
+	if ( Q_stricmp( username, expectedUsername ) != 0 || strcmp( password, expectedPassword ) != 0 ) {
+		return qfalse;
+	}
+
+	if ( userId ) {
+		*userId = expectedUsername;
+	}
+
+	return qtrue;
+}
+
+/*
+==================
+idZMQ_EnsureAuthSocket
+==================
+*/
+static qboolean idZMQ_EnsureAuthSocket( void ) {
+	void *socket;
+	int enabled;
+
+	enabled = ( s_zmqRconEnable && s_zmqRconEnable->integer ) || ( s_zmqStatsEnable && s_zmqStatsEnable->integer );
+	if ( !enabled ) {
+		idZMQ_CloseAuthSocket();
+		return qfalse;
+	}
+	if ( s_zmq.authSocket ) {
+		return qtrue;
+	}
+	if ( !idZMQ_EnsureRuntime() ) {
+		return qfalse;
+	}
+
+	socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_REP );
+	if ( !socket ) {
+		idZMQ_LogRuntimeUnavailable( va( "failed to create auth socket: %s", idZMQ_LastErrorString() ) );
+		return qfalse;
+	}
+	if ( s_zmq.zmq_bind( socket, QL_ZMQ_ZAP_ENDPOINT ) != 0 ) {
+		idZMQ_LogRuntimeUnavailable( va( "failed to bind auth socket: %s", idZMQ_LastErrorString() ) );
+		s_zmq.zmq_close( socket );
+		return qfalse;
+	}
+
+	s_zmq.authSocket = socket;
+	return qtrue;
+}
+
+/*
+==================
+idZMQ_PumpAuthSocket
+==================
+*/
+static void idZMQ_PumpAuthSocket( void ) {
+	ql_zmq_pollitem_t item;
+	char version[16];
+	char requestId[64];
+	char domain[64];
+	char address[128];
+	char identity[QL_ZMQ_MAX_IDENTITY];
+	char mechanism[16];
+	char username[QL_ZMQ_MAX_IDENTITY];
+	char password[MAX_STRING_CHARS];
+	const char *statusCode;
+	const char *statusText;
+	const char *userId;
+	int length;
+	qboolean more;
+
+	if ( !idZMQ_EnsureAuthSocket() || !s_zmq.zmq_poll || !s_zmq.zmq_recv || !s_zmq.zmq_send ) {
+		return;
+	}
+
+	item.socket = s_zmq.authSocket;
+	item.fd = 0;
+	item.events = QL_ZMQ_POLLIN;
+	item.revents = 0;
+
+	while ( s_zmq.zmq_poll( &item, 1, 0 ) > 0 && ( item.revents & QL_ZMQ_POLLIN ) ) {
+		Q_strncpyz( version, "1.0", sizeof( version ) );
+		requestId[0] = '\0';
+		domain[0] = '\0';
+		address[0] = '\0';
+		identity[0] = '\0';
+		mechanism[0] = '\0';
+		username[0] = '\0';
+		password[0] = '\0';
+		statusCode = "400";
+		statusText = "BAD REQUEST";
+		userId = "";
+		more = qfalse;
+
+		length = idZMQ_ReadFrameString( s_zmq.authSocket, version, sizeof( version ), &more );
+		if ( length < 0 ) {
+			break;
+		}
+		if ( !more ) {
+			idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+			item.revents = 0;
+			continue;
+		}
+
+		length = idZMQ_ReadFrameString( s_zmq.authSocket, requestId, sizeof( requestId ), &more );
+		if ( length < 0 ) {
+			break;
+		}
+		if ( !more ) {
+			idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+			item.revents = 0;
+			continue;
+		}
+
+		length = idZMQ_ReadFrameString( s_zmq.authSocket, domain, sizeof( domain ), &more );
+		if ( length < 0 ) {
+			break;
+		}
+		if ( !more ) {
+			idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+			item.revents = 0;
+			continue;
+		}
+
+		length = idZMQ_ReadFrameString( s_zmq.authSocket, address, sizeof( address ), &more );
+		if ( length < 0 ) {
+			break;
+		}
+		if ( !more ) {
+			idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+			item.revents = 0;
+			continue;
+		}
+
+		length = idZMQ_ReadFrameString( s_zmq.authSocket, identity, sizeof( identity ), &more );
+		if ( length < 0 ) {
+			break;
+		}
+		if ( !more ) {
+			idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+			item.revents = 0;
+			continue;
+		}
+
+		length = idZMQ_ReadFrameString( s_zmq.authSocket, mechanism, sizeof( mechanism ), &more );
+		if ( length < 0 ) {
+			break;
+		}
+		if ( !Q_stricmp( mechanism, "NULL" ) ) {
+			statusCode = "200";
+			statusText = "OK";
+			idZMQ_DrainRemainingFrames( s_zmq.authSocket, more );
+			idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+			item.revents = 0;
+			continue;
+		}
+		if ( !Q_stricmp( mechanism, "PLAIN" ) ) {
+			if ( !more ) {
+				idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+				item.revents = 0;
+				continue;
+			}
+
+			length = idZMQ_ReadFrameString( s_zmq.authSocket, username, sizeof( username ), &more );
+			if ( length < 0 ) {
+				break;
+			}
+			if ( !more ) {
+				idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+				item.revents = 0;
+				continue;
+			}
+
+			length = idZMQ_ReadFrameString( s_zmq.authSocket, password, sizeof( password ), &more );
+			if ( length < 0 ) {
+				break;
+			}
+
+			statusText = "NO ACCESS";
+			if ( idZMQ_ValidatePlainCredentials( domain, username, password, &userId ) ) {
+				statusCode = "200";
+				statusText = "OK";
+			}
+			idZMQ_DrainRemainingFrames( s_zmq.authSocket, more );
+			idZMQ_SendAuthResponse( version, requestId, statusCode, statusText, userId );
+			item.revents = 0;
+			continue;
+		}
+
+		idZMQ_DrainRemainingFrames( s_zmq.authSocket, more );
+		idZMQ_SendAuthResponse( version, requestId, statusCode, "NO ACCESS", userId );
+		item.revents = 0;
+	}
+}
+
+/*
+==================
+idZMQ_ApplyPasswords
+==================
+*/
+static void idZMQ_ApplyPasswords( qboolean rconModeChanged, qboolean statsModeChanged ) {
+	idZMQ_WritePasswordFile();
+
+	if ( rconModeChanged ) {
+		idZMQ_ClearRconPeers();
+		idZMQ_CloseSocket( &s_zmq.rconSocket );
+		s_zmq.rconEndpoint[0] = '\0';
+	}
+	if ( statsModeChanged ) {
+		idZMQ_CloseSocket( &s_zmq.pubSocket );
+		s_zmq.statsEndpoint[0] = '\0';
+	}
+	if ( rconModeChanged || statsModeChanged ) {
+		idZMQ_CloseAuthSocket();
+	}
+	if ( statsModeChanged ) {
+		idZMQ_EnsureStatsPublisher();
+	}
+	if ( rconModeChanged ) {
+		idZMQ_EnsureRconSocket();
+	}
+}
+
+/*
+==================
 idZMQ_EnsureRconSocket
 ==================
 */
@@ -534,6 +935,9 @@ static qboolean idZMQ_EnsureRconSocket( void ) {
 	if ( !idZMQ_EnsureRuntime() ) {
 		return qfalse;
 	}
+	if ( !idZMQ_EnsureAuthSocket() ) {
+		return qfalse;
+	}
 
 	socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_ROUTER );
 	if ( !socket ) {
@@ -541,13 +945,12 @@ static qboolean idZMQ_EnsureRconSocket( void ) {
 		return qfalse;
 	}
 
-	idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_HANDOVER, 1 );
+	idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );
 	idZMQ_TrySetSocketInt( socket, QL_ZMQ_ROUTER_MANDATORY, 1 );
-	idZMQ_TrySetSocketInt( socket, QL_ZMQ_IMMEDIATE, 1 );
-	idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, 1 );
-	idZMQ_ResolveEndpoint( s_zmqRconIp, s_zmqRconPort, 1000, s_zmq.rconEndpoint, sizeof( s_zmq.rconEndpoint ) );
+	idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? 1 : 0 );
+	idZMQ_ResolveRconEndpoint( s_zmq.rconEndpoint, sizeof( s_zmq.rconEndpoint ) );
 	if ( s_zmq.zmq_bind( socket, s_zmq.rconEndpoint ) != 0 ) {
-		Com_Printf( "ZMQ RCON bind failed: %s\n", idZMQ_LastErrorString() );
+		Com_Printf( "zmq RCON socket error, bind failed: %s\n", idZMQ_LastErrorString() );
 		s_zmq.zmq_close( socket );
 		return qfalse;
 	}
@@ -582,6 +985,9 @@ static qboolean idZMQ_EnsureStatsPublisher( void ) {
 	if ( !idZMQ_EnsureRuntime() ) {
 		return qfalse;
 	}
+	if ( !idZMQ_EnsureAuthSocket() ) {
+		return qfalse;
+	}
 
 	socket = s_zmq.zmq_socket( s_zmq.context, QL_ZMQ_PUB );
 	if ( !socket ) {
@@ -589,11 +995,11 @@ static qboolean idZMQ_EnsureStatsPublisher( void ) {
 		return qfalse;
 	}
 
-	idZMQ_TrySetSocketInt( socket, QL_ZMQ_IMMEDIATE, 1 );
-	idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, 1 );
-	idZMQ_ResolveEndpoint( s_zmqStatsIp, s_zmqStatsPort, 0, s_zmq.statsEndpoint, sizeof( s_zmq.statsEndpoint ) );
+	idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );
+	idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? 1 : 0 );
+	idZMQ_ResolveStatsEndpoint( s_zmq.statsEndpoint, sizeof( s_zmq.statsEndpoint ) );
 	if ( s_zmq.zmq_bind( socket, s_zmq.statsEndpoint ) != 0 ) {
-		Com_Printf( "ZMQ stats bind failed: %s\n", idZMQ_LastErrorString() );
+		Com_Printf( "zmq PUB socket error, bind failed: %s\n", idZMQ_LastErrorString() );
 		s_zmq.zmq_close( socket );
 		return qfalse;
 	}
@@ -667,8 +1073,8 @@ Zmq_RegisterCvarsAndInitRcon
 void Zmq_RegisterCvarsAndInitRcon( void ) {
 	s_zmqRconEnable = Cvar_Get( "zmq_rcon_enable", "0", CVAR_ARCHIVE );
 	s_zmqStatsEnable = Cvar_Get( "zmq_stats_enable", "0", CVAR_ARCHIVE );
-	s_zmqRconIp = Cvar_Get( "zmq_rcon_ip", "", CVAR_ARCHIVE );
-	s_zmqRconPort = Cvar_Get( "zmq_rcon_port", "", CVAR_ARCHIVE );
+	s_zmqRconIp = Cvar_Get( "zmq_rcon_ip", "0.0.0.0", CVAR_ARCHIVE );
+	s_zmqRconPort = Cvar_Get( "zmq_rcon_port", "28960", CVAR_ARCHIVE );
 	s_zmqStatsIp = Cvar_Get( "zmq_stats_ip", "", CVAR_ARCHIVE );
 	s_zmqStatsPort = Cvar_Get( "zmq_stats_port", "", CVAR_ARCHIVE );
 	s_zmqStatsPassword = Cvar_Get( "zmq_stats_password", "", CVAR_ARCHIVE | CVAR_PROTECTED );
@@ -684,6 +1090,8 @@ Zmq_UpdatePasswords
 ==================
 */
 void Zmq_UpdatePasswords( void ) {
+	qboolean statsModeChanged;
+	qboolean rconModeChanged;
 	qboolean changed;
 
 	if ( !s_zmqStatsPassword || !s_zmqRconPassword ) {
@@ -696,6 +1104,7 @@ void Zmq_UpdatePasswords( void ) {
 		s_zmq.statsPasswordRevision = s_zmqStatsPassword->modificationCount;
 		s_zmq.rconPasswordRevision = s_zmqRconPassword->modificationCount;
 		s_zmq.passwordsPrimed = qtrue;
+		idZMQ_ApplyPasswords( qfalse, qfalse );
 		return;
 	}
 
@@ -705,10 +1114,13 @@ void Zmq_UpdatePasswords( void ) {
 		return;
 	}
 
+	statsModeChanged = (qboolean)( ( s_zmq.statsPassword[0] != '\0' ) != ( s_zmqStatsPassword->string[0] != '\0' ) );
+	rconModeChanged = (qboolean)( ( s_zmq.rconPassword[0] != '\0' ) != ( s_zmqRconPassword->string[0] != '\0' ) );
 	Q_strncpyz( s_zmq.statsPassword, s_zmqStatsPassword->string, sizeof( s_zmq.statsPassword ) );
 	Q_strncpyz( s_zmq.rconPassword, s_zmqRconPassword->string, sizeof( s_zmq.rconPassword ) );
 	s_zmq.statsPasswordRevision = s_zmqStatsPassword->modificationCount;
 	s_zmq.rconPasswordRevision = s_zmqRconPassword->modificationCount;
+	idZMQ_ApplyPasswords( rconModeChanged, statsModeChanged );
 	Com_Printf( "zmq stats and rcon passwords updated\n" );
 }
 
@@ -791,24 +1203,12 @@ idZMQ_ReadRconCommand
 */
 static int idZMQ_ReadRconCommand( char *command, size_t commandSize ) {
 	int commandLength;
-	int more;
-	size_t moreSize;
+	qboolean more;
 
-	command[0] = '\0';
-	commandLength = -1;
-	do {
-		commandLength = s_zmq.zmq_recv( s_zmq.rconSocket, command, commandSize - 1, QL_ZMQ_DONTWAIT );
-		if ( commandLength < 0 ) {
-			return commandLength;
-		}
-		command[commandLength] = '\0';
-		more = 0;
-		moreSize = sizeof( more );
-		if ( !s_zmq.zmq_getsockopt || s_zmq.zmq_getsockopt( s_zmq.rconSocket, QL_ZMQ_RCVMORE, &more, &moreSize ) != 0 ) {
-			more = 0;
-		}
-	} while ( more );
-
+	commandLength = idZMQ_ReadFrameString( s_zmq.rconSocket, command, commandSize, &more );
+	if ( commandLength >= 0 ) {
+		idZMQ_DrainRemainingFrames( s_zmq.rconSocket, more );
+	}
 	return commandLength;
 }
 
@@ -819,14 +1219,14 @@ Zmq_PumpRcon
 */
 void Zmq_PumpRcon( void ) {
 	ql_zmq_pollitem_t item;
-	byte identity[QL_ZMQ_MAX_IDENTITY];
+	char identity[QL_ZMQ_MAX_IDENTITY];
 	char command[MAX_STRING_CHARS];
 	int identityLength;
 	int commandLength;
-	int more;
-	size_t moreSize;
+	qboolean more;
 	zmqRconPeer_t *peer;
 
+	idZMQ_PumpAuthSocket();
 	if ( !idZMQ_EnsureRconSocket() || !s_zmq.zmq_poll || !s_zmq.zmq_recv ) {
 		return;
 	}
@@ -836,37 +1236,36 @@ void Zmq_PumpRcon( void ) {
 	item.events = QL_ZMQ_POLLIN;
 	item.revents = 0;
 
-	while ( s_zmq.zmq_poll( &item, 1, 0 ) > 0 && ( item.revents & QL_ZMQ_POLLIN ) ) {
-		identityLength = s_zmq.zmq_recv( s_zmq.rconSocket, identity, sizeof( identity ), QL_ZMQ_DONTWAIT );
-		if ( identityLength <= 0 ) {
-			break;
-		}
-
-		more = 0;
-		moreSize = sizeof( more );
-		if ( !s_zmq.zmq_getsockopt || s_zmq.zmq_getsockopt( s_zmq.rconSocket, QL_ZMQ_RCVMORE, &more, &moreSize ) != 0 || !more ) {
-			break;
-		}
-
-		commandLength = idZMQ_ReadRconCommand( command, sizeof( command ) );
-		if ( commandLength <= 0 ) {
-			break;
-		}
-
-		peer = idZMQ_FindRconPeer( identity, identityLength );
-		if ( !peer ) {
-			peer = idZMQ_InsertRconPeer( identity, identityLength );
-			if ( peer ) {
-				Com_Printf( "zmq RCON client connected: %s\n", peer->label );
-			}
-		}
-
-		if ( peer ) {
-			Com_Printf( "zmq RCON command from %s: %s\n", peer->label, command );
-		}
-		Cmd_ExecuteString( command );
-		item.revents = 0;
+	if ( s_zmq.zmq_poll( &item, 1, 0 ) <= 0 || !( item.revents & QL_ZMQ_POLLIN ) ) {
+		return;
 	}
+
+	identityLength = idZMQ_ReadFrameString( s_zmq.rconSocket, identity, sizeof( identity ), &more );
+	if ( identityLength <= 0 ) {
+		idZMQ_DrainRemainingFrames( s_zmq.rconSocket, more );
+		return;
+	}
+	if ( !more ) {
+		return;
+	}
+
+	commandLength = idZMQ_ReadRconCommand( command, sizeof( command ) );
+	if ( commandLength <= 0 ) {
+		return;
+	}
+
+	peer = idZMQ_FindRconPeer( identity );
+	if ( !peer ) {
+		peer = idZMQ_InsertRconPeer( identity );
+		if ( peer ) {
+			Com_Printf( "zmq RCON client connected: %s\n", peer->label );
+		}
+	}
+
+	if ( peer ) {
+		Com_Printf( "zmq RCON command from %s: %s\n", peer->label, command );
+	}
+	Cmd_ExecuteString( command );
 }
 
 /*
@@ -877,6 +1276,7 @@ Zmq_ShutdownRuntime
 void Zmq_ShutdownRuntime( void ) {
 	Zmq_ShutdownStatsPublisher();
 	idZMQ_ClearRconPeers();
+	idZMQ_CloseAuthSocket();
 	idZMQ_CloseSocket( &s_zmq.rconSocket );
 	s_zmq.rconEndpoint[0] = '\0';
 	if ( s_zmq.context && s_zmq.zmq_ctx_term ) {

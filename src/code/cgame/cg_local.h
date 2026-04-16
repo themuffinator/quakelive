@@ -83,7 +83,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	GIANT_WIDTH			32
 #define	GIANT_HEIGHT		48
 
-#define	NUM_CROSSHAIRS		10
+#define	NUM_CROSSHAIRS		30
 #define CG_MAX_LIGHTNING_STYLES 5
 
 #define CG_VIEW_FILTER_MAX_SAMPLES	32
@@ -807,6 +807,7 @@ typedef struct {
 	qboolean	levelShot;			// taking a level menu screenshot
 	int			deferredPlayerLoading;
 	qboolean	loading;			// don't defer players at initial startup
+	qboolean	hudMenusLoaded;		// tracks if the active HUD script exposes menu-driven roots
 	qboolean	competitiveHudLoaded;	// tracks if Quake Live HUD menus are available
 	qboolean	armorTieredEnabled;	// caches cg_armorTiered for HUD scripting
 	qboolean	voiceChatIndicatorEnabled;	// caches cg_voiceChatIndicator state
@@ -1114,6 +1115,9 @@ typedef struct {
 	qhandle_t	qlLogo;
 	qhandle_t	menuSmokeShader;
 	qhandle_t	modifiedIcon;
+	qhandle_t	weaponBarLitShader;
+	qhandle_t	weaponBarIdle1Shader;
+	qhandle_t	weaponBarIdle2Shader;
 
 	qhandle_t	redCubeModel;
 	qhandle_t	blueCubeModel;
@@ -1682,6 +1686,12 @@ typedef struct {
 	int		raceLeaderSplitCount;
 	cgRacePointInfo_t	racePoints[MAX_RACE_POINTS];
 	int		raceLeaderSplits[MAX_RACE_POINTS];
+	qboolean	raceInfoActive;
+	int		raceInfoStartTime;
+	int		raceInfoLastTime;
+	int		raceInfoCheckpointCount;
+	int		raceInfoCurrentCheckpointEntityNum;
+	int		raceInfoNextCheckpointEntityNum;
 
 	cgRaceClientProgress_t	raceProgress[MAX_CLIENTS];
 	cgRaceClientStatus_t	raceStatus[MAX_CLIENTS];
@@ -2128,6 +2138,7 @@ extern  char systemChat[256];
 extern  char teamChat1[256];
 extern  char teamChat2[256];
 
+void CG_RaceResetRunState( qboolean clearRecordedTimes );
 void CG_RaceResetState( void );
 void CG_ParseRaceInfoString( const char *infoString );
 void CG_ParseRaceStatusString( const char *statusString );
@@ -2143,8 +2154,12 @@ qhandle_t CG_GetObituaryIcon( int mod );
 void CG_ObituaryColorForIndex( int colorIndex, float alpha, vec4_t color );
 void CG_DrawTeamBackground( int x, int y, int w, int h, float alpha, int team );
 void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle);
+int CG_SelectTextFontHandle( float scale, int fontIndex );
+void CG_Text_PaintExt( float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style, int fontIndex );
 void CG_Text_Paint(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style);
+int CG_Text_WidthExt( const char *text, float scale, int limit, int fontIndex );
 int CG_Text_Width(const char *text, float scale, int limit);
+int CG_Text_HeightExt( const char *text, float scale, int limit, int fontIndex );
 int CG_Text_Height(const char *text, float scale, int limit);
 void CG_SelectPrevPlayer();
 void CG_SelectNextPlayer();

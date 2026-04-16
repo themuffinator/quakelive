@@ -171,7 +171,6 @@ cvar_t	*cl_mouseAccelDebug;
 cvar_t	*cl_mouseAccelOffset;
 cvar_t	*cl_mouseAccelPower;
 cvar_t	*cl_mouseSensCap;
-cvar_t	*cl_showMouseRate;
 
 cvar_t	*m_pitch;
 cvar_t	*m_yaw;
@@ -286,10 +285,15 @@ static qboolean cl_statsClearRegistered;
 #define CL_STEAM_BROWSER_EVENT_COUNT 32
 #define CL_STEAM_BROWSER_EVENT_NAME_LENGTH 96
 #define CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH 2048
+#define CL_STEAM_SERVER_ID_CONFIGSTRING 0x2ca
 #define CL_STEAM_WORKSHOP_ITEMS_CONFIGSTRING 0x2cb
 #define CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED 0x4u
 #define CL_STEAM_WORKSHOP_ITEM_DELIMS " \t\r\n"
 #define CL_STEAM_MAX_WORKSHOP_ITEMS 256
+#define CL_STEAM_VOICE_CHANNEL 1
+#define CL_STEAM_VOICE_SAMPLE_RATE 22050u
+#define CL_STEAM_VOICE_MAX_COMPRESSED 0x4000
+#define CL_STEAM_VOICE_MAX_DECOMPRESSED 0x8000
 
 typedef struct {
 	int sequence;
@@ -332,6 +336,22 @@ static clSteamWorkshopDownloadState_t cl_steamWorkshopDownloadState;
 
 /*
 =============
+CL_SetClientSpeakingState
+
+Publishes a speaking-state update for the requested client through the native
+cgame export used by the retail voice sidecar.
+=============
+*/
+static void CL_SetClientSpeakingState( int clientNum, qboolean speaking ) {
+	if ( !cgvm || cls.state != CA_ACTIVE || !cl.snap.valid ) {
+		return;
+	}
+
+	VM_Call( cgvm, CG_SET_CLIENT_SPEAKING_STATE, clientNum, speaking ? 1 : 0 );
+}
+
+/*
+=============
 CL_SetLocalSpeakingState
 
 Publishes the local speaking-state sidecar through the native cgame export
@@ -360,6 +380,15 @@ static void CL_VoiceStartRecording_f( void ) {
 	}
 
 	cl_voiceRecordingActive = qtrue;
+	if ( CL_SteamServicesEnabled() ) {
+		uint32_t sampleRate;
+
+		QL_Steamworks_StartVoiceRecording();
+		sampleRate = QL_Steamworks_GetVoiceOptimalSampleRate();
+		if ( sampleRate != 0u ) {
+			Com_DPrintf( "Started recording - optimal sample rate %u\n", sampleRate );
+		}
+	}
 	CL_SetLocalSpeakingState( qtrue );
 }
 
@@ -377,6 +406,9 @@ static void CL_VoiceStopRecording_f( void ) {
 	}
 
 	cl_voiceRecordingActive = qfalse;
+	if ( CL_SteamServicesEnabled() ) {
+		QL_Steamworks_StopVoiceRecording();
+	}
 	CL_SetLocalSpeakingState( qfalse );
 }
 
@@ -471,6 +503,18 @@ static const char *CL_GetConfigStringValue( int index ) {
 
 /*
 =============
+CL_GetServerSteamId
+
+Resolves the published Steam gameserver identity from the retained client
+configstring.
+=============
+*/
+static qboolean CL_GetServerSteamId( uint32_t *steamIdLow, uint32_t *steamIdHigh ) {
+	return CL_ParseSteamIdString( CL_GetConfigStringValue( CL_STEAM_SERVER_ID_CONFIGSTRING ), steamIdLow, steamIdHigh );
+}
+
+/*
+=============
 CL_Workshop_UpdateProgressCvars
 =============
 */
@@ -545,6 +589,37 @@ static void CL_Workshop_SetActiveItem( int itemIndex ) {
 
 /*
 =============
+CL_Workshop_FindItemIndex
+=============
+*/
+static int CL_Workshop_FindItemIndex( uint32_t itemIdLow, uint32_t itemIdHigh ) {
+	int i;
+
+	for ( i = 0; i < cl_steamWorkshopDownloadState.itemCount; ++i ) {
+		clSteamWorkshopItem_t *item = &cl_steamWorkshopDownloadState.items[i];
+
+		if ( item->itemIdLow == itemIdLow && item->itemIdHigh == itemIdHigh ) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+/*
+=============
+CL_Workshop_ClearActiveDownload
+=============
+*/
+static void CL_Workshop_ClearActiveDownload( void ) {
+	cl_steamWorkshopDownloadState.activeItemIndex = -1;
+	cl_steamWorkshopDownloadState.downloadedBytes = 0;
+	cl_steamWorkshopDownloadState.totalBytes = 0;
+	CL_Workshop_UpdateProgressCvars();
+}
+
+/*
+=============
 CL_Workshop_StartDownload
 =============
 */
@@ -601,6 +676,54 @@ static qboolean CL_Workshop_AdvanceQueue( void ) {
 
 /*
 =============
+CL_Workshop_FinalizeInstalledItem
+=============
+*/
+static void CL_Workshop_FinalizeInstalledItem( int itemIndex ) {
+	clSteamWorkshopItem_t *item;
+
+	if ( itemIndex < 0 || itemIndex >= cl_steamWorkshopDownloadState.itemCount ) {
+		return;
+	}
+
+	item = &cl_steamWorkshopDownloadState.items[itemIndex];
+	if ( item->completed ) {
+		return;
+	}
+
+	item->completed = qtrue;
+	if ( cl_steamWorkshopDownloadState.activeItemIndex == itemIndex ) {
+		unsigned long long itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
+
+		Com_Printf( "Steamworks download complete: %llu\n", itemId );
+		CL_Workshop_ClearActiveDownload();
+	}
+}
+
+/*
+=============
+CL_Workshop_FailActiveDownload
+=============
+*/
+static void CL_Workshop_FailActiveDownload( int result ) {
+	clSteamWorkshopItem_t *item;
+	unsigned long long itemId;
+	int itemIndex;
+
+	itemIndex = cl_steamWorkshopDownloadState.activeItemIndex;
+	if ( itemIndex < 0 || itemIndex >= cl_steamWorkshopDownloadState.itemCount ) {
+		return;
+	}
+
+	item = &cl_steamWorkshopDownloadState.items[itemIndex];
+	itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
+	Com_Printf( "Download item %llu failed with EResult code %i\n", itemId, result );
+	item->completed = qtrue;
+	CL_Workshop_ClearActiveDownload();
+}
+
+/*
+=============
 CL_Workshop_DownloadsSettled
 =============
 */
@@ -613,10 +736,7 @@ static qboolean CL_Workshop_DownloadsSettled( void ) {
 			return qfalse;
 		}
 
-		item->completed = qtrue;
-		cl_steamWorkshopDownloadState.activeItemIndex = -1;
-		cl_steamWorkshopDownloadState.downloadedBytes = 0;
-		cl_steamWorkshopDownloadState.totalBytes = 0;
+		CL_Workshop_FinalizeInstalledItem( cl_steamWorkshopDownloadState.activeItemIndex );
 	}
 
 	if ( CL_Workshop_AdvanceQueue() ) {
@@ -778,6 +898,123 @@ static qboolean CL_GetClientSteamId( int clientNum, uint32_t *steamIdLow, uint32
 	steamId = Info_ValueForKey( info, "steamid" );
 
 	return CL_ParseSteamIdString( steamId, steamIdLow, steamIdHigh );
+}
+
+/*
+=============
+CL_IsVoiceSenderMuted
+
+Checks the reconstructed local mute set before mixing remote Steam voice.
+=============
+*/
+static qboolean CL_IsVoiceSenderMuted( int clientNum ) {
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
+
+	if ( !CL_GetClientSteamId( clientNum, &steamIdLow, &steamIdHigh ) ) {
+		return qfalse;
+	}
+
+	return CL_IsSteamIdentityMuted( steamIdLow, steamIdHigh );
+}
+
+/*
+=============
+CL_Steam_SendVoicePacket
+
+Pulls compressed voice from Steam and relays it to the published server
+SteamID over channel 1, matching the retail client voice transport.
+=============
+*/
+static void CL_Steam_SendVoicePacket( void ) {
+	byte compressedVoice[CL_STEAM_VOICE_MAX_COMPRESSED];
+	uint32_t compressedBytes;
+	uint32_t serverIdLow;
+	uint32_t serverIdHigh;
+	CSteamID serverId;
+
+	if ( !cl_voiceRecordingActive || cls.state < CA_CONNECTED ) {
+		return;
+	}
+
+	if ( !CL_GetServerSteamId( &serverIdLow, &serverIdHigh ) ) {
+		return;
+	}
+
+	compressedBytes = 0u;
+	if ( !QL_Steamworks_GetCompressedVoice( compressedVoice, sizeof( compressedVoice ), &compressedBytes ) ) {
+		return;
+	}
+
+	if ( compressedBytes == 0u ) {
+		return;
+	}
+
+	serverId.value = ( (uint64_t)serverIdHigh << 32 ) | serverIdLow;
+	QL_Steamworks_SendP2PPacket( &serverId, compressedVoice, compressedBytes, 1, CL_STEAM_VOICE_CHANNEL );
+}
+
+/*
+=============
+CL_Steam_ProcessVoicePackets
+
+Consumes incoming relayed Steam voice packets, applies the reconstructed mute
+filter, updates the speaking-state sidecar, and feeds PCM into the sound
+voice mixer.
+=============
+*/
+static void CL_Steam_ProcessVoicePackets( void ) {
+	uint32_t packetSize;
+
+	packetSize = 0u;
+	while ( QL_Steamworks_IsP2PPacketAvailable( &packetSize, CL_STEAM_VOICE_CHANNEL ) ) {
+		byte *packetBuffer;
+		uint32_t bytesRead;
+		uint32_t voiceBytes;
+		CSteamID remoteId;
+		short decompressedVoice[CL_STEAM_VOICE_MAX_DECOMPRESSED / sizeof( short )];
+		int clientNum;
+
+		if ( packetSize == 0u ) {
+			break;
+		}
+
+		packetBuffer = malloc( packetSize );
+		if ( !packetBuffer ) {
+			break;
+		}
+
+		bytesRead = 0u;
+		voiceBytes = 0u;
+		remoteId.value = 0ull;
+		if ( !QL_Steamworks_ReadP2PPacket( packetBuffer, packetSize, &bytesRead, &remoteId, CL_STEAM_VOICE_CHANNEL ) || bytesRead <= 1u ) {
+			free( packetBuffer );
+			packetSize = 0u;
+			continue;
+		}
+
+		if ( !QL_Steamworks_DecompressVoice( packetBuffer + 1, bytesRead - 1, decompressedVoice, sizeof( decompressedVoice ), &voiceBytes, CL_STEAM_VOICE_SAMPLE_RATE ) ) {
+			free( packetBuffer );
+			packetSize = 0u;
+			continue;
+		}
+
+		if ( voiceBytes == 0u ) {
+			Com_DPrintf( "%d compressed voice bytes, decompressed to 0\n", bytesRead - 1 );
+			free( packetBuffer );
+			packetSize = 0u;
+			continue;
+		}
+
+		clientNum = packetBuffer[0];
+		if ( clientNum >= 0 && clientNum < MAX_CLIENTS && !CL_IsVoiceSenderMuted( clientNum ) ) {
+			CL_SetClientSpeakingState( clientNum, qtrue );
+			S_AddVoiceSamples( clientNum, (int)( voiceBytes >> 1 ), decompressedVoice );
+		}
+
+		free( packetBuffer );
+		packetSize = 0u;
+	}
 }
 
 /*
@@ -1306,6 +1543,7 @@ static void CL_Steam_Client_OnP2PSessionRequest( void *context, const ql_steam_p
 		return;
 	}
 
+	QL_Steamworks_AcceptP2PSession( &event->remoteId );
 	CL_Steam_FormatSteamId( event->remoteId.value, remoteId, sizeof( remoteId ) );
 	Com_DPrintf( "steam_p2p_session_request %s\n", remoteId );
 }
@@ -1603,6 +1841,77 @@ static void CL_Steam_Micro_OnAuthorizationResponse( void *context, const ql_stea
 
 /*
 =============
+CL_Steam_Workshop_OnItemInstalled
+=============
+*/
+static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_item_installed_t *event ) {
+	uint32_t appId;
+	int itemIndex;
+
+	(void)context;
+
+	if ( !event || !cl_steamWorkshopDownloadState.active ) {
+		return;
+	}
+
+	appId = QL_Steamworks_GetAppID();
+	if ( appId != 0u && event->appId != appId ) {
+		Com_Printf( "OnItemInstalled skip, invalid app id %d\n", event->appId );
+		return;
+	}
+
+	itemIndex = CL_Workshop_FindItemIndex( event->itemIdLow, event->itemIdHigh );
+	if ( itemIndex < 0 ) {
+		return;
+	}
+
+	CL_Workshop_FinalizeInstalledItem( itemIndex );
+	if ( cl_steamWorkshopDownloadState.activeItemIndex < 0 ) {
+		CL_Workshop_AdvanceQueue();
+	}
+}
+
+/*
+=============
+CL_Steam_Workshop_OnDownloadItemResult
+=============
+*/
+static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_steam_download_item_result_t *event ) {
+	clSteamWorkshopItem_t *item;
+	unsigned long long itemId;
+	uint32_t appId;
+
+	(void)context;
+
+	if ( !event || !cl_steamWorkshopDownloadState.active || cl_steamWorkshopDownloadState.activeItemIndex < 0 ) {
+		return;
+	}
+
+	appId = QL_Steamworks_GetAppID();
+	if ( appId != 0u && event->appId != appId ) {
+		Com_Printf( "OnDownloadItemResult skip, invalid app id %d\n", event->appId );
+		return;
+	}
+
+	item = &cl_steamWorkshopDownloadState.items[cl_steamWorkshopDownloadState.activeItemIndex];
+	itemId = ( (unsigned long long)event->itemIdHigh << 32 ) | event->itemIdLow;
+	if ( item->itemIdLow != event->itemIdLow || item->itemIdHigh != event->itemIdHigh ) {
+		Com_Printf( "OnDownloadItemResult skip, not the active download %llu\n", itemId );
+		return;
+	}
+
+	if ( event->result == 1 ) {
+		CL_Workshop_FinalizeInstalledItem( cl_steamWorkshopDownloadState.activeItemIndex );
+		CL_Workshop_AdvanceQueue();
+		return;
+	}
+
+	CL_Workshop_FailActiveDownload( event->result );
+	CL_Workshop_AdvanceQueue();
+}
+
+/*
+=============
 CL_Steam_InitCallbacks
 =============
 */
@@ -1610,6 +1919,7 @@ static void CL_Steam_InitCallbacks( void ) {
 	ql_steam_client_callback_bindings_t clientBindings;
 	ql_steam_lobby_callback_bindings_t lobbyBindings;
 	ql_steam_micro_callback_bindings_t microBindings;
+	ql_steam_workshop_callback_bindings_t workshopBindings;
 
 	cl_steamCallbackState.callbackRegistrationActive = qfalse;
 	CL_Steam_ClearCurrentLobby();
@@ -1640,6 +1950,10 @@ static void CL_Steam_InitCallbacks( void ) {
 	memset( &microBindings, 0, sizeof( microBindings ) );
 	microBindings.onAuthorizationResponse = CL_Steam_Micro_OnAuthorizationResponse;
 
+	memset( &workshopBindings, 0, sizeof( workshopBindings ) );
+	workshopBindings.onItemInstalled = CL_Steam_Workshop_OnItemInstalled;
+	workshopBindings.onDownloadItemResult = CL_Steam_Workshop_OnDownloadItemResult;
+
 	if ( !QL_Steamworks_RegisterClientCallbacks( &clientBindings ) ||
 		!QL_Steamworks_RegisterLobbyCallbacks( &lobbyBindings ) ||
 		!QL_Steamworks_RegisterMicroCallbacks( &microBindings ) ) {
@@ -1647,6 +1961,10 @@ static void CL_Steam_InitCallbacks( void ) {
 		QL_Steamworks_UnregisterLobbyCallbacks();
 		QL_Steamworks_UnregisterClientCallbacks();
 		return;
+	}
+
+	if ( !QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings ) ) {
+		Com_DPrintf( "Steam workshop callbacks unavailable; keeping polling fallback\n" );
 	}
 
 	cl_steamCallbackState.callbackRegistrationActive = qtrue;
@@ -1658,6 +1976,7 @@ CL_Steam_ShutdownCallbacks
 =============
 */
 static void CL_Steam_ShutdownCallbacks( void ) {
+	QL_Steamworks_UnregisterWorkshopCallbacks();
 	QL_Steamworks_UnregisterMicroCallbacks();
 	QL_Steamworks_UnregisterLobbyCallbacks();
 	QL_Steamworks_UnregisterClientCallbacks();
@@ -1677,6 +1996,8 @@ static void CL_Steam_Frame( void ) {
 	}
 
 	QL_Steamworks_RunCallbacks();
+	CL_Steam_SendVoicePacket();
+	CL_Steam_ProcessVoicePackets();
 }
 
 /*
@@ -1727,7 +2048,7 @@ static void CL_Steam_SetMainMenuRichPresence( void ) {
 =============
 CL_Steam_SyncPersonaNameCvar
 
-Mirrors the retail Steam persona bootstrap, using com_buildScript as the closest build-harness gate in the current tree.
+Mirrors the retail Steam persona bootstrap and respects the retail com_build harness gate.
 =============
 */
 static void CL_Steam_SyncPersonaNameCvar( void ) {
@@ -2460,6 +2781,9 @@ void CL_Disconnect( qboolean showMainMenu ) {
 	}
 
 	cl_voiceRecordingActive = qfalse;
+	if ( CL_SteamServicesEnabled() ) {
+		QL_Steamworks_StopVoiceRecording();
+	}
 	
 	CL_ClearState ();
 
@@ -2586,7 +2910,6 @@ in anyway.
 void CL_RequestAuthorization( void ) {
 	char	authorizePayload[64];
 	ql_auth_credential_t	credential;
-	cvar_t	*fs;
 
 	authorizePayload[0] = '\0';
 
@@ -2611,9 +2934,8 @@ void CL_RequestAuthorization( void ) {
 		QL_FormatCredentialForAuthorize( &credential, authorizePayload, sizeof( authorizePayload ) );
 	}
 
-	fs = Cvar_Get ("cl_anonymous", "0", CVAR_INIT|CVAR_SYSTEMINFO );
-
-	NET_OutOfBandPrint(NS_CLIENT, cls.authorizeServer, va("getKeyAuthorize %i %s", fs->integer, authorizePayload) );
+	NET_OutOfBandPrint(NS_CLIENT, cls.authorizeServer,
+		va("getKeyAuthorize %i %s", Cvar_VariableIntegerValue( "cl_anonymous" ), authorizePayload) );
 }
 
 /*
@@ -2878,6 +3200,7 @@ doesn't know what graphics to reload
 void CL_Vid_Restart_f( void ) {
 #ifdef _WIN32
 	if ( !Cvar_VariableIntegerValue( "r_noFastRestart" ) && Cmd_Argc() > 1 && !Q_stricmp( Cmd_Argv( 1 ), "fast" ) ) {
+		float consoleScale;
 		int vidWidth;
 		int vidHeight;
 		qboolean fullscreen;
@@ -2886,7 +3209,11 @@ void CL_Vid_Restart_f( void ) {
 			cls.glconfig.vidWidth = vidWidth;
 			cls.glconfig.vidHeight = vidHeight;
 			cls.glconfig.isFullscreen = fullscreen;
-			g_console_field_width = cls.glconfig.vidWidth / SMALLCHAR_WIDTH - 2;
+			consoleScale = Com_Clamp( 0.5f, 1.0f, Cvar_VariableValue( "con_scale" ) );
+			if ( consoleScale <= 0.0f ) {
+				consoleScale = 0.5f;
+			}
+			g_console_field_width = (int)( (float)cls.glconfig.vidWidth / ( consoleScale * 12.0f ) - 2.0f );
 			g_consoleField.widthInChars = g_console_field_width;
 			Cbuf_AddText( "postprocess_restart\n" );
 			if ( cgvm ) {
@@ -3768,11 +4095,25 @@ void CL_Frame ( int msec ) {
 		}
 	}
 
+	// retail QL can defer avidemo activation until demo time reaches the configured start point
+	if ( cl_avidemo_latch->integer ) {
+		if ( !cl_avidemo_mintime->integer || cl.serverTime > cl_avidemo_mintime->integer ) {
+			Cvar_SetValue( "cl_avidemo", cl_avidemo_latch->integer );
+			Cvar_Set( "cl_avidemo_latch", "0" );
+		}
+	}
+
 	// if recording an avi, lock to a fixed fps
 	if ( cl_avidemo->integer && msec) {
 		// save the current screen
 		if ( cls.state == CA_ACTIVE || cl_forceavidemo->integer) {
-			Cbuf_ExecuteText( EXEC_NOW, "screenshot silent\n" );
+			if ( cl_avidemo_maxtime->integer && cl.serverTime > cl_avidemo_maxtime->integer ) {
+				CL_Disconnect_f();
+				return;
+			}
+			if ( !cl_avidemo_mintime->integer || cl.serverTime >= cl_avidemo_mintime->integer ) {
+				Cbuf_ExecuteText( EXEC_NOW, "screenshot silent\n" );
+			}
 		}
 		// fixed time for next frame'
 		msec = (1000 / cl_avidemo->integer) * com_timescale->value;
@@ -3904,7 +4245,15 @@ void CL_InitRenderer( void ) {
 	} else {
 		Com_Printf( S_COLOR_YELLOW "WARNING: CL_InitRenderer failed to register consoleShader.\n" );
 	}
-	g_console_field_width = cls.glconfig.vidWidth / SMALLCHAR_WIDTH - 2;
+	{
+		float consoleScale;
+
+		consoleScale = Com_Clamp( 0.5f, 1.0f, Cvar_VariableValue( "con_scale" ) );
+		if ( consoleScale <= 0.0f ) {
+			consoleScale = 0.5f;
+		}
+		g_console_field_width = (int)( (float)cls.glconfig.vidWidth / ( consoleScale * 12.0f ) - 2.0f );
+	}
 	g_consoleField.widthInChars = g_console_field_width;
 }
 
@@ -4054,6 +4403,7 @@ void CL_InitRef( void ) {
 	ri.FS_FileIsInPAK = FS_FileIsInPAK;
 	ri.FS_FileExists = FS_FileExists;
 	ri.Cvar_Get = Cvar_Get;
+	ri.Cvar_GetBounded = Cvar_GetBounded;
 	ri.Cvar_Set = Cvar_Set;
 
 	// cinematic stuff
@@ -4124,19 +4474,19 @@ void CL_Init( void ) {
 
 	cl_timeout = Cvar_Get ("cl_timeout", "40", 0);
 
-	cl_timeNudge = Cvar_Get ("cl_timeNudge", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED );
+	cl_timeNudge = Cvar_GetBounded( "cl_timeNudge", "0", "-20", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED );
 	cl_shownet = Cvar_Get ("cl_shownet", "0", CVAR_TEMP );
 	cl_showSend = Cvar_Get ("cl_showSend", "0", CVAR_TEMP );
 	cl_showTimeDelta = Cvar_Get ("cl_showTimeDelta", "0", CVAR_TEMP );
 	cl_freezeDemo = Cvar_Get ("cl_freezeDemo", "0", CVAR_TEMP );
 	cl_quitOnDemoCompleted = Cvar_Get ("cl_quitOnDemoCompleted", "0", 0 );
 	cl_allowConsoleChat = Cvar_Get ("cl_allowConsoleChat", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
-	Cvar_Get ("web_browserActive", "0", CVAR_TEMP );
+	Cvar_Get ("web_browserActive", "0", CVAR_ROM );
 	Cvar_Get ("web_zoom", "100", CVAR_ARCHIVE );
 	Cvar_Get ("web_console", "0", CVAR_ARCHIVE );
 	rcon_client_password = Cvar_Get ("rconPassword", "", CVAR_TEMP );
 	cl_activeAction = Cvar_Get( "activeAction", "", CVAR_TEMP );
-	cl_demoRecordMessage = Cvar_Get ("cl_demoRecordMessage", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
+	cl_demoRecordMessage = Cvar_Get ("cl_demoRecordMessage", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_lobbyAutoConnect = Cvar_Get( "lobby_autoconnect", "", CVAR_TEMP );
 	cl_steamMaxLobbyClients = Cvar_Get( "steam_maxLobbyClients", "16", CVAR_ARCHIVE );
 
@@ -4153,7 +4503,7 @@ void CL_Init( void ) {
 	cl_pitchspeed = Cvar_Get ("cl_pitchspeed", "140", CVAR_CHEAT );
 	cl_anglespeedkey = Cvar_Get ("cl_anglespeedkey", "1.5", CVAR_CHEAT );
 
-	cl_maxpackets = Cvar_Get ("cl_maxpackets", "63", CVAR_CHEAT );
+	cl_maxpackets = Cvar_Get ("cl_maxpackets", "125", CVAR_CHEAT );
 	cl_packetdup = Cvar_Get ("cl_packetdup", "1", CVAR_ARCHIVE | CVAR_CLOUD );
 
 	cl_run = Cvar_Get ("cl_run", "1", CVAR_ARCHIVE);
@@ -4161,12 +4511,10 @@ void CL_Init( void ) {
 	cl_sensitivity = Cvar_Get ("sensitivity", "4", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_mouseAccel = Cvar_Get ("cl_mouseAccel", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_mouseAccelDebug = Cvar_Get ("cl_mouseAccelDebug", "0", 0 );
-	cl_mouseAccelOffset = Cvar_Get ("cl_mouseAccelOffset", "5", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
+	cl_mouseAccelOffset = Cvar_Get ("cl_mouseAccelOffset", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_mouseAccelPower = Cvar_Get ("cl_mouseAccelPower", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	cl_mouseSensCap = Cvar_Get ("cl_mouseSensCap", "0", CVAR_ARCHIVE | CVAR_CLOUD );
 	cl_freelook = Cvar_Get( "cl_freelook", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
-
-	cl_showMouseRate = Cvar_Get ("cl_showmouserate", "0", 0);
 
 	cl_allowDownload = Cvar_Get ("cl_allowDownload", "1", CVAR_ARCHIVE );
 
@@ -4187,9 +4535,9 @@ void CL_Init( void ) {
 	m_cpi = Cvar_Get ("m_cpi", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 
 	cl_motdString = Cvar_Get( "cl_motdString", "", CVAR_ROM );
-	cl_platform = Cvar_Get ("cl_platform", "1", CVAR_ROM | CVAR_SYSTEMINFO | CVAR_USERINFO );
+	cl_platform = Cvar_Get ("cl_platform", "1", CVAR_ROM );
 
-	cl_autoTimeNudge = Cvar_Get ("cl_autoTimeNudge", "0", CVAR_ARCHIVE | CVAR_TEMP );
+	cl_autoTimeNudge = Cvar_GetBounded( "cl_autoTimeNudge", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED );
 	cl_contimestamps = Cvar_Get ("cl_contimestamps", "0", CVAR_ARCHIVE );
 	cl_mouseAccelStyle = Cvar_Get ("cl_mouseAccelStyle", "0", CVAR_ARCHIVE );
 	cl_guid = Cvar_Get ("cl_guid", "", CVAR_USERINFO | CVAR_ROM );
@@ -4205,7 +4553,7 @@ void CL_Init( void ) {
 	// userinfo
 	Cvar_Get ("name", "UnnamedPlayer", CVAR_USERINFO | CVAR_ROM );
 	Cvar_Get ("country", "", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
-	Cvar_Get ("rate", "25000", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_LATCH | CVAR_VM_CREATED );
+	Cvar_GetBounded( "rate", "25000", "8000", "25000", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_LATCH | CVAR_VM_CREATED );
 	Cvar_Get ("snaps", "20", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("model", "sarge", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED );
 	Cvar_Get ("headmodel", "sarge", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED );
@@ -4213,8 +4561,8 @@ void CL_Init( void ) {
 	Cvar_Get ("team_headmodel", "*james", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED );
 	Cvar_Get ("g_redTeam", "Stroggs", CVAR_ARCHIVE);
 	Cvar_Get ("g_blueTeam", "Pagans", CVAR_ARCHIVE);
-	Cvar_Get ("color1",  "7", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
-	Cvar_Get ("color2", "25", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
+	Cvar_GetBounded( "color1", "7", "1", "26", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
+	Cvar_GetBounded( "color2", "25", "1", "26", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
 	Cvar_Get ("handicap", "100", CVAR_USERINFO | CVAR_TEMP );
 	Cvar_Get ("teamtask", "0", CVAR_USERINFO | CVAR_PROTECTED );
 	Cvar_Get ("sex", "male", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED );
@@ -4256,6 +4604,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
 	Cmd_AddCommand ("model", CL_SetModel_f );
+	Cmd_AddCommand ("togglemenu", CL_ToggleMenu_f );
 	Cmd_AddCommand ("web_showBrowser", CL_Web_ShowBrowser_f );
 	Cmd_AddCommand ("web_changeHash", CL_Web_ChangeHash_f );
 	Cmd_AddCommand ("web_hideBrowser", CL_Web_HideBrowser_f );
@@ -4338,6 +4687,7 @@ void CL_Shutdown( void ) {
 	Cmd_RemoveCommand ("serverstatus");
 	Cmd_RemoveCommand ("showip");
 	Cmd_RemoveCommand ("model");
+	Cmd_RemoveCommand ("togglemenu");
 	Cmd_RemoveCommand ("web_showBrowser");
 	Cmd_RemoveCommand ("web_changeHash");
 	Cmd_RemoveCommand ("web_hideBrowser");
@@ -4376,9 +4726,6 @@ static void CL_SetServerInfo(serverInfo_t *server, const char *info, int ping) {
 			Q_strncpyz(server->game,Info_ValueForKey(info, "game"), MAX_NAME_LENGTH);
 			server->gameType = atoi(Info_ValueForKey(info, "gametype"));
 			server->netType = atoi(Info_ValueForKey(info, "nettype"));
-			server->minPing = atoi(Info_ValueForKey(info, "minping"));
-			server->maxPing = atoi(Info_ValueForKey(info, "maxping"));
-			server->punkbuster = atoi(Info_ValueForKey(info, "punkbuster"));
 		}
 		server->ping = ping;
 	}

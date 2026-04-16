@@ -6,10 +6,13 @@ import argparse
 import json
 import pathlib
 import re
-import shutil
 import sys
-import zipfile
 from typing import Dict, List, Tuple
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from scripts.ui.retail_ui_corpus import DEFAULT_BASEQ3_ROOT
 
 PANELS = [
     "hud.txt",
@@ -30,8 +33,7 @@ FONT_PATTERN = re.compile(r"\b(font|smallFont|bigFont)\s+\"([^\"]+)\"", re.IGNOR
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate baked UI assets")
-    parser.add_argument("--bundle", type=pathlib.Path, default=pathlib.Path("build/ui_bundle/pak_uiql.pk3"))
-    parser.add_argument("--homepath", type=pathlib.Path, default=pathlib.Path("build/ui_validation/home"))
+    parser.add_argument("--baseq3-root", type=pathlib.Path, default=DEFAULT_BASEQ3_ROOT)
     parser.add_argument("--log-dir", type=pathlib.Path, default=pathlib.Path("artifacts/ui_validation/logs"))
     parser.add_argument("--metrics", type=pathlib.Path, default=pathlib.Path("artifacts/ui_bundle/metrics/font_metrics.json"))
     parser.add_argument("--expected-metrics", type=pathlib.Path,
@@ -42,20 +44,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shader-source", type=pathlib.Path,
                         default=pathlib.Path("src/code/cgame/cg_main.c"))
     return parser.parse_args()
-
-
-def ensure_clean_homepath(homepath: pathlib.Path) -> pathlib.Path:
-    if homepath.exists():
-        shutil.rmtree(homepath)
-    (homepath / "baseq3").mkdir(parents=True, exist_ok=True)
-    return homepath / "baseq3"
-
-
-def extract_bundle(bundle: pathlib.Path, baseq3: pathlib.Path) -> None:
-    if not bundle.exists():
-        raise SystemExit(f"UI bundle not found: {bundle}")
-    with zipfile.ZipFile(bundle, "r") as archive:
-        archive.extractall(baseq3)
 
 
 def inspect_panels(root: pathlib.Path) -> Dict[str, Dict[str, object]]:
@@ -120,8 +108,9 @@ def verify_configs(baseq3: pathlib.Path, configs: List[str]) -> Tuple[bool, Dict
 
 def main() -> int:
     args = parse_args()
-    baseq3 = ensure_clean_homepath(args.homepath)
-    extract_bundle(args.bundle, baseq3)
+    baseq3 = args.baseq3_root.resolve()
+    if not baseq3.exists():
+        raise SystemExit(f"Retail baseq3 root not found: {baseq3}")
 
     panels_report = inspect_panels(args.panels_root)
     metrics_ok, metrics_report = verify_metrics(args.metrics, args.expected_metrics)
@@ -129,8 +118,7 @@ def main() -> int:
     configs_ok, config_report = verify_configs(baseq3, CONFIGS)
 
     summary = {
-        "bundle": args.bundle.as_posix(),
-        "homepath": args.homepath.as_posix(),
+        "baseq3_root": baseq3.as_posix(),
         "panels": panels_report,
         "glyphMetrics": metrics_report,
         "shaderHandles": shader_report,

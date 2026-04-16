@@ -180,7 +180,9 @@ def _build_retail_module_parity_gate_report() -> dict[str, Any]:
 	gmr_g02_ok = (
 		"FS_OnlineServicesEnabled" not in files_c
 		and 'Com_sprintf( outPath, outSize, "%s/%s", fs_webpath->string, localPath );' in files_c
-		and "return ( cl_webPak != NULL );" in cl_webpak
+		and "return ( cl_webPak != NULL || cl_webDataPak.loaded );" in cl_webpak
+		and "if ( CL_WebDataPak_Load( pakPath ) ) {" in cl_webpak
+		and 'Com_Printf( "web.pak datapack mounted from %s\\n", pakPath );' in cl_webpak
 		and "CL_OnlineServicesEnabled()" not in cl_webpak
 		and "if ( CL_SteamResources_IsSteamURL( url ) ) {" in steam_resources
 		and "if ( !CL_SteamServicesEnabled() ) {" in steam_resources
@@ -287,7 +289,8 @@ def _build_retail_module_parity_gate_report() -> dict[str, Any]:
 		),
 		{
 			"filesystem_gate_removed": "FS_OnlineServicesEnabled" not in files_c,
-			"webpak_remains_available_offline": "return ( cl_webPak != NULL );" in cl_webpak and "CL_OnlineServicesEnabled()" not in cl_webpak,
+			"webpak_remains_available_offline": "return ( cl_webPak != NULL || cl_webDataPak.loaded );" in cl_webpak and "CL_OnlineServicesEnabled()" not in cl_webpak,
+			"datapack_bridge_present": "if ( CL_WebDataPak_Load( pakPath ) ) {" in cl_webpak and 'Com_Printf( "web.pak datapack mounted from %s\\n", pakPath );' in cl_webpak,
 			"steam_only_uri_gate_preserved": "if ( CL_SteamResources_IsSteamURL( url ) ) {" in steam_resources and "if ( !CL_SteamServicesEnabled() ) {" in steam_resources,
 			"platform_service_coverage_present": (
 				"test_launcher_resource_bridge_reconstructs_retail_web_fallback_owner" in platform_tests

@@ -62,8 +62,8 @@ Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'fonts/
 Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'fonts/notosans-regular\.ttf' -Description 'retail sans font mapping'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'fonts/droidsansmono\.ttf' -Description 'retail mono font mapping'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'fonts/droidsansfallbackfull\.ttf' -Description 'retail fallback font mapping'
-Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern '#include <ft2build\.h>' -Description 'external FreeType SDK header root'
-Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern '#include FT_FREETYPE_H' -Description 'external FreeType SDK face header macro'
+Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern '#include <ft2build\.h>' -Description 'repo-managed FreeType header root'
+Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern '#include FT_FREETYPE_H' -Description 'repo-managed FreeType face header macro'
 Assert-FileContains -RelativePath 'docs/reverse-engineering/renderer-font-cache-and-atlas-ownership-2026-04-10.md' -Pattern 'RG-G05 is now considered closed' -Description 'RG-P7 ownership closure note'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern '\*fontstash' -Description 'renderer-owned fontstash texture name'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'R_fonsErrorCallback' -Description 'retail fontstash error callback'
@@ -74,6 +74,7 @@ Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'void R
 Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'void RE_DrawScaledText\( int x, int y, const char \*text, int fontHandle, float scale, int maxX, float \*outMaxX, qboolean forceColor, const float \*baseColor \)' -Description 'shared renderer host text draw helper'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'void RE_MeasureScaledText\( const char \*text, const char \*end, int fontHandle, float scale, int maxX, float \*outWidth, float \*outHeight, float \*outLeft \)' -Description 'shared renderer host text measure helper'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'sans-windows-fallback' -Description 'renderer Windows fallback face slot'
+Assert-FileContains -RelativePath 'src/code/renderer/tr_font.c' -Pattern 'Retail host DrawScaledText/MeasureText resolve glyphs from the retained' -Description 'retail retained-atlas glyph-priority note'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_init.c' -Pattern 'R_InitFontStash\(\)' -Description 'renderer startup fontstash wiring'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_init.c' -Pattern 'R_DoneFontStash\(\)' -Description 'renderer shutdown fontstash wiring'
 Assert-FileContains -RelativePath 'docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md' -Pattern 'RG-P8 is now considered complete' -Description 'RG-P8 ownership closure note'
@@ -82,11 +83,12 @@ Assert-FileContains -RelativePath 'src/code/client/cl_ui.c' -Pattern 'RE_Measure
 Assert-FileContains -RelativePath 'src/code/client/cl_cgame.c' -Pattern 'RE_DrawScaledText\( x, y, text, fontHandle, scale, maxX, outMaxX' -Description 'cgame native host text draw switchover'
 Assert-FileContains -RelativePath 'src/code/client/cl_cgame.c' -Pattern 'RE_MeasureScaledText\( text, end, fontHandle, scale, maxX, &width, &height, outLeft \)' -Description 'cgame native host text measure switchover'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_backend.c' -Pattern 'RB_ShowFontAtlas' -Description 'renderer debug font atlas draw path'
-Assert-FileContains -RelativePath 'src/code/renderer/renderer.vcxproj' -Pattern 'QLEnableFreeType' -Description 'renderer external FreeType build toggle'
-Assert-FileContains -RelativePath 'src/code/renderer/renderer.vcxproj' -Pattern 'ValidateFreeType' -Description 'renderer external FreeType validation target'
-Assert-FileContains -RelativePath 'src/code/quakelive_steam.vcxproj' -Pattern 'QLEnableFreeType' -Description 'engine external FreeType link toggle'
-Assert-FileContains -RelativePath 'src/code/quakelive_steam.vcxproj' -Pattern 'ValidateFreeType' -Description 'engine external FreeType validation target'
+Assert-FileContains -RelativePath 'src/code/renderer/renderer.vcxproj' -Pattern 'QLEnableFreeType' -Description 'renderer repo-managed FreeType build toggle'
+Assert-FileContains -RelativePath 'src/code/renderer/renderer.vcxproj' -Pattern 'ValidateFreeType' -Description 'renderer repo-managed FreeType validation target'
+Assert-FileContains -RelativePath 'src/code/quakelive_steam.vcxproj' -Pattern 'QLEnableFreeType' -Description 'engine repo-managed FreeType link toggle'
+Assert-FileContains -RelativePath 'src/code/quakelive_steam.vcxproj' -Pattern 'ValidateFreeType' -Description 'engine repo-managed FreeType validation target'
 Assert-FileContains -RelativePath '.vscode/build.ps1' -Pattern 'QLEnableFreeType' -Description 'Windows build-script FreeType toggle'
+Assert-FileContains -RelativePath '.vscode/build.ps1' -Pattern 'build_internal_deps\.ps1' -Description 'Windows internal codec bootstrap hook'
 Assert-FileContains -RelativePath 'src/code/unix/Makefile' -Pattern 'QL_ENABLE_FREETYPE \?= 0' -Description 'Unix FreeType toggle'
 Assert-FileContains -RelativePath 'src/code/unix/Makefile' -Pattern 'pkg-config --cflags freetype2' -Description 'Unix FreeType pkg-config include detection'
 Assert-FileContains -RelativePath 'src/code/unix/Makefile' -Pattern 'CLIENT_FREETYPE_CFLAGS := \$\(FREETYPE_CFLAGS\) -DBUILD_FREETYPE' -Description 'Unix FreeType compile define wiring'
@@ -113,12 +115,22 @@ else {
 
 $uiCompatShimPresent = Select-String -Path (Join-Path $RepoRoot 'src/code/client/cl_ui.c') -Pattern 'font = QL_UI_GetScaledFont\( fontHandle \);' -Quiet
 $cgameCompatShimPresent = Select-String -Path (Join-Path $RepoRoot 'src/code/client/cl_cgame.c') -Pattern 'font = QL_CG_GetScaledFont\( fontHandle \);' -Quiet
+$trFontSource = Get-Content -Path (Join-Path $RepoRoot 'src/code/renderer/tr_font.c') -Raw
+$retainedAtlasPriority = $trFontSource.IndexOf('if ( face->ftFace && r_fontStash.shader ) {')
+$compatFontPriority = $trFontSource.IndexOf('if ( R_EnsureFontStashCompatibilityFont( face ) ) {')
 
 if ($uiCompatShimPresent -or $cgameCompatShimPresent) {
 	Report-UnresolvedGap -Message 'Retail host text import switchover remains incomplete: native ui/cgame DrawScaledText and MeasureText still use compatibility glyph loops instead of the retained host text core.'
 }
 else {
 	Write-Host 'Verified host text imports no longer route through compatibility glyph loops.'
+}
+
+if ($retainedAtlasPriority -lt 0 -or $compatFontPriority -lt 0 -or $retainedAtlasPriority -gt $compatFontPriority) {
+	Report-UnresolvedGap -Message 'Renderer host text glyph selection still prefers the classic compatibility font lane ahead of the retained *fontstash atlas.'
+}
+else {
+	Write-Host 'Verified renderer host text glyph selection prefers the retained *fontstash atlas.'
 }
 
 if ($unexpectedDebugAtlasPaths.Count -gt 0) {
@@ -137,6 +149,17 @@ foreach ($projectPath in @(
 	$fullPath = Join-Path $RepoRoot $projectPath
 	if (Select-String -Path $fullPath -Pattern '\.\.\\ft2\\|src/code/ft2|FTDIR' -Quiet) {
 		Report-UnresolvedGap -Message "Legacy FreeType vendor references remain in $projectPath."
+	}
+}
+
+foreach ($projectPath in @(
+	'src/code/renderer/renderer.vcxproj',
+	'src/code/quakelive_steam.vcxproj',
+	'.vscode/build.ps1'
+)) {
+	$fullPath = Join-Path $RepoRoot $projectPath
+	if (Select-String -Path $fullPath -Pattern 'VCPKG_ROOT|C:\\vcpkg' -Quiet) {
+		Report-UnresolvedGap -Message "Non-retail external dependency probing remains in $projectPath."
 	}
 }
 

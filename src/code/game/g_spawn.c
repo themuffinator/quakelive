@@ -63,6 +63,236 @@ static const disableLoadoutToken_t s_disableLoadoutTokens[] = {
 	{ NULL, 0 }
 };
 
+#define ENTITY_DEBUG_MAX_CLASSES	256
+
+typedef struct entityDebugClassSummary_s {
+	char	classname[MAX_QPATH];
+	int		parsedCount;
+	int		spawnedCount;
+	int		filteredCount;
+	int		noHandlerCount;
+} entityDebugClassSummary_t;
+
+typedef struct entityDebugSummary_s {
+	int							parsedEntityCount;
+	int							parsedKeyValueCount;
+	int							spawnedEntityCount;
+	int							filteredEntityCount;
+	int							noHandlerEntityCount;
+	int							worldspawnKeyCount;
+	int							classCount;
+	qboolean					classOverflow;
+	entityDebugClassSummary_t	classes[ENTITY_DEBUG_MAX_CLASSES];
+} entityDebugSummary_t;
+
+static entityDebugSummary_t	s_entityDebugSummary;
+
+/*
+=============
+G_EntityDebug_ClassnameOrPlaceholder
+
+Normalises empty classnames so summary output stays readable.
+=============
+*/
+static const char *G_EntityDebug_ClassnameOrPlaceholder( const char *classname ) {
+	if ( classname && classname[0] ) {
+		return classname;
+	}
+
+	return "<missing>";
+}
+
+/*
+=============
+G_EntityDebug_FindClassSummary
+
+Returns the retained per-class summary bucket for the selected classname.
+=============
+*/
+static entityDebugClassSummary_t *G_EntityDebug_FindClassSummary( const char *classname ) {
+	const char				*safeClassname;
+	entityDebugClassSummary_t	*entry;
+	int						i;
+
+	safeClassname = G_EntityDebug_ClassnameOrPlaceholder( classname );
+
+	for ( i = 0; i < s_entityDebugSummary.classCount; ++i ) {
+		entry = &s_entityDebugSummary.classes[i];
+		if ( !Q_stricmp( entry->classname, safeClassname ) ) {
+			return entry;
+		}
+	}
+
+	if ( s_entityDebugSummary.classCount >= ENTITY_DEBUG_MAX_CLASSES ) {
+		s_entityDebugSummary.classOverflow = qtrue;
+		return NULL;
+	}
+
+	entry = &s_entityDebugSummary.classes[s_entityDebugSummary.classCount++];
+	memset( entry, 0, sizeof( *entry ) );
+	Q_strncpyz( entry->classname, safeClassname, sizeof( entry->classname ) );
+	return entry;
+}
+
+/*
+=============
+G_EntityDebug_RecordParsedEntity
+
+Tracks the latest brace-bounded entity definition parsed out of the entstring.
+=============
+*/
+static void G_EntityDebug_RecordParsedEntity( const char *classname, int keyValueCount ) {
+	entityDebugClassSummary_t	*entry;
+
+	s_entityDebugSummary.parsedEntityCount++;
+	s_entityDebugSummary.parsedKeyValueCount += keyValueCount;
+	if ( s_entityDebugSummary.parsedEntityCount == 1 ) {
+		s_entityDebugSummary.worldspawnKeyCount = keyValueCount;
+	}
+
+	entry = G_EntityDebug_FindClassSummary( classname );
+	if ( entry ) {
+		entry->parsedCount++;
+	}
+}
+
+/*
+=============
+G_EntityDebug_RecordSpawnedEntity
+
+Tracks a classname that successfully completed its spawn path.
+=============
+*/
+static void G_EntityDebug_RecordSpawnedEntity( const char *classname ) {
+	entityDebugClassSummary_t	*entry;
+
+	s_entityDebugSummary.spawnedEntityCount++;
+	entry = G_EntityDebug_FindClassSummary( classname );
+	if ( entry ) {
+		entry->spawnedCount++;
+	}
+}
+
+/*
+=============
+G_EntityDebug_RecordFilteredEntity
+
+Tracks a classname rejected by the retained spawn filters.
+=============
+*/
+static void G_EntityDebug_RecordFilteredEntity( const char *classname ) {
+	entityDebugClassSummary_t	*entry;
+
+	s_entityDebugSummary.filteredEntityCount++;
+	entry = G_EntityDebug_FindClassSummary( classname );
+	if ( entry ) {
+		entry->filteredCount++;
+	}
+}
+
+/*
+=============
+G_EntityDebug_RecordNoHandlerEntity
+
+Tracks a classname that parsed successfully but had no spawn handler.
+=============
+*/
+static void G_EntityDebug_RecordNoHandlerEntity( const char *classname ) {
+	entityDebugClassSummary_t	*entry;
+
+	s_entityDebugSummary.noHandlerEntityCount++;
+	entry = G_EntityDebug_FindClassSummary( classname );
+	if ( entry ) {
+		entry->noHandlerCount++;
+	}
+}
+
+/*
+=============
+G_EntityDebug_ResetSummary
+
+Clears the retained entity parse/spawn summary for the next map bootstrap.
+=============
+*/
+static void G_EntityDebug_ResetSummary( void ) {
+	memset( &s_entityDebugSummary, 0, sizeof( s_entityDebugSummary ) );
+}
+
+/*
+=============
+G_EntityDebug_LiveInUseCount
+
+Returns the number of currently in-use entities in the live level state.
+=============
+*/
+static int G_EntityDebug_LiveInUseCount( void ) {
+	int	i;
+	int	count;
+
+	count = 0;
+	for ( i = 0; i < level.num_entities; ++i ) {
+		if ( g_entities[i].inuse ) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
+/*
+=============
+G_EntityDebug_LogClassSummary
+
+Prints the retained per-class parse/spawn counters collected during map init.
+=============
+*/
+static void G_EntityDebug_LogClassSummary( void ) {
+	int	i;
+
+	G_Printf( "entitydebug(qagame): class parsed spawned filtered noHandler classname\n" );
+	for ( i = 0; i < s_entityDebugSummary.classCount; ++i ) {
+		entityDebugClassSummary_t	*entry;
+
+		entry = &s_entityDebugSummary.classes[i];
+		G_Printf( "entitydebug(qagame): %5i %7i %8i %9i %s\n",
+			entry->parsedCount,
+			entry->spawnedCount,
+			entry->filteredCount,
+			entry->noHandlerCount,
+			entry->classname );
+	}
+
+	if ( s_entityDebugSummary.classOverflow ) {
+		G_Printf( "entitydebug(qagame): class summary overflowed after %i unique classnames\n",
+			ENTITY_DEBUG_MAX_CLASSES );
+	}
+}
+
+/*
+=============
+G_EntityDebug_PrintSummary
+
+Prints the retained entity parse/spawn summary, with optional per-class detail.
+=============
+*/
+void G_EntityDebug_PrintSummary( qboolean includeClasses ) {
+	G_Printf(
+		"entitydebug(qagame): parsed=%i keyValues=%i spawned=%i filtered=%i noHandler=%i live=%i worldspawnKeys=%i classes=%i overflow=%i\n",
+		s_entityDebugSummary.parsedEntityCount,
+		s_entityDebugSummary.parsedKeyValueCount,
+		s_entityDebugSummary.spawnedEntityCount,
+		s_entityDebugSummary.filteredEntityCount,
+		s_entityDebugSummary.noHandlerEntityCount,
+		G_EntityDebug_LiveInUseCount(),
+		s_entityDebugSummary.worldspawnKeyCount,
+		s_entityDebugSummary.classCount,
+		s_entityDebugSummary.classOverflow ? 1 : 0 );
+
+	if ( includeClasses ) {
+		G_EntityDebug_LogClassSummary();
+	}
+}
+
 /*
 =============
 G_LoadoutTokenToMask
@@ -705,6 +935,7 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 	if ( g_gametype.integer == GT_SINGLE_PLAYER ) {
 		G_SpawnInt( "notsingle", "0", &i );
 		if ( i ) {
+			G_EntityDebug_RecordFilteredEntity( classname );
 			G_FreeEntity( ent );
 			return;
 		}
@@ -714,12 +945,14 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 		if ( g_gametype.integer >= GT_TEAM ) {
 			G_SpawnInt( "notteam", "0", &i );
 			if ( i ) {
+				G_EntityDebug_RecordFilteredEntity( classname );
 				G_FreeEntity( ent );
 				return;
 			}
 		} else {
 			G_SpawnInt( "notfree", "0", &i );
 			if ( i ) {
+				G_EntityDebug_RecordFilteredEntity( classname );
 				G_FreeEntity( ent );
 				return;
 			}
@@ -727,6 +960,7 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 
 		if ( G_SpawnString( "gametype", NULL, &value ) ) {
 			if ( !G_SpawnGametypeMatchesFilter( value ) ) {
+				G_EntityDebug_RecordFilteredEntity( classname );
 				G_FreeEntity( ent );
 				return;
 			}
@@ -734,6 +968,7 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 
 		if ( G_SpawnString( "not_gametype", NULL, &value ) ) {
 			if ( G_SpawnGametypeMatchesFilter( value ) ) {
+				G_EntityDebug_RecordFilteredEntity( classname );
 				G_FreeEntity( ent );
 				return;
 			}
@@ -742,6 +977,7 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 
 	G_SpawnInt( "notta", "0", &i );
 	if ( i ) {
+		G_EntityDebug_RecordFilteredEntity( classname );
 		G_FreeEntity( ent );
 		return;
 	}
@@ -752,8 +988,12 @@ void G_SpawnGEntityFromSpawnVars( void ) {
 
 	// if we didn't get a classname, don't bother spawning anything
 	if ( !G_CallSpawn( ent ) ) {
+		G_EntityDebug_RecordNoHandlerEntity( classname );
 		G_FreeEntity( ent );
+		return;
 	}
+
+	G_EntityDebug_RecordSpawnedEntity( classname );
 }
 
 
@@ -793,6 +1033,7 @@ This does not actually spawn an entity.
 qboolean G_ParseSpawnVars( void ) {
 	char		keyname[MAX_TOKEN_CHARS];
 	char		com_token[MAX_TOKEN_CHARS];
+	char		*classname;
 
 	level.numSpawnVars = 0;
 	level.numSpawnVarChars = 0;
@@ -832,6 +1073,9 @@ qboolean G_ParseSpawnVars( void ) {
 		level.spawnVars[ level.numSpawnVars ][1] = G_AddSpawnVarToken( com_token );
 		level.numSpawnVars++;
 	}
+
+	G_SpawnString( "classname", "", &classname );
+	G_EntityDebug_RecordParsedEntity( classname, level.numSpawnVars );
 
 	return qtrue;
 }
@@ -1065,6 +1309,29 @@ static void G_ClearQueuedSpawnState( int clientNum ) {
 
 /*
 =============
+G_CancelQueuedClientSpawn
+
+Clears any pending delayed spawn state for one client and removes the
+scheduled client-entity think callback that executes queued spawns.
+=============
+*/
+void G_CancelQueuedClientSpawn( int clientNum ) {
+	gentity_t	*ent;
+
+	if ( clientNum < 0 || clientNum >= level.maxclients ) {
+		return;
+	}
+
+	ent = &g_entities[clientNum];
+	ent->think = NULL;
+	ent->nextthink = 0;
+
+	G_ClearQueuedSpawnState( clientNum );
+	G_UpdateSpawnQueueFlag();
+}
+
+/*
+=============
 G_InitSpawnQueue
 
 Initialises the spawn delay bookkeeping used to mimic Quake Live's factory scheduling.
@@ -1244,6 +1511,8 @@ Parses textual entity definitions out of an entstring and spawns gentities.
 ==============
 */
 void G_SpawnEntitiesFromString( void ) {
+	G_EntityDebug_ResetSummary();
+
 	// allow calls to G_Spawn*()
 	level.spawning = qtrue;
 	level.numSpawnVars = 0;
@@ -1255,6 +1524,7 @@ void G_SpawnEntitiesFromString( void ) {
 		G_Error( "SpawnEntities: no entities" );
 	}
 	SP_worldspawn();
+	G_EntityDebug_RecordSpawnedEntity( "worldspawn" );
 
 	// parse ents
 	while( G_ParseSpawnVars() ) {
@@ -1263,5 +1533,9 @@ void G_SpawnEntitiesFromString( void ) {
 
 	level.spawning = qfalse;			// any future calls to G_Spawn*() will be errors
 	G_MatchConfig_UpdateConfigstrings();
+
+	if ( trap_Cvar_VariableIntegerValue( "developer" ) > 0 ) {
+		G_EntityDebug_PrintSummary( qfalse );
+	}
 }
 

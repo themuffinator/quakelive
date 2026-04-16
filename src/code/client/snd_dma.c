@@ -59,10 +59,9 @@ static qboolean		s_backgroundIsOgg;
 #define		SOUND_FULLVOLUME	80
 
 #define		SOUND_ATTENUATE		0.0008f
-#define		S_DEFAULT_OGG_SANITY		"sound/world/telein.ogg"
-
 channel_t   s_channels[MAX_CHANNELS];
 channel_t   loop_channels[MAX_CHANNELS];
+voiceChannel_t	s_voiceChannels[MAX_VOICE_CHANNELS];
 int			numLoopChannels;
 
 static int	s_soundStarted;
@@ -91,10 +90,14 @@ cvar_t		*s_testsound;
 cvar_t		*s_khz;
 cvar_t		*s_show;
 cvar_t		*s_mixahead;
+cvar_t		*s_announcerVolume;
 cvar_t		*s_mixPreStep;
 cvar_t		*s_musicVolume;
 cvar_t		*s_separation;
 cvar_t		*s_doppler;
+cvar_t		*s_pvs;
+cvar_t		*s_voiceStep;
+cvar_t		*s_voiceVolume;
 
 static loopSound_t		loopSounds[MAX_GENTITIES];
 static	channel_t		*freelist = NULL;
@@ -134,35 +137,43 @@ void S_SoundInfo_f(void) {
 }
 
 /*
-=============
-S_TestOgg_f
-
-Registers and plays a Vorbis asset to verify decoding and resampling.
-=============
+====================
+S_ChannelVolumeScale
+====================
 */
-static void S_TestOgg_f( void ) {
-	const char		*path;
-	sfxHandle_t	handle;
+static float S_ChannelVolumeScale( int entchannel ) {
+	float	scale;
 
-	if ( !s_soundStarted ) {
-		Com_Printf( S_COLOR_YELLOW "WARNING: sound system not initialized\n" );
-		return;
+	scale = 1.0f;
+
+	if ( entchannel == CHAN_ANNOUNCER && s_announcerVolume ) {
+		scale = Com_Clamp( 0.0f, 2.0f, s_announcerVolume->value );
+	} else if ( entchannel == CHAN_VOICE && s_voiceVolume ) {
+		scale = Com_Clamp( 0.0f, 2.0f, s_voiceVolume->value );
 	}
 
-	if ( Cmd_Argc() > 1 ) {
-		path = Cmd_Argv( 1 );
-	} else {
-		path = S_DEFAULT_OGG_SANITY;
-	}
+	return scale;
+}
 
-	handle = S_RegisterSound( path, qfalse );
-	if ( !handle ) {
-		Com_Printf( S_COLOR_YELLOW "WARNING: could not register %s for ogg test\n", path );
-		return;
-	}
+/*
+====================
+S_ChannelMasterVolume
+====================
+*/
+static int S_ChannelMasterVolume( int entchannel ) {
+	return (int)Com_Clamp( 0.0f, 255.0f, 127.0f * S_ChannelVolumeScale( entchannel ) );
+}
 
-	S_StartLocalSound( handle, CHAN_LOCAL_SOUND );
-	Com_Printf( "Started OGG sanity playback for %s\n", path );
+/*
+==========================
+S_ChannelMasterVolumeScaled
+==========================
+*/
+static int S_ChannelMasterVolumeScaled( int entchannel, float volumeScale ) {
+	float	scale;
+
+	scale = Com_Clamp( 0.0f, 2.0f, volumeScale ) * S_ChannelVolumeScale( entchannel );
+	return (int)Com_Clamp( 0.0f, 255.0f, 127.0f * scale );
 }
 
 /*
@@ -176,18 +187,21 @@ void S_Init( void ) {
 
 	Com_Printf("\n------- sound initialization -------\n");
 
-	s_volume = Cvar_Get ("s_volume", "0.8", CVAR_ARCHIVE);
-	s_musicVolume = Cvar_Get ("s_musicvolume", "0.25", CVAR_ARCHIVE);
-	s_separation = Cvar_Get ("s_separation", "0.5", CVAR_ARCHIVE);
-	s_doppler = Cvar_Get ("s_doppler", "1", CVAR_ARCHIVE);
-	s_khz = Cvar_Get ("s_khz", "22", CVAR_ARCHIVE);
-	s_mixahead = Cvar_Get ("s_mixahead", "0.2", CVAR_ARCHIVE);
+	s_announcerVolume = Cvar_GetBounded( "s_announcerVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
+	s_doppler = Cvar_Get( "s_doppler", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
+	cv = Cvar_Get ("s_initsound", "1", 0);
+	s_mixahead = Cvar_Get( "s_mixahead", "0.140", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
+	s_mixPreStep = Cvar_Get( "s_mixPreStep", "0.05", CVAR_ARCHIVE | CVAR_PROTECTED );
+	s_musicVolume = Cvar_GetBounded( "s_musicvolume", "0.5", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
+	s_pvs = Cvar_GetBounded( "s_pvs", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
+	s_voiceVolume = Cvar_GetBounded( "s_voiceVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
+	s_voiceStep = Cvar_Get( "s_voiceStep", "0.02", CVAR_ARCHIVE | CVAR_PROTECTED );
+	s_volume = Cvar_GetBounded( "s_volume", "0.8", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
 
-	s_mixPreStep = Cvar_Get ("s_mixPreStep", "0.05", CVAR_ARCHIVE);
+	s_separation = Cvar_Get ("s_separation", "0.5", CVAR_ARCHIVE);
+	s_khz = Cvar_Get ("s_khz", "22", CVAR_ARCHIVE);
 	s_show = Cvar_Get ("s_show", "0", CVAR_CHEAT);
 	s_testsound = Cvar_Get ("s_testsound", "0", CVAR_CHEAT);
-
-	cv = Cvar_Get ("s_initsound", "1", 0);
 	if ( !cv->integer ) {
 		Com_Printf ("not initializing.\n");
 		Com_Printf("------------------------------------\n");
@@ -199,7 +213,6 @@ void S_Init( void ) {
 	Cmd_AddCommand("s_list", S_SoundList_f);
 	Cmd_AddCommand("s_info", S_SoundInfo_f);
 	Cmd_AddCommand("s_stop", S_StopAllSounds);
-	Cmd_AddCommand("s_testogg", S_TestOgg_f);
 
 	r = SNDDMA_Init();
 	Com_Printf("------------------------------------\n");
@@ -269,16 +282,16 @@ void S_Shutdown( void ) {
 		return;
 	}
 
+	SND_shutdown();
 	SNDDMA_Shutdown();
 
 	s_soundStarted = 0;
 
 	Cmd_RemoveCommand("play");
 	Cmd_RemoveCommand("music");
-	Cmd_RemoveCommand("stopsound");
-	Cmd_RemoveCommand("soundlist");
-	Cmd_RemoveCommand("soundinfo");
-	Cmd_RemoveCommand("s_testogg");
+	Cmd_RemoveCommand("s_list");
+	Cmd_RemoveCommand("s_info");
+	Cmd_RemoveCommand("s_stop");
 }
 
 
@@ -410,15 +423,14 @@ S_BeginRegistration
 void S_BeginRegistration( void ) {
 	s_soundMuted = qfalse;		// we can play again
 
-	if (s_numSfx == 0) {
-		SND_setup();
+	SND_shutdown();
+	SND_setup();
 
-		s_numSfx = 0;
-		Com_Memset( s_knownSfx, 0, sizeof( s_knownSfx ) );
-		Com_Memset(sfxHash, 0, sizeof(sfx_t *)*LOOP_HASH);
+	s_numSfx = 0;
+	Com_Memset( s_knownSfx, 0, sizeof( s_knownSfx ) );
+	Com_Memset(sfxHash, 0, sizeof(sfx_t *)*LOOP_HASH);
 
-		S_RegisterSound("sound/feedback/hit.wav", qfalse);		// changed to a sound in baseq3
-	}
+	S_RegisterSound("sound/feedback/hit.wav", qfalse);		// changed to a sound in baseq3
 }
 
 
@@ -542,18 +554,21 @@ void S_SpatializeOrigin (vec3_t origin, int master_vol, int *left_vol, int *righ
 
 /*
 ====================
-S_StartSound
+S_StartSoundInternal
 
-Validates the parms and ques the sound up
-if pos is NULL, the sound will be dynamically sourced from the entity
-Entchannel 0 will never override a playing sound
+Common channel-start path shared by the fixed-volume and retail volume-aware
+entry points.
 ====================
 */
-void S_StartSound(vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxHandle ) {
+static void S_StartSoundInternal( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxHandle, int masterVol ) {
 	channel_t	*ch;
 	sfx_t		*sfx;
-  int i, oldest, chosen, time;
-  int	inplay, allowed;
+	int			i;
+	int			oldest;
+	int			chosen;
+	int			time;
+	int			inplay;
+	int			allowed;
 
 	if ( !s_soundStarted || s_soundMuted ) {
 		return;
@@ -591,8 +606,8 @@ void S_StartSound(vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxH
 	ch = s_channels;
 	inplay = 0;
 	for ( i = 0; i < MAX_CHANNELS ; i++, ch++ ) {		
-		if (ch[i].entnum == entityNum && ch[i].thesfx == sfx) {
-			if (time - ch[i].allocTime < 50) {
+		if ( ch->entnum == entityNum && ch->thesfx == sfx ) {
+			if ( time - ch->allocTime < 50 ) {
 //				if (Cvar_VariableValue( "cg_showmiss" )) {
 //					Com_Printf("double sound start\n");
 //				}
@@ -629,7 +644,8 @@ void S_StartSound(vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxH
 				}
 			}
 			if (chosen == -1) {
-				if (ch->entnum == listener_number) {
+				if ( entityNum == listener_number ) {
+					ch = s_channels;
 					for ( i = 0 ; i < MAX_CHANNELS ; i++, ch++ ) {
 						if (ch->allocTime<oldest) {
 							oldest = ch->allocTime;
@@ -654,7 +670,11 @@ void S_StartSound(vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxH
 		ch->fixed_origin = qfalse;
 	}
 
-	ch->master_vol = 127;
+	if ( masterVol < 0 ) {
+		ch->master_vol = S_ChannelMasterVolume( entchannel );
+	} else {
+		ch->master_vol = masterVol;
+	}
 	ch->entnum = entityNum;
 	ch->thesfx = sfx;
 	ch->startSample = START_SAMPLE_IMMEDIATE;
@@ -664,6 +684,33 @@ void S_StartSound(vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxH
 	ch->doppler = qfalse;
 }
 
+/*
+====================
+S_StartSound
+
+Validates the parms and ques the sound up
+if pos is NULL, the sound will be dynamically sourced from the entity
+Entchannel 0 will never override a playing sound
+====================
+*/
+void S_StartSound( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxHandle ) {
+	S_StartSoundInternal( origin, entityNum, entchannel, sfxHandle, -1 );
+}
+
+/*
+====================
+S_StartSoundVolume
+
+Reconstructs the retail sound-start helper with an explicit caller-controlled
+volume scalar.
+====================
+*/
+void S_StartSoundVolume( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfxHandle, float volume ) {
+	int masterVol;
+
+	masterVol = S_ChannelMasterVolumeScaled( entchannel, volume );
+	S_StartSoundInternal( origin, entityNum, entchannel, sfxHandle, masterVol );
+}
 
 /*
 ==================
@@ -671,16 +718,106 @@ S_StartLocalSound
 ==================
 */
 void S_StartLocalSound( sfxHandle_t sfxHandle, int channelNum ) {
-	if ( !s_soundStarted || s_soundMuted ) {
-		return;
-	}
-
 	if ( sfxHandle < 0 || sfxHandle >= s_numSfx ) {
 		Com_Printf( S_COLOR_YELLOW, "S_StartLocalSound: handle %i out of range\n", sfxHandle );
 		return;
 	}
 
-	S_StartSound (NULL, listener_number, channelNum, sfxHandle );
+	S_StartSound( NULL, listener_number, channelNum, sfxHandle );
+}
+
+/*
+========================
+S_StartLocalSoundVolume
+========================
+*/
+void S_StartLocalSoundVolume( sfxHandle_t sfxHandle, int channelNum, float volume ) {
+	if ( sfxHandle < 0 || sfxHandle >= s_numSfx ) {
+		Com_Printf( S_COLOR_YELLOW, "S_StartLocalSound: handle %i out of range\n", sfxHandle );
+		return;
+	}
+
+	S_StartSoundVolume( NULL, listener_number, channelNum, sfxHandle, volume );
+}
+
+/*
+================
+S_AddVoiceSamples
+
+Queues decompressed voice PCM into the retail-style five-lane circular voice
+buffer consumed from the top-level paint path.
+================
+*/
+void S_AddVoiceSamples( int clientNum, int samples, const short *data ) {
+	voiceChannel_t	*voice;
+	int				i;
+	int				channelIndex;
+	int				queuedSamples;
+	int				startSample;
+	int				count;
+
+	if ( !s_soundStarted || s_soundMuted || !data || samples <= 0 ) {
+		return;
+	}
+
+	channelIndex = -1;
+	for ( i = 0; i < MAX_VOICE_CHANNELS; ++i ) {
+		if ( s_voiceChannels[i].clientNum == clientNum ) {
+			channelIndex = i;
+			break;
+		}
+	}
+
+	if ( channelIndex < 0 ) {
+		for ( i = 0; i < MAX_VOICE_CHANNELS; ++i ) {
+			if ( s_voiceChannels[i].endSample <= s_paintedtime ) {
+				channelIndex = i;
+				break;
+			}
+		}
+	}
+
+	if ( channelIndex < 0 ) {
+		for ( i = 0; i < MAX_VOICE_CHANNELS; ++i ) {
+			if ( s_voiceChannels[i].endSample - s_paintedtime < (int)( dma.speed * 0.5f ) ) {
+				channelIndex = i;
+				break;
+			}
+		}
+	}
+
+	if ( channelIndex < 0 ) {
+		return;
+	}
+
+	voice = &s_voiceChannels[channelIndex];
+	voice->clientNum = clientNum;
+
+	if ( voice->endSample <= voice->startSample ) {
+		startSample = s_paintedtime + (int)( s_mixPreStep->value * dma.speed );
+		if ( s_voiceStep ) {
+			startSample += (int)( s_voiceStep->value * dma.speed );
+		}
+
+		voice->startSample = startSample;
+		voice->endSample = startSample;
+	}
+
+	queuedSamples = voice->endSample - voice->startSample;
+	if ( queuedSamples < 0 ) {
+		queuedSamples = 0;
+	}
+
+	count = samples;
+	if ( count > VOICE_BUFFER_SAMPLES - queuedSamples ) {
+		count = VOICE_BUFFER_SAMPLES - queuedSamples;
+	}
+
+	for ( i = 0; i < count; ++i ) {
+		voice->samples[( voice->endSample + i ) & ( VOICE_BUFFER_SAMPLES - 1 )] = data[i];
+	}
+
+	voice->endSample += count;
 }
 
 
@@ -706,6 +843,7 @@ void S_ClearSoundBuffer( void ) {
 	S_ChannelSetup();
 
 	s_rawend = 0;
+	Com_Memset( s_voiceChannels, 0, sizeof( s_voiceChannels ) );
 
 	if (dma.samplebits == 8)
 		clear = 0x80;
@@ -1100,6 +1238,34 @@ void S_UpdateEntityPosition( int entityNum, const vec3_t origin ) {
 	VectorCopy( origin, loopSounds[entityNum].origin );
 }
 
+/*
+================
+S_OriginInPVS
+================
+*/
+static qboolean S_OriginInPVS( const vec3_t listener, const vec3_t origin ) {
+	int listenerLeaf;
+	int listenerCluster;
+	int originLeaf;
+	int originCluster;
+	byte *mask;
+
+	listenerLeaf = CM_PointLeafnum( listener );
+	originLeaf = CM_PointLeafnum( origin );
+	listenerCluster = CM_LeafCluster( listenerLeaf );
+	originCluster = CM_LeafCluster( originLeaf );
+	if ( listenerCluster < 0 || originCluster < 0 ) {
+		return qfalse;
+	}
+
+	mask = CM_ClusterPVS( listenerCluster );
+	if ( !mask ) {
+		return qfalse;
+	}
+
+	return ( mask[originCluster >> 3] & ( 1 << ( originCluster & 7 ) ) ) ? qtrue : qfalse;
+}
+
 
 /*
 ============
@@ -1138,6 +1304,12 @@ void S_Respatialize( int entityNum, const vec3_t head, vec3_t axis[3], int inwat
 				VectorCopy( ch->origin, origin );
 			} else {
 				VectorCopy( loopSounds[ ch->entnum ].origin, origin );
+			}
+
+			if ( s_pvs && s_pvs->integer && !S_OriginInPVS( listener_origin, origin ) ) {
+				ch->leftvol = 0;
+				ch->rightvol = 0;
+				continue;
 			}
 
 			S_SpatializeOrigin (origin, ch->master_vol, &ch->leftvol, &ch->rightvol);
@@ -1648,6 +1820,28 @@ static qboolean S_BackgroundTrackLoop( void ) {
 }
 
 /*
+==========================
+S_OggUpdateBackgroundTrack
+
+Feeds decoded OGG music into the temporary buffer and mirrors the retail
+helper's error handling by logging the decode status and closing the decoder on
+failure.
+==========================
+*/
+static int S_OggUpdateBackgroundTrack( byte *buffer, int bytesToRead ) {
+	int	result;
+
+	result = S_OggStreamRead( &s_backgroundOgg, buffer, bytesToRead );
+	if ( result < 0 ) {
+		Com_Printf( S_COLOR_YELLOW "OGG_UpdateBackgroundTrack: %i\n", result );
+		S_OggStreamClose( &s_backgroundOgg );
+		return 0;
+	}
+
+	return result;
+}
+
+/*
 ======================
 S_StopBackgroundTrack
 ======================
@@ -1785,21 +1979,7 @@ void S_UpdateBackgroundTrack( void ) {
 		}
 
 		if ( usingOgg ) {
-			r = S_OggStreamRead( &s_backgroundOgg, raw, fileBytes );
-			if ( r < 0 ) {
-				Com_Printf( S_COLOR_YELLOW "WARNING: Vorbis decode error on %s\n", s_backgroundOgg.path );
-				S_StopBackgroundTrack();
-				return;
-			}
-			if ( r == 0 ) {
-				if ( !S_BackgroundTrackLoop() ) {
-					S_StopBackgroundTrack();
-					return;
-				}
-				usingOgg = ( s_backgroundIsOgg && S_OggStreamActive( &s_backgroundOgg ) );
-				continue;
-			}
-
+			r = S_OggUpdateBackgroundTrack( raw, fileBytes );
 			fileSamples = r / (s_backgroundInfo.width * s_backgroundInfo.channels);
 		} else {
 			// don't try and read past the end of the file
@@ -1838,6 +2018,14 @@ void S_UpdateBackgroundTrack( void ) {
 			s_backgroundInfo.width, s_backgroundInfo.channels, raw, musicVolume );
 
 		if ( usingOgg ) {
+			if ( r < fileBytes ) {
+				s_backgroundIsOgg = qfalse;
+				if ( !S_BackgroundTrackLoop() ) {
+					S_StopBackgroundTrack();
+					return;
+				}
+				usingOgg = ( s_backgroundIsOgg && S_OggStreamActive( &s_backgroundOgg ) );
+			}
 			continue;
 		}
 

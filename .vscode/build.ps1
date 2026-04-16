@@ -136,21 +136,60 @@ if (-not $windowsTargetPlatformVersion -and $toolset -eq 'v141') {
 
 $solutionPath = Resolve-Path $Solution
 $solutionDir = Split-Path -Parent $solutionPath
+$repoLibsDir = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot '..\src\libs'))
+$internalDepsScript = Join-Path $scriptRoot '..\tools\build_internal_deps.ps1'
 
-$vorbisSdkDir = $env:VorbisSdkDir
-if (-not $vorbisSdkDir) {
-	$vorbisSdkDir = Join-Path $solutionDir '..\libs\vorbis'
+function Invoke-InternalDependencyBootstrap {
+	param(
+		[string]$DependencyName
+	)
+
+	if (-not (Test-Path $internalDepsScript)) {
+		throw "Internal dependency bootstrap script was not found: $internalDepsScript"
+	}
+
+	$bootstrapArgs = @(
+		'-NoProfile',
+		'-ExecutionPolicy', 'Bypass',
+		'-File', $internalDepsScript,
+		'-RepoRoot', (Join-Path $scriptRoot '..'),
+		'-Dependency', $DependencyName
+	)
+
+	if ($toolset) {
+		$bootstrapArgs += @('-PlatformToolset', $toolset)
+	}
+
+	& powershell @bootstrapArgs
+	if ($LASTEXITCODE -ne 0) {
+		throw "Failed to bootstrap repo-managed dependency '$DependencyName'."
+	}
 }
 
-$pngSdkDir = $env:PngSdkDir
-if (-not $pngSdkDir) {
-	$pngSdkDir = Join-Path $solutionDir '..\libs\libpng'
-}
+$vorbisSdkDir = Join-Path $repoLibsDir 'vorbis'
+$vorbisIncludeDir = Join-Path $vorbisSdkDir 'include'
+$vorbisLibDir = Join-Path $vorbisSdkDir 'lib\Win32'
+$vorbisHeader = Join-Path $vorbisIncludeDir 'vorbis\vorbisfile.h'
+
+$pngSdkDir = Join-Path $repoLibsDir 'libpng'
+$pngInclude = Join-Path $pngSdkDir 'include'
+$pngLibDir = Join-Path $pngSdkDir 'lib\Win32'
+$pngHeader = Join-Path $pngInclude 'png.h'
+$pngSource = 'repo-managed libpng install root'
+
+$FreeTypeSdkDir = Join-Path $repoLibsDir 'freetype'
+$FreeTypeIncludeDir = Join-Path $FreeTypeSdkDir 'include'
+$FreeTypeLibDir = ''
+$FreeTypeLibrary = $null
+$FreeTypeSource = ''
+$FreeTypeLibraryCandidates = @('freetype.lib', 'libfreetype.lib')
 
 $enableOgg = $env:QLEnableOgg
-$vorbisInclude = Join-Path $vorbisSdkDir 'include\vorbis\vorbisfile.h'
-$vorbisLibDir = Join-Path $vorbisSdkDir 'lib\Win32'
-$oggAvailable = (Test-Path $vorbisInclude) -and
+if (-not $enableOgg) {
+	Invoke-InternalDependencyBootstrap -DependencyName 'vorbis'
+}
+
+$oggAvailable = (Test-Path $vorbisHeader) -and
 	(Test-Path (Join-Path $vorbisLibDir 'vorbisfile.lib')) -and
 	(Test-Path (Join-Path $vorbisLibDir 'vorbis.lib')) -and
 	(Test-Path (Join-Path $vorbisLibDir 'ogg.lib'))
@@ -161,9 +200,11 @@ if (-not $enableOgg) {
 }
 
 $enablePng = $env:QLEnablePng
-$pngInclude = Join-Path $pngSdkDir 'include\png.h'
-$pngLibDir = Join-Path $pngSdkDir 'lib\Win32'
-$pngAvailable = (Test-Path $pngInclude) -and
+if (-not $enablePng) {
+	Invoke-InternalDependencyBootstrap -DependencyName 'png'
+}
+
+$pngAvailable = (Test-Path $pngHeader) -and
 	(Test-Path (Join-Path $pngLibDir 'libpng16.lib')) -and
 	(Test-Path (Join-Path $pngLibDir 'zlib.lib'))
 if (-not $enablePng) {
@@ -172,81 +213,28 @@ if (-not $enablePng) {
 	$enablePng = [int]$enablePng
 }
 if ($enablePng -eq 0 -and $pngAvailable) {
-	Write-Warning "QLEnablePng was forced to 0 but libpng is available. Enabling PNG to avoid blank UI assets."
+	Write-Warning "QLEnablePng was forced to 0 but repo-managed libpng is available. Enabling PNG to avoid blank UI assets."
 	$enablePng = 1
 }
 
-$freeTypeSdkDir = $env:FreeTypeSdkDir
-$freeTypeIncludeDir = $env:FreeTypeIncludeDir
-$freeTypeLibDir = $env:FreeTypeLibDir
-$enableFreeType = $env:QLEnableFreeType
-$freeTypeLibraryCandidates = @('freetype.lib', 'libfreetype.lib')
-$freeTypeCandidates = New-Object 'System.Collections.Generic.List[object]'
-
-if ($freeTypeIncludeDir -or $freeTypeLibDir) {
-	$freeTypeCandidates.Add([pscustomobject]@{
-		sdk = $freeTypeSdkDir
-		include = if ($freeTypeIncludeDir) { $freeTypeIncludeDir } elseif ($freeTypeSdkDir) { Join-Path $freeTypeSdkDir 'include' } else { '' }
-		lib = if ($freeTypeLibDir) { $freeTypeLibDir } elseif ($freeTypeSdkDir) { Join-Path $freeTypeSdkDir 'lib\Win32' } else { '' }
-		source = 'explicit FreeType include/lib override'
-	})
-}
-
-$defaultFreeTypeSdkDir = if ($freeTypeSdkDir) { $freeTypeSdkDir } else { Join-Path $solutionDir '..\libs\freetype' }
-foreach ($candidate in @(
-	[pscustomobject]@{
-		sdk = $defaultFreeTypeSdkDir
-		include = Join-Path $defaultFreeTypeSdkDir 'include'
-		lib = Join-Path $defaultFreeTypeSdkDir 'lib\Win32'
-		source = 'repo-style FreeType SDK root'
-	},
-	[pscustomobject]@{
-		sdk = $defaultFreeTypeSdkDir
-		include = Join-Path $defaultFreeTypeSdkDir 'include'
-		lib = Join-Path $defaultFreeTypeSdkDir 'lib'
-		source = 'flat FreeType SDK root'
-	}
+foreach ($candidateLibDir in @(
+	(Join-Path $FreeTypeSdkDir 'lib\Win32'),
+	(Join-Path $FreeTypeSdkDir 'lib')
 )) {
-	$freeTypeCandidates.Add($candidate)
-}
-
-$vcpkgRoot = $env:VCPKG_ROOT
-if (-not $vcpkgRoot -and (Test-Path 'C:\vcpkg')) {
-	$vcpkgRoot = 'C:\vcpkg'
-}
-if ($vcpkgRoot) {
-	$vcpkgTripletDir = Join-Path $vcpkgRoot 'installed\x86-windows'
-	$freeTypeCandidates.Add([pscustomobject]@{
-		sdk = $vcpkgTripletDir
-		include = Join-Path $vcpkgTripletDir 'include'
-		lib = Join-Path $vcpkgTripletDir 'lib'
-		source = 'vcpkg x86-windows installed tree'
-	})
-}
-
-$freeTypeLibrary = $null
-$freeTypeSource = ''
-foreach ($candidate in $freeTypeCandidates) {
-	if (-not $candidate.include -or -not $candidate.lib) {
-		continue
-	}
-
-	$header = Join-Path $candidate.include 'ft2build.h'
-	$library = $freeTypeLibraryCandidates |
-		Where-Object { Test-Path (Join-Path $candidate.lib $_) } |
+	$library = $FreeTypeLibraryCandidates |
+		Where-Object { Test-Path (Join-Path $candidateLibDir $_) } |
 		Select-Object -First 1
-	if ((Test-Path $header) -and $null -ne $library) {
-		$freeTypeSdkDir = $candidate.sdk
-		$freeTypeIncludeDir = $candidate.include
-		$freeTypeLibDir = $candidate.lib
-		$freeTypeLibrary = $library
-		$freeTypeSource = $candidate.source
+	if ($library -and (Test-Path (Join-Path $FreeTypeIncludeDir 'ft2build.h'))) {
+		$FreeTypeLibDir = $candidateLibDir
+		$FreeTypeLibrary = $library
+		$FreeTypeSource = 'repo-managed FreeType tree'
 		break
 	}
 }
 
-$freeTypeHeader = if ($freeTypeIncludeDir) { Join-Path $freeTypeIncludeDir 'ft2build.h' } else { '' }
-$freeTypeAvailable = ($freeTypeHeader -and (Test-Path $freeTypeHeader) -and ($null -ne $freeTypeLibrary))
+$enableFreeType = $env:QLEnableFreeType
+$freeTypeHeader = Join-Path $FreeTypeIncludeDir 'ft2build.h'
+$freeTypeAvailable = (Test-Path $freeTypeHeader) -and ($null -ne $FreeTypeLibrary)
 if (-not $enableFreeType) {
 	$enableFreeType = if ($freeTypeAvailable) { 1 } else { 0 }
 } else {
@@ -283,21 +271,6 @@ if ($enablePng -ne $null) {
 if ($enableFreeType -ne $null) {
 	$msbuildArgs += "/p:QLEnableFreeType=$enableFreeType"
 }
-if ($env:VorbisSdkDir) {
-	$msbuildArgs += "/p:VorbisSdkDir=$vorbisSdkDir"
-}
-if ($env:PngSdkDir) {
-	$msbuildArgs += "/p:PngSdkDir=$pngSdkDir"
-}
-if ($freeTypeSdkDir) {
-	$msbuildArgs += "/p:FreeTypeSdkDir=$freeTypeSdkDir"
-}
-if ($freeTypeIncludeDir) {
-	$msbuildArgs += "/p:FreeTypeIncludeDir=$freeTypeIncludeDir"
-}
-if ($freeTypeLibDir) {
-	$msbuildArgs += "/p:FreeTypeLibDir=$freeTypeLibDir"
-}
 
 Write-Host "Using MSBuild: $msbuildPath"
 if ($toolset) {
@@ -316,25 +289,36 @@ if ($OpenSteam -ne '') {
 	Write-Host "QLBuildOpenSteam: $OpenSteam"
 }
 Write-Host "QLEnableOgg: $enableOgg (available: $oggAvailable)"
+Write-Host "Vorbis include: $vorbisIncludeDir"
+Write-Host "Vorbis library dir: $vorbisLibDir"
 Write-Host "QLEnablePng: $enablePng (available: $pngAvailable)"
+if ($pngSource) {
+	Write-Host "PNG source: $pngSource"
+	Write-Host "PNG include: $pngInclude"
+	Write-Host "PNG library dir: $pngLibDir"
+}
 Write-Host "QLEnableFreeType: $enableFreeType (available: $freeTypeAvailable)"
 if ($freeTypeAvailable) {
-	Write-Host "FreeType SDK source: $freeTypeSource"
-	Write-Host "FreeType include: $freeTypeIncludeDir"
-	Write-Host "FreeType library: $(Join-Path $freeTypeLibDir $freeTypeLibrary)"
+	Write-Host "FreeType source: $FreeTypeSource"
+	Write-Host "FreeType include: $FreeTypeIncludeDir"
+	Write-Host "FreeType library: $(Join-Path $FreeTypeLibDir $FreeTypeLibrary)"
 }
 
 & $msbuildPath @msbuildArgs
 $buildExitCode = $LASTEXITCODE
 
+if ($buildExitCode -ne 0) {
+	exit $buildExitCode
+}
+
 if ($enableFreeType -ne 0 -and $freeTypeAvailable) {
 	$freeTypeBinDirCandidates = @()
-	if ($freeTypeSdkDir) {
-		$freeTypeBinDirCandidates += (Join-Path $freeTypeSdkDir 'bin')
-		$freeTypeBinDirCandidates += (Join-Path $freeTypeSdkDir 'bin\Win32')
+	if ($FreeTypeSdkDir) {
+		$freeTypeBinDirCandidates += (Join-Path $FreeTypeSdkDir 'bin')
+		$freeTypeBinDirCandidates += (Join-Path $FreeTypeSdkDir 'bin\Win32')
 	}
-	if ($freeTypeLibDir) {
-		$freeTypeLibParent = Split-Path -Parent $freeTypeLibDir
+	if ($FreeTypeLibDir) {
+		$freeTypeLibParent = Split-Path -Parent $FreeTypeLibDir
 		if ($freeTypeLibParent) {
 			$freeTypeBinDirCandidates += (Join-Path $freeTypeLibParent 'bin')
 			$freeTypeLibGrandParent = Split-Path -Parent $freeTypeLibParent
@@ -365,6 +349,63 @@ if ($enableFreeType -ne 0 -and $freeTypeAvailable) {
 }
 
 $runtimeBinDir = Join-Path $solutionDir "..\..\build\win32\$Configuration\bin"
+$runtimeBaseq3Dir = Join-Path $runtimeBinDir 'baseq3'
+$runtimeModulesDir = Join-Path $solutionDir "..\..\build\win32\$Configuration\modules"
+$uiBundleBuilder = Join-Path $solutionDir '..\..\tools\build_ui_bundle.py'
+$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+if (-not $pythonCmd) {
+	$pythonCmd = Get-Command py -ErrorAction SilentlyContinue
+}
+
+function Sync-ModuleRuntimeArtifacts {
+	param(
+		[string]$ModuleName,
+		[string]$RuntimeBaseq3Dir,
+		[string]$ModulesDir
+	)
+
+	$moduleDir = Join-Path $ModulesDir $ModuleName
+	if (-not (Test-Path $moduleDir)) {
+		return
+	}
+
+	foreach ($artifact in @('dll', 'pdb', 'map', 'bsc')) {
+		$sourcePath = Join-Path $moduleDir "$ModuleName.$artifact"
+		if (-not (Test-Path $sourcePath)) {
+			continue
+		}
+
+		$destinationPath = Join-Path $RuntimeBaseq3Dir "$ModuleName.$artifact"
+		Copy-Item -Path $sourcePath -Destination $destinationPath -Force
+	}
+}
+
+if (-not (Test-Path $runtimeBaseq3Dir)) {
+	New-Item -ItemType Directory -Path $runtimeBaseq3Dir | Out-Null
+}
+
+if ($pythonCmd) {
+	Write-Host "Refreshing staged retail UI bundle..."
+	$pythonArgs = @(
+		$uiBundleBuilder,
+		'--runtime-root',
+		$runtimeBaseq3Dir
+	)
+	if ($pythonCmd.Name -ieq 'py.exe' -or $pythonCmd.Name -ieq 'py') {
+		$pythonArgs = @('-3') + $pythonArgs
+	}
+	& $pythonCmd.Source @pythonArgs
+	$uiBundleExitCode = $LASTEXITCODE
+	if ($uiBundleExitCode -ne 0) {
+		exit $uiBundleExitCode
+	}
+} else {
+	Write-Warning "Python was not found; skipping tools/build_ui_bundle.py refresh. Launches may use stale staged UI content."
+}
+
+Sync-ModuleRuntimeArtifacts -ModuleName 'cgamex86' -RuntimeBaseq3Dir $runtimeBaseq3Dir -ModulesDir $runtimeModulesDir
+Sync-ModuleRuntimeArtifacts -ModuleName 'qagamex86' -RuntimeBaseq3Dir $runtimeBaseq3Dir -ModulesDir $runtimeModulesDir
+
 $clientExe = Join-Path $runtimeBinDir 'quakelive_steam.exe'
 $dedicatedExe = Join-Path $runtimeBinDir 'qzeroded.exe'
 if (Test-Path $clientExe) {
@@ -382,8 +423,4 @@ if (Test-Path $clientExe) {
 	}
 
 	Write-Host "Emitted dedicated server alias: $dedicatedExe"
-}
-
-if ($buildExitCode -ne 0) {
-	exit $buildExitCode
 }

@@ -689,6 +689,15 @@ typedef struct {
 } bmodel_t;
 
 typedef struct {
+	int			cellId;
+	bmodel_t	*bmodel;
+	vec3_t		center;
+	vec3_t		normal;
+	vec3_t		points[4];
+	int			sourceIndex;
+} qlAdvertisement_t;
+
+typedef struct {
 	char		name[MAX_QPATH];		// ie: maps/tim_dm2.bsp
 	char		baseName[MAX_QPATH];	// ie: tim_dm2
 
@@ -697,6 +706,8 @@ typedef struct {
 	int			numShaders;
 	dshader_t	*shaders;
 
+	int			bmodelHandleBase;
+	int			numBmodels;
 	bmodel_t	*bmodels;
 
 	int			numplanes;
@@ -708,6 +719,9 @@ typedef struct {
 
 	int			numsurfaces;
 	msurface_t	*surfaces;
+
+	int			numAdvertisements;
+	qlAdvertisement_t	*advertisements;
 
 	int			nummarksurfaces;
 	msurface_t	**marksurfaces;
@@ -764,6 +778,7 @@ int			R_LerpTag( orientation_t *tag, qhandle_t handle, int startFrame, int endFr
 void		R_ModelBounds( qhandle_t handle, vec3_t mins, vec3_t maxs );
 
 void		R_Modellist_f (void);
+void		R_AdvertisementList_f( void );
 
 //====================================================
 extern	refimport_t		ri;

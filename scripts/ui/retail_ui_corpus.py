@@ -43,8 +43,8 @@ def iter_baseq3_root_candidates() -> list[Path]:
 		if env_value:
 			candidates.append(Path(env_value))
 
-	candidates.append(DEFAULT_LOCAL_BASEQ3_ROOT)
 	candidates.extend(_steam_install_candidates())
+	candidates.append(DEFAULT_LOCAL_BASEQ3_ROOT)
 
 	deduped: list[Path] = []
 	seen: set[str] = set()
@@ -277,6 +277,13 @@ def _baseq3_relative(path: Path, baseq3_root: Path) -> str:
 	return path.relative_to(baseq3_root).as_posix()
 
 
+def _inventory_relative(path: Path, baseq3_root: Path) -> str:
+	try:
+		return _baseq3_relative(path, baseq3_root)
+	except ValueError:
+		return _repo_relative(path)
+
+
 def _sha256_file(path: Path) -> str:
 	sha256 = hashlib.sha256()
 	with path.open("rb") as handle:
@@ -287,7 +294,7 @@ def _sha256_file(path: Path) -> str:
 
 def _record_file(path: Path, baseq3_root: Path) -> dict[str, object]:
 	return {
-		"path": _baseq3_relative(path, baseq3_root),
+		"path": _inventory_relative(path, baseq3_root),
 		"size": path.stat().st_size,
 		"sha256": _sha256_file(path),
 	}
@@ -346,9 +353,9 @@ def _map_required_staging_path_to_source(
 	if "source" in entry:
 		if suffix:
 			return None
-		return baseq3_root / _normalize_relpath(entry["source"]).split("assets/quakelive/baseq3/", 1)[-1]
+		return resolve_manifest_source_path(entry["source"], baseq3_root)
 
-	source_dir = baseq3_root / _normalize_relpath(entry["source_dir"]).split("assets/quakelive/baseq3/", 1)[-1]
+	source_dir = resolve_manifest_source_path(entry["source_dir"], baseq3_root)
 	return source_dir / suffix if suffix else source_dir
 
 
@@ -375,13 +382,13 @@ def _map_required_staging_glob_to_source(
 	suffix = normalized[len(destination) :].strip("/")
 
 	if "source" in entry:
-		source_path = baseq3_root / _normalize_relpath(entry["source"]).split("assets/quakelive/baseq3/", 1)[-1]
+		source_path = resolve_manifest_source_path(entry["source"], baseq3_root)
 		matches = [source_path] if source_path.is_file() and not suffix else []
-		return _baseq3_relative(source_path, baseq3_root), matches
+		return _inventory_relative(source_path, baseq3_root), matches
 
-	source_dir = baseq3_root / _normalize_relpath(entry["source_dir"]).split("assets/quakelive/baseq3/", 1)[-1]
+	source_dir = resolve_manifest_source_path(entry["source_dir"], baseq3_root)
 	matches = _collect_matching_files(source_dir, [suffix or "**/*"])
-	source_glob = _baseq3_relative(source_dir, baseq3_root)
+	source_glob = _inventory_relative(source_dir, baseq3_root)
 	if suffix:
 		source_glob = f"{source_glob}/{suffix}"
 	return source_glob, matches
@@ -430,7 +437,7 @@ def build_retail_ui_inventory(
 	for entry in entries:
 		if "source" in entry:
 			source_path = resolve_manifest_source_path(entry["source"], baseq3_root)
-			source_rel = _baseq3_relative(source_path, baseq3_root)
+			source_rel = _inventory_relative(source_path, baseq3_root)
 			exists = source_path.is_file()
 			expected_sources.append(
 				{
@@ -447,7 +454,7 @@ def build_retail_ui_inventory(
 			continue
 
 		source_dir = resolve_manifest_source_path(entry["source_dir"], baseq3_root)
-		source_dir_rel = _baseq3_relative(source_dir, baseq3_root)
+		source_dir_rel = _inventory_relative(source_dir, baseq3_root)
 		include_patterns = [_normalize_relpath(pattern) for pattern in entry.get("include", ["**/*"])]
 		matches = _collect_matching_files(source_dir, include_patterns)
 
@@ -470,12 +477,12 @@ def build_retail_ui_inventory(
 			continue
 
 		for match in matches:
-			inventory_files[_baseq3_relative(match, baseq3_root)] = _record_file(match, baseq3_root)
+			inventory_files[_inventory_relative(match, baseq3_root)] = _record_file(match, baseq3_root)
 
 	required_paths = []
 	for relative_path in audit.get("required_paths", []):
 		source_path = _map_required_staging_path_to_source(relative_path, entries, baseq3_root)
-		source_rel = _baseq3_relative(source_path, baseq3_root) if source_path is not None else None
+		source_rel = _inventory_relative(source_path, baseq3_root) if source_path is not None else None
 		exists = source_path.exists() if source_path is not None else False
 		required_paths.append(
 			{

@@ -61,8 +61,8 @@
         "windowed_sync_helper_present": true,
         "maximize_preservation_present": true,
         "loading_window_wrapper_present": true,
-        "runtime_window_capture_present": true,
-        "runtime_map_capture_present": true
+        "runtime_main_engine_capture_present": true,
+        "runtime_map_engine_capture_present": true
       }
     },
     "RG-G05": {
@@ -150,8 +150,10 @@
         "engine_vcxproj_has_freetype_toggle": true,
         "engine_vcxproj_has_validate_target": true,
         "build_script_has_freetype_toggle": true,
-        "build_script_has_freetype_include_override": true,
-        "build_script_has_freetype_lib_override": true,
+        "build_script_bootstraps_internal_codecs": true,
+        "renderer_vcxproj_has_vcpkg_probe": false,
+        "engine_vcxproj_has_vcpkg_probe": false,
+        "build_script_has_vcpkg_probe": false,
         "unix_makefile_has_freetype_toggle": true,
         "unix_makefile_uses_pkg_config_freetype": true,
         "unix_makefile_defines_build_freetype": true,

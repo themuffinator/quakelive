@@ -1,6 +1,5 @@
 {
-  "package": "pak_uiql.pk3",
-  "description": "Fonts and HUD/UI dependencies sourced from assets/quakelive/baseq3/fonts and bundled so FS_InitFilesystem can satisfy Quake Live font lookups.",
+  "description": "Retail Quake Live startup assets and UI dependencies sourced from baseq3 for validation and inventory without repackaging retail distributables.",
   "files": [
     {
       "source": "assets/quakelive/baseq3/default.cfg",
@@ -64,6 +63,11 @@
       "description": "Menu scripts and HUD definitions consumed by the native UI module"
     },
     {
+      "source": "src/ui/menudef.h",
+      "destination": "ui/menudef.h",
+      "description": "Runtime menu header required by retail Quake Live menu includes"
+    },
+    {
       "source_dir": "assets/quakelive/baseq3/ui/assets",
       "destination": "ui/assets",
       "include": ["**/*"],
@@ -102,6 +106,7 @@
       "scripts/ui.shader",
       "scripts/ui_hud.shader",
       "ui/main.menu",
+      "ui/menudef.h",
       "icons",
       "menu/icons",
       "levelshots"

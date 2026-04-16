@@ -57,6 +57,28 @@ static const char *Cvar_GetValidatedValueString( const cvar_t *var, const char *
 	}
 
 	numericValue = (float)atof( value );
+	if ( var->flags & CVAR_BOUNDED_DISCRETE ) {
+		if ( numericValue < var->min ) {
+			if ( var->minString && var->minString[0] ) {
+				return var->minString;
+			}
+
+			Com_sprintf( buffer, bufferSize, "%g", var->min );
+			return buffer;
+		}
+
+		if ( numericValue > var->min ) {
+			if ( var->maxString && var->maxString[0] ) {
+				return var->maxString;
+			}
+
+			Com_sprintf( buffer, bufferSize, "%g", var->max );
+			return buffer;
+		}
+
+		return value;
+	}
+
 	if ( numericValue < var->min ) {
 		if ( var->minString && var->minString[0] ) {
 			return var->minString;
@@ -466,6 +488,8 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 
 	if ( !force )
 	{
+		// Retail Quake Live only blocks ROM, INIT, LATCH, and CHEAT writes here.
+		// Higher metadata bits still remain console-writable.
 		if ( var->flags & CVAR_ROM )
 		{
 			Com_Printf ("%s is read only.\n", var_name);
@@ -475,18 +499,6 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		if ( var->flags & CVAR_INIT )
 		{
 			Com_Printf ("%s is write protected.\n", var_name);
-			return var;
-		}
-
-		if ( var->flags & CVAR_PROTECTED )
-		{
-			Com_Printf ("%s is protected and may only be set by the engine or VM.\n", var_name);
-			return var;
-		}
-
-		if ( var->flags & CVAR_VM_CREATED )
-		{
-			Com_Printf ("%s is protected and may only be set by the VM.\n", var_name);
 			return var;
 		}
 
@@ -713,7 +725,7 @@ void Cvar_Set_f( void ) {
 	combined[0] = 0;
 	l = 0;
 	for ( i = 2 ; i < c ; i++ ) {
-		len = strlen ( Cmd_Argv( i ) + 1 );
+		len = strlen( Cmd_Argv( i ) ) + 1;
 		if ( l + len >= MAX_STRING_TOKENS - 2 ) {
 			break;
 		}
@@ -813,7 +825,7 @@ void Cvar_SetCloud_f( void ) {
 	combined[0] = 0;
 	l = 0;
 	for ( i = 2 ; i < c ; i++ ) {
-		len = strlen ( Cmd_Argv( i ) + 1 );
+		len = strlen( Cmd_Argv( i ) ) + 1;
 		if ( l + len >= MAX_STRING_TOKENS - 2 ) {
 			break;
 		}

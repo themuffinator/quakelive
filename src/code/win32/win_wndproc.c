@@ -257,10 +257,13 @@ static void VID_AppActivate(BOOL fActive, BOOL minimize)
 	// minimize/restore mouse-capture on demand
 	if (!g_wv.activeApp )
 	{
+		CL_WebHost_NotifyAppActivation( qfalse );
 		IN_Activate (qfalse);
 	}
 	else
 	{
+		SetFocus( g_wv.hWnd );
+		CL_WebHost_NotifyAppActivation( qtrue );
 		IN_Activate (qtrue);
 	}
 }
@@ -414,6 +417,18 @@ LONG WINAPI MainWndProc (
 
 	switch (uMsg)
 	{
+	case WM_SETCURSOR:
+		if ( LOWORD( lParam ) == HTCLIENT ) {
+			HCURSOR browserCursor;
+
+			browserCursor = (HCURSOR)CL_WebHost_GetCursorHandle();
+			if ( browserCursor ) {
+				SetCursor( browserCursor );
+				return TRUE;
+			}
+		}
+		break;
+
 	case WM_INPUT:
 		IN_RawInputEvent( wParam, lParam );
 		return DefWindowProcW( hWnd, uMsg, wParam, lParam );

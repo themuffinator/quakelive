@@ -858,7 +858,7 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 													=============
 													SV_FactoryLoadSupplementalFiles
 
-													Loads optional *.factories files from the scripts directory.
+													Loads optional *.factories or *.factory files from the scripts directory.
 													=============
 													*/
 													static void SV_FactoryLoadSupplementalFiles( void ) {
@@ -868,6 +868,9 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 														int index;
 
 														count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
+														if ( count <= 0 ) {
+															count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );
+														}
 														cursor = fileList;
 														for ( index = 0; index < count; index++ ) {
 															int length = strlen( cursor );
@@ -1525,7 +1528,7 @@ static void SV_MapRestart_f( void ) {
 
 	// check for changes in variables that can't just be restarted
 	// check for maxclients change
-	if ( sv_maxclients->modified || sv_gametype->modified ) {
+	if ( sv_maxclients->modified || sv_gametype->modified || ( sv_ammoPack && sv_ammoPack->modified ) ) {
 		char	mapname[MAX_QPATH];
 
 		Com_Printf( "variable change -- restarting.\n" );

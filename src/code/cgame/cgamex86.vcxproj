@@ -64,7 +64,7 @@
     <QLEnableOgg Condition="'$(QLEnableOgg)'==''">1</QLEnableOgg>
   </PropertyGroup>
   <PropertyGroup Label="VorbisSdk">
-    <VorbisSdkDir Condition="'$(VorbisSdkDir)'==''">$(ProjectDir)..\..\libs\vorbis</VorbisSdkDir>
+    <VorbisSdkDir>$(ProjectDir)..\..\libs\vorbis</VorbisSdkDir>
     <VorbisIncludeDir Condition="'$(QLEnableOgg)'!='0'">$(VorbisSdkDir)\include</VorbisIncludeDir>
     <VorbisIncludeDir Condition="'$(QLEnableOgg)'=='0'"></VorbisIncludeDir>
     <VorbisLibDir Condition="'$(QLEnableOgg)'!='0'">$(VorbisSdkDir)\lib\Win32</VorbisLibDir>
@@ -102,11 +102,11 @@
     </Link>
   </ItemDefinitionGroup>
   <Target Name="ValidateVorbis" BeforeTargets="ClCompile" Condition="'$(QLEnableOgg)'=='1'">
-    <Error Condition="!Exists('$(VorbisIncludeDir)')" Text="Vorbis SDK include path '$(VorbisIncludeDir)' was not found. Either install the SDK, override VorbisSdkDir, or set QLEnableOgg=0." />
-    <Error Condition="!Exists('$(VorbisIncludeDir)\\vorbis\\vorbisfile.h')" Text="Vorbis headers missing under $(VorbisIncludeDir). Install libvorbis/libogg development headers or set QLEnableOgg=0." />
-    <Error Condition="!Exists('$(VorbisLibDir)')" Text="Vorbis SDK library path '$(VorbisLibDir)' was not found. Install the codec SDK or set QLEnableOgg=0." />
-    <Error Condition="!Exists('$(VorbisLibDir)\\vorbisfile.lib') or !Exists('$(VorbisLibDir)\\vorbis.lib') or !Exists('$(VorbisLibDir)\\ogg.lib')" Text="Vorbis support enabled but vorbisfile.lib/vorbis.lib/ogg.lib were not found in $(VorbisLibDir). Provide the SDK import libraries or build with QLEnableOgg=0." />
-    <Message Text="cgame OGG support enabled (include: $(VorbisIncludeDir), lib: $(VorbisLibDir))" Importance="High" />
+    <Error Condition="!Exists('$(VorbisIncludeDir)')" Text="Repo-managed Vorbis include path '$(VorbisIncludeDir)' was not found. Bootstrap the internal codec dependencies or set QLEnableOgg=0." />
+    <Error Condition="!Exists('$(VorbisIncludeDir)\\vorbis\\vorbisfile.h')" Text="Repo-managed Vorbis headers are missing under $(VorbisIncludeDir). Bootstrap the internal codec dependencies or set QLEnableOgg=0." />
+    <Error Condition="!Exists('$(VorbisLibDir)')" Text="Repo-managed Vorbis library path '$(VorbisLibDir)' was not found. Bootstrap the internal codec dependencies or set QLEnableOgg=0." />
+    <Error Condition="!Exists('$(VorbisLibDir)\\vorbisfile.lib') or !Exists('$(VorbisLibDir)\\vorbis.lib') or !Exists('$(VorbisLibDir)\\ogg.lib')" Text="Vorbis support enabled but repo-managed vorbisfile.lib/vorbis.lib/ogg.lib were not found in $(VorbisLibDir). Bootstrap the internal codec dependencies or build with QLEnableOgg=0." />
+    <Message Text="cgame OGG support enabled from repo-managed libs (include: $(VorbisIncludeDir), lib: $(VorbisLibDir))" Importance="High" />
   </Target>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release TA|Win32'">
     <ClCompile>
@@ -624,6 +624,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug TA|Win32'">true</ExcludedFromBuild>
     </CustomBuild>
   </ItemGroup>
+  <Import Project="$(MSBuildThisFileDirectory)..\quakelive.internal-deps.targets" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

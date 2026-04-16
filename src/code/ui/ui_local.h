@@ -230,11 +230,11 @@ extern vmCvar_t	ui_scoreTime2;
 extern vmCvar_t	ui_smallFont;
 extern vmCvar_t	ui_bigFont;
 extern vmCvar_t	ui_bloomPreset;
-extern vmCvar_t	ui_enemyModel;
-extern vmCvar_t	ui_enemyModelBright;
+extern vmCvar_t	ui_forceEnemyModel;
+extern vmCvar_t	ui_forceEnemyModelBright;
 extern vmCvar_t	ui_forceEnemySkin;
-extern vmCvar_t	ui_teamModel;
-extern vmCvar_t	ui_teamModelBright;
+extern vmCvar_t	ui_forceTeamModel;
+extern vmCvar_t	ui_forceTeamModelBright;
 extern vmCvar_t	ui_forceTeamSkin;
 extern vmCvar_t	ui_enemyHeadColor;
 extern vmCvar_t	ui_enemyLowerColor;
@@ -728,6 +728,13 @@ typedef struct {
 	int				barrelTime;
 
 	int				realWeapon;
+
+	vec3_t			headColor;
+	vec3_t			upperColor;
+	vec3_t			lowerColor;
+	qboolean		headColorForced;
+	qboolean		upperColorForced;
+	qboolean		lowerColorForced;
 } playerInfo_t;
 
 void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int time );

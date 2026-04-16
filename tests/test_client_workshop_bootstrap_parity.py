@@ -35,6 +35,12 @@ def test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owner
     frame_block = _extract_function_block(cl_main, "void CL_Frame ( int msec ) {")
     workshop_frame_block = _extract_function_block(cl_main, "static void CL_Workshop_Frame( void ) {")
     workshop_begin_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_BeginBootstrap( void ) {")
+    callback_init_block = _extract_function_block(cl_main, "static void CL_Steam_InitCallbacks( void ) {")
+    callback_shutdown_block = _extract_function_block(cl_main, "static void CL_Steam_ShutdownCallbacks( void ) {")
+    item_installed_block = _extract_function_block(cl_main, "static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_item_installed_t *event ) {")
+    download_result_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_steam_download_item_result_t *event ) {"
+    )
 
     assert "#define CL_STEAM_WORKSHOP_ITEMS_CONFIGSTRING 0x2cb" in cl_main
     assert "Server requires the following workshop items: %s\\n" in workshop_begin_block
@@ -48,6 +54,14 @@ def test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owner
     assert "FS_Restart( clc.checksumFeed );" in workshop_frame_block
     assert "FS_ComparePaks( missingfiles, sizeof( missingfiles ), qfalse )" in workshop_frame_block
     assert "CL_DownloadsComplete();" in workshop_frame_block
+    assert "QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings )" in callback_init_block
+    assert "Steam workshop callbacks unavailable; keeping polling fallback\\n" in callback_init_block
+    assert "QL_Steamworks_UnregisterWorkshopCallbacks();" in callback_shutdown_block
+    assert "OnItemInstalled skip, invalid app id %d\\n" in item_installed_block
+    assert "CL_Workshop_FinalizeInstalledItem( itemIndex );" in item_installed_block
+    assert "OnDownloadItemResult skip, invalid app id %d\\n" in download_result_block
+    assert "OnDownloadItemResult skip, not the active download %llu\\n" in download_result_block
+    assert "CL_Workshop_FailActiveDownload( event->result );" in download_result_block
 
 
 def test_client_workshop_progress_owner_is_exposed_for_ui_imports() -> None:

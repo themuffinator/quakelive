@@ -16,6 +16,7 @@ typedef struct {
 } clTranslatedKey_t;
 
 clTranslatedKey_t CL_TranslateRetailKeycode( int key );
+int CL_EncodeUtf8Codepoint( int codepoint, char *buffer, int bufferSize );
 int CL_TranslateRetailMouseDelta( int delta, float cpiValue );
 
 #endif

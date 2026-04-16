@@ -60,7 +60,6 @@ if (-not $steamBasePath) {
 }
 $steamBasePath = [System.IO.Path]::GetFullPath($steamBasePath)
 $retailPakPath = Join-Path $steamBasePath 'baseq3\pak00.pk3'
-$assetCdPath = Join-Path $repoRoot 'assets\quakelive'
 
 if (-not (Test-Path $steamBasePath -PathType Container)) {
 	throw "Quake Live base path was not found: $steamBasePath. Update .vscode\\launch.json or set QLR_STEAM_BASEPATH."
@@ -70,10 +69,102 @@ if (-not (Test-Path $retailPakPath -PathType Leaf)) {
 	throw "Quake Live base path is missing retail data: $retailPakPath. Point the launcher at the Steam install root that contains baseq3\\pak00.pk3."
 }
 
-$workingDirectory = $steamBasePath
+$retailUiBundleRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'build\ui_bundle\staging'))
+$retailUiBundleBaseq3 = Join-Path $retailUiBundleRoot 'baseq3'
+foreach ($requiredRetailUiPath in @(
+	$retailUiBundleBaseq3,
+	(Join-Path $retailUiBundleBaseq3 'default.cfg'),
+	(Join-Path $retailUiBundleBaseq3 'ui\menudef.h'),
+	(Join-Path $retailUiBundleBaseq3 'ui\hud3.txt'),
+	(Join-Path $retailUiBundleBaseq3 'ui\ingame_scoreboard_ffa.menu'),
+	(Join-Path $retailUiBundleBaseq3 'ui\assets\button_back.png'),
+	(Join-Path $retailUiBundleBaseq3 'ui\assets\hud\ffa.png'),
+	(Join-Path $retailUiBundleBaseq3 'ui\assets\score\scoretl.png'),
+	(Join-Path $retailUiBundleBaseq3 'fonts\font.dat'),
+	(Join-Path $retailUiBundleBaseq3 'fonts\font.tga')
+)) {
+	if (-not (Test-Path -LiteralPath $requiredRetailUiPath)) {
+		throw "Quake Live UI staging content was not found: $requiredRetailUiPath. Run tools/build_ui_bundle.py before launching so the retail HUD, scoreboard, and loading assets are mounted under staging\\baseq3."
+	}
+}
+
+$workingDirectory = $runtimeBinDir
 $steamBasePathArg = Get-LaunchSafeArgument -Path $steamBasePath
+$retailUiBundleRootArg = Get-LaunchSafeArgument -Path $retailUiBundleRoot
 $runtimeBinDirArg = Get-LaunchSafeArgument -Path $runtimeBinDir
-$assetCdPathArg = Get-LaunchSafeArgument -Path $assetCdPath
+$runtimeBaseq3 = Join-Path $runtimeBinDir 'baseq3'
+$runtimeModulesDir = Join-Path $repoRoot "build\win32\$Configuration\modules"
+
+function Sync-LaunchModuleArtifact {
+	param(
+		[string]$ModuleName
+	)
+
+	$moduleDir = Join-Path $runtimeModulesDir $ModuleName
+	if (-not (Test-Path -LiteralPath $moduleDir)) {
+		return
+	}
+
+	foreach ($artifact in @('dll', 'pdb', 'map', 'bsc')) {
+		$sourcePath = Join-Path $moduleDir "$ModuleName.$artifact"
+		if (-not (Test-Path -LiteralPath $sourcePath)) {
+			continue
+		}
+
+		$destinationPath = Join-Path $runtimeBaseq3 "$ModuleName.$artifact"
+		$shouldCopy = $true
+		if (Test-Path -LiteralPath $destinationPath) {
+			$sourceInfo = Get-Item -LiteralPath $sourcePath
+			$destinationInfo = Get-Item -LiteralPath $destinationPath
+			$shouldCopy = $sourceInfo.LastWriteTimeUtc -gt $destinationInfo.LastWriteTimeUtc -or
+				$sourceInfo.Length -ne $destinationInfo.Length
+		}
+
+		if ($shouldCopy) {
+			Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+		}
+	}
+}
+
+function Sync-RuntimeUiPackages {
+	param(
+		[string]$RuntimeBaseq3Dir
+	)
+
+	$uiBundleBuilder = Join-Path $repoRoot 'tools\build_ui_bundle.py'
+	$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+	if (-not $pythonCmd) {
+		$pythonCmd = Get-Command py -ErrorAction SilentlyContinue
+	}
+
+	if (-not $pythonCmd) {
+		Write-Warning "Python was not found; skipping runtime UI PK3 refresh. Existing pak_uiql.pk3 artifacts will be reused if present."
+		return
+	}
+
+	$pythonArgs = @(
+		$uiBundleBuilder,
+		'--runtime-root',
+		$RuntimeBaseq3Dir
+	)
+	if ($pythonCmd.Name -ieq 'py.exe' -or $pythonCmd.Name -ieq 'py') {
+		$pythonArgs = @('-3') + $pythonArgs
+	}
+
+	& $pythonCmd.Source @pythonArgs
+	if ($LASTEXITCODE -ne 0) {
+		throw "tools/build_ui_bundle.py failed while refreshing runtime UI packages."
+	}
+}
+
+if (-not (Test-Path -LiteralPath $runtimeBaseq3)) {
+	New-Item -ItemType Directory -Path $runtimeBaseq3 | Out-Null
+}
+
+Sync-RuntimeUiPackages -RuntimeBaseq3Dir $runtimeBaseq3
+
+Sync-LaunchModuleArtifact -ModuleName 'cgamex86'
+Sync-LaunchModuleArtifact -ModuleName 'qagamex86'
 
 $arguments = @(
 	'+set', 'developer', '1',
@@ -81,8 +172,8 @@ $arguments = @(
 	'+set', 'g_logfile', '1',
 	'+set', 'com_noErrorInterrupt', '1',
 	'+set', 'fs_basepath', $steamBasePathArg,
+	'+set', 'fs_cdpath', $retailUiBundleRootArg,
 	'+set', 'fs_homepath', $runtimeBinDirArg,
-	'+set', 'fs_cdpath', $assetCdPathArg,
 	'+set', 'r_fullscreen', '0',
 	'+set', 'r_ext_multitexture', '0'
 )
@@ -114,6 +205,8 @@ if ($EnableAwesomium) {
 
 Write-Host "Launching: $program"
 Write-Host "Working directory: $workingDirectory"
+Write-Host "Retail base path: $steamBasePath"
+Write-Host "UI content root: $retailUiBundleRoot"
 Write-Host "Awesomium enabled: $EnableAwesomium"
 $commandLine = ($arguments | ForEach-Object { Format-LaunchArgument $_ }) -join ' '
 Write-Host "Arguments: $commandLine"

@@ -26,7 +26,9 @@ void S_Shutdown( void );
 
 // if origin is NULL, the sound will be dynamically sourced from the entity
 void S_StartSound( vec3_t origin, int entnum, int entchannel, sfxHandle_t sfx );
+void S_StartSoundVolume( vec3_t origin, int entnum, int entchannel, sfxHandle_t sfx, float volume );
 void S_StartLocalSound( sfxHandle_t sfx, int channelNum );
+void S_StartLocalSoundVolume( sfxHandle_t sfx, int channelNum, float volume );
 
 void S_StartBackgroundTrack( const char *intro, const char *loop );
 void S_StopBackgroundTrack( void );
@@ -66,6 +68,7 @@ sfxHandle_t	S_RegisterSound( const char *sample, qboolean compressed );
 void S_DisplayFreeMemory(void);
 
 void S_ClearSoundBuffer( void );
+void S_AddVoiceSamples( int clientNum, int samples, const short *data );
 
 void SNDDMA_Activate( void );
 

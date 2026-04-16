@@ -49,6 +49,69 @@ clTranslatedKey_t CL_TranslateRetailKeycode( int key ) {
 
 /*
 =============
+CL_EncodeUtf8Codepoint
+
+Encode a single Unicode codepoint into the same UTF-8 byte
+sequence that retail Quake Live's WM_CHAR path feeds into the
+field and UI handlers after WideCharToMultiByte.
+=============
+*/
+int CL_EncodeUtf8Codepoint( int codepoint, char *buffer, int bufferSize ) {
+	if ( !buffer || bufferSize <= 0 ) {
+		return 0;
+	}
+
+	if ( codepoint < 0 || codepoint > 0x10FFFF ) {
+		return 0;
+	}
+
+	if ( codepoint >= 0xD800 && codepoint <= 0xDFFF ) {
+		return 0;
+	}
+
+	if ( codepoint <= 0x7F ) {
+		if ( bufferSize < 1 ) {
+			return 0;
+		}
+
+		buffer[0] = (char)codepoint;
+		return 1;
+	}
+
+	if ( codepoint <= 0x7FF ) {
+		if ( bufferSize < 2 ) {
+			return 0;
+		}
+
+		buffer[0] = (char)( 0xC0 | ( codepoint >> 6 ) );
+		buffer[1] = (char)( 0x80 | ( codepoint & 0x3F ) );
+		return 2;
+	}
+
+	if ( codepoint <= 0xFFFF ) {
+		if ( bufferSize < 3 ) {
+			return 0;
+		}
+
+		buffer[0] = (char)( 0xE0 | ( codepoint >> 12 ) );
+		buffer[1] = (char)( 0x80 | ( ( codepoint >> 6 ) & 0x3F ) );
+		buffer[2] = (char)( 0x80 | ( codepoint & 0x3F ) );
+		return 3;
+	}
+
+	if ( bufferSize < 4 ) {
+		return 0;
+	}
+
+	buffer[0] = (char)( 0xF0 | ( codepoint >> 18 ) );
+	buffer[1] = (char)( 0x80 | ( ( codepoint >> 12 ) & 0x3F ) );
+	buffer[2] = (char)( 0x80 | ( ( codepoint >> 6 ) & 0x3F ) );
+	buffer[3] = (char)( 0x80 | ( codepoint & 0x3F ) );
+	return 4;
+}
+
+/*
+=============
 CL_TranslateRetailMouseDelta
 
 Scale a single mouse delta using the retail CPI-derived conversion

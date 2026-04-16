@@ -280,6 +280,7 @@ extern	cvar_t	*sv_mapPoolFile;
 extern	cvar_t	*sv_includeCurrentMapInVote;
 extern	cvar_t	*sv_gtid;
 extern	cvar_t	*sv_serverType;
+extern	cvar_t	*sv_ammoPack;
 extern	cvar_t	*sv_idleRestart;
 extern	cvar_t	*sv_idleExit;
 extern	cvar_t	*sv_errorExit;

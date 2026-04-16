@@ -78,19 +78,22 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros">
-    <QLEnablePng Condition="'$(QLEnablePng)'==''">1</QLEnablePng>
+    <QLEnablePng Condition="'$(QLEnablePng)'=='' and Exists('$(ProjectDir)..\..\libs\libpng\include\png.h')">1</QLEnablePng>
+    <QLEnablePng Condition="'$(QLEnablePng)'==''">0</QLEnablePng>
+    <QLEnableFreeType Condition="'$(QLEnableFreeType)'=='' and Exists('$(ProjectDir)..\..\libs\freetype\include\ft2build.h') and (Exists('$(ProjectDir)..\..\libs\freetype\lib\Win32\freetype.lib') or Exists('$(ProjectDir)..\..\libs\freetype\lib\Win32\libfreetype.lib') or Exists('$(ProjectDir)..\..\libs\freetype\lib\freetype.lib') or Exists('$(ProjectDir)..\..\libs\freetype\lib\libfreetype.lib'))">1</QLEnableFreeType>
     <QLEnableFreeType Condition="'$(QLEnableFreeType)'==''">0</QLEnableFreeType>
   </PropertyGroup>
   <PropertyGroup Label="PngSdk">
-    <PngSdkDir Condition="'$(PngSdkDir)'==''">$(ProjectDir)..\..\libs\libpng</PngSdkDir>
+    <PngSdkDir>$(ProjectDir)..\..\libs\libpng</PngSdkDir>
     <PngIncludeDir Condition="'$(QLEnablePng)'!='0'">$(PngSdkDir)\include</PngIncludeDir>
     <PngIncludeDir Condition="'$(QLEnablePng)'=='0'"></PngIncludeDir>
   </PropertyGroup>
   <PropertyGroup Label="FreeTypeSdk">
-    <FreeTypeSdkDir Condition="'$(FreeTypeSdkDir)'==''">$(ProjectDir)..\..\libs\freetype</FreeTypeSdkDir>
+    <FreeTypeSdkDir>$(ProjectDir)..\..\libs\freetype</FreeTypeSdkDir>
     <FreeTypeIncludeDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeIncludeDir)'==''">$(FreeTypeSdkDir)\include</FreeTypeIncludeDir>
     <FreeTypeIncludeDir Condition="'$(QLEnableFreeType)'=='0' and '$(FreeTypeIncludeDir)'==''"></FreeTypeIncludeDir>
-    <FreeTypeLibDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeLibDir)'==''">$(FreeTypeSdkDir)\lib\Win32</FreeTypeLibDir>
+    <FreeTypeLibDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeLibDir)'=='' and Exists('$(FreeTypeSdkDir)\lib\Win32')">$(FreeTypeSdkDir)\lib\Win32</FreeTypeLibDir>
+    <FreeTypeLibDir Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeLibDir)'==''">$(FreeTypeSdkDir)\lib</FreeTypeLibDir>
     <FreeTypeLibDir Condition="'$(QLEnableFreeType)'=='0' and '$(FreeTypeLibDir)'==''"></FreeTypeLibDir>
     <FreeTypeLibFileName Condition="'$(QLEnableFreeType)'!='0' and Exists('$(FreeTypeLibDir)\freetype.lib')">freetype.lib</FreeTypeLibFileName>
     <FreeTypeLibFileName Condition="'$(QLEnableFreeType)'!='0' and '$(FreeTypeLibFileName)'=='' and Exists('$(FreeTypeLibDir)\libfreetype.lib')">libfreetype.lib</FreeTypeLibFileName>
@@ -133,16 +136,16 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <Target Name="ValidatePng" BeforeTargets="ClCompile" Condition="'$(QLEnablePng)'=='1'">
-    <Error Condition="!Exists('$(PngIncludeDir)')" Text="PNG SDK include path '$(PngIncludeDir)' was not found. Either install libpng, override PngSdkDir, or set QLEnablePng=0." />
-    <Error Condition="!Exists('$(PngIncludeDir)\\png.h')" Text="libpng headers missing under $(PngIncludeDir). Install libpng development headers or set QLEnablePng=0." />
-    <Message Text="Renderer PNG support enabled (include: $(PngIncludeDir))" Importance="High" />
+    <Error Condition="!Exists('$(PngIncludeDir)')" Text="Repo-managed PNG include path '$(PngIncludeDir)' was not found. Bootstrap the internal codec dependencies or set QLEnablePng=0." />
+    <Error Condition="!Exists('$(PngIncludeDir)\\png.h')" Text="Repo-managed libpng headers are missing under $(PngIncludeDir). Bootstrap the internal codec dependencies or set QLEnablePng=0." />
+    <Message Text="Renderer PNG support enabled from repo-managed libs (include: $(PngIncludeDir))" Importance="High" />
   </Target>
   <Target Name="ValidateFreeType" BeforeTargets="ClCompile" Condition="'$(QLEnableFreeType)'=='1'">
-    <Error Condition="!Exists('$(FreeTypeIncludeDir)')" Text="FreeType SDK include path '$(FreeTypeIncludeDir)' was not found. Either install FreeType, override FreeTypeSdkDir, or set QLEnableFreeType=0." />
-    <Error Condition="!Exists('$(FreeTypeIncludeDir)\\ft2build.h')" Text="FreeType headers missing under $(FreeTypeIncludeDir). Install FreeType development headers or set QLEnableFreeType=0." />
-    <Error Condition="!Exists('$(FreeTypeLibDir)')" Text="FreeType SDK library path '$(FreeTypeLibDir)' was not found. Install FreeType import libraries, override FreeTypeSdkDir, or set QLEnableFreeType=0." />
-    <Error Condition="'$(FreeTypeLibFileName)'==''" Text="FreeType support enabled but neither freetype.lib nor libfreetype.lib was found in $(FreeTypeLibDir). Provide the import library or set QLEnableFreeType=0." />
-    <Message Text="Renderer FreeType support enabled (include: $(FreeTypeIncludeDir), lib: $(FreeTypeLibDir)\\$(FreeTypeLibFileName))" Importance="High" />
+    <Error Condition="!Exists('$(FreeTypeIncludeDir)')" Text="Repo-managed FreeType include path '$(FreeTypeIncludeDir)' was not found. Provide an in-repo FreeType tree or set QLEnableFreeType=0." />
+    <Error Condition="!Exists('$(FreeTypeIncludeDir)\\ft2build.h')" Text="Repo-managed FreeType headers are missing under $(FreeTypeIncludeDir). Provide an in-repo FreeType tree or set QLEnableFreeType=0." />
+    <Error Condition="!Exists('$(FreeTypeLibDir)')" Text="Repo-managed FreeType library path '$(FreeTypeLibDir)' was not found. Provide an in-repo FreeType tree or set QLEnableFreeType=0." />
+    <Error Condition="'$(FreeTypeLibFileName)'==''" Text="FreeType support enabled but neither freetype.lib nor libfreetype.lib was found in $(FreeTypeLibDir). Provide an in-repo FreeType build or set QLEnableFreeType=0." />
+    <Message Text="Renderer FreeType support enabled from repo-managed libs (include: $(FreeTypeIncludeDir), lib: $(FreeTypeLibDir)\\$(FreeTypeLibFileName))" Importance="High" />
   </Target>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug TA|Win32'">
     <ClCompile>
@@ -981,6 +984,7 @@
     <ClInclude Include="tr_local.h" />
     <ClInclude Include="tr_public.h" />
   </ItemGroup>
+  <Import Project="$(MSBuildThisFileDirectory)..\quakelive.internal-deps.targets" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -64,6 +64,13 @@ def _read_json(path: Path) -> dict[str, Any]:
 	return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _home_ui_search_path_is_clean(main_menu: dict[str, Any]) -> bool:
+	if "search_path_contains_home_duplicate_ui_pk3" in main_menu:
+		return main_menu["search_path_contains_home_duplicate_ui_pk3"] is False
+
+	return main_menu.get("search_path_contains_home_overlay") is True
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
 	path.parent.mkdir(parents=True, exist_ok=True)
 	path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -118,7 +125,7 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 		and main_menu["execed_repconfig"] is True
 		and main_menu["current_search_path"]
 		and main_menu["search_path_contains_homepath_root"] is True
-		and main_menu["search_path_contains_home_overlay"] is True
+		and _home_ui_search_path_is_clean(main_menu)
 		and main_menu["search_path_contains_retail_pak00"] is True
 		and service_disabled_policy["steam_resource_bridge_disabled"] is True
 		and service_disabled_policy["show_browser_ignored"] is True
@@ -564,7 +571,7 @@ def test_qcommon_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	assert runtime_evidence["main_menu"]["execed_qzconfig"] is True
 	assert runtime_evidence["main_menu"]["execed_repconfig"] is True
 	assert runtime_evidence["main_menu"]["search_path_contains_homepath_root"] is True
-	assert runtime_evidence["main_menu"]["search_path_contains_home_overlay"] is True
+	assert _home_ui_search_path_is_clean(runtime_evidence["main_menu"])
 	assert runtime_evidence["main_menu"]["search_path_contains_retail_pak00"] is True
 	assert runtime_evidence["main_menu"]["service_disabled_policy"]["steam_resource_bridge_disabled"] is True
 	assert runtime_evidence["main_menu"]["ui_dll_load_roots"]["repo_root_failed"] is True

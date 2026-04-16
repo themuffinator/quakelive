@@ -1,10 +1,9 @@
 {
-  "bundle": "build/ui_bundle/pak_uiql.pk3",
-  "homepath": "build/ui_validation/home",
+  "baseq3_root": "E:/Repositories/QuakeLive-reverse/build/ui_retail_corpus_cache/baseq3",
   "panels": {
     "hud.txt": {
       "fonts": [],
-      "lineCount": 13
+      "lineCount": 6
     },
     "hud2.txt": {
       "fonts": [],
@@ -69,7 +68,7 @@
           2208,
           1839
         ],
-        "source": "assets/quakelive/baseq3/fonts/handelgothic.ttf",
+        "source": "build/ui_retail_corpus_cache/baseq3/fonts/handelgothic.ttf",
         "atlasSize": [
           1,
           1
@@ -89,7 +88,7 @@
           2208,
           1839
         ],
-        "source": "assets/quakelive/baseq3/fonts/handelgothic.ttf",
+        "source": "build/ui_retail_corpus_cache/baseq3/fonts/handelgothic.ttf",
         "atlasSize": [
           1,
           1
@@ -109,7 +108,7 @@
           2706,
           2146
         ],
-        "source": "assets/quakelive/baseq3/fonts/notosans-regular.ttf",
+        "source": "build/ui_retail_corpus_cache/baseq3/fonts/notosans-regular.ttf",
         "atlasSize": [
           1,
           1
@@ -129,7 +128,7 @@
           1315,
           2163
         ],
-        "source": "assets/quakelive/baseq3/fonts/droidsansmono.ttf",
+        "source": "build/ui_retail_corpus_cache/baseq3/fonts/droidsansmono.ttf",
         "atlasSize": [
           1,
           1

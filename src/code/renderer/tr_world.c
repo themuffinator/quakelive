@@ -338,6 +338,159 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 	}
 }
 
+/*
+=================
+R_CullAdvertisementQuad
+=================
+*/
+static int R_CullAdvertisementQuad( const qlAdvertisement_t *advertisement ) {
+	cplane_t	*frust;
+	float		dist;
+	int			anyBack;
+	int			front;
+	int			back;
+	int			i;
+	int			j;
+
+	if ( r_nocull->integer ) {
+		return CULL_CLIP;
+	}
+
+	anyBack = 0;
+	for ( i = 0 ; i < 4 ; i++ ) {
+		frust = &tr.viewParms.frustum[i];
+		front = 0;
+		back = 0;
+
+		for ( j = 0 ; j < 4 ; j++ ) {
+			dist = DotProduct( advertisement->points[j], frust->normal ) - frust->dist;
+			if ( dist > 0.0f ) {
+				front = 1;
+				if ( back ) {
+					break;
+				}
+			} else {
+				back = 1;
+			}
+		}
+
+		if ( !front ) {
+			return CULL_OUT;
+		}
+
+		anyBack |= back;
+	}
+
+	if ( !anyBack ) {
+		return CULL_IN;
+	}
+
+	return CULL_CLIP;
+}
+
+/*
+=================
+R_AddAdvertisementSurfaces
+=================
+*/
+static void R_AddAdvertisementSurfaces( void ) {
+	qlAdvertisement_t	*advertisement;
+	bmodel_t			*bmodel;
+	vec3_t				viewDelta;
+	int					i;
+
+	if ( !tr.world || tr.world->numAdvertisements <= 0 ) {
+		return;
+	}
+
+	tr.currentEntity = &tr.worldEntity;
+
+	for ( i = 0 ; i < tr.world->numAdvertisements ; i++ ) {
+		advertisement = &tr.world->advertisements[i];
+		bmodel = advertisement->bmodel;
+		if ( !bmodel ) {
+			continue;
+		}
+
+		VectorSubtract( tr.refdef.vieworg, advertisement->center, viewDelta );
+		if ( DotProduct( advertisement->normal, viewDelta ) <= 0.0f ) {
+			continue;
+		}
+
+		if ( R_CullAdvertisementQuad( advertisement ) == CULL_OUT ) {
+			continue;
+		}
+
+		R_DlightBmodel( bmodel );
+		R_AddWorldSurface( bmodel->firstSurface, tr.currentEntity->needDlights );
+	}
+}
+
+/*
+=================
+R_AdvertisementList_f
+=================
+*/
+void R_AdvertisementList_f( void ) {
+	qlAdvertisement_t	*advertisement;
+	bmodel_t			*bmodel;
+	msurface_t			*surface;
+	const char			*shaderName;
+	int					bmodelIndex;
+	int					i;
+
+	if ( !tr.world ) {
+		ri.Printf( PRINT_ALL, "advertlist: no world model loaded\n" );
+		return;
+	}
+
+	if ( tr.world->numAdvertisements <= 0 ) {
+		ri.Printf( PRINT_ALL, "advertlist: world=%s loaded=0\n", tr.world->name );
+		return;
+	}
+
+	ri.Printf( PRINT_ALL, "advertlist: world=%s loaded=%d\n",
+		tr.world->name,
+		tr.world->numAdvertisements );
+
+	for ( i = 0 ; i < tr.world->numAdvertisements ; i++ ) {
+		advertisement = &tr.world->advertisements[i];
+		bmodel = advertisement->bmodel;
+		surface = ( bmodel && bmodel->numSurfaces > 0 ) ? bmodel->firstSurface : NULL;
+		shaderName = ( surface && surface->shader && surface->shader->name[0] ) ? surface->shader->name : "<null>";
+		bmodelIndex = bmodel ? (int)( bmodel - tr.world->bmodels ) : -1;
+
+		ri.Printf( PRINT_ALL,
+			"advertlist: [%d] cellId=%d sourceIndex=%d model=*%d surfaces=%d shader=%s center=(%.1f %.1f %.1f) normal=(%.3f %.3f %.3f)\n",
+			i,
+			advertisement->cellId,
+			advertisement->sourceIndex,
+			bmodelIndex,
+			bmodel ? bmodel->numSurfaces : 0,
+			shaderName,
+			advertisement->center[0],
+			advertisement->center[1],
+			advertisement->center[2],
+			advertisement->normal[0],
+			advertisement->normal[1],
+			advertisement->normal[2] );
+		ri.Printf( PRINT_ALL,
+			"advertlist:      points=(%.1f %.1f %.1f) (%.1f %.1f %.1f) (%.1f %.1f %.1f) (%.1f %.1f %.1f)\n",
+			advertisement->points[0][0],
+			advertisement->points[0][1],
+			advertisement->points[0][2],
+			advertisement->points[1][0],
+			advertisement->points[1][1],
+			advertisement->points[1][2],
+			advertisement->points[2][0],
+			advertisement->points[2][1],
+			advertisement->points[2][2],
+			advertisement->points[3][0],
+			advertisement->points[3][1],
+			advertisement->points[3][2] );
+	}
+}
+
 
 /*
 =============================================================
@@ -652,6 +805,7 @@ void R_AddWorldSurfaces (void) {
 	}
 
 	tr.currentEntityNum = ENTITYNUM_WORLD;
+	tr.currentEntity = &tr.worldEntity;
 	tr.shiftedEntityNum = tr.currentEntityNum << QSORT_ENTITYNUM_SHIFT;
 
 	// determine which leaves are in the PVS / areamask
@@ -665,4 +819,5 @@ void R_AddWorldSurfaces (void) {
 		tr.refdef.num_dlights = 32 ;
 	}
 	R_RecursiveWorldNode( tr.world->nodes, 15, ( 1 << tr.refdef.num_dlights ) - 1 );
+	R_AddAdvertisementSurfaces();
 }

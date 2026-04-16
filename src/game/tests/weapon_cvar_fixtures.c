@@ -24,7 +24,7 @@ HLIL defaults referenced by these fixtures
 The Quake Live HLIL listings pin the following gameplay baselines:
 - g_powerupRespawn = 120 seconds.
 - g_respawn_delay_min = 500 ms while g_respawn_delay_max = 3500 ms.
-- g_regenHealthRate = 133 milliseconds per health point.
+- g_regenHealthRate defaults to 100 milliseconds per health point.
 =================
 */
 

@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 botlib_export_t	*botlib_export;
 static char	sv_gameClientConnectDenied[MAX_STRING_CHARS];
 static char	*s_svEntityStringOverride;
+static char	s_svEntityStringSource[MAX_QPATH];
 
 void SV_GameError( const char *string ) {
 	Com_Error( ERR_DROP, "%s", string );
@@ -1572,6 +1573,84 @@ void SV_ShutdownGameProgs( void ) {
 
 /*
 ==================
+SV_CountEntityStringBlocks
+
+Counts brace-delimited entity definitions without mutating the live parse point.
+==================
+*/
+static int SV_CountEntityStringBlocks( const char *entityString, qboolean *unbalanced ) {
+	char		*parsePoint;
+	const char	*token;
+	int		braceDepth;
+	int		entityCount;
+
+	if ( unbalanced ) {
+		*unbalanced = qfalse;
+	}
+
+	if ( !entityString ) {
+		return 0;
+	}
+
+	parsePoint = (char *)entityString;
+	braceDepth = 0;
+	entityCount = 0;
+
+	while ( 1 ) {
+		token = COM_Parse( &parsePoint );
+		if ( !parsePoint && !token[0] ) {
+			break;
+		}
+
+		if ( token[0] == '{' && token[1] == '\0' ) {
+			if ( braceDepth == 0 ) {
+				entityCount++;
+			}
+			braceDepth++;
+			continue;
+		}
+
+		if ( token[0] == '}' && token[1] == '\0' ) {
+			if ( braceDepth > 0 ) {
+				braceDepth--;
+			} else if ( unbalanced ) {
+				*unbalanced = qtrue;
+			}
+		}
+	}
+
+	if ( braceDepth != 0 && unbalanced ) {
+		*unbalanced = qtrue;
+	}
+
+	return entityCount;
+}
+
+/*
+==================
+SV_LogEntityStringSummary
+
+Prints a developer-facing summary of the entity string handed to qagame.
+==================
+*/
+static void SV_LogEntityStringSummary( const char *entityString ) {
+	qboolean	unbalanced;
+	int		entityCount;
+
+	if ( !com_developer || !com_developer->integer || !entityString ) {
+		return;
+	}
+
+	entityCount = SV_CountEntityStringBlocks( entityString, &unbalanced );
+	Com_Printf( "entitydebug(engine): source=%s bytes=%i entityBlocks=%i balanced=%i\n",
+		s_svEntityStringSource[0] ? s_svEntityStringSource : "bsp",
+		(int)strlen( entityString ),
+		entityCount,
+		unbalanced ? 0 : 1 );
+}
+
+/*
+==================
 SV_GetGameEntityString
 
 Loads the retained alternate entity-string override at the qagame boundary and
@@ -1585,6 +1664,7 @@ static char *SV_GetGameEntityString( void ) {
 	char		*entityString;
 
 	entityString = CM_EntityString();
+	Q_strncpyz( s_svEntityStringSource, "bsp", sizeof( s_svEntityStringSource ) );
 
 	if ( s_svEntityStringOverride ) {
 		FS_FreeFile( s_svEntityStringOverride );
@@ -1602,6 +1682,7 @@ static char *SV_GetGameEntityString( void ) {
 		Com_sprintf( altEntPath, sizeof( altEntPath ), "%s/%s.ent", sv_altEntDir->string, mapName );
 		if ( FS_ReadFile( altEntPath, (void **)&s_svEntityStringOverride ) >= 0 && s_svEntityStringOverride ) {
 			entityString = s_svEntityStringOverride;
+			Q_strncpyz( s_svEntityStringSource, altEntPath, sizeof( s_svEntityStringSource ) );
 		}
 	}
 
@@ -1625,6 +1706,7 @@ static void SV_InitGameVM( qboolean restart ) {
 
 	// start the entity parsing at the beginning
 	sv.entityParsePoint = SV_GetGameEntityString();
+	SV_LogEntityStringSummary( sv.entityParsePoint );
 
 	// clear all gentity pointers that might still be set from
 	// a previous level

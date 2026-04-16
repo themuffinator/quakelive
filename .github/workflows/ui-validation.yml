@@ -90,8 +90,6 @@ jobs:
       - name: Run headless UI validation
         run: >-
           python3 tests/run_ui_validation.py
-          --bundle build/ui_bundle/pak_uiql.pk3
-          --homepath build/ui_validation/home
           --log-dir "${{ env.UI_VALIDATION_ROOT }}/logs"
 
       - name: Run unified UI parity gate

@@ -606,6 +606,59 @@ void S_PaintChannels( int endtime ) {
 			}
 		}
 
+		if ( s_voiceVolume && s_voiceVolume->value > 0.0f ) {
+			int voiceScale;
+			int voiceIndex;
+
+			voiceScale = (int)( Com_Clamp( 0.0f, 2.0f, s_voiceVolume->value ) * 256.0f );
+			for ( voiceIndex = 0; voiceIndex < MAX_VOICE_CHANNELS; ++voiceIndex ) {
+				voiceChannel_t *voice;
+				int voiceStart;
+				int voiceEnd;
+				int sampleTime;
+				portable_samplepair_t *samp;
+
+				voice = &s_voiceChannels[voiceIndex];
+				if ( voice->endSample <= voice->startSample ) {
+					continue;
+				}
+
+				voiceStart = voice->startSample;
+				voiceEnd = voice->endSample;
+				if ( voiceStart < s_paintedtime ) {
+					voiceStart = s_paintedtime;
+				}
+				if ( voiceEnd > end ) {
+					voiceEnd = end;
+				}
+				if ( voiceStart >= voiceEnd ) {
+					if ( end > voice->startSample ) {
+						voice->startSample = end;
+						if ( voice->startSample > voice->endSample ) {
+							voice->startSample = voice->endSample;
+						}
+					}
+					continue;
+				}
+
+				samp = &paintbuffer[voiceStart - s_paintedtime];
+				for ( sampleTime = voiceStart; sampleTime < voiceEnd; ++sampleTime, ++samp ) {
+					int data;
+
+					data = voice->samples[sampleTime & ( VOICE_BUFFER_SAMPLES - 1 )] * voiceScale;
+					samp->left += data;
+					samp->right += data;
+				}
+
+				if ( end > voice->startSample ) {
+					voice->startSample = end;
+					if ( voice->startSample > voice->endSample ) {
+						voice->startSample = voice->endSample;
+					}
+				}
+			}
+		}
+
 		// paint in the channels.
 		ch = s_channels;
 		for ( i = 0; i < MAX_CHANNELS ; i++, ch++ ) {		

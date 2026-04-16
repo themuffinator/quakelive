@@ -168,14 +168,18 @@ def test_retail_ui_override_script_manifest_records_hashes_and_stale_cleanup(
 	assert report["manifest_version"] == 2
 	assert report["drift_files"] == ["hud.txt", "ingame_join.menu"]
 	assert report["overlay_files"] == expected_overlay_files
+	assert report["materialization_mode"] == "report-only"
+	assert report["materialized_overlay_files"] == []
 	assert report["stale_removed_files"] == ["baseq3/ui/stale/obsolete.menu"]
 	assert f"{homepath_root.as_posix()}/baseq3/ui/stale" in report["stale_removed_dirs"]
 	assert report["stale_missing_files"] == []
-	assert report["overlay_policy"]["mode"] == "overlay-first-read-only-src-ui"
-	assert report["overlay_policy"]["overlay_package_name"] == "pak_ui_src_retail_overlay.pk3"
-	assert report["overlay_policy"]["base_ui_package_name"] == "pak_uiql.pk3"
-	assert "fs_homepath" in report["overlay_policy"]["precedence_contract"]
-	assert "same-directory pk3 alphabetical ordering" in report["overlay_policy"]["same_root_warning"]
+	assert report["overlay_policy"]["mode"] == "retail-install-first-read-only-src-ui"
+	assert report["overlay_policy"]["runtime_base_source"] == "retail-fs_basepath/baseq3"
+	assert report["overlay_policy"]["duplication_policy"] == "do-not-duplicate-retail-distributables"
+	assert report["overlay_policy"]["overlay_materialization_default"] == "report-only"
+	assert "fs_basepath" in report["overlay_policy"]["precedence_contract"]
+	assert "Do not package or mount duplicated retail UI bundles" in report["overlay_policy"]["precedence_contract"]
+	assert "Report-only" in report["overlay_policy"]["materialization_warning"]
 	assert not stale_file.exists()
 
 	overlay_entries = {entry["overlay_path"]: entry for entry in report["overlay_entries"]}
@@ -185,15 +189,13 @@ def test_retail_ui_override_script_manifest_records_hashes_and_stale_cleanup(
 	):
 		entry = overlay_entries[overlay_path]
 		retail_bytes = (retail_root / "ui" / relative_ui_path).read_bytes()
-		override_path = homepath_root / overlay_path
 		assert entry["ui_path"] == relative_ui_path
 		assert entry["size"] == len(retail_bytes)
 		assert entry["sha256"] == _sha256_bytes(retail_bytes)
 		assert report["overlay_file_hashes"][overlay_path] == entry["sha256"]
-		assert override_path.read_bytes() == retail_bytes
 
 
-def test_retail_ui_override_script_emits_drifted_files(
+def test_retail_ui_override_script_reports_drifted_files_without_materializing_by_default(
 	tmp_path: Path,
 	retail_ui_corpus_inventory: dict[str, object],
 ) -> None:
@@ -218,17 +220,53 @@ def test_retail_ui_override_script_emits_drifted_files(
 
 	report = json.loads(manifest_path.read_text(encoding="utf-8"))
 	assert report["manifest_version"] == 2
+	assert report["materialization_mode"] == "report-only"
+	assert report["materialized_overlay_files"] == []
 	assert report["drift_files"] == drift_files
 	assert set(report["overlay_files"]) == {f"baseq3/ui/{relative_path}" for relative_path in drift_files}
 	assert set(report["overlay_file_hashes"]) == set(report["overlay_files"])
 	assert set(report["overlay_policy"]) >= {
 		"mode",
-		"overlay_package_name",
-		"base_ui_package_name",
+		"runtime_base_source",
+		"duplication_policy",
+		"overlay_materialization_default",
 		"precedence_contract",
 		"verification_contract",
-		"same_root_warning",
+		"materialization_warning",
 	}
+
+	for relative_path in drift_files:
+		override_path = homepath_root / "baseq3" / "ui" / relative_path
+		assert not override_path.exists()
+
+
+def test_retail_ui_override_script_can_materialize_explicit_emit_files(
+	tmp_path: Path,
+	retail_ui_corpus_inventory: dict[str, object],
+) -> None:
+	_require_retail_ui_corpus(retail_ui_corpus_inventory)
+	homepath_root = tmp_path / "ui_homepath"
+	manifest_path = tmp_path / "ui_retail_overrides.json"
+	drift = compute_ui_panel_drift(SOURCE_ROOT, RETAIL_ROOT)
+	drift_files = _assert_repo_overlay_drift_contract(drift)
+
+	subprocess.run(
+		[
+			sys.executable,
+			str(SCRIPT_PATH),
+			"--homepath-root",
+			str(homepath_root),
+			"--manifest",
+			str(manifest_path),
+			"--emit-files",
+		],
+		check=True,
+		cwd=REPO_ROOT,
+	)
+
+	report = json.loads(manifest_path.read_text(encoding="utf-8"))
+	assert report["materialization_mode"] == "emit-files"
+	assert set(report["materialized_overlay_files"]) == {f"baseq3/ui/{relative_path}" for relative_path in drift_files}
 
 	for relative_path in drift_files:
 		override_path = homepath_root / "baseq3" / "ui" / relative_path
@@ -341,7 +379,7 @@ def test_retail_ui_override_script_supports_pk3_overlay_prefix(
 		assert override_path.read_bytes() == retail_path.read_bytes()
 
 
-def test_ui_bundle_build_emits_src_ui_overlay_package(
+def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 	retail_ui_corpus_inventory: dict[str, object],
 ) -> None:
 	overlay_package = REPO_ROOT / "build" / "ui_bundle" / "pak_ui_src_retail_overlay.pk3"
@@ -349,6 +387,7 @@ def test_ui_bundle_build_emits_src_ui_overlay_package(
 	main_package = REPO_ROOT / "build" / "ui_bundle" / "pak_uiql.pk3"
 	metrics_path = REPO_ROOT / "artifacts" / "ui_bundle" / "metrics" / "font_metrics.json"
 	inventory_manifest = REPO_ROOT / "artifacts" / "ui_bundle" / "ui_retail_inventory.json"
+	staging_root = REPO_ROOT / "build" / "ui_bundle" / "staging" / "baseq3"
 	preserved_files = {}
 	for path in (
 		overlay_package,
@@ -384,20 +423,36 @@ def test_ui_bundle_build_emits_src_ui_overlay_package(
 		if retail_ui_corpus_inventory["retail_ui_corpus_available"]:
 			assert result.returncode == 0, result.stderr
 			assert overlay_manifest.exists()
-			assert main_package.exists()
 			assert metrics_path.exists()
+			assert not overlay_package.exists()
+			assert not main_package.exists()
+			assert (staging_root / "default.cfg").exists()
+			assert (staging_root / "ui" / "main.menu").exists()
+			assert (staging_root / "ui" / "assets" / "button_back.png").exists()
+			assert (staging_root / "ui" / "assets" / "hud" / "ffa.png").exists()
+			assert (staging_root / "ui" / "assets" / "hud" / "dm.png").exists()
+			assert (staging_root / "ui" / "assets" / "hud" / "tourn.png").exists()
+			assert (staging_root / "ui" / "assets" / "bluechip.png").exists()
+			assert (staging_root / "ui" / "assets" / "redchip.png").exists()
+			assert (staging_root / "ui" / "assets" / "score" / "scoretl.png").exists()
+			assert (staging_root / "ui" / "assets" / "score" / "navbarl.png").exists()
+			assert (staging_root / "ui" / "assets" / "score" / "navbarm.png").exists()
+			assert (staging_root / "ui" / "assets" / "score" / "navbarr.png").exists()
+			assert (staging_root / "ui" / "assets" / "score" / "navleft.png").exists()
+			assert (staging_root / "ui" / "assets" / "score" / "navright.png").exists()
+			assert (staging_root / "ui" / "assets" / "score" / "navfriends.png").exists()
+			assert (staging_root / "fonts" / "font.dat").exists()
+			assert (staging_root / "fonts" / "font.tga").exists()
 
 			report = json.loads(overlay_manifest.read_text(encoding="utf-8"))
 			drift = compute_ui_panel_drift(SOURCE_ROOT, RETAIL_ROOT)
 			drift_files = _assert_repo_overlay_drift_contract(drift)
-			assert report["overlay_prefix"] == "ui"
+			assert report["overlay_prefix"] == "baseq3/ui"
 			assert report["drift_files"] == drift_files
-			assert set(report["overlay_files"]) == {f"ui/{relative_path}" for relative_path in drift_files}
+			assert report["materialization_mode"] == "report-only"
+			assert report["materialized_overlay_files"] == []
+			assert set(report["overlay_files"]) == {f"baseq3/ui/{relative_path}" for relative_path in drift_files}
 			assert len(report["overlay_entries"]) == len(drift_files)
-			if drift_files:
-				assert overlay_package.exists()
-			else:
-				assert not overlay_package.exists()
 			return
 
 		assert result.returncode != 0

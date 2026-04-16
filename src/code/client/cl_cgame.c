@@ -62,6 +62,13 @@ static clAdvertisementBridgeState_t cl_advertisementBridge;
 #define CL_WEB_FRIEND_FLAGS 4
 #define CL_WEB_MAX_QZ_METHODS 20
 #define CL_WEB_JSON_BUFFER_SIZE 32768
+#define CL_WEB_LAUNCHER_SCRIPT_LIST_BUFFER 4096
+#define CL_WEB_DEFAULT_URL "asset://ql/index.html"
+#define CL_WEB_SURFACE_SHADER "browser"
+#define CL_WEB_BOOTSTRAP_MAX_ATTEMPTS 10
+#define CL_WEB_BOOTSTRAP_SLEEP_MSEC 100
+
+static qboolean CL_OverlayServiceAvailable( void );
 
 typedef enum {
 	CL_WEB_METHOD_IS_PAK_FILE_PRESENT = 1,
@@ -95,26 +102,56 @@ typedef struct {
 	qboolean	coreInitialised;
 	qboolean	sessionInitialised;
 	qboolean	viewInitialised;
+	qboolean	bootstrapReady;
+	qboolean	documentReady;
+	qboolean	loadingDocument;
+	qboolean	loadFailed;
+	qboolean	dataPakSourceInstalled;
+	qboolean	steamDataSourceInstalled;
+	qboolean	resourceInterceptorInstalled;
+	qboolean	jsMethodHandlerInstalled;
+	qboolean	dialogHandlerInstalled;
+	qboolean	viewHandlerInstalled;
+	qboolean	loadHandlerInstalled;
 	qboolean	windowObjectBound;
 	qboolean	qzInstanceBound;
 	qboolean	browserVisible;
 	qboolean	browserActive;
 	qboolean	refreshStopped;
 	qboolean	surfaceImageInitialised;
+	qboolean	surfaceDirty;
 	qboolean	keyCaptureArmed;
 	qboolean	focused;
+	qboolean	cursorPositionValid;
 	int			viewWidth;
 	int			viewHeight;
 	int			surfaceWidth;
 	int			surfaceHeight;
+	int			cursorX;
+	int			cursorY;
 	int			frameSequence;
+	int			bootstrapAttemptCount;
+	int			surfaceUploadWidth;
+	int			surfaceUploadHeight;
 	uint32_t	appId;
 	uint32_t	steamIdLow;
 	uint32_t	steamIdHigh;
+	qhandle_t	surfaceShader;
+	byte		*surfaceBuffer;
+	int			surfaceBufferLength;
 	char		currentUrl[MAX_STRING_CHARS];
+	char		currentDocument[MAX_QPATH];
 	char		pendingHash[MAX_STRING_CHARS];
 	char		playerName[MAX_NAME_LENGTH];
+	char		sessionPath[MAX_OSPATH];
+	char		surfaceShaderName[MAX_QPATH];
 	char		tooltip[MAX_QPATH];
+#if defined( _WIN32 )
+	HCURSOR		activeCursorHandle;
+	HCURSOR		restoreCursorHandle;
+	int			activeCursorType;
+	qboolean	cursorOverrideActive;
+#endif
 } clWebHostState_t;
 
 typedef struct {
@@ -123,9 +160,41 @@ typedef struct {
 	int			count;
 } clWebJsonBuilder_t;
 
+#define CL_WEB_ARENA_FILE_LIST_BUFFER 4096
+#define CL_WEB_MAX_MAPS 128
+#define CL_WEB_MAX_FACTORY_DEFINITIONS 256
+#define CL_WEB_FACTORY_JSON_STRING 8192
+
+typedef struct {
+	const char	*cursor;
+	const char	*end;
+	const char	*filename;
+	int			line;
+} clWebFactoryParseState_t;
+
+typedef struct {
+	char		id[MAX_QPATH];
+	char		title[128];
+	char		author[128];
+	char		description[1024];
+	char		basegt[64];
+	char		settingsJson[CL_WEB_FACTORY_JSON_STRING];
+} clWebFactoryDefinition_t;
+
 static clWebHostState_t cl_webHost;
 
 static void CL_Web_ClearSessionState( void );
+static void CL_WebHost_ClearSurfaceImage( void );
+static void CL_WebHost_ClearCursorOverride( void );
+static void CL_WebHost_ResolveSessionPath( char *buffer, size_t bufferSize );
+static void QLWebView_PublishGameKey( int key );
+static void *QLViewHandler_OnChangeCursor( int cursorType );
+static void QLViewHandler_OnChangeTooltip( const char *tooltip );
+static void QLWebHost_RegisterRuntimeSources( void );
+static qboolean QLWebHost_WaitForBootstrapReady( void );
+static void QLWebHost_InstallRuntimeListeners( void );
+static void QLWebView_WriteSurfacePixels( void );
+static qboolean QLWebView_UploadSurfaceImage( void );
 
 static const clWebMethodBinding_t cl_webMethodBindings[CL_WEB_MAX_QZ_METHODS] = {
 	{ "IsPakFilePresent", CL_WEB_METHOD_IS_PAK_FILE_PRESENT, qtrue },
@@ -245,20 +314,43 @@ static void CL_WebHost_FormatSteamId( uint32_t idLow, uint32_t idHigh, char *buf
 
 /*
 =============
-CL_WebHost_BuildCurrentURL
+CL_WebHost_NormalizeHash
 =============
 */
-static void CL_WebHost_BuildCurrentURL( const char *hash, char *buffer, size_t bufferSize ) {
+static void CL_WebHost_NormalizeHash( const char *hash, char *buffer, size_t bufferSize ) {
+	const char	*cursor;
+
 	if ( !buffer || bufferSize == 0 ) {
 		return;
 	}
 
-	if ( hash && hash[0] ) {
-		Com_sprintf( buffer, bufferSize, "ql://quakelive#%s", hash );
+	cursor = hash ? hash : "";
+	while ( *cursor == '#' || *cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n' ) {
+		cursor++;
+	}
+
+	Q_strncpyz( buffer, cursor, bufferSize );
+}
+
+/*
+=============
+CL_WebHost_BuildCurrentURL
+=============
+*/
+static void CL_WebHost_BuildCurrentURL( const char *hash, char *buffer, size_t bufferSize ) {
+	char normalizedHash[MAX_STRING_CHARS];
+
+	if ( !buffer || bufferSize == 0 ) {
 		return;
 	}
 
-	Q_strncpyz( buffer, "ql://quakelive", bufferSize );
+	CL_WebHost_NormalizeHash( hash, normalizedHash, sizeof( normalizedHash ) );
+	if ( normalizedHash[0] ) {
+		Com_sprintf( buffer, bufferSize, "%s#%s", CL_WEB_DEFAULT_URL, normalizedHash );
+		return;
+	}
+
+	Q_strncpyz( buffer, CL_WEB_DEFAULT_URL, bufferSize );
 }
 
 /*
@@ -287,27 +379,155 @@ CL_WebHost_ResetRuntime
 =============
 */
 static void CL_WebHost_ResetRuntime( qboolean clearVisibility ) {
+	CL_WebHost_ClearCursorOverride();
+	CL_WebHost_ClearSurfaceImage();
 	cl_webHost.coreInitialised = qfalse;
 	cl_webHost.sessionInitialised = qfalse;
 	cl_webHost.viewInitialised = qfalse;
+	cl_webHost.bootstrapReady = qfalse;
+	cl_webHost.documentReady = qfalse;
+	cl_webHost.loadingDocument = qfalse;
+	cl_webHost.loadFailed = qfalse;
+	cl_webHost.dataPakSourceInstalled = qfalse;
+	cl_webHost.steamDataSourceInstalled = qfalse;
+	cl_webHost.resourceInterceptorInstalled = qfalse;
+	cl_webHost.jsMethodHandlerInstalled = qfalse;
+	cl_webHost.dialogHandlerInstalled = qfalse;
+	cl_webHost.viewHandlerInstalled = qfalse;
+	cl_webHost.loadHandlerInstalled = qfalse;
 	cl_webHost.windowObjectBound = qfalse;
 	cl_webHost.qzInstanceBound = qfalse;
 	cl_webHost.browserActive = qfalse;
 	cl_webHost.refreshStopped = qfalse;
-	cl_webHost.surfaceImageInitialised = qfalse;
 	cl_webHost.keyCaptureArmed = qfalse;
 	cl_webHost.focused = qfalse;
+	cl_webHost.cursorPositionValid = qfalse;
 	cl_webHost.viewWidth = 0;
 	cl_webHost.viewHeight = 0;
 	cl_webHost.surfaceWidth = 0;
 	cl_webHost.surfaceHeight = 0;
+	cl_webHost.cursorX = 0;
+	cl_webHost.cursorY = 0;
 	cl_webHost.frameSequence = 0;
+	cl_webHost.bootstrapAttemptCount = 0;
+	cl_webHost.surfaceUploadWidth = 0;
+	cl_webHost.surfaceUploadHeight = 0;
+	cl_webHost.surfaceShader = 0;
 	cl_webHost.currentUrl[0] = '\0';
+	cl_webHost.currentDocument[0] = '\0';
 	cl_webHost.pendingHash[0] = '\0';
 	cl_webHost.tooltip[0] = '\0';
+	cl_webHost.sessionPath[0] = '\0';
+	cl_webHost.surfaceShaderName[0] = '\0';
 
 	if ( clearVisibility ) {
 		cl_webHost.browserVisible = qfalse;
+	}
+}
+
+/*
+=============
+CL_WebHost_ClearSurfaceImage
+=============
+*/
+static void CL_WebHost_ClearSurfaceImage( void ) {
+	if ( cl_webHost.surfaceBuffer ) {
+		Z_Free( cl_webHost.surfaceBuffer );
+		cl_webHost.surfaceBuffer = NULL;
+	}
+
+	cl_webHost.surfaceBufferLength = 0;
+	cl_webHost.surfaceShader = 0;
+	cl_webHost.surfaceImageInitialised = qfalse;
+	cl_webHost.surfaceDirty = qfalse;
+	cl_webHost.surfaceUploadWidth = 0;
+	cl_webHost.surfaceUploadHeight = 0;
+	cl_webHost.surfaceShaderName[0] = '\0';
+}
+
+/*
+=============
+CL_WebHost_LoadWin32CursorHandle
+=============
+*/
+#if defined( _WIN32 )
+static HCURSOR CL_WebHost_LoadWin32CursorHandle( int cursorType ) {
+	LPCSTR cursorId;
+
+	switch ( cursorType ) {
+		case 1:
+			cursorId = IDC_CROSS;
+			break;
+		case 2:
+			cursorId = IDC_HAND;
+			break;
+		case 3:
+			cursorId = IDC_IBEAM;
+			break;
+		case 4:
+			cursorId = IDC_WAIT;
+			break;
+		case 5:
+			cursorId = IDC_HELP;
+			break;
+		case 7:
+			cursorId = IDC_SIZEWE;
+			break;
+		case 8:
+			cursorId = IDC_SIZENS;
+			break;
+		case 9:
+			cursorId = IDC_SIZENESW;
+			break;
+		case 10:
+			cursorId = IDC_SIZENWSE;
+			break;
+		case 11:
+			cursorId = IDC_SIZEALL;
+			break;
+		case 14:
+			cursorId = IDC_NO;
+			break;
+		default:
+			cursorId = IDC_ARROW;
+			break;
+	}
+
+	return LoadCursorA( NULL, cursorId );
+}
+#endif
+
+/*
+=============
+CL_WebHost_ClearCursorOverride
+=============
+*/
+static void CL_WebHost_ClearCursorOverride( void ) {
+#if defined( _WIN32 )
+	if ( cl_webHost.cursorOverrideActive && cl_webHost.restoreCursorHandle ) {
+		SetCursor( cl_webHost.restoreCursorHandle );
+	}
+
+	cl_webHost.activeCursorHandle = NULL;
+	cl_webHost.restoreCursorHandle = NULL;
+	cl_webHost.activeCursorType = 0;
+	cl_webHost.cursorOverrideActive = qfalse;
+#endif
+}
+
+/*
+=============
+CL_WebHost_ResolveSessionPath
+=============
+*/
+static void CL_WebHost_ResolveSessionPath( char *buffer, size_t bufferSize ) {
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	Cvar_VariableStringBuffer( "fs_homepath", buffer, bufferSize );
+	if ( !buffer[0] ) {
+		Q_strncpyz( buffer, ".", bufferSize );
 	}
 }
 
@@ -351,7 +571,304 @@ static void QLJSHandler_BindQzInstance( void ) {
 	CL_WebHost_RefreshBootstrapProperties();
 	cl_webHost.qzInstanceBound = qtrue;
 	cl_webHost.windowObjectBound = qtrue;
+}
+
+/*
+=============
+QLWebHost_RegisterRuntimeSources
+=============
+*/
+static void QLWebHost_RegisterRuntimeSources( void ) {
+	CL_WebHost_ResolveSessionPath( cl_webHost.sessionPath, sizeof( cl_webHost.sessionPath ) );
+	cl_webHost.dataPakSourceInstalled = qtrue;
+	cl_webHost.steamDataSourceInstalled = qtrue;
+	cl_webHost.resourceInterceptorInstalled = qtrue;
+}
+
+/*
+=============
+QLWebHost_WaitForBootstrapReady
+=============
+*/
+static qboolean QLWebHost_WaitForBootstrapReady( void ) {
+	int attempt;
+
+	for ( attempt = 0; attempt < CL_WEB_BOOTSTRAP_MAX_ATTEMPTS; attempt++ ) {
+		cl_webHost.bootstrapAttemptCount = attempt + 1;
+		if ( cl_webHost.sessionInitialised
+			&& cl_webHost.viewInitialised
+			&& cl_webHost.dataPakSourceInstalled
+			&& cl_webHost.steamDataSourceInstalled
+			&& cl_webHost.resourceInterceptorInstalled
+			&& cl_webHost.jsMethodHandlerInstalled ) {
+			cl_webHost.bootstrapReady = qtrue;
+			return qtrue;
+		}
+
+		NET_Sleep( CL_WEB_BOOTSTRAP_SLEEP_MSEC );
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+QLWebHost_InstallRuntimeListeners
+=============
+*/
+static void QLWebHost_InstallRuntimeListeners( void ) {
+	cl_webHost.dialogHandlerInstalled = qtrue;
+	cl_webHost.viewHandlerInstalled = qtrue;
+	cl_webHost.loadHandlerInstalled = qtrue;
+}
+
+/*
+=============
+CL_WebHost_NormalizeDocumentPath
+=============
+*/
+static qboolean CL_WebHost_NormalizeDocumentPath( const char *url, char *buffer, size_t bufferSize ) {
+	const char	*pathStart;
+	const char	*separator;
+	size_t		index;
+
+	if ( !url || !url[0] || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	pathStart = url;
+	separator = strstr( url, "://" );
+	if ( separator ) {
+		pathStart = separator + 3;
+		separator = strchr( pathStart, '/' );
+		if ( separator ) {
+			pathStart = separator + 1;
+		}
+	}
+
+	while ( *pathStart == '/' || *pathStart == '\\' ) {
+		pathStart++;
+	}
+
+	for ( index = 0; pathStart[index] && pathStart[index] != '?' && pathStart[index] != '#'; index++ ) {
+		char ch;
+
+		if ( index >= bufferSize - 1 ) {
+			break;
+		}
+
+		ch = pathStart[index];
+		buffer[index] = ( ch == '\\' ) ? '/' : ch;
+	}
+	buffer[index] = '\0';
+
+	if ( !buffer[0] || strstr( buffer, ".." ) || strstr( buffer, "::" ) || strchr( buffer, ':' ) ) {
+		return qfalse;
+	}
+
+	Q_strlwr( buffer );
+	return qtrue;
+}
+
+/*
+=============
+QLLoadHandler_OnBeginLoadingFrame
+=============
+*/
+static void QLLoadHandler_OnBeginLoadingFrame( void ) {
+	cl_webHost.loadingDocument = qtrue;
+	cl_webHost.loadFailed = qfalse;
+	cl_webHost.documentReady = qfalse;
+	cl_webHost.surfaceDirty = qtrue;
+	if ( cl_webHost.tooltip[0] && cl_webHost.windowObjectBound ) {
+		QLViewHandler_OnChangeTooltip( "" );
+	} else {
+		cl_webHost.tooltip[0] = '\0';
+	}
+	cl_webHost.windowObjectBound = qfalse;
+	cl_webHost.qzInstanceBound = qfalse;
+	cl_webHost.currentDocument[0] = '\0';
+}
+
+/*
+=============
+QLLoadHandler_OnFinishLoadingFrame
+=============
+*/
+static void QLLoadHandler_OnFinishLoadingFrame( void ) {
+	cl_webHost.loadingDocument = qfalse;
+	cl_webHost.surfaceDirty = qtrue;
+}
+
+/*
+=============
+CL_WebHost_PrimeLauncherDocument
+=============
+*/
+static qboolean CL_WebHost_PrimeLauncherDocument( const char *url ) {
+	void	*buffer;
+	int		length;
+	char	documentPath[MAX_QPATH];
+
+	buffer = NULL;
+	length = 0;
+
+	if ( !url || !url[0] ) {
+		return qfalse;
+	}
+
+	if ( !CL_LauncherRequestData( url, &buffer, &length ) ) {
+		return qfalse;
+	}
+
+	if ( buffer ) {
+		Z_Free( buffer );
+	}
+
+	if ( CL_WebHost_NormalizeDocumentPath( url, documentPath, sizeof( documentPath ) ) ) {
+		Q_strncpyz( cl_webHost.currentDocument, documentPath, sizeof( cl_webHost.currentDocument ) );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+QLLoadHandler_LoadDocumentScripts
+
+Stages the retail launcher js/* bundle through the retained web.pak and
+filesystem bridge before the browser object is marked ready.
+=============
+*/
+static void QLLoadHandler_LoadDocumentScripts( void ) {
+	char	fileList[CL_WEB_LAUNCHER_SCRIPT_LIST_BUFFER];
+	char	scriptPath[MAX_QPATH];
+	char	*cursor;
+	int	count;
+	int	i;
+
+	count = CL_WebPak_GetFileList( "js", ".js", fileList, sizeof( fileList ) );
+	cursor = fileList;
+
+	for ( i = 0; i < count && *cursor; i++ ) {
+		void	*scriptBuffer;
+		int	scriptLength;
+
+		scriptBuffer = NULL;
+		scriptLength = 0;
+
+		Com_sprintf( scriptPath, sizeof( scriptPath ), "js/%s", cursor );
+		if ( CL_LauncherRequestData( scriptPath, &scriptBuffer, &scriptLength ) && scriptBuffer ) {
+			Z_Free( scriptBuffer );
+		}
+
+		cursor += strlen( cursor ) + 1;
+	}
+}
+
+/*
+=============
+QLLoadHandler_OnDocumentReady
+=============
+*/
+static void QLLoadHandler_OnDocumentReady( void ) {
+	QLLoadHandler_LoadDocumentScripts();
+	QLJSHandler_BindQzInstance();
+	cl_webHost.documentReady = qtrue;
+	cl_webHost.surfaceDirty = qtrue;
+	QLViewHandler_OnChangeCursor( 0 );
 	CL_WebView_PublishEvent( "web.object.ready", NULL );
+}
+
+/*
+=============
+QLLoadHandler_OnFailLoadingFrame
+=============
+*/
+static void QLLoadHandler_OnFailLoadingFrame( const char *url ) {
+	char message[MAX_STRING_CHARS];
+
+	cl_webHost.loadingDocument = qfalse;
+	cl_webHost.loadFailed = qtrue;
+	cl_webHost.documentReady = qfalse;
+	if ( cl_webHost.tooltip[0] && cl_webHost.windowObjectBound ) {
+		QLViewHandler_OnChangeTooltip( "" );
+	}
+	cl_webHost.windowObjectBound = qfalse;
+	cl_webHost.qzInstanceBound = qfalse;
+	cl_webHost.browserVisible = qfalse;
+	cl_webHost.browserActive = qfalse;
+	cl_webHost.focused = qfalse;
+	cl_webHost.currentDocument[0] = '\0';
+	cl_webHost.tooltip[0] = '\0';
+	cl_webHost.surfaceDirty = qtrue;
+	cl_webBrowserVisible = qfalse;
+	CL_WebHost_ClearCursorOverride();
+
+	Com_sprintf( message, sizeof( message ), "Failed to load QUAKE LIVE site... %s", url ? url : CL_WEB_DEFAULT_URL );
+	Cvar_Set( "web_browserActive", "0" );
+	Cvar_Set( "com_errorMessage", message );
+	Com_DPrintf( "%s\n", message );
+}
+
+/*
+=============
+QLViewHandler_OnChangeCursor
+=============
+*/
+static void *QLViewHandler_OnChangeCursor( int cursorType ) {
+#if defined( _WIN32 )
+	HCURSOR cursorHandle;
+
+	if ( !cl_webHost.cursorOverrideActive ) {
+		cl_webHost.restoreCursorHandle = GetCursor();
+	}
+
+	cursorHandle = CL_WebHost_LoadWin32CursorHandle( cursorType );
+	if ( !cursorHandle ) {
+		cursorHandle = LoadCursorA( NULL, IDC_ARROW );
+	}
+
+	cl_webHost.activeCursorType = cursorType;
+	cl_webHost.activeCursorHandle = cursorHandle;
+	cl_webHost.cursorOverrideActive = cursorHandle ? qtrue : qfalse;
+	if ( cl_webHost.cursorOverrideActive ) {
+		SetCursor( cl_webHost.activeCursorHandle );
+	}
+
+	return cl_webHost.activeCursorHandle;
+#else
+	(void)cursorType;
+	return NULL;
+#endif
+}
+
+/*
+=============
+QLViewHandler_OnChangeTooltip
+=============
+*/
+static void QLViewHandler_OnChangeTooltip( const char *tooltip ) {
+	char escapedTooltip[MAX_QPATH * 2];
+	char payload[MAX_STRING_CHARS];
+
+	Q_strncpyz( cl_webHost.tooltip, tooltip ? tooltip : "", sizeof( cl_webHost.tooltip ) );
+	CL_WebHost_JsonEscape( cl_webHost.tooltip, escapedTooltip, sizeof( escapedTooltip ) );
+	Com_sprintf( payload, sizeof( payload ), "{\"tooltip\":\"%s\"}", escapedTooltip );
+	CL_WebView_PublishEvent( "web.tooltip", payload );
+}
+
+/*
+=============
+QLViewHandler_OnAddConsoleMessage
+=============
+*/
+static void QLViewHandler_OnAddConsoleMessage( const char *source, int line, const char *message ) {
+	if ( !Cvar_VariableIntegerValue( "web_console" ) ) {
+		return;
+	}
+
+	Com_Printf( "%s:%i: %s\n", source ? source : "", line, message ? message : "" );
 }
 
 /*
@@ -360,8 +877,96 @@ QLWebView_SetLocationHash
 =============
 */
 static void QLWebView_SetLocationHash( const char *hash ) {
-	Q_strncpyz( cl_webHost.pendingHash, hash ? hash : "", sizeof( cl_webHost.pendingHash ) );
+	CL_WebHost_NormalizeHash( hash, cl_webHost.pendingHash, sizeof( cl_webHost.pendingHash ) );
 	CL_WebHost_BuildCurrentURL( cl_webHost.pendingHash, cl_webHost.currentUrl, sizeof( cl_webHost.currentUrl ) );
+}
+
+/*
+=============
+QLWebView_NextPowerOfTwo
+=============
+*/
+static int QLWebView_NextPowerOfTwo( int value ) {
+	int result;
+
+	if ( value <= 0 ) {
+		return 0;
+	}
+
+	for ( result = 1; result < value; result <<= 1 ) {
+		/* loop until result is at least value */
+	}
+
+	return result;
+}
+
+/*
+=============
+QLWebView_MapCursorCoordinate
+=============
+*/
+static int QLWebView_MapCursorCoordinate( int coordinate, int viewDimension, int surfaceDimension ) {
+	int clampedCoordinate;
+	int targetDimension;
+	double mappedCoordinate;
+
+	clampedCoordinate = coordinate;
+	if ( clampedCoordinate < 0 ) {
+		clampedCoordinate = 0;
+	}
+
+	if ( viewDimension > 0 && clampedCoordinate > viewDimension ) {
+		clampedCoordinate = viewDimension;
+	}
+
+	targetDimension = surfaceDimension > 0 ? surfaceDimension : viewDimension;
+	if ( targetDimension <= 0 || viewDimension <= 0 ) {
+		return clampedCoordinate;
+	}
+
+	mappedCoordinate = ( (double)clampedCoordinate / (double)viewDimension ) * (double)targetDimension;
+	clampedCoordinate = (int)( mappedCoordinate + 0.5 );
+	if ( clampedCoordinate < 0 ) {
+		clampedCoordinate = 0;
+	} else if ( clampedCoordinate > targetDimension ) {
+		clampedCoordinate = targetDimension;
+	}
+
+	return clampedCoordinate;
+}
+
+/*
+=============
+QLWebView_InjectMappedMouseMove
+=============
+*/
+static void QLWebView_InjectMappedMouseMove( int x, int y ) {
+	int cursorX;
+	int cursorY;
+	int cursorWidth;
+	int cursorHeight;
+
+	cursorX = x;
+	cursorY = y;
+	cursorWidth = cl_webHost.surfaceWidth > 0 ? cl_webHost.surfaceWidth : cl_webHost.viewWidth;
+	cursorHeight = cl_webHost.surfaceHeight > 0 ? cl_webHost.surfaceHeight : cl_webHost.viewHeight;
+
+	if ( cursorX < 0 ) {
+		cursorX = 0;
+	} else if ( cursorWidth > 0 && cursorX > cursorWidth ) {
+		cursorX = cursorWidth;
+	}
+
+	if ( cursorY < 0 ) {
+		cursorY = 0;
+	} else if ( cursorHeight > 0 && cursorY > cursorHeight ) {
+		cursorY = cursorHeight;
+	}
+
+	cl_webHost.cursorX = cursorX;
+	cl_webHost.cursorY = cursorY;
+	cl_webHost.cursorPositionValid = qtrue;
+	cl_webHost.focused = qtrue;
 }
 
 /*
@@ -380,9 +985,262 @@ QLWebView_RebuildSurfaceImage
 =============
 */
 static void QLWebView_RebuildSurfaceImage( void ) {
-	cl_webHost.surfaceWidth = cl_webHost.viewWidth;
-	cl_webHost.surfaceHeight = cl_webHost.viewHeight;
+	cl_webHost.surfaceWidth = QLWebView_NextPowerOfTwo( cl_webHost.viewWidth );
+	cl_webHost.surfaceHeight = QLWebView_NextPowerOfTwo( cl_webHost.viewHeight );
+	cl_webHost.surfaceDirty = qtrue;
+	QLWebView_UploadSurfaceImage();
+}
+
+/*
+=============
+QLWebView_WriteSurfacePixels
+=============
+*/
+static void QLWebView_WriteSurfacePixels( void ) {
+	int requiredLength;
+	int pixelCount;
+	int i;
+	byte red;
+	byte green;
+	byte blue;
+	byte alpha;
+
+	requiredLength = cl_webHost.surfaceWidth * cl_webHost.surfaceHeight * 4;
+	if ( cl_webHost.surfaceWidth <= 0 || cl_webHost.surfaceHeight <= 0 || requiredLength <= 0 ) {
+		CL_WebHost_ClearSurfaceImage();
+		return;
+	}
+
+	if ( !cl_webHost.surfaceBuffer || cl_webHost.surfaceBufferLength != requiredLength ) {
+		if ( cl_webHost.surfaceBuffer ) {
+			Z_Free( cl_webHost.surfaceBuffer );
+		}
+
+		cl_webHost.surfaceBuffer = Z_Malloc( requiredLength );
+		cl_webHost.surfaceBufferLength = requiredLength;
+	}
+
+	red = 0x14;
+	green = 0x14;
+	blue = 0x14;
+	alpha = 0xff;
+
+	if ( cl_webHost.loadFailed ) {
+		red = 0x6a;
+		green = 0x12;
+		blue = 0x12;
+	} else if ( cl_webHost.loadingDocument ) {
+		red = 0x12;
+		green = 0x24;
+		blue = 0x68;
+	} else if ( cl_webHost.documentReady ) {
+		red = 0x1f;
+		green = 0x1f;
+		blue = 0x1f;
+	}
+
+	pixelCount = cl_webHost.surfaceWidth * cl_webHost.surfaceHeight;
+	for ( i = 0; i < pixelCount; i++ ) {
+		int offset = i * 4;
+
+		cl_webHost.surfaceBuffer[offset + 0] = red;
+		cl_webHost.surfaceBuffer[offset + 1] = green;
+		cl_webHost.surfaceBuffer[offset + 2] = blue;
+		cl_webHost.surfaceBuffer[offset + 3] = alpha;
+	}
+
+	if ( cl_webHost.surfaceBufferLength >= 16 ) {
+		cl_webHost.surfaceBuffer[0] = cl_webHost.dataPakSourceInstalled ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[1] = cl_webHost.steamDataSourceInstalled ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[2] = cl_webHost.resourceInterceptorInstalled ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[3] = 0xff;
+		cl_webHost.surfaceBuffer[4] = cl_webHost.jsMethodHandlerInstalled ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[5] = cl_webHost.dialogHandlerInstalled ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[6] = cl_webHost.viewHandlerInstalled ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[7] = 0xff;
+		cl_webHost.surfaceBuffer[8] = cl_webHost.loadHandlerInstalled ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[9] = cl_webHost.bootstrapReady ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[10] = cl_webHost.documentReady ? 0xff : 0x00;
+		cl_webHost.surfaceBuffer[11] = 0xff;
+		cl_webHost.surfaceBuffer[12] = (byte)( cl_webHost.bootstrapAttemptCount & 0xff );
+		cl_webHost.surfaceBuffer[13] = 0xff;
+		cl_webHost.surfaceBuffer[14] = 0xff;
+		cl_webHost.surfaceBuffer[15] = 0xff;
+	}
+}
+
+/*
+=============
+QLWebView_UploadSurfaceImage
+=============
+*/
+static qboolean QLWebView_UploadSurfaceImage( void ) {
+	if ( !cl_webHost.viewInitialised || cl_webHost.surfaceWidth <= 0 || cl_webHost.surfaceHeight <= 0 ) {
+		return qfalse;
+	}
+
+	QLWebView_WriteSurfacePixels();
+	if ( !cl_webHost.surfaceBuffer || cl_webHost.surfaceBufferLength <= 0 ) {
+		return qfalse;
+	}
+
+	if ( !cl_webHost.surfaceShaderName[0] ) {
+		Q_strncpyz( cl_webHost.surfaceShaderName, CL_WEB_SURFACE_SHADER, sizeof( cl_webHost.surfaceShaderName ) );
+	}
+
+	cl_webHost.surfaceShader = CL_RegisterShaderFromRGBA(
+		cl_webHost.surfaceShaderName,
+		cl_webHost.surfaceBuffer,
+		cl_webHost.surfaceWidth,
+		cl_webHost.surfaceHeight,
+		qfalse
+	);
+	if ( !cl_webHost.surfaceShader ) {
+		return qfalse;
+	}
+
+	cl_webHost.surfaceUploadWidth = cl_webHost.surfaceWidth;
+	cl_webHost.surfaceUploadHeight = cl_webHost.surfaceHeight;
 	cl_webHost.surfaceImageInitialised = qtrue;
+	cl_webHost.surfaceDirty = qfalse;
+	return qtrue;
+}
+
+/*
+=============
+CL_WebHost_MapMouseButton
+=============
+*/
+static int CL_WebHost_MapMouseButton( int key ) {
+	switch ( key ) {
+		case K_MOUSE1:
+			return 0;
+
+		case K_MOUSE2:
+			return 2;
+
+		case K_MOUSE3:
+			return 1;
+
+		default:
+			return -1;
+	}
+}
+
+/*
+=============
+QLWebView_InjectMouseMove
+=============
+*/
+static void QLWebView_InjectMouseMove( int x, int y ) {
+	if ( !cl_webHost.viewInitialised || !cl_webHost.browserVisible || !cl_webHost.browserActive ) {
+		return;
+	}
+
+	QLWebView_InjectMappedMouseMove(
+		QLWebView_MapCursorCoordinate( x, cl_webHost.viewWidth, cl_webHost.surfaceWidth ),
+		QLWebView_MapCursorCoordinate( y, cl_webHost.viewHeight, cl_webHost.surfaceHeight )
+	);
+}
+
+/*
+=============
+QLWebView_InjectMouseDown
+=============
+*/
+static void QLWebView_InjectMouseDown( int key ) {
+	int button;
+
+	if ( !cl_webHost.viewInitialised || !cl_webHost.browserVisible || !cl_webHost.browserActive ) {
+		return;
+	}
+
+	button = CL_WebHost_MapMouseButton( key );
+	if ( button < 0 ) {
+		return;
+	}
+
+	if ( cl_webHost.cursorPositionValid ) {
+		QLWebView_InjectMappedMouseMove( cl_webHost.cursorX, cl_webHost.cursorY );
+	}
+
+	cl_webHost.focused = qtrue;
+}
+
+/*
+=============
+QLWebView_InjectMouseUp
+=============
+*/
+static void QLWebView_InjectMouseUp( int key ) {
+	int button;
+
+	if ( !cl_webHost.viewInitialised || !cl_webHost.browserVisible || !cl_webHost.browserActive ) {
+		return;
+	}
+
+	button = CL_WebHost_MapMouseButton( key );
+	if ( button < 0 ) {
+		return;
+	}
+
+	cl_webHost.focused = qtrue;
+}
+
+/*
+=============
+QLWebView_InjectMouseWheel
+=============
+*/
+static void QLWebView_InjectMouseWheel( int direction ) {
+	if ( !cl_webHost.viewInitialised || !cl_webHost.browserVisible || !cl_webHost.browserActive ) {
+		return;
+	}
+
+	if ( direction == 0 ) {
+		return;
+	}
+
+	cl_webHost.focused = qtrue;
+}
+
+/*
+=============
+QLWebView_InjectKeyboardEvent
+=============
+*/
+static void QLWebView_InjectKeyboardEvent( int key, qboolean down ) {
+	if ( !cl_webHost.viewInitialised || !cl_webHost.browserVisible || !cl_webHost.browserActive ) {
+		return;
+	}
+
+	if ( !down && cl_webHost.keyCaptureArmed ) {
+		QLWebView_PublishGameKey( key );
+		cl_webHost.keyCaptureArmed = qfalse;
+	}
+
+	if ( down ) {
+		cl_webHost.focused = qtrue;
+	}
+}
+
+/*
+=============
+QLWebView_InjectActivationKeyboardEvent
+
+Mirrors the retail synthetic modifier-key injection used when the native
+window regains focus while a retained browser view exists.
+=============
+*/
+static void QLWebView_InjectActivationKeyboardEvent( void ) {
+	if ( !cl_webHost.viewInitialised ) {
+		return;
+	}
+
+	cl_webHost.focused = qtrue;
+	if ( cl_webHost.browserVisible || cl_webHost.browserActive ) {
+		QLWebView_InjectKeyboardEvent( 0x11, qtrue );
+	}
 }
 
 /*
@@ -398,13 +1256,21 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 		return qfalse;
 	}
 
+	(void)QLViewHandler_OnAddConsoleMessage;
+
 	if ( !cl_webHost.coreInitialised ) {
 		cl_webHost.coreInitialised = qtrue;
 		cl_webHost.sessionInitialised = qtrue;
+		QLWebHost_RegisterRuntimeSources();
 		cl_webHost.viewInitialised = qtrue;
+		cl_webHost.jsMethodHandlerInstalled = qtrue;
+		if ( !QLWebHost_WaitForBootstrapReady() ) {
+			CL_WebHost_ResetRuntime( qfalse );
+			return qfalse;
+		}
+		QLWebHost_InstallRuntimeListeners();
 		QLWebView_Resize( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
 		QLWebView_RebuildSurfaceImage();
-		QLJSHandler_BindQzInstance();
 	}
 
 	return qtrue;
@@ -422,12 +1288,20 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 	}
 
 	CL_WebHost_RefreshBootstrapProperties();
-	Q_strncpyz( cl_webHost.currentUrl, url ? url : "ql://quakelive", sizeof( cl_webHost.currentUrl ) );
+	Q_strncpyz( cl_webHost.currentUrl, url ? url : CL_WEB_DEFAULT_URL, sizeof( cl_webHost.currentUrl ) );
 	cl_webHost.browserVisible = qtrue;
 	cl_webHost.browserActive = qtrue;
 	cl_webHost.refreshStopped = qfalse;
 	cl_webHost.focused = qtrue;
-	cl_webHost.windowObjectBound = qtrue;
+
+	QLLoadHandler_OnBeginLoadingFrame();
+	if ( CL_WebHost_PrimeLauncherDocument( cl_webHost.currentUrl ) ) {
+		QLLoadHandler_OnFinishLoadingFrame();
+		QLLoadHandler_OnDocumentReady();
+	} else {
+		QLLoadHandler_OnFailLoadingFrame( cl_webHost.currentUrl );
+	}
+
 	return qtrue;
 }
 
@@ -439,7 +1313,7 @@ QLWebHost_OpenRelativeURL
 static qboolean QLWebHost_OpenRelativeURL( const char *hash ) {
 	char url[MAX_STRING_CHARS];
 
-	Q_strncpyz( cl_webHost.pendingHash, hash ? hash : "", sizeof( cl_webHost.pendingHash ) );
+	CL_WebHost_NormalizeHash( hash, cl_webHost.pendingHash, sizeof( cl_webHost.pendingHash ) );
 	CL_WebHost_BuildCurrentURL( hash, url, sizeof( url ) );
 	return QLWebHost_OpenURL( url );
 }
@@ -450,7 +1324,7 @@ QLWebHost_NavigateOrOpen
 =============
 */
 static qboolean QLWebHost_NavigateOrOpen( const char *hash ) {
-	if ( cl_webHost.viewInitialised && cl_webHost.windowObjectBound ) {
+	if ( cl_webHost.viewInitialised && cl_webHost.documentReady && cl_webHost.windowObjectBound ) {
 		QLWebView_SetLocationHash( hash );
 		cl_webHost.browserVisible = qtrue;
 		cl_webHost.browserActive = qtrue;
@@ -470,6 +1344,10 @@ static void QLWebHost_HideBrowser( void ) {
 	cl_webHost.browserVisible = qfalse;
 	cl_webHost.browserActive = qfalse;
 	cl_webHost.focused = qfalse;
+	CL_WebHost_ClearCursorOverride();
+	if ( cl_webHost.tooltip[0] ) {
+		QLViewHandler_OnChangeTooltip( "" );
+	}
 }
 
 /*
@@ -483,6 +1361,9 @@ static void QLWebCore_Update( void ) {
 	}
 
 	cl_webHost.frameSequence++;
+	if ( cl_webHost.viewInitialised && ( cl_webHost.browserVisible || cl_webHost.browserActive || cl_webHost.loadingDocument ) ) {
+		cl_webHost.surfaceDirty = qtrue;
+	}
 }
 
 /*
@@ -498,6 +1379,21 @@ static void QLWebHost_PumpFrame( void ) {
 	if ( cl_webHost.viewWidth != cls.glconfig.vidWidth || cl_webHost.viewHeight != cls.glconfig.vidHeight ) {
 		QLWebView_Resize( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
 		QLWebView_RebuildSurfaceImage();
+		return;
+	}
+
+	if ( !cl_webHost.surfaceImageInitialised ) {
+		QLWebView_RebuildSurfaceImage();
+		return;
+	}
+
+	if ( cl_webHost.surfaceUploadWidth != cl_webHost.surfaceWidth || cl_webHost.surfaceUploadHeight != cl_webHost.surfaceHeight ) {
+		QLWebView_RebuildSurfaceImage();
+		return;
+	}
+
+	if ( cl_webHost.surfaceDirty ) {
+		QLWebView_UploadSurfaceImage();
 	}
 }
 
@@ -537,17 +1433,245 @@ static void CL_WebHost_AppendGametypeAvailability( char *buffer, size_t bufferSi
 
 /*
 =============
-CL_WebHost_BuildMapListJson
+CL_WebHost_StringListContains
 =============
 */
-static void CL_WebHost_BuildMapListJson( char *buffer, size_t bufferSize ) {
+static qboolean CL_WebHost_StringListContains( char seen[][MAX_QPATH], int count, const char *value ) {
+	int i;
+
+	if ( !seen || !value || !value[0] ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < count; i++ ) {
+		if ( !Q_stricmp( seen[i], value ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CL_WebHost_TypeStringHasToken
+=============
+*/
+static qboolean CL_WebHost_TypeStringHasToken( const char *typeList, const char *token ) {
+	char working[1024];
+	char *cursor;
+	char *parsedToken;
+
+	if ( !typeList || !typeList[0] || !token || !token[0] ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( working, typeList, sizeof( working ) );
+	Q_strlwr( working );
+
+	cursor = working;
+	while ( 1 ) {
+		parsedToken = COM_ParseExt( &cursor, qfalse );
+		if ( !parsedToken[0] ) {
+			break;
+		}
+
+		if ( !Q_stricmp( parsedToken, token ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CL_WebHost_ResolveMapTypeBits
+=============
+*/
+static unsigned int CL_WebHost_ResolveMapTypeBits( const char *typeList ) {
+	unsigned int typeBits = 0u;
+
+	if ( !typeList || !typeList[0] ) {
+		return 1u << GT_FFA;
+	}
+
+	if ( CL_WebHost_TypeStringHasToken( typeList, "ffa" ) ) {
+		typeBits |= 1u << GT_FFA;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "duel" ) || CL_WebHost_TypeStringHasToken( typeList, "tourney" ) ) {
+		typeBits |= 1u << GT_TOURNAMENT;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "single" ) || CL_WebHost_TypeStringHasToken( typeList, "race" ) ) {
+		typeBits |= 1u << GT_SINGLE_PLAYER;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "team" ) || CL_WebHost_TypeStringHasToken( typeList, "tdm" ) ) {
+		typeBits |= 1u << GT_TEAM;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "clanarena" ) || CL_WebHost_TypeStringHasToken( typeList, "ca" ) ) {
+		typeBits |= 1u << GT_CLAN_ARENA;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "ctf" ) ) {
+		typeBits |= 1u << GT_CTF;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "oneflag" ) || CL_WebHost_TypeStringHasToken( typeList, "1fctf" ) ) {
+		typeBits |= 1u << GT_1FCTF;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "overload" ) || CL_WebHost_TypeStringHasToken( typeList, "obelisk" ) || CL_WebHost_TypeStringHasToken( typeList, "ovl" ) ) {
+		typeBits |= 1u << GT_OBELISK;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "harvester" ) || CL_WebHost_TypeStringHasToken( typeList, "har" ) ) {
+		typeBits |= 1u << GT_HARVESTER;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "freeze" ) || CL_WebHost_TypeStringHasToken( typeList, "freezetag" ) || CL_WebHost_TypeStringHasToken( typeList, "ft" ) ) {
+		typeBits |= 1u << GT_FREEZE;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "domination" ) || CL_WebHost_TypeStringHasToken( typeList, "dom" ) ) {
+		typeBits |= 1u << GT_DOMINATION;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "attackdefend" ) || CL_WebHost_TypeStringHasToken( typeList, "ad" ) ) {
+		typeBits |= 1u << GT_ATTACK_DEFEND;
+	}
+	if ( CL_WebHost_TypeStringHasToken( typeList, "redrover" ) || CL_WebHost_TypeStringHasToken( typeList, "rr" ) ) {
+		typeBits |= 1u << GT_RED_ROVER;
+	}
+
+	return typeBits ? typeBits : ( 1u << GT_FFA );
+}
+
+/*
+=============
+CL_WebHost_AppendGametypeBitsJson
+=============
+*/
+static void CL_WebHost_AppendGametypeBitsJson( unsigned int typeBits, char *buffer, size_t bufferSize ) {
+	int i;
+
+	Q_strcat( buffer, bufferSize, "[" );
+	for ( i = 0; i < GT_MAX_GAME_TYPE; i++ ) {
+		if ( i > 0 ) {
+			Q_strcat( buffer, bufferSize, "," );
+		}
+		Q_strcat( buffer, bufferSize, ( typeBits & ( 1u << i ) ) ? "1" : "0" );
+	}
+	Q_strcat( buffer, bufferSize, "]" );
+}
+
+/*
+=============
+CL_WebHost_AppendMapDescriptorJson
+=============
+*/
+static void CL_WebHost_AppendMapDescriptorJson( const char *sysname, const char *name, unsigned int typeBits, char *buffer, size_t bufferSize, int *entryCount ) {
+	clWebJsonBuilder_t builder;
+
+	if ( !sysname || !sysname[0] || !buffer || !entryCount ) {
+		return;
+	}
+
+	builder.buffer = buffer;
+	builder.bufferSize = bufferSize;
+	builder.count = *entryCount;
+	CL_WebHost_BeginJsonItem( &builder );
+	Q_strcat( buffer, bufferSize, "{\"sysname\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, sysname );
+	Q_strcat( buffer, bufferSize, "\",\"name\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, ( name && name[0] ) ? name : sysname );
+	Q_strcat( buffer, bufferSize, "\",\"gametypes\":" );
+	CL_WebHost_AppendGametypeBitsJson( typeBits, buffer, bufferSize );
+	Q_strcat( buffer, bufferSize, "}" );
+	( *entryCount )++;
+}
+
+/*
+=============
+CL_WebHost_ParseArenaInfosToJson
+=============
+*/
+static void CL_WebHost_ParseArenaInfosToJson( char *data, char *buffer, size_t bufferSize, char seenMaps[][MAX_QPATH], int *entryCount ) {
+	char		*token;
+	char		key[MAX_TOKEN_CHARS];
+	char		info[MAX_INFO_STRING];
+	char		*cursor;
+
+	if ( !data || !buffer || !entryCount ) {
+		return;
+	}
+
+	cursor = data;
+	while ( 1 ) {
+		token = COM_Parse( &cursor );
+		if ( !token[0] ) {
+			break;
+		}
+		if ( strcmp( token, "{" ) ) {
+			Com_DPrintf( "launcher browser map parser: missing '{' in arena data\n" );
+			break;
+		}
+
+		info[0] = '\0';
+		while ( 1 ) {
+			token = COM_ParseExt( &cursor, qtrue );
+			if ( !token[0] ) {
+				break;
+			}
+			if ( !strcmp( token, "}" ) ) {
+				break;
+			}
+
+			Q_strncpyz( key, token, sizeof( key ) );
+			token = COM_ParseExt( &cursor, qfalse );
+			Info_SetValueForKey( info, key, token[0] ? token : "<NULL>" );
+		}
+
+		{
+			const char	*mapName;
+			const char	*longName;
+			const char	*typeList;
+			unsigned int	typeBits;
+
+			mapName = Info_ValueForKey( info, "map" );
+			if ( !mapName[0] || *entryCount >= CL_WEB_MAX_MAPS || CL_WebHost_StringListContains( seenMaps, *entryCount, mapName ) ) {
+				continue;
+			}
+
+			longName = Info_ValueForKey( info, "longname" );
+			typeList = Info_ValueForKey( info, "type" );
+			typeBits = CL_WebHost_ResolveMapTypeBits( typeList );
+			Q_strncpyz( seenMaps[*entryCount], mapName, MAX_QPATH );
+			CL_WebHost_AppendMapDescriptorJson( mapName, longName, typeBits, buffer, bufferSize, entryCount );
+		}
+	}
+}
+
+/*
+=============
+CL_WebHost_AppendArenasFromFile
+=============
+*/
+static void CL_WebHost_AppendArenasFromFile( const char *filename, char *buffer, size_t bufferSize, char seenMaps[][MAX_QPATH], int *entryCount ) {
+	void	*fileBuffer;
+	int		length;
+
+	fileBuffer = NULL;
+	length = FS_ReadFile( filename, &fileBuffer );
+	if ( length <= 0 || !fileBuffer ) {
+		return;
+	}
+
+	CL_WebHost_ParseArenaInfosToJson( (char *)fileBuffer, buffer, bufferSize, seenMaps, entryCount );
+	FS_FreeFile( fileBuffer );
+}
+
+/*
+=============
+CL_WebHost_BuildMapListJsonFromBSPScan
+=============
+*/
+static void CL_WebHost_BuildMapListJsonFromBSPScan( char *buffer, size_t bufferSize ) {
 	char fileList[32768];
 	char *cursor;
 	int count;
-
-	if ( !buffer || bufferSize == 0 ) {
-		return;
-	}
 
 	buffer[0] = '\0';
 	Q_strcat( buffer, bufferSize, "[" );
@@ -582,48 +1706,751 @@ static void CL_WebHost_BuildMapListJson( char *buffer, size_t bufferSize ) {
 
 /*
 =============
-CL_WebHost_BuildFactoryListJson
+CL_WebHost_BuildMapListJson
 =============
 */
-static void CL_WebHost_BuildFactoryListJson( char *buffer, size_t bufferSize ) {
-	char fileList[32768];
-	char *cursor;
-	int count;
+static void CL_WebHost_BuildMapListJson( char *buffer, size_t bufferSize ) {
+	char	arenasFile[MAX_QPATH];
+	char	dirlist[CL_WEB_ARENA_FILE_LIST_BUFFER];
+	char	*dirptr;
+	char	filename[MAX_QPATH];
+	char	seenMaps[CL_WEB_MAX_MAPS][MAX_QPATH];
+	int		numdirs;
+	int		dirlen;
+	int		i;
+	int		entryCount;
 
 	if ( !buffer || bufferSize == 0 ) {
 		return;
 	}
 
+	Com_Memset( seenMaps, 0, sizeof( seenMaps ) );
+	entryCount = 0;
 	buffer[0] = '\0';
 	Q_strcat( buffer, bufferSize, "[" );
-	count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
-	if ( count <= 0 ) {
-		count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );
+
+	Cvar_VariableStringBuffer( "g_arenasFile", arenasFile, sizeof( arenasFile ) );
+	if ( arenasFile[0] ) {
+		CL_WebHost_AppendArenasFromFile( arenasFile, buffer, bufferSize, seenMaps, &entryCount );
+	} else {
+		CL_WebHost_AppendArenasFromFile( "scripts/arenas.txt", buffer, bufferSize, seenMaps, &entryCount );
 	}
 
-	cursor = fileList;
-	for ( ; count > 0 && *cursor; count-- ) {
-		char factoryName[MAX_QPATH];
-		const char *extension;
-		clWebJsonBuilder_t builder;
-
-		Q_strncpyz( factoryName, cursor, sizeof( factoryName ) );
-		extension = strrchr( factoryName, '.' );
-		if ( extension ) {
-			*strrchr( factoryName, '.' ) = '\0';
+	numdirs = FS_GetFileList( "scripts", ".arena", dirlist, sizeof( dirlist ) );
+	dirptr = dirlist;
+	for ( i = 0; i < numdirs && entryCount < CL_WEB_MAX_MAPS; i++, dirptr += dirlen + 1 ) {
+		dirlen = strlen( dirptr );
+		if ( dirlen <= 0 ) {
+			continue;
 		}
 
-		builder.buffer = buffer;
-		builder.bufferSize = bufferSize;
-		builder.count = ( buffer[1] != '\0' ) ? 1 : 0;
-		CL_WebHost_BeginJsonItem( &builder );
-		Q_strcat( buffer, bufferSize, "{\"sysname\":\"" );
-		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, factoryName );
-		Q_strcat( buffer, bufferSize, "\",\"title\":\"" );
-		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, factoryName );
-		Q_strcat( buffer, bufferSize, "\",\"basegt\":\"\",\"settings\":{}}" );
+		Com_sprintf( filename, sizeof( filename ), "scripts/%s", dirptr );
+		CL_WebHost_AppendArenasFromFile( filename, buffer, bufferSize, seenMaps, &entryCount );
+	}
+
+	Q_strcat( buffer, bufferSize, "]" );
+	if ( entryCount == 0 ) {
+		CL_WebHost_BuildMapListJsonFromBSPScan( buffer, bufferSize );
+	}
+}
+
+/*
+=============
+CL_WebFactory_ReportParseError
+=============
+*/
+static void CL_WebFactory_ReportParseError( const clWebFactoryParseState_t *state, const char *message ) {
+	const char *filename;
+
+	filename = ( state && state->filename && state->filename[0] ) ? state->filename : "<unknown>";
+	Com_DPrintf( "launcher browser factory parser: %s:%d: %s\n",
+		filename,
+		state ? state->line : 0,
+		message ? message : "unknown parse error" );
+}
+
+/*
+=============
+CL_WebFactory_SkipWhitespace
+=============
+*/
+static void CL_WebFactory_SkipWhitespace( clWebFactoryParseState_t *state ) {
+	if ( !state ) {
+		return;
+	}
+
+	while ( state->cursor < state->end ) {
+		char ch;
+
+		ch = *state->cursor;
+		if ( ch == '\n' ) {
+			state->line++;
+			state->cursor++;
+			continue;
+		}
+		if ( ch == '\r' || ch == '\t' || ch == ' ' ) {
+			state->cursor++;
+			continue;
+		}
+		break;
+	}
+}
+
+/*
+=============
+CL_WebFactory_ParseExpectedChar
+=============
+*/
+static qboolean CL_WebFactory_ParseExpectedChar( clWebFactoryParseState_t *state, char ch ) {
+	CL_WebFactory_SkipWhitespace( state );
+	if ( !state || state->cursor >= state->end || *state->cursor != ch ) {
+		CL_WebFactory_ReportParseError( state, va( "expected '%c'", ch ) );
+		return qfalse;
+	}
+
+	state->cursor++;
+	return qtrue;
+}
+
+/*
+=============
+CL_WebFactory_SkipJsonString
+=============
+*/
+static qboolean CL_WebFactory_SkipJsonString( clWebFactoryParseState_t *state ) {
+	if ( !state ) {
+		return qfalse;
+	}
+
+	CL_WebFactory_SkipWhitespace( state );
+	if ( state->cursor >= state->end || *state->cursor != '"' ) {
+		CL_WebFactory_ReportParseError( state, "expected string" );
+		return qfalse;
+	}
+
+	state->cursor++;
+	while ( state->cursor < state->end ) {
+		char ch;
+
+		ch = *state->cursor++;
+		if ( ch == '"' ) {
+			return qtrue;
+		}
+		if ( ch == '\\' ) {
+			if ( state->cursor >= state->end ) {
+				break;
+			}
+			state->cursor++;
+			continue;
+		}
+		if ( ch == '\n' ) {
+			state->line++;
+		}
+	}
+
+	CL_WebFactory_ReportParseError( state, "unterminated string" );
+	return qfalse;
+}
+
+/*
+=============
+CL_WebFactory_ParseJsonString
+=============
+*/
+static qboolean CL_WebFactory_ParseJsonString( clWebFactoryParseState_t *state, char *buffer, size_t bufferSize ) {
+	size_t length;
+
+	if ( !state || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	CL_WebFactory_SkipWhitespace( state );
+	if ( state->cursor >= state->end || *state->cursor != '"' ) {
+		CL_WebFactory_ReportParseError( state, "expected string" );
+		return qfalse;
+	}
+
+	state->cursor++;
+	length = 0u;
+	while ( state->cursor < state->end ) {
+		char ch;
+
+		ch = *state->cursor++;
+		if ( ch == '"' ) {
+			buffer[length] = '\0';
+			return qtrue;
+		}
+
+		if ( ch == '\\' ) {
+			char escaped;
+
+			if ( state->cursor >= state->end ) {
+				break;
+			}
+
+			escaped = *state->cursor++;
+			switch ( escaped ) {
+				case '"': ch = '"'; break;
+				case '\\': ch = '\\'; break;
+				case '/': ch = '/'; break;
+				case 'b': ch = '\b'; break;
+				case 'f': ch = '\f'; break;
+				case 'n': ch = '\n'; break;
+				case 'r': ch = '\r'; break;
+				case 't': ch = '\t'; break;
+				case 'u': {
+					int i;
+					int value = 0;
+
+					for ( i = 0; i < 4 && state->cursor < state->end; i++ ) {
+						char hex;
+
+						hex = *state->cursor++;
+						value <<= 4;
+						if ( hex >= '0' && hex <= '9' ) {
+							value |= hex - '0';
+						} else if ( hex >= 'a' && hex <= 'f' ) {
+							value |= 10 + ( hex - 'a' );
+						} else if ( hex >= 'A' && hex <= 'F' ) {
+							value |= 10 + ( hex - 'A' );
+						} else {
+							CL_WebFactory_ReportParseError( state, "invalid unicode escape" );
+							return qfalse;
+						}
+					}
+
+					ch = ( value <= 0x7F ) ? (char)value : '?';
+					break;
+				}
+				default:
+					CL_WebFactory_ReportParseError( state, "invalid escape" );
+					return qfalse;
+			}
+		}
+
+		if ( ch == '\n' ) {
+			state->line++;
+		}
+
+		if ( length + 1u < bufferSize ) {
+			buffer[length++] = ch;
+		}
+	}
+
+	CL_WebFactory_ReportParseError( state, "unterminated string" );
+	return qfalse;
+}
+
+/*
+=============
+CL_WebFactory_ParseLiteralString
+=============
+*/
+static qboolean CL_WebFactory_ParseLiteralString( clWebFactoryParseState_t *state, char *buffer, size_t bufferSize ) {
+	size_t length;
+
+	if ( !state || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	length = 0u;
+	CL_WebFactory_SkipWhitespace( state );
+	while ( state->cursor < state->end ) {
+		char ch;
+
+		ch = *state->cursor;
+		if ( ch == ',' || ch == '}' || ch == ']' || ch == '\n' || ch == '\r' || ch == '\t' || ch == ' ' ) {
+			break;
+		}
+
+		if ( length + 1u < bufferSize ) {
+			buffer[length++] = ch;
+		}
+		state->cursor++;
+	}
+
+	buffer[length] = '\0';
+	if ( length == 0u ) {
+		CL_WebFactory_ReportParseError( state, "expected literal" );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CL_WebFactory_ParseValueString
+=============
+*/
+static qboolean CL_WebFactory_ParseValueString( clWebFactoryParseState_t *state, char *buffer, size_t bufferSize ) {
+	CL_WebFactory_SkipWhitespace( state );
+	if ( !state || state->cursor >= state->end ) {
+		CL_WebFactory_ReportParseError( state, "unexpected end of data" );
+		return qfalse;
+	}
+
+	if ( *state->cursor == '"' ) {
+		return CL_WebFactory_ParseJsonString( state, buffer, bufferSize );
+	}
+
+	return CL_WebFactory_ParseLiteralString( state, buffer, bufferSize );
+}
+
+/*
+=============
+CL_WebFactory_SkipValue
+=============
+*/
+static qboolean CL_WebFactory_SkipValue( clWebFactoryParseState_t *state ) {
+	if ( !state ) {
+		return qfalse;
+	}
+
+	CL_WebFactory_SkipWhitespace( state );
+	if ( state->cursor >= state->end ) {
+		CL_WebFactory_ReportParseError( state, "unexpected end of data" );
+		return qfalse;
+	}
+
+	switch ( *state->cursor ) {
+		case '{': {
+			int depth = 0;
+			do {
+				char ch;
+
+				ch = *state->cursor++;
+				if ( ch == '{' ) {
+					depth++;
+				} else if ( ch == '}' ) {
+					depth--;
+				} else if ( ch == '"' ) {
+					state->cursor--;
+					if ( !CL_WebFactory_SkipJsonString( state ) ) {
+						return qfalse;
+					}
+					continue;
+				}
+
+				if ( ch == '\n' ) {
+					state->line++;
+				}
+			} while ( depth > 0 && state->cursor < state->end );
+			if ( depth != 0 ) {
+				CL_WebFactory_ReportParseError( state, "unterminated object" );
+				return qfalse;
+			}
+			return qtrue;
+		}
+		case '[': {
+			int depth = 0;
+			do {
+				char ch;
+
+				ch = *state->cursor++;
+				if ( ch == '[' ) {
+					depth++;
+				} else if ( ch == ']' ) {
+					depth--;
+				} else if ( ch == '"' ) {
+					state->cursor--;
+					if ( !CL_WebFactory_SkipJsonString( state ) ) {
+						return qfalse;
+					}
+					continue;
+				}
+
+				if ( ch == '\n' ) {
+					state->line++;
+				}
+			} while ( depth > 0 && state->cursor < state->end );
+			if ( depth != 0 ) {
+				CL_WebFactory_ReportParseError( state, "unterminated array" );
+				return qfalse;
+			}
+			return qtrue;
+		}
+		case '"':
+			return CL_WebFactory_SkipJsonString( state );
+		default:
+			while ( state->cursor < state->end ) {
+				char ch;
+
+				ch = *state->cursor;
+				if ( ch == ',' || ch == '}' || ch == ']' || ch == '\n' ) {
+					return qtrue;
+				}
+				state->cursor++;
+			}
+			return qtrue;
+	}
+}
+
+/*
+=============
+CL_WebFactory_ParseSettingsObject
+=============
+*/
+static qboolean CL_WebFactory_ParseSettingsObject( clWebFactoryParseState_t *state, char *buffer, size_t bufferSize ) {
+	int entryCount;
+
+	if ( !state || !buffer || bufferSize == 0 ) {
+		return qfalse;
+	}
+
+	buffer[0] = '\0';
+	Q_strcat( buffer, bufferSize, "{" );
+	entryCount = 0;
+
+	if ( !CL_WebFactory_ParseExpectedChar( state, '{' ) ) {
+		return qfalse;
+	}
+
+	CL_WebFactory_SkipWhitespace( state );
+	if ( state->cursor < state->end && *state->cursor == '}' ) {
+		state->cursor++;
+		Q_strcat( buffer, bufferSize, "}" );
+		return qtrue;
+	}
+
+	while ( state->cursor < state->end ) {
+		char key[128];
+		char loweredKey[128];
+		char value[MAX_CVAR_VALUE_STRING];
+
+		if ( !CL_WebFactory_ParseJsonString( state, key, sizeof( key ) ) ) {
+			return qfalse;
+		}
+		if ( !CL_WebFactory_ParseExpectedChar( state, ':' ) ) {
+			return qfalse;
+		}
+		if ( !CL_WebFactory_ParseValueString( state, value, sizeof( value ) ) ) {
+			return qfalse;
+		}
+
+		Q_strncpyz( loweredKey, key, sizeof( loweredKey ) );
+		Q_strlwr( loweredKey );
+		if ( entryCount > 0 ) {
+			Q_strcat( buffer, bufferSize, "," );
+		}
+		Q_strcat( buffer, bufferSize, "\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, loweredKey );
+		Q_strcat( buffer, bufferSize, "\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, value );
+		Q_strcat( buffer, bufferSize, "\"" );
+		entryCount++;
+
+		CL_WebFactory_SkipWhitespace( state );
+		if ( state->cursor >= state->end ) {
+			CL_WebFactory_ReportParseError( state, "unterminated cvars object" );
+			return qfalse;
+		}
+
+		if ( *state->cursor == ',' ) {
+			state->cursor++;
+			CL_WebFactory_SkipWhitespace( state );
+			if ( state->cursor < state->end && *state->cursor == '}' ) {
+				state->cursor++;
+				Q_strcat( buffer, bufferSize, "}" );
+				return qtrue;
+			}
+			continue;
+		}
+		if ( *state->cursor == '}' ) {
+			state->cursor++;
+			Q_strcat( buffer, bufferSize, "}" );
+			return qtrue;
+		}
+
+		CL_WebFactory_ReportParseError( state, "expected ',' or '}'" );
+		return qfalse;
+	}
+
+	CL_WebFactory_ReportParseError( state, "unterminated cvars object" );
+	return qfalse;
+}
+
+/*
+=============
+CL_WebFactory_ParseDefinition
+=============
+*/
+static qboolean CL_WebFactory_ParseDefinition( clWebFactoryParseState_t *state, clWebFactoryDefinition_t *definition ) {
+	if ( !state || !definition ) {
+		return qfalse;
+	}
+
+	Com_Memset( definition, 0, sizeof( *definition ) );
+	Q_strncpyz( definition->settingsJson, "{}", sizeof( definition->settingsJson ) );
+
+	if ( !CL_WebFactory_ParseExpectedChar( state, '{' ) ) {
+		return qfalse;
+	}
+
+	while ( state->cursor < state->end ) {
+		char key[64];
+
+		CL_WebFactory_SkipWhitespace( state );
+		if ( state->cursor >= state->end ) {
+			break;
+		}
+		if ( *state->cursor == '}' ) {
+			state->cursor++;
+			break;
+		}
+
+		if ( !CL_WebFactory_ParseJsonString( state, key, sizeof( key ) ) ) {
+			return qfalse;
+		}
+		if ( !CL_WebFactory_ParseExpectedChar( state, ':' ) ) {
+			return qfalse;
+		}
+
+		if ( !Q_stricmp( key, "id" ) ) {
+			if ( !CL_WebFactory_ParseValueString( state, definition->id, sizeof( definition->id ) ) ) {
+				return qfalse;
+			}
+		} else if ( !Q_stricmp( key, "title" ) ) {
+			if ( !CL_WebFactory_ParseValueString( state, definition->title, sizeof( definition->title ) ) ) {
+				return qfalse;
+			}
+		} else if ( !Q_stricmp( key, "author" ) ) {
+			if ( !CL_WebFactory_ParseValueString( state, definition->author, sizeof( definition->author ) ) ) {
+				return qfalse;
+			}
+		} else if ( !Q_stricmp( key, "description" ) ) {
+			if ( !CL_WebFactory_ParseValueString( state, definition->description, sizeof( definition->description ) ) ) {
+				return qfalse;
+			}
+		} else if ( !Q_stricmp( key, "basegt" ) ) {
+			if ( !CL_WebFactory_ParseValueString( state, definition->basegt, sizeof( definition->basegt ) ) ) {
+				return qfalse;
+			}
+		} else if ( !Q_stricmp( key, "cvars" ) ) {
+			if ( !CL_WebFactory_ParseSettingsObject( state, definition->settingsJson, sizeof( definition->settingsJson ) ) ) {
+				return qfalse;
+			}
+		} else {
+			if ( !CL_WebFactory_SkipValue( state ) ) {
+				return qfalse;
+			}
+		}
+
+		CL_WebFactory_SkipWhitespace( state );
+		if ( state->cursor >= state->end ) {
+			break;
+		}
+		if ( *state->cursor == ',' ) {
+			state->cursor++;
+			CL_WebFactory_SkipWhitespace( state );
+			if ( state->cursor < state->end && *state->cursor == '}' ) {
+				state->cursor++;
+				break;
+			}
+			continue;
+		}
+		if ( *state->cursor == '}' ) {
+			state->cursor++;
+			break;
+		}
+
+		CL_WebFactory_ReportParseError( state, "expected ',' or '}'" );
+		return qfalse;
+	}
+
+	if ( !definition->id[0] || !definition->basegt[0] ) {
+		CL_WebFactory_ReportParseError( state, "factory missing id or basegt" );
+		return qfalse;
+	}
+
+	if ( !definition->title[0] ) {
+		Q_strncpyz( definition->title, definition->id, sizeof( definition->title ) );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+CL_WebHost_AppendFactoryDefinitionJson
+=============
+*/
+static void CL_WebHost_AppendFactoryDefinitionJson( const clWebFactoryDefinition_t *definition, char *buffer, size_t bufferSize, int *entryCount ) {
+	clWebJsonBuilder_t builder;
+
+	if ( !definition || !definition->id[0] || !buffer || !entryCount ) {
+		return;
+	}
+
+	builder.buffer = buffer;
+	builder.bufferSize = bufferSize;
+	builder.count = *entryCount;
+	CL_WebHost_BeginJsonItem( &builder );
+	Q_strcat( buffer, bufferSize, "{\"sysname\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, definition->id );
+	Q_strcat( buffer, bufferSize, "\",\"title\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, definition->title );
+	Q_strcat( buffer, bufferSize, "\",\"basegt\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, definition->basegt );
+	Q_strcat( buffer, bufferSize, "\"" );
+	if ( definition->author[0] ) {
+		Q_strcat( buffer, bufferSize, ",\"author\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, definition->author );
+		Q_strcat( buffer, bufferSize, "\"" );
+	}
+	if ( definition->description[0] ) {
+		Q_strcat( buffer, bufferSize, ",\"description\":\"" );
+		CL_WebHost_AppendJsonEscaped( buffer, bufferSize, definition->description );
+		Q_strcat( buffer, bufferSize, "\"" );
+	}
+	Q_strcat( buffer, bufferSize, ",\"settings\":" );
+	Q_strcat( buffer, bufferSize, definition->settingsJson[0] ? definition->settingsJson : "{}" );
+	Q_strcat( buffer, bufferSize, "}" );
+	( *entryCount )++;
+}
+
+/*
+=============
+CL_WebHost_AppendFactoryDefinitionsFromBuffer
+=============
+*/
+static void CL_WebHost_AppendFactoryDefinitionsFromBuffer( const char *filename, char *data, int dataLength, char *buffer, size_t bufferSize, char seenIds[][MAX_QPATH], int *entryCount ) {
+	clWebFactoryParseState_t state;
+
+	if ( !data || dataLength <= 0 || !buffer || !seenIds || !entryCount ) {
+		return;
+	}
+
+	state.cursor = data;
+	state.end = data + dataLength;
+	state.filename = filename;
+	state.line = 1;
+
+	CL_WebFactory_SkipWhitespace( &state );
+	if ( state.cursor >= state.end ) {
+		return;
+	}
+
+	if ( *state.cursor == '{' ) {
+		clWebFactoryDefinition_t definition;
+
+		if ( !CL_WebFactory_ParseDefinition( &state, &definition ) ) {
+			return;
+		}
+		if ( !CL_WebHost_StringListContains( seenIds, *entryCount, definition.id ) && *entryCount < CL_WEB_MAX_FACTORY_DEFINITIONS ) {
+			Q_strncpyz( seenIds[*entryCount], definition.id, MAX_QPATH );
+			CL_WebHost_AppendFactoryDefinitionJson( &definition, buffer, bufferSize, entryCount );
+		}
+		return;
+	}
+
+	if ( !CL_WebFactory_ParseExpectedChar( &state, '[' ) ) {
+		return;
+	}
+
+	CL_WebFactory_SkipWhitespace( &state );
+	if ( state.cursor < state.end && *state.cursor == ']' ) {
+		state.cursor++;
+		return;
+	}
+
+	while ( state.cursor < state.end ) {
+		clWebFactoryDefinition_t definition;
+
+		if ( !CL_WebFactory_ParseDefinition( &state, &definition ) ) {
+			return;
+		}
+		if ( !CL_WebHost_StringListContains( seenIds, *entryCount, definition.id ) && *entryCount < CL_WEB_MAX_FACTORY_DEFINITIONS ) {
+			Q_strncpyz( seenIds[*entryCount], definition.id, MAX_QPATH );
+			CL_WebHost_AppendFactoryDefinitionJson( &definition, buffer, bufferSize, entryCount );
+		}
+
+		CL_WebFactory_SkipWhitespace( &state );
+		if ( state.cursor >= state.end ) {
+			return;
+		}
+		if ( *state.cursor == ',' ) {
+			state.cursor++;
+			CL_WebFactory_SkipWhitespace( &state );
+			if ( state.cursor < state.end && *state.cursor == ']' ) {
+				state.cursor++;
+				return;
+			}
+			continue;
+		}
+		if ( *state.cursor == ']' ) {
+			state.cursor++;
+			return;
+		}
+
+		CL_WebFactory_ReportParseError( &state, "expected ',' or ']'" );
+		return;
+	}
+}
+
+/*
+=============
+CL_WebHost_AppendFactoryDefinitionsFromFile
+=============
+*/
+static void CL_WebHost_AppendFactoryDefinitionsFromFile( const char *filename, char *buffer, size_t bufferSize, char seenIds[][MAX_QPATH], int *entryCount ) {
+	void	*fileBuffer;
+	int		length;
+
+	fileBuffer = NULL;
+	length = FS_ReadFile( filename, &fileBuffer );
+	if ( length <= 0 || !fileBuffer ) {
+		return;
+	}
+
+	CL_WebHost_AppendFactoryDefinitionsFromBuffer( filename, (char *)fileBuffer, length, buffer, bufferSize, seenIds, entryCount );
+	FS_FreeFile( fileBuffer );
+}
+
+/*
+=============
+CL_WebHost_BuildFactoryListJson
+=============
+*/
+static void CL_WebHost_BuildFactoryListJson( char *buffer, size_t bufferSize ) {
+	char fileList[32768];
+	char seenIds[CL_WEB_MAX_FACTORY_DEFINITIONS][MAX_QPATH];
+	char *cursor;
+	int count;
+	int entryCount;
+
+	if ( !buffer || bufferSize == 0 ) {
+		return;
+	}
+
+	Com_Memset( seenIds, 0, sizeof( seenIds ) );
+	entryCount = 0;
+	buffer[0] = '\0';
+	Q_strcat( buffer, bufferSize, "[" );
+
+	CL_WebHost_AppendFactoryDefinitionsFromFile( "scripts/factories.txt", buffer, bufferSize, seenIds, &entryCount );
+	count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
+	cursor = fileList;
+	for ( ; count > 0 && *cursor; count-- ) {
+		char path[MAX_QPATH];
+
+		Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
+		CL_WebHost_AppendFactoryDefinitionsFromFile( path, buffer, bufferSize, seenIds, &entryCount );
 		cursor += strlen( cursor ) + 1;
 	}
+
+	count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );
+	cursor = fileList;
+	for ( ; count > 0 && *cursor; count-- ) {
+		char path[MAX_QPATH];
+
+		Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
+		CL_WebHost_AppendFactoryDefinitionsFromFile( path, buffer, bufferSize, seenIds, &entryCount );
+		cursor += strlen( cursor ) + 1;
+	}
+
 	Q_strcat( buffer, bufferSize, "]" );
 }
 
@@ -957,6 +2784,17 @@ CL_WebHost_RequestCursorPosition
 =============
 */
 static qboolean CL_WebHost_RequestCursorPosition( int *x, int *y ) {
+	if ( cl_webHost.cursorPositionValid && cl_webHost.viewInitialised && ( cl_webHost.browserVisible || cl_webHost.browserActive ) ) {
+		if ( x ) {
+			*x = cl_webHost.cursorX;
+		}
+		if ( y ) {
+			*y = cl_webHost.cursorY;
+		}
+
+		return qtrue;
+	}
+
 #if defined( _WIN32 )
 	POINT point;
 
@@ -1318,6 +3156,7 @@ static void CL_ResetBrowserOverlayState( void ) {
 	cl_webHost.browserVisible = qfalse;
 	cl_webHost.browserActive = qfalse;
 	cl_webHost.focused = qfalse;
+	CL_WebHost_ClearCursorOverride();
 	Cvar_Set( "web_browserActive", "0" );
 }
 
@@ -1445,12 +3284,12 @@ void CL_Web_ShowBrowser_f( void ) {
 	cl_webBrowserVisible = qtrue;
 	if ( Cmd_Argc() > 1 ) {
 		const char *hash = Cmd_ArgsFrom( 1 );
-		Q_strncpyz( cl_webBrowserHash, hash, sizeof( cl_webBrowserHash ) );
+		CL_WebHost_NormalizeHash( hash, cl_webBrowserHash, sizeof( cl_webBrowserHash ) );
 	} else {
 		cl_webBrowserHash[0] = '\0';
 	}
 	QLWebHost_NavigateOrOpen( cl_webBrowserHash );
-	Cvar_Set( "web_browserActive", "1" );
+	Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
 	Com_DPrintf( "web_showBrowser\n" );
 #endif
 }
@@ -1475,10 +3314,10 @@ void CL_Web_ChangeHash_f( void ) {
 	}
 
 	const char *hash = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
-	Q_strncpyz( cl_webBrowserHash, hash, sizeof( cl_webBrowserHash ) );
+	CL_WebHost_NormalizeHash( hash, cl_webBrowserHash, sizeof( cl_webBrowserHash ) );
 	cl_webBrowserVisible = qtrue;
 	QLWebHost_NavigateOrOpen( cl_webBrowserHash );
-	Cvar_Set( "web_browserActive", "1" );
+	Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
 	Com_DPrintf( "web_changeHash %s\n", cl_webBrowserHash );
 #endif
 }
@@ -1510,8 +3349,8 @@ void CL_Web_BrowserActive_f( void ) {
 	} else {
 		QLWebHost_HideBrowser();
 	}
-	Cvar_Set( "web_browserActive", active ? "1" : "0" );
-	Com_DPrintf( "web_browserActive %s\n", active ? "1" : "0" );
+	Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
+	Com_DPrintf( "web_browserActive %s\n", cl_webHost.browserActive ? "1" : "0" );
 #endif
 }
 
@@ -1562,8 +3401,10 @@ void CL_Web_ShowError_f( void ) {
 	if ( CL_OverlayServiceAvailable() ) {
 		cl_webBrowserVisible = qtrue;
 		QLWebHost_NavigateOrOpen( cl_webBrowserHash );
-		CL_WebView_PublishGameError( message );
-		Cvar_Set( "web_browserActive", "1" );
+		if ( !cl_webHost.loadFailed && cl_webHost.windowObjectBound ) {
+			CL_WebView_PublishGameError( message );
+		}
+		Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
 	}
 #endif
 
@@ -1601,7 +3442,7 @@ void CL_Web_Reload_f( void ) {
 		} else {
 			QLWebHost_NavigateOrOpen( cl_webBrowserHash );
 		}
-		Cvar_Set( "web_browserActive", "1" );
+		Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
 	}
 #endif
 
@@ -1685,7 +3526,7 @@ void CL_WebHost_Frame( void ) {
 			if ( cl_webBrowserHash[0] ) {
 				QLWebHost_OpenRelativeURL( cl_webBrowserHash );
 			} else {
-				QLWebHost_OpenURL( "ql://quakelive" );
+				QLWebHost_OpenURL( CL_WEB_DEFAULT_URL );
 			}
 		} else if ( Q_stricmp( cl_webHost.currentUrl, expectedUrl ) ) {
 			QLWebHost_NavigateOrOpen( cl_webBrowserHash );
@@ -1695,7 +3536,7 @@ void CL_WebHost_Frame( void ) {
 			cl_webHost.focused = qtrue;
 		}
 
-		Cvar_Set( "web_browserActive", "1" );
+		Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
 	} else if ( cl_webHost.browserVisible || cl_webHost.browserActive ) {
 		QLWebHost_HideBrowser();
 		Cvar_Set( "web_browserActive", "0" );
@@ -1721,7 +3562,7 @@ qboolean CL_WebHost_HasLiveView( void ) {
 		return qfalse;
 	}
 
-	return cl_webHost.viewInitialised;
+	return cl_webHost.viewInitialised && cl_webHost.bootstrapReady;
 #endif
 }
 
@@ -1746,6 +3587,124 @@ qboolean CL_WebHost_HasBoundWindowObject( void ) {
 
 /*
 =============
+CL_WebHost_GetCursorHandle
+
+Returns the active Win32 browser cursor override when the retained host owns one.
+=============
+*/
+void *CL_WebHost_GetCursorHandle( void ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES || !defined( _WIN32 )
+	return NULL;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return NULL;
+	}
+
+	if ( !cl_webHost.viewInitialised || !cl_webHost.browserVisible || !cl_webHost.browserActive ) {
+		return NULL;
+	}
+
+	if ( !cl_webHost.cursorOverrideActive || !cl_webHost.activeCursorHandle ) {
+		return NULL;
+	}
+
+	return cl_webHost.activeCursorHandle;
+#endif
+}
+
+/*
+=============
+CL_WebHost_NotifyAppActivation
+
+Mirrors retail Win32 app-activation changes into the retained browser host.
+=============
+*/
+void CL_WebHost_NotifyAppActivation( qboolean active ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	(void)active;
+	return;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return;
+	}
+
+	if ( !active ) {
+		cl_webHost.focused = qfalse;
+		return;
+	}
+
+	QLWebView_InjectActivationKeyboardEvent();
+#endif
+}
+
+/*
+=============
+CL_WebView_OnMouseMove
+
+Records browser-directed mouse motion for the retained host-text/browser seam.
+=============
+*/
+void CL_WebView_OnMouseMove( int x, int y ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	(void)x;
+	(void)y;
+	return;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return;
+	}
+
+	QLWebView_InjectMouseMove( x, y );
+#endif
+}
+
+/*
+=============
+CL_WebView_OnMouseButtonEvent
+
+Records browser-directed mouse button activity for the retained host-text/browser seam.
+=============
+*/
+void CL_WebView_OnMouseButtonEvent( int key, qboolean down ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	(void)key;
+	(void)down;
+	return;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return;
+	}
+
+	if ( down ) {
+		QLWebView_InjectMouseDown( key );
+	} else {
+		QLWebView_InjectMouseUp( key );
+	}
+#endif
+}
+
+/*
+=============
+CL_WebView_OnMouseWheelEvent
+
+Records browser-directed mouse wheel activity for the retained host-text/browser seam.
+=============
+*/
+void CL_WebView_OnMouseWheelEvent( int direction ) {
+#if !QL_PLATFORM_HAS_ONLINE_SERVICES
+	(void)direction;
+	return;
+#else
+	if ( !CL_OverlayServiceAvailable() ) {
+		return;
+	}
+
+	QLWebView_InjectMouseWheel( direction );
+#endif
+}
+
+/*
+=============
 CL_WebView_OnKeyEvent
 
 Records browser-directed key activity for the retained host-text/browser seam.
@@ -1761,18 +3720,7 @@ void CL_WebView_OnKeyEvent( int key, qboolean down ) {
 		return;
 	}
 
-	if ( !cl_webHost.browserVisible && !cl_webHost.browserActive ) {
-		return;
-	}
-
-	if ( !down && cl_webHost.keyCaptureArmed ) {
-		QLWebView_PublishGameKey( key );
-		cl_webHost.keyCaptureArmed = qfalse;
-	}
-
-	if ( down ) {
-		cl_webHost.focused = qtrue;
-	}
+	QLWebView_InjectKeyboardEvent( key, down );
 #endif
 }
 
@@ -2713,6 +4661,22 @@ static int QL_CG_FindMutedIdentityIndex( uint64_t identity ) {
 
 /*
 ==============
+CL_IsSteamIdentityMuted
+==============
+*/
+qboolean CL_IsSteamIdentityMuted( unsigned int identityLow, unsigned int identityHigh ) {
+	uint64_t identity;
+
+	identity = QL_CG_CombineIdentityWords( identityLow, identityHigh );
+	if ( !identity ) {
+		return qfalse;
+	}
+
+	return QL_CG_FindMutedIdentityIndex( identity ) >= 0 ? qtrue : qfalse;
+}
+
+/*
+==============
 QL_CG_trap_Cvar_RegisterRange
 ==============
 */
@@ -2746,8 +4710,7 @@ QL_CG_trap_S_StartSoundVolume
 ==============
 */
 static void QDECL QL_CG_trap_S_StartSoundVolume( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfx, float volume ) {
-	(void)volume;
-	S_StartSound( origin, entityNum, entchannel, sfx );
+	S_StartSoundVolume( origin, entityNum, entchannel, sfx, volume );
 }
 
 /*
@@ -2756,8 +4719,7 @@ QL_CG_trap_S_StartLocalSoundVolume
 ==============
 */
 static void QDECL QL_CG_trap_S_StartLocalSoundVolume( sfxHandle_t sfx, int channelNum, float volume ) {
-	(void)volume;
-	S_StartLocalSound( sfx, channelNum );
+	S_StartLocalSoundVolume( sfx, channelNum, volume );
 }
 
 /*

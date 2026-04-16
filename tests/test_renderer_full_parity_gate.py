@@ -224,7 +224,7 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 		and '"scripts/posteffect.vs"' in tr_backend
 		and "GL_TEXTURE_RECTANGLE_ARB" in tr_backend
 		and "tr.postProcessActive = backEnd.postProcessActive;" in tr_backend
-		and 'r_contrast = ri.Cvar_Get( "r_contrast", "1", CVAR_ARCHIVE );' in tr_init
+		and 'r_contrast = ri.Cvar_Get( "r_contrast", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
 		and "tests/test_renderer_post_process_parity.py" in workflow_text
 	)
 	report["tranches"]["RG-G03"] = _entry(
@@ -240,7 +240,7 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 			"posteffect_vertex_shader_present": '"scripts/posteffect.vs"' in tr_backend,
 			"rectangle_texture_path_present": "GL_TEXTURE_RECTANGLE_ARB" in tr_backend,
 			"active_state_mirror_present": "tr.postProcessActive = backEnd.postProcessActive;" in tr_backend,
-			"contrast_cvar_present": 'r_contrast = ri.Cvar_Get( "r_contrast", "1", CVAR_ARCHIVE );' in tr_init,
+			"contrast_cvar_present": 'r_contrast = ri.Cvar_Get( "r_contrast", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init,
 		},
 	)
 
@@ -449,8 +449,10 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 		and "QLEnableFreeType" in quakelive_steam_vcxproj
 		and "ValidateFreeType" in quakelive_steam_vcxproj
 		and "QLEnableFreeType" in build_script
-		and "FreeTypeIncludeDir" in build_script
-		and "FreeTypeLibDir" in build_script
+		and "build_internal_deps.ps1" in build_script
+		and "VCPKG_ROOT" not in renderer_vcxproj
+		and "VCPKG_ROOT" not in quakelive_steam_vcxproj
+		and "VCPKG_ROOT" not in build_script
 		and "QL_ENABLE_FREETYPE ?= 0" in unix_makefile
 		and "pkg-config --cflags freetype2" in unix_makefile
 		and "CLIENT_FREETYPE_CFLAGS := $(FREETYPE_CFLAGS) -DBUILD_FREETYPE" in unix_makefile
@@ -480,8 +482,10 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 			"engine_vcxproj_has_freetype_toggle": "QLEnableFreeType" in quakelive_steam_vcxproj,
 			"engine_vcxproj_has_validate_target": "ValidateFreeType" in quakelive_steam_vcxproj,
 			"build_script_has_freetype_toggle": "QLEnableFreeType" in build_script,
-			"build_script_has_freetype_include_override": "FreeTypeIncludeDir" in build_script,
-			"build_script_has_freetype_lib_override": "FreeTypeLibDir" in build_script,
+			"build_script_bootstraps_internal_codecs": "build_internal_deps.ps1" in build_script,
+			"renderer_vcxproj_has_vcpkg_probe": "VCPKG_ROOT" in renderer_vcxproj,
+			"engine_vcxproj_has_vcpkg_probe": "VCPKG_ROOT" in quakelive_steam_vcxproj,
+			"build_script_has_vcpkg_probe": "VCPKG_ROOT" in build_script,
 			"unix_makefile_has_freetype_toggle": "QL_ENABLE_FREETYPE ?= 0" in unix_makefile,
 			"unix_makefile_uses_pkg_config_freetype": "pkg-config --cflags freetype2" in unix_makefile,
 			"unix_makefile_defines_build_freetype": "CLIENT_FREETYPE_CFLAGS := $(FREETYPE_CFLAGS) -DBUILD_FREETYPE" in unix_makefile,

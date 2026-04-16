@@ -645,6 +645,90 @@ static void UI_PlayerFloatSprite( playerInfo_t *pi, vec3_t origin, qhandle_t sha
 	trap_R_AddRefEntityToScene( &ent );
 }
 
+/*
+=============
+UI_GetPlayerColorScale
+
+Retail doubles UI preview colors when renderer-side color correction is not
+active.
+=============
+*/
+static int UI_GetPlayerColorScale( void ) {
+	char	value[16];
+
+	trap_Cvar_VariableStringBuffer( "r_colorCorrectActive", value, sizeof( value ) );
+	return atof( value ) > 0.0f ? 1 : 2;
+}
+
+/*
+=============
+UI_SetScaledShaderRGBA
+
+Copies a normalized RGB color into shader bytes using the retail preview
+color gain.
+=============
+*/
+static void UI_SetScaledShaderRGBA( byte *rgba, const vec3_t color, int colorScale ) {
+	int	i;
+
+	if ( !rgba || !color ) {
+		return;
+	}
+
+	for ( i = 0 ; i < 3 ; i++ ) {
+		float	component;
+
+		component = Com_Clamp( 0.0f, 1.0f, color[i] ) * 255.0f * colorScale;
+		rgba[i] = (byte)Com_Clamp( 0.0f, 255.0f, component );
+	}
+
+	rgba[3] = 255;
+}
+
+/*
+=============
+UI_ApplyPlayerColors
+
+Applies the retail UI preview color overrides across the player model parts.
+=============
+*/
+static void UI_ApplyPlayerColors( const playerInfo_t *pi, refEntity_t *legs, refEntity_t *torso, refEntity_t *head ) {
+	int	colorScale;
+
+	if ( !pi || !legs || !torso || !head ) {
+		return;
+	}
+
+	legs->shaderRGBA[0] = 255;
+	legs->shaderRGBA[1] = 255;
+	legs->shaderRGBA[2] = 255;
+	legs->shaderRGBA[3] = 255;
+	torso->shaderRGBA[0] = 255;
+	torso->shaderRGBA[1] = 255;
+	torso->shaderRGBA[2] = 255;
+	torso->shaderRGBA[3] = 255;
+	head->shaderRGBA[0] = 255;
+	head->shaderRGBA[1] = 255;
+	head->shaderRGBA[2] = 255;
+	head->shaderRGBA[3] = 255;
+
+	if ( !pi->headColorForced && !pi->upperColorForced && !pi->lowerColorForced ) {
+		return;
+	}
+
+	colorScale = UI_GetPlayerColorScale();
+
+	if ( pi->upperColorForced ) {
+		UI_SetScaledShaderRGBA( torso->shaderRGBA, pi->upperColor, colorScale );
+	}
+	if ( pi->lowerColorForced ) {
+		UI_SetScaledShaderRGBA( legs->shaderRGBA, pi->lowerColor, colorScale );
+	}
+	if ( pi->headColorForced ) {
+		UI_SetScaledShaderRGBA( head->shaderRGBA, pi->headColor, colorScale );
+	}
+}
+
 
 /*
 ======================
@@ -765,6 +849,7 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 		 &torso.oldframe, &torso.frame, &torso.backlerp );
 
 	renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
+	UI_ApplyPlayerColors( pi, &legs, &torso, &head );
 
 	//
 	// add the legs

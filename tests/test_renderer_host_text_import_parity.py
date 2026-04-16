@@ -43,3 +43,14 @@ def test_renderer_debug_font_atlas_path_is_implemented() -> None:
 	assert "RB_ShowFontAtlas();" in tr_backend
 	assert "DrawScaledText` / `MeasureText` now route through the shared" in retail_font_stack
 	assert "`r_debugFontAtlas` now has an in-source draw path" in retail_font_stack
+
+
+def test_renderer_host_text_virtual_point_baseline_matches_retail_wrapper_scale() -> None:
+	ui_shared_h = _read("src/code/ui/ui_shared.h")
+	cg_draw = _read("src/code/cgame/cg_draw.c")
+	ui_main = _read("src/code/ui/ui_main.c")
+
+	assert "#define QL_FONT_HOST_POINT_SIZE 60.0f" in ui_shared_h
+	assert "#define QL_FONT_HOST_POINT_SIZE 48.0f" not in ui_shared_h
+	assert "scale * QL_FONT_HOST_POINT_SIZE * yScale" in cg_draw
+	assert "scale * QL_FONT_HOST_POINT_SIZE * uiInfo.uiDC.yscale" in ui_main

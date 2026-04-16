@@ -2594,7 +2594,13 @@ static void CG_DrawLegacyWeaponSelect( void ) {
 		CG_DrawPic( x, y, 16.0f, 16.0f, cg_weapons[weapon].weaponIcon );
 
 		if ( weapon == cg.weaponSelect ) {
-			CG_DrawPic( x + selectX, y - 2.0f, 52.0f, 20.0f, cgs.media.selectShader );
+			qhandle_t	selectionShader;
+
+			selectionShader = cgs.media.weaponBarLitShader;
+			if ( selectionShader == 0 ) {
+				selectionShader = cgs.media.selectShader;
+			}
+			CG_DrawPic( x + selectX, y - 2.0f, 52.0f, 20.0f, selectionShader );
 		}
 
 		if ( ownedBits & ( 1 << weapon ) ) {

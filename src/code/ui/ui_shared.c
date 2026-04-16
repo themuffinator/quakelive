@@ -823,13 +823,54 @@ static int UI_ResolveWidescreenMode(const menuDef_t *menu, const itemDef_t *item
 
 /*
 ==================
+UI_ApplyWidescreenLocalX
+
+Retargets menu-local text anchors through the same stretch ratio used for
+widescreen-stretched item rects so centered and right-aligned text stays bound
+to the widened rect instead of the centered 640-space safe area.
+==================
+*/
+static float UI_ApplyWidescreenLocalX(const menuDef_t *menu, const itemDef_t *item, float x) {
+	float fullXScale;
+	float stretchRatio;
+	int widescreen;
+
+	if (DC && DC->setAdjustFrom640Mode) {
+		return x;
+	}
+
+	if (!DC || DC->xscale <= 0.0f) {
+		return x;
+	}
+
+	if (DC->bias <= 0.0f) {
+		return x;
+	}
+
+	if (DC->glconfig.vidWidth <= 0) {
+		return x;
+	}
+
+	widescreen = UI_ResolveWidescreenMode(menu, item);
+	if (widescreen != WIDESCREEN_STRETCH) {
+		return x;
+	}
+
+	fullXScale = (float)DC->glconfig.vidWidth / (float)SCREEN_WIDTH;
+	stretchRatio = fullXScale / DC->xscale;
+
+	return x * stretchRatio;
+}
+
+/*
+==================
 UI_ApplyWidescreenRect
 ==================
 */
 static void UI_ApplyWidescreenRect(rectDef_t *rect, int widescreen) {
-	float ratio;
-	float extra;
-	float offset;
+	float fullXScale;
+	float biasVirtual;
+	float stretchRatio;
 
 	if (!rect) {
 		return;
@@ -839,39 +880,59 @@ static void UI_ApplyWidescreenRect(rectDef_t *rect, int widescreen) {
 		return;
 	}
 
-	if (widescreen == WIDESCREEN_STRETCH) {
-		return;
-	}
-
 	if (!DC || DC->xscale <= 0.0f) {
 		return;
 	}
 
-	if (DC->xscale <= DC->yscale) {
+	if (DC->bias <= 0.0f) {
 		return;
 	}
 
-	ratio = DC->yscale / DC->xscale;
-	extra = (DC->xscale - DC->yscale) * (float)SCREEN_WIDTH;
-	if (extra <= 0.0f) {
+	if (DC->glconfig.vidWidth <= 0) {
 		return;
 	}
+
+	fullXScale = (float)DC->glconfig.vidWidth / (float)SCREEN_WIDTH;
+	biasVirtual = DC->bias / DC->xscale;
+	stretchRatio = fullXScale / DC->xscale;
 
 	switch (widescreen) {
-	case WIDESCREEN_CENTER:
-		offset = extra * 0.5f;
+	case WIDESCREEN_LEFT:
+		rect->x -= biasVirtual;
 		break;
 	case WIDESCREEN_RIGHT:
-		offset = extra;
+		rect->x += biasVirtual;
 		break;
-	case WIDESCREEN_LEFT:
+	case WIDESCREEN_STRETCH:
+		rect->x = (rect->x * stretchRatio) - biasVirtual;
+		rect->w *= stretchRatio;
+		break;
+	case WIDESCREEN_CENTER:
 	default:
-		offset = 0.0f;
 		break;
 	}
+}
 
-	rect->x = (rect->x * ratio) + (offset / DC->xscale);
-	rect->w *= ratio;
+#define UI_FULLSCREEN_BACKGROUND_WIDTH	1920.0f
+#define UI_FULLSCREEN_BACKGROUND_HEIGHT	1080.0f
+
+/*
+==================
+UI_NormalizeFullscreenBackgroundRect
+
+Normalizes retail backgroundSize authoring coordinates into the shared
+640x480 menu space before the active widescreen transform is applied.
+==================
+*/
+static void UI_NormalizeFullscreenBackgroundRect(rectDef_t *rect) {
+	if (!rect) {
+		return;
+	}
+
+	rect->x *= (float)SCREEN_WIDTH / UI_FULLSCREEN_BACKGROUND_WIDTH;
+	rect->y *= (float)SCREEN_HEIGHT / UI_FULLSCREEN_BACKGROUND_HEIGHT;
+	rect->w *= (float)SCREEN_WIDTH / UI_FULLSCREEN_BACKGROUND_WIDTH;
+	rect->h *= (float)SCREEN_HEIGHT / UI_FULLSCREEN_BACKGROUND_HEIGHT;
 }
 
 void Item_SetScreenCoords(itemDef_t *item, float x, float y) {
@@ -3576,6 +3637,7 @@ static void Item_DrawTextWithCursor(itemDef_t *item, float x, float y, vec4_t co
 void Item_SetTextExtents(itemDef_t *item, int *width, int *height, const char *text) {
 	char textBuffer[1024];
 	const char *textPtr = (text) ? text : Item_GetTextSource(item, textBuffer, sizeof(textBuffer));
+	menuDef_t *menu;
 
 	if (textPtr == NULL ) {
 		return;
@@ -3587,6 +3649,7 @@ void Item_SetTextExtents(itemDef_t *item, int *width, int *height, const char *t
 	// keeps us from computing the widths and heights more than once
 	if (*width == 0 || (item->type == ITEM_TYPE_OWNERDRAW && item->textalignment == ITEM_ALIGN_CENTER)) {
 		int originalWidth = Item_TextWidth(item, textPtr, 0);
+		float textAlignX;
 
 		if (item->type == ITEM_TYPE_OWNERDRAW && (item->textalignment == ITEM_ALIGN_CENTER || item->textalignment == ITEM_ALIGN_RIGHT)) {
 			originalWidth += DC->ownerDrawWidth(item->window.ownerDraw, item->textscale);
@@ -3600,12 +3663,14 @@ void Item_SetTextExtents(itemDef_t *item, int *width, int *height, const char *t
 		*height = Item_TextHeight(item, textPtr, 0);
 		item->textRect.w = *width;
 		item->textRect.h = *height;
-		item->textRect.x = item->textalignx;
+		menu = (menuDef_t *)item->parent;
+		textAlignX = UI_ApplyWidescreenLocalX(menu, item, item->textalignx);
+		item->textRect.x = textAlignX;
 		item->textRect.y = item->textaligny;
 		if (item->textalignment == ITEM_ALIGN_RIGHT) {
-			item->textRect.x = item->textalignx - originalWidth;
+			item->textRect.x = textAlignX - originalWidth;
 		} else if (item->textalignment == ITEM_ALIGN_CENTER) {
-			item->textRect.x = item->textalignx - originalWidth / 2;
+			item->textRect.x = textAlignX - originalWidth / 2;
 		}
 
 		ToWindowCoords(&item->textRect.x, &item->textRect.y, &item->window);
@@ -3648,7 +3713,9 @@ void Item_Text_AutoWrapped_Paint(itemDef_t *item) {
 	char buff[1024];
 	int width, height, len, textWidth, newLine, newLineWidth;
 	float y;
+	float textAlignX;
 	vec4_t color;
+	menuDef_t *menu;
 
 	textWidth = 0;
 	newLinePtr = NULL;
@@ -3662,6 +3729,8 @@ void Item_Text_AutoWrapped_Paint(itemDef_t *item) {
 	}
 	Item_TextColor(item, &color);
 	Item_SetTextExtents(item, &width, &height, textPtr);
+	menu = (menuDef_t *)item->parent;
+	textAlignX = UI_ApplyWidescreenLocalX(menu, item, item->textalignx);
 
 	y = item->textaligny;
 	len = 0;
@@ -3679,11 +3748,11 @@ void Item_Text_AutoWrapped_Paint(itemDef_t *item) {
 		if ( (newLine && textWidth > item->window.rect.w) || *p == '\n' || *p == '\0') {
 			if (len) {
 				if (item->textalignment == ITEM_ALIGN_LEFT) {
-					item->textRect.x = item->textalignx;
+					item->textRect.x = textAlignX;
 				} else if (item->textalignment == ITEM_ALIGN_RIGHT) {
-					item->textRect.x = item->textalignx - newLineWidth;
+					item->textRect.x = textAlignX - newLineWidth;
 				} else if (item->textalignment == ITEM_ALIGN_CENTER) {
-					item->textRect.x = item->textalignx - newLineWidth / 2;
+					item->textRect.x = textAlignX - newLineWidth / 2;
 				}
 				item->textRect.y = y;
 				ToWindowCoords(&item->textRect.x, &item->textRect.y, &item->window);
@@ -4744,14 +4813,17 @@ void Item_OwnerDraw_Paint(itemDef_t *item) {
 	
 		if (item->text) {
 			Item_Text_Paint(item);
-				if (item->text[0]) {
-					// +8 is an offset kludge to properly align owner draw items that have text combined with them
-					DC->ownerDrawItem(item->textRect.x + item->textRect.w + 8, item->window.rect.y, item->window.rect.w, item->window.rect.h, 0, item->textaligny, item->window.ownerDraw, item->window.ownerDrawFlags, item->alignment, item->special, item->textscale, color, item->window.background, item->textStyle );
-				} else {
-					DC->ownerDrawItem(item->textRect.x + item->textRect.w, item->window.rect.y, item->window.rect.w, item->window.rect.h, 0, item->textaligny, item->window.ownerDraw, item->window.ownerDrawFlags, item->alignment, item->special, item->textscale, color, item->window.background, item->textStyle );
-				}
+			if (item->text[0]) {
+				// +8 is an offset kludge to properly align owner draw items that have text combined with them
+				DC->ownerDrawItem(item->textRect.x + item->textRect.w + 8, item->window.rect.y, item->window.rect.w, item->window.rect.h, 0, item->textaligny, item->window.ownerDraw, item->window.ownerDrawFlags, item->alignment, item->special, item->textscale, color, item->window.background, item->textStyle );
 			} else {
-			DC->ownerDrawItem(item->window.rect.x, item->window.rect.y, item->window.rect.w, item->window.rect.h, item->textalignx, item->textaligny, item->window.ownerDraw, item->window.ownerDrawFlags, item->alignment, item->special, item->textscale, color, item->window.background, item->textStyle );
+				DC->ownerDrawItem(item->textRect.x + item->textRect.w, item->window.rect.y, item->window.rect.w, item->window.rect.h, 0, item->textaligny, item->window.ownerDraw, item->window.ownerDrawFlags, item->alignment, item->special, item->textscale, color, item->window.background, item->textStyle );
+			}
+		} else {
+			float textAlignX;
+
+			textAlignX = UI_ApplyWidescreenLocalX(parent, item, item->textalignx);
+			DC->ownerDrawItem(item->window.rect.x, item->window.rect.y, item->window.rect.w, item->window.rect.h, textAlignX, item->textaligny, item->window.ownerDraw, item->window.ownerDrawFlags, item->alignment, item->special, item->textscale, color, item->window.background, item->textStyle );
 		}
 	}
 }
@@ -5227,7 +5299,9 @@ void Menu_Paint(menuDef_t *menu, qboolean forcePaint) {
 
 		if (menu->backgroundSizeSet) {
 			backgroundRect = menu->backgroundRect;
+			UI_NormalizeFullscreenBackgroundRect(&backgroundRect);
 		}
+		UI_ApplyWidescreenRect(&backgroundRect, menu->widescreen);
 
 		// implies a background shader
 		// FIXME: make sure we have a default shader if fullscreen is set with no background
@@ -6658,6 +6732,7 @@ qboolean MenuParse_font( itemDef_t *item, int handle ) {
 
 	fontPath = menu->font;
 	UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE );
+	menu->font = String_Alloc( fontPath );
 
 	if (!DC->Assets.fontRegistered) {
 		DC->registerFont( fontPath, pointSize, &DC->Assets.textFont );

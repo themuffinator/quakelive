@@ -102,8 +102,9 @@ If not running in restricted mode, and a file is not found in any local filesyst
 an attempt will be made to download it and save it under the base path.
 
 If the "fs_copyfiles" cvar is set to 1, then every time a file is sourced from the cd
-path, it will be copied over to the base path.  This is a development aid to help build
-test releases and to copy working sets over slow network links.
+path, it will be copied over to the base path. If it is set to 2, the engine writes
+zero-byte marker files under fs_copypath for every opened asset. These are development
+aids used to build test releases and derive working sets from mounted data.
 
 File search order: when FS_FOpenFileRead gets called it will go through the fs_searchpaths
 structure and stop on the first successful hit. fs_searchpaths is built with successive
@@ -240,6 +241,7 @@ static	cvar_t		*fs_basepath;
 static	cvar_t		*fs_basegame;
 static	cvar_t		*fs_cdpath;
 static	cvar_t		*fs_copyfiles;
+static	cvar_t		*fs_copypath;
 static	cvar_t		*fs_webpath;
 static	cvar_t		*fs_gamedirvar;
 static	cvar_t		*fs_restrict;
@@ -954,10 +956,9 @@ static void FS_RunAssetPreflight( void )
 	}
 
 	if ( missing ) {
-		Com_Printf( "Ensure packaged assets mirror the Quake Live layout: place default.cfg at the root of your PK3, ship fonts/ttf"
-			" files (handelgothic, notosans-regular, droidsansmono, droidsansfallbackfull) under fonts/, and keep ui/*.menu and"
-			" supporting txt files adjacent to the packaged UI DLLs. Review tools/packaging/ui_bundle_manifest.json and"
-			" docs/quakelive_asset_audit.md for the expected staging tree.\n" );
+		Com_Printf( "Ensure fs_basepath points at a retail Quake Live install whose baseq3 contains default.cfg, fonts/ttf"
+			" files (handelgothic, notosans-regular, droidsansmono, droidsansfallbackfull), ui/*.menu, and the supporting"
+			" txt files. Do not rely on repo-generated replacement PK3 bundles for startup asset coverage.\n" );
 		Com_Error( ERR_FATAL, "Required startup assets are missing; see preflight log for details." );
 	}
 }
@@ -1807,13 +1808,26 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 			}
 
 			// if we are getting it from the cdpath, optionally copy it
-			//  to the basepath
-			if ( fs_copyfiles->integer && !Q_stricmp( dir->path, fs_cdpath->string ) ) {
+			// to the basepath, or emit build-harness marker files
+			if ( fs_copyfiles->integer
+				&& ( !Q_stricmp( dir->path, fs_cdpath->string ) || fs_copyfiles->integer == 2 ) ) {
 				char	*copypath;
 
 				if ( !dir->rawPath ) {
-					copypath = FS_BuildOSPath( fs_basepath->string, dir->gamedir, filename );
-					FS_CopyFile( netpath, copypath );
+					if ( fs_copyfiles->integer != 2 ) {
+						copypath = FS_BuildOSPath( fs_basepath->string, dir->gamedir, filename );
+						FS_CopyFile( netpath, copypath );
+					} else {
+						FILE *copyFile;
+
+						copypath = FS_BuildOSPath( fs_copypath->string, dir->gamedir, filename );
+						if ( !FS_CreatePath( copypath ) ) {
+							copyFile = fopen( copypath, "wb" );
+							if ( copyFile ) {
+								fclose( copyFile );
+							}
+						}
+					}
 				}
 			}
 
@@ -2867,6 +2881,96 @@ int	FS_GetFileList(  const char *path, const char *extension, char *listbuf, int
 }
 
 /*
+================
+FS_GetPakFileList
+================
+*/
+int FS_GetPakFileList( const pack_t *pack, const char *path, const char *extension, char *listbuf, int bufsize ) {
+	char		*list[MAX_FOUND_FILES];
+	char		zpath[MAX_ZPATH];
+	int		nFiles;
+	int		listCount;
+	int		pathLength;
+	int		extensionLength;
+	int		pathDepth;
+	int		i;
+	int		nTotal;
+	int		nLen;
+
+	if ( !pack || !path || !extension ) {
+		return 0;
+	}
+
+	pathLength = strlen( path );
+	if ( pathLength > 0 && ( path[pathLength - 1] == '\\' || path[pathLength - 1] == '/' ) ) {
+		pathLength--;
+	}
+	extensionLength = strlen( extension );
+	FS_ReturnPath( path, zpath, &pathDepth );
+
+	nFiles = 0;
+	for ( i = 0; i < pack->numfiles; i++ ) {
+		char	*name;
+		int		zpathLen;
+		int		depth;
+		int		length;
+		int		temp;
+
+		name = pack->buildBuffer[i].name;
+		zpathLen = FS_ReturnPath( name, zpath, &depth );
+
+		if ( ( depth - pathDepth ) > 2 || pathLength > zpathLen || Q_stricmpn( name, path, pathLength ) ) {
+			continue;
+		}
+
+		length = strlen( name );
+		if ( length < extensionLength ) {
+			continue;
+		}
+
+		if ( Q_stricmp( name + length - extensionLength, extension ) ) {
+			continue;
+		}
+
+		temp = pathLength;
+		if ( pathLength ) {
+			temp++;
+		}
+
+		nFiles = FS_AddFileToList( name + temp, list, nFiles );
+	}
+	listCount = nFiles;
+
+	if ( !listbuf || bufsize <= 0 ) {
+		for ( i = 0; i < listCount; i++ ) {
+			Z_Free( list[i] );
+		}
+		return nFiles;
+	}
+
+	*listbuf = 0;
+	nTotal = 0;
+
+	for ( i = 0; i < nFiles; i++ ) {
+		nLen = strlen( list[i] ) + 1;
+		if ( nTotal + nLen + 1 < bufsize ) {
+			strcpy( listbuf, list[i] );
+			listbuf += nLen;
+			nTotal += nLen;
+		} else {
+			nFiles = i;
+			break;
+		}
+	}
+
+	for ( i = 0; i < listCount; i++ ) {
+		Z_Free( list[i] );
+	}
+
+	return nFiles;
+}
+
+/*
 =============
 Sys_CountFileList
 
@@ -3833,6 +3937,7 @@ static void FS_Startup( const char *gameName ) {
 
 	fs_debug = Cvar_Get( "fs_debug", "0", 0 );
 	fs_copyfiles = Cvar_Get( "fs_copyfiles", "0", CVAR_INIT );
+	fs_copypath = Cvar_Get( "fs_copypath", "", CVAR_INIT );
 	fs_webpath = Cvar_Get( "fs_webpath", "web", CVAR_INIT );
 	fs_cdpath = Cvar_Get ("fs_cdpath", Sys_DefaultCDPath(), CVAR_INIT );
 	fs_basepath = Cvar_Get ("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT );
@@ -3843,7 +3948,7 @@ static void FS_Startup( const char *gameName ) {
 	fs_webMappings = Cvar_Get ("fs_webMappings", fs_defaultFallbackMappings, CVAR_ARCHIVE );
 	fs_gamedirvar = Cvar_Get ("fs_game", "", CVAR_INIT|CVAR_SYSTEMINFO );
 	fs_restrict = Cvar_Get ("fs_restrict", "", CVAR_INIT );
-	fs_skipWorkshop = Cvar_Get( "fs_skipWorkshop", "0", CVAR_ARCHIVE );
+	fs_skipWorkshop = Cvar_Get( "fs_skipWorkshop", "0", CVAR_INIT );
 
 	FS_ParseFallbackMappings( fs_webMappings->string );
 

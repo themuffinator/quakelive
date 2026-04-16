@@ -94,27 +94,23 @@ version resource, import surface, and linker/header profile for the executable:
 pwsh tools\ci\verify-awesomium-process-parity.ps1
 ```
 
-## Codec SDK prerequisites
+## Repo-Managed Codec Bootstrap
 
-The Visual Studio projects now assume the Vorbis headers and import libraries
-are available so the client’s Ogg decoder can link successfully. Place the
-official Xiph.Org SDK (or any build that ships `vorbisfile.lib`, `vorbis.lib`,
-`ogg.lib`, and the matching `include/vorbis/` headers) under
-`src/libs/vorbis/` and the MSBuild files will automatically pull them in for
-both Debug and Release outputs. If you keep the SDK somewhere else, define the
-`VorbisSdkDir` property when invoking MSBuild:
+The Windows MSBuild projects no longer probe Vcpkg or arbitrary system SDK
+locations for the non-retail codec stack. Instead, they bootstrap the
+repo-managed `libogg`, `libvorbis`, `zlib`, and `libpng` trees through
+`tools/build_internal_deps.ps1`, staging the resulting headers and import
+libraries under `src/libs/vorbis/` and `src/libs/libpng/`.
 
-```powershell
-msbuild src\code\quakelive.sln /t:quakelive_steam /p:Configuration=Debug /p:VorbisSdkDir=C:\SDKs\vorbis-1.3.7
-```
+That bootstrap expects the corresponding source trees to exist under
+`src/libs/_deps/` and expects `cmake` to be available on `PATH`. Once those
+repo-managed sources are present, solution or project builds can invoke MSBuild
+directly and the codec prerequisites will be prepared automatically before the
+normal validation steps run.
 
-Without these libraries the linker fails fast, mirroring the Unix makefile’s
-`OGG_CFLAGS`/`OGG_LDFLAGS` checks.
-
-The repo also carries libpng/zlib development copies under `src/libs/libpng/`.
-These codec SDK layouts are build-time conveniences, not part of the retail
-runtime surface: the Steam install does not ship `vorbisfile.dll`, `ogg.dll`,
-`libpng16.dll`, or `zlib1.dll`. Use
+These staged codec trees are still build-time conveniences, not part of the
+retail runtime surface: the Steam install does not ship `vorbisfile.dll`,
+`ogg.dll`, `libpng16.dll`, or `zlib1.dll`. Use
 `pwsh tools/ci/audit-retail-dependencies.ps1 -Strict` to verify that the staged
 runtime still matches the retail DLL payload.
 

@@ -18,6 +18,130 @@ gameplay-validation Task 24 later in this file.
 
 ## Recently closed
 
+### Task 121: Awesomium/browser host runtime bootstrap and surface-pump closure [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_cgame.c`, `tests/test_awesomium_browser_parity.py`, `tests/test_platform_services.py`, `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 99.7% -> after 100%** (`AW-G12` closed; no engine-owned Awesomium/browser host gap remains)
+
+Completed work:
+
+1. Re-audited the last supposedly compatibility-only Awesomium/browser host lane against the retail HLIL for `sub_4F2D30`, `sub_4F2B40`, `sub_4F2590`, and the earlier launcher/Awesomium notes, and found one remaining source-owned closure path: retail still owns explicit core/session/view bootstrap state, provider/listener registration inventory, bounded bootstrap readiness polling, and a dirty-surface frame pump, while the current retained source still collapsed that lane to a few booleans and a resize-only surface refresh.
+2. Reconstructed that retained runtime contract in writable source: `cl_cgame.c` now owns explicit session-root resolution, retained provider/listener bootstrap state, bounded bootstrap readiness polling, and a retained surface-upload path so `QLWebView_RebuildSurfaceImage()` and `QLWebHost_PumpFrame()` now mirror the retail rebuild-versus-dirty-upload split instead of treating all surface refresh as a resize-only side effect.
+3. Extended `tests/test_awesomium_browser_parity.py` and `tests/test_platform_services.py` so the runtime bootstrap inventory, bootstrap wait path, retained surface upload owner, and dirty-surface pump are machine-validated; the refreshed focused Awesomium/platform-service surface now reports `73 passed`.
+4. Refreshed the dedicated Awesomium audit plus the top-level ledgers so the browser-host estimate now records the eighth closure tranche and the lane as fully closed on the engine-owned side; a fresh `Debug|x86` build attempt still stops in unrelated pre-existing `src/code/client/snd_mix.c` errors after compiling the touched browser file cleanly.
+
+### Task 120: Awesomium/browser host retained-surface mouse mapping refresh [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_cgame.c`, `tests/test_awesomium_browser_parity.py`, `tests/test_platform_services.py`, `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 99.5% -> after 99.7%** (`AW-G11` closed; `AW-G12` remains compatibility-bounded)
+
+Completed work:
+
+1. Re-audited the last supposedly compatibility-bounded retained-host path against the retail HLIL for `sub_4F25F0`, `sub_4F2750`, and `sub_4F27C0`, and found one more source-owned runtime gap: retail rebuilds the browser backing surface in retained surface space and maps window-space mouse coordinates into that surface before caching and reusing them on button-down, while the current source still mirrored raw view dimensions and cached raw cursor coordinates.
+2. Reconstructed that retained surface/input seam in writable source: `cl_cgame.c` now owns `QLWebView_NextPowerOfTwo()`, `QLWebView_MapCursorCoordinate()`, and `QLWebView_InjectMappedMouseMove()`, `QLWebView_RebuildSurfaceImage()` now rebuilds explicit retained surface dimensions instead of blindly mirroring the raw view size, and the browser mouse move/button-down path now caches retained browser-surface coordinates instead of raw window coordinates.
+3. Extended `tests/test_awesomium_browser_parity.py` and `tests/test_platform_services.py` so the retained-surface rebuild sizing, cursor-space scaling, and mouse-down cache reuse are machine-validated; the refreshed focused Awesomium/platform-service surface now reports `72 passed`.
+4. Refreshed the dedicated Awesomium audit plus the top-level ledgers so the browser-host estimate now records the seventh 2026-04-16 closure tranche explicitly while leaving only the literal `WebCore` / `WebSession` / `WebView` embed/runtime seam open and compatibility-bounded; a fresh `Debug|x86` build attempt still stops in unrelated pre-existing `src/code/client/snd_mix.c` errors after compiling the touched browser file cleanly.
+
+### Task 119: Awesomium/browser host document-ready launcher script staging refresh [COMPLETED]
+Priority: High
+Files: `src/code/client/client.h`, `src/code/client/cl_cgame.c`, `src/code/client/cl_webpak.c`, `src/code/qcommon/files.c`, `src/code/qcommon/qcommon.h`, `tests/test_awesomium_browser_parity.py`, `tests/test_platform_services.py`, `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 99% -> after 99.5%** (`AW-G10` closed; `AW-G11` and `AW-G12` remained open at that point)
+
+Completed work:
+
+1. Re-audited the remaining compatibility-bounded Awesomium/browser host lane against the retail HLIL for `sub_4317F0` and found one more source-owned runtime gap: retail `QLLoadHandler_OnDocumentReady()` stages the launcher `js/*.js` bundle through the browser view before publishing `web.object.ready`, while the retained source still jumped straight to the ready publication path.
+2. Reconstructed that retained launcher-script seam in writable source: `qcommon/files.c` now exposes `FS_GetPakFileList()` for explicit pack enumeration, `cl_webpak.c` now owns `CL_WebPak_GetFileList()` across zip-backed `web.pak`, datapack-backed `web.pak`, and normal filesystem fallback listings, and `cl_cgame.c` now stages the launcher `js/*.js` bundle through `QLLoadHandler_LoadDocumentScripts()` before marking the retained browser object ready.
+3. Extended `tests/test_awesomium_browser_parity.py` and `tests/test_platform_services.py` so the document-ready script-bundle staging path, explicit pack file-list helper, and retained `web.pak` enumeration seam are machine-validated; the refreshed focused Awesomium/platform-service surface now reports `71 passed`.
+4. Refreshed the dedicated Awesomium audit plus the top-level ledgers so the browser-host estimate now records the sixth 2026-04-16 closure tranche explicitly while leaving the later retained surface-rebuild / cursor-mapping seam plus the literal `WebCore` / `WebSession` / `WebView` embed/runtime seam open at that point; a fresh `Debug|x86` build attempt still stops in unrelated pre-existing `src/code/client/snd_mix.c` errors after compiling the touched browser/browser-resource/filesystem files, with the same existing `src/code/server/sv_zmq.c` warnings also still present.
+
+### Task 118: Awesomium/browser host pointer-button and wheel exactness refresh [COMPLETED]
+Priority: High
+Files: `src/code/client/client.h`, `src/code/client/cl_cgame.c`, `src/code/client/cl_keys.c`, `tests/test_awesomium_browser_parity.py`, `tests/test_platform_services.py`, `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 98% -> after 99%** (`AW-G09` closed; `AW-G10` through `AW-G12` remained open at that point)
+
+Completed work:
+
+1. Re-audited the remaining compatibility-bounded Awesomium/browser host lane against the retail HLIL around `sub_4F27C0`, `sub_4F2820`, `sub_4F2870`, and their `sub_4F3420` dispatch owner, and found one more source-owned runtime gap: retail still owns distinct browser mouse-down, mouse-up, and wheel injection helpers, while the current retained source was still sending those inputs through the keyboard seam.
+2. Reconstructed that retained pointer-input seam in writable source: `cl_cgame.c` now owns `QLWebView_InjectMouseDown()`, `QLWebView_InjectMouseUp()`, `QLWebView_InjectMouseWheel()`, and a retained mouse-button mapper matching the retail left/right/middle order.
+3. Added public `CL_WebView_OnMouseButtonEvent()` and `CL_WebView_OnMouseWheelEvent()` entrypoints, and wired `cl_keys.c` so `CL_KeyEvent()` now routes mouse buttons and wheel through those browser pointer helpers instead of misclassifying them as keyboard input.
+4. Extended `tests/test_awesomium_browser_parity.py` and `tests/test_platform_services.py` so the browser pointer helper split and the `CL_KeyEvent()` routing change are machine-validated; the refreshed focused Awesomium/platform-service surface now reports `70 passed`.
+5. Refreshed the dedicated Awesomium audit plus the top-level ledgers so the browser-host estimate now records the fifth 2026-04-16 closure tranche explicitly while leaving the later document-ready script-bundle seam, retained surface-rebuild / cursor-mapping seam, and literal `WebCore` / `WebSession` / `WebView` embed/runtime seam open at that point; a fresh `Debug|x86` build attempt still stops in unrelated pre-existing `src/code/client/snd_mix.c` errors after compiling the touched browser/client files, with the same existing `src/code/server/sv_zmq.c` warnings also still present.
+
+### Task 117: Awesomium/browser host app-activation modifier exactness refresh [COMPLETED]
+Priority: High
+Files: `src/code/client/client.h`, `src/code/client/cl_cgame.c`, `src/code/win32/win_wndproc.c`, `tests/test_awesomium_browser_parity.py`, `tests/test_platform_services.py`, `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 97% -> after 98%** (`AW-G08` closed; `AW-G09` through `AW-G12` remained open at that point)
+
+Completed work:
+
+1. Re-audited the remaining compatibility-bounded Awesomium/browser host lane against the retail HLIL around `sub_4F1530` and `sub_4F2900`, and found one last narrow source-owned runtime gap: retail `VID_AppActivate(1)` injects a fixed browser modifier-key event before restoring the active browser/input state, while the current retained host had no activation helper at all.
+2. Reconstructed that retained activation seam in writable source: `cl_cgame.c` now owns `QLWebView_InjectActivationKeyboardEvent()` plus `CL_WebHost_NotifyAppActivation()`, which mirrors the synthetic activation modifier path into the retained browser host whenever a live view exists.
+3. Wired `win_wndproc.c` so `VID_AppActivate()` now matches the retail browser path more closely by calling `SetFocus( g_wv.hWnd )` on the active branch and forwarding `qtrue` / `qfalse` activation changes into the retained browser host before input capture is re-armed.
+4. Extended `tests/test_awesomium_browser_parity.py` and `tests/test_platform_services.py` so the synthetic activation modifier helper and the Win32 activation owner are machine-validated; the refreshed focused Awesomium/platform-service surface now reports `69 passed`.
+5. Refreshed the dedicated Awesomium audit plus the top-level ledgers so the browser-host estimate now records the fourth 2026-04-16 closure tranche explicitly while leaving the later browser pointer-button/wheel seam, document-ready seam, retained surface-rebuild / cursor-mapping seam, and literal `WebCore` / `WebSession` / `WebView` embed/runtime seam open at that point; a fresh `Debug|x86` build attempt still stops in unrelated pre-existing `src/code/client/snd_mix.c` errors after compiling the touched browser/Win32 files, with the same existing `src/code/server/sv_zmq.c` warnings also still present.
+
+### Task 116: Awesomium/browser host direct-input ownership refresh [COMPLETED]
+Priority: High
+Files: `src/code/client/client.h`, `src/code/client/cl_cgame.c`, `src/code/client/cl_input.c`, `tests/test_awesomium_browser_parity.py`, `tests/test_platform_services.py`, `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 97%** (`AW-G07` closed; `AW-G08` through `AW-G12` remained open at that point)
+
+Completed work:
+
+1. Re-audited the remaining compatibility-bounded Awesomium/browser host lane against mapping round `94` plus the earlier launcher/runtime notes, and found one last source-owned runtime gap: the named browser input helpers were still collapsed into the public callback surface and the retained absolute mouse cursor path never reached the browser host.
+2. Reconstructed the retained direct browser input seam in writable source: `cl_cgame.c` now owns `QLWebView_InjectMouseMove()` and `QLWebView_InjectKeyboardEvent()`, the host now caches the injected browser cursor position, and the public `CL_WebView_OnMouseMove()` / `CL_WebView_OnKeyEvent()` entrypoints now delegate into those retail-backed owners.
+3. Wired `cl_input.c` so the existing absolute cursor path used for `UI_MOUSE_EVENT` and `CG_MOUSE_EVENT` is now also forwarded into the retained browser host whenever the UI/cgame cursor lanes are active.
+4. Extended `tests/test_awesomium_browser_parity.py` and `tests/test_platform_services.py` so the direct browser input owner split, retained cursor-position cache, and `CL_MouseEvent()` forwarding path are machine-validated; the refreshed focused Awesomium/platform-service surface now reports `68 passed`.
+5. Refreshed the dedicated Awesomium audit plus the top-level ledgers so the browser-host estimate now records the third 2026-04-16 closure tranche explicitly while leaving the later Win32 activation modifier seam, pointer-button/wheel seam, document-ready seam, retained surface-rebuild / cursor-mapping seam, and literal `WebCore` / `WebSession` / `WebView` embed/runtime seam open at that point; a fresh `Debug|x86` build attempt still stops in unrelated pre-existing `src/code/client/snd_mix.c` errors after compiling the touched browser/client files.
+
+### Task 115: Awesomium/browser host cursor and load-failure exactness refresh [COMPLETED]
+Priority: High
+Files: `src/code/client/client.h`, `src/code/client/cl_cgame.c`, `src/code/win32/win_wndproc.c`, `tests/test_awesomium_browser_parity.py`, `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 92% -> after 96%** (`AW-G05` and `AW-G06` closed; `AW-G07` through `AW-G12` remained open at that point)
+
+Completed work:
+
+1. Re-audited the still-open Awesomium/browser host runtime lane against mapping rounds `10`, `11`, `94`, and `96`, and found two remaining source-owned gaps inside the previously compatibility-bounded bucket: missing Win32 `QLViewHandler_OnChangeCursor` ownership and loose `QLLoadHandler_OnFailLoadingFrame` hide/retry behavior.
+2. Reconstructed the retained Win32 cursor callback seam in writable source: `cl_cgame.c` now owns `QLViewHandler_OnChangeCursor`, caches the active/restored cursor handles, exposes `CL_WebHost_GetCursorHandle()`, and `win_wndproc.c` now applies that browser-owned cursor through a dedicated `WM_SETCURSOR` owner.
+3. Tightened the retained load-failure contract so launcher document failures now hide the browser host, clear transient tooltip/cursor state, drop `web_browserActive`, and stop `web_showError`, `web_reload`, and the frame pump from blindly reasserting active browser state while failure is still pending.
+4. Extended `tests/test_awesomium_browser_parity.py` so the focused parity suite now covers the cursor override surface and the stricter load-failure suppression/recovery path; the refreshed Awesomium/platform-service surface reports `67 passed`.
+5. Refreshed the dedicated Awesomium audit plus the top-level ledgers so the browser-host estimate now records the second 2026-04-16 closure tranche explicitly while keeping the later direct-input/runtime gaps and the literal WebCore/WebView/embed seam open at that point.
+
+### Task 114: Engine Steamworks workshop callback parity refresh [COMPLETED]
+Priority: High
+Files: `src/common/platform/platform_steamworks.h`, `src/common/platform/platform_steamworks.c`, `src/code/client/cl_main.c`, `tests/steamworks_harness.c`, `tests/test_steamworks_harness.py`, `tests/test_client_workshop_bootstrap_parity.py`, `tests/test_platform_services.py`, `tests/test_client_full_parity_gate.py`, `artifacts/client_validation/logs/client_full_parity_gate.json`, `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 99.8% -> after 100%** (narrow retail workshop callback exactness gap closed)
+
+Completed work:
+
+1. Re-audited the engine-owned Steamworks wrapper and client workshop bootstrap lane against the committed retail `quakelive_steam.exe` HLIL plus mapping rounds `01`, `02`, `68`, and `105`, and found one remaining source-owned gap: retail retains a dedicated `SteamWorkshopCallbacks_Init` family for `ItemInstalled` and `DownloadItemResult`, while the current source only polled for workshop completion.
+2. Reconstructed that retained callback family in writable source: `platform_steamworks.c` / `.h` now expose explicit workshop callback bindings and registration helpers, and `cl_main.c` now consumes the retained workshop callbacks to finalize or fail the active item and advance the bootstrap queue immediately while preserving the existing polling path as a fallback.
+3. Extended the Steamworks harness, client workshop parity test, platform-service parity test, and client parity gate criteria so the repo now machine-validates the workshop callback registration inventory and the callback-owned completion path instead of only the older polling and mount/publication surface.
+4. Refreshed the client audit plus the top-level ledgers so the 2026-04-16 Steamworks parity pass is recorded explicitly; focused source-backed validation now reports `96 passed` across `tests/test_steamworks_harness.py`, `tests/test_client_workshop_bootstrap_parity.py`, and `tests/test_platform_services.py`.
+5. Attempted a fresh `Debug|x86` rebuild to rerun the tracked client runtime probe, but that remains blocked by unrelated pre-existing compile errors in `src/code/client/snd_mix.c` and `src/code/server/sv_zmq.c`; the verification for this task is therefore the focused source-backed Steamworks surface rather than a refreshed runtime bundle.
+
+### Task 112: Awesomium/browser host parity audit and first closure tranche [COMPLETED]
+Priority: High
+Files: `src/code/client/cl_cgame.c`, `tests/test_awesomium_browser_parity.py`, `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 82% -> after 92%** (`AW-G01`..`AW-G04` closed; `AW-G05` and later gaps remained open at that point)
+
+Completed work:
+
+1. Re-audited the engine-owned Awesomium/browser host against the committed retail mapping rounds plus the shipped retail `baseq3/scripts/*.arena` and `factories*.json` manifests, and published the dedicated audit in `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`.
+2. Fixed the retained browser hash-routing seam in `cl_cgame.c` by canonicalising `#home`-style fragments before URL rebuilds, which removes the source-only `asset://...##hash` behavior.
+3. Restored the mapped `QLViewHandler` tooltip and browser-console callback owners, and replaced the placeholder `GetMapList` / `GetFactoryList` surfaces with real arena/factory catalog parsing from the filesystem while preserving the older BSP scan only as a compatibility fallback when no arena metadata exists.
+4. Added `tests/test_awesomium_browser_parity.py` and reran it together with `tests/test_platform_services.py` (`65 passed`), which keeps the reopened browser-host gaps machine-visible even though the broader native solution build remains blocked by unrelated pre-existing errors in `snd_mix.c` and `sv_zmq.c`.
+
+### Task 111: Platform-specific engine parity audit and Win32 PFD auto-selection closure [COMPLETED]
+Priority: High
+Files: `src/code/win32/win_glimp.c`, `tests/test_renderer_win32_host_glue_parity.py`, `docs/reverse-engineering/platform-specific-engine-parity-audit-and-implementation-plan-2026-04-16.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 99% -> after 100%** (strict retail Windows platform-specific engine surface; compatibility-only Unix/macOS/null unchanged)
+
+Completed work:
+
+1. Re-audited the platform-specific engine surface against retail `quakelive_steam.exe`, separating the strict-retail Windows host from the compatibility-only `unix`, `macosx`, and `null` ports and publishing the result in `docs/reverse-engineering/platform-specific-engine-parity-audit-and-implementation-plan-2026-04-16.md`.
+2. Restored the retail `GLW_AutoSelectPFD` owner split in `src/code/win32/win_glimp.c`, so ICD drivers again use `ChoosePixelFormat`, standalone/minidriver drivers keep the `wglChoosePixelFormat` path, and the subsequent pixel-format queries now switch between GDI and WGL `DescribePixelFormat` owners the same way retail does.
+3. Extended `tests/test_renderer_win32_host_glue_parity.py` so the recovered `GLW_AutoSelectPFD` logging plus the ICD/WGL choose/describe branching are now regression-tested, then refreshed the top-level ledgers with the resulting before/after parity estimate.
+
 ### Task 110: Engine-wide parity audit and implementation plan publication [COMPLETED]
 Priority: High
 Files: `docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
@@ -179,6 +303,18 @@ Completed work:
 2. Re-ran the UI parity gate in both artifact-refresh and enforced release-mode forms, plus the workflow-matching platform-service selector and the wider UI/fs/vote regression surface, refreshing `artifacts/ui_validation/logs/ui_full_parity_gate.json` to `overall_status: pass` with `UI-G06` closed.
 3. Updated the dedicated module audit plus the top-level ledgers so `GMR-P7` and the restored UI lane are recorded cleanly, setting up the final `GMR-P8` reconciliation pass.
 
+### Task 107: Server control-plane exactness and audit refresh [COMPLETED]
+Priority: High
+Files: `src/code/server/sv_main.c`, `tests/test_engine_cvar_retail_parity.py`, `tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`, `artifacts/server_validation/logs/server_full_parity_gate.json`, `docs/reverse-engineering/server-full-parity-audit-and-implementation-plan-2026-04-10.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 100% -> after 100%** (server closure estimate unchanged; `SV-G05` exactness and evidence classification refreshed)
+
+Completed work:
+
+1. Re-audited the current server control-plane lane against the committed retail HLIL around `0x004E48E0`..`0x004E4B05`, confirming that `sv_idleRestart` and `sv_quitOnEmpty` have direct downstream runtime owners in retail rather than only registration-time evidence.
+2. Tightened `sv_main.c` to match the retained empty-server quit string exactly, changing the host log to `server has been empty for %d seconds, quit\n` before the queued `quit\n`.
+3. Extended the focused validation surface so `tests/test_engine_cvar_retail_parity.py`, `tests/test_platform_services.py`, and `tests/test_server_full_parity_gate.py` now pin the refreshed `SV-G05` story, including the recovered idle-restart and empty-server quit owners, then refreshed `artifacts/server_validation/logs/server_full_parity_gate.json`.
+4. Refreshed the dedicated server audit plus the top-level ledger so `SV-G05` no longer under-claims `sv_idleRestart` / `sv_quitOnEmpty`; only the remaining registration-only names stay in the explicit compatibility/publication bucket.
+
 ### Task 104: Strict retail game-module final ledger and runtime-evidence reconciliation [COMPLETED]
 Priority: High
 Files: `tests/test_game_module_retail_parity_gate.py`, `artifacts/module_validation/logs/retail_module_parity_gate.json`, `docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-10.md`, `docs/build-pipeline.md`, `docs/architecture/native-pipeline.md`, `AUDIT.md`, `IMPLEMENTATION_PLAN.md`
@@ -189,6 +325,17 @@ Completed work:
 1. Reconciled the current-worktree module audit, the top-level ledgers, and the supporting pipeline notes so they all now describe the same post-`GMR-P6`/`GMR-P7` `100%` strict-retail module closure state.
 2. Tightened `tests/test_game_module_retail_parity_gate.py` so the module gate now validates the current `2026-04-10` audit and the supporting pipeline notes in addition to the historical `2026-04-09` closure note, then refreshed `artifacts/module_validation/logs/retail_module_parity_gate.json`.
 3. Confirmed the archived retail runtime probe remains sufficient and did not need a fresh rerun because the workflow topology and host-side validation contract were unchanged during this final reconciliation pass.
+
+### Task 99: Server SV-P3 follow-up ZMQ auth/password exactness closure [COMPLETED]
+Priority: High
+Files: `src/code/server/sv_zmq.c`, `tests/test_platform_services.py`, `tests/test_server_full_parity_gate.py`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 100% -> after 100%** (retail ZMQ auth/password exactness tightened; no audited server gap reopened)
+
+Completed work:
+
+1. Re-checked the retail `Zmq_ApplyPasswords` helper against HLIL and confirmed that Quake Live regenerates `zmqpass.txt` with `stats_stats=%s` and `rcon_rcon=%s`, then reapplies that retained auth configuration through the engine-owned ZMQ runtime.
+2. Updated `sv_zmq.c` so the writable fallback now mirrors that passfile side effect, keeps the recovered `stats`/`rcon` username contract explicit, and reconfigures the live PUB or ROUTER sockets only when the password-empty state changes, which closes the last practical drift in the current source-backed auth lane.
+3. Extended the focused parity suite so the recovered passfile/auth-owner seam is pinned in `tests/test_platform_services.py` and `tests/test_server_full_parity_gate.py`; the focused validation slice now reports `96 passed, 1 skipped`.
 
 ### Task 98: Server SV-P6 control-plane cvar and policy closure [COMPLETED]
 Priority: High
@@ -1237,9 +1384,10 @@ Subtasks:
 
 1. [x] Validate Attack & Defend round-controller parity against retail HLIL and the `qagame` symbol mapping after the latest gameplay-side changes.
 2. [x] Restore the recovered retail award-configstring block and the init-side spawn-point count helper after the follow-up qagame parity pass.
-3. Re-run focused Race checks after major gameplay-side changes.
-4. Continue verifying match-flow sequencing against HLIL whenever state-machine code changes.
-5. [x] Capture the shared `pmove` regressions with focused tests instead of relying on broad manual inspection, including jump timing, circle-strafe friction, step-jump gating, unsupported air-step suppression, and double-jump reuse.
+3. [x] Re-run focused Race checks after major gameplay-side changes.
+4. [x] Close the retail Race target-chain temp-entity transport seam so `qagame` emits `EV_RACE_START` / `EV_RACE_CHECKPOINT` / `EV_RACE_FINISH` / `EV_NEW_HIGH_SCORE` and `cgame` tracks current-run state from those payloads.
+5. Continue verifying match-flow sequencing against HLIL whenever state-machine code changes.
+6. [x] Capture the shared `pmove` regressions with focused tests instead of relying on broad manual inspection, including jump timing, circle-strafe friction, step-jump gating, unsupported air-step suppression, and double-jump reuse.
 
 ### Task 25: Qagame behavioral parity closure execution [COMPLETED]
 Priority: High
@@ -1316,6 +1464,32 @@ Completed work in this task:
 3. Reconciled the module parity ledgers so the repo consistently distinguishes
    source-built DLL closure from strict retail module parity closure while now
    marking the strict-retail module layer closed as well.
+
+### Task 113: Engine netcode parity audit and server-browser cleanup [COMPLETED]
+Priority: High
+Primary areas: `src/code/qcommon/net_chan.c`, `src/code/client/cl_net_chan.c`, `src/code/server/sv_net_chan.c`, `src/code/win32/win_net.c`, `src/code/client/cl_main.c`, `src/code/client/ql_ui_imports.inc`, parity docs/tests
+Parity estimate: **before 99% -> after 100%**
+
+The focused audit in
+`docs/reverse-engineering/engine-netcode-parity-audit-2026-04-16.md`
+rechecked the engine-owned transport, packet, and server-browser seams against
+the committed retail corpus and closed the two remaining source-owned
+mismatches found in this register.
+
+Completed work in this task:
+
+1. Reconfirmed that the core `net_chan`, Win32 socket, client packet/event,
+   server packet/event, and ping or status helper lanes were already bounded by
+   mapping rounds `103` through `107`.
+2. Removed the non-retail `minping`, `maxping`, and `punkbuster` assignments
+   from `CL_SetServerInfo()` so cached server records now match retail
+   `sub_4B9F90`.
+3. Converted the native `QLUIImport_LAN_LoadCachedServers` and
+   `QLUIImport_LAN_SaveCachedServers` wrappers into retail-compatible no-op
+   stubs while leaving the generic UI syscall bridge available for
+   compatibility paths outside the native import table.
+4. Added `tests/test_engine_netcode_parity.py` and refreshed `AUDIT.md` so the
+   closure stays explicit in both the machine-checked and narrative ledgers.
 
 ## Verification expectations after gameplay/client changes
 

@@ -625,10 +625,13 @@ typedef struct {
 	qboolean supported;
 	int maxRectangleTextureSize;
 	ppRenderTarget_t sceneTarget;
+	ppRenderTarget_t bloomDownsampleTarget;
 	ppRenderTarget_t bloomBrightTarget;
-	ppRenderTarget_t bloomHalfTarget;
-	ppRenderTarget_t bloomPingTarget;
-	ppRenderTarget_t bloomPongTarget;
+	ppRenderTarget_t bloomBlurVerticalTarget;
+	ppRenderTarget_t bloomBlurHorizontalTarget;
+	ppRenderTarget_t bloomQuarterDownsampleTarget;
+	ppRenderTarget_t bloomQuarterVerticalTarget;
+	ppRenderTarget_t bloomQuarterHorizontalTarget;
 	GLuint colorCorrectTexture;
 	int colorCorrectWidth;
 	int colorCorrectHeight;
@@ -681,13 +684,11 @@ static const GLcharARB *s_downsampleFragmentShaderSource =
 static const GLcharARB *s_blurVerticalFragmentShaderSource =
 	"#extension GL_ARB_texture_rectangle : enable\n"
 	"uniform sampler2DRect backBufferTex;\n"
-	"uniform float p_blurStep;\n"
-	"uniform float p_blurFalloff;\n"
 	"void main(void)\n"
 	"{\n"
 	"	vec2 coord = gl_TexCoord[0].st;\n"
-	"	float stepSize = max(p_blurStep, 1.0);\n"
-	"	float falloff = clamp(p_blurFalloff, 0.0, 1.0);\n"
+	"	float stepSize = 1.25;\n"
+	"	float falloff = 0.75;\n"
 	"	float centerWeight = 0.40 + (falloff * 0.20);\n"
 	"	float nearWeight = 0.22 * falloff;\n"
 	"	float midWeight = 0.10 * falloff;\n"
@@ -705,13 +706,11 @@ static const GLcharARB *s_blurVerticalFragmentShaderSource =
 static const GLcharARB *s_blurHorizontalFragmentShaderSource =
 	"#extension GL_ARB_texture_rectangle : enable\n"
 	"uniform sampler2DRect backBufferTex;\n"
-	"uniform float p_blurStep;\n"
-	"uniform float p_blurFalloff;\n"
 	"void main(void)\n"
 	"{\n"
 	"	vec2 coord = gl_TexCoord[0].st;\n"
-	"	float stepSize = max(p_blurStep, 1.0);\n"
-	"	float falloff = clamp(p_blurFalloff, 0.0, 1.0);\n"
+	"	float stepSize = 1.25;\n"
+	"	float falloff = 0.75;\n"
 	"	float centerWeight = 0.40 + (falloff * 0.20);\n"
 	"	float nearWeight = 0.22 * falloff;\n"
 	"	float midWeight = 0.10 * falloff;\n"
@@ -1286,8 +1285,6 @@ static qboolean RBPP_LoadProgram( ppProgram_t *program, const char *name, const 
 	program->gammaRecipUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_gammaRecip" );
 	program->overbrightUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_overbright" );
 	program->contrastUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_contrast" );
-	program->blurStepUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_blurStep" );
-	program->blurFalloffUniform = s_postProcess.procs.qglGetUniformLocationARBFunc( program->programObject, "p_blurFalloff" );
 
 	if ( program->backBufferTexUniform >= 0 ) {
 		s_postProcess.procs.qglUniform1iARBFunc( program->backBufferTexUniform, 0 );
@@ -1441,18 +1438,45 @@ static void RBPP_DestroyColorCorrectTexture( void ) {
 
 /*
 =============
+RBPP_GetBloomMode
+
+Retail Quake Live treats r_enableBloom as a mode selector:
+0 disables bloom, 1 keeps the half-resolution chain, and 2 enables the
+additional quarter-resolution stage.
+=============
+*/
+static int RBPP_GetBloomMode( void ) {
+	if ( !r_enableBloom || r_enableBloom->integer <= 0 ) {
+		return 0;
+	}
+
+	if ( r_enableBloom->integer == 1 ) {
+		return 1;
+	}
+
+	return 2;
+}
+
+/*
+=============
 RBPP_InitBloomResources
 
-Allocate the bloom render-target chain and compile the recovered bloom programs.
+Allocate the retail bloom render-target chain and compile the recovered bloom programs.
 =============
 */
 static qboolean RBPP_InitBloomResources( void ) {
+	int bloomMode;
 	int width;
 	int height;
 	int halfWidth;
 	int halfHeight;
 	int quarterWidth;
 	int quarterHeight;
+
+	bloomMode = RBPP_GetBloomMode();
+	if ( bloomMode <= 0 ) {
+		return qfalse;
+	}
 
 	width = glConfig.vidWidth;
 	height = glConfig.vidHeight;
@@ -1481,10 +1505,19 @@ static qboolean RBPP_InitBloomResources( void ) {
 		quarterHeight = 1;
 	}
 
-	if ( !RBPP_CreateRenderTarget( &s_postProcess.bloomBrightTarget, width, height, qfalse, qfalse ) ||
-		!RBPP_CreateRenderTarget( &s_postProcess.bloomHalfTarget, halfWidth, halfHeight, qtrue, qfalse ) ||
-		!RBPP_CreateRenderTarget( &s_postProcess.bloomPingTarget, quarterWidth, quarterHeight, qtrue, qfalse ) ||
-		!RBPP_CreateRenderTarget( &s_postProcess.bloomPongTarget, quarterWidth, quarterHeight, qtrue, qfalse ) ) {
+	if ( !RBPP_CreateRenderTarget( &s_postProcess.bloomDownsampleTarget, halfWidth, halfHeight, qtrue, qfalse ) ||
+		!RBPP_CreateRenderTarget( &s_postProcess.bloomBrightTarget, halfWidth, halfHeight, qtrue, qfalse ) ||
+		!RBPP_CreateRenderTarget( &s_postProcess.bloomBlurVerticalTarget, halfWidth, halfHeight, qtrue, qfalse ) ||
+		!RBPP_CreateRenderTarget( &s_postProcess.bloomBlurHorizontalTarget, halfWidth, halfHeight, qtrue, qfalse ) ) {
+		ri.Printf( PRINT_WARNING, "Bloom Failure - unable to create FBO. Bloom effect disabled\n" );
+		RBPP_ShutdownBloomResources();
+		return qfalse;
+	}
+
+	if ( bloomMode == 2 &&
+		( !RBPP_CreateRenderTarget( &s_postProcess.bloomQuarterDownsampleTarget, quarterWidth, quarterHeight, qtrue, qfalse ) ||
+		!RBPP_CreateRenderTarget( &s_postProcess.bloomQuarterVerticalTarget, quarterWidth, quarterHeight, qtrue, qfalse ) ||
+		!RBPP_CreateRenderTarget( &s_postProcess.bloomQuarterHorizontalTarget, quarterWidth, quarterHeight, qtrue, qfalse ) ) ) {
 		ri.Printf( PRINT_WARNING, "Bloom Failure - unable to create FBO. Bloom effect disabled\n" );
 		RBPP_ShutdownBloomResources();
 		return qfalse;
@@ -1508,10 +1541,13 @@ Release the bloom targets and shader programs.
 */
 static void RBPP_ShutdownBloomResources( void ) {
 	RBPP_DestroyBloomPrograms();
-	RBPP_DestroyRenderTarget( &s_postProcess.bloomPongTarget );
-	RBPP_DestroyRenderTarget( &s_postProcess.bloomPingTarget );
-	RBPP_DestroyRenderTarget( &s_postProcess.bloomHalfTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomQuarterHorizontalTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomQuarterVerticalTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomQuarterDownsampleTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomBlurHorizontalTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomBlurVerticalTarget );
 	RBPP_DestroyRenderTarget( &s_postProcess.bloomBrightTarget );
+	RBPP_DestroyRenderTarget( &s_postProcess.bloomDownsampleTarget );
 }
 
 
@@ -1751,16 +1787,11 @@ static void RBPP_BlitSceneTarget( void ) {
 =============
 RBPP_ApplyBloom
 
-Run the recovered bright-pass, downsample, separable blur, and combine chain on rectangle textures.
+Run the retail downsample, bright-pass, blur, and combine chain on rectangle textures.
 =============
 */
 static qboolean RBPP_ApplyBloom( void ) {
-	int passes;
-	int passIndex;
-	int blurRadius;
-	float blurScale;
-	float blurFalloff;
-	float blurStep;
+	int bloomMode;
 	float brightThreshold;
 	float bloomIntensity;
 	float bloomSaturation;
@@ -1769,22 +1800,21 @@ static qboolean RBPP_ApplyBloom( void ) {
 	ppRenderTarget_t *finalBloom;
 
 	if ( !backEnd.bloomActive || !s_postProcess.sceneTarget.initialized ||
-		!s_postProcess.bloomBrightTarget.initialized || !s_postProcess.bloomHalfTarget.initialized ||
-		!s_postProcess.bloomPingTarget.initialized || !s_postProcess.bloomPongTarget.initialized ) {
+		!s_postProcess.bloomDownsampleTarget.initialized || !s_postProcess.bloomBrightTarget.initialized ||
+		!s_postProcess.bloomBlurVerticalTarget.initialized || !s_postProcess.bloomBlurHorizontalTarget.initialized ) {
 		return qfalse;
 	}
 
-	passes = ( r_bloomPasses && r_bloomPasses->integer > 0 ) ? r_bloomPasses->integer : 1;
-	if ( passes > 2 ) {
-		passes = 2;
+	bloomMode = RBPP_GetBloomMode();
+	if ( bloomMode <= 0 ) {
+		return qfalse;
 	}
 
-	blurRadius = ( r_bloomBlurRadius && r_bloomBlurRadius->integer > 0 ) ? r_bloomBlurRadius->integer : 1;
-	blurScale = ( r_bloomBlurScale && r_bloomBlurScale->value > 0.0f ) ? r_bloomBlurScale->value : 1.0f;
-	blurFalloff = ( r_bloomBlurFalloff && r_bloomBlurFalloff->value > 0.0f ) ? r_bloomBlurFalloff->value : 0.75f;
-	blurStep = blurScale * (float)blurRadius * 0.25f;
-	if ( blurStep < 1.0f ) {
-		blurStep = 1.0f;
+	if ( bloomMode == 2 &&
+		( !s_postProcess.bloomQuarterDownsampleTarget.initialized ||
+		!s_postProcess.bloomQuarterVerticalTarget.initialized ||
+		!s_postProcess.bloomQuarterHorizontalTarget.initialized ) ) {
+		return qfalse;
 	}
 
 	brightThreshold = r_bloomBrightThreshold ? r_bloomBrightThreshold->value : 0.25f;
@@ -1793,53 +1823,54 @@ static qboolean RBPP_ApplyBloom( void ) {
 	sceneIntensity = r_bloomSceneIntensity ? r_bloomSceneIntensity->value : 1.0f;
 	sceneSaturation = r_bloomSceneSaturation ? r_bloomSceneSaturation->value : 1.0f;
 
+	RBPP_BindRenderTarget( &s_postProcess.bloomDownsampleTarget );
+	RBPP_Set2DState( s_postProcess.bloomDownsampleTarget.width, s_postProcess.bloomDownsampleTarget.height );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.downsampleProgram.programObject );
+	RBPP_BindRectangleTexture( 0, s_postProcess.sceneTarget.texture );
+	RBPP_DrawQuad( s_postProcess.bloomDownsampleTarget.width, s_postProcess.bloomDownsampleTarget.height, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height );
+
 	RBPP_BindRenderTarget( &s_postProcess.bloomBrightTarget );
 	RBPP_Set2DState( s_postProcess.bloomBrightTarget.width, s_postProcess.bloomBrightTarget.height );
 	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.brightPassProgram.programObject );
 	if ( s_postProcess.brightPassProgram.brightThresholdUniform >= 0 ) {
 		s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.brightPassProgram.brightThresholdUniform, brightThreshold );
 	}
-	RBPP_BindRectangleTexture( 0, s_postProcess.sceneTarget.texture );
-	RBPP_DrawQuad( s_postProcess.bloomBrightTarget.width, s_postProcess.bloomBrightTarget.height, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height, (float)s_postProcess.sceneTarget.width, (float)s_postProcess.sceneTarget.height );
+	RBPP_BindRectangleTexture( 0, s_postProcess.bloomDownsampleTarget.texture );
+	RBPP_DrawQuad( s_postProcess.bloomBrightTarget.width, s_postProcess.bloomBrightTarget.height, (float)s_postProcess.bloomDownsampleTarget.width, (float)s_postProcess.bloomDownsampleTarget.height, (float)s_postProcess.bloomDownsampleTarget.width, (float)s_postProcess.bloomDownsampleTarget.height );
 
-	RBPP_BindRenderTarget( &s_postProcess.bloomHalfTarget );
-	RBPP_Set2DState( s_postProcess.bloomHalfTarget.width, s_postProcess.bloomHalfTarget.height );
-	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.downsampleProgram.programObject );
+	RBPP_BindRenderTarget( &s_postProcess.bloomBlurVerticalTarget );
+	RBPP_Set2DState( s_postProcess.bloomBlurVerticalTarget.width, s_postProcess.bloomBlurVerticalTarget.height );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.blurVerticalProgram.programObject );
 	RBPP_BindRectangleTexture( 0, s_postProcess.bloomBrightTarget.texture );
-	RBPP_DrawQuad( s_postProcess.bloomHalfTarget.width, s_postProcess.bloomHalfTarget.height, (float)s_postProcess.bloomBrightTarget.width, (float)s_postProcess.bloomBrightTarget.height, (float)s_postProcess.bloomBrightTarget.width, (float)s_postProcess.bloomBrightTarget.height );
+	RBPP_DrawQuad( s_postProcess.bloomBlurVerticalTarget.width, s_postProcess.bloomBlurVerticalTarget.height, (float)s_postProcess.bloomBrightTarget.width, (float)s_postProcess.bloomBrightTarget.height, (float)s_postProcess.bloomBrightTarget.width, (float)s_postProcess.bloomBrightTarget.height );
 
-	RBPP_BindRenderTarget( &s_postProcess.bloomPingTarget );
-	RBPP_Set2DState( s_postProcess.bloomPingTarget.width, s_postProcess.bloomPingTarget.height );
-	RBPP_BindRectangleTexture( 0, s_postProcess.bloomHalfTarget.texture );
-	RBPP_DrawQuad( s_postProcess.bloomPingTarget.width, s_postProcess.bloomPingTarget.height, (float)s_postProcess.bloomHalfTarget.width, (float)s_postProcess.bloomHalfTarget.height, (float)s_postProcess.bloomHalfTarget.width, (float)s_postProcess.bloomHalfTarget.height );
+	RBPP_BindRenderTarget( &s_postProcess.bloomBlurHorizontalTarget );
+	RBPP_Set2DState( s_postProcess.bloomBlurHorizontalTarget.width, s_postProcess.bloomBlurHorizontalTarget.height );
+	s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.blurHorizontalProgram.programObject );
+	RBPP_BindRectangleTexture( 0, s_postProcess.bloomBlurVerticalTarget.texture );
+	RBPP_DrawQuad( s_postProcess.bloomBlurHorizontalTarget.width, s_postProcess.bloomBlurHorizontalTarget.height, (float)s_postProcess.bloomBlurVerticalTarget.width, (float)s_postProcess.bloomBlurVerticalTarget.height, (float)s_postProcess.bloomBlurVerticalTarget.width, (float)s_postProcess.bloomBlurVerticalTarget.height );
 
-	finalBloom = &s_postProcess.bloomPingTarget;
+	finalBloom = &s_postProcess.bloomBlurHorizontalTarget;
 
-	for ( passIndex = 0; passIndex < passes; passIndex++ ) {
-		RBPP_BindRenderTarget( &s_postProcess.bloomPongTarget );
-		RBPP_Set2DState( s_postProcess.bloomPongTarget.width, s_postProcess.bloomPongTarget.height );
-		s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.blurVerticalProgram.programObject );
-		if ( s_postProcess.blurVerticalProgram.blurStepUniform >= 0 ) {
-			s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.blurVerticalProgram.blurStepUniform, blurStep );
-		}
-		if ( s_postProcess.blurVerticalProgram.blurFalloffUniform >= 0 ) {
-			s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.blurVerticalProgram.blurFalloffUniform, blurFalloff );
-		}
+	if ( bloomMode == 2 ) {
+		RBPP_BindRenderTarget( &s_postProcess.bloomQuarterDownsampleTarget );
+		RBPP_Set2DState( s_postProcess.bloomQuarterDownsampleTarget.width, s_postProcess.bloomQuarterDownsampleTarget.height );
+		s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.downsampleProgram.programObject );
 		RBPP_BindRectangleTexture( 0, finalBloom->texture );
-		RBPP_DrawQuad( s_postProcess.bloomPongTarget.width, s_postProcess.bloomPongTarget.height, (float)finalBloom->width, (float)finalBloom->height, (float)finalBloom->width, (float)finalBloom->height );
+		RBPP_DrawQuad( s_postProcess.bloomQuarterDownsampleTarget.width, s_postProcess.bloomQuarterDownsampleTarget.height, (float)finalBloom->width, (float)finalBloom->height, (float)finalBloom->width, (float)finalBloom->height );
 
-		RBPP_BindRenderTarget( &s_postProcess.bloomPingTarget );
-		RBPP_Set2DState( s_postProcess.bloomPingTarget.width, s_postProcess.bloomPingTarget.height );
+		RBPP_BindRenderTarget( &s_postProcess.bloomQuarterVerticalTarget );
+		RBPP_Set2DState( s_postProcess.bloomQuarterVerticalTarget.width, s_postProcess.bloomQuarterVerticalTarget.height );
+		s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.blurVerticalProgram.programObject );
+		RBPP_BindRectangleTexture( 0, s_postProcess.bloomQuarterDownsampleTarget.texture );
+		RBPP_DrawQuad( s_postProcess.bloomQuarterVerticalTarget.width, s_postProcess.bloomQuarterVerticalTarget.height, (float)s_postProcess.bloomQuarterDownsampleTarget.width, (float)s_postProcess.bloomQuarterDownsampleTarget.height, (float)s_postProcess.bloomQuarterDownsampleTarget.width, (float)s_postProcess.bloomQuarterDownsampleTarget.height );
+
+		RBPP_BindRenderTarget( &s_postProcess.bloomQuarterHorizontalTarget );
+		RBPP_Set2DState( s_postProcess.bloomQuarterHorizontalTarget.width, s_postProcess.bloomQuarterHorizontalTarget.height );
 		s_postProcess.procs.qglUseProgramObjectARBFunc( s_postProcess.blurHorizontalProgram.programObject );
-		if ( s_postProcess.blurHorizontalProgram.blurStepUniform >= 0 ) {
-			s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.blurHorizontalProgram.blurStepUniform, blurStep );
-		}
-		if ( s_postProcess.blurHorizontalProgram.blurFalloffUniform >= 0 ) {
-			s_postProcess.procs.qglUniform1fARBFunc( s_postProcess.blurHorizontalProgram.blurFalloffUniform, blurFalloff );
-		}
-		RBPP_BindRectangleTexture( 0, s_postProcess.bloomPongTarget.texture );
-		RBPP_DrawQuad( s_postProcess.bloomPingTarget.width, s_postProcess.bloomPingTarget.height, (float)s_postProcess.bloomPongTarget.width, (float)s_postProcess.bloomPongTarget.height, (float)s_postProcess.bloomPongTarget.width, (float)s_postProcess.bloomPongTarget.height );
-		finalBloom = &s_postProcess.bloomPingTarget;
+		RBPP_BindRectangleTexture( 0, s_postProcess.bloomQuarterVerticalTarget.texture );
+		RBPP_DrawQuad( s_postProcess.bloomQuarterHorizontalTarget.width, s_postProcess.bloomQuarterHorizontalTarget.height, (float)s_postProcess.bloomQuarterVerticalTarget.width, (float)s_postProcess.bloomQuarterVerticalTarget.height, (float)s_postProcess.bloomQuarterVerticalTarget.width, (float)s_postProcess.bloomQuarterVerticalTarget.height );
+		finalBloom = &s_postProcess.bloomQuarterHorizontalTarget;
 	}
 
 	RBPP_ReleaseSceneRenderTarget();

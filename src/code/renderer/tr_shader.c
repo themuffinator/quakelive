@@ -1347,6 +1347,8 @@ infoParm_t	infoParms[] = {
 	{"ladder",		0,	SURF_LADDER,	0 },
 	{"nodamage",	0,	SURF_NODAMAGE,	0 },
 	{"metalsteps",	0,	SURF_METALSTEPS,0 },
+	{"snowsteps",	0,	SURF_SNOWSTEPS,0 },
+	{"woodsteps",	0,	SURF_WOODSTEPS,0 },
 	{"flesh",		0,	SURF_FLESH,		0 },
 	{"nosteps",		0,	SURF_NOSTEPS,	0 },
 

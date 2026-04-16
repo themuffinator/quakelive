@@ -241,39 +241,223 @@ static void UI_LoadCountries(void);
         return (lhs && rhs) ? (Q_stricmp(lhs, rhs) == 0) : qfalse;
 }
 
+static char uiCachedForceTeamModel[MAX_QPATH];
+static char uiCachedForceTeamSkin[MAX_QPATH];
+static char uiCachedForceEnemyModel[MAX_QPATH];
+static char uiCachedForceEnemySkin[MAX_QPATH];
+
+static int uiTeamHeadColorModificationCount = -1;
+static int uiTeamUpperColorModificationCount = -1;
+static int uiTeamLowerColorModificationCount = -1;
+static int uiEnemyHeadColorModificationCount = -1;
+static int uiEnemyUpperColorModificationCount = -1;
+static int uiEnemyLowerColorModificationCount = -1;
+static int uiScreenDamageModificationCount = -1;
+static int uiScreenDamageTeamModificationCount = -1;
+
 /*
 =============
-UI_UpdateForceModelSettings
+UI_IsUnsetValue
 
-Synchronizes the UI force model cvars with the current force model and skin
-state, while refreshing the head feeder selection.
+Treats empty and `NULL` strings as an unset retail cvar value.
 =============
 */
-static void UI_UpdateForceModelSettings(qboolean team) {
-	char model[MAX_QPATH];
+static qboolean UI_IsUnsetValue( const char *value ) {
+	return ( !value || !value[0] || Q_stricmp( value, "NULL" ) == 0 );
+}
+
+/*
+=============
+UI_UpdateForceModelBrightness
+
+Mirrors the retail force-model bright toggle by checking the active model and
+skin cvar pair for the `bright` token.
+=============
+*/
+static void UI_UpdateForceModelBrightness( const char *modelCvar, const char *skinCvar, const char *uiBrightCvar ) {
+	char	model[MAX_QPATH];
+	char	skin[MAX_QPATH];
+	qboolean bright;
+
+	trap_Cvar_VariableStringBuffer( modelCvar, model, sizeof( model ) );
+	trap_Cvar_VariableStringBuffer( skinCvar, skin, sizeof( skin ) );
+	Q_strlwr( model );
+	Q_strlwr( skin );
+
+	bright = ( strstr( skin, "bright" ) != NULL );
+	if ( !bright && UI_IsUnsetValue( skin ) ) {
+		bright = ( strstr( model, "bright" ) != NULL );
+	}
+
+	trap_Cvar_Set( uiBrightCvar, bright ? "1" : "0" );
+}
+
+/*
+=============
+UI_CopyForceModelCache
+
+Caches the current force-model cvar strings so UI_UpdateCvars can detect when
+they change out from under the menu scripts.
+=============
+*/
+static void UI_CopyForceModelCache( qboolean team, const char *model, const char *skin ) {
+	if ( team ) {
+		Q_strncpyz( uiCachedForceTeamModel, model, sizeof( uiCachedForceTeamModel ) );
+		Q_strncpyz( uiCachedForceTeamSkin, skin, sizeof( uiCachedForceTeamSkin ) );
+		return;
+	}
+
+	Q_strncpyz( uiCachedForceEnemyModel, model, sizeof( uiCachedForceEnemyModel ) );
+	Q_strncpyz( uiCachedForceEnemySkin, skin, sizeof( uiCachedForceEnemySkin ) );
+}
+
+/*
+=============
+UI_FormatForceModelLabel
+
+Maps the live force-model selection back onto the retail preset-list labels
+used by the advanced Quake Live menu.
+=============
+*/
+static void UI_FormatForceModelLabel( qboolean team, const char *modelValue, const char *skinValue, char *buffer, int bufferSize ) {
+	char	model[MAX_QPATH];
+	char	skin[MAX_QPATH];
+	char	*slash;
+	const char *label;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	if ( UI_IsUnsetValue( modelValue ) ) {
+		Q_strncpyz( buffer, "No", bufferSize );
+		return;
+	}
+
+	Q_strncpyz( model, modelValue, sizeof( model ) );
+	Q_strncpyz( skin, UI_IsUnsetValue( skinValue ) ? "" : skinValue, sizeof( skin ) );
+	slash = strchr( model, '/' );
+	if ( slash ) {
+		if ( !skin[0] ) {
+			Q_strncpyz( skin, slash + 1, sizeof( skin ) );
+		}
+		*slash = '\0';
+	}
+
+	label = NULL;
+	if ( team ) {
+		if ( Q_stricmp( model, "sarge" ) == 0 ) {
+			label = "Sarge";
+		} else if ( Q_stricmp( model, "ranger" ) == 0 && !skin[0] ) {
+			label = "Ranger";
+		} else if ( Q_stricmp( model, "bitterman" ) == 0 && !skin[0] ) {
+			label = "Bitterman";
+		} else if ( Q_stricmp( model, "visor" ) == 0 && Q_stricmp( skin, "bright" ) == 0 ) {
+			label = "Visor Bright";
+		} else if ( Q_stricmp( model, "visor" ) == 0 ) {
+			label = "Visor";
+		} else if ( Q_stricmp( model, "crash" ) == 0 && Q_stricmp( skin, "bright" ) == 0 ) {
+			label = "Crash Bright";
+		} else if ( Q_stricmp( model, "crash" ) == 0 ) {
+			label = "Crash";
+		}
+	} else {
+		if ( Q_stricmp( model, "keel" ) == 0 && Q_stricmp( skin, "bright" ) == 0 ) {
+			label = "Keel Bright";
+		} else if ( Q_stricmp( model, "keel" ) == 0 && Q_stricmp( skin, "sport" ) == 0 ) {
+			label = "Keel Sport";
+		} else if ( Q_stricmp( model, "tankjr" ) == 0 && Q_stricmp( skin, "bright" ) == 0 ) {
+			label = "TankJr Bright";
+		} else if ( Q_stricmp( model, "tankjr" ) == 0 && Q_stricmp( skin, "sport" ) == 0 ) {
+			label = "TankJr Sport";
+		}
+	}
+
+	if ( label ) {
+		Q_strncpyz( buffer, label, bufferSize );
+		return;
+	}
+
+	Q_strncpyz( buffer, model, bufferSize );
+}
+
+/*
+=============
+UI_FormatForceSkinLabel
+
+Formats the retail force-skin label cvars that drive the advanced-menu preset
+selectors.
+=============
+*/
+static void UI_FormatForceSkinLabel( const char *skinValue, char *buffer, int bufferSize ) {
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	if ( UI_IsUnsetValue( skinValue ) ) {
+		Q_strncpyz( buffer, "No", bufferSize );
+		return;
+	}
+
+	if ( Q_stricmp( skinValue, "bright" ) == 0 ) {
+		Q_strncpyz( buffer, "Bright", bufferSize );
+		return;
+	}
+
+	if ( Q_stricmp( skinValue, "sport" ) == 0 ) {
+		Q_strncpyz( buffer, "Sport", bufferSize );
+		return;
+	}
+
+	Q_strncpyz( buffer, skinValue, bufferSize );
+}
+
+/*
+=============
+UI_SyncForceModelCvars
+
+Synchronizes the retail Quake Live preset-label cvars and bright toggle with
+the live cg_force* model and skin state.
+=============
+*/
+static void UI_SyncForceModelCvars( qboolean team ) {
+	char	model[MAX_QPATH];
+	char	skin[MAX_QPATH];
+	char	uiModelValue[MAX_QPATH];
+	char	uiSkinValue[MAX_QPATH];
 	const char *modelCvar;
 	const char *skinCvar;
 	const char *uiModelCvar;
 	const char *uiSkinCvar;
 	const char *uiBrightCvar;
-	const char *modelValue;
-	char *slash;
 
-	modelCvar = team ? "cg_teamModel" : "cg_enemyModel";
+	modelCvar = team ? "cg_forceTeamModel" : "cg_forceEnemyModel";
 	skinCvar = team ? "cg_forceTeamSkin" : "cg_forceEnemySkin";
-	uiModelCvar = team ? "ui_teamModel" : "ui_enemyModel";
+	uiModelCvar = team ? "ui_forceTeamModel" : "ui_forceEnemyModel";
 	uiSkinCvar = team ? "ui_forceTeamSkin" : "ui_forceEnemySkin";
-	uiBrightCvar = team ? "ui_teamModelBright" : "ui_enemyModelBright";
+	uiBrightCvar = team ? "ui_forceTeamModelBright" : "ui_forceEnemyModelBright";
 
-	trap_Cvar_VariableStringBuffer(modelCvar, model, sizeof(model));
-	slash = strchr(model, '/');
-	trap_Cvar_Set(uiBrightCvar, (slash && Q_stricmp(slash + 1, "bright") == 0) ? "1" : "0");
-	if (slash) {
-		*slash = '\0';
-	}
-	modelValue = (model[0]) ? model : "No";
-	trap_Cvar_Set(uiModelCvar, modelValue);
-	trap_Cvar_Set(uiSkinCvar, UI_Cvar_VariableString(skinCvar));
+	trap_Cvar_VariableStringBuffer( modelCvar, model, sizeof( model ) );
+	trap_Cvar_VariableStringBuffer( skinCvar, skin, sizeof( skin ) );
+	UI_CopyForceModelCache( team, model, skin );
+	UI_FormatForceModelLabel( team, model, skin, uiModelValue, sizeof( uiModelValue ) );
+	UI_FormatForceSkinLabel( skin, uiSkinValue, sizeof( uiSkinValue ) );
+
+	trap_Cvar_Set( uiModelCvar, uiModelValue );
+	trap_Cvar_Set( uiSkinCvar, uiSkinValue );
+	UI_UpdateForceModelBrightness( modelCvar, skinCvar, uiBrightCvar );
+}
+
+/*
+=============
+UI_UpdateForceModelSettings
+
+Synchronizes the retail Quake Live force-model menu state and refreshes the
+head feeder after a visible preset change.
+=============
+*/
+static void UI_UpdateForceModelSettings(qboolean team) {
+	UI_SyncForceModelCvars( team );
 	UI_FeederSelection(FEEDER_HEADS, 0);
 	Menu_SetFeederSelection(NULL, FEEDER_HEADS, 0, NULL);
 }
@@ -587,11 +771,12 @@ static int UI_RefreshDisplayContextScale(void) {
 	trap_GetGlconfig(&uiInfo.uiDC.glconfig);
 
 	uiInfo.uiDC.yscale = uiInfo.uiDC.glconfig.vidHeight * (1.0f / 480.0f);
-	uiInfo.uiDC.xscale = uiInfo.uiDC.glconfig.vidWidth * (1.0f / 640.0f);
 	if (uiInfo.uiDC.glconfig.vidWidth * SCREEN_HEIGHT > uiInfo.uiDC.glconfig.vidHeight * SCREEN_WIDTH) {
 		uiInfo.uiDC.bias = 0.5f * (uiInfo.uiDC.glconfig.vidWidth - (uiInfo.uiDC.glconfig.vidHeight * (640.0f / 480.0f)));
+		uiInfo.uiDC.xscale = uiInfo.uiDC.yscale;
 	} else {
 		uiInfo.uiDC.bias = 0.0f;
+		uiInfo.uiDC.xscale = uiInfo.uiDC.glconfig.vidWidth * (1.0f / 640.0f);
 	}
 
 	return uiInfo.uiDC.glconfig.vidWidth * SCREEN_HEIGHT;
@@ -747,7 +932,7 @@ static void UI_ActivateAdvert(int cellId) {
 }
 
 void _UI_KeyEvent( int key, qboolean down );
-void _UI_MouseEvent( int dx, int dy );
+void _UI_MouseEvent( int x, int y );
 void _UI_Refresh( int realtime );
 qboolean _UI_IsFullscreen( void );
 void _UI_SetActiveMenu( uiMenuCommand_t menu );
@@ -1080,8 +1265,8 @@ void AssetCache() {
 	uiInfo.uiDC.Assets.sliderBar = trap_R_RegisterShaderNoMip( ASSET_SLIDER_BAR );
 	uiInfo.uiDC.Assets.sliderThumb = trap_R_RegisterShaderNoMip( ASSET_SLIDER_THUMB );
 
-	for( n = 0; n < NUM_CROSSHAIRS; n++ ) {
-		uiInfo.uiDC.Assets.crosshairShader[n] = trap_R_RegisterShaderNoMip( va("gfx/2d/crosshair%c", 'a' + n ) );
+	for ( n = 1; n < NUM_CROSSHAIRS; n++ ) {
+		uiInfo.uiDC.Assets.crosshairShader[n] = trap_R_RegisterShaderNoMip( va( "gfx/2d/crosshair%d", n ) );
 	}
 
 	UI_RegisterQLMenuAssets();
@@ -2479,6 +2664,426 @@ static void UI_DrawPlayerModel(rectDef_t *rect) {
 
 		}
 
+static const unsigned int uiRetailCommandColorPalette[26] = {
+	0x800000ffu,
+	0x802300ffu,
+	0x804000ffu,
+	0x805e00ffu,
+	0x808000ffu,
+	0x5e8000ffu,
+	0x408000ffu,
+	0x238000ffu,
+	0x008000ffu,
+	0x008023ffu,
+	0x008040ffu,
+	0x00805effu,
+	0x008080ffu,
+	0x005e80ffu,
+	0x004080ffu,
+	0x002380ffu,
+	0x000080ffu,
+	0x230080ffu,
+	0x400080ffu,
+	0x5e0080ffu,
+	0x800080ffu,
+	0x80005effu,
+	0x800040ffu,
+	0x800023ffu,
+	0x808080ffu,
+	0x404040ffu
+};
+
+/*
+=============
+UI_HexCharToInt
+
+Converts a single hexadecimal digit for retail packed-color parsing.
+=============
+*/
+static int UI_HexCharToInt( char ch ) {
+	if ( ch >= '0' && ch <= '9' ) {
+		return ch - '0';
+	}
+	if ( ch >= 'a' && ch <= 'f' ) {
+		return 10 + ( ch - 'a' );
+	}
+	if ( ch >= 'A' && ch <= 'F' ) {
+		return 10 + ( ch - 'A' );
+	}
+	return -1;
+}
+
+/*
+=============
+UI_PackedColorToVec3
+
+Converts a retail `0xRRGGBBAA` packed color into normalized RGB components.
+=============
+*/
+static void UI_PackedColorToVec3( unsigned int packed, vec3_t color ) {
+	if ( !color ) {
+		return;
+	}
+
+	color[0] = ( ( packed >> 24 ) & 0xFF ) / 255.0f;
+	color[1] = ( ( packed >> 16 ) & 0xFF ) / 255.0f;
+	color[2] = ( ( packed >> 8 ) & 0xFF ) / 255.0f;
+}
+
+/*
+=============
+UI_LerpPackedColor
+
+Interpolates between two retail packed RGBA colors channel-by-channel.
+=============
+*/
+static unsigned int UI_LerpPackedColor( unsigned int a, unsigned int b, float frac ) {
+	int i;
+	unsigned int result;
+
+	frac = Com_Clamp( 0.0f, 1.0f, frac );
+	result = 0;
+	for ( i = 0; i < 4; i++ ) {
+		int shift;
+		int componentA;
+		int componentB;
+		int component;
+
+		shift = 24 - ( i * 8 );
+		componentA = ( a >> shift ) & 0xFF;
+		componentB = ( b >> shift ) & 0xFF;
+		component = (int)( componentA + ( componentB - componentA ) * frac + 0.5f );
+		component = (int)Com_Clamp( 0.0f, 255.0f, (float)component );
+		result = ( result << 8 ) | (unsigned int)component;
+	}
+
+	return result;
+}
+
+/*
+=============
+UI_RetailSliderValueToPackedColor
+
+Maps the Quake Live slider range onto the observed 26-entry retail command
+palette used by the team, enemy, and screen-damage color callbacks.
+=============
+*/
+static qboolean UI_RetailSliderValueToPackedColor( float value, unsigned int *packedColor, vec3_t color ) {
+	float normalized;
+	float progress;
+	int index;
+	unsigned int packed;
+
+	if ( value <= 0.001f ) {
+		return qfalse;
+	}
+
+	normalized = ( value <= 1.0f ) ? 0.0f : ( value / 100.0f );
+	normalized = Com_Clamp( 0.0f, 1.0f, normalized );
+	progress = normalized * 25.0f;
+	index = (int)progress;
+
+	if ( index >= 25 ) {
+		packed = uiRetailCommandColorPalette[25];
+	} else {
+		packed = UI_LerpPackedColor(
+			uiRetailCommandColorPalette[index],
+			uiRetailCommandColorPalette[index + 1],
+			progress - index );
+	}
+
+	if ( packedColor ) {
+		*packedColor = packed;
+	}
+	if ( color ) {
+		UI_PackedColorToVec3( packed, color );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+UI_SyncRetailSliderColorCvar
+
+Writes the retail packed-color form for one slider-backed UI cvar into its
+paired gameplay cvar.
+=============
+*/
+static void UI_SyncRetailSliderColorCvar( const vmCvar_t *uiCvar, const char *cgCvar ) {
+	char colorValue[16];
+	unsigned int packedColor;
+
+	if ( !uiCvar || !cgCvar ) {
+		return;
+	}
+
+	if ( !UI_RetailSliderValueToPackedColor( uiCvar->value, &packedColor, NULL ) ) {
+		return;
+	}
+
+	Com_sprintf( colorValue, sizeof( colorValue ), "0x%08x", packedColor );
+	trap_Cvar_Set( cgCvar, colorValue );
+}
+
+/*
+=============
+UI_ParsePreviewColorString
+
+Parses either retail packed hex color strings or legacy numeric slider values
+into preview-ready RGB vectors.
+=============
+*/
+static qboolean UI_ParsePreviewColorString( const char *value, vec3_t color ) {
+	char buffer[64];
+	const char *hex;
+	char *endptr;
+	unsigned int raw;
+	int len;
+	int digit;
+	int i;
+	float sliderValue;
+
+	if ( UI_IsUnsetValue( value ) ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( buffer, value, sizeof( buffer ) );
+	hex = buffer;
+	while ( *hex == ' ' || *hex == '\t' || *hex == '"' ) {
+		hex++;
+	}
+
+	if ( hex[0] == '0' && ( hex[1] == 'x' || hex[1] == 'X' ) ) {
+		hex += 2;
+	}
+
+	len = strlen( hex );
+	if ( len == 6 || len == 8 ) {
+		raw = 0;
+		for ( i = 0; i < len; i++ ) {
+			digit = UI_HexCharToInt( hex[i] );
+			if ( digit < 0 ) {
+				raw = 0;
+				break;
+			}
+			raw = ( raw << 4 ) | (unsigned int)digit;
+		}
+		if ( i == len ) {
+			if ( len == 6 ) {
+				raw = ( raw << 8 ) | 0xFFu;
+			}
+			UI_PackedColorToVec3( raw, color );
+			return qtrue;
+		}
+	}
+
+	sliderValue = (float)strtod( hex, &endptr );
+	if ( endptr != hex ) {
+		while ( *endptr == ' ' || *endptr == '\t' || *endptr == '"' ) {
+			endptr++;
+		}
+		if ( *endptr == '\0' ) {
+			return UI_RetailSliderValueToPackedColor( sliderValue, NULL, color );
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+UI_UpdatePreviewPlayerColors
+
+Refreshes the cached preview tint overrides from the live team/enemy color
+cvars before UI_DrawPlayer consumes the playerInfo_t.
+=============
+*/
+static void UI_UpdatePreviewPlayerColors( playerInfo_t *info, const char *headColorCvar, const char *upperColorCvar, const char *lowerColorCvar ) {
+	char value[MAX_CVAR_VALUE_STRING];
+
+	if ( !info ) {
+		return;
+	}
+
+	info->headColorForced = qfalse;
+	info->upperColorForced = qfalse;
+	info->lowerColorForced = qfalse;
+
+	if ( headColorCvar ) {
+		trap_Cvar_VariableStringBuffer( headColorCvar, value, sizeof( value ) );
+		if ( UI_ParsePreviewColorString( value, info->headColor ) ) {
+			info->headColorForced = qtrue;
+		}
+	}
+
+	if ( upperColorCvar ) {
+		trap_Cvar_VariableStringBuffer( upperColorCvar, value, sizeof( value ) );
+		if ( UI_ParsePreviewColorString( value, info->upperColor ) ) {
+			info->upperColorForced = qtrue;
+		}
+	}
+
+	if ( lowerColorCvar ) {
+		trap_Cvar_VariableStringBuffer( lowerColorCvar, value, sizeof( value ) );
+		if ( UI_ParsePreviewColorString( value, info->lowerColor ) ) {
+			info->lowerColorForced = qtrue;
+		}
+	}
+}
+
+/*
+=============
+UI_BuildForcedPlayerModel
+
+Builds the retail preview model string from the force-model and force-skin
+cvars, applying the observed `sarge` fallback when only a skin is selected.
+=============
+*/
+static qboolean UI_BuildForcedPlayerModel( const char *modelCvar, const char *skinCvar, const char *defaultModel, char *buffer, int bufferSize ) {
+	char model[MAX_QPATH];
+	char skin[MAX_QPATH];
+	char baseModel[MAX_QPATH];
+	char *slash;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	trap_Cvar_VariableStringBuffer( modelCvar, model, sizeof( model ) );
+	if ( skinCvar ) {
+		trap_Cvar_VariableStringBuffer( skinCvar, skin, sizeof( skin ) );
+	} else {
+		skin[0] = '\0';
+	}
+
+	if ( UI_IsUnsetValue( model ) ) {
+		if ( UI_IsUnsetValue( skin ) || !defaultModel || !defaultModel[0] ) {
+			return qfalse;
+		}
+		Q_strncpyz( baseModel, defaultModel, sizeof( baseModel ) );
+	} else {
+		Q_strncpyz( baseModel, model, sizeof( baseModel ) );
+	}
+
+	slash = strchr( baseModel, '/' );
+	if ( slash ) {
+		if ( UI_IsUnsetValue( skin ) ) {
+			Q_strncpyz( buffer, model, bufferSize );
+			return qtrue;
+		}
+		*slash = '\0';
+	}
+
+	if ( UI_IsUnsetValue( skin ) ) {
+		Q_strncpyz( buffer, baseModel, bufferSize );
+	} else {
+		Com_sprintf( buffer, bufferSize, "%s/%s", baseModel, skin );
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+UI_DrawForcedPlayerPreview
+
+Draws one of the retail force-model ownerdraw previews while caching the model
+assets and refreshing the live tint overrides every frame.
+=============
+*/
+static void UI_DrawForcedPlayerPreview( rectDef_t *rect, playerInfo_t *info, char *cachedModel, int cachedModelSize, const char *modelCvar, const char *skinCvar, const char *defaultModel, const char *headColorCvar, const char *upperColorCvar, const char *lowerColorCvar ) {
+	char modelString[MAX_QPATH];
+	vec3_t viewangles;
+	vec3_t moveangles;
+
+	if ( !rect || !info || !cachedModel ) {
+		return;
+	}
+
+	if ( !UI_BuildForcedPlayerModel( modelCvar, skinCvar, defaultModel, modelString, sizeof( modelString ) ) ) {
+		return;
+	}
+
+	if ( Q_stricmp( cachedModel, modelString ) != 0 || !info->legsModel || !info->torsoModel || !info->headModel ) {
+		memset( info, 0, sizeof( *info ) );
+		viewangles[YAW] = 180 - 10;
+		viewangles[PITCH] = 0;
+		viewangles[ROLL] = 0;
+		VectorClear( moveangles );
+		UI_PlayerInfo_SetModel( info, modelString, modelString, "" );
+		UI_PlayerInfo_SetInfo( info, LEGS_IDLE, TORSO_STAND, viewangles, moveangles, WP_MACHINEGUN, qfalse );
+		Q_strncpyz( cachedModel, modelString, cachedModelSize );
+	}
+
+	UI_UpdatePreviewPlayerColors( info, headColorCvar, upperColorCvar, lowerColorCvar );
+	UI_DrawPlayer( rect->x, rect->y, rect->w, rect->h, info, uiInfo.uiDC.realTime / 2 );
+}
+
+/*
+=============
+UI_DrawTeamPlayerModel
+
+Restores the retail Quake Live team-model preview ownerdraw.
+=============
+*/
+static void UI_DrawTeamPlayerModel( rectDef_t *rect ) {
+	static playerInfo_t	info;
+	static char		cachedModel[MAX_QPATH];
+
+	UI_DrawForcedPlayerPreview( rect, &info, cachedModel, sizeof( cachedModel ),
+		"cg_forceTeamModel", "cg_forceTeamSkin", "sarge",
+		"cg_teamHeadColor", "cg_teamUpperColor", "cg_teamLowerColor" );
+}
+
+/*
+=============
+UI_DrawEnemyPlayerModel
+
+Restores the retail Quake Live enemy-model preview ownerdraw.
+=============
+*/
+static void UI_DrawEnemyPlayerModel( rectDef_t *rect ) {
+	static playerInfo_t	info;
+	static char		cachedModel[MAX_QPATH];
+
+	UI_DrawForcedPlayerPreview( rect, &info, cachedModel, sizeof( cachedModel ),
+		"cg_forceEnemyModel", "cg_forceEnemySkin", "sarge",
+		"cg_enemyHeadColor", "cg_enemyUpperColor", "cg_enemyLowerColor" );
+}
+
+/*
+=============
+UI_DrawRedTeamModel
+
+Restores the retail red-team preview ownerdraw used by match setup menus.
+=============
+*/
+static void UI_DrawRedTeamModel( rectDef_t *rect ) {
+	static playerInfo_t	info;
+	static char		cachedModel[MAX_QPATH];
+
+	UI_DrawForcedPlayerPreview( rect, &info, cachedModel, sizeof( cachedModel ),
+		"cg_forceRedTeamModel", NULL, NULL,
+		"cg_teamHeadColor", "cg_teamUpperColor", "cg_teamLowerColor" );
+}
+
+/*
+=============
+UI_DrawBlueTeamModel
+
+Restores the retail blue-team preview ownerdraw used by match setup menus.
+=============
+*/
+static void UI_DrawBlueTeamModel( rectDef_t *rect ) {
+	static playerInfo_t	info;
+	static char		cachedModel[MAX_QPATH];
+
+	UI_DrawForcedPlayerPreview( rect, &info, cachedModel, sizeof( cachedModel ),
+		"cg_forceBlueTeamModel", NULL, NULL,
+		"cg_enemyHeadColor", "cg_enemyUpperColor", "cg_enemyLowerColor" );
+}
+
 static void UI_DrawNetSource(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	if (ui_netSource.integer < 0 || ui_netSource.integer > numNetSources) {
 		ui_netSource.integer = 0;
@@ -3286,10 +3891,7 @@ static void UI_DrawServerSettingsModifiedWeapons( float x, float y, unsigned int
 	UI_EnsureStartingWeaponIcons();
 
 	if ( uiModifiedWeaponIconHandle == 0 ) {
-		uiModifiedWeaponIconHandle = trap_R_RegisterShaderNoMip( "icons/modified" );
-		if ( uiModifiedWeaponIconHandle == 0 ) {
-			uiModifiedWeaponIconHandle = trap_R_RegisterShaderNoMip( "icons/modified.png" );
-		}
+		uiModifiedWeaponIconHandle = trap_R_RegisterShaderNoMip( "icons/modified.tga" );
 	}
 
 	y += 6.0f;
@@ -4049,6 +4651,18 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 			break;
 		case UI_VOTESTRING:
 			UI_DrawVoteString(&rect, scale, color, textStyle);
+			break;
+		case UI_TEAMPLAYERMODEL:
+			UI_DrawTeamPlayerModel(&rect);
+			break;
+		case UI_ENEMYPLAYERMODEL:
+			UI_DrawEnemyPlayerModel(&rect);
+			break;
+		case UI_REDTEAMMODEL:
+			UI_DrawRedTeamModel(&rect);
+			break;
+		case UI_BLUETEAMMODEL:
+			UI_DrawBlueTeamModel(&rect);
 			break;
 		case UI_SERVER_SETTINGS:
 			UI_DrawServerSettings(&rect, scale, color, textStyle);
@@ -5401,18 +6015,12 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_Set("ui_teamHeadColor", "96");
 			trap_Cvar_Set("ui_teamUpperColor", "96");
 			trap_Cvar_Set("ui_teamLowerColor", "96");
-			trap_Cvar_Set("cg_teamHeadColor", "96");
-			trap_Cvar_Set("cg_teamUpperColor", "96");
-			trap_Cvar_Set("cg_teamLowerColor", "96");
 		} else if (Q_stricmp(name, "enemyModelChanged") == 0) {
 			UI_UpdateForceModelSettings(qfalse);
 		} else if (Q_stricmp(name, "enemyColorDefaults") == 0) {
 			trap_Cvar_Set("ui_enemyHeadColor", "27");
 			trap_Cvar_Set("ui_enemyUpperColor", "27");
 			trap_Cvar_Set("ui_enemyLowerColor", "27");
-			trap_Cvar_Set("cg_enemyHeadColor", "27");
-			trap_Cvar_Set("cg_enemyUpperColor", "27");
-			trap_Cvar_Set("cg_enemyLowerColor", "27");
                 } else if (Q_stricmp(name, "ServerSort") == 0) {
                         int sortColumn;
                         if (Int_Parse(args, &sortColumn)) {
@@ -7880,6 +8488,8 @@ void _UI_Init( qboolean inGameLoad ) {
 	UI_ApplyRetailMenuFixups();
 	
 	Menus_CloseAll();
+	UI_SetBrowserActive( qfalse );
+	UI_BrowserBridge_SetActive( qfalse );
 
 	trap_LAN_LoadCachedServers();
 	UI_LoadBestScores(uiInfo.mapList[ui_currentMap.integer].mapLoadName, uiInfo.gameTypes[ui_gameType.integer].gtEnum);
@@ -7934,29 +8544,77 @@ void _UI_KeyEvent( int key, qboolean down ) {
 
 /*
 =================
+UI_RoundScreenCursorCoord
+
+Matches the retail cursor-coordinate rounding used after projecting host
+screen-space mouse coordinates back into UI virtual space.
+=================
+*/
+static int UI_RoundScreenCursorCoord( float value ) {
+	if ( value < 0.0f ) {
+		return (int)( value - 0.5f );
+	}
+
+	return (int)( value + 0.5f );
+}
+
+/*
+=================
+UI_ConvertScreenCursorXToVirtual
+
+Projects a host screen-space X coordinate into the retail UI cursor space,
+including the centered 4:3 widescreen bias path used by uix86.
+=================
+*/
+static int UI_ConvertScreenCursorXToVirtual( int x ) {
+	float	virtualX;
+
+	if ( uiInfo.uiDC.bias > 0.0f && uiInfo.uiDC.xscale > 0.0f ) {
+		virtualX = ( (float)x - uiInfo.uiDC.bias ) / uiInfo.uiDC.xscale;
+		return UI_RoundScreenCursorCoord( virtualX );
+	}
+
+	if ( uiInfo.uiDC.glconfig.vidWidth <= 0 ) {
+		return 0;
+	}
+
+	virtualX = (float)x * ( (float)SCREEN_WIDTH / (float)uiInfo.uiDC.glconfig.vidWidth );
+	return UI_RoundScreenCursorCoord( virtualX );
+}
+
+/*
+=================
+UI_ConvertScreenCursorYToVirtual
+
+Projects a host screen-space Y coordinate into the retail UI cursor space.
+=================
+*/
+static int UI_ConvertScreenCursorYToVirtual( int y ) {
+	float	virtualY;
+
+	if ( uiInfo.uiDC.glconfig.vidHeight <= 0 ) {
+		return 0;
+	}
+
+	virtualY = (float)y * ( (float)SCREEN_HEIGHT / (float)uiInfo.uiDC.glconfig.vidHeight );
+	return UI_RoundScreenCursorCoord( virtualY );
+}
+
+/*
+=================
 UI_MouseEvent
 =================
 */
-void _UI_MouseEvent( int dx, int dy )
+void _UI_MouseEvent( int x, int y )
 {
-	// update mouse screen position
-	uiInfo.uiDC.cursorx += dx;
-	if (uiInfo.uiDC.cursorx < 0)
-		uiInfo.uiDC.cursorx = 0;
-	else if (uiInfo.uiDC.cursorx > SCREEN_WIDTH)
-		uiInfo.uiDC.cursorx = SCREEN_WIDTH;
+	uiInfo.uiDC.cursorx = UI_ConvertScreenCursorXToVirtual( x );
+	uiInfo.uiDC.cursory = UI_ConvertScreenCursorYToVirtual( y );
 
-	uiInfo.uiDC.cursory += dy;
-	if (uiInfo.uiDC.cursory < 0)
-		uiInfo.uiDC.cursory = 0;
-	else if (uiInfo.uiDC.cursory > SCREEN_HEIGHT)
-		uiInfo.uiDC.cursory = SCREEN_HEIGHT;
-
-  if (Menu_Count() > 0) {
-    //menuDef_t *menu = Menu_GetFocused();
-    //Menu_HandleMouseMove(menu, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory);
-		Display_MouseMove(NULL, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory);
-  }
+	if ( Menu_Count() > 0 &&
+		(unsigned int)uiInfo.uiDC.cursorx <= SCREEN_WIDTH &&
+		(unsigned int)uiInfo.uiDC.cursory <= SCREEN_HEIGHT ) {
+		Display_MouseMove( NULL, uiInfo.uiDC.cursorx, uiInfo.uiDC.cursory );
+	}
 
 		}
 
@@ -7974,9 +8632,6 @@ void UI_LoadNonIngame() {
 void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 	char buf[256];
 
-	UI_SetBrowserActive(ui_activeMenuFlow == UI_MENU_FLOW_QUAKELIVE);
-	UI_BrowserBridge_SetActive(ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED);
-
 	// this should be the ONLY way the menu system is brought up
 	// enusure minumum menu data is cached
   if (Menu_Count() > 0) {
@@ -7984,6 +8639,8 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		v[0] = v[1] = v[2] = 0;
 	  switch ( menu ) {
 	  case UIMENU_NONE:
+			UI_SetBrowserActive( qfalse );
+			UI_BrowserBridge_SetActive( qfalse );
 			trap_Key_SetCatcher( trap_Key_GetCatcher() & ~KEYCATCH_UI );
 			trap_Key_ClearStates();
 			trap_Cvar_Set( "cl_paused", "0" );
@@ -7991,6 +8648,8 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 
 		  return;
 	  case UIMENU_MAIN:
+			UI_SetBrowserActive( ui_activeMenuFlow == UI_MENU_FLOW_QUAKELIVE );
+			UI_BrowserBridge_SetActive( ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED );
 			//trap_Cvar_Set( "sv_killserver", "1" );
 			trap_Key_SetCatcher( KEYCATCH_UI );
 			UI_SyncMenuStateFromCvars();
@@ -8010,22 +8669,30 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 			}
 		  return;
 	  case UIMENU_TEAM:
+			UI_SetBrowserActive( qfalse );
+			UI_BrowserBridge_SetActive( qfalse );
 			trap_Key_SetCatcher( KEYCATCH_UI );
 			Menus_ActivateByName("joingame_menu");
 		  return;
 	  case UIMENU_NEED_CD:
+			UI_SetBrowserActive( qfalse );
+			UI_BrowserBridge_SetActive( qfalse );
 			// no cd check in TA
 			//trap_Key_SetCatcher( KEYCATCH_UI );
       //Menus_ActivateByName("needcd");
 		  //UI_ConfirmMenu( "Insert the CD", NULL, NeedCDAction );
 		  return;
 	  case UIMENU_BAD_CD_KEY:
+			UI_SetBrowserActive( qfalse );
+			UI_BrowserBridge_SetActive( qfalse );
 			// no cd check in TA
 			//trap_Key_SetCatcher( KEYCATCH_UI );
       //Menus_ActivateByName("badcd");
 //UI_ConfirmMenu( "CD Key Error", NULL, NeedCDKeyAction );
 		  return;
 	  case UIMENU_INGAME:
+			UI_SetBrowserActive( qfalse );
+			UI_BrowserBridge_SetActive( qfalse );
 		  trap_Cvar_Set( "cl_paused", "1" );
 			UI_SyncMenuStateFromCvars();
 			// Retail resets the ingame callvote filter each time the menu is reopened.
@@ -8035,6 +8702,7 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 			UI_BuildPlayerList();
 			Menus_CloseAll();
 			Menus_ActivateByName("ingame");
+			Menus_ActivateByName("ingame_about");
 		  return;
 	  }
   }
@@ -8457,12 +9125,12 @@ vmCvar_t	ui_serverStatusTimeOut;
 vmCvar_t	ui_mapVotingDisabled;
 vmCvar_t	ui_gameTypeVotingDisabled;
 vmCvar_t	ui_bloomPreset;
-	vmCvar_t	ui_teamModel;
-	vmCvar_t	ui_teamModelBright;
-	vmCvar_t	ui_enemyModel;
-	vmCvar_t	ui_enemyModelBright;
-vmCvar_t	ui_forceEnemySkin;
-vmCvar_t	ui_forceTeamSkin;
+	vmCvar_t	ui_forceTeamModel;
+	vmCvar_t	ui_forceTeamModelBright;
+	vmCvar_t	ui_forceEnemyModel;
+	vmCvar_t	ui_forceEnemyModelBright;
+	vmCvar_t	ui_forceEnemySkin;
+	vmCvar_t	ui_forceTeamSkin;
 vmCvar_t	ui_enemyHeadColor;
 vmCvar_t	ui_enemyLowerColor;
 vmCvar_t	ui_enemyUpperColor;
@@ -8639,11 +9307,11 @@ static cvarTable_t		cvarTable[] = {
 	{ &ui_realWarmUp, "g_warmup", "20", CVAR_ARCHIVE},
 	{ &ui_realCaptureLimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART},
 	{ &ui_bloomPreset, "ui_bloomPreset", "0", CVAR_ARCHIVE},
-	{ &ui_enemyModel, "ui_enemyModel", "", CVAR_ARCHIVE},
-	{ &ui_enemyModelBright, "ui_enemyModelBright", "0", CVAR_ARCHIVE},
+	{ &ui_forceEnemyModel, "ui_forceEnemyModel", "", CVAR_ARCHIVE},
+	{ &ui_forceEnemyModelBright, "ui_forceEnemyModelBright", "0", CVAR_ARCHIVE},
 	{ &ui_forceEnemySkin, "ui_forceEnemySkin", "", CVAR_ARCHIVE},
-	{ &ui_teamModel, "ui_teamModel", "", CVAR_ARCHIVE},
-	{ &ui_teamModelBright, "ui_teamModelBright", "0", CVAR_ARCHIVE},
+	{ &ui_forceTeamModel, "ui_forceTeamModel", "", CVAR_ARCHIVE},
+	{ &ui_forceTeamModelBright, "ui_forceTeamModelBright", "0", CVAR_ARCHIVE},
 	{ &ui_forceTeamSkin, "ui_forceTeamSkin", "", CVAR_ARCHIVE},
 	{ &ui_enemyHeadColor, "ui_enemyHeadColor", "0", CVAR_ARCHIVE},
 	{ &ui_enemyLowerColor, "ui_enemyLowerColor", "0", CVAR_ARCHIVE},
@@ -8700,7 +9368,19 @@ void UI_RegisterCvars( void ) {
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Register( cv->vmCvar, cv->cvarName, cv->defaultString, cv->cvarFlags );
 	}
-		}
+
+	UI_SyncForceModelCvars( qtrue );
+	UI_SyncForceModelCvars( qfalse );
+
+	uiTeamHeadColorModificationCount = ui_teamHeadColor.modificationCount;
+	uiTeamUpperColorModificationCount = ui_teamUpperColor.modificationCount;
+	uiTeamLowerColorModificationCount = ui_teamLowerColor.modificationCount;
+	uiEnemyHeadColorModificationCount = ui_enemyHeadColor.modificationCount;
+	uiEnemyUpperColorModificationCount = ui_enemyUpperColor.modificationCount;
+	uiEnemyLowerColorModificationCount = ui_enemyLowerColor.modificationCount;
+	uiScreenDamageModificationCount = ui_screenDamage.modificationCount;
+	uiScreenDamageTeamModificationCount = ui_screenDamage_Team.modificationCount;
+}
 
 /*
 =================
@@ -8710,11 +9390,58 @@ UI_UpdateCvars
 void UI_UpdateCvars( void ) {
 	int			i;
 	cvarTable_t	*cv;
+	char		model[MAX_QPATH];
+	char		skin[MAX_QPATH];
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Update( cv->vmCvar );
 	}
-		}
+
+	trap_Cvar_VariableStringBuffer( "cg_forceTeamModel", model, sizeof( model ) );
+	trap_Cvar_VariableStringBuffer( "cg_forceTeamSkin", skin, sizeof( skin ) );
+	if ( Q_stricmp( model, uiCachedForceTeamModel ) != 0 || Q_stricmp( skin, uiCachedForceTeamSkin ) != 0 ) {
+		UI_SyncForceModelCvars( qtrue );
+	}
+
+	trap_Cvar_VariableStringBuffer( "cg_forceEnemyModel", model, sizeof( model ) );
+	trap_Cvar_VariableStringBuffer( "cg_forceEnemySkin", skin, sizeof( skin ) );
+	if ( Q_stricmp( model, uiCachedForceEnemyModel ) != 0 || Q_stricmp( skin, uiCachedForceEnemySkin ) != 0 ) {
+		UI_SyncForceModelCvars( qfalse );
+	}
+
+	if ( uiTeamHeadColorModificationCount != ui_teamHeadColor.modificationCount ) {
+		uiTeamHeadColorModificationCount = ui_teamHeadColor.modificationCount;
+		UI_SyncRetailSliderColorCvar( &ui_teamHeadColor, "cg_teamHeadColor" );
+	}
+	if ( uiTeamUpperColorModificationCount != ui_teamUpperColor.modificationCount ) {
+		uiTeamUpperColorModificationCount = ui_teamUpperColor.modificationCount;
+		UI_SyncRetailSliderColorCvar( &ui_teamUpperColor, "cg_teamUpperColor" );
+	}
+	if ( uiTeamLowerColorModificationCount != ui_teamLowerColor.modificationCount ) {
+		uiTeamLowerColorModificationCount = ui_teamLowerColor.modificationCount;
+		UI_SyncRetailSliderColorCvar( &ui_teamLowerColor, "cg_teamLowerColor" );
+	}
+	if ( uiEnemyHeadColorModificationCount != ui_enemyHeadColor.modificationCount ) {
+		uiEnemyHeadColorModificationCount = ui_enemyHeadColor.modificationCount;
+		UI_SyncRetailSliderColorCvar( &ui_enemyHeadColor, "cg_enemyHeadColor" );
+	}
+	if ( uiEnemyUpperColorModificationCount != ui_enemyUpperColor.modificationCount ) {
+		uiEnemyUpperColorModificationCount = ui_enemyUpperColor.modificationCount;
+		UI_SyncRetailSliderColorCvar( &ui_enemyUpperColor, "cg_enemyUpperColor" );
+	}
+	if ( uiEnemyLowerColorModificationCount != ui_enemyLowerColor.modificationCount ) {
+		uiEnemyLowerColorModificationCount = ui_enemyLowerColor.modificationCount;
+		UI_SyncRetailSliderColorCvar( &ui_enemyLowerColor, "cg_enemyLowerColor" );
+	}
+	if ( uiScreenDamageModificationCount != ui_screenDamage.modificationCount ) {
+		uiScreenDamageModificationCount = ui_screenDamage.modificationCount;
+		UI_SyncRetailSliderColorCvar( &ui_screenDamage, "cg_screenDamage" );
+	}
+	if ( uiScreenDamageTeamModificationCount != ui_screenDamage_Team.modificationCount ) {
+		uiScreenDamageTeamModificationCount = ui_screenDamage_Team.modificationCount;
+		UI_SyncRetailSliderColorCvar( &ui_screenDamage_Team, "cg_screenDamage_Team" );
+	}
+}
 
 
 /*

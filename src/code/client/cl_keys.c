@@ -36,6 +36,7 @@ int			historyLine;	// the line being displayed from history buffer
 
 field_t		g_consoleField;
 field_t		chatField;
+qboolean	chat_reply;
 qboolean	chat_team;
 
 int			chat_playerNum;
@@ -825,13 +826,21 @@ void Message_Key( int key ) {
 	if (key == K_ESCAPE) {
 		cls.keyCatchers &= ~KEYCATCH_MESSAGE;
 		Field_Clear( &chatField );
+		if ( cgvm ) {
+			VM_Call( cgvm, CG_CHAT_UP );
+		}
 		return;
 	}
 
 	if ( key == K_ENTER || key == K_KP_ENTER )
 	{
 		if ( chatField.buffer[0] && cls.state == CA_ACTIVE ) {
-			if (chat_playerNum != -1 )
+			if ( chat_reply ) {
+				Com_sprintf( buffer, sizeof( buffer ), "reply \"%s\"\n", chatField.buffer );
+				Cbuf_ExecuteText( EXEC_APPEND, buffer );
+			}
+
+			else if (chat_playerNum != -1 )
 
 				Com_sprintf( buffer, sizeof( buffer ), "tell %i \"%s\"\n", chat_playerNum, chatField.buffer );
 
@@ -843,10 +852,15 @@ void Message_Key( int key ) {
 
 
 
-			CL_AddReliableCommand( buffer );
+			if ( !chat_reply ) {
+				CL_AddReliableCommand( buffer );
+			}
 		}
 		cls.keyCatchers &= ~KEYCATCH_MESSAGE;
 		Field_Clear( &chatField );
+		if ( cgvm ) {
+			VM_Call( cgvm, CG_CHAT_UP );
+		}
 		return;
 	}
 
@@ -900,7 +914,7 @@ int Key_StringToKeynum( char *str ) {
 		return -1;
 	}
 	if ( !str[1] ) {
-		return str[0];
+		return tolower( str[0] );
 	}
 
 	// check for hex code
@@ -1193,6 +1207,18 @@ CL_InitKeyCommands
 ===================
 */
 void CL_InitKeyCommands( void ) {
+	Com_Memset( historyEditLines, 0, sizeof( historyEditLines ) );
+	nextHistoryLine = 0;
+	historyLine = 0;
+	Com_Memset( &g_consoleField, 0, sizeof( g_consoleField ) );
+	Com_Memset( &chatField, 0, sizeof( chatField ) );
+	chat_reply = qfalse;
+	chat_team = qfalse;
+	chat_playerNum = 0;
+	key_overstrikeMode = qfalse;
+	anykeydown = qfalse;
+	Com_Memset( keys, 0, sizeof( keys ) );
+
 	// register our functions
 	Cmd_AddCommand ("bind",Key_Bind_f);
 	Cmd_AddCommand ("unbind",Key_Unbind_f);
@@ -1246,6 +1272,63 @@ void CL_AddKeyUpCommands( int key, char *kb ) {
 
 /*
 =============
+CL_ToggleMenuInternal
+
+Routes the Quake Live-style menu toggle through the same escape-key path used
+for the hard-coded K_ESCAPE handler, optionally synthesizing the key-up event
+that bound console commands do not generate.
+=============
+*/
+static void CL_ToggleMenuInternal( int key, qboolean sendKeyUp, unsigned time ) {
+	if ( cls.keyCatchers & KEYCATCH_MESSAGE ) {
+		Message_Key( K_ESCAPE );
+		return;
+	}
+
+	// escape always gets out of CGAME stuff
+	if ( cls.keyCatchers & KEYCATCH_CGAME ) {
+		cls.keyCatchers &= ~KEYCATCH_CGAME;
+		if ( cgvm ) {
+			VM_Call( cgvm, CG_EVENT_HANDLING, CGAME_EVENT_NONE );
+		}
+		return;
+	}
+
+	if ( !( cls.keyCatchers & KEYCATCH_UI ) ) {
+		if ( !uivm ) {
+			return;
+		}
+
+		if ( cls.state == CA_ACTIVE && !clc.demoplaying ) {
+			VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
+		}
+		else {
+			CL_Disconnect_f();
+			S_StopAllSounds();
+			VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+		}
+		return;
+	}
+
+	if ( uivm ) {
+		VM_Call( uivm, UI_KEY_EVENT, key, qtrue, time );
+		if ( sendKeyUp ) {
+			VM_Call( uivm, UI_KEY_EVENT, key, qfalse, time );
+		}
+	}
+}
+
+/*
+================
+CL_ToggleMenu_f
+================
+*/
+void CL_ToggleMenu_f( void ) {
+	CL_ToggleMenuInternal( K_ESCAPE, qtrue, cls.realtime );
+}
+
+/*
+=============
 CL_KeyEvent
 
 Called by the system for both key up and key down events
@@ -1264,7 +1347,19 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 	// update auto-repeat status and BUTTON_ANY status
 	keys[key].down = dispatchDown;
-	CL_WebView_OnKeyEvent( dispatchKey, dispatchDown );
+	if ( dispatchKey >= K_MOUSE1 && dispatchKey <= K_MOUSE5 ) {
+		CL_WebView_OnMouseButtonEvent( dispatchKey, dispatchDown );
+	} else if ( dispatchKey == K_MWHEELUP ) {
+		if ( dispatchDown ) {
+			CL_WebView_OnMouseWheelEvent( 1 );
+		}
+	} else if ( dispatchKey == K_MWHEELDOWN ) {
+		if ( dispatchDown ) {
+			CL_WebView_OnMouseWheelEvent( -1 );
+		}
+	} else {
+		CL_WebView_OnKeyEvent( dispatchKey, dispatchDown );
+	}
 
 	if ( dispatchDown ) {
 		keys[key].repeats++;
@@ -1326,32 +1421,7 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 	// escape is always handled special
 	if ( key == K_ESCAPE && dispatchDown ) {
-		if ( cls.keyCatchers & KEYCATCH_MESSAGE ) {
-			// clear message mode
-			Message_Key( key );
-			return;
-		}
-
-		// escape always gets out of CGAME stuff
-		if (cls.keyCatchers & KEYCATCH_CGAME) {
-			cls.keyCatchers &= ~KEYCATCH_CGAME;
-			VM_Call (cgvm, CG_EVENT_HANDLING, CGAME_EVENT_NONE);
-			return;
-		}
-
-		if ( !( cls.keyCatchers & KEYCATCH_UI ) ) {
-			if ( cls.state == CA_ACTIVE && !clc.demoplaying ) {
-				VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
-			}
-			else {
-				CL_Disconnect_f();
-				S_StopAllSounds();
-				VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
-			}
-			return;
-		}
-
-		VM_Call( uivm, UI_KEY_EVENT, dispatchKey, dispatchDown, time );
+		CL_ToggleMenuInternal( dispatchKey, qfalse, time );
 		return;
 	}
 
@@ -1443,36 +1513,44 @@ Normal keyboard characters, already shifted / capslocked / etc
 =============
 */
 void CL_CharEvent( int key ) {
-clTranslatedKey_t translated;
+	clTranslatedKey_t translated;
+	char			utf8[4];
+	int				byteCount;
+	int				i;
 
 // the console key should never be used as a char
 	if ( key == '`' || key == '~' ) {
-	return;
+		return;
 	}
 
 	translated = CL_TranslateRetailKeycode( key );
 	if ( !translated.hasChar ) {
-	return;
+		return;
 	}
 
-	key = translated.charCode;
+	byteCount = CL_EncodeUtf8Codepoint( translated.charCode, utf8, sizeof( utf8 ) );
+	if ( byteCount <= 0 ) {
+		return;
+	}
 
-	// distribute the key down event to the apropriate handler
-	if ( cls.keyCatchers & KEYCATCH_CONSOLE )
-	{
-	Field_CharEvent( &g_consoleField, key );
-	}
-	else if ( cls.keyCatchers & KEYCATCH_UI )
-	{
-	VM_Call( uivm, UI_KEY_EVENT, key | K_CHAR_FLAG, qtrue, cls.realtime );
-	}
-	else if ( cls.keyCatchers & KEYCATCH_MESSAGE )
-	{
-	Field_CharEvent( &chatField, key );
-	}
-	else if ( cls.state == CA_DISCONNECTED )
-	{
-	Field_CharEvent( &g_consoleField, key );
+	for ( i = 0 ; i < byteCount ; i++ ) {
+		int utf8Byte;
+
+		utf8Byte = (unsigned char)utf8[i];
+
+		// distribute the key down event to the apropriate handler
+		if ( cls.keyCatchers & KEYCATCH_CONSOLE ) {
+			Field_CharEvent( &g_consoleField, utf8Byte );
+		}
+		else if ( cls.keyCatchers & KEYCATCH_UI ) {
+			VM_Call( uivm, UI_KEY_EVENT, utf8Byte | K_CHAR_FLAG, qtrue, cls.realtime );
+		}
+		else if ( cls.keyCatchers & KEYCATCH_MESSAGE ) {
+			Field_CharEvent( &chatField, utf8Byte );
+		}
+		else if ( cls.state == CA_DISCONNECTED ) {
+			Field_CharEvent( &g_consoleField, utf8Byte );
+		}
 	}
 }
 

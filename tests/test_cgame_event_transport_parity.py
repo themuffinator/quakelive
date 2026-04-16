@@ -14,6 +14,7 @@ G_CLIENT = REPO_ROOT / "src" / "code" / "game" / "g_client.c"
 G_TEAM = REPO_ROOT / "src" / "code" / "game" / "g_team.c"
 G_WEAPON = REPO_ROOT / "src" / "code" / "game" / "g_weapon.c"
 G_MAIN = REPO_ROOT / "src" / "code" / "game" / "g_main.c"
+G_RACE = REPO_ROOT / "src" / "code" / "game" / "g_race.c"
 BG_PUBLIC = REPO_ROOT / "src" / "code" / "game" / "bg_public.h"
 CG_EVENT = REPO_ROOT / "src" / "code" / "cgame" / "cg_event.c"
 
@@ -166,6 +167,52 @@ def test_qagame_award_entity_restores_retail_temp_entity_payload() -> None:
 	assert "G_AddAwardEntity( ent, awardEventId );" in medal_block
 
 
+def test_qagame_race_events_use_retail_single_client_payload_slots() -> None:
+	source = G_RACE.read_text(encoding="utf-8")
+	emit_block = _block_from_marker(source, "static gentity_t *G_RaceEmitClientEvent")
+	start_block = _block_from_marker(source, "static void G_RaceEmitStartEvent")
+	checkpoint_block = _block_from_marker(source, "static void G_RaceEmitCheckpointEvent")
+	finish_block = _block_from_marker(source, "static void G_RaceEmitFinishEvent")
+	high_score_block = _block_from_marker(source, "static void G_RaceEmitNewHighScoreEvent")
+	touch_block = _block_from_marker(source, "void G_RaceHandlePointTouch")
+
+	for expected in (
+		"tent = G_TempEntity( player->client->ps.origin, event );",
+		"tent->r.svFlags |= SVF_SINGLECLIENT;",
+		"tent->r.singleClient = player->s.number;",
+		"G_SetRetailEventRecipient( tent, player->s.number );",
+	):
+		assert expected in emit_block
+
+	for expected in (
+		"tent = G_RaceEmitClientEvent( player, EV_RACE_START );",
+		"tent->s.groundEntityNum = G_RaceCheckpointCount( client );",
+		"tent->s.constantLight = G_RacePointEntityNum( client->raceState.currentPoint );",
+		"tent->s.legsAnim = G_RacePointEntityNum( client->raceState.nextPoint );",
+		"G_SetRetailEventIntPayload( &tent->s, client->raceState.startTime );",
+	):
+		assert expected in start_block
+
+	for expected in (
+		"tent = G_RaceEmitClientEvent( player, EV_RACE_CHECKPOINT );",
+		"tent->s.groundEntityNum = G_RaceCheckpointCount( client );",
+		"tent->s.constantLight = G_RacePointEntityNum( client->raceState.currentPoint );",
+		"tent->s.legsAnim = G_RacePointEntityNum( client->raceState.nextPoint );",
+		"G_SetRetailEventIntPayload( &tent->s, splitDelta );",
+		"G_SetRetailEventData( &tent->s, hasBestSplit ? 1 : 0 );",
+	):
+		assert expected in checkpoint_block
+
+	assert "tent = G_RaceEmitClientEvent( player, EV_RACE_FINISH );" in finish_block
+	assert "G_SetRetailEventIntPayload( &tent->s, elapsed );" in finish_block
+	assert "G_SetRetailEventData( &tent->s, 1 );" in finish_block
+
+	assert "(void)G_RaceEmitClientEvent( player, EV_NEW_HIGH_SCORE );" in high_score_block
+	assert "if ( G_RacePointIsStart( point ) ) {" in touch_block
+	assert "G_RaceStartRun( point, player );" in touch_block
+	assert "G_RaceAdvanceCheckpoint( point, player );" in touch_block
+
+
 def test_cgame_damage_plum_reads_retail_int_and_data_slots_directly() -> None:
 	source = CG_EVENT.read_text(encoding="utf-8")
 	damage_block = _block_from_marker(source, "static int CG_GetRetailDamagePlumDamage")
@@ -181,6 +228,32 @@ def test_cgame_damage_plum_reads_retail_int_and_data_slots_directly() -> None:
 	assert "weapon = (weapon_t)es->weapon;" not in weapon_block
 	assert "cg.predictedPlayerState.weapon" not in weapon_block
 	assert "cg.snap->ps.weapon" not in weapon_block
+
+
+def test_cgame_race_events_read_retail_payload_slots_directly() -> None:
+	source = CG_EVENT.read_text(encoding="utf-8")
+	int_payload_block = _block_from_marker(source, "static int CG_GetRetailEventIntPayload")
+	checkpoint_count_block = _block_from_marker(source, "static int CG_GetRaceEventCheckpointCount")
+	current_checkpoint_block = _block_from_marker(source, "static int CG_GetRaceEventCurrentCheckpointEntityNum")
+	next_checkpoint_block = _block_from_marker(source, "static int CG_GetRaceEventNextCheckpointEntityNum")
+	event_block = _block_from_marker(source, "void CG_EntityEvent")
+
+	assert "memcpy( &value, &es->origin[0], sizeof( value ) );" in int_payload_block
+	assert "return value;" in int_payload_block
+	assert "return es->groundEntityNum;" in checkpoint_count_block
+	assert "return es->constantLight;" in current_checkpoint_block
+	assert "return es->legsAnim;" in next_checkpoint_block
+
+	for expected in (
+		"CG_RaceResetRunState( qfalse );",
+		"cgs.raceInfoActive = qtrue;",
+		"cgs.raceInfoStartTime = CG_GetRetailEventIntPayload( es );",
+		"cgs.raceInfoCheckpointCount = CG_GetRaceEventCheckpointCount( es );",
+		"cgs.raceInfoCurrentCheckpointEntityNum = CG_GetRaceEventCurrentCheckpointEntityNum( es );",
+		"cgs.raceInfoNextCheckpointEntityNum = CG_GetRaceEventNextCheckpointEntityNum( es );",
+		"cgs.raceInfoLastTime = CG_GetRetailEventIntPayload( es );",
+	):
+		assert expected in event_block
 
 
 def test_cgame_award_and_global_team_sound_read_retail_payload_slots_directly() -> None:

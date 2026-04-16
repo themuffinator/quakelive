@@ -814,6 +814,7 @@ static cvar_t fs_stub_webpath = { .name = "fs_webpath", .string = "", .resetStri
 static cvar_t fs_stub_webMappings = { .name = "fs_webMappings", .string = "", .resetString = "", .flags = 0, .value = 0.0f, .integer = 0 };
 static cvar_t fs_stub_basegame = { .name = "fs_basegame", .string = "baseq3", .resetString = "baseq3", .flags = 0, .value = 0.0f, .integer = 0 };
 static cvar_t fs_stub_copyfiles = { .name = "fs_copyfiles", .string = "0", .resetString = "0", .flags = 0, .value = 0.0f, .integer = 0 };
+static cvar_t fs_stub_copypath = { .name = "fs_copypath", .string = "", .resetString = "", .flags = 0, .value = 0.0f, .integer = 0 };
 static cvar_t fs_stub_gamedirvar = { .name = "fs_game", .string = "", .resetString = "", .flags = 0, .value = 0.0f, .integer = 0 };
 static cvar_t fs_stub_restrict = { .name = "fs_restrict", .string = "0", .resetString = "0", .flags = 0, .value = 0.0f, .integer = 0 };
 
@@ -867,6 +868,8 @@ QLR_TEST_EXPORT void QLR_FS_TestInitCvars( const char *basepath, const char *hom
 	fs_basegame->string = QLR_StrDup( fs_stub_basegame.string );
 	fs_copyfiles = &fs_stub_copyfiles;
 	fs_copyfiles->string = QLR_StrDup( "0" );
+	fs_copypath = &fs_stub_copypath;
+	fs_copypath->string = QLR_StrDup( "" );
 	fs_gamedirvar = &fs_stub_gamedirvar;
 	fs_restrict = &fs_stub_restrict;
 	fs_restrict->string = QLR_StrDup( "0" );

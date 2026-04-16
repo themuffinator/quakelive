@@ -350,12 +350,16 @@ def test_scoreboard_and_race_server_command_wrappers_match_retail_dispatch() -> 
 	assert "cg.scores[i].scoreFlags = atoi( CG_Argv( i * 8 + 9 ) );" not in compact_block
 
 	for expected in (
-		"argc = trap_Argc();",
-		"count = atoi( CG_Argv( 1 ) );",
-		"cgs.raceLeaderSplitCount = 0;",
-		"cgs.raceLeaderSplits[i] = atoi( CG_Argv( i + 2 ) );",
+		"cgs.raceInfoActive = atoi( CG_Argv( 1 ) ) ? qtrue : qfalse;",
+		"cgs.raceInfoStartTime = atoi( CG_Argv( 2 ) );",
+		"cgs.raceInfoLastTime = atoi( CG_Argv( 3 ) );",
+		"cgs.raceInfoCheckpointCount = atoi( CG_Argv( 4 ) );",
+		"cgs.raceInfoCurrentCheckpointEntityNum = atoi( CG_Argv( 5 ) );",
+		"cgs.raceInfoNextCheckpointEntityNum = atoi( CG_Argv( 6 ) );",
 	):
 		assert expected in race_info_block
+
+	assert "cgs.raceLeaderSplitCount = 0;" not in race_info_block
 
 
 def test_cgame_attack_defend_round_scoreboard_owner_matches_retail_warmup_panel() -> None:
@@ -1222,7 +1226,20 @@ def test_register_cvars_publishes_retail_version_and_vote_reset() -> None:
 
 	assert 'trap_Cvar_Register(NULL, "cg_version", Q3_VERSION, CVAR_ROM );' in block
 	assert 'trap_Cvar_Set( "ui_voteactive", "0" );' in block
+	assert "cg.hudMenusLoaded = CG_HudScriptHasMenuLoads( hudSet );" in load_hud_block
 	assert "cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );" in load_hud_block
+
+
+def test_load_hud_menu_uses_menu_load_presence_for_runtime_hud_gate() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	menu_load_block = _block_from_marker(source, "static qboolean CG_HudScriptHasMenuLoads")
+	competitive_block = _block_from_marker(source, "static qboolean CG_HudScriptHasCompetitiveMenus")
+	menu_gate_block = _block_from_marker(draw_source, "static qboolean CG_IsMenuHudActive")
+
+	assert 'return ( strstr( buffer, "loadMenu" ) != NULL ) ? qtrue : qfalse;' in menu_load_block
+	assert 'if ( strstr( buffer, "comp_hud" ) || strstr( buffer, "comp_spectator" ) ) {' in competitive_block
+	assert "return cg.hudMenusLoaded;" in menu_gate_block
 
 
 def test_register_sounds_prefers_retail_announcer_folders_before_fallbacks() -> None:
@@ -1536,10 +1553,15 @@ def test_cgame_browser_runtime_surface_restores_overlay_draw_and_capture_owners(
 	assert "Window_Paint( window, fadeAmount, fadeClamp, fadeCycle );" in frame_block
 	assert "CG_AllocBrowserWidgetState( item );" in widget_block
 	assert "Item_Paint( item );" in widget_block
+	assert "switch ( item->type ) {" not in widget_block
+	assert "static void CG_NormalizeBrowserFullscreenBackgroundRect( rectDef_t *rect ) {" in newdraw_source
 	assert "Menus_HandleOOBClick( (menuDef_t *)overlay, key, down );" in oob_block
 
 	for expected in (
+		"if ( menu->window.ownerDrawFlags2 && cgDC.ownerDrawVisible &&",
+		"!cgDC.ownerDrawVisible( menu->window.ownerDrawFlags2 ) ) {",
 		"CG_UpdateBrowserPresetLists( menu );",
+		"CG_NormalizeBrowserFullscreenBackgroundRect( &backgroundRect );",
 		"CG_DrawBrowserWidgetFrame( &menu->window, menu->fadeAmount, menu->fadeClamp, menu->fadeCycle );",
 		"CG_DrawBrowserWidget( menu->items[i] );",
 		"cgDC.setAdjustFrom640Mode( WIDESCREEN_STRETCH );",
@@ -1715,19 +1737,8 @@ def test_cgame_browser_leaf_wrappers_restore_remaining_retail_owner_slice() -> N
 	):
 		assert expected in widget_key_block
 
-	for expected in (
-		"CG_DrawBrowserModelPreview( item );",
-		"CG_DrawBrowserListWidget( item );",
-		"CG_DrawBrowserText( item );",
-		"CG_DrawBrowserTextField( item );",
-		"CG_DrawBrowserYesNoControl( item );",
-		"CG_DrawBrowserMultiControl( item );",
-		"CG_DrawBrowserBindControl( item );",
-		"CG_DrawBrowserSliderControl( item );",
-		"CG_DrawBrowserSliderColorControl( item );",
-		"CG_DrawBrowserPresetList( item );",
-	):
-		assert expected in widget_block
+	assert "Item_Paint( item );" in widget_block
+	assert "switch ( item->type ) {" not in widget_block
 
 	for expected in (
 		"CG_UpdateBrowserWidgetPositions( menu );",
@@ -2067,6 +2078,9 @@ def test_cgame_init_splits_display_context_bootstrap_before_collision_map() -> N
 		"cgDC.registerShaderNoMip = &trap_R_RegisterShaderNoMip;",
 		"cgDC.setColor = &trap_R_SetColor;",
 		"cgDC.drawHandlePic = &CG_DrawPic;",
+		"cgDC.drawTextExt = &CG_Text_PaintExt;",
+		"cgDC.textWidthExt = &CG_Text_WidthExt;",
+		"cgDC.textHeightExt = &CG_Text_HeightExt;",
 		"cgDC.fillRect = &CG_FillRect;",
 		"cgDC.drawRect = &CG_DrawRect;",
 		"cgDC.drawSides = &CG_DrawSides;",
@@ -2080,6 +2094,7 @@ def test_cgame_init_splits_display_context_bootstrap_before_collision_map() -> N
 		"cgDC.registerSound = &trap_S_RegisterSound;",
 		"cgDC.startBackgroundTrack = &trap_S_StartBackgroundTrack;",
 		"cgDC.stopBackgroundTrack = &trap_S_StopBackgroundTrack;",
+		"cgDC.drawTextWithCursorExt = &CG_Text_PaintWithCursorExt;",
 		"cgDC.adjustFrom640 = &CG_AdjustFrom640;",
 		"cgDC.setAdjustFrom640Mode = &CG_SetAdjustFrom640Mode;",
 		"cgDC.bias = cgs.screenXBias;",
@@ -2101,6 +2116,66 @@ def test_cgame_init_splits_display_context_bootstrap_before_collision_map() -> N
 		"cgs.screenXBias = 0.0f;",
 	):
 		assert expected in init_block
+
+
+def test_cgame_host_text_helpers_honor_retail_font_buckets() -> None:
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	select_block = _block_from_marker(draw_source, "int CG_SelectTextFontHandle")
+	width_block = _block_from_marker(draw_source, "int CG_Text_WidthExt")
+	height_block = _block_from_marker(draw_source, "int CG_Text_HeightExt")
+	paint_block = _block_from_marker(draw_source, "void CG_Text_PaintExt")
+	cursor_ext_block = _block_from_marker(main_source, "static void CG_Text_PaintWithCursorExt")
+	cursor_block = _block_from_marker(main_source, "void CG_Text_PaintWithCursor")
+
+	for expected in (
+		"if ( fontIndex != ITEM_FONT_INHERIT ) {",
+		"case FONT_SANS:",
+		"return FONT_SANS;",
+		"case FONT_MONO:",
+		"return FONT_MONO;",
+		"case FONT_DEFAULT:",
+		"return FONT_DEFAULT;",
+		"if ( scale <= cg_smallFont.value ) {",
+	):
+		assert expected in select_block
+
+	assert "CG_GetHostTextMetrics( text, scale, limit, fontIndex, &width, NULL );" in width_block
+	assert "CG_GetHostTextMetrics( text, scale, limit, fontIndex, NULL, &height );" in height_block
+	assert "CG_DrawHostTextSpan( x, y, scale, color, drawText, fontIndex, style, qfalse );" in paint_block
+	assert "CG_Text_PaintExt( x, y, scale, color, text, 0.0f, limit, style, fontIndex );" in cursor_ext_block
+	assert "CG_Text_PaintWithCursorExt( x, y, scale, color, text, cursorPos, cursor, limit, style, ITEM_FONT_INHERIT );" in cursor_block
+
+	for expected in (
+		"return CG_Text_WidthExt( text, scale, limit, ITEM_FONT_INHERIT );",
+		"return CG_Text_HeightExt( text, scale, limit, ITEM_FONT_INHERIT );",
+		"CG_Text_PaintExt( x, y, scale, color, text, adjust, limit, style, ITEM_FONT_INHERIT );",
+	):
+		assert expected in draw_source
+
+
+def test_cgame_text_paint_limit_reuses_shared_font_selector() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	block = _block_from_marker(source, "static void CG_Text_Paint_Limit")
+
+	assert "fontHandle = CG_SelectTextFontHandle( scale, ITEM_FONT_INHERIT );" in block
+	assert "fontHandle = ( scale <= cg_smallFont.value ) ? FONT_SANS : FONT_DEFAULT;" not in block
+
+
+def test_cgame_host_text_shadow_offsets_stay_in_virtual_space() -> None:
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	span_block = _block_from_marker(draw_source, "static void CG_DrawHostTextSpan")
+
+	for expected in (
+		"hostScale = scale * QL_FONT_HOST_POINT_SIZE * yScale;",
+		"shadowOffset = ( style == ITEM_TEXTSTYLE_SHADOWED ) ? 1.0f : 2.0f;",
+		"shadowX = x + shadowOffset;",
+		"shadowY = y + shadowOffset;",
+		"CG_AdjustFrom640( &shadowX, &shadowY, NULL, NULL );",
+		"trap_QL_DrawScaledText( (int)shadowX, (int)shadowY, text, fontHandle, hostScale, 0, NULL, qtrue );",
+		"trap_QL_DrawScaledText( (int)screenX, (int)screenY, text, fontHandle, hostScale, 0, NULL, forceColor );",
+	):
+		assert expected in span_block
 
 
 def test_cgame_advert_bridge_lifecycle_matches_retail_init_and_shutdown_order() -> None:
@@ -2139,6 +2214,7 @@ def test_cgame_drawtools_keep_retail_widescreen_bias_consumers() -> None:
 		"ah = (float)PROPB_HEIGHT * cgs.screenYScale;",
 		"aw = (float)propMap[ch][2] * xScale * sizeScale;",
 		"ah = (float)PROP_HEIGHT * cgs.screenYScale * sizeScale;",
+		"size *= xScale;",
 		"void CG_SetAdjustFrom640Mode( int widescreen ) {",
 	):
 		assert expected in source
@@ -2146,6 +2222,18 @@ def test_cgame_drawtools_keep_retail_widescreen_bias_consumers() -> None:
 	assert "if ( x ) {" in adjust_block
 	assert "ax = x * cgs.screenXScale + cgs.screenXBias;" not in source
 	assert "ay = y * cgs.screenXScale;" not in source
+	assert "size *= cgs.screenXScale;" not in source
+
+
+def test_cgame_crosshair_resets_renderer_color_after_shader_draw() -> None:
+	source = CG_DRAW.read_text(encoding="utf-8")
+	block = _block_from_marker(source, "static void CG_DrawCrosshair(void)")
+
+	assert "if ( !cg_drawCrosshair.integer ) {" in block
+	assert block.index("if ( !cg_drawCrosshair.integer ) {") < block.index("trap_R_SetColor(")
+	assert "trap_R_DrawStretchPic( x + cg.refdef.x + 0.5 * (cg.refdef.width - w)," in block
+	assert "trap_R_SetColor( NULL );" in block
+	assert block.index("trap_R_SetColor( NULL );") > block.index("trap_R_DrawStretchPic(")
 
 
 def test_cgame_drawtools_big_string_wrappers_use_retail_text_paint_path() -> None:
@@ -2194,11 +2282,71 @@ def test_cgame_effects_keep_retail_lightning_discharge_sprite_producer() -> None
 
 def test_cgame_race_reset_state_keeps_retail_raceinit_command() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	run_block = _block_from_marker(source, "void CG_RaceResetRunState")
 	block = _block_from_marker(source, "void CG_RaceResetState")
 
-	assert "memset( cgs.raceLeaderSplits, 0, sizeof( cgs.raceLeaderSplits ) );" in block
+	assert "memset( cgs.raceProgress, 0, sizeof( cgs.raceProgress ) );" in run_block
+	assert "cgs.raceInfoActive = qfalse;" in run_block
+	assert "cgs.raceInfoCurrentCheckpointEntityNum = -1;" in run_block
+	assert "cgs.raceInfoNextCheckpointEntityNum = -1;" in run_block
+	assert "if ( clearRecordedTimes ) {" in run_block
+	assert "memset( cgs.raceLeaderSplits, 0, sizeof( cgs.raceLeaderSplits ) );" in run_block
+	assert "cgs.raceInfoLastTime = -1;" in run_block
+	assert "CG_RaceResetRunState( qtrue );" in block
 	assert "if ( cgs.gametype == GT_RACE ) {" in block
 	assert 'trap_SendClientCommand( "raceinit" );' in block
+
+
+def test_cgame_race_follow_payload_drives_followed_progress_and_times() -> None:
+	draw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	progress_block = _block_from_marker(draw_source, "static qboolean CG_RaceApplyObservedFollowProgress")
+	update_block = _block_from_marker(draw_source, "static void CG_RaceUpdateClientProgress")
+	times_block = _block_from_marker(draw_source, "static qboolean CG_RaceBuildTimesStrings")
+
+	assert "static qboolean CG_RaceApplyObservedFollowProgress( int clientNum, cgRaceClientProgress_t *progress ) {" in draw_source
+	assert "clientNum != cg.spectatorFollowClient" in progress_block
+	assert "clientNum != cg.clientNum" in progress_block
+	assert "progress->runActive = cgs.raceInfoActive;" in progress_block
+	assert "progress->currentCheckpoint = cgs.raceInfoCheckpointCount;" in progress_block
+	assert "if ( CG_RaceApplyObservedFollowProgress( clientNum, progress ) ) {" in update_block
+	assert "currentElapsed = cg.time - cgs.raceInfoStartTime;" in times_block
+	assert "lastTime = ( cgs.raceInfoLastTime >= 0 ) ? cgs.raceInfoLastTime : -1;" in times_block
+
+
+def test_cgame_view_keeps_retail_aspect_ratio_fallback_and_horplus_helpers() -> None:
+	view_source = CG_VIEW.read_text(encoding="utf-8")
+	aspect_block = _block_from_marker(view_source, "static qboolean CG_GetTargetAspectDimensions")
+	horplus_block = _block_from_marker(view_source, "static float CG_CalcHorPlusFov")
+
+	assert "case 1:" in aspect_block
+	assert "case 2:" in aspect_block
+	assert "case 3:" in aspect_block
+	assert "if ( ratio <= 0 ) {" in aspect_block
+	assert "*targetWidth = 5.0f;" in aspect_block
+	assert "*targetHeight = 4.0f;" in aspect_block
+	assert "return qfalse;" in aspect_block
+
+	assert "baseWidth = 4.0f;" in horplus_block
+	assert "baseHeight = 3.0f;" in horplus_block
+	assert "x = baseWidth / tan( baseFov / 360.0f * M_PI );" in horplus_block
+	assert "fovY = atan2( baseHeight, x );" in horplus_block
+	assert "x = targetHeight / tan( fovY / 360.0f * M_PI );" in horplus_block
+	assert "return atan2( targetWidth, x ) * 360.0f / M_PI;" in horplus_block
+
+
+def test_cgame_view_keeps_retail_fov_order_for_horplus_and_zoom_trace() -> None:
+	view_source = CG_VIEW.read_text(encoding="utf-8")
+	fov_block = _block_from_marker(view_source, "static int CG_CalcFov")
+	trace_block = _block_from_marker(view_source, "static float CG_CalcSmartCameraTraceRange")
+
+	assert "fov_x = CG_CalcHorPlusFov( fov_x );" in fov_block
+	assert "x = cg.refdef.width / tan( fov_x / 360 * M_PI );" in fov_block
+	assert "fov_y = atan2( cg.refdef.height, x );" in fov_block
+	assert "fov_y = fov_y * 360 / M_PI;" in fov_block
+	assert "fov_x += v;" in fov_block
+	assert "fov_y -= v;" in fov_block
+	assert "fovY = atan2( 480.0f, x ) * 360.0f / M_PI;" in trace_block
+	assert "fovX = CG_CalcAspectAdjustedFovFromVertical( fovY );" in trace_block
 
 
 def test_cgame_event_reconstruction_keeps_retail_overtime_gameover_and_race_handlers() -> None:
@@ -2252,11 +2400,14 @@ def test_cgame_event_reconstruction_keeps_retail_overtime_gameover_and_race_hand
 		"case QL_EV_LIGHTNING_DISCHARGE:",
 		"CG_LightningDischargeEffect( cent->lerpOrigin, es->eventParm );",
 		"case QL_EV_RACE_START:",
+		"CG_RaceResetRunState( qfalse );",
+		"cgs.raceInfoStartTime = CG_GetRetailEventIntPayload( es );",
 		"CG_RacePlayCue( CG_RACE_CUE_START );",
 		"case QL_EV_RACE_CHECKPOINT:",
+		"cgs.raceInfoCheckpointCount = CG_GetRaceEventCheckpointCount( es );",
 		"CG_RacePlayCue( CG_RACE_CUE_CHECKPOINT );",
 		"case QL_EV_RACE_FINISH:",
-		"CG_RaceResetState();",
+		"cgs.raceInfoLastTime = CG_GetRetailEventIntPayload( es );",
 		"CG_RacePlayCue( CG_RACE_CUE_FINISH );",
 	):
 		assert expected in event_block
@@ -2487,6 +2638,26 @@ def test_cgame_player_cylinders_configstring_retains_direct_retail_parser_bounda
 
 	assert 'Info_ValueForKey( info, "g_playerCylinders" )' not in parse_serverinfo_block
 	assert 'trap_Cvar_Set( "cg_playerCylinders", playerCylindersValue );' not in parse_serverinfo_block
+
+
+def test_game_cvar_transport_redundancy_stays_off_serverinfo_slabs() -> None:
+	game_source = G_MAIN.read_text(encoding="utf-8")
+
+	for expected in (
+		'{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional model path used to override every player\'s model selection server-wide." },',
+		'{ &g_playerheadmodelOverride, "g_playerheadmodelOverride", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional head model override applied to all players for consistent visuals." },',
+		'{ &g_playerCylinders, "g_playerCylinders", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Toggles the Quake Live player-cylinder collision volumes so forced cosmetics line up with the server\'s hitboxes." },',
+		'{ &g_armorTiered, "g_armorTiered", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable retail Quake Live tiered armor behaviour for pickups, regen, and the dedicated HUD settings transport." },',
+	):
+		assert expected in game_source
+
+	for unexpected in (
+		'{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE,',
+		'{ &g_playerheadmodelOverride, "g_playerheadmodelOverride", "", CVAR_SERVERINFO | CVAR_ARCHIVE,',
+		'{ &g_playerCylinders, "g_playerCylinders", "1", CVAR_SERVERINFO | CVAR_ARCHIVE,',
+		'{ &g_armorTiered, "g_armorTiered", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART,',
+	):
+		assert unexpected not in game_source
 
 
 def test_cgame_factory_title_reconstruction_uses_serverinfo_and_factory_flags_split() -> None:
@@ -3046,11 +3217,99 @@ def test_ui_adjust_from_640_uses_retail_bias_and_null_guards() -> None:
 	assert "*x *= uiInfo.uiDC.xscale;" not in adjust_block
 
 
+def test_ui_refresh_display_context_scale_keeps_centered_widescreen_xscale() -> None:
+	source = UI_MAIN.read_text(encoding="utf-8")
+	block = _block_from_marker(source, "static int UI_RefreshDisplayContextScale(void)")
+
+	for expected in (
+		"uiInfo.uiDC.yscale = uiInfo.uiDC.glconfig.vidHeight * (1.0f / 480.0f);",
+		"if (uiInfo.uiDC.glconfig.vidWidth * SCREEN_HEIGHT > uiInfo.uiDC.glconfig.vidHeight * SCREEN_WIDTH) {",
+		"uiInfo.uiDC.bias = 0.5f * (uiInfo.uiDC.glconfig.vidWidth - (uiInfo.uiDC.glconfig.vidHeight * (640.0f / 480.0f)));",
+		"uiInfo.uiDC.xscale = uiInfo.uiDC.yscale;",
+		"uiInfo.uiDC.xscale = uiInfo.uiDC.glconfig.vidWidth * (1.0f / 640.0f);",
+	):
+		assert expected in block
+
+
+def test_ui_shared_widescreen_rect_flow_retargets_centered_ui_scale() -> None:
+	source = UI_SHARED.read_text(encoding="utf-8")
+	apply_block = _block_from_marker(source, "static void UI_ApplyWidescreenRect(rectDef_t *rect, int widescreen)")
+	normalize_block = _block_from_marker(source, "static void UI_NormalizeFullscreenBackgroundRect(rectDef_t *rect)")
+	paint_block = _block_from_marker(source, "void Menu_Paint(menuDef_t *menu, qboolean forcePaint)")
+
+	for expected in (
+		"if (DC->bias <= 0.0f) {",
+		"fullXScale = (float)DC->glconfig.vidWidth / (float)SCREEN_WIDTH;",
+		"biasVirtual = DC->bias / DC->xscale;",
+		"stretchRatio = fullXScale / DC->xscale;",
+		"rect->x -= biasVirtual;",
+		"rect->x += biasVirtual;",
+		"rect->x = (rect->x * stretchRatio) - biasVirtual;",
+		"rect->w *= stretchRatio;",
+	):
+		assert expected in apply_block
+
+	for expected in (
+		"#define UI_FULLSCREEN_BACKGROUND_WIDTH\t1920.0f",
+		"#define UI_FULLSCREEN_BACKGROUND_HEIGHT\t1080.0f",
+		"rect->x *= (float)SCREEN_WIDTH / UI_FULLSCREEN_BACKGROUND_WIDTH;",
+		"rect->y *= (float)SCREEN_HEIGHT / UI_FULLSCREEN_BACKGROUND_HEIGHT;",
+		"rect->w *= (float)SCREEN_WIDTH / UI_FULLSCREEN_BACKGROUND_WIDTH;",
+		"rect->h *= (float)SCREEN_HEIGHT / UI_FULLSCREEN_BACKGROUND_HEIGHT;",
+	):
+		assert expected in source
+		assert expected in normalize_block or expected.startswith("#define")
+
+	assert "UI_NormalizeFullscreenBackgroundRect(&backgroundRect);" in paint_block
+	assert "UI_ApplyWidescreenRect(&backgroundRect, menu->widescreen);" in paint_block
+
+
+def test_ui_text_alignment_retargets_local_stretch_anchors() -> None:
+	source = UI_SHARED.read_text(encoding="utf-8")
+	local_x_block = _block_from_marker(source, "static float UI_ApplyWidescreenLocalX")
+	extents_block = _block_from_marker(source, "void Item_SetTextExtents(itemDef_t *item, int *width, int *height, const char *text)")
+	auto_wrap_block = _block_from_marker(source, "void Item_Text_AutoWrapped_Paint(itemDef_t *item)")
+	ownerdraw_block = _block_from_marker(source, "void Item_OwnerDraw_Paint(itemDef_t *item)")
+
+	for expected in (
+		"widescreen = UI_ResolveWidescreenMode(menu, item);",
+		"if (widescreen != WIDESCREEN_STRETCH) {",
+		"stretchRatio = fullXScale / DC->xscale;",
+		"return x * stretchRatio;",
+	):
+		assert expected in local_x_block
+
+	for expected in (
+		"textAlignX = UI_ApplyWidescreenLocalX(menu, item, item->textalignx);",
+		"item->textRect.x = textAlignX;",
+		"item->textRect.x = textAlignX - originalWidth;",
+		"item->textRect.x = textAlignX - originalWidth / 2;",
+	):
+		assert expected in extents_block
+
+	for expected in (
+		"textAlignX = UI_ApplyWidescreenLocalX(menu, item, item->textalignx);",
+		"item->textRect.x = textAlignX;",
+		"item->textRect.x = textAlignX - newLineWidth;",
+		"item->textRect.x = textAlignX - newLineWidth / 2;",
+	):
+		assert expected in auto_wrap_block
+
+	assert "textAlignX = UI_ApplyWidescreenLocalX(parent, item, item->textalignx);" in ownerdraw_block
+
+
 def test_cgame_public_and_local_headers_expose_bridge_imports() -> None:
 	public_source = CG_PUBLIC.read_text(encoding="utf-8")
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
 
-	assert "#define CGAME_NATIVE_IMPORT_COUNT\t(CG_ADVERTISEMENTBRIDGE_SETFRAMETIME + 1)" in public_source
+	assert "#define CGAME_NATIVE_IMPORT_COUNT\tCG_QL_IMPORT_TOTAL_COUNT" in public_source
+
+	for expected in (
+		"CG_QL_IMPORT_DRAW_SCALED_TEXT = 123",
+		"CG_QL_IMPORT_MEASURE_TEXT = 124",
+		"CG_QL_IMPORT_TOTAL_COUNT",
+	):
+		assert expected in public_source
 
 	for expected in (
 		"CG_KEY_GETBINDINGBUF",
@@ -3171,6 +3430,12 @@ def test_native_import_table_keeps_new_cgame_bridge_callbacks() -> None:
 	):
 		assert expected in client_source
 
+	for expected in (
+		"ql_cgame_imports[CG_QL_IMPORT_DRAW_SCALED_TEXT] = (ql_import_f)QL_CG_trap_DrawScaledText;",
+		"ql_cgame_imports[CG_QL_IMPORT_MEASURE_TEXT] = (ql_import_f)QL_CG_trap_MeasureText;",
+	):
+		assert expected in client_source
+
 
 def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
@@ -3217,9 +3482,23 @@ def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None
 		assert expected in red_flag_block
 
 	for expected in (
+		"qboolean vis = qtrue;",
+		"while ( flags ) {",
 		"if (flags & (CG_SHOW_BLUE_TEAM_HAS_REDFLAG | CG_SHOW_RED_TEAM_HAS_BLUEFLAG)) {",
 		"if (flags & CG_SHOW_BLUE_TEAM_HAS_REDFLAG && CG_ShowBlueTeamHasRedFlag()) {",
 		"} else if (flags & CG_SHOW_RED_TEAM_HAS_BLUEFLAG && CG_ShowRedTeamHasBlueFlag()) {",
+		"if ( flags & ( CG_SHOW_ANYTEAMGAME | UI_SHOW_ANYTEAMGAME ) ) {",
+		"if (flags & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED |",
+		"UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED)) {",
+		"if (flags & (CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP |",
+		"UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP)) {",
+		"if ( ( flags & ( CG_SHOW_IF_WARMUP | UI_SHOW_IF_WARMUP ) ) && inWarmup ) {",
+		"if ( ( flags & ( CG_SHOW_IF_NOT_WARMUP | UI_SHOW_IF_NOT_WARMUP ) ) && !inWarmup ) {",
+		"if ( flags & CG_SHOW_IF_CHAT_VISIBLE ) {",
+		"if ( flags & CG_SHOW_INTERMISSION ) {",
+		"if ( flags & ( CG_SHOW_NOTINTERMISSION | UI_SHOW_IF_NOT_INTERMISSION ) ) {",
+		"if ( flags & CG_SHOW_IF_PLYR_IS_ON_RED && playerTeam == TEAM_RED ) {",
+		"if ( flags & CG_SHOW_IF_PLYR_IS_ON_BLUE && playerTeam == TEAM_BLUE ) {",
 	):
 		assert expected in visible_block
 
@@ -3229,6 +3508,67 @@ def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None
 		"CG_DrawRaceStatusAndTimes( &rect, scale, color, textStyle, ownerDraw );",
 	):
 		assert expected in source
+
+
+def test_cgame_loaded_browser_menu_visibility_flags_are_backed_by_cgame() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	visible_block = _block_from_marker(source, "qboolean CG_OwnerDrawVisible")
+	menu_files = (
+		"intro.menu",
+		"ingamescoreteam.menu",
+		"ingamescorenoteam.menu",
+		"endscoreteam.menu",
+		"endscorenoteam.menu",
+		"spectator.menu",
+		"spectator_follow.menu",
+		"comp_spectator.menu",
+		"comp_spectator_follow.menu",
+		"ingamestats.menu",
+		"ingame_scoreboard_ffa.menu",
+		"ingame_scoreboard_duel.menu",
+		"ingame_scoreboard_race.menu",
+		"ingame_scoreboard_tdm.menu",
+		"ingame_scoreboard_ca.menu",
+		"ingame_scoreboard_ctf.menu",
+		"ingame_scoreboard_1fctf.menu",
+		"ingame_scoreboard_har.menu",
+		"ingame_scoreboard_ft.menu",
+		"ingame_scoreboard_dom.menu",
+		"ingame_scoreboard_ad.menu",
+		"ingame_scoreboard_rr.menu",
+		"end_scoreboard_ffa.menu",
+		"end_scoreboard_duel.menu",
+		"end_scoreboard_race.menu",
+		"end_scoreboard_tdm.menu",
+		"end_scoreboard_ca.menu",
+		"end_scoreboard_ctf.menu",
+		"end_scoreboard_1fctf.menu",
+		"end_scoreboard_har.menu",
+		"end_scoreboard_ft.menu",
+		"end_scoreboard_dom.menu",
+		"end_scoreboard_ad.menu",
+		"end_scoreboard_rr.menu",
+		"ingame.menu",
+		"ingame_about.menu",
+		"ingame_addbot.menu",
+		"ingame_admin.menu",
+		"ingame_callvote.menu",
+		"ingame_controls.menu",
+		"ingame_join.menu",
+		"ingame_options.menu",
+		"ingame_vote.menu",
+		"hud.menu",
+		"comp_hud.menu",
+		"min_hud.menu",
+	)
+	flags: set[str] = set()
+
+	for filename in menu_files:
+		menu_source = (REPO_ROOT / "src" / "ui" / filename).read_text(encoding="utf-8")
+		flags.update(re.findall(r"\bownerdrawflag2?\s+([A-Z0-9_]+)", menu_source))
+
+	missing = sorted(flag for flag in flags if flag not in visible_block)
+	assert not missing, f"loaded cgame browser menu flags lack CG_OwnerDrawVisible coverage: {missing}"
 
 	assert "static void CG_DrawRaceStatus(" not in source
 	assert "static void CG_DrawRaceTimes(" not in source

@@ -139,10 +139,9 @@ Observed source-backed weaknesses:
 1. The retained `idZMQ` runtime is now source-backed, but the writable host still keeps the live transport behind the repo's default-disabled online-services policy and uses a local transcript fallback when no runtime transport is available.
 2. The retained rankings owner in `sv_rankings.c` is now paired with an explicit default-disabled compatibility surface: `SV_Init()` registers `sv_enableRankings`, `sv_rankingsActive`, and `sv_leagueName`, while the disabled owner in `sv_rankings.c` logs the policy gate once, forces `sv_enableRankings` back to `0` if requested, and reports per-server init completion so qagame stops retrying `trap_RankBegin()` every frame.
 3. The retail server-only control-plane cvar surface from the original audit is now reconstructed in writable source, but a smaller compatibility/publication tail remains intentionally conservative where the committed corpus only proves registration/publication rather than a stronger downstream owner:
-   - `sv_idleRestart`
-   - `sv_quitOnEmpty`
    - `sv_includeCurrentMapInVote`
    - `sv_gtid`
+   - `sv_quitOnExitLevel`
 
 ## Refreshed Strict `server` Parity Estimate
 
@@ -353,6 +352,7 @@ Conclusion:
 Retail evidence anchors:
 
 - HLIL cvar registrations around `0x004E3B10`..`0x004E3EAB`
+- HLIL `SV_CheckTimeouts` / `SV_Frame` control flow around `0x004E48E0`..`0x004E4B05`
 - HLIL strings:
   - `sv_mapPoolFile`
   - `sv_includeCurrentMapInVote`
@@ -361,22 +361,27 @@ Retail evidence anchors:
   - `sv_idleExit`
   - `sv_errorExit`
   - `sv_quitOnEmpty`
+  - `sv_quitOnExitLevel`
   - `sv_cylinderScale`
   - `sv_altEntDir`
   - `sv_dumpEntities`
+  - `server has been empty for %d seconds, quit`
+  - `Restarting idle server`
+  - `vstr nextmap\n`
 
 Observed current-source facts:
 
-1. `SV_Init()` now registers the missing retail server-only control-plane cvars with the mapped defaults and flags: `sv_mapPoolFile`, `sv_includeCurrentMapInVote`, `sv_gtid`, `sv_idleRestart`, `sv_idleExit`, `sv_errorExit`, `sv_quitOnEmpty`, `sv_altEntDir`, `sv_dumpEntities`, and `sv_cylinderScale`.
+1. `SV_Init()` now registers the missing retail server-only control-plane cvars with the mapped defaults and flags: `sv_mapPoolFile`, `sv_includeCurrentMapInVote`, `sv_gtid`, `sv_idleRestart`, `sv_idleExit`, `sv_errorExit`, `sv_quitOnEmpty`, `sv_quitOnExitLevel`, `sv_altEntDir`, `sv_dumpEntities`, and `sv_cylinderScale`. A follow-up exactness pass against the same retail registration slab also revalidated the mapped defaults or flags for `sv_floodProtect`, `sv_serverType`, `g_ammoPack`, `sv_fps`, `sv_timeout`, and `sv_padPackets`.
 2. The retained `sv_errorExit` and `sv_idleExit` policy owners now exist in writable source: `common.c` routes `ERR_DROP`/`ERR_DISCONNECT` through `SV_ShouldErrorExit()`, while `Com_Frame()` uses `SV_CheckIdleServerExit()` for the dedicated idle-server shutdown path.
 3. The retained alternate-entity and entity-dump control plane now lives at the qagame boundary in `sv_game.c`, where `SV_GetGameEntityString()` loads `%s/%s.ent`, writes `ents/%s.ent`, and feeds the selected string into `sv.entityParsePoint` before `GAME_INIT`.
 4. The retained collision owner now applies `sv_cylinderScale` inside `CM_TraceThroughVerticalCylinder()`, matching the mapped retail helper.
 5. `sv_mapPoolFile` is now source-backed as a retained host/UI control-plane cvar via the existing `UI_LoadMapRotations()` consumer.
-6. `sv_idleRestart`, `sv_quitOnEmpty`, `sv_includeCurrentMapInVote`, and `sv_gtid` are now present as explicit compatibility/publication cvars with the retail registration contract intact, while the committed corpus still only proves registration/publication for those names rather than a stronger downstream runtime owner.
+6. `sv_idleRestart` and `sv_quitOnEmpty` now have direct downstream runtime owners in writable `sv_main.c` that match the committed HLIL: idle servers past `0x5265c00` milliseconds emit `Restarting idle server`, shut down, and enqueue `vstr nextmap\n`, while empty servers retain the sentinel timer, log `server has been empty for %d seconds, quit\n`, and enqueue `quit\n` after the configured delay.
+7. Only `sv_includeCurrentMapInVote`, `sv_gtid`, and the current `sv_quitOnExitLevel` compatibility helper remain intentionally conservative where the committed corpus still only proves registration/publication rather than a stronger downstream retail owner.
 
 Conclusion:
 
-- `SV-G05` is closed. The missing retail control-plane cvar surface is now reconstructed in writable source, and the source-backed runtime owners that were still absent now exist in the correct server/qcommon owners without inventing stronger behavior than the committed corpus proves.
+- `SV-G05` is closed. The missing retail control-plane cvar surface is now reconstructed in writable source, the direct retail runtime owners for `sv_idleRestart` and `sv_quitOnEmpty` are now recovered in `sv_main.c`, and the remaining lower-confidence names stay explicit compatibility/publication surfaces instead of silent omissions.
 
 ## SV-G06 - Dedicated server parity still lacks a unified gate and tracked runtime evidence
 
@@ -516,7 +521,7 @@ Completed work:
    - `sv_errorExit` and `sv_idleExit` now route through `sv_main.c` helpers called from `common.c`
    - `sv_altEntDir` and `sv_dumpEntities` now live at the `qagame` init boundary in `sv_game.c`
    - `sv_cylinderScale` now applies in `CM_TraceThroughVerticalCylinder()`
-3. Kept the lower-confidence retail cvars (`sv_idleRestart`, `sv_quitOnEmpty`, `sv_includeCurrentMapInVote`, `sv_gtid`) as explicit compatibility/publication surfaces with the mapped defaults and flags instead of inventing downstream behavior not supported by the committed HLIL/Ghidra corpus.
+3. A follow-up exactness pass against the committed HLIL now also proves the downstream `sv_idleRestart` and `sv_quitOnEmpty` owners in `sv_main.c`, while `sv_includeCurrentMapInVote`, `sv_gtid`, and the current `sv_quitOnExitLevel` compatibility helper remain intentionally conservative because the corpus still only proves registration/publication for those names.
 4. Extended `tests/test_platform_services.py` so the focused parity suite now proves the new cvar registrations, the `sv_errorExit`/`sv_idleExit` owners, the alternate-entity/dump boundary, the retained `sv_mapPoolFile` consumer, and the `sv_cylinderScale` collision hook.
 
 Validation:

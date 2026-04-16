@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 import subprocess
 import shutil
 import textwrap
@@ -547,6 +549,32 @@ def test_service_disabled_menu_verb_matrix_stays_explicit() -> None:
     assert 'Com_Printf( "UI: browser overlay unavailable; keeping native menu fallback for %s.\\n", commandText );' in deferred_exec_block
 
 
+def test_awesomium_menu_flow_clears_browser_overlay_for_gameplay() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+
+    init_block = _extract_function_block(ui_main, "void _UI_Init( qboolean inGameLoad ) {")
+    set_active_menu_block = _extract_function_block(ui_main, "void _UI_SetActiveMenu( uiMenuCommand_t menu ) {")
+
+    assert "Menus_CloseAll();" in init_block
+    assert "UI_SetBrowserActive( qfalse );" in init_block
+    assert "UI_BrowserBridge_SetActive( qfalse );" in init_block
+
+    main_case = re.search(r"case UIMENU_MAIN:(.*?)return;", set_active_menu_block, re.DOTALL)
+    none_case = re.search(r"case UIMENU_NONE:(.*?)return;", set_active_menu_block, re.DOTALL)
+    ingame_case = re.search(r"case UIMENU_INGAME:(.*?)return;", set_active_menu_block, re.DOTALL)
+
+    assert main_case is not None
+    assert none_case is not None
+    assert ingame_case is not None
+
+    assert "UI_SetBrowserActive( ui_activeMenuFlow == UI_MENU_FLOW_QUAKELIVE );" in main_case.group(1)
+    assert "UI_BrowserBridge_SetActive( ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED );" in main_case.group(1)
+    assert "UI_SetBrowserActive( qfalse );" in none_case.group(1)
+    assert "UI_BrowserBridge_SetActive( qfalse );" in none_case.group(1)
+    assert "UI_SetBrowserActive( qfalse );" in ingame_case.group(1)
+    assert "UI_BrowserBridge_SetActive( qfalse );" in ingame_case.group(1)
+
+
 def test_disabled_online_services_no_longer_force_console_fallback() -> None:
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
     cl_scrn = (REPO_ROOT / "src/code/client/cl_scrn.c").read_text(encoding="utf-8")
@@ -656,8 +684,10 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert "QL_Steamworks_RegisterClientCallbacks( &clientBindings )" in callback_init_block
     assert "QL_Steamworks_RegisterLobbyCallbacks( &lobbyBindings )" in callback_init_block
     assert "QL_Steamworks_RegisterMicroCallbacks( &microBindings )" in callback_init_block
+    assert "QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings )" in callback_init_block
     assert "cl_steamCallbackState.callbackRegistrationActive = qtrue;" in callback_init_block
 
+    assert "QL_Steamworks_UnregisterWorkshopCallbacks();" in callback_shutdown_block
     assert "QL_Steamworks_UnregisterMicroCallbacks();" in callback_shutdown_block
     assert "QL_Steamworks_UnregisterLobbyCallbacks();" in callback_shutdown_block
     assert "QL_Steamworks_UnregisterClientCallbacks();" in callback_shutdown_block
@@ -677,12 +707,17 @@ def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_su
     register_micro_block = _extract_function_block(
         steamworks, "qboolean QL_Steamworks_RegisterMicroCallbacks( const ql_steam_micro_callback_bindings_t *bindings ) {"
     )
+    register_workshop_block = _extract_function_block(
+        steamworks, "qboolean QL_Steamworks_RegisterWorkshopCallbacks( const ql_steam_workshop_callback_bindings_t *bindings ) {"
+    )
     bind_ugc_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_BindUGCQueryCallResult( SteamAPICall_t callHandle ) {")
     shutdown_block = _extract_function_block(steamworks, "void QL_Steamworks_Shutdown( void ) {")
 
     assert '#define QL_STEAM_CALLBACK_RICH_PRESENCE_JOIN_REQUESTED 0x151' in steamworks
     assert '#define QL_STEAM_CALLBACK_USER_STATS_RECEIVED 0x44d' in steamworks
     assert '#define QL_STEAM_CALLBACK_FRIEND_RICH_PRESENCE_UPDATE 0x150' in steamworks
+    assert '#define QL_STEAM_CALLBACK_ITEM_INSTALLED 0xd4d' in steamworks
+    assert '#define QL_STEAM_CALLBACK_DOWNLOAD_ITEM_RESULT 0xd4e' in steamworks
     assert '#define QL_STEAM_CALLBACK_LOBBY_CREATED 0x201' in steamworks
     assert '#define QL_STEAM_CALLBACK_LOBBY_CHAT_MESSAGE 0x1fb' in steamworks
     assert '#define QL_STEAM_CALLBACK_MICROTXN_AUTHORIZATION_RESPONSE 0x98' in steamworks
@@ -700,9 +735,15 @@ def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_su
     assert "QL_Steamworks_PrepareCallbackObject( &callbackState->authorizationResponse" in register_micro_block
     assert "QL_Steamworks_RegisterCallbackObject( &callbackState->authorizationResponse )" in register_micro_block
 
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->itemInstalled" in register_workshop_block
+    assert "QL_Steamworks_PrepareCallbackObject( &callbackState->downloadItemResult" in register_workshop_block
+    assert "QL_Steamworks_RegisterCallbackObject( &callbackState->itemInstalled )" in register_workshop_block
+    assert "QL_Steamworks_RegisterCallbackObject( &callbackState->downloadItemResult )" in register_workshop_block
+
     assert "state.SteamAPI_RegisterCallResult( &callbackState->ugcQueryCompleted, callHandle );" in bind_ugc_block
     assert "callbackState->ugcCallBound = qtrue;" in bind_ugc_block
 
+    assert "QL_Steamworks_UnregisterWorkshopCallbacks();" in shutdown_block
     assert "QL_Steamworks_UnregisterMicroCallbacks();" in shutdown_block
     assert "QL_Steamworks_UnregisterLobbyCallbacks();" in shutdown_block
     assert "QL_Steamworks_UnregisterClientCallbacks();" in shutdown_block
@@ -714,6 +755,31 @@ def test_launcher_resource_bridge_reconstructs_retail_web_fallback_owner() -> No
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
     client_h = (REPO_ROOT / "src/code/client/client.h").read_text(encoding="utf-8")
 
+    normalize_block = _extract_function_block(
+        cl_webpak,
+        "static qboolean CL_WebPak_NormalizePath( const char *virtualPath, char *normalized, size_t normalizedSize ) {",
+    )
+    datapack_table_block = _extract_function_block(
+        cl_webpak,
+        "static qboolean CL_WebDataPak_BuildPathTable( clWebDataPak_t *dataPak ) {",
+    )
+    datapack_load_block = _extract_function_block(
+        cl_webpak,
+        "static qboolean CL_WebDataPak_LoadFile( const char *pakPath, clWebDataPak_t *outDataPak ) {",
+    )
+    datapack_index_block = _extract_function_block(
+        cl_webpak,
+        "static int CL_WebDataPak_FindEntryIndex( const clWebDataPak_t *dataPak, uint16_t resourceId ) {",
+    )
+    datapack_view_block = _extract_function_block(
+        cl_webpak,
+        "static qboolean CL_WebDataPak_GetResourceView( const clWebDataPak_t *dataPak, uint16_t resourceId, const byte **outData, int *outLength ) {",
+    )
+    standalone_path_block = _extract_function_block(
+        cl_webpak,
+        "static void CL_WebPak_BuildStandalonePath( const char *rootPath, const char *filename, char *outPath, size_t outPathSize ) {",
+    )
+    init_block = _extract_function_block(cl_webpak, "void CL_WebPak_Init( void ) {")
     request_block = _extract_function_block(
         cl_webpak,
         "qboolean CL_WebRequestResolve( const char *virtualPath, void **outBuffer, int *outLength ) {",
@@ -735,7 +801,29 @@ def test_launcher_resource_bridge_reconstructs_retail_web_fallback_owner() -> No
         "qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize ) {",
     )
 
-    assert 'strstr( virtualPath, ".." ) || strstr( virtualPath, "::" ) || strchr( virtualPath, \':\' )' in cl_webpak
+    assert "static const char *CL_WebPak_StripProtocol( const char *virtualPath ) {" in cl_webpak
+    assert "typedef struct {" in cl_webpak
+    assert "static clWebDataPak_t cl_webDataPak;" in cl_webpak
+    assert "Retail web.pak sits beside the executable." in cl_webpak
+    assert 'Com_sprintf( outPath, outPathSize, "%s%c%s", rootPath, PATH_SEP, filename );' in standalone_path_block
+    assert 'separator = strstr( virtualPath, "://" );' in cl_webpak
+    assert "normalizedSource = CL_WebPak_StripProtocol( virtualPath );" in normalize_block
+    assert "normalized[index] = ( ch == '\\\\' ) ? '/' : ch;" in normalize_block
+    assert "strchr( normalized, ':' )" in normalize_block
+    assert "trailerResourceId = CL_WebDataPak_ReadUInt32( manifestData + manifestLength - 4 );" in datapack_table_block
+    assert "if ( havePending ) {" in datapack_table_block
+    assert "dataPak->paths[dataPak->pathCount].resourceId = (uint16_t)nextResourceId;" in datapack_table_block
+    assert "dataPak->paths[dataPak->pathCount].resourceId = (uint16_t)trailerResourceId;" in datapack_table_block
+    assert "if ( !dataPak || !dataPak->buffer || dataPak->resourceCount == 0 ) {" in datapack_index_block
+    assert "!dataPak->loaded" not in datapack_index_block
+    assert "if ( !dataPak || !dataPak->buffer || dataPak->resourceCount == 0 ) {" in datapack_view_block
+    assert "!dataPak->loaded" not in datapack_view_block
+    assert "if ( fileLength <= 0 || fileLength > INT_MAX ) {" in datapack_load_block
+    assert "dataPak.buffer = malloc( (size_t)fileLength );" in datapack_load_block
+    assert "if ( version == 4u ) {" in datapack_load_block
+    assert "dataPak.headerLength = 9;" in datapack_load_block
+    assert "if ( version == 5u ) {" in datapack_load_block
+    assert "if ( !CL_WebDataPak_BuildPathTable( &dataPak ) ) {" in datapack_load_block
     assert "FS_FOpenWebFileRead( request, &file, resolvedPath, sizeof( resolvedPath ) )" in mapped_block
     assert "length = FS_filelength( file );" in mapped_block
     assert "buffer = Z_Malloc( length + 1 );" in mapped_block
@@ -745,6 +833,10 @@ def test_launcher_resource_bridge_reconstructs_retail_web_fallback_owner() -> No
     assert "if ( CL_WebRequestReadMappedFile( virtualPath, outBuffer, outLength ) ) {" in request_block
     assert "if ( !normalizedValid ) {" in request_block
     assert "length = FS_ReadFile( normalized, &fsBuffer );" in request_block
+    assert 'CL_WebPak_BuildStandalonePath( homePath, "web.pak", pakPath, sizeof( pakPath ) );' in init_block
+    assert 'CL_WebPak_BuildStandalonePath( basePath, "web.pak", pakPath, sizeof( pakPath ) );' in init_block
+    assert "if ( CL_WebDataPak_Load( pakPath ) ) {" in init_block
+    assert 'Com_Printf( "web.pak datapack mounted from %s\\n", pakPath );' in init_block
 
     assert "static qboolean CL_SteamResources_IsURIResource( const char *url ) {" in steam_resources
     assert 'return ( strstr( url, "://" ) != NULL ) ? qtrue : qfalse;' in steam_resources
@@ -814,7 +906,7 @@ def test_launcher_resource_fallbacks_survive_service_disabled_policy() -> None:
 
     assert "web.pak mount skipped: online services disabled by build/runtime policy" not in init_block
     assert "CL_OnlineServicesEnabled()" not in init_block
-    assert "return ( cl_webPak != NULL );" in available_block
+    assert "return ( cl_webPak != NULL || cl_webDataPak.loaded );" in available_block
     assert "CL_OnlineServicesEnabled()" not in fetch_block
     assert "CL_OnlineServicesEnabled()" not in request_block
     assert "CL_OnlineServicesEnabled()" not in launcher_block
@@ -827,6 +919,16 @@ def test_launcher_resource_fallbacks_survive_service_disabled_policy() -> None:
     assert "QLResourceInterceptor_OnRequest( url, &response )" in url_block
     assert "Launcher backend disabled by build/runtime policy" not in url_block
     assert 'Com_Printf( "Launcher resource backend unavailable for %s\\n"' in url_block
+
+
+def test_awesomium_launch_task_builds_with_in_process_overlay_provider() -> None:
+    tasks = json.loads((REPO_ROOT / ".vscode" / "tasks.json").read_text(encoding="utf-8"))
+    awesomium_task = next(task for task in tasks["tasks"] if task["label"] == "Build Debug Awesomium")
+    args = awesomium_task["args"]
+
+    assert args[args.index("-OnlineServices") + 1] == "1"
+    assert args[args.index("-Steamworks") + 1] == "0"
+    assert args[args.index("-OpenSteam") + 1] == "1"
 
 
 def test_client_auth_ticket_lifetime_reconstructs_retail_disconnect_owner() -> None:
@@ -909,24 +1011,72 @@ def test_browser_cache_reload_owner_restores_retail_command_and_cvar_surface() -
 
 def test_client_browser_host_core_reconstructs_retained_runtime_owner() -> None:
     cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
+    cl_webpak = (REPO_ROOT / "src/code/client/cl_webpak.c").read_text(encoding="utf-8")
+    qcommon_h = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
+    files_c = (REPO_ROOT / "src/code/qcommon/files.c").read_text(encoding="utf-8")
 
+    load_scripts_block = _extract_function_block(cl_cgame, "static void QLLoadHandler_LoadDocumentScripts( void ) {")
+    resolve_session_block = _extract_function_block(cl_cgame, "static void CL_WebHost_ResolveSessionPath( char *buffer, size_t bufferSize ) {")
+    register_sources_block = _extract_function_block(cl_cgame, "static void QLWebHost_RegisterRuntimeSources( void ) {")
+    wait_bootstrap_block = _extract_function_block(cl_cgame, "static qboolean QLWebHost_WaitForBootstrapReady( void ) {")
+    install_listeners_block = _extract_function_block(cl_cgame, "static void QLWebHost_InstallRuntimeListeners( void ) {")
+    upload_surface_block = _extract_function_block(cl_cgame, "static qboolean QLWebView_UploadSurfaceImage( void ) {")
     runtime_block = _extract_function_block(cl_cgame, "static qboolean QLWebHost_EnsureRuntime( void ) {")
+    open_block = _extract_function_block(cl_cgame, "static qboolean QLWebHost_OpenURL( const char *url ) {")
+    document_ready_block = _extract_function_block(cl_cgame, "static void QLLoadHandler_OnDocumentReady( void ) {")
+    webpak_list_block = _extract_function_block(cl_webpak, "int CL_WebPak_GetFileList( const char *path, const char *extension, char *listbuf, int bufsize ) {")
+    pak_list_block = _extract_function_block(files_c, "int FS_GetPakFileList( const pack_t *pack, const char *path, const char *extension, char *listbuf, int bufsize ) {")
     bridge_block = _extract_function_block(cl_cgame, "void CL_RefreshOnlineServicesBridgeState( void ) {")
     frame_block = _extract_function_block(cl_cgame, "void CL_WebHost_Frame( void ) {")
     shutdown_block = _extract_function_block(cl_cgame, "void CL_WebHost_Shutdown( void ) {")
 
+    assert '#define CL_WEB_DEFAULT_URL "asset://ql/index.html"' in cl_cgame
+    assert '#define CL_WEB_SURFACE_SHADER "browser"' in cl_cgame
+    assert "#define CL_WEB_BOOTSTRAP_MAX_ATTEMPTS 10" in cl_cgame
+    assert "#define CL_WEB_BOOTSTRAP_SLEEP_MSEC 100" in cl_cgame
+    assert "int\t\tFS_GetPakFileList( const pack_t *pack, const char *path, const char *extension, char *listbuf, int bufsize );" in qcommon_h
+    assert 'Cvar_VariableStringBuffer( "fs_homepath", buffer, bufferSize );' in resolve_session_block
+    assert "cl_webHost.dataPakSourceInstalled = qtrue;" in register_sources_block
+    assert "cl_webHost.steamDataSourceInstalled = qtrue;" in register_sources_block
+    assert "cl_webHost.resourceInterceptorInstalled = qtrue;" in register_sources_block
+    assert "for ( attempt = 0; attempt < CL_WEB_BOOTSTRAP_MAX_ATTEMPTS; attempt++ ) {" in wait_bootstrap_block
+    assert "NET_Sleep( CL_WEB_BOOTSTRAP_SLEEP_MSEC );" in wait_bootstrap_block
+    assert "cl_webHost.bootstrapReady = qtrue;" in wait_bootstrap_block
+    assert "cl_webHost.dialogHandlerInstalled = qtrue;" in install_listeners_block
+    assert "cl_webHost.viewHandlerInstalled = qtrue;" in install_listeners_block
+    assert "cl_webHost.loadHandlerInstalled = qtrue;" in install_listeners_block
+    assert 'Q_strncpyz( cl_webHost.surfaceShaderName, CL_WEB_SURFACE_SHADER, sizeof( cl_webHost.surfaceShaderName ) );' in upload_surface_block
+    assert "cl_webHost.surfaceShader = CL_RegisterShaderFromRGBA(" in upload_surface_block
     assert "cl_webHost.coreInitialised = qtrue;" in runtime_block
     assert "cl_webHost.sessionInitialised = qtrue;" in runtime_block
     assert "cl_webHost.viewInitialised = qtrue;" in runtime_block
+    assert "QLWebHost_RegisterRuntimeSources();" in runtime_block
+    assert "cl_webHost.jsMethodHandlerInstalled = qtrue;" in runtime_block
+    assert "if ( !QLWebHost_WaitForBootstrapReady() ) {" in runtime_block
+    assert "QLWebHost_InstallRuntimeListeners();" in runtime_block
     assert "QLWebView_Resize( cls.glconfig.vidWidth, cls.glconfig.vidHeight );" in runtime_block
     assert "QLWebView_RebuildSurfaceImage();" in runtime_block
-    assert "QLJSHandler_BindQzInstance();" in runtime_block
+
+    assert "Q_strncpyz( cl_webHost.currentUrl, url ? url : CL_WEB_DEFAULT_URL, sizeof( cl_webHost.currentUrl ) );" in open_block
+    assert "QLLoadHandler_OnBeginLoadingFrame();" in open_block
+    assert "CL_WebHost_PrimeLauncherDocument( cl_webHost.currentUrl )" in open_block
+    assert "QLLoadHandler_OnDocumentReady();" in open_block
+    assert "QLLoadHandler_OnFailLoadingFrame( cl_webHost.currentUrl );" in open_block
+    assert 'count = CL_WebPak_GetFileList( "js", ".js", fileList, sizeof( fileList ) );' in load_scripts_block
+    assert "CL_LauncherRequestData( scriptPath, &scriptBuffer, &scriptLength )" in load_scripts_block
+    assert "QLLoadHandler_LoadDocumentScripts();" in document_ready_block
+    assert "QLJSHandler_BindQzInstance();" in document_ready_block
+    assert 'CL_WebView_PublishEvent( "web.object.ready", NULL );' in document_ready_block
+    assert "sourceCount = FS_GetPakFileList( cl_webPak, path, extension, sourceList, sizeof( sourceList ) );" in webpak_list_block
+    assert "sourceCount = CL_WebDataPak_GetFileList( path, extension, sourceList, sizeof( sourceList ) );" in webpak_list_block
+    assert "sourceCount = FS_GetFileList( path, extension, sourceList, sizeof( sourceList ) );" in webpak_list_block
+    assert "nFiles = FS_AddFileToList( name + temp, list, nFiles );" in pak_list_block
 
     assert 'Cvar_Set( "ui_browserAwesomium", overlayAvailable ? "1" : "0" );' in bridge_block
     assert "CL_WebHost_ResetRuntime( qtrue );" in bridge_block
 
     assert "CL_RefreshOnlineServicesBridgeState();" in frame_block
-    assert 'QLWebHost_OpenURL( "ql://quakelive" );' in frame_block
+    assert "QLWebHost_OpenURL( CL_WEB_DEFAULT_URL );" in frame_block
     assert "Q_stricmp( cl_webHost.currentUrl, expectedUrl )" in frame_block
     assert "QLWebCore_Update();" in frame_block
     assert "QLWebHost_PumpFrame();" in frame_block
@@ -962,6 +1112,12 @@ def test_client_browser_js_bridge_reconstructs_qz_instance_contract() -> None:
     cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
 
     bind_block = _extract_function_block(cl_cgame, "static void QLJSHandler_BindQzInstance( void ) {")
+    load_scripts_block = _extract_function_block(cl_cgame, "static void QLLoadHandler_LoadDocumentScripts( void ) {")
+    document_ready_block = _extract_function_block(cl_cgame, "static void QLLoadHandler_OnDocumentReady( void ) {")
+    next_power_block = _extract_function_block(cl_cgame, "static int QLWebView_NextPowerOfTwo( int value ) {")
+    map_cursor_block = _extract_function_block(cl_cgame, "static int QLWebView_MapCursorCoordinate( int coordinate, int viewDimension, int surfaceDimension ) {")
+    mapped_mouse_block = _extract_function_block(cl_cgame, "static void QLWebView_InjectMappedMouseMove( int x, int y ) {")
+    rebuild_surface_block = _extract_function_block(cl_cgame, "static void QLWebView_RebuildSurfaceImage( void ) {")
     method_block = _extract_function_block(
         cl_cgame,
         "static qboolean QLJSHandler_OnMethodCall( const char *methodName, const char **arguments, int argumentCount ) {",
@@ -970,7 +1126,17 @@ def test_client_browser_js_bridge_reconstructs_qz_instance_contract() -> None:
         cl_cgame,
         "static qboolean QLJSHandler_OnMethodCallWithReturnValue( const char *methodName, const char **arguments, int argumentCount, char *outValue, size_t outValueSize ) {",
     )
-    key_block = _extract_function_block(cl_cgame, "void CL_WebView_OnKeyEvent( int key, qboolean down ) {")
+    mouse_block = _extract_function_block(cl_cgame, "static void QLWebView_InjectMouseMove( int x, int y ) {")
+    mouse_down_block = _extract_function_block(cl_cgame, "static void QLWebView_InjectMouseDown( int key ) {")
+    mouse_up_block = _extract_function_block(cl_cgame, "static void QLWebView_InjectMouseUp( int key ) {")
+    wheel_block = _extract_function_block(cl_cgame, "static void QLWebView_InjectMouseWheel( int direction ) {")
+    key_block = _extract_function_block(cl_cgame, "static void QLWebView_InjectKeyboardEvent( int key, qboolean down ) {")
+    activation_block = _extract_function_block(cl_cgame, "static void QLWebView_InjectActivationKeyboardEvent( void ) {")
+    app_activate_block = _extract_function_block(cl_cgame, "void CL_WebHost_NotifyAppActivation( qboolean active ) {")
+    public_mouse_block = _extract_function_block(cl_cgame, "void CL_WebView_OnMouseMove( int x, int y ) {")
+    public_mouse_button_block = _extract_function_block(cl_cgame, "void CL_WebView_OnMouseButtonEvent( int key, qboolean down ) {")
+    public_wheel_event_block = _extract_function_block(cl_cgame, "void CL_WebView_OnMouseWheelEvent( int direction ) {")
+    public_key_block = _extract_function_block(cl_cgame, "void CL_WebView_OnKeyEvent( int key, qboolean down ) {")
 
     assert '{ "GetFriendList", CL_WEB_METHOD_GET_FRIEND_LIST, qtrue }' in cl_cgame
     assert '{ "GetConfig", CL_WEB_METHOD_GET_CONFIG, qtrue }' in cl_cgame
@@ -979,7 +1145,16 @@ def test_client_browser_js_bridge_reconstructs_qz_instance_contract() -> None:
 
     assert "cl_webHost.qzInstanceBound = qtrue;" in bind_block
     assert "cl_webHost.windowObjectBound = qtrue;" in bind_block
-    assert 'CL_WebView_PublishEvent( "web.object.ready", NULL );' in bind_block
+    assert 'count = CL_WebPak_GetFileList( "js", ".js", fileList, sizeof( fileList ) );' in load_scripts_block
+    assert "CL_LauncherRequestData( scriptPath, &scriptBuffer, &scriptLength )" in load_scripts_block
+    assert "QLLoadHandler_LoadDocumentScripts();" in document_ready_block
+    assert "for ( result = 1; result < value; result <<= 1 ) {" in next_power_block
+    assert "targetDimension = surfaceDimension > 0 ? surfaceDimension : viewDimension;" in map_cursor_block
+    assert "cl_webHost.cursorX = cursorX;" in mapped_mouse_block
+    assert "cl_webHost.surfaceWidth = QLWebView_NextPowerOfTwo( cl_webHost.viewWidth );" in rebuild_surface_block
+    assert "cl_webHost.surfaceHeight = QLWebView_NextPowerOfTwo( cl_webHost.viewHeight );" in rebuild_surface_block
+    assert "QLJSHandler_BindQzInstance();" in document_ready_block
+    assert 'CL_WebView_PublishEvent( "web.object.ready", NULL );' in document_ready_block
 
     assert "case CL_WEB_METHOD_GET_ALL_UGC:" in method_block
     assert "CL_WebHost_BuildUGCResultsJson( ugcJson, sizeof( ugcJson ) );" in method_block
@@ -998,8 +1173,22 @@ def test_client_browser_js_bridge_reconstructs_qz_instance_contract() -> None:
     assert "case CL_WEB_METHOD_GET_CLIPBOARD_TEXT:" in return_block
     assert "Sys_GetClipboardData();" in return_block
 
+    assert "QLWebView_InjectMappedMouseMove(" in mouse_block
+    assert "QLWebView_MapCursorCoordinate( x, cl_webHost.viewWidth, cl_webHost.surfaceWidth )" in mouse_block
+    assert "QLWebView_MapCursorCoordinate( y, cl_webHost.viewHeight, cl_webHost.surfaceHeight )" in mouse_block
+    assert "button = CL_WebHost_MapMouseButton( key );" in mouse_down_block
+    assert "button = CL_WebHost_MapMouseButton( key );" in mouse_up_block
+    assert "QLWebView_InjectMappedMouseMove( cl_webHost.cursorX, cl_webHost.cursorY );" in mouse_down_block
+    assert "if ( direction == 0 ) {" in wheel_block
     assert "QLWebView_PublishGameKey( key );" in key_block
     assert "cl_webHost.keyCaptureArmed = qfalse;" in key_block
+    assert "QLWebView_InjectKeyboardEvent( 0x11, qtrue );" in activation_block
+    assert "QLWebView_InjectActivationKeyboardEvent();" in app_activate_block
+    assert "QLWebView_InjectMouseMove( x, y );" in public_mouse_block
+    assert "QLWebView_InjectMouseDown( key );" in public_mouse_button_block
+    assert "QLWebView_InjectMouseUp( key );" in public_mouse_button_block
+    assert "QLWebView_InjectMouseWheel( direction );" in public_wheel_event_block
+    assert "QLWebView_InjectKeyboardEvent( key, down );" in public_key_block
     assert 'CL_WebView_PublishEvent( "game.key", payload );' in cl_cgame
 
 
@@ -1493,6 +1682,25 @@ def test_native_command_queries_and_fullscreen_gate_normalize_nonzero_returns_to
     assert "return VM_Call( gvm, GAME_CONSOLE_COMMAND );" not in sv_command_block
 
 
+def test_scr_adjust_from_640_matches_retail_engine_full_width_scaling() -> None:
+    cl_scrn = (REPO_ROOT / "src/code/client/cl_scrn.c").read_text(encoding="utf-8")
+    adjust_block = _extract_function_block(cl_scrn, "void SCR_AdjustFrom640( float *x, float *y, float *w, float *h ) {")
+
+    for expected in (
+        "float\txscale;",
+        "float\tyscale;",
+        "xscale = cls.glconfig.vidWidth / 640.0;",
+        "yscale = cls.glconfig.vidHeight / 480.0;",
+        "*x *= xscale;",
+        "*w *= xscale;",
+        "*y *= yscale;",
+        "*h *= yscale;",
+    ):
+        assert expected in adjust_block
+
+    assert "xbias" not in adjust_block
+
+
 def test_native_qboolean_argument_owners_normalize_explicit_values() -> None:
     cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
     cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
@@ -1896,6 +2104,7 @@ def test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners() ->
         sv_game, "static void SV_ReportPlayerEvent( uint32_t steamIdLow, uint32_t steamIdHigh, const void *clientStats, const char *eventName, void *payload )"
     )
     register_block = _extract_function_block(sv_zmq, "void Zmq_RegisterCvarsAndInitRcon( void )")
+    apply_passwords_block = _extract_function_block(sv_zmq, "static void idZMQ_ApplyPasswords( qboolean rconModeChanged, qboolean statsModeChanged )")
     update_passwords_block = _extract_function_block(sv_zmq, "void Zmq_UpdatePasswords( void )")
     init_publisher_block = _extract_function_block(sv_zmq, "void Zmq_InitStatsPublisher( void )")
     shutdown_runtime_block = _extract_function_block(sv_zmq, "void Zmq_ShutdownRuntime( void )")
@@ -1916,21 +2125,44 @@ def test_server_zmq_runtime_reconstructs_retail_publication_and_rcon_owners() ->
 
     assert 'Cvar_Get( "zmq_rcon_enable", "0", CVAR_ARCHIVE );' in register_block
     assert 'Cvar_Get( "zmq_stats_enable", "0", CVAR_ARCHIVE );' in register_block
+    assert 'Cvar_Get( "zmq_rcon_ip", "0.0.0.0", CVAR_ARCHIVE );' in register_block
+    assert 'Cvar_Get( "zmq_rcon_port", "28960", CVAR_ARCHIVE );' in register_block
     assert 'Cvar_Get( "zmq_rcon_password", "", CVAR_ARCHIVE | CVAR_PROTECTED );' in register_block
     assert 'Cvar_Get( "zmq_stats_password", "", CVAR_ARCHIVE | CVAR_PROTECTED );' in register_block
     assert "idZMQ_EnsureRconSocket();" in register_block
+    assert 'FS_FOpenFileWrite( QL_ZMQ_PASSFILE );' in sv_zmq
+    assert 'Com_sprintf( line, sizeof( line ), "stats_stats=%s\\n", s_zmq.statsPassword );' in sv_zmq
+    assert 'Com_sprintf( line, sizeof( line ), "rcon_rcon=%s\\n", s_zmq.rconPassword );' in sv_zmq
+    assert 'Com_Printf( "Failed to open %s\\n", QL_ZMQ_PASSFILE );' in sv_zmq
+    assert "idZMQ_ApplyPasswords( qfalse, qfalse );" in update_passwords_block
+    assert "idZMQ_ApplyPasswords( rconModeChanged, statsModeChanged );" in update_passwords_block
+    assert "idZMQ_CloseSocket( &s_zmq.rconSocket );" in apply_passwords_block
+    assert "idZMQ_CloseSocket( &s_zmq.pubSocket );" in apply_passwords_block
+    assert "idZMQ_CloseAuthSocket();" in apply_passwords_block
     assert 'Com_Printf( "zmq stats and rcon passwords updated\\n" );' in update_passwords_block
     assert "idZMQ_EnsureStatsPublisher();" in init_publisher_block
     assert 'idZMQ_Publish( "MATCH_REPORT", (const char *)report );' in sv_zmq
     assert 'idZMQ_Publish( eventName && eventName[0] ? eventName : "UNKNOWN_EVENT", (const char *)payload );' in sv_zmq
+    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "rcon" );' in sv_zmq
+    assert 'idZMQ_TrySetSocketString( socket, QL_ZMQ_ZAP_DOMAIN, "stats" );' in sv_zmq
+    assert 'idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.rconPassword[0] ? 1 : 0 );' in sv_zmq
+    assert 'idZMQ_TrySetSocketInt( socket, QL_ZMQ_PLAIN_SERVER, s_zmq.statsPassword[0] ? 1 : 0 );' in sv_zmq
     assert 'Com_Printf( "zmq RCON socket: %s\\n", s_zmq.rconEndpoint );' in sv_zmq
     assert 'Com_Printf( "zmq PUB socket: %s\\n", s_zmq.statsEndpoint );' in sv_zmq
+    assert 'Com_Printf( "zmq RCON socket error, bind failed: %s\\n", idZMQ_LastErrorString() );' in sv_zmq
+    assert 'Com_Printf( "zmq PUB socket error, bind failed: %s\\n", idZMQ_LastErrorString() );' in sv_zmq
+    assert "idZMQ_PumpAuthSocket();" in pump_block
+    assert "if ( s_zmq.zmq_poll( &item, 1, 0 ) <= 0 || !( item.revents & QL_ZMQ_POLLIN ) ) {" in pump_block
+    assert "while ( s_zmq.zmq_poll( &item, 1, 0 ) > 0 && ( item.revents & QL_ZMQ_POLLIN ) ) {" not in pump_block
     assert 'Com_Printf( "zmq RCON client connected: %s\\n", peer->label );' in pump_block
     assert 'Com_Printf( "zmq RCON command from %s: %s\\n", peer->label, command );' in pump_block
     assert 'Com_Printf( "zmq RCON client disconnected: %s\\n", peer->label );' in broadcast_block
     assert 'Com_sprintf( buffer, bufferSize, "{\\"TYPE\\":\\"%s\\",\\"DATA\\":%s}\\n", type, payload );' in sv_zmq
     assert 'Com_sprintf( buffer, bufferSize, "{\\"TYPE\\":\\"%s\\",\\"DATA\\":null}\\n", type );' in sv_zmq
     assert 's_zmq.statsTranscript = FS_FOpenFileWrite( QL_ZMQ_STATS_TRANSCRIPT );' in sv_zmq
+    assert "idZMQ_CloseAuthSocket();" in shutdown_runtime_block
+    assert "QL_ZMQ_IMMEDIATE" not in sv_zmq
+    assert "QL_ZMQ_ROUTER_HANDOVER" not in sv_zmq
     assert "Zmq_RegisterCvarsAndInitRcon();" in init_block
     assert "Zmq_InitStatsPublisher();" in spawn_block
     assert spawn_block.index("QL_Steamworks_ServerSetKeyValuesFromInfoString( serverInfo );") < spawn_block.index("Zmq_InitStatsPublisher();")
@@ -1997,6 +2229,8 @@ def test_server_control_plane_cvars_restore_retail_runtime_owners() -> None:
 	clear_idle_block = _extract_function_block(sv_main, "void SV_ClearIdleServerExit( void )")
 	should_error_block = _extract_function_block(sv_main, "qboolean SV_ShouldErrorExit( errorParm_t code )")
 	check_idle_block = _extract_function_block(sv_main, "qboolean SV_CheckIdleServerExit( int currentTime )")
+	check_timeouts_block = _extract_function_block(sv_main, "void SV_CheckTimeouts( void )")
+	sv_frame_block = _extract_function_block(sv_main, "void SV_Frame( int msec )")
 	shutdown_game_block = _extract_function_block(sv_game, "void SV_ShutdownGameProgs( void )")
 	entity_string_block = _extract_function_block(sv_game, "static char *SV_GetGameEntityString( void )")
 	init_game_vm_block = _extract_function_block(sv_game, "static void SV_InitGameVM( qboolean restart )")
@@ -2013,6 +2247,7 @@ def test_server_control_plane_cvars_restore_retail_runtime_owners() -> None:
 	assert "extern\tcvar_t\t*sv_idleExit;" in server_h
 	assert "extern\tcvar_t\t*sv_errorExit;" in server_h
 	assert "extern\tcvar_t\t*sv_quitOnEmpty;" in server_h
+	assert "extern\tcvar_t\t*sv_quitOnExitLevel;" in server_h
 	assert "extern\tcvar_t\t*sv_altEntDir;" in server_h
 	assert "extern\tcvar_t\t*sv_dumpEntities;" in server_h
 	assert "extern\tcvar_t\t*sv_cylinderScale;" in server_h
@@ -2028,6 +2263,7 @@ def test_server_control_plane_cvars_restore_retail_runtime_owners() -> None:
 	assert 'sv_idleExit = Cvar_Get ("sv_idleExit", "120", 0 );' in init_block
 	assert 'sv_errorExit = Cvar_Get ("sv_errorExit", "1", 0 );' in init_block
 	assert 'sv_quitOnEmpty = Cvar_Get ("sv_quitOnEmpty", "0", 0 );' in init_block
+	assert 'sv_quitOnExitLevel = Cvar_Get ("sv_quitOnExitLevel", "0", 0 );' in init_block
 	assert 'sv_altEntDir = Cvar_Get ("sv_altEntDir", "", 0 );' in init_block
 	assert 'sv_dumpEntities = Cvar_Get ("sv_dumpEntities", "0", 0 );' in init_block
 	assert 'sv_cylinderScale = Cvar_Get ("sv_cylinderScale", "1.1f", 0 );' in init_block
@@ -2042,6 +2278,10 @@ def test_server_control_plane_cvars_restore_retail_runtime_owners() -> None:
 	assert "s_svIdleExitDeadline = currentTime + sv_idleExit->integer * 1000;" in check_idle_block
 	assert "SV_ClearIdleServerExit();" in check_idle_block
 	assert 'Com_Error( ERR_FATAL, "shutting down idle dedicated server after sv_idleExit (%d) seconds", sv_idleExit->integer );' in check_idle_block
+	assert "if ( SV_CountActiveHumanClients() > 0 ) {" in check_timeouts_block
+	assert "if ( s_svEmptyServerTime == -1 ) {" in check_timeouts_block
+	assert "if ( sv_quitOnEmpty && sv_quitOnEmpty->integer > 0 ) {" in check_timeouts_block
+	assert 'Com_Printf( "server has been empty for %d seconds, quit\\n", sv_quitOnEmpty->integer );' in check_timeouts_block
 
 	assert "if ( SV_ShouldErrorExit( code ) ) {" in error_block
 	assert "code = ERR_FATAL;" in error_block
@@ -2049,6 +2289,9 @@ def test_server_control_plane_cvars_restore_retail_runtime_owners() -> None:
 	assert "minMsec = 50;" in frame_block
 	assert "SV_CheckIdleServerExit( Sys_Milliseconds() );" in frame_block
 	assert "SV_ClearIdleServerExit();" in frame_block
+	assert 'if ( sv_idleRestart && sv_idleRestart->integer && svs.time > 0x5265c00 && SV_CountActiveHumanClients() == 0 ) {' in sv_frame_block
+	assert 'SV_Shutdown( "Restarting idle server" );' in sv_frame_block
+	assert 'Cbuf_AddText( "vstr nextmap\\n" );' in sv_frame_block
 
 	assert "FS_FreeFile( s_svEntityStringOverride );" in shutdown_game_block
 	assert 'Com_sprintf( altEntPath, sizeof( altEntPath ), "%s/%s.ent", sv_altEntDir->string, mapName );' in entity_string_block
@@ -2101,6 +2344,29 @@ def test_server_dedicated_build_lane_emits_qzeroded_and_defaults_dedicated_runti
 	assert "`qzeroded.exe`" in windows_pipeline
 
 
+def test_windows_build_and_launch_pipeline_refresh_runtime_ui_bundle_and_vm_modules() -> None:
+	build_script = (REPO_ROOT / ".vscode/build.ps1").read_text(encoding="utf-8")
+	launch_script = (REPO_ROOT / ".vscode/launch.ps1").read_text(encoding="utf-8")
+	launch_json = json.loads((REPO_ROOT / ".vscode/launch.json").read_text(encoding="utf-8"))
+
+	assert '$uiBundleBuilder = Join-Path $solutionDir \'..\\..\\tools\\build_ui_bundle.py\'' in build_script
+	assert 'Write-Host "Refreshing staged retail UI bundle..."' in build_script
+	assert "Sync-ModuleRuntimeArtifacts -ModuleName 'cgamex86'" in build_script
+	assert "Sync-ModuleRuntimeArtifacts -ModuleName 'qagamex86'" in build_script
+	assert "Copy-Item -Path $sourcePath -Destination $destinationPath -Force" in build_script
+
+	assert "(Join-Path $retailUiBundleBaseq3 'ui\\menudef.h')" in launch_script
+	assert "$runtimeModulesDir = Join-Path $repoRoot \"build\\win32\\$Configuration\\modules\"" in launch_script
+	assert "function Sync-LaunchModuleArtifact" in launch_script
+	assert "Sync-LaunchModuleArtifact -ModuleName 'cgamex86'" in launch_script
+	assert "Sync-LaunchModuleArtifact -ModuleName 'qagamex86'" in launch_script
+
+	for configuration in launch_json["configurations"]:
+		assert configuration["cwd"] == "${workspaceFolder}\\build\\win32\\Debug\\bin"
+		basepath_index = configuration["args"].index("fs_basepath") + 1
+		assert configuration["args"][basepath_index] == "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1"
+
+
 def test_filesystem_referenced_steamworks_helper_reconstructs_retail_publication_list() -> None:
     files = (REPO_ROOT / "src/code/qcommon/files.c").read_text(encoding="utf-8")
     qcommon = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
@@ -2135,7 +2401,7 @@ def test_workshop_mount_startup_reconstructs_retail_subscribed_item_import_path(
     )
 
     assert "qboolean\trawPath;" in files
-    assert 'fs_skipWorkshop = Cvar_Get( "fs_skipWorkshop", "0", CVAR_ARCHIVE );' in startup_block
+    assert 'fs_skipWorkshop = Cvar_Get( "fs_skipWorkshop", "0", CVAR_INIT );' in startup_block
     assert "FS_SteamWorkshopInit( gameName );" in startup_block
     assert "search->dir->rawPath = rawPath;" in add_dir_block
     assert "pak->steamItemIdLow = steamItemIdLow;" in add_dir_block

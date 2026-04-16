@@ -441,6 +441,28 @@ static void Svcmd_DumpVars_f( void ) {
 
 /*
 ===================
+Svcmd_EntityDebug_f
+
+Prints the retained entity parse/spawn summary and optional per-class counts.
+===================
+*/
+static void Svcmd_EntityDebug_f( void ) {
+	char		mode[MAX_TOKEN_CHARS];
+	qboolean	includeClasses;
+
+	includeClasses = qfalse;
+	if ( trap_Argc() > 1 ) {
+		trap_Argv( 1, mode, sizeof( mode ) );
+		if ( !Q_stricmp( mode, "classes" ) || !Q_stricmp( mode, "all" ) ) {
+			includeClasses = qtrue;
+		}
+	}
+
+	G_EntityDebug_PrintSummary( includeClasses );
+}
+
+/*
+===================
 Svcmd_ForceTeam_f
 
 forceteam <player> <team>
@@ -625,6 +647,10 @@ qboolean	ConsoleCommand( void ) {
 
 	if ( Q_stricmp (cmd, "entitylist") == 0 ) {
 		Svcmd_EntityList_f();
+		return qtrue;
+	}
+	if ( Q_stricmp( cmd, "entitydebug" ) == 0 ) {
+		Svcmd_EntityDebug_f();
 		return qtrue;
 	}
 	if ( Q_stricmp (cmd, "forceteam") == 0 ) {

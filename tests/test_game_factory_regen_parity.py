@@ -62,13 +62,113 @@ def test_factory_config_mirrors_regen_delay_and_rate_milliseconds() -> None:
 	config_c = _read("src/game/g_config.c")
 	local_h = _read("src/code/game/g_local.h")
 
-	assert "#define DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS     1250" in config_c
-	assert "#define DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS      133" in config_c
-	assert "#define DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS      1250" in config_c
-	assert "#define DEFAULT_REGEN_ARMOR_RATE_MILLISECONDS       133" in config_c
+	assert "#define DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS     0" in config_c
+	assert "#define DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS      100" in config_c
+	assert "#define DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS      0" in config_c
+	assert "#define DEFAULT_REGEN_ARMOR_RATE_MILLISECONDS       100" in config_c
 	assert "Milliseconds after taking damage before factory health regeneration begins." in config_c
 	assert "Milliseconds after taking damage before factory armor regeneration begins." in config_c
 	assert "int\t\tregenHealthDelayMilliseconds;" in local_h
 	assert "int\t\tregenHealthRateMilliseconds;" in local_h
 	assert "int\t\tregenArmorDelayMilliseconds;" in local_h
 	assert "int\t\tregenArmorRateMilliseconds;" in local_h
+
+
+def test_factory_item_spawn_defaults_match_retail_registration() -> None:
+	config_c = _read("src/game/g_config.c")
+
+	assert "#define DEFAULT_SPAWN_ITEM_POWERUP                  1" in config_c
+	assert "#define DEFAULT_SPAWN_ITEM_HOLDABLE                 1" in config_c
+	assert "#define DEFAULT_SPAWN_ITEM_WEAPONS                  1" in config_c
+	assert "#define DEFAULT_SPAWN_ITEM_HEALTH                   1" in config_c
+	assert "#define DEFAULT_SPAWN_ITEM_ARMOR                    1" in config_c
+	assert "#define DEFAULT_SPAWN_ITEM_AMMO                     1" in config_c
+
+
+def test_factory_item_spawn_cvars_are_vm_owned_startup_settings() -> None:
+	config_c = _read("src/game/g_config.c")
+
+	assert '{ &g_spawnItemPowerup,     "g_spawnItemPowerup",     STRINGIZE( DEFAULT_SPAWN_ITEM_POWERUP ), CVAR_SERVERINFO | CVAR_INIT,' in config_c
+	assert '{ &g_spawnItemHoldable,    "g_spawnItemHoldable",    STRINGIZE( DEFAULT_SPAWN_ITEM_HOLDABLE ), CVAR_SERVERINFO | CVAR_INIT,' in config_c
+	assert '{ &g_spawnItemWeapons,     "g_spawnItemWeapons",     STRINGIZE( DEFAULT_SPAWN_ITEM_WEAPONS ), CVAR_SERVERINFO | CVAR_INIT,' in config_c
+	assert '{ &g_spawnItemHealth,      "g_spawnItemHealth",      STRINGIZE( DEFAULT_SPAWN_ITEM_HEALTH ), CVAR_SERVERINFO | CVAR_INIT,' in config_c
+	assert '{ &g_spawnItemArmor,       "g_spawnItemArmor",       STRINGIZE( DEFAULT_SPAWN_ITEM_ARMOR ), CVAR_SERVERINFO | CVAR_INIT,' in config_c
+	assert '{ &g_spawnItemAmmo,        "g_spawnItemAmmo",        STRINGIZE( DEFAULT_SPAWN_ITEM_AMMO ), CVAR_SERVERINFO | CVAR_INIT,' in config_c
+
+
+def test_factory_apply_resets_factory_managed_cvars_before_overrides() -> None:
+	config_c = _read("src/game/g_config.c")
+	factory_c = _read("src/code/game/g_factory.c")
+
+	assert "void G_Config_ResetFactoryManagedCvars( void ) {" in config_c
+	assert 'trap_Cvar_Set( "g_loadout", STRINGIZE( DEFAULT_FACTORY_LOADOUT ) );' in config_c
+	assert 'trap_Cvar_Set( "g_runes", STRINGIZE( DEFAULT_FACTORY_RUNES ) );' in config_c
+	assert 'trap_Cvar_Set( "g_regenHealth", STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ) );' in config_c
+	assert 'trap_Cvar_Set( "g_spawnItemPowerup", STRINGIZE( DEFAULT_SPAWN_ITEM_POWERUP ) );' in config_c
+	assert 'trap_Cvar_Set( "g_spawnItemAmmo", STRINGIZE( DEFAULT_SPAWN_ITEM_AMMO ) );' in config_c
+	assert factory_c.count("G_Config_ResetFactoryManagedCvars();") == 2
+
+
+def test_factory_runes_are_gated_separately_from_map_powerups() -> None:
+	config_c = _read("src/game/g_config.c")
+	items_c = _read("src/code/game/g_items.c")
+	local_h = _read("src/code/game/g_local.h")
+
+	assert "extern vmCvar_t g_loadout;" in local_h
+	assert "extern vmCvar_t g_runes;" in local_h
+	assert '{ &g_loadout,              "g_loadout",              STRINGIZE( DEFAULT_FACTORY_LOADOUT ), CVAR_SERVERINFO,' in config_c
+	assert '{ &g_runes,                "g_runes",                STRINGIZE( DEFAULT_FACTORY_RUNES ), 0,' in config_c
+	assert """\tcase IT_PERSISTANT_POWERUP:
+\t\treturn g_runes.integer ? qtrue : qfalse;""" in items_c
+	assert items_c.count("if ( !g_runes.integer ) {") == 3
+	assert "if ( g_runes.integer ) {" in items_c
+
+
+def test_factory_ammo_spawn_gate_switches_between_global_and_weapon_ammo_families() -> None:
+	items_c = _read("src/code/game/g_items.c")
+	config_c = _read("src/game/g_config.c")
+
+	assert """\tcase IT_AMMO:
+\t\tif ( !g_factoryCvarConfig.spawnItemAmmo ) {
+\t\t\treturn qfalse;
+\t\t}
+
+\t\tif ( item->giTag == WP_NUM_WEAPONS ) {
+\t\t\treturn ( g_factoryCvarConfig.ammoPackEnabled || g_factoryCvarConfig.ammoPackHackEnabled ) ? qtrue : qfalse;
+\t\t}
+
+\t\treturn ( g_factoryCvarConfig.ammoPackEnabled || g_factoryCvarConfig.ammoPackHackEnabled ) ? qfalse : qtrue;""" in items_c
+	assert "Allow the active ammo pickup family to spawn when factories expose either global ammo packs or weapon-specific ammo." in config_c
+
+
+def test_factory_selection_falls_back_to_retail_gametype_defaults() -> None:
+	factory_c = _read("src/code/game/g_factory.c")
+
+	assert "static const char *Factory_GetDefaultIdForGametype( gametype_t gametype ) {" in factory_c
+	assert 'case GT_FFA:\n\t\treturn "ffa";' in factory_c
+	assert 'case GT_OBELISK:\n\t\treturn "ovl";' in factory_c
+	assert 'case GT_ATTACK_DEFEND:\n\t\treturn "ad";' in factory_c
+	assert "static qboolean Factory_ApplyDefaultSelection( qboolean forceReapply ) {" in factory_c
+	assert 'G_Printf( "factories: no retail default for g_gametype %i\\n", g_gametype.integer );' in factory_c
+	assert 'G_Printf( "factories: missing retail default id %s for g_gametype %i\\n", defaultId, g_gametype.integer );' in factory_c
+	assert factory_c.count("Factory_ApplyDefaultSelection( forceReapply );") == 2
+
+
+def test_factory_loader_accepts_both_plural_and_singular_supplement_extensions() -> None:
+	factory_c = _read("src/code/game/g_factory.c")
+	server_c = _read("src/code/server/sv_ccmds.c")
+
+	assert 'total = trap_FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );' in factory_c
+	assert 'if ( total <= 0 ) {' in factory_c
+	assert 'total = trap_FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );' in factory_c
+	assert 'count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );' in server_c
+	assert 'if ( count <= 0 ) {' in server_c
+	assert 'count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );' in server_c
+
+
+def test_ruleset_sync_stops_seeding_factory_and_registers_weapon_spawn_alias() -> None:
+	main_c = _read("src/code/game/g_main.c")
+
+	assert '{ &g_spawnItemWeapons, "g_spawnItemWeapons", &g_spawnItemWeaponLegacy, "g_spawnItemWeapon", "1", CVAR_SERVERINFO | CVAR_INIT, -1, -1 }' in main_c
+	assert 'trap_Cvar_Set( "g_factory", ruleset );' not in main_c
+	assert "defaulting to the current gametype's retail factory when unset or invalid." in main_c

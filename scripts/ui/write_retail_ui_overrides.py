@@ -13,6 +13,7 @@ if __package__ in (None, ""):
 	sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.ui.retail_ui_corpus import (  # noqa: E402
+	DEFAULT_BASEQ3_ROOT,
 	DEFAULT_BUNDLE_MANIFEST,
 	build_retail_ui_inventory,
 	compute_ui_panel_drift,
@@ -21,10 +22,8 @@ from scripts.ui.retail_ui_corpus import (  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SOURCE_ROOT = REPO_ROOT / "src" / "ui"
-DEFAULT_RETAIL_ROOT = REPO_ROOT / "assets" / "quakelive" / "baseq3" / "ui"
+DEFAULT_RETAIL_ROOT = DEFAULT_BASEQ3_ROOT / "ui"
 DEFAULT_HOMEPATH_ROOT = REPO_ROOT / "build" / "ui_retail_overrides"
-OVERLAY_PACKAGE_NAME = "pak_ui_src_retail_overlay.pk3"
-BASE_UI_PACKAGE_NAME = "pak_uiql.pk3"
 
 
 def _repo_relative(path: Path) -> str:
@@ -46,6 +45,14 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument("--homepath-root", type=Path, default=DEFAULT_HOMEPATH_ROOT)
 	parser.add_argument("--manifest", type=Path, default=None)
 	parser.add_argument("--overlay-prefix", default="baseq3/ui")
+	parser.add_argument(
+		"--emit-files",
+		action="store_true",
+		help=(
+			"Materialize retail-derived override files under the homepath overlay root. "
+			"Disabled by default so the validation workflow does not duplicate retail distributables."
+		),
+	)
 	return parser.parse_args()
 
 
@@ -97,7 +104,12 @@ def delete_stale_overrides(
 	missing_files: list[str] = []
 	removed_dirs: list[str] = []
 
-	for relative_path in previous_manifest.get("overlay_files", []):
+	previous_overlay_files = previous_manifest.get(
+		"materialized_overlay_files",
+		previous_manifest.get("overlay_files", []),
+	)
+
+	for relative_path in previous_overlay_files:
 		if relative_path in current_overlay_files:
 			continue
 
@@ -143,24 +155,25 @@ def build_overlay_entries(
 
 def build_overlay_policy(overlay_prefix: str) -> dict[str, object]:
 	return {
-		"mode": "overlay-first-read-only-src-ui",
+		"mode": "retail-install-first-read-only-src-ui",
 		"src_ui_baseline": _repo_relative(DEFAULT_SOURCE_ROOT),
 		"src_ui_write_policy": "read-only",
-		"overlay_mount_root": "fs_homepath/baseq3",
+		"runtime_base_source": "retail-fs_basepath/baseq3",
+		"duplication_policy": "do-not-duplicate-retail-distributables",
 		"overlay_virtual_root": overlay_prefix,
-		"overlay_package_name": OVERLAY_PACKAGE_NAME,
-		"base_ui_package_name": BASE_UI_PACKAGE_NAME,
+		"overlay_materialization_default": "report-only",
 		"precedence_contract": (
-			"Mount the drift overlay from fs_homepath so it outranks the base UI bundle and "
-			"any lower-priority src/ui-derived payloads mounted from fs_basepath or fs_cdpath."
+			"Load retail UI assets directly from the installed Quake Live baseq3 via fs_basepath. "
+			"Do not package or mount duplicated retail UI bundles from fs_homepath or repo-owned asset roots."
 		),
 		"verification_contract": (
-			"With fs_debug enabled, FS_FOpenFileRead log lines for drifted ui/*.menu or ui/*.txt "
-			"targets must report the overlay package as the winning source."
+			"With fs_debug enabled, FS_FOpenFileRead log lines for ui/*.menu, ui/*.txt, default.cfg, "
+			"and required fonts should resolve from the retail install unless a non-retail bridge file "
+			"is intentionally written into fs_homepath."
 		),
-		"same_root_warning": (
-			"Do not rely on same-directory pk3 alphabetical ordering to give the overlay precedence; "
-			"the supported runtime strategy is a separate fs_homepath overlay layer."
+		"materialization_warning": (
+			"Report-only mode is the supported default. Emitting retail-derived overlay files is an "
+			"exception path for investigation only and should not be part of normal runtime validation."
 		),
 	}
 
@@ -193,9 +206,15 @@ def main() -> int:
 	overlay_files = [f"{overlay_prefix}/{relative_path}" for relative_path in drift_files]
 	overlay_entries = build_overlay_entries(args.retail_root, overlay_files, overlay_prefix)
 	previous_manifest = load_previous_manifest(manifest_path)
-	cleanup_report = delete_stale_overrides(args.homepath_root, previous_manifest, set(overlay_files))
+	materialized_overlay_files = overlay_files if args.emit_files else []
+	cleanup_report = delete_stale_overrides(
+		args.homepath_root,
+		previous_manifest,
+		set(materialized_overlay_files),
+	)
 
-	write_overlay_files(args.retail_root, args.homepath_root, overlay_entries)
+	if args.emit_files:
+		write_overlay_files(args.retail_root, args.homepath_root, overlay_entries)
 
 	report = dict(drift)
 	report["manifest_version"] = 2
@@ -203,6 +222,8 @@ def main() -> int:
 	report["overlay_root"] = _repo_relative(args.homepath_root / overlay_prefix)
 	report["overlay_prefix"] = overlay_prefix
 	report["overlay_files"] = overlay_files
+	report["materialization_mode"] = "emit-files" if args.emit_files else "report-only"
+	report["materialized_overlay_files"] = materialized_overlay_files
 	report["drift_files"] = drift_files
 	report["overlay_entries"] = overlay_entries
 	report["overlay_file_hashes"] = {
@@ -217,9 +238,14 @@ def main() -> int:
 	manifest_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
 	print(
-		f"Wrote {len(report['overlay_files'])} retail ui overrides to "
+		f"Recorded {len(report['overlay_files'])} retail ui drift entries for "
 		f"{(args.homepath_root / overlay_prefix).as_posix()}"
 	)
+	if args.emit_files:
+		print(
+			f"Materialized {len(report['materialized_overlay_files'])} retail ui overrides under "
+			f"{(args.homepath_root / overlay_prefix).as_posix()}"
+		)
 	print(f"Manifest written to {manifest_path.as_posix()}")
 	return 0
 
