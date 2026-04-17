@@ -1444,6 +1444,7 @@ static int G_BuildExitRuleLimitMsec( int minutes, int bonusMsec );
 static qboolean G_StartOrExtendOvertime( void );
 static void G_StopOvertime( void );
 static void G_TrackSuddenDeathAnnouncements( void );
+static qboolean G_ClearConnectedReadyStates( qboolean updateUserinfo );
 static void G_ResetDuelWarmupState( qboolean clearReadyFlags );
 void G_InitGame( int levelTime, int randomSeed, int restart );
 void G_RunFrame( int levelTime );

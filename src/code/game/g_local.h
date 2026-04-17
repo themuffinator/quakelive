@@ -1139,6 +1139,7 @@ typedef struct {
 	int			voteTime;				// level.time vote was called
 	int			voteExecuteTime;		// time the vote is executed
 	int			voteEligibleTime;		// next level.time a vote may be issued
+	int			pendingVoteClientNum;
 	int			voteYes;
 	int			voteNo;
 	int			nextMapVoteCounts[3];		// retail intermission next-map vote counts keyed by slot
@@ -1983,6 +1984,7 @@ qboolean	trap_GetEntityToken( char *buffer, int bufferSize );
 
 int		trap_DebugPolygonCreate(int color, int numPoints, vec3_t *points);
 void	trap_DebugPolygonDelete(int id);
+int		trap_RealTime( qtime_t *qtime );
 
 int		trap_BotLibSetup( void );
 int		trap_BotLibShutdown( void );

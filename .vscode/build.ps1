@@ -136,7 +136,8 @@ if (-not $windowsTargetPlatformVersion -and $toolset -eq 'v141') {
 
 $solutionPath = Resolve-Path $Solution
 $solutionDir = Split-Path -Parent $solutionPath
-$repoLibsDir = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot '..\src\libs'))
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot '..'))
+$repoLibsDir = Join-Path $repoRoot 'src\libs'
 $internalDepsScript = Join-Path $scriptRoot '..\tools\build_internal_deps.ps1'
 
 function Invoke-InternalDependencyBootstrap {
@@ -152,7 +153,7 @@ function Invoke-InternalDependencyBootstrap {
 		'-NoProfile',
 		'-ExecutionPolicy', 'Bypass',
 		'-File', $internalDepsScript,
-		'-RepoRoot', (Join-Path $scriptRoot '..'),
+		'-RepoRoot', $repoRoot,
 		'-Dependency', $DependencyName
 	)
 
@@ -351,7 +352,7 @@ if ($enableFreeType -ne 0 -and $freeTypeAvailable) {
 		Where-Object { $_ -and (Test-Path $_) } |
 		Select-Object -First 1
 	if ($freeTypeBinDir) {
-		$runtimeBinDir = Join-Path $solutionDir "..\..\build\win32\$Configuration\bin"
+		$runtimeBinDir = Join-Path $repoRoot "build\win32\$Configuration\bin"
 		$freeTypeRuntimeDependencies = @(
 			'freetype.dll',
 			'brotlidec.dll',
@@ -367,10 +368,10 @@ if ($enableFreeType -ne 0 -and $freeTypeAvailable) {
 	}
 }
 
-$runtimeBinDir = Join-Path $solutionDir "..\..\build\win32\$Configuration\bin"
+$runtimeBinDir = Join-Path $repoRoot "build\win32\$Configuration\bin"
 $runtimeBaseq3Dir = Join-Path $runtimeBinDir 'baseq3'
-$runtimeModulesDir = Join-Path $solutionDir "..\..\build\win32\$Configuration\modules"
-$uiBundleBuilder = Join-Path $solutionDir '..\..\tools\build_ui_bundle.py'
+$runtimeModulesDir = Join-Path $repoRoot "build\win32\$Configuration\modules"
+$uiBundleBuilder = Join-Path $repoRoot 'tools\build_ui_bundle.py'
 $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
 if (-not $pythonCmd) {
 	$pythonCmd = Get-Command py -ErrorAction SilentlyContinue

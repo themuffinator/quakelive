@@ -26,30 +26,20 @@ if /I "%~1"=="-Awesomium" (
 	goto parse_opts
 )
 
-set "EXTRA_ARGS="
-:collect_args
-if "%~1"=="" goto args_ready
-set "EXTRA_ARGS=%EXTRA_ARGS% \"%~1\""
-shift
-goto collect_args
+if not "%~1"=="" (
+	echo launch.cmd: additional game arguments are not supported through the batch wrapper.
+	echo launch.cmd: run ".vscode\launch.ps1" directly if you need custom launch args.
+	exit /b 1
+)
 
-:args_ready
 set "AWESOMIUM_ARG="
 if defined ENABLE_AWESOMIUM set "AWESOMIUM_ARG=-EnableAwesomium"
 
 where pwsh.exe >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
-	if not defined EXTRA_ARGS (
-		pwsh.exe -NoExit -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%launch.ps1" -Configuration "%CONFIG%" -BasePath "%BASEPATH%" %AWESOMIUM_ARG%
-	) else (
-		pwsh.exe -NoExit -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%launch.ps1" -Configuration "%CONFIG%" -BasePath "%BASEPATH%" %AWESOMIUM_ARG% -ExtraArgs %EXTRA_ARGS%
-	)
+	pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%launch.ps1" -Configuration "%CONFIG%" -BasePath "%BASEPATH%" %AWESOMIUM_ARG%
 	exit /b %ERRORLEVEL%
 )
 
-if not defined EXTRA_ARGS (
-	powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%launch.ps1" -Configuration "%CONFIG%" -BasePath "%BASEPATH%" %AWESOMIUM_ARG%
-) else (
-	powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%launch.ps1" -Configuration "%CONFIG%" -BasePath "%BASEPATH%" %AWESOMIUM_ARG% -ExtraArgs %EXTRA_ARGS%
-)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%launch.ps1" -Configuration "%CONFIG%" -BasePath "%BASEPATH%" %AWESOMIUM_ARG%
 exit /b %ERRORLEVEL%

@@ -69,31 +69,49 @@ if (-not (Test-Path $retailPakPath -PathType Leaf)) {
 	throw "Quake Live base path is missing retail data: $retailPakPath. Point the launcher at the Steam install root that contains baseq3\\pak00.pk3."
 }
 
-$retailUiBundleRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'build\ui_bundle\staging'))
-$retailUiBundleBaseq3 = Join-Path $retailUiBundleRoot 'baseq3'
-foreach ($requiredRetailUiPath in @(
-	$retailUiBundleBaseq3,
-	(Join-Path $retailUiBundleBaseq3 'default.cfg'),
-	(Join-Path $retailUiBundleBaseq3 'ui\menudef.h'),
-	(Join-Path $retailUiBundleBaseq3 'ui\hud3.txt'),
-	(Join-Path $retailUiBundleBaseq3 'ui\ingame_scoreboard_ffa.menu'),
-	(Join-Path $retailUiBundleBaseq3 'ui\assets\button_back.png'),
-	(Join-Path $retailUiBundleBaseq3 'ui\assets\hud\ffa.png'),
-	(Join-Path $retailUiBundleBaseq3 'ui\assets\score\scoretl.png'),
-	(Join-Path $retailUiBundleBaseq3 'fonts\font.dat'),
-	(Join-Path $retailUiBundleBaseq3 'fonts\font.tga')
-)) {
-	if (-not (Test-Path -LiteralPath $requiredRetailUiPath)) {
-		throw "Quake Live UI staging content was not found: $requiredRetailUiPath. Run tools/build_ui_bundle.py before launching so the retail HUD, scoreboard, and loading assets are mounted under staging\\baseq3."
-	}
-}
-
 $workingDirectory = $runtimeBinDir
 $steamBasePathArg = Get-LaunchSafeArgument -Path $steamBasePath
-$retailUiBundleRootArg = Get-LaunchSafeArgument -Path $retailUiBundleRoot
-$runtimeBinDirArg = Get-LaunchSafeArgument -Path $runtimeBinDir
 $runtimeBaseq3 = Join-Path $runtimeBinDir 'baseq3'
 $runtimeModulesDir = Join-Path $repoRoot "build\win32\$Configuration\modules"
+$stagedUiBundleRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'build\ui_bundle\staging'))
+$stagedUiBundleBaseq3 = Join-Path $stagedUiBundleRoot 'baseq3'
+$runtimeUiPackage = Join-Path $runtimeBaseq3 'pak_uiql.pk3'
+
+function Test-LaunchUiStagingRoot {
+	param(
+		[string]$Baseq3Root
+	)
+
+	foreach ($requiredRetailUiPath in @(
+		$Baseq3Root,
+		(Join-Path $Baseq3Root 'default.cfg'),
+		(Join-Path $Baseq3Root 'ui\menudef.h'),
+		(Join-Path $Baseq3Root 'ui\hud3.txt'),
+		(Join-Path $Baseq3Root 'ui\ingame_scoreboard_ffa.menu'),
+		(Join-Path $Baseq3Root 'ui\assets\button_back.png'),
+		(Join-Path $Baseq3Root 'ui\assets\hud\ffa.png'),
+		(Join-Path $Baseq3Root 'ui\assets\score\scoretl.png'),
+		(Join-Path $Baseq3Root 'fonts\font.dat'),
+		(Join-Path $Baseq3Root 'fonts\font.tga')
+	)) {
+		if (-not (Test-Path -LiteralPath $requiredRetailUiPath)) {
+			return $false
+		}
+	}
+
+	return $true
+}
+
+if (Test-LaunchUiStagingRoot -Baseq3Root $stagedUiBundleBaseq3) {
+	$retailUiBundleRoot = $stagedUiBundleRoot
+} elseif (Test-Path -LiteralPath $runtimeUiPackage) {
+	$retailUiBundleRoot = $runtimeBinDir
+} else {
+	throw "Quake Live UI content was not found in either $stagedUiBundleBaseq3 or $runtimeUiPackage. Run the Build Debug task or tools/build_ui_bundle.py before launching."
+}
+
+$retailUiBundleRootArg = Get-LaunchSafeArgument -Path $retailUiBundleRoot
+$runtimeBinDirArg = Get-LaunchSafeArgument -Path $runtimeBinDir
 
 function Sync-LaunchModuleArtifact {
 	param(

@@ -72,6 +72,71 @@
 			},
 			"problemMatcher": "$msCompile",
 			"group": "build"
+		},
+		{
+			"label": "Run Debug (No Build)",
+			"type": "process",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}\\.vscode\\launch.ps1",
+				"-Configuration",
+				"Debug"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"hide": true
+		},
+		{
+			"label": "Run Debug Awesomium (No Build)",
+			"type": "process",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}\\.vscode\\launch.ps1",
+				"-Configuration",
+				"Debug",
+				"-EnableAwesomium"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"hide": true
+		},
+		{
+			"label": "Launch Debug",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"Build Debug",
+				"Run Debug (No Build)"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Launch Debug Awesomium",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"Build Debug Awesomium",
+				"Run Debug Awesomium (No Build)"
+			],
+			"problemMatcher": []
 		}
 	]
 }
