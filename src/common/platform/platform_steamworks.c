@@ -1033,6 +1033,36 @@ qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_t *outIdHigh )
 
 /*
 =============
+QL_Steamworks_SetInGameVoiceSpeaking
+=============
+*/
+qboolean QL_Steamworks_SetInGameVoiceSpeaking( uint32_t idLow, uint32_t idHigh, qboolean speaking ) {
+	void *friends;
+	void **vtable;
+	typedef void (__fastcall *QL_SteamFriends_SetInGameVoiceSpeakingFn)( void *self, void *unused, CSteamID steamId, int speaking );
+	QL_SteamFriends_SetInGameVoiceSpeakingFn fn;
+
+	if ( !( idLow | idHigh ) ) {
+		return qfalse;
+	}
+
+	friends = QL_Steamworks_GetFriendsInterface();
+	vtable = QL_Steamworks_GetInterfaceVTable( friends );
+	if ( !vtable ) {
+		return qfalse;
+	}
+
+	fn = (QL_SteamFriends_SetInGameVoiceSpeakingFn)vtable[0x6c / 4];
+	if ( !fn ) {
+		return qfalse;
+	}
+
+	fn( friends, NULL, QL_Steamworks_CombineIdentityWords( idLow, idHigh ), speaking ? 1 : 0 );
+	return qtrue;
+}
+
+/*
+=============
 QL_Steamworks_GetFriendCount
 =============
 */

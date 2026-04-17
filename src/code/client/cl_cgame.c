@@ -1293,6 +1293,7 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 	cl_webHost.browserActive = qtrue;
 	cl_webHost.refreshStopped = qfalse;
 	cl_webHost.focused = qtrue;
+	Cvar_Set( "web_browserActive", "1" );
 
 	QLLoadHandler_OnBeginLoadingFrame();
 	if ( CL_WebHost_PrimeLauncherDocument( cl_webHost.currentUrl ) ) {
@@ -1341,10 +1342,20 @@ QLWebHost_HideBrowser
 =============
 */
 static void QLWebHost_HideBrowser( void ) {
+	if ( !cl_webHost.coreInitialised || !cl_webHost.viewInitialised || cl_webHost.keyCaptureArmed ) {
+		return;
+	}
+
+	cl_webBrowserVisible = qfalse;
 	cl_webHost.browserVisible = qfalse;
 	cl_webHost.browserActive = qfalse;
 	cl_webHost.focused = qfalse;
+	cl_webHost.surfaceDirty = qtrue;
+	Cvar_Set( "web_browserActive", "0" );
 	CL_WebHost_ClearCursorOverride();
+	if ( cgvm ) {
+		VM_Call( cgvm, CG_EVENT_HANDLING, CGAME_EVENT_CLOSECOMMANDOVERLAY );
+	}
 	if ( cl_webHost.tooltip[0] ) {
 		QLViewHandler_OnChangeTooltip( "" );
 	}
@@ -3289,8 +3300,6 @@ void CL_Web_ShowBrowser_f( void ) {
 		cl_webBrowserHash[0] = '\0';
 	}
 	QLWebHost_NavigateOrOpen( cl_webBrowserHash );
-	Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
-	Com_DPrintf( "web_showBrowser\n" );
 #endif
 }
 
@@ -3317,8 +3326,6 @@ void CL_Web_ChangeHash_f( void ) {
 	CL_WebHost_NormalizeHash( hash, cl_webBrowserHash, sizeof( cl_webBrowserHash ) );
 	cl_webBrowserVisible = qtrue;
 	QLWebHost_NavigateOrOpen( cl_webBrowserHash );
-	Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
-	Com_DPrintf( "web_changeHash %s\n", cl_webBrowserHash );
 #endif
 }
 
@@ -3362,10 +3369,7 @@ Hides the browser overlay and clears the active cvar latch.
 =============
 */
 void CL_Web_HideBrowser_f( void ) {
-	cl_webBrowserVisible = qfalse;
 	QLWebHost_HideBrowser();
-	Cvar_Set( "web_browserActive", "0" );
-	Com_DPrintf( "web_hideBrowser\n" );
 }
 
 /*
@@ -3388,27 +3392,14 @@ Publishes a browser error through the fallback error state when no live host bri
 =============
 */
 void CL_Web_ShowError_f( void ) {
-	const char *message = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
+	const char *message = ( Cmd_Argc() > 1 ) ? Cmd_Argv( 1 ) : "";
 
 	if ( !message ) {
 		message = "";
 	}
 
 	Cvar_Set( "com_errorMessage", message );
-
-#if QL_PLATFORM_HAS_ONLINE_SERVICES
-	CL_RefreshOnlineServicesBridgeState();
-	if ( CL_OverlayServiceAvailable() ) {
-		cl_webBrowserVisible = qtrue;
-		QLWebHost_NavigateOrOpen( cl_webBrowserHash );
-		if ( !cl_webHost.loadFailed && cl_webHost.windowObjectBound ) {
-			CL_WebView_PublishGameError( message );
-		}
-		Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );
-	}
-#endif
-
-	Com_DPrintf( "web_showError %s\n", message );
+	CL_WebView_PublishGameError( message );
 }
 
 /*

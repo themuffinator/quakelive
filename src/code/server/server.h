@@ -313,6 +313,8 @@ qboolean SV_HandleQuitOnExitLevel( const char *context );
 
 void SV_AddOperatorCommands (void);
 void SV_RemoveOperatorCommands (void);
+void SV_InitRetailOperatorData( void );
+void SV_UpdateMapPoolRotationCvars( void );
 
 
 void SV_MasterHeartbeat (void);

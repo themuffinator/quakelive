@@ -1636,6 +1636,7 @@ typedef struct {
 	int		matchOvertimeEndTime;
 	int		matchOvertimeCount;
 	qboolean	matchSuddenDeathActive;
+	qboolean	intermissionExitStatusLatched;
 	qboolean	matchTimeoutActive;
 	int		matchTimeoutTeam;
 	int		matchTimeoutExpireTime;
@@ -1646,6 +1647,7 @@ typedef struct {
 	int		matchRoundTurn;
 	int		matchRoundState;
 	int		matchTeamCount[TEAM_NUM_TEAMS];
+	int		dominationOwnedPointCount[TEAM_NUM_TEAMS];
 	int		matchTeamRespawnRatio[TEAM_NUM_TEAMS];
 	qboolean	matchAutoShuffleArmed;
 	int		matchAutoShuffleSecondsRemaining;

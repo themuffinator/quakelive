@@ -43,10 +43,12 @@ def test_team_balance_helper_is_split_out_for_setteam_and_readyup() -> None:
 def test_team_join_guard_and_connect_broadcast_match_retail_flow() -> None:
 	game_cmds = _read("src/code/game/g_cmds.c")
 	game_client = _read("src/code/game/g_client.c")
+	game_session = _read("src/code/game/g_session.c")
 	join_block = _block_from_marker(game_cmds, "static qboolean G_TeamJoinAllowed")
 	setteam_block = _block_from_marker(game_cmds, "void SetTeam")
 	connect_block = _block_from_marker(game_client, "char *ClientConnect")
 	spawn_block = _block_from_marker(game_client, "void ClientSpawn")
+	session_block = _block_from_marker(game_session, "void G_InitSessionData")
 
 	assert "static qboolean G_TeamJoinAllowed( team_t team, gentity_t *ent ) {" in game_cmds
 	assert "if ( team == TEAM_SPECTATOR || team == TEAM_FREE || !g_teamSpawnAsSpec.integer ) {" in join_block
@@ -61,6 +63,7 @@ def test_team_join_guard_and_connect_broadcast_match_retail_flow() -> None:
 	assert 'client->pers.recordingPreferences = atoi( Info_ValueForKey( userinfo, "cg_autoAction" ) );' in game_client
 	assert "if ( firstTime && !isBot ) {" in connect_block
 	assert "if ( !firstTime && !isBot ) {" not in connect_block
+	assert "client->sess.privilege = connectionPrivilege;" not in connect_block
 	assert 'trap_SendServerCommand( clientNum, va( "priv %i", client->sess.privilege ) );' in connect_block
 	assert "G_StartAutoRecordForClient( ent );" in connect_block
 	assert 'G_LogPrintf( "ClientMask: %i %s\\n", clientNum, ( ent->r.svFlags & SVF_BOT ) ? "bot" : "human" );' not in connect_block
@@ -69,6 +72,14 @@ def test_team_join_guard_and_connect_broadcast_match_retail_flow() -> None:
 	assert connect_block.index("G_RankClientConnect( ent );") < connect_block.index("BroadcastTeamChange( client, -1 );")
 	assert connect_block.index("BroadcastTeamChange( client, -1 );") < connect_block.index("G_StartAutoRecordForClient( ent );")
 	assert connect_block.index("if ( runFirstTimeConnectSideEffects ) {") < connect_block.index("BroadcastTeamChange( client, -1 );")
+	assert connect_block.index("client->pers.steamIdLow = connectSteamIdLow;") < connect_block.index("G_InitSessionData( client, userinfo );")
+	assert connect_block.index("client->pers.steamIdHigh = connectSteamIdHigh;") < connect_block.index("G_InitSessionData( client, userinfo );")
+	assert "G_ReadSessionData( client );" in connect_block
+	assert "G_ReadSessionData( client, firstTime );" not in connect_block
+	assert "if ( client->pers.localClient ) {" in session_block
+	assert "if ( client->pers.steamIdValid ) {" in session_block
+	assert "sess->privilege = G_AdminAccessForSteamID( steamIdString );" in session_block
+	assert 'sess->privilege = G_AdminAccessForSteamID( Info_ValueForKey( userinfo, "steamid" ) );' in session_block
 	assert "g_teamSpawnAsSpec.integer && g_gametype.integer >= GT_TEAM" not in spawn_block
 
 
@@ -90,6 +101,43 @@ def test_client_connect_autorecord_helpers_match_recovered_retail_boundaries() -
 	assert "G_CheckAutoRecord();" in update_state_block
 	assert "void G_StartAutoRecordForClient( gentity_t *ent );" in game_local
 	assert "int\t\t\trecordingPreferences;\t// server-visible cg_autoAction bitfield for match media helpers" in game_local
+
+
+def test_session_init_and_serializer_follow_recovered_retail_shape() -> None:
+	game_session = _read("src/code/game/g_session.c")
+	game_main = _read("src/code/game/g_main.c")
+	game_local = _read("src/code/game/g_local.h")
+	init_block = _block_from_marker(game_session, "void G_InitSessionData")
+	read_block = _block_from_marker(game_session, "void G_ReadSessionData")
+	write_block = _block_from_marker(game_session, "void G_WriteClientSessionData")
+
+	assert "if ( g_gametype.integer >= GT_TEAM && g_teamAutoJoin.integer ) {" in init_block
+	assert "sess->sessionTeam = TEAM_SPECTATOR;" in init_block
+	assert 'Info_ValueForKey( userinfo, "team" )' not in init_block
+	assert "level.numNonSpectatorClients" not in init_block
+	assert "g_maxGameClients.integer" not in init_block
+	assert "sess->spectatorState = SPECTATOR_FREE;" in init_block
+	assert "sess->spectatorTime = (int)time( NULL );" in init_block
+	assert "g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD" not in init_block
+	assert "if ( g_gametype.integer == GT_TOURNAMENT ) {" in init_block
+	assert "sess->spectateOnly = qtrue;" in init_block
+
+	assert '%i %ld %i %i %i %i %i %i %i %i %i %i' in write_block
+	assert "client->sess.skill1" not in write_block
+	assert "client->sess.skill2" not in write_block
+	assert "client->sess.skill3" not in write_block
+
+	assert '%i %ld %i %i %i %i %i %i %i %i %i %i %i %i' in read_block
+	assert read_block.count( "sscanf" ) == 1
+	assert "client->sess.skill1 = 0;" in read_block
+	assert "client->sess.skill2 = 0;" in read_block
+	assert "client->sess.skill3 = 0;" in read_block
+	assert "if ( g_teamSpawnAsSpec.integer && g_gametype.integer >= GT_TEAM && level.warmupTime != 0 ) {" in read_block
+	assert "g_maintainTeam.integer" not in read_block
+	assert "firstTime" not in read_block
+	assert "g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD" not in read_block
+	assert "g_maintainTeam" not in game_main
+	assert "g_maintainTeam" not in game_local
 
 
 def test_client_spawn_uses_recovered_loadout_and_rr_helpers() -> None:
@@ -233,15 +281,17 @@ def test_red_rover_helpers_match_recovered_retail_boundaries() -> None:
 	reset_block = _block_from_marker(game_client, "static void G_RRResetClientForRound")
 
 	assert "int G_RRResolveRoundState( void ) {" in game_active
-	assert "if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {" in game_client
+	assert "if ( G_RRResolveRoundState() != RR_ROUNDSTATE_ACTIVE ) {" in game_client
 	assert "static void G_RRResetClientForRound( gentity_t *ent ) {" in game_client
 	assert "G_RRResetClientForRound( ent );" in game_client
 	assert "ClientSpawn( ent );" in reset_block
+	assert "void G_RRInitRoundController( void );" in game_local
 	assert "void G_RRHandleCompletedRound( void );" in game_local
 	assert "void G_RRHandlePlayerDeath( team_t oldTeam, gentity_t *victim, int meansOfDeath );" in game_local
 	assert "void G_RRHandleCompletedRound( void ) {" in game_client
 	assert "void G_RRHandlePlayerDeath( team_t oldTeam, gentity_t *victim, int meansOfDeath ) {" in game_client
 	assert "G_RRHandlePlayerDeath( client->sess.sessionTeam, self, meansOfDeath );" in game_client
+	assert "G_FreezeRunFrame();" in game_client
 	assert "G_CountConnectedClientsByTeam( counts );" in game_client
 	assert "if ( G_RRCheckRoundCompletion( counts ) ) {" in game_client
 	assert "level.roundTransitionTime = level.time + ( level.rrPendingMatchExit ? 1500 : 3500 );" in game_client
@@ -389,6 +439,8 @@ def test_timeout_race_and_direct_command_helpers_match_recovered_boundaries() ->
 
 def test_g_initgame_pipeline_matches_recovered_retail_bootstrap_order() -> None:
 	game_main = _read("src/code/game/g_main.c")
+	game_session = _read("src/code/game/g_session.c")
+	game_local = _read("src/code/game/g_local.h")
 	init_block = _block_from_marker(game_main, "void G_InitGame")
 	published_block = _block_from_marker(game_main, "static void G_InitPublishedCvarState")
 	level_mirror_block = _block_from_marker(game_main, "static void G_InitLevelCvarMirrors")
@@ -412,6 +464,10 @@ def test_g_initgame_pipeline_matches_recovered_retail_bootstrap_order() -> None:
 		"level.previousTime = levelTime;",
 		"level.pendingVoteClientNum = -1;",
 		'trap_Cvar_Set( "g_levelStartTime", startTimeBuffer );',
+		'trap_Cvar_VariableStringBuffer( "session", session, sizeof( session ) );',
+		'G_Printf( "Gametype changed, clearing session data.\\n" );',
+		'trap_GetConfigstring( CS_WARMUP_READY, warmupReadyInfo, sizeof( warmupReadyInfo ) );',
+		'trap_SetConfigstring( CS_WARMUP_READY, warmupReadyInfo );',
 		"FindIntermissionPoint();",
 		"G_UpdateTimeoutConfigStrings();",
 		"G_SpawnQuadHogQuad();",
@@ -421,6 +477,9 @@ def test_g_initgame_pipeline_matches_recovered_retail_bootstrap_order() -> None:
 
 	assert "G_ProcessIPBans();" not in init_block
 	assert "G_AutoAction( AUTOACTION_MATCH_START" not in init_block
+	assert "G_InitWorldSession();" not in init_block
+	assert "void G_InitWorldSession( void ) {" not in game_session
+	assert "void G_InitWorldSession( void );" not in game_local
 
 	assert init_block.index("Factory_ApplyCurrentSelection( qtrue );") < init_block.index("G_InitPublishedCvarState();")
 	assert init_block.index("G_InitPublishedCvarState();") < init_block.index("G_LoadAdminAccessFile();")
@@ -429,6 +488,9 @@ def test_g_initgame_pipeline_matches_recovered_retail_bootstrap_order() -> None:
 	assert init_block.index("memset( &level, 0, sizeof( level ) );") < init_block.index("G_InitLevelCvarMirrors();")
 	assert init_block.index("level.pendingVoteClientNum = -1;") < init_block.index('trap_Cvar_Set( "g_levelStartTime", startTimeBuffer );')
 	assert init_block.index('trap_Cvar_Set( "g_levelStartTime", startTimeBuffer );') < init_block.index('level.snd_fry = G_SoundIndex("sound/player/fry.wav");')
+	assert init_block.index('trap_Cvar_VariableStringBuffer( "session", session, sizeof( session ) );') < init_block.index("memset( g_entities, 0, MAX_GENTITIES * sizeof(g_entities[0]) );")
+	assert init_block.index('trap_GetConfigstring( CS_WARMUP_READY, warmupReadyInfo, sizeof( warmupReadyInfo ) );') < init_block.index("trap_LocateGameData( level.gentities, level.num_entities, sizeof( gentity_t ),")
+	assert init_block.index('trap_SetConfigstring( CS_WARMUP_READY, warmupReadyInfo );') < init_block.index("trap_LocateGameData( level.gentities, level.num_entities, sizeof( gentity_t ),")
 	assert init_block.index("G_SpawnEntitiesFromString();") < init_block.index("FindIntermissionPoint();")
 	assert init_block.index("FindIntermissionPoint();") < init_block.index("G_CountSpawnPoints();")
 	assert init_block.index("G_UpdateTimeoutConfigStrings();") < init_block.index("BotAISetup( restart );")

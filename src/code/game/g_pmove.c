@@ -465,6 +465,69 @@ void G_PmoveStoreWeaponReloads( const weaponReloadConfig_t *config ) {
 
 /*
 =============
+G_PmoveResetFactoryManagedCvars
+
+Restores every factory-owned cvar surface that feeds the published pmove
+settings payload before a new factory layers overrides on top.
+=============
+*/
+void G_PmoveResetFactoryManagedCvars( void ) {
+	trap_Cvar_Set( "pmove_AirAccel", "1.0f" );
+	trap_Cvar_Set( "pmove_AirControl", "0" );
+	trap_Cvar_Set( "pmove_AirStepFriction", "0.03f" );
+	trap_Cvar_Set( "pmove_AirSteps", "1" );
+	trap_Cvar_Set( "pmove_AirStopAccel", "1.0f" );
+	trap_Cvar_Set( "pmove_AutoHop", "1" );
+	trap_Cvar_Set( "pmove_BunnyHop", "1" );
+	trap_Cvar_Set( "pmove_ChainJump", "1" );
+	trap_Cvar_Set( "pmove_ChainJumpVelocity", "110.0f" );
+	trap_Cvar_Set( "pmove_CircleStrafeFriction", "6.0f" );
+	trap_Cvar_Set( "pmove_CrouchSlide", "0" );
+	trap_Cvar_Set( "pmove_CrouchSlideFriction", "0.5f" );
+	trap_Cvar_Set( "pmove_CrouchSlideTime", "2000" );
+	trap_Cvar_Set( "g_flightThrust", "0" );
+	trap_Cvar_Set( "pmove_CrouchStepJump", "1" );
+	trap_Cvar_Set( "pmove_DoubleJump", "0" );
+	trap_Cvar_Set( "pmove_JumpTimeDeltaMin", "100.0f" );
+	trap_Cvar_Set( "pmove_JumpVelocity", "275.0f" );
+	trap_Cvar_Set( "pmove_JumpVelocityMax", "700.0f" );
+	trap_Cvar_Set( "pmove_JumpVelocityScaleAdd", "0.4f" );
+	trap_Cvar_Set( "pmove_JumpVelocityTimeThreshold", "500.0f" );
+	trap_Cvar_Set( "pmove_JumpVelocityTimeThresholdOffset", "0.6f" );
+	trap_Cvar_Set( "pmove_noPlayerClip", "0" );
+	trap_Cvar_Set( "g_instaGib", "0" );
+	trap_Cvar_Set( "pmove_RampJump", "0" );
+	trap_Cvar_Set( "pmove_RampJumpScale", "1.0f" );
+	trap_Cvar_Set( "pmove_StepHeight", "22.0f" );
+	trap_Cvar_Set( "pmove_StepJump", "1" );
+	trap_Cvar_Set( "pmove_StepJumpVelocity", "48.0f" );
+	trap_Cvar_Set( "pmove_StrafeAccel", "1.0f" );
+	trap_Cvar_Set( "pmove_velocity_gh", "800" );
+	trap_Cvar_Set( "g_velocity_gh", "800" );
+	trap_Cvar_Set( "pmove_WalkAccel", "10.0f" );
+	trap_Cvar_Set( "pmove_WalkFriction", "6.0f" );
+	trap_Cvar_Set( "pmove_WaterSwimScale", "0.6f" );
+	trap_Cvar_Set( "pmove_WaterWadeScale", "0.8f" );
+	trap_Cvar_Set( "pmove_WeaponDropTime", "200" );
+	trap_Cvar_Set( "pmove_WeaponRaiseTime", "200" );
+	trap_Cvar_Set( "pmove_WishSpeed", "400.0f" );
+	trap_Cvar_Set( "g_gauntletSpeedFactor", "1.0" );
+	trap_Cvar_Set( "g_ironsights_mg", "1.0" );
+	trap_Cvar_Set( "g_midAirMinHeight", "96" );
+	trap_Cvar_Set( "g_nailbounce", "1" );
+	trap_Cvar_Set( "g_nailbouncepercentage", "65" );
+	trap_Cvar_Set( "g_quadDamageFactor", "3" );
+	trap_Cvar_Set( "g_guidedRocket", "0" );
+	trap_Cvar_Set( "g_quadHog", "0" );
+	trap_Cvar_Set( "g_quadHogIdle", "0" );
+	trap_Cvar_Set( "g_quadHogTime", "0" );
+	trap_Cvar_Set( "g_quadHogPingRate", "0" );
+
+	g_pmove_force_update = qtrue;
+}
+
+/*
+=============
 G_RegisterPmoveCvars
 
 Registers all Quake Live pmove tuning cvars.

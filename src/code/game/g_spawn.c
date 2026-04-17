@@ -1162,7 +1162,9 @@ void SP_worldspawn( void ) {
 	trap_SetConfigstring( CS_WARMUP, "" );
 	G_UpdateReadyUpConfigstring();
 	trap_SetConfigstring( CS_MATCH_STATE, "" );
-	trap_SetConfigstring( CS_SUDDENDEATH_STATUS, "0" );
+	trap_SetConfigstring( CS_INTERMISSION_EXIT_STATUS, "" );
+	trap_SetConfigstring( CS_ROTATION_TITLES, "" );
+	trap_SetConfigstring( CS_ROTATION_CONFIGS, "" );
 	trap_Cvar_Set( "g_gameState", "PRE_GAME" );
 
 	if ( g_restarted.integer ) {

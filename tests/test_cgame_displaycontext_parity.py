@@ -3165,6 +3165,26 @@ def test_cgame_vote_widget_reconstruction_uses_retail_vote_cvar_and_text_paths()
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "Votes: %s", countText );' in vote_count_block
 
 
+def test_cgame_rotation_vote_payload_populates_endgamevote_ownerdraw_cvars() -> None:
+	servercmds_source = ( REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c" ).read_text(encoding="utf-8")
+	parse_block = _block_from_marker(servercmds_source, "static void CG_ParseRotationVoteConfigStrings( void )")
+	config_modified_block = _block_from_marker(servercmds_source, "static void CG_ConfigStringModified( void )")
+	set_config_values_block = _block_from_marker(servercmds_source, "void CG_SetConfigValues")
+
+	assert "static void CG_SetRotationVoteSlotCvar( int slot, const char *suffix, const char *value ) {" in servercmds_source
+	assert 'rotationTitles = CG_ConfigString( CS_ROTATION_TITLES );' in parse_block
+	assert 'rotationCounts = CG_ConfigString( CS_ROTATION_CONFIGS );' in parse_block
+	assert 'CG_SetRotationVoteSlotCvar( slot, "Map", mapName );' in parse_block
+	assert 'CG_SetRotationVoteSlotCvar( slot, "Name", voteName );' in parse_block
+	assert 'CG_SetRotationVoteSlotCvar( slot, "Gametype", voteGametype );' in parse_block
+	assert 'CG_SetRotationVoteSlotCvar( slot, "Count", voteCount );' in parse_block
+	assert 'CG_SetRotationVoteSlotCvar( slot, "Shot", voteShot );' in parse_block
+	assert 'Com_sprintf( voteShot, sizeof( voteShot ), "levelshots/%s", mapName );' in parse_block
+	assert "CG_ParseRotationVoteConfigStrings();" in set_config_values_block
+	assert "} else if ( num == CS_ROTATION_TITLES || num == CS_ROTATION_CONFIGS ) {" in config_modified_block
+	assert "CG_ParseRotationVoteConfigStrings();" in config_modified_block
+
+
 def test_display_context_core_layout_matches_retail_widescreen_tail() -> None:
 	source = UI_SHARED_H.read_text(encoding="utf-8")
 

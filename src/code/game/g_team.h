@@ -64,6 +64,8 @@ void Team_RunDomination( void );
 void Team_RegisterDominationPoint( gentity_t *ent );
 qboolean Team_RegisterDominationTrigger( gentity_t *trigger );
 void Team_DominationPointTouch( gentity_t *trigger, gentity_t *other, trace_t *trace );
+void G_UpdateDominationPointCountConfigstrings( void );
+gentity_t *Team_ReturnFlagIfMissing( int team );
 void Team_ReturnFlag(int team);
 void Team_FreeEntity(gentity_t *ent);
 gentity_t *SelectCTFSpawnPoint ( team_t team, int teamstate, vec3_t origin, vec3_t angles );

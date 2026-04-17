@@ -1037,6 +1037,7 @@ qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReappl
 		Factory_LogSelection( NULL );
 		s_activeFactory = NULL;
 		G_Config_ResetFactoryManagedCvars();
+		G_PmoveResetFactoryManagedCvars();
 		trap_Cvar_Set( "g_factoryTitle", "" );
 		trap_Cvar_Update( &g_factoryTitle );
 		G_RefreshAllCvars();
@@ -1053,6 +1054,7 @@ qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReappl
 	s_activeFactory = factory;
 	Factory_LogSelection( factory );
 	G_Config_ResetFactoryManagedCvars();
+	G_PmoveResetFactoryManagedCvars();
 
 	for ( override = factory->overrides; override; override = override->next ) {
 		if ( override->name && override->value ) {

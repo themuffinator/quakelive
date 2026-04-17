@@ -76,7 +76,6 @@ def test_engine_cvar_registrations_match_targeted_retail_contracts() -> None:
 
 	assert 'cl_demoRecordMessage = Cvar_Get ("cl_demoRecordMessage", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
 	assert 'if ( cl_demoRecordMessage->integer >= 2 ) {' in cl_main
-	assert 'if ( cl_demoRecordMessage->integer ) {' in cl_main
 
 	assert 'cl_platform = Cvar_Get ("cl_platform", "1", CVAR_ROM );' in cl_main
 
@@ -638,8 +637,9 @@ def test_engine_cvar_twelfth_common_misc_tranche_matches_retail_contracts() -> N
 
 	assert 'Cvar_Get( "web_browserActive", "0", CVAR_ROM );' in common
 	assert 'Cvar_Get ("web_browserActive", "0", CVAR_ROM );' in cl_main
-	assert 'Cmd_AddCommand ("web_browserActive", CL_Web_BrowserActive_f );' in cl_main
-	assert 'Cvar_Set( "web_browserActive", active ? "1" : "0" );' in cl_cgame
+	assert 'Cmd_AddCommand ("web_browserActive", CL_Web_BrowserActive_f );' not in cl_main
+	assert 'Cvar_Set( "web_browserActive", "1" );' in cl_cgame
+	assert 'Cvar_Set( "web_browserActive", "0" );' in cl_cgame
 	assert 'browserActive = trap_Cvar_VariableValue( "web_browserActive" );' in cg_draw
 
 	assert 'com_buildScript = Cvar_Get( "com_build", "0", 0 );' in common

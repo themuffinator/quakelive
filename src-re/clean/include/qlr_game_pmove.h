@@ -11,7 +11,7 @@ struct qlr_game_pmove_context_s;
 typedef void (*qlr_game_pmove_event_hook_t)(struct qlr_game_pmove_context_s *ctx, int new_event);
 typedef void (*qlr_game_pmove_touch_hook_t)(struct qlr_game_pmove_context_s *ctx, int entity_num);
 typedef void (*qlr_game_pmove_step_hook_t)(struct qlr_game_pmove_context_s *ctx);
-typedef bool (*qlr_game_pmove_check_jump_hook_t)(struct qlr_game_pmove_context_s *ctx);
+typedef bool (*qlr_game_pmove_check_jump_hook_t)(struct qlr_game_pmove_context_s *ctx, bool allowAirDoubleJump);
 typedef void (*qlr_game_pmove_process_hook_t)(struct qlr_game_pmove_context_s *ctx, qlr_pmove_t *pmove);
 
 typedef struct qlr_game_pmove_hooks_s {
@@ -39,7 +39,7 @@ void PM_AddTouchEnt(int entity_num);
 void PM_AirMove(void);
 void PM_WaterMove(void);
 void PM_WalkMove(void);
-bool PM_CheckJump(void);
+bool PM_CheckJump(bool allowAirDoubleJump);
 void PM_Weapon(void);
 void Pmove(qlr_pmove_t *pmove);
 

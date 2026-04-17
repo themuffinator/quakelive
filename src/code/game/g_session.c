@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 //
 #include "g_local.h"
+#include <time.h>
 
 
 /*
@@ -44,9 +45,9 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	const char	*s;
 	const char	*var;
 
-	s = va("%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
+	s = va("%i %ld %i %i %i %i %i %i %i %i %i %i",
 		client->sess.sessionTeam,
-		client->sess.spectatorTime,
+		(long)client->sess.spectatorTime,
 		client->sess.spectatorState,
 		client->sess.spectatorClient,
 		client->sess.selectedSpawnWeapon,
@@ -56,11 +57,7 @@ void G_WriteClientSessionData( gclient_t *client ) {
 		client->sess.privilege,
 		client->sess.spectateOnly,
 		client->sess.spectatorQueuePosition,
-		client->sess.muted,
-		client->sess.sessionField34,
-		client->sess.skill1,
-		client->sess.skill2,
-		client->sess.skill3
+		client->sess.muted
 		);
 
 	var = va( "session%i", client - level.clients );
@@ -75,7 +72,7 @@ G_ReadSessionData
 Called on a reconnect
 ================
 */
-void G_ReadSessionData( gclient_t *client, qboolean firstTime ) {
+void G_ReadSessionData( gclient_t *client ) {
 	char	s[MAX_STRING_CHARS];
 	const char	*var;
 
@@ -89,26 +86,29 @@ void G_ReadSessionData( gclient_t *client, qboolean firstTime ) {
 	int muted;
 	int selectedSpawnWeapon;
 	int sessionField34;
-	int skill1;
-	int skill2;
-	int skill3;
-	int parsed;
+	int ignoredSessionTail;
+	long spectatorTime;
 
 	var = va( "session%i", client - level.clients );
 	trap_Cvar_VariableStringBuffer( var, s, sizeof(s) );
 
+	sessionTeam = TEAM_SPECTATOR;
+	spectatorTime = 0;
+	spectatorState = SPECTATOR_FREE;
+	client->sess.spectatorClient = 0;
+	selectedSpawnWeapon = 0;
+	client->sess.wins = 0;
+	client->sess.losses = 0;
+	teamLeader = 0;
 	privilege = 0;
 	spectateOnly = 0;
 	spectatorQueuePosition = 0;
 	muted = 0;
-	selectedSpawnWeapon = 0;
 	sessionField34 = 0;
-	skill1 = 0;
-	skill2 = 0;
-	skill3 = 0;
-	parsed = sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
+	ignoredSessionTail = 0;
+	sscanf( s, "%i %ld %i %i %i %i %i %i %i %i %i %i %i %i",
 		&sessionTeam,                 // bk010221 - format
-		&client->sess.spectatorTime,
+		&spectatorTime,
 		&spectatorState,              // bk010221 - format
 		&client->sess.spectatorClient,
 		&selectedSpawnWeapon,
@@ -120,60 +120,25 @@ void G_ReadSessionData( gclient_t *client, qboolean firstTime ) {
 		&spectatorQueuePosition,
 		&muted,
 		&sessionField34,
-		&skill1,
-		&skill2,
-		&skill3
+		&ignoredSessionTail
 		);
-	if ( parsed < 16 ) {
-		muted = 0;
-		sscanf( s, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i",
-			&sessionTeam,                 // bk010221 - format
-			&client->sess.spectatorTime,
-			&spectatorState,              // bk010221 - format
-			&client->sess.spectatorClient,
-			&client->sess.wins,
-			&client->sess.losses,
-			&teamLeader,                  // bk010221 - format
-			&spectateOnly,
-			&privilege,
-			&spectatorQueuePosition,
-			&skill1,
-			&skill2,
-			&skill3,
-			&muted
-			);
-		selectedSpawnWeapon = 0;
-		sessionField34 = 0;
-	}
+	client->sess.spectatorTime = (int)spectatorTime;
 	client->sess.selectedSpawnWeapon = selectedSpawnWeapon;
 	client->sess.privilege = privilege;
 	client->sess.spectateOnly = spectateOnly;
 	client->sess.spectatorQueuePosition = spectatorQueuePosition;
 	client->sess.sessionField34 = sessionField34;
-	client->sess.skill1 = skill1;
-	client->sess.skill2 = skill2;
-	client->sess.skill3 = skill3;
+	client->sess.skill1 = 0;
+	client->sess.skill2 = 0;
+	client->sess.skill3 = 0;
 	client->sess.muted = (qboolean)muted;
 	client->sess.spectatorQueuePositionDirty = qfalse;
 
 	// bk001205 - format issues
 	client->sess.sessionTeam = (team_t)sessionTeam;
 	client->sess.spectatorState = (spectatorState_t)spectatorState;
-	if ( !firstTime && g_gametype.integer >= GT_TEAM && !g_maintainTeam.integer ) {
+	if ( g_teamSpawnAsSpec.integer && g_gametype.integer >= GT_TEAM && level.warmupTime != 0 ) {
 		client->sess.sessionTeam = TEAM_SPECTATOR;
-		client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
-		client->sess.spectatorClient = -1;
-		client->sess.spectateOnly = qfalse;
-		client->sess.spectatorQueuePosition = 0;
-		client->sess.spectatorQueuePositionDirty = qfalse;
-	}
-	if ( client->sess.sessionTeam == TEAM_SPECTATOR && !g_teamSpecFreeCam.integer && client->sess.spectatorState == SPECTATOR_FREE ) {
-		client->sess.spectatorState = SPECTATOR_SCOREBOARD;
-	}
-	if ( client->sess.sessionTeam != TEAM_SPECTATOR ) {
-		client->sess.spectateOnly = qfalse;
-		client->sess.spectatorQueuePosition = 0;
-		client->sess.spectatorQueuePositionDirty = qfalse;
 	}
 	client->sess.teamLeader = (qboolean)teamLeader;
 }
@@ -188,49 +153,18 @@ Called on a first-time connect
 */
 void G_InitSessionData( gclient_t *client, char *userinfo ) {
 	clientSession_t	*sess;
-	const char		*value = "";
 
 	sess = &client->sess;
 
 	// initial team determination
-	if ( g_gametype.integer >= GT_TEAM ) {
-		if ( g_teamAutoJoin.integer ) {
-			sess->sessionTeam = PickTeam( -1 );
-			BroadcastTeamChange( client, -1 );
-		} else {
-			// always spawn as spectator in team games
-			sess->sessionTeam = TEAM_SPECTATOR;
-		}
+	if ( g_gametype.integer >= GT_TEAM && g_teamAutoJoin.integer ) {
+		sess->sessionTeam = PickTeam( -1 );
+		BroadcastTeamChange( client, -1 );
 	} else {
-		value = Info_ValueForKey( userinfo, "team" );
-		if ( value[0] == 's' ) {
-			// a willing spectator, not a waiting-in-line
-			sess->sessionTeam = TEAM_SPECTATOR;
-		} else {
-			switch ( g_gametype.integer ) {
-			default:
-			case GT_FFA:
-			case GT_SINGLE_PLAYER:
-				if ( g_maxGameClients.integer > 0 && 
-					level.numNonSpectatorClients >= g_maxGameClients.integer ) {
-					sess->sessionTeam = TEAM_SPECTATOR;
-				} else {
-					sess->sessionTeam = TEAM_FREE;
-				}
-				break;
-			case GT_TOURNAMENT:
-				// if the game is full, go into a waiting mode
-				if ( level.numNonSpectatorClients >= 2 ) {
-					sess->sessionTeam = TEAM_SPECTATOR;
-				} else {
-					sess->sessionTeam = TEAM_FREE;
-				}
-				break;
-			}
-		}
+		sess->sessionTeam = TEAM_SPECTATOR;
 	}
-	sess->spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
-	sess->spectatorTime = level.time;
+	sess->spectatorState = SPECTATOR_FREE;
+	sess->spectatorTime = (int)time( NULL );
 	sess->selectedSpawnWeapon = 0;
 	sess->spectateOnly = qfalse;
 	sess->spectatorQueuePosition = 0;
@@ -238,38 +172,28 @@ void G_InitSessionData( gclient_t *client, char *userinfo ) {
 	sess->muted = qfalse;
 	sess->sessionField34 = 0;
 
-	sess->privilege = G_AdminAccessForSteamID( Info_ValueForKey( userinfo, "steamid" ) );
+	if ( client->pers.localClient ) {
+		sess->privilege = PRIV_ROOT;
+	} else if ( client->pers.steamIdValid ) {
+		unsigned long long	steamIdValue;
+		char			steamIdString[32];
+
+		steamIdValue = ( (unsigned long long)client->pers.steamIdHigh << 32 ) | client->pers.steamIdLow;
+		Com_sprintf( steamIdString, sizeof( steamIdString ), "%llu", steamIdValue );
+		sess->privilege = G_AdminAccessForSteamID( steamIdString );
+	} else {
+		sess->privilege = G_AdminAccessForSteamID( Info_ValueForKey( userinfo, "steamid" ) );
+	}
 	sess->skill1 = 0;
 	sess->skill2 = 0;
 	sess->skill3 = 0;
-	if ( g_gametype.integer == GT_TOURNAMENT && value[0] == 's' ) {
+	if ( g_gametype.integer == GT_TOURNAMENT ) {
 		sess->spectateOnly = qtrue;
 	}
 
 	G_WriteClientSessionData( client );
 }
 
-
-/*
-==================
-G_InitWorldSession
-
-==================
-*/
-void G_InitWorldSession( void ) {
-	char	s[MAX_STRING_CHARS];
-	int			gt;
-
-	trap_Cvar_VariableStringBuffer( "session", s, sizeof(s) );
-	gt = atoi( s );
-	
-	// if the gametype changed since the last session, don't use any
-	// client sessions
-	if ( g_gametype.integer != gt ) {
-		level.newSession = qtrue;
-		G_Printf( "Gametype changed, clearing session data.\n" );
-	}
-}
 
 /*
 ==================
@@ -281,6 +205,9 @@ void G_WriteSessionData( void ) {
 	int		i;
 
 	trap_Cvar_Set( "session", va("%i", g_gametype.integer) );
+	if ( g_gametype.integer == GT_TOURNAMENT ) {
+		G_UpdateTournamentQueuePositions();
+	}
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
 		if ( level.clients[i].pers.connected == CON_CONNECTED ) {

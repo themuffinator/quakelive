@@ -265,5 +265,4 @@ void G_UpdateMatchStateConfigString( void ) {
 	G_UpdateRoundStartConfigString();
 	trap_SetConfigstring( CS_MATCH_STATE, info );
 	G_UpdateTimeoutConfigStrings();
-	trap_SetConfigstring( CS_SUDDENDEATH_STATUS, level.suddenDeathActive ? "1" : "0" );
 }

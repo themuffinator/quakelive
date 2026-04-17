@@ -4475,27 +4475,15 @@ Counts Domination capture points owned by the specified team.
 =============
 */
 static int CG_CountDominationOwnedFlags( team_t team ) {
-	int		owned;
-	int		index;
-	centity_t	*cent;
-
 	if ( cgs.gametype != GT_DOMINATION || !cg.snap ) {
 		return 0;
 	}
 
-	owned = 0;
-	for ( index = 0; index < cg.snap->numEntities; index++ ) {
-		cent = &cg_entities[cg.snap->entities[index].number];
-		if ( cent->currentState.eType != ET_TEAM ) {
-			continue;
-		}
-
-		if ( CG_ClampTeamValue( cent->currentState.modelindex ) == team ) {
-			owned++;
-		}
+	if ( team <= TEAM_FREE || team >= TEAM_NUM_TEAMS ) {
+		return 0;
 	}
 
-	return owned;
+	return cgs.dominationOwnedPointCount[team];
 }
 
 /*

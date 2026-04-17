@@ -98,15 +98,44 @@ def test_factory_item_spawn_cvars_are_vm_owned_startup_settings() -> None:
 
 def test_factory_apply_resets_factory_managed_cvars_before_overrides() -> None:
 	config_c = _read("src/game/g_config.c")
+	pmove_c = _read("src/code/game/g_pmove.c")
+	local_h = _read("src/code/game/g_local.h")
 	factory_c = _read("src/code/game/g_factory.c")
 
 	assert "void G_Config_ResetFactoryManagedCvars( void ) {" in config_c
+	assert 'trap_Cvar_Set( "weapon_reload_gauntlet", "0" );' in config_c
+	assert 'trap_Cvar_Set( "weapon_reload_hmg", "0" );' in config_c
 	assert 'trap_Cvar_Set( "g_loadout", STRINGIZE( DEFAULT_FACTORY_LOADOUT ) );' in config_c
 	assert 'trap_Cvar_Set( "g_runes", STRINGIZE( DEFAULT_FACTORY_RUNES ) );' in config_c
 	assert 'trap_Cvar_Set( "g_regenHealth", STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ) );' in config_c
 	assert 'trap_Cvar_Set( "g_spawnItemPowerup", STRINGIZE( DEFAULT_SPAWN_ITEM_POWERUP ) );' in config_c
 	assert 'trap_Cvar_Set( "g_spawnItemAmmo", STRINGIZE( DEFAULT_SPAWN_ITEM_AMMO ) );' in config_c
+	assert "void G_PmoveResetFactoryManagedCvars( void );" in local_h
+	assert "void G_PmoveResetFactoryManagedCvars( void ) {" in pmove_c
+	assert 'trap_Cvar_Set( "pmove_AirControl", "0" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_flightThrust", "0" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_instaGib", "0" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_velocity_gh", "800" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_ironsights_mg", "1.0" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_quadHogPingRate", "0" );' in pmove_c
+	assert "g_pmove_force_update = qtrue;" in pmove_c
 	assert factory_c.count("G_Config_ResetFactoryManagedCvars();") == 2
+	assert factory_c.count("G_PmoveResetFactoryManagedCvars();") == 2
+
+
+def test_factory_pmove_reset_tracks_every_nonlocal_pmove_input_surface() -> None:
+	pmove_c = _read("src/code/game/g_pmove.c")
+
+	assert "g_pmoveSettings.flightThrust = ( g_flightThrust.value > 0.0f ) ? g_flightThrust.value : 0.0f;" in pmove_c
+	assert "if ( g_instaGib.integer != 0 ) {" in pmove_c
+	assert "grappleSpeed = ( float )g_weaponConfig.grappleSpeed;" in pmove_c
+	assert "machinegunIronsightsScale = g_weaponConfig.machinegunIronsightsScale;" in pmove_c
+	assert "g_pmoveSettings.guidedRocketEnabled = ( g_weaponConfig.guidedRocketEnabled != 0 );" in pmove_c
+	assert "g_pmoveSettings.quadHogPingRateSeconds = g_weaponConfig.quadHogPingRateSeconds;" in pmove_c
+	assert 'trap_Cvar_Set( "g_velocity_gh", "800" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_gauntletSpeedFactor", "1.0" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_guidedRocket", "0" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_quadHogTime", "0" );' in pmove_c
 
 
 def test_factory_runes_are_gated_separately_from_map_powerups() -> None:

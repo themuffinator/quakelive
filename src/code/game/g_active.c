@@ -1796,7 +1796,7 @@ static qboolean G_FreezeTeamIsFullyFrozen( team_t team );
 static int Freeze_RoundStateTransition( qboolean announce );
 static int G_TotalLivingHealthByTeam( team_t team );
 static void G_RRSeedInfectionTeams( void );
-static void G_RRInitRoundController( void );
+void G_RRInitRoundController( void );
 static int RR_RoundStateTransition( qboolean announce );
 int G_RRResolveRoundState( void );
 static qboolean G_RoundTimeLimitExpired( int startTime );
@@ -2959,7 +2959,7 @@ G_RRInitRoundController
 Initializes the Red Rover round controller whenever the mode enters a new round phase.
 =============
 */
-static void G_RRInitRoundController( void ) {
+void G_RRInitRoundController( void ) {
 	if ( g_gametype.integer != GT_RED_ROVER ) {
 		return;
 	}

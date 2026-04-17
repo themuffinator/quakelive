@@ -148,21 +148,24 @@ void PM_WalkMove(void) {
 =============
 PM_CheckJump
 
-Queries the Quake Live pmove hook to decide if a jump should trigger.
+Queries the Quake Live pmove hook to decide if a jump should trigger, while
+preserving the retail air-double-jump gate used by PM_AirMove versus
+PM_WalkMove.
 =============
 */
-bool PM_CheckJump(void) {
+bool PM_CheckJump(bool allowAirDoubleJump) {
 	qlr_game_pmove_context_t *ctx = qlr_game_pmove_ctx;
 	if (!ctx || !ctx->hooks.check_jump) {
 		qlr_native_shim_logf(
 		"game",
 		"PM_CheckJump",
-		"missing-hook ctx=%p",
-		(void *)ctx);
+		"missing-hook ctx=%p allowAirDoubleJump=%d",
+		(void *)ctx,
+		allowAirDoubleJump ? 1 : 0);
 		return false;
 	}
 
-	return ctx->hooks.check_jump(ctx);
+	return ctx->hooks.check_jump(ctx, allowAirDoubleJump);
 }
 
 /*

@@ -69,6 +69,7 @@ typedef struct {
 	void	(*AddAdditiveLightToScene)( const vec3_t org, float intensity, float r, float g, float b );
 	void	(*RenderScene)( const refdef_t *fd );
 	void	(*AdvertisementBridge_UpdateLoadingViewParameters)( void );
+	void	(*PostProcessRestart)( void );
 
 	void	(*SetColor)( const float *rgba );	// NULL = 1,1,1,1
 	void	(*DrawStretchPic) ( float x, float y, float w, float h, 

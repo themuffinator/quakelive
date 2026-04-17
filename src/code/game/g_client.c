@@ -1870,8 +1870,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	if ( firstTime || level.newSession ) {
 		G_InitSessionData( client, userinfo );
 	}
-	G_ReadSessionData( client, firstTime );
-	client->sess.privilege = connectionPrivilege;
+	G_ReadSessionData( client );
 	runFirstTimeConnectSideEffects = ( firstTime && !level.trainingMapActive ) ? qtrue : qfalse;
 
 #if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
@@ -3152,7 +3151,7 @@ static void G_RRCheckInfectionSpread( void ) {
 	int		warningStartMs;
 	int		elapsedMs;
 
-	if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {
+	if ( G_RRResolveRoundState() != RR_ROUNDSTATE_ACTIVE ) {
 		return;
 	}
 	if ( g_rrInfectedSpreadTime.integer <= 0 || level.rrLastInfectionTime < 0 ) {
@@ -3350,7 +3349,7 @@ team counts.
 static qboolean G_RRCheckRoundCompletion( const int counts[TEAM_NUM_TEAMS] ) {
 	int			carryoverClientNum;
 
-	if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {
+	if ( G_RRResolveRoundState() != RR_ROUNDSTATE_ACTIVE ) {
 		return qfalse;
 	}
 
@@ -3584,29 +3583,61 @@ void G_RRTrackRoundActivity( void ) {
 	int			counts[TEAM_NUM_TEAMS];
 	int			state;
 
+	if ( g_gametype.integer != GT_RED_ROVER ) {
+		return;
+	}
+
+	if ( !Team_HasMinimumPlayersForWarmup() ) {
+		if ( level.rrRoundState != RR_ROUNDSTATE_INACTIVE
+			|| level.roundState != ROUNDSTATE_INACTIVE
+			|| level.roundTransitionTime != ROUND_TRANSITION_NONE ) {
+			level.roundState = ROUNDSTATE_INACTIVE;
+			level.roundTransitionTime = ROUND_TRANSITION_NONE;
+			level.roundPendingExit = qfalse;
+			level.rrRoundState = RR_ROUNDSTATE_INACTIVE;
+			level.rrPendingRoundState = RR_ROUNDSTATE_INACTIVE;
+			level.rrStateChangeTime = level.time;
+			level.rrSelectedInfectedClientNum = -1;
+			level.rrCarryoverInfectedClientNum = -1;
+			level.rrLastInfectionTime = -1;
+			level.rrNextSurvivalBonusTime = 0;
+			level.rrPendingMatchExit = qfalse;
+			G_UpdateMatchStateConfigString();
+		}
+		G_FreezeRunFrame();
+		return;
+	}
+
 	state = G_RRResolveRoundState();
-	if ( state == RR_ROUNDSTATE_INFECTION_SEED ) {
-		return;
+	if ( state == RR_ROUNDSTATE_INACTIVE && level.roundTransitionTime == ROUND_TRANSITION_NONE ) {
+		if ( level.roundState == ROUNDSTATE_INACTIVE ) {
+			G_Frame_BeginRoundWarmup();
+		} else if ( level.roundState == ROUNDSTATE_WARMUP && level.warmupTime == 0 ) {
+			G_RRInitRoundController();
+		}
+		state = G_RRResolveRoundState();
 	}
 
-	if ( state != RR_ROUNDSTATE_ACTIVE ) {
-		return;
+	if ( state == RR_ROUNDSTATE_ACTIVE ) {
+		G_CountConnectedClientsByTeam( counts );
+		G_RRApplySurvivalBonus( qfalse );
+		if ( G_RRResolveRoundState() != RR_ROUNDSTATE_ACTIVE ) {
+			G_FreezeRunFrame();
+			return;
+		}
+
+		G_RRCheckInfectionSpread();
+		if ( G_RRResolveRoundState() != RR_ROUNDSTATE_ACTIVE ) {
+			G_FreezeRunFrame();
+			return;
+		}
+
+		if ( G_RRCheckRoundCompletion( counts ) ) {
+			G_RRHandleCompletedRound();
+		}
 	}
 
-	G_CountConnectedClientsByTeam( counts );
-	G_RRApplySurvivalBonus( qfalse );
-	if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {
-		return;
-	}
-
-	G_RRCheckInfectionSpread();
-	if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {
-		return;
-	}
-
-	if ( G_RRCheckRoundCompletion( counts ) ) {
-		G_RRHandleCompletedRound();
-	}
+	G_FreezeRunFrame();
 }
 
 

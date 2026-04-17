@@ -1248,10 +1248,10 @@ void R_UpdatePostProcessCvars( void ) {
 
 /*
 =============
-R_PostProcessRestart_f
+R_PostProcessRestart
 =============
 */
-static void R_PostProcessRestart_f( void ) {
+static void R_PostProcessRestart( void ) {
 	R_UpdatePostProcessCvars();
 	tr.postProcessNeedsReset = qtrue;
 }
@@ -1437,7 +1437,6 @@ void R_Register( void )
 	ri.Cmd_AddCommand( "modelist", R_ModeList_f );
 	ri.Cmd_AddCommand( "screenshot", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "screenshotJPEG", R_ScreenShotJPEG_f );
-	ri.Cmd_AddCommand( "postprocess_restart", R_PostProcessRestart_f );
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
 }
 
@@ -1573,7 +1572,6 @@ void RE_Shutdown( qboolean destroyWindow ) {
 	ri.Cmd_RemoveCommand ("skinlist");
 	ri.Cmd_RemoveCommand ("gfxinfo");
 	ri.Cmd_RemoveCommand( "modelist" );
-	ri.Cmd_RemoveCommand( "postprocess_restart" );
 	ri.Cmd_RemoveCommand( "shaderstate" );
 
 	R_DoneFontStash();
@@ -1652,6 +1650,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.AddAdditiveLightToScene = RE_AddAdditiveLightToScene;
 	re.RenderScene = RE_RenderScene;
 	re.AdvertisementBridge_UpdateLoadingViewParameters = AdvertisementBridge_UpdateLoadingViewParameters;
+	re.PostProcessRestart = R_PostProcessRestart;
 	re.SetColor = RE_SetColor;
 	re.DrawStretchPic = RE_StretchPic;
 	re.DrawStretchRaw = RE_StretchRaw;

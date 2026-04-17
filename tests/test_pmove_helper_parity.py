@@ -7,12 +7,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BG_PMOVE_PATH = REPO_ROOT / "src" / "code" / "game" / "bg_pmove.c"
 BG_PUBLIC_PATH = REPO_ROOT / "src" / "code" / "game" / "bg_public.h"
+CLEAN_PMOVE_HEADER_PATH = REPO_ROOT / "src-re" / "clean" / "include" / "qlr_game_pmove.h"
+CLEAN_PMOVE_SOURCE_PATH = REPO_ROOT / "src-re" / "clean" / "gameplay" / "pmove.c"
 
 
 def _function_body(signature: str) -> str:
 	source = BG_PMOVE_PATH.read_text(encoding="utf-8")
 	match = re.search(
-		rf"(?:static )?(?:qboolean|void) {re.escape(signature)}\([^)]*\)\s*\{{(?P<body>.*?)^\}}",
+		rf"(?:static )?(?:qboolean|void) {re.escape(signature)}\s*\([^)]*\)\s*\{{(?P<body>.*?)^\}}",
 		source,
 		re.MULTILINE | re.DOTALL,
 	)
@@ -139,3 +141,78 @@ def test_step_jump_routes_through_the_shared_takeoff_helper() -> None:
 	assert "PM_PrepareJumpTakeoff( qfalse )" in body
 	assert "PM_ApplyJumpTakeoff();" in body
 	assert "PM_CheckJump( qfalse )" not in body
+
+
+def test_pmove_single_keeps_the_retail_dispatch_order() -> None:
+	body = _function_body("PmoveSingle")
+	post_move_markers = [
+		"PM_Animate();",
+		"PM_GroundTrace();",
+		"PM_SetWaterLevel();",
+		"PM_Weapon();",
+		"PM_TorsoAnimation();",
+		"PM_Footsteps();",
+		"PM_WaterEvents();",
+		"trap_SnapVector( pm->ps->velocity );",
+	]
+	position = -1
+	initial_water_level = body.index("PM_SetWaterLevel();")
+	check_duck = body.index("PM_CheckDuck ();", initial_water_level)
+	initial_ground_trace = body.index("PM_GroundTrace();", check_duck)
+
+	assert initial_water_level < check_duck
+	assert check_duck < initial_ground_trace
+	assert body.index("PM_DropTimers();") < body.index("PM_CheckLadder();")
+	assert body.index("PM_CheckLadder();") < body.index("pm->ps->powerups[PW_INVULNERABILITY] = 0;")
+	assert body.index("if ( pm->ps->powerups[PW_FLIGHT] )") < body.index("} else if (pm->ps->pm_flags & PMF_GRAPPLE_PULL)")
+	assert body.index("} else if (pm->ps->pm_flags & PMF_GRAPPLE_PULL)") < body.index("} else if (pm->ps->pm_flags & PMF_TIME_WATERJUMP)")
+	assert body.index("} else if (pm->ps->pm_flags & PMF_TIME_WATERJUMP)") < body.index("} else if ( pm->waterlevel > 1 )")
+	assert body.index("} else if ( pm->waterlevel > 1 )") < body.index("} else if ( pml.ladder )")
+	assert body.index("} else if ( pml.ladder )") < body.index("} else if ( pml.walking )")
+
+	for marker in post_move_markers:
+		next_position = body.index(marker, position + 1)
+		assert next_position > position
+		position = next_position
+
+
+def test_pmove_replays_long_frames_through_the_retail_chunk_loop() -> None:
+	body = _function_body("Pmove")
+
+	assert "pmove->stepUp = 0.0f;" in body
+	assert "pmove->stepUpTime = 0;" in body
+	assert "if ( finalTime > pmove->ps->commandTime + 1000 ) {" in body
+	assert "pmove->ps->pmove_framecount = (pmove->ps->pmove_framecount+1) & ((1<<PS_PMOVEFRAMECOUNTBITS)-1);" in body
+	assert "while ( pmove->ps->commandTime != finalTime ) {" in body
+	assert "if ( pmove->pmove_fixed ) {" in body
+	assert "if ( msec > pmove->pmove_msec ) {" in body
+	assert "if ( msec > 66 ) {" in body
+	assert body.index("pmove->cmd.serverTime = pmove->ps->commandTime + msec;") < body.index("PmoveSingle( pmove );")
+	assert "if ( pml.stepUp > 0.0f ) {" in body
+	assert "pmove->stepUp += pml.stepUp;" in body
+	assert "pmove->stepUpTime = pmove->cmd.serverTime;" in body
+	assert "if ( ( pmove->ps->pm_flags & PMF_JUMP_HELD ) && originalUpmove >= 10 ) {" in body
+	assert "pmove->cmd.upmove = 20;" in body
+
+
+def test_walk_move_uses_the_grounded_jump_gate_before_friction() -> None:
+	body = _function_body("PM_WalkMove")
+	jump_gate = body.index("if ( PM_CheckJump( qfalse ) ) {")
+	post_jump_water = body.index("if ( pm->waterlevel > 1 ) {", jump_gate)
+	post_jump_air = body.index("PM_AirMove();", post_jump_water)
+
+	assert "if ( PM_CheckJump( qfalse ) ) {" in body
+	assert jump_gate < body.index("PM_Friction ();")
+	assert jump_gate < post_jump_water
+	assert post_jump_water < post_jump_air
+
+
+def test_clean_pmove_shim_preserves_the_retail_check_jump_parameter() -> None:
+	header = CLEAN_PMOVE_HEADER_PATH.read_text(encoding="utf-8")
+	source = CLEAN_PMOVE_SOURCE_PATH.read_text(encoding="utf-8")
+
+	assert "typedef bool (*qlr_game_pmove_check_jump_hook_t)(struct qlr_game_pmove_context_s *ctx, bool allowAirDoubleJump);" in header
+	assert "bool PM_CheckJump(bool allowAirDoubleJump);" in header
+	assert "bool PM_CheckJump(bool allowAirDoubleJump) {" in source
+	assert "\"missing-hook ctx=%p allowAirDoubleJump=%d\"" in source
+	assert "return ctx->hooks.check_jump(ctx, allowAirDoubleJump);" in source

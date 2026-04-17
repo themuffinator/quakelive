@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "../qcommon/vm_local.h"
 #include "../../common/auth_credentials.h"
 #include "../../common/platform/platform_config.h"
 #include "../../common/platform/platform_steamworks.h"
@@ -251,12 +252,10 @@ void CL_ServerStatus_f(void);
 void CL_ServerStatusResponse( netadr_t from, msg_t *msg );
 void CL_Web_ShowBrowser_f( void );
 void CL_Web_ChangeHash_f( void );
-void CL_Web_BrowserActive_f( void );
 void CL_Web_HideBrowser_f( void );
 void CL_Web_ShowError_f( void );
 void CL_Web_ClearCache_f( void );
 void CL_Web_Reload_f( void );
-void CL_Web_StopRefresh_f( void );
 
 /*
 =============
@@ -266,17 +265,7 @@ Mirrors the retail stats_clear command through the Steam user-stats reset path.
 =============
 */
 static void CL_Steam_ClearStats_f( void ) {
-	if ( !CL_SteamServicesEnabled() ) {
-		Com_DPrintf( "stats_clear ignored: Steam services unavailable\n" );
-		return;
-	}
-
-	if ( !QL_Steamworks_Init() || !QL_Steamworks_ClearStats( qtrue ) ) {
-		Com_DPrintf( "stats_clear ignored: Steam stats backend unavailable\n" );
-		return;
-	}
-
-	Com_DPrintf( "stats_clear\n" );
+	QL_Steamworks_ClearStats( qtrue );
 }
 
 static qboolean cl_voiceRecordingActive;
@@ -381,13 +370,15 @@ static void CL_VoiceStartRecording_f( void ) {
 
 	cl_voiceRecordingActive = qtrue;
 	if ( CL_SteamServicesEnabled() ) {
-		uint32_t sampleRate;
+		uint32_t steamIdLow;
+		uint32_t steamIdHigh;
 
-		QL_Steamworks_StartVoiceRecording();
-		sampleRate = QL_Steamworks_GetVoiceOptimalSampleRate();
-		if ( sampleRate != 0u ) {
-			Com_DPrintf( "Started recording - optimal sample rate %u\n", sampleRate );
+		if ( QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
+			QL_Steamworks_SetInGameVoiceSpeaking( steamIdLow, steamIdHigh, qtrue );
 		}
+		QL_Steamworks_StartVoiceRecording();
+		Com_DPrintf( "Started recording - optimal sample rate %d\n",
+			(int)QL_Steamworks_GetVoiceOptimalSampleRate() );
 	}
 	CL_SetLocalSpeakingState( qtrue );
 }
@@ -405,10 +396,16 @@ static void CL_VoiceStopRecording_f( void ) {
 		return;
 	}
 
-	cl_voiceRecordingActive = qfalse;
 	if ( CL_SteamServicesEnabled() ) {
+		uint32_t steamIdLow;
+		uint32_t steamIdHigh;
+
 		QL_Steamworks_StopVoiceRecording();
+		if ( QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
+			QL_Steamworks_SetInGameVoiceSpeaking( steamIdLow, steamIdHigh, qfalse );
+		}
 	}
+	cl_voiceRecordingActive = qfalse;
 	CL_SetLocalSpeakingState( qfalse );
 }
 
@@ -453,6 +450,32 @@ static qboolean CL_ParseSteamIdString( const char *steamId, uint32_t *steamIdLow
 	*steamIdLow = (uint32_t)( value & 0xffffffffull );
 	*steamIdHigh = (uint32_t)( ( value >> 32 ) & 0xffffffffull );
 	return qtrue;
+}
+
+/*
+=============
+CL_CopyClientIdentity
+
+Uses the retail native cgame export when it is available to recover the
+selected-client identity sidecar.
+=============
+*/
+static qboolean CL_CopyClientIdentity( int clientNum, cgameClientIdentity_t *identity ) {
+	if ( !identity ) {
+		return qfalse;
+	}
+
+	memset( identity, 0, sizeof( *identity ) );
+
+	if ( !cgvm || !( cgvm->entryPoint || cgvm->dllExports ) ) {
+		return qfalse;
+	}
+
+	if ( !VM_Call( cgvm, CG_COPY_CLIENT_IDENTITY, clientNum, (int)(intptr_t)identity ) ) {
+		return qfalse;
+	}
+
+	return ( identity->identityLow | identity->identityHigh ) ? qtrue : qfalse;
 }
 
 /*
@@ -870,10 +893,12 @@ qboolean CL_GetWorkshopDownloadInfo( unsigned int itemIdLow, unsigned int itemId
 CL_GetClientSteamId
 
 Resolves a scoreboard client slot into the Steam identity used by the retail
-overlay commands.
+overlay commands. Native cgame builds expose this through
+CG_COPY_CLIENT_IDENTITY; qvm-style fallbacks rebuild it from CS_PLAYERS.
 =============
 */
 static qboolean CL_GetClientSteamId( int clientNum, uint32_t *steamIdLow, uint32_t *steamIdHigh ) {
+	cgameClientIdentity_t identity;
 	char info[MAX_INFO_STRING];
 	int offset;
 	const char *steamId;
@@ -887,6 +912,12 @@ static qboolean CL_GetClientSteamId( int clientNum, uint32_t *steamIdLow, uint32
 
 	if ( !steamIdLow || !steamIdHigh || clientNum < 0 || clientNum >= MAX_CLIENTS ) {
 		return qfalse;
+	}
+
+	if ( CL_CopyClientIdentity( clientNum, &identity ) ) {
+		*steamIdLow = identity.identityLow;
+		*steamIdHigh = identity.identityHigh;
+		return qtrue;
 	}
 
 	offset = cl.gameState.stringOffsets[CS_PLAYERS + clientNum];
@@ -2222,9 +2253,7 @@ void CL_StopRecord_f( void ) {
 	if ( clc.demoName[0] ) {
 		CL_WebView_PublishGameDemo( clc.demoName, clc.demoName );
 	}
-	if ( cl_demoRecordMessage->integer ) {
-		Com_Printf ("Stopped demo.\n");
-	}
+	Com_Printf ("Stopped demo.\n");
 }
 
 /* 
@@ -2273,25 +2302,21 @@ void CL_Record_f( void ) {
 	char		*s;
 
 	if ( Cmd_Argc() > 2 ) {
-		Com_Printf ("record <demoname>\n");
+		Com_Printf ("Correct usage: record <demoname>\n");
 		return;
 	}
 
 	if ( clc.demorecording ) {
-		if (!clc.spDemoRecording) {
-			Com_Printf ("Already recording.\n");
+		Com_Printf ("Already recording.\n");
+		CL_StopRecord_f();
+		if ( clc.demorecording ) {
+			Com_Error( ERR_FATAL, "stoprecord failed" );
 		}
-		return;
 	}
 
 	if ( cls.state != CA_ACTIVE ) {
 		Com_Printf ("You must be in a level to record.\n");
 		return;
-	}
-
-  // sync 0 doesn't prevent recording, so not forcing it off .. everyone does g_sync 1 ; record ; g_sync 0 ..
-	if ( !Cvar_VariableValue( "g_synchronousClients" ) ) {
-		Com_Printf (S_COLOR_YELLOW "WARNING: You should set 'g_synchronousClients 1' for smoother demo recording\n");
 	}
 
 	if ( Cmd_Argc() == 2 ) {
@@ -2315,9 +2340,7 @@ void CL_Record_f( void ) {
 
 	// open the demo file
 
-	if ( cl_demoRecordMessage->integer ) {
-		Com_Printf ("recording to %s.\n", name);
-	}
+	Com_Printf ("recording to %s.\n", name);
 	clc.demofile = FS_FOpenFileWrite( name );
 	if ( !clc.demofile ) {
 		Com_Printf ("ERROR: couldn't open.\n");
@@ -2515,10 +2538,8 @@ void CL_PlayDemo_f( void ) {
 		return;
 	}
 
-	// make sure a local server is killed
-	Cvar_Set( "sv_killserver", "1" );
-
-	CL_Disconnect( qtrue );
+	SV_Shutdown( "Starting Demo.\n" );
+	CL_Disconnect( qfalse );
 
 	// open the demo file
 	arg = Cmd_Argv(1);
@@ -2948,6 +2969,29 @@ CONSOLE COMMANDS
 
 /*
 ==================
+CL_CommandContainsUserinfoToken
+
+Retail cmd forwarding refuses to relay userinfo through the generic client command path.
+==================
+*/
+static qboolean CL_CommandContainsUserinfoToken( const char *commandName ) {
+	const char	*cursor;
+
+	if ( !commandName || !commandName[0] ) {
+		return qfalse;
+	}
+
+	for ( cursor = commandName; *cursor; cursor++ ) {
+		if ( !Q_stricmpn( cursor, "userinfo", 8 ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+==================
 CL_ForwardToServer_f
 ==================
 */
@@ -2958,7 +3002,7 @@ void CL_ForwardToServer_f( void ) {
 	}
 	
 	// don't forward the first argument
-	if ( Cmd_Argc() > 1 ) {
+	if ( Cmd_Argc() > 1 && !CL_CommandContainsUserinfoToken( Cmd_Argv( 1 ) ) ) {
 		CL_AddReliableCommand( Cmd_Args() );
 	}
 }
@@ -3277,6 +3321,21 @@ void CL_Vid_Restart_f( void ) {
 
 /*
 =================
+CL_PostProcessRestart_f
+
+Invokes the renderer-owned post-process restart hook exported through GetRefAPI.
+=================
+*/
+static void CL_PostProcessRestart_f( void ) {
+	if ( !re.PostProcessRestart ) {
+		return;
+	}
+
+	re.PostProcessRestart();
+}
+
+/*
+=================
 CL_Snd_Restart_f
 
 Restart the sound subsystem
@@ -3345,6 +3404,16 @@ void CL_Clientinfo_f( void ) {
 	Com_Printf ("User info settings:\n");
 	Info_Print( Cvar_InfoString( CVAR_USERINFO ) );
 	Com_Printf( "--------------------------------------\n" );
+}
+
+/*
+==================
+CL_Userinfo_f
+
+Retail reserves the userinfo command name with a no-op owner.
+==================
+*/
+static void CL_Userinfo_f( void ) {
 }
 
 
@@ -4587,6 +4656,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("clientinfo", CL_Clientinfo_f);
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
+	Cmd_AddCommand ("postprocess_restart", CL_PostProcessRestart_f);
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
 	Cmd_AddCommand ("record", CL_Record_f);
 	Cmd_AddCommand ("demo", CL_PlayDemo_f);
@@ -4604,15 +4674,13 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
 	Cmd_AddCommand ("model", CL_SetModel_f );
-	Cmd_AddCommand ("togglemenu", CL_ToggleMenu_f );
+	Cmd_AddCommand ("userinfo", CL_Userinfo_f );
 	Cmd_AddCommand ("web_showBrowser", CL_Web_ShowBrowser_f );
 	Cmd_AddCommand ("web_changeHash", CL_Web_ChangeHash_f );
 	Cmd_AddCommand ("web_hideBrowser", CL_Web_HideBrowser_f );
 	Cmd_AddCommand ("web_showError", CL_Web_ShowError_f );
 	Cmd_AddCommand ("web_clearCache", CL_Web_ClearCache_f );
 	Cmd_AddCommand ("web_reload", CL_Web_Reload_f );
-	Cmd_AddCommand ("web_browserActive", CL_Web_BrowserActive_f );
-	Cmd_AddCommand ("web_stopRefresh", CL_Web_StopRefresh_f );
 	Cmd_AddCommand ("+voice", CL_VoiceStartRecording_f );
 	Cmd_AddCommand ("-voice", CL_VoiceStopRecording_f );
 	Cmd_AddCommand ("connect_lobby", CL_Steam_ConnectLobby_f );
@@ -4673,6 +4741,7 @@ void CL_Shutdown( void ) {
 	Cmd_RemoveCommand ("userinfo");
 	Cmd_RemoveCommand ("snd_restart");
 	Cmd_RemoveCommand ("vid_restart");
+	Cmd_RemoveCommand ("postprocess_restart");
 	Cmd_RemoveCommand ("disconnect");
 	Cmd_RemoveCommand ("record");
 	Cmd_RemoveCommand ("demo");
@@ -4687,15 +4756,12 @@ void CL_Shutdown( void ) {
 	Cmd_RemoveCommand ("serverstatus");
 	Cmd_RemoveCommand ("showip");
 	Cmd_RemoveCommand ("model");
-	Cmd_RemoveCommand ("togglemenu");
 	Cmd_RemoveCommand ("web_showBrowser");
 	Cmd_RemoveCommand ("web_changeHash");
 	Cmd_RemoveCommand ("web_hideBrowser");
 	Cmd_RemoveCommand ("web_showError");
 	Cmd_RemoveCommand ("web_clearCache");
 	Cmd_RemoveCommand ("web_reload");
-	Cmd_RemoveCommand ("web_browserActive");
-	Cmd_RemoveCommand ("web_stopRefresh");
 	Cmd_RemoveCommand ("+voice");
 	Cmd_RemoveCommand ("-voice");
 	Cmd_RemoveCommand ("connect_lobby");

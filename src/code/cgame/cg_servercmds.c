@@ -3065,6 +3065,7 @@ static void CG_ParseMatchState( void ) {
 	cgs.matchRoundTurn = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_TURN, 0 );
 	cgs.matchRoundState = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_STATE, 0 );
 	cgs.matchOvertimeActive = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_ACTIVE, 0 ) ? qtrue : qfalse;
+	cgs.matchSuddenDeathActive = cgs.matchOvertimeActive;
 	cgs.matchOvertimeStartTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_START, 0 );
 	cgs.matchOvertimeEndTime = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_END, 0 );
 	cgs.matchOvertimeCount = CG_InfoIntForMatchKey( info, MATCH_STATE_KEY_OVERTIME_COUNT, 0 );
@@ -3117,19 +3118,19 @@ static void CG_ParseMatchState( void ) {
 
 /*
 =============
-CG_ParseSuddenDeathStatus
+ CG_ParseIntermissionExitStatus
 
-Parses the sudden-death active flag mirrored through its dedicated configstring.
+Parses the retail intermission-exit latch published through configstring 0x2C3.
 =============
 */
-static void CG_ParseSuddenDeathStatus( void ) {
+static void CG_ParseIntermissionExitStatus( void ) {
 	const char	*info;
 	int		value;
 
-	info = CG_ConfigString( CS_SUDDENDEATH_STATUS );
+	info = CG_ConfigString( CS_INTERMISSION_EXIT_STATUS );
 	value = ( info && *info ) ? atoi( info ) : 0;
 
-	cgs.matchSuddenDeathActive = value ? qtrue : qfalse;
+	cgs.intermissionExitStatusLatched = value ? qtrue : qfalse;
 }
 
 /*
@@ -3195,6 +3196,46 @@ static void CG_ParseWarmupReadyStatus( void ) {
 	if ( cgs.matchWarmupReadyCount > cgs.matchWarmupReadyEligible ) {
 		cgs.matchWarmupReadyCount = cgs.matchWarmupReadyEligible;
 	}
+}
+
+/*
+=============
+CG_ParseSharedRaceDominationConfigStrings
+
+Parses the retail shared Race/Domination auxiliary slots according to the active gametype.
+=============
+*/
+static void CG_ParseSharedRaceDominationConfigStrings( void ) {
+	const char	*info;
+	int		value;
+
+	cgs.dominationOwnedPointCount[TEAM_RED] = 0;
+	cgs.dominationOwnedPointCount[TEAM_BLUE] = 0;
+
+	if ( cgs.gametype == GT_RACE ) {
+		CG_ParseRaceInfoString( CG_ConfigString( CS_RACE_INFO ) );
+		CG_ParseRaceStatusString( CG_ConfigString( CS_RACE_STATUS ) );
+		return;
+	}
+
+	CG_ParseRaceInit();
+	if ( cgs.gametype != GT_DOMINATION ) {
+		return;
+	}
+
+	info = CG_ConfigString( CS_RACE_STATUS );
+	value = ( info && *info ) ? atoi( info ) : 0;
+	if ( value < 0 ) {
+		value = 0;
+	}
+	cgs.dominationOwnedPointCount[TEAM_RED] = value;
+
+	info = CG_ConfigString( CS_RACE_INFO );
+	value = ( info && *info ) ? atoi( info ) : 0;
+	if ( value < 0 ) {
+		value = 0;
+	}
+	cgs.dominationOwnedPointCount[TEAM_BLUE] = value;
 }
 
 /*
@@ -3491,6 +3532,88 @@ static void CG_SetTeamNameFromConfigString( team_t team, const char *configstrin
 	}
 }
 
+/*
+=================
+CG_SetRotationVoteSlotCvar
+
+Formats and updates one of the retail endgame-vote UI helper cvars.
+=================
+*/
+static void CG_SetRotationVoteSlotCvar( int slot, const char *suffix, const char *value ) {
+	char	key[MAX_CVAR_VALUE_STRING];
+
+	if ( !suffix || !suffix[0] || slot < 0 || slot >= 3 ) {
+		return;
+	}
+
+	Com_sprintf( key, sizeof( key ), "ui_vote%s%i", suffix, slot + 1 );
+	trap_Cvar_Set( key, ( value && value[0] ) ? value : "" );
+}
+
+/*
+=================
+CG_ParseRotationVoteConfigStrings
+
+Mirrors the retail intermission next-map preview payloads into the UI helper
+cvars consumed by the `endgamevote.menu` ownerdraws.
+=================
+*/
+static void CG_ParseRotationVoteConfigStrings( void ) {
+	const char	*rotationTitles;
+	const char	*rotationCounts;
+	int			slot;
+
+	rotationTitles = CG_ConfigString( CS_ROTATION_TITLES );
+	rotationCounts = CG_ConfigString( CS_ROTATION_CONFIGS );
+
+	for ( slot = 0; slot < 3; slot++ ) {
+		char	infoKey[16];
+		char	mapName[MAX_QPATH];
+		char	voteName[MAX_CVAR_VALUE_STRING];
+		char	voteGametype[MAX_CVAR_VALUE_STRING];
+		char	voteCount[16];
+		char	voteShot[MAX_QPATH];
+		const char	*value;
+
+		Com_sprintf( infoKey, sizeof( infoKey ), "map_%i", slot );
+		value = Info_ValueForKey( rotationTitles, infoKey );
+		Q_strncpyz( mapName, value ? value : "", sizeof( mapName ) );
+
+		Com_sprintf( infoKey, sizeof( infoKey ), "title_%i", slot );
+		value = Info_ValueForKey( rotationTitles, infoKey );
+		Q_strncpyz( voteName, value ? value : "", sizeof( voteName ) );
+		if ( !voteName[0] ) {
+			Q_strncpyz( voteName, mapName, sizeof( voteName ) );
+		}
+
+		Com_sprintf( infoKey, sizeof( infoKey ), "gt_%i", slot );
+		value = Info_ValueForKey( rotationTitles, infoKey );
+		Q_strncpyz( voteGametype, value ? value : "", sizeof( voteGametype ) );
+
+		Com_sprintf( infoKey, sizeof( infoKey ), "%i", slot );
+		value = Info_ValueForKey( rotationCounts, infoKey );
+		if ( value && value[0] ) {
+			Q_strncpyz( voteCount, value, sizeof( voteCount ) );
+		} else if ( mapName[0] ) {
+			Q_strncpyz( voteCount, "0", sizeof( voteCount ) );
+		} else {
+			voteCount[0] = '\0';
+		}
+
+		if ( mapName[0] ) {
+			Com_sprintf( voteShot, sizeof( voteShot ), "levelshots/%s", mapName );
+		} else {
+			voteShot[0] = '\0';
+		}
+
+		CG_SetRotationVoteSlotCvar( slot, "Map", mapName );
+		CG_SetRotationVoteSlotCvar( slot, "Name", voteName );
+		CG_SetRotationVoteSlotCvar( slot, "Gametype", voteGametype );
+		CG_SetRotationVoteSlotCvar( slot, "Count", voteCount );
+		CG_SetRotationVoteSlotCvar( slot, "Shot", voteShot );
+	}
+}
+
 void CG_SetConfigValues( void ) {
 	const char *s;
 
@@ -3503,6 +3626,7 @@ void CG_SetConfigValues( void ) {
 	Q_strncpyz( cgs.voteString, CG_ConfigString( CS_VOTE_STRING ), sizeof( cgs.voteString ) );
 	trap_Cvar_Set( "ui_voteactive", cgs.voteTime ? "1" : "0" );
 	trap_Cvar_Set( "ui_votestring", cgs.voteString );
+	CG_ParseRotationVoteConfigStrings();
 	CG_SetTeamNameFromConfigString( TEAM_RED, CG_ConfigString( CS_RED_TEAM_NAME ) );
 	CG_SetTeamNameFromConfigString( TEAM_BLUE, CG_ConfigString( CS_BLUE_TEAM_NAME ) );
 	CG_ParseDisableLoadoutConfigString( CG_ConfigString( CS_LOADOUT_FLAGS ) );
@@ -3521,7 +3645,7 @@ void CG_SetConfigValues( void ) {
 	CG_ParseRoundStartTimeConfigString();
 	CG_ParseTimeoutConfigStrings();
 	CG_ParseTeamCountConfigStrings();
-	CG_ParseSuddenDeathStatus();
+	CG_ParseIntermissionExitStatus();
 	CG_ParseReadyUpStatus();
 	CG_ParseWarmupReadyStatus();
 	CG_ParseForcedCosmetics();
@@ -3534,8 +3658,7 @@ void CG_SetConfigValues( void ) {
 	CG_ParsePlayerAppearanceConfigString();
 	CG_ParsePmoveConfigString( CG_ConfigString( CS_PMOVE_SETTINGS ) );
 	CG_ParseWeaponReloadConfigString();
-	CG_ParseRaceInfoString( CG_ConfigString( CS_RACE_INFO ) );
-	CG_ParseRaceStatusString( CG_ConfigString( CS_RACE_STATUS ) );
+	CG_ParseSharedRaceDominationConfigStrings();
 }
 /*
 =====================
@@ -3612,8 +3735,8 @@ static void CG_ConfigStringModified( void ) {
 	} else if ( num == CS_TIMEOUT_START_TIME || num == CS_TIMEOUT_EXPIRE_TIME ||
 		num == CS_TIMEOUT_COUNT_RED || num == CS_TIMEOUT_COUNT_BLUE ) {
 		CG_ParseTimeoutConfigStrings();
-	} else if ( num == CS_SUDDENDEATH_STATUS ) {
-		CG_ParseSuddenDeathStatus();
+	} else if ( num == CS_INTERMISSION_EXIT_STATUS ) {
+		CG_ParseIntermissionExitStatus();
 	} else if ( num == CS_READYUP_STATUS ) {
 		CG_ParseReadyUpStatus();
 	} else if ( num == CS_WARMUP_READY ) {
@@ -3648,10 +3771,8 @@ static void CG_ConfigStringModified( void ) {
 		CG_ParseForcedCosmetics();
 	} else if ( num >= CS_FREEZE_TIP_OBJECTIVE && num <= CS_FREEZE_TIP_SUMMARY ) {
 		CG_ParseFreezeTipConfigstrings();
-	} else if ( num == CS_RACE_INFO ) {
-		CG_ParseRaceInfoString( str );
-	} else if ( num == CS_RACE_STATUS ) {
-		CG_ParseRaceStatusString( str );
+	} else if ( num == CS_RACE_INFO || num == CS_RACE_STATUS ) {
+		CG_ParseSharedRaceDominationConfigStrings();
 	} else if ( num == CS_VOTE_TIME ) {
 		cgs.voteTime = atoi( str );
 		trap_Cvar_Set( "ui_voteactive", cgs.voteTime ? "1" : "0" );
@@ -3666,6 +3787,8 @@ static void CG_ConfigStringModified( void ) {
 		Q_strncpyz( cgs.voteString, str, sizeof( cgs.voteString ) );
 		trap_Cvar_Set( "ui_votestring", cgs.voteString );
 		trap_S_StartLocalSound( cgs.media.voteNow, CHAN_ANNOUNCER );
+	} else if ( num == CS_ROTATION_TITLES || num == CS_ROTATION_CONFIGS ) {
+		CG_ParseRotationVoteConfigStrings();
 	} else if ( num >= CS_TEAMVOTE_TIME && num <= CS_TEAMVOTE_TIME + 1) {
 		cgs.teamVoteTime[num-CS_TEAMVOTE_TIME] = atoi( str );
 		cgs.teamVoteModified[num-CS_TEAMVOTE_TIME] = qtrue;

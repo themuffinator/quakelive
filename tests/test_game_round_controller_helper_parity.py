@@ -45,8 +45,8 @@ def test_freeze_round_controller_helpers_match_retail_mapping_surface() -> None:
 	assert "roundState = G_FreezeResolveRoundState();" in client_c
 	assert "client->freezeAccumulatedThaw = 0;" in client_c
 	assert "client->freezeAutoThawTime = 0;" in client_c
-	assert "if ( client->freezeNextThawTick > 0 ) {" in main_c
-	assert "client->freezeProtectedUntil += msec;" in main_c
+	assert "client->freezeNextThawTick = G_ShiftTimeoutAbsoluteTime( client->freezeNextThawTick, msec );" in main_c
+	assert "client->freezeProtectedUntil = G_ShiftTimeoutAbsoluteTime( client->freezeProtectedUntil, msec );" in main_c
 
 
 def test_red_rover_controller_readback_helpers_match_retail_mapping_surface() -> None:
@@ -62,11 +62,14 @@ def test_red_rover_controller_readback_helpers_match_retail_mapping_surface() ->
 	assert "if ( level.warmupTime < 0 ) {" in active_c
 	assert "RR_ROUNDSTATE_INFECTION_SEED = 2," in local_h
 	assert "RR_ROUNDSTATE_EXIT = 5" in local_h
+	assert "void G_RRInitRoundController( void );" in local_h
 	assert "level.rrPendingRoundState = RR_ROUNDSTATE_ACTIVE;" in active_c
 	assert "state == RR_ROUNDSTATE_INACTIVE && level.roundTransitionTime == ROUND_TRANSITION_NONE" in active_c
 	assert "state == RR_ROUNDSTATE_ACTIVE || state == RR_ROUNDSTATE_INFECTION_SEED" in active_c
 	assert "G_RRResolveRoundState();" in cmds_c
-	assert "if ( G_RRResolveRoundState() != ROUNDSTATE_ACTIVE ) {" in client_c
+	assert "if ( G_RRResolveRoundState() != RR_ROUNDSTATE_ACTIVE ) {" in client_c
+	assert "if ( !Team_HasMinimumPlayersForWarmup() ) {" in client_c
+	assert "G_FreezeRunFrame();" in client_c
 	assert "level.rrRoundState = RR_ROUNDSTATE_COMPLETE;" in client_c
 	assert "level.rrPendingRoundState = level.rrPendingMatchExit ? RR_ROUNDSTATE_EXIT : nextState;" in client_c
 

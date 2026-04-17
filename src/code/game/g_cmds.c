@@ -5318,6 +5318,153 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 
 
 /*
+==================
+G_ClearNextMapVoteState
+
+Clears the retail intermission next-map vote latches so the upcoming match-end
+vote starts from an empty tally table.
+==================
+*/
+void G_ClearNextMapVoteState( void ) {
+	int		clientNum;
+
+	level.nextMapVoteCounts[0] = 0;
+	level.nextMapVoteCounts[1] = 0;
+	level.nextMapVoteCounts[2] = 0;
+
+	if ( !level.clients ) {
+		return;
+	}
+
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		level.clients[clientNum].pers.voteDelayTime = 0;
+		level.clients[clientNum].pers.voteLastSelection = 0;
+		level.clients[clientNum].pers.voteLastEnableFrame = -1;
+	}
+}
+
+/*
+==================
+G_UpdateNextMapVoteTallies
+
+Recounts the three retail intermission next-map vote buckets and republishes
+their compact configstring payload for the endgame vote UI.
+==================
+*/
+void G_UpdateNextMapVoteTallies( void ) {
+	char	voteCounts[MAX_INFO_STRING];
+	int		clientNum;
+	int		slot;
+
+	level.nextMapVoteCounts[0] = 0;
+	level.nextMapVoteCounts[1] = 0;
+	level.nextMapVoteCounts[2] = 0;
+
+	if ( level.clients ) {
+		for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+			int selection;
+
+			if ( level.clients[clientNum].pers.connected != CON_CONNECTED ) {
+				continue;
+			}
+
+			selection = level.clients[clientNum].pers.voteLastSelection;
+			if ( selection < 1 || selection > 3 ) {
+				continue;
+			}
+
+			level.nextMapVoteCounts[selection - 1]++;
+		}
+	}
+
+	voteCounts[0] = '\0';
+	for ( slot = 0; slot < 3; slot++ ) {
+		char	key[16];
+		char	value[16];
+
+		Com_sprintf( key, sizeof( key ), "%i", slot );
+		Com_sprintf( value, sizeof( value ), "%i", level.nextMapVoteCounts[slot] );
+		Info_SetValueForKey( voteCounts, key, value );
+	}
+
+	trap_SetConfigstring( CS_ROTATION_CONFIGS, voteCounts );
+}
+
+/*
+==================
+G_HandleNextMapVote
+
+Routes intermission `vote 1/2/3` commands through the retail next-map ballot
+lane instead of the normal yes/no vote path.
+==================
+*/
+qboolean G_HandleNextMapVote( gentity_t *ent ) {
+	char		nextmaps[MAX_STRING_CHARS];
+	char		msg[64];
+	char		key[16];
+	char		mapName[MAX_QPATH];
+	char		voteLabel[MAX_STRING_CHARS];
+	int			voteSelection;
+
+	if ( !ent || !ent->client ) {
+		return qfalse;
+	}
+
+	if ( g_singlePlayer.integer ) {
+		return qfalse;
+	}
+
+	trap_Cvar_VariableStringBuffer( "nextmaps", nextmaps, sizeof( nextmaps ) );
+	if ( !nextmaps[0] ) {
+		return qfalse;
+	}
+
+	trap_Argv( 1, msg, sizeof( msg ) );
+	voteSelection = atoi( msg );
+
+	if ( level.time - level.voteTime >= 20000 ) {
+		trap_SendServerCommand( ent-g_entities, "print \"Voting time has expired.\n\"" );
+		return qtrue;
+	}
+
+	if ( ent->client->pers.voteDelayTime > 0 && level.time - ent->client->pers.voteDelayTime < VOTE_THROTTLE_MSEC ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You may only vote once every 2 seconds.\n\"" );
+		return qtrue;
+	}
+
+	if ( voteSelection == ent->client->pers.voteLastSelection ) {
+		trap_SendServerCommand( ent-g_entities, "print \"You already voted for this arena.\n\"" );
+		return qtrue;
+	}
+
+	if ( voteSelection < 1 || voteSelection > 3 ) {
+		return qtrue;
+	}
+
+	Com_sprintf( key, sizeof( key ), "map_%i", voteSelection - 1 );
+	Q_strncpyz( mapName, Info_ValueForKey( nextmaps, key ), sizeof( mapName ) );
+	if ( !mapName[0] || !Q_stricmp( mapName, "default" ) ) {
+		return qtrue;
+	}
+
+	ent->client->pers.voteDelayTime = level.time;
+	ent->client->pers.voteLastSelection = voteSelection;
+	ent->client->pers.voteLastEnableFrame = -1;
+
+	G_UpdateNextMapVoteTallies();
+	trap_SendServerCommand( ent-g_entities, "disable_vote_ui" );
+
+	Com_sprintf( key, sizeof( key ), "title_%i", voteSelection - 1 );
+	Q_strncpyz( voteLabel, Info_ValueForKey( nextmaps, key ), sizeof( voteLabel ) );
+	if ( !voteLabel[0] ) {
+		Q_strncpyz( voteLabel, mapName, sizeof( voteLabel ) );
+	}
+
+	trap_SendServerCommand( -1, va( "print \"%s voted for %s.\n\"", ent->client->pers.netname, voteLabel ) );
+	return qtrue;
+}
+
+/*
 =============
 Cmd_Vote_f
 
@@ -5328,6 +5475,11 @@ void Cmd_Vote_f( gentity_t *ent ) {
 	char		msg[64];
 	voteState_t	voteState;
 	gclient_t	*client;
+
+	if ( level.intermissiontime ) {
+		G_HandleNextMapVote( ent );
+		return;
+	}
 
 	if ( !level.voteTime ) {
 		trap_SendServerCommand( ent-g_entities, "print \"No vote in progress.\n\"" );

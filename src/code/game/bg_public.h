@@ -194,8 +194,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_MATCH_AWARDS		0x2BF		// info string announcing accuracy/perfect medals
 #define CS_CUSTOM_SETTINGS		0x2C0		// serialized factory overrides broadcast at init
 #define CS_ROTATION_TITLES		0x2C1		// queue of map titles/modes for the upcoming rotation
-#define CS_ROTATION_CONFIGS		0x2C2		// queued map configs (map/cfg/gt triplets)
-#define CS_SUDDENDEATH_STATUS		0x2C3		// sudden-death toggle mirrored for clients
+#define CS_ROTATION_CONFIGS		0x2C2		// retail intermission next-map vote counts keyed by slot index
+#define CS_INTERMISSION_EXIT_STATUS	0x2C3		// retail one-shot intermission-exit latch published before ExitLevel
+#define CS_SUDDENDEATH_STATUS		CS_INTERMISSION_EXIT_STATUS	// legacy reconstruction alias
 #define CS_READYUP_STATUS		0x2C4		// ready-up controller state machine payload
 #define CS_RR_INFECTED_SURVIVOR_PING_RATE	0x2C5		// floating-point g_rrInfectedSurvivorPingRate payload
 #define CS_RACE_RECORDS		0x2C6		// race checkpoint history used by race_init

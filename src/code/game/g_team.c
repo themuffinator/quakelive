@@ -2045,6 +2045,43 @@ void Team_RegisterDominationPoint( gentity_t *pointEnt ) {
 
 /*
 =============
+G_UpdateDominationPointCountConfigstrings
+
+Publishes the retail shared-slot Domination point counts for the red and blue teams.
+=============
+*/
+void G_UpdateDominationPointCountConfigstrings( void ) {
+	char		redOwnedString[16];
+	char		blueOwnedString[16];
+	int		redOwned;
+	int		blueOwned;
+	int		i;
+
+	if ( g_gametype.integer != GT_DOMINATION ) {
+		return;
+	}
+
+	redOwned = 0;
+	blueOwned = 0;
+	for ( i = 0; i < teamgame.dominationPointCount; i++ ) {
+		dominationPoint_t	*point;
+
+		point = &teamgame.dominationPoints[i];
+		if ( point->ownerTeam == TEAM_RED ) {
+			redOwned++;
+		} else if ( point->ownerTeam == TEAM_BLUE ) {
+			blueOwned++;
+		}
+	}
+
+	Com_sprintf( redOwnedString, sizeof( redOwnedString ), "%i", redOwned );
+	Com_sprintf( blueOwnedString, sizeof( blueOwnedString ), "%i", blueOwned );
+	trap_SetConfigstring( CS_RACE_SCORES, redOwnedString );
+	trap_SetConfigstring( CS_RACE_INFO, blueOwnedString );
+}
+
+/*
+=============
 Team_RegisterDominationTrigger
 
 Binds a Domination capture trigger to its metadata entity.
@@ -3192,6 +3229,69 @@ void Team_CheckDroppedItem( gentity_t *dropped ) {
 	else if( dropped->item->giTag == PW_NEUTRALFLAG ) {
 		Team_SetFlagStatus( TEAM_FREE, FLAG_DROPPED );
 	}
+}
+
+/*
+=============
+Team_ReturnFlagIfMissing
+
+Restores the requested CTF flag when no visible world entity or live carrier still owns it.
+=============
+*/
+gentity_t *Team_ReturnFlagIfMissing( int team ) {
+	int		flagPowerup;
+	int		i;
+
+	switch ( team ) {
+	case TEAM_RED:
+		flagPowerup = PW_REDFLAG;
+		break;
+
+	case TEAM_BLUE:
+		flagPowerup = PW_BLUEFLAG;
+		break;
+
+	default:
+		return NULL;
+	}
+
+	for ( i = 0; i < level.num_entities; i++ ) {
+		gentity_t	*ent = &g_entities[i];
+
+		if ( !ent->inuse || !ent->item || ent->item->giTag != flagPowerup ) {
+			continue;
+		}
+
+		if ( ent->flags & FL_DROPPED_ITEM ) {
+			return ent;
+		}
+
+		if ( ent->r.contents != 0 || !( ent->s.eFlags & EF_NODRAW ) ) {
+			return ent;
+		}
+	}
+
+	for ( i = 0; i < level.maxclients; i++ ) {
+		gentity_t	*ent = &g_entities[i];
+
+		if ( !ent->inuse || !ent->client ) {
+			continue;
+		}
+		if ( ent->client->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+		if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR || ent->client->sess.sessionTeam == team ) {
+			continue;
+		}
+		if ( !ent->client->ps.powerups[flagPowerup] ) {
+			continue;
+		}
+
+		return ent;
+	}
+
+	Team_ReturnFlag( team );
+	return NULL;
 }
 
 /*

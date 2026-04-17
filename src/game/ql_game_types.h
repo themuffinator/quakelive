@@ -201,7 +201,7 @@ typedef struct ql_clientSession_s {
 	int32_t spectator_queue_position;	// 0x28 (retail `pq` slot)
 	int32_t spectator_queue_position_dirty;	// 0x2C (live queue-dirty latch, skipped by session serializer)
 	int32_t muted;				// 0x30 (persistent mute latch)
-	int32_t field_34;			// 0x34 (serialized session tail still open)
+	int32_t field_34;			// 0x34 (optional session-read tail still open)
 } ql_clientSession_t;
 
 typedef struct ql_gclient_s {

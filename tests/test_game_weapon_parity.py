@@ -96,6 +96,50 @@ def test_lightning_path_uses_retail_falloff_and_muzzle_discharge_gate() -> None:
     assert "damage = G_GetLightningDamageForDistance( distance ) * s_quadFactor;" in lightning_body
 
 
+def test_missile_pipeline_matches_retail_callback_schedule() -> None:
+    g_main_c = _read("src/code/game/g_main.c")
+    g_missile_c = _read("src/code/game/g_missile.c")
+
+    run_missile_body = _function_body(g_missile_c, "void G_RunMissile( gentity_t *ent )")
+    fire_rocket_body = _function_body(g_missile_c, "gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir)")
+    fire_plasma_body = _function_body(g_missile_c, "gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir)")
+    fire_bfg_body = _function_body(g_missile_c, "gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir)")
+    fire_nail_body = _function_body(g_missile_c, "gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t right, vec3_t up )")
+    nail_bounce_body = _function_body(g_missile_c, "static qboolean G_HandleNailgunBounce( gentity_t *ent, trace_t *trace )")
+
+    assert "#define\tGUIDED_ROCKET_THINK_TIME\t25" in g_missile_c
+    assert "#define\tGUIDED_ROCKET_SPEED\t20.0f" in g_missile_c
+    assert "#define\tNAILGUN_LIFETIME\t4500" in g_missile_c
+    assert "#define\tEF_NAIL_BOUNCE\tEF_READY" in g_missile_c
+    assert "static void G_RunGuidedRocketThink( gentity_t *ent )" in g_missile_c
+    assert "static void G_RunRocketAccelerationThink( gentity_t *ent )" in g_missile_c
+    assert "static void G_RunPlasmaAccelerationThink( gentity_t *ent )" in g_missile_c
+    assert "static void G_RunBfgAccelerationThink( gentity_t *ent )" in g_missile_c
+
+    assert "g_weaponConfig.guidedRocketEnabled && ent->count" not in run_missile_body
+    assert "G_UpdateMissileAcceleration( ent );" not in run_missile_body
+    assert "bolt->nextthink = level.time + GUIDED_ROCKET_INITIAL_THINK_TIME;" in fire_rocket_body
+    assert "bolt->think = G_RunGuidedRocketThink;" in fire_rocket_body
+    assert "bolt->think = G_RunRocketAccelerationThink;" in fire_rocket_body
+    assert "bolt->think = G_RunPlasmaAccelerationThink;" in fire_plasma_body
+    assert "bolt->think = G_RunBfgAccelerationThink;" in fire_bfg_body
+
+    assert 'g_accelFactor_rl", "1"' in g_main_c
+    assert 'g_accelFactor_pg", "1"' in g_main_c
+    assert 'g_accelFactor_bfg", "1"' in g_main_c
+    assert 'G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_rl, 1.0f, "g_accelFactor_rl" );' in g_main_c
+    assert 'G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_pg, 1.0f, "g_accelFactor_pg" );' in g_main_c
+    assert 'G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_bfg, 1.0f, "g_accelFactor_bfg" );' in g_main_c
+
+    assert "bolt->nextthink = level.time + NAILGUN_LIFETIME;" in fire_nail_body
+    assert "bolt->s.eFlags = canBounce ? EF_NAIL_BOUNCE : 0;" in fire_nail_body
+    assert "bolt->count = 0;" in fire_nail_body
+    assert "vectoangles( dir, angles );" not in fire_nail_body
+    assert "G_AddEvent( ent, EV_GRENADE_BOUNCE, 0 );" in nail_bounce_body
+    assert "ent->count++;" in nail_bounce_body
+    assert "g_weaponConfig.nailgunBounceEnabled" not in nail_bounce_body
+
+
 def test_lightning_discharge_helper_matches_retail_radius_burst_shape() -> None:
     g_weapon_c = _read("src/code/game/g_weapon.c")
     discharge_helper = _function_body(

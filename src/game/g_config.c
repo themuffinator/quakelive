@@ -337,11 +337,27 @@ void G_Config_UpdateCvars( void ) {
 =============
 G_Config_ResetFactoryManagedCvars
 
-Restores the factory-managed loadout, rune, regen, and item spawn toggles
-to their compiled defaults before a factory selection layers overrides.
+Restores the factory-managed loadout, rune, regen, item spawn, and weapon
+reload toggles to their compiled defaults before a factory selection layers
+overrides.
 =============
 */
 void G_Config_ResetFactoryManagedCvars( void ) {
+	trap_Cvar_Set( "weapon_reload_gauntlet", "0" );
+	trap_Cvar_Set( "weapon_reload_mg", "0" );
+	trap_Cvar_Set( "weapon_reload_sg", "0" );
+	trap_Cvar_Set( "weapon_reload_gl", "0" );
+	trap_Cvar_Set( "weapon_reload_rl", "0" );
+	trap_Cvar_Set( "weapon_reload_lg", "0" );
+	trap_Cvar_Set( "weapon_reload_rg", "0" );
+	trap_Cvar_Set( "weapon_reload_pg", "0" );
+	trap_Cvar_Set( "weapon_reload_bfg", "0" );
+	trap_Cvar_Set( "weapon_reload_gh", "0" );
+	trap_Cvar_Set( "weapon_reload_hook", "0" );
+	trap_Cvar_Set( "weapon_reload_ng", "0" );
+	trap_Cvar_Set( "weapon_reload_prox", "0" );
+	trap_Cvar_Set( "weapon_reload_cg", "0" );
+	trap_Cvar_Set( "weapon_reload_hmg", "0" );
 	trap_Cvar_Set( "g_loadout", STRINGIZE( DEFAULT_FACTORY_LOADOUT ) );
 	trap_Cvar_Set( "g_runes", STRINGIZE( DEFAULT_FACTORY_RUNES ) );
 	trap_Cvar_Set( "g_regenHealth", STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ) );

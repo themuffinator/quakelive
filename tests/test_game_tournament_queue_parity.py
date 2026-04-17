@@ -8,6 +8,23 @@ def _read(rel_path: str) -> str:
 	return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def _extract_block(source: str, anchor: str) -> str:
+	start = source.index(anchor)
+	brace_start = source.index("{", start)
+	depth = 0
+
+	for index in range(brace_start, len(source)):
+		char = source[index]
+		if char == "{":
+			depth += 1
+		elif char == "}":
+			depth -= 1
+			if depth == 0:
+				return source[start : index + 1]
+
+	raise AssertionError(f"Unterminated block for {anchor}")
+
+
 def test_duel_queue_helpers_and_dirty_latch_match_retail_surface() -> None:
 	local_h = _read("src/code/game/g_local.h")
 	main_c = _read("src/code/game/g_main.c")
@@ -44,10 +61,27 @@ def test_clientuserinfochanged_publishes_queue_surface() -> None:
 
 def test_queue_helpers_are_wired_into_init_and_frame_flow() -> None:
 	main_c = _read("src/code/game/g_main.c")
+	session_c = _read("src/code/game/g_session.c")
 
 	assert "G_UpdateTournamentQueuePositions();" in main_c
 	assert "G_SyncTournamentQueueTeamTasks();" in main_c
+	assert "AddTournamentPlayer();" in main_c
 	assert main_c.index("G_SyncTournamentQueueTeamTasks();") < main_c.index("CheckTournament();")
+	assert main_c.index("AddTournamentPlayer();") < main_c.index("G_SyncTournamentQueueTeamTasks();")
+	assert "if ( g_gametype.integer == GT_TOURNAMENT ) {" in session_c
+	assert "G_UpdateTournamentQueuePositions();" in session_c
+	assert session_c.index('trap_Cvar_Set( "session", va("%i", g_gametype.integer) );') < session_c.index("G_UpdateTournamentQueuePositions();")
+
+
+def test_addtournamentplayer_self_gates_and_resets_duel_pregame_state() -> None:
+	main_c = _read("src/code/game/g_main.c")
+	block = _extract_block(main_c, "void AddTournamentPlayer( void ) {")
+
+	assert "if ( g_gametype.integer != GT_TOURNAMENT ) {" in block
+	assert "if ( level.intermissiontime || level.intermissionQueued || level.timeoutActive ) {" in block
+	assert "G_ResetDuelWarmupState( qfalse );" in block
+	assert 'SetTeam( nextInLine, "f" );' in block
+	assert "G_ClearConnectedReadyStates( qtrue );" in block
 
 
 def test_queue_dirty_slot_is_documented_in_source_overlay() -> None:

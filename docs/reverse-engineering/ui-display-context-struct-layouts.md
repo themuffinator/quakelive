@@ -68,9 +68,9 @@ is a compact shader/sound/tuning tail.
 | `0x0000` | `fontStr` | `const char *` | Retained legacy font-path slot. The current asset-global parser and the committed retail token set both go straight through `font`, `smallFont`, and `bigFont` registration paths instead of storing through this field, and no active consumer was found. |
 | `0x0004` | `cursorStr` | `const char *` | Parsed cursor-shader path. The asset-global parser fills it before registering `Assets.cursor`. |
 | `0x0008` | `gradientStr` | `const char *` | Retained legacy gradient-path slot. The live parser path and committed retail token set use `gradientbar` and register `Assets.gradientBar` directly instead of storing through this field, and no active consumer was found. |
-| `0x000C` | `textFont` | `fontInfo_t` | Primary UI font. Populated by `AssetCache` or the asset-global `font` directive and used by the text paint helpers. |
-| `0x5050` | `smallFont` | `fontInfo_t` | Small-font variant used by the text paint helpers when `scale <= ui_smallFont`. |
-| `0xA094` | `bigFont` | `fontInfo_t` | Large-font variant used by the text paint helpers when `scale >= ui_bigFont`. |
+| `0x000C` | `textFont` | `fontInfo_t` | Primary UI font. Seeded by the asset-global `font` directive or the retail `MenuParse_font` registration path and used by the text paint helpers. |
+| `0x5050` | `smallFont` | `fontInfo_t` | Small-font variant used by the text paint helpers when `scale <= ui_smallFont`. Seeded by the asset-global `smallFont` directive or the retail menu-font normalization path. |
+| `0xA094` | `bigFont` | `fontInfo_t` | Large-font variant used by the text paint helpers when `scale >= ui_bigFont`. Seeded by the asset-global `bigFont` directive or the retail menu-font normalization path. |
 | `0xF0D8` | `cursor` | `qhandle_t` | Active cursor shader used by `UI_Refresh` when drawing the visible menu cursor. |
 | `0xF0DC` | `gradientBar` | `qhandle_t` | Gradient-bar shader used by `GradientBar_Paint`. |
 | `0xF0E0` | `scrollBarArrowUp` | `qhandle_t` | Up-arrow shader for vertical listbox scrollbars. |
@@ -129,7 +129,7 @@ menu runtime.
 | `0x0034` | `clearScene` | `void (*)(void)` | Scene reset hook for model/cinematic-backed item painting. |
 | `0x0038` | `addRefEntityToScene` | `void (*)(const refEntity_t *)` | Model-item scene submission hook. |
 | `0x003C` | `renderScene` | `void (*)(const refdef_t *)` | Model-item scene render hook. |
-| `0x0040` | `registerFont` | `void (*)(const char *, int, fontInfo_t *)` | Font registration hook used by the asset cache and asset-global parser. |
+| `0x0040` | `registerFont` | `void (*)(const char *, int, fontInfo_t *)` | Font registration hook used by the asset-global parser and the retail menu-font normalization/bootstrap path. |
 | `0x0044` | `ownerDrawItem` | `void (*)(float,float,float,float,float,float,int,int,int,float,float,vec4_t,qhandle_t,int)` | Owning UI-side ownerdraw dispatcher used by item paint paths. |
 
 ### Script, Cvar, Feeder, And Bind Hooks
@@ -211,9 +211,13 @@ menu runtime.
   - retained carry-over slots with no active producer/consumer in current
     evidence: `fontStr`, `gradientStr`, `buttonMiddle`, `buttonInside`,
     `solidBox`, `gradientImage`, and the tail `cursor` as a live draw input
-- `AssetCache` owns the fixed Quake Live-compatible shared textures and fonts:
+- `AssetCache` now owns the fixed Quake Live-compatible shared textures only:
   gradient bar, scrollbar assets, slider assets, effects-color strip assets,
   and the crosshair preview bank.
+- Core UI fonts are now owned by the parser/bootstrap side instead:
+  `Asset_Parse` seeds the asset-global `font` / `smallFont` / `bigFont`
+  buckets, while `MenuParse_font` normalizes menu-level font tokens onto the
+  same registered font bank.
 
 ## Open Questions
 

@@ -314,6 +314,8 @@ uint32_t QL_Steamworks_GetAppID( void );
 
 qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_t *outIdHigh );
 
+qboolean QL_Steamworks_SetInGameVoiceSpeaking( uint32_t idLow, uint32_t idHigh, qboolean speaking );
+
 int QL_Steamworks_GetFriendCount( int flags );
 
 qboolean QL_Steamworks_GetFriendByIndex( int index, int flags, uint32_t *outIdLow, uint32_t *outIdHigh );
@@ -754,6 +756,18 @@ static inline qboolean QL_Steamworks_GetUserSteamID( uint32_t *outIdLow, uint32_
 	if ( outIdHigh ) {
 		*outIdHigh = 0u;
 	}
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_SetInGameVoiceSpeaking
+=============
+*/
+static inline qboolean QL_Steamworks_SetInGameVoiceSpeaking( uint32_t idLow, uint32_t idHigh, qboolean speaking ) {
+	(void)idLow;
+	(void)idHigh;
+	(void)speaking;
 	return qfalse;
 }
 

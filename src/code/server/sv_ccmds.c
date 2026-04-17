@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define SV_FACTORY_FILE_LIST_BUFFER       4096
 
 #define SV_MAX_MAP_GAMETYPE_ALIASES       3
+#define SV_MAP_POOL_FILE_BYTES            0x8000
+#define SV_MAX_MAP_POOL_ENTRIES           1024
 
 typedef struct svFactoryParseState_s {
 	const char *cursor;
@@ -51,12 +53,24 @@ typedef struct svFactoryDefinition_s {
 	struct svFactoryDefinition_s *next;
 } svFactoryDefinition_t;
 
+typedef struct svMapPoolEntry_s {
+	char mapName[MAX_QPATH];
+	char mapTitle[MAX_INFO_VALUE];
+	char factoryId[MAX_QPATH];
+	char factoryTitle[MAX_INFO_VALUE];
+} svMapPoolEntry_t;
+
 static qboolean s_svFactoryRegistryLoaded = qfalse;
 static svFactoryDefinition_t *s_svFactoryList = NULL;
 static const svFactoryDefinition_t *s_svCurrentFactory = NULL;
+static svFactoryDefinition_t *s_svDetachedCurrentFactory = NULL;
 static qboolean s_svArenaRegistryLoaded = qfalse;
 static int s_svNumArenaInfos = 0;
 static char *s_svArenaInfos[MAX_ARENAS];
+static int s_svMapPoolCount = 0;
+static svMapPoolEntry_t s_svMapPool[SV_MAX_MAP_POOL_ENTRIES];
+
+static void SV_FactoryLoadSupplementalFiles( void );
 
 /*
 =============
@@ -824,20 +838,23 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 													Reads and parses a factories file.
 													=============
 													*/
-													static qboolean SV_FactoryLoadFile( const char *filename ) {
-														fileHandle_t file;
-														int length;
-														char *data;
+static qboolean SV_FactoryLoadFile( const char *filename ) {
+	fileHandle_t file;
+	int length;
+	char *data;
+	int totalCount = 0;
+	const svFactoryDefinition_t *factory;
 
-														length = FS_FOpenFileRead( filename, &file, qfalse );
-														if ( length <= 0 ) {
-															return qfalse;
-														}
-														if ( length >= SV_FACTORY_MAX_JSON_STRING * 64 ) {
-															Com_Printf( "factories: file %s too large (%i bytes)\n", filename, length );
-															FS_FCloseFile( file );
-															return qfalse;
-														}
+	length = FS_FOpenFileRead( filename, &file, qfalse );
+	if ( length <= 0 ) {
+		Com_Printf( "^1file not found: %s\n^7", filename );
+		return qfalse;
+	}
+	if ( length >= SV_FACTORY_MAX_JSON_STRING * 64 ) {
+		Com_Printf( "^1file too large: %s is %i, max allowed is %i^7", filename, length, SV_FACTORY_MAX_JSON_STRING * 64 );
+		FS_FCloseFile( file );
+		return qfalse;
+	}
 
 														data = ( char * )Z_Malloc( length + 1 );
 														if ( !data ) {
@@ -845,36 +862,56 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 															return qfalse;
 														}
 
-														FS_Read( data, length, file );
-														data[length] = '\0';
-														FS_FCloseFile( file );
+	FS_Read( data, length, file );
+	data[length] = '\0';
+	FS_FCloseFile( file );
 
-														SV_FactoryParseFactoriesBuffer( filename, data, length );
-														Z_Free( data );
-														return qtrue;
-													}
+	SV_FactoryParseFactoriesBuffer( filename, data, length );
+	Z_Free( data );
 
-													/*
-													=============
-													SV_FactoryLoadSupplementalFiles
+	for ( factory = s_svFactoryList; factory; factory = factory->next ) {
+		totalCount++;
+	}
 
-													Loads optional *.factories or *.factory files from the scripts directory.
-													=============
-													*/
-													static void SV_FactoryLoadSupplementalFiles( void ) {
+	Com_Printf( "loaded factories from %s, total %i\n", filename, totalCount );
+	return qtrue;
+}
+
+/*
+=============
+SV_FactoryLoadAllDefinitions
+
+Loads the retail base factories file plus any supplemental `*.factories`
+definitions shipped alongside it.
+=============
+*/
+static void SV_FactoryLoadAllDefinitions( void ) {
+	SV_FactoryLoadFile( "scripts/factories.txt" );
+	SV_FactoryLoadSupplementalFiles();
+}
+
+/*
+=============
+SV_FactoryLoadSupplementalFiles
+
+Loads optional `*.factories` files from the scripts directory, falling back to
+the singular `*.factory` suffix when no plural supplements are present.
+=============
+*/
+static void SV_FactoryLoadSupplementalFiles( void ) {
 														char fileList[SV_FACTORY_FILE_LIST_BUFFER];
 														char *cursor;
-														int count;
-														int index;
+	int count;
+	int index;
 
-														count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
-														if ( count <= 0 ) {
-															count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );
-														}
-														cursor = fileList;
-														for ( index = 0; index < count; index++ ) {
-															int length = strlen( cursor );
-															char path[MAX_QPATH];
+	count = FS_GetFileList( "scripts", ".factories", fileList, sizeof( fileList ) );
+	if ( count <= 0 ) {
+		count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );
+	}
+	cursor = fileList;
+	for ( index = 0; index < count; index++ ) {
+		int length = strlen( cursor );
+		char path[MAX_QPATH];
 
 															if ( length <= 0 ) {
 																cursor++;
@@ -884,25 +921,147 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 															Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
 															SV_FactoryLoadFile( path );
 															cursor += length + 1;
-														}
-													}
+	}
+}
 
-													/*
-													=============
-													SV_FactoryEnsureRegistryLoaded
+/*
+=============
+SV_FactoryCloneOverrides
+
+Creates a deep copy of a factory override list so the active selection can
+survive retail registry reloads.
+=============
+*/
+static svFactoryOverride_t *SV_FactoryCloneOverrides( const svFactoryOverride_t *source ) {
+	svFactoryOverride_t *head = NULL;
+	svFactoryOverride_t *tail = NULL;
+
+	while ( source ) {
+		svFactoryOverride_t *copy = ( svFactoryOverride_t * )Z_Malloc( sizeof( *copy ) );
+
+		if ( !copy ) {
+			SV_FactoryFreeOverrides( head );
+			return NULL;
+		}
+
+		copy->name = SV_FactoryCopyString( source->name );
+		copy->value = SV_FactoryCopyString( source->value );
+		copy->next = NULL;
+
+		if ( tail ) {
+			tail->next = copy;
+		} else {
+			head = copy;
+		}
+
+		tail = copy;
+		source = source->next;
+	}
+
+	return head;
+}
+
+/*
+=============
+SV_FactoryCloneDefinition
+
+Duplicates a parsed factory definition so the current selection can outlive a
+registry rebuild.
+=============
+*/
+static svFactoryDefinition_t *SV_FactoryCloneDefinition( const svFactoryDefinition_t *source ) {
+	svFactoryDefinition_t *copy;
+
+	if ( !source ) {
+		return NULL;
+	}
+
+	copy = ( svFactoryDefinition_t * )Z_Malloc( sizeof( *copy ) );
+	if ( !copy ) {
+		return NULL;
+	}
+
+	Com_Memset( copy, 0, sizeof( *copy ) );
+	copy->id = SV_FactoryCopyString( source->id );
+	copy->title = SV_FactoryCopyString( source->title );
+	copy->baseGametype = source->baseGametype;
+	copy->sourceFile = SV_FactoryCopyString( source->sourceFile );
+	copy->overrideCount = source->overrideCount;
+	copy->overrides = SV_FactoryCloneOverrides( source->overrides );
+	return copy;
+}
+
+/*
+=============
+SV_FactoryReleaseDetachedCurrentSelection
+
+Frees the preserved current-factory copy created during a retail reload once
+its overrides are no longer needed.
+=============
+*/
+static void SV_FactoryReleaseDetachedCurrentSelection( void ) {
+	if ( !s_svDetachedCurrentFactory ) {
+		return;
+	}
+
+	if ( s_svCurrentFactory == s_svDetachedCurrentFactory ) {
+		s_svCurrentFactory = NULL;
+	}
+
+	SV_FactoryFreeDefinition( s_svDetachedCurrentFactory );
+	s_svDetachedCurrentFactory = NULL;
+}
+
+/*
+=============
+SV_FactoryResetRegistry
+
+Clears the loaded factory registry, optionally preserving the active selection
+so running servers keep the retail-applied ruleset until the next map change.
+=============
+*/
+static void SV_FactoryResetRegistry( qboolean preserveCurrent ) {
+	svFactoryDefinition_t *definition = s_svFactoryList;
+	const svFactoryDefinition_t *currentFactory = s_svCurrentFactory;
+	svFactoryDefinition_t *preservedFactory = NULL;
+
+	if ( preserveCurrent && currentFactory && currentFactory->id ) {
+		preservedFactory = SV_FactoryCloneDefinition( currentFactory );
+		if ( preservedFactory ) {
+			Com_Printf( "not clearing currently loaded factory id %s, continuing\n", currentFactory->id );
+		}
+	}
+
+	SV_FactoryReleaseDetachedCurrentSelection();
+	s_svFactoryList = NULL;
+	s_svFactoryRegistryLoaded = qfalse;
+	s_svDetachedCurrentFactory = preservedFactory;
+
+	while ( definition ) {
+		svFactoryDefinition_t *next = definition->next;
+
+		SV_FactoryFreeDefinition( definition );
+		definition = next;
+	}
+
+	s_svCurrentFactory = s_svDetachedCurrentFactory;
+}
+
+/*
+=============
+SV_FactoryEnsureRegistryLoaded
 
 													Initialises the factory registry on demand.
 													=============
 													*/
-													static void SV_FactoryEnsureRegistryLoaded( void ) {
-														if ( s_svFactoryRegistryLoaded ) {
-															return;
-														}
+static void SV_FactoryEnsureRegistryLoaded( void ) {
+	if ( s_svFactoryRegistryLoaded ) {
+		return;
+	}
 
-														SV_FactoryLoadFile( "scripts/factories.txt" );
-														SV_FactoryLoadSupplementalFiles();
-														s_svFactoryRegistryLoaded = qtrue;
-													}
+	SV_FactoryLoadAllDefinitions();
+	s_svFactoryRegistryLoaded = qtrue;
+}
 
 													/*
 													=============
@@ -977,19 +1136,24 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 													Applies the selected host-side factory before the next map bootstraps qagame.
 													=============
 													*/
-													static void SV_FactoryApplySelection( const svFactoryDefinition_t *factory ) {
-														const svFactoryOverride_t *override;
-														char gametypeBuffer[8];
+static void SV_FactoryApplySelection( const svFactoryDefinition_t *factory ) {
+	const svFactoryOverride_t *override;
+	char gametypeBuffer[8];
+	const svFactoryDefinition_t *previousFactory;
 
-														if ( s_svCurrentFactory == factory ) {
-															return;
-														}
+	if ( s_svCurrentFactory == factory ) {
+		return;
+	}
 
-														SV_FactoryResetOverrides( s_svCurrentFactory );
+	previousFactory = s_svCurrentFactory;
+	SV_FactoryResetOverrides( previousFactory );
+	if ( previousFactory == s_svDetachedCurrentFactory ) {
+		SV_FactoryReleaseDetachedCurrentSelection();
+	}
 
-														for ( override = factory ? factory->overrides : NULL; override; override = override->next ) {
-															if ( override->name && override->value ) {
-																Cvar_Set( override->name, override->value );
+	for ( override = factory ? factory->overrides : NULL; override; override = override->next ) {
+		if ( override->name && override->value ) {
+			Cvar_Set( override->name, override->value );
 															}
 														}
 
@@ -1065,77 +1229,111 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 														return count;
 													}
 
-													/*
-													=============
-													SV_LoadArenasFromFile
+/*
+=============
+SV_ClearArenaRegistry
 
-													Loads arena definitions from the given file.
-													=============
-													*/
-													static void SV_LoadArenasFromFile( const char *filename ) {
-														fileHandle_t file;
-														int length;
-														char buffer[MAX_ARENAS_TEXT];
+Releases the cached host arena metadata so it can be rebuilt from disk.
+=============
+*/
+static void SV_ClearArenaRegistry( void ) {
+	int index;
 
-														length = FS_FOpenFileRead( filename, &file, qfalse );
-														if ( length <= 0 ) {
-															return;
-														}
-														if ( length >= MAX_ARENAS_TEXT ) {
-															Com_Printf( "arenas: file %s too large (%i bytes)\n", filename, length );
-															FS_FCloseFile( file );
-															return;
-														}
+	for ( index = 0; index < s_svNumArenaInfos; index++ ) {
+		if ( s_svArenaInfos[index] ) {
+			Z_Free( s_svArenaInfos[index] );
+			s_svArenaInfos[index] = NULL;
+		}
+	}
+
+	s_svNumArenaInfos = 0;
+	s_svArenaRegistryLoaded = qfalse;
+}
+
+/*
+=============
+SV_LoadArenasFromFile
+
+Loads arena definitions from the given file.
+=============
+*/
+static void SV_LoadArenasFromFile( const char *filename ) {
+	fileHandle_t file;
+	int length;
+	char buffer[MAX_ARENAS_TEXT];
+
+	length = FS_FOpenFileRead( filename, &file, qfalse );
+	if ( length <= 0 ) {
+		Com_Printf( "^1file not found: %s\n", filename );
+		return;
+	}
+	if ( length >= MAX_ARENAS_TEXT ) {
+		Com_Printf( "^1file too large: %s is %i, max allowed is %i^7", filename, length, MAX_ARENAS_TEXT );
+		FS_FCloseFile( file );
+		return;
+	}
 
 														FS_Read( buffer, length, file );
 														buffer[length] = '\0';
 														FS_FCloseFile( file );
 
 														s_svNumArenaInfos += SV_ParseInfos( buffer, MAX_ARENAS - s_svNumArenaInfos, &s_svArenaInfos[s_svNumArenaInfos] );
-													}
+}
 
-													/*
-													=============
-													SV_LoadArenaRegistry
+/*
+=============
+SV_LoadArenas
 
-													Initialises the cached arena metadata used for gametype validation.
-													=============
-													*/
-													static void SV_LoadArenaRegistry( void ) {
-														char fileList[MAX_ARENAS_TEXT];
-														char *cursor;
-														int count;
-														int index;
+Initialises the cached arena metadata used for retail map validation.
+=============
+*/
+static void SV_LoadArenas( void ) {
+	char fileList[MAX_ARENAS_TEXT];
+	char *cursor;
+	int count;
+	int index;
 
-														if ( s_svArenaRegistryLoaded ) {
-															return;
-														}
+	SV_ClearArenaRegistry();
+	SV_LoadArenasFromFile( "scripts/arenas.txt" );
 
-														s_svNumArenaInfos = 0;
-														SV_LoadArenasFromFile( "scripts/arenas.txt" );
+	count = FS_GetFileList( "scripts", ".arena", fileList, sizeof( fileList ) );
+	cursor = fileList;
+	for ( index = 0; index < count; index++ ) {
+		int length = strlen( cursor );
+		char path[MAX_QPATH];
 
-														count = FS_GetFileList( "scripts", ".arena", fileList, sizeof( fileList ) );
-														cursor = fileList;
-														for ( index = 0; index < count; index++ ) {
-															int length = strlen( cursor );
-															char path[MAX_QPATH];
+		if ( length <= 0 ) {
+			cursor++;
+			continue;
+		}
 
-															if ( length <= 0 ) {
-																cursor++;
-																continue;
-															}
+		Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
+		SV_LoadArenasFromFile( path );
+		cursor += length + 1;
+	}
 
-															Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
-															SV_LoadArenasFromFile( path );
-															cursor += length + 1;
-														}
+	s_svArenaRegistryLoaded = qtrue;
+	Com_Printf( "%i arenas parsed\n", s_svNumArenaInfos );
+}
 
-														s_svArenaRegistryLoaded = qtrue;
-													}
+/*
+=============
+SV_EnsureArenaRegistryLoaded
 
-													/*
-													=============
-													SV_GetArenaInfoByMap
+Initialises the cached arena metadata used for gametype validation.
+=============
+*/
+static void SV_EnsureArenaRegistryLoaded( void ) {
+	if ( s_svArenaRegistryLoaded ) {
+		return;
+	}
+
+	SV_LoadArenas();
+}
+
+/*
+=============
+SV_GetArenaInfoByMap
 
 													Returns arena metadata for the supplied map name when available.
 													=============
@@ -1143,15 +1341,15 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 													static const char *SV_GetArenaInfoByMap( const char *map ) {
 														int index;
 
-														if ( !map || !*map ) {
-															return NULL;
-														}
+	if ( !map || !*map ) {
+		return NULL;
+	}
 
-														SV_LoadArenaRegistry();
-														for ( index = 0; index < s_svNumArenaInfos; index++ ) {
-															if ( !Q_stricmp( Info_ValueForKey( s_svArenaInfos[index], "map" ), map ) ) {
-																return s_svArenaInfos[index];
-															}
+	SV_EnsureArenaRegistryLoaded();
+	for ( index = 0; index < s_svNumArenaInfos; index++ ) {
+		if ( !Q_stricmp( Info_ValueForKey( s_svArenaInfos[index], "map" ), map ) ) {
+			return s_svArenaInfos[index];
+		}
 														}
 
 														return NULL;
@@ -1206,8 +1404,8 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 													Determines whether the supplied map exposes entities for the requested gametype.
 													=============
 													*/
-													static qboolean SV_MapSupportsGametype( const char *mapName, gametype_t gametype ) {
-														static const char *const s_gametypeTokens[GT_MAX_GAME_TYPE][SV_MAX_MAP_GAMETYPE_ALIASES] = {
+static qboolean SV_MapSupportsGametype( const char *mapName, gametype_t gametype ) {
+	static const char *const s_gametypeTokens[GT_MAX_GAME_TYPE][SV_MAX_MAP_GAMETYPE_ALIASES] = {
 															[GT_FFA] = { "ffa", NULL, NULL },
 															[GT_TOURNAMENT] = { "duel", "tourney", NULL },
 															[GT_SINGLE_PLAYER] = { "single", NULL, NULL },
@@ -1255,8 +1453,439 @@ static char *SV_FactoryParseJsonString( svFactoryParseState_t *state ) {
 															}
 														}
 
-														return qfalse;
-													}
+	return qfalse;
+}
+
+/*
+=============
+SV_GetArenaDisplayTitle
+
+Returns the host-visible long title for the supplied map, falling back to the
+raw map token when the arena catalog does not expose one.
+=============
+*/
+static void SV_GetArenaDisplayTitle( const char *mapName, char *buffer, int bufferSize ) {
+	const char *arenaInfo;
+	const char *longName;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	if ( !mapName || !*mapName ) {
+		return;
+	}
+
+	arenaInfo = SV_GetArenaInfoByMap( mapName );
+	if ( arenaInfo ) {
+		longName = Info_ValueForKey( arenaInfo, "longname" );
+		if ( longName && *longName ) {
+			Q_strncpyz( buffer, longName, bufferSize );
+			return;
+		}
+	}
+
+	Q_strncpyz( buffer, mapName, bufferSize );
+}
+
+/*
+=============
+SV_MapPoolTrimToken
+
+Strips leading and trailing whitespace from a parsed map-pool token.
+=============
+*/
+static void SV_MapPoolTrimToken( char *token ) {
+	char *start;
+	char *end;
+
+	if ( !token ) {
+		return;
+	}
+
+	start = token;
+	while ( *start == ' ' || *start == '\t' ) {
+		start++;
+	}
+
+	end = start + strlen( start );
+	while ( end > start && ( end[-1] == ' ' || end[-1] == '\t' ) ) {
+		end--;
+	}
+	*end = '\0';
+
+	if ( start != token ) {
+		memmove( token, start, ( end - start ) + 1 );
+	}
+}
+
+/*
+=============
+SV_MapPoolClear
+
+Resets the loaded retail map-pool cache.
+=============
+*/
+static void SV_MapPoolClear( void ) {
+	Com_Memset( s_svMapPool, 0, sizeof( s_svMapPool ) );
+	s_svMapPoolCount = 0;
+}
+
+/*
+=============
+SV_MapPoolAppendEntry
+
+Appends one validated retail map-pool entry to the host cache.
+=============
+*/
+static void SV_MapPoolAppendEntry( const char *mapName, const char *mapTitle, const svFactoryDefinition_t *factory ) {
+	svMapPoolEntry_t *entry;
+
+	if ( s_svMapPoolCount >= SV_MAX_MAP_POOL_ENTRIES || !mapName || !*mapName || !factory ) {
+		return;
+	}
+
+	entry = &s_svMapPool[s_svMapPoolCount++];
+	Com_Memset( entry, 0, sizeof( *entry ) );
+	Q_strncpyz( entry->mapName, mapName, sizeof( entry->mapName ) );
+	Q_strncpyz( entry->mapTitle, ( mapTitle && *mapTitle ) ? mapTitle : mapName, sizeof( entry->mapTitle ) );
+	Q_strncpyz( entry->factoryId, factory->id ? factory->id : "", sizeof( entry->factoryId ) );
+	Q_strncpyz( entry->factoryTitle, factory->title ? factory->title : "", sizeof( entry->factoryTitle ) );
+}
+
+/*
+=============
+SV_MapPoolLoadLine
+
+Parses and validates one retail map-pool definition line.
+=============
+*/
+static void SV_MapPoolLoadLine( const char *line ) {
+	char lineBuffer[MAX_STRING_CHARS * 2];
+	char *mapSeparator;
+	char *comment;
+	char *mapToken;
+	char *factoryToken;
+	char mapPath[MAX_QPATH];
+	char mapTitle[MAX_INFO_VALUE];
+	const svFactoryDefinition_t *factory;
+
+	if ( !line ) {
+		return;
+	}
+
+	Q_strncpyz( lineBuffer, line, sizeof( lineBuffer ) );
+	mapToken = lineBuffer;
+	while ( *mapToken == ' ' || *mapToken == '\t' ) {
+		mapToken++;
+	}
+
+	if ( !*mapToken || *mapToken == '#' ) {
+		return;
+	}
+
+	comment = strchr( mapToken, '#' );
+	if ( comment ) {
+		*comment = '\0';
+	}
+
+	mapSeparator = strchr( mapToken, '|' );
+	if ( !mapSeparator ) {
+		Com_Printf( "^1map rotation item missing map or factory name, skipping: %s\n^7", line );
+		return;
+	}
+
+	*mapSeparator = '\0';
+	factoryToken = mapSeparator + 1;
+
+	SV_MapPoolTrimToken( mapToken );
+	SV_MapPoolTrimToken( factoryToken );
+	if ( !mapToken[0] || !factoryToken[0] ) {
+		Com_Printf( "^1map rotation item missing map or factory name, skipping: %s\n^7", line );
+		return;
+	}
+
+	factory = SV_FactoryFindById( factoryToken );
+	if ( !factory || factoryToken[0] == '_' ) {
+		Com_Printf( "^1invalid factory found in rotation, skipping: %s\n^7", line );
+		return;
+	}
+
+	Com_sprintf( mapPath, sizeof( mapPath ), "maps/%s.bsp", mapToken );
+	if ( FS_ReadFile( mapPath, NULL ) == -1 ) {
+		Com_Printf( "^1map doesn't exist, skipping: %s\n^7", mapToken );
+		return;
+	}
+
+	if ( !SV_MapSupportsGametype( mapToken, factory->baseGametype ) ) {
+		Com_Printf( "^1map isn't valid for factory gametype, skipping: %s\n^7", line );
+		return;
+	}
+
+	SV_GetArenaDisplayTitle( mapToken, mapTitle, sizeof( mapTitle ) );
+	SV_MapPoolAppendEntry( mapToken, mapTitle, factory );
+}
+
+/*
+=============
+SV_MapPoolLoadFromFile
+
+Loads and validates the retail host map-pool file.
+=============
+*/
+static qboolean SV_MapPoolLoadFromFile( const char *path ) {
+	fileHandle_t file;
+	int length;
+	static char buffer[SV_MAP_POOL_FILE_BYTES];
+	char *cursor;
+
+	if ( !path || !*path ) {
+		path = "mappool.txt";
+	}
+
+	length = FS_FOpenFileRead( path, &file, qfalse );
+	if ( length <= 0 ) {
+		Com_Printf( "^1rotation file not found: %s\n^7", path );
+		return qfalse;
+	}
+	if ( length >= SV_MAP_POOL_FILE_BYTES ) {
+		Com_Printf( "^1rotations file too large: %s is %i, max allowed is %i^7", path, length, SV_MAP_POOL_FILE_BYTES );
+		FS_FCloseFile( file );
+		return qfalse;
+	}
+
+	FS_Read( buffer, length, file );
+	buffer[length] = '\0';
+	FS_FCloseFile( file );
+
+	SV_EnsureArenaRegistryLoaded();
+	SV_FactoryEnsureRegistryLoaded();
+
+	cursor = buffer;
+	while ( *cursor && s_svMapPoolCount < SV_MAX_MAP_POOL_ENTRIES ) {
+		char lineBuffer[MAX_STRING_CHARS * 2];
+		int lineLength = 0;
+
+		while ( cursor[lineLength] && cursor[lineLength] != '\n' && cursor[lineLength] != '\r'
+			&& lineLength < sizeof( lineBuffer ) - 1 ) {
+			lineBuffer[lineLength] = cursor[lineLength];
+			lineLength++;
+		}
+		lineBuffer[lineLength] = '\0';
+		SV_MapPoolLoadLine( lineBuffer );
+
+		cursor += lineLength;
+		while ( *cursor == '\n' || *cursor == '\r' ) {
+			cursor++;
+		}
+	}
+
+	Com_Printf( "loaded %i maps into the map pool\n", s_svMapPoolCount );
+	return ( s_svMapPoolCount > 0 );
+}
+
+/*
+=============
+SV_MapPoolSelectRandomEntry
+
+Returns a retail-style random entry from the loaded map pool, falling back to
+`campgrounds` when the pool is empty.
+=============
+*/
+static const svMapPoolEntry_t *SV_MapPoolSelectRandomEntry( void ) {
+	static svMapPoolEntry_t fallbackEntry;
+	int index;
+
+	if ( s_svMapPoolCount <= 0 ) {
+		Com_Memset( &fallbackEntry, 0, sizeof( fallbackEntry ) );
+		Q_strncpyz( fallbackEntry.mapName, "campgrounds", sizeof( fallbackEntry.mapName ) );
+		Q_strncpyz( fallbackEntry.mapTitle, "campgrounds", sizeof( fallbackEntry.mapTitle ) );
+		if ( s_svCurrentFactory ) {
+			Q_strncpyz( fallbackEntry.factoryId, s_svCurrentFactory->id ? s_svCurrentFactory->id : "", sizeof( fallbackEntry.factoryId ) );
+			Q_strncpyz( fallbackEntry.factoryTitle, s_svCurrentFactory->title ? s_svCurrentFactory->title : "", sizeof( fallbackEntry.factoryTitle ) );
+		}
+		return &fallbackEntry;
+	}
+
+	index = ( rand() ^ Com_Milliseconds() ) % s_svMapPoolCount;
+	if ( index < 0 ) {
+		index = 0;
+	}
+
+	return &s_svMapPool[index];
+}
+
+/*
+=============
+SV_MapPoolUpdateNextMap
+
+Refreshes the retail `nextmap` command from the loaded map-pool state.
+=============
+*/
+static void SV_MapPoolUpdateNextMap( void ) {
+	const svMapPoolEntry_t *entry;
+
+	if ( s_svMapPoolCount <= 0 ) {
+		Cvar_Set( "nextmap", "map_restart 0" );
+		return;
+	}
+
+	entry = SV_MapPoolSelectRandomEntry();
+	Cvar_Set( "nextmap", va( "map %s %s", entry->mapName, entry->factoryId ) );
+}
+
+/*
+=============
+SV_MapPoolBuildNextMapsCvar
+
+Builds the retail `nextmaps` preview payload consumed by the downstream
+intermission vote UI.
+=============
+*/
+static void SV_MapPoolBuildNextMapsCvar( void ) {
+	char nextmaps[MAX_STRING_CHARS];
+	int slot = 0;
+	int index;
+
+	nextmaps[0] = '\0';
+
+	if ( sv_includeCurrentMapInVote && sv_includeCurrentMapInVote->integer && s_svCurrentFactory ) {
+		char currentMap[MAX_QPATH];
+		char currentTitle[MAX_INFO_VALUE];
+
+		Q_strncpyz( currentMap, Cvar_VariableString( "mapname" ), sizeof( currentMap ) );
+		if ( currentMap[0] ) {
+			SV_GetArenaDisplayTitle( currentMap, currentTitle, sizeof( currentTitle ) );
+			Info_SetValueForKey( nextmaps, va( "map_%i", slot ), currentMap );
+			Info_SetValueForKey( nextmaps, va( "title_%i", slot ), currentTitle );
+			Info_SetValueForKey( nextmaps, va( "cfg_%i", slot ), s_svCurrentFactory->id ? s_svCurrentFactory->id : "" );
+			Info_SetValueForKey( nextmaps, va( "gt_%i", slot ), s_svCurrentFactory->title ? s_svCurrentFactory->title : "" );
+			slot++;
+		}
+	}
+
+	if ( s_svMapPoolCount >= 4 ) {
+		qboolean used[SV_MAX_MAP_POOL_ENTRIES];
+
+		Com_Memset( used, 0, sizeof( used ) );
+		while ( slot < 3 ) {
+			const svMapPoolEntry_t *entry;
+
+			index = ( rand() ^ Com_Milliseconds() ) % s_svMapPoolCount;
+			if ( index < 0 ) {
+				index = 0;
+			}
+			if ( used[index] ) {
+				continue;
+			}
+
+			used[index] = qtrue;
+			entry = &s_svMapPool[index];
+			Info_SetValueForKey( nextmaps, va( "map_%i", slot ), entry->mapName );
+			Info_SetValueForKey( nextmaps, va( "title_%i", slot ), entry->mapTitle );
+			Info_SetValueForKey( nextmaps, va( "cfg_%i", slot ), entry->factoryId );
+			Info_SetValueForKey( nextmaps, va( "gt_%i", slot ), entry->factoryTitle );
+			slot++;
+		}
+	} else {
+		for ( index = 0; index < s_svMapPoolCount && slot < 3; index++ ) {
+			const svMapPoolEntry_t *entry = &s_svMapPool[index];
+
+			Info_SetValueForKey( nextmaps, va( "map_%i", slot ), entry->mapName );
+			Info_SetValueForKey( nextmaps, va( "title_%i", slot ), entry->mapTitle );
+			Info_SetValueForKey( nextmaps, va( "cfg_%i", slot ), entry->factoryId );
+			Info_SetValueForKey( nextmaps, va( "gt_%i", slot ), entry->factoryTitle );
+			slot++;
+		}
+	}
+
+	Cvar_Set( "nextmaps", nextmaps );
+}
+
+/*
+=============
+ReloadArenaDefinitions_f
+
+Reloads the host-side arena catalog from retail assets.
+=============
+*/
+static void ReloadArenaDefinitions_f( void ) {
+	Com_Printf( "reloading arena definitions...\n" );
+	SV_LoadArenas();
+}
+
+/*
+=============
+MapPool_Reload_f
+
+Reloads the retail host map pool from the current `sv_mapPoolFile` path.
+=============
+*/
+static void MapPool_Reload_f( void ) {
+	Com_Printf( "reloading map pool...\n" );
+	SV_MapPoolClear();
+	SV_MapPoolLoadFromFile( sv_mapPoolFile ? sv_mapPoolFile->string : "mappool.txt" );
+}
+
+/*
+=============
+StartRandomMap_f
+
+Queues the retail random map-pool starter command.
+=============
+*/
+static void StartRandomMap_f( void ) {
+	const svMapPoolEntry_t *entry = SV_MapPoolSelectRandomEntry();
+
+	Cbuf_AddText( va( "map %s %s\n", entry->mapName, entry->factoryId ) );
+}
+
+/*
+=============
+Factory_Reload_f
+
+Rebuilds the host-side factory registry while preserving the currently loaded
+selection until the next map change.
+=============
+*/
+static void Factory_Reload_f( void ) {
+	SV_FactoryResetRegistry( qtrue );
+	SV_FactoryEnsureRegistryLoaded();
+	s_svFactoryRegistryLoaded = qtrue;
+}
+
+/*
+=============
+SV_InitRetailOperatorData
+
+Preloads the retail arena, factory, and map-pool data owned by the server
+operator command surface.
+=============
+*/
+void SV_InitRetailOperatorData( void ) {
+	if ( !s_svArenaRegistryLoaded ) {
+		SV_LoadArenas();
+	}
+
+	SV_FactoryEnsureRegistryLoaded();
+
+	SV_MapPoolClear();
+	SV_MapPoolLoadFromFile( sv_mapPoolFile ? sv_mapPoolFile->string : "mappool.txt" );
+}
+
+/*
+=============
+SV_UpdateMapPoolRotationCvars
+
+Refreshes the retail `nextmap` and `nextmaps` cvars after map boots and
+restart-style command paths.
+=============
+*/
+void SV_UpdateMapPoolRotationCvars( void ) {
+	SV_MapPoolUpdateNextMap();
+	SV_MapPoolBuildNextMapsCvar();
+}
 
 
 /*
@@ -1473,6 +2102,167 @@ static void SV_Map_f( void ) {
 	} else {
 		Cvar_Set( "sv_cheats", "0" );
 	}
+
+	if ( !com_dedicated->integer ) {
+		Cvar_Set( "ui_singlePlayerActive", "1" );
+		Cvar_Set( "ui_priv", "3" );
+	}
+}
+
+/*
+==================
+SV_Arena_f
+
+Launches a retail single-player arena descriptor from `scripts/*.sp_arena`.
+==================
+*/
+static void SV_Arena_f( void ) {
+	const char	*arenaName;
+	fileHandle_t	file;
+	int		length;
+	char		path[MAX_QPATH];
+	char		buffer[1024];
+	char		*cursor;
+	char		*token;
+	int		fragLimit;
+	int		timeLimit;
+	int		botSkill;
+	char		mapName[MAX_QPATH];
+	char		mapPath[MAX_QPATH];
+	char		botList[MAX_INFO_VALUE];
+	qboolean	valid;
+
+	arenaName = Cmd_Argv( 1 );
+	if ( !arenaName || !arenaName[0] ) {
+		Com_Printf( "No arena name passed\n" );
+		return;
+	}
+
+	fragLimit = 20;
+	timeLimit = 0;
+	botSkill = (int)Cvar_VariableValue( "g_spSkill" );
+	mapName[0] = '\0';
+	botList[0] = '\0';
+
+	Com_sprintf( path, sizeof( path ), "scripts/%s.sp_arena", arenaName );
+	length = FS_FOpenFileRead( path, &file, qfalse );
+	if ( length <= 0 ) {
+		Com_Printf( "^1file not found: %s\n", path );
+		return;
+	}
+	if ( length >= sizeof( buffer ) ) {
+		Com_Printf( "^1file too large: %s is %i, max allowed is %i", path, length, sizeof( buffer ) );
+		FS_FCloseFile( file );
+		return;
+	}
+
+	FS_Read( buffer, length, file );
+	buffer[length] = '\0';
+	FS_FCloseFile( file );
+
+	cursor = buffer;
+	token = COM_Parse( &cursor );
+	if ( !token[0] ) {
+		Com_Printf( "%s is empty!\n", path );
+		return;
+	}
+	if ( strcmp( token, "{" ) ) {
+		Com_Printf( "Missing initial \"{\" in %s!\n", path );
+		return;
+	}
+
+	valid = qtrue;
+	while ( valid ) {
+		token = COM_ParseExt( &cursor, qtrue );
+		if ( !token[0] ) {
+			Com_Printf( "Unexpected end of info file!\n" );
+			return;
+		}
+		if ( !strcmp( token, "}" ) ) {
+			break;
+		}
+
+		if ( !Q_stricmp( token, "fraglimit" ) ) {
+			token = COM_ParseExt( &cursor, qfalse );
+			if ( !token[0] ) {
+				Com_Printf( "No matching value given for fraglimit!\n" );
+				return;
+			}
+
+			fragLimit = atoi( token );
+			if ( fragLimit < 1 ) {
+				Com_Printf( "Fraglimit was an invalid value! Valid values are 1 or greater. Setting to 20.\n" );
+				fragLimit = 20;
+			}
+		} else if ( !Q_stricmp( token, "timelimit" ) ) {
+			token = COM_ParseExt( &cursor, qfalse );
+			if ( !token[0] ) {
+				Com_Printf( "No matching value given for timelimit!\n" );
+				return;
+			}
+
+			timeLimit = atoi( token );
+			if ( timeLimit < 0 ) {
+				Com_Printf( "timelimit was an invalid value! Valid values are 0 or greater. Setting to 0.\n" );
+				timeLimit = 0;
+			}
+		} else if ( !Q_stricmp( token, "bot_skill" ) ) {
+			token = COM_ParseExt( &cursor, qfalse );
+			if ( !token[0] ) {
+				Com_Printf( "No matching value given for botSkill!\n" );
+				return;
+			}
+
+			botSkill = atoi( token );
+			if ( botSkill < 1 || botSkill > 5 ) {
+				Com_Printf( "bot_skill was an invalid value! Valid values are 1 - 5. Setting to 4.\n" );
+				botSkill = 4;
+			}
+		} else if ( !Q_stricmp( token, "map" ) ) {
+			token = COM_ParseExt( &cursor, qfalse );
+			if ( !token[0] ) {
+				Com_Printf( "No map name given!\n" );
+				return;
+			}
+
+			Q_strncpyz( mapName, token, sizeof( mapName ) );
+			Com_sprintf( mapPath, sizeof( mapPath ), "maps/%s.bsp", mapName );
+			if ( FS_ReadFile( mapPath, NULL ) == -1 ) {
+				Com_Printf( "Can't find map %s!\n", mapPath );
+				return;
+			}
+		} else if ( !Q_stricmp( token, "bots" ) ) {
+			token = COM_ParseExt( &cursor, qfalse );
+			if ( !token[0] ) {
+				Com_Printf( "No bot names given for bots!\n" );
+				return;
+			}
+
+			Q_strncpyz( botList, token, sizeof( botList ) );
+		} else {
+			Com_Printf( "Unknown value in %s\n", path );
+			valid = qfalse;
+		}
+	}
+
+	if ( !valid ) {
+		return;
+	}
+	if ( !mapName[0] ) {
+		Com_Printf( "No map name given!\n" );
+		return;
+	}
+
+	Cvar_SetValue( "g_gametype", GT_FFA );
+	Cvar_SetValue( "g_spSkill", botSkill );
+	Cvar_SetValue( "fraglimit", fragLimit );
+	Cvar_SetValue( "timelimit", timeLimit );
+	if ( botList[0] ) {
+		Cvar_Set( "g_botSpawnList", botList );
+	}
+
+	SV_SpawnServer( mapName, qtrue );
+	Cvar_Set( "sv_cheats", "0" );
 }
 
 /*
@@ -1597,6 +2387,8 @@ static void SV_MapRestart_f( void ) {
 	// run another frame to allow things to look at all the players
 	VM_Call( gvm, GAME_RUN_FRAME, svs.time );
 	svs.time += 100;
+
+	SV_UpdateMapPoolRotationCvars();
 }
 
 //===============================================================
@@ -1611,6 +2403,8 @@ Kick a user off of the server  FIXME: move to game
 static void SV_Kick_f( void ) {
 	client_t	*cl;
 	int			i;
+	const char	*reason;
+	const char	*dropReason;
 
 	// make sure server is running
 	if ( !com_sv_running->integer ) {
@@ -1618,9 +2412,16 @@ static void SV_Kick_f( void ) {
 		return;
 	}
 
-	if ( Cmd_Argc() != 2 ) {
+	if ( Cmd_Argc() == 1 ) {
 		Com_Printf ("Usage: kick <player name>\nkick all = kick everyone\nkick allbots = kick all bots\n");
 		return;
+	}
+
+	reason = ( Cmd_Argc() > 2 ) ? Cmd_Argv( 2 ) : NULL;
+	if ( reason && reason[0] && strlen( reason ) < 0x80 ) {
+		dropReason = va( "was kicked: %s", reason );
+	} else {
+		dropReason = "was kicked";
 	}
 
 	cl = SV_GetPlayerByName();
@@ -1633,7 +2434,7 @@ static void SV_Kick_f( void ) {
 				if( cl->netchan.remoteAddress.type == NA_LOOPBACK ) {
 					continue;
 				}
-				SV_DropClient( cl, "was kicked" );
+				SV_DropClient( cl, dropReason );
 				cl->lastPacketTime = svs.time;	// in case there is a funny zombie
 			}
 		}
@@ -1645,18 +2446,18 @@ static void SV_Kick_f( void ) {
 				if( cl->netchan.remoteAddress.type != NA_BOT ) {
 					continue;
 				}
-				SV_DropClient( cl, "was kicked" );
+				SV_DropClient( cl, dropReason );
 				cl->lastPacketTime = svs.time;	// in case there is a funny zombie
 			}
 		}
 		return;
 	}
 	if( cl->netchan.remoteAddress.type == NA_LOOPBACK ) {
-		SV_SendServerCommand(NULL, "print \"%s\"", "Cannot kick host player\n");
+		SV_SendServerCommand(NULL, "print \"%s\"", "Cannot kick host player.\n");
 		return;
 	}
 
-	SV_DropClient( cl, "was kicked" );
+	SV_DropClient( cl, dropReason );
 	cl->lastPacketTime = svs.time;	// in case there is a funny zombie
 }
 
@@ -1806,6 +2607,45 @@ static void SV_KickNum_f( void ) {
 
 /*
 ================
+SV_StatusClientSteamId
+================
+*/
+static unsigned long long SV_StatusClientSteamId( const client_t *cl ) {
+	const char			*steamId;
+	const char			*cursor;
+	unsigned long long	value;
+
+	if ( !cl ) {
+		return 0ull;
+	}
+
+#if SV_HAS_PLATFORM_AUTH
+	if ( cl->platformSteamId[0] ) {
+		steamId = cl->platformSteamId;
+	} else
+#endif
+	{
+		steamId = Info_ValueForKey( cl->userinfo, "steamid" );
+	}
+
+	if ( !steamId || !steamId[0] ) {
+		return 0ull;
+	}
+
+	value = 0ull;
+	for ( cursor = steamId; *cursor; cursor++ ) {
+		if ( *cursor < '0' || *cursor > '9' ) {
+			return 0ull;
+		}
+
+		value = value * 10ull + (unsigned long long)( *cursor - '0' );
+	}
+
+	return value;
+}
+
+/*
+================
 SV_Status_f
 ================
 */
@@ -1815,6 +2655,7 @@ static void SV_Status_f( void ) {
 	playerState_t	*ps;
 	const char		*s;
 	int			ping;
+	unsigned long long	steamIdValue;
 
 	// make sure server is running
 	if ( !com_sv_running->integer ) {
@@ -1824,8 +2665,8 @@ static void SV_Status_f( void ) {
 
 	Com_Printf ("map: %s\n", sv_mapname->string );
 
-	Com_Printf ("num score ping name            lastmsg address               qport rate\n");
-	Com_Printf ("--- ----- ---- --------------- ------- --------------------- ----- -----\n");
+	Com_Printf ("num score ping name            lastmsg address               qport rate  steamid\n");
+	Com_Printf ("--- ----- ---- --------------- ------- --------------------- ----- ----- -----------------\n");
 	for (i=0,cl=svs.clients ; i < sv_maxclients->integer ; i++,cl++)
 	{
 		if (!cl->state)
@@ -1863,6 +2704,8 @@ static void SV_Status_f( void ) {
 		Com_Printf ("%5i", cl->netchan.qport);
 
 		Com_Printf (" %5i", cl->rate);
+		steamIdValue = SV_StatusClientSteamId( cl );
+		Com_Printf (" %llu", steamIdValue);
 
 		Com_Printf ("\n");
 	}
@@ -2102,27 +2945,26 @@ void SV_AddOperatorCommands( void ) {
 	}
 	initialized = qtrue;
 
-	Cmd_AddCommand ("heartbeat", SV_Heartbeat_f);
 	Cmd_AddCommand ("kick", SV_Kick_f);
-	Cmd_AddCommand ("banUser", SV_Ban_f);
-	Cmd_AddCommand ("banClient", SV_BanNum_f);
 	Cmd_AddCommand ("clientkick", SV_KickNum_f);
 	Cmd_AddCommand ("status", SV_Status_f);
 	Cmd_AddCommand ("serverinfo", SV_Serverinfo_f);
-	Cmd_AddCommand ("systeminfo", SV_Systeminfo_f);
 	Cmd_AddCommand ("dumpuser", SV_DumpUser_f);
 	Cmd_AddCommand ("map_restart", SV_MapRestart_f);
 	Cmd_AddCommand ("sectorlist", SV_SectorList_f);
 	Cmd_AddCommand ("map", SV_Map_f);
+	Cmd_AddCommand ("arena", SV_Arena_f);
 #ifndef PRE_RELEASE_DEMO
 	Cmd_AddCommand ("devmap", SV_Map_f);
-	Cmd_AddCommand ("spmap", SV_Map_f);
-	Cmd_AddCommand ("spdevmap", SV_Map_f);
 #endif
 	Cmd_AddCommand ("killserver", SV_KillServer_f);
 	Cmd_AddCommand ("steam_downloadugc", SV_SteamCmd_DownloadUGC_f);
 	Cmd_AddCommand ("steam_subscribeugc", SV_SteamCmd_SubscribeUGC_f);
 	Cmd_AddCommand ("steam_unsubscribeugc", SV_SteamCmd_UnsubscribeUGC_f);
+	Cmd_AddCommand ("startRandomMap", StartRandomMap_f);
+	Cmd_AddCommand ("reload_mappool", MapPool_Reload_f);
+	Cmd_AddCommand ("reload_arenas", ReloadArenaDefinitions_f);
+	Cmd_AddCommand ("reload_factories", Factory_Reload_f);
 	if( com_dedicated->integer ) {
 		Cmd_AddCommand ("say", SV_ConSay_f);
 	}

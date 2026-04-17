@@ -725,7 +725,7 @@ typedef struct {
 	int			spectatorQueuePosition;	// retail-style duel "pq" slot
 	qboolean	spectatorQueuePositionDirty;
 	qboolean	muted;
-	int			sessionField34;		// retail serialized session tail remains descriptive
+	int			sessionField34;		// retail optional session-read tail remains descriptive
 	int			skill1;
 	int			skill2;
 	int			skill3;
@@ -1124,6 +1124,8 @@ typedef struct {
 	int			numConnectedClients;
 	int			numNonSpectatorClients;	// includes connecting clients
 	int			numPlayingClients;		// connected, non-spectators
+	int			readyUpEligibleClients;	// retail cached warmup-ready eligible tally
+	int			readyUpReadyClients;	// retail cached warmup-ready count
 	int			sortedClients[MAX_CLIENTS];		// sorted by score
 	int			follow1, follow2;		// clientNums for auto-follow spectators
 
@@ -1139,6 +1141,7 @@ typedef struct {
 	int			voteEligibleTime;		// next level.time a vote may be issued
 	int			voteYes;
 	int			voteNo;
+	int			nextMapVoteCounts[3];		// retail intermission next-map vote counts keyed by slot
 	int			numVotingClients;		// set by CalculateRanks
 
 	// team voting state
@@ -1165,6 +1168,7 @@ typedef struct {
 	char		*changemap;
 	qboolean	readyToExit;			// at least one client wants to exit
 	int			exitTime;
+	int			intermissionExitStatusLatched;	// one-shot 0x2C3 latch during intermission exit countdown
 	vec3_t		intermission_origin;	// also used for spectator spawns
 	vec3_t		intermission_angle;
 
@@ -1174,6 +1178,7 @@ typedef struct {
 	gentity_t	*bodyQue[BODY_QUEUE_SIZE];
 	int			portalSequence;
 
+	int		overtimeAccumulatedMsec;
 	qboolean	overtimeActive;
 	int		overtimeStartTime;
 	int		overtimeEndTime;
@@ -1491,6 +1496,7 @@ void G_RRProcessClient( gentity_t *ent );
 void G_RRHandlePlayerDeath( team_t oldTeam, gentity_t *victim, int meansOfDeath );
 void G_RRHandleDamageScore( gentity_t *attacker, gentity_t *targ, int damage );
 void G_RRHandleCompletedRound( void );
+void G_RRInitRoundController( void );
 void G_RRResetRoundState( void );
 qboolean G_RRCheckExitRules( qboolean announce );
 void G_RRTrackRoundActivity( void );
@@ -1573,6 +1579,9 @@ void G_UpdateVoteThrottle( void );
 int G_UpdateVoteCounts( void );
 qboolean G_TryExecuteVoteString( const char *voteString );
 void G_ClearVoteState( void );
+void G_ClearNextMapVoteState( void );
+void G_UpdateNextMapVoteTallies( void );
+qboolean G_HandleNextMapVote( gentity_t *ent );
 void G_ComplaintResetClient( gclient_t *client, qboolean resetCount );
 void G_ComplaintConsiderForDamage( gentity_t *attacker, gentity_t *victim, int damage );
 void G_ComplaintResolve( gentity_t *victim, qboolean filed );
@@ -1656,7 +1665,9 @@ void Team_RunDomination( void );
 void Team_RegisterDominationPoint( gentity_t *ent );
 qboolean Team_RegisterDominationTrigger( gentity_t *trigger );
 void Team_DominationPointTouch( gentity_t *ent, gentity_t *other, trace_t *trace );
+void G_UpdateDominationPointCountConfigstrings( void );
 gentity_t *Team_SelectDominationSpawnPoint( gentity_t *ent, vec3_t origin, vec3_t angles );
+gentity_t *Team_ReturnFlagIfMissing( int team );
 void Team_ReturnFlag( int team );
 void Team_FreeEntity( gentity_t *ent );
 gentity_t *SelectCTFSpawnPoint ( team_t team, int teamstate, vec3_t origin, vec3_t angles );
@@ -1680,10 +1691,9 @@ void Svcmd_GameMem_f( void );
 //
 // g_session.c
 //
-void G_ReadSessionData( gclient_t *client, qboolean firstTime );
+void G_ReadSessionData( gclient_t *client );
 void G_InitSessionData( gclient_t *client, char *userinfo );
 
-void G_InitWorldSession( void );
 void G_WriteSessionData( void );
 
 //
@@ -1818,7 +1828,6 @@ extern	vmCvar_t	g_complaintLimit;
 extern	vmCvar_t	g_voteFlags;
 extern	vmCvar_t	g_teamAutoJoin;
 extern	vmCvar_t	g_teamForceBalance;
-extern	vmCvar_t	g_maintainTeam;
 extern	vmCvar_t	g_teamSpawnAsSpec;
 extern	vmCvar_t	g_teamSpecFreeCam;
 extern	vmCvar_t	g_teamSpecSayEnable;
@@ -2132,6 +2141,7 @@ void	trap_BotResetWeaponState(int weaponstate);
 extern pmove_settings_t g_pmoveSettings;
 
 void G_PmoveStoreWeaponReloads( const weaponReloadConfig_t *config );
+void G_PmoveResetFactoryManagedCvars( void );
 void G_RegisterPmoveCvars( void );
 void G_RefreshPmoveSettings( void );
 void G_PmoveClearConfigstring( void );

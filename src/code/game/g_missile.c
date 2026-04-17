@@ -23,7 +23,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_local.h"
 
 #define	MISSILE_PRESTEP_TIME	50
-#define	GUIDED_ROCKET_TURN_FRACTION	0.2f
+#define	GUIDED_ROCKET_INITIAL_THINK_TIME	MISSILE_PRESTEP_TIME
+#define	GUIDED_ROCKET_THINK_TIME	25
+#define	GUIDED_ROCKET_SPEED	20.0f
+#define	MISSILE_ACCELERATION_DEFAULT_TIME	MISSILE_PRESTEP_TIME
+#define	NAILGUN_LIFETIME	4500
+#define	NAILGUN_MAX_BOUNCES	4
+// Retail reuses the shared ready bit as a missile-only nail ricochet latch.
+#define	EF_NAIL_BOUNCE	EF_READY
 
 
 /*
@@ -525,7 +532,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 =============
 G_SynchronizeRocketConfig
 
-Reapplies weapon configuration speed and guidance values so acceleration tweaks stay in sync for prediction.
+Reapplies the configured rocket launch speed.
 =============
 */
 static void G_SynchronizeRocketConfig( gentity_t *bolt, vec3_t dir ) {
@@ -533,7 +540,6 @@ static void G_SynchronizeRocketConfig( gentity_t *bolt, vec3_t dir ) {
 
 	speed = ( float )g_weaponConfig.rocketSpeed;
 	bolt->speed = speed;
-	bolt->count = ( g_weaponConfig.guidedRocketEnabled != 0 ) ? 1 : 0;
 
 	VectorScale( dir, speed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );
@@ -541,69 +547,88 @@ static void G_SynchronizeRocketConfig( gentity_t *bolt, vec3_t dir ) {
 
 /*
 =============
-G_InitializeMissileAcceleration
+G_MissileAccelerationEnabled
 
-Stores acceleration configuration on the entity for later prediction updates.
+Returns qtrue when the retail acceleration callback should be armed for the missile.
 =============
 */
-static void G_InitializeMissileAcceleration( gentity_t *bolt, float accelerationFactor, int accelerationRate ) {
-	float	factor;
-
-	if ( accelerationFactor <= 0.0f || accelerationRate <= 0 ) {
-		bolt->s.time = 0;
-		bolt->s.time2 = 0;
-		bolt->s.generic1 = 0;
-		return;
-	}
-
-	factor = accelerationFactor;
-	if ( factor < 0.0f ) {
-		factor = 0.0f;
-	}
-
-	bolt->s.time = level.time;
-	bolt->s.time2 = accelerationRate;
-	bolt->s.generic1 = (int)( factor * 1000.0f );
+static qboolean G_MissileAccelerationEnabled( float accelerationFactor ) {
+	return ( accelerationFactor != 1.0f ) ? qtrue : qfalse;
 }
 
 /*
 =============
-G_UpdateMissileAcceleration
+G_GetMissileAccelerationThinkTime
 
-Accelerates missiles over time based on their stored configuration.
+Returns the retail acceleration think cadence, falling back to the baked missile frame when the override is unset.
 =============
 */
-static void G_UpdateMissileAcceleration( gentity_t *ent ) {
-	float	accelerationFactor;
-	int		accelerationRate;
-	vec3_t	currentOrigin;
+static int G_GetMissileAccelerationThinkTime( int configuredRate ) {
+	if ( configuredRate > 0 ) {
+		return configuredRate;
+	}
 
-	accelerationRate = ent->s.time2;
-	if ( accelerationRate <= 0 ) {
+	return MISSILE_ACCELERATION_DEFAULT_TIME;
+}
+
+/*
+=============
+G_RunRocketAccelerationThink
+
+Applies the retail rocket acceleration callback directly against the active trajectory delta.
+=============
+*/
+static void G_RunRocketAccelerationThink( gentity_t *ent ) {
+	VectorScale( ent->s.pos.trDelta, g_weaponConfig.rocketAccelerationFactor, ent->s.pos.trDelta );
+	ent->nextthink = level.time + G_GetMissileAccelerationThinkTime( g_weaponConfig.rocketAccelerationRate );
+}
+
+/*
+=============
+G_RunGuidedRocketThink
+
+Rebuilds the retail guided-rocket steering vector from the owner's current view angles.
+=============
+*/
+static void G_RunGuidedRocketThink( gentity_t *ent ) {
+	gentity_t	*owner;
+	vec3_t		forward;
+
+	owner = ent->parent;
+	if ( !owner || !owner->client ) {
+		ent->nextthink = level.time + GUIDED_ROCKET_THINK_TIME;
 		return;
 	}
 
-	accelerationFactor = (float)ent->s.generic1 / 1000.0f;
-	if ( accelerationFactor <= 0.0f ) {
-		return;
-	}
+	AngleVectors( owner->client->ps.viewangles, forward, NULL, NULL );
+	VectorCopy( forward, ent->movedir );
+	VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
+	VectorScale( forward, GUIDED_ROCKET_SPEED, ent->s.pos.trDelta );
+	ent->nextthink = level.time + GUIDED_ROCKET_THINK_TIME;
+}
 
-	if ( ent->s.time <= 0 ) {
-		ent->s.time = level.time;
-	}
+/*
+=============
+G_RunPlasmaAccelerationThink
 
-	while ( level.time - ent->s.time >= accelerationRate ) {
-		ent->s.time += accelerationRate;
+Applies the retail plasmagun acceleration callback directly against the active trajectory delta.
+=============
+*/
+static void G_RunPlasmaAccelerationThink( gentity_t *ent ) {
+	VectorScale( ent->s.pos.trDelta, g_weaponConfig.plasmaAccelerationFactor, ent->s.pos.trDelta );
+	ent->nextthink = level.time + G_GetMissileAccelerationThinkTime( g_weaponConfig.plasmaAccelerationRate );
+}
 
-		BG_EvaluateTrajectory( &ent->s.pos, level.time, currentOrigin );
-		VectorCopy( currentOrigin, ent->s.pos.trBase );
-		ent->s.pos.trTime = level.time;
-		ent->s.pos.trType = TR_LINEAR;
+/*
+=============
+G_RunBfgAccelerationThink
 
-		VectorScale( ent->s.pos.trDelta, accelerationFactor, ent->s.pos.trDelta );
-		SnapVector( ent->s.pos.trDelta );
-		ent->speed = VectorLength( ent->s.pos.trDelta );
-	}
+Applies the retail BFG acceleration callback directly against the active trajectory delta.
+=============
+*/
+static void G_RunBfgAccelerationThink( gentity_t *ent ) {
+	VectorScale( ent->s.pos.trDelta, g_weaponConfig.bfgAccelerationFactor, ent->s.pos.trDelta );
+	ent->nextthink = level.time + G_GetMissileAccelerationThinkTime( g_weaponConfig.bfgAccelerationRate );
 }
 
 /*
@@ -615,11 +640,7 @@ Returns qtrue if the collision was converted into a bounce.
 =============
 */
 static qboolean G_HandleNailgunBounce( gentity_t *ent, trace_t *trace ) {
-	vec3_t	 velocity;
-	float	 speed;
-	float	 dot;
-
-	if ( !g_weaponConfig.nailgunBounceEnabled || ent->count <= 0 ) {
+	if ( !( ent->s.eFlags & EF_NAIL_BOUNCE ) || ent->count >= NAILGUN_MAX_BOUNCES ) {
 		return qfalse;
 	}
 
@@ -627,33 +648,9 @@ static qboolean G_HandleNailgunBounce( gentity_t *ent, trace_t *trace ) {
 		return qfalse;
 	}
 
-	BG_EvaluateTrajectoryDelta( &ent->s.pos, level.time, velocity );
-	speed = VectorLength( velocity );
-	if ( speed <= 0.0f ) {
-		return qfalse;
-	}
-
-	dot = DotProduct( velocity, trace->plane.normal );
-	VectorMA( velocity, -2.0f * dot, trace->plane.normal, velocity );
-	if ( VectorNormalize( velocity ) == 0.0f ) {
-		return qfalse;
-	}
-
-	VectorScale( velocity, speed, ent->s.pos.trDelta );
-	SnapVector( ent->s.pos.trDelta );
-
-	ent->s.pos.trType = TR_LINEAR;
-	ent->s.pos.trTime = level.time;
-	VectorCopy( trace->endpos, ent->r.currentOrigin );
-	VectorAdd( ent->r.currentOrigin, trace->plane.normal, ent->r.currentOrigin );
-	VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
-
-	vectoangles( ent->s.pos.trDelta, ent->s.apos.trBase );
-	ent->s.apos.trType = TR_LINEAR;
-	ent->s.apos.trTime = level.time;
-
-	ent->count--;
-	trap_LinkEntity( ent );
+	G_BounceMissile( ent, trace );
+	ent->count++;
+	G_AddEvent( ent, EV_GRENADE_BOUNCE, 0 );
 
 	return qtrue;
 }
@@ -670,54 +667,6 @@ void G_RunMissile( gentity_t *ent ) {
 	vec3_t		origin;
 	trace_t		tr;
 	int			passent;
-
-	if ( ent->s.weapon == WP_ROCKET_LAUNCHER ) {
-		if ( g_weaponConfig.guidedRocketEnabled && ent->count ) {
-			gentity_t	*owner = ent->parent;
-
-			if ( owner && owner->inuse && owner->client && owner->client->sess.sessionTeam != TEAM_SPECTATOR
-				&& owner->client->ps.pm_type < PM_DEAD ) {
-				vec3_t	desiredDir;
-				vec3_t	currentDir;
-				float	speed;
-
-				AngleVectors( owner->client->ps.viewangles, desiredDir, NULL, NULL );
-				if ( VectorNormalize( desiredDir ) == 0.0f ) {
-					desiredDir[0] = 1.0f;
-					desiredDir[1] = 0.0f;
-					desiredDir[2] = 0.0f;
-				}
-
-				VectorCopy( ent->s.pos.trDelta, currentDir );
-				if ( VectorNormalize( currentDir ) == 0.0f ) {
-					VectorCopy( desiredDir, currentDir );
-				}
-
-				speed = ent->speed;
-				if ( speed <= 0.0f ) {
-					speed = VectorLength( ent->s.pos.trDelta );
-				}
-				if ( speed <= 0.0f ) {
-					speed = ( float )g_weaponConfig.rocketSpeed;
-				}
-
-				VectorMA( currentDir, GUIDED_ROCKET_TURN_FRACTION, desiredDir, currentDir );
-				if ( VectorNormalize( currentDir ) == 0.0f ) {
-					VectorCopy( desiredDir, currentDir );
-				}
-
-				VectorScale( currentDir, speed, ent->s.pos.trDelta );
-			} else {
-				ent->count = 0;
-			}
-		} else if ( ent->count ) {
-			ent->count = 0;
-		}
-	}
-
-	if ( ent->s.weapon == WP_ROCKET_LAUNCHER || ent->s.weapon == WP_PLASMAGUN || ent->s.weapon == WP_BFG ) {
-		G_UpdateMissileAcceleration( ent );
-	}
 
 	// get current position
 	BG_EvaluateTrajectory( &ent->s.pos, level.time, origin );
@@ -818,7 +767,10 @@ gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir) {
 
 	VectorCopy (start, bolt->r.currentOrigin);
 
-	G_InitializeMissileAcceleration( bolt, g_weaponConfig.plasmaAccelerationFactor, g_weaponConfig.plasmaAccelerationRate );
+	if ( G_MissileAccelerationEnabled( g_weaponConfig.plasmaAccelerationFactor ) ) {
+		bolt->nextthink = level.time + G_GetMissileAccelerationThinkTime( g_weaponConfig.plasmaAccelerationRate );
+		bolt->think = G_RunPlasmaAccelerationThink;
+	}
 
 	return bolt;
 }	
@@ -904,7 +856,10 @@ gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir) {
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
 
-	G_InitializeMissileAcceleration( bolt, g_weaponConfig.bfgAccelerationFactor, g_weaponConfig.bfgAccelerationRate );
+	if ( G_MissileAccelerationEnabled( g_weaponConfig.bfgAccelerationFactor ) ) {
+		bolt->nextthink = level.time + G_GetMissileAccelerationThinkTime( g_weaponConfig.bfgAccelerationRate );
+		bolt->think = G_RunBfgAccelerationThink;
+	}
 
 	return bolt;
 }
@@ -945,7 +900,15 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	G_SynchronizeRocketConfig( bolt, dir );
 	VectorCopy (start, bolt->r.currentOrigin);
 
-	G_InitializeMissileAcceleration( bolt, g_weaponConfig.rocketAccelerationFactor, g_weaponConfig.rocketAccelerationRate );
+	if ( g_weaponConfig.guidedRocketEnabled ) {
+		bolt->nextthink = level.time + GUIDED_ROCKET_INITIAL_THINK_TIME;
+		bolt->think = G_RunGuidedRocketThink;
+	}
+
+	if ( G_MissileAccelerationEnabled( g_weaponConfig.rocketAccelerationFactor ) ) {
+		bolt->nextthink = level.time + G_GetMissileAccelerationThinkTime( g_weaponConfig.rocketAccelerationRate );
+		bolt->think = G_RunRocketAccelerationThink;
+	}
 
 	return bolt;
 }
@@ -1020,15 +983,15 @@ gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t righ
 	vec3_t		 end;
 	float		 r, u, scale;
 	qboolean	canBounce;
-	vec3_t		 angles;
 
 	bolt = G_Spawn();
 	bolt->classname = "nail";
-	bolt->nextthink = level.time + 10000;
+	bolt->nextthink = level.time + NAILGUN_LIFETIME;
 	bolt->think = G_ExplodeMissile;
 	bolt->s.eType = ET_MISSILE;
 	bolt->r.svFlags = SVF_USE_CURRENT_ORIGIN;
 	bolt->s.weapon = WP_NAILGUN;
+	bolt->s.eFlags = 0;
 	bolt->r.ownerNum = self->s.number;
 	bolt->parent = self;
 	bolt->damage = 20;
@@ -1050,7 +1013,8 @@ gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t righ
 		}
 	}
 
-	bolt->count = canBounce ? 4 : 0;
+	bolt->s.eFlags = canBounce ? EF_NAIL_BOUNCE : 0;
+	bolt->count = 0;
 
 	r = random() * M_PI * 2.0f;
 	u = sin(r) * crandom() * NAILGUN_SPREAD * 16;
@@ -1064,13 +1028,6 @@ gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t righ
 	scale = 555 + random() * 1800;
 	VectorScale( dir, scale, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );
-
-	if ( canBounce ) {
-		vectoangles( dir, angles );
-		VectorCopy( angles, bolt->s.apos.trBase );
-		bolt->s.apos.trType = TR_LINEAR;
-		bolt->s.apos.trTime = level.time;
-	}
 
 	VectorCopy( start, bolt->r.currentOrigin );
 

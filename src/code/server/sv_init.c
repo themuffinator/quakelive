@@ -613,6 +613,7 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	SV_SteamServerUpdatePublishedState( qtrue );
 	QL_Steamworks_ServerSetKeyValuesFromInfoString( serverInfo );
 	Zmq_InitStatsPublisher();
+	SV_UpdateMapPoolRotationCvars();
 
 	// send a heartbeat now so the master will get up to date info
 	SV_Heartbeat_f();
@@ -653,6 +654,7 @@ void SV_Init (void) {
 	sv_floodProtect = Cvar_Get ("sv_floodProtect", "10", CVAR_ARCHIVE );
 	sv_mapPoolFile = Cvar_Get ("sv_mapPoolFile", "mappool.txt", CVAR_ARCHIVE );
 	sv_includeCurrentMapInVote = Cvar_Get ("sv_includeCurrentMapInVote", "0", CVAR_TEMP );
+	SV_InitRetailOperatorData();
 	sv_gtid = Cvar_Get ("sv_gtid", "", CVAR_SERVERINFO | CVAR_ROM );
 	sv_serverType = Cvar_Get ("sv_serverType", "0", CVAR_ARCHIVE );
 	sv_ammoPack = Cvar_Get ("g_ammoPack", "1", CVAR_LATCH );
