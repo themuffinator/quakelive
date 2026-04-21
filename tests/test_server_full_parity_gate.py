@@ -84,6 +84,15 @@ def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> d
 	}
 
 
+def _query_field(fields: dict[str, Any], *names: str) -> str:
+	for name in names:
+		value = fields.get(name)
+		if isinstance(value, str) and value:
+			return value
+
+	return ""
+
+
 def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> bool:
 	if runtime_evidence is None:
 		return False
@@ -111,8 +120,8 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 		and metadata["query_response_raw"]
 		and fields["sv_hostname"] == "SVP7 Probe"
 		and fields["mapname"] == "bloodrun"
-		and fields["sv_vac"] == "1"
-		and fields["sv_serverType"] == "0"
+		and _query_field(fields, "sv_vac", "vac") == "1"
+		and _query_field(fields, "sv_serverType", "serverType") == "0"
 		and fields["sv_maxclients"] == "8"
 		and fields["sv_warmupReadyPercentage"] == "0.51"
 		and shutdown["rcon_status_seen"] is True
@@ -487,8 +496,8 @@ def test_server_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	assert runtime_evidence["metadata_publication"]["query_response_seen"] is True
 	assert runtime_evidence["metadata_publication"]["query_response_fields"]["sv_hostname"] == "SVP7 Probe"
 	assert runtime_evidence["metadata_publication"]["query_response_fields"]["mapname"] == "bloodrun"
-	assert runtime_evidence["metadata_publication"]["query_response_fields"]["sv_vac"] == "1"
-	assert runtime_evidence["metadata_publication"]["query_response_fields"]["sv_serverType"] == "0"
+	assert _query_field(runtime_evidence["metadata_publication"]["query_response_fields"], "sv_vac", "vac") == "1"
+	assert _query_field(runtime_evidence["metadata_publication"]["query_response_fields"], "sv_serverType", "serverType") == "0"
 	assert runtime_evidence["shutdown"]["rcon_status_seen"] is True
 	assert runtime_evidence["shutdown"]["quit_command_sent"] is True
 	assert runtime_evidence["shutdown"]["process_exited"] is True

@@ -7,9 +7,9 @@ This audit compares the Quake Live reference snapshot in `assets/quakelive/baseq
 ### Definition Parity
 | Category | Reference Count | GPL Count | Notes |
 | --- | --- | --- | --- |
-| `.menu` / `.txt` definitions | 65 | 65 | The file inventory is now exact. The remaining raw drift is content-only and limited to `comp_spectator.menu`, `comp_spectator_follow.menu`, `hud.txt`, `hud3.txt`, `ingame_callvote.menu`, and `ingame_join.menu`.
-| `menudef.h` | 1 | 1 | The Quake Live enum definitions exist in both trees and remain the canonical owner-draw ID source.
-| Accessory config (`hud*.txt`) | 3 | 3 | `hud3.txt` is present in both trees; the remaining issue is that the frozen `src/ui/hud3.txt` text still differs from retail and contains merge-conflict damage.
+| `.menu` / `.txt` definitions | 65 | 65 | The runtime panel inventory is exact and the current compare is clean: `0` missing, `0` extra, `0` content diffs against the staged retail corpus.
+| `menudef.h` | 1 | 1 | The source-side header remains tracked locally, but it sits outside the runtime panel drift gate and should be validated separately whenever owner-draw enums change.
+| Accessory config (`hud*.txt`) | 3 | 3 | `hud.txt`, `hud2.txt`, and `hud3.txt` now align with the staged retail panel corpus on the current worktree.
 
 ### GPL-Only Bootstrap Files
 The GPL branch introduces the following convenience files to seed the port:
@@ -22,24 +22,25 @@ These files should remain, but their dependencies must be harmonised with the re
 ## Supporting Assets & Dependencies
 | Area | Reference Location | GPL Status | Gap Summary |
 | --- | --- | --- | --- |
-| HUD & menu art | `ui/assets/{hud,score,menu,flags,main_menu,statusbar}` | Mirrored | `src/ui/assets/` now matches the retail `ui/assets/` subtree exactly (`454 / 454` files, `0` content diffs). Remaining work is packaging/mounting, not asset mirroring.
+| HUD & menu art | `ui/assets/{hud,score,menu,flags,main_menu,statusbar}` | Packaged from retail snapshot | `src/ui` intentionally remains a script/header tree. The bundle pipeline stages the retail art subtree into runtime output (`build/ui_bundle/staging/ui/assets/` and `pak_uiql.pk3`), so the remaining work is runtime mounting/screenshot QA rather than source-tree mirroring.
 | Fonts | `baseq3/fonts/*.ttf` | Automated | `tools/build_ui_bundle.sh` pulls in the Quake Live TTFs declared in `tools/packaging/ui_bundle_manifest.json`, bakes deterministic `.dat`/`.tga` pairs via `tools/packaging/bake_fonts.py`, and records glyph metrics in `artifacts/ui_bundle/metrics/font_metrics.json` for CI triage.
 | Shader scripts | `baseq3/scripts/ui*.shader` (tracked in the global asset audit) | Packaged | The UI bundle manifest stages the retail `ui*.shader` scripts into the main bundle, so gradient, cursor, and overlay materials are now part of the packaged UI payload.
-| Packaging hooks | `pak/ui` structure in the reference PK3s | Automated | `tools/build_ui_bundle.sh` now stages the retail `ui/*.menu`, `ui/*.txt`, `ui/assets/*`, `baseq3/icons/*`, `baseq3/levelshots/*`, and emits both `pak_uiql.pk3` and `pak_ui_src_retail_overlay.pk3`. The remaining work is runtime QA rather than missing bundle plumbing.
+| Packaging hooks | `pak/ui` structure in the reference PK3s | Automated | `tools/build_ui_bundle.sh` now stages the retail `ui/*.menu`, `ui/*.txt`, `ui/assets/*`, `baseq3/icons/*`, and `baseq3/levelshots/*`. Default runs keep runtime PK3s unmaterialized; explicit `tools/build_ui_bundle.py --runtime-root ...` refreshes emit `pak_uiql.pk3`, emit `pak_ui_src_retail_overlay.pk3` only when `drift_files` is non-empty, and always record `artifacts/ui_bundle/runtime_ui_package_manifest.json` so probe flows can verify the packaged contract. The remaining work is runtime QA rather than missing bundle plumbing.
 
 ## Parity Gaps & Recommended Actions
 | Area | Gap | Action |
 | --- | --- | --- |
-| Frozen `src/ui` drift | The read-only `src/ui` tree still differs from retail in 7 files, including merge-conflicted `hud.txt`, `hud3.txt`, and `ingame_callvote.menu`. | Generate and mount the retail override layer (`scripts/ui/write_retail_ui_overrides.py` or `pak_ui_src_retail_overlay.pk3`) instead of editing `src/ui` directly.
-| HUD/menu art | Quake Live’s art hierarchy is mirrored in `src/ui/assets`, and the bundle now stages those files along with icons/levelshots. | Validate runtime mounting and screenshot parity rather than adding more packaging entries.
+| Runtime panel baseline | The checked-in `src/ui` runtime-panel compare is currently clean (`65 / 65`, `0` content diffs), and `artifacts/ui_bundle/ui_src_retail_overlay.json` records an empty drift contract. | Keep the UI parity gate and overlay manifest green so any future drift is caught immediately; only materialize an overlay package if drift reappears.
+| HUD/menu art | The retail art hierarchy is supplied by the staged bundle/runtime path rather than a checked-in `src/ui/assets` mirror. | Validate runtime mounting and screenshot parity rather than adding more packaging entries.
 | Fonts & readability | Glyph counts must remain in lockstep with Quake Live defaults to keep scripted `textscale` stable. | Run `tools/build_ui_bundle.sh` (font bake) and `python tests/run_ui_validation.py` before landing HUD changes so glyph or shader drift is caught in CI logs.
 | Shader/material coverage | The retail shader scripts are now packaged, but they still need runtime verification to confirm gradients/cursors resolve as expected. | Validate the packaged `ui*.shader` set in a launch-time renderer smoke test and capture screenshot evidence.
 | Build integration | The package flow now exists, but it still needs runtime verification against in-game renders and mount order. | Keep `tools/build_ui_bundle.sh` and `tests/run_ui_validation.py` in CI, and add launch-time UI screenshot checks on top.
 
 ## Follow-Up Validation Checklist
 - [x] Confirm all menu and metadata files referenced by Quake Live scripts exist in `src/ui` with identical casing.
-- [ ] Confirm the 7-file frozen drift set remains stable and that the overlay package reproduces byte-identical retail replacements.
+- [x] Confirm the current runtime panel compare remains clean and that explicit runtime-root refreshes preserve an empty-or-bounded overlay package contract through the overlay/runtime manifests.
 - [ ] Verify that UI art directories resolve in-game by launching with a clean homepath and inspecting HUD, scoreboard, and menu screens.
+- [x] Confirm that explicit runtime-root refreshes write a runtime package manifest and the required packaged UI entries before client probes launch.
 - [x] Run font bake tooling and compare generated atlas metrics against Quake Live defaults to ensure `textscale` directives remain accurate (`tools/build_ui_bundle.sh` + `tests/run_ui_validation.py`).
 - [ ] Recompile shader caches with the imported `ui*.shader` files and validate gradients/cursors in the renderer.
 - [ ] Exercise the packaging workflow to ensure PK3 generation is deterministic and platform-agnostic.

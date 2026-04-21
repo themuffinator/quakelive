@@ -1,6 +1,6 @@
 # `renderer` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-10
+Last updated: 2026-04-21
 
 Scope: `src/code/renderer/*` plus renderer-facing Win32 and client glue in `src/code/win32/*` and `src/code/client/*` versus retail `quakelive_steam.exe`
 
@@ -44,7 +44,7 @@ Canonical committed evidence used for this audit:
   - `docs/hud_render_baseline.md`
   - `docs/launcher_awesomium_audit.md`
 - Validation artifacts:
-  - `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+  - `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`
   - `artifacts/renderer_validation/logs/renderer_full_parity_gate.json`
   - `tools/ci/audit-retail-font-stack.ps1`
   - `tests/test_renderer_font_build_lane_parity.py`
@@ -103,8 +103,8 @@ Validation rerun on 2026-04-10:
 3. The renderer build metadata no longer points at a missing in-tree `ft2`
    vendor tree; the committed replacement lane is now the explicit external
    FreeType SDK or `pkg-config freetype2` path.
-4. The tracked runtime artifact
-   `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+4. The tracked runtime artifact alias
+   `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`
    now proves:
    - forced-windowed UI bootstrap
    - forced-windowed retained-atlas debug rendering with `r_debugFontAtlas 1`
@@ -114,6 +114,8 @@ Validation rerun on 2026-04-10:
    - expected renderer init markers including `R_Init: InitOpenGL`,
      `R_Init: InitImages`, `R_Init: InitShaders`, `R_Init: InitFreeType`, and
      `R_Init: InitFontStash`
+   The stable alias was refreshed on 2026-04-21 from the clean
+   `renderer_runtime_evidence_20260421.json` bundle.
 
 Observed fact:
 
@@ -298,8 +300,8 @@ Observed facts:
 3. `tools/ci/audit-retail-font-stack.ps1` now validates the final build-lane
    and runtime-evidence surface without unresolved warnings.
 4. The renderer parity gate now passes `RG-G01` through `RG-G09`.
-5. The tracked runtime artifact
-   `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+5. The tracked runtime artifact alias
+   `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`
    now proves text-specific behavior through distinct startup/bootstrap,
    debug-atlas, and live-map captures plus a no-fallback runtime log surface.
 
@@ -418,7 +420,7 @@ Completed deliverables:
 2. Aligned `tests/test_renderer_full_parity_gate.py` and the focused renderer
    font/runtime tests with the fully closed gap set.
 3. Refreshed the runtime probe and tracked
-   `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+   `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`
    so the retained-atlas debug pass is now part of the closure proof.
 4. Closed the remaining runtime blocker in the classic `RE_RegisterFont`
    atlas builder so uncached UI font generation now bounds-checks glyph copies

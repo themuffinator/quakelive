@@ -125,6 +125,7 @@
         "toolchain_matrix_present": true,
         "unix_placeholder_lane_present": true,
         "null_stub_lane_present": true,
+        "null_input_lane_present": true,
         "excluded_from_strict_retail_score": true
       }
     },

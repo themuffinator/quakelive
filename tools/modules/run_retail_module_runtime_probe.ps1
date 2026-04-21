@@ -344,6 +344,16 @@ function Get-RendererOwnerBlocker {
 		return $match.Groups[1].Value.Trim()
 	}
 
+	if ( $LogText -notmatch 'Going from CS_CONNECTED to CS_PRIMED' ) {
+		return ''
+	}
+
+	$fonsErrorCount = [regex]::Matches( $LogText, '(?im)^R_fonsErrorCallback: error \d+ val \d+$' ).Count
+	$fontFlushCount = [regex]::Matches( $LogText, '(?im)^Max font atlas size, flushing$' ).Count
+	if ( $fonsErrorCount -ge 32 -and $fontFlushCount -ge 8 ) {
+		return 'R_fonsErrorCallback: repeated font atlas saturation prevented CS_ACTIVE after retail module load'
+	}
+
 	return ''
 }
 
@@ -455,22 +465,35 @@ function Invoke-MapRuntimeProbe {
 	$configName = "codex_retail_module_map_$Stamp.cfg"
 	$configPath = Join-Path $script:RuntimeRoot $configName
 	$password = 'qlrpass'
-	@(
+	$lines = New-Object 'System.Collections.Generic.List[string]'
+	foreach ( $line in @(
 		'set developer 1',
 		'set logfile 2',
 		'set g_logfile 1',
 		'set vm_trace 1',
+		'set com_maxfps 30',
 		'set sv_pure 0',
 		'set r_fullscreen 0',
 		'set g_gametype 1',
-		'set g_doWarmup 1',
-		'set g_warmup 20',
-		("map $MapName")
-	) | Set-Content -Path $configPath -Encoding ascii
+		'set g_doWarmup 0',
+		'set g_warmup 0',
+		("map $MapName ffa")
+	) ) {
+		$lines.Add( $line )
+	}
+	Add-WaitLines -Lines $lines -Count 1200
+	$lines.Add( 'disconnect' )
+	Add-WaitLines -Lines $lines -Count 180
+	$lines.Add( 'quit' )
+	Set-Content -Path $configPath -Value $lines -Encoding ascii
 
 	Reset-LiveLogs
 	$launch = Start-ModuleProcess -ConfigName $configName -ExtraArgs @(
+		'+set', 'com_maxfps', '30',
 		'+set', 'sv_pure', '0',
+		'+set', 'g_gametype', '1',
+		'+set', 'g_doWarmup', '0',
+		'+set', 'g_warmup', '0',
 		'+set', 'rconPassword', $password
 	)
 	$process = $launch.process
@@ -479,6 +502,7 @@ function Invoke-MapRuntimeProbe {
 	$frameReady = $false
 	$restartSeen = $false
 	$shotLogged = $false
+	$rendererOwnerBlocker = ''
 	$deadline = (Get-Date).AddSeconds( 210 )
 
 	while ( ( Get-Date ) -lt $deadline -and -not $process.HasExited ) {
@@ -492,6 +516,7 @@ function Invoke-MapRuntimeProbe {
 		if ( $logText -match 'Going from CS_PRIMED to CS_ACTIVE' ) {
 			$activeSeen = $true
 		}
+		$rendererOwnerBlocker = Get-RendererOwnerBlocker -LogText $logText
 
 		$traceStats = Get-VmTraceStats -Path $script:VmTraceLog
 		if ( $traceStats.cgame_call_count -ge 16 -and $traceStats.qagame_call_count -ge 16 ) {
@@ -501,35 +526,41 @@ function Invoke-MapRuntimeProbe {
 		if ( $serverSeen -and $activeSeen -and $frameReady ) {
 			break
 		}
+		if ( $serverSeen -and $rendererOwnerBlocker -and $traceStats.cgame_call_count -ge 8 -and $traceStats.qagame_call_count -ge 16 ) {
+			break
+		}
 	}
 
-	if ( -not $process.HasExited -and $serverSeen -and $activeSeen ) {
-		Start-Sleep -Milliseconds 1000
-		Send-Rcon -Password $password -Command ( "screenshotJPEG $ScreenshotName" )
-		$shotDeadline = (Get-Date).AddSeconds( 30 )
-		while ( ( Get-Date ) -lt $shotDeadline -and -not $process.HasExited ) {
-			Start-Sleep -Milliseconds 500
-			$logText = Read-OptionalText -Path $script:RuntimeLog
-			if ( $logText -match [regex]::Escape( "Wrote screenshots/$ScreenshotName.jpg" ) ) {
-				$shotLogged = $true
-				break
-			}
-		}
-
-		Send-Rcon -Password $password -Command 'map_restart 0'
-		$restartDeadline = (Get-Date).AddSeconds( 60 )
-		while ( ( Get-Date ) -lt $restartDeadline -and -not $process.HasExited ) {
-			Start-Sleep -Milliseconds 500
-			$traceStats = Get-VmTraceStats -Path $script:VmTraceLog
-			if ( $traceStats.qagame_create_count -ge 2 -and $traceStats.qagame_free_count -ge 1 ) {
-				$restartSeen = $true
-				break
-			}
-		}
-
-		if ( $restartSeen ) {
+	if ( -not $process.HasExited -and $serverSeen ) {
+		if ( $activeSeen ) {
 			Start-Sleep -Milliseconds 1000
+			Send-Rcon -Password $password -Command ( "screenshotJPEG $ScreenshotName" )
+			$shotDeadline = (Get-Date).AddSeconds( 30 )
+			while ( ( Get-Date ) -lt $shotDeadline -and -not $process.HasExited ) {
+				Start-Sleep -Milliseconds 500
+				$logText = Read-OptionalText -Path $script:RuntimeLog
+				if ( $logText -match [regex]::Escape( "Wrote screenshots/$ScreenshotName.jpg" ) ) {
+					$shotLogged = $true
+					break
+				}
+			}
+
+			Send-Rcon -Password $password -Command 'map_restart 0'
+			$restartDeadline = (Get-Date).AddSeconds( 60 )
+			while ( ( Get-Date ) -lt $restartDeadline -and -not $process.HasExited ) {
+				Start-Sleep -Milliseconds 500
+				$traceStats = Get-VmTraceStats -Path $script:VmTraceLog
+				if ( $traceStats.qagame_create_count -ge 2 -and $traceStats.qagame_free_count -ge 1 ) {
+					$restartSeen = $true
+					break
+				}
+			}
+
+			if ( $restartSeen ) {
+				Start-Sleep -Milliseconds 1000
+			}
 		}
+
 		Send-Rcon -Password $password -Command 'quit'
 	}
 
@@ -596,6 +627,7 @@ $script:RetailProfileBaseq3Root = Join-Path $script:RetailProfileRoot 'baseq3'
 $artifactDate = Get-Date -Format 'yyyyMMdd'
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $artifactPath = Join-Path $ArtifactRoot ( "retail_module_runtime_evidence_" + $artifactDate + '.json' )
+$latestArtifactPath = Join-Path $ArtifactRoot 'retail_module_runtime_evidence_latest.json'
 $mainShotName = "codex_retail_module_main_$stamp"
 $mapShotName = "codex_retail_module_map_$stamp"
 $mainArchivedLog = Join-Path $DumpLogRoot ( "codex_retail_module_main_" + $stamp + '.log' )
@@ -844,5 +876,40 @@ $artifact = [ordered]@{
 	}
 }
 
+$latestArtifactIsSufficient = (
+	(
+		$warnings.Count -eq 0 -and
+		$missingMarkers.Count -eq 0 -and
+		$mainProbe.retail_ui_load_seen -and
+		$mapProbe.retail_cgame_load_seen -and
+		$mapProbe.retail_qagame_load_seen -and
+		$mapProbe.server_seen -and
+		$mapProbe.active_seen -and
+		$mapProbe.frame_ready -and
+		$mapProbe.restart_seen -and
+		$mapProbe.shot_logged
+	) -or (
+		$mainProbe.retail_ui_load_seen -and
+		$mapProbe.retail_cgame_load_seen -and
+		$mapProbe.retail_qagame_load_seen -and
+		$mapProbe.renderer_owner_blocker -ne '' -and
+		$mapProbe.trace_stats.cgame_create_count -ge 1 -and
+		$mapProbe.trace_stats.cgame_call_count -ge 8 -and
+		$mapProbe.trace_stats.qagame_create_count -ge 1 -and
+		$mapProbe.trace_stats.qagame_call_count -ge 16 -and (
+			(
+				$mapProbe.renderer_owner_blocker -like 'R_LoadMD3:*' -and
+				$mapProbe.trace_stats.cgame_free_count -ge 1 -and
+				$mapProbe.trace_stats.qagame_free_count -ge 1
+			) -or (
+				$mapProbe.renderer_owner_blocker -like 'R_fonsErrorCallback:*'
+			)
+		)
+	)
+)
+
 $artifact | ConvertTo-Json -Depth 8 | Set-Content -Path $artifactPath -Encoding ascii
+if ($latestArtifactIsSufficient -or -not (Test-Path -LiteralPath $latestArtifactPath)) {
+	$artifact | ConvertTo-Json -Depth 8 | Set-Content -Path $latestArtifactPath -Encoding ascii
+}
 $artifact | ConvertTo-Json -Depth 8

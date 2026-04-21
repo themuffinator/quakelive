@@ -1,6 +1,6 @@
 # `qcommon` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-10
+Last updated: 2026-04-21
 
 Scope: `src/code/qcommon/*` against retail `quakelive_steam.exe`, with adjacent ownership checks in `src/code/win32/win_net.c`, `src/common/platform/platform_steamworks.c`, and the current module/runtime validation surface where those owners are required to prove the `qcommon` host contract.
 
@@ -438,7 +438,7 @@ Observed closure facts after `QC-P6`:
    - bootstrap `qzconfig.cfg` / `repconfig.cfg` execution
    - the active filesystem search-path roots
    - writable-homepath DLL loading for `ui`, `qagame`, and `cgame`
-   - service-disabled launcher/resource policy markers from the current debug build
+   - service-disabled launcher/resource policy markers from the current debug build, including the current `game.error` publication and native `stopRefresh` fallback markers
 4. `docs/reverse-engineering/qcommon-validation-and-runtime-evidence-2026-04-10.md` now records that runtime bundle plus the dedicated gate artifact as the final qcommon closure proof lane.
 
 Conclusion:
@@ -554,7 +554,7 @@ Completed work:
 Validation:
 
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/qcommon/run_qcommon_runtime_probe.ps1`
-  - Result: `artifacts/qcommon_validation/logs/qcommon_runtime_evidence_20260410.json` refreshed with clean bootstrap/search-path/DLL-root/service-policy evidence plus authoritative engine and process-bound captures
+  - Result: `artifacts/qcommon_validation/logs/qcommon_runtime_evidence_20260410.json` refreshed with clean bootstrap/search-path/DLL-root/service-policy evidence plus authoritative engine screenshots, the current `map <name> ffa` launch contract, and the current default-disabled browser-policy markers
 - `python -m pytest tests/test_cvar_parity.py tests/test_cvar_alias_console.py tests/test_fs_search_paths.py tests/test_qcommon_collision_leaf_parity.py tests/test_qcommon_vm_fallback_parity.py tests/test_playerstate_replication.py tests/test_client_config_parity.py tests/test_platform_services.py tests/test_cgame_event_transport_parity.py tests/test_qcommon_full_parity_gate.py -q`
   - Result: `101 passed`, `2 skipped`
 

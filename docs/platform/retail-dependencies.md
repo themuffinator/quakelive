@@ -155,6 +155,32 @@ game binaries or replaced by different in-tree code, so the repo’s dynamic SDK
 layout should be treated as a development convenience rather than as the retail
 dependency surface.
 
+## Staged retail runtime boundary
+
+Observed fact: the repo-managed Windows build output under
+`build\win32\<Config>\bin\` can legitimately contain extra dependency DLLs
+copied from the in-repo Vorbis/libpng/FreeType bootstrap lanes
+(`vorbisfile.dll`, `vorbis.dll`, `ogg.dll`, `libpng16.dll`, `zlib1.dll`,
+`freetype.dll`, and related helper DLLs). That mixed build root is useful for
+development, but it is not the strict retail payload boundary.
+
+The parity-oriented Windows validator now resolves that ambiguity by staging a
+clean runtime root at `build\win32\<Config>\retail-runtime\`:
+
+- rebuilt host executables are copied in from `build\win32\<Config>\bin\`
+- rebuilt gameplay/UI DLLs are copied in from the native module outputs
+- only the exact retail browser/media/Steam/XInput DLL payload from
+  `assets\quakelive\` is copied beside them
+
+`tools/ci/validate-windows-native.ps1 -RuntimeProfile retail` then runs
+`tools/ci/audit-retail-dependencies.ps1 -RuntimeRoot <stage> -SkipSteamInstall -Strict`
+against that staged root so parity validation fails fast if an extra
+non-retail DLL is introduced or a required retail DLL goes missing. The
+external launcher/media payload is hash-matched against retail; the rebuilt
+`cgamex86.dll`, `qagamex86.dll`, and `uix86.dll` slots are required to be
+present in the staged root but are intentionally allowed to differ from retail
+hashes because they are the outputs under validation.
+
 ## Current repository adjustments
 
 - Retail-facing `.vcxproj` files now default back to `v100`.
@@ -174,4 +200,15 @@ pwsh tools\ci\audit-retail-dependencies.ps1
 ```
 
 Use `-Strict` to fail the run when the Steam install differs from the committed
-retail payload.
+retail payload. When the committed DLL corpus is not present locally, the
+script falls back to the installed Steam payload as its reference source.
+
+To audit the strict staged runtime root instead of a local Steam install, run:
+
+```powershell
+pwsh tools\ci\audit-retail-dependencies.ps1 -RuntimeRoot build\win32\Release\retail-runtime -SkipSteamInstall -Strict
+```
+
+The retail validation lane assembles that `retail-runtime` tree
+automatically. Use the command above when you want to re-check an already
+staged runtime root directly without rerunning the full native build wrapper.

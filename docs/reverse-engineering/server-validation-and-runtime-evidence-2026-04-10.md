@@ -18,8 +18,8 @@ Probe owner:
 
 Observed closure evidence from the tracked bundle:
 
-1. A dedicated/headless server probe now boots `bloodrun`, loads `qagamex86.dll` from the writable homepath, archives the dedicated `qconsole.log`, and records the end-to-end startup plus clean-exit path as one tracked runtime artifact instead of leaving server validation spread across ad hoc local logs.
-2. The probe now sends a local `getstatus` query and records the parsed serverinfo publication surface, proving network-visible metadata publication for `sv_hostname = SVP7 Probe`, `mapname = bloodrun`, `sv_vac = 1`, `sv_serverType = 0`, `sv_maxclients = 8`, and the retained `sv_warmupReadyPercentage` default.
+1. A dedicated/headless server probe now boots `bloodrun` through the current `map <name> ffa` command shape, loads `qagamex86.dll` from the writable homepath, archives the dedicated `qconsole.log`, and records the end-to-end startup plus clean-exit path as one tracked runtime artifact instead of leaving server validation spread across ad hoc local logs.
+2. The probe now sends a local `getstatus` query and records the parsed serverinfo publication surface, proving network-visible metadata publication for `sv_hostname = SVP7 Probe`, `mapname = bloodrun`, `sv_vac = 1`, the retained server-type slot (`sv_serverType` or `serverType`) at `0`, `sv_maxclients = 8`, and the retained `sv_warmupReadyPercentage` default.
 3. The same probe now drives a clean dedicated shutdown through local RCON (`status`, then `quit`) and records the resulting `Rcon from 127.0.0.1` control path, clean process exit, and any observed legacy shutdown markers so the shutdown path is part of the tracked evidence instead of being inferred.
 4. The runtime artifact also records optional live-service startup state explicitly:
    - master-heartbeat and `NET: server auth` telemetry markers when observed

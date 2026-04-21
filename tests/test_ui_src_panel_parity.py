@@ -22,17 +22,6 @@ RETAIL_ROOT = DEFAULT_BASEQ3_ROOT / "ui"
 SCRIPT_PATH = REPO_ROOT / "scripts" / "ui" / "write_retail_ui_overrides.py"
 CORPUS_CHECK_SCRIPT = REPO_ROOT / "scripts" / "ui" / "check_retail_ui_corpus.py"
 
-EXPECTED_CONTENT_DIFFS = {
-	"comp_spectator.menu",
-	"comp_spectator_follow.menu",
-	"hud.txt",
-	"hud3.txt",
-	"ingame_callvote.menu",
-	"ingame_join.menu",
-	"menudef.h",
-}
-
-
 def _sha256_bytes(data: bytes) -> str:
 	return hashlib.sha256(data).hexdigest()
 
@@ -42,7 +31,7 @@ def _assert_repo_overlay_drift_contract(drift: dict[str, object]) -> list[str]:
 	assert drift["extra_in_source"] == []
 
 	drift_files = sorted(drift["content_diffs"])
-	assert set(drift_files) in (EXPECTED_CONTENT_DIFFS, set())
+	assert drift_files == []
 	return drift_files
 
 
@@ -94,20 +83,13 @@ def test_src_ui_inventory_matches_retail_tree(
 	assert retail_assets.is_dir()
 
 
-def test_src_ui_content_drift_is_limited_to_known_retail_gaps(
+def test_src_ui_content_drift_is_clean_against_retail_panels(
 	retail_ui_corpus_inventory: dict[str, object],
 ) -> None:
 	_require_retail_ui_corpus(retail_ui_corpus_inventory)
 	drift = compute_ui_panel_drift(SOURCE_ROOT, RETAIL_ROOT)
 	drift_files = _assert_repo_overlay_drift_contract(drift)
-
-	if drift_files:
-		hud_text = (SOURCE_ROOT / "hud.txt").read_text(encoding="utf-8")
-		hud3_text = (SOURCE_ROOT / "hud3.txt").read_text(encoding="utf-8")
-		callvote_text = (SOURCE_ROOT / "ingame_callvote.menu").read_text(encoding="utf-8")
-		assert "<<<<<<<" in hud_text
-		assert "<<<<<<<" in hud3_text
-		assert "<<<<<<<" in callvote_text
+	assert drift_files == []
 
 
 def test_retail_ui_override_script_manifest_records_hashes_and_stale_cleanup(
@@ -385,6 +367,7 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 	overlay_package = REPO_ROOT / "build" / "ui_bundle" / "pak_ui_src_retail_overlay.pk3"
 	overlay_manifest = REPO_ROOT / "artifacts" / "ui_bundle" / "ui_src_retail_overlay.json"
 	main_package = REPO_ROOT / "build" / "ui_bundle" / "pak_uiql.pk3"
+	runtime_package_manifest = REPO_ROOT / "artifacts" / "ui_bundle" / "runtime_ui_package_manifest.json"
 	metrics_path = REPO_ROOT / "artifacts" / "ui_bundle" / "metrics" / "font_metrics.json"
 	inventory_manifest = REPO_ROOT / "artifacts" / "ui_bundle" / "ui_retail_inventory.json"
 	staging_root = REPO_ROOT / "build" / "ui_bundle" / "staging" / "baseq3"
@@ -393,6 +376,7 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 		overlay_package,
 		overlay_manifest,
 		main_package,
+		runtime_package_manifest,
 		metrics_path,
 		inventory_manifest,
 	):
@@ -405,6 +389,8 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 			overlay_manifest.unlink()
 		if main_package.exists():
 			main_package.unlink()
+		if runtime_package_manifest.exists():
+			runtime_package_manifest.unlink()
 		if metrics_path.exists():
 			metrics_path.unlink()
 		if inventory_manifest.exists():
@@ -426,6 +412,7 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 			assert metrics_path.exists()
 			assert not overlay_package.exists()
 			assert not main_package.exists()
+			assert not runtime_package_manifest.exists()
 			assert (staging_root / "default.cfg").exists()
 			assert (staging_root / "ui" / "main.menu").exists()
 			assert (staging_root / "ui" / "assets" / "button_back.png").exists()
@@ -469,3 +456,86 @@ def test_ui_bundle_build_keeps_retail_packages_unmaterialized(
 
 			path.parent.mkdir(parents=True, exist_ok=True)
 			path.write_bytes(content)
+
+
+def test_ui_bundle_build_emits_runtime_package_manifest_for_explicit_runtime_root(
+	tmp_path: Path,
+	retail_ui_corpus_inventory: dict[str, object],
+) -> None:
+	_require_retail_ui_corpus(retail_ui_corpus_inventory)
+	build_root = tmp_path / "build"
+	artifact_root = tmp_path / "artifacts"
+	runtime_root = tmp_path / "runtime" / "baseq3"
+	overlay_manifest = artifact_root / "ui_src_retail_overlay.json"
+	runtime_package_manifest = artifact_root / "runtime_ui_package_manifest.json"
+	main_package = runtime_root / "pak_uiql.pk3"
+	overlay_package = runtime_root / "pak_ui_src_retail_overlay.pk3"
+	drift = compute_ui_panel_drift(SOURCE_ROOT, RETAIL_ROOT)
+	drift_files = _assert_repo_overlay_drift_contract(drift)
+
+	result = subprocess.run(
+		[
+			sys.executable,
+			str(REPO_ROOT / "tools" / "build_ui_bundle.py"),
+			"--build-root",
+			str(build_root),
+			"--artifact-root",
+			str(artifact_root),
+			"--runtime-root",
+			str(runtime_root),
+		],
+		cwd=REPO_ROOT,
+		check=False,
+		text=True,
+		capture_output=True,
+	)
+
+	assert result.returncode == 0, result.stderr
+	assert overlay_manifest.exists()
+	assert runtime_package_manifest.exists()
+	assert main_package.exists()
+	assert overlay_package.exists() is bool(drift_files)
+
+	report = json.loads(runtime_package_manifest.read_text(encoding="utf-8"))
+	assert report["manifest_version"] == 1
+	assert report["runtime_root"] == runtime_root.resolve().as_posix()
+	assert report["overlay_manifest_path"] == overlay_manifest.resolve().as_posix()
+	assert report["drift_files"] == drift_files
+	assert report["main_package"]["path"] == main_package.resolve().as_posix()
+	assert report["main_package"]["sha256"] == _sha256_bytes(main_package.read_bytes())
+	assert report["main_package"]["required_entries_present"] is True
+	assert report["main_package"]["missing_required_entries"] == []
+	assert report["overlay_package"]["path"] == overlay_package.resolve().as_posix()
+	assert report["overlay_package"]["exists"] is bool(drift_files)
+	assert report["overlay_package"]["entry_count"] == len(drift_files)
+	assert report["overlay_package"]["entry_paths"] == [f"ui/{relative_path}" for relative_path in drift_files]
+	assert report["overlay_package"]["matches_overlay_manifest"] is True
+	if drift_files:
+		assert report["overlay_package"]["sha256"] == _sha256_bytes(overlay_package.read_bytes())
+
+	with zipfile.ZipFile(main_package, "r") as archive:
+		entry_names = set(archive.namelist())
+
+	assert {
+		"default.cfg",
+		"fonts/font.dat",
+		"fonts/font.tga",
+		"ui/main.menu",
+		"ui/hud3.txt",
+		"ui/ingame_scoreboard_ffa.menu",
+		"ui/assets/button_back.png",
+		"ui/assets/hud/ffa.png",
+		"ui/assets/hud/dm.png",
+		"ui/assets/hud/tourn.png",
+		"ui/assets/score/navbarl.png",
+		"ui/assets/score/navbarm.png",
+		"ui/assets/score/navbarr.png",
+		"ui/assets/score/navleft.png",
+		"ui/assets/score/navright.png",
+		"ui/assets/score/navfriends.png",
+		"ui/assets/score/scoretl.png",
+	}.issubset(entry_names)
+
+	if drift_files:
+		with zipfile.ZipFile(overlay_package, "r") as archive:
+			assert sorted(archive.namelist()) == [f"ui/{relative_path}" for relative_path in drift_files]

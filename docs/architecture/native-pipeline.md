@@ -16,25 +16,26 @@ That closes the core import/export replication work for the reconstructed source
 That retail-binary validation lane now has a dedicated tracked probe:
 `tools/modules/run_retail_module_runtime_probe.ps1`, with the current evidence
 captured in
-`artifacts/module_validation/logs/retail_module_runtime_evidence_20260409.json`.
-The latest pass loads retail `uix86.dll`, `qagamex86.dll`, and `cgamex86.dll`
-from the Steam profile root under the reconstructed host. The remaining
-live-map shortfall is no longer an ambiguous module-host failure; it is the
-renderer-owned `R_LoadMD3` rejection of retail
-`models/weapons3/hmg/hmg.md3`, which belongs to the renderer audit rather than
-to the native module ABI slice.
+`artifacts/module_validation/logs/retail_module_runtime_evidence_latest.json`.
+That stable alias is only promoted when a rerun remains sufficient, and it now
+points at the current bounded `2026-04-21` artifact. The authoritative tracked
+pass still loads retail `uix86.dll`, `qagamex86.dll`, and `cgamex86.dll` from
+the Steam profile root under the reconstructed host. The remaining live-map
+shortfall is no longer an ambiguous module-host failure; it is the
+renderer-owned `R_fonsErrorCallback` font-atlas saturation blocker that
+prevents `CS_ACTIVE` after retail module load, which belongs to the renderer
+text audit rather than to the native module ABI slice.
 
 The final strict-retail module closure state is tracked separately by
 `tests/test_game_module_retail_parity_gate.py`, which writes
 `artifacts/module_validation/logs/retail_module_parity_gate.json` as the
 current `GMR-P8` artifact across the combined module gap register first unified
-in `GMR-P5`. That gate consumes the archived runtime probe above together with
+in `GMR-P5`. That gate consumes the stable runtime alias above together with
 the launcher/resource fallback closure, the current `2026-04-10` module audit,
 and the synced parity ledgers/pipeline notes, so the module layer can close
-without claiming ownership of the remaining renderer blocker. Because the
-workflow topology and host-side validation contract were unchanged during the
-final `GMR-P8` reconciliation pass, the archived runtime probe remains
-authoritative until that host/runtime seam changes again.
+without claiming ownership of the remaining renderer blocker. The alias
+promotion rule keeps degraded reruns from silently replacing the authoritative
+bounded artifact until the host/runtime seam is revalidated cleanly again.
 
 ## Client UI VM (`uivm`)
 | Lifecycle | Location(s) | Current invocation | Proposed native entry (signature) | Notes / blockers |

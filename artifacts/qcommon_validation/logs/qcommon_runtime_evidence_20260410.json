@@ -8,15 +8,15 @@
   "probe_script": "tools/qcommon/run_qcommon_runtime_probe.ps1",
   "runtime_root": "build/win32/Debug/bin/baseq3",
   "retail_basepath": "C:/Program Files (x86)/Steam/steamapps/common/Quake Live",
-  "asset_cdpath": "assets/quakelive",
+  "asset_cdpath": "build/ui_bundle/staging",
   "main_menu": {
-    "engine_screenshot": "build/win32/Debug/bin/baseq3/screenshots/codex_qcommon_p6_main_20260410_211026.jpg",
-    "engine_sha256": "9bb2c05f93dc6fa9ff3ba1e7931329292cf43956e9f8176aa6ff0a47c0662126",
-    "window_capture": "build/win32/Debug/dumps/screenshots/codex_qcommon_p6_main_20260410_211026_window.png",
-    "window_sha256": "1d88436eff5ffb8e2340f250469533de0473f30af0756bcc9b835c2340d09794",
-    "window_meta": "build/win32/Debug/dumps/screenshots/codex_qcommon_p6_main_20260410_211026_window.json",
-    "log": "build/win32/Debug/dumps/logs/codex_qcommon_p6_main_20260410_211026.log",
-    "config": "build/win32/Debug/bin/baseq3/codex_qcommon_p6_main_20260410_211026.cfg",
+    "engine_screenshot": "build/win32/Debug/bin/baseq3/screenshots/codex_qcommon_p6_main_20260421_182135.jpg",
+    "engine_sha256": "7a0c6e10118e7983dd50c7fd11e8e18947f26f5e5318897cd3cc1cbbcdaff5be",
+    "window_capture": "",
+    "window_sha256": "",
+    "window_meta": "",
+    "log": "build/win32/Debug/dumps/logs/codex_qcommon_p6_main_20260421_182135.log",
+    "config": "build/win32/Debug/bin/baseq3/codex_qcommon_p6_main_20260421_182135.cfg",
     "launch_args": [
       "+set",
       "developer",
@@ -27,6 +27,9 @@
       "+set",
       "g_logfile",
       "1",
+      "+set",
+      "com_maxfps",
+      "30",
       "+set",
       "com_noErrorInterrupt",
       "1",
@@ -40,11 +43,11 @@
       "fs_basepath",
       "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1",
       "+set",
+      "fs_cdpath",
+      "E:\\Repositories\\QuakeLive-reverse\\build\\ui_bundle\\staging",
+      "+set",
       "fs_homepath",
       "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin",
-      "+set",
-      "fs_cdpath",
-      "E:\\Repositories\\QuakeLive-reverse\\assets\\quakelive",
       "+set",
       "r_fullscreen",
       "0",
@@ -79,72 +82,61 @@
       "s_initsound",
       "0",
       "+exec",
-      "codex_qcommon_p6_main_20260410_211026.cfg"
+      "codex_qcommon_p6_main_20260421_182135.cfg"
     ],
-    "argument_line": "+set developer 1 +set logfile 2 +set g_logfile 1 +set com_noErrorInterrupt 1 +set com_zoneMegs 64 +set com_hunkMegs 256 +set fs_basepath C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1 +set fs_homepath E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin +set fs_cdpath E:\\Repositories\\QuakeLive-reverse\\assets\\quakelive +set r_fullscreen 0 +set r_mode -1 +set r_customwidth 1280 +set r_customheight 720 +set r_windowedMode -1 +set r_windowedWidth 1280 +set r_windowedHeight 720 +set r_ext_multitexture 0 +set ui_browserAwesomium 0 +set web_browserActive 0 +set s_initsound 0 +exec codex_qcommon_p6_main_20260410_211026.cfg",
+    "argument_line": "+set developer 1 +set logfile 2 +set g_logfile 1 +set com_maxfps 30 +set com_noErrorInterrupt 1 +set com_zoneMegs 64 +set com_hunkMegs 256 +set fs_basepath C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1 +set fs_cdpath E:\\Repositories\\QuakeLive-reverse\\build\\ui_bundle\\staging +set fs_homepath E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin +set r_fullscreen 0 +set r_mode -1 +set r_customwidth 1280 +set r_customheight 720 +set r_windowedMode -1 +set r_windowedWidth 1280 +set r_windowedHeight 720 +set r_ext_multitexture 0 +set ui_browserAwesomium 0 +set web_browserActive 0 +set s_initsound 0 +exec codex_qcommon_p6_main_20260421_182135.cfg",
     "environment": {
+      "QLR_DUMP_PATH": "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\dumps",
       "QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
       "QL_DISABLE_AWESOMIUM": "1",
-      "QLR_DUMP_PATH": "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\dumps",
       "QL_DISABLE_STEAMWORKS": "1"
     },
     "ui_init_complete": true,
     "execed_qzconfig": true,
     "execed_repconfig": true,
     "current_search_path": [
-      "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin\\baseq3\\pak_ui_src_retail_overlay.pk3 (7 files)",
-      "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin\\baseq3\\pak_uiql.pk3 (939 files)",
       "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin/baseq3",
-      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\pak00.pk3 (9285 files)",
-      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\curry.pk3 (4 files)",
-      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\common-spog.pk3 (30 files)",
-      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\common-q3map2.pk3 (14 files)",
-      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\bin.pk3 (5 files)",
+      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\pak00.pk3 (0x15a37833 - 9285 files)",
+      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\curry.pk3 (0x3cef0e3c - 4 files)",
+      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\common-spog.pk3 (0xd6bc5bc9 - 30 files)",
+      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\common-q3map2.pk3 (0xa2480b0a - 14 files)",
+      "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\bin.pk3 (0x7c1d0d5e - 5 files)",
       "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1/baseq3",
-      "E:\\Repositories\\QuakeLive-reverse\\assets\\quakelive/baseq3"
+      "E:\\Repositories\\QuakeLive-reverse\\build\\ui_bundle\\staging/baseq3"
     ],
     "search_path_contains_homepath_root": true,
-    "search_path_contains_home_overlay": true,
+    "search_path_contains_home_duplicate_ui_pk3": false,
     "search_path_contains_retail_pak00": true,
     "service_disabled_policy": {
       "web_pak_skipped": false,
       "steam_resource_bridge_disabled": true,
       "show_browser_ignored": true,
       "change_hash_ignored": true,
-      "show_error_logged": true,
-      "reload_logged": true,
-      "stop_refresh_ignored": true
+      "game_error_published": true,
+      "native_stop_refresh_logged": true
     },
     "ui_dll_load_roots": {
       "attempts": [
-        {
-          "path": "E:\\Repositories\\QuakeLive-reverse\\baseq3\\uix86.dll",
-          "status": "failed"
-        },
-        {
-          "path": "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\uix86.dll",
-          "status": "failed"
-        },
         {
           "path": "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin\\baseq3\\uix86.dll",
           "status": "ok"
         }
       ],
-      "repo_root_failed": true,
-      "retail_base_failed": true,
+      "repo_root_failed": false,
+      "retail_base_failed": false,
       "writable_homepath_ok": true
     },
     "shot_logged": true
   },
   "map_runtime": {
     "map": "bloodrun",
-    "engine_screenshot": "build/win32/Debug/bin/baseq3/screenshots/codex_qcommon_p6_map_20260410_211026.jpg",
-    "engine_sha256": "efca3839195f277ab85779130a87c57d677b9de2fdd969f35aba2c7ccea28cc5",
-    "window_capture": "build/win32/Debug/dumps/screenshots/codex_qcommon_p6_map_20260410_211026_window.png",
-    "window_sha256": "b7a02d11171f3c9feeaac3c292d5b203e7b27d8d9ed1eea7917d9ab6839ebbec",
-    "window_meta": "build/win32/Debug/dumps/screenshots/codex_qcommon_p6_map_20260410_211026_window.json",
-    "log": "build/win32/Debug/dumps/logs/codex_qcommon_p6_map_20260410_211026.log",
-    "config": "build/win32/Debug/bin/baseq3/codex_qcommon_p6_map_20260410_211026.cfg",
+    "engine_screenshot": "build/win32/Debug/bin/baseq3/screenshots/codex_qcommon_p6_map_20260421_182135.jpg",
+    "engine_sha256": "557a93fa26fe4a251b436d67049f29407dd97d2a6f7a2f2e09149f54b222c054",
+    "window_capture": "",
+    "window_sha256": "",
+    "window_meta": "",
+    "log": "build/win32/Debug/dumps/logs/codex_qcommon_p6_map_20260421_182135.log",
+    "config": "build/win32/Debug/bin/baseq3/codex_qcommon_p6_map_20260421_182135.cfg",
     "launch_args": [
       "+set",
       "developer",
@@ -155,6 +147,9 @@
       "+set",
       "g_logfile",
       "1",
+      "+set",
+      "com_maxfps",
+      "30",
       "+set",
       "com_noErrorInterrupt",
       "1",
@@ -168,11 +163,11 @@
       "fs_basepath",
       "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1",
       "+set",
+      "fs_cdpath",
+      "E:\\Repositories\\QuakeLive-reverse\\build\\ui_bundle\\staging",
+      "+set",
       "fs_homepath",
       "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin",
-      "+set",
-      "fs_cdpath",
-      "E:\\Repositories\\QuakeLive-reverse\\assets\\quakelive",
       "+set",
       "r_fullscreen",
       "0",
@@ -222,13 +217,13 @@
       "g_warmup",
       "0",
       "+exec",
-      "codex_qcommon_p6_map_20260410_211026.cfg"
+      "codex_qcommon_p6_map_20260421_182135.cfg"
     ],
-    "argument_line": "+set developer 1 +set logfile 2 +set g_logfile 1 +set com_noErrorInterrupt 1 +set com_zoneMegs 64 +set com_hunkMegs 256 +set fs_basepath C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1 +set fs_homepath E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin +set fs_cdpath E:\\Repositories\\QuakeLive-reverse\\assets\\quakelive +set r_fullscreen 0 +set r_mode -1 +set r_customwidth 1280 +set r_customheight 720 +set r_windowedMode -1 +set r_windowedWidth 1280 +set r_windowedHeight 720 +set r_ext_multitexture 0 +set ui_browserAwesomium 0 +set web_browserActive 0 +set s_initsound 0 +set sv_pure 0 +set rconPassword qlrpass +set g_gametype 1 +set g_doWarmup 0 +set g_warmup 0 +exec codex_qcommon_p6_map_20260410_211026.cfg",
+    "argument_line": "+set developer 1 +set logfile 2 +set g_logfile 1 +set com_maxfps 30 +set com_noErrorInterrupt 1 +set com_zoneMegs 64 +set com_hunkMegs 256 +set fs_basepath C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1 +set fs_cdpath E:\\Repositories\\QuakeLive-reverse\\build\\ui_bundle\\staging +set fs_homepath E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin +set r_fullscreen 0 +set r_mode -1 +set r_customwidth 1280 +set r_customheight 720 +set r_windowedMode -1 +set r_windowedWidth 1280 +set r_windowedHeight 720 +set r_ext_multitexture 0 +set ui_browserAwesomium 0 +set web_browserActive 0 +set s_initsound 0 +set sv_pure 0 +set rconPassword qlrpass +set g_gametype 1 +set g_doWarmup 0 +set g_warmup 0 +exec codex_qcommon_p6_map_20260421_182135.cfg",
     "environment": {
+      "QLR_DUMP_PATH": "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\dumps",
       "QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
       "QL_DISABLE_AWESOMIUM": "1",
-      "QLR_DUMP_PATH": "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\dumps",
       "QL_DISABLE_STEAMWORKS": "1"
     },
     "server_seen": true,
@@ -238,39 +233,23 @@
     "qagame_dll_load_roots": {
       "attempts": [
         {
-          "path": "E:\\Repositories\\QuakeLive-reverse\\baseq3\\qagamex86.dll",
-          "status": "failed"
-        },
-        {
-          "path": "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\qagamex86.dll",
-          "status": "failed"
-        },
-        {
           "path": "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin\\baseq3\\qagamex86.dll",
           "status": "ok"
         }
       ],
-      "repo_root_failed": true,
-      "retail_base_failed": true,
+      "repo_root_failed": false,
+      "retail_base_failed": false,
       "writable_homepath_ok": true
     },
     "cgame_dll_load_roots": {
       "attempts": [
         {
-          "path": "E:\\Repositories\\QuakeLive-reverse\\baseq3\\cgamex86.dll",
-          "status": "failed"
-        },
-        {
-          "path": "C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1\\baseq3\\cgamex86.dll",
-          "status": "failed"
-        },
-        {
           "path": "E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin\\baseq3\\cgamex86.dll",
           "status": "ok"
         }
       ],
-      "repo_root_failed": true,
-      "retail_base_failed": true,
+      "repo_root_failed": false,
+      "retail_base_failed": false,
       "writable_homepath_ok": true
     }
   },
@@ -286,7 +265,9 @@
     "LoadLibrary 'E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin\\baseq3\\qagamex86.dll' ok",
     "Loading dll file cgame.",
     "LoadLibrary 'E:\\Repositories\\QuakeLive-reverse\\build\\win32\\Debug\\bin\\baseq3\\cgamex86.dll' ok",
-    "Going from CS_PRIMED to CS_ACTIVE"
+    "Going from CS_PRIMED to CS_ACTIVE",
+    "qcommon runtime game.error marker observed",
+    "qcommon runtime stopRefresh fallback observed"
   ],
   "missing_log_markers": [],
   "warnings": [],

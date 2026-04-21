@@ -274,7 +274,7 @@ foreach ($projectPath in @(
 	}
 }
 
-$runtimeEvidence = Read-JsonFile -RelativePath 'artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json'
+$runtimeEvidence = Read-JsonFile -RelativePath 'artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json'
 if ($runtimeEvidence.phase -ne 'RG-P11') {
 	Report-UnresolvedGap -Message 'Renderer runtime artifact is not the RG-P11 closure artifact.'
 }

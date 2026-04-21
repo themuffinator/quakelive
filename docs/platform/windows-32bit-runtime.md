@@ -24,7 +24,7 @@ Perform these checks after installing prerequisites:
 1. **Confirm WOW64 status:** Run `wmic OS get OSArchitecture` or `set PROCESSOR_ARCHITECTURE` and verify `AMD64` with `WOW64` enabled; `PROCESSOR_ARCHITEW6432` should be set when spawning a 32-bit shell (`%SystemRoot%\SysWOW64\cmd.exe`).
 2. **Verify redistributables:** Use `sigcheck -q -nobanner %SystemRoot%\SysWOW64\msvcr100.dll` (from Sysinternals) to ensure the 32-bit CRT is present and signed. If missing, reinstall the x86 Visual C++ runtime.
 3. **Check DirectX presence:** Run `dxdiag /whql:off` and inspect the `DirectX Files` tab for `d3dx9_43.dll` under `SysWOW64`. Absence indicates the June 2010 runtime is not installed for 32-bit binaries.
-4. **Retail payload parity:** Run `pwsh tools\ci\audit-retail-dependencies.ps1 -Strict` to confirm the local Steam install still matches the committed `assets\quakelive\` payload byte-for-byte.
+4. **Retail payload parity:** Run `pwsh tools\ci\audit-retail-dependencies.ps1 -Strict` to confirm the local Steam install still matches the committed `assets\quakelive\` payload byte-for-byte, and use `pwsh tools\ci\audit-retail-dependencies.ps1 -RuntimeRoot build\win32\Release\retail-runtime -SkipSteamInstall -Strict` to verify the staged strict runtime root after `tools\ci\validate-windows-native.ps1 -RuntimeProfile retail`.
 5. **MSBuild targeting:** From a Visual Studio x86 Native Tools prompt, execute `msbuild src\code\quakelive.sln /t:qagamex86 /p:Platform=Win32 /p:Configuration=Debug /p:PlatformToolset=v100` and verify outputs land in `build\win32\Debug\modules\qagamex86`. Any `“64-bit tools are not available”` warnings indicate the wrong developer prompt was used.
 
 ## Troubleshooting launch failures

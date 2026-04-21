@@ -6,15 +6,16 @@ This guide documents how to stage Quake Live HUD and menu assets inside the GPL 
 ## Asset Workflow Overview
 ### 1. Establish the Source of Truth
 - Treat `assets/quakelive/baseq3/ui` as the canonical snapshot for `.menu`/`.txt` definitions, metadata tables, and supporting enums.
-- Treat `src/ui` as a frozen mirror, not an active authoring surface. Use the audit notes and parity tests to flag drift between `src/ui` and the retail snapshot, then correct the drift through layered overrides rather than direct edits.
+- Treat `src/ui` as the read-only checked-in runtime-panel baseline, not an active authoring surface. The current `.menu`/`.txt` compare is clean (`65 / 65` files, `0` content diffs); if drift reappears, use the audit notes and parity tests to catch it and correct it through layered overrides rather than direct edits.
 
 ### 2. Sync Menu Definitions and Metadata
 - Verify the staged retail corpus first with `scripts/ui/check_retail_ui_corpus.py`. The check writes `artifacts/ui_bundle/ui_retail_inventory.json`, reports all missing manifest-tracked `baseq3` inputs in one pass, and lets the UI parity tests switch cleanly between strict compare mode and actionable environment-warning mode.
-- For frozen `src/ui` drift, generate retail-correct replacements with `scripts/ui/write_retail_ui_overrides.py` instead of patching files in place.
-- Treat the generated overlay manifest as a drift report, not as a default runtime package: `src/ui` stays the read-only baseline, and the supported runtime contract is to load retail UI assets directly from the installed Quake Live `baseq3` via `fs_basepath`.
-- Do not mount repo-generated retail replacement PK3s from `fs_homepath`. The only files that should appear there by default are locally built DLLs, configs, logs, screenshots, and bridge files that do not duplicate retail distributables.
+- If `src/ui` drift reappears, generate retail-correct replacements with `scripts/ui/write_retail_ui_overrides.py` instead of patching files in place.
+- Treat the generated overlay manifest as the default drift report, not as a default runtime package: `src/ui` stays the read-only baseline, normal contributor runs keep retail runtime PK3s unmaterialized, and the current manifest records an empty `drift_files` set on the clean worktree.
+- The supported exception is an explicit runtime-refresh or probe flow that calls `tools/build_ui_bundle.py --runtime-root <writable baseq3>`, emits `pak_uiql.pk3`, emits the bounded `pak_ui_src_retail_overlay.pk3` only when `drift_files` is non-empty, and records `artifacts/ui_bundle/runtime_ui_package_manifest.json` as the verification contract.
+- Do not leave repo-generated retail replacement PK3s in `fs_homepath` by default. Outside the explicit runtime-refresh/probe path above, the only files that should appear there are locally built DLLs, configs, logs, screenshots, and bridge files that do not duplicate retail distributables.
 - Keep GPL-only helpers (`credential.menu`, `ingame_quakelive.txt`, `menus_quakelive.txt`) but reconcile their dependencies so they reference the restored assets instead of temporary fallbacks.
-- Diff the staged files against upstream Quake Live revisions before shipping changes to maintain behavioural parity, and record the known drift set in the audit docs/tests.
+- Diff the staged files against upstream Quake Live revisions before shipping changes to maintain behavioural parity, and record any future drift in the overlay manifest plus the audit docs/tests.
 
 ### 3. Stage Art, Fonts, and Shaders
 - Validate the entire `ui/assets` hierarchy against the retail install instead of repackaging it into a repo-owned runtime bundle. This includes HUD chrome, score state textures, menu backgrounds, and national flags.
@@ -24,13 +25,15 @@ This guide documents how to stage Quake Live HUD and menu assets inside the GPL 
 - Bring over the `ui*.shader` files and any dependent materials so gradients, cursors, and overlay effects compile correctly.
 
 ### 4. Prepare Validation Inputs
-- Keep the validation recipe under version control (for example `tools/build_ui_bundle.sh`, which now runs the retail corpus check, records the drift manifest, removes stale duplicate-package artifacts, and bakes font metrics without writing a retail UI PK3).
+- Keep the validation recipe under version control (for example `tools/build_ui_bundle.sh`, which now runs the retail corpus check, records the drift manifest, removes stale duplicate-package artifacts, and bakes font metrics without writing a retail UI PK3 by default).
 - The preflight now runs `scripts/ui/check_retail_ui_corpus.py --strict` first, so missing retail configs, fonts, shaders, menus, icons, and levelshots are reported together before validation starts.
 - `artifacts/ui_bundle/ui_src_retail_overlay.json` records the drift policy, the deterministic hash and size for every drifted file, and stale-file cleanup evidence so CI can verify that duplicate retail overrides are not being materialized by default.
+- `artifacts/ui_bundle/runtime_ui_package_manifest.json` is written only for explicit `--runtime-root` refreshes. It records the runtime root, package hashes, required-entry coverage, and the exact overlay-entry list so local probe automation can fail fast before launch.
 - Track validation manifests under `tools/` so the retail-input recipe is auditable. `tools/packaging/ui_bundle_manifest.json` now lists the Quake Live font binaries sourced from `assets/quakelive/baseq3/fonts/`, their HUD roles (`font`, `smallFont`, `bigFont`, `mono`), and the license caveats (Handel Gothic remains proprietary, while the Droid and Noto families stay under Apache 2.0).
 
 ### 5. Validate In-Game
 - Launch with a clean homepath to ensure stale local PK3s are not masking the retail install. `tests/run_ui_validation.py` now reads directly from the detected retail `baseq3` root while parsing representative HUD/menu panels for font references.
+- The client runtime probe now performs an explicit runtime-root refresh before launch and refuses to continue unless `runtime_ui_package_manifest.json` and the required UI package entries were emitted successfully.
 - Exercise HUD preset rotation, scoreboard variants, and menu navigation to confirm art, fonts, and locale tables resolve correctly. The validation harness checks `hud*.txt`/`*.menu` fonts plus shader handles, then uploads `artifacts/ui_validation/logs/ui_validation_summary.json` for CI triage.
 - Run `python -B -m pytest tests/test_ui_full_parity_gate.py -q` after the bundle and headless validation passes. The gate writes `artifacts/ui_validation/logs/ui_full_parity_gate.json`, summarises every UI gap tranche (`UI-G01`..`UI-G06`), and records an overall release-style pass/fail result.
 - When a milestone run needs the gate to fail hard unless every tranche is green, set `UI_FULL_PARITY_GATE_ENFORCE=1` before invoking the test. In normal contributor runs the report is still written, but the strict release-mode assertion remains opt-in.
@@ -59,8 +62,8 @@ This guide documents how to stage Quake Live HUD and menu assets inside the GPL 
 
 ## Contribution Checklist
 - [x] All Quake Live `.menu`/`.txt` files (including locale and HUD presets) are staged in `src/ui`.
-- [ ] The frozen `src/ui` drift set is either unchanged and covered by the retail overlay package, or deliberately reduced with updated parity evidence.
-- [ ] Art, fonts, and shader dependencies are packaged into a reproducible PK3 and referenced by the scripts.
+- [x] The current `src/ui` runtime-panel compare is clean (`65 / 65`, `0` content diffs), and any future drift must be captured by the overlay manifest/runtime package proof path.
+- [ ] Default validation runs leave retail runtime PK3s unmaterialized, while explicit runtime-refresh/probe flows emit reproducible PK3s plus `runtime_ui_package_manifest.json` when the writable homepath contract needs them.
 - [ ] `tools/build_ui_bundle.sh` completes without error and `python tests/run_ui_validation.py` reports no glyph/shader drift.
 - [ ] `python -B -m pytest tests/test_ui_full_parity_gate.py -q` writes `artifacts/ui_validation/logs/ui_full_parity_gate.json` and any non-passing tranche is understood before landing changes.
 - [ ] Accessibility guidelines (redundant cues, locale support, typography) are verified during manual QA.

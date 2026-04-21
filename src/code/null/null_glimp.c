@@ -35,7 +35,7 @@ void ( * qglUnlockArraysEXT) ( void );
 void		GLimp_EndFrame( void ) {
 }
 
-int 		GLimp_Init( void )
+void		GLimp_Init( void )
 {
 }
 
@@ -43,12 +43,15 @@ void		GLimp_Shutdown( void ) {
 }
 
 void		GLimp_EnableLogging( qboolean enable ) {
+	(void)enable;
 }
 
 void GLimp_LogComment( char *comment ) {
+	(void)comment;
 }
 
 qboolean QGL_Init( const char *dllname ) {
+	(void)dllname;
 	return qtrue;
 }
 

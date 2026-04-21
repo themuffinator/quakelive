@@ -1,3 +1,7 @@
+#if defined( __linux__ ) && !defined( _GNU_SOURCE )
+#define _GNU_SOURCE
+#endif
+
 /*
 ===========================================================================
 Copyright (C) 1999-2005 Id Software, Inc.
@@ -39,6 +43,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <errno.h>
 #ifdef __linux__ // rb010123
   #include <mntent.h>
+  #include <link.h>
 #endif
 #include <dlfcn.h>
 
@@ -62,6 +67,16 @@ unsigned  sys_frame_time;
 
 uid_t saved_euid;
 qboolean stdin_active = qtrue;
+
+typedef void (*sys_moncontrol_t)( int mode );
+typedef void (*sys_mcleanup_t)( void );
+
+static sys_moncontrol_t	sys_moncontrol = NULL;
+static sys_mcleanup_t	sys_mcleanup = NULL;
+static qboolean		sys_profilingHooksResolved = qfalse;
+static qboolean		sys_profilingHooksAvailable = qfalse;
+static qboolean		sys_profilingSessionStarted = qfalse;
+static qboolean		sys_profilingActive = qfalse;
 
 // =============================================================
 // tty console variables
@@ -101,14 +116,92 @@ static int hist_current = -1, hist_count = 0;
 
 /*
 ==================
+Sys_QueryPhysicalMemoryBytes
+==================
+*/
+static qboolean Sys_QueryPhysicalMemoryBytes( unsigned long long *totalBytes ) {
+	long	pageCount;
+	long	pageSize;
+
+	if ( !totalBytes ) {
+		return qfalse;
+	}
+
+#if defined( _SC_PHYS_PAGES )
+	pageCount = sysconf( _SC_PHYS_PAGES );
+#else
+	pageCount = -1;
+#endif
+
+#if defined( _SC_PAGESIZE )
+	pageSize = sysconf( _SC_PAGESIZE );
+#elif defined( _SC_PAGE_SIZE )
+	pageSize = sysconf( _SC_PAGE_SIZE );
+#else
+	pageSize = -1;
+#endif
+
+	if ( pageCount <= 0 || pageSize <= 0 ) {
+		return qfalse;
+	}
+
+	*totalBytes = (unsigned long long)pageCount * (unsigned long long)pageSize;
+	return qtrue;
+}
+
+/*
+==================
 Sys_LowPhysicalMemory()
 ==================
 */
 qboolean Sys_LowPhysicalMemory() {
-  //MEMORYSTATUS stat;
-  //GlobalMemoryStatus (&stat);
-  //return (stat.dwTotalPhys <= MEM_THRESHOLD) ? qtrue : qfalse;
-  return qfalse; // bk001207 - FIXME
+	unsigned long long	totalBytes;
+
+	if ( Sys_QueryPhysicalMemoryBytes( &totalBytes ) ) {
+		return ( totalBytes <= MEM_THRESHOLD ) ? qtrue : qfalse;
+	}
+
+	return qfalse;
+}
+
+/*
+==================
+Sys_QueryFunctionBytes
+==================
+*/
+static qboolean Sys_QueryFunctionBytes( void *functionPointer, const byte **functionBytes, size_t *functionSize ) {
+#if defined( __linux__ ) && defined( RTLD_DL_SYMENT )
+	Dl_info		info;
+	ElfW( Sym )	*symbol;
+
+	if ( !functionPointer || !functionBytes || !functionSize ) {
+		return qfalse;
+	}
+
+	*functionBytes = NULL;
+	*functionSize = 0;
+
+	memset( &info, 0, sizeof( info ) );
+	symbol = NULL;
+
+	if ( dladdr1( functionPointer, &info, (void **)&symbol, RTLD_DL_SYMENT ) == 0 ) {
+		return qfalse;
+	}
+
+	if ( !info.dli_saddr || !symbol || symbol->st_size == 0 ) {
+		return qfalse;
+	}
+
+	*functionBytes = (const byte *)info.dli_saddr;
+	*functionSize = (size_t)symbol->st_size;
+	return qtrue;
+#else
+	(void)functionPointer;
+	(void)functionBytes;
+	(void)functionSize;
+
+	return qfalse;
+#endif
 }
 
 /*
@@ -116,8 +209,29 @@ qboolean Sys_LowPhysicalMemory() {
 Sys_FunctionCmp
 ==================
 */
-int Sys_FunctionCmp(void *f1, void *f2) {
-  return qtrue;
+int Sys_FunctionCmp( void *f1, void *f2 ) {
+	const byte	*functionBytes1;
+	const byte	*functionBytes2;
+	size_t		functionSize1;
+	size_t		functionSize2;
+
+	if ( f1 == f2 ) {
+		return qtrue;
+	}
+
+	if ( !Sys_QueryFunctionBytes( f1, &functionBytes1, &functionSize1 ) ) {
+		return qfalse;
+	}
+
+	if ( !Sys_QueryFunctionBytes( f2, &functionBytes2, &functionSize2 ) ) {
+		return qfalse;
+	}
+
+	if ( functionSize1 != functionSize2 ) {
+		return qfalse;
+	}
+
+	return memcmp( functionBytes1, functionBytes2, functionSize1 ) == 0 ? qtrue : qfalse;
 }
 
 /*
@@ -125,8 +239,40 @@ int Sys_FunctionCmp(void *f1, void *f2) {
 Sys_FunctionCheckSum
 ==================
 */
-int Sys_FunctionCheckSum(void *f1) {
-  return 0;
+int Sys_FunctionCheckSum( void *f1 ) {
+	const byte	*functionBytes;
+	size_t		functionSize;
+
+	if ( !Sys_QueryFunctionBytes( f1, &functionBytes, &functionSize ) ) {
+		return 0;
+	}
+
+	if ( functionSize > INT_MAX ) {
+		return 0;
+	}
+
+	return Com_BlockChecksum( functionBytes, (int)functionSize );
+}
+
+/*
+==================
+Sys_PathHasReleaseMarker
+==================
+*/
+static qboolean Sys_PathHasReleaseMarker( const char *directory, const char *markerName ) {
+	char		path[MAX_OSPATH];
+	struct stat	fileInfo;
+
+	if ( !directory || !directory[0] || !markerName || !markerName[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( path, sizeof( path ), "%s/%s", directory, markerName );
+	if ( stat( path, &fileInfo ) != 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
 }
 
 /*
@@ -135,10 +281,103 @@ Sys_MonkeyShouldBeSpanked
 ==================
 */
 int Sys_MonkeyShouldBeSpanked( void ) {
-  return 0;
+	/*
+	 * The historical Unix release flow used an external spank.sh pass keyed off
+	 * a q3monkeyid marker file. The script itself is not committed, but the
+	 * marker contract is still visible in the original Construct script and the
+	 * retained retail string corpus, so reconstruct the marker detection here
+	 * instead of keeping the hook as an unconditional placeholder.
+	 */
+	if ( Sys_PathHasReleaseMarker( Sys_Cwd(), "q3monkeyid" ) ) {
+		return qtrue;
+	}
+
+	if ( Sys_PathHasReleaseMarker( Sys_DefaultInstallPath(), "q3monkeyid" ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
 }
 
+/*
+==================
+Sys_ResolveProfilingHooks
+==================
+*/
+static qboolean Sys_ResolveProfilingHooks( void ) {
+	if ( sys_profilingHooksResolved ) {
+		return sys_profilingHooksAvailable;
+	}
+
+	sys_profilingHooksResolved = qtrue;
+	sys_moncontrol = (sys_moncontrol_t)dlsym( RTLD_DEFAULT, "moncontrol" );
+	sys_mcleanup = (sys_mcleanup_t)dlsym( RTLD_DEFAULT, "_mcleanup" );
+
+	if ( !sys_moncontrol || !sys_mcleanup ) {
+		sys_moncontrol = NULL;
+		sys_mcleanup = NULL;
+		return qfalse;
+	}
+
+	sys_profilingHooksAvailable = qtrue;
+	return qtrue;
+}
+
+/*
+==================
+Sys_SetProfilingEnabled
+==================
+*/
+static void Sys_SetProfilingEnabled( qboolean enabled ) {
+	if ( !Sys_ResolveProfilingHooks() ) {
+		return;
+	}
+
+	sys_moncontrol( enabled ? 1 : 0 );
+	sys_profilingActive = enabled;
+}
+
+/*
+==================
+Sys_BeginProfiling
+==================
+*/
 void Sys_BeginProfiling( void ) {
+	if ( sys_profilingActive ) {
+		return;
+	}
+
+	if ( !Sys_ResolveProfilingHooks() ) {
+		return;
+	}
+
+	sys_profilingSessionStarted = qtrue;
+	Sys_SetProfilingEnabled( qtrue );
+}
+
+/*
+==================
+Sys_EndProfiling
+==================
+*/
+void Sys_EndProfiling( void ) {
+	if ( !sys_profilingSessionStarted ) {
+		return;
+	}
+
+	if ( !Sys_ResolveProfilingHooks() ) {
+		sys_profilingSessionStarted = qfalse;
+		sys_profilingActive = qfalse;
+		return;
+	}
+
+	if ( sys_profilingActive ) {
+		sys_moncontrol( 0 );
+		sys_profilingActive = qfalse;
+	}
+
+	sys_mcleanup();
+	sys_profilingSessionStarted = qfalse;
 }
 
 /*
@@ -319,7 +558,8 @@ void Sys_Printf (char *fmt, ...)
 
 // single exit point (regular exit or in case of signal fault)
 void Sys_Exit( int ex ) {
-  Sys_ConsoleInputShutdown();
+	Sys_EndProfiling();
+	Sys_ConsoleInputShutdown();
 
 #ifdef NDEBUG // regular behavior
 
@@ -344,7 +584,8 @@ void Sys_Quit (void) {
 
 void Sys_Init(void)
 {
-  Cmd_AddCommand ("in_restart", Sys_In_Restart_f);
+	Cmd_AddCommand ("in_restart", Sys_In_Restart_f);
+	Sys_SetProfilingEnabled( qfalse );
 
 #if defined __linux__
 #if defined __i386__
@@ -494,8 +735,7 @@ void Sys_ConsoleInputInit()
               characters  EOF,  EOL,  EOL2, ERASE, KILL, REPRINT,
               STATUS, and WERASE, and buffers by lines.
      ISIG: when any of the characters  INTR,  QUIT,  SUSP,  or
-              DSUSP are received, generate the corresponding sig­
-              nal
+              DSUSP are received, generate the corresponding signal
     */              
     tc.c_lflag &= ~(ECHO | ICANON);
     /*

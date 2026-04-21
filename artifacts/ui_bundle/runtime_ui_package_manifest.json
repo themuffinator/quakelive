@@ -1,0 +1,42 @@
+{
+  "manifest_version": 1,
+  "runtime_root": "build/win32/Debug/bin/baseq3",
+  "overlay_manifest_path": "artifacts/ui_bundle/ui_src_retail_overlay.json",
+  "overlay_manifest_sha256": "f86c2ae829411693e309edf92a5faf2a348e7fc5debf1536f637b083d25bc009",
+  "retail_ui_corpus_available": true,
+  "drift_files": [],
+  "main_package": {
+    "path": "build/win32/Debug/bin/baseq3/pak_uiql.pk3",
+    "size": 83105162,
+    "sha256": "e2e4b2c677d8816b7ff5e2516df7a11bd74bf9285d71d9264d700dc6922a016e",
+    "entry_count": 950,
+    "required_entries": [
+      "default.cfg",
+      "fonts/font.dat",
+      "fonts/font.tga",
+      "ui/hud3.txt",
+      "ui/ingame_scoreboard_ffa.menu",
+      "ui/main.menu",
+      "ui/assets/button_back.png",
+      "ui/assets/hud/dm.png",
+      "ui/assets/hud/ffa.png",
+      "ui/assets/hud/tourn.png",
+      "ui/assets/score/navbarm.png",
+      "ui/assets/score/navbarl.png",
+      "ui/assets/score/navbarr.png",
+      "ui/assets/score/navfriends.png",
+      "ui/assets/score/navleft.png",
+      "ui/assets/score/navright.png",
+      "ui/assets/score/scoretl.png"
+    ],
+    "required_entries_present": true,
+    "missing_required_entries": []
+  },
+  "overlay_package": {
+    "path": "build/win32/Debug/bin/baseq3/pak_ui_src_retail_overlay.pk3",
+    "exists": false,
+    "entry_count": 0,
+    "entry_paths": [],
+    "matches_overlay_manifest": true
+  }
+}

@@ -5,8 +5,9 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+RUNTIME_ARTIFACT_NAME = "renderer_runtime_evidence_latest.json"
 RUNTIME_ARTIFACT_PATH = (
-	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / "renderer_runtime_evidence_20260410.json"
+	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / RUNTIME_ARTIFACT_NAME
 )
 
 
@@ -40,8 +41,11 @@ def test_renderer_docs_and_probe_track_rg_p11_closure() -> None:
 	assert "r_debugFontAtlas" in runtime_probe
 	assert "codex_renderer_p11_atlas_" in runtime_probe
 	assert "phase = 'RG-P11'" in runtime_probe
-	assert "renderer_runtime_evidence_20260410.json" in renderer_audit
+	assert RUNTIME_ARTIFACT_NAME in runtime_probe
+	assert "map $MapName ffa" in runtime_probe
+	assert RUNTIME_ARTIFACT_NAME in renderer_audit
 	assert "Strict renderer estimate after `RG-P11` closure: **100%**" in renderer_audit
-	assert "renderer_runtime_evidence_20260410.json" in build_pipeline
-	assert "renderer_runtime_evidence_20260410.json" in hud_baseline
+	assert RUNTIME_ARTIFACT_NAME in build_pipeline
+	assert RUNTIME_ARTIFACT_NAME in hud_baseline
+	assert RUNTIME_ARTIFACT_NAME in rg_p11_note
 	assert "RG-P11 is now considered complete." in rg_p11_note

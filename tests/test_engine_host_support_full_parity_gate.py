@@ -49,6 +49,7 @@ WIN_RAWINPUT_SHARED_PATH = REPO_ROOT / "src" / "code" / "win32" / "win_rawinput_
 WIN_SYSCON_PATH = REPO_ROOT / "src" / "code" / "win32" / "win_syscon.c"
 UNIX_MAIN_PATH = REPO_ROOT / "src" / "code" / "unix" / "unix_main.c"
 NULL_CLIENT_PATH = REPO_ROOT / "src" / "code" / "null" / "null_client.c"
+NULL_INPUT_PATH = REPO_ROOT / "src" / "code" / "null" / "null_input.c"
 BOTLIB_ROOT = REPO_ROOT / "src" / "code" / "botlib"
 BOTLIB_INTERFACE_PATH = BOTLIB_ROOT / "be_interface.c"
 
@@ -218,6 +219,7 @@ def _build_engine_host_support_full_parity_gate_report() -> dict[str, Any]:
 	win_syscon = _read_text(WIN_SYSCON_PATH)
 	unix_main = _read_text(UNIX_MAIN_PATH)
 	null_client = _read_text(NULL_CLIENT_PATH)
+	null_input = _read_text(NULL_INPUT_PATH)
 	compiler_support = _read_text(COMPILER_SUPPORT_PATH)
 	input_translation_tests = _read_text(INPUT_TRANSLATION_TEST_PATH)
 	platform_services_tests = _read_text(PLATFORM_SERVICES_TEST_PATH)
@@ -642,9 +644,19 @@ def _build_engine_host_support_full_parity_gate_report() -> dict[str, Any]:
 		)
 		and _contains_all(
 			null_client,
+			"void CL_RefreshOnlineServicesBridgeState( void ) {",
 			"void CL_WebHost_Init( void ) {",
 			"void CL_WebHost_Shutdown( void ) {",
 			"qboolean CL_WebHost_HasLiveView( void ) {",
+			"void *CL_WebHost_GetCursorHandle( void ) {",
+			"void CL_AdvertisementBridge_InitUI( void ) {",
+		)
+		and _contains_all(
+			null_input,
+			'void IN_Init( void ) {',
+			'in_joystick = Cvar_Get( "in_joystick", "0", CVAR_ARCHIVE|CVAR_LATCH );',
+			'Cvar_Set( "ui_joyavail", "0" );',
+			'void Sys_SendKeyEvents( void ) {',
 		)
 	)
 	report["tranches"]["EH-G05"] = _entry(
@@ -667,9 +679,19 @@ def _build_engine_host_support_full_parity_gate_report() -> dict[str, Any]:
 			),
 			"null_stub_lane_present": _contains_all(
 				null_client,
+				"void CL_RefreshOnlineServicesBridgeState( void ) {",
 				"void CL_WebHost_Init( void ) {",
 				"void CL_WebHost_Shutdown( void ) {",
 				"qboolean CL_WebHost_HasLiveView( void ) {",
+				"void *CL_WebHost_GetCursorHandle( void ) {",
+				"void CL_AdvertisementBridge_InitUI( void ) {",
+			),
+			"null_input_lane_present": _contains_all(
+				null_input,
+				'void IN_Init( void ) {',
+				'in_joystick = Cvar_Get( "in_joystick", "0", CVAR_ARCHIVE|CVAR_LATCH );',
+				'Cvar_Set( "ui_joyavail", "0" );',
+				'void Sys_SendKeyEvents( void ) {',
 			),
 			"excluded_from_strict_retail_score": _contains_all(
 				toolchain_matrix,

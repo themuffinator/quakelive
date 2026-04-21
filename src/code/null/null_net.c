@@ -20,11 +20,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#include "../game/q_shared.h"
 #include "../qcommon/qcommon.h"
 
 /*
 =============
-NET_StringToAdr
+Sys_StringToAdr
 
 localhost
 idnewt
@@ -33,15 +34,32 @@ idnewt:28000
 192.246.40.70:28000
 =============
 */
-qboolean	NET_StringToAdr (char *s, netadr_t *a)
+qboolean Sys_StringToAdr( const char *s, netadr_t *a )
 {	
-	if (!strcmp (s, "localhost")) {
-		memset (a, 0, sizeof(*a));
+	if ( !Q_stricmp( s, "localhost" ) ) {
+		memset( a, 0, sizeof( *a ) );
 		a->type = NA_LOOPBACK;
-		return true;
+		return qtrue;
 	}
 
-	return false;
+	return qfalse;
+}
+
+/*
+==================
+Sys_IsLANAddress
+==================
+*/
+qboolean Sys_IsLANAddress( netadr_t adr ) {
+	return ( adr.type == NA_LOOPBACK ) ? qtrue : qfalse;
+}
+
+/*
+==================
+Sys_ShowIP
+==================
+*/
+void Sys_ShowIP( void ) {
 }
 
 /*
@@ -49,7 +67,10 @@ qboolean	NET_StringToAdr (char *s, netadr_t *a)
 Sys_SendPacket
 ==================
 */
-void Sys_SendPacket( int length, void *data, netadr_t to ) {
+void Sys_SendPacket( int length, const void *data, netadr_t to ) {
+	(void)length;
+	(void)data;
+	(void)to;
 }
 
 /*
@@ -59,6 +80,8 @@ Sys_GetPacket
 Never called by the game logic, just the system event queing
 ==================
 */
-qboolean	Sys_GetPacket ( netadr_t *net_from, msg_t *net_message ) {
-	return false;
+qboolean Sys_GetPacket( netadr_t *net_from, msg_t *net_message ) {
+	(void)net_from;
+	(void)net_message;
+	return qfalse;
 }

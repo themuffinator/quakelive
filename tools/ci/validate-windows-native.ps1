@@ -119,6 +119,110 @@ function Assert-FilesAvailable {
     Write-Host "Validated required $Description are available: $($FileNames -join ', ')"
 }
 
+function Assert-PathUnderRoot {
+    param(
+        [string]$Path,
+        [string]$Root,
+        [string]$Description
+    )
+
+    $resolvedPath = [System.IO.Path]::GetFullPath($Path)
+    $resolvedRoot = [System.IO.Path]::GetFullPath($Root)
+    if (-not $resolvedRoot.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $resolvedRoot += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    if (-not $resolvedPath.StartsWith($resolvedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "$Description path '$resolvedPath' escapes the allowed root '$resolvedRoot'."
+    }
+
+    return $resolvedPath
+}
+
+function Copy-StagedRuntimeFile {
+    param(
+        [string]$SourcePath,
+        [string]$DestinationPath
+    )
+
+    if (-not (Test-Path $SourcePath)) {
+        throw "Expected staged runtime source file was not found: $SourcePath"
+    }
+
+    $destinationDir = Split-Path -Parent $DestinationPath
+    if ($destinationDir -and -not (Test-Path $destinationDir)) {
+        New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+    }
+
+    Copy-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force
+}
+
+function Initialize-RetailRuntimeStage {
+    param(
+        [string]$ConfigurationName,
+        [string[]]$LauncherPayloadFiles
+    )
+
+    $stageRoot = Assert-PathUnderRoot `
+        -Path (Join-Path $RepoRoot "build\win32\$ConfigurationName\retail-runtime") `
+        -Root $RepoRoot `
+        -Description 'Retail runtime stage'
+
+    if (Test-Path $stageRoot) {
+        Remove-Item -LiteralPath $stageRoot -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $stageRoot 'baseq3') -Force | Out-Null
+
+    foreach ($payloadFile in $LauncherPayloadFiles) {
+        Copy-StagedRuntimeFile `
+            -SourcePath (Join-Path $launcherRoot $payloadFile) `
+            -DestinationPath (Join-Path $stageRoot $payloadFile)
+    }
+
+    $runtimeCopies = @(
+        @{
+            Source = Join-Path $RepoRoot "build\win32\$ConfigurationName\bin\quakelive_steam.exe"
+            Destination = Join-Path $stageRoot 'quakelive_steam.exe'
+        },
+        @{
+            Source = Join-Path $RepoRoot "build\win32\$ConfigurationName\bin\awesomium_process.exe"
+            Destination = Join-Path $stageRoot 'awesomium_process.exe'
+        },
+        @{
+            Source = Join-Path $RepoRoot "build\win32\$ConfigurationName\bin\qzeroded.exe"
+            Destination = Join-Path $stageRoot 'qzeroded.exe'
+        },
+        @{
+            Source = Join-Path $RepoRoot "build\win32\$ConfigurationName\modules\cgamex86\cgamex86.dll"
+            Destination = Join-Path $stageRoot 'baseq3\cgamex86.dll'
+        },
+        @{
+            Source = Join-Path $RepoRoot "build\win32\$ConfigurationName\modules\qagamex86\qagamex86.dll"
+            Destination = Join-Path $stageRoot 'baseq3\qagamex86.dll'
+        },
+        @{
+            Source = Join-Path $RepoRoot "build\win32\$ConfigurationName\bin\baseq3\uix86.dll"
+            Destination = Join-Path $stageRoot 'baseq3\uix86.dll'
+        }
+    )
+
+    foreach ($copy in $runtimeCopies) {
+        if (-not (Test-Path $copy.Source)) {
+            if ([System.IO.Path]::GetFileName($copy.Source) -ieq 'qzeroded.exe') {
+                continue
+            }
+
+            throw "Retail runtime staging source was not found: $($copy.Source)"
+        }
+
+        Copy-StagedRuntimeFile -SourcePath $copy.Source -DestinationPath $copy.Destination
+    }
+
+    return $stageRoot
+}
+
 $projectChecks = @(
     'src/code/game/qagamex86.vcxproj',
     'src/code/cgame/cgamex86.vcxproj',
@@ -198,5 +302,12 @@ if (-not (Test-Path $awesomiumProcessPath)) {
 
 $exportAudit = Join-Path $PSScriptRoot 'assert-dll-exports.ps1'
 & $exportAudit -RepoRoot $RepoRoot
+
+if ($RuntimeProfile -eq 'retail') {
+    $retailRuntimeRoot = Initialize-RetailRuntimeStage -ConfigurationName $Configuration -LauncherPayloadFiles $launcherPayload
+    $dependencyAudit = Join-Path $PSScriptRoot 'audit-retail-dependencies.ps1'
+    & $dependencyAudit -RepoRoot $RepoRoot -RuntimeRoot $retailRuntimeRoot -SkipSteamInstall -Strict:$true
+    Write-Host "Validated staged retail runtime root: $retailRuntimeRoot"
+}
 
 Write-Host "Validated awesomium_process build output: $awesomiumProcessPath"

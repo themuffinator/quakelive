@@ -258,6 +258,7 @@ function Start-ClientProcess {
 		'+set', 'developer', '1',
 		'+set', 'logfile', '2',
 		'+set', 'g_logfile', '1',
+		'+set', 'com_maxfps', '30',
 		'+set', 'com_noErrorInterrupt', '1',
 		'+set', 'com_zoneMegs', '64',
 		'+set', 'com_hunkMegs', '256',
@@ -425,6 +426,7 @@ function Invoke-MainMenuProbe {
 		'set developer 1',
 		'set logfile 2',
 		'set g_logfile 1',
+		'set com_maxfps 30',
 		'set r_fullscreen 0',
 		'set ui_browserAwesomium 0',
 		'set web_browserActive 0',
@@ -439,8 +441,6 @@ function Invoke-MainMenuProbe {
 		'web_changeHash #friends',
 		'web_showError codex_qcommon_p6_error',
 		'web_hideBrowser',
-		'web_reload',
-		'web_stopRefresh',
 		("screenshotJPEG $ScreenshotPrefix")
 	) ) {
 		$lines.Add( $command )
@@ -516,12 +516,13 @@ function Invoke-MapRuntimeProbe {
 		'set developer 1',
 		'set logfile 2',
 		'set g_logfile 1',
+		'set com_maxfps 30',
 		'set r_fullscreen 0',
 		'set sv_pure 0',
 		'set g_gametype 1',
 		'set g_doWarmup 0',
 		'set g_warmup 0',
-		("map $MapName")
+		("map $MapName ffa")
 	) ) {
 		$lines.Add( $line )
 	}
@@ -684,9 +685,11 @@ $cgameRepoRootPath = Join-Path ( Join-Path $script:RepoRoot 'baseq3' ) 'cgamex86
 $cgameRetailPath = Join-Path ( Join-Path $script:RetailBasePath 'baseq3' ) 'cgamex86.dll'
 $cgameHomePath = Join-Path $script:RuntimeRoot 'cgamex86.dll'
 
-$uiDllAttempts = Get-DllLoadAttempts -LogText $mainLogText -ModuleName 'ui'
-$qagameDllAttempts = Get-DllLoadAttempts -LogText $mapLogText -ModuleName 'qagame'
-$cgameDllAttempts = Get-DllLoadAttempts -LogText $mapLogText -ModuleName 'cgame'
+$uiDllAttempts = @( Get-DllLoadAttempts -LogText $mainLogText -ModuleName 'ui' )
+$qagameDllAttempts = @( Get-DllLoadAttempts -LogText $mapLogText -ModuleName 'qagame' )
+$cgameDllAttempts = @( Get-DllLoadAttempts -LogText $mapLogText -ModuleName 'cgame' )
+$gameErrorPublished = ( $mainLogText -match [regex]::Escape( 'steam_event game.error' ) ) -and ( $mainLogText -match [regex]::Escape( 'codex_qcommon_p6_error' ) )
+$nativeStopRefreshFallbackLogged = $mainLogText -match [regex]::Escape( 'UI: stopRefresh requested without browser overlay; only native refresh stopped.' )
 
 $verifiedMarkers = New-Object 'System.Collections.Generic.List[string]'
 $missingMarkers = New-Object 'System.Collections.Generic.List[string]'
@@ -710,6 +713,18 @@ $missingMarkers = New-Object 'System.Collections.Generic.List[string]'
 	} else {
 		$missingMarkers.Add( $pair[0] )
 	}
+}
+
+if ( $gameErrorPublished ) {
+	$verifiedMarkers.Add( 'qcommon runtime game.error marker observed' )
+} else {
+	$missingMarkers.Add( 'qcommon runtime game.error marker observed' )
+}
+
+if ( $nativeStopRefreshFallbackLogged ) {
+	$verifiedMarkers.Add( 'qcommon runtime stopRefresh fallback observed' )
+} else {
+	$missingMarkers.Add( 'qcommon runtime stopRefresh fallback observed' )
 }
 
 $warnings = New-Object 'System.Collections.Generic.List[string]'
@@ -772,12 +787,11 @@ $artifact = [ordered]@{
 			steam_resource_bridge_disabled = $mainLogText -match [regex]::Escape( 'Steam resource bridge disabled by build/runtime policy' )
 			show_browser_ignored = $mainLogText -match [regex]::Escape( 'web_showBrowser ignored: online services disabled by build settings' )
 			change_hash_ignored = $mainLogText -match [regex]::Escape( 'web_changeHash ignored: online services disabled by build settings' )
-			show_error_logged = $mainLogText -match [regex]::Escape( 'web_showError codex_qcommon_p6_error' )
-			reload_logged = $mainLogText -match [regex]::Escape( 'web_reload' )
-			stop_refresh_ignored = $mainLogText -match [regex]::Escape( 'web_stopRefresh ignored: online services disabled by build settings' )
+			game_error_published = $gameErrorPublished
+			native_stop_refresh_logged = $nativeStopRefreshFallbackLogged
 		}
 		ui_dll_load_roots = [ordered]@{
-			attempts = $uiDllAttempts
+			attempts = @( $uiDllAttempts )
 			repo_root_failed = Test-DllRootStatus -Attempts $uiDllAttempts -ExpectedPath $uiRepoRootPath -ExpectedStatus 'failed'
 			retail_base_failed = Test-DllRootStatus -Attempts $uiDllAttempts -ExpectedPath $uiRetailPath -ExpectedStatus 'failed'
 			writable_homepath_ok = Test-DllRootStatus -Attempts $uiDllAttempts -ExpectedPath $uiHomePath -ExpectedStatus 'ok'
@@ -801,13 +815,13 @@ $artifact = [ordered]@{
 		shutdown_seen = $mapProbe.shutdown_seen
 		shot_logged = $mapProbe.shot_logged
 		qagame_dll_load_roots = [ordered]@{
-			attempts = $qagameDllAttempts
+			attempts = @( $qagameDllAttempts )
 			repo_root_failed = Test-DllRootStatus -Attempts $qagameDllAttempts -ExpectedPath $qagameRepoRootPath -ExpectedStatus 'failed'
 			retail_base_failed = Test-DllRootStatus -Attempts $qagameDllAttempts -ExpectedPath $qagameRetailPath -ExpectedStatus 'failed'
 			writable_homepath_ok = Test-DllRootStatus -Attempts $qagameDllAttempts -ExpectedPath $qagameHomePath -ExpectedStatus 'ok'
 		}
 		cgame_dll_load_roots = [ordered]@{
-			attempts = $cgameDllAttempts
+			attempts = @( $cgameDllAttempts )
 			repo_root_failed = Test-DllRootStatus -Attempts $cgameDllAttempts -ExpectedPath $cgameRepoRootPath -ExpectedStatus 'failed'
 			retail_base_failed = Test-DllRootStatus -Attempts $cgameDllAttempts -ExpectedPath $cgameRetailPath -ExpectedStatus 'failed'
 			writable_homepath_ok = Test-DllRootStatus -Attempts $cgameDllAttempts -ExpectedPath $cgameHomePath -ExpectedStatus 'ok'

@@ -111,8 +111,13 @@ normal validation steps run.
 These staged codec trees are still build-time conveniences, not part of the
 retail runtime surface: the Steam install does not ship `vorbisfile.dll`,
 `ogg.dll`, `libpng16.dll`, or `zlib1.dll`. Use
-`pwsh tools/ci/audit-retail-dependencies.ps1 -Strict` to verify that the staged
-runtime still matches the retail DLL payload.
+`pwsh tools/ci/validate-windows-native.ps1 -PlatformToolset v100 -RuntimeProfile retail`
+to assemble and audit `build\win32\<Config>\retail-runtime\`, or rerun
+`pwsh tools/ci/audit-retail-dependencies.ps1 -RuntimeRoot build\win32\Release\retail-runtime -SkipSteamInstall -Strict`
+to re-check an existing staged runtime root directly. The mixed
+`build\win32\<Config>\bin\` output can still carry those build-time codec DLLs,
+so the strict retail payload boundary now lives in the dedicated
+`retail-runtime` stage instead of the raw build directory.
 
 Run `pwsh tools/ci/audit-retail-toolchain.ps1 -Strict` to verify that the
 retail-facing project files still match the recovered VC10-era build settings
@@ -126,6 +131,17 @@ defaults intact but compiles with `v141`, run:
 ```powershell
 pwsh tools\ci\validate-windows-native.ps1 -PlatformToolset v141 -RuntimeProfile modern
 ```
+
+For the strict retail validation lane, run:
+
+```powershell
+pwsh tools\ci\validate-windows-native.ps1 -PlatformToolset v100 -RuntimeProfile retail
+```
+
+That lane now stages `build\win32\<Config>\retail-runtime\` from the rebuilt
+executables and gameplay/UI DLLs plus the exact retail launcher DLL payload in
+`assets\quakelive\`, then fails fast if an extra non-retail DLL appears in that
+staged runtime root.
 
 When you target a `.vcxproj` directly, keep using `/p:Platform=Win32`. The
 solution-level builds use `x86` because that is the platform name advertised by

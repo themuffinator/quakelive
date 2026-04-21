@@ -25,36 +25,92 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../client/client.h"
 
-qboolean SNDDMA_Init(void)
-{
+/*
+================
+SNDDMA_Init
+================
+*/
+qboolean SNDDMA_Init( void ) {
 	return qfalse;
 }
 
-int	SNDDMA_GetDMAPos(void)
-{
+/*
+================
+SNDDMA_GetDMAPos
+================
+*/
+int	SNDDMA_GetDMAPos( void ) {
 	return 0;
 }
 
-void SNDDMA_Shutdown(void)
-{
+/*
+================
+SNDDMA_Shutdown
+================
+*/
+void SNDDMA_Shutdown( void ) {
 }
 
-void SNDDMA_BeginPainting (void)
-{
+/*
+================
+SNDDMA_BeginPainting
+================
+*/
+void SNDDMA_BeginPainting( void ) {
 }
 
-void SNDDMA_Submit(void)
-{
+/*
+================
+SNDDMA_Submit
+================
+*/
+void SNDDMA_Submit( void ) {
 }
 
-// bk001119 - added boolean flag, match client/snd_public.h
-sfxHandle_t S_RegisterSound( const char *name, qboolean compressed ) 
-{
+/*
+================
+SNDDMA_Activate
+================
+*/
+void SNDDMA_Activate( void ) {
+}
+
+/*
+================
+S_RegisterSound
+================
+*/
+sfxHandle_t S_RegisterSound( const char *name, qboolean compressed ) {
+	(void)name;
+	(void)compressed;
 	return 0;
 }
 
+/*
+================
+S_StartLocalSound
+================
+*/
 void S_StartLocalSound( sfxHandle_t sfxHandle, int channelNum ) {
+	(void)sfxHandle;
+	(void)channelNum;
 }
 
+/*
+================
+S_ClearSoundBuffer
+================
+*/
 void S_ClearSoundBuffer( void ) {
+}
+
+/*
+================
+S_AddVoiceSamples
+================
+*/
+void S_AddVoiceSamples( int clientNum, int samples, const short *data ) {
+	(void)clientNum;
+	(void)samples;
+	(void)data;
 }

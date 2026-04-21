@@ -1,5 +1,11 @@
 # Parity Audit and Delivery Plan
 
+> Historical planning snapshot. Many items below predate the current
+> reverse-engineering closure work and should not be read as the current gap
+> register. For the current repo-wide status, use `AUDIT.md`,
+> `IMPLEMENTATION_PLAN.md`, and
+> `docs/reverse-engineering/repo-wide-parity-audit-2026-04-21.md`.
+
 ## Purpose and approach
 - Establish a living action plan that drives the Quake Live reverse port toward feature, UI, and platform parity while staying aligned with the existing gameplay ledger and UI delta reports.
 - Track progress directly in this document with dated status updates so future "Work on the plan" requests continue from the next unchecked item.

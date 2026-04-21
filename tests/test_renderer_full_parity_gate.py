@@ -12,8 +12,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RENDERER_FULL_PARITY_GATE_PATH = (
 	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / "renderer_full_parity_gate.json"
 )
+RENDERER_RUNTIME_EVIDENCE_ARTIFACT_NAME = "renderer_runtime_evidence_latest.json"
 RENDERER_RUNTIME_EVIDENCE_PATH = (
-	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / "renderer_runtime_evidence_20260410.json"
+	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / RENDERER_RUNTIME_EVIDENCE_ARTIFACT_NAME
 )
 RENDERER_PLAN_PATH = (
 	REPO_ROOT / "docs" / "reverse-engineering" / "renderer-full-parity-audit-and-implementation-plan-2026-04-09.md"
@@ -141,6 +142,7 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 	cl_steam_resources = _read_text(CL_STEAM_RESOURCES_PATH)
 	client_h = _read_text(CLIENT_H_PATH)
 	workflow_text = _read_text(WORKFLOW_PATH)
+	runtime_probe = _read_text(RUNTIME_PROBE_PATH)
 	build_script = _read_text(BUILD_SCRIPT_PATH)
 	rg_g06_note = _read_text(RG_G06_NOTE_PATH)
 	rg_g06_mapping = _read_text(RG_G06_MAPPING_PATH)
@@ -351,11 +353,13 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 	)
 	rg_g07_ok = (
 		RUNTIME_PROBE_PATH.exists()
+		and RENDERER_RUNTIME_EVIDENCE_ARTIFACT_NAME in runtime_probe
+		and "map $MapName ffa" in runtime_probe
 		and runtime_clean
 		and "tests/test_renderer_full_parity_gate.py" in workflow_text
 		and "renderer_full_parity_gate.json" in build_pipeline
-		and "renderer_runtime_evidence_20260410.json" in build_pipeline
-		and "renderer_runtime_evidence_20260410.json" in hud_baseline
+		and RENDERER_RUNTIME_EVIDENCE_ARTIFACT_NAME in build_pipeline
+		and RENDERER_RUNTIME_EVIDENCE_ARTIFACT_NAME in hud_baseline
 		and "tools/renderer/run_renderer_runtime_probe.ps1" in hud_baseline
 	)
 	report["tranches"]["RG-G07"] = _entry(
@@ -368,6 +372,8 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 		),
 		{
 			"runtime_probe_present": RUNTIME_PROBE_PATH.exists(),
+			"runtime_probe_mentions_latest_alias": RENDERER_RUNTIME_EVIDENCE_ARTIFACT_NAME in runtime_probe,
+			"runtime_probe_uses_current_map_contract": "map $MapName ffa" in runtime_probe,
 			"runtime_evidence_present": RENDERER_RUNTIME_EVIDENCE_PATH.exists(),
 			"runtime_evidence_clean": runtime_clean,
 			"runtime_no_registerfont_fallback": (
@@ -377,8 +383,8 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 			"workflow_references_gate": "tests/test_renderer_full_parity_gate.py" in workflow_text,
 			"workflow_runs_gate": "tests/test_renderer_full_parity_gate.py" in workflow_text,
 			"build_pipeline_mentions_gate": "renderer_full_parity_gate.json" in build_pipeline,
-			"build_pipeline_mentions_runtime_artifact": "renderer_runtime_evidence_20260410.json" in build_pipeline,
-			"hud_baseline_mentions_runtime_artifact": "renderer_runtime_evidence_20260410.json" in hud_baseline,
+			"build_pipeline_mentions_runtime_artifact": RENDERER_RUNTIME_EVIDENCE_ARTIFACT_NAME in build_pipeline,
+			"hud_baseline_mentions_runtime_artifact": RENDERER_RUNTIME_EVIDENCE_ARTIFACT_NAME in hud_baseline,
 		},
 	)
 

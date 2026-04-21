@@ -75,9 +75,20 @@ msbuild src\code\quakelive.sln /m /p:Configuration=Release /p:Platform=Win32 /p:
 
 The helper script `tools/ci/build-windows-dlls.ps1` wraps this command line and defaults to the `v100` toolset, ensuring the gameplay DLLs are compiled with the correct compiler/linker pair even on newer Visual Studio installations.
 
-Run `pwsh tools/ci/audit-retail-dependencies.ps1 -Strict` after staging the
-launcher payload to confirm the local Steam install still matches the committed
-retail dependency set.
+Run `pwsh tools/ci/validate-windows-native.ps1 -PlatformToolset v100 -RuntimeProfile retail`
+to execute the full strict retail validation lane. In addition to the metadata,
+toolchain, and export checks, that wrapper now assembles
+`build\win32\<Config>\retail-runtime\` from the rebuilt executables/modules plus
+the exact retail launcher DLL payload and then audits that staged root for
+missing or extra DLLs.
+
+Run `pwsh tools/ci/audit-retail-dependencies.ps1 -Strict` when you want to
+confirm the local Steam install still matches the committed retail dependency
+set.
+
+Run
+`pwsh tools/ci/audit-retail-dependencies.ps1 -RuntimeRoot build\win32\Release\retail-runtime -SkipSteamInstall -Strict`
+when you want to re-audit an already staged strict runtime root directly.
 
 Run `pwsh tools/ci/audit-retail-toolchain.ps1 -Strict` to confirm the checked-in
 project metadata still matches the recovered retail VC10-era settings.

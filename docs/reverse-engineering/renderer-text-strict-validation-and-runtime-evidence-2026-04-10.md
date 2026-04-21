@@ -1,6 +1,6 @@
 # Renderer Text Strict Validation And Runtime Evidence
 
-Last updated: 2026-04-10
+Last updated: 2026-04-21
 
 Scope: `RG-P11`
 
@@ -17,8 +17,11 @@ renderer parity claim was still too loose:
 
 ## Validation changes landed
 
-1. `tools/renderer/run_renderer_runtime_probe.ps1` now writes the `RG-P11`
-   artifact `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`.
+1. `tools/renderer/run_renderer_runtime_probe.ps1` now writes dated `RG-P11`
+   artifacts and maintains the stable tracked alias
+   `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`.
+   The current alias was refreshed on 2026-04-21 from the clean
+   `renderer_runtime_evidence_20260421.json` bundle.
 2. That artifact now captures three distinct passes:
    - windowed UI-bootstrap render pass
    - retained-atlas debug render with `r_debugFontAtlas 1`
@@ -46,7 +49,7 @@ renderer parity claim was still too loose:
 
 Observed facts after the change:
 
-- the tracked runtime artifact phase is now `RG-P11`
+- the tracked runtime artifact alias phase is now `RG-P11`
 - the retained debug-atlas pass is present and hash-distinct from the normal
   UI-bootstrap pass
 - the runtime artifact no longer treats the `RE_RegisterFont` compatibility

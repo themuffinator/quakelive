@@ -40,7 +40,7 @@ multiple independent UI logs by hand. The final windowed runtime confirmation
 evidence for the current parity milestone is tracked separately in
 `artifacts/ui_validation/logs/ui_runtime_evidence_20260406.json`.
 
-The dedicated `Renderer Validation` workflow now does the equivalent for the renderer stack. It runs the focused renderer tranche tests together with `tests/test_renderer_full_parity_gate.py`, which writes `artifacts/renderer_validation/logs/renderer_full_parity_gate.json` so the current renderer gap register (`RG-G01`..`RG-G09`) is machine-readable instead of living only in prose. The tracked windowed runtime evidence for the final renderer text-closure milestone is `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`, and contributors can refresh it locally with `tools/renderer/run_renderer_runtime_probe.ps1`.
+The dedicated `Renderer Validation` workflow now does the equivalent for the renderer stack. It runs the focused renderer tranche tests together with `tests/test_renderer_full_parity_gate.py`, which writes `artifacts/renderer_validation/logs/renderer_full_parity_gate.json` so the current renderer gap register (`RG-G01`..`RG-G09`) is machine-readable instead of living only in prose. The tracked windowed runtime evidence for the final renderer text-closure milestone now lives at the stable alias `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`; the probe only promotes that alias when a rerun remains sufficient, and the current alias was refreshed on 2026-04-21 from the clean `renderer_runtime_evidence_20260421.json` bundle. Contributors can refresh it locally with `tools/renderer/run_renderer_runtime_probe.ps1`.
 
 The dedicated `Module Validation` workflow now does the same for the strict
 retail game-module lane. It runs
@@ -49,12 +49,15 @@ retail game-module lane. It runs
 `artifacts/module_validation/logs/retail_module_parity_gate.json` as the
 current `GMR-P8` closure artifact across the combined module gap register first
 unified in `GMR-P5` (`GMR-G01`, `GMR-G02`, `GMR-G05`). The tracked retail
-runtime evidence used by that gate remains the archived `GMR-P1` probe at
-`artifacts/module_validation/logs/retail_module_runtime_evidence_20260409.json`;
-because the workflow topology and host-side validation contract were unchanged
-by the final `GMR-P8` ledger reconciliation, that archived runtime artifact
-remains authoritative until the host/runtime seam changes again. Contributors
-can refresh that runtime artifact locally with
+runtime evidence used by that gate now lives at the stable alias
+`artifacts/module_validation/logs/retail_module_runtime_evidence_latest.json`;
+that alias is only promoted when a rerun remains sufficient. It currently
+points at the refreshed bounded `GMR-P1` artifact
+`retail_module_runtime_evidence_20260421.json`, because the 2026-04-21 rerun
+recovered the current `map <name> ffa` path, proved retail module loads again,
+and reduced the remaining live-map shortfall to the renderer-owned
+`R_fonsErrorCallback` font-atlas saturation blocker outside module scope.
+Contributors can refresh that runtime artifact locally with
 `tools/modules/run_retail_module_runtime_probe.ps1`.
 
 The dedicated `Client Validation` workflow now gives the native client host the

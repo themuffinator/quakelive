@@ -1,6 +1,6 @@
 # `Remaining Engine Host/Support` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-10
+Last updated: 2026-04-21
 
 Scope: remaining engine-owned support layers outside `src/code/qcommon/*`, `src/code/server/*`, `src/code/client/*`, and `src/code/renderer/*`; primarily `src/common/platform/*`, `src/code/win32/*` host seams not already owned by the qcommon/client/renderer audits, `src/code/botlib/*`, `src/code/unix/*`, `src/code/null/*`, and `src/code/win32/awesomium_process.cpp` versus retail `quakelive_steam.exe` plus the committed `awesomium_process.exe` reference corpus.
 
@@ -201,8 +201,8 @@ Observed source-backed weaknesses:
    - provider labels such as `Build-disabled (QL_BUILD_ONLINE_SERVICES=0)`, `Open Steam Adapter`, and `Hybrid` are not retail contracts
    - `platform_backend_steamworks.c` and `platform_backend_open_steam.c` currently decide outcomes from token-substring heuristics, not retail service behavior
 2. Unix/null remain explicit compatibility ports, not retail-parity implementations.
-   - `src/code/unix/unix_main.c` still returns placeholders for `Sys_LowPhysicalMemory`, `Sys_FunctionCmp`, `Sys_FunctionCheckSum`, `Sys_MonkeyShouldBeSpanked`, and profiling hooks
-   - `src/code/null/*` keeps no-op client/webview/platform stubs that are useful for compatibility but irrelevant to the retail Windows target
+   - `src/code/unix/unix_main.c` now restores `Sys_LowPhysicalMemory()` plus Linux/glibc `Sys_FunctionCmp()` / `Sys_FunctionCheckSum()` coverage, reconstructs `Sys_MonkeyShouldBeSpanked()` as a retained `q3monkeyid` release-marker probe, and exposes a bounded `gprof`-compatible profiling control path when the Unix engine is built with `QL_ENABLE_GPROF=1`
+   - `src/code/null/*` now carries current executable/timer/path/network contract scaffolding, but it still keeps no-op client/webview/platform stubs that are useful for compatibility and irrelevant to the retail Windows target
 
 ## Refreshed Strict `Remaining Engine Host/Support` Parity Estimate
 
@@ -411,7 +411,7 @@ Retail evidence anchors:
 Observed current-source facts:
 
 1. `src/code/unix/unix_main.c` still contains placeholder returns for several `Sys_*` helpers.
-2. `src/code/null/null_client.c` and the rest of the null tree intentionally stub major client/webview/platform functions.
+2. `src/code/null/null_client.c`, `src/code/null/null_snddma.c`, and `src/code/null/null_input.c` now expose the current browser/advert/input, silent-audio, and input-bootstrap compatibility entry points, but the null tree still remains a bounded compatibility host rather than a real client/webview/platform implementation.
 3. These lanes are useful for compatibility and tooling, but they are not part of the retail Windows host target.
 
 Conclusion:

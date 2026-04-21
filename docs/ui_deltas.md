@@ -1,5 +1,11 @@
 # UI and Gameplay HUD Delta Report
 
+> Historical delta snapshot. Several gaps described below were closed or
+> re-bounded by later UI/cgame parity work. Use
+> `docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md`
+> and `docs/reverse-engineering/repo-wide-parity-audit-2026-04-21.md` for the
+> current status.
+
 This report compares the repository's current cgame and UI implementations with the Quake Live reverse-engineering references. It highlights visual/behavioral gaps and identifies the updates required to reach feature parity.
 
 ## HUD Elements

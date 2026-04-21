@@ -1,6 +1,6 @@
 # `server` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-10
+Last updated: 2026-04-21
 
 Scope: `src/code/server/*` plus server-owned host seams in `src/common/platform/platform_steamworks.c`, `src/code/qcommon/files.c`, and the native qagame bridge in `src/code/server/sv_game.c` versus retail `quakelive_steam.exe`
 
@@ -398,7 +398,7 @@ Observed current-source and validation facts:
 
 1. `tests/test_server_full_parity_gate.py` now writes `artifacts/server_validation/logs/server_full_parity_gate.json` as the machine-readable status artifact for the full audited server gap register (`SV-G01`..`SV-G06`).
 2. `tools/server/run_server_runtime_probe.ps1` now runs a low-cost dedicated/headless validation pass against the current `Debug|x86` host, captures local `getstatus` and `rcon` evidence, archives the runtime log, and writes `artifacts/server_validation/logs/server_runtime_evidence_20260410.json`.
-3. The tracked runtime artifact now proves startup, qagame load, metadata publication, local `getstatus` visibility for `sv_hostname`, `mapname`, `sv_vac`, `sv_serverType`, `sv_maxclients`, and `sv_warmupReadyPercentage`, plus clean shutdown through `rcon quit`.
+3. The tracked runtime artifact now proves startup, qagame load, metadata publication, local `getstatus` visibility for `sv_hostname`, `mapname`, `sv_vac`, the retained server-type slot (`sv_serverType` or `serverType`), `sv_maxclients`, and `sv_warmupReadyPercentage`, plus clean shutdown through `rcon quit`.
 4. The runtime artifact also records optional Steam GameServer and `idZMQ` startup markers as explicit booleans rather than treating their absence in one probe environment as a hard failure, which keeps the verification lane honest while respecting the repo's default-disabled online-services policy.
 5. `.github/workflows/server-validation.yml`, `docs/build-pipeline.md`, `docs/windows-native-pipeline.md`, and `docs/reverse-engineering/server-validation-and-runtime-evidence-2026-04-10.md` now expose the dedicated gate/runtime lane alongside the existing renderer, client, and qcommon closure surfaces.
 
@@ -545,7 +545,7 @@ Completed work:
 Validation:
 
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/server/run_server_runtime_probe.ps1`
-- Result: wrote `artifacts/server_validation/logs/server_runtime_evidence_20260410.json`
+  - Result: wrote `artifacts/server_validation/logs/server_runtime_evidence_20260410.json`; the 2026-04-21 refresh also kept the probe aligned with the current `map <name> ffa` command contract and the current `getstatus` server-type field spelling
 - `python -m pytest tests/test_platform_services.py tests/test_fake_vacban.py tests/test_server_full_parity_gate.py -q --tb=no`
 - Result: `59 passed, 1 skipped`
 

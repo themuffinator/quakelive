@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-04-17
+Last updated: 2026-04-21
 
 This file is the current cross-subsystem ledger for the repository. Detailed
 reconstruction history belongs in the dedicated subsystem audits under
@@ -8,69 +8,149 @@ reconstruction history belongs in the dedicated subsystem audits under
 repo-wide state, the active remaining work, and a minimal set of historical
 closure anchors kept for existing parity gates.
 
+This ledger now distinguishes between:
+
+- the strict-retail Windows replacement target that the dedicated parity gates
+  score; and
+- repo-wide parity across the whole checked-in tree, including the
+  compatibility-only and packaging-dependent surfaces that the strict-retail
+  score intentionally excludes.
+
 ## Current status
 
-The repo is no longer carrying broad engine or module reconstruction debt as an
-active top-level problem. The current audited state on 2026-04-17 is:
+The current audited state on 2026-04-21 is:
 
 - `ui`, strict retail module, `qcommon`, the mapped `qshared` helper family,
   renderer, server, remaining engine host/support, and `client` parity gates
   are green on the current worktree.
-- The focused 2026-04-16 Windows platform-specific engine audit remains closed.
-- The focused 2026-04-16 engine netcode audit remains closed.
-- The focused 2026-04-16 Awesomium/browser host audit remains closed.
-- The focused gameplay validation sweep is now closed again on the current
-  worktree through dedicated Race, gametype-lifecycle, ready-up, and `pmove`
-  fixtures.
-- The ownerdraw/stat payload validation lane is now closed again on the current
-  worktree after the runtime harness was refreshed to match the live float
-  `pickupAvg` debug payload shape.
-- The previously reopened client validation lane is now reclosed on the current
-  worktree; there is no top-level audited gate failure in the current ledger.
+- The focused 2026-04-16 Windows platform-specific engine audit remains
+  closed, as do the focused 2026-04-16 engine netcode and
+  Awesomium/browser-host audits.
+- The focused gameplay validation sweep remains closed on the current worktree
+  through dedicated Race, gametype-lifecycle, ready-up, and `pmove` fixtures.
+- The strict-retail Windows replacement target remains defensible at
+  **100%** on the current worktree.
+- Repo-wide parity is not **100%** once the deliberate compatibility-only
+  lanes, the bounded non-Windows portability debt, and the remaining
+  evidence-freshness gap are counted. The current repo-wide estimate for the
+  whole checked-in tree is **96%**.
+- A broad current-worktree parity sweep spanning the top-level parity gates,
+  gameplay fixtures, portability checks, and the staged retail-runtime audit
+  lane now passes at `60 passed, 7 skipped`.
+- The checked-in `src/ui` runtime-panel compare is now clean (`65 / 65`,
+  `0` content diffs), and the UI overlay/runtime-package machinery now acts
+  as a regression sentinel rather than an active correction path. It no
+  longer stands as an active repo-wide proof gap.
 
-Treat the 2026-04-10 engine-wide **100%** report as an important closure
-milestone, not as a substitute for the current checked-in evidence bundle. The
-2026-04-17 client workflow/runtime refresh returns the current top-level gate
-set to green on this worktree.
+Treat the 2026-04-10 engine-wide **100%** report as a strict-retail Windows
+closure milestone, not as a claim that every checked-in portability or
+compatibility surface has reached retail parity.
 
-## Evidence checked on 2026-04-17
+## Evidence checked on 2026-04-21
 
 Verified directly:
 
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/client/run_client_runtime_probe.ps1` -> refreshed `artifacts/client_validation/logs/client_runtime_evidence_20260410.json`
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/qcommon/run_qcommon_runtime_probe.ps1` -> refreshed `artifacts/qcommon_validation/logs/qcommon_runtime_evidence_20260410.json`
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/renderer/run_renderer_runtime_probe.ps1` -> refreshed `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json` via the clean dated `20260421` bundle
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/server/run_server_runtime_probe.ps1` -> refreshed `artifacts/server_validation/logs/server_runtime_evidence_20260410.json`
+- `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/modules/run_retail_module_runtime_probe.ps1` -> refreshed `artifacts/module_validation/logs/retail_module_runtime_evidence_latest.json` through the bounded `20260421` retail-module probe bundle
+- `C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\ci\wow64-smoketest.ps1` -> refreshed `artifacts/wow64-smoketest/wow64-smoketest.log`
+- `pytest tests/test_client_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
 - `pytest tests/test_ui_full_parity_gate.py -q --tb=no` -> `1 passed, 1 skipped`
 - `pytest tests/test_game_module_retail_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
 - `pytest tests/test_qcommon_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
 - `pytest tests/test_renderer_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
 - `pytest tests/test_server_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
 - `pytest tests/test_engine_host_support_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
-- `pytest tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_client_config_parity.py tests/test_client_workshop_bootstrap_parity.py tests/test_ui_menu_files.py tests/test_client_full_parity_gate.py -q --tb=no` -> `146 passed, 1 skipped`
-- `pytest tests/test_client_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
+- `pytest tests/test_ui_src_panel_parity.py tests/test_non_windows_portability.py -q --tb=no` -> `13 passed`
 - `pytest tests/test_gametype_lifecycle.py -q` -> `8 passed`
 - `pytest tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py -q` -> `7 passed`
 - `pytest tests/test_racepoint_commands.py -q` -> `1 passed`
 - `pytest tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q` -> `14 passed`
+- `pytest tests/test_non_windows_portability.py tests/test_retail_dependency_runtime_audit.py tests/test_ui_src_panel_parity.py tests/test_ui_full_parity_gate.py tests/test_client_full_parity_gate.py tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_renderer_full_parity_gate.py tests/test_server_full_parity_gate.py tests/test_engine_host_support_full_parity_gate.py tests/test_gametype_lifecycle.py tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py tests/test_racepoint_commands.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q --tb=no` -> `60 passed, 7 skipped`
 
-Current client-lane closure refresh details:
+Audited by source/doc inspection:
 
-- `.github/workflows/client-validation.yml` is restored and now matches the
-  audited `CL-P6` validation surface.
-- `artifacts/client_validation/logs/client_runtime_evidence_20260410.json`
-  now carries a clean main-menu plus `bloodrun` local-map bundle with the
-  required disabled-browser markers, `CS_ACTIVE` transition, engine screenshot,
-  flushed demo artifact, and lifecycle end markers.
-- `tools/client/run_client_runtime_probe.ps1` now uses the valid
-  `map bloodrun ffa` command shape, survives transient `pak_uiql.pk3` rewrite
-  locks, and paces the local map probe deterministically enough to reach the
-  active runtime before issuing demo/screenshot commands.
+- `src/common/platform/platform_config.h`
+- `src/common/platform/platform_services.c`
+- `src/common/platform/backends/platform_backend_open_steam.c`
+- `src/common/platform/backends/platform_backend_steamworks.c`
+- `src/code/unix/unix_main.c`
+- `tools/ci/audit-retail-dependencies.ps1`
+- `tools/ci/validate-windows-native.ps1`
+- `docs/platform/authentication.md`
+- `docs/platform/retail-dependencies.md`
+- `docs/platform/toolchain-matrix.md`
+- `docs/toolchain-ci.md`
+- `docs/windows-native-pipeline.md`
+- `docs/quakelive_asset_audit.md`
+- `docs/ui/hud-audit.md`
+- `docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md`
+- the legacy planning/status notes demoted in this pass:
+  `docs/parity-plan.md`, `docs/ui_deltas.md`, and `docs/ui_followup_issues.md`
 
 ## Active remaining work
 
-No top-level audited gap is currently open in `AUDIT.md`. Reopen this section
-only when a parity gate fails or new retail evidence creates a concrete
-cross-subsystem delta.
+The strict-retail Windows gate set is green, and three repo-wide gap families
+remain active:
+
+- `RW-G01` Online services and external ecosystems are still a deliberate
+  non-retail compatibility lane. Default builds set
+  `QL_BUILD_ONLINE_SERVICES=0`, the service table reports build-disabled
+  providers, and the open/hybrid auth backends are heuristic
+  accept/retry/deny shims rather than live service implementations.
+- `RW-G02` Non-Windows portability is still incomplete. The Linux path remains
+  server-only, the documented glibc preset is server-module-only evidence
+  rather than Linux client/runtime parity proof, Unix
+  `Sys_LowPhysicalMemory()` plus Linux/glibc
+  `Sys_FunctionCmp()` / `Sys_FunctionCheckSum()` are now restored, the
+  historical `q3monkeyid` release-marker probe is now reconstructed, the Unix
+  engine now exposes a bounded `gprof`-compatible profiling control path via
+  `moncontrol` / `_mcleanup` when built with `QL_ENABLE_GPROF=1`, and the
+  null host/runtime now carries current executable-name, path, timer,
+  loopback-network, browser/advert/input, and silent sound/device activation/voice compatibility
+  shims plus the newer input bootstrap-cvar surface, but the profiling lane
+  is still optional and the broader Unix runtime still remains
+  compatibility-only rather than retail-equivalent hosts.
+- `RW-G04` Evidence freshness outside the tracked artifacts remains incomplete.
+  This audit reran the gate suites, refreshed the tracked client, qcommon,
+  server, and renderer runtime bundles, reran the retained WOW64 smoke
+  harness, and introduced guarded `latest` aliases for the renderer/module
+  runtime probes so degraded reruns do not silently replace authoritative
+  evidence. The retail native validation lane now also stages
+  `build\win32\<Config>\retail-runtime\` and audits that strict runtime root
+  for missing or extra DLLs, so the formerly documented local/runtime DLL
+  guard follow-up is no longer open. That strict runtime-root boundary is now
+  also pinned by `tests/test_retail_dependency_runtime_audit.py`, which proves
+  the mixed `build\win32\Debug\bin` lane still fails the strict audit while a
+  clean staged root passes with rebuilt module slots treated as required but
+  hash-optional. The module alias now also points at the current bounded
+  `2026-04-21` retail-module artifact, whose remaining live-map shortfall is
+  explicitly the renderer-owned `R_fonsErrorCallback` font-atlas saturation
+  lane rather than an ambiguous module-host failure. The remaining debt is now
+  concentrated in fresh native build outputs and the broader glibc plus
+  self-hosted publication follow-ups in `docs/platform/toolchain-matrix.md`.
+
+The former `RW-G03` UI packaging/proof gap is now bounded rather than active:
+the checked-in `src/ui` runtime-panel baseline is clean, and explicit
+runtime-root package emission is now described by
+`artifacts/ui_bundle/runtime_ui_package_manifest.json`, verified in
+`tests/test_ui_src_panel_parity.py`, and consumed by the client runtime probe
+before launch when future drift needs investigation.
+
+Historical planning/docs convergence is no longer an active gap family after
+this pass; the stale broad-planning notes that still described older open UI
+and HUD deltas are now explicitly marked historical.
+
+## Detailed repo-wide audit
+
+- `docs/reverse-engineering/repo-wide-parity-audit-2026-04-21.md`
 
 ## Subsystem references
 
+- Repo-wide gap register and rationale:
+  `docs/reverse-engineering/repo-wide-parity-audit-2026-04-21.md`
 - Engine-wide closure milestone:
   `docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`
 - Current strict retail module ledger:
@@ -102,7 +182,7 @@ cross-subsystem delta.
 
 These lines intentionally preserve a minimal set of exact historical closure
 strings that the checked-in parity gates still consume. They document past
-closure milestones, not the full current 2026-04-17 top-level state by
+closure milestones, not the full current 2026-04-21 top-level state by
 themselves.
 
 ### Module closure milestones
@@ -161,6 +241,6 @@ themselves.
 - No open gap remains in the audited client register.
 
 Those three lines record the 2026-04-10 client closure milestone. The
-2026-04-17 worktree now revalidates that same closure state with a refreshed
+2026-04-21 worktree now revalidates that same closure state with a refreshed
 workflow plus runtime bundle, as described in the current-status sections
 above.

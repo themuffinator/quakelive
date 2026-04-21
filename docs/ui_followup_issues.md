@@ -1,5 +1,10 @@
 # Follow-up Issues for Quake Live UI Parity
 
+> Historical issue list. This file captures early UI follow-up ideas and is no
+> longer the authoritative parity register. Current status lives in
+> `docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md`
+> and `docs/reverse-engineering/repo-wide-parity-audit-2026-04-21.md`.
+
 ## Issue: Port Quake Live HUD and scoreboards
 - **Problem**: The active HUD uses Quake III definitions and the legacy `cg_scoreboard.c` renderer, so none of the Quake Live scoreboxes, round timers, or overtime cues appear.【F:src/ui/hud.txt†L1-L7】【F:src/code/cgame/cg_scoreboard.c†L266-L352】
 - **Scope**: Introduce the Quake Live HUD menus (`comp_hud.menu`, `hud3.menu`, and gametype-specific end scoreboards), add missing owner-draw enums, and update cgame drawing code to populate the new widgets.【F:assets/quakelive/baseq3/ui/comp_hud.menu†L24-L118】【F:src/ui/menudef.h†L137-L212】

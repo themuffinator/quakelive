@@ -6,6 +6,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$RepoRoot = [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $RepoRoot).Path)
+$RetailBasePath = [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $RetailBasePath).Path)
 
 function Resolve-RetailUiBundleRoot {
 	param([string]$Root)
@@ -105,6 +107,20 @@ function Set-ProbeRuntimeContext {
 	Initialize-ProbeHome
 }
 
+function Quote-LaunchArgument {
+	param([string]$Value)
+
+	if ($null -eq $Value) {
+		return '""'
+	}
+
+	if ($Value -notmatch '[\s"]') {
+		return $Value
+	}
+
+	return '"' + $Value.Replace('"', '\"') + '"'
+}
+
 function Start-RendererProcess {
 	param(
 		[string]$ConfigName,
@@ -140,10 +156,12 @@ function Start-RendererProcess {
 	}
 	$launchArgs += @('+exec', $ConfigName)
 
-	$process = Start-Process -FilePath $script:Exe -ArgumentList $launchArgs -WorkingDirectory $script:QlHome -PassThru
+	$argumentLine = ($launchArgs | ForEach-Object { Quote-LaunchArgument -Value $_ }) -join ' '
+	$process = Start-Process -FilePath $script:Exe -ArgumentList $argumentLine -WorkingDirectory $script:QlHome -PassThru
 	return [ordered]@{
 		process = $process
 		launch_args = $launchArgs
+		argument_line = $argumentLine
 	}
 }
 
@@ -184,6 +202,39 @@ function Get-ArtifactSha256 {
 	}
 
 	return (Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant()
+}
+
+function Get-MissingAasAliasName {
+	param([string]$LogText)
+
+	$match = [regex]::Match($LogText, '(?im)Fatal: can''t open maps/([^/\r\n]+)\.aas')
+	if ($match.Success) {
+		return $match.Groups[1].Value
+	}
+
+	return ''
+}
+
+function Stage-RetailAasAlias {
+	param(
+		[string]$MapName,
+		[string]$AliasName
+	)
+
+	if ([string]::IsNullOrWhiteSpace($AliasName)) {
+		return ''
+	}
+
+	$source = Join-Path $script:RetailBaseq3Root ('maps\' + $MapName + '.aas')
+	if (-not (Test-Path -LiteralPath $source)) {
+		return ''
+	}
+
+	$destinationDir = Join-Path $script:RuntimeRoot 'maps'
+	$destination = Join-Path $destinationDir ($AliasName + '.aas')
+	New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
+	Copy-Item -LiteralPath $source -Destination $destination -Force
+	return $destination
 }
 
 function Archive-LiveLog {
@@ -249,6 +300,7 @@ function Invoke-MainMenuProbe {
 	return [ordered]@{
 		config = $configPath
 		launch_args = $launch.launch_args
+		argument_line = $launch.argument_line
 		engine_screenshot = Resolve-EngineScreenshot -ScreenshotName $ScreenshotName
 		log_path = $ArchivedLog
 		shot_logged = $shotLogged
@@ -275,7 +327,7 @@ function Invoke-DebugAtlasProbe {
 		'set g_gametype 1',
 		'set g_doWarmup 1',
 		'set g_warmup 20',
-		("map $MapName")
+		("map $MapName ffa")
 	) | Set-Content -Path $configPath -Encoding ascii
 
 	Reset-LiveLog
@@ -335,15 +387,18 @@ function Invoke-DebugAtlasProbe {
 
 	Archive-LiveLog -Destination $ArchivedLog
 	$engineScreenshot = Resolve-EngineScreenshot -ScreenshotName $ScreenshotName
+	$logText = if (Test-Path $ArchivedLog) { Get-Content -Path $ArchivedLog -Raw -ErrorAction SilentlyContinue } else { '' }
 	return [ordered]@{
 		config = $configPath
 		launch_args = $launch.launch_args
+		argument_line = $launch.argument_line
 		engine_screenshot = $engineScreenshot
 		log_path = $ArchivedLog
 		server_seen = $serverSeen
 		active_seen = $activeSeen
 		shot_logged = ($shotLogged -or $null -ne $engineScreenshot)
-		log_text = if (Test-Path $ArchivedLog) { Get-Content -Path $ArchivedLog -Raw -ErrorAction SilentlyContinue } else { '' }
+		log_text = $logText
+		missing_aas_alias = Get-MissingAasAliasName -LogText $logText
 	}
 }
 
@@ -366,7 +421,7 @@ function Invoke-MapRuntimeProbe {
 		'set g_gametype 1',
 		'set g_doWarmup 1',
 		'set g_warmup 20',
-		("map $MapName")
+		("map $MapName ffa")
 	) | Set-Content -Path $configPath -Encoding ascii
 
 	Reset-LiveLog
@@ -420,15 +475,18 @@ function Invoke-MapRuntimeProbe {
 
 	Archive-LiveLog -Destination $ArchivedLog
 	$engineScreenshot = Resolve-EngineScreenshot -ScreenshotName $ScreenshotName
+	$logText = if (Test-Path $ArchivedLog) { Get-Content -Path $ArchivedLog -Raw -ErrorAction SilentlyContinue } else { '' }
 	return [ordered]@{
 		config = $configPath
 		launch_args = $launch.launch_args
+		argument_line = $launch.argument_line
 		engine_screenshot = $engineScreenshot
 		log_path = $ArchivedLog
 		server_seen = $serverSeen
 		active_seen = $activeSeen
 		shot_logged = ($shotLogged -or $null -ne $engineScreenshot)
-		log_text = if (Test-Path $ArchivedLog) { Get-Content -Path $ArchivedLog -Raw -ErrorAction SilentlyContinue } else { '' }
+		log_text = $logText
+		missing_aas_alias = Get-MissingAasAliasName -LogText $logText
 	}
 }
 
@@ -446,9 +504,11 @@ $script:ArtifactRoot = Join-Path $RepoRoot 'artifacts\renderer_validation\logs'
 $script:RuntimeLog = ''
 $script:MapName = $MapName
 $retailBaseq3Root = Join-Path $RetailBasePath 'baseq3'
+$script:RetailBaseq3Root = $retailBaseq3Root
 $artifactDate = Get-Date -Format 'yyyyMMdd'
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $artifactPath = Join-Path $ArtifactRoot ("renderer_runtime_evidence_" + $artifactDate + '.json')
+$latestArtifactPath = Join-Path $ArtifactRoot 'renderer_runtime_evidence_latest.json'
 $mainShotName = "codex_renderer_p11_main_$stamp"
 $atlasShotName = "codex_renderer_p11_atlas_$stamp"
 $mapShotName = "codex_renderer_p11_map_$stamp"
@@ -471,6 +531,25 @@ Set-ProbeRuntimeContext -Label 'atlas'
 $atlasProbe = Invoke-DebugAtlasProbe -Stamp $stamp -ScreenshotName $atlasShotName -ArchivedLog $atlasArchivedLog
 Set-ProbeRuntimeContext -Label 'map'
 $mapProbe = Invoke-MapRuntimeProbe -Stamp $stamp -ScreenshotName $mapShotName -ArchivedLog $mapArchivedLog
+$stagedAasAlias = ''
+$stagedAasAliasName = ''
+
+if (-not $atlasProbe.active_seen -or -not $mapProbe.active_seen) {
+	$stagedAasAliasName = if ($mapProbe.missing_aas_alias) { $mapProbe.missing_aas_alias } else { $atlasProbe.missing_aas_alias }
+	$stagedAasAlias = Stage-RetailAasAlias -MapName $MapName -AliasName $stagedAasAliasName
+	if ($stagedAasAlias) {
+		$retryStamp = $stamp + '_aas'
+		$atlasShotName = "codex_renderer_p11_atlas_$retryStamp"
+		$mapShotName = "codex_renderer_p11_map_$retryStamp"
+		$retryAtlasArchivedLog = Join-Path $DumpLogRoot ("codex_renderer_p11_atlas_" + $retryStamp + '.log')
+		$retryMapArchivedLog = Join-Path $DumpLogRoot ("codex_renderer_p11_map_" + $retryStamp + '.log')
+
+		Set-ProbeRuntimeContext -Label 'atlas'
+		$atlasProbe = Invoke-DebugAtlasProbe -Stamp $retryStamp -ScreenshotName $atlasShotName -ArchivedLog $retryAtlasArchivedLog
+		Set-ProbeRuntimeContext -Label 'map'
+		$mapProbe = Invoke-MapRuntimeProbe -Stamp $retryStamp -ScreenshotName $mapShotName -ArchivedLog $retryMapArchivedLog
+	}
+}
 
 $verifiedMarkers = @()
 $missingMarkers = @()
@@ -593,6 +672,7 @@ $artifact = [ordered]@{
 		log = To-RepoPath $mainProbe.log_path
 		config = To-RepoPath $mainProbe.config
 		launch_args = $mainProbe.launch_args
+		argument_line = $mainProbe.argument_line
 	}
 	debug_atlas = [ordered]@{
 		engine_screenshot = if ($atlasProbe.engine_screenshot) { To-RepoPath $atlasProbe.engine_screenshot.FullName } else { '' }
@@ -603,6 +683,7 @@ $artifact = [ordered]@{
 		log = To-RepoPath $atlasProbe.log_path
 		config = To-RepoPath $atlasProbe.config
 		launch_args = $atlasProbe.launch_args
+		argument_line = $atlasProbe.argument_line
 	}
 	map_runtime = [ordered]@{
 		map = $MapName
@@ -614,9 +695,13 @@ $artifact = [ordered]@{
 		log = To-RepoPath $mapProbe.log_path
 		config = To-RepoPath $mapProbe.config
 		launch_args = $mapProbe.launch_args
+		argument_line = $mapProbe.argument_line
 		server_seen = $mapProbe.server_seen
 		active_seen = $mapProbe.active_seen
 		shot_logged = $mapProbe.shot_logged
+		missing_aas_alias = $mapProbe.missing_aas_alias
+		staged_aas_alias = if ($stagedAasAlias) { To-RepoPath $stagedAasAlias } else { '' }
+		staged_aas_alias_name = $stagedAasAliasName
 	}
 	verified_log_markers = $verifiedMarkers
 	missing_log_markers = $missingMarkers
@@ -634,5 +719,23 @@ $artifact = [ordered]@{
 	}
 }
 
+$latestArtifactIsSufficient = (
+	$warnings.Count -eq 0 -and
+	$missingMarkers.Count -eq 0 -and
+	$mainEngineSha256 -ne '' -and
+	$atlasEngineSha256 -ne '' -and
+	$mapEngineSha256 -ne '' -and
+	$mainEngineSha256 -ne $atlasEngineSha256 -and
+	$mainProbe.shot_logged -and
+	$atlasProbe.shot_logged -and
+	$mapProbe.server_seen -and
+	$mapProbe.active_seen -and
+	$mapProbe.shot_logged -and
+	-not $registerFontFallbackSeen
+)
+
 $artifact | ConvertTo-Json -Depth 7 | Set-Content -Path $artifactPath -Encoding ascii
+if ($latestArtifactIsSufficient -or -not (Test-Path -LiteralPath $latestArtifactPath)) {
+	$artifact | ConvertTo-Json -Depth 7 | Set-Content -Path $latestArtifactPath -Encoding ascii
+}
 $artifact | ConvertTo-Json -Depth 7

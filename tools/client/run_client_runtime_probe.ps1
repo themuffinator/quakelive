@@ -114,6 +114,9 @@ function Sync-RuntimeUiPackages {
 	param([string]$RuntimeBaseq3Dir)
 
 	$uiBundleBuilder = Join-Path $script:RepoRoot 'tools\build_ui_bundle.py'
+	$runtimePackageManifest = Join-Path $script:RepoRoot 'artifacts\ui_bundle\runtime_ui_package_manifest.json'
+	$mainPackagePath = Join-Path $RuntimeBaseq3Dir 'pak_uiql.pk3'
+	$overlayPackagePath = Join-Path $RuntimeBaseq3Dir 'pak_ui_src_retail_overlay.pk3'
 	$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
 	if (-not $pythonCmd) {
 		$pythonCmd = Get-Command py -ErrorAction SilentlyContinue
@@ -136,6 +139,21 @@ function Sync-RuntimeUiPackages {
 	& $pythonCmd.Source @pythonArgs
 	if ($LASTEXITCODE -ne 0) {
 		throw "tools/build_ui_bundle.py failed while refreshing runtime UI packages."
+	}
+
+	if (-not (Test-Path -LiteralPath $runtimePackageManifest)) {
+		throw "tools/build_ui_bundle.py did not emit the runtime UI package manifest."
+	}
+	if (-not (Test-Path -LiteralPath $mainPackagePath)) {
+		throw "tools/build_ui_bundle.py did not emit pak_uiql.pk3 into the requested runtime root."
+	}
+
+	$packageReport = Get-Content -LiteralPath $runtimePackageManifest -Raw | ConvertFrom-Json
+	if (-not $packageReport.main_package.required_entries_present) {
+		throw "The refreshed pak_uiql.pk3 package is missing required runtime UI entries."
+	}
+	if ($packageReport.overlay_package.exists -and -not (Test-Path -LiteralPath $overlayPackagePath)) {
+		throw "The runtime UI package manifest reports an overlay package, but pak_ui_src_retail_overlay.pk3 was not emitted."
 	}
 }
 
@@ -383,8 +401,6 @@ function Invoke-MainMenuProbe {
 		'web_changeHash #friends',
 		'web_showError codex_client_p6_error',
 		'web_hideBrowser',
-		'web_reload',
-		'web_stopRefresh',
 		("writeClientConfig $SavedConfigName"),
 		("screenshotJPEG $ScreenshotPrefix")
 	) ) {
@@ -562,6 +578,9 @@ $script:RetailBasePath = Get-LaunchSafePath -Path ( Resolve-RetailBasePath -Expl
 $script:RetailUiBundleRoot = Resolve-RetailUiBundleRoot -ExplicitPath $AssetCdPath -Root $RepoRoot
 $script:QlHome = Join-Path $RepoRoot 'build\win32\Debug\bin'
 $script:RuntimeRoot = Join-Path $script:QlHome 'baseq3'
+$script:RuntimeUiPackageManifest = Join-Path $RepoRoot 'artifacts\ui_bundle\runtime_ui_package_manifest.json'
+$script:RuntimeUiPackage = Join-Path $script:RuntimeRoot 'pak_uiql.pk3'
+$script:RuntimeUiOverlayPackage = Join-Path $script:RuntimeRoot 'pak_ui_src_retail_overlay.pk3'
 $script:DumpsRoot = Join-Path $RepoRoot 'build\win32\Debug\dumps'
 $script:LogRoot = Join-Path $script:DumpsRoot 'logs'
 $script:RuntimeLog = Join-Path $script:RuntimeRoot 'qconsole.log'
@@ -626,6 +645,8 @@ $mapScreenshotLogged = ( $mapLogText -match [regex]::Escape( "Wrote screenshots/
 $gameEndPublished = $mapLogText -match [regex]::Escape( 'steam_event game.end' )
 $shutdownSeen = $mapLogText -match [regex]::Escape( '----- CL_Shutdown -----' )
 $lifecycleEndConfirmed = $mapProbe.disconnect_seen -or $gameEndPublished -or $shutdownSeen
+$gameErrorPublished = ( $mainLogText -match [regex]::Escape( 'steam_event game.error' ) ) -and ( $mainLogText -match [regex]::Escape( 'codex_client_p6_error' ) )
+$nativeStopRefreshFallbackLogged = $mainLogText -match [regex]::Escape( 'UI: stopRefresh requested without browser overlay; only native refresh stopped.' )
 
 foreach ( $pair in @(
 		@('----- UI Initialization -----', $mainLogText),
@@ -634,9 +655,6 @@ foreach ( $pair in @(
 		@('execing repconfig.cfg', $mainLogText),
 		@('web_showBrowser ignored: online services disabled by build settings', $mainLogText),
 		@('web_changeHash ignored: online services disabled by build settings', $mainLogText),
-		@('web_showError codex_client_p6_error', $mainLogText),
-		@('web_reload', $mainLogText),
-		@('web_stopRefresh ignored: online services disabled by build settings', $mainLogText),
 		@("Wrote screenshots/$menuShotPrefix.jpg", $mainLogText),
 		@("Server: $MapName", $mapLogText),
 		@('Going from CS_PRIMED to CS_ACTIVE', $mapLogText)
@@ -652,6 +670,18 @@ if ( $mapScreenshotLogged ) {
 	$verifiedMarkers.Add( "engine screenshot artifact: $mapShotPrefix" )
 } else {
 	$missingMarkers.Add( "engine screenshot artifact: $mapShotPrefix" )
+}
+
+if ( $gameErrorPublished ) {
+	$verifiedMarkers.Add( 'client runtime game.error marker observed' )
+} else {
+	$missingMarkers.Add( 'client runtime game.error marker observed' )
+}
+
+if ( $nativeStopRefreshFallbackLogged ) {
+	$verifiedMarkers.Add( 'client runtime stopRefresh fallback observed' )
+} else {
+	$missingMarkers.Add( 'client runtime stopRefresh fallback observed' )
 }
 
 if ( $lifecycleEndConfirmed ) {
@@ -671,6 +701,23 @@ $artifact = [ordered]@{
 	runtime_root = To-RepoPath -Path $script:RuntimeRoot
 	retail_basepath = To-RepoPath -Path $script:RetailBasePath
 	asset_cdpath = To-RepoPath -Path $script:RetailUiBundleRoot
+	ui_runtime_packages = [ordered]@{
+		manifest = [ordered]@{
+			path = To-RepoPath -Path $script:RuntimeUiPackageManifest
+			exists = Test-Path -LiteralPath $script:RuntimeUiPackageManifest
+			sha256 = Get-ArtifactSha256 -Path $script:RuntimeUiPackageManifest
+		}
+		main_package = [ordered]@{
+			path = To-RepoPath -Path $script:RuntimeUiPackage
+			exists = Test-Path -LiteralPath $script:RuntimeUiPackage
+			sha256 = Get-ArtifactSha256 -Path $script:RuntimeUiPackage
+		}
+		overlay_package = [ordered]@{
+			path = To-RepoPath -Path $script:RuntimeUiOverlayPackage
+			exists = Test-Path -LiteralPath $script:RuntimeUiOverlayPackage
+			sha256 = Get-ArtifactSha256 -Path $script:RuntimeUiOverlayPackage
+		}
+	}
 	main_menu = [ordered]@{
 		engine_screenshot = To-RepoPath -Path $mainEngineScreenshotPath
 		engine_sha256 = Get-ArtifactSha256 -Path $mainEngineScreenshotPath
@@ -705,9 +752,8 @@ $artifact = [ordered]@{
 		offline_browser_policy = [ordered]@{
 			show_browser_ignored = $mainLogText -match [regex]::Escape( 'web_showBrowser ignored: online services disabled by build settings' )
 			change_hash_ignored = $mainLogText -match [regex]::Escape( 'web_changeHash ignored: online services disabled by build settings' )
-			show_error_logged = $mainLogText -match [regex]::Escape( 'web_showError codex_client_p6_error' )
-			reload_logged = $mainLogText -match [regex]::Escape( 'web_reload' )
-			stop_refresh_ignored = $mainLogText -match [regex]::Escape( 'web_stopRefresh ignored: online services disabled by build settings' )
+			game_error_published = $gameErrorPublished
+			native_stop_refresh_logged = $nativeStopRefreshFallbackLogged
 		}
 		shot_logged = $mainProbe.shot_logged
 	}

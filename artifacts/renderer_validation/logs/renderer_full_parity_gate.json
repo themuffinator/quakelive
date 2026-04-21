@@ -100,6 +100,8 @@
       "summary": "Renderer parity gate and tracked runtime evidence are now present.",
       "details": {
         "runtime_probe_present": true,
+        "runtime_probe_mentions_latest_alias": true,
+        "runtime_probe_uses_current_map_contract": true,
         "runtime_evidence_present": true,
         "runtime_evidence_clean": true,
         "runtime_no_registerfont_fallback": true,

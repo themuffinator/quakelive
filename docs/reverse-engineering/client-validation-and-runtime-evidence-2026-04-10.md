@@ -20,6 +20,23 @@ locks, and caps probe pacing at `com_maxfps 30` so the local-map tranche
 reliably reaches `CS_ACTIVE` before issuing the demo/screenshot/disconnect
 sequence.
 
+## 2026-04-21 Runtime Evidence Refresh
+
+The tracked client runtime bundle was refreshed again on 2026-04-21 after the
+UI runtime-package proof path was hardened.
+
+The refreshed pass reran `tools/client/run_client_runtime_probe.ps1` against
+the current `Debug|x86` client build and the local retail install. The tracked
+artifact now records the emitted `ui_runtime_packages` block, including
+`artifacts/ui_bundle/runtime_ui_package_manifest.json`,
+`build/win32/Debug/bin/baseq3/pak_uiql.pk3`, and the bounded overlay-package
+slot, which currently remains unmaterialized because `drift_files` is empty.
+The main-menu/browser-policy proof is also now keyed to the current
+fallback markers the runtime actually emits:
+`web_showBrowser ignored`, `web_changeHash ignored`,
+`steam_event game.error {"text":"codex_client_p6_error"}`, and the UI-side
+`stopRefresh` offline fallback log.
+
 ## Runtime Evidence Bundle
 
 Tracked artifact:
@@ -32,7 +49,7 @@ Probe owner:
 
 Observed closure evidence from the tracked bundle:
 
-1. A windowed main-menu probe now captures both an engine screenshot and a process-bound window screenshot while proving the retail `qzconfig.cfg` / `repconfig.cfg` bootstrap, `writeClientConfig` output, and the default-disabled browser-policy behavior for `web_showBrowser`, `web_changeHash`, `web_showError`, `web_reload`, and `web_stopRefresh`.
+1. A windowed main-menu probe now captures an authoritative engine screenshot while proving the retail `qzconfig.cfg` / `repconfig.cfg` bootstrap, `writeClientConfig` output, the emitted UI runtime-package manifest/main-package hashes, and the default-disabled browser-policy behavior for `web_showBrowser`, `web_changeHash`, `game.error`, and the UI-side `stopRefresh` fallback.
 2. A windowed local-map probe now reaches `Going from CS_PRIMED to CS_ACTIVE` on `bloodrun`, captures both engine and process-bound runtime screenshots, records a flushed demo artifact, and proves client-lifecycle end markers through `steam_event game.end` plus `----- CL_Shutdown -----`.
 3. The runtime probe now follows the real launched `quakelive_steam` process instead of assuming the first returned process handle owns the full game lifetime, which keeps the archived logs and capture artifacts aligned with the actual client session.
 

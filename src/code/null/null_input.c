@@ -21,15 +21,75 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #include "../client/client.h"
 
+static cvar_t	*in_mouse;
+static cvar_t	*in_nograb;
+static cvar_t	*in_joystick;
+static cvar_t	*in_debugJoystick;
+static cvar_t	*joy_threshold;
+
+/*
+================
+IN_NullTouchCompatibilityCvars
+================
+*/
+static void IN_NullTouchCompatibilityCvars( void ) {
+	(void)in_mouse;
+	(void)in_nograb;
+	(void)in_debugJoystick;
+	(void)joy_threshold;
+}
+
+/*
+================
+IN_NullRefreshCompatibilityState
+================
+*/
+static void IN_NullRefreshCompatibilityState( void ) {
+	Cvar_Set( "ui_joyavail", "0" );
+	IN_NullTouchCompatibilityCvars();
+}
+
+/*
+================
+IN_Init
+================
+*/
 void IN_Init( void ) {
+	in_mouse = Cvar_Get( "in_mouse", "0", CVAR_ARCHIVE );
+	in_nograb = Cvar_Get( "in_nograb", "0", CVAR_TEMP );
+	in_joystick = Cvar_Get( "in_joystick", "0", CVAR_ARCHIVE|CVAR_LATCH );
+	in_debugJoystick = Cvar_Get( "in_debugjoystick", "0", CVAR_TEMP );
+	joy_threshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE );
+
+	IN_NullRefreshCompatibilityState();
 }
 
-void IN_Frame (void) {
+/*
+================
+IN_Frame
+================
+*/
+void IN_Frame( void ) {
+	if ( in_joystick && in_joystick->modified ) {
+		in_joystick->modified = qfalse;
+	}
+
+	IN_NullRefreshCompatibilityState();
 }
 
+/*
+================
+IN_Shutdown
+================
+*/
 void IN_Shutdown( void ) {
+	IN_NullRefreshCompatibilityState();
 }
 
-void Sys_SendKeyEvents (void) {
+/*
+================
+Sys_SendKeyEvents
+================
+*/
+void Sys_SendKeyEvents( void ) {
 }
-

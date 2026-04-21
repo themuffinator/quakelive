@@ -1,6 +1,6 @@
 # `Engine` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-10
+Last updated: 2026-04-21
 
 Scope: engine-owned executable surfaces in `src/code/qcommon/*`,
 `src/code/client/*`, `src/code/server/*`, `src/code/renderer/*`, and the
@@ -53,13 +53,13 @@ Canonical committed evidence used for this engine-wide audit:
   - `artifacts/qcommon_validation/logs/qcommon_runtime_evidence_20260410.json`
   - `artifacts/client_validation/logs/client_runtime_evidence_20260410.json`
   - `artifacts/server_validation/logs/server_runtime_evidence_20260410.json`
-  - `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+  - `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`
   - `artifacts/engine_host_support_validation/logs/engine_host_support_runtime_evidence_20260410.json`
 - Dependent module evidence used to bound the replacement target:
   - `docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-10.md`
   - `artifacts/module_validation/logs/retail_module_parity_gate.json`
   - `artifacts/ui_validation/logs/ui_full_parity_gate.json`
-  - `artifacts/module_validation/logs/retail_module_runtime_evidence_20260409.json`
+  - `artifacts/module_validation/logs/retail_module_runtime_evidence_latest.json`
 
 Method:
 
@@ -110,7 +110,7 @@ Interpretation:
   current worktree.
 - The module dependency layer is also closed separately at **100%**, with
   `retail_module_parity_gate.json` and `ui_full_parity_gate.json` both passing
-  and the archived retail-DLL runtime probe still providing direct retail
+  and the stable retail-DLL runtime alias still providing direct retail
   module-host evidence.
 
 Important scope note:
@@ -126,7 +126,7 @@ Important scope note:
 | `qcommon` | `docs/reverse-engineering/qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md` | `100%` | `5 / 5` passing | `artifacts/qcommon_validation/logs/qcommon_full_parity_gate.json` | `artifacts/qcommon_validation/logs/qcommon_runtime_evidence_20260410.json` | Bootstrap, filesystem, message transport, collision leaf ownership, and VM host/fallback behavior are closed. |
 | `client` | `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md` | `100%` | `5 / 5` passing | `artifacts/client_validation/logs/client_full_parity_gate.json` | `artifacts/client_validation/logs/client_runtime_evidence_20260410.json` | Browser-host runtime, Steam callback lifetime, workshop bootstrap, config persistence, and final client proof are closed. |
 | `server` | `docs/reverse-engineering/server-full-parity-audit-and-implementation-plan-2026-04-10.md` | `100%` | `6 / 6` passing | `artifacts/server_validation/logs/server_full_parity_gate.json` | `artifacts/server_validation/logs/server_runtime_evidence_20260410.json` | Steam GameServer lifecycle, `idZMQ`, stat/achievement ownership, rankings compatibility, control-plane cvars, and dedicated proof are closed. |
-| `renderer` | `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md` | `100%` | `9 / 9` passing | `artifacts/renderer_validation/logs/renderer_full_parity_gate.json` | `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json` | Export ABI, memory-image ingestion, post-process, Win32 glue, classic font lane, host text core, build lane, and strict validation are closed. |
+| `renderer` | `docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md` | `100%` | `9 / 9` passing | `artifacts/renderer_validation/logs/renderer_full_parity_gate.json` | `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json` | Export ABI, memory-image ingestion, post-process, Win32 glue, classic font lane, host text core, build lane, and strict validation are closed. |
 | Remaining engine host/support | `docs/reverse-engineering/engine-host-support-full-parity-audit-and-implementation-plan-2026-04-10.md` | `100%` | `6 / 6` passing (`4 / 4` strict-retail-counted) | `artifacts/engine_host_support_validation/logs/engine_host_support_full_parity_gate.json` | `artifacts/engine_host_support_validation/logs/engine_host_support_runtime_evidence_20260410.json` | Win32 clipboard/raw-input, loading-window glue, botlib internal proof, and boundary formalisation are closed; compatibility-only lanes are explicit exclusions. |
 
 ## Historical Uplift By Register
@@ -247,7 +247,7 @@ Observed facts:
    - the retained `*fontstash` host text engine
    - native `ui` and `cgame` host text import switchover
    - an explicit external FreeType build lane
-3. `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+3. `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`
    proves:
    - windowed main-menu bootstrap
    - retained-atlas debug rendering through `r_debugFontAtlas`
@@ -304,9 +304,12 @@ Observed facts:
    `3 / 3` passing module tranches with `overall_status: pass`.
 3. `artifacts/ui_validation/logs/ui_full_parity_gate.json` records
    `6 / 6` passing UI tranches with `overall_status: pass`.
-4. `artifacts/module_validation/logs/retail_module_runtime_evidence_20260409.json`
+4. `artifacts/module_validation/logs/retail_module_runtime_evidence_latest.json`
    still proves direct retail-DLL host loading for retail `uix86.dll`,
    `qagamex86.dll`, and `cgamex86.dll` under the reconstructed host.
+   The stable alias now points at the current bounded `2026-04-21` artifact,
+   whose remaining live-map shortfall is explicitly renderer-owned rather than
+   a module-host ambiguity.
 5. The only bounded live-map shortfall archived in that retail module runtime
    probe was explicitly renderer-owned, and the renderer register is now closed
    separately in the current worktree.
@@ -316,8 +319,8 @@ Conclusion:
 - the module dependency layer is not an active blocker for the current
   engine-wide replacement target
 - the authoritative current state is that both the engine-owned registers and
-  the module dependency registers are closed, even though the direct retail
-  module runtime artifact remains archived under its 2026-04-09 filename
+  the module dependency registers are closed, even though the stable runtime
+  alias currently remains pinned to the bounded `2026-04-09` artifact
 
 ## Open Gap Register
 
@@ -334,9 +337,12 @@ Explicit non-gap exclusions that remain visible:
 
 Active remaining repo work outside this engine register:
 
-- `IMPLEMENTATION_PLAN.md` Task 23: ownerdraw/stat payload completion and
-  runtime validation
-- `IMPLEMENTATION_PLAN.md` Task 24: targeted gameplay validation sweep
+- `IMPLEMENTATION_PLAN.md` Task A3: resolve or permanently bound the
+  compatibility-only online-service lanes
+- `IMPLEMENTATION_PLAN.md` Task A4: modernise or explicitly contain the
+  non-Windows portability lanes
+- `IMPLEMENTATION_PLAN.md` Task A6: finish refreshing the remaining
+  build/runtime evidence and publication follow-ups
 
 ## Implementation Plan
 

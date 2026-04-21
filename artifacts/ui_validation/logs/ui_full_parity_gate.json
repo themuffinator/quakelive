@@ -29,7 +29,7 @@
     "UI-G02": {
       "gap_id": "UI-G02",
       "status": "pass",
-      "summary": "Source-vs-retail panel drift is constrained to the approved overlay contract.",
+      "summary": "Source-vs-retail panel drift is clean and the overlay manifest records an empty drift contract.",
       "details": {
         "overlay_manifest_path": "artifacts/ui_bundle/ui_src_retail_overlay.json",
         "overlay_manifest_present": true,

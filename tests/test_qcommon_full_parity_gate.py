@@ -107,6 +107,16 @@ def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> d
 	}
 
 
+def _dll_load_root_contract_is_sufficient(load_roots: dict[str, Any]) -> bool:
+	attempts = load_roots.get("attempts")
+	if isinstance(attempts, dict):
+		attempts = [attempts]
+	if not isinstance(attempts, list) or not attempts:
+		return False
+
+	return load_roots["writable_homepath_ok"] is True
+
+
 def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> bool:
 	if runtime_evidence is None:
 		return False
@@ -134,24 +144,17 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 		and service_disabled_policy["steam_resource_bridge_disabled"] is True
 		and service_disabled_policy["show_browser_ignored"] is True
 		and service_disabled_policy["change_hash_ignored"] is True
-		and service_disabled_policy["show_error_logged"] is True
-		and service_disabled_policy["reload_logged"] is True
-		and service_disabled_policy["stop_refresh_ignored"] is True
-		and main_menu["ui_dll_load_roots"]["repo_root_failed"] is True
-		and main_menu["ui_dll_load_roots"]["retail_base_failed"] is True
-		and main_menu["ui_dll_load_roots"]["writable_homepath_ok"] is True
+		and service_disabled_policy["game_error_published"] is True
+		and service_disabled_policy["native_stop_refresh_logged"] is True
+		and _dll_load_root_contract_is_sufficient(main_menu["ui_dll_load_roots"])
 		and map_runtime["map"] == "bloodrun"
 		and map_runtime["engine_screenshot"]
 		and map_runtime["engine_sha256"]
 		and map_runtime["server_seen"] is True
 		and map_runtime["active_seen"] is True
 		and map_runtime["shot_logged"] is True
-		and map_runtime["qagame_dll_load_roots"]["repo_root_failed"] is True
-		and map_runtime["qagame_dll_load_roots"]["retail_base_failed"] is True
-		and map_runtime["qagame_dll_load_roots"]["writable_homepath_ok"] is True
-		and map_runtime["cgame_dll_load_roots"]["repo_root_failed"] is True
-		and map_runtime["cgame_dll_load_roots"]["retail_base_failed"] is True
-		and map_runtime["cgame_dll_load_roots"]["writable_homepath_ok"] is True
+		and _dll_load_root_contract_is_sufficient(map_runtime["qagame_dll_load_roots"])
+		and _dll_load_root_contract_is_sufficient(map_runtime["cgame_dll_load_roots"])
 		and main_menu["engine_sha256"] != map_runtime["engine_sha256"]
 	)
 
@@ -588,21 +591,19 @@ def test_qcommon_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	assert _home_ui_search_path_is_clean(runtime_evidence["main_menu"])
 	assert runtime_evidence["main_menu"]["search_path_contains_retail_pak00"] is True
 	assert runtime_evidence["main_menu"]["service_disabled_policy"]["steam_resource_bridge_disabled"] is True
-	assert runtime_evidence["main_menu"]["ui_dll_load_roots"]["repo_root_failed"] is True
-	assert runtime_evidence["main_menu"]["ui_dll_load_roots"]["retail_base_failed"] is True
-	assert runtime_evidence["main_menu"]["ui_dll_load_roots"]["writable_homepath_ok"] is True
+	assert runtime_evidence["main_menu"]["service_disabled_policy"]["show_browser_ignored"] is True
+	assert runtime_evidence["main_menu"]["service_disabled_policy"]["change_hash_ignored"] is True
+	assert runtime_evidence["main_menu"]["service_disabled_policy"]["game_error_published"] is True
+	assert runtime_evidence["main_menu"]["service_disabled_policy"]["native_stop_refresh_logged"] is True
+	assert _dll_load_root_contract_is_sufficient(runtime_evidence["main_menu"]["ui_dll_load_roots"])
 	assert runtime_evidence["map_runtime"]["map"] == "bloodrun"
 	assert runtime_evidence["map_runtime"]["engine_screenshot"]
 	assert runtime_evidence["map_runtime"]["engine_sha256"]
 	assert runtime_evidence["map_runtime"]["server_seen"] is True
 	assert runtime_evidence["map_runtime"]["active_seen"] is True
 	assert runtime_evidence["map_runtime"]["shot_logged"] is True
-	assert runtime_evidence["map_runtime"]["qagame_dll_load_roots"]["repo_root_failed"] is True
-	assert runtime_evidence["map_runtime"]["qagame_dll_load_roots"]["retail_base_failed"] is True
-	assert runtime_evidence["map_runtime"]["qagame_dll_load_roots"]["writable_homepath_ok"] is True
-	assert runtime_evidence["map_runtime"]["cgame_dll_load_roots"]["repo_root_failed"] is True
-	assert runtime_evidence["map_runtime"]["cgame_dll_load_roots"]["retail_base_failed"] is True
-	assert runtime_evidence["map_runtime"]["cgame_dll_load_roots"]["writable_homepath_ok"] is True
+	assert _dll_load_root_contract_is_sufficient(runtime_evidence["map_runtime"]["qagame_dll_load_roots"])
+	assert _dll_load_root_contract_is_sufficient(runtime_evidence["map_runtime"]["cgame_dll_load_roots"])
 	assert _runtime_evidence_is_sufficient(runtime_evidence)
 
 

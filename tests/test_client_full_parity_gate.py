@@ -80,11 +80,26 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 	main_menu = runtime_evidence["main_menu"]
 	map_runtime = runtime_evidence["map_runtime"]
 	offline_browser_policy = main_menu["offline_browser_policy"]
+	ui_runtime_packages = runtime_evidence.get("ui_runtime_packages", {})
+	ui_package_manifest = ui_runtime_packages.get("manifest", {})
+	ui_main_package = ui_runtime_packages.get("main_package", {})
+	ui_overlay_package = ui_runtime_packages.get("overlay_package", {})
 
 	return (
 		runtime_evidence["artifact_version"] == 2
 		and runtime_evidence["phase"] == "CL-P6"
 		and runtime_evidence["parity_estimate"] == {"before": 99, "after": 100}
+		and ui_package_manifest.get("path") == "artifacts/ui_bundle/runtime_ui_package_manifest.json"
+		and ui_package_manifest.get("exists") is True
+		and bool(ui_package_manifest.get("sha256"))
+		and ui_main_package.get("path") == "build/win32/Debug/bin/baseq3/pak_uiql.pk3"
+		and ui_main_package.get("exists") is True
+		and bool(ui_main_package.get("sha256"))
+		and ui_overlay_package.get("path") == "build/win32/Debug/bin/baseq3/pak_ui_src_retail_overlay.pk3"
+		and (
+			ui_overlay_package.get("exists") is False
+			or bool(ui_overlay_package.get("sha256"))
+		)
 		and runtime_evidence["warnings"] == []
 		and runtime_evidence["missing_log_markers"] == []
 		and main_menu["engine_screenshot"]
@@ -96,9 +111,8 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 		and main_menu["write_client_config"]["exists"] is True
 		and offline_browser_policy["show_browser_ignored"] is True
 		and offline_browser_policy["change_hash_ignored"] is True
-		and offline_browser_policy["show_error_logged"] is True
-		and offline_browser_policy["reload_logged"] is True
-		and offline_browser_policy["stop_refresh_ignored"] is True
+		and offline_browser_policy["game_error_published"] is True
+		and offline_browser_policy["native_stop_refresh_logged"] is True
 		and map_runtime["map"] == "bloodrun"
 		and map_runtime["engine_screenshot"]
 		and map_runtime["engine_sha256"]
@@ -409,6 +423,15 @@ def test_client_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	assert runtime_evidence["artifact_version"] == 2
 	assert runtime_evidence["phase"] == "CL-P6"
 	assert runtime_evidence["parity_estimate"] == {"before": 99, "after": 100}
+	assert runtime_evidence["ui_runtime_packages"]["manifest"]["path"] == "artifacts/ui_bundle/runtime_ui_package_manifest.json"
+	assert runtime_evidence["ui_runtime_packages"]["manifest"]["exists"] is True
+	assert runtime_evidence["ui_runtime_packages"]["manifest"]["sha256"]
+	assert runtime_evidence["ui_runtime_packages"]["main_package"]["path"] == "build/win32/Debug/bin/baseq3/pak_uiql.pk3"
+	assert runtime_evidence["ui_runtime_packages"]["main_package"]["exists"] is True
+	assert runtime_evidence["ui_runtime_packages"]["main_package"]["sha256"]
+	assert runtime_evidence["ui_runtime_packages"]["overlay_package"]["path"] == "build/win32/Debug/bin/baseq3/pak_ui_src_retail_overlay.pk3"
+	if runtime_evidence["ui_runtime_packages"]["overlay_package"]["exists"]:
+		assert runtime_evidence["ui_runtime_packages"]["overlay_package"]["sha256"]
 	assert runtime_evidence["warnings"] == []
 	assert runtime_evidence["missing_log_markers"] == []
 	assert runtime_evidence["main_menu"]["engine_screenshot"]
@@ -417,9 +440,8 @@ def test_client_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	assert runtime_evidence["main_menu"]["write_client_config"]["exists"] is True
 	assert runtime_evidence["main_menu"]["offline_browser_policy"]["show_browser_ignored"] is True
 	assert runtime_evidence["main_menu"]["offline_browser_policy"]["change_hash_ignored"] is True
-	assert runtime_evidence["main_menu"]["offline_browser_policy"]["show_error_logged"] is True
-	assert runtime_evidence["main_menu"]["offline_browser_policy"]["reload_logged"] is True
-	assert runtime_evidence["main_menu"]["offline_browser_policy"]["stop_refresh_ignored"] is True
+	assert runtime_evidence["main_menu"]["offline_browser_policy"]["game_error_published"] is True
+	assert runtime_evidence["main_menu"]["offline_browser_policy"]["native_stop_refresh_logged"] is True
 	assert runtime_evidence["map_runtime"]["map"] == "bloodrun"
 	assert runtime_evidence["map_runtime"]["engine_screenshot"]
 	assert runtime_evidence["map_runtime"]["engine_sha256"]

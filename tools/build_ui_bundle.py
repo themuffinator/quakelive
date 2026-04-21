@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -30,6 +31,7 @@ UI_RETAIL_OVERRIDE_TOOL = REPO_ROOT / "scripts" / "ui" / "write_retail_ui_overri
 UI_RETAIL_CORPUS_TOOL = REPO_ROOT / "scripts" / "ui" / "check_retail_ui_corpus.py"
 RETAIL_UI_PACKAGE_NAME = "pak_uiql.pk3"
 OVERLAY_PACKAGE_NAME = "pak_ui_src_retail_overlay.pk3"
+RUNTIME_PACKAGE_MANIFEST_NAME = "runtime_ui_package_manifest.json"
 
 # The Steam-era retail UI pack carries several renamed PNG assets while the
 # native menus still request the legacy symbolic names. Stage compatibility
@@ -45,6 +47,26 @@ RUNTIME_UI_COMPATIBILITY_ALIASES: tuple[tuple[str, str], ...] = (
 	("ui/assets/score/btn.png", "ui/assets/score/navleft.png"),
 	("ui/assets/score/btn.png", "ui/assets/score/navright.png"),
 	("ui/assets/score/scorebox_follow.png", "ui/assets/score/navfriends.png"),
+)
+
+RUNTIME_MAIN_PACKAGE_REQUIRED_ENTRIES: tuple[str, ...] = (
+	"default.cfg",
+	"fonts/font.dat",
+	"fonts/font.tga",
+	"ui/hud3.txt",
+	"ui/ingame_scoreboard_ffa.menu",
+	"ui/main.menu",
+	"ui/assets/button_back.png",
+	"ui/assets/hud/dm.png",
+	"ui/assets/hud/ffa.png",
+	"ui/assets/hud/tourn.png",
+	"ui/assets/score/navbarm.png",
+	"ui/assets/score/navbarl.png",
+	"ui/assets/score/navbarr.png",
+	"ui/assets/score/navfriends.png",
+	"ui/assets/score/navleft.png",
+	"ui/assets/score/navright.png",
+	"ui/assets/score/scoretl.png",
 )
 
 
@@ -91,6 +113,28 @@ def _iter_manifest_matches(source_dir: Path, include_patterns: list[str]) -> lis
 def _copy_file(source_path: Path, destination_path: Path) -> None:
 	destination_path.parent.mkdir(parents=True, exist_ok=True)
 	shutil.copy2(source_path, destination_path)
+
+
+def _display_path(path: Path) -> str:
+	try:
+		return path.resolve().relative_to(REPO_ROOT).as_posix()
+	except ValueError:
+		return path.resolve().as_posix()
+
+
+def _sha256_file(path: Path) -> str:
+	digest = hashlib.sha256()
+
+	with path.open("rb") as handle:
+		for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+			digest.update(chunk)
+
+	return digest.hexdigest()
+
+
+def _archive_entry_names(package_path: Path) -> list[str]:
+	with zipfile.ZipFile(package_path, "r") as archive:
+		return sorted(info.filename for info in archive.infolist())
 
 
 def stage_runtime_compatibility_aliases(staging_baseq3: Path) -> None:
@@ -204,6 +248,69 @@ def emit_runtime_packages(
 	return main_package_path, overlay_package_path
 
 
+def write_runtime_package_manifest(
+	manifest_path: Path,
+	runtime_root: Path,
+	overlay_manifest_path: Path,
+	main_package_path: Path,
+	overlay_package_path: Path | None,
+) -> None:
+	overlay_manifest = json.loads(overlay_manifest_path.read_text(encoding="utf-8"))
+	main_entry_names = _archive_entry_names(main_package_path)
+	main_entry_set = set(main_entry_names)
+	overlay_entry_paths = sorted(
+		str(entry["overlay_path"]).replace("\\", "/").removeprefix("baseq3/")
+		for entry in overlay_manifest.get("overlay_entries", [])
+	)
+
+	report: dict[str, object] = {
+		"manifest_version": 1,
+		"runtime_root": _display_path(runtime_root),
+		"overlay_manifest_path": _display_path(overlay_manifest_path),
+		"overlay_manifest_sha256": _sha256_file(overlay_manifest_path),
+		"retail_ui_corpus_available": overlay_manifest.get("retail_ui_corpus_available"),
+		"drift_files": overlay_manifest.get("drift_files", []),
+		"main_package": {
+			"path": _display_path(main_package_path),
+			"size": main_package_path.stat().st_size,
+			"sha256": _sha256_file(main_package_path),
+			"entry_count": len(main_entry_names),
+			"required_entries": list(RUNTIME_MAIN_PACKAGE_REQUIRED_ENTRIES),
+			"required_entries_present": all(
+				entry in main_entry_set for entry in RUNTIME_MAIN_PACKAGE_REQUIRED_ENTRIES
+			),
+			"missing_required_entries": [
+				entry
+				for entry in RUNTIME_MAIN_PACKAGE_REQUIRED_ENTRIES
+				if entry not in main_entry_set
+			],
+		},
+	}
+
+	if overlay_package_path is None:
+		report["overlay_package"] = {
+			"path": _display_path(runtime_root / OVERLAY_PACKAGE_NAME),
+			"exists": False,
+			"entry_count": 0,
+			"entry_paths": [],
+			"matches_overlay_manifest": not overlay_entry_paths,
+		}
+	else:
+		overlay_entry_names = _archive_entry_names(overlay_package_path)
+		report["overlay_package"] = {
+			"path": _display_path(overlay_package_path),
+			"exists": True,
+			"size": overlay_package_path.stat().st_size,
+			"sha256": _sha256_file(overlay_package_path),
+			"entry_count": len(overlay_entry_names),
+			"entry_paths": overlay_entry_names,
+			"matches_overlay_manifest": overlay_entry_names == overlay_entry_paths,
+		}
+
+	manifest_path.parent.mkdir(parents=True, exist_ok=True)
+	manifest_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> int:
 	args = parse_args()
 
@@ -218,6 +325,7 @@ def main() -> int:
 	metrics_dir = artifact_root / "metrics"
 	overlay_manifest_json = artifact_root / "ui_src_retail_overlay.json"
 	ui_retail_inventory_json = artifact_root / "ui_retail_inventory.json"
+	runtime_package_manifest_json = artifact_root / RUNTIME_PACKAGE_MANIFEST_NAME
 	bake_log = log_dir / "font_bake.log"
 	metrics_json = metrics_dir / "font_metrics.json"
 	stale_package_paths = (
@@ -289,6 +397,15 @@ def main() -> int:
 			overlay_manifest_path=overlay_manifest_json,
 			runtime_root=runtime_root,
 		)
+		write_runtime_package_manifest(
+			manifest_path=runtime_package_manifest_json,
+			runtime_root=runtime_root,
+			overlay_manifest_path=overlay_manifest_json,
+			main_package_path=runtime_package_paths[0],
+			overlay_package_path=runtime_package_paths[1],
+		)
+	elif runtime_package_manifest_json.exists():
+		runtime_package_manifest_json.unlink()
 
 	print("UI validation inputs prepared.")
 	print(f"  retail baseq3 root: {baseq3_root}")
@@ -297,6 +414,7 @@ def main() -> int:
 		print(f"  runtime ui package: {runtime_package_paths[0]}")
 		if runtime_package_paths[1] is not None:
 			print(f"  runtime overlay package: {runtime_package_paths[1]}")
+		print(f"  runtime package manifest: {runtime_package_manifest_json}")
 	print(f"  font validation output: {font_output}")
 	print(f"  src/ui overlay manifest: {overlay_manifest_json}")
 	print(f"  retail ui inventory: {ui_retail_inventory_json}")

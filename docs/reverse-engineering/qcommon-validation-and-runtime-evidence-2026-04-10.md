@@ -18,9 +18,9 @@ Probe owner:
 
 Observed closure evidence from the tracked bundle:
 
-1. A windowed main-menu probe now archives both an engine screenshot and a process-bound window capture while proving retail `qzconfig.cfg` / `repconfig.cfg` bootstrap, the active `Current search path:` block, the retained writable-homepath-first UI DLL load roots, and the service-disabled launcher/resource policy markers captured by the current debug build.
-2. A windowed local-map probe now reaches `Going from CS_PRIMED to CS_ACTIVE` on `bloodrun`, captures both engine and process-bound runtime screenshots, and records the same writable-homepath DLL load-root contract for `qagamex86.dll` and `cgamex86.dll`.
-3. The tracked runtime bundle therefore closes the last low-cost qcommon proof tail: bootstrap config execution, chosen filesystem roots, retail DLL load roots, and service-disabled launcher/resource fallback behavior are now archived in one machine-readable artifact instead of being inferred from scattered historical logs.
+1. A windowed main-menu probe now archives an authoritative engine screenshot while proving retail `qzconfig.cfg` / `repconfig.cfg` bootstrap, the active `Current search path:` block, the current writable-homepath UI DLL loading contract, and the default-disabled browser markers captured by the current debug build (`web_showBrowser` ignored, `web_changeHash` ignored, published `game.error`, and the native `stopRefresh` fallback log).
+2. A windowed local-map probe now reaches `Going from CS_PRIMED to CS_ACTIVE` on `bloodrun` through the current `map <name> ffa` command shape, captures an authoritative engine screenshot, and records the same writable-homepath DLL loading contract for `qagamex86.dll` and `cgamex86.dll`.
+3. The tracked runtime bundle therefore closes the last low-cost qcommon proof tail: bootstrap config execution, chosen filesystem roots, writable-homepath DLL loading, and service-disabled launcher/resource fallback behavior are now archived in one machine-readable artifact instead of being inferred from scattered historical logs.
 
 ## Dedicated Qcommon Parity Gate
 

@@ -68,7 +68,7 @@ Existing module notes:
 
 Tracked artifacts and validation sources:
 
-- `artifacts/module_validation/logs/retail_module_runtime_evidence_20260409.json`
+- `artifacts/module_validation/logs/retail_module_runtime_evidence_latest.json`
 - `artifacts/module_validation/logs/retail_module_parity_gate.json`
 - `artifacts/ui_validation/logs/ui_full_parity_gate.json`
 - `tests/test_game_module_retail_parity_gate.py`
@@ -110,7 +110,8 @@ Interpretation:
 - Module naming and ownership recovery remain saturated.
 - No open strict-retail module shortfall remains inside the audited module
   layer. The only remaining runtime blocker cited by the tracked retail probe is
-  the renderer-owned `R_LoadMD3` fault, which stays outside module scope.
+  the renderer-owned `R_fonsErrorCallback` font-atlas saturation blocker, which
+  stays outside module scope.
 
 ## Live Validation Snapshot
 
@@ -131,10 +132,12 @@ Observed facts from the refreshed machine-readable artifacts:
   cleanly again after `GMR-P6`.
 - `artifacts/ui_validation/logs/ui_full_parity_gate.json` now passes cleanly
   after `GMR-P7`, with no non-passing gap IDs.
-- `artifacts/module_validation/logs/retail_module_runtime_evidence_20260409.json`
-  is still sufficient: the tracked retail probe still loads retail
-  `uix86.dll`, `qagamex86.dll`, and `cgamex86.dll`, and the remaining
-  live-map shortfall is still the renderer-owned `R_LoadMD3` fault.
+- `artifacts/module_validation/logs/retail_module_runtime_evidence_latest.json`
+  is still sufficient: the stable alias now points at the current bounded
+  `2026-04-21` probe. The authoritative tracked retail probe still loads
+  retail `uix86.dll`, `qagamex86.dll`, and `cgamex86.dll`, and the remaining
+  live-map shortfall is now explicitly the renderer-owned
+  `R_fonsErrorCallback` font-atlas saturation blocker.
 
 Current-worktree validation blockers:
 
@@ -343,11 +346,13 @@ Completed work:
    `2026-04-10` audit, the top-level ledgers, and the supporting pipeline notes
    together instead of only relying on the historical `2026-04-09` closure
    narrative.
-3. Confirmed that the archived retail runtime probe at
-   `artifacts/module_validation/logs/retail_module_runtime_evidence_20260409.json`
-   remains sufficient and did not need a fresh rerun because the workflow
-   topology and host-side validation contract were unchanged by this final
-   ledger/pipeline reconciliation pass.
+3. The tracked module runtime evidence now lives at the stable alias
+   `artifacts/module_validation/logs/retail_module_runtime_evidence_latest.json`.
+   That alias now points at the bounded `2026-04-21` probe: the refreshed
+   rerun recovered the current `map <name> ffa` contract and retail module
+   loads again, and it now classifies the remaining live-map shortfall as the
+   renderer-owned `R_fonsErrorCallback` font-atlas saturation blocker outside
+   module scope.
 
 Exit status:
 
@@ -396,4 +401,6 @@ the current worktree when all conditions below hold:
   certification lane are restored and machine-readable.
 - The current authoritative strict-retail module estimate for the current
   worktree is **`100%`**. The remaining live-map shortfall stays explicitly
-  renderer-owned outside the module layer.
+  renderer-owned outside the module layer, and the stable runtime alias now
+  points at the current bounded `2026-04-21` artifact instead of an older
+  archived rerun.

@@ -1,10 +1,24 @@
 [CmdletBinding()]
 param(
-    [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+    [string]$RepoRoot = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $scriptRoot = $PSScriptRoot
+    if ([string]::IsNullOrWhiteSpace($scriptRoot) -and $MyInvocation.MyCommand.Path) {
+        $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
+        $scriptRoot = (Get-Location).Path
+    }
+
+    $RepoRoot = (Resolve-Path (Join-Path $scriptRoot '../..')).Path
+} else {
+    $RepoRoot = (Resolve-Path $RepoRoot).Path
+}
 
 $stagingRoot = Join-Path $RepoRoot 'artifacts/wow64-smoketest'
 $logPath = Join-Path $stagingRoot 'wow64-smoketest.log'
@@ -51,21 +65,50 @@ function Ensure-Redist {
     Write-Log 'Redistributable installation completed.'
 }
 
+function Resolve-ModuleSource {
+    param(
+        [string]$PreferredPath,
+        [string]$FallbackPath
+    )
+
+    if (Test-Path $PreferredPath) {
+        return $PreferredPath
+    }
+
+    if (Test-Path $FallbackPath) {
+        return $FallbackPath
+    }
+
+    throw "Missing source module. Checked: $PreferredPath and $FallbackPath"
+}
+
 function Stage-Modules {
     $sources = @(
-        @{ Name = 'qagamex86.dll'; Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/qagamex86.dll'; Exports = @('dllEntry', 'vmMain') },
-        @{ Name = 'cgamex86.dll'; Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/cgamex86.dll'; Exports = @('dllEntry', 'vmMain') },
-        @{ Name = 'uix86.dll'; Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/uix86.dll'; Exports = @('dllEntry', 'vmMain') }
+        @{
+            Name = 'qagamex86.dll'
+            Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/qagamex86.dll'
+            FallbackSource = Join-Path $RepoRoot 'build/win32/Debug/bin/baseq3/qagamex86.dll'
+            Exports = @('dllEntry', 'vmMain')
+        },
+        @{
+            Name = 'cgamex86.dll'
+            Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/cgamex86.dll'
+            FallbackSource = Join-Path $RepoRoot 'build/win32/Debug/bin/baseq3/cgamex86.dll'
+            Exports = @('dllEntry', 'vmMain')
+        },
+        @{
+            Name = 'uix86.dll'
+            Source = Join-Path $RepoRoot 'assets/quakelive/baseq3/uix86.dll'
+            FallbackSource = Join-Path $RepoRoot 'build/win32/Debug/bin/baseq3/uix86.dll'
+            Exports = @('dllEntry', 'vmMain')
+        }
     )
 
     foreach ($item in $sources) {
-        if (-not (Test-Path $item.Source)) {
-            throw "Missing source module: $($item.Source)"
-        }
-
+        $sourcePath = Resolve-ModuleSource -PreferredPath $item.Source -FallbackPath $item.FallbackSource
         $destination = Join-Path $stagingRoot $item.Name
-        Copy-Item -LiteralPath $item.Source -Destination $destination -Force
-        Write-Log "Staged $($item.Name) to $destination"
+        Copy-Item -LiteralPath $sourcePath -Destination $destination -Force
+        Write-Log "Staged $($item.Name) from $sourcePath to $destination"
     }
 
     return $sources

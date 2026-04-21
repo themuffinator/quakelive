@@ -211,7 +211,7 @@ $password = 'qlrpass'
 	'set zmq_stats_password qlrstats',
 	'set zmq_rcon_password qlrrcon',
 	'set rconPassword qlrpass',
-	("map $MapName")
+	("map $MapName ffa")
 ) | Set-Content -LiteralPath $cfgPath -Encoding ascii
 
 Reset-LiveLog
@@ -364,7 +364,7 @@ $artifact = [ordered]@{
 		hostname_published = ( $queryFields['sv_hostname'] -eq 'SVP7 Probe' )
 		map_published = ( $queryFields['mapname'] -eq $MapName )
 		vac_published = ( $queryFields['sv_vac'] -eq '1' )
-		server_type_published = ( $queryFields['sv_serverType'] -eq '0' )
+		server_type_published = ( $queryFields['sv_serverType'] -eq '0' -or $queryFields['serverType'] -eq '0' )
 		warmup_ready_percentage_published = ( $queryFields['sv_warmupReadyPercentage'] -eq '0.51' )
 		maxclients_published = ( $queryFields['sv_maxclients'] -eq '8' )
 	}

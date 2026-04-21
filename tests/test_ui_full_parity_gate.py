@@ -35,16 +35,6 @@ UI_PLAN_PATH = REPO_ROOT / "docs" / "reverse-engineering" / "ui-full-parity-audi
 QMENU_NOTE_PATH = REPO_ROOT / "docs" / "reverse-engineering" / "ui-qmenu-struct-layouts.md"
 MAPPING_ROUND_PATH = REPO_ROOT / "docs" / "reverse-engineering" / "ui-mapping-round-2026-04-01.md"
 
-EXPECTED_CONTENT_DIFFS = {
-	"comp_spectator.menu",
-	"comp_spectator_follow.menu",
-	"hud.txt",
-	"hud3.txt",
-	"ingame_callvote.menu",
-	"ingame_join.menu",
-	"menudef.h",
-}
-
 GAP_ORDER = (
 	"UI-G01",
 	"UI-G02",
@@ -159,7 +149,7 @@ def _build_ui_full_parity_gate_report(
 		contract_ok = (
 			drift["missing_in_source"] == []
 			and drift["extra_in_source"] == []
-			and set(drift_files) in (EXPECTED_CONTENT_DIFFS, set())
+			and drift_files == []
 		)
 		manifest_ok = (
 			overlay_manifest is not None
@@ -180,9 +170,9 @@ def _build_ui_full_parity_gate_report(
 			"UI-G02",
 			"pass" if (contract_ok and manifest_ok) else "fail",
 			(
-				"Source-vs-retail panel drift is constrained to the approved overlay contract."
+				"Source-vs-retail panel drift is clean and the overlay manifest records an empty drift contract."
 				if (contract_ok and manifest_ok)
-				else "Source-vs-retail panel drift no longer matches the approved overlay contract."
+				else "Source-vs-retail panel drift or the overlay manifest no longer matches the clean current contract."
 			),
 			overlay_details,
 		)

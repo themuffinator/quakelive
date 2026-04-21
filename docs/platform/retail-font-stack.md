@@ -136,7 +136,9 @@ Inference:
     from system SDK or Vcpkg discovery
 - `RG-P11` is now complete:
   - the tracked runtime artifact is
-    `artifacts/renderer_validation/logs/renderer_runtime_evidence_20260410.json`
+    `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`
+  - the stable alias was refreshed on 2026-04-21 from the clean
+    `renderer_runtime_evidence_20260421.json` bundle
   - that artifact now proves a windowed UI-bootstrap pass, retained-atlas
     debug rendering, and live `bloodrun` runtime with distinct engine/window
     capture hashes, while rejecting `RE_RegisterFont` fallback-lane logs
