@@ -113,6 +113,7 @@ static int hist_current = -1, hist_count = 0;
 
 // bk001207 
 #define MEM_THRESHOLD 96*1024*1024
+#define SYS_CLIPBOARD_MAX_BYTES ( 1024 * 1024 )
 
 /*
 ==================
@@ -1412,17 +1413,282 @@ sysEvent_t Sys_GetEvent( void ) {
 
 /*****************************************************************************/
 
+/*
+==================
+Sys_PathHasBaseq3Asset
+==================
+*/
+static qboolean Sys_PathHasBaseq3Asset( const char *rootPath, const char *assetName ) {
+	char		path[MAX_OSPATH];
+	struct stat	fileInfo;
+
+	if ( !rootPath || !rootPath[0] || !assetName || !assetName[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( path, sizeof( path ), "%s/baseq3/%s", rootPath, assetName );
+	if ( stat( path, &fileInfo ) != 0 ) {
+		return qfalse;
+	}
+
+	return S_ISREG( fileInfo.st_mode ) ? qtrue : qfalse;
+}
+
+/*
+================
+Sys_CheckCD
+
+Return true if a usable Quake data root is configured.
+================
+*/
 qboolean Sys_CheckCD( void ) {
-  return qtrue;
+	const char	*roots[] = {
+		Cvar_VariableString( "fs_basepath" ),
+		Cvar_VariableString( "fs_cdpath" ),
+		Sys_DefaultInstallPath(),
+		Sys_DefaultCDPath(),
+		Sys_Cwd()
+	};
+	const char	*assets[] = {
+		"default.cfg",
+		"pak00.pk3",
+		"pak0.pk3"
+	};
+	int			i;
+	int			j;
+
+	for ( i = 0; i < sizeof( roots ) / sizeof( roots[0] ); i++ ) {
+		for ( j = 0; j < sizeof( assets ) / sizeof( assets[0] ); j++ ) {
+			if ( Sys_PathHasBaseq3Asset( roots[i], assets[j] ) ) {
+				return qtrue;
+			}
+		}
+	}
+
+	return qfalse;
 }
 
 void Sys_AppActivate (void)
 {
 }
 
-char *Sys_GetClipboardData(void)
-{
-  return NULL;
+/*
+==================
+Sys_TrimClipboardText
+==================
+*/
+static void Sys_TrimClipboardText( char *text ) {
+	char	*cursor;
+
+	if ( !text ) {
+		return;
+	}
+
+	for ( cursor = text; *cursor; cursor++ ) {
+		if ( *cursor == '\n' || *cursor == '\r' || *cursor == '\b' ) {
+			*cursor = '\0';
+			break;
+		}
+	}
+}
+
+/*
+==================
+Sys_IsExecutableOnPath
+==================
+*/
+static qboolean Sys_IsExecutableOnPath( const char *name ) {
+	const char	*pathEnv;
+	const char	*segmentStart;
+	const char	*segmentEnd;
+	char		candidate[MAX_OSPATH];
+	size_t		nameLength;
+
+	if ( !name || !name[0] ) {
+		return qfalse;
+	}
+
+	if ( strchr( name, '/' ) ) {
+		return access( name, X_OK ) == 0 ? qtrue : qfalse;
+	}
+
+	pathEnv = getenv( "PATH" );
+	if ( !pathEnv || !pathEnv[0] ) {
+		return qfalse;
+	}
+
+	nameLength = strlen( name );
+	segmentStart = pathEnv;
+
+	while ( segmentStart && *segmentStart ) {
+		size_t segmentLength;
+
+		segmentEnd = strchr( segmentStart, ':' );
+		if ( !segmentEnd ) {
+			segmentEnd = segmentStart + strlen( segmentStart );
+		}
+
+		segmentLength = (size_t)( segmentEnd - segmentStart );
+		if ( segmentLength == 0 ) {
+			Q_strncpyz( candidate, name, sizeof( candidate ) );
+		} else if ( segmentLength + 1 + nameLength + 1 <= sizeof( candidate ) ) {
+			Com_sprintf( candidate, sizeof( candidate ), "%.*s/%s", (int)segmentLength, segmentStart, name );
+		} else {
+			candidate[0] = '\0';
+		}
+
+		if ( candidate[0] && access( candidate, X_OK ) == 0 ) {
+			return qtrue;
+		}
+
+		if ( !*segmentEnd ) {
+			break;
+		}
+
+		segmentStart = segmentEnd + 1;
+	}
+
+	return qfalse;
+}
+
+/*
+==================
+Sys_ReadClipboardCommand
+==================
+*/
+static char *Sys_ReadClipboardCommand( const char *command ) {
+	FILE	*pipe;
+	char	chunk[256];
+	char	*buffer;
+	char	*newBuffer;
+	char	*data;
+	size_t	bytesRead;
+	size_t	used;
+	size_t	capacity;
+	size_t	dataBytes;
+
+	if ( !command || !command[0] ) {
+		return NULL;
+	}
+
+	pipe = popen( command, "r" );
+	if ( !pipe ) {
+		return NULL;
+	}
+
+	buffer = NULL;
+	used = 0;
+	capacity = 0;
+
+	while ( ( bytesRead = fread( chunk, 1, sizeof( chunk ), pipe ) ) > 0 ) {
+		size_t bytesToCopy;
+		size_t requiredCapacity;
+
+		if ( used >= SYS_CLIPBOARD_MAX_BYTES ) {
+			break;
+		}
+
+		bytesToCopy = bytesRead;
+		if ( bytesToCopy > SYS_CLIPBOARD_MAX_BYTES - used ) {
+			bytesToCopy = SYS_CLIPBOARD_MAX_BYTES - used;
+		}
+
+		requiredCapacity = used + bytesToCopy + 1;
+		if ( requiredCapacity > capacity ) {
+			size_t newCapacity;
+
+			newCapacity = capacity ? capacity : sizeof( chunk );
+			while ( newCapacity < requiredCapacity ) {
+				newCapacity *= 2;
+			}
+
+			if ( newCapacity > SYS_CLIPBOARD_MAX_BYTES + 1 ) {
+				newCapacity = SYS_CLIPBOARD_MAX_BYTES + 1;
+			}
+
+			newBuffer = realloc( buffer, newCapacity );
+			if ( !newBuffer ) {
+				free( buffer );
+				pclose( pipe );
+				return NULL;
+			}
+
+			buffer = newBuffer;
+			capacity = newCapacity;
+		}
+
+		memcpy( buffer + used, chunk, bytesToCopy );
+		used += bytesToCopy;
+		buffer[used] = '\0';
+
+		if ( bytesToCopy < bytesRead ) {
+			break;
+		}
+	}
+
+	pclose( pipe );
+
+	if ( !buffer || !used ) {
+		free( buffer );
+		return NULL;
+	}
+
+	Sys_TrimClipboardText( buffer );
+	if ( !buffer[0] ) {
+		free( buffer );
+		return NULL;
+	}
+
+	dataBytes = strlen( buffer ) + 1;
+	data = Z_Malloc( dataBytes );
+	Q_strncpyz( data, buffer, dataBytes );
+	free( buffer );
+
+	return data;
+}
+
+/*
+==================
+Sys_GetClipboardData
+==================
+*/
+char *Sys_GetClipboardData( void ) {
+	const char	*display;
+	const char	*waylandDisplay;
+	char		*data;
+
+	display = getenv( "DISPLAY" );
+	waylandDisplay = getenv( "WAYLAND_DISPLAY" );
+
+	if ( waylandDisplay && waylandDisplay[0] && Sys_IsExecutableOnPath( "wl-paste" ) ) {
+		data = Sys_ReadClipboardCommand( "wl-paste --no-newline 2>/dev/null" );
+		if ( data ) {
+			return data;
+		}
+
+		data = Sys_ReadClipboardCommand( "wl-paste 2>/dev/null" );
+		if ( data ) {
+			return data;
+		}
+	}
+
+	if ( display && display[0] ) {
+		if ( Sys_IsExecutableOnPath( "xclip" ) ) {
+			data = Sys_ReadClipboardCommand( "xclip -selection clipboard -out 2>/dev/null" );
+			if ( data ) {
+				return data;
+			}
+		}
+
+		if ( Sys_IsExecutableOnPath( "xsel" ) ) {
+			data = Sys_ReadClipboardCommand( "xsel --clipboard --output 2>/dev/null" );
+			if ( data ) {
+				return data;
+			}
+		}
+	}
+
+	return NULL;
 }
 
 void  Sys_Print( const char *msg )

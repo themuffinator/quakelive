@@ -107,8 +107,12 @@ remain active:
   `Sys_FunctionCmp()` / `Sys_FunctionCheckSum()` are now restored, the
   historical `q3monkeyid` release-marker probe is now reconstructed, the Unix
   engine now exposes a bounded `gprof`-compatible profiling control path via
-  `moncontrol` / `_mcleanup` when built with `QL_ENABLE_GPROF=1`, and the
-  null host/runtime now carries current executable-name, path, timer,
+  `moncontrol` / `_mcleanup` when built with `QL_ENABLE_GPROF=1`, Unix
+  `Sys_GetClipboardData()` now exposes a bounded clipboard retrieval path via
+  `wl-paste`, `xclip`, or `xsel` when the host environment provides those
+  helpers, Unix `Sys_CheckCD()` now performs a bounded `baseq3` data-root
+  probe across `fs_basepath`, `fs_cdpath`, and the default install roots, and
+  the null host/runtime now carries current executable-name, path, timer,
   loopback-network, browser/advert/input, and silent sound/device activation/voice compatibility
   shims plus the newer input bootstrap-cvar surface, but the profiling lane
   is still optional and the broader Unix runtime still remains

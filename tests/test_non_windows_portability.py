@@ -125,6 +125,63 @@ def test_unix_profiling_hooks_use_gmon_compatible_runtime_controls() -> None:
 	assert "$(LDFLAGS) $(PROFILE_LDFLAGS)" in unix_makefile
 
 
+def test_unix_clipboard_path_uses_bounded_wayland_and_x11_command_probes() -> None:
+	unix_main = _read_text(UNIX_MAIN_PATH)
+
+	assert "#define SYS_CLIPBOARD_MAX_BYTES ( 1024 * 1024 )" in unix_main
+	assert "static void Sys_TrimClipboardText( char *text ) {" in unix_main
+	assert "static qboolean Sys_IsExecutableOnPath( const char *name ) {" in unix_main
+	assert "static char *Sys_ReadClipboardCommand( const char *command ) {" in unix_main
+
+	path_block = _function_block(unix_main, "static qboolean Sys_IsExecutableOnPath( const char *name ) {")
+	assert 'getenv( "PATH" )' in path_block
+	assert "strchr( name, '/' )" in path_block
+	assert "access( candidate, X_OK ) == 0" in path_block
+
+	read_block = _function_block(unix_main, "static char *Sys_ReadClipboardCommand( const char *command ) {")
+	assert 'pipe = popen( command, "r" );' in read_block
+	assert "used >= SYS_CLIPBOARD_MAX_BYTES" in read_block
+	assert "newBuffer = realloc( buffer, newCapacity );" in read_block
+	assert "Sys_TrimClipboardText( buffer );" in read_block
+	assert "data = Z_Malloc( dataBytes );" in read_block
+
+	clipboard_block = _function_block(unix_main, "char *Sys_GetClipboardData( void ) {")
+	assert 'display = getenv( "DISPLAY" );' in clipboard_block
+	assert 'waylandDisplay = getenv( "WAYLAND_DISPLAY" );' in clipboard_block
+	assert 'Sys_IsExecutableOnPath( "wl-paste" )' in clipboard_block
+	assert 'Sys_ReadClipboardCommand( "wl-paste --no-newline 2>/dev/null" )' in clipboard_block
+	assert 'Sys_ReadClipboardCommand( "wl-paste 2>/dev/null" )' in clipboard_block
+	assert 'Sys_IsExecutableOnPath( "xclip" )' in clipboard_block
+	assert 'Sys_ReadClipboardCommand( "xclip -selection clipboard -out 2>/dev/null" )' in clipboard_block
+	assert 'Sys_IsExecutableOnPath( "xsel" )' in clipboard_block
+	assert 'Sys_ReadClipboardCommand( "xsel --clipboard --output 2>/dev/null" )' in clipboard_block
+
+
+def test_unix_checkcd_uses_configured_baseq3_content_roots_instead_of_an_unconditional_success() -> None:
+	unix_main = _read_text(UNIX_MAIN_PATH)
+
+	assert "static qboolean Sys_PathHasBaseq3Asset( const char *rootPath, const char *assetName ) {" in unix_main
+
+	path_block = _function_block(unix_main, "static qboolean Sys_PathHasBaseq3Asset( const char *rootPath, const char *assetName ) {")
+	assert 'Com_sprintf( path, sizeof( path ), "%s/baseq3/%s", rootPath, assetName );' in path_block
+	assert "stat( path, &fileInfo ) != 0" in path_block
+	assert "S_ISREG( fileInfo.st_mode )" in path_block
+
+	checkcd_block = _function_block(unix_main, "qboolean Sys_CheckCD( void ) {")
+	assert 'Cvar_VariableString( "fs_basepath" )' in checkcd_block
+	assert 'Cvar_VariableString( "fs_cdpath" )' in checkcd_block
+	assert "Sys_DefaultInstallPath()" in checkcd_block
+	assert "Sys_DefaultCDPath()" in checkcd_block
+	assert "Sys_Cwd()" in checkcd_block
+	assert '"default.cfg"' in checkcd_block
+	assert '"pak00.pk3"' in checkcd_block
+	assert '"pak0.pk3"' in checkcd_block
+	assert "Sys_PathHasBaseq3Asset( roots[i], assets[j] )" in checkcd_block
+	assert "return qfalse;" in checkcd_block
+	assert "return qtrue;" in checkcd_block
+	assert "return qtrue;" not in checkcd_block.split("for ( i = 0;", 1)[0]
+
+
 def test_null_runtime_shims_track_current_qcommon_contracts() -> None:
 	null_main = _read_text(NULL_MAIN_PATH)
 	null_net = _read_text(NULL_NET_PATH)
@@ -191,6 +248,8 @@ def test_portability_docs_track_restored_low_memory_probe_and_remaining_stubs() 
 	assert "intentionally limited to the 32-bit `qagamei386.so` server-module lane" in linux_glibc_doc
 	assert "not evidence of a retail-equivalent Linux client/runtime" in linux_glibc_doc
 	assert "`QL_ENABLE_GPROF=1` for a bounded `gprof`-compatible build lane" in linux_glibc_doc
+	assert "bounded clipboard retrieval path via `wl-paste`, `xclip`, or `xsel`" in linux_glibc_doc
+	assert "`Sys_CheckCD()` now performs a bounded data-root probe across `fs_basepath`" in linux_glibc_doc
 	assert "remaining Unix renderer/audio/input host gaps" in linux_glibc_doc
 
 	assert "`Sys_LowPhysicalMemory()` now queries physical page counts through `sysconf()`" in toolchain_matrix
@@ -198,6 +257,9 @@ def test_portability_docs_track_restored_low_memory_probe_and_remaining_stubs() 
 	assert "`Sys_MonkeyShouldBeSpanked()` now reconstructs the retained `q3monkeyid` release-marker probe" in toolchain_matrix
 	assert "`Sys_BeginProfiling()` / `Sys_EndProfiling()` now pause or resume `moncontrol()`" in toolchain_matrix
 	assert "`_mcleanup()` when the Unix engine is built with `QL_ENABLE_GPROF=1`" in toolchain_matrix
+	assert "bounded clipboard retrieval path through `wl-paste`, `xclip`, or `xsel`" in toolchain_matrix
+	assert "`Sys_CheckCD()` now probes configured `baseq3` roots" in toolchain_matrix
+	assert "`default.cfg`, `pak00.pk3`, or `pak0.pk3`" in toolchain_matrix
 	assert "server-module-only evidence rather than Linux client/runtime parity proof" in toolchain_matrix
 	assert "null host/runtime now carries current executable-name, path, timer, and loopback-network scaffolding" in toolchain_matrix
 	assert "browser/advert/input shim entry points" in toolchain_matrix
@@ -213,6 +275,11 @@ def test_portability_docs_track_restored_low_memory_probe_and_remaining_stubs() 
 	assert "bounded `gprof`-compatible profiling control path" in repo_wide_audit
 	assert "`moncontrol` / `_mcleanup`" in repo_wide_audit
 	assert "`QL_ENABLE_GPROF=1`" in repo_wide_audit
+	assert "bounded clipboard retrieval path" in repo_wide_audit
+	assert "`wl-paste`, `xclip`, or `xsel`" in repo_wide_audit
+	assert "`Sys_CheckCD()` now also acts as a bounded" in repo_wide_audit
+	assert "accepting `default.cfg`, `pak00.pk3`, or" in repo_wide_audit
+	assert "`pak0.pk3` as sufficient evidence of usable game data" in repo_wide_audit
 	assert "server-module-only evidence rather than Linux client/runtime parity" in repo_wide_audit
 	assert "current executable-name," in repo_wide_audit
 	assert "timer/path, loopback-network" in repo_wide_audit

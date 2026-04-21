@@ -2,7 +2,7 @@
 
 This preset rebuilds the Quake Live `qagamei386.so` against the historical glibc baseline (`libc6`) and X11/OpenGL headers called out in the original Linux README. It pairs a multiarch GCC toolchain with the archive copy of the server module so you can confirm symbol parity after the build.
 
-Scope note: this preset is intentionally limited to the 32-bit `qagamei386.so` server-module lane. It is useful for export and symbol parity against the archived Linux shared object, but it is not evidence of a retail-equivalent Linux client/runtime, and it does not close the remaining Unix renderer/audio/input host gaps tracked in the portability ledgers. If you need engine-host profiling on Linux, the Unix makefile now exposes `QL_ENABLE_GPROF=1` for a bounded `gprof`-compatible build lane, but that is separate from this server-module-only preset.
+Scope note: this preset is intentionally limited to the 32-bit `qagamei386.so` server-module lane. It is useful for export and symbol parity against the archived Linux shared object, but it is not evidence of a retail-equivalent Linux client/runtime, and it does not close the remaining Unix renderer/audio/input host gaps tracked in the portability ledgers. If you need engine-host profiling on Linux, the Unix makefile now exposes `QL_ENABLE_GPROF=1` for a bounded `gprof`-compatible build lane, the Unix host also carries a bounded clipboard retrieval path via `wl-paste`, `xclip`, or `xsel` when those helpers are available, and `Sys_CheckCD()` now performs a bounded data-root probe across `fs_basepath`, `fs_cdpath`, and the default install roots for `baseq3/default.cfg`, `pak00.pk3`, or `pak0.pk3`, but all three remain separate from this server-module-only preset.
 
 ## Prerequisites
 

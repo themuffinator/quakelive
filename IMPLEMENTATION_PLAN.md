@@ -34,6 +34,60 @@ disabled, until a documented open replacement path exists.
 
 ## Recent closure
 
+### Task A4i: Replace the Unix `Sys_CheckCD()` unconditional pass with a bounded data-root probe [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/unix_main.c`,
+`tests/test_non_windows_portability.py`,
+`docs/platform/toolchain-matrix.md`, `docs/build/linux-glibc-32bit.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Replaced the Unix `Sys_CheckCD()` `return qtrue;` placeholder with a
+   bounded Quake-data probe that now scans the configured `fs_basepath`,
+   `fs_cdpath`, default install roots, and current working directory for
+   `baseq3/default.cfg`, `pak00.pk3`, or `pak0.pk3` before reporting success.
+2. Kept the reconstructed lane deliberately compatibility-scoped rather than
+   over-claiming retail parity: the probe is a coarse host-side data-root
+   guard for existing engine callers such as `SV_BotInitBotLib()`, not a full
+   filesystem bootstrap replacement.
+3. Expanded the focused non-Windows portability suite so the new root list,
+   accepted asset markers, and `baseq3` path contract are source-pinned
+   alongside the previously restored low-memory, symbol-compare, release-marker,
+   profiling, and clipboard seams.
+4. Narrowed `RW-G02` again: the remaining portability debt is now even more
+   cleanly concentrated in the absent real Unix renderer/audio/input host
+   modernization and broader non-Windows validation breadth, not in an
+   unconditional Unix content-root success stub.
+
+### Task A4h: Restore a bounded Unix clipboard compatibility path [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/unix_main.c`,
+`tests/test_non_windows_portability.py`,
+`docs/platform/toolchain-matrix.md`, `docs/build/linux-glibc-32bit.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Replaced the bare Unix `Sys_GetClipboardData()` `NULL` stub with a bounded
+   compatibility path that now reads clipboard text through `wl-paste`,
+   `xclip`, or `xsel` when the surrounding Wayland/X11 environment and helper
+   binaries are available, while still returning `NULL` cleanly on unsupported
+   hosts.
+2. Bounded the new lane explicitly so it mirrors the existing host contract
+   instead of over-claiming parity: clipboard text is trimmed at the first
+   newline/control break, capped to a fixed maximum size, and copied into the
+   engine allocator before it reaches the existing client, UI, and browser
+   clipboard consumers.
+3. Expanded the focused non-Windows portability suite so the Unix clipboard
+   probe chain, PATH lookup, command gating, and Wayland/X11 fallback order
+   are source-pinned alongside the earlier low-memory, symbol-compare,
+   monkey-marker, profiling, and null-runtime compatibility seams.
+4. Narrowed `RW-G02` again: the remaining portability debt is now even more
+   clearly in the missing real Unix renderer/audio/input host modernization
+   and broader non-Windows validation breadth, not in an unimplemented Unix
+   clipboard host hook.
+
 ### Task A2c: Refresh the repo-wide parity audit evidence on the current worktree [COMPLETED]
 Priority: Medium
 Primary areas: `AUDIT.md`, `IMPLEMENTATION_PLAN.md`,
@@ -481,8 +535,8 @@ Scope:
 
 1. Replace the remaining Unix `Sys_*` helper placeholders that still matter
    after the restored low-memory, Linux/glibc function compare/checksum,
-   `q3monkeyid` marker-probe, and bounded `gprof`-control paths, or keep them
-   clearly classified as
+   `q3monkeyid` marker-probe, bounded `gprof`-control paths, and bounded
+   clipboard retrieval path, or keep them clearly classified as
    compatibility-only. The null host/client/audio shims now match the current
    contract surface closely enough that the remaining work is primarily about
    the real Unix host boundary rather than stale null host/client/audio/input

@@ -118,9 +118,14 @@ Observed facts:
   `sysconf()`-backed physical page-count query, provides symbol-backed
   `Sys_FunctionCmp()` / `Sys_FunctionCheckSum()` coverage on Linux/glibc,
   reconstructs `Sys_MonkeyShouldBeSpanked()` as a retained `q3monkeyid`
-  marker probe, and exposes a bounded `gprof`-compatible profiling control path
+  marker probe, exposes a bounded `gprof`-compatible profiling control path
   through `moncontrol` / `_mcleanup` when the Unix engine is built with
-  `QL_ENABLE_GPROF=1`.
+  `QL_ENABLE_GPROF=1`, and now carries a bounded clipboard retrieval path
+  through `wl-paste`, `xclip`, or `xsel` when the surrounding Wayland/X11
+  environment is present. `Sys_CheckCD()` now also acts as a bounded
+  data-root probe across the configured `baseq3` roots instead of an
+  unconditional success path, accepting `default.cfg`, `pak00.pk3`, or
+  `pak0.pk3` as sufficient evidence of usable game data.
 - `src/code/null/null_main.c`, `src/code/null/null_net.c`,
   `src/code/null/null_glimp.c`, `src/code/null/null_client.c`,
   `src/code/null/null_snddma.c`, and `src/code/null/null_input.c` now carry
