@@ -366,6 +366,11 @@ void SV_ExecuteClientCommand( client_t *cl, const char *s, qboolean clientOK );
 void SV_ClientThink (client_t *cl, usercmd_t *cmd);
 
 void SV_WriteDownloadToClient( client_t *cl , msg_t *msg );
+const char *SV_GetPlatformAuthProviderLabel( void );
+const char *SV_GetPlatformAuthPolicyLabel( void );
+const char *SV_GetSteamServerProviderLabel( void );
+const char *SV_GetSteamServerPolicyLabel( void );
+void SV_RefreshPlatformServiceCvars( void );
 void SV_SteamServerPublishIdentity( void );
 void SV_SteamServerUpdatePublishedState( qboolean fullUpdate );
 void SV_SteamStats_AddFieldValue( int clientNum, int statIndex, int delta );

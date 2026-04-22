@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/q_shared.h"
 #include "qcommon.h"
 #include "../../common/platform/platform_config.h"
+#include "../../common/platform/platform_services.h"
 #include "../../common/platform/platform_steamworks.h"
 #include "../../../src-re/include/fs_imports.h"
 #include <stdlib.h>
@@ -2709,6 +2710,54 @@ static void Com_ApplyOnlineServicesBuildPolicy( void ) {
 
 /*
 =================
+Com_GetSteamGameServerServiceDescriptor
+
+Returns the retained platform-service descriptor used to label the dedicated
+Steam GameServer bootstrap lane.
+=================
+*/
+static const ql_platform_feature_descriptor *Com_GetSteamGameServerServiceDescriptor( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return NULL;
+	}
+
+	return &services->matchmaking;
+}
+
+/*
+=================
+Com_GetSteamGameServerProviderLabel
+
+Returns the provider label for the retained dedicated Steam GameServer
+bootstrap lane.
+=================
+*/
+static const char *Com_GetSteamGameServerProviderLabel( void ) {
+	const ql_platform_feature_descriptor *descriptor = Com_GetSteamGameServerServiceDescriptor();
+
+	if ( !descriptor || !descriptor->provider ) {
+		return "Unavailable";
+	}
+
+	return descriptor->provider;
+}
+
+/*
+=================
+Com_GetSteamGameServerPolicyLabel
+
+Returns the compatibility policy label for the retained dedicated Steam
+GameServer bootstrap lane.
+=================
+*/
+static const char *Com_GetSteamGameServerPolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( Com_GetSteamGameServerServiceDescriptor() );
+}
+
+/*
+=================
 Com_SteamPackGameServerIP
 
 Converts the retained `net_ip` cvar into the big-endian word layout passed to
@@ -2761,6 +2810,8 @@ void Com_InitSteamGameServer( void ) {
 	steamIp = Com_SteamPackGameServerIP( netIp );
 
 	if ( !QL_Steamworks_ServerInit( steamIp, (uint16_t)netPort->integer, steamVac && steamVac->integer ? qtrue : qfalse, dedicated ) ) {
+		Com_Printf( "Steam GameServer bootstrap unavailable for %s [%s]; keeping compatibility-only dedicated-server publication fallback.\n",
+			Com_GetSteamGameServerProviderLabel(), Com_GetSteamGameServerPolicyLabel() );
 		return;
 	}
 
@@ -2770,6 +2821,9 @@ void Com_InitSteamGameServer( void ) {
 	QL_Steamworks_ServerEnableHeartbeats( qfalse );
 	QL_Steamworks_ServerSetProduct( "Quake Live" );
 	QL_Steamworks_ServerSetGameDir( "baseq3" );
+#elif QL_PLATFORM_HAS_STEAM_SERVICES
+	Com_Printf( "Steam GameServer bootstrap unavailable for %s [%s]; keeping compatibility-only dedicated-server publication fallback.\n",
+		Com_GetSteamGameServerProviderLabel(), Com_GetSteamGameServerPolicyLabel() );
 #endif
 }
 

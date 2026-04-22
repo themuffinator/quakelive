@@ -31,6 +31,7 @@ def _extract_function_block(text: str, signature: str) -> str:
 def test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owners() -> None:
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
 
+    workshop_service_support_block = _extract_function_block(cl_main, "static qboolean CL_WorkshopServiceSupportsSteamBootstrap( void ) {")
     init_block = _extract_function_block(cl_main, "void CL_InitDownloads(void) {")
     frame_block = _extract_function_block(cl_main, "void CL_Frame ( int msec ) {")
     workshop_frame_block = _extract_function_block(cl_main, "static void CL_Workshop_Frame( void ) {")
@@ -43,7 +44,12 @@ def test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owner
     )
 
     assert "#define CL_STEAM_WORKSHOP_ITEMS_CONFIGSTRING 0x2cb" in cl_main
+    assert 'return ( strstr( provider, "Steam UGC" ) != NULL );' in workshop_service_support_block
     assert "Server requires the following workshop items: %s\\n" in workshop_begin_block
+    assert "CL_GetWorkshopServiceProviderLabel();" in workshop_begin_block
+    assert "CL_GetWorkshopServicePolicyLabel();" in workshop_begin_block
+    assert "CL_WorkshopServiceSupportsSteamBootstrap()" in workshop_begin_block
+    assert 'Com_Printf( "Workshop bootstrap unavailable for %s [%s]; keeping compatibility-only fallback for required items.\\n",' in workshop_begin_block
     assert "QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED" in workshop_begin_block
     assert 'Com_sprintf( downloadName, sizeof( downloadName ), "Workshop item %i of %i", item->requestNumber, cl_steamWorkshopDownloadState.totalItems );' in cl_main
     assert "CL_Workshop_ClearBootstrapState( qtrue );" in init_block
@@ -55,7 +61,9 @@ def test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owner
     assert "FS_ComparePaks( missingfiles, sizeof( missingfiles ), qfalse )" in workshop_frame_block
     assert "CL_DownloadsComplete();" in workshop_frame_block
     assert "QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings )" in callback_init_block
-    assert "Steam workshop callbacks unavailable; keeping polling fallback\\n" in callback_init_block
+    assert "CL_GetWorkshopServiceProviderLabel();" in callback_init_block
+    assert "CL_GetWorkshopServicePolicyLabel();" in callback_init_block
+    assert 'Com_DPrintf( "Workshop callbacks unavailable for %s [%s]; keeping polling fallback\\n",' in callback_init_block
     assert "QL_Steamworks_UnregisterWorkshopCallbacks();" in callback_shutdown_block
     assert "OnItemInstalled skip, invalid app id %d\\n" in item_installed_block
     assert "CL_Workshop_FinalizeInstalledItem( itemIndex );" in item_installed_block

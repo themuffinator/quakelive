@@ -13,6 +13,7 @@
 typedef struct {
 	ql_auth_request_descriptor_t descriptor;
 	const char *logPrefix;
+	const char *policyLabel;
 } ql_client_auth_transport_t;
 
 static uint32_t cl_clientAuthSteamTicketHandle = 0;
@@ -97,8 +98,9 @@ static void QL_ClientAuth_LogStage( const ql_client_auth_transport_t *transport,
 		return;
 	}
 
-	Com_Printf( "[auth] %s %s (%s): %s\n",
+	Com_Printf( "[auth] %s [%s] %s (%s): %s\n",
 	transport->logPrefix,
+	transport->policyLabel ? transport->policyLabel : "compatibility-unavailable",
 	stage,
 	transport->descriptor.endpoint ? transport->descriptor.endpoint : "<none>",
 	detail );
@@ -116,8 +118,9 @@ static void QL_ClientAuth_LogResponse( const ql_client_auth_transport_t *transpo
 		return;
 	}
 
-	Com_Printf( "[auth] %s result -> outcome=%s, message=\"%s\"\n",
+	Com_Printf( "[auth] %s [%s] result -> outcome=%s, message=\"%s\"\n",
 	transport->logPrefix,
+	transport->policyLabel ? transport->policyLabel : "compatibility-unavailable",
 	QL_DescribeAuthOutcome( response ),
 	response->message );
 }
@@ -428,6 +431,7 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 	const qboolean authCompiled = services && services->auth.compiled;
 	const qboolean authInitialised = services && services->auth.initialised;
 	const char *provider = services && services->auth.provider ? services->auth.provider : "dispatcher";
+	const char *policyLabel = services ? QL_DescribePlatformFeaturePolicy( &services->auth ) : "compatibility-unavailable";
 	const char *endpoint = "<unroutable>";
 
 	switch ( activeCredential->kind ) {
@@ -443,12 +447,9 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 
 	ql_client_auth_transport_t transport = {
 		{ provider, endpoint },
-		provider
+		provider,
+		policyLabel
 	};
-
-	if ( !authInitialised ) {
-		transport.logPrefix = "dispatcher";
-	}
 
 	QL_ClientAuth_LogStage( &transport, "dispatch", "submitting credential" );
 
@@ -457,16 +458,16 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 
 	switch ( activeCredential->kind ) {
 		case QL_AUTH_CREDENTIAL_STEAM:
-		Com_Printf( "[auth] %s payload summary: ticket=%s (len=%zu)\n",
-		transport.logPrefix, steamHex[0] ? steamHex : preview, activeCredential->length );
+		Com_Printf( "[auth] %s [%s] payload summary: ticket=%s (len=%zu)\n",
+		transport.logPrefix, transport.policyLabel, steamHex[0] ? steamHex : preview, activeCredential->length );
 		break;
 		case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-		Com_Printf( "[auth] %s payload summary: token=%s (len=%zu)\n",
-		transport.logPrefix, preview, activeCredential->length );
+		Com_Printf( "[auth] %s [%s] payload summary: token=%s (len=%zu)\n",
+		transport.logPrefix, transport.policyLabel, preview, activeCredential->length );
 		break;
 		default:
-		Com_Printf( "[auth] %s payload summary: credential=%s (len=%zu)\n",
-		transport.logPrefix, preview, activeCredential->length );
+		Com_Printf( "[auth] %s [%s] payload summary: credential=%s (len=%zu)\n",
+		transport.logPrefix, transport.policyLabel, preview, activeCredential->length );
 		break;
 	}
 

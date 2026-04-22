@@ -3216,6 +3216,50 @@ static const ql_platform_feature_descriptor *CL_GetOverlayServiceDescriptor( voi
 
 /*
 =============
+CL_GetOverlayServiceProviderLabel
+
+Returns the human-readable provider label for the browser overlay seam.
+=============
+*/
+static const char *CL_GetOverlayServiceProviderLabel( void ) {
+	const ql_platform_feature_descriptor *overlay = CL_GetOverlayServiceDescriptor();
+
+	if ( !overlay || !overlay->provider ) {
+		return "Unavailable";
+	}
+
+	return overlay->provider;
+}
+
+/*
+=============
+CL_GetOverlayServicePolicyLabel
+
+Returns the short compatibility policy label for the browser overlay seam.
+=============
+*/
+static const char *CL_GetOverlayServicePolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( CL_GetOverlayServiceDescriptor() );
+}
+
+/*
+=============
+CL_LogOverlayServiceIgnored
+
+Publishes provider-aware diagnostics whenever a browser overlay command is
+blocked by the compatibility-only service policy.
+=============
+*/
+static void CL_LogOverlayServiceIgnored( const char *commandName, const char *reason ) {
+	Com_DPrintf( "%s ignored: %s (%s [%s])\n",
+		commandName ? commandName : "web",
+		reason ? reason : "browser overlay provider unavailable",
+		CL_GetOverlayServiceProviderLabel(),
+		CL_GetOverlayServicePolicyLabel() );
+}
+
+/*
+=============
 CL_OverlayServiceAvailable
 
 Returns qtrue when an online-services overlay provider is compiled and initialised.
@@ -3235,12 +3279,17 @@ Synchronises client-visible browser and advert bridge state with the platform-se
 =============
 */
 void CL_RefreshOnlineServicesBridgeState( void ) {
+	const char *overlayProvider = CL_GetOverlayServiceProviderLabel();
+	const char *overlayPolicy = CL_GetOverlayServicePolicyLabel();
+
 #if !QL_PLATFORM_HAS_ONLINE_SERVICES
 	cl_advertisementBridge.overlayCompiled = qfalse;
 	cl_advertisementBridge.overlayAvailable = qfalse;
 	cl_advertisementBridge.viewWidth = 0;
 	cl_advertisementBridge.viewHeight = 0;
 	Cvar_Set( "ui_browserAwesomium", "0" );
+	Cvar_Set( "ui_browserAwesomiumProvider", overlayProvider );
+	Cvar_Set( "ui_browserAwesomiumPolicy", overlayPolicy );
 	CL_WebHost_ResetRuntime( qtrue );
 	CL_ResetBrowserOverlayState();
 #else
@@ -3253,6 +3302,8 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 	cl_advertisementBridge.viewHeight = cls.glconfig.vidHeight;
 
 	Cvar_Set( "ui_browserAwesomium", overlayAvailable ? "1" : "0" );
+	Cvar_Set( "ui_browserAwesomiumProvider", overlayProvider );
+	Cvar_Set( "ui_browserAwesomiumPolicy", overlayPolicy );
 	if ( !overlayAvailable ) {
 		CL_WebHost_ResetRuntime( qtrue );
 		CL_ResetBrowserOverlayState();
@@ -3309,12 +3360,12 @@ Marks the browser overlay as visible and records an optional hash target.
 void CL_Web_ShowBrowser_f( void ) {
 #if !QL_PLATFORM_HAS_ONLINE_SERVICES
 	CL_ResetBrowserOverlayState();
-	Com_DPrintf( "web_showBrowser ignored: online services disabled by build settings\n" );
+	CL_LogOverlayServiceIgnored( "web_showBrowser", "online services disabled by build settings" );
 	return;
 #else
 	CL_RefreshOnlineServicesBridgeState();
 	if ( !CL_OverlayServiceAvailable() ) {
-		Com_DPrintf( "web_showBrowser ignored: browser overlay provider unavailable\n" );
+		CL_LogOverlayServiceIgnored( "web_showBrowser", "browser overlay provider unavailable" );
 		return;
 	}
 
@@ -3339,12 +3390,12 @@ Updates the browser target and ensures the overlay remains visible.
 void CL_Web_ChangeHash_f( void ) {
 #if !QL_PLATFORM_HAS_ONLINE_SERVICES
 	CL_ResetBrowserOverlayState();
-	Com_DPrintf( "web_changeHash ignored: online services disabled by build settings\n" );
+	CL_LogOverlayServiceIgnored( "web_changeHash", "online services disabled by build settings" );
 	return;
 #else
 	CL_RefreshOnlineServicesBridgeState();
 	if ( !CL_OverlayServiceAvailable() ) {
-		Com_DPrintf( "web_changeHash ignored: browser overlay provider unavailable\n" );
+		CL_LogOverlayServiceIgnored( "web_changeHash", "browser overlay provider unavailable" );
 		return;
 	}
 
@@ -3365,12 +3416,12 @@ Toggles the browser overlay active state used by the UI VM.
 void CL_Web_BrowserActive_f( void ) {
 #if !QL_PLATFORM_HAS_ONLINE_SERVICES
 	CL_ResetBrowserOverlayState();
-	Com_DPrintf( "web_browserActive ignored: online services disabled by build settings\n" );
+	CL_LogOverlayServiceIgnored( "web_browserActive", "online services disabled by build settings" );
 	return;
 #else
 	CL_RefreshOnlineServicesBridgeState();
 	if ( !CL_OverlayServiceAvailable() ) {
-		Com_DPrintf( "web_browserActive ignored: browser overlay provider unavailable\n" );
+		CL_LogOverlayServiceIgnored( "web_browserActive", "browser overlay provider unavailable" );
 		return;
 	}
 
@@ -3468,12 +3519,12 @@ Handles Awesomium refresh-stop requests when an overlay provider is active.
 */
 void CL_Web_StopRefresh_f( void ) {
 #if !QL_PLATFORM_HAS_ONLINE_SERVICES
-	Com_DPrintf( "web_stopRefresh ignored: online services disabled by build settings\n" );
+	CL_LogOverlayServiceIgnored( "web_stopRefresh", "online services disabled by build settings" );
 	return;
 #else
 	CL_RefreshOnlineServicesBridgeState();
 	if ( !CL_OverlayServiceAvailable() ) {
-		Com_DPrintf( "web_stopRefresh ignored: browser overlay provider unavailable\n" );
+		CL_LogOverlayServiceIgnored( "web_stopRefresh", "browser overlay provider unavailable" );
 		return;
 	}
 

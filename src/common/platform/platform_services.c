@@ -69,7 +69,43 @@ static void QL_FinaliseDescriptor( ql_platform_feature_descriptor *descriptor, c
 	if ( !descriptor->provider && fallbackLabel ) {
 		descriptor->provider = fallbackLabel;
 	}
+}
+
+/*
+=============
+QL_DescribePlatformFeaturePolicy
+
+Publishes a short policy label describing how one online-service descriptor
+should be interpreted by the rest of the client/server surfaces.
+=============
+*/
+const char *QL_DescribePlatformFeaturePolicy( const ql_platform_feature_descriptor *descriptor ) {
+	const char *provider;
+
+	if ( !descriptor ) {
+		return "compatibility-unavailable";
 	}
+
+	provider = descriptor->provider ? descriptor->provider : "";
+
+	if ( strstr( provider, "QL_BUILD_ONLINE_SERVICES=0" ) != NULL ) {
+		return "compatibility-disabled (QL_BUILD_ONLINE_SERVICES=0)";
+	}
+
+	if ( strstr( provider, "QL_DISABLE_EXTERNAL_ECOSYSTEMS" ) != NULL ) {
+		return "compatibility-disabled (QL_DISABLE_EXTERNAL_ECOSYSTEMS)";
+	}
+
+	if ( descriptor->compiled && !descriptor->initialised ) {
+		return "compatibility-only provider unavailable";
+	}
+
+	if ( descriptor->compiled ) {
+		return "compatibility-only";
+	}
+
+	return "compatibility-unavailable";
+}
 
 #if QL_PLATFORM_HAS_STEAMWORKS
 /*
@@ -89,7 +125,7 @@ static qboolean QL_PlatformSteamworks_InitOnce( void ) {
 	}
 
 	return steamInitialised;
-	}
+}
 #endif
 
 /*
@@ -208,7 +244,7 @@ static ql_platform_service_table QL_BuildServiceTable( void ) {
 	QL_FinaliseDescriptor( &table.stats, "Unavailable" );
 
 	return table;
-	}
+}
 
 /*
 =============

@@ -333,18 +333,51 @@ static void SV_FinalisePlatformAuthState( client_t *cl, qboolean accepted, const
 
 /*
 =================
+SV_BuildPlatformAuthCompatibilityDetail
+
+Builds the final server-auth telemetry detail with explicit compatibility
+provider and policy labels.
+=================
+*/
+static void SV_BuildPlatformAuthCompatibilityDetail( const char *detail, char *buffer, int bufferSize ) {
+	const char	*provider;
+	const char	*policy;
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	provider = SV_GetPlatformAuthProviderLabel();
+	policy = SV_GetPlatformAuthPolicyLabel();
+	buffer[0] = '\0';
+
+	if ( detail && detail[0] ) {
+		Q_strncpyz( buffer, detail, bufferSize );
+		Q_strcat( buffer, bufferSize, " | " );
+	}
+
+	Q_strcat( buffer, bufferSize, "provider=" );
+	Q_strcat( buffer, bufferSize, provider && provider[0] ? provider : "Unavailable" );
+	Q_strcat( buffer, bufferSize, " policy=" );
+	Q_strcat( buffer, bufferSize, policy && policy[0] ? policy : "compatibility-unavailable" );
+}
+
+/*
+=================
 SV_LogPlatformAuth
 
 Emits one unified telemetry record for the server-side auth owner.
 =================
 */
 static void SV_LogPlatformAuth( const netadr_t *adr, const client_t *cl, const char *status, const char *detail ) {
+	char		detailMessage[QL_AUTH_MAX_RESPONSE_MESSAGE * 2];
 	char		message[QL_AUTH_MAX_RESPONSE_MESSAGE * 2];
 	const char	*label;
 	const char	*steamId;
 	const char	*result;
 	const char	*outcome;
 
+	detailMessage[0] = '\0';
 	message[0] = '\0';
 
 	if ( !cl ) {
@@ -357,18 +390,19 @@ static void SV_LogPlatformAuth( const netadr_t *adr, const client_t *cl, const c
 	outcome = cl->platformAuthOutcome[0] ? cl->platformAuthOutcome : NULL;
 
 	if ( detail && detail[0] ) {
-		Q_strncpyz( message, detail, sizeof( message ) );
+		Q_strncpyz( detailMessage, detail, sizeof( detailMessage ) );
 	}
 
 	if ( cl->platformAuthMessage[0] ) {
-		if ( !message[0] ) {
-			Q_strncpyz( message, cl->platformAuthMessage, sizeof( message ) );
-		} else if ( Q_stricmp( message, cl->platformAuthMessage ) ) {
-			Q_strcat( message, sizeof( message ), " | " );
-			Q_strcat( message, sizeof( message ), cl->platformAuthMessage );
+		if ( !detailMessage[0] ) {
+			Q_strncpyz( detailMessage, cl->platformAuthMessage, sizeof( detailMessage ) );
+		} else if ( Q_stricmp( detailMessage, cl->platformAuthMessage ) ) {
+			Q_strcat( detailMessage, sizeof( detailMessage ), " | " );
+			Q_strcat( detailMessage, sizeof( detailMessage ), cl->platformAuthMessage );
 		}
 	}
 
+	SV_BuildPlatformAuthCompatibilityDetail( detailMessage[0] ? detailMessage : NULL, message, sizeof( message ) );
 	NET_LogAuthTelemetry( NS_SERVER, adr, steamId, label, status, result, outcome, message[0] ? message : NULL );
 }
 
@@ -1131,7 +1165,8 @@ static void SV_SteamServerConnectedCallback( void *context, const ql_steam_serve
 	(void)event;
 
 	sv_steamServerConnected = qtrue;
-	Com_Printf( "Connected to Steam servers\n" );
+	Com_Printf( "Connected to Steam servers via %s [%s]\n",
+		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
 	SV_SteamServerPublishIdentity();
 	SV_SteamServerUpdatePublishedState( qtrue );
 	SV_SteamStats_RequerySessions();
@@ -1153,7 +1188,8 @@ static void SV_SteamServerConnectFailureCallback( void *context, const ql_steam_
 		return;
 	}
 
-	Com_Printf( "Steam server connect failure (%d)\n", event->result );
+	Com_Printf( "Steam server connect failure (%d) via %s [%s]\n", event->result,
+		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
 }
 
 /*
@@ -1172,7 +1208,8 @@ static void SV_SteamServerDisconnectedCallback( void *context, const ql_steam_se
 		return;
 	}
 
-	Com_Printf( "Disconnected from Steam servers (%d)\n", event->result );
+	Com_Printf( "Disconnected from Steam servers (%d) via %s [%s]\n", event->result,
+		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
 }
 
 /*
@@ -1267,7 +1304,8 @@ void SV_SteamServerInitCallbacks( void ) {
 	bindings.onP2PSessionRequest = SV_SteamServerP2PSessionRequestCallback;
 
 	if ( !QL_Steamworks_RegisterServerCallbacks( &bindings ) ) {
-		Com_DPrintf( "Steam server callbacks unavailable\n" );
+		Com_DPrintf( "Steam server callbacks unavailable for %s [%s]\n",
+			SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
 		return;
 	}
 

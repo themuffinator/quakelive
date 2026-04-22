@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/vm_local.h"
 #include "../../common/auth_credentials.h"
 #include "../../common/platform/platform_config.h"
+#include "../../common/platform/platform_services.h"
 #include "../../common/platform/platform_steamworks.h"
 #include <limits.h>
 #include <stdlib.h>
@@ -128,6 +129,70 @@ qboolean CL_SteamServicesEnabled( void ) {
 	}
 
 	return CL_OnlineServicesEnabled();
+}
+
+/*
+=============
+CL_GetWorkshopServiceDescriptor
+
+Returns the current platform-service descriptor for the workshop seam.
+=============
+*/
+static const ql_platform_feature_descriptor *CL_GetWorkshopServiceDescriptor( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return NULL;
+	}
+
+	return &services->workshop;
+}
+
+/*
+=============
+CL_GetWorkshopServiceProviderLabel
+
+Returns the human-readable provider label for the workshop seam.
+=============
+*/
+static const char *CL_GetWorkshopServiceProviderLabel( void ) {
+	const ql_platform_feature_descriptor *workshop = CL_GetWorkshopServiceDescriptor();
+
+	if ( !workshop || !workshop->provider ) {
+		return "Unavailable";
+	}
+
+	return workshop->provider;
+}
+
+/*
+=============
+CL_GetWorkshopServicePolicyLabel
+
+Returns the short compatibility policy label for the workshop seam.
+=============
+*/
+static const char *CL_GetWorkshopServicePolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( CL_GetWorkshopServiceDescriptor() );
+}
+
+/*
+=============
+CL_WorkshopServiceSupportsSteamBootstrap
+
+Returns qtrue when the retained Steam UGC bootstrap path is the active owner
+for workshop item resolution in the current compatibility lane.
+=============
+*/
+static qboolean CL_WorkshopServiceSupportsSteamBootstrap( void ) {
+	const ql_platform_feature_descriptor *workshop = CL_GetWorkshopServiceDescriptor();
+	const char *provider = CL_GetWorkshopServiceProviderLabel();
+
+	if ( !workshop || !workshop->compiled || !workshop->initialised ) {
+		return qfalse;
+	}
+
+	return ( strstr( provider, "Steam UGC" ) != NULL );
 }
 
 cvar_t	*cl_nodelta;
@@ -784,6 +849,8 @@ static qboolean CL_Workshop_BeginBootstrap( void ) {
 	const char	*requiredItems;
 	char		workshopItems[BIG_INFO_STRING];
 	char		*token;
+	const char	*workshopProvider;
+	const char	*workshopPolicy;
 	int			totalItems;
 	int			requestNumber;
 
@@ -794,6 +861,13 @@ static qboolean CL_Workshop_BeginBootstrap( void ) {
 
 	Q_strncpyz( workshopItems, requiredItems, sizeof( workshopItems ) );
 	Com_Printf( "Server requires the following workshop items: %s\n", workshopItems );
+	workshopProvider = CL_GetWorkshopServiceProviderLabel();
+	workshopPolicy = CL_GetWorkshopServicePolicyLabel();
+	if ( !CL_WorkshopServiceSupportsSteamBootstrap() ) {
+		Com_Printf( "Workshop bootstrap unavailable for %s [%s]; keeping compatibility-only fallback for required items.\n",
+			workshopProvider, workshopPolicy );
+		return qfalse;
+	}
 
 	totalItems = 0;
 	for ( token = strtok( workshopItems, CL_STEAM_WORKSHOP_ITEM_DELIMS ); token; token = strtok( NULL, CL_STEAM_WORKSHOP_ITEM_DELIMS ) ) {
@@ -1951,6 +2025,8 @@ static void CL_Steam_InitCallbacks( void ) {
 	ql_steam_lobby_callback_bindings_t lobbyBindings;
 	ql_steam_micro_callback_bindings_t microBindings;
 	ql_steam_workshop_callback_bindings_t workshopBindings;
+	const char *workshopProvider;
+	const char *workshopPolicy;
 
 	cl_steamCallbackState.callbackRegistrationActive = qfalse;
 	CL_Steam_ClearCurrentLobby();
@@ -1984,6 +2060,8 @@ static void CL_Steam_InitCallbacks( void ) {
 	memset( &workshopBindings, 0, sizeof( workshopBindings ) );
 	workshopBindings.onItemInstalled = CL_Steam_Workshop_OnItemInstalled;
 	workshopBindings.onDownloadItemResult = CL_Steam_Workshop_OnDownloadItemResult;
+	workshopProvider = CL_GetWorkshopServiceProviderLabel();
+	workshopPolicy = CL_GetWorkshopServicePolicyLabel();
 
 	if ( !QL_Steamworks_RegisterClientCallbacks( &clientBindings ) ||
 		!QL_Steamworks_RegisterLobbyCallbacks( &lobbyBindings ) ||
@@ -1995,7 +2073,8 @@ static void CL_Steam_InitCallbacks( void ) {
 	}
 
 	if ( !QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings ) ) {
-		Com_DPrintf( "Steam workshop callbacks unavailable; keeping polling fallback\n" );
+		Com_DPrintf( "Workshop callbacks unavailable for %s [%s]; keeping polling fallback\n",
+			workshopProvider, workshopPolicy );
 	}
 
 	cl_steamCallbackState.callbackRegistrationActive = qtrue;
@@ -4551,6 +4630,8 @@ void CL_Init( void ) {
 	cl_quitOnDemoCompleted = Cvar_Get ("cl_quitOnDemoCompleted", "0", 0 );
 	cl_allowConsoleChat = Cvar_Get ("cl_allowConsoleChat", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
 	Cvar_Get ("web_browserActive", "0", CVAR_ROM );
+	Cvar_Get ("ui_browserAwesomiumProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("ui_browserAwesomiumPolicy", "compatibility-unavailable", CVAR_ROM );
 	Cvar_Get ("web_zoom", "100", CVAR_ARCHIVE );
 	Cvar_Get ("web_console", "0", CVAR_ARCHIVE );
 	rcon_client_password = Cvar_Get ("rconPassword", "", CVAR_TEMP );

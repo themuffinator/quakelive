@@ -19,7 +19,7 @@ retail-only service dependency.
 
 ## Request Routing
 
-`QL_RequestExternalAuth` clears the response container and invokes `QL_Auth_ExecuteRequest`, which consults the platform service table to discover the active authentication backend.【F:src/common/auth_credentials.c†L120-L154】【F:src/code/client/ql_auth.c†L200-L273】 The descriptor published by `QL_GetPlatformServices` provides the human-readable provider name (for example, “Steamworks”, “Open Steam Adapter”, or “Hybrid”), and the dispatcher derives the request endpoint from the credential kind:
+`QL_RequestExternalAuth` clears the response container and invokes `QL_Auth_ExecuteRequest`, which consults the platform service table to discover the active authentication backend.【F:src/common/auth_credentials.c†L120-L154】【F:src/code/client/ql_auth.c†L200-L273】 The descriptor published by `QL_GetPlatformServices` provides the human-readable provider name (for example, “Steamworks”, “Open Steam Adapter”, or “Hybrid”), while `QL_DescribePlatformFeaturePolicy(...)` publishes the short compatibility policy label paired with that provider (for example, `compatibility-disabled (QL_BUILD_ONLINE_SERVICES=0)`, `compatibility-disabled (QL_DISABLE_EXTERNAL_ECOSYSTEMS)`, `compatibility-only provider unavailable`, or `compatibility-only`). The dispatcher carries both labels into the auth logs and still derives the request endpoint from the credential kind:
 
 - **Steam** – `/steam/session/validate`
 - **Standalone launcher** – `/launcher/auth/verify`
@@ -39,7 +39,18 @@ non-retail providers are part of the strict-retail path.
 | `QL_BUILD_ONLINE_SERVICES=1`, `QL_BUILD_STEAMWORKS=0`, `QL_BUILD_OPEN_STEAM=1` | `Open Steam Adapter` | `/launcher/auth/verify` |
 | `QL_BUILD_ONLINE_SERVICES=1`, `QL_BUILD_STEAMWORKS=1`, `QL_BUILD_OPEN_STEAM=1` | `Hybrid` (Steam primary, open fallback) | Steam: `/steam/session/validate`<br>Fallback: `/launcher/auth/verify` |
 
-Each dispatch prints a log entry with the provider label, summarizes the credential using a masked preview, and writes the final outcome to the shared response object.【F:src/code/client/ql_auth.c†L44-L273】 The service table ensures that builds compiled without a given backend still advertise accurate capabilities.【F:src/common/platform/platform_services.c†L16-L75】
+Each dispatch now prints both the provider label and the compatibility policy label, summarizes the credential using a masked preview, and writes the final outcome to the shared response object.【F:src/code/client/ql_auth.c†L44-L273】 This keeps default-disabled or provider-unavailable builds explicit in the client logs instead of collapsing them into a generic dispatcher-only message. The service table ensures that builds compiled without a given backend still advertise accurate capabilities.【F:src/common/platform/platform_services.c†L16-L110】
+
+The retained server auth owner now mirrors that same compatibility story instead
+of hiding it behind generic Steam-only wording. `SV_LogPlatformAuth` preserves
+the legacy `credential=steam` telemetry field for downstream log consumers, but
+it now appends `provider=<...> policy=<...>` to the message payload so the
+current auth lane remains explicit in server-side telemetry too. The dedicated
+server bootstrap and callback logs likewise reuse the matchmaking descriptor’s
+provider/policy labels, which keeps connect, disconnect, callback-registration,
+and bootstrap-unavailable diagnostics aligned with the documented
+compatibility-only boundary rather than reading like strict-retail service
+ownership.
 
 ## Structured Outcomes
 
@@ -66,9 +77,9 @@ The script drives representative credentials through the same heuristics used in
 Provider/token combinations demonstrate success, retry, and failure paths.
 
 -- Scenario 1: Steamworks --
-[auth] Steamworks dispatch (/steam/session/validate): submitting credential
-[auth] Steamworks payload summary: ticket=TICKET-…cdef (len=23)
-[auth] Steamworks result -> outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
+[auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Steamworks [compatibility-only] payload summary: ticket=TICKET-…cdef (len=23)
+[auth] Steamworks [compatibility-only] result -> outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
 ```
 
 Use the remaining scenarios from the script to validate retry and failure paths for Steamworks, hybrid fallback, and the standalone launcher. Each log line corresponds to the callbacks issued by the client dispatcher when `QL_RequestExternalAuth` runs during a real handshake.【F:src/code/client/ql_auth.c†L26-L273】【F:tools/integration/auth_flow_trace.py†L1-L113】

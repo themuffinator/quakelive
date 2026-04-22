@@ -12,9 +12,17 @@ The client resource bridge reconstructs the menu-facing resource flow, but Steam
 
 ## Observed facts
 
-- `CL_Steam_RegisterShader()` logs `UI: Steam resource request stubbed` when Steam services are disabled by build or runtime policy.
+- `CL_Steam_RegisterShader()` now logs stubbed `steam://` requests with the
+  active overlay provider/policy pair when the compatibility lane is disabled
+  or unavailable.
+- `CL_SteamDataSource_Request()` and `QLResourceInterceptor_OnRequest()` now
+  keep the fallback story explicit by labeling Steam-resource failures and the
+  launcher/web fallback owner with the same overlay provider/policy pair,
+  rather than generic “Steam backend unavailable” wording.
 - `QLResourceInterceptor_OnRequest()` falls back from SteamDataSource to launcher/web filesystem owners instead of proving a retail-equivalent live resource path.
-- `CL_InitSteamResources()` explicitly reports that the Steam resource bridge is disabled by build/runtime policy when the lane is unavailable.
+- `CL_InitSteamResources()` now reports that the Steam resource bridge is
+  disabled for the current overlay provider/policy pair while keeping the
+  launcher/web fallback resource bridge active.
 
 ## Function-by-function status
 

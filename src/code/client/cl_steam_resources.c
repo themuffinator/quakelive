@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
+#include "../../common/platform/platform_services.h"
 #include "../../common/platform/platform_steamworks.h"
 
 #define MAX_STEAM_RESOURCES 64
@@ -29,6 +30,100 @@ static unsigned int cl_steamResourceGeneration = 1;
 
 qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize );
 void Sys_Steam_FreeRequestBuffer( byte *buffer );
+
+/*
+=============
+CL_GetSteamResourceServiceDescriptor
+
+Returns the retained platform-service descriptor that owns the browser/live
+resource bridge compatibility boundary.
+=============
+*/
+static const ql_platform_feature_descriptor *CL_GetSteamResourceServiceDescriptor( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return NULL;
+	}
+
+	return &services->overlay;
+}
+
+/*
+=============
+CL_GetSteamResourceServiceProviderLabel
+
+Returns the human-readable provider label for the browser/live resource bridge.
+=============
+*/
+static const char *CL_GetSteamResourceServiceProviderLabel( void ) {
+	const ql_platform_feature_descriptor *descriptor = CL_GetSteamResourceServiceDescriptor();
+
+	if ( !descriptor || !descriptor->provider ) {
+		return "Unavailable";
+	}
+
+	return descriptor->provider;
+}
+
+/*
+=============
+CL_GetSteamResourceServicePolicyLabel
+
+Returns the short compatibility policy label for the browser/live resource
+bridge.
+=============
+*/
+static const char *CL_GetSteamResourceServicePolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( CL_GetSteamResourceServiceDescriptor() );
+}
+
+/*
+=============
+CL_LogSteamResourceBridgeUnavailable
+
+Publishes provider-aware diagnostics whenever the retained Steam resource
+bridge cannot satisfy a request.
+=============
+*/
+static void CL_LogSteamResourceBridgeUnavailable( const char *url, const char *reason ) {
+	Com_Printf( "Steam resource bridge unavailable for %s via %s [%s]; %s\n",
+		url ? url : "<null>",
+		CL_GetSteamResourceServiceProviderLabel(),
+		CL_GetSteamResourceServicePolicyLabel(),
+		reason ? reason : "request could not be satisfied" );
+}
+
+/*
+=============
+CL_LogLauncherResourceFallbackUnavailable
+
+Publishes provider-aware diagnostics when the retained launcher/web fallback
+owner cannot satisfy a live resource request.
+=============
+*/
+static void CL_LogLauncherResourceFallbackUnavailable( const char *url, const char *reason ) {
+	Com_Printf( "Launcher/web fallback unavailable for %s via %s [%s]; %s\n",
+		url ? url : "<null>",
+		CL_GetSteamResourceServiceProviderLabel(),
+		CL_GetSteamResourceServicePolicyLabel(),
+		reason ? reason : "no launcher/web resource owner is available" );
+}
+
+/*
+=============
+CL_LogSteamResourceRequestStubbed
+
+Publishes provider-aware diagnostics when the UI-side Steam resource request is
+stubbed by the current compatibility policy.
+=============
+*/
+static void CL_LogSteamResourceRequestStubbed( const char *url ) {
+	Com_DPrintf( "UI: Steam resource request stubbed for %s via %s [%s]\n",
+		url ? url : "<null>",
+		CL_GetSteamResourceServiceProviderLabel(),
+		CL_GetSteamResourceServicePolicyLabel() );
+}
 
 /*
 =============
@@ -402,12 +497,12 @@ static qboolean CL_SteamDataSource_Request( const char *url, clSteamDataSourceRe
 
 	if ( CL_SteamResources_IsAvatarURL( url ) ) {
 		if ( !CL_SteamServicesEnabled() ) {
-			Com_Printf( "Steam backend disabled by build/runtime policy for %s\n", url ? url : "<null>" );
+			CL_LogSteamResourceBridgeUnavailable( url, "keeping launcher/web fallback resource bridge" );
 			return qfalse;
 		}
 
 		if ( !CL_SteamResources_RequestAvatarRGBA( url, &response->rgbaPixels, &response->width, &response->height ) ) {
-			Com_Printf( "Steam backend unavailable for %s\n", url ? url : "<null>" );
+			CL_LogSteamResourceBridgeUnavailable( url, "avatar request could not be satisfied" );
 			return qfalse;
 		}
 
@@ -416,11 +511,11 @@ static qboolean CL_SteamDataSource_Request( const char *url, clSteamDataSourceRe
 	}
 
 	if ( !CL_SteamServicesEnabled() ) {
-		Com_Printf( "Steam backend disabled by build/runtime policy for %s\n", url ? url : "<null>" );
+		CL_LogSteamResourceBridgeUnavailable( url, "keeping launcher/web fallback resource bridge" );
 		return qfalse;
 	}
 
-	Com_Printf( "Steam backend unavailable for %s\n", url ? url : "<null>" );
+	CL_LogSteamResourceBridgeUnavailable( url, "no live SteamDataSource owner is available" );
 	return qfalse;
 }
 
@@ -448,7 +543,7 @@ static qboolean QLResourceInterceptor_OnRequest( const char *url, clSteamDataSou
 		return qtrue;
 	}
 
-	Com_Printf( "Launcher resource backend unavailable for %s\n", url ? url : "<null>" );
+	CL_LogLauncherResourceFallbackUnavailable( url, "no launcher/web resource owner is available" );
 	return qfalse;
 }
 
@@ -476,7 +571,7 @@ qhandle_t CL_Steam_RegisterShader( const char *url ) {
 
 	if ( CL_SteamResources_IsSteamURL( url ) ) {
 		if ( !CL_SteamServicesEnabled() ) {
-			Com_DPrintf( "UI: Steam resource request stubbed for %s\n", url ? url : "<null>" );
+			CL_LogSteamResourceRequestStubbed( url );
 			return 0;
 		}
 	}
@@ -495,7 +590,10 @@ qhandle_t CL_Steam_RegisterShader( const char *url ) {
 
 	if ( CL_SteamResources_IsAvatarURL( url ) ) {
 		if ( !CL_SteamResources_RequestAvatarRGBA( url, &rgbaPixels, &width, &height ) ) {
-			Com_Printf( "UI: unable to satisfy avatar resource request for %s\n", url );
+			Com_Printf( "UI: unable to satisfy avatar resource request for %s via %s [%s]\n",
+				url,
+				CL_GetSteamResourceServiceProviderLabel(),
+				CL_GetSteamResourceServicePolicyLabel() );
 			return 0;
 		}
 
@@ -506,7 +604,10 @@ qhandle_t CL_Steam_RegisterShader( const char *url ) {
 
 		CL_SteamDataSource_ClearResponse( &response );
 		if ( !QLResourceInterceptor_OnRequest( url, &response ) ) {
-			Com_Printf( "UI: unable to satisfy in-memory resource request for %s\n", url );
+			Com_Printf( "UI: unable to satisfy in-memory resource request for %s via %s [%s]\n",
+				url,
+				CL_GetSteamResourceServiceProviderLabel(),
+				CL_GetSteamResourceServicePolicyLabel() );
 			return 0;
 		}
 
@@ -528,7 +629,10 @@ qhandle_t CL_Steam_RegisterShader( const char *url ) {
 	}
 
 	if ( !shader ) {
-		Com_Printf( "UI: unable to register live resource image for %s\n", url );
+		Com_Printf( "UI: unable to register live resource image for %s via %s [%s]\n",
+			url,
+			CL_GetSteamResourceServiceProviderLabel(),
+			CL_GetSteamResourceServicePolicyLabel() );
 		return 0;
 	}
 
@@ -570,7 +674,9 @@ void CL_InitSteamResources( void ) {
 	cl_steamResourceGeneration = 1;
 
 	if ( !CL_SteamServicesEnabled() ) {
-		Com_Printf( "Steam resource bridge disabled by build/runtime policy\n" );
+		Com_Printf( "Steam resource bridge disabled for %s [%s]; keeping launcher/web fallback resource bridge.\n",
+			CL_GetSteamResourceServiceProviderLabel(),
+			CL_GetSteamResourceServicePolicyLabel() );
 	}
 }
 
@@ -606,7 +712,7 @@ qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize )
 
 	CL_SteamDataSource_ClearResponse( &response );
 	if ( !QLResourceInterceptor_OnRequest( url, &response ) ) {
-		Com_Printf( "Launcher resource backend unavailable for %s\n", url ? url : "<null>" );
+		CL_LogLauncherResourceFallbackUnavailable( url, "request could not be resolved" );
 		return qfalse;
 	}
 
@@ -614,7 +720,7 @@ qboolean Sys_Steam_RequestURL( const char *url, byte **outBuffer, int *outSize )
 		if ( response.rgbaPixels ) {
 			QL_Steamworks_FreeBuffer( response.rgbaPixels );
 		}
-		Com_Printf( "Launcher resource backend unavailable for %s\n", url ? url : "<null>" );
+		CL_LogLauncherResourceFallbackUnavailable( url, "no binary buffer was produced" );
 		return qfalse;
 	}
 

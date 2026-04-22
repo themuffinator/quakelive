@@ -21,7 +21,108 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include "../../common/platform/platform_services.h"
 #include "../../common/platform/platform_steamworks.h"
+
+/*
+===============
+SV_GetPlatformFeatureProviderLabel
+
+Returns the human-readable provider label for one retained platform-service
+descriptor.
+===============
+*/
+static const char *SV_GetPlatformFeatureProviderLabel( const ql_platform_feature_descriptor *descriptor ) {
+	if ( !descriptor || !descriptor->provider ) {
+		return "Unavailable";
+	}
+
+	return descriptor->provider;
+}
+
+/*
+===============
+SV_GetPlatformAuthProviderLabel
+
+Returns the provider label for the retained server auth lane.
+===============
+*/
+const char *SV_GetPlatformAuthProviderLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return "Unavailable";
+	}
+
+	return SV_GetPlatformFeatureProviderLabel( &services->auth );
+}
+
+/*
+===============
+SV_GetPlatformAuthPolicyLabel
+
+Returns the compatibility policy label for the retained server auth lane.
+===============
+*/
+const char *SV_GetPlatformAuthPolicyLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return "compatibility-unavailable";
+	}
+
+	return QL_DescribePlatformFeaturePolicy( &services->auth );
+}
+
+/*
+===============
+SV_GetSteamServerProviderLabel
+
+Returns the provider label for the retained Steam GameServer publication lane.
+===============
+*/
+const char *SV_GetSteamServerProviderLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return "Unavailable";
+	}
+
+	return SV_GetPlatformFeatureProviderLabel( &services->matchmaking );
+}
+
+/*
+===============
+SV_GetSteamServerPolicyLabel
+
+Returns the compatibility policy label for the retained Steam GameServer
+publication lane.
+===============
+*/
+const char *SV_GetSteamServerPolicyLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return "compatibility-unavailable";
+	}
+
+	return QL_DescribePlatformFeaturePolicy( &services->matchmaking );
+}
+
+/*
+===============
+SV_RefreshPlatformServiceCvars
+
+Mirrors the retained server platform-service provider and policy labels through
+ROM cvars for diagnostics and bounded compatibility reporting.
+===============
+*/
+void SV_RefreshPlatformServiceCvars( void ) {
+	Cvar_Set( "sv_platformAuthProvider", SV_GetPlatformAuthProviderLabel() );
+	Cvar_Set( "sv_platformAuthPolicy", SV_GetPlatformAuthPolicyLabel() );
+	Cvar_Set( "sv_steamServerProvider", SV_GetSteamServerProviderLabel() );
+	Cvar_Set( "sv_steamServerPolicy", SV_GetSteamServerPolicyLabel() );
+}
 
 /*
 ===============
@@ -395,6 +496,8 @@ void SV_SteamServerPublishIdentity( void ) {
 	const char			*referencedSteamworks;
 
 	if ( !QL_Steamworks_ServerGetSteamID( &steamIdLow, &steamIdHigh ) ) {
+		Com_DPrintf( "Steam server identity unavailable for %s [%s]\n",
+			SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
 		return;
 	}
 
@@ -608,6 +711,7 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	// and any configstring changes should be reliably transmitted
 	// to all clients
 	sv.state = SS_GAME;
+	SV_RefreshPlatformServiceCvars();
 	SV_SteamServerPublishIdentity();
 	QL_Steamworks_ServerEnableHeartbeats( SV_SteamServerHasConfiguredMasters() );
 	SV_SteamServerUpdatePublishedState( qtrue );
@@ -686,6 +790,10 @@ void SV_Init (void) {
 	Cvar_Get ("sv_referencedPaks", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get ("sv_referencedPakNames", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get ("sv_referencedSteamworks", "", CVAR_ROM );
+	Cvar_Get ("sv_platformAuthProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("sv_platformAuthPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("sv_steamServerProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("sv_steamServerPolicy", "compatibility-unavailable", CVAR_ROM );
 
 	// server vars
 	sv_rconPassword = Cvar_Get ("rconPassword", "", CVAR_TEMP );
@@ -710,6 +818,7 @@ void SV_Init (void) {
 	sv_strictAuth = Cvar_Get ("sv_strictAuth", "1", CVAR_ARCHIVE );
 	Cvar_Get ("sv_setSteamAccount", "", CVAR_ARCHIVE | CVAR_PROTECTED );
 	net_fakevacban = Cvar_Get ("net_fakevacban", "0", CVAR_TEMP );
+	SV_RefreshPlatformServiceCvars();
 	SV_SteamServerInitCallbacks();
 	Zmq_RegisterCvarsAndInitRcon();
 
