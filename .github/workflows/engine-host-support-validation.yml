@@ -2,39 +2,6 @@ name: Engine Host Support Validation
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/engine-host-support-validation.yml'
-      - 'tests/compiler_support.py'
-      - 'tests/input_translation_harness.c'
-      - 'tests/test_platform_services.py'
-      - 'tests/test_steamworks_harness.py'
-      - 'tests/test_renderer_win32_host_glue_parity.py'
-      - 'tests/test_bot_resource_loading.py'
-      - 'tests/test_botlib_internal_parity.py'
-      - 'tests/test_win32_clipboard_parity.py'
-      - 'tests/test_win32_raw_input_parity.py'
-      - 'tests/test_input_translation.py'
-      - 'tests/test_engine_host_support_full_parity_gate.py'
-      - 'tests/botlib_internal_harness.c'
-      - 'tests/win_clipboard_harness.c'
-      - 'tests/win_raw_input_harness.c'
-      - 'artifacts/engine_host_support_validation/**'
-      - 'docs/build-pipeline.md'
-      - 'docs/windows-native-pipeline.md'
-      - 'docs/reverse-engineering/botlib-internal-parity-audit-and-implementation-plan-2026-04-10.md'
-      - 'docs/reverse-engineering/engine-host-support-full-parity-audit-and-implementation-plan-2026-04-10.md'
-      - 'docs/reverse-engineering/engine-host-support-validation-and-runtime-evidence-2026-04-10.md'
-      - 'AUDIT.md'
-      - 'IMPLEMENTATION_PLAN.md'
-      - 'src/common/platform/**'
-      - 'src/code/win32/**'
-      - 'src/code/unix/**'
-      - 'src/code/null/**'
-      - 'src/code/botlib/**'
-      - 'src/code/client/cl_input_translation.c'
   pull_request:
     paths:
       - '.github/workflows/engine-host-support-validation.yml'

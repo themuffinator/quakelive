@@ -2,36 +2,6 @@ name: UI Validation
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/ui-validation.yml'
-      - 'scripts/ui/**'
-      - 'tests/test_ui_src_panel_parity.py'
-      - 'tests/test_ui_menu_files.py'
-      - 'tests/test_ui_full_parity_gate.py'
-      - 'tests/test_platform_services.py'
-      - 'tests/test_fs_search_paths.py'
-      - 'tests/test_vote_ui_throttle.py'
-      - 'src/code/ui/**'
-      - 'src/code/client/**'
-      - 'src/ui/**'
-      - 'src/code/cgame/**'
-      - 'tests/run_ui_validation.py'
-      - 'tests/expectations/ui/**'
-      - 'tools/build_ui_bundle.sh'
-      - 'tools/build_ui_bundle.py'
-      - 'tools/packaging/**'
-      - 'docs/build-pipeline.md'
-      - 'docs/ui/scripting-guide.md'
-      - 'docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-10.md'
-      - 'docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md'
-      - 'AUDIT.md'
-      - 'IMPLEMENTATION_PLAN.md'
-      - 'artifacts/ui_bundle/**'
-      - 'artifacts/ui_validation/**'
-      - 'assets/quakelive/baseq3/**'
   pull_request:
     paths:
       - '.github/workflows/ui-validation.yml'

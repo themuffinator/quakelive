@@ -2,26 +2,6 @@ name: Server Validation
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/server-validation.yml'
-      - 'tests/test_platform_services.py'
-      - 'tests/test_fake_vacban.py'
-      - 'tests/test_server_full_parity_gate.py'
-      - 'tools/server/run_server_runtime_probe.ps1'
-      - 'artifacts/server_validation/**'
-      - 'docs/build-pipeline.md'
-      - 'docs/windows-native-pipeline.md'
-      - 'docs/reverse-engineering/server-full-parity-audit-and-implementation-plan-2026-04-10.md'
-      - 'docs/reverse-engineering/server-validation-and-runtime-evidence-2026-04-10.md'
-      - 'AUDIT.md'
-      - 'IMPLEMENTATION_PLAN.md'
-      - 'src/code/server/**'
-      - 'src/code/qcommon/common.c'
-      - 'src/common/platform/platform_steamworks.c'
-      - 'src/common/platform/platform_steamworks.h'
   pull_request:
     paths:
       - '.github/workflows/server-validation.yml'
