@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from tests._shared import (
+	REPO_ROOT,
+	contains_all as _contains_all,
+	read_json as _read_json,
+	section_text_for_id as _section_text_for_id,
+	write_json as _write_json,
+)
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 QCOMMON_FULL_PARITY_GATE_PATH = (
 	REPO_ROOT / "artifacts" / "qcommon_validation" / "logs" / "qcommon_full_parity_gate.json"
 )
@@ -59,44 +63,14 @@ ROUND_109_PATH = REPO_ROOT / "docs" / "reverse-engineering" / "quakelive_steam_m
 
 GAP_ORDER = ("QC-G01", "QC-G02", "QC-G03", "QC-G04", "QC-G05")
 
-
 def _read_text(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-	return json.loads(path.read_text(encoding="utf-8"))
-
 
 def _home_ui_search_path_is_clean(main_menu: dict[str, Any]) -> bool:
 	if "search_path_contains_home_duplicate_ui_pk3" in main_menu:
 		return main_menu["search_path_contains_home_duplicate_ui_pk3"] is False
 
 	return main_menu.get("search_path_contains_home_overlay") is True
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-	path.parent.mkdir(parents=True, exist_ok=True)
-	path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
-def _contains_all(text: str, *needles: str) -> bool:
-	return all(needle in text for needle in needles)
-
-
-def _section_text_for_id(text: str, section_id: str) -> str:
-	match = re.search(rf"^## {re.escape(section_id)}\b.*$", text, re.MULTILINE)
-	if match is None:
-		return ""
-
-	start = match.start()
-	next_match = re.search(r"\n## ", text[match.end() :])
-	if next_match is None:
-		return text[start:]
-
-	end = match.end() + next_match.start()
-	return text[start:end]
-
 
 def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> dict[str, Any]:
 	return {
@@ -106,7 +80,6 @@ def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> d
 		"details": details,
 	}
 
-
 def _dll_load_root_contract_is_sufficient(load_roots: dict[str, Any]) -> bool:
 	attempts = load_roots.get("attempts")
 	if isinstance(attempts, dict):
@@ -115,7 +88,6 @@ def _dll_load_root_contract_is_sufficient(load_roots: dict[str, Any]) -> bool:
 		return False
 
 	return load_roots["writable_homepath_ok"] is True
-
 
 def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> bool:
 	if runtime_evidence is None:
@@ -157,7 +129,6 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 		and _dll_load_root_contract_is_sufficient(map_runtime["cgame_dll_load_roots"])
 		and main_menu["engine_sha256"] != map_runtime["engine_sha256"]
 	)
-
 
 def _build_qcommon_full_parity_gate_report() -> dict[str, Any]:
 	qcommon_plan = _read_text(QCOMMON_PLAN_PATH)
@@ -573,7 +544,6 @@ def _build_qcommon_full_parity_gate_report() -> dict[str, Any]:
 	}
 	return report
 
-
 def test_qcommon_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	runtime_evidence = _read_json(QCOMMON_RUNTIME_EVIDENCE_PATH)
 
@@ -606,7 +576,6 @@ def test_qcommon_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	assert _dll_load_root_contract_is_sufficient(runtime_evidence["map_runtime"]["cgame_dll_load_roots"])
 	assert _runtime_evidence_is_sufficient(runtime_evidence)
 
-
 def test_qcommon_full_parity_gate_writes_status_artifact() -> None:
 	report = _build_qcommon_full_parity_gate_report()
 	_write_json(QCOMMON_FULL_PARITY_GATE_PATH, report)
@@ -631,7 +600,6 @@ def test_qcommon_full_parity_gate_writes_status_artifact() -> None:
 		assert entry["gap_id"] == gap_id
 		assert entry["status"] in {"pass", "fail", "blocked"}
 		assert entry["summary"]
-
 
 def test_qcommon_full_parity_gate_release_mode() -> None:
 	if os.environ.get("QCOMMON_FULL_PARITY_GATE_ENFORCE") != "1":

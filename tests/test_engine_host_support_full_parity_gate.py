@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from tests._shared import (
+	REPO_ROOT,
+	contains_all as _contains_all,
+	read_json as _read_json,
+	section_text_for_id as _section_text_for_id,
+	write_json as _write_json,
+)
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 ENGINE_HOST_SUPPORT_FULL_PARITY_GATE_PATH = (
 	REPO_ROOT / "artifacts" / "engine_host_support_validation" / "logs" / "engine_host_support_full_parity_gate.json"
 )
@@ -100,37 +104,8 @@ GAP_CLASSIFICATIONS = {
 	},
 }
 
-
 def _read_text(path: Path) -> str:
 	return path.read_text(encoding="utf-8", errors="ignore")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-	return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-	path.parent.mkdir(parents=True, exist_ok=True)
-	path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
-def _contains_all(text: str, *needles: str) -> bool:
-	return all(needle in text for needle in needles)
-
-
-def _section_text_for_id(text: str, section_id: str) -> str:
-	match = re.search(rf"^## {re.escape(section_id)}\b.*$", text, re.MULTILINE)
-	if match is None:
-		return ""
-
-	start = match.start()
-	next_match = re.search(r"\n## ", text[match.end() :])
-	if next_match is None:
-		return text[start:]
-
-	end = match.end() + next_match.start()
-	return text[start:end]
-
 
 def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> dict[str, Any]:
 	gap_metadata = GAP_CLASSIFICATIONS[gap_id]
@@ -144,13 +119,11 @@ def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> d
 		"details": details,
 	}
 
-
 def _botlib_fixme_count() -> int:
 	return sum(
 		path.read_text(encoding="utf-8", errors="ignore").count("FIXME")
 		for path in BOTLIB_ROOT.rglob("*.c")
 	)
-
 
 def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> bool:
 	if runtime_evidence is None:
@@ -194,7 +167,6 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 			"tests/test_engine_host_support_full_parity_gate.py",
 		]
 	)
-
 
 def _build_engine_host_support_full_parity_gate_report() -> dict[str, Any]:
 	engine_host_support_plan = _read_text(ENGINE_HOST_SUPPORT_PLAN_PATH)
@@ -826,7 +798,6 @@ def _build_engine_host_support_full_parity_gate_report() -> dict[str, Any]:
 	}
 	return report
 
-
 def test_engine_host_support_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	runtime_evidence = _read_json(ENGINE_HOST_SUPPORT_RUNTIME_EVIDENCE_PATH)
 
@@ -855,7 +826,6 @@ def test_engine_host_support_runtime_evidence_artifact_is_tracked_and_clean() ->
 	assert runtime_evidence["platform_and_bot_validation"]["bot_resource_schedule_tracked"] is True
 	assert runtime_evidence["platform_and_bot_validation"]["botlib_internal_surface_tracked"] is True
 	assert _runtime_evidence_is_sufficient(runtime_evidence)
-
 
 def test_engine_host_support_full_parity_gate_writes_status_artifact() -> None:
 	report = _build_engine_host_support_full_parity_gate_report()
@@ -910,7 +880,6 @@ def test_engine_host_support_full_parity_gate_writes_status_artifact() -> None:
 		assert isinstance(entry["counts_toward_strict_retail_score"], bool)
 		assert entry["closure_phase"].startswith("EH-P")
 		assert entry["summary"]
-
 
 def test_engine_host_support_full_parity_gate_release_mode() -> None:
 	if os.environ.get("ENGINE_HOST_SUPPORT_FULL_PARITY_GATE_ENFORCE") != "1":

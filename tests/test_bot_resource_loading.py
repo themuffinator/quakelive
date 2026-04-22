@@ -4,13 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable, List
-import sys
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+from tests._shared import REPO_ROOT
 
 from tools.tests.match_sim import (
     BotConfig,
@@ -20,7 +17,6 @@ from tools.tests.match_sim import (
     run_from_file,
 )
 
-
 def _collect_spawn_events(frames: Iterable) -> List[dict]:
     events: List[dict] = []
     for frame in frames:
@@ -28,7 +24,6 @@ def _collect_spawn_events(frames: Iterable) -> List[dict]:
             if event.get("action") == "client_spawn":
                 events.append(event)
     return events
-
 
 def _summarise_spawn_events(frames: Iterable) -> str:
     lines: List[str] = []
@@ -45,7 +40,6 @@ def _summarise_spawn_events(frames: Iterable) -> str:
                 f"{event['time']:.3f} {event['bot']} alias={alias} warmup={warmup} issuer={issuer} reason={reason}"
             )
     return "\n".join(lines)
-
 
 def test_bot_spawn_schedule_applies_delays() -> None:
     metadata = {
@@ -96,7 +90,6 @@ def test_bot_spawn_schedule_applies_delays() -> None:
     ]
     assert [entry["bot"] for entry in result.spawn_schedule] == ["slash", "keel", "slash"]
     assert result.bot_profiles["scripted_slash"]["name"] == "slash"
-
 
 def test_access_permissions_enforced_for_commands() -> None:
     metadata = {
@@ -157,7 +150,6 @@ def test_access_permissions_enforced_for_commands() -> None:
 
     assert result.access_permissions["commands"]["addbot"]["allow"] == ["admin"]
     assert result.spawn_schedule == []
-
 
 def test_bot_resource_scenario_matches_expectation(tmp_path: Path) -> None:
     scenario_path = REPO_ROOT / "tools" / "tests" / "match_sim" / "bot_resource_schedule.json"

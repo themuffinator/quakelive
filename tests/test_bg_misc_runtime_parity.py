@@ -366,7 +366,7 @@ def test_can_item_be_grabbed_keeps_the_normal_weapon_and_health_gates(
 	health_index = _item_index(bg_misc_library, "item_health")
 	small_health_index = _item_index(bg_misc_library, "item_health_small")
 
-	assert bg_misc_library.QLR_CanGrabRocketLauncherCase(1, 10, 0, 0, 0, 0, 0) == 1
+	assert bg_misc_library.QLR_CanGrabRocketLauncherCase(1, 10, 0, 0, 0, 0, 0) == 0
 	assert bg_misc_library.QLR_CanGrabRocketLauncherCase(1, 0, 0, 0, 0, 0, 0) == 1
 	assert bg_misc_library.QLR_CanGrabRocketLauncherCase(0, 0, 1, 0, 0, 0, 0) == 0
 	assert bg_misc_library.QLR_CanGrabRocketLauncherCase(0, 0, 0, 1, 1, 1500, 1000) == 0

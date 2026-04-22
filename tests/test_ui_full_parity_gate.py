@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+from tests._shared import REPO_ROOT, read_json as _read_json, write_json as _write_json
 
 from scripts.ui.retail_ui_corpus import (
 	DEFAULT_BASEQ3_ROOT,
@@ -14,7 +15,6 @@ from scripts.ui.retail_ui_corpus import (
 	compute_ui_panel_drift,
 )
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_ROOT = REPO_ROOT / "src" / "ui"
 RETAIL_ROOT = DEFAULT_BASEQ3_ROOT / "ui"
 
@@ -44,19 +44,8 @@ GAP_ORDER = (
 	"UI-G06",
 )
 
-
 def _read_text(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-	return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-	path.parent.mkdir(parents=True, exist_ok=True)
-	path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
 
 def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> dict[str, Any]:
 	return {
@@ -65,7 +54,6 @@ def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> d
 		"summary": summary,
 		"details": details,
 	}
-
 
 def _inventory_artifact_details(
 	retail_ui_corpus_inventory: dict[str, object],
@@ -90,7 +78,6 @@ def _inventory_artifact_details(
 	)
 	details["artifact_matches_runtime_probe"] = matches
 	return matches, details
-
 
 def _build_ui_full_parity_gate_report(
 	retail_ui_corpus_inventory: dict[str, object],
@@ -330,7 +317,6 @@ def _build_ui_full_parity_gate_report(
 	}
 	return report
 
-
 def test_ui_full_parity_gate_writes_status_artifact(
 	retail_ui_corpus_inventory: dict[str, object],
 ) -> None:
@@ -358,7 +344,6 @@ def test_ui_full_parity_gate_writes_status_artifact(
 		assert report["tranches"]["UI-G01"]["status"] == "fail"
 		assert report["tranches"]["UI-G02"]["status"] == "blocked"
 		assert report["tranches"]["UI-G03"]["status"] == "fail"
-
 
 def test_ui_full_parity_gate_release_mode(
 	retail_ui_corpus_inventory: dict[str, object],

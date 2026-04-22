@@ -167,14 +167,16 @@ def test_health_pickup_helper_restores_retail_leaf_boundary() -> None:
 	assert "return ( ps->stats[STAT_HEALTH] < upperBound ) ? qtrue : qfalse;" in body
 
 
-def test_weapon_pickup_helper_keeps_world_weapon_regrabs_open_outside_ironsights() -> None:
+def test_weapon_pickup_helper_restores_the_retail_world_weapon_regrab_gate() -> None:
 	body = _function_body(
 		r"static qboolean BG_CanGrabWeaponItem\( int gametype, int currentTime, const entityState_t \*ent, const playerState_t \*ps, const gitem_t \*item, qboolean dropped \)\s*\{(?P<body>.*?)^\}",
 	)
 
 	assert "if ( ps->pm_flags & PMF_IRONSIGHTS ) {" in body
 	assert "if ( dropped ) {" in body
+	assert "weapon = BG_WeaponForItemTag( item->giTag );" in body
+	assert "if ( !( ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {" in body
 	assert "(void)gametype;" in body
 	assert "(void)currentTime;" in body
 	assert "(void)ent;" in body
-	assert "return qtrue;" in body
+	assert "return ( ps->ammo[weapon] <= 0 ) ? qtrue : qfalse;" in body

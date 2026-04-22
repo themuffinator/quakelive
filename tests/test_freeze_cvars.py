@@ -3,19 +3,15 @@
 from __future__ import annotations
 
 import copy
-import sys
 from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from tests._shared import REPO_ROOT
+
 FREEZE_SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "freeze_cvars.json"
 
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 from tools.tests.match_sim.harness import MatchHarness, load_config
-
 
 def _load_freeze_harness(**cvar_overrides: int) -> MatchHarness:
     config = load_config(FREEZE_SCENARIO)
@@ -27,13 +23,11 @@ def _load_freeze_harness(**cvar_overrides: int) -> MatchHarness:
     config.metadata["freeze"] = freeze_meta
     return MatchHarness(config, seed=config.seed)
 
-
 def _collect_events(result, action: str):
     for frame in result.frames:
         for event in frame.events:
             if event["action"] == action:
                 yield event
-
 
 def test_spawn_protection_blocks_damage_until_expiry() -> None:
     harness = _load_freeze_harness()
@@ -51,7 +45,6 @@ def test_spawn_protection_blocks_damage_until_expiry() -> None:
 
     spawn_events = list(_collect_events(result, "client_spawn"))
     assert spawn_events[0]["details"]["freeze_protection_expires"] == pytest.approx(3.0)
-
 
 def test_auto_thaw_and_inventory_resets() -> None:
     harness = _load_freeze_harness()
@@ -77,7 +70,6 @@ def test_auto_thaw_and_inventory_resets() -> None:
     assert ember_state["ammo"]["rocket"] == pytest.approx(10.0)
     assert ember_state["inventory"]["armor"] == 50
     assert "powerup_quad" not in ember_state["inventory"]
-
 
 def test_thaw_assist_respects_through_surface_toggle() -> None:
     default_result = _load_freeze_harness().run()
@@ -109,7 +101,6 @@ def test_thaw_assist_respects_through_surface_toggle() -> None:
         if event["details"]["reason"] == "auto_thaw"
     ]
     assert not enabled_auto, "Manual thaw should preempt auto-thaw"
-
 
 def test_winning_team_credit_thaws_players_when_enabled() -> None:
     enabled = _load_freeze_harness().run()

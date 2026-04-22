@@ -1,6 +1,6 @@
 # Repo-Wide Parity Audit
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 ## Scope
 
@@ -249,17 +249,34 @@ already closed or rebounded those surfaces:
 They are now explicitly marked historical so they stop conflicting with the
 current ledgers.
 
+## Source-file audit campaign
+
+A new file-by-file campaign now sits alongside this repo-wide summary:
+
+- `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`
+- `docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`
+- `docs/reverse-engineering/source-file-gap-notes/`
+
+It tracks `567` source entries, keeps the existing subsystem audits as
+inherited baselines, and only opens dedicated per-file notes when the current
+evidence isolates a concrete parity gap. That campaign does not add a new
+repo-wide gap family; it turns `RW-G01` and `RW-G02` into a cleaner
+file-ownership queue.
+
 ## Recommended next steps
 
-1. Decide whether online services stay permanently bounded or receive real open
+1. Drive the new source-file campaign through the primary runtime and module
+   surface so the remaining repo-wide gaps are isolated file-by-file instead
+   of only by tree or subsystem.
+2. Decide whether online services stay permanently bounded or receive real open
    replacements.
-2. Re-baseline the Unix/null portability boundary and finish any platform work
+3. Re-baseline the Unix/null portability boundary and finish any platform work
    that should count toward repo-wide parity.
-3. Refresh archived runtime/build evidence on current toolchains when the
+4. Refresh archived runtime/build evidence on current toolchains when the
    remaining Windows and non-Windows environments are available, especially the
    native build outputs, a fresh
    `tools/ci/validate-windows-native.ps1 -RuntimeProfile retail` pass, and the
    next promotable retail-module rerun.
-4. Keep the clean `src/ui` runtime-panel baseline and overlay manifests in
+5. Keep the clean `src/ui` runtime-panel baseline and overlay manifests in
    sync so future regressions are caught immediately without reviving a manual
    packaging dependency.

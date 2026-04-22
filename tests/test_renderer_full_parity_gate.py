@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from tests._shared import REPO_ROOT, read_json as _read_json, write_json as _write_json
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 RENDERER_FULL_PARITY_GATE_PATH = (
 	REPO_ROOT / "artifacts" / "renderer_validation" / "logs" / "renderer_full_parity_gate.json"
 )
@@ -79,19 +78,8 @@ GAP_ORDER = (
 	"RG-G09",
 )
 
-
 def _read_text(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-	return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-	path.parent.mkdir(parents=True, exist_ok=True)
-	path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
 
 def _source_code_files() -> list[Path]:
 	return sorted(
@@ -100,14 +88,12 @@ def _source_code_files() -> list[Path]:
 		if path.is_file() and path.suffix.lower() in {".c", ".h"}
 	)
 
-
 def _paths_with_pattern(pattern: str) -> list[Path]:
 	return [
 		path
 		for path in _source_code_files()
 		if pattern in path.read_text(encoding="utf-8", errors="ignore")
 	]
-
 
 def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> dict[str, Any]:
 	return {
@@ -116,7 +102,6 @@ def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> d
 		"summary": summary,
 		"details": details,
 	}
-
 
 def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 	renderer_plan = _read_text(RENDERER_PLAN_PATH)
@@ -521,7 +506,6 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 	}
 	return report
 
-
 def test_renderer_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	runtime_evidence = _read_json(RENDERER_RUNTIME_EVIDENCE_PATH)
 
@@ -542,7 +526,6 @@ def test_renderer_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	assert runtime_evidence["map_runtime"]["shot_logged"] is True
 	assert runtime_evidence["text_validation"]["fontstash_init_seen"] is True
 	assert runtime_evidence["text_validation"]["debug_atlas_engine_capture_distinct"] is True
-
 
 def test_renderer_full_parity_gate_writes_status_artifact() -> None:
 	report = _build_renderer_full_parity_gate_report()
@@ -566,7 +549,6 @@ def test_renderer_full_parity_gate_writes_status_artifact() -> None:
 		assert entry["gap_id"] == gap_id
 		assert entry["status"] in {"pass", "fail", "blocked"}
 		assert entry["summary"]
-
 
 def test_renderer_full_parity_gate_release_mode() -> None:
 	if os.environ.get("RENDERER_FULL_PARITY_GATE_ENFORCE") != "1":

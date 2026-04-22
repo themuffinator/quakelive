@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from tests._shared import REPO_ROOT, contains_all as _contains_all, read_json as _read_json, write_json as _write_json
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 RETAIL_MODULE_PARITY_GATE_PATH = (
 	REPO_ROOT / "artifacts" / "module_validation" / "logs" / "retail_module_parity_gate.json"
 )
@@ -46,19 +45,8 @@ PLATFORM_SERVICES_TEST_PATH = REPO_ROOT / "tests" / "test_platform_services.py"
 
 GAP_ORDER = ("GMR-G01", "GMR-G02", "GMR-G05")
 
-
 def _read_text(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-	return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-	path.parent.mkdir(parents=True, exist_ok=True)
-	path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
 
 def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> dict[str, Any]:
 	return {
@@ -67,11 +55,6 @@ def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> d
 		"summary": summary,
 		"details": details,
 	}
-
-
-def _contains_all(text: str, *needles: str) -> bool:
-	return all(needle in text for needle in needles)
-
 
 def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> bool:
 	if runtime_evidence is None:
@@ -136,7 +119,6 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 		and (trace_stats["cgame_free_count"] >= 1 or renderer_font_livelock_bounded)
 		and (clean_runtime or bounded_runtime)
 	)
-
 
 def _build_retail_module_parity_gate_report() -> dict[str, Any]:
 	retail_module_plan = _read_text(RETAIL_MODULE_PLAN_PATH)
@@ -390,7 +372,6 @@ def _build_retail_module_parity_gate_report() -> dict[str, Any]:
 	}
 	return report
 
-
 def test_retail_module_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	runtime_evidence = _read_json(RETAIL_MODULE_RUNTIME_EVIDENCE_PATH)
 
@@ -411,7 +392,6 @@ def test_retail_module_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 		assert runtime_evidence["map_runtime"]["trace_stats"]["cgame_free_count"] >= 1
 		assert runtime_evidence["map_runtime"]["trace_stats"]["qagame_free_count"] >= 1
 	assert _runtime_evidence_is_sufficient(runtime_evidence)
-
 
 def test_retail_module_parity_gate_writes_status_artifact() -> None:
 	report = _build_retail_module_parity_gate_report()
@@ -436,7 +416,6 @@ def test_retail_module_parity_gate_writes_status_artifact() -> None:
 		assert entry["gap_id"] == gap_id
 		assert entry["status"] in {"pass", "fail", "blocked"}
 		assert entry["summary"]
-
 
 def test_retail_module_parity_gate_release_mode() -> None:
 	if os.environ.get("RETAIL_MODULE_PARITY_GATE_ENFORCE") != "1":

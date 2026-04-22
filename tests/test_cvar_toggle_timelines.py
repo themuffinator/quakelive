@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from tests._shared import REPO_ROOT
+
 SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "cvar_toggles.json"
 EXPECTATION = REPO_ROOT / "tests" / "expectations" / "match_sim_cvar_toggles.expect"
 
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 from tools.tests.match_sim.harness import run_from_file  # noqa: E402
-
 
 def _summarise_cvar_events(frames):
     lines = []
@@ -31,7 +27,6 @@ def _summarise_cvar_events(frames):
             value = details.get("value")
             lines.append(f"{event.get('time', 0.0):.3f} {name}={value}")
     return "\n".join(lines)
-
 
 def test_cvar_toggle_timeline_matches_expectation(tmp_path: Path) -> None:
     timeline = run_from_file(SCENARIO)

@@ -6,35 +6,37 @@ from pathlib import Path
 
 import pytest
 
+from tests.compiler_support import compile_c_binary, executable_name, find_c_compiler
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _compile_and_run(source: str, workdir: Path) -> str:
     workdir.mkdir(parents=True, exist_ok=True)
     c_path = workdir / "probe.c"
-    exe_path = workdir / "probe"
+    exe_path = workdir / executable_name("probe")
     c_path.write_text(source, encoding="utf-8")
 
-    include_args = [
-        f"-I{REPO_ROOT}",
-        "-Isrc/common",
-        "-Isrc/code",
-        "-Isrc/code/game",
-        "-Isrc/code/qcommon",
-    ]
+    compiler = find_c_compiler()
+    if compiler is None:
+        pytest.skip("no supported C compiler is available for the auto-shuffle countdown harness")
 
-    compile_cmd = [
-        "gcc",
-        "-std=c99",
-        "-Wall",
-        "-Werror",
-        *include_args,
-        str(c_path),
-        "src/code/game/g_autoshuffle.c",
-        "-o",
-        str(exe_path),
-    ]
-    subprocess.run(compile_cmd, check=True, cwd=REPO_ROOT)
+    extra_cflags = ["/W4", "/WX"] if compiler.is_msvc else ["-Wall", "-Werror"]
+
+    compile_c_binary(
+        compiler,
+        [c_path, REPO_ROOT / "src" / "code" / "game" / "g_autoshuffle.c"],
+        exe_path,
+        include_dirs=[
+            REPO_ROOT,
+            REPO_ROOT / "src" / "common",
+            REPO_ROOT / "src" / "code",
+            REPO_ROOT / "src" / "code" / "game",
+            REPO_ROOT / "src" / "code" / "qcommon",
+        ],
+        extra_cflags=extra_cflags,
+        workdir=REPO_ROOT,
+    )
 
     result = subprocess.run([str(exe_path)], check=True, cwd=REPO_ROOT, capture_output=True, text=True)
     return result.stdout

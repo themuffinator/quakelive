@@ -3,21 +3,17 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Iterable, Sequence
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+from tests._shared import REPO_ROOT
 
 from tools.tests.match_sim import BotConfig, CommandConfig, MatchConfig, MatchHarness
 
 EXPECTATION_PATH = REPO_ROOT / "tests" / "expectations" / "match_sim_item_pickups.expect"
 TARGETS: Sequence[str] = ("qvm", "dll")
-
 
 def _load_expectations() -> dict[str, dict[str, list[str]]]:
     payload = json.loads(EXPECTATION_PATH.read_text(encoding="utf-8"))
@@ -28,11 +24,9 @@ def _load_expectations() -> dict[str, dict[str, list[str]]]:
             scenarios[scenario][target] = [str(line) for line in lines]
     return scenarios
 
-
 @pytest.fixture(scope="module")
 def pickup_expectations() -> dict[str, dict[str, list[str]]]:
     return _load_expectations()
-
 
 def _collect_pickup_summary(result) -> list[str]:
     lines: list[str] = []
@@ -75,7 +69,6 @@ def _collect_pickup_summary(result) -> list[str]:
                 )
     return lines
 
-
 def _assert_pickup_parity(
     scenario: str,
     captured: Iterable[str],
@@ -100,11 +93,9 @@ def _assert_pickup_parity(
                 f"Captured payload written to {output_path}"
             )
 
-
 def _run_harness(config: MatchConfig) -> list[str]:
     harness = MatchHarness(config, seed=config.seed)
     return _collect_pickup_summary(harness.run())
-
 
 def _max_ammo_config() -> MatchConfig:
     script = [
@@ -146,7 +137,6 @@ def _max_ammo_config() -> MatchConfig:
     )
     return config
 
-
 def _spawn_armor_config() -> MatchConfig:
     bot = BotConfig(
         name="anarki",
@@ -182,7 +172,6 @@ def _spawn_armor_config() -> MatchConfig:
         ],
     )
     return MatchConfig(map="pro-q3dm6", duration=2.0, tick_rate=10, seed=4040, bots=[bot])
-
 
 def _flag_modes_config() -> MatchConfig:
     ranger_script = [
@@ -245,16 +234,13 @@ def _flag_modes_config() -> MatchConfig:
         ],
     )
 
-
 def test_max_ammo_pickup_parity(tmp_path: Path, pickup_expectations: dict[str, dict[str, list[str]]]) -> None:
     summary = _run_harness(_max_ammo_config())
     _assert_pickup_parity("max_ammo", summary, pickup_expectations, tmp_path)
 
-
 def test_spawn_armor_handicap(tmp_path: Path, pickup_expectations: dict[str, dict[str, list[str]]]) -> None:
     summary = _run_harness(_spawn_armor_config())
     _assert_pickup_parity("spawn_armor", summary, pickup_expectations, tmp_path)
-
 
 def test_flag_modes_cover_ctf_and_oneflag(
     tmp_path: Path, pickup_expectations: dict[str, dict[str, list[str]]]

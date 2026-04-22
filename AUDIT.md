@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 This file is the current cross-subsystem ledger for the repository. Detailed
 reconstruction history belongs in the dedicated subsystem audits under
@@ -34,6 +34,13 @@ The current audited state on 2026-04-21 is:
   lanes, the bounded non-Windows portability debt, and the remaining
   evidence-freshness gap are counted. The current repo-wide estimate for the
   whole checked-in tree is **96%**.
+- A new source-file parity campaign is now open under
+  `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md` and
+  `docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`.
+  That campaign decomposes the current repo-wide story into `567` tracked
+  source entries plus dedicated per-file gap notes where the current evidence
+  is already concrete, without changing the top-level **100%** strict-retail
+  / **96%** repo-wide assessment.
 - A broad current-worktree parity sweep spanning the top-level parity gates,
   gameplay fixtures, portability checks, and the staged retail-runtime audit
   lane now passes at `60 passed, 7 skipped`.
@@ -150,6 +157,9 @@ and HUD deltas are now explicitly marked historical.
 ## Detailed repo-wide audit
 
 - `docs/reverse-engineering/repo-wide-parity-audit-2026-04-21.md`
+- `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`
+- `docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`
+- `docs/reverse-engineering/historical-audit-index-2026-04-22.md`
 
 ## Subsystem references
 

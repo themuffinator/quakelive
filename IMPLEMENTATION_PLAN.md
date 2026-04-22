@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -26,6 +26,12 @@ disabled, until a documented open replacement path exists.
 - The strict-retail Windows replacement target remains **100%** on the current
   worktree, but the current repo-wide parity estimate is **96%** once the
   compatibility-only and packaging-dependent surfaces are counted.
+- The new file-by-file audit campaign now lives in
+  `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md` and
+  `docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`.
+  It tracks `567` source entries, seeds concrete file-level notes for the
+  currently evidenced `RW-G01` and `RW-G02` owners, and keeps the older
+  subsystem ledgers as inherited baselines until each file is walked again.
 - Top-level planning is reopened in this file because the 2026-04-21 repo-wide
   audit identified active gaps outside the strict-retail score.
 - The older broad planning notes under `docs/parity-plan.md`,
@@ -33,6 +39,261 @@ disabled, until a documented open replacement path exists.
   snapshots, not current gap ledgers.
 
 ## Recent closure
+
+### Task A7i: Audit `src/code/cgame` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/code/cgame/`,
+`docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-10.md`,
+`tools/reverse-engineering/generate_source_file_audit.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Completed the next module/gameplay tranche in the source-file campaign by
+   walking all `22` tracked `src/code/cgame` entries against the refreshed
+   strict-retail module audit, the focused `cgame` parity lane, and the
+   current repo-wide gap ledger.
+2. Confirmed that no `src/code/cgame` file needs a new file-level gap note:
+   the current module closure still holds on current evidence, the focused
+   `cgame` suite is green (`199 passed`, `1 skipped`), and the shared native
+   export-helper certification still bounds the tree without needing a source
+   correction in this tranche.
+3. Hardened the source-file audit generator so completed tranche checkmarks,
+   section result notes, and current-walk ledger rows now survive regeneration
+   instead of reverting already-audited runtime sections back to the default
+   pending wording; `--help` is also now a safe no-write path.
+4. Regenerated the source-file campaign docs from the hardened generator so
+   the corrected `cgame` function counts and the previously completed runtime
+   tranches live in one durable output again, and the next file-walk target
+   is now the read-only `src/code/ui` tranche at the head of the remaining
+   module/gameplay queue.
+
+### Task A7h: Audit `src/code/game` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/code/game/`,
+`docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-10.md`,
+`tools/reverse-engineering/generate_source_file_audit.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Hardened the source-file audit generator again so it now ignores
+   control-flow keywords such as `if`, `for`, `while`, and `switch`, which
+   keeps the source-file campaign counts aligned with real Quake-style C
+   definitions in the `src/code/game` tranche instead of overcounting
+   control blocks.
+2. Completed the next module/gameplay tranche in the source-file campaign by
+   walking all `45` tracked `src/code/game` entries against the refreshed
+   strict-retail module audit, the qagame retail gate, and the current
+   repo-wide gap ledger.
+3. Closed the concrete issues surfaced during the walk without opening a new
+   persistent gap note: `BG_CanGrabWeaponItem()` now matches the retained
+   retail world-weapon regrab gate, the Attack & Defend lifecycle/frame hooks
+   are explicit in the module-side source layout again, and the standalone
+   auto-shuffle countdown harness now uses the shared compiler-discovery path
+   on Windows instead of assuming `gcc`.
+4. Confirmed that no `src/code/game` file needs a new file-level gap note:
+   the current gameplay/module closure still holds on current evidence, and
+   the newer auto-shuffle/countdown, Clan Arena shuffle, Race, ready-up, and
+   shared `pmove` coverage all remain bounded inside the already-closed
+   module register rather than opening a new repo-wide gap family.
+5. Recorded the result directly in the source-file campaign docs so the game
+   rows now distinguish current function-walk completion from the
+   still-pending module trees, and the next file-walk target is now the
+   `src/code/cgame` tranche at the head of the remaining module/gameplay
+   queue.
+
+### Task A7g: Audit `src/code/botlib` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/code/botlib/`,
+`docs/reverse-engineering/botlib-internal-parity-audit-and-implementation-plan-2026-04-10.md`,
+`tools/reverse-engineering/generate_source_file_audit.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Fixed the source-file audit generator so it now counts Quake-style
+   brace-on-next-line C function definitions, which restores accurate
+   function-count coverage for the `src/code/botlib` tranche instead of
+   leaving most files reported as zero-function placeholders.
+2. Completed the next primary-runtime tranche in the source-file campaign by
+   walking all `28` tracked `src/code/botlib` entries against the dedicated
+   botlib internal audit, the retained mapping-round `61` bridge/import
+   ownership, and the current repo-wide gap ledger.
+3. Confirmed that no `src/code/botlib` file needs a new file-level gap note:
+   the retained bridge/import closures and the deterministic
+   AAS/reachability/goal-state proof lane still bound the tree on current
+   evidence, while the remaining live-map or gameplay-tuning nuance stays
+   explicitly outside the repo-wide/file-level gap register.
+4. Recorded the result directly in the source-file campaign docs so the
+   botlib rows now distinguish current function-walk completion from the
+   still-pending module and compatibility trees, and the next file-walk
+   target is now the `src/code/game` tranche at the head of the remaining
+   module/gameplay queue.
+
+### Task A7f: Audit `src/code/win32` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/code/win32/`,
+`docs/reverse-engineering/platform-specific-engine-parity-audit-and-implementation-plan-2026-04-16.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Completed the next primary-runtime tranche in the source-file campaign by
+   walking all `11` tracked `src/code/win32` entries against the closed
+   strict-retail Windows platform audit, renderer host-glue evidence, and the
+   current repo-wide gap ledger.
+2. Confirmed that no `src/code/win32` file needs a new file-level gap note:
+   the retained clipboard, raw-input, loading-window, renderer-host glue, and
+   `win_glimp.c` pixel-format closures still hold on current evidence, and no
+   file in this tree currently owns a repo-wide gap family.
+3. Recorded the result directly in the source-file campaign docs so the
+   Win32 rows now distinguish current function-walk completion from the
+   still-pending runtime trees, without reopening the closed strict-retail
+   Windows platform register.
+4. Narrowed `A7` procedurally again: the next file-walk target is now the
+   `src/code/botlib` tranche at the head of the remaining strict-retail
+   engine-core queue.
+
+### Task A7e: Audit `src/code/renderer` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/code/renderer/`,
+`docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Completed the next primary-runtime tranche in the source-file campaign by
+   walking all `23` tracked `src/code/renderer` entries against the closed
+   strict-retail renderer audit, mapping notes, and the current repo-wide
+   gap ledger.
+2. Confirmed that no `src/code/renderer` file needs a new file-level gap note:
+   the retained export, image, post-process, scene/runtime, font, and
+   host-text closures still hold on current evidence, and the bounded
+   `R_fonsErrorCallback` module-runtime blocker remains classified under
+   `RW-G04` evidence freshness rather than as a new renderer source-gap
+   owner.
+3. Recorded the result directly in the source-file campaign docs so the
+   renderer rows now distinguish current function-walk completion from the
+   still-pending runtime trees, without reopening the closed strict-retail
+   renderer register.
+4. Narrowed `A7` procedurally again: the next file-walk target is now the
+   `src/code/win32` tranche at the head of the remaining strict-retail
+   engine-core queue.
+
+### Task A7d: Audit `src/code/server` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/code/server/`,
+`docs/reverse-engineering/server-full-parity-audit-and-implementation-plan-2026-04-10.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Completed the next primary-runtime tranche in the source-file campaign by
+   walking all `11` tracked `src/code/server` entries against the closed
+   strict-retail server audit, mapping notes, and the current repo-wide
+   gap ledger.
+2. Confirmed that no new `src/code/server` file-level owners need opening
+   beyond the already-seeded `RW-G01` note for `sv_rankings.c`; the retained
+   Steam GameServer/auth/stats and `idZMQ` publication/runtime owners remain
+   closed on current evidence.
+3. Recorded the result directly in the source-file campaign docs so the
+   server rows now distinguish current function-walk completion from the
+   still-pending runtime trees, while keeping the bounded rankings ownership
+   explicit in the existing `sv_rankings.c` gap note instead of reopening the
+   closed strict-retail server register.
+4. Narrowed `A7` procedurally again: the next file-walk target is now the
+   `src/code/renderer` tranche at the head of the remaining strict-retail
+   engine-core queue.
+
+### Task A7c: Audit `src/code/client` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/code/client/`,
+`docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Completed the next primary-runtime tranche in the source-file campaign by
+   walking all `22` tracked `src/code/client` entries against the closed
+   strict-retail client audit, mapping notes, and the current repo-wide
+   gap ledger.
+2. Confirmed that no new `src/code/client` file-level owners need opening
+   beyond the already-seeded `RW-G01` notes for `ql_auth.c` and
+   `cl_steam_resources.c`.
+3. Recorded the result directly in the source-file campaign docs so the
+   client rows now distinguish current function-walk completion from the
+   still-pending runtime trees, while keeping the bounded online-services
+   ownership explicit in the two existing client gap notes instead of
+   reopening the closed strict-retail client register.
+4. Narrowed `A7` procedurally again: the next file-walk target is now the
+   `src/code/server` tranche at the head of the remaining strict-retail
+   engine-core queue.
+
+### Task A7b: Audit `src/code/qcommon` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/code/qcommon/`,
+`docs/reverse-engineering/qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Completed the next primary-runtime tranche in the source-file campaign by
+   walking all `19` tracked `src/code/qcommon` entries against the closed
+   strict-retail qcommon audit, mapping rounds, and the current repo-wide
+   ledger.
+2. Confirmed that no new `src/code/qcommon` file-level owners need opening:
+   the current strict-retail qcommon register remains closed, and no
+   additional repo-wide gap family is concretely owned by a qcommon source
+   file on the current worktree.
+3. Recorded the result directly in the source-file campaign docs so the
+   qcommon rows now distinguish current function-walk completion from the
+   still-pending runtime trees, while keeping `vm_x86.c` classified as the
+   already-bounded compatibility carry beneath the closed `vm.c`
+   host-selection seam.
+4. Narrowed `A7` procedurally again: the next file-walk target is now the
+   `src/code/client` tranche at the head of the remaining strict-retail
+   engine-core queue.
+
+### Task A7a: Audit `src/common` function-by-function and isolate file-level gap ownership [COMPLETED]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`src/common/`, `src/common/platform/`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Completed the first primary-runtime tranche in the new source-file campaign
+   by walking all `18` tracked `src/common` entries against the current
+   engine-wide closure and repo-wide gap ledgers.
+2. Confirmed that no new `src/common` file-level owners need opening beyond
+   the already-seeded `RW-G01` notes for `platform_config.h`,
+   `platform_services.c`, and the bounded auth backend shims.
+3. Recorded the result directly in the source-file campaign docs so the
+   `src/common` rows now distinguish current function-walk completion from the
+   still-pending primary-runtime trees, while keeping `platform_steamworks.c`
+   classified as a retained Steamworks wrapper surface gated by policy rather
+   than as a newly opened repo-wide gap owner.
+4. Narrowed `A7` procedurally: the next file-walk target is now the
+   `src/code/qcommon` tranche at the head of the remaining strict-retail
+   engine-core queue.
 
 ### Task A4i: Replace the Unix `Sys_CheckCD()` unconditional pass with a bounded data-root probe [COMPLETED]
 Priority: Medium
@@ -508,6 +769,27 @@ Completed work:
 
 ## Active tasks
 
+### Task A7: Run the source-file parity audit campaign and isolate the remaining file-level gaps [OPEN]
+Priority: High
+Primary areas: `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`docs/reverse-engineering/source-file-gap-notes/`, all tracked `src/` source
+trees
+Estimated repo-wide lift if closed: **96% -> 96%**
+
+Scope:
+
+1. Work through the `567` tracked source entries in the new ledger in the
+   chunk order defined by the source-file audit plan.
+2. Keep inherited subsystem closure as the starting baseline, but only open a
+   dedicated per-file note when the current function walk isolates a concrete
+   parity gap.
+3. Convert the current repo-wide gap families from tree-level summaries into
+   stable file-level ownership wherever the evidence is concrete, beginning
+   with the seeded `RW-G01` and `RW-G02` notes.
+4. Keep `AUDIT.md` and the repo-wide audit concise summary ledgers rather than
+   turning them into file-by-file dumps.
+
 ### Task A3: Replace or further bound the compatibility-only online-service lanes [OPEN]
 Priority: Critical
 Primary areas: `src/common/platform/`, `src/code/client/`, `src/code/server/`,
@@ -601,13 +883,18 @@ Completed work:
 
 ## Working priority order
 
-1. Resolve the online-service compatibility boundary and evidence story.
-2. Re-baseline the non-Windows portability lanes.
-3. Refresh archived build/runtime evidence on current toolchains.
+1. Drive the source-file parity audit campaign through the primary runtime
+   surface so the remaining gaps are isolated file-by-file.
+2. Resolve the online-service compatibility boundary and evidence story.
+3. Re-baseline the non-Windows portability lanes.
+4. Refresh archived build/runtime evidence on current toolchains.
 
 ## Reference audits for closed surfaces
 
 - `docs/reverse-engineering/repo-wide-parity-audit-2026-04-21.md`
+- `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`
+- `docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`
+- `docs/reverse-engineering/historical-audit-index-2026-04-22.md`
 - `docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`
 - `docs/reverse-engineering/game-module-parity-audit-and-implementation-plan-2026-04-10.md`
 - `docs/reverse-engineering/ui-full-parity-audit-and-implementation-plan-2026-04-05.md`

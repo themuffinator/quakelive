@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from tests._shared import (
+	REPO_ROOT,
+	contains_all as _contains_all,
+	read_json as _read_json,
+	section_text_for_id as _section_text_for_id,
+	write_json as _write_json,
+)
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 SERVER_FULL_PARITY_GATE_PATH = (
 	REPO_ROOT / "artifacts" / "server_validation" / "logs" / "server_full_parity_gate.json"
 )
@@ -43,37 +47,8 @@ FAKE_VACBAN_TEST_PATH = REPO_ROOT / "tests" / "test_fake_vacban.py"
 
 GAP_ORDER = ("SV-G01", "SV-G02", "SV-G03", "SV-G04", "SV-G05", "SV-G06")
 
-
 def _read_text(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-	return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-	path.parent.mkdir(parents=True, exist_ok=True)
-	path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
-def _contains_all(text: str, *needles: str) -> bool:
-	return all(needle in text for needle in needles)
-
-
-def _section_text_for_id(text: str, section_id: str) -> str:
-	match = re.search(rf"^## {re.escape(section_id)}\b.*$", text, re.MULTILINE)
-	if match is None:
-		return ""
-
-	start = match.start()
-	next_match = re.search(r"\n## ", text[match.end() :])
-	if next_match is None:
-		return text[start:]
-
-	end = match.end() + next_match.start()
-	return text[start:end]
-
 
 def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> dict[str, Any]:
 	return {
@@ -83,7 +58,6 @@ def _entry(gap_id: str, status: str, summary: str, details: dict[str, Any]) -> d
 		"details": details,
 	}
 
-
 def _query_field(fields: dict[str, Any], *names: str) -> str:
 	for name in names:
 		value = fields.get(name)
@@ -91,7 +65,6 @@ def _query_field(fields: dict[str, Any], *names: str) -> str:
 			return value
 
 	return ""
-
 
 def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> bool:
 	if runtime_evidence is None:
@@ -144,7 +117,6 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 		and isinstance(zmq_runtime["runtime_disabled_logged"], bool)
 		and isinstance(zmq_runtime["runtime_unavailable_logged"], bool)
 	)
-
 
 def _build_server_full_parity_gate_report() -> dict[str, Any]:
 	server_plan = _read_text(SERVER_PLAN_PATH)
@@ -479,7 +451,6 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 	}
 	return report
 
-
 def test_server_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	runtime_evidence = _read_json(SERVER_RUNTIME_EVIDENCE_PATH)
 
@@ -509,7 +480,6 @@ def test_server_runtime_evidence_artifact_is_tracked_and_clean() -> None:
 	assert runtime_evidence["zmq_runtime"]["rcon_enabled_requested"] is True
 	assert _runtime_evidence_is_sufficient(runtime_evidence)
 
-
 def test_server_full_parity_gate_writes_status_artifact() -> None:
 	report = _build_server_full_parity_gate_report()
 	_write_json(SERVER_FULL_PARITY_GATE_PATH, report)
@@ -533,7 +503,6 @@ def test_server_full_parity_gate_writes_status_artifact() -> None:
 		assert entry["gap_id"] == gap_id
 		assert entry["status"] in {"pass", "fail", "blocked"}
 		assert entry["summary"]
-
 
 def test_server_full_parity_gate_release_mode() -> None:
 	if os.environ.get("SERVER_FULL_PARITY_GATE_ENFORCE") != "1":

@@ -8,14 +8,12 @@ import ctypes
 import hashlib
 import os
 import subprocess
-import sys
 from collections.abc import Iterable, Mapping
+from typing import Any
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+from tests._shared import REPO_ROOT
 
 from tools.tests.match_sim.harness import MatchHarness, load_config, run_from_file
 
@@ -251,7 +249,6 @@ void QLR_BuildFactoryMetadata( void ) {
     .replace("@TAB@", "\t")
 )
 
-
 def test_run_from_file_is_deterministic(tmp_path) -> None:
     """Running the same scenario with the same seed yields identical timelines."""
 
@@ -261,7 +258,6 @@ def test_run_from_file_is_deterministic(tmp_path) -> None:
     assert result_a.config.seed == 4242
     assert result_b.config.seed == 4242
     assert result_a.to_json(indent=None) == result_b.to_json(indent=None)
-
 
 def test_seed_override_changes_randomised_outputs() -> None:
     """Using different seeds should influence randomised spawn and script values."""
@@ -288,7 +284,6 @@ def test_seed_override_changes_randomised_outputs() -> None:
     assert default_direction != override_direction
     assert default_result.to_json(indent=None) != override_result.to_json(indent=None)
 
-
 @pytest.mark.parametrize("scenario_path", ALL_SCENARIOS, ids=[path.stem for path in ALL_SCENARIOS])
 def test_all_scenarios_produce_frames(scenario_path: Path) -> None:
     """Ensure every shipped scenario runs without errors and emits timeline frames."""
@@ -298,7 +293,6 @@ def test_all_scenarios_produce_frames(scenario_path: Path) -> None:
     assert result.frames, "Scenario should produce at least one frame"
     assert result.config.map
     assert result.config.metadata is not None
-
 
 def test_rotation_vote_metadata_tracks_factory_title() -> None:
     """The rotation scenario captures factory vote details for documentation."""
@@ -334,7 +328,6 @@ def _configure_factory_config(**overrides) -> MatchHarness:
     config.metadata["factory"] = factory_meta
     return MatchHarness(config, seed=config.seed)
 
-
 @pytest.mark.parametrize(
     "active_loadout, expected_visor, expected_anarki",
     [
@@ -367,7 +360,6 @@ def test_factory_loadout_toggle_updates_inventory(
     assert anarki_state["ammo"] == expected_anarki["ammo"]
     assert anarki_state["inventory"] == expected_anarki["inventory"]
 
-
 def test_factory_spawn_delays_emit_client_spawn_events() -> None:
     harness = _configure_factory_config()
     result = harness.run()
@@ -385,7 +377,6 @@ def test_factory_spawn_delays_emit_client_spawn_events() -> None:
         ("visor", False, 2.5),
         ("anarki", False, 2.7),
     ]
-
 
 def _summarise_item_events(frames: Iterable[object]) -> str:
     lines: list[str] = []
@@ -413,7 +404,6 @@ def _summarise_item_events(frames: Iterable[object]) -> str:
                 lines.append(f"{event['time']:.3f} {bot} return {item}")
     return "\n".join(lines)
 
-
 def _summarise_scoreboard_hashes(frames: Iterable[object]) -> str:
     snapshots: list[str] = []
     for frame in frames:
@@ -430,11 +420,9 @@ def _summarise_scoreboard_hashes(frames: Iterable[object]) -> str:
         snapshots.append(f"{frame.time:05.2f} {digest}")
     return "\n".join(snapshots)
 
-
 def _read_expectation(name: str) -> str:
     expectation_path = REPO_ROOT / "tests" / "expectations" / name
     return expectation_path.read_text(encoding="utf-8").strip()
-
 
 def test_factory_item_flags_control_drop_behaviour(tmp_path: Path) -> None:
     baseline = _configure_factory_config()
@@ -457,11 +445,9 @@ def test_factory_item_flags_control_drop_behaviour(tmp_path: Path) -> None:
             f"Captured summary written to {output_path}"
         )
 
-
 def _read_factory_item_sections() -> list[str]:
     expectation = _read_expectation("match_sim_factory_items.expect")
     return [section.strip() for section in expectation.split("\n---\n")]
-
 
 def _summarise_rating_events(frames: list[Mapping[str, Any]]) -> str:
     lines: list[str] = []
@@ -493,7 +479,6 @@ def test_scoreboard_snapshot_hashes_match_expectation(tmp_path: Path) -> None:
             f"Captured summary written to {output_path}"
         )
 
-
 def test_cli_item_parity_matches_baseline_expectation(harness_parity_runs) -> None:
     sections = _read_factory_item_sections()
     baseline_expectation = sections[0]
@@ -510,7 +495,6 @@ def test_cli_item_parity_matches_baseline_expectation(harness_parity_runs) -> No
         else:
             assert payload == reference_payload, f"{target} payload diverged from parity baseline"
 
-
 def test_cli_item_parity_native_build_matches_vm(harness_parity_runs) -> None:
     native_run = harness_parity_runs.get("re")
     if native_run is None:
@@ -523,7 +507,6 @@ def test_cli_item_parity_native_build_matches_vm(harness_parity_runs) -> None:
 
     trace_log = native_run.read_log("trace_harness")
     assert "Trace harness run completed successfully." in trace_log
-
 
 def test_rating_metadata_parity(harness_parity_runs) -> None:
     expectation = _read_expectation("match_sim_rating_metadata.expect")
@@ -543,7 +526,6 @@ def test_rating_metadata_parity(harness_parity_runs) -> None:
     native_run = harness_parity_runs.get("re")
     if native_run is not None and reference_payload is not None:
         assert native_run.load_match_timeline("rating_metadata") == reference_payload
-
 
 def _build_factory_metadata_library(tmp_path: Path) -> Path:
     src_path = tmp_path / "factory_metadata_test.c"
@@ -588,7 +570,6 @@ def _build_factory_metadata_library(tmp_path: Path) -> Path:
     subprocess.run(compile_cmd, check=True)
     return lib_path
 
-
 def _load_factory_metadata_library(lib_path: Path) -> ctypes.CDLL:
     library = ctypes.CDLL(str(lib_path))
     library.QLR_ResetFactoryConfig.argtypes = []
@@ -603,7 +584,6 @@ def _load_factory_metadata_library(lib_path: Path) -> ctypes.CDLL:
     library.QLR_GetFactoryFlagsConfigstring.restype = ctypes.c_char_p
     return library
 
-
 @pytest.fixture(scope="module")
 def factory_metadata_library(tmp_path_factory: pytest.TempPathFactory) -> ctypes.CDLL:
     if os.name == "nt":
@@ -611,7 +591,6 @@ def factory_metadata_library(tmp_path_factory: pytest.TempPathFactory) -> ctypes
     tmp_path = tmp_path_factory.mktemp("factory_metadata")
     lib_path = _build_factory_metadata_library(tmp_path)
     return _load_factory_metadata_library(lib_path)
-
 
 @pytest.mark.skipif(os.name == "nt", reason="Factory metadata harness requires a POSIX toolchain")
 def test_factory_flags_configstring_tracks_customised_preset(factory_metadata_library: ctypes.CDLL) -> None:

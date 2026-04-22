@@ -8386,8 +8386,14 @@ Runs the retail late-frame gametype switch after exit/team maintenance.
 static void G_RunFrameGametypeHooks( void ) {
 	if ( g_gametype.integer == GT_FFA ) {
 		G_EnsureQuadHogQuad();
-	} else if ( g_gametype.integer == GT_CLAN_ARENA || g_gametype.integer == GT_FREEZE ||
-		g_gametype.integer == GT_ATTACK_DEFEND ) {
+	} else if ( g_gametype.integer == GT_CLAN_ARENA || g_gametype.integer == GT_FREEZE ) {
+		G_Frame_UpdateRoundController();
+	} else if ( g_gametype.integer == GT_ATTACK_DEFEND ) {
+		if ( level.adRoundState == AD_ROUNDSTATE_EXIT ) {
+			G_Frame_UpdateRoundController();
+			return;
+		}
+
 		G_Frame_UpdateRoundController();
 	} else if ( g_gametype.integer == GT_RED_ROVER ) {
 		G_RRTrackRoundActivity();

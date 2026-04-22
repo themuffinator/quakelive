@@ -3,23 +3,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from tests._shared import REPO_ROOT
+
 SCENARIO = REPO_ROOT / "tools" / "tests" / "match_sim" / "duel_cvars.json"
 
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 from tools.tests.match_sim.harness import run_from_file  # noqa: E402
-
 
 @pytest.fixture(scope="module")
 def duel_timeline():
     return run_from_file(SCENARIO)
-
 
 def _extract_events(result, action: str):
     for frame in result.frames:
@@ -27,13 +22,11 @@ def _extract_events(result, action: str):
             if event["action"] == action:
                 yield event
 
-
 def test_duel_loadout_grant_matches_retail_baseline(duel_timeline):
     grants = list(_extract_events(duel_timeline, "duel_loadout"))
     assert grants, "Loadout grant event missing from duel scenario"
     details = grants[0]["details"]
     assert details["script"] == "weapon_gauntlet weapon_machinegun ammo_bullets 100"
-
 
 def test_duel_ready_up_flow_exposes_warmup_and_counts(duel_timeline):
     ready_events = list(_extract_events(duel_timeline, "duel_ready_up"))
@@ -43,7 +36,6 @@ def test_duel_ready_up_flow_exposes_warmup_and_counts(duel_timeline):
     assert ready["min_players"] == 2
     assert ready["countdown_seconds"] == 20
     assert ready["ready_configstring"] == "ready:0"
-
 
 def test_duel_sudden_death_cvars_match_baseline(duel_timeline):
     sudden_death = list(_extract_events(duel_timeline, "duel_sudden_death"))

@@ -106,6 +106,12 @@ controller can manage respawns.
 */
 static void G_GametypeHandleRoundBased( gametypeLifecycleStage_t stage, gentity_t *ent ) {
 	if ( stage == GAMETYPE_LIFECYCLE_INIT ) {
+		if ( g_gametype.integer == GT_ATTACK_DEFEND ) {
+			if ( level.adRoundState == AD_ROUNDSTATE_EXIT ) {
+				return;
+			}
+		}
+
 		G_Frame_BeginRoundWarmup();
 	}
 
@@ -245,6 +251,7 @@ static void G_RunGametypeLifecycle( gametypeLifecycleStage_t stage, gentity_t *e
 		break;
 
 	case GT_CLAN_ARENA:
+	case GT_ATTACK_DEFEND:
 	case GT_RED_ROVER:
 		G_GametypeHandleRoundBased( stage, ent );
 		break;
