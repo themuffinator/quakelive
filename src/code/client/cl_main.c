@@ -178,6 +178,298 @@ static const char *CL_GetWorkshopServicePolicyLabel( void ) {
 
 /*
 =============
+CL_GetMatchmakingServiceDescriptor
+
+Returns the current platform-service descriptor for the client matchmaking and
+social presence seam.
+=============
+*/
+static const ql_platform_feature_descriptor *CL_GetMatchmakingServiceDescriptor( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return NULL;
+	}
+
+	return &services->matchmaking;
+}
+
+/*
+=============
+CL_GetMatchmakingServiceProviderLabel
+
+Returns the human-readable provider label for the client matchmaking seam.
+=============
+*/
+static const char *CL_GetMatchmakingServiceProviderLabel( void ) {
+	const ql_platform_feature_descriptor *descriptor = CL_GetMatchmakingServiceDescriptor();
+
+	if ( !descriptor || !descriptor->provider ) {
+		return "Unavailable";
+	}
+
+	return descriptor->provider;
+}
+
+/*
+=============
+CL_GetMatchmakingServicePolicyLabel
+
+Returns the short compatibility policy label for the client matchmaking seam.
+=============
+*/
+static const char *CL_GetMatchmakingServicePolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( CL_GetMatchmakingServiceDescriptor() );
+}
+
+/*
+=============
+CL_GetStatsServiceDescriptor
+
+Returns the current platform-service descriptor for the client stats seam.
+=============
+*/
+static const ql_platform_feature_descriptor *CL_GetStatsServiceDescriptor( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return NULL;
+	}
+
+	return &services->stats;
+}
+
+/*
+=============
+CL_GetStatsServiceProviderLabel
+
+Returns the human-readable provider label for the client stats seam.
+=============
+*/
+static const char *CL_GetStatsServiceProviderLabel( void ) {
+	const ql_platform_feature_descriptor *descriptor = CL_GetStatsServiceDescriptor();
+
+	if ( !descriptor || !descriptor->provider ) {
+		return "Unavailable";
+	}
+
+	return descriptor->provider;
+}
+
+/*
+=============
+CL_GetStatsServicePolicyLabel
+
+Returns the short compatibility policy label for the client stats seam.
+=============
+*/
+static const char *CL_GetStatsServicePolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( CL_GetStatsServiceDescriptor() );
+}
+
+/*
+=============
+CL_GetSocialOverlayServiceDescriptor
+
+Returns the current platform-service descriptor for the Steam social-overlay
+command seam.
+=============
+*/
+static const ql_platform_feature_descriptor *CL_GetSocialOverlayServiceDescriptor( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return NULL;
+	}
+
+	return &services->overlay;
+}
+
+/*
+=============
+CL_GetSocialOverlayServiceProviderLabel
+
+Returns the human-readable provider label for the Steam social-overlay command
+seam.
+=============
+*/
+static const char *CL_GetSocialOverlayServiceProviderLabel( void ) {
+	const ql_platform_feature_descriptor *descriptor = CL_GetSocialOverlayServiceDescriptor();
+
+	if ( !descriptor || !descriptor->provider ) {
+		return "Unavailable";
+	}
+
+	return descriptor->provider;
+}
+
+/*
+=============
+CL_GetSocialOverlayServicePolicyLabel
+
+Returns the short compatibility policy label for the Steam social-overlay
+command seam.
+=============
+*/
+static const char *CL_GetSocialOverlayServicePolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( CL_GetSocialOverlayServiceDescriptor() );
+}
+
+/*
+=============
+CL_GetIdentityBootstrapModeLabel
+
+Returns the overall online-services mode label used by the retained client
+identity bootstrap lane.
+=============
+*/
+static const char *CL_GetIdentityBootstrapModeLabel( void ) {
+	return QL_GetOnlineServicesModeLabel();
+}
+
+/*
+=============
+CL_GetIdentityBootstrapPolicyLabel
+
+Returns the overall online-services policy label used by the retained client
+identity bootstrap lane.
+=============
+*/
+static const char *CL_GetIdentityBootstrapPolicyLabel( void ) {
+	return QL_GetOnlineServicesPolicyLabel();
+}
+
+/*
+=============
+CL_LogIdentityBootstrapFallback
+
+Publishes explicit diagnostics whenever the retained Steam persona/country
+bootstrap lane falls back under the compatibility policy.
+=============
+*/
+static void CL_LogIdentityBootstrapFallback( const char *stage, const char *reason ) {
+	Com_DPrintf( "%s identity bootstrap: %s (%s [%s])\n",
+		stage ? stage : "client_identity",
+		reason ? reason : "identity bootstrap provider unavailable",
+		CL_GetIdentityBootstrapModeLabel(),
+		CL_GetIdentityBootstrapPolicyLabel() );
+}
+
+/*
+=============
+CL_GetVoiceServiceModeLabel
+
+Returns the overall online-services mode label used by the retained voice
+compatibility lane.
+=============
+*/
+static const char *CL_GetVoiceServiceModeLabel( void ) {
+	return QL_GetOnlineServicesModeLabel();
+}
+
+/*
+=============
+CL_GetVoiceServicePolicyLabel
+
+Returns the overall online-services policy label used by the retained voice
+compatibility lane.
+=============
+*/
+static const char *CL_GetVoiceServicePolicyLabel( void ) {
+	return QL_GetOnlineServicesPolicyLabel();
+}
+
+/*
+=============
+CL_LogVoiceServiceFallback
+
+Publishes explicit diagnostics whenever the retained voice command surface
+falls back to the local speaking-state bridge.
+=============
+*/
+static void CL_LogVoiceServiceFallback( const char *commandName, const char *reason ) {
+	Com_DPrintf( "%s voice fallback: %s (%s [%s])\n",
+		commandName ? commandName : "voice",
+		reason ? reason : "local speaking-state fallback active",
+		CL_GetVoiceServiceModeLabel(),
+		CL_GetVoiceServicePolicyLabel() );
+}
+
+/*
+=============
+CL_LogMatchmakingServiceIgnored
+
+Publishes provider-aware diagnostics whenever a client matchmaking or social
+presence command is ignored by the retained compatibility policy.
+=============
+*/
+static void CL_LogMatchmakingServiceIgnored( const char *commandName, const char *reason ) {
+	Com_DPrintf( "%s ignored: %s (%s [%s])\n",
+		commandName ? commandName : "matchmaking",
+		reason ? reason : "matchmaking provider unavailable",
+		CL_GetMatchmakingServiceProviderLabel(),
+		CL_GetMatchmakingServicePolicyLabel() );
+}
+
+/*
+=============
+CL_LogStatsServiceIgnored
+
+Publishes provider-aware diagnostics whenever a client stats command is ignored
+by the retained compatibility policy.
+=============
+*/
+static void CL_LogStatsServiceIgnored( const char *commandName, const char *reason ) {
+	Com_DPrintf( "%s ignored: %s (%s [%s])\n",
+		commandName ? commandName : "stats",
+		reason ? reason : "stats provider unavailable",
+		CL_GetStatsServiceProviderLabel(),
+		CL_GetStatsServicePolicyLabel() );
+}
+
+/*
+=============
+CL_LogSocialOverlayIgnored
+
+Publishes provider-aware diagnostics whenever a Steam social-overlay command is
+ignored by the retained compatibility policy.
+=============
+*/
+static void CL_LogSocialOverlayIgnored( const char *commandName, const char *reason ) {
+	Com_DPrintf( "%s ignored: %s (%s [%s])\n",
+		commandName ? commandName : "social_overlay",
+		reason ? reason : "social overlay provider unavailable",
+		CL_GetSocialOverlayServiceProviderLabel(),
+		CL_GetSocialOverlayServicePolicyLabel() );
+}
+
+/*
+=============
+CL_RefreshPlatformServiceCvars
+
+Mirrors the retained client platform-service provider/policy labels through ROM
+cvars for diagnostics and bounded compatibility reporting.
+=============
+*/
+static void CL_RefreshPlatformServiceCvars( void ) {
+	Cvar_Set( "cl_onlineServicesMode", QL_GetOnlineServicesModeLabel() );
+	Cvar_Set( "cl_onlineServicesPolicy", QL_GetOnlineServicesPolicyLabel() );
+	Cvar_Set( "cl_identityBootstrapMode", CL_GetIdentityBootstrapModeLabel() );
+	Cvar_Set( "cl_identityBootstrapPolicy", CL_GetIdentityBootstrapPolicyLabel() );
+	Cvar_Set( "cl_voiceServiceMode", CL_GetVoiceServiceModeLabel() );
+	Cvar_Set( "cl_voiceServicePolicy", CL_GetVoiceServicePolicyLabel() );
+	Cvar_Set( "cl_matchmakingProvider", CL_GetMatchmakingServiceProviderLabel() );
+	Cvar_Set( "cl_matchmakingPolicy", CL_GetMatchmakingServicePolicyLabel() );
+	Cvar_Set( "cl_statsProvider", CL_GetStatsServiceProviderLabel() );
+	Cvar_Set( "cl_statsPolicy", CL_GetStatsServicePolicyLabel() );
+	Cvar_Set( "cl_socialOverlayProvider", CL_GetSocialOverlayServiceProviderLabel() );
+	Cvar_Set( "cl_socialOverlayPolicy", CL_GetSocialOverlayServicePolicyLabel() );
+	Cvar_Set( "ui_subscriptionBridgeMode", QL_GetOnlineServicesModeLabel() );
+	Cvar_Set( "ui_subscriptionBridgePolicy", QL_GetOnlineServicesPolicyLabel() );
+}
+
+/*
+=============
 CL_WorkshopServiceSupportsSteamBootstrap
 
 Returns qtrue when the retained Steam UGC bootstrap path is the active owner
@@ -330,7 +622,14 @@ Mirrors the retail stats_clear command through the Steam user-stats reset path.
 =============
 */
 static void CL_Steam_ClearStats_f( void ) {
-	QL_Steamworks_ClearStats( qtrue );
+	if ( !CL_SteamServicesEnabled() ) {
+		CL_LogStatsServiceIgnored( "stats_clear", "stats provider unavailable" );
+		return;
+	}
+
+	if ( !QL_Steamworks_ClearStats( qtrue ) ) {
+		CL_LogStatsServiceIgnored( "stats_clear", "clear request failed" );
+	}
 }
 
 static qboolean cl_voiceRecordingActive;
@@ -429,15 +728,17 @@ bridge as the current fallback when live voice services are unavailable.
 =============
 */
 static void CL_VoiceStartRecording_f( void ) {
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
+
 	if ( cl_voiceRecordingActive ) {
 		return;
 	}
 
 	cl_voiceRecordingActive = qtrue;
-	if ( CL_SteamServicesEnabled() ) {
-		uint32_t steamIdLow;
-		uint32_t steamIdHigh;
-
+	if ( !CL_SteamServicesEnabled() ) {
+		CL_LogVoiceServiceFallback( "+voice", "local speaking-state fallback active" );
+	} else {
 		if ( QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
 			QL_Steamworks_SetInGameVoiceSpeaking( steamIdLow, steamIdHigh, qtrue );
 		}
@@ -457,14 +758,16 @@ fallback when the key is released.
 =============
 */
 static void CL_VoiceStopRecording_f( void ) {
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
+
 	if ( !cl_voiceRecordingActive ) {
 		return;
 	}
 
-	if ( CL_SteamServicesEnabled() ) {
-		uint32_t steamIdLow;
-		uint32_t steamIdHigh;
-
+	if ( !CL_SteamServicesEnabled() ) {
+		CL_LogVoiceServiceFallback( "-voice", "local speaking-state fallback active" );
+	} else {
 		QL_Steamworks_StopVoiceRecording();
 		if ( QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh ) ) {
 			QL_Steamworks_SetInGameVoiceSpeaking( steamIdLow, steamIdHigh, qfalse );
@@ -1136,11 +1439,17 @@ static void CL_Steam_OverlayCommand_f( void ) {
 	uint32_t steamIdLow;
 	uint32_t steamIdHigh;
 
-	if ( Cmd_Argc() < 2 || !CL_SteamServicesEnabled() ) {
+	commandName = Cmd_Argv( 0 );
+	if ( Cmd_Argc() < 2 ) {
+		CL_LogSocialOverlayIgnored( commandName, "missing target client" );
 		return;
 	}
 
-	commandName = Cmd_Argv( 0 );
+	if ( !CL_SteamServicesEnabled() ) {
+		CL_LogSocialOverlayIgnored( commandName, "social overlay provider unavailable" );
+		return;
+	}
+
 	dialog = NULL;
 
 	if ( !Q_stricmp( commandName, "clientviewprofile" ) ) {
@@ -1150,15 +1459,19 @@ static void CL_Steam_OverlayCommand_f( void ) {
 	}
 
 	if ( !dialog ) {
+		CL_LogSocialOverlayIgnored( commandName, "unsupported social overlay verb" );
 		return;
 	}
 
 	clientNum = atoi( Cmd_Argv( 1 ) );
 	if ( !CL_GetClientSteamId( clientNum, &steamIdLow, &steamIdHigh ) ) {
+		CL_LogSocialOverlayIgnored( commandName, "target client has no Steam identity" );
 		return;
 	}
 
-	QL_Steamworks_ActivateOverlayToUser( dialog, steamIdLow, steamIdHigh );
+	if ( !QL_Steamworks_ActivateOverlayToUser( dialog, steamIdLow, steamIdHigh ) ) {
+		CL_LogSocialOverlayIgnored( commandName, "overlay activation failed" );
+	}
 }
 
 /*
@@ -2025,12 +2338,17 @@ static void CL_Steam_InitCallbacks( void ) {
 	ql_steam_lobby_callback_bindings_t lobbyBindings;
 	ql_steam_micro_callback_bindings_t microBindings;
 	ql_steam_workshop_callback_bindings_t workshopBindings;
+	const char *matchmakingProvider;
+	const char *matchmakingPolicy;
+	const char *statsProvider;
+	const char *statsPolicy;
 	const char *workshopProvider;
 	const char *workshopPolicy;
 
 	cl_steamCallbackState.callbackRegistrationActive = qfalse;
 	CL_Steam_ClearCurrentLobby();
 	CL_Steam_ClearBrowserEvents();
+	CL_RefreshPlatformServiceCvars();
 	if ( !CL_SteamServicesEnabled() ) {
 		return;
 	}
@@ -2060,12 +2378,18 @@ static void CL_Steam_InitCallbacks( void ) {
 	memset( &workshopBindings, 0, sizeof( workshopBindings ) );
 	workshopBindings.onItemInstalled = CL_Steam_Workshop_OnItemInstalled;
 	workshopBindings.onDownloadItemResult = CL_Steam_Workshop_OnDownloadItemResult;
+	matchmakingProvider = CL_GetMatchmakingServiceProviderLabel();
+	matchmakingPolicy = CL_GetMatchmakingServicePolicyLabel();
+	statsProvider = CL_GetStatsServiceProviderLabel();
+	statsPolicy = CL_GetStatsServicePolicyLabel();
 	workshopProvider = CL_GetWorkshopServiceProviderLabel();
 	workshopPolicy = CL_GetWorkshopServicePolicyLabel();
 
 	if ( !QL_Steamworks_RegisterClientCallbacks( &clientBindings ) ||
 		!QL_Steamworks_RegisterLobbyCallbacks( &lobbyBindings ) ||
 		!QL_Steamworks_RegisterMicroCallbacks( &microBindings ) ) {
+		Com_DPrintf( "Client callback bundle unavailable for matchmaking=%s [%s], stats=%s [%s]; keeping compatibility-only browser event fallback\n",
+			matchmakingProvider, matchmakingPolicy, statsProvider, statsPolicy );
 		QL_Steamworks_UnregisterMicroCallbacks();
 		QL_Steamworks_UnregisterLobbyCallbacks();
 		QL_Steamworks_UnregisterClientCallbacks();
@@ -2136,6 +2460,15 @@ ID into lobby_autoconnect.
 =============
 */
 static void CL_Steam_ConnectLobby_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		CL_LogMatchmakingServiceIgnored( "connect_lobby", "missing lobby id" );
+		return;
+	}
+
+	if ( !CL_SteamServicesEnabled() ) {
+		CL_LogMatchmakingServiceIgnored( "connect_lobby", "matchmaking provider unavailable" );
+	}
+
 	Cvar_Set( "lobby_autoconnect", Cmd_Argv( 1 ) );
 }
 
@@ -2151,7 +2484,9 @@ static void CL_Steam_SetMainMenuRichPresence( void ) {
 		return;
 	}
 
-	QL_Steamworks_SetRichPresence( "status", "At the main menu" );
+	if ( !QL_Steamworks_SetRichPresence( "status", "At the main menu" ) ) {
+		CL_LogMatchmakingServiceIgnored( "steam_presence_main_menu", "rich presence update failed" );
+	}
 }
 
 /*
@@ -2165,6 +2500,7 @@ static void CL_Steam_SyncPersonaNameCvar( void ) {
 	char personaName[MAX_CVAR_VALUE_STRING];
 
 	if ( !CL_SteamServicesEnabled() ) {
+		CL_LogIdentityBootstrapFallback( "steam_persona_name", "identity bootstrap provider unavailable" );
 		return;
 	}
 
@@ -2173,6 +2509,7 @@ static void CL_Steam_SyncPersonaNameCvar( void ) {
 	}
 
 	if ( !QL_Steamworks_Init() ) {
+		CL_LogIdentityBootstrapFallback( "steam_persona_name", "identity bootstrap initialisation failed" );
 		return;
 	}
 
@@ -2181,6 +2518,7 @@ static void CL_Steam_SyncPersonaNameCvar( void ) {
 		return;
 	}
 
+	CL_LogIdentityBootstrapFallback( "steam_persona_name", "persona unavailable; falling back to anon" );
 	Cvar_Set( "name", "anon" );
 }
 
@@ -2195,6 +2533,7 @@ static void CL_Steam_SeedCountryCvar( void ) {
 	char country[MAX_CVAR_VALUE_STRING];
 
 	if ( !CL_SteamServicesEnabled() ) {
+		CL_LogIdentityBootstrapFallback( "steam_country_seed", "identity bootstrap provider unavailable" );
 		return;
 	}
 
@@ -2204,12 +2543,16 @@ static void CL_Steam_SeedCountryCvar( void ) {
 	}
 
 	if ( !QL_Steamworks_Init() ) {
+		CL_LogIdentityBootstrapFallback( "steam_country_seed", "identity bootstrap initialisation failed" );
 		return;
 	}
 
 	if ( QL_Steamworks_GetIPCountry( country, sizeof( country ) ) && country[0] ) {
 		Cvar_Set( "country", country );
+		return;
 	}
+
+	CL_LogIdentityBootstrapFallback( "steam_country_seed", "country seed unavailable" );
 }
 
 /*
@@ -4632,6 +4975,24 @@ void CL_Init( void ) {
 	Cvar_Get ("web_browserActive", "0", CVAR_ROM );
 	Cvar_Get ("ui_browserAwesomiumProvider", "Unavailable", CVAR_ROM );
 	Cvar_Get ("ui_browserAwesomiumPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("ui_advertisementBridgeProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("ui_advertisementBridgePolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("ui_resourceBridgeProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("ui_resourceBridgePolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("ui_subscriptionBridgeMode", "Unavailable", CVAR_ROM );
+	Cvar_Get ("ui_subscriptionBridgePolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("cl_onlineServicesMode", "Unavailable", CVAR_ROM );
+	Cvar_Get ("cl_onlineServicesPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("cl_identityBootstrapMode", "Unavailable", CVAR_ROM );
+	Cvar_Get ("cl_identityBootstrapPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("cl_voiceServiceMode", "Unavailable", CVAR_ROM );
+	Cvar_Get ("cl_voiceServicePolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("cl_matchmakingProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("cl_matchmakingPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("cl_statsProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("cl_statsPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("cl_socialOverlayProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("cl_socialOverlayPolicy", "compatibility-unavailable", CVAR_ROM );
 	Cvar_Get ("web_zoom", "100", CVAR_ARCHIVE );
 	Cvar_Get ("web_console", "0", CVAR_ARCHIVE );
 	rcon_client_password = Cvar_Get ("rconPassword", "", CVAR_TEMP );
@@ -4726,6 +5087,7 @@ void CL_Init( void ) {
 	// cgame might not be initialized before menu is used
 	Cvar_Get ("cg_viewsize", "100", CVAR_ARCHIVE | CVAR_CLOUD );
 	
+	CL_RefreshPlatformServiceCvars();
 	CL_InitSteamResources();
 	CL_WebHost_Init();
 	

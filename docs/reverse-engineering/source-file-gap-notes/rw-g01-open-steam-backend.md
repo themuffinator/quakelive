@@ -14,13 +14,14 @@ The open adapter backend still decides accept, retry, and deny outcomes from tok
 
 - Standalone launcher tokens are accepted, retried, or denied based on payload length and substring checks such as `refresh`, `revoke`, and `denied`.
 - Steam fallback tickets are also accepted or denied from local string inspection rather than an external validation path.
+- The response payloads now explicitly call themselves an `Open adapter heuristic compatibility backend`, which keeps the bounded lane visible in auth logs and scripted QA traces.
 - The file is honest about being a bounded compatibility path, but it is still not a retail-equivalent service implementation.
 
 ## Function-by-function status
 
 | Function | Status | Notes |
 | --- | --- | --- |
-| `QL_PlatformBackendOpenSteam_Authenticate` | `gap owner` | This file is entirely the current heuristic open-adapter compatibility backend. |
+| `QL_PlatformBackendOpenSteam_Authenticate` | `gap owner` | Entire heuristic open-adapter compatibility backend; its response payloads now self-identify as such. |
 
 ## Closure target
 

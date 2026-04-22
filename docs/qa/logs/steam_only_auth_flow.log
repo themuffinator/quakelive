@@ -1,5 +1,14 @@
--- Scenario 1: Steamworks --
-[auth] Steamworks dispatch (/steam/session/validate): submitting credential
-[auth] Steamworks payload summary: ticket=TICKET-…cdef (len=23)
-[auth] Steamworks result -> outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
+-- Scenario 1: Steamworks success --
+[auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Steamworks [compatibility-only] payload summary: ticket=TICKET-…cdef (len=23)
+[auth] Steamworks [compatibility-only] result -> outcome=success, message="Steamworks heuristic compatibility backend accepted ticket (ticket=TICKET-…cdef)"
 
+-- Scenario 2: Steamworks malformed --
+[auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Steamworks [compatibility-only] payload summary: ticket=SHORT-TICKET (len=12)
+[auth] Steamworks [compatibility-only] result -> outcome=failure, message="Steamworks heuristic compatibility backend rejected ticket: payload too short"
+
+-- Scenario 3: Steamworks denied --
+[auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Steamworks [compatibility-only] payload summary: ticket=TICKET-…6789 (len=24)
+[auth] Steamworks [compatibility-only] result -> outcome=failure, message="Steamworks heuristic compatibility backend denied the ticket"

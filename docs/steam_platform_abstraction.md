@@ -47,14 +47,82 @@ Define the macros through your build system to toggle the desired providers:
 
 When the flags change, the service table automatically advertises the active providers and `QL_Auth_ExecuteRequest` logs both the provider name and the companion policy label reported by the table (for example, “Steamworks [compatibility-only]”, “Build-disabled (QL_BUILD_ONLINE_SERVICES=0) [compatibility-disabled (QL_BUILD_ONLINE_SERVICES=0)]”, or “Disabled by QL_DISABLE_EXTERNAL_ECOSYSTEMS [compatibility-disabled (QL_DISABLE_EXTERNAL_ECOSYSTEMS)]”).【F:src/common/platform/platform_services.c†L16-L110】【F:src/code/client/ql_auth.c†L200-L273】
 
-The browser/advert bridge now mirrors the active overlay descriptor into the ROM cvars `ui_browserAwesomiumProvider` and `ui_browserAwesomiumPolicy`, and the client overlay commands route blocked-command diagnostics through provider-aware log helpers. The workshop bootstrap likewise refuses to pretend that non-Steam-UGC compatibility providers own the retained Steam bootstrap path: it logs the active workshop provider/policy pair and falls back to the existing compatibility lane when the current descriptor is build-disabled, runtime-disabled, or otherwise not a Steam UGC owner.【F:src/code/client/cl_cgame.c†L3215-L3490】【F:src/code/client/cl_main.c†L108-L2140】
+The structural online-service lane now also exposes an overall mode/policy
+summary in addition to the feature-by-feature descriptors. The common helpers
+`QL_GetOnlineServicesModeLabel()` and `QL_GetOnlineServicesPolicyLabel()`
+collapse the cached auth/service-table view into labels such as
+`Build-disabled default (QL_BUILD_ONLINE_SERVICES=0)`,
+`Steamworks compatibility lane`, `Open-adapter compatibility lane`,
+`Hybrid compatibility lane`, or `Externally-disabled compatibility lane`,
+paired with policy labels like
+`compatibility-opt-in heuristic steamworks` or
+`compatibility-opt-in heuristic hybrid`. The client and dedicated server mirror
+those summary labels through the ROM cvars `cl_onlineServicesMode`,
+`cl_onlineServicesPolicy`, `sv_onlineServicesMode`, and
+`sv_onlineServicesPolicy` so the repo-wide online-service boundary is visible
+without inspecting each per-feature provider cvar individually.【F:src/common/platform/platform_services.c†L16-L164】【F:src/code/client/cl_main.c†L368-L379】【F:src/code/server/sv_init.c†L114-L126】
+
+That same structural summary now feeds the auth dispatcher's early exits too.
+Policy-blocked Steam or standalone requests emit an explicit
+`policy-blocked` lifecycle stage before transport dispatch, and failed Steam
+ticket acquisition reports `ticket-request-failed`, with both response paths
+naming the active overall mode/policy lane rather than falling back to generic
+build/runtime wording.【F:src/code/client/ql_auth.c†L139-L325】
+
+The browser/advert bridge now mirrors the active overlay descriptor into the
+ROM cvars `ui_browserAwesomiumProvider`,
+`ui_browserAwesomiumPolicy`, `ui_advertisementBridgeProvider`, and
+`ui_advertisementBridgePolicy`. The retained advert lifecycle hooks also emit
+provider-aware debug logs such as `Advert bridge init-ui ... via <provider>
+[<policy>]` or `Advert bridge set-active ... via <provider> [<policy>]`, so
+the compatibility-only advert bridge no longer hides behind the browser cvars
+alone. The client overlay commands route blocked-command diagnostics through
+the same provider-aware helpers. The workshop bootstrap likewise refuses to
+pretend that non-Steam-UGC compatibility providers own the retained Steam
+bootstrap path: it logs the active workshop provider/policy pair and falls
+back to the existing compatibility lane when the current descriptor is
+build-disabled, runtime-disabled, or otherwise not a Steam UGC owner.【F:src/code/client/cl_cgame.c†L3215-L3490】【F:src/code/client/cl_main.c†L108-L2142】
+
+The retained client matchmaking, stats, and social-overlay seams now follow the
+same contract. `CL_Init` and `CL_Steam_InitCallbacks` mirror the active
+descriptor labels through the ROM cvars `cl_matchmakingProvider`,
+`cl_matchmakingPolicy`, `cl_statsProvider`, `cl_statsPolicy`,
+`cl_socialOverlayProvider`, and `cl_socialOverlayPolicy`, while
+`stats_clear`, `connect_lobby`, `clientviewprofile`, `clientfriendinvite`, the
+main-menu rich-presence seed, and the client callback-bundle fallback logs all
+spell out the current provider/policy pair instead of silently reading like the
+retail Steam owner lane.【F:src/code/client/cl_main.c†L176-L2397】
+
+The retained client voice seam now mirrors the overall online-services lane
+through the ROM cvars `cl_voiceServiceMode` and `cl_voiceServicePolicy`.
+`+voice` and `-voice` keep the retail local speaking-state bridge as the
+bounded fallback when Steam voice is unavailable, but they now emit explicit
+`voice fallback` diagnostics naming the active overall mode/policy lane rather
+than silently degrading to the local-only path.【F:src/code/client/cl_main.c†L176-L2397】
+
+The retained client identity/bootstrap and UI subscription seams now follow
+that same structural summary too. `CL_Init` mirrors the current mode/policy
+through the ROM cvars `cl_identityBootstrapMode`,
+`cl_identityBootstrapPolicy`, `ui_subscriptionBridgeMode`, and
+`ui_subscriptionBridgePolicy`, while the Steam persona-name seed, Steam
+country seed, and the UI `IsSubscribedApp` import emit explicit
+compatibility-lane diagnostics instead of silently short-circuiting as though
+the retail Steam owner still existed. Persona lookup still falls back to
+`anon`, and the country seed still leaves the userinfo field unchanged when no
+country is available, but those retained compatibility outcomes are now named
+at runtime too.【F:src/code/client/cl_main.c†L176-L2478】【F:src/code/client/cl_ui.c†L1556-L1594】
 
 The retained live-resource bridge now follows the same overlay descriptor too.
 `steam://` resource requests, avatar fetch failures, launcher/web fallback
 failures, and the disabled resource-bridge startup path all log the active
 overlay provider/policy pair instead of generic “Steam backend unavailable”
 messages, which keeps the compatibility-only browser/resource lane explicit
-when the menu falls back to launcher-backed data sources or stubs.
+when the menu falls back to launcher-backed data sources or stubs. The client
+now also mirrors that retained lane through the ROM cvars
+`ui_resourceBridgeProvider` and `ui_resourceBridgePolicy`, and the cgame
+avatar import no longer short-circuits ahead of the provider-aware stub path,
+so disabled `steam://avatar/...` lookups still report the current
+compatibility owner instead of failing silently.【F:src/code/client/cl_steam_resources.c†L31-L733】【F:src/code/client/cl_cgame.c†L5046-L5063】
 
 The dedicated-server owner now mirrors the same labeling into the ROM cvars
 `sv_platformAuthProvider`, `sv_platformAuthPolicy`,
@@ -66,7 +134,7 @@ pair, while the structured auth telemetry intentionally preserves the legacy
 
 ## Mocked End-to-End Flow
 
-`QL_Auth_ExecuteRequest` (implemented in `src/code/client/ql_auth.c`) now owns the end-to-end flow. Steam tickets and standalone launcher tokens are forwarded to the active backend discovered via `QL_GetPlatformServices`, so the dispatcher honours Steamworks-only, open-only, and hybrid builds without code changes.【F:src/code/client/ql_auth.c†L200-L273】 Each backend emits lifecycle logs that now include both the provider label and the companion compatibility policy label, and classifies the result as success, retry, or failure using the heuristics defined alongside the dispatcher.【F:src/code/client/ql_auth.c†L111-L225】 `QL_RequestExternalAuth` clears the response, invokes the dispatcher, and reports structured outcomes back to the caller, replacing the earlier mock helper entirely.【F:src/common/auth_credentials.c†L120-L154】
+`QL_Auth_ExecuteRequest` (implemented in `src/code/client/ql_auth.c`) now owns the end-to-end flow. Steam tickets and standalone launcher tokens are forwarded to the active backend discovered via `QL_GetPlatformServices`, so the dispatcher honours Steamworks-only, open-only, and hybrid builds without code changes.【F:src/code/client/ql_auth.c†L200-L325】 Each backend emits lifecycle logs that now include both the provider label and the companion compatibility policy label, classifies the result as success, retry, or failure using the heuristics defined alongside the dispatcher, and returns response payloads that explicitly identify the heuristic compatibility backend that produced them instead of reading like retail service verdicts. The policy-blocked and ticket-request-failed early exits now also surface the structural overall online-services mode/policy label, while hybrid fallback traces log the handoff into the open adapter before the fallback credential is dispatched, which keeps the bounded compatibility-only auth lane explicit during scripted QA capture too.【F:src/code/client/ql_auth.c†L111-L325】【F:src/common/platform/backends/platform_backend_steamworks.c†L1-L31】【F:src/common/platform/backends/platform_backend_open_steam.c†L1-L47】 `QL_RequestExternalAuth` clears the response, invokes the dispatcher, and reports structured outcomes back to the caller, replacing the earlier mock helper entirely.【F:src/common/auth_credentials.c†L120-L154】
 
 ## QA Matrix
 
@@ -75,6 +143,6 @@ Quality assurance must validate four build flavours:
 1. **Default offline build** (`QL_BUILD_ONLINE_SERVICES=0`): confirm the service table reports `Build-disabled (QL_BUILD_ONLINE_SERVICES=0)`, advert/web fetch paths short-circuit cleanly, and Steam/auth requests fail with policy messages instead of live-service attempts.
 2. **Steamworks-enabled** (`QL_BUILD_ONLINE_SERVICES=1`, `QL_BUILD_STEAMWORKS=1`, `QL_BUILD_OPEN_STEAM=0`): confirm Steam APIs initialise, callbacks fire, and tickets trigger the Steam handler inside `QL_Auth_ExecuteRequest`. Validate matchmaking delegates to Steam-only descriptors.
 3. **Open-source-only** (`QL_BUILD_ONLINE_SERVICES=1`, `QL_BUILD_STEAMWORKS=0`, `QL_BUILD_OPEN_STEAM=1`): ensure REST payloads follow the documented schemas, open adapters advertise support for all five features, and overlay commands surface through the JSON RPC bridge.
-4. **Hybrid** (`QL_BUILD_ONLINE_SERVICES=1`, `QL_BUILD_STEAMWORKS=1`, `QL_BUILD_OPEN_STEAM=1`): simulate Steam downtime by providing a ticket flagged for retry and observe the fallback to the open adapter. Expect the client log `[auth] Hybrid result -> … Hybrid fallback accepted credential via open adapter …` while the service table advertises combined providers (e.g., matchmaking lists “Hybrid: Steamworks + GameNetworkingSockets”).【F:src/common/platform/platform_services.c†L16-L89】【F:src/code/client/ql_auth.c†L152-L225】【F:src/code/client/ql_auth.c†L200-L273】
+4. **Hybrid** (`QL_BUILD_ONLINE_SERVICES=1`, `QL_BUILD_STEAMWORKS=1`, `QL_BUILD_OPEN_STEAM=1`): simulate Steam downtime by providing a ticket flagged for retry and observe the fallback to the open adapter. Expect the client log to include an explicit `hybrid-fallback` handoff stage plus the final result `Hybrid fallback accepted credential via heuristic open adapter …` while the service table advertises combined providers (e.g., matchmaking lists “Hybrid: Steamworks + GameNetworkingSockets”).【F:src/common/platform/platform_services.c†L16-L89】【F:src/code/client/ql_auth.c†L152-L225】【F:src/code/client/ql_auth.c†L200-L273】
 
 Each scenario should capture logs of the response payloads plus assertions that feature availability flags match expectations.

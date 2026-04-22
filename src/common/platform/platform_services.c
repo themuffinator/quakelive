@@ -107,6 +107,80 @@ const char *QL_DescribePlatformFeaturePolicy( const ql_platform_feature_descript
 	return "compatibility-unavailable";
 }
 
+/*
+=============
+QL_GetOnlineServicesModeLabel
+
+Returns a high-level mode label summarising the current retained online-service
+lane derived from the cached service table and build/runtime policy.
+=============
+*/
+const char *QL_GetOnlineServicesModeLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+	const char *provider;
+
+	if ( !services ) {
+		return "Unavailable";
+	}
+
+	provider = services->auth.provider ? services->auth.provider : "";
+
+	if ( strstr( provider, "QL_BUILD_ONLINE_SERVICES=0" ) != NULL ) {
+		return "Build-disabled default (QL_BUILD_ONLINE_SERVICES=0)";
+	}
+
+	if ( strstr( provider, "QL_DISABLE_EXTERNAL_ECOSYSTEMS" ) != NULL ) {
+		return "Externally-disabled compatibility lane";
+	}
+
+#if QL_PLATFORM_BUILD_HYBRID
+	return "Hybrid compatibility lane";
+#elif QL_PLATFORM_HAS_STEAMWORKS
+	return "Steamworks compatibility lane";
+#elif QL_PLATFORM_HAS_OPEN_STEAM
+	return "Open-adapter compatibility lane";
+#else
+	return "Unavailable";
+#endif
+}
+
+/*
+=============
+QL_GetOnlineServicesPolicyLabel
+
+Returns a high-level compatibility policy label summarising the current
+online-service lane across the cached service table.
+=============
+*/
+const char *QL_GetOnlineServicesPolicyLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+	const char *authPolicy;
+
+	if ( !services ) {
+		return "compatibility-unavailable";
+	}
+
+	authPolicy = QL_DescribePlatformFeaturePolicy( &services->auth );
+
+	if ( strstr( authPolicy, "compatibility-disabled" ) != NULL ) {
+		return authPolicy;
+	}
+
+#if QL_PLATFORM_BUILD_HYBRID
+	return "compatibility-opt-in heuristic hybrid";
+#elif QL_PLATFORM_HAS_STEAMWORKS
+	if ( services->auth.compiled && !services->auth.initialised ) {
+		return "compatibility-opt-in heuristic steamworks (provider unavailable)";
+	}
+
+	return "compatibility-opt-in heuristic steamworks";
+#elif QL_PLATFORM_HAS_OPEN_STEAM
+	return "compatibility-opt-in heuristic open-adapter";
+#else
+	return authPolicy;
+#endif
+}
+
 #if QL_PLATFORM_HAS_STEAMWORKS
 /*
 =============

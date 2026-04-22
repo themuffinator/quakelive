@@ -41,6 +41,27 @@ non-retail providers are part of the strict-retail path.
 
 Each dispatch now prints both the provider label and the compatibility policy label, summarizes the credential using a masked preview, and writes the final outcome to the shared response object.【F:src/code/client/ql_auth.c†L44-L273】 This keeps default-disabled or provider-unavailable builds explicit in the client logs instead of collapsing them into a generic dispatcher-only message. The service table ensures that builds compiled without a given backend still advertise accurate capabilities.【F:src/common/platform/platform_services.c†L16-L110】
 
+The same common layer now also exposes an overall online-service mode/policy
+summary through `QL_GetOnlineServicesModeLabel()` and
+`QL_GetOnlineServicesPolicyLabel()`. Those helpers collapse the cached service
+table into a single compatibility-lane label such as
+`Build-disabled default (QL_BUILD_ONLINE_SERVICES=0)`,
+`Steamworks compatibility lane`, `Open-adapter compatibility lane`, or
+`Hybrid compatibility lane`, paired with a policy label that stays explicit
+about whether the current lane is default-disabled, runtime-disabled, or an
+opted-in heuristic compatibility path. The client mirrors those labels through
+the ROM cvars `cl_onlineServicesMode` and `cl_onlineServicesPolicy`, while the
+server mirrors them through `sv_onlineServicesMode` and
+`sv_onlineServicesPolicy`, which keeps the structural `RW-G01` boundary visible
+outside the per-feature provider cvars too.
+
+Those overall labels now also drive the dispatcher's early failure paths.
+Steam and standalone requests that never reach a backend emit an explicit
+`policy-blocked` lifecycle stage naming the active overall mode/policy pair
+before dispatch, and Steam ticket-acquisition failures similarly report a
+`ticket-request-failed` stage plus a response tied to the same structural lane
+instead of the older generic build/runtime wording.
+
 The retained server auth owner now mirrors that same compatibility story instead
 of hiding it behind generic Steam-only wording. `SV_LogPlatformAuth` preserves
 the legacy `credential=steam` telemetry field for downstream log consumers, but
@@ -54,7 +75,7 @@ ownership.
 
 ## Structured Outcomes
 
-Handlers normalise their decisions into three high-level outcomes so callers can distinguish fatal errors from transient hiccups. The heuristics live inside the platform backends so each build flavour (Steamworks, open adapter, or hybrid) shares consistent responses.【F:src/common/platform/backends/platform_backend_steamworks.c†L1-L29】【F:src/common/platform/backends/platform_backend_open_steam.c†L1-L47】 Hybrid builds automatically replay Steam credentials through the open adapter whenever the Steamworks backend reports `QL_AUTH_RESULT_PENDING`, preserving the fallback response when it accepts the credential so downtime still produces a `success` outcome.【F:src/code/client/ql_auth.c†L139-L212】【F:tests/test_platform_services.py†L134-L177】
+Handlers normalise their decisions into three high-level outcomes so callers can distinguish fatal errors from transient hiccups. The heuristics live inside the platform backends so each build flavour (Steamworks, open adapter, or hybrid) shares consistent responses, and those response payloads now explicitly identify the heuristic compatibility backend that produced them instead of reading like a retail live-service verdict.【F:src/common/platform/backends/platform_backend_steamworks.c†L1-L31】【F:src/common/platform/backends/platform_backend_open_steam.c†L1-L47】 Hybrid builds automatically replay Steam credentials through the open adapter whenever the Steamworks backend reports `QL_AUTH_RESULT_PENDING`, and the dispatcher now emits an explicit `hybrid-fallback` stage before the open-adapter dispatch so the compatibility-only handoff stays visible in lifecycle traces too.【F:src/code/client/ql_auth.c†L139-L225】【F:tests/test_platform_services.py†L134-L177】
 
 - `success` – the credential was accepted and the legacy code path may continue.
 - `retry` – the backend asked for another attempt (for example, a Steam ticket marked with `retry` or a standalone token containing `refresh`).【F:src/common/platform/backends/platform_backend_steamworks.c†L12-L23】【F:src/common/platform/backends/platform_backend_open_steam.c†L25-L33】
@@ -70,16 +91,16 @@ Run the simulation script to capture an end-to-end trace for both providers:
 python3 tools/integration/auth_flow_trace.py
 ```
 
-The script drives representative credentials through the same heuristics used in the C implementation and prints the dispatch/result logs.【F:tools/integration/auth_flow_trace.py†L1-L113】 Example output:
+The script drives representative credentials through the same heuristics used in the C implementation and prints the dispatch/result logs.【F:tools/integration/auth_flow_trace.py†L1-L137】 Example output:
 
 ```text
 == Auth Flow Lifecycle ==
 Provider/token combinations demonstrate success, retry, and failure paths.
 
--- Scenario 1: Steamworks --
+-- Scenario 1: Steamworks success --
 [auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential
 [auth] Steamworks [compatibility-only] payload summary: ticket=TICKET-…cdef (len=23)
-[auth] Steamworks [compatibility-only] result -> outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
+[auth] Steamworks [compatibility-only] result -> outcome=success, message="Steamworks heuristic compatibility backend accepted ticket (ticket=TICKET-…cdef)"
 ```
 
-Use the remaining scenarios from the script to validate retry and failure paths for Steamworks, hybrid fallback, and the standalone launcher. Each log line corresponds to the callbacks issued by the client dispatcher when `QL_RequestExternalAuth` runs during a real handshake.【F:src/code/client/ql_auth.c†L26-L273】【F:tools/integration/auth_flow_trace.py†L1-L113】
+Use the remaining scenarios from the script to validate malformed, denied, retry, hybrid-fallback, revoked-token, and accepted-token paths for the retained compatibility backends. Each log line corresponds to the callbacks issued by the client dispatcher when `QL_RequestExternalAuth` runs during a real handshake, including the explicit hybrid fallback handoff into the open adapter when Steamworks returns a retry-eligible result.【F:src/code/client/ql_auth.c†L26-L273】【F:tools/integration/auth_flow_trace.py†L1-L137】

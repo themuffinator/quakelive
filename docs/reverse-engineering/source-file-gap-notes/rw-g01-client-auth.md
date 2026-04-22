@@ -12,8 +12,9 @@ The client auth owner cleanly reconstructs the dispatcher and ticket lifetime, b
 
 ## Observed facts
 
-- Steam auth requests are blocked entirely when `CL_SteamServicesEnabled()` is false.
-- Standalone launcher auth is blocked when `CL_OnlineServicesEnabled()` is false.
+- Steam auth requests are blocked entirely when `CL_SteamServicesEnabled()` is false, and the dispatcher now emits a `policy-blocked` lifecycle stage plus response text that names the active overall online-services mode/policy label before any backend dispatch occurs.
+- Standalone launcher auth is blocked when `CL_OnlineServicesEnabled()` is false, with the same explicit `policy-blocked` stage and structural mode/policy response wording.
+- Steam ticket-acquisition failures now log `ticket-request-failed` and report the active overall online-services mode/policy lane instead of a generic ticket-request error.
 - Hybrid dispatch explicitly falls back to the open adapter whenever the Steamworks lane does not accept the credential.
 
 ## Function-by-function status
@@ -26,6 +27,8 @@ The client auth owner cleanly reconstructs the dispatcher and ticket lifetime, b
 | `QL_ClientAuth_LogStage` | `helper closed` | Local helper or logging function; not the direct remaining parity blocker on its own. |
 | `QL_ClientAuth_LogResponse` | `helper closed` | Local helper or logging function; not the direct remaining parity blocker on its own. |
 | `QL_ClientAuth_TokenPreview` | `helper closed` | Local helper or logging function; not the direct remaining parity blocker on its own. |
+| `QL_ClientAuth_GetEndpoint` | `helper closed` | Keeps the retained endpoint labels stable across provider/policy diagnostics. |
+| `QL_ClientAuth_ReportPolicyBlock` | `helper closed` | Centralises the explicit overall mode/policy wording for early blocked auth requests. |
 | `QL_ClientAuth_InvokeBackend` | `bounded compatibility` | Reports build-unavailable backend states instead of closing the live-service lane. |
 | `QL_ClientAuth_SetSteamTicketHandle` | `helper closed` | Local helper or logging function; not the direct remaining parity blocker on its own. |
 | `QL_ClientAuth_RequestSteamTicket` | `bounded compatibility` | Still depends on the build/runtime Steam-service gate before any online auth path exists. |

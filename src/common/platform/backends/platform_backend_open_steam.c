@@ -19,48 +19,48 @@ qboolean QL_PlatformBackendOpenSteam_Authenticate( const ql_auth_credential_t *c
 
     if ( credential->length == 0 ) {
         QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED,
-            "Open adapter rejected credential: payload missing" );
+            "Open adapter heuristic compatibility backend rejected credential: payload missing" );
         return qtrue;
     }
 
     if ( isStandalone ) {
         if ( credential->length < 12 ) {
             QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED,
-                "Standalone token rejected: payload too short" );
+                "Open adapter heuristic compatibility backend rejected standalone token: payload too short" );
             return qtrue;
         }
 
         if ( strstr( credential->value, "refresh" ) ) {
             QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_PENDING,
-                "Launcher token expired, request a refresh" );
+                "Open adapter heuristic compatibility backend requested launcher token refresh" );
             return qtrue;
         }
 
         if ( strstr( credential->value, "revoke" ) || strstr( credential->value, "denied" ) ) {
             QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED,
-                "Launcher revoked the token" );
+                "Open adapter heuristic compatibility backend treated token as revoked" );
             return qtrue;
         }
 
         QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ACCEPTED,
-            "Standalone token accepted (token=%s)", preview );
+            "Open adapter heuristic compatibility backend accepted standalone token (token=%s)", preview );
         return qtrue;
     }
 
     if ( credential->length < 16 ) {
         QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED,
-            "Open adapter rejected Steam credential: payload too short" );
+            "Open adapter heuristic compatibility backend rejected Steam credential: payload too short" );
         return qtrue;
     }
 
     if ( strstr( credential->value, "denied" ) || strstr( credential->value, "invalid" ) ) {
         QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED,
-            "Open adapter respected Steam denial" );
+            "Open adapter heuristic compatibility backend respected Steam denial" );
         return qtrue;
     }
 
     QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ACCEPTED,
-        "Open adapter accepted Steam ticket (ticket=%s)", preview );
+        "Open adapter heuristic compatibility backend accepted Steam ticket (ticket=%s)", preview );
     return qtrue;
 }
 

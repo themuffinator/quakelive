@@ -1,22 +1,39 @@
 == Auth Flow Lifecycle ==
 Provider/token combinations demonstrate success, retry, and failure paths.
 
--- Scenario 1: Steamworks --
-[auth] Steamworks dispatch (/steam/session/validate): submitting credential
-[auth] Steamworks payload summary: ticket=TICKET-…cdef (len=23)
-[auth] Steamworks result -> outcome=success, message="Steam session established (ticket=TICKET-…cdef)"
+-- Scenario 1: Steamworks success --
+[auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Steamworks [compatibility-only] payload summary: ticket=TICKET-…cdef (len=23)
+[auth] Steamworks [compatibility-only] result -> outcome=success, message="Steamworks heuristic compatibility backend accepted ticket (ticket=TICKET-…cdef)"
 
--- Scenario 2: Hybrid --
-[auth] Hybrid dispatch (/steam/session/validate): submitting credential
-[auth] Hybrid payload summary: ticket=retry:T…FFFF (len=21)
-[auth] Hybrid result -> outcome=success, message="Hybrid fallback accepted credential via open adapter (token=retry:T…FFFF)"
+-- Scenario 2: Steamworks malformed --
+[auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Steamworks [compatibility-only] payload summary: ticket=SHORT-TICKET (len=12)
+[auth] Steamworks [compatibility-only] result -> outcome=failure, message="Steamworks heuristic compatibility backend rejected ticket: payload too short"
 
--- Scenario 3: Open Steam Adapter --
-[auth] Open Steam Adapter dispatch (/launcher/auth/verify): submitting credential
-[auth] Open Steam Adapter payload summary: token=JWT-abc…resh (len=18)
-[auth] Open Steam Adapter result -> outcome=retry, message="Launcher token expired, request a refresh"
+-- Scenario 3: Steamworks denied --
+[auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Steamworks [compatibility-only] payload summary: ticket=TICKET-…6789 (len=24)
+[auth] Steamworks [compatibility-only] result -> outcome=failure, message="Steamworks heuristic compatibility backend denied the ticket"
 
--- Scenario 4: Open Steam Adapter --
-[auth] Open Steam Adapter dispatch (/launcher/auth/verify): submitting credential
-[auth] Open Steam Adapter payload summary: token=TOKEN-V…7890 (len=22)
-[auth] Open Steam Adapter result -> outcome=success, message="Standalone token accepted (token=TOKEN-V…7890)"
+-- Scenario 4: Hybrid fallback --
+[auth] Hybrid [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Hybrid [compatibility-only] payload summary: ticket=retry:T…FFFF (len=21)
+[auth] Hybrid [compatibility-only] hybrid-fallback (/steam/session/validate): Steamworks heuristic compatibility backend returned retry; dispatching open adapter fallback
+[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting fallback credential
+[auth] Hybrid [compatibility-only] result -> outcome=success, message="Hybrid fallback accepted credential via heuristic open adapter (token=retry:T…FFFF)"
+
+-- Scenario 5: Open adapter refresh --
+[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting credential
+[auth] Open Steam Adapter [compatibility-only] payload summary: token=JWT-abc…resh (len=18)
+[auth] Open Steam Adapter [compatibility-only] result -> outcome=retry, message="Open adapter heuristic compatibility backend requested launcher token refresh"
+
+-- Scenario 6: Open adapter revoked --
+[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting credential
+[auth] Open Steam Adapter [compatibility-only] payload summary: token=TOKEN-r…7890 (len=23)
+[auth] Open Steam Adapter [compatibility-only] result -> outcome=failure, message="Open adapter heuristic compatibility backend treated token as revoked"
+
+-- Scenario 7: Open adapter success --
+[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting credential
+[auth] Open Steam Adapter [compatibility-only] payload summary: token=TOKEN-V…7890 (len=22)
+[auth] Open Steam Adapter [compatibility-only] result -> outcome=success, message="Open adapter heuristic compatibility backend accepted standalone token (token=TOKEN-V…7890)"

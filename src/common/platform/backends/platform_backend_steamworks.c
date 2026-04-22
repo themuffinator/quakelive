@@ -11,22 +11,25 @@ qboolean QL_PlatformBackendSteamworks_Authenticate( const ql_auth_credential_t *
     QL_Backend_FormatCredentialPreview( credential, preview, sizeof( preview ) );
 
     if ( credential->length < 16 ) {
-        QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED, "Steam ticket rejected: payload too short" );
+        QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED,
+            "Steamworks heuristic compatibility backend rejected ticket: payload too short" );
         return qtrue;
     }
 
     if ( strstr( credential->value, "retry" ) ) {
-        QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_PENDING, "Steam service busy, retry with refreshed ticket" );
+        QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_PENDING,
+            "Steamworks heuristic compatibility backend reported busy; retry with refreshed ticket" );
         return qtrue;
     }
 
     if ( strstr( credential->value, "denied" ) || strstr( credential->value, "invalid" ) ) {
-        QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED, "Steam backend denied the ticket" );
+        QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_DENIED,
+            "Steamworks heuristic compatibility backend denied the ticket" );
         return qtrue;
     }
 
     QL_Backend_SetAuthResponse( response, QL_AUTH_RESULT_ACCEPTED,
-        "Steam session established (ticket=%s)", preview );
+        "Steamworks heuristic compatibility backend accepted ticket (ticket=%s)", preview );
     return qtrue;
 }
 

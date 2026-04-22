@@ -127,6 +127,19 @@ static void CL_LogSteamResourceRequestStubbed( const char *url ) {
 
 /*
 =============
+CL_RefreshSteamResourceBridgeCvars
+
+Mirrors the retained live-resource bridge provider/policy labels through ROM
+cvars for diagnostics and bounded compatibility reporting.
+=============
+*/
+static void CL_RefreshSteamResourceBridgeCvars( void ) {
+	Cvar_Set( "ui_resourceBridgeProvider", CL_GetSteamResourceServiceProviderLabel() );
+	Cvar_Set( "ui_resourceBridgePolicy", CL_GetSteamResourceServicePolicyLabel() );
+}
+
+/*
+=============
 CL_SteamResources_IsSteamURL
 
 Returns qtrue when the provided resource begins with the Steam URL scheme.
@@ -672,6 +685,7 @@ Initialises the Steam resource bridge and related configuration.
 void CL_InitSteamResources( void ) {
 	Com_Memset( cl_steamResources, 0, sizeof( cl_steamResources ) );
 	cl_steamResourceGeneration = 1;
+	CL_RefreshSteamResourceBridgeCvars();
 
 	if ( !CL_SteamServicesEnabled() ) {
 		Com_Printf( "Steam resource bridge disabled for %s [%s]; keeping launcher/web fallback resource bridge.\n",

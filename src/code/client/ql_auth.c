@@ -160,6 +160,61 @@ static void QL_ClientAuth_TokenPreview( const ql_auth_credential_t *credential, 
 
 /*
 =============
+QL_ClientAuth_GetEndpoint
+
+Returns the retained request endpoint label for one credential kind.
+=============
+*/
+static const char *QL_ClientAuth_GetEndpoint( qlAuthCredentialKind kind ) {
+	switch ( kind ) {
+		case QL_AUTH_CREDENTIAL_STEAM:
+		return "/steam/session/validate";
+		case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
+		return "/launcher/auth/verify";
+		default:
+		return "<unroutable>";
+	}
+}
+
+/*
+=============
+QL_ClientAuth_ReportPolicyBlock
+
+Publishes a policy-blocked auth result using the structural online-services
+mode and policy labels.
+=============
+*/
+static qboolean QL_ClientAuth_ReportPolicyBlock( const ql_client_auth_transport_t *transport, ql_auth_response_t *response, const char *requestLabel ) {
+	char detail[256];
+	const char *responseLabel = requestLabel ? requestLabel : "Authentication";
+	const char *modeLabel = QL_GetOnlineServicesModeLabel();
+	const char *policyLabel = QL_GetOnlineServicesPolicyLabel();
+
+	if ( requestLabel ) {
+		if ( !Q_stricmp( requestLabel, "Steam authentication" ) ) {
+			responseLabel = "Steam";
+		} else if ( !Q_stricmp( requestLabel, "Standalone launcher authentication" ) ) {
+			responseLabel = "Standalone";
+		}
+	}
+
+	Com_sprintf( detail, sizeof( detail ), "%s blocked by %s [%s] before dispatch",
+		requestLabel ? requestLabel : "Authentication",
+		modeLabel ? modeLabel : "Unavailable",
+		policyLabel ? policyLabel : "compatibility-unavailable" );
+	QL_ClientAuth_LogStage( transport, "policy-blocked", detail );
+
+	QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
+		"%s blocked: %s [%s]",
+		responseLabel,
+		modeLabel ? modeLabel : "Unavailable",
+		policyLabel ? policyLabel : "compatibility-unavailable" );
+	QL_ClientAuth_LogResponse( transport, response );
+	return qfalse;
+}
+
+/*
+=============
 QL_ClientAuth_InvokeBackend
 
 Invokes a backend authenticator if present, emitting an error otherwise.
@@ -324,26 +379,42 @@ Attempts Steamworks validation first, falling back to the open adapter on retry-
 */
 static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
 	ql_auth_response_t steamResponse;
+	ql_client_auth_transport_t fallbackTransport;
+	qboolean handled;
+	qboolean fallbackEligible;
+	qboolean fallbackHandled;
+	char preview[32];
 	memset( &steamResponse, 0, sizeof( steamResponse ) );
 
-	qboolean handled = QL_ClientAuth_HandleSteamworksTicket( transport, credential, &steamResponse );
+	handled = QL_ClientAuth_HandleSteamworksTicket( transport, credential, &steamResponse );
 
 	if ( handled && steamResponse.result == QL_AUTH_RESULT_ACCEPTED ) {
 		*response = steamResponse;
 		return qtrue;
 	}
 
-	qboolean fallbackEligible = !handled || steamResponse.result == QL_AUTH_RESULT_PENDING;
+	fallbackEligible = !handled || steamResponse.result == QL_AUTH_RESULT_PENDING;
 	if ( fallbackEligible ) {
-		qboolean fallbackHandled = QL_ClientAuth_HandleOpenSteamTicket( credential, response );
+		QL_ClientAuth_LogStage( transport,
+			"hybrid-fallback",
+			handled
+				? "Steamworks heuristic compatibility backend returned retry; dispatching open adapter fallback"
+				: "Steamworks compatibility path unavailable; dispatching open adapter fallback" );
+
+		fallbackTransport.descriptor.provider = "Open Steam Adapter";
+		fallbackTransport.descriptor.endpoint = "/launcher/auth/verify";
+		fallbackTransport.logPrefix = "Open Steam Adapter";
+		fallbackTransport.policyLabel = transport && transport->policyLabel ? transport->policyLabel : "compatibility-unavailable";
+		QL_ClientAuth_LogStage( &fallbackTransport, "dispatch", "submitting fallback credential" );
+
+		fallbackHandled = QL_ClientAuth_HandleOpenSteamTicket( credential, response );
 
 		if ( fallbackHandled ) {
 			if ( response->result == QL_AUTH_RESULT_ACCEPTED ) {
-				char preview[32];
 				QL_ClientAuth_TokenPreview( credential, preview, sizeof( preview ) );
 
 				QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ACCEPTED,
-				"Hybrid fallback accepted credential via open adapter (token=%s)", preview );
+				"Hybrid fallback accepted credential via heuristic open adapter (token=%s)", preview );
 			}
 
 			return qtrue;
@@ -366,11 +437,13 @@ Selects the correct Steam validation path for the configured provider.
 =============
 */
 static qboolean QL_ClientAuth_DispatchSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
+	const char *provider;
+
 	if ( !transport || !credential ) {
 		return qfalse;
 	}
 
-	const char *provider = transport->descriptor.provider ? transport->descriptor.provider : "";
+	provider = transport->descriptor.provider ? transport->descriptor.provider : "";
 
 	if ( !Q_stricmp( provider, "Hybrid" ) ) {
 		return QL_ClientAuth_HandleHybridSteam( transport, credential, response );
@@ -392,8 +465,17 @@ Dispatches a credential to the configured auth backend and reports the result.
 */
 qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {
 	const ql_auth_credential_t *activeCredential;
+	const ql_platform_service_table *services;
+	qboolean authCompiled;
+	qboolean authInitialised;
+	const char *provider;
+	const char *policyLabel;
+	const char *endpoint;
+	ql_client_auth_transport_t transport;
 	ql_auth_credential_t steamCredential;
 	char steamHex[QL_AUTH_MAX_CREDENTIAL_STORAGE];
+	char preview[32];
+	qboolean handled;
 
 	if ( !credential || !response ) {
 		return qfalse;
@@ -401,20 +483,33 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 
 	activeCredential = credential;
 	steamHex[0] = '\0';
+	services = QL_GetPlatformServices();
+	authCompiled = services && services->auth.compiled;
+	authInitialised = services && services->auth.initialised;
+	provider = services && services->auth.provider ? services->auth.provider : "dispatcher";
+	policyLabel = services ? QL_DescribePlatformFeaturePolicy( &services->auth ) : "compatibility-unavailable";
+	endpoint = QL_ClientAuth_GetEndpoint( credential->kind );
+
+	transport.descriptor.provider = provider;
+	transport.descriptor.endpoint = endpoint;
+	transport.logPrefix = provider;
+	transport.policyLabel = policyLabel;
 
 	if ( credential->kind == QL_AUTH_CREDENTIAL_STEAM ) {
 		if ( !CL_SteamServicesEnabled() ) {
-			QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
-			"Steam authentication disabled by build/runtime policy" );
-			return qfalse;
+			return QL_ClientAuth_ReportPolicyBlock( &transport, response, "Steam authentication" );
 		}
 
 		QL_InitAuthCredential( &steamCredential );
 		steamCredential.kind = QL_AUTH_CREDENTIAL_STEAM;
 
 		if ( !QL_ClientAuth_RequestSteamTicket( &steamCredential, steamHex, sizeof( steamHex ) ) ) {
+			QL_ClientAuth_LogStage( &transport, "ticket-request-failed", "Steam auth ticket request failed before dispatch" );
 			QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
-			"Failed to request Steam auth ticket" );
+			"Steam ticket failed: %s [%s]",
+			QL_GetOnlineServicesModeLabel(),
+			QL_GetOnlineServicesPolicyLabel() );
+			QL_ClientAuth_LogResponse( &transport, response );
 			return qfalse;
 		}
 
@@ -422,38 +517,11 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 	}
 
 	if ( credential->kind == QL_AUTH_CREDENTIAL_STANDALONE_TOKEN && !CL_OnlineServicesEnabled() ) {
-		QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
-		"Standalone launcher authentication disabled by build/runtime policy" );
-		return qfalse;
+		return QL_ClientAuth_ReportPolicyBlock( &transport, response, "Standalone launcher authentication" );
 	}
-
-	const ql_platform_service_table *services = QL_GetPlatformServices();
-	const qboolean authCompiled = services && services->auth.compiled;
-	const qboolean authInitialised = services && services->auth.initialised;
-	const char *provider = services && services->auth.provider ? services->auth.provider : "dispatcher";
-	const char *policyLabel = services ? QL_DescribePlatformFeaturePolicy( &services->auth ) : "compatibility-unavailable";
-	const char *endpoint = "<unroutable>";
-
-	switch ( activeCredential->kind ) {
-		case QL_AUTH_CREDENTIAL_STEAM:
-		endpoint = "/steam/session/validate";
-		break;
-		case QL_AUTH_CREDENTIAL_STANDALONE_TOKEN:
-		endpoint = "/launcher/auth/verify";
-		break;
-		default:
-		break;
-	}
-
-	ql_client_auth_transport_t transport = {
-		{ provider, endpoint },
-		provider,
-		policyLabel
-	};
 
 	QL_ClientAuth_LogStage( &transport, "dispatch", "submitting credential" );
 
-	char preview[32];
 	QL_ClientAuth_TokenPreview( activeCredential, preview, sizeof( preview ) );
 
 	switch ( activeCredential->kind ) {
@@ -473,12 +541,16 @@ qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth
 
 	if ( !authInitialised ) {
 		QL_ClientAuth_SetResponse( response, QL_AUTH_RESULT_ERROR,
-		authCompiled ? "Authentication backend failed to initialise." : "No authentication backend is compiled in." );
+		authCompiled
+			? "Auth init failed: %s [%s]"
+			: "No auth backend: %s [%s]",
+		QL_GetOnlineServicesModeLabel(),
+		QL_GetOnlineServicesPolicyLabel() );
 		QL_ClientAuth_LogResponse( &transport, response );
 		return qfalse;
 	}
 
-	qboolean handled = qfalse;
+	handled = qfalse;
 
 	switch ( activeCredential->kind ) {
 		case QL_AUTH_CREDENTIAL_STEAM:

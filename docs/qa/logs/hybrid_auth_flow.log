@@ -1,5 +1,6 @@
--- Scenario 2: Hybrid --
-[auth] Hybrid dispatch (/steam/session/validate): submitting credential
-[auth] Hybrid payload summary: ticket=retry:T…FFFF (len=21)
-[auth] Hybrid result -> outcome=success, message="Hybrid fallback accepted credential via open adapter (token=retry:T…FFFF)"
-
+-- Scenario 4: Hybrid fallback --
+[auth] Hybrid [compatibility-only] dispatch (/steam/session/validate): submitting credential
+[auth] Hybrid [compatibility-only] payload summary: ticket=retry:T…FFFF (len=21)
+[auth] Hybrid [compatibility-only] hybrid-fallback (/steam/session/validate): Steamworks heuristic compatibility backend returned retry; dispatching open adapter fallback
+[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting fallback credential
+[auth] Hybrid [compatibility-only] result -> outcome=success, message="Hybrid fallback accepted credential via heuristic open adapter (token=retry:T…FFFF)"

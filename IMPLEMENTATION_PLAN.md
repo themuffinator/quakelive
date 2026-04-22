@@ -1091,6 +1091,201 @@ Completed work:
    bounded compatibility/fallback story it still implements instead of the
    older generic “backend unavailable” wording.
 
+### Task A3d: Expose explicit compatibility-only provider/policy labels through client matchmaking, stats, and social-overlay command surfaces [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Mirrored the retained client matchmaking, stats, and social-overlay
+   descriptors through the ROM cvars `cl_matchmakingProvider`,
+   `cl_matchmakingPolicy`, `cl_statsProvider`, `cl_statsPolicy`,
+   `cl_socialOverlayProvider`, and `cl_socialOverlayPolicy` so the active
+   provider/policy pair remains visible at bootstrap and callback-init time.
+2. Routed the retained `stats_clear`, `connect_lobby`, `clientviewprofile`,
+   `clientfriendinvite`, callback-bundle fallback, and main-menu rich-presence
+   failure paths through provider-aware compatibility diagnostics instead of
+   generic Steam-only wording.
+3. Refreshed the focused platform-service regression coverage and the platform
+   abstraction notes so this client command surface now documents the bounded
+   compatibility lane it still implements.
+
+### Task A3e: Expose explicit compatibility-only provider/policy labels through the default-disabled server rankings surface [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_rankings.c`, `src/code/server/sv_init.c`,
+`tests/test_platform_services.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-server-rankings.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added explicit rankings provider/policy helpers and mirrored them through
+   the ROM cvars `sv_rankingsProvider` and `sv_rankingsPolicy` so the
+   default-disabled rankings lane no longer hides behind the generic
+   `sv_rankingsActive` flag alone.
+2. Threaded the provider/policy pair into the disabled rankings bootstrap
+   diagnostics so the forced `sv_enableRankings 0` fallback and the retained
+   compatibility-only rankings surface stay explicit at runtime.
+3. Refreshed the focused server/platform-service parity checks and the
+   `RW-G01` rankings gap note so this retained GPL-era rankings lane is now
+   documented using the same compatibility-labeling story as the other active
+   repo-wide online-service seams.
+
+### Task A3f: Expose explicit heuristic compatibility labeling through auth backend responses and fallback traces [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/backends/`, `src/code/client/ql_auth.c`,
+`tools/integration/auth_flow_trace.py`, `docs/platform/authentication.md`,
+`docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained Steamworks and open-adapter auth backends so their
+   response payloads explicitly identify themselves as heuristic compatibility
+   backends instead of reading like retail live-service verdicts.
+2. Threaded an explicit `hybrid-fallback` stage plus fallback-dispatch log
+   through the hybrid auth path so the open-adapter handoff is visible in
+   lifecycle traces whenever Steamworks returns a retry-eligible result.
+3. Refreshed the scripted auth-flow trace, the focused platform-service
+   regression coverage, and the auth/backend gap notes so the documented QA
+   evidence now matches the bounded compatibility story carried by the current
+   source.
+
+### Task A3g: Expose explicit overall online-services mode/policy labels through the structural service-table surface [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_services.c`,
+`src/code/client/cl_main.c`, `src/code/server/sv_init.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added common helpers that collapse the cached service table into overall
+   online-services mode/policy labels, keeping the build-disabled,
+   externally-disabled, Steamworks-only, open-adapter-only, and hybrid
+   compatibility lanes explicit at the structural layer itself.
+2. Mirrored those summary labels through the new ROM cvars
+   `cl_onlineServicesMode`, `cl_onlineServicesPolicy`,
+   `sv_onlineServicesMode`, and `sv_onlineServicesPolicy` so client/server
+   diagnostics no longer require reading each per-feature provider cvar to
+   understand the current repo-wide online-service boundary.
+3. Refreshed the focused platform-service probes plus the `RW-G01`
+   platform-services/platform-config notes so the structural service-table and
+   build-flag story now matches the bounded compatibility surface described by
+   the current docs and tests.
+
+### Task A3h: Expose explicit overall online-services mode/policy labeling through auth policy-block and ticket-request failure paths [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/ql_auth.c`,
+`tests/test_platform_services.py`, `docs/platform/authentication.md`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-client-auth.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the early Steam and standalone auth policy gates through a shared
+   helper that now emits explicit `policy-blocked` lifecycle logs and response
+   text naming the active overall online-services mode/policy lane instead of
+   the older generic build/runtime wording.
+2. Threaded that same structural mode/policy context through Steam
+   ticket-request failure and backend-uninitialised responses so the bounded
+   auth surface stays explicit even when no backend dispatch occurs.
+3. Refreshed the focused auth/platform-service regression coverage plus the
+   client-auth gap note and supporting docs so the documented `RW-G01`
+   compatibility story now matches those early auth exit paths too.
+
+### Task A3i: Expose explicit provider/policy labeling through the retained advert bridge surface [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_cgame.c`, `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Mirrored the retained advert bridge through the new ROM cvars
+   `ui_advertisementBridgeProvider` and `ui_advertisementBridgePolicy` so the
+   active advert bridge lane is visible independently of the older browser
+   overlay cvars.
+2. Added bounded provider-aware advert lifecycle diagnostics for the UI/cgame
+   bridge transitions (`init-ui`, `activate`, `set-active`, and
+   `shutdown-cgame`) instead of leaving that seam implicit behind generic
+   overlay state refreshes.
+3. Refreshed the focused platform-service assertions plus the platform-service
+   abstraction/gap-note docs so the retained advert flow now matches the same
+   explicit compatibility-labeling story as the other active `RW-G01`
+   surfaces.
+
+### Task A3j: Expose explicit overall mode/policy labeling through the retained client voice fallback lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Mirrored the retained client voice compatibility lane through the new ROM
+   cvars `cl_voiceServiceMode` and `cl_voiceServicePolicy` so the local
+   speaking-state fallback no longer hides behind the broader online-services
+   summary cvars alone.
+2. Added explicit `voice fallback` diagnostics for `+voice` and `-voice`,
+   naming the active overall online-services mode/policy lane whenever Steam
+   voice is unavailable and the local speaking-state bridge is the remaining
+   compatibility path.
+3. Refreshed the focused platform-service assertions plus the
+   platform-service abstraction/gap-note docs so the retained voice surface now
+   matches the same explicit compatibility-labeling story as the other active
+   `RW-G01` seams.
+
+### Task A3k: Expose explicit overall mode/policy labeling through the retained client identity bootstrap and UI subscription lanes [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `src/code/client/cl_ui.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Mirrored the retained client identity/bootstrap and UI app-subscription
+   lanes through the new ROM cvars `cl_identityBootstrapMode`,
+   `cl_identityBootstrapPolicy`, `ui_subscriptionBridgeMode`, and
+   `ui_subscriptionBridgePolicy` so these remaining Steam-owned shims no longer
+   rely on the broader summary cvars alone for compatibility context.
+2. Added explicit identity/subscription diagnostics for Steam persona-name
+   seeding, Steam country seeding, and the UI `IsSubscribedApp` bridge,
+   naming the active overall online-services mode/policy lane whenever the
+   compatibility path falls back or the current provider is unavailable.
+3. Refreshed the focused platform-service assertions plus the
+   platform-service abstraction/gap-note docs so the retained client bootstrap
+   and UI subscription surface now matches the same explicit
+   compatibility-labeling story as the other active `RW-G01` seams.
+
+### Task A3l: Expose explicit provider/policy labeling through the retained live-resource and avatar bridge lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_steam_resources.c`,
+`src/code/client/cl_main.c`, `src/code/client/cl_cgame.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Mirrored the retained live-resource bridge through the new ROM cvars
+   `ui_resourceBridgeProvider` and `ui_resourceBridgePolicy` so the
+   `steam://`/launcher-backed image lane is visible independently of the older
+   browser overlay and advert bridge cvars.
+2. Routed the cgame avatar import through the existing provider-aware resource
+   stub path instead of returning before the compatibility diagnostics fired,
+   which keeps disabled `steam://avatar/...` lookups explicit at runtime.
+3. Refreshed the focused platform-service assertions plus the
+   platform-service abstraction/gap-note docs so the retained live-resource and
+   avatar lane now matches the same explicit compatibility-labeling story as
+   the other active `RW-G01` seams.
+
 ## Active tasks
 
 ### Task A3: Replace or further bound the compatibility-only online-service lanes [OPEN]

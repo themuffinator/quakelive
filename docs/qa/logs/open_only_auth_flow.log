@@ -1,9 +1,14 @@
--- Scenario 3: Open Steam Adapter --
-[auth] Open Steam Adapter dispatch (/launcher/auth/verify): submitting credential
-[auth] Open Steam Adapter payload summary: token=JWT-abc…resh (len=18)
-[auth] Open Steam Adapter result -> outcome=retry, message="Launcher token expired, request a refresh"
+-- Scenario 5: Open adapter refresh --
+[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting credential
+[auth] Open Steam Adapter [compatibility-only] payload summary: token=JWT-abc…resh (len=18)
+[auth] Open Steam Adapter [compatibility-only] result -> outcome=retry, message="Open adapter heuristic compatibility backend requested launcher token refresh"
 
--- Scenario 4: Open Steam Adapter --
-[auth] Open Steam Adapter dispatch (/launcher/auth/verify): submitting credential
-[auth] Open Steam Adapter payload summary: token=TOKEN-V…7890 (len=22)
-[auth] Open Steam Adapter result -> outcome=success, message="Standalone token accepted (token=TOKEN-V…7890)"
+-- Scenario 6: Open adapter revoked --
+[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting credential
+[auth] Open Steam Adapter [compatibility-only] payload summary: token=TOKEN-r…7890 (len=23)
+[auth] Open Steam Adapter [compatibility-only] result -> outcome=failure, message="Open adapter heuristic compatibility backend treated token as revoked"
+
+-- Scenario 7: Open adapter success --
+[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting credential
+[auth] Open Steam Adapter [compatibility-only] payload summary: token=TOKEN-V…7890 (len=22)
+[auth] Open Steam Adapter [compatibility-only] result -> outcome=success, message="Open adapter heuristic compatibility backend accepted standalone token (token=TOKEN-V…7890)"

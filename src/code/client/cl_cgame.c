@@ -3244,6 +3244,46 @@ static const char *CL_GetOverlayServicePolicyLabel( void ) {
 
 /*
 =============
+CL_GetAdvertisementBridgeProviderLabel
+
+Returns the human-readable provider label for the advert bridge seam.
+=============
+*/
+static const char *CL_GetAdvertisementBridgeProviderLabel( void ) {
+	return CL_GetOverlayServiceProviderLabel();
+}
+
+/*
+=============
+CL_GetAdvertisementBridgePolicyLabel
+
+Returns the short compatibility policy label for the advert bridge seam.
+=============
+*/
+static const char *CL_GetAdvertisementBridgePolicyLabel( void ) {
+	return CL_GetOverlayServicePolicyLabel();
+}
+
+/*
+=============
+CL_LogAdvertisementBridgeLifecycle
+
+Publishes provider-aware diagnostics whenever the retained advert bridge syncs
+one of its compatibility-only lifecycle transitions.
+=============
+*/
+static void CL_LogAdvertisementBridgeLifecycle( const char *stage, int cellId ) {
+	Com_DPrintf( "Advert bridge %s: cell=%d active=%d activated=%d via %s [%s]\n",
+		stage ? stage : "sync",
+		cellId,
+		cl_advertisementBridge.activeAdvertCellId,
+		cl_advertisementBridge.activatedAdvertCellId,
+		CL_GetAdvertisementBridgeProviderLabel(),
+		CL_GetAdvertisementBridgePolicyLabel() );
+}
+
+/*
+=============
 CL_LogOverlayServiceIgnored
 
 Publishes provider-aware diagnostics whenever a browser overlay command is
@@ -3281,6 +3321,8 @@ Synchronises client-visible browser and advert bridge state with the platform-se
 void CL_RefreshOnlineServicesBridgeState( void ) {
 	const char *overlayProvider = CL_GetOverlayServiceProviderLabel();
 	const char *overlayPolicy = CL_GetOverlayServicePolicyLabel();
+	const char *advertProvider = CL_GetAdvertisementBridgeProviderLabel();
+	const char *advertPolicy = CL_GetAdvertisementBridgePolicyLabel();
 
 #if !QL_PLATFORM_HAS_ONLINE_SERVICES
 	cl_advertisementBridge.overlayCompiled = qfalse;
@@ -3290,6 +3332,8 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 	Cvar_Set( "ui_browserAwesomium", "0" );
 	Cvar_Set( "ui_browserAwesomiumProvider", overlayProvider );
 	Cvar_Set( "ui_browserAwesomiumPolicy", overlayPolicy );
+	Cvar_Set( "ui_advertisementBridgeProvider", advertProvider );
+	Cvar_Set( "ui_advertisementBridgePolicy", advertPolicy );
 	CL_WebHost_ResetRuntime( qtrue );
 	CL_ResetBrowserOverlayState();
 #else
@@ -3304,6 +3348,8 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 	Cvar_Set( "ui_browserAwesomium", overlayAvailable ? "1" : "0" );
 	Cvar_Set( "ui_browserAwesomiumProvider", overlayProvider );
 	Cvar_Set( "ui_browserAwesomiumPolicy", overlayPolicy );
+	Cvar_Set( "ui_advertisementBridgeProvider", advertProvider );
+	Cvar_Set( "ui_advertisementBridgePolicy", advertPolicy );
 	if ( !overlayAvailable ) {
 		CL_WebHost_ResetRuntime( qtrue );
 		CL_ResetBrowserOverlayState();
@@ -3320,6 +3366,7 @@ Mirrors the retail UI advertisement-bridge init hook.
 */
 void CL_AdvertisementBridge_InitUI( void ) {
 	CL_RefreshOnlineServicesBridgeState();
+	CL_LogAdvertisementBridgeLifecycle( "init-ui", 0 );
 }
 
 /*
@@ -3332,6 +3379,7 @@ Mirrors the retail UI-side advert activation bridge path.
 void CL_AdvertisementBridge_ActivateAdvert( int cellId ) {
 	cl_advertisementBridge.activatedAdvertCellId = cellId;
 	CL_RefreshOnlineServicesBridgeState();
+	CL_LogAdvertisementBridgeLifecycle( "activate", cellId );
 }
 
 /*
@@ -3348,6 +3396,7 @@ void CL_AdvertisementBridge_SetActiveAdvert( int cellId ) {
 	}
 
 	CL_RefreshOnlineServicesBridgeState();
+	CL_LogAdvertisementBridgeLifecycle( "set-active", cellId );
 }
 
 /*
@@ -3812,6 +3861,7 @@ static void CL_AdvertisementBridge_ShutdownCGame( void ) {
 	cl_advertisementBridge.activeAdvertCellId = 0;
 	cl_advertisementBridge.activatedAdvertCellId = 0;
 	CL_RefreshOnlineServicesBridgeState();
+	CL_LogAdvertisementBridgeLifecycle( "shutdown-cgame", 0 );
 }
 
 /*
@@ -4999,10 +5049,6 @@ QL_CG_trap_GetAvatarImageHandle
 static qhandle_t QDECL QL_CG_trap_GetAvatarImageHandle( unsigned int identityLow, unsigned int identityHigh ) {
 	uint64_t identity;
 	char url[MAX_QPATH];
-
-	if ( !CL_SteamServicesEnabled() ) {
-		return 0;
-	}
 
 	identity = QL_CG_CombineIdentityWords( identityLow, identityHigh );
 	if ( !identity ) {

@@ -118,6 +118,8 @@ ROM cvars for diagnostics and bounded compatibility reporting.
 ===============
 */
 void SV_RefreshPlatformServiceCvars( void ) {
+	Cvar_Set( "sv_onlineServicesMode", QL_GetOnlineServicesModeLabel() );
+	Cvar_Set( "sv_onlineServicesPolicy", QL_GetOnlineServicesPolicyLabel() );
 	Cvar_Set( "sv_platformAuthProvider", SV_GetPlatformAuthProviderLabel() );
 	Cvar_Set( "sv_platformAuthPolicy", SV_GetPlatformAuthPolicyLabel() );
 	Cvar_Set( "sv_steamServerProvider", SV_GetSteamServerProviderLabel() );
@@ -712,6 +714,7 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	// to all clients
 	sv.state = SS_GAME;
 	SV_RefreshPlatformServiceCvars();
+	SV_RefreshRankingsPolicyCvars();
 	SV_SteamServerPublishIdentity();
 	QL_Steamworks_ServerEnableHeartbeats( SV_SteamServerHasConfiguredMasters() );
 	SV_SteamServerUpdatePublishedState( qtrue );
@@ -790,10 +793,14 @@ void SV_Init (void) {
 	Cvar_Get ("sv_referencedPaks", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get ("sv_referencedPakNames", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get ("sv_referencedSteamworks", "", CVAR_ROM );
+	Cvar_Get ("sv_onlineServicesMode", "Unavailable", CVAR_ROM );
+	Cvar_Get ("sv_onlineServicesPolicy", "compatibility-unavailable", CVAR_ROM );
 	Cvar_Get ("sv_platformAuthProvider", "Unavailable", CVAR_ROM );
 	Cvar_Get ("sv_platformAuthPolicy", "compatibility-unavailable", CVAR_ROM );
 	Cvar_Get ("sv_steamServerProvider", "Unavailable", CVAR_ROM );
 	Cvar_Get ("sv_steamServerPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("sv_rankingsProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("sv_rankingsPolicy", "compatibility-unavailable", CVAR_ROM );
 
 	// server vars
 	sv_rconPassword = Cvar_Get ("rconPassword", "", CVAR_TEMP );
@@ -819,6 +826,7 @@ void SV_Init (void) {
 	Cvar_Get ("sv_setSteamAccount", "", CVAR_ARCHIVE | CVAR_PROTECTED );
 	net_fakevacban = Cvar_Get ("net_fakevacban", "0", CVAR_TEMP );
 	SV_RefreshPlatformServiceCvars();
+	SV_RefreshRankingsPolicyCvars();
 	SV_SteamServerInitCallbacks();
 	Zmq_RegisterCvarsAndInitRcon();
 

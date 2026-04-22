@@ -81,6 +81,57 @@ qboolean QL_Steamworks_Init( void ) {
     """
 )
 
+_SERVICE_MODE_PROBE = textwrap.dedent(
+    """
+    #include <stdio.h>
+
+    #include "src/common/platform/platform_services.c"
+
+#ifndef QL_STEAMWORKS_INIT_RESULT
+#define QL_STEAMWORKS_INIT_RESULT 1
+#endif
+
+#if QL_BUILD_STEAMWORKS
+/*
+=============
+QL_Steamworks_Init
+=============
+*/
+qboolean QL_Steamworks_Init( void ) {
+    return QL_STEAMWORKS_INIT_RESULT;
+}
+#endif
+
+    static int qlower(int ch) {
+        return tolower(ch & 0xff);
+    }
+
+    int Q_stricmp( const char *s1, const char *s2 ) {
+        if ( !s1 ) {
+            s1 = "";
+        }
+        if ( !s2 ) {
+            s2 = "";
+        }
+
+        while ( *s1 && *s2 ) {
+            int diff = qlower(*s1++) - qlower(*s2++);
+            if ( diff ) {
+                return diff;
+            }
+        }
+
+        return qlower(*s1) - qlower(*s2);
+    }
+
+    int main(void) {
+        printf("mode=%s\\n", QL_GetOnlineServicesModeLabel());
+        printf("policy=%s\\n", QL_GetOnlineServicesPolicyLabel());
+        return 0;
+    }
+    """
+)
+
 _HYBRID_FALLBACK_PROBE = textwrap.dedent(
     """
     #include <stdio.h>
@@ -290,6 +341,152 @@ qboolean CL_SteamServicesEnabled( void ) {
     """
 )
 
+_POLICY_BLOCKED_AUTH_PROBE = textwrap.dedent(
+    """
+    #include <stdio.h>
+    #include <stdarg.h>
+    #include <string.h>
+    #include <ctype.h>
+
+    #include "client.h"
+    #include "src/common/platform/platform_services.c"
+    #include "src/common/auth_credentials.c"
+    #include "src/code/client/ql_auth.c"
+
+    static int qlower(int ch) {
+        return tolower(ch & 0xff);
+    }
+
+    void QDECL Com_Printf( const char *fmt, ... ) {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(stderr, fmt, args);
+        va_end(args);
+    }
+
+    int QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) {
+        if ( !dest || size <= 0 ) {
+            return 0;
+        }
+
+        va_list args;
+        va_start(args, fmt);
+        int written = vsnprintf(dest, (size_t)size, fmt, args);
+        va_end(args);
+
+        dest[size - 1] = '\\0';
+        return written;
+    }
+
+    void Q_strncpyz( char *dest, const char *src, int destsize ) {
+        if ( !dest || destsize <= 0 ) {
+            return;
+        }
+
+        if ( !src ) {
+            dest[0] = '\\0';
+            return;
+        }
+
+        size_t count = destsize > 1 ? (size_t)(destsize - 1) : (size_t)0;
+        if ( count == 0 ) {
+            dest[0] = '\\0';
+            return;
+        }
+
+        strncpy(dest, src, count);
+        dest[count] = '\\0';
+    }
+
+    int Q_stricmp( const char *s1, const char *s2 ) {
+        if ( !s1 ) {
+            s1 = "";
+        }
+        if ( !s2 ) {
+            s2 = "";
+        }
+
+        while ( *s1 && *s2 ) {
+            int diff = qlower(*s1++) - qlower(*s2++);
+            if ( diff ) {
+                return diff;
+            }
+        }
+
+        return qlower(*s1) - qlower(*s2);
+    }
+
+    int Q_stricmpn( const char *s1, const char *s2, int n ) {
+        if ( n <= 0 ) {
+            return 0;
+        }
+
+        if ( !s1 ) {
+            s1 = "";
+        }
+        if ( !s2 ) {
+            s2 = "";
+        }
+
+        while ( n-- > 0 ) {
+            unsigned char c1 = (unsigned char)*s1++;
+            unsigned char c2 = (unsigned char)*s2++;
+            int diff = qlower(c1) - qlower(c2);
+            if ( diff || !c1 || !c2 ) {
+                return diff;
+            }
+        }
+
+        return 0;
+    }
+
+/*
+=============
+CL_OnlineServicesEnabled
+=============
+*/
+qboolean CL_OnlineServicesEnabled( void ) {
+#if QL_BUILD_ONLINE_SERVICES
+        return qtrue;
+#else
+        return qfalse;
+#endif
+}
+
+/*
+=============
+CL_SteamServicesEnabled
+=============
+*/
+qboolean CL_SteamServicesEnabled( void ) {
+#if QL_PLATFORM_HAS_STEAM_SERVICES
+        return CL_OnlineServicesEnabled();
+#else
+        return qfalse;
+#endif
+}
+
+    int main(void) {
+        ql_auth_credential_t credential;
+        memset(&credential, 0, sizeof(credential));
+        credential.kind = QL_AUTH_CREDENTIAL_STEAM;
+        Q_strncpyz(credential.value, "retry:TICKET-ABCDEFGHIJKLMNOP", sizeof(credential.value));
+        credential.length = strlen(credential.value);
+
+        ql_auth_response_t response;
+        memset(&response, 0, sizeof(response));
+
+        qboolean handled = QL_Auth_ExecuteRequest(&credential, &response);
+
+        printf("handled=%d\\n", handled ? 1 : 0);
+        printf("result=%d\\n", response.result);
+        printf("outcome=%d\\n", response.outcome);
+        printf("message=%s\\n", response.message);
+        return 0;
+    }
+    """
+)
+
 
 def _compile_and_run(
     workdir: Path,
@@ -356,6 +553,10 @@ def _parse_service_output(output: str) -> Dict[str, Tuple[str, str, bool, bool]]
         label, provider, policy, compiled, initialised = line.split("|", 4)
         services[label] = (provider, policy, compiled == "1", initialised == "1")
     return services
+
+
+def _parse_mode_output(output: str) -> Dict[str, str]:
+    return dict(line.split("=", 1) for line in output.strip().splitlines())
 
 
 def _extract_function_block(text: str, signature: str) -> str:
@@ -471,7 +672,7 @@ def test_hybrid_fallback_accepts_when_steam_pending(tmp_path) -> None:
     assert details["handled"] == "1"
     assert details["result"] == str(QL_AUTH_RESULT_ACCEPTED := 1)
     assert details["outcome"] == str(QL_AUTH_OUTCOME_SUCCESS := 0)
-    assert "Hybrid fallback accepted credential via open adapter" in details["message"]
+    assert "Hybrid fallback accepted credential via heuristic open adapter" in details["message"]
 
 
 def test_platform_service_table_respects_runtime_external_disable_env(tmp_path) -> None:
@@ -495,6 +696,78 @@ def test_platform_service_table_respects_runtime_external_disable_env(tmp_path) 
     assert services == expected
 
 
+def test_online_services_mode_labels_track_build_flags_and_runtime_policy(tmp_path) -> None:
+    scenarios = [
+        (
+            {},
+            {
+                "mode": "Build-disabled default (QL_BUILD_ONLINE_SERVICES=0)",
+                "policy": "compatibility-disabled (QL_BUILD_ONLINE_SERVICES=0)",
+            },
+            None,
+        ),
+        (
+            {"QL_BUILD_ONLINE_SERVICES": 0, "QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
+            {
+                "mode": "Build-disabled default (QL_BUILD_ONLINE_SERVICES=0)",
+                "policy": "compatibility-disabled (QL_BUILD_ONLINE_SERVICES=0)",
+            },
+            None,
+        ),
+        (
+            {"QL_BUILD_ONLINE_SERVICES": 1, "QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 0},
+            {
+                "mode": "Steamworks compatibility lane",
+                "policy": "compatibility-opt-in heuristic steamworks",
+            },
+            None,
+        ),
+        (
+            {"QL_BUILD_ONLINE_SERVICES": 1, "QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 0, "QL_STEAMWORKS_INIT_RESULT": 0},
+            {
+                "mode": "Steamworks compatibility lane",
+                "policy": "compatibility-opt-in heuristic steamworks (provider unavailable)",
+            },
+            None,
+        ),
+        (
+            {"QL_BUILD_ONLINE_SERVICES": 1, "QL_BUILD_STEAMWORKS": 0, "QL_BUILD_OPEN_STEAM": 1},
+            {
+                "mode": "Open-adapter compatibility lane",
+                "policy": "compatibility-opt-in heuristic open-adapter",
+            },
+            None,
+        ),
+        (
+            {"QL_BUILD_ONLINE_SERVICES": 1, "QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
+            {
+                "mode": "Hybrid compatibility lane",
+                "policy": "compatibility-opt-in heuristic hybrid",
+            },
+            None,
+        ),
+        (
+            {"QL_BUILD_ONLINE_SERVICES": 1, "QL_BUILD_STEAMWORKS": 1, "QL_BUILD_OPEN_STEAM": 1},
+            {
+                "mode": "Externally-disabled compatibility lane",
+                "policy": "compatibility-disabled (QL_DISABLE_EXTERNAL_ECOSYSTEMS)",
+            },
+            {"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1"},
+        ),
+    ]
+
+    for idx, (macros, expected, extra_env) in enumerate(scenarios):
+        workdir = tmp_path / f"service_mode_probe_{idx}"
+        output = _compile_and_run(
+            workdir,
+            _SERVICE_MODE_PROBE,
+            macros,
+            extra_env=extra_env,
+        )
+        details = _parse_mode_output(output)
+        assert details == expected
+
+
 def test_online_service_bridge_only_hard_stubs_when_build_disabled() -> None:
     cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
@@ -506,12 +779,16 @@ def test_online_service_bridge_only_hard_stubs_when_build_disabled() -> None:
     assert 'Cvar_Set( "ui_browserAwesomium", "0" );' in refresh_block
     assert 'Cvar_Set( "ui_browserAwesomiumProvider", overlayProvider );' in refresh_block
     assert 'Cvar_Set( "ui_browserAwesomiumPolicy", overlayPolicy );' in refresh_block
+    assert 'Cvar_Set( "ui_advertisementBridgeProvider", advertProvider );' in refresh_block
+    assert 'Cvar_Set( "ui_advertisementBridgePolicy", advertPolicy );' in refresh_block
     assert "CL_GetOverlayServiceDescriptor()" in refresh_block
     assert 'Cvar_Set( "ui_browserAwesomium", overlayAvailable ? "1" : "0" );' in refresh_block
     assert "CL_GetOverlayServiceProviderLabel()" in refresh_block
     assert "CL_GetOverlayServicePolicyLabel()" in refresh_block
     assert 'Cvar_Get ("ui_browserAwesomiumProvider", "Unavailable", CVAR_ROM );' in cl_main
     assert 'Cvar_Get ("ui_browserAwesomiumPolicy", "compatibility-unavailable", CVAR_ROM );' in cl_main
+    assert 'Cvar_Get ("ui_advertisementBridgeProvider", "Unavailable", CVAR_ROM );' in cl_main
+    assert 'Cvar_Get ("ui_advertisementBridgePolicy", "compatibility-unavailable", CVAR_ROM );' in cl_main
 
     assert '#include "../../common/platform/platform_config.h"' in ui_main
     assert "#define UI_BROWSER_AWESOMIUM_DEFAULT \"0\"" in ui_main
@@ -619,7 +896,7 @@ def test_native_cgame_avatar_import_routes_through_steam_shader_cache() -> None:
         "static qhandle_t QDECL QL_CG_trap_GetAvatarImageHandle( unsigned int identityLow, unsigned int identityHigh )",
     )
 
-    assert "CL_SteamServicesEnabled()" in block
+    assert "CL_SteamServicesEnabled()" not in block
     assert "QL_CG_CombineIdentityWords( identityLow, identityHigh )" in block
     assert 'Com_sprintf( url, sizeof( url ), "steam://avatar/large/%llu"' in block
     assert "CL_Steam_RegisterShader( url )" in block
@@ -639,6 +916,11 @@ def test_steam_resource_bridge_reconstructs_avatar_url_fetches() -> None:
         steam_resources,
         "qhandle_t CL_Steam_RegisterShader( const char *url ) {",
     )
+    refresh_cvars_block = _extract_function_block(
+        steam_resources,
+        "static void CL_RefreshSteamResourceBridgeCvars( void ) {",
+    )
+    resources_init_block = _extract_function_block(steam_resources, "void CL_InitSteamResources( void ) {")
     load_avatar_block = _extract_function_block(
         steamworks,
         "qboolean QL_Steamworks_LoadAvatarRGBA( uint32_t idLow, uint32_t idHigh, ql_steam_avatar_size_t size, uint8_t **outPixels, uint32_t *outWidth, uint32_t *outHeight )",
@@ -662,6 +944,9 @@ def test_steam_resource_bridge_reconstructs_avatar_url_fetches() -> None:
     assert "QL_Steamworks_FreeBuffer( rgbaPixels );" in shader_block
     assert "CL_SteamResources_EncodeAvatarTGA" not in shader_block
     assert '".tga"' not in steam_resources
+    assert 'Cvar_Set( "ui_resourceBridgeProvider", CL_GetSteamResourceServiceProviderLabel() );' in refresh_cvars_block
+    assert 'Cvar_Set( "ui_resourceBridgePolicy", CL_GetSteamResourceServicePolicyLabel() );' in refresh_cvars_block
+    assert "CL_RefreshSteamResourceBridgeCvars();" in resources_init_block
 
     assert "friendsVTable" in load_avatar_block
     assert "utilsVTable" in load_avatar_block
@@ -679,15 +964,38 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     callback_init_block = _extract_function_block(cl_main, "static void CL_Steam_InitCallbacks( void ) {")
     callback_shutdown_block = _extract_function_block(cl_main, "static void CL_Steam_ShutdownCallbacks( void ) {")
     stats_gate_block = _extract_function_block(cl_main, "static qboolean CL_Steam_ShouldRegisterStatsClear( void ) {")
+    stats_clear_block = _extract_function_block(cl_main, "static void CL_Steam_ClearStats_f( void )")
 
     assert "CL_Steam_Frame();" in frame_block
     assert frame_block.index("CL_Steam_Frame();") < frame_block.index("CL_CheckForResend();")
     assert "CL_WebHost_Frame();" in frame_block
     assert frame_block.index("CL_WebHost_Frame();") < frame_block.index("CL_CheckForResend();")
 
+    assert "static const ql_platform_feature_descriptor *CL_GetMatchmakingServiceDescriptor( void ) {" in cl_main
+    assert "static const ql_platform_feature_descriptor *CL_GetStatsServiceDescriptor( void ) {" in cl_main
+    assert "static void CL_LogMatchmakingServiceIgnored( const char *commandName, const char *reason ) {" in cl_main
+    assert "static void CL_LogStatsServiceIgnored( const char *commandName, const char *reason ) {" in cl_main
+    assert "static void CL_RefreshPlatformServiceCvars( void ) {" in cl_main
     assert "cl_statsClearRegistered = qfalse;" in init_block
     assert "if ( CL_Steam_ShouldRegisterStatsClear() ) {" in init_block
     assert 'Cmd_AddCommand ("stats_clear", CL_Steam_ClearStats_f );' in init_block
+    assert 'Cvar_Get ("ui_resourceBridgeProvider", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("ui_resourceBridgePolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("ui_subscriptionBridgeMode", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("ui_subscriptionBridgePolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_onlineServicesMode", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_onlineServicesPolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_identityBootstrapMode", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_identityBootstrapPolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_voiceServiceMode", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_voiceServicePolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_matchmakingProvider", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_matchmakingPolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_statsProvider", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_statsPolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_socialOverlayProvider", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("cl_socialOverlayPolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert "CL_RefreshPlatformServiceCvars();" in init_block
     assert "CL_Steam_InitCallbacks();" in init_block
     assert "CL_WebHost_Init();" in init_block
 
@@ -700,6 +1008,20 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert "QL_Steamworks_RegisterLobbyCallbacks( &lobbyBindings )" in callback_init_block
     assert "QL_Steamworks_RegisterMicroCallbacks( &microBindings )" in callback_init_block
     assert "QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings )" in callback_init_block
+    assert "CL_RefreshPlatformServiceCvars();" in callback_init_block
+    assert 'Cvar_Set( "cl_onlineServicesMode", QL_GetOnlineServicesModeLabel() );' in cl_main
+    assert 'Cvar_Set( "cl_onlineServicesPolicy", QL_GetOnlineServicesPolicyLabel() );' in cl_main
+    assert 'Cvar_Set( "cl_identityBootstrapMode", CL_GetIdentityBootstrapModeLabel() );' in cl_main
+    assert 'Cvar_Set( "cl_identityBootstrapPolicy", CL_GetIdentityBootstrapPolicyLabel() );' in cl_main
+    assert 'Cvar_Set( "cl_voiceServiceMode", CL_GetVoiceServiceModeLabel() );' in cl_main
+    assert 'Cvar_Set( "cl_voiceServicePolicy", CL_GetVoiceServicePolicyLabel() );' in cl_main
+    assert 'Cvar_Set( "ui_subscriptionBridgeMode", QL_GetOnlineServicesModeLabel() );' in cl_main
+    assert 'Cvar_Set( "ui_subscriptionBridgePolicy", QL_GetOnlineServicesPolicyLabel() );' in cl_main
+    assert "matchmakingProvider = CL_GetMatchmakingServiceProviderLabel();" in callback_init_block
+    assert "matchmakingPolicy = CL_GetMatchmakingServicePolicyLabel();" in callback_init_block
+    assert "statsProvider = CL_GetStatsServiceProviderLabel();" in callback_init_block
+    assert "statsPolicy = CL_GetStatsServicePolicyLabel();" in callback_init_block
+    assert 'Com_DPrintf( "Client callback bundle unavailable for matchmaking=%s [%s], stats=%s [%s]; keeping compatibility-only browser event fallback\\n",' in callback_init_block
     assert "cl_steamCallbackState.callbackRegistrationActive = qtrue;" in callback_init_block
 
     assert "QL_Steamworks_UnregisterWorkshopCallbacks();" in callback_shutdown_block
@@ -708,6 +1030,9 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert "QL_Steamworks_UnregisterClientCallbacks();" in callback_shutdown_block
 
     assert "return QL_Steamworks_GetAppID() == 0x54100u ? qtrue : qfalse;" in stats_gate_block
+    assert 'CL_LogStatsServiceIgnored( "stats_clear", "stats provider unavailable" );' in stats_clear_block
+    assert 'if ( !QL_Steamworks_ClearStats( qtrue ) ) {' in stats_clear_block
+    assert 'CL_LogStatsServiceIgnored( "stats_clear", "clear request failed" );' in stats_clear_block
 
 
 def test_platform_steamworks_reconstructs_retail_callback_bundle_registration_surface() -> None:
@@ -929,6 +1254,10 @@ def test_launcher_resource_fallbacks_survive_service_disabled_policy() -> None:
         "static qboolean CL_SteamDataSource_Request( const char *url, clSteamDataSourceResponse_t *response ) {",
     )
     resources_init_block = _extract_function_block(steam_resources, "void CL_InitSteamResources( void ) {")
+    refresh_cvars_block = _extract_function_block(
+        steam_resources,
+        "static void CL_RefreshSteamResourceBridgeCvars( void ) {",
+    )
     interceptor_block = _extract_function_block(
         steam_resources,
         "static qboolean QLResourceInterceptor_OnRequest( const char *url, clSteamDataSourceResponse_t *response ) {",
@@ -960,6 +1289,8 @@ def test_launcher_resource_fallbacks_survive_service_disabled_policy() -> None:
     assert "Steam resource bridge disabled by build/runtime policy" not in steam_resources
     assert 'Com_Printf( "Steam resource bridge unavailable for %s via %s [%s]; %s\\n"' in steam_resources
     assert 'Com_Printf( "Launcher/web fallback unavailable for %s via %s [%s]; %s\\n"' in steam_resources
+    assert 'Cvar_Set( "ui_resourceBridgeProvider", CL_GetSteamResourceServiceProviderLabel() );' in refresh_cvars_block
+    assert 'Cvar_Set( "ui_resourceBridgePolicy", CL_GetSteamResourceServicePolicyLabel() );' in refresh_cvars_block
     assert 'Com_Printf( "Steam resource bridge disabled for %s [%s]; keeping launcher/web fallback resource bridge.\\n",' in resources_init_block
     assert 'CL_LogSteamResourceBridgeUnavailable( url, "keeping launcher/web fallback resource bridge" );' in data_source_block
     assert "if ( CL_LauncherRequestData( url, (void **)&response->buffer, &response->bufferLength ) ) {" in interceptor_block
@@ -1030,17 +1361,107 @@ def test_client_auth_logs_include_provider_and_policy_labels() -> None:
         ql_auth,
         "static void QL_ClientAuth_LogResponse( const ql_client_auth_transport_t *transport, const ql_auth_response_t *response ) {",
     )
+    policy_block_block = _extract_function_block(
+        ql_auth,
+        "static qboolean QL_ClientAuth_ReportPolicyBlock( const ql_client_auth_transport_t *transport, ql_auth_response_t *response, const char *requestLabel ) {",
+    )
     execute_block = _extract_function_block(
         ql_auth,
         "qboolean QL_Auth_ExecuteRequest( const ql_auth_credential_t *credential, ql_auth_response_t *response ) {",
     )
 
     assert "const char *policyLabel;" in ql_auth
+    assert 'static const char *QL_ClientAuth_GetEndpoint( qlAuthCredentialKind kind ) {' in ql_auth
     assert 'Com_Printf( "[auth] %s [%s] %s (%s): %s\\n",' in log_stage_block
     assert 'Com_Printf( "[auth] %s [%s] result -> outcome=%s, message=\\"%s\\"\\n",' in log_response_block
-    assert 'const char *policyLabel = services ? QL_DescribePlatformFeaturePolicy( &services->auth ) : "compatibility-unavailable";' in execute_block
+    assert 'const char *modeLabel = QL_GetOnlineServicesModeLabel();' in policy_block_block
+    assert 'const char *policyLabel = QL_GetOnlineServicesPolicyLabel();' in policy_block_block
+    assert 'QL_ClientAuth_LogStage( transport, "policy-blocked", detail );' in policy_block_block
+    assert 'responseLabel = "Steam";' in policy_block_block
+    assert 'responseLabel = "Standalone";' in policy_block_block
+    assert '"%s blocked: %s [%s]"' in policy_block_block
+    assert 'policyLabel = services ? QL_DescribePlatformFeaturePolicy( &services->auth ) : "compatibility-unavailable";' in execute_block
+    assert 'endpoint = QL_ClientAuth_GetEndpoint( credential->kind );' in execute_block
+    assert 'return QL_ClientAuth_ReportPolicyBlock( &transport, response, "Steam authentication" );' in execute_block
+    assert 'return QL_ClientAuth_ReportPolicyBlock( &transport, response, "Standalone launcher authentication" );' in execute_block
+    assert 'QL_ClientAuth_LogStage( &transport, "ticket-request-failed", "Steam auth ticket request failed before dispatch" );' in execute_block
+    assert '"Steam ticket failed: %s [%s]"' in execute_block
+    assert '"Auth init failed: %s [%s]"' in execute_block
+    assert '"No auth backend: %s [%s]"' in execute_block
     assert 'transport.logPrefix = "dispatcher";' not in execute_block
     assert '[auth] %s [%s] payload summary: ticket=%s (len=%zu)\\n' in execute_block
+
+
+def test_policy_blocked_auth_requests_surface_online_services_mode_and_policy(tmp_path) -> None:
+    steam_workdir = tmp_path / "steam_policy_block"
+    steam_output = _compile_and_run(
+        steam_workdir,
+        _POLICY_BLOCKED_AUTH_PROBE,
+        {"QL_BUILD_ONLINE_SERVICES": 0, "QL_BUILD_STEAMWORKS": 0, "QL_BUILD_OPEN_STEAM": 0},
+        include_client_stub=True,
+    )
+    steam_details = dict(line.split("=", 1) for line in steam_output.strip().splitlines())
+
+    standalone_probe = _POLICY_BLOCKED_AUTH_PROBE.replace(
+        "credential.kind = QL_AUTH_CREDENTIAL_STEAM;",
+        "credential.kind = QL_AUTH_CREDENTIAL_STANDALONE_TOKEN;",
+    ).replace(
+        'Q_strncpyz(credential.value, "retry:TICKET-ABCDEFGHIJKLMNOP", sizeof(credential.value));',
+        'Q_strncpyz(credential.value, "JWT-VALID-ABCDEFGHIJKLMNOP", sizeof(credential.value));',
+    )
+    standalone_workdir = tmp_path / "standalone_policy_block"
+    standalone_output = _compile_and_run(
+        standalone_workdir,
+        standalone_probe,
+        {"QL_BUILD_ONLINE_SERVICES": 0, "QL_BUILD_STEAMWORKS": 0, "QL_BUILD_OPEN_STEAM": 0},
+        include_client_stub=True,
+    )
+    standalone_details = dict(line.split("=", 1) for line in standalone_output.strip().splitlines())
+
+    expected_suffix = "Build-disabled default (QL_BUILD_ONLINE_SERVICES=0) [compatibility-disabled (QL_BUILD_ONLINE_SERVICES=0)]"
+    assert steam_details["handled"] == "0"
+    assert f"Steam blocked: {expected_suffix}" == steam_details["message"]
+    assert standalone_details["handled"] == "0"
+    assert f"Standalone blocked: {expected_suffix}" == standalone_details["message"]
+
+
+def test_auth_backend_responses_and_trace_keep_heuristic_compatibility_lanes_explicit() -> None:
+    steamworks_backend = (REPO_ROOT / "src/common/platform/backends/platform_backend_steamworks.c").read_text(encoding="utf-8")
+    open_backend = (REPO_ROOT / "src/common/platform/backends/platform_backend_open_steam.c").read_text(encoding="utf-8")
+    ql_auth = (REPO_ROOT / "src/code/client/ql_auth.c").read_text(encoding="utf-8")
+    trace_script = REPO_ROOT / "tools/integration/auth_flow_trace.py"
+
+    hybrid_block = _extract_function_block(
+        ql_auth,
+        "static qboolean QL_ClientAuth_HandleHybridSteam( const ql_client_auth_transport_t *transport, const ql_auth_credential_t *credential, ql_auth_response_t *response ) {",
+    )
+
+    assert "Steamworks heuristic compatibility backend" in steamworks_backend
+    assert "Open adapter heuristic compatibility backend" in open_backend
+    assert '"Hybrid fallback accepted credential via heuristic open adapter (token=%s)"' in ql_auth
+    assert 'QL_ClientAuth_LogStage( transport,' in hybrid_block
+    assert '"hybrid-fallback"' in hybrid_block
+    assert '"Steamworks heuristic compatibility backend returned retry; dispatching open adapter fallback"' in hybrid_block
+    assert 'fallbackTransport.logPrefix = "Open Steam Adapter";' in hybrid_block
+    assert 'QL_ClientAuth_LogStage( &fallbackTransport, "dispatch", "submitting fallback credential" );' in hybrid_block
+
+    trace_output = subprocess.run(
+        [os.sys.executable, str(trace_script)],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+    assert "[auth] Steamworks [compatibility-only] dispatch (/steam/session/validate): submitting credential" in trace_output
+    assert 'message="Steamworks heuristic compatibility backend rejected ticket: payload too short"' in trace_output
+    assert 'message="Steamworks heuristic compatibility backend denied the ticket"' in trace_output
+    assert "[auth] Hybrid [compatibility-only] hybrid-fallback (/steam/session/validate): Steamworks heuristic compatibility backend returned retry; dispatching open adapter fallback" in trace_output
+    assert "[auth] Open Steam Adapter [compatibility-only] dispatch (/launcher/auth/verify): submitting fallback credential" in trace_output
+    assert 'message="Hybrid fallback accepted credential via heuristic open adapter' in trace_output
+    assert 'message="Open adapter heuristic compatibility backend requested launcher token refresh"' in trace_output
+    assert 'message="Open adapter heuristic compatibility backend treated token as revoked"' in trace_output
+    assert 'message="Open adapter heuristic compatibility backend accepted standalone token' in trace_output
 
 
 def test_browser_cache_reload_owner_restores_retail_command_and_cvar_surface() -> None:
@@ -1297,6 +1718,9 @@ def test_advert_bridge_callbacks_track_retail_ui_and_cgame_state_paths() -> None
     cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
     cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
 
+    advert_log_block = _extract_function_block(
+        cl_cgame, "static void CL_LogAdvertisementBridgeLifecycle( const char *stage, int cellId ) {"
+    )
     init_ui_block = _extract_function_block(cl_cgame, "void CL_AdvertisementBridge_InitUI( void )")
     activate_block = _extract_function_block(cl_cgame, "void CL_AdvertisementBridge_ActivateAdvert( int cellId )")
     set_active_block = _extract_function_block(cl_cgame, "void CL_AdvertisementBridge_SetActiveAdvert( int cellId )")
@@ -1305,6 +1729,9 @@ def test_advert_bridge_callbacks_track_retail_ui_and_cgame_state_paths() -> None
     ui_import84_block = _extract_function_block(cl_ui, "static void QDECL QL_UI_trap_ActivateAdvert( int cellId )")
     cg_import_block = _extract_function_block(cl_cgame, "static void QDECL QL_CG_trap_SetActiveAdvert( int cellId )")
 
+    assert "static const char *CL_GetAdvertisementBridgeProviderLabel( void ) {" in cl_cgame
+    assert "static const char *CL_GetAdvertisementBridgePolicyLabel( void ) {" in cl_cgame
+    assert 'Com_DPrintf( "Advert bridge %s: cell=%d active=%d activated=%d via %s [%s]\\n",' in advert_log_block
     assert "cl_advertisementBridge.activatedAdvertCellId = cellId;" in activate_block
     assert "cl_advertisementBridge.activeAdvertCellId = cellId;" in set_active_block
     assert "if ( cellId == 0 ) {" in set_active_block
@@ -1312,6 +1739,10 @@ def test_advert_bridge_callbacks_track_retail_ui_and_cgame_state_paths() -> None
     assert "cl_advertisementBridge.activeAdvertCellId = 0;" in shutdown_block
     assert "cl_advertisementBridge.activatedAdvertCellId = 0;" in shutdown_block
     assert "CL_RefreshOnlineServicesBridgeState();" in init_ui_block
+    assert 'CL_LogAdvertisementBridgeLifecycle( "init-ui", 0 );' in init_ui_block
+    assert 'CL_LogAdvertisementBridgeLifecycle( "activate", cellId );' in activate_block
+    assert 'CL_LogAdvertisementBridgeLifecycle( "set-active", cellId );' in set_active_block
+    assert 'CL_LogAdvertisementBridgeLifecycle( "shutdown-cgame", 0 );' in shutdown_block
     assert "CL_AdvertisementBridge_InitUI();" in ui_import82_block
     assert "CL_AdvertisementBridge_ActivateAdvert( cellId );" in ui_import84_block
     assert "CL_AdvertisementBridge_SetActiveAdvert( cellId );" in cg_import_block
@@ -1344,12 +1775,20 @@ def test_client_overlay_commands_reconstruct_retail_steam_surface() -> None:
         "qboolean QL_Steamworks_ActivateOverlayToUser( const char *dialog, uint32_t idLow, uint32_t idHigh )",
     )
 
+    assert "static const ql_platform_feature_descriptor *CL_GetSocialOverlayServiceDescriptor( void ) {" in cl_main
+    assert "static void CL_LogSocialOverlayIgnored( const char *commandName, const char *reason ) {" in cl_main
     assert 'Info_ValueForKey( info, "steamid" )' in parse_block
     assert "cl.gameState.stringOffsets[CS_PLAYERS + clientNum]" in parse_block
+    assert "commandName = Cmd_Argv( 0 );" in overlay_block
+    assert 'CL_LogSocialOverlayIgnored( commandName, "missing target client" );' in overlay_block
+    assert 'CL_LogSocialOverlayIgnored( commandName, "social overlay provider unavailable" );' in overlay_block
     assert 'dialog = "steamid";' in overlay_block
     assert 'dialog = "friendadd";' in overlay_block
+    assert 'CL_LogSocialOverlayIgnored( commandName, "unsupported social overlay verb" );' in overlay_block
     assert "CL_GetClientSteamId( clientNum, &steamIdLow, &steamIdHigh )" in overlay_block
-    assert "QL_Steamworks_ActivateOverlayToUser( dialog, steamIdLow, steamIdHigh );" in overlay_block
+    assert 'CL_LogSocialOverlayIgnored( commandName, "target client has no Steam identity" );' in overlay_block
+    assert 'if ( !QL_Steamworks_ActivateOverlayToUser( dialog, steamIdLow, steamIdHigh ) ) {' in overlay_block
+    assert 'CL_LogSocialOverlayIgnored( commandName, "overlay activation failed" );' in overlay_block
     assert 'Cmd_AddCommand ("clientviewprofile", CL_Steam_OverlayCommand_f );' in init_block
     assert 'Cmd_AddCommand ("clientfriendinvite", CL_Steam_OverlayCommand_f );' in init_block
     assert 'Cmd_RemoveCommand ("clientviewprofile");' in shutdown_block
@@ -1361,6 +1800,9 @@ def test_client_overlay_commands_reconstruct_retail_steam_surface() -> None:
 def test_client_voice_commands_reconstruct_retail_binding_surface() -> None:
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
 
+    voice_log_block = _extract_function_block(
+        cl_main, "static void CL_LogVoiceServiceFallback( const char *commandName, const char *reason ) {"
+    )
     state_block = _extract_function_block(cl_main, "static void CL_SetLocalSpeakingState( qboolean speaking )")
     start_block = _extract_function_block(cl_main, "static void CL_VoiceStartRecording_f( void )")
     stop_block = _extract_function_block(cl_main, "static void CL_VoiceStopRecording_f( void )")
@@ -1368,13 +1810,18 @@ def test_client_voice_commands_reconstruct_retail_binding_surface() -> None:
     init_block = _extract_function_block(cl_main, "void CL_Init( void )")
     shutdown_block = _extract_function_block(cl_main, "void CL_Shutdown( void )")
 
+    assert "static const char *CL_GetVoiceServiceModeLabel( void ) {" in cl_main
+    assert "static const char *CL_GetVoiceServicePolicyLabel( void ) {" in cl_main
+    assert 'Com_DPrintf( "%s voice fallback: %s (%s [%s])\\n",' in voice_log_block
     assert "if ( !cgvm || cls.state != CA_ACTIVE || !cl.snap.valid ) {" in state_block
     assert "VM_Call( cgvm, CG_SET_CLIENT_SPEAKING_STATE, cl.snap.ps.clientNum, speaking ? 1 : 0 );" in state_block
     assert "if ( cl_voiceRecordingActive ) {" in start_block
     assert "cl_voiceRecordingActive = qtrue;" in start_block
+    assert 'CL_LogVoiceServiceFallback( "+voice", "local speaking-state fallback active" );' in start_block
     assert "CL_SetLocalSpeakingState( qtrue );" in start_block
     assert "if ( !cl_voiceRecordingActive ) {" in stop_block
     assert "cl_voiceRecordingActive = qfalse;" in stop_block
+    assert 'CL_LogVoiceServiceFallback( "-voice", "local speaking-state fallback active" );' in stop_block
     assert "CL_SetLocalSpeakingState( qfalse );" in stop_block
     assert "cl_voiceRecordingActive = qfalse;" in disconnect_block
     assert 'Cmd_AddCommand ("+voice", CL_VoiceStartRecording_f );' in init_block
@@ -1390,7 +1837,11 @@ def test_client_lobby_bootstrap_reconstructs_retail_connect_surface() -> None:
     init_block = _extract_function_block(cl_main, "void CL_Init( void )")
     shutdown_block = _extract_function_block(cl_main, "void CL_Shutdown( void )")
 
+    assert "static const char *CL_GetMatchmakingServiceProviderLabel( void ) {" in cl_main
+    assert "static const char *CL_GetMatchmakingServicePolicyLabel( void ) {" in cl_main
     assert 'Cvar_Set( "lobby_autoconnect", Cmd_Argv( 1 ) );' in connect_block
+    assert 'CL_LogMatchmakingServiceIgnored( "connect_lobby", "missing lobby id" );' in connect_block
+    assert 'CL_LogMatchmakingServiceIgnored( "connect_lobby", "matchmaking provider unavailable" );' in connect_block
     assert 'Cvar_Get( "lobby_autoconnect", "", CVAR_TEMP );' in init_block
     assert 'Cvar_Get( "steam_maxLobbyClients", "16", CVAR_ARCHIVE );' in init_block
     assert 'Cmd_AddCommand ("connect_lobby", CL_Steam_ConnectLobby_f );' in init_block
@@ -1425,10 +1876,45 @@ def test_client_main_menu_presence_seed_reconstructs_retail_bootstrap_status() -
         "qboolean QL_Steamworks_SetRichPresence( const char *key, const char *value )",
     )
 
-    assert 'QL_Steamworks_SetRichPresence( "status", "At the main menu" );' in presence_block
+    assert 'if ( !QL_Steamworks_SetRichPresence( "status", "At the main menu" ) ) {' in presence_block
+    assert 'CL_LogMatchmakingServiceIgnored( "steam_presence_main_menu", "rich presence update failed" );' in presence_block
     assert "CL_Steam_SetMainMenuRichPresence();" in init_block
     assert "vtable[0xac / 4]" in platform_block
     assert "return fn( friends, NULL, key, value ) ? qtrue : qfalse;" in platform_block
+
+
+def test_client_identity_bootstrap_and_ui_subscription_lanes_stay_explicit() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
+
+    identity_log_block = _extract_function_block(
+        cl_main, "static void CL_LogIdentityBootstrapFallback( const char *stage, const char *reason ) {"
+    )
+    persona_block = _extract_function_block(cl_main, "static void CL_Steam_SyncPersonaNameCvar( void )")
+    country_block = _extract_function_block(cl_main, "static void CL_Steam_SeedCountryCvar( void )")
+    subscribed_block = _extract_function_block(cl_ui, "static int QDECL QL_UI_trap_IsSubscribedApp( int arg1 )")
+    subscription_log_block = _extract_function_block(
+        cl_ui, "static void QL_UI_LogSubscriptionBridgeIgnored( int appId, const char *reason ) {"
+    )
+
+    assert "static const char *CL_GetIdentityBootstrapModeLabel( void ) {" in cl_main
+    assert "static const char *CL_GetIdentityBootstrapPolicyLabel( void ) {" in cl_main
+    assert 'Com_DPrintf( "%s identity bootstrap: %s (%s [%s])\\n",' in identity_log_block
+    assert 'CL_LogIdentityBootstrapFallback( "steam_persona_name", "identity bootstrap provider unavailable" );' in persona_block
+    assert 'CL_LogIdentityBootstrapFallback( "steam_persona_name", "identity bootstrap initialisation failed" );' in persona_block
+    assert 'CL_LogIdentityBootstrapFallback( "steam_persona_name", "persona unavailable; falling back to anon" );' in persona_block
+    assert 'CL_LogIdentityBootstrapFallback( "steam_country_seed", "identity bootstrap provider unavailable" );' in country_block
+    assert 'CL_LogIdentityBootstrapFallback( "steam_country_seed", "identity bootstrap initialisation failed" );' in country_block
+    assert 'CL_LogIdentityBootstrapFallback( "steam_country_seed", "country seed unavailable" );' in country_block
+    assert 'if ( QL_Steamworks_GetIPCountry( country, sizeof( country ) ) && country[0] ) {' in country_block
+    assert 'Cvar_Set( "country", country );' in country_block
+
+    assert '#include "../../common/platform/platform_services.h"' in cl_ui
+    assert "static const char *QL_UI_GetSubscriptionBridgeModeLabel( void ) {" in cl_ui
+    assert "static const char *QL_UI_GetSubscriptionBridgePolicyLabel( void ) {" in cl_ui
+    assert 'Com_DPrintf( "UI subscription bridge ignored for app %d: %s (%s [%s])\\n",' in subscription_log_block
+    assert 'QL_UI_LogSubscriptionBridgeIgnored( arg1, "subscription bridge provider unavailable" );' in subscribed_block
+    assert "return QL_Steamworks_IsSubscribedApp( (uint32_t)arg1 ) ? 1 : 0;" in subscribed_block
 
 
 def test_first_snapshot_reconstructs_retail_match_start_presence_status() -> None:
@@ -1709,6 +2195,10 @@ def test_server_init_reconstructs_retail_hostname_and_bootstrap_metadata() -> No
 	assert 'Cvar_Get ("sv_platformAuthPolicy", "compatibility-unavailable", CVAR_ROM );' in sv_init_block
 	assert 'Cvar_Get ("sv_steamServerProvider", "Unavailable", CVAR_ROM );' in sv_init_block
 	assert 'Cvar_Get ("sv_steamServerPolicy", "compatibility-unavailable", CVAR_ROM );' in sv_init_block
+	assert 'Cvar_Get ("sv_onlineServicesMode", "Unavailable", CVAR_ROM );' in sv_init_block
+	assert 'Cvar_Get ("sv_onlineServicesPolicy", "compatibility-unavailable", CVAR_ROM );' in sv_init_block
+	assert 'Cvar_Set( "sv_onlineServicesMode", QL_GetOnlineServicesModeLabel() );' in sv_init
+	assert 'Cvar_Set( "sv_onlineServicesPolicy", QL_GetOnlineServicesPolicyLabel() );' in sv_init
 	assert "SV_RefreshPlatformServiceCvars();" in sv_init_block
 	assert "SV_RefreshPlatformServiceCvars();" in spawn_block
 	assert 'Com_DPrintf( "Steam server identity unavailable for %s [%s]\\n",' in publish_block
@@ -2330,20 +2820,34 @@ def test_server_rankings_policy_lane_stays_explicit_and_per_server() -> None:
     assert "extern\tcvar_t\t*sv_enableRankings;" in server_h
     assert "extern\tcvar_t\t*sv_rankingsActive;" in server_h
     assert "extern\tcvar_t\t*sv_leagueName;" in server_h
+    assert "const char *SV_GetRankingsProviderLabel( void );" in server_h
+    assert "const char *SV_GetRankingsPolicyLabel( void );" in server_h
+    assert "void SV_RefreshRankingsPolicyCvars( void );" in server_h
     assert "cvar_t\t*sv_enableRankings;" in sv_main
     assert "cvar_t\t*sv_rankingsActive;" in sv_main
     assert "cvar_t\t*sv_leagueName;" in sv_main
     assert 'sv_enableRankings = Cvar_Get ("sv_enableRankings", "0", CVAR_SERVERINFO | CVAR_ARCHIVE );' in init_block
     assert 'sv_rankingsActive = Cvar_Get ("sv_rankingsActive", "0", CVAR_SERVERINFO );' in init_block
     assert 'sv_leagueName = Cvar_Get ("sv_leagueName", "", CVAR_ARCHIVE );' in init_block
+    assert 'Cvar_Get ("sv_rankingsProvider", "Unavailable", CVAR_ROM );' in init_block
+    assert 'Cvar_Get ("sv_rankingsPolicy", "compatibility-unavailable", CVAR_ROM );' in init_block
+    assert "SV_RefreshRankingsPolicyCvars();" in sv_init
 
     assert "static qboolean\ts_rankings_stub_announced = qfalse;" in sv_rankings
     assert "static int\t\ts_rankings_stub_server_id = -1;" in sv_rankings
-    assert 'Com_Printf( "Rankings disabled by build policy (QL_ENABLE_RANKINGS=0); exposing retained compatibility surface only.\\n" );' in log_disabled_block
+    assert 'const char *SV_GetRankingsProviderLabel( void ) {' in sv_rankings
+    assert 'return "Build-disabled (QL_ENABLE_RANKINGS=0)";' in sv_rankings
+    assert 'const char *SV_GetRankingsPolicyLabel( void ) {' in sv_rankings
+    assert 'return "compatibility-disabled (QL_ENABLE_RANKINGS=0)";' in sv_rankings
+    assert 'void SV_RefreshRankingsPolicyCvars( void ) {' in sv_rankings
+    assert 'Cvar_Set( "sv_rankingsProvider", SV_GetRankingsProviderLabel() );' in sv_rankings
+    assert 'Cvar_Set( "sv_rankingsPolicy", SV_GetRankingsPolicyLabel() );' in sv_rankings
+    assert "SV_RefreshRankingsPolicyCvars();" in publish_disabled_block
+    assert 'Com_Printf( "Rankings disabled by build policy (QL_ENABLE_RANKINGS=0); exposing retained compatibility surface only (%s [%s]).\\n",' in log_disabled_block
     assert 'Cvar_Set( "sv_rankingsActive", "0" );' in publish_disabled_block
     assert "SV_RankLogDisabledState();" in begin_block
     assert "if ( sv_enableRankings && sv_enableRankings->integer != 0 ) {" in begin_block
-    assert 'Com_Printf( "Rankings requested but build disabled (QL_ENABLE_RANKINGS=0); forcing sv_enableRankings back to 0.\\n" );' in begin_block
+    assert 'Com_Printf( "Rankings requested but build disabled (QL_ENABLE_RANKINGS=0); forcing sv_enableRankings back to 0 (%s [%s]).\\n",' in begin_block
     assert 'Cvar_Set( "sv_enableRankings", "0" );' in begin_block
     assert "SV_RankPublishDisabledState();" in begin_block
     assert "s_rankings_stub_server_id = sv.serverId;" in begin_block

@@ -23,6 +23,49 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 
+/*
+================
+SV_GetRankingsProviderLabel
+
+Returns the provider label for the retained rankings compatibility lane.
+================
+*/
+const char *SV_GetRankingsProviderLabel( void ) {
+#if !QL_ENABLE_RANKINGS
+	return "Build-disabled (QL_ENABLE_RANKINGS=0)";
+#else
+	return "Legacy GRank Service";
+#endif
+}
+
+/*
+================
+SV_GetRankingsPolicyLabel
+
+Returns the compatibility policy label for the retained rankings lane.
+================
+*/
+const char *SV_GetRankingsPolicyLabel( void ) {
+#if !QL_ENABLE_RANKINGS
+	return "compatibility-disabled (QL_ENABLE_RANKINGS=0)";
+#else
+	return "compatibility-opt-in (QL_ENABLE_RANKINGS=1)";
+#endif
+}
+
+/*
+================
+SV_RefreshRankingsPolicyCvars
+
+Mirrors the retained rankings provider/policy labels through ROM cvars for
+diagnostics and bounded compatibility reporting.
+================
+*/
+void SV_RefreshRankingsPolicyCvars( void ) {
+	Cvar_Set( "sv_rankingsProvider", SV_GetRankingsProviderLabel() );
+	Cvar_Set( "sv_rankingsPolicy", SV_GetRankingsPolicyLabel() );
+}
+
 #if !QL_ENABLE_RANKINGS
 static qboolean	s_rankings_stub_announced = qfalse;
 static int		s_rankings_stub_server_id = -1;
@@ -33,6 +76,7 @@ SV_RankPublishDisabledState
 ================
 */
 static void SV_RankPublishDisabledState( void ) {
+	SV_RefreshRankingsPolicyCvars();
 	Cvar_Set( "sv_rankingsActive", "0" );
 }
 
@@ -46,7 +90,8 @@ static void SV_RankLogDisabledState( void ) {
 		return;
 	}
 
-	Com_Printf( "Rankings disabled by build policy (QL_ENABLE_RANKINGS=0); exposing retained compatibility surface only.\n" );
+	Com_Printf( "Rankings disabled by build policy (QL_ENABLE_RANKINGS=0); exposing retained compatibility surface only (%s [%s]).\n",
+		SV_GetRankingsProviderLabel(), SV_GetRankingsPolicyLabel() );
 	s_rankings_stub_announced = qtrue;
 }
 
@@ -60,7 +105,8 @@ void SV_RankBegin( char *gamekey ) {
 	SV_RankLogDisabledState();
 
 	if ( sv_enableRankings && sv_enableRankings->integer != 0 ) {
-		Com_Printf( "Rankings requested but build disabled (QL_ENABLE_RANKINGS=0); forcing sv_enableRankings back to 0.\n" );
+		Com_Printf( "Rankings requested but build disabled (QL_ENABLE_RANKINGS=0); forcing sv_enableRankings back to 0 (%s [%s]).\n",
+			SV_GetRankingsProviderLabel(), SV_GetRankingsPolicyLabel() );
 		Cvar_Set( "sv_enableRankings", "0" );
 	}
 
@@ -198,6 +244,7 @@ void SV_RankBegin( char *gamekey )
 	GR_INIT		init;
 	GR_STATUS	status;
 
+	SV_RefreshRankingsPolicyCvars();
 	assert( s_rankings_contexts == 0 );
 	assert( !s_rankings_active );
 	assert( s_ranked_players == NULL );

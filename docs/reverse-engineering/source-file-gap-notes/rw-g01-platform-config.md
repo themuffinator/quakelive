@@ -15,6 +15,7 @@ This header defaults `QL_BUILD_ONLINE_SERVICES` to `0` and forces both provider 
 - `QL_BUILD_ONLINE_SERVICES` defaults to `0` when no override is supplied.
 - When online services are disabled, both `QL_BUILD_STEAMWORKS` and `QL_BUILD_OPEN_STEAM` are forced to `0` as well.
 - The derived `QL_PLATFORM_HAS_*` and `QL_PLATFORM_BUILD_HYBRID` macros therefore advertise a bounded compatibility story instead of retail live-service parity in default builds.
+- The surrounding service layer now mirrors those macro-derived states into overall mode/policy summary labels and ROM cvars, which makes the default-disabled and opt-in heuristic lanes explicit at runtime without changing the underlying repo-wide gap.
 
 ## Surface-by-surface status
 

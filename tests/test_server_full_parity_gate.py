@@ -286,6 +286,8 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 		and 'sv_enableRankings = Cvar_Get ("sv_enableRankings", "0",' in sv_init
 		and 'sv_rankingsActive = Cvar_Get ("sv_rankingsActive", "0",' in sv_init
 		and 'sv_leagueName = Cvar_Get ("sv_leagueName", "",' in sv_init
+		and 'Cvar_Get ("sv_rankingsProvider", "Unavailable", CVAR_ROM );' in sv_init
+		and 'Cvar_Get ("sv_rankingsPolicy", "compatibility-unavailable", CVAR_ROM );' in sv_init
 		and "void SV_RankBegin( char *gamekey )" in sv_rankings
 		and "test_server_rankings_policy_lane_stays_explicit_and_per_server" in platform_services_tests
 	)
@@ -303,6 +305,8 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 				'sv_enableRankings = Cvar_Get ("sv_enableRankings", "0",' in sv_init
 				and 'sv_rankingsActive = Cvar_Get ("sv_rankingsActive", "0",' in sv_init
 				and 'sv_leagueName = Cvar_Get ("sv_leagueName", "",' in sv_init
+				and 'Cvar_Get ("sv_rankingsProvider", "Unavailable", CVAR_ROM );' in sv_init
+				and 'Cvar_Get ("sv_rankingsPolicy", "compatibility-unavailable", CVAR_ROM );' in sv_init
 			),
 			"rank_begin_owner_present": "void SV_RankBegin( char *gamekey )" in sv_rankings,
 			"focused_validation_present": "test_server_rankings_policy_lane_stays_explicit_and_per_server" in platform_services_tests,

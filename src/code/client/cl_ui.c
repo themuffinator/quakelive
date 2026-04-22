@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../game/botlib.h"
 #include "../../common/auth_credentials.h"
+#include "../../common/platform/platform_services.h"
 #include "../../common/platform/platform_steamworks.h"
 #include "../../../src-re/include/fs_imports.h"
 #ifdef _WIN32
@@ -1553,12 +1554,53 @@ static int QDECL QL_UI_trap_GetCursorPos( int *x, int *y ) {
 
 /*
 ==============
+QL_UI_GetSubscriptionBridgeModeLabel
+
+Returns the overall online-services mode label mirrored through the retained
+UI subscription bridge.
+==============
+*/
+static const char *QL_UI_GetSubscriptionBridgeModeLabel( void ) {
+	return QL_GetOnlineServicesModeLabel();
+}
+
+/*
+==============
+QL_UI_GetSubscriptionBridgePolicyLabel
+
+Returns the overall online-services policy label mirrored through the retained
+UI subscription bridge.
+==============
+*/
+static const char *QL_UI_GetSubscriptionBridgePolicyLabel( void ) {
+	return QL_GetOnlineServicesPolicyLabel();
+}
+
+/*
+==============
+QL_UI_LogSubscriptionBridgeIgnored
+
+Publishes explicit diagnostics whenever the retained UI app-subscription
+bridge cannot be served by the current compatibility lane.
+==============
+*/
+static void QL_UI_LogSubscriptionBridgeIgnored( int appId, const char *reason ) {
+	Com_DPrintf( "UI subscription bridge ignored for app %d: %s (%s [%s])\n",
+		appId,
+		reason ? reason : "subscription bridge provider unavailable",
+		QL_UI_GetSubscriptionBridgeModeLabel(),
+		QL_UI_GetSubscriptionBridgePolicyLabel() );
+}
+
+/*
+==============
 QL_UI_trap_IsSubscribedApp
 ==============
 */
 static int QDECL QL_UI_trap_IsSubscribedApp( int arg1 ) {
 	// uix86.dll HLIL: import[93] (offset 0x174) checks Steam subscription for app IDs.
 	if ( !CL_SteamServicesEnabled() ) {
+		QL_UI_LogSubscriptionBridgeIgnored( arg1, "subscription bridge provider unavailable" );
 		return 0;
 	}
 

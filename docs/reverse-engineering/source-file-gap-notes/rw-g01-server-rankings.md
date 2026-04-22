@@ -12,14 +12,18 @@ The default `!QL_ENABLE_RANKINGS` branch is explicit and useful, but it still pr
 
 ## Observed facts
 
-- The disabled branch logs `Rankings disabled by build policy (QL_ENABLE_RANKINGS=0)` and forces `sv_enableRankings` back to `0` when requested.
+- The disabled branch now mirrors its compatibility state through the ROM cvars `sv_rankingsProvider` and `sv_rankingsPolicy`.
+- The disabled branch logs `Rankings disabled by build policy (QL_ENABLE_RANKINGS=0)` together with the active provider/policy pair and forces `sv_enableRankings` back to `0` when requested.
 - Most disabled-branch functions publish compatibility-safe return values or no-ops rather than a live rankings path.
-- The live rankings implementation remains present under the enabled branch, but the repo-wide default policy keeps that surface outside closure.
+- The enabled branch still exposes a retained opt-in `Legacy GRank Service` provider label rather than changing the repo-wide closure story.
 
 ## Function-by-function status
 
 | Function | Status | Notes |
 | --- | --- | --- |
+| `SV_GetRankingsProviderLabel` | `gap owner` | Publishes the current rankings provider label for the retained compatibility lane. |
+| `SV_GetRankingsPolicyLabel` | `gap owner` | Publishes the current rankings compatibility policy label. |
+| `SV_RefreshRankingsPolicyCvars` | `gap owner` | Mirrors the rankings provider/policy pair through ROM cvars for diagnostics. |
 | `SV_RankPublishDisabledState` | `gap owner` | Publishes the disabled compatibility state to cvars. |
 | `SV_RankLogDisabledState` | `gap owner` | Makes the build-disabled rankings policy explicit at runtime. |
 | `SV_RankBegin` | `gap owner` | Disabled-branch entry point forces the rankings surface back to compatibility-only behavior. |
