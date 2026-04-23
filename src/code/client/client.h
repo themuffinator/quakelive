@@ -431,6 +431,7 @@ void CL_VerifyCode( void );
 qboolean CL_ShouldFilterConsoleText( const char *text );
 qboolean CL_OnlineServicesEnabled( void );
 qboolean CL_SteamServicesEnabled( void );
+void CL_LogMatchmakingServiceIgnored( const char *commandName, const char *reason );
 void CL_Steam_OnRichPresenceJoinRequested( const char *command );
 void CL_Steam_OnGameServerChangeRequested( const char *server, const char *password );
 qboolean CL_GetWorkshopDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal );

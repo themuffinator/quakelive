@@ -111,6 +111,76 @@ const char *SV_GetSteamServerPolicyLabel( void ) {
 
 /*
 ===============
+SV_GetWorkshopProviderLabel
+
+Returns the provider label for the retained dedicated-server workshop lane.
+===============
+*/
+const char *SV_GetWorkshopProviderLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return "Unavailable";
+	}
+
+	return SV_GetPlatformFeatureProviderLabel( &services->workshop );
+}
+
+/*
+===============
+SV_GetWorkshopPolicyLabel
+
+Returns the compatibility policy label for the retained dedicated-server
+workshop lane.
+===============
+*/
+const char *SV_GetWorkshopPolicyLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return "compatibility-unavailable";
+	}
+
+	return QL_DescribePlatformFeaturePolicy( &services->workshop );
+}
+
+/*
+===============
+SV_GetServerStatsProviderLabel
+
+Returns the provider label for the retained dedicated-server stats lane.
+===============
+*/
+const char *SV_GetServerStatsProviderLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return "Unavailable";
+	}
+
+	return SV_GetPlatformFeatureProviderLabel( &services->stats );
+}
+
+/*
+===============
+SV_GetServerStatsPolicyLabel
+
+Returns the compatibility policy label for the retained dedicated-server stats
+lane.
+===============
+*/
+const char *SV_GetServerStatsPolicyLabel( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return "compatibility-unavailable";
+	}
+
+	return QL_DescribePlatformFeaturePolicy( &services->stats );
+}
+
+/*
+===============
 SV_RefreshPlatformServiceCvars
 
 Mirrors the retained server platform-service provider and policy labels through
@@ -124,6 +194,10 @@ void SV_RefreshPlatformServiceCvars( void ) {
 	Cvar_Set( "sv_platformAuthPolicy", SV_GetPlatformAuthPolicyLabel() );
 	Cvar_Set( "sv_steamServerProvider", SV_GetSteamServerProviderLabel() );
 	Cvar_Set( "sv_steamServerPolicy", SV_GetSteamServerPolicyLabel() );
+	Cvar_Set( "sv_workshopProvider", SV_GetWorkshopProviderLabel() );
+	Cvar_Set( "sv_workshopPolicy", SV_GetWorkshopPolicyLabel() );
+	Cvar_Set( "sv_statsProvider", SV_GetServerStatsProviderLabel() );
+	Cvar_Set( "sv_statsPolicy", SV_GetServerStatsPolicyLabel() );
 }
 
 /*
@@ -799,6 +873,10 @@ void SV_Init (void) {
 	Cvar_Get ("sv_platformAuthPolicy", "compatibility-unavailable", CVAR_ROM );
 	Cvar_Get ("sv_steamServerProvider", "Unavailable", CVAR_ROM );
 	Cvar_Get ("sv_steamServerPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("sv_workshopProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("sv_workshopPolicy", "compatibility-unavailable", CVAR_ROM );
+	Cvar_Get ("sv_statsProvider", "Unavailable", CVAR_ROM );
+	Cvar_Get ("sv_statsPolicy", "compatibility-unavailable", CVAR_ROM );
 	Cvar_Get ("sv_rankingsProvider", "Unavailable", CVAR_ROM );
 	Cvar_Get ("sv_rankingsPolicy", "compatibility-unavailable", CVAR_ROM );
 

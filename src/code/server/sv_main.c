@@ -49,6 +49,44 @@ static int s_svEmptyServerTime = -1;
 
 /*
 =============
+SV_LogSteamServerNetworkingLifecycle
+
+Publishes provider-aware diagnostics for the retained Steam GameServer
+networking maintenance lane.
+=============
+*/
+static void SV_LogSteamServerNetworkingLifecycle( const CSteamID *steamId, const char *stage, const char *detail ) {
+	unsigned long long remoteId;
+
+	remoteId = steamId ? (unsigned long long)steamId->value : 0ull;
+	Com_DPrintf( "Steam server networking %s for %llu via %s [%s]: %s\n",
+		stage ? stage : "update",
+		remoteId,
+		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=============
+SV_LogSteamServerPublishedState
+
+Publishes provider-aware diagnostics for the retained Steam GameServer
+published-state owner.
+=============
+*/
+static void SV_LogSteamServerPublishedState( const CSteamID *steamId, const char *stage, const char *detail ) {
+	unsigned long long remoteId;
+
+	remoteId = steamId ? (unsigned long long)steamId->value : 0ull;
+	Com_DPrintf( "Steam server published state %s for %llu via %s [%s]: %s\n",
+		stage ? stage : "update",
+		remoteId,
+		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=============
 SV_ParseSteamIdToCSteamID
 
 Converts a decimal SteamID string into a CSteamID container.
@@ -141,7 +179,9 @@ static void SV_SteamServerSendKeepAlive( void ) {
 			continue;
 		}
 
-		QL_Steamworks_ServerSendP2PPacket( &steamId, keepAlive, (uint32_t)sizeof( keepAlive ), 2, 16 );
+		if ( !QL_Steamworks_ServerSendP2PPacket( &steamId, keepAlive, (uint32_t)sizeof( keepAlive ), 2, 16 ) ) {
+			SV_LogSteamServerNetworkingLifecycle( &steamId, "keepalive", "send failed" );
+		}
 	}
 }
 
@@ -173,6 +213,7 @@ static void SV_SteamServerRelayP2PPackets( void ) {
 		}
 
 		if ( !QL_Steamworks_ServerReadP2PPacket( buffer + 1, packetSize, &bytesRead, &remoteId, 1 ) ) {
+			SV_LogSteamServerNetworkingLifecycle( NULL, "p2p-read", "read failed" );
 			free( buffer );
 			continue;
 		}
@@ -195,6 +236,7 @@ static void SV_SteamServerRelayP2PPackets( void ) {
 		}
 
 		if ( senderIndex < 0 ) {
+			SV_LogSteamServerNetworkingLifecycle( &remoteId, "p2p-relay", "sender not found" );
 			free( buffer );
 			continue;
 		}
@@ -216,7 +258,9 @@ static void SV_SteamServerRelayP2PPackets( void ) {
 				continue;
 			}
 
-			QL_Steamworks_ServerSendP2PPacket( &clientId, buffer, bytesRead + 1, 1, 1 );
+			if ( !QL_Steamworks_ServerSendP2PPacket( &clientId, buffer, bytesRead + 1, 1, 1 ) ) {
+				SV_LogSteamServerNetworkingLifecycle( &clientId, "p2p-relay", "relay send failed" );
+			}
 		}
 
 		free( buffer );
@@ -910,27 +954,38 @@ void SV_SteamServerUpdatePublishedState( qboolean fullUpdate ) {
 	char			tagVampiric[MAX_CVAR_VALUE_STRING];
 	char			tagCustom[MAX_CVAR_VALUE_STRING];
 	char			gameTags[MAX_CVAR_VALUE_STRING];
+	char			detail[MAX_STRING_CHARS];
 
 	if ( fullUpdate || ( sv_maxclients && sv_maxclients->modified ) ) {
-		QL_Steamworks_ServerSetMaxPlayerCount( sv_maxclients ? sv_maxclients->integer : 0 );
+		if ( !QL_Steamworks_ServerSetMaxPlayerCount( sv_maxclients ? sv_maxclients->integer : 0 ) ) {
+			SV_LogSteamServerPublishedState( NULL, "max-players", "publish failed" );
+		}
 	}
 
 	needPass = Cvar_VariableIntegerValue( "g_needpass" );
 	if ( fullUpdate || needPass != s_steamPublishedNeedPass ) {
-		QL_Steamworks_ServerSetPasswordProtected( needPass ? qtrue : qfalse );
+		if ( !QL_Steamworks_ServerSetPasswordProtected( needPass ? qtrue : qfalse ) ) {
+			SV_LogSteamServerPublishedState( NULL, "password-protected", "publish failed" );
+		}
 		s_steamPublishedNeedPass = needPass;
 	}
 
 	if ( fullUpdate || ( sv_hostname && sv_hostname->modified ) ) {
-		QL_Steamworks_ServerSetServerName( sv_hostname->string );
+		if ( !QL_Steamworks_ServerSetServerName( sv_hostname->string ) ) {
+			SV_LogSteamServerPublishedState( NULL, "server-name", "publish failed" );
+		}
 	}
 
 	if ( fullUpdate || ( sv_mapname && sv_mapname->modified ) ) {
-		QL_Steamworks_ServerSetMapName( sv_mapname->string );
+		if ( !QL_Steamworks_ServerSetMapName( sv_mapname->string ) ) {
+			SV_LogSteamServerPublishedState( NULL, "map-name", "publish failed" );
+		}
 	}
 
 	if ( fullUpdate || ( sv_gametype && sv_gametype->modified ) ) {
-		QL_Steamworks_ServerSetGameDescription( SV_SteamServerGameDescription( sv_gametype->integer ) );
+		if ( !QL_Steamworks_ServerSetGameDescription( SV_SteamServerGameDescription( sv_gametype->integer ) ) ) {
+			SV_LogSteamServerPublishedState( NULL, "game-description", "publish failed" );
+		}
 	}
 
 	tagGametype = Cvar_VariableIntegerValue( "g_gametype" );
@@ -978,7 +1033,9 @@ void SV_SteamServerUpdatePublishedState( qboolean fullUpdate ) {
 
 	if ( refreshTags ) {
 		SV_SteamServerBuildGameTags( gameTags, sizeof( gameTags ) );
-		QL_Steamworks_ServerSetGameTags( gameTags );
+		if ( !QL_Steamworks_ServerSetGameTags( gameTags ) ) {
+			SV_LogSteamServerPublishedState( NULL, "game-tags", "publish failed" );
+		}
 		s_steamPublishedTagsInitialised = qtrue;
 		s_steamPublishedTagGametype = tagGametype;
 		s_steamPublishedTagCheats = tagCheats;
@@ -1004,8 +1061,12 @@ void SV_SteamServerUpdatePublishedState( qboolean fullUpdate ) {
 
 	Cvar_VariableStringBuffer( "g_redScore", redScore, sizeof( redScore ) );
 	Cvar_VariableStringBuffer( "g_blueScore", blueScore, sizeof( blueScore ) );
-	QL_Steamworks_ServerSetKeyValue( "g_redScore", redScore );
-	QL_Steamworks_ServerSetKeyValue( "g_blueScore", blueScore );
+	if ( !QL_Steamworks_ServerSetKeyValue( "g_redScore", redScore ) ) {
+		SV_LogSteamServerPublishedState( NULL, "key-value", "publish failed for g_redScore" );
+	}
+	if ( !QL_Steamworks_ServerSetKeyValue( "g_blueScore", blueScore ) ) {
+		SV_LogSteamServerPublishedState( NULL, "key-value", "publish failed for g_blueScore" );
+	}
 
 	botCount = 0;
 
@@ -1043,10 +1104,15 @@ void SV_SteamServerUpdatePublishedState( qboolean fullUpdate ) {
 			continue;
 		}
 
-		QL_Steamworks_ServerUpdateUserData( &steamId, playerName, (uint32_t)playerState->persistant[PERS_SCORE] );
+		if ( !QL_Steamworks_ServerUpdateUserData( &steamId, playerName, (uint32_t)playerState->persistant[PERS_SCORE] ) ) {
+			Com_sprintf( detail, sizeof( detail ), "publish failed for client %d (%s)", i, playerName );
+			SV_LogSteamServerPublishedState( &steamId, "user-data", detail );
+		}
 	}
 
-	QL_Steamworks_ServerSetBotPlayerCount( botCount );
+	if ( !QL_Steamworks_ServerSetBotPlayerCount( botCount ) ) {
+		SV_LogSteamServerPublishedState( NULL, "bot-player-count", "publish failed" );
+	}
 }
 
 

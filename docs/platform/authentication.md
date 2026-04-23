@@ -67,11 +67,15 @@ of hiding it behind generic Steam-only wording. `SV_LogPlatformAuth` preserves
 the legacy `credential=steam` telemetry field for downstream log consumers, but
 it now appends `provider=<...> policy=<...>` to the message payload so the
 current auth lane remains explicit in server-side telemetry too. The dedicated
-server bootstrap and callback logs likewise reuse the matchmaking descriptor’s
+server auth and GameServer bootstrap/callback logs likewise reuse their active
 provider/policy labels, which keeps connect, disconnect, callback-registration,
 and bootstrap-unavailable diagnostics aligned with the documented
 compatibility-only boundary rather than reading like strict-retail service
-ownership.
+ownership. The retained auth-session bootstrap also now emits explicit
+provider/policy-aware connection-rejection diagnostics when session startup
+fails, while the outward drop message intentionally keeps the legacy
+`Failed to authenticate with Steam: ...` wording for stable client-facing and
+telemetry consumers.
 
 ## Structured Outcomes
 

@@ -355,6 +355,171 @@ static void CL_WebHost_BuildCurrentURL( const char *hash, char *buffer, size_t b
 
 /*
 =============
+CL_GetWebHostModeLabel
+
+Returns the overall online-services mode label used by the retained web host.
+=============
+*/
+static const char *CL_GetWebHostModeLabel( void ) {
+	return QL_GetOnlineServicesModeLabel();
+}
+
+/*
+=============
+CL_GetWebHostPolicyLabel
+
+Returns the overall online-services policy label used by the retained web host.
+=============
+*/
+static const char *CL_GetWebHostPolicyLabel( void ) {
+	return QL_GetOnlineServicesPolicyLabel();
+}
+
+/*
+=============
+CL_GetWebHostMatchmakingServiceDescriptor
+
+Returns the current platform-service descriptor for web-host social exports.
+=============
+*/
+static const ql_platform_feature_descriptor *CL_GetWebHostMatchmakingServiceDescriptor( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return NULL;
+	}
+
+	return &services->matchmaking;
+}
+
+/*
+=============
+CL_GetWebHostMatchmakingProviderLabel
+
+Returns the human-readable provider label for web-host social exports.
+=============
+*/
+static const char *CL_GetWebHostMatchmakingProviderLabel( void ) {
+	const ql_platform_feature_descriptor *descriptor = CL_GetWebHostMatchmakingServiceDescriptor();
+
+	if ( !descriptor || !descriptor->provider ) {
+		return "Unavailable";
+	}
+
+	return descriptor->provider;
+}
+
+/*
+=============
+CL_GetWebHostMatchmakingPolicyLabel
+
+Returns the short compatibility policy label for web-host social exports.
+=============
+*/
+static const char *CL_GetWebHostMatchmakingPolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( CL_GetWebHostMatchmakingServiceDescriptor() );
+}
+
+/*
+=============
+CL_GetWebHostWorkshopServiceDescriptor
+
+Returns the current platform-service descriptor for web-host UGC exports.
+=============
+*/
+static const ql_platform_feature_descriptor *CL_GetWebHostWorkshopServiceDescriptor( void ) {
+	const ql_platform_service_table *services = QL_GetPlatformServices();
+
+	if ( !services ) {
+		return NULL;
+	}
+
+	return &services->workshop;
+}
+
+/*
+=============
+CL_GetWebHostWorkshopProviderLabel
+
+Returns the human-readable provider label for web-host UGC exports.
+=============
+*/
+static const char *CL_GetWebHostWorkshopProviderLabel( void ) {
+	const ql_platform_feature_descriptor *descriptor = CL_GetWebHostWorkshopServiceDescriptor();
+
+	if ( !descriptor || !descriptor->provider ) {
+		return "Unavailable";
+	}
+
+	return descriptor->provider;
+}
+
+/*
+=============
+CL_GetWebHostWorkshopPolicyLabel
+
+Returns the short compatibility policy label for web-host UGC exports.
+=============
+*/
+static const char *CL_GetWebHostWorkshopPolicyLabel( void ) {
+	return QL_DescribePlatformFeaturePolicy( CL_GetWebHostWorkshopServiceDescriptor() );
+}
+
+/*
+=============
+CL_LogWebHostMatchmakingExportLifecycle
+
+Publishes provider-aware diagnostics whenever the retained web-host social
+export lane falls back under the compatibility policy.
+=============
+*/
+static void CL_LogWebHostMatchmakingExportLifecycle( const char *stage, const char *reason ) {
+	Com_DPrintf( "Web host matchmaking %s: %s (%s [%s])\n",
+		stage ? stage : "export",
+		reason ? reason : "Steam social export unavailable for current compatibility lane",
+		CL_GetWebHostMatchmakingProviderLabel(),
+		CL_GetWebHostMatchmakingPolicyLabel() );
+}
+
+/*
+=============
+CL_LogWebHostWorkshopExportLifecycle
+
+Publishes provider-aware diagnostics whenever the retained web-host UGC export
+lane falls back under the compatibility policy.
+=============
+*/
+static void CL_LogWebHostWorkshopExportLifecycle( const char *stage, const char *reason ) {
+	Com_DPrintf( "Web host workshop %s: %s (%s [%s])\n",
+		stage ? stage : "export",
+		reason ? reason : "Steam UGC export unavailable for current compatibility lane",
+		CL_GetWebHostWorkshopProviderLabel(),
+		CL_GetWebHostWorkshopPolicyLabel() );
+}
+
+/*
+=============
+CL_WebHost_HasSteamIdentity
+
+Returns qtrue when the retained web host can safely query Steam-backed social
+and UGC data for the current session.
+=============
+*/
+static qboolean CL_WebHost_HasSteamIdentity( void ) {
+	uint32_t steamIdLow;
+	uint32_t steamIdHigh;
+
+	if ( !CL_SteamServicesEnabled() ) {
+		return qfalse;
+	}
+
+	steamIdLow = 0u;
+	steamIdHigh = 0u;
+	return QL_Steamworks_GetUserSteamID( &steamIdLow, &steamIdHigh );
+}
+
+/*
+=============
 CL_WebHost_RefreshBootstrapProperties
 =============
 */
@@ -2549,6 +2714,12 @@ static void CL_WebHost_BuildFriendListJson( char *buffer, size_t bufferSize ) {
 	buffer[0] = '\0';
 	Q_strcat( buffer, bufferSize, "[" );
 
+	if ( !CL_WebHost_HasSteamIdentity() ) {
+		CL_LogWebHostMatchmakingExportLifecycle( "friend-list", "Steam social export unavailable for current compatibility lane" );
+		Q_strcat( buffer, bufferSize, "]" );
+		return;
+	}
+
 	friendCount = QL_Steamworks_GetFriendCount( CL_WEB_FRIEND_FLAGS );
 	for ( index = 0; index < friendCount; index++ ) {
 		uint32_t idLow;
@@ -2702,6 +2873,12 @@ static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {
 	char steamId[32];
 	clWebConfigArrayContext_t cvarContext;
 	clWebConfigArrayContext_t bindContext;
+	const char *onlineServicesMode;
+	const char *onlineServicesPolicy;
+	const char *matchmakingProvider;
+	const char *matchmakingPolicy;
+	const char *workshopProvider;
+	const char *workshopPolicy;
 
 	if ( !buffer || bufferSize == 0 ) {
 		return;
@@ -2709,6 +2886,12 @@ static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {
 
 	CL_WebHost_RefreshBootstrapProperties();
 	CL_WebHost_FormatSteamId( cl_webHost.steamIdLow, cl_webHost.steamIdHigh, steamId, sizeof( steamId ) );
+	onlineServicesMode = CL_GetWebHostModeLabel();
+	onlineServicesPolicy = CL_GetWebHostPolicyLabel();
+	matchmakingProvider = CL_GetWebHostMatchmakingProviderLabel();
+	matchmakingPolicy = CL_GetWebHostMatchmakingPolicyLabel();
+	workshopProvider = CL_GetWebHostWorkshopProviderLabel();
+	workshopPolicy = CL_GetWebHostWorkshopPolicyLabel();
 
 	cvarJson[0] = '\0';
 	bindJson[0] = '\0';
@@ -2733,7 +2916,19 @@ static void CL_WebHost_BuildConfigJson( char *buffer, size_t bufferSize ) {
 	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, cl_webHost.playerName );
 	Q_strcat( buffer, bufferSize, "\",\"appId\":" );
 	Q_strcat( buffer, bufferSize, va( "%u", cl_webHost.appId ) );
-	Q_strcat( buffer, bufferSize, ",\"browserVisible\":" );
+	Q_strcat( buffer, bufferSize, ",\"onlineServicesMode\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, onlineServicesMode );
+	Q_strcat( buffer, bufferSize, "\",\"onlineServicesPolicy\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, onlineServicesPolicy );
+	Q_strcat( buffer, bufferSize, "\",\"matchmakingProvider\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, matchmakingProvider );
+	Q_strcat( buffer, bufferSize, "\",\"matchmakingPolicy\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, matchmakingPolicy );
+	Q_strcat( buffer, bufferSize, "\",\"workshopProvider\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, workshopProvider );
+	Q_strcat( buffer, bufferSize, "\",\"workshopPolicy\":\"" );
+	CL_WebHost_AppendJsonEscaped( buffer, bufferSize, workshopPolicy );
+	Q_strcat( buffer, bufferSize, "\",\"browserVisible\":" );
 	Q_strcat( buffer, bufferSize, cl_webHost.browserVisible ? "1" : "0" );
 	Q_strcat( buffer, bufferSize, ",\"browserActive\":" );
 	Q_strcat( buffer, bufferSize, cl_webHost.browserActive ? "1" : "0" );
@@ -2763,6 +2958,12 @@ static void CL_WebHost_BuildUGCResultsJson( char *buffer, size_t bufferSize ) {
 
 	buffer[0] = '\0';
 	Q_strcat( buffer, bufferSize, "[" );
+
+	if ( !CL_WebHost_HasSteamIdentity() ) {
+		CL_LogWebHostWorkshopExportLifecycle( "ugc-results", "Steam UGC export unavailable for current compatibility lane" );
+		Q_strcat( buffer, bufferSize, "]" );
+		return;
+	}
 
 	subscribedCount = QL_Steamworks_GetNumSubscribedItems();
 	if ( subscribedCount > ARRAY_LEN( itemIds ) ) {
@@ -3055,12 +3256,19 @@ static qboolean QLJSHandler_OnMethodCall( const char *methodName, const char **a
 		case CL_WEB_METHOD_GET_ALL_UGC:
 			{
 				char ugcJson[CL_WEB_JSON_BUFFER_SIZE];
+				char ugcFailure[512];
 
 				CL_WebHost_BuildUGCResultsJson( ugcJson, sizeof( ugcJson ) );
 				if ( ugcJson[1] != '\0' ) {
 					CL_WebView_PublishEvent( "web.ugc.results", ugcJson );
 				} else {
-					CL_WebView_PublishEvent( "web.ugc.failed", "{\"result\":0}" );
+					ugcFailure[0] = '\0';
+					Q_strcat( ugcFailure, sizeof( ugcFailure ), "{\"result\":0,\"provider\":\"" );
+					CL_WebHost_AppendJsonEscaped( ugcFailure, sizeof( ugcFailure ), CL_GetWebHostWorkshopProviderLabel() );
+					Q_strcat( ugcFailure, sizeof( ugcFailure ), "\",\"policy\":\"" );
+					CL_WebHost_AppendJsonEscaped( ugcFailure, sizeof( ugcFailure ), CL_GetWebHostWorkshopPolicyLabel() );
+					Q_strcat( ugcFailure, sizeof( ugcFailure ), "\"}" );
+					CL_WebView_PublishEvent( "web.ugc.failed", ugcFailure );
 				}
 				return qtrue;
 			}
@@ -5413,11 +5621,18 @@ Mirrors the retail game-start status write once the first active snapshot lands.
 ==================
 */
 static void CL_Steam_SetMatchRichPresence( void ) {
-	if ( !CL_SteamServicesEnabled() || clc.demoplaying ) {
+	if ( !CL_SteamServicesEnabled() ) {
+		CL_LogMatchmakingServiceIgnored( "steam_presence_match", "matchmaking provider unavailable" );
 		return;
 	}
 
-	QL_Steamworks_SetRichPresence( "status", "Playing a match" );
+	if ( clc.demoplaying ) {
+		return;
+	}
+
+	if ( !QL_Steamworks_SetRichPresence( "status", "Playing a match" ) ) {
+		CL_LogMatchmakingServiceIgnored( "steam_presence_match", "rich presence update failed" );
+	}
 }
 
 

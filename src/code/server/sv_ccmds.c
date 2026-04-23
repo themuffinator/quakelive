@@ -2842,6 +2842,37 @@ static qboolean SV_SteamWorkshop_SplitItemId( unsigned long long itemId, uint32_
 
 /*
 =============
+SV_LogWorkshopOperatorLifecycle
+
+Publishes provider-aware diagnostics for the retained dedicated-server manual
+Steam workshop command surface.
+=============
+*/
+static void SV_LogWorkshopOperatorLifecycle( const char *commandName, unsigned long long itemId, const char *detail ) {
+	Com_Printf( "Workshop operator %s for %llu via %s [%s]: %s\n",
+		commandName ? commandName : "unknown",
+		itemId,
+		SV_GetWorkshopProviderLabel(),
+		SV_GetWorkshopPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=============
+SV_WorkshopServiceSupportsSteamCommands
+
+Returns qtrue when the retained workshop descriptor still owns the manual
+Steam UGC operator command lane.
+=============
+*/
+static qboolean SV_WorkshopServiceSupportsSteamCommands( void ) {
+	const char *provider = SV_GetWorkshopProviderLabel();
+
+	return ( strstr( provider, "Steam UGC" ) != NULL );
+}
+
+/*
+=============
 SV_SteamCmd_DownloadUGC_f
 
 Mirrors the retail manual workshop download command surface.
@@ -2862,14 +2893,20 @@ static void SV_SteamCmd_DownloadUGC_f( void ) {
 		return;
 	}
 
-	if ( QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & 4u ) {
-		Com_Printf( "Workshop item %llu: in cache.\n", itemId );
+	if ( !SV_WorkshopServiceSupportsSteamCommands() ) {
+		SV_LogWorkshopOperatorLifecycle( "steam_downloadugc", itemId,
+			"Steam UGC operator unavailable for current compatibility lane" );
 		return;
 	}
 
-	Com_Printf( "Workshop item %llu: download\n", itemId );
+	if ( QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & 4u ) {
+		SV_LogWorkshopOperatorLifecycle( "steam_downloadugc", itemId, "item already in cache" );
+		return;
+	}
+
+	SV_LogWorkshopOperatorLifecycle( "steam_downloadugc", itemId, "download requested" );
 	if ( !QL_Steamworks_DownloadItem( itemIdLow, itemIdHigh, qtrue ) ) {
-		Com_Printf( "Workshop item %llu: download request failed.\n", itemId );
+		SV_LogWorkshopOperatorLifecycle( "steam_downloadugc", itemId, "download request failed" );
 	}
 }
 
@@ -2895,8 +2932,15 @@ static void SV_SteamCmd_SubscribeUGC_f( void ) {
 		return;
 	}
 
+	if ( !SV_WorkshopServiceSupportsSteamCommands() ) {
+		SV_LogWorkshopOperatorLifecycle( "steam_subscribeugc", itemId,
+			"Steam UGC operator unavailable for current compatibility lane" );
+		return;
+	}
+
+	SV_LogWorkshopOperatorLifecycle( "steam_subscribeugc", itemId, "subscribe requested" );
 	if ( !QL_Steamworks_SubscribeItem( itemIdLow, itemIdHigh ) ) {
-		Com_Printf( "Workshop item %llu: subscribe request failed.\n", itemId );
+		SV_LogWorkshopOperatorLifecycle( "steam_subscribeugc", itemId, "subscribe request failed" );
 	}
 }
 
@@ -2922,8 +2966,15 @@ static void SV_SteamCmd_UnsubscribeUGC_f( void ) {
 		return;
 	}
 
+	if ( !SV_WorkshopServiceSupportsSteamCommands() ) {
+		SV_LogWorkshopOperatorLifecycle( "steam_unsubscribeugc", itemId,
+			"Steam UGC operator unavailable for current compatibility lane" );
+		return;
+	}
+
+	SV_LogWorkshopOperatorLifecycle( "steam_unsubscribeugc", itemId, "unsubscribe requested" );
 	if ( !QL_Steamworks_UnsubscribeItem( itemIdLow, itemIdHigh ) ) {
-		Com_Printf( "Workshop item %llu: unsubscribe request failed.\n", itemId );
+		SV_LogWorkshopOperatorLifecycle( "steam_unsubscribeugc", itemId, "unsubscribe request failed" );
 	}
 }
 

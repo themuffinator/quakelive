@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-04-22
+Last updated: 2026-04-23
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -1285,6 +1285,355 @@ Completed work:
    platform-service abstraction/gap-note docs so the retained live-resource and
    avatar lane now matches the same explicit compatibility-labeling story as
    the other active `RW-G01` seams.
+
+### Task A3m: Expose explicit provider/policy labeling through the retained client workshop lifecycle [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`tests/test_client_workshop_bootstrap_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Mirrored the retained client workshop seam through the ROM cvars
+   `cl_workshopProvider` and `cl_workshopPolicy` so the active workshop owner
+   is visible alongside the other client online-service descriptors.
+2. Routed the workshop bootstrap, download, callback-ignore, queue-complete,
+   and filesystem-restart diagnostics through a shared provider-aware helper,
+   which keeps the current compatibility-only workshop lane explicit instead of
+   falling back to generic Steamworks-only wording.
+3. Refreshed the focused workshop/platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the documented
+   workshop lifecycle now matches the same explicit compatibility-labeling
+   story as the other active online-service seams.
+
+### Task A3n: Expose explicit provider/policy labeling through the retained dedicated-server P2P callback lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared dedicated-server P2P callback logger that reports the active
+   Steam GameServer provider/policy pair for the retained session-request
+   surface instead of leaving those diagnostics as raw Steam-only wording.
+2. Routed the server-side P2P request callback through that helper for missing
+   client, unauthenticated client, and accept-failure paths so the bounded
+   compatibility lane stays explicit during those callback exits too.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the dedicated-server
+   P2P callback path now matches the same explicit compatibility-labeling story
+   as the other active online-service seams.
+
+### Task A3o: Expose explicit provider/policy labeling through the retained dedicated-server stats lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_init.c`, `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Mirrored the retained dedicated-server stats seam through the ROM cvars
+   `sv_statsProvider` and `sv_statsPolicy` so the active GameServerStats owner
+   is visible alongside the other server online-service descriptors.
+2. Added a shared provider-aware server-stats logger and routed the
+   request-current-values, session-bootstrap P2P hello failure, and stat-delta
+   diagnostics through it so this compatibility-only lane no longer hides
+   behind raw Steam-only wording.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the dedicated-server
+   stats path now matches the same explicit compatibility-labeling story as the
+   other active online-service seams.
+
+### Task A3p: Expose explicit provider/policy labeling through the retained client rich-presence lifecycle [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `src/code/client/cl_cgame.c`,
+`src/code/client/client.h`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Exported the shared matchmaking-lane logger through `client.h` so the
+   retained first-snapshot rich-presence owner can report the active
+   provider/policy pair instead of silently depending on a Steam-only path.
+2. Routed the main-menu and first-snapshot rich-presence writes through
+   explicit provider-aware fallback diagnostics for provider-unavailable and
+   update-failed exits while preserving the existing retail status strings.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   rich-presence lifecycle now matches the same explicit compatibility-labeling
+   story as the other active online-service seams.
+
+### Task A3q: Expose explicit provider/policy labeling through the retained dedicated-server auth rejection lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/platform/authentication.md`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared dedicated-server auth rejection logger so the retained
+   auth-session bootstrap reports the active provider/policy pair when session
+   startup fails instead of falling back to raw Steam-only debug wording.
+2. Routed both auth-session bootstrap failure exits through that helper while
+   preserving the legacy outward `Failed to authenticate with Steam: ...`
+   message contract for stable client-facing and telemetry consumers.
+3. Refreshed the focused platform-service regression coverage plus the auth and
+   platform-service docs so the retained dedicated-server auth rejection path
+   now matches the same explicit compatibility-labeling story as the other
+   active online-service seams.
+
+### Task A3r: Expose explicit provider/policy labeling through the retained client callback and stats-registration bootstrap gates [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the disabled-services early exit in `CL_Steam_InitCallbacks()` through
+   the same provider-aware callback-bundle fallback diagnostic used by the
+   registration-failure path, so the retained browser-event compatibility lane
+   no longer stays silent when callbacks never become eligible.
+2. Added explicit stats provider/policy-aware skip diagnostics to the
+   `stats_clear` registration gate for provider-unavailable, initialisation-
+   failed, and unsupported-app-id exits, which keeps that bootstrap boundary
+   explicit even when the command is never registered.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   callback/stats bootstrap path now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3s: Expose explicit provider/policy labeling through the retained dedicated-server callback bootstrap stub [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the build-disabled `SV_SteamServerInitCallbacks()` stub through the
+   same provider-aware callback-registration fallback diagnostic used by the
+   active registration failure path, so the dedicated-server callback lane no
+   longer disappears silently during startup.
+2. Extended the focused platform-service regression coverage to pin that
+   build-disabled callback-bootstrap fallback against the existing provider and
+   policy labels.
+3. Refreshed the platform-service abstraction and `RW-G01` gap note so the
+   retained dedicated-server callback bootstrap now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3t: Expose explicit mode/policy labeling through the retained client voice transport lifecycle [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared voice-transport lifecycle logger so the retained Steam voice
+   send/receive lane now reports the active overall mode/policy pair instead
+   of falling back to raw generic trace wording when the transport fails.
+2. Routed voice packet send failure, packet read failure, decompress failure,
+   and zero-byte-decompress diagnostics through that helper so the retained
+   voice transport now matches the same explicit compatibility story as the
+   `+voice` / `-voice` command surface.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   voice transport lifecycle now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3u: Expose explicit provider/policy labeling through the retained dedicated-server stats-owner stubs [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared provider-aware stub logger for the build-disabled dedicated-
+   server stats owner path so the retained `SV_SteamStats_*` surface no longer
+   disappears silently when the current stats lane is unavailable.
+2. Routed the build-disabled stat-delta, achievement-unlock, and achievement-
+   query stubs through that helper with call-site detail strings, keeping the
+   compatibility-only fallback explicit even when the owner functions still
+   return without touching a live backend.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats-owner stubs now match the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3v: Expose explicit provider/policy labeling through the retained dedicated-server networking maintenance lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared provider-aware networking logger for the retained Steam
+   GameServer maintenance owner so keepalive and packet-relay failures no
+   longer collapse into silent compatibility-only behavior.
+2. Routed keepalive send failure, inbound relay read failure, unknown relay
+   sender, and relay-send failure exits through that helper, keeping the
+   bounded Steam GameServer networking lane explicit whenever those paths fail.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server networking maintenance lane now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3w: Expose explicit provider/policy labeling through the retained dedicated-server published-state owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared provider-aware published-state logger for the retained Steam
+   GameServer metadata owner so publication writes no longer fail silently
+   behind the bounded compatibility lane.
+2. Routed max-player, password, hostname, map, game-description, game-tags,
+   score key-value, player-data, and bot-count publication failures through
+   that helper, keeping the retained GameServer metadata owner explicit when
+   those writes cannot be applied.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server published-state owner now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3x: Expose explicit provider/policy labeling through the retained client P2P callback lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared matchmaking callback logger for the retained client P2P
+   session-request owner so this callback lane no longer falls back to a raw
+   generic Steam trace.
+2. Routed both the accept-failure and accepted-session callback exits through
+   that helper with the requested remote SteamID detail, which keeps the
+   bounded client matchmaking callback surface explicit whenever the callback
+   fires.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   P2P callback lane now matches the same explicit compatibility-labeling story
+   as the other active online-service seams.
+
+### Task A3y: Expose explicit provider/policy labeling through the retained client browser-event publish lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared browser-event lifecycle logger for the retained client
+   browser-event owner so this queue lane no longer falls back to generic
+   `PublishEvent failed` or raw `steam_event` traces.
+2. Routed the missing-view, missing-window-object, and queued-event exits
+   through that helper with explicit queue metadata, keeping the retained
+   overlay/browser seam honest about the current provider/policy pair whenever
+   browser events are published.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   browser-event publish lane now matches the same explicit compatibility
+   labeling story as the other active online-service seams.
+
+### Task A3z: Expose explicit provider/policy labeling through the retained client microtransaction callback lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared microtransaction callback logger for the retained client
+   purchase-authorization lane so this callback no longer falls back to a raw
+   generic payload dump.
+2. Routed the retained microtransaction authorization callback through that
+   helper before it forwards the purchase update into the browser-event queue,
+   keeping the overlay/browser compatibility owner explicit whenever this
+   callback fires.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   microtransaction callback lane now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3aa: Expose explicit provider/policy labeling through the retained dedicated-server workshop operator surface [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_init.c`, `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Mirrored the retained dedicated-server workshop seam through the ROM cvars
+   `sv_workshopProvider` and `sv_workshopPolicy` so the active workshop owner
+   is visible alongside the other server online-service descriptors.
+2. Added a shared provider-aware workshop operator logger plus a bounded
+   Steam-UGC support gate for `steam_downloadugc`, `steam_subscribeugc`, and
+   `steam_unsubscribeugc`, which keeps those Steam-specific operator commands
+   explicit about the current compatibility lane instead of pretending that
+   every workshop provider owns the same surface.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained server
+   workshop operator surface now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3ab: Expose explicit provider/policy labeling through the retained client web-host social and UGC export lanes [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_cgame.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added retained web-host helpers for the overall online-service mode/policy
+   plus matchmaking and workshop provider/policy labels, keeping the browser
+   social/UGC export seams aligned with the repo-wide compatibility boundary.
+2. Updated `GetConfig`, friend-list export, UGC export, and `web.ugc.failed`
+   publication so browser callers see explicit provider/policy metadata while
+   disabled or unavailable Steam-backed exports log bounded fallback
+   diagnostics without changing the legacy array payload shape.
+3. Refreshed focused regression coverage plus the platform-service abstraction
+   and `RW-G01` gap note so the retained client web-host export lane now
+   matches the same explicit compatibility-labeling story as the other active
+   online-service seams.
 
 ## Active tasks
 

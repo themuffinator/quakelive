@@ -364,6 +364,20 @@ static void SV_BuildPlatformAuthCompatibilityDetail( const char *detail, char *b
 
 /*
 =================
+SV_LogPlatformAuthConnectRejected
+
+Publishes provider-aware diagnostics whenever the retained server-auth
+bootstrap rejects a connection under the compatibility policy.
+=================
+*/
+static void SV_LogPlatformAuthConnectRejected( const char *detail ) {
+	Com_DPrintf( "Server auth rejected connection via %s [%s]: %s\n",
+		SV_GetPlatformAuthProviderLabel(), SV_GetPlatformAuthPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=================
 SV_LogPlatformAuth
 
 Emits one unified telemetry record for the server-side auth owner.
@@ -631,6 +645,25 @@ static client_t *SV_SteamStats_GetClientSlot( int clientNum ) {
 
 /*
 =================
+SV_LogSteamStatsLifecycle
+
+Publishes provider-aware diagnostics for the retained dedicated-server stats
+compatibility lane.
+=================
+*/
+static void SV_LogSteamStatsLifecycle( const CSteamID *steamId, const char *stage, const char *detail ) {
+	unsigned long long remoteId;
+
+	remoteId = steamId ? (unsigned long long)steamId->value : 0ull;
+	Com_DPrintf( "Server stats %s for %llu via %s [%s]: %s\n",
+		stage ? stage : "update",
+		remoteId,
+		SV_GetServerStatsProviderLabel(), SV_GetServerStatsPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=================
 SV_SteamStats_RequestCurrentValues
 
 Reissues the retail SteamGameServerStats request for one active player session.
@@ -642,6 +675,7 @@ static qboolean SV_SteamStats_RequestCurrentValues( sv_steam_stats_session_t *se
 	}
 
 	if ( !QL_Steamworks_ServerRequestUserStats( &session->steamId ) ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "request-current-values", "request failed" );
 		return qfalse;
 	}
 
@@ -886,7 +920,9 @@ static void SV_SteamStats_CreatePlayerSession( client_t *cl ) {
 	session->active = qtrue;
 	session->steamId = steamId;
 	SV_SteamStats_RequestCurrentValues( session );
-	QL_Steamworks_ServerSendP2PPacket( &session->steamId, SV_STEAM_STATS_P2P_HELLO, 5, SV_STEAM_STATS_P2P_SEND_RELIABLE, SV_STEAM_STATS_P2P_CHANNEL );
+	if ( !QL_Steamworks_ServerSendP2PPacket( &session->steamId, SV_STEAM_STATS_P2P_HELLO, 5, SV_STEAM_STATS_P2P_SEND_RELIABLE, SV_STEAM_STATS_P2P_CHANNEL ) ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "p2p hello send failed" );
+	}
 }
 
 /*
@@ -952,6 +988,7 @@ void SV_SteamStats_AddFieldValue( int clientNum, int statIndex, int delta ) {
 	client_t *cl;
 	sv_steam_stats_session_t *session;
 	const char *name;
+	char detail[128];
 
 	if ( delta == 0 ) {
 		return;
@@ -978,7 +1015,8 @@ void SV_SteamStats_AddFieldValue( int clientNum, int statIndex, int delta ) {
 	session->pendingStatDelta[statIndex] += delta;
 	session->statDirty[statIndex] = qtrue;
 
-	Com_DPrintf( "Steam stat %s += %d -> %d for client %d\n", name, delta, session->statValue[statIndex], clientNum );
+	Com_sprintf( detail, sizeof( detail ), "stat %s += %d -> %d for client %d", name, delta, session->statValue[statIndex], clientNum );
+	SV_LogSteamStatsLifecycle( &session->steamId, "field-delta", detail );
 }
 
 /*
@@ -1125,6 +1163,7 @@ static const char *SV_BeginPlatformAuthSession( client_t *cl, const netadr_t *ad
 		SV_SetPlatformAuthUserinfo( cl, "error", "failure", message );
 		SV_FinalisePlatformAuthState( cl, qfalse, message );
 		SV_LogPlatformAuth( adr, cl, "failed", message );
+		SV_LogPlatformAuthConnectRejected( message );
 		return message;
 	}
 
@@ -1138,6 +1177,7 @@ static const char *SV_BeginPlatformAuthSession( client_t *cl, const netadr_t *ad
 			message );
 		SV_FinalisePlatformAuthState( cl, qfalse, message );
 		SV_LogPlatformAuth( adr, cl, "failed", message );
+		SV_LogPlatformAuthConnectRejected( message );
 		return message;
 	}
 
@@ -1261,6 +1301,25 @@ static void SV_SteamServerValidateAuthTicketResponseCallback( void *context, con
 
 /*
 =================
+SV_LogSteamServerP2PSessionRequest
+
+Publishes provider-aware diagnostics for the retained Steam GameServer P2P
+session-request surface.
+=================
+*/
+static void SV_LogSteamServerP2PSessionRequest( const CSteamID *steamId, const char *state, const char *reason ) {
+	unsigned long long remoteId;
+
+	remoteId = steamId ? (unsigned long long)steamId->value : 0ull;
+	Com_Printf( "Steam P2P session request %s for %llu via %s [%s]: %s\n",
+		state ? state : "update",
+		remoteId,
+		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel(),
+		reason ? reason : "no detail" );
+}
+
+/*
+=================
 SV_SteamServerP2PSessionRequestCallback
 
 Accepts server-side Steam P2P sessions only for live, authenticated clients.
@@ -1276,13 +1335,18 @@ static void SV_SteamServerP2PSessionRequestCallback( void *context, const ql_ste
 	}
 
 	cl = SV_FindClientBySteamId( &event->remoteId );
-	if ( !cl || !cl->platformAuthSucceeded ) {
-		Com_Printf( "Ignoring Steam P2P session request from %llu\n", (unsigned long long)event->remoteId.value );
+	if ( !cl ) {
+		SV_LogSteamServerP2PSessionRequest( &event->remoteId, "ignored", "client not found" );
+		return;
+	}
+
+	if ( !cl->platformAuthSucceeded ) {
+		SV_LogSteamServerP2PSessionRequest( &event->remoteId, "ignored", "client not authenticated" );
 		return;
 	}
 
 	if ( !QL_Steamworks_ServerAcceptP2PSession( &event->remoteId ) ) {
-		Com_Printf( "Failed to accept Steam P2P session request from %llu\n", (unsigned long long)event->remoteId.value );
+		SV_LogSteamServerP2PSessionRequest( &event->remoteId, "failed", "accept call failed" );
 	}
 }
 
@@ -1318,12 +1382,29 @@ void SV_SteamServerInitCallbacks( void ) {
 
 /*
 =================
+SV_LogSteamStatsStubLifecycle
+
+Publishes provider-aware diagnostics whenever the retained dedicated-server
+stats owner falls back through the build-disabled compatibility stub.
+=================
+*/
+static void SV_LogSteamStatsStubLifecycle( const char *stage, const char *detail ) {
+	Com_DPrintf( "Server stats %s via %s [%s]: %s\n",
+		stage ? stage : "update",
+		SV_GetServerStatsProviderLabel(), SV_GetServerStatsPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=================
 SV_SteamServerInitCallbacks
 
 Build-disabled stub for server auth callback registration.
 =================
 */
 void SV_SteamServerInitCallbacks( void ) {
+	Com_DPrintf( "Steam server callbacks unavailable for %s [%s]\n",
+		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
 }
 
 /*
@@ -1334,6 +1415,16 @@ Build-disabled stub for the retained server-owned Steam stat owner.
 =================
 */
 void SV_SteamStats_AddFieldValue( int clientNum, int statIndex, int delta ) {
+	char detail[128];
+
+	if ( delta == 0 ) {
+		return;
+	}
+
+	Com_sprintf( detail, sizeof( detail ),
+		"ignored stat index %d delta %d for client %d", statIndex, delta, clientNum );
+	SV_LogSteamStatsStubLifecycle( "field-delta", detail );
+
 	(void)clientNum;
 	(void)statIndex;
 	(void)delta;
@@ -1347,6 +1438,12 @@ Build-disabled stub for the retained server-owned achievement owner.
 =================
 */
 void SV_SteamStats_UnlockAchievement( int clientNum, int achievementId ) {
+	char detail[128];
+
+	Com_sprintf( detail, sizeof( detail ),
+		"ignored achievement %d for client %d", achievementId, clientNum );
+	SV_LogSteamStatsStubLifecycle( "achievement-unlock", detail );
+
 	(void)clientNum;
 	(void)achievementId;
 }
@@ -1359,6 +1456,12 @@ Build-disabled stub for the retained server-owned achievement query.
 =================
 */
 qboolean SV_SteamStats_HasAchievement( int clientNum, int achievementId ) {
+	char detail[128];
+
+	Com_sprintf( detail, sizeof( detail ),
+		"query unavailable for achievement %d on client %d", achievementId, clientNum );
+	SV_LogSteamStatsStubLifecycle( "achievement-query", detail );
+
 	(void)clientNum;
 	(void)achievementId;
 	return qfalse;
@@ -1881,7 +1984,6 @@ gotnewcl:
 	denied = SV_BeginPlatformAuthSession( newcl, &from );
 	if ( denied ) {
 		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", denied );
-		Com_DPrintf( "Steam rejected a connection: %s.\n", denied );
 		return;
 	}
 #endif

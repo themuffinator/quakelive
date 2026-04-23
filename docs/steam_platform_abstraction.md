@@ -79,9 +79,13 @@ the compatibility-only advert bridge no longer hides behind the browser cvars
 alone. The client overlay commands route blocked-command diagnostics through
 the same provider-aware helpers. The workshop bootstrap likewise refuses to
 pretend that non-Steam-UGC compatibility providers own the retained Steam
-bootstrap path: it logs the active workshop provider/policy pair and falls
-back to the existing compatibility lane when the current descriptor is
-build-disabled, runtime-disabled, or otherwise not a Steam UGC owner.【F:src/code/client/cl_cgame.c†L3215-L3490】【F:src/code/client/cl_main.c†L108-L2142】
+bootstrap path: it now mirrors the retained workshop seam through the ROM
+cvars `cl_workshopProvider` and `cl_workshopPolicy`, logs the active workshop
+provider/policy pair when the server publishes required workshop items, and
+threads that same pair through download start, completion, callback-ignore,
+filesystem-restart, and non-Steam bootstrap fallback messages when the current
+descriptor is build-disabled, runtime-disabled, or otherwise not a Steam UGC
+owner.【F:src/code/client/cl_cgame.c†L3215-L3490】【F:src/code/client/cl_main.c†L108-L2142】
 
 The retained client matchmaking, stats, and social-overlay seams now follow the
 same contract. `CL_Init` and `CL_Steam_InitCallbacks` mirror the active
@@ -89,16 +93,42 @@ descriptor labels through the ROM cvars `cl_matchmakingProvider`,
 `cl_matchmakingPolicy`, `cl_statsProvider`, `cl_statsPolicy`,
 `cl_socialOverlayProvider`, and `cl_socialOverlayPolicy`, while
 `stats_clear`, `connect_lobby`, `clientviewprofile`, `clientfriendinvite`, the
-main-menu rich-presence seed, and the client callback-bundle fallback logs all
-spell out the current provider/policy pair instead of silently reading like the
-retail Steam owner lane.【F:src/code/client/cl_main.c†L176-L2397】
+main-menu and first-snapshot rich-presence seeds, and the client
+callback-bundle fallback logs all spell out the current provider/policy pair
+instead of silently reading like the retail Steam owner lane. The
+`stats_clear` registration gate now also emits explicit provider-aware skip
+diagnostics when the current compatibility lane cannot own that command during
+bootstrap, rather than silently leaving the command unregistered. The retained
+client P2P session-request callback now also emits explicit matchmaking
+provider/policy-aware acceptance and accept-failure diagnostics instead of a
+raw generic Steam trace line. The retained browser-event publish lane now also
+uses the mirrored overlay provider/policy pair when events are queued before a
+live view or bound window object exists, and its queue trace now reports the
+named browser event plus payload/sequence detail instead of a raw `steam_event`
+dump. The retained microtransaction authorization callback now also emits an
+explicit overlay provider/policy-aware callback diagnostic before forwarding
+its purchase update into that browser-event queue, instead of logging a raw
+generic payload dump line.【F:src/code/client/cl_main.c†L176-L2397】【F:src/code/client/cl_cgame.c†L5410-L5441】
+
+The retained client web-host export lane now carries the same boundary through
+the browser-facing data contracts. `GetConfig` includes the overall
+online-service mode/policy plus matchmaking and workshop provider/policy
+labels, the friend-list and UGC export helpers log provider-aware fallback
+diagnostics when Steam identity is unavailable, and `web.ugc.failed` includes
+the workshop provider/policy pair instead of returning a bare failure result.
+That keeps the Steam-authored social and UGC exports visibly bounded while
+preserving the legacy array payload shape for browser callers.【F:src/code/client/cl_cgame.c†L350-L3165】
 
 The retained client voice seam now mirrors the overall online-services lane
 through the ROM cvars `cl_voiceServiceMode` and `cl_voiceServicePolicy`.
 `+voice` and `-voice` keep the retail local speaking-state bridge as the
 bounded fallback when Steam voice is unavailable, but they now emit explicit
 `voice fallback` diagnostics naming the active overall mode/policy lane rather
-than silently degrading to the local-only path.【F:src/code/client/cl_main.c†L176-L2397】
+than silently degrading to the local-only path. The retained voice transport
+lane now also emits explicit mode/policy-aware diagnostics when the Steam voice
+packet send, packet read, or decompress path fails, and it routes the
+zero-byte-decompress diagnostic through that same compatibility label instead
+of a raw generic trace line.【F:src/code/client/cl_main.c†L176-L2397】
 
 The retained client identity/bootstrap and UI subscription seams now follow
 that same structural summary too. `CL_Init` mirrors the current mode/policy
@@ -126,11 +156,38 @@ compatibility owner instead of failing silently.【F:src/code/client/cl_steam_re
 
 The dedicated-server owner now mirrors the same labeling into the ROM cvars
 `sv_platformAuthProvider`, `sv_platformAuthPolicy`,
-`sv_steamServerProvider`, and `sv_steamServerPolicy`. Steam GameServer
+`sv_steamServerProvider`, `sv_steamServerPolicy`, `sv_workshopProvider`,
+`sv_workshopPolicy`, `sv_statsProvider`, and `sv_statsPolicy`. Steam GameServer
 bootstrap fallback logs, callback-registration diagnostics, connect/disconnect
 notifications, and server auth telemetry all include the active provider/policy
-pair, while the structured auth telemetry intentionally preserves the legacy
-`credential=steam` field so existing log consumers keep their stable contract.
+pair. The retained server-side Steam P2P session-request path now uses that
+same provider/policy pair for ignored unauthenticated requests and accept-call
+failures too. The retained Steam GameServer networking maintenance lane now
+also emits provider/policy-aware diagnostics when keepalive sends fail, inbound
+relay reads fail, relay senders cannot be matched back to a live client, or
+relay forwards fail. The retained published-state owner now also emits
+provider/policy-aware diagnostics when max-player, password, hostname, map,
+description, tag, score-key, player-data, or bot-count publication writes fail
+instead of silently assuming the Steam GameServer owner is always writable. The
+retained dedicated-server workshop operator lane now mirrors the workshop
+descriptor too: the `steam_downloadugc`, `steam_subscribeugc`, and
+`steam_unsubscribeugc` commands emit provider/policy-aware workshop lifecycle
+diagnostics, and they now stop early when the current compatibility lane does
+not include a Steam UGC owner instead of pretending that a non-Steam workshop
+provider can service those Steam-specific commands. The retained GameServerStats lane now mirrors the same stats
+descriptor and uses it in request/session lifecycle diagnostics too, while the
+structured auth telemetry intentionally preserves the legacy `credential=steam`
+field so existing log consumers keep their stable contract. The retained
+auth-session bootstrap now also emits provider/policy-aware connection-reject
+diagnostics when session setup fails, while keeping the outward
+`Failed to authenticate with Steam: ...` drop message stable for existing
+consumers. The callback-registration bootstrap now emits that same
+provider/policy-aware fallback even in the build-disabled stub path, so the
+dedicated-server callback lane no longer disappears silently before startup
+diagnostics are emitted. The build-disabled `SV_SteamStats_AddFieldValue`,
+`SV_SteamStats_UnlockAchievement`, and `SV_SteamStats_HasAchievement` stubs now
+also emit stats provider/policy-aware diagnostics instead of silently no-oping
+when the retained stats owner is unavailable.
 
 ## Mocked End-to-End Flow
 
