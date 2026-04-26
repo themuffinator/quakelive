@@ -11,7 +11,7 @@ The ledger does not replace the current gate-facing ledgers. `AUDIT.md`, `IMPLEM
 ## Scope
 
 - Tracked compilation units under `src/` excluding generated/vendor mirror trees under `src/libs/_deps/` and `src/libs/_build/`: `566` files.
-- Header exception tracked because it owns an active repo-wide gap policy surface: `1` file.
+- Header exception tracked because it owns a documented repo-wide divergence policy surface: `1` file.
 - Total tracked source entries in this ledger: `567`.
 - Function counts are approximate source-definition counts from the checked-in tree and are meant for audit triage, not for ABI accounting.
 
@@ -19,6 +19,7 @@ The ledger does not replace the current gate-facing ledgers. `AUDIT.md`, `IMPLEM
 
 - `walked-closed`: The 2026-04-22 campaign has rerun the full file walk for this file and did not isolate a new file-level gap.
 - `baseline-closed`: Subsystem or strict-retail closure already exists; this 2026-04-22 campaign has not yet rerun the full file walk.
+- `documented-divergence`: The file has a dedicated note because it remains an intentional bounded compatibility divergence, not active parity debt.
 - `gap-note-open`: A concrete file-level parity gap is already evidenced and has a dedicated note.
 - `compatibility-open`: The file sits inside an open repo-wide compatibility or portability lane; a file-specific gap note will be added once the function walk isolates it.
 - `queued-secondary`: The file belongs to a secondary tool, editor, compiler, or legacy support tree; it is catalogued now and queued after the primary runtime surface.
@@ -27,11 +28,12 @@ The ledger does not replace the current gate-facing ledgers. `AUDIT.md`, `IMPLEM
 
 - `walked-closed`: `551` files
 - `baseline-closed`: `0` files
-- `gap-note-open`: `16` files
+- `documented-divergence`: `7` files
+- `gap-note-open`: `9` files
 - `compatibility-open`: `0` files
 - `queued-secondary`: `0` files
 
-## Active file-level gap notes
+## Documented divergence notes
 
 | File | Gap family | Note |
 | --- | --- | --- |
@@ -42,6 +44,11 @@ The ledger does not replace the current gate-facing ledgers. `AUDIT.md`, `IMPLEM
 | `src/code/client/ql_auth.c` | `RW-G01` | [note](source-file-gap-notes/rw-g01-client-auth.md) |
 | `src/code/client/cl_steam_resources.c` | `RW-G01` | [note](source-file-gap-notes/rw-g01-client-steam-resources.md) |
 | `src/code/server/sv_rankings.c` | `RW-G01` | [note](source-file-gap-notes/rw-g01-server-rankings.md) |
+
+## Active file-level gap notes
+
+| File | Gap family | Note |
+| --- | --- | --- |
 | `src/code/unix/unix_main.c` | `RW-G02` | [note](source-file-gap-notes/rw-g02-unix-main.md) |
 | `src/code/unix/linux_glimp.c` | `RW-G02` | [note](source-file-gap-notes/rw-g02-linux-glimp.md) |
 | `src/code/unix/linux_snd.c` | `RW-G02` | [note](source-file-gap-notes/rw-g02-linux-snd.md) |
@@ -75,15 +82,15 @@ auth/backend call sites.
 | `src/common/mathlib.c` | `25` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/common/md4.c` | `7` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/common/mutex.c` | `12` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/common/platform/backends/platform_backend_open_steam.c` | `1` | RW-G01 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g01-open-steam-backend.md) | [note](source-file-gap-notes/rw-g01-open-steam-backend.md) |
-| `src/common/platform/backends/platform_backend_steamworks.c` | `1` | RW-G01 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g01-steamworks-backend.md) | [note](source-file-gap-notes/rw-g01-steamworks-backend.md) |
-| `src/common/platform/platform_services.c` | `6` | RW-G01 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g01-platform-services.md) | [note](source-file-gap-notes/rw-g01-platform-services.md) |
-| `src/common/platform/platform_steamworks.c` | `142` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/common/platform/backends/platform_backend_open_steam.c` | `1` | RW-G01 documented divergence note | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-open-steam-backend.md) | [note](source-file-gap-notes/rw-g01-open-steam-backend.md) |
+| `src/common/platform/backends/platform_backend_steamworks.c` | `1` | RW-G01 documented divergence note | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-steamworks-backend.md) | [note](source-file-gap-notes/rw-g01-steamworks-backend.md) |
+| `src/common/platform/platform_services.c` | `9` | RW-G01 documented divergence note | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-platform-services.md) | [note](source-file-gap-notes/rw-g01-platform-services.md) |
+| `src/common/platform/platform_steamworks.c` | `144` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/common/polylib.c` | `17` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/common/scriplib.c` | `14` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/common/threads.c` | `19` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/common/trilib.c` | `3` | Current function walk complete; no new file-level gap isolated | [engine-wide closure](engine-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/common/platform/platform_config.h` | `n/a` | RW-G01 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g01-platform-config.md) | [note](source-file-gap-notes/rw-g01-platform-config.md) |
+| `src/common/platform/platform_config.h` | `n/a` | RW-G01 documented divergence note | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-platform-config.md) | [note](source-file-gap-notes/rw-g01-platform-config.md) |
 ### `src/code/client` (22 files)
 
 Current 2026-04-22 audit result: the `src/code/client` function walk did
@@ -95,21 +102,21 @@ online-services story inside this tree.
 
 | File | Functions | Current parity state | Primary evidence | Gap note |
 | --- | ---: | --- | --- | --- |
-| `src/code/client/cl_cgame.c` | `177` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
+| `src/code/client/cl_cgame.c` | `194` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_cin.c` | `46` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_console.c` | `45` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_input.c` | `80` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_input_translation.c` | `3` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_keys.c` | `37` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
-| `src/code/client/cl_main.c` | `163` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
+| `src/code/client/cl_main.c` | `195` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_net_chan.c` | `5` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_parse.c` | `9` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_screenshot_io.c` | `3` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_scrn.c` | `18` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
-| `src/code/client/cl_steam_resources.c` | `20` | RW-G01 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g01-client-steam-resources.md) | [note](source-file-gap-notes/rw-g01-client-steam-resources.md) |
-| `src/code/client/cl_ui.c` | `61` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
+| `src/code/client/cl_steam_resources.c` | `27` | RW-G01 documented divergence note | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-client-steam-resources.md) | [note](source-file-gap-notes/rw-g01-client-steam-resources.md) |
+| `src/code/client/cl_ui.c` | `64` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/cl_webpak.c` | `28` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
-| `src/code/client/ql_auth.c` | `16` | RW-G01 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g01-client-auth.md) | [note](source-file-gap-notes/rw-g01-client-auth.md) |
+| `src/code/client/ql_auth.c` | `18` | RW-G01 documented divergence note | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-client-auth.md) | [note](source-file-gap-notes/rw-g01-client-auth.md) |
 | `src/code/client/snd_adpcm.c` | `4` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/snd_dma.c` | `57` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
 | `src/code/client/snd_mem.c` | `17` | Current function walk complete; no new file-level gap isolated | [client audit](client-full-parity-audit-and-implementation-plan-2026-04-09.md) + current 2026-04-22 source walk | - |
@@ -224,7 +231,7 @@ owner.
 | `src/code/qcommon/cm_test.c` | `15` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/qcommon/cm_trace.c` | `23` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/qcommon/cmd.c` | `30` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/qcommon/common.c` | `103` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/code/qcommon/common.c` | `106` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/qcommon/cvar.c` | `45` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/qcommon/files.c` | `105` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/qcommon/huffman.c` | `18` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
@@ -283,13 +290,13 @@ the subsystem.
 | File | Functions | Current parity state | Primary evidence | Gap note |
 | --- | ---: | --- | --- | --- |
 | `src/code/server/sv_bot.c` | `30` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/server/sv_ccmds.c` | `73` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/server/sv_client.c` | `62` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/code/server/sv_ccmds.c` | `78` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/code/server/sv_client.c` | `70` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/server/sv_game.c` | `47` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/server/sv_init.c` | `17` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/server/sv_main.c` | `39` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/code/server/sv_init.c` | `28` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/code/server/sv_main.c` | `41` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/server/sv_net_chan.c` | `5` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/server/sv_rankings.c` | `39` | RW-G01 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g01-server-rankings.md) | [note](source-file-gap-notes/rw-g01-server-rankings.md) |
+| `src/code/server/sv_rankings.c` | `42` | RW-G01 documented divergence note | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-server-rankings.md) | [note](source-file-gap-notes/rw-g01-server-rankings.md) |
 | `src/code/server/sv_snapshot.c` | `11` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/server/sv_world.c` | `12` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/server/sv_zmq.c` | `45` | Current function walk complete; no new file-level gap isolated | [server audit](server-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
@@ -390,12 +397,12 @@ notes for `unix_main.c`, `linux_glimp.c`, `linux_snd.c`, and
 | File | Functions | Current parity state | Primary evidence | Gap note |
 | --- | ---: | --- | --- | --- |
 | `src/code/unix/linux_common.c` | `6` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
-| `src/code/unix/linux_glimp.c` | `40` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-linux-glimp.md) | [note](source-file-gap-notes/rw-g02-linux-glimp.md) |
-| `src/code/unix/linux_joystick.c` | `2` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-linux-joystick.md) | [note](source-file-gap-notes/rw-g02-linux-joystick.md) |
+| `src/code/unix/linux_glimp.c` | `40` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-glimp.md) | [note](source-file-gap-notes/rw-g02-linux-glimp.md) |
+| `src/code/unix/linux_joystick.c` | `2` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-joystick.md) | [note](source-file-gap-notes/rw-g02-linux-joystick.md) |
 | `src/code/unix/linux_qgl.c` | `341` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
 | `src/code/unix/linux_signals.c` | `2` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
-| `src/code/unix/linux_snd.c` | `6` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-linux-snd.md) | [note](source-file-gap-notes/rw-g02-linux-snd.md) |
-| `src/code/unix/unix_main.c` | `59` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-unix-main.md) | [note](source-file-gap-notes/rw-g02-unix-main.md) |
+| `src/code/unix/linux_snd.c` | `6` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-snd.md) | [note](source-file-gap-notes/rw-g02-linux-snd.md) |
+| `src/code/unix/unix_main.c` | `59` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-unix-main.md) | [note](source-file-gap-notes/rw-g02-unix-main.md) |
 | `src/code/unix/unix_net.c` | `17` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
 | `src/code/unix/unix_shared.c` | `21` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
 | `src/code/unix/vm_x86.c` | `2` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
@@ -412,12 +419,12 @@ file-level owner is opened inside the null tree this round.
 | File | Functions | Current parity state | Primary evidence | Gap note |
 | --- | ---: | --- | --- | --- |
 | `src/code/null/mac_net.c` | `5` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
-| `src/code/null/null_client.c` | `50` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-null-client.md) | [note](source-file-gap-notes/rw-g02-null-client.md) |
-| `src/code/null/null_glimp.c` | `7` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-null-glimp.md) | [note](source-file-gap-notes/rw-g02-null-glimp.md) |
-| `src/code/null/null_input.c` | `6` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-null-input.md) | [note](source-file-gap-notes/rw-g02-null-input.md) |
-| `src/code/null/null_main.c` | `28` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-null-main.md) | [note](source-file-gap-notes/rw-g02-null-main.md) |
+| `src/code/null/null_client.c` | `50` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-client.md) | [note](source-file-gap-notes/rw-g02-null-client.md) |
+| `src/code/null/null_glimp.c` | `7` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-glimp.md) | [note](source-file-gap-notes/rw-g02-null-glimp.md) |
+| `src/code/null/null_input.c` | `6` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-input.md) | [note](source-file-gap-notes/rw-g02-null-input.md) |
+| `src/code/null/null_main.c` | `28` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-main.md) | [note](source-file-gap-notes/rw-g02-null-main.md) |
 | `src/code/null/null_net.c` | `5` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
-| `src/code/null/null_snddma.c` | `10` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-null-snddma.md) | [note](source-file-gap-notes/rw-g02-null-snddma.md) |
+| `src/code/null/null_snddma.c` | `10` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-snddma.md) | [note](source-file-gap-notes/rw-g02-null-snddma.md) |
 
 ## Secondary Tool, Editor, Compiler, And Legacy Source Surface
 

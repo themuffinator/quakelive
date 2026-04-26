@@ -3555,25 +3555,12 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 FS_HasBasePak0
 ================
 */
-static qboolean FS_HasBasePak0( const char *gameName ) {
-	const char	*roots[3];
-	int			i;
-
-	roots[0] = fs_homepath ? fs_homepath->string : "";
-	roots[1] = fs_basepath ? fs_basepath->string : "";
-	roots[2] = fs_cdpath ? fs_cdpath->string : "";
-
-	for ( i = 0 ; i < 3 ; i++ ) {
-		if ( !roots[i] || !roots[i][0] ) {
-			continue;
-		}
-
-		if ( FS_FileExistsOnDisk( FS_BuildOSPath( roots[i], gameName, "pak00.pk3" ) ) ) {
-			return qtrue;
-		}
+static qboolean FS_HasBasePak0( void ) {
+	if ( !fs_basepath || !fs_basepath->string[0] ) {
+		return qfalse;
 	}
 
-	return qfalse;
+	return FS_FileExistsOnDisk( FS_BuildOSPath( fs_basepath->string, BASEGAME, "pak00.pk3" ) );
 }
 
 /*
@@ -3590,20 +3577,30 @@ static void FS_SteamWorkshopInit( const char *gameName ) {
 	uint32_t	subscribedCount;
 	uint32_t	mountedCount;
 	uint64_t	*itemIds;
+	qboolean	mountRawPath;
 
 	if ( !gameName || Q_stricmp( gameName, BASEGAME ) ) {
 		return;
 	}
 
+	mountRawPath = qfalse;
+	if ( !FS_HasBasePak0() ) {
+		Com_Printf( "WARNING: Skipping workshop PK3s since pak00 doesn't exist.\n" );
+		mountRawPath = qtrue;
+	}
+
 	if ( fs_skipWorkshop && fs_skipWorkshop->integer ) {
+		Com_Printf( "Skipping workshop since fs_skipWorkshop is set.\n" );
 		return;
 	}
 
 	if ( com_buildScript && com_buildScript->integer ) {
+		Com_Printf( "Skipping workshop since running in build mode.\n" );
 		return;
 	}
 
-	if ( !FS_HasBasePak0( gameName ) ) {
+	if ( !QL_Steamworks_HasUGCInterface() ) {
+		Com_Printf( "WARNING: Skipping workshop, ISteamUGC is NULL.\n" );
 		return;
 	}
 
@@ -3639,7 +3636,7 @@ static void FS_SteamWorkshopInit( const char *gameName ) {
 			continue;
 		}
 
-		FS_AddGameDirectoryInternal( installFolder, "", qtrue, idLow, idHigh );
+		FS_AddGameDirectoryInternal( installFolder, "", mountRawPath, idLow, idHigh );
 	}
 
 	Z_Free( itemIds );

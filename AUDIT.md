@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-04-22
+Last updated: 2026-04-23
 
 This file is the current cross-subsystem ledger for the repository. Detailed
 reconstruction history belongs in the dedicated subsystem audits under
@@ -33,14 +33,14 @@ The current audited state on 2026-04-21 is:
 - Repo-wide parity is not **100%** once the deliberate compatibility-only
   lanes, the bounded non-Windows portability debt, and the remaining
   evidence-freshness gap are counted. The current repo-wide estimate for the
-  whole checked-in tree is **96%**.
+  whole checked-in tree is **98%**.
 - A new source-file parity campaign is now open under
   `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md` and
   `docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`.
   That campaign decomposes the current repo-wide story into `567` tracked
-  source entries plus dedicated per-file gap notes where the current evidence
-  is already concrete, without changing the top-level **100%** strict-retail
-  / **96%** repo-wide assessment.
+  source entries plus dedicated per-file notes where the current evidence is
+  already concrete, without changing the top-level **100%** strict-retail /
+  **98%** repo-wide assessment.
 - A broad current-worktree parity sweep spanning the top-level parity gates,
   gameplay fixtures, portability checks, and the staged retail-runtime audit
   lane now passes at `60 passed, 7 skipped`.
@@ -99,14 +99,17 @@ Audited by source/doc inspection:
 
 ## Active remaining work
 
-The strict-retail Windows gate set is green, and three repo-wide gap families
-remain active:
+The strict-retail Windows gate set is green. `RW-G01` online services and
+external ecosystems are now tracked as a documented bounded divergence rather
+than active parity debt: default builds still set
+`QL_BUILD_ONLINE_SERVICES=0`, the service table still reports build-disabled
+providers, and the open/hybrid auth backends remain heuristic
+accept/retry/deny shims rather than live service implementations, but that
+lane is now explicitly excluded from the repo-wide deficit instead of being
+left as ambiguous open work.
 
-- `RW-G01` Online services and external ecosystems are still a deliberate
-  non-retail compatibility lane. Default builds set
-  `QL_BUILD_ONLINE_SERVICES=0`, the service table reports build-disabled
-  providers, and the open/hybrid auth backends are heuristic
-  accept/retry/deny shims rather than live service implementations.
+Two repo-wide gap families remain active:
+
 - `RW-G02` Non-Windows portability is still incomplete. The Linux path remains
   server-only, the documented glibc preset is server-module-only evidence
   rather than Linux client/runtime parity proof, Unix

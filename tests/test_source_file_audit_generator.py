@@ -97,7 +97,11 @@ def test_completed_cgame_surface_classifies_as_walked_closed() -> None:
 	assert module.ledger_evidence("src/code/cgame/cg_draw.c") == (
 		"[module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk"
 	)
-	assert module.classify("src/code/client/ql_auth.c") == "gap-note-open"
+	assert module.classify("src/code/client/ql_auth.c") == "documented-divergence"
+	assert module.ledger_state("src/code/client/ql_auth.c") == "RW-G01 documented divergence note"
+	assert module.ledger_evidence("src/code/client/ql_auth.c") == (
+		"[repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-client-auth.md)"
+	)
 
 
 def test_completed_ui_surface_classifies_as_walked_closed() -> None:
@@ -336,8 +340,46 @@ def test_write_ledger_marks_completed_unix_section(tmp_path: Path) -> None:
 	) in content
 	assert (
 		"| `src/code/unix/unix_main.c` | `59` | RW-G02 file-level note open | "
-		"[repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-unix-main.md) | "
+		"[repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-unix-main.md) | "
 		"[note](source-file-gap-notes/rw-g02-unix-main.md) |"
+	) in content
+
+
+def test_write_ledger_separates_documented_divergences_from_active_gap_notes(tmp_path: Path) -> None:
+	module = _load_generator_module()
+	module.LEDGER_PATH = tmp_path / "source-file-ledger.md"
+
+	all_tracked = ["src/code/client/ql_auth.c", "src/code/unix/unix_main.c"]
+	function_counts = {
+		"src/code/client/ql_auth.c": 16,
+		"src/code/unix/unix_main.c": 59,
+	}
+	status_counts: defaultdict[str, int] = defaultdict(int)
+	status_counts["documented-divergence"] = 1
+	status_counts["gap-note-open"] = 1
+	primary_sections = OrderedDict([("src/code/client", ["src/code/client/ql_auth.c"])])
+	compatibility_sections = OrderedDict([("src/code/unix", ["src/code/unix/unix_main.c"])])
+	secondary_sections = OrderedDict()
+
+	module.write_ledger(
+		all_tracked,
+		function_counts,
+		status_counts,
+		primary_sections,
+		compatibility_sections,
+		secondary_sections,
+	)
+
+	content = module.LEDGER_PATH.read_text(encoding="utf-8")
+
+	assert "## Documented divergence notes" in content
+	assert "| `src/code/client/ql_auth.c` | `RW-G01` | [note](source-file-gap-notes/rw-g01-client-auth.md) |" in content
+	assert "## Active file-level gap notes" in content
+	assert "| `src/code/unix/unix_main.c` | `RW-G02` | [note](source-file-gap-notes/rw-g02-unix-main.md) |" in content
+	assert (
+		"| `src/code/client/ql_auth.c` | `16` | RW-G01 documented divergence note | "
+		"[repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g01-client-auth.md) | "
+		"[note](source-file-gap-notes/rw-g01-client-auth.md) |"
 	) in content
 
 
@@ -378,7 +420,7 @@ def test_write_ledger_marks_completed_null_section(tmp_path: Path) -> None:
 	) in content
 	assert (
 		"| `src/code/null/null_glimp.c` | `7` | RW-G02 file-level note open | "
-		"[repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [gap note](source-file-gap-notes/rw-g02-null-glimp.md) | "
+		"[repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-glimp.md) | "
 		"[note](source-file-gap-notes/rw-g02-null-glimp.md) |"
 	) in content
 

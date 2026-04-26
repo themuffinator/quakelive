@@ -9,7 +9,7 @@ This campaign breaks the broad parity story back down into manageable, checklist
 Per tracked file, the campaign should eventually produce:
 
 - one concise row in the main source-file parity ledger;
-- a dedicated per-file note whenever a concrete parity gap is confirmed; and
+- a dedicated per-file note whenever a concrete parity gap or documented bounded divergence is confirmed; and
 - a function-by-function status table inside that per-file note.
 
 ## Scope
@@ -35,7 +35,7 @@ Per tracked file, the campaign should eventually produce:
 - [x] Keep `AUDIT.md` and `IMPLEMENTATION_PLAN.md` in place as gate-facing ledgers.
 - [x] Create `source-file-parity-ledger-2026-04-22.md` as the clean main file-by-file ledger.
 - [x] Create `historical-audit-index-2026-04-22.md` instead of renaming or moving older audit docs that workflows and tests already reference.
-- [x] Seed `16` concrete file-level gap notes for the currently evidenced `RW-G01` and `RW-G02` owners.
+- [x] Seed `16` concrete per-file notes for the currently evidenced `RW-G01` documented divergences and `RW-G02` gap owners.
 
 ### Phase 1 - Strict-Retail Engine Core
 
@@ -134,7 +134,7 @@ Per tracked file, the campaign should eventually produce:
   plugin bridge, OpenGL host glue, and bundled spline/editor helpers
   remain bounded secondary support trees on current evidence.
 
-## Current seeded file-level gap set
+## Current seeded documented-divergence note set
 
 - `RW-G01`: `src/common/platform/platform_config.h` -> `docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-config.md`
 - `RW-G01`: `src/common/platform/platform_services.c` -> `docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
@@ -143,6 +143,9 @@ Per tracked file, the campaign should eventually produce:
 - `RW-G01`: `src/code/client/ql_auth.c` -> `docs/reverse-engineering/source-file-gap-notes/rw-g01-client-auth.md`
 - `RW-G01`: `src/code/client/cl_steam_resources.c` -> `docs/reverse-engineering/source-file-gap-notes/rw-g01-client-steam-resources.md`
 - `RW-G01`: `src/code/server/sv_rankings.c` -> `docs/reverse-engineering/source-file-gap-notes/rw-g01-server-rankings.md`
+
+## Current seeded active file-level gap set
+
 - `RW-G02`: `src/code/unix/unix_main.c` -> `docs/reverse-engineering/source-file-gap-notes/rw-g02-unix-main.md`
 - `RW-G02`: `src/code/unix/linux_glimp.c` -> `docs/reverse-engineering/source-file-gap-notes/rw-g02-linux-glimp.md`
 - `RW-G02`: `src/code/unix/linux_snd.c` -> `docs/reverse-engineering/source-file-gap-notes/rw-g02-linux-snd.md`
@@ -156,5 +159,5 @@ Per tracked file, the campaign should eventually produce:
 ## Completion criteria
 
 - Every tracked file in the ledger has been explicitly walked in the current campaign, not just inherited from an older subsystem closure note.
-- Every file with a confirmed parity gap has its own dedicated note with a function-by-function status table and explicit closure conditions.
+- Every file with a confirmed parity gap or documented divergence has its own dedicated note with a function-by-function status table and explicit closure conditions.
 - `AUDIT.md` and the repo-wide audit remain concise summary ledgers instead of turning into file dumps.

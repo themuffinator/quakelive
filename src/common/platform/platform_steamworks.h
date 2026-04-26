@@ -366,6 +366,8 @@ qboolean QL_Steamworks_ValidateTicket( const char *ticketHex, ql_auth_response_t
 
 qboolean QL_Steamworks_IsSubscribedApp( uint32_t appId );
 
+qboolean QL_Steamworks_HasUGCInterface( void );
+
 uint32_t QL_Steamworks_GetNumSubscribedItems( void );
 
 uint32_t QL_Steamworks_GetSubscribedItems( uint64_t *outItemIds, uint32_t maxItems );
@@ -1076,6 +1078,15 @@ QL_Steamworks_IsSubscribedApp
 */
 static inline qboolean QL_Steamworks_IsSubscribedApp( uint32_t appId ) {
 	(void)appId;
+	return qfalse;
+}
+
+/*
+=============
+QL_Steamworks_HasUGCInterface
+=============
+*/
+static inline qboolean QL_Steamworks_HasUGCInterface( void ) {
 	return qfalse;
 }
 

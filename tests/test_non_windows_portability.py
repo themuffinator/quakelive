@@ -286,3 +286,12 @@ def test_portability_docs_track_restored_low_memory_probe_and_remaining_stubs() 
 	assert "browser/advert/input, and silent" in repo_wide_audit
 	assert "input bootstrap-cvar" in repo_wide_audit
 	assert "sound/device activation/voice shims" in repo_wide_audit
+
+
+def test_repo_wide_audit_closes_rw_g01_as_documented_divergence() -> None:
+	repo_wide_audit = _read_text(REPO_WIDE_AUDIT_PATH)
+
+	assert "Repo-wide parity across the checked-in tree: **98%**" in repo_wide_audit
+	assert "two bounded gap" in repo_wide_audit
+	assert "### RW-G01 - Online services and external ecosystems are now a documented bounded divergence" in repo_wide_audit
+	assert "Current status: **Closed as an active repo-wide gap; bounded divergence remains documented**" in repo_wide_audit

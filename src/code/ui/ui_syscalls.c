@@ -755,7 +755,7 @@ unsigned long long trap_QL_MeasureText( const char *text, const char *end, int f
 trap_QL_GetItemDownloadInfo
 =================
 */
-void trap_QL_GetItemDownloadInfo( unsigned int itemHi, unsigned int itemLo, unsigned long long *outDownloaded, unsigned long long *outTotal ) {
+void trap_QL_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {
 	ql_import_f import = UI_GetNativeImportFunction( UI_QL_IMPORT_GET_ITEM_DOWNLOAD_INFO );
 
 	if ( !import ) {
@@ -768,5 +768,5 @@ void trap_QL_GetItemDownloadInfo( unsigned int itemHi, unsigned int itemLo, unsi
 		return;
 	}
 
-	((void (QDECL *)( unsigned int, unsigned int, unsigned long long *, unsigned long long * ))import)( itemHi, itemLo, outDownloaded, outTotal );
+	((void (QDECL *)( unsigned int, unsigned int, unsigned long long *, unsigned long long * ))import)( itemIdLow, itemIdHigh, outDownloaded, outTotal );
 }

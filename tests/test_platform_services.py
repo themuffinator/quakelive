@@ -963,6 +963,9 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     shutdown_block = _extract_function_block(cl_main, "void CL_Shutdown( void ) {")
     callback_init_block = _extract_function_block(cl_main, "static void CL_Steam_InitCallbacks( void ) {")
     callback_shutdown_block = _extract_function_block(cl_main, "static void CL_Steam_ShutdownCallbacks( void ) {")
+    callback_bootstrap_log_block = _extract_function_block(
+        cl_main, "static void CL_LogClientCallbackBootstrapFallback( const char *reason ) {"
+    )
     stats_gate_block = _extract_function_block(cl_main, "static qboolean CL_Steam_ShouldRegisterStatsClear( void ) {")
     stats_clear_block = _extract_function_block(cl_main, "static void CL_Steam_ClearStats_f( void )")
 
@@ -1022,12 +1025,20 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     assert 'Cvar_Set( "cl_workshopPolicy", CL_GetWorkshopServicePolicyLabel() );' in cl_main
     assert 'Cvar_Set( "ui_subscriptionBridgeMode", QL_GetOnlineServicesModeLabel() );' in cl_main
     assert 'Cvar_Set( "ui_subscriptionBridgePolicy", QL_GetOnlineServicesPolicyLabel() );' in cl_main
-    assert "matchmakingProvider = CL_GetMatchmakingServiceProviderLabel();" in callback_init_block
-    assert "matchmakingPolicy = CL_GetMatchmakingServicePolicyLabel();" in callback_init_block
-    assert "statsProvider = CL_GetStatsServiceProviderLabel();" in callback_init_block
-    assert "statsPolicy = CL_GetStatsServicePolicyLabel();" in callback_init_block
-    assert callback_init_block.index("matchmakingProvider = CL_GetMatchmakingServiceProviderLabel();") < callback_init_block.index("if ( !CL_SteamServicesEnabled() ) {")
-    assert 'Com_DPrintf( "Client callback bundle unavailable for matchmaking=%s [%s], stats=%s [%s]; keeping compatibility-only browser event fallback\\n",' in callback_init_block
+    assert 'Com_DPrintf( "client callback bootstrap: %s (matchmaking=%s [%s], stats=%s [%s], overlay=%s [%s])\\n",' in callback_bootstrap_log_block
+    assert "CL_GetMatchmakingServiceProviderLabel()" in callback_bootstrap_log_block
+    assert "CL_GetMatchmakingServicePolicyLabel()" in callback_bootstrap_log_block
+    assert "CL_GetStatsServiceProviderLabel()" in callback_bootstrap_log_block
+    assert "CL_GetStatsServicePolicyLabel()" in callback_bootstrap_log_block
+    assert "CL_GetSocialOverlayServiceProviderLabel()" in callback_bootstrap_log_block
+    assert "CL_GetSocialOverlayServicePolicyLabel()" in callback_bootstrap_log_block
+    assert "workshopProvider = CL_GetWorkshopServiceProviderLabel();" in callback_init_block
+    assert "workshopPolicy = CL_GetWorkshopServicePolicyLabel();" in callback_init_block
+    assert callback_init_block.index("CL_RefreshPlatformServiceCvars();") < callback_init_block.index("if ( !CL_SteamServicesEnabled() ) {")
+    assert 'CL_LogClientCallbackBootstrapFallback( "online services disabled; keeping compatibility-only browser event fallback" );' in callback_init_block
+    assert 'CL_LogClientCallbackBootstrapFallback( "callback registration failed; keeping compatibility-only browser event fallback" );' in callback_init_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "callbacks unavailable; keeping polling fallback (%s [%s])",' in callback_init_block
+    assert 'CL_LogWorkshopLifecycle( "callback-bootstrap", detail );' in callback_init_block
     assert "cl_steamCallbackState.callbackRegistrationActive = qtrue;" in callback_init_block
 
     assert "QL_Steamworks_UnregisterWorkshopCallbacks();" in callback_shutdown_block
@@ -1828,6 +1839,7 @@ def test_client_browser_event_publication_hooks_reconstruct_runtime_owner() -> N
     first_snapshot_block = _extract_function_block(cl_cgame, "void CL_FirstSnapshot( void )")
 
     assert 'Com_DPrintf( "microtxn.authorization callback: appid=%u order=%llu authorized=%d (%s [%s])\\n",' in micro_callback_log_block
+    assert 'Com_DPrintf( "microtxn.authorization callback: ignored null callback payload (%s [%s])\\n",' in micro_callback_log_block
     assert "CL_GetSocialOverlayServiceProviderLabel()," in micro_callback_log_block
     assert "CL_GetSocialOverlayServicePolicyLabel()" in micro_callback_log_block
     assert 'Com_DPrintf( "%s browser event: %s (%s [%s])\\n",' in browser_event_log_block
@@ -1838,6 +1850,7 @@ def test_client_browser_event_publication_hooks_reconstruct_runtime_owner() -> N
     assert "payloadLength = (int)strlen( event->payload );" in publish_event_block
     assert 'Com_sprintf( detail, sizeof( detail ), "queued payload bytes=%d sequence=%d", payloadLength, event->sequence );' in publish_event_block
     assert "CL_LogBrowserEventLifecycle( event->name, detail );" in publish_event_block
+    assert "CL_LogMicroTransactionCallbackLifecycle( NULL );" in micro_callback_block
     assert "CL_LogMicroTransactionCallbackLifecycle( event );" in micro_callback_block
     assert 'CL_Steam_PublishBrowserEvent( "microtxn.authorization", payload );' in micro_callback_block
     assert 'Com_DPrintf( "GOT MICRO RESPONSE: %s\\n", payload );' not in micro_callback_block
@@ -1981,9 +1994,39 @@ def test_client_lobby_bootstrap_reconstructs_retail_connect_surface() -> None:
     callback_log_block = _extract_function_block(
         cl_main, "static void CL_LogMatchmakingCallbackLifecycle( const char *stage, const char *reason ) {"
     )
+    rich_presence_callback_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Client_OnRichPresenceJoinRequested( void *context, const ql_steam_rich_presence_join_requested_t *event )"
+    )
     connect_block = _extract_function_block(cl_main, "static void CL_Steam_ConnectLobby_f( void )")
     p2p_callback_block = _extract_function_block(
         cl_main, "static void CL_Steam_Client_OnP2PSessionRequest( void *context, const ql_steam_p2p_session_request_t *event )"
+    )
+    server_change_callback_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Client_OnGameServerChangeRequested( void *context, const ql_steam_game_server_change_requested_t *event )"
+    )
+    lobby_created_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Lobby_OnLobbyCreated( void *context, const ql_steam_lobby_created_t *event )"
+    )
+    lobby_enter_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Lobby_OnLobbyEnter( void *context, const ql_steam_lobby_enter_t *event )"
+    )
+    lobby_chat_update_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Lobby_OnLobbyChatUpdate( void *context, const ql_steam_lobby_chat_update_t *event )"
+    )
+    lobby_chat_message_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Lobby_OnLobbyChatMessage( void *context, const ql_steam_lobby_chat_message_t *event )"
+    )
+    lobby_data_update_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Lobby_OnLobbyDataUpdate( void *context, const ql_steam_lobby_data_update_t *event )"
+    )
+    lobby_game_created_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Lobby_OnLobbyGameCreated( void *context, const ql_steam_lobby_game_created_t *event )"
+    )
+    lobby_kicked_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Lobby_OnLobbyKicked( void *context, const ql_steam_lobby_kicked_t *event )"
+    )
+    lobby_join_requested_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Lobby_OnGameLobbyJoinRequested( void *context, const ql_steam_game_lobby_join_requested_t *event )"
     )
     init_block = _extract_function_block(cl_main, "void CL_Init( void )")
     shutdown_block = _extract_function_block(cl_main, "void CL_Shutdown( void )")
@@ -1991,14 +2034,45 @@ def test_client_lobby_bootstrap_reconstructs_retail_connect_surface() -> None:
     assert "static const char *CL_GetMatchmakingServiceProviderLabel( void ) {" in cl_main
     assert "static const char *CL_GetMatchmakingServicePolicyLabel( void ) {" in cl_main
     assert 'Com_DPrintf( "%s callback: %s (%s [%s])\\n",' in callback_log_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "rich_presence_join_requested", "ignored null callback payload" );' in rich_presence_callback_block
+    assert "CL_Steam_OnRichPresenceJoinRequested( event->command );" in rich_presence_callback_block
     assert 'Cvar_Set( "lobby_autoconnect", Cmd_Argv( 1 ) );' in connect_block
     assert 'CL_LogMatchmakingServiceIgnored( "connect_lobby", "missing lobby id" );' in connect_block
     assert 'CL_LogMatchmakingServiceIgnored( "connect_lobby", "matchmaking provider unavailable" );' in connect_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "p2p_session_request", "ignored null callback payload" );' in p2p_callback_block
     assert "CL_Steam_FormatSteamId( event->remoteId.value, remoteId, sizeof( remoteId ) );" in p2p_callback_block
     assert 'if ( !QL_Steamworks_AcceptP2PSession( &event->remoteId ) ) {' in p2p_callback_block
     assert 'CL_LogMatchmakingCallbackLifecycle( "p2p_session_request", detail );' in p2p_callback_block
     assert '"accept failed for %s"' in p2p_callback_block
     assert '"accepted %s"' in p2p_callback_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "server_change_requested", "ignored null callback payload" );' in server_change_callback_block
+    assert "CL_Steam_OnGameServerChangeRequested( event->server, event->password );" in server_change_callback_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_created", "ignored null callback payload" );' in lobby_created_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_created", detail );' in lobby_created_block
+    assert '"error result=%d id=%s"' in lobby_created_block
+    assert '"created id=%s result=%d"' in lobby_created_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_enter", "ignored null callback payload" );' in lobby_enter_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_enter", detail );' in lobby_enter_block
+    assert '"enter failed response=%d permissions=%u id=%s"' in lobby_enter_block
+    assert '"entered id=%s permissions=%u locked=%d"' in lobby_enter_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_chat_update", "ignored null callback payload" );' in lobby_chat_update_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_chat_update", detail );' in lobby_chat_update_block
+    assert '"user %s %s in lobby %s (state=%u)"' in lobby_chat_update_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_chat_message", "ignored null callback payload" );' in lobby_chat_message_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_chat_message", detail );' in lobby_chat_message_block
+    assert '"chat from %s in lobby %s type=%d bytes=%d"' in lobby_chat_message_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_data_update", "ignored null callback payload" );' in lobby_data_update_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_data_update", detail );' in lobby_data_update_block
+    assert '"update lobby=%llu member=%llu success=%d"' in lobby_data_update_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_game_created", "ignored null callback payload" );' in lobby_game_created_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_game_created", detail );' in lobby_game_created_block
+    assert '"game created lobby=%llu server=%llu ip=%u port=%u"' in lobby_game_created_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_kicked", "ignored null callback payload" );' in lobby_kicked_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_kicked", detail );' in lobby_kicked_block
+    assert '"kicked lobby=%llu admin=%llu disconnected=%d"' in lobby_kicked_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_join_requested", "ignored null callback payload" );' in lobby_join_requested_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "lobby_join_requested", detail );' in lobby_join_requested_block
+    assert '"join requested lobby=%llu friend=%llu"' in lobby_join_requested_block
     assert 'Cvar_Get( "lobby_autoconnect", "", CVAR_TEMP );' in init_block
     assert 'Cvar_Get( "steam_maxLobbyClients", "16", CVAR_ARCHIVE );' in init_block
     assert 'Cmd_AddCommand ("connect_lobby", CL_Steam_ConnectLobby_f );' in init_block
@@ -2008,6 +2082,9 @@ def test_client_lobby_bootstrap_reconstructs_retail_connect_surface() -> None:
 def test_client_rich_presence_join_and_server_change_reconstruct_retail_connect_handoff() -> None:
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
 
+    callback_log_block = _extract_function_block(
+        cl_main, "static void CL_LogMatchmakingCallbackLifecycle( const char *stage, const char *reason ) {"
+    )
     execute_block = _extract_function_block(cl_main, "static void CL_Steam_ExecuteImmediateCommand( const char *command )")
     join_block = _extract_function_block(cl_main, "void CL_Steam_OnRichPresenceJoinRequested( const char *command )")
     server_change_block = _extract_function_block(
@@ -2015,11 +2092,189 @@ def test_client_rich_presence_join_and_server_change_reconstruct_retail_connect_
         "void CL_Steam_OnGameServerChangeRequested( const char *server, const char *password )",
     )
 
+    assert 'Com_DPrintf( "%s callback: %s (%s [%s])\\n",' in callback_log_block
     assert "Cbuf_ExecuteText( EXEC_NOW, command );" in execute_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "rich_presence_join_requested", "missing join command" );' in join_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "rich_presence_join_requested", "executing immediate join command" );' in join_block
     assert "CL_Steam_ExecuteImmediateCommand( command );" in join_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "server_change_requested", "missing server target" );' in server_change_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "connecting to requested server (password=%d)",' in server_change_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "server_change_requested", detail );' in server_change_block
     assert "if ( password && password[0] ) {" in server_change_block
     assert 'Cvar_Set( "password", password );' in server_change_block
     assert 'CL_Steam_ExecuteImmediateCommand( va( "connect %s\\n", server ) );' in server_change_block
+
+
+def test_client_stats_callback_lane_stays_explicit() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+
+    callback_log_block = _extract_function_block(
+        cl_main, "static void CL_LogStatsCallbackLifecycle( const char *stage, const char *reason ) {"
+    )
+    callback_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Client_OnUserStatsReceived( void *context, const ql_steam_user_stats_received_t *event )"
+    )
+
+    assert 'Com_DPrintf( "%s callback: %s (%s [%s])\\n",' in callback_log_block
+    assert "CL_GetStatsServiceProviderLabel()," in callback_log_block
+    assert "CL_GetStatsServicePolicyLabel()" in callback_log_block
+    assert 'CL_LogStatsCallbackLifecycle( "user_stats_received", "ignored null callback payload" );' in callback_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "user stats received for %s game=%u result=%d",' in callback_block
+    assert 'CL_LogStatsCallbackLifecycle( "user_stats_received", detail );' in callback_block
+    assert 'Com_sprintf( eventName, sizeof( eventName ), "users.stats.%s.received", steamId );' in callback_block
+    assert 'CL_Steam_PublishBrowserEvent( eventName, payload );' in callback_block
+
+
+def test_client_social_presence_and_ugc_callback_lanes_stay_explicit() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+
+    persona_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Client_OnPersonaStateChange( void *context, const ql_steam_persona_state_change_t *event )"
+    )
+    presence_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Client_OnFriendRichPresenceUpdate( void *context, const ql_steam_friend_rich_presence_update_t *event )"
+    )
+    ugc_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Client_OnUGCQueryCompleted( void *context, const ql_steam_ugc_query_completed_t *event )"
+    )
+
+    assert 'CL_LogMatchmakingCallbackLifecycle( "persona_state_change", "ignored null callback payload" );' in persona_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "persona_state_change", detail );' in persona_block
+    assert '"persona changed for %s flags=%u"' in persona_block
+    assert 'Com_sprintf( eventName, sizeof( eventName ), "users.persona.%s.change", steamId );' in persona_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "friend_rich_presence_update", "ignored null callback payload" );' in presence_block
+    assert 'CL_LogMatchmakingCallbackLifecycle( "friend_rich_presence_update", detail );' in presence_block
+    assert '"rich presence updated for %s app=%u"' in presence_block
+    assert 'Com_sprintf( eventName, sizeof( eventName ), "users.presence.%s.change", steamId );' in presence_block
+    assert 'CL_LogWorkshopLifecycle( "callback-ugc-query", "ignored null callback payload" );' in ugc_block
+    assert 'CL_LogWorkshopLifecycle( "callback-ugc-query", detail );' in ugc_block
+    assert '"query completed call=%llu query=%llu result=%d count=%u total=%u cached=%d"' in ugc_block
+    assert 'eventName = ( event->result == 1 ) ? "web.ugc.results" : "web.ugc.failed";' in ugc_block
+
+
+def test_client_workshop_callback_lanes_stay_explicit() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+
+    item_installed_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_item_installed_t *event )"
+    )
+    download_result_block = _extract_function_block(
+        cl_main, "static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_steam_download_item_result_t *event )"
+    )
+
+    assert 'CL_LogWorkshopLifecycle( "callback-item-installed", detail );' in item_installed_block
+    assert 'CL_LogWorkshopLifecycle( "callback-item-installed", "ignored null callback payload" );' in item_installed_block
+    assert 'CL_LogWorkshopLifecycle( "callback-item-installed", "ignored installed callback without active download state" );' in item_installed_block
+    assert '"OnDownloadItemResult skip, invalid app id %d"' in item_installed_block
+    assert '"ignored installed callback for untracked item %llu"' in item_installed_block
+    assert '"installed item %llu request=%d"' in item_installed_block
+    assert "CL_Workshop_FinalizeInstalledItem( itemIndex );" in item_installed_block
+    assert 'CL_LogWorkshopLifecycle( "callback-download-result", detail );' in download_result_block
+    assert 'CL_LogWorkshopLifecycle( "callback-download-result", "ignored null callback payload" );' in download_result_block
+    assert 'CL_LogWorkshopLifecycle( "callback-download-result", "ignored download callback without active download state" );' in download_result_block
+    assert 'CL_LogWorkshopLifecycle( "callback-download-result", "ignored download callback without active item index" );' in download_result_block
+    assert '"OnDownloadItemResult skip, invalid app id %d"' in download_result_block
+    assert '"OnDownloadItemResult skip, not the active download %llu"' in download_result_block
+    assert '"Download item %llu failed with EResult code %i"' in download_result_block
+    assert 'CL_Workshop_FinalizeInstalledItem( cl_steamWorkshopDownloadState.activeItemIndex );' in download_result_block
+    assert "CL_Workshop_FailActiveDownload();" in download_result_block
+    assert "CL_Workshop_AdvanceDownloadQueue();" not in download_result_block
+
+
+def test_client_workshop_required_items_bootstrap_lane_stays_explicit() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+
+    bootstrap_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_BeginBootstrap( void )")
+    set_request_cvars_block = _extract_function_block(cl_main, "static void CL_Workshop_SetDownloadRequestCvars( int itemIndex )")
+    set_active_item_block = _extract_function_block(cl_main, "static void CL_Workshop_SetActiveItem( int itemIndex )")
+    clear_active_download_block = _extract_function_block(cl_main, "static void CL_Workshop_ClearActiveDownload( void )")
+    request_download_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_RequestDownload( int itemIndex )")
+    advance_queue_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_AdvanceDownloadQueue( void )")
+    finalize_item_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_FinalizeInstalledItem( int itemIndex )")
+    fail_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_FailActiveDownload( void )")
+    downloads_settled_block = _extract_function_block(cl_main, "static qboolean CL_Workshop_DownloadsSettled( void )")
+
+    assert "qboolean\tqueued;" in cl_main
+    assert 'Com_Printf( "Server requires the following workshop items: %s\\n", workshopItems );' in bootstrap_block
+    assert "workshopProvider = CL_GetWorkshopServiceProviderLabel();" not in bootstrap_block
+    assert "workshopPolicy = CL_GetWorkshopServicePolicyLabel();" not in bootstrap_block
+    assert 'CL_LogWorkshopLifecycle( "bootstrap-unavailable", "required items unavailable; keeping compatibility-only fallback" );' in bootstrap_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "server requires %i workshop item(s)", totalItems );' in bootstrap_block
+    assert 'CL_LogWorkshopLifecycle( "bootstrap-begin", detail );' in bootstrap_block
+    assert '"Workshop item %llu: queueing download."' not in bootstrap_block
+    assert 'if ( CL_Workshop_RequestDownload( itemIndex ) ) {' in bootstrap_block
+    assert "item->requestNumber = ++requestNumber;" in bootstrap_block
+    assert 'cl_steamWorkshopDownloadState.downloadsRequested = qtrue;' in bootstrap_block
+    assert "CL_Workshop_SetDownloadRequestCvars( itemIndex );" in bootstrap_block
+    assert 'Cvar_Set( "cl_downloadItem", itemString );' in set_request_cvars_block
+    assert 'Cvar_Set( "cl_downloadName", downloadName );' in set_request_cvars_block
+    assert 'Cvar_SetValue( "cl_downloadTime", cls.realtime );' in set_request_cvars_block
+    assert 'Cvar_Set( "cl_downloadItem", itemString );' not in set_active_item_block
+    assert 'Cvar_Set( "cl_downloadName", downloadName );' not in set_active_item_block
+    assert 'Cvar_SetValue( "cl_downloadTime", cls.realtime );' not in set_active_item_block
+    assert "CL_Workshop_UpdateProgressCvars();" not in set_active_item_block
+    assert "CL_Workshop_UpdateProgressCvars();" not in clear_active_download_block
+    assert '"Workshop item %llu: in cache."' in request_download_block
+    assert "CL_Workshop_FinalizeInstalledItem( itemIndex );" in request_download_block
+    assert '"Workshop item %llu: requesting download."' in request_download_block
+    assert '"Workshop item %llu: queueing download."' in request_download_block
+    assert '"Workshop item %llu: was queued, requesting download."' not in request_download_block
+    assert '"download request failed"' not in request_download_block
+    assert "cl_steamWorkshopDownloadState.queueActive = qtrue;" in request_download_block
+    assert "item->queued = qtrue;" in request_download_block
+    assert '"Workshop item %llu: was queued, requesting download."' in advance_queue_block
+    assert "CL_Workshop_ClearActiveDownload();" in advance_queue_block
+    assert "if ( item->completed || !item->queued ) {" in advance_queue_block
+    assert "item->queued = qfalse;" in advance_queue_block
+    assert "CL_Workshop_SetActiveItem( i );" in advance_queue_block
+    assert "QL_Steamworks_DownloadItem( item->itemIdLow, item->itemIdHigh, qtrue );" in advance_queue_block
+    assert '"Steamworks download complete: %llu"' in finalize_item_block
+    assert "CL_Workshop_ClearActiveDownload();" not in finalize_item_block
+    assert "return CL_Workshop_AdvanceDownloadQueue();" in finalize_item_block
+    assert 'CL_LogWorkshopLifecycle( "item-failed", detail );' not in fail_block
+    assert "return CL_Workshop_AdvanceDownloadQueue();" in fail_block
+    assert 'if ( CL_Workshop_FinalizeInstalledItem( cl_steamWorkshopDownloadState.activeItemIndex ) ) {' in downloads_settled_block
+    assert 'if ( CL_Workshop_AdvanceDownloadQueue() ) {' in downloads_settled_block
+    assert 'CL_LogWorkshopLifecycle( "queue-complete", "Download completed for all steamworks items" );' in downloads_settled_block
+
+
+def test_client_workshop_frame_reuses_retail_completion_strings() -> None:
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+
+    frame_block = _extract_function_block(cl_main, "static void CL_Workshop_Frame( void )")
+
+    assert 'Com_Printf( "Steamworks downloads complete - FS restart is required\\n" );' in frame_block
+    assert 'CL_LogWorkshopLifecycle( "filesystem-restart", "downloads complete; restarting filesystem" );' not in frame_block
+    assert 'Com_Printf( "Steamworks downloads complete\\n" );' in frame_block
+    assert 'Com_Printf( "WARNING: Missing pk3s referenced by the server:\\n%s\\n"' in frame_block
+    assert '"The server will most likely refuse the connection.\\n", missingfiles );' in frame_block
+    assert '"WARNING: You are missing some files referenced by the server:\\n%s"' not in frame_block
+    assert '"You might not be able to join the game\\n"' not in frame_block
+    assert "FS_Restart( clc.checksumFeed );" in frame_block
+    assert "cl_steamWorkshopDownloadState.active = qfalse;" in frame_block
+    assert "CL_Workshop_ClearBootstrapState( qtrue );" not in frame_block
+    assert "CL_DownloadsComplete();" in frame_block
+
+
+def test_recovered_ui_workshop_progress_bridge_uses_item_id_and_native_download_info() -> None:
+    ui_reconstruction = (
+        REPO_ROOT
+        / "references"
+        / "reverse-engineering"
+        / "ghidra"
+        / "uix86"
+        / "source-recreation"
+        / "ui_reconstruction.c"
+    ).read_text(encoding="cp1252")
+
+    bridge_start = ui_reconstruction.index('(**(code **)(DAT_106b40a8 + 0x24))("cl_downloadItem",local_d0,0x40);')
+    bridge_block = ui_reconstruction[bridge_start:bridge_start + 320]
+
+    assert 'sscanf(local_d0,"%llu",&uStack_158);' in bridge_block
+    assert '(**(code **)(DAT_106b40a8 + 0x180))(uStack_158,uStack_154,&uStack_168,&uStack_170);' in bridge_block
+    assert '(**(code **)(DAT_106b40a8 + 0x28))("cl_downloadTime");' in bridge_block
+    assert "cl_downloadCount" not in bridge_block
+    assert "cl_downloadSize" not in bridge_block
 
 
 def test_client_main_menu_presence_seed_reconstructs_retail_bootstrap_status() -> None:
@@ -2106,6 +2361,24 @@ def test_server_game_server_wrappers_reconstruct_mapped_server_slots() -> None:
         steamworks, "qboolean QL_Steamworks_RegisterServerCallbacks( const ql_steam_server_callback_bindings_t *bindings )"
     )
     unregister_callbacks_block = _extract_function_block(steamworks, "void QL_Steamworks_UnregisterServerCallbacks( void )")
+    dispatch_log_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_LogServerCallbackDispatch( const char *stage, const char *detail ) {"
+    )
+    dispatch_connected_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_DispatchServersConnected( void *context, const void *payload )"
+    )
+    dispatch_failure_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_DispatchServerConnectFailure( void *context, const void *payload )"
+    )
+    dispatch_disconnected_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_DispatchServersDisconnected( void *context, const void *payload )"
+    )
+    dispatch_validate_auth_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_DispatchValidateAuthTicketResponse( void *context, const void *payload )"
+    )
+    dispatch_p2p_block = _extract_function_block(
+        steamworks, "static void QL_Steamworks_DispatchServerP2PSessionRequest( void *context, const void *payload )"
+    )
     ugc_block = _extract_function_block(steamworks, "static void *QL_Steamworks_GetUGCInterface( void )")
     dedicated_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerSetDedicated( qboolean dedicated )")
     logon_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_ServerLogOn( const char *account )")
@@ -2151,6 +2424,24 @@ def test_server_game_server_wrappers_reconstruct_mapped_server_slots() -> None:
     assert "state.useGameServerUGC = qfalse;" in shutdown_block
     assert "return state.gameServerInitialised;" in is_initialised_block
     assert "!state.gameServerInitialised" in run_callbacks_block
+    assert 'Com_DPrintf( "Steam server callback dispatch %s via %s [%s]: %s\\n",' in dispatch_log_block
+    assert "services = QL_GetPlatformServices();" in dispatch_log_block
+    assert 'provider = services->matchmaking.provider ? services->matchmaking.provider : "Unavailable";' in dispatch_log_block
+    assert 'policy = QL_DescribePlatformFeaturePolicy( &services->matchmaking );' in dispatch_log_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "servers_connected", "ignored dispatch without callback state" );' in dispatch_connected_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "servers_connected", "ignored dispatch without registered callback" );' in dispatch_connected_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "connect_failure", "ignored dispatch without callback state" );' in dispatch_failure_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "connect_failure", "ignored dispatch without registered callback" );' in dispatch_failure_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "connect_failure", "ignored dispatch without payload" );' in dispatch_failure_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "disconnected", "ignored dispatch without callback state" );' in dispatch_disconnected_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "disconnected", "ignored dispatch without registered callback" );' in dispatch_disconnected_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "disconnected", "ignored dispatch without payload" );' in dispatch_disconnected_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "validate_auth_ticket_response", "ignored dispatch without callback state" );' in dispatch_validate_auth_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "validate_auth_ticket_response", "ignored dispatch without registered callback" );' in dispatch_validate_auth_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "validate_auth_ticket_response", "ignored dispatch without payload" );' in dispatch_validate_auth_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "p2p_session_request", "ignored dispatch without callback state" );' in dispatch_p2p_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "p2p_session_request", "ignored dispatch without registered callback" );' in dispatch_p2p_block
+    assert 'QL_Steamworks_LogServerCallbackDispatch( "p2p_session_request", "ignored dispatch without payload" );' in dispatch_p2p_block
     assert "if ( callbackState->registered ) {" in register_callbacks_block
     assert "QL_Steamworks_UnregisterServerCallbacks();" in register_callbacks_block
     assert (
@@ -2407,7 +2698,9 @@ def test_server_init_reconstructs_retail_hostname_and_bootstrap_metadata() -> No
 	assert 'Cvar_Set( "sv_statsPolicy", SV_GetServerStatsPolicyLabel() );' in sv_init
 	assert "SV_RefreshPlatformServiceCvars();" in sv_init_block
 	assert "SV_RefreshPlatformServiceCvars();" in spawn_block
-	assert 'Com_DPrintf( "Steam server identity unavailable for %s [%s]\\n",' in publish_block
+	assert 'SV_LogSteamServerIdentityLifecycle( "unavailable", "server steam ID unavailable" );' in publish_block
+	assert 'Com_sprintf( detail, sizeof( detail ), "published id=%s referenced=%d",' in publish_block
+	assert 'SV_LogSteamServerIdentityLifecycle( "published", detail );' in publish_block
 	assert "SV_SteamServerConfigureBootstrap" not in sv_init
 
 
@@ -2640,6 +2933,12 @@ def test_server_callback_auth_owner_reconstructs_retail_steam_gameserver_bundle(
     connect_rejected_block = _extract_function_block(
         sv_client, "static void SV_LogPlatformAuthConnectRejected( const char *detail ) {"
     )
+    callback_log_block = _extract_function_block(
+        sv_client, "static void SV_LogSteamServerCallbackLifecycle( const char *stage, const char *detail ) {"
+    )
+    bootstrap_log_block = _extract_function_block(
+        sv_client, "static void SV_LogSteamServerCallbackBootstrapLifecycle( const char *stage, const char *detail ) {"
+    )
     connected_block = _extract_function_block(
         sv_client, "static void SV_SteamServerConnectedCallback( void *context, const ql_steam_server_connected_t *event )"
     )
@@ -2670,25 +2969,41 @@ def test_server_callback_auth_owner_reconstructs_retail_steam_gameserver_bundle(
     assert 'Com_DPrintf( "Server auth rejected connection via %s [%s]: %s\\n",' in connect_rejected_block
     assert "SV_GetPlatformAuthProviderLabel()" in connect_rejected_block
     assert "SV_GetPlatformAuthPolicyLabel()" in connect_rejected_block
+    assert 'Com_Printf( "Steam server callback %s via %s [%s]: %s\\n",' in callback_log_block
+    assert "SV_GetSteamServerProviderLabel()" in callback_log_block
+    assert "SV_GetSteamServerPolicyLabel()" in callback_log_block
+    assert 'Com_DPrintf( "Steam server callback bootstrap %s via %s [%s]: %s\\n",' in bootstrap_log_block
+    assert "SV_GetSteamServerProviderLabel()" in bootstrap_log_block
+    assert "SV_GetSteamServerPolicyLabel()" in bootstrap_log_block
     assert "SV_BuildPlatformAuthCompatibilityDetail( detailMessage[0] ? detailMessage : NULL, message, sizeof( message ) );" in log_auth_block
     assert "NET_LogAuthTelemetry( NS_SERVER, adr, steamId, label, status, result, outcome, message[0] ? message : NULL );" in log_auth_block
-    assert 'Com_Printf( "Connected to Steam servers via %s [%s]\\n",' in connected_block
+    assert 'SV_LogSteamServerCallbackLifecycle( "connected", "published identity and state refresh" );' in connected_block
     assert "SV_SteamServerPublishIdentity();" in connected_block
     assert "SV_SteamServerUpdatePublishedState( qtrue );" in connected_block
-    assert 'Com_Printf( "Steam server connect failure (%d) via %s [%s]\\n", event->result,' in failure_block
-    assert 'Com_Printf( "Disconnected from Steam servers (%d) via %s [%s]\\n", event->result,' in disconnected_block
+    assert 'SV_LogSteamServerCallbackLifecycle( "connect_failure", "ignored null callback payload" );' in failure_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "connect failure result=%d", event->result );' in failure_block
+    assert 'SV_LogSteamServerCallbackLifecycle( "connect_failure", detail );' in failure_block
+    assert 'SV_LogSteamServerCallbackLifecycle( "disconnected", "ignored null callback payload" );' in disconnected_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "disconnected result=%d", event->result );' in disconnected_block
+    assert 'SV_LogSteamServerCallbackLifecycle( "disconnected", detail );' in disconnected_block
+    assert 'SV_LogSteamServerCallbackLifecycle( "validate_auth_ticket_response", "ignored null callback payload" );' in auth_callback_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "ignored auth response for missing client %llu",' in auth_callback_block
+    assert 'SV_LogSteamServerCallbackLifecycle( "validate_auth_ticket_response", detail );' in auth_callback_block
     assert 'Com_Printf( "Steam P2P session request %s for %llu via %s [%s]: %s\\n",' in p2p_log_block
     assert "SV_GetSteamServerProviderLabel()" in p2p_log_block
     assert "SV_GetSteamServerPolicyLabel()" in p2p_log_block
     assert "QL_Steamworks_RegisterServerCallbacks( &bindings )" in init_callbacks_block
     assert "bindings.onValidateAuthTicketResponse = SV_SteamServerValidateAuthTicketResponseCallback;" in init_callbacks_block
-    assert 'Com_DPrintf( "Steam server callbacks unavailable for %s [%s]\\n",' in init_callbacks_block
-    assert 'Com_DPrintf( "Steam server callbacks unavailable for %s [%s]\\n",' in stub_section
+    assert 'SV_LogSteamServerCallbackBootstrapLifecycle( "unavailable", "register callbacks failed" );' in init_callbacks_block
+    assert "static void SV_LogSteamServerCallbackBootstrapLifecycle( const char *stage, const char *detail ) {" in stub_section
+    assert 'Com_DPrintf( "Steam server callback bootstrap %s via %s [%s]: %s\\n",' in stub_section
+    assert 'SV_LogSteamServerCallbackBootstrapLifecycle( "unavailable", "build-disabled stub" );' in stub_section
     assert "SV_GetSteamServerProviderLabel()" in stub_section
     assert "SV_GetSteamServerPolicyLabel()" in stub_section
     assert "response = k_EAuthSessionResponseVACBanned;" in auth_callback_block
     assert "SV_DropClient( cl, message );" in auth_callback_block
     assert "QL_Steamworks_ServerAcceptP2PSession( &event->remoteId )" in p2p_block
+    assert 'SV_LogSteamServerP2PSessionRequest( NULL, "ignored", "null callback payload" );' in p2p_block
     assert 'SV_LogSteamServerP2PSessionRequest( &event->remoteId, "ignored", "client not found" );' in p2p_block
     assert 'SV_LogSteamServerP2PSessionRequest( &event->remoteId, "ignored", "client not authenticated" );' in p2p_block
     assert 'SV_LogSteamServerP2PSessionRequest( &event->remoteId, "failed", "accept call failed" );' in p2p_block
@@ -2712,8 +3027,21 @@ def test_server_steam_stats_owner_reconstructs_retail_gameserverstats_bridge() -
     stats_log_block = _extract_function_block(
         sv_client, "static void SV_LogSteamStatsLifecycle( const CSteamID *steamId, const char *stage, const char *detail ) {"
     )
+    reset_block = _extract_function_block(sv_client, "static void SV_SteamStats_ResetSession( sv_steam_stats_session_t *session )")
+    field_name_block = _extract_function_block(
+        sv_client, "static const char *SV_SteamStats_GetFieldName( int statIndex, const char *stage ) {"
+    )
+    achievement_name_block = _extract_function_block(
+        sv_client, "static const char *SV_SteamStats_GetAchievementName( int achievementId, const char *stage ) {"
+    )
+    client_slot_block = _extract_function_block(
+        sv_client, "static client_t *SV_SteamStats_GetClientSlot( int clientNum, const char *stage, const char *subject ) {"
+    )
     create_session_block = _extract_function_block(sv_client, "static void SV_SteamStats_CreatePlayerSession( client_t *cl )")
     request_values_block = _extract_function_block(sv_client, "static qboolean SV_SteamStats_RequestCurrentValues( sv_steam_stats_session_t *session )")
+    load_stat_block = _extract_function_block(sv_client, "static qboolean SV_SteamStats_LoadFieldValue( sv_steam_stats_session_t *session, int statIndex )")
+    load_achievement_block = _extract_function_block(sv_client, "static qboolean SV_SteamStats_LoadAchievement( sv_steam_stats_session_t *session, int achievementId )")
+    flush_block = _extract_function_block(sv_client, "static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session )")
     remove_session_block = _extract_function_block(sv_client, "static void SV_SteamStats_RemovePlayerSession( client_t *cl )")
     requery_block = _extract_function_block(sv_client, "static void SV_SteamStats_RequerySessions( void )")
     add_stat_block = _extract_function_block(sv_client, "void SV_SteamStats_AddFieldValue( int clientNum, int statIndex, int delta )")
@@ -2775,11 +3103,83 @@ def test_server_steam_stats_owner_reconstructs_retail_gameserverstats_bridge() -
     assert 'Com_DPrintf( "Server stats %s via %s [%s]: %s\\n",' in stub_section
     assert "SV_GetServerStatsProviderLabel()" in stub_section
     assert "SV_GetServerStatsPolicyLabel()" in stub_section
+    assert 'SV_LogSteamStatsLifecycle( NULL, "session-reset", "ignored reset for null session" );' in reset_block
+    assert '"session-reset", "cleared retained session state"' in reset_block
+    assert 'lookupStage = stage ? stage : "descriptor-lookup";' in field_name_block
+    assert '"ignored stat descriptor lookup for invalid index %d"' in field_name_block
+    assert '"ignored stat descriptor lookup for unmapped index %d"' in field_name_block
+    assert "SV_LogSteamStatsLifecycle( NULL, lookupStage, detail );" in field_name_block
+    assert 'lookupStage = stage ? stage : "descriptor-lookup";' in achievement_name_block
+    assert '"ignored achievement descriptor lookup for invalid id %d"' in achievement_name_block
+    assert '"ignored achievement descriptor lookup for unmapped id %d"' in achievement_name_block
+    assert "SV_LogSteamStatsLifecycle( NULL, lookupStage, detail );" in achievement_name_block
+    assert '"%s unavailable for out-of-range client %d"' in client_slot_block
+    assert '"%s unavailable for inactive client %d"' in client_slot_block
+    assert '"%s unavailable for zombie client %d"' in client_slot_block
+    assert '"%s unavailable for client %d without gentity"' in client_slot_block
+    assert '"%s unavailable for client %d without steam id"' in client_slot_block
+    assert '"%s unavailable for bot-owned client %d"' in client_slot_block
+    assert '"%s unavailable for client %d with invalid steam id"' in client_slot_block
+    assert "SV_LogSteamStatsLifecycle( NULL, stage, detail );" in client_slot_block
     assert 'QL_Steamworks_ServerSendP2PPacket( &session->steamId, SV_STEAM_STATS_P2P_HELLO, 5, SV_STEAM_STATS_P2P_SEND_RELIABLE, SV_STEAM_STATS_P2P_CHANNEL )' in create_session_block
+    assert 'SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", "ignored bootstrap for null client" );' in create_session_block
+    assert '"ignored bootstrap for out-of-range client %d"' in create_session_block
+    assert '"ignored bootstrap for zombie client %d"' in create_session_block
+    assert '"ignored bootstrap for client %d without gentity"' in create_session_block
+    assert '"ignored bootstrap for client %d without steam id"' in create_session_block
+    assert '"ignored bootstrap for bot-owned client %d"' in create_session_block
+    assert '"ignored bootstrap for client %d with invalid steam id"' in create_session_block
+    assert 'SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", detail );' in create_session_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "reusing active session" );' in create_session_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "created session" );' in create_session_block
     assert 'SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "p2p hello send failed" );' in create_session_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "p2p hello sent" );' in create_session_block
+    assert 'SV_LogSteamStatsLifecycle( NULL, "request-current-values", "ignored request for null session" );' in request_values_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "request-current-values", "ignored request for inactive session" );' in request_values_block
+    assert 'SV_LogSteamStatsLifecycle( NULL, "request-current-values", "ignored request for session without steam id" );' in request_values_block
     assert 'SV_LogSteamStatsLifecycle( &session->steamId, "request-current-values", "request failed" );' in request_values_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "request-current-values", "request issued" );' in request_values_block
+    assert '"ignored stat query for null session at index %d"' in load_stat_block
+    assert '"ignored stat query for inactive session at index %d"' in load_stat_block
+    assert '"ignored stat query for invalid index %d"' in load_stat_block
+    assert '"ignored stat query for unmapped index %d"' in load_stat_block
+    assert '"stat %s already cached as %d"' in load_stat_block
+    assert '"stat %s query failed"' in load_stat_block
+    assert '"stat %s loaded as %d"' in load_stat_block
+    assert 'SV_SteamStats_GetFieldName( statIndex, "value-query" );' in load_stat_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );' in load_stat_block
+    assert "session->statValue[statIndex] = value + session->pendingStatDelta[statIndex];" in load_stat_block
+    assert '"ignored achievement query for null session at id %d"' in load_achievement_block
+    assert '"ignored achievement query for inactive session at id %d"' in load_achievement_block
+    assert '"ignored achievement query for invalid id %d"' in load_achievement_block
+    assert '"ignored achievement query for unmapped id %d"' in load_achievement_block
+    assert '"achievement %s already cached as %s"' in load_achievement_block
+    assert '"achievement %s query failed"' in load_achievement_block
+    assert '"achievement %s loaded as %s"' in load_achievement_block
+    assert 'SV_SteamStats_GetAchievementName( achievementId, "value-query" );' in load_achievement_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );' in load_achievement_block
+    assert 'name, session->achievementUnlocked[achievementId] ? "unlocked" : "locked" );' in load_achievement_block
     assert "SV_SteamStats_RequestCurrentValues( session );" in create_session_block
+    assert 'SV_LogSteamStatsLifecycle( NULL, "value-flush", "ignored flush for null session" );' in flush_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", "ignored flush for inactive session" );' in flush_block
+    assert 'SV_LogSteamStatsLifecycle( NULL, "value-flush", "ignored flush for session without steam id" );' in flush_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", "no pending stat or achievement updates" );' in flush_block
+    assert '"stat %s unavailable during flush"' in flush_block
+    assert '"stat %s publish failed"' in flush_block
+    assert '"achievement %s publish failed"' in flush_block
+    assert 'SV_SteamStats_GetFieldName( i, "value-flush" );' in flush_block
+    assert 'SV_SteamStats_GetAchievementName( i, "value-flush" );' in flush_block
+    assert '"retained %d stat field(s) and %d achievement(s) after publish failure"' in flush_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", "store request failed" );' in flush_block
+    assert '"stored %d stat field(s) and %d achievement(s)"' in flush_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", detail );' in flush_block
+    assert "QL_Steamworks_ServerStoreUserStats( &session->steamId )" in flush_block
+    assert '"session teardown skipped for inactive client %d"' in remove_session_block
+    assert '"cleared session for client %d"' in remove_session_block
+    assert 'SV_LogSteamStatsLifecycle( NULL, "session-teardown", detail );' in remove_session_block
+    assert 'SV_LogSteamStatsLifecycle( &steamId, "session-teardown", detail );' in remove_session_block
     assert "SV_SteamStats_FlushPendingValues( session );" in remove_session_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "session-requery", "backend reconnected; request reset" );' in requery_block
     assert "SV_SteamStats_RequestCurrentValues( session );" in requery_block
     assert 'Cvar_VariableStringBuffer( "g_gameState", gameState, sizeof( gameState ) );' in should_unlock_block
     assert '!Q_stricmp( gameState, "IN_PROGRESS" )' in should_unlock_block
@@ -2790,12 +3190,30 @@ def test_server_steam_stats_owner_reconstructs_retail_gameserverstats_bridge() -
     assert "SV_SteamStats_RequerySessions();" in connected_block
     assert "session->pendingStatDelta[statIndex] += delta;" in add_stat_block
     assert "session->statDirty[statIndex] = qtrue;" in add_stat_block
+    assert '"ignored stat index %d delta %d for client %d"' in add_stat_block
+    assert '"stat %s session unavailable for client %d"' in add_stat_block
+    assert '"stat %s baseline unavailable; queuing delta %d for client %d"' in add_stat_block
+    assert 'SV_SteamStats_GetFieldName( statIndex, "field-delta" );' in add_stat_block
+    assert 'SV_SteamStats_GetClientSlot( clientNum, "field-delta", subject );' in add_stat_block
     assert 'SV_LogSteamStatsLifecycle( &session->steamId, "field-delta", detail );' in add_stat_block
     assert 'SV_LogSteamStatsStubLifecycle( "field-delta", detail );' in stub_section
     assert '"ignored stat index %d delta %d for client %d"' in stub_section
     assert "SV_SteamStats_ShouldUnlockAchievement()" in unlock_block
+    assert '"ignored achievement %d for client %d"' in unlock_block
+    assert '"achievement %s blocked by gameplay gate for client %d"' in unlock_block
+    assert '"achievement %s session unavailable for client %d"' in unlock_block
+    assert '"achievement %s already unlocked for client %d"' in unlock_block
+    assert '"queued achievement %s unlock for client %d"' in unlock_block
+    assert 'SV_SteamStats_GetAchievementName( achievementId, "achievement-unlock" );' in unlock_block
+    assert 'SV_LogSteamStatsLifecycle( NULL, "achievement-unlock", detail );' in unlock_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );' in unlock_block
     assert "session->achievementDirty[achievementId] = qtrue;" in unlock_block
     assert "SV_SteamStats_FlushPendingValues( session );" in unlock_block
+    assert '"query unavailable for achievement %d on client %d"' in has_block
+    assert '"achievement %s ownership is %s for client %d"' in has_block
+    assert 'SV_SteamStats_GetAchievementName( achievementId, "achievement-query" );' in has_block
+    assert 'SV_LogSteamStatsLifecycle( &session->steamId, "achievement-query", detail );' in has_block
+    assert 'SV_SteamStats_GetClientSlot( clientNum, "achievement-query", subject );' in has_block
     assert "return session->achievementUnlocked[achievementId] ? qtrue : qfalse;" in has_block
     assert 'SV_LogSteamStatsStubLifecycle( "achievement-unlock", detail );' in stub_section
     assert 'SV_LogSteamStatsStubLifecycle( "achievement-query", detail );' in stub_section
@@ -2943,6 +3361,9 @@ def test_module_native_export_qboolean_slots_use_explicit_wrappers() -> None:
 def test_server_spawn_and_shutdown_reconstruct_retail_steam_identity_and_heartbeat_control() -> None:
     sv_init = (REPO_ROOT / "src/code/server/sv_init.c").read_text(encoding="utf-8")
 
+    identity_log_block = _extract_function_block(
+        sv_init, "static void SV_LogSteamServerIdentityLifecycle( const char *stage, const char *detail ) {"
+    )
     masters_block = _extract_function_block(sv_init, "static qboolean SV_SteamServerHasConfiguredMasters( void )")
     publish_block = _extract_function_block(sv_init, "void SV_SteamServerPublishIdentity( void )")
     spawn_block = _extract_function_block(sv_init, "void SV_SpawnServer( char *server, qboolean killBots )")
@@ -2951,13 +3372,18 @@ def test_server_spawn_and_shutdown_reconstruct_retail_steam_identity_and_heartbe
 
     assert 'Cvar_Get ("sv_referencedSteamworks", "", CVAR_ROM );' in init_block
     assert "SV_SteamServerInitCallbacks();" in init_block
+    assert 'Com_DPrintf( "Steam server identity %s via %s [%s]: %s\\n",' in identity_log_block
+    assert "SV_GetSteamServerProviderLabel()" in identity_log_block
+    assert "SV_GetSteamServerPolicyLabel()" in identity_log_block
     assert "if ( sv_master[i] && sv_master[i]->string[0] ) {" in masters_block
     assert "QL_Steamworks_ServerGetSteamID( &steamIdLow, &steamIdHigh )" in publish_block
-    assert 'Com_DPrintf( "Steam server identity unavailable for %s [%s]\\n",' in publish_block
+    assert 'SV_LogSteamServerIdentityLifecycle( "unavailable", "server steam ID unavailable" );' in publish_block
     assert "referencedSteamworks = FS_ReferencedSteamworks();" in publish_block
     assert "SV_SetConfigstring( 0x2ca, steamIdString );" in publish_block
     assert 'Cvar_Set( "sv_referencedSteamworks", referencedSteamworks );' in publish_block
     assert "SV_SetConfigstring( 0x2cb, referencedSteamworks );" in publish_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "published id=%s referenced=%d",' in publish_block
+    assert 'SV_LogSteamServerIdentityLifecycle( "published", detail );' in publish_block
     assert "SV_RefreshPlatformServiceCvars();" in spawn_block
     assert "SV_SteamServerPublishIdentity();" in spawn_block
     assert "QL_Steamworks_ServerEnableHeartbeats( SV_SteamServerHasConfiguredMasters() );" in spawn_block
@@ -3285,8 +3711,10 @@ def test_workshop_mount_startup_reconstructs_retail_subscribed_item_import_path(
         files,
         "static void FS_AddGameDirectoryInternal( const char *path, const char *dir, qboolean rawPath, unsigned int steamItemIdLow, unsigned int steamItemIdHigh ) {",
     )
+    base_pak_block = _extract_function_block(files, "static qboolean FS_HasBasePak0( void ) {")
     workshop_init_block = _extract_function_block(files, "static void FS_SteamWorkshopInit( const char *gameName ) {")
     startup_block = _extract_function_block(files, "static void FS_Startup( const char *gameName ) {")
+    has_ugc_block = _extract_function_block(steamworks, "qboolean QL_Steamworks_HasUGCInterface( void ) {")
     count_block = _extract_function_block(steamworks, "uint32_t QL_Steamworks_GetNumSubscribedItems( void ) {")
     list_block = _extract_function_block(steamworks, "uint32_t QL_Steamworks_GetSubscribedItems( uint64_t *outItemIds, uint32_t maxItems ) {")
     install_block = _extract_function_block(
@@ -3300,14 +3728,25 @@ def test_workshop_mount_startup_reconstructs_retail_subscribed_item_import_path(
     assert "search->dir->rawPath = rawPath;" in add_dir_block
     assert "pak->steamItemIdLow = steamItemIdLow;" in add_dir_block
     assert "pak->steamItemIdHigh = steamItemIdHigh;" in add_dir_block
+    assert "!fs_basepath || !fs_basepath->string[0]" in base_pak_block
+    assert 'FS_FileExistsOnDisk( FS_BuildOSPath( fs_basepath->string, BASEGAME, "pak00.pk3" ) )' in base_pak_block
+    assert "mountRawPath = qfalse;" in workshop_init_block
+    assert 'Com_Printf( "WARNING: Skipping workshop PK3s since pak00 doesn\'t exist.\\n" );' in workshop_init_block
+    assert "mountRawPath = qtrue;" in workshop_init_block
+    assert 'Com_Printf( "Skipping workshop since fs_skipWorkshop is set.\\n" );' in workshop_init_block
+    assert 'Com_Printf( "Skipping workshop since running in build mode.\\n" );' in workshop_init_block
+    assert "QL_Steamworks_HasUGCInterface()" in workshop_init_block
+    assert 'Com_Printf( "WARNING: Skipping workshop, ISteamUGC is NULL.\\n" );' in workshop_init_block
     assert "subscribedCount = QL_Steamworks_GetNumSubscribedItems();" in workshop_init_block
     assert "mountedCount = QL_Steamworks_GetSubscribedItems( itemIds, subscribedCount );" in workshop_init_block
     assert "QL_Steamworks_GetItemInstallInfo( idLow, idHigh, &sizeOnDisk, installFolder, sizeof( installFolder ), &timestamp )" in workshop_init_block
-    assert 'FS_AddGameDirectoryInternal( installFolder, "", qtrue, idLow, idHigh );' in workshop_init_block
+    assert 'FS_AddGameDirectoryInternal( installFolder, "", mountRawPath, idLow, idHigh );' in workshop_init_block
     assert "const char *path, const char *dir, qboolean rawPath, unsigned int steamItemIdLow, unsigned int steamItemIdHigh" in files
+    assert "qboolean QL_Steamworks_HasUGCInterface( void );" in steamworks_h
     assert "uint32_t QL_Steamworks_GetNumSubscribedItems( void );" in steamworks_h
     assert "uint32_t QL_Steamworks_GetSubscribedItems( uint64_t *outItemIds, uint32_t maxItems );" in steamworks_h
     assert "qboolean QL_Steamworks_GetItemInstallInfo( uint32_t idLow, uint32_t idHigh, uint64_t *outSizeOnDisk, char *folder, size_t folderSize, uint32_t *outTimestamp );" in steamworks_h
+    assert "return QL_Steamworks_GetUGCInterface() != NULL ? qtrue : qfalse;" in has_ugc_block
     assert "vtable[0xc8 / 4]" in count_block
     assert "vtable[0xcc / 4]" in list_block
     assert "vtable[0xd4 / 4]" in install_block
@@ -3358,6 +3797,9 @@ def test_operator_workshop_commands_reconstruct_retail_ugc_surface() -> None:
         sv_ccmds, "static void SV_LogWorkshopOperatorLifecycle( const char *commandName, unsigned long long itemId, const char *detail )"
     )
     workshop_support_block = _extract_function_block(sv_ccmds, "static qboolean SV_WorkshopServiceSupportsSteamCommands( void )")
+    request_helper_block = _extract_function_block(sv_ccmds, "static void SV_SteamWorkshop_RequestDownload( uint32_t itemIdLow, uint32_t itemIdHigh )")
+    subscribe_helper_block = _extract_function_block(sv_ccmds, "static void SV_SteamWorkshop_SubscribeItem( uint32_t itemIdLow, uint32_t itemIdHigh )")
+    unsubscribe_helper_block = _extract_function_block(sv_ccmds, "static void SV_SteamWorkshop_UnsubscribeItem( uint32_t itemIdLow, uint32_t itemIdHigh )")
     download_block = _extract_function_block(sv_ccmds, "static void SV_SteamCmd_DownloadUGC_f( void )")
     subscribe_block = _extract_function_block(sv_ccmds, "static void SV_SteamCmd_SubscribeUGC_f( void )")
     unsubscribe_block = _extract_function_block(sv_ccmds, "static void SV_SteamCmd_UnsubscribeUGC_f( void )")
@@ -3387,29 +3829,27 @@ def test_operator_workshop_commands_reconstruct_retail_ugc_surface() -> None:
     assert "SV_GetWorkshopProviderLabel()" in workshop_log_block
     assert "SV_GetWorkshopPolicyLabel()" in workshop_log_block
     assert 'return ( strstr( provider, "Steam UGC" ) != NULL );' in workshop_support_block
+    assert "SV_WorkshopServiceSupportsSteamCommands()" in request_helper_block
+    assert "QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & 4u" in request_helper_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "Workshop item %llu: in cache.", itemId );' in request_helper_block
+    assert 'Com_sprintf( detail, sizeof( detail ), "Workshop item %llu: download", itemId );' in request_helper_block
+    assert "(void)QL_Steamworks_SubscribeItem( itemIdLow, itemIdHigh );" in subscribe_helper_block
+    assert "QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & 4u" in subscribe_helper_block
+    assert "FS_Restart( sv.checksumFeed );" in subscribe_helper_block
+    assert "(void)QL_Steamworks_UnsubscribeItem( itemIdLow, itemIdHigh );" in unsubscribe_helper_block
     assert 'Com_Printf( "Usage: steam_downloadugc <itemid>\\n" );' in download_block
     assert 'sscanf( Cmd_Argv( 1 ), "%llu", &itemId );' in download_block
-    assert "SV_WorkshopServiceSupportsSteamCommands()" in download_block
-    assert 'SV_LogWorkshopOperatorLifecycle( "steam_downloadugc", itemId,' in download_block
-    assert "QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & 4u" in download_block
-    assert 'SV_LogWorkshopOperatorLifecycle( "steam_downloadugc", itemId, "item already in cache" );' in download_block
-    assert "QL_Steamworks_DownloadItem( itemIdLow, itemIdHigh, qtrue )" in download_block
-    assert 'SV_LogWorkshopOperatorLifecycle( "steam_downloadugc", itemId, "download requested" );' in download_block
-    assert 'SV_LogWorkshopOperatorLifecycle( "steam_downloadugc", itemId, "download request failed" );' in download_block
+    assert "SV_SteamWorkshop_RequestDownload( itemIdLow, itemIdHigh );" in download_block
     assert 'Com_Printf( "Usage: steam_subscribeugc <itemid>\\n" );' in subscribe_block
-    assert "SV_WorkshopServiceSupportsSteamCommands()" in subscribe_block
-    assert 'SV_LogWorkshopOperatorLifecycle( "steam_subscribeugc", itemId, "subscribe requested" );' in subscribe_block
-    assert 'SV_LogWorkshopOperatorLifecycle( "steam_subscribeugc", itemId, "subscribe request failed" );' in subscribe_block
-    assert "QL_Steamworks_SubscribeItem( itemIdLow, itemIdHigh )" in subscribe_block
+    assert "SV_SteamWorkshop_SubscribeItem( itemIdLow, itemIdHigh );" in subscribe_block
     assert 'Com_Printf( "Usage: steam_unsubscribeugc <itemid>\\n" );' in unsubscribe_block
-    assert "SV_WorkshopServiceSupportsSteamCommands()" in unsubscribe_block
-    assert 'SV_LogWorkshopOperatorLifecycle( "steam_unsubscribeugc", itemId, "unsubscribe requested" );' in unsubscribe_block
-    assert 'SV_LogWorkshopOperatorLifecycle( "steam_unsubscribeugc", itemId, "unsubscribe request failed" );' in unsubscribe_block
-    assert "QL_Steamworks_UnsubscribeItem( itemIdLow, itemIdHigh )" in unsubscribe_block
+    assert "SV_SteamWorkshop_UnsubscribeItem( itemIdLow, itemIdHigh );" in unsubscribe_block
     assert 'Cmd_AddCommand ("steam_downloadugc", SV_SteamCmd_DownloadUGC_f);' in add_block
     assert 'Cmd_AddCommand ("steam_subscribeugc", SV_SteamCmd_SubscribeUGC_f);' in add_block
     assert 'Cmd_AddCommand ("steam_unsubscribeugc", SV_SteamCmd_UnsubscribeUGC_f);' in add_block
     assert "vtable[0xd0 / 4]" in item_state_block
     assert "vtable[0xc0 / 4]" in subscribe_platform_block
+    assert "itemState = QL_Steamworks_GetItemState( idLow, idHigh );" in subscribe_platform_block
+    assert "return itemState != 0u ? qtrue : qfalse;" in subscribe_platform_block
     assert "vtable[0xc4 / 4]" in unsubscribe_platform_block
     assert "vtable[0xdc / 4]" in download_platform_block

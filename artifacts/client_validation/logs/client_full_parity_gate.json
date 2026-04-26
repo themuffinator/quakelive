@@ -48,7 +48,10 @@
         "workshop_callback_owner_present": true,
         "ui_progress_import_present": true,
         "workshop_mount_helpers_present": true,
-        "focused_validation_present": true
+        "focused_validation_present": true,
+        "client_cvar_notes_current": true,
+        "client_plan_notes_current": true,
+        "implementation_plan_notes_current": true
       }
     },
     "CL-G04": {

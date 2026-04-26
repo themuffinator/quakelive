@@ -1,32 +1,31 @@
-# `src/code/server/sv_rankings.c` Gap Note
+# `src/code/server/sv_rankings.c` Divergence Note
 
 Last updated: 2026-04-22
 
 Gap family: `RW-G01`
 - Owning retail binary: `assets/quakelive/quakelive_steam.exe` for engine-owned surfaces, or the corresponding committed module corpus when this file sits in a module tree.
-- Current classification: Open repo-wide gap; default builds expose a retained rankings compatibility surface instead of a live service integration.
+- Current classification: Documented repo-wide divergence; default builds intentionally expose a retained rankings compatibility surface instead of a live service integration.
 
-## Why this file is still open
+## Why this file remains a documented divergence
 
-The default `!QL_ENABLE_RANKINGS` branch is explicit and useful, but it still proves that the checked-in default build does not implement retail-equivalent rankings behavior across the whole repo-wide score.
+The default `!QL_ENABLE_RANKINGS` branch is explicit and useful, but it keeps the checked-in default build honest about not implementing retail-equivalent rankings behavior.
 
 ## Observed facts
 
-- The disabled branch now mirrors its compatibility state through the ROM cvars `sv_rankingsProvider` and `sv_rankingsPolicy`.
-- The disabled branch logs `Rankings disabled by build policy (QL_ENABLE_RANKINGS=0)` together with the active provider/policy pair and forces `sv_enableRankings` back to `0` when requested.
+- The disabled branch logs `Rankings disabled by build policy (QL_ENABLE_RANKINGS=0)` and forces `sv_enableRankings` back to `0` when requested.
 - Most disabled-branch functions publish compatibility-safe return values or no-ops rather than a live rankings path.
-- The enabled branch still exposes a retained opt-in `Legacy GRank Service` provider label rather than changing the repo-wide closure story.
+- The live rankings implementation remains present under the enabled branch, but the repo-wide default policy keeps that surface outside closure.
 
 ## Function-by-function status
 
 | Function | Status | Notes |
 | --- | --- | --- |
-| `SV_GetRankingsProviderLabel` | `gap owner` | Publishes the current rankings provider label for the retained compatibility lane. |
-| `SV_GetRankingsPolicyLabel` | `gap owner` | Publishes the current rankings compatibility policy label. |
-| `SV_RefreshRankingsPolicyCvars` | `gap owner` | Mirrors the rankings provider/policy pair through ROM cvars for diagnostics. |
-| `SV_RankPublishDisabledState` | `gap owner` | Publishes the disabled compatibility state to cvars. |
-| `SV_RankLogDisabledState` | `gap owner` | Makes the build-disabled rankings policy explicit at runtime. |
-| `SV_RankBegin` | `gap owner` | Disabled-branch entry point forces the rankings surface back to compatibility-only behavior. |
+| `SV_GetRankingsProviderLabel` | `bounded compatibility` | File member inside the retained rankings compatibility branch. |
+| `SV_GetRankingsPolicyLabel` | `bounded compatibility` | File member inside the retained rankings compatibility branch. |
+| `SV_RefreshRankingsPolicyCvars` | `bounded compatibility` | File member inside the retained rankings compatibility branch. |
+| `SV_RankPublishDisabledState` | `divergence owner` | Publishes the disabled compatibility state to cvars. |
+| `SV_RankLogDisabledState` | `divergence owner` | Makes the build-disabled rankings policy explicit at runtime. |
+| `SV_RankBegin` | `divergence owner` | Disabled-branch entry point forces the rankings surface back to compatibility-only behavior. |
 | `SV_RankCheckInit` | `bounded compatibility` | Only reports the stub server-id state in disabled builds. |
 | `SV_RankActive` | `bounded compatibility` | Hard-wired false in the disabled branch. |
 | `SV_RankPoll` | `bounded compatibility` | No-op in the disabled branch. |
@@ -34,7 +33,7 @@ The default `!QL_ENABLE_RANKINGS` branch is explicit and useful, but it still pr
 | `SV_RankUserReset` | `bounded compatibility` | No-op compatibility branch. |
 | `SV_RankReportInt` | `bounded compatibility` | No-op compatibility branch. |
 | `SV_RankReportStr` | `bounded compatibility` | No-op compatibility branch. |
-| `SV_RankBegin` | `gap owner` | Disabled-branch entry point forces the rankings surface back to compatibility-only behavior. |
+| `SV_RankBegin` | `divergence owner` | Disabled-branch entry point forces the rankings surface back to compatibility-only behavior. |
 | `SV_RankEnd` | `bounded compatibility` | File member inside the retained rankings compatibility branch. |
 | `SV_RankPoll` | `bounded compatibility` | No-op in the disabled branch. |
 | `SV_RankCheckInit` | `bounded compatibility` | Only reports the stub server-id state in disabled builds. |
@@ -64,7 +63,7 @@ The default `!QL_ENABLE_RANKINGS` branch is explicit and useful, but it still pr
 | `SV_RankStatusString` | `bounded compatibility` | File member inside the retained rankings compatibility branch. |
 | `SV_RankError` | `bounded compatibility` | File member inside the retained rankings compatibility branch. |
 
-## Closure target
+## Maintenance expectations
 
-- Either keep rankings permanently outside the repo-wide target as a documented compatibility lane or promote a real open replacement path.
-- Do not mark the file closed repo-wide while the checked-in default branch remains the build-disabled compatibility surface.
+- Keep rankings permanently documented as a bounded compatibility lane unless a real open replacement path is adopted.
+- If the checked-in default branch changes, refresh the rankings note and repo-wide audit together.

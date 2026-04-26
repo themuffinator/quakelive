@@ -31,12 +31,29 @@
     {
       "address": "0x00445AB0",
       "raw_name": "sub_445AB0",
-      "normalized_name": "UNRESOLVED_CLIENT_func_00445AB0",
-      "status": "unresolved",
+      "normalized_name": "RETIRED_LEGACY_CLIENT_RENDER_BACKEND_PLACEHOLDER",
+      "status": "retired",
       "signature": null,
       "string_refs": ["0x0068C5D0"],
       "relocation_refs": [],
-      "comment": "Large render system helper still pending naming"
+      "replacement_refs": [
+        {
+          "map": "references/analysis/quakelive_symbol_aliases.json",
+          "raw_name": "sub_4B9AA0",
+          "normalized_name": "CL_InitRenderer"
+        },
+        {
+          "map": "references/analysis/quakelive_symbol_aliases.json",
+          "raw_name": "sub_4B9BF0",
+          "normalized_name": "CL_InitRef"
+        },
+        {
+          "map": "references/analysis/quakelive_symbol_aliases.json",
+          "raw_name": "sub_450E80",
+          "normalized_name": "RE_RenderScene"
+        }
+      ],
+      "comment": "Retired legacy seed row. The newer quakelive_steam.exe rounds resolve the renderer bootstrap and core scene owners through the current host aliases; the old client.x86 address/string pair is not a current retail Quake Live function gap."
     },
     {
       "address": "0x004912F0",
@@ -92,8 +109,9 @@
       "address": "0x0068C5D0",
       "value": "render backend missing implementation",
       "xref_functions": ["0x00445AB0"],
-      "normalized_label": "UNRESOLVED_CLIENT_str_0068C5D0",
-      "status": "unresolved"
+      "normalized_label": "retired_legacy_client_str_0068C5D0",
+      "status": "retired",
+      "comment": "Retired with the legacy 0x00445AB0 seed row; no matching current retail Quake Live host string was found in the committed Ghidra/HLIL corpus."
     }
   ],
   "relocations": [
@@ -121,8 +139,10 @@
   "stats": {
     "function_total": 5,
     "function_matched": 4,
+    "function_retired": 1,
     "string_total": 5,
     "string_resolved": 4,
+    "string_retired": 1,
     "relocation_total": 4
   }
 }

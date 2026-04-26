@@ -24,13 +24,14 @@ disabled, until a documented open replacement path exists.
 - Treat the 2026-04-10 engine-wide **100%** report as the strict-retail
   Windows closure milestone, not as a whole-repo all-green claim.
 - The strict-retail Windows replacement target remains **100%** on the current
-  worktree, but the current repo-wide parity estimate is **96%** once the
+  worktree, but the current repo-wide parity estimate is **98%** once the
   compatibility-only and packaging-dependent surfaces are counted.
 - The new file-by-file audit campaign now lives in
   `docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md` and
   `docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`.
-  It tracks `567` source entries, seeds concrete file-level notes for the
-  currently evidenced `RW-G01` and `RW-G02` owners, and keeps the older
+  It tracks `567` source entries, seeds concrete per-file notes for the
+  documented `RW-G01` divergence owners plus the active `RW-G02` gap owners,
+  and keeps the older
   subsystem ledgers as inherited baselines until each file is walked again.
 - Top-level planning is reopened in this file because the 2026-04-21 repo-wide
   audit identified active gaps outside the strict-retail score.
@@ -1635,30 +1636,3542 @@ Completed work:
    matches the same explicit compatibility-labeling story as the other active
    online-service seams.
 
-## Active tasks
-
-### Task A3: Replace or further bound the compatibility-only online-service lanes [OPEN]
+### Task A3ac: Expose explicit provider/policy labeling through the retained client lobby callback lane [COMPLETED]
 Priority: Critical
-Primary areas: `src/common/platform/`, `src/code/client/`, `src/code/server/`,
-`docs/platform/authentication.md`, `docs/steam_platform_abstraction.md`
-Estimated repo-wide lift if closed: **96% -> 98%**
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
 
-Scope:
+Completed work:
 
-1. Decide whether the repo will keep online services permanently bounded as a
-   documented divergence or pursue real open replacements.
-2. If the lane remains bounded, keep the default-disabled policy and
-   compatibility labeling explicit everywhere the service table, auth flow,
-   workshop flow, advert flow, or browser overlay surfaces are exposed.
-3. If an open replacement path is pursued, replace the current heuristic
-   backends with transport-backed implementations and refresh the runtime
-   evidence for opted-in builds.
+1. Extended the retained matchmaking callback diagnostics so the client lobby
+   callback owner now reports provider/policy-aware lifecycle detail for lobby
+   create, enter, membership, chat, metadata, game-created, kicked, and
+   join-requested events instead of only making the bounded queue visible once
+   the browser-event publication layer runs.
+2. Kept the existing browser-event payload shapes intact while making the
+   callback-origin seam explicit, which preserves the compatibility-only
+   browser contract without letting those lobby callbacks read like silent
+   Steam-owned behavior.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   lobby callback lane now matches the same explicit compatibility-labeling
+   story as the other active online-service seams.
+
+### Task A3ad: Expose explicit provider/policy labeling through the retained client callback connect-handoff lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained rich-presence join and server-change callback handoff
+   through the shared matchmaking callback logger so the immediate
+   join/connect command path now reports the active provider/policy pair
+   instead of silently executing callback payloads.
+2. Added bounded callback detail for missing join commands, missing server
+   targets, and password-seeded server-connect handoff without changing the
+   legacy immediate-command behavior or the outward connect payload shape.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   callback connect-handoff lane now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3ae: Expose explicit provider/policy labeling through the retained client stats callback lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared stats callback logger so the retained user-stats callback
+   owner now reports the active stats provider/policy pair instead of only
+   becoming visible once the browser-event queue publishes the resulting
+   payload.
+2. Routed the `users.stats.*.received` callback path through that helper with
+   bounded SteamID, game-ID, and result detail while preserving the legacy
+   browser-event payload shape and queue semantics.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   stats callback lane now matches the same explicit compatibility-labeling
+   story as the other active online-service seams.
+
+### Task A3af: Expose explicit provider/policy labeling through the retained client social-presence and UGC callback lanes [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained client persona-state and friend-rich-presence callback
+   owners through the shared matchmaking callback logger so those
+   browser-facing presence updates now report the active provider/policy pair
+   instead of only becoming visible when the shared queue publishes them.
+2. Routed the retained client UGC query-complete callback through the
+   workshop lifecycle logger with bounded call/query/result detail while
+   preserving the legacy `web.ugc.results` / `web.ugc.failed` payload shapes
+   and browser event names.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   social-presence and UGC callback lanes now match the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3ag: Expose explicit provider/policy labeling through the retained client workshop callback lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained client workshop `ItemInstalled` and
+   `DownloadItemResult` callback owners through provider/policy-aware
+   lifecycle diagnostics so tracked completion, untracked-item ignore, and
+   result-failure exits are explicit instead of only becoming visible through
+   the downstream queue helpers.
+2. Kept the existing workshop queue behavior intact: item completion still
+   flows through `CL_Workshop_FinalizeInstalledItem()`, failures still flow
+   through `CL_Workshop_FailActiveDownload()`, and the legacy queue-advance
+   behavior remains unchanged.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   workshop callback lane now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3ah: Expose explicit provider/policy labeling through the retained dedicated-server connection callback lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained Steam GameServer connected, connect-failure, and
+   disconnected callbacks through a shared provider/policy-aware callback
+   lifecycle logger so those server callback-owner state changes no longer
+   appear as isolated one-off print lines.
+2. Kept the existing server behavior intact: successful connects still publish
+   identity and refreshed published state, failure/disconnect callbacks still
+   clear the connected flag, and no auth/session routing changed.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server connection callback lane now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3ai: Expose explicit provider/policy labeling through the retained client workshop callback bootstrap gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained client workshop callback registration-failure path
+   through the shared workshop lifecycle logger so the polling-only fallback is
+   explicit about the active provider/policy pair instead of appearing as a
+   one-off raw debug line.
+2. Kept the existing bootstrap behavior intact: the client still enables the
+   main callback bundle, leaves workshop progress on the polling fallback when
+   workshop callback registration fails, and does not change queue or browser
+   event behavior.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   workshop callback bootstrap gate now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3aj: Expose explicit provider/policy labeling through the retained dedicated-server identity publication lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_init.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained Steam GameServer identity-publication owner through a
+   shared provider/policy-aware lifecycle logger so both the unavailable and
+   successful publish paths are explicit instead of only surfacing a raw
+   identity-unavailable debug line.
+2. Kept the existing identity behavior intact: the server still publishes the
+   `0x2ca` SteamID configstring, mirrors `sv_referencedSteamworks`, and writes
+   the `0x2cb` referenced-workshop configstring without changing the outward
+   contract.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server identity publication lane now matches the same explicit
+   compatibility-labeling story as the other active online-service seams.
+
+### Task A3ak: Expose explicit provider/policy labeling through the retained dedicated-server callback bootstrap gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained Steam GameServer callback-registration fallback through
+   a provider/policy-aware bootstrap lifecycle logger in both the live
+   registration-failure path and the build-disabled stub path instead of
+   leaving those exits as raw one-off debug lines.
+2. Kept the existing callback-registration behavior intact: successful
+   registration still clears `sv_steamServerConnected`, while the unavailable
+   paths still return immediately after surfacing the explicit compatibility
+   diagnostic.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server callback bootstrap gate now matches the same explicit
+   compatibility-labeling story as the other active server-owned seams.
+
+### Task A3al: Expose explicit provider/policy labeling through the retained client callback bootstrap gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained client callback-bundle fallback through a shared
+   provider-aware bootstrap logger so the services-disabled and
+   registration-failure exits now spell out the active matchmaking, stats, and
+   social-overlay provider/policy pairs instead of staying as raw one-off
+   debug lines.
+2. Kept the existing callback bootstrap behavior intact: the client still
+   clears the browser-event and lobby state before registration, still returns
+   early when online services stay disabled, and still unregisters the partial
+   client/lobby/micro callback bundle before falling back.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   callback bootstrap gate now matches the same explicit compatibility-labeling
+   story as the other active client-owned seams.
+
+### Task A3am: Expose explicit provider/policy labeling through the retained client workshop required-items bootstrap gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained client workshop required-items bootstrap fallback
+   through the shared workshop lifecycle logger so the non-Steam/bootstrap-
+   unavailable exit no longer stays as a raw one-off print line.
+2. Kept the existing workshop bootstrap behavior intact: the client still logs
+   the server-published required item list, still returns immediately when the
+   current workshop lane cannot own Steam bootstrap, and still preserves the
+   existing queue setup once a Steam UGC owner is available.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained client
+   workshop required-items bootstrap gate now matches the same explicit
+   compatibility-labeling story as the other active workshop seams.
+
+### Task A3an: Expose explicit provider/policy labeling through the retained dedicated-server stats request/session lifecycle lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed successful stats request issue plus the active-session reuse, fresh
+   session-bootstrap, and backend reconnect requery transitions through the
+   shared stats lifecycle logger, so those retained GameServerStats success
+   paths now surface the same provider/policy pair as the existing failure
+   diagnostics.
+2. Kept the retained stats owner behavior intact: existing request issuance,
+   session reset/bootstrap, P2P hello delivery, and reconnect-driven requery
+   semantics all remain unchanged apart from the new explicit compatibility
+   labels.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story on both its request and session lifecycle
+   paths.
+
+### Task A3ao: Expose explicit provider/policy labeling through the retained dedicated-server stats publish/store lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained stats pending-value flush path through the shared stats
+   lifecycle logger so stat publish failures, achievement publish failures,
+   store-request failure, and successful store completion now all surface the
+   same provider/policy pair instead of failing silently inside the
+   GameServerStats owner.
+2. Kept the retained stats owner behavior intact: dirty stat/achievement
+   accumulation, backend store submission, and dirty-bit clearing still follow
+   the same recovered control flow, with the new compatibility labels only
+   documenting the existing publish/store decisions.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request, session, and publish/store
+   lifecycle paths.
+
+### Task A3ap: Expose explicit provider/policy labeling through the retained dedicated-server stats query/load lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `GetUserStatInt` and `GetUserAchievement` fetch paths
+   through the shared stats lifecycle logger so stat/achievement query
+   success and failure now surface the same provider/policy pair instead of
+   silently returning through the dedicated-server `GameServerStats` owner.
+2. Kept the retained stats owner behavior intact: request issuance, cached
+   value reuse, pending-delta accumulation, and achievement unlock decisions
+   still follow the same recovered control flow, with the new compatibility
+   labels only documenting the existing query/load outcomes.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request, session, query, and
+   publish/store lifecycle paths.
+
+### Task A3aq: Expose explicit provider/policy labeling through the retained dedicated-server stats achievement owner/query lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained achievement-owner entry points through the shared stats
+   lifecycle logger so invalid-achievement, gameplay-gated, unavailable,
+   session-unavailable, already-held, queued-unlock, and ownership-result
+   outcomes now surface the same provider/policy pair instead of returning
+   silently through the active `GameServerStats` owner.
+2. Kept the retained stats owner behavior intact: achievement gate checks,
+   session bootstrap, cached ownership reuse, and pending unlock/store flows
+   still follow the same recovered control flow, with the new compatibility
+   labels only documenting the existing owner/query decisions.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request, session, query,
+   achievement-owner, and publish/store lifecycle paths.
+
+### Task A3ar: Expose explicit provider/policy labeling through the retained dedicated-server stats field-owner lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained stat-delta owner entry point through the shared stats
+   lifecycle logger so invalid/no-op, unavailable, session-unavailable, and
+   baseline-unavailable queue decisions now surface the same provider/policy
+   pair instead of returning silently through the active `GameServerStats`
+   owner.
+2. Kept the retained stats owner behavior intact: stat lookup, session
+   bootstrap, pending-delta accumulation, and dirty-bit publication still
+   follow the same recovered control flow, with the new compatibility labels
+   only documenting the existing field-owner decisions.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request, session, query,
+   field-owner, achievement-owner, and publish/store lifecycle paths.
+
+### Task A3as: Expose explicit provider/policy labeling through the retained dedicated-server stats session-teardown lane [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained stats session-teardown helper through the shared stats
+   lifecycle logger so inactive-session skips and completed session clears now
+   surface the same provider/policy pair instead of returning silently during
+   auth/session shutdown.
+2. Kept the retained teardown behavior intact: pending stat/achievement flush,
+   session reset, and caller-owned auth shutdown sequencing still follow the
+   same recovered control flow, with the new compatibility labels only
+   documenting the existing session-clear decisions.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request, session, query,
+   field-owner, achievement-owner, session-teardown, and publish/store
+   lifecycle paths.
+
+### Task A3at: Expose explicit provider/policy labeling through the retained dedicated-server stats session-bootstrap gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained stats session-bootstrap gate through the shared stats
+   lifecycle logger so null, out-of-range, zombie, missing-gentity,
+   missing-SteamID, bot-owned, and invalid-SteamID skips now surface the same
+   provider/policy pair instead of returning silently before session creation.
+2. Kept the retained bootstrap behavior intact: valid clients still reuse live
+   sessions, still create/reset sessions the same way, still request current
+   values, and still send the Steam P2P hello packet with the same recovered
+   control flow.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request, session-bootstrap, query,
+   field-owner, achievement-owner, session-teardown, and publish/store
+   lifecycle paths.
+
+### Task A3au: Expose explicit provider/policy labeling through the retained dedicated-server stats client-slot gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained stats client-slot helper through the shared stats
+   lifecycle logger so out-of-range, inactive, zombie, missing-gentity,
+   missing-SteamID, bot-owned, and invalid-SteamID gating now surface the
+   same provider/policy pair instead of returning silently before the field
+   and achievement owners can explain why the request stopped.
+2. Kept the retained owner behavior intact: valid stat/achievement callers
+   still resolve the same live client slot, still bootstrap or reuse sessions
+   the same way, and still apply the same field/achievement control flow once
+   a valid slot is available.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request, session-bootstrap,
+   client-slot, query, field-owner, achievement-owner, session-teardown, and
+   publish/store lifecycle paths.
+
+### Task A3av: Expose explicit provider/policy labeling through the retained dedicated-server stats request gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamStats_RequestCurrentValues` gate through the
+   shared stats lifecycle logger so null-session, inactive-session, and
+   missing-SteamID request skips now surface the same provider/policy pair
+   instead of returning silently before the existing request issue/failure
+   diagnostics run.
+2. Kept the retained request behavior intact: valid sessions still issue the
+   same `SteamGameServerStats` request, still mark `backendAvailable` and
+   `requestIssued`, and still preserve the same success/failure control flow
+   once the request gate is satisfied.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request gate, session-bootstrap,
+   client-slot, query, field-owner, achievement-owner, session-teardown, and
+   publish/store lifecycle paths.
+
+### Task A3aw: Expose explicit provider/policy labeling through the retained dedicated-server stats value-query gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained stat/achievement value-query gate through the shared
+   stats lifecycle logger so null-session, inactive-session, invalid-id,
+   unmapped-id, and already-cached paths now surface the same provider/policy
+   pair instead of returning silently before the existing query result
+   diagnostics run.
+2. Kept the retained query behavior intact: valid uncached stat and
+   achievement requests still issue the same backend reads, still apply the
+   same pending-delta merge or cached ownership update, and still preserve the
+   same success/failure control flow once the query gate is satisfied.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request gate, session-bootstrap,
+   client-slot, value-query gate, field-owner, achievement-owner,
+   session-teardown, and publish/store lifecycle paths.
+
+### Task A3ax: Expose explicit provider/policy labeling through the retained dedicated-server stats value-flush gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamStats_FlushPendingValues` gate through the
+   shared stats lifecycle logger so null-session, inactive-session,
+   missing-SteamID, and no-pending-update skips now surface the same
+   provider/policy pair instead of returning silently before the existing
+   publish/store diagnostics run.
+2. Kept the retained flush behavior intact: dirty stat/achievement scans,
+   backend publish attempts, store submission, and dirty-bit clearing still
+   follow the same recovered control flow once the flush gate is satisfied.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request gate, session-bootstrap,
+   client-slot, value-query gate, value-flush gate, field-owner,
+   achievement-owner, session-teardown, and publish/store lifecycle paths.
+
+### Task A3ay: Expose explicit provider/policy labeling through the retained dedicated-server stats session-reset helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamStats_ResetSession` helper through the shared
+   stats lifecycle logger so null-session skips and retained-session clears
+   now surface the same provider/policy pair instead of clearing state
+   silently inside the dedicated-server `GameServerStats` owner.
+2. Kept the retained reset behavior intact: session memory still clears with
+   the same recovered `Com_Memset` flow, while the new compatibility labels
+   only document when the helper is skipping or clearing retained state.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its request gate, session-bootstrap,
+   client-slot, value-query gate, value-flush gate, session-reset helper,
+   field-owner, achievement-owner, session-teardown, and publish/store
+   lifecycle paths.
+
+### Task A3az: Expose explicit provider/policy labeling through the retained dedicated-server stats descriptor lookup helpers [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamStats_GetFieldName` and
+   `SV_SteamStats_GetAchievementName` helpers through the shared stats
+   lifecycle logger so invalid and unmapped descriptor lookups now surface the
+   same provider/policy pair instead of returning silently beneath the
+   dedicated-server `GameServerStats` owner.
+2. Kept the retained stats behavior intact: the same caller-specific query,
+   flush, stat-delta, and achievement owner paths still short-circuit on
+   missing descriptors, while the helper signatures now accept the active
+   lifecycle stage so those compatibility labels stay contextual.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so the retained
+   dedicated-server stats owner now documents the same explicit
+   compatibility-labeling story across its descriptor lookup helpers,
+   request gate, session-bootstrap, client-slot, value-query gate,
+   value-flush gate, session-reset helper, field-owner, achievement-owner,
+   session-teardown, and publish/store lifecycle paths.
+
+### Task A3ba: Expose explicit provider/policy labeling through the retained client rich-presence join callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Client_OnRichPresenceJoinRequested` null-event
+   guard through the shared matchmaking callback logger so the compatibility
+   lane now labels ignored null join payloads instead of silently returning.
+2. Kept the retained callback handoff intact: non-null join payloads still
+   flow through `CL_Steam_OnRichPresenceJoinRequested` without behavioral
+   changes beyond the new compatibility labeling.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bb: Expose explicit provider/policy labeling through the retained client user-stats callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Client_OnUserStatsReceived` null-event guard
+   through the shared stats callback logger so ignored null payloads now
+   surface the active provider/policy pair instead of dropping silently.
+2. Kept the retained stats browser-event behavior intact for non-null payloads:
+   user-stat JSON publishing still follows the same recovered control flow.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bc: Expose explicit provider/policy labeling through the retained client persona callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Client_OnPersonaStateChange` null-event guard
+   through the shared matchmaking callback logger so ignored null persona
+   payloads no longer return silently.
+2. Kept the retained persona browser-event behavior intact for non-null
+   payloads: the same summary formatting and publish path still applies.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bd: Expose explicit provider/policy labeling through the retained client P2P-session callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Client_OnP2PSessionRequest` null-event guard
+   through the shared matchmaking callback logger so ignored null session
+   payloads no longer return silently.
+2. Kept the retained accept/fail logging and `QL_Steamworks_AcceptP2PSession`
+   behavior intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3be: Expose explicit provider/policy labeling through the retained client server-change callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Client_OnGameServerChangeRequested`
+   null-event guard through the shared matchmaking callback logger so ignored
+   null server-change payloads no longer return silently.
+2. Kept the retained connect handoff intact: non-null payloads still flow
+   through `CL_Steam_OnGameServerChangeRequested` without behavioral changes.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bf: Expose explicit provider/policy labeling through the retained client friend rich-presence callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Client_OnFriendRichPresenceUpdate`
+   null-event guard through the shared matchmaking callback logger so ignored
+   null rich-presence payloads no longer return silently.
+2. Kept the retained friend-summary formatting and browser-event publishing
+   intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bg: Expose explicit provider/policy labeling through the retained client UGC-query callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Client_OnUGCQueryCompleted` null-event guard
+   through the shared workshop lifecycle logger so ignored null query payloads
+   no longer return silently.
+2. Kept the retained UGC result/failure browser-event publishing intact for
+   non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bh: Expose explicit provider/policy labeling through the retained client lobby-created callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Lobby_OnLobbyCreated` null-event guard
+   through the shared matchmaking callback logger so ignored null lobby-create
+   payloads no longer return silently.
+2. Kept the retained success/error lobby browser-event publishing intact for
+   non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bi: Expose explicit provider/policy labeling through the retained client lobby-enter callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Lobby_OnLobbyEnter` null-event guard through
+   the shared matchmaking callback logger so ignored null lobby-enter payloads
+   no longer return silently.
+2. Kept the retained lobby-enter success/error publishing and current-lobby
+   tracking intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bj: Expose explicit provider/policy labeling through the retained client lobby-chat-update callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Lobby_OnLobbyChatUpdate` null-event guard
+   through the shared matchmaking callback logger so ignored null lobby-chat
+   payloads no longer return silently.
+2. Kept the retained user-summary formatting and join/leave browser-event
+   publishing intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bk: Expose explicit provider/policy labeling through the retained client lobby-chat-message callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Lobby_OnLobbyChatMessage` null-event guard
+   through the shared matchmaking callback logger so ignored null lobby-chat
+   message payloads no longer return silently.
+2. Kept the retained friend-summary lookup, JSON escaping, and browser-event
+   publishing intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bl: Expose explicit provider/policy labeling through the retained client lobby-data-update callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Lobby_OnLobbyDataUpdate` null-event guard
+   through the shared matchmaking callback logger so ignored null lobby-data
+   update payloads no longer return silently.
+2. Kept the retained lobby/member detail formatting and browser-event
+   publishing intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bm: Expose explicit provider/policy labeling through the retained client lobby-game-created callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Lobby_OnLobbyGameCreated` null-event guard
+   through the shared matchmaking callback logger so ignored null lobby-game
+   created payloads no longer return silently.
+2. Kept the retained game-server detail formatting and browser-event
+   publishing intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bn: Expose explicit provider/policy labeling through the retained client lobby-kicked callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Lobby_OnLobbyKicked` null-event guard through
+   the shared matchmaking callback logger so ignored null lobby-kicked
+   payloads no longer return silently.
+2. Kept the retained current-lobby clearing, detail formatting, and
+   browser-event publishing intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bo: Expose explicit provider/policy labeling through the retained client lobby-join-requested callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Lobby_OnGameLobbyJoinRequested` null-event
+   guard through the shared matchmaking callback logger so ignored null
+   join-requested payloads no longer return silently.
+2. Kept the retained lobby/friend detail formatting and browser-event
+   publishing intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bp: Expose explicit provider/policy labeling through the retained client microtransaction authorization callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Micro_OnAuthorizationResponse` null-event
+   guard through the shared microtransaction callback logger so ignored null
+   authorization payloads no longer return silently.
+2. Kept the retained purchase payload formatting and browser-event publishing
+   intact for non-null payloads while extending the logger to spell out the
+   null-payload compatibility path.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bq: Expose explicit provider/policy labeling through the retained client workshop item-installed callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Workshop_OnItemInstalled` null-event guard
+   through the shared workshop lifecycle logger so ignored null item-installed
+   payloads no longer return silently.
+2. Kept the retained app-id validation, item lookup, and install-finalization
+   behavior intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this client callback
+   owner now documents the same explicit compatibility-labeling story.
+
+### Task A3br: Expose explicit provider/policy labeling through the retained client workshop item-installed inactive-download-state guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Workshop_OnItemInstalled` inactive-download
+   guard through the shared workshop lifecycle logger so compatibility-owned
+   installed callbacks now explain why no active download state can consume
+   them.
+2. Kept the retained unexpected-app-id, untracked-item, and install-complete
+   handling intact once a live download state exists.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this workshop
+   callback guard now documents the same explicit compatibility-labeling story.
+
+### Task A3bs: Expose explicit provider/policy labeling through the retained client workshop download-result callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Workshop_OnDownloadItemResult` null-event
+   guard through the shared workshop lifecycle logger so ignored null
+   download-result payloads no longer return silently.
+2. Kept the retained app-id validation, active-item matching, and
+   success/failure completion handling intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this workshop
+   callback owner now documents the same explicit compatibility-labeling
+   story.
+
+### Task A3bt: Expose explicit provider/policy labeling through the retained client workshop download-result inactive-lane guards [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `CL_Steam_Workshop_OnDownloadItemResult`
+   inactive-download-state and active-item-index guards through the shared
+   workshop lifecycle logger so compatibility-owned download callbacks now
+   explain why no active lane can consume them.
+2. Kept the retained unexpected-app-id, inactive-item, and
+   success/failure-completion handling intact once a live download lane exists.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so these workshop guard
+   exits now document the same explicit compatibility-labeling story.
+
+### Task A3bu: Expose explicit provider/policy labeling through the retained dedicated-server connect-failure callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamServerConnectFailureCallback` null-event guard
+   through the shared server-callback lifecycle logger so ignored null
+   connect-failure payloads no longer return silently.
+2. Kept the retained connected-flag clear and failure-result formatting intact
+   for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this dedicated-server
+   callback owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bv: Expose explicit provider/policy labeling through the retained dedicated-server disconnected callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamServerDisconnectedCallback` null-event guard
+   through the shared server-callback lifecycle logger so ignored null
+   disconnect payloads no longer return silently.
+2. Kept the retained connected-flag clear and disconnect-result formatting
+   intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this dedicated-server
+   callback owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bw: Expose explicit provider/policy labeling through the retained dedicated-server auth-ticket callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamServerValidateAuthTicketResponseCallback`
+   null-event guard through the shared server-callback lifecycle logger so
+   ignored null auth-ticket payloads no longer return silently.
+2. Kept the retained fake-VAC override, auth-state publication, and
+   accept/drop handling intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this dedicated-server
+   callback owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bx: Expose explicit provider/policy labeling through the retained dedicated-server auth-ticket missing-client guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamServerValidateAuthTicketResponseCallback`
+   missing-client guard through the shared server-callback lifecycle logger so
+   auth responses for no-longer-tracked clients no longer return silently.
+2. Kept the retained client lookup and finalise/drop behavior intact once one
+   live client session still owns the callback.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this dedicated-server
+   callback owner now documents the same explicit compatibility-labeling story.
+
+### Task A3by: Expose explicit provider/policy labeling through the retained dedicated-server P2P-session-request callback null-payload guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_client.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `SV_SteamServerP2PSessionRequestCallback` null-event
+   guard through the shared P2P-session lifecycle logger so ignored null
+   session-request payloads no longer return silently.
+2. Kept the retained client lookup, auth gate, and accept-call failure
+   handling intact for non-null payloads.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this dedicated-server
+   callback owner now documents the same explicit compatibility-labeling story.
+
+### Task A3bz: Expose explicit provider/policy labeling through the Steamworks servers-connected dispatch guard [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a shared `QL_Steamworks_LogServerCallbackDispatch` helper and routed
+   the retained `QL_Steamworks_DispatchServersConnected` missing-state and
+   missing-binding guards through it so that dispatcher no longer returns
+   silently.
+2. Kept the retained zeroed event bootstrap and callback invocation intact
+   once one registered dispatch target exists.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so this dispatcher guard
+   now documents the same explicit compatibility-labeling story.
+
+### Task A3ca: Expose explicit provider/policy labeling through the Steamworks connect-failure dispatch guards [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `QL_Steamworks_DispatchServerConnectFailure`
+   missing-state, missing-binding, and missing-payload guards through the
+   shared server-dispatch logger so that dispatcher no longer returns
+   silently.
+2. Kept the retained raw-event translation and callback invocation intact once
+   one valid dispatch surface and payload exist.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so these dispatcher
+   guards now document the same explicit compatibility-labeling story.
+
+### Task A3cb: Expose explicit provider/policy labeling through the Steamworks disconnected dispatch guards [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `QL_Steamworks_DispatchServersDisconnected`
+   missing-state, missing-binding, and missing-payload guards through the
+   shared server-dispatch logger so that dispatcher no longer returns
+   silently.
+2. Kept the retained raw-event translation and callback invocation intact once
+   one valid dispatch surface and payload exist.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so these dispatcher
+   guards now document the same explicit compatibility-labeling story.
+
+### Task A3cc: Expose explicit provider/policy labeling through the Steamworks auth-ticket dispatch guards [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `QL_Steamworks_DispatchValidateAuthTicketResponse`
+   missing-state, missing-binding, and missing-payload guards through the
+   shared server-dispatch logger so that dispatcher no longer returns
+   silently.
+2. Kept the retained raw auth-ticket response translation and callback
+   invocation intact once one valid dispatch surface and payload exist.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so these dispatcher
+   guards now document the same explicit compatibility-labeling story.
+
+### Task A3cd: Expose explicit provider/policy labeling through the Steamworks P2P-session-request dispatch guards [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`, `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Routed the retained `QL_Steamworks_DispatchServerP2PSessionRequest`
+   missing-state, missing-binding, and missing-payload guards through the
+   shared server-dispatch logger so that dispatcher no longer returns
+   silently.
+2. Kept the retained raw P2P-session translation and callback invocation
+   intact once one valid dispatch surface and payload exist.
+3. Refreshed the focused platform-service regression coverage plus the
+   platform-service abstraction and `RW-G01` gap note so these dispatcher
+   guards now document the same explicit compatibility-labeling story.
+
+### Task A3ce: Restore the retail direct-request workshop detail string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop direct-request lane so it now reuses
+   the retail-observed `Workshop item %llu: requesting download.` detail.
+2. Kept the existing compatibility wrapper ownership and queue-state updates
+   intact around that retail string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the workshop request lane.
+
+### Task A3cf: Restore the retail queued-request workshop detail string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop bootstrap queueing lane so it now
+   reuses the retail-observed `Workshop item %llu: queueing download.` detail.
+2. Kept the existing deferred-download state model intact around that retail
+   string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the queued-request lane.
+
+### Task A3cg: Restore the retail workshop cache-hit detail string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop bootstrap cache-hit lane so it now
+   reuses the retail-observed `Workshop item %llu: in cache.` detail.
+2. Kept the existing cached-item completion handling intact around that retail
+   string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the cache-hit lane.
+
+### Task A3ch: Restore the retail queued-handoff workshop detail string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop queue-advance lane so it now reuses
+   the retail-observed `Workshop item %llu: was queued, requesting download.`
+   detail.
+2. Kept the existing queue-advance ownership and state updates intact around
+   that retail string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the queued handoff lane.
+
+### Task A3ci: Restore the retail workshop completion detail string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop active-item completion lane so it now
+   reuses the retail-observed `Steamworks download complete: %llu` detail.
+2. Kept the existing active-download clear path intact around that retail
+   string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the workshop completion lane.
+
+### Task A3cj: Restore the retail workshop queue-complete detail string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop queue-settled lane so it now reuses
+   the retail-observed `Download completed for all steamworks items` detail.
+2. Kept the existing queue-active reset behavior intact around that retail
+   string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the queue-complete lane.
+
+### Task A3ck: Restore the retail workshop invalid-app skip detail in the item-installed callback [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop item-installed invalid-app guard so it
+   now reuses the retail-observed `OnDownloadItemResult skip, invalid app id
+   %d` detail.
+2. Kept the existing compatibility wrapper ownership intact around that
+   observed retail string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the item-installed invalid-app guard.
+
+### Task A3cl: Restore the retail workshop invalid-app skip detail in the download-result callback [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop download-result invalid-app guard so
+   it now reuses the retail-observed `OnDownloadItemResult skip, invalid app
+   id %d` detail.
+2. Kept the existing callback wrapper ownership intact around that retail
+   string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the download-result invalid-app guard.
+
+### Task A3cm: Restore the retail workshop active-download skip detail [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop active-download mismatch guard so it
+   now reuses the retail-observed `OnDownloadItemResult skip, not the active
+   download %llu` detail.
+2. Kept the existing active-item comparison and early-return behavior intact
+   around that retail string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the active-download skip lane.
+
+### Task A3cn: Restore the retail workshop failure-result detail string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client workshop download-result failure lane so it now
+   reuses the retail-observed `Download item %llu failed with EResult code %i`
+   detail.
+2. Kept the existing failure-state and queue-advance behavior intact around
+   that retail string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the failure-result lane.
+
+### Task A3co: Restore the retail workshop missing-`pak00.pk3` warning [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/qcommon/files.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the filesystem-side workshop startup lane so it now reuses the
+   retail-observed `WARNING: Skipping workshop PK3s since pak00 doesn't
+   exist.` detail.
+2. Kept the retained workshop mount pass active after that warning, matching
+   the retail mount-mode toggle instead of turning the warning into a hard
+   return.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the missing-`pak00.pk3` guard.
+
+### Task A3cp: Restore the retail `fs_skipWorkshop` skip detail [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/qcommon/files.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the filesystem-side workshop startup lane so the
+   `fs_skipWorkshop` gate now reuses the retail-observed `Skipping workshop
+   since fs_skipWorkshop is set.` detail.
+2. Kept the existing early-return ownership intact around that exact retail
+   string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the `fs_skipWorkshop` gate.
+
+### Task A3cq: Restore the retail workshop build-mode skip detail [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/qcommon/files.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the filesystem-side workshop startup lane so the retained
+   `com_build`/`com_buildScript` gate now reuses the retail-observed
+   `Skipping workshop since running in build mode.` detail.
+2. Kept the existing build-mode early return intact around that retail string
+   restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the build-mode gate.
+
+### Task A3cr: Restore the retail null-`ISteamUGC` skip detail [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/qcommon/files.c`,
+`src/common/platform/platform_steamworks.c`,
+`src/common/platform/platform_steamworks.h`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the filesystem-side workshop startup lane so it now reuses the
+   retail-observed `WARNING: Skipping workshop, ISteamUGC is NULL.` detail.
+2. Kept the existing early-return behavior intact while splitting the null
+   interface case away from the zero-subscribed-items case.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the null-`ISteamUGC` guard.
+
+### Task A3cs: Expose the exact workshop UGC-availability helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`src/common/platform/platform_steamworks.h`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added `QL_Steamworks_HasUGCInterface()` so the retained workshop startup
+   lane can distinguish a null `ISteamUGC` owner from an empty subscription
+   list.
+2. Kept the helper thin by routing it straight through the retained
+   `QL_Steamworks_GetUGCInterface()` owner.
+3. Refreshed the focused regression coverage for the new availability helper.
+
+### Task A3ct: Restore the retail basepath-only `pak00.pk3` probe [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/qcommon/files.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `FS_HasBasePak0` so it now mirrors the retail
+   `fs_basepath/baseq3/pak00.pk3` probe instead of scanning the broader local
+   root set.
+2. Kept the helper bounded to the workshop startup gate, matching the retail
+   `SteamWorkshop_Init` ownership.
+3. Refreshed the focused regression coverage for the basepath-only probe.
+
+### Task A3cu: Restore the retail workshop raw-path mount toggle [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/qcommon/files.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the workshop mount pass so it now forwards the retained
+   `mountRawPath` flag into `FS_AddGameDirectoryInternal` instead of always
+   forcing the raw-path lane.
+2. Mirrored the retail rule where the flag depends on whether `pak00.pk3` was
+   present when workshop startup began.
+3. Refreshed the focused regression coverage for the mount-mode toggle.
+
+### Task A3cv: Restore the retail manual workshop direct-download detail [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained `steam_downloadugc` immediate-request lane so it now
+   reuses the retail-observed `Workshop item %llu: download` detail.
+2. Kept the existing provider/policy-aware operator logger intact around that
+   exact retail string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the direct-download lane.
+
+### Task A3cw: Restore the retail manual workshop cache-hit detail [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained `steam_downloadugc` cache-hit lane so it now reuses
+   the retail-observed `Workshop item %llu: in cache.` detail.
+2. Kept the existing immediate-return ownership intact around that retail
+   string restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the manual cache-hit lane.
+
+### Task A3cx: Remove the non-retail manual download failure-only diagnostic [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained `steam_downloadugc` immediate-request lane so it no
+   longer emits the extra compatibility-only `download request failed`
+   diagnostic that retail never printed.
+2. Kept the existing command registration and provider-gated command surface
+   intact while mirroring the retail immediate-request call shape more closely.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the removed non-retail failure-only diagnostic.
+
+### Task A3cy: Remove the non-retail client workshop request-failure gate [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_StartDownload` so it now ignores the raw
+   `QL_Steamworks_DownloadItem` return value like the retail
+   `SteamWorkshop_RequestDownload` owner.
+2. Kept the existing queue-state and active-item updates intact around that
+   control-flow restoration.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the removed client request-failure gate.
+
+### Task A3cz: Remove the non-retail client workshop request-failure detail [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the extra `item %llu download request failed` detail from
+   `CL_Workshop_StartDownload`, which retail never printed.
+2. Kept the retained retail request strings unchanged around that removal.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the removed request-failure detail.
+
+### Task A3da: Remove the duplicate client workshop failure trace [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_FailActiveDownload` so it no longer emits a second
+   `item %llu failed with EResult code %i` trace after the callback owner has
+   already logged the retail failure detail.
+2. Kept the existing completed-state and active-download clear behavior intact.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the removed duplicate failure trace.
+
+### Task A3db: Restore the thin retail `steam_subscribeugc` command shape [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamCmd_SubscribeUGC_f` so it now mirrors the retail thin
+   wrapper shape instead of stopping early behind the compatibility-only
+   workshop-support gate.
+2. Kept the existing one-argument item-ID parse surface intact.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the subscribe command shape.
+
+### Task A3dc: Remove the non-retail subscribe-request trace [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the extra `subscribe requested` diagnostic from
+   `SV_SteamCmd_SubscribeUGC_f`, which retail never printed.
+2. Kept the retained command registration and parse surface unchanged.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the removed subscribe-request trace.
+
+### Task A3dd: Remove the non-retail subscribe-failure trace [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the extra `subscribe request failed` diagnostic from
+   `SV_SteamCmd_SubscribeUGC_f`, which retail never printed.
+2. Kept the retained direct wrapper call intact around that removal.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the removed subscribe-failure trace.
+
+### Task A3de: Restore the retail post-subscribe item-state refresh [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamCmd_SubscribeUGC_f` so it now re-reads
+   `QL_Steamworks_GetItemState` after the subscribe call, matching the retail
+   `SteamWorkshop_SubscribeItem` wrapper behavior.
+2. Kept the existing one-argument item-ID parse surface intact.
+3. Refreshed the focused regression coverage for the post-subscribe state
+   refresh.
+
+### Task A3df: Restore the retail post-subscribe filesystem restart fast path [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamCmd_SubscribeUGC_f` so it now calls `FS_Restart` when the
+   newly subscribed item is already installed, matching the retail installed-
+   item fast path recovered from `SteamWorkshop_SubscribeItem`.
+2. Kept the retained operator command surface intact around that restart hook.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the post-subscribe restart path.
+
+### Task A3dg: Restore the thin retail `steam_unsubscribeugc` command shape [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamCmd_UnsubscribeUGC_f` so it now mirrors the retail thin
+   wrapper shape instead of stopping early behind the compatibility-only
+   workshop-support gate.
+2. Kept the existing one-argument item-ID parse surface intact.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the unsubscribe command shape.
+
+### Task A3dh: Remove the non-retail unsubscribe request/failure traces [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the extra `unsubscribe requested` and `unsubscribe request failed`
+   diagnostics from `SV_SteamCmd_UnsubscribeUGC_f`, which retail never
+   printed.
+2. Kept the retained direct wrapper call intact around those removals.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the removed unsubscribe traces.
+
+### Task A3di: Restore the thin retail `steam_downloadugc` command helper ownership [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamCmd_DownloadUGC_f` so it now mirrors the retail thin
+   wrapper shape by handing the parsed item ID off to
+   `SV_SteamWorkshop_RequestDownload` instead of inlining the workshop
+   control-flow directly in the operator command.
+2. Kept the existing one-argument item-ID parse surface intact.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the recovered command-helper ownership split.
+
+### Task A3dj: Restore the local `SteamWorkshop_RequestDownload` helper ownership [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added `SV_SteamWorkshop_RequestDownload` so the compatibility-gated cache
+   hit, restored retail detail strings, and `QL_Steamworks_DownloadItem`
+   dispatch now sit under the same local helper boundary that the retail
+   `steam_downloadugc` command calls into.
+2. Kept the restored `Workshop item %llu: in cache.` and
+   `Workshop item %llu: download` details intact around that helper recovery.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the recovered request-download helper ownership.
+
+### Task A3dk: Restore the thin retail `steam_subscribeugc` command helper ownership [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamCmd_SubscribeUGC_f` so it now mirrors the retail thin
+   wrapper shape by handing the parsed item ID off to
+   `SV_SteamWorkshop_SubscribeItem` instead of owning the workshop control
+   flow directly.
+2. Kept the existing one-argument item-ID parse surface intact.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the recovered subscribe-helper ownership split.
+
+### Task A3dl: Restore the thin retail `steam_unsubscribeugc` command helper ownership [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamCmd_UnsubscribeUGC_f` so it now mirrors the retail thin
+   wrapper shape by handing the parsed item ID off to
+   `SV_SteamWorkshop_UnsubscribeItem` instead of owning the unsubscribe call
+   path directly.
+2. Kept the existing one-argument item-ID parse surface intact.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the recovered unsubscribe-helper ownership split.
+
+### Task A3dm: Move the recovered post-subscribe item-state refresh under the local helper owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamWorkshop_SubscribeItem` so the recovered
+   `QL_Steamworks_GetItemState` re-read now sits under the same local helper
+   owner that the thin `steam_subscribeugc` command calls into.
+2. Kept the direct `QL_Steamworks_SubscribeItem` wrapper call intact around
+   that ownership correction.
+3. Refreshed the focused regression coverage for the helper-owned
+   post-subscribe state refresh.
+
+### Task A3dn: Move the recovered post-subscribe filesystem restart under the local helper owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/server/sv_ccmds.c`,
+`tests/test_platform_services.py`,
+`tests/test_engine_operator_command_parity.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `SV_SteamWorkshop_SubscribeItem` so the recovered installed-item
+   `FS_Restart` fast path now sits under the same local helper owner that the
+   thin `steam_subscribeugc` command calls into.
+2. Kept the retained operator command surface intact around that helper-owned
+   restart path.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the helper-owned post-subscribe restart path.
+
+### Task A3do: Restore the retail platform subscribe-wrapper item-state refresh [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `QL_Steamworks_SubscribeItem` so it now re-reads
+   `QL_Steamworks_GetItemState` after the raw subscribe vtable call, matching
+   the retail `SteamWorkshop_SubscribeItem` helper shape.
+2. Kept the recovered `0xc0 / 4` subscribe slot ownership intact around that
+   state refresh.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the platform subscribe-wrapper state refresh.
+
+### Task A3dp: Remove the unconditional platform subscribe success return [COMPLETED]
+Priority: Critical
+Primary areas: `src/common/platform/platform_steamworks.c`,
+`tests/test_platform_services.py`,
+`tests/test_steamworks_harness.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Replaced the unconditional `return qtrue;` tail in
+   `QL_Steamworks_SubscribeItem` with the recovered `itemState != 0u` result,
+   matching the retail helper's post-subscribe return contract.
+2. Kept the wrapper ABI and surrounding UGC interface ownership unchanged.
+3. Refreshed the focused regression coverage and the matching abstraction/gap
+   notes for the removed unconditional subscribe success return.
+
+### Task A3dq: Add harness coverage for the zero-state subscribe result [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_steamworks_harness.py`,
+`tests/steamworks_harness.c`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Extended the Steamworks harness so the enabled workshop helper test now
+   asserts that `QLR_Steamworks_SubscribeItem` returns false when the post-
+   subscribe item state remains zero.
+2. Kept the existing disabled-lane and installed-item success expectations
+   intact around that new regression.
+3. Refreshed the harness support stubs so `platform_steamworks.c` continues to
+   compile directly under the test fixture after the newer platform-services
+   diagnostics were added.
+
+### Task A3dr: Add harness coverage for dedicated-server installed-state subscribe success [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_steamworks_harness.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the dedicated-server UGC ownership harness so it now primes the
+   installed-item state before asserting subscribe success, matching the
+   restored retail post-subscribe return contract.
+2. Kept the existing dedicated-server UGC call-count and item-ID assertions
+   intact.
+3. Refreshed the focused harness coverage for the server-owned workshop lane.
+
+### Task A3ds: Restore the client bootstrap helper name to the retail request owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Renamed the retained client bootstrap helper to
+   `CL_Workshop_RequestDownload` so the source-side owner now mirrors the
+   retail `SteamWorkshop_RequestDownload` helper boundary again.
+2. Dropped the synthetic queued-branch parameter from that helper.
+3. Refreshed the focused regression coverage for the recovered helper owner.
+
+### Task A3dt: Remove the non-retail queued-handoff branch from the request helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the queued-handoff branch from `CL_Workshop_RequestDownload` so it
+   now owns only the initial `Workshop item %llu: requesting download.`
+   detail recovered from retail `SteamWorkshop_RequestDownload`.
+2. Kept the retained request-state updates intact around that narrower helper
+   contract.
+3. Refreshed the focused regression coverage for the removed queued branch.
+
+### Task A3du: Restore the retail queued-handoff detail under `SteamWorkshop_AdvanceDownloadQueue` [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Moved the retail `Workshop item %llu: was queued, requesting download.`
+   detail under `CL_Workshop_AdvanceQueue`, matching the recovered
+   `SteamWorkshop_AdvanceDownloadQueue` string owner.
+2. Removed that detail from the initial-request helper owner.
+3. Refreshed the focused regression coverage for the recovered queued-handoff
+   detail owner.
+
+### Task A3dv: Restore the queued download dispatch under the queue-pop helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Moved the queued `QL_Steamworks_DownloadItem` dispatch under
+   `CL_Workshop_AdvanceQueue`, matching the recovered retail queue-pop helper
+   flow instead of reusing the initial-request helper.
+2. Kept the retained queue-state bookkeeping intact around that owner shift.
+3. Refreshed the focused regression coverage for the recovered dispatch owner.
+
+### Task A3dw: Restore the queued active-item handoff under the queue-pop helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Moved the queued `CL_Workshop_SetActiveItem` handoff under
+   `CL_Workshop_AdvanceQueue`, matching the retail helper that promotes the
+   next queued item before issuing its download request.
+2. Kept the retained progress-cvar updates intact around that recovered owner
+   split.
+3. Refreshed the focused regression coverage for the queued active-item
+   handoff owner.
+
+### Task A3dx: Restore the queue-advance owner split under `SteamWorkshop_FinalizeItem` [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_FinalizeInstalledItem` so it now returns the
+   `CL_Workshop_AdvanceQueue` result when the active item completes, matching
+   the recovered retail `SteamWorkshop_FinalizeItem` helper flow.
+2. Kept the retained completion log and active-download clear intact around
+   that owner split.
+3. Refreshed the focused regression coverage for the finalize-owned queue
+   advance.
+
+### Task A3dy: Remove the explicit queued-handoff from the item-installed callback owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the extra `CL_Workshop_AdvanceQueue` call from
+   `CL_Steam_Workshop_OnItemInstalled` so the callback now leaves queued
+   handoff ownership with `CL_Workshop_FinalizeInstalledItem`, matching
+   retail.
+2. Kept the retained null/app-id/tracked-item guard surface intact.
+3. Refreshed the focused regression coverage for the callback-owner cleanup.
+
+### Task A3dz: Remove the explicit queued-handoff from the download-result success owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the extra `CL_Workshop_AdvanceQueue` call from the successful
+   `CL_Steam_Workshop_OnDownloadItemResult` lane so the completion path now
+   mirrors the retail finalize-helper ownership split.
+2. Kept the recovered invalid-app, active-download, and failure-result details
+   intact.
+3. Refreshed the focused regression coverage for the success-owner cleanup.
+
+### Task A3ea: Route bootstrap cache hits through the finalize helper owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the bootstrap cache-hit path so it now calls
+   `CL_Workshop_FinalizeInstalledItem` after the retail `Workshop item %llu:
+   in cache.` detail instead of marking the item complete inline.
+2. Kept the retained cache-hit logging intact around that recovered owner
+   split.
+3. Refreshed the focused regression coverage for the finalize-owned cache-hit
+   path.
+
+### Task A3eb: Update the bootstrap caller to use the recovered request helper split [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the client workshop bootstrap caller so the first request now goes
+   through `CL_Workshop_RequestDownload`, while queued handoffs and completion
+   handoffs stay with the recovered queue/finalize owners.
+2. Refreshed the focused regression coverage plus the matching abstraction and
+   gap-note documentation for the recovered helper ownership split.
+3. Kept the bounded compatibility-only workshop provider/policy diagnostics
+   intact around that tighter retail flow.
+
+### Task A3ec: Add explicit retained state for queued workshop items [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added an explicit `queued` flag to the retained client workshop item state
+   so the source can distinguish queued-for-later items from items that have
+   already issued `DownloadItem`, matching the retail queue-container
+   separation more closely.
+2. Kept the retained `requestNumber`, `downloadRequested`, and `completed`
+   fields intact around that narrower queue-state split.
+3. Refreshed the focused regression coverage for the new queued-item state.
+
+### Task A3ed: Restore bootstrap queueing ownership under `SteamWorkshop_RequestDownload` [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_RequestDownload` so it now owns the retail
+   `Workshop item %llu: queueing download.` branch when a bootstrap download
+   is already active, instead of leaving that detail under the caller.
+2. Kept the recovered initial `requesting download` branch intact in the same
+   helper.
+3. Refreshed the focused regression coverage for the restored queueing-detail
+   owner.
+
+### Task A3ee: Route every uncached bootstrap item through the recovered request helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the bootstrap loop so every uncached item now flows through
+   `CL_Workshop_RequestDownload`, matching the retail `CL_InitDownloads`
+   caller shape instead of splitting the queueing branch out in the caller.
+2. Kept the retained cache-hit finalize path intact around that caller
+   tightening.
+3. Refreshed the focused regression coverage for the unified request-helper
+   routing.
+
+### Task A3ef: Mark queued bootstrap items explicitly when the request helper defers them [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_RequestDownload` so it now marks later bootstrap items
+   as explicitly queued when the active download already exists, matching the
+   recovered retail helper's queue-container behavior more closely.
+2. Kept the retained active-download issue path intact for the first item.
+3. Refreshed the focused regression coverage for the explicit queued-item
+   mark.
+
+### Task A3eg: Make the queue-pop helper consume explicit queued items only [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_AdvanceQueue` so it now consumes only items marked as
+   queued, instead of inferring queue membership from
+   `!completed && !downloadRequested`.
+2. Kept the recovered queued-handoff detail and `DownloadItem` dispatch intact
+   around that narrower scan.
+3. Refreshed the focused regression coverage for the explicit queued scan.
+
+### Task A3eh: Clear the retained queued flag when a queued item becomes active [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_AdvanceQueue` so it now clears the retained queued
+   flag before issuing the queued item's `DownloadItem` request, matching the
+   queue-pop ownership more closely.
+2. Kept the retained `downloadRequested` tracking intact around that state
+   handoff.
+3. Refreshed the focused regression coverage for the queued-flag clear path.
+
+### Task A3ei: Restore bootstrap caller ownership of `cl_downloadItem` seeding [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added `CL_Workshop_SetDownloadRequestCvars` and moved the
+   `cl_downloadItem` seed under the bootstrap caller after successful request-
+   helper returns, matching the retail `CL_InitDownloads` ownership split.
+2. Kept the retained decimal SteamID formatting intact around that move.
+3. Refreshed the focused regression coverage for the caller-owned item cvar.
+
+### Task A3ej: Restore bootstrap caller ownership of `cl_downloadName` seeding [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Moved the `cl_downloadName` seed under
+   `CL_Workshop_SetDownloadRequestCvars` so the bootstrap caller now owns the
+   `Workshop item %i of %i` request-label cvar after successful helper
+   returns, matching retail.
+2. Kept the retained `requestNumber`/`totalItems` labeling intact around that
+   ownership split.
+3. Refreshed the focused regression coverage for the caller-owned name cvar.
+
+### Task A3ek: Restore bootstrap caller ownership of `cl_downloadTime` seeding [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Moved the `cl_downloadTime` seed under
+   `CL_Workshop_SetDownloadRequestCvars` so the bootstrap caller now owns the
+   request timestamp after successful helper returns, matching the retail
+   `CL_InitDownloads` call site.
+2. Kept the retained `cls.realtime` source intact around that move.
+3. Refreshed the focused regression coverage for the caller-owned time cvar.
+
+### Task A3el: Remove item/name/time cvar mutation from the active-item helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`,
+`docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the `cl_downloadItem`, `cl_downloadName`, and `cl_downloadTime`
+   mutations from `CL_Workshop_SetActiveItem`, leaving that helper focused on
+   active-download state and progress-byte refresh rather than bootstrap-cvar
+   ownership.
+2. Kept the then-retained UI-facing `cl_downloadCount` / `cl_downloadSize`
+   temp-cvar updates intact around that narrower helper contract.
+3. Refreshed the focused regression coverage plus the matching abstraction and
+   gap-note documentation for the recovered active-item helper split.
+
+### Task A3em: Restore installed-item handling under the client request helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_RequestDownload` so it now owns the installed-item
+   gate, matching the retail `SteamWorkshop_RequestDownload` helper shape
+   instead of relying on a bootstrap-caller pre-check.
+2. Kept the retained queued and active-download branches intact around that
+   helper-owned cache-hit path.
+3. Refreshed the focused regression coverage for the recovered installed-item
+   owner split.
+
+### Task A3en: Remove the bootstrap caller installed-state pre-check [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the installed-state short-circuit from
+   `CL_Workshop_BeginBootstrap` so parsed workshop items now flow through the
+   recovered request helper regardless of whether they are already installed.
+2. Kept the retained parsed-item count, truncation guard, and SteamID parse
+   surface intact.
+3. Refreshed the focused regression coverage for the removed caller pre-check.
+
+### Task A3eo: Restore the retail `in cache` detail under `SteamWorkshop_RequestDownload` [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Moved the retail `Workshop item %llu: in cache.` detail under
+   `CL_Workshop_RequestDownload`, matching the recovered helper that owns that
+   string in retail.
+2. Removed that detail from the bootstrap caller owner.
+3. Refreshed the focused regression coverage for the recovered cache-hit
+   string owner.
+
+### Task A3ep: Restore finalize ownership for request-helper cache hits [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the request helper so installed-item cache hits now call
+   `CL_Workshop_FinalizeInstalledItem`, matching the retail helper/finalize
+   handoff.
+2. Removed that finalize call from the bootstrap caller cache-hit branch.
+3. Refreshed the focused regression coverage for the recovered finalize owner.
+
+### Task A3eq: Restore queue-gate activation for helper-owned cache hits [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Kept `CL_Workshop_RequestDownload` setting the retained queue gate active
+   before the installed-item branch, matching the retail helper that marks the
+   queue lane active even when a bootstrap item is already in cache.
+2. Left the later queue-complete owner unchanged around that recovered gate
+   activation.
+3. Refreshed the focused regression coverage for the helper-owned queue gate.
+
+### Task A3er: Keep bootstrap request numbering limited to helper-success returns [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Kept `item->requestNumber` assignment under the bootstrap caller's
+   successful `CL_Workshop_RequestDownload` return path, matching the retail
+   `CL_InitDownloads` caller shape after the installed-item path moved under
+   the helper.
+2. Prevented cache-hit items from receiving bootstrap request ordinals.
+3. Refreshed the focused regression coverage for the request-number owner.
+
+### Task A3es: Route every parsed bootstrap item through the recovered request helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Tightened `CL_Workshop_BeginBootstrap` so every parsed workshop item now
+   flows through `CL_Workshop_RequestDownload`, matching the retail caller
+   that invokes `SteamWorkshop_RequestDownload` for each token.
+2. Kept the retained truncation and parse guards intact around that caller
+   recovery.
+3. Refreshed the focused regression coverage for the per-token request-helper
+   routing.
+
+### Task A3et: Restore queue-complete eligibility for all-cached bootstrap passes [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. By moving cache-hit handling under `CL_Workshop_RequestDownload`, the
+   retained bootstrap lane now marks the queue gate active even when every
+   required item is already installed, matching the retail path that still
+   runs the later queue-complete helper.
+2. Kept the retained no-download request-number and cvar behavior intact for
+   those cache-hit items.
+3. Refreshed the focused regression coverage for the all-cached queue-complete
+   eligibility lane.
+
+### Task A3eu: Update the focused workshop bootstrap regression for helper-owned cache hits [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the focused client workshop regression so it now asserts the
+   installed-item `in cache` detail and finalize handoff under
+   `CL_Workshop_RequestDownload` instead of under the bootstrap caller.
+2. Added a direct assertion that the helper keeps the retained queue gate
+   active around that installed-item branch.
+3. Kept the existing queued and active-download assertions intact.
+
+### Task A3ev: Refresh the abstraction notes for the helper-owned cache-hit split [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`,
+`IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Refreshed the abstraction notes so they now document the recovered
+   `SteamWorkshop_RequestDownload` cache-hit ownership split and the retained
+   all-cached queue-gate behavior.
+2. Recorded the next ten micro-closures in the implementation ledger as
+   `A3em` through `A3ev`.
+3. Kept the compatibility-boundary framing explicit around those retail-backed
+   helper corrections.
+
+### Task A3ew: Restore the plain retail workshop bootstrap announcement string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_BeginBootstrap` so it now prints the recovered retail
+   `Server requires the following workshop items: %s` announcement instead of
+   the newer provider/policy-flavored compatibility detail.
+2. Kept the retained bootstrap-unavailable compatibility log intact around
+   that exact-string recovery.
+3. Refreshed the focused regression coverage for the restored announcement
+   string.
+
+### Task A3ex: Remove the non-retail bootstrap provider/policy announcement locals [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the bootstrap-only `workshopProvider` / `workshopPolicy` locals
+   from `CL_Workshop_BeginBootstrap` after restoring the plain retail
+   announcement string.
+2. Kept the later provider/policy-aware fallback diagnostics intact elsewhere
+   in the workshop lane.
+3. Refreshed the focused regression coverage for the removed announcement
+   locals.
+
+### Task A3ey: Update the bootstrap regression for the restored retail announcement [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the focused client workshop bootstrap regression so it now asserts
+   the plain retail announcement string and the absence of the removed
+   provider/policy announcement locals.
+2. Kept the existing request-helper and queue-owner assertions intact.
+3. Reconfirmed the bootstrap regression against the current worktree.
+
+### Task A3ez: Restore the retail frame restart-required string [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_Frame` so the restart-required path now prints the
+   recovered retail `Steamworks downloads complete - FS restart is required`
+   detail.
+2. Kept the retained `FS_Restart( clc.checksumFeed )` behavior and
+   `downloadsRequested` reset intact around that exact-string recovery.
+3. Refreshed the focused regression coverage for the restored restart-required
+   string.
+
+### Task A3fa: Remove the compatibility-only frame restart lifecycle trace [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the compatibility-only `downloads complete; restarting filesystem`
+   workshop lifecycle trace from the frame restart path, which retail never
+   printed.
+2. Replaced it with the recovered plain restart-required print under the same
+   owner.
+3. Refreshed the focused regression coverage for the removed compatibility
+   trace.
+
+### Task A3fb: Restore the retail frame completion string before pk3 validation [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added the recovered `Steamworks downloads complete` print to the no-restart
+   branch of `CL_Workshop_Frame`, matching the retail completion helper before
+   it performs the missing-pk3 compare.
+2. Kept the retained state-clear and `CL_DownloadsComplete` handoff ordering
+   unchanged around that exact-string recovery.
+3. Refreshed the focused regression coverage for the restored completion
+   string.
+
+### Task A3fc: Restore the retail missing-pk3 warning header under the frame helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Replaced the non-retail `WARNING: You are missing some files referenced by
+   the server:` wording in `CL_Workshop_Frame` with the recovered retail
+   `WARNING: Missing pk3s referenced by the server:` header.
+2. Kept the retained `FS_ComparePaks( ..., qfalse )` gate intact around that
+   warning path.
+3. Refreshed the focused regression coverage for the restored warning header.
+
+### Task A3fd: Restore the retail missing-pk3 consequence line [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`,
+`tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Replaced the newer `You might not be able to join the game` /
+   `Go to the setting menu...` warning tail in `CL_Workshop_Frame` with the
+   recovered retail `The server will most likely refuse the connection.` line.
+2. Kept the retained missing-file payload insertion intact around that exact
+   warning tail.
+3. Refreshed the focused regression coverage for the restored consequence
+   line.
+
+### Task A3fe: Add focused regression coverage for the retail frame strings [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a dedicated `CL_Workshop_Frame` regression so the restart-required,
+   downloads-complete, and missing-pk3 warning strings now stay pinned to the
+   recovered retail literals.
+2. Included negative assertions for the removed compatibility-only restart and
+   missing-file wording.
+3. Kept the retained `FS_Restart`, state-clear, and `CL_DownloadsComplete`
+   owner assertions intact.
+
+### Task A3ff: Refresh the abstraction notes for the restored bootstrap/frame string surface [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`,
+`IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Refreshed the abstraction notes so they now document the restored plain
+   workshop bootstrap announcement plus the recovered retail frame restart,
+   completion, and missing-pk3 warning strings.
+2. Recorded the next ten micro-closures in the implementation ledger as
+   `A3ew` through `A3ff`.
+3. Kept the compatibility-boundary framing explicit around those retail-backed
+   exact-string corrections.
+
+### Task A3fg: Restore the retained no-restart workshop completion lane to the retail active-gate teardown [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Rechecked the retail `CL_Workshop_Frame` HLIL helper and confirmed that the
+   no-restart lane clears only the outer workshop-active gate before tailing
+   into `CL_DownloadsComplete()`.
+2. Updated the retained frame helper to drop only
+   `cl_steamWorkshopDownloadState.active` on the no-restart completion path
+   instead of zeroing the full bootstrap state.
+3. Refreshed the focused frame regression so it now pins that exact handoff.
+
+### Task A3fh: Remove the compatibility-only bootstrap-state reset from the retained workshop completion frame owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the retained `CL_Workshop_ClearBootstrapState( qtrue )` call from
+   the workshop no-restart completion lane because the retail helper does not
+   clear the full bootstrap structure there.
+2. Kept the recovered retail completion/warning strings and the
+   `CL_DownloadsComplete()` handoff intact.
+3. Added the matching negative assertion to the focused regression.
+
+### Task A3fi: Refresh the workshop frame regression for the retail active-gate handoff [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the focused frame test to assert the retained active-gate clear
+   instead of the older bootstrap-state reset.
+2. Kept the surrounding retail restart-required, downloads-complete, and
+   missing-pk3 string checks intact.
+3. Recorded the handoff correction in the implementation ledger.
+
+### Task A3fj: Bound retained workshop progress ownership to the recovered UI bridge [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Cross-checked the recovered `uix86` workshop-progress path and confirmed
+   that it reads `cl_downloadItem`, calls the native `GetItemDownloadInfo`
+   import, and reads `cl_downloadTime` rather than consuming
+   `cl_downloadCount` / `cl_downloadSize`.
+2. Used that evidence to trim the retained workshop helper ownership back to
+   the native-item download-info bridge instead of generic download cvars.
+3. Added focused evidence coverage for that UI bridge sequence.
+
+### Task A3fk: Remove the compatibility-only generic progress-cvar write from the retained workshop active-item helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the retained `CL_Workshop_UpdateProgressCvars()` call from
+   `CL_Workshop_SetActiveItem`.
+2. Kept the active-item byte reset and immediate native
+   `CL_Workshop_RefreshProgress()` query intact.
+3. Refreshed the focused helper regression to pin the trimmed cvar surface.
+
+### Task A3fl: Remove the compatibility-only generic progress-cvar write from the retained workshop clear-active helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the retained `CL_Workshop_UpdateProgressCvars()` call from
+   `CL_Workshop_ClearActiveDownload`.
+2. Kept the retained active-item and byte-count clear itself intact.
+3. Added the matching negative regression assertion for the helper body.
+
+### Task A3fm: Refresh the retained workshop helper regression for the trimmed progress-cvar surface [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Extended the workshop helper test to extract
+   `CL_Workshop_ClearActiveDownload`.
+2. Added explicit negative assertions covering both the active-item helper and
+   the clear-active helper so future edits do not reintroduce generic
+   progress-cvar churn on workshop queue handoffs.
+3. Recorded that focused regression tightening in the plan ledger.
+
+### Task A3fn: Pin the recovered `uix86` workshop progress bridge evidence [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`,
+`references/reverse-engineering/ghidra/uix86/source-recreation/ui_reconstruction.c`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a focused evidence test covering the recovered workshop progress
+   bridge in `ui_reconstruction.c`.
+2. Pinned the `cl_downloadItem` read, native `GetItemDownloadInfo` import
+   call, and `cl_downloadTime` read as the companion evidence backing the
+   retained client-side ownership trim.
+3. Included negative assertions showing that same recovered bridge does not
+   use `cl_downloadCount` or `cl_downloadSize`.
+
+### Task A3fo: Refresh the abstraction notes for the workshop completion and progress-bridge ownership correction [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the abstraction note so it now documents the retail no-restart
+   frame handoff as an active-gate clear rather than a full bootstrap-state
+   reset.
+2. Recorded the recovered `uix86` workshop progress bridge evidence and the
+   resulting removal of retained generic progress-cvar churn from the workshop
+   active-item and clear-active helpers.
+3. Kept the broader online-service compatibility-boundary framing explicit.
+
+### Task A3fp: Refresh the source-gap notes and ledger for the workshop completion/progress ownership correction [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`,
+`IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the `RW-G01` source-gap note to match the restored workshop frame
+   teardown and progress-bridge ownership story.
+2. Recorded the next ten micro-closures in the implementation ledger as
+   `A3fg` through `A3fp`.
+3. Kept the evidence wording explicit so the batch is framed as retail-backed
+   ownership correction rather than freehand compatibility instrumentation.
+
+### Task A3fq: Restore the retained workshop queue-pop helper name to the recovered retail owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Rechecked the retail alias/evidence for `sub_469400` and renamed the
+   retained queue-pop helper to `CL_Workshop_AdvanceDownloadQueue` so it
+   matches the recovered `SteamWorkshop_AdvanceDownloadQueue` owner.
+2. Updated the focused workshop regression to extract/assert that renamed
+   helper directly.
+3. Kept the broader workshop bootstrap ownership split intact around the
+   recovered helper family.
+
+### Task A3fr: Move the retained active-download clear under the shared queue-pop owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Rechecked the retail `SteamWorkshop_AdvanceDownloadQueue` HLIL and
+   restored the retained active-download clear under the shared queue-pop
+   helper before it scans for queued items.
+2. Removed the need for completion/failure callers to open-code that clear.
+3. Added focused regression coverage pinning the retained
+   `CL_Workshop_ClearActiveDownload()` call inside the queue-pop owner.
+
+### Task A3fs: Route the retained finalize helper through the shared queue-pop owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_FinalizeInstalledItem` so the active-item completion
+   lane now tails directly into `CL_Workshop_AdvanceDownloadQueue()`.
+2. Removed the explicit active-download clear from the finalize helper body
+   because that teardown now belongs to the shared queue-pop owner.
+3. Refreshed the focused helper regression so it now asserts the shared
+   completion handoff instead of the old inline clear.
+
+### Task A3ft: Route the retained active-download failure helper through the shared queue-pop owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated `CL_Workshop_FailActiveDownload` so it now marks the active item
+   completed and then tails into `CL_Workshop_AdvanceDownloadQueue()`.
+2. Kept the helper bounded to retained state management only; the retail
+   failure detail still stays in the callback owner.
+3. Added the matching regression assertion for the shared failure handoff.
+
+### Task A3fu: Remove the ignored retained `EResult` parameter from the workshop failure helper [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Dropped the unused `result` parameter from `CL_Workshop_FailActiveDownload`
+   because the retained helper never consumed it and the retail shared
+   queue-pop handoff does not take that result code.
+2. Kept the actual failure-detail formatting anchored to the
+   `DownloadItemResult` callback owner where the retail string lives.
+3. Updated the focused callback/helper regression to match the trimmed helper
+   signature.
+
+### Task A3fv: Remove the callback-inline queue advance from the retained workshop download-result owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_main.c`, `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Removed the retained `CL_Workshop_AdvanceDownloadQueue()` call from the
+   `CL_Steam_Workshop_OnDownloadItemResult` failure lane.
+2. Kept the retail failure detail log intact and let the failure helper own
+   the shared queue-pop handoff instead.
+3. Added a focused negative assertion so that callback owner no longer grows
+   a second inline queue-advance call.
+
+### Task A3fw: Refresh the retained workshop callback regression for the shared failure handoff [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the workshop callback regression so the download-result owner now
+   asserts `CL_Workshop_FailActiveDownload()` without the older ignored
+   result argument.
+2. Added the matching negative assertion covering the removed callback-inline
+   queue-advance call.
+3. Recorded that callback-owner tightening in the implementation ledger.
+
+### Task A3fx: Refresh the retained workshop helper regression for the shared queue-pop teardown [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`, `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the focused helper regression to extract
+   `CL_Workshop_AdvanceDownloadQueue`.
+2. Added assertions covering the shared active-download clear in the queue-pop
+   helper plus the new finalize/failure return handoffs.
+3. Tightened the downloads-settled assertion so it now references the renamed
+   shared owner as well.
+
+### Task A3fy: Refresh the abstraction notes for the retained workshop failure/queue-pop owner split [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the abstraction note so it now documents the recovered
+   `DownloadItemResult` failure handoff into the shared
+   `SteamWorkshop_AdvanceDownloadQueue` owner.
+2. Recorded that the retained queue-pop helper now owns the active-download
+   clear before scanning queued items.
+3. Kept the framing explicit that this batch is a bounded retail ownership
+   correction inside the already-bounded online-services lane.
+
+### Task A3fz: Refresh the source-gap notes and ledger for the retained workshop failure/queue-pop owner split [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`,
+`IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the `RW-G01` note to match the recovered shared queue-pop ownership
+   for both workshop completion and failure lanes.
+2. Recorded the next ten micro-closures in the implementation ledger as
+   `A3fq` through `A3fz`.
+3. Kept the evidence wording explicit so the batch stays framed as retail
+   helper-owner correction rather than new compatibility instrumentation.
+
+### Task A3ga: Rename the retained client UI workshop progress import parameters to the recovered low/high split [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_ui.c`, `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Rechecked the companion `uix86` workshop-progress reconstruction and
+   confirmed that the native `GetItemDownloadInfo` import is reached from the
+   parsed `cl_downloadItem` low/high words.
+2. Renamed the retained `QL_UI_trap_GetItemDownloadInfo` parameters from
+   generic `arg1` / `arg2` to `itemIdLow` / `itemIdHigh` to match that
+   recovered split without changing runtime behavior.
+3. Refreshed the focused client workshop import assertion to pin the renamed
+   retained bridge.
+
+### Task A3gb: Clarify the retained client workshop progress bridge comment against the recovered `uix86` owner [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/client/cl_ui.c`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained client bridge comment so it now records that the
+   companion `uix86` reconstruction parses `cl_downloadItem`, calls the native
+   import with the low/high words, and then reads `cl_downloadTime`.
+2. Kept the retained bridge behavior unchanged: it still prefers retained
+   client workshop state and falls back to the platform Steamworks helper.
+3. Preserved the workshop progress import as a naming/evidence correction
+   rather than a behavior change.
+
+### Task A3gc: Rename the retained UI syscall wrapper parameters to the recovered low/high split [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/ui/ui_syscalls.c`, `tests/test_ui_menu_files.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Renamed `trap_QL_GetItemDownloadInfo` to use `itemIdLow` / `itemIdHigh`
+   parameter names instead of the older `itemHi` / `itemLo` wording.
+2. Kept the retained native import call order unchanged while making that
+   order explicit in the wrapper surface.
+3. Refreshed the UI menu syscall regression to pin the renamed wrapper
+   signature.
+
+### Task A3gd: Rename the retained UI local declaration for the workshop progress import to the recovered low/high split [COMPLETED]
+Priority: Critical
+Primary areas: `src/code/ui/ui_local.h`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the retained `ui_local.h` declaration for
+   `trap_QL_GetItemDownloadInfo` to use `itemIdLow` / `itemIdHigh`.
+2. Kept the declaration aligned with the wrapper implementation and retained
+   import cast signature.
+3. Preserved the rest of the native UI import surface unchanged.
+
+### Task A3ge: Extend the recovered workshop progress evidence test to pin the parsed item-ID split before the import call [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_platform_services.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Extended the companion `uix86` evidence test so it now asserts the
+   recovered `sscanf( "%llu", ... )` parse before the `GetItemDownloadInfo`
+   import call.
+2. Kept the existing assertions covering the native import and
+   `cl_downloadTime` read intact.
+3. Tightened the evidence trail for the retained low/high parameter naming.
+
+### Task A3gf: Refresh the retained workshop progress import regression for the renamed client bridge parameters [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the focused workshop progress import regression so it now extracts
+   the renamed `QL_UI_trap_GetItemDownloadInfo` signature.
+2. Refreshed the retained bridge assertions to use `itemIdLow` /
+   `itemIdHigh` in both the client-state and platform fallback calls.
+3. Kept the negative assertions against generic download-count/size ownership
+   intact.
+
+### Task A3gg: Refresh the CL-G03 parity gate for the retained workshop progress import naming correction [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_full_parity_gate.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the `CL-G03` parity gate so it now looks for the renamed
+   `itemIdLow` / `itemIdHigh` signature on the retained client workshop
+   progress bridge.
+2. Kept the broader workshop publication/bootstrap/mount ownership gate
+   unchanged.
+3. Preserved the gate as a source-shape check rather than runtime behavior.
+
+### Task A3gh: Refresh the UI menu import-surface regression for the retained workshop progress naming correction [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_ui_menu_files.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the UI menu native-import regression so it now asserts the renamed
+   `trap_QL_GetItemDownloadInfo( itemIdLow, itemIdHigh, ... )` wrapper.
+2. Kept the rest of the recovered advert/cursor/subscription/measure-text
+   import surface unchanged.
+3. Recorded the import-surface naming correction in the focused regression.
+
+### Task A3gi: Refresh the abstraction note for the recovered workshop progress import low/high split [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the abstraction note so it now explicitly records the recovered
+   `GetItemDownloadInfo` low/high-word call shape from the parsed
+   `cl_downloadItem`.
+2. Kept the surrounding workshop progress-bridge ownership story intact.
+3. Preserved the framing as companion-evidence-backed naming clarification.
+
+### Task A3gj: Refresh the source-gap notes and ledger for the retained workshop progress import low/high split [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`,
+`IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the `RW-G01` note so it now explicitly describes the recovered
+   low/high-word `GetItemDownloadInfo` bridge.
+2. Recorded the next ten micro-closures in the implementation ledger as
+   `A3ga` through `A3gj`.
+3. Kept the batch framed as an evidence-backed interface-naming correction
+   rather than a behavior change.
+
+### Task A3gk: Refresh the legacy workshop bootstrap parity suite for the recovered request-helper owner [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the legacy workshop parity suite to extract
+   `CL_Workshop_RequestDownload` instead of the removed pre-audit
+   `CL_Workshop_StartDownload` helper.
+2. Replaced the stale request-helper assertions with the current retail-backed
+   `in cache`, `requesting download`, and `queueing download` owner split.
+3. Kept the broader workshop bootstrap coverage anchored to current retained
+   source instead of older compatibility wording.
+
+### Task A3gl: Refresh the legacy workshop bootstrap parity suite for the recovered shared queue-pop owner [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the legacy workshop parity suite to extract
+   `CL_Workshop_AdvanceDownloadQueue`.
+2. Added the current shared-owner assertions for the active-download clear,
+   queued-item clear, and retained queued download request.
+3. Removed the older assumptions that queue progression stayed inline under
+   callback or finalize owners.
+
+### Task A3gm: Refresh the legacy workshop bootstrap parity suite for the recovered finalize/failure helper signatures [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the suite to match the current `qboolean`
+   `CL_Workshop_FinalizeInstalledItem` / `CL_Workshop_FailActiveDownload`
+   helper shapes.
+2. Replaced the stale failure-helper expectation that still passed an ignored
+   `EResult` parameter.
+3. Added the shared queue-pop handoff assertions for both completion and
+   failure helpers.
+
+### Task A3gn: Refresh the legacy workshop bootstrap parity suite for the recovered bootstrap exact-string surface [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Replaced the stale provider/policy-decorated bootstrap string expectations
+   with the restored retail `Server requires the following workshop items: %s`
+   announcement.
+2. Updated the bootstrap-unavailable expectation to the current workshop
+   lifecycle log detail instead of the older raw print wording.
+3. Kept the request-number/download-cvar ownership assertions aligned with the
+   current retained bootstrap caller.
+
+### Task A3go: Refresh the legacy workshop bootstrap parity suite for the recovered callback bootstrap and failure-owner split [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the callback-bootstrap expectation to the current
+   `CL_LogWorkshopLifecycle( "callback-bootstrap", detail )` fallback lane.
+2. Refreshed the item-installed and download-result callback assertions to
+   match the current null-payload, invalid-app, untracked-item, and
+   active-download guards.
+3. Added the current shared failure-handoff expectation so the callback owner
+   no longer expects an inline queue advance.
+
+### Task A3gp: Refresh the legacy workshop bootstrap parity suite for the recovered workshop frame string surface [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the workshop frame assertions to the restored retail
+   restart-required and downloads-complete print strings.
+2. Replaced the older compatibility-only restart log expectation with the
+   current retail output plus missing-pk3 warning assertions.
+3. Kept the frame-order and `CL_DownloadsComplete()` ownership checks intact.
+
+### Task A3gq: Refresh the legacy workshop bootstrap parity suite for the current queue-complete/request-cvar ownership split [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the queue-complete assertion to the current
+   `Download completed for all steamworks items` detail.
+2. Kept the request-number / `cl_downloadItem` / `cl_downloadName` /
+   `cl_downloadTime` ownership assertions aligned with the retained bootstrap
+   caller and helper split.
+3. Preserved the workshop progress owner assertions already tightened in the
+   newer focused tests.
+
+### Task A3gr: Restore the full legacy workshop bootstrap parity suite to passing status [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Re-ran the full legacy workshop parity suite after the assertion refresh.
+2. Confirmed the older coverage now passes again instead of failing on removed
+   pre-audit helper names.
+3. Kept the suite as supplemental validation beside the newer
+   platform-services coverage.
+
+### Task A3gs: Refresh the abstraction note for the restored legacy workshop validation alignment [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the abstraction note so it now records that focused validation
+   keeps the recovered workshop owner split aligned across both the
+   platform-services and legacy workshop parity suites.
+2. Kept the note framed as validation coverage around the already-documented
+   recovered owner split.
+3. Avoided re-framing the batch as a runtime behavior change.
+
+### Task A3gt: Refresh the source-gap notes and ledger for the restored legacy workshop validation alignment [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`,
+`IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the `RW-G01` note so it now records that the recovered workshop
+   owner split is validated in both focused workshop suites.
+2. Recorded the next ten micro-closures in the implementation ledger as
+   `A3gk` through `A3gt`.
+3. Kept the batch framed as validation-gap closure on top of already-restored
+   retail-backed behavior.
+
+### Task A3gu: Refresh the Round 05 workshop wrapper note for the retained client-state progress bridge [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_05.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the Round 05 `SteamUGC_GetItemDownloadInfo` note so it no longer
+   describes the older legacy-download-counter fallback.
+2. Recorded that the retained UI import now consults retained client workshop
+   state first and only then falls back to `QL_Steamworks_GetItemDownloadInfo`,
+   the retained wrapper over the same low/high-word
+   `SteamUGC_GetItemDownloadInfo` slot.
+3. Kept the wrapper promotion itself unchanged.
+
+### Task A3gv: Refresh the Round 14 workshop import-call note for the recovered parsed low/high split [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_14.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the Round 14 local-fact note so it now records the parsed
+   `cl_downloadItem` low/high-word handoff before the UI import call.
+2. Removed the stale `(itemHi, itemLo, ...)` wording.
+3. Kept the underlying wrapper identification unchanged.
+
+### Task A3gw: Refresh the Round 14 workshop import-owner note for the retained wrapper name and fallback story [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_14.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the Round 14 note so import `96` is described as
+   `QL_UI_trap_GetItemDownloadInfo` instead of the older placeholder wrapper
+   name.
+2. Recorded the retained-client-state-first progress bridge plus the direct
+   Steam item-info fallback.
+3. Kept the wrapper role framed as a UI-owned import seam.
+
+### Task A3gx: Refresh the Round 14 alias summary for the recovered workshop import-entry wording [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_14.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the alias-summary row for `QLUIImport_GetItemDownloadInfo`.
+2. Recorded that the wrapper is reached from the parsed `cl_downloadItem`
+   low/high words.
+3. Kept the alias candidate itself unchanged.
+
+### Task A3gy: Refresh the CL-G03 audit note for the retained workshop request-surface cvars [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the CL-G03 closure note so it now records the retained
+   `cl_downloadItem` / `cl_downloadName` / `cl_downloadTime` request surface
+   instead of the older byte-counter wording.
+2. Kept the surrounding retained bootstrap-owner summary intact.
+3. Avoided re-framing the lane as a new runtime change.
+
+### Task A3gz: Refresh the CL-G03 audit note for the retained shared queue-pop callback-owner split [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the CL-G03 closure note so it now records the shared queue-pop
+   owner for installed-item completion and download-result failure.
+2. Removed the older phrasing that implied direct callback-owned queue
+   advancement.
+3. Kept the polling-fallback note intact.
+
+### Task A3ha: Refresh the CL-P3 closure note for the retained workshop request-surface cvars [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the CL-P3 completed-work note so it now records
+   `cl_downloadItem` / `cl_downloadName` / `cl_downloadTime` instead of the
+   older byte-counter wording.
+2. Kept the retained active/queued workshop bootstrap summary intact.
+3. Preserved the closure note as historical documentation rather than a new
+   behavior claim.
+
+### Task A3hb: Refresh the CL-P3 closure note for the retained shared finalize/failure helper handoff [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the CL-P3 callback-exactness closure note so it now records the
+   shared finalize/failure helper handoff into
+   `SteamWorkshop_AdvanceDownloadQueue`.
+2. Removed the older immediate callback-owned queue-advancement wording.
+3. Kept the listed validation suites intact.
+
+### Task A3hc: Add focused validation for the stale reverse-engineering workshop note cleanup and tighten the CL-G03 parity gate [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`,
+`tests/test_client_full_parity_gate.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added a focused regression covering the refreshed Round 05 / Round 14 /
+   client-parity-plan workshop notes.
+2. Tightened the `CL-G03` parity gate so it now requires the current request-
+   surface and shared queue-pop wording in the client parity plan.
+3. Kept the gate scoped to current workshop ownership/validation shape rather
+   than runtime artifacts.
+
+### Task A3hd: Refresh the abstraction notes, source-gap notes, and ledger for stale reverse-engineering workshop note cleanup [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`,
+`IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the abstraction/source-gap notes so they now explicitly record that
+   the older reverse-engineering workshop notes were brought back into line
+   with the recovered low/high import wording and shared queue-pop owner
+   story.
+2. Recorded the next ten micro-closures in the implementation ledger as
+   `A3gu` through `A3hd`.
+3. Kept the batch framed as stale-note cleanup and validation tightening on
+   top of already-restored retail-backed behavior.
+
+### Task A3he: Refresh the client CVar note for the retained workshop request-surface cvars [COMPLETED]
+Priority: Critical
+Primary areas: `docs/client_cvars.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the client CVar note so it now records `cl_downloadItem`,
+   `cl_downloadName`, and `cl_downloadTime` as the retained workshop
+   request-surface trio.
+2. Anchored that wording to the recovered `CL_InitDownloads` ownership.
+3. Kept the note scoped to documentation rather than new runtime behavior.
+
+### Task A3hf: Refresh the client CVar note for the recovered UI progress bridge [COMPLETED]
+Priority: Critical
+Primary areas: `docs/client_cvars.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the same note so it now records the parsed `cl_downloadItem`
+   low/high-word handoff into the native `GetItemDownloadInfo` probe.
+2. Kept `cl_downloadTime` in the documented retained progress surface.
+3. Avoided reintroducing the older legacy-byte-counter wording.
+
+### Task A3hg: Refresh the client CVar note for the non-authoritative counter cvars [COMPLETED]
+Priority: Critical
+Primary areas: `docs/client_cvars.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the note so it now records `cl_downloadCount` and
+   `cl_downloadSize` as UI-facing temp cvars rather than the authoritative
+   workshop progress owner.
+2. Kept the non-Steam fallback guidance explicit.
+3. Left the underlying CVar registration untouched.
+
+### Task A3hh: Refresh the CL-P3 closure note for the retained/direct workshop progress bridge [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the historical `CL-P3` closure note so it now describes the
+   retained-client-state-first workshop progress bridge plus the direct
+   `GetItemDownloadInfo` fallback keyed by parsed `cl_downloadItem` words.
+2. Removed the older generic "retained client owner" shorthand.
+3. Kept the rest of the closure summary intact.
+
+### Task A3hi: Add focused validation for the client workshop CVar-note alignment [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Extended the focused workshop-note regression so it now reads
+   `docs/client_cvars.md`.
+2. Added assertions for the retained request-surface trio, direct
+   `GetItemDownloadInfo` bridge wording, and the non-authoritative
+   `cl_downloadCount` / `cl_downloadSize` note.
+3. Kept the test scoped to evidence-note drift rather than runtime behavior.
+
+### Task A3hj: Tighten the CL-G03 parity gate for current client workshop CVar wording [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_full_parity_gate.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Added `docs/client_cvars.md` as a tracked CL-G03 documentation input.
+2. Tightened the gate so it now requires the current retained/direct workshop
+   progress wording in both the client CVar note and the client parity plan.
+3. Added a dedicated `client_cvar_notes_current` detail lane for that check.
+
+### Task A3hk: Refresh the abstraction note for the aligned workshop CVar note [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the abstraction note so it now calls out the aligned
+   `docs/client_cvars.md` wording.
+2. Recorded that `cl_downloadItem`, `cl_downloadName`, and `cl_downloadTime`
+   remain the retained workshop request/progress bridge.
+3. Recorded that `cl_downloadCount` / `cl_downloadSize` stay UI-facing temp
+   cvars instead of the authoritative owner.
+
+### Task A3hl: Refresh the RW-G01 source-gap note for the aligned workshop CVar note [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the `RW-G01` note so it now calls out the aligned
+   `docs/client_cvars.md` wording alongside the workshop progress bridge note.
+2. Recorded the same retained trio versus UI-temp-counter split there.
+3. Kept the note framed as documentation alignment over already-restored
+   behavior.
+
+### Task A3hm: Refresh the implementation ledger for the workshop CVar-note cleanup [COMPLETED]
+Priority: Critical
+Primary areas: `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Recorded the client workshop CVar-note cleanup as explicit micro-closures
+   instead of leaving it implicit.
+2. Kept the ledger framing evidence-backed and documentation-oriented.
+3. Preserved the active `A3` scope summary unchanged.
+
+### Task A3hn: Record the next ten micro-closures for the client workshop CVar-note cleanup batch [COMPLETED]
+Priority: Critical
+Primary areas: `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Recorded this batch in the implementation ledger as `A3he` through
+   `A3hn`.
+2. Kept the batch framed as stale-note cleanup and validation tightening on
+   top of already-restored retail-backed behavior.
+3. Avoided re-framing the batch as a runtime code change.
+
+### Task A3ho: Refresh the Round 05 workshop wrapper note for the retained direct-helper name [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_05.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the Round 05 `SteamUGC_GetItemDownloadInfo` note so it now names
+   `QL_Steamworks_GetItemDownloadInfo` directly instead of the older generic
+   "direct Steam item-info probe" wording.
+2. Kept the retained-client-state-first UI import story intact.
+3. Preserved the wrapper promotion itself unchanged.
+
+### Task A3hp: Refresh the Round 14 workshop import-call note for the retained direct-helper name [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_14.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the Round 14 local-fact note so it now names
+   `QL_Steamworks_GetItemDownloadInfo` as the retained fallback helper.
+2. Kept the parsed `cl_downloadItem` low/high-word handoff explicit.
+3. Avoided changing the underlying wrapper identification.
+
+### Task A3hq: Refresh the Round 14 alias summary for the retained direct-helper bridge wording [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/quakelive_steam_mapping_round_14.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the alias-summary row for `QLUIImport_GetItemDownloadInfo`.
+2. Recorded that the retained `cl_ui.c` bridge falls back to
+   `QL_Steamworks_GetItemDownloadInfo`.
+3. Kept the alias candidate itself unchanged.
+
+### Task A3hr: Refresh the CL-G03 observed-source note for the retained direct-helper bridge [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the historical `CL-G03` observed-source note so it now names
+   `QL_Steamworks_GetItemDownloadInfo` instead of the older generic direct
+   Steam-item probe wording.
+2. Kept the retained-client-state-first bridge summary intact.
+3. Left the surrounding workshop mount/bootstrap notes unchanged.
+
+### Task A3hs: Refresh the CL-P3 closure note for the retained direct-helper bridge [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the historical `CL-P3` closure note so it now names
+   `QL_Steamworks_GetItemDownloadInfo` as the retained fallback helper.
+2. Kept the retained workshop owner split and legacy-counter exclusion intact.
+3. Preserved the closure note as historical documentation rather than a new
+   runtime change.
+
+### Task A3ht: Refresh the CL-P3 exit criteria for the recovered low/high workshop progress bridge [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the workshop-progress exit criterion so it now names the recovered
+   `GetItemDownloadInfo` low/high-word bridge explicitly.
+2. Kept the negative contrast with the older generic legacy counters.
+3. Avoided re-framing the lane as a behavior change.
+
+### Task A3hu: Add focused validation for the refreshed workshop helper-note wording [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Extended the focused workshop-note regression to require the refreshed
+   Round 05 / Round 14 helper wording.
+2. Added assertions for the current client-parity-plan wording around the
+   retained/direct helper split and the low/high-word exit criterion.
+3. Kept the test scoped to evidence-note drift rather than runtime behavior.
+
+### Task A3hv: Tighten the CL-G03 parity gate for the refreshed workshop helper-note wording [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_full_parity_gate.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Tightened the `CL-G03` parity gate so it now requires the refreshed
+   retained/direct helper wording in the client parity plan.
+2. Kept the existing retained request-surface and shared queue-pop checks
+   intact.
+3. Preserved the gate as a documentation/validation guard, not a runtime
+   behavior claim.
+
+### Task A3hw: Refresh the abstraction and RW-G01 notes for the retained direct-helper wording alignment [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the abstraction and `RW-G01` notes so they now record that the
+   older client-parity notes were aligned to the explicit
+   `QL_Steamworks_GetItemDownloadInfo` fallback naming.
+2. Kept the retained-client-state progress bridge and shared queue-pop owner
+   story intact.
+3. Left the surrounding workshop/service-boundary notes unchanged.
+
+### Task A3hx: Record the next ten micro-closures for the workshop helper-note wording cleanup batch [COMPLETED]
+Priority: Critical
+Primary areas: `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Recorded this batch in the implementation ledger as `A3ho` through
+   `A3hx`.
+2. Kept the batch framed as stale-note cleanup and validation tightening on
+   top of already-restored retail-backed behavior.
+3. Avoided re-framing the batch as a runtime code change.
+
+### Task A3hy: Refresh the top-level CL-P3 summary for the retained direct-helper name [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the top-level `CL-P3` summary so it now names
+   `QL_Steamworks_GetItemDownloadInfo` instead of the older generic direct
+   probe wording.
+2. Kept the retained-client-state-first bridge summary intact.
+3. Preserved the surrounding parity summary unchanged.
+
+### Task A3hz: Refresh the top-level CL-P3 summary for the recovered low/high-word bridge wording [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/client-full-parity-audit-and-implementation-plan-2026-04-09.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the same summary so it now records the retail
+   `SteamUGC_GetItemDownloadInfo` low/high-word slot more explicitly.
+2. Kept the parsed `cl_downloadItem` ownership visible in the wording.
+3. Avoided reintroducing generic helper shorthand.
+
+### Task A3ia: Refresh the historical A3gu implementation-plan note for the retained direct-helper name [COMPLETED]
+Priority: Critical
+Primary areas: `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the older `A3gu` completed-work note so it now names
+   `QL_Steamworks_GetItemDownloadInfo` directly.
+2. Kept the retained-client-state-first import story intact.
+3. Preserved the historical task framing.
+
+### Task A3ib: Refresh the historical A3el implementation-plan note for UI-facing temp-cvar wording [COMPLETED]
+Priority: Critical
+Primary areas: `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the older `A3el` note so it now describes the then-retained
+   `cl_downloadCount` / `cl_downloadSize` updates as UI-facing temp cvars.
+2. Kept the note historically accurate for that intermediate step.
+3. Avoided implying those counters were ever the authoritative progress owner.
+
+### Task A3ic: Add focused validation for the top-level CL-P3 workshop helper wording [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Extended the focused workshop-note regression to require the refreshed
+   top-level `CL-P3` summary wording.
+2. Kept the existing Round 05 / Round 14 note checks intact.
+3. Left the test scoped to evidence-note drift rather than runtime behavior.
+
+### Task A3id: Add focused validation for the historical implementation-plan workshop wording [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_workshop_bootstrap_parity.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Extended the same regression so it now reads `IMPLEMENTATION_PLAN.md`.
+2. Added assertions for the refreshed `A3gu` helper wording and `A3el`
+   temp-cvar wording.
+3. Kept the validation surface narrow and evidence-backed.
+
+### Task A3ie: Tighten the CL-G03 parity gate for the refreshed implementation-plan workshop wording [COMPLETED]
+Priority: Critical
+Primary areas: `tests/test_client_full_parity_gate.py`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Tightened the `CL-G03` parity gate so it now requires the refreshed
+   top-level client-plan wording plus the aligned implementation-plan notes.
+2. Added a dedicated `implementation_plan_notes_current` detail lane for that
+   check.
+3. Preserved the gate as a documentation/validation guard, not a runtime
+   behavior claim.
+
+### Task A3if: Refresh the abstraction note for the aligned top-level summary and implementation-plan wording [COMPLETED]
+Priority: Critical
+Primary areas: `docs/steam_platform_abstraction.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the abstraction note so it now calls out the aligned top-level
+   `CL-P3` summary and older implementation-plan workshop note wording.
+2. Recorded the explicit helper naming and UI-facing temp-cvar framing there.
+3. Left the broader workshop boundary story unchanged.
+
+### Task A3ig: Refresh the RW-G01 note for the aligned top-level summary and implementation-plan wording [COMPLETED]
+Priority: Critical
+Primary areas: `docs/reverse-engineering/source-file-gap-notes/rw-g01-platform-services.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Updated the `RW-G01` note so it now records the aligned top-level `CL-P3`
+   summary and implementation-plan workshop wording.
+2. Kept the explicit helper naming and UI-facing temp-cvar framing visible.
+3. Preserved the surrounding compatibility-boundary note unchanged.
+
+### Task A3ih: Record the next ten micro-closures for the workshop summary-and-ledger wording cleanup batch [COMPLETED]
+Priority: Critical
+Primary areas: `IMPLEMENTATION_PLAN.md`
+Parity estimate: **before 96% -> after 96%**
+
+Completed work:
+
+1. Recorded this batch in the implementation ledger as `A3hy` through
+   `A3ih`.
+2. Kept the batch framed as stale-note cleanup and validation tightening on
+   top of already-restored retail-backed behavior.
+3. Avoided re-framing the batch as a runtime code change.
+
+### Task A3ii: Close `RW-G01` as a documented bounded divergence across the repo-wide ledgers [COMPLETED]
+Priority: Critical
+Primary areas: `AUDIT.md`, `IMPLEMENTATION_PLAN.md`,
+`docs/reverse-engineering/repo-wide-parity-audit-2026-04-21.md`,
+`docs/reverse-engineering/source-file-parity-ledger-2026-04-22.md`,
+`docs/reverse-engineering/source-file-parity-audit-plan-2026-04-22.md`,
+`docs/reverse-engineering/source-file-gap-notes/`,
+`tools/reverse-engineering/generate_source_file_audit.py`
+Parity estimate: **before 96% -> after 98%**
+
+Completed work:
+
+1. Reclassified the `RW-G01` online-services lane as an intentional
+   documented divergence instead of active repo-wide parity debt, while
+   keeping the strict-retail Windows target unchanged at `100%`.
+2. Updated the source-file audit generator and regenerated the plan, ledger,
+   and per-file note set so the seven `RW-G01` owners now land under
+   documented-divergence notes while `RW-G02` remains the only active
+   file-level compatibility gap family.
+3. Refreshed the top-level repo-wide ledgers so the checked-in whole-repo
+   estimate now reads `98%`, with `RW-G02` and `RW-G04` left as the active
+   remaining repo-wide gap families.
+
+## Active tasks
 
 ### Task A4: Modernise or explicitly contain the non-Windows portability lanes [OPEN]
 Priority: High
 Primary areas: `src/code/unix/`, `src/code/null/`,
 `docs/platform/toolchain-matrix.md`, `docs/build/linux-glibc-32bit.md`
-Estimated repo-wide lift if closed: **96% -> 97%**
+Estimated repo-wide lift if closed: **98% -> 99%**
 
 Scope:
 
@@ -1679,7 +5192,7 @@ Scope:
 Priority: Medium
 Primary areas: tracked runtime probe bundles, native build helpers, platform
 docs
-Estimated repo-wide lift if closed: **96% -> 97%**
+Estimated repo-wide lift if closed: **98% -> 99%**
 
 Scope:
 

@@ -782,7 +782,7 @@ def test_ui_native_syscall_bridge_matches_recovered_retail_slots() -> None:
         "qboolean trap_QL_IsSubscribedApp( int appId ) {",
         "void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor ) {",
         "unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {",
-        "void trap_QL_GetItemDownloadInfo( unsigned int itemHi, unsigned int itemLo, unsigned long long *outDownloaded, unsigned long long *outTotal ) {",
+        "void trap_QL_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {",
         "UI_GetNativeImportFunction( UI_QL_IMPORT_INIT_ADVERTISEMENT_BRIDGE )",
         "UI_GetNativeImportFunction( UI_QL_IMPORT_SETUP_ADVERT_CELL_SHADER )",
         "UI_GetNativeImportFunction( UI_QL_IMPORT_REFRESH_ADVERT_CELL_SHADER )",

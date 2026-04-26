@@ -102,8 +102,8 @@ Observed local facts:
 
 1. `sub_4BF2F0` is a pure tailcall to `sub_460660`.
 2. `sub_460660` is already promoted as `SteamUGC_GetItemDownloadInfo`.
-3. `uix86.dll` calls offset `0x180` with `(itemHi, itemLo, &downloaded, &total)`.
-4. `cl_ui.c` reconstructs import `96` as `QL_UI_trap_Import96`, returning workshop download statistics and falling back to legacy download counters when Steam does not answer.
+3. `uix86.dll` parses `cl_downloadItem` and calls offset `0x180` with the resulting `(itemIdLow, itemIdHigh, &downloaded, &total)` words.
+4. `cl_ui.c` reconstructs import `96` as `QL_UI_trap_GetItemDownloadInfo`, returning workshop download statistics from retained client workshop state before falling back to `QL_Steamworks_GetItemDownloadInfo`, the retained platform wrapper over `SteamUGC_GetItemDownloadInfo` reached from the parsed low/high words.
 
 This is the UI-owned workshop download-info import wrapper.
 
@@ -118,7 +118,7 @@ This is the UI-owned workshop download-info import wrapper.
 | `sub_4B03E0` (`0x004B03E0`) | `QLUIImport_DrawScaledText` | Observed plus bounded inference | Host text renderer exposed through UI import `94`, supporting scale, max width, and forced-color handling. |
 | `sub_4BF2E0` (`0x004BF2E0`) | `QLUIImport_IsSubscribedApp` | Observed | UI import wrapper over `SteamApps_BIsSubscribedApp`. |
 | `sub_4BF310` (`0x004BF310`) | `QLUIImport_MeasureText` | Observed plus bounded inference | Host text measurement helper exposed through UI import `95`, returning packed width/height floats. |
-| `sub_4BF2F0` (`0x004BF2F0`) | `QLUIImport_GetItemDownloadInfo` | Observed | UI import wrapper over `SteamUGC_GetItemDownloadInfo`. |
+| `sub_4BF2F0` (`0x004BF2F0`) | `QLUIImport_GetItemDownloadInfo` | Observed | UI import wrapper over `SteamUGC_GetItemDownloadInfo`, reached from the parsed `cl_downloadItem` low/high words and mirrored in retained `cl_ui.c` as a retained-state-first bridge that falls back to `QL_Steamworks_GetItemDownloadInfo`. |
 
 ## Open Questions
 

@@ -942,6 +942,7 @@ def test_game_server_init_uses_retail_init_signature_and_dedicated_ugc_owner(ste
     assert lib.QLR_SteamworksMock_GetSteamGameServerLastInitVersion() == b"1069"
     assert lib.QLR_Steamworks_ServerIsInitialised()
 
+    lib.QLR_SteamworksMock_SetUGCItemState(4)
     assert lib.QLR_Steamworks_SubscribeItem(0x89ABCDEF, 0x01234567)
     assert lib.QLR_Steamworks_DownloadItem(0x89ABCDEF, 0x01234567, 1)
     assert lib.QLR_SteamworksMock_GetUGCSubscribeCalls() == 0
@@ -1043,6 +1044,13 @@ def test_workshop_helpers_use_mapped_ugc_slots(steamworks_harness: tuple[ctypes.
         assert not lib.QLR_Steamworks_UnsubscribeItem(0xAAAAAAAA, 0xBBBBBBBB)
         assert not lib.QLR_Steamworks_DownloadItem(0xAAAAAAAA, 0xBBBBBBBB, 1)
         return
+
+    lib.QLR_SteamworksMock_Reset()
+    lib.QLR_SteamworksMock_PrimeState()
+    lib.QLR_SteamworksMock_SetUGCItemState(0)
+
+    assert not lib.QLR_Steamworks_SubscribeItem(0xAAAAAAAA, 0xBBBBBBBB)
+    assert lib.QLR_SteamworksMock_GetUGCSubscribeCalls() == 1
 
     lib.QLR_SteamworksMock_Reset()
     lib.QLR_SteamworksMock_PrimeState()

@@ -1,6 +1,6 @@
 # Repo-Wide Parity Audit
 
-Last updated: 2026-04-22
+Last updated: 2026-04-23
 
 ## Scope
 
@@ -60,7 +60,7 @@ Reviewed by source and current documentation:
 ## Current assessment
 
 - Strict-retail Windows replacement target: **100%**
-- Repo-wide parity across the checked-in tree: **96%**
+- Repo-wide parity across the checked-in tree: **98%**
 
 Rationale:
 
@@ -73,12 +73,13 @@ Rationale:
 3. The checked-in `src/ui` runtime-panel compare is now clean, and the
    accepted runtime correction/proof path remains explicit, machine-described,
    and test-backed if future drift ever reappears.
-4. The remaining repo-wide deficit is concentrated in three bounded gap
-   families rather than broad unknown engine debt.
+4. The remaining repo-wide deficit is concentrated in two bounded gap
+   families, while the online-services lane is now tracked as a documented
+   bounded divergence rather than active parity debt.
 
 ## Gap register
 
-### RW-G01 - Online services and external ecosystems remain compatibility-only
+### RW-G01 - Online services and external ecosystems are now a documented bounded divergence
 
 Observed facts:
 
@@ -101,9 +102,10 @@ Impact:
 - Opted-in builds expose bounded compatibility behavior rather than a complete
   retail-equivalent ecosystem implementation.
 - The strict-retail score remains valid because this lane is deliberately
-  excluded there, but the repo-wide score cannot call this surface closed.
+  excluded there, and the repo-wide score now tracks it as an intentional
+  documented divergence rather than unresolved engine debt.
 
-Current status: **Open repo-wide gap**
+Current status: **Closed as an active repo-wide gap; bounded divergence remains documented**
 
 ### RW-G02 - Non-Windows portability remains incomplete
 
@@ -260,16 +262,16 @@ A new file-by-file campaign now sits alongside this repo-wide summary:
 It tracks `567` source entries, keeps the existing subsystem audits as
 inherited baselines, and only opens dedicated per-file notes when the current
 evidence isolates a concrete parity gap. That campaign does not add a new
-repo-wide gap family; it turns `RW-G01` and `RW-G02` into a cleaner
-file-ownership queue.
+repo-wide gap family; it keeps `RW-G01` as documented per-file divergence
+notes and turns `RW-G02` into the remaining active file-ownership queue.
 
 ## Recommended next steps
 
 1. Drive the new source-file campaign through the primary runtime and module
    surface so the remaining repo-wide gaps are isolated file-by-file instead
    of only by tree or subsystem.
-2. Decide whether online services stay permanently bounded or receive real open
-   replacements.
+2. Keep the online-services lane explicitly bounded and documented unless a
+   real open replacement path is intentionally adopted later.
 3. Re-baseline the Unix/null portability boundary and finish any platform work
    that should count toward repo-wide parity.
 4. Refresh archived runtime/build evidence on current toolchains when the

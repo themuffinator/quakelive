@@ -15,5 +15,7 @@ The client registration table now mirrors the Quake Live HLIL defaults:
 These CVars are only meaningful on Steam-enabled builds and should be stubbed or conditionally compiled on other platforms:
 
 - `cl_platform` is a ROM marker describing the active platform (HLIL defaults it to `1` for Steam).
-- Download bookkeeping (`cl_downloadName`, `cl_downloadTime`, `cl_downloadItem`, `cl_downloadCount`, `cl_downloadSize`) reflects Steam Workshop/UGC progress strings seen in the HLIL trace; non-Steam targets should keep them as inert temp CVars.
+- Workshop/bootstrap request bookkeeping (`cl_downloadItem`, `cl_downloadName`, `cl_downloadTime`) matches the recovered `CL_InitDownloads` and `uix86` surface: the retained client bootstrap seeds those CVars, and the UI progress import reads `cl_downloadItem`, calls the native `GetItemDownloadInfo` probe with the parsed item-ID low/high words, and consults `cl_downloadTime`.
+- `cl_downloadCount` and `cl_downloadSize` still exist because Quake Live UI strings reference them, but the recovered workshop queue/progress owner no longer treats them as authoritative progress state.
+- Non-Steam targets should keep the whole download-cvar cluster as inert temp CVars.
 - `cl_allowConsoleChat` and the cloud/protected flags (`CVAR_PROTECTED`, `CVAR_VM_CREATED`, `CVAR_CLOUD`) are Quake Live-specific; other targets can treat them as no-op guards.

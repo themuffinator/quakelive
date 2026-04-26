@@ -27,7 +27,7 @@ Two small helpers that were previously left unnamed now have enough support to p
 | Raw symbol | Alias candidate | Basis | Observed role |
 | --- | --- | --- | --- |
 | `sub_460590` (`0x00460590`) | `SteamApps_BIsSubscribedApp` | Observed | Returns `0` until the client Steam API is initialized, then calls `SteamApps()->vtable[0x1c]` with the supplied app ID. The same `0x1c` slot is reconstructed in `platform_steamworks.c` as `QL_Steamworks_IsSubscribedApp`, and `cl_ui.c` wires the equivalent behavior into UI import `93`. |
-| `sub_460660` (`0x00460660`) | `SteamUGC_GetItemDownloadInfo` | Observed | Direct wrapper around `SteamUGC()->vtable[0xd8]` with `(idLow, idHigh, outDownloaded, outTotal)`. The same `0xd8` slot is reconstructed in `platform_steamworks.c` as `QL_Steamworks_GetItemDownloadInfo`, and `cl_ui.c` uses that path for UI import `96` with fallback to legacy download counters. |
+| `sub_460660` (`0x00460660`) | `SteamUGC_GetItemDownloadInfo` | Observed | Direct wrapper around `SteamUGC()->vtable[0xd8]` with `(idLow, idHigh, outDownloaded, outTotal)`. The same `0xd8` slot is reconstructed in `platform_steamworks.c` as `QL_Steamworks_GetItemDownloadInfo`, and `cl_ui.c` uses that path for UI import `96` by consulting retained client workshop state first and then falling back to `QL_Steamworks_GetItemDownloadInfo`, the retained wrapper over the same low/high-word `SteamUGC_GetItemDownloadInfo` slot. |
 
 ### Import-table anchors
 

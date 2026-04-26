@@ -31,12 +31,29 @@
     {
       "address": "0x00412190",
       "raw_name": "sub_412190",
-      "normalized_name": "UNRESOLVED_SERVER_func_00412190",
-      "status": "unresolved",
+      "normalized_name": "RETIRED_LEGACY_SERVER_TEAM_SCORE_PLACEHOLDER",
+      "status": "retired",
       "signature": null,
       "string_refs": ["0x0069F210", "0x0069F250"],
       "relocation_refs": ["0x000E3F10"],
-      "comment": "Suspected team scoring routine"
+      "replacement_refs": [
+        {
+          "map": "references/symbol-maps/qagame.json",
+          "address": "0x100681B0",
+          "normalized_name": "AddTeamScore"
+        },
+        {
+          "map": "references/symbol-maps/qagame.json",
+          "address": "0x1003DD20",
+          "normalized_name": "G_BuildTeamScoreboardMessage"
+        },
+        {
+          "map": "references/symbol-maps/qagame.json",
+          "address": "0x1003E1B0",
+          "normalized_name": "G_SendTDMStatsMessage"
+        }
+      ],
+      "comment": "Retired legacy seed row. The current qagame map resolves the corresponding team-score and lead-change surface through AddTeamScore and the retail scoreboard serializers, so this old server.x86 placeholder is no longer an active unresolved map entry."
     },
     {
       "address": "0x0042B030",
@@ -78,15 +95,17 @@
       "address": "0x0069F210",
       "value": "Team %d scored %d",
       "xref_functions": ["0x00412190"],
-      "normalized_label": "UNRESOLVED_SERVER_str_0069F210",
-      "status": "unresolved"
+      "normalized_label": "retired_legacy_server_str_0069F210",
+      "status": "retired",
+      "comment": "Retired with the legacy 0x00412190 seed row; current team-score ownership is carried by qagame AddTeamScore and scoreboard helpers."
     },
     {
       "address": "0x0069F250",
       "value": "Capture lead maintained",
       "xref_functions": ["0x00412190"],
-      "normalized_label": "UNRESOLVED_SERVER_str_0069F250",
-      "status": "unresolved"
+      "normalized_label": "retired_legacy_server_str_0069F250",
+      "status": "retired",
+      "comment": "Retired with the legacy 0x00412190 seed row; current lead-change and team-score behavior is represented by the qagame function map."
     },
     {
       "address": "0x006A0210",
@@ -133,8 +152,10 @@
   "stats": {
     "function_total": 5,
     "function_matched": 4,
+    "function_retired": 1,
     "string_total": 6,
     "string_resolved": 4,
+    "string_retired": 2,
     "relocation_total": 5
   }
 }

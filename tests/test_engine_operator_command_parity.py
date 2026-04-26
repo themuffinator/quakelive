@@ -118,6 +118,9 @@ def test_operator_command_handlers_match_retail_kick_map_and_reload_contracts() 
 	download_block = _extract_function_block(sv_ccmds, "static void SV_SteamCmd_DownloadUGC_f( void ) {")
 	subscribe_block = _extract_function_block(sv_ccmds, "static void SV_SteamCmd_SubscribeUGC_f( void ) {")
 	unsubscribe_block = _extract_function_block(sv_ccmds, "static void SV_SteamCmd_UnsubscribeUGC_f( void ) {")
+	request_helper_block = _extract_function_block(sv_ccmds, "static void SV_SteamWorkshop_RequestDownload( uint32_t itemIdLow, uint32_t itemIdHigh ) {")
+	subscribe_helper_block = _extract_function_block(sv_ccmds, "static void SV_SteamWorkshop_SubscribeItem( uint32_t itemIdLow, uint32_t itemIdHigh ) {")
+	unsubscribe_helper_block = _extract_function_block(sv_ccmds, "static void SV_SteamWorkshop_UnsubscribeItem( uint32_t itemIdLow, uint32_t itemIdHigh ) {")
 	sectorlist_block = _extract_function_block(sv_world, "void SV_SectorList_f( void ) {")
 
 	assert 'reason = ( Cmd_Argc() > 2 ) ? Cmd_Argv( 2 ) : NULL;' in kick_block
@@ -168,15 +171,28 @@ def test_operator_command_handlers_match_retail_kick_map_and_reload_contracts() 
 
 	assert 'Com_Printf( "Usage: steam_downloadugc <itemid>\\n" );' in download_block
 	assert 'sscanf( Cmd_Argv( 1 ), "%llu", &itemId );' in download_block
-	assert "QL_Steamworks_DownloadItem( itemIdLow, itemIdHigh, qtrue )" in download_block
+	assert "SV_SteamWorkshop_RequestDownload( itemIdLow, itemIdHigh );" in download_block
+	assert "SV_WorkshopServiceSupportsSteamCommands()" in request_helper_block
+	assert 'Com_sprintf( detail, sizeof( detail ), "Workshop item %llu: in cache.", itemId );' in request_helper_block
+	assert 'Com_sprintf( detail, sizeof( detail ), "Workshop item %llu: download", itemId );' in request_helper_block
+	assert "QL_Steamworks_DownloadItem( itemIdLow, itemIdHigh, qtrue )" in request_helper_block
+	assert '"download request failed"' not in request_helper_block
 
 	assert 'Com_Printf( "Usage: steam_subscribeugc <itemid>\\n" );' in subscribe_block
 	assert 'sscanf( Cmd_Argv( 1 ), "%llu", &itemId );' in subscribe_block
-	assert "QL_Steamworks_SubscribeItem( itemIdLow, itemIdHigh )" in subscribe_block
+	assert "SV_SteamWorkshop_SubscribeItem( itemIdLow, itemIdHigh );" in subscribe_block
+	assert "(void)QL_Steamworks_SubscribeItem( itemIdLow, itemIdHigh );" in subscribe_helper_block
+	assert "QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & 4u" in subscribe_helper_block
+	assert "FS_Restart( sv.checksumFeed );" in subscribe_helper_block
+	assert '"subscribe requested"' not in subscribe_helper_block
+	assert '"subscribe request failed"' not in subscribe_helper_block
 
 	assert 'Com_Printf( "Usage: steam_unsubscribeugc <itemid>\\n" );' in unsubscribe_block
 	assert 'sscanf( Cmd_Argv( 1 ), "%llu", &itemId );' in unsubscribe_block
-	assert "QL_Steamworks_UnsubscribeItem( itemIdLow, itemIdHigh )" in unsubscribe_block
+	assert "SV_SteamWorkshop_UnsubscribeItem( itemIdLow, itemIdHigh );" in unsubscribe_block
+	assert "(void)QL_Steamworks_UnsubscribeItem( itemIdLow, itemIdHigh );" in unsubscribe_helper_block
+	assert '"unsubscribe requested"' not in unsubscribe_helper_block
+	assert '"unsubscribe request failed"' not in unsubscribe_helper_block
 
 
 def test_spawn_restart_and_game_consumers_follow_retail_nextmap_payload_wiring() -> None:

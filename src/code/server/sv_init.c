@@ -559,6 +559,22 @@ static void SV_SteamServerInitDefaultHostname( void ) {
 
 /*
 ================
+SV_LogSteamServerIdentityLifecycle
+
+Publishes provider-aware diagnostics for the retained Steam GameServer identity
+publication lane.
+================
+*/
+static void SV_LogSteamServerIdentityLifecycle( const char *stage, const char *detail ) {
+	Com_DPrintf( "Steam server identity %s via %s [%s]: %s\n",
+		stage ? stage : "update",
+		SV_GetSteamServerProviderLabel(),
+		SV_GetSteamServerPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+================
 SV_SteamServerPublishIdentity
 
 Mirrors the retail Steam game-server identity publication path.
@@ -569,11 +585,11 @@ void SV_SteamServerPublishIdentity( void ) {
 	uint32_t			steamIdHigh;
 	unsigned long long	steamIdValue;
 	char				steamIdString[32];
+	char				detail[128];
 	const char			*referencedSteamworks;
 
 	if ( !QL_Steamworks_ServerGetSteamID( &steamIdLow, &steamIdHigh ) ) {
-		Com_DPrintf( "Steam server identity unavailable for %s [%s]\n",
-			SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
+		SV_LogSteamServerIdentityLifecycle( "unavailable", "server steam ID unavailable" );
 		return;
 	}
 
@@ -583,6 +599,9 @@ void SV_SteamServerPublishIdentity( void ) {
 	SV_SetConfigstring( 0x2ca, steamIdString );
 	Cvar_Set( "sv_referencedSteamworks", referencedSteamworks );
 	SV_SetConfigstring( 0x2cb, referencedSteamworks );
+	Com_sprintf( detail, sizeof( detail ), "published id=%s referenced=%d",
+		steamIdString, ( referencedSteamworks && referencedSteamworks[0] ) ? 1 : 0 );
+	SV_LogSteamServerIdentityLifecycle( "published", detail );
 }
 
 /*

@@ -448,7 +448,7 @@ void CL_LogMatchmakingServiceIgnored( const char *commandName, const char *reaso
 CL_LogMatchmakingCallbackLifecycle
 
 Publishes provider-aware diagnostics whenever the retained matchmaking callback
-lane handles a Steam P2P session request.
+lane handles a Steam callback.
 =============
 */
 static void CL_LogMatchmakingCallbackLifecycle( const char *stage, const char *reason ) {
@@ -492,6 +492,22 @@ static void CL_LogStatsServiceRegistrationSkipped( const char *reason ) {
 
 /*
 =============
+CL_LogStatsCallbackLifecycle
+
+Publishes provider-aware diagnostics whenever the retained stats callback lane
+forwards one browser-facing update.
+=============
+*/
+static void CL_LogStatsCallbackLifecycle( const char *stage, const char *reason ) {
+	Com_DPrintf( "%s callback: %s (%s [%s])\n",
+		stage ? stage : "stats_callback",
+		reason ? reason : "callback updated",
+		CL_GetStatsServiceProviderLabel(),
+		CL_GetStatsServicePolicyLabel() );
+}
+
+/*
+=============
 CL_LogSocialOverlayIgnored
 
 Publishes provider-aware diagnostics whenever a Steam social-overlay command is
@@ -502,6 +518,25 @@ static void CL_LogSocialOverlayIgnored( const char *commandName, const char *rea
 	Com_DPrintf( "%s ignored: %s (%s [%s])\n",
 		commandName ? commandName : "social_overlay",
 		reason ? reason : "social overlay provider unavailable",
+		CL_GetSocialOverlayServiceProviderLabel(),
+		CL_GetSocialOverlayServicePolicyLabel() );
+}
+
+/*
+=============
+CL_LogClientCallbackBootstrapFallback
+
+Publishes provider-aware diagnostics whenever the retained client callback
+bundle stays on the compatibility fallback path during bootstrap.
+=============
+*/
+static void CL_LogClientCallbackBootstrapFallback( const char *reason ) {
+	Com_DPrintf( "client callback bootstrap: %s (matchmaking=%s [%s], stats=%s [%s], overlay=%s [%s])\n",
+		reason ? reason : "keeping compatibility-only browser event fallback",
+		CL_GetMatchmakingServiceProviderLabel(),
+		CL_GetMatchmakingServicePolicyLabel(),
+		CL_GetStatsServiceProviderLabel(),
+		CL_GetStatsServicePolicyLabel(),
 		CL_GetSocialOverlayServiceProviderLabel(),
 		CL_GetSocialOverlayServicePolicyLabel() );
 }
@@ -734,6 +769,7 @@ typedef struct {
 	uint32_t	itemIdLow;
 	uint32_t	itemIdHigh;
 	int			requestNumber;
+	qboolean	queued;
 	qboolean	downloadRequested;
 	qboolean	completed;
 } clSteamWorkshopItem_t;
@@ -1014,10 +1050,10 @@ static qboolean CL_Workshop_RefreshProgress( int itemIndex ) {
 
 /*
 =============
-CL_Workshop_SetActiveItem
+CL_Workshop_SetDownloadRequestCvars
 =============
 */
-static void CL_Workshop_SetActiveItem( int itemIndex ) {
+static void CL_Workshop_SetDownloadRequestCvars( int itemIndex ) {
 	clSteamWorkshopItem_t	*item;
 	unsigned long long		itemId;
 	char					itemString[32];
@@ -1030,16 +1066,27 @@ static void CL_Workshop_SetActiveItem( int itemIndex ) {
 	item = &cl_steamWorkshopDownloadState.items[itemIndex];
 	itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
 
-	cl_steamWorkshopDownloadState.activeItemIndex = itemIndex;
-	cl_steamWorkshopDownloadState.downloadedBytes = 0;
-	cl_steamWorkshopDownloadState.totalBytes = 0;
-
 	Com_sprintf( itemString, sizeof( itemString ), "%llu", itemId );
 	Com_sprintf( downloadName, sizeof( downloadName ), "Workshop item %i of %i", item->requestNumber, cl_steamWorkshopDownloadState.totalItems );
 	Cvar_Set( "cl_downloadItem", itemString );
 	Cvar_Set( "cl_downloadName", downloadName );
-	CL_Workshop_UpdateProgressCvars();
 	Cvar_SetValue( "cl_downloadTime", cls.realtime );
+}
+
+/*
+=============
+CL_Workshop_SetActiveItem
+=============
+*/
+static void CL_Workshop_SetActiveItem( int itemIndex ) {
+	if ( itemIndex < 0 || itemIndex >= cl_steamWorkshopDownloadState.itemCount ) {
+		return;
+	}
+
+	cl_steamWorkshopDownloadState.activeItemIndex = itemIndex;
+	cl_steamWorkshopDownloadState.downloadedBytes = 0;
+	cl_steamWorkshopDownloadState.totalBytes = 0;
+
 	CL_Workshop_RefreshProgress( itemIndex );
 }
 
@@ -1071,15 +1118,14 @@ static void CL_Workshop_ClearActiveDownload( void ) {
 	cl_steamWorkshopDownloadState.activeItemIndex = -1;
 	cl_steamWorkshopDownloadState.downloadedBytes = 0;
 	cl_steamWorkshopDownloadState.totalBytes = 0;
-	CL_Workshop_UpdateProgressCvars();
 }
 
 /*
 =============
-CL_Workshop_StartDownload
+CL_Workshop_RequestDownload
 =============
 */
-static qboolean CL_Workshop_StartDownload( int itemIndex ) {
+static qboolean CL_Workshop_RequestDownload( int itemIndex ) {
 	clSteamWorkshopItem_t	*item;
 	unsigned long long		itemId;
 	char					detail[128];
@@ -1090,45 +1136,62 @@ static qboolean CL_Workshop_StartDownload( int itemIndex ) {
 
 	item = &cl_steamWorkshopDownloadState.items[itemIndex];
 	itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
-	if ( !QL_Steamworks_DownloadItem( item->itemIdLow, item->itemIdHigh, qtrue ) ) {
-		Com_sprintf( detail, sizeof( detail ), "item %llu download request failed", itemId );
-		CL_LogWorkshopLifecycle( "start-download", detail );
+	cl_steamWorkshopDownloadState.queueActive = qtrue;
+
+	if ( QL_Steamworks_GetItemState( item->itemIdLow, item->itemIdHigh ) & CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED ) {
+		Com_sprintf( detail, sizeof( detail ), "Workshop item %llu: in cache.", itemId );
+		CL_LogWorkshopLifecycle( "request-download", detail );
+		CL_Workshop_FinalizeInstalledItem( itemIndex );
 		return qfalse;
 	}
 
+	if ( cl_steamWorkshopDownloadState.activeItemIndex >= 0 ) {
+		Com_sprintf( detail, sizeof( detail ), "Workshop item %llu: queueing download.", itemId );
+		CL_LogWorkshopLifecycle( "request-download", detail );
+		item->queued = qtrue;
+		return qtrue;
+	}
+
+	Com_sprintf( detail, sizeof( detail ), "Workshop item %llu: requesting download.", itemId );
+	CL_LogWorkshopLifecycle( "request-download", detail );
+	QL_Steamworks_DownloadItem( item->itemIdLow, item->itemIdHigh, qtrue );
 	item->downloadRequested = qtrue;
-	cl_steamWorkshopDownloadState.queueActive = qtrue;
-	cl_steamWorkshopDownloadState.downloadsRequested = qtrue;
 	CL_Workshop_SetActiveItem( itemIndex );
 	return qtrue;
 }
 
 /*
 =============
-CL_Workshop_AdvanceQueue
+CL_Workshop_AdvanceDownloadQueue
 =============
 */
-static qboolean CL_Workshop_AdvanceQueue( void ) {
+static qboolean CL_Workshop_AdvanceDownloadQueue( void ) {
 	int						i;
 	clSteamWorkshopItem_t	*item;
+	unsigned long long		itemId;
+	char					detail[128];
+
+	if ( cl_steamWorkshopDownloadState.activeItemIndex >= 0 ) {
+		CL_Workshop_ClearActiveDownload();
+	}
 
 	for ( i = 0; i < cl_steamWorkshopDownloadState.itemCount; ++i ) {
 		item = &cl_steamWorkshopDownloadState.items[i];
 
-		if ( item->completed || item->downloadRequested ) {
+		if ( item->completed || !item->queued ) {
 			continue;
 		}
 
-		if ( CL_Workshop_StartDownload( i ) ) {
-			return qtrue;
-		}
-
-		item->completed = qtrue;
+		itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
+		item->queued = qfalse;
+		item->downloadRequested = qtrue;
+		CL_Workshop_SetActiveItem( i );
+		Com_sprintf( detail, sizeof( detail ), "Workshop item %llu: was queued, requesting download.", itemId );
+		CL_LogWorkshopLifecycle( "advance-download", detail );
+		QL_Steamworks_DownloadItem( item->itemIdLow, item->itemIdHigh, qtrue );
+		return qtrue;
 	}
 
-	cl_steamWorkshopDownloadState.activeItemIndex = -1;
-	cl_steamWorkshopDownloadState.downloadedBytes = 0;
-	cl_steamWorkshopDownloadState.totalBytes = 0;
 	return qfalse;
 }
 
@@ -1137,27 +1200,29 @@ static qboolean CL_Workshop_AdvanceQueue( void ) {
 CL_Workshop_FinalizeInstalledItem
 =============
 */
-static void CL_Workshop_FinalizeInstalledItem( int itemIndex ) {
+static qboolean CL_Workshop_FinalizeInstalledItem( int itemIndex ) {
 	clSteamWorkshopItem_t *item;
 	char detail[128];
 
 	if ( itemIndex < 0 || itemIndex >= cl_steamWorkshopDownloadState.itemCount ) {
-		return;
+		return qfalse;
 	}
 
 	item = &cl_steamWorkshopDownloadState.items[itemIndex];
 	if ( item->completed ) {
-		return;
+		return qfalse;
 	}
 
 	item->completed = qtrue;
 	if ( cl_steamWorkshopDownloadState.activeItemIndex == itemIndex ) {
 		unsigned long long itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
 
-		Com_sprintf( detail, sizeof( detail ), "item %llu download complete", itemId );
+		Com_sprintf( detail, sizeof( detail ), "Steamworks download complete: %llu", itemId );
 		CL_LogWorkshopLifecycle( "item-complete", detail );
-		CL_Workshop_ClearActiveDownload();
+		return CL_Workshop_AdvanceDownloadQueue();
 	}
+
+	return qfalse;
 }
 
 /*
@@ -1165,23 +1230,18 @@ static void CL_Workshop_FinalizeInstalledItem( int itemIndex ) {
 CL_Workshop_FailActiveDownload
 =============
 */
-static void CL_Workshop_FailActiveDownload( int result ) {
+static qboolean CL_Workshop_FailActiveDownload( void ) {
 	clSteamWorkshopItem_t *item;
-	unsigned long long itemId;
 	int itemIndex;
-	char detail[128];
 
 	itemIndex = cl_steamWorkshopDownloadState.activeItemIndex;
 	if ( itemIndex < 0 || itemIndex >= cl_steamWorkshopDownloadState.itemCount ) {
-		return;
+		return qfalse;
 	}
 
 	item = &cl_steamWorkshopDownloadState.items[itemIndex];
-	itemId = ( (unsigned long long)item->itemIdHigh << 32 ) | item->itemIdLow;
-	Com_sprintf( detail, sizeof( detail ), "item %llu failed with EResult code %i", itemId, result );
-	CL_LogWorkshopLifecycle( "item-failed", detail );
 	item->completed = qtrue;
-	CL_Workshop_ClearActiveDownload();
+	return CL_Workshop_AdvanceDownloadQueue();
 }
 
 /*
@@ -1198,15 +1258,17 @@ static qboolean CL_Workshop_DownloadsSettled( void ) {
 			return qfalse;
 		}
 
-		CL_Workshop_FinalizeInstalledItem( cl_steamWorkshopDownloadState.activeItemIndex );
+		if ( CL_Workshop_FinalizeInstalledItem( cl_steamWorkshopDownloadState.activeItemIndex ) ) {
+			return qfalse;
+		}
 	}
 
-	if ( CL_Workshop_AdvanceQueue() ) {
+	if ( CL_Workshop_AdvanceDownloadQueue() ) {
 		return qfalse;
 	}
 
 	if ( cl_steamWorkshopDownloadState.queueActive ) {
-		CL_LogWorkshopLifecycle( "queue-complete", "download completed for all required items" );
+		CL_LogWorkshopLifecycle( "queue-complete", "Download completed for all steamworks items" );
 		cl_steamWorkshopDownloadState.queueActive = qfalse;
 		return qfalse;
 	}
@@ -1224,8 +1286,6 @@ static qboolean CL_Workshop_BeginBootstrap( void ) {
 	char		workshopItems[BIG_INFO_STRING];
 	char		detail[256];
 	char		*token;
-	const char	*workshopProvider;
-	const char	*workshopPolicy;
 	int			totalItems;
 	int			requestNumber;
 
@@ -1235,13 +1295,9 @@ static qboolean CL_Workshop_BeginBootstrap( void ) {
 	}
 
 	Q_strncpyz( workshopItems, requiredItems, sizeof( workshopItems ) );
-	workshopProvider = CL_GetWorkshopServiceProviderLabel();
-	workshopPolicy = CL_GetWorkshopServicePolicyLabel();
-	Com_Printf( "Server requires the following workshop items via %s [%s]: %s\n",
-		workshopProvider, workshopPolicy, workshopItems );
+	Com_Printf( "Server requires the following workshop items: %s\n", workshopItems );
 	if ( !CL_WorkshopServiceSupportsSteamBootstrap() ) {
-		Com_Printf( "Workshop bootstrap unavailable for %s [%s]; keeping compatibility-only fallback for required items.\n",
-			workshopProvider, workshopPolicy );
+		CL_LogWorkshopLifecycle( "bootstrap-unavailable", "required items unavailable; keeping compatibility-only fallback" );
 		return qfalse;
 	}
 
@@ -1284,16 +1340,12 @@ static qboolean CL_Workshop_BeginBootstrap( void ) {
 		item->itemIdLow = itemIdLow;
 		item->itemIdHigh = itemIdHigh;
 
-		if ( QL_Steamworks_GetItemState( itemIdLow, itemIdHigh ) & CL_STEAM_WORKSHOP_ITEM_STATE_INSTALLED ) {
+		if ( CL_Workshop_RequestDownload( itemIndex ) ) {
+			item->requestNumber = ++requestNumber;
+			cl_steamWorkshopDownloadState.downloadsRequested = qtrue;
+			CL_Workshop_SetDownloadRequestCvars( itemIndex );
+		} else {
 			item->completed = qtrue;
-			continue;
-		}
-
-		item->requestNumber = ++requestNumber;
-		if ( cl_steamWorkshopDownloadState.activeItemIndex < 0 ) {
-			if ( !CL_Workshop_StartDownload( itemIndex ) ) {
-				item->completed = qtrue;
-			}
 		}
 	}
 
@@ -1581,6 +1633,12 @@ command string immediately through the client command path.
 =============
 */
 void CL_Steam_OnRichPresenceJoinRequested( const char *command ) {
+	if ( !command || !command[0] ) {
+		CL_LogMatchmakingCallbackLifecycle( "rich_presence_join_requested", "missing join command" );
+		return;
+	}
+
+	CL_LogMatchmakingCallbackLifecycle( "rich_presence_join_requested", "executing immediate join command" );
 	CL_Steam_ExecuteImmediateCommand( command );
 }
 
@@ -1593,9 +1651,16 @@ present and routing the server target through the immediate connect path.
 =============
 */
 void CL_Steam_OnGameServerChangeRequested( const char *server, const char *password ) {
+	char detail[96];
+
 	if ( !server || !server[0] ) {
+		CL_LogMatchmakingCallbackLifecycle( "server_change_requested", "missing server target" );
 		return;
 	}
+
+	Com_sprintf( detail, sizeof( detail ), "connecting to requested server (password=%d)",
+		( password && password[0] ) ? 1 : 0 );
+	CL_LogMatchmakingCallbackLifecycle( "server_change_requested", detail );
 
 	if ( password && password[0] ) {
 		Cvar_Set( "password", password );
@@ -1714,6 +1779,13 @@ authorization callback forwards one browser-facing purchase update.
 =============
 */
 static void CL_LogMicroTransactionCallbackLifecycle( const ql_steam_microtxn_authorization_response_t *event ) {
+	if ( !event ) {
+		Com_DPrintf( "microtxn.authorization callback: ignored null callback payload (%s [%s])\n",
+			CL_GetSocialOverlayServiceProviderLabel(),
+			CL_GetSocialOverlayServicePolicyLabel() );
+		return;
+	}
+
 	Com_DPrintf( "microtxn.authorization callback: appid=%u order=%llu authorized=%d (%s [%s])\n",
 		event ? event->appId : 0u,
 		event ? (unsigned long long)event->orderId : 0ull,
@@ -2013,6 +2085,7 @@ static void CL_Steam_Client_OnRichPresenceJoinRequested( void *context, const ql
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "rich_presence_join_requested", "ignored null callback payload" );
 		return;
 	}
 
@@ -2029,15 +2102,20 @@ static void CL_Steam_Client_OnUserStatsReceived( void *context, const ql_steam_u
 	char steamId[32];
 	char name[QL_STEAM_NAME_LENGTH * 2];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogStatsCallbackLifecycle( "user_stats_received", "ignored null callback payload" );
 		return;
 	}
 
 	CL_Steam_FormatSteamId( event->steamId.value, steamId, sizeof( steamId ) );
 	CL_Steam_JsonEscape( event->name, name, sizeof( name ) );
+	Com_sprintf( detail, sizeof( detail ), "user stats received for %s game=%u result=%d",
+		steamId, event->gameId, event->result );
+	CL_LogStatsCallbackLifecycle( "user_stats_received", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "users.stats.%s.received", steamId );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"name\":\"%s\",\"gameId\":%u,\"result\":%d}", steamId, name, event->gameId, event->result );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2053,15 +2131,20 @@ static void CL_Steam_Client_OnPersonaStateChange( void *context, const ql_steam_
 	char steamId[32];
 	char summary[1024];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "persona_state_change", "ignored null callback payload" );
 		return;
 	}
 
 	CL_Steam_FormatSteamId( event->steamId.value, steamId, sizeof( steamId ) );
 	CL_Steam_FormatFriendSummaryJson( &event->summary, summary, sizeof( summary ) );
+	Com_sprintf( detail, sizeof( detail ), "persona changed for %s flags=%u",
+		steamId, event->changeFlags );
+	CL_LogMatchmakingCallbackLifecycle( "persona_state_change", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "users.persona.%s.change", steamId );
 	Com_sprintf( payload, sizeof( payload ), "{\"changeFlags\":%u,\"friend\":%s}", event->changeFlags, summary );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2079,6 +2162,7 @@ static void CL_Steam_Client_OnP2PSessionRequest( void *context, const ql_steam_p
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "p2p_session_request", "ignored null callback payload" );
 		return;
 	}
 
@@ -2102,6 +2186,7 @@ static void CL_Steam_Client_OnGameServerChangeRequested( void *context, const ql
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "server_change_requested", "ignored null callback payload" );
 		return;
 	}
 
@@ -2118,15 +2203,20 @@ static void CL_Steam_Client_OnFriendRichPresenceUpdate( void *context, const ql_
 	char steamId[32];
 	char summary[1024];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "friend_rich_presence_update", "ignored null callback payload" );
 		return;
 	}
 
 	CL_Steam_FormatSteamId( event->steamId.value, steamId, sizeof( steamId ) );
 	CL_Steam_FormatFriendSummaryJson( &event->summary, summary, sizeof( summary ) );
+	Com_sprintf( detail, sizeof( detail ), "rich presence updated for %s app=%u",
+		steamId, event->appId );
+	CL_LogMatchmakingCallbackLifecycle( "friend_rich_presence_update", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "users.presence.%s.change", steamId );
 	Com_sprintf( payload, sizeof( payload ), "{\"appId\":%u,\"friend\":%s}", event->appId, summary );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2140,14 +2230,25 @@ CL_Steam_Client_OnUGCQueryCompleted
 static void CL_Steam_Client_OnUGCQueryCompleted( void *context, const ql_steam_ugc_query_completed_t *event ) {
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
 	const char *eventName;
+	char detail[160];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogWorkshopLifecycle( "callback-ugc-query", "ignored null callback payload" );
 		return;
 	}
 
 	eventName = ( event->result == 1 ) ? "web.ugc.results" : "web.ugc.failed";
+	Com_sprintf( detail, sizeof( detail ),
+		"query completed call=%llu query=%llu result=%d count=%u total=%u cached=%d",
+		(unsigned long long)event->callHandle,
+		(unsigned long long)event->queryHandle,
+		event->result,
+		event->numResultsReturned,
+		event->totalMatchingResults,
+		event->cachedData ? 1 : 0 );
+	CL_LogWorkshopLifecycle( "callback-ugc-query", detail );
 	Com_sprintf(
 		payload,
 		sizeof( payload ),
@@ -2171,20 +2272,26 @@ static void CL_Steam_Lobby_OnLobbyCreated( void *context, const ql_steam_lobby_c
 	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
 	char lobbyId[32];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "lobby_created", "ignored null callback payload" );
 		return;
 	}
 
 	CL_Steam_FormatSteamId( event->lobbyId.value, lobbyId, sizeof( lobbyId ) );
 	if ( event->result != 1 || event->lobbyId.value == 0ull ) {
+		Com_sprintf( detail, sizeof( detail ), "error result=%d id=%s", event->result, lobbyId );
+		CL_LogMatchmakingCallbackLifecycle( "lobby_created", detail );
 		Com_sprintf( payload, sizeof( payload ), "{\"result\":%d,\"id\":\"%s\"}", event->result, lobbyId );
 		CL_Steam_PublishBrowserEvent( "lobby.error", payload );
 		return;
 	}
 
+	Com_sprintf( detail, sizeof( detail ), "created id=%s result=%d", lobbyId, event->result );
+	CL_LogMatchmakingCallbackLifecycle( "lobby_created", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "lobby.%s.create", lobbyId );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"result\":%d}", lobbyId, event->result );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2199,21 +2306,29 @@ static void CL_Steam_Lobby_OnLobbyEnter( void *context, const ql_steam_lobby_ent
 	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
 	char lobbyId[32];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "lobby_enter", "ignored null callback payload" );
 		return;
 	}
 
 	CL_Steam_FormatSteamId( event->lobbyId.value, lobbyId, sizeof( lobbyId ) );
 	if ( event->response != 1 || event->lobbyId.value == 0ull ) {
+		Com_sprintf( detail, sizeof( detail ), "enter failed response=%d permissions=%u id=%s",
+			event->response, event->chatPermissions, lobbyId );
+		CL_LogMatchmakingCallbackLifecycle( "lobby_enter", detail );
 		Com_sprintf( payload, sizeof( payload ), "{\"response\":%d,\"permissions\":%u,\"id\":\"%s\"}", event->response, event->chatPermissions, lobbyId );
 		CL_Steam_PublishBrowserEvent( "lobby.error", payload );
 		return;
 	}
 
 	CL_Steam_SetCurrentLobby( event->lobbyId.value );
+	Com_sprintf( detail, sizeof( detail ), "entered id=%s permissions=%u locked=%d",
+		lobbyId, event->chatPermissions, event->locked ? 1 : 0 );
+	CL_LogMatchmakingCallbackLifecycle( "lobby_enter", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "lobby.%s.enter", lobbyId );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"permissions\":%u,\"locked\":%d,\"response\":%d}", lobbyId, event->chatPermissions, event->locked ? 1 : 0, event->response );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2230,12 +2345,14 @@ static void CL_Steam_Lobby_OnLobbyChatUpdate( void *context, const ql_steam_lobb
 	char userId[32];
 	char name[QL_STEAM_NAME_LENGTH * 2];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 	ql_steam_friend_summary_t summary;
 	const char *verb;
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "lobby_chat_update", "ignored null callback payload" );
 		return;
 	}
 
@@ -2245,6 +2362,9 @@ static void CL_Steam_Lobby_OnLobbyChatUpdate( void *context, const ql_steam_lobb
 	CL_Steam_FormatSteamId( event->changedUser.value, userId, sizeof( userId ) );
 	CL_Steam_JsonEscape( summary.name, name, sizeof( name ) );
 	verb = ( event->stateChange & 0x01u ) ? "joined" : "left";
+	Com_sprintf( detail, sizeof( detail ), "user %s %s in lobby %s (state=%u)",
+		userId, verb, lobbyId, event->stateChange );
+	CL_LogMatchmakingCallbackLifecycle( "lobby_chat_update", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "lobby.%s.user.%s", lobbyId, verb );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"name\":\"%s\",\"stateChange\":%u}", userId, name, event->stateChange );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2262,11 +2382,13 @@ static void CL_Steam_Lobby_OnLobbyChatMessage( void *context, const ql_steam_lob
 	char name[QL_STEAM_NAME_LENGTH * 2];
 	char message[QL_STEAM_LOBBY_MESSAGE_LENGTH * 2];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 	ql_steam_friend_summary_t summary;
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "lobby_chat_message", "ignored null callback payload" );
 		return;
 	}
 
@@ -2276,6 +2398,9 @@ static void CL_Steam_Lobby_OnLobbyChatMessage( void *context, const ql_steam_lob
 	CL_Steam_FormatSteamId( event->chatter.value, userId, sizeof( userId ) );
 	CL_Steam_JsonEscape( summary.name, name, sizeof( name ) );
 	CL_Steam_JsonEscape( event->message, message, sizeof( message ) );
+	Com_sprintf( detail, sizeof( detail ), "chat from %s in lobby %s type=%d bytes=%d",
+		userId, lobbyId, event->chatEntryType, (int)strlen( event->message ) );
+	CL_LogMatchmakingCallbackLifecycle( "lobby_chat_message", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "lobby.%s.chat", lobbyId );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%s\",\"name\":\"%s\",\"msg\":\"%s\",\"type\":%d}", userId, name, message, event->chatEntryType );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2289,13 +2414,20 @@ CL_Steam_Lobby_OnLobbyDataUpdate
 static void CL_Steam_Lobby_OnLobbyDataUpdate( void *context, const ql_steam_lobby_data_update_t *event ) {
 	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "lobby_data_update", "ignored null callback payload" );
 		return;
 	}
 
+	Com_sprintf( detail, sizeof( detail ), "update lobby=%llu member=%llu success=%d",
+		(unsigned long long)event->lobbyId.value,
+		(unsigned long long)event->memberId.value,
+		event->success ? 1 : 0 );
+	CL_LogMatchmakingCallbackLifecycle( "lobby_data_update", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "lobby.%llu.updated", (unsigned long long)event->lobbyId.value );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%llu\",\"member\":\"%llu\",\"success\":%d}", (unsigned long long)event->lobbyId.value, (unsigned long long)event->memberId.value, event->success ? 1 : 0 );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2309,13 +2441,21 @@ CL_Steam_Lobby_OnLobbyGameCreated
 static void CL_Steam_Lobby_OnLobbyGameCreated( void *context, const ql_steam_lobby_game_created_t *event ) {
 	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "lobby_game_created", "ignored null callback payload" );
 		return;
 	}
 
+	Com_sprintf( detail, sizeof( detail ), "game created lobby=%llu server=%llu ip=%u port=%u",
+		(unsigned long long)event->lobbyId.value,
+		(unsigned long long)event->serverId.value,
+		event->serverIp,
+		(unsigned int)event->serverPort );
+	CL_LogMatchmakingCallbackLifecycle( "lobby_game_created", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "lobby.%llu.game_created", (unsigned long long)event->lobbyId.value );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%llu\",\"ip\":%u,\"port\":%u,\"server\":\"%llu\"}", (unsigned long long)event->lobbyId.value, event->serverIp, (unsigned int)event->serverPort, (unsigned long long)event->serverId.value );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2329,10 +2469,12 @@ CL_Steam_Lobby_OnLobbyKicked
 static void CL_Steam_Lobby_OnLobbyKicked( void *context, const ql_steam_lobby_kicked_t *event ) {
 	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "lobby_kicked", "ignored null callback payload" );
 		return;
 	}
 
@@ -2340,6 +2482,11 @@ static void CL_Steam_Lobby_OnLobbyKicked( void *context, const ql_steam_lobby_ki
 		CL_Steam_ClearCurrentLobby();
 	}
 
+	Com_sprintf( detail, sizeof( detail ), "kicked lobby=%llu admin=%llu disconnected=%d",
+		(unsigned long long)event->lobbyId.value,
+		(unsigned long long)event->adminId.value,
+		event->disconnected ? 1 : 0 );
+	CL_LogMatchmakingCallbackLifecycle( "lobby_kicked", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "lobby.%llu.kicked", (unsigned long long)event->lobbyId.value );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%llu\",\"admin\":\"%llu\",\"disconnected\":%d}", (unsigned long long)event->lobbyId.value, (unsigned long long)event->adminId.value, event->disconnected ? 1 : 0 );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2353,13 +2500,19 @@ CL_Steam_Lobby_OnGameLobbyJoinRequested
 static void CL_Steam_Lobby_OnGameLobbyJoinRequested( void *context, const ql_steam_game_lobby_join_requested_t *event ) {
 	char eventName[CL_STEAM_BROWSER_EVENT_NAME_LENGTH];
 	char payload[CL_STEAM_BROWSER_EVENT_PAYLOAD_LENGTH];
+	char detail[128];
 
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMatchmakingCallbackLifecycle( "lobby_join_requested", "ignored null callback payload" );
 		return;
 	}
 
+	Com_sprintf( detail, sizeof( detail ), "join requested lobby=%llu friend=%llu",
+		(unsigned long long)event->lobbyId.value,
+		(unsigned long long)event->friendId.value );
+	CL_LogMatchmakingCallbackLifecycle( "lobby_join_requested", detail );
 	Com_sprintf( eventName, sizeof( eventName ), "lobby.%llu.join_requested", (unsigned long long)event->lobbyId.value );
 	Com_sprintf( payload, sizeof( payload ), "{\"id\":\"%llu\",\"friend\":\"%llu\"}", (unsigned long long)event->lobbyId.value, (unsigned long long)event->friendId.value );
 	CL_Steam_PublishBrowserEvent( eventName, payload );
@@ -2376,6 +2529,7 @@ static void CL_Steam_Micro_OnAuthorizationResponse( void *context, const ql_stea
 	(void)context;
 
 	if ( !event ) {
+		CL_LogMicroTransactionCallbackLifecycle( NULL );
 		return;
 	}
 
@@ -2392,30 +2546,40 @@ CL_Steam_Workshop_OnItemInstalled
 static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_item_installed_t *event ) {
 	uint32_t appId;
 	int itemIndex;
+	unsigned long long itemId;
 	char detail[128];
 
 	(void)context;
 
-	if ( !event || !cl_steamWorkshopDownloadState.active ) {
+	if ( !event ) {
+		CL_LogWorkshopLifecycle( "callback-item-installed", "ignored null callback payload" );
+		return;
+	}
+
+	if ( !cl_steamWorkshopDownloadState.active ) {
+		CL_LogWorkshopLifecycle( "callback-item-installed", "ignored installed callback without active download state" );
 		return;
 	}
 
 	appId = QL_Steamworks_GetAppID();
 	if ( appId != 0u && event->appId != appId ) {
-		Com_sprintf( detail, sizeof( detail ), "ignored installed callback for unexpected app id %u", event->appId );
+		Com_sprintf( detail, sizeof( detail ), "OnDownloadItemResult skip, invalid app id %d", (int)event->appId );
 		CL_LogWorkshopLifecycle( "callback-item-installed", detail );
 		return;
 	}
 
+	itemId = ( (unsigned long long)event->itemIdHigh << 32 ) | event->itemIdLow;
 	itemIndex = CL_Workshop_FindItemIndex( event->itemIdLow, event->itemIdHigh );
 	if ( itemIndex < 0 ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored installed callback for untracked item %llu", itemId );
+		CL_LogWorkshopLifecycle( "callback-item-installed", detail );
 		return;
 	}
 
+	Com_sprintf( detail, sizeof( detail ), "installed item %llu request=%d",
+		itemId, cl_steamWorkshopDownloadState.items[itemIndex].requestNumber );
+	CL_LogWorkshopLifecycle( "callback-item-installed", detail );
 	CL_Workshop_FinalizeInstalledItem( itemIndex );
-	if ( cl_steamWorkshopDownloadState.activeItemIndex < 0 ) {
-		CL_Workshop_AdvanceQueue();
-	}
 }
 
 /*
@@ -2431,13 +2595,24 @@ static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_stea
 
 	(void)context;
 
-	if ( !event || !cl_steamWorkshopDownloadState.active || cl_steamWorkshopDownloadState.activeItemIndex < 0 ) {
+	if ( !event ) {
+		CL_LogWorkshopLifecycle( "callback-download-result", "ignored null callback payload" );
+		return;
+	}
+
+	if ( !cl_steamWorkshopDownloadState.active ) {
+		CL_LogWorkshopLifecycle( "callback-download-result", "ignored download callback without active download state" );
+		return;
+	}
+
+	if ( cl_steamWorkshopDownloadState.activeItemIndex < 0 ) {
+		CL_LogWorkshopLifecycle( "callback-download-result", "ignored download callback without active item index" );
 		return;
 	}
 
 	appId = QL_Steamworks_GetAppID();
 	if ( appId != 0u && event->appId != appId ) {
-		Com_sprintf( detail, sizeof( detail ), "ignored download callback for unexpected app id %u", event->appId );
+		Com_sprintf( detail, sizeof( detail ), "OnDownloadItemResult skip, invalid app id %d", (int)event->appId );
 		CL_LogWorkshopLifecycle( "callback-download-result", detail );
 		return;
 	}
@@ -2445,19 +2620,19 @@ static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_stea
 	item = &cl_steamWorkshopDownloadState.items[cl_steamWorkshopDownloadState.activeItemIndex];
 	itemId = ( (unsigned long long)event->itemIdHigh << 32 ) | event->itemIdLow;
 	if ( item->itemIdLow != event->itemIdLow || item->itemIdHigh != event->itemIdHigh ) {
-		Com_sprintf( detail, sizeof( detail ), "ignored download callback for inactive item %llu", itemId );
+		Com_sprintf( detail, sizeof( detail ), "OnDownloadItemResult skip, not the active download %llu", itemId );
 		CL_LogWorkshopLifecycle( "callback-download-result", detail );
 		return;
 	}
 
 	if ( event->result == 1 ) {
 		CL_Workshop_FinalizeInstalledItem( cl_steamWorkshopDownloadState.activeItemIndex );
-		CL_Workshop_AdvanceQueue();
 		return;
 	}
 
-	CL_Workshop_FailActiveDownload( event->result );
-	CL_Workshop_AdvanceQueue();
+	Com_sprintf( detail, sizeof( detail ), "Download item %llu failed with EResult code %i", itemId, event->result );
+	CL_LogWorkshopLifecycle( "callback-download-result", detail );
+	CL_Workshop_FailActiveDownload();
 }
 
 /*
@@ -2470,10 +2645,6 @@ static void CL_Steam_InitCallbacks( void ) {
 	ql_steam_lobby_callback_bindings_t lobbyBindings;
 	ql_steam_micro_callback_bindings_t microBindings;
 	ql_steam_workshop_callback_bindings_t workshopBindings;
-	const char *matchmakingProvider;
-	const char *matchmakingPolicy;
-	const char *statsProvider;
-	const char *statsPolicy;
 	const char *workshopProvider;
 	const char *workshopPolicy;
 
@@ -2481,15 +2652,10 @@ static void CL_Steam_InitCallbacks( void ) {
 	CL_Steam_ClearCurrentLobby();
 	CL_Steam_ClearBrowserEvents();
 	CL_RefreshPlatformServiceCvars();
-	matchmakingProvider = CL_GetMatchmakingServiceProviderLabel();
-	matchmakingPolicy = CL_GetMatchmakingServicePolicyLabel();
-	statsProvider = CL_GetStatsServiceProviderLabel();
-	statsPolicy = CL_GetStatsServicePolicyLabel();
 	workshopProvider = CL_GetWorkshopServiceProviderLabel();
 	workshopPolicy = CL_GetWorkshopServicePolicyLabel();
 	if ( !CL_SteamServicesEnabled() ) {
-		Com_DPrintf( "Client callback bundle unavailable for matchmaking=%s [%s], stats=%s [%s]; keeping compatibility-only browser event fallback\n",
-			matchmakingProvider, matchmakingPolicy, statsProvider, statsPolicy );
+		CL_LogClientCallbackBootstrapFallback( "online services disabled; keeping compatibility-only browser event fallback" );
 		return;
 	}
 
@@ -2522,8 +2688,7 @@ static void CL_Steam_InitCallbacks( void ) {
 	if ( !QL_Steamworks_RegisterClientCallbacks( &clientBindings ) ||
 		!QL_Steamworks_RegisterLobbyCallbacks( &lobbyBindings ) ||
 		!QL_Steamworks_RegisterMicroCallbacks( &microBindings ) ) {
-		Com_DPrintf( "Client callback bundle unavailable for matchmaking=%s [%s], stats=%s [%s]; keeping compatibility-only browser event fallback\n",
-			matchmakingProvider, matchmakingPolicy, statsProvider, statsPolicy );
+		CL_LogClientCallbackBootstrapFallback( "callback registration failed; keeping compatibility-only browser event fallback" );
 		QL_Steamworks_UnregisterMicroCallbacks();
 		QL_Steamworks_UnregisterLobbyCallbacks();
 		QL_Steamworks_UnregisterClientCallbacks();
@@ -2531,8 +2696,11 @@ static void CL_Steam_InitCallbacks( void ) {
 	}
 
 	if ( !QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings ) ) {
-		Com_DPrintf( "Workshop callbacks unavailable for %s [%s]; keeping polling fallback\n",
+		char detail[160];
+
+		Com_sprintf( detail, sizeof( detail ), "callbacks unavailable; keeping polling fallback (%s [%s])",
 			workshopProvider, workshopPolicy );
+		CL_LogWorkshopLifecycle( "callback-bootstrap", detail );
 	}
 
 	cl_steamCallbackState.callbackRegistrationActive = qtrue;
@@ -4058,19 +4226,19 @@ static void CL_Workshop_Frame( void ) {
 	}
 
 	if ( cl_steamWorkshopDownloadState.downloadsRequested ) {
-		CL_LogWorkshopLifecycle( "filesystem-restart", "downloads complete; restarting filesystem" );
+		Com_Printf( "Steamworks downloads complete - FS restart is required\n" );
 		FS_Restart( clc.checksumFeed );
 		cl_steamWorkshopDownloadState.downloadsRequested = qfalse;
 		return;
 	}
 
+	Com_Printf( "Steamworks downloads complete\n" );
 	if ( FS_ComparePaks( missingfiles, sizeof( missingfiles ), qfalse ) ) {
-		Com_Printf( "\nWARNING: You are missing some files referenced by the server:\n%s"
-			"You might not be able to join the game\n"
-			"Go to the setting menu to turn on autodownload, or get the file elsewhere\n\n", missingfiles );
+		Com_Printf( "WARNING: Missing pk3s referenced by the server:\n%s\n"
+			"The server will most likely refuse the connection.\n", missingfiles );
 	}
 
-	CL_Workshop_ClearBootstrapState( qtrue );
+	cl_steamWorkshopDownloadState.active = qfalse;
 	CL_DownloadsComplete();
 }
 

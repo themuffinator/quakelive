@@ -20,6 +20,7 @@ CLIENT_PLAN_PATH = (
 CLIENT_VALIDATION_NOTE_PATH = (
 	REPO_ROOT / "docs" / "reverse-engineering" / "client-validation-and-runtime-evidence-2026-04-10.md"
 )
+CLIENT_CVAR_NOTE_PATH = REPO_ROOT / "docs" / "client_cvars.md"
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "client-validation.yml"
 BUILD_PIPELINE_PATH = REPO_ROOT / "docs" / "build-pipeline.md"
 WINDOWS_NATIVE_PIPELINE_PATH = REPO_ROOT / "docs" / "windows-native-pipeline.md"
@@ -113,6 +114,7 @@ def _runtime_evidence_is_sufficient(runtime_evidence: dict[str, Any] | None) -> 
 def _build_client_full_parity_gate_report() -> dict[str, Any]:
 	client_plan = _read_text(CLIENT_PLAN_PATH)
 	client_validation_note = _read_text(CLIENT_VALIDATION_NOTE_PATH)
+	client_cvar_notes = _read_text(CLIENT_CVAR_NOTE_PATH)
 	workflow_text = _read_text(WORKFLOW_PATH) if WORKFLOW_PATH.exists() else ""
 	build_pipeline = _read_text(BUILD_PIPELINE_PATH)
 	windows_native_pipeline = _read_text(WINDOWS_NATIVE_PIPELINE_PATH)
@@ -239,14 +241,29 @@ def _build_client_full_parity_gate_report() -> dict[str, Any]:
 		and "static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_item_installed_t *event ) {" in cl_main
 		and "static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_steam_download_item_result_t *event ) {" in cl_main
 		and "QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings )" in cl_main
-		and "static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int arg1, unsigned int arg2, unsigned long long *outDownloaded, unsigned long long *outTotal ) {" in cl_ui
+		and "static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {" in cl_ui
 		and "QL_Steamworks_GetSubscribedItems" in platform_steamworks
 		and "QL_Steamworks_GetItemInstallInfo" in platform_steamworks
 		and "test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owners" in client_workshop_tests
 		and "test_callback_bundle_registration_and_dispatch_reconstructs_retail_client_owner" in steamworks_harness_tests
 		and "test_ui_item_download_import_uses_retained_client_workshop_state" in client_workshop_tests
+		and "test_reverse_engineering_workshop_notes_track_current_progress_and_callback_owner_split" in client_workshop_tests
 		and "test_workshop_subscription_enumeration_uses_retail_ugc_mount_slots" in steamworks_harness_tests
 		and "test_workshop_mount_startup_reconstructs_retail_subscribed_item_import_path" in platform_services_tests
+		and "Workshop/bootstrap request bookkeeping (`cl_downloadItem`, `cl_downloadName`, `cl_downloadTime`) matches the recovered `CL_InitDownloads` and `uix86` surface" in client_cvar_notes
+		and "reads `cl_downloadItem`, calls the native `GetItemDownloadInfo` probe with the parsed item-ID low/high words, and consults `cl_downloadTime`" in client_cvar_notes
+		and "`cl_downloadCount` and `cl_downloadSize` still exist because Quake Live UI strings reference them" in client_cvar_notes
+		and "seeds the retail-facing `cl_downloadItem` / `cl_downloadName` / `cl_downloadTime` request surface from that retained state" in client_plan
+		and "consults retained client workshop state first before falling back to `QL_Steamworks_GetItemDownloadInfo`, the retained wrapper over the retail `SteamUGC_GetItemDownloadInfo` low/high-word slot keyed by the parsed `cl_downloadItem` words, instead of legacy byte counters" in client_plan
+		and "imports workshop download progress from retained client state before falling back to `QL_Steamworks_GetItemDownloadInfo`, the retained wrapper over the retail `SteamUGC_GetItemDownloadInfo` low/high-word slot" in client_plan
+		and "routes installed-item completion plus download-result failure through the shared queue-pop owner" in client_plan
+		and "only falls back to `QL_Steamworks_GetItemDownloadInfo`, the retained wrapper over the retail `SteamUGC_GetItemDownloadInfo` low/high-word slot" in client_plan
+		and "consumes `ItemInstalled` / `DownloadItemResult` through shared finalize/failure helpers that tail into `SteamWorkshop_AdvanceDownloadQueue`" in client_plan
+		and "reconstructed client/workshop state first, then the recovered `GetItemDownloadInfo` low/high-word bridge" in client_plan
+		and "state first and only then falls back to `QL_Steamworks_GetItemDownloadInfo`," in implementation_plan
+		and "`SteamUGC_GetItemDownloadInfo` slot." in implementation_plan
+		and "Kept the then-retained UI-facing `cl_downloadCount` / `cl_downloadSize`" in implementation_plan
+		and "temp-cvar updates intact around that narrower helper contract." in implementation_plan
 	)
 	report["tranches"]["CL-G03"] = _entry(
 		"CL-G03",
@@ -268,15 +285,36 @@ def _build_client_full_parity_gate_report() -> dict[str, Any]:
 				and "static void CL_Steam_Workshop_OnDownloadItemResult( void *context, const ql_steam_download_item_result_t *event ) {" in cl_main
 				and "QL_Steamworks_RegisterWorkshopCallbacks( &workshopBindings )" in cl_main
 			),
-			"ui_progress_import_present": "static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int arg1, unsigned int arg2, unsigned long long *outDownloaded, unsigned long long *outTotal ) {" in cl_ui,
+			"ui_progress_import_present": "static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {" in cl_ui,
 			"workshop_mount_helpers_present": (
 				"QL_Steamworks_GetSubscribedItems" in platform_steamworks
 				and "QL_Steamworks_GetItemInstallInfo" in platform_steamworks
 			),
 			"focused_validation_present": (
 				"test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owners" in client_workshop_tests
+				and "test_reverse_engineering_workshop_notes_track_current_progress_and_callback_owner_split" in client_workshop_tests
 				and "test_callback_bundle_registration_and_dispatch_reconstructs_retail_client_owner" in steamworks_harness_tests
 				and "test_workshop_mount_startup_reconstructs_retail_subscribed_item_import_path" in platform_services_tests
+			),
+			"client_cvar_notes_current": (
+				"Workshop/bootstrap request bookkeeping (`cl_downloadItem`, `cl_downloadName`, `cl_downloadTime`) matches the recovered `CL_InitDownloads` and `uix86` surface" in client_cvar_notes
+				and "reads `cl_downloadItem`, calls the native `GetItemDownloadInfo` probe with the parsed item-ID low/high words, and consults `cl_downloadTime`" in client_cvar_notes
+				and "`cl_downloadCount` and `cl_downloadSize` still exist because Quake Live UI strings reference them" in client_cvar_notes
+			),
+			"client_plan_notes_current": (
+				"seeds the retail-facing `cl_downloadItem` / `cl_downloadName` / `cl_downloadTime` request surface from that retained state" in client_plan
+				and "consults retained client workshop state first before falling back to `QL_Steamworks_GetItemDownloadInfo`, the retained wrapper over the retail `SteamUGC_GetItemDownloadInfo` low/high-word slot keyed by the parsed `cl_downloadItem` words, instead of legacy byte counters" in client_plan
+				and "imports workshop download progress from retained client state before falling back to `QL_Steamworks_GetItemDownloadInfo`, the retained wrapper over the retail `SteamUGC_GetItemDownloadInfo` low/high-word slot" in client_plan
+				and "routes installed-item completion plus download-result failure through the shared queue-pop owner" in client_plan
+				and "only falls back to `QL_Steamworks_GetItemDownloadInfo`, the retained wrapper over the retail `SteamUGC_GetItemDownloadInfo` low/high-word slot" in client_plan
+				and "consumes `ItemInstalled` / `DownloadItemResult` through shared finalize/failure helpers that tail into `SteamWorkshop_AdvanceDownloadQueue`" in client_plan
+				and "reconstructed client/workshop state first, then the recovered `GetItemDownloadInfo` low/high-word bridge" in client_plan
+			),
+			"implementation_plan_notes_current": (
+				"state first and only then falls back to `QL_Steamworks_GetItemDownloadInfo`," in implementation_plan
+				and "`SteamUGC_GetItemDownloadInfo` slot." in implementation_plan
+				and "Kept the then-retained UI-facing `cl_downloadCount` / `cl_downloadSize`" in implementation_plan
+				and "temp-cvar updates intact around that narrower helper contract." in implementation_plan
 			),
 		},
 	)

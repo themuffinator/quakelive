@@ -13,29 +13,34 @@ behavior and interface evidence set.
 
 ## Coverage snapshot
 
-| Binary | Functions resolved | Strings resolved | Relocations captured |
+| Binary | Functions resolved / retired | Strings resolved / retired | Relocations captured |
 | ------ | ------------------ | ---------------- | -------------------- |
-| Client | 4 / 5 | 4 / 5 | 4 |
-| Server | 4 / 5 | 4 / 6 | 5 |
+| Client | 4 resolved, 1 retired / 5 | 4 resolved, 1 retired / 5 | 4 |
+| Server | 4 resolved, 1 retired / 5 | 4 resolved, 2 retired / 6 | 5 |
 | UI     | 4 / 5 | 4 / 5 | 4 |
 | Cgame  | 154 / 154 | 168 / 168 | 0 |
 
 Key metrics come directly from the `stats` nodes in the exported JSON manifests
 (`client.json`, `server.json`, `ui.json`, `cgame.json`).
 
-## High-priority unknowns
+## Retired legacy seed rows
 
 ### Client
-- `UNRESOLVED_CLIENT_func_00445AB0` at `0x00445AB0` references the unresolved
-  string `UNRESOLVED_CLIENT_str_0068C5D0`. This block appears inside the renderer
-  call chain and should be triaged alongside the draw backend bootstrap.
+- The old `0x00445AB0` client seed row has been retired rather than carried as
+  an unresolved Quake Live gap. The newer `quakelive_steam.exe` mapping rounds
+  resolve the renderer/bootstrap surface through current host aliases including
+  `CL_InitRenderer`, `CL_InitRef`, and `RE_RenderScene`; the old
+  `render backend missing implementation` string is not a current retail host
+  string in the committed Ghidra/HLIL corpus.
 
 ### Server
-- `UNRESOLVED_SERVER_func_00412190` at `0x00412190` is tied to scoring text and
-  relocates `teamScores`. Confirm whether this houses the team scoring logic for
-  Capture the Flag and Duel variations.
-- Strings `UNRESOLVED_SERVER_str_0069F210` and `UNRESOLVED_SERVER_str_0069F250`
-  share that same function and may expose additional team messaging formats.
+- The old `0x00412190` server seed row has been retired. The current
+  function-to-function qagame map resolves the corresponding team-score and
+  lead-change behavior through `AddTeamScore` at `0x100681B0`, with the
+  surrounding retail scoreboard serialization covered by
+  `G_BuildTeamScoreboardMessage` and `G_SendTDMStatsMessage`.
+
+## Remaining baseline unknowns
 
 ### UI
 - `UNRESOLVED_UI_func_0030F8A0` at `0x0030F8A0` references

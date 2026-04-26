@@ -85,7 +85,8 @@ provider/policy pair when the server publishes required workshop items, and
 threads that same pair through download start, completion, callback-ignore,
 filesystem-restart, and non-Steam bootstrap fallback messages when the current
 descriptor is build-disabled, runtime-disabled, or otherwise not a Steam UGC
-owner.【F:src/code/client/cl_cgame.c†L3215-L3490】【F:src/code/client/cl_main.c†L108-L2142】
+owner. That required-items fallback now also flows through the shared workshop
+lifecycle logger instead of a one-off raw print line.【F:src/code/client/cl_cgame.c†L3215-L3490】【F:src/code/client/cl_main.c†L108-L2142】
 
 The retained client matchmaking, stats, and social-overlay seams now follow the
 same contract. `CL_Init` and `CL_Steam_InitCallbacks` mirror the active
@@ -94,11 +95,16 @@ descriptor labels through the ROM cvars `cl_matchmakingProvider`,
 `cl_socialOverlayProvider`, and `cl_socialOverlayPolicy`, while
 `stats_clear`, `connect_lobby`, `clientviewprofile`, `clientfriendinvite`, the
 main-menu and first-snapshot rich-presence seeds, and the client
-callback-bundle fallback logs all spell out the current provider/policy pair
-instead of silently reading like the retail Steam owner lane. The
+callback-bundle bootstrap now flows through a shared provider-aware fallback
+logger that spells out the current matchmaking, stats, and social-overlay
+provider/policy pairs instead of leaving those bootstrap exits as raw one-off
+lines. The
 `stats_clear` registration gate now also emits explicit provider-aware skip
 diagnostics when the current compatibility lane cannot own that command during
 bootstrap, rather than silently leaving the command unregistered. The retained
+user-stats callback lane now also emits stats provider/policy-aware callback
+diagnostics before it forwards browser-facing `users.stats.*.received` payloads
+into the shared event queue. The retained
 client P2P session-request callback now also emits explicit matchmaking
 provider/policy-aware acceptance and accept-failure diagnostics instead of a
 raw generic Steam trace line. The retained browser-event publish lane now also
@@ -108,7 +114,28 @@ named browser event plus payload/sequence detail instead of a raw `steam_event`
 dump. The retained microtransaction authorization callback now also emits an
 explicit overlay provider/policy-aware callback diagnostic before forwarding
 its purchase update into that browser-event queue, instead of logging a raw
-generic payload dump line.【F:src/code/client/cl_main.c†L176-L2397】【F:src/code/client/cl_cgame.c†L5410-L5441】
+generic payload dump line. The retained client lobby callback owner now also
+emits matchmaking provider/policy-aware lifecycle diagnostics for lobby
+create, enter, membership, chat, metadata, game-created, kicked, and
+join-requested callbacks before those payloads are forwarded into the same
+browser-event queue. The retained rich-presence join and server-change
+callback handoff now also logs the same matchmaking provider/policy pair when
+it routes immediate join/connect commands, so those callback-driven connect
+surfaces no longer read like silent Steam-owned behavior. The retained
+persona-state and friend-rich-presence callbacks now also emit matchmaking
+provider/policy-aware lifecycle diagnostics before they forward
+`users.persona.*.change` and `users.presence.*.change` payloads into that
+browser-event queue, while the retained client UGC query-complete callback now
+emits workshop provider/policy-aware lifecycle detail before it forwards the
+legacy `web.ugc.results` or `web.ugc.failed` payloads. The retained client
+workshop item-installed and download-result callbacks now also emit the same
+workshop provider/policy-aware lifecycle diagnostics for tracked success,
+untracked-item ignore, and result-failure exits before the queue helpers log
+their broader `item-complete` / `item-failed` lifecycle transitions. The
+retained client workshop callback bootstrap gate now also routes its
+registration-failure polling fallback through that same workshop lifecycle
+logger instead of a one-off raw debug line, so the callback-owner boundary is
+explicit even when the client falls back to polling-only workshop progress.【F:src/code/client/cl_main.c†L176-L2397】【F:src/code/client/cl_cgame.c†L5410-L5441】
 
 The retained client web-host export lane now carries the same boundary through
 the browser-facing data contracts. `GetConfig` includes the overall
@@ -169,22 +196,159 @@ relay forwards fail. The retained published-state owner now also emits
 provider/policy-aware diagnostics when max-player, password, hostname, map,
 description, tag, score-key, player-data, or bot-count publication writes fail
 instead of silently assuming the Steam GameServer owner is always writable. The
+retained GameServer connect, connect-failure, and disconnect callbacks now also
+flow through a shared callback-owner lifecycle logger, which keeps those
+callback-origin state changes explicit instead of leaving them as isolated
+one-off print lines. The retained server identity-publication owner now also
+flows through its own provider/policy-aware lifecycle logger for both the
+unavailable and successful publish paths instead of only surfacing a raw
+identity-unavailable line. The
 retained dedicated-server workshop operator lane now mirrors the workshop
-descriptor too: the `steam_downloadugc`, `steam_subscribeugc`, and
-`steam_unsubscribeugc` commands emit provider/policy-aware workshop lifecycle
-diagnostics, and they now stop early when the current compatibility lane does
-not include a Steam UGC owner instead of pretending that a non-Steam workshop
-provider can service those Steam-specific commands. The retained GameServerStats lane now mirrors the same stats
-descriptor and uses it in request/session lifecycle diagnostics too, while the
+descriptor too: the retained `steam_downloadugc` command still uses the
+provider/policy-aware workshop lifecycle logger for the bounded compatibility
+lane, while `steam_subscribeugc` and `steam_unsubscribeugc` now mirror the
+thinner retail command shape instead of layering extra compatibility-only
+request/failure diagnostics on top. The recovered subscribe path also restores
+the retail installed-item fast path by restarting the filesystem immediately
+when the newly subscribed item is already installed. Those three operator
+commands are now thin parse wrappers again in source and hand off to local
+helpers that mirror the recovered retail `SteamWorkshop_RequestDownload`,
+`SteamWorkshop_SubscribeItem`, and `SteamWorkshop_UnsubscribeItem` ownership
+split instead of inlining the workshop control flow directly in the command
+handlers. The shared `QL_Steamworks_SubscribeItem` wrapper now also mirrors
+the retail helper contract by re-reading `QL_Steamworks_GetItemState` after
+the raw subscribe call and only reporting success when that item state becomes
+non-zero. The retained client workshop bootstrap lane now mirrors the
+recovered retail `SteamWorkshop_RequestDownload`,
+`SteamWorkshop_AdvanceDownloadQueue`, and `SteamWorkshop_FinalizeItem`
+ownership split too: the first bootstrap request helper now owns only the
+initial `requesting download` path, the queue-pop helper owns the retail
+`was queued, requesting download` handoff again, and the finalize helper now
+advances the queued download lane after completion instead of leaving that
+work inline in the callback owners. The recovered `DownloadItemResult`
+failure path now also tails into that same shared queue-pop helper: the
+retained queue-pop owner clears the active download gate before scanning for
+queued items, the completion/failure helpers both hand off there, and the
+callback owner no longer inlines a second queue-advance call after marking
+the active item failed. The retained bootstrap caller now also
+matches the retail `CL_InitDownloads` ownership more closely: uncached items
+flow through `CL_Workshop_RequestDownload` regardless of whether they become
+the active download or just queue for later, queued items are tracked
+explicitly in retained state instead of being inferred from
+`!completed && !downloadRequested`, and the caller now seeds
+`cl_downloadItem`, `cl_downloadName`, and `cl_downloadTime` after successful
+request-helper returns instead of having the active-item helper mutate those
+cvars directly. The retained workshop request helper now also mirrors the
+retail `SteamWorkshop_RequestDownload` cache-hit ownership more closely:
+parsed bootstrap items no longer short-circuit installed-state handling in the
+caller, the helper itself now owns the retail `Workshop item %llu: in cache.`
+detail plus finalize handoff, and even all-cached bootstrap passes still mark
+the retained queue gate active so the later queue-complete lane can run in the
+same place retail does. The retained client workshop bootstrap/frame lane now
+also mirrors the retail string surface more closely: the bootstrap
+announcement is back to the plain `Server requires the following workshop
+items: %s` detail without the compatibility-only provider/policy suffix, and
+the frame helper now reuses the recovered `Steamworks downloads complete - FS
+restart is required`, `Steamworks downloads complete`, and `WARNING: Missing
+pk3s referenced by the server:\n%s\nThe server will most likely refuse the
+connection.` strings instead of the newer compatibility-only restart and
+warning wording. The retained workshop completion gate also now mirrors the
+retail owner split more closely: after the no-restart frame path prints the
+recovered completion/warning surface it only drops the outer workshop-active
+gate before `CL_DownloadsComplete()` rather than zeroing the whole retained
+bootstrap state. Companion `uix86` reconstruction evidence also shows the
+workshop progress screen reading `cl_downloadItem`, the native
+`GetItemDownloadInfo` import with the parsed item-ID low/high words, and
+`cl_downloadTime`, so the retained client
+active-item and clear-active helpers no longer churn the generic
+`cl_downloadCount` / `cl_downloadSize` cvars on every queue handoff. Focused
+validation now keeps that recovered owner split aligned across both the
+platform-services workshop regression and the older
+`test_client_workshop_bootstrap_parity.py` coverage, and the older
+reverse-engineering workshop notes now match the same low/high import wording,
+retained-client-state progress bridge, and shared queue-pop callback-owner
+story. The aligned `docs/client_cvars.md` note now records the same split:
+`cl_downloadItem`, `cl_downloadName`, and `cl_downloadTime` remain the
+retained workshop request/progress bridge, while `cl_downloadCount` and
+`cl_downloadSize` stay UI-facing temp cvars rather than the authoritative
+workshop progress owner. The older client-parity notes now also spell out
+that the retained UI bridge falls back specifically to
+`QL_Steamworks_GetItemDownloadInfo`, the retained wrapper over the retail
+`SteamUGC_GetItemDownloadInfo` low/high-word slot. The top-level `CL-P3`
+summary and the older implementation-plan workshop note now also use that
+same explicit helper naming, while describing `cl_downloadCount` and
+`cl_downloadSize` as UI-facing temp cvars rather than the authoritative
+progress owner. The
+retained GameServerStats lane now
+mirrors the same stats
+descriptor and uses it in request/session/query/store lifecycle diagnostics
+too: successful request issue, active-session reuse, fresh-session bootstrap,
+backend reconnect requery, stat/achievement query success and failure,
+pending-value publish failure, store failure, and store success traces all
+carry the same provider/policy pair, and the retained achievement owner/query
+entry points now also label invalid, gameplay-gated, unavailable, already-held,
+queued-unlock, and ownership-result decisions through the same compatibility
+descriptor. The retained stat-delta owner now also labels invalid/no-op,
+unavailable, session-unavailable, and baseline-unavailable queue decisions
+through that same compatibility descriptor. The retained session-teardown lane
+now also labels inactive-session skips and completed session clears through
+that same compatibility descriptor. The retained session-bootstrap gate now
+also labels null, out-of-range, zombie, missing-gentity, missing-SteamID,
+bot-owned, and invalid-SteamID skips through that same compatibility
+descriptor. The retained client-slot gate now also labels out-of-range,
+inactive, zombie, missing-gentity, missing-SteamID, bot-owned, and
+invalid-SteamID request gating through that same compatibility descriptor,
+and the retained request-current-values gate now also labels null, inactive,
+and missing-SteamID session skips through that same compatibility descriptor.
+The retained value-query gate now also labels null-session, inactive-session,
+invalid-id, unmapped-id, and already-cached stat/achievement paths through
+that same compatibility descriptor. The retained value-flush gate now also
+labels null-session, inactive-session, missing-SteamID, and no-pending-update
+skips through that same compatibility descriptor. The retained session-reset
+helper now also labels null-session skips and retained-session clears through
+that same compatibility descriptor, and the retained stat/achievement
+descriptor lookup helpers now also label invalid and unmapped descriptor
+requests through that same compatibility descriptor,
+while the
 structured auth telemetry intentionally preserves the legacy `credential=steam`
 field so existing log consumers keep their stable contract. The retained
 auth-session bootstrap now also emits provider/policy-aware connection-reject
 diagnostics when session setup fails, while keeping the outward
 `Failed to authenticate with Steam: ...` drop message stable for existing
-consumers. The callback-registration bootstrap now emits that same
-provider/policy-aware fallback even in the build-disabled stub path, so the
-dedicated-server callback lane no longer disappears silently before startup
-diagnostics are emitted. The build-disabled `SV_SteamStats_AddFieldValue`,
+consumers. The callback-registration bootstrap now flows through its own
+provider/policy-aware lifecycle logger in both the registration-failure and
+build-disabled stub paths, so the dedicated-server callback lane no longer
+falls back through isolated raw debug lines before startup diagnostics are
+emitted. The retained client callback owners now also label ignored null
+callback payloads across rich-presence join, user-stats, persona, P2P session,
+server-change, friend rich-presence, UGC query, the full lobby lifecycle
+callback set, the microtransaction authorization owner, and the workshop
+callback guards instead of silently returning. The retained dedicated-server
+callback owners now also label null connect-failure, disconnect, auth-ticket,
+and P2P payloads plus missing-client auth responses, while the Steamworks
+server callback dispatchers now label missing callback state, unregistered
+callbacks, and missing payload prerequisites instead of silently returning.
+The retained client workshop queue/request/result lane now also prefers the
+retail-observed SteamWorkshop detail strings for direct request, queued
+request, cache hit, queued handoff, completion, queue completion, invalid-app
+skip, active-download skip, and failure-result cases instead of the earlier
+freehand compatibility wording. The filesystem-side workshop startup lane now
+also reuses the retail `SteamWorkshop_Init` skip strings for the missing
+`pak00.pk3`, `fs_skipWorkshop`, build-mode, and null-`ISteamUGC` gates, keeps
+the exact basepath-only `pak00.pk3` probe, and restores the retail raw-path
+mount toggle that depends on whether `pak00.pk3` was present. The retained
+manual `steam_downloadugc` operator path now likewise reuses the retail
+immediate-download `Workshop item %llu: download` / `Workshop item %llu: in
+cache.` detail strings instead of compatibility-only wording. The retained
+client `CL_Workshop_StartDownload` helper also now ignores the raw
+`DownloadItem` return value like the retail owner and no longer emits a
+separate compatibility-only request-failure trace, while the internal failure
+cleanup helper no longer duplicates the already restored retail callback
+failure log. The retained `steam_subscribeugc` / `steam_unsubscribeugc`
+operator commands now likewise mirror the retail thin-wrapper contract instead
+of adding compatibility-only request/failure traces, and the subscribe command
+restores the retail installed-item `FS_Restart` fast path.
+The build-disabled `SV_SteamStats_AddFieldValue`,
 `SV_SteamStats_UnlockAchievement`, and `SV_SteamStats_HasAchievement` stubs now
 also emit stats provider/policy-aware diagnostics instead of silently no-oping
 when the retained stats owner is unavailable.

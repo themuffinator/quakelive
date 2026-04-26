@@ -208,6 +208,8 @@ static const char *s_svSteamAchievementNames[SV_STEAM_ACHIEVEMENT_COUNT] = {
 	"AW_MAX"
 };
 
+static void SV_LogSteamStatsLifecycle( const CSteamID *steamId, const char *stage, const char *detail );
+
 /*
 =================
 SV_ClearPlatformAuthState
@@ -574,8 +576,17 @@ Clears one retained server-owned Steam stats session.
 =================
 */
 static void SV_SteamStats_ResetSession( sv_steam_stats_session_t *session ) {
+	CSteamID steamId;
+
 	if ( !session ) {
+		SV_LogSteamStatsLifecycle( NULL, "session-reset", "ignored reset for null session" );
 		return;
+	}
+
+	steamId = session->steamId;
+	if ( session->active || steamId.value != 0ull || session->requestIssued || session->backendAvailable ) {
+		SV_LogSteamStatsLifecycle( steamId.value != 0ull ? &steamId : NULL,
+			"session-reset", "cleared retained session state" );
 	}
 
 	Com_Memset( session, 0, sizeof( *session ) );
@@ -585,30 +596,62 @@ static void SV_SteamStats_ResetSession( sv_steam_stats_session_t *session ) {
 =================
 SV_SteamStats_GetFieldName
 
-Returns the mapped retail Steam stat descriptor name for one field index.
+Returns the mapped retail Steam stat descriptor name for one field index while
+labeling invalid or unmapped descriptor lookups through the shared stats
+lifecycle logger.
 =================
 */
-static const char *SV_SteamStats_GetFieldName( int statIndex ) {
+static const char *SV_SteamStats_GetFieldName( int statIndex, const char *stage ) {
+	const char *lookupStage;
+	const char *name;
+	char detail[128];
+
+	lookupStage = stage ? stage : "descriptor-lookup";
 	if ( statIndex < 0 || statIndex >= SV_STEAM_STATS_FIELD_COUNT ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored stat descriptor lookup for invalid index %d", statIndex );
+		SV_LogSteamStatsLifecycle( NULL, lookupStage, detail );
 		return NULL;
 	}
 
-	return s_svSteamStatNames[statIndex];
+	name = s_svSteamStatNames[statIndex];
+	if ( !name ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored stat descriptor lookup for unmapped index %d", statIndex );
+		SV_LogSteamStatsLifecycle( NULL, lookupStage, detail );
+		return NULL;
+	}
+
+	return name;
 }
 
 /*
 =================
 SV_SteamStats_GetAchievementName
 
-Returns the mapped retail Steam achievement name for one achievement index.
+Returns the mapped retail Steam achievement name for one achievement index while
+labeling invalid or unmapped descriptor lookups through the shared stats
+lifecycle logger.
 =================
 */
-static const char *SV_SteamStats_GetAchievementName( int achievementId ) {
+static const char *SV_SteamStats_GetAchievementName( int achievementId, const char *stage ) {
+	const char *lookupStage;
+	const char *name;
+	char detail[128];
+
+	lookupStage = stage ? stage : "descriptor-lookup";
 	if ( achievementId < 0 || achievementId >= SV_STEAM_ACHIEVEMENT_COUNT ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement descriptor lookup for invalid id %d", achievementId );
+		SV_LogSteamStatsLifecycle( NULL, lookupStage, detail );
 		return NULL;
 	}
 
-	return s_svSteamAchievementNames[achievementId];
+	name = s_svSteamAchievementNames[achievementId];
+	if ( !name ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement descriptor lookup for unmapped id %d", achievementId );
+		SV_LogSteamStatsLifecycle( NULL, lookupStage, detail );
+		return NULL;
+	}
+
+	return name;
 }
 
 /*
@@ -619,24 +662,54 @@ Returns the retained client slot for a stats/achievement request when it is live
 and not a bot-owned surrogate.
 =================
 */
-static client_t *SV_SteamStats_GetClientSlot( int clientNum ) {
+static client_t *SV_SteamStats_GetClientSlot( int clientNum, const char *stage, const char *subject ) {
 	client_t *cl;
 	CSteamID steamId;
+	char detail[128];
+	const char *label;
+
+	label = subject ? subject : "stats request";
 
 	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
+		Com_sprintf( detail, sizeof( detail ), "%s unavailable for out-of-range client %d", label, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, stage, detail );
 		return NULL;
 	}
 
 	cl = &svs.clients[clientNum];
-	if ( cl->state < CS_CONNECTED || cl->state == CS_ZOMBIE || !cl->gentity || !cl->platformSteamId[0] ) {
+	if ( cl->state < CS_CONNECTED ) {
+		Com_sprintf( detail, sizeof( detail ), "%s unavailable for inactive client %d", label, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, stage, detail );
+		return NULL;
+	}
+
+	if ( cl->state == CS_ZOMBIE ) {
+		Com_sprintf( detail, sizeof( detail ), "%s unavailable for zombie client %d", label, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, stage, detail );
+		return NULL;
+	}
+
+	if ( !cl->gentity ) {
+		Com_sprintf( detail, sizeof( detail ), "%s unavailable for client %d without gentity", label, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, stage, detail );
+		return NULL;
+	}
+
+	if ( !cl->platformSteamId[0] ) {
+		Com_sprintf( detail, sizeof( detail ), "%s unavailable for client %d without steam id", label, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, stage, detail );
 		return NULL;
 	}
 
 	if ( SV_ClientIsBot( cl ) || ( cl->gentity->r.svFlags & SVF_BOT ) ) {
+		Com_sprintf( detail, sizeof( detail ), "%s unavailable for bot-owned client %d", label, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, stage, detail );
 		return NULL;
 	}
 
 	if ( !SV_ParsePlatformSteamId( cl->platformSteamId, &steamId ) || steamId.value == 0ull ) {
+		Com_sprintf( detail, sizeof( detail ), "%s unavailable for client %d with invalid steam id", label, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, stage, detail );
 		return NULL;
 	}
 
@@ -670,7 +743,18 @@ Reissues the retail SteamGameServerStats request for one active player session.
 =================
 */
 static qboolean SV_SteamStats_RequestCurrentValues( sv_steam_stats_session_t *session ) {
-	if ( !session || !session->active || session->steamId.value == 0ull ) {
+	if ( !session ) {
+		SV_LogSteamStatsLifecycle( NULL, "request-current-values", "ignored request for null session" );
+		return qfalse;
+	}
+
+	if ( !session->active ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "request-current-values", "ignored request for inactive session" );
+		return qfalse;
+	}
+
+	if ( session->steamId.value == 0ull ) {
+		SV_LogSteamStatsLifecycle( NULL, "request-current-values", "ignored request for session without steam id" );
 		return qfalse;
 	}
 
@@ -681,6 +765,7 @@ static qboolean SV_SteamStats_RequestCurrentValues( sv_steam_stats_session_t *se
 
 	session->backendAvailable = qtrue;
 	session->requestIssued = qtrue;
+	SV_LogSteamStatsLifecycle( &session->steamId, "request-current-values", "request issued" );
 	return qtrue;
 }
 
@@ -693,23 +778,38 @@ Loads one stat value from SteamGameServerStats when the backend is available.
 */
 static qboolean SV_SteamStats_LoadFieldValue( sv_steam_stats_session_t *session, int statIndex ) {
 	const char *name;
+	char detail[128];
 	int value;
 
-	if ( !session || !session->active ) {
+	if ( !session ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored stat query for null session at index %d", statIndex );
+		SV_LogSteamStatsLifecycle( NULL, "value-query", detail );
+		return qfalse;
+	}
+
+	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored stat query for inactive session at index %d", statIndex );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 		return qfalse;
 	}
 
 	if ( statIndex < 0 || statIndex >= SV_STEAM_STATS_FIELD_COUNT ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored stat query for invalid index %d", statIndex );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
+		return qfalse;
+	}
+
+	name = SV_SteamStats_GetFieldName( statIndex, "value-query" );
+	if ( !name ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored stat query for unmapped index %d", statIndex );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 		return qfalse;
 	}
 
 	if ( session->statLoaded[statIndex] ) {
+		Com_sprintf( detail, sizeof( detail ), "stat %s already cached as %d", name, session->statValue[statIndex] );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 		return qtrue;
-	}
-
-	name = SV_SteamStats_GetFieldName( statIndex );
-	if ( !name ) {
-		return qfalse;
 	}
 
 	if ( !session->requestIssued ) {
@@ -719,12 +819,16 @@ static qboolean SV_SteamStats_LoadFieldValue( sv_steam_stats_session_t *session,
 	session->statQueryAttempted[statIndex] = qtrue;
 	value = 0;
 	if ( !QL_Steamworks_ServerGetUserStatInt( &session->steamId, name, &value ) ) {
+		Com_sprintf( detail, sizeof( detail ), "stat %s query failed", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 		return qfalse;
 	}
 
 	session->backendAvailable = qtrue;
 	session->statLoaded[statIndex] = qtrue;
 	session->statValue[statIndex] = value + session->pendingStatDelta[statIndex];
+	Com_sprintf( detail, sizeof( detail ), "stat %s loaded as %d", name, session->statValue[statIndex] );
+	SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 	return qtrue;
 }
 
@@ -737,23 +841,39 @@ Loads one achievement bit from SteamGameServerStats when the backend is availabl
 */
 static qboolean SV_SteamStats_LoadAchievement( sv_steam_stats_session_t *session, int achievementId ) {
 	const char *name;
+	char detail[128];
 	qboolean achieved;
 
-	if ( !session || !session->active ) {
+	if ( !session ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement query for null session at id %d", achievementId );
+		SV_LogSteamStatsLifecycle( NULL, "value-query", detail );
+		return qfalse;
+	}
+
+	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement query for inactive session at id %d", achievementId );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 		return qfalse;
 	}
 
 	if ( achievementId < 0 || achievementId >= SV_STEAM_ACHIEVEMENT_COUNT ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement query for invalid id %d", achievementId );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
+		return qfalse;
+	}
+
+	name = SV_SteamStats_GetAchievementName( achievementId, "value-query" );
+	if ( !name ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement query for unmapped id %d", achievementId );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 		return qfalse;
 	}
 
 	if ( session->achievementLoaded[achievementId] ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s already cached as %s",
+			name, session->achievementUnlocked[achievementId] ? "unlocked" : "locked" );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 		return qtrue;
-	}
-
-	name = SV_SteamStats_GetAchievementName( achievementId );
-	if ( !name ) {
-		return qfalse;
 	}
 
 	if ( !session->requestIssued ) {
@@ -763,12 +883,17 @@ static qboolean SV_SteamStats_LoadAchievement( sv_steam_stats_session_t *session
 	session->achievementQueryAttempted[achievementId] = qtrue;
 	achieved = qfalse;
 	if ( !QL_Steamworks_ServerGetUserAchievement( &session->steamId, name, &achieved ) ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s query failed", name );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 		return qfalse;
 	}
 
 	session->backendAvailable = qtrue;
 	session->achievementLoaded[achievementId] = qtrue;
 	session->achievementUnlocked[achievementId] = ( session->achievementUnlocked[achievementId] || achieved ) ? qtrue : qfalse;
+	Com_sprintf( detail, sizeof( detail ), "achievement %s loaded as %s",
+		name, session->achievementUnlocked[achievementId] ? "unlocked" : "locked" );
+	SV_LogSteamStatsLifecycle( &session->steamId, "value-query", detail );
 	return qtrue;
 }
 
@@ -783,14 +908,30 @@ static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session 
 	const char *name;
 	qboolean hasPending;
 	qboolean failed;
+	char detail[128];
+	int pendingStats;
+	int pendingAchievements;
 	int i;
 
-	if ( !session || !session->active || session->steamId.value == 0ull ) {
+	if ( !session ) {
+		SV_LogSteamStatsLifecycle( NULL, "value-flush", "ignored flush for null session" );
+		return;
+	}
+
+	if ( !session->active ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", "ignored flush for inactive session" );
+		return;
+	}
+
+	if ( session->steamId.value == 0ull ) {
+		SV_LogSteamStatsLifecycle( NULL, "value-flush", "ignored flush for session without steam id" );
 		return;
 	}
 
 	hasPending = qfalse;
 	failed = qfalse;
+	pendingStats = 0;
+	pendingAchievements = 0;
 
 	for ( i = 0; i < SV_STEAM_STATS_FIELD_COUNT; i++ ) {
 		if ( !session->statDirty[i] ) {
@@ -798,13 +939,18 @@ static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session 
 		}
 
 		hasPending = qtrue;
+		pendingStats++;
+		name = SV_SteamStats_GetFieldName( i, "value-flush" );
 		if ( !session->statLoaded[i] && !SV_SteamStats_LoadFieldValue( session, i ) ) {
+			Com_sprintf( detail, sizeof( detail ), "stat %s unavailable during flush", name ? name : "<unknown>" );
+			SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", detail );
 			failed = qtrue;
 			continue;
 		}
 
-		name = SV_SteamStats_GetFieldName( i );
 		if ( !name || !QL_Steamworks_ServerSetUserStatInt( &session->steamId, name, session->statValue[i] ) ) {
+			Com_sprintf( detail, sizeof( detail ), "stat %s publish failed", name ? name : "<unknown>" );
+			SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", detail );
 			failed = qtrue;
 			continue;
 		}
@@ -818,8 +964,11 @@ static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session 
 		}
 
 		hasPending = qtrue;
-		name = SV_SteamStats_GetAchievementName( i );
+		name = SV_SteamStats_GetAchievementName( i, "value-flush" );
+		pendingAchievements++;
 		if ( !name || !QL_Steamworks_ServerSetUserAchievement( &session->steamId, name ) ) {
+			Com_sprintf( detail, sizeof( detail ), "achievement %s publish failed", name ? name : "<unknown>" );
+			SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", detail );
 			failed = qtrue;
 			continue;
 		}
@@ -827,11 +976,26 @@ static void SV_SteamStats_FlushPendingValues( sv_steam_stats_session_t *session 
 		session->backendAvailable = qtrue;
 	}
 
-	if ( !hasPending || failed || !QL_Steamworks_ServerStoreUserStats( &session->steamId ) ) {
+	if ( !hasPending ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", "no pending stat or achievement updates" );
+		return;
+	}
+
+	if ( failed ) {
+		Com_sprintf( detail, sizeof( detail ), "retained %d stat field(s) and %d achievement(s) after publish failure",
+			pendingStats, pendingAchievements );
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", detail );
+		return;
+	}
+
+	if ( !QL_Steamworks_ServerStoreUserStats( &session->steamId ) ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", "store request failed" );
 		return;
 	}
 
 	session->backendAvailable = qtrue;
+	Com_sprintf( detail, sizeof( detail ), "stored %d stat field(s) and %d achievement(s)", pendingStats, pendingAchievements );
+	SV_LogSteamStatsLifecycle( &session->steamId, "value-flush", detail );
 
 	for ( i = 0; i < SV_STEAM_STATS_FIELD_COUNT; i++ ) {
 		if ( !session->statDirty[i] ) {
@@ -891,27 +1055,54 @@ authenticated client slot.
 static void SV_SteamStats_CreatePlayerSession( client_t *cl ) {
 	sv_steam_stats_session_t *session;
 	CSteamID steamId;
+	char detail[128];
 	int clientNum;
 
-	if ( !cl || cl->state == CS_ZOMBIE || !cl->gentity || !cl->platformSteamId[0] ) {
-		return;
-	}
-
-	if ( SV_ClientIsBot( cl ) || ( cl->gentity->r.svFlags & SVF_BOT ) ) {
-		return;
-	}
-
-	if ( !SV_ParsePlatformSteamId( cl->platformSteamId, &steamId ) || steamId.value == 0ull ) {
+	if ( !cl ) {
+		SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", "ignored bootstrap for null client" );
 		return;
 	}
 
 	clientNum = (int)( cl - svs.clients );
 	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored bootstrap for out-of-range client %d", clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", detail );
+		return;
+	}
+
+	if ( cl->state == CS_ZOMBIE ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored bootstrap for zombie client %d", clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", detail );
+		return;
+	}
+
+	if ( !cl->gentity ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored bootstrap for client %d without gentity", clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", detail );
+		return;
+	}
+
+	if ( !cl->platformSteamId[0] ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored bootstrap for client %d without steam id", clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", detail );
+		return;
+	}
+
+	if ( SV_ClientIsBot( cl ) || ( cl->gentity->r.svFlags & SVF_BOT ) ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored bootstrap for bot-owned client %d", clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", detail );
+		return;
+	}
+
+	if ( !SV_ParsePlatformSteamId( cl->platformSteamId, &steamId ) || steamId.value == 0ull ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored bootstrap for client %d with invalid steam id", clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "session-bootstrap", detail );
 		return;
 	}
 
 	session = &sv_steamStatsSessions[clientNum];
 	if ( session->active && session->steamId.value == steamId.value ) {
+		SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "reusing active session" );
 		SV_SteamStats_RequestCurrentValues( session );
 		return;
 	}
@@ -919,9 +1110,12 @@ static void SV_SteamStats_CreatePlayerSession( client_t *cl ) {
 	SV_SteamStats_ResetSession( session );
 	session->active = qtrue;
 	session->steamId = steamId;
+	SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "created session" );
 	SV_SteamStats_RequestCurrentValues( session );
 	if ( !QL_Steamworks_ServerSendP2PPacket( &session->steamId, SV_STEAM_STATS_P2P_HELLO, 5, SV_STEAM_STATS_P2P_SEND_RELIABLE, SV_STEAM_STATS_P2P_CHANNEL ) ) {
 		SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "p2p hello send failed" );
+	} else {
+		SV_LogSteamStatsLifecycle( &session->steamId, "session-bootstrap", "p2p hello sent" );
 	}
 }
 
@@ -934,6 +1128,8 @@ Flushes and clears the retained Steam stats session for one client slot.
 */
 static void SV_SteamStats_RemovePlayerSession( client_t *cl ) {
 	sv_steam_stats_session_t *session;
+	CSteamID steamId;
+	char detail[128];
 	int clientNum;
 
 	if ( !cl ) {
@@ -947,11 +1143,16 @@ static void SV_SteamStats_RemovePlayerSession( client_t *cl ) {
 
 	session = &sv_steamStatsSessions[clientNum];
 	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "session teardown skipped for inactive client %d", clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "session-teardown", detail );
 		return;
 	}
 
+	steamId = session->steamId;
 	SV_SteamStats_FlushPendingValues( session );
 	SV_SteamStats_ResetSession( session );
+	Com_sprintf( detail, sizeof( detail ), "cleared session for client %d", clientNum );
+	SV_LogSteamStatsLifecycle( &steamId, "session-teardown", detail );
 }
 
 /*
@@ -973,6 +1174,7 @@ static void SV_SteamStats_RequerySessions( void ) {
 		}
 
 		session->requestIssued = qfalse;
+		SV_LogSteamStatsLifecycle( &session->steamId, "session-requery", "backend reconnected; request reset" );
 		SV_SteamStats_RequestCurrentValues( session );
 	}
 }
@@ -989,17 +1191,25 @@ void SV_SteamStats_AddFieldValue( int clientNum, int statIndex, int delta ) {
 	sv_steam_stats_session_t *session;
 	const char *name;
 	char detail[128];
+	char subject[128];
 
 	if ( delta == 0 ) {
+		Com_sprintf( detail, sizeof( detail ),
+			"ignored stat index %d delta %d for client %d", statIndex, delta, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "field-delta", detail );
 		return;
 	}
 
-	name = SV_SteamStats_GetFieldName( statIndex );
+	name = SV_SteamStats_GetFieldName( statIndex, "field-delta" );
 	if ( !name ) {
+		Com_sprintf( detail, sizeof( detail ),
+			"ignored stat index %d delta %d for client %d", statIndex, delta, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "field-delta", detail );
 		return;
 	}
 
-	cl = SV_SteamStats_GetClientSlot( clientNum );
+	Com_sprintf( subject, sizeof( subject ), "stat %s", name );
+	cl = SV_SteamStats_GetClientSlot( clientNum, "field-delta", subject );
 	if ( !cl ) {
 		return;
 	}
@@ -1007,10 +1217,18 @@ void SV_SteamStats_AddFieldValue( int clientNum, int statIndex, int delta ) {
 	SV_SteamStats_CreatePlayerSession( cl );
 	session = &sv_steamStatsSessions[clientNum];
 	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "stat %s session unavailable for client %d", name, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "field-delta", detail );
 		return;
 	}
 
 	SV_SteamStats_LoadFieldValue( session, statIndex );
+	if ( !session->statLoaded[statIndex] ) {
+		Com_sprintf( detail, sizeof( detail ),
+			"stat %s baseline unavailable; queuing delta %d for client %d", name, delta, clientNum );
+		SV_LogSteamStatsLifecycle( &session->steamId, "field-delta", detail );
+	}
+
 	session->statValue[statIndex] += delta;
 	session->pendingStatDelta[statIndex] += delta;
 	session->statDirty[statIndex] = qtrue;
@@ -1029,12 +1247,25 @@ Unlocks one mapped Steam achievement through the retained server-owned owner.
 void SV_SteamStats_UnlockAchievement( int clientNum, int achievementId ) {
 	client_t *cl;
 	sv_steam_stats_session_t *session;
+	const char *name;
+	char detail[128];
+	char subject[128];
 
-	if ( !SV_SteamStats_GetAchievementName( achievementId ) || !SV_SteamStats_ShouldUnlockAchievement() ) {
+	name = SV_SteamStats_GetAchievementName( achievementId, "achievement-unlock" );
+	if ( !name ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored achievement %d for client %d", achievementId, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-unlock", detail );
 		return;
 	}
 
-	cl = SV_SteamStats_GetClientSlot( clientNum );
+	if ( !SV_SteamStats_ShouldUnlockAchievement() ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s blocked by gameplay gate for client %d", name, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-unlock", detail );
+		return;
+	}
+
+	Com_sprintf( subject, sizeof( subject ), "achievement %s", name );
+	cl = SV_SteamStats_GetClientSlot( clientNum, "achievement-unlock", subject );
 	if ( !cl ) {
 		return;
 	}
@@ -1042,16 +1273,22 @@ void SV_SteamStats_UnlockAchievement( int clientNum, int achievementId ) {
 	SV_SteamStats_CreatePlayerSession( cl );
 	session = &sv_steamStatsSessions[clientNum];
 	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s session unavailable for client %d", name, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-unlock", detail );
 		return;
 	}
 
 	SV_SteamStats_LoadAchievement( session, achievementId );
 	if ( session->achievementUnlocked[achievementId] ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s already unlocked for client %d", name, clientNum );
+		SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
 		return;
 	}
 
 	session->achievementUnlocked[achievementId] = qtrue;
 	session->achievementDirty[achievementId] = qtrue;
+	Com_sprintf( detail, sizeof( detail ), "queued achievement %s unlock for client %d", name, clientNum );
+	SV_LogSteamStatsLifecycle( &session->steamId, "achievement-unlock", detail );
 	SV_SteamStats_FlushPendingValues( session );
 }
 
@@ -1065,12 +1302,19 @@ Reports whether the retained session already owns one mapped achievement.
 qboolean SV_SteamStats_HasAchievement( int clientNum, int achievementId ) {
 	client_t *cl;
 	sv_steam_stats_session_t *session;
+	const char *name;
+	char detail[128];
+	char subject[128];
 
-	if ( !SV_SteamStats_GetAchievementName( achievementId ) ) {
+	name = SV_SteamStats_GetAchievementName( achievementId, "achievement-query" );
+	if ( !name ) {
+		Com_sprintf( detail, sizeof( detail ), "query unavailable for achievement %d on client %d", achievementId, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-query", detail );
 		return qfalse;
 	}
 
-	cl = SV_SteamStats_GetClientSlot( clientNum );
+	Com_sprintf( subject, sizeof( subject ), "achievement %s", name );
+	cl = SV_SteamStats_GetClientSlot( clientNum, "achievement-query", subject );
 	if ( !cl ) {
 		return qfalse;
 	}
@@ -1078,10 +1322,15 @@ qboolean SV_SteamStats_HasAchievement( int clientNum, int achievementId ) {
 	SV_SteamStats_CreatePlayerSession( cl );
 	session = &sv_steamStatsSessions[clientNum];
 	if ( !session->active ) {
+		Com_sprintf( detail, sizeof( detail ), "achievement %s session unavailable for client %d", name, clientNum );
+		SV_LogSteamStatsLifecycle( NULL, "achievement-query", detail );
 		return qfalse;
 	}
 
 	SV_SteamStats_LoadAchievement( session, achievementId );
+	Com_sprintf( detail, sizeof( detail ), "achievement %s ownership is %s for client %d",
+		name, session->achievementUnlocked[achievementId] ? "present" : "absent", clientNum );
+	SV_LogSteamStatsLifecycle( &session->steamId, "achievement-query", detail );
 	return session->achievementUnlocked[achievementId] ? qtrue : qfalse;
 }
 
@@ -1195,6 +1444,38 @@ static const char *SV_BeginPlatformAuthSession( client_t *cl, const netadr_t *ad
 
 /*
 =================
+SV_LogSteamServerCallbackLifecycle
+
+Publishes provider-aware diagnostics for the retained Steam GameServer
+callback-owner lifecycle.
+=================
+*/
+static void SV_LogSteamServerCallbackLifecycle( const char *stage, const char *detail ) {
+	Com_Printf( "Steam server callback %s via %s [%s]: %s\n",
+		stage ? stage : "update",
+		SV_GetSteamServerProviderLabel(),
+		SV_GetSteamServerPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=================
+SV_LogSteamServerCallbackBootstrapLifecycle
+
+Publishes provider-aware diagnostics when the retained Steam GameServer
+callback bootstrap falls back before registration succeeds.
+=================
+*/
+static void SV_LogSteamServerCallbackBootstrapLifecycle( const char *stage, const char *detail ) {
+	Com_DPrintf( "Steam server callback bootstrap %s via %s [%s]: %s\n",
+		stage ? stage : "update",
+		SV_GetSteamServerProviderLabel(),
+		SV_GetSteamServerPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=================
 SV_SteamServerConnectedCallback
 
 Publishes the current server identity once Steam confirms the GameServer session.
@@ -1205,8 +1486,7 @@ static void SV_SteamServerConnectedCallback( void *context, const ql_steam_serve
 	(void)event;
 
 	sv_steamServerConnected = qtrue;
-	Com_Printf( "Connected to Steam servers via %s [%s]\n",
-		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
+	SV_LogSteamServerCallbackLifecycle( "connected", "published identity and state refresh" );
 	SV_SteamServerPublishIdentity();
 	SV_SteamServerUpdatePublishedState( qtrue );
 	SV_SteamStats_RequerySessions();
@@ -1220,16 +1500,19 @@ Tracks retail-style Steam server connect failures in the server owner.
 =================
 */
 static void SV_SteamServerConnectFailureCallback( void *context, const ql_steam_server_connect_failure_t *event ) {
+	char detail[96];
+
 	(void)context;
 
 	sv_steamServerConnected = qfalse;
 
 	if ( !event ) {
+		SV_LogSteamServerCallbackLifecycle( "connect_failure", "ignored null callback payload" );
 		return;
 	}
 
-	Com_Printf( "Steam server connect failure (%d) via %s [%s]\n", event->result,
-		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
+	Com_sprintf( detail, sizeof( detail ), "connect failure result=%d", event->result );
+	SV_LogSteamServerCallbackLifecycle( "connect_failure", detail );
 }
 
 /*
@@ -1240,16 +1523,19 @@ Tracks when the Steam GameServer session disconnects from Valve backends.
 =================
 */
 static void SV_SteamServerDisconnectedCallback( void *context, const ql_steam_server_disconnected_t *event ) {
+	char detail[96];
+
 	(void)context;
 
 	sv_steamServerConnected = qfalse;
 
 	if ( !event ) {
+		SV_LogSteamServerCallbackLifecycle( "disconnected", "ignored null callback payload" );
 		return;
 	}
 
-	Com_Printf( "Disconnected from Steam servers (%d) via %s [%s]\n", event->result,
-		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
+	Com_sprintf( detail, sizeof( detail ), "disconnected result=%d", event->result );
+	SV_LogSteamServerCallbackLifecycle( "disconnected", detail );
 }
 
 /*
@@ -1265,11 +1551,13 @@ static void SV_SteamServerValidateAuthTicketResponseCallback( void *context, con
 	char				result[16];
 	char				outcome[64];
 	char				message[QL_AUTH_MAX_RESPONSE_MESSAGE];
+	char				detail[96];
 	qboolean			accepted;
 
 	(void)context;
 
 	if ( !event ) {
+		SV_LogSteamServerCallbackLifecycle( "validate_auth_ticket_response", "ignored null callback payload" );
 		return;
 	}
 
@@ -1280,6 +1568,9 @@ static void SV_SteamServerValidateAuthTicketResponseCallback( void *context, con
 
 	cl = SV_FindClientBySteamId( &event->steamId );
 	if ( !cl ) {
+		Com_sprintf( detail, sizeof( detail ), "ignored auth response for missing client %llu",
+			(unsigned long long)event->steamId.value );
+		SV_LogSteamServerCallbackLifecycle( "validate_auth_ticket_response", detail );
 		return;
 	}
 
@@ -1331,6 +1622,7 @@ static void SV_SteamServerP2PSessionRequestCallback( void *context, const ql_ste
 	(void)context;
 
 	if ( !event ) {
+		SV_LogSteamServerP2PSessionRequest( NULL, "ignored", "null callback payload" );
 		return;
 	}
 
@@ -1368,8 +1660,7 @@ void SV_SteamServerInitCallbacks( void ) {
 	bindings.onP2PSessionRequest = SV_SteamServerP2PSessionRequestCallback;
 
 	if ( !QL_Steamworks_RegisterServerCallbacks( &bindings ) ) {
-		Com_DPrintf( "Steam server callbacks unavailable for %s [%s]\n",
-			SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
+		SV_LogSteamServerCallbackBootstrapLifecycle( "unavailable", "register callbacks failed" );
 		return;
 	}
 
@@ -1397,14 +1688,29 @@ static void SV_LogSteamStatsStubLifecycle( const char *stage, const char *detail
 
 /*
 =================
+SV_LogSteamServerCallbackBootstrapLifecycle
+
+Publishes provider-aware diagnostics when the retained Steam GameServer
+callback bootstrap falls back through the build-disabled stub.
+=================
+*/
+static void SV_LogSteamServerCallbackBootstrapLifecycle( const char *stage, const char *detail ) {
+	Com_DPrintf( "Steam server callback bootstrap %s via %s [%s]: %s\n",
+		stage ? stage : "update",
+		SV_GetSteamServerProviderLabel(),
+		SV_GetSteamServerPolicyLabel(),
+		detail ? detail : "no detail" );
+}
+
+/*
+=================
 SV_SteamServerInitCallbacks
 
 Build-disabled stub for server auth callback registration.
 =================
 */
 void SV_SteamServerInitCallbacks( void ) {
-	Com_DPrintf( "Steam server callbacks unavailable for %s [%s]\n",
-		SV_GetSteamServerProviderLabel(), SV_GetSteamServerPolicyLabel() );
+	SV_LogSteamServerCallbackBootstrapLifecycle( "unavailable", "build-disabled stub" );
 }
 
 /*

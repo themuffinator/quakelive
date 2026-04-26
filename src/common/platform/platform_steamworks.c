@@ -1,4 +1,5 @@
 #include "platform_steamworks.h"
+#include "platform_services.h"
 
 #if QL_BUILD_STEAMWORKS
 
@@ -1698,6 +1699,34 @@ static void QL_Steamworks_DispatchMicroAuthorizationResponse( void *context, con
 
 /*
 =============
+QL_Steamworks_LogServerCallbackDispatch
+
+Publishes provider-aware diagnostics whenever the retained Steam GameServer
+callback dispatch layer ignores one callback surface.
+=============
+*/
+static void QL_Steamworks_LogServerCallbackDispatch( const char *stage, const char *detail ) {
+	const ql_platform_service_table *services;
+	const char *provider;
+	const char *policy;
+
+	services = QL_GetPlatformServices();
+	provider = "Unavailable";
+	policy = "compatibility-unavailable";
+	if ( services ) {
+		provider = services->matchmaking.provider ? services->matchmaking.provider : "Unavailable";
+		policy = QL_DescribePlatformFeaturePolicy( &services->matchmaking );
+	}
+
+	Com_DPrintf( "Steam server callback dispatch %s via %s [%s]: %s\n",
+		stage ? stage : "update",
+		provider,
+		policy,
+		detail ? detail : "no detail" );
+}
+
+/*
+=============
 QL_Steamworks_DispatchServersConnected
 =============
 */
@@ -1708,7 +1737,13 @@ static void QL_Steamworks_DispatchServersConnected( void *context, const void *p
 	(void)payload;
 
 	callbackState = (ql_steam_server_callback_state_t *)context;
-	if ( !callbackState || !callbackState->bindings.onServersConnected ) {
+	if ( !callbackState ) {
+		QL_Steamworks_LogServerCallbackDispatch( "servers_connected", "ignored dispatch without callback state" );
+		return;
+	}
+
+	if ( !callbackState->bindings.onServersConnected ) {
+		QL_Steamworks_LogServerCallbackDispatch( "servers_connected", "ignored dispatch without registered callback" );
 		return;
 	}
 
@@ -1727,7 +1762,18 @@ static void QL_Steamworks_DispatchServerConnectFailure( void *context, const voi
 	ql_steam_server_connect_failure_t event;
 
 	callbackState = (ql_steam_server_callback_state_t *)context;
-	if ( !callbackState || !callbackState->bindings.onConnectFailure || !payload ) {
+	if ( !callbackState ) {
+		QL_Steamworks_LogServerCallbackDispatch( "connect_failure", "ignored dispatch without callback state" );
+		return;
+	}
+
+	if ( !callbackState->bindings.onConnectFailure ) {
+		QL_Steamworks_LogServerCallbackDispatch( "connect_failure", "ignored dispatch without registered callback" );
+		return;
+	}
+
+	if ( !payload ) {
+		QL_Steamworks_LogServerCallbackDispatch( "connect_failure", "ignored dispatch without payload" );
 		return;
 	}
 
@@ -1749,7 +1795,18 @@ static void QL_Steamworks_DispatchServersDisconnected( void *context, const void
 	ql_steam_server_disconnected_t event;
 
 	callbackState = (ql_steam_server_callback_state_t *)context;
-	if ( !callbackState || !callbackState->bindings.onServersDisconnected || !payload ) {
+	if ( !callbackState ) {
+		QL_Steamworks_LogServerCallbackDispatch( "disconnected", "ignored dispatch without callback state" );
+		return;
+	}
+
+	if ( !callbackState->bindings.onServersDisconnected ) {
+		QL_Steamworks_LogServerCallbackDispatch( "disconnected", "ignored dispatch without registered callback" );
+		return;
+	}
+
+	if ( !payload ) {
+		QL_Steamworks_LogServerCallbackDispatch( "disconnected", "ignored dispatch without payload" );
 		return;
 	}
 
@@ -1770,7 +1827,18 @@ static void QL_Steamworks_DispatchValidateAuthTicketResponse( void *context, con
 	ql_steam_validate_auth_ticket_response_t event;
 
 	callbackState = (ql_steam_server_callback_state_t *)context;
-	if ( !callbackState || !callbackState->bindings.onValidateAuthTicketResponse || !payload ) {
+	if ( !callbackState ) {
+		QL_Steamworks_LogServerCallbackDispatch( "validate_auth_ticket_response", "ignored dispatch without callback state" );
+		return;
+	}
+
+	if ( !callbackState->bindings.onValidateAuthTicketResponse ) {
+		QL_Steamworks_LogServerCallbackDispatch( "validate_auth_ticket_response", "ignored dispatch without registered callback" );
+		return;
+	}
+
+	if ( !payload ) {
+		QL_Steamworks_LogServerCallbackDispatch( "validate_auth_ticket_response", "ignored dispatch without payload" );
 		return;
 	}
 
@@ -1793,7 +1861,18 @@ static void QL_Steamworks_DispatchServerP2PSessionRequest( void *context, const 
 	ql_steam_p2p_session_request_t event;
 
 	callbackState = (ql_steam_server_callback_state_t *)context;
-	if ( !callbackState || !callbackState->bindings.onP2PSessionRequest || !payload ) {
+	if ( !callbackState ) {
+		QL_Steamworks_LogServerCallbackDispatch( "p2p_session_request", "ignored dispatch without callback state" );
+		return;
+	}
+
+	if ( !callbackState->bindings.onP2PSessionRequest ) {
+		QL_Steamworks_LogServerCallbackDispatch( "p2p_session_request", "ignored dispatch without registered callback" );
+		return;
+	}
+
+	if ( !payload ) {
+		QL_Steamworks_LogServerCallbackDispatch( "p2p_session_request", "ignored dispatch without payload" );
 		return;
 	}
 
@@ -2680,6 +2759,15 @@ static void *QL_Steamworks_GetUGCInterface( void ) {
 
 /*
 =============
+QL_Steamworks_HasUGCInterface
+=============
+*/
+qboolean QL_Steamworks_HasUGCInterface( void ) {
+	return QL_Steamworks_GetUGCInterface() != NULL ? qtrue : qfalse;
+}
+
+/*
+=============
 QL_Steamworks_GetNumSubscribedItems
 
 Maps the retail SteamUGC subscribed-item count slot used by workshop startup.
@@ -2836,6 +2924,7 @@ qboolean QL_Steamworks_SubscribeItem( uint32_t idLow, uint32_t idHigh ) {
 	void **vtable;
 	typedef int (__fastcall *QL_SteamUGC_SubscribeItemFn)( void *self, void *unused, uint32_t idLow, uint32_t idHigh );
 	QL_SteamUGC_SubscribeItemFn fn;
+	uint32_t itemState;
 
 	ugc = QL_Steamworks_GetUGCInterface();
 	if ( !ugc ) {
@@ -2853,7 +2942,8 @@ qboolean QL_Steamworks_SubscribeItem( uint32_t idLow, uint32_t idHigh ) {
 	}
 
 	fn( ugc, NULL, idLow, idHigh );
-	return qtrue;
+	itemState = QL_Steamworks_GetItemState( idLow, idHigh );
+	return itemState != 0u ? qtrue : qfalse;
 }
 
 /*

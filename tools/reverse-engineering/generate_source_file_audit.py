@@ -50,6 +50,10 @@ STATUS_DESCRIPTIONS = OrderedDict(
 			"Subsystem or strict-retail closure already exists; this 2026-04-22 campaign has not yet rerun the full file walk.",
 		),
 		(
+			"documented-divergence",
+			"The file has a dedicated note because it remains an intentional bounded compatibility divergence, not active parity debt.",
+		),
+		(
 			"gap-note-open",
 			"A concrete file-level parity gap is already evidenced and has a dedicated note.",
 		),
@@ -571,9 +575,24 @@ def has_current_walk(rel_path: str) -> bool:
 	return bool(audit and audit.get("completed"))
 
 
+def note_family(rel_path: str) -> str | None:
+	if rel_path not in NOTE_FILES:
+		return None
+	return "RW-G01" if NOTE_FILES[rel_path].startswith("rw-g01") else "RW-G02"
+
+
+def note_status(rel_path: str) -> str | None:
+	family = note_family(rel_path)
+	if family == "RW-G01":
+		return "documented-divergence"
+	if family == "RW-G02":
+		return "gap-note-open"
+	return None
+
+
 def classify(rel_path: str) -> str:
 	if rel_path in NOTE_FILES:
-		return "gap-note-open"
+		return str(note_status(rel_path))
 	if has_current_walk(rel_path):
 		return "walked-closed"
 	if rel_path.startswith(("src/code/unix/", "src/code/null/")):
@@ -597,9 +616,10 @@ def classify(rel_path: str) -> str:
 
 def ledger_state(rel_path: str) -> str:
 	status = classify(rel_path)
+	if status == "documented-divergence":
+		return f"{note_family(rel_path)} documented divergence note"
 	if status == "gap-note-open":
-		family = "RW-G01" if NOTE_FILES[rel_path].startswith("rw-g01") else "RW-G02"
-		return f"{family} file-level note open"
+		return f"{note_family(rel_path)} file-level note open"
 	if status == "compatibility-open":
 		return "RW-G02 tree still open; file-specific gap not yet isolated"
 	if status == "queued-secondary":
@@ -614,8 +634,8 @@ def ledger_state(rel_path: str) -> str:
 
 def ledger_evidence(rel_path: str) -> str:
 	status = classify(rel_path)
-	if status == "gap-note-open":
-		return f"{doc_link('repo')} + [gap note](source-file-gap-notes/{NOTE_FILES[rel_path]})"
+	if status in {"documented-divergence", "gap-note-open"}:
+		return f"{doc_link('repo')} + [note](source-file-gap-notes/{NOTE_FILES[rel_path]})"
 	if status == "compatibility-open":
 		return doc_link("repo")
 	if status == "queued-secondary":
@@ -662,26 +682,26 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 		configs,
 		"src/common/platform/platform_config.h",
 		"RW-G01",
-		"Open repo-wide gap; strict-retail Windows closure intentionally excludes this compatibility-only build lane.",
-		"This header defaults `QL_BUILD_ONLINE_SERVICES` to `0` and forces both provider macros off in the default build, so the repo still does not claim retail-equivalent online-service behavior in the checked-in default configuration.",
+		"Documented repo-wide divergence; strict-retail Windows closure intentionally excludes this default-disabled compatibility-only build lane.",
+		"This header defaults `QL_BUILD_ONLINE_SERVICES` to `0` and forces both provider macros off in the default build, which keeps the checked-in online-service story explicitly bounded instead of over-claiming retail-equivalent behavior.",
 		[
 			"`QL_BUILD_ONLINE_SERVICES` defaults to `0` when no override is supplied.",
 			"When online services are disabled, both `QL_BUILD_STEAMWORKS` and `QL_BUILD_OPEN_STEAM` are forced to `0` as well.",
 			"The derived `QL_PLATFORM_HAS_*` and `QL_PLATFORM_BUILD_HYBRID` macros therefore advertise a bounded compatibility story instead of retail live-service parity in default builds.",
 		],
 		[
-			"Either keep the default-disabled policy as a permanent documented divergence or replace it with a real open service path that can be claimed as equivalent for the repo-wide score.",
+			"Keep the default-disabled policy documented as an intentional divergence unless a real open service path becomes a target.",
 			"When the policy changes, the surrounding service table, auth dispatch, and runtime evidence need to be refreshed together so this header does not drift from the rest of the lane.",
 		],
 		surface_rows=[
-			("`QL_BUILD_ONLINE_SERVICES`", "gap owner", "Defaults to `0`, which keeps the whole online-service lane outside repo-wide closure."),
+			("`QL_BUILD_ONLINE_SERVICES`", "divergence owner", "Defaults to `0`, which keeps the whole online-service lane explicitly bounded by policy."),
 			("`QL_BUILD_STEAMWORKS`", "bounded compatibility", "Forced off in the default build unless online services are explicitly enabled."),
 			("`QL_BUILD_OPEN_STEAM`", "bounded compatibility", "Forced off in the default build unless online services are explicitly enabled."),
-			("`QL_PLATFORM_HAS_ONLINE_SERVICES`", "derived compatibility flag", "Mirrors the bounded build policy rather than proving a retail-equivalent service surface."),
-			("`QL_PLATFORM_HAS_STEAMWORKS`", "derived compatibility flag", "Only reports an opted-in build capability."),
-			("`QL_PLATFORM_HAS_OPEN_STEAM`", "derived compatibility flag", "Only reports an opted-in build capability."),
-			("`QL_PLATFORM_BUILD_HYBRID`", "derived compatibility flag", "Advertises a hybrid fallback lane rather than a retail live-service closure claim."),
-			("`QL_PLATFORM_HAS_STEAM_SERVICES`", "derived compatibility flag", "Reports bounded Steam-facing service availability, not repo-wide parity closure."),
+			("`QL_PLATFORM_HAS_ONLINE_SERVICES`", "derived divergence flag", "Mirrors the bounded build policy rather than proving a retail-equivalent service surface."),
+			("`QL_PLATFORM_HAS_STEAMWORKS`", "derived divergence flag", "Only reports an opted-in build capability."),
+			("`QL_PLATFORM_HAS_OPEN_STEAM`", "derived divergence flag", "Only reports an opted-in build capability."),
+			("`QL_PLATFORM_BUILD_HYBRID`", "derived divergence flag", "Advertises a hybrid fallback lane rather than a retail live-service closure claim."),
+			("`QL_PLATFORM_HAS_STEAM_SERVICES`", "derived divergence flag", "Reports bounded Steam-facing service availability, not repo-wide parity closure."),
 		],
 	)
 
@@ -689,23 +709,23 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 		configs,
 		"src/common/platform/platform_services.c",
 		"RW-G01",
-		"Open repo-wide gap; strict-retail Windows closure intentionally excludes this compatibility-only build lane.",
-		"This file publishes build-disabled, externally-disabled, Steamworks, open-adapter, and hybrid descriptors. That keeps the repo honest, but it also means the file still encodes a bounded compatibility story instead of a retail-equivalent live-service surface.",
+		"Documented repo-wide divergence; strict-retail Windows closure intentionally excludes this compatibility-only build lane.",
+		"This file publishes build-disabled, externally-disabled, Steamworks, open-adapter, and hybrid descriptors. That keeps the repo honest and makes the bounded compatibility story explicit instead of pretending the checked-in tree has a retail-equivalent live-service surface.",
 		[
 			"Default builds return `Build-disabled (QL_BUILD_ONLINE_SERVICES=0)` provider labels for auth, matchmaking, workshop, overlay, and stats.",
 			"Runtime environment variables can also force the descriptor table into a disabled external-ecosystem mode.",
 			"Hybrid and open-adapter provider labels remain explicit compatibility descriptors, not evidence of a retail live-service implementation.",
 		],
 		[
-			"Keep the current explicit compatibility labels if the lane stays bounded, or replace them with a real open implementation backed by refreshed runtime proof.",
-			"Do not close this note until the descriptor table and the auth or workshop callers all agree on the same policy and evidence story.",
+			"Keep the current explicit compatibility labels while this lane remains a documented divergence.",
+			"If a real open implementation is pursued later, refresh the descriptor table, auth, workshop, and runtime evidence together so the policy story stays consistent.",
 		],
 		default_status=("helper closed", "Helper-only function; not the primary remaining parity blocker by itself."),
 		overrides={
 			"QL_PlatformExternalEcosystemsDisabled": ("bounded compatibility", "Runtime kill-switch for the non-retail external ecosystem lane."),
 			"QL_FinaliseDescriptor": ("bounded compatibility", "Normalises fallback labels for compatibility descriptors."),
 			"QL_PlatformSteamworks_InitOnce": ("bounded compatibility", "Caches wrapper initialisation, but still sits under the bounded online-service policy."),
-			"QL_BuildServiceTable": ("gap owner", "Builds the service descriptor table that still advertises build-disabled and compatibility-only providers."),
+			"QL_BuildServiceTable": ("divergence owner", "Builds the service descriptor table that explicitly advertises build-disabled and compatibility-only providers."),
 		},
 	)
 
@@ -713,7 +733,7 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 		configs,
 		"src/common/platform/backends/platform_backend_open_steam.c",
 		"RW-G01",
-		"Open repo-wide gap; this backend is currently a heuristic compatibility surface.",
+		"Documented repo-wide divergence; this backend intentionally remains a heuristic compatibility surface.",
 		"The open adapter backend still decides accept, retry, and deny outcomes from token length and substring heuristics rather than from a transport-backed exchange with a documented open replacement service.",
 		[
 			"Standalone launcher tokens are accepted, retried, or denied based on payload length and substring checks such as `refresh`, `revoke`, and `denied`.",
@@ -721,17 +741,17 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 			"The file is honest about being a bounded compatibility path, but it is still not a retail-equivalent service implementation.",
 		],
 		[
-			"Replace the heuristic token-shape logic with a documented open transport path if this lane is meant to count toward repo-wide closure.",
-			"If the lane remains bounded permanently, keep this note open as the explicit evidence that the repo-wide score still excludes real online-service parity.",
+			"If this lane stays bounded, keep the heuristic token-shape logic documented as intentional compatibility behavior.",
+			"If a documented open transport path is adopted later, replace the heuristics and refresh the surrounding auth evidence together.",
 		],
-		default_status=("gap owner", "This file is entirely the current heuristic open-adapter compatibility backend."),
+		default_status=("divergence owner", "This file is entirely the current heuristic open-adapter compatibility backend."),
 	)
 
 	add_note(
 		configs,
 		"src/common/platform/backends/platform_backend_steamworks.c",
 		"RW-G01",
-		"Open repo-wide gap; this backend still resolves auth outcomes heuristically.",
+		"Documented repo-wide divergence; this backend intentionally resolves auth outcomes heuristically.",
 		"The Steamworks auth backend currently uses local ticket-length and substring heuristics to decide accepted, pending, or denied outcomes, so it remains a bounded compatibility surface rather than direct proof of retail-equivalent live-service behavior.",
 		[
 			"Short tickets are denied immediately as malformed.",
@@ -739,17 +759,17 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 			"Accepted responses are still generated locally from ticket shape rather than a live validation exchange.",
 		],
 		[
-			"Replace the heuristic accept or retry mapping with a real validated path if repo-wide online-service parity becomes a target.",
-			"Until then, keep the file documented as a compatibility backend and leave the repo-wide gap open.",
+			"If repo-wide online-service parity ever becomes a target, replace the heuristic accept or retry mapping with a real validated path.",
+			"Until then, keep the file documented as a bounded compatibility backend.",
 		],
-		default_status=("gap owner", "This file is entirely the current heuristic Steamworks auth backend."),
+		default_status=("divergence owner", "This file is entirely the current heuristic Steamworks auth backend."),
 	)
 
 	add_note(
 		configs,
 		"src/code/client/ql_auth.c",
 		"RW-G01",
-		"Open repo-wide gap; this dispatcher still routes into bounded compatibility backends.",
+		"Documented repo-wide divergence; this dispatcher intentionally routes into bounded compatibility backends.",
 		"The client auth owner cleanly reconstructs the dispatcher and ticket lifetime, but the actual online-service lane it drives is still bounded by build/runtime policy and heuristic Steam or open-adapter backends.",
 		[
 			"Steam auth requests are blocked entirely when `CL_SteamServicesEnabled()` is false.",
@@ -757,19 +777,19 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 			"Hybrid dispatch explicitly falls back to the open adapter whenever the Steamworks lane does not accept the credential.",
 		],
 		[
-			"Keep the dispatcher if the lane stays compatibility-only, but do not close this file until the providers beneath it are either intentionally excluded forever or replaced with a real open implementation.",
-			"The closure decision has to line up with `platform_services.c`, the backend files, and the runtime evidence/docs so the auth story stays consistent end-to-end.",
+			"Keep the dispatcher aligned with the bounded provider set while this lane remains a documented divergence.",
+			"If the providers beneath it change, refresh `platform_services.c`, the backend files, and the runtime evidence/docs together so the auth story stays consistent end-to-end.",
 		],
 		default_status=("helper closed", "Local helper or logging function; not the direct remaining parity blocker on its own."),
 		overrides={
 			"QL_ClientAuth_InvokeBackend": ("bounded compatibility", "Reports build-unavailable backend states instead of closing the live-service lane."),
 			"QL_ClientAuth_RequestSteamTicket": ("bounded compatibility", "Still depends on the build/runtime Steam-service gate before any online auth path exists."),
-			"QL_ClientAuth_HandleSteamworksTicket": ("gap owner", "Dispatches into the heuristic Steamworks backend."),
-			"QL_ClientAuth_HandleOpenSteamTicket": ("gap owner", "Dispatches into the heuristic open-adapter Steam fallback path."),
-			"QL_ClientAuth_HandleStandaloneToken": ("gap owner", "Dispatches standalone launcher tokens into the same bounded open-adapter lane."),
-			"QL_ClientAuth_HandleHybridSteam": ("gap owner", "Explicitly encodes the hybrid compatibility fallback from Steamworks to the open adapter."),
-			"QL_ClientAuth_DispatchSteam": ("gap owner", "Selects between Steamworks, open-adapter, and hybrid compatibility providers."),
-			"QL_Auth_ExecuteRequest": ("gap owner", "Top-level auth request path remains gated by build/runtime policy and bounded providers."),
+			"QL_ClientAuth_HandleSteamworksTicket": ("divergence owner", "Dispatches into the heuristic Steamworks backend."),
+			"QL_ClientAuth_HandleOpenSteamTicket": ("divergence owner", "Dispatches into the heuristic open-adapter Steam fallback path."),
+			"QL_ClientAuth_HandleStandaloneToken": ("divergence owner", "Dispatches standalone launcher tokens into the same bounded open-adapter lane."),
+			"QL_ClientAuth_HandleHybridSteam": ("divergence owner", "Explicitly encodes the hybrid compatibility fallback from Steamworks to the open adapter."),
+			"QL_ClientAuth_DispatchSteam": ("divergence owner", "Selects between Steamworks, open-adapter, and hybrid compatibility providers."),
+			"QL_Auth_ExecuteRequest": ("divergence owner", "Top-level auth request path remains gated by build/runtime policy and bounded providers."),
 		},
 	)
 
@@ -777,7 +797,7 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 		configs,
 		"src/code/client/cl_steam_resources.c",
 		"RW-G01",
-		"Open repo-wide gap; live resource resolution is still a bounded bridge or stub lane.",
+		"Documented repo-wide divergence; live resource resolution remains a bounded bridge or stub lane.",
 		"The client resource bridge reconstructs the menu-facing resource flow, but Steam-backed requests still devolve into stubs or fallback launch-resource paths whenever live services are disabled or unavailable.",
 		[
 			"`CL_Steam_RegisterShader()` logs `UI: Steam resource request stubbed` when Steam services are disabled by build or runtime policy.",
@@ -785,17 +805,17 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 			"`CL_InitSteamResources()` explicitly reports that the Steam resource bridge is disabled by build/runtime policy when the lane is unavailable.",
 		],
 		[
-			"Do not close this file until Steam-backed menu resources are either intentionally retained as bounded compatibility behavior or supported by a real open replacement path.",
-			"If the lane remains bounded, keep the fallback and stub logging explicit so callers do not over-claim parity.",
+			"Keep the fallback and stub logging explicit while Steam-backed menu resources remain an intentional bounded compatibility story.",
+			"If a real open replacement path is adopted later, refresh the request bridge and note accordingly.",
 		],
 		default_status=("helper closed", "Utility parser or cache helper; not the direct remaining parity blocker on its own."),
 		overrides={
 			"CL_SteamResources_RequestAvatarRGBA": ("bounded compatibility", "Still depends on the Steam-facing compatibility bridge rather than a repo-wide-closed live path."),
-			"CL_SteamDataSource_Request": ("gap owner", "Live resource requests still depend on bounded Steam or launcher compatibility backends."),
-			"QLResourceInterceptor_OnRequest": ("gap owner", "Routes URI resources through the current fallback bridge instead of a closed retail-equivalent lane."),
-			"CL_Steam_RegisterShader": ("gap owner", "Resource registration still stubs or falls back when the live service lane is disabled."),
+			"CL_SteamDataSource_Request": ("divergence owner", "Live resource requests still depend on bounded Steam or launcher compatibility backends."),
+			"QLResourceInterceptor_OnRequest": ("divergence owner", "Routes URI resources through the current fallback bridge instead of a closed retail-equivalent lane."),
+			"CL_Steam_RegisterShader": ("divergence owner", "Resource registration still stubs or falls back when the live service lane is disabled."),
 			"CL_InitSteamResources": ("bounded compatibility", "Publishes the build/runtime-disabled status of the bridge."),
-			"Sys_Steam_RequestURL": ("gap owner", "Public request bridge still returns launcher-backed compatibility data rather than a closed retail service surface."),
+			"Sys_Steam_RequestURL": ("divergence owner", "Public request bridge still returns launcher-backed compatibility data rather than a closed retail service surface."),
 		},
 	)
 
@@ -803,22 +823,22 @@ def build_gap_note_configs() -> dict[str, dict[str, object]]:
 		configs,
 		"src/code/server/sv_rankings.c",
 		"RW-G01",
-		"Open repo-wide gap; default builds expose a retained rankings compatibility surface instead of a live service integration.",
-		"The default `!QL_ENABLE_RANKINGS` branch is explicit and useful, but it still proves that the checked-in default build does not implement retail-equivalent rankings behavior across the whole repo-wide score.",
+		"Documented repo-wide divergence; default builds intentionally expose a retained rankings compatibility surface instead of a live service integration.",
+		"The default `!QL_ENABLE_RANKINGS` branch is explicit and useful, but it keeps the checked-in default build honest about not implementing retail-equivalent rankings behavior.",
 		[
 			"The disabled branch logs `Rankings disabled by build policy (QL_ENABLE_RANKINGS=0)` and forces `sv_enableRankings` back to `0` when requested.",
 			"Most disabled-branch functions publish compatibility-safe return values or no-ops rather than a live rankings path.",
 			"The live rankings implementation remains present under the enabled branch, but the repo-wide default policy keeps that surface outside closure.",
 		],
 		[
-			"Either keep rankings permanently outside the repo-wide target as a documented compatibility lane or promote a real open replacement path.",
-			"Do not mark the file closed repo-wide while the checked-in default branch remains the build-disabled compatibility surface.",
+			"Keep rankings permanently documented as a bounded compatibility lane unless a real open replacement path is adopted.",
+			"If the checked-in default branch changes, refresh the rankings note and repo-wide audit together.",
 		],
 		default_status=("bounded compatibility", "File member inside the retained rankings compatibility branch."),
 		overrides={
-			"SV_RankPublishDisabledState": ("gap owner", "Publishes the disabled compatibility state to cvars."),
-			"SV_RankLogDisabledState": ("gap owner", "Makes the build-disabled rankings policy explicit at runtime."),
-			"SV_RankBegin": ("gap owner", "Disabled-branch entry point forces the rankings surface back to compatibility-only behavior."),
+			"SV_RankPublishDisabledState": ("divergence owner", "Publishes the disabled compatibility state to cvars."),
+			"SV_RankLogDisabledState": ("divergence owner", "Makes the build-disabled rankings policy explicit at runtime."),
+			"SV_RankBegin": ("divergence owner", "Disabled-branch entry point forces the rankings surface back to compatibility-only behavior."),
 			"SV_RankCheckInit": ("bounded compatibility", "Only reports the stub server-id state in disabled builds."),
 			"SV_RankActive": ("bounded compatibility", "Hard-wired false in the disabled branch."),
 			"SV_RankPoll": ("bounded compatibility", "No-op in the disabled branch."),
@@ -1068,9 +1088,14 @@ def write_lines(path: Path, lines: list[str]) -> None:
 def render_gap_note(rel_path: str, config: dict[str, object]) -> None:
 	text = read_text(rel_path)
 	functions = extract_functions(text)
+	classification = str(config["classification"])
+	is_documented_divergence = "documented" in classification.lower() and "divergence" in classification.lower()
+	title = "Divergence Note" if is_documented_divergence else "Gap Note"
+	why_heading = "## Why this file remains a documented divergence" if is_documented_divergence else "## Why this file is still open"
+	target_heading = "## Maintenance expectations" if is_documented_divergence else "## Closure target"
 
 	lines = [
-		f"# `{rel_path}` Gap Note",
+		f"# `{rel_path}` {title}",
 		"",
 		f"Last updated: {DATE}",
 		"",
@@ -1078,7 +1103,7 @@ def render_gap_note(rel_path: str, config: dict[str, object]) -> None:
 		"- Owning retail binary: `assets/quakelive/quakelive_steam.exe` for engine-owned surfaces, or the corresponding committed module corpus when this file sits in a module tree.",
 		f"- Current classification: {config['classification']}",
 		"",
-		"## Why this file is still open",
+		why_heading,
 		"",
 		str(config["why"]),
 		"",
@@ -1111,7 +1136,7 @@ def render_gap_note(rel_path: str, config: dict[str, object]) -> None:
 			status, notes = overrides.get(function, default_status)  # type: ignore[arg-type]
 			lines.append(f"| `{function}` | `{status}` | {notes} |")
 
-	lines.extend(["", "## Closure target", ""])
+	lines.extend(["", target_heading, ""])
 	for item in config["closure"]:  # type: ignore[index]
 		lines.append(f"- {item}")
 
@@ -1129,15 +1154,15 @@ def write_gap_notes(configs: dict[str, dict[str, object]]) -> None:
 			"",
 			f"Last updated: {DATE}",
 			"",
-			"Each note in this directory exists only when a concrete parity gap has already been isolated to a specific file. The main ledger keeps tree-level or inherited status; these notes are for file-level ownership only.",
+			"Each note in this directory exists only when a concrete parity gap or documented bounded divergence has already been isolated to a specific file. The main ledger keeps tree-level or inherited status; these notes are for file-level ownership only.",
 			"",
 			"Every note should capture:",
 			"",
 			"- the owning repo-wide gap family;",
-			"- the file-level reason the gap is still open;",
+			"- the file-level reason the gap remains open or the divergence remains intentional;",
 			"- observed facts grounded in current source or committed evidence;",
 			"- a function-by-function status table; and",
-			"- an explicit closure target.",
+			"- an explicit closure target or maintenance expectation.",
 		],
 	)
 
@@ -1164,7 +1189,7 @@ def write_plan(
 		"Per tracked file, the campaign should eventually produce:",
 		"",
 		"- one concise row in the main source-file parity ledger;",
-		"- a dedicated per-file note whenever a concrete parity gap is confirmed; and",
+		"- a dedicated per-file note whenever a concrete parity gap or documented bounded divergence is confirmed; and",
 		"- a function-by-function status table inside that per-file note.",
 		"",
 		"## Scope",
@@ -1190,7 +1215,7 @@ def write_plan(
 		"- [x] Keep `AUDIT.md` and `IMPLEMENTATION_PLAN.md` in place as gate-facing ledgers.",
 		f"- [x] Create `source-file-parity-ledger-{DATE}.md` as the clean main file-by-file ledger.",
 		f"- [x] Create `historical-audit-index-{DATE}.md` instead of renaming or moving older audit docs that workflows and tests already reference.",
-		f"- [x] Seed `{len(GAP_NOTE_ORDER)}` concrete file-level gap notes for the currently evidenced `RW-G01` and `RW-G02` owners.",
+		f"- [x] Seed `{len(GAP_NOTE_ORDER)}` concrete per-file notes for the currently evidenced `RW-G01` documented divergences and `RW-G02` gap owners.",
 		"",
 		"### Phase 1 - Strict-Retail Engine Core",
 		"",
@@ -1246,12 +1271,22 @@ def write_plan(
 			for note in group.get("plan_result", []):  # type: ignore[union-attr]
 				lines.append(f"  {note}")
 
-	lines.extend(["", "## Current seeded file-level gap set", ""])
+	lines.extend(["", "## Current seeded documented-divergence note set", ""])
 
 	for rel_path in GAP_NOTE_ORDER:
-		family = "RW-G01" if NOTE_FILES[rel_path].startswith("rw-g01") else "RW-G02"
+		if note_status(rel_path) != "documented-divergence":
+			continue
 		lines.append(
-			f"- `{family}`: `{rel_path}` -> `docs/reverse-engineering/source-file-gap-notes/{NOTE_FILES[rel_path]}`"
+			f"- `{note_family(rel_path)}`: `{rel_path}` -> `docs/reverse-engineering/source-file-gap-notes/{NOTE_FILES[rel_path]}`"
+		)
+
+	lines.extend(["", "## Current seeded active file-level gap set", ""])
+
+	for rel_path in GAP_NOTE_ORDER:
+		if note_status(rel_path) != "gap-note-open":
+			continue
+		lines.append(
+			f"- `{note_family(rel_path)}`: `{rel_path}` -> `docs/reverse-engineering/source-file-gap-notes/{NOTE_FILES[rel_path]}`"
 		)
 
 	lines.extend(
@@ -1260,7 +1295,7 @@ def write_plan(
 			"## Completion criteria",
 			"",
 			"- Every tracked file in the ledger has been explicitly walked in the current campaign, not just inherited from an older subsystem closure note.",
-			"- Every file with a confirmed parity gap has its own dedicated note with a function-by-function status table and explicit closure conditions.",
+			"- Every file with a confirmed parity gap or documented divergence has its own dedicated note with a function-by-function status table and explicit closure conditions.",
 			"- `AUDIT.md` and the repo-wide audit remain concise summary ledgers instead of turning into file dumps.",
 		]
 	)
@@ -1380,7 +1415,7 @@ def write_ledger(
 		"## Scope",
 		"",
 		f"- Tracked compilation units under `src/` excluding generated/vendor mirror trees under `src/libs/_deps/` and `src/libs/_build/`: `{len(all_tracked) - len(HEADER_EXCEPTIONS)}` files.",
-		f"- Header exception tracked because it owns an active repo-wide gap policy surface: `{len(HEADER_EXCEPTIONS)}` file.",
+		f"- Header exception tracked because it owns a documented repo-wide divergence policy surface: `{len(HEADER_EXCEPTIONS)}` file.",
 		f"- Total tracked source entries in this ledger: `{len(all_tracked)}`.",
 		"- Function counts are approximate source-definition counts from the checked-in tree and are meant for audit triage, not for ABI accounting.",
 		"",
@@ -1396,11 +1431,18 @@ def write_ledger(
 	for status in STATUS_DESCRIPTIONS:
 		lines.append(f"- `{status}`: `{status_counts[status]}` files")
 
+	documented_divergences = [rel_path for rel_path in GAP_NOTE_ORDER if classify(rel_path) == "documented-divergence"]
+	open_gap_notes = [rel_path for rel_path in GAP_NOTE_ORDER if classify(rel_path) == "gap-note-open"]
+
+	lines.extend(["", "## Documented divergence notes", "", "| File | Gap family | Note |", "| --- | --- | --- |"])
+
+	for rel_path in documented_divergences:
+		lines.append(f"| `{rel_path}` | `{note_family(rel_path)}` | [note](source-file-gap-notes/{NOTE_FILES[rel_path]}) |")
+
 	lines.extend(["", "## Active file-level gap notes", "", "| File | Gap family | Note |", "| --- | --- | --- |"])
 
-	for rel_path in GAP_NOTE_ORDER:
-		family = "RW-G01" if NOTE_FILES[rel_path].startswith("rw-g01") else "RW-G02"
-		lines.append(f"| `{rel_path}` | `{family}` | [note](source-file-gap-notes/{NOTE_FILES[rel_path]}) |")
+	for rel_path in open_gap_notes:
+		lines.append(f"| `{rel_path}` | `{note_family(rel_path)}` | [note](source-file-gap-notes/{NOTE_FILES[rel_path]}) |")
 
 	def emit_section(title: str, sections: OrderedDict[str, list[str]]) -> None:
 		lines.extend(["", f"## {title}", ""])

@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../src/common/platform/platform_steamworks.h"
+#include "../src/common/platform/platform_services.h"
 
 #ifdef _WIN32
 #define QLR_EXPORT __declspec(dllexport)
@@ -1468,6 +1469,15 @@ QLR_EXPORT int QLR_SteamworksMock_GetUGCLastHighPriority( void ) {
 
 /*
 =============
+Com_DPrintf
+=============
+*/
+void QDECL Com_DPrintf( const char *fmt, ... ) {
+	(void)fmt;
+}
+
+/*
+=============
 Com_Printf
 =============
 */
@@ -1489,6 +1499,62 @@ int QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) {
 	int written = vsnprintf( dest, (size_t)size, fmt, args );
 	va_end( args );
 	return written;
+}
+
+static const ql_platform_service_table qlr_platform_services = {
+	{ qtrue, qtrue, "Steam Auth" },
+	{ qtrue, qtrue, "Steam Matchmaking" },
+	{ qtrue, qtrue, "Steam UGC" },
+	{ qtrue, qtrue, "Steam Overlay" },
+	{ qtrue, qtrue, "Steam Stats" },
+};
+
+/*
+=============
+QL_GetPlatformServices
+=============
+*/
+const ql_platform_service_table *QL_GetPlatformServices( void ) {
+	return &qlr_platform_services;
+}
+
+/*
+=============
+QL_DescribePlatformFeaturePolicy
+=============
+*/
+const char *QL_DescribePlatformFeaturePolicy( const ql_platform_feature_descriptor *descriptor ) {
+	if ( !descriptor ) {
+		return "compatibility-unavailable";
+	}
+
+	if ( !descriptor->compiled ) {
+		return "build-disabled";
+	}
+
+	if ( !descriptor->initialised ) {
+		return "runtime-disabled";
+	}
+
+	return "enabled";
+}
+
+/*
+=============
+QL_GetOnlineServicesModeLabel
+=============
+*/
+const char *QL_GetOnlineServicesModeLabel( void ) {
+	return "steamworks";
+}
+
+/*
+=============
+QL_GetOnlineServicesPolicyLabel
+=============
+*/
+const char *QL_GetOnlineServicesPolicyLabel( void ) {
+	return "enabled";
 }
 
 /*

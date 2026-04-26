@@ -1638,13 +1638,14 @@ static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const 
 QL_UI_trap_GetItemDownloadInfo
 ==============
 */
-static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int arg1, unsigned int arg2, unsigned long long *outDownloaded, unsigned long long *outTotal ) {
+static void QDECL QL_UI_trap_GetItemDownloadInfo( unsigned int itemIdLow, unsigned int itemIdHigh, unsigned long long *outDownloaded, unsigned long long *outTotal ) {
 	unsigned long long downloaded = 0;
 	unsigned long long total = 0;
 
-	// uix86.dll HLIL: import[96] (offset 0x180) returns download stats for workshop items.
-	if ( !CL_GetWorkshopDownloadInfo( arg1, arg2, &downloaded, &total ) ) {
-		QL_Steamworks_GetItemDownloadInfo( arg1, arg2, &downloaded, &total );
+	// Companion uix86 reconstruction shows import[96] receiving the parsed
+	// cl_downloadItem low/high words before it reads cl_downloadTime.
+	if ( !CL_GetWorkshopDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total ) ) {
+		QL_Steamworks_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );
 	}
 
 	if ( outDownloaded ) {
