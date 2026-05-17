@@ -771,39 +771,58 @@ void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned 
 */
 void GLimp_Shutdown( void )
 {
-  if (!ctx || !dpy)
-    return;
-  IN_DeactivateMouse();
-  // bk001206 - replaced with H2/Fakk2 solution
-  // XAutoRepeatOn(dpy);
-  // autorepeaton = qfalse; // bk001130 - from cvs1.17 (mkv)
-  if (dpy)
-  {
-    if (ctx)
-      qglXDestroyContext(dpy, ctx);
-    if (win)
-      XDestroyWindow(dpy, win);
-    if (vidmode_active)
-      XF86VidModeSwitchToMode(dpy, scrnum, vidmodes[0]);
-    if (glConfig.deviceSupportsGamma)
-    {
-      XF86VidModeSetGamma(dpy, scrnum, &vidmode_InitialGamma);
-    }
-    // NOTE TTimo opening/closing the display should be necessary only once per run
-    //   but it seems QGL_Shutdown gets called in a lot of occasion
-    //   in some cases, this XCloseDisplay is known to raise some X errors
-    //   ( https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=33 )
-    XCloseDisplay(dpy);
-  }
-  vidmode_active = qfalse;
-  dpy = NULL;
-  win = 0;
-  ctx = NULL;
+	ri.Printf( PRINT_ALL, "Shutting down OpenGL subsystem\n" );
 
-  memset( &glConfig, 0, sizeof( glConfig ) );
-  memset( &glState, 0, sizeof( glState ) );
+	IN_DeactivateMouse();
+	mouse_active = qfalse;
 
-  QGL_Shutdown();
+	// bk001206 - replaced with H2/Fakk2 solution
+	// XAutoRepeatOn(dpy);
+	// autorepeaton = qfalse; // bk001130 - from cvs1.17 (mkv)
+	if ( dpy )
+	{
+		if ( qglXMakeCurrent )
+		{
+			qglXMakeCurrent( dpy, None, NULL );
+		}
+		if ( ctx && qglXDestroyContext )
+		{
+			qglXDestroyContext( dpy, ctx );
+		}
+		if ( win )
+		{
+			XDestroyWindow( dpy, win );
+		}
+		if ( vidmode_active && vidmodes )
+		{
+			XF86VidModeSwitchToMode( dpy, scrnum, vidmodes[0] );
+		}
+		if ( glConfig.deviceSupportsGamma )
+		{
+			XF86VidModeSetGamma( dpy, scrnum, &vidmode_InitialGamma );
+		}
+		// NOTE TTimo opening/closing the display should be necessary only once per run
+		//   but it seems QGL_Shutdown gets called in a lot of occasion
+		//   in some cases, this XCloseDisplay is known to raise some X errors
+		//   ( https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=33 )
+		XCloseDisplay( dpy );
+	}
+
+	if ( glw_state.log_fp )
+	{
+		fclose( glw_state.log_fp );
+		glw_state.log_fp = NULL;
+	}
+
+	vidmode_active = qfalse;
+	dpy = NULL;
+	win = 0;
+	ctx = NULL;
+
+	QGL_Shutdown();
+
+	memset( &glConfig, 0, sizeof( glConfig ) );
+	memset( &glState, 0, sizeof( glState ) );
 }
 
 /*
@@ -1560,6 +1579,11 @@ void GLimp_Init( void )
 */
 void GLimp_EndFrame (void)
 {
+	if ( !dpy || !win || !qglXSwapBuffers )
+	{
+		return;
+	}
+
   // don't flip if drawing to front buffer
   if ( stricmp( r_drawBuffer->string, "GL_FRONT" ) != 0 )
   {
@@ -1706,11 +1730,16 @@ void GLimp_WakeRenderer( void *data ) {}
 /* MOUSE                                                                     */
 /*****************************************************************************/
 
+/*
+================
+IN_Init
+================
+*/
 void IN_Init(void) {
 	Com_Printf ("\n------- Input Initialization -------\n");
-  // mouse variables
-  in_mouse = Cvar_Get ("in_mouse", "1", CVAR_ARCHIVE);
-  in_dgamouse = Cvar_Get ("in_dgamouse", "1", CVAR_ARCHIVE);
+	// mouse variables
+	in_mouse = Cvar_Get ("in_mouse", "1", CVAR_ARCHIVE);
+	in_dgamouse = Cvar_Get ("in_dgamouse", "1", CVAR_ARCHIVE);
 	
 	// turn on-off sub-frame timing of X events
 	in_subframe = Cvar_Get ("in_subframe", "1", CVAR_ARCHIVE);
@@ -1718,30 +1747,50 @@ void IN_Init(void) {
 	// developer feature, allows to break without loosing mouse pointer
 	in_nograb = Cvar_Get ("in_nograb", "0", 0);
 
-  // bk001130 - from cvs.17 (mkv), joystick variables
-  in_joystick = Cvar_Get ("in_joystick", "0", CVAR_ARCHIVE|CVAR_LATCH);
-  // bk001130 - changed this to match win32
-  in_joystickDebug = Cvar_Get ("in_debugjoystick", "0", CVAR_TEMP);
-  joy_threshold = Cvar_Get ("joy_threshold", "0.15", CVAR_ARCHIVE); // FIXME: in_joythreshold
+	// bk001130 - from cvs.17 (mkv), joystick variables
+	in_joystick = Cvar_Get ("in_joystick", "0", CVAR_ARCHIVE|CVAR_LATCH);
+	// bk001130 - changed this to match win32
+	in_joystickDebug = Cvar_Get ("in_debugjoystick", "0", CVAR_TEMP);
+	joy_threshold = Cvar_Get ("joy_threshold", "0.15", CVAR_ARCHIVE); // FIXME: in_joythreshold
 
-  if (in_mouse->value)
-    mouse_avail = qtrue;
-  else
-    mouse_avail = qfalse;
+	if (in_mouse->value)
+		mouse_avail = qtrue;
+	else
+		mouse_avail = qfalse;
 
-  IN_StartupJoystick( ); // bk001130 - from cvs1.17 (mkv)
+	IN_StartupJoystick( ); // bk001130 - from cvs1.17 (mkv)
+	in_joystick->modified = qfalse;
 	Com_Printf ("------------------------------------\n");
 }
 
+/*
+================
+IN_Shutdown
+================
+*/
 void IN_Shutdown(void)
 {
-  mouse_avail = qfalse;
+	IN_DeactivateMouse();
+	IN_ShutdownJoystick();
+	mouse_avail = qfalse;
+	mouse_active = qfalse;
 }
 
+/*
+================
+IN_Frame
+================
+*/
 void IN_Frame (void) {
 
-  // bk001130 - from cvs 1.17 (mkv)
-  IN_JoyMove(); // FIXME: disable if on desktop?
+	if ( in_joystick && in_joystick->modified )
+	{
+		IN_StartupJoystick();
+		in_joystick->modified = qfalse;
+	}
+
+	// bk001130 - from cvs 1.17 (mkv)
+	IN_JoyMove(); // FIXME: disable if on desktop?
 
   if ( cls.keyCatchers & KEYCATCH_CONSOLE )
   {
@@ -1778,6 +1827,24 @@ void Sys_SendKeyEvents (void) {
 // FIXME - use NO_JOYSTICK or something else generic
 
 #if defined( __FreeBSD__ ) // rb010123
+/*
+================
+IN_StartupJoystick
+================
+*/
 void IN_StartupJoystick( void ) {}
+
+/*
+================
+IN_ShutdownJoystick
+================
+*/
+void IN_ShutdownJoystick( void ) {}
+
+/*
+================
+IN_JoyMove
+================
+*/
 void IN_JoyMove( void ) {}
 #endif

@@ -26,6 +26,7 @@ static cvar_t	*in_nograb;
 static cvar_t	*in_joystick;
 static cvar_t	*in_debugJoystick;
 static cvar_t	*joy_threshold;
+static qboolean	in_nullInputInitialized;
 
 /*
 ================
@@ -35,6 +36,7 @@ IN_NullTouchCompatibilityCvars
 static void IN_NullTouchCompatibilityCvars( void ) {
 	(void)in_mouse;
 	(void)in_nograb;
+	(void)in_joystick;
 	(void)in_debugJoystick;
 	(void)joy_threshold;
 }
@@ -45,6 +47,10 @@ IN_NullRefreshCompatibilityState
 ================
 */
 static void IN_NullRefreshCompatibilityState( void ) {
+	if ( in_joystick ) {
+		in_joystick->modified = qfalse;
+	}
+
 	Cvar_Set( "ui_joyavail", "0" );
 	IN_NullTouchCompatibilityCvars();
 }
@@ -61,6 +67,7 @@ void IN_Init( void ) {
 	in_debugJoystick = Cvar_Get( "in_debugjoystick", "0", CVAR_TEMP );
 	joy_threshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE );
 
+	in_nullInputInitialized = qtrue;
 	IN_NullRefreshCompatibilityState();
 }
 
@@ -70,10 +77,6 @@ IN_Frame
 ================
 */
 void IN_Frame( void ) {
-	if ( in_joystick && in_joystick->modified ) {
-		in_joystick->modified = qfalse;
-	}
-
 	IN_NullRefreshCompatibilityState();
 }
 
@@ -84,6 +87,7 @@ IN_Shutdown
 */
 void IN_Shutdown( void ) {
 	IN_NullRefreshCompatibilityState();
+	in_nullInputInitialized = qfalse;
 }
 
 /*
@@ -92,4 +96,7 @@ Sys_SendKeyEvents
 ================
 */
 void Sys_SendKeyEvents( void ) {
+	if ( in_nullInputInitialized ) {
+		IN_NullRefreshCompatibilityState();
+	}
 }

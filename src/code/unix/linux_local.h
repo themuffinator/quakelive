@@ -34,6 +34,7 @@ void IN_Shutdown (void);
 
 void IN_JoyMove( void );
 void IN_StartupJoystick( void );
+void IN_ShutdownJoystick( void );
 
 // GL subsystem
 qboolean QGL_Init( const char *dllname );

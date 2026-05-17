@@ -938,6 +938,7 @@ changed the load procedure to match VFS logic, and allow developer use
 #1 look down current path
 #2 look in fs_homepath
 #3 look in fs_basepath
+#4 look in fs_cdpath
 =================
 */
 extern char   *FS_BuildOSPath( const char *base, const char *game, const char *qpath );
@@ -960,12 +961,17 @@ void *Sys_LoadDll( const char *name, char *fqpath,
 	char  fname[MAX_OSPATH];
 	char  *basepath;
 	char  *homepath;
+	char  *cdpath;
 	char  *pwdpath;
 	char  *gamedir;
+	char  *searchRoots[4];
 	char  *fn;
+	int   searchCount;
+	int   i;
 	const char*  err = NULL;
 	
 	*fqpath = 0;
+	*entryPoint = NULL;
 	if ( dllExports ) {
 		*dllExports = NULL;
 	}
@@ -992,88 +998,110 @@ void *Sys_LoadDll( const char *name, char *fqpath,
 	pwdpath = Sys_Cwd();
 	basepath = Cvar_VariableString( "fs_basepath" );
 	homepath = Cvar_VariableString( "fs_homepath" );
+	cdpath = Cvar_VariableString( "fs_cdpath" );
 	gamedir = Cvar_VariableString( "fs_game" );
 
-	// pwdpath
-	fn = FS_BuildOSPath( pwdpath, gamedir, fname );
-	Com_Printf( "Sys_LoadDll(%s)... \n", fn );
-	libHandle = dlopen( fn, Q_RTLD );
+	searchCount = 0;
+	if ( pwdpath && pwdpath[0] ) {
+		searchRoots[searchCount++] = pwdpath;
+	}
+	if ( homepath && homepath[0] ) {
+		searchRoots[searchCount++] = homepath;
+	}
+	if ( basepath && basepath[0] ) {
+		searchRoots[searchCount++] = basepath;
+	}
+	if ( cdpath && cdpath[0] ) {
+		searchRoots[searchCount++] = cdpath;
+	}
 
-	if ( !libHandle )
-	{
-		Com_Printf( "Sys_LoadDll(%s) failed:\n\"%s\"\n", fn, dlerror() );
-		// fs_homepath
-		fn = FS_BuildOSPath( homepath, gamedir, fname );
+	libHandle = NULL;
+	fn = NULL;
+	for ( i = 0; i < searchCount; i++ ) {
+		fn = FS_BuildOSPath( searchRoots[i], gamedir, fname );
 		Com_Printf( "Sys_LoadDll(%s)... \n", fn );
 		libHandle = dlopen( fn, Q_RTLD );
 
-		if ( !libHandle )
-		{
-			Com_Printf( "Sys_LoadDll(%s) failed:\n\"%s\"\n", fn, dlerror() );
-			// fs_basepath
-			fn = FS_BuildOSPath( basepath, gamedir, fname );
-			Com_Printf( "Sys_LoadDll(%s)... \n", fn );
-			libHandle = dlopen( fn, Q_RTLD );
+		if ( !libHandle ) {
+			err = dlerror();
+			if ( err ) {
+				Com_Printf( "Sys_LoadDll(%s) failed:\n\"%s\"\n", fn, err );
+			} else {
+				Com_Printf( "Sys_LoadDll(%s) failed\n", fn );
+			}
+			continue;
+		}
 
-			if ( !libHandle )
-			{
-#ifndef NDEBUG // bk001206 - in debug abort on failure
-				Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlopen() completely!\n", name  );
-#else
-				Com_Printf ( "Sys_LoadDll(%s) failed dlopen() completely!\n", name );
-#endif
-				return NULL;
-			} else
-				Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
-		} else
-			Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
-	} else
-		Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn ); 
+		Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );
 
-	dllEntry = (dllEntryVoid_t)dlsym( libHandle, "dllEntry" );
-	vmMain = (vmMain_t)dlsym( libHandle, "vmMain" );
-	if ( !dllEntry )
-	{
+		dlerror();
+		dllEntry = (dllEntryVoid_t)dlsym( libHandle, "dllEntry" );
 		err = dlerror();
+		if ( !dllEntry ) {
 #ifndef NDEBUG // bk001206 - in debug abort on failure
-		Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlsym(dllEntry):\n\"%s\" !\n", name, err );
+			Com_Printf ( "Rejected DLL '%s': missing dllEntry export\n", fn );
 #else
-		Com_Printf ( "Sys_LoadDll(%s) failed dlsym(dllEntry):\n\"%s\" !\n", name, err );
+			if ( err ) {
+				Com_Printf ( "Sys_LoadDll(%s) failed dlsym(dllEntry):\n\"%s\" !\n", name, err );
+			} else {
+				Com_Printf ( "Sys_LoadDll(%s) failed dlsym(dllEntry)!\n", name );
+			}
 #endif
-		dlclose( libHandle );
-		err = dlerror();
-		if ( err != NULL )
-			Com_Printf ( "Sys_LoadDll(%s) failed dlcose:\n\"%s\"\n", name, err );
-		return NULL;
-	}
-	if ( vmMain ) {
-		*entryPoint = vmMain;
-		Com_Printf ( "Sys_LoadDll(%s) found **vmMain** at  %p  \n", name, *entryPoint ); // bk001212
-		dllEntry( systemcalls );
-		Com_Printf ( "Sys_LoadDll(%s) succeeded!\n", name );
-	} else {
+			dlerror();
+			dlclose( libHandle );
+			err = dlerror();
+			if ( err != NULL )
+				Com_Printf ( "Sys_LoadDll(%s) failed dlclose:\n\"%s\"\n", name, err );
+			libHandle = NULL;
+			continue;
+		}
+		vmMain = (vmMain_t)dlsym( libHandle, "vmMain" );
 		if ( dllExports && imports && apiVersion ) {
 			dllEntryQL = (dllEntryQL_t)dllEntry;
 			dllEntryQL( dllExports, imports, apiVersion );
 			if ( dllExports && *dllExports ) {
-				if ( libHandle ) Q_strncpyz ( fqpath , fn , MAX_QPATH ) ;
+				Q_strncpyz ( fqpath , fn , MAX_QPATH ) ;
 				return libHandle;
 			}
+		}
+		if ( vmMain ) {
+			*entryPoint = vmMain;
+			Com_Printf ( "Sys_LoadDll(%s) found **vmMain** at  %p  \n", name, *entryPoint ); // bk001212
+			dllEntry( systemcalls );
+			Com_Printf ( "Sys_LoadDll(%s) succeeded!\n", name );
+			Q_strncpyz ( fqpath , fn , MAX_QPATH ) ;
+			return libHandle;
 		}
 		if ( systemcalls ) {
 			dllEntryRet = (dllEntryRet_t)dllEntry;
 			*entryPoint = dllEntryRet( systemcalls );
-			if ( !*entryPoint ) {
-				dlclose( libHandle );
-				err = dlerror();
-				if ( err != NULL )
-					Com_Printf ( "Sys_LoadDll(%s) failed dlcose:\n\"%s\"\n", name, err );
-				return NULL;
+			if ( *entryPoint ) {
+				Q_strncpyz ( fqpath , fn , MAX_QPATH ) ;
+				return libHandle;
 			}
 		}
+
+#ifndef NDEBUG
+		Com_Printf ( "Rejected DLL '%s': missing compatible VM exports\n", fn );
+#endif
+		if ( dllExports ) {
+			*dllExports = NULL;
+		}
+		*entryPoint = NULL;
+		dlerror();
+		dlclose( libHandle );
+		err = dlerror();
+		if ( err != NULL )
+			Com_Printf ( "Sys_LoadDll(%s) failed dlclose:\n\"%s\"\n", name, err );
+		libHandle = NULL;
 	}
-	if ( libHandle ) Q_strncpyz ( fqpath , fn , MAX_QPATH ) ;		// added 7/20/02 by T.Ray
-	return libHandle;
+
+#ifndef NDEBUG // bk001206 - in debug abort on failure
+	Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlopen() completely!\n", name  );
+#else
+	Com_Printf ( "Sys_LoadDll(%s) failed dlopen() completely!\n", name );
+#endif
+	return NULL;
 }
 
 
@@ -1389,10 +1417,11 @@ sysEvent_t Sys_GetEvent( void ) {
     int       len;
 
     // copy out to a seperate buffer for qeueing
-    len = sizeof( netadr_t ) + netmsg.cursize;
+    // the readcount stepahead is for SOCKS-style packet headers
+    len = sizeof( netadr_t ) + netmsg.cursize - netmsg.readcount;
     buf = Z_Malloc( len );
     *buf = adr;
-    memcpy( buf+1, netmsg.data, netmsg.cursize );
+    memcpy( buf+1, &netmsg.data[netmsg.readcount], netmsg.cursize - netmsg.readcount );
     Sys_QueEvent( 0, SE_PACKET, 0, 0, len, buf );
   }
 

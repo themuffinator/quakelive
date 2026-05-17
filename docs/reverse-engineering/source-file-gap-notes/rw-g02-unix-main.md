@@ -1,6 +1,6 @@
 # `src/code/unix/unix_main.c` Gap Note
 
-Last updated: 2026-04-22
+Last updated: 2026-05-17
 
 Gap family: `RW-G02`
 - Owning retail binary: `assets/quakelive/quakelive_steam.exe` for engine-owned surfaces, or the corresponding committed module corpus when this file sits in a module tree.
@@ -12,7 +12,9 @@ This file has absorbed a lot of restoration work, yet its current state is still
 
 ## Observed facts
 
-- `Sys_LowPhysicalMemory()`, `Sys_FunctionCmp()`, `Sys_FunctionCheckSum()`, `Sys_MonkeyShouldBeSpanked()`, bounded `gprof` hooks, clipboard retrieval, and `Sys_CheckCD()` are all restored in scoped form.
+- `Sys_LowPhysicalMemory()`, `Sys_FunctionCmp()`, `Sys_FunctionCheckSum()`, `Sys_MonkeyShouldBeSpanked()`, bounded `gprof` hooks, clipboard retrieval, `Sys_CheckCD()`, the Unix native-module loader, and the Unix packet event copy path are all restored in scoped form.
+- `Sys_LoadDll()` now clears the legacy `entryPoint` output before probing, searches cwd, `fs_homepath`, `fs_basepath`, and `fs_cdpath`, and rejects incompatible native-module candidates before continuing the root search, keeping archived module roots reachable without changing the broader Unix host classification.
+- `Sys_GetEvent()` now queues only unread packet payload bytes after `netmsg.readcount`, matching the recovered Win32 event-loop shape while the current Unix UDP path still leaves `readcount` at zero.
 - The file still underpins a broader Unix runtime that the repo-wide audit explicitly classifies as compatibility-only rather than a closed retail replacement target.
 - Optional profiling and environment-dependent clipboard helpers remain bounded host shims, not broad portability closure proof.
 
@@ -51,7 +53,7 @@ This file has absorbed a lot of restoration work, yet its current state is still
 | `Sys_ConsoleInputInit` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
 | `Sys_ConsoleInput` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
 | `Sys_UnloadDll` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
-| `Sys_LoadDll` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
+| `Sys_LoadDll` | `bounded compatibility` | Now resets failed-load outputs, validates candidate exports, closes incompatible handles, and searches cwd, `fs_homepath`, `fs_basepath`, and `fs_cdpath`; still a retained Unix host loader rather than broad client/runtime closure proof. |
 | `Sys_InitStreamThread` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
 | `Sys_ShutdownStreamThread` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
 | `Sys_BeginStreamedFile` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
@@ -66,7 +68,7 @@ This file has absorbed a lot of restoration work, yet its current state is still
 | `Sys_StreamedRead` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
 | `Sys_StreamSeek` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
 | `Sys_QueEvent` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
-| `Sys_GetEvent` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
+| `Sys_GetEvent` | `bounded compatibility` | Now preserves only unread packet payload bytes after `netmsg.readcount` when queuing `SE_PACKET`; still a retained Unix event-loop host rather than broad client/runtime closure proof. |
 | `Sys_PathHasBaseq3Asset` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |
 | `Sys_CheckCD` | `bounded compatibility` | Now a coarse data-root probe rather than an unconditional success stub, but still not a full portability closure claim. |
 | `Sys_AppActivate` | `not currently implicated` | Recovered or retained helper not currently singled out as the active remaining portability blocker. |

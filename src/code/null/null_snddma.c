@@ -20,10 +20,37 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
-// snddma_null.c
-// all other sound mixing is portable
+// null_snddma.c
+// silent DMA sink for compatibility-only hosts
 
-#include "../client/client.h"
+#include "../client/snd_local.h"
+
+#define SND_NULL_SAMPLEBITS 16
+#define SND_NULL_SPEED 22050
+#define SND_NULL_CHANNELS 2
+#define SND_NULL_BUFFER_SAMPLES 0x8000
+
+#if defined( DEDICATED ) || defined( C_ONLY )
+dma_t	dma;
+#endif
+
+static byte	snd_nullBuffer[SND_NULL_BUFFER_SAMPLES * ( SND_NULL_SAMPLEBITS / 8 )];
+static qboolean	snd_nullInited;
+static int	snd_nullDmaPosition;
+static int	snd_nullLastMilliseconds;
+
+/*
+================
+SNDDMA_ClearNullState
+================
+*/
+static void SNDDMA_ClearNullState( void ) {
+	snd_nullInited = qfalse;
+	snd_nullDmaPosition = 0;
+	snd_nullLastMilliseconds = 0;
+	Com_Memset( snd_nullBuffer, 0, sizeof( snd_nullBuffer ) );
+	Com_Memset( &dma, 0, sizeof( dma ) );
+}
 
 /*
 ================
@@ -31,7 +58,21 @@ SNDDMA_Init
 ================
 */
 qboolean SNDDMA_Init( void ) {
-	return qfalse;
+	Com_Memset( &dma, 0, sizeof( dma ) );
+	Com_Memset( snd_nullBuffer, 0, sizeof( snd_nullBuffer ) );
+
+	dma.channels = SND_NULL_CHANNELS;
+	dma.samplebits = SND_NULL_SAMPLEBITS;
+	dma.speed = SND_NULL_SPEED;
+	dma.samples = SND_NULL_BUFFER_SAMPLES;
+	dma.submission_chunk = 1;
+	dma.buffer = snd_nullBuffer;
+
+	snd_nullDmaPosition = 0;
+	snd_nullLastMilliseconds = Sys_Milliseconds();
+	snd_nullInited = qtrue;
+
+	return qtrue;
 }
 
 /*
@@ -40,7 +81,23 @@ SNDDMA_GetDMAPos
 ================
 */
 int	SNDDMA_GetDMAPos( void ) {
-	return 0;
+	int	currentMilliseconds;
+	int	elapsedMilliseconds;
+	int	sampleDelta;
+
+	if ( !snd_nullInited ) {
+		return 0;
+	}
+
+	currentMilliseconds = Sys_Milliseconds();
+	elapsedMilliseconds = currentMilliseconds - snd_nullLastMilliseconds;
+	if ( elapsedMilliseconds > 0 && dma.samples > 0 ) {
+		sampleDelta = ( elapsedMilliseconds * dma.speed * dma.channels ) / 1000;
+		snd_nullDmaPosition = ( snd_nullDmaPosition + sampleDelta ) % dma.samples;
+		snd_nullLastMilliseconds = currentMilliseconds;
+	}
+
+	return snd_nullDmaPosition;
 }
 
 /*
@@ -49,6 +106,7 @@ SNDDMA_Shutdown
 ================
 */
 void SNDDMA_Shutdown( void ) {
+	SNDDMA_ClearNullState();
 }
 
 /*
@@ -57,6 +115,9 @@ SNDDMA_BeginPainting
 ================
 */
 void SNDDMA_BeginPainting( void ) {
+	if ( snd_nullInited ) {
+		Com_Memset( snd_nullBuffer, 0, sizeof( snd_nullBuffer ) );
+	}
 }
 
 /*
@@ -102,6 +163,11 @@ S_ClearSoundBuffer
 ================
 */
 void S_ClearSoundBuffer( void ) {
+	if ( snd_nullInited ) {
+		snd_nullDmaPosition = 0;
+		snd_nullLastMilliseconds = Sys_Milliseconds();
+		Com_Memset( snd_nullBuffer, 0, sizeof( snd_nullBuffer ) );
+	}
 }
 
 /*

@@ -1,6 +1,6 @@
 # Repo-Wide Parity Audit
 
-Last updated: 2026-04-23
+Last updated: 2026-05-17
 
 ## Scope
 
@@ -20,7 +20,8 @@ tree is counted.
 
 ## Audit method
 
-Validated directly on 2026-04-21:
+Validated directly on 2026-04-21, with the aggregate pytest sweep refreshed on
+2026-05-17:
 
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/client/run_client_runtime_probe.ps1`
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File tools/qcommon/run_qcommon_runtime_probe.ps1`
@@ -35,8 +36,8 @@ Validated directly on 2026-04-21:
 - `pytest tests/test_renderer_full_parity_gate.py -q --tb=no`
 - `pytest tests/test_server_full_parity_gate.py -q --tb=no`
 - `pytest tests/test_engine_host_support_full_parity_gate.py -q --tb=no`
-- `pytest tests/test_ui_src_panel_parity.py tests/test_non_windows_portability.py -q --tb=no`
-- `pytest tests/test_non_windows_portability.py tests/test_retail_dependency_runtime_audit.py tests/test_ui_src_panel_parity.py tests/test_ui_full_parity_gate.py tests/test_client_full_parity_gate.py tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_renderer_full_parity_gate.py tests/test_server_full_parity_gate.py tests/test_engine_host_support_full_parity_gate.py tests/test_gametype_lifecycle.py tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py tests/test_racepoint_commands.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q --tb=no` -> `60 passed, 7 skipped`
+- `pytest tests/test_ui_src_panel_parity.py tests/test_non_windows_portability.py -q --tb=no` -> `28 passed`
+- `pytest tests/test_non_windows_portability.py tests/test_retail_dependency_runtime_audit.py tests/test_ui_src_panel_parity.py tests/test_ui_full_parity_gate.py tests/test_client_full_parity_gate.py tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_renderer_full_parity_gate.py tests/test_server_full_parity_gate.py tests/test_engine_host_support_full_parity_gate.py tests/test_gametype_lifecycle.py tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py tests/test_racepoint_commands.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q --tb=no` -> `72 passed, 7 skipped`
 
 Reviewed by source and current documentation:
 
@@ -127,15 +128,42 @@ Observed facts:
   environment is present. `Sys_CheckCD()` now also acts as a bounded
   data-root probe across the configured `baseq3` roots instead of an
   unconditional success path, accepting `default.cfg`, `pak00.pk3`, or
-  `pak0.pk3` as sufficient evidence of usable game data.
+  `pak0.pk3` as sufficient evidence of usable game data. `Sys_LoadDll()` now
+  resets failed-load outputs, validates candidate exports, closes incompatible
+  handles, and searches cwd, `fs_homepath`, `fs_basepath`, and `fs_cdpath`, so
+  archived module roots are part of the retained Unix
+  native-module probe without closing the broader host lane. Unix
+  `Sys_GetEvent()` now also queues only unread packet bytes after
+  `netmsg.readcount`, matching the recovered Win32 event-loop packet copy
+  behavior while the current Unix UDP path keeps `readcount` at zero.
 - `src/code/null/null_main.c`, `src/code/null/null_net.c`,
   `src/code/null/null_glimp.c`, `src/code/null/null_client.c`,
   `src/code/null/null_snddma.c`, and `src/code/null/null_input.c` now carry
-  current executable-name, timer/path, loopback-network, browser/advert/input, and silent sound/device activation/voice shims
-  plus the newer input bootstrap-cvar surface instead of the older stale
+  current executable-name, timer/path, loopback-network, browser/advert/input,
+  a renderer GL init refusal, an explicit null silent DMA sink, and
+  sound/device activation/voice shims plus the newer input bootstrap-cvar and
+  no-device key-pump surface instead of the older stale
   `Com_Init( argc, argv )`, `NET_StringToAdr`, `FILE *`, and missing
   web-host/audio/input compatibility contracts, but the null runtime still
   does not implement a real live graphics/audio/input host.
+- The Linux sound host now has a bounded silent DMA sink via `snddevice null`
+  (also accepting `none` and `silent`) for headless/client smoke work, and the
+  OSS `/dev/dsp` path now has explicit shutdown cleanup for its descriptor and
+  mmap-backed DMA buffer. This reduces portability friction but does not add
+  a modern audible Linux backend.
+- Linux joystick input now bounds the retained device scan to `/dev/input/js0-3`
+  and `/dev/js0-3`, caps button/axis event translation to the Quake key ranges
+  exposed by the engine, and resets `ui_joyavail` and closes `joy_fd` across
+  shutdown or `in_joystick` restarts. The Linux input shutdown path now also
+  releases the retained X mouse grab before clearing mouse availability and
+  activity state. This is still retained Linux input compatibility rather than
+  a validated modern input stack.
+- Linux GLX teardown now handles partial-init state instead of returning early
+  when only the display/window or QGL loader state exists: it deactivates mouse
+  state, detaches and destroys any live GLX context, destroys the retained
+  window, restores VidMode/gamma state, closes the QGL log file, releases QGL,
+  and guards the end-frame swap path when display/window/swap state is absent.
+  This bounds lifecycle leakage without claiming a modern Linux renderer.
 - The same platform note now records a successful 2026-04-21 WOW64 smoke run,
   but it still carries open follow-ups for broader glibc validation breadth
   and Unix-side modernization.

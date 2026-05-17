@@ -1,6 +1,6 @@
 # Function-Level Parity Gap Audit
 
-Last updated: 2026-04-28
+Last updated: 2026-05-17
 
 ## Purpose
 
@@ -294,12 +294,18 @@ Function-level source gaps:
 | `src/code/unix/unix_main.c` | `Sys_ResolveProfilingHooks`, `Sys_SetProfilingEnabled`, `Sys_BeginProfiling`, `Sys_EndProfiling` | bounded compatibility | Profiling only exists behind optional host/build support |
 | `src/code/unix/unix_main.c` | `Sys_CheckCD` | bounded compatibility | Now probes data roots, but remains a coarse compatibility check rather than broad host parity proof |
 | `src/code/unix/unix_main.c` | `Sys_IsExecutableOnPath` | bounded compatibility | Supports the bounded clipboard helper chain |
+| `src/code/unix/unix_main.c` | `Sys_LoadDll` | bounded compatibility | Unix native-module loading now resets failed-load outputs, validates candidate exports, closes incompatible handles, and probes cwd, `fs_homepath`, `fs_basepath`, and `fs_cdpath`, but remains part of the compatibility-only Unix host lane |
+| `src/code/unix/unix_main.c` | `Sys_GetEvent` | bounded compatibility | Unix packet event queuing now preserves only unread bytes after `netmsg.readcount`, matching the recovered Win32 event-loop shape while remaining in the compatibility-only Unix host lane |
 | `src/code/unix/unix_main.c` | `main` | compatibility host owner | Unix host entry remains outside the closed Windows replacement target |
-| `src/code/unix/linux_glimp.c` | `GLimp_SetGamma`, `GLimp_Shutdown`, `GLimp_Init`, `GLimp_EndFrame` | open portability owners | Linux GLX renderer host path is not validated as a retail-equivalent client/runtime |
-| `src/code/unix/linux_glimp.c` | `IN_Shutdown`, `IN_Frame`, `IN_Activate`, `IN_StartupJoystick` | open portability owners | Linux input/client activation remains part of the unresolved portability lane |
+| `src/code/unix/linux_glimp.c` | `GLimp_SetGamma`, `GLimp_Init` | open portability owners | Linux GLX renderer host path is not validated as a retail-equivalent client/runtime |
+| `src/code/unix/linux_glimp.c` | `GLimp_Shutdown`, `GLimp_EndFrame` | bounded compatibility | Linux GLX teardown now handles partial display/context/window state, closes the QGL log, releases QGL state, and guards end-frame swaps after shutdown or partial init failure while remaining compatibility-only |
+| `src/code/unix/linux_glimp.c` | `IN_Frame`, `IN_Activate`, `IN_StartupJoystick` | open portability owners | Linux input/client activation remains part of the unresolved portability lane |
+| `src/code/unix/linux_glimp.c` | `IN_Shutdown` | bounded compatibility | Linux input teardown now releases retained X mouse grabs before clearing mouse availability/activity state, then closes the retained joystick descriptor and clears `ui_joyavail` through `IN_ShutdownJoystick()` |
 | `src/code/unix/linux_glimp.c` | `Q_stristr`, `XLateKey`, `CreateNullCursor`, `install_grabs`, `uninstall_grabs`, `X11_PendingInput`, `repeated_press`, `HandleEvents`, `KBD_Init`, `KBD_Close`, `IN_ActivateMouse`, `IN_DeactivateMouse`, `GLimp_LogComment`, `GLW_StartDriverAndSetMode`, `GLW_SetMode`, `GLW_InitExtensions`, `GLW_InitGamma`, `GLW_LoadOpenGL`, `qXErrorHandler`, `GLimp_RenderThreadWrapper`, `GLimp_SpawnRenderThread`, `GLimp_RendererSleep`, `GLimp_FrontEndSleep`, `GLimp_WakeRenderer`, `IN_Init`, `Sys_SendKeyEvents`, `IN_JoyMove` | bounded compatibility | Retained legacy Linux renderer/input helper surface |
-| `src/code/unix/linux_snd.c` | `Snd_Memset`, `SNDDMA_Init`, `SNDDMA_GetDMAPos`, `SNDDMA_Shutdown`, `SNDDMA_Submit`, `SNDDMA_BeginPainting` | open portability owners | OSS `/dev/dsp` sound path is not modernized or validated as a client/runtime parity target |
-| `src/code/unix/linux_joystick.c` | `IN_StartupJoystick`, `IN_JoyMove` | open portability owners | `/dev/js*` joystick lane remains unresolved Linux input portability |
+| `src/code/unix/linux_snd.c` | `SNDDMA_Init`, `SNDDMA_Submit` | open portability owners | OSS `/dev/dsp` remains the only real audible Linux backend, so the sound path is not validated as a client/runtime parity target |
+| `src/code/unix/linux_snd.c` | `Snd_Memset`, `SNDDMA_InitCvars`, `SNDDMA_IsNullDevice`, `SNDDMA_InitNull`, `SNDDMA_GetDMAPos`, `SNDDMA_Shutdown`, `SNDDMA_BeginPainting` | bounded compatibility | Silent `snddevice null` DMA sink and OSS mmap/descriptor shutdown reduce headless/runtime friction without closing modern Linux audio parity |
+| `src/code/unix/linux_joystick.c` | `IN_StartupJoystick`, `IN_JoyMove` | open portability owners | Linux joystick startup/event translation remains unresolved input portability, though the scan and event ranges are now bounded |
+| `src/code/unix/linux_joystick.c` | `IN_ClearJoystickState`, `IN_ReleaseJoystickKeys`, `IN_TryOpenJoystick`, `IN_ShutdownJoystick` | bounded compatibility | Modern `/dev/input/js*` plus historical `/dev/js*` probing, `ui_joyavail`, descriptor cleanup, and key-release state are now explicit compatibility work |
 
 Closure requirement:
 
@@ -322,13 +328,14 @@ Function-level source gaps:
 | --- | --- | --- | --- |
 | `src/code/null/null_main.c` | `Sys_GetGameAPI`, `Sys_GetClipboardData`, `main` | open portability owners | Null host has no real module API, clipboard, or runtime entry parity target |
 | `src/code/null/null_main.c` | `Sys_CurrentWallClockMilliseconds`, `Sys_CopyDirectoryName`, `Sys_BeginStreamedFile`, `Sys_EndStreamedFile`, `Sys_StreamedRead`, `Sys_StreamSeek`, `Sys_Error`, `Sys_Quit`, `Sys_UnloadGame`, `Sys_Print`, `Sys_DisplaySystemConsole`, `Sys_SetErrorText`, `Sys_ExecutableBaseName`, `Sys_Milliseconds`, `Sys_Mkdir`, `Sys_Cwd`, `Sys_SetDefaultCDPath`, `Sys_DefaultCDPath`, `Sys_SetDefaultInstallPath`, `Sys_DefaultInstallPath`, `Sys_SetDefaultHomePath`, `Sys_DefaultHomePath`, `Sys_GetCurrentUser`, `Sys_Init`, `Sys_EarlyOutput` | bounded compatibility | Utility shims keep the null host buildable, but do not close runtime parity |
-| `src/code/null/null_glimp.c` | `GLimp_EndFrame`, `GLimp_Init`, `GLimp_Shutdown`, `QGL_Init` | open portability owners | No graphics context, swap path, or real GL loader exists |
-| `src/code/null/null_glimp.c` | `GLimp_EnableLogging`, `GLimp_LogComment`, `QGL_Shutdown` | bounded compatibility | Null renderer host shims |
+| `src/code/null/null_glimp.c` | `GLimp_EndFrame`, `GLimp_Init` | open portability owners | No graphics context or swap path exists; `GLimp_Init()` now fails explicitly instead of letting the null host look like a renderer |
+| `src/code/null/null_glimp.c` | `GLimp_Shutdown`, `GLimp_EnableLogging`, `GLimp_LogComment`, `QGL_Init`, `QGL_Shutdown` | bounded compatibility | Null renderer host now refuses fake GL init success and clears retained extension/logging state |
 | `src/code/null/null_client.c` | `CL_RefreshOnlineServicesBridgeState`, `CL_WebHost_Init`, `CL_WebHost_Shutdown`, `CL_WebHost_Frame`, `CL_WebHost_HasLiveView`, `CL_WebHost_HasBoundWindowObject`, `CL_WebHost_GetCursorHandle`, `CL_WebView_PublishEvent`, `CL_WebView_InvokeCommNotice`, `CL_WebView_PublishGameError`, `CL_WebView_PublishGameEnd`, `CL_WebView_PublishBindChanged`, `CL_WebView_PublishGameStart`, `CL_WebView_PublishGameScreenshot`, `CL_WebView_OnMouseMove`, `CL_WebView_OnMouseButtonEvent`, `CL_WebView_OnMouseWheelEvent`, `CL_WebView_OnKeyEvent`, `CL_AdvertisementBridge_RefreshLoadingViewParameters`, `CL_AdvertisementBridge_UpdateLoadingViewParameters`, `CL_AdvertisementBridge_InitUI`, `CL_AdvertisementBridge_ActivateAdvert`, `CL_AdvertisementBridge_SetActiveAdvert` | open portability owners | Browser, advert, and web-view behavior is stubbed |
 | `src/code/null/null_client.c` | `CL_NullResetAdvertisementBridgeState`, `CL_NullRefreshBrowserCvars`, `CL_Shutdown`, `CL_Init`, `CL_MouseEvent`, `Key_WriteBindings`, `Key_EnumerateBindings`, `CL_Frame`, `CL_PacketEvent`, `CL_CharEvent`, `CL_Disconnect`, `CL_MapLoading`, `CL_GameCommand`, `CL_KeyEvent`, `UI_GameCommand`, `CL_WebHost_NotifyAppActivation`, `CL_WebView_PublishCvarChange`, `CL_WebView_PublishGameDemo`, `CL_ForwardCommandToServer`, `CL_ConsolePrint`, `CL_JoystickEvent`, `CL_InitKeyCommands`, `CL_CDDialog`, `CL_FlushMemory`, `CL_StartHunkUsers`, `CL_ShutdownAll`, `CL_CDKeyValidate` | bounded compatibility | Null-client no-op or safe-default shims |
-| `src/code/null/null_input.c` | `IN_NullRefreshCompatibilityState`, `IN_Init`, `IN_Frame`, `Sys_SendKeyEvents` | open portability owners | No real input device or key-event pump exists |
-| `src/code/null/null_input.c` | `IN_NullTouchCompatibilityCvars`, `IN_Shutdown` | bounded compatibility | Null input cvar/shutdown shims |
-| `src/code/null/null_snddma.c` | `SNDDMA_Init`, `SNDDMA_GetDMAPos`, `SNDDMA_Shutdown`, `SNDDMA_BeginPainting`, `SNDDMA_Submit`, `SNDDMA_Activate`, `S_RegisterSound`, `S_StartLocalSound`, `S_ClearSoundBuffer`, `S_AddVoiceSamples` | open portability owners | Sound and voice paths are intentionally silent/no-op |
+| `src/code/null/null_input.c` | `IN_Init`, `IN_Frame`, `Sys_SendKeyEvents` | open portability owners | No real input device or key-event pump exists; the pump now refreshes no-device state but still emits no events |
+| `src/code/null/null_input.c` | `IN_NullTouchCompatibilityCvars`, `IN_NullRefreshCompatibilityState`, `IN_Shutdown` | bounded compatibility | Null input cvar/no-device-state/shutdown shims |
+| `src/code/null/null_snddma.c` | `SNDDMA_ClearNullState`, `SNDDMA_Init`, `SNDDMA_GetDMAPos`, `SNDDMA_Shutdown`, `SNDDMA_BeginPainting`, `S_ClearSoundBuffer` | bounded compatibility | Null sound now carries an explicit silent DMA sink and cursor/buffer cleanup without becoming an audible backend |
+| `src/code/null/null_snddma.c` | `SNDDMA_Submit`, `SNDDMA_Activate`, `S_RegisterSound`, `S_StartLocalSound`, `S_AddVoiceSamples` | open portability owners | Sound/device activation and voice paths remain intentionally silent/no-op |
 
 Closure requirement:
 

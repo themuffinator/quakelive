@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-04-23
+Last updated: 2026-05-17
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -617,7 +617,7 @@ Completed work:
 
 1. Re-ran a broad current-worktree parity sweep across the top-level
    strict-retail gates, gameplay validation fixtures, portability suite, and
-   staged runtime-audit lane, producing `60 passed, 7 skipped`.
+   staged runtime-audit lane, producing `72 passed, 7 skipped`.
 2. Rebased the top-level ledgers on that sweep so the current repo-wide gap
    register is explicitly backed by one aggregated evidence pass instead of
    only by the individual runtime-probe refresh notes.
@@ -774,9 +774,8 @@ Completed work:
    instead of leaving the file as a bare inert no-op.
 2. Reconstructed the null input frame pump as an explicit no-device contract:
    `IN_Frame()` now maintains the compatibility cvar surface and consumes
-   joystick modification latches, while `Sys_SendKeyEvents()` remains the
-   documented null-host no-op event source rather than an unstructured empty
-   placeholder.
+   joystick modification latches, while `Sys_SendKeyEvents()` now refreshes
+   the same no-device state without emitting real input events.
 3. Expanded both the focused non-Windows portability suite and the
    engine-host/support compatibility gate so the current null input lane is
    pinned alongside the earlier null host/client/audio modernization work.
@@ -5165,6 +5164,236 @@ Completed work:
    estimate now reads `98%`, with `RW-G02` and `RW-G04` left as the active
    remaining repo-wide gap families.
 
+### Task A4j: Add a bounded silent Linux sound sink and close the OSS shutdown leak [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/linux_snd.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-linux-snd.md`,
+`docs/platform/toolchain-matrix.md`, `docs/build/linux-glibc-32bit.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Added an explicit silent Linux DMA sink selected through `snddevice null`,
+   `none`, or `silent`, giving headless/client smoke probes a non-OSS sound
+   path without pulling in ALSA, PulseAudio, SDL, or other external library
+   code.
+2. Reconstructed the Linux sound lifecycle around the retained OSS backend so
+   `audio_fd` starts at `-1`, failed init paths route through shared cleanup,
+   and `SNDDMA_Shutdown()` now unmaps the mmap DMA buffer and closes the sound
+   descriptor instead of leaving restart/error cleanup implicit.
+3. Kept the result deliberately bounded: the default Linux sound backend is
+   still the legacy `/dev/dsp` OSS path, the silent sink is not an audible
+   backend, and `RW-G02` remains open until the broader Linux client renderer,
+   audio, input, and validation boundary is settled.
+4. Expanded the focused non-Windows portability suite and refreshed the
+   platform/gap notes so the new silent sink, DMA-position simulation, and OSS
+   shutdown cleanup stay source-pinned as compatibility work rather than
+   strict-retail Windows parity.
+
+### Task A4k: Bound the retained Linux joystick device and restart lifecycle [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/linux_joystick.c`,
+`src/code/unix/linux_glimp.c`, `src/code/unix/linux_local.h`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-linux-joystick.md`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-linux-glimp.md`,
+`docs/platform/toolchain-matrix.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Reworked the retained Linux joystick lane so startup now scans modern
+   `/dev/input/js0` through `/dev/input/js3` before the historical
+   `/dev/js0` through `/dev/js3` nodes, while still avoiding SDL or any other
+   external input library.
+2. Added explicit joystick shutdown/restart handling: `IN_ShutdownJoystick()`
+   releases queued joystick key state, clears tracked axes/buttons, closes
+   `joy_fd`, and resets `ui_joyavail`; `linux_glimp.c` now calls that path on
+   input shutdown and when latched `in_joystick` changes trigger a restart.
+3. Bounded event translation so Linux button events cannot exceed the
+   `K_JOY1` through `K_JOY32` range and axis events cannot exceed the
+   retained eight-axis / sixteen-direction-key table.
+4. Kept `RW-G02` open because this is still retained Linux joystick
+   compatibility, not a validated modern Linux client input stack, and pinned
+   that distinction in the focused portability suite and gap notes.
+
+### Task A4l: Bound the retained Linux mouse/input shutdown lifecycle [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/linux_glimp.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-linux-glimp.md`,
+`docs/reverse-engineering/function-parity-gap-audit-2026-04-24.md`,
+`docs/platform/toolchain-matrix.md`, `docs/build/linux-glibc-32bit.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Reconstructed the Linux input shutdown path around the retained X11 mouse
+   grab lifecycle so `IN_Shutdown()` now calls `IN_DeactivateMouse()` before
+   clearing `mouse_avail`, avoiding stale grab/activity state across
+   `in_restart` and normal input teardown.
+2. Kept joystick teardown in the same host-owned shutdown path and now clears
+   `mouse_active` explicitly after the deactivate call, so a later `IN_Init()`
+   can reactivate the mouse according to the current cvar state instead of
+   inheriting a stale active flag.
+3. Added focused source assertions and refreshed the RW-G02 notes so this
+   remains bounded Linux-host compatibility work rather than a claim that the
+   legacy X11/GLX/DGA client path is modern or retail-equivalent.
+
+### Task A4m: Bound the retained Unix native-module loader roots and outputs [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/unix_main.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-unix-main.md`,
+`docs/reverse-engineering/function-parity-gap-audit-2026-04-24.md`,
+`docs/platform/toolchain-matrix.md`, `docs/build/linux-glibc-32bit.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Reworked the retained Unix `Sys_LoadDll()` root probe into an explicit
+   bounded search over cwd, `fs_homepath`, `fs_basepath`, and `fs_cdpath`, so
+   archived/native module roots can be reached through the same configured
+   data-root lane used elsewhere in the Unix host.
+2. Reset the legacy `entryPoint` output before probing, matching the safer
+   failure contract used by the recovered Win32 loader shape and preventing a
+   failed Unix load from leaving stale caller state behind.
+3. Added focused source assertions and refreshed the RW-G02 notes so this
+   remains Unix host compatibility work, not a claim that the non-Windows
+   native-module runtime is retail-equivalent.
+
+### Task A4n: Bound the Unix event-loop packet payload copy [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/unix_main.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-unix-main.md`,
+`docs/reverse-engineering/function-parity-gap-audit-2026-04-24.md`,
+`docs/platform/toolchain-matrix.md`, `docs/build/linux-glibc-32bit.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Reconstructed the retained Unix `Sys_GetEvent()` packet queue copy so
+   `SE_PACKET` events preserve only unread bytes after `netmsg.readcount`,
+   matching the recovered Win32 event-loop packet path and its SOCKS-aware
+   comment.
+2. Kept the change deliberately bounded: the current Unix UDP receiver still
+   leaves `readcount` at zero, but the event loop now honors that field if a
+   future Unix packet transport consumes header bytes before queuing.
+3. Added focused source assertions and refreshed the RW-G02 notes so this is
+   recorded as Unix host event-loop compatibility, not proof of full
+   non-Windows runtime parity.
+
+### Task A4o: Bound Unix native-module candidate validation [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/unix_main.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-unix-main.md`,
+`docs/reverse-engineering/function-parity-gap-audit-2026-04-24.md`,
+`docs/platform/toolchain-matrix.md`, `docs/build/linux-glibc-32bit.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Reworked the retained Unix `Sys_LoadDll()` probing loop so each opened
+   native-module candidate is validated before returning a handle: it must
+   expose `dllEntry` and then satisfy either the Quake Live export-table path,
+   a `vmMain` export, or the legacy `dllEntry()`-returned entry point path.
+2. Closed incompatible `dlopen()` handles, reset failed-load outputs, and
+   continued to the next configured root instead of treating the first opened
+   but incompatible shared object as the final loader outcome.
+3. Added focused source assertions and refreshed the RW-G02 docs so this stays
+   recorded as bounded Unix host compatibility work aligned with the recovered
+   Win32 loader shape, not proof of full non-Windows runtime parity.
+
+### Task A4p: Bound the null sound host with an explicit silent DMA sink [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/null/null_snddma.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-null-snddma.md`,
+`docs/reverse-engineering/function-parity-gap-audit-2026-04-24.md`,
+`docs/platform/toolchain-matrix.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Replaced the null sound host's outright `SNDDMA_Init()` failure with a
+   local silent DMA sink that seeds the shared `dma` shape, owns a deterministic
+   22,050 Hz 16-bit stereo buffer, and advances its DMA cursor from
+   `Sys_Milliseconds()`.
+2. Added explicit buffer/state cleanup through `SNDDMA_Shutdown()`,
+   `SNDDMA_BeginPainting()`, and `S_ClearSoundBuffer()` while preserving the
+   compatibility-only no-op behavior for submit, activation, sound
+   registration, local sound, and voice samples.
+3. Added focused source assertions and refreshed the RW-G02 docs so this
+   remains a bounded null-host compatibility sink, not an audible backend or
+   a broader runtime parity claim.
+
+### Task A4q: Make the null renderer host refuse fake GL initialization [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/null/null_glimp.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-null-glimp.md`,
+`docs/reverse-engineering/function-parity-gap-audit-2026-04-24.md`,
+`docs/platform/toolchain-matrix.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Replaced the null `QGL_Init()` success stub with an explicit `qfalse`
+   result, so the compatibility host no longer claims that a GL backend was
+   loaded when no renderer library or function pointers exist.
+2. Made `GLimp_Init()` fail with a clear fatal message for the null renderer
+   host and routed `GLimp_Shutdown()` through `QGL_Shutdown()`, which now clears
+   retained extension pointers and logging state.
+3. Added focused source assertions and refreshed the RW-G02 docs so this stays
+   recorded as a bounded renderer-host compatibility boundary, not a real
+   graphics context or swap path.
+
+### Task A4r: Route the null key-event pump through explicit no-device input state [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/null/null_input.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-null-input.md`,
+`docs/reverse-engineering/function-parity-gap-audit-2026-04-24.md`,
+`docs/platform/toolchain-matrix.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Extended the null input compatibility state so it clears the retained
+   `in_joystick->modified` latch while continuing to pin `ui_joyavail` to `0`.
+2. Routed `Sys_SendKeyEvents()` through that no-device refresh once null input
+   is initialized, making the key-event pump an explicit disabled-input
+   maintenance path instead of an unstructured empty placeholder.
+3. Added focused source assertions and refreshed the RW-G02 docs so this stays
+   recorded as a null-host input boundary, not a real input backend or event
+   source.
+
+### Task A4s: Bound the Linux GLX shutdown and end-frame lifecycle [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/unix/linux_glimp.c`,
+`tests/test_non_windows_portability.py`,
+`docs/reverse-engineering/source-file-gap-notes/rw-g02-linux-glimp.md`,
+`docs/reverse-engineering/function-parity-gap-audit-2026-04-24.md`,
+`docs/platform/toolchain-matrix.md`
+Parity estimate: **before 98% -> after 98%**
+
+Completed work:
+
+1. Reworked `GLimp_Shutdown()` so partial Linux GLX init state is cleaned up
+   instead of returning early when `ctx` is missing: the path now deactivates
+   mouse state, detaches any current context, destroys retained context/window
+   state only when present, restores VidMode/gamma state, closes the QGL log,
+   clears the GLX globals, and releases QGL before clearing renderer state.
+2. Guarded `GLimp_EndFrame()` against missing display/window/swap state so a
+   failed partial init or post-shutdown call cannot fall through into stale
+   GLX function-pointer state.
+3. Added focused source assertions and refreshed the RW-G02 docs so this stays
+   recorded as Linux renderer-host lifecycle containment, not a modern GLX or
+   SDL-style Linux client parity claim.
+
 ## Active tasks
 
 ### Task A4: Modernise or explicitly contain the non-Windows portability lanes [OPEN]
@@ -5178,7 +5407,13 @@ Scope:
 1. Replace the remaining Unix `Sys_*` helper placeholders that still matter
    after the restored low-memory, Linux/glibc function compare/checksum,
    `q3monkeyid` marker-probe, bounded `gprof`-control paths, and bounded
-   clipboard retrieval path, or keep them clearly classified as
+   clipboard retrieval path, bounded data-root probe, and Linux silent sound
+   sink / OSS shutdown cleanup plus bounded Linux joystick descriptor/restart
+   handling plus Linux mouse-grab shutdown cleanup plus Linux GLX partial-init
+   shutdown/end-frame containment and the bounded Unix native-module root probe
+   plus candidate validation, Unix packet event copy,
+   the null renderer GL-init refusal, the explicit null silent DMA sink, and
+   the null no-device key pump, or keep them clearly classified as
    compatibility-only. The null host/client/audio shims now match the current
    contract surface closely enough that the remaining work is primarily about
    the real Unix host boundary rather than stale null host/client/audio/input

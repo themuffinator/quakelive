@@ -31,29 +31,79 @@ void ( * qglClientActiveTextureARB )( GLenum texture );
 void ( * qglLockArraysEXT)( int, int);
 void ( * qglUnlockArraysEXT) ( void );
 
+static qboolean	glimp_nullLogging;
 
-void		GLimp_EndFrame( void ) {
+void QGL_Shutdown( void );
+
+/*
+================
+GLimp_EndFrame
+================
+*/
+void GLimp_EndFrame( void ) {
 }
 
-void		GLimp_Init( void )
-{
+/*
+================
+GLimp_Init
+================
+*/
+void GLimp_Init( void ) {
+	ri.Error( ERR_FATAL, "GLimp_Init() - null renderer host has no OpenGL subsystem\n" );
 }
 
-void		GLimp_Shutdown( void ) {
+/*
+================
+GLimp_Shutdown
+================
+*/
+void GLimp_Shutdown( void ) {
+	QGL_Shutdown();
 }
 
+/*
+================
+GLimp_EnableLogging
+================
+*/
 void		GLimp_EnableLogging( qboolean enable ) {
-	(void)enable;
+	glimp_nullLogging = enable;
 }
 
+/*
+================
+GLimp_LogComment
+================
+*/
 void GLimp_LogComment( char *comment ) {
+	if ( !glimp_nullLogging ) {
+		return;
+	}
+
 	(void)comment;
 }
 
+/*
+================
+QGL_Init
+================
+*/
 qboolean QGL_Init( const char *dllname ) {
 	(void)dllname;
-	return qtrue;
+	return qfalse;
 }
 
-void		QGL_Shutdown( void ) {
+/*
+================
+QGL_Shutdown
+================
+*/
+void QGL_Shutdown( void ) {
+	qwglSwapIntervalEXT = NULL;
+	qglMultiTexCoord2fARB = NULL;
+	qglActiveTextureARB = NULL;
+	qglClientActiveTextureARB = NULL;
+	qglLockArraysEXT = NULL;
+	qglUnlockArraysEXT = NULL;
+	glimp_nullLogging = qfalse;
 }

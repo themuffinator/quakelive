@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-04-23
+Last updated: 2026-05-17
 
 This file is the current cross-subsystem ledger for the repository. Detailed
 reconstruction history belongs in the dedicated subsystem audits under
@@ -18,7 +18,8 @@ This ledger now distinguishes between:
 
 ## Current status
 
-The current audited state on 2026-04-21 is:
+The current audited state, with the aggregate pytest sweep refreshed on
+2026-05-17, is:
 
 - `ui`, strict retail module, `qcommon`, the mapped `qshared` helper family,
   renderer, server, remaining engine host/support, and `client` parity gates
@@ -43,7 +44,7 @@ The current audited state on 2026-04-21 is:
   **98%** repo-wide assessment.
 - A broad current-worktree parity sweep spanning the top-level parity gates,
   gameplay fixtures, portability checks, and the staged retail-runtime audit
-  lane now passes at `60 passed, 7 skipped`.
+  lane now passes at `72 passed, 7 skipped`.
 - The checked-in `src/ui` runtime-panel compare is now clean (`65 / 65`,
   `0` content diffs), and the UI overlay/runtime-package machinery now acts
   as a regression sentinel rather than an active correction path. It no
@@ -53,7 +54,10 @@ Treat the 2026-04-10 engine-wide **100%** report as a strict-retail Windows
 closure milestone, not as a claim that every checked-in portability or
 compatibility surface has reached retail parity.
 
-## Evidence checked on 2026-04-21
+## Evidence checked
+
+Runtime artifacts below remain the 2026-04-21 refresh set unless a newer date
+is called out; the aggregate pytest sweep was refreshed on 2026-05-17.
 
 Verified directly:
 
@@ -70,12 +74,12 @@ Verified directly:
 - `pytest tests/test_renderer_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
 - `pytest tests/test_server_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
 - `pytest tests/test_engine_host_support_full_parity_gate.py -q --tb=no` -> `2 passed, 1 skipped`
-- `pytest tests/test_ui_src_panel_parity.py tests/test_non_windows_portability.py -q --tb=no` -> `13 passed`
+- `pytest tests/test_ui_src_panel_parity.py tests/test_non_windows_portability.py -q --tb=no` -> `28 passed`
 - `pytest tests/test_gametype_lifecycle.py -q` -> `8 passed`
 - `pytest tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py -q` -> `7 passed`
 - `pytest tests/test_racepoint_commands.py -q` -> `1 passed`
 - `pytest tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q` -> `14 passed`
-- `pytest tests/test_non_windows_portability.py tests/test_retail_dependency_runtime_audit.py tests/test_ui_src_panel_parity.py tests/test_ui_full_parity_gate.py tests/test_client_full_parity_gate.py tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_renderer_full_parity_gate.py tests/test_server_full_parity_gate.py tests/test_engine_host_support_full_parity_gate.py tests/test_gametype_lifecycle.py tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py tests/test_racepoint_commands.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q --tb=no` -> `60 passed, 7 skipped`
+- `pytest tests/test_non_windows_portability.py tests/test_retail_dependency_runtime_audit.py tests/test_ui_src_panel_parity.py tests/test_ui_full_parity_gate.py tests/test_client_full_parity_gate.py tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_renderer_full_parity_gate.py tests/test_server_full_parity_gate.py tests/test_engine_host_support_full_parity_gate.py tests/test_gametype_lifecycle.py tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py tests/test_racepoint_commands.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q --tb=no` -> `72 passed, 7 skipped`
 
 Audited by source/doc inspection:
 
@@ -121,11 +125,26 @@ Two repo-wide gap families remain active:
   `Sys_GetClipboardData()` now exposes a bounded clipboard retrieval path via
   `wl-paste`, `xclip`, or `xsel` when the host environment provides those
   helpers, Unix `Sys_CheckCD()` now performs a bounded `baseq3` data-root
-  probe across `fs_basepath`, `fs_cdpath`, and the default install roots, and
-  the null host/runtime now carries current executable-name, path, timer,
-  loopback-network, browser/advert/input, and silent sound/device activation/voice compatibility
-  shims plus the newer input bootstrap-cvar surface, but the profiling lane
-  is still optional and the broader Unix runtime still remains
+  probe across `fs_basepath`, `fs_cdpath`, and the default install roots, Unix
+  `Sys_LoadDll()` now clears failed-load outputs, validates candidate exports,
+  closes incompatible handles, and probes cwd, `fs_homepath`, `fs_basepath`,
+  and `fs_cdpath`, Unix `Sys_GetEvent()` now
+  queues only unread packet bytes after `netmsg.readcount`, and
+  the Linux sound host now provides a bounded silent DMA sink via
+  `snddevice null` / `none` / `silent` plus explicit OSS descriptor and mmap
+  cleanup on shutdown, Linux joystick input now bounds device probing to
+  `/dev/input/js0-3` and `/dev/js0-3` while clearing `ui_joyavail` and closing
+  `joy_fd` across shutdown or `in_joystick` restarts, and Linux input shutdown
+  now releases retained X mouse grabs before clearing mouse availability, Linux
+  GLX shutdown now handles partial-init display/context/window state, closes
+  the QGL log, releases QGL state, and guards end-frame swaps after shutdown,
+  while the null host/runtime now carries current executable-name, path, timer,
+  loopback-network, browser/advert/input, a renderer GL init refusal, an
+  explicit null silent DMA sink, and sound/device activation/voice
+  compatibility shims plus the newer input bootstrap-cvar and no-device
+  key-pump surface, but the profiling lane
+  is still optional, the Linux sound lane still lacks a real modern audible
+  backend, and the broader Unix runtime still remains
   compatibility-only rather than retail-equivalent hosts.
 - `RW-G04` Evidence freshness outside the tracked artifacts remains incomplete.
   This audit reran the gate suites, refreshed the tracked client, qcommon,

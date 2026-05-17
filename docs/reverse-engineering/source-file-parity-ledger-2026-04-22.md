@@ -1,6 +1,6 @@
 # Source-File Parity Ledger
 
-Last updated: 2026-04-22
+Last updated: 2026-05-17
 
 ## Purpose
 
@@ -390,18 +390,18 @@ Current 2026-04-22 audit result: the `src/code/unix` function walk did
 not isolate any new file-level owners beyond the existing `RW-G02`
 notes for `unix_main.c`, `linux_glimp.c`, `linux_snd.c`, and
 `linux_joystick.c`. The focused non-Windows portability lane
-(`8 passed`) and the current repo-wide audit still bound
+(`18 passed`) and the current repo-wide audit still bound
 `linux_common.c`, `linux_qgl.c`, `linux_signals.c`, `unix_net.c`,
 `unix_shared.c`, and `vm_x86.c` on current evidence.
 
 | File | Functions | Current parity state | Primary evidence | Gap note |
 | --- | ---: | --- | --- | --- |
 | `src/code/unix/linux_common.c` | `6` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
-| `src/code/unix/linux_glimp.c` | `40` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-glimp.md) | [note](source-file-gap-notes/rw-g02-linux-glimp.md) |
-| `src/code/unix/linux_joystick.c` | `2` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-joystick.md) | [note](source-file-gap-notes/rw-g02-linux-joystick.md) |
+| `src/code/unix/linux_glimp.c` | `41` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-glimp.md) | [note](source-file-gap-notes/rw-g02-linux-glimp.md) |
+| `src/code/unix/linux_joystick.c` | `6` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-joystick.md) | [note](source-file-gap-notes/rw-g02-linux-joystick.md) |
 | `src/code/unix/linux_qgl.c` | `341` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
 | `src/code/unix/linux_signals.c` | `2` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
-| `src/code/unix/linux_snd.c` | `6` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-snd.md) | [note](source-file-gap-notes/rw-g02-linux-snd.md) |
+| `src/code/unix/linux_snd.c` | `9` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-linux-snd.md) | [note](source-file-gap-notes/rw-g02-linux-snd.md) |
 | `src/code/unix/unix_main.c` | `59` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-unix-main.md) | [note](source-file-gap-notes/rw-g02-unix-main.md) |
 | `src/code/unix/unix_net.c` | `17` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
 | `src/code/unix/unix_shared.c` | `21` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
@@ -412,7 +412,7 @@ Current 2026-04-22 audit result: the `src/code/null` function walk
 isolated `null_glimp.c` as an additional `RW-G02` owner beside the
 existing notes for `null_main.c`, `null_client.c`, `null_input.c`,
 and `null_snddma.c`. The focused non-Windows portability lane
-(`8 passed`) and the current repo-wide audit still bound
+(`18 passed`) and the current repo-wide audit still bound
 `null_net.c` and `mac_net.c` on current evidence, so no further
 file-level owner is opened inside the null tree this round.
 
@@ -424,7 +424,7 @@ file-level owner is opened inside the null tree this round.
 | `src/code/null/null_input.c` | `6` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-input.md) | [note](source-file-gap-notes/rw-g02-null-input.md) |
 | `src/code/null/null_main.c` | `28` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-main.md) | [note](source-file-gap-notes/rw-g02-null-main.md) |
 | `src/code/null/null_net.c` | `5` | Current compatibility function walk complete; no new file-level portability gap isolated | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + current 2026-04-22 source walk | - |
-| `src/code/null/null_snddma.c` | `10` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-snddma.md) | [note](source-file-gap-notes/rw-g02-null-snddma.md) |
+| `src/code/null/null_snddma.c` | `11` | RW-G02 file-level note open | [repo-wide audit](repo-wide-parity-audit-2026-04-21.md) + [note](source-file-gap-notes/rw-g02-null-snddma.md) | [note](source-file-gap-notes/rw-g02-null-snddma.md) |
 
 ## Secondary Tool, Editor, Compiler, And Legacy Source Surface
 
