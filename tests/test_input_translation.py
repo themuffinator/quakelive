@@ -10,6 +10,7 @@ from tests.compiler_support import compile_c_binary, find_c_compiler, shared_lib
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CL_INPUT = REPO_ROOT / "src" / "code" / "client" / "cl_input.c"
+CLIENT_H = REPO_ROOT / "src" / "code" / "client" / "client.h"
 CL_KEYS = REPO_ROOT / "src" / "code" / "client" / "cl_keys.c"
 
 
@@ -176,23 +177,36 @@ def test_mouse_delta_scales_with_cpi(input_translation_lib: ctypes.CDLL) -> None
     assert unchanged == 4
 
 
-def test_mouse_event_dispatch_tracks_absolute_cursor_position() -> None:
+def test_mouse_event_dispatch_matches_retail_keycatcher_order() -> None:
     source = CL_INPUT.read_text(encoding="utf-8")
+    client_h = CLIENT_H.read_text(encoding="utf-8")
 
     for expected in (
-        "static int\t\tcl_mouseCursorX;",
-        "static int\t\tcl_mouseCursorY;",
-        "static qboolean\tcl_mouseCursorInitialized;",
-        "static void CL_ResetMouseCursorPosition( void ) {",
-        "static void CL_UpdateMouseCursorPosition( int dx, int dy, int *cursorX, int *cursorY ) {",
-        "CL_UpdateMouseCursorPosition( translatedDx, translatedDy, &cursorX, &cursorY );",
-        "VM_Call( uivm, UI_MOUSE_EVENT, cursorX, cursorY );",
-        "VM_Call (cgvm, CG_MOUSE_EVENT, cursorX, cursorY);",
+        "#define KEYCATCH_RETAIL_MOUSEPASS\t0x0010",
+        "#define KEYCATCH_BROWSER\t\t\t0x0020",
+    ):
+        assert expected in client_h
+
+    for expected in (
+        "(void)time;",
+        'if ( Cvar_VariableIntegerValue( "cg_ignoreMouseInput" ) ) {',
+        "if ( cls.keyCatchers & KEYCATCH_BROWSER ) {",
+        "CL_WebView_OnMouseMove( dx, dy );",
+        "VM_Call( uivm, UI_MOUSE_EVENT, dx, dy );",
+        "VM_Call( cgvm, CG_MOUSE_EVENT, dx, dy );",
+        "if ( ( cls.keyCatchers & ~KEYCATCH_RETAIL_MOUSEPASS ) == 0 ) {",
+        "cl.mouseDx[0] += dx;",
+        "cl.mouseDy[0] += dy;",
     ):
         assert expected in source
 
     for unexpected in (
+        "static int\t\tcl_mouseCursorX;",
+        "static int\t\tcl_mouseCursorY;",
+        "CL_UpdateMouseCursorPosition(",
+        "translatedDx = CL_TranslateRetailMouseDelta",
         "VM_Call( uivm, UI_MOUSE_EVENT, translatedDx, translatedDy );",
         "VM_Call (cgvm, CG_MOUSE_EVENT, translatedDx, translatedDy);",
+        "CL_WebView_OnMouseMove( cursorX, cursorY );",
     ):
         assert unexpected not in source

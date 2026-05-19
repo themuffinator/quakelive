@@ -421,7 +421,7 @@ typedef struct {
   void (*registerFont) (const char *pFontname, int pointSize, fontInfo_t *font);
   void (*ownerDrawItem) (float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle);
 	float (*getValue) (int ownerDraw);
-	qboolean (*ownerDrawVisible) (int flags);
+	qboolean (*ownerDrawVisible) (int flags, int flags2);
   void (*runScript)(char **p);
   void (*getTeamColor)(vec4_t *color);
   void (*getCVarString)(const char *cvar, char *buffer, int bufsize);

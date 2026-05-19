@@ -53,16 +53,13 @@ static float	cg_speedometerHistory[CG_SPEEDOMETER_HISTORY_SAMPLES];
 static int	cg_speedometerHistoryCount;
 static int	cg_speedometerHistoryHead = -1;
 static int	cg_speedometerHistoryTime;
-static qhandle_t	cg_inputCmdUpShader;
-static qhandle_t	cg_inputCmdDownShader;
-static qhandle_t	cg_inputCmdRightShader;
-static qhandle_t	cg_inputCmdLeftShader;
 static float	cg_spectatorItemPickupBaseY;
 static int	cg_drawActiveMilliseconds;
 
 static float CG_DrawSnapshot( float y );
 static void CG_DrawCrosshair( void );
 static void CG_DrawCrosshairNames( void );
+static const char *CG_GetBindKeyName( const char *cmd, char *buf, int len );
 
 
 /*
@@ -154,21 +151,22 @@ static void CG_RecordSpeedometerSample( void ) {
 =============
 CG_RegisterInputCmdShaders
 
-Lazily registers the retail race command-arrow icons used by the classic HUD.
+Ensures the retail race command-arrow icons used by the classic HUD are cached
+in the shared cgame media table.
 =============
 */
 static void CG_RegisterInputCmdShaders( void ) {
-	if ( !cg_inputCmdUpShader ) {
-		cg_inputCmdUpShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_up" );
+	if ( !cgs.media.raceCommandUpShader ) {
+		cgs.media.raceCommandUpShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_up" );
 	}
-	if ( !cg_inputCmdDownShader ) {
-		cg_inputCmdDownShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_down" );
+	if ( !cgs.media.raceCommandDownShader ) {
+		cgs.media.raceCommandDownShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_down" );
 	}
-	if ( !cg_inputCmdRightShader ) {
-		cg_inputCmdRightShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_right" );
+	if ( !cgs.media.raceCommandRightShader ) {
+		cgs.media.raceCommandRightShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_right" );
 	}
-	if ( !cg_inputCmdLeftShader ) {
-		cg_inputCmdLeftShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_left" );
+	if ( !cgs.media.raceCommandLeftShader ) {
+		cgs.media.raceCommandLeftShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_left" );
 	}
 }
 
@@ -226,10 +224,10 @@ static void CG_DrawInputCmds( void ) {
 	}
 
 	CG_RegisterInputCmdShaders();
-	upShader = cg_inputCmdUpShader;
-	downShader = cg_inputCmdDownShader;
-	rightShader = cg_inputCmdRightShader;
-	leftShader = cg_inputCmdLeftShader;
+	upShader = cgs.media.raceCommandUpShader;
+	downShader = cgs.media.raceCommandDownShader;
+	rightShader = cgs.media.raceCommandRightShader;
+	leftShader = cgs.media.raceCommandLeftShader;
 	if ( !upShader || !downShader || !rightShader || !leftShader ) {
 		return;
 	}
@@ -1105,12 +1103,12 @@ static void CG_BuildTeammatePOILabel( const clientInfo_t *ci, char *buffer, size
 
 /*
 =============
-CG_TeammatePOIPowerupIcon
+CG_ItemBackedPowerupIcon
 
-Resolves the icon used for projected teammate markers.
+Resolves the classic HUD/item-table icon for a powerup.
 =============
 */
-static qhandle_t CG_TeammatePOIPowerupIcon( int powerup ) {
+static qhandle_t CG_ItemBackedPowerupIcon( int powerup ) {
 	gitem_t	*item;
 
 	item = BG_FindItemForPowerup( powerup );
@@ -1130,6 +1128,47 @@ static qhandle_t CG_TeammatePOIPowerupIcon( int powerup ) {
 	default:
 		return 0;
 	}
+}
+
+/*
+=============
+CG_TeammatePOIPowerupIcon
+
+Resolves the icon used for projected teammate markers.
+=============
+*/
+static qhandle_t CG_TeammatePOIPowerupIcon( int powerup ) {
+	switch ( powerup ) {
+	case PW_QUAD:
+		if ( cgs.media.poiPowerupQuadShader ) {
+			return cgs.media.poiPowerupQuadShader;
+		}
+		break;
+	case PW_BATTLESUIT:
+		if ( cgs.media.poiPowerupBattleSuitShader ) {
+			return cgs.media.poiPowerupBattleSuitShader;
+		}
+		break;
+	case PW_HASTE:
+		if ( cgs.media.poiPowerupHasteShader ) {
+			return cgs.media.poiPowerupHasteShader;
+		}
+		break;
+	case PW_INVIS:
+		if ( cgs.media.poiPowerupInvisShader ) {
+			return cgs.media.poiPowerupInvisShader;
+		}
+		break;
+	case PW_REGEN:
+		if ( cgs.media.poiPowerupRegenShader ) {
+			return cgs.media.poiPowerupRegenShader;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return CG_ItemBackedPowerupIcon( powerup );
 }
 
 /*
@@ -1184,6 +1223,11 @@ static void CG_DrawTeammatePOIBar( float x, float y, float width, qhandle_t shad
 	CG_FillRect( x, y, width, CG_TEAMMATE_POI_BAR_HEIGHT, backgroundColor );
 	if ( fraction <= 0.0f ) {
 		return;
+	}
+
+	if ( !shader ) {
+		cgs.media.healthSegmentShader = trap_R_RegisterShader( "gfx/2d/health_segment.tga" );
+		shader = cgs.media.healthSegmentShader;
 	}
 
 	fraction = Com_Clamp( 0.0f, 1.0f, fraction );
@@ -1364,7 +1408,7 @@ static void CG_DrawTeammatePOIs( void ) {
 				boxX + CG_TEAMMATE_POI_PADDING_X,
 				textBaseline,
 				barWidth,
-				cgs.media.healthTick200,
+				cgs.media.healthSegmentShader,
 				Com_Clamp( 0.0f, 200.0f, (float)ci->health ) / 200.0f,
 				healthColor
 			);
@@ -1375,7 +1419,7 @@ static void CG_DrawTeammatePOIs( void ) {
 				boxX + CG_TEAMMATE_POI_PADDING_X,
 				textBaseline,
 				barWidth,
-				cgs.media.armorTick200,
+				cgs.media.healthSegmentShader,
 				Com_Clamp( 0.0f, 200.0f, (float)ci->armor ) / 200.0f,
 				armorColor
 			);
@@ -1906,14 +1950,16 @@ CG_DrawSnapshot
 static float CG_DrawSnapshot( float y ) {
 	char		*s;
 	int			w;
+	float		drawY;
 
 	s = va( "time:%i snap:%i cmd:%i", cg.snap->serverTime, 
 		cg.latestSnapshotNum, cgs.serverCommandSequence );
-	w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
+	w = CG_Text_WidthExt( s, 0.25f, 0, FONT_DEFAULT );
+	drawY = (float)(int)( y + 2.0f ) + 16.0f;
 
-	CG_DrawBigString( 635 - w, y + 2, s, 1.0F);
+	CG_Text_PaintExt( 635.0f - w, drawY, 0.25f, colorWhite, s, 0.0f, 0, ITEM_TEXTSTYLE_NORMAL, FONT_DEFAULT );
 
-	return y + BIGCHAR_HEIGHT + 4;
+	return y + 16.0f + 4.0f;
 }
 
 /*
@@ -1925,6 +1971,7 @@ CG_DrawFPS
 static float CG_DrawFPS( float y ) {
 	char		*s;
 	int			w;
+	int			h;
 	static int	previousTimes[FPS_FRAMES];
 	static int	index;
 	int		i, total;
@@ -1952,12 +1999,14 @@ static float CG_DrawFPS( float y ) {
 		fps = 1000 * FPS_FRAMES / total;
 
 		s = va( "%ifps", fps );
-		w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
+		w = CG_Text_WidthExt( s, 0.25f, 0, FONT_MONO );
+		h = CG_Text_HeightExt( s, 0.25f, 0, FONT_MONO );
 
-		CG_DrawBigString( 635 - w, y + 2, s, 1.0F);
+		CG_Text_PaintExt( 635.0f - w, y + h, 0.25f, colorWhite, s, 0.0f, 0, ITEM_TEXTSTYLE_NORMAL, FONT_MONO );
+		return y + h;
 	}
 
-	return y + BIGCHAR_HEIGHT + 4;
+	return y;
 }
 
 /*
@@ -2748,7 +2797,7 @@ static float CG_DrawPowerups( float y ) {
 	textWidth = CG_Text_Width( powerupTimeText, scale, 0 );
 	x = (float)textWidth + 13.0f;
 
-	icon = CG_TeammatePOIPowerupIcon( cg.powerupActive );
+	icon = CG_ItemBackedPowerupIcon( cg.powerupActive );
 	if ( !icon ) {
 		icon = trap_R_RegisterShader( item->icon );
 	}
@@ -2906,7 +2955,7 @@ static void CG_DrawLowerRight( void ) {
 	float	y;
 
 	y = 408.0f;
-	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 2 ) {
+	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 3 ) {
 		y = CG_DrawTeamOverlay( y, qtrue, qfalse );
 	}
 
@@ -3174,7 +3223,7 @@ static qhandle_t CG_TeamInfoCarryIcon( const clientInfo_t *ci ) {
 
 	for ( i = 0; i < ARRAY_LEN( powerups ); i++ ) {
 		if ( ci->powerups & ( 1 << powerups[i] ) ) {
-			return CG_TeammatePOIPowerupIcon( powerups[i] );
+			return CG_ItemBackedPowerupIcon( powerups[i] );
 		}
 	}
 
@@ -3576,6 +3625,7 @@ static void CG_DrawDisconnect( void ) {
 	usercmd_t	cmd;
 	const char		*s;
 	int			w;  // bk010215 - FIXME char message[1024];
+	qhandle_t	netShader;
 
 	// draw the phone jack if we are completely past our buffers
 	cmdNum = trap_GetCurrentCmdNumber() - CMD_BACKUP + 1;
@@ -3597,8 +3647,8 @@ static void CG_DrawDisconnect( void ) {
 
 	x = 640 - 48;
 	y = 480 - 48;
-
-	CG_DrawPic( x, y, 48, 48, trap_R_RegisterShader("gfx/2d/net.tga" ) );
+	netShader = trap_R_RegisterShader( "gfx/2d/net.tga" );
+	CG_DrawPic( x, y, 48, 48, netShader );
 }
 
 
@@ -3617,8 +3667,7 @@ static void CG_DrawLagometer( void ) {
 	int		color;
 	float	vscale;
 
-	if ( !cg_lagometer.integer || cgs.localServer ) {
-		CG_DrawDisconnect();
+	if ( !cg_lagometer.integer || cgs.localServer || cg.renderingThirdPerson ) {
 		return;
 	}
 
@@ -3708,8 +3757,6 @@ static void CG_DrawLagometer( void ) {
 	if ( cg_nopredict.integer || cg_synchronousClients.integer ) {
 		CG_DrawBigString( ax, ay, "snc", 1.0 );
 	}
-
-	CG_DrawDisconnect();
 }
 
 
@@ -3737,7 +3784,11 @@ void CG_CenterPrint( const char *str, int y, float scale ) {
 	Q_strncpyz( cg.centerPrint, str, sizeof(cg.centerPrint) );
 
 	cg.centerPrintTime = cg.time;
-	cg.centerPrintY = y;
+	if ( cgs.gametype == GT_RACE ) {
+		cg.centerPrintY = y + 10;
+	} else {
+		cg.centerPrintY = y;
+	}
 	cg.centerPrintScale = scale;
 
 	// count the number of lines for centering
@@ -3797,7 +3848,7 @@ static void CG_DrawCenterString( void ) {
 		w = CG_Text_Width( linebuffer, scale, 0 );
 		h = CG_Text_Height( linebuffer, scale, 0 );
 		x = (SCREEN_WIDTH - w) / 2;
-		CG_Text_Paint( x, y + h, scale, color, linebuffer, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+		CG_Text_Paint( x, y + h, scale, color, linebuffer, 0, 0, 0 );
 		y += h + 6;
 		while ( *start && ( *start != '\n' ) ) {
 			start++;
@@ -3830,21 +3881,23 @@ Draws the retail fullscreen vignette overlay when the cached cvar allows it.
 =================
 */
 static void CG_DrawScreenVignette( void ) {
-	static qhandle_t	vignetteShader;
+	vec4_t vignetteColor = { 1.0f, 1.0f, 1.0f, 0.35f };
 
 	if ( !cg.vignetteEnabled ) {
 		return;
 	}
 
-	if ( vignetteShader == 0 ) {
-		vignetteShader = trap_R_RegisterShader( "gfx/misc/vignette" );
+	if ( !cgs.media.vignetteShader ) {
+		cgs.media.vignetteShader = trap_R_RegisterShader( "gfx/misc/vignette" );
 	}
 
-	if ( vignetteShader == 0 ) {
+	if ( !cgs.media.vignetteShader ) {
 		return;
 	}
 
-	CG_DrawPic( 0.0f, 0.0f, 640.0f, 480.0f, vignetteShader );
+	trap_R_SetColor( vignetteColor );
+	CG_DrawPic( 0.0f, 0.0f, 640.0f, 480.0f, cgs.media.vignetteShader );
+	trap_R_SetColor( NULL );
 }
 
 /*
@@ -4392,8 +4445,54 @@ CG_DrawVote
 =================
 */
 static void CG_DrawVote(void) {
-	char	*s;
+	static vec4_t	voteColor = { 1.0f, 1.0f, 0.0f, 1.0f };
+	const char	*s;
+	char		yesKey[32];
+	char		noKey[32];
 	int		sec;
+
+	CG_GetBindKeyName( "vote yes", yesKey, sizeof( yesKey ) );
+	CG_GetBindKeyName( "vote no", noKey, sizeof( noKey ) );
+
+	if ( cgs.gametype >= GT_TEAM && cgs.gametype != GT_RED_ROVER ) {
+		if ( cg_complaintWarning.integer && cg.complaintClient >= 0 &&
+				cg.complaintEndTime > cg.time && !cg.renderingThirdPerson ) {
+			sec = ( cg.complaintEndTime - cg.time ) / 1000;
+			if ( sec < 0 ) {
+				sec = 0;
+			}
+
+			s = va( "File complaint against %s for team-killing?", cgs.clientinfo[cg.complaintClient].name );
+			CG_Text_Paint( 4.0f, 300.0f, 0.22f, voteColor, s, 0, 0, 0 );
+			s = va( "Press '%s' for Yes, or '%s' for No (%is)", yesKey, noKey, sec );
+			CG_Text_Paint( 8.0f, 312.0f, 0.22f, colorWhite, s, 0, 0, 0 );
+			return;
+		}
+
+		if ( cg.complaintEndTime > cg.time && !cg.renderingThirdPerson &&
+				cg_complaintWarning.integer > 0 && cg.complaintClient < 0 ) {
+			s = NULL;
+			switch ( cg.complaintClient ) {
+			case -1:
+				s = "Your complaint has been filed.";
+				break;
+			case -2:
+				s = "Your complaint has been dismissed.";
+				break;
+			case -3:
+				s = "Comlaints cannot be filed against server admins.";
+				break;
+			case -4:
+				s = "You received friendly fire from a server admin.";
+				break;
+			}
+
+			if ( s ) {
+				CG_Text_PaintNoAdjust( 3.0f, 300.0f, 0.22f, colorWhite, s, 0, 0 );
+				return;
+			}
+		}
+	}
 
 	if ( !cgs.voteTime ) {
 		return;
@@ -4409,47 +4508,11 @@ static void CG_DrawVote(void) {
 	if ( sec < 0 ) {
 		sec = 0;
 	}
-	s = va("VOTE(%i):%s yes:%i no:%i", sec, cgs.voteString, cgs.voteYes, cgs.voteNo);
-	CG_DrawSmallString( 0, 58, s, 1.0F );
-	s = "or press ESC then click Vote";
-	CG_DrawSmallString( 0, 58 + SMALLCHAR_HEIGHT + 2, s, 1.0F );
+
+	s = va( "VOTE(%is):%s Yes(%s):%i No(%s):%i", sec, cgs.voteString, yesKey, cgs.voteYes, noKey, cgs.voteNo );
+	CG_Text_PaintNoAdjust( 4.0f, 300.0f, 0.22f, voteColor, s, 0, 0 );
+	CG_Text_PaintNoAdjust( 8.0f, 312.0f, 0.22f, colorWhite, "or press ESC then click Vote", 0, 0 );
 }
-
-/*
-=================
-CG_DrawTeamVote
-=================
-*/
-static void CG_DrawTeamVote(void) {
-	char	*s;
-	int		sec, cs_offset;
-
-	if ( cgs.clientinfo->team == TEAM_RED )
-		cs_offset = 0;
-	else if ( cgs.clientinfo->team == TEAM_BLUE )
-		cs_offset = 1;
-	else
-		return;
-
-	if ( !cgs.teamVoteTime[cs_offset] ) {
-		return;
-	}
-
-	// play a talk beep whenever it is modified
-	if ( cgs.teamVoteModified[cs_offset] ) {
-		cgs.teamVoteModified[cs_offset] = qfalse;
-		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
-	}
-
-	sec = ( VOTE_TIME - ( cg.time - cgs.teamVoteTime[cs_offset] ) ) / 1000;
-	if ( sec < 0 ) {
-		sec = 0;
-	}
-	s = va("TEAMVOTE(%i):%s yes:%i no:%i", sec, cgs.teamVoteString[cs_offset],
-							cgs.teamVoteYes[cs_offset], cgs.teamVoteNo[cs_offset] );
-	CG_DrawSmallString( 0, 90, s, 1.0F );
-}
-
 
 /*
 =============
@@ -4712,36 +4775,36 @@ CG_DrawProxWarning
 =================
 */
 static void CG_DrawProxWarning( void ) {
-	char s [32];
+	char		s[32];
 	int			w;
-  static int proxTime;
-  static int proxCounter;
-  static int proxTick;
+	static int	proxTime;
+	static int	proxCounter;
+	static int	proxTick;
 
-	if( !(cg.snap->ps.eFlags & EF_TICKING ) ) {
-    proxTime = 0;
+	if ( !( cg.snap->ps.eFlags & EF_TICKING ) ) {
+		proxTime = 0;
 		return;
 	}
 
-  if (proxTime == 0) {
-    proxTime = cg.time + 5000;
-    proxCounter = 5;
-    proxTick = 0;
-  }
+	if ( proxTime == 0 ) {
+		proxTime = cg.time + 5000;
+		proxCounter = 5;
+		proxTick = 0;
+	}
 
-  if (cg.time > proxTime) {
-    proxTick = proxCounter--;
-    proxTime = cg.time + 1000;
-  }
+	if ( cg.time > proxTime ) {
+		proxTick = proxCounter--;
+		proxTime = cg.time + 1000;
+	}
 
-  if (proxTick != 0) {
-    Com_sprintf(s, sizeof(s), "INTERNAL COMBUSTION IN: %i", proxTick);
-  } else {
-    Com_sprintf(s, sizeof(s), "YOU HAVE BEEN MINED");
-  }
+	if ( proxTick != 0 ) {
+		Com_sprintf( s, sizeof( s ), "INTERNAL COMBUSTION IN: %i", proxTick );
+	} else {
+		Com_sprintf( s, sizeof( s ), "YOU HAVE BEEN MINED" );
+	}
 
-	w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
-	CG_DrawBigStringColor( 320 - w / 2, 64 + BIGCHAR_HEIGHT, s, g_color_table[ColorIndex(COLOR_RED)] );
+	CG_Text_GetExtents( s, 0.25f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+	CG_Text_PaintNoAdjust( 320 - w / 2, 112.0f, 0.25f, g_color_table[ColorIndex(COLOR_RED)], s, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
 }
 
 
@@ -4754,12 +4817,7 @@ static const char *CG_GetBindKeyName( const char *cmd, char *buf, int len ) {
 	int key;
 
 	key = trap_Key_GetKey( cmd );
-	if ( key == -1 ) {
-		Q_strncpyz( buf, "???", len );
-	} else {
-		trap_Key_KeynumToStringBuf( key, buf, len );
-		Q_strupr( buf );
-	}
+	trap_Key_KeynumToStringBuf( key, buf, len );
 	return buf;
 }
 
@@ -4785,14 +4843,28 @@ static void CG_DrawWarmupStartBanner( void ) {
 		}
 
 		if ( localTeam == TEAM_RED || localTeam == TEAM_BLUE ) {
-			text = ( localTeam == attackingTeam ) ? "ATTACK THE FLAG" : "DEFEND THE FLAG";
-		} else {
-			text = ( attackingTeam == TEAM_RED ) ? "Red is on offense" : "Blue is on offense";
+			if ( localTeam == attackingTeam ) {
+				text = "ATTACK THE FLAG!";
+				if ( cgs.media.attackTheFlagSound ) {
+					sound = cgs.media.attackTheFlagSound;
+				}
+			} else {
+				text = "DEFEND THE FLAG!";
+				if ( cgs.media.defendTheFlagSound ) {
+					sound = cgs.media.defendTheFlagSound;
+				}
+			}
 		}
-	} else if ( cgs.gametype == GT_RED_ROVER && ( cgs.customSettingsMask & CUSTOM_SETTING_INFECTED ) ) {
-		text = "BITE!";
-		if ( cgs.media.infectedSound ) {
-			sound = cgs.media.infectedSound;
+	} else if ( cgs.gametype == GT_RED_ROVER ) {
+		if ( cgs.matchRoundNumber > 0 && cgs.media.kamikazeRespawnSound ) {
+			trap_S_StartLocalSound( cgs.media.kamikazeRespawnSound, CHAN_LOCAL_SOUND );
+		}
+		if ( ( cgs.customSettingsMask & CUSTOM_SETTING_INFECTED )
+			&& cg.snap && cg.snap->ps.generic1 == 2 ) {
+			text = "BITE!";
+			if ( cgs.media.biteSound ) {
+				sound = cgs.media.biteSound;
+			}
 		}
 	}
 
@@ -4831,20 +4903,25 @@ static void CG_PlayWarmupCountSound( int countdown ) {
 		break;
 
 	case 0:
-		CG_DrawWarmupStartBanner();
+		if ( CG_IsRoundStartGametype( cgs.gametype ) ) {
+			CG_DrawWarmupStartBanner();
+		}
+		break;
+
+	case 5:
+		if ( cgs.matchTimeoutActive ) {
+			if ( cgs.media.countPrepareSound ) {
+				trap_S_StartLocalSound( cgs.media.countPrepareSound, CHAN_ANNOUNCER );
+			}
+		} else if ( CG_IsRoundStartGametype( cgs.gametype )
+			&& ( cgs.gametype != GT_FREEZE || countdown >= 5 ) ) {
+			if ( cgs.media.roundBeginsInSound ) {
+				trap_S_StartLocalSound( cgs.media.roundBeginsInSound, CHAN_ANNOUNCER );
+			}
+		}
 		break;
 
 	default:
-		if ( countdown > 3 ) {
-			if ( ( cgs.gametype == GT_CLAN_ARENA || cgs.gametype == GT_DOMINATION
-				|| cgs.gametype == GT_ATTACK_DEFEND
-				|| ( cgs.gametype == GT_FREEZE && countdown >= 5 ) )
-				&& cgs.media.roundBeginsInSound ) {
-				trap_S_StartLocalSound( cgs.media.roundBeginsInSound, CHAN_ANNOUNCER );
-			} else if ( cgs.media.countPrepareSound ) {
-				trap_S_StartLocalSound( cgs.media.countPrepareSound, CHAN_ANNOUNCER );
-			}
-		}
 		break;
 	}
 }
@@ -4913,8 +4990,8 @@ static void CG_DrawADRoundScoreboard( void ) {
 	static const vec4_t activeTeamBlueFillColor = { 0.1f, 0.1f, 0.5f, 0.5f };
 	static const vec4_t activeRoundRedFillColor = { 1.0f, 0.0f, 0.0f, 0.5f };
 	static const vec4_t activeRoundBlueFillColor = { 0.0f, 0.0f, 1.0f, 0.5f };
-	static const vec4_t redColor = { 1.0f, 0.0f, 0.0f, 1.0f };
-	static const vec4_t blueColor = { 0.0f, 0.0f, 1.0f, 1.0f };
+	static vec4_t	redColor = { 1.0f, 0.0f, 0.0f, 1.0f };
+	static vec4_t	blueColor = { 0.0f, 0.0f, 1.0f, 1.0f };
 	const vec4_t	*activeTeamFillColor;
 	const vec4_t	*activeRoundFillColor;
 	const char	*statusText;
@@ -5010,7 +5087,7 @@ static void CG_DrawADRoundScoreboard( void ) {
 	statusText = CG_ADRoundScoreboardStatusText();
 	if ( statusText && statusText[0] ) {
 		int		textWidth;
-		const vec4_t	*statusColor;
+		vec4_t	*statusColor;
 
 		statusColor = &colorWhite;
 		if ( !Q_stricmp( statusText, "Red Wins! Good Game" ) ) {
@@ -5066,7 +5143,6 @@ static void CG_DrawWarmupStatusText( int gametype ) {
 		if ( ci1 && ci2 ) {
 			title = va( "%s vs %s", ci1->name, ci2->name );
 		}
-		titleY = 60.0f;
 	} else if ( gametype == GT_FFA && ( cgs.customSettingsMask & CUSTOM_SETTING_QUAD_HOG ) ) {
 		title = "Quad Hog";
 	} else if ( gametype == GT_RED_ROVER &&
@@ -5122,19 +5198,6 @@ static void CG_DrawWarmupStatusText( int gametype ) {
 
 	countdownText = va( shortCountdown ? "%i" : "Starts in: %i", countdown );
 	countdownScale = 0.45f;
-	switch ( countdown ) {
-	case 1:
-		countdownScale = 0.51f;
-		break;
-
-	case 2:
-		countdownScale = 0.48f;
-		break;
-
-	default:
-		break;
-	}
-
 	CG_Text_GetExtents( countdownText, countdownScale, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
 	CG_Text_PaintNoAdjust( 320 - w / 2, countdownY + verticalOffset, countdownScale, colorWhite,
 		countdownText, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
@@ -5156,7 +5219,7 @@ static void CG_DrawMatchPauseStatus( void ) {
 
 	text = "Match Paused";
 	if ( cgs.matchTimeoutExpireTime > 0 ) {
-		remaining = ( ( cgs.matchTimeoutExpireTime - cg.time ) + 1000 ) / 1000;
+		remaining = ( cgs.matchTimeoutExpireTime - cg.time ) / 1000;
 		if ( remaining < 0 ) {
 			remaining = 0;
 		}
@@ -5179,8 +5242,8 @@ static void CG_DrawMatchPauseStatus( void ) {
 		cg.warmupCount = -1;
 	}
 
-	CG_Text_GetExtents( text, 0.45f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
-	CG_Text_PaintNoAdjust( 320 - w / 2, 105.0f, 0.45f, colorWhite, text, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	CG_Text_GetExtents( text, 0.5f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+	CG_Text_PaintNoAdjust( 320 - w / 2, 128.0f, 0.5f, colorWhite, text, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
 }
 
 /*
@@ -5310,15 +5373,276 @@ static void CG_DrawDominationPointStatus( void ) {
 
 /*
 =================
+CG_WarmupPlayerCountTeamSize
+=================
+*/
+static int CG_WarmupPlayerCountTeamSize( void ) {
+	if ( cgs.playerCountTeamSize > 0 ) {
+		return cgs.playerCountTeamSize;
+	}
+
+	return 1;
+}
+
+/*
+=================
+CG_CountWarmupPlayersByTeam
+=================
+*/
+static void CG_CountWarmupPlayersByTeam( int teamCounts[TEAM_NUM_TEAMS] ) {
+	int		i;
+	int		team;
+
+	for ( i = 0; i < TEAM_NUM_TEAMS; i++ ) {
+		teamCounts[i] = 0;
+	}
+
+	for ( i = 0; i < cgs.maxclients; i++ ) {
+		if ( !cgs.clientinfo[i].infoValid ) {
+			continue;
+		}
+
+		team = cgs.clientinfo[i].team;
+		if ( team >= TEAM_FREE && team < TEAM_NUM_TEAMS ) {
+			teamCounts[team]++;
+		}
+	}
+}
+
+/*
+=================
+CG_WarmupReadyDeadlineSeconds
+=================
+*/
+static int CG_WarmupReadyDeadlineSeconds( void ) {
+	int		remaining;
+
+	if ( cgs.matchReadyUpDeadline <= 0 ) {
+		return 0;
+	}
+
+	remaining = ( cgs.matchReadyUpDeadline - cg.time ) / 1000 + 1;
+	if ( remaining < 0 ) {
+		remaining = 0;
+	}
+	return remaining;
+}
+
+/*
+=================
+CG_WarmupPluralSuffix
+=================
+*/
+static const char *CG_WarmupPluralSuffix( int count ) {
+	return ( count == 1 ) ? "" : "s";
+}
+
+/*
+=================
+CG_WarmupTeamsBalanced
+=================
+*/
+static qboolean CG_WarmupTeamsBalanced( const int teamCounts[TEAM_NUM_TEAMS] ) {
+	if ( teamCounts[TEAM_RED] > teamCounts[TEAM_BLUE] + 1 ) {
+		return qfalse;
+	}
+	if ( teamCounts[TEAM_BLUE] > teamCounts[TEAM_RED] + 1 ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+/*
+=================
+CG_BuildWarmupWaitingStatus
+
+Builds the retail two-line pregame waiting prompt from player counts.
+=================
+*/
+static void CG_BuildWarmupWaitingStatus( int gametype, const int teamCounts[TEAM_NUM_TEAMS],
+	char *line1, int line1Size, char *line2, int line2Size ) {
+	int		requiredPlayers;
+	int		readySeconds;
+	int		missingPlayers;
+
+	requiredPlayers = CG_WarmupPlayerCountTeamSize();
+	Q_strncpyz( line1, "The wanking will begin", line1Size );
+	Q_strncpyz( line2, "when more players are ready.", line2Size );
+
+	if ( gametype == GT_RED_ROVER ) {
+		if ( cgs.customSettingsMask & CUSTOM_SETTING_INFECTED ) {
+			if ( teamCounts[TEAM_RED] + teamCounts[TEAM_BLUE] < requiredPlayers ) {
+				Q_strncpyz( line2, "when more players join.", line2Size );
+			}
+			return;
+		}
+
+		if ( teamCounts[TEAM_RED] < requiredPlayers || teamCounts[TEAM_BLUE] < requiredPlayers ) {
+			Q_strncpyz( line2, "when more players join.", line2Size );
+		}
+		return;
+	}
+
+	if ( gametype < GT_TEAM ) {
+		if ( gametype == GT_TOURNAMENT && teamCounts[TEAM_FREE] > 2 ) {
+			Q_strncpyz( line1, "The wanking will begin when", line1Size );
+			Q_strncpyz( line2, "fewer players are in the match.", line2Size );
+		} else if ( teamCounts[TEAM_FREE] < 2 ) {
+			Q_strncpyz( line2, "when more players join.", line2Size );
+		} else {
+			readySeconds = CG_WarmupReadyDeadlineSeconds();
+			if ( readySeconds > 0 ) {
+				Q_strncpyz( line1, "Players must ready", line1Size );
+				Com_sprintf( line2, line2Size, "within %i second%s.",
+					readySeconds, CG_WarmupPluralSuffix( readySeconds ) );
+			}
+		}
+		return;
+	}
+
+	if ( teamCounts[TEAM_RED] < requiredPlayers ) {
+		if ( teamCounts[TEAM_BLUE] < requiredPlayers ) {
+			Q_strncpyz( line1, "Waiting for more players.", line1Size );
+			Com_sprintf( line2, line2Size, "The match requires %i player%s per team.",
+				requiredPlayers, CG_WarmupPluralSuffix( requiredPlayers ) );
+		} else {
+			missingPlayers = requiredPlayers - teamCounts[TEAM_RED];
+			Com_sprintf( line1, line1Size, "Waiting for %i more player%s",
+				missingPlayers, CG_WarmupPluralSuffix( missingPlayers ) );
+			Q_strncpyz( line2, "to join the Red Team.", line2Size );
+		}
+		return;
+	}
+
+	if ( teamCounts[TEAM_BLUE] < requiredPlayers ) {
+		missingPlayers = requiredPlayers - teamCounts[TEAM_BLUE];
+		Com_sprintf( line1, line1Size, "Waiting for %i more player%s",
+			missingPlayers, CG_WarmupPluralSuffix( missingPlayers ) );
+		Q_strncpyz( line2, "to join the Blue Team.", line2Size );
+		return;
+	}
+
+	if ( !CG_WarmupTeamsBalanced( teamCounts ) ) {
+		Q_strncpyz( line1, "The teams must be balanced", line1Size );
+		Q_strncpyz( line2, "before the match can begin.", line2Size );
+	}
+}
+
+/*
+=================
+CG_DrawWarmupTextLine
+=================
+*/
+static void CG_DrawWarmupTextLine( const char *text, float y, float scale ) {
+	int		w;
+
+	CG_Text_GetExtents( text, scale, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
+	CG_Text_PaintNoAdjust( 320 - w / 2, y, scale, colorWhite, text, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+}
+
+/*
+=================
+CG_DrawWarmupWaitingStatus
+=================
+*/
+static void CG_DrawWarmupWaitingStatus( int gametype, const int teamCounts[TEAM_NUM_TEAMS],
+	float verticalOffset ) {
+	char	line1[128];
+	char	line2[128];
+
+	if ( !cg_drawPregameMessages.integer ) {
+		return;
+	}
+
+	CG_BuildWarmupWaitingStatus( gametype, teamCounts, line1, sizeof( line1 ), line2, sizeof( line2 ) );
+	CG_DrawWarmupTextLine( line1, 88.0f + verticalOffset, 0.35f );
+	CG_DrawWarmupTextLine( line2, 108.0f + verticalOffset, 0.35f );
+}
+
+/*
+=================
+CG_ShouldDrawWarmupReadyPrompt
+=================
+*/
+static qboolean CG_ShouldDrawWarmupReadyPrompt( int gametype, const int teamCounts[TEAM_NUM_TEAMS] ) {
+	int		requiredPlayers;
+	team_t	localTeam;
+
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+
+	localTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+	if ( localTeam == TEAM_SPECTATOR ) {
+		return qfalse;
+	}
+
+	requiredPlayers = CG_WarmupPlayerCountTeamSize();
+	if ( gametype < GT_TEAM ) {
+		return (qboolean)( teamCounts[TEAM_FREE] >= 2 );
+	}
+
+	if ( gametype == GT_RED_ROVER && ( cgs.customSettingsMask & CUSTOM_SETTING_INFECTED ) ) {
+		return (qboolean)( teamCounts[TEAM_RED] + teamCounts[TEAM_BLUE] >= requiredPlayers );
+	}
+
+	return (qboolean)( teamCounts[TEAM_RED] >= requiredPlayers && teamCounts[TEAM_BLUE] >= requiredPlayers );
+}
+
+/*
+=================
+CG_DrawWarmupReadyPrompt
+=================
+*/
+static void CG_DrawWarmupReadyPrompt( int gametype, const int teamCounts[TEAM_NUM_TEAMS],
+	float verticalOffset ) {
+	char		keyBuf[32];
+	const char	*keyName;
+	const char	*prompt;
+
+	if ( !CG_ShouldDrawWarmupReadyPrompt( gametype, teamCounts ) ) {
+		return;
+	}
+
+	keyName = CG_GetBindKeyName( "readyup", keyBuf, sizeof( keyBuf ) );
+	if ( cg.snap->ps.eFlags & EF_READY ) {
+		prompt = va( "Press %s to unready yourself", keyName );
+	} else {
+		prompt = va( "Press %s to ready yourself", keyName );
+	}
+
+	CG_DrawWarmupTextLine( prompt, 124.0f + verticalOffset, 0.25f );
+}
+
+/*
+=================
+CG_ShouldPlayWarmupCountSound
+=================
+*/
+static qboolean CG_ShouldPlayWarmupCountSound( int gametype ) {
+	if ( !CG_IsRoundStartGametype( (gametype_t)gametype ) ) {
+		return qtrue;
+	}
+
+	if ( gametype == GT_FREEZE && cgs.matchRoundNumber == 0 ) {
+		return qtrue;
+	}
+
+	return (qboolean)( cgs.matchRoundNumber > 0 );
+}
+
+/*
+=================
 CG_DrawWarmup
 =================
 */
 static void CG_DrawWarmup( void ) {
-	int			w;
-	int			sec;
-	const char	*s;
+	int		sec;
 
 	if ( CG_IsJoinGameMenuCaptureActive() && !cg.scoreBoardShowing ) {
+		return;
+	}
+	if ( cg.showScores || !cg.snap ) {
 		return;
 	}
 
@@ -5331,47 +5655,14 @@ static void CG_DrawWarmup( void ) {
 	}
 
 	if ( sec < 0 ) {
-		float	promptY;
+		int		teamCounts[TEAM_NUM_TEAMS];
+		float	verticalOffset;
 
-		s = "Waiting for players";		
-		w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
-		CG_DrawBigString(320 - w / 2, 24, s, 1.0F);
-		cg.warmupCount = 0;
-		promptY = 45.0f;
-
-		if ( cgs.matchWarmupReadyEligible > 0 ) {
-			char status[64];
-
-			if ( cgs.matchWarmupReadyPercent > 0 ) {
-				Com_sprintf( status, sizeof( status ), "%i/%i ready (%i%% required)",
-					cgs.matchWarmupReadyCount,
-					cgs.matchWarmupReadyEligible,
-					cgs.matchWarmupReadyPercent );
-			} else {
-				Com_sprintf( status, sizeof( status ), "%i/%i ready",
-					cgs.matchWarmupReadyCount,
-					cgs.matchWarmupReadyEligible );
-			}
-
-			CG_Text_GetExtents( status, 0.25f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
-			CG_Text_PaintNoAdjust( 320 - w / 2, promptY, 0.25f, colorWhite, status, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
-			promptY += 15.0f;
-		}
-
-		// if local player is not ready, draw the ready string
-		if ( !( cg.snap->ps.eFlags & EF_READY ) ) {
-			char keyBuf[32];
-			const char *keyName;
-
-			keyName = CG_GetBindKeyName( "readyup", keyBuf, sizeof( keyBuf ) );
-			if ( !Q_stricmp( keyName, "???" ) ) {
-				keyName = CG_GetBindKeyName( "ready", keyBuf, sizeof( keyBuf ) );
-			}
-
-			s = va( "Press %s to ready yourself", keyName );
-			CG_Text_GetExtents( s, 0.25f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
-			CG_Text_PaintNoAdjust( 320 - w / 2, promptY, 0.25f, colorWhite, s, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
-		}
+		verticalOffset = ( cgs.gametype == GT_RACE ) ? 30.0f : 0.0f;
+		CG_CountWarmupPlayersByTeam( teamCounts );
+		cg.warmupCount = -1;
+		CG_DrawWarmupWaitingStatus( cgs.gametype, teamCounts, verticalOffset );
+		CG_DrawWarmupReadyPrompt( cgs.gametype, teamCounts, verticalOffset );
 		return;
 	}
 
@@ -5383,7 +5674,9 @@ static void CG_DrawWarmup( void ) {
 
 	if ( sec != cg.warmupCount ) {
 		cg.warmupCount = sec;
-		CG_PlayWarmupCountSound( sec );
+		if ( CG_ShouldPlayWarmupCountSound( cgs.gametype ) ) {
+			CG_PlayWarmupCountSound( sec );
+		}
 	}
 
 	if ( sec <= 0 ) {
@@ -5477,6 +5770,7 @@ Paints one retail demo-HUD label/key pair centered on the supplied x column.
 =============
 */
 static void CG_DrawDemoControlPair( float centerX, const char *label, const char *key ) {
+	static vec4_t	demoKeyColor = { 1.0f, 1.0f, 0.0f, 1.0f };
 	int	labelWidth;
 	int	keyWidth;
 
@@ -5488,7 +5782,7 @@ static void CG_DrawDemoControlPair( float centerX, const char *label, const char
 
 	if ( key && key[0] ) {
 		keyWidth = CG_Text_Width( key, 0.15f, 0 );
-		CG_Text_PaintNoAdjust( centerX - keyWidth * 0.5f, 405.0f, 0.15f, colorWhite,
+		CG_Text_PaintNoAdjust( centerX - keyWidth * 0.5f, 405.0f, 0.15f, demoKeyColor,
 			key, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
 	}
 }
@@ -5606,10 +5900,6 @@ static void CG_DrawPregamePlacementPrompt( void ) {
 	}
 
 	keyName = CG_GetBindKeyName( "readyup", keyBuf, sizeof( keyBuf ) );
-	if ( !Q_stricmp( keyName, "???" ) ) {
-		keyName = CG_GetBindKeyName( "ready", keyBuf, sizeof( keyBuf ) );
-	}
-
 	if ( CG_IsTrainingTutorialSession() ) {
 		prompt = va( "Press %s to skip the tutorial", keyName );
 		y = 30.0f;
@@ -5650,8 +5940,6 @@ static void CG_DrawDemoPlaybackControls( int panelWidth ) {
 	float		freezeDemo;
 	float		columnOffset;
 	vec4_t		panelColor;
-	vec4_t		borderColor;
-	int			textWidth;
 	qboolean	showPlaybackControls;
 
 	freezeDemo = trap_Cvar_VariableValue( "cl_freezeDemo" );
@@ -5673,20 +5961,13 @@ static void CG_DrawDemoPlaybackControls( int panelWidth ) {
 	panelColor[0] = 0.0f;
 	panelColor[1] = 0.0f;
 	panelColor[2] = 0.0f;
-	panelColor[3] = 0.45f;
-	borderColor[0] = 1.0f;
-	borderColor[1] = 1.0f;
-	borderColor[2] = 1.0f;
-	borderColor[3] = 0.18f;
-	CG_FillRect( 220.0f, 355.0f, 210.0f, 60.0f, panelColor );
-	CG_DrawRect( 220.0f, 355.0f, 210.0f, 60.0f, 1.0f, borderColor );
+	panelColor[3] = 0.5f;
+	CG_FillRect( 210.0f, 355.0f, 220.0f, 60.0f, panelColor );
 
 	columnOffset = panelWidth * 0.5f;
 
 	deltaText = CG_FormatSignedMilliseconds( cg.time - cgs.levelStartTime );
-	textWidth = CG_Text_Width( deltaText, 0.30f, 0 );
-	CG_Text_PaintNoAdjust( 320.0f - textWidth * 0.5f, 375.0f, 0.30f, colorWhite,
-		deltaText, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	CG_Text_PaintNoAdjust( 288.0f, 375.0f, 0.30f, colorWhite, deltaText, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
 
 	CG_DrawDemoControlPair( 235.0f - columnOffset, stateLabel, "[SPACE]" );
 
@@ -5694,7 +5975,7 @@ static void CG_DrawDemoPlaybackControls( int panelWidth ) {
 		CG_DrawDemoControlPair( 275.0f - columnOffset, "-", "[LEFT]" );
 
 		speedText = va( "%0.1fx", cg_timescale.value );
-		CG_DrawDemoControlPair( 320.0f - columnOffset, speedText, NULL );
+		CG_Text_PaintNoAdjust( 290.0f, 395.0f, 0.25f, colorWhite, speedText, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
 		CG_DrawDemoControlPair( 330.0f - columnOffset, "+", "[RIGHT]" );
 		CG_DrawDemoControlPair( 370.0f - columnOffset, "1.0x", "[DOWN]" );
 	} else {
@@ -5915,20 +6196,28 @@ static void CG_Draw2D( void ) {
 		menuScoreboardHandled = qtrue;
 	}
 
-	CG_DrawVote();
-	CG_DrawTeamVote();
-
 	CG_DrawLagometer();
+	if ( !cg.renderingThirdPerson ) {
+		CG_DrawDisconnect();
+	}
 
 	if (!cg_paused.integer) {
 		if ( !menuHudActive ) {
 			CG_DrawInputCmds();
 			CG_DrawSpeedometer();
+		}
+
+		CG_DrawVote();
+		CG_DrawUpperRight();
+		CG_DrawSpectatorItemPickups();
+		if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 2 ) {
+			CG_DrawTeamOverlay( 408.0f, qtrue, qfalse );
+		}
+
+		if ( !menuHudActive ) {
 			CG_DrawLowerRight();
 			CG_DrawLowerLeft();
 		}
-		CG_DrawUpperRight();
-		CG_DrawSpectatorItemPickups();
 	}
 
 

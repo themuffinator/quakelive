@@ -1787,31 +1787,24 @@ static void CG_GetArmorTierColor( int armor, vec4_t color ) {
 
 /*
 =============
-CG_NormalizedTo100
+CG_BarValueFraction
 
-Returns a normalized percentage for values capped at 100.
+Returns a normalized percentage for a clamped value.
 =============
 */
-static float CG_NormalizedTo100( int value ) {
-	return Com_Clamp( 0.0f, 100.0f, (float)value ) * ( 1.0f / 100.0f );
-}
+static float CG_BarValueFraction( int value, int maximum ) {
+	if ( maximum <= 0 ) {
+		return 0.0f;
+	}
 
-/*
-=============
-CG_NormalizedTo200
-
-Returns a normalized percentage for values capped at 200.
-=============
-*/
-static float CG_NormalizedTo200( int value ) {
-	return Com_Clamp( 0.0f, 200.0f, (float)value ) * ( 1.0f / 200.0f );
+	return Com_Clamp( 0.0f, (float)maximum, (float)value ) / (float)maximum;
 }
 
 /*
 =============
 CG_DrawBarFill
 
-Renders a clipped portion of the supplied shader using the specified color and ratio.
+Renders a left-clipped portion of the supplied shader using the specified color and ratio.
 =============
 */
 static void CG_DrawBarFill( const rectDef_t *rect, qhandle_t shader, float fraction, const vec4_t color ) {
@@ -1848,16 +1841,119 @@ static void CG_DrawBarFill( const rectDef_t *rect, qhandle_t shader, float fract
 
 /*
 =============
-CG_DrawPlayerHealthBarRange
+CG_DrawBarFillFromRight
 
-Draws the player health fill bar for either the 0-100 or 0-200 range.
+Renders a right-clipped portion of the supplied shader using the specified color and ratio.
 =============
 */
-static void CG_DrawPlayerHealthBarRange( rectDef_t *rect, qhandle_t shader, qboolean use200Range ) {
+static void CG_DrawBarFillFromRight( const rectDef_t *rect, qhandle_t shader, float fraction, const vec4_t color ) {
+	float x;
+	float y;
+	float w;
+	float h;
+	float s1;
+
+	if ( !rect ) {
+		return;
+	}
+
+	if ( fraction <= 0.0f || rect->w <= 0.0f || rect->h <= 0.0f ) {
+		return;
+	}
+
+	if ( fraction > 1.0f ) {
+		fraction = 1.0f;
+	}
+
+	w = rect->w * fraction;
+	x = rect->x + rect->w - w;
+
+	if ( shader ) {
+		y = rect->y;
+		h = rect->h;
+		s1 = 1.0f - fraction;
+		CG_AdjustFrom640( &x, &y, &w, &h );
+		trap_R_SetColor( color );
+		trap_R_DrawStretchPic( x, y, w, h, s1, 0.0f, 1.0f, 1.0f, shader );
+		trap_R_SetColor( NULL );
+	} else {
+		CG_FillRect( x, rect->y, w, rect->h, color );
+	}
+}
+
+/*
+=============
+CG_DrawBarFillFromBottom
+
+Renders a bottom-clipped portion of the supplied shader using the specified color and ratio.
+=============
+*/
+static void CG_DrawBarFillFromBottom( const rectDef_t *rect, qhandle_t shader, float fraction, const vec4_t color ) {
+	float x;
+	float y;
+	float w;
+	float h;
+	float t1;
+
+	if ( !rect ) {
+		return;
+	}
+
+	if ( fraction <= 0.0f || rect->w <= 0.0f || rect->h <= 0.0f ) {
+		return;
+	}
+
+	if ( fraction > 1.0f ) {
+		fraction = 1.0f;
+	}
+
+	h = rect->h * fraction;
+	y = rect->y + rect->h - h;
+
+	if ( shader ) {
+		x = rect->x;
+		w = rect->w;
+		t1 = 1.0f - fraction;
+		CG_AdjustFrom640( &x, &y, &w, &h );
+		trap_R_SetColor( color );
+		trap_R_DrawStretchPic( x, y, w, h, 0.0f, t1, 1.0f, 1.0f, shader );
+		trap_R_SetColor( NULL );
+	} else {
+		CG_FillRect( rect->x, y, rect->w, h, color );
+	}
+}
+
+/*
+=============
+CG_PlayerMaxHealth
+
+Returns the local player's retail max-health split for primary and excess bar segments.
+=============
+*/
+static int CG_PlayerMaxHealth( void ) {
+	int maxHealth;
+
+	maxHealth = cg.snap->ps.stats[STAT_MAX_HEALTH];
+	if ( maxHealth <= 0 ) {
+		maxHealth = 100;
+	}
+
+	return maxHealth;
+}
+
+/*
+=============
+CG_DrawPlayerHealthBar100
+
+Draws the retail primary player health bar ownerdraw.
+=============
+*/
+static void CG_DrawPlayerHealthBar100( rectDef_t *rect, qhandle_t shader ) {
 	vec4_t barColor;
 	float ratio;
 	int health;
 	int armor;
+	int maxHealth;
 
 	if ( !cg.snap ) {
 		return;
@@ -1865,12 +1961,13 @@ static void CG_DrawPlayerHealthBarRange( rectDef_t *rect, qhandle_t shader, qboo
 
 	health = cg.snap->ps.stats[STAT_HEALTH];
 	armor = cg.snap->ps.stats[STAT_ARMOR];
+	maxHealth = CG_PlayerMaxHealth();
 	CG_GetColorForHealth( health, armor, barColor );
 	barColor[3] = 1.0f;
-	ratio = use200Range ? CG_NormalizedTo200( health ) : CG_NormalizedTo100( health );
+	ratio = CG_BarValueFraction( health, maxHealth );
 
 	if ( !shader ) {
-		shader = use200Range ? cgs.media.healthBar200 : cgs.media.healthBar100;
+		shader = cgs.media.healthBar100;
 	}
 
 	CG_DrawBarFill( rect, shader, ratio, barColor );
@@ -1878,34 +1975,50 @@ static void CG_DrawPlayerHealthBarRange( rectDef_t *rect, qhandle_t shader, qboo
 
 /*
 =============
-CG_DrawPlayerHealthBar100
-
-Draws the 0-100 retail player health bar ownerdraw.
-=============
-*/
-static void CG_DrawPlayerHealthBar100( rectDef_t *rect, qhandle_t shader ) {
-	CG_DrawPlayerHealthBarRange( rect, shader, qfalse );
-}
-
-/*
-=============
 CG_DrawPlayerHealthBar200
 
-Draws the 0-200 retail player health bar ownerdraw.
+Draws the retail excess player health bar ownerdraw.
 =============
 */
 static void CG_DrawPlayerHealthBar200( rectDef_t *rect, qhandle_t shader ) {
-	CG_DrawPlayerHealthBarRange( rect, shader, qtrue );
+	vec4_t barColor;
+	float ratio;
+	int health;
+	int armor;
+	int maxHealth;
+	int excessHealth;
+
+	if ( !cg.snap ) {
+		return;
+	}
+
+	health = cg.snap->ps.stats[STAT_HEALTH];
+	armor = cg.snap->ps.stats[STAT_ARMOR];
+	maxHealth = CG_PlayerMaxHealth();
+	excessHealth = health - maxHealth;
+	if ( excessHealth <= 0 ) {
+		return;
+	}
+
+	CG_GetColorForHealth( health, armor, barColor );
+	barColor[3] = 1.0f;
+	ratio = CG_BarValueFraction( excessHealth, maxHealth );
+
+	if ( !shader ) {
+		shader = cgs.media.healthBar200;
+	}
+
+	CG_DrawBarFillFromBottom( rect, shader, ratio, barColor );
 }
 
 /*
 =============
-CG_DrawPlayerArmorBarRange
+CG_DrawPlayerArmorBar100
 
-Draws the player armor fill bar for either the 0-100 or 0-200 range.
+Draws the retail primary player armor bar ownerdraw.
 =============
 */
-static void CG_DrawPlayerArmorBarRange( rectDef_t *rect, qhandle_t shader, qboolean use200Range ) {
+static void CG_DrawPlayerArmorBar100( rectDef_t *rect, qhandle_t shader ) {
 	vec4_t barColor;
 	float ratio;
 	int armor;
@@ -1917,35 +2030,47 @@ static void CG_DrawPlayerArmorBarRange( rectDef_t *rect, qhandle_t shader, qbool
 	armor = cg.snap->ps.stats[STAT_ARMOR];
 	CG_GetArmorTierColor( armor, barColor );
 	barColor[3] = 1.0f;
-	ratio = use200Range ? CG_NormalizedTo200( armor ) : CG_NormalizedTo100( armor );
+	ratio = CG_BarValueFraction( armor, 100 );
 
 	if ( !shader ) {
-		shader = use200Range ? cgs.media.armorBar200 : cgs.media.armorBar100;
+		shader = cgs.media.armorBar100;
 	}
 
-	CG_DrawBarFill( rect, shader, ratio, barColor );
-}
-
-/*
-=============
-CG_DrawPlayerArmorBar100
-
-Draws the 0-100 retail player armor bar ownerdraw.
-=============
-*/
-static void CG_DrawPlayerArmorBar100( rectDef_t *rect, qhandle_t shader ) {
-	CG_DrawPlayerArmorBarRange( rect, shader, qfalse );
+	CG_DrawBarFillFromRight( rect, shader, ratio, barColor );
 }
 
 /*
 =============
 CG_DrawPlayerArmorBar200
 
-Draws the 0-200 retail player armor bar ownerdraw.
+Draws the retail excess player armor bar ownerdraw.
 =============
 */
 static void CG_DrawPlayerArmorBar200( rectDef_t *rect, qhandle_t shader ) {
-	CG_DrawPlayerArmorBarRange( rect, shader, qtrue );
+	vec4_t barColor;
+	float ratio;
+	int armor;
+	int excessArmor;
+
+	if ( !cg.snap ) {
+		return;
+	}
+
+	armor = cg.snap->ps.stats[STAT_ARMOR];
+	excessArmor = armor - 100;
+	if ( excessArmor <= 0 ) {
+		return;
+	}
+
+	CG_GetArmorTierColor( armor, barColor );
+	barColor[3] = 1.0f;
+	ratio = CG_BarValueFraction( excessArmor, 100 );
+
+	if ( !shader ) {
+		shader = cgs.media.armorBar200;
+	}
+
+	CG_DrawBarFillFromBottom( rect, shader, ratio, barColor );
 }
 
 /*
@@ -3396,20 +3521,17 @@ static void CG_DrawGameTypeIcon(rectDef_t *rect) {
 =============
 CG_DrawGameTypeMap
 
-Outputs the retail "Gametype Fullname - Map" intro-panel label.
+Outputs the retail "Gametype Fullname - Detail" intro-panel label.
 =============
 */
 static void CG_DrawGameTypeMap(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
 	char	detailBuffer[256];
-	char	mapName[MAX_QPATH];
 	char	buffer[256];
 	float	x;
 	float	y;
 
 	CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );
-	CG_GetMapDisplayName( mapName, sizeof( mapName ) );
 	Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), detailBuffer );
-	Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), mapName );
 
 	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
 	CG_Text_Paint( x, y, scale, color, buffer, 0, 0, textStyle );
@@ -3503,22 +3625,18 @@ static const char *CG_GetMatchDetailsPhaseLabel( void ) {
 =============
 CG_DrawMatchDetails
 
-Renders the retail "Match phase - Gametype Shortname - Map" text.
+Renders the retail "Match phase - Gametype Shortname - Detail" text.
 =============
 */
 static void CG_DrawMatchDetails(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
 	char	detailBuffer[256];
-	char	mapName[MAX_QPATH];
 	char	buffer[256];
 	float	x;
 	float	y;
 
 	CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );
-	CG_GetMapDisplayName( mapName, sizeof( mapName ) );
 	Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s",
 		CG_GetMatchDetailsPhaseLabel(), CG_GameTypeShortString(), detailBuffer );
-	Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s",
-		CG_GetMatchDetailsPhaseLabel(), CG_GameTypeShortString(), mapName );
 
 	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
 	CG_Text_Paint( x, y, scale, color, buffer, 0, 0, textStyle );
@@ -3681,7 +3799,7 @@ static const char *CG_GetMatchStatusText( void ) {
 =============
 CG_DrawMatchStatus
 
-Renders "Game State - Scores message" using the existing HUD helpers.
+Renders the pre-composed retail match-status ownerdraw text.
 =============
 */
 static void CG_DrawMatchStatus(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
@@ -3965,16 +4083,22 @@ static void CG_DrawEndGameScore( rectDef_t *rect, float text_x, float text_y, fl
 =============
 CG_DrawRoundLabel
 
-Displays the current round or match state string.
+Displays the retail warmup/round label.
 =============
 */
 static void CG_DrawRoundLabel(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
-	const char	*label;
+	char		label[32];
 	float		x;
 	float		y;
 
-	label = CG_GetMatchStateLabel();
-	if ( !label || !*label ) {
+	label[0] = '\0';
+	if ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) {
+		Q_strncpyz( label, "Warmup", sizeof( label ) );
+	} else if ( cgs.matchRoundNumber > 0 ) {
+		Com_sprintf( label, sizeof( label ), "Round %d", cgs.matchRoundNumber );
+	}
+
+	if ( !label[0] ) {
 		return;
 	}
 
@@ -4062,16 +4186,18 @@ Displays the screenshot preview tied to a given vote option slot.
 */
 static void CG_DrawVoteShot(rectDef_t *rect, int slot) {
 	char	path[MAX_QPATH];
+	char	previewToken[MAX_QPATH];
 	cgVoteShotCache_t *cache;
 
 	if ( slot < 1 || slot > 3 ) {
 		return;
 	}
 	cache = &cg_voteShotCache[slot - 1];
-	CG_GetVoteSlotString( slot, "Shot", path, sizeof( path ) );
-	if ( !path[0] ) {
-		return;
+	CG_GetVoteSlotString( slot, "Shot", previewToken, sizeof( previewToken ) );
+	if ( !previewToken[0] ) {
+		Q_strncpyz( previewToken, "default", sizeof( previewToken ) );
 	}
+	Com_sprintf( path, sizeof( path ), "levelshots/preview/%s", previewToken );
 	if ( Q_stricmp( cache->path, path ) ) {
 		cache->handle = trap_R_RegisterShaderNoMip( path );
 		Q_strncpyz( cache->path, path, sizeof( cache->path ) );
@@ -4247,6 +4373,7 @@ static void CG_DrawSelectedPlayerAccuracy(rectDef_t *rect, float scale, vec4_t c
 }
 
 static const weapon_t cgVerticalAccWeaponOrder[] = {
+	WP_GAUNTLET,
 	WP_MACHINEGUN,
 	WP_SHOTGUN,
 	WP_GRENADE_LAUNCHER,
@@ -4409,7 +4536,7 @@ static void CG_DrawTeamTimeoutCount(rectDef_t *rect, float scale, vec4_t color, 
 	}
 
 	remaining = cgs.matchTimeoutRemaining[team];
-	Com_sprintf( buffer, sizeof( buffer ), "Timeouts %i", remaining );
+	Com_sprintf( buffer, sizeof( buffer ), "TO: %d", remaining );
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
@@ -4519,6 +4646,7 @@ static void CG_DrawTeamAveragePing(rectDef_t *rect, float scale, vec4_t color, i
 	int		average;
 	int		i;
 	char	buffer[48];
+	vec4_t	drawColor;
 
 	sum = 0;
 	count = 0;
@@ -4538,8 +4666,19 @@ static void CG_DrawTeamAveragePing(rectDef_t *rect, float scale, vec4_t color, i
 	}
 
 	average = sum / count;
+	Vector4Copy( color, drawColor );
+	if ( average >= 80 ) {
+		drawColor[0] = 1.0f;
+		drawColor[1] = 0.2f;
+		drawColor[2] = 0.2f;
+	} else if ( average >= 40 ) {
+		drawColor[0] = 1.0f;
+		drawColor[1] = 0.85f;
+		drawColor[2] = 0.2f;
+	}
+
 	Com_sprintf( buffer, sizeof( buffer ), "Avg ping %i", average );
-	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+	CG_Text_Paint(rect->x, rect->y + rect->h, scale, drawColor, buffer, 0, 0, textStyle);
 }
 
 /*
@@ -6453,7 +6592,7 @@ static qboolean CG_IsCompetitiveScoreOwnerDraw( int ownerDraw ) {
 		ownerDraw == CG_2ND_PLYR_HEALTH_ARMOR || ownerDraw == CG_2ND_PLYR_AVATAR ||
 		ownerDraw == CG_TEAM_PLYR_COUNT || ownerDraw == CG_ENEMY_PLYR_COUNT ||
 		ownerDraw == CG_MATCH_WINNER || ownerDraw == CG_PLYR_END_GAME_SCORE ||
-		ownerDraw == CG_1STPLACE_PLYR_MODEL || ownerDraw == CG_1STPLACE_PLYR_MODEL_ACTIVE ||
+		ownerDraw == CG_1STPLACE_PLYR_MODEL ||
 		ownerDraw == CG_FLAG_STATUS || ownerDraw == CG_RED_BASESTATUS || ownerDraw == CG_BLUE_BASESTATUS ) {
 		return qtrue;
 	}
@@ -7627,7 +7766,14 @@ static void CG_DrawPlayerScore( rectDef_t *rect, float scale, vec4_t color, qhan
 	}
 }
 
-static void CG_DrawPlayerItem( rectDef_t *rect, float scale, qboolean draw2D) {
+/*
+=============
+CG_DrawPlayerItem
+
+Draws the active holdable item and its retail progress overlay.
+=============
+*/
+static void CG_DrawPlayerItem( rectDef_t *rect, float scale, qboolean draw2D ) {
 	int		value;
 	char	progressText[16];
 	float	progressScale;
@@ -8910,21 +9056,12 @@ static void CG_DrawAreaPowerUp(rectDef_t *rect, int align, float special, float 
 
 float CG_GetValue(int ownerDraw) {
 	centity_t	*cent;
- 	clientInfo_t *ci;
 	playerState_t	*ps;
 
   cent = &cg_entities[cg.snap->ps.clientNum];
 	ps = &cg.snap->ps;
 
   switch (ownerDraw) {
-  case CG_SELECTEDPLAYER_ARMOR:
-    ci = cgs.clientinfo + sortedTeamPlayers[CG_GetSelectedPlayer()];
-    return ci->armor;
-    break;
-  case CG_SELECTEDPLAYER_HEALTH:
-    ci = cgs.clientinfo + sortedTeamPlayers[CG_GetSelectedPlayer()];
-    return ci->health;
-    break;
   case CG_PLAYER_ARMOR_VALUE:
 		return ps->stats[STAT_ARMOR];
     break;
@@ -9195,7 +9332,7 @@ CG_OwnerDrawVisible
 Evaluates the ownerdraw visibility bitmasks for HUD and menu scripts.
 =============
 */
-qboolean CG_OwnerDrawVisible(int flags) {
+qboolean CG_OwnerDrawVisible(int flags, int flags2) {
 	qboolean vis = qtrue;
 
 	while ( flags ) {
@@ -9377,149 +9514,40 @@ qboolean CG_OwnerDrawVisible(int flags) {
 			flags &= ~CG_SHOW_PLAYERS_REMAINING;
 		}
 
-		if ( flags & CG_SHOW_IF_PLYR1 ) {
-			if ( !CG_SpectatorPlayerSlotActive( 0 ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_PLYR1;
-		}
-
-		if ( flags & CG_SHOW_IF_PLYR2 ) {
-			if ( !CG_SpectatorPlayerSlotActive( 1 ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_PLYR2;
-		}
-
-		if ( flags & CG_SHOW_IF_G_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_GAUNTLET ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_G_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_MG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_MACHINEGUN ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_MG_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_SG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_SHOTGUN ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_SG_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_GL_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_GRENADE_LAUNCHER ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_GL_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_RL_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_ROCKET_LAUNCHER ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_RL_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_LG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_LIGHTNING ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_LG_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_RG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_RAILGUN ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_RG_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_PG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_PLASMAGUN ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_PG_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_BFG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_BFG ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_BFG_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_CG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_CHAINGUN ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_CG_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_NG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_NAILGUN ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_NG_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_PL_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_PROX_LAUNCHER ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_PL_FIRED;
-		}
-
-		if ( flags & CG_SHOW_IF_HMG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_HEAVY_MACHINEGUN ) ) {
-				vis = qfalse;
-			}
-			flags &= ~CG_SHOW_IF_HMG_FIRED;
-		}
-
-		if (flags & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED |
-			UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED)) {
+		if (flags & (UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED)) {
 			qboolean loadoutsEnabled = CG_LoadoutsEnabled();
 			qboolean showLoadoutState = qfalse;
 
-			if ( ( flags & ( CG_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_ENABLED ) ) && loadoutsEnabled ) {
+			if ( ( flags & UI_SHOW_IF_LOADOUT_ENABLED ) && loadoutsEnabled ) {
 				showLoadoutState = qtrue;
 			}
 
-			if ( ( flags & ( CG_SHOW_IF_LOADOUT_DISABLED | UI_SHOW_IF_LOADOUT_DISABLED ) ) && !loadoutsEnabled ) {
+			if ( ( flags & UI_SHOW_IF_LOADOUT_DISABLED ) && !loadoutsEnabled ) {
 				showLoadoutState = qtrue;
 			}
 
 			if ( !showLoadoutState ) {
 				vis = qfalse;
 			}
-			flags &= ~( CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED |
-				UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED );
+			flags &= ~( UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED );
 		}
 
-		if (flags & (CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP |
-			UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP)) {
+		if (flags & (UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP)) {
 			qboolean warmupVisible = qfalse;
 			qboolean inWarmup = ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) ? qtrue : qfalse;
 
-			if ( ( flags & ( CG_SHOW_IF_WARMUP | UI_SHOW_IF_WARMUP ) ) && inWarmup ) {
+			if ( ( flags & UI_SHOW_IF_WARMUP ) && inWarmup ) {
 				warmupVisible = qtrue;
 			}
 
-			if ( ( flags & ( CG_SHOW_IF_NOT_WARMUP | UI_SHOW_IF_NOT_WARMUP ) ) && !inWarmup ) {
+			if ( ( flags & UI_SHOW_IF_NOT_WARMUP ) && !inWarmup ) {
 				warmupVisible = qtrue;
 			}
 
 			if ( !warmupVisible ) {
 				vis = qfalse;
 			}
-			flags &= ~( CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP |
-				UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP );
+			flags &= ~( UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP );
 		}
 
 		if ( flags & CG_SHOW_IF_CHAT_VISIBLE ) {
@@ -9543,7 +9571,137 @@ qboolean CG_OwnerDrawVisible(int flags) {
 			flags &= ~( CG_SHOW_NOTINTERMISSION | UI_SHOW_IF_NOT_INTERMISSION );
 		}
 
-		if (flags & (CG_SHOW_IF_PLYR_IS_ON_RED | CG_SHOW_IF_PLYR_IS_ON_BLUE |
+		if ( flags ) {
+			vis = qfalse;
+			flags = 0;
+		}
+	}
+
+	while ( flags2 ) {
+		if ( flags2 & CG_SHOW_IF_PLYR1 ) {
+			if ( !CG_SpectatorPlayerSlotActive( 0 ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_PLYR1;
+		}
+
+		if ( flags2 & CG_SHOW_IF_PLYR2 ) {
+			if ( !CG_SpectatorPlayerSlotActive( 1 ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_PLYR2;
+		}
+
+		if ( flags2 & CG_SHOW_IF_G_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_GAUNTLET ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_G_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_MG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_MACHINEGUN ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_MG_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_SG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_SHOTGUN ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_SG_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_GL_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_GRENADE_LAUNCHER ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_GL_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_RL_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_ROCKET_LAUNCHER ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_RL_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_LG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_LIGHTNING ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_LG_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_RG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_RAILGUN ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_RG_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_PG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_PLASMAGUN ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_PG_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_BFG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_BFG ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_BFG_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_CG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_CHAINGUN ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_CG_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_NG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_NAILGUN ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_NG_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_PL_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_PROX_LAUNCHER ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_PL_FIRED;
+		}
+
+		if ( flags2 & CG_SHOW_IF_HMG_FIRED ) {
+			if ( !CG_LocalPlayerHasWeapon( WP_HEAVY_MACHINEGUN ) ) {
+				vis = qfalse;
+			}
+			flags2 &= ~CG_SHOW_IF_HMG_FIRED;
+		}
+
+		if (flags2 & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED)) {
+			qboolean loadoutsEnabled = CG_LoadoutsEnabled();
+			qboolean showLoadoutState = qfalse;
+
+			if ( ( flags2 & CG_SHOW_IF_LOADOUT_ENABLED ) && loadoutsEnabled ) {
+				showLoadoutState = qtrue;
+			}
+
+			if ( ( flags2 & CG_SHOW_IF_LOADOUT_DISABLED ) && !loadoutsEnabled ) {
+				showLoadoutState = qtrue;
+			}
+
+			if ( !showLoadoutState ) {
+				vis = qfalse;
+			}
+			flags2 &= ~( CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED );
+		}
+
+		if (flags2 & (CG_SHOW_IF_PLYR_IS_ON_RED | CG_SHOW_IF_PLYR_IS_ON_BLUE |
 			CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC |
 			CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC)) {
 			team_t playerTeam = TEAM_FREE;
@@ -9556,69 +9714,69 @@ qboolean CG_OwnerDrawVisible(int flags) {
 					(cg.snap->ps.pm_flags & PMF_FOLLOW);
 			}
 
-			if ( flags & CG_SHOW_IF_PLYR_IS_ON_RED && playerTeam == TEAM_RED ) {
+			if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED && playerTeam == TEAM_RED ) {
 				showPlayerTeam = qtrue;
 			}
 
-			if ( flags & CG_SHOW_IF_PLYR_IS_ON_BLUE && playerTeam == TEAM_BLUE ) {
+			if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE && playerTeam == TEAM_BLUE ) {
 				showPlayerTeam = qtrue;
 			}
 
-			if ( flags & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC && ( playerTeam == TEAM_RED || spectator ) ) {
+			if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC && ( playerTeam == TEAM_RED || spectator ) ) {
 				showPlayerTeam = qtrue;
 			}
 
-			if ( flags & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC && ( playerTeam == TEAM_BLUE || spectator ) ) {
+			if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC && ( playerTeam == TEAM_BLUE || spectator ) ) {
 				showPlayerTeam = qtrue;
 			}
 
-			if ( flags & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC && playerTeam == TEAM_RED && !spectator ) {
+			if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC && playerTeam == TEAM_RED && !spectator ) {
 				showPlayerTeam = qtrue;
 			}
 
-			if ( flags & CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC && playerTeam == TEAM_BLUE && !spectator ) {
+			if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC && playerTeam == TEAM_BLUE && !spectator ) {
 				showPlayerTeam = qtrue;
 			}
 
 			if ( !showPlayerTeam ) {
 				vis = qfalse;
 			}
-			flags &= ~( CG_SHOW_IF_PLYR_IS_ON_RED | CG_SHOW_IF_PLYR_IS_ON_BLUE |
+			flags2 &= ~( CG_SHOW_IF_PLYR_IS_ON_RED | CG_SHOW_IF_PLYR_IS_ON_BLUE |
 				CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC |
 				CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC | CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC );
 		}
 
-		if ( flags & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) {
+		if ( flags2 & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) {
 			if ( !CG_SpectatorSlotFollowed( 0 ) ) {
 				vis = qfalse;
 			}
-			flags &= ~CG_SHOW_IF_1ST_PLYR_FOLLOWED;
+			flags2 &= ~CG_SHOW_IF_1ST_PLYR_FOLLOWED;
 		}
 
-		if ( flags & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) {
+		if ( flags2 & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) {
 			if ( !CG_SpectatorSlotFollowed( 1 ) ) {
 				vis = qfalse;
 			}
-			flags &= ~CG_SHOW_IF_2ND_PLYR_FOLLOWED;
+			flags2 &= ~CG_SHOW_IF_2ND_PLYR_FOLLOWED;
 		}
 
-		if ( flags & CG_SHOW_IF_1ST_PLYR_TRACKED ) {
+		if ( flags2 & CG_SHOW_IF_1ST_PLYR_TRACKED ) {
 			if ( !CG_SpectatorSlotTracked( 0 ) ) {
 				vis = qfalse;
 			}
-			flags &= ~CG_SHOW_IF_1ST_PLYR_TRACKED;
+			flags2 &= ~CG_SHOW_IF_1ST_PLYR_TRACKED;
 		}
 
-		if ( flags & CG_SHOW_IF_2ND_PLYR_TRACKED ) {
+		if ( flags2 & CG_SHOW_IF_2ND_PLYR_TRACKED ) {
 			if ( !CG_SpectatorSlotTracked( 1 ) ) {
 				vis = qfalse;
 			}
-			flags &= ~CG_SHOW_IF_2ND_PLYR_TRACKED;
+			flags2 &= ~CG_SHOW_IF_2ND_PLYR_TRACKED;
 		}
 
-		if ( flags ) {
+		if ( flags2 ) {
 			vis = qfalse;
-			flags = 0;
+			flags2 = 0;
 		}
 	}
 
@@ -10485,11 +10643,13 @@ rect.y = y;
 		CG_DrawLevelTimer(&rect, scale, color, textStyle);
 		break;
 	case CG_ROUND:
+		if ( CG_ShowPlayersRemaining() ) {
 			CG_DrawRoundLabel(&rect, text_x, text_y, scale, color, textStyle);
+		}
 			break;
 	case CG_ROUND_BACKGROUND:
-			CG_DrawRoundBackground(&rect, shader, color);
-			break;
+			/* Retail maps raw ownerdraw 0x162 to the common no-op return target. */
+			return;
 	case CG_ROUNDTIMER:
 			CG_DrawRoundTimer(&rect, scale, color, textStyle);
 			break;
@@ -10497,8 +10657,8 @@ rect.y = y;
 			CG_DrawOvertime(&rect, scale, color, textStyle);
 			break;
 	case CG_OVERTIME_BACKGROUND:
-			CG_DrawOvertimeBackground(&rect, shader, color);
-			break;
+			/* Retail maps raw ownerdraw 0x163 to the common no-op return target. */
+			return;
 	case CG_LOCALTIME:
 		CG_DrawLocalTime(&rect, text_x, text_y, scale, color, textStyle);
 		break;
@@ -10581,36 +10741,18 @@ rect.y = y;
 	case CG_PLAYER_AMMO_VALUE:
 		CG_DrawPlayerAmmoValue( &rect, scale, color, shader, textStyle );
 		break;
-  case CG_SELECTEDPLAYER_HEAD:
-    CG_DrawSelectedPlayerHead(&rect, ownerDrawFlags & CG_SHOW_2DONLY, qfalse);
-    break;
-  case CG_VOICE_HEAD:
-    CG_DrawSelectedPlayerHead(&rect, ownerDrawFlags & CG_SHOW_2DONLY, qtrue);
-    break;
-  case CG_VOICE_NAME:
-    CG_DrawSelectedPlayerName(&rect, scale, color, qtrue, textStyle);
-    break;
-  case CG_SELECTEDPLAYER_STATUS:
-    CG_DrawSelectedPlayerStatus(&rect);
-    break;
-  case CG_SELECTEDPLAYER_ARMOR:
-    CG_DrawSelectedPlayerArmor(&rect, scale, color, shader, textStyle);
-    break;
-  case CG_SELECTEDPLAYER_HEALTH:
-    CG_DrawSelectedPlayerHealth(&rect, scale, color, shader, textStyle);
-    break;
-  case CG_SELECTEDPLAYER_NAME:
-    CG_DrawSelectedPlayerName(&rect, scale, color, qfalse, textStyle);
-    break;
-  case CG_SELECTEDPLAYER_LOCATION:
-    CG_DrawSelectedPlayerLocation(&rect, scale, color, textStyle);
-    break;
-  case CG_SELECTEDPLAYER_WEAPON:
-    CG_DrawSelectedPlayerWeapon(&rect);
-    break;
-  case CG_SELECTEDPLAYER_POWERUP:
-    CG_DrawSelectedPlayerPowerup(&rect, ownerDrawFlags & CG_SHOW_2DONLY);
-    break;
+	case CG_SELECTEDPLAYER_HEAD:
+	case CG_SELECTEDPLAYER_NAME:
+	case CG_SELECTEDPLAYER_LOCATION:
+	case CG_SELECTEDPLAYER_STATUS:
+	case CG_SELECTEDPLAYER_WEAPON:
+	case CG_SELECTEDPLAYER_POWERUP:
+	case CG_SELECTEDPLAYER_ARMOR:
+	case CG_SELECTEDPLAYER_HEALTH:
+	case CG_VOICE_HEAD:
+	case CG_VOICE_NAME:
+		/* Retail maps raw ownerdraws 0x158-0x161 to the common no-op return target. */
+		return;
 	case CG_PLAYER_HEAD:
 		CG_DrawPlayerHead( &rect, ownerDrawFlags & CG_SHOW_2DONLY );
 		break;
@@ -10642,22 +10784,34 @@ rect.y = y;
 		CG_DrawTeamPlayerCount(&rect, scale, color, textStyle, TEAM_BLUE, align);
 		break;
 	case CG_RED_CLAN_PLYRS:
-		CG_DrawClanArenaPlayers(&rect, scale, color, textStyle, TEAM_RED);
+		if ( CG_ShowPlayersRemaining() ) {
+			CG_DrawClanArenaPlayers(&rect, scale, color, textStyle, TEAM_RED);
+		}
 		break;
 	case CG_BLUE_CLAN_PLYRS:
-		CG_DrawClanArenaPlayers(&rect, scale, color, textStyle, TEAM_BLUE);
+		if ( CG_ShowPlayersRemaining() ) {
+			CG_DrawClanArenaPlayers(&rect, scale, color, textStyle, TEAM_BLUE);
+		}
 		break;
 	case CG_RED_OWNED_FLAGS:
-		CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_RED);
+		if ( cgs.gametype == GT_DOMINATION || cgs.gametype == GT_ATTACK_DEFEND ) {
+			CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_RED);
+		}
 		break;
 	case CG_BLUE_OWNED_FLAGS:
-		CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_BLUE);
+		if ( cgs.gametype == GT_DOMINATION || cgs.gametype == GT_ATTACK_DEFEND ) {
+			CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_BLUE);
+		}
 		break;
   case CG_RED_TIMEOUT_COUNT:
-		CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_RED);
+		if ( cgs.playerCountTeamSize > 0 ) {
+			CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_RED);
+		}
 		break;
   case CG_BLUE_TIMEOUT_COUNT:
-		CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_BLUE);
+		if ( cgs.playerCountTeamSize > 0 ) {
+			CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_BLUE);
+		}
 		break;
   case CG_RED_AVG_PING:
 		CG_DrawTeamAveragePing(&rect, scale, color, textStyle, TEAM_RED);
@@ -10671,24 +10825,24 @@ rect.y = y;
   case CG_BLUE_NAME:
 		CG_DrawTeamName( &rect, scale, color, textStyle, TEAM_BLUE, align );
 		break;
-  case CG_BLUE_FLAGHEAD:
-    CG_DrawBlueFlagHead(&rect);
-    break;
+	case CG_BLUE_FLAGHEAD:
+		/* Retail maps raw ownerdraw 0x167 to the common no-op return target. */
+		return;
   case CG_BLUE_FLAGSTATUS:
     CG_DrawTeamFlagOrBaseStatus( &rect, TEAM_BLUE, qfalse, shader );
     break;
-  case CG_BLUE_FLAGNAME:
-    CG_DrawBlueFlagName(&rect, scale, color, textStyle);
-    break;
-  case CG_RED_FLAGHEAD:
-    CG_DrawRedFlagHead(&rect);
-    break;
+	case CG_BLUE_FLAGNAME:
+		/* Retail maps raw ownerdraw 0x168 to the common no-op return target. */
+		return;
+	case CG_RED_FLAGHEAD:
+		/* Retail maps raw ownerdraw 0x169 to the common no-op return target. */
+		return;
   case CG_RED_FLAGSTATUS:
     CG_DrawTeamFlagOrBaseStatus( &rect, TEAM_RED, qfalse, shader );
     break;
-  case CG_RED_FLAGNAME:
-    CG_DrawRedFlagName(&rect, scale, color, textStyle);
-    break;
+	case CG_RED_FLAGNAME:
+		/* Retail maps raw ownerdraw 0x16a to the common no-op return target. */
+		return;
   case CG_HARVESTER_SKULLS:
     CG_HarvesterSkulls(&rect, scale, color, qfalse, textStyle);
     break;
@@ -10698,9 +10852,9 @@ rect.y = y;
   case CG_ONEFLAG_STATUS:
     CG_OneFlagStatus(&rect);
     break;
-  case CG_PLAYER_LOCATION:
-    CG_DrawPlayerLocation(&rect, scale, color, textStyle);
-    break;
+	case CG_PLAYER_LOCATION:
+		/* Retail maps raw ownerdraw 0x16b to the common no-op return target. */
+		return;
   case CG_TEAM_COLOR:
     CG_DrawTeamColor(&rect, color);
     break;
@@ -10710,30 +10864,28 @@ rect.y = y;
   case CG_AREA_POWERUP:
 		CG_DrawAreaPowerUp(&rect, align, special, scale, color);
     break;
-  case CG_PLAYER_STATUS:
-    CG_DrawPlayerStatus(&rect);
-    break;
+	case CG_PLAYER_STATUS:
+		/* Retail maps raw ownerdraw 0x16c to the common no-op return target. */
+		return;
   case CG_PLAYER_HASFLAG:
     CG_DrawPlayerHasFlag(&rect, qfalse);
     break;
   case CG_PLAYER_HASFLAG2D:
     CG_DrawPlayerHasFlag(&rect, qtrue);
     break;
-  case CG_AREA_SYSTEMCHAT:
-    CG_DrawAreaSystemChat(&rect, scale, color, shader);
-    break;
-  case CG_AREA_TEAMCHAT:
-    CG_DrawAreaTeamChat(&rect, scale, color, shader);
-    break;
-  case CG_AREA_CHAT:
-    CG_DrawAreaChat(&rect, scale, color, shader);
-    break;
+	case CG_AREA_SYSTEMCHAT:
+	case CG_AREA_TEAMCHAT:
+	case CG_AREA_CHAT:
+		/* Retail maps raw ownerdraws 0x16d-0x16f to the common no-op return target. */
+		return;
   case CG_AREA_NEW_CHAT:
                 CG_DrawNewChatArea(&rect, scale, color, textStyle);
                 break;
   case CG_KILLER:
-    CG_DrawKiller(&rect, scale, color, shader, textStyle);
-    break;
+		if ( cg.killerName[0] ) {
+			CG_DrawKiller(&rect, scale, color, shader, textStyle);
+		}
+		break;
 	case CG_ACCURACY:
 	case CG_ASSISTS:
 	case CG_DEFEND:
@@ -10745,8 +10897,10 @@ rect.y = y;
 		CG_DrawMedal(ownerDraw, &rect, scale, color, shader);
 		break;
 	case CG_SPECTATORS:
-                CG_DrawTeamSpectators(&rect, scale, color, shader);
-                break;
+		if ( cg.spectatorEntryCount > 0 ) {
+			CG_DrawTeamSpectators(&rect, scale, color, shader);
+		}
+		break;
 	case UI_ADVERT:
 		CG_DrawAdvert( &rect, color, shader );
 		break;
@@ -10768,20 +10922,18 @@ rect.y = y;
   case CG_SPEC_MESSAGES:
 		CG_DrawSpectatorMessages(&rect, scale, color, textStyle);
 		break;
-  case CG_TEAMINFO:
-                if (cg_currentSelectedPlayer.integer == numSortedTeamPlayers) {
-                        CG_DrawNewTeamInfo(&rect, text_x, text_y, scale, color, shader);
-                }
-                break;
+	case CG_TEAMINFO:
+		/* Retail maps raw ownerdraw 0x166 to the common no-op return target. */
+		return;
   case CG_1STPLACE:
     CG_Draw1stPlace(&rect, scale, color, shader, textStyle);
                 break;
   case CG_1STPLACE_PLYR_MODEL:
 		CG_DrawFirstPlaceModel( &rect, qfalse );
 		break;
-  case CG_1STPLACE_PLYR_MODEL_ACTIVE:
-		CG_DrawFirstPlaceModel( &rect, qtrue );
-		break;
+	case CG_1STPLACE_PLYR_MODEL_ACTIVE:
+		/* Retail maps raw ownerdraw 0x66 to the common no-op return target. */
+		return;
   case CG_2NDPLACE:
     CG_Draw2ndPlace(&rect, scale, color, shader, textStyle);
                 break;
@@ -10836,19 +10988,15 @@ rect.y = y;
 				CG_DrawPlacementAvatarOwnerDraw( &rect, 1 );
 				break;
 		case CG_SCOREBOX_FOLLOW_BACKGROUND:
-				CG_DrawScoreboxFollowBackground(&rect, shader, color);
-				break;
 		case CG_SCOREBOX_SPEC_BACKGROUND:
-				CG_DrawScoreboxSpecBackground(&rect, shader, color);
-				break;
+				/* Retail maps raw ownerdraws 0x164-0x165 to the common no-op return target. */
+				return;
 		case CG_SPEC_FOLLOW_PRIMARY:
 		case CG_SPEC_FOLLOW_SECONDARY:
-				CG_DrawSpectatorFollowIndicator( &rect, ownerDraw, shader, color );
-				break;
 		case CG_SPEC_COMPARE_PRIMARY:
 		case CG_SPEC_COMPARE_SECONDARY:
-				CG_DrawSpectatorComparison( &rect, scale, color, textStyle, ownerDraw );
-				break;
+				/* Retail maps raw ownerdraws 0x154-0x157 to the common no-op return target. */
+				return;
 	case CG_HEALTH_COLORIZED: {
 		qhandle_t followShader = shader;
 
@@ -10943,10 +11091,14 @@ rect.y = y;
 		CG_DrawSpeedometerOwnerDraw( &rect, scale, color, textStyle );
 		break;
   case CG_TEAM_PLYR_COUNT:
-CG_DrawPlayerCount(&rect, scale, color, textStyle, qtrue);
-break;
+		if ( CG_ShowPlayersRemaining() ) {
+			CG_DrawPlayerCount(&rect, scale, color, textStyle, qtrue);
+		}
+		break;
 	case CG_ENEMY_PLYR_COUNT:
-		CG_DrawPlayerCount(&rect, scale, color, textStyle, qfalse);
+		if ( CG_ShowPlayersRemaining() ) {
+			CG_DrawPlayerCount(&rect, scale, color, textStyle, qfalse);
+		}
 		break;
   default:
     break;
@@ -11997,13 +12149,8 @@ void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint ) {
 		return;
 	}
 
-	if ( menu->window.ownerDrawFlags && cgDC.ownerDrawVisible &&
-		!cgDC.ownerDrawVisible( menu->window.ownerDrawFlags ) ) {
-		return;
-	}
-
-	if ( menu->window.ownerDrawFlags2 && cgDC.ownerDrawVisible &&
-		!cgDC.ownerDrawVisible( menu->window.ownerDrawFlags2 ) ) {
+	if ( ( menu->window.ownerDrawFlags || menu->window.ownerDrawFlags2 ) && cgDC.ownerDrawVisible &&
+		!cgDC.ownerDrawVisible( menu->window.ownerDrawFlags, menu->window.ownerDrawFlags2 ) ) {
 		return;
 	}
 

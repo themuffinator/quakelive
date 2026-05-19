@@ -102,7 +102,7 @@ static void CG_ShowTrackedPlayerSlot( int slot );
 static void CG_Show1stTrackedPlayer( void );
 static void CG_Show2ndTrackedPlayer( void );
 void CG_Cvar_GetString( const char *cvar, char *buffer, int bufsize );
-menuDef_t *Menu_FindItemByName( menuDef_t *menu, const char *p );
+itemDef_t *Menu_FindItemByName( menuDef_t *menu, const char *p );
 void Menu_UpdatePosition( menuDef_t *menu );
 
 /*
@@ -304,6 +304,7 @@ vmCvar_t	cg_cameraThirdPersonSmartMode;
 vmCvar_t	cg_centertime;
 vmCvar_t	cg_chatbeep;
 vmCvar_t	cg_chatHistoryLength;
+vmCvar_t	cg_complaintWarning;
 vmCvar_t	cg_playVoiceChats;
 vmCvar_t	cg_showVoiceText;
 vmCvar_t	cg_crosshairBrightness;
@@ -602,6 +603,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_centertime, "cg_centertime", "3", CVAR_CHEAT },
 	{ &cg_chatbeep, "cg_chatbeep", "1", CVAR_ARCHIVE },
 	{ &cg_chatHistoryLength, "cg_chatHistoryLength", "0", CVAR_ARCHIVE },
+	{ &cg_complaintWarning, "cg_complaintWarning", "1", CVAR_ARCHIVE },
 	{ &cg_playVoiceChats, "cg_playVoiceChats", "1", CVAR_ARCHIVE },
 	{ &cg_showVoiceText, "cg_showVoiceText", "1", CVAR_ARCHIVE },
 	{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1", CVAR_ARCHIVE },
@@ -816,7 +818,9 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_useItemMessage, "cg_useItemMessage", "1", CVAR_ARCHIVE },
 	{ &cg_useItemWarning, "cg_useItemWarning", "1", CVAR_ARCHIVE },
 	{ &cg_viewsize, "cg_viewsize", "100", CVAR_ARCHIVE },
-	{ &cg_vignette, "cg_vignette", "1", CVAR_ARCHIVE },
+	// Retail defaults this on, but the current renderer path treats the black
+	// PNG vignette as too opaque until shader/PNG alpha parity is restored.
+	{ &cg_vignette, "cg_vignette", "0", CVAR_ARCHIVE },
 	{ &cg_voiceChatIndicator, "cg_voiceChatIndicator", "1", CVAR_ARCHIVE },
 	{ &cg_waterWarp, "cg_waterWarp", "1", CVAR_ARCHIVE },
 	{ &cg_weaponBar, "cg_weaponBar", "4", CVAR_ARCHIVE },
@@ -2825,6 +2829,11 @@ static void CG_RegisterSounds( void ) {
 			CG_REGISTER_CONFIGURED_ANNOUNCER_SAMPLE( enemyTookTheFlagSound, "defend_the_flag.ogg" );
 		}
 
+		if ( cgs.gametype == GT_ATTACK_DEFEND || cg_buildScript.integer ) {
+			CG_REGISTER_CONFIGURED_ANNOUNCER_SAMPLE( attackTheFlagSound, "attack_the_flag.ogg" );
+			CG_REGISTER_CONFIGURED_ANNOUNCER_SAMPLE( defendTheFlagSound, "defend_the_flag.ogg" );
+		}
+
 		if ( cgs.gametype == GT_1FCTF || cgs.gametype == GT_CTF || cg_buildScript.integer ) {
 			CG_REGISTER_CONFIGURED_ANNOUNCER_SAMPLE( youHaveFlagSound, "you_have_flag.ogg" );
 			CG_REGISTER_CONFIGURED_ANNOUNCER_SAMPLE( holyShitSound, "holy_shit.ogg" );
@@ -2944,6 +2953,10 @@ static void CG_RegisterSounds( void ) {
 	CG_REGISTER_RETAIL_REWARD_SAMPLE( revengeSound2, "revenge2", "revenge" );
 	CG_REGISTER_RETAIL_REWARD_SAMPLE( revengeSound3, "revenge3", "revenge" );
 	CG_REGISTER_RETAIL_REWARD_SAMPLE( perforatedSound, "perforated", "perforated" );
+	if ( cgs.gametype == GT_RED_ROVER || cg_buildScript.integer ) {
+		CG_REGISTER_CONFIGURED_ANNOUNCER_SAMPLE( biteSound, "bite.ogg" );
+		cgs.media.kamikazeRespawnSound = trap_S_RegisterSound( "sound/items/kamikazerespawn.wav", qfalse );
+	}
 	CG_REGISTER_RETAIL_REWARD_SAMPLE( headshotSound, "headshot", "headshot" );
 	CG_REGISTER_RETAIL_REWARD_SAMPLE( firstFragSound, "first_frag", "first_frag" );
 	CG_REGISTER_RETAIL_REWARD_SAMPLE( infectedSound, "infected", "infected" );
@@ -3083,6 +3096,55 @@ static void CG_RegisterSounds( void ) {
 
 //===================================================================================
 
+/*
+=================
+CG_ShouldRegisterPOIPowerupShaders
+
+Matches the retail gametype gate around the projected item/teammate POI
+powerup icon bank, while preserving build-script asset discovery.
+=================
+*/
+static qboolean CG_ShouldRegisterPOIPowerupShaders( void ) {
+	if ( cg_buildScript.integer ) {
+		return qtrue;
+	}
+
+	switch ( cgs.gametype ) {
+	case GT_RACE:
+	case GT_CLAN_ARENA:
+	case GT_DOMINATION:
+	case GT_RED_ROVER:
+		return qfalse;
+	default:
+		return qtrue;
+	}
+}
+
+/*
+=================
+CG_ShouldRegisterFlagStatusShaders
+
+Matches the retail objective-gametype gate around the flag-status icon bank
+for the dropped-marker subset currently exposed through cgs.media.
+=================
+*/
+static qboolean CG_ShouldRegisterFlagStatusShaders( void ) {
+	if ( cg_buildScript.integer ) {
+		return qtrue;
+	}
+
+	switch ( cgs.gametype ) {
+	case GT_RACE:
+	case GT_CTF:
+	case GT_1FCTF:
+	case GT_OBELISK:
+	case GT_DOMINATION:
+	case GT_ATTACK_DEFEND:
+		return qtrue;
+	default:
+		return qfalse;
+	}
+}
 
 /*
 =================
@@ -3126,12 +3188,15 @@ static void CG_RegisterGraphics( void ) {
 		cgs.media.numberShaders[i] = trap_R_RegisterShader( sb_nums[i] );
 	}
 
+	cgs.media.healthSegmentShader = trap_R_RegisterShader( "gfx/2d/health_segment.tga" );
+
 	cgs.media.botSkillShaders[0] = trap_R_RegisterShader( "menu/art/skill1.tga" );
 	cgs.media.botSkillShaders[1] = trap_R_RegisterShader( "menu/art/skill2.tga" );
 	cgs.media.botSkillShaders[2] = trap_R_RegisterShader( "menu/art/skill3.tga" );
 	cgs.media.botSkillShaders[3] = trap_R_RegisterShader( "menu/art/skill4.tga" );
 	cgs.media.botSkillShaders[4] = trap_R_RegisterShader( "menu/art/skill5.tga" );
 
+	cgs.media.viewDamageBlendShader = trap_R_RegisterShader( "viewDamageBlend" );
 	if ( haveDlcGibs ) {
 		cgs.media.viewBloodShader = trap_R_RegisterShader( "viewBloodBlend" );
 	} else {
@@ -3146,6 +3211,12 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.scoreboardTime = trap_R_RegisterShaderNoMip( "menu/tab/time.tga" );
 	cgs.media.scoreboxSpecShader = trap_R_RegisterShaderNoMip( "ui/assets/score/scorebox_spec.tga" );
 	cgs.media.scoreboxFollowShader = trap_R_RegisterShaderNoMip( "ui/assets/score/scorebox_follow.tga" );
+	cgs.media.scoreArrowGreenShader = trap_R_RegisterShader( "ui/assets/score/arrowg.tga" );
+	cgs.media.scoreArrowRedShader = trap_R_RegisterShader( "ui/assets/score/arrowr.tga" );
+	if ( cgs.gametype >= GT_TEAM || cg_buildScript.integer ) {
+		cgs.media.scoreCAArrowRedShader = trap_R_RegisterShader( "ui/assets/score/ca_arrow_red.tga" );
+		cgs.media.scoreCAArrowBlueShader = trap_R_RegisterShader( "ui/assets/score/ca_arrow_blue.tga" );
+	}
 	cgs.media.scoreMutedShader = trap_R_RegisterShaderNoMip( "ui/assets/score/muted" );
 	cgs.media.scoreSpeakingShader = trap_R_RegisterShaderNoMip( "ui/assets/score/speaking" );
 	cgs.media.inkFadeLeftShader = trap_R_RegisterShaderNoMip( "ui/assets/score/ink_fade_left.tga" );
@@ -3175,6 +3246,7 @@ static void CG_RegisterGraphics( void ) {
 
 	cgs.media.waterBubbleShader = trap_R_RegisterShader( "waterBubble" );
 
+	cgs.media.vignetteShader = trap_R_RegisterShader( "gfx/misc/vignette" );
 	cgs.media.tracerShader = trap_R_RegisterShader( "gfx/misc/tracer" );
 	cgs.media.iceTrailShader = trap_R_RegisterShader( "iceTrail" );
 	cgs.media.iceballShader = trap_R_RegisterShader( "gfx/misc/iceball" );
@@ -3208,16 +3280,22 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.invisShader = trap_R_RegisterShader("powerups/invisibility" );
 	cgs.media.regenShader = trap_R_RegisterShader("powerups/regen" );
 	cgs.media.hastePuffShader = trap_R_RegisterShader("hasteSmokePuff" );
-	cgs.media.poiPowerupQuadShader = trap_R_RegisterShader( "gfx/2d/powerup/quad" );
-	cgs.media.poiPowerupBattleSuitShader = trap_R_RegisterShader( "gfx/2d/powerup/bs" );
-	cgs.media.poiPowerupHasteShader = trap_R_RegisterShader( "gfx/2d/powerup/haste" );
-	cgs.media.poiPowerupInvisShader = trap_R_RegisterShader( "gfx/2d/powerup/invis" );
-	cgs.media.poiPowerupRegenShader = trap_R_RegisterShader( "gfx/2d/powerup/regen" );
-	cgs.media.poiPowerupIncomingShader = trap_R_RegisterShader( "gfx/2d/powerup/incoming" );
-	cgs.media.poiFlagDroppedNeutralShader = trap_R_RegisterShader( "gfx/2d/flag_status/flag_dropped" );
-	cgs.media.poiFlagDroppedRedShader = trap_R_RegisterShader( "gfx/2d/flag_status/red_flag_dropped" );
-	cgs.media.poiFlagDroppedBlueShader = trap_R_RegisterShader( "gfx/2d/flag_status/blue_flag_dropped" );
-	cgs.media.poiQuadHogShader = trap_R_RegisterShader( "gfx/2d/quad_hog/quadhog" );
+	if ( CG_ShouldRegisterPOIPowerupShaders() ) {
+		cgs.media.poiPowerupQuadShader = trap_R_RegisterShader( "gfx/2d/powerup/quad" );
+		cgs.media.poiPowerupBattleSuitShader = trap_R_RegisterShader( "gfx/2d/powerup/bs" );
+		cgs.media.poiPowerupHasteShader = trap_R_RegisterShader( "gfx/2d/powerup/haste" );
+		cgs.media.poiPowerupInvisShader = trap_R_RegisterShader( "gfx/2d/powerup/invis" );
+		cgs.media.poiPowerupRegenShader = trap_R_RegisterShader( "gfx/2d/powerup/regen" );
+		cgs.media.poiPowerupIncomingShader = trap_R_RegisterShader( "gfx/2d/powerup/incoming" );
+	}
+	if ( CG_ShouldRegisterFlagStatusShaders() ) {
+		cgs.media.poiFlagDroppedNeutralShader = trap_R_RegisterShader( "gfx/2d/flag_status/flag_dropped" );
+		cgs.media.poiFlagDroppedRedShader = trap_R_RegisterShader( "gfx/2d/flag_status/red_flag_dropped" );
+		cgs.media.poiFlagDroppedBlueShader = trap_R_RegisterShader( "gfx/2d/flag_status/blue_flag_dropped" );
+	}
+	if ( cgs.gametype == GT_FFA || cg_buildScript.integer ) {
+		cgs.media.poiQuadHogShader = trap_R_RegisterShader( "gfx/2d/quad_hog/quadhog" );
+	}
 	cgs.media.poiNeutralFlagCarrierShader = trap_R_RegisterShader( "sprites/neutralflagcarrier" );
 	cgs.media.poiInfectedShader = trap_R_RegisterShader( "gfx/2d/infected/bite" );
 	cgs.media.poiUnavailableShader = trap_R_RegisterShader( "gfx/2d/unavailable" );
@@ -3502,9 +3580,14 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.cursor = trap_R_RegisterShaderNoMip( "menu/art/3_cursor2" );
 	cgs.media.sizeCursor = trap_R_RegisterShaderNoMip( "ui/assets/sizecursor.tga" );
 	cgs.media.selectCursor = trap_R_RegisterShaderNoMip( "ui/assets/3_cursor3.tga" );
+	cgs.media.raceNavShader = trap_R_RegisterShader( "gfx/misc/racenav.jpg" );
 	cgs.media.raceStartShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/start" );
 	cgs.media.raceCheckpointShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/checkpoint" );
 	cgs.media.raceFinishShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/finish" );
+	cgs.media.raceCommandUpShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_up" );
+	cgs.media.raceCommandDownShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_down" );
+	cgs.media.raceCommandRightShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_right" );
+	cgs.media.raceCommandLeftShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_left" );
 
 	trap_R_RegisterModel( "models/players/james/lower.md3" );
 	trap_R_RegisterModel( "models/players/james/upper.md3" );

@@ -3034,6 +3034,8 @@ static void CG_ParseTeamCountConfigStrings( void ) {
 	cgs.matchTeamCount[TEAM_BLUE] = value;
 }
 
+static void CG_ParseSuddenDeathStatus( void );
+
 /*
 =============
 CG_ParseMatchState
@@ -3620,7 +3622,7 @@ static void CG_ParseRotationVoteConfigStrings( void ) {
 		}
 
 		if ( mapName[0] ) {
-			Com_sprintf( voteShot, sizeof( voteShot ), "levelshots/%s", mapName );
+			Q_strncpyz( voteShot, mapName, sizeof( voteShot ) );
 		} else {
 			voteShot[0] = '\0';
 		}

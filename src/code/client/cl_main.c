@@ -645,7 +645,6 @@ cvar_t	*cl_inGameVideo;
 
 cvar_t	*cl_autoTimeNudge;
 cvar_t	*cl_contimestamps;
-cvar_t	*cl_mouseAccelStyle;
 cvar_t	*cl_guid;
 cvar_t	*cl_punkbuster;
 
@@ -7384,6 +7383,8 @@ void CL_Init( void ) {
 	cl_shownet = Cvar_Get ("cl_shownet", "0", CVAR_TEMP );
 	cl_showSend = Cvar_Get ("cl_showSend", "0", CVAR_TEMP );
 	cl_showTimeDelta = Cvar_Get ("cl_showTimeDelta", "0", CVAR_TEMP );
+	Cvar_Get( "cg_spectating", "0", CVAR_ROM );
+	Cvar_Get( "cg_ignoreMouseInput", "0", CVAR_ROM );
 	cl_freezeDemo = Cvar_Get ("cl_freezeDemo", "0", CVAR_TEMP );
 	cl_quitOnDemoCompleted = Cvar_Get ("cl_quitOnDemoCompleted", "0", 0 );
 	cl_allowConsoleChat = Cvar_Get ("cl_allowConsoleChat", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );
@@ -7459,7 +7460,6 @@ void CL_Init( void ) {
 
 	cl_autoTimeNudge = Cvar_GetBounded( "cl_autoTimeNudge", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED );
 	cl_contimestamps = Cvar_Get ("cl_contimestamps", "0", CVAR_ARCHIVE );
-	cl_mouseAccelStyle = Cvar_Get ("cl_mouseAccelStyle", "0", CVAR_ARCHIVE );
 	cl_guid = Cvar_Get ("cl_guid", "", CVAR_USERINFO | CVAR_ROM );
 	cl_punkbuster = Cvar_Get ("cl_punkbuster", "1", CVAR_ARCHIVE | CVAR_USERINFO );
 

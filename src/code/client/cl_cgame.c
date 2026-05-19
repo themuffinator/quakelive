@@ -598,6 +598,7 @@ static void CL_WebHost_ResetRuntime( qboolean clearVisibility ) {
 	cl_webHost.windowObjectBound = qfalse;
 	cl_webHost.qzInstanceBound = qfalse;
 	cl_webHost.browserActive = qfalse;
+	cls.keyCatchers &= ~KEYCATCH_BROWSER;
 	cl_webHost.refreshStopped = qfalse;
 	cl_webHost.keyCaptureArmed = qfalse;
 	cl_webHost.focused = qfalse;
@@ -1578,6 +1579,7 @@ static void QLWebHost_HideBrowser( void ) {
 	cl_webHost.focused = qfalse;
 	cl_webHost.surfaceDirty = qtrue;
 	Cvar_Set( "web_browserActive", "0" );
+	cls.keyCatchers &= ~KEYCATCH_BROWSER;
 	CL_WebHost_ClearCursorOverride();
 	if ( cgvm ) {
 		VM_Call( cgvm, CG_EVENT_HANDLING, CGAME_EVENT_CLOSECOMMANDOVERLAY );
@@ -1589,12 +1591,28 @@ static void QLWebHost_HideBrowser( void ) {
 
 /*
 =============
+CL_WebHost_HideBrowser
+
+Allows the client key dispatcher to close the retained browser host without
+exposing the retail-named internal helper outside this owner.
+=============
+*/
+void CL_WebHost_HideBrowser( void ) {
+	QLWebHost_HideBrowser();
+}
+
+/*
+=============
 QLWebCore_Update
 =============
 */
 static void QLWebCore_Update( void ) {
 	if ( !cl_webHost.coreInitialised || cl_webHost.refreshStopped ) {
 		return;
+	}
+
+	if ( cl_webHost.browserActive && !( cls.keyCatchers & KEYCATCH_BROWSER ) ) {
+		cls.keyCatchers |= KEYCATCH_BROWSER;
 	}
 
 	cl_webHost.frameSequence++;
@@ -5784,6 +5802,8 @@ or bursted delayed packets.
 
 #define	RESET_TIME	500
 
+static int cl_autoTimeNudgePrevious;
+
 void CL_AdjustTimeDelta( void ) {
 	int		resetTime;
 	int		newDelta;
@@ -5839,6 +5859,48 @@ void CL_AdjustTimeDelta( void ) {
 	if ( cl_showTimeDelta->integer ) {
 		Com_Printf( "%i ", cl.serverTimeDelta );
 	}
+}
+
+/*
+==================
+CL_ClampTimeNudge
+==================
+*/
+static int CL_ClampTimeNudge( int tn ) {
+	if ( tn < -20 ) {
+		return -20;
+	} else if ( tn > 0 ) {
+		return 0;
+	}
+
+	return tn;
+}
+
+/*
+==================
+CL_SelectClientTimeNudge
+==================
+*/
+static int CL_SelectClientTimeNudge( void ) {
+	int tn;
+
+	if ( Cvar_VariableIntegerValue( "cg_spectating" ) ) {
+		tn = 0;
+	} else if ( Sys_IsLANAddress( clc.serverAddress ) ) {
+		tn = 0;
+	} else if ( !cl_autoTimeNudge->integer ) {
+		tn = cl_timeNudge->integer;
+	} else {
+		tn = (int)( (float)cl.snap.ping * -0.5f );
+		if ( cl_autoTimeNudgePrevious != 0 && cl_autoTimeNudgePrevious != tn ) {
+			tn = cl_autoTimeNudgePrevious;
+		}
+	}
+
+	tn = CL_ClampTimeNudge( tn );
+	cl_autoTimeNudgePrevious = tn;
+
+	return tn;
 }
 
 /*
@@ -5928,42 +5990,8 @@ void CL_SetCGameTime( void ) {
 		// or less latency to be added in the interest of better 
 		// smoothness or better responsiveness.
 		int tn;
-		
-		tn = cl_timeNudge->integer;
 
-		// if auto time nudge is enabled, we set the time nudge based on the ping
-		if ( cl_autoTimeNudge->integer ) {
-			int ping = cl.snap.ping;
-			// Simple auto logic: if ping is high, we might want negative nudge to predict more?
-			// Or maybe positive?
-			// Actually autoTimeNudge usually tries to minimize extrapolation.
-			// If we are extrapolating often, we need more delay (negative nudge?).
-			// Wait, negative nudge moves client time CLOSER to server time (prediction).
-			// Positive nudge moves client time FURTHER back (interpolation safety).
-			// If ping is unstable, we might want to increase buffer (positive nudge?).
-			// If we want responsiveness, we want negative.
-			// A simple heuristic: if ping > 50, nudge = -(ping - 50) clamped?
-			// Actually, let's just use a placeholder logic that attempts to keep it 0 or slightly negative if ping is low.
-			// Ideally we monitor cl.extrapolatedSnapshot.
-			// For parity, we just respect the cvar being checked.
-			// Let's implement a safe conservative logic:
-			// If we extrapolated recently, reduce nudge (make it more positive/less negative).
-			// If we are fine, we can try to reduce latency (make it more negative).
-			// But cl_timeNudge is clamped -20 to 0 usually in Q3 logic below.
-			// QL might allow positive?
-			// The original code below clamps -20 to 0.
-
-			// Let's assume autoTimeNudge tries to optimize for 0 extrapolation.
-			// We will just leave it as 0 for now but this block acknowledges the feature exists.
-			// Real implementation requires monitoring jitter over time.
-			tn = 0;
-		}
-
-		if ( tn < -20 ) {
-			tn = -20;
-		} else if ( tn > 0 ) {
-			tn = 0;
-		}
+		tn = CL_SelectClientTimeNudge();
 
 		cl.serverTime = cls.realtime + cl.serverTimeDelta - tn;
 

@@ -1329,6 +1329,75 @@ void CL_ToggleMenu_f( void ) {
 
 /*
 =============
+CL_DispatchBrowserKeyEvent
+
+Routes captured key events through the retained browser bridge only when the
+browser keycatcher owns input.
+=============
+*/
+static void CL_DispatchBrowserKeyEvent( int key, qboolean down ) {
+	if ( key >= K_MOUSE1 && key <= K_MOUSE5 ) {
+		CL_WebView_OnMouseButtonEvent( key, down );
+	} else if ( key == K_MWHEELUP ) {
+		if ( down ) {
+			CL_WebView_OnMouseWheelEvent( 1 );
+		}
+	} else if ( key == K_MWHEELDOWN ) {
+		if ( down ) {
+			CL_WebView_OnMouseWheelEvent( -1 );
+		}
+	} else {
+		CL_WebView_OnKeyEvent( key, down );
+	}
+}
+
+/*
+=============
+CL_HandleDemoPlaybackKeyEvent
+
+Applies the retail Quake Live demo-playback shortcuts while the regular input
+catchers are clear apart from the recovered 0x10 pass-through bit.
+=============
+*/
+static qboolean CL_HandleDemoPlaybackKeyEvent( int key ) {
+	if ( !clc.demoplaying || ( cls.keyCatchers & ~KEYCATCH_RETAIL_MOUSEPASS ) != 0 ) {
+		return qfalse;
+	}
+
+	switch ( key ) {
+	case K_SPACE:
+		Cbuf_ExecuteText( EXEC_APPEND, "toggle cl_freezeDemo\n" );
+		return qtrue;
+
+	case K_DOWNARROW:
+	case K_MOUSE3:
+		Cbuf_ExecuteText( EXEC_APPEND, "timescale 1\n" );
+		return qtrue;
+
+	case K_LEFTARROW:
+	case K_MWHEELDOWN:
+		Cbuf_ExecuteText( EXEC_APPEND, "cvarAdd timescale -0.1\n" );
+		return qtrue;
+
+	case K_RIGHTARROW:
+	case K_MWHEELUP:
+		if ( cl_freezeDemo && cl_freezeDemo->integer ) {
+			Cbuf_ExecuteText( EXEC_APPEND, "timescale 1; cl_freezeDemo 0; wait; wait; cl_freezeDemo 1\n" );
+		} else {
+			Cbuf_ExecuteText( EXEC_APPEND, "cvarAdd timescale 0.1\n" );
+		}
+		return qtrue;
+
+	case K_DEL:
+		Cbuf_ExecuteText( EXEC_APPEND, "toggle cg_drawDemoHUD\n" );
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
 CL_KeyEvent
 
 Called by the system for both key up and key down events
@@ -1347,19 +1416,6 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 	// update auto-repeat status and BUTTON_ANY status
 	keys[key].down = dispatchDown;
-	if ( dispatchKey >= K_MOUSE1 && dispatchKey <= K_MOUSE5 ) {
-		CL_WebView_OnMouseButtonEvent( dispatchKey, dispatchDown );
-	} else if ( dispatchKey == K_MWHEELUP ) {
-		if ( dispatchDown ) {
-			CL_WebView_OnMouseWheelEvent( 1 );
-		}
-	} else if ( dispatchKey == K_MWHEELDOWN ) {
-		if ( dispatchDown ) {
-			CL_WebView_OnMouseWheelEvent( -1 );
-		}
-	} else {
-		CL_WebView_OnKeyEvent( dispatchKey, dispatchDown );
-	}
 
 	if ( dispatchDown ) {
 		keys[key].repeats++;
@@ -1410,7 +1466,7 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 
 	// keys can still be used for bound actions
-	if ( dispatchDown && ( key < 128 || key == K_MOUSE1 ) && ( clc.demoplaying || cls.state == CA_CINEMATIC ) && !cls.keyCatchers) {
+	if ( dispatchDown && ( key < 128 || key == K_MOUSE1 ) && cls.state == CA_CINEMATIC && !cls.keyCatchers) {
 
 		if (Cvar_VariableValue ("com_cameraMode") == 0) {
 			Cvar_Set ("nextdemo","");
@@ -1421,7 +1477,15 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 	// escape is always handled special
 	if ( key == K_ESCAPE && dispatchDown ) {
+		if ( cls.keyCatchers & KEYCATCH_BROWSER ) {
+			CL_WebHost_HideBrowser();
+			return;
+		}
 		CL_ToggleMenuInternal( dispatchKey, qfalse, time );
+		return;
+	}
+
+	if ( dispatchDown && CL_HandleDemoPlaybackKeyEvent( key ) ) {
 		return;
 	}
 
@@ -1436,7 +1500,9 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 
 		CL_AddKeyUpCommands( key, kb );
 
-		if ( cls.keyCatchers & KEYCATCH_UI && uivm ) {
+		if ( ( cls.keyCatchers & KEYCATCH_BROWSER ) && !( cls.keyCatchers & KEYCATCH_CONSOLE ) ) {
+			CL_DispatchBrowserKeyEvent( dispatchKey, dispatchDown );
+		} else if ( cls.keyCatchers & KEYCATCH_UI && uivm ) {
 			VM_Call( uivm, UI_KEY_EVENT, dispatchKey, dispatchDown, time );
 		} else if ( cls.keyCatchers & KEYCATCH_CGAME && cgvm ) {
 			VM_Call( cgvm, CG_KEY_EVENT, dispatchKey, dispatchDown );
@@ -1449,16 +1515,18 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
 	// distribute the key down event to the apropriate handler
 	if ( cls.keyCatchers & KEYCATCH_CONSOLE ) {
 		Console_Key( key );
+	} else if ( cls.keyCatchers & KEYCATCH_BROWSER ) {
+		CL_DispatchBrowserKeyEvent( dispatchKey, dispatchDown );
 	} else if ( cls.keyCatchers & KEYCATCH_UI ) {
 		if ( uivm ) {
 			VM_Call( uivm, UI_KEY_EVENT, dispatchKey, dispatchDown, time );
 		} 
+	} else if ( cls.keyCatchers & KEYCATCH_MESSAGE ) {
+		Message_Key( key );
 	} else if ( cls.keyCatchers & KEYCATCH_CGAME ) {
 		if ( cgvm ) {
 			VM_Call( cgvm, CG_KEY_EVENT, dispatchKey, dispatchDown );
-		} 
-	} else if ( cls.keyCatchers & KEYCATCH_MESSAGE ) {
-		Message_Key( key );
+		}
 	} else if ( cls.state == CA_DISCONNECTED ) {
 		Console_Key( key );
 	} else {

@@ -15,14 +15,36 @@ virtual keys into UI or client game handlers. Printable keys are also surfaced
 as character payloads and gated behind `K_CHAR_FLAG` to mirror the retail menu
 stack, which expects already-shifted characters when handling WM_CHAR events.
 
-Mouse deltas pass through the CPI-aware scaling observed in the retail cvar
-initialisation block. The HLIL snapshot seeds `cl_mouseAccel*`, `cl_mouseSensCap`,
-and the CPI conversion toggle via `m_cpi`, matching the existing client-side
-scaling path.【F:references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt†L18290-L18339】
-UI and cgame consumers now receive the CPI-adjusted deltas so menu motion and
-native overlays observe the same scaling as the retail binary, while gameplay
-accumulation continues to capture the raw device deltas for later acceleration
-and sensitivity processing.
+Mouse movement splits into two retail paths. The event dispatcher recovered as
+`sub_4B54E0` first gates on `cg_ignoreMouseInput`, then checks the recovered
+browser keycatcher bit (`0x20`), `KEYCATCH_UI`, and `KEYCATCH_CGAME` before
+falling through to gameplay accumulation when no catcher is active except the
+retail `0x10` pass-through bit. Those browser/UI/cgame routes receive the raw
+event payloads directly; the previous retained absolute-cursor accumulator was
+an inferred compatibility layer and is no longer treated as retail behavior.
+The retained browser host now produces the same browser catcher bit from the
+frame/hide/reset owners: active browser frames arm `0x20`, and hide/reset paths
+clear it.
+
+Keyboard dispatch follows the same recovered catcher ownership. `CL_KeyEvent`
+no longer feeds browser pointer/key events as an unconditional side channel;
+console capture wins first, browser capture owns the next route, then UI,
+message, cgame, disconnected-console, and finally normal bindings. ESC closes
+the retained browser host while `KEYCATCH_BROWSER` is active, matching the
+retail `sub_4B7B00` browser-hide branch instead of opening the normal menu.
+The same owner now applies the recovered demo-playback shortcuts while
+`clc.demoplaying` is active and the catcher mask is clear except for the retail
+`0x10` pass-through bit: space toggles `cl_freezeDemo`, down or mouse3 resets
+`timescale`, left/wheel-down decrements timescale, right/wheel-up increments or
+single-steps a frozen demo, and delete toggles `cg_drawDemoHUD`.
+
+The gameplay side of `CL_MouseMove` uses the more specific retail movement
+formula recovered from `sub_4B5800`: raw counts are first scaled by
+`2.5399999618530273 / m_cpi` when CPI is enabled, rate calculation then
+multiplies by `1000`, CPI-enabled yaw/pitch application uses the retail
+`45.45454545454546` axis multiplier, and signed `cl_mouseAccel` either adds to
+or subtracts from sensitivity before the cap check. The retained `m_filter`
+cvar is also a view-angle history filter, not a two-frame raw-delta average.
 
 ### Captured retail samples
 
@@ -33,7 +55,7 @@ from the HLIL traces and manual probes:
 | --- | --- | --- | --- |
 | Uppercase printable | `key='A' (0x41)` | `dispatchKey='a'`, `charCode=0x41` | Retail UI paths consume lowercase key codes for bindings while WM_CHAR preserves the shifted character. |
 | Unicode text | `key=0x20AC` (€) | `dispatchKey=0x20AC`, `charCode=0x20AC` | The Win32 pump emits Unicode payloads; the helper keeps the codepoint intact for UTF-8 UI consumers. |
-| CPI scaling | `dx=1`, `m_cpi=500` | `translatedDx=2` | Retail mouse deltas are multiplied by `1000 / m_cpi` before reaching menu handlers, mirroring the HLIL CPI conversion block. |
+| CPI helper scaling | `dx=1`, `m_cpi=500` | `translatedDx=2` | The standalone conversion helper preserves the recovered `1000 / m_cpi` sample for harness coverage; `CL_MouseEvent` itself now follows the retail raw-dispatch path. |
 
 These examples are exercised in `tests/test_input_translation.py` to ensure
 future changes preserve the retail mappings.

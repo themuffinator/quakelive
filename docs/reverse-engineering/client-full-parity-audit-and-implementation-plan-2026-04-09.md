@@ -1,6 +1,6 @@
 # `client` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-16
+Last updated: 2026-05-18
 
 Scope: `src/code/client/*` plus client-owned host seams in `src/code/qcommon/common.c`, `src/common/platform/*`, and the adjacent launcher helper surface in `src/code/win32/*` versus retail `quakelive_steam.exe`
 
@@ -22,6 +22,41 @@ Current ledger note:
   recorded the same day,
   supersedes the older blanket-closure wording here for the browser-specific
   sub-lane.
+- A focused `2026-05-18` reread of `sub_4B07C0` / `CL_SetCGameTime`
+  tightened the classic timing lane: `cl_autoTimeNudge` now follows the
+  retail spectator, LAN, manual, half-ping, previous-value, and clamp contract
+  instead of preserving the older source placeholder branch.
+- A second focused `2026-05-18` reread of `sub_4B5800` / `CL_MouseMove`
+  tightened the classic input lane: `cl_mouseAccelDebug` now follows the
+  retail `fs_homepath/mouse.log` file-backed diagnostic path, and the
+  source-only `cl_mouseAccelStyle` cvar registration was removed because the
+  committed retail corpus has no matching string or cvar-table entry.
+- A third focused `2026-05-18` reread of the same `CL_MouseMove` owner
+  reconstructed the retail gameplay mouse math: CPI uses the
+  inches-per-centimeter movement scale plus CPI-specific view-axis multiplier,
+  signed acceleration can add to or subtract from sensitivity, the sensitivity
+  cap is acceleration-scoped, and `m_filter` now smooths the retained
+  view-angle history rather than averaging two raw input buckets.
+- A fourth focused `2026-05-18` reread of `sub_4B54E0` / `CL_MouseEvent`
+  corrected the client event wiring: the dispatcher now gates on
+  `cg_ignoreMouseInput`, gives the recovered browser keycatcher bit (`0x20`)
+  first chance at the raw event payload, forwards raw payloads to UI/cgame VM
+  mouse handlers, and only accumulates gameplay deltas when the catcher mask is
+  clear except for the recovered retail `0x10` pass-through bit. The retained
+  browser host now also arms that `0x20` catcher from `QLWebCore_Update` while
+  browser-active state is live and clears it from hide/reset paths.
+- A fifth focused `2026-05-18` reread of `sub_4B7B00` / `CL_KeyEvent`
+  corrected the sibling key route: browser key/button/wheel delivery is now
+  gated by `KEYCATCH_BROWSER` instead of running as an unconditional side
+  channel, console capture keeps priority over browser capture, ESC closes the
+  retained browser host, and key-down handler order now matches the recovered
+  console -> browser -> UI -> message -> cgame -> disconnected -> binding flow.
+- A sixth focused `2026-05-18` reread of the same `CL_KeyEvent` owner closed
+  the demo-playback shortcut sublane: `clc.demoplaying` with only the recovered
+  `0x10` pass-through catcher now handles the retail `cl_freezeDemo`,
+  `timescale`, and `cg_drawDemoHUD` commands before normal binding dispatch,
+  while the older source-only demo-any-key-to-ESC path is no longer applied to
+  demo playback.
 
 ## Audit Method And Evidence
 
@@ -66,6 +101,13 @@ Canonical retail evidence used for this pass:
   - `docs/reverse-engineering/quakelive_steam_mapping_round_107.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_108.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_109.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_123.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_254.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_255.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_256.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_257.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_258.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_259.md`
 - Client-host and launcher notes:
   - `docs/reverse-engineering/quakelive_steam_parity_plan.md`
   - `docs/launcher_awesomium_audit.md`
@@ -166,6 +208,7 @@ Recent closure:
 - Refreshed strict `client` estimate after `CL-P4`: **97%**
 - Refreshed strict `client` estimate after `CL-P5`: **99%**
 - Refreshed strict `client` estimate after `CL-P6`: **100%**
+- Refreshed strict `client` estimate after the 2026-05-18 timing/input rereads: **100%**
 
 This is a behavior-backed uplift driven by the `CL-G04`, `CL-G02`, `CL-G03`, and `CL-G01` closures, not a scoring-only correction.
 
@@ -174,6 +217,7 @@ Rationale:
 1. The retained Quake III-era client runtime inside `cl_main.c`, `cl_parse.c`, `cl_keys.c`, `cl_ui.c`, `cl_cgame.c`, `snd_dma.c`, `snd_mem.c`, and `snd_mix.c` is now in strong shape. That keeps the client well above the broad launcher/platform baseline described in top-level audits.
 2. The retained browser-host core, `QLJSHandler` / `qz_instance` surface, `EnginePublish` publication path, `SteamDataSource`, and `QLResourceInterceptor` are now explicit in writable source behind the repo policy gate. That closes the largest Quake Live-only runtime hole in the client host.
 3. The final verification lane is now closed too: the client now has a dedicated parity gate, a tracked runtime-evidence bundle, and repo-level CI/docs wiring that keeps the recovered host behavior machine-visible.
+4. The classic timing/input lane has less residual source-only drift after the `CL_SetCGameTime` and `CL_MouseMove` rereads: both patches are tied directly to HLIL/Ghidra cvar tables and control-flow evidence rather than compatibility guesses.
 
 Confidence: high.
 

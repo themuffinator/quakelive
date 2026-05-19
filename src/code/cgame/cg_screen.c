@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "cg_local.h"
 
-static qhandle_t	cg_screenDamageBlendShader;
 static qboolean		cg_joinGameMenuCaptureActive;
 
 /*
@@ -62,11 +61,11 @@ Lazily resolves the retail no-blood damage blend shader.
 ================
 */
 static qhandle_t CG_GetScreenDamageBlendShader( void ) {
-	if ( !cg_screenDamageBlendShader ) {
-		cg_screenDamageBlendShader = trap_R_RegisterShader( "viewDamageBlend" );
+	if ( !cgs.media.viewDamageBlendShader ) {
+		cgs.media.viewDamageBlendShader = trap_R_RegisterShader( "viewDamageBlend" );
 	}
 
-	return cg_screenDamageBlendShader;
+	return cgs.media.viewDamageBlendShader;
 }
 
 /*

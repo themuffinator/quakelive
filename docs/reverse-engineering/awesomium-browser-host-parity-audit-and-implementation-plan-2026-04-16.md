@@ -84,8 +84,8 @@ remained inside the previously compatibility-bounded bucket:
 
 1. the mapped direct browser input helpers `QLWebView_InjectMouseMove` and
    `QLWebView_InjectKeyboardEvent` were still collapsed into the public browser
-   callback surface, and `CL_MouseEvent` never forwarded the retained absolute
-   cursor position into the browser host
+   callback surface, and the client mouse dispatcher still lacked the recovered
+   browser-capture route into the browser host
 
 After the direct-input tranche, one last narrow source-owned runtime gap still
 remained inside that same bucket:
@@ -311,8 +311,7 @@ Current-source problem before this pass:
 
 - `cl_cgame.c` still kept the browser key-capture behavior inline in
   `CL_WebView_OnKeyEvent`, had no retail-named direct input helper owners, and
-  `cl_input.c` never forwarded the retained absolute mouse cursor path into the
-  browser host at all.
+  `cl_input.c` had no recovered browser-capture route into the browser host.
 
 Closure in this pass:
 
@@ -320,9 +319,11 @@ Closure in this pass:
   `QLWebView_InjectKeyboardEvent()` owners in `cl_cgame.c`.
 - Added retained browser cursor-position caching so the host now keeps the
   latest injected browser-space cursor coordinates.
-- Added public `CL_WebView_OnMouseMove()` and wired `CL_MouseEvent()` to
-  forward the existing absolute UI/cgame cursor path into the retained browser
-  host.
+- Added public `CL_WebView_OnMouseMove()`. A later `2026-05-18`
+  `CL_MouseEvent` reread superseded the temporary absolute UI/cgame cursor
+  forwarding assumption: the client dispatcher now forwards raw event payloads
+  through the recovered browser keycatcher bit (`0x20`) before UI/cgame routing,
+  with `QLWebCore_Update` arming that bit and hide/reset paths clearing it.
 - Tightened the focused parity tests so the direct browser input owner split is
   now machine-validated.
 
@@ -385,6 +386,10 @@ Closure in this pass:
   `CL_WebView_OnMouseWheelEvent()` entrypoints in the retained browser host.
 - Updated `cl_keys.c` so mouse buttons and wheel now dispatch into the new
   browser pointer helpers instead of flowing through the keyboard seam.
+- A later `2026-05-18` `CL_KeyEvent` reread tightened this further: those
+  pointer/key helpers now run only while `KEYCATCH_BROWSER` owns input, console
+  capture remains higher priority, and ESC closes the retained browser host
+  through a public `CL_WebHost_HideBrowser()` wrapper.
 - Tightened the focused parity tests so the browser pointer helper split and
   the `CL_KeyEvent()` routing change are now machine-validated.
 

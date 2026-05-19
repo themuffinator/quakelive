@@ -190,7 +190,7 @@ scoreboard draw code, and the item/powerup event handlers.
 | Offset | Member | Type | Role |
 | --- | --- | --- | --- |
 | `0x230B4` | `centerPrintTime` | `int` | Centerprint start time. |
-| `0x230B8` | `centerPrintCharWidth` | `int` | Legacy centerprint width hint preserved alongside the text buffer. |
+| `0x230B8` | `centerPrintScale` | `float` | Retail centerprint text scale stored by `CG_CenterPrint` and consumed by `CG_DrawCenterString`. |
 | `0x230BC` | `centerPrintY` | `int` | Centerprint vertical anchor. |
 | `0x230C0` | `centerPrint` | `char[1024]` | Active centerprint text buffer. |
 | `0x234C0` | `centerPrintLines` | `int` | Cached centerprint line count. |
@@ -410,8 +410,6 @@ The highest-confidence live fields are:
   and `spectatorPaintLen` are still present in the retail-compatible layout,
   but the current tree no longer uses the old GPL scrolling spectator ticker
   that consumed them.
-- `centerPrintCharWidth` is written by `CG_CenterPrint`, but the current draw
-  path does not read it back.
 - `powerupActive` and `powerupTime` are still written by the major powerup
   event path, but the legacy HUD pulse consumer is gone from the current tree.
 - `headYaw` remains in the layout, but the current HUD head wobble uses the

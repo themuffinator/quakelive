@@ -4682,7 +4682,7 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 
 		}
 
-static qboolean UI_OwnerDrawVisible(int flags) {
+static qboolean UI_OwnerDrawVisibleFlags( int flags ) {
 	qboolean vis = qtrue;
 
 	while (flags) {
@@ -4793,6 +4793,25 @@ static qboolean UI_OwnerDrawVisible(int flags) {
 	}
   return vis;
 		}
+
+/*
+=============
+UI_OwnerDrawVisible
+
+Evaluates both retail ownerdraw visibility flag words for UI menus.
+=============
+*/
+static qboolean UI_OwnerDrawVisible( int flags, int flags2 ) {
+	if ( flags && !UI_OwnerDrawVisibleFlags( flags ) ) {
+		return qfalse;
+	}
+
+	if ( flags2 && !UI_OwnerDrawVisibleFlags( flags2 ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
 
 static qboolean UI_Handicap_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {

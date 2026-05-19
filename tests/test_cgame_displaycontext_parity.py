@@ -36,6 +36,7 @@ UI_MAIN = REPO_ROOT / "src" / "code" / "ui" / "ui_main.c"
 UI_ATOMS = REPO_ROOT / "src" / "code" / "ui" / "ui_atoms.c"
 UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
 UI_SHARED_H = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.h"
+MENUDEF_H = REPO_ROOT / "src" / "ui" / "menudef.h"
 
 
 def _block_from_marker(source: str, marker: str) -> str:
@@ -504,11 +505,15 @@ def test_cgame_acc_vertical_overlay_reconstruction_uses_retail_acc_parser_and_se
 
 	for expected in (
 		"static const weapon_t cgVerticalAccWeaponOrder[] = {",
+		"WP_GAUNTLET,",
 		"WP_MACHINEGUN,",
 		"WP_BFG,",
 		"WP_HEAVY_MACHINEGUN",
 	):
 		assert expected in newdraw_source
+	vertical_order_block = _block_from_marker(newdraw_source, "static const weapon_t cgVerticalAccWeaponOrder[] = {")
+	assert "WP_GAUNTLET,\n\tWP_MACHINEGUN," in vertical_order_block
+	assert "WP_GRAPPLING_HOOK" not in vertical_order_block
 
 	assert "if ( !cg.accRequestActive || !cg.snap ) {" in draw_gate_block
 	assert "cg.snap->ps.pm_type == PM_SPECTATOR" in draw_gate_block
@@ -831,10 +836,11 @@ def test_cgame_objective_ownerdraws_restore_retail_flag_key_and_powerup_seam() -
 
 def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
-	health_range_block = _block_from_marker(source, "static void CG_DrawPlayerHealthBarRange")
+	bar_fraction_block = _block_from_marker(source, "static float CG_BarValueFraction")
+	bar_right_block = _block_from_marker(source, "static void CG_DrawBarFillFromRight")
+	bar_bottom_block = _block_from_marker(source, "static void CG_DrawBarFillFromBottom")
 	health_100_block = _block_from_marker(source, "static void CG_DrawPlayerHealthBar100")
 	health_200_block = _block_from_marker(source, "static void CG_DrawPlayerHealthBar200")
-	armor_range_block = _block_from_marker(source, "static void CG_DrawPlayerArmorBarRange")
 	armor_100_block = _block_from_marker(source, "static void CG_DrawPlayerArmorBar100")
 	armor_200_block = _block_from_marker(source, "static void CG_DrawPlayerArmorBar200")
 	armor_icon_block = _block_from_marker(source, "static void CG_DrawPlayerArmorIcon")
@@ -842,27 +848,59 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 	ammo_icon_block = _block_from_marker(source, "static void CG_DrawPlayerAmmoIcon")
 	ammo_value_block = _block_from_marker(source, "static void CG_DrawPlayerAmmoValue")
 	head_block = _block_from_marker(source, "static void CG_DrawPlayerHead")
+	item_block = _block_from_marker(source, "static void CG_DrawPlayerItem")
 	tiered_block = _block_from_marker(source, "static void CG_DrawArmorTieredColorized")
 
+	assert (
+		"return Com_Clamp( 0.0f, (float)maximum, (float)value ) / (float)maximum;"
+		in bar_fraction_block
+	)
+
 	for expected in (
-		"ratio = use200Range ? CG_NormalizedTo200( health ) : CG_NormalizedTo100( health );",
-		"shader = use200Range ? cgs.media.healthBar200 : cgs.media.healthBar100;",
+		"x = rect->x + rect->w - w;",
+		"trap_R_DrawStretchPic( x, y, w, h, s1, 0.0f, 1.0f, 1.0f, shader );",
+	):
+		assert expected in bar_right_block
+
+	for expected in (
+		"y = rect->y + rect->h - h;",
+		"trap_R_DrawStretchPic( x, y, w, h, 0.0f, t1, 1.0f, 1.0f, shader );",
+	):
+		assert expected in bar_bottom_block
+
+	for expected in (
+		"maxHealth = CG_PlayerMaxHealth();",
+		"ratio = CG_BarValueFraction( health, maxHealth );",
+		"shader = cgs.media.healthBar100;",
 		"CG_DrawBarFill( rect, shader, ratio, barColor );",
 	):
-		assert expected in health_range_block
+		assert expected in health_100_block
 
-	assert "CG_DrawPlayerHealthBarRange( rect, shader, qfalse );" in health_100_block
-	assert "CG_DrawPlayerHealthBarRange( rect, shader, qtrue );" in health_200_block
+	for expected in (
+		"excessHealth = health - maxHealth;",
+		"if ( excessHealth <= 0 ) {",
+		"ratio = CG_BarValueFraction( excessHealth, maxHealth );",
+		"shader = cgs.media.healthBar200;",
+		"CG_DrawBarFillFromBottom( rect, shader, ratio, barColor );",
+	):
+		assert expected in health_200_block
 
 	for expected in (
 		"CG_GetArmorTierColor( armor, barColor );",
-		"ratio = use200Range ? CG_NormalizedTo200( armor ) : CG_NormalizedTo100( armor );",
-		"shader = use200Range ? cgs.media.armorBar200 : cgs.media.armorBar100;",
+		"ratio = CG_BarValueFraction( armor, 100 );",
+		"shader = cgs.media.armorBar100;",
+		"CG_DrawBarFillFromRight( rect, shader, ratio, barColor );",
 	):
-		assert expected in armor_range_block
+		assert expected in armor_100_block
 
-	assert "CG_DrawPlayerArmorBarRange( rect, shader, qfalse );" in armor_100_block
-	assert "CG_DrawPlayerArmorBarRange( rect, shader, qtrue );" in armor_200_block
+	for expected in (
+		"excessArmor = armor - 100;",
+		"if ( excessArmor <= 0 ) {",
+		"ratio = CG_BarValueFraction( excessArmor, 100 );",
+		"shader = cgs.media.armorBar200;",
+		"CG_DrawBarFillFromBottom( rect, shader, ratio, barColor );",
+	):
+		assert expected in armor_200_block
 
 	for expected in (
 		"cgs.media.armorIcon",
@@ -881,7 +919,30 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 		assert expected in ammo_icon_block
 
 	assert "value = ps->ammo[cent->currentState.weapon];" in ammo_value_block
+	for expected in (
+		"if ( value == -1 ) {",
+		"if ( !shader && cgs.media.infiniteAmmoShader ) {",
+		"CG_DrawPic( rect->x, rect->y, rect->w, rect->h, cgs.media.infiniteAmmoShader );",
+		"return;",
+	):
+		assert expected in ammo_value_block
+
 	assert "CG_DrawHead( x, rect->y, rect->w, rect->h, cg.snap->ps.clientNum, angles );" in head_block
+
+	for expected in (
+		"value = cg.snap->ps.stats[STAT_HOLDABLE_ITEM];",
+		"BG_HoldableForItemTag( bg_itemlist[ value ].giTag ) == HI_INVULNERABILITY",
+		"cg.snap->ps.playerItemTime > 0",
+		"cg.snap->ps.playerItemTimeMax > 0",
+		"progressPercent = (int)( ( cg.snap->ps.playerItemTime * 100.0f ) / cg.snap->ps.playerItemTimeMax + 0.5f );",
+		"progressPercent = 0;",
+		"progressPercent = 100;",
+		'Com_sprintf( progressText, sizeof( progressText ), "%d%%", progressPercent );',
+		"progressScale = scale * 0.25f;",
+		"progressWidth = CG_Text_Width( progressText, progressScale, 0 );",
+		"CG_Text_Paint( rect->x + ( rect->w - progressWidth ) * 0.5f, rect->y + rect->h, progressScale,",
+	):
+		assert expected in item_block
 
 	for expected in (
 		"CG_GetArmorTierColor( cg.snap->ps.stats[STAT_ARMOR], color );",
@@ -909,6 +970,8 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 		"CG_DrawPlayerAmmoValue( &rect, scale, color, shader, textStyle );",
 		"case CG_PLAYER_HEAD:",
 		"CG_DrawPlayerHead( &rect, ownerDrawFlags & CG_SHOW_2DONLY );",
+		"case CG_PLAYER_ITEM:",
+		"CG_DrawPlayerItem( &rect, scale, ownerDrawFlags & CG_SHOW_2DONLY );",
 		"case CG_PLAYER_HEALTH:",
 		"CG_DrawPlayerHealth( &rect, scale, color, shader, textStyle );",
 	):
@@ -922,6 +985,9 @@ def test_cgame_team_score_name_playercount_and_match_phase_ownerdraws_follow_ret
 	score_block = _block_from_marker(source, "static void CG_DrawTeamScore")
 	name_block = _block_from_marker(source, "static void CG_DrawTeamName")
 	player_count_block = _block_from_marker(source, "static void CG_DrawTeamPlayerCount")
+	timeout_count_block = _block_from_marker(source, "static void CG_DrawTeamTimeoutCount")
+	round_label_block = _block_from_marker(source, "static void CG_DrawRoundLabel")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
 	match_phase_block = _block_from_marker(source, "static const char *CG_GetMatchPhaseText")
 	match_status_block = _block_from_marker(source, "static const char *CG_GetMatchStatusText")
 	match_state_block = _block_from_marker(source, "static void CG_DrawMatchState")
@@ -967,6 +1033,23 @@ def test_cgame_team_score_name_playercount_and_match_phase_ownerdraws_follow_ret
 		assert expected in player_count_block
 
 	for expected in (
+		"remaining = cgs.matchTimeoutRemaining[team];",
+		'Com_sprintf( buffer, sizeof( buffer ), "TO: %d", remaining );',
+	):
+		assert expected in timeout_count_block
+
+	for expected in (
+		"if ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) {",
+		'Q_strncpyz( label, "Warmup", sizeof( label ) );',
+		'Com_sprintf( label, sizeof( label ), "Round %d", cgs.matchRoundNumber );',
+		"if ( !label[0] ) {",
+		"CG_GetTextPosition( rect, text_x, text_y, &x, &y );",
+	):
+		assert expected in round_label_block
+
+	assert "CG_GetMatchStateLabel();" not in round_label_block
+
+	for expected in (
 		'return "MATCH SUMMARY";',
 		'return "MATCH WARMUP";',
 		'return "MATCH IN PROGRESS";',
@@ -975,6 +1058,45 @@ def test_cgame_team_score_name_playercount_and_match_phase_ownerdraws_follow_ret
 
 	assert "phase = CG_GetMatchPhaseText();" in match_status_block
 	assert "CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, CG_GetMatchPhaseText(), 0, 0, textStyle );" in match_state_block
+	assert ownerdraw_block.count("if ( CG_ShowPlayersRemaining() ) {") >= 5
+
+	start = ownerdraw_block.index("case CG_ROUND:")
+	end = ownerdraw_block.index("break;", start)
+	round_case_block = ownerdraw_block[start:end]
+	assert "if ( CG_ShowPlayersRemaining() ) {" in round_case_block
+	assert "CG_DrawRoundLabel(&rect, text_x, text_y, scale, color, textStyle);" in round_case_block
+
+	for marker, expected in (
+		("case CG_RED_OWNED_FLAGS:", "CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_RED);"),
+		("case CG_BLUE_OWNED_FLAGS:", "CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_BLUE);"),
+	):
+		start = ownerdraw_block.index(marker)
+		end = ownerdraw_block.index("break;", start)
+		case_block = ownerdraw_block[start:end]
+		assert "if ( cgs.gametype == GT_DOMINATION || cgs.gametype == GT_ATTACK_DEFEND ) {" in case_block
+		assert expected in case_block
+
+	for marker, expected in (
+		("case CG_RED_TIMEOUT_COUNT:", "CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_RED);"),
+		("case CG_BLUE_TIMEOUT_COUNT:", "CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_BLUE);"),
+	):
+		start = ownerdraw_block.index(marker)
+		end = ownerdraw_block.index("break;", start)
+		case_block = ownerdraw_block[start:end]
+		assert "if ( cgs.playerCountTeamSize > 0 ) {" in case_block
+		assert expected in case_block
+
+	for marker, expected in (
+		("case CG_RED_CLAN_PLYRS:", "CG_DrawClanArenaPlayers(&rect, scale, color, textStyle, TEAM_RED);"),
+		("case CG_BLUE_CLAN_PLYRS:", "CG_DrawClanArenaPlayers(&rect, scale, color, textStyle, TEAM_BLUE);"),
+		("case CG_TEAM_PLYR_COUNT:", "CG_DrawPlayerCount(&rect, scale, color, textStyle, qtrue);"),
+		("case CG_ENEMY_PLYR_COUNT:", "CG_DrawPlayerCount(&rect, scale, color, textStyle, qfalse);"),
+	):
+		start = ownerdraw_block.index(marker)
+		end = ownerdraw_block.index("break;", start)
+		case_block = ownerdraw_block[start:end]
+		assert "if ( CG_ShowPlayersRemaining() ) {" in case_block
+		assert expected in case_block
 
 	for expected in (
 		"case CG_RED_SCORE:",
@@ -1050,8 +1172,13 @@ def test_cgame_intro_panel_and_player_count_widgets_restore_retail_detail_and_ca
 
 	assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in game_type_map_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), detailBuffer );' in game_type_map_block
+	assert "CG_GetMapDisplayName( mapName, sizeof( mapName ) );" not in game_type_map_block
+	assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), mapName );' not in game_type_map_block
 	assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in match_details_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s",' in match_details_block
+	assert "CG_GameTypeShortString(), detailBuffer );" in match_details_block
+	assert "CG_GetMapDisplayName( mapName, sizeof( mapName ) );" not in match_details_block
+	assert "CG_GameTypeShortString(), mapName );" not in match_details_block
 
 	assert '&g_teamSizeMin, "g_teamSizeMin", &g_teamSizeLegacy, "teamsize", "0", CVAR_SERVERINFO | CVAR_NORESTART' in game_source
 
@@ -1078,6 +1205,7 @@ def test_cgame_hud_ownerdraw_reconstruction_keeps_retail_medal_spectator_advert_
 	advert_block = _block_from_marker(newdraw_source, "static void CG_DrawAdvert")
 	medal_block = _block_from_marker(newdraw_source, "void CG_DrawMedal")
 	team_pickup_block = _block_from_marker(newdraw_source, "static void CG_DrawTeamPickupOwnerDraw")
+	ownerdraw_block = _block_from_marker(newdraw_source, "void CG_OwnerDraw(")
 	syscall_block = _block_from_marker(syscalls_source, "void trap_QL_UpdateAdvert")
 	client_block = _block_from_marker(client_source, "static void QDECL QL_CG_trap_UpdateAdvert")
 
@@ -1102,6 +1230,18 @@ def test_cgame_hud_ownerdraw_reconstruction_keeps_retail_medal_spectator_advert_
 	):
 		assert expected in spectator_block
 	assert "CG_UpdateSpectatorTargets();" not in spectator_block
+
+	start = ownerdraw_block.index("case CG_KILLER:")
+	end = ownerdraw_block.index("break;", start)
+	killer_case_block = ownerdraw_block[start:end]
+	assert "if ( cg.killerName[0] ) {" in killer_case_block
+	assert "CG_DrawKiller(&rect, scale, color, shader, textStyle);" in killer_case_block
+
+	start = ownerdraw_block.index("case CG_SPECTATORS:")
+	end = ownerdraw_block.index("break;", start)
+	spectators_case_block = ownerdraw_block[start:end]
+	assert "if ( cg.spectatorEntryCount > 0 ) {" in spectators_case_block
+	assert "CG_DrawTeamSpectators(&rect, scale, color, shader);" in spectators_case_block
 
 	for expected in (
 		"trap_R_SetColor( color );",
@@ -1200,6 +1340,13 @@ def test_cgame_team_scoreboard_and_award_ownerdraws_follow_retail_helper_split()
 	award_player_block = _block_from_marker(source, "static qboolean CG_DrawAwardPlayer")
 
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "Avg ping %i", average );' in average_ping_block
+	for expected in (
+		"Vector4Copy( color, drawColor );",
+		"if ( average >= 80 ) {",
+		"} else if ( average >= 40 ) {",
+		"CG_Text_Paint(rect->x, rect->y + rect->h, scale, drawColor, buffer, 0, 0, textStyle);",
+	):
+		assert expected in average_ping_block
 	assert "if ( !CG_IsTeamTimeHeldOwnerDraw( ownerDraw ) ) {" in timeheld_build_block
 	assert 'Q_strncpyz( buffer, CG_FormatMinutesSeconds( value ), bufferSize );' in timeheld_build_block
 	assert "CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );" in timeheld_block
@@ -1558,8 +1705,8 @@ def test_cgame_browser_runtime_surface_restores_overlay_draw_and_capture_owners(
 	assert "Menus_HandleOOBClick( (menuDef_t *)overlay, key, down );" in oob_block
 
 	for expected in (
-		"if ( menu->window.ownerDrawFlags2 && cgDC.ownerDrawVisible &&",
-		"!cgDC.ownerDrawVisible( menu->window.ownerDrawFlags2 ) ) {",
+		"if ( ( menu->window.ownerDrawFlags || menu->window.ownerDrawFlags2 ) && cgDC.ownerDrawVisible &&",
+		"!cgDC.ownerDrawVisible( menu->window.ownerDrawFlags, menu->window.ownerDrawFlags2 ) ) {",
 		"CG_UpdateBrowserPresetLists( menu );",
 		"CG_NormalizeBrowserFullscreenBackgroundRect( &backgroundRect );",
 		"CG_DrawBrowserWidgetFrame( &menu->window, menu->fadeAmount, menu->fadeClamp, menu->fadeCycle );",
@@ -3135,6 +3282,7 @@ def test_cgame_vote_widget_reconstruction_uses_retail_vote_cvar_and_text_paths()
 	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
 	vote_timer_block = _block_from_marker(newdraw_source, "static void CG_DrawVoteTimer")
 	vote_count_block = _block_from_marker(newdraw_source, "static void CG_DrawVoteCount")
+	vote_shot_block = _block_from_marker(newdraw_source, "static void CG_DrawVoteShot")
 	set_config_values_block = _block_from_marker(servercmds_source, "void CG_SetConfigValues")
 
 	for expected in (
@@ -3163,6 +3311,10 @@ def test_cgame_vote_widget_reconstruction_uses_retail_vote_cvar_and_text_paths()
 
 	assert '"Vote %is"' not in vote_timer_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "Votes: %s", countText );' in vote_count_block
+	assert 'CG_GetVoteSlotString( slot, "Shot", previewToken, sizeof( previewToken ) );' in vote_shot_block
+	assert 'Q_strncpyz( previewToken, "default", sizeof( previewToken ) );' in vote_shot_block
+	assert 'Com_sprintf( path, sizeof( path ), "levelshots/preview/%s", previewToken );' in vote_shot_block
+	assert "trap_R_RegisterShaderNoMip( path );" in vote_shot_block
 
 
 def test_cgame_rotation_vote_payload_populates_endgamevote_ownerdraw_cvars() -> None:
@@ -3179,7 +3331,8 @@ def test_cgame_rotation_vote_payload_populates_endgamevote_ownerdraw_cvars() -> 
 	assert 'CG_SetRotationVoteSlotCvar( slot, "Gametype", voteGametype );' in parse_block
 	assert 'CG_SetRotationVoteSlotCvar( slot, "Count", voteCount );' in parse_block
 	assert 'CG_SetRotationVoteSlotCvar( slot, "Shot", voteShot );' in parse_block
-	assert 'Com_sprintf( voteShot, sizeof( voteShot ), "levelshots/%s", mapName );' in parse_block
+	assert "Q_strncpyz( voteShot, mapName, sizeof( voteShot ) );" in parse_block
+	assert '"levelshots/%s"' not in parse_block
 	assert "CG_ParseRotationVoteConfigStrings();" in set_config_values_block
 	assert "} else if ( num == CS_ROTATION_TITLES || num == CS_ROTATION_CONFIGS ) {" in config_modified_block
 	assert "CG_ParseRotationVoteConfigStrings();" in config_modified_block
@@ -3516,17 +3669,17 @@ def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None
 		"if (flags & CG_SHOW_BLUE_TEAM_HAS_REDFLAG && CG_ShowBlueTeamHasRedFlag()) {",
 		"} else if (flags & CG_SHOW_RED_TEAM_HAS_BLUEFLAG && CG_ShowRedTeamHasBlueFlag()) {",
 		"if ( flags & ( CG_SHOW_ANYTEAMGAME | UI_SHOW_ANYTEAMGAME ) ) {",
-		"if (flags & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED |",
-		"UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED)) {",
-		"if (flags & (CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP |",
-		"UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP)) {",
-		"if ( ( flags & ( CG_SHOW_IF_WARMUP | UI_SHOW_IF_WARMUP ) ) && inWarmup ) {",
-		"if ( ( flags & ( CG_SHOW_IF_NOT_WARMUP | UI_SHOW_IF_NOT_WARMUP ) ) && !inWarmup ) {",
+		"if (flags & (UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED)) {",
+		"if (flags & (UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP)) {",
+		"if ( ( flags & UI_SHOW_IF_WARMUP ) && inWarmup ) {",
+		"if ( ( flags & UI_SHOW_IF_NOT_WARMUP ) && !inWarmup ) {",
 		"if ( flags & CG_SHOW_IF_CHAT_VISIBLE ) {",
 		"if ( flags & CG_SHOW_INTERMISSION ) {",
 		"if ( flags & ( CG_SHOW_NOTINTERMISSION | UI_SHOW_IF_NOT_INTERMISSION ) ) {",
-		"if ( flags & CG_SHOW_IF_PLYR_IS_ON_RED && playerTeam == TEAM_RED ) {",
-		"if ( flags & CG_SHOW_IF_PLYR_IS_ON_BLUE && playerTeam == TEAM_BLUE ) {",
+		"while ( flags2 ) {",
+		"if (flags2 & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED)) {",
+		"if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED && playerTeam == TEAM_RED ) {",
+		"if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE && playerTeam == TEAM_BLUE ) {",
 	):
 		assert expected in visible_block
 
@@ -3719,6 +3872,120 @@ def test_cgame_objective_status_ownerdraws_use_shared_team_status_leaf() -> None
 
 	assert "static void CG_DrawFlagStatusText(" not in source
 	assert "static qboolean CG_BuildFlagStatusLabel(" not in source
+
+
+def test_cgame_legacy_ui_shared_ownerdraws_match_retail_noop_slots() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	ui_shared_h = UI_SHARED_H.read_text(encoding="utf-8")
+	menudef_h = MENUDEF_H.read_text(encoding="utf-8")
+	value_block = _block_from_marker(source, "float CG_GetValue")
+	competitive_refresh_block = _block_from_marker(source, "static qboolean CG_IsCompetitiveScoreOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	start = ownerdraw_block.index("case CG_AREA_SYSTEMCHAT:")
+	end = ownerdraw_block.index("case CG_AREA_NEW_CHAT:", start)
+	legacy_chat_cases = ownerdraw_block[start:end]
+	start = ownerdraw_block.index("case CG_1STPLACE_PLYR_MODEL_ACTIVE:")
+	end = ownerdraw_block.index("case CG_2NDPLACE:", start)
+	active_model_case = ownerdraw_block[start:end]
+	start = ownerdraw_block.index("case CG_TEAMINFO:")
+	end = ownerdraw_block.index("case CG_1STPLACE:", start)
+	teaminfo_case = ownerdraw_block[start:end]
+	start = ownerdraw_block.index("case CG_SELECTEDPLAYER_HEAD:")
+	end = ownerdraw_block.index("case CG_PLAYER_HEAD:", start)
+	selectedplayer_cases = ownerdraw_block[start:end]
+	start = ownerdraw_block.index("case CG_BLUE_FLAGHEAD:")
+	end = ownerdraw_block.index("case CG_HARVESTER_SKULLS:", start)
+	legacy_flag_cases = ownerdraw_block[start:end]
+	start = ownerdraw_block.index("case CG_SCOREBOX_FOLLOW_BACKGROUND:")
+	end = ownerdraw_block.index("case CG_HEALTH_COLORIZED:", start)
+	scorebox_spectator_cases = ownerdraw_block[start:end]
+
+	assert "#define\tCG_1STPLACE_PLYR_MODEL_ACTIVE\t\t102" in menudef_h
+	assert "CG_1STPLACE_PLYR_MODEL ||" in competitive_refresh_block
+	assert "CG_1STPLACE_PLYR_MODEL_ACTIVE" not in competitive_refresh_block
+
+	for expected in (
+		"#define CG_SELECTEDPLAYER_HEAD 344",
+		"#define CG_SELECTEDPLAYER_HEALTH 351",
+		"#define CG_VOICE_HEAD 352",
+		"#define CG_SCOREBOX_FOLLOW_BACKGROUND 356",
+		"#define CG_TEAMINFO 358",
+		"#define CG_PLAYER_STATUS 364",
+		"#define CG_AREA_SYSTEMCHAT 365",
+		"#define CG_AREA_CHAT 367",
+	):
+		assert expected in ui_shared_h
+
+	for stale in (
+		"case CG_SELECTEDPLAYER_ARMOR:",
+		"case CG_SELECTEDPLAYER_HEALTH:",
+	):
+		assert stale not in value_block
+
+	assert "return;" in selectedplayer_cases
+	for stale in (
+		"CG_DrawSelectedPlayerHead",
+		"CG_DrawSelectedPlayerName",
+		"CG_DrawSelectedPlayerStatus",
+		"CG_DrawSelectedPlayerArmor",
+		"CG_DrawSelectedPlayerHealth",
+		"CG_DrawSelectedPlayerLocation",
+		"CG_DrawSelectedPlayerWeapon",
+		"CG_DrawSelectedPlayerPowerup",
+	):
+		assert stale not in selectedplayer_cases
+
+	assert "return;" in active_model_case
+	assert "CG_DrawFirstPlaceModel" not in active_model_case
+
+	for expected in (
+		"case CG_ROUND_BACKGROUND:",
+		"case CG_OVERTIME_BACKGROUND:",
+		"case CG_BLUE_FLAGHEAD:",
+		"case CG_BLUE_FLAGNAME:",
+		"case CG_RED_FLAGHEAD:",
+		"case CG_RED_FLAGNAME:",
+		"case CG_PLAYER_LOCATION:",
+		"case CG_PLAYER_STATUS:",
+		"case CG_AREA_SYSTEMCHAT:",
+		"case CG_AREA_TEAMCHAT:",
+		"case CG_AREA_CHAT:",
+		"case CG_SCOREBOX_FOLLOW_BACKGROUND:",
+		"case CG_SCOREBOX_SPEC_BACKGROUND:",
+		"case CG_SPEC_FOLLOW_PRIMARY:",
+		"case CG_SPEC_FOLLOW_SECONDARY:",
+		"case CG_SPEC_COMPARE_PRIMARY:",
+		"case CG_SPEC_COMPARE_SECONDARY:",
+	):
+		assert expected in ownerdraw_block
+
+	for stale in (
+		"CG_DrawAreaSystemChat",
+		"CG_DrawAreaTeamChat",
+		"CG_DrawAreaChat",
+	):
+		assert stale not in legacy_chat_cases
+
+	for stale in (
+		"CG_DrawBlueFlagHead",
+		"CG_DrawBlueFlagName",
+		"CG_DrawRedFlagHead",
+		"CG_DrawRedFlagName",
+		"CG_DrawPlayerLocation",
+		"CG_DrawPlayerStatus",
+	):
+		assert stale not in legacy_flag_cases
+
+	for stale in (
+		"CG_DrawScoreboxFollowBackground",
+		"CG_DrawScoreboxSpecBackground",
+		"CG_DrawSpectatorFollowIndicator",
+		"CG_DrawSpectatorComparison",
+	):
+		assert stale not in scorebox_spectator_cases
+
+	assert "return;" in teaminfo_case
+	assert "CG_DrawNewTeamInfo" not in teaminfo_case
 
 
 def test_cgame_selected_player_and_placement_weapon_helpers_restore_retail_split() -> None:

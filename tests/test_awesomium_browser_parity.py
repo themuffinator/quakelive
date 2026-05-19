@@ -129,6 +129,7 @@ def test_awesomium_load_failure_hides_host_and_suppresses_error_publish_until_re
 	show_browser_block = _extract_function_block(cl_cgame, "void CL_Web_ShowBrowser_f( void ) {")
 	change_hash_block = _extract_function_block(cl_cgame, "void CL_Web_ChangeHash_f( void ) {")
 	hide_browser_block = _extract_function_block(cl_cgame, "static void QLWebHost_HideBrowser( void ) {")
+	update_block = _extract_function_block(cl_cgame, "static void QLWebCore_Update( void ) {")
 	show_error_block = _extract_function_block(cl_cgame, "void CL_Web_ShowError_f( void ) {")
 	clear_cache_block = _extract_function_block(cl_cgame, "void CL_Web_ClearCache_f( void ) {")
 	reload_view_block = _extract_function_block(cl_cgame, "static void QLWebHost_ReloadView( qboolean ignoreCache ) {")
@@ -144,6 +145,9 @@ def test_awesomium_load_failure_hides_host_and_suppresses_error_publish_until_re
 	assert 'Cvar_Set( "web_browserActive", "1" );' in open_url_block
 	assert 'if ( !cl_webHost.coreInitialised || !cl_webHost.viewInitialised || cl_webHost.keyCaptureArmed ) {' in hide_browser_block
 	assert 'Cvar_Set( "web_browserActive", "0" );' in hide_browser_block
+	assert "cls.keyCatchers &= ~KEYCATCH_BROWSER;" in hide_browser_block
+	assert "if ( cl_webHost.browserActive && !( cls.keyCatchers & KEYCATCH_BROWSER ) ) {" in update_block
+	assert "cls.keyCatchers |= KEYCATCH_BROWSER;" in update_block
 	assert "VM_Call( cgvm, CG_EVENT_HANDLING, CGAME_EVENT_CLOSECOMMANDOVERLAY );" in hide_browser_block
 
 	assert 'Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );' not in show_browser_block
@@ -190,6 +194,8 @@ def test_awesomium_direct_input_helpers_reconstruct_browser_runtime_injection_su
 	mouse_event_block = _extract_function_block(cl_input, "void CL_MouseEvent( int dx, int dy, int time ) {")
 
 	assert "void CL_WebView_OnMouseMove( int x, int y );" in client_h
+	assert "#define KEYCATCH_RETAIL_MOUSEPASS\t0x0010" in client_h
+	assert "#define KEYCATCH_BROWSER\t\t\t0x0020" in client_h
 	assert "if ( !cl_webHost.viewInitialised || !cl_webHost.browserVisible || !cl_webHost.browserActive ) {" in inject_mouse_block
 	assert "for ( result = 1; result < value; result <<= 1 ) {" in next_power_block
 	assert "mappedCoordinate = ( (double)clampedCoordinate / (double)viewDimension ) * (double)targetDimension;" in map_cursor_block
@@ -205,7 +211,9 @@ def test_awesomium_direct_input_helpers_reconstruct_browser_runtime_injection_su
 	assert "QLWebView_InjectMouseMove( x, y );" in on_mouse_block
 	assert "QLWebView_InjectKeyboardEvent( key, down );" in on_key_block
 	assert "if ( cl_webHost.cursorPositionValid && cl_webHost.viewInitialised && ( cl_webHost.browserVisible || cl_webHost.browserActive ) ) {" in request_cursor_block
-	assert "CL_WebView_OnMouseMove( cursorX, cursorY );" in mouse_event_block
+	assert "if ( cls.keyCatchers & KEYCATCH_BROWSER ) {" in mouse_event_block
+	assert "CL_WebView_OnMouseMove( dx, dy );" in mouse_event_block
+	assert "CL_WebView_OnMouseMove( cursorX, cursorY );" not in mouse_event_block
 
 
 def test_awesomium_activation_path_reconstructs_retail_modifier_injection_on_app_focus() -> None:
@@ -257,10 +265,14 @@ def test_awesomium_mouse_button_and_wheel_helpers_reconstruct_retail_pointer_inj
 	public_wheel_block = _extract_function_block(
 		cl_cgame, "void CL_WebView_OnMouseWheelEvent( int direction ) {"
 	)
+	browser_key_block = _extract_function_block(
+		cl_keys, "static void CL_DispatchBrowserKeyEvent( int key, qboolean down ) {"
+	)
 	key_event_block = _extract_function_block(cl_keys, "void CL_KeyEvent (int key, qboolean down, unsigned time) {")
 
 	assert "void CL_WebView_OnMouseButtonEvent( int key, qboolean down );" in client_h
 	assert "void CL_WebView_OnMouseWheelEvent( int direction );" in client_h
+	assert "void CL_WebHost_HideBrowser( void );" in client_h
 	assert "case K_MOUSE1:" in map_button_block
 	assert "case K_MOUSE2:" in map_button_block
 	assert "case K_MOUSE3:" in map_button_block
@@ -271,12 +283,17 @@ def test_awesomium_mouse_button_and_wheel_helpers_reconstruct_retail_pointer_inj
 	assert "QLWebView_InjectMouseDown( key );" in public_button_block
 	assert "QLWebView_InjectMouseUp( key );" in public_button_block
 	assert "QLWebView_InjectMouseWheel( direction );" in public_wheel_block
-	assert "if ( dispatchKey >= K_MOUSE1 && dispatchKey <= K_MOUSE5 ) {" in key_event_block
-	assert "CL_WebView_OnMouseButtonEvent( dispatchKey, dispatchDown );" in key_event_block
-	assert 'dispatchKey == K_MWHEELUP' in key_event_block
-	assert 'CL_WebView_OnMouseWheelEvent( 1 );' in key_event_block
-	assert 'dispatchKey == K_MWHEELDOWN' in key_event_block
-	assert 'CL_WebView_OnMouseWheelEvent( -1 );' in key_event_block
+	assert "if ( key >= K_MOUSE1 && key <= K_MOUSE5 ) {" in browser_key_block
+	assert "CL_WebView_OnMouseButtonEvent( key, down );" in browser_key_block
+	assert 'key == K_MWHEELUP' in browser_key_block
+	assert 'CL_WebView_OnMouseWheelEvent( 1 );' in browser_key_block
+	assert 'key == K_MWHEELDOWN' in browser_key_block
+	assert 'CL_WebView_OnMouseWheelEvent( -1 );' in browser_key_block
+	assert "CL_WebView_OnKeyEvent( key, down );" in browser_key_block
+	assert "if ( cls.keyCatchers & KEYCATCH_BROWSER ) {" in key_event_block
+	assert "CL_WebHost_HideBrowser();" in key_event_block
+	assert "CL_DispatchBrowserKeyEvent( dispatchKey, dispatchDown );" in key_event_block
+	assert "CL_WebView_OnMouseButtonEvent( dispatchKey, dispatchDown );" not in key_event_block
 
 
 def test_awesomium_document_ready_stages_launcher_script_bundle_before_ready_event() -> None:

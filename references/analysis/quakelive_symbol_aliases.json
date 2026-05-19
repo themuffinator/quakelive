@@ -2619,6 +2619,7 @@
     "sub_4B4920": "Con_Bottom",
     "sub_4B4930": "Con_Close",
     "sub_4B4A00": "Con_Clear_f",
+    "sub_4B54E0": "CL_MouseEvent",
     "sub_4B5800": "CL_MouseMove",
     "sub_4B5F70": "CL_WritePacket",
     "sub_4B6330": "CL_InitInput",

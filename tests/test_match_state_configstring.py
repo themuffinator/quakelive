@@ -1016,13 +1016,14 @@ def test_cgame_match_flow_configstrings_are_wired() -> None:
     assert "num == CS_WARMUP_READY" in servercmds
 
 
-def test_client_hud_uses_runtime_sudden_death_and_ready_counts() -> None:
+def test_client_hud_uses_runtime_sudden_death_and_retail_warmup_prompts() -> None:
     draw = (CODE_DIR / "cgame" / "cg_draw.c").read_text(encoding="utf-8")
     scoreboard = (CODE_DIR / "cgame" / "cg_scoreboard.c").read_text(encoding="utf-8")
     match_state = (CODE_DIR / "game" / "g_match_state.c").read_text(encoding="utf-8")
 
-    assert "cgs.matchWarmupReadyEligible" in draw
-    assert "cgs.matchWarmupReadyCount" in draw
+    assert "CG_BuildWarmupWaitingStatus" in draw
+    assert '"The match requires %i player%s per team."' in draw
+    assert '"Press %s to unready yourself"' in draw
     assert "cgs.matchReadyUpDeadline" in draw
     assert 'title = cgs.matchSuddenDeathActive ? "Sudden Death" : "Round Begins in";' in draw
     assert "cgHudScoreboard.suddenDeathActive = cgs.matchSuddenDeathActive;" in scoreboard

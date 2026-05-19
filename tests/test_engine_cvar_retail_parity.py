@@ -112,7 +112,16 @@ def test_engine_cvar_second_tranche_matches_retail_contracts() -> None:
 	assert 'tn = cl_timeNudge->integer;' in cl_cgame
 
 	assert 'cl_autoTimeNudge = Cvar_GetBounded( "cl_autoTimeNudge", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED );' in cl_main
-	assert 'if ( cl_autoTimeNudge->integer ) {' in cl_cgame
+	assert 'Cvar_Get( "cg_spectating", "0", CVAR_ROM );' in cl_main
+	assert 'static int cl_autoTimeNudgePrevious;' in cl_cgame
+	assert 'static int CL_SelectClientTimeNudge( void ) {' in cl_cgame
+	assert 'if ( Cvar_VariableIntegerValue( "cg_spectating" ) ) {' in cl_cgame
+	assert 'else if ( Sys_IsLANAddress( clc.serverAddress ) ) {' in cl_cgame
+	assert 'else if ( !cl_autoTimeNudge->integer ) {' in cl_cgame
+	assert 'tn = (int)( (float)cl.snap.ping * -0.5f );' in cl_cgame
+	assert 'if ( cl_autoTimeNudgePrevious != 0 && cl_autoTimeNudgePrevious != tn ) {' in cl_cgame
+	assert 'cl_autoTimeNudgePrevious = tn;' in cl_cgame
+	assert 'tn = CL_SelectClientTimeNudge();' in cl_cgame
 
 	assert 'cl_maxpackets = Cvar_Get ("cl_maxpackets", "125", CVAR_CHEAT );' in cl_main
 	assert 'if ( cl_maxpackets->integer < 15 ) {' in cl_input
@@ -297,6 +306,7 @@ def test_engine_cvar_sixth_client_tranche_matches_retail_contracts() -> None:
 	cl_main = _read_text(CL_MAIN)
 	cl_console = _read_text(CL_CONSOLE)
 	cl_input = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_input.c")
+	win_input = _read_text(WIN_INPUT)
 	common = _read_text(COMMON)
 	cmd = _read_text(REPO_ROOT / "src" / "code" / "qcommon" / "cmd.c")
 
@@ -324,8 +334,9 @@ def test_engine_cvar_sixth_client_tranche_matches_retail_contracts() -> None:
 	assert 'if ( in_speed.active ^ cl_run->integer ) {' in cl_input
 
 	assert 'cl_viewAccel = Cvar_Get ("cl_viewAccel", "1.7", CVAR_ARCHIVE | CVAR_CLOUD );' in cl_main
-	assert 'cl.viewangles[YAW] -= cl_viewAccel->value * m_yaw->value * mx;' in cl_input
-	assert 'cl.viewangles[PITCH] += cl_viewAccel->value * m_pitch->value * my;' in cl_input
+	assert 'accel = cl_viewAccel ? cl_viewAccel->value : 1.0f;' in win_input
+	assert 'cl.viewangles[YAW] -= cl_viewAccel->value * m_yaw->value * mx;' not in cl_input
+	assert 'cl.viewangles[PITCH] += cl_viewAccel->value * m_pitch->value * my;' not in cl_input
 
 	assert 'cl_serverStatusResendTime = Cvar_Get ("cl_serverStatusResendTime", "750", 0);' in cl_main
 	assert 'serverStatus->startTime < Com_Milliseconds() - cl_serverStatusResendTime->integer' in cl_main
@@ -403,24 +414,32 @@ def test_engine_cvar_eighth_client_input_tranche_matches_retail_contracts() -> N
 	assert 'if ( (in_mlooking || cl_freelook->integer) && !in_strafe.active ) {' in cl_input
 
 	assert 'cl_sensitivity = Cvar_Get ("sensitivity", "4", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
-	assert 'accelSensitivity += cl_sensitivity->value;' in cl_input
+	assert 'sensitivity = cl_sensitivity->value;' in cl_input
 
 	assert 'cl_mouseAccel = Cvar_Get ("cl_mouseAccel", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
-	assert 'accelSensitivity = cl_mouseAccel->value * powf( rate - cl_mouseAccelOffset->value, cl_mouseAccelPower->value );' in cl_input
+	assert 'if ( cl_mouseAccel->value != 0.0f ) {' in cl_input
+	assert 'accelRate = fabsf( cl_mouseAccel->value ) * rate;' in cl_input
+	assert 'accelSensitivity = powf( accelRate, power );' in cl_input
+	assert 'sensitivity -= accelSensitivity;' in cl_input
+	assert 'sensitivity += accelSensitivity;' in cl_input
 
 	assert 'cl_mouseAccelPower = Cvar_Get ("cl_mouseAccelPower", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
-	assert 'cl_mouseAccelPower->value' in cl_input
+	assert 'power = cl_mouseAccelPower->value - 1.0f;' in cl_input
 
 	assert 'cl_mouseSensCap = Cvar_Get ("cl_mouseSensCap", "0", CVAR_ARCHIVE | CVAR_CLOUD );' in cl_main
-	assert 'if ( cl_mouseSensCap->value > 0.0f && accelSensitivity > cl_mouseSensCap->value ) {' in cl_input
+	assert 'if ( cl_mouseSensCap->value > 0.0f && cl_mouseSensCap->value < sensitivity ) {' in cl_input
 
 	assert 'm_filter = Cvar_Get ("m_filter", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
-	assert 'if ( m_filter->integer ) {' in cl_input
+	assert 'static void CL_BeginMouseFilter( void ) {' in cl_input
+	assert 'Cvar_Set( "m_filter", "31" );' in cl_input
+	assert 'CL_EndMouseFilter();' in cl_input
 
 	assert 'm_cpi = Cvar_Get ("m_cpi", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
-	assert 'translatedDx = CL_TranslateRetailMouseDelta( dx, m_cpi->value );' in cl_input
-	assert 'cpiScale = m_cpi->value;' in cl_input
-	assert 'cpiScale = 1000.0f / cpiScale;' in cl_input
+	assert 'cpiScale = m_cpi->value / CL_MOUSE_CPI_INCHES_PER_CM;' in cl_input
+	assert 'rate *= 1000.0f;' in cl_input
+	assert 'translatedDx = CL_TranslateRetailMouseDelta( dx, m_cpi->value );' not in cl_input
+	assert 'Cvar_Get( "cg_ignoreMouseInput", "0", CVAR_ROM );' in cl_main
+	assert 'if ( Cvar_VariableIntegerValue( "cg_ignoreMouseInput" ) ) {' in cl_input
 
 
 def test_engine_cvar_ninth_client_misc_tranche_matches_retail_contracts() -> None:
@@ -444,13 +463,13 @@ def test_engine_cvar_ninth_client_misc_tranche_matches_retail_contracts() -> Non
 	assert 'cmd->forwardmove = ClampChar( cmd->forwardmove - m_forward->value * my );' in cl_input
 
 	assert 'm_pitch = Cvar_Get ("m_pitch", "0.022", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
-	assert 'cl.viewangles[PITCH] += cl_viewAccel->value * m_pitch->value * my;' in cl_input
+	assert 'cl.viewangles[PITCH] += m_pitch->value * mouseScale * my;' in cl_input
 
 	assert 'm_side = Cvar_Get ("m_side", "0.25", CVAR_ARCHIVE | CVAR_CLOUD );' in cl_main
 	assert 'cmd->rightmove = ClampChar( cmd->rightmove + m_side->value * mx );' in cl_input
 
 	assert 'm_yaw = Cvar_Get ("m_yaw", "0.022", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
-	assert 'cl.viewangles[YAW] -= cl_viewAccel->value * m_yaw->value * mx;' in cl_input
+	assert 'cl.viewangles[YAW] -= m_yaw->value * mouseScale * mx;' in cl_input
 
 	assert 'Cvar_Get( "cl_maxPing", "800", CVAR_ARCHIVE );' in cl_main
 	assert 'maxPing = Cvar_VariableIntegerValue( "cl_maxPing" );' in cl_main
@@ -710,6 +729,7 @@ def test_engine_cvar_fourteenth_core_timing_tranche_matches_retail_contracts() -
 	common = _read_text(COMMON)
 	cl_main = _read_text(CL_MAIN)
 	cl_input = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_input.c")
+	client_h = _read_text(REPO_ROOT / "src" / "code" / "client" / "client.h")
 	cl_cgame = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c")
 	cg_draw = _read_text(REPO_ROOT / "src" / "code" / "cgame" / "cg_draw.c")
 	cg_servercmds = _read_text(REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c")
@@ -740,8 +760,15 @@ def test_engine_cvar_fourteenth_core_timing_tranche_matches_retail_contracts() -
 	assert 'freezeDemo = trap_Cvar_VariableValue( "cl_freezeDemo" );' in cg_draw
 
 	assert 'cl_mouseAccelDebug = Cvar_Get ("cl_mouseAccelDebug", "0", 0 );' in cl_main
-	assert 'if ( cl_mouseAccelDebug->integer ) {' in cl_input
-	assert 'mouse accel: rate %.3f offset %.3f power %.3f accel %.3f sens %.3f cap %.3f\\n' in cl_input
+	assert 'static FILE\t\t*cl_mouseAccelDebugLog;' in cl_input
+	assert 'Cvar_VariableStringBuffer( "fs_homepath", homepath, sizeof( homepath ) );' in cl_input
+	assert 'path = FS_BuildOSPath( homepath, "", "mouse.log" );' in cl_input
+	assert 'fprintf( cl_mouseAccelDebugLog, "mx my frame_msec rate power\\n" );' in cl_input
+	assert 'fprintf( cl_mouseAccelDebugLog, "%g %g %d ", mx, my, frame_msec );' in cl_input
+	assert 'Com_Printf( "mouse accel:' not in cl_input
+	assert 'cl_mouseAccelStyle' not in cl_main
+	assert 'cl_mouseAccelStyle' not in cl_input
+	assert 'cl_mouseAccelStyle' not in client_h
 
 	assert 'Cvar_Get ("dmflags", "0", CVAR_SERVERINFO);' in sv_init
 	assert '{ &g_dmflags, "dmflags", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue  },' in g_main
@@ -1078,8 +1105,12 @@ def test_engine_cvar_twentieth_client_debug_tranche_matches_retail_contracts() -
 	assert '// cl_freezeDemo is used to lock a demo in place for single frame advances' in cl_cgame
 
 	assert 'cl_mouseAccelDebug = Cvar_Get ("cl_mouseAccelDebug", "0", 0 );' in cl_main
-	assert 'if ( cl_mouseAccelDebug->integer ) {' in cl_input
-	assert 'Com_Printf( "mouse accel: rate %.3f offset %.3f power %.3f accel %.3f sens %.3f cap %.3f\\n",' in cl_input
+	assert 'CL_UpdateMouseAccelDebugLog();' in cl_input
+	assert 'if ( !cl_mouseAccelDebug || !cl_mouseAccelDebug->integer ) {' in cl_input
+	assert 'fclose( cl_mouseAccelDebugLog );' in cl_input
+	assert 'fprintf( cl_mouseAccelDebugLog, "\\n" );' in cl_input
+	assert 'cl_mouseAccelStyle' not in cl_main
+	assert 'cl_mouseAccelStyle' not in client_h
 
 	assert 'cl_nodelta = Cvar_Get ("cl_nodelta", "0", 0);' in cl_input
 	assert 'if ( cl_nodelta->integer || !cl.snap.valid || clc.demowaiting' in cl_input

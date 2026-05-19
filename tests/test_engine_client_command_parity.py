@@ -461,7 +461,8 @@ def test_client_input_button3_release_and_mlook_follow_retail_mouse_and_joystick
 	assert 'IN_CenterView ();' in mlook_up_block
 
 	assert 'if ( (in_mlooking || cl_freelook->integer) && !in_strafe.active ) {' in mouse_move_block
-	assert 'cl.viewangles[PITCH] += cl_viewAccel->value * m_pitch->value * my;' in mouse_move_block
+	assert 'cl.viewangles[PITCH] += m_pitch->value * mouseScale * my;' in mouse_move_block
+	assert 'cl_viewAccel->value * m_pitch->value * my' not in mouse_move_block
 	assert 'cmd->forwardmove = ClampChar( cmd->forwardmove - m_forward->value * my );' in mouse_move_block
 
 	assert 'if ( in_mlooking ) {' in joystick_move_block
@@ -681,6 +682,35 @@ def test_client_command_registration_matches_retail_cinematic_network_and_browse
 	assert "void\tCL_GlobalServers_f( void );" not in client_h
 	assert "void\tCL_Ping_f( void );" not in client_h
 	assert "void QLWebHost_RegisterCommands( void );" in client_h
+
+
+def test_client_key_event_matches_retail_demo_playback_controls() -> None:
+	cl_keys = (REPO_ROOT / "src/code/client/cl_keys.c").read_text(encoding="utf-8")
+
+	demo_block = _extract_function_block(
+		cl_keys, "static qboolean CL_HandleDemoPlaybackKeyEvent( int key ) {"
+	)
+	key_event_block = _extract_function_block(cl_keys, "void CL_KeyEvent (int key, qboolean down, unsigned time) {")
+
+	assert "if ( !clc.demoplaying || ( cls.keyCatchers & ~KEYCATCH_RETAIL_MOUSEPASS ) != 0 ) {" in demo_block
+	assert "case K_SPACE:" in demo_block
+	assert 'Cbuf_ExecuteText( EXEC_APPEND, "toggle cl_freezeDemo\\n" );' in demo_block
+	assert "case K_DOWNARROW:" in demo_block
+	assert "case K_MOUSE3:" in demo_block
+	assert 'Cbuf_ExecuteText( EXEC_APPEND, "timescale 1\\n" );' in demo_block
+	assert "case K_LEFTARROW:" in demo_block
+	assert "case K_MWHEELDOWN:" in demo_block
+	assert 'Cbuf_ExecuteText( EXEC_APPEND, "cvarAdd timescale -0.1\\n" );' in demo_block
+	assert "case K_RIGHTARROW:" in demo_block
+	assert "case K_MWHEELUP:" in demo_block
+	assert "if ( cl_freezeDemo && cl_freezeDemo->integer ) {" in demo_block
+	assert 'Cbuf_ExecuteText( EXEC_APPEND, "timescale 1; cl_freezeDemo 0; wait; wait; cl_freezeDemo 1\\n" );' in demo_block
+	assert 'Cbuf_ExecuteText( EXEC_APPEND, "cvarAdd timescale 0.1\\n" );' in demo_block
+	assert "case K_DEL:" in demo_block
+	assert 'Cbuf_ExecuteText( EXEC_APPEND, "toggle cg_drawDemoHUD\\n" );' in demo_block
+
+	assert "if ( dispatchDown && CL_HandleDemoPlaybackKeyEvent( key ) ) {" in key_event_block
+	assert "clc.demoplaying || cls.state == CA_CINEMATIC" not in key_event_block
 
 
 def test_client_command_handlers_match_retail_cinematic_network_and_browser_contracts() -> None:

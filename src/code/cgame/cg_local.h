@@ -130,6 +130,25 @@ static ID_INLINE qboolean CG_HasObjectiveCountStat( gametype_t gametype ) {
 
 /*
 =============
+CG_IsRoundStartGametype
+
+Retail warmup/countdown predicate for round-family start banners.
+=============
+*/
+static ID_INLINE qboolean CG_IsRoundStartGametype( gametype_t gametype ) {
+	switch ( gametype ) {
+	case GT_CLAN_ARENA:
+	case GT_FREEZE:
+	case GT_ATTACK_DEFEND:
+	case GT_RED_ROVER:
+		return qtrue;
+	default:
+		return qfalse;
+	}
+}
+
+/*
+=============
 CG_IsTeamWinnerGametype
 
 Retail gametype predicate for the shared endgame winner seams.
@@ -1200,12 +1219,15 @@ typedef struct {
 
 	qhandle_t	selectShader;
 	qhandle_t	viewBloodShader;
+	qhandle_t	viewDamageBlendShader;
+	qhandle_t	vignetteShader;
 	qhandle_t	tracerShader;
 	qhandle_t	crosshairShader[NUM_CROSSHAIRS];
 	qhandle_t	lagometerShader;
 	qhandle_t	backTileShader;
 	qhandle_t	noammoShader;
 	qhandle_t	infiniteAmmoShader;
+	qhandle_t	healthSegmentShader;
 	qhandle_t	healthBar100;
 	qhandle_t	healthBar200;
 	qhandle_t	armorBar100;
@@ -1329,6 +1351,10 @@ typedef struct {
 	qhandle_t	scoreboardTime;
 	qhandle_t	scoreboxSpecShader;
 	qhandle_t	scoreboxFollowShader;
+	qhandle_t	scoreArrowGreenShader;
+	qhandle_t	scoreArrowRedShader;
+	qhandle_t	scoreCAArrowRedShader;
+	qhandle_t	scoreCAArrowBlueShader;
 	qhandle_t	scoreMutedShader;
 	qhandle_t	scoreSpeakingShader;
 	qhandle_t	inkFadeLeftShader;
@@ -1379,6 +1405,7 @@ typedef struct {
 	sfxHandle_t kamikazeExplodeSound;
 	sfxHandle_t kamikazeImplodeSound;
 	sfxHandle_t kamikazeFarSound;
+	sfxHandle_t kamikazeRespawnSound;
 	sfxHandle_t useInvulnerabilitySound;
 	sfxHandle_t invulnerabilityImpactSound1;
 	sfxHandle_t invulnerabilityImpactSound2;
@@ -1453,6 +1480,7 @@ typedef struct {
 	sfxHandle_t revengeSound2;
 	sfxHandle_t revengeSound3;
 	sfxHandle_t perforatedSound;
+	sfxHandle_t biteSound;
 	sfxHandle_t headshotSound;
 	sfxHandle_t firstFragSound;
 	sfxHandle_t infectedSound;
@@ -1497,6 +1525,8 @@ typedef struct {
 	sfxHandle_t	enemyTookTheFlagSound;
 	sfxHandle_t yourTeamTookEnemyFlagSound;
 	sfxHandle_t yourTeamTookTheFlagSound;
+	sfxHandle_t attackTheFlagSound;
+	sfxHandle_t defendTheFlagSound;
 	sfxHandle_t	youHaveFlagSound;
 	sfxHandle_t yourBaseIsUnderAttackSound;
 	sfxHandle_t holyShitSound;
@@ -1534,9 +1564,14 @@ typedef struct {
 	qhandle_t escortShader;
 	qhandle_t flagShaders[3];
 	qhandle_t countryFlagNoneShader;
+	qhandle_t	raceNavShader;
 	qhandle_t	raceStartShader;
 	qhandle_t	raceCheckpointShader;
 	qhandle_t	raceFinishShader;
+	qhandle_t	raceCommandUpShader;
+	qhandle_t	raceCommandDownShader;
+	qhandle_t	raceCommandRightShader;
+	qhandle_t	raceCommandLeftShader;
 	sfxHandle_t	countPrepareTeamSound;
 
 	sfxHandle_t ammoregenSound;
@@ -1783,6 +1818,7 @@ extern	vmCvar_t		cg_cameraThirdPersonSmartMode;
 extern	vmCvar_t		cg_centertime;
 extern	vmCvar_t		cg_chatbeep;
 extern	vmCvar_t		cg_chatHistoryLength;
+extern	vmCvar_t		cg_complaintWarning;
 extern	vmCvar_t		cg_playVoiceChats;
 extern	vmCvar_t		cg_showVoiceText;
 extern	vmCvar_t		cg_crosshairBrightness;
@@ -2177,7 +2213,7 @@ void CG_StopSpectatorFollow( void );
 void CG_SetSpectatorCameraLock( qboolean locked );
 void *CG_SetClientSpeakingState( int clientNum, int speaking );
 float CG_GetValue(int ownerDraw);
-qboolean CG_OwnerDrawVisible(int flags);
+qboolean CG_OwnerDrawVisible(int flags, int flags2);
 void CG_ScoresDown_f( void );
 void CG_RunMenuScript(char **args);
 void CG_SetPrintString(int type, const char *p);

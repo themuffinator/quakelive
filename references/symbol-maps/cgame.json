@@ -59,12 +59,12 @@
     {
       "address": "0x10001020",
       "raw_name": "FUN_10001020",
-      "normalized_name": "CG_HasObjectiveCountStat",
+      "normalized_name": "CG_IsRoundStartGametype",
       "status": "matched",
-      "signature": "static qboolean CG_HasObjectiveCountStat(gametype_t gametype)",
+      "signature": "static qboolean CG_IsRoundStartGametype(gametype_t gametype)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail gametype predicate for the shared objective-count stat seam. HLIL is a compact lookup keyed by gametype that returns true only for CTF, 1FCTF, Overload, Harvester, and Domination; committed callers reuse it both when choosing the extra endgame/scoreboard objective-count column and when gating the retail last-chance style limit-announcement path near timelimit expiry."
+      "comment": "Deliberate synthetic retail warmup/countdown predicate. HLIL is a compact lookup keyed by gametype that returns true only for Clan Arena, Freeze Tag, Attack and Defend, and Red Rover; committed callers reuse it to gate round-family warmup countdown sounds, start banners, and round transition status prompts."
     },
     {
       "address": "0x10001060",
@@ -1647,7 +1647,7 @@
       "signature": "static float CG_DrawSnapshot(float y)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Upper-right debug snapshot drawer anchored by the retail `time:%i snap:%i cmd:%i` format string. HLIL preserves the same `cg.snap->serverTime`, `cg.latestSnapshotNum`, and `cgs.serverCommandSequence` text composition and advanced-y return as src/code/cgame/cg_draw.c::CG_DrawSnapshot."
+      "comment": "Upper-right debug snapshot drawer anchored by the retail `time:%i snap:%i cmd:%i` format string. HLIL preserves the same `cg.snap->serverTime`, `cg.latestSnapshotNum`, and `cgs.serverCommandSequence` text composition, then measures and paints the right-aligned line through the host-text lane at scale `0.25` with `FONT_DEFAULT` before advancing the stack by 20 pixels."
     },
     {
       "address": "0x10009C10",
@@ -1657,7 +1657,7 @@
       "signature": "static float CG_DrawFPS(float y)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Upper-right FPS drawer anchored by the `%ifps` format string. HLIL keeps the same rolling frame-time sample ring, averaged FPS computation, right-aligned big-string draw, and advanced-y return from src/code/cgame/cg_draw.c::CG_DrawFPS."
+      "comment": "Upper-right FPS drawer anchored by the `%ifps` format string. HLIL keeps the same rolling frame-time sample ring and averaged FPS computation, then measures and paints the right-aligned text through the host-text lane at scale `0.25` with `FONT_MONO`, returning `y + textHeight` only once a sample is ready."
     },
     {
       "address": "0x10009D60",
@@ -1669,7 +1669,7 @@
         "0x1006E3C0"
       ],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic fullscreen vignette overlay helper beneath `CG_Draw2D`. HLIL only runs it when the cached `cg_vignette` state is enabled, draws the registered `gfx/misc/vignette` shader across the full 640x480 screen through `CG_DrawPic`, and the retail `CG_DrawActive` flow calls it immediately before the main 2D HUD pass when the browser overlay is inactive."
+      "comment": "Deliberate synthetic fullscreen vignette overlay helper beneath `CG_Draw2D`. HLIL only runs it when the cached `cg_vignette` state is enabled, draws the pre-registered `gfx/misc/vignette` media handle across the full 640x480 screen through `CG_DrawPic`, and the retail `CG_DrawActive` flow calls it immediately before the main 2D HUD pass when the browser overlay is inactive."
     },
     {
       "address": "0x10009DA0",
@@ -1706,7 +1706,7 @@
         "0x10068E40"
       ],
       "relocation_refs": [],
-      "comment": "Lower-right powerup ladder helper that consumes the active powerup selection, formats the remaining timer and count, draws the powerup icon, and appends a stack count exactly like the classic `cg_draw.c` `CG_DrawPowerups` role; retail folds the current-source ownerdraw-era state into the old fixed-position path and returns the advanced y position."
+      "comment": "Lower-right powerup ladder helper that consumes the active powerup selection, formats the remaining timer and count, draws the classic item-backed powerup icon, and appends a stack count exactly like the classic `cg_draw.c` `CG_DrawPowerups` role; retail folds the current-source ownerdraw-era state into the old fixed-position path and returns the advanced y position."
     },
     {
       "address": "0x1000ABF0",
@@ -1716,7 +1716,7 @@
       "signature": "static void CG_DrawLowerRight(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Lower-right HUD wrapper from the classic `cg_draw.c` seam. HLIL shows it starting the stack, optionally routing `cg_drawTeamOverlay == 2` through the lower-right `CG_DrawTeamOverlay` variant in team games, and then tailcalling `CG_DrawPowerups` with the running y coordinate."
+      "comment": "Lower-right HUD wrapper from the classic `cg_draw.c` seam. HLIL shows it starting the stack, optionally routing `cg_drawTeamOverlay == 3` through the lower-right `CG_DrawTeamOverlay` variant in team games, and then tailcalling `CG_DrawPowerups` with the running y coordinate; mode `2` is a separate `CG_Draw2D` call after the upper-right stack."
     },
     {
       "address": "0x1000AC30",
@@ -1738,7 +1738,7 @@
         "0x10068E48"
       ],
       "relocation_refs": [],
-      "comment": "Disconnect warning helper anchored by the centered `Connection Interrupted` banner. HLIL preserves the current-usercmd versus snapshot command-time gate, the blink timing, and the lower-right `gfx/2d/net.tga` icon draw from src/code/cgame/cg_draw.c::CG_DrawDisconnect."
+      "comment": "Disconnect warning helper anchored by the centered `Connection Interrupted` banner. HLIL preserves the current-usercmd versus snapshot command-time gate, the blink timing, and the lower-right draw using the helper-local `gfx/2d/net.tga` shader registration; `CG_Draw2D` calls this separately from the lagometer path outside third-person rendering."
     },
     {
       "address": "0x1000B000",
@@ -1748,7 +1748,7 @@
       "signature": "static void CG_DrawLagometer(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Lagometer graph renderer that draws the frame interpolate/extrapolate history, the snapshot ping/drop history, the synchronous-clients marker, and the disconnect warning exactly like `cg_draw.c::CG_DrawLagometer`."
+      "comment": "Lagometer graph renderer that draws the frame interpolate/extrapolate history, the snapshot ping/drop history, and the synchronous-clients marker like `cg_draw.c::CG_DrawLagometer`; retail keeps the disconnect warning in the adjacent `CG_Draw2D` call-site instead of embedding it in this graph helper."
     },
     {
       "address": "0x1000B610",
@@ -1758,7 +1758,7 @@
       "signature": "static void CG_DrawInputCmds(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail HUD helper for the `cg_drawInputCmds{,X,Y,Size}` cvar family carried in the current source tree. HLIL reads the live or followed `usercmd_t` forward/right/up bytes and paints the matching arrow icons around the configured anchor point."
+      "comment": "Deliberate synthetic retail HUD helper for the `cg_drawInputCmds{,X,Y,Size}` cvar family carried in the current source tree. HLIL reads the live or followed `usercmd_t` forward/right/up bytes and paints the matching pre-registered race command-arrow media handles around the configured anchor point."
     },
     {
       "address": "0x1000B8F0",
@@ -1836,7 +1836,7 @@
         "0x10068E14"
       ],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic Quake Live teammate-POI overlay helper. HLIL walks visible teammate entities in front of the camera, projects their world positions to screen space, draws the teammate name/location label, and appends the same health, armor, flag, powerup, and task-state markers exposed by the `cg_teammateNames` / `cg_teammatePOIs` cvar family carried in the current source."
+      "comment": "Deliberate synthetic Quake Live teammate-POI overlay helper. HLIL walks visible teammate entities in front of the camera, projects their world positions to screen space, draws the teammate name/location label, and appends the same health, armor, flag, powerup, and task-state markers exposed by the `cg_teammateNames` / `cg_teammatePOIs` cvar family carried in the current source. The projected health/armor indicators consume the pre-registered retail `gfx/2d/health_segment.tga` media handle, and the powerup marker path now consumes the registered `gfx/2d/powerup/*` POI handle bank before falling back to item icons."
     },
     {
       "address": "0x1000BE10",
@@ -1849,7 +1849,7 @@
         "0x10068DFC"
       ],
       "relocation_refs": [],
-      "comment": "Retail centerprint setter that copies the message into the live centerprint buffer, stamps the start time and y offset, stores the retail float text scale, and counts newline-separated lines before draw-time layout. The current source still models the third slot as an integer width argument, but the ownership and buffered-centerprint contract are otherwise exact."
+      "comment": "Retail centerprint setter that copies the message into the live centerprint buffer, stamps the start time, applies the Race-only +10 y-anchor bias, stores the retail float text scale, and counts newline-separated lines before draw-time layout."
     },
     {
       "address": "0x1000BEB0",
@@ -1859,7 +1859,7 @@
       "signature": "static void CG_DrawCenterString(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Centerprint renderer that fades from `cg.centerPrintTime`, splits the buffered text on newlines, centers each line from `cg.centerPrintY`, and draws the result using `cg.centerPrintCharWidth` / `cg.centerPrintLines` exactly like src/code/cgame/cg_draw.c::CG_DrawCenterString."
+      "comment": "Centerprint renderer that fades from `cg.centerPrintTime`, splits the buffered text on newlines, centers each line from `cg.centerPrintY`, and draws the result using `cg.centerPrintScale` / `cg.centerPrintLines` and the retail plain text style exactly like src/code/cgame/cg_draw.c::CG_DrawCenterString."
     },
     {
       "address": "0x1000D940",
@@ -1882,7 +1882,7 @@
         "0x10068FB8"
       ],
       "relocation_refs": [],
-      "comment": "Vote-status drawer anchored by the retail `VOTE(%is):%s Yes(%s):%i No(%s):%i` and `or press ESC then click Vote` strings. HLIL preserves the vote-time gate, talk-sound replay on modification, localized yes/no key lookup, countdown formatting, and final small-string draw from src/code/cgame/cg_draw.c::CG_DrawVote."
+      "comment": "Vote-status drawer anchored by the retail `VOTE(%is):%s Yes(%s):%i No(%s):%i`, `or press ESC then click Vote`, and team-kill complaint strings. HLIL preserves the raw yes/no key lookup before the vote-time gate, the cg_complaintWarning/team-gametype/third-person checks, complaint prompt/result lanes at 4/300, 8/312, and 3/300, then the normal vote countdown formatting and talk-sound replay from src/code/cgame/cg_draw.c::CG_DrawVote."
     },
     {
       "address": "0x1000DAD0",
@@ -1934,7 +1934,7 @@
       "signature": "static void CG_DrawProxWarning(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Proximity-mine warning helper that gates on the ticking eFlag, seeds the same five-second countdown, and switches between `INTERNAL COMBUSTION IN: %i` and `YOU HAVE BEEN MINED` before drawing the centered red warning exactly like src/code/cgame/cg_draw.c::CG_DrawProxWarning."
+      "comment": "Proximity-mine warning helper that gates on the ticking eFlag, seeds the same five-second countdown, and switches between `INTERNAL COMBUSTION IN: %i` and `YOU HAVE BEEN MINED` before measuring/drawing the centered red warning through the retail `CG_Text_GetExtents` plus `CG_Text_PaintNoAdjust` text lane."
     },
     {
       "address": "0x1000E600",
@@ -1944,7 +1944,7 @@
       "signature": "static void CG_DrawPregamePlacementPrompt(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail pregame prompt helper. When the placement/tutorial gate is active it centers `This match will determine` / `your skill placement`, resolves the `readyup` bind, and prints either `Press %s to start the match` or `Press %s to skip the tutorial`."
+      "comment": "Deliberate synthetic retail pregame prompt helper. When the placement/tutorial gate is active it centers `This match will determine` / `your skill placement`, resolves the raw `readyup` bind without falling back to `ready`, and prints either `Press %s to start the match` or `Press %s to skip the tutorial`."
     },
     {
       "address": "0x1000E880",
@@ -2004,7 +2004,7 @@
       "signature": "static void CG_DrawWarmupStatusText(int gametype)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail warmup-status text helper split out of `CG_DrawWarmup`. It resolves tournament-versus names, Attack and Defend offense/defense labels, special `Quad Hog` / `Infected` titles, round-state strings such as `Round Begins in` and `Sudden Death`, and the final `Starts in: %i` countdown line."
+      "comment": "Deliberate synthetic retail warmup-status text helper split out of `CG_DrawWarmup`. It resolves tournament-versus names on the common 90.0 title baseline, Attack and Defend offense/defense labels, special `Quad Hog` / `Infected` titles, round-state strings such as `Round Begins in` and `Sudden Death`, and the final `Starts in: %i` countdown line."
     },
     {
       "address": "0x1000EF30",
@@ -2014,7 +2014,7 @@
       "signature": "static void CG_DrawMatchPauseStatus(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail pause overlay helper. HLIL preserves the centered `Match Paused` / `Match resuming in ^5%d^7 seconds` banner, the once-per-second countdown tick, and the call into `CG_PlayWarmupCountSound` for the resume beeps."
+      "comment": "Deliberate synthetic retail pause overlay helper. HLIL preserves the centered `Match Paused` / `Match resuming in ^5%d^7 seconds` banner, the direct `(timeoutExpire - cg.time) / 1000` resume countdown, the once-per-second countdown tick, and the call into `CG_PlayWarmupCountSound` for the resume beeps."
     },
     {
       "address": "0x1000F090",
@@ -2024,7 +2024,7 @@
       "signature": "static void CG_DrawWarmup(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Warmup and ready-up banner renderer. HLIL keeps the same waiting-for-players and ready prompt families, team-size readiness gates, gametype title selection, and final countdown draw path that define `cg_draw.c::CG_DrawWarmup`."
+      "comment": "Warmup and ready-up banner renderer. HLIL keeps the same waiting-for-players and ready prompt families, including the retail `The wanking will begin` copy, the raw `readyup` bind lookup, the `(readyDeadline - cg.time) / 1000 + 1` prompt countdown, team-size readiness gates, gametype title selection, and final countdown draw path that define `cg_draw.c::CG_DrawWarmup`."
     },
     {
       "address": "0x1000FAB0",
@@ -2034,7 +2034,7 @@
       "signature": "static void CG_DrawTeamInfo(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail fixed-position team overlay renderer. HLIL walks the active teammate rows, draws carry/powerup icons, health and armor bars, task/status indicators, names, and locations, which matches the still-empty `CG_DrawTeamInfo` slot carried in `cg_draw.c`."
+      "comment": "Retail fixed-position team overlay renderer. HLIL walks the active teammate rows, draws classic item-backed carry/powerup icons, health and armor bars, task/status indicators, names, and locations, which matches the fixed `CG_DrawTeamInfo` slot now reconstructed in `cg_draw.c`."
     },
     {
       "address": "0x10010450",
@@ -2053,7 +2053,7 @@
         "0x100695EC"
       ],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail demo-HUD helper. HLIL shows it rendering the playback key legend built around `Play`, `Pause`, `Advance`, `[SPACE]`, `[LEFT]`, `[RIGHT]`, `[DOWN]`, and `[DEL]` after checking the current cinematic/demo pause state."
+      "comment": "Deliberate synthetic retail demo-HUD helper. HLIL shows it rendering the playback key legend built around `Play`, `Pause`, `Advance`, `[SPACE]`, `[LEFT]`, `[RIGHT]`, `[DOWN]`, and `[DEL]` after checking the current cinematic/demo pause state. The recovered source now mirrors the retail black half-alpha panel at 210/355/220/60, fixed timestamp and speed-text lanes, and yellow key-label color tuple."
     },
     {
       "address": "0x10010A90",
@@ -2073,7 +2073,7 @@
       "signature": "static void CG_Draw2D(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Main 2D HUD dispatcher that keeps the levelshot and `cg_draw2D` early-outs, intermission routing, spectator/player HUD split, menu-HUD scoreboard handling, vote/lagometer/upper-right drawers, follow and warmup overlays, and the final scoreboard-versus-center-string routing from src/code/cgame/cg_draw.c::CG_Draw2D."
+      "comment": "Main 2D HUD dispatcher that keeps the levelshot and `cg_draw2D` early-outs, intermission routing, spectator/player HUD split, menu-HUD scoreboard handling, the retail lagometer/disconnect split ahead of input and speed widgets, the single global vote drawer before upper-right work, the upper-right stack before the standalone `cg_drawTeamOverlay == 2` right-side overlay and lower-right wrapper, follow and warmup overlays, and the final scoreboard-versus-center-string routing from src/code/cgame/cg_draw.c::CG_Draw2D."
     },
     {
       "address": "0x10011490",
@@ -3415,7 +3415,7 @@
       "signature": "static void CG_RegisterGraphics(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Graphics and media registration pass reached from CG_Init after the retail loading string switches to \"graphics\"."
+      "comment": "Graphics and media registration pass reached from CG_Init after the retail loading string switches to \"graphics\"; source wiring now mirrors the recovered teammate-POI `gfx/2d/health_segment.tga` handle, the gametype-gated `gfx/2d/powerup/*` POI bank, the exposed dropped-marker subset of the retail `gfx/2d/flag_status/*` bank, the FFA-only Quad Hog marker, score-arrow media (`ui/assets/score/arrowg.tga`, `arrowr.tga`, `ca_arrow_red.tga`, `ca_arrow_blue.tga`), plus the race HUD cluster including gfx/misc/racenav.jpg and gfx/2d/race/cmd_* handles."
     },
     {
       "address": "0x10025260",
@@ -3887,7 +3887,7 @@
       "signature": "static void CG_DrawPlayerAmmoValue(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ammo-count ownerdraw for `CG_PLAYER_AMMO_VALUE`. HLIL formats the current-weapon ammo count through the shared text path when finite and also carries a separate no-ammo fallback branch that the current source has not fully reconstructed yet."
+      "comment": "Retail ammo-count ownerdraw for `CG_PLAYER_AMMO_VALUE`. HLIL formats the current-weapon ammo count through the shared text path when finite and carries the negative-ammo fallback branch now mirrored by the source through the pre-registered `icons/infinite.tga` media handle."
     },
     {
       "address": "0x1002ED50",
@@ -3897,7 +3897,7 @@
       "signature": "static void CG_DrawPlayerHealthBar100(rectDef_t *rect, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_HEALTH_BAR_100` leaf. HLIL draws the primary health segment with the same ownerdraw shader clip path now exposed through the dedicated `CG_DrawPlayerHealthBar100` source wrapper."
+      "comment": "Retail `CG_PLAYER_HEALTH_BAR_100` leaf. HLIL clamps `STAT_HEALTH` against `STAT_MAX_HEALTH` and draws the primary `healthBar100` segment from the left, matching the dedicated source wrapper."
     },
     {
       "address": "0x1002EE50",
@@ -3907,7 +3907,7 @@
       "signature": "static void CG_DrawPlayerHealthBar200(rectDef_t *rect, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_HEALTH_BAR_200` leaf. HLIL renders the excess-health segment through a separate clipped ownerdraw path instead of reusing the 100-range helper, which is why the current source now exposes a dedicated wrapper."
+      "comment": "Retail `CG_PLAYER_HEALTH_BAR_200` leaf. HLIL subtracts `STAT_MAX_HEALTH` and renders only the excess-health segment through the bottom-clipped `healthBar200` ownerdraw path."
     },
     {
       "address": "0x1002EFB0",
@@ -3917,7 +3917,7 @@
       "signature": "static void CG_DrawPlayerArmorBar100(rectDef_t *rect, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_ARMOR_BAR_100` leaf. HLIL clips the primary armor segment through its own ownerdraw path, matching the dedicated source wrapper restored in this pass."
+      "comment": "Retail `CG_PLAYER_ARMOR_BAR_100` leaf. HLIL clamps armor to the primary 0-100 segment and clips the tinted `armorBar100` fill from the right."
     },
     {
       "address": "0x1002F0C0",
@@ -3927,7 +3927,7 @@
       "signature": "static void CG_DrawPlayerArmorBar200(rectDef_t *rect, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_ARMOR_BAR_200` leaf. HLIL treats the excess-armor segment as a separate draw leaf instead of a boolean branch, which is why the source now routes this slot through `CG_DrawPlayerArmorBar200`."
+      "comment": "Retail `CG_PLAYER_ARMOR_BAR_200` leaf. HLIL subtracts 100 armor and renders only the excess-armor segment through the bottom-clipped `armorBar200` ownerdraw path."
     },
     {
       "address": "0x1002F6B0",
@@ -3967,7 +3967,7 @@
       "signature": "static void CG_DrawPlayerItem(rectDef_t *rect, float scale, qboolean draw2D)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_ITEM` ownerdraw. HLIL resolves the active holdable item visuals and, for progress-based holdables, adds a centered `%d%%` overlay that the current source still has not fully reconstructed."
+      "comment": "Retail `CG_PLAYER_ITEM` ownerdraw. HLIL resolves the active holdable item visuals and, for progress-backed holdables, adds a centered `%d%%` overlay. Current source now mirrors that visible invulnerability-holdable progress branch through `playerItemTime` / `playerItemTimeMax` while keeping raw ownerdraw case `0x32` on this dedicated leaf."
     },
     {
       "address": "0x1002FDF0",
@@ -4146,7 +4146,7 @@
       "signature": "float CG_GetValue(int ownerDraw)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "HLIL-only callback-table target that returns ownerdraw-driven score, stat, and selected-player values for the HUD scripting layer."
+      "comment": "HLIL-only callback-table target that returns the retail ownerdraw-driven score/stat values for armor, health, ammo, local score, red score, and blue score; legacy selected-player value ids are not handled."
     },
     {
       "address": "0x100316B0",
@@ -4173,10 +4173,10 @@
       "raw_name": "FUN_10031790",
       "normalized_name": "CG_OwnerDrawVisible",
       "status": "matched",
-      "signature": "qboolean CG_OwnerDrawVisible(int flags)",
+      "signature": "qboolean CG_OwnerDrawVisible(int flags, int flags2)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail HUD visibility predicate assigned into cgDC.ownerDrawVisible; evaluates ownerdraw bitmasks against gametype, team, follow, vote, and scoreboard state."
+      "comment": "Retail HUD visibility predicate assigned into cgDC.ownerDrawVisible; evaluates the primary ownerdraw flag word plus Quake Live's secondary ownerdrawflag2 word against gametype, team, follow, vote, and scoreboard state."
     },
     {
       "address": "0x10031CD0",
@@ -4208,7 +4208,7 @@
         "0x10070788"
       ],
       "relocation_refs": [],
-      "comment": "Retail HUD obituary-line helper that centers the local killer text. HLIL uses cg.killerName directly and inlines the CG_GetKillerText formatting step before measuring and drawing the \"Fragged by %s\" string."
+      "comment": "Retail HUD obituary-line helper reached from `CG_KILLER` only when the cached killer-name byte is nonzero. HLIL uses cg.killerName directly and inlines the CG_GetKillerText formatting step before measuring and drawing the \"Fragged by %s\" string."
     },
     {
       "address": "0x10032240",
@@ -4319,7 +4319,7 @@
       "signature": "static void CG_DrawTeamTimeoutCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail team-timeout ownerdraw reached from the red/blue timeout HUD slots. The body pulls the per-team timeout counter from the same cached team array as the source helper and paints the compact `TO: %d` label."
+      "comment": "Retail team-timeout ownerdraw reached from the red/blue timeout HUD slots only after the ownerdraw dispatcher admits a positive team-size field. The body pulls the per-team timeout counter from the same cached team array as the source helper and paints the compact `TO: %d` label."
     },
     {
       "address": "0x100335F0",
@@ -4329,7 +4329,7 @@
       "signature": "static void CG_DrawClanArenaPlayers(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ownerdraw helper reached from `CG_RED_CLAN_PLYRS` and `CG_BLUE_CLAN_PLYRS`; HLIL selects the round-based per-team count and paints it through the shared numeric text path."
+      "comment": "Retail ownerdraw helper reached from `CG_RED_CLAN_PLYRS` and `CG_BLUE_CLAN_PLYRS` only after the ownerdraw dispatcher admits the round-family gametypes; HLIL selects the round-based per-team count and paints it through the shared numeric text path."
     },
     {
       "address": "0x10033650",
@@ -4339,7 +4339,7 @@
       "signature": "static void CG_DrawPlayerCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, qboolean friendly)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ownerdraw helper reached from `CG_TEAM_PLYR_COUNT` and `CG_ENEMY_PLYR_COUNT`; HLIL swaps the local team when the enemy slot is requested and paints the centered living-player count through the same numeric path as the source helper."
+      "comment": "Retail ownerdraw helper reached from `CG_TEAM_PLYR_COUNT` and `CG_ENEMY_PLYR_COUNT` only after the ownerdraw dispatcher admits the round-family gametypes; HLIL swaps the local team when the enemy slot is requested and paints the centered living-player count through the same numeric path as the source helper."
     },
     {
       "address": "0x100336E0",
@@ -4352,7 +4352,7 @@
         "0x10070810"
       ],
       "relocation_refs": [],
-      "comment": "Retail round-label ownerdraw that emits either \"Warmup\" or \"Round %d\" before routing through the shared text alignment path."
+      "comment": "Retail round-label ownerdraw that emits either \"Warmup\" or \"Round %d\" before routing through the shared text alignment path; the ownerdraw dispatcher reaches it only after admitting the round-family gametypes, so source now keeps timeout, overtime, intermission, in-progress, and non-round-mode text out of this dedicated label slot."
     },
     {
       "address": "0x100337A0",
@@ -4362,7 +4362,7 @@
       "signature": "static void CG_DrawDominationOwnedFlags(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ownerdraw helper reached from `CG_RED_OWNED_FLAGS` and `CG_BLUE_OWNED_FLAGS`; HLIL selects the per-team Domination owned-flag counter and paints it through the shared numeric HUD text path."
+      "comment": "Retail ownerdraw helper reached from `CG_RED_OWNED_FLAGS` and `CG_BLUE_OWNED_FLAGS` only after the ownerdraw dispatcher admits `GT_DOMINATION` or `GT_ATTACK_DEFEND`; HLIL selects the per-team Domination owned-flag counter and paints it through the shared numeric HUD text path."
     },
     {
       "address": "0x10033800",
@@ -4377,7 +4377,7 @@
         "0x10070848"
       ],
       "relocation_refs": [],
-      "comment": "Retail legacy `CG_GAME_LIMIT` ownerdraw that selects one of the exact `Cap Limit`, `Frag Limit`, `Round Limit`, or `Score Limit` formats and centers the result. Narrower than the current source helper, but clearly the same HUD slot."
+      "comment": "Retail legacy `CG_GAME_LIMIT` ownerdraw that selects one of the exact `Cap Limit`, `Frag Limit`, `Round Limit`, or `Score Limit` formats and centers the result; source now mirrors that narrowed label family directly."
     },
     {
       "address": "0x10033910",
@@ -4387,7 +4387,7 @@
       "signature": "static void CG_DrawStartingWeapons(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_STARTING_WEAPONS` ownerdraw that walks the starting-weapon mask and renders the configured loadout through the intro-panel draw path. The current source helper prints a text list instead, but the owning slot and role still line up cleanly."
+      "comment": "Retail `CG_STARTING_WEAPONS` ownerdraw that walks the starting-weapon mask and renders the configured loadout through the intro-panel draw path; source now mirrors the icon-strip path with `CS_LOADOUT_MASK` preference and queued-primary preview fallback."
     },
     {
       "address": "0x10033BF0",
@@ -4411,7 +4411,7 @@
         "0x100708A0"
       ],
       "relocation_refs": [],
-      "comment": "Retail `CG_LOCALTIME` ownerdraw. Unlike the current source helper's `HH:MM` output, retail formats a full local time/date label with month, day, and year before routing through the shared text path."
+      "comment": "Retail `CG_LOCALTIME` ownerdraw that formats the full local time/date label with month, day, and year before routing through the shared text path; source now matches the `HH:MM (Mon DD, YYYY)` shape."
     },
     {
       "address": "0x10033F00",
@@ -4480,7 +4480,7 @@
         "0x10070AF4"
       ],
       "relocation_refs": [],
-      "comment": "Retail `CG_MATCH_DETAILS` ownerdraw that formats the current phase label plus gametype and the prebuilt panel string via `%s - %s - %s`. Narrower than the newer source helper, but clearly the same overlay slot."
+      "comment": "Retail `CG_MATCH_DETAILS` ownerdraw that formats the current phase label plus gametype and the prebuilt panel string via `%s - %s - %s`; source now preserves that shared panel-detail buffer instead of overwriting it with the plain map name."
     },
     {
       "address": "0x100344B0",
@@ -4492,7 +4492,7 @@
         "0x10070B04"
       ],
       "relocation_refs": [],
-      "comment": "Retail `CG_GAME_TYPE_MAP` ownerdraw that formats the gametype label plus the same prebuilt panel string through `%s - %s`. The current source helper now expands that slot to a three-part location/map line."
+      "comment": "Retail `CG_GAME_TYPE_MAP` ownerdraw that formats the gametype label plus the same prebuilt panel string through `%s - %s`; source now preserves that shared panel-detail buffer instead of overwriting it with the plain map name."
     },
     {
       "address": "0x10034590",
@@ -4623,7 +4623,7 @@
       "signature": "static void CG_DrawMatchStatus(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail match-status ownerdraw. Instead of composing the label inline like the current source tree, it pulls the already-combined retail status string from the synthetic helper at 0x10034A00 and then draws it with the standard HUD alignment rules."
+      "comment": "Retail match-status ownerdraw that pulls the already-combined status string from the synthetic helper at 0x10034A00 and draws it with the standard HUD alignment rules; source now keeps that compositor split instead of rebuilding the label inline."
     },
     {
       "address": "0x10034D70",
@@ -4658,7 +4658,7 @@
       "signature": "void CG_DrawTeamSpectators(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_SPECTATORS` ownerdraw. The committed body pages horizontally through the live spectator-name list, measures how many names fit across the current rect, paints that slice at the HUD baseline, and advances the starting slot on a timed cadence instead of using the older source placeholder that only showed primary/secondary tracked players."
+      "comment": "Retail `CG_SPECTATORS` ownerdraw reached only when the cached spectator-entry count is nonzero. The committed body pages horizontally through the live spectator-name list, measures how many names fit across the current rect, paints that slice at the HUD baseline, and advances the starting slot on a timed cadence instead of using the older source placeholder that only showed primary/secondary tracked players."
     },
     {
       "address": "0x10035340",
@@ -4718,7 +4718,7 @@
       "signature": "static void CG_DrawVoteShot(rectDef_t *rect, int slot)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail endgame-vote screenshot ownerdraw for `CG_VOTESHOT1..3` (`0x19..0x1B`). HLIL switches on those ownerdraw ids, resolves the slot preview token through the retail vote info payload, falls back to `default` when absent, formats `levelshots/preview/%s`, and renders the shader through the standard pic path."
+      "comment": "Retail endgame-vote screenshot ownerdraw for `CG_VOTESHOT1..3` (`0x19..0x1B`). HLIL switches on those ownerdraw ids, resolves the slot preview token through the retail vote info payload, falls back to `default` when absent, formats `levelshots/preview/%s`, and renders the shader through the standard pic path; source now keeps `ui_voteShot*` as that raw token instead of a preformatted shader path."
     },
     {
       "address": "0x10035820",
@@ -4748,7 +4748,7 @@
       "signature": "static void CG_DrawWeaponVertical(rectDef_t *rect, vec4_t color)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_WP_VERTICAL` ownerdraw (`97`). HLIL tints the draw state with the caller-supplied color, iterates the fixed local-accuracy weapon slab, skips the retail grappling-hook slot, and renders the vertical icon strip."
+      "comment": "Retail `CG_WP_VERTICAL` ownerdraw (`97`). HLIL tints the draw state with the caller-supplied color, iterates the fixed local-accuracy weapon slab, keeps the gauntlet row from the parser-fed payload, skips the retail grappling-hook slot, and renders the vertical icon strip."
     },
     {
       "address": "0x10035B10",
@@ -4758,7 +4758,7 @@
       "signature": "static void CG_DrawAccVertical(rectDef_t *rect, float scale, vec4_t color, int textStyle)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_ACC_VERTICAL` ownerdraw (`98`). HLIL walks the same vertical weapon slab as `CG_DrawWeaponVertical` and formats each cached `acc` percentage as `%i%%` from the parser-fed local accuracy table."
+      "comment": "Retail `CG_ACC_VERTICAL` ownerdraw (`98`). HLIL walks the same gauntlet-preserving, grappling-hook-skipping vertical weapon slab as `CG_DrawWeaponVertical` and formats each cached `acc` percentage as `%i%%` from the parser-fed local accuracy table."
     },
     {
       "address": "0x10035BD0",
@@ -4899,7 +4899,7 @@
       "signature": "static void CG_DrawTeamAveragePing(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail average-ping ownerdraw shared by `CG_RED_AVG_PING` and `CG_BLUE_AVG_PING`. The committed `CG_OwnerDraw` switch reaches it only from raw cases `0x11F` and `0x13A`, and HLIL shows the helper averaging non-negative ping values for the requested team, applying the same threshold-based tinting, formatting `Avg ping %i`, and drawing it through the shared HUD text path."
+      "comment": "Retail average-ping ownerdraw shared by `CG_RED_AVG_PING` and `CG_BLUE_AVG_PING`. The committed `CG_OwnerDraw` switch reaches it only from raw cases `0x11F` and `0x13A`, and HLIL shows the helper averaging non-negative ping values for the requested team, applying the same 40/80 warning tinting used by the placement ping ownerdraws, formatting `Avg ping %i`, and drawing it through the shared HUD text path."
     },
     {
       "address": "0x1003A0D0",
@@ -5034,7 +5034,7 @@
       "signature": "void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Large ownerdraw dispatcher assigned into cgDC.ownerDrawItem; switches over the HUD ownerdraw IDs and forwards to the expected draw helpers."
+      "comment": "Large ownerdraw dispatcher assigned into cgDC.ownerDrawItem; switches over the HUD ownerdraw IDs and forwards to the expected draw helpers. The source-only raw slots 0x66, 0x154-0x157, and the legacy ui_shared.h corridor 0x158-0x16f are retail no-op buckets, so source keeps those labels explicit without calling the old widgets or pre-refreshing competitive scores for 0x66."
     },
     {
       "address": "0x1003C570",

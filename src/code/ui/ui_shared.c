@@ -4943,16 +4943,8 @@ void Item_Paint(itemDef_t *item) {
     }
   }
 
-	if (item->window.ownerDrawFlags && DC->ownerDrawVisible) {
-		if (!DC->ownerDrawVisible(item->window.ownerDrawFlags)) {
-			item->window.flags &= ~WINDOW_VISIBLE;
-		} else {
-			item->window.flags |= WINDOW_VISIBLE;
-		}
-	}
-
-	if ( item->window.ownerDrawFlags2 && DC->ownerDrawVisible ) {
-		if ( !DC->ownerDrawVisible( item->window.ownerDrawFlags2 ) ) {
+	if ((item->window.ownerDrawFlags || item->window.ownerDrawFlags2) && DC->ownerDrawVisible) {
+		if (!DC->ownerDrawVisible(item->window.ownerDrawFlags, item->window.ownerDrawFlags2)) {
 			item->window.flags &= ~WINDOW_VISIBLE;
 		} else {
 			item->window.flags |= WINDOW_VISIBLE;
@@ -5270,11 +5262,8 @@ void Menu_Paint(menuDef_t *menu, qboolean forcePaint) {
 		return;
 	}
 
-	if (menu->window.ownerDrawFlags && DC->ownerDrawVisible && !DC->ownerDrawVisible(menu->window.ownerDrawFlags)) {
-		return;
-	}
-
-	if (menu->window.ownerDrawFlags2 && DC->ownerDrawVisible && !DC->ownerDrawVisible(menu->window.ownerDrawFlags2)) {
+	if ((menu->window.ownerDrawFlags || menu->window.ownerDrawFlags2) && DC->ownerDrawVisible &&
+		!DC->ownerDrawVisible(menu->window.ownerDrawFlags, menu->window.ownerDrawFlags2)) {
 		return;
 	}
 	

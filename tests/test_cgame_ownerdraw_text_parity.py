@@ -97,15 +97,17 @@ def test_intro_panel_draws_use_retail_map_panel_shapes() -> None:
     match_details = _block_from_marker(source, "static void CG_DrawMatchDetails")
     phase_label = _block_from_marker(source, "static const char *CG_GetMatchDetailsPhaseLabel")
 
-    assert 'CG_GetMapDisplayName( mapName, sizeof( mapName ) );' in game_type_map
-    assert '%s - %s", CG_GameTypeString(), mapName' in game_type_map
-    assert 'CG_GetServerLocation' not in game_type_map
+    assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in game_type_map
+    assert '%s - %s", CG_GameTypeString(), detailBuffer' in game_type_map
+    assert 'CG_GetMapDisplayName( mapName, sizeof( mapName ) );' not in game_type_map
     assert '%s - %s - %s' not in game_type_map
 
+    assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in match_details
     assert 'CG_GetMatchDetailsPhaseLabel()' in match_details
+    assert 'CG_GameTypeShortString(), detailBuffer );' in match_details
     assert '%s - %s - %s' in match_details
     assert '%s - %s - %s - %s' not in match_details
-    assert 'CG_GetServerLocation' not in match_details
+    assert 'CG_GetMapDisplayName( mapName, sizeof( mapName ) );' not in match_details
 
     for expected in (
         'MATCH WARMUP',

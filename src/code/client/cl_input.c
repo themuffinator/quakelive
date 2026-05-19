@@ -21,14 +21,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // cl.input.c  -- builds an intended movement command to send to the server
 
+#include <math.h>
+#include <stdio.h>
+
 #include "client.h"
-#include "cl_input_translation.h"
 
 unsigned	frame_msec;
 int			old_com_frameTime;
-static int		cl_mouseCursorX;
-static int		cl_mouseCursorY;
-static qboolean	cl_mouseCursorInitialized;
+static FILE		*cl_mouseAccelDebugLog;
+static float	cl_mouseFilterYaw[32];
+static float	cl_mouseFilterPitch[32];
+static int		cl_mouseFilterCount;
+static int		cl_mouseFilterIndex;
+static float	cl_mouseFilterBaseYaw;
+static float	cl_mouseFilterBasePitch;
+
+#define CL_MOUSE_CPI_INCHES_PER_CM	2.5399999618530273f
+#define CL_MOUSE_CPI_VIEW_SCALE		45.45454545454546f
+#define CL_MOUSE_FILTER_SAMPLES		32
 
 /*
 ===============================================================================
@@ -349,108 +359,35 @@ cmd->upmove = ClampChar( up );
 }
 /*
 =============
-CL_ResetMouseCursorPosition
-
-Seeds the retail-style absolute cursor position from the current client
-resolution so UI and cgame mouse events can consume screen-space coordinates.
-=============
-*/
-static void CL_ResetMouseCursorPosition( void ) {
-	int		width;
-	int		height;
-
-	width = cls.glconfig.vidWidth;
-	height = cls.glconfig.vidHeight;
-
-	if ( width <= 0 ) {
-		width = SCREEN_WIDTH;
-	}
-
-	if ( height <= 0 ) {
-		height = SCREEN_HEIGHT;
-	}
-
-	cl_mouseCursorX = width / 2;
-	cl_mouseCursorY = height / 2;
-	cl_mouseCursorInitialized = qtrue;
-}
-
-/*
-=============
-CL_UpdateMouseCursorPosition
-
-Accumulates translated mouse deltas into the current absolute cursor position
-and clamps the result to the client render bounds before dispatch.
-=============
-*/
-static void CL_UpdateMouseCursorPosition( int dx, int dy, int *cursorX, int *cursorY ) {
-	int		width;
-	int		height;
-
-	if ( !cl_mouseCursorInitialized ) {
-		CL_ResetMouseCursorPosition();
-	}
-
-	width = cls.glconfig.vidWidth;
-	height = cls.glconfig.vidHeight;
-
-	if ( width <= 0 ) {
-		width = SCREEN_WIDTH;
-	}
-
-	if ( height <= 0 ) {
-		height = SCREEN_HEIGHT;
-	}
-
-	cl_mouseCursorX += dx;
-	if ( cl_mouseCursorX < 0 ) {
-		cl_mouseCursorX = 0;
-	} else if ( cl_mouseCursorX > width ) {
-		cl_mouseCursorX = width;
-	}
-
-	cl_mouseCursorY += dy;
-	if ( cl_mouseCursorY < 0 ) {
-		cl_mouseCursorY = 0;
-	} else if ( cl_mouseCursorY > height ) {
-		cl_mouseCursorY = height;
-	}
-
-	if ( cursorX ) {
-		*cursorX = cl_mouseCursorX;
-	}
-
-	if ( cursorY ) {
-		*cursorY = cl_mouseCursorY;
-	}
-}
-
-/*
-=============
 CL_MouseEvent
-Translate mouse motion into UI or client game handlers
+Route raw mouse events into browser, UI, cgame, or gameplay handlers
 =============
 */
 void CL_MouseEvent( int dx, int dy, int time ) {
-	int		translatedDx;
-	int		translatedDy;
-	int		cursorX;
-	int		cursorY;
+	(void)time;
 
-	translatedDx = CL_TranslateRetailMouseDelta( dx, m_cpi->value );
-	translatedDy = CL_TranslateRetailMouseDelta( dy, m_cpi->value );
+	if ( Cvar_VariableIntegerValue( "cg_ignoreMouseInput" ) ) {
+		return;
+	}
+
+	if ( cls.keyCatchers & KEYCATCH_BROWSER ) {
+		CL_WebView_OnMouseMove( dx, dy );
+		return;
+	}
 
 	if ( cls.keyCatchers & KEYCATCH_UI ) {
-		CL_UpdateMouseCursorPosition( translatedDx, translatedDy, &cursorX, &cursorY );
-		CL_WebView_OnMouseMove( cursorX, cursorY );
-		VM_Call( uivm, UI_MOUSE_EVENT, cursorX, cursorY );
-	} else if ( cls.keyCatchers & KEYCATCH_CGAME ) {
-		CL_UpdateMouseCursorPosition( translatedDx, translatedDy, &cursorX, &cursorY );
-		CL_WebView_OnMouseMove( cursorX, cursorY );
-		VM_Call (cgvm, CG_MOUSE_EVENT, cursorX, cursorY);
-	} else {
-		cl.mouseDx[cl.mouseIndex] += dx;
-		cl.mouseDy[cl.mouseIndex] += dy;
+		VM_Call( uivm, UI_MOUSE_EVENT, dx, dy );
+		return;
+	}
+
+	if ( cls.keyCatchers & KEYCATCH_CGAME ) {
+		VM_Call( cgvm, CG_MOUSE_EVENT, dx, dy );
+		return;
+	}
+
+	if ( ( cls.keyCatchers & ~KEYCATCH_RETAIL_MOUSEPASS ) == 0 ) {
+		cl.mouseDx[0] += dx;
+		cl.mouseDy[0] += dy;
 	}
 }
 
@@ -507,83 +444,280 @@ void CL_JoystickMove( usercmd_t *cmd ) {
 
 /*
 =================
+CL_CloseMouseAccelDebugLog
+=================
+*/
+static void CL_CloseMouseAccelDebugLog( void ) {
+	if ( !cl_mouseAccelDebugLog ) {
+		return;
+	}
+
+	fclose( cl_mouseAccelDebugLog );
+	cl_mouseAccelDebugLog = NULL;
+}
+
+/*
+=================
+CL_UpdateMouseAccelDebugLog
+=================
+*/
+static void CL_UpdateMouseAccelDebugLog( void ) {
+	char	homepath[MAX_OSPATH];
+	char	*path;
+
+	if ( !cl_mouseAccelDebug || !cl_mouseAccelDebug->integer ) {
+		CL_CloseMouseAccelDebugLog();
+		return;
+	}
+
+	if ( cl_mouseAccelDebugLog ) {
+		return;
+	}
+
+	Cvar_VariableStringBuffer( "fs_homepath", homepath, sizeof( homepath ) );
+	path = FS_BuildOSPath( homepath, "", "mouse.log" );
+	cl_mouseAccelDebugLog = fopen( path, "w" );
+	if ( cl_mouseAccelDebugLog ) {
+		fprintf( cl_mouseAccelDebugLog, "mx my frame_msec rate power\n" );
+	}
+}
+
+/*
+=================
+CL_WriteMouseAccelDebugLog
+=================
+*/
+static void CL_WriteMouseAccelDebugLog( float mx, float my, float rate, float power ) {
+	if ( !cl_mouseAccelDebugLog ) {
+		return;
+	}
+
+	fprintf( cl_mouseAccelDebugLog, "%g %g %d ", mx, my, frame_msec );
+	if ( cl_mouseAccel->value != 0.0f ) {
+		fprintf( cl_mouseAccelDebugLog, "%g %g ", rate, power );
+	}
+	fprintf( cl_mouseAccelDebugLog, "\n" );
+}
+
+/*
+=================
+CL_ReadMouseMovement
+=================
+*/
+static void CL_ReadMouseMovement( float *mx, float *my ) {
+	*mx = cl.mouseDx[0] + cl.mouseDx[1];
+	*my = cl.mouseDy[0] + cl.mouseDy[1];
+
+	cl.mouseDx[0] = 0;
+	cl.mouseDx[1] = 0;
+	cl.mouseDy[0] = 0;
+	cl.mouseDy[1] = 0;
+}
+
+/*
+=================
+CL_ApplyMouseCpiScale
+=================
+*/
+static void CL_ApplyMouseCpiScale( float *mx, float *my ) {
+	float	cpiScale;
+
+	if ( m_cpi->value == 0.0f ) {
+		return;
+	}
+
+	cpiScale = m_cpi->value / CL_MOUSE_CPI_INCHES_PER_CM;
+	*mx /= cpiScale;
+	*my /= cpiScale;
+}
+
+/*
+=================
+CL_MouseAxisScale
+=================
+*/
+static float CL_MouseAxisScale( void ) {
+	if ( m_cpi->value != 0.0f ) {
+		return CL_MOUSE_CPI_VIEW_SCALE;
+	}
+
+	return 1.0f;
+}
+
+/*
+=================
+CL_CalculateMouseSensitivity
+=================
+*/
+static float CL_CalculateMouseSensitivity( float mx, float my, float *debugRate, float *debugPower ) {
+	float	rate;
+	float	power;
+	float	accelRate;
+	float	accelSensitivity;
+	float	sensitivity;
+
+	rate = 0.0f;
+	power = 0.0f;
+	sensitivity = cl_sensitivity->value;
+
+	if ( cl_mouseAccel->value != 0.0f ) {
+		rate = sqrtf( mx * mx + my * my ) / (float)frame_msec;
+		if ( m_cpi->value != 0.0f ) {
+			rate *= 1000.0f;
+		}
+		rate -= cl_mouseAccelOffset->value;
+
+		power = cl_mouseAccelPower->value - 1.0f;
+		if ( power < 0.0f ) {
+			power = 0.0f;
+		}
+
+		if ( rate > 0.0f ) {
+			accelRate = fabsf( cl_mouseAccel->value ) * rate;
+			accelSensitivity = powf( accelRate, power );
+			if ( cl_mouseAccel->value <= 0.0f ) {
+				sensitivity -= accelSensitivity;
+			} else {
+				sensitivity += accelSensitivity;
+			}
+			rate = accelRate;
+		}
+
+		if ( cl_mouseSensCap->value > 0.0f && cl_mouseSensCap->value < sensitivity ) {
+			sensitivity = cl_mouseSensCap->value;
+		}
+	}
+
+	if ( debugRate ) {
+		*debugRate = rate;
+	}
+
+	if ( debugPower ) {
+		*debugPower = power;
+	}
+
+	return sensitivity;
+}
+
+/*
+=================
+CL_BeginMouseFilter
+=================
+*/
+static void CL_BeginMouseFilter( void ) {
+	if ( !m_filter->integer ) {
+		return;
+	}
+
+	if ( m_filter->integer < 0 ) {
+		Cvar_Set( "m_filter", "0" );
+		return;
+	}
+
+	if ( m_filter->integer >= CL_MOUSE_FILTER_SAMPLES ) {
+		Cvar_Set( "m_filter", "31" );
+	}
+
+	if ( m_filter->modified ) {
+		cl_mouseFilterBaseYaw = cl.viewangles[YAW];
+		cl_mouseFilterBasePitch = cl.viewangles[PITCH];
+		Com_Memset( cl_mouseFilterYaw, 0, sizeof( cl_mouseFilterYaw ) );
+		Com_Memset( cl_mouseFilterPitch, 0, sizeof( cl_mouseFilterPitch ) );
+		cl_mouseFilterCount = 0;
+		cl_mouseFilterIndex = 0;
+		m_filter->modified = qfalse;
+	}
+
+	cl.viewangles[YAW] = cl_mouseFilterBaseYaw;
+	cl.viewangles[PITCH] = cl_mouseFilterBasePitch;
+}
+
+/*
+=================
+CL_EndMouseFilter
+=================
+*/
+static void CL_EndMouseFilter( void ) {
+	float	yaw;
+	float	pitch;
+	int		index;
+	int		i;
+
+	if ( !m_filter->integer ) {
+		return;
+	}
+
+	cl_mouseFilterYaw[cl_mouseFilterIndex] = cl.viewangles[YAW];
+	cl_mouseFilterPitch[cl_mouseFilterIndex] = cl.viewangles[PITCH];
+
+	cl_mouseFilterCount++;
+	if ( cl_mouseFilterCount > m_filter->integer ) {
+		cl_mouseFilterCount = m_filter->integer;
+	}
+
+	yaw = 0.0f;
+	pitch = 0.0f;
+	index = cl_mouseFilterIndex;
+	for ( i = 0 ; i < cl_mouseFilterCount ; i++ ) {
+		yaw += cl_mouseFilterYaw[index];
+		pitch += cl_mouseFilterPitch[index];
+		index = ( index - 1 ) & ( CL_MOUSE_FILTER_SAMPLES - 1 );
+	}
+
+	cl_mouseFilterIndex = ( cl_mouseFilterIndex + 1 ) & ( CL_MOUSE_FILTER_SAMPLES - 1 );
+	cl_mouseFilterBaseYaw = cl.viewangles[YAW];
+	cl_mouseFilterBasePitch = cl.viewangles[PITCH];
+	cl.viewangles[YAW] = yaw / (float)cl_mouseFilterCount;
+	cl.viewangles[PITCH] = pitch / (float)cl_mouseFilterCount;
+}
+
+/*
+=================
 CL_MouseMove
 =================
 */
 void CL_MouseMove( usercmd_t *cmd ) {
 	float	mx, my;
-	float	accelSensitivity;
 	float	rate;
-	float	cpiScale;
+	float	power;
+	float	sensitivity;
+	float	mouseScale;
 
-	// allow mouse smoothing
-	if ( m_filter->integer ) {
-		mx = ( cl.mouseDx[0] + cl.mouseDx[1] ) * 0.5;
-		my = ( cl.mouseDy[0] + cl.mouseDy[1] ) * 0.5;
-	} else {
-		mx = cl.mouseDx[cl.mouseIndex];
-		my = cl.mouseDy[cl.mouseIndex];
-	}
-	cl.mouseIndex ^= 1;
-		cl.mouseDx[cl.mouseIndex] = 0;
-		cl.mouseDy[cl.mouseIndex] = 0;
+	CL_UpdateMouseAccelDebugLog();
 
-	cpiScale = m_cpi->value;
-	if ( cpiScale > 0.0f ) {
-		cpiScale = 1000.0f / cpiScale;
-		mx *= cpiScale;
-		my *= cpiScale;
-	}
-
-	rate = sqrt( mx * mx + my * my ) / (float)frame_msec;
-
-	// Style 0 is the legacy Q3 acceleration
-	// Style 1 (QL) logic is typically unknown/same or similar to 0 but with different cap behavior?
-	// For now, we fallback to style 0 logic for any unknown style to ensure consistent behavior.
-	// TODO: Implement specific logic for cl_mouseAccelStyle 1 if different.
-	if ( cl_mouseAccelOffset->value < rate ) {
-		accelSensitivity = cl_mouseAccel->value * powf( rate - cl_mouseAccelOffset->value, cl_mouseAccelPower->value );
-	} else {
-		accelSensitivity = 0.0f;
-	}
-	accelSensitivity += cl_sensitivity->value;
-
-	if ( cl_mouseSensCap->value > 0.0f && accelSensitivity > cl_mouseSensCap->value ) {
-		accelSensitivity = cl_mouseSensCap->value;
-	}
+	CL_ReadMouseMovement( &mx, &my );
+	CL_ApplyMouseCpiScale( &mx, &my );
+	sensitivity = CL_CalculateMouseSensitivity( mx, my, &rate, &power );
 
 	// scale by FOV
-	accelSensitivity *= cl.cgameSensitivity;
+	sensitivity *= cl.cgameSensitivity;
 
-	if ( cl_mouseAccelDebug->integer ) {
-		Com_Printf( "mouse accel: rate %.3f offset %.3f power %.3f accel %.3f sens %.3f cap %.3f\n",
-			rate,
-			cl_mouseAccelOffset->value,
-			cl_mouseAccelPower->value,
-			cl_mouseAccel->value,
-			accelSensitivity,
-			cl_mouseSensCap->value );
-	}
+	CL_WriteMouseAccelDebugLog( mx, my, rate, power );
 
-	mx *= accelSensitivity;
-	my *= accelSensitivity;
+	mx *= sensitivity;
+	my *= sensitivity;
 
-	if (!mx && !my) {
+	if ( !mx && !my && !m_filter->integer ) {
 		return;
 	}
+
+	CL_BeginMouseFilter();
+	mouseScale = CL_MouseAxisScale();
 
 	// add mouse X/Y movement to cmd
 	if ( in_strafe.active ) {
 		cmd->rightmove = ClampChar( cmd->rightmove + m_side->value * mx );
 	} else {
-		cl.viewangles[YAW] -= cl_viewAccel->value * m_yaw->value * mx;
+		cl.viewangles[YAW] -= m_yaw->value * mouseScale * mx;
 	}
 
 	if ( (in_mlooking || cl_freelook->integer) && !in_strafe.active ) {
-		cl.viewangles[PITCH] += cl_viewAccel->value * m_pitch->value * my;
+		cl.viewangles[PITCH] += m_pitch->value * mouseScale * my;
 	} else {
 		cmd->forwardmove = ClampChar( cmd->forwardmove - m_forward->value * my );
 	}
+
+	CL_EndMouseFilter();
 }
 
 

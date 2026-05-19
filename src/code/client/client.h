@@ -31,6 +31,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/bg_public.h"
 
 #define	RETRANSMIT_TIMEOUT	3000	// time between connection packet retransmits
+#define KEYCATCH_RETAIL_MOUSEPASS	0x0010
+#define KEYCATCH_BROWSER			0x0020
 
 
 // snapshots are a view of the server at a given time
@@ -365,7 +367,6 @@ extern	cvar_t	*cl_inGameVideo;
 
 extern	cvar_t	*cl_autoTimeNudge;
 extern	cvar_t	*cl_contimestamps;
-extern	cvar_t	*cl_mouseAccelStyle;
 extern	cvar_t	*cl_guid;
 extern	cvar_t	*cl_punkbuster;
 
@@ -559,6 +560,7 @@ void CL_WebHost_Frame( void );
 qboolean CL_WebHost_HasLiveView( void );
 qboolean CL_WebHost_HasBoundWindowObject( void );
 void *CL_WebHost_GetCursorHandle( void );
+void CL_WebHost_HideBrowser( void );
 void CL_WebHost_NotifyAppActivation( qboolean active );
 void CL_WebView_PublishEvent( const char *name, const char *payload );
 void CL_WebView_InvokeCommNotice( const char *channel, const char *message );
