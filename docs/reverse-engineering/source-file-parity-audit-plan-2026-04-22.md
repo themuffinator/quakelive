@@ -1,6 +1,6 @@
 # Source-File Parity Audit Plan
 
-Last updated: 2026-04-22
+Last updated: 2026-05-20
 
 ## Purpose
 
@@ -59,10 +59,14 @@ Per tracked file, the campaign should eventually produce:
   existing `RW-G01` note for `sv_rankings.c`; the rest of the strict-retail
   server register remains closed on current evidence.
 - [x] Audit `src/code/renderer` function-by-function (`23` tracked files).
-  2026-04-22 result: no new file-level gap owners were isolated inside the
-  closed strict-retail `renderer` register; the bounded
-  `R_fonsErrorCallback` module-runtime blocker remains part of `RW-G04`
-  evidence freshness rather than a new source-file gap owner.
+  2026-04-22 result plus 2026-05-20 renderer wiring refresh: no new
+  file-level gap owners were isolated inside the closed strict-retail
+  `renderer` register. The stale `R_fonsErrorCallback` module-runtime
+  artifact remains part of `RW-G04` evidence freshness rather than a new
+  source-file gap owner after the non-retail eager FontStash prebuild was
+  removed from `tr_font.c`, the retained atlas upload path was restored to
+  `GL_ALPHA`, and the `GetRefAPI` export table was realigned to the retail
+  API version `9` / `0x9c` ABI tail.
 - [x] Audit `src/code/win32` function-by-function (`11` tracked files).
   2026-04-22 result: no new file-level gap owners were isolated inside the
   closed strict-retail Windows platform register; the earlier `PS-G01`

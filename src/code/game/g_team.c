@@ -362,6 +362,7 @@ static void G_ADApplyHoldingState( gentity_t *ent ) {
 	}
 
 	ent->client->ps.pm_type = PM_FREEZE;
+	G_SetClientAttackLockout( ent, qtrue );
 	ent->client->respawnTime = level.time;
 	ent->takedamage = qtrue;
 	ent->r.contents = CONTENTS_BODY;
@@ -384,6 +385,7 @@ static void G_ADReleaseClientForRound( gentity_t *ent ) {
 	}
 
 	ent->client->ps.pm_type = PM_NORMAL;
+	G_SetClientAttackLockout( ent, qfalse );
 	ent->client->respawnTime = level.time;
 	ent->takedamage = qtrue;
 	ent->r.contents = CONTENTS_BODY;
@@ -1126,6 +1128,7 @@ int AD_RoundStateTransition( qboolean announce ) {
 			if ( ent->client->ps.pm_type == PM_NORMAL ) {
 				ent->client->ps.pm_type = PM_FREEZE;
 			}
+			G_SetClientAttackLockout( ent, qtrue );
 		}
 
 		winner = level.adRoundWinner;

@@ -19,6 +19,7 @@ typedef struct ql_gentity_s ql_gentity_t;
 typedef struct ql_level_locals_s ql_level_locals_t;
 
 typedef void (*ql_gentity_think_fn)(ql_gentity_t *self);
+typedef void (*ql_gentity_runframe_fn)(ql_gentity_t *self, float thinktime);
 typedef void (*ql_gentity_touch_fn)(ql_gentity_t *self, ql_gentity_t *other, void *trace);
 typedef void (*ql_gentity_use_fn)(ql_gentity_t *self, ql_gentity_t *other, ql_gentity_t *activator);
 typedef void (*ql_gentity_blocked_fn)(ql_gentity_t *self, ql_gentity_t *other);
@@ -276,6 +277,7 @@ enum {
 	QL_GENTITY_OFFSET_TARGETNAME = 0x2D4,
 	QL_GENTITY_OFFSET_NEXTTHINK = 0x2F4,
 	QL_GENTITY_OFFSET_THINK = 0x2F8,
+	QL_GENTITY_OFFSET_RUNFRAME = 0x2FC,
 	QL_GENTITY_OFFSET_REACHED = 0x300,
 	QL_GENTITY_OFFSET_BLOCKED = 0x304,
 	QL_GENTITY_OFFSET_TOUCH = 0x308,
@@ -361,8 +363,9 @@ typedef struct ql_gentity_s {
 		(QL_GENTITY_OFFSET_MOVEDIR + sizeof(float[3]))];
 	int32_t nextthink; // 0x2F4
 	ql_gentity_think_fn think; // 0x2F8
+	ql_gentity_runframe_fn runFrame; // 0x2FC (retail per-frame callback before think)
 	uint8_t reached_pad[QL_GENTITY_OFFSET_REACHED -
-		(QL_GENTITY_OFFSET_THINK + sizeof(ql_gentity_think_fn))];
+		(QL_GENTITY_OFFSET_RUNFRAME + sizeof(ql_gentity_runframe_fn))];
 	ql_gentity_think_fn reached; // 0x300
 	ql_gentity_blocked_fn blocked; // 0x304
 	uint8_t callback_pad[QL_GENTITY_OFFSET_TOUCH -
@@ -765,6 +768,7 @@ QL_STATIC_ASSERT(offsetof(ql_gentity_t, speed) == 0x2E4, "gentity_t.speed offset
 QL_STATIC_ASSERT(offsetof(ql_gentity_t, movedir) == 0x2E8, "gentity_t.movedir offset");
 QL_STATIC_ASSERT(offsetof(ql_gentity_t, nextthink) == 0x2F4, "gentity_t.nextthink offset");
 QL_STATIC_ASSERT(offsetof(ql_gentity_t, think) == 0x2F8, "gentity_t.think offset");
+QL_STATIC_ASSERT(offsetof(ql_gentity_t, runFrame) == 0x2FC, "gentity_t.runFrame offset");
 QL_STATIC_ASSERT(offsetof(ql_gentity_t, reached) == 0x300, "gentity_t.reached offset");
 QL_STATIC_ASSERT(offsetof(ql_gentity_t, blocked) == 0x304, "gentity_t.blocked offset");
 QL_STATIC_ASSERT(offsetof(ql_gentity_t, touch) == 0x308, "gentity_t.touch offset");

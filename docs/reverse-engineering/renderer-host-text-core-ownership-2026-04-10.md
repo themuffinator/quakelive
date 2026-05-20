@@ -1,6 +1,6 @@
 # Renderer Host Text Core Ownership Note
 
-Last updated: 2026-04-10
+Last updated: 2026-05-20
 
 This note records the renderer-owned host text-engine core now present in
 writable source after `RG-P8`.
@@ -63,6 +63,48 @@ Inference:
   closure is now closed. The retained renderer-owned host-text core matches the
   retail glyph-ownership split and the retail Unicode/fallback behavior much
   more closely.
+
+## 2026-05-20 Wiring Refresh
+
+Observed facts from the committed retail `R_InitFontStash` HLIL:
+
+- The initialization path creates the `512 x 512` retained context, installs
+  `R_fonsErrorCallback`, loads the five recovered faces, and assigns the
+  preferred sans/fallback pointers.
+- The initialization path does not perform a startup sweep across
+  `GLYPH_START..GLYPH_END` for every retained face.
+- The atlas resize and flush callbacks are reached from the retained glyph
+  cache path as glyphs are requested, not from an eager all-face prebuild.
+- Retail atlas expansion copies the previous alpha buffer into the larger
+  atlas before rebinding the `*fontstash` image, while the max-size flush path
+  clears the atlas and glyph-cache state.
+- The retained texture callback uses `GL_ALPHA` storage/upload for the
+  one-byte atlas after the initial renderer image handle has been created.
+
+Observed facts now mirrored in source:
+
+- `R_InitFontStash` now stops after image creation and face initialization.
+- Retained host glyphs are cached lazily by `RE_DrawScaledText` and
+  `RE_MeasureScaledText` through `R_GetFontStashGlyph`.
+- The previous eager prebuild loop was removed because it could saturate and
+  flush the atlas before retail modules reached live map rendering.
+- `R_ResizeFontStashAtlas` now copies the old atlas rows into the expanded
+  buffer and rescales cached glyph UVs to the new dimensions instead of
+  throwing away the retained glyph cache during normal expansion.
+- `R_UploadFontStashAtlas` now mirrors the retail texture-storage callback by
+  uploading the retained buffer as `GL_ALPHA`, leaving the RGBA seed image only
+  for initial renderer image creation.
+- The retail `refexport_t` legacy font slot is now represented as a no-op in
+  the renderer export table; native UI/cgame font registration still reaches
+  the classic `RE_RegisterFont` compatibility lane through client import
+  wrappers, not through that private tail slot.
+
+Inference:
+
+- The renderer-owned host text core is closer to the retail FontStash lifetime:
+  the atlas starts empty, expands only under demand, preserves useful retained
+  glyphs across growth, keeps the GL object as an alpha texture, and remains a
+  runtime cache instead of a startup-baked glyph atlas.
 
 ## Downstream Closure
 

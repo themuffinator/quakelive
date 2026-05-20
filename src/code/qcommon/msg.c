@@ -128,8 +128,10 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 			}
 		} else {
 			int	r;
+			int	signedBits;
 
-			r = 1 << (bits-1);
+			signedBits = -bits;
+			r = 1 << (signedBits - 1);
 
 			if ( value >  r - 1 || value < -r ) {
 				overflows++;
@@ -655,6 +657,8 @@ void MSG_WriteDeltaUsercmd( msg_t *msg, usercmd_t *from, usercmd_t *to ) {
 	MSG_WriteDelta( msg, from->upmove, to->upmove, 8 );
 	MSG_WriteDelta( msg, from->buttons, to->buttons, 16 );
 	MSG_WriteDelta( msg, from->weapon, to->weapon, 8 );
+	MSG_WriteDelta( msg, from->weaponPrimary, to->weaponPrimary, 8 );
+	MSG_WriteDelta( msg, from->fov, to->fov, 8 );
 }
 
 
@@ -677,6 +681,8 @@ void MSG_ReadDeltaUsercmd( msg_t *msg, usercmd_t *from, usercmd_t *to ) {
 	to->upmove = MSG_ReadDelta( msg, from->upmove, 8);
 	to->buttons = MSG_ReadDelta( msg, from->buttons, 16);
 	to->weapon = MSG_ReadDelta( msg, from->weapon, 8);
+	to->weaponPrimary = MSG_ReadDelta( msg, from->weaponPrimary, 8);
+	to->fov = MSG_ReadDelta( msg, from->fov, 8);
 }
 
 /*
@@ -699,7 +705,9 @@ void MSG_WriteDeltaUsercmdKey( msg_t *msg, int key, usercmd_t *from, usercmd_t *
 		from->rightmove == to->rightmove &&
 		from->upmove == to->upmove &&
 		from->buttons == to->buttons &&
-		from->weapon == to->weapon) {
+		from->weapon == to->weapon &&
+		from->weaponPrimary == to->weaponPrimary &&
+		from->fov == to->fov) {
 			MSG_WriteBits( msg, 0, 1 );				// no change
 			oldsize += 7;
 			return;
@@ -714,6 +722,8 @@ void MSG_WriteDeltaUsercmdKey( msg_t *msg, int key, usercmd_t *from, usercmd_t *
 	MSG_WriteDeltaKey( msg, key, from->upmove, to->upmove, 8 );
 	MSG_WriteDeltaKey( msg, key, from->buttons, to->buttons, 16 );
 	MSG_WriteDeltaKey( msg, key, from->weapon, to->weapon, 8 );
+	MSG_WriteDeltaKey( msg, key, from->weaponPrimary, to->weaponPrimary, 8 );
+	MSG_WriteDeltaKey( msg, key, from->fov, to->fov, 8 );
 }
 
 
@@ -738,6 +748,8 @@ void MSG_ReadDeltaUsercmdKey( msg_t *msg, int key, usercmd_t *from, usercmd_t *t
 		to->upmove = MSG_ReadDeltaKey( msg, key, from->upmove, 8);
 		to->buttons = MSG_ReadDeltaKey( msg, key, from->buttons, 16);
 		to->weapon = MSG_ReadDeltaKey( msg, key, from->weapon, 8);
+		to->weaponPrimary = MSG_ReadDeltaKey( msg, key, from->weaponPrimary, 8);
+		to->fov = MSG_ReadDeltaKey( msg, key, from->fov, 8);
 	} else {
 		to->angles[0] = from->angles[0];
 		to->angles[1] = from->angles[1];
@@ -747,6 +759,8 @@ void MSG_ReadDeltaUsercmdKey( msg_t *msg, int key, usercmd_t *from, usercmd_t *t
 		to->upmove = from->upmove;
 		to->buttons = from->buttons;
 		to->weapon = from->weapon;
+		to->weaponPrimary = from->weaponPrimary;
+		to->fov = from->fov;
 	}
 }
 
@@ -1128,7 +1142,7 @@ netField_t	playerStateFields[] =
 { PSF(events[0]), 8 },
 { PSF(legsAnim), 8 },
 { PSF(events[1]), 8 },
-{ PSF(pm_flags), 16 },
+{ PSF(pm_flags), 24 },
 { PSF(groundEntityNum), GENTITYNUM_BITS },
 { PSF(groundTraceHistoryIndex), 8 },
 { PSF(groundTraceHistoryCount), 8 },
@@ -1170,6 +1184,7 @@ netField_t	playerStateFields[] =
 { PSF(eventParms[1]), 8 },
 { PSF(clientNum), 8 },
 { PSF(weapon), 5 },
+{ PSF(weaponPrimary), 8 },
 { PSF(viewangles[2]), 0 },
 { PSF(grapplePoint[0]), 0 },
 { PSF(grapplePoint[1]), 0 },
@@ -1181,9 +1196,10 @@ netField_t	playerStateFields[] =
 { PSF(playerItemTimeMax), 16 },
 { PSF(playerItemTime), 16 },
 { PSF(armorTier), 2 },
-{ PSF(forwardmove), 8 },
-{ PSF(rightmove), 8 },
-{ PSF(upmove), 8 }
+{ PSF(fov), 8 },
+{ PSF(forwardmove), -8 },
+{ PSF(rightmove), -8 },
+{ PSF(upmove), -8 }
 };
 
 /*

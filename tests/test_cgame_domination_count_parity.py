@@ -31,6 +31,7 @@ def test_domination_count_configstrings_share_retail_race_slots_safely() -> None
 	newdraw_c = _read("src/code/cgame/cg_newdraw.c")
 	game_local_h = _read("src/code/game/g_local.h")
 	game_team_c = _read("src/code/game/g_team.c")
+	cgame_ghidra = _read("references/reverse-engineering/ghidra/cgamex86/decompile_top_functions.c")
 
 	shared_block = _extract_block(servercmds_c, "static void CG_ParseSharedRaceDominationConfigStrings( void ) {")
 	draw_block = _extract_block(newdraw_c, "static int CG_CountDominationOwnedFlags( team_t team ) {")
@@ -43,12 +44,19 @@ def test_domination_count_configstrings_share_retail_race_slots_safely() -> None
 	assert "CG_ParseRaceInfoString( CG_ConfigString( CS_RACE_INFO ) );" in shared_block
 	assert "CG_ParseRaceStatusString( CG_ConfigString( CS_RACE_STATUS ) );" in shared_block
 	assert "CG_ParseRaceInit();" in shared_block
-	assert "if ( cgs.gametype != GT_DOMINATION ) {" in shared_block
+	assert "if ( cgs.gametype != GT_DOMINATION && cgs.gametype != GT_ATTACK_DEFEND ) {" in shared_block
 	assert "cgs.dominationOwnedPointCount[TEAM_RED] = value;" in shared_block
 	assert "cgs.dominationOwnedPointCount[TEAM_BLUE] = value;" in shared_block
 
+	assert "if ( cgs.gametype != GT_DOMINATION && cgs.gametype != GT_ATTACK_DEFEND ) {" in draw_block
 	assert "return cgs.dominationOwnedPointCount[team];" in draw_block
 	assert "cg.snap->numEntities" not in draw_block
+	assert "!cg.snap" not in draw_block
 
 	assert 'trap_SetConfigstring( CS_RACE_SCORES, redOwnedString );' in game_block
 	assert 'trap_SetConfigstring( CS_RACE_INFO, blueOwnedString );' in game_block
+
+	assert "if (iVar1 == 700) {" in cgame_ghidra
+	assert "_DAT_10a404cc = atoi(_Str);" in cgame_ghidra
+	assert "if (iVar1 == 0x2bd) {" in cgame_ghidra
+	assert "_DAT_10a404d0 = atoi(_Str);" in cgame_ghidra

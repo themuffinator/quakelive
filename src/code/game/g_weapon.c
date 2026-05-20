@@ -107,25 +107,25 @@ static qboolean G_WeaponUsesLagHaxTimeshift( weapon_t weapon ) {
 =============
 G_GetChaingunSpread
 
-Returns the retail chaingun spread derived from the current weaponTime spin-up.
+Returns the retail chaingun spread derived from the shared pmove spin-up stat.
 =============
 */
 static float G_GetChaingunSpread( const gentity_t *ent ) {
-	float	weaponTime;
+	float	chaingunSpin;
 	float	spread;
 
 	if ( !ent || !ent->client ) {
 		return 700.0f;
 	}
 
-	weaponTime = ( float )ent->client->ps.weaponTime;
-	if ( weaponTime < 0.0f ) {
-		weaponTime = 0.0f;
-	} else if ( weaponTime > 1000.0f ) {
-		weaponTime = 1000.0f;
+	chaingunSpin = (float)ent->client->ps.stats[STAT_CHAINGUN_SPINUP];
+	if ( chaingunSpin < 0.0f ) {
+		chaingunSpin = 0.0f;
+	} else if ( chaingunSpin > 1000.0f ) {
+		chaingunSpin = 1000.0f;
 	}
 
-	spread = 700.0f + ( weaponTime / 1000.0f ) * 700.0f;
+	spread = 700.0f + ( chaingunSpin / 1000.0f ) * 700.0f;
 	if ( spread < 700.0f ) {
 		spread = 700.0f;
 	} else if ( spread > 1400.0f ) {

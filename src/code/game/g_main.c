@@ -140,7 +140,9 @@ static void G_UpdatePlayerAppearanceConfigstring( qboolean forceBroadcast );
 static void G_UpdateModeSpecificConfigstrings( qboolean forceBroadcast );
 static uint64_t G_ComputeCustomSettingsMask( void );
 static void G_UpdateCustomSettingsConfigstring( qboolean forceBroadcast );
+static void G_UpdateCustomSettingsMaskForCvar( const cvarTable_t *cv );
 static void G_PublishWarmupReadyConfigstring( int readyCount, int eligibleCount, int readyMask );
+static void G_CountAndSortConnectedClients( int *numNonSpectatorClients, int *numConnectedClients, int *follow1, int *follow2, int *numPlayingClients, int *sortedClients );
 void G_SuddenDeathThink( void );
 
 /*
@@ -1661,6 +1663,21 @@ void G_RemapTeamShaders() {
 	trap_SetConfigstring(CS_SHADERSTATE, BuildShaderStateConfig());
 }
 
+/*
+=============
+G_UpdateCustomSettingsMaskForCvar
+
+Marks the published custom-settings digest dirty when a tracked gameplay cvar
+entry participates in the retail custom-settings mask.
+=============
+*/
+static void G_UpdateCustomSettingsMaskForCvar( const cvarTable_t *cv ) {
+	if ( !cv || !cv->customSetting ) {
+		return;
+	}
+
+	s_customSettingsDirty = qtrue;
+}
 
 /*
 =================
@@ -1680,9 +1697,7 @@ void G_RegisterCvars( void ) {
 			cv->modificationCount = cv->vmCvar->modificationCount;
 		}
 
-		if ( cv->customSetting ) {
-			s_customSettingsDirty = qtrue;
-		}
+		G_UpdateCustomSettingsMaskForCvar( cv );
 
 		if ( cv->teamShader ) {
 			remapped = qtrue;
@@ -1793,9 +1808,7 @@ void G_UpdateCvars( void ) {
                                                 cv->cvarName, cv->vmCvar->string ) );
                                 }
 
-				if ( cv->customSetting ) {
-					s_customSettingsDirty = qtrue;
-				}
+				G_UpdateCustomSettingsMaskForCvar( cv );
 
                                 if (cv->teamShader) {
                                         remapped = qtrue;
@@ -3375,6 +3388,65 @@ int QDECL SortRanks( const void *a, const void *b ) {
 
 /*
 ============
+G_CountAndSortConnectedClients
+
+Rebuilds the retail connected-client count block used by CalculateRanks.
+============
+*/
+static void G_CountAndSortConnectedClients( int *numNonSpectatorClients, int *numConnectedClients, int *follow1, int *follow2, int *numPlayingClients, int *sortedClients ) {
+	int		i;
+
+	*follow1 = -1;
+	*follow2 = -1;
+	*numConnectedClients = 0;
+	*numNonSpectatorClients = 0;
+	*numPlayingClients = 0;
+	level.numVotingClients = 0;		// don't count bots
+	for ( i = 0; i < TEAM_NUM_TEAMS; i++ ) {
+		level.numteamVotingClients[i] = 0;
+	}
+
+	for ( i = 0 ; i < level.maxclients ; i++ ) {
+		if ( level.clients[i].pers.connected == CON_DISCONNECTED ) {
+			continue;
+		}
+
+		sortedClients[*numConnectedClients] = i;
+		( *numConnectedClients )++;
+
+		if ( level.clients[i].sess.sessionTeam == TEAM_SPECTATOR ) {
+			continue;
+		}
+
+		( *numNonSpectatorClients )++;
+
+		// decide if this should be auto-followed
+		if ( level.clients[i].pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+
+		( *numPlayingClients )++;
+		if ( !( g_entities[i].r.svFlags & SVF_BOT ) ) {
+			level.numVotingClients++;
+			if ( level.clients[i].sess.sessionTeam == TEAM_RED ) {
+				level.numteamVotingClients[0]++;
+			} else if ( level.clients[i].sess.sessionTeam == TEAM_BLUE ) {
+				level.numteamVotingClients[1]++;
+			}
+		}
+
+		if ( *follow1 == -1 ) {
+			*follow1 = i;
+		} else if ( *follow2 == -1 ) {
+			*follow2 = i;
+		}
+	}
+
+	qsort( sortedClients, *numConnectedClients, sizeof( sortedClients[0] ), SortRanks );
+}
+
+/*
+============
 CalculateRanks
 
 Recalculates the score ranks of all players
@@ -3389,45 +3461,8 @@ void CalculateRanks( void ) {
 	int		newScore;
 	gclient_t	*cl;
 
-	level.follow1 = -1;
-	level.follow2 = -1;
-	level.numConnectedClients = 0;
-	level.numNonSpectatorClients = 0;
-	level.numPlayingClients = 0;
-	level.numVotingClients = 0;		// don't count bots
-	for ( i = 0; i < TEAM_NUM_TEAMS; i++ ) {
-		level.numteamVotingClients[i] = 0;
-	}
-	for ( i = 0 ; i < level.maxclients ; i++ ) {
-		if ( level.clients[i].pers.connected != CON_DISCONNECTED ) {
-			level.sortedClients[level.numConnectedClients] = i;
-			level.numConnectedClients++;
-
-			if ( level.clients[i].sess.sessionTeam != TEAM_SPECTATOR ) {
-				level.numNonSpectatorClients++;
-			
-				// decide if this should be auto-followed
-				if ( level.clients[i].pers.connected == CON_CONNECTED ) {
-					level.numPlayingClients++;
-					if ( !(g_entities[i].r.svFlags & SVF_BOT) ) {
-						level.numVotingClients++;
-						if ( level.clients[i].sess.sessionTeam == TEAM_RED )
-							level.numteamVotingClients[0]++;
-						else if ( level.clients[i].sess.sessionTeam == TEAM_BLUE )
-							level.numteamVotingClients[1]++;
-					}
-					if ( level.follow1 == -1 ) {
-						level.follow1 = i;
-					} else if ( level.follow2 == -1 ) {
-						level.follow2 = i;
-					}
-				}
-			}
-		}
-	}
-
-	qsort( level.sortedClients, level.numConnectedClients, 
-		sizeof(level.sortedClients[0]), SortRanks );
+	G_CountAndSortConnectedClients( &level.numNonSpectatorClients, &level.numConnectedClients,
+		&level.follow1, &level.follow2, &level.numPlayingClients, level.sortedClients );
 
 	// set the rank value for all clients that are connected and not spectators
 	if ( g_gametype.integer >= GT_TEAM ) {

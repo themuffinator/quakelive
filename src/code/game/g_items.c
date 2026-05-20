@@ -1633,7 +1633,7 @@ int Pickup_Health (gentity_t *ent, gentity_t *other) {
 =============
 Pickup_Armor
 
-Adds armor from pickups and clamps it based on the player's current powerups.
+Adds armor from pickups and clamps it through the shared retail armor rules.
 =============
 */
 int Pickup_Armor( gentity_t *ent, gentity_t *other ) {

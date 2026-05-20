@@ -126,3 +126,20 @@ def test_timeout_resume_restores_retail_client_timer_shifts() -> None:
 
 	assert "freezeEnabled = G_FreezeGametypeEnabled();" in pause_delta_block
 	assert "G_ApplyTimeoutPauseDeltaToClient( client, msec, freezeEnabled );" in pause_delta_block
+
+
+def test_timeout_expiry_helper_preserves_retail_resume_handoff() -> None:
+	source = (REPO_ROOT / "src" / "code" / "game" / "g_main.c").read_text(encoding="utf-8")
+	timeout_block = _extract_block(source, "static void G_CheckTimeoutExpired( void ) {")
+
+	assert "if ( !level.timeoutActive ) {" in timeout_block
+	assert "return;" in timeout_block
+	assert "if ( !level.timeoutExpireTime || level.time < level.timeoutExpireTime ) {" in timeout_block
+	assert "pausedDuration = 0;" in timeout_block
+	assert "if ( level.timeoutStartTime > 0 && level.time > level.timeoutStartTime ) {" in timeout_block
+	assert "pausedDuration = level.time - level.timeoutStartTime;" in timeout_block
+	assert "G_ApplyTimeoutPauseDelta( pausedDuration );" in timeout_block
+	assert "G_ResetTimeoutState();" in timeout_block
+	assert "G_UpdateMatchStateConfigString();" in timeout_block
+	assert timeout_block.index("G_ApplyTimeoutPauseDelta( pausedDuration );") < timeout_block.index("G_ResetTimeoutState();")
+	assert timeout_block.index("G_ResetTimeoutState();") < timeout_block.index("G_UpdateMatchStateConfigString();")

@@ -79,6 +79,7 @@ def test_new_chat_area_obeys_history_latch() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	init_block = _block_from_marker(source, "void CG_InitTeamChat()")
 	draw_block = _block_from_marker(source, "static void CG_DrawNewChatArea")
+	visible_block = _block_from_marker(source, "qboolean CG_OwnerDrawVisible")
 
 	assert "memset( cgs.teamChatMsgs, 0, sizeof( cgs.teamChatMsgs ) );" in init_block
 	assert "memset( cgs.teamChatMsgTimes, 0, sizeof( cgs.teamChatMsgTimes ) );" in init_block
@@ -89,6 +90,7 @@ def test_new_chat_area_obeys_history_latch() -> None:
 	assert "maxLines = cg.chatHistoryVisible ? chatHeight : 1;" in draw_block
 	assert "if (elapsed < 0) {" in draw_block
 	assert "elapsed = 0;" in draw_block
+	assert "if ( !cg.chatHistoryVisible && !cg.scoreBoardShowing ) {" in visible_block
 
 
 def test_server_command_path_uses_shared_buffered_writer() -> None:

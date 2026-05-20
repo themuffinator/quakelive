@@ -629,8 +629,8 @@ static qboolean QDECL QL_CG_trap_GetUserCmd( int cmdNumber, usercmd_t *ucmd ) {
 QL_CG_trap_SetUserCmdValue
 ==============
 */
-static void QDECL QL_CG_trap_SetUserCmdValue( int stateValue, float sensitivityScale ) {
-	CG_Import_Syscall( CG_SETUSERCMDVALUE, stateValue, QL_CG_PASSFLOAT(sensitivityScale) );
+static void QDECL QL_CG_trap_SetUserCmdValue( int stateValue, int primaryValue, float sensitivityScale, int fov ) {
+	CG_Import_Syscall( CG_SETUSERCMDVALUE, stateValue, primaryValue, QL_CG_PASSFLOAT(sensitivityScale), fov );
 }
 
 /*

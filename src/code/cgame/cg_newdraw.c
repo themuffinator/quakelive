@@ -255,13 +255,14 @@ static const char *CG_FormatSignedWholeSeconds( int milliseconds ) {
 
 static void CG_DrawServerSettings(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
 static void CG_DrawStartingWeapons(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
-static void CG_DrawGameLimit(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
+static void CG_DrawGameLimit( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
 static void CG_DrawGameTypeIcon(rectDef_t *rect);
-static void CG_DrawGameTypeMap(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
-static void CG_DrawMatchDetails(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
-static void CG_DrawMatchEndCondition(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
-static void CG_DrawMatchStatus(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
-static void CG_DrawRoundLabel(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
+static void CG_DrawGameTypeMap( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
+static void CG_DrawGameType( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
+static void CG_DrawMatchDetails( rectDef_t *rect, float scale, vec4_t color, int textStyle );
+static void CG_DrawMatchEndCondition( rectDef_t *rect, float scale, vec4_t color, int textStyle );
+static void CG_DrawMatchStatus( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
+static void CG_DrawRoundLabel( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
 static void CG_DrawLocalTime(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
 static void CG_DrawVoteGametype(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle, int slot);
 static void CG_DrawVoteName(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle, int slot);
@@ -2075,64 +2076,32 @@ static void CG_DrawPlayerArmorBar200( rectDef_t *rect, qhandle_t shader ) {
 
 /*
 =============
-CG_CountLivingPlayers
+CG_GetRoundPlayerCountTeam
 
-Determines how many teammates and enemies are alive based on clientinfo health data.
+Resolves the team whose cached round count should be displayed.
 =============
 */
-static void CG_CountLivingPlayers( int *friendCount, int *enemyCount ) {
-	team_t myTeam;
-	int i;
-
-	if ( !friendCount || !enemyCount ) {
-		return;
-	}
-
-	*friendCount = 0;
-	*enemyCount = 0;
+static team_t CG_GetRoundPlayerCountTeam( qboolean friendly ) {
+	team_t	team;
 
 	if ( !cg.snap ) {
-		return;
+		return TEAM_FREE;
 	}
 
-	myTeam = cg.snap->ps.persistant[PERS_TEAM];
-	if ( myTeam == TEAM_SPECTATOR && ( cg.snap->ps.pm_flags & PMF_FOLLOW ) ) {
-		int followClient = cg.snap->ps.clientNum;
-		if ( followClient >= 0 && followClient < cgs.maxclients && cgs.clientinfo[followClient].infoValid ) {
-			myTeam = cgs.clientinfo[followClient].team;
+	team = (team_t)cg.snap->ps.persistant[PERS_TEAM];
+	if ( !friendly ) {
+		if ( team == TEAM_RED ) {
+			team = TEAM_BLUE;
+		} else if ( team == TEAM_BLUE ) {
+			team = TEAM_RED;
 		}
 	}
 
-	for ( i = 0; i < cgs.maxclients; i++ ) {
-		const clientInfo_t *ci = &cgs.clientinfo[i];
-		team_t team;
-		qboolean alive;
-
-		if ( !ci->infoValid ) {
-			continue;
-		}
-
-		team = ci->team;
-		if ( team != TEAM_RED && team != TEAM_BLUE ) {
-			continue;
-		}
-
-		if ( i == cg.snap->ps.clientNum ) {
-			alive = ( cg.snap->ps.stats[STAT_HEALTH] > 0 );
-		} else {
-			alive = ( ci->health > 0 );
-		}
-
-		if ( !alive ) {
-			continue;
-		}
-
-		if ( team == myTeam ) {
-			( *friendCount )++;
-		} else {
-			( *enemyCount )++;
-		}
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return TEAM_FREE;
 	}
+
+	return team;
 }
 
 /*
@@ -2142,16 +2111,17 @@ CG_DrawPlayerCount
 Draws the text for either the friendly or enemy player count widgets.
 =============
 */
-static void CG_DrawPlayerCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, qboolean friendly) {
-char buffer[8];
-int friendCount;
-int enemyCount;
-int width;
+static void CG_DrawPlayerCount( rectDef_t *rect, float scale, vec4_t color, int textStyle, qboolean friendly ) {
+	char	buffer[8];
+	team_t	team;
+	int		count;
+	int		width;
 
-CG_CountLivingPlayers(&friendCount, &enemyCount);
-Com_sprintf(buffer, sizeof(buffer), "%i", friendly ? friendCount : enemyCount);
-width = CG_Text_Width(buffer, scale, 0);
-		CG_Text_Paint(rect->x + (rect->w - width) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+	team = CG_GetRoundPlayerCountTeam( friendly );
+	count = ( team == TEAM_RED || team == TEAM_BLUE ) ? cgs.matchTeamCount[team] : 0;
+	Com_sprintf( buffer, sizeof( buffer ), "%i", count );
+	width = CG_Text_Width( buffer, scale, 0 );
+	CG_Text_Paint( rect->x + ( rect->w - width ) * 0.5f, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -2904,7 +2874,7 @@ static int CG_GetConfiguredPlayerCountLimit( void ) {
 	int	playerLimit;
 
 	playerLimit = cgs.maxclients;
-	if ( cgs.gametype == GT_FFA || cgs.playerCountTeamSize <= 0 ) {
+	if ( cgs.gametype == GT_FFA || cgs.gametype == GT_TOURNAMENT || cgs.playerCountTeamSize <= 0 ) {
 		return playerLimit;
 	}
 
@@ -3404,59 +3374,39 @@ CG_DrawGameLimit
 Renders the retail-style single limit label for the current ruleset.
 =============
 */
-static void CG_DrawGameLimit(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+static void CG_DrawGameLimit( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align ) {
 	char	buffer[128];
-	const char *info;
-	int		limitValue;
-	char		value[MAX_INFO_VALUE];
 	float	x;
-	float	y;
-
-	buffer[0] = '\0';
-	info = CG_ConfigString( CS_SERVERINFO );
-	limitValue = 0;
 
 	switch ( cgs.gametype ) {
+	case GT_CTF:
+	case GT_1FCTF:
+	case GT_OBELISK:
+	case GT_HARVESTER:
+		Com_sprintf( buffer, sizeof( buffer ), "Cap Limit: %d", cgs.capturelimit );
+		break;
+
 	case GT_CLAN_ARENA:
 	case GT_FREEZE:
 	case GT_RED_ROVER:
-		if ( info && *info ) {
-			CG_GetServerInfoValue( info, "roundlimit", value, sizeof( value ) );
-			limitValue = value[0] ? atoi( value ) : 0;
-		}
-		if ( limitValue > 0 ) {
-			Com_sprintf( buffer, sizeof( buffer ), "Round Limit: %d", limitValue );
-		}
+		Com_sprintf( buffer, sizeof( buffer ), "Round Limit: %d", cgs.roundlimit );
 		break;
 
+	case GT_DOMINATION:
 	case GT_ATTACK_DEFEND:
-		if ( info && *info ) {
-			CG_GetServerInfoValue( info, "g_scorelimit", value, sizeof( value ) );
-			limitValue = value[0] ? atoi( value ) : 0;
-		}
-		if ( limitValue > 0 ) {
-			Com_sprintf( buffer, sizeof( buffer ), "Score Limit: %d", limitValue );
-		}
+		Com_sprintf( buffer, sizeof( buffer ), "Score Limit: %d", cgs.scorelimit );
 		break;
 
 	default:
-		if ( CG_HasObjectiveCountStat( cgs.gametype ) ) {
-			limitValue = cgs.capturelimit;
-			if ( limitValue > 0 ) {
-				Com_sprintf( buffer, sizeof( buffer ), "Cap Limit: %d", limitValue );
-			}
-		} else if ( cgs.fraglimit > 0 ) {
-			Com_sprintf( buffer, sizeof( buffer ), "Frag Limit: %d", cgs.fraglimit );
-		}
+		Com_sprintf( buffer, sizeof( buffer ), "Frag Limit: %d", cgs.fraglimit );
 		break;
 	}
 
-	if ( !buffer[0] ) {
-		return;
+	x = rect->x;
+	if ( align == ITEM_ALIGN_CENTER ) {
+		x -= CG_Text_Width( buffer, scale, 0 ) * 0.5f;
 	}
-
-	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
-	CG_Text_Paint( x, y, scale, color, buffer, 0, 0, textStyle );
+	CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -3524,17 +3474,17 @@ CG_DrawGameTypeMap
 Outputs the retail "Gametype Fullname - Detail" intro-panel label.
 =============
 */
-static void CG_DrawGameTypeMap(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+static void CG_DrawGameTypeMap( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align ) {
 	char	detailBuffer[256];
 	char	buffer[256];
 	float	x;
-	float	y;
 
 	CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );
 	Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), detailBuffer );
 
-	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
-	CG_Text_Paint( x, y, scale, color, buffer, 0, 0, textStyle );
+	x = rect->x;
+	CG_AlignTextX( &x, buffer, scale, align );
+	CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -3628,124 +3578,57 @@ CG_DrawMatchDetails
 Renders the retail "Match phase - Gametype Shortname - Detail" text.
 =============
 */
-static void CG_DrawMatchDetails(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+static void CG_DrawMatchDetails( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
 	char	detailBuffer[256];
 	char	buffer[256];
-	float	x;
-	float	y;
 
 	CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );
 	Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s",
 		CG_GetMatchDetailsPhaseLabel(), CG_GameTypeShortString(), detailBuffer );
 
-	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
-	CG_Text_Paint( x, y, scale, color, buffer, 0, 0, textStyle );
-}
-
-static qboolean CG_TimeLimitHit( void ) {
-	if ( cgs.timelimit <= 0 || cgs.levelStartTime <= 0 ) {
-		return qfalse;
-	}
-	return ( cg.time - cgs.levelStartTime ) >= cgs.timelimit * 60000;
-}
-
-static qboolean CG_FragLimitHit( void ) {
-	if ( cgs.fraglimit <= 0 ) {
-		return qfalse;
-	}
-	if ( cgs.scores1 != SCORE_NOT_PRESENT && cgs.scores1 >= cgs.fraglimit ) {
-		return qtrue;
-	}
-	return qfalse;
-}
-
-static qboolean CG_CaptureLimitHit( void ) {
-	if ( cgs.capturelimit <= 0 ) {
-		return qfalse;
-	}
-	if ( cgs.scores1 != SCORE_NOT_PRESENT && cgs.scores1 >= cgs.capturelimit ) {
-		return qtrue;
-	}
-	if ( cgs.scores2 != SCORE_NOT_PRESENT && cgs.scores2 >= cgs.capturelimit ) {
-		return qtrue;
-	}
-	return qfalse;
-}
-
-static qboolean CG_ScoreLimitHit( void ) {
-	const char *info;
-	char		value[MAX_INFO_VALUE];
-	int		limit;
-
-	info = CG_ConfigString( CS_SERVERINFO );
-	if ( !info || !*info ) {
-		return qfalse;
-	}
-	CG_GetServerInfoValue( info, "g_scorelimit", value, sizeof( value ) );
-	limit = value[0] ? atoi( value ) : 0;
-	if ( limit <= 0 ) {
-		return qfalse;
-	}
-	if ( cgs.scores1 != SCORE_NOT_PRESENT && cgs.scores1 >= limit ) {
-		return qtrue;
-	}
-	if ( cgs.scores2 != SCORE_NOT_PRESENT && cgs.scores2 >= limit ) {
-		return qtrue;
-	}
-	return qfalse;
-}
-
-static qboolean CG_MercyLimitHit( void ) {
-	const char *info;
-	char		value[MAX_INFO_VALUE];
-	int		limit;
-	int		delta;
-
-	info = CG_ConfigString( CS_SERVERINFO );
-	if ( !info || !*info ) {
-		return qfalse;
-	}
-	CG_GetServerInfoValue( info, "mercylimit", value, sizeof( value ) );
-	limit = value[0] ? atoi( value ) : 0;
-	if ( limit <= 0 ) {
-		return qfalse;
-	}
-	if ( cgs.scores1 == SCORE_NOT_PRESENT || cgs.scores2 == SCORE_NOT_PRESENT ) {
-		return qfalse;
-	}
-	delta = abs( cgs.scores1 - cgs.scores2 );
-	return ( delta >= limit );
+	CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
 =============
 CG_DrawMatchEndCondition
 
-Summarizes why the previous match ended (time, frag limit, mercy, etc.).
+Draws the retail end-condition sentence for the active ruleset.
 =============
 */
-static void CG_DrawMatchEndCondition(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+static void CG_DrawMatchEndCondition( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
 	const char *reason;
-	float x;
-	float y;
+	qboolean	timeLimitExpired;
 
-	reason = "Match complete";
-	if ( CG_TimeLimitHit() ) {
-		reason = "Time limit hit";
-	} else if ( CG_CaptureLimitHit() ) {
-		reason = "Capture limit hit";
-	} else if ( CG_ScoreLimitHit() ) {
-		reason = "Score limit hit";
-	} else if ( CG_FragLimitHit() ) {
-		reason = "Frag limit hit";
-	} else if ( CG_MercyLimitHit() ) {
-		reason = "Mercy rule";
-	} else if ( cgs.matchOvertimeActive ) {
-		reason = "Sudden death";
+	if ( cgs.gametype == GT_RACE ) {
+		reason = "Fastest race time within the time limit";
+	} else {
+		timeLimitExpired = ( cgs.timelimit > 0
+			&& cg.time - cgs.levelStartTime >= cgs.timelimit * 60000 ) ? qtrue : qfalse;
+		if ( timeLimitExpired ) {
+			if ( cgs.gametype == GT_CTF ) {
+				reason = "Most flag captures within the time limit";
+			} else if ( cgs.gametype == GT_CLAN_ARENA ) {
+				reason = "Most rounds won within the time limit";
+			} else {
+				reason = "Highest score within the time limit";
+			}
+		} else if ( cgs.gametype == GT_CTF ) {
+			if ( cgs.capturelimit == 0 || ( cgs.scores1 < cgs.capturelimit && cgs.scores2 < cgs.capturelimit ) ) {
+				reason = "First to reach the mercy limit";
+			} else {
+				reason = "First to reach the capture limit";
+			}
+		} else if ( cgs.gametype == GT_CLAN_ARENA ) {
+			reason = "First to reach the round limit";
+		} else if ( cgs.gametype == GT_DOMINATION || cgs.gametype == GT_ATTACK_DEFEND ) {
+			reason = "First to reach the score limit";
+		} else {
+			reason = "Highest score at the end of the game";
+		}
 	}
 
-	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
-	CG_Text_Paint( x, y, scale, color, reason, 0, 0, textStyle );
+	CG_Text_Paint( rect->x, rect->y, scale, color, reason, 0, 0, textStyle );
 }
 
 /*
@@ -3773,7 +3656,7 @@ CG_GetMatchStatusText
 Builds the retail phase-plus-status text used by the match-status ownerdraw.
 =============
 */
-static const char *CG_GetMatchStatusText( void ) {
+const char *CG_GetMatchStatusText( void ) {
 	static char	buffer[256];
 	const char	*status;
 	const char	*phase;
@@ -3802,18 +3685,14 @@ CG_DrawMatchStatus
 Renders the pre-composed retail match-status ownerdraw text.
 =============
 */
-static void CG_DrawMatchStatus(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+static void CG_DrawMatchStatus( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align ) {
 	const char	*statusText;
 	float	x;
-	float	y;
-
-	if ( !cg.snap ) {
-		return;
-	}
 
 	statusText = CG_GetMatchStatusText();
-	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
-	CG_Text_Paint( x, y, scale, color, statusText, 0, 0, textStyle );
+	x = rect->x;
+	CG_AlignTextX( &x, statusText, scale, align );
+	CG_Text_Paint( x, rect->y, scale, color, statusText, 0, 0, textStyle );
 }
 
 /*
@@ -4086,24 +3965,18 @@ CG_DrawRoundLabel
 Displays the retail warmup/round label.
 =============
 */
-static void CG_DrawRoundLabel(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+static void CG_DrawRoundLabel( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align ) {
 	char		label[32];
 	float		x;
-	float		y;
 
-	label[0] = '\0';
-	if ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) {
-		Q_strncpyz( label, "Warmup", sizeof( label ) );
-	} else if ( cgs.matchRoundNumber > 0 ) {
+	if ( cgs.matchRoundNumber > 0 ) {
 		Com_sprintf( label, sizeof( label ), "Round %d", cgs.matchRoundNumber );
+	} else {
+		Q_strncpyz( label, "Warmup", sizeof( label ) );
 	}
 
-	if ( !label[0] ) {
-		return;
-	}
-
-	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
-	CG_Text_Paint( x, y, scale, color, label, 0, 0, textStyle );
+	x = CG_AlignTextInRectX( rect, scale, label, align );
+	CG_Text_Paint( x, rect->y + rect->h, scale, color, label, 0, 0, textStyle );
 }
 
 /*
@@ -4306,10 +4179,7 @@ static void CG_DrawVoteTimer(rectDef_t *rect, float text_x, float text_y, float 
 	float	x;
 	float	y;
 
-	if ( !cgs.voteTime ) {
-		return;
-	}
-	remaining = ( VOTE_TIME - ( cg.time - cgs.voteTime ) + 999 ) / 1000;
+	remaining = ( cgs.voteTime - cg.time + 20000 ) / 1000;
 	if ( remaining < 1 ) {
 		Q_strncpyz( buffer, "Voting has ended.", sizeof( buffer ) );
 	} else if ( remaining == 1 ) {
@@ -4524,12 +4394,13 @@ static void CG_DrawTeamPlayerCount(rectDef_t *rect, float scale, vec4_t color, i
 =============
 CG_DrawTeamTimeoutCount
 
-Displays the remaining timeout count for the given team if known.
+Displays the aligned timeout count for the given team if known.
 =============
 */
-static void CG_DrawTeamTimeoutCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team) {
+static void CG_DrawTeamTimeoutCount( rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team, int align ) {
 	char	buffer[64];
 	int		remaining;
+	float	x;
 
 	if ( team <= TEAM_FREE || team >= TEAM_NUM_TEAMS ) {
 		return;
@@ -4537,7 +4408,8 @@ static void CG_DrawTeamTimeoutCount(rectDef_t *rect, float scale, vec4_t color, 
 
 	remaining = cgs.matchTimeoutRemaining[team];
 	Com_sprintf( buffer, sizeof( buffer ), "TO: %d", remaining );
-	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+	x = CG_AlignTextInRectX( rect, scale, buffer, align );
+	CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
 }
 
 
@@ -4560,22 +4432,15 @@ static team_t CG_ClampTeamValue( int value ) {
 =============
 CG_GetRoundTeamCount
 
-Returns the round-based team count, falling back to the roster size.
+Returns the cached round-based team count.
 =============
 */
 static int CG_GetRoundTeamCount( team_t team ) {
-	int	count;
-
 	if ( team <= TEAM_FREE || team >= TEAM_NUM_TEAMS ) {
 		return 0;
 	}
 
-	count = cgs.matchTeamCount[team];
-	if ( count > 0 ) {
-		return count;
-	}
-
-	return CG_CountPlayersForTeam( team );
+	return cgs.matchTeamCount[team];
 }
 
 /*
@@ -4590,7 +4455,7 @@ static void CG_DrawClanArenaPlayers(rectDef_t *rect, float scale, vec4_t color, 
 	int		count;
 
 	count = CG_GetRoundTeamCount( team );
-	Com_sprintf( buffer, sizeof( buffer ), "%s players %i", CG_GetTeamLabel( team ), count );
+	Com_sprintf( buffer, sizeof( buffer ), "%d", count );
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
@@ -4602,7 +4467,7 @@ Counts Domination capture points owned by the specified team.
 =============
 */
 static int CG_CountDominationOwnedFlags( team_t team ) {
-	if ( cgs.gametype != GT_DOMINATION || !cg.snap ) {
+	if ( cgs.gametype != GT_DOMINATION && cgs.gametype != GT_ATTACK_DEFEND ) {
 		return 0;
 	}
 
@@ -4629,7 +4494,7 @@ static void CG_DrawDominationOwnedFlags(rectDef_t *rect, float scale, vec4_t col
 	}
 
 	owned = CG_CountDominationOwnedFlags( team );
-	Com_sprintf( buffer, sizeof( buffer ), "%s flags %i", CG_GetTeamLabel( team ), owned );
+	Com_sprintf( buffer, sizeof( buffer ), "%d", owned );
 	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
 }
 
@@ -5818,39 +5683,6 @@ static qboolean CG_BuildPlacementPickupMetricText( int ownerDraw, const score_t 
 
 /*
 =============
-CG_BuildPlacementProgressionMetricText
-
-Builds placement progression (PR/TIER) ownerdraw text from scorestats.
-=============
-*/
-static qboolean CG_BuildPlacementProgressionMetricText( int ownerDraw, const score_t *score, char *buffer, size_t bufferSize ) {
-	const cgScoreStats_t	*stats;
-
-	if ( !score || !buffer || bufferSize <= 0 ) {
-		return qfalse;
-	}
-
-	if ( ownerDraw != CG_1ST_PLYR_PR && ownerDraw != CG_1ST_PLYR_TIER ) {
-		return qfalse;
-	}
-
-	stats = CG_GetPlacementScoreStats( score );
-	if ( !stats ) {
-		Q_strncpyz( buffer, "-", bufferSize );
-		return qtrue;
-	}
-
-	if ( ownerDraw == CG_1ST_PLYR_PR ) {
-		Com_sprintf( buffer, bufferSize, "%i", stats->progressionPr );
-	} else {
-		Com_sprintf( buffer, bufferSize, "%i", stats->progressionTier );
-	}
-
-	return qtrue;
-}
-
-/*
-=============
 CG_GetPlacementFragCount
 
 Returns the frag tally for placement ownerdraws. Retail team-family scoreboard
@@ -5994,8 +5826,6 @@ Builds a text payload for first/second place metric ownerdraws.
 =============
 */
 static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score, const clientInfo_t *ci, char *buffer, size_t bufferSize ) {
-	team_t	team;
-
 	if ( !score || !ci || !buffer || bufferSize <= 0 ) {
 		return qfalse;
 	}
@@ -6018,9 +5848,6 @@ static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score
 	case CG_1ST_PLYR_DMG:
 		Com_sprintf( buffer, bufferSize, "%i", score->damage );
 		return qtrue;
-	case CG_1ST_PLYR_TIME:
-		Com_sprintf( buffer, bufferSize, "%i", score->time );
-		return qtrue;
 	case CG_1ST_PLYR_PING:
 		Com_sprintf( buffer, bufferSize, "%i", score->ping );
 		return qtrue;
@@ -6032,14 +5859,6 @@ static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score
 		return qtrue;
 	case CG_1ST_PLYR_FLAG:
 		return qfalse;
-	case CG_1ST_PLYR_TIMEOUT_COUNT:
-		team = CG_ClampTeamValue( ci->team );
-		if ( team == TEAM_RED || team == TEAM_BLUE ) {
-			Com_sprintf( buffer, bufferSize, "%i", cgs.matchTimeoutRemaining[team] );
-		} else {
-			Q_strncpyz( buffer, "-", bufferSize );
-		}
-		return qtrue;
 	case CG_1ST_PLYR_EXCELLENT:
 		Com_sprintf( buffer, bufferSize, "%i", score->excellentCount );
 		return qtrue;
@@ -6058,10 +5877,6 @@ static qboolean CG_BuildPlacementMetricText( int ownerDraw, const score_t *score
 	}
 
 	if ( CG_BuildPlacementPickupMetricText( ownerDraw, score, buffer, bufferSize ) ) {
-		return qtrue;
-	}
-
-	if ( CG_BuildPlacementProgressionMetricText( ownerDraw, score, buffer, bufferSize ) ) {
 		return qtrue;
 	}
 
@@ -6324,6 +6139,80 @@ static void CG_DrawPlacementAwardCountOwnerDraw( rectDef_t *rect, float scale, v
 
 /*
 =============
+CG_IsRetailPlacementMetricOwnerDraw
+
+Reports whether the retail ownerdraw switch routes the placement metric to the
+pre-switch placement helper.
+=============
+*/
+static qboolean CG_IsRetailPlacementMetricOwnerDraw( int ownerDraw ) {
+	switch ( ownerDraw ) {
+	case CG_1ST_PLYR_READY:
+	case CG_2ND_PLYR_READY:
+	case CG_1ST_PLYR_FRAGS:
+	case CG_2ND_PLYR_FRAGS:
+	case CG_1ST_PLYR_DEATHS:
+	case CG_2ND_PLYR_DEATHS:
+	case CG_1ST_PLYR_DMG:
+	case CG_2ND_PLYR_DMG:
+	case CG_1ST_PLYR_PING:
+	case CG_2ND_PLYR_PING:
+	case CG_1ST_PLYR_WINS:
+	case CG_2ND_PLYR_WINS:
+	case CG_1ST_PLYR_ACC:
+	case CG_2ND_PLYR_ACC:
+	case CG_1ST_PLYR_FLAG:
+	case CG_2ND_PLYR_FLAG:
+		return qtrue;
+	default:
+		break;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_FRAGS_G && ownerDraw <= CG_1ST_PLYR_FRAGS_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_FRAGS_G && ownerDraw <= CG_2ND_PLYR_FRAGS_HMG ) ) {
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_HITS_MG && ownerDraw <= CG_1ST_PLYR_HITS_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_HITS_MG && ownerDraw <= CG_2ND_PLYR_HITS_HMG ) ) {
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_SHOTS_MG && ownerDraw <= CG_1ST_PLYR_SHOTS_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_SHOTS_MG && ownerDraw <= CG_2ND_PLYR_SHOTS_HMG ) ) {
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_DMG_G && ownerDraw <= CG_1ST_PLYR_DMG_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_DMG_G && ownerDraw <= CG_2ND_PLYR_DMG_HMG ) ) {
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_ACC_MG && ownerDraw <= CG_1ST_PLYR_ACC_HMG ) ||
+		( ownerDraw >= CG_2ND_PLYR_ACC_MG && ownerDraw <= CG_2ND_PLYR_ACC_HMG ) ) {
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_PICKUPS && ownerDraw <= CG_1ST_PLYR_PICKUPS_MH ) ||
+		( ownerDraw >= CG_2ND_PLYR_PICKUPS && ownerDraw <= CG_2ND_PLYR_PICKUPS_MH ) ) {
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && ownerDraw <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH ) ||
+		( ownerDraw >= CG_2ND_PLYR_AVG_PICKUP_TIME_RA && ownerDraw <= CG_2ND_PLYR_AVG_PICKUP_TIME_MH ) ) {
+		return qtrue;
+	}
+
+	if ( ( ownerDraw >= CG_1ST_PLYR_EXCELLENT && ownerDraw <= CG_1ST_PLYR_HUMILIATION ) ||
+		( ownerDraw >= CG_2ND_PLYR_EXCELLENT && ownerDraw <= CG_2ND_PLYR_HUMILIATION ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
 CG_DrawPlacementMetricOwnerDraw
 
 Renders first/second place metric ownerdraws from available scoreboard fields.
@@ -6332,6 +6221,10 @@ Renders first/second place metric ownerdraws from available scoreboard fields.
 static qboolean CG_DrawPlacementMetricOwnerDraw( rectDef_t *rect, float scale, vec4_t color, int textStyle, int ownerDraw ) {
 	int			normalized;
 	int			slot;
+
+	if ( !CG_IsRetailPlacementMetricOwnerDraw( ownerDraw ) ) {
+		return qfalse;
+	}
 
 	if ( ownerDraw == CG_1ST_PLYR_READY ) {
 		CG_DrawSpectatorPrimaryStatus( rect );
@@ -6543,15 +6436,7 @@ Returns qtrue when the ownerdraw targets first/second place stats.
 =============
 */
 static qboolean CG_IsPlacementMetricOwnerDraw( int ownerDraw ) {
-	if ( ownerDraw >= CG_1ST_PLYR_READY && ownerDraw <= CG_1ST_PLYR_TIER ) {
-		return qtrue;
-	}
-
-	if ( ownerDraw >= CG_2ND_PLYR_READY && ownerDraw <= CG_2ND_PLYR_TIER ) {
-		return qtrue;
-	}
-
-	return qfalse;
+	return CG_IsRetailPlacementMetricOwnerDraw( ownerDraw );
 }
 
 /*
@@ -6616,7 +6501,7 @@ Outputs the retail compact match-phase banner.
 =============
 */
 static void CG_DrawMatchState(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, CG_GetMatchPhaseText(), 0, 0, textStyle );
+	CG_Text_Paint( rect->x, rect->y, scale, color, CG_GetMatchPhaseText(), 0, 0, textStyle );
 }
 
 /*
@@ -8111,7 +7996,10 @@ static void CG_DrawTeamScore( rectDef_t *rect, float scale, vec4_t color, int te
 =============
 CG_DrawScoreValue
 
-Restores the retail wrapper over the local and team score ownerdraw slots.
+Restores the retail wrapper over the local and compact placement score ownerdraw
+slots. Related retail team-score wiring stays in the ownerdraw dispatcher:
+retail case CG_RED_SCORE: CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_RED, ITEM_ALIGN_CENTER );
+retail case CG_BLUE_SCORE: CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_BLUE, ITEM_ALIGN_CENTER );
 =============
 */
 static void CG_DrawScoreValue( rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle, int ownerDraw ) {
@@ -8119,11 +8007,15 @@ static void CG_DrawScoreValue( rectDef_t *rect, float scale, vec4_t color, qhand
 	case CG_PLAYER_SCORE:
 		CG_DrawPlayerScore( rect, scale, color, shader, textStyle );
 		return;
-	case CG_RED_SCORE:
-		CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_RED, ITEM_ALIGN_CENTER );
+	case CG_1STPLACE:
+		if ( cgs.scores1 != SCORE_NOT_PRESENT ) {
+			CG_Text_Paint( rect->x, rect->y, scale, color, va( "%2i", cgs.scores1 ), 0, 0, textStyle );
+		}
 		return;
-	case CG_BLUE_SCORE:
-		CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_BLUE, ITEM_ALIGN_CENTER );
+	case CG_2NDPLACE:
+		if ( cgs.scores2 != SCORE_NOT_PRESENT ) {
+			CG_Text_Paint( rect->x, rect->y, scale, color, va( "%2i", cgs.scores2 ), 0, 0, textStyle );
+		}
 		return;
 	default:
 		return;
@@ -9053,38 +8945,40 @@ static void CG_DrawAreaPowerUp(rectDef_t *rect, int align, float special, float 
 	CG_DrawPowerupSpriteStack(rect, align, special, scale, color, &cg.snap->ps);
 }
 
+/*
+=============
+CG_GetValue
 
+Returns the retail ownerdraw score/stat callback values for menu-driven HUD
+items.
+=============
+*/
 float CG_GetValue(int ownerDraw) {
 	centity_t	*cent;
 	playerState_t	*ps;
 
-  cent = &cg_entities[cg.snap->ps.clientNum];
+	cent = &cg_entities[cg.snap->ps.clientNum];
 	ps = &cg.snap->ps;
 
-  switch (ownerDraw) {
-  case CG_PLAYER_ARMOR_VALUE:
+	switch (ownerDraw) {
+	case CG_PLAYER_ARMOR_VALUE:
 		return ps->stats[STAT_ARMOR];
-    break;
-  case CG_PLAYER_AMMO_VALUE:
+	case CG_PLAYER_AMMO_VALUE:
 		if ( cent->currentState.weapon ) {
-		  return ps->ammo[cent->currentState.weapon];
+			return ps->ammo[cent->currentState.weapon];
 		}
-    break;
-  case CG_PLAYER_SCORE:
-	  return cg.snap->ps.persistant[PERS_SCORE];
-    break;
-  case CG_PLAYER_HEALTH:
+		break;
+	case CG_PLAYER_SCORE:
+		return cg.snap->ps.persistant[PERS_SCORE];
+	case CG_PLAYER_HEALTH:
 		return ps->stats[STAT_HEALTH];
-    break;
-  case CG_RED_SCORE:
+	case CG_RED_SCORE:
 		return cgs.scores1;
-    break;
-  case CG_BLUE_SCORE:
+	case CG_BLUE_SCORE:
 		return cgs.scores2;
-    break;
-  default:
-    break;
-  }
+	default:
+		break;
+	}
 	return -1;
 }
 
@@ -9102,21 +8996,42 @@ static qboolean CG_SpectatorPlayerSlotActive( int slot ) {
 
 /*
 =============
-CG_LocalPlayerHasWeapon
+CG_PlacementWeaponFired
 
-Checks if the predicted player currently owns the supplied weapon.
+Mirrors the retail duel scoreboard weapon-row visibility cache checks for the
+first two placement rows.
 =============
 */
-static qboolean CG_LocalPlayerHasWeapon( weapon_t weapon ) {
-	if ( !cg.snap ) {
-		return qfalse;
-	}
+static qboolean CG_PlacementWeaponFired( weapon_t weapon ) {
+	int	i;
 
 	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
 		return qfalse;
 	}
 
-	return ( ( cg.snap->ps.stats[STAT_WEAPONS] & ( 1 << weapon ) ) != 0 );
+	for ( i = 0; i < cg.numScores && i < 2; i++ ) {
+		const score_t		*score;
+		const cgScoreStats_t	*stats;
+		int			value;
+
+		score = CG_GetPlacementScore( i );
+		stats = CG_GetPlacementScoreStats( score );
+		if ( !stats ) {
+			continue;
+		}
+
+		if ( weapon == WP_GAUNTLET ) {
+			value = stats->weaponShots[weapon];
+		} else {
+			value = stats->weaponDamage[weapon];
+		}
+
+		if ( value != 0 ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
 }
 
 /*
@@ -9143,8 +9058,15 @@ static qboolean CG_LoadoutsEnabled( void ) {
 	return ( atoi( value ) != 0 );
 }
 
-qboolean CG_OtherTeamHasFlag() {
-	if (cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF) {
+/*
+=============
+CG_OtherTeamHasFlag
+
+Retail visibility predicate for the `CG_SHOW_OTHERTEAMHASFLAG` display flag.
+=============
+*/
+qboolean CG_OtherTeamHasFlag( void ) {
+	if (cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF || cgs.gametype == GT_ATTACK_DEFEND) {
 		int team = cg.snap->ps.persistant[PERS_TEAM];
 		if (cgs.gametype == GT_1FCTF) {
 			if (team == TEAM_RED && cgs.flagStatus == FLAG_TAKEN_BLUE) {
@@ -9167,8 +9089,15 @@ qboolean CG_OtherTeamHasFlag() {
 	return qfalse;
 }
 
-qboolean CG_YourTeamHasFlag() {
-	if (cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF) {
+/*
+=============
+CG_YourTeamHasFlag
+
+Retail visibility predicate for the `CG_SHOW_YOURTEAMHASENEMYFLAG` display flag.
+=============
+*/
+qboolean CG_YourTeamHasFlag( void ) {
+	if (cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF || cgs.gametype == GT_ATTACK_DEFEND) {
 		int team = cg.snap->ps.persistant[PERS_TEAM];
 		if (cgs.gametype == GT_1FCTF) {
 			if (team == TEAM_RED && cgs.flagStatus == FLAG_TAKEN_RED) {
@@ -9195,12 +9124,16 @@ qboolean CG_YourTeamHasFlag() {
 =============
 CG_ShowBlueTeamHasRedFlag
 
-Retail HUD visibility helper for the red-flag carrier predicate.
+HUD visibility helper for the blue-team carrier predicate.
 =============
 */
 static qboolean CG_ShowBlueTeamHasRedFlag( void ) {
 	if ( cgs.gametype != GT_CTF && cgs.gametype != GT_1FCTF && cgs.gametype != GT_ATTACK_DEFEND ) {
 		return qfalse;
+	}
+
+	if ( cgs.gametype == GT_1FCTF ) {
+		return ( cgs.flagStatus == FLAG_TAKEN_BLUE ) ? qtrue : qfalse;
 	}
 
 	return ( cgs.redflag == FLAG_TAKEN || cgs.flagStatus == FLAG_TAKEN_RED ) ? qtrue : qfalse;
@@ -9210,7 +9143,7 @@ static qboolean CG_ShowBlueTeamHasRedFlag( void ) {
 =============
 CG_ShowRedTeamHasBlueFlag
 
-Retail HUD visibility helper for the blue-flag carrier predicate.
+HUD visibility helper for the red-team carrier predicate.
 =============
 */
 static qboolean CG_ShowRedTeamHasBlueFlag( void ) {
@@ -9218,30 +9151,49 @@ static qboolean CG_ShowRedTeamHasBlueFlag( void ) {
 		return qfalse;
 	}
 
+	if ( cgs.gametype == GT_1FCTF ) {
+		return ( cgs.flagStatus == FLAG_TAKEN_RED ) ? qtrue : qfalse;
+	}
+
 	return ( cgs.blueflag == FLAG_TAKEN || cgs.flagStatus == FLAG_TAKEN_BLUE ) ? qtrue : qfalse;
+}
+
+/*
+=============
+CG_HudNotificationVisible
+
+Mirrors the retail notification visibility gate: a live timeout must be armed,
+and the icon blinks on the 0x200 time bit while the timeout is active.
+=============
+*/
+static qboolean CG_HudNotificationVisible( int expireTime ) {
+	if ( expireTime <= 0 || expireTime < cg.time ) {
+		return qfalse;
+	}
+
+	return ( cg.time & 0x200 ) ? qtrue : qfalse;
 }
 
 /*
 =============
 CG_HasHudNoticeMessage
 
-Reports whether the retail notice icon should be shown for the buffered
-system-message lane.
+Reports whether the second retail notification icon should be visible.
 =============
 */
 static qboolean CG_HasHudNoticeMessage( void ) {
-	return ( systemChat[0] != '\0' ) ? qtrue : qfalse;
+	return CG_HudNotificationVisible( cg.spectatorSlotTrackedTime[1] );
 }
 
 /*
 =============
 CG_HasHudPlayerMessage
 
-Reports whether the retail player-message indicator should be visible.
+Reports whether the first retail notification icon should be visible.
 =============
 */
 static qboolean CG_HasHudPlayerMessage( void ) {
-	return ( teamChat1[0] != '\0' ) ? qtrue : qfalse;
+	return CG_HudNotificationVisible( cg.spectatorSlotTrackedTime[0] );
 }
 
 /*
@@ -9436,11 +9388,11 @@ qboolean CG_OwnerDrawVisible(int flags, int flags2) {
 			flags &= ~( CG_SHOW_IF_PLYR_IS_FIRST_PLACE | CG_SHOW_IF_PLYR_IS_NOT_FIRST_PLACE );
 		}
 
-		if ( flags & ( CG_SHOW_ANYTEAMGAME | UI_SHOW_ANYTEAMGAME ) ) {
+		if ( flags & CG_SHOW_ANYTEAMGAME ) {
 			if ( cgs.gametype < GT_TEAM ) {
 				vis = qfalse;
 			}
-			flags &= ~( CG_SHOW_ANYTEAMGAME | UI_SHOW_ANYTEAMGAME );
+			flags &= ~CG_SHOW_ANYTEAMGAME;
 		}
 
 		if ( flags & CG_SHOW_ANYNONTEAMGAME ) {
@@ -9514,44 +9466,26 @@ qboolean CG_OwnerDrawVisible(int flags, int flags2) {
 			flags &= ~CG_SHOW_PLAYERS_REMAINING;
 		}
 
-		if (flags & (UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED)) {
-			qboolean loadoutsEnabled = CG_LoadoutsEnabled();
-			qboolean showLoadoutState = qfalse;
-
-			if ( ( flags & UI_SHOW_IF_LOADOUT_ENABLED ) && loadoutsEnabled ) {
-				showLoadoutState = qtrue;
-			}
-
-			if ( ( flags & UI_SHOW_IF_LOADOUT_DISABLED ) && !loadoutsEnabled ) {
-				showLoadoutState = qtrue;
-			}
-
-			if ( !showLoadoutState ) {
-				vis = qfalse;
-			}
-			flags &= ~( UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED );
-		}
-
-		if (flags & (UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP)) {
+		if (flags & (CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP)) {
 			qboolean warmupVisible = qfalse;
 			qboolean inWarmup = ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) ? qtrue : qfalse;
 
-			if ( ( flags & UI_SHOW_IF_WARMUP ) && inWarmup ) {
+			if ( ( flags & CG_SHOW_IF_WARMUP ) && inWarmup ) {
 				warmupVisible = qtrue;
 			}
 
-			if ( ( flags & UI_SHOW_IF_NOT_WARMUP ) && !inWarmup ) {
+			if ( ( flags & CG_SHOW_IF_NOT_WARMUP ) && !inWarmup ) {
 				warmupVisible = qtrue;
 			}
 
 			if ( !warmupVisible ) {
 				vis = qfalse;
 			}
-			flags &= ~( UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP );
+			flags &= ~( CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP );
 		}
 
 		if ( flags & CG_SHOW_IF_CHAT_VISIBLE ) {
-			if ( !cg.chatHistoryVisible ) {
+			if ( !cg.chatHistoryVisible && !cg.scoreBoardShowing ) {
 				vis = qfalse;
 			}
 			flags &= ~CG_SHOW_IF_CHAT_VISIBLE;
@@ -9564,11 +9498,11 @@ qboolean CG_OwnerDrawVisible(int flags, int flags2) {
 			flags &= ~CG_SHOW_INTERMISSION;
 		}
 
-		if ( flags & ( CG_SHOW_NOTINTERMISSION | UI_SHOW_IF_NOT_INTERMISSION ) ) {
+		if ( flags & CG_SHOW_NOTINTERMISSION ) {
 			if ( cg.snap->ps.pm_type == PM_INTERMISSION || cg.snap->ps.pm_type == PM_SPINTERMISSION ) {
 				vis = qfalse;
 			}
-			flags &= ~( CG_SHOW_NOTINTERMISSION | UI_SHOW_IF_NOT_INTERMISSION );
+			flags &= ~CG_SHOW_NOTINTERMISSION;
 		}
 
 		if ( flags ) {
@@ -9593,91 +9527,91 @@ qboolean CG_OwnerDrawVisible(int flags, int flags2) {
 		}
 
 		if ( flags2 & CG_SHOW_IF_G_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_GAUNTLET ) ) {
+			if ( !CG_PlacementWeaponFired( WP_GAUNTLET ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_G_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_MG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_MACHINEGUN ) ) {
+			if ( !CG_PlacementWeaponFired( WP_MACHINEGUN ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_MG_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_SG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_SHOTGUN ) ) {
+			if ( !CG_PlacementWeaponFired( WP_SHOTGUN ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_SG_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_GL_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_GRENADE_LAUNCHER ) ) {
+			if ( !CG_PlacementWeaponFired( WP_GRENADE_LAUNCHER ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_GL_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_RL_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_ROCKET_LAUNCHER ) ) {
+			if ( !CG_PlacementWeaponFired( WP_ROCKET_LAUNCHER ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_RL_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_LG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_LIGHTNING ) ) {
+			if ( !CG_PlacementWeaponFired( WP_LIGHTNING ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_LG_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_RG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_RAILGUN ) ) {
+			if ( !CG_PlacementWeaponFired( WP_RAILGUN ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_RG_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_PG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_PLASMAGUN ) ) {
+			if ( !CG_PlacementWeaponFired( WP_PLASMAGUN ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_PG_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_BFG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_BFG ) ) {
+			if ( !CG_PlacementWeaponFired( WP_BFG ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_BFG_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_CG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_CHAINGUN ) ) {
+			if ( !CG_PlacementWeaponFired( WP_CHAINGUN ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_CG_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_NG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_NAILGUN ) ) {
+			if ( !CG_PlacementWeaponFired( WP_NAILGUN ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_NG_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_PL_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_PROX_LAUNCHER ) ) {
+			if ( !CG_PlacementWeaponFired( WP_PROX_LAUNCHER ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_PL_FIRED;
 		}
 
 		if ( flags2 & CG_SHOW_IF_HMG_FIRED ) {
-			if ( !CG_LocalPlayerHasWeapon( WP_HEAVY_MACHINEGUN ) ) {
+			if ( !CG_PlacementWeaponFired( WP_HEAVY_MACHINEGUN ) ) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_HMG_FIRED;
@@ -9758,20 +9692,6 @@ qboolean CG_OwnerDrawVisible(int flags, int flags2) {
 				vis = qfalse;
 			}
 			flags2 &= ~CG_SHOW_IF_2ND_PLYR_FOLLOWED;
-		}
-
-		if ( flags2 & CG_SHOW_IF_1ST_PLYR_TRACKED ) {
-			if ( !CG_SpectatorSlotTracked( 0 ) ) {
-				vis = qfalse;
-			}
-			flags2 &= ~CG_SHOW_IF_1ST_PLYR_TRACKED;
-		}
-
-		if ( flags2 & CG_SHOW_IF_2ND_PLYR_TRACKED ) {
-			if ( !CG_SpectatorSlotTracked( 1 ) ) {
-				vis = qfalse;
-			}
-			flags2 &= ~CG_SHOW_IF_2ND_PLYR_TRACKED;
 		}
 
 		if ( flags2 ) {
@@ -9863,18 +9783,6 @@ static void CG_DrawKiller(rectDef_t *rect, float scale, vec4_t color, qhandle_t 
 static void CG_DrawCapFragLimit(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle) {
 	int limit = CG_HasObjectiveCountStat( cgs.gametype ) ? cgs.capturelimit : cgs.fraglimit;
 	CG_Text_Paint(rect->x, rect->y, scale, color, va("%2i", limit),0, 0, textStyle); 
-}
-
-static void CG_Draw1stPlace(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle) {
-	if (cgs.scores1 != SCORE_NOT_PRESENT) {
-		CG_Text_Paint(rect->x, rect->y, scale, color, va("%2i", cgs.scores1),0, 0, textStyle); 
-	}
-}
-
-static void CG_Draw2ndPlace(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle) {
-	if (cgs.scores2 != SCORE_NOT_PRESENT) {
-		CG_Text_Paint(rect->x, rect->y, scale, color, va("%2i", cgs.scores2),0, 0, textStyle); 
-	}
 }
 
 /*
@@ -10132,8 +10040,24 @@ const char *CG_GameTypeString() {
 		return "Unknown Gametype";
 	}
 }
-static void CG_DrawGameType(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle ) {
-	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, CG_GameTypeString(), 0, 0, textStyle);
+/*
+=============
+CG_DrawGameType
+
+Draws the current gametype label through the retail center-only alignment path.
+=============
+*/
+static void CG_DrawGameType( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align ) {
+	const char	*gameType;
+	float		x;
+
+	gameType = CG_GameTypeString();
+	x = rect->x;
+	if ( align == ITEM_ALIGN_CENTER ) {
+		x -= CG_Text_Width( gameType, scale, 0 ) * 0.5f;
+	}
+
+	CG_Text_Paint( x, rect->y, scale, color, gameType, 0, 0, textStyle );
 }
 
 /*
@@ -10469,52 +10393,63 @@ static void CG_DrawAdvert( rectDef_t *rect, vec4_t color, qhandle_t shader ) {
 	trap_R_SetColor( NULL );
 }
 
+/*
+=============
+CG_DrawMedal
+
+Draws the retail scoreboard medal ownerdraw leaf.
+=============
+*/
 void CG_DrawMedal(int ownerDraw, rectDef_t *rect, float scale, vec4_t color, qhandle_t shader) {
-	score_t *score = &cg.scores[cg.selectedScore];
-	float value = 0;
-	char *text = NULL;
+	score_t		*score;
+	float		value;
+	const char	*text;
+
+	score = &cg.scores[cg.selectedScore];
+	value = 0;
+	text = NULL;
 	color[3] = 0.25;
 
-	switch (ownerDraw) {
-		case CG_ACCURACY:
-			value = score->accuracy;
-			break;
-		case CG_ASSISTS:
-			value = score->assistCount;
-			break;
-		case CG_DEFEND:
-			value = score->defendCount;
-			break;
-		case CG_EXCELLENT:
-			value = score->excellentCount;
-			break;
-		case CG_IMPRESSIVE:
-			value = score->impressiveCount;
-			break;
-		case CG_PERFECT:
-			value = score->perfect;
-			break;
-		case CG_GAUNTLET:
-			value = score->guantletCount;
-			break;
-		case CG_CAPTURES:
-			value = score->captures;
-			break;
+	switch ( ownerDraw ) {
+	case CG_ACCURACY:
+		value = score->accuracy;
+		break;
+	case CG_ASSISTS:
+		value = score->assistCount;
+		break;
+	case CG_DEFEND:
+		value = score->defendCount;
+		break;
+	case CG_EXCELLENT:
+		value = score->excellentCount;
+		break;
+	case CG_IMPRESSIVE:
+		value = score->impressiveCount;
+		break;
+	case CG_PERFECT:
+		value = score->perfect;
+		break;
+	case CG_GAUNTLET:
+		value = score->guantletCount;
+		break;
+	case CG_CAPTURES:
+		value = score->captures;
+		break;
 	}
 
-	if (value > 0) {
-		if (ownerDraw != CG_PERFECT) {
-			if (ownerDraw == CG_ACCURACY) {
-				text = va("%i%%", (int)value);
-				if (value > 50) {
+	if ( value > 0 ) {
+		if ( ownerDraw != CG_PERFECT ) {
+			if ( ownerDraw == CG_ACCURACY ) {
+				text = va( "%i%%", (int)value );
+				if ( value > 50 ) {
 					color[3] = 1.0;
 				}
 			} else {
-				text = va("%i", (int)value);
+				text = va( "%i", (int)value );
 				color[3] = 1.0;
 			}
 		} else {
-			if (value) {
+			if ( value ) {
 				color[3] = 1.0;
 			}
 			text = "Wow";
@@ -10524,12 +10459,12 @@ void CG_DrawMedal(int ownerDraw, rectDef_t *rect, float scale, vec4_t color, qha
 	trap_R_SetColor(color);
 	CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );
 
-	if (text) {
+	if ( text ) {
 		color[3] = 1.0;
-		value = CG_Text_Width(text, scale, 0);
-		CG_Text_Paint(rect->x + (rect->w - value) / 2, rect->y + rect->h + 10 , scale, color, text, 0, 0, 0);
+		value = CG_Text_Width( text, scale, 0 );
+		CG_Text_Paint( rect->x + ( rect->w - value ) / 2, rect->y + rect->h + 10, scale, color, text, 0, 0, 0 );
 	}
-	trap_R_SetColor(NULL);
+	trap_R_SetColor( NULL );
 
 }
 
@@ -10584,7 +10519,7 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 		return;
 	}
 
-	//if (ownerDrawFlags != 0 && !CG_OwnerDrawVisible(ownerDrawFlags)) {
+	//if (ownerDrawFlags != 0 && !CG_OwnerDrawVisible(ownerDrawFlags, 0)) {
 	//	return;
 	//}
 
@@ -10613,28 +10548,28 @@ rect.y = y;
 		CG_DrawStartingWeapons(&rect, text_x, text_y, scale, color, textStyle);
 		break;
 	case CG_GAME_LIMIT:
-		CG_DrawGameLimit(&rect, text_x, text_y, scale, color, textStyle);
+		CG_DrawGameLimit( &rect, scale, color, textStyle, align );
 		break;
 	case CG_GAME_TYPE_ICON:
 		CG_DrawGameTypeIcon(&rect);
 		break;
 	case CG_GAME_TYPE_MAP:
-		CG_DrawGameTypeMap(&rect, text_x, text_y, scale, color, textStyle);
+		CG_DrawGameTypeMap( &rect, scale, color, textStyle, align );
 		break;
 	case CG_GAME_TYPE:
-		CG_DrawGameType(&rect, scale, color, shader, textStyle);
+		CG_DrawGameType( &rect, scale, color, textStyle, align );
 		break;
 	case CG_GAME_STATUS:
 		CG_DrawGameStatus(&rect, scale, color, shader, textStyle);
 		break;
 	case CG_MATCH_DETAILS:
-		CG_DrawMatchDetails(&rect, text_x, text_y, scale, color, textStyle);
+		CG_DrawMatchDetails( &rect, scale, color, textStyle );
 		break;
 	case CG_MATCH_END_CONDITION:
-		CG_DrawMatchEndCondition(&rect, text_x, text_y, scale, color, textStyle);
+		CG_DrawMatchEndCondition( &rect, scale, color, textStyle );
 		break;
 	case CG_MATCH_STATUS:
-		CG_DrawMatchStatus(&rect, text_x, text_y, scale, color, textStyle);
+		CG_DrawMatchStatus( &rect, scale, color, textStyle, align );
 		break;
 	case CG_CAPFRAGLIMIT:
 		CG_DrawCapFragLimit(&rect, scale, color, shader, textStyle);
@@ -10644,7 +10579,7 @@ rect.y = y;
 		break;
 	case CG_ROUND:
 		if ( CG_ShowPlayersRemaining() ) {
-			CG_DrawRoundLabel(&rect, text_x, text_y, scale, color, textStyle);
+			CG_DrawRoundLabel( &rect, scale, color, textStyle, align );
 		}
 			break;
 	case CG_ROUND_BACKGROUND:
@@ -10654,8 +10589,10 @@ rect.y = y;
 			CG_DrawRoundTimer(&rect, scale, color, textStyle);
 			break;
 	case CG_OVERTIME:
+		if ( cg.warmup == 0 ) {
 			CG_DrawOvertime(&rect, scale, color, textStyle);
-			break;
+		}
+		break;
 	case CG_OVERTIME_BACKGROUND:
 			/* Retail maps raw ownerdraw 0x163 to the common no-op return target. */
 			return;
@@ -10756,6 +10693,9 @@ rect.y = y;
 	case CG_PLAYER_HEAD:
 		CG_DrawPlayerHead( &rect, ownerDrawFlags & CG_SHOW_2DONLY );
 		break;
+	case CG_PLAYERMODEL:
+		CG_DrawPlayerModel( &rect );
+		break;
 	case CG_PLAYER_ITEM:
 		CG_DrawPlayerItem( &rect, scale, ownerDrawFlags & CG_SHOW_2DONLY );
 		break;
@@ -10805,12 +10745,12 @@ rect.y = y;
 		break;
   case CG_RED_TIMEOUT_COUNT:
 		if ( cgs.playerCountTeamSize > 0 ) {
-			CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_RED);
+			CG_DrawTeamTimeoutCount( &rect, scale, color, textStyle, TEAM_RED, align );
 		}
 		break;
   case CG_BLUE_TIMEOUT_COUNT:
 		if ( cgs.playerCountTeamSize > 0 ) {
-			CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_BLUE);
+			CG_DrawTeamTimeoutCount( &rect, scale, color, textStyle, TEAM_BLUE, align );
 		}
 		break;
   case CG_RED_AVG_PING:
@@ -10925,18 +10865,18 @@ rect.y = y;
 	case CG_TEAMINFO:
 		/* Retail maps raw ownerdraw 0x166 to the common no-op return target. */
 		return;
-  case CG_1STPLACE:
-    CG_Draw1stPlace(&rect, scale, color, shader, textStyle);
-                break;
+	case CG_1STPLACE:
+		CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );
+		break;
   case CG_1STPLACE_PLYR_MODEL:
 		CG_DrawFirstPlaceModel( &rect, qfalse );
 		break;
 	case CG_1STPLACE_PLYR_MODEL_ACTIVE:
 		/* Retail maps raw ownerdraw 0x66 to the common no-op return target. */
 		return;
-  case CG_2NDPLACE:
-    CG_Draw2ndPlace(&rect, scale, color, shader, textStyle);
-                break;
+	case CG_2NDPLACE:
+		CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );
+		break;
   case CG_1ST_PLACE_SCORE:
     CG_Draw1stPlaceScore(&rect, scale, color, textStyle);
                 break;

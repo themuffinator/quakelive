@@ -5,7 +5,6 @@ This repository exists to faithfully reconstruct the Quake Live engine and game 
 This repository currently has the following rules for agents:
 
 - Obey system, developer, and user instructions, and ensure AGENTS.md scope rules are followed.
-- Announce the AI model used at the start of the first response each session.
 - In C/C++ code, indent with tabs, and include the required commented header format above every function definition.
 - Avoid creating binary files (including standard images, models, and similar assets).
 - Avoid creating new source files for trivially small code additions unless they are expected to grow.

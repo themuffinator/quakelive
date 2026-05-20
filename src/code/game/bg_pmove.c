@@ -62,8 +62,6 @@ int		c_pmove = 0;
 
 static float	pm_jumpTakeoffVelocity;
 static qboolean	pm_jumpTakeoffDoubleJumpActive;
-static qboolean	pm_jumpTakeoffChainJumpActive;
-static qboolean	pm_jumpTakeoffRampJumpActive;
 
 typedef struct {
 	float	airControl;
@@ -347,6 +345,10 @@ Returns whether jump inputs must be released before another takeoff.
 static qboolean PM_ShouldRequireJumpRelease( const pmove_settings_t *settings ) {
 	const pmove_settings_t	*activeSettings;
 
+	if ( pm && pm->ps && ( pm->ps->pm_flags & PMF_REQUIRE_JUMP_RELEASE ) ) {
+		return qtrue;
+	}
+
 	activeSettings = settings ? settings : PM_GetActiveSettings();
 
 	if ( activeSettings ) {
@@ -381,7 +383,7 @@ static void PM_LoadMoveTuningConstants( void ) {
 	qboolean		airControlTuning;
 
 	settings = PM_GetActiveSettings();
-	airControlTuning = ( settings->airControl > 0.0f ) ? qtrue : qfalse;
+	airControlTuning = ( pm->ps->pm_flags & PMF_AIR_CONTROL ) ? qtrue : qfalse;
 
 	pm_accelerate = PM_LoadMoveTuningFloat(
 		settings->walkAccel,
@@ -401,7 +403,7 @@ static void PM_LoadMoveTuningConstants( void ) {
 		settings->airControl,
 		pm_retailDefaultTuning.airControl,
 		pm_retailAirControlTuning.airControl,
-		qfalse,
+		airControlTuning,
 		qfalse
 	);
 	pm_airstepfriction = PM_LoadMoveTuningFloat(
@@ -681,6 +683,10 @@ static void PM_Friction( void ) {
 
 	if ( pm->ps->pm_type == PM_SPECTATOR) {
 		drop += speed*pm_spectatorfriction*pml.frametime;
+	}
+
+	if ( pm->ps->pm_type == PM_FREEZE || ( pm->ps->pm_flags & PMF_SCOREBOARD ) ) {
+		drop *= 0.25f;
 	}
 
 	// scale the velocity
@@ -967,18 +973,6 @@ static void PM_ApplyJumpTakeoff( void ) {
 	}
 	PM_AddEvent( EV_JUMP );
 
-	if ( pm_jumpTakeoffChainJumpActive ) {
-		pm->ps->pm_flags |= PMF_CHAIN_JUMP;
-	} else {
-		pm->ps->pm_flags &= ~PMF_CHAIN_JUMP;
-	}
-
-	if ( pm_jumpTakeoffRampJumpActive ) {
-		pm->ps->pm_flags |= PMF_RAMP_JUMP;
-	} else {
-		pm->ps->pm_flags &= ~PMF_RAMP_JUMP;
-	}
-
 	if ( pm->cmd.forwardmove >= 0 ) {
 		PM_ForceLegsAnim( LEGS_JUMP );
 		pm->ps->pm_flags &= ~PMF_BACKWARDS_JUMP;
@@ -1006,7 +1000,10 @@ static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump ) {
 	qboolean		releaseRequired;
 	int			timeDelta;
 
-	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
+	settings = PM_GetActiveSettings();
+	releaseRequired = PM_ShouldRequireJumpRelease( settings );
+
+	if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {
 		return qfalse;		// don't allow jump until all buttons are up
 	}
 
@@ -1014,9 +1011,6 @@ static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump ) {
 		// not holding jump
 		return qfalse;
 	}
-
-	settings = PM_GetActiveSettings();
-	releaseRequired = PM_ShouldRequireJumpRelease( settings );
 
 	if ( allowAirDoubleJump ) {
 		if ( !settings->doubleJump || pm->ps->doubleJumped ) {
@@ -1077,8 +1071,6 @@ static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump ) {
 	PM_ApplyJumpPlanarVelocity( chainJumpActive, rampJumpActive, settings );
 	pm_jumpTakeoffVelocity = jumpVelocity;
 	pm_jumpTakeoffDoubleJumpActive = doubleJumpActive;
-	pm_jumpTakeoffChainJumpActive = chainJumpActive;
-	pm_jumpTakeoffRampJumpActive = rampJumpActive;
 
 	return qtrue;
 }
@@ -1351,6 +1343,11 @@ Only with the invulnerability powerup
 static void PM_InvulnerabilityMove( void ) {
 	int				invulnerabilityItemNum;
 
+	if ( !PM_ShouldUseInvulnerabilityMove() ) {
+		pm->ps->powerups[PW_INVULNERABILITY] = 0;
+		return;
+	}
+
 	PM_HasHeldInvulnerabilityItem( &invulnerabilityItemNum );
 
 	pm->cmd.forwardmove = 0;
@@ -1494,11 +1491,9 @@ static void PM_AirMove( void ) {
 	}
 
 	PM_StepSlideMove( qtrue );
-	if ( PM_ShouldUseInvulnerabilityMove() ) {
-		PM_InvulnerabilityMove();
-	}
+	PM_InvulnerabilityMove();
 
-	if ( settings && settings->doubleJump ) {
+	if ( pm->ps->pm_flags & PMF_DOUBLE_JUMP ) {
 		PM_CheckJump( qtrue );
 	}
 }
@@ -1568,6 +1563,12 @@ static void PM_WalkMove( void ) {
 	}
 
 	settings = PM_GetActiveSettings();
+
+	if ( PM_ShouldUseInvulnerabilityMove() ) {
+		PM_StepSlideMove( qfalse );
+		PM_InvulnerabilityMove();
+		return;
+	}
 
 	if ( PM_CheckJump( qfalse ) ) {
 		// jumped away
@@ -1681,9 +1682,6 @@ static void PM_WalkMove( void ) {
 	}
 
 	PM_StepSlideMove( qfalse );
-	if ( PM_ShouldUseInvulnerabilityMove() ) {
-		PM_InvulnerabilityMove();
-	}
 
 	//Com_Printf("velocity2 = %1.1f\n", VectorLength(pm->ps->velocity));
 
@@ -1770,6 +1768,9 @@ Returns an event number apropriate for the groundsurface
 ================
 */
 static int PM_FootstepForSurface( void ) {
+	if ( pm->noFootsteps ) {
+		return 0;
+	}
 	if ( pml.groundTrace.surfaceFlags & SURF_NOSTEPS ) {
 		return 0;
 	}
@@ -1853,7 +1854,7 @@ static void PM_CrashLand( void ) {
 
 	// SURF_NODAMAGE is used for bounce pads where you don't ever
 	// want to take damage or play a crunch sound
-	if ( !(pml.groundTrace.surfaceFlags & SURF_NODAMAGE) )  {
+	if ( !(pml.groundTrace.surfaceFlags & SURF_NODAMAGE) && pm->ps->stats[STAT_HEALTH] > -40 )  {
 		if ( delta > 60 ) {
 			PM_AddEvent( EV_FALL_FAR );
 		} else if ( delta > 40 ) {
@@ -1870,6 +1871,9 @@ static void PM_CrashLand( void ) {
 
 	// start footstep cycle over
 	pm->ps->bobCycle = 0;
+	if ( pm->ps->pm_flags & PMF_DOUBLE_JUMP ) {
+		pm->ps->doubleJumped = qfalse;
+	}
 }
 
 /*
@@ -2079,8 +2083,6 @@ static void PM_GroundTrace( void ) {
 
 	pml.groundPlane = qtrue;
 	pml.walking = qtrue;
-	pm->ps->pm_flags &= ~( PMF_RAMP_JUMP | PMF_CHAIN_JUMP );
-	pm->ps->doubleJumped = qfalse;
 	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
 	pm->ps->groundTraceLatestEntNum = trace.entityNum;
 	VectorCopy( trace.plane.normal, pm->ps->groundTraceLatestNormal );
@@ -2163,43 +2165,6 @@ static void PM_SetWaterLevel( void ) {
 }
 
 /*
-=============
-PM_UpdateCrouchSlideState
-
-Maintains crouch slide timers and activation flags after duck state updates.
-=============
-*/
-static void PM_UpdateCrouchSlideState( qboolean wasDucked ) {
-	const pmove_settings_t	*settings;
-	qboolean	crouched;
-
-	(void)wasDucked;
-	settings = PM_GetActiveSettings();
-	crouched = ( pm->ps->pm_flags & PMF_DUCKED ) ? qtrue : qfalse;
-
-	if ( crouched && pm->cmd.upmove < 0 && pm->ps->crouchTime == 0 ) {
-		pm->ps->crouchTime = pm->cmd.serverTime;
-	}
-
-	if ( !settings->crouchSlide || !( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) || settings->crouchSlideTime <= 0 ) {
-		pm->ps->crouchSlideTime = 0;
-		return;
-	}
-
-	if ( pm->ps->crouchSlideTime < 0 ) {
-		pm->ps->crouchSlideTime = 0;
-	}
-
-	if ( pm->ps->crouchSlideTime > settings->crouchSlideTime ) {
-		pm->ps->crouchSlideTime = settings->crouchSlideTime;
-	}
-
-	if ( !crouched && pm->ps->crouchSlideTime != 0 ) {
-		pm->ps->crouchSlideTime = 0;
-	}
-}
-
-/*
 ==============
 PM_CheckDuck
 
@@ -2210,9 +2175,7 @@ static void PM_CheckDuck (void)
 {
 	trace_t	trace;
 	qboolean	invulnerabilityActive;
-	qboolean	wasDucked;
 
-	wasDucked = ( pm->ps->pm_flags & PMF_DUCKED ) ? qtrue : qfalse;
 	invulnerabilityActive = (qboolean)( pm->ps->powerups[PW_INVULNERABILITY] != 0 );
 
 	if ( invulnerabilityActive ) {
@@ -2249,6 +2212,9 @@ static void PM_CheckDuck (void)
 	if (pm->cmd.upmove < 0)
 	{	// duck
 		pm->ps->pm_flags |= PMF_DUCKED;
+		if ( pm->ps->crouchTime == 0 ) {
+			pm->ps->crouchTime = pm->cmd.serverTime;
+		}
 	}
 	else
 	{	// stand up if possible
@@ -2274,9 +2240,10 @@ static void PM_CheckDuck (void)
 	{
 		pm->maxs[2] = 32;
 		pm->ps->viewheight = DEFAULT_VIEWHEIGHT;
+		if ( ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) && pm->ps->crouchSlideTime != 0 && pml.groundPlane ) {
+			pm->ps->crouchSlideTime = 0;
+		}
 	}
-
-	PM_UpdateCrouchSlideState( wasDucked );
 }
 
 
@@ -2293,6 +2260,8 @@ static void PM_Footsteps( void ) {
 	float		bobmove;
 	int			old;
 	qboolean	footstep;
+	qboolean	crouchSlideMoving;
+	qboolean	runSpeed;
 
 	//
 	// calculate speed and cycle to be used for
@@ -2300,6 +2269,8 @@ static void PM_Footsteps( void ) {
 	//
 	pm->xyspeed = sqrt( pm->ps->velocity[0] * pm->ps->velocity[0]
 		+  pm->ps->velocity[1] * pm->ps->velocity[1] );
+	crouchSlideMoving = (qboolean)( ( pm->ps->pm_flags & PMF_CROUCH_SLIDE )
+		&& pm->cmd.upmove < 0 && pm->ps->crouchSlideTime > 0 );
 
 	if ( pm->ps->groundEntityNum == ENTITYNUM_NONE ) {
 
@@ -2314,7 +2285,7 @@ static void PM_Footsteps( void ) {
 	}
 
 	// if not trying to move
-	if ( !pm->cmd.forwardmove && !pm->cmd.rightmove ) {
+	if ( !pm->cmd.forwardmove && !pm->cmd.rightmove && !crouchSlideMoving ) {
 		if (  pm->xyspeed < 5 ) {
 			pm->ps->bobCycle = 0;	// start at beginning of cycle again
 			if ( pm->ps->pm_flags & PMF_DUCKED ) {
@@ -2350,14 +2321,26 @@ static void PM_Footsteps( void ) {
 	*/
 	} else {
 		if ( !( pm->cmd.buttons & BUTTON_WALKING ) ) {
-			bobmove = 0.4f;	// faster speeds bob faster
-			if ( pm->ps->pm_flags & PMF_BACKWARDS_RUN ) {
-				PM_ContinueLegsAnim( LEGS_BACK );
+			runSpeed = (qboolean)( pm->ps->velocity[0] >= 32.0f || pm->ps->velocity[0] <= -32.0f
+				|| pm->ps->velocity[1] >= 32.0f || pm->ps->velocity[1] <= -32.0f );
+			if ( runSpeed ) {
+				bobmove = 0.4f;	// faster speeds bob faster
+				if ( pm->ps->pm_flags & PMF_BACKWARDS_RUN ) {
+					PM_ContinueLegsAnim( LEGS_BACK );
+				}
+				else {
+					PM_ContinueLegsAnim( LEGS_RUN );
+				}
+				footstep = qtrue;
+			} else {
+				bobmove = 0.35f;
+				if ( pm->ps->pm_flags & PMF_BACKWARDS_RUN ) {
+					PM_ContinueLegsAnim( LEGS_BACKWALK );
+				}
+				else {
+					PM_ContinueLegsAnim( LEGS_WALK );
+				}
 			}
-			else {
-				PM_ContinueLegsAnim( LEGS_RUN );
-			}
-			footstep = qtrue;
 		} else {
 			bobmove = 0.3f;	// walking bobs slow
 			if ( pm->ps->pm_flags & PMF_BACKWARDS_RUN ) {
@@ -2377,7 +2360,7 @@ static void PM_Footsteps( void ) {
 	if ( ( ( old + 64 ) ^ ( pm->ps->bobCycle + 64 ) ) & 128 ) {
 		if ( pm->waterlevel == 0 ) {
 			// on ground will only play sounds if running
-			if ( footstep && !pm->noFootsteps ) {
+			if ( footstep ) {
 				PM_AddEvent( PM_FootstepForSurface() );
 			}
 		} else if ( pm->waterlevel == 1 ) {
@@ -2415,6 +2398,10 @@ static void PM_WaterEvents( void ) {		// FIXME?
 		PM_AddEvent( EV_WATER_LEAVE );
 	}
 
+	if ( pm->ps->pm_type == PM_DEAD ) {
+		return;
+	}
+
 	//
 	// check for head just going under water
 	//
@@ -2425,7 +2412,7 @@ static void PM_WaterEvents( void ) {		// FIXME?
 	//
 	// check for head just coming out of water
 	//
-	if (pml.previous_waterlevel == 3 && pm->waterlevel != 3) {
+	if ( !pm->ps->powerups[PW_INVULNERABILITY] && pml.previous_waterlevel == 3 && pm->waterlevel != 3 ) {
 		PM_AddEvent( EV_WATER_CLEAR );
 	}
 }
@@ -2440,7 +2427,7 @@ static void PM_BeginWeaponChange( int weapon ) {
 	const pmove_settings_t	*settings;
 	int		dropTime;
 
-	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+	if ( weapon <= WP_NONE || weapon > WP_NUM_WEAPONS ) {
 		return;
 	}
 
@@ -2452,10 +2439,18 @@ static void PM_BeginWeaponChange( int weapon ) {
 		return;
 	}
 
+	PM_AddEvent( EV_CHANGE_WEAPON );
+
+	if ( weapon == WP_NUM_WEAPONS ) {
+		pm->ps->weaponstate = WEAPON_READY;
+		pm->ps->weapon = WP_NUM_WEAPONS;
+		PM_StartTorsoAnim( TORSO_STAND );
+		return;
+	}
+
 	settings = PM_GetActiveSettings();
 	dropTime = ( settings->weaponDropTime > 0 ) ? settings->weaponDropTime : 200;
 
-	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
 	pm->ps->weaponTime += dropTime;
 	PM_StartTorsoAnim( TORSO_DROP );
@@ -2473,7 +2468,7 @@ static void PM_FinishWeaponChange( void ) {
 	int		raiseTime;
 
 	weapon = pm->cmd.weapon;
-	if ( weapon < WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+	if ( weapon < WP_NONE || weapon > WP_NUM_WEAPONS ) {
 		weapon = WP_NONE;
 	}
 
@@ -2487,6 +2482,7 @@ static void PM_FinishWeaponChange( void ) {
 	pm->ps->weapon = weapon;
 	pm->ps->weaponstate = WEAPON_RAISING;
 	pm->ps->weaponTime += raiseTime;
+	pm->ps->stats[STAT_CHAINGUN_SPINUP] = 0;
 	PM_StartTorsoAnim( TORSO_RAISE );
 }
 
@@ -2535,6 +2531,13 @@ static void PM_Weapon( void ) {
 	if ( pm->ps->stats[STAT_HEALTH] <= 0 ) {
 		pm->ps->weapon = WP_NONE;
 		return;
+	}
+
+	if ( pm->ps->weapon > WP_NONE && pm->ps->weapon < WP_NUM_WEAPONS &&
+		( pm->cmd.buttons & BUTTON_ATTACK ) &&
+		!( pm->ps->pm_flags & PMF_ATTACK_LOCKOUT ) &&
+		( pm->ps->ammo[ pm->ps->weapon ] || pm->ps->weapon == WP_GRAPPLING_HOOK ) ) {
+		pm->ps->eFlags |= EF_FIRING;
 	}
 
 	holdable = pm->ps->stats[STAT_HOLDABLE_ITEM];
@@ -2592,10 +2595,28 @@ static void PM_Weapon( void ) {
 		return;
 	}
 
+	if ( pm->ps->weapon == WP_NUM_WEAPONS ) {
+		return;
+	}
+
 	// check for fire
-	if ( ! (pm->cmd.buttons & BUTTON_ATTACK) ) {
+	if ( ! ( pm->cmd.buttons & BUTTON_ATTACK ) || ( pm->ps->pm_flags & PMF_ATTACK_LOCKOUT ) ) {
 		pm->ps->weaponTime = 0;
 		pm->ps->weaponstate = WEAPON_READY;
+		pm->ps->stats[STAT_CHAINGUN_SPINUP] -= pml.msec;
+		if ( pm->ps->stats[STAT_CHAINGUN_SPINUP] < 0 ) {
+			pm->ps->stats[STAT_CHAINGUN_SPINUP] = 0;
+		} else if ( pm->ps->stats[STAT_CHAINGUN_SPINUP] > 1000 ) {
+			pm->ps->stats[STAT_CHAINGUN_SPINUP] = 1000;
+		}
+		return;
+	}
+
+	if ( pm->ps->pm_flags & PMF_WEAPON_RESET ) {
+		pm->ps->weaponTime = 0;
+		pm->ps->weaponstate = WEAPON_READY;
+		pm->ps->eFlags &= ~EF_FIRING;
+		pm->ps->pm_flags &= ~PMF_WEAPON_RESET;
 		return;
 	}
 
@@ -2631,9 +2652,21 @@ static void PM_Weapon( void ) {
 
 	addTime = PM_GetWeaponReloadTime( (weapon_t)pm->ps->weapon );
 
-	if ( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
-		addTime /= 1.5;
-	} else if ( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
+	if ( pm->ps->weapon == WP_CHAINGUN ) {
+		if ( pm->ps->stats[STAT_CHAINGUN_SPINUP] < 1000 ) {
+			addTime *= 2;
+		}
+		pm->ps->stats[STAT_CHAINGUN_SPINUP] += addTime;
+		if ( pm->ps->stats[STAT_CHAINGUN_SPINUP] < 0 ) {
+			pm->ps->stats[STAT_CHAINGUN_SPINUP] = 0;
+		} else if ( pm->ps->stats[STAT_CHAINGUN_SPINUP] > 1000 ) {
+			pm->ps->stats[STAT_CHAINGUN_SPINUP] = 1000;
+		}
+	}
+
+	if ( BG_PlayerHasPersistantPowerup( pm->ps, PW_SCOUT ) ) {
+		addTime /= 1.25f;
+	} else if ( BG_PlayerHasPersistantPowerup( pm->ps, PW_AMMOREGEN ) ) {
 		addTime /= 1.3;
 	} else if ( pm->ps->powerups[PW_HASTE] ) {
 		addTime /= 1.3;
@@ -2721,7 +2754,7 @@ static void PM_DropTimers( void ) {
 		}
 	}
 
-	if ( ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) && pml.groundPlane && pm->ps->crouchSlideTime > 0 ) {
+	if ( ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) && pml.groundPlane && pm->ps->crouchSlideTime != 0 ) {
 		pm->ps->crouchSlideTime -= pml.msec;
 		if ( pm->ps->crouchSlideTime < 0 ) {
 			pm->ps->crouchSlideTime = 0;
@@ -2745,7 +2778,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		return;		// no view changes at all
 	}
 
-	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 ) {
+	if ( ps->pm_type != PM_SPECTATOR && ps->pm_type != PM_FREEZE && ps->stats[STAT_HEALTH] <= 0 ) {
 		return;		// no view changes at all
 	}
 
@@ -2780,8 +2813,28 @@ void PmoveSingle (pmove_t *pmove) {
 	const pmove_settings_t	*settings;
 
 	pm = pmove;
-	PM_LoadMoveTuningConstants();
+	// this counter lets us debug movement problems with a journal
+	// by setting a conditional breakpoint fot the previous frame
+	c_pmove++;
+
+	// clear results
+	pm->numtouch = 0;
+	pm->watertype = 0;
+	pm->waterlevel = 0;
+
 	settings = PM_GetActiveSettings();
+	if ( settings->airControl > 0.0f ) {
+		pm->ps->pm_flags |= PMF_AIR_CONTROL;
+	} else {
+		pm->ps->pm_flags &= ~PMF_AIR_CONTROL;
+	}
+	if ( settings->doubleJump ) {
+		pm->ps->pm_flags |= PMF_DOUBLE_JUMP;
+	} else {
+		pm->ps->pm_flags &= ~PMF_DOUBLE_JUMP;
+	}
+	PM_LoadMoveTuningConstants();
+
 	if ( settings->crouchSlide ) {
 		pm->ps->pm_flags |= PMF_CROUCH_SLIDE;
 	} else {
@@ -2800,15 +2853,6 @@ void PmoveSingle (pmove_t *pmove) {
 			pm_autohop ? 1 : 0,
 			pm_bunnyhop ? 1 : 0 );
 	}
-
-	// this counter lets us debug movement problems with a journal
-	// by setting a conditional breakpoint fot the previous frame
-	c_pmove++;
-
-	// clear results
-	pm->numtouch = 0;
-	pm->watertype = 0;
-	pm->waterlevel = 0;
 
 	if ( pm->ps->stats[STAT_HEALTH] <= 0 ) {
 		pm->tracemask &= ~CONTENTS_BODY;	// corpses can fly through bodies
@@ -2831,13 +2875,8 @@ void PmoveSingle (pmove_t *pmove) {
 		pm->ps->eFlags &= ~EF_TALK;
 	}
 
-	// set the firing flag for continuous beam weapons
-	if ( !(pm->ps->pm_flags & PMF_RESPAWNED) && pm->ps->pm_type != PM_INTERMISSION
-		&& ( pm->cmd.buttons & BUTTON_ATTACK ) && pm->ps->ammo[ pm->ps->weapon ] ) {
-		pm->ps->eFlags |= EF_FIRING;
-	} else {
-		pm->ps->eFlags &= ~EF_FIRING;
-	}
+	// PM_Weapon relatches this after the retail attack, health, and ammo gates.
+	pm->ps->eFlags &= ~EF_FIRING;
 
 	// clear the respawned flag if attack and use are cleared
 	if ( pm->ps->stats[STAT_HEALTH] > 0 && 
@@ -2869,6 +2908,10 @@ void PmoveSingle (pmove_t *pmove) {
 	}
 	pm->ps->commandTime = pmove->cmd.serverTime;
 
+	if ( pm->ps->pm_flags & PMF_NO_MOVE ) {
+		return;
+	}
+
 	// save old org in case we get stuck
 	VectorCopy (pm->ps->origin, pml.previous_origin);
 
@@ -2879,6 +2922,17 @@ void PmoveSingle (pmove_t *pmove) {
 
 	// update the viewangles
 	PM_UpdateViewAngles( pm->ps, &pm->cmd );
+
+	// Retail mirrors raw command state before movement rewrites inputs.
+	if ( pm->cmd.weaponPrimary > WP_NONE && pm->cmd.weaponPrimary < WP_NUM_WEAPONS ) {
+		pm->ps->weaponPrimary = pm->cmd.weaponPrimary;
+	}
+	if ( pm->cmd.fov >= 10 && pm->cmd.fov <= 130 ) {
+		pm->ps->fov = pm->cmd.fov;
+	}
+	pm->ps->forwardmove = pm->cmd.forwardmove;
+	pm->ps->rightmove = pm->cmd.rightmove;
+	pm->ps->upmove = pm->cmd.upmove;
 
 	AngleVectors (pm->ps->viewangles, pml.forward, pml.right, pml.up);
 

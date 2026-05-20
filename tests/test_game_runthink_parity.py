@@ -11,10 +11,14 @@ def _read(rel_path: str) -> str:
 def test_runthink_services_retail_runframe_callback() -> None:
 	local_h = _read("src/code/game/g_local.h")
 	main_c = _read("src/code/game/g_main.c")
+	game_types_h = _read("src/game/ql_game_types.h")
 
 	assert "(*runFrame)(gentity_t *self, float thinktime)" in local_h
 	assert "if ( ent->runFrame ) {" in main_c
 	assert "ent->runFrame( ent, thinktime );" in main_c
+	assert "QL_GENTITY_OFFSET_RUNFRAME = 0x2FC" in game_types_h
+	assert "ql_gentity_runframe_fn runFrame; // 0x2FC" in game_types_h
+	assert 'QL_STATIC_ASSERT(offsetof(ql_gentity_t, runFrame) == 0x2FC, "gentity_t.runFrame offset");' in game_types_h
 
 
 def test_trigger_push_uses_runframe_aim_refresh() -> None:

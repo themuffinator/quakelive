@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-05-17
+Last updated: 2026-05-20
 
 This file is the current cross-subsystem ledger for the repository. Detailed
 reconstruction history belongs in the dedicated subsystem audits under
@@ -158,12 +158,18 @@ Two repo-wide gap families remain active:
   also pinned by `tests/test_retail_dependency_runtime_audit.py`, which proves
   the mixed `build\win32\Debug\bin` lane still fails the strict audit while a
   clean staged root passes with rebuilt module slots treated as required but
-  hash-optional. The module alias now also points at the current bounded
-  `2026-04-21` retail-module artifact, whose remaining live-map shortfall is
-  explicitly the renderer-owned `R_fonsErrorCallback` font-atlas saturation
-  lane rather than an ambiguous module-host failure. The remaining debt is now
-  concentrated in fresh native build outputs and the broader glibc plus
-  self-hosted publication follow-ups in `docs/platform/toolchain-matrix.md`.
+  hash-optional. The module alias still points at the bounded `2026-04-21`
+  retail-module artifact, whose remaining live-map shortfall was explicitly the
+  renderer-owned `R_fonsErrorCallback` font-atlas saturation lane rather than an
+  ambiguous module-host failure. The 2026-05-20 renderer wiring pass removed the
+  non-retail eager FontStash prebuild that most plausibly caused that
+  saturation, restored direct `GL_ALPHA` atlas refreshes, and re-aligned the
+  retail `GetRefAPI` export ABI tail around API version `9`, the no-op legacy
+  font slot, and the private `postprocess_restart` offset. This part of
+  `RW-G04` is now stale evidence awaiting a fresh module-runtime rerun. The
+  remaining debt is concentrated in fresh native build
+  outputs and the broader glibc plus self-hosted publication follow-ups in
+  `docs/platform/toolchain-matrix.md`.
 
 The former `RW-G03` UI packaging/proof gap is now bounded rather than active:
 the checked-in `src/ui` runtime-panel baseline is clean, and explicit

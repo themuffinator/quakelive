@@ -37,6 +37,22 @@ UI_ATOMS = REPO_ROOT / "src" / "code" / "ui" / "ui_atoms.c"
 UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
 UI_SHARED_H = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.h"
 MENUDEF_H = REPO_ROOT / "src" / "ui" / "menudef.h"
+CGAME_GHIDRA_DECOMPILE = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "cgamex86"
+	/ "decompile_top_functions.c"
+)
+CGAME_HLIL = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "cgamex86.dll"
+	/ "cgamex86.dll_hlil.txt"
+)
 
 
 def _block_from_marker(source: str, marker: str) -> str:
@@ -54,6 +70,66 @@ def _block_from_marker(source: str, marker: str) -> str:
 				return source[start:index + 1]
 
 	raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
+def _text_between(source: str, start_marker: str, end_marker: str) -> str:
+	start = source.index(start_marker)
+	end = source.index(end_marker, start)
+	return source[start:end]
+
+
+def _menudef_ownerdraw_constants() -> dict[str, int]:
+	menudef = MENUDEF_H.read_text(encoding="utf-8")
+	constants: dict[str, int] = {}
+
+	for match in re.finditer(
+		r"#define\s+(CG_[A-Z0-9_]+|UI_ADVERT)\s+(0x[0-9a-fA-F]+|\d+)",
+		menudef,
+	):
+		constants[match.group(1)] = int(match.group(2), 0)
+
+	return constants
+
+
+def _retail_cg_ownerdraw_case_values() -> set[int]:
+	source = CGAME_GHIDRA_DECOMPILE.read_text(encoding="utf-8")
+	start = source.index("void FUN_1003b0f0(")
+	end = source.index("/* FUN_1003a1c0", start)
+	block = source[start:end]
+
+	return {
+		int(match.group(1), 0)
+		for match in re.finditer(r"case\s+(0x[0-9a-fA-F]+|\d+)\s*:", block)
+	}
+
+
+def _retail_cg_ownerdraw_cases_for_target(target: str) -> set[int]:
+	source = CGAME_GHIDRA_DECOMPILE.read_text(encoding="utf-8")
+	start = source.index("void FUN_1003b0f0(")
+	end = source.index("/* FUN_1003a1c0", start)
+	block = source[start:end]
+	cases: set[int] = set()
+	active_cases: list[int] = []
+
+	for line in block.splitlines():
+		match = re.match(r"\s*case\s+(0x[0-9a-fA-F]+|\d+)\s*:", line)
+		if match:
+			active_cases.append(int(match.group(1), 0))
+			continue
+
+		if target in line and active_cases:
+			cases.update(active_cases)
+			active_cases = []
+			continue
+
+		if re.match(r"\s*(break|return);", line):
+			active_cases = []
+
+	return cases
+
+
+def _case_labels(block: str) -> list[str]:
+	return re.findall(r"^\s*case\s+([A-Z0-9_]+)\s*:", block, flags=re.MULTILINE)
 
 
 def test_cgame_display_context_wires_binding_and_execute_hooks() -> None:
@@ -292,17 +368,22 @@ def test_cgame_match_state_auxiliary_configstrings_drive_live_timeout_and_team_c
 
 
 def test_cgame_overtime_ownerdraw_reconstruction_matches_retail_label_family() -> None:
-	main_source = CG_MAIN.read_text(encoding="utf-8")
+	ghidra_source = CGAME_GHIDRA_DECOMPILE.read_text(encoding="utf-8")
 	event_source = CG_EVENT.read_text(encoding="utf-8")
 	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
 	scoreboard_source = CG_SCOREBOARD.read_text(encoding="utf-8")
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
-	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
 	draw_block = _block_from_marker(newdraw_source, "static void CG_DrawOvertime")
+	ownerdraw_block = _block_from_marker(newdraw_source, "void CG_OwnerDraw(")
+	retail_ownerdraw_block = _block_from_marker(ghidra_source, "void FUN_1003b0f0(")
 	scoreboard_block = _block_from_marker(scoreboard_source, "static void CG_UpdateHudScoreboardBanners( void )")
+	constants = _menudef_ownerdraw_constants()
 
 	assert "int CG_GetOvertimeCount( void );" in local_source
 	assert "int CG_GetOvertimeCount( void ) {" in event_source
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10030d20") == {
+		constants["CG_OVERTIME"],
+	}
 
 	for expected in (
 		"overtimeCount = CG_GetOvertimeCount();",
@@ -310,11 +391,77 @@ def test_cgame_overtime_ownerdraw_reconstruction_matches_retail_label_family() -
 		'Q_strncpyz( buffer, "Overtime", sizeof( buffer ) );',
 	):
 		assert expected in draw_block
-		assert expected in width_block
 
 	assert 'CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);' in draw_block
-	assert "return CG_Text_Width( buffer, scale, 0 );" in width_block
 	assert "if ( cgHudScoreboard.overtimeCount > 1 ) {" in scoreboard_block
+	assert "case 0xf:" in retail_ownerdraw_block
+	assert "if (DAT_10ab8f4c == 0) {" in retail_ownerdraw_block
+	assert "FUN_10030d20(param_13,param_14,param_16,param_10);" in retail_ownerdraw_block
+
+	start = ownerdraw_block.index("case CG_OVERTIME:")
+	end = ownerdraw_block.index("break;", start)
+	overtime_case = ownerdraw_block[start:end]
+	assert "if ( cg.warmup == 0 ) {" in overtime_case
+	assert "CG_DrawOvertime(&rect, scale, color, textStyle);" in overtime_case
+
+
+def test_cgame_ownerdraw_width_callback_matches_retail_hlil_surface() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+	retail_width_block = _text_between(
+		hlil_source,
+		"10028d80    int32_t sub_10028d80",
+		"10028e80    int32_t sub_10028e80",
+	)
+
+	for expected in (
+		"switch (arg1 + &jump_table_10028e30[4])",
+		'ecx_1 = "Unknown Gametype"',
+		"eax_4, ecx = sub_10034b30()",
+		"eax_4, ecx = sub_10034a00()",
+		'eax_4, ecx = sub_100575e0("Fragged by %s")',
+		"return 0",
+	):
+		assert expected in retail_width_block
+
+	assert set(_case_labels(width_block)) == {
+		"CG_GAME_TYPE",
+		"CG_GAME_STATUS",
+		"CG_MATCH_STATUS",
+		"CG_KILLER",
+	}
+
+	for expected in (
+		"return CG_Text_Width( CG_GameTypeString(), scale, 0 );",
+		"return CG_Text_Width( CG_GetGameStatusText(), scale, 0 );",
+		"return CG_Text_Width( CG_GetMatchStatusText(), scale, 0 );",
+		"return CG_Text_Width( CG_GetKillerText(), scale, 0 );",
+		"return 0;",
+	):
+		assert expected in width_block
+
+	for stale in (
+		"CG_LEVELTIMER",
+		"CG_ROUNDTIMER",
+		"CG_OVERTIME",
+		"CG_ROUND",
+		"CG_HEALTH_COLORIZED",
+		"CG_1ST_PLYR_HEALTH_ARMOR",
+		"CG_RACE_STATUS",
+		"CG_RACE_TIMES",
+		"CG_RED_NAME",
+		"CG_BLUE_NAME",
+	):
+		assert stale not in width_block
+
+	assert "static int CG_LevelTimerWidth" not in main_source
+	assert "static int CG_RoundLabelWidth" not in main_source
+	assert "const char *CG_GetMatchStatusText( void );" in local_source
+	assert "const char *CG_GetMatchStatusText( void )" in newdraw_source
+	assert "static const char *CG_GetMatchStatusText" not in newdraw_source
 
 
 def test_scoreboard_and_race_server_command_wrappers_match_retail_dispatch() -> None:
@@ -681,6 +828,141 @@ def test_cgame_placement_metric_wrappers_restore_retail_direct_owners() -> None:
 		assert expected in dispatch_block
 
 
+def test_cgame_placement_metric_target_groups_match_retail_ownerdraw_switch() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	guard_block = _block_from_marker(source, "static qboolean CG_IsRetailPlacementMetricOwnerDraw")
+	build_block = _block_from_marker(source, "static qboolean CG_BuildPlacementMetricText")
+	dispatch_block = _block_from_marker(source, "static qboolean CG_DrawPlacementMetricOwnerDraw")
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	all_weapons = ("G", "MG", "SG", "GL", "RL", "LG", "RG", "PG", "BFG", "CG", "NG", "PL", "HMG")
+	non_gauntlet_weapons = all_weapons[1:]
+
+	def values(names: set[str]) -> set[int]:
+		return {constants[name] for name in names}
+
+	def weapon_names(metric: str, weapons: tuple[str, ...]) -> set[str]:
+		return {
+			f"CG_{slot}_PLYR_{metric}_{weapon}"
+			for slot in ("1ST", "2ND")
+			for weapon in weapons
+		}
+
+	simple_target_groups = {
+		"FUN_10035bd0": {"CG_1ST_PLYR", "CG_2ND_PLYR"},
+		"FUN_10037ba0": {"CG_1ST_PLYR_READY"},
+		"FUN_10035f30": {"CG_1ST_PLYR_SCORE", "CG_2ND_PLYR_SCORE"},
+		"FUN_100361f0": {"CG_1ST_PLYR_FRAGS", "CG_2ND_PLYR_FRAGS"},
+		"FUN_10036320": {"CG_1ST_PLYR_DEATHS", "CG_2ND_PLYR_DEATHS"},
+		"FUN_10036770": {"CG_1ST_PLYR_DMG", "CG_2ND_PLYR_DMG"},
+		"FUN_10036070": {"CG_1ST_PLYR_PING", "CG_2ND_PLYR_PING"},
+		"FUN_10036450": {"CG_1ST_PLYR_WINS", "CG_2ND_PLYR_WINS"},
+		"FUN_10036570": {"CG_1ST_PLYR_ACC", "CG_2ND_PLYR_ACC"},
+		"FUN_10036720": {"CG_1ST_PLYR_FLAG", "CG_2ND_PLYR_FLAG"},
+		"FUN_100366a0": {"CG_1ST_PLYR_AVATAR", "CG_2ND_PLYR_AVATAR"},
+		"FUN_10033040": {"CG_1ST_PLYR_HEALTH_ARMOR", "CG_2ND_PLYR_HEALTH_ARMOR"},
+		"FUN_10037d60": {"CG_2ND_PLYR_READY"},
+	}
+
+	for target, names in simple_target_groups.items():
+		assert _retail_cg_ownerdraw_cases_for_target(target) == values(names)
+
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_100368a0") == values(weapon_names("FRAGS", all_weapons))
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_100369d0") == values(weapon_names("HITS", non_gauntlet_weapons))
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10036b00") == values(weapon_names("SHOTS", non_gauntlet_weapons))
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10036c30") == values(weapon_names("DMG", all_weapons))
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10036d60") == values(weapon_names("ACC", non_gauntlet_weapons))
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10036eb0") == values({
+		"CG_1ST_PLYR_PICKUPS",
+		"CG_1ST_PLYR_PICKUPS_RA",
+		"CG_1ST_PLYR_PICKUPS_YA",
+		"CG_1ST_PLYR_PICKUPS_GA",
+		"CG_1ST_PLYR_PICKUPS_MH",
+		"CG_2ND_PLYR_PICKUPS",
+		"CG_2ND_PLYR_PICKUPS_RA",
+		"CG_2ND_PLYR_PICKUPS_YA",
+		"CG_2ND_PLYR_PICKUPS_GA",
+		"CG_2ND_PLYR_PICKUPS_MH",
+	})
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10037730") == values({
+		"CG_1ST_PLYR_AVG_PICKUP_TIME_RA",
+		"CG_1ST_PLYR_AVG_PICKUP_TIME_YA",
+		"CG_1ST_PLYR_AVG_PICKUP_TIME_GA",
+		"CG_1ST_PLYR_AVG_PICKUP_TIME_MH",
+		"CG_2ND_PLYR_AVG_PICKUP_TIME_RA",
+		"CG_2ND_PLYR_AVG_PICKUP_TIME_YA",
+		"CG_2ND_PLYR_AVG_PICKUP_TIME_GA",
+		"CG_2ND_PLYR_AVG_PICKUP_TIME_MH",
+	})
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10037990") == values({
+		"CG_1ST_PLYR_EXCELLENT",
+		"CG_1ST_PLYR_IMPRESSIVE",
+		"CG_1ST_PLYR_HUMILIATION",
+		"CG_2ND_PLYR_EXCELLENT",
+		"CG_2ND_PLYR_IMPRESSIVE",
+		"CG_2ND_PLYR_HUMILIATION",
+	})
+
+	assert set(_case_labels(guard_block)) == {
+		"CG_1ST_PLYR_READY",
+		"CG_2ND_PLYR_READY",
+		"CG_1ST_PLYR_FRAGS",
+		"CG_2ND_PLYR_FRAGS",
+		"CG_1ST_PLYR_DEATHS",
+		"CG_2ND_PLYR_DEATHS",
+		"CG_1ST_PLYR_DMG",
+		"CG_2ND_PLYR_DMG",
+		"CG_1ST_PLYR_PING",
+		"CG_2ND_PLYR_PING",
+		"CG_1ST_PLYR_WINS",
+		"CG_2ND_PLYR_WINS",
+		"CG_1ST_PLYR_ACC",
+		"CG_2ND_PLYR_ACC",
+		"CG_1ST_PLYR_FLAG",
+		"CG_2ND_PLYR_FLAG",
+	}
+
+	for expected in (
+		"ownerDraw >= CG_1ST_PLYR_FRAGS_G && ownerDraw <= CG_1ST_PLYR_FRAGS_HMG",
+		"ownerDraw >= CG_1ST_PLYR_HITS_MG && ownerDraw <= CG_1ST_PLYR_HITS_HMG",
+		"ownerDraw >= CG_1ST_PLYR_SHOTS_MG && ownerDraw <= CG_1ST_PLYR_SHOTS_HMG",
+		"ownerDraw >= CG_1ST_PLYR_DMG_G && ownerDraw <= CG_1ST_PLYR_DMG_HMG",
+		"ownerDraw >= CG_1ST_PLYR_ACC_MG && ownerDraw <= CG_1ST_PLYR_ACC_HMG",
+		"ownerDraw >= CG_1ST_PLYR_PICKUPS && ownerDraw <= CG_1ST_PLYR_PICKUPS_MH",
+		"ownerDraw >= CG_1ST_PLYR_AVG_PICKUP_TIME_RA && ownerDraw <= CG_1ST_PLYR_AVG_PICKUP_TIME_MH",
+		"ownerDraw >= CG_1ST_PLYR_EXCELLENT && ownerDraw <= CG_1ST_PLYR_HUMILIATION",
+		"ownerDraw >= CG_2ND_PLYR_EXCELLENT && ownerDraw <= CG_2ND_PLYR_HUMILIATION",
+	):
+		assert expected in guard_block
+
+	for direct_owner_draw in (
+		"CG_1ST_PLYR_SCORE",
+		"CG_2ND_PLYR_SCORE",
+		"CG_1ST_PLYR_HEALTH_ARMOR",
+		"CG_2ND_PLYR_HEALTH_ARMOR",
+		"CG_1ST_PLYR_AVATAR",
+		"CG_2ND_PLYR_AVATAR",
+	):
+		assert direct_owner_draw not in guard_block
+		assert direct_owner_draw in ownerdraw_block
+
+	for absent_owner_draw in (
+		"CG_1ST_PLYR_TIME",
+		"CG_2ND_PLYR_TIME",
+		"CG_1ST_PLYR_TIMEOUT_COUNT",
+		"CG_2ND_PLYR_TIMEOUT_COUNT",
+		"CG_1ST_PLYR_PR",
+		"CG_2ND_PLYR_PR",
+		"CG_1ST_PLYR_TIER",
+		"CG_2ND_PLYR_TIER",
+	):
+		assert absent_owner_draw not in guard_block
+		assert absent_owner_draw not in build_block
+
+	assert "if ( !CG_IsRetailPlacementMetricOwnerDraw( ownerDraw ) ) {" in dispatch_block
+	assert "CG_BuildPlacementProgressionMetricText" not in source
+
+
 def test_cgame_country_flag_cache_restores_retail_player_configstring_transport() -> None:
 	cg_main = CG_MAIN.read_text(encoding="utf-8")
 	cg_players = CG_PLAYERS.read_text(encoding="utf-8")
@@ -722,16 +1004,41 @@ def test_cgame_country_flag_cache_restores_retail_player_configstring_transport(
 
 def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
-	first_place_block = _block_from_marker(source, "static void CG_Draw1stPlace(")
-	second_place_block = _block_from_marker(source, "static void CG_Draw2ndPlace(")
+	score_value_block = _block_from_marker(source, "static void CG_DrawScoreValue")
 	value_block = _block_from_marker(source, "static qboolean CG_BuildPlacementScoreValue")
 	line_block = _block_from_marker(source, "static void CG_DrawPlacementScoreLine")
 	first_score_block = _block_from_marker(source, "static void CG_Draw1stPlaceScore")
 	second_score_block = _block_from_marker(source, "static void CG_Draw2ndPlaceScore")
 	follow_block = _block_from_marker(source, "static void CG_DrawFollowPlayerNameEx")
+	constants = _menudef_ownerdraw_constants()
 
-	assert 'CG_Text_Paint(rect->x, rect->y, scale, color, va("%2i", cgs.scores1),0, 0, textStyle);' in first_place_block
-	assert 'CG_Text_Paint(rect->x, rect->y, scale, color, va("%2i", cgs.scores2),0, 0, textStyle);' in second_place_block
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_100323d0") == {
+		constants["CG_PLAYER_SCORE"],
+		constants["CG_1STPLACE"],
+		constants["CG_2NDPLACE"],
+	}
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_1002ff50") == {
+		constants["CG_RED_SCORE"],
+		constants["CG_BLUE_SCORE"],
+	}
+
+	assert set(_case_labels(score_value_block)) == {
+		"CG_PLAYER_SCORE",
+		"CG_1STPLACE",
+		"CG_2NDPLACE",
+	}
+	assert "CG_DrawTeamScore" not in score_value_block
+	assert "case CG_RED_SCORE:" not in score_value_block
+	assert "case CG_BLUE_SCORE:" not in score_value_block
+
+	for expected in (
+		"CG_DrawPlayerScore( rect, scale, color, shader, textStyle );",
+		"if ( cgs.scores1 != SCORE_NOT_PRESENT ) {",
+		'CG_Text_Paint( rect->x, rect->y, scale, color, va( "%2i", cgs.scores1 ), 0, 0, textStyle );',
+		"if ( cgs.scores2 != SCORE_NOT_PRESENT ) {",
+		'CG_Text_Paint( rect->x, rect->y, scale, color, va( "%2i", cgs.scores2 ), 0, 0, textStyle );',
+	):
+		assert expected in score_value_block
 
 	for expected in (
 		"if ( cgs.gametype == GT_RACE ) {",
@@ -777,6 +1084,11 @@ def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split()
 	assert "CG_Draw1stPlaceScore(&rect, scale, color, textStyle);" in source
 	assert "case CG_2ND_PLACE_SCORE:" in source
 	assert "CG_Draw2ndPlaceScore(&rect, scale, color, textStyle);" in source
+	assert "case CG_1STPLACE:" in source
+	assert "case CG_2NDPLACE:" in source
+	assert "CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );" in source
+	assert "static void CG_Draw1stPlace(" not in source
+	assert "static void CG_Draw2ndPlace(" not in source
 	assert "case CG_FOLLOW_PLAYER_NAME:" in source
 	assert "CG_DrawFollowPlayerNameEx(&rect, scale, color, textStyle, ownerDraw, align);" in source
 	assert "case CG_FOLLOW_PLAYER_NAME_EX:" in source
@@ -980,17 +1292,61 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 
 def test_cgame_team_score_name_playercount_and_match_phase_ownerdraws_follow_retail_shared_leaves() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	align_block = _block_from_marker(source, "static float CG_AlignTextInRectX")
 	score_text_block = _block_from_marker(source, "static qboolean CG_BuildTeamScoreText")
 	score_block = _block_from_marker(source, "static void CG_DrawTeamScore")
 	name_block = _block_from_marker(source, "static void CG_DrawTeamName")
 	player_count_block = _block_from_marker(source, "static void CG_DrawTeamPlayerCount")
+	round_team_count_block = _block_from_marker(source, "static int CG_GetRoundTeamCount")
+	clan_arena_block = _block_from_marker(source, "static void CG_DrawClanArenaPlayers")
+	round_player_count_team_block = _block_from_marker(source, "static team_t CG_GetRoundPlayerCountTeam")
+	round_player_count_block = _block_from_marker(source, "static void CG_DrawPlayerCount( rectDef_t")
 	timeout_count_block = _block_from_marker(source, "static void CG_DrawTeamTimeoutCount")
+	domination_count_block = _block_from_marker(source, "static int CG_CountDominationOwnedFlags")
+	domination_flags_block = _block_from_marker(source, "static void CG_DrawDominationOwnedFlags")
 	round_label_block = _block_from_marker(source, "static void CG_DrawRoundLabel")
 	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	game_type_block = _block_from_marker(source, "static void CG_DrawGameType( rectDef_t")
 	match_phase_block = _block_from_marker(source, "static const char *CG_GetMatchPhaseText")
-	match_status_block = _block_from_marker(source, "static const char *CG_GetMatchStatusText")
+	match_status_block = _block_from_marker(source, "const char *CG_GetMatchStatusText")
+	draw_match_status_block = _block_from_marker(source, "static void CG_DrawMatchStatus")
 	match_state_block = _block_from_marker(source, "static void CG_DrawMatchState")
+	retail_match_state_block = _text_between(
+		hlil_source,
+		"10034360    int32_t sub_10034360",
+		"100343d0",
+	)
+	retail_game_type_block = _text_between(
+		hlil_source,
+		"10034c20    int32_t sub_10034c20",
+		"10034cc0",
+	)
+	retail_round_player_count_block = _text_between(
+		hlil_source,
+		'10033650    int32_t __convention("regparm") sub_10033650',
+		"100336e0",
+	)
+	retail_clan_arena_block = _text_between(
+		hlil_source,
+		'100335f0    int32_t __convention("regparm") sub_100335f0',
+		"10033650",
+	)
+	retail_timeout_count_block = _text_between(
+		hlil_source,
+		'10033530    void __convention("regparm") sub_10033530',
+		"100335f0",
+	)
+	retail_round_label_block = _text_between(
+		hlil_source,
+		"100336e0    void sub_100336e0",
+		"100337a0",
+	)
+	retail_domination_flags_block = _text_between(
+		hlil_source,
+		'100337a0    int32_t __convention("regparm") sub_100337a0',
+		"10033800",
+	)
 
 	for expected in (
 		"if ( align == ITEM_ALIGN_CENTER ) {",
@@ -1032,21 +1388,93 @@ def test_cgame_team_score_name_playercount_and_match_phase_ownerdraws_follow_ret
 	):
 		assert expected in player_count_block
 
+	assert "int32_t var_c = *((arg2 << 2) + &data_10a404b8)" in retail_clan_arena_block
+	assert "10068e44              25 64 00 00" in hlil_source
+	assert "return cgs.matchTeamCount[team];" in round_team_count_block
+	assert "CG_CountPlayersForTeam" not in round_team_count_block
+	assert "count > 0" not in round_team_count_block
+	assert "count = CG_GetRoundTeamCount( team );" in clan_arena_block
+	assert 'Com_sprintf( buffer, sizeof( buffer ), "%d", count );' in clan_arena_block
+	assert "CG_GetTeamLabel" not in clan_arena_block
+	assert "players" not in clan_arena_block
+
+	assert "int32_t eax_1 = *(data_10a6f8c4 + 0x138)" in retail_round_player_count_block
+	assert "if (arg4 == 0)" in retail_round_player_count_block
+	assert "eax_1 = 2" in retail_round_player_count_block
+	assert "eax_1 = 1" in retail_round_player_count_block
+	assert "int32_t var_8 = *((eax_1 << 2) + &data_10a404b8)" in retail_round_player_count_block
+
+	for expected in (
+		"team = (team_t)cg.snap->ps.persistant[PERS_TEAM];",
+		"if ( !friendly ) {",
+		"if ( team == TEAM_RED ) {",
+		"team = TEAM_BLUE;",
+		"team = TEAM_RED;",
+		"return TEAM_FREE;",
+	):
+		assert expected in round_player_count_team_block
+
+	assert "team = CG_GetRoundPlayerCountTeam( friendly );" in round_player_count_block
+	assert "count = ( team == TEAM_RED || team == TEAM_BLUE ) ? cgs.matchTeamCount[team] : 0;" in round_player_count_block
+	assert "CG_CountLivingPlayers" not in round_player_count_block
+	assert "friendCount" not in round_player_count_block
+	assert "enemyCount" not in round_player_count_block
+	assert "static void CG_CountLivingPlayers" not in source
+
 	for expected in (
 		"remaining = cgs.matchTimeoutRemaining[team];",
 		'Com_sprintf( buffer, sizeof( buffer ), "TO: %d", remaining );',
+		"x = CG_AlignTextInRectX( rect, scale, buffer, align );",
+		"CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
 	):
 		assert expected in timeout_count_block
 
 	for expected in (
-		"if ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) {",
-		'Q_strncpyz( label, "Warmup", sizeof( label ) );',
+		"int32_t var_10 = *((arg1 << 2) + &data_10a404d8)",
+		"int32_t eax_1 = sub_100575e0(&data_10068de8)",
+		"if (edx == 1)",
+		"*ebx = fconvert.s(fconvert.t(*ebx) - float.t(arg_10) * fconvert.t(0.5))",
+		"else if (edx == 2)",
+		"*ebx = fconvert.s(fconvert.t(*ebx) - float.t(arg_10))",
+	):
+		assert expected in retail_timeout_count_block
+
+	assert "if ( cgs.gametype != GT_DOMINATION && cgs.gametype != GT_ATTACK_DEFEND ) {" in domination_count_block
+	assert "!cg.snap" not in domination_count_block
+	assert "return cgs.dominationOwnedPointCount[team];" in domination_count_block
+	assert "int32_t var_c = *((arg2 << 2) + &data_10a404c8)" in retail_domination_flags_block
+	assert "eax_1, ecx_1 = sub_100575e0(&data_10068e44)" in retail_domination_flags_block
+	assert "owned = CG_CountDominationOwnedFlags( team );" in domination_flags_block
+	assert 'Com_sprintf( buffer, sizeof( buffer ), "%d", owned );' in domination_flags_block
+	assert "CG_GetTeamLabel" not in domination_flags_block
+	assert "flags" not in domination_flags_block
+
+	for expected in (
+		"int32_t eax_3 = data_10ab8f58",
+		"if (eax_3 s<= 0)",
+		'ebp = "Warmup"',
+		'ebp = sub_100575e0("Round %d")',
+		"int32_t eax_1 = sub_100575e0(&data_10068de8)",
+		"if (edx == 1)",
+		"*ebx = fconvert.s(fconvert.t(*ebx) - float.t(arg_10) * fconvert.t(0.5))",
+		"else if (edx == 2)",
+		"*ebx = fconvert.s(fconvert.t(*ebx) - float.t(arg_10))",
+	):
+		assert expected in retail_round_label_block
+
+	for expected in (
+		"if ( cgs.matchRoundNumber > 0 ) {",
 		'Com_sprintf( label, sizeof( label ), "Round %d", cgs.matchRoundNumber );',
-		"if ( !label[0] ) {",
-		"CG_GetTextPosition( rect, text_x, text_y, &x, &y );",
+		'Q_strncpyz( label, "Warmup", sizeof( label ) );',
+		"x = CG_AlignTextInRectX( rect, scale, label, align );",
+		"CG_Text_Paint( x, rect->y + rect->h, scale, color, label, 0, 0, textStyle );",
 	):
 		assert expected in round_label_block
 
+	assert "cgs.matchRoundState" not in round_label_block
+	assert "cg.warmup" not in round_label_block
+	assert "CG_GetTextPosition" not in round_label_block
+	assert "if ( !label[0] )" not in round_label_block
 	assert "CG_GetMatchStateLabel();" not in round_label_block
 
 	for expected in (
@@ -1057,14 +1485,37 @@ def test_cgame_team_score_name_playercount_and_match_phase_ownerdraws_follow_ret
 		assert expected in match_phase_block
 
 	assert "phase = CG_GetMatchPhaseText();" in match_status_block
-	assert "CG_Text_Paint( rect->x, rect->y + rect->h, scale, color, CG_GetMatchPhaseText(), 0, 0, textStyle );" in match_state_block
+	assert "CG_AlignTextX( &x, statusText, scale, align );" in draw_match_status_block
+	assert "CG_Text_Paint( x, rect->y, scale, color, statusText, 0, 0, textStyle );" in draw_match_status_block
+	assert "CG_GetTextPosition" not in draw_match_status_block
+	for expected in (
+		"if (arg5 == 1)",
+		"sub_100082b0(0, 0, ebx, &arg1, nullptr, 0, fconvert.s(fconvert.t(arg2)))",
+		"arg1 = fconvert.s(x87_r7_5 - float.t(arg1))",
+		"float var_28 = fconvert.s(fconvert.t(*(ebp + 4)))",
+	):
+		assert expected in retail_game_type_block
+	assert "else if (arg5 == 2)" not in retail_game_type_block
+	assert "gameType = CG_GameTypeString();" in game_type_block
+	assert "if ( align == ITEM_ALIGN_CENTER ) {" in game_type_block
+	assert "x -= CG_Text_Width( gameType, scale, 0 ) * 0.5f;" in game_type_block
+	assert "CG_Text_Paint( x, rect->y, scale, color, gameType, 0, 0, textStyle );" in game_type_block
+	assert "ITEM_ALIGN_RIGHT" not in game_type_block
+	assert "rect->y + rect->h" not in game_type_block
+	assert "qhandle_t shader" not in game_type_block
+	assert "fconvert.s(fconvert.t(arg1[1]))" in retail_match_state_block
+	assert "arg1[3]" not in retail_match_state_block
+	assert "CG_Text_Paint( rect->x, rect->y, scale, color, CG_GetMatchPhaseText(), 0, 0, textStyle );" in match_state_block
+	assert "rect->y + rect->h" not in match_state_block
+	assert "CG_DrawGameType( &rect, scale, color, textStyle, align );" in ownerdraw_block
+	assert "CG_DrawGameType(&rect, scale, color, shader, textStyle);" not in ownerdraw_block
 	assert ownerdraw_block.count("if ( CG_ShowPlayersRemaining() ) {") >= 5
 
 	start = ownerdraw_block.index("case CG_ROUND:")
 	end = ownerdraw_block.index("break;", start)
 	round_case_block = ownerdraw_block[start:end]
 	assert "if ( CG_ShowPlayersRemaining() ) {" in round_case_block
-	assert "CG_DrawRoundLabel(&rect, text_x, text_y, scale, color, textStyle);" in round_case_block
+	assert "CG_DrawRoundLabel( &rect, scale, color, textStyle, align );" in round_case_block
 
 	for marker, expected in (
 		("case CG_RED_OWNED_FLAGS:", "CG_DrawDominationOwnedFlags(&rect, scale, color, textStyle, TEAM_RED);"),
@@ -1077,8 +1528,8 @@ def test_cgame_team_score_name_playercount_and_match_phase_ownerdraws_follow_ret
 		assert expected in case_block
 
 	for marker, expected in (
-		("case CG_RED_TIMEOUT_COUNT:", "CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_RED);"),
-		("case CG_BLUE_TIMEOUT_COUNT:", "CG_DrawTeamTimeoutCount(&rect, scale, color, textStyle, TEAM_BLUE);"),
+		("case CG_RED_TIMEOUT_COUNT:", "CG_DrawTeamTimeoutCount( &rect, scale, color, textStyle, TEAM_RED, align );"),
+		("case CG_BLUE_TIMEOUT_COUNT:", "CG_DrawTeamTimeoutCount( &rect, scale, color, textStyle, TEAM_BLUE, align );"),
 	):
 		start = ownerdraw_block.index(marker)
 		end = ownerdraw_block.index("break;", start)
@@ -1127,8 +1578,10 @@ def test_cgame_intro_panel_and_player_count_widgets_restore_retail_detail_and_ca
 	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
 	game_source = G_MAIN.read_text(encoding="utf-8")
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	player_limit_block = _block_from_marker(newdraw_source, "static int CG_GetConfiguredPlayerCountLimit")
 	player_counts_block = _block_from_marker(newdraw_source, "static void CG_DrawPlayerCounts")
+	retail_player_counts_block = _text_between(hlil_source, "10032f30    void sub_10032f30", "10033040")
 	location_block = _block_from_marker(newdraw_source, "static void CG_GetServerLocation")
 	detail_block = _block_from_marker(newdraw_source, "static void CG_BuildIntroPanelDetailString")
 	game_type_map_block = _block_from_marker(newdraw_source, "static void CG_DrawGameTypeMap")
@@ -1139,12 +1592,15 @@ def test_cgame_intro_panel_and_player_count_widgets_restore_retail_detail_and_ca
 
 	for expected in (
 		"playerLimit = cgs.maxclients;",
-		"if ( cgs.gametype == GT_FFA || cgs.playerCountTeamSize <= 0 ) {",
+		"if ( cgs.gametype == GT_FFA || cgs.gametype == GT_TOURNAMENT || cgs.playerCountTeamSize <= 0 ) {",
 		"playerLimit = cgs.playerCountTeamSize * 2;",
 		"if ( playerLimit > cgs.maxclients ) {",
 		"return cgs.playerCountTeamSize;",
 	):
 		assert expected in player_limit_block
+
+	assert "if (esi_1 == 1 || i_4 == 0)" in retail_player_counts_block
+	assert "if (esi_1 s>= 3)" in retail_player_counts_block
 
 	for expected in (
 		"active = CG_CountActivePlayers();",
@@ -1172,13 +1628,18 @@ def test_cgame_intro_panel_and_player_count_widgets_restore_retail_detail_and_ca
 
 	assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in game_type_map_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), detailBuffer );' in game_type_map_block
+	assert "CG_AlignTextX( &x, buffer, scale, align );" in game_type_map_block
+	assert "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );" in game_type_map_block
 	assert "CG_GetMapDisplayName( mapName, sizeof( mapName ) );" not in game_type_map_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GameTypeString(), mapName );' not in game_type_map_block
+	assert "CG_GetTextPosition" not in game_type_map_block
 	assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in match_details_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s - %s",' in match_details_block
 	assert "CG_GameTypeShortString(), detailBuffer );" in match_details_block
+	assert "CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );" in match_details_block
 	assert "CG_GetMapDisplayName( mapName, sizeof( mapName ) );" not in match_details_block
 	assert "CG_GameTypeShortString(), mapName );" not in match_details_block
+	assert "CG_GetTextPosition" not in match_details_block
 
 	assert '&g_teamSizeMin, "g_teamSizeMin", &g_teamSizeLegacy, "teamsize", "0", CVAR_SERVERINFO | CVAR_NORESTART' in game_source
 
@@ -1254,7 +1715,7 @@ def test_cgame_hud_ownerdraw_reconstruction_keeps_retail_medal_spectator_advert_
 
 	for expected in (
 		"case CG_ACCURACY:",
-		'text = va("%i%%", (int)value);',
+		'text = va( "%i%%", (int)value );',
 		'text = "Wow";',
 		"CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );",
 	):
@@ -1275,6 +1736,99 @@ def test_cgame_hud_ownerdraw_reconstruction_keeps_retail_medal_spectator_advert_
 	assert "(void)handleOrToken;" in client_block
 	assert "(void)area;" in client_block
 	assert "ql_cgame_imports[CG_QL_IMPORT_UPDATE_ADVERT] = (ql_import_f)QL_CG_trap_UpdateAdvert;" in client_source
+
+
+def test_cgame_team_pickup_timeheld_and_medal_dispatch_groups_match_retail_switch() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	medal_block = ownerdraw_block[
+		ownerdraw_block.index("case CG_ACCURACY:"):
+		ownerdraw_block.index("case CG_SPECTATORS:")
+	]
+	pickup_block = ownerdraw_block[
+		ownerdraw_block.index("case CG_RED_TEAM_MAP_PICKUPS:"):
+		ownerdraw_block.index("case CG_RED_TEAM_TIMEHELD_QUAD:")
+	]
+	timeheld_block = ownerdraw_block[
+		ownerdraw_block.index("case CG_RED_TEAM_TIMEHELD_QUAD:"):
+		ownerdraw_block.index("case CG_MATCH_WINNER:")
+	]
+	medal_names = {
+		"CG_ACCURACY",
+		"CG_ASSISTS",
+		"CG_CAPTURES",
+		"CG_DEFEND",
+		"CG_EXCELLENT",
+		"CG_GAUNTLET",
+		"CG_IMPRESSIVE",
+		"CG_PERFECT",
+	}
+	pickup_names = {
+		"CG_RED_TEAM_MAP_PICKUPS",
+		"CG_RED_TEAM_PICKUPS_RA",
+		"CG_RED_TEAM_PICKUPS_YA",
+		"CG_RED_TEAM_PICKUPS_GA",
+		"CG_RED_TEAM_PICKUPS_MH",
+		"CG_RED_TEAM_PICKUPS_QUAD",
+		"CG_RED_TEAM_PICKUPS_BS",
+		"CG_RED_TEAM_PICKUPS_FLAG",
+		"CG_RED_TEAM_PICKUPS_MEDKIT",
+		"CG_RED_TEAM_PICKUPS_REGEN",
+		"CG_RED_TEAM_PICKUPS_HASTE",
+		"CG_RED_TEAM_PICKUPS_INVIS",
+		"CG_BLUE_TEAM_MAP_PICKUPS",
+		"CG_BLUE_TEAM_PICKUPS_RA",
+		"CG_BLUE_TEAM_PICKUPS_YA",
+		"CG_BLUE_TEAM_PICKUPS_GA",
+		"CG_BLUE_TEAM_PICKUPS_MH",
+		"CG_BLUE_TEAM_PICKUPS_QUAD",
+		"CG_BLUE_TEAM_PICKUPS_BS",
+		"CG_BLUE_TEAM_PICKUPS_FLAG",
+		"CG_BLUE_TEAM_PICKUPS_MEDKIT",
+		"CG_BLUE_TEAM_PICKUPS_REGEN",
+		"CG_BLUE_TEAM_PICKUPS_HASTE",
+		"CG_BLUE_TEAM_PICKUPS_INVIS",
+	}
+	timeheld_names = {
+		"CG_RED_TEAM_TIMEHELD_QUAD",
+		"CG_RED_TEAM_TIMEHELD_BS",
+		"CG_RED_TEAM_TIMEHELD_FLAG",
+		"CG_RED_TEAM_TIMEHELD_REGEN",
+		"CG_RED_TEAM_TIMEHELD_HASTE",
+		"CG_RED_TEAM_TIMEHELD_INVIS",
+		"CG_BLUE_TEAM_TIMEHELD_QUAD",
+		"CG_BLUE_TEAM_TIMEHELD_BS",
+		"CG_BLUE_TEAM_TIMEHELD_FLAG",
+		"CG_BLUE_TEAM_TIMEHELD_REGEN",
+		"CG_BLUE_TEAM_TIMEHELD_HASTE",
+		"CG_BLUE_TEAM_TIMEHELD_INVIS",
+	}
+
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10035340") == {
+		constants[name]
+		for name in medal_names
+	}
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10037f80") == {
+		constants[name]
+		for name in pickup_names
+	}
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_10039ae0") == {
+		constants[name]
+		for name in timeheld_names
+	}
+
+	assert set(_case_labels(medal_block)) == medal_names
+	assert set(_case_labels(pickup_block)) == pickup_names
+	assert set(_case_labels(timeheld_block)) == timeheld_names
+	assert "CG_DrawMedal(ownerDraw, &rect, scale, color, shader);" in medal_block
+	assert "CG_DrawTeamPickupOwnerDraw( &rect, scale, color, textStyle, ownerDraw );" in pickup_block
+	assert "CG_DrawTeamTimeHeldOwnerDraw( &rect, scale, color, textStyle, ownerDraw );" in timeheld_block
+
+	for stale in timeheld_names:
+		assert stale not in pickup_block
+	for stale in pickup_names:
+		assert stale not in timeheld_block
 
 
 def test_cgame_spectator_cache_restores_retail_queue_metadata_and_cached_strip() -> None:
@@ -1368,13 +1922,80 @@ def test_cgame_team_scoreboard_and_award_ownerdraws_follow_retail_helper_split()
 
 def test_register_cvars_publishes_retail_version_and_vote_reset() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	table_decl = _text_between(source, "typedef struct {\n\tvmCvar_t\t*vmCvar;", "} cvarTable_t;")
+	cvar_table = source[source.index("static cvarTable_t cvarTable[]"):source.index("static int  cvarTableSize")]
 	block = _block_from_marker(source, "void CG_RegisterCvars")
-	load_hud_block = _block_from_marker(source, "void CG_LoadHudMenu()")
+	update_block = _block_from_marker(source, "void CG_UpdateCvars")
+	load_hud_block = _block_from_marker(source, "void CG_LoadHudMenu( void )")
+	retail_register_block = _text_between(hlil_source, "10020bb0    int32_t sub_10020bb0", "10020c94")
+	retail_update_block = _text_between(hlil_source, "10020ca0    int32_t* sub_10020ca0", "10020d5b")
+	retail_cvar_table = _text_between(hlil_source, "10076ad8  void* data_10076ad8", "10076da4")
 
+	assert "const char\t*cvarName;" in table_decl
+	assert "const char\t*defaultString;" in table_decl
+	assert "static int  cvarTableSize = sizeof( cvarTable ) / sizeof( cvarTable[0] );" in source
+	for expected in (
+		'{ &cg_autoAction, "cg_autoAction", "0", CVAR_ARCHIVE | CVAR_LATCH },',
+		'{ &cg_autoHop, "cg_autoHop", "1", CVAR_ARCHIVE | CVAR_LATCH },',
+		'{ &cg_autoProjectileNudge, "cg_autoProjectileNudge", "0", CVAR_ARCHIVE | CVAR_LATCH },',
+		'{ &cg_predictLocalRailshots, "cg_predictLocalRailshots", "0", CVAR_ARCHIVE | CVAR_LATCH },',
+		'{ &cg_projectileNudge, "cg_projectileNudge", "0", CVAR_ARCHIVE | CVAR_LATCH },',
+		'{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1", CVAR_ARCHIVE },',
+		'{ &cg_crosshairColor, "cg_crosshairColor", "4", CVAR_ARCHIVE },',
+		'{ &cg_crosshairHitColor, "cg_crosshairHitColor", "1", CVAR_ARCHIVE },',
+		'{ &cg_crosshairHitStyle, "cg_crosshairHitStyle", "2", CVAR_ARCHIVE },',
+		'{ &cg_crosshairHitTime, "cg_crosshairHitTime", "200", CVAR_ARCHIVE },',
+	):
+		assert expected in cvar_table
+	assert 'trap_Cvar_Register( cv->vmCvar, cv->cvarName,' in block
+	assert 'trap_Cvar_VariableStringBuffer( "sv_running", var, sizeof( var ) );' in block
+	assert 'cgs.localServer = atoi( var );' in block
 	assert 'trap_Cvar_Register(NULL, "cg_version", Q3_VERSION, CVAR_ROM );' in block
 	assert 'trap_Cvar_Set( "ui_voteactive", "0" );' in block
+	assert 'trap_Cvar_Set( "ui_votestring", "" );' in block
+	assert "trap_Cvar_Update( cv->vmCvar );" in update_block
+	assert "CG_UpdateDamagePlumSettings();" in update_block
+	assert "CG_UpdateCrosshairColorSettings();" in update_block
+	assert "CG_UpdateCrosshairPulseSettings();" in update_block
+	assert "CG_UpdateCrosshairHitSettings();" in update_block
 	assert "cg.hudMenusLoaded = CG_HudScriptHasMenuLoads( hudSet );" in load_hud_block
 	assert "cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );" in load_hud_block
+
+	for expected in (
+		"void* esi = &data_10076a14",
+		"int32_t i_1 = 0x127",
+		"esi += 0x18",
+		'(*(data_1074cccc + 0x10))(i_1, "model", "sarge", 0x803)',
+		'(*(data_1074cccc + 0x10))(i_1, "headmodel", "sarge", 0x803)',
+		'"cg_version"',
+		'return (*(data_1074cccc + 0x1c))("ui_voteactive", &data_1006841c)',
+	):
+		assert expected in retail_register_block
+	for expected in (
+		"void** esi = &data_10076a00",
+		"int32_t i_1 = 0x127",
+		"result = (*(data_1074cccc + 0x18))(*esi)",
+		"esi = &esi[6]",
+		"return sub_1003e640",
+	):
+		assert expected in retail_update_block
+	for expected in (
+		'{"cg_autoAction"}',
+		'{"cg_autoHop"}',
+		'{"cg_autoProjectileNudge"}',
+		'{"cg_crosshairBrightness"}',
+		'{"cg_crosshairColor"}',
+		'{"cg_crosshairHealth"}',
+		'{"cg_crosshairHitColor"}',
+		'{"cg_crosshairHitStyle"}',
+		'{"cg_crosshairHitTime"}',
+		'{"cg_crosshairPulse"}',
+		'{"cg_crosshairSize"}',
+		'{"cg_crosshairX"}',
+		'{"cg_crosshairY"}',
+	):
+		assert expected in retail_cvar_table
 
 
 def test_load_hud_menu_uses_menu_load_presence_for_runtime_hud_gate() -> None:
@@ -1414,15 +2035,333 @@ def test_register_sounds_prefers_retail_announcer_folders_before_fallbacks() -> 
 
 def test_display_context_print_and_error_bridges_use_retail_direct_trap_wrappers() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	com_error_block = _block_from_marker(source, "void QDECL Com_Error")
 	com_printf_block = _block_from_marker(source, "void QDECL Com_Printf")
+	retail_printf_block = _text_between(hlil_source, "10020a90    int32_t sub_10020a90", "10020af0")
+	retail_error_block = _text_between(hlil_source, "10020af0    int32_t sub_10020af0", "10020b50")
 
 	assert "(void)level;" in com_error_block
+	assert "vsprintf( text, error, argptr );" in com_error_block
 	assert "trap_Error( text );" in com_error_block
 	assert "CG_Error( \"%s\", text);" not in com_error_block
 
+	assert "vsprintf( text, msg, argptr );" in com_printf_block
 	assert "trap_Print( text );" in com_printf_block
 	assert "CG_Printf (\"%s\", text);" not in com_printf_block
+
+	for expected in (
+		"vsprintf(&var_404, arg1, &arg_8)",
+		"(*data_1074cccc)(&var_404)",
+	):
+		assert expected in retail_printf_block
+
+	for expected in (
+		"vsprintf(&var_404, arg1, &arg_c)",
+		"(*(data_1074cccc + 4))(&var_404)",
+	):
+		assert expected in retail_error_block
+
+
+def test_command_and_configstring_music_bridges_match_retail_wrappers() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	symbol_map = (REPO_ROOT / "references" / "symbol-maps" / "cgame.json").read_text(encoding="utf-8")
+	alias_map = (REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	argv_block = _block_from_marker(source, "const char *CG_Argv( int arg )")
+	config_block = _block_from_marker(source, "const char *CG_ConfigString( int index )")
+	music_block = _block_from_marker(source, "void CG_StartMusic( void )")
+	retail_argv_block = _text_between(
+		hlil_source,
+		'10020db0    int32_t __convention("regparm") sub_10020db0',
+		"10020dd0",
+	)
+	retail_config_block = _text_between(hlil_source, "100252f0    int32_t sub_100252f0", "10025320")
+	retail_music_block = _text_between(hlil_source, "10025320    int32_t sub_10025320", "100253f0")
+
+	assert "trap_Argv( arg, buffer, sizeof( buffer ) );" in argv_block
+	assert "return buffer;" in argv_block
+	assert "CG_Error( \"CG_ConfigString: bad index: %i\", index );" in config_block
+	assert "return cgs.gameState.stringData + cgs.gameState.stringOffsets[ index ];" in config_block
+	assert "s = (char *)CG_ConfigString( CS_MUSIC );" in music_block
+	assert "Q_strncpyz( parm1, COM_Parse( &s ), sizeof( parm1 ) );" in music_block
+	assert "Q_strncpyz( parm2, COM_Parse( &s ), sizeof( parm2 ) );" in music_block
+	assert "trap_S_StartBackgroundTrack( parm1, parm2 );" in music_block
+
+	for expected in (
+		"sub_10020db0",
+		"data_100bb910",
+		"0x400",
+		"(*(data_1074cccc + 0x30))(arg1, &data_100bb910, 0x400)",
+	):
+		assert expected in retail_argv_block
+
+	for expected in (
+		"arg1 s< 0 || arg1 s>= 0x400",
+		'"CG_ConfigString: bad index: %i"',
+		"return (&data_10a38420)[arg1] + 0x10a39420",
+	):
+		assert expected in retail_config_block
+
+	for expected in (
+		"var_88 = data_10a38428 + 0x10a39420",
+		"sub_10057120(&var_88, 1)",
+		"strncpy(&var_44, 0x100d6a78, 0x3f)",
+		"strncpy(&var_84, 0x100d6a78, 0x3f)",
+		"(*(data_1074cccc + 0xbc))(&var_44, &var_84)",
+	):
+		assert expected in retail_music_block
+
+	for expected in (
+		'"FUN_10020db0": "CG_Argv"',
+		'"FUN_100252f0": "CG_ConfigString"',
+		'"FUN_10025320": "CG_StartMusic"',
+	):
+		assert expected in alias_map
+
+	for expected in (
+		'"address": "0x10020DB0"',
+		'"normalized_name": "CG_Argv"',
+		'"address": "0x100252F0"',
+		'"normalized_name": "CG_ConfigString"',
+		'"address": "0x10025320"',
+		'"normalized_name": "CG_StartMusic"',
+	):
+		assert expected in symbol_map
+
+
+def test_hud_asset_parser_matches_retail_assetglobaldef_leaf() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	symbol_map = (REPO_ROOT / "references" / "symbol-maps" / "cgame.json").read_text(encoding="utf-8")
+	alias_map = (REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	asset_block = _block_from_marker(source, "qboolean CG_Asset_Parse( int handle )")
+	parse_menu_block = _text_between(
+		source,
+		"void CG_ParseMenu( const char *menuFile )",
+		"qboolean CG_Load_Menu( char **p )",
+	)
+	retail_asset_block = _text_between(hlil_source, "10025590    int32_t sub_10025590", "10025ac0")
+
+	for expected in (
+		"if (!trap_PC_ReadToken(handle, &token))",
+		"if (Q_stricmp(token.string, \"{\") != 0) {",
+		"if (Q_stricmp(token.string, \"}\") == 0) {",
+		"if (Q_stricmp(token.string, \"font\") == 0) {",
+		"cgDC.registerFont(tempStr, pointSize, &cgDC.Assets.textFont);",
+		"if (Q_stricmp(token.string, \"smallFont\") == 0) {",
+		"cgDC.registerFont(tempStr, pointSize, &cgDC.Assets.smallFont);",
+		"if (Q_stricmp(token.string, \"bigfont\") == 0) {",
+		"cgDC.registerFont(tempStr, pointSize, &cgDC.Assets.bigFont);",
+		"if (Q_stricmp(token.string, \"gradientbar\") == 0) {",
+		"cgDC.Assets.gradientBar = trap_R_RegisterShaderNoMip(tempStr);",
+		"if (Q_stricmp(token.string, \"menuEnterSound\") == 0) {",
+		"cgDC.Assets.menuEnterSound = trap_S_RegisterSound( tempStr, qfalse );",
+		"if (Q_stricmp(token.string, \"menuExitSound\") == 0) {",
+		"cgDC.Assets.menuExitSound = trap_S_RegisterSound( tempStr, qfalse );",
+		"if (Q_stricmp(token.string, \"itemFocusSound\") == 0) {",
+		"cgDC.Assets.itemFocusSound = trap_S_RegisterSound( tempStr, qfalse );",
+		"if (Q_stricmp(token.string, \"menuBuzzSound\") == 0) {",
+		"cgDC.Assets.menuBuzzSound = trap_S_RegisterSound( tempStr, qfalse );",
+		"if (Q_stricmp(token.string, \"cursor\") == 0) {",
+		"cgDC.Assets.cursor = trap_R_RegisterShaderNoMip( cgDC.Assets.cursorStr);",
+		"if (Q_stricmp(token.string, \"fadeClamp\") == 0) {",
+		"if (Q_stricmp(token.string, \"fadeCycle\") == 0) {",
+		"if (Q_stricmp(token.string, \"fadeAmount\") == 0) {",
+		"if (Q_stricmp(token.string, \"shadowX\") == 0) {",
+		"if (Q_stricmp(token.string, \"shadowY\") == 0) {",
+		"if (Q_stricmp(token.string, \"shadowColor\") == 0) {",
+		"cgDC.Assets.shadowFadeClamp = cgDC.Assets.shadowColor[3];",
+	):
+		assert expected in asset_block
+
+	for expected in (
+		'if ( Q_stricmp( token.string, "assetGlobalDef" ) == 0 ) {',
+		"if ( CG_Asset_Parse( handle ) ) {",
+	):
+		assert expected in parse_menu_block
+
+	for expected in (
+		"(*(data_1074cccc + 0x1b8))(edi, &var_830)",
+		"sub_10057330(U\"{}\", 0x1869f, &var_820)",
+		"sub_10057330(\"font\", 0x1869f, &var_820)",
+		"sub_10057330(\"smallFont\", 0x1869f, &var_820)",
+		"sub_10057330(\"bigfont\", 0x1869f, &var_820)",
+		"sub_10057330(\"gradientbar\", 0x1869f, &var_820)",
+		"sub_10057330(\"menuEnterSound\", 0x1869f, &var_820)",
+		"sub_10057330(\"menuExitSound\", 0x1869f, &var_820)",
+		"sub_10057330(\"itemFocusSound\", 0x1869f, &var_820)",
+		"sub_10057330(\"menuBuzzSound\", 0x1869f, &var_820)",
+		"sub_10057330(\"cursor\", 0x1869f, &var_820)",
+		"sub_10057330(\"fadeClamp\", 0x1869f,",
+		"sub_10057330(\"fadeCycle\", 0x1869f,",
+		"sub_10057330(\"fadeAmount\", 0x1869f,",
+		"sub_10057330(\"shadowX\", 0x1869f,",
+		"sub_10057330(\"shadowY\", 0x1869f,",
+		"sub_10057330(\"shadowColor\",",
+		"data_10a3485c = data_10a34858",
+		"return 1",
+		"return 0",
+	):
+		assert expected in retail_asset_block
+
+	for expected in (
+		'"FUN_10025590": "CG_Asset_Parse"',
+		'"address": "0x10025590"',
+		'"normalized_name": "CG_Asset_Parse"',
+	):
+		assert expected in alias_map or expected in symbol_map
+
+
+def test_hud_menu_file_loader_matches_retail_fallback_and_timing_path() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	symbol_map = (REPO_ROOT / "references" / "symbol-maps" / "cgame.json").read_text(encoding="utf-8")
+	alias_map = (REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	load_menus_block = _block_from_marker(source, "void CG_LoadMenus( const char *menuFile )")
+	retail_load_menus_block = _text_between(hlil_source, "10025ca0    int32_t __convention", "10025e60")
+
+	for expected in (
+		"start = trap_Milliseconds();",
+		"len = trap_FS_FOpenFile( menuFile, &f, FS_READ );",
+		'CG_Printf( S_COLOR_YELLOW "menu file not found: %s, using default\\n", menuFile );',
+		"len = trap_FS_FOpenFile( CG_LEGACY_HUD_FILE, &f, FS_READ );",
+		'trap_Error( va( S_COLOR_RED "default menu file not found: %s, unable to continue!\\n", CG_LEGACY_HUD_FILE ) );',
+		"if ( len >= MAX_MENUDEFFILE ) {",
+		'trap_Error( va( S_COLOR_RED "menu file too large: %s is %i, max allowed is %i", menuFile, len, MAX_MENUDEFFILE ) );',
+		"trap_FS_Read( buf, len, f );",
+		"buf[len] = 0;",
+		"trap_FS_FCloseFile( f );",
+		"COM_Compress( buf );",
+		"CG_ResetBrowserOverlayState();",
+		"CG_ParseMenu( cgRetailSupplementalMenuFiles[i] );",
+		"token = COM_ParseExt( &p, qtrue );",
+		'if ( Q_stricmp( token, "loadmenu" ) == 0 ) {',
+		"if ( CG_Load_Menu( &p ) ) {",
+		'Com_Printf( "UI menu load time = %d milli seconds\\n", trap_Milliseconds() - start );',
+	):
+		assert expected in load_menus_block
+
+	assert 'trap_Error( va( S_COLOR_YELLOW "menu file not found: %s, using default\\n", menuFile ) );' not in load_menus_block
+	assert "Menu_Reset();" not in load_menus_block
+
+	for expected in (
+		"(*(data_1074cccc + 8))()",
+		"(*(data_1074cccc + 0x38))(arg1, &var_14, 0)",
+		'"Warning: menu file not found: %s',
+		'"ui/hud.txt"',
+		'"^1default menu file not found: u',
+		"esi s>= 0x1000",
+		'"^1menu file too large: %s is %i,',
+		"(*(data_1074cccc + 0x3c))(&data_100bbd10, esi, var_14)",
+		"(*(edx_4 + 0x44))(ecx_5)",
+		"sub_10057020()",
+		"sub_10057120(&var_10, 1)",
+		"sub_10057330(\"loadmenu\", 0x1869f, 0x100d6a78)",
+		"sub_10025c40(&var_10)",
+		'"UI menu load time = %d milli sec',
+	):
+		assert expected in retail_load_menus_block
+
+	for expected in (
+		'"FUN_10025ca0": "CG_LoadMenus"',
+		'"address": "0x10025CA0"',
+		'"normalized_name": "CG_LoadMenus"',
+	):
+		assert expected in alias_map or expected in symbol_map
+
+
+def test_hud_bootstrap_and_asset_cache_match_retail_split_helpers() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	symbol_map = (REPO_ROOT / "references" / "symbol-maps" / "cgame.json").read_text(encoding="utf-8")
+	alias_map = (REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	load_hud_block = _block_from_marker(source, "void CG_LoadHudMenu( void )")
+	asset_block = _block_from_marker(source, "void CG_AssetCache( void )")
+	init_block = _block_from_marker(source, "void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum )")
+	retail_load_hud_block = _text_between(hlil_source, "10029120    int32_t sub_10029120", "10029210")
+	retail_asset_block = _text_between(hlil_source, "10029420    int32_t sub_10029420", "100295c0")
+
+	for expected in (
+		'trap_Cvar_VariableStringBuffer( "cg_hudFiles", buff, sizeof( buff ) );',
+		"hudSet = buff;",
+		"if ( hudSet[0] == '\\0' ) {",
+		"hudSet = CG_DEFAULT_HUD_FILE;",
+		"cg.hudMenusLoaded = CG_HudScriptHasMenuLoads( hudSet );",
+		"cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );",
+		"CG_LoadMenus( hudSet );",
+		"CG_CacheDraw2DMenuCache();",
+		"CG_CacheScoreboardSelectionMenus();",
+	):
+		assert expected in load_hud_block
+
+	assert "Init_Display(" not in load_hud_block
+	assert "CG_InitDisplayContext();" in init_block
+	assert init_block.index("CG_InitDisplayContext();") < init_block.index("CG_LoadHudMenu();")
+
+	for expected in (
+		"data_1074cd0c = 0",
+		"(*(data_1074cccc + 0x24))(\"cg_hudFiles\", &var_404, 0x400)",
+		'if (var_404 == 0)',
+		'eax_4 = "ui/hud.txt"',
+		"sub_10025ca0(eax_4)",
+		"sub_10028f30()",
+	):
+		assert expected in retail_load_hud_block
+
+	for expected in (
+		"cgDC.Assets.gradientBar = trap_R_RegisterShaderNoMip( ASSET_GRADIENTBAR );",
+		"cgDC.Assets.fxBasePic = trap_R_RegisterShaderNoMip( ART_FX_BASE );",
+		"cgDC.Assets.fxPic[0] = trap_R_RegisterShaderNoMip( ART_FX_RED );",
+		"cgDC.Assets.fxPic[1] = trap_R_RegisterShaderNoMip( ART_FX_YELLOW );",
+		"cgDC.Assets.fxPic[2] = trap_R_RegisterShaderNoMip( ART_FX_GREEN );",
+		"cgDC.Assets.fxPic[3] = trap_R_RegisterShaderNoMip( ART_FX_TEAL );",
+		"cgDC.Assets.fxPic[4] = trap_R_RegisterShaderNoMip( ART_FX_BLUE );",
+		"cgDC.Assets.fxPic[5] = trap_R_RegisterShaderNoMip( ART_FX_CYAN );",
+		"cgDC.Assets.fxPic[6] = trap_R_RegisterShaderNoMip( ART_FX_WHITE );",
+		"cgDC.Assets.scrollBar = trap_R_RegisterShaderNoMip( ASSET_SCROLLBAR );",
+		"cgDC.Assets.scrollBarArrowDown = trap_R_RegisterShaderNoMip( ASSET_SCROLLBAR_ARROWDOWN );",
+		"cgDC.Assets.scrollBarArrowUp = trap_R_RegisterShaderNoMip( ASSET_SCROLLBAR_ARROWUP );",
+		"cgDC.Assets.scrollBarArrowLeft = trap_R_RegisterShaderNoMip( ASSET_SCROLLBAR_ARROWLEFT );",
+		"cgDC.Assets.scrollBarArrowRight = trap_R_RegisterShaderNoMip( ASSET_SCROLLBAR_ARROWRIGHT );",
+		"cgDC.Assets.scrollBarThumb = trap_R_RegisterShaderNoMip( ASSET_SCROLL_THUMB );",
+		"cgDC.Assets.sliderBar = trap_R_RegisterShaderNoMip( ASSET_SLIDER_BAR );",
+		"cgDC.Assets.sliderThumb = trap_R_RegisterShaderNoMip( ASSET_SLIDER_THUMB );",
+		"CG_RegisterScoreTextures();",
+	):
+		assert expected in asset_block
+
+	for expected in (
+		'"ui/assets/gradientbar2.tga"',
+		'"menu/art/fx_base"',
+		'"menu/art/fx_red"',
+		'"menu/art/fx_yel"',
+		'"menu/art/fx_grn"',
+		'"menu/art/fx_teal"',
+		'"menu/art/fx_blue"',
+		'"menu/art/fx_cyan"',
+		'"menu/art/fx_white"',
+		'"ui/assets/scrollbar.tga"',
+		'"ui/assets/scrollbar_arrow_dwn_a.',
+		'"ui/assets/scrollbar_arrow_up_a.t',
+		'"ui/assets/scrollbar_arrow_left.t',
+		'"ui/assets/scrollbar_arrow_right.',
+		'"ui/assets/scrollbar_thumb.tga"',
+		'"ui/assets/slider2.tga"',
+		'"ui/assets/sliderbutt_1.tga"',
+		"(*(data_1074cccc + 0xd4))",
+	):
+		assert expected in retail_asset_block
+
+	for expected in (
+		'"FUN_10029120": "CG_LoadHudMenu"',
+		'"FUN_10029420": "CG_AssetCache"',
+		'"address": "0x10029120"',
+		'"normalized_name": "CG_LoadHudMenu"',
+		'"address": "0x10029420"',
+		'"normalized_name": "CG_AssetCache"',
+	):
+		assert expected in alias_map or expected in symbol_map
 
 
 def test_cgame_browser_runtime_wrappers_drive_hud_reload_and_score_feeders() -> None:
@@ -1899,17 +2838,25 @@ def test_cgame_browser_leaf_wrappers_restore_remaining_retail_owner_slice() -> N
 
 def test_cgame_menu_parser_and_score_selection_restore_retail_parser_and_cursor_seam() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
-	parse_menu_start = source.index("void CG_ParseMenu(const char *menuFile)")
-	load_menu_start = source.index("qboolean CG_Load_Menu(char **p)")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	parse_menu_start = source.index("void CG_ParseMenu( const char *menuFile )")
+	load_menu_start = source.index("qboolean CG_Load_Menu( char **p )")
 	parse_menu_block = source[parse_menu_start:load_menu_start]
+	load_menu_block = _block_from_marker(source, "qboolean CG_Load_Menu( char **p )")
+	retail_parse_menu_block = _text_between(hlil_source, "10025ac0    void sub_10025ac0", "10025c40")
+	retail_load_menu_block = _text_between(hlil_source, "10025c40    int32_t sub_10025c40", "10025ca0")
+	retail_score_selection_block = _text_between(hlil_source, "10025f60    void sub_10025f60", "100260e0")
+	retail_info_block = _text_between(hlil_source, "100260e0    void* __convention", "10026160")
 	score_block = _block_from_marker(source, "void CG_SetScoreSelection")
+	info_block = _block_from_marker(source, "static clientInfo_t *CG_InfoFromScoreIndex")
 	selection_block = _block_from_marker(source, "static void CG_FeederSelection")
 
 	for expected in (
-		'handle = trap_PC_LoadSource("ui/testhud.menu");',
-		'if (Q_stricmp(token.string, "assetGlobalDef") == 0) {',
-		"if (CG_Asset_Parse(handle)) {",
-		'if (Q_stricmp(token.string, "menudef") == 0) {',
+		'handle = trap_PC_LoadSource( "ui/testhud.menu" );',
+		'if ( Q_stricmp( token.string, "assetGlobalDef" ) == 0 ) {',
+		"if ( CG_Asset_Parse( handle ) ) {",
+		'if ( Q_stricmp( token.string, "menudef" ) == 0 ) {',
 		"menu = &Menus[menuCount];",
 		"CG_InitBrowserOverlay( menu );",
 		"if ( CG_ParseBrowserMenu( handle, menu ) ) {",
@@ -1921,12 +2868,33 @@ def test_cgame_menu_parser_and_score_selection_restore_retail_parser_and_cursor_
 	assert "Menu_New(handle);" not in parse_menu_block
 
 	for expected in (
-		"token = COM_ParseExt(p, qtrue);",
-		"if (token[0] != '{') {",
-		'if (Q_stricmp(token, "}") == 0) {',
-		"CG_ParseMenu(token);",
+		"token = COM_ParseExt( p, qtrue );",
+		"if ( token[0] != '{' ) {",
+		'if ( Q_stricmp( token, "}" ) == 0 ) {',
+		"CG_ParseMenu( token );",
 	):
-		assert expected in source
+		assert expected in load_menu_block
+
+	for expected in (
+		'"ui/testhud.menu"',
+		'"assetGlobalDef"',
+		'"menudef"',
+		"+ 0x1b0",
+		"+ 0x1b4",
+		"+ 0x1b8",
+	):
+		assert expected in retail_parse_menu_block
+
+	for expected in (
+		"sub_10025ac0(0x100d6a78)",
+		'"}"',
+	):
+		assert expected in retail_load_menu_block
+
+	for expected in (
+		"void CG_SetScoreSelection( void *menu );",
+	):
+		assert expected in local_source
 
 	for expected in (
 		"if ( cg.selectedScore < 0 || cg.selectedScore >= cg.numScores ) {",
@@ -1934,6 +2902,32 @@ def test_cgame_menu_parser_and_score_selection_restore_retail_parser_and_cursor_
 		"CG_SetBrowserFeederSelection( menu, FEEDER_SCOREBOARD, cg.selectedScore );",
 	):
 		assert expected in score_block
+
+	for expected in (
+		"CG_BuildHudScoreboard();",
+		"entry = CG_GetHudScoreboardEntry( index, team );",
+		"mappedIndex = CG_FindScoreIndexForClient( entry->clientNum );",
+		"if ( cgs.gametype >= GT_TEAM ) {",
+		"for ( i = 0; i < cg.numScores; i++ ) {",
+		"if ( cg.scores[i].team == team ) {",
+		"*scoreIndex = index;",
+	):
+		assert expected in info_block
+
+	for expected in (
+		"data_10a9cdc4 = ebx",
+		"data_10a3ff14 s>= 3",
+		"sub_10060650(var_8, arg1, ecx_3)",
+	):
+		assert expected in retail_score_selection_block
+
+	for expected in (
+		"data_10a3ff14 s>= 3",
+		"*arg2 = eax",
+		"*arg2 = arg1",
+		"data_10a9cdc0",
+	):
+		assert expected in retail_info_block
 
 	for expected in (
 		"if ( index == -1 ) {",
@@ -2019,10 +3013,13 @@ def test_cgame_scoreboard_feeder_stats_restore_retail_leaf_split() -> None:
 		"stats = &cg.clanArenaStats[row.scoreIndex];",
 		'return va( "%i", stats->damageGiven );',
 		'return va( "%i", stats->damageReceived );',
+		'return va( "%i", stats->weaponFrags[WP_GAUNTLET] );',
 		'"^3%i ^7%i%%"',
 		"stats->weaponFrags[WP_HEAVY_MACHINEGUN]",
 	):
 		assert expected in ca_block
+
+	assert "stats->weaponAccuracy[WP_GAUNTLET]" not in ca_block
 
 	for expected in (
 		"stats = &cg.ctfStats[row.scoreIndex];",
@@ -2096,12 +3093,15 @@ def test_cgame_team_list_feeders_restore_retail_family_split() -> None:
 
 def test_cgame_scoreboard_selection_callbacks_restore_cached_team_list_menu_seam() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	menu_name_block = _block_from_marker(source, "static const char *CG_GetScoreboardSelectionMenuName")
 	cache_block = _block_from_marker(source, "static void CG_CacheScoreboardSelectionMenus")
 	sync_block = _block_from_marker(source, "static void CG_SyncScoreboardTeamListSelection")
-	image_block = _block_from_marker(source, "static qhandle_t CG_FeederItemImage")
-	selection_block = _block_from_marker(source, "static void CG_FeederSelection")
-	load_hud_block = _block_from_marker(source, "void CG_LoadHudMenu()")
+	image_block = _block_from_marker(source, "static qhandle_t CG_FeederItemImage( float feederID, int index )")
+	selection_block = _block_from_marker(source, "static void CG_FeederSelection( float feederID, int index )")
+	retail_selection_block = _text_between(hlil_source, "10028b10    void sub_10028b10", "10028c30")
+	retail_bootstrap_block = _text_between(hlil_source, "10029210    void* sub_10029210", "10029420")
+	load_hud_block = _block_from_marker(source, "void CG_LoadHudMenu( void )")
 
 	for expected in (
 		'return "score_menu_ffa";',
@@ -2146,6 +3146,21 @@ def test_cgame_scoreboard_selection_callbacks_restore_cached_team_list_menu_seam
 	):
 		assert expected in selection_block
 
+	for expected in (
+		"data_10a256a4 = sub_10025e60",
+		"data_10a256a0 = sub_10028830",
+		"data_10a256a8 = sub_10028b10",
+	):
+		assert expected in retail_bootstrap_block
+
+	for expected in (
+		'"playerlistRED"',
+		'"playerlistBLUE"',
+		"data_10a9cdc4 = edi",
+		"= 0xffffffff",
+	):
+		assert expected in retail_selection_block
+
 	assert "CG_CacheScoreboardSelectionMenus();" in load_hud_block
 
 
@@ -2188,12 +3203,18 @@ def test_cgame_gameinfo_cvars_restore_retail_training_and_gametype_text() -> Non
 		assert expected in game_info_block
 
 	assert "CG_SetGameInfoCvars();" in parse_block
+	assert 'cgs.scorelimit = atoi( Info_ValueForKey( info, "g_scorelimit" ) );' in parse_block
+	assert 'cgs.roundlimit = atoi( Info_ValueForKey( info, "roundlimit" ) );' in parse_block
+	assert parse_block.index('cgs.scorelimit = atoi( Info_ValueForKey( info, "g_scorelimit" ) );') > parse_block.index('cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );')
+	assert parse_block.index('cgs.roundlimit = atoi( Info_ValueForKey( info, "roundlimit" ) );') > parse_block.index('cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );')
 	assert parse_block.index("CG_SetGameInfoCvars();") > parse_block.index('cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );')
+	assert parse_block.index("CG_SetGameInfoCvars();") > parse_block.index('cgs.roundlimit = atoi( Info_ValueForKey( info, "roundlimit" ) );')
 	assert parse_block.index("CG_SetGameInfoCvars();") < parse_block.index('voteFlagsValue = Info_ValueForKey( info, "g_voteFlags" );')
 
 
 def test_display_context_uses_named_cvar_string_and_native_chat_helpers() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	display_block = _block_from_marker(source, "static void CG_InitDisplayContext")
 	cvar_string_block = _block_from_marker(source, "void CG_Cvar_GetString")
 	compact_hud_block = _block_from_marker(source, "static qboolean CG_UseMatchSummaryChatLayout")
@@ -2201,6 +3222,10 @@ def test_display_context_uses_named_cvar_string_and_native_chat_helpers() -> Non
 	chat_y_block = _block_from_marker(source, "static float CG_GetChatFieldY")
 	chat_width_block = _block_from_marker(source, "static float CG_GetChatFieldPixelWidth")
 	chat_chars_block = _block_from_marker(source, "static int CG_GetChatFieldWidthInChars")
+	physics_hlil = _text_between(hlil_source, "1004e4d0    int32_t sub_1004e4d0", "1004e4d6")
+	chat_y_hlil = _text_between(hlil_source, "100209e0    long double sub_100209e0", "100209f7")
+	chat_width_hlil = _text_between(hlil_source, "10020a00    long double sub_10020a00", "10020a17")
+	chat_chars_hlil = _text_between(hlil_source, "10020a20    int32_t sub_10020a20", "10020a33")
 
 	assert "cgDC.getCVarString = &CG_Cvar_GetString;" in display_block
 	assert "trap_Cvar_VariableStringBuffer( cvar, buffer, bufsize );" in cvar_string_block
@@ -2212,14 +3237,213 @@ def test_display_context_uses_named_cvar_string_and_native_chat_helpers() -> Non
 	assert "return CG_UseMatchSummaryChatLayout() ? 455.0f : 413.0f;" in chat_y_block
 	assert "return CG_UseMatchSummaryChatLayout() ? 300.0f : 640.0f;" in chat_width_block
 	assert "return CG_UseMatchSummaryChatLayout() ? 30 : 73;" in chat_chars_block
+	assert "return data_10a9c1f4" in physics_hlil
+	for expected in (
+		"data_10a9c214.d != 5",
+		"return fconvert.t(413f)",
+		"return fconvert.t(455f)",
+	):
+		assert expected in chat_y_hlil
+	for expected in (
+		"data_10a9c214.d != 5",
+		"return fconvert.t(640f)",
+		"return fconvert.t(300f)",
+	):
+		assert expected in chat_width_hlil
+	for expected in (
+		"data_10a9c214.d - 5",
+		"& 0x2b) + 0x1e",
+	):
+		assert expected in chat_chars_hlil
+
+
+def test_cgame_native_sidecar_helpers_match_retail_export_leafs() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	public_source = CG_PUBLIC.read_text(encoding="utf-8")
+	tracked_block = _block_from_marker(source, "static void CG_ShowTrackedPlayerSlot")
+	first_tracked_block = _block_from_marker(source, "static void CG_Show1stTrackedPlayer")
+	second_tracked_block = _block_from_marker(source, "static void CG_Show2ndTrackedPlayer")
+	identity_block = _block_from_marker(source, "static qboolean CG_CopyClientIdentity")
+	speaking_block = _block_from_marker(source, "void *CG_SetClientSpeakingState")
+	native_speaking_block = _block_from_marker(source, "static int CG_NativeSetClientSpeakingState")
+	identity_hlil = _text_between(hlil_source, "10020910    int32_t sub_10020910", "100209de")
+	first_tracked_hlil = _text_between(hlil_source, "10029ff0    int32_t sub_10029ff0", "1002a053")
+	second_tracked_hlil = _text_between(hlil_source, "1002a060    int32_t sub_1002a060", "1002a0c3")
+	speaking_hlil = _text_between(hlil_source, "10020a40    void* sub_10020a40", "10020a68")
+
+	for expected in (
+		"if ( slot < 0 || slot > 1 ) {",
+		"cg.spectatorSlotTrackedTime[slot] = cg.time + CG_SPECTATOR_SLOT_TRACK_HOLD;",
+		"CG_ReplayLastMessageFromCvar();",
+	):
+		assert expected in tracked_block
+	assert "CG_ShowTrackedPlayerSlot( 0 );" in first_tracked_block
+	assert "CG_ShowTrackedPlayerSlot( 1 );" in second_tracked_block
+
+	for expected in (
+		"data_10a5f2f8 = data_10a9c1ec + 0xbb8",
+		'(*(edx + 0x24))("cg_lastmsg", &var_104, 0x100)',
+		"sub_10006910(&var_104, 0, 0)",
+	):
+		assert expected in first_tracked_hlil
+	for expected in (
+		"data_10a5f2fc = data_10a9c1ec + 0xbb8",
+		'(*(edx + 0x24))("cg_lastmsg", &var_104, 0x100)',
+		"sub_10006910(&var_104, 0, 0)",
+	):
+		assert expected in second_tracked_hlil
+
+	for expected in (
+		"if ( !outIdentity ) {",
+		"if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {",
+		"if ( !ci->infoValid ) {",
+		"memset( identity, 0, sizeof( *identity ) );",
+		"identity->clientNum = clientNum;",
+		"identity->identityTransport = 0;",
+		"identity->identityLow = ci->identityLow;",
+		"identity->identityHigh = ci->identityHigh;",
+		"Q_strncpyz( identity->displayName, ci->name, sizeof( identity->displayName ) );",
+		"Q_CleanStr( cleanName );",
+		"return qtrue;",
+	):
+		assert expected in identity_block
+	for expected in (
+		"#define CG_CLIENT_IDENTITY_NAME_CHARS\t40",
+		"char\t\t\tdisplayName[CG_CLIENT_IDENTITY_NAME_CHARS];",
+		"char\t\t\tcleanName[CG_CLIENT_IDENTITY_NAME_CHARS];",
+	):
+		assert expected in public_source
+	for expected in (
+		"if (arg1 u> 0x3f)",
+		"if (*(arg1 * 0x738 + &data_10a41cf0) == 0)",
+		"*arg2 = arg1",
+		"arg2[1] = *(arg1 * 0x738 + 0x10a42400)",
+		"arg2[2] = *(arg1 * 0x738 + &data_10a42418)",
+		"arg2[3] = *(arg1 * 0x738 + 0x10a4241c)",
+		"strncpy(&arg2[4], arg1 * 0x738 + 0x10a41cf8, 0x27)",
+		"*(arg2 + 0x37) = 0",
+		"strncpy(&arg2[0xe], arg1 * 0x738 + 0x10a41d38, 0x27)",
+		"*(arg2 + 0x5f) = 0",
+		"return 1",
+	):
+		assert expected in identity_hlil
+
+	for expected in (
+		"if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {",
+		"speakingState->speaking = speaking ? qtrue : qfalse;",
+		"speakingState->time = cg.time;",
+		"cgs.currentVoiceClient = clientNum;",
+		"cg.voiceTime = cg.time;",
+		"cgs.currentVoiceClient = -1;",
+		"cg.voiceTime = 0;",
+		"return ci;",
+	):
+		assert expected in speaking_block
+	assert "return (int)(intptr_t)CG_SetClientSpeakingState( clientNum, speaking );" in native_speaking_block
+	for expected in (
+		"int32_t eax = arg1 * 0x738",
+		"*(eax + 0x10a4240c) = arg2",
+		"*(eax + 0x10a42410) = edx_1",
+		"return eax + &data_10a41cf0",
+	):
+		assert expected in speaking_hlil
+
+
+def test_cgame_getvalue_callback_surface_matches_retail_score_stat_leaf() -> None:
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	ghidra_source = CGAME_GHIDRA_DECOMPILE.read_text(encoding="utf-8")
+	ui_shared_h = UI_SHARED_H.read_text(encoding="utf-8")
+	value_block = _block_from_marker(newdraw_source, "float CG_GetValue")
+	display_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+	retail_bootstrap_block = _block_from_marker(ghidra_source, "void FUN_10029210(void)")
+	constants = _menudef_ownerdraw_constants()
+
+	assert {
+		name: constants[name]
+		for name in (
+			"CG_PLAYER_ARMOR_VALUE",
+			"CG_PLAYER_AMMO_VALUE",
+			"CG_PLAYER_SCORE",
+			"CG_PLAYER_HEALTH",
+			"CG_RED_SCORE",
+			"CG_BLUE_SCORE",
+		)
+	} == {
+		"CG_PLAYER_ARMOR_VALUE": 40,
+		"CG_PLAYER_AMMO_VALUE": 49,
+		"CG_PLAYER_SCORE": 51,
+		"CG_PLAYER_HEALTH": 44,
+		"CG_RED_SCORE": 284,
+		"CG_BLUE_SCORE": 312,
+	}
+
+	for expected in (
+		"_DAT_10a25664 = FUN_1003b0f0;",
+		"_DAT_10a25668 = &LAB_10031610;",
+		"_DAT_10a2566c = FUN_10031790;",
+		"_DAT_10a256c8 = &LAB_10028d80;",
+	):
+		assert expected in retail_bootstrap_block
+
+	assert retail_bootstrap_block.index("_DAT_10a25664 = FUN_1003b0f0;") < retail_bootstrap_block.index("_DAT_10a25668 = &LAB_10031610;")
+	assert retail_bootstrap_block.index("_DAT_10a25668 = &LAB_10031610;") < retail_bootstrap_block.index("_DAT_10a2566c = FUN_10031790;")
+	assert display_block.index("cgDC.ownerDrawItem = &CG_OwnerDraw;") < display_block.index("cgDC.getValue = &CG_GetValue;")
+	assert display_block.index("cgDC.getValue = &CG_GetValue;") < display_block.index("cgDC.ownerDrawVisible = &CG_OwnerDrawVisible;")
+	assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_block
+
+	assert set(_case_labels(value_block)) == {
+		"CG_PLAYER_ARMOR_VALUE",
+		"CG_PLAYER_AMMO_VALUE",
+		"CG_PLAYER_SCORE",
+		"CG_PLAYER_HEALTH",
+		"CG_RED_SCORE",
+		"CG_BLUE_SCORE",
+	}
+
+	for expected in (
+		"return ps->stats[STAT_ARMOR];",
+		"return ps->ammo[cent->currentState.weapon];",
+		"return cg.snap->ps.persistant[PERS_SCORE];",
+		"return ps->stats[STAT_HEALTH];",
+		"return cgs.scores1;",
+		"return cgs.scores2;",
+		"return -1;",
+	):
+		assert expected in value_block
+
+	for stale in (
+		"#define CG_SELECTEDPLAYER_ARMOR 350",
+		"#define CG_SELECTEDPLAYER_HEALTH 351",
+	):
+		assert stale in ui_shared_h
+
+	for stale in (
+		"CG_SELECTEDPLAYER_ARMOR",
+		"CG_SELECTEDPLAYER_HEALTH",
+		"cg.selectedTeamPlayer",
+		"CG_GetSelectedPlayer",
+	):
+		assert stale not in value_block
 
 
 def test_cgame_init_splits_display_context_bootstrap_before_collision_map() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	ghidra_source = CGAME_GHIDRA_DECOMPILE.read_text(encoding="utf-8")
 	display_block = _block_from_marker(source, "static void CG_InitDisplayContext")
-	load_hud_block = _block_from_marker(source, "void CG_LoadHudMenu()")
+	cvar_float_block = _block_from_marker(source, "static float CG_Cvar_Get")
+	play_cinematic_block = _block_from_marker(source, "static int CG_PlayCinematic")
+	stop_cinematic_block = _block_from_marker(source, "static void CG_StopCinematic")
+	draw_cinematic_block = _block_from_marker(source, "static void CG_DrawCinematic")
+	run_cinematic_block = _block_from_marker(source, "static void CG_RunCinematicFrame")
+	retail_bootstrap_block = _block_from_marker(ghidra_source, "void FUN_10029210(void)")
+	retail_play_cinematic_block = _text_between(hlil_source, "10028e80    int32_t sub_10028e80", "10028eb5")
+	retail_draw_cinematic_block = _text_between(hlil_source, "10028ec0    int32_t sub_10028ec0", "10028f20")
+	load_hud_block = _block_from_marker(source, "void CG_LoadHudMenu( void )")
 	register_fonts_block = _block_from_marker(source, "static void CG_RegisterHudFonts( void )")
-	asset_block = _block_from_marker(source, "void CG_AssetCache()")
+	asset_block = _block_from_marker(source, "void CG_AssetCache( void )")
 	init_block = _block_from_marker(source, "void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum )")
 
 	for expected in (
@@ -2243,12 +3467,44 @@ def test_cgame_init_splits_display_context_bootstrap_before_collision_map() -> N
 		"cgDC.startBackgroundTrack = &trap_S_StartBackgroundTrack;",
 		"cgDC.stopBackgroundTrack = &trap_S_StopBackgroundTrack;",
 		"cgDC.drawTextWithCursorExt = &CG_Text_PaintWithCursorExt;",
+		"cgDC.feederItemImage = &CG_FeederItemImage;",
+		"cgDC.feederItemText = &CG_FeederItemText;",
+		"cgDC.feederSelection = &CG_FeederSelection;",
+		"cgDC.getCVarValue = CG_Cvar_Get;",
+		"cgDC.playCinematic = &CG_PlayCinematic;",
+		"cgDC.stopCinematic = &CG_StopCinematic;",
+		"cgDC.drawCinematic = &CG_DrawCinematic;",
+		"cgDC.runCinematicFrame = &CG_RunCinematicFrame;",
 		"cgDC.adjustFrom640 = &CG_AdjustFrom640;",
 		"cgDC.setAdjustFrom640Mode = &CG_SetAdjustFrom640Mode;",
 		"cgDC.bias = cgs.screenXBias;",
 		"Init_Display( &cgDC );",
 	):
 		assert expected in display_block
+
+	for expected in (
+		"_DAT_10a2567c = &LAB_10028c30;",
+		"_DAT_10a256d8 = &LAB_10028e80;",
+		"_DAT_10a256dc = &LAB_10028ec0;",
+		"_DAT_10a256e0 = &LAB_10028ed0;",
+		"_DAT_10a256e4 = &LAB_10028f20;",
+	):
+		assert expected in retail_bootstrap_block
+
+	assert "trap_Cvar_VariableStringBuffer( cvar, buff, sizeof( buff ) );" in cvar_float_block
+	assert "return atof( buff );" in cvar_float_block
+	assert "trap_CIN_PlayCinematic( name, x, y, w, h, CIN_loop );" in play_cinematic_block
+	assert "trap_CIN_StopCinematic( handle );" in stop_cinematic_block
+	assert "trap_CIN_SetExtents( handle, x, y, w, h );" in draw_cinematic_block
+	assert "trap_CIN_DrawCinematic( handle );" in draw_cinematic_block
+	assert "trap_CIN_RunCinematic( handle );" in run_cinematic_block
+
+	assert "int.d(fconvert.t(arg2))" in retail_play_cinematic_block
+	assert "int.d(fconvert.t(arg5)), 2)" in retail_play_cinematic_block
+	assert "+ 0x194" in retail_play_cinematic_block
+	assert "+ 0x198" in retail_draw_cinematic_block
+	assert "a4 01 00 00" in retail_draw_cinematic_block
+	assert "a0 01 00 00" in retail_draw_cinematic_block
 
 	assert "Init_Display(" not in load_hud_block
 	assert "CG_RegisterHudFonts();" not in asset_block
@@ -2281,7 +3537,7 @@ def test_cgame_host_text_helpers_honor_retail_font_buckets() -> None:
 	height_block = _block_from_marker(draw_source, "int CG_Text_HeightExt")
 	paint_block = _block_from_marker(draw_source, "void CG_Text_PaintExt")
 	cursor_ext_block = _block_from_marker(main_source, "static void CG_Text_PaintWithCursorExt")
-	cursor_block = _block_from_marker(main_source, "void CG_Text_PaintWithCursor")
+	cursor_block = _block_from_marker(main_source, "void CG_Text_PaintWithCursor( float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style )")
 
 	for expected in (
 		"if ( fontIndex != ITEM_FONT_INHERIT ) {",
@@ -2333,17 +3589,176 @@ def test_cgame_host_text_shadow_offsets_stay_in_virtual_space() -> None:
 		assert expected in span_block
 
 
+def test_cgame_native_export_table_and_vmmain_wrappers_match_retail_order() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	public_source = CG_PUBLIC.read_text(encoding="utf-8")
+	native_table = source[source.index("static void *cg_nativeExports"):source.index("void **CG_GetNativeExportTable")]
+	vm_main_block = _block_from_marker(source, "int vmMain")
+	draw_wrapper = _block_from_marker(source, "static void CG_NativeDrawActiveFrame")
+	key_wrapper = _block_from_marker(source, "static void CG_NativeKeyEvent")
+	mouse_wrapper = _block_from_marker(source, "static void CG_NativeMouseEvent")
+	chat_down_wrapper = _block_from_marker(source, "static void CG_NativeChatDown")
+	chat_up_wrapper = _block_from_marker(source, "static void CG_NativeChatUp")
+	export_getter = _block_from_marker(source, "void **CG_GetNativeExportTable")
+	retail_entry_block = _text_between(hlil_source, "10020a70    void*** dllEntry", "10020a90")
+	retail_native_table = _text_between(hlil_source, "100769a8  void* data_100769a8", "100769fc")
+	native_enum = _text_between(public_source, "typedef enum {\n\tCG_NATIVE_EXPORT_INIT", "} cgameNativeExport_t;")
+
+	assert "CG_DrawActiveFrame( serverTime, stereoView, demoPlayback );" in draw_wrapper
+	assert "CG_KeyEvent( key, down );" in key_wrapper
+	for expected in (
+		"cgDC.cursorx = cgs.cursorX;",
+		"cgDC.cursory = cgs.cursorY;",
+		"CG_MouseEvent( dx, dy );",
+	):
+		assert expected in mouse_wrapper
+	assert "cg.chatHistoryVisible = qtrue;" in chat_down_wrapper
+	assert "cg.chatHistoryVisible = qfalse;" in chat_up_wrapper
+	assert "return cg_nativeExports;" in export_getter
+
+	for expected in (
+		"case CG_DRAW_ACTIVE_FRAME:",
+		"CG_NativeDrawActiveFrame( arg0, arg1, arg2 ? qtrue : qfalse );",
+		"case CG_KEY_EVENT:",
+		"CG_NativeKeyEvent( arg0, arg1 ? qtrue : qfalse );",
+		"case CG_MOUSE_EVENT:",
+		"cgDC.cursorx = cgs.cursorX;",
+		"cgDC.cursory = cgs.cursorY;",
+		"CG_MouseEvent( arg0, arg1 );",
+		"case CG_EVENT_HANDLING:",
+		"CG_EventHandling( arg0 );",
+		"case CG_CHAT_DOWN:",
+		"cg.chatHistoryVisible = qtrue;",
+		"case CG_CHAT_UP:",
+		"cg.chatHistoryVisible = qfalse;",
+	):
+		assert expected in vm_main_block
+
+	expected_exports = (
+		"[CG_NATIVE_EXPORT_INIT] = CG_Init,",
+		"[CG_NATIVE_EXPORT_REGISTER_CVARS] = CG_RegisterCvars,",
+		"[CG_NATIVE_EXPORT_SHUTDOWN] = CG_Shutdown,",
+		"[CG_NATIVE_EXPORT_CONSOLE_COMMAND] = CG_ConsoleCommand,",
+		"[CG_NATIVE_EXPORT_DRAW_ACTIVE_FRAME] = CG_NativeDrawActiveFrame,",
+		"[CG_NATIVE_EXPORT_CROSSHAIR_PLAYER] = CG_CrosshairPlayer,",
+		"[CG_NATIVE_EXPORT_LAST_ATTACKER] = CG_LastAttacker,",
+		"[CG_NATIVE_EXPORT_KEY_EVENT] = CG_NativeKeyEvent,",
+		"[CG_NATIVE_EXPORT_MOUSE_EVENT] = CG_NativeMouseEvent,",
+		"[CG_NATIVE_EXPORT_EVENT_HANDLING] = CG_EventHandling,",
+		"[CG_NATIVE_EXPORT_SHOW_1ST_TRACKED_PLAYER] = CG_Show1stTrackedPlayer,",
+		"[CG_NATIVE_EXPORT_SHOW_2ND_TRACKED_PLAYER] = CG_Show2ndTrackedPlayer,",
+		"[CG_NATIVE_EXPORT_CHAT_DOWN] = CG_NativeChatDown,",
+		"[CG_NATIVE_EXPORT_CHAT_UP] = CG_NativeChatUp,",
+		"[CG_NATIVE_EXPORT_GET_PHYSICS_TIME] = CG_GetPhysicsTime,",
+		"[CG_NATIVE_EXPORT_COPY_CLIENT_IDENTITY] = CG_CopyClientIdentity,",
+		"[CG_NATIVE_EXPORT_RESERVED_NULL] = NULL,",
+		"[CG_NATIVE_EXPORT_GET_CHAT_FIELD_Y] = CG_NativeGetChatFieldY,",
+		"[CG_NATIVE_EXPORT_GET_CHAT_FIELD_PIXEL_WIDTH] = CG_NativeGetChatFieldPixelWidth,",
+		"[CG_NATIVE_EXPORT_GET_CHAT_FIELD_WIDTH_IN_CHARS] = CG_GetChatFieldWidthInChars,",
+		"[CG_NATIVE_EXPORT_SET_CLIENT_SPEAKING_STATE] = CG_NativeSetClientSpeakingState",
+	)
+	last_index = -1
+	for expected in expected_exports:
+		current_index = native_table.index(expected)
+		assert current_index > last_index
+		last_index = current_index
+		assert expected.split("]")[0].removeprefix("[") in native_enum
+
+	for expected in (
+		"*arg1 = &data_100769a8",
+		"*arg3 = 8",
+	):
+		assert expected in retail_entry_block
+
+	for expected in (
+		"100769a8  void* data_100769a8 = sub_10029820",
+		"100769ac  void* data_100769ac = sub_10020bb0",
+		"100769b0  void* data_100769b0 = sub_10029fc0",
+		"100769b4  void* data_100769b4 = sub_10007f00",
+		"100769b8  void* data_100769b8 = sub_1004e4e0",
+		"100769bc  void* data_100769bc = sub_10020d60",
+		"100769c0  void* data_100769c0 = sub_10020d80",
+		"100769c4  void* data_100769c4 = sub_1003c6f0",
+		"100769c8  void* data_100769c8 = 0x100208f0",
+		"100769cc  void* data_100769cc = sub_1003c620",
+		"100769d0  void* data_100769d0 = sub_10029ff0",
+		"100769d4  void* data_100769d4 = sub_1002a060",
+		"100769d8  void* data_100769d8 = sub_10007cd0",
+		"100769dc  void* data_100769dc = sub_10007cf0",
+		"100769e0  void* data_100769e0 = sub_1004e4d0",
+		"100769e4  void* data_100769e4 = sub_10020910",
+		"100769e8",
+		"00 00 00 00",
+		"100769ec  void* data_100769ec = sub_100209e0",
+		"100769f0  void* data_100769f0 = sub_10020a00",
+		"100769f4  void* data_100769f4 = sub_10020a20",
+		"100769f8  void* data_100769f8 = sub_10020a40",
+	):
+		assert expected in retail_native_table
+
+
 def test_cgame_advert_bridge_lifecycle_matches_retail_init_and_shutdown_order() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	symbol_map = (REPO_ROOT / "references" / "symbol-maps" / "cgame.json").read_text(encoding="utf-8")
+	alias_map = (REPO_ROOT / "references" / "analysis" / "quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	native_table = source[source.index("static void *cg_nativeExports"):source.index("void **CG_GetNativeExportTable")]
 	init_block = _block_from_marker(source, "void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum )")
 	shutdown_block = _block_from_marker(source, "void CG_Shutdown( void )")
+	retail_init_tail = _text_between(hlil_source, "10029e21  sub_10029420()", "10029fc0")
+	retail_shutdown_block = _text_between(hlil_source, "10029fc0    int32_t sub_10029fc0", "10029ff0")
+	retail_native_table = _text_between(hlil_source, "100769a8  void* data_100769a8", "100769d0")
 
 	assert "trap_AdvertisementBridge_InitCGame();" in init_block
 	assert init_block.index("trap_AdvertisementBridge_InitCGame();") > init_block.index("CG_ShaderStateChanged();")
 	assert init_block.index("trap_AdvertisementBridge_InitCGame();") < init_block.index("trap_S_ClearLoopingSounds( qtrue );")
+	assert init_block.index("CG_SetConfigValues();") < init_block.index("CG_StartMusic();")
 
 	assert "trap_AdvertisementBridge_ShutdownCGame();" in shutdown_block
 	assert shutdown_block.index("trap_AdvertisementBridge_ShutdownCGame();") < shutdown_block.index('trap_Cvar_Set( "ui_mainmenu", "1" );')
+
+	for expected in (
+		"[CG_NATIVE_EXPORT_INIT] = CG_Init,",
+		"[CG_NATIVE_EXPORT_SHUTDOWN] = CG_Shutdown,",
+	):
+		assert expected in native_table
+
+	for expected in (
+		"sub_10029420()",
+		"sub_10029120()",
+		"sub_10049420",
+		"sub_10025320()",
+		"(*(data_1074cccc + 0xf4))()",
+		"sub_100295c0()",
+		"sub_100253f0()",
+	):
+		assert expected in retail_init_tail
+
+	assert retail_init_tail.index("sub_10049420") < retail_init_tail.index("sub_10025320()")
+	assert retail_init_tail.index("(*(data_1074cccc + 0xf4))()") < retail_init_tail.index("sub_100295c0()")
+	assert retail_init_tail.index("sub_100295c0()") < retail_init_tail.index("sub_100253f0()")
+
+	for expected in (
+		"(*(data_1074cccc + 0xf8))()",
+		'(*(data_1074cccc + 0x1c))("ui_mainmenu", &data_10068c04)',
+	):
+		assert expected in retail_shutdown_block
+
+	for expected in (
+		"100769a8  void* data_100769a8 = sub_10029820",
+		"100769b0  void* data_100769b0 = sub_10029fc0",
+	):
+		assert expected in retail_native_table
+
+	for expected in (
+		'"sub_10029fc0": "CG_Shutdown"',
+		'"address": "0x10029820"',
+		'"normalized_name": "CG_Init"',
+		'"address": "0x10029FC0"',
+		'"normalized_name": "CG_Shutdown"',
+	):
+		assert expected in alias_map or expected in symbol_map
 
 
 def test_cgame_drawtools_keep_retail_widescreen_bias_consumers() -> None:
@@ -3280,7 +4695,9 @@ def test_cgame_vote_widget_reconstruction_uses_retail_vote_cvar_and_text_paths()
 	servercmds_source = ( REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c" ).read_text(encoding="utf-8")
 	main_source = ( REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c" ).read_text(encoding="utf-8")
 	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	vote_timer_block = _block_from_marker(newdraw_source, "static void CG_DrawVoteTimer")
+	vote_timer_hlil = _text_between(hlil_source, "10035920    void sub_10035920", "10035a10")
 	vote_count_block = _block_from_marker(newdraw_source, "static void CG_DrawVoteCount")
 	vote_shot_block = _block_from_marker(newdraw_source, "static void CG_DrawVoteShot")
 	set_config_values_block = _block_from_marker(servercmds_source, "void CG_SetConfigValues")
@@ -3308,7 +4725,12 @@ def test_cgame_vote_widget_reconstruction_uses_retail_vote_cvar_and_text_paths()
 		'"Voting ends in %i seconds."',
 	):
 		assert expected in vote_timer_block
+		assert expected in vote_timer_hlil
 
+	assert "data_10a3ffc4 - data_10a9c1ec + 0x4e20" in vote_timer_hlil
+	assert "remaining = ( cgs.voteTime - cg.time + 20000 ) / 1000;" in vote_timer_block
+	assert "if ( !cgs.voteTime ) {" not in vote_timer_block
+	assert "VOTE_TIME - ( cg.time - cgs.voteTime ) + 999" not in vote_timer_block
 	assert '"Vote %is"' not in vote_timer_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "Votes: %s", countText );' in vote_count_block
 	assert 'CG_GetVoteSlotString( slot, "Shot", previewToken, sizeof( previewToken ) );' in vote_shot_block
@@ -3622,8 +5044,14 @@ def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	race_block = _block_from_marker(source, "static void CG_DrawRaceStatusAndTimes")
 	round_timer_block = _block_from_marker(source, "static void CG_DrawRoundTimer")
+	other_flag_block = _block_from_marker(source, "qboolean CG_OtherTeamHasFlag")
+	your_flag_block = _block_from_marker(source, "qboolean CG_YourTeamHasFlag")
 	blue_flag_block = _block_from_marker(source, "static qboolean CG_ShowBlueTeamHasRedFlag")
 	red_flag_block = _block_from_marker(source, "static qboolean CG_ShowRedTeamHasBlueFlag")
+	notification_block = _block_from_marker(source, "static qboolean CG_HudNotificationVisible")
+	notice_block = _block_from_marker(source, "static qboolean CG_HasHudNoticeMessage")
+	message_block = _block_from_marker(source, "static qboolean CG_HasHudPlayerMessage")
+	weapon_fired_block = _block_from_marker(source, "static qboolean CG_PlacementWeaponFired")
 	visible_block = _block_from_marker(source, "qboolean CG_OwnerDrawVisible")
 
 	for expected in (
@@ -3651,16 +5079,58 @@ def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None
 	assert "CG_GetScoreboardTimerSeconds();" not in round_timer_block
 
 	for expected in (
+		"cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF || cgs.gametype == GT_ATTACK_DEFEND",
+		"team == TEAM_RED && cgs.flagStatus == FLAG_TAKEN_BLUE",
+		"team == TEAM_BLUE && cgs.flagStatus == FLAG_TAKEN_RED",
+		"team == TEAM_RED && cgs.redflag == FLAG_TAKEN",
+		"team == TEAM_BLUE && cgs.blueflag == FLAG_TAKEN",
+	):
+		assert expected in other_flag_block
+
+	for expected in (
+		"cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF || cgs.gametype == GT_ATTACK_DEFEND",
+		"team == TEAM_RED && cgs.flagStatus == FLAG_TAKEN_RED",
+		"team == TEAM_BLUE && cgs.flagStatus == FLAG_TAKEN_BLUE",
+		"team == TEAM_RED && cgs.blueflag == FLAG_TAKEN",
+		"team == TEAM_BLUE && cgs.redflag == FLAG_TAKEN",
+	):
+		assert expected in your_flag_block
+
+	for expected in (
 		"cgs.gametype != GT_CTF && cgs.gametype != GT_1FCTF && cgs.gametype != GT_ATTACK_DEFEND",
+		"if ( cgs.gametype == GT_1FCTF ) {",
+		"return ( cgs.flagStatus == FLAG_TAKEN_BLUE ) ? qtrue : qfalse;",
 		"return ( cgs.redflag == FLAG_TAKEN || cgs.flagStatus == FLAG_TAKEN_RED ) ? qtrue : qfalse;",
 	):
 		assert expected in blue_flag_block
 
 	for expected in (
 		"cgs.gametype != GT_CTF && cgs.gametype != GT_1FCTF && cgs.gametype != GT_ATTACK_DEFEND",
+		"if ( cgs.gametype == GT_1FCTF ) {",
+		"return ( cgs.flagStatus == FLAG_TAKEN_RED ) ? qtrue : qfalse;",
 		"return ( cgs.blueflag == FLAG_TAKEN || cgs.flagStatus == FLAG_TAKEN_BLUE ) ? qtrue : qfalse;",
 	):
 		assert expected in red_flag_block
+
+	for expected in (
+		"if ( expireTime <= 0 || expireTime < cg.time ) {",
+		"return ( cg.time & 0x200 ) ? qtrue : qfalse;",
+	):
+		assert expected in notification_block
+
+	assert "return CG_HudNotificationVisible( cg.spectatorSlotTrackedTime[1] );" in notice_block
+	assert "return CG_HudNotificationVisible( cg.spectatorSlotTrackedTime[0] );" in message_block
+
+	for expected in (
+		"for ( i = 0; i < cg.numScores && i < 2; i++ ) {",
+		"score = CG_GetPlacementScore( i );",
+		"stats = CG_GetPlacementScoreStats( score );",
+		"if ( weapon == WP_GAUNTLET ) {",
+		"value = stats->weaponShots[weapon];",
+		"value = stats->weaponDamage[weapon];",
+		"if ( value != 0 ) {",
+	):
+		assert expected in weapon_fired_block
 
 	for expected in (
 		"qboolean vis = qtrue;",
@@ -3668,20 +5138,34 @@ def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None
 		"if (flags & (CG_SHOW_BLUE_TEAM_HAS_REDFLAG | CG_SHOW_RED_TEAM_HAS_BLUEFLAG)) {",
 		"if (flags & CG_SHOW_BLUE_TEAM_HAS_REDFLAG && CG_ShowBlueTeamHasRedFlag()) {",
 		"} else if (flags & CG_SHOW_RED_TEAM_HAS_BLUEFLAG && CG_ShowRedTeamHasBlueFlag()) {",
-		"if ( flags & ( CG_SHOW_ANYTEAMGAME | UI_SHOW_ANYTEAMGAME ) ) {",
-		"if (flags & (UI_SHOW_IF_LOADOUT_ENABLED | UI_SHOW_IF_LOADOUT_DISABLED)) {",
-		"if (flags & (UI_SHOW_IF_WARMUP | UI_SHOW_IF_NOT_WARMUP)) {",
-		"if ( ( flags & UI_SHOW_IF_WARMUP ) && inWarmup ) {",
-		"if ( ( flags & UI_SHOW_IF_NOT_WARMUP ) && !inWarmup ) {",
+		"if ( flags & CG_SHOW_ANYTEAMGAME ) {",
+		"if (flags & (CG_SHOW_IF_WARMUP | CG_SHOW_IF_NOT_WARMUP)) {",
+		"if ( ( flags & CG_SHOW_IF_WARMUP ) && inWarmup ) {",
+		"if ( ( flags & CG_SHOW_IF_NOT_WARMUP ) && !inWarmup ) {",
 		"if ( flags & CG_SHOW_IF_CHAT_VISIBLE ) {",
+		"if ( !cg.chatHistoryVisible && !cg.scoreBoardShowing ) {",
 		"if ( flags & CG_SHOW_INTERMISSION ) {",
-		"if ( flags & ( CG_SHOW_NOTINTERMISSION | UI_SHOW_IF_NOT_INTERMISSION ) ) {",
+		"if ( flags & CG_SHOW_NOTINTERMISSION ) {",
 		"while ( flags2 ) {",
 		"if (flags2 & (CG_SHOW_IF_LOADOUT_ENABLED | CG_SHOW_IF_LOADOUT_DISABLED)) {",
 		"if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED && playerTeam == TEAM_RED ) {",
 		"if ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE && playerTeam == TEAM_BLUE ) {",
+		"CG_PlacementWeaponFired( WP_GAUNTLET )",
+		"CG_PlacementWeaponFired( WP_MACHINEGUN )",
+		"CG_PlacementWeaponFired( WP_HEAVY_MACHINEGUN )",
 	):
 		assert expected in visible_block
+
+	assert "CG_LocalPlayerHasWeapon" not in source
+
+	for cgame_collision in (
+		"UI_SHOW_ANYTEAMGAME",
+		"UI_SHOW_IF_LOADOUT_ENABLED",
+		"UI_SHOW_IF_WARMUP",
+		"UI_SHOW_IF_NOT_WARMUP",
+		"UI_SHOW_IF_NOT_INTERMISSION",
+	):
+		assert cgame_collision not in visible_block
 
 	for expected in (
 		"case CG_RACE_STATUS:",
@@ -3689,6 +5173,13 @@ def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None
 		"CG_DrawRaceStatusAndTimes( &rect, scale, color, textStyle, ownerDraw );",
 	):
 		assert expected in source
+
+	for source_only_flag in (
+		"CG_SHOW_IF_1ST_PLYR_TRACKED",
+		"CG_SHOW_IF_2ND_PLYR_TRACKED",
+	):
+		assert source_only_flag not in visible_block
+		assert source_only_flag not in UI_SHARED_H.read_text(encoding="utf-8")
 
 
 def test_cgame_loaded_browser_menu_visibility_flags_are_backed_by_cgame() -> None:
@@ -3748,11 +5239,49 @@ def test_cgame_loaded_browser_menu_visibility_flags_are_backed_by_cgame() -> Non
 		menu_source = (REPO_ROOT / "src" / "ui" / filename).read_text(encoding="utf-8")
 		flags.update(re.findall(r"\bownerdrawflag2?\s+([A-Z0-9_]+)", menu_source))
 
+	flags = {flag for flag in flags if not flag.startswith("UI_SHOW_")}
 	missing = sorted(flag for flag in flags if flag not in visible_block)
 	assert not missing, f"loaded cgame browser menu flags lack CG_OwnerDrawVisible coverage: {missing}"
 
 	assert "static void CG_DrawRaceStatus(" not in source
 	assert "static void CG_DrawRaceTimes(" not in source
+
+
+def test_cgame_ownerdraw_dispatch_covers_committed_retail_switch_cases() -> None:
+	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	constants = _menudef_ownerdraw_constants()
+	names_by_value = {value: name for name, value in constants.items()}
+	ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+	source_case_names = set(re.findall(r"case\s+([A-Z0-9_]+)\s*:", ownerdraw_block))
+	covered_values = {
+		constants[name]
+		for name in source_case_names
+		if name in constants
+	}
+
+	for first, last in (
+		("CG_1ST_PLYR_READY", "CG_1ST_PLYR_TIER"),
+		("CG_2ND_PLYR_READY", "CG_2ND_PLYR_TIER"),
+	):
+		covered_values.update(range(constants[first], constants[last] + 1))
+
+	for award_owner_draw in (
+		"CG_MOST_DAMAGEDEALT_PLYR",
+		"CG_MOST_ACCURATE_PLYR",
+		"CG_MOST_VALUABLE_OFFENSIVE_PLYR",
+		"CG_MOST_VALUABLE_DEFENSIVE_PLYR",
+		"CG_MOST_VALUABLE_PLYR",
+		"CG_BEST_ITEMCONTROL_PLYR",
+	):
+		covered_values.add(constants[award_owner_draw])
+
+	missing_named_cases = [
+		names_by_value[value]
+		for value in sorted(_retail_cg_ownerdraw_case_values())
+		if value in names_by_value and value not in covered_values
+	]
+
+	assert not missing_named_cases
 
 
 def test_cgame_objective_status_ownerdraws_use_shared_team_status_leaf() -> None:
@@ -3887,6 +5416,9 @@ def test_cgame_legacy_ui_shared_ownerdraws_match_retail_noop_slots() -> None:
 	start = ownerdraw_block.index("case CG_1STPLACE_PLYR_MODEL_ACTIVE:")
 	end = ownerdraw_block.index("case CG_2NDPLACE:", start)
 	active_model_case = ownerdraw_block[start:end]
+	start = ownerdraw_block.index("case CG_PLAYERMODEL:")
+	end = ownerdraw_block.index("case CG_PLAYER_ITEM:", start)
+	player_model_case = ownerdraw_block[start:end]
 	start = ownerdraw_block.index("case CG_TEAMINFO:")
 	end = ownerdraw_block.index("case CG_1STPLACE:", start)
 	teaminfo_case = ownerdraw_block[start:end]
@@ -3900,6 +5432,7 @@ def test_cgame_legacy_ui_shared_ownerdraws_match_retail_noop_slots() -> None:
 	end = ownerdraw_block.index("case CG_HEALTH_COLORIZED:", start)
 	scorebox_spectator_cases = ownerdraw_block[start:end]
 
+	assert "#define\tCG_PLAYERMODEL\t\t\t\t\t\t37" in menudef_h
 	assert "#define\tCG_1STPLACE_PLYR_MODEL_ACTIVE\t\t102" in menudef_h
 	assert "CG_1STPLACE_PLYR_MODEL ||" in competitive_refresh_block
 	assert "CG_1STPLACE_PLYR_MODEL_ACTIVE" not in competitive_refresh_block
@@ -3937,6 +5470,7 @@ def test_cgame_legacy_ui_shared_ownerdraws_match_retail_noop_slots() -> None:
 
 	assert "return;" in active_model_case
 	assert "CG_DrawFirstPlaceModel" not in active_model_case
+	assert "CG_DrawPlayerModel( &rect );" in player_model_case
 
 	for expected in (
 		"case CG_ROUND_BACKGROUND:",

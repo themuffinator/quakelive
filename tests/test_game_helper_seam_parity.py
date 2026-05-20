@@ -87,6 +87,7 @@ def test_client_connect_autorecord_helpers_match_recovered_retail_boundaries() -
 	game_main = _read("src/code/game/g_main.c")
 	game_local = _read("src/code/game/g_local.h")
 	update_state_block = _block_from_marker(game_main, "static void G_UpdateGameStateForLevel")
+	check_record_block = _block_from_marker(game_main, "static void G_CheckAutoRecord")
 
 	assert "#define AUTO_RECORD_STATE_RECORDING\t( 1 << 0 )" in game_main
 	assert "#define AUTO_RECORD_STATE_SCREENSHOT\t( 1 << 1 )" in game_main
@@ -99,6 +100,15 @@ def test_client_connect_autorecord_helpers_match_recovered_retail_boundaries() -
 	assert 'trap_SendServerCommand( clientNum, va( "record \\"%s\\"\\n", G_BuildAutoRecordBasename( ent ) ) );' in game_main
 	assert 'trap_SendServerCommand( i, va( "screenshot \\"%s\\"\\n", G_BuildAutoRecordBasename( ent ) ) );' in game_main
 	assert "G_CheckAutoRecord();" in update_state_block
+	assert "if ( level.warmupTime == -1 ) {" in check_record_block
+	assert "G_StopAutoRecord();" in check_record_block
+	assert "s_autoRecordState = 0;" in check_record_block
+	assert check_record_block.index("if ( level.warmupTime == -1 ) {") < check_record_block.index("if ( level.warmupTime != 0 ) {")
+	assert "if ( level.time - level.intermissiontime <= 4000 ) {" in check_record_block
+	assert "if ( s_autoRecordState & AUTO_RECORD_STATE_SCREENSHOT ) {" in check_record_block
+	assert "s_autoRecordState |= AUTO_RECORD_STATE_SCREENSHOT;" in check_record_block
+	assert check_record_block.index("G_StopAutoRecord();") < check_record_block.index("s_autoRecordState |= AUTO_RECORD_STATE_SCREENSHOT;")
+	assert check_record_block.index("s_autoRecordState |= AUTO_RECORD_STATE_SCREENSHOT;") < check_record_block.index('trap_SendServerCommand( i, va( "screenshot \\"%s\\"\\n", G_BuildAutoRecordBasename( ent ) ) );')
 	assert "void G_StartAutoRecordForClient( gentity_t *ent );" in game_local
 	assert "int\t\t\trecordingPreferences;\t// server-visible cg_autoAction bitfield for match media helpers" in game_local
 
@@ -440,6 +450,19 @@ def test_timeout_race_and_direct_command_helpers_match_recovered_boundaries() ->
 	assert "Svcmd_ReloadAccess_f();" in game_svcmds
 
 
+def test_custom_settings_cvar_helper_matches_recovered_boundary() -> None:
+	game_main = _read("src/code/game/g_main.c")
+	register_block = _block_from_marker(game_main, "void G_RegisterCvars")
+	update_block = _block_from_marker(game_main, "void G_UpdateCvars")
+	helper_block = _block_from_marker(game_main, "static void G_UpdateCustomSettingsMaskForCvar")
+
+	assert "static void G_UpdateCustomSettingsMaskForCvar( const cvarTable_t *cv );" in game_main
+	assert "if ( !cv || !cv->customSetting ) {" in helper_block
+	assert "s_customSettingsDirty = qtrue;" in helper_block
+	assert "G_UpdateCustomSettingsMaskForCvar( cv );" in register_block
+	assert "G_UpdateCustomSettingsMaskForCvar( cv );" in update_block
+
+
 def test_g_initgame_pipeline_matches_recovered_retail_bootstrap_order() -> None:
 	game_main = _read("src/code/game/g_main.c")
 	game_session = _read("src/code/game/g_session.c")
@@ -467,14 +490,42 @@ def test_g_initgame_pipeline_matches_recovered_retail_bootstrap_order() -> None:
 		"level.previousTime = levelTime;",
 		"level.pendingVoteClientNum = -1;",
 		'trap_Cvar_Set( "g_levelStartTime", startTimeBuffer );',
+		"G_SetGameState( GAME_STATE_PRE_GAME );",
+		"level.timeoutOwner = -1;",
+		"level.timeoutTeam = TEAM_FREE;",
+		"level.timeoutActive = qfalse;",
+		"level.timeoutStartTime = 0;",
+		"level.timeoutExpireTime = 0;",
+		"level.intermissionExitStatusLatched = qfalse;",
+		"level.overtimeAccumulatedMsec = 0;",
+		"level.overtimeActive = qfalse;",
+		"level.overtimeStartTime = 0;",
+		"level.overtimeEndTime = 0;",
+		"level.overtimeCount = 0;",
+		"level.suddenDeathActive = qfalse;",
+		"level.suddenDeathLastDelay = -1;",
+		"level.suddenDeathNoRespawnLogged = qfalse;",
+		"level.timeoutRemaining[team] = g_matchFactoryConfig.timeoutCountPerTeam;",
+		"matchFlow_lastConfig = g_matchFactoryConfig;",
 		'trap_Cvar_VariableStringBuffer( "session", session, sizeof( session ) );',
 		'G_Printf( "Gametype changed, clearing session data.\\n" );',
 		'trap_GetConfigstring( CS_WARMUP_READY, warmupReadyInfo, sizeof( warmupReadyInfo ) );',
 		'trap_SetConfigstring( CS_WARMUP_READY, warmupReadyInfo );',
 		"FindIntermissionPoint();",
+		"G_FreezeSyncCvars();",
+		"level.timeoutRemaining[team] = 0;",
+		"level.timeoutOwner = -1;",
+		"level.timeoutTeam = TEAM_FREE;",
+		"level.timeoutExpireTime = 0;",
+		"level.timeoutStartTime = 0;",
 		"G_UpdateTimeoutConfigStrings();",
 		"G_SpawnQuadHogQuad();",
 		"G_SpawnItemPowerups();",
+		"LevelCheckTimers();",
+		"G_UpdateMatchStateConfigString();",
+		"G_UpdateTeamCountConfigstrings();",
+		"G_MatchConfig_UpdateConfigstrings();",
+		"G_UpdateTournamentQueuePositions();",
 	):
 		assert expected in init_block
 
@@ -491,14 +542,24 @@ def test_g_initgame_pipeline_matches_recovered_retail_bootstrap_order() -> None:
 	assert init_block.index("memset( &level, 0, sizeof( level ) );") < init_block.index("G_InitLevelCvarMirrors();")
 	assert init_block.index("level.pendingVoteClientNum = -1;") < init_block.index('trap_Cvar_Set( "g_levelStartTime", startTimeBuffer );')
 	assert init_block.index('trap_Cvar_Set( "g_levelStartTime", startTimeBuffer );') < init_block.index('level.snd_fry = G_SoundIndex("sound/player/fry.wav");')
+	assert init_block.index("G_SetGameState( GAME_STATE_PRE_GAME );") < init_block.index("level.timeoutOwner = -1;")
+	assert init_block.index("level.suddenDeathNoRespawnLogged = qfalse;") < init_block.index("matchFlow_lastConfig = g_matchFactoryConfig;")
 	assert init_block.index('trap_Cvar_VariableStringBuffer( "session", session, sizeof( session ) );') < init_block.index("memset( g_entities, 0, MAX_GENTITIES * sizeof(g_entities[0]) );")
 	assert init_block.index('trap_GetConfigstring( CS_WARMUP_READY, warmupReadyInfo, sizeof( warmupReadyInfo ) );') < init_block.index("trap_LocateGameData( level.gentities, level.num_entities, sizeof( gentity_t ),")
 	assert init_block.index('trap_SetConfigstring( CS_WARMUP_READY, warmupReadyInfo );') < init_block.index("trap_LocateGameData( level.gentities, level.num_entities, sizeof( gentity_t ),")
 	assert init_block.index("G_SpawnEntitiesFromString();") < init_block.index("FindIntermissionPoint();")
 	assert init_block.index("FindIntermissionPoint();") < init_block.index("G_CountSpawnPoints();")
+	assert init_block.index("G_CountSpawnPoints();") < init_block.index("G_InitLagHaxHistory();")
+	lag_history_index = init_block.index("G_InitLagHaxHistory();")
+	assert lag_history_index < init_block.index("G_UpdateTrainingState();", lag_history_index)
 	assert init_block.index("G_UpdateTimeoutConfigStrings();") < init_block.index("BotAISetup( restart );")
 	assert init_block.index("BotAISetup( restart );") < init_block.index("G_SpawnQuadHogQuad();")
 	assert init_block.index("G_SpawnQuadHogQuad();") < init_block.index("G_SpawnItemPowerups();")
+	assert init_block.index("G_RemapTeamShaders();") < init_block.index("LevelCheckTimers();")
+	assert init_block.index("LevelCheckTimers();") < init_block.index("G_UpdateMatchStateConfigString();")
+	assert init_block.index("G_UpdateMatchStateConfigString();") < init_block.index("G_UpdateTeamCountConfigstrings();")
+	assert init_block.index("G_UpdateTeamCountConfigstrings();") < init_block.index("G_MatchConfig_UpdateConfigstrings();")
+	assert init_block.index("G_MatchConfig_UpdateConfigstrings();") < init_block.index("G_UpdateTournamentQueuePositions();")
 
 
 def test_console_tail_and_training_bootstrap_helpers_match_recovered_boundaries() -> None:

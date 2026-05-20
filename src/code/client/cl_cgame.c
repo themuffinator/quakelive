@@ -4502,8 +4502,10 @@ qboolean	CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
 CL_SetUserCmdValue
 =====================
 */
-void CL_SetUserCmdValue( int userCmdValue, float sensitivityScale ) {
+void CL_SetUserCmdValue( int userCmdValue, int userCmdPrimary, float sensitivityScale, int userCmdFov ) {
 	cl.cgameUserCmdValue = userCmdValue;
+	cl.cgameUserCmdPrimary = userCmdPrimary;
+	cl.cgameUserCmdFov = userCmdFov;
 	cl.cgameSensitivity = sensitivityScale;
 }
 
@@ -4957,7 +4959,7 @@ static int CL_CgameSystemCallsImpl( int *args, qboolean logContract ) {
 	case CG_GETUSERCMD:
 		return CL_GetUserCmd( args[1], VMA(2) ) ? qtrue : qfalse;
 	case CG_SETUSERCMDVALUE:
-		CL_SetUserCmdValue( args[1], VMF(2) );
+		CL_SetUserCmdValue( args[1], args[2], VMF(3), args[4] );
 		return 0;
 	case CG_MEMORY_REMAINING:
 		return Hunk_MemoryRemaining();

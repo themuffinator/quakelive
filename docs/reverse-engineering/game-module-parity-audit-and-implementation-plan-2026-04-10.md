@@ -111,7 +111,9 @@ Interpretation:
 - No open strict-retail module shortfall remains inside the audited module
   layer. The only remaining runtime blocker cited by the tracked retail probe is
   the renderer-owned `R_fonsErrorCallback` font-atlas saturation blocker, which
-  stays outside module scope.
+  stays outside module scope. The 2026-05-20 renderer wiring pass removed the
+  non-retail eager FontStash prebuild behind that source-side blocker, so the
+  tracked 2026-04-21 module-runtime alias is now stale until rerun.
 
 ## Live Validation Snapshot
 
@@ -137,7 +139,9 @@ Observed facts from the refreshed machine-readable artifacts:
   `2026-04-21` probe. The authoritative tracked retail probe still loads
   retail `uix86.dll`, `qagamex86.dll`, and `cgamex86.dll`, and the remaining
   live-map shortfall is now explicitly the renderer-owned
-  `R_fonsErrorCallback` font-atlas saturation blocker.
+  `R_fonsErrorCallback` font-atlas saturation blocker. Source has since removed
+  the eager retained-atlas prebuild, so this blocker classification needs a
+  fresh module-runtime rerun before it can be promoted again.
 
 Current-worktree validation blockers:
 
@@ -352,7 +356,9 @@ Completed work:
    rerun recovered the current `map <name> ffa` contract and retail module
    loads again, and it now classifies the remaining live-map shortfall as the
    renderer-owned `R_fonsErrorCallback` font-atlas saturation blocker outside
-   module scope.
+   module scope. The renderer source-side cause has since been patched by
+   removing the non-retail eager FontStash prebuild, so this runtime evidence is
+   now stale until a new rerun confirms the current behavior.
 
 Exit status:
 

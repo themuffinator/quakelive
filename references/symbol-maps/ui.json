@@ -492,7 +492,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Lower-level retail text-bounds helper that measures string width and height through out-parameters and sits underneath the Text_Width and Text_Height wrappers."
+      "comment": "Lower-level retail text-bounds helper that measures string width and height through the host scaled-text measurement lane and sits underneath the Text_Width and Text_Height wrappers."
     },
     {
       "address": "0x10003E60",
@@ -522,7 +522,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Font renderer assigned into uiDC.drawText during _UI_Init."
+      "comment": "Font renderer assigned into uiDC.drawText during _UI_Init; source-side reconstruction routes the paint through the host scaled-text draw lane while preserving the retail text style entry point."
     },
     {
       "address": "0x10004070",
@@ -582,7 +582,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Parses assetGlobalDef menu blocks and populates shared UI asset definitions."
+      "comment": "Parses assetGlobalDef menu blocks and populates shared UI asset definitions, including the retail `font`, `smallFont`, and `bigFont` registration tokens before the gradient, cursor, fade, and sound assets."
     },
     {
       "address": "0x10004B20",
@@ -3395,7 +3395,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail-only item parser that interns the item's font token."
+      "comment": "Retail-only item parser for the integer per-item font bucket. HLIL/source evidence parse the `font` keyword into `item->fontIndex`, which item text helpers later pass to the extended draw and measure callbacks."
     },
     {
       "address": "0x1001E340",
@@ -3895,7 +3895,7 @@
       "signature": null,
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Normalizes the menu font path, registers the retail text, small, and big fonts on first use, and stores the resolved menu font token."
+      "comment": "Normalizes the menu font path, lazily registers the retail text, small, and big baked fonts on first use, and stores the resolved menu font token."
     },
     {
       "address": "0x1001FAA0",

@@ -260,6 +260,10 @@ Returns whether the retail step-jump probes still require a fresh jump press.
 ==================
 */
 static qboolean PM_ShouldRequireStepJumpRelease( const pmove_settings_t *settings ) {
+	if ( pm && pm->ps && ( pm->ps->pm_flags & PMF_REQUIRE_JUMP_RELEASE ) ) {
+		return qtrue;
+	}
+
 	if ( settings ) {
 		if ( settings->autoHop ) {
 			return qfalse;
@@ -324,13 +328,16 @@ Returns whether the general retail step-jump helper should run.
 */
 static qboolean PM_CanStepJump( void ) {
 	const pmove_settings_t	*settings;
+	qboolean		releaseRequired;
 
 	settings = PM_GetActiveSettings();
 	if ( !PM_CanProbeStepJump( settings ) ) {
 		return qfalse;
 	}
 
-	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
+	releaseRequired = PM_ShouldRequireStepJumpRelease( settings );
+
+	if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {
 		return qfalse;
 	}
 
@@ -338,7 +345,7 @@ static qboolean PM_CanStepJump( void ) {
 		return qfalse;
 	}
 
-	if ( PM_ShouldRequireStepJumpRelease( settings ) && ( pm->ps->pm_flags & PMF_JUMP_HELD ) ) {
+	if ( releaseRequired && ( pm->ps->pm_flags & PMF_JUMP_HELD ) ) {
 		pm->cmd.upmove = 0;
 		return qfalse;
 	}
@@ -360,13 +367,16 @@ Returns whether the crouch-specific retail step-jump probe should run.
 */
 static qboolean PM_CanCrouchStepJump( void ) {
 	const pmove_settings_t	*settings;
+	qboolean		releaseRequired;
 
 	settings = PM_GetActiveSettings();
 	if ( !PM_CanProbeStepJump( settings ) ) {
 		return qfalse;
 	}
 
-	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
+	releaseRequired = PM_ShouldRequireStepJumpRelease( settings );
+
+	if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {
 		return qfalse;
 	}
 
@@ -378,7 +388,7 @@ static qboolean PM_CanCrouchStepJump( void ) {
 		return qfalse;
 	}
 
-	if ( PM_ShouldRequireStepJumpRelease( settings ) && ( pm->ps->pm_flags & PMF_JUMP_HELD ) ) {
+	if ( releaseRequired && ( pm->ps->pm_flags & PMF_JUMP_HELD ) ) {
 		return qfalse;
 	}
 

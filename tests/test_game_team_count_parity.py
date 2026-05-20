@@ -19,9 +19,11 @@ def test_team_count_configstrings_are_declared_and_published() -> None:
 	assert "static void G_UpdateRoundStartConfigString( void ) {" in match_state
 	assert 'trap_SetConfigstring( CS_ROUND_START_TIME, va( "%i", level.roundStartTime ) );' in match_state
 	assert "void G_UpdateTeamCountConfigstrings( void ) {" in match_state
+	assert "level.time > s_lastTeamCountConfigstringUpdateTime" in match_state
+	assert "level.time - s_lastTeamCountConfigstringUpdateTime <= 250" in match_state
+	assert "s_lastTeamCountConfigstringUpdateTime = level.time;" in match_state
 	assert 'trap_SetConfigstring( CS_TEAM_COUNT_RED, va( "%i", counts[TEAM_RED] ) );' in match_state
 	assert 'trap_SetConfigstring( CS_TEAM_COUNT_BLUE, va( "%i", counts[TEAM_BLUE] ) );' in match_state
-	assert "s_nextTeamCountConfigstringUpdateTime = level.time + 250;" in match_state
 	assert "G_UpdateTeamCountConfigstrings();" in main_c
 
 

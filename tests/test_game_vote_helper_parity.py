@@ -47,13 +47,19 @@ def test_vote_commands_seed_and_consume_per_client_vote_state() -> None:
 def test_checkvote_uses_retail_vote_helpers_and_timeout_string() -> None:
 	game_main = _read("src/code/game/g_main.c")
 	vote_c = _read("src/code/game/g_vote.c")
+	qagame_mapping = _read("docs/reverse-engineering/qagame-mapping.md")
 
 	assert "if ( G_TryExecuteVoteString( level.voteString ) == qfalse ) {" in game_main
 	assert "voteResult = G_UpdateVoteCounts();" in game_main
+	assert "G_ClearVoteState();" in game_main
 	assert 'trap_SendServerCommand( -1, "print \\"Voting time has expired.\\n\\"" );' in game_main
 	assert 'trap_SendServerCommand( -1, "print \\"Vote passed.\\n\\"" );' in game_main
 	assert 'trap_SendServerCommand( -1, "print \\"Vote failed.\\n\\"" );' in game_main
 	assert "level.voteExecuteTime = level.time + 3000;" in game_main
+	assert "`0x100588F0` | `G_UpdateVoteCounts` | `g_vote.c::G_UpdateVoteCounts`" in qagame_mapping
+	assert "`0x10058AB0` | `G_TryExecuteVoteString` | `g_vote.c::G_TryExecuteVoteString`" in qagame_mapping
+	assert "`0x10059130` | `G_ClearVoteState` | `g_vote.c::G_ClearVoteState`" in qagame_mapping
+	assert "does not preserve these exact helpers as separate named functions" not in qagame_mapping
 
 	assert "qboolean G_TryExecuteVoteString( const char *voteString ) {" in vote_c
 	assert '!Q_stricmp( command, "cointoss" )' in vote_c

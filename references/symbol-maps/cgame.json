@@ -102,12 +102,12 @@
     {
       "address": "0x10001170",
       "raw_name": "FUN_10001170",
-      "normalized_name": "BG_FindItemByTypeTag",
+      "normalized_name": "BG_FindItemByTypeAndTag",
       "status": "matched",
-      "signature": "static gitem_t *BG_FindItemByTypeTag(int giType, int giTag)",
+      "signature": "gitem_t *BG_FindItemByTypeAndTag(itemType_t type, int tag)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic shared `bg_itemlist` lookup keyed by `giType` and `giTag`. HLIL walks the retail item table, returns the first row whose type/tag pair matches the requested values, and otherwise raises the generic `Couldn't find item for type %i tag %i` error; committed callers reuse it for holdables, persistant powerups, and team-item style lookups."
+      "comment": "Retail shared `bg_itemlist` lookup keyed by item type and tag, matching bg_misc.c::BG_FindItemByTypeAndTag. HLIL walks the retail item table, returns the first row whose type/tag pair matches the requested values, and otherwise raises the generic `Couldn't find item for type %i tag %i` error; committed callers reuse it for holdables, persistant powerups, and team-item style lookups."
     },
     {
       "address": "0x100011C0",
@@ -167,7 +167,7 @@
       "signature": "qboolean BG_CanItemBeGrabbed(int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail shared pickup gate beneath client prediction and server item touches. HLIL carries the exact `index out of range` / `invalid item type` diagnostics, the same dropped-item self-grab timeout, and the same `bg_itemGrabHandlers[item->giType]` dispatch used by `BG_CanItemBeGrabbed`."
+      "comment": "Retail shared pickup gate beneath client prediction and server item touches. HLIL carries the exact `index out of range` / `invalid item type` diagnostics, the same dropped-item self-grab timeout, and the direct item-type switch used by `BG_CanItemBeGrabbed` for weapon, ammo, armor, health, powerup, holdable, team, and key items."
     },
     {
       "address": "0x10001850",
@@ -187,7 +187,7 @@
       "signature": "void BG_EvaluateTrajectory(const trajectory_t *tr, int atTime, vec3_t result)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail trajectory position evaluator. HLIL preserves the exact `unknown trType` error string and the same TR_STATIONARY / TR_INTERPOLATE / TR_LINEAR / TR_SINE / TR_LINEAR_STOP / TR_GRAVITY switch, including the gravity half-acceleration term."
+      "comment": "Retail trajectory position evaluator. HLIL preserves the exact `unknown trType` error string and the same TR_STATIONARY / TR_INTERPOLATE / TR_LINEAR / TR_LINEAR_STOP / TR_SINE / TR_GRAVITY / TR_QL_ACCEL switch, including the gravity half-acceleration term and the type-6 extra acceleration scalar read after trDelta."
     },
     {
       "address": "0x10001A70",
@@ -197,7 +197,7 @@
       "signature": "void BG_EvaluateTrajectoryDelta(const trajectory_t *tr, int atTime, vec3_t result)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail trajectory-velocity evaluator adjacent to `BG_EvaluateTrajectory`. The body emits the exact `unknown trType` diagnostic and keeps the same zero/linear/cosine/gravity delta switch used by `BG_EvaluateTrajectoryDelta`."
+      "comment": "Retail trajectory-velocity evaluator adjacent to `BG_EvaluateTrajectory`. The body emits the exact `unknown trType` diagnostic and keeps the same zero/linear/cosine/gravity delta switch used by `BG_EvaluateTrajectoryDelta`, including the TR_QL_ACCEL type-6 path that subtracts the extra acceleration scalar times elapsed seconds."
     },
     {
       "address": "0x10001BC0",
@@ -327,7 +327,7 @@
       "signature": "static void PM_Friction(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail friction path beneath every major move mode; HLIL preserves the same speed/drop computation, walking-water-special-case gates, and final velocity scaling as `PM_Friction`."
+      "comment": "Retail friction path beneath every major move mode; HLIL preserves the same speed/drop computation, crouch-slide and diagonal circle-strafe friction overrides, walking-water-special-case gates, water/flight/spectator drops, PM_FREEZE or PMF_SCOREBOARD 0.25 drop multiplier, and final velocity scaling as `PM_Friction`."
     },
     {
       "address": "0x100023C0",
@@ -372,32 +372,32 @@
     {
       "address": "0x10002790",
       "raw_name": "FUN_10002790",
-      "normalized_name": "PM_LaunchJump",
+      "normalized_name": "PM_ApplyJumpTakeoff",
       "status": "matched",
-      "signature": "static void PM_LaunchJump(void)",
+      "signature": "static void PM_ApplyJumpTakeoff(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail jump-launch leaf shared by `PM_CheckJump` and the step-jump path. The body computes the final vertical takeoff speed from the cached jump timing mode, clears ground state, queues `EV_JUMP`, updates the jump timestamp, and selects the forward/back jump animation."
+      "comment": "Descriptive retail-only jump takeoff body shared by PM_CheckJump and the step-jump seam. HLIL matches the qagame 0x1002E2C0 body: it latches jump flags, derives final vertical takeoff velocity from the active jump-mode globals, clears ground state, queues EV_JUMP, selects the forward/back jump animation, and refreshes the jump timestamp."
     },
     {
       "address": "0x10002990",
       "raw_name": "FUN_10002990",
-      "normalized_name": "PM_ShouldTryCrouchStepJump",
+      "normalized_name": "PM_CanCrouchStepJump",
       "status": "matched",
-      "signature": "static qboolean PM_ShouldTryCrouchStepJump(void)",
+      "signature": "static qboolean PM_CanCrouchStepJump(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail crouch-step-jump gate under `PM_StepSlideMove`. HLIL checks the duck flag, rejects grounded or downward motion, and enforces the same recent-ground-contact timing threshold before allowing the extra crouch-step jump probe."
+      "comment": "Descriptive retail-only crouch step-jump gate checked from the PM_StepSlideMove seam. HLIL matches the qagame 0x1002E4C0 body: it requires the ducked movement flag, rejects the pending step-jump suppression latch, keeps only non-descending vertical velocity, and reuses the same jump-cooldown timing threshold before reporting success."
     },
     {
       "address": "0x100029E0",
       "raw_name": "FUN_100029e0",
-      "normalized_name": "PM_ShouldTryStepJump",
+      "normalized_name": "PM_CanStepJump",
       "status": "matched",
-      "signature": "static qboolean PM_ShouldTryStepJump(void)",
+      "signature": "static qboolean PM_CanStepJump(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail general step-jump gate beneath `PM_StepSlideMove`. The body validates an upward jump input, applies the same jump-release/auto-hop style restrictions used by the main jump path, and uses the cached ground-contact timing window before allowing a step jump."
+      "comment": "Descriptive retail-only step-jump precheck beneath PM_StepSlideMove. HLIL matches the qagame 0x1002E510 body: it enforces the retail upmove, jump-delay, and jump-held restrictions around the step-jump modes, clearing the queued jump state on rejected attempts before the surrounding movement code decides whether to run the takeoff body."
     },
     {
       "address": "0x10002A60",
@@ -457,7 +457,7 @@
       "signature": "static void PM_WaterMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail swimming movement path. The body starts with `PM_CheckWaterJump`, sinks with `-60` when idle, clamps to the swim-speed scale, clips against the ground plane underwater, and finishes with `PM_SlideMove(qfalse)`, which makes `PM_WaterMove` exact."
+      "comment": "Retail swimming movement path. The body starts with PM_CheckWaterJump, otherwise applies PM_Friction, builds the 3D command vector through PM_BuildWishMove3D, sinks with -60 when idle, clamps to the swim-speed scale, accelerates with PM_Accelerate and pm_wateraccelerate, clips against the ground plane underwater, and finishes with PM_SlideMove(qfalse), which makes PM_WaterMove exact."
     },
     {
       "address": "0x10003EF0",
@@ -467,7 +467,7 @@
       "signature": "static void PM_FlyMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail spectator/flight move leaf reached directly from the pm_type dispatch; HLIL runs friction, builds the 3D wish vector, accelerates with the flight rate, and ends in `PM_StepSlideMove(qfalse)`, matching `PM_FlyMove`."
+      "comment": "Retail spectator/flight move leaf reached from PM_SPECTATOR and flight-powerup dispatch; HLIL runs PM_Friction, builds the 3D wish vector through PM_BuildWishMove3D, accelerates with PM_Accelerate and pm_flyaccelerate, and ends in PM_StepSlideMove(qfalse), matching PM_FlyMove."
     },
     {
       "address": "0x10003F50",
@@ -477,7 +477,7 @@
       "signature": "static void PM_InvulnerabilityMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail-expanded invulnerability move handler reached from the walk and grapple paths after `PM_Weapon` arms `PMF_USE_ITEM_HELD` for the invulnerability holdable. HLIL seeds the active invulnerability powerup state, applies the pitch-driven float / sink bias, counts down the internal activation timer, clears the pending holdable slot when the effect collapses, and forces the special legs-animation branch while active, so this is still the retail `PM_InvulnerabilityMove` boundary even though the current GPL stub remains minimal."
+      "comment": "Retail-expanded invulnerability move handler reached from the walk and air movement tails after PM_Weapon arms PMF_USE_ITEM_HELD for the invulnerability holdable. HLIL seeds the active invulnerability powerup state, applies the pitch-driven float / sink bias, counts down the internal activation timer, clears the pending holdable slot when the effect collapses, and forces the special legs-animation branch while active, matching the reconstructed PM_InvulnerabilityMove boundary."
     },
     {
       "address": "0x10004070",
@@ -497,7 +497,7 @@
       "signature": "static void PM_AirMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail airborne movement path; the committed body runs `PM_Friction`, `PM_SetMovementDir`, 2D wishdir normalization, air acceleration, optional ground-plane clipping, `PM_StepSlideMove(qtrue)`, and the trailing jump recheck from `PM_AirMove`."
+      "comment": "Retail airborne movement path; the committed body runs PM_Friction, PM_SetMovementDir, 2D wishdir normalization, the air-control acceleration mode split for airstop versus strafe movement, the pm_wishspeed clamp on pure side movement, PM_Accelerate as the generic velocity pusher, optional PM_AirControl steering, ground-plane clipping, PM_StepSlideMove(qtrue), PM_InvulnerabilityMove, and the trailing PMF_DOUBLE_JUMP recheck from PM_AirMove."
     },
     {
       "address": "0x100043F0",
@@ -517,7 +517,7 @@
       "signature": "static void PM_LadderMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ladder-movement path gated by the ladder probe. The body uses 3D wishvel plus explicit `0.66 * speed` up/down overrides, clips against the ground plane when needed, and ends in `PM_SlideMove(qfalse)`, which matches `PM_LadderMove` rather than the nearby water move."
+      "comment": "Retail ladder-movement path gated by the ladder probe. The body applies PM_Friction, builds 3D wishvel through PM_BuildWishMove3D, overrides explicit up/down input to +/-0.66 * speed, caps total wishspeed to the same 66% limit, accelerates with PM_Accelerate and pm_accelerate, clips against the ground plane when needed, and ends in PM_SlideMove(qfalse), which matches PM_LadderMove rather than the nearby water move."
     },
     {
       "address": "0x10004830",
@@ -537,7 +537,7 @@
       "signature": "static void PM_WalkMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail grounded walk path; HLIL preserves the early swim handoff, jump handoff, friction, ground-plane projection, duck and wade clamps, slick/knockback acceleration split, and final `PM_StepSlideMove(qfalse)` from `PM_WalkMove`."
+      "comment": "Retail grounded walk path; HLIL preserves the early swim handoff, PM_ShouldUseInvulnerabilityMove handoff through PM_StepSlideMove(qfalse) and PM_InvulnerabilityMove, jump handoff, friction, crouch-slide timer refresh, ground-plane projection, duck/wade clamps including the crouch-slide 0.75 duck scale, slick/knockback acceleration split, and final PM_StepSlideMove(qfalse) from PM_WalkMove."
     },
     {
       "address": "0x10004C60",
@@ -557,7 +557,7 @@
       "signature": "static void PM_NoclipMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail noclip path reached from the pm_type dispatch; HLIL applies the extra friction, rebuilds the 3D wish vector, accelerates, and directly integrates origin by `frametime * velocity`, which makes `PM_NoclipMove` exact."
+      "comment": "Retail noclip path reached from the pm_type dispatch; HLIL forces DEFAULT_VIEWHEIGHT, applies the 1.5x friction variant, rebuilds the 3D wish vector through PM_BuildWishMove3D, accelerates with PM_Accelerate and pm_accelerate, and directly integrates origin by frametime * velocity, which makes PM_NoclipMove exact."
     },
     {
       "address": "0x10004E70",
@@ -567,7 +567,7 @@
       "signature": "static int PM_FootstepForSurface(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail footstep-event selector. The helper inspects the current ground surface flags and returns the same splash, metal, and default step event ids used by `PM_FootstepForSurface`."
+      "comment": "Retail footstep-event selector. The helper honors the pmove noFootsteps gate, then inspects the current ground surface flags and returns the same no-step, metal, snow, wood, and default step event ids used by `PM_FootstepForSurface`."
     },
     {
       "address": "0x10004EC0",
@@ -577,7 +577,7 @@
       "signature": "static void PM_CrashLand(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail landing classifier beneath `PM_GroundTrace`; HLIL drives the same land animations, computes the same fall-delta severity, and emits the short/medium/far footstep or fall events through the shared pmove event queue, matching `PM_CrashLand`."
+      "comment": "Retail landing classifier beneath `PM_GroundTrace`; HLIL drives the same land animations, computes the same fall-delta severity, applies the gib-health fall-event gate, clears the PMF_DOUBLE_JUMP latch, and emits the short/medium/far footstep or fall events through the shared pmove event queue, matching `PM_CrashLand`."
     },
     {
       "address": "0x100050B0",
@@ -589,7 +589,7 @@
         "0x100687F4"
       ],
       "relocation_refs": [],
-      "comment": "Retail allsolid recovery helper under `PM_GroundTrace`; the body emits the exact `\"%i:allsolid\\n\"` diagnostic, jitters the player origin across the same 3x3x3 neighborhood, rebuilds the ground trace on success, and otherwise clears the walking/ground state exactly like `PM_CorrectAllSolid`."
+      "comment": "Retail allsolid recovery helper under `PM_GroundTrace`; the body emits the exact `\"%i:allsolid\\n\"` diagnostic, jitters the player origin across the same 3x3x3 neighborhood, rebuilds pml.groundTrace with the 0.25-unit down trace on success, and otherwise clears groundEntityNum plus groundTraceLatestEntNum/Time/Normal before dropping pml.groundPlane and pml.walking exactly like `PM_CorrectAllSolid`."
     },
     {
       "address": "0x10005270",
@@ -599,7 +599,7 @@
       "signature": "static void PM_GroundTraceMissed(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail lift-off helper used by `PM_GroundTrace`; HLIL emits the same `\"%i:lift\\n\"` debug path, picks the forward/back jump animation from the current command, clears the walking state, and resets the cached ground trace exactly like `PM_GroundTraceMissed`."
+      "comment": "Retail lift-off helper used by `PM_GroundTrace`; HLIL emits the same `\"%i:lift\\n\"` debug path, traces 64 units down before picking LEGS_JUMP or LEGS_JUMPB/PMF_BACKWARDS_JUMP from the current command, and clears groundEntityNum, groundTraceLatestEntNum/Time/Normal, pml.groundPlane, and pml.walking exactly like `PM_GroundTraceMissed`."
     },
     {
       "address": "0x100053A0",
@@ -609,7 +609,7 @@
       "signature": "static void PM_GroundTrace(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ground-state resolver. The committed body preserves the allsolid fallback, the `\"%i:kickoff\\n\"`, `\"%i:steep\\n\"`, and `\"%i:Land\\n\"` diagnostics, the steep-slope rejection, and the landing handoff into `PM_CrashLand`, which makes `PM_GroundTrace` exact."
+      "comment": "Retail ground-state resolver. The committed body preserves the 0.25-unit trace, allsolid fallback, lift miss, kickoff dot > 10 branch, steep-slope pml.groundPlane-without-walking state, groundTraceLatestEntNum/Time/Normal writes, PMF_TIME_WATERJUMP/PMF_TIME_LAND timer clearing, landing handoff into `PM_CrashLand`, -200 z-velocity PMF_TIME_LAND/250 ms latch, PM_RecordGroundContact update, and final PM_AddTouchEnt, which makes `PM_GroundTrace` exact."
     },
     {
       "address": "0x10005610",
@@ -619,7 +619,7 @@
       "signature": "static void PM_SetWaterLevel(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail three-sample water-state helper; HLIL traces at feet, chest, and head heights, updates `watertype`, and promotes `waterlevel` through the same 0/1/2/3 ladder as `PM_SetWaterLevel`."
+      "comment": "Retail three-sample water-state helper; HLIL samples MASK_WATER at MINS_Z + 1, halfway from MINS_Z to viewheight, and head height at viewheight, updates `watertype`, and promotes `waterlevel` through the same 0/1/2/3 ladder as `PM_SetWaterLevel`."
     },
     {
       "address": "0x10005710",
@@ -629,7 +629,7 @@
       "signature": "static void PM_CheckDuck(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail bounds/viewheight manager for gib, dead, ducked, and standing states. HLIL switches between the same mins/maxs slabs, duck flags, and viewheight values while probing the stand-up trace exactly like `PM_CheckDuck`."
+      "comment": "Retail bounds/viewheight manager for gib, dead, ducked, and standing states. HLIL switches between the same mins/maxs slabs, duck flags, and viewheight values while probing the stand-up trace, then maintains crouchTime and crouchSlideTime inline like `PM_CheckDuck`."
     },
     {
       "address": "0x100059A0",
@@ -639,7 +639,7 @@
       "signature": "static void PM_Footsteps(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail leg-animation and footstep-event driver reached after weapon/torso handling; HLIL owns the same idle, crouch, swim, walk, run, and landing event split as `PM_Footsteps`."
+      "comment": "Retail leg-animation and footstep-event driver reached after weapon/torso handling; HLIL owns the same crouch-slide branch, airborne LEGS_IDLECR invulnerability idle, LEGS_SWIM water path, idle xyspeed < 5 bobCycle reset, ducked footstep suppression, walk/run axis-speed gate, and bob-boundary footstep, EV_FOOTSPLASH, or EV_SWIM event split as `PM_Footsteps`."
     },
     {
       "address": "0x10005C70",
@@ -649,7 +649,7 @@
       "signature": "static void PM_WaterEvents(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail water-transition event helper. The body compares previous and current `waterlevel`, then emits the same touch/leave/under/clear events as `PM_WaterEvents`."
+      "comment": "Retail water-transition event helper. The body compares previous and current `waterlevel`, emits the same touch/leave events, suppresses head-water under/clear transitions while PM_DEAD, and skips EV_WATER_CLEAR while invulnerability is active."
     },
     {
       "address": "0x10005D50",
@@ -659,7 +659,7 @@
       "signature": "static void PM_BeginWeaponChange(int weapon)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail begin-change leaf beneath `PM_Weapon`; HLIL validates the requested weapon against the owned-weapon bitmask, queues the change event, stages the drop animation, and arms `WEAPON_DROPPING` exactly like `PM_BeginWeaponChange`."
+      "comment": "Retail begin-change leaf beneath `PM_Weapon`; HLIL validates the requested weapon against the owned-weapon bitmask, queues the change event, stages the drop animation, arms `WEAPON_DROPPING`, and preserves the no-weapon sentinel branch exactly like `PM_BeginWeaponChange`."
     },
     {
       "address": "0x10005DF0",
@@ -669,7 +669,7 @@
       "signature": "static void PM_FinishWeaponChange(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail finish-change leaf that validates the requested weapon, commits it to `ps->weapon`, moves to `WEAPON_RAISING`, primes `weaponTime`, and updates the torso anim, matching `PM_FinishWeaponChange`."
+      "comment": "Retail finish-change leaf that validates the requested weapon, commits it to `ps->weapon`, moves to `WEAPON_RAISING`, primes `weaponTime`, clears the retail +0xe0 chaingun spin accumulator now named STAT_CHAINGUN_SPINUP, and updates the torso anim, matching `PM_FinishWeaponChange`."
     },
     {
       "address": "0x10005E60",
@@ -679,7 +679,7 @@
       "signature": "static void PM_Weapon(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail weapon state machine beneath `PmoveSingle`; HLIL preserves the holdable-use path, weapon-change handling, ready/drop/raise states, no-ammo event, fire event, ammo decrement, and gauntlet/lightning timing details from `PM_Weapon`."
+      "comment": "Retail weapon state machine beneath `PmoveSingle`; HLIL preserves respawn/spectator/health gates, holdable use, attack-lockout and PMF_WEAPON_RESET cleanup, weapon-change and sentinel handling, ready/drop/raise states, no-ammo event, fire event, ammo decrement, Scout/AmmoRegen/Haste refire scaling, gauntlet/lightning timing, and the WP_CHAINGUN +0xe0 spin accumulator now named STAT_CHAINGUN_SPINUP."
     },
     {
       "address": "0x100061B0",
@@ -699,7 +699,7 @@
       "signature": "static void PM_DropTimers(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail pmove timer decrement helper; HLIL subtracts `pml.msec` from `pm_time`, `legsTimer`, `torsoTimer`, and the jump-hold timer with the same floor-at-zero behavior used by `PM_DropTimers`."
+      "comment": "Retail pmove timer decrement helper; HLIL subtracts `pml.msec` from `pm_time`, `legsTimer`, `torsoTimer`, and the crouch-slide timer with the same floor-at-zero behavior used by `PM_DropTimers`."
     },
     {
       "address": "0x100063A0",
@@ -709,7 +709,7 @@
       "signature": "void PM_UpdateViewAngles(playerState_t *ps, const usercmd_t *cmd)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail viewangle updater; the body applies the cmd angle deltas onto `delta_angles`, clamps pitch, and rebuilds the float `viewangles` vector exactly like `PM_UpdateViewAngles`."
+      "comment": "Retail viewangle updater; the body skips intermission and dead-player updates while preserving the PM_FREEZE dead-player exception, applies the cmd angle deltas onto `delta_angles`, clamps pitch, and rebuilds the float `viewangles` vector exactly like `PM_UpdateViewAngles`."
     },
     {
       "address": "0x10006470",
@@ -719,7 +719,7 @@
       "signature": "void PmoveSingle(pmove_t *pmove)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "This is the full retail per-command pmove dispatcher: it seeds globals, clamps `msec`, copies previous origin/velocity, updates viewangles, runs the pm_type early exits, then dispatches into the recovered ground/water/ladder/fly/grapple/walk/air chain before weapon, torso, footstep, and water-event handling."
+      "comment": "This is the full retail per-command pmove dispatcher: it seeds globals, clamps `msec`, copies previous origin/velocity, updates viewangles, mirrors weaponPrimary/fov/forwardmove/rightmove/upmove into playerState, honors PMF_NO_MOVE before movement, runs the pm_type early exits, then dispatches into the recovered ground/water/ladder/fly/grapple/walk/air chain before weapon, torso, footstep, and water-event handling."
     },
     {
       "address": "0x10006870",
@@ -1557,7 +1557,7 @@
       "signature": "void CG_Text_Paint(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Shared retail text painter used across cgame HUD ownerdraw paths. HLIL preserves the same widescreen-adjusted draw origin, color-string handling, shadow style branch, glyph xSkip accumulation, and renderer callback flow as `cg_draw.c::CG_Text_Paint`."
+      "comment": "Shared retail text painter used across cgame HUD ownerdraw paths. HLIL/source evidence keep the widescreen-adjusted draw origin, color-string handling, shadow style branch, font-bucket selection through `CG_SelectTextFontHandle`, and renderer scaled-text callback flow as `cg_draw.c::CG_Text_Paint`."
     },
     {
       "address": "0x10008780",
@@ -3219,7 +3219,7 @@
         "0x1006B460"
       ],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic native-export name for the first tracked-slot notifier: it arms the 3000 ms latch later consumed by CG_SHOW_IF_1ST_PLYR_TRACKED, reloads cg_lastmsg, and replays that text through the buffered print stack."
+      "comment": "Deliberate synthetic native-export name for the first tracked-slot notifier: it arms the 3000 ms spectator slot-highlight / `CG_SHOW_IF_MSG_PRESENT` latch, reloads cg_lastmsg, and replays that text through the buffered print stack."
     },
     {
       "address": "0x1002A060",
@@ -3231,7 +3231,7 @@
         "0x1006B460"
       ],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic native-export name for the second tracked-slot notifier: it arms the 3000 ms latch later consumed by CG_SHOW_IF_2ND_PLYR_TRACKED, reloads cg_lastmsg, and replays that text through the buffered print stack."
+      "comment": "Deliberate synthetic native-export name for the second tracked-slot notifier: it arms the 3000 ms spectator slot-highlight / `CG_SHOW_IF_NOTICE_PRESENT` latch, reloads cg_lastmsg, and replays that text through the buffered print stack."
     },
     {
       "address": "0x1002A0D0",
@@ -3472,7 +3472,7 @@
       "signature": "qboolean CG_Asset_Parse(int handle)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail HUD asset parser for assetGlobalDef blocks; the committed Ghidra body walks the same font, gradient, cursor, fade, and sound tokens as src/code/cgame/cg_main.c::CG_Asset_Parse."
+      "comment": "Retail HUD asset parser for assetGlobalDef blocks; the committed Ghidra body walks the same `font`, `smallFont`, lowercase `bigfont`, gradient, cursor, fade, and sound tokens as src/code/cgame/cg_main.c::CG_Asset_Parse, with the three font tokens resolving through `cgDC.registerFont`."
     },
     {
       "address": "0x10025AC0",
@@ -3608,7 +3608,7 @@
       "signature": "static const char *CG_FeederItemTextClanArenaStats(int team, int index, int column, qhandle_t *handle)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail Clan Arena end-score stats feeder leaf. The committed dispatcher only reaches this start for `FEEDER_REDTEAM_STATS` / `FEEDER_BLUETEAM_STATS` under GT_CLAN_ARENA, and the 17-column body lines up with the shipped kill/accuracy weapon strip in `end_scoreboard_ca.menu`."
+      "comment": "Retail Clan Arena end-score stats feeder leaf. The committed dispatcher only reaches this start for `FEEDER_REDTEAM_STATS` / `FEEDER_BLUETEAM_STATS` under GT_CLAN_ARENA, and the 17-column body lines up with the shipped stats strip: score, kills/deaths, damage given/received, total accuracy, gauntlet frags only, then MG/SG/GL/RL/LG/RG/PG/HMG kill+accuracy pairs."
     },
     {
       "address": "0x10027C40",
@@ -3701,7 +3701,7 @@
         "0x10070788"
       ],
       "relocation_refs": [],
-      "comment": "HUD callback that computes text widths for ownerdraw labels such as the gametype string and the obituary-style 'Fragged by %s' line."
+      "comment": "HUD callback that computes text widths only for the retail ownerdraw-width switch surface: CG_GAME_TYPE, CG_GAME_STATUS, CG_MATCH_STATUS, and CG_KILLER, including the Unknown Gametype and obituary-style 'Fragged by %s' strings."
     },
     {
       "address": "0x10028E80",
@@ -4096,7 +4096,7 @@
         "0x10070760"
       ],
       "relocation_refs": [],
-      "comment": "Retail `CG_OVERTIME` ownerdraw. The committed body gates on the active overtime HUD state, calls the recovered `CG_GetOvertimeCount` helper, formats `Overtime%s`, appends the exact ` x%i` suffix only when the count exceeds `1`, and paints the result through the shared text path."
+      "comment": "Retail `CG_OVERTIME` ownerdraw. The committed dispatcher reaches this helper only when the warmup latch is zero; the body then gates on the active overtime HUD state, calls the recovered `CG_GetOvertimeCount` helper, formats `Overtime%s`, appends the exact ` x%i` suffix only when the count exceeds `1`, and paints the result through the shared text path."
     },
     {
       "address": "0x10030DF0",
@@ -4151,22 +4151,22 @@
     {
       "address": "0x100316B0",
       "raw_name": "FUN_100316b0",
-      "normalized_name": "CG_ShowBlueTeamHasRedFlag",
+      "normalized_name": "CG_OtherTeamHasFlag",
       "status": "matched",
-      "signature": "static qboolean CG_ShowBlueTeamHasRedFlag( void )",
+      "signature": "qboolean CG_OtherTeamHasFlag( void )",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail HUD visibility predicate for `CG_SHOW_BLUE_TEAM_HAS_REDFLAG`. The committed `CG_OwnerDrawVisible` body reaches this tiny helper from the `0x00000001` bit branch, and HLIL gates it to the retail CTF / 1FCTF / Attack Defend seam before checking the red-flag carrier state."
+      "comment": "Retail HUD visibility predicate for `CG_SHOW_OTHERTEAMHASFLAG`. `CG_OwnerDrawVisible` reaches this tiny helper from the `0x00040000` bit branch, and HLIL gates it to the CTF / 1FCTF / Attack Defend seam before checking whether the opposing team has the local player's flag."
     },
     {
       "address": "0x10031720",
       "raw_name": "FUN_10031720",
-      "normalized_name": "CG_ShowRedTeamHasBlueFlag",
+      "normalized_name": "CG_YourTeamHasFlag",
       "status": "matched",
-      "signature": "static qboolean CG_ShowRedTeamHasBlueFlag( void )",
+      "signature": "qboolean CG_YourTeamHasFlag( void )",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail HUD visibility predicate for `CG_SHOW_RED_TEAM_HAS_BLUEFLAG`. The committed `CG_OwnerDrawVisible` body reaches this helper from the `0x00000002` bit branch, and HLIL mirrors the same gametype gate while swapping the blue-flag carrier checks."
+      "comment": "Retail HUD visibility predicate for `CG_SHOW_YOURTEAMHASENEMYFLAG`. `CG_OwnerDrawVisible` reaches this tiny helper from the `0x00080000` bit branch, and HLIL mirrors the same CTF / 1FCTF / Attack Defend gate while checking whether the local player's team has the enemy flag."
     },
     {
       "address": "0x10031790",
@@ -4176,7 +4176,7 @@
       "signature": "qboolean CG_OwnerDrawVisible(int flags, int flags2)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail HUD visibility predicate assigned into cgDC.ownerDrawVisible; evaluates the primary ownerdraw flag word plus Quake Live's secondary ownerdrawflag2 word against gametype, team, follow, vote, and scoreboard state."
+      "comment": "Retail HUD visibility predicate assigned into cgDC.ownerDrawVisible; evaluates the primary ownerdraw flag word plus Quake Live's secondary ownerdrawflag2 word against gametype, team, follow, vote, scoreboard state, and the first two placement rows' weapon-stat caches for CG_SHOW_IF_*_FIRED."
     },
     {
       "address": "0x10031CD0",
@@ -4238,7 +4238,7 @@
       "signature": "static void CG_DrawScoreValue(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle, int ownerDraw)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail scorebox wrapper reached from the local, red, and blue score ownerdraw slots. HLIL selects the cached player or team score value, formats the same unavailable sentinel fallback, and routes the result through the shared HUD text path."
+      "comment": "Deliberate synthetic retail scorebox wrapper reached from CG_PLAYER_SCORE, CG_1STPLACE, and CG_2NDPLACE. The committed ownerdraw switch routes raw cases 0x33, 0x53, and 0x56 here, while CG_RED_SCORE and CG_BLUE_SCORE land at the separate CG_DrawTeamScore leaf."
     },
     {
       "address": "0x10032520",
@@ -4287,7 +4287,7 @@
         "0x100707D8"
       ],
       "relocation_refs": [],
-      "comment": "Active-player counter ownerdraw. HLIL counts valid clientinfo rows, applies the same maxclients and team-size clamp rules, and paints the `%d/%d Players` summary carried by `cg_newdraw.c::CG_DrawPlayerCounts`."
+      "comment": "Active-player counter ownerdraw. HLIL counts valid clientinfo rows, falls back to maxclients for FFA, Tournament, and unset team-size modes, doubles and clamps the team-size cap for team modes, and paints the `%d/%d Players` summary carried by `cg_newdraw.c::CG_DrawPlayerCounts`."
     },
     {
       "address": "0x10033040",
@@ -4316,10 +4316,10 @@
       "raw_name": "FUN_10033530",
       "normalized_name": "CG_DrawTeamTimeoutCount",
       "status": "matched",
-      "signature": "static void CG_DrawTeamTimeoutCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team)",
+      "signature": "static void CG_DrawTeamTimeoutCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team, int align)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail team-timeout ownerdraw reached from the red/blue timeout HUD slots only after the ownerdraw dispatcher admits a positive team-size field. The body pulls the per-team timeout counter from the same cached team array as the source helper and paints the compact `TO: %d` label."
+      "comment": "Retail team-timeout ownerdraw reached from the red/blue timeout HUD slots only after the ownerdraw dispatcher admits a positive team-size field. The body pulls the per-team timeout counter from `data_10A404D8`, formats the compact `TO: %d` label, honors the menu alignment, and then paints the result."
     },
     {
       "address": "0x100335F0",
@@ -4329,7 +4329,7 @@
       "signature": "static void CG_DrawClanArenaPlayers(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ownerdraw helper reached from `CG_RED_CLAN_PLYRS` and `CG_BLUE_CLAN_PLYRS` only after the ownerdraw dispatcher admits the round-family gametypes; HLIL selects the round-based per-team count and paints it through the shared numeric text path."
+      "comment": "Retail ownerdraw helper reached from `CG_RED_CLAN_PLYRS` and `CG_BLUE_CLAN_PLYRS` only after the ownerdraw dispatcher admits the round-family gametypes; HLIL indexes the `data_10A404B8` cached team-count table directly for the supplied team and paints that value through the bare `%d` numeric text path."
     },
     {
       "address": "0x10033650",
@@ -4339,20 +4339,20 @@
       "signature": "static void CG_DrawPlayerCount(rectDef_t *rect, float scale, vec4_t color, int textStyle, qboolean friendly)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ownerdraw helper reached from `CG_TEAM_PLYR_COUNT` and `CG_ENEMY_PLYR_COUNT` only after the ownerdraw dispatcher admits the round-family gametypes; HLIL swaps the local team when the enemy slot is requested and paints the centered living-player count through the same numeric path as the source helper."
+      "comment": "Retail ownerdraw helper reached from `CG_TEAM_PLYR_COUNT` and `CG_ENEMY_PLYR_COUNT` only after the ownerdraw dispatcher admits the round-family gametypes; HLIL reads the local team from the predicted player state, swaps red/blue when the enemy slot is requested, then paints the centered cached round count from the `data_10A404B8` team-count table."
     },
     {
       "address": "0x100336E0",
       "raw_name": "sub_100336e0",
       "normalized_name": "CG_DrawRoundLabel",
       "status": "matched",
-      "signature": "static void CG_DrawRoundLabel(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
+      "signature": "static void CG_DrawRoundLabel(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align)",
       "string_refs": [
         "0x10070804",
         "0x10070810"
       ],
       "relocation_refs": [],
-      "comment": "Retail round-label ownerdraw that emits either \"Warmup\" or \"Round %d\" before routing through the shared text alignment path; the ownerdraw dispatcher reaches it only after admitting the round-family gametypes, so source now keeps timeout, overtime, intermission, in-progress, and non-round-mode text out of this dedicated label slot."
+      "comment": "Retail round-label ownerdraw that reads the cached round number at `data_10AB8F58`, emits `Round %d` only when it is positive, otherwise emits `Warmup`, then measures the `%s` text for center/right alignment before painting; the ownerdraw dispatcher reaches it only after admitting the round-family gametypes, so source now keeps timeout, overtime, intermission, in-progress, and non-round-mode text out of this dedicated label slot."
     },
     {
       "address": "0x100337A0",
@@ -4362,14 +4362,14 @@
       "signature": "static void CG_DrawDominationOwnedFlags(rectDef_t *rect, float scale, vec4_t color, int textStyle, team_t team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail ownerdraw helper reached from `CG_RED_OWNED_FLAGS` and `CG_BLUE_OWNED_FLAGS` only after the ownerdraw dispatcher admits `GT_DOMINATION` or `GT_ATTACK_DEFEND`; HLIL selects the per-team Domination owned-flag counter and paints it through the shared numeric HUD text path."
+      "comment": "Retail ownerdraw helper reached from `CG_RED_OWNED_FLAGS` and `CG_BLUE_OWNED_FLAGS` only after the ownerdraw dispatcher admits `GT_DOMINATION` or `GT_ATTACK_DEFEND`; HLIL selects the per-team owned-flag counters populated from the shared `CS_RACE_STATUS` / `CS_RACE_INFO` slots and paints them through the bare `%d` numeric HUD text path."
     },
     {
       "address": "0x10033800",
       "raw_name": "sub_10033800",
       "normalized_name": "CG_DrawGameLimit",
       "status": "matched",
-      "signature": "static void CG_DrawGameLimit(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
+      "signature": "static void CG_DrawGameLimit(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align)",
       "string_refs": [
         "0x10070818",
         "0x10070828",
@@ -4377,7 +4377,7 @@
         "0x10070848"
       ],
       "relocation_refs": [],
-      "comment": "Retail legacy `CG_GAME_LIMIT` ownerdraw that selects one of the exact `Cap Limit`, `Frag Limit`, `Round Limit`, or `Score Limit` formats and centers the result; source now mirrors that narrowed label family directly."
+      "comment": "Retail legacy `CG_GAME_LIMIT` ownerdraw that selects one of the exact `Cap Limit`, `Frag Limit`, `Round Limit`, or `Score Limit` formats from cached serverinfo mirrors (`data_10A3FF38`, `data_10A3FF34`, `data_10A3FF48`, `data_10A3FF54`), then applies the center-only width adjustment when the ownerdraw align argument is `ITEM_ALIGN_CENTER`; source now mirrors that narrowed label family and cache dependency directly."
     },
     {
       "address": "0x10033910",
@@ -4428,7 +4428,7 @@
       "raw_name": "sub_10034280",
       "normalized_name": "CG_DrawMatchEndCondition",
       "status": "matched",
-      "signature": "static void CG_DrawMatchEndCondition(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
+      "signature": "static void CG_DrawMatchEndCondition(rectDef_t *rect, float scale, vec4_t color, int textStyle)",
       "string_refs": [
         "0x10070974",
         "0x1007099C",
@@ -4441,7 +4441,7 @@
         "0x10070A98"
       ],
       "relocation_refs": [],
-      "comment": "Retail `CG_MATCH_END_CONDITION` ownerdraw that selects the winning condition text family for race, team, round-limit, mercy, score-limit, and end-of-game cases before drawing it directly."
+      "comment": "Retail `CG_MATCH_END_CONDITION` ownerdraw that selects the fixed winning-condition sentence family for race, time-limit, CTF capture/mercy, Clan Arena round-limit, Domination/Attack and Defend score-limit, and generic highest-score cases before drawing directly at the supplied rect origin."
     },
     {
       "address": "0x10034360",
@@ -4455,7 +4455,7 @@
         "0x10070AE0"
       ],
       "relocation_refs": [],
-      "comment": "Retail `CG_MATCH_STATE` ownerdraw. HLIL selects only the uppercase phase banner `MATCH SUMMARY`, `MATCH WARMUP`, or `MATCH IN PROGRESS` and paints it directly, leaving timeout and overtime text to other dedicated ownerdraws."
+      "comment": "Retail `CG_MATCH_STATE` ownerdraw. HLIL selects only the uppercase phase banner `MATCH SUMMARY`, `MATCH WARMUP`, or `MATCH IN PROGRESS` and paints it directly at the supplied rect y, leaving timeout and overtime text to other dedicated ownerdraws."
     },
     {
       "address": "0x100343D0",
@@ -4472,7 +4472,7 @@
       "raw_name": "sub_10034420",
       "normalized_name": "CG_DrawMatchDetails",
       "status": "matched",
-      "signature": "static void CG_DrawMatchDetails(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
+      "signature": "static void CG_DrawMatchDetails(rectDef_t *rect, float scale, vec4_t color, int textStyle)",
       "string_refs": [
         "0x10070AC0",
         "0x10070AD0",
@@ -4480,19 +4480,19 @@
         "0x10070AF4"
       ],
       "relocation_refs": [],
-      "comment": "Retail `CG_MATCH_DETAILS` ownerdraw that formats the current phase label plus gametype and the prebuilt panel string via `%s - %s - %s`; source now preserves that shared panel-detail buffer instead of overwriting it with the plain map name."
+      "comment": "Retail `CG_MATCH_DETAILS` ownerdraw that formats the current phase label plus gametype and the prebuilt panel string via `%s - %s - %s`, then paints directly at the supplied rect origin; source now preserves that shared panel-detail buffer instead of overwriting it with the plain map name."
     },
     {
       "address": "0x100344B0",
       "raw_name": "sub_100344b0",
       "normalized_name": "CG_DrawGameTypeMap",
       "status": "matched",
-      "signature": "static void CG_DrawGameTypeMap(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
+      "signature": "static void CG_DrawGameTypeMap(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align)",
       "string_refs": [
         "0x10070B04"
       ],
       "relocation_refs": [],
-      "comment": "Retail `CG_GAME_TYPE_MAP` ownerdraw that formats the gametype label plus the same prebuilt panel string through `%s - %s`; source now preserves that shared panel-detail buffer instead of overwriting it with the plain map name."
+      "comment": "Retail `CG_GAME_TYPE_MAP` ownerdraw that formats the gametype label plus the same prebuilt panel string through `%s - %s`, applies the raw x-anchor center/right adjustment through the smaller `CG_AlignTextX` path, and paints at the supplied rect y; source now preserves that shared panel-detail buffer instead of overwriting it with the plain map name."
     },
     {
       "address": "0x10034590",
@@ -4562,7 +4562,7 @@
       "signature": "static void CG_DrawPlayerModel(rectDef_t *rect)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail name for the old `CG_PLAYERMODEL` ownerdraw wrapper. HLIL reaches it from ownerdraw case `0x1A`, selects either the tracked client slot or the live local client slot, and forwards that client through the same shared profile/model draw helper used by `CG_DrawFirstPlaceModel`."
+      "comment": "Retail `CG_PLAYERMODEL` ownerdraw wrapper. HLIL reaches it from ownerdraw case `0x25`, selects either the tracked client slot or the live local client slot, and forwards that client through the same shared profile/model draw helper used by `CG_DrawFirstPlaceModel`; the current source switch now dispatches the slot directly."
     },
     {
       "address": "0x10034A00",
@@ -4610,20 +4610,20 @@
       "raw_name": "sub_10034c20",
       "normalized_name": "CG_DrawGameType",
       "status": "matched",
-      "signature": "static void CG_DrawGameType(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle)",
+      "signature": "static void CG_DrawGameType(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail gametype-text ownerdraw that selects the current gametype label from the same static gametype string table used by CG_OwnerDrawWidth and paints it through the shared text path."
+      "comment": "Retail gametype-text ownerdraw that selects the current gametype label from the same static gametype string table used by CG_OwnerDrawWidth, applies only the center-alignment width subtraction when requested, and paints at the supplied rect y."
     },
     {
       "address": "0x10034CC0",
       "raw_name": "sub_10034cc0",
       "normalized_name": "CG_DrawMatchStatus",
       "status": "matched",
-      "signature": "static void CG_DrawMatchStatus(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
+      "signature": "static void CG_DrawMatchStatus(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail match-status ownerdraw that pulls the already-combined status string from the synthetic helper at 0x10034A00 and draws it with the standard HUD alignment rules; source now keeps that compositor split instead of rebuilding the label inline."
+      "comment": "Retail match-status ownerdraw that pulls the already-combined status string from the synthetic helper at `0x10034A00`, formats it through `%s`, applies the raw x-anchor center/right alignment path, and paints at the supplied rect y; source now keeps that compositor split instead of rebuilding the label inline."
     },
     {
       "address": "0x10034D70",
@@ -4738,7 +4738,7 @@
       "signature": "static void CG_DrawVoteTimer(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail vote timer ownerdraw reached from `CG_VOTETIMER` (`0x22`). HLIL derives the remaining seconds from `cgs.voteTime`, switches between `Voting has ended.`, `Voting ends in %i second.`, and `Voting ends in %i seconds.`, then aligns and paints the final text with `CG_Text_Paint`."
+      "comment": "Retail vote timer ownerdraw reached from `CG_VOTETIMER` (`0x22`). HLIL derives the remaining seconds from `cgs.voteTime - cg.time + 0x4E20` with no local zero-time early return, switches between `Voting has ended.`, `Voting ends in %i second.`, and `Voting ends in %i seconds.`, then aligns and paints the final text with `CG_Text_Paint`."
     },
     {
       "address": "0x10035A10",
@@ -5750,7 +5750,7 @@
         "scores_duel"
       ],
       "relocation_refs": [],
-      "comment": "Deliberate retail-only name for the `scores_duel` parser. The dispatcher, the qagame-side `G_BuildDuelScoreboardMessage` evidence, and the dedicated one- or two-player duel row layout all point to a standalone retail duel scoreboard transport."
+      "comment": "Deliberate retail-only name for the `scores_duel` parser. The dispatcher, the qagame-side `G_BuildDuelScoreboardMessage` evidence, and the dedicated one- or two-player duel row layout all point to a standalone retail duel scoreboard transport; HLIL parses the 14 weapon blocks in classic item-tag order before mirroring them into the placement ownerdraw cache."
     },
     {
       "address": "0x10045DB0",
@@ -5822,7 +5822,7 @@
         "castats"
       ],
       "relocation_refs": [],
-      "comment": "Retail `castats` row parser keyed by scoreboard row index. Dispatcher evidence routes the literal command here, and HLIL clears one `cg.clanArenaStats[rowIndex]` record, stores `damageGiven` and `damageReceived`, then consumes the same per-weapon frag/accuracy pairs through the `cgCAStatWeapons` order before marking the row valid."
+      "comment": "Retail `castats` row parser keyed by scoreboard row index. Dispatcher evidence routes the literal command here, and HLIL clears one `cg.clanArenaStats[rowIndex]` record, stores `damageGiven` and `damageReceived`, then consumes per-weapon frag/accuracy pairs in classic item-tag order (G, MG, SG, GL, RL, LG, RG, PG, BFG, hook, NG, PL, CG, HMG) before marking the row valid."
     },
     {
       "address": "0x10047400",

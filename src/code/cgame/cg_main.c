@@ -108,6 +108,8 @@ void Menu_UpdatePosition( menuDef_t *menu );
 /*
 ================
 CG_NativeDrawActiveFrame
+
+Native export wrapper for the legacy CG_DRAW_ACTIVE_FRAME entry.
 ================
 */
 static void CG_NativeDrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demoPlayback ) {
@@ -117,6 +119,8 @@ static void CG_NativeDrawActiveFrame( int serverTime, stereoFrame_t stereoView, 
 /*
 ================
 CG_NativeKeyEvent
+
+Native export wrapper for the legacy CG_KEY_EVENT entry.
 ================
 */
 static void CG_NativeKeyEvent( int key, qboolean down ) {
@@ -156,10 +160,10 @@ int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int a
 	case CG_MOUSE_EVENT:
 		cgDC.cursorx = cgs.cursorX;
 		cgDC.cursory = cgs.cursorY;
-		CG_MouseEvent(arg0, arg1);
+		CG_MouseEvent( arg0, arg1 );
 		return 0;
 	case CG_EVENT_HANDLING:
-		CG_EventHandling(arg0);
+		CG_EventHandling( arg0 );
 		return 0;
 	case CG_CHAT_DOWN:
 		cg.chatHistoryVisible = qtrue;
@@ -195,6 +199,8 @@ int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int a
 /*
 ================
 CG_NativeMouseEvent
+
+Native export wrapper for the legacy CG_MOUSE_EVENT entry.
 ================
 */
 static void CG_NativeMouseEvent( int dx, int dy ) {
@@ -206,6 +212,8 @@ static void CG_NativeMouseEvent( int dx, int dy ) {
 /*
 ================
 CG_NativeChatDown
+
+Native export wrapper for the legacy CG_CHAT_DOWN entry.
 ================
 */
 static void CG_NativeChatDown( void ) {
@@ -215,6 +223,8 @@ static void CG_NativeChatDown( void ) {
 /*
 ================
 CG_NativeChatUp
+
+Native export wrapper for the legacy CG_CHAT_UP entry.
 ================
 */
 static void CG_NativeChatUp( void ) {
@@ -248,6 +258,8 @@ static void *cg_nativeExports[CG_NATIVE_EXPORT_COUNT] = {
 /*
 ================
 CG_GetNativeExportTable
+
+Returns the Quake Live native cgame export table published by dllEntry.
 ================
 */
 void **CG_GetNativeExportTable( void ) {
@@ -550,8 +562,8 @@ vmCvar_t	cg_zoomToggle;
 
 typedef struct {
 	vmCvar_t	*vmCvar;
-	char		*cvarName;
-	char		*defaultString;
+	const char	*cvarName;
+	const char	*defaultString;
 	int			cvarFlags;
 } cvarTable_t;
 
@@ -1375,6 +1387,8 @@ static void CG_UpdateScreenDamageAlphaFromCvar( vmCvar_t *alphaCvar, float *targ
 /*
 =================
 CG_RegisterCvars
+
+Registers the retail cgame cvar table and seeds cached derived settings.
 =================
 */
 void CG_RegisterCvars( void ) {
@@ -1843,6 +1857,8 @@ static void CG_UpdateCrosshairHitSettings( void ) {
 /*
 =================
 CG_UpdateCvars
+
+Refreshes cgame cvar mirrors and rebuilds derived state when tracked cvars move.
 =================
 */
 void CG_UpdateCvars( void ) {
@@ -1949,7 +1965,7 @@ void CG_UpdateCvars( void ) {
 	if ( deadBodyColorModificationCount != cg_deadBodyColor.modificationCount ) {
 		deadBodyColorModificationCount = cg_deadBodyColor.modificationCount;
 		refreshDeadBodyPalette = qtrue;
-  }
+	}
 	if ( armorTieredModificationCount != cg_armorTiered.modificationCount ) {
 		armorTieredModificationCount = cg_armorTiered.modificationCount;
 		cg.armorTieredEnabled = (qboolean)( cg_armorTiered.integer != 0 );
@@ -2230,17 +2246,7 @@ Arms the retail tracked-slot UI latch and replays the persisted last message.
 =============
 */
 static void CG_ShowTrackedPlayerSlot( int slot ) {
-	int clientNum;
-
 	if ( slot < 0 || slot > 1 ) {
-		return;
-	}
-
-	clientNum = ( slot == 0 ) ? cg.spectatorPrimaryClient : cg.spectatorSecondaryClient;
-	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
-		return;
-	}
-	if ( !cgs.clientinfo[clientNum].infoValid ) {
 		return;
 	}
 
@@ -2286,13 +2292,27 @@ qboolean CG_ShouldDisplayVoiceIndicator( void ) {
 	return qtrue;
 }
 
+/*
+=============
+CG_CrosshairPlayer
+
+Returns the active crosshair client for the recovered native export slot.
+=============
+*/
 int CG_CrosshairPlayer( void ) {
-if ( cg.time > ( cg.crosshairClientTime + 1000 ) ) {
+	if ( cg.time > ( cg.crosshairClientTime + 1000 ) ) {
 		return -1;
 	}
 	return cg.crosshairClientNum;
 }
 
+/*
+=============
+CG_LastAttacker
+
+Returns the last attacker client for the recovered native export slot.
+=============
+*/
 int CG_LastAttacker( void ) {
 	if ( !cg.attackerTime ) {
 		return -1;
@@ -2300,13 +2320,20 @@ int CG_LastAttacker( void ) {
 	return cg.snap->ps.persistant[PERS_ATTACKER];
 }
 
+/*
+=============
+CG_Printf
+
+Formats a cgame message and forwards it through the client print trap.
+=============
+*/
 void QDECL CG_Printf( const char *msg, ... ) {
 	va_list		argptr;
 	char		text[1024];
 
-	va_start (argptr, msg);
-	vsprintf (text, msg, argptr);
-	va_end (argptr);
+	va_start( argptr, msg );
+	vsprintf( text, msg, argptr );
+	va_end( argptr );
 
 	trap_Print( text );
 	if ( cg_chatbeep.integer && cgs.media.talkSound ) {
@@ -2314,13 +2341,20 @@ void QDECL CG_Printf( const char *msg, ... ) {
 	}
 }
 
+/*
+=============
+CG_Error
+
+Formats a cgame error and forwards it through the client error trap.
+=============
+*/
 void QDECL CG_Error( const char *msg, ... ) {
 	va_list		argptr;
 	char		text[1024];
 
-	va_start (argptr, msg);
-	vsprintf (text, msg, argptr);
-	va_end (argptr);
+	va_start( argptr, msg );
+	vsprintf( text, msg, argptr );
+	va_end( argptr );
 
 	trap_Error( text );
 }
@@ -2328,26 +2362,40 @@ void QDECL CG_Error( const char *msg, ... ) {
 #ifndef CGAME_HARD_LINKED
 // this is only here so the functions in q_shared.c and bg_*.c can link (FIXME)
 
+/*
+=============
+Com_Error
+
+Retail cgDC error callback wrapper that forwards directly to trap_Error.
+=============
+*/
 void QDECL Com_Error( int level, const char *error, ... ) {
 	va_list		argptr;
 	char		text[1024];
 
 	(void)level;
 
-	va_start (argptr, error);
-	vsprintf (text, error, argptr);
-	va_end (argptr);
+	va_start( argptr, error );
+	vsprintf( text, error, argptr );
+	va_end( argptr );
 
 	trap_Error( text );
 }
 
+/*
+=============
+Com_Printf
+
+Retail cgDC print callback wrapper that forwards directly to trap_Print.
+=============
+*/
 void QDECL Com_Printf( const char *msg, ... ) {
 	va_list		argptr;
 	char		text[1024];
 
-	va_start (argptr, msg);
-	vsprintf (text, msg, argptr);
-	va_end (argptr);
+	va_start( argptr, msg );
+	vsprintf( text, msg, argptr );
+	va_end( argptr );
 
 	trap_Print( text );
 }
@@ -2357,6 +2405,8 @@ void QDECL Com_Printf( const char *msg, ... ) {
 /*
 ================
 CG_Argv
+
+Returns one command argument through the recovered cgame argv wrapper.
 ================
 */
 const char *CG_Argv( int arg ) {
@@ -3772,6 +3822,8 @@ static void CG_RegisterClients( void ) {
 /*
 =================
 CG_ConfigString
+
+Returns a bounds-checked configstring pointer out of the client game state.
 =================
 */
 const char *CG_ConfigString( int index ) {
@@ -3787,6 +3839,7 @@ const char *CG_ConfigString( int index ) {
 ======================
 CG_StartMusic
 
+Parses the music configstring and starts the paired intro/loop track.
 ======================
 */
 void CG_StartMusic( void ) {
@@ -3800,7 +3853,15 @@ void CG_StartMusic( void ) {
 
 	trap_S_StartBackgroundTrack( parm1, parm2 );
 }
-char *CG_GetMenuBuffer(const char *filename) {
+
+/*
+=============
+CG_GetMenuBuffer
+
+Loads a HUD menu text file into the shared menu buffer.
+=============
+*/
+char *CG_GetMenuBuffer( const char *filename ) {
 	int	len;
 	fileHandle_t	f;
 	static char buf[MAX_MENUFILE];
@@ -3823,12 +3884,14 @@ char *CG_GetMenuBuffer(const char *filename) {
 	return buf;
 }
 
-//
-// ==============================
-// new hud stuff ( mission pack )
-// ==============================
-//
-qboolean CG_Asset_Parse(int handle) {
+/*
+=============
+CG_Asset_Parse
+
+Parses the global HUD asset block used by the menu parser.
+=============
+*/
+qboolean CG_Asset_Parse( int handle ) {
 	pc_token_t token;
 	const char *tempStr;
 
@@ -3975,18 +4038,27 @@ qboolean CG_Asset_Parse(int handle) {
 	return qfalse; // bk001204 - why not?
 }
 
-void CG_ParseMenu(const char *menuFile) {
-	pc_token_t token;
-	int handle;
+/*
+=============
+CG_ParseMenu
 
-	handle = trap_PC_LoadSource(menuFile);
-	if (!handle)
-		handle = trap_PC_LoadSource("ui/testhud.menu");
-	if (!handle)
+Parses one HUD menu source through the retail cgame-owned browser/menu bridge.
+=============
+*/
+void CG_ParseMenu( const char *menuFile ) {
+	pc_token_t	token;
+	int			handle;
+
+	handle = trap_PC_LoadSource( menuFile );
+	if ( !handle ) {
+		handle = trap_PC_LoadSource( "ui/testhud.menu" );
+	}
+	if ( !handle ) {
 		return;
+	}
 
 	while ( 1 ) {
-		if (!trap_PC_ReadToken( handle, &token )) {
+		if ( !trap_PC_ReadToken( handle, &token ) ) {
 			break;
 		}
 
@@ -4004,8 +4076,8 @@ void CG_ParseMenu(const char *menuFile) {
 			break;
 		}
 
-		if (Q_stricmp(token.string, "assetGlobalDef") == 0) {
-			if (CG_Asset_Parse(handle)) {
+		if ( Q_stricmp( token.string, "assetGlobalDef" ) == 0 ) {
+			if ( CG_Asset_Parse( handle ) ) {
 				continue;
 			} else {
 				break;
@@ -4013,7 +4085,7 @@ void CG_ParseMenu(const char *menuFile) {
 		}
 
 
-		if (Q_stricmp(token.string, "menudef") == 0) {
+		if ( Q_stricmp( token.string, "menudef" ) == 0 ) {
 			menuDef_t	*menu;
 
 			if ( menuCount >= MAX_MENUS ) {
@@ -4028,23 +4100,30 @@ void CG_ParseMenu(const char *menuFile) {
 			}
 		}
 	}
-	trap_PC_FreeSource(handle);
+	trap_PC_FreeSource( handle );
 }
 
-qboolean CG_Load_Menu(char **p) {
-	char *token;
+/*
+=============
+CG_Load_Menu
 
-	token = COM_ParseExt(p, qtrue);
+Walks a retail loadmenu block and parses each nested menu source.
+=============
+*/
+qboolean CG_Load_Menu( char **p ) {
+	char	*token;
 
-	if (token[0] != '{') {
+	token = COM_ParseExt( p, qtrue );
+
+	if ( token[0] != '{' ) {
 		return qfalse;
 	}
 
 	while ( 1 ) {
 
-		token = COM_ParseExt(p, qtrue);
-    
-		if (Q_stricmp(token, "}") == 0) {
+		token = COM_ParseExt( p, qtrue );
+
+		if ( Q_stricmp( token, "}" ) == 0 ) {
 			return qtrue;
 		}
 
@@ -4052,7 +4131,7 @@ qboolean CG_Load_Menu(char **p) {
 			return qfalse;
 		}
 
-		CG_ParseMenu(token); 
+		CG_ParseMenu( token );
 	}
 	return qfalse;
 }
@@ -4369,24 +4448,32 @@ static const char *const cgRetailSupplementalMenuFiles[] = {
 	"ui/end_scoreboard_rr.menu"
 };
 
-void CG_LoadMenus(const char *menuFile) {
-	char	*token;
-	char *p;
-	int	i;
-	int	len, start;
+/*
+=============
+CG_LoadMenus
+
+Loads the selected HUD script and any retail supplemental menu files.
+=============
+*/
+void CG_LoadMenus( const char *menuFile ) {
+	char			*token;
+	char			*p;
+	int				i;
+	int				len;
+	int				start;
 	fileHandle_t	f;
-	static char buf[MAX_MENUDEFFILE];
+	static char		buf[MAX_MENUDEFFILE];
 
 	start = trap_Milliseconds();
 
-        len = trap_FS_FOpenFile( menuFile, &f, FS_READ );
-        if ( !f ) {
-                trap_Error( va( S_COLOR_YELLOW "menu file not found: %s, using default\n", menuFile ) );
-                len = trap_FS_FOpenFile( CG_LEGACY_HUD_FILE, &f, FS_READ );
-                if (!f) {
-                        trap_Error( va( S_COLOR_RED "default menu file not found: %s, unable to continue!\n", CG_LEGACY_HUD_FILE ) );
-                }
-        }
+	len = trap_FS_FOpenFile( menuFile, &f, FS_READ );
+	if ( !f ) {
+		CG_Printf( S_COLOR_YELLOW "menu file not found: %s, using default\n", menuFile );
+		len = trap_FS_FOpenFile( CG_LEGACY_HUD_FILE, &f, FS_READ );
+		if ( !f ) {
+			trap_Error( va( S_COLOR_RED "default menu file not found: %s, unable to continue!\n", CG_LEGACY_HUD_FILE ) );
+		}
+	}
 
 	if ( len >= MAX_MENUDEFFILE ) {
 		trap_Error( va( S_COLOR_RED "menu file too large: %s is %i, max allowed is %i", menuFile, len, MAX_MENUDEFFILE ) );
@@ -4398,7 +4485,7 @@ void CG_LoadMenus(const char *menuFile) {
 	buf[len] = 0;
 	trap_FS_FCloseFile( f );
 
-	COM_Compress(buf);
+	COM_Compress( buf );
 
 	CG_ResetBrowserOverlayState();
 
@@ -4416,7 +4503,7 @@ void CG_LoadMenus(const char *menuFile) {
 
 	while ( 1 ) {
 		token = COM_ParseExt( &p, qtrue );
-		if( !token || token[0] == 0 || token[0] == '}') {
+		if ( !token || token[0] == 0 || token[0] == '}' ) {
 			break;
 		}
 
@@ -4434,8 +4521,8 @@ void CG_LoadMenus(const char *menuFile) {
 			break;
 		}
 
-		if (Q_stricmp(token, "loadmenu") == 0) {
-			if (CG_Load_Menu(&p)) {
+		if ( Q_stricmp( token, "loadmenu" ) == 0 ) {
+			if ( CG_Load_Menu( &p ) ) {
 				continue;
 			} else {
 				break;
@@ -4443,7 +4530,7 @@ void CG_LoadMenus(const char *menuFile) {
 		}
 	}
 
-	Com_Printf("UI menu load time = %d milli seconds\n", trap_Milliseconds() - start);
+	Com_Printf( "UI menu load time = %d milli seconds\n", trap_Milliseconds() - start );
 
 }
 
@@ -4460,7 +4547,14 @@ void CG_SetBrowserFeederSelection( void *overlay, int feeder, int index ) {
 
 
 
-static qboolean CG_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, int key) {
+/*
+=============
+CG_OwnerDrawHandleKey
+
+Retail null key handler reused by the display-context ownerdraw callbacks.
+=============
+*/
+static qboolean CG_OwnerDrawHandleKey( int ownerDraw, int flags, float *special, int key ) {
 	return qfalse;
 }
 
@@ -4581,10 +4675,20 @@ static int CG_FeederCount( float feederID ) {
 }
 
 
-void CG_SetScoreSelection(void *p) {
-	menuDef_t *menu = (menuDef_t *)p;
-	playerState_t *ps = &cg.snap->ps;
-	int i;
+/*
+=============
+CG_SetScoreSelection
+
+Synchronizes the active scoreboard row into the matching browser feeder.
+=============
+*/
+void CG_SetScoreSelection( void *p ) {
+	menuDef_t		*menu;
+	playerState_t	*ps;
+	int				i;
+
+	menu = (menuDef_t *)p;
+	ps = &cg.snap->ps;
 
 	for ( i = 0; i < cg.numScores; i++ ) {
 		if ( ps->clientNum == cg.scores[i].client ) {
@@ -4809,9 +4913,16 @@ static void CG_SyncScoreboardTeamListSelection( team_t team, int index ) {
 	}
 }
 
-// FIXME: might need to cache this info
-static clientInfo_t * CG_InfoFromScoreIndex(int index, int team, int *scoreIndex) {
-	int i, count;
+/*
+=============
+CG_InfoFromScoreIndex
+
+Maps a feeder-local row back to the absolute score row and client info.
+=============
+*/
+static clientInfo_t *CG_InfoFromScoreIndex( int index, int team, int *scoreIndex ) {
+	int		i;
+	int		count;
 
 	if ( cg.competitiveHudLoaded ) {
 		const cgHudScoreboardEntry_t		*entry;
@@ -4830,9 +4941,9 @@ static clientInfo_t * CG_InfoFromScoreIndex(int index, int team, int *scoreIndex
 
 	if ( cgs.gametype >= GT_TEAM ) {
 		count = 0;
-		for (i = 0; i < cg.numScores; i++) {
-			if (cg.scores[i].team == team) {
-				if (count == index) {
+		for ( i = 0; i < cg.numScores; i++ ) {
+			if ( cg.scores[i].team == team ) {
+				if ( count == index ) {
 					*scoreIndex = i;
 					return &cgs.clientinfo[cg.scores[i].client];
 				}
@@ -5417,7 +5528,7 @@ static const char *CG_FeederItemTextClanArenaStats( int team, int index, int col
 	case 6:
 		return va( "%i%%", row.scoreRow->accuracy );
 	case 7:
-		return va( "^3%i ^7%i%%", stats->weaponFrags[WP_GAUNTLET], stats->weaponAccuracy[WP_GAUNTLET] );
+		return va( "%i", stats->weaponFrags[WP_GAUNTLET] );
 	case 8:
 		return va( "^3%i ^7%i%%", stats->weaponFrags[WP_MACHINEGUN], stats->weaponAccuracy[WP_MACHINEGUN] );
 	case 9:
@@ -5580,7 +5691,7 @@ Retail keeps the cgDC.feederItemImage callback as a null stub and sources the
 scoreboard icons through the feeder-text handle out-param instead.
 =============
 */
-static qhandle_t CG_FeederItemImage(float feederID, int index) {
+static qhandle_t CG_FeederItemImage( float feederID, int index ) {
 	(void)feederID;
 	(void)index;
 
@@ -5595,7 +5706,7 @@ Maintains the selected scoreboard row and mirrors the retail team-list cursor
 selection into the cached live/end scoreboard menus.
 =============
 */
-static void CG_FeederSelection(float feederID, int index) {
+static void CG_FeederSelection( float feederID, int index ) {
 	int		i;
 	int		selectedClient;
 	int		selectedIndex;
@@ -5665,7 +5776,14 @@ static void CG_FeederSelection(float feederID, int index) {
 	CG_SyncScoreboardTeamListSelection( team, selectedIndex );
 }
 
-static float CG_Cvar_Get(const char *cvar) {
+/*
+=============
+CG_Cvar_Get
+
+Provides the retail cgDC numeric cvar callback.
+=============
+*/
+static float CG_Cvar_Get( const char *cvar ) {
 	char buff[128];
 
 	memset( buff, 0, sizeof( buff ) );
@@ -5794,7 +5912,7 @@ static qboolean CG_CopyClientIdentity( int clientNum, void *outIdentity ) {
 		return qfalse;
 	}
 
-	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
 		return qfalse;
 	}
 
@@ -5838,7 +5956,7 @@ void *CG_SetClientSpeakingState( int clientNum, int speaking ) {
 	clientInfo_t			*ci;
 	cgClientSpeakingState_t	*speakingState;
 
-	if ( clientNum < 0 || clientNum >= cgs.maxclients ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
 		return NULL;
 	}
 
@@ -5893,62 +6011,8 @@ Mirrors the retail cgame cursor-signature wrapper by forwarding through the
 shared host-text painter.
 =============
 */
-void CG_Text_PaintWithCursor(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style) {
+void CG_Text_PaintWithCursor( float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style ) {
 	CG_Text_PaintWithCursorExt( x, y, scale, color, text, cursorPos, cursor, limit, style, ITEM_FONT_INHERIT );
-}
-
-/*
-=============
-CG_LevelTimerWidth
-
-Returns the width of the level timer string for layout calculations.
-=============
-*/
-static int CG_LevelTimerWidth( float scale ) {
-	char buffer[32];
-	int msec;
-	int seconds;
-
-	msec = cg.time - cgs.levelStartTime;
-	if ( msec < 0 ) {
-	msec = 0;
-	}
-
-	seconds = msec / 1000;
-	Com_sprintf( buffer, sizeof( buffer ), "%02i:%02i", seconds / 60, seconds % 60 );
-
-	return CG_Text_Width( buffer, scale, 0 );
-}
-
-/*
-=============
-CG_RoundLabelWidth
-
-Returns the width of the current match state label.
-=============
-*/
-static int CG_RoundLabelWidth( float scale ) {
-	char buffer[32];
-	const char *label;
-
-	if ( cgs.matchTimeoutActive ) {
-	label = "Timeout";
-	} else if ( cgs.matchOvertimeActive ) {
-	label = "Overtime";
-	} else if ( cg.snap && cg.snap->ps.pm_type == PM_INTERMISSION ) {
-	label = "Intermission";
-	} else if ( cgs.matchRoundState == ROUNDSTATE_WARMUP || cg.warmup > 0 ) {
-	label = "Warmup";
-	} else if ( cgs.matchRoundState == ROUNDSTATE_COMPLETE ) {
-	label = "Round complete";
-	} else if ( cgs.matchRoundNumber > 0 ) {
-	Com_sprintf( buffer, sizeof( buffer ), "Round %i", cgs.matchRoundNumber );
-	label = buffer;
-	} else {
-	label = "In progress";
-	}
-
-	return CG_Text_Width( label, scale, 0 );
 }
 
 /*
@@ -5959,80 +6023,65 @@ Calculates the width to reserve for a HUD owner-draw element.
 =============
 */
 static int CG_OwnerDrawWidth( int ownerDraw, float scale ) {
-	qboolean overtimeActive;
-
-	overtimeActive = (qboolean)( ( cg.timelimitWarnings & 4 ) || cgs.matchOvertimeActive );
-
 	switch ( ownerDraw ) {
 	case CG_GAME_TYPE:
 		return CG_Text_Width( CG_GameTypeString(), scale, 0 );
 	case CG_GAME_STATUS:
 		return CG_Text_Width( CG_GetGameStatusText(), scale, 0 );
-		break;
+	case CG_MATCH_STATUS:
+		return CG_Text_Width( CG_GetMatchStatusText(), scale, 0 );
 	case CG_KILLER:
 		return CG_Text_Width( CG_GetKillerText(), scale, 0 );
-		break;
-	case CG_LEVELTIMER:
-	case CG_ROUNDTIMER:
-		return CG_LevelTimerWidth( scale );
-	case CG_OVERTIME: {
-		char	buffer[32];
-		int		overtimeCount;
-
-		if ( !overtimeActive ) {
-			return 0;
-		}
-
-		overtimeCount = CG_GetOvertimeCount();
-		if ( overtimeCount > 1 ) {
-			Com_sprintf( buffer, sizeof( buffer ), "Overtime x%i", overtimeCount );
-		} else {
-			Q_strncpyz( buffer, "Overtime", sizeof( buffer ) );
-		}
-
-		return CG_Text_Width( buffer, scale, 0 );
-	}
-	case CG_ROUND:
-		return CG_RoundLabelWidth( scale );
-	case CG_HEALTH_COLORIZED:
-	case CG_1ST_PLYR_HEALTH_ARMOR:
-		return CG_Text_Width( "000 / 000", scale, 0 );
-	case CG_RACE_STATUS:
-		return CG_Text_Width( CG_GetRaceStatusText(), scale, 0 );
-	case CG_RACE_TIMES: {
-		int width = CG_Text_Width( CG_GetRaceTimesPrimaryText(), scale, 0 );
-		int secondaryWidth = CG_Text_Width( CG_GetRaceTimesSecondaryText(), scale, 0 );
-		if ( secondaryWidth > width ) {
-			width = secondaryWidth;
-		}
-		return width;
-	}
-	case CG_RED_NAME:
-		return CG_Text_Width( CG_GetTeamName( TEAM_RED ), scale, 0 );
-		break;
-	case CG_BLUE_NAME:
-		return CG_Text_Width( CG_GetTeamName( TEAM_BLUE ), scale, 0 );
+	default:
 		break;
 	}
 
 	return 0;
 }
 
-static int CG_PlayCinematic(const char *name, float x, float y, float w, float h) {
-  return trap_CIN_PlayCinematic(name, x, y, w, h, CIN_loop);
+/*
+=============
+CG_PlayCinematic
+
+Starts a looping cinematic through the retail cgDC callback.
+=============
+*/
+static int CG_PlayCinematic( const char *name, float x, float y, float w, float h ) {
+	return trap_CIN_PlayCinematic( name, x, y, w, h, CIN_loop );
 }
 
-static void CG_StopCinematic(int handle) {
-  trap_CIN_StopCinematic(handle);
+/*
+=============
+CG_StopCinematic
+
+Stops a cinematic through the retail cgDC callback.
+=============
+*/
+static void CG_StopCinematic( int handle ) {
+	trap_CIN_StopCinematic( handle );
 }
 
-static void CG_DrawCinematic(int handle, float x, float y, float w, float h) {
-	trap_CIN_SetExtents(handle, x, y, w, h);
-	trap_CIN_DrawCinematic(handle);
+/*
+=============
+CG_DrawCinematic
+
+Sets the cinematic extents and draws through the retail cgDC callback.
+=============
+*/
+static void CG_DrawCinematic( int handle, float x, float y, float w, float h ) {
+	trap_CIN_SetExtents( handle, x, y, w, h );
+	trap_CIN_DrawCinematic( handle );
 }
 
-static void CG_RunCinematicFrame(int handle) {
-	trap_CIN_RunCinematic(handle);
+/*
+=============
+CG_RunCinematicFrame
+
+Advances a cinematic through the retail cgDC callback.
+=============
+*/
+static void CG_RunCinematicFrame( int handle ) {
+	trap_CIN_RunCinematic( handle );
 }
 
 static const char *cgScoreTextureNames[] = {
@@ -6429,19 +6478,26 @@ static void CG_RegisterHudFonts( void ) {
 	cgDC.Assets.fontRegistered = qtrue;
 }
 
-void CG_LoadHudMenu() {
+/*
+=============
+CG_LoadHudMenu
+
+Loads the configured HUD menu set and refreshes retail scoreboard menu caches.
+=============
+*/
+void CG_LoadHudMenu( void ) {
 	char buff[1024];
 	const char *hudSet;
 
-	trap_Cvar_VariableStringBuffer("cg_hudFiles", buff, sizeof(buff));
+	trap_Cvar_VariableStringBuffer( "cg_hudFiles", buff, sizeof( buff ) );
 	hudSet = buff;
-	if (hudSet[0] == '\0') {
+	if ( hudSet[0] == '\0' ) {
 		hudSet = CG_DEFAULT_HUD_FILE;
 	}
 
 	cg.hudMenusLoaded = CG_HudScriptHasMenuLoads( hudSet );
 	cg.competitiveHudLoaded = CG_HudScriptHasCompetitiveMenus( hudSet );
-	CG_LoadMenus(hudSet);
+	CG_LoadMenus( hudSet );
 	CG_CacheDraw2DMenuCache();
 	CG_CacheScoreboardSelectionMenus();
 }
@@ -6454,7 +6510,7 @@ CG_AssetCache
 Registers the shared UI art cache used by the client game module.
 =============
 */
-void CG_AssetCache() {
+void CG_AssetCache( void ) {
 	//if (Assets.textFont == NULL) {
 	//  trap_R_RegisterFont("fonts/arial.ttf", 72, &Assets.textFont);
 	//}
@@ -6485,7 +6541,7 @@ void CG_AssetCache() {
 CG_Init
 
 Called after every level change or subsystem restart
-Will perform callbacks to make the loading info screen update.
+Rebuilds the cgame runtime and performs callbacks to make the loading info screen update.
 =================
 */
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
@@ -6635,7 +6691,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 =================
 CG_Shutdown
 
-Called before every level change or subsystem restart
+Called before every level change or subsystem restart and tears down host-side cgame bridges.
 =================
 */
 void CG_Shutdown( void ) {

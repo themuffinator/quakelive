@@ -514,6 +514,11 @@ def test_engine_cvar_tenth_client_userinfo_tranche_matches_retail_contracts() ->
 	assert 'Cvar_Get ("cg_autoHop", "1", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
 	assert '{ &cg_autoHop, "cg_autoHop", "1", CVAR_ARCHIVE | CVAR_LATCH },' in cg_main
 	assert 'cg.autoHopEnabled = (qboolean)( cg_autoHop.integer != 0 );' in cg_main
+	assert 'cg.predictedPlayerState.pm_flags &= ~PMF_REQUIRE_JUMP_RELEASE;' in cg_predict
+	assert 'cg.predictedPlayerState.pm_flags |= PMF_REQUIRE_JUMP_RELEASE;' in cg_predict
+	assert 's = Info_ValueForKey( userinfo, "cg_autoHop" );' in g_client
+	assert 'client->ps.pm_flags |= PMF_REQUIRE_JUMP_RELEASE;' in g_client
+	assert 'client->ps.pm_flags &= ~PMF_REQUIRE_JUMP_RELEASE;' in g_client
 
 	assert 'Cvar_Get ("cg_predictItems", "1", CVAR_USERINFO | CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
 	assert '{ &cg_predictItems, "cg_predictItems", "1", CVAR_ARCHIVE },' in cg_main

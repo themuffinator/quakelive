@@ -64,6 +64,8 @@ def test_tracked_slot_notifiers_arm_retail_latches_and_replay_last_message() -> 
 	assert "spectatorSlotTrackedTime[2];" in local_source
 	assert "cg.spectatorSlotTrackedTime[slot] = cg.time + CG_SPECTATOR_SLOT_TRACK_HOLD;" in slot_block
 	assert "CG_ReplayLastMessageFromCvar();" in slot_block
+	assert "clientNum =" not in slot_block
+	assert "infoValid" not in slot_block
 	assert "CG_ShowTrackedPlayerSlot( 0 );" in first_block
 	assert "CG_ShowTrackedPlayerSlot( 1 );" in second_block
 	assert "trackedTime = cg.spectatorSlotTrackedTime[0];" in tracked_block
@@ -139,10 +141,6 @@ def test_score_value_wrapper_restores_retail_competitive_score_owner() -> None:
 	for expected in (
 		"case CG_PLAYER_SCORE:",
 		"CG_DrawPlayerScore( rect, scale, color, shader, textStyle );",
-		"case CG_RED_SCORE:",
-		"CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_RED, ITEM_ALIGN_CENTER );",
-		"case CG_BLUE_SCORE:",
-		"CG_DrawTeamScore( rect, scale, color, textStyle, TEAM_BLUE, ITEM_ALIGN_CENTER );",
 	):
 		assert expected in value_block
 
@@ -150,6 +148,8 @@ def test_score_value_wrapper_restores_retail_competitive_score_owner() -> None:
 		"case CG_PLAYER_SCORE:",
 		"CG_DrawScoreValue( &rect, scale, color, shader, textStyle, ownerDraw );",
 		"case CG_RED_SCORE:",
+		"CG_DrawTeamScore( &rect, scale, color, textStyle, TEAM_RED, align );",
 		"case CG_BLUE_SCORE:",
+		"CG_DrawTeamScore( &rect, scale, color, textStyle, TEAM_BLUE, align );",
 	):
 		assert expected in source

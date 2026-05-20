@@ -71,6 +71,27 @@ def test_renderer_host_text_core_matches_retail_surface() -> None:
 	assert "Retail host DrawScaledText/MeasureText resolve glyphs from the retained" in r_get_glyph_block
 	assert "R_DecodeFontStashCodepoint( s, end, &codepoint )" in tr_font
 	assert "R_ParseHostTextColorEscape( s, end, &colorIndex, &colorNext )" in tr_font
+	assert "static void R_RescaleFontStashGlyphUVs( int oldWidth, int oldHeight, int newWidth, int newHeight ) {" in tr_font
+
+	upload_block = tr_font.split("static void R_UploadFontStashAtlas", 1)[1].split("static qboolean R_EnsureFontStashImage", 1)[0]
+	assert "r_fontStash.image->internalFormat = GL_ALPHA;" in upload_block
+	assert "qglTexImage2D( GL_TEXTURE_2D, 0, GL_ALPHA, r_fontStash.width, r_fontStash.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, r_fontStash.buffer );" in upload_block
+	assert "R_BuildFontStashSeedImage" not in upload_block
+
+	resize_block = tr_font.split("static qboolean R_ResizeFontStashAtlas", 1)[1].split("static void R_fonsErrorCallback", 1)[0]
+	assert "oldBuffer = r_fontStash.buffer;" in resize_block
+	assert "if ( oldBuffer ) {" in resize_block
+	assert "if ( oldWidth > 0 && oldHeight > 0 ) {" in resize_block
+	assert "Com_Memcpy( newBuffer + row * width, oldBuffer + row * oldWidth, copyWidth );" in resize_block
+	assert "Z_Free( oldBuffer );" in resize_block
+	assert "R_RescaleFontStashGlyphUVs( oldWidth, oldHeight, width, height );" in resize_block
+	assert "R_ClearFontStashFaceGlyphState();" not in resize_block
+
+	r_init_block = tr_font.split("void R_InitFontStash( void ) {", 1)[1].split("void R_DoneFontStash( void ) {", 1)[0]
+	assert "R_InitFontStashFaces();" in r_init_block
+	assert "R_PrebuildFontStashAtlas" not in tr_font
+	assert "R_FONTSTASH_PREBUILD_ATTEMPTS" not in tr_font
+	assert 'R_InitFontStash: unable to prebuild retained' not in tr_font
 
 
 def test_renderer_host_text_core_docs_track_rg_p8_completion() -> None:
@@ -85,8 +106,13 @@ def test_renderer_host_text_core_docs_track_rg_p8_completion() -> None:
 	assert "## RG-P8 - Host text-engine core recovery [COMPLETED]" in renderer_audit
 	assert "Strict renderer estimate after `RG-P8` closure: **97%**" in renderer_audit
 	assert "The 2026-04-17 full font audit reopened one hidden renderer-host exactness tail" in renderer_audit
+	assert "The 2026-05-20 wiring refresh removed the eager retained-atlas prebuild" in renderer_audit
 	assert "*fontstash" in retail_font_stack
 	assert "renderer-owned retained host text core" in retail_font_stack
 	assert "consume UTF-8 text through the" in retail_font_stack
 	assert "retained host lane instead of indexing raw bytes" in retail_font_stack
+	assert "cached lazily as text is measured or drawn" in retail_font_stack
+	assert "preserves the previous atlas pixels" in retail_font_stack
+	assert "cached glyph coordinates when `R_fonsErrorCallback` expands" in retail_font_stack
+	assert "texture as a `GL_ALPHA` atlas" in retail_font_stack
 	assert "No confirmed renderer font-stack gap remains after `RG-P11` and the" in retail_font_stack

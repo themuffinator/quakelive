@@ -68,7 +68,7 @@ def test_air_move_probes_retail_double_jump_path() -> None:
 	assert "PM_Accelerate( wishdir, wishspeed, accelerate );" in body
 	assert body.index("PM_Accelerate( wishdir, wishspeed, accelerate );") < body.index("PM_AirControl( wishdir, wishspeed );")
 	assert "pm_circlestrafe_friction" not in body
-	assert "if ( settings && settings->doubleJump ) {" in body
+	assert "if ( pm->ps->pm_flags & PMF_DOUBLE_JUMP ) {" in body
 	assert "PM_CheckJump( qtrue );" in body
 
 
@@ -90,11 +90,17 @@ def test_jump_takeoff_split_keeps_retail_jump_time_gate_and_double_jump_latch() 
 	assert "PM_ResetDoubleJumpSupport" not in takeoff_body
 
 
-def test_ground_trace_clears_double_jump_latch_on_ground_contact() -> None:
-	body = _function_body(
+def test_crash_land_owns_the_retail_double_jump_latch_clear() -> None:
+	crash_land_body = _function_body(
+		BG_PMOVE_PATH,
+		r"static void PM_CrashLand\( void \)\s*\{(?P<body>.*?)^\}",
+	)
+	ground_trace_body = _function_body(
 		BG_PMOVE_PATH,
 		r"static void PM_GroundTrace\( void \)\s*\{(?P<body>.*?)^\}",
 	)
 
-	assert "pm->ps->doubleJumped = qfalse;" in body
-	assert "PMF_DOUBLE_JUMP" not in body
+	assert "if ( pm->ps->pm_flags & PMF_DOUBLE_JUMP ) {" in crash_land_body
+	assert "pm->ps->doubleJumped = qfalse;" in crash_land_body
+	assert crash_land_body.index("pm->ps->bobCycle = 0;") < crash_land_body.index("pm->ps->doubleJumped = qfalse;")
+	assert "pm->ps->doubleJumped = qfalse;" not in ground_trace_body

@@ -137,7 +137,7 @@ menu runtime.
 | Offset | Member | Type | Role |
 | --- | --- | --- | --- |
 | `0x0048` | `getValue` | `float (*)(int)` | Numeric ownerdraw query hook installed by `_UI_Init`. The committed retail callback body is a pure hardcoded `0.0` return, so ownerdraw color-range selection in `Item_Paint` only ever evaluates against zero unless another layer replaces the slot. |
-| `0x004C` | `ownerDrawVisible` | `qboolean (*)(int)` | Visibility predicate for ownerdraw-backed widgets. |
+| `0x004C` | `ownerDrawVisible` | `qboolean (*)(int,int)` | Visibility predicate for ownerdraw-backed widgets; cgame passes the primary `ownerdrawflag` word plus Quake Live's secondary `ownerdrawflag2` word. |
 | `0x0050` | `runScript` | `void (*)(char **)` | Menu script dispatcher used by item/menu events. |
 | `0x0054` | `getTeamColor` | `void (*)(vec4_t *)` | Team-color callback installed by `_UI_Init`. Shared `WINDOW_STYLE_TEAMCOLOR` paint and `Script_SetTeamColor` still call through it, but the committed retail body is a pure no-op that does not populate the color buffer. |
 | `0x0058` | `getCVarString` | `void (*)(const char *, char *, int)` | Cvar-string query hook used by parser/runtime bindings. |

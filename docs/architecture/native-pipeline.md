@@ -24,7 +24,12 @@ the Steam profile root under the reconstructed host. The remaining live-map
 shortfall is no longer an ambiguous module-host failure; it is the
 renderer-owned `R_fonsErrorCallback` font-atlas saturation blocker that
 prevents `CS_ACTIVE` after retail module load, which belongs to the renderer
-text audit rather than to the native module ABI slice.
+text audit rather than to the native module ABI slice. The 2026-05-20 renderer
+wiring pass removed the non-retail eager FontStash prebuild behind that
+source-side blocker, restored the retained atlas upload to retail `GL_ALPHA`
+storage, and realigned the renderer `GetRefAPI` table to the retail version
+`9` / `0x9c` export-tail ABI. This alias is now stale evidence until the
+module runtime probe is rerun.
 
 The final strict-retail module closure state is tracked separately by
 `tests/test_game_module_retail_parity_gate.py`, which writes

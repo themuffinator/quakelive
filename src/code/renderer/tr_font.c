@@ -115,7 +115,6 @@ FT_Library ftLibrary = NULL;
 #define R_FONTSTASH_FACE_NAME_MAX 32
 #define R_FONTSTASH_POINT_SIZE 48
 #define R_FONTSTASH_PADDING 1
-#define R_FONTSTASH_PREBUILD_ATTEMPTS 8
 #define R_FONTSTASH_GLYPH_CACHE_GROW 64
 static int registeredFontCount = 0;
 static fontInfo_t registeredFont[MAX_FONTS];
@@ -1155,6 +1154,43 @@ static void R_ClearFontStashAtlasBuffer( void ) {
 
 /*
 =================
+R_RescaleFontStashGlyphUVs
+
+When the retained atlas grows, keep existing glyph cache entries valid by
+rebasing their normalized coordinates onto the new texture dimensions.
+=================
+*/
+static void R_RescaleFontStashGlyphUVs( int oldWidth, int oldHeight, int newWidth, int newHeight ) {
+	int faceIndex;
+
+	if ( oldWidth <= 0 || oldHeight <= 0 || newWidth <= 0 || newHeight <= 0 ) {
+		return;
+	}
+
+	for ( faceIndex = 0; faceIndex < R_FONTSTASH_FACE_COUNT; faceIndex++ ) {
+		rFontStashFace_t *face;
+		int glyphIndex;
+
+		face = &r_fontStash.faces[faceIndex];
+		for ( glyphIndex = 0; glyphIndex < face->hostGlyphCount; glyphIndex++ ) {
+			rFontStashGlyph_t *cachedGlyph;
+			int x;
+			int y;
+
+			cachedGlyph = &face->hostGlyphs[glyphIndex];
+			x = (int)( cachedGlyph->glyph.s * oldWidth + 0.5f );
+			y = (int)( cachedGlyph->glyph.t * oldHeight + 0.5f );
+
+			cachedGlyph->glyph.s = (float)x / newWidth;
+			cachedGlyph->glyph.t = (float)y / newHeight;
+			cachedGlyph->glyph.s2 = (float)( x + cachedGlyph->glyph.imageWidth ) / newWidth;
+			cachedGlyph->glyph.t2 = (float)( y + cachedGlyph->glyph.imageHeight ) / newHeight;
+		}
+	}
+}
+
+/*
+=================
 R_BuildFontStashSeedImage
 
 Create a temporary RGBA seed image so the renderer owns *fontstash through the
@@ -1192,8 +1228,6 @@ shader handle.
 =================
 */
 static void R_UploadFontStashAtlas( void ) {
-	byte *seedImage;
-
 	if ( !r_fontStash.image || !r_fontStash.buffer ) {
 		return;
 	}
@@ -1202,21 +1236,19 @@ static void R_UploadFontStashAtlas( void ) {
 	r_fontStash.image->height = r_fontStash.height;
 	r_fontStash.image->uploadWidth = r_fontStash.width;
 	r_fontStash.image->uploadHeight = r_fontStash.height;
-	r_fontStash.image->internalFormat = GL_RGBA;
+	r_fontStash.image->internalFormat = GL_ALPHA;
 	r_fontStash.image->mipmap = qfalse;
 	r_fontStash.image->allowPicmip = qfalse;
 	r_fontStash.image->wrapClampMode = GL_CLAMP;
 	r_fontStash.texnum = r_fontStash.image->texnum;
 
-	seedImage = R_BuildFontStashSeedImage( r_fontStash.buffer, r_fontStash.width, r_fontStash.height );
 	GL_Bind( r_fontStash.image );
-	qglTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, r_fontStash.width, r_fontStash.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, seedImage );
+	qglTexImage2D( GL_TEXTURE_2D, 0, GL_ALPHA, r_fontStash.width, r_fontStash.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, r_fontStash.buffer );
 	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
 	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
 	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 	qglBindTexture( GL_TEXTURE_2D, 0 );
-	Z_Free( seedImage );
 }
 
 /*
@@ -1281,23 +1313,39 @@ R_ResizeFontStashAtlas
 */
 static qboolean R_ResizeFontStashAtlas( int width, int height ) {
 	byte *newBuffer;
+	byte *oldBuffer;
+	int oldWidth;
+	int oldHeight;
+	int row;
 
 	if ( width <= 0 || height <= 0 ) {
 		return qfalse;
 	}
 
+	oldBuffer = r_fontStash.buffer;
+	oldWidth = r_fontStash.width;
+	oldHeight = r_fontStash.height;
+
 	newBuffer = Z_Malloc( width * height );
 	Com_Memset( newBuffer, 0, width * height );
 
-	if ( r_fontStash.buffer ) {
-		Z_Free( r_fontStash.buffer );
+	if ( oldBuffer ) {
+		if ( oldWidth > 0 && oldHeight > 0 ) {
+			int copyWidth = oldWidth < width ? oldWidth : width;
+			int copyHeight = oldHeight < height ? oldHeight : height;
+
+			for ( row = 0; row < copyHeight; row++ ) {
+				Com_Memcpy( newBuffer + row * width, oldBuffer + row * oldWidth, copyWidth );
+			}
+		}
+
+		Z_Free( oldBuffer );
 	}
 
 	r_fontStash.buffer = newBuffer;
 	r_fontStash.width = width;
 	r_fontStash.height = height;
-	R_ResetFontStashLayout();
-	R_ClearFontStashFaceGlyphState();
+	R_RescaleFontStashGlyphUVs( oldWidth, oldHeight, width, height );
 
 	return R_EnsureFontStashImage();
 }
@@ -1799,51 +1847,6 @@ static qboolean R_CacheFontStashGlyph( rFontStashFace_t *face, unsigned int code
 	return qtrue;
 }
 
-/*
-=================
-R_PrebuildFontStashAtlas
-=================
-*/
-static void R_PrebuildFontStashAtlas( void ) {
-	int attempt;
-	qboolean built = qfalse;
-
-	if ( !r_fontStash.buffer || !R_EnsureFontStashImage() ) {
-		return;
-	}
-
-	for ( attempt = 0; attempt < R_FONTSTASH_PREBUILD_ATTEMPTS && !built; attempt++ ) {
-		int faceIndex;
-
-		built = qtrue;
-		R_ClearFontStashAtlasBuffer();
-
-		for ( faceIndex = 0; faceIndex < R_FONTSTASH_FACE_COUNT; faceIndex++ ) {
-			int glyphIndex;
-			rFontStashFace_t *face = &r_fontStash.faces[faceIndex];
-
-			if ( !face->loaded || !face->ftFace ) {
-				continue;
-			}
-
-			for ( glyphIndex = GLYPH_START; glyphIndex <= GLYPH_END; glyphIndex++ ) {
-				if ( !R_CacheFontStashGlyph( face, (unsigned int)glyphIndex, R_GetFontStashScaleTenths( (float)R_FONTSTASH_POINT_SIZE ), qfalse, NULL ) ) {
-					built = qfalse;
-					break;
-				}
-			}
-
-			if ( !built ) {
-				break;
-			}
-		}
-	}
-
-	R_UploadFontStashAtlas();
-	if ( !built ) {
-		ri.Printf( PRINT_ALL, "R_InitFontStash: unable to prebuild retained %s atlas\n", R_FONTSTASH_TEXTURE_NAME );
-	}
-}
 #endif
 
 /*
@@ -2644,10 +2647,6 @@ void R_InitFontStash( void ) {
 	}
 
 	R_InitFontStashFaces();
-
-#ifdef BUILD_FREETYPE
-	R_PrebuildFontStashAtlas();
-#endif
 }
 
 /*

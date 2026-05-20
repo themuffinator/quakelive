@@ -1,7 +1,7 @@
 # Quake Live Source Reconstruction Project
 
 [![Accuracy First](https://img.shields.io/badge/Accuracy-First-1f6feb)](AUDIT.md)
-[![Reconstruction Status](https://img.shields.io/badge/Reconstruction-In%20Progress-b8860b)](AUDIT.md)
+[![Ongoing Reconstruction](https://img.shields.io/badge/Reconstruction-Ongoing-b8860b)](AUDIT.md)
 [![Reconstruction Plan](https://img.shields.io/badge/Work%20Queue-Reconstruction%20Plan-2ea44f)](IMPLEMENTATION_PLAN.md)
 [![Getting Started](https://img.shields.io/badge/Docs-Getting%20Started-6f42c1)](docs/onboarding/overview.md)
 
@@ -27,57 +27,52 @@ way that stays grounded in evidence instead of guesswork.
   assumptions.
 - Quake Live-specific online services can be disabled in builds when the retail dependency
   cannot yet be reconstructed cleanly or does not have an open replacement.
-- Progress is measured by parity with the retail game, not just by whether the code builds
-  or runs.
+- Progress is measured by evidence-backed movement toward retail parity, not just by
+  whether the code builds or runs.
 
-## Current status
+## Current reconstruction state
 
-> **Note:** The parity audit figures shown below reflect a coarse-level review of module
-> boundaries and subsystem registration. They do not imply the reconstruction is finished or
-> production-ready. At a granular level — individual functions, edge-case behaviour, data
-> layout, and runtime correctness — a great deal of testing and fixing remains to be done
-> before the reconstruction can be considered truly complete.
+This repository is an active reconstruction effort, not a retail-equivalent codebase.
+The audit files, task plan, and validation artifacts record what has been
+reconstructed, what has supporting evidence, and what still needs sharper verification.
+Older finality language in historical audit notes should be read as evidence for bounded
+checkpoints, not as a project-wide claim that reconstruction is done.
 
-The project is now in the final exactness and validation phase for the current audited
-register. The strict retail-facing module register for `cgame`, `qagame`, and `ui` is
-closed, and the consolidated 2026-04-10 engine audit now records `qcommon`, `client`,
-`server`, `renderer`, and the remaining engine host/support surface as closed too.
+The current work is focused on rebuilding retail behavior area by area from the committed
+Binary Ninja HLIL dumps, Ghidra exports, symbol maps, and targeted runtime evidence. Some
+subsystems have strong validation coverage, while others still need
+function-level mapping, edge-case tests, data-layout confirmation, or refreshed runtime
+proof.
 
-That does not mean the repository is "done." The active work queue is now narrower:
-ownerdraw/stat payload completion, targeted gameplay validation, and normal refresh of the
-subsystem parity gates and runtime evidence whenever audited contracts change. The biggest
-remaining repo work is no longer broad engine-host reconstruction.
-
-Based on the focused parity audits published between 2026-04-05 and 2026-04-10 and the
-consolidated engine-wide audit published on 2026-04-10:
-
-Legend: `🟢` closed or effectively complete in the current audited register, `🟡`
-strong but still open, `🔴` major open reconstruction lane.
+The active work queue remains the source of truth for what should be reconstructed next.
+At the time of this README update, the leading tracks are physics reconstruction,
+UI bridge/fallback verification, Race and gametype validation, and continued cleanup of
+audited subsystem gaps as new evidence is promoted.
 
 ### Game reconstruction
 
-| Area | Status | Strict retail parity | Current snapshot |
-| --- | --- | ---: | --- |
-| `cgame` | 🟢 | `100%` | Closed in the combined strict-retail module audit; the direct `cgame` suite is green (`170 passed`). |
-| `qagame` | 🟢 | `100%` | Closed in the combined strict-retail module audit; retail `qagamex86.dll` hosting is validated. |
-| `ui` | 🟢 | `100%` | UI parity gate, retail corpus parity, bundle reproducibility, and runtime evidence are all green. |
+| Area | Current reconstruction focus |
+| --- | --- |
+| `cgame` | Continue validating predicted movement, ownerdraw/stat payloads, UI-facing imports, and gameplay presentation against retail evidence. |
+| `qagame` | Continue reconstructing server-side gameplay rules, match flow, awards, voting, team logic, and gametype-specific behavior. |
+| `ui` | Keep the retail UI bridge, menu data, fallback paths, and panel/runtime assumptions under evidence-backed review. |
 
 ### Engine reconstruction
 
-| Area | Status | Strict retail parity | Current snapshot |
-| --- | --- | ---: | --- |
-| `client` | 🟢 | `100%` | Dedicated parity gate and tracked runtime evidence are both closed. |
-| `renderer` | 🟢 | `100%` | Final text/font/runtime closure landed in the `RG-P11` audit pass. |
-| `qcommon` | 🟢 | `100%` | Dedicated gate and runtime evidence now close bootstrap, filesystem, collision-leaf, fallback-VM, and ledger/runtime proof work. |
-| `server` | 🟢 | `100%` | Steam GameServer lifecycle, `idZMQ`, stat/achievement ownership, control-plane CVars, rankings compatibility, and dedicated runtime evidence are closed. |
-| `engine host/support` | 🟢 | `100%` | Win32 clipboard/raw-input recovery, botlib internal proof, and host/support boundary formalisation are closed; compatibility-only lanes are explicit exclusions. |
+| Area | Current reconstruction focus |
+| --- | --- |
+| `client` | Continue mapping client/game/UI ownership, workshop and download behavior, command routing, prediction handoff, and runtime evidence freshness. |
+| `renderer` | Continue validating text/font behavior, exported renderer ABI details, host wiring, and reference-backed helper ownership. |
+| `qcommon` | Continue verifying filesystem, VM loading, message parsing, collision, CVar, command, and bootstrap behavior against retail references. |
+| `server` | Continue validating dedicated-server behavior, Steam-compatible boundaries, game-state messaging, ranking/stat hooks, and control-plane CVars. |
+| `engine host/support` | Continue refining Win32 host behavior, botlib ownership, platform services, crash/logging paths, and explicit compatibility boundaries. |
 
-Compatibility-only surfaces are still called out explicitly rather than being counted as open
-strict-retail engine debt: `platform_services.c`, the open/hybrid auth backends, the
-`unix`/`null` ports, and live online-service activation behind `QL_BUILD_ONLINE_SERVICES`.
+Compatibility-only surfaces are called out explicitly so they are not mistaken for retail
+reconstruction: `platform_services.c`, the open/hybrid auth backends, the `unix`/`null`
+ports, and live online-service activation behind `QL_BUILD_ONLINE_SERVICES`.
 
-For the detailed parity breakdown and current task queue, see [`AUDIT.md`](AUDIT.md),
-[`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md), and
+For the detailed audit trail and current task queue, see [`AUDIT.md`](AUDIT.md),
+[`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md), and the historical engine audit in
 [`docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md`](docs/reverse-engineering/engine-full-parity-audit-and-implementation-plan-2026-04-10.md).
 
 ## Repository guide

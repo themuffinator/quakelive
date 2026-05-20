@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../cgame/tr_types.h"
 
-#define	REF_API_VERSION		8
+#define	REF_API_VERSION		9
 
 //
 // these are the functions exported by the refresh module
@@ -69,7 +69,6 @@ typedef struct {
 	void	(*AddAdditiveLightToScene)( const vec3_t org, float intensity, float r, float g, float b );
 	void	(*RenderScene)( const refdef_t *fd );
 	void	(*AdvertisementBridge_UpdateLoadingViewParameters)( void );
-	void	(*PostProcessRestart)( void );
 
 	void	(*SetColor)( const float *rgba );	// NULL = 1,1,1,1
 	void	(*DrawStretchPic) ( float x, float y, float w, float h, 
@@ -91,6 +90,7 @@ typedef struct {
 	int		(*LerpTag)( orientation_t *tag,  qhandle_t model, int startFrame, int endFrame, 
 					 float frac, const char *tagName );
 	void	(*ModelBounds)( qhandle_t model, vec3_t mins, vec3_t maxs );
+	void	(*RegisterFont)( const char *fontName, int pointSize, fontInfo_t *font );
 
 #ifdef __USEA3D
 	void    (*A3D_RenderGeometry) (void *pVoidA3D, void *pVoidGeom, void *pVoidMat, void *pVoidGeomStatus);
@@ -98,6 +98,18 @@ typedef struct {
 	void	(*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
 	qboolean (*GetEntityToken)( char *buffer, int size );
 	qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );
+
+	// Quake Live extends the classic refresh ABI to 0x9c bytes. Keep the
+	// private tail in retail order even when source callers use direct helpers.
+	void	(*RetailFrameCommandFlush)( void );
+	void	(*RetailPostProcessCapture)( void );
+	void	(*PostProcessRestart)( void );
+	void	(*RetailPostProcessPass)( float arg1, float arg2, float arg3, float arg4, float arg5 );
+	qboolean (*RetailProjectPoint)( const vec3_t point, vec4_t clip, vec4_t window );
+	void	(*TransformClipToWindow)( const vec4_t clip, vec4_t normalized, vec4_t window );
+	void	(*DrawScaledText)( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor, const float *baseColor );
+	void	(*MeasureScaledText)( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outWidth, float *outHeight, float *outLeft );
+	void	(*RetailStretchPicCommand)( void );
 } refexport_t;
 
 //

@@ -1,6 +1,6 @@
 # `client` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-05-18
+Last updated: 2026-05-20
 
 Scope: `src/code/client/*` plus client-owned host seams in `src/code/qcommon/common.c`, `src/common/platform/*`, and the adjacent launcher helper surface in `src/code/win32/*` versus retail `quakelive_steam.exe`
 
@@ -57,6 +57,27 @@ Current ledger note:
   `timescale`, and `cg_drawDemoHUD` commands before normal binding dispatch,
   while the older source-only demo-any-key-to-ESC path is no longer applied to
   demo playback.
+- A focused `2026-05-20` Ghidra/HLIL mapping round refreshed the native cgame
+  bridge around the client source wiring: `CL_InitCGame`,
+  `CL_LoadCGameForCvarRegistration`, `CL_GameCommand`, `CL_CGameRendering`,
+  `CL_AdjustServerTimeDelta`, `CL_FirstSnapshot`, the mirror import wrappers,
+  and the tagged serverinfo-to-browser comm-notice lane are now address-backed
+  in the alias ledger and guarded by a focused parity test.
+- A second focused `2026-05-20` input/console mapping round promoted the retail
+  `Con_Init`/`CL_InitInput` helper surface, `IN_KeyDown`/`IN_KeyUp`/
+  `CL_KeyState`, movement thunks, joystick/mouse filter helpers,
+  `CL_CreateCmd`, `CL_CreateNewCommands`, `CL_ReadyToSendPacket`, and
+  `CL_SendCmd` into the alias ledger and focused parity guard.
+- A third focused `2026-05-20` parse/screen/UI bridge mapping round promoted
+  the retail `CL_Workshop_Frame`, client netchan encode/decode/transmit
+  wrappers, `CL_SystemInfoChanged`, `CL_ParseServerMessage`, screen update
+  helpers, `CL_GetClientState`, and LAN server-list helpers into the alias
+  ledger and focused parity guard.
+- A fourth focused `2026-05-20` client/collision-model mapping round promoted
+  the retained BSP `CMod_Load*` lump-loader island under `CM_LoadMap`, the
+  adjacent `CM_ClearMap`/leaf/box-hull helpers, and the configstring, pause,
+  and advertisement visibility-trace callback wiring into the alias ledger and
+  focused parity guard.
 
 ## Audit Method And Evidence
 
@@ -108,6 +129,10 @@ Canonical retail evidence used for this pass:
   - `docs/reverse-engineering/quakelive_steam_mapping_round_257.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_258.md`
   - `docs/reverse-engineering/quakelive_steam_mapping_round_259.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_275.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_277.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_280.md`
+  - `docs/reverse-engineering/quakelive_steam_mapping_round_283.md`
 - Client-host and launcher notes:
   - `docs/reverse-engineering/quakelive_steam_parity_plan.md`
   - `docs/launcher_awesomium_audit.md`
@@ -169,6 +194,16 @@ Interpretation:
 - Classic client/runtime ownership recovery is much stronger than the sparse committed `client.json` file suggests.
 - Strict client parity is not mainly blocked by missing Quake III-era discovery anymore.
 - The main remaining loss is now verification: a dedicated client parity gate and tracked runtime evidence bundle are still missing.
+
+2026-05-20 mapping refresh:
+
+- Round 285 promotes the remaining high-confidence `cl_cin.c` RoQ helper island
+  and the Awesomium activation-key helper in
+  `references/analysis/quakelive_symbol_aliases.json`.
+- The refresh is evidence-only and does not change the strict client behavior
+  estimate. It raises client cinematic helper symbol coverage for that tranche
+  from roughly `58%` to `96%` and browser activation-helper symbol coverage
+  from roughly `93%` to `96%`.
 
 ## Current Verified State
 

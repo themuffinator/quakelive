@@ -1812,25 +1812,21 @@ static qboolean BG_CanGrabWeaponItem( int gametype, int currentTime, const entit
 =============
 BG_CanGrabArmorItem
 
-Implements the shared armor pickup checks used by the DLL's case tables.
+Implements the tiered armor pickup checks used by the DLL's case tables.
 =============
 */
 static qboolean BG_CanGrabArmorItem( int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped )
 {
-	const qboolean	armorTiered = BG_IsArmorTieredModeEnabled();
 	const int	armor = ps ? ps->stats[STAT_ARMOR] : 0;
 
 	if ( !ps || !item ) {
 		return qfalse;
 	}
 
-	if ( BG_PlayerHasPersistantPowerup( ps, PW_SCOUT ) ) {
-		return qfalse;
-	}
-
-	if ( !armorTiered ) {
-		return ( armor < BG_GetArmorUpperBound( ps ) ) ? qtrue : qfalse;
-	}
+	(void)gametype;
+	(void)currentTime;
+	(void)ent;
+	(void)dropped;
 
 	if ( item->quantity == 100 ) {
 		return ( armor < 200 ) ? qtrue : qfalse;
@@ -1967,6 +1963,10 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 		return ( ps->ammo[weapon] < BG_GetWeaponMaxAmmo( weapon ) ) ? qtrue : qfalse;
 
 	case IT_ARMOR:
+		if ( !BG_IsArmorTieredModeEnabled() ) {
+			return ( ps->stats[STAT_ARMOR] < BG_GetArmorUpperBound( ps ) ) ? qtrue : qfalse;
+		}
+
 		return BG_CanGrabArmorItem( gametype, currentTime, ent, ps, item, dropped );
 
 	case IT_HEALTH:
@@ -2106,6 +2106,21 @@ qboolean BG_CanItemBeGrabbed( int gametype, int currentTime, const entityState_t
 
 /*
 ================
+BG_TrajectoryAcceleration
+
+Returns the Quake Live acceleration scalar stored immediately after trDelta
+by retail type-6 trajectory callers.
+================
+*/
+static float BG_TrajectoryAcceleration( const trajectory_t *tr ) {
+	const float	*acceleration;
+
+	acceleration = (const float *)(const void *)( (const byte *)tr + sizeof( *tr ) );
+	return *acceleration;
+}
+
+/*
+================
 BG_EvaluateTrajectory
 
 ================
@@ -2142,6 +2157,11 @@ void BG_EvaluateTrajectory( const trajectory_t *tr, int atTime, vec3_t result ) 
 		deltaTime = ( atTime - tr->trTime ) * 0.001;	// milliseconds to seconds
 		VectorMA( tr->trBase, deltaTime, tr->trDelta, result );
 		result[2] -= 0.5 * DEFAULT_GRAVITY * deltaTime * deltaTime;		// FIXME: local gravity...
+		break;
+	case TR_QL_ACCEL:
+		deltaTime = ( atTime - tr->trTime ) * 0.001;	// milliseconds to seconds
+		VectorMA( tr->trBase, deltaTime, tr->trDelta, result );
+		result[2] -= 0.5 * BG_TrajectoryAcceleration( tr ) * deltaTime * deltaTime;
 		break;
 	default:
 		Com_Error( ERR_DROP, "BG_EvaluateTrajectory: unknown trType: %i", tr->trTime );
@@ -2185,6 +2205,11 @@ void BG_EvaluateTrajectoryDelta( const trajectory_t *tr, int atTime, vec3_t resu
 		deltaTime = ( atTime - tr->trTime ) * 0.001;	// milliseconds to seconds
 		VectorCopy( tr->trDelta, result );
 		result[2] -= DEFAULT_GRAVITY * deltaTime;		// FIXME: local gravity...
+		break;
+	case TR_QL_ACCEL:
+		deltaTime = ( atTime - tr->trTime ) * 0.001;	// milliseconds to seconds
+		VectorCopy( tr->trDelta, result );
+		result[2] -= BG_TrajectoryAcceleration( tr ) * deltaTime;
 		break;
 	default:
 		Com_Error( ERR_DROP, "BG_EvaluateTrajectoryDelta: unknown trType: %i", tr->trTime );

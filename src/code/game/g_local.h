@@ -1268,6 +1268,8 @@ void	G_RoundHandleWarmupDelayCvarUpdate( void );
 void	G_UpdateReadyUpConfigstring( void );
 qboolean	G_RequestClientSpawn( gentity_t *ent, qboolean warmupSpawn, qboolean initialSpawn );
 void	G_CancelQueuedClientSpawn( int clientNum );
+void	G_SetClientAttackLockout( gentity_t *ent, qboolean lockout );
+void	G_SetAllActiveClientAttackLockout( qboolean lockout );
 void	G_SpawnEntitiesFromString( void );
 void	G_UpdateDisableLoadoutConfigstrings( void );
 void	G_UpdateTimeoutConfigStrings( void );

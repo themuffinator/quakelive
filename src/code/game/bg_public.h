@@ -277,22 +277,25 @@ typedef enum {
 // pmove->pm_flags
 #define	PMF_DUCKED			1
 #define	PMF_JUMP_HELD		2
+#define PMF_ATTACK_LOCKOUT	4		// round/controller fire gate
 #define	PMF_BACKWARDS_JUMP	8		// go into backwards land
 #define	PMF_BACKWARDS_RUN	16		// coast down to backwards run
 #define	PMF_TIME_LAND		32		// pm_time is time before rejump
 #define	PMF_TIME_KNOCKBACK	64		// pm_time is an air-accelerate only time
-#define	PMF_TIME_WATERJUMP	256		// pm_time is waterjump
+#define	PMF_TIME_WATERJUMP	128		// pm_time is waterjump
+#define PMF_NO_MOVE			256		// retail advances commandTime only while set
 #define	PMF_RESPAWNED		512		// clear after attack and jump buttons come up
 #define	PMF_USE_ITEM_HELD	1024
 #define PMF_GRAPPLE_PULL	2048	// pull towards grapple location
 #define PMF_FOLLOW			4096	// spectate following another player
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
-#define PMF_CROUCH_SLIDE	32768	// crouch slide behavior enabled; crouchSlideTime tracks remaining slide resource
-#define PMF_RAMP_JUMP		65536	// ramp jump scale applied to takeoff
-#define PMF_CHAIN_JUMP	131072	// jump executed within chain window
-#define PMF_DOUBLE_JUMP	262144	// performed a double jump since last landing
-#define PMF_IRONSIGHTS	524288	// ironsight/ADS input is being held
+#define PMF_WEAPON_RESET	32768	// one-shot PM_Weapon reset consumed while attacking
+#define PMF_AIR_CONTROL		65536	// retail alternate air-control movement profile
+#define PMF_DOUBLE_JUMP		131072	// retail air double-jump movement profile
+#define PMF_REQUIRE_JUMP_RELEASE	262144	// cg_autoHop/userinfo override requiring a fresh jump press
+#define PMF_IRONSIGHTS		524288	// ironsight/ADS input is being held
+#define PMF_CROUCH_SLIDE	1048576	// crouch slide behavior enabled; crouchSlideTime tracks remaining slide resource
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
@@ -310,8 +313,6 @@ typedef struct {
 	int			debugLevel;			// if set, diagnostic output will be printed
 	qboolean	noFootsteps;		// if the game is setup for no footsteps by the server
 	qboolean	gauntletHit;		// true if a gauntlet attack would actually hit something
-
-	int			framecount;
 
 	// results (out)
 	int			numtouch;
@@ -357,7 +358,8 @@ typedef enum {
 	STAT_ARMOR,				
 	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
 	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
-	STAT_MAX_HEALTH					// health / armor limit, changable by handicap
+	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
+	STAT_CHAINGUN_SPINUP			// retail chaingun spin accumulator, clamped to 0..1000
 } statIndex_t;
 
 

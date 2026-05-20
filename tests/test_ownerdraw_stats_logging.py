@@ -185,6 +185,35 @@ def test_ownerdraw_dumps_run_after_scorestats_updates() -> None:
     assert score_guard < score_parse
 
 
+def test_duel_scorestats_use_retail_weapon_entry_order() -> None:
+    source = CG_SERVERCMDS.read_text(encoding="utf-8")
+
+    order_start = source.index("static const weapon_t cg_retailWeaponReloadOrder[]")
+    order_end = source.index("typedef struct {", order_start)
+    order_block = source[order_start:order_end]
+    duel_start = source.index("static void CG_ParseDuelScores")
+    duel_end = source.index("CG_SetScoreSelection( NULL );", duel_start)
+    duel_block = source[duel_start:duel_end]
+
+    for expected in (
+        "WP_GAUNTLET",
+        "WP_MACHINEGUN",
+        "WP_SHOTGUN",
+        "WP_GRAPPLING_HOOK",
+        "WP_NAILGUN",
+        "WP_PROX_LAUNCHER",
+        "WP_CHAINGUN",
+        "WP_HEAVY_MACHINEGUN",
+    ):
+        assert expected in order_block
+
+    assert order_block.index("WP_SHOTGUN") < order_block.index("WP_HEAVY_MACHINEGUN")
+    assert order_block.index("WP_GRAPPLING_HOOK") < order_block.index("WP_NAILGUN")
+    assert "for ( weaponIndex = 0; weaponIndex < ARRAY_LEN( cg_retailWeaponReloadOrder ); weaponIndex++ )" in duel_block
+    assert "weapon = cg_retailWeaponReloadOrder[weaponIndex];" in duel_block
+    assert "for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; ++weapon )" not in duel_block
+
+
 def test_team_scorestats_cache_tracks_field_count() -> None:
     servercmds = CG_SERVERCMDS.read_text(encoding="utf-8")
     local = CG_LOCAL.read_text(encoding="utf-8")

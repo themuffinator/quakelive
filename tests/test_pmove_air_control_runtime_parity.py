@@ -106,6 +106,7 @@ QLR_EXPORT void QLR_LoadAirControlTuning(
 	float wishSpeedValue,
 	float walkAccelValue,
 	int airStepsValue,
+	int pmFlags,
 	float *outValues
 ) {
 	static pmove_t localPM;
@@ -119,6 +120,7 @@ QLR_EXPORT void QLR_LoadAirControlTuning(
 
 	localPM.ps = &localPS;
 	localPM.pmoveSettings = &localSettings;
+	localPS.pm_flags = pmFlags;
 	pm = &localPM;
 
 	localSettings = *PM_GetDefaultSettings();
@@ -151,6 +153,7 @@ resolved velocity plus the jump-side effects used by the parity fixtures.
 */
 QLR_EXPORT void QLR_RunAirMove(
 	float airControlValue,
+	int pmFlags,
 	int doubleJumpEnabled,
 	float velocityX,
 	float velocityY,
@@ -189,6 +192,7 @@ QLR_EXPORT void QLR_RunAirMove(
 	localSettings.bunnyHop = qfalse;
 
 	localPS.speed = 320;
+	localPS.pm_flags = pmFlags;
 	localPS.velocity[0] = velocityX;
 	localPS.velocity[1] = velocityY;
 	localPS.velocity[2] = velocityZ;
@@ -301,12 +305,14 @@ def air_control_library(tmp_path_factory: pytest.TempPathFactory) -> ctypes.CDLL
 		ctypes.c_float,
 		ctypes.c_float,
 		ctypes.c_int,
+		ctypes.c_int,
 		ctypes.POINTER(ctypes.c_float),
 	]
 	library.QLR_LoadAirControlTuning.restype = None
 
 	library.QLR_RunAirMove.argtypes = [
 		ctypes.c_float,
+		ctypes.c_int,
 		ctypes.c_int,
 		ctypes.c_float,
 		ctypes.c_float,
@@ -327,6 +333,7 @@ def air_control_library(tmp_path_factory: pytest.TempPathFactory) -> ctypes.CDLL
 
 
 def test_air_control_bundle_promotes_stock_values_to_the_retail_profile( air_control_library: ctypes.CDLL ) -> None:
+	pmf_air_control = 65536
 	default_values = ( ctypes.c_float * 7 )()
 	air_control_library.QLR_LoadAirControlTuning(
 		ctypes.c_float( 0.0 ),
@@ -336,6 +343,7 @@ def test_air_control_bundle_promotes_stock_values_to_the_retail_profile( air_con
 		ctypes.c_float( 400.0 ),
 		ctypes.c_float( 10.0 ),
 		ctypes.c_int( 1 ),
+		ctypes.c_int( 0 ),
 		default_values,
 	)
 
@@ -349,13 +357,14 @@ def test_air_control_bundle_promotes_stock_values_to_the_retail_profile( air_con
 
 	air_control_values = ( ctypes.c_float * 7 )()
 	air_control_library.QLR_LoadAirControlTuning(
-		ctypes.c_float( 150.0 ),
+		ctypes.c_float( 0.0 ),
 		ctypes.c_float( 1.0 ),
 		ctypes.c_float( 1.0 ),
 		ctypes.c_float( 1.0 ),
 		ctypes.c_float( 400.0 ),
 		ctypes.c_float( 10.0 ),
 		ctypes.c_int( 1 ),
+		ctypes.c_int( pmf_air_control ),
 		air_control_values,
 	)
 
@@ -369,6 +378,7 @@ def test_air_control_bundle_promotes_stock_values_to_the_retail_profile( air_con
 
 
 def test_air_control_bundle_keeps_non_stock_overrides_when_the_profile_switch_is_enabled( air_control_library: ctypes.CDLL ) -> None:
+	pmf_air_control = 65536
 	custom_values = ( ctypes.c_float * 7 )()
 	air_control_library.QLR_LoadAirControlTuning(
 		ctypes.c_float( 150.0 ),
@@ -378,6 +388,7 @@ def test_air_control_bundle_keeps_non_stock_overrides_when_the_profile_switch_is
 		ctypes.c_float( 40.0 ),
 		ctypes.c_float( 17.0 ),
 		ctypes.c_int( 4 ),
+		ctypes.c_int( pmf_air_control ),
 		custom_values,
 	)
 
@@ -391,12 +402,14 @@ def test_air_control_bundle_keeps_non_stock_overrides_when_the_profile_switch_is
 
 
 def test_air_move_preserves_reverse_speed_while_using_retail_air_stop_accel( air_control_library: ctypes.CDLL ) -> None:
+	pmf_air_control = 65536
 	velocity = ( ctypes.c_float * 3 )()
 	double_jumped = ctypes.c_int()
 	jump_time = ctypes.c_int()
 
 	air_control_library.QLR_RunAirMove(
 		ctypes.c_float( 150.0 ),
+		ctypes.c_int( pmf_air_control ),
 		ctypes.c_int( 0 ),
 		ctypes.c_float( -100.0 ),
 		ctypes.c_float( 0.0 ),
@@ -420,12 +433,14 @@ def test_air_move_preserves_reverse_speed_while_using_retail_air_stop_accel( air
 
 
 def test_air_move_uses_retail_strafe_accel_and_wishspeed_clamp( air_control_library: ctypes.CDLL ) -> None:
+	pmf_air_control = 65536
 	velocity = ( ctypes.c_float * 3 )()
 	double_jumped = ctypes.c_int()
 	jump_time = ctypes.c_int()
 
 	air_control_library.QLR_RunAirMove(
 		ctypes.c_float( 150.0 ),
+		ctypes.c_int( pmf_air_control ),
 		ctypes.c_int( 0 ),
 		ctypes.c_float( 0.0 ),
 		ctypes.c_float( 0.0 ),
@@ -449,12 +464,14 @@ def test_air_move_uses_retail_strafe_accel_and_wishspeed_clamp( air_control_libr
 
 
 def test_air_move_allows_one_retail_double_jump_and_rejects_reuse( air_control_library: ctypes.CDLL ) -> None:
+	pmf_double_jump = 131072
 	accepted_velocity = ( ctypes.c_float * 3 )()
 	accepted_double_jumped = ctypes.c_int()
 	accepted_jump_time = ctypes.c_int()
 
 	air_control_library.QLR_RunAirMove(
 		ctypes.c_float( 0.0 ),
+		ctypes.c_int( pmf_double_jump ),
 		ctypes.c_int( 1 ),
 		ctypes.c_float( 0.0 ),
 		ctypes.c_float( 0.0 ),
@@ -480,6 +497,7 @@ def test_air_move_allows_one_retail_double_jump_and_rejects_reuse( air_control_l
 
 	air_control_library.QLR_RunAirMove(
 		ctypes.c_float( 0.0 ),
+		ctypes.c_int( pmf_double_jump ),
 		ctypes.c_int( 1 ),
 		ctypes.c_float( 0.0 ),
 		ctypes.c_float( 0.0 ),

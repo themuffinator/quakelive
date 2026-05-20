@@ -1,6 +1,6 @@
 # Function-Level Parity Gap Audit
 
-Last updated: 2026-05-17
+Last updated: 2026-05-20
 
 ## Purpose
 
@@ -352,7 +352,7 @@ Function-level blocker:
 
 | Owner | Function or probe surface | Current state | Gap reason |
 | --- | --- | --- | --- |
-| `src/code/renderer/tr_font.c` | `R_fonsErrorCallback` | bounded runtime blocker | Retail-module live-map probe can load retail `qagamex86.dll` and `cgamex86.dll`, but repeated font-atlas saturation still prevents `CS_ACTIVE` in that probe lane |
+| `src/code/renderer/tr_font.c` / `tr_public.h` / `tr_init.c` | `R_fonsErrorCallback` / retained glyph cache / `GetRefAPI` export ABI | source-side blockers patched; runtime evidence stale | Retail-module live-map probe can load retail `qagamex86.dll` and `cgamex86.dll`, but the tracked 2026-04-21 artifact still records repeated font-atlas saturation. The 2026-05-20 renderer pass removed the non-retail eager all-face glyph prebuild, made normal atlas expansion preserve existing pixels plus cached glyph UVs, restored direct `GL_ALPHA` texture uploads for the retained one-byte atlas, and realigned the `GetRefAPI` table to the retail `REF_API_VERSION == 9` / `0x9c` ABI with the no-op legacy font slot plus private `postprocess_restart` offset; this lane needs a fresh module-runtime rerun before FG-04 can close. |
 | `tools/modules/run_retail_module_runtime_probe.ps1` | map-probe blocker classification | evidence bounded | Probe recognizes the renderer-owned blocker rather than treating it as module parity failure |
 | `tools/ci/validate-windows-native.ps1` | staged `retail-runtime` validation | evidence needs fresh rerun | Current audit did not regenerate all native build outputs on current toolchains |
 | `docs/platform/toolchain-matrix.md` | glibc and self-hosted publication follow-ups | evidence needs breadth | Broader glibc validation and continuous/self-hosted WOW64 publication remain follow-up work |
@@ -598,7 +598,7 @@ native qagame corpus rather than in the legacy sparse `server.json` seed file.
 | FG-01 online services and external ecosystems | Default builds intentionally use disabled, heuristic, or fallback behavior | `quakelive_steam.exe` service clusters remain only partially mapped | Documented bounded divergence |
 | FG-02 Unix/Linux client/runtime portability | Linux client graphics, input, audio, and host runtime remain compatibility-only | Mostly source-file gap notes, not closed retail reference debt | Open repo-wide gap |
 | FG-03 null host compatibility | Null graphics/audio/input/browser/module hosts are no-op or safe-default shims | No direct retail target; whole-tree parity gap only | Open repo-wide gap |
-| FG-04 evidence freshness | Structural gates are green, but some runtime/build artifacts need fresh regeneration | Retail-module live-map probe still records `R_fonsErrorCallback` blocker | Open validation gap |
+| FG-04 evidence freshness | Structural gates are green, but some runtime/build artifacts need fresh regeneration | Retail-module live-map probe still records the stale pre-fix `R_fonsErrorCallback` blocker | Open validation gap |
 | Mapping-only host coverage | Not automatically source debt | `quakelive_steam.exe` retains unresolved function rows; legacy `client.json` and `server.json` stale rows are retired | Open host mapping work |
 
 ## Recommended Next Audit Tasks

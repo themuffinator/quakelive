@@ -723,13 +723,13 @@ void CG_PredictPlayerState( void ) {
 		return;
 	}
 
-	// Retail mirrors cg_autoHop through the recovered 0x00040000 pm_flags bit
+	// Retail mirrors cg_autoHop through PMF_REQUIRE_JUMP_RELEASE
 	// instead of forcing the local pmove settings block.
 	if ( cg.autoHopEnabled ) {
-		cg.predictedPlayerState.pm_flags &= ~0x00040000;
+		cg.predictedPlayerState.pm_flags &= ~PMF_REQUIRE_JUMP_RELEASE;
 	}
 	else {
-		cg.predictedPlayerState.pm_flags |= 0x00040000;
+		cg.predictedPlayerState.pm_flags |= PMF_REQUIRE_JUMP_RELEASE;
 	}
 
 	// prepare for pmove

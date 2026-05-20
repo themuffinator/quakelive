@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-05-17
+Last updated: 2026-05-20
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -40,6 +40,48 @@ disabled, until a documented open replacement path exists.
   snapshots, not current gap ledgers.
 
 ## Recent closure
+
+### Task A8: Re-audit renderer source and host wiring, then remove the non-retail FontStash prebuild [COMPLETED]
+Priority: High
+Primary areas: `src/code/renderer/tr_font.c`,
+`docs/reverse-engineering/renderer-wiring-reverse-engineering-round-2026-05-20.md`,
+`docs/reverse-engineering/renderer-full-parity-audit-and-implementation-plan-2026-04-09.md`,
+`docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md`,
+`docs/platform/retail-font-stack.md`,
+`tests/test_renderer_host_text_core_parity.py`
+Parity estimate: **before 99% -> after 100%** for scoped renderer
+source/wiring parity; repo-wide remains **98%** pending fresh runtime evidence.
+
+Completed work:
+
+1. Re-ran the renderer source/wiring evidence walk against the committed
+   `quakelive_steam.exe` Ghidra/HLIL corpus, current symbol aliases, renderer
+   parity gates, and the tracked renderer/module runtime artifacts.
+2. Confirmed that scene, world/model, shader, post-process, memory-image,
+   export ABI, Win32 host glue, and native UI/cgame host-text import ownership
+   still do not need a new renderer file-level gap note.
+3. Isolated one hidden retained-host-text mismatch: source eagerly prebuilt
+   every byte glyph for every retained FontStash face during
+   `R_InitFontStash`, while retail HLIL creates the atlas, installs
+   `R_fonsErrorCallback`, loads the five faces, and leaves glyph population
+   lazy through the draw/measure cache path.
+4. Removed the eager `R_PrebuildFontStashAtlas` startup sweep from
+   `tr_font.c`, added focused source/docs coverage so the lazy retained-atlas
+   ownership stays pinned, and documented that the older
+   `R_fonsErrorCallback` retail-module artifact is now stale `RW-G04`
+   evidence until the module runtime probe is rerun.
+5. Followed up on the same FontStash overflow lane by preserving old atlas
+   pixels and cached glyph UVs during `R_ResizeFontStashAtlas` expansion,
+   leaving full glyph-cache clearing reserved for the retail max-size flush
+   path.
+6. Matched the retail `*fontstash` texture callback by uploading the retained
+   one-byte atlas through `GL_ALPHA` texture storage instead of expanding it
+   into RGBA for every atlas refresh.
+7. Restored the retail renderer export ABI shape around `GetRefAPI`: source now
+   uses `REF_API_VERSION == 9`, keeps the legacy post-`ModelBounds` font slot
+   as a no-op, preserves `SetColor` immediately after the loading-view bridge,
+   and leaves `postprocess_restart` at the private tail offset recovered from
+   the `0x9c` retail export table.
 
 ### Task A7: Run the source-file parity audit campaign and isolate the remaining file-level gaps [COMPLETED]
 Priority: High
@@ -437,10 +479,11 @@ Completed work:
    gap ledger.
 2. Confirmed that no `src/code/renderer` file needs a new file-level gap note:
    the retained export, image, post-process, scene/runtime, font, and
-   host-text closures still hold on current evidence, and the bounded
-   `R_fonsErrorCallback` module-runtime blocker remains classified under
-   `RW-G04` evidence freshness rather than as a new renderer source-gap
-   owner.
+   host-text closures still hold on current evidence, and the then-bounded
+   `R_fonsErrorCallback` module-runtime blocker remained classified under
+   `RW-G04` evidence freshness rather than as a new renderer source-gap owner.
+   The later 2026-05-20 renderer wiring pass patched the source-side eager
+   FontStash prebuild behind that stale artifact.
 3. Recorded the result directly in the source-file campaign docs so the
    renderer rows now distinguish current function-walk completion from the
    still-pending runtime trees, without reopening the closed strict-retail

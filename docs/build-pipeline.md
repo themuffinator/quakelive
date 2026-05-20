@@ -56,7 +56,12 @@ points at the refreshed bounded `GMR-P1` artifact
 `retail_module_runtime_evidence_20260421.json`, because the 2026-04-21 rerun
 recovered the current `map <name> ffa` path, proved retail module loads again,
 and reduced the remaining live-map shortfall to the renderer-owned
-`R_fonsErrorCallback` font-atlas saturation blocker outside module scope.
+`R_fonsErrorCallback` font-atlas saturation blocker outside module scope. The
+2026-05-20 renderer wiring pass removed the non-retail eager FontStash prebuild
+behind that source-side blocker, restored direct `GL_ALPHA` retained-atlas
+uploads, and realigned the renderer `GetRefAPI` table to the retail version
+`9` / `0x9c` export-tail ABI. This artifact should be treated as stale until
+the module runtime probe is rerun.
 Contributors can refresh that runtime artifact locally with
 `tools/modules/run_retail_module_runtime_probe.ps1`.
 

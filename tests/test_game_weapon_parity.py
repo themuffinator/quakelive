@@ -45,7 +45,8 @@ def test_server_weapon_parity_hooks_match_retail_ql() -> None:
     assert "#define\tMACHINEGUN_SPREAD\t150" in g_weapon_c
     assert "#define\tHEAVY_MACHINEGUN_SPREAD\t350" in g_weapon_c
     assert "#define\tCHAINGUN_DAMAGE\t\t(g_weaponConfig.chaingunDamage)" in g_weapon_c
-    assert "spread = 700.0f + ( weaponTime / 1000.0f ) * 700.0f;" in g_weapon_c
+    assert "chaingunSpin = (float)ent->client->ps.stats[STAT_CHAINGUN_SPINUP];" in g_weapon_c
+    assert "spread = 700.0f + ( chaingunSpin / 1000.0f ) * 700.0f;" in g_weapon_c
     assert "distancePastFalloff = G_RoundFloatToInt( distance - falloffRange );" in g_weapon_c
     assert "baseDamage -= falloffDamage;" in g_weapon_c
     assert "trap_Trace( &trace, muzzle, NULL, NULL, end, ent->s.number, CONTENTS_SOLID );" in g_weapon_c

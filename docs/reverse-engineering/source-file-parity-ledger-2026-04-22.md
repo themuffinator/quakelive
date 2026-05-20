@@ -1,6 +1,6 @@
 # Source-File Parity Ledger
 
-Last updated: 2026-05-17
+Last updated: 2026-05-20
 
 ## Purpose
 
@@ -176,7 +176,7 @@ evidence.
 | `src/code/game/ai_team.c` | `28` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/ai_vcmd.c` | `16` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/bg_lib.c` | `33` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/game/bg_misc.c` | `37` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/code/game/bg_misc.c` | `37` | 2026-05-19 re-audit closed the armor pickup branch mismatch, corrected the qagame `0x1002CE00` helper label to `BG_CanGrabArmorItem`, refreshed the `BG_PlayerTouchesItem` touch-bounds evidence, restored the retail `TR_QL_ACCEL` trajectory branch, normalized the cgame `0x10001170` lookup label to `BG_FindItemByTypeAndTag`, corrected the cgame pickup-gate switch evidence, and added executable coverage for armor pickup, tier rebuild, regen targets, type-6 trajectory evaluation, weapon/holdable tag bridge numbering, the full weapon stat table, pickup/classname/type-tag lookup helpers, persistent-powerup guards, health/armor upper bounds, armor-tier clearing, predictable events, jump pads, playerstate event projection, and playerstate-to-entitystate visibility/replication fields | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + [BG-B armor note](cgame-bg-parity-implementation-plan.md#2026-05-19-bg-misc-armor-pickup-re-audit) | - |
 | `src/code/game/bg_pmove.c` | `64` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/bg_slidemove.c` | `9` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_active.c` | `65` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
@@ -184,14 +184,14 @@ evidence.
 | `src/code/game/g_autoshuffle.c` | `7` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_bot.c` | `27` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_client.c` | `77` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/game/g_cmds.c` | `159` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/code/game/g_cmds.c` | `159` | 2026-05-19 re-audit tightened the `Cmd_Forfeit_f` / `G_CanForfeit` split so the command wrapper only handles pause/countdown rejection while the shared forfeit gate owns the retail duel surrender `-999` score marker before `g_main.c::G_ApplyForfeit` runs | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-05-19 source walk | - |
 | `src/code/game/g_combat.c` | `41` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_entity.c` | `0` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_factory.c` | `26` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_freeze.c` | `7` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_items.c` | `74` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/game/g_main.c` | `196` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
-| `src/code/game/g_match_state.c` | `9` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
+| `src/code/game/g_main.c` | `198` | 2026-05-19 re-audit preserved the recovered `G_CountAndSortConnectedClients` helper boundary at `0x10055FA0`, confirmed `G_FindNextTournamentPlayer` is now a real `AddTournamentPlayer` dependency, named the retail `G_RunThink` `ent + 0x2FC` callback as `runFrame` in the source overlay, restored the `G_UpdateCustomSettingsMaskForCvar` cvar-table helper boundary used by registration/update, revalidated `CheckVote`/intermission wiring through the real `g_vote.c` helper trio, tightened the init/frame calls into the retail `G_UpdateTeamCountConfigstrings` publisher, rechecked the `G_CanForfeit` to `G_ApplyForfeit` shared exit path, guarded the `G_CheckAutoRecord` frame hook's sentinel/start/stop/delayed-screenshot split, promoted the `G_UpdateAwardConfigstrings` tail to a preserved source helper, guarded the overtime/sudden-death exit-rule helper chain, pinned the `G_SelectNextMapVoteSlot` empty-slot/tie-break rules consumed by `ExitLevel`, locked the `G_CheckTimeoutExpired` pause-delta/reset/match-state republish handoff, tightened the `G_InitGame` timeout/overtime/match-state bootstrap corridor, and guarded the `LogExit` one-shot `PLAYER_STATS`/match-report handoff while retaining the existing init/run-frame/intermission wiring | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-05-19 source walk | - |
+| `src/code/game/g_match_state.c` | `9` | 2026-05-19 re-audit matched `G_UpdateTeamCountConfigstrings` to the HLIL last-publish `> 250 ms` cadence and preserved the `0x297`/`0x298` raw-roster versus active-player count policy used by `g_main.c` init/frame wiring | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-05-19 source walk | - |
 | `src/code/game/g_mem.c` | `3` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_misc.c` | `24` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 | `src/code/game/g_missile.c` | `27` | Current function walk complete; no file-level parity gap isolated | [module audit](game-module-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
@@ -246,12 +246,15 @@ owner.
 | `src/code/qcommon/vm_x86.c` | `15` | Current function walk complete; no file-level parity gap isolated | [qcommon audit](qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md) + current 2026-04-22 source walk | - |
 ### `src/code/renderer` (23 files)
 
-Current 2026-04-22 audit result: the `src/code/renderer` function walk
-did not isolate any new file-level owners inside the closed strict-retail
-`renderer` register. The retained export, image, post-process,
-scene/runtime, font, and host-text closures still hold on current
-evidence, while the bounded `R_fonsErrorCallback` issue remains part of
-`RW-G04` evidence freshness rather than a new renderer source-gap owner.
+Current 2026-04-22 audit result plus 2026-05-20 renderer wiring refresh:
+the `src/code/renderer` function walk did not isolate any new file-level
+owners inside the closed strict-retail `renderer` register. The retained
+export, image, post-process, scene/runtime, font, and host-text closures
+still hold on current evidence. The 2026-05-20 renderer refresh also restored
+direct `GL_ALPHA` retained-atlas uploads and the retail `REF_API_VERSION == 9`
+/ `0x9c` `GetRefAPI` tail, while the stale `R_fonsErrorCallback`
+module-runtime artifact remains part of `RW-G04` evidence freshness rather
+than a new renderer source-gap owner.
 
 | File | Functions | Current parity state | Primary evidence | Gap note |
 | --- | ---: | --- | --- | --- |

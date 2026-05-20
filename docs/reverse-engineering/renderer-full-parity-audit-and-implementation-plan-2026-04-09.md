@@ -1,6 +1,6 @@
 # `renderer` Full Parity Audit And Closure Implementation Plan
 
-Last updated: 2026-04-21
+Last updated: 2026-05-20
 
 Scope: `src/code/renderer/*` plus renderer-facing Win32 and client glue in `src/code/win32/*` and `src/code/client/*` versus retail `quakelive_steam.exe`
 
@@ -130,7 +130,7 @@ Inference:
 
 | Area | Current status | Writable files in scope | Strongest retail evidence | Audit conclusion |
 | --- | --- | --- | --- | --- |
-| Export ABI and loading bridge | Closed | `tr_public.h`, `tr_init.c`, `tr_scene.c`, `cl_main.c`, `cl_cgame.c` | mapping rounds 37, 38, and 43; alias `AdvertisementBridge_UpdateLoadingViewParameters`; parity gate `RG-G01` | The `GetRefAPI` tail still matches the retail contract, and the old mistaken `RegisterFont` export reading remains closed. |
+| Export ABI and loading bridge | Closed | `tr_public.h`, `tr_init.c`, `tr_scene.c`, `cl_main.c`, `cl_cgame.c` | mapping rounds 37, 38, 43, and 229; alias `AdvertisementBridge_UpdateLoadingViewParameters`; retail HLIL `sub_449F70`, `sub_4B9060`; parity gate `RG-G01` | The `GetRefAPI` tail now matches the retail `0x9c` contract: `REF_API_VERSION` is `9`, `AdvertisementBridge_UpdateLoadingViewParameters` stays between `RenderScene` and `SetColor`, the legacy post-`ModelBounds` font slot is a no-op rather than `RE_RegisterFont`, and `postprocess_restart` lives in the private tail at the recovered offset. |
 | Memory-image ingestion and live resource registration | Closed | `tr_image.c`, `tr_local.h`, `cl_main.c`, `cl_steam_resources.c` | mapping round 42; aliases `R_CreateImageWithTarget`, `R_DetectImageTypeFromMemory`, `R_LoadImageFromMemory`; parity gate `RG-G02` | The retail in-memory image lane remains reconstructed and actively used by launcher or Steam resource ingestion. |
 | Post-process and color correction | Closed | `tr_backend.c`, `tr_init.c`, `tr_local.h` | HLIL strings for `brightpass`, `downsample1`, `blurvertical`, `blurhoriz`, `combine`, and `colorcorrect`; parity gate `RG-G03` | The recovered shader-backed rectangle-texture pipeline still matches the committed retail shader family. |
 | World, model, surface, and scene runtime | Closed with bounded helper uncertainty | `tr_bsp.c`, `tr_curve.c`, `tr_light.c`, `tr_main.c`, `tr_marks.c`, `tr_mesh.c`, `tr_model.c`, `tr_scene.c`, `tr_shader.c`, `tr_shade*.c`, `tr_sky.c`, `tr_surface.c`, `tr_world.c` | `R_*`, `RE_*`, and `RB_*` alias families; mapping rounds 37 and 100; runtime probe on `bloodrun` | No new retail evidence pushed these files back into the open gap register. The remaining unmapped leaves are bounded helpers beneath already-promoted runtime owners. |
@@ -192,9 +192,34 @@ inside the earlier `RG-P8` closure and closed it in the same pass:
 - The host draw helper still consumed non-digit caret sequences and still drew
   recognized color escapes literally when `forceColor` was set.
 
+The 2026-05-20 wiring refresh removed the eager retained-atlas prebuild that
+had been added during reconstruction but is not present in the retail
+`R_InitFontStash` HLIL path. Retail creates the `512 x 512` `*fontstash`
+atlas, installs `R_fonsErrorCallback`, loads the five face handles, and then
+lets glyphs populate the atlas lazily through measure/draw calls. The source
+now follows that ownership split, which makes the prior retail-module
+`R_fonsErrorCallback` saturation artifact a stale validation item rather than
+a still-supported renderer source behavior. The follow-up resize check also
+matched retail's grow-versus-flush split: atlas expansion preserves previous
+alpha pixels and cached glyph coordinates, while only the maximum-size flush
+path clears retained glyph state. A subsequent same-day check also matched the
+retail texture-storage callback by refreshing the retained `*fontstash` image
+as `GL_ALPHA` storage instead of expanding the one-byte atlas into RGBA on each
+upload.
+
+The same 2026-05-20 wiring refresh also rechecked the renderer export ABI
+against `sub_449F70` and `CL_InitRef`. Retail rejects any API version other
+than `9`, zeroes/copies a `0x9c` export table, places the loading-view bridge
+between `RenderScene` and `SetColor`, keeps the historical post-`ModelBounds`
+font slot as `sub_4D7980` rather than the classic `RE_RegisterFont` lane, and
+routes `CL_PostProcessRestart_f` through the private tail slot copied at
+`data_146CCE0`. The source now preserves that layout while native UI/cgame font
+registration remains on the explicit client compatibility wrappers.
+
 The strict percentages above therefore remain unchanged, but the font/text
 closure now has direct source-backed proof for the remaining Unicode and
-fallback behavior that retail exposes.
+fallback behavior, plus the lazy retained-atlas population behavior that
+retail exposes.
 
 Confidence:
 

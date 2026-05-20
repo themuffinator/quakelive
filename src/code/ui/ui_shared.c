@@ -5251,6 +5251,24 @@ void Menu_HandleMouseMove(menuDef_t *menu, float x, float y) {
 
 }
 
+/*
+===============
+Menu_WebBrowserActive
+===============
+*/
+static qboolean Menu_WebBrowserActive(void) {
+	if (!DC || !DC->getCVarValue) {
+		return qfalse;
+	}
+
+	return DC->getCVarValue("web_browserActive") != 0.0f ? qtrue : qfalse;
+}
+
+/*
+===============
+Menu_Paint
+===============
+*/
 void Menu_Paint(menuDef_t *menu, qboolean forcePaint) {
 	int i;
 
@@ -5259,6 +5277,8 @@ void Menu_Paint(menuDef_t *menu, qboolean forcePaint) {
 	}
 
 	if (!(menu->window.flags & WINDOW_VISIBLE) &&  !forcePaint) {
+		menu->window.flags &= ~WINDOW_FORCED;
+		Menu_RefreshAdvertCellShaders(menu);
 		return;
 	}
 
@@ -5266,11 +5286,16 @@ void Menu_Paint(menuDef_t *menu, qboolean forcePaint) {
 		!DC->ownerDrawVisible(menu->window.ownerDrawFlags, menu->window.ownerDrawFlags2)) {
 		return;
 	}
+
+	if (Menu_WebBrowserActive()) {
+		return;
+	}
 	
 	if (forcePaint) {
 		menu->window.flags |= WINDOW_FORCED;
 	}
 
+	Menu_RefreshAdvertCellShaders(menu);
 	Menu_UpdatePresetLists(menu);
 
 	if (DC->setAdjustFrom640Mode) {

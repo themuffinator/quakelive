@@ -8,6 +8,12 @@ def _read(rel_path: str) -> str:
 	return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def _static_array_block(source: str, marker: str) -> str:
+	start = source.index(marker)
+	end = source.index("};", start)
+	return source[start:end]
+
+
 def test_qagame_uses_compact_smscores_fallback_when_forced_or_overflowing() -> None:
 	game_cmds = _read("src/code/game/g_cmds.c")
 
@@ -39,6 +45,36 @@ def test_qagame_emits_retail_castats_rows_during_clan_arena_intermission() -> No
 	assert "if ( level.intermissiontime ) {" in game_cmds
 	assert "if ( g_gametype.integer == GT_CLAN_ARENA ) {" in game_cmds
 	assert "G_SendCAStatsMessage( ent );" in game_cmds
+
+
+def test_castats_use_retail_weapon_entry_order() -> None:
+	game_cmds = _read("src/code/game/g_cmds.c")
+	servercmds = _read("src/code/cgame/cg_servercmds.c")
+
+	for source, marker in (
+		(game_cmds, "static const weapon_t castatWeapons"),
+		(servercmds, "static const weapon_t cgCAStatWeapons"),
+	):
+		order_block = _static_array_block(source, marker)
+
+		for expected in (
+			"WP_GAUNTLET",
+			"WP_MACHINEGUN",
+			"WP_SHOTGUN",
+			"WP_GRAPPLING_HOOK",
+			"WP_NAILGUN",
+			"WP_PROX_LAUNCHER",
+			"WP_CHAINGUN",
+			"WP_HEAVY_MACHINEGUN",
+		):
+			assert expected in order_block
+
+		assert order_block.index("WP_SHOTGUN") < order_block.index("WP_HEAVY_MACHINEGUN")
+		assert order_block.index("WP_GRAPPLING_HOOK") < order_block.index("WP_NAILGUN")
+		assert order_block.index("WP_CHAINGUN") < order_block.index("WP_HEAVY_MACHINEGUN")
+
+	assert "weapon = castatWeapons[weaponIndex];" in game_cmds
+	assert "weapon = cgCAStatWeapons[weaponIndex];" in servercmds
 
 
 def test_cgame_caches_and_parses_retail_castats_rows() -> None:

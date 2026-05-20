@@ -8,6 +8,74 @@ def _read(rel_path: str) -> str:
 	return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def _extract_block(source: str, anchor: str) -> str:
+	start = source.index(anchor)
+	brace_start = source.index("{", start)
+	depth = 0
+
+	for index in range(brace_start, len(source)):
+		char = source[index]
+		if char == "{":
+			depth += 1
+		elif char == "}":
+			depth -= 1
+			if depth == 0:
+				return source[start : index + 1]
+
+	raise AssertionError(f"Unterminated block for {anchor}")
+
+
+def test_qagame_native_export_table_matches_recovered_slot_order() -> None:
+	public_h = _read("src/code/game/g_public.h")
+	game_main = _read("src/code/game/g_main.c")
+	vm_c = _read("src/code/qcommon/vm.c")
+	export_block = _extract_block(game_main, "static void *g_nativeExports")
+	vm_block = _extract_block(vm_c, "static int VM_CallNativeExports")
+
+	expected_slots = [
+		("GAME_NATIVE_EXPORT_SHUTDOWN", "G_NativeShutdown"),
+		("GAME_NATIVE_EXPORT_RUN_FRAME", "G_RunFrame"),
+		("GAME_NATIVE_EXPORT_REGISTER_CVARS", "G_RegisterCvars"),
+		("GAME_NATIVE_EXPORT_INIT", "G_NativeInit"),
+		("GAME_NATIVE_EXPORT_CONSOLE_COMMAND", "ConsoleCommand"),
+		("GAME_NATIVE_EXPORT_CLIENT_USERINFO_CHANGED", "ClientUserinfoChanged"),
+		("GAME_NATIVE_EXPORT_CLIENT_THINK", "ClientThink"),
+		("GAME_NATIVE_EXPORT_CLIENT_DISCONNECT", "ClientDisconnect"),
+		("GAME_NATIVE_EXPORT_CLIENT_CONNECT", "G_NativeClientConnect"),
+		("GAME_NATIVE_EXPORT_CLIENT_COMMAND", "ClientCommand"),
+		("GAME_NATIVE_EXPORT_CLIENT_BEGIN", "ClientBegin"),
+		("GAME_NATIVE_EXPORT_BOTAI_START_FRAME", "BotAIStartFrame"),
+		("GAME_NATIVE_EXPORT_CAN_CLIENT_SEE_CLIENT", "G_CanClientSeeClient"),
+		("GAME_NATIVE_EXPORT_FREEZE_CAN_SEE_THAW_PROGRESS_EVENT", "G_FreezeCanSeeThawProgressEvent"),
+		("GAME_NATIVE_EXPORT_IS_OBJECTIVE_ENTITY", "G_IsObjectiveEntity"),
+		("GAME_NATIVE_EXPORT_SHOULD_SUPPRESS_VOICE_TO_CLIENT", "G_ShouldSuppressVoiceToClient"),
+		("GAME_NATIVE_EXPORT_IS_CLIENT_ADMIN", "G_IsClientAdmin"),
+		("GAME_NATIVE_EXPORT_ARE_ENEMY_CLIENTS", "G_AreEnemyClients"),
+		("GAME_NATIVE_EXPORT_GET_CLIENT_SCORE", "G_GetClientScore"),
+	]
+
+	for slot, target in expected_slots:
+		assert slot in public_h
+		assert f"[{slot}] = {target}" in export_block
+
+	dispatched_slots = [
+		slot
+		for slot, _target in expected_slots
+		if slot != "GAME_NATIVE_EXPORT_REGISTER_CVARS"
+	]
+
+	for slot in dispatched_slots:
+		assert f"dllExports[{slot}]" in vm_block
+
+	assert "dllExports[GAME_NATIVE_EXPORT_REGISTER_CVARS]" not in vm_block
+
+	assert "GAME_NATIVE_EXPORT_COUNT" in public_h
+	assert "static void *g_nativeExports[GAME_NATIVE_EXPORT_COUNT]" in game_main
+	assert "return GAME_NATIVE_EXPORT_COUNT;" in vm_c
+	assert "VM_NormalizeQbooleanArg( args[2] )" in vm_block
+	assert "VM_NormalizeQbooleanResult" in vm_block
+
+
 def test_voice_suppression_helper_matches_retail_export_policy() -> None:
 	local_h = _read("src/code/game/g_local.h")
 	team_c = _read("src/code/game/g_team.c")

@@ -124,6 +124,53 @@ def test_client_command_registration_matches_retail_cl_init_surface() -> None:
 	assert 'Cmd_RemoveCommand ("reconnect");' not in shutdown_block
 
 
+def test_usercmd_cgame_bridge_matches_retail_weapon_primary_and_fov_bytes() -> None:
+	client_h = (REPO_ROOT / "src/code/client/client.h").read_text(encoding="utf-8")
+	cl_input = (REPO_ROOT / "src/code/client/cl_input.c").read_text(encoding="utf-8")
+	cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
+	q_shared = (REPO_ROOT / "src/code/game/q_shared.h").read_text(encoding="utf-8")
+	cg_local = (REPO_ROOT / "src/code/cgame/cg_local.h").read_text(encoding="utf-8")
+	cg_syscalls = (REPO_ROOT / "src/code/cgame/cg_syscalls.c").read_text(encoding="utf-8")
+	cg_view = (REPO_ROOT / "src/code/cgame/cg_view.c").read_text(encoding="utf-8")
+	ql_imports = (REPO_ROOT / "src/code/client/ql_cgame_imports.inc").read_text(encoding="utf-8")
+
+	usercmd_decl = q_shared[q_shared.index("typedef struct usercmd_s {") : q_shared.index("} usercmd_t;")]
+	finish_move_block = _extract_function_block(cl_input, "void CL_FinishMove( usercmd_t *cmd ) {")
+	set_value_block = _extract_function_block(
+		cl_cgame,
+		"void CL_SetUserCmdValue( int userCmdValue, int userCmdPrimary, float sensitivityScale, int userCmdFov ) {",
+	)
+	draw_active_block = _extract_function_block(
+		cg_view,
+		"void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demoPlayback ) {",
+	)
+
+	assert "byte\t\t\tweapon;" in usercmd_decl
+	assert "byte\t\t\tweaponPrimary;" in usercmd_decl
+	assert "byte\t\t\tfov;" in usercmd_decl
+	assert usercmd_decl.index("byte\t\t\tweapon;") < usercmd_decl.index("byte\t\t\tweaponPrimary;")
+	assert usercmd_decl.index("byte\t\t\tweaponPrimary;") < usercmd_decl.index("byte\t\t\tfov;")
+	assert usercmd_decl.index("byte\t\t\tfov;") < usercmd_decl.index("signed char\tforwardmove, rightmove, upmove;")
+
+	assert "int\t\t\tcgameUserCmdValue;" in client_h
+	assert "int\t\t\tcgameUserCmdPrimary;" in client_h
+	assert "int\t\t\tcgameUserCmdFov;" in client_h
+	assert "cl.cgameUserCmdPrimary = userCmdPrimary;" in set_value_block
+	assert "cl.cgameUserCmdFov = userCmdFov;" in set_value_block
+	assert "CL_SetUserCmdValue( args[1], args[2], VMF(3), args[4] );" in cl_cgame
+
+	assert "cmd->weapon = cl.cgameUserCmdValue;" in finish_move_block
+	assert "cmd->weaponPrimary = cl.cgameUserCmdPrimary;" in finish_move_block
+	assert "cmd->fov = cl.cgameUserCmdFov;" in finish_move_block
+
+	assert "void\t\ttrap_SetUserCmdValue( int stateValue, int primaryValue, float sensitivityScale, int fov );" in cg_local
+	assert "syscall( CG_SETUSERCMDVALUE, stateValue, primaryValue, PASSFLOAT(sensitivityScale), fov );" in cg_syscalls
+	assert "CG_Import_Syscall( CG_SETUSERCMDVALUE, stateValue, primaryValue, QL_CG_PASSFLOAT(sensitivityScale), fov );" in ql_imports
+	assert "cg.userCmdFov = (int)fov_x;" in cg_view
+	assert "cg.weaponPrimary = CG_StartingWeaponIndexFromToken( cg_weaponPrimaryQueued.string );" in draw_active_block
+	assert "trap_SetUserCmdValue( cg.weaponSelect, cg.weaponPrimary, cg.zoomSensitivity, cg.userCmdFov );" in draw_active_block
+
+
 def test_client_command_handlers_match_retail_forward_restart_and_info_contracts() -> None:
 	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
 	aliases = json.loads(
@@ -480,8 +527,11 @@ def test_postprocess_restart_routes_through_renderer_export_not_renderer_cmd_reg
 	api_block = _extract_function_block(tr_init, "refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {")
 
 	assert 'void\t(*PostProcessRestart)( void );' in tr_public
+	assert "#define\tREF_API_VERSION\t\t9" in tr_public
+	assert tr_public.index('(*SetColor)') < tr_public.index('(*PostProcessRestart)')
 	assert "R_UpdatePostProcessCvars();" in restart_block
 	assert "tr.postProcessNeedsReset = qtrue;" in restart_block
+	assert api_block.index("re.SetColor = RE_SetColor;") < api_block.index("re.PostProcessRestart = R_PostProcessRestart;")
 	assert "re.PostProcessRestart = R_PostProcessRestart;" in api_block
 	assert 'ri.Cmd_AddCommand( "postprocess_restart", R_PostProcessRestart' not in register_block
 	assert 'ri.Cmd_RemoveCommand( "postprocess_restart" );' not in shutdown_block
@@ -794,3 +844,730 @@ def test_client_command_handlers_match_retail_cinematic_network_and_browser_cont
 	assert "CL_RefreshOnlineServicesBridgeState();" not in reload_block
 	assert "QLWebHost_NavigateOrOpen( cl_webBrowserHash );" not in reload_block
 	assert aliases["sub_4F2A30"] == "CL_Web_Reload_f"
+
+
+def test_client_cgame_native_bridge_mapping_round_275_promotes_hlil_backed_symbols() -> None:
+	aliases = json.loads(
+		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	)["quakelive_steam"]
+	host_hlil = (
+		REPO_ROOT
+		/ "references"
+		/ "hlil"
+		/ "quakelive"
+		/ "quakelive_steam.exe"
+		/ "quakelive_steam.exe_hlil.txt"
+	).read_text(encoding="utf-8")
+	cgame_hlil = (
+		REPO_ROOT
+		/ "references"
+		/ "hlil"
+		/ "quakelive"
+		/ "cgamex86.dll"
+		/ "cgamex86.dll_hlil.txt"
+	).read_text(encoding="utf-8")
+	ghidra_functions = (
+		REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+	).read_text(encoding="utf-8")
+	cg_public = (REPO_ROOT / "src/code/cgame/cg_public.h").read_text(encoding="utf-8")
+	cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
+	mapping_round = (
+		REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_275.md"
+	).read_text(encoding="utf-8")
+
+	expected_aliases = {
+		"sub_4B03B0": "QLCGImport_PublishTaggedInfoString",
+		"sub_4B03C0": "QLCGImport_R_MirrorPoint",
+		"sub_4B03D0": "QLCGImport_R_MirrorVector",
+		"sub_4B0460": "CL_LoadCGameForCvarRegistration",
+		"sub_4B04C0": "CL_InitCGame",
+		"sub_4B0610": "CL_GameCommand",
+		"sub_4B0630": "CL_CGameRendering",
+		"sub_4B0660": "CL_AdjustServerTimeDelta",
+		"sub_4B0760": "CL_FirstSnapshot",
+		"sub_4B07C0": "CL_SetCGameTime",
+		"sub_4BF5D0": "QLWebView_PublishTaggedInfoString",
+		"sub_4EC6D0": "QLWebView_InvokeCommNoticeThunk",
+		"sub_4F2950": "QLWebView_InvokeCommNotice",
+	}
+
+	for address, normalized_name in expected_aliases.items():
+		assert aliases[address] == normalized_name
+
+	for expected_row in (
+		"FUN_004b03b0,004b03b0,9,0,unknown",
+		"FUN_004b03c0,004b03c0,10,0,unknown",
+		"FUN_004b03d0,004b03d0,10,0,unknown",
+		"FUN_004b0460,004b0460,87,0,unknown",
+		"FUN_004b04c0,004b04c0,321,0,unknown",
+		"FUN_004b0610,004b0610,22,0,unknown",
+		"FUN_004b0630,004b0630,35,0,unknown",
+		"FUN_004b0660,004b0660,255,0,unknown",
+		"FUN_004b0760,004b0760,92,0,unknown",
+		"FUN_004bf5d0,004bf5d0,312,0,unknown",
+		"FUN_004ec6d0,004ec6d0,9,0,unknown",
+	):
+		assert expected_row in ghidra_functions
+
+	for expected in (
+		"004b03b4  return sub_4bf5d0() __tailcall",
+		"004b03c4  jump(data_146cce8)",
+		"004b03d4  jump(data_146ccec)",
+		'004b047e  void* result = sub_4e9ff0("cgame", &data_146cc38, &data_565958, &var_8)',
+		'004b0523  void* eax_4 = sub_4e9ff0("cgame", &data_146cc38, &data_565958, &var_8)',
+		"004b0624      jump(*(data_146cc38 + 0xc))",
+		"004b0652  return (*(data_146cc38 + 0x10))(data_146cfbc, arg1, data_16177e0)",
+		"004b0767  if ((data_146cd28 & 2) != 0",
+		'004bf60b  sub_429440(sub_42a110(&var_838, "MSG_TYPE"), arg1)',
+		"004bf635          sub_4d9380(&var_828, &var_408, &var_808)",
+		"004bf6b5  sub_4ec6d0()",
+		"004ec6d4  return sub_4f2950() __tailcall",
+		'004f29e0          char* eax_5 = sub_4314d0(&var_10, "OnCommNotice")',
+	):
+		assert expected in host_hlil
+
+	for expected in (
+		'10048931  (*(data_1074cccc + 0x1d0))("serverinfo", data_10a38420 + 0x10a39420)',
+		'10049440  (*(data_1074cccc + 0x1d0))("serverinfo", data_10a38420 + 0x10a39420)',
+		"10011794                  (*(data_1074cccc + 0x1e0))(&var_64, &var_38, &var_48)",
+		"100117b4                  (*(data_1074cccc + 0x1e4))(&var_48, &var_28, &var_58)",
+	):
+		assert expected in cgame_hlil
+
+	for expected in (
+		"CG_QL_IMPORT_TAGGED_CVAR_STRING_BUFFER = 116,",
+		"CG_QL_IMPORT_R_MIRROR_POINT = 120,",
+		"CG_QL_IMPORT_R_MIRROR_VECTOR = 121,",
+		"ql_cgame_imports[CG_QL_IMPORT_TAGGED_CVAR_STRING_BUFFER] = (ql_import_f)QL_CG_trap_TaggedCvarStringBuffer;",
+		"ql_cgame_imports[CG_QL_IMPORT_R_MIRROR_POINT] = (ql_import_f)QL_CG_trap_R_MirrorPoint;",
+		"ql_cgame_imports[CG_QL_IMPORT_R_MIRROR_VECTOR] = (ql_import_f)QL_CG_trap_R_MirrorVector;",
+	):
+		assert expected in cg_public or expected in cl_cgame
+
+	for expected in (
+		"# Quake Live Steam Host Mapping Round 275",
+		"| `sub_4B03B0` | `QLCGImport_PublishTaggedInfoString` |",
+		"| `sub_4B04C0` | `CL_InitCGame` |",
+		"| `sub_4BF5D0` | `QLWebView_PublishTaggedInfoString` |",
+	):
+		assert expected in mapping_round
+
+
+def test_client_input_mapping_round_277_promotes_console_input_and_usercmd_symbols() -> None:
+	aliases = json.loads(
+		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	)["quakelive_steam"]
+	host_hlil = (
+		REPO_ROOT
+		/ "references"
+		/ "hlil"
+		/ "quakelive"
+		/ "quakelive_steam.exe"
+		/ "quakelive_steam.exe_hlil.txt"
+	).read_text(encoding="utf-8")
+	ghidra_functions = (
+		REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+	).read_text(encoding="utf-8")
+	cl_input = (REPO_ROOT / "src/code/client/cl_input.c").read_text(encoding="utf-8")
+	mapping_round = (
+		REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_277.md"
+	).read_text(encoding="utf-8")
+
+	expected_aliases = {
+		"sub_4B4A30": "Con_Init",
+		"sub_4B4BD0": "IN_MLookDown",
+		"sub_4B4BE0": "IN_KeyDown",
+		"sub_4B4C60": "IN_KeyUp",
+		"sub_4B4CF0": "CL_KeyState",
+		"sub_4B4D80": "IN_UpDown",
+		"sub_4B4D90": "IN_UpUp",
+		"sub_4B4DA0": "IN_DownDown",
+		"sub_4B4DB0": "IN_DownUp",
+		"sub_4B4DC0": "IN_LeftDown",
+		"sub_4B4DD0": "IN_LeftUp",
+		"sub_4B4DE0": "IN_RightDown",
+		"sub_4B4DF0": "IN_RightUp",
+		"sub_4B4E00": "IN_ForwardDown",
+		"sub_4B4E10": "IN_ForwardUp",
+		"sub_4B4E20": "IN_BackDown",
+		"sub_4B4E30": "IN_BackUp",
+		"sub_4B4E40": "IN_LookupDown",
+		"sub_4B4E50": "IN_LookupUp",
+		"sub_4B4E60": "IN_LookdownDown",
+		"sub_4B4E70": "IN_LookdownUp",
+		"sub_4B4E80": "IN_MoveleftDown",
+		"sub_4B4E90": "IN_MoveleftUp",
+		"sub_4B4EA0": "IN_MoverightDown",
+		"sub_4B4EB0": "IN_MoverightUp",
+		"sub_4B4EC0": "IN_SpeedDown",
+		"sub_4B4ED0": "IN_SpeedUp",
+		"sub_4B4EE0": "IN_StrafeDown",
+		"sub_4B4EF0": "IN_StrafeUp",
+		"sub_4B4F00": "IN_Button0Down",
+		"sub_4B4F10": "IN_Button0Up",
+		"sub_4B4F20": "IN_Button2Down",
+		"sub_4B4F30": "IN_Button2Up",
+		"sub_4B4F40": "IN_Button3Down",
+		"sub_4B4F50": "IN_Button3Up",
+		"sub_4B4F60": "IN_CenterView",
+		"sub_4B5290": "CL_AdjustAngles",
+		"sub_4B5360": "CL_KeyMove",
+		"sub_4B5570": "CL_JoystickEvent",
+		"sub_4B55B0": "CL_JoystickMove",
+		"sub_4B5640": "CL_BeginMouseFilter",
+		"sub_4B5710": "CL_EndMouseFilter",
+		"sub_4B5BD0": "CL_CmdButtons",
+		"sub_4B5C70": "CL_CreateCmd",
+		"sub_4B5DE0": "CL_CreateNewCommands",
+		"sub_4B5E60": "CL_ReadyToSendPacket",
+		"sub_4B62A0": "CL_SendCmd",
+		"sub_4B6300": "IN_MLookUp",
+		"sub_4B6330": "CL_InitInput",
+	}
+
+	for address, normalized_name in expected_aliases.items():
+		assert aliases[address] == normalized_name
+
+	for expected_row in (
+		"FUN_004b4a30,004b4a30,408,0,unknown",
+		"FUN_004b4be0,004b4be0,125,0,unknown",
+		"FUN_004b4c60,004b4c60,130,0,unknown",
+		"FUN_004b4cf0,004b4cf0,136,0,unknown",
+		"FUN_004b5290,004b5290,203,0,unknown",
+		"FUN_004b5360,004b5360,381,0,unknown",
+		"FUN_004b5570,004b5570,58,0,unknown",
+		"FUN_004b55b0,004b55b0,139,0,unknown",
+		"FUN_004b5640,004b5640,197,0,unknown",
+		"FUN_004b5710,004b5710,236,0,unknown",
+		"FUN_004b5bd0,004b5bd0,160,0,unknown",
+		"FUN_004b5c70,004b5c70,364,0,unknown",
+		"FUN_004b5de0,004b5de0,118,0,unknown",
+		"FUN_004b5e60,004b5e60,265,0,unknown",
+		"FUN_004b62a0,004b62a0,88,0,unknown",
+		"FUN_004b6330,004b6330,570,0,unknown",
+	):
+		assert expected_row in ghidra_functions
+
+	for expected in (
+		'004b4a68      sub_4cdd30(x87_r0, x87_r1, x87_r2, "con_background", U"0", U"0", U"1", 0x81800)',
+		'004b4b73  sub_4c81d0("toggleconsole", sub_4b49d0)',
+		'004b4c51                  return sub_4c9860(arg1, "Three keys down for a button!\\n")',
+		"004b4cd7      arg1[1] = 0",
+		"004b4d47  long double x87_r6_1 = fconvert.t(fconvert.s(float.t(arg1) / x87_r6))",
+		"004b4d8b  return sub_4b4be0(&data_164af20)",
+		"004b4d9b  return sub_4b4c60(&data_164af20)",
+		"004b52a3  long double x87_r7_1 = float.t(data_1528cc4) * fconvert.t(0.001)",
+		"004b5366  int32_t result = sub_4f22e0()",
+		"004b557e  if (arg1 s>= 0 && arg1 s< 6)",
+		'004b5588  sub_4c9b60(1, "CL_JoystickEvent: bad axis %i")',
+		"004b5629          data_1471ea4 = 0",
+		"004b564c  if (result != 0)",
+		"004b571f  if (*(result + 0x30) != 0)",
+		"004b5c43  for (void* i = &data_164af74; i s< 0x164b0dc; )",
+		"004b5c89  sub_4b5290()",
+		"004b5ca2  sub_4b5360(arg1)",
+		"004b5ca8  sub_4b5800(arg1)",
+		"004b5cae  sub_4b55b0(arg1)",
+		"004b5ded  if (data_1528ba0 s>= 7)",
+		'004b5f28                          sub_4cd250("cl_maxpackets", "125")',
+		"004b62cc      sub_4b5de0()",
+		"004b62f3          return sub_4b5f70(esi) __tailcall",
+		"004b6305  data_165d59c = 0",
+		'004b633a  sub_4c81d0("centerview", sub_4b4f60)',
+		'004b64ba  sub_4c81d0("+attack", sub_4b4f00)',
+		'004b6514  sub_4c81d0("+mlook", sub_4b4bd0)',
+		'004b6526  sub_4c81d0("-mlook", sub_4b6300)',
+		'004b6535  sub_4c81d0("ListInputDevices", sub_4eab90)',
+		'004b6557  data_146ccfc = sub_4ce0d0(x87_r0, "cl_nodelta", U"0", 0)',
+		'004b655c  void** result = sub_4ce0d0(x87_r2, "cl_debugMove", U"0", 0)',
+	):
+		assert expected in host_hlil
+
+	finish_move_block = _extract_function_block(cl_input, "void CL_FinishMove( usercmd_t *cmd ) {")
+	create_cmd_block = _extract_function_block(cl_input, "usercmd_t CL_CreateCmd( void ) {")
+	assert "CL_FinishMove( &cmd );" in create_cmd_block
+	assert "cmd->serverTime = cl.serverTime;" in finish_move_block
+	assert "cmd->angles[i] = ANGLE2SHORT(cl.viewangles[i]);" in finish_move_block
+
+	for expected in (
+		"# Quake Live Steam Host Mapping Round 277",
+		"| `sub_4B4A30` | `Con_Init` |",
+		"| `sub_4B4BE0` | `IN_KeyDown` |",
+		"| `sub_4B5C70` | `CL_CreateCmd` |",
+		"| `sub_4B62A0` | `CL_SendCmd` |",
+		"Retail `0x004B5C70` appears to inline the final move storage",
+		"Higher `+button4` through `+button14` source registrations remain a",
+	):
+		assert expected in mapping_round
+
+
+def test_client_parse_screen_ui_mapping_round_280_promotes_hlil_backed_symbols() -> None:
+	aliases = json.loads(
+		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	)["quakelive_steam"]
+	host_hlil = (
+		REPO_ROOT
+		/ "references"
+		/ "hlil"
+		/ "quakelive"
+		/ "quakelive_steam.exe"
+		/ "quakelive_steam.exe_hlil.txt"
+	).read_text(encoding="utf-8")
+	ghidra_functions = (
+		REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+	).read_text(encoding="utf-8")
+	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+	cl_net_chan = (REPO_ROOT / "src/code/client/cl_net_chan.c").read_text(encoding="utf-8")
+	cl_parse = (REPO_ROOT / "src/code/client/cl_parse.c").read_text(encoding="utf-8")
+	cl_scrn = (REPO_ROOT / "src/code/client/cl_scrn.c").read_text(encoding="utf-8")
+	cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
+	mapping_round = (
+		REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_280.md"
+	).read_text(encoding="utf-8")
+
+	expected_aliases = {
+		"sub_4BC320": "CL_Workshop_Frame",
+		"sub_4BCE30": "CL_Netchan_Encode",
+		"sub_4BCEF0": "CL_Netchan_Decode",
+		"sub_4BCF80": "CL_Netchan_TransmitNextFragment",
+		"sub_4BCF90": "CL_Netchan_Transmit",
+		"sub_4BCFC0": "CL_Netchan_Process",
+		"sub_4BD620": "CL_SystemInfoChanged",
+		"sub_4BDA00": "CL_ParseServerMessage",
+		"sub_4BDB90": "SCR_AdjustFrom640",
+		"sub_4BDC00": "SCR_FillRect",
+		"sub_4BDCB0": "SCR_DrawPic",
+		"sub_4BDEB0": "SCR_DrawDemoRecording",
+		"sub_4BE040": "SCR_DebugGraph",
+		"sub_4BE080": "SCR_Init",
+		"sub_4BE3A0": "SCR_UpdateScreen",
+		"sub_4BE460": "CL_GetClientState",
+		"sub_4BE4C0": "LAN_ResetPings",
+		"sub_4BE520": "LAN_AddServer",
+		"sub_4BE6B0": "LAN_RemoveServer",
+		"sub_4BE7F0": "LAN_GetServerAddressString",
+		"sub_4BEB00": "LAN_GetServerPing",
+		"sub_4BEB80": "LAN_CompareServers",
+		"sub_4BED10": "LAN_MarkServerVisible",
+		"sub_4BEDE0": "LAN_ServerIsVisible",
+	}
+
+	for address, normalized_name in expected_aliases.items():
+		assert aliases[address] == normalized_name
+
+	for expected_row in (
+		"FUN_004bc320,004bc320,187,0,unknown",
+		"FUN_004bce30,004bce30,173,0,unknown",
+		"FUN_004bcef0,004bcef0,140,0,unknown",
+		"FUN_004bcf80,004bcf80,9,0,unknown",
+		"FUN_004bcf90,004bcf90,43,0,unknown",
+		"FUN_004bcfc0,004bcfc0,49,0,unknown",
+		"FUN_004bd620,004bd620,360,0,unknown",
+		"FUN_004bda00,004bda00,367,0,unknown",
+		"FUN_004bdb90,004bdb90,108,0,unknown",
+		"FUN_004bdc00,004bdc00,163,0,unknown",
+		"FUN_004bdcb0,004bdcb0,141,0,unknown",
+		"FUN_004bdeb0,004bdeb0,392,0,unknown",
+		"FUN_004be040,004be040,49,0,unknown",
+		"FUN_004be080,004be080,139,0,unknown",
+		"FUN_004be3a0,004be3a0,184,0,unknown",
+		"FUN_004be460,004be460,92,0,unknown",
+		"FUN_004be4c0,004be4c0,79,0,unknown",
+		"FUN_004be520,004be520,377,0,unknown",
+		"FUN_004be6b0,004be6b0,297,0,unknown",
+		"FUN_004be7f0,004be7f0,145,0,unknown",
+		"FUN_004beb00,004beb00,99,0,unknown",
+		"FUN_004beb80,004beb80,347,0,unknown",
+		"FUN_004bed10,004bed10,163,0,unknown",
+		"FUN_004bede0,004bede0,15,0,unknown",
+	):
+		assert expected_row in ghidra_functions
+
+	for expected in (
+		'004bc392          sub_4c9ab0("Steamworks downloads complete\\n")',
+		"004bce5a      char eax_2 = sub_4d5020(arg1)",
+		"004bce8f      int32_t eax = ((eax_4 & 0x3f) << 0xa) + 0x1606b88",
+		"004bcf2b  result.b = *edx",
+		"004bcf84  return sub_4d7370() __tailcall",
+		"004bcf9a  sub_4d4dc0(arg2, 5)",
+		"004bcfba  return sub_4d74e0(arg1, arg2[4], arg2[2])",
+		"004bcfcc  int32_t result = sub_4d7640(&__saved_ebp, arg2, edi, arg1, arg2)",
+		"004bcfdb  sub_4bcef0(arg2)",
+		'004bd657  int32_t result = atoi(sub_4d9260(i_2, "sv_serverid"))',
+		'004bd69f      i = sub_4d9260(i_2, "sv_paks")',
+		"004bda3b  sub_4d4a70(arg1)",
+		"004bdb04                      sub_4bd790(arg1)",
+		"004bdb0f                      sub_4bd350(arg1)",
+		'0053f4c8  char const data_53f4c8[0x37] = "CL_ParseServerMessage: read past end of server message", 0',
+		'0053f500  char const data_53f500[0x34] = "CL_ParseServerMessage: Illegible server message %d\\n", 0',
+		"004bdbb4  float var_c = fconvert.s(float.t(data_15ee344) / fconvert.t(480.0))",
+		"004bdc0a  data_146cca4(arg5)",
+		"004bdcc9  float var_8 = fconvert.s(float.t(data_15ee340) / fconvert.t(640.0))",
+		'004bdfdd              sprintf(&var_408, "RECORDING %s: %ik", 0x1617798, ',
+		"004be043  int32_t ecx = data_114e14c",
+		'004be0a3  data_146cc2c = sub_4ce0d0(x87_r0, "timegraph", U"0", 0x200)',
+		'0053f5f0  char const data_53f5f0[0x25] = "SCR_UpdateScreen: recursively called", 0',
+		"004be40e          sub_4be110(0)",
+		"004be46a  arg1[1] = data_15f6768",
+		"004be500              *arg1 = 0xffffffff",
+		"004be643          sub_4d8f40(*esi_1 * 0xac + var_20_1 + 0x14, arg4, 0x28)",
+		"004be7b0                  eax_2 = sub_4cb7d0(edi_2, edi_2 + 0xac, 0xac)",
+		"004be832              sub_4d6dd0(*eax_1, *(eax_1 + 4), *(eax_1 + 8), *(eax_1 + 0xc), ",
+		'004be950          sub_4d9620(&var_408, "hostname", esi_2 + 0x14)',
+		"004beb5e                  return *(eax_1 + 0xa4)",
+		"004bed52                  *eax = arg2",
+		"004bed74                  *(arg1 * 0xac + 0x1528d7c) = arg2",
+		"004bee38  return 0",
+	):
+		assert expected in host_hlil
+
+	for expected in (
+		"static void CL_Workshop_Frame( void ) {",
+		"static void CL_Netchan_Encode( msg_t *msg ) {",
+		"static void CL_Netchan_Decode( msg_t *msg ) {",
+		"void CL_Netchan_TransmitNextFragment( netchan_t *chan ) {",
+		"void CL_Netchan_Transmit( netchan_t *chan, msg_t* msg ) {",
+		"qboolean CL_Netchan_Process( netchan_t *chan, msg_t *msg ) {",
+		"void CL_SystemInfoChanged( void ) {",
+		"void CL_ParseServerMessage( msg_t *msg ) {",
+		"void SCR_AdjustFrom640( float *x, float *y, float *w, float *h ) {",
+		"void SCR_FillRect( float x, float y, float width, float height, const float *color ) {",
+		"void SCR_DrawPic( float x, float y, float width, float height, qhandle_t hShader ) {",
+		"void SCR_DrawDemoRecording( void ) {",
+		"void SCR_DebugGraph (float value, int color)",
+		"void SCR_Init( void ) {",
+		"void SCR_UpdateScreen( void ) {",
+		"static void GetClientState( uiClientState_t *state ) {",
+		"static void LAN_ResetPings(int source) {",
+		"static int LAN_AddServer(int source, const char *name, const char *address) {",
+		"static void LAN_RemoveServer(int source, const char *addr) {",
+		"static void LAN_GetServerAddressString( int source, int n, char *buf, int buflen ) {",
+		"static int LAN_GetServerPing( int source, int n ) {",
+		"static int LAN_CompareServers( int source, int sortKey, int sortDir, int s1, int s2 ) {",
+		"static void LAN_MarkServerVisible(int source, int n, qboolean visible ) {",
+		"static int LAN_ServerIsVisible(int source, int n ) {",
+	):
+		assert (
+			expected in cl_main
+			or expected in cl_net_chan
+			or expected in cl_parse
+			or expected in cl_scrn
+			or expected in cl_ui
+		)
+
+	for expected in (
+		"# Quake Live Steam Host Mapping Round 280",
+		"| `sub_4BCE30` | `CL_Netchan_Encode` |",
+		"| `sub_4BDA00` | `CL_ParseServerMessage` |",
+		"| `sub_4BE3A0` | `SCR_UpdateScreen` |",
+		"| `sub_4BEB80` | `LAN_CompareServers` |",
+		"0x004BDDF0` and `0x004BDE80` remain",
+	):
+		assert expected in mapping_round
+
+
+def test_client_collision_mapping_round_283_promotes_hlil_backed_symbols() -> None:
+	aliases = json.loads(
+		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	)["quakelive_steam"]
+	host_hlil = (
+		REPO_ROOT
+		/ "references"
+		/ "hlil"
+		/ "quakelive"
+		/ "quakelive_steam.exe"
+		/ "quakelive_steam.exe_hlil.txt"
+	).read_text(encoding="utf-8")
+	ghidra_functions = (
+		REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+	).read_text(encoding="utf-8")
+	cm_load = (REPO_ROOT / "src/code/qcommon/cm_load.c").read_text(encoding="utf-8")
+	cm_patch = (REPO_ROOT / "src/code/qcommon/cm_patch.c").read_text(encoding="utf-8")
+	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+	cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
+	bridge_round = (
+		REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_13.md"
+	).read_text(encoding="utf-8")
+	mapping_round = (
+		REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_283.md"
+	).read_text(encoding="utf-8")
+
+	expected_aliases = {
+		"sub_4B9430": "CL_GetConfigStringValue",
+		"sub_4B9940": "CL_IsClientPaused",
+		"sub_4B9DA0": "CL_AdvertisementBridge_VisibilityTraceCallback",
+		"sub_4BF710": "CMod_LoadShaders",
+		"sub_4BF7A0": "CMod_LoadSubmodels",
+		"sub_4BF910": "CMod_LoadNodes",
+		"sub_4BF9C0": "CMod_LoadBrushes",
+		"sub_4BFAD0": "CMod_LoadLeafs",
+		"sub_4BFBD0": "CMod_LoadPlanes",
+		"sub_4BFCF0": "CMod_LoadLeafBrushes",
+		"sub_4BFD60": "CMod_LoadLeafSurfaces",
+		"sub_4BFDD0": "CMod_LoadBrushSides",
+		"sub_4BFE80": "CMod_LoadVisibility",
+		"sub_4BFF10": "CMod_LoadPatches",
+		"sub_4C0160": "CM_ClearMap",
+		"sub_4C0240": "CM_NumInlineModels",
+		"sub_4C0260": "CM_LeafCluster",
+		"sub_4C02A0": "CM_LeafArea",
+		"sub_4C02E0": "CM_InitBoxHull",
+		"sub_4C0830": "CM_ClearLevelPatches",
+	}
+
+	for address, normalized_name in expected_aliases.items():
+		assert aliases[address] == normalized_name
+
+	for expected_row in (
+		"FUN_004bf7a0,004bf7a0,364,0,unknown",
+		"FUN_004bfbd0,004bfbd0,281,0,unknown",
+		"FUN_004bf9c0,004bf9c0,258,0,unknown",
+		"FUN_004bfad0,004bfad0,254,0,unknown",
+		"FUN_004bfdd0,004bfdd0,163,0,unknown",
+		"FUN_004bf910,004bf910,161,0,unknown",
+		"FUN_004bf710,004bf710,143,0,unknown",
+		"FUN_004bfe80,004bfe80,136,0,unknown",
+		"FUN_004b9da0,004b9da0,102,0,unknown",
+		"FUN_004bfcf0,004bfcf0,97,0,unknown",
+		"FUN_004bfd60,004bfd60,97,0,unknown",
+		"FUN_004b9940,004b9940,26,0,unknown",
+		"FUN_004b9430,004b9430,20,0,unknown",
+		"FUN_004c02e0,004c02e0,278,0,unknown",
+		"FUN_004c02a0,004c02a0,50,0,unknown",
+		"FUN_004c0260,004c0260,49,0,unknown",
+		"FUN_004c0160,004c0160,25,0,unknown",
+		"FUN_004c0830,004c0830,13,0,unknown",
+	):
+		assert expected_row in ghidra_functions
+
+	for expected in (
+		"004b9443  return (&data_146cfd4)[arg1] + 0x146dfd4",
+		"004b994f  if (*(eax_2 + 0x30) == 0 && *(eax_2 + 0x20) == 0)",
+		"004b9dcf  sub_4c78c0(&var_40, arg1, arg2, &data_124a6b4, &data_124a6b4, 0, 0x6000001, 0)",
+		"004bce19  sub_4f20a0(sub_4b9da0)",
+		"CMod_LoadShaders: funny lump",
+		"Map with no shaders",
+		"MAX_SUBMODELS exceeded",
+		"Map has no nodes",
+		"CMod_LoadBrushes: bad shaderNum",
+		"CMod_LoadBrushSides: bad shaderN",
+		"004bfe96      int32_t eax_3 = (data_146cbc8 + 0x1f) & 0xffffffe0",
+		"004bfec1      return sub_4c95e0(eax_4, 0xff, ecx)",
+		"004c016c  sub_4c95e0(&data_146cb00, 0, 0xfc)",
+		"004c0245  return data_146cbb8",
+		"004c027a  sub_4c9b60(1, \"CM_LeafCluster: bad number\")",
+		"004c02ba  sub_4c9b60(1, \"CM_LeafArea: bad number\")",
+		"004c0330  *(data_146cc00 + 4) = 0x2000000",
+		"004c0832  data_114e160 = 0",
+	):
+		assert expected in host_hlil
+
+	cm_load_order = [
+		"004c0746  sub_4bf710(var_b4_8)",
+		"004c074f  sub_4bfad0(&var_78)",
+		"004c0758  sub_4bfcf0(&var_68)",
+		"004c0761  sub_4bfd60(&var_70)",
+		"004c076d  sub_4bfbd0(&var_88)",
+		"004c0776  sub_4bfdd0(&var_50)",
+		"004c077f  sub_4bf9c0(&var_58)",
+		"004c0788  sub_4bf7a0(&var_60)",
+		"004c0791  sub_4bf910(&var_80)",
+		"004c07c7  sub_4bfe80(&var_18)",
+		"004c07d4  sub_4bff10(&var_30, &var_48)",
+	]
+	call_offsets = [host_hlil.index(line) for line in cm_load_order]
+	assert call_offsets == sorted(call_offsets)
+
+	for expected in (
+		"void CMod_LoadShaders( lump_t *l ) {",
+		"void CMod_LoadSubmodels( lump_t *l ) {",
+		"void CMod_LoadNodes( lump_t *l ) {",
+		"void CMod_LoadBrushes( lump_t *l ) {",
+		"void CMod_LoadLeafs (lump_t *l)",
+		"void CMod_LoadPlanes (lump_t *l)",
+		"void CMod_LoadLeafBrushes (lump_t *l)",
+		"void CMod_LoadLeafSurfaces( lump_t *l )",
+		"void CMod_LoadBrushSides (lump_t *l)",
+		"void CMod_LoadVisibility( lump_t *l ) {",
+		"void CMod_LoadPatches( lump_t *surfs, lump_t *verts ) {",
+		"void CM_ClearMap( void ) {",
+		"CM_NumInlineModels( void )",
+		"CM_LeafCluster( int leafnum )",
+		"CM_LeafArea( int leafnum )",
+		"void CM_InitBoxHull (void)",
+	):
+		assert expected in cm_load
+
+	config_string_block = _extract_function_block(
+		cl_main, "static const char *CL_GetConfigStringValue( int index ) {"
+	)
+	set_cgame_time_block = _extract_function_block(cl_cgame, "void CL_SetCGameTime( void ) {")
+
+	assert "offset = cl.gameState.stringOffsets[index];" in config_string_block
+	assert "return cl.gameState.stringData + offset;" in config_string_block
+	assert "if ( sv_paused->integer && cl_paused->integer && com_sv_running->integer ) {" in set_cgame_time_block
+	assert "void CM_ClearLevelPatches( void ) {" in cm_patch
+	assert "debugPatchCollide = NULL;" in cm_patch
+	assert "debugFacet = NULL;" in cm_patch
+	assert "| `sub_4F20A0` (`0x004F20A0`) | `AdvertisementBridge_SetVisibilityTraceCallback` |" in bridge_round
+
+	for expected in (
+		"# Quake Live Steam Host Mapping Round 283",
+		"| `sub_4BF710` | `CMod_LoadShaders` |",
+		"| `sub_4BF9C0` | `CMod_LoadBrushes` |",
+		"| `sub_4BFE80` | `CMod_LoadVisibility` |",
+		"| `sub_4C02E0` | `CM_InitBoxHull` |",
+		"`CMod_LoadEntityString` is not a separate retail function",
+	):
+		assert expected in mapping_round
+
+
+def test_client_cinematic_and_browser_mapping_round_285_promotes_hlil_backed_symbols() -> None:
+	aliases = json.loads(
+		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")
+	)["quakelive_steam"]
+	host_hlil = (
+		REPO_ROOT
+		/ "references"
+		/ "hlil"
+		/ "quakelive"
+		/ "quakelive_steam.exe"
+		/ "quakelive_steam.exe_hlil.txt"
+	).read_text(encoding="utf-8")
+	ghidra_functions = (
+		REPO_ROOT / "references/reverse-engineering/ghidra/quakelive_steam/functions.csv"
+	).read_text(encoding="utf-8")
+	cl_cin = (REPO_ROOT / "src/code/client/cl_cin.c").read_text(encoding="utf-8")
+	cl_cgame = (REPO_ROOT / "src/code/client/cl_cgame.c").read_text(encoding="utf-8")
+	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+	browser_note = (
+		REPO_ROOT
+		/ "docs/reverse-engineering/awesomium-browser-host-parity-audit-and-implementation-plan-2026-04-16.md"
+	).read_text(encoding="utf-8")
+	mapping_round = (
+		REPO_ROOT / "docs/reverse-engineering/quakelive_steam_mapping_round_285.md"
+	).read_text(encoding="utf-8")
+
+	expected_aliases = {
+		"sub_4B0A70": "RllDecodeStereoToStereo",
+		"sub_4B0AF0": "move8_32",
+		"sub_4B0BD0": "blit8_32",
+		"sub_4B0F60": "ROQ_GenYUVTables",
+		"sub_4B1010": "yuv_to_rgb",
+		"sub_4B1080": "yuv_to_rgb24",
+		"sub_4B1DA0": "recurseQuad",
+		"sub_4B1EB0": "setupQuad",
+		"sub_4B1FC0": "readQuadInfo",
+		"sub_4B2110": "RoQPrepMcomp",
+		"sub_4B21C0": "initRoQ",
+		"sub_4B2220": "RoQ_init",
+		"sub_4B2300": "RoQShutdown",
+		"sub_4B2790": "SCR_DrawCinematic",
+		"sub_4B27B0": "SCR_StopCinematic",
+		"sub_4B27E0": "CIN_UploadCinematic",
+		"sub_4B2890": "CIN_CloseAllVideos",
+		"sub_4B2910": "RoQReset",
+		"sub_4B3510": "SCR_RunCinematic",
+		"sub_4F2900": "QLWebView_InjectActivationKeyboardEvent",
+	}
+
+	for address, normalized_name in expected_aliases.items():
+		assert aliases[address] == normalized_name
+
+	for expected_row in (
+		"FUN_004b1fc0,004b1fc0,322,0,unknown",
+		"FUN_004b1eb0,004b1eb0,260,0,unknown",
+		"FUN_004b1da0,004b1da0,259,0,unknown",
+		"FUN_004b0bd0,004b0bd0,255,0,unknown",
+		"FUN_004b2300,004b2300,254,0,unknown",
+		"FUN_004b2220,004b2220,223,0,unknown",
+		"FUN_004b0af0,004b0af0,214,0,unknown",
+		"FUN_004b2910,004b2910,179,0,unknown",
+		"FUN_004b0f60,004b0f60,173,0,unknown",
+		"FUN_004b27e0,004b27e0,172,0,unknown",
+		"FUN_004b2110,004b2110,161,0,unknown",
+		"FUN_004b0a70,004b0a70,128,0,unknown",
+		"FUN_004b1080,004b1080,124,0,unknown",
+		"FUN_004b2890,004b2890,122,0,unknown",
+		"FUN_004b1010,004b1010,111,0,unknown",
+		"FUN_004b21c0,004b21c0,83,0,unknown",
+		"FUN_004f2900,004f2900,77,0,unknown",
+		"FUN_004b27b0,004b27b0,35,0,unknown",
+		"FUN_004b2790,004b2790,18,0,unknown",
+		"FUN_004b3510,004b3510,18,0,unknown",
+	):
+		assert expected_row in ghidra_functions
+
+	for expected in (
+		"004b0a8e  if (arg4 != 0)",
+		"004b0aef  return eax u>> 1",
+		"004b0af5  *arg3 = fconvert.d(fconvert.t(*arg1))",
+		"004b0bd5  *arg3 = fconvert.d(fconvert.t(*arg1))",
+		"004b0f94      long double x87_r2_2 = fconvert.t(fconvert.s(float.t(i_1)))",
+		"004b101f  int32_t esi = *((arg1 << 2) + &data_114b930)",
+		"004b1088  int32_t esi = *((arg3 << 2) + &data_114b930)",
+		"004b1e61      sub_4b1da0(ebx, edi, esi, arg4, arg5)",
+		"004b1f6c                      sub_4b1da0(edi_1, i, 0x10, arg1, arg2)",
+		"004b1fe0      *(result + 0x1149a6c) = (zx.d(arg1[1]) << 8) + zx.d(*arg1)",
+		"004b211b  void* eax_1 = data_565b5c * 0x1c4",
+		"004b21d4      *(eax + 0x1149a5c) = sub_4b0cd0",
+		"004b21ea      sub_4b0f60()",
+		"004b222e  long double x87_r7 = float.t(sub_4b9bd0())",
+		"004b232a      sub_4c9ab0(\"finished cinematic\\n\")",
+		"004b27bb      sub_4b2400(result)",
+		"004b2861          data_146ccb0(0x100, 0x100, 0x100, 0x100, ecx_1, arg1, *(esi_2 + 0x1149a10))",
+		"004b28be          sub_4c9ab0(\"trFMV::stop(), closing %s\\n\")",
+		"004b299f      sub_4ed020(&data_1050ad8, 0x10, 1, *(data_565b5c * 0x1c4 + 0x1149a20))",
+		"004b351b      result = sub_4b2f40(result)",
+		"004f2925      Awesomium::WebKeyboardEvent::WebKeyboardEvent(this: ecx, 0, 0x11, 0x1d0001)",
+		"004f293d      result = (*(*data_12d3050 + 0xe0))(&var_40)",
+	):
+		assert expected in host_hlil
+
+	for expected in (
+		"long RllDecodeStereoToStereo(unsigned char *from,short *to,unsigned int size,char signedOutput, unsigned short flag)",
+		"static void move8_32( byte *src, byte *dst, int spl )",
+		"static void blit8_32( byte *src, byte *dst, int spl  )",
+		"static void ROQ_GenYUVTables( void )",
+		"static unsigned short yuv_to_rgb( long y, long u, long v )",
+		"static unsigned int yuv_to_rgb24( long y, long u, long v )",
+		"static void recurseQuad( long startX, long startY, long quadSize, long xOff, long yOff )",
+		"static void setupQuad( long xOff, long yOff )",
+		"static void readQuadInfo( byte *qData )",
+		"static void RoQPrepMcomp( long xoff, long yoff )",
+		"static void initRoQ()",
+		"static void RoQReset() {",
+		"static void RoQShutdown( void ) {",
+		"void CIN_CloseAllVideos(void) {",
+		"void SCR_DrawCinematic (void) {",
+		"void SCR_RunCinematic (void)",
+		"void SCR_StopCinematic(void) {",
+		"void CIN_UploadCinematic(int handle) {",
+	):
+		assert expected in cl_cin
+
+	init_ref_block = _extract_function_block(cl_main, "void CL_InitRef( void ) {")
+	activation_block = _extract_function_block(
+		cl_cgame, "static void QLWebView_InjectActivationKeyboardEvent( void ) {"
+	)
+	notify_activation_block = _extract_function_block(
+		cl_cgame, "void CL_WebHost_NotifyAppActivation( qboolean active ) {"
+	)
+
+	assert "ri.CIN_UploadCinematic = CIN_UploadCinematic;" in init_ref_block
+	assert "ri.CIN_PlayCinematic = CIN_PlayCinematic;" in init_ref_block
+	assert "ri.CIN_RunCinematic = CIN_RunCinematic;" in init_ref_block
+	assert "QLWebView_InjectKeyboardEvent( 0x11, qtrue );" in activation_block
+	assert "QLWebView_InjectActivationKeyboardEvent();" in notify_activation_block
+	assert "Added retained `QLWebView_InjectActivationKeyboardEvent()`" in browser_note
+
+	for expected in (
+		"# Quake Live Steam Host Mapping Round 285",
+		"| `sub_4B0A70` | `RllDecodeStereoToStereo` |",
+		"| `sub_4B1FC0` | `readQuadInfo` |",
+		"| `sub_4B27E0` | `CIN_UploadCinematic` |",
+		"| `sub_4F2900` | `QLWebView_InjectActivationKeyboardEvent` |",
+		"`0x004F2320`, `0x004F2330`, `0x004F2380`, and",
+		"Client cinematic helper symbol coverage: before 58%, after 96%.",
+	):
+		assert expected in mapping_round

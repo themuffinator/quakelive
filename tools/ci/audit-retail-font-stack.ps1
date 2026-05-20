@@ -103,6 +103,10 @@ Assert-FileContains -RelativePath 'src/ui/hud.menu' -Pattern 'smallFont\s+"fonts
 Assert-FileContains -RelativePath 'src/ui/hud.menu' -Pattern 'bigFont\s+"fonts/bigfont"\s+48' -Description 'HUD big-font size'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_init.c' -Pattern 'R_InitFontStash\(\)' -Description 'renderer startup fontstash wiring'
 Assert-FileContains -RelativePath 'src/code/renderer/tr_init.c' -Pattern 'R_DoneFontStash\(\)' -Description 'renderer shutdown fontstash wiring'
+Assert-FileContains -RelativePath 'src/code/renderer/tr_public.h' -Pattern '#define\s+REF_API_VERSION\s+9' -Description 'retail renderer API version'
+Assert-FileContains -RelativePath 'src/code/renderer/tr_init.c' -Pattern 're\.RegisterFont = R_NoopRegisterFont;' -Description 'retail no-op legacy refexport font slot'
+Assert-FileContains -RelativePath 'src/code/renderer/tr_init.c' -Pattern 're\.PostProcessRestart = R_PostProcessRestart;' -Description 'retail private postprocess_restart refexport slot'
+Assert-FileContains -RelativePath 'src/code/renderer/tr_init.c' -Pattern 're\.TransformClipToWindow = R_TransformClipToWindowExport;' -Description 'retail private clip-to-window refexport wrapper'
 Assert-FileContains -RelativePath 'docs/reverse-engineering/renderer-host-text-core-ownership-2026-04-10.md' -Pattern 'RG-P8 is now considered complete' -Description 'RG-P8 ownership closure note'
 Assert-FileContains -RelativePath 'src/code/client/cl_ui.c' -Pattern 'RE_DrawScaledText\( x, y, text, fontHandle, scale, maxX, outMaxX' -Description 'UI native host text draw switchover'
 Assert-FileContains -RelativePath 'src/code/client/cl_ui.c' -Pattern 'RE_MeasureScaledText\( text, end, fontHandle, scale, maxX, &width, &height, outLeft \)' -Description 'UI native host text measure switchover'
@@ -150,6 +154,8 @@ $cgameCompatShimPresent = Select-String -Path (Join-Path $RepoRoot 'src/code/cli
 $trFontSource = Get-Content -Path (Join-Path $RepoRoot 'src/code/renderer/tr_font.c') -Raw
 $uiMainSource = Get-Content -Path (Join-Path $RepoRoot 'src/code/ui/ui_main.c') -Raw
 $cgMainSource = Get-Content -Path (Join-Path $RepoRoot 'src/code/cgame/cg_main.c') -Raw
+$trPublicSource = Get-Content -Path (Join-Path $RepoRoot 'src/code/renderer/tr_public.h') -Raw
+$trInitSource = Get-Content -Path (Join-Path $RepoRoot 'src/code/renderer/tr_init.c') -Raw
 $retainedAtlasPriority = $trFontSource.IndexOf('if ( r_fontStash.shader ) {')
 $compatFontPriority = $trFontSource.IndexOf('codepoint <= GLYPH_END && R_EnsureFontStashCompatibilityFont( face )')
 $uiAssetCacheStart = $uiMainSource.IndexOf('void AssetCache() {')
@@ -216,6 +222,18 @@ else {
 	Write-Host 'Verified renderer host text glyph selection prefers the retained *fontstash atlas.'
 }
 
+if ( $trPublicSource.IndexOf('(*AdvertisementBridge_UpdateLoadingViewParameters)') -lt $trPublicSource.IndexOf('(*SetColor)') -and
+	$trPublicSource.IndexOf('(*ModelBounds)') -lt $trPublicSource.IndexOf('(*RegisterFont)') -and
+	$trPublicSource.IndexOf('(*RegisterFont)') -lt $trPublicSource.IndexOf('(*RemapShader)') -and
+	$trPublicSource.IndexOf('(*inPVS)') -lt $trPublicSource.IndexOf('(*PostProcessRestart)') -and
+	$trPublicSource.IndexOf('(*PostProcessRestart)') -lt $trPublicSource.IndexOf('(*DrawScaledText)') -and
+	$trInitSource.IndexOf('re.SetColor = RE_SetColor;') -lt $trInitSource.IndexOf('re.PostProcessRestart = R_PostProcessRestart;') ) {
+	Write-Host 'Verified renderer refexport ABI tail keeps the retail loading bridge, no-op font slot, and postprocess_restart order.'
+}
+else {
+	Report-UnresolvedGap -Message 'Renderer refexport ABI tail no longer matches the retail loading bridge, no-op font slot, or postprocess_restart order.'
+}
+
 if ( $trFontSource -match 'for \( s = text; \*s; s\+\+ \)' -or $trFontSource -match 'for \( s = text; \*s && \( !end \|\| s < end \); s\+\+ \)' ) {
 	Report-UnresolvedGap -Message 'Renderer host text draw/measure still iterate raw bytes instead of decoding UTF-8 codepoints first.'
 }
@@ -242,6 +260,25 @@ if ( $trFontSource -match 'R_BuildFontStashFaceChain\( face, faceChain, ARRAY_LE
 }
 else {
 	Report-UnresolvedGap -Message 'Renderer host text glyph lookup still lacks retail fallback-face probing or codepoint-plus-size glyph cache selection.'
+}
+
+if ( $trFontSource -match 'R_PrebuildFontStashAtlas' -or $trFontSource -match 'R_FONTSTASH_PREBUILD_ATTEMPTS' ) {
+	Report-UnresolvedGap -Message 'Renderer host text still eagerly prebuilds the retained FontStash atlas during startup instead of populating it lazily.'
+}
+elseif ( $trFontSource -match 'R_RescaleFontStashGlyphUVs\( oldWidth, oldHeight, width, height \)' -and
+	$trFontSource -match 'Com_Memcpy\( newBuffer \+ row \* width, oldBuffer \+ row \* oldWidth, copyWidth \);' ) {
+	Write-Host 'Verified retained FontStash atlas growth preserves cached glyph pixels and UVs.'
+}
+else {
+	Report-UnresolvedGap -Message 'Renderer host text atlas expansion does not preserve cached glyph pixels and UVs.'
+}
+
+if ( $trFontSource -match 'r_fontStash\.image->internalFormat = GL_ALPHA;' -and
+	$trFontSource -match 'qglTexImage2D\( GL_TEXTURE_2D, 0, GL_ALPHA, r_fontStash\.width, r_fontStash\.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, r_fontStash\.buffer \);' ) {
+	Write-Host 'Verified retained FontStash atlas uploads use the retail GL_ALPHA texture storage path.'
+}
+else {
+	Report-UnresolvedGap -Message 'Renderer host text atlas uploads still do not mirror the retail GL_ALPHA texture storage path.'
 }
 
 if ($unexpectedDebugAtlasPaths.Count -gt 0) {

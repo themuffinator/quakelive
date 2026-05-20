@@ -540,6 +540,17 @@ static void UI_SetBrowserActive(qboolean active) {
 
 /*
 =============
+UI_MenuFlowUsesBrowserOverlay
+
+Returns whether the selected menu flow has a real browser overlay behind it.
+=============
+*/
+static qboolean UI_MenuFlowUsesBrowserOverlay(uiMenuFlow_t flow) {
+	return (flow == UI_MENU_FLOW_QUAKELIVE && UI_BrowserOverlayAvailable()) ? qtrue : qfalse;
+}
+
+/*
+=============
 UI_SetActiveMenuFlow
 
 Apply the resolved menu flow selection to runtime state.
@@ -548,7 +559,7 @@ Apply the resolved menu flow selection to runtime state.
 static void UI_SetActiveMenuFlow(uiMenuFlow_t flow) {
 	ui_activeMenuFlow = flow;
 	ui_new.integer = (flow != UI_MENU_FLOW_LEGACY);
-	UI_SetBrowserActive(flow == UI_MENU_FLOW_QUAKELIVE);
+	UI_SetBrowserActive(UI_MenuFlowUsesBrowserOverlay(flow));
 	UI_BrowserBridge_SetActive(flow == UI_MENU_FLOW_BRIDGED);
 }
 
@@ -2259,7 +2270,7 @@ int start;
 
 
 	UI_UpdateActiveMenuFlowForFile(menuFile);
-	UI_SetBrowserActive(ui_activeMenuFlow == UI_MENU_FLOW_QUAKELIVE);
+	UI_SetBrowserActive(UI_MenuFlowUsesBrowserOverlay(ui_activeMenuFlow));
 	UI_BrowserBridge_SetActive(ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED);
 
 	if (reset) {
@@ -3449,7 +3460,7 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 			break;
 		case UI_KEYBINDSTATUS:
 			if (Display_KeyBindPending()) {
-				s = "Waiting for new key... Press ESC...";
+				s = "Waiting for new key... Press ESCAPE to cancel";
 			} else {
 				s = "Press ENTER or CLICK to change, Press BACKSPACE to clear";
 			}
@@ -3469,19 +3480,12 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 
 static void UI_DrawBotName(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	int value = uiInfo.botIndex;
-	int game = trap_Cvar_VariableValue("g_gametype");
 	const char *text = "";
-	if (game >= GT_TEAM) {
-		if (value >= uiInfo.characterCount) {
-			value = 0;
-		}
-		text = uiInfo.characterList[value].name;
-	} else {
-		if (value >= UI_GetNumBots()) {
-			value = 0;
-		}
-		text = UI_GetBotNameByNumber(value);
+
+	if (value >= UI_GetNumBots()) {
+		value = 0;
 	}
+	text = UI_GetBotNameByNumber(value);
   Text_Paint(rect->x, rect->y, scale, color, text, 0, 0, textStyle);
 		}
 
@@ -4316,6 +4320,7 @@ static void UI_BuildPlayerList() {
 		if (info[0]) {
 			Q_strncpyz( uiInfo.playerNames[uiInfo.playerCount], Info_ValueForKey( info, "n" ), MAX_NAME_LENGTH );
 			Q_CleanStr( uiInfo.playerNames[uiInfo.playerCount] );
+			uiInfo.playerClientNums[uiInfo.playerCount] = n;
 			uiInfo.playerCount++;
 			team2 = atoi(Info_ValueForKey(info, "t"));
 			if (team2 == team) {
@@ -4430,7 +4435,7 @@ static void UI_DrawServerMOTD(rectDef_t *rect, float scale, vec4_t color) {
 static void UI_DrawKeyBindStatus(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 //	int ofs = 0; TTimo: unused
 	if (Display_KeyBindPending()) {
-		Text_Paint(rect->x, rect->y, scale, color, "Waiting for new key... Press ESC...", 0, 0, textStyle);
+		Text_Paint(rect->x, rect->y, scale, color, "Waiting for new key... Press ESCAPE to cancel", 0, 0, textStyle);
 	} else {
 		Text_Paint(rect->x, rect->y, scale, color, "Press ENTER or CLICK to change, Press BACKSPACE to clear", 0, 0, textStyle);
 	}
@@ -4682,6 +4687,13 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 
 		}
 
+/*
+=============
+UI_OwnerDrawVisibleFlags
+
+Evaluates one UI ownerdraw visibility flag word.
+=============
+*/
 static qboolean UI_OwnerDrawVisibleFlags( int flags ) {
 	qboolean vis = qtrue;
 
@@ -5112,7 +5124,6 @@ static qboolean UI_OpponentName_HandleKey(int flags, float *special, int key) {
 
 static qboolean UI_BotName_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
-		int game = trap_Cvar_VariableValue("g_gametype");
 		int value = uiInfo.botIndex;
 
 		if (key == K_MOUSE2) {
@@ -5121,18 +5132,10 @@ static qboolean UI_BotName_HandleKey(int flags, float *special, int key) {
 			value++;
 		}
 
-		if (game >= GT_TEAM) {
-			if (value >= uiInfo.characterCount + 2) {
-				value = 0;
-			} else if (value < 0) {
-				value = uiInfo.characterCount + 2 - 1;
-			}
-		} else {
-			if (value >= UI_GetNumBots() + 2) {
-				value = 0;
-			} else if (value < 0) {
-				value = UI_GetNumBots() + 2 - 1;
-			}
+		if (value >= UI_GetNumBots() + 2) {
+			value = 0;
+		} else if (value < 0) {
+			value = UI_GetNumBots() + 2 - 1;
 		}
 		uiInfo.botIndex = value;
     return qtrue;
@@ -5315,7 +5318,9 @@ static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, 
 			UI_Crosshair_HandleKey(flags, special, key);
 			break;
 		case UI_CROSSHAIR_COLOR:
-			return UI_CrosshairColor_HandleKey(flags, special, key);
+			if (trap_Cvar_VariableValue("cg_crosshairHealth") == 0) {
+				return UI_CrosshairColor_HandleKey(flags, special, key);
+			}
 			break;
 		case UI_SELECTEDPLAYER:
 			UI_SelectedPlayer_HandleKey(flags, special, key);
@@ -5771,17 +5776,81 @@ static qboolean UI_GetSelectedAdminClientNum(const char *scriptName, int *client
 		return qfalse;
 	}
 
-	UI_BuildPlayerList();
-	selected = trap_Cvar_VariableValue("cg_selectedPlayer");
+	selected = uiInfo.playerIndex;
 
-	if (selected < 0 || selected >= uiInfo.myTeamCount) {
-		Com_Printf("UI: %s requires a valid selected player (cg_selectedPlayer=%d, teamCount=%d).\n",
-			scriptName ? scriptName : "admin command", selected, uiInfo.myTeamCount);
+	if (selected < 0 || selected >= uiInfo.playerCount) {
+		Com_Printf("UI: %s requires a valid selected player (playerIndex=%d, playerCount=%d).\n",
+			scriptName ? scriptName : "admin command", selected, uiInfo.playerCount);
 		return qfalse;
 	}
 
-	*clientNum = uiInfo.teamClientNums[selected];
+	*clientNum = uiInfo.playerClientNums[selected];
 	return qtrue;
+}
+
+/*
+=============
+UI_RunOrdersScript
+
+Executes the retail team-order script command for the selected teammate or group.
+=============
+*/
+static void UI_RunOrdersScript(const char *command) {
+	int selected;
+	int i;
+
+	selected = trap_Cvar_VariableValue("cg_selectedPlayer");
+	if (selected >= 0 && selected < uiInfo.myTeamCount) {
+		trap_Cmd_ExecuteText(EXEC_APPEND, va(command, uiInfo.teamClientNums[selected]));
+		trap_Cmd_ExecuteText(EXEC_APPEND, "\n");
+	} else if (uiInfo.myTeamCount > 0) {
+		for (i = 0; i < uiInfo.myTeamCount; i++) {
+			if (Q_stricmp(uiInfo.teamNames[i], UI_Cvar_VariableString("name"))) {
+				trap_Cmd_ExecuteText(EXEC_APPEND, va(command, uiInfo.teamNames[i]));
+				trap_Cmd_ExecuteText(EXEC_APPEND, "\n");
+			}
+		}
+	}
+
+	UI_CloseInGameMenu();
+}
+
+/*
+=============
+UI_RunVoiceOrdersTeamScript
+
+Executes the retail all-team voice order when the Everyone row is selected.
+=============
+*/
+static void UI_RunVoiceOrdersTeamScript(const char *command) {
+	int selected;
+
+	selected = trap_Cvar_VariableValue("cg_selectedPlayer");
+	if (selected == uiInfo.myTeamCount) {
+		trap_Cmd_ExecuteText(EXEC_APPEND, command);
+		trap_Cmd_ExecuteText(EXEC_APPEND, "\n");
+	}
+
+	UI_CloseInGameMenu();
+}
+
+/*
+=============
+UI_RunVoiceOrdersScript
+
+Executes the retail per-player voice order for the selected teammate.
+=============
+*/
+static void UI_RunVoiceOrdersScript(const char *command) {
+	int selected;
+
+	selected = trap_Cvar_VariableValue("cg_selectedPlayer");
+	if (selected >= 0 && selected < uiInfo.myTeamCount) {
+		trap_Cmd_ExecuteText(EXEC_APPEND, va(command, uiInfo.teamClientNums[selected]));
+		trap_Cmd_ExecuteText(EXEC_APPEND, "\n");
+	}
+
+	UI_CloseInGameMenu();
 }
 
 static void UI_RunMenuScript(char **args) {
@@ -6022,7 +6091,7 @@ static void UI_RunMenuScript(char **args) {
 			Menus_ActivateByName("setup_menu2");
 		} else if (Q_stricmp(name, "Leave") == 0) {
 			UI_LeaveGame();
-		} else if (Q_stricmp(name, "teamModelChanged") == 0) {
+		} else if (Q_stricmp(name, "teamModelChanged") == 0 || Q_stricmp(name, "openWebGameSettings") == 0) {
 			UI_UpdateForceModelSettings(qtrue);
 		} else if (Q_stricmp(name, "teamColorDefaults") == 0) {
 			trap_Cvar_Set("ui_teamHeadColor", "96");
@@ -6034,11 +6103,13 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_Set("ui_enemyHeadColor", "27");
 			trap_Cvar_Set("ui_enemyUpperColor", "27");
 			trap_Cvar_Set("ui_enemyLowerColor", "27");
-                } else if (Q_stricmp(name, "ServerSort") == 0) {
-                        int sortColumn;
-                        if (Int_Parse(args, &sortColumn)) {
-                                // if same column we're already sorting on then flip the direction
-                                if (sortColumn == uiInfo.serverStatus.sortKey) {
+		} else if (Q_stricmp(name, "playerModelChanged") == 0) {
+			updateModel = qtrue;
+		} else if (Q_stricmp(name, "ServerSort") == 0) {
+			int sortColumn;
+			if (Int_Parse(args, &sortColumn)) {
+				// if same column we're already sorting on then flip the direction
+				if (sortColumn == uiInfo.serverStatus.sortKey) {
 					uiInfo.serverStatus.sortDir = !uiInfo.serverStatus.sortDir;
 				}
 				// make sure we sort again
@@ -6050,6 +6121,18 @@ static void UI_RunMenuScript(char **args) {
 			UI_StartSkirmish(qfalse);
 		} else if (Q_stricmp(name, "closeingame") == 0) {
 			UI_CloseInGameMenu();
+		} else if (Q_stricmp(name, "setFullScreen") == 0) {
+			trap_Cvar_Set( "r_fullScreen", "1" );
+			trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart fast\n" );
+		} else if (Q_stricmp(name, "setWindowed") == 0) {
+			trap_Cvar_Set( "r_fullScreen", "0" );
+			trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart fast\n" );
+		} else if (Q_stricmp(name, "toggleFullscreen") == 0) {
+			qboolean fullscreen;
+
+			fullscreen = ( trap_Cvar_VariableValue( "r_fullScreen" ) != 0.0f ) ? qtrue : qfalse;
+			trap_Cvar_Set( "r_fullScreen", fullscreen ? "0" : "1" );
+			trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart fast\n" );
 		} else if (Q_stricmp(name, "clientviewProfile") == 0) {
 			int clientNum;
 
@@ -6163,7 +6246,14 @@ static void UI_RunMenuScript(char **args) {
 			UI_FeederSelection(FEEDER_CVMAPS, ui_mapIndex.integer);
 		} else if (Q_stricmp(name, "voteKick") == 0) {
 			if (uiInfo.playerIndex >= 0 && uiInfo.playerIndex < uiInfo.playerCount) {
-				trap_Cmd_ExecuteText( EXEC_APPEND, va("callvote kick %s\n",uiInfo.playerNames[uiInfo.playerIndex]) );
+				const char *kickName;
+
+				kickName = strstr(uiInfo.playerNames[uiInfo.playerIndex], " ");
+				if (!kickName) {
+					kickName = uiInfo.playerNames[uiInfo.playerIndex];
+				}
+
+				trap_Cmd_ExecuteText( EXEC_APPEND, va("callvote kick %s\n", kickName) );
 			}
 		} else if (Q_stricmp(name, "voteGame") == 0) {
 			if (ui_netGameType.integer >= 0 && ui_netGameType.integer < uiInfo.numGameTypes) {
@@ -6174,11 +6264,7 @@ static void UI_RunMenuScript(char **args) {
 				trap_Cmd_ExecuteText( EXEC_APPEND, va("callteamvote leader %s\n",uiInfo.teamNames[uiInfo.teamIndex]) );
 			}
 		} else if (Q_stricmp(name, "addBot") == 0) {
-			if (trap_Cvar_VariableValue("g_gametype") >= GT_TEAM) {
-				trap_Cmd_ExecuteText( EXEC_APPEND, va("addbot %s %i %s\n", uiInfo.characterList[uiInfo.botIndex].name, uiInfo.skillIndex+1, (uiInfo.redBlue == 0) ? "Red" : "Blue") );
-			} else {
-				trap_Cmd_ExecuteText( EXEC_APPEND, va("addbot %s %i %s\n", UI_GetBotNameByNumber(uiInfo.botIndex), uiInfo.skillIndex+1, (uiInfo.redBlue == 0) ? "Red" : "Blue") );
-			}
+			trap_Cmd_ExecuteText( EXEC_APPEND, va("addbot %s %i %s\n", UI_GetBotNameByNumber(uiInfo.botIndex), uiInfo.skillIndex+1, (uiInfo.redBlue == 0) ? "Red" : "Blue") );
 		} else if (Q_stricmp(name, "addFavorite") == 0) {
 			if (ui_netSource.integer != AS_FAVORITES) {
 				char name[MAX_NAME_LENGTH];
@@ -6239,6 +6325,18 @@ static void UI_RunMenuScript(char **args) {
 						Com_Printf("Added favorite server %s\n", addr);
 					}
 				}
+			}
+		} else if (Q_stricmp(name, "orders") == 0) {
+			if (String_Parse(args, &name2)) {
+				UI_RunOrdersScript(name2);
+			}
+		} else if (Q_stricmp(name, "voiceOrdersTeam") == 0) {
+			if (String_Parse(args, &name2)) {
+				UI_RunVoiceOrdersTeamScript(name2);
+			}
+		} else if (Q_stricmp(name, "voiceOrders") == 0) {
+			if (String_Parse(args, &name2)) {
+				UI_RunVoiceOrdersScript(name2);
 			}
 		} else if (Q_stricmp(name, "glCustom") == 0) {
 			trap_Cvar_Set("ui_glCustom", "4");
@@ -8661,7 +8759,7 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 
 		  return;
 	  case UIMENU_MAIN:
-			UI_SetBrowserActive( ui_activeMenuFlow == UI_MENU_FLOW_QUAKELIVE );
+			UI_SetBrowserActive( UI_MenuFlowUsesBrowserOverlay( ui_activeMenuFlow ) );
 			UI_BrowserBridge_SetActive( ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED );
 			//trap_Cvar_Set( "sv_killserver", "1" );
 			trap_Key_SetCatcher( KEYCATCH_UI );
@@ -8760,9 +8858,18 @@ static void UI_PrintTime ( char *buf, int bufsize, int time ) {
 	}
 		}
 
+/*
+=================
+Text_PaintCenter
+=================
+*/
 void Text_PaintCenter(float x, float y, float scale, vec4_t color, const char *text, float adjust) {
-	int len = Text_Width(text, scale, 0);
-	Text_Paint(x - len / 2, y, scale, color, text, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE);
+	int len;
+
+	(void)adjust;
+
+	len = Text_Width(text, scale, 0);
+	Text_Paint(x - len / 2, y, scale, color, text, 0, 0, 0);
 		}
 
 void Text_PaintCenter_AutoWrapped(float x, float y, float xmax, float ystep, float scale, vec4_t color, const char *str, float adjust) {
@@ -8821,19 +8928,39 @@ void Text_PaintCenter_AutoWrapped(float x, float y, float xmax, float ystep, flo
 	}
 		}
 
+/*
+=================
+UI_DisplayDownloadInfo
+=================
+*/
 static void UI_DisplayDownloadInfo( const char *downloadName, float centerPoint, float yStart, float scale ) {
 	static char dlText[]	= "Downloading:";
 	static char etaText[]	= "Estimated time left:";
 	static char xferText[]	= "Transfer rate:";
 
-	int downloadSize, downloadCount, downloadTime;
+	unsigned long long downloadSize, downloadCount;
+	int downloadTime;
 	char dlSizeBuf[64], totalSizeBuf[64], xferRateBuf[64], dlTimeBuf[64];
-	int xferRate;
+	unsigned long long xferRate;
 	int leftWidth;
 	const char *s;
 
-	downloadSize = trap_Cvar_VariableValue( "cl_downloadSize" );
-	downloadCount = trap_Cvar_VariableValue( "cl_downloadCount" );
+#ifndef Q3_VM
+	{
+		char downloadItem[64];
+		unsigned long long downloadItemId;
+
+		downloadItemId = 0;
+		downloadCount = 0;
+		downloadSize = 0;
+		trap_Cvar_VariableStringBuffer( "cl_downloadItem", downloadItem, sizeof( downloadItem ) );
+		sscanf( downloadItem, "%llu", &downloadItemId );
+		trap_QL_GetItemDownloadInfo( (unsigned int)downloadItemId, (unsigned int)( downloadItemId >> 32 ), &downloadCount, &downloadSize );
+	}
+#else
+	downloadSize = (unsigned long long)(int)trap_Cvar_VariableValue( "cl_downloadSize" );
+	downloadCount = (unsigned long long)(int)trap_Cvar_VariableValue( "cl_downloadCount" );
+#endif
 	downloadTime = trap_Cvar_VariableValue( "cl_downloadTime" );
 
 	leftWidth = 320;
@@ -8844,15 +8971,15 @@ static void UI_DisplayDownloadInfo( const char *downloadName, float centerPoint,
 	Text_PaintCenter(centerPoint, yStart + 248, scale, colorWhite, xferText, 0);
 
 	if (downloadSize > 0) {
-		s = va( "%s (%d%%)", downloadName, downloadCount * 100 / downloadSize );
+		s = va( "%s (%d%%)", downloadName, (int)( downloadCount * 100 / downloadSize ) );
 	} else {
 		s = downloadName;
 	}
 
 	Text_PaintCenter(centerPoint, yStart+136, scale, colorWhite, s, 0);
 
-	UI_ReadableSize( dlSizeBuf,		sizeof dlSizeBuf,		downloadCount );
-	UI_ReadableSize( totalSizeBuf,	sizeof totalSizeBuf,	downloadSize );
+	UI_ReadableSize( dlSizeBuf,		sizeof dlSizeBuf,		(int)downloadCount );
+	UI_ReadableSize( totalSizeBuf,	sizeof totalSizeBuf,	(int)downloadSize );
 
 	if (downloadCount < 4096 || !downloadTime) {
 		Text_PaintCenter(leftWidth, yStart+216, scale, colorWhite, "estimating", 0);
@@ -8863,15 +8990,15 @@ static void UI_DisplayDownloadInfo( const char *downloadName, float centerPoint,
 		} else {
 			xferRate = 0;
 		}
-		UI_ReadableSize( xferRateBuf, sizeof xferRateBuf, xferRate );
+		UI_ReadableSize( xferRateBuf, sizeof xferRateBuf, (int)xferRate );
 
 		// Extrapolate estimated completion time
 		if (downloadSize && xferRate) {
-			int n = downloadSize / xferRate; // estimated time for entire d/l in secs
+			unsigned long long n = downloadSize / xferRate; // estimated time for entire d/l in secs
 
 			// We do it in K (/1024) because we'd overflow around 4MB
 			UI_PrintTime ( dlTimeBuf, sizeof dlTimeBuf, 
-				(n - (((downloadCount/1024) * n) / (downloadSize/1024))) * 1000);
+				(int)((n - (((downloadCount/1024) * n) / (downloadSize/1024))) * 1000));
 
 			Text_PaintCenter(leftWidth, yStart+216, scale, colorWhite, dlTimeBuf, 0);
 			Text_PaintCenter(leftWidth, yStart+160, scale, colorWhite, va("(%s of %s copied)", dlSizeBuf, totalSizeBuf), 0);
@@ -8932,10 +9059,10 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 	}
 
 	if (!Q_stricmp(cstate.servername,"localhost")) {
-		Text_PaintCenter(centerPoint, yStart + 48, scale, colorWhite, va("Starting up..."), ITEM_TEXTSTYLE_SHADOWEDMORE);
+		Text_PaintCenter(centerPoint, yStart + 48, scale, colorWhite, va("Starting up..."), 0);
 	} else {
 		strcpy(text, va("Connecting to %s", cstate.servername));
-		Text_PaintCenter(centerPoint, yStart + 48, scale, colorWhite,text , ITEM_TEXTSTYLE_SHADOWEDMORE);
+		Text_PaintCenter(centerPoint, yStart + 48, scale, colorWhite,text , 0);
 	}
 
 	// display global MOTD at bottom
@@ -8980,6 +9107,8 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 	if (Q_stricmp(cstate.servername,"localhost")) {
 		Text_PaintCenter(centerPoint, yStart + 80, scale, colorWhite, s, 0);
 	}
+
+	Text_PaintCenter(centerPoint, 440, scale, colorWhite, "Press ESC to cancel", 0);
 
 	// password required / connection rejected information goes here
 		}

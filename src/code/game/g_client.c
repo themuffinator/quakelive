@@ -1520,6 +1520,13 @@ void ClientUserinfoChanged( int clientNum ) {
 		client->ps.eFlags &= ~EF_AWARD_DENIED;
 	}
 
+	s = Info_ValueForKey( userinfo, "cg_autoHop" );
+	if ( !atoi( s ) ) {
+		client->ps.pm_flags |= PMF_REQUIRE_JUMP_RELEASE;
+	} else {
+		client->ps.pm_flags &= ~PMF_REQUIRE_JUMP_RELEASE;
+	}
+
 	client->pers.recordingPreferences = atoi( Info_ValueForKey( userinfo, "cg_autoAction" ) );
 
 	// set name
@@ -3408,6 +3415,7 @@ void G_RRHandleCompletedRound( void ) {
 	level.rrPendingMatchExit = G_RRShouldExitMatch();
 	level.roundPendingExit = level.rrPendingMatchExit;
 	level.roundState = ROUNDSTATE_COMPLETE;
+	G_SetAllActiveClientAttackLockout( qtrue );
 	level.rrRoundState = RR_ROUNDSTATE_COMPLETE;
 	level.rrPendingRoundState = level.rrPendingMatchExit ? RR_ROUNDSTATE_EXIT : nextState;
 	level.rrStateChangeTime = level.time;

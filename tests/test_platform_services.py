@@ -859,7 +859,9 @@ def test_awesomium_menu_flow_clears_browser_overlay_for_gameplay() -> None:
     assert none_case is not None
     assert ingame_case is not None
 
-    assert "UI_SetBrowserActive( ui_activeMenuFlow == UI_MENU_FLOW_QUAKELIVE );" in main_case.group(1)
+    assert "static qboolean UI_MenuFlowUsesBrowserOverlay(uiMenuFlow_t flow) {" in ui_main
+    assert "flow == UI_MENU_FLOW_QUAKELIVE && UI_BrowserOverlayAvailable()" in ui_main
+    assert "UI_SetBrowserActive( UI_MenuFlowUsesBrowserOverlay( ui_activeMenuFlow ) );" in main_case.group(1)
     assert "UI_BrowserBridge_SetActive( ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED );" in main_case.group(1)
     assert "UI_SetBrowserActive( qfalse );" in none_case.group(1)
     assert "UI_BrowserBridge_SetActive( qfalse );" in none_case.group(1)

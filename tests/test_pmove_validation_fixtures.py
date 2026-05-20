@@ -40,6 +40,16 @@ class DoubleJumpResult(ctypes.Structure):
 	]
 
 
+class CommandMirrorResult(ctypes.Structure):
+	_fields_ = [
+		("weaponPrimary", ctypes.c_int),
+		("fov", ctypes.c_int),
+		("forwardmove", ctypes.c_int),
+		("rightmove", ctypes.c_int),
+		("upmove", ctypes.c_int),
+	]
+
+
 def _find_c_compiler() -> str:
 	compiler = shutil.which("gcc") or shutil.which("clang") or shutil.which("cc")
 	if not compiler:
@@ -84,6 +94,8 @@ def pmove_validation_harness(tmp_path_factory: pytest.TempPathFactory) -> ctypes
 	library.QLR_RunAirStepScenario.restype = None
 	library.QLR_RunAirDoubleJumpSequence.argtypes = [ctypes.POINTER(DoubleJumpResult)]
 	library.QLR_RunAirDoubleJumpSequence.restype = None
+	library.QLR_RunCommandMirrorScenario.argtypes = [ctypes.POINTER(CommandMirrorResult)]
+	library.QLR_RunCommandMirrorScenario.restype = None
 	return library
 
 
@@ -122,3 +134,17 @@ def test_air_double_jump_fixture_blocks_reuse_until_ground_contact(
 	assert result.reuseJumpVelocity < result.firstJumpVelocity
 	assert result.doubleJumped == 1
 	assert result.eventSequence == 1
+
+
+def test_pmove_single_mirrors_signed_command_axes_for_retail_hud_state(
+	pmove_validation_harness: ctypes.CDLL,
+) -> None:
+	result = CommandMirrorResult()
+
+	pmove_validation_harness.QLR_RunCommandMirrorScenario(ctypes.byref(result))
+
+	assert result.weaponPrimary == 14
+	assert result.fov == 110
+	assert result.forwardmove == -127
+	assert result.rightmove == 64
+	assert result.upmove == -12

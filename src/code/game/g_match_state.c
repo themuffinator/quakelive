@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_match_config.h"
 #include "../game/match_state_keys.h"
 
-static int s_nextTeamCountConfigstringUpdateTime;
+static int s_lastTeamCountConfigstringUpdateTime;
 
 /*
 =============
@@ -160,18 +160,14 @@ Refreshes the auxiliary retail team-count configstrings on the observed 250 ms c
 void G_UpdateTeamCountConfigstrings( void ) {
 	int counts[TEAM_NUM_TEAMS];
 
-	if ( level.time < ( s_nextTeamCountConfigstringUpdateTime - 250 ) ) {
-		s_nextTeamCountConfigstringUpdateTime = 0;
-	}
-
-	if ( level.time < s_nextTeamCountConfigstringUpdateTime ) {
+	if ( level.time > s_lastTeamCountConfigstringUpdateTime && level.time - s_lastTeamCountConfigstringUpdateTime <= 250 ) {
 		return;
 	}
 
+	s_lastTeamCountConfigstringUpdateTime = level.time;
 	G_BuildPublishedTeamCounts( counts );
 	trap_SetConfigstring( CS_TEAM_COUNT_RED, va( "%i", counts[TEAM_RED] ) );
 	trap_SetConfigstring( CS_TEAM_COUNT_BLUE, va( "%i", counts[TEAM_BLUE] ) );
-	s_nextTeamCountConfigstringUpdateTime = level.time + 250;
 }
 
 /*

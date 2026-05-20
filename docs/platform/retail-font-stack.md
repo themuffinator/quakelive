@@ -29,6 +29,14 @@ Observed facts from the committed retail launcher HLIL:
   tenths-sized request and probes the requested face before the retained
   fallback-face slots. HLIL `0x00443720` shows the current face search, the
   three retained fallback slots, and the size-tenths key in the same helper.
+- Retail `R_InitFontStash` creates the retained `512 x 512` atlas, installs the
+  callback, loads the face table, and leaves glyph population lazy; no
+  initialization-time loop prebuilds every byte glyph for every face.
+- Retail atlas expansion preserves the existing alpha atlas contents while
+  growing the retained image, and it only clears cached glyph state on the
+  maximum-size flush path.
+- Retail `*fontstash` texture refreshes rebind the renderer image as
+  `GL_ALPHA` storage and upload the retained one-byte alpha buffer directly.
 - Retail host draw only treats `^0` through `^7` as color escapes. Other caret
   pairs stay visible in the glyph stream, while `forceColor` still consumes the
   recognized color escapes without recoloring.
@@ -54,10 +62,23 @@ Observed facts from the writable source tree:
   codepoints, caches retained glyphs by codepoint plus rounded size tenths, and
   probes the recovered retained fallback-face chain before dropping to the
   classic baked-font compatibility lane.
+- `src/code/renderer/tr_font.c` now leaves retained host glyphs lazy: glyphs
+  are cached lazily as text is measured or drawn, matching the retail
+  `R_InitFontStash` ownership path and avoiding startup atlas saturation.
+- `src/code/renderer/tr_font.c` now also preserves the previous atlas pixels
+  and cached glyph coordinates when `R_fonsErrorCallback` expands the retained
+  atlas, keeping cache invalidation reserved for the retail max-size flush.
+- `src/code/renderer/tr_font.c` now refreshes the retained `*fontstash`
+  texture as a `GL_ALPHA` atlas instead of expanding the alpha buffer into
+  RGBA on every upload.
 - native `DrawScaledText` / `MeasureText` now route through the shared
   renderer host-text helpers instead of through duplicated client-side glyph
   loops.
 - `r_debugFontAtlas` now has an in-source draw path in `tr_backend.c`.
+- The retail `GetRefAPI` table still carries a legacy font slot after
+  `ModelBounds`, but the current source keeps that slot as a no-op and routes
+  native UI/cgame font registration through the client compatibility wrappers
+  that call the classic `RE_RegisterFont` lane directly.
 
 ## Source alignment landed in this pass
 

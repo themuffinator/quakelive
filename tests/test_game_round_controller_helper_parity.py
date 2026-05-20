@@ -15,10 +15,17 @@ def test_clan_arena_round_controller_helpers_match_retail_mapping_surface() -> N
 
 	assert "int G_CAResolveRoundState( void ) {" in active_c
 	assert "static int CA_RoundStateTransition( qboolean announce ) {" in active_c
+	assert "void G_SetClientAttackLockout( gentity_t *ent, qboolean lockout ) {" in active_c
+	assert "void G_SetAllActiveClientAttackLockout( qboolean lockout ) {" in active_c
+	assert "G_SetClientAttackLockout( ent, lockout );" in active_c
 	assert "if ( g_gametype.integer == GT_CLAN_ARENA ) {" in active_c
 	assert "CA_RoundStateTransition( qtrue );" in active_c
 	assert "level.roundPendingExit = G_CAFZCheckExitRules( qfalse );" in active_c
+	assert "G_SetAllActiveClientAttackLockout( qtrue );" in active_c
+	assert "G_SetAllActiveClientAttackLockout( qfalse );" in active_c
 	assert "state = G_CAResolveRoundState();" in team_c
+	assert "G_SetClientAttackLockout( ent, qtrue );" in team_c
+	assert "G_SetClientAttackLockout( ent, qfalse );" in team_c
 	assert "caState = G_CAResolveRoundState();" in client_c
 
 
@@ -40,6 +47,8 @@ def test_freeze_round_controller_helpers_match_retail_mapping_surface() -> None:
 	assert active_c.index("if ( !G_FreezeShouldCompleteRound( level.freezeLivingCount ) ) {") < active_c.index("winner = G_FreezeEvaluateRoundWinner( level.freezeLivingCount, level.freezeLivingHealth );")
 	assert "if ( !G_FreezeShouldCompleteRound( level.freezeLivingCount ) ) {" in active_c
 	assert "winner = G_FreezeEvaluateRoundWinner( level.freezeLivingCount, level.freezeLivingHealth );" in active_c
+	assert "G_SetAllActiveClientAttackLockout( qtrue );" in active_c
+	assert "G_SetAllActiveClientAttackLockout( qfalse );" in active_c
 	assert "Freeze_RoundStateTransition( qtrue );" in active_c
 	assert "if ( G_FreezeResolveRoundState() != ROUNDSTATE_ACTIVE ) {" in freeze_c
 	assert "roundState = G_FreezeResolveRoundState();" in client_c
@@ -57,6 +66,8 @@ def test_red_rover_controller_readback_helpers_match_retail_mapping_surface() ->
 
 	assert "int G_RRResolveRoundState( void ) {" in active_c
 	assert "static int RR_RoundStateTransition( qboolean announce ) {" in active_c
+	assert "G_SetAllActiveClientAttackLockout( qtrue );" in active_c
+	assert "G_SetAllActiveClientAttackLockout( qfalse );" in active_c
 	assert "G_RRInitRoundController();" in active_c
 	assert "RR_RoundStateTransition( qtrue );" in active_c
 	assert "if ( level.warmupTime < 0 ) {" in active_c
@@ -71,6 +82,7 @@ def test_red_rover_controller_readback_helpers_match_retail_mapping_surface() ->
 	assert "if ( !Team_HasMinimumPlayersForWarmup() ) {" in client_c
 	assert "G_FreezeRunFrame();" in client_c
 	assert "level.rrRoundState = RR_ROUNDSTATE_COMPLETE;" in client_c
+	assert "G_SetAllActiveClientAttackLockout( qtrue );" in client_c
 	assert "level.rrPendingRoundState = level.rrPendingMatchExit ? RR_ROUNDSTATE_EXIT : nextState;" in client_c
 
 

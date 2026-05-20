@@ -901,8 +901,8 @@ qboolean	trap_GetUserCmd( int cmdNumber, usercmd_t *ucmd ) {
 	return syscall( CG_GETUSERCMD, cmdNumber, ucmd ) ? qtrue : qfalse;
 }
 
-void		trap_SetUserCmdValue( int stateValue, float sensitivityScale ) {
-	syscall( CG_SETUSERCMDVALUE, stateValue, PASSFLOAT(sensitivityScale) );
+void		trap_SetUserCmdValue( int stateValue, int primaryValue, float sensitivityScale, int fov ) {
+	syscall( CG_SETUSERCMDVALUE, stateValue, primaryValue, PASSFLOAT(sensitivityScale), fov );
 }
 
 void		testPrintInt( char *string, int i ) {

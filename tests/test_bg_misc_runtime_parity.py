@@ -36,6 +36,13 @@ C_SOURCE = r"""
 #define QLR_EXPORT
 #endif
 
+vmCvar_t g_armorTiered;
+
+typedef struct {
+	trajectory_t	tr;
+	float		acceleration;
+} qlrExtendedTrajectory_t;
+
 /*
 =============
 Com_Printf
@@ -195,6 +202,65 @@ QLR_EXPORT int QLR_CanGrabHealthCase( int itemIndex, int health, int maxHealth )
 
 	return BG_CanItemBeGrabbed( GT_FFA, 0, &ent, &ps ) ? 1 : 0;
 }
+
+/*
+=============
+QLR_CanGrabArmorCase
+
+Runs the shared armor pickup gate for the supplied item and player state.
+=============
+*/
+QLR_EXPORT int QLR_CanGrabArmorCase( int itemIndex, int armor, int armorTier, int maxHealth, int armorTiered, int scoutPowerup ) {
+	playerState_t	ps;
+	entityState_t	ent;
+	int		scoutIndex;
+
+	memset( &ps, 0, sizeof( ps ) );
+	memset( &ent, 0, sizeof( ent ) );
+
+	ps.stats[STAT_ARMOR] = armor;
+	ps.stats[STAT_MAX_HEALTH] = maxHealth;
+	ps.armorTier = armorTier;
+
+	if ( scoutPowerup ) {
+		scoutIndex = QLR_FindItemIndexByClassname( "item_scout" );
+		if ( scoutIndex < 0 ) {
+			return -1;
+		}
+		ps.stats[STAT_PERSISTANT_POWERUP] = scoutIndex;
+	}
+
+	g_armorTiered.integer = armorTiered;
+	ent.modelindex = itemIndex;
+
+	return BG_CanItemBeGrabbed( GT_FFA, 0, &ent, &ps ) ? 1 : 0;
+}
+
+/*
+=============
+QLR_EvaluateAcceleratedTrajectory
+
+Runs the retail type-6 trajectory path against an extended trajectory record.
+=============
+*/
+QLR_EXPORT void QLR_EvaluateAcceleratedTrajectory( float acceleration, int atTime, float *position, float *velocity ) {
+	qlrExtendedTrajectory_t	trajectory;
+
+	memset( &trajectory, 0, sizeof( trajectory ) );
+
+	trajectory.tr.trType = TR_QL_ACCEL;
+	trajectory.tr.trTime = 1000;
+	trajectory.tr.trBase[0] = 10.0f;
+	trajectory.tr.trBase[1] = 20.0f;
+	trajectory.tr.trBase[2] = 30.0f;
+	trajectory.tr.trDelta[0] = 3.0f;
+	trajectory.tr.trDelta[1] = 4.0f;
+	trajectory.tr.trDelta[2] = 100.0f;
+	trajectory.acceleration = acceleration;
+
+	BG_EvaluateTrajectory( &trajectory.tr, atTime, position );
+	BG_EvaluateTrajectoryDelta( &trajectory.tr, atTime, velocity );
+}
 """
 
 
@@ -212,6 +278,7 @@ def _build_test_library(tmp_path: Path) -> Path:
 			clang,
 			"-DWIN32",
 			"-D_CRT_SECURE_NO_WARNINGS",
+			"-DQAGAME",
 			"-std=c99",
 			"-shared",
 			"-fuse-ld=lld",
@@ -235,6 +302,7 @@ def _build_test_library(tmp_path: Path) -> Path:
 		lib_path = tmp_path / "libbg_misc_runtime_test.dylib"
 		compile_cmd = [
 			cc,
+			"-DQAGAME",
 			"-std=c99",
 			"-dynamiclib",
 			"-I",
@@ -255,6 +323,7 @@ def _build_test_library(tmp_path: Path) -> Path:
 		lib_path = tmp_path / "libbg_misc_runtime_test.so"
 		compile_cmd = [
 			cc,
+			"-DQAGAME",
 			"-std=c99",
 			"-shared",
 			"-fPIC",
@@ -309,6 +378,24 @@ def bg_misc_library(tmp_path_factory: pytest.TempPathFactory) -> ctypes.CDLL:
 		ctypes.c_int,
 	]
 	library.QLR_CanGrabHealthCase.restype = ctypes.c_int
+
+	library.QLR_CanGrabArmorCase.argtypes = [
+		ctypes.c_int,
+		ctypes.c_int,
+		ctypes.c_int,
+		ctypes.c_int,
+		ctypes.c_int,
+		ctypes.c_int,
+	]
+	library.QLR_CanGrabArmorCase.restype = ctypes.c_int
+
+	library.QLR_EvaluateAcceleratedTrajectory.argtypes = [
+		ctypes.c_float,
+		ctypes.c_int,
+		ctypes.POINTER(ctypes.c_float),
+		ctypes.POINTER(ctypes.c_float),
+	]
+	library.QLR_EvaluateAcceleratedTrajectory.restype = None
 
 	return library
 
@@ -378,3 +465,43 @@ def test_can_item_be_grabbed_keeps_the_normal_weapon_and_health_gates(
 	assert bg_misc_library.QLR_CanGrabHealthCase(small_health_index, 200, 100) == 0
 	assert bg_misc_library.QLR_CanGrabHealthCase(mega_index, 150, 100) == 1
 	assert bg_misc_library.QLR_CanGrabHealthCase(mega_index, 200, 100) == 0
+
+
+def test_can_item_be_grabbed_keeps_retail_armor_gates(
+	bg_misc_library: ctypes.CDLL,
+) -> None:
+	red_armor_index = _item_index(bg_misc_library, "item_armor_body")
+	yellow_armor_index = _item_index(bg_misc_library, "item_armor_combat")
+	green_armor_index = _item_index(bg_misc_library, "item_armor_jacket")
+
+	assert bg_misc_library.QLR_CanGrabArmorCase(red_armor_index, 199, 2, 100, 0, 1) == 1
+	assert bg_misc_library.QLR_CanGrabArmorCase(red_armor_index, 200, 2, 100, 0, 1) == 0
+	assert bg_misc_library.QLR_CanGrabArmorCase(red_armor_index, 199, 2, 100, 1, 1) == 1
+	assert bg_misc_library.QLR_CanGrabArmorCase(red_armor_index, 200, 2, 100, 1, 1) == 0
+
+	assert bg_misc_library.QLR_CanGrabArmorCase(yellow_armor_index, 149, 1, 100, 1, 0) == 1
+	assert bg_misc_library.QLR_CanGrabArmorCase(yellow_armor_index, 150, 1, 100, 1, 0) == 0
+	assert bg_misc_library.QLR_CanGrabArmorCase(yellow_armor_index, 132, 2, 100, 1, 0) == 1
+	assert bg_misc_library.QLR_CanGrabArmorCase(yellow_armor_index, 133, 2, 100, 1, 0) == 0
+
+	assert bg_misc_library.QLR_CanGrabArmorCase(green_armor_index, 99, 0, 100, 1, 0) == 1
+	assert bg_misc_library.QLR_CanGrabArmorCase(green_armor_index, 100, 0, 100, 1, 0) == 0
+	assert bg_misc_library.QLR_CanGrabArmorCase(green_armor_index, 75, 1, 100, 1, 0) == 1
+	assert bg_misc_library.QLR_CanGrabArmorCase(green_armor_index, 76, 1, 100, 1, 0) == 0
+
+
+def test_evaluate_trajectory_keeps_retail_type_six_acceleration(
+	bg_misc_library: ctypes.CDLL,
+) -> None:
+	position = (ctypes.c_float * 3)()
+	velocity = (ctypes.c_float * 3)()
+
+	bg_misc_library.QLR_EvaluateAcceleratedTrajectory(
+		ctypes.c_float(40.0),
+		1500,
+		position,
+		velocity,
+	)
+
+	assert list(position) == pytest.approx([11.5, 22.0, 75.0])
+	assert list(velocity) == pytest.approx([3.0, 4.0, 80.0])

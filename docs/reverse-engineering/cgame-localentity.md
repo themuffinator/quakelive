@@ -22,9 +22,10 @@ kamikaze / invulnerability composites.
 
 ## Hard Layout Facts
 
-- `sizeof(trajectory_t) = 0x24` (`36`) in the current source tree, but the
-  retail cgame local-entity trajectory contract behaves like a 10-dword
-  extension with one extra scalar consumed by the type-`6` evaluator.
+- `sizeof(trajectory_t) = 0x24` (`36`) in the current source tree. The shared
+  `bg_misc` evaluator now recognizes retail type `6` (`TR_QL_ACCEL`) when a
+  caller provides the extra scalar immediately after `trDelta`, while the
+  local-entity source layout keeps that scalar in bridge fields below.
 - `sizeof(refEntity_t) = 0x8C` (`140`).
 - `sizeof(localEntity_t) = 0x12C` (`300`) in the recovered retail-compatible
   x86 layout.
@@ -148,9 +149,9 @@ smaller hot subset rather than every render field uniformly.
 ### Motion And Collision Payload
 
 - `pos` is the primary motion payload for puffs and fragments. The current
-  source now routes local-entity evaluation through a cgame-side bridge so the
-  retail type-`6` path can use `posTrajExtra` without expanding `trajectory_t`
-  globally.
+  source still routes local-entity evaluation through a cgame-side bridge so
+  `posTrajExtra` can feed the retail type-`6` path without expanding
+  `trajectory_t` globally.
 - `CG_ReflectVelocity` rewrites `pos.trDelta`, `pos.trBase`, `pos.trTime`, and
   sometimes `pos.trType` when a fragment collides.
 - `angles` has two strong roles:

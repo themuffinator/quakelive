@@ -1,6 +1,6 @@
 # `cgame` / `bg_*` Retail Parity Audit And Multi-Agent Plan
 
-Last updated: 2026-04-05
+Last updated: 2026-05-20
 
 Scope: `src/code/cgame/*`, `src/code/game/bg_misc.c`, `src/code/game/bg_pmove.c`, `src/code/game/bg_slidemove.c`
 
@@ -149,12 +149,54 @@ Purpose: supplement [IMPLEMENTATION_PLAN.md](../../IMPLEMENTATION_PLAN.md) with 
 | `BG-A3` | Completed 2026-04-05 | Boundary-only | `references/symbol-maps/qagame.json` comment for `PM_StepSlideMove`, [`bg_slidemove.c:436-575`](../../src/code/game/bg_slidemove.c) | `PM_StepSlideMove` remains the only public movement-step boundary, while `PM_StepSlideMoveWithStepHeight` stays private and is validated at the stock 22-unit step height through the public supported or unsupported air-step fixtures. | Completed. |
 | `BG-A4` | Low | Validation | [`bg_pmove.c`](../../src/code/game/bg_pmove.c), [`bg_slidemove.c`](../../src/code/game/bg_slidemove.c) | Closed 2026-04-05: focused pytest fixtures now cover jump timing, circle-strafe friction, step-jump gating, unsupported air-step suppression, and double-jump reuse across the shared movement seam. | Completed. |
 
+#### 2026-05-20 BG Pmove Symbol Re-Audit
+
+The qagame and cgame Ghidra rows for the shared pmove tail remain a one-to-one source island: qagame `FUN_10031920` / cgame `FUN_10005df0` map to `PM_FinishWeaponChange`, qagame `FUN_10031990` / cgame `FUN_10005e60` map to `PM_Weapon`, and qagame `FUN_1006f290` maps to the server-only `FireWeapon` dispatcher. The HLIL in both client and game modules clears playerState offset `+0xe0` when a new weapon is raised, then `PM_Weapon` increments that same slot for WP_CHAINGUN while firing and drains it on release.
+
+Source now names that shared slot as `STAT_CHAINGUN_SPINUP`; `PM_FinishWeaponChange` resets it, `PM_Weapon` owns the retail 0..1000 spin accumulator and below-cap doubled reload-time path, and `g_weapon.c::FireWeapon` derives chaingun spread from the recovered stat rather than from `weaponTime`. Focused structural and executable coverage lives in [`tests/test_pmove_helper_parity.py`](../../tests/test_pmove_helper_parity.py), [`tests/test_pmove_movement_fixtures.py`](../../tests/test_pmove_movement_fixtures.py), and [`tests/test_game_weapon_parity.py`](../../tests/test_game_weapon_parity.py).
+
+The same round tightened the symbol-map notes for nearby non-weapon edges: `PM_FootstepForSurface` records the noFootsteps plus no-step/metal/snow/wood/default branches, `PM_CrashLand` records the gib-health fall-event gate and double-jump latch clear, `PM_WaterEvents` records the PM_DEAD head-water suppression plus invulnerability clear suppression, and `PmoveSingle` records the command-to-playerState mirrors before the movement dispatch.
+
+The follow-up symbol pass aligned the cgame step-jump helper names with the qagame/source names: cgame `0x10002790`, `0x10002990`, and `0x100029E0` now map to `PM_ApplyJumpTakeoff`, `PM_CanCrouchStepJump`, and `PM_CanStepJump`, matching qagame `0x1002E2C0`, `0x1002E4C0`, and `0x1002E510`. `PM_Friction` symbol prose now also records the recovered crouch-slide, diagonal circle-strafe, and PM_FREEZE/PMF_SCOREBOARD drop-multiplier branches shared by both binaries.
+
+The air-move follow-up rechecked qagame `0x1002FCB0` and cgame `0x10004180` against the current source and tests. The mode-specific airstop, strafe, and `pm_wishspeed` handling belongs to `PM_AirMove` before the generic `PM_Accelerate` call, while `PM_AirControl`, `PM_StepSlideMove(qtrue)`, `PM_InvulnerabilityMove`, and the trailing `PMF_DOUBLE_JUMP` probe remain in the same tail order in both binaries.
+
+The neighboring walk-move symbols now call out the same retail handoff shape: `PM_WalkMove` owns the early `PM_ShouldUseInvulnerabilityMove` branch through `PM_StepSlideMove(qfalse)` and `PM_InvulnerabilityMove`, then continues through jump handling, crouch-slide timer refresh, duck/wade speed clamps, slick/knockback acceleration selection, and the final grounded step move. The cgame `PM_InvulnerabilityMove` prose was also refreshed to remove the old minimal-stub caveat now that the reconstructed source owns the retail activation/timer/animation behavior.
+
+The 3D movement leaf sweep rechecked water, ladder, fly, and noclip paths against both pmove islands. `PM_WaterMove` now records the shared `PM_BuildWishMove3D` vector builder plus the idle `-60` sink fallback, `PM_LadderMove` records the explicit `0.66 * speed` climb/descent cap, `PM_FlyMove` records the spectator and flight-powerup dispatch into the shared 3D wish-vector path, and `PM_NoclipMove` records the default-viewheight plus 1.5x friction/no-trace integration path.
+
+The ground-contact and footstep follow-up rechecked qagame `0x10030BE0`/`0x10030DA0`/`0x10030ED0`/`0x10031140`/`0x100314D0` and cgame `0x100050B0`/`0x10005270`/`0x100053A0`/`0x10005610`/`0x100059A0` against the Ghidra/HLIL pmove islands. `PM_CorrectAllSolid` now records the 0.25-unit recovery trace and `groundTraceLatest*` clearing, `PM_GroundTraceMissed` records the 64-unit lift probe plus forward/back jump animation split, `PM_GroundTrace` records the kickoff/steep/land timer/history/touch-entity edges, `PM_SetWaterLevel` records the exact `MASK_WATER` sample heights, and `PM_Footsteps` records the airborne invulnerability, swim, idle-bob, ducked-suppression, and splash/swim event split.
+
 ### `BG-B` Shared Pickup / Trajectory / Boundary Cleanup
 
 | ID | Priority | Type | Evidence | Current state | Exit criteria |
 | --- | --- | --- | --- | --- | --- |
 | `BG-B1` | Completed 2026-04-05 | Validation | `references/symbol-maps/qagame.json` comments for `BG_PlayerTouchesItem`, `BG_CanItemBeGrabbed`, and `BG_FindItemForPowerup`; direct scan found `0` missing normalized names | Closed 2026-04-05: structural and executable fixtures now cover the mapped powerup lookup seam, the retail pickup-touch envelopes, and representative weapon or health pickup gates in [`tests/test_bg_misc_helper_parity.py`](../../tests/test_bg_misc_helper_parity.py), [`tests/test_bg_itemlist_indexes.py`](../../tests/test_bg_itemlist_indexes.py), [`tests/bg_misc_validation_harness.c`](../../tests/bg_misc_validation_harness.c), and [`tests/test_bg_misc_validation_fixtures.py`](../../tests/test_bg_misc_validation_fixtures.py). | Completed. |
 | `BG-B2` | Completed 2026-04-05 | Boundary-only | `docs/reverse-engineering/qagame-mapping.md:568-579`, [`bg_misc.c`](../../src/code/game/bg_misc.c), [`tests/test_bg_misc_runtime_parity.py`](../../tests/test_bg_misc_runtime_parity.py) | The shared pickup/touch helpers remain a deliberate verified source merge; no current retail evidence requires extra boundary splitting beyond the existing source-owned family. | Completed. |
+
+#### 2026-05-19 BG Misc Armor Pickup Re-Audit
+
+The qagame `FUN_1002ced0` and cgame `FUN_10001560` decompiles both split the `IT_ARMOR` pickup branch on the armor-tiered cvar parameter: classic armor returns `STAT_ARMOR < STAT_MAX_HEALTH * 2` directly from `BG_CanItemBeGrabbed`, while the nonzero tiered path enters the recovered `BG_CanGrabArmorItem` leaf. That leaf owns only the retail 100/50/25 quantity thresholds and does not consult `PW_SCOUT` or `STAT_PERSISTANT_POWERUP`.
+
+Source now mirrors that wiring in [`bg_misc.c`](../../src/code/game/bg_misc.c), with structural coverage in [`tests/test_bg_misc_helper_parity.py`](../../tests/test_bg_misc_helper_parity.py) and executable coverage in [`tests/bg_misc_validation_harness.c`](../../tests/bg_misc_validation_harness.c), [`tests/test_bg_misc_validation_fixtures.py`](../../tests/test_bg_misc_validation_fixtures.py), and [`tests/test_bg_misc_runtime_parity.py`](../../tests/test_bg_misc_runtime_parity.py). The runtime fixtures now exercise classic armor capacity with Scout present plus the tiered red, yellow, and green armor boundaries.
+
+The follow-up pass corrected the qagame symbol map label for `0x1002CE00` from a stale health-helper name to `BG_CanGrabArmorItem`. The Binary Ninja HLIL at that address recovers the exact tier thresholds (`armor * 0.75 <= 99.0`, `armor * 0.66 <= 50.0`, and `armor * 0.75 <= 50.0`), and [`tests/test_bg_misc_validation_fixtures.py`](../../tests/test_bg_misc_validation_fixtures.py) now also covers `BG_ApplyArmorPickup`, `BG_UpdateArmorTierFromCurrentArmor`, and `BG_GetArmorRegenTarget` through the reusable C harness.
+
+The same round rechecked `BG_PlayerTouchesItem` in both qagame (`FUN_1002cd30`) and cgame (`FUN_100013c0`) Binary Ninja HLIL. The corrected qagame symbol-map prose now records the exact shared touch envelope: `+/-36` horizontal bounds, `-50` lower vertical tolerance, a `29` unit normal upward window, and a `64` unit upward window for red, blue, and neutral team flags.
+
+The subsequent trajectory audit found the remaining shared `bg_misc` mismatch: qagame `FUN_1002d210` / `FUN_1002d3e0` and cgame `FUN_100018a0` / `FUN_10001a70` both keep a type-`6` `TR_QL_ACCEL` trajectory path. Source now names that enum value and mirrors the retail formula by reading the extra acceleration scalar from the dword immediately after `trDelta`, while preserving the current 36-byte `trajectory_t` source layout.
+
+The item-helper follow-up rechecked the top-of-file weapon/holdable tag bridges and the cgame `FUN_10001170` item lookup leaf. No new source behavior mismatch was isolated; the cgame symbol map now uses the public `BG_FindItemByTypeAndTag` name consistently with qagame/source, and helper tests pin the retail HMG item-tag append plus the invulnerability holdable tag gap.
+
+The prediction-state follow-up corrected the cgame `0x10001560` pickup-gate prose from stale handler-table wording to the direct item-type switch recovered in qagame/source. The same pass added executable fixtures for `BG_AddPredictableEventToPlayerstate`, `BG_TouchJumpPad`, and `BG_PlayerStateToEntityState` event projection, plus a structural guard that keeps the `eventnames[]` debug table aligned with `entity_event_t` through `EV_NEW_HIGH_SCORE = 99`.
+
+The next playerstate-projection follow-up kept production source unchanged after rechecking the qagame/cgame `BG_PlayerStateToEntityState` symbols against the source bridge. The reusable harness now covers external-event precedence, spectator/intermission/gib visibility, `EF_DEAD` projection, number/clientNum mirroring, weapon and ground projection, loop sound and generic payload copying, animation fields, and powerup-bit packing.
+
+The top-helper follow-up rechecked the remaining source-side bridges above `bg_itemlist`: weapon names, weapon max ammo, ammo-pack quantities, handicap scalar lookups, weapon/item tag roundtrips, and holdable/item tag roundtrips. No new retail mismatch was isolated; the reusable C harness now exercises the local enum to retail tag mapping directly, including Heavy Machinegun as local `WP_HEAVY_MACHINEGUN` but retail item tag `14`, and the intentional empty holdable tag `5` before invulnerability tag `6`.
+
+The lookup/stat-table follow-up expanded that coverage from representative samples to the full recovered weapon-stat table. The harness now checks every shared weapon row against the qagame HLIL ammo pickup/max-stack evidence plus the source-side handicap scalar table, and separately exercises pickup-name, classname, and type/tag item lookup paths for the qagame `BG_FindItem`, `BG_FindItemByTypeAndTag`, and cgame `BG_FindItemByTypeAndTag` mappings.
+
+The small-policy-helper follow-up kept production source unchanged after confirming `BG_PlayerHasPersistantPowerup`, `BG_GetArmorUpperBound`, `BG_GetHealthUpperBound`, and `BG_ClearArmorTierIfEmpty` are source-side helper splits rather than standalone nearby retail function boundaries in the qagame/cgame corridors. The C harness now exercises persistent-powerup guard behavior, health/armor upper bounds, and armor-tier clearing for stripped or non-tiered states.
 
 ## Recommended Execution Order
 

@@ -11,12 +11,16 @@ def _read(rel_path: str) -> str:
 def test_refexport_tail_restores_retail_loading_view_slot() -> None:
 	tr_public = _read("src/code/renderer/tr_public.h")
 
+	assert "#define\tREF_API_VERSION\t\t9" in tr_public
 	assert tr_public.index("(*RenderScene)") < tr_public.index("(*AdvertisementBridge_UpdateLoadingViewParameters)") < tr_public.index("(*SetColor)")
 	assert tr_public.index("(*DrawStretchRaw)") < tr_public.index("(*BeginFrame)")
-	assert "(*RegisterFont)" not in tr_public
+	assert tr_public.index("(*ModelBounds)") < tr_public.index("(*RegisterFont)") < tr_public.index("(*RemapShader)")
+	assert tr_public.index("(*inPVS)") < tr_public.index("(*PostProcessRestart)") < tr_public.index("(*DrawScaledText)")
+	assert tr_public.index("(*RetailProjectPoint)") < tr_public.index("(*TransformClipToWindow)") < tr_public.index("(*DrawScaledText)")
+	assert "void\t(*TransformClipToWindow)( const vec4_t clip, vec4_t normalized, vec4_t window );" in tr_public
 
 
-def test_getrefapi_assigns_retail_tail_without_font_export() -> None:
+def test_getrefapi_assigns_retail_tail_without_re_registerfont_export() -> None:
 	tr_init = _read("src/code/renderer/tr_init.c")
 	expected_tail = (
 		"re.RenderScene = RE_RenderScene;",
@@ -30,14 +34,23 @@ def test_getrefapi_assigns_retail_tail_without_font_export() -> None:
 		"re.MarkFragments = R_MarkFragments;",
 		"re.LerpTag = R_LerpTag;",
 		"re.ModelBounds = R_ModelBounds;",
+		"re.RegisterFont = R_NoopRegisterFont;",
 		"re.RemapShader = R_RemapShader;",
 		"re.GetEntityToken = R_GetEntityToken;",
 		"re.inPVS = R_inPVS;",
+		"re.PostProcessRestart = R_PostProcessRestart;",
+		"re.TransformClipToWindow = R_TransformClipToWindowExport;",
+		"re.DrawScaledText = RE_DrawScaledText;",
+		"re.MeasureScaledText = RE_MeasureScaledText;",
 	)
 
 	positions = [tr_init.index(entry) for entry in expected_tail]
 	assert positions == sorted(positions)
 	assert "re.RegisterFont = RE_RegisterFont;" not in tr_init
+	transform_export = tr_init.split("static void R_TransformClipToWindowExport", 1)[1].split("static void R_NoopRegisterFont", 1)[0]
+	assert "R_TransformClipToWindow( clip, &backEnd.viewParms, normalized, window );" in transform_export
+	assert "window[2] = 0.5f * ( 1.0f + normalized[0] );" in transform_export
+	assert "window[3] = 0.5f * ( 1.0f + normalized[1] );" in transform_export
 
 
 def test_client_font_registration_uses_compatibility_lane() -> None:

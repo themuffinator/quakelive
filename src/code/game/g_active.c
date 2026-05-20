@@ -1780,13 +1780,6 @@ void ClientEndFrame( gentity_t *ent ) {
 	G_StoreHistory( ent );
 }
 
-/*
-=============
-G_Frame_BeginRoundWarmup
-
-Transitions the round controller into the warmup state.
-=============
-*/
 static void G_RoundScheduleWarmupDelay( void );
 int G_CAResolveRoundState( void );
 static int CA_RoundStateTransition( qboolean announce );
@@ -1801,6 +1794,59 @@ static int RR_RoundStateTransition( qboolean announce );
 int G_RRResolveRoundState( void );
 static qboolean G_RoundTimeLimitExpired( int startTime );
 static qboolean G_CAFZCheckExitRules( qboolean announce );
+
+/*
+=============
+G_SetClientAttackLockout
+
+Mirrors the retail round-controller attack suppression bit into playerstate.
+=============
+*/
+void G_SetClientAttackLockout( gentity_t *ent, qboolean lockout ) {
+	if ( !ent || !ent->client ) {
+		return;
+	}
+
+	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	if ( lockout ) {
+		ent->client->ps.pm_flags |= PMF_ATTACK_LOCKOUT;
+	} else {
+		ent->client->ps.pm_flags &= ~PMF_ATTACK_LOCKOUT;
+	}
+}
+
+/*
+=============
+G_SetAllActiveClientAttackLockout
+
+Applies the retail attack lockout to every connected non-spectator client.
+=============
+*/
+void G_SetAllActiveClientAttackLockout( qboolean lockout ) {
+	int		clientNum;
+
+	for ( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+		gentity_t	*ent;
+
+		ent = &g_entities[clientNum];
+		if ( !ent->inuse || !ent->client ) {
+			continue;
+		}
+
+		G_SetClientAttackLockout( ent, lockout );
+	}
+}
+
+/*
+=============
+G_Frame_BeginRoundWarmup
+
+Transitions the round controller into the warmup state.
+=============
+*/
 void G_Frame_BeginRoundWarmup( void ) {
 	level.roundState = ROUNDSTATE_WARMUP;
 	level.roundTransitionTime = ROUND_TRANSITION_NONE;
@@ -1828,6 +1874,7 @@ void G_Frame_BeginRoundWarmup( void ) {
 	} else if ( g_gametype.integer == GT_RED_ROVER ) {
 		G_RoundScheduleWarmupDelay();
 	}
+	G_SetAllActiveClientAttackLockout( qtrue );
 	G_UpdateMatchStateConfigString();
 }
 
@@ -2137,6 +2184,7 @@ static int CA_RoundStateTransition( qboolean announce ) {
 
 		winner = G_CAResolveRoundWinner( counts, health );
 		level.roundState = ROUNDSTATE_COMPLETE;
+		G_SetAllActiveClientAttackLockout( qtrue );
 
 		if ( winner == TEAM_RED || winner == TEAM_BLUE ) {
 			level.teamScores[winner]++;
@@ -2284,6 +2332,7 @@ static void G_Frame_BeginRoundActive( void ) {
 		G_FreezeSyncCvars();
 		G_FreezeResetClientsForRound();
 	}
+	G_SetAllActiveClientAttackLockout( qfalse );
 	G_UpdateMatchStateConfigString();
 }
 
@@ -2764,6 +2813,7 @@ static void G_FreezeHandleRoundEnd( team_t winner ) {
 	}
 
 	level.roundState = ROUNDSTATE_COMPLETE;
+	G_SetAllActiveClientAttackLockout( qtrue );
 	level.roundPendingExit = G_CAFZCheckExitRules( qfalse );
 	if ( level.roundPendingExit ) {
 		level.roundTransitionTime = level.time + 1500;
@@ -3069,6 +3119,7 @@ static int RR_RoundStateTransition( qboolean announce ) {
 		level.roundStartTime = level.time;
 		level.roundNumber = level.teamScores[TEAM_RED] + level.teamScores[TEAM_BLUE] + 1;
 		G_RRResetRoundState();
+		G_SetAllActiveClientAttackLockout( qtrue );
 		delayMs = g_roundWarmupDelay.integer;
 		if ( delayMs < 0 ) {
 			delayMs = 0;
@@ -3089,6 +3140,7 @@ static int RR_RoundStateTransition( qboolean announce ) {
 		level.roundPendingExit = qfalse;
 		level.roundStartTime = level.time;
 		G_RRSeedInfectionTeams();
+		G_SetAllActiveClientAttackLockout( qtrue );
 		level.roundTransitionTime = level.time + 1;
 		level.rrPendingRoundState = RR_ROUNDSTATE_WARMUP;
 		G_UpdateMatchStateConfigString();
@@ -3104,11 +3156,13 @@ static int RR_RoundStateTransition( qboolean announce ) {
 		level.rrLastInfectionTime = level.time;
 		level.rrNextSurvivalBonusTime = 0;
 		level.rrPendingRoundState = RR_ROUNDSTATE_ACTIVE;
+		G_SetAllActiveClientAttackLockout( qfalse );
 		G_UpdateMatchStateConfigString();
 		break;
 
 	case RR_ROUNDSTATE_COMPLETE:
 		level.roundState = ROUNDSTATE_COMPLETE;
+		G_SetAllActiveClientAttackLockout( qtrue );
 		if ( level.rrPendingMatchExit ) {
 			level.rrPendingRoundState = RR_ROUNDSTATE_EXIT;
 		} else {
@@ -3121,6 +3175,7 @@ static int RR_RoundStateTransition( qboolean announce ) {
 		level.roundState = ROUNDSTATE_COMPLETE;
 		level.roundTransitionTime = ROUND_TRANSITION_NONE;
 		level.rrPendingRoundState = RR_ROUNDSTATE_EXIT;
+		G_SetAllActiveClientAttackLockout( qtrue );
 		G_UpdateMatchStateConfigString();
 		G_RRCheckExitRules( qtrue );
 		break;

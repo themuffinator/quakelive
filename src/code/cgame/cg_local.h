@@ -440,8 +440,6 @@ typedef enum {
 	LEBS_ICE = 4
 } leFragmentBounceSoundType_t;	// retail fragment trail / bounce selector at localEntity + 0x9c
 
-#define	TR_QL_ACCEL	((trType_t)6)	// retail cgame-only trajectory_t extension with a companion scalar
-
 typedef struct localEntity_s {
 	struct localEntity_s	*prev, *next;
 	leType_t		leType;
@@ -887,6 +885,8 @@ typedef struct {
 
 	// input state sent to server
 	int			weaponSelect;
+	int			weaponPrimary;
+	int			userCmdFov;
 
 	// auto rotating items
 	vec3_t		autoAngles;
@@ -1628,7 +1628,9 @@ typedef struct {
 	int				teamflags;
 	int				fraglimit;
 	int				capturelimit;
+	int				scorelimit;
 	int				timelimit;
+	int				roundlimit;
 	int				voteFlags;
 	int				maxclients;
 	int				playerCountTeamSize;
@@ -2095,7 +2097,7 @@ void *CG_CloseBrowserOverlayByName( const char *name );
 void CG_ActivateBrowserOverlay( void *overlay );
 void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint );
 void CG_DrawBrowserOverlays( void );
-void CG_LoadMenus(const char *menuFile);
+void CG_LoadMenus( const char *menuFile );
 void CG_LoadHudMenu( void );
 void CG_ResetDraw2DMenuCache( void );
 void CG_CacheDraw2DMenuCache( void );
@@ -2104,7 +2106,7 @@ void CG_KeyEvent(int key, qboolean down);
 void CG_MouseEvent(int x, int y);
 void CG_EventHandling(int type);
 void CG_RankRunFrame( void );
-void CG_SetScoreSelection(void *menu);
+void CG_SetScoreSelection( void *menu );
 score_t *CG_GetSelectedScore();
 void CG_BuildSpectatorString();
 
@@ -2224,6 +2226,7 @@ void CG_GetColorForIndex( int index, vec4_t color );
 int CG_ColorCharToIndex( char ch );
 const char *CG_GetTeamName( team_t team );
 const char *CG_GetGameStatusText();
+const char *CG_GetMatchStatusText( void );
 const char *CG_GetKillerText();
 const char *CG_GetRaceStatusText( void );
 const char *CG_GetRaceTimesPrimaryText( void );
@@ -2233,8 +2236,8 @@ void CG_Text_PaintChar(float x, float y, float width, float height, float scale,
 void CG_CheckOrderPending();
 const char *CG_GameTypeString();
 void CG_RegisterGameTypeIcons( void );
-qboolean CG_YourTeamHasFlag();
-qboolean CG_OtherTeamHasFlag();
+qboolean CG_YourTeamHasFlag( void );
+qboolean CG_OtherTeamHasFlag( void );
 qhandle_t CG_StatusHandle(int task);
 qboolean CG_ShouldDrawAccOverlay( void );
 
@@ -2656,7 +2659,7 @@ int			trap_GetCurrentCmdNumber( void );
 qboolean	trap_GetUserCmd( int cmdNumber, usercmd_t *ucmd );
 
 // used for the weapon select and zoom
-void		trap_SetUserCmdValue( int stateValue, float sensitivityScale );
+void		trap_SetUserCmdValue( int stateValue, int primaryValue, float sensitivityScale, int fov );
 
 // aids for VM testing
 void		testPrintInt( char *string, int i );

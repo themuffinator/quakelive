@@ -158,8 +158,16 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 	}
 
 	rg_g01_ok = (
-		"AdvertisementBridge_UpdateLoadingViewParameters" in tr_public
+		"#define\tREF_API_VERSION\t\t9" in tr_public
+		and "AdvertisementBridge_UpdateLoadingViewParameters" in tr_public
+		and tr_public.index("(*RenderScene)") < tr_public.index("(*AdvertisementBridge_UpdateLoadingViewParameters)") < tr_public.index("(*SetColor)")
+		and tr_public.index("(*ModelBounds)") < tr_public.index("(*RegisterFont)") < tr_public.index("(*RemapShader)")
+		and tr_public.index("(*inPVS)") < tr_public.index("(*PostProcessRestart)") < tr_public.index("(*DrawScaledText)")
 		and "AdvertisementBridge_UpdateLoadingViewParameters = AdvertisementBridge_UpdateLoadingViewParameters;" in tr_init
+		and "re.RegisterFont = R_NoopRegisterFont;" in tr_init
+		and "re.SetColor = RE_SetColor;" in tr_init
+		and tr_init.index("re.SetColor = RE_SetColor;") < tr_init.index("re.PostProcessRestart = R_PostProcessRestart;")
+		and "re.TransformClipToWindow = R_TransformClipToWindowExport;" in tr_init
 		and "void CL_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {" in cl_main
 		and "tests/test_renderer_export_tail_parity.py" in workflow_text
 	)
@@ -172,8 +180,11 @@ def _build_renderer_full_parity_gate_report() -> dict[str, Any]:
 			else "Export-tail ABI closure no longer matches the documented validation surface."
 		),
 		{
+			"retail_ref_api_version": "#define\tREF_API_VERSION\t\t9" in tr_public,
 			"advert_bridge_slot_present": "AdvertisementBridge_UpdateLoadingViewParameters" in tr_public,
 			"bridge_assignment_present": "AdvertisementBridge_UpdateLoadingViewParameters = AdvertisementBridge_UpdateLoadingViewParameters;" in tr_init,
+			"legacy_font_slot_is_noop": "re.RegisterFont = R_NoopRegisterFont;" in tr_init,
+			"postprocess_restart_private_tail": "re.PostProcessRestart = R_PostProcessRestart;" in tr_init,
 			"client_font_lane_present": "void CL_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {" in cl_main,
 			"workflow_references_export_test": "tests/test_renderer_export_tail_parity.py" in workflow_text,
 		},

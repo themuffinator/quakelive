@@ -1127,14 +1127,15 @@ int FUN_0043c570(int param_1);
 void FUN_0043c5d0(std::uint32_t param_1, std::uint32_t param_2);
 void RE_SetColor(const float* rgba);
 void RE_StretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader);
-void FUN_0043c750(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3, std::uint32_t param_4);
+void RE_RetailStretchPicCommand(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3,
+                                std::uint32_t param_4);
 void RE_BeginFrame(stereoFrame_t stereoFrame);
 void RE_EndFrame(int* frontEndMsec, int* backEndMsec);
 void FUN_0043cba0(void);
-void FUN_0043cbe0(int param_1, int param_2, std::uint32_t param_3, int param_4, std::uint32_t param_5,
-                  std::uint32_t param_6, std::uint32_t param_7, std::uint32_t param_8);
-void FUN_0043cc50(std::uint32_t param_1, std::uint32_t param_2, int param_3, std::uint32_t param_4,
-                  std::uint32_t param_5, int param_6);
+void RE_DrawScaledText(int param_1, int param_2, std::uint32_t param_3, int param_4, std::uint32_t param_5,
+                       std::uint32_t param_6, std::uint32_t param_7, std::uint32_t param_8);
+void RE_MeasureScaledText(std::uint32_t param_1, std::uint32_t param_2, int param_3, std::uint32_t param_4,
+                          std::uint32_t param_5, int param_6);
 void FUN_0043ccd0(void);
 std::uint32_t FUN_0043cce0(void);
 void FUN_0043cd10(void);
@@ -1187,9 +1188,9 @@ std::uint32_t __fastcall fons__atlasAddSkylineLevel(int param_1, int param_2, in
 int __thiscall fons__atlasRectFits(int param_1, int param_2);
 std::uint32_t fons__atlasAddRect(std::uint32_t param_1, int param_2, int* param_3, int* param_4);
 void fons__addWhiteRect(size_t param_1, int param_2);
-void FUN_004413f0(int param_1, std::uint32_t param_2);
-void FUN_00441410(int param_1, std::uint32_t param_2);
-void FUN_00441430(int param_1, std::uint32_t param_2);
+void fonsSetSize(int param_1, std::uint32_t param_2);
+void fonsSetColor(int param_1, std::uint32_t param_2);
+void fonsSetFont(int param_1, std::uint32_t param_2);
 void fonsPushState(int param_1);
 void fonsClearState(int param_1);
 int fons__allocFont(void);
@@ -1197,24 +1198,24 @@ int fonsAddFontMem(int param_1, char* param_2, int param_3, int param_4, std::ui
 void __fastcall fons__blurCols(int param_1, int param_2, int param_3);
 void __fastcall fons__blurRows(int param_1, int param_2, int param_3);
 void fons__blur(void);
-void FUN_004418b0(std::uint32_t param_1, float param_2, std::uint32_t param_3, float* param_4);
-void FUN_00441a50(void);
-void FUN_00441ad0(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3, std::uint32_t param_4,
+void fons__getQuad(std::uint32_t param_1, float param_2, std::uint32_t param_3, float* param_4);
+void fons__flush(void);
+void fons__vertex(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3, std::uint32_t param_4,
                   std::uint32_t param_5);
-long double __thiscall FUN_00441b30(short param_1, std::uint8_t param_2);
-void FUN_00441c50(int param_1, float* param_2, float* param_3, float* param_4);
+long double __thiscall fons__getVertAlign(short param_1, std::uint8_t param_2);
+void fonsVertMetrics(int param_1, float* param_2, float* param_3, float* param_4);
 void fonsDeleteInternal(void* param_1);
-std::uint32_t FUN_00441dc0(size_t* param_1, size_t param_2, size_t param_3);
-std::uint32_t FUN_00441f60(int* param_1, int param_2, int param_3);
-std::uint32_t FUN_00442060(std::uint32_t* param_1, int param_2, int param_3);
-void FUN_00442150(void);
-void FUN_00442160(int* param_1, int* param_2, std::uint32_t param_3);
-void FUN_00442210(int* param_1, int param_2, int param_3, std::uint32_t param_4, int param_5);
-void FUN_004422b0(std::uint32_t* param_1);
-std::uint32_t FUN_004422d0(std::uint8_t param_1, std::uint8_t param_2, std::uint8_t param_3, std::uint8_t param_4);
-void FUN_00442300(int param_1, int param_2, std::uint32_t param_3);
-void FUN_004423a0(void);
-void FUN_004423c0(void);
+std::uint32_t fonsExpandAtlas(size_t* param_1, size_t param_2, size_t param_3);
+std::uint32_t fonsResetAtlas(int* param_1, int param_2, int param_3);
+std::uint32_t R_fonsRenderCreate(std::uint32_t* param_1, int param_2, int param_3);
+void R_fonsRenderResize(void);
+void R_fonsRenderUpdate(int* param_1, int* param_2, std::uint32_t param_3);
+void R_fonsRenderDraw(int* param_1, int param_2, int param_3, std::uint32_t param_4, int param_5);
+void R_fonsRenderDelete(std::uint32_t* param_1);
+std::uint32_t fonsRGBA(std::uint8_t param_1, std::uint8_t param_2, std::uint8_t param_3, std::uint8_t param_4);
+void R_fonsErrorCallback(int param_1, int param_2, std::uint32_t param_3);
+void R_ResetFontStashAtlas(void);
+void R_DoneFontStash(void);
 int stbtt__GetGlyphShapeTT(int* param_1, std::uint32_t param_2, int* param_3);
 int* __thiscall FUN_00442b40(std::uint32_t param_1, int param_2, float param_3);
 void __fastcall stbtt__rasterize_sorted_edges(std::uint32_t param_1, int param_2, int param_3, int param_4,
@@ -1233,7 +1234,7 @@ std::uint32_t fonsAddFont(std::uint32_t param_1, std::uint32_t param_2, char* pa
 int* fons__getGlyph(int param_1, int param_2, short param_3, short param_4);
 long double fonsTextBounds(float param_1, float param_2, float param_3, std::uint8_t* param_4, std::uint8_t* param_5,
                            int param_6, float* param_7);
-void FUN_00443f50(std::uint32_t param_1, std::uint32_t param_2, std::uint8_t param_3);
+void R_CreateFontStashContext(std::uint32_t param_1, std::uint32_t param_2, std::uint8_t param_3);
 void R_InitFontStash(void);
 long double fonsDrawText(int param_1, float param_2, float param_3, std::uint8_t* param_4, std::uint8_t* param_5,
                          int param_6, float* param_7, int param_8);
@@ -1341,7 +1342,7 @@ void R_AddDrawSurf(surfaceType_t* surface, shader_t* shader, int fogIndex, int d
 void R_DecomposeSort(unsigned sort, int* entityNum, shader_t** shader, int* fogNum, int* dlightMap);
 void R_AddEntitySurfaces(void);
 void R_DebugPolygon(int color, int numPoints, float* points);
-void FUN_0044d0d0(void);
+void RB_ShowFontAtlas(void);
 int R_CullLocalPointAndRadius(vec3_t pt, float radius);
 static qboolean SurfIsOffscreen(const drawSurf_t* drawSurf, vec4_t clipDest[128]);
 qboolean R_MirrorViewBySurface(drawSurf_t* drawSurf, int entityNum);
@@ -2902,7 +2903,7 @@ void QLCGImport_AdvertisementBridge_UpdateViewParameters(std::uint32_t param_1, 
 void FUN_004affc0(void);
 void QLCGImport_AdvertisementBridge_SetFrameTime(void);
 void QLCGImport_AdvertisementBridge_ClearDelay(void);
-void QLCGImport_R_RegisterFont(void);
+void QLImport_R_RegisterFont(void);
 void QLCGImport_R_AddRefEntityToScene(void);
 void QLCGImport_R_AddPolyToScene(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3);
 void QLCGImport_R_AddPolysToScene(void);
@@ -2940,7 +2941,7 @@ void FUN_004b0370(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t pa
 void FUN_004b03b0(void);
 void FUN_004b03c0(void);
 void FUN_004b03d0(void);
-void QLUIImport_DrawScaledText(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3,
+void QLImport_DrawScaledText(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3,
                                std::uint32_t param_4, std::uint32_t param_5, std::uint32_t param_6,
                                std::uint32_t param_7, std::uint32_t param_8);
 void QLCGImport_ToggleClientMute(std::uint32_t param_1, std::uint32_t param_2);
@@ -3121,14 +3122,14 @@ void FUN_004bda00(int param_1);
 void FUN_004bdb90(float* param_1, float* param_2, float* param_3, float* param_4);
 void FUN_004bdc00(float param_1, float param_2, float param_3, float param_4, std::uint32_t param_5);
 void FUN_004bdcb0(float param_1, float param_2, float param_3, float param_4, std::uint32_t param_5);
-void FUN_004bdd40(std::uint32_t param_1, int param_2, int param_3, int param_4, std::uint8_t param_5);
-void FUN_004bdd90(std::uint32_t param_1, int param_2, char* param_3, int param_4, int param_5, int param_6,
-                  std::uint32_t param_7);
-void FUN_004bddf0(int param_1, std::uint32_t param_2, float param_3, std::uint32_t param_4, int param_5,
-                  std::uint32_t param_6);
-void FUN_004bde80(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3, std::uint32_t param_4,
-                  std::uint32_t param_5);
-void FUN_004bdeb0(void);
+void Con_DrawHostChar(std::uint32_t param_1, int param_2, int param_3, int param_4, std::uint8_t param_5);
+void Con_DrawHostText(std::uint32_t param_1, int param_2, char* param_3, int param_4, int param_5, int param_6,
+                      std::uint32_t param_7);
+void SCR_DrawStringExt(int param_1, std::uint32_t param_2, float param_3, std::uint32_t param_4, int param_5,
+                       std::uint32_t param_6);
+void SCR_DrawBigStringExt(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3,
+                          std::uint32_t param_4, std::uint32_t param_5);
+void SCR_DrawDemoRecording(void);
 void FUN_004be040(std::uint32_t param_1, std::uint32_t param_2);
 void FUN_004be080(void);
 void SCR_DrawScreenField(stereoFrame_t stereoFrame);
@@ -3188,7 +3189,7 @@ void QLUIImport_VerifyCDKey(void);
 void QLUIImport_IsSubscribedApp(void);
 void QLUIImport_GetItemDownloadInfo(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3,
                                     std::uint32_t param_4);
-void QLUIImport_MeasureText(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3, std::uint32_t param_4,
+void QLImport_MeasureText(std::uint32_t param_1, std::uint32_t param_2, std::uint32_t param_3, std::uint32_t param_4,
                             std::uint32_t param_5, std::uint32_t param_6);
 void QLCGImport_IsClientMuted(std::uint32_t param_1, std::uint32_t param_2);
 void CL_ShutdownUI(void);

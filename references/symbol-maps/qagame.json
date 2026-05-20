@@ -3017,7 +3017,7 @@
       "signature": "const char *BG_WeaponName(weapon_t weapon)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only weapon-name string helper. HLIL reduces the body to a bounds check over the shared weapon-name table with a `None` fallback, and the adjacent `G_ExpandChatTokens` path uses it to expand the `#w` token into the current weapon label plus ammo count."
+      "comment": "Descriptive retail-only weapon-name string helper. HLIL reduces the body to a bounds check over the shared retail weapon-name table with a `None` fallback, and the adjacent `G_ExpandChatTokens` path uses it to expand the `#w` token into the current weapon label plus ammo count; source reconstruction maps the local weapon enum through the retail item-tag order so Heavy Machinegun still resolves through item tag 14."
     },
     {
       "address": "0x1002CD30",
@@ -3027,17 +3027,17 @@
       "signature": "qboolean BG_PlayerTouchesItem(playerState_t *ps, entityState_t *item, int atTime)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact touch-bounds helper from bg_misc.c::BG_PlayerTouchesItem. It evaluates the item trajectory, uses the wider 35-unit Z reach for flag-style team items, and keeps the retail 44x44 horizontal plus -50 vertical pickup bounds."
+      "comment": "Exact touch-bounds helper from bg_misc.c::BG_PlayerTouchesItem. Binary Ninja HLIL evaluates the item trajectory, keeps the retail +/-36 horizontal bounds and -50 lower vertical tolerance, uses a 29-unit upward window for normal items, and expands the upward window to 64 units for red, blue, and neutral team-flag items."
     },
     {
       "address": "0x1002CE00",
       "raw_name": "FUN_1002ce00",
-      "normalized_name": "BG_CanGrabHealthItem",
+      "normalized_name": "BG_CanGrabArmorItem",
       "status": "matched",
-      "signature": "static qboolean BG_CanGrabHealthItem(int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped)",
+      "signature": "static qboolean BG_CanGrabArmorItem(int gametype, int currentTime, const entityState_t *ent, const playerState_t *ps, const gitem_t *item, qboolean dropped)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Standalone retail health-pickup helper used from `BG_CanItemBeGrabbed`. The compiler drops unused switch parameters, but the body matches the 100/50/25 quantity branches and armor-tier health gates carried by bg_misc.c::BG_CanGrabHealthItem."
+      "comment": "Standalone retail tiered armor-pickup helper used from `BG_CanItemBeGrabbed`. Binary Ninja HLIL shows the 100/50/25 item-quantity branches: red armor allows current armor below 200, yellow armor allows below 150 through tier 1 or `armor * 0.75 <= 99.0` at tier 2, and green armor allows below 100 at tier 0, `armor * 0.66 <= 50.0` at tier 1, or `armor * 0.75 <= 50.0` at tier 2."
     },
     {
       "address": "0x1002D1C0",
@@ -3057,7 +3057,7 @@
       "signature": "void BG_EvaluateTrajectory(const trajectory_t *tr, int atTime, vec3_t result)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact trajectory evaluator from bg_misc.c::BG_EvaluateTrajectory. The retail switch covers stationary, interpolate, linear, sine, linear-stop, and gravity, then faults on unknown trajectory types."
+      "comment": "Exact trajectory evaluator from bg_misc.c::BG_EvaluateTrajectory. The retail switch covers stationary, interpolate, linear, linear-stop, sine, gravity, and the Quake Live TR_QL_ACCEL type-6 path, where the dword after trDelta supplies the extra acceleration scalar before unknown trajectory types fault."
     },
     {
       "address": "0x1002D3E0",
@@ -3067,7 +3067,7 @@
       "signature": "void BG_EvaluateTrajectoryDelta(const trajectory_t *tr, int atTime, vec3_t result)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact trajectory-velocity evaluator from bg_misc.c::BG_EvaluateTrajectoryDelta. The retail body preserves the sine derivative path, the linear-stop zeroing after expiry, and the gravity Z subtraction."
+      "comment": "Exact trajectory-velocity evaluator from bg_misc.c::BG_EvaluateTrajectoryDelta. The retail body preserves the sine derivative path, the linear-stop zeroing after expiry, the gravity Z subtraction, and the TR_QL_ACCEL type-6 delta path that subtracts the extra acceleration scalar times elapsed seconds."
     },
     {
       "address": "0x1002D5B0",
@@ -3217,7 +3217,7 @@
       "signature": "static void PM_Friction(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact friction helper from bg_pmove.c::PM_Friction. The retail body zeroes tiny speeds, applies the grounded, water, flight, and spectator drops, then rescales all three velocity components by the resulting newspeed fraction."
+      "comment": "Exact friction helper from bg_pmove.c::PM_Friction. The retail body zeroes tiny speeds, applies grounded friction with crouch-slide and diagonal circle-strafe overrides, adds water/flight/spectator drops, applies the PM_FREEZE or PMF_SCOREBOARD 0.25 drop multiplier, then rescales all three velocity components by the resulting newspeed fraction."
     },
     {
       "address": "0x1002DEF0",
@@ -3357,7 +3357,7 @@
       "signature": "void PM_WaterMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_WaterMove. The retail flow begins with PM_CheckWaterJump, otherwise applies water friction, caps wishspeed by swim scale, clips against the ground plane when needed, and finishes with a no-gravity movement step."
+      "comment": "Exact match for bg_pmove.c::PM_WaterMove. The retail flow begins with PM_CheckWaterJump, otherwise applies PM_Friction, builds the 3D command vector through PM_BuildWishMove3D, falls back to the idle -60 sink vector, clamps wishspeed by the swim scale, accelerates with PM_Accelerate and pm_wateraccelerate, clips against the ground plane when needed, and finishes with PM_SlideMove(qfalse)."
     },
     {
       "address": "0x1002FA20",
@@ -3367,7 +3367,7 @@
       "signature": "void PM_FlyMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_FlyMove. It applies normal friction, builds a wish direction from the command axes, accelerates with flight thrust, and then steps through PM_StepSlideMove without gravity."
+      "comment": "Exact match for bg_pmove.c::PM_FlyMove as reached by spectator and flight-powerup dispatch. It applies PM_Friction, builds the full 3D wish vector through PM_BuildWishMove3D, accelerates with PM_Accelerate and pm_flyaccelerate, and then steps through PM_StepSlideMove(qfalse)."
     },
     {
       "address": "0x1002FA80",
@@ -3397,7 +3397,7 @@
       "signature": "void PM_AirMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_AirMove. The dispatcher reaches it only in the free-air path, and the retail body preserves the friction, wishdir construction, air acceleration, optional ground-plane clip, gravity step-slide, and trailing double-jump probe."
+      "comment": "Exact match for bg_pmove.c::PM_AirMove. The dispatcher reaches it only in the free-air path, and the retail body preserves friction, 2D wishdir construction, the air-control acceleration mode split for airstop versus strafe movement, the pm_wishspeed clamp on pure side movement, PM_Accelerate as the generic velocity pusher, optional PM_AirControl steering, ground-plane clipping, gravity step-slide, PM_InvulnerabilityMove, and the trailing PMF_DOUBLE_JUMP probe."
     },
     {
       "address": "0x1002FF20",
@@ -3417,7 +3417,7 @@
       "signature": "static void PM_LadderMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact ladder-movement path from bg_pmove.c::PM_LadderMove. Retail applies friction, builds a full-axis wish direction from the command vector, caps climb and descent speed to 66% of player speed, accelerates with the shared movement accel, clips against the ground plane when needed, and finishes with PM_SlideMove without gravity."
+      "comment": "Exact ladder-movement path from bg_pmove.c::PM_LadderMove. Retail applies PM_Friction, builds a full-axis wish direction through PM_BuildWishMove3D, overrides explicit climb/descent input to +/-0.66 * speed, caps total wishspeed to the same 66% limit, accelerates with PM_Accelerate and pm_accelerate, clips against the ground plane when needed, and finishes with PM_SlideMove(qfalse)."
     },
     {
       "address": "0x10030360",
@@ -3437,7 +3437,7 @@
       "signature": "void PM_WalkMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_WalkMove. The retail path begins with the water transition gate and PM_CheckJump, applies friction, advances the crouch-slide timer, projects forward/right onto the ground plane, accelerates, clips downhill motion, and resolves the step move."
+      "comment": "Exact match for bg_pmove.c::PM_WalkMove. The retail path begins with the water transition gate, the PM_ShouldUseInvulnerabilityMove handoff through PM_StepSlideMove(qfalse) and PM_InvulnerabilityMove, and PM_CheckJump, then applies friction, refreshes the crouch-slide timer, projects forward/right onto the ground plane, applies duck/wade speed clamps including the crouch-slide 0.75 duck scale, splits slick/knockback acceleration, clips downhill motion, and resolves the final step move."
     },
     {
       "address": "0x10030790",
@@ -3457,7 +3457,7 @@
       "signature": "void PM_NoclipMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_NoclipMove. The retail helper applies extra friction, accelerates from the full three-axis command vector, and integrates the origin directly without collision tracing."
+      "comment": "Exact match for bg_pmove.c::PM_NoclipMove. The retail helper forces DEFAULT_VIEWHEIGHT, applies the 1.5x friction variant, rebuilds the full 3D command vector through PM_BuildWishMove3D, accelerates with PM_Accelerate and pm_accelerate, and integrates origin directly by frametime * velocity without collision tracing."
     },
     {
       "address": "0x100309A0",
@@ -3467,7 +3467,7 @@
       "signature": "int PM_FootstepForSurface(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_FootstepForSurface. It switches directly on the current ground-surface flags to choose no footstep, metal footsteps, or the default footstep event."
+      "comment": "Exact match for bg_pmove.c::PM_FootstepForSurface. It first honors the pmove noFootsteps gate, then switches on the current ground-surface flags for no-steps, metal, snow, wood, or default footstep events."
     },
     {
       "address": "0x100309F0",
@@ -3477,7 +3477,7 @@
       "signature": "void PM_CrashLand(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_CrashLand. The retail body chooses the landing animation, solves the quadratic for impact velocity, scales damage by ducking and water depth, emits the matching fall event, and resets bobCycle."
+      "comment": "Exact match for bg_pmove.c::PM_CrashLand. The retail body chooses the landing animation, solves the quadratic for impact velocity, scales damage by ducking and water depth, suppresses fall events below the gib-health gate, clears the PMF_DOUBLE_JUMP latch, emits the matching fall event, and resets bobCycle."
     },
     {
       "address": "0x10030BE0",
@@ -3487,7 +3487,7 @@
       "signature": "int PM_CorrectAllSolid(trace_t *trace)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_CorrectAllSolid, anchored by the preserved allsolid debug line. The retail helper jitters the origin across the 3x3x3 probe cube, retries the ground trace, and otherwise drops the player out of the ground-contact state."
+      "comment": "Exact match for bg_pmove.c::PM_CorrectAllSolid, anchored by the preserved allsolid debug line. The retail helper jitters the origin across the 3x3x3 probe cube, retraces 0.25 units down into pml.groundTrace on success, and otherwise clears groundEntityNum plus groundTraceLatestEntNum/Time/Normal before dropping pml.groundPlane and pml.walking."
     },
     {
       "address": "0x10030DA0",
@@ -3497,7 +3497,7 @@
       "signature": "void PM_GroundTraceMissed(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_GroundTraceMissed, anchored by the preserved lift debug line. The retail body forces the jump animation when the floor falls away and then clears the grounded state and cached ground-contact data."
+      "comment": "Exact match for bg_pmove.c::PM_GroundTraceMissed, anchored by the preserved lift debug line. The retail body traces 64 units down when the floor falls away, chooses LEGS_JUMP or LEGS_JUMPB/PMF_BACKWARDS_JUMP from forwardmove, and then clears groundEntityNum, groundTraceLatestEntNum/Time/Normal, pml.groundPlane, and pml.walking."
     },
     {
       "address": "0x10030ED0",
@@ -3507,7 +3507,7 @@
       "signature": "void PM_GroundTrace(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_GroundTrace. The retail flow runs the short downward trace, routes allsolid recovery through PM_CorrectAllSolid, handles lift/kickoff/steep transitions, calls PM_CrashLand on fresh landings, and updates the grounded entity state."
+      "comment": "Exact match for bg_pmove.c::PM_GroundTrace. The retail flow traces 0.25 units down, routes allsolid recovery through PM_CorrectAllSolid, handles lift misses, kickoff dot > 10, and steep normals by setting pml.groundPlane without walking, records groundTraceLatestEntNum/Time/Normal on valid ground, clears PMF_TIME_WATERJUMP/PMF_TIME_LAND timers on landing, calls PM_CrashLand, applies the -200 z-velocity PMF_TIME_LAND/250 ms latch, updates PM_RecordGroundContact on fresh or changed ground, and finishes through PM_AddTouchEnt."
     },
     {
       "address": "0x10031140",
@@ -3517,7 +3517,7 @@
       "signature": "void PM_SetWaterLevel(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_SetWaterLevel. It clears watertype and waterlevel, samples three heights relative to the view height, and records whether the player is standing in shallow, mid, or fully submerged water."
+      "comment": "Exact match for bg_pmove.c::PM_SetWaterLevel. It clears watertype and waterlevel, then samples MASK_WATER at MINS_Z + 1, halfway from MINS_Z to viewheight, and head height at viewheight to promote the player through shallow, mid, or fully submerged water levels."
     },
     {
       "address": "0x10031240",
@@ -3527,7 +3527,7 @@
       "signature": "void PM_CheckDuck(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_CheckDuck. The retail helper switches the mins/maxs and viewheight for invulnerability, death, ducking, and standing-up probes before handing off to the crouch-state maintenance logic."
+      "comment": "Exact match for bg_pmove.c::PM_CheckDuck. The retail helper switches the mins/maxs and viewheight for invulnerability, death, ducking, and standing-up probes, then maintains crouchTime and crouchSlideTime inline with the recovered crouch-slide cleanup gates."
     },
     {
       "address": "0x100314D0",
@@ -3537,7 +3537,7 @@
       "signature": "void PM_Footsteps(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_Footsteps. It computes xyspeed, selects the legs animation for water, duck, walk, run, or idle states, advances bobCycle, and emits the matching footstep, splash, or land event when the cycle crosses the boundary."
+      "comment": "Exact match for bg_pmove.c::PM_Footsteps. It computes xyspeed, preserves the crouch-slide movement branch, keeps airborne invulnerability on LEGS_IDLECR and waterlevel > 1 on LEGS_SWIM without advancing bobCycle, resets idle bobCycle when xyspeed < 5, suppresses ducked footsteps, applies the retail axis-speed run gate, and emits footstep, EV_FOOTSPLASH, or EV_SWIM when the bob boundary crosses."
     },
     {
       "address": "0x100317A0",
@@ -3547,7 +3547,7 @@
       "signature": "void PM_WaterEvents(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_WaterEvents. The retail helper compares the previous and current water levels and emits the same touch, leave, under, and clear transition events as the GPL path."
+      "comment": "Exact match for bg_pmove.c::PM_WaterEvents. The retail helper compares previous/current water levels, emits foot touch/leave events, suppresses head-water under/clear events while PM_DEAD, and suppresses EV_WATER_CLEAR while invulnerability is active."
     },
     {
       "address": "0x10031880",
@@ -3567,7 +3567,7 @@
       "signature": "void PM_FinishWeaponChange(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_FinishWeaponChange. It resolves the requested weapon from the current command, falls back when the slot is invalid or unavailable, raises the new weapon, applies the raise timer, and starts the torso raise animation."
+      "comment": "Exact match for bg_pmove.c::PM_FinishWeaponChange. It resolves the requested weapon from the current command, falls back when the slot is invalid or unavailable, raises the new weapon, applies the raise timer, clears the retail +0xe0 chaingun spin accumulator now named STAT_CHAINGUN_SPINUP, and starts the torso raise animation."
     },
     {
       "address": "0x10031990",
@@ -3577,7 +3577,7 @@
       "signature": "void PM_Weapon(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_Weapon. The retail body covers respawn and spectator gating, holdable-item use, weapon cooldown and switching, ready/raising/dropping states, out-of-ammo handling, EV_FIRE_WEAPON emission, ammo consumption, and reload-time scaling."
+      "comment": "Exact match for bg_pmove.c::PM_Weapon. The retail body covers respawn/spectator/health gates, holdable use, attack-lockout and PMF_WEAPON_RESET cleanup, weapon cooldown and sentinel switching, ready/raising/dropping states, out-of-ammo handling, ammo consumption, EV_FIRE_WEAPON emission, Scout/AmmoRegen/Haste refire scaling, and the WP_CHAINGUN +0xe0 spin accumulator now named STAT_CHAINGUN_SPINUP that doubles refire while below 1000 and drains on release."
     },
     {
       "address": "0x10031CE0",
@@ -3607,7 +3607,7 @@
       "signature": "void PM_UpdateViewAngles(playerState_t *ps, const usercmd_t *cmd)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_UpdateViewAngles. It rejects intermission and dead-player updates, then applies the delta angles while clamping pitch to the same +/-16000 short-angle range as the GPL implementation."
+      "comment": "Exact match for bg_pmove.c::PM_UpdateViewAngles. It rejects intermission and dead-player updates while preserving the PM_FREEZE dead-player exception, then applies the delta angles while clamping pitch to the same +/-16000 short-angle range as the GPL implementation."
     },
     {
       "address": "0x10031FA0",
@@ -3617,7 +3617,7 @@
       "signature": "void PmoveSingle(pmove_t *pmove)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PmoveSingle. The retail dispatcher seeds the pm globals, clamps msec, updates view angles and command state, branches through noclip/spectator/water/air/walk/grapple movement, then finishes with timers, weapons, footsteps, and final animation events."
+      "comment": "Exact match for bg_pmove.c::PmoveSingle. The retail dispatcher seeds the pm globals, clamps msec, updates view angles, mirrors weaponPrimary/fov/forwardmove/rightmove/upmove into playerState, honors PMF_NO_MOVE before movement, branches through noclip/spectator/water/air/walk/grapple movement, then finishes with timers, weapons, footsteps, and final animation events."
     },
     {
       "address": "0x100323A0",
@@ -4773,7 +4773,7 @@
         "0x10082EE4"
       ],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only Clan Arena postgame stats publisher. During intermission it emits the per-client castats payload containing the retained weapon-accuracy and round-combat counters that sit alongside the scores_ca scoreboard rows."
+      "comment": "Descriptive retail-only Clan Arena postgame stats publisher. During intermission it emits the per-client castats payload containing damage given/received plus per-weapon frag/accuracy pairs in classic item-tag order (G, MG, SG, GL, RL, LG, RG, PG, BFG, hook, NG, PL, CG, HMG), matching the cgame stats feeder that renders gauntlet as frags-only and the MG-through-HMG columns as kill+accuracy pairs."
     },
     {
       "address": "0x1003E6D0",
@@ -8610,7 +8610,7 @@
       "signature": "void FireWeapon(gentity_t *ent)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for the master weapon dispatcher. It computes the quad factor, records per-weapon accuracy shots, resolves aim vectors and muzzle, and routes into the gauntlet, hitscan, projectile, grapple, nail, prox, chaingun, and heavy-machinegun fire paths."
+      "comment": "Exact match for the master weapon dispatcher. It computes the quad factor, records per-weapon accuracy shots, resolves aim vectors and muzzle, routes into the weapon fire leaves, and derives chaingun spread from the shared playerState +0xe0 spin accumulator recovered in PM_Weapon."
     },
     {
       "address": "0x1006F690",

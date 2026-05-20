@@ -90,7 +90,6 @@ static const weapon_t retailAccuracyCommandOrder[] = {
 static const weapon_t castatWeapons[CASTAT_WEAPON_COUNT] = {
 	WP_GAUNTLET,
 	WP_MACHINEGUN,
-	WP_HEAVY_MACHINEGUN,
 	WP_SHOTGUN,
 	WP_GRENADE_LAUNCHER,
 	WP_ROCKET_LAUNCHER,
@@ -101,7 +100,8 @@ static const weapon_t castatWeapons[CASTAT_WEAPON_COUNT] = {
 	WP_GRAPPLING_HOOK,
 	WP_NAILGUN,
 	WP_PROX_LAUNCHER,
-	WP_CHAINGUN
+	WP_CHAINGUN,
+	WP_HEAVY_MACHINEGUN
 };
 
 static const teamScoreStatIndex_t scorestatPlacementPickupTeamStats[SCORESTAT_PICKUP_COUNT] = {
@@ -3549,6 +3549,7 @@ qboolean G_CanForfeit( gentity_t *ent, qboolean fromCommand ) {
 			return qfalse;
 		}
 
+		ent->client->ps.persistant[PERS_SCORE] = -999;
 		return qtrue;
 	}
 

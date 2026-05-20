@@ -45,13 +45,19 @@ def test_shared_surface_flags_restore_quakelive_snow_and_wood_steps() -> None:
 
 def test_pmove_surface_helper_emits_retail_quakelive_step_events() -> None:
 	source = BG_PMOVE.read_text( encoding = "utf-8" )
+	helper_start = source.index("static int PM_FootstepForSurface( void )")
+	footsteps_start = source.index("static void PM_Footsteps( void )")
 
+	assert "if ( pm->noFootsteps ) {" in source
 	assert "if ( pml.groundTrace.surfaceFlags & SURF_METALSTEPS ) {" in source
 	assert "return EV_FOOTSTEP_METAL;" in source
 	assert "if ( pml.groundTrace.surfaceFlags & SURF_SNOWSTEPS ) {" in source
 	assert "return EV_FOOTSTEP_SNOW;" in source
 	assert "if ( pml.groundTrace.surfaceFlags & SURF_WOODSTEPS ) {" in source
 	assert "return EV_FOOTSTEP_WOOD;" in source
+	assert helper_start < source.index("if ( pm->noFootsteps ) {", helper_start)
+	assert source.index("if ( pm->noFootsteps ) {", helper_start) < source.index("if ( pml.groundTrace.surfaceFlags & SURF_NOSTEPS )", helper_start)
+	assert "footstep && !pm->noFootsteps" not in source[footsteps_start:]
 
 
 def test_shader_surfaceparm_table_restores_snowsteps_and_woodsteps() -> None:

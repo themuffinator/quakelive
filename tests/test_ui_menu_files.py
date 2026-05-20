@@ -167,7 +167,7 @@ def test_ui_extended_native_exports_match_retail_bridge_surface() -> None:
     assert "UI_DrawAdvertisementWaitScreen" in ui_main
     assert "Waiting on Advertisement" in ui_main
     assert "Press ESC to cancel" in ui_main
-    assert "Waiting for new key... Press ESC..." in ui_main
+    assert "Waiting for new key... Press ESCAPE to cancel" in ui_main
 
     ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
     assert "qboolean Menus_AnyVisible()" in ui_shared
@@ -401,9 +401,16 @@ def test_ui_dead_legacy_helper_band_is_removed() -> None:
     resolve_menu_flow_block = _extract_function_block(
         ui_main, "static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {"
     )
+    load_menus_block = _extract_function_block(
+        ui_main, "void UI_LoadMenus(const char *menuFile, qboolean reset) {"
+    )
     assert "UI_BrowserOverlayAvailable()" in resolve_menu_flow_block
     assert "UI_BrowserBridgeAvailable()" in resolve_menu_flow_block
     assert "UI_RequestedMenuFlow" not in resolve_menu_flow_block
+    assert "static qboolean UI_MenuFlowUsesBrowserOverlay(uiMenuFlow_t flow) {" in ui_main
+    assert "UI_SetBrowserActive(flow == UI_MENU_FLOW_QUAKELIVE);" not in ui_main
+    assert "UI_SetBrowserActive(ui_activeMenuFlow == UI_MENU_FLOW_QUAKELIVE);" not in ui_main
+    assert "UI_SetBrowserActive(UI_MenuFlowUsesBrowserOverlay(ui_activeMenuFlow));" in load_menus_block
 
 
 def test_ui_service_disabled_exec_paths_keep_menu_flow_navigable() -> None:
@@ -444,9 +451,11 @@ def test_ui_service_disabled_exec_paths_keep_menu_flow_navigable() -> None:
     assert 'action { open ingame_about ; exec "web_showBrowser" }' in lowernav_menu
 
     assert 'menuDef_t *menu = Menus_FindByName("Connect");' in connect_block
-    assert 'Text_PaintCenter(centerPoint, yStart + 48, scale, colorWhite, va("Starting up..."), ITEM_TEXTSTYLE_SHADOWEDMORE);' in connect_block
+    assert 'Text_PaintCenter(centerPoint, yStart + 48, scale, colorWhite, va("Starting up..."), 0);' in connect_block
+    assert 'Text_PaintCenter(centerPoint, yStart + 48, scale, colorWhite,text , 0);' in connect_block
     assert 'strcpy(text, va("Connecting to %s", cstate.servername));' in connect_block
     assert 'Text_PaintCenter(centerPoint, yStart + 80, scale, colorWhite, s, 0);' in connect_block
+    assert 'Text_PaintCenter(centerPoint, 440, scale, colorWhite, "Press ESC to cancel", 0);' in connect_block
 
     assert 'static const char *waitingText = "Waiting on Advertisement";' in advert_wait_block
     assert 'static const char *cancelText = "Press ESC to cancel";' in advert_wait_block
@@ -654,6 +663,28 @@ def test_ui_retail_advert_runtime_seam_restored() -> None:
     assert ui_main.index("UI_InitAdvertisementBridge();") < ui_main.index("uiInfo.uiDC.setupAdvertCellShader = &UI_SetupAdvertCellShader;")
 
 
+def test_ui_retail_advert_paint_refresh_and_browser_active_gate_restored() -> None:
+    ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
+    helper_block = _extract_function_block(ui_shared, "static qboolean Menu_WebBrowserActive(void) {")
+    paint_block = _extract_function_block(ui_shared, "void Menu_Paint(menuDef_t *menu, qboolean forcePaint) {")
+
+    assert 'DC->getCVarValue("web_browserActive")' in helper_block
+
+    hidden_gate = paint_block.index("if (!(menu->window.flags & WINDOW_VISIBLE) &&  !forcePaint) {")
+    hidden_clear = paint_block.index("menu->window.flags &= ~WINDOW_FORCED;", hidden_gate)
+    hidden_refresh = paint_block.index("Menu_RefreshAdvertCellShaders(menu);", hidden_clear)
+    hidden_return = paint_block.index("return;", hidden_refresh)
+    assert hidden_gate < hidden_clear < hidden_refresh < hidden_return
+
+    ownerdraw_gate = paint_block.index("if ((menu->window.ownerDrawFlags || menu->window.ownerDrawFlags2) && DC->ownerDrawVisible &&")
+    browser_gate = paint_block.index("if (Menu_WebBrowserActive()) {")
+    force_flag = paint_block.index("if (forcePaint) {")
+    visible_refresh = paint_block.index("Menu_RefreshAdvertCellShaders(menu);", browser_gate)
+    preset_refresh = paint_block.index("Menu_UpdatePresetLists(menu);")
+
+    assert ownerdraw_gate < browser_gate < force_flag < visible_refresh < preset_refresh
+
+
 def test_ui_retail_listbox_and_secondary_ownerdraw_flags_parse_cleanly() -> None:
     ui_shared_h = (REPO_ROOT / "src/code/ui/ui_shared.h").read_text(encoding="utf-8")
     assert "int ownerDrawFlags2;" in ui_shared_h
@@ -835,6 +866,32 @@ def test_ui_native_export_table_matches_recovered_retail_order() -> None:
     assert '"exports": ["dllEntry", "vmMain"]' in export_manifest
 
 
+def test_ui_retail_keybind_pending_prompt_matches_width_and_paint_paths() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    width_block = _extract_function_block(ui_main, "static int UI_OwnerDrawWidth(int ownerDraw, float scale) {")
+    paint_block = _extract_function_block(
+        ui_main, "static void UI_DrawKeyBindStatus(rectDef_t *rect, float scale, vec4_t color, int textStyle) {"
+    )
+
+    assert 's = "Waiting for new key... Press ESCAPE to cancel";' in width_block
+    assert 'Text_Paint(rect->x, rect->y, scale, color, "Waiting for new key... Press ESCAPE to cancel", 0, 0, textStyle);' in paint_block
+    assert '"Waiting for new key... Press ESC..."' not in ui_main
+
+
+def test_ui_retail_crosshair_color_key_handler_respects_health_color_gate() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    handle_block = _extract_function_block(
+        ui_main, "static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, int key) {"
+    )
+    color_case = handle_block.split("case UI_CROSSHAIR_COLOR:", 1)[1].split("case UI_SELECTEDPLAYER:", 1)[0]
+
+    assert 'if (trap_Cvar_VariableValue("cg_crosshairHealth") == 0) {' in color_case
+    assert "return UI_CrosshairColor_HandleKey(flags, special, key);" in color_case
+    assert color_case.index('if (trap_Cvar_VariableValue("cg_crosshairHealth") == 0) {') < color_case.index(
+        "return UI_CrosshairColor_HandleKey(flags, special, key);"
+    )
+
+
 def test_ui_retail_toggle_script_command_restored() -> None:
     ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
     assert "static void Script_Toggle(itemDef_t *item, char **args)" in ui_shared
@@ -909,6 +966,37 @@ def test_ui_retail_item_font_runtime_compatibility_restored() -> None:
     assert "uiInfo.uiDC.textWidthExt = &Text_WidthExt;" in ui_main
     assert "uiInfo.uiDC.textHeightExt = &Text_HeightExt;" in ui_main
     assert "uiInfo.uiDC.drawTextWithCursorExt = &Text_PaintWithCursorExt;" in ui_main
+
+
+def test_ui_retail_centered_text_helper_keeps_plain_text_style() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    paint_center_block = _extract_function_block(
+        ui_main, "void Text_PaintCenter(float x, float y, float scale, vec4_t color, const char *text, float adjust) {"
+    )
+
+    assert "(void)adjust;" in paint_center_block
+    assert "len = Text_Width(text, scale, 0);" in paint_center_block
+    assert "Text_Paint(x - len / 2, y, scale, color, text, 0, 0, 0);" in paint_center_block
+    assert "ITEM_TEXTSTYLE_SHADOWEDMORE" not in paint_center_block
+
+
+def test_ui_retail_download_info_reads_item_progress_through_native_slot() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    download_block = _extract_function_block(
+        ui_main,
+        "static void UI_DisplayDownloadInfo( const char *downloadName, float centerPoint, float yStart, float scale ) {",
+    )
+    native_start = download_block.index("#ifndef Q3_VM")
+    fallback_start = download_block.index("#else", native_start)
+    native_block = download_block[native_start:fallback_start]
+
+    assert 'trap_Cvar_VariableStringBuffer( "cl_downloadItem", downloadItem, sizeof( downloadItem ) );' in native_block
+    assert 'sscanf( downloadItem, "%llu", &downloadItemId );' in native_block
+    assert "trap_QL_GetItemDownloadInfo( (unsigned int)downloadItemId, (unsigned int)( downloadItemId >> 32 ), &downloadCount, &downloadSize );" in native_block
+    assert 'trap_Cvar_VariableValue( "cl_downloadTime" );' in download_block
+    assert 'trap_Cvar_VariableValue( "cl_downloadCount" )' not in native_block
+    assert 'trap_Cvar_VariableValue( "cl_downloadSize" )' not in native_block
+    assert "unsigned long long downloadSize, downloadCount;" in download_block
 
 
 def test_ui_menu_font_parser_stores_resolved_font_token() -> None:
@@ -1258,6 +1346,178 @@ def test_ui_retail_callvote_map_token_path_restored() -> None:
     assert "trap_Cvar_Update( &ui_cvGameType );" in active_menu_block
     assert 'Menus_ActivateByName("ingame");' in active_menu_block
     assert 'Menus_ActivateByName("ingame_about");' in active_menu_block
+
+
+def test_ui_retail_admin_scripts_use_player_list_client_numbers() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+    build_player_list_block = _extract_function_block(ui_main, "static void UI_BuildPlayerList() {")
+    admin_client_block = _extract_function_block(
+        ui_main, "static qboolean UI_GetSelectedAdminClientNum(const char *scriptName, int *clientNum) {"
+    )
+    run_menu_script_block = _extract_function_block(
+        ui_main, "static void UI_RunMenuScript(char **args) {"
+    )
+
+    assert "int playerClientNums[MAX_CLIENTS];" in ui_local
+    assert "uiInfo.playerClientNums[uiInfo.playerCount] = n;" in build_player_list_block
+    assert "uiInfo.playerIndex;" in admin_client_block
+    assert "selected >= uiInfo.playerCount" in admin_client_block
+    assert "*clientNum = uiInfo.playerClientNums[selected];" in admin_client_block
+    assert 'trap_Cvar_VariableValue("cg_selectedPlayer")' not in admin_client_block
+    assert "uiInfo.teamClientNums[selected]" not in admin_client_block
+
+    for command in (
+        'va("clientviewprofile %i\\n", clientNum)',
+        'va("clientfriendinvite %i\\n", clientNum)',
+        'va("clientmute %i\\n", clientNum)',
+        'va("callvote clientkick %i\\n", clientNum)',
+        'va("tempban %i\\n", clientNum)',
+        'va("ban %i\\n", clientNum)',
+        'va("mute %i\\n", clientNum)',
+        'va("unmute %i\\n", clientNum)',
+        'va("addmod %i\\n", clientNum)',
+        'va("addadmin %i\\n", clientNum)',
+        'va("demote %i\\n", clientNum)',
+        'va("put %i r\\n", clientNum)',
+        'va("put %i b\\n", clientNum)',
+        'va("put %i s\\n", clientNum)',
+    ):
+        assert command in run_menu_script_block
+
+
+def test_ui_retail_vote_kick_uses_player_name_suffix_for_spaced_names() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    run_menu_script_block = _extract_function_block(
+        ui_main, "static void UI_RunMenuScript(char **args) {"
+    )
+    vote_kick_block = run_menu_script_block.split('Q_stricmp(name, "voteKick") == 0', 1)[1].split(
+        'Q_stricmp(name, "voteGame") == 0', 1
+    )[0]
+
+    assert "const char *kickName;" in vote_kick_block
+    assert 'kickName = strstr(uiInfo.playerNames[uiInfo.playerIndex], " ");' in vote_kick_block
+    assert "if (!kickName) {" in vote_kick_block
+    assert "kickName = uiInfo.playerNames[uiInfo.playerIndex];" in vote_kick_block
+    assert 'va("callvote kick %s\\n", kickName)' in vote_kick_block
+    assert 'va("callvote kick %s\\n",uiInfo.playerNames[uiInfo.playerIndex])' not in vote_kick_block
+
+
+def test_ui_retail_addbot_uses_bot_catalog_independent_of_gametype() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    draw_bot_block = _extract_function_block(
+        ui_main, "static void UI_DrawBotName(rectDef_t *rect, float scale, vec4_t color, int textStyle) {"
+    )
+    handle_bot_block = _extract_function_block(
+        ui_main, "static qboolean UI_BotName_HandleKey(int flags, float *special, int key) {"
+    )
+    run_menu_script_block = _extract_function_block(
+        ui_main, "static void UI_RunMenuScript(char **args) {"
+    )
+    addbot_block = run_menu_script_block.split('Q_stricmp(name, "addBot") == 0', 1)[1].split(
+        'Q_stricmp(name, "addFavorite") == 0', 1
+    )[0]
+
+    assert "text = UI_GetBotNameByNumber(value);" in draw_bot_block
+    assert "if (value >= UI_GetNumBots()) {" in draw_bot_block
+    assert 'trap_Cvar_VariableValue("g_gametype")' not in draw_bot_block
+    assert "uiInfo.characterList[value].name" not in draw_bot_block
+
+    assert "if (value >= UI_GetNumBots() + 2) {" in handle_bot_block
+    assert "value = UI_GetNumBots() + 2 - 1;" in handle_bot_block
+    assert 'trap_Cvar_VariableValue("g_gametype")' not in handle_bot_block
+    assert "uiInfo.characterCount + 2" not in handle_bot_block
+
+    assert 'va("addbot %s %i %s\\n", UI_GetBotNameByNumber(uiInfo.botIndex), uiInfo.skillIndex+1,' in addbot_block
+    assert 'trap_Cvar_VariableValue("g_gametype")' not in addbot_block
+    assert "uiInfo.characterList[uiInfo.botIndex].name" not in addbot_block
+
+
+def test_ui_retail_team_order_scripts_route_selected_team_targets() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    run_menu_script_block = _extract_function_block(
+        ui_main, "static void UI_RunMenuScript(char **args) {"
+    )
+    orders_block = _extract_function_block(ui_main, "static void UI_RunOrdersScript(const char *command) {")
+    voice_team_block = _extract_function_block(
+        ui_main, "static void UI_RunVoiceOrdersTeamScript(const char *command) {"
+    )
+    voice_block = _extract_function_block(ui_main, "static void UI_RunVoiceOrdersScript(const char *command) {")
+
+    for command_name, helper_name in (
+        ("orders", "UI_RunOrdersScript(name2);"),
+        ("voiceOrdersTeam", "UI_RunVoiceOrdersTeamScript(name2);"),
+        ("voiceOrders", "UI_RunVoiceOrdersScript(name2);"),
+    ):
+        script_case = run_menu_script_block.split(f'Q_stricmp(name, "{command_name}") == 0', 1)[1].split(
+            "} else if", 1
+        )[0]
+        assert "if (String_Parse(args, &name2)) {" in script_case
+        assert helper_name in script_case
+
+    assert 'selected = trap_Cvar_VariableValue("cg_selectedPlayer");' in orders_block
+    assert "selected >= 0 && selected < uiInfo.myTeamCount" in orders_block
+    assert "va(command, uiInfo.teamClientNums[selected])" in orders_block
+    assert "for (i = 0; i < uiInfo.myTeamCount; i++) {" in orders_block
+    assert 'Q_stricmp(uiInfo.teamNames[i], UI_Cvar_VariableString("name"))' in orders_block
+    assert "va(command, uiInfo.teamNames[i])" in orders_block
+    assert 'trap_Cmd_ExecuteText(EXEC_APPEND, "\\n");' in orders_block
+    assert "UI_CloseInGameMenu();" in orders_block
+
+    assert 'selected = trap_Cvar_VariableValue("cg_selectedPlayer");' in voice_team_block
+    assert "selected == uiInfo.myTeamCount" in voice_team_block
+    assert "trap_Cmd_ExecuteText(EXEC_APPEND, command);" in voice_team_block
+    assert 'trap_Cmd_ExecuteText(EXEC_APPEND, "\\n");' in voice_team_block
+    assert "UI_CloseInGameMenu();" in voice_team_block
+
+    assert 'selected = trap_Cvar_VariableValue("cg_selectedPlayer");' in voice_block
+    assert "selected >= 0 && selected < uiInfo.myTeamCount" in voice_block
+    assert "va(command, uiInfo.teamClientNums[selected])" in voice_block
+    assert 'trap_Cmd_ExecuteText(EXEC_APPEND, "\\n");' in voice_block
+    assert "UI_CloseInGameMenu();" in voice_block
+
+
+def test_ui_retail_model_update_scripts_restore_alias_and_player_refresh_flag() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    run_menu_script_block = _extract_function_block(
+        ui_main, "static void UI_RunMenuScript(char **args) {"
+    )
+    team_model_block = run_menu_script_block.split(
+        'Q_stricmp(name, "teamModelChanged") == 0', 1
+    )[1].split('Q_stricmp(name, "teamColorDefaults") == 0', 1)[0]
+    enemy_model_block = run_menu_script_block.split(
+        'Q_stricmp(name, "enemyModelChanged") == 0', 1
+    )[1].split('Q_stricmp(name, "enemyColorDefaults") == 0', 1)[0]
+    player_model_block = run_menu_script_block.split(
+        'Q_stricmp(name, "playerModelChanged") == 0', 1
+    )[1].split('Q_stricmp(name, "ServerSort") == 0', 1)[0]
+
+    assert 'Q_stricmp(name, "openWebGameSettings") == 0' in team_model_block
+    assert "UI_UpdateForceModelSettings(qtrue);" in team_model_block
+    assert "UI_UpdateForceModelSettings(qfalse);" in enemy_model_block
+    assert "updateModel = qtrue;" in player_model_block
+
+
+def test_ui_retail_fullscreen_menu_scripts_match_native_command_surface() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    run_menu_script_block = _extract_function_block(
+        ui_main, "static void UI_RunMenuScript(char **args) {"
+    )
+    fullscreen_block = run_menu_script_block.split(
+        'Q_stricmp(name, "setFullScreen") == 0', 1
+    )[1].split('Q_stricmp(name, "clientviewProfile") == 0', 1)[0]
+
+    for expected in (
+        'Q_stricmp(name, "setWindowed") == 0',
+        'Q_stricmp(name, "toggleFullscreen") == 0',
+        'trap_Cvar_Set( "r_fullScreen", "1" );',
+        'trap_Cvar_Set( "r_fullScreen", "0" );',
+        'fullscreen = ( trap_Cvar_VariableValue( "r_fullScreen" ) != 0.0f ) ? qtrue : qfalse;',
+        'trap_Cvar_Set( "r_fullScreen", fullscreen ? "0" : "1" );',
+    ):
+        assert expected in fullscreen_block
+
+    assert fullscreen_block.count('trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart fast\\n" );') == 3
 
 
 def test_ui_retail_callvote_map_feeder_uses_active_map_slab() -> None:

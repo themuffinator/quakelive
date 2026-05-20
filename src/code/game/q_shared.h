@@ -1232,7 +1232,9 @@ typedef struct playerState_s {
 
 	int			clientNum;		// ranges from 0 to MAX_CLIENTS-1
 	int			weapon;			// copied to entityState_t->weapon
+	int			weaponPrimary;	// mirrored usercmd byte for retail follow/demo HUD widgets
 	int			weaponstate;
+	int			fov;			// mirrored usercmd byte for retail prediction/HUD consumers
 
 	vec3_t		viewangles;		// for fixed views
 	int			viewheight;
@@ -1265,6 +1267,8 @@ typedef struct playerState_s {
 	int			pmove_framecount;	// FIXME: don't transmit over the network
 	int			jumppad_frame;
 	int			entityEventSequence;
+
+	// replicated Quake Live HUD/prediction sidecars
 	int			armorTier;		// retail Quake Live tiered armor state: 0=green, 1=yellow, 2=red
 	int			forwardmove;	// mirrored usercmd byte for retail follow/demo HUD widgets
 	int			rightmove;	// mirrored usercmd byte for retail follow/demo HUD widgets
@@ -1307,6 +1311,8 @@ typedef struct usercmd_s {
 	int				angles[3];
 	int 			buttons;
 	byte			weapon;           // weapon 
+	byte			weaponPrimary;
+	byte			fov;
 	signed char	forwardmove, rightmove, upmove;
 } usercmd_t;
 
@@ -1321,7 +1327,8 @@ typedef enum {
 	TR_LINEAR,
 	TR_LINEAR_STOP,
 	TR_SINE,					// value = base + sin( time / duration ) * delta
-	TR_GRAVITY
+	TR_GRAVITY,
+	TR_QL_ACCEL					// Quake Live extension: type 6 reads an extra acceleration scalar after trDelta
 } trType_t;
 
 typedef struct {

@@ -29,14 +29,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../ui/menudef.h"
 
-// Quake Live retail menus define extra ownerdraw flags/ids not present in the GPL header.
-#ifndef CG_SHOW_IF_1ST_PLYR_TRACKED
-#define CG_SHOW_IF_1ST_PLYR_TRACKED 0x00800000
-#endif
-#ifndef CG_SHOW_IF_2ND_PLYR_TRACKED
-#define CG_SHOW_IF_2ND_PLYR_TRACKED 0x01000000
-#endif
-
 #ifndef CG_SPEC_FOLLOW_PRIMARY
 #define CG_SPEC_FOLLOW_PRIMARY 340
 #define CG_SPEC_FOLLOW_SECONDARY 341

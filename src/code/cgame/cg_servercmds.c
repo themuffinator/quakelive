@@ -1090,7 +1090,6 @@ static const weapon_t cgScoreStatAccuracyWeapons[CG_SCORESTAT_ACCURACY_WEAPON_CO
 static const weapon_t cgCAStatWeapons[CG_CASTAT_WEAPON_COUNT] = {
 	WP_GAUNTLET,
 	WP_MACHINEGUN,
-	WP_HEAVY_MACHINEGUN,
 	WP_SHOTGUN,
 	WP_GRENADE_LAUNCHER,
 	WP_ROCKET_LAUNCHER,
@@ -1101,7 +1100,8 @@ static const weapon_t cgCAStatWeapons[CG_CASTAT_WEAPON_COUNT] = {
 	WP_GRAPPLING_HOOK,
 	WP_NAILGUN,
 	WP_PROX_LAUNCHER,
-	WP_CHAINGUN
+	WP_CHAINGUN,
+	WP_HEAVY_MACHINEGUN
 };
 
 /*
@@ -2105,6 +2105,7 @@ static void CG_ParseDuelScores( void ) {
 		int	baseArg;
 		int	clientNum;
 		int	weaponArg;
+		int	weaponIndex;
 		weapon_t	weapon;
 
 		baseArg = 2 + i * CG_RETAIL_DUEL_SCORE_ROW_FIELDS;
@@ -2147,7 +2148,8 @@ static void CG_ParseDuelScores( void ) {
 			cg.scoreStats[clientNum].pickupAvgSeconds[CG_SCORESTAT_PICKUP_MH] = (float)atof( CG_Argv( baseArg + 20 ) );
 
 			weaponArg = baseArg + CG_RETAIL_DUEL_CORE_FIELDS;
-			for ( weapon = WP_GAUNTLET; weapon < WP_NUM_WEAPONS; ++weapon ) {
+			for ( weaponIndex = 0; weaponIndex < ARRAY_LEN( cg_retailWeaponReloadOrder ); weaponIndex++ ) {
+				weapon = cg_retailWeaponReloadOrder[weaponIndex];
 				cg.scoreStats[clientNum].weaponFrags[weapon] = atoi( CG_Argv( weaponArg ) );
 				cg.scoreStats[clientNum].weaponDamage[weapon] = atoi( CG_Argv( weaponArg + 1 ) );
 				cg.scoreStats[clientNum].weaponShots[weapon] = atoi( CG_Argv( weaponArg + 3 ) );
@@ -2595,7 +2597,9 @@ void CG_ParseServerinfo( void ) {
 	cgs.teamflags = atoi( Info_ValueForKey( info, "teamflags" ) );
 	cgs.fraglimit = atoi( Info_ValueForKey( info, "fraglimit" ) );
 	cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );
+	cgs.scorelimit = atoi( Info_ValueForKey( info, "g_scorelimit" ) );
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
+	cgs.roundlimit = atoi( Info_ValueForKey( info, "roundlimit" ) );
 	CG_SetGameInfoCvars();
 	voteFlagsValue = Info_ValueForKey( info, "g_voteFlags" );
 	cgs.voteFlags = atoi( voteFlagsValue );
@@ -3240,7 +3244,7 @@ static void CG_ParseSharedRaceDominationConfigStrings( void ) {
 	}
 
 	CG_ParseRaceInit();
-	if ( cgs.gametype != GT_DOMINATION ) {
+	if ( cgs.gametype != GT_DOMINATION && cgs.gametype != GT_ATTACK_DEFEND ) {
 		return;
 	}
 

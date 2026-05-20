@@ -30,6 +30,14 @@ typedef struct {
 	int	eventSequence;
 } qlr_double_jump_result_t;
 
+typedef struct {
+	int	weaponPrimary;
+	int	fov;
+	int	forwardmove;
+	int	rightmove;
+	int	upmove;
+} qlr_command_mirror_result_t;
+
 static qlr_trace_mode_t	qlr_traceMode;
 static int		qlr_traceCallCount;
 
@@ -371,4 +379,40 @@ QLR_EXPORT void QLR_RunAirDoubleJumpSequence( qlr_double_jump_result_t *outResul
 	outResult->reuseJumpVelocity = localPS.velocity[2];
 	outResult->doubleJumped = localPS.doubleJumped;
 	outResult->eventSequence = localPS.eventSequence;
+}
+
+/*
+=============
+QLR_RunCommandMirrorScenario
+
+Runs one pmove frame and captures the retail playerstate command-axis mirrors.
+=============
+*/
+QLR_EXPORT void QLR_RunCommandMirrorScenario( qlr_command_mirror_result_t *outResult ) {
+	pmove_t		localPM;
+	playerState_t	localPS;
+	pmove_settings_t	localSettings;
+
+	if ( !outResult ) {
+		return;
+	}
+
+	memset( outResult, 0, sizeof( *outResult ) );
+	QLR_ResetPmove( &localPM, &localPS, &localSettings );
+	QLR_ResetTraceMode( QLR_TRACE_FREE_AIR );
+
+	localPM.cmd.weaponPrimary = 14;
+	localPM.cmd.fov = 110;
+	localPM.cmd.forwardmove = -127;
+	localPM.cmd.rightmove = 64;
+	localPM.cmd.upmove = -12;
+	localPM.cmd.serverTime = 16;
+
+	PmoveSingle( &localPM );
+
+	outResult->weaponPrimary = localPS.weaponPrimary;
+	outResult->fov = localPS.fov;
+	outResult->forwardmove = localPS.forwardmove;
+	outResult->rightmove = localPS.rightmove;
+	outResult->upmove = localPS.upmove;
 }

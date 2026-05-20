@@ -56,6 +56,45 @@ def test_check_exit_rules_matches_retail_gate_order_and_limit_owners() -> None:
 	assert "if ( -scoreDelta >= mercylimit.integer ) {" in check_block
 
 
+def test_overtime_helpers_publish_retail_sudden_death_state() -> None:
+	main_c = _read("src/code/game/g_main.c")
+	build_limit_block = _block_from_marker(main_c, "static int G_BuildExitRuleLimitMsec")
+	start_block = _block_from_marker(main_c, "static qboolean G_StartOrExtendOvertime")
+	stop_block = _block_from_marker(main_c, "static void G_StopOvertime")
+	level_timers_block = _block_from_marker(main_c, "static void LevelCheckTimers")
+
+	assert "totalMsec = (long long)minutes * 60000 + bonusMsec;" in build_limit_block
+	assert "if ( totalMsec > INT_MAX ) {" in build_limit_block
+	assert "return INT_MAX;" in build_limit_block
+
+	assert "overtimeMillis = ( lengthSeconds > 0 ) ? lengthSeconds * 1000 : 0;" in start_block
+	assert "if ( level.overtimeActive && level.overtimeEndTime > level.time ) {" in start_block
+	assert "level.overtimeAccumulatedMsec += overtimeMillis;" in start_block
+	assert "level.overtimeStartTime = level.time;" in start_block
+	assert "level.overtimeEndTime = level.startTime +" in start_block
+	assert "G_BuildExitRuleLimitMsec( g_timelimit.integer, level.overtimeAccumulatedMsec );" in start_block
+	assert "level.overtimeCount++;" in start_block
+	assert "level.suddenDeathActive = qtrue;" in start_block
+	assert "level.suddenDeathLastDelay = -1;" in start_block
+	assert "level.suddenDeathNoRespawnLogged = qfalse;" in start_block
+	assert "G_UpdateMatchStateConfigString();" in start_block
+
+	assert "level.overtimeActive = qfalse;" in stop_block
+	assert "level.overtimeAccumulatedMsec = 0;" in stop_block
+	assert "level.overtimeCount = 0;" in stop_block
+	assert "level.suddenDeathActive = qfalse;" in stop_block
+	assert 'trap_SetConfigstring( CS_WARMUP_READY, "" );' in stop_block
+	assert "G_UpdateMatchStateConfigString();" in stop_block
+
+	assert "G_CheckTimeoutExpired();" in level_timers_block
+	assert "if ( level.timeoutActive ) {" in level_timers_block
+	assert "return;" in level_timers_block
+	assert "if ( level.intermissiontime || level.intermissionQueued || level.warmupTime ) {" in level_timers_block
+	assert "G_StopOvertime();" in level_timers_block
+	assert "if ( level.overtimeActive ) {" in level_timers_block
+	assert "G_SuddenDeathThink();" in level_timers_block
+
+
 def test_intermission_exit_flow_uses_retail_fixed_grace_window_and_latch() -> None:
 	main_c = _read("src/code/game/g_main.c")
 	intermission_block = _block_from_marker(main_c, "void CheckIntermissionExit( void )")
@@ -145,16 +184,73 @@ def test_nextmap_vote_pipeline_matches_retail_intermission_vote_flow() -> None:
 	assert "RemoveTournamentLoser();" in exit_block
 
 
+def test_nextmap_vote_slot_selector_preserves_retail_tie_and_empty_slot_rules() -> None:
+	main_c = _read("src/code/game/g_main.c")
+	selector_block = _block_from_marker(main_c, "static int G_SelectNextMapVoteSlot( void )")
+
+	assert "maxVotes = -1;" in selector_block
+	assert "tiedSlotCount = 0;" in selector_block
+	assert 'trap_Cvar_VariableStringBuffer( "nextmaps", nextmaps, sizeof( nextmaps ) );' in selector_block
+	assert "for ( slot = 0; slot < 3; slot++ ) {" in selector_block
+	assert 'Com_sprintf( key, sizeof( key ), "map_%i", slot );' in selector_block
+	assert 'Q_strncpyz( mapName, value ? value : "", sizeof( mapName ) );' in selector_block
+	assert "if ( !mapName[0] ) {" in selector_block
+	assert "continue;" in selector_block
+	assert "if ( level.nextMapVoteCounts[slot] > maxVotes ) {" in selector_block
+	assert "maxVotes = level.nextMapVoteCounts[slot];" in selector_block
+	assert "tiedSlotCount = 0;" in selector_block
+	assert "tiedSlots[tiedSlotCount++] = slot;" in selector_block
+	assert "} else if ( level.nextMapVoteCounts[slot] == maxVotes ) {" in selector_block
+	assert "if ( tiedSlotCount <= 0 ) {" in selector_block
+	assert "return -1;" in selector_block
+	assert "if ( tiedSlotCount == 1 ) {" in selector_block
+	assert "return tiedSlots[0];" in selector_block
+	assert "slot = (int)( (float)( rand() & 0x7fff ) / 32767.0f * tiedSlotCount );" in selector_block
+	assert "if ( slot >= tiedSlotCount ) {" in selector_block
+	assert "slot = tiedSlotCount - 1;" in selector_block
+	assert "return tiedSlots[slot];" in selector_block
+
+
 def test_log_exit_emits_retail_match_end_events() -> None:
 	main_c = _read("src/code/game/g_main.c")
 	log_exit_block = _block_from_marker(main_c, "void LogExit( const char *string )")
 
+	assert "Q_strncpyz( level.rankExitMessage, exitMessage, sizeof( level.rankExitMessage ) );" in log_exit_block
+	assert 'G_LogPrintf( "Exit: %s\\n", exitMessage );' in log_exit_block
+	assert "level.intermissionQueued = level.time;" in log_exit_block
 	assert "teamMatchEnd = ( g_gametype.integer > GT_SINGLE_PLAYER && g_gametype.integer != GT_RED_ROVER );" in log_exit_block
 	assert 'trap_SetConfigstring( CS_INTERMISSION, "1" );' not in log_exit_block
 	assert 'te = G_TempEntity( vec3_origin, EV_GLOBAL_TEAM_SOUND );' in log_exit_block
 	assert 'te = G_TempEntity( vec3_origin, EV_GAMEOVER );' in log_exit_block
 	assert "G_SetRetailGlobalTeamSoundPayload( te," in log_exit_block
 	assert "te->r.svFlags |= SVF_BROADCAST;" in log_exit_block
+
+
+def test_log_exit_runs_rank_match_report_once_after_player_stats() -> None:
+	main_c = _read("src/code/game/g_main.c")
+	log_exit_block = _block_from_marker(main_c, "void LogExit( const char *string )")
+	stats_block = _block_from_marker(main_c, "void G_RankSendPlayerStats")
+	report_block = _block_from_marker(main_c, "void G_RankSubmitMatchReport")
+
+	assert "if ( !level.rankMatchReportSent && !trap_Cvar_VariableIntegerValue( \"g_restarted\" ) ) {" in log_exit_block
+	assert "for ( i = 0; i < level.maxclients; i++ ) {" in log_exit_block
+	assert "ent = &g_entities[i];" in log_exit_block
+	assert "if ( !ent->client ) {" in log_exit_block
+	assert "if ( ent->client->pers.connected != CON_CONNECTED ) {" in log_exit_block
+	assert "if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {" in log_exit_block
+	assert "G_RankSendPlayerStats( ent, qfalse );" in log_exit_block
+	assert "G_RankSubmitMatchReport( qfalse );" in log_exit_block
+	assert log_exit_block.index("G_RankSendPlayerStats( ent, qfalse );") < log_exit_block.index(
+		"G_RankSubmitMatchReport( qfalse );"
+	)
+
+	assert "payloadPtr = G_RankBuildPlayerStatsPayload( ent, aborted, payload, sizeof( payload ) ) ? payload : NULL;" in stats_block
+	assert 'trap_ReportPlayerEvent( steamIdLow, steamIdHigh, &ent->client->rankStats, "PLAYER_STATS", payloadPtr );' in stats_block
+
+	assert "if ( level.rankMatchReportSent ) {" in report_block
+	assert "level.rankMatchReportSent = qtrue;" in report_block
+	assert "payloadPtr = G_RankBuildMatchReportPayload( aborted, payload, sizeof( payload ) ) ? payload : NULL;" in report_block
+	assert "trap_SubmitMatchReport( payloadPtr );" in report_block
 
 
 def test_cgame_and_match_state_follow_retail_configstring_ownership() -> None:

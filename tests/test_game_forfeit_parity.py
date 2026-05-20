@@ -37,6 +37,20 @@ def test_forfeit_eligibility_helper_is_shared_with_exit_rules() -> None:
 	assert "G_ApplyForfeit();" in check_exit_block
 
 
+def test_duel_forfeit_gate_marks_surrendering_player_before_shared_executor() -> None:
+	cmds_c = _read("src/code/game/g_cmds.c")
+
+	start = cmds_c.index("qboolean G_CanForfeit( gentity_t *ent, qboolean fromCommand ) {")
+	end = cmds_c.index("/*\n=============\nCmd_Kill_f", start)
+	can_forfeit_block = cmds_c[start:end]
+	tournament_start = can_forfeit_block.index("if ( gametype == GT_TOURNAMENT ) {")
+	tournament_block = can_forfeit_block[tournament_start:]
+
+	assert "ent->client->ps.persistant[PERS_SCORE] = -999;" in tournament_block
+	assert tournament_block.index("ent->client->ps.persistant[PERS_SCORE] = -999;") < tournament_block.index("return qtrue;")
+	assert "G_ApplyForfeit();" not in can_forfeit_block
+
+
 def test_g_apply_forfeit_marks_only_the_losing_side() -> None:
 	main_c = _read("src/code/game/g_main.c")
 

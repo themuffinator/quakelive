@@ -1257,6 +1257,34 @@ static void R_PostProcessRestart( void ) {
 	tr.postProcessNeedsReset = qtrue;
 }
 
+/*
+=============
+R_TransformClipToWindowExport
+
+Retail exposes this helper through the private refexport tail without the
+source helper's explicit view parameter; it uses the active backend view.
+=============
+*/
+static void R_TransformClipToWindowExport( const vec4_t clip, vec4_t normalized, vec4_t window ) {
+	R_TransformClipToWindow( clip, &backEnd.viewParms, normalized, window );
+	window[2] = 0.5f * ( 1.0f + normalized[0] );
+	window[3] = 0.5f * ( 1.0f + normalized[1] );
+}
+
+/*
+=============
+R_NoopRegisterFont
+
+Retail keeps the historical refexport font slot as a no-op; native module font
+registration is handled by the client import wrappers instead.
+=============
+*/
+static void R_NoopRegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {
+	(void)fontName;
+	(void)pointSize;
+	(void)font;
+}
+
 
 /*
 ===============
@@ -1653,7 +1681,6 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.AddAdditiveLightToScene = RE_AddAdditiveLightToScene;
 	re.RenderScene = RE_RenderScene;
 	re.AdvertisementBridge_UpdateLoadingViewParameters = AdvertisementBridge_UpdateLoadingViewParameters;
-	re.PostProcessRestart = R_PostProcessRestart;
 	re.SetColor = RE_SetColor;
 	re.DrawStretchPic = RE_StretchPic;
 	re.DrawStretchRaw = RE_StretchRaw;
@@ -1663,10 +1690,15 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.MarkFragments = R_MarkFragments;
 	re.LerpTag = R_LerpTag;
 	re.ModelBounds = R_ModelBounds;
+	re.RegisterFont = R_NoopRegisterFont;
 
 	re.RemapShader = R_RemapShader;
 	re.GetEntityToken = R_GetEntityToken;
 	re.inPVS = R_inPVS;
+	re.PostProcessRestart = R_PostProcessRestart;
+	re.TransformClipToWindow = R_TransformClipToWindowExport;
+	re.DrawScaledText = RE_DrawScaledText;
+	re.MeasureScaledText = RE_MeasureScaledText;
 
 	return &re;
 }

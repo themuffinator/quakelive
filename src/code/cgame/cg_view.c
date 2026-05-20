@@ -992,6 +992,7 @@ static int CG_CalcFov( void ) {
 		}
 	}
 
+	cg.userCmdFov = (int)fov_x;
 	fov_x = CG_CalcHorPlusFov( fov_x );
 
 	x = cg.refdef.width / tan( fov_x / 360 * M_PI );
@@ -1332,7 +1333,8 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	inwater = CG_CalcViewValues();
 
 	// let the client system know what our weapon and zoom settings are
-	trap_SetUserCmdValue( cg.weaponSelect, cg.zoomSensitivity );
+	cg.weaponPrimary = CG_StartingWeaponIndexFromToken( cg_weaponPrimaryQueued.string );
+	trap_SetUserCmdValue( cg.weaponSelect, cg.weaponPrimary, cg.zoomSensitivity, cg.userCmdFov );
 
 	// first person blend blobs, done after AnglesToAxis
 	if ( !cg.renderingThirdPerson ) {

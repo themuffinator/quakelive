@@ -559,9 +559,17 @@ def test_classic_input_cmd_overlay_restores_retail_follow_and_arrow_icon_path() 
 	assert "int\t\t\tforwardmove;" in shared
 	assert "int\t\t\trightmove;" in shared
 	assert "int\t\t\tupmove;" in shared
-	assert "{ PSF(forwardmove), 8 }" in msg
-	assert "{ PSF(rightmove), 8 }" in msg
-	assert "{ PSF(upmove), 8 }" in msg
+	assert "int\t\t\tweaponPrimary;" in shared
+	assert "int\t\t\tfov;" in shared
+	assert "byte\t\t\tweaponPrimary;" in shared
+	assert "byte\t\t\tfov;" in shared
+	assert "{ PSF(weaponPrimary), 8 }" in msg
+	assert "{ PSF(fov), 8 }" in msg
+	assert msg.index("{ PSF(weapon), 5 }") < msg.index("{ PSF(weaponPrimary), 8 }")
+	assert msg.index("{ PSF(fov), 8 }") < msg.index("{ PSF(forwardmove), -8 }")
+	assert "{ PSF(forwardmove), -8 }" in msg
+	assert "{ PSF(rightmove), -8 }" in msg
+	assert "{ PSF(upmove), -8 }" in msg
 	assert "client->ps.forwardmove = ucmd->forwardmove;" in active
 	assert "client->ps.rightmove = ucmd->rightmove;" in active
 	assert "client->ps.upmove = ucmd->upmove;" in active

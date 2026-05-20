@@ -9,6 +9,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
 CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
 CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
+CGAME_HLIL = (
+    REPO_ROOT
+    / "references"
+    / "hlil"
+    / "quakelive"
+    / "cgamex86.dll"
+    / "cgamex86.dll_hlil.txt"
+)
 
 
 def _block_from_marker(source: str, marker: str) -> str:
@@ -28,15 +36,54 @@ def _block_from_marker(source: str, marker: str) -> str:
     raise AssertionError(f"Unbalanced block for marker: {marker}")
 
 
+def _text_between(source: str, start_marker: str, end_marker: str) -> str:
+    start = source.index(start_marker)
+    end = source.index(end_marker, start)
+    return source[start:end]
+
+
 def test_game_limit_uses_retail_limit_strings() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
     block = _block_from_marker(source, "static void CG_DrawGameLimit")
+    retail_block = _text_between(
+        hlil_source,
+        '10033800    int32_t __convention("regparm") sub_10033800',
+        "10033910",
+    )
 
     for expected in (
-        "Cap Limit: %d",
-        "Frag Limit: %d",
-        "Round Limit: %d",
-        "Score Limit: %d",
+        '"Cap Limit: %d"',
+        '"Frag Limit: %d"',
+        '"Round Limit: %d"',
+        '"Score Limit: %d"',
+        "data_10a3ff38",
+        "data_10a3ff48",
+        "data_10a3ff54",
+        "data_10a3ff34",
+        "if (arg8 == 1)",
+        "sub_100082b0(0, 0, result, &var_4, nullptr, 0, fconvert.s(fconvert.t(arg5)))",
+        "var_4 = fconvert.s(x87_r7_5 - float.t(var_4))",
+    ):
+        assert expected in retail_block
+
+    for expected in (
+        "case GT_CTF:",
+        "case GT_1FCTF:",
+        "case GT_OBELISK:",
+        "case GT_HARVESTER:",
+        'Com_sprintf( buffer, sizeof( buffer ), "Cap Limit: %d", cgs.capturelimit );',
+        "case GT_CLAN_ARENA:",
+        "case GT_FREEZE:",
+        "case GT_RED_ROVER:",
+        'Com_sprintf( buffer, sizeof( buffer ), "Round Limit: %d", cgs.roundlimit );',
+        "case GT_DOMINATION:",
+        "case GT_ATTACK_DEFEND:",
+        'Com_sprintf( buffer, sizeof( buffer ), "Score Limit: %d", cgs.scorelimit );',
+        'Com_sprintf( buffer, sizeof( buffer ), "Frag Limit: %d", cgs.fraglimit );',
+        "if ( align == ITEM_ALIGN_CENTER ) {",
+        "x -= CG_Text_Width( buffer, scale, 0 ) * 0.5f;",
+        "CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
     ):
         assert expected in block
 
@@ -46,6 +93,83 @@ def test_game_limit_uses_retail_limit_strings() -> None:
         "Score %i",
         "Frags %i",
         "Mercy %i",
+        "CG_GetServerInfoValue",
+        "CG_HasObjectiveCountStat",
+        "limitValue > 0",
+        "CG_GetTextPosition",
+        "ITEM_ALIGN_RIGHT",
+    ):
+        assert stale not in block
+
+
+def test_match_end_condition_uses_retail_condition_strings() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    block = _block_from_marker(source, "static void CG_DrawMatchEndCondition")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_block = _text_between(
+        hlil_source,
+        '10034280    int32_t __convention("regparm") sub_10034280',
+        "10034360",
+    )
+
+    for expected in (
+        '"Fastest race time within the time limit"',
+        '"Most flag captures within the time limit"',
+        '"Most rounds won within the time limit"',
+        '"Highest score within the time limit"',
+        '"First to reach the capture limit"',
+        '"First to reach the mercy limit"',
+        '"First to reach the round limit"',
+        '"First to reach the score limit"',
+        '"Highest score at the end of the game"',
+    ):
+        assert expected in hlil_source
+
+    for expected in (
+        "data_10a3ff14",
+        "data_10a3ff44",
+        "data_10a3ff38",
+        "data_10a403ec",
+        "data_10a403f0",
+    ):
+        assert expected in retail_block
+
+    for expected in (
+        "if ( cgs.gametype == GT_RACE ) {",
+        'reason = "Fastest race time within the time limit";',
+        "timeLimitExpired = ( cgs.timelimit > 0",
+        "&& cg.time - cgs.levelStartTime >= cgs.timelimit * 60000 ) ? qtrue : qfalse;",
+        'reason = "Most flag captures within the time limit";',
+        'reason = "Most rounds won within the time limit";',
+        'reason = "Highest score within the time limit";',
+        "if ( cgs.capturelimit == 0 || ( cgs.scores1 < cgs.capturelimit && cgs.scores2 < cgs.capturelimit ) ) {",
+        'reason = "First to reach the mercy limit";',
+        'reason = "First to reach the capture limit";',
+        'reason = "First to reach the round limit";',
+        'reason = "First to reach the score limit";',
+        'reason = "Highest score at the end of the game";',
+        "CG_Text_Paint( rect->x, rect->y, scale, color, reason, 0, 0, textStyle );",
+    ):
+        assert expected in block
+
+    assert "CG_DrawMatchEndCondition( &rect, scale, color, textStyle );" in ownerdraw_block
+    assert "CG_DrawMatchEndCondition(&rect, text_x, text_y, scale, color, textStyle);" not in ownerdraw_block
+
+    for stale in (
+        "Match complete",
+        "Time limit hit",
+        "Capture limit hit",
+        "Score limit hit",
+        "Frag limit hit",
+        "Mercy rule",
+        "Sudden death",
+        "CG_TimeLimitHit",
+        "CG_FragLimitHit",
+        "CG_CaptureLimitHit",
+        "CG_ScoreLimitHit",
+        "CG_MercyLimitHit",
+        "CG_GetTextPosition",
     ):
         assert stale not in block
 
@@ -93,21 +217,49 @@ def test_level_timer_uses_retail_clock_format() -> None:
 
 def test_intro_panel_draws_use_retail_map_panel_shapes() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
     game_type_map = _block_from_marker(source, "static void CG_DrawGameTypeMap")
     match_details = _block_from_marker(source, "static void CG_DrawMatchDetails")
     phase_label = _block_from_marker(source, "static const char *CG_GetMatchDetailsPhaseLabel")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_match_details = _text_between(
+        hlil_source,
+        '10034420    int32_t __convention("regparm") sub_10034420',
+        "100344b0",
+    )
+    retail_game_type_map = _text_between(
+        hlil_source,
+        "100344b0    void sub_100344b0",
+        "10034590",
+    )
 
     assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in game_type_map
     assert '%s - %s", CG_GameTypeString(), detailBuffer' in game_type_map
+    assert "x = rect->x;" in game_type_map
+    assert "CG_AlignTextX( &x, buffer, scale, align );" in game_type_map
+    assert "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );" in game_type_map
     assert 'CG_GetMapDisplayName( mapName, sizeof( mapName ) );' not in game_type_map
     assert '%s - %s - %s' not in game_type_map
+    assert "CG_GetTextPosition" not in game_type_map
+
+    for expected in (
+        "eax_2, ecx_1 = sub_100575e0(\"%s - %s\")",
+        "if (arg5 == 1)",
+        "*ebp = fconvert.s(fconvert.t(*ebp) - float.t(arg1) * fconvert.t(0.5))",
+        "else if (arg5 == 2)",
+        "*ebp = fconvert.s(fconvert.t(*ebp) - float.t(arg1))",
+    ):
+        assert expected in retail_game_type_map
 
     assert "CG_BuildIntroPanelDetailString( detailBuffer, sizeof( detailBuffer ) );" in match_details
     assert 'CG_GetMatchDetailsPhaseLabel()' in match_details
     assert 'CG_GameTypeShortString(), detailBuffer );' in match_details
     assert '%s - %s - %s' in match_details
+    assert "CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );" in match_details
     assert '%s - %s - %s - %s' not in match_details
     assert 'CG_GetMapDisplayName( mapName, sizeof( mapName ) );' not in match_details
+    assert "CG_GetTextPosition" not in match_details
+    assert 'sub_100575e0("%s - %s - %s")' in retail_match_details
 
     for expected in (
         'MATCH WARMUP',
@@ -115,6 +267,11 @@ def test_intro_panel_draws_use_retail_map_panel_shapes() -> None:
         'MATCH SUMMARY',
     ):
         assert expected in phase_label
+
+    assert "CG_DrawGameTypeMap( &rect, scale, color, textStyle, align );" in ownerdraw_block
+    assert "CG_DrawMatchDetails( &rect, scale, color, textStyle );" in ownerdraw_block
+    assert "CG_DrawGameTypeMap(&rect, text_x, text_y, scale, color, textStyle);" not in ownerdraw_block
+    assert "CG_DrawMatchDetails(&rect, text_x, text_y, scale, color, textStyle);" not in ownerdraw_block
 
 
 def test_intro_panel_gametype_tables_match_retail_labels() -> None:
@@ -140,11 +297,64 @@ def test_intro_panel_gametype_tables_match_retail_labels() -> None:
     assert 'Attack & Defend' not in source
 
 
+def test_plain_gametype_and_match_state_draws_use_retail_origin_alignment() -> None:
+    source = CG_NEWDRAW.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    game_type = _block_from_marker(source, "static void CG_DrawGameType( rectDef_t")
+    match_state = _block_from_marker(source, "static void CG_DrawMatchState")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_game_type = _text_between(
+        hlil_source,
+        "10034c20    int32_t sub_10034c20",
+        "10034cc0",
+    )
+    retail_match_state = _text_between(
+        hlil_source,
+        "10034360    int32_t sub_10034360",
+        "100343d0",
+    )
+
+    for expected in (
+        "if (arg5 == 1)",
+        "sub_100082b0(0, 0, ebx, &arg1, nullptr, 0, fconvert.s(fconvert.t(arg2)))",
+        "float var_28 = fconvert.s(fconvert.t(*(ebp + 4)))",
+        "return sub_10008440(fconvert.s(fconvert.t(arg1)), var_28, 0,",
+    ):
+        assert expected in retail_game_type
+    assert "else if (arg5 == 2)" not in retail_game_type
+
+    for expected in (
+        "gameType = CG_GameTypeString();",
+        "x = rect->x;",
+        "if ( align == ITEM_ALIGN_CENTER ) {",
+        "x -= CG_Text_Width( gameType, scale, 0 ) * 0.5f;",
+        "CG_Text_Paint( x, rect->y, scale, color, gameType, 0, 0, textStyle );",
+    ):
+        assert expected in game_type
+    assert "ITEM_ALIGN_RIGHT" not in game_type
+    assert "rect->y + rect->h" not in game_type
+    assert "qhandle_t shader" not in game_type
+    assert "CG_DrawGameType( &rect, scale, color, textStyle, align );" in ownerdraw_block
+    assert "CG_DrawGameType(&rect, scale, color, shader, textStyle);" not in ownerdraw_block
+
+    assert "fconvert.s(fconvert.t(arg1[1]))" in retail_match_state
+    assert "arg1[3]" not in retail_match_state
+    assert "CG_Text_Paint( rect->x, rect->y, scale, color, CG_GetMatchPhaseText(), 0, 0, textStyle );" in match_state
+    assert "rect->y + rect->h" not in match_state
+
+
 def test_match_status_uses_retail_status_text_family() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
     status_text = _block_from_marker(source, "const char *CG_GetGameStatusText()")
-    status_helper = _block_from_marker(source, "static const char *CG_GetMatchStatusText")
+    status_helper = _block_from_marker(source, "const char *CG_GetMatchStatusText")
     draw_match_status = _block_from_marker(source, "static void CG_DrawMatchStatus")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    retail_draw_match_status = _text_between(
+        hlil_source,
+        "10034cc0    void sub_10034cc0",
+        "10034d70",
+    )
 
     assert "case GT_SINGLE_PLAYER:" in status_text
     assert "case GT_RED_ROVER:" in status_text
@@ -163,7 +373,24 @@ def test_match_status_uses_retail_status_text_family() -> None:
     assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", phase, status );' in status_helper
 
     assert "statusText = CG_GetMatchStatusText();" in draw_match_status
+    assert "x = rect->x;" in draw_match_status
+    assert "CG_AlignTextX( &x, statusText, scale, align );" in draw_match_status
+    assert "CG_Text_Paint( x, rect->y, scale, color, statusText, 0, 0, textStyle );" in draw_match_status
     assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", CG_GetMatchStateLabel(), CG_GetGameStatusText() );' not in draw_match_status
+    assert "if ( !cg.snap ) {" not in draw_match_status
+    assert "CG_GetTextPosition" not in draw_match_status
+    assert "CG_DrawMatchStatus( &rect, scale, color, textStyle, align );" in ownerdraw_block
+    assert "CG_DrawMatchStatus(&rect, text_x, text_y, scale, color, textStyle);" not in ownerdraw_block
+
+    for expected in (
+        "char* eax = sub_10034a00()",
+        "int32_t eax_1 = sub_100575e0(&data_10068de8)",
+        "if (edx == 1)",
+        "*ebx = fconvert.s(fconvert.t(*ebx) - float.t(arg_10) * fconvert.t(0.5))",
+        "else if (edx == 2)",
+        "*ebx = fconvert.s(fconvert.t(*ebx) - float.t(arg_10))",
+    ):
+        assert expected in retail_draw_match_status
 
 
 def test_player_model_helper_restores_retail_3d_preview_scene() -> None:
