@@ -1953,7 +1953,6 @@ static void CG_DrawPlayerHealthBar100( rectDef_t *rect, qhandle_t shader ) {
 	vec4_t barColor;
 	float ratio;
 	int health;
-	int armor;
 	int maxHealth;
 
 	if ( !cg.snap ) {
@@ -1961,9 +1960,8 @@ static void CG_DrawPlayerHealthBar100( rectDef_t *rect, qhandle_t shader ) {
 	}
 
 	health = cg.snap->ps.stats[STAT_HEALTH];
-	armor = cg.snap->ps.stats[STAT_ARMOR];
 	maxHealth = CG_PlayerMaxHealth();
-	CG_GetColorForHealth( health, armor, barColor );
+	Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );
 	barColor[3] = 1.0f;
 	ratio = CG_BarValueFraction( health, maxHealth );
 
@@ -1985,7 +1983,6 @@ static void CG_DrawPlayerHealthBar200( rectDef_t *rect, qhandle_t shader ) {
 	vec4_t barColor;
 	float ratio;
 	int health;
-	int armor;
 	int maxHealth;
 	int excessHealth;
 
@@ -1994,14 +1991,13 @@ static void CG_DrawPlayerHealthBar200( rectDef_t *rect, qhandle_t shader ) {
 	}
 
 	health = cg.snap->ps.stats[STAT_HEALTH];
-	armor = cg.snap->ps.stats[STAT_ARMOR];
 	maxHealth = CG_PlayerMaxHealth();
 	excessHealth = health - maxHealth;
 	if ( excessHealth <= 0 ) {
 		return;
 	}
 
-	CG_GetColorForHealth( health, armor, barColor );
+	Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );
 	barColor[3] = 1.0f;
 	ratio = CG_BarValueFraction( excessHealth, maxHealth );
 
@@ -2029,7 +2025,7 @@ static void CG_DrawPlayerArmorBar100( rectDef_t *rect, qhandle_t shader ) {
 	}
 
 	armor = cg.snap->ps.stats[STAT_ARMOR];
-	CG_GetArmorTierColor( armor, barColor );
+	Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );
 	barColor[3] = 1.0f;
 	ratio = CG_BarValueFraction( armor, 100 );
 
@@ -2063,7 +2059,7 @@ static void CG_DrawPlayerArmorBar200( rectDef_t *rect, qhandle_t shader ) {
 		return;
 	}
 
-	CG_GetArmorTierColor( armor, barColor );
+	Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );
 	barColor[3] = 1.0f;
 	ratio = CG_BarValueFraction( excessArmor, 100 );
 
@@ -12071,6 +12067,26 @@ static void CG_NormalizeBrowserFullscreenBackgroundRect( rectDef_t *rect ) {
 
 /*
 =============
+CG_ResolveBrowserMenuWidescreenMode
+
+Mirrors the shared menu widescreen resolver for cgame-owned direct overlay
+paints that bypass Menu_Paint.
+=============
+*/
+static int CG_ResolveBrowserMenuWidescreenMode( const menuDef_t *menu ) {
+	if ( menu == NULL ) {
+		return WIDESCREEN_STRETCH;
+	}
+
+	if ( !menu->widescreenSet && !menu->fullScreen ) {
+		return WIDESCREEN_CENTER;
+	}
+
+	return menu->widescreen;
+}
+
+/*
+=============
 CG_DrawBrowserOverlayTree
 
 Paints one retail browser overlay root through the cgame-owned draw dispatcher.
@@ -12101,7 +12117,7 @@ void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint ) {
 	CG_UpdateBrowserPresetLists( menu );
 
 	if ( cgDC.setAdjustFrom640Mode ) {
-		cgDC.setAdjustFrom640Mode( menu->widescreen );
+		cgDC.setAdjustFrom640Mode( CG_ResolveBrowserMenuWidescreenMode( menu ) );
 	}
 
 	if ( menu->fullScreen ) {
@@ -12127,7 +12143,7 @@ void CG_DrawBrowserOverlayTree( void *overlay, qboolean forcePaint ) {
 	}
 
 	if ( cgDC.setAdjustFrom640Mode ) {
-		cgDC.setAdjustFrom640Mode( WIDESCREEN_STRETCH );
+		cgDC.setAdjustFrom640Mode( WIDESCREEN_CENTER );
 	}
 }
 

@@ -5845,6 +5845,40 @@ static qboolean CG_HasVisibleMenu( void ) {
 
 /*
 =============
+CG_DrawBrowserCursor
+
+Draws the cgame-owned menu cursor while Win32 keeps the system cursor hidden
+and captured for raw input.
+=============
+*/
+static void CG_DrawBrowserCursor( void ) {
+	qhandle_t	cursor;
+
+	if ( !( trap_Key_GetCatcher() & KEYCATCH_CGAME ) ) {
+		return;
+	}
+
+	if ( !CG_HasVisibleMenu() ) {
+		return;
+	}
+
+	cursor = cgs.activeCursor;
+	if ( !cursor ) {
+		cursor = cgs.media.cursor;
+	}
+	if ( !cursor ) {
+		cursor = cgs.media.selectCursor;
+	}
+	if ( !cursor ) {
+		return;
+	}
+
+	trap_R_SetColor( NULL );
+	CG_DrawPic( (float)cgs.cursorX - 16.0f, (float)cgs.cursorY - 16.0f, 32.0f, 32.0f, cursor );
+}
+
+/*
+=============
 CG_UpdateSpIntermissionMouseInput
 
 Matches the retail SP intermission path that only re-enables mouse movement
@@ -6136,6 +6170,7 @@ static void CG_Draw2D( void ) {
 		CG_DrawCenterString();
 		CG_DrawPregamePlacementPrompt();
 		CG_UpdateSpIntermissionMouseInput();
+		CG_DrawBrowserCursor();
 		return;
 	}
 
@@ -6246,6 +6281,8 @@ static void CG_Draw2D( void ) {
 	if ( cg.demoPlayback && cg_drawDemoHUD.integer ) {
 		CG_DrawDemoPlaybackControls( 0 );
 	}
+
+	CG_DrawBrowserCursor();
 }
 
 /*

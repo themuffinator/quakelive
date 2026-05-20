@@ -445,12 +445,15 @@ CG_TeamColor
 ================
 */
 float *CG_TeamColor( int team ) {
-	static vec4_t	red = {1, 0.2f, 0.2f, 1};
-	static vec4_t	blue = {0.2f, 0.2f, 1, 1};
-	static vec4_t	other = {1, 1, 1, 1};
-	static vec4_t	spectator = {0.7f, 0.7f, 0.7f, 1};
+	static vec4_t	free = {1.0f, 0.8f, 0.2f, 1.0f};
+	static vec4_t	red = {1.0f, 0.2f, 0.1f, 1.0f};
+	static vec4_t	blue = {0.2f, 0.4f, 1.0f, 1.0f};
+	static vec4_t	spectator = {0.75f, 0.75f, 0.75f, 1.0f};
+	static vec4_t	other = {1.0f, 1.0f, 1.0f, 1.0f};
 
 	switch ( team ) {
+	case TEAM_FREE:
+		return free;
 	case TEAM_RED:
 		return red;
 	case TEAM_BLUE:

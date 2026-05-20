@@ -1228,6 +1228,8 @@ shader handle.
 =================
 */
 static void R_UploadFontStashAtlas( void ) {
+	int	previousTMU;
+
 	if ( !r_fontStash.image || !r_fontStash.buffer ) {
 		return;
 	}
@@ -1242,13 +1244,22 @@ static void R_UploadFontStashAtlas( void ) {
 	r_fontStash.image->wrapClampMode = GL_CLAMP;
 	r_fontStash.texnum = r_fontStash.image->texnum;
 
+	previousTMU = glState.currenttmu;
+	if ( previousTMU != 0 ) {
+		GL_SelectTexture( 0 );
+	}
+
+	glState.currenttextures[glState.currenttmu] = 0;
 	GL_Bind( r_fontStash.image );
 	qglTexImage2D( GL_TEXTURE_2D, 0, GL_ALPHA, r_fontStash.width, r_fontStash.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, r_fontStash.buffer );
 	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
 	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
 	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-	qglBindTexture( GL_TEXTURE_2D, 0 );
+
+	if ( previousTMU != glState.currenttmu ) {
+		GL_SelectTexture( previousTMU );
+	}
 }
 
 /*

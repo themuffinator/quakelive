@@ -46,8 +46,8 @@ static int cg_bufferedSoundDelays[CG_BUFFERED_ANNOUNCER_COUNT];
 =============
 CG_GetTargetAspectDimensions
 
-Returns qtrue when a valid r_aspectRatio preset is active, storing the
-corresponding width/height pair.
+Returns qtrue when a valid r_aspectRatio preset or auto-detected view aspect is
+available, storing the corresponding width/height pair.
 =============
 */
 static qboolean CG_GetTargetAspectDimensions( float *targetWidth, float *targetHeight ) {
@@ -59,7 +59,12 @@ static qboolean CG_GetTargetAspectDimensions( float *targetWidth, float *targetH
 	ratioString = ratioBuffer;
 	ratio = atoi( ratioString );
 	if ( ratio <= 0 ) {
-		return qfalse;
+		if ( cg.refdef.width <= 0 || cg.refdef.height <= 0 ) {
+			return qfalse;
+		}
+		*targetWidth = (float)cg.refdef.width;
+		*targetHeight = (float)cg.refdef.height;
+		return qtrue;
 	}
 
 	switch ( ratio ) {
@@ -76,7 +81,12 @@ static qboolean CG_GetTargetAspectDimensions( float *targetWidth, float *targetH
 			*targetHeight = 4.0f;
 			return qtrue;
 		default:
-			return qfalse;
+			if ( cg.refdef.width <= 0 || cg.refdef.height <= 0 ) {
+				return qfalse;
+			}
+			*targetWidth = (float)cg.refdef.width;
+			*targetHeight = (float)cg.refdef.height;
+			return qtrue;
 	}
 }
 
@@ -116,7 +126,7 @@ CG_CalcAspectAdjustedFovFromVertical
 
 Matches the retail helper used by the smart third-person trace path. The input
 FOV is treated as a 4:3 vertical FOV and expanded horizontally when an
-`r_aspectRatio` preset is active.
+`r_aspectRatio` preset or auto-detected view aspect is active.
 =============
 */
 static float CG_CalcAspectAdjustedFovFromVertical( float baseFov ) {

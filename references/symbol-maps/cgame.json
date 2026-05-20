@@ -3897,7 +3897,7 @@
       "signature": "static void CG_DrawPlayerHealthBar100(rectDef_t *rect, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_HEALTH_BAR_100` leaf. HLIL clamps `STAT_HEALTH` against `STAT_MAX_HEALTH` and draws the primary `healthBar100` segment from the left, matching the dedicated source wrapper."
+      "comment": "Retail `CG_PLAYER_HEALTH_BAR_100` leaf. HLIL clamps `STAT_HEALTH` against `STAT_MAX_HEALTH`, selects the local team color from `PERS_TEAM`, and draws the primary `healthBar100` segment from the left, matching the dedicated source wrapper."
     },
     {
       "address": "0x1002EE50",
@@ -3907,7 +3907,7 @@
       "signature": "static void CG_DrawPlayerHealthBar200(rectDef_t *rect, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_HEALTH_BAR_200` leaf. HLIL subtracts `STAT_MAX_HEALTH` and renders only the excess-health segment through the bottom-clipped `healthBar200` ownerdraw path."
+      "comment": "Retail `CG_PLAYER_HEALTH_BAR_200` leaf. HLIL subtracts `STAT_MAX_HEALTH`, selects the local team color from `PERS_TEAM`, and renders only the excess-health segment through the bottom-clipped `healthBar200` ownerdraw path."
     },
     {
       "address": "0x1002EFB0",
@@ -3917,7 +3917,7 @@
       "signature": "static void CG_DrawPlayerArmorBar100(rectDef_t *rect, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_ARMOR_BAR_100` leaf. HLIL clamps armor to the primary 0-100 segment and clips the tinted `armorBar100` fill from the right."
+      "comment": "Retail `CG_PLAYER_ARMOR_BAR_100` leaf. HLIL clamps armor to the primary 0-100 segment, selects the local team color from `PERS_TEAM`, and clips the tinted `armorBar100` fill from the right."
     },
     {
       "address": "0x1002F0C0",
@@ -3927,7 +3927,7 @@
       "signature": "static void CG_DrawPlayerArmorBar200(rectDef_t *rect, qhandle_t shader)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail `CG_PLAYER_ARMOR_BAR_200` leaf. HLIL subtracts 100 armor and renders only the excess-armor segment through the bottom-clipped `armorBar200` ownerdraw path."
+      "comment": "Retail `CG_PLAYER_ARMOR_BAR_200` leaf. HLIL subtracts 100 armor, selects the local team color from `PERS_TEAM`, and renders only the excess-armor segment through the bottom-clipped `armorBar200` ownerdraw path."
     },
     {
       "address": "0x1002F6B0",

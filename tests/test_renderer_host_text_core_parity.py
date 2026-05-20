@@ -75,7 +75,11 @@ def test_renderer_host_text_core_matches_retail_surface() -> None:
 
 	upload_block = tr_font.split("static void R_UploadFontStashAtlas", 1)[1].split("static qboolean R_EnsureFontStashImage", 1)[0]
 	assert "r_fontStash.image->internalFormat = GL_ALPHA;" in upload_block
+	assert "previousTMU = glState.currenttmu;" in upload_block
+	assert "glState.currenttextures[glState.currenttmu] = 0;" in upload_block
+	assert "GL_Bind( r_fontStash.image );" in upload_block
 	assert "qglTexImage2D( GL_TEXTURE_2D, 0, GL_ALPHA, r_fontStash.width, r_fontStash.height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, r_fontStash.buffer );" in upload_block
+	assert "qglBindTexture( GL_TEXTURE_2D, 0 );" not in upload_block
 	assert "R_BuildFontStashSeedImage" not in upload_block
 
 	resize_block = tr_font.split("static qboolean R_ResizeFontStashAtlas", 1)[1].split("static void R_fonsErrorCallback", 1)[0]

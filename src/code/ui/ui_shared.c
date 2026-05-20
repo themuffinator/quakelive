@@ -806,6 +806,23 @@ void Window_Paint(Window *w, float fadeAmount, float fadeClamp, float fadeCycle)
 
 /*
 ==================
+UI_ResolveMenuWidescreenMode
+==================
+*/
+static int UI_ResolveMenuWidescreenMode(const menuDef_t *menu) {
+	if (!menu) {
+		return WIDESCREEN_STRETCH;
+	}
+
+	if (!menu->widescreenSet && !menu->fullScreen) {
+		return WIDESCREEN_CENTER;
+	}
+
+	return menu->widescreen;
+}
+
+/*
+==================
 UI_ResolveWidescreenMode
 ==================
 */
@@ -814,11 +831,7 @@ static int UI_ResolveWidescreenMode(const menuDef_t *menu, const itemDef_t *item
 		return item->widescreen;
 	}
 
-	if (menu) {
-		return menu->widescreen;
-	}
-
-	return WIDESCREEN_STRETCH;
+	return UI_ResolveMenuWidescreenMode(menu);
 }
 
 /*
@@ -1002,7 +1015,7 @@ void Menu_UpdatePosition(menuDef_t *menu) {
 	}
 
 	rect = menu->window.rectClient;
-	UI_ApplyWidescreenRect(&rect, menu->widescreen);
+	UI_ApplyWidescreenRect(&rect, UI_ResolveMenuWidescreenMode(menu));
 
 	menu->window.rect.x = rect.x;
 	menu->window.rect.y = rect.y;
@@ -5036,7 +5049,7 @@ void Item_Paint(itemDef_t *item) {
 	}
 
 	if (DC->setAdjustFrom640Mode) {
-		DC->setAdjustFrom640Mode(parent ? parent->widescreen : WIDESCREEN_STRETCH);
+		DC->setAdjustFrom640Mode(parent ? UI_ResolveMenuWidescreenMode(parent) : WIDESCREEN_CENTER);
 	}
 
 }
@@ -5048,6 +5061,7 @@ void Menu_Init(menuDef_t *menu) {
 	menu->fadeClamp = DC->Assets.fadeClamp;
 	menu->fadeCycle = DC->Assets.fadeCycle;
 	menu->widescreen = WIDESCREEN_STRETCH;
+	menu->widescreenSet = qfalse;
 	Window_Init(&menu->window);
 }
 
@@ -5299,7 +5313,7 @@ void Menu_Paint(menuDef_t *menu, qboolean forcePaint) {
 	Menu_UpdatePresetLists(menu);
 
 	if (DC->setAdjustFrom640Mode) {
-		DC->setAdjustFrom640Mode(menu->widescreen);
+		DC->setAdjustFrom640Mode(UI_ResolveMenuWidescreenMode(menu));
 	}
 
 	// draw the background if necessary
@@ -5340,7 +5354,7 @@ void Menu_Paint(menuDef_t *menu, qboolean forcePaint) {
 	}
 
 	if (DC->setAdjustFrom640Mode) {
-		DC->setAdjustFrom640Mode(WIDESCREEN_STRETCH);
+		DC->setAdjustFrom640Mode(WIDESCREEN_CENTER);
 	}
 }
 
@@ -6795,6 +6809,7 @@ qboolean MenuParse_widescreen( itemDef_t *item, int handle ) {
 	}
 
 	menu->widescreen = widescreen;
+	menu->widescreenSet = qtrue;
 	return qtrue;
 }
 

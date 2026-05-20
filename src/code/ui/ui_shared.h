@@ -330,6 +330,7 @@ typedef struct {
   const char  *font;								// font
   qboolean fullScreen;							// covers entire screen 
 	int widescreen;
+	qboolean widescreenSet;
 	Rectangle backgroundRect;					// retail full-screen background paint rect
 	qboolean backgroundSizeSet;				// backgroundRect came from backgroundSize
   int itemCount;										// number of items;

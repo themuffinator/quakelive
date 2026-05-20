@@ -1182,6 +1182,7 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 
 	for expected in (
 		"maxHealth = CG_PlayerMaxHealth();",
+		"Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );",
 		"ratio = CG_BarValueFraction( health, maxHealth );",
 		"shader = cgs.media.healthBar100;",
 		"CG_DrawBarFill( rect, shader, ratio, barColor );",
@@ -1191,6 +1192,7 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 	for expected in (
 		"excessHealth = health - maxHealth;",
 		"if ( excessHealth <= 0 ) {",
+		"Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );",
 		"ratio = CG_BarValueFraction( excessHealth, maxHealth );",
 		"shader = cgs.media.healthBar200;",
 		"CG_DrawBarFillFromBottom( rect, shader, ratio, barColor );",
@@ -1198,7 +1200,7 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 		assert expected in health_200_block
 
 	for expected in (
-		"CG_GetArmorTierColor( armor, barColor );",
+		"Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );",
 		"ratio = CG_BarValueFraction( armor, 100 );",
 		"shader = cgs.media.armorBar100;",
 		"CG_DrawBarFillFromRight( rect, shader, ratio, barColor );",
@@ -1208,6 +1210,7 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 	for expected in (
 		"excessArmor = armor - 100;",
 		"if ( excessArmor <= 0 ) {",
+		"Vector4Copy( CG_TeamColor( cg.snap->ps.persistant[PERS_TEAM] ), barColor );",
 		"ratio = CG_BarValueFraction( excessArmor, 100 );",
 		"shader = cgs.media.armorBar200;",
 		"CG_DrawBarFillFromBottom( rect, shader, ratio, barColor );",
@@ -2641,6 +2644,7 @@ def test_cgame_browser_runtime_surface_restores_overlay_draw_and_capture_owners(
 	assert "Item_Paint( item );" in widget_block
 	assert "switch ( item->type ) {" not in widget_block
 	assert "static void CG_NormalizeBrowserFullscreenBackgroundRect( rectDef_t *rect ) {" in newdraw_source
+	assert "static int CG_ResolveBrowserMenuWidescreenMode( const menuDef_t *menu ) {" in newdraw_source
 	assert "Menus_HandleOOBClick( (menuDef_t *)overlay, key, down );" in oob_block
 
 	for expected in (
@@ -2650,7 +2654,8 @@ def test_cgame_browser_runtime_surface_restores_overlay_draw_and_capture_owners(
 		"CG_NormalizeBrowserFullscreenBackgroundRect( &backgroundRect );",
 		"CG_DrawBrowserWidgetFrame( &menu->window, menu->fadeAmount, menu->fadeClamp, menu->fadeCycle );",
 		"CG_DrawBrowserWidget( menu->items[i] );",
-		"cgDC.setAdjustFrom640Mode( WIDESCREEN_STRETCH );",
+		"cgDC.setAdjustFrom640Mode( CG_ResolveBrowserMenuWidescreenMode( menu ) );",
+		"cgDC.setAdjustFrom640Mode( WIDESCREEN_CENTER );",
 	):
 		assert expected in overlay_tree_block
 
@@ -2672,6 +2677,7 @@ def test_cgame_browser_runtime_surface_restores_overlay_draw_and_capture_owners(
 	assert 'menuStats = CG_FindBrowserOverlayByName( "stats_menu" );' in stats_block
 	assert "CG_DrawBrowserOverlayTree( menuStats, qtrue );" in stats_block
 	assert "CG_DrawBrowserOverlays();" in draw_2d_block
+	assert "CG_DrawBrowserCursor();" in draw_2d_block
 	assert "Menu_PaintAll();" not in draw_2d_block
 
 	assert "CG_DrawBrowserOverlayTree( menu, qtrue );" in join_menu_block
@@ -3764,6 +3770,7 @@ def test_cgame_advert_bridge_lifecycle_matches_retail_init_and_shutdown_order() 
 def test_cgame_drawtools_keep_retail_widescreen_bias_consumers() -> None:
 	source = CG_DRAWTOOLS.read_text(encoding="utf-8")
 	adjust_block = _block_from_marker(source, "void CG_AdjustFrom640")
+	team_color_block = _block_from_marker(source, "float *CG_TeamColor")
 
 	for expected in (
 		"static int cgAdjustFrom640Mode = -1;",
@@ -3793,6 +3800,15 @@ def test_cgame_drawtools_keep_retail_widescreen_bias_consumers() -> None:
 	assert "ax = x * cgs.screenXScale + cgs.screenXBias;" not in source
 	assert "ay = y * cgs.screenXScale;" not in source
 	assert "size *= cgs.screenXScale;" not in source
+
+	for expected in (
+		"static vec4_t\tfree = {1.0f, 0.8f, 0.2f, 1.0f};",
+		"static vec4_t\tred = {1.0f, 0.2f, 0.1f, 1.0f};",
+		"static vec4_t\tblue = {0.2f, 0.4f, 1.0f, 1.0f};",
+		"static vec4_t\tspectator = {0.75f, 0.75f, 0.75f, 1.0f};",
+		"case TEAM_FREE:",
+	):
+		assert expected in team_color_block
 
 
 def test_cgame_crosshair_resets_renderer_color_after_shader_draw() -> None:
@@ -3894,6 +3910,8 @@ def test_cgame_view_keeps_retail_aspect_ratio_fallback_and_horplus_helpers() -> 
 	assert "if ( ratio <= 0 ) {" in aspect_block
 	assert "*targetWidth = 5.0f;" in aspect_block
 	assert "*targetHeight = 4.0f;" in aspect_block
+	assert "*targetWidth = (float)cg.refdef.width;" in aspect_block
+	assert "*targetHeight = (float)cg.refdef.height;" in aspect_block
 	assert "return qfalse;" in aspect_block
 
 	assert "baseWidth = 4.0f;" in horplus_block
@@ -4783,11 +4801,14 @@ def test_shared_ui_widescreen_flow_uses_retail_adjust_callbacks() -> None:
 	for expected in (
 		"if (DC && DC->setAdjustFrom640Mode) {",
 		"if (DC && DC->adjustFrom640) {",
+		"static int UI_ResolveMenuWidescreenMode(const menuDef_t *menu) {",
+		"if (!menu->widescreenSet && !menu->fullScreen) {",
+		"return WIDESCREEN_CENTER;",
 		"if (DC->setAdjustFrom640Mode && item->widescreenSet) {",
 		"DC->setAdjustFrom640Mode(item->widescreen);",
-		"DC->setAdjustFrom640Mode(parent ? parent->widescreen : WIDESCREEN_STRETCH);",
-		"DC->setAdjustFrom640Mode(menu->widescreen);",
-		"DC->setAdjustFrom640Mode(WIDESCREEN_STRETCH);",
+		"DC->setAdjustFrom640Mode(parent ? UI_ResolveMenuWidescreenMode(parent) : WIDESCREEN_CENTER);",
+		"DC->setAdjustFrom640Mode(UI_ResolveMenuWidescreenMode(menu));",
+		"DC->setAdjustFrom640Mode(WIDESCREEN_CENTER);",
 	):
 		assert expected in shared_source
 
@@ -4837,8 +4858,10 @@ def test_ui_refresh_display_context_scale_keeps_centered_widescreen_xscale() -> 
 def test_ui_shared_widescreen_rect_flow_retargets_centered_ui_scale() -> None:
 	source = UI_SHARED.read_text(encoding="utf-8")
 	apply_block = _block_from_marker(source, "static void UI_ApplyWidescreenRect(rectDef_t *rect, int widescreen)")
+	menu_update_block = _block_from_marker(source, "void Menu_UpdatePosition(menuDef_t *menu)")
 	normalize_block = _block_from_marker(source, "static void UI_NormalizeFullscreenBackgroundRect(rectDef_t *rect)")
 	paint_block = _block_from_marker(source, "void Menu_Paint(menuDef_t *menu, qboolean forcePaint)")
+	parse_block = _block_from_marker(source, "qboolean MenuParse_widescreen( itemDef_t *item, int handle )")
 
 	for expected in (
 		"if (DC->bias <= 0.0f) {",
@@ -4865,6 +4888,8 @@ def test_ui_shared_widescreen_rect_flow_retargets_centered_ui_scale() -> None:
 
 	assert "UI_NormalizeFullscreenBackgroundRect(&backgroundRect);" in paint_block
 	assert "UI_ApplyWidescreenRect(&backgroundRect, menu->widescreen);" in paint_block
+	assert "UI_ApplyWidescreenRect(&rect, UI_ResolveMenuWidescreenMode(menu));" in menu_update_block
+	assert "menu->widescreenSet = qtrue;" in parse_block
 
 
 def test_ui_text_alignment_retargets_local_stretch_anchors() -> None:
