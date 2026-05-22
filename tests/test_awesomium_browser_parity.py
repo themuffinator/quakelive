@@ -283,7 +283,7 @@ def test_awesomium_mouse_button_and_wheel_helpers_reconstruct_retail_pointer_inj
 	assert "QLWebView_InjectMouseDown( key );" in public_button_block
 	assert "QLWebView_InjectMouseUp( key );" in public_button_block
 	assert "QLWebView_InjectMouseWheel( direction );" in public_wheel_block
-	assert "if ( key >= K_MOUSE1 && key <= K_MOUSE5 ) {" in browser_key_block
+	assert "if ( key >= K_MOUSE1 && key <= K_MOUSE9 ) {" in browser_key_block
 	assert "CL_WebView_OnMouseButtonEvent( key, down );" in browser_key_block
 	assert 'key == K_MWHEELUP' in browser_key_block
 	assert 'CL_WebView_OnMouseWheelEvent( 1 );' in browser_key_block

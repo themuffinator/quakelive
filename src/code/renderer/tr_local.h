@@ -1269,7 +1269,8 @@ int			R_DetectImageTypeFromMemory( const byte *buffer, int bufferLength );
 image_t		*R_LoadImageFromMemory( const char *name, const byte *buffer, int bufferLength, qboolean mipmap
 					, qboolean allowPicmip, int glWrapClampMode );
 int			R_GetMode( void );
-qboolean	R_GetModeInfo( int *width, int *height, float *windowAspect, int mode, qboolean fullscreen );
+int			R_GetModeAspectRatioPreset( int width, int height );
+qboolean	R_GetModeInfo( int *width, int *height, int *aspectRatio, int mode, qboolean fullscreen );
 
 void		R_SetColorMappings( void );
 void		R_GammaCorrect( byte *buffer, int bufSize );

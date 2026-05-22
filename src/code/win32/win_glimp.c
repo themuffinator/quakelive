@@ -111,40 +111,6 @@ static qboolean GLW_StartDriverAndSetMode( const char *drivername,
 }
 
 /*
-==================
-GLW_GetModeAspectRatioPreset
-==================
-*/
-static int GLW_GetModeAspectRatioPreset( int width, int height )
-{
-	float aspectRatio;
-
-	if ( height <= 0 )
-	{
-		return 0;
-	}
-
-	aspectRatio = (float)width / (float)height;
-
-	if ( aspectRatio >= 1.77777779f )
-	{
-		return 1;
-	}
-
-	if ( aspectRatio >= 1.60000002f )
-	{
-		return 2;
-	}
-
-	if ( aspectRatio < 1.33333337f )
-	{
-		return 3;
-	}
-
-	return 0;
-}
-
-/*
 ** ChoosePFD
 **
 ** Helper function that replaces ChoosePixelFormat.
@@ -852,6 +818,63 @@ static qboolean GLW_CreateWindow( const char *drivername, int width, int height,
 
 /*
 ==================
+GLW_GetModeInfo
+==================
+*/
+static qboolean GLW_GetModeInfo( int *width, int *height, int *aspectRatio, int mode, qboolean fullscreen )
+{
+	DEVMODE		devmode;
+	DWORD		bestWidth;
+	int			bestMode;
+	int			modeNum;
+
+	if ( mode != -2 )
+	{
+		return R_GetModeInfo( width, height, aspectRatio, mode, fullscreen );
+	}
+
+	bestWidth = 0;
+	bestMode = 0;
+
+	for ( modeNum = 0; ; modeNum++ )
+	{
+		Com_Memset( &devmode, 0, sizeof( devmode ) );
+		devmode.dmSize = sizeof( devmode );
+
+		if ( !EnumDisplaySettings( NULL, modeNum, &devmode ) )
+		{
+			break;
+		}
+
+		if ( devmode.dmBitsPerPel == 32 && devmode.dmPelsWidth > bestWidth )
+		{
+			bestWidth = devmode.dmPelsWidth;
+			bestMode = modeNum;
+		}
+	}
+
+	if ( bestWidth == 0 )
+	{
+		return qfalse;
+	}
+
+	Com_Memset( &devmode, 0, sizeof( devmode ) );
+	devmode.dmSize = sizeof( devmode );
+
+	if ( !EnumDisplaySettings( NULL, bestMode, &devmode ) )
+	{
+		return qfalse;
+	}
+
+	*width = devmode.dmPelsWidth;
+	*height = devmode.dmPelsHeight;
+	*aspectRatio = R_GetModeAspectRatioPreset( *width, *height );
+
+	return qtrue;
+}
+
+/*
+==================
 GLW_ChangeWindowMode
 ==================
 */
@@ -865,6 +888,7 @@ static qboolean GLW_ChangeWindowMode( void )
 	int			mode;
 	int			width;
 	int			height;
+	int			modeAspect;
 
 	if ( !g_wv.hWnd )
 	{
@@ -873,12 +897,13 @@ static qboolean GLW_ChangeWindowMode( void )
 
 	mode = R_GetMode();
 
-	if ( !R_GetModeInfo( &width, &height, &glConfig.windowAspect, mode, r_fullscreen->integer ) )
+	if ( !GLW_GetModeInfo( &width, &height, &modeAspect, mode, r_fullscreen->integer ) )
 	{
 		return qfalse;
 	}
 
-	ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( width, height ) ) );
+	ri.Cvar_Set( "r_aspectRatio", va( "%d", modeAspect ) );
+	glConfig.windowAspect = (float)width / (float)height;
 
 	if ( !r_fullscreen->integer && g_wv.isMaximized && GetClientRect( g_wv.hWnd, &rect ) )
 	{
@@ -907,7 +932,7 @@ static qboolean GLW_ChangeWindowMode( void )
 			return qfalse;
 		}
 
-		if ( !SetWindowPos( g_wv.hWnd, NULL, 0, 0, glConfig.vidWidth, glConfig.vidHeight, 0 ) )
+		if ( !SetWindowPos( g_wv.hWnd, NULL, 0, 0, glConfig.vidWidth, glConfig.vidHeight, SWP_FRAMECHANGED | SWP_SHOWWINDOW ) )
 		{
 			ri.Printf( PRINT_ALL, "SetWindowPos failed\n" );
 			return qfalse;
@@ -973,7 +998,7 @@ static qboolean GLW_ChangeWindowMode( void )
 		AdjustWindowRect( &rect, windowStyle, FALSE );
 
 		if ( !SetWindowPos( g_wv.hWnd, HWND_NOTOPMOST, vid_xpos->integer, vid_ypos->integer,
-			rect.right - rect.left, rect.bottom - rect.top, SWP_NOSENDCHANGING ) )
+			rect.right - rect.left, rect.bottom - rect.top, SWP_NOSENDCHANGING | SWP_FRAMECHANGED | SWP_SHOWWINDOW ) )
 		{
 			ri.Printf( PRINT_ALL, "SetWindowPos failed\n" );
 			return qfalse;
@@ -1074,18 +1099,20 @@ static rserr_t GLW_SetMode( const char *drivername,
 	const char *win_fs[] = { "W", "FS" };
 	int		cdsRet;
 	DEVMODE dm;
+	int		modeAspect;
 		
 	//
 	// print out informational messages
 	//
 	ri.Printf( PRINT_ALL, "...setting mode %d:", mode );
-	if ( !R_GetModeInfo( &glConfig.vidWidth, &glConfig.vidHeight, &glConfig.windowAspect, mode, cdsFullscreen ) )
+	if ( !GLW_GetModeInfo( &glConfig.vidWidth, &glConfig.vidHeight, &modeAspect, mode, cdsFullscreen ) )
 	{
 		ri.Printf( PRINT_ALL, " invalid mode\n" );
 		return RSERR_INVALID_MODE;
 	}
 
-	ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( glConfig.vidWidth, glConfig.vidHeight ) ) );
+	ri.Cvar_Set( "r_aspectRatio", va( "%d", modeAspect ) );
+	glConfig.windowAspect = (float)glConfig.vidWidth / (float)glConfig.vidHeight;
 	ri.Printf( PRINT_ALL, " %d %d %s\n", glConfig.vidWidth, glConfig.vidHeight, win_fs[cdsFullscreen] );
 
 	//

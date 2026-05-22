@@ -911,6 +911,7 @@ int GLW_SetMode( const char *drivername, int mode, qboolean fullscreen )
   int tcolorbits, tdepthbits, tstencilbits;
   int dga_MajorVersion, dga_MinorVersion;
   int actualWidth, actualHeight;
+  int modeAspect;
   int i;
   const char*   glstring; // bk001130 - from cvs1.17 (mkv)
 
@@ -918,11 +919,12 @@ int GLW_SetMode( const char *drivername, int mode, qboolean fullscreen )
 
   ri.Printf (PRINT_ALL, "...setting mode %d:", mode );
 
-  if ( !R_GetModeInfo( &glConfig.vidWidth, &glConfig.vidHeight, &glConfig.windowAspect, mode, fullscreen ) )
+  if ( !R_GetModeInfo( &glConfig.vidWidth, &glConfig.vidHeight, &modeAspect, mode, fullscreen ) )
   {
     ri.Printf( PRINT_ALL, " invalid mode\n" );
     return RSERR_INVALID_MODE;
   }
+  glConfig.windowAspect = (float)glConfig.vidWidth / (float)glConfig.vidHeight;
   ri.Printf( PRINT_ALL, " %d %d\n", glConfig.vidWidth, glConfig.vidHeight);
 
   if (!(dpy = XOpenDisplay(NULL)))

@@ -45,15 +45,14 @@ Observed corpus facts:
 ## Key-Number Boundary
 
 The committed retail key-name table shows Quake Live added `MOUSE6` through
-`MOUSE9`, shifting wheel and joystick numbers relative to the current
-`src/ui/keycodes.h` enum. The table maps `MWHEELDOWN` to `0xBB` and
-`MWHEELUP` to `0xBC`, while the current read-only source enum still exposes
-`K_MWHEELDOWN` and `K_MWHEELUP` at the older GPL numbers.
+`MOUSE9`, shifting wheel and joystick numbers relative to the older GPL enum.
+The table maps `MWHEELDOWN` to `0xBB`, `MWHEELUP` to `0xBC`, and `JOY1` to
+`0xBD`.
 
-Because repository scope marks `src/ui/` read-only, this round keeps the source
-patch on the semantic client constants (`K_MWHEELDOWN` / `K_MWHEELUP`) instead
-of rewriting the shared enum. The broader key-number reconciliation remains a
-separate whole-engine source/UI boundary task.
+Follow-up input parity work resolved this boundary in `src/code/ui/keycodes.h`
+by inserting `K_MOUSE6` through `K_MOUSE9` before the wheel and joystick ranges.
+That path is distinct from the repository's read-only `src/ui/` tree, so the
+retail key-number reconciliation no longer remains open.
 
 ## Source Reconstruction
 
@@ -95,6 +94,5 @@ sufficient for this static key-routing reconstruction.
 Strict engine `client` parity remains **100% -> 100%**. This closes another
 source-only behavior difference inside the high-traffic key dispatcher.
 
-Repo-wide retail parity remains **98% -> 98%** because the remaining key-number
-enum reconciliation crosses the read-only source/UI boundary and is larger than
-this focused client reconstruction.
+Repo-wide retail parity remained **98% -> 98%** for this historical round. A
+later input parity pass closed the key-number enum boundary described above.

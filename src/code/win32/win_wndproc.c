@@ -28,6 +28,21 @@ WinVars_t	g_wv;
 #ifndef WM_MOUSEWHEEL
 #define WM_MOUSEWHEEL (WM_MOUSELAST+1)  // message that will be supported by the OS 
 #endif
+#ifndef WM_XBUTTONDOWN
+#define WM_XBUTTONDOWN 0x020B
+#endif
+#ifndef WM_XBUTTONUP
+#define WM_XBUTTONUP 0x020C
+#endif
+#ifndef WM_DPICHANGED
+#define WM_DPICHANGED 0x02E0
+#endif
+#ifndef MK_XBUTTON1
+#define MK_XBUTTON1 0x0020
+#endif
+#ifndef MK_XBUTTON2
+#define MK_XBUTTON2 0x0040
+#endif
 
 static UINT MSH_MOUSEWHEEL;
 
@@ -506,6 +521,24 @@ LONG WINAPI MainWndProc (
 		}
 
 		break;
+
+	case WM_DPICHANGED:
+		if ( r_fullscreen && r_fullscreen->integer )
+		{
+			return 0;
+		}
+
+		if ( lParam )
+		{
+			RECT *dpiRect;
+
+			dpiRect = (RECT *)lParam;
+			SetWindowPos( hWnd, NULL, dpiRect->left, dpiRect->top,
+				dpiRect->right - dpiRect->left, dpiRect->bottom - dpiRect->top,
+				SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED );
+			WIN_SyncWindowedModeFromClientRect();
+		}
+		return 0;
 #if 0
 	case WM_DISPLAYCHANGE:
 		Com_DPrintf( "WM_DISPLAYCHANGE\n" );
@@ -605,6 +638,8 @@ LONG WINAPI MainWndProc (
 	case WM_RBUTTONUP:
 	case WM_MBUTTONDOWN:
 	case WM_MBUTTONUP:
+	case WM_XBUTTONDOWN:
+	case WM_XBUTTONUP:
 	case WM_MOUSEMOVE:
 		{
 			int	temp;
@@ -619,6 +654,12 @@ LONG WINAPI MainWndProc (
 
 			if (wParam & MK_MBUTTON)
 				temp |= 4;
+
+			if (wParam & MK_XBUTTON1)
+				temp |= 8;
+
+			if (wParam & MK_XBUTTON2)
+				temp |= 16;
 
 			if ( !IN_RawInputIsActive() )
 			{

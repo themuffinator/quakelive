@@ -31,6 +31,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 typedef struct {
 	int			oldButtonState;
+	int			oldCursorX;
+	int			oldCursorY;
 
 	qboolean	mouseActive;
 	qboolean	mouseInitialized;
@@ -155,8 +157,8 @@ void IN_ActivateWin32Mouse( void ) {
 	int			width, height;
 	RECT		window_rect;
 
-	width = GetSystemMetrics (SM_CXSCREEN);
-	height = GetSystemMetrics (SM_CYSCREEN);
+	width = GetSystemMetrics (SM_CXVIRTUALSCREEN);
+	height = GetSystemMetrics (SM_CYVIRTUALSCREEN);
 
 	GetWindowRect ( g_wv.hWnd, &window_rect);
 	if (window_rect.left < 0)
@@ -171,6 +173,8 @@ void IN_ActivateWin32Mouse( void ) {
 	window_center_y = (window_rect.top + window_rect.bottom)/2;
 
 	SetCursorPos (window_center_x, window_center_y);
+	Cvar_SetValue( "vid_xpos", (float)window_rect.left );
+	Cvar_SetValue( "vid_ypos", (float)window_rect.top );
 
 	SetCapture ( g_wv.hWnd );
 	ClipCursor (&window_rect);
@@ -207,6 +211,51 @@ void IN_Win32Mouse( int *mx, int *my ) {
 
 	*mx = current_pos.x - window_center_x;
 	*my = current_pos.y - window_center_y;
+}
+
+/*
+================
+IN_ShouldUseRelativeMouse
+================
+*/
+static qboolean IN_ShouldUseRelativeMouse( void ) {
+	if ( !s_wmv.mouseActive ) {
+		return qfalse;
+	}
+
+	if ( cls.keyCatchers & ~( KEYCATCH_MESSAGE | KEYCATCH_RETAIL_MOUSEPASS ) ) {
+		return qfalse;
+	}
+
+	if ( in_nograb && in_nograb->integer ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+================
+IN_WindowMouse
+================
+*/
+static void IN_WindowMouse( void ) {
+	POINT	current_pos;
+
+	if ( !g_wv.hWnd ) {
+		return;
+	}
+
+	GetCursorPos( &current_pos );
+	ScreenToClient( g_wv.hWnd, &current_pos );
+
+	if ( current_pos.x == s_wmv.oldCursorX && current_pos.y == s_wmv.oldCursorY ) {
+		return;
+	}
+
+	s_wmv.oldCursorX = current_pos.x;
+	s_wmv.oldCursorY = current_pos.y;
+	Sys_QueEvent( 0, SE_MOUSE, current_pos.x, current_pos.y, 0, NULL );
 }
 
 /*
@@ -479,7 +528,19 @@ DEFINE_GUID(GUID_YAxis,   0xA36D02E1,0xC9F3,0x11CF,0xBF,0xC7,0x44,0x45,0x53,0x54
 DEFINE_GUID(GUID_ZAxis,   0xA36D02E2,0xC9F3,0x11CF,0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00);
 
 
-#define DINPUT_BUFFERSIZE           16
+#define DINPUT_BUFFERSIZE           0x200
+#ifndef DIMOFS_BUTTON4
+#define DIMOFS_BUTTON4              (DIMOFS_BUTTON0 + 4)
+#endif
+#ifndef DIMOFS_BUTTON5
+#define DIMOFS_BUTTON5              (DIMOFS_BUTTON0 + 5)
+#endif
+#ifndef DIMOFS_BUTTON6
+#define DIMOFS_BUTTON6              (DIMOFS_BUTTON0 + 6)
+#endif
+#ifndef DIMOFS_BUTTON7
+#define DIMOFS_BUTTON7              (DIMOFS_BUTTON0 + 7)
+#endif
 #define iDirectInputCreate(a,b,c,d)	pDirectInputCreate(a,b,c,d)
 
 HRESULT (WINAPI *pDirectInputCreate)(HINSTANCE hinst, DWORD dwVersion,
@@ -495,6 +556,10 @@ typedef struct MYDATA {
 	BYTE  bButtonB;             // Another button goes here
 	BYTE  bButtonC;             // Another button goes here
 	BYTE  bButtonD;             // Another button goes here
+	BYTE  bButtonE;             // Another button goes here
+	BYTE  bButtonF;             // Another button goes here
+	BYTE  bButtonG;             // Another button goes here
+	BYTE  bButtonH;             // Another button goes here
 } MYDATA;
 
 static DIOBJECTDATAFORMAT rgodf[] = {
@@ -505,6 +570,10 @@ static DIOBJECTDATAFORMAT rgodf[] = {
   { 0,              FIELD_OFFSET(MYDATA, bButtonB), DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0,},
   { 0,              FIELD_OFFSET(MYDATA, bButtonC), 0x80000000 | DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0,},
   { 0,              FIELD_OFFSET(MYDATA, bButtonD), 0x80000000 | DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0,},
+  { 0,              FIELD_OFFSET(MYDATA, bButtonE), 0x80000000 | DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0,},
+  { 0,              FIELD_OFFSET(MYDATA, bButtonF), 0x80000000 | DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0,},
+  { 0,              FIELD_OFFSET(MYDATA, bButtonG), 0x80000000 | DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0,},
+  { 0,              FIELD_OFFSET(MYDATA, bButtonH), 0x80000000 | DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0,},
 };
 
 #define NUM_OBJECTS (sizeof(rgodf) / sizeof(rgodf[0]))
@@ -680,24 +749,24 @@ IN_DIMouse
 ===================
 */
 void IN_DIMouse( int *mx, int *my ) {
-	DIDEVICEOBJECTDATA	od;
-	DIMOUSESTATE		state;
+	DIDEVICEOBJECTDATA	od[DINPUT_BUFFERSIZE];
 	DWORD				dwElements;
 	HRESULT				hr;
-  int value;
-	static float		oldSysTime;
+	int					i;
+	int					key;
+	int					value;
+
+	*mx = *my = 0;
 
 	if ( !g_pMouse ) {
 		return;
 	}
 
 	// fetch new events
-	for (;;)
-	{
-		dwElements = 1;
+	for ( ;; ) {
+		dwElements = DINPUT_BUFFERSIZE;
 
-		hr = IDirectInputDevice_GetDeviceData(g_pMouse,
-				sizeof(DIDEVICEOBJECTDATA), &od, &dwElements, 0);
+		hr = IDirectInputDevice_GetDeviceData( g_pMouse, sizeof( DIDEVICEOBJECTDATA ), od, &dwElements, 0 );
 		if ((hr == DIERR_INPUTLOST) || (hr == DIERR_NOTACQUIRED)) {
 			IDirectInputDevice_Acquire(g_pMouse);
 			return;
@@ -708,64 +777,41 @@ void IN_DIMouse( int *mx, int *my ) {
 			break;
 		}
 
+		if ( hr == DI_BUFFEROVERFLOW ) {
+			Com_Printf( "IN_DIMouse: DI_BUFFEROVERFLOW\n" );
+		}
+
 		if ( dwElements == 0 ) {
 			break;
 		}
 
-		switch (od.dwOfs) {
-		case DIMOFS_BUTTON0:
-			if (od.dwData & 0x80)
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MOUSE1, qtrue, 0, NULL );
-			else
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MOUSE1, qfalse, 0, NULL );
-			break;
-
-		case DIMOFS_BUTTON1:
-			if (od.dwData & 0x80)
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MOUSE2, qtrue, 0, NULL );
-			else
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MOUSE2, qfalse, 0, NULL );
-			break;
-			
-		case DIMOFS_BUTTON2:
-			if (od.dwData & 0x80)
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MOUSE3, qtrue, 0, NULL );
-			else
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MOUSE3, qfalse, 0, NULL );
-			break;
-
-		case DIMOFS_BUTTON3:
-			if (od.dwData & 0x80)
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MOUSE4, qtrue, 0, NULL );
-			else
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MOUSE4, qfalse, 0, NULL );
-			break;      
-    // https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=50
-		case DIMOFS_Z:
-			value = od.dwData;
-			if (value == 0) {
-
-			} else if (value < 0) {
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MWHEELDOWN, qtrue, 0, NULL );
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MWHEELDOWN, qfalse, 0, NULL );
-			} else {
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MWHEELUP, qtrue, 0, NULL );
-				Sys_QueEvent( od.dwTimeStamp, SE_KEY, K_MWHEELUP, qfalse, 0, NULL );
+		for ( i = 0; i < (int)dwElements; i++ ) {
+			switch ( od[i].dwOfs ) {
+			case DIMOFS_X:
+				*mx += (int)od[i].dwData;
+				break;
+			case DIMOFS_Y:
+				*my += (int)od[i].dwData;
+				break;
+			case DIMOFS_Z:
+				value = (int)od[i].dwData;
+				if ( value < 0 ) {
+					Sys_QueEvent( od[i].dwTimeStamp, SE_KEY, K_MWHEELDOWN, qtrue, 0, NULL );
+					Sys_QueEvent( od[i].dwTimeStamp, SE_KEY, K_MWHEELDOWN, qfalse, 0, NULL );
+				} else if ( value > 0 ) {
+					Sys_QueEvent( od[i].dwTimeStamp, SE_KEY, K_MWHEELUP, qtrue, 0, NULL );
+					Sys_QueEvent( od[i].dwTimeStamp, SE_KEY, K_MWHEELUP, qfalse, 0, NULL );
+				}
+				break;
+			default:
+				if ( od[i].dwOfs >= DIMOFS_BUTTON0 && od[i].dwOfs <= DIMOFS_BUTTON7 ) {
+					key = K_MOUSE1 + (int)( od[i].dwOfs - DIMOFS_BUTTON0 );
+					Sys_QueEvent( od[i].dwTimeStamp, SE_KEY, key, ( od[i].dwData & 0x80 ) ? qtrue : qfalse, 0, NULL );
+				}
+				break;
 			}
-			break;
 		}
 	}
-
-	// read the raw delta counter and ignore
-	// the individual sample time / values
-	hr = IDirectInputDevice_GetDeviceState(g_pMouse,
-			sizeof(DIDEVICEOBJECTDATA), &state);
-	if ( FAILED(hr) ) {
-		*mx = *my = 0;
-		return;
-	}
-	*mx = state.lX;
-	*my = state.lY;
 }
 
 /*
@@ -931,7 +977,7 @@ void IN_MouseEvent (int mstate)
 		return;
 
 // perform button actions
-	for  (i = 0 ; i < 3 ; i++ )
+	for  (i = 0 ; i < 8 ; i++ )
 	{
 		if ( (mstate & (1<<i)) &&
 			!(s_wmv.oldButtonState & (1<<i)) )
@@ -957,6 +1003,11 @@ IN_MouseMove
 */
 void IN_MouseMove ( void ) {
 	int		mx, my;
+
+	if ( !IN_ShouldUseRelativeMouse() ) {
+		IN_WindowMouse();
+		return;
+	}
 
 	if ( in_mouse && in_mouse->integer == 2 && s_wri.registered ) {
 		IN_RawInputMouse( &mx, &my );
@@ -1098,17 +1149,20 @@ void IN_Frame (void) {
 		if (Cvar_VariableValue ("r_fullscreen") == 0
 			&& strcmp( Cvar_VariableString("r_glDriver"), _3DFX_DRIVER_NAME) )	{
 			IN_DeactivateMouse ();
+			IN_MouseMove();
 			return;
 		}
 	}
 
 	if ( !in_appactive ) {
 		IN_DeactivateMouse ();
+		IN_MouseMove();
 		return;
 	}
 
 	if ( in_nograb && in_nograb->integer ) {
 		IN_DeactivateMouse();
+		IN_MouseMove();
 		return;
 	}
 

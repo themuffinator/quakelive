@@ -245,6 +245,7 @@ static qboolean CreateGameWindow( qboolean isSecondTry )
 {
     const char *windowed[] = { "Windowed", "Fullscreen" };
     int			current_mode;
+    int			modeAspect;
     NSOpenGLPixelFormatAttribute *pixelAttributes;
     NSOpenGLPixelFormat *pixelFormat;
     CGDisplayErr err;
@@ -266,10 +267,11 @@ static qboolean CreateGameWindow( qboolean isSecondTry )
 #endif
 
     ri.Printf( PRINT_ALL, "...setting mode %d:\n", current_mode );
-    if ( !R_GetModeInfo( &glConfig.vidWidth, &glConfig.vidHeight, &glConfig.windowAspect, current_mode ) )  {
+    if ( !R_GetModeInfo( &glConfig.vidWidth, &glConfig.vidHeight, &modeAspect, current_mode, glConfig.isFullscreen ) )  {
         ri.Printf( PRINT_ALL, " invalid mode\n" );
         return qfalse;
     }
+    glConfig.windowAspect = (float)glConfig.vidWidth / (float)glConfig.vidHeight;
     ri.Printf( PRINT_ALL, " %d %d %s\n", glConfig.vidWidth, glConfig.vidHeight, windowed[glConfig.isFullscreen] );
 
     if (glConfig.isFullscreen) {
@@ -1110,5 +1112,4 @@ qboolean Sys_Unhide()
     Sys_IsHidden = qfalse;
     return qtrue;
 }
-
 

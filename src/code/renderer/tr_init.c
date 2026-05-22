@@ -471,43 +471,73 @@ void GL_CheckErrors( void ) {
 */
 typedef struct vidmode_s
 {
-    const char *description;
-    int         width, height;
-	float		pixelAspect;		// pixel width / height
+	const char *description;
+	int         width, height;
+	int			aspectRatio;
 } vidmode_t;
 
 vidmode_t r_vidModes[] =
 {
-    { "Mode  0: 320x240",		320,	240,	1 },
-    { "Mode  1: 400x300",		400,	300,	1 },
-    { "Mode  2: 512x384",		512,	384,	1 },
-    { "Mode  3: 640x360",		640,	360,	1 },
-    { "Mode  4: 640x400",		640,	400,	1 },
-    { "Mode  5: 640x480",		640,	480,	1 },
-    { "Mode  6: 800x450",		800,	450,	1 },
-    { "Mode  7: 852x480",		852,	480,	1 },
-    { "Mode  8: 800x500",		800,	500,	1 },
-    { "Mode  9: 800x600",		800,	600,	1 },
-    { "Mode 10: 1024x640",		1024,	640,	1 },
-    { "Mode 11: 1024x576",		1024,	576,	1 },
-    { "Mode 12: 1024x768",		1024,	768,	1 },
-    { "Mode 13: 1152x864",		1152,	864,	1 },
-    { "Mode 14: 1280x720",		1280,	720,	1 },
-    { "Mode 15: 1280x768",		1280,	768,	1 },
-    { "Mode 16: 1280x800",		1280,	800,	1 },
-    { "Mode 17: 1280x1024",		1280,	1024,	1 },
-    { "Mode 18: 1440x900",		1440,	900,	1 },
-    { "Mode 19: 1600x900",		1600,	900,	1 },
-    { "Mode 20: 1600x1000",		1600,	1000,	1 },
-    { "Mode 21: 1680x1050",		1680,	1050,	1 },
-    { "Mode 22: 1600x1200",		1600,	1200,	1 },
-    { "Mode 23: 1920x1080",		1920,	1080,	1 },
-    { "Mode 24: 1920x1200",		1920,	1200,	1 },
-    { "Mode 25: 1920x1440",		1920,	1440,	1 },
-    { "Mode 26: 2048x1536",		2048,	1536,	1 },
-    { "Mode 27: 2560x1600",		2560,	1600,	1 }
+	{ "Mode  0: 320x240",		320,	240,	0 },
+	{ "Mode  1: 400x300",		400,	300,	0 },
+	{ "Mode  2: 512x384",		512,	384,	0 },
+	{ "Mode  3: 640x360",		640,	360,	1 },
+	{ "Mode  4: 640x400",		640,	400,	2 },
+	{ "Mode  5: 640x480",		640,	480,	0 },
+	{ "Mode  6: 800x450",		800,	450,	1 },
+	{ "Mode  7: 852x480",		852,	480,	1 },
+	{ "Mode  8: 800x500",		800,	500,	2 },
+	{ "Mode  9: 800x600",		800,	600,	0 },
+	{ "Mode 10: 1024x640",		1024,	640,	2 },
+	{ "Mode 11: 1024x576",		1024,	576,	1 },
+	{ "Mode 12: 1024x768",		1024,	768,	0 },
+	{ "Mode 13: 1152x864",		1152,	864,	0 },
+	{ "Mode 14: 1280x720",		1280,	720,	1 },
+	{ "Mode 15: 1280x768",		1280,	768,	2 },
+	{ "Mode 16: 1280x800",		1280,	800,	2 },
+	{ "Mode 17: 1280x1024",		1280,	1024,	3 },
+	{ "Mode 18: 1440x900",		1440,	900,	2 },
+	{ "Mode 19: 1600x900",		1600,	900,	1 },
+	{ "Mode 20: 1600x1000",		1600,	1000,	2 },
+	{ "Mode 21: 1680x1050",		1680,	1050,	2 },
+	{ "Mode 22: 1600x1200",		1600,	1200,	0 },
+	{ "Mode 23: 1920x1080",		1920,	1080,	1 },
+	{ "Mode 24: 1920x1200",		1920,	1200,	2 },
+	{ "Mode 25: 1920x1440",		1920,	1440,	0 },
+	{ "Mode 26: 2048x1536",		2048,	1536,	0 },
+	{ "Mode 27: 2560x1600",		2560,	1600,	2 }
 };
 static int	s_numVidModes = ( sizeof( r_vidModes ) / sizeof( r_vidModes[0] ) );
+
+/*
+==========================
+R_GetModeAspectRatioPreset
+==========================
+*/
+int R_GetModeAspectRatioPreset( int width, int height )
+{
+	float	aspectRatio;
+
+	if ( height <= 0 ) {
+		return 0;
+	}
+
+	aspectRatio = (float)width / (float)height;
+
+	if ( aspectRatio >= 1.77777779f ) {
+		return 1;
+	}
+
+	if ( aspectRatio >= 1.60000002f ) {
+		return 2;
+	}
+
+	if ( aspectRatio < 1.33333337f ) {
+		return 3;
+	}
+
+	return 0;
+}
 
 /*
 =============
@@ -516,7 +546,7 @@ R_IsValidMode
 */
 static qboolean R_IsValidMode( int mode )
 {
-	if ( mode < -1 ) {
+	if ( mode < -2 ) {
 		return qfalse;
 	}
 
@@ -550,10 +580,14 @@ int R_GetMode( void )
 R_GetModeInfo
 =============
 */
-qboolean R_GetModeInfo( int *width, int *height, float *windowAspect, int mode, qboolean fullscreen ) {
+qboolean R_GetModeInfo( int *width, int *height, int *aspectRatio, int mode, qboolean fullscreen ) {
 	vidmode_t	*vm;
 
 	if ( !R_IsValidMode( mode ) ) {
+		return qfalse;
+	}
+
+	if ( mode == -2 ) {
 		return qfalse;
 	}
 
@@ -566,17 +600,17 @@ qboolean R_GetModeInfo( int *width, int *height, float *windowAspect, int mode, 
 			*height = r_windowedHeight->integer;
 		}
 
-		*windowAspect = (float)*width / (float)*height;
+		*aspectRatio = R_GetModeAspectRatioPreset( *width, *height );
 		return qtrue;
 	}
 
 	vm = &r_vidModes[mode];
 
-    *width  = vm->width;
-    *height = vm->height;
-    *windowAspect = (float)vm->width / ( vm->height * vm->pixelAspect );
+	*width  = vm->width;
+	*height = vm->height;
+	*aspectRatio = vm->aspectRatio;
 
-    return qtrue;
+	return qtrue;
 }
 
 /*
@@ -592,13 +626,13 @@ static void R_ValidateModeCvars( void )
 	}
 
 	if ( r_customwidth && r_customwidth->integer <= 0 ) {
-		ri.Printf( PRINT_WARNING, "WARNING: invalid r_customwidth %d, resetting to 1600\n", r_customwidth->integer );
-		ri.Cvar_Set( "r_customwidth", "1600" );
+		ri.Printf( PRINT_WARNING, "WARNING: invalid r_customWidth %d, resetting to 1600\n", r_customwidth->integer );
+		ri.Cvar_Set( "r_customWidth", "1600" );
 	}
 
 	if ( r_customheight && r_customheight->integer <= 0 ) {
-		ri.Printf( PRINT_WARNING, "WARNING: invalid r_customheight %d, resetting to 1024\n", r_customheight->integer );
-		ri.Cvar_Set( "r_customheight", "1024" );
+		ri.Printf( PRINT_WARNING, "WARNING: invalid r_customHeight %d, resetting to 1024\n", r_customheight->integer );
+		ri.Cvar_Set( "r_customHeight", "1024" );
 	}
 }
 
@@ -1333,8 +1367,8 @@ void R_Register( void )
 	r_windowedMode = ri.Cvar_Get( "r_windowedMode", "12", CVAR_ARCHIVE | CVAR_LATCH | CVAR_PROTECTED | CVAR_CLOUD );
 	r_windowedWidth = ri.Cvar_Get( "r_windowedWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
 	r_windowedHeight = ri.Cvar_Get( "r_windowedHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
-	r_customwidth = ri.Cvar_Get( "r_customwidth", "1600", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );
-	r_customheight = ri.Cvar_Get( "r_customheight", "1024", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );
+	r_customwidth = ri.Cvar_Get( "r_customWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );
+	r_customheight = ri.Cvar_Get( "r_customHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );
 	r_customaspect = ri.Cvar_Get( "r_customaspect", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_aspectRatio = ri.Cvar_Get( "r_aspectRatio", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );
 	R_ValidateModeCvars();

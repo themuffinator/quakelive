@@ -102,6 +102,10 @@ keyname_t keynames[] =
 	{"MOUSE3", K_MOUSE3},
 	{"MOUSE4", K_MOUSE4},
 	{"MOUSE5", K_MOUSE5},
+	{"MOUSE6", K_MOUSE6},
+	{"MOUSE7", K_MOUSE7},
+	{"MOUSE8", K_MOUSE8},
+	{"MOUSE9", K_MOUSE9},
 
 	{"MWHEELUP",	K_MWHEELUP },
 	{"MWHEELDOWN",	K_MWHEELDOWN },
@@ -1337,7 +1341,7 @@ browser keycatcher owns input.
 =============
 */
 static void CL_DispatchBrowserKeyEvent( int key, qboolean down ) {
-	if ( key >= K_MOUSE1 && key <= K_MOUSE5 ) {
+	if ( key >= K_MOUSE1 && key <= K_MOUSE9 ) {
 		CL_WebView_OnMouseButtonEvent( key, down );
 	} else if ( key == K_MWHEELUP ) {
 		if ( down ) {

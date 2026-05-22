@@ -28,6 +28,16 @@ Each project already sets a Win32 dynamic-library configuration with explicit ou
 
 Once `uix86.dll` is built with the correct toolset/runtime, stage it beside the UI script tree (`baseq3/ui/*.menu`, `baseq3/ui/*.txt`) in the distribution layout so the native module and its menu assets ship together.
 
+## Windows DPI behavior
+
+The native `quakelive_steam.exe` host intentionally diverges from the retail
+launcher by opting into modern DPI awareness. The embedded manifest declares
+per-monitor DPI awareness with a legacy `true/pm` fallback, and `WinMain` calls
+the runtime DPI-awareness shim before creating the loading window, console, or
+OpenGL window. This keeps fullscreen mode dimensions in physical pixels on
+scaled Windows desktops and avoids the cropped fullscreen viewport caused by
+system-DPI virtualization.
+
 ## Log files
 
 The engine writes a console log when `logfile` is enabled (for example `+set logfile 1` for buffered output or `+set logfile 2` to flush on each print). The log is created under:

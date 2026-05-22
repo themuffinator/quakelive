@@ -50,6 +50,59 @@ static char		sys_dumpPath[MAX_OSPATH];
 static LONG		sys_crashHandled;
 static LPTOP_LEVEL_EXCEPTION_FILTER	sys_previousExceptionFilter;
 
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2	((HANDLE)-4)
+#endif
+
+typedef BOOL (WINAPI *SetProcessDpiAwarenessContextProc)( HANDLE value );
+typedef BOOL (WINAPI *SetProcessDPIAwareProc)( void );
+
+/*
+==================
+Sys_EnableDpiAwareness
+==================
+*/
+static void Sys_EnableDpiAwareness( void )
+{
+	HMODULE		user32;
+	qboolean	loadedUser32;
+	SetProcessDpiAwarenessContextProc	setDpiAwarenessContext;
+	SetProcessDPIAwareProc				setDPIAware;
+
+	user32 = GetModuleHandleA( "user32.dll" );
+	loadedUser32 = qfalse;
+	if ( !user32 )
+	{
+		user32 = LoadLibraryA( "user32.dll" );
+		loadedUser32 = (qboolean)( user32 != NULL );
+	}
+	if ( !user32 )
+	{
+		return;
+	}
+
+	setDpiAwarenessContext = (SetProcessDpiAwarenessContextProc)GetProcAddress( user32, "SetProcessDpiAwarenessContext" );
+	if ( setDpiAwarenessContext && setDpiAwarenessContext( DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ) )
+	{
+		if ( loadedUser32 )
+		{
+			FreeLibrary( user32 );
+		}
+		return;
+	}
+
+	setDPIAware = (SetProcessDPIAwareProc)GetProcAddress( user32, "SetProcessDPIAware" );
+	if ( setDPIAware )
+	{
+		setDPIAware();
+	}
+
+	if ( loadedUser32 )
+	{
+		FreeLibrary( user32 );
+	}
+}
+
 // define this to use alternate spanking method
 // I found out that the regular way doesn't work on my box for some reason
 // see the associated spank.sh script
@@ -1767,10 +1820,12 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	char		cwd[MAX_OSPATH];
 	int			startTime, endTime;
 
-    // should never get a previous instance in Win32
-    if ( hPrevInstance ) {
-        return 0;
+	// should never get a previous instance in Win32
+	if ( hPrevInstance ) {
+		return 0;
 	}
+
+	Sys_EnableDpiAwareness();
 
 	g_wv.hInstance = hInstance;
 	Q_strncpyz( sys_cmdline, lpCmdLine, sizeof( sys_cmdline ) );

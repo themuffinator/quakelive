@@ -19,12 +19,23 @@ Mouse movement splits into two retail paths. The event dispatcher recovered as
 `sub_4B54E0` first gates on `cg_ignoreMouseInput`, then checks the recovered
 browser keycatcher bit (`0x20`), `KEYCATCH_UI`, and `KEYCATCH_CGAME` before
 falling through to gameplay accumulation when no catcher is active except the
-retail `0x10` pass-through bit. Those browser/UI/cgame routes receive the raw
-event payloads directly; the previous retained absolute-cursor accumulator was
-an inferred compatibility layer and is no longer treated as retail behavior.
+retail `0x10` pass-through bit. `CL_MouseEvent` passes the queued payloads
+directly to those browser/UI/cgame routes; the previous client-side retained
+absolute-cursor accumulator was an inferred compatibility layer and is no
+longer treated as retail behavior. The Windows host still chooses which payload
+shape to queue: while capture is active and the catcher mask is clear except
+for message/pass-through bits, it queues relative deltas; when browser/UI/cgame
+capture, `in_nograb`, inactive focus, or the windowed console releases capture,
+it queues `ScreenToClient` client-area coordinates for the absolute cursor lane.
 The retained browser host now produces the same browser catcher bit from the
 frame/hide/reset owners: active browser frames arm `0x20`, and hide/reset paths
 clear it.
+
+Mouse button numbering now follows the recovered retail key-name table through
+`MOUSE9`, so `MOUSE6` through `MOUSE9` occupy the range before `MWHEELDOWN`,
+`MWHEELUP`, and `JOY1`. The Win32 fallback path maps `MK_XBUTTON1` and
+`MK_XBUTTON2` into the same contiguous key range, and the DirectInput buffered
+path accepts button offsets through `DIMOFS_BUTTON7`.
 
 Keyboard dispatch follows the same recovered catcher ownership. `CL_KeyEvent`
 no longer feeds browser pointer/key events as an unconditional side channel;
@@ -55,7 +66,7 @@ from the HLIL traces and manual probes:
 | --- | --- | --- | --- |
 | Uppercase printable | `key='A' (0x41)` | `dispatchKey='a'`, `charCode=0x41` | Retail UI paths consume lowercase key codes for bindings while WM_CHAR preserves the shifted character. |
 | Unicode text | `key=0x20AC` (€) | `dispatchKey=0x20AC`, `charCode=0x20AC` | The Win32 pump emits Unicode payloads; the helper keeps the codepoint intact for UTF-8 UI consumers. |
-| CPI helper scaling | `dx=1`, `m_cpi=500` | `translatedDx=2` | The standalone conversion helper preserves the recovered `1000 / m_cpi` sample for harness coverage; `CL_MouseEvent` itself now follows the retail raw-dispatch path. |
+| CPI helper scaling | `dx=1`, `m_cpi=500` | `translatedDx=2` | The standalone conversion helper preserves the recovered `1000 / m_cpi` sample for harness coverage; `CL_MouseEvent` itself passes the host-queued payload without client-side cursor translation. |
 
 These examples are exercised in `tests/test_input_translation.py` to ensure
 future changes preserve the retail mappings.

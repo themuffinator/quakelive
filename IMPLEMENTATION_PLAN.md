@@ -6204,6 +6204,9 @@ Parity estimate: **before 99% -> after 100%**
 
 ### Task 105: Remaining engine host/support EH-P3 raw-input host closure [COMPLETED]
 
+### Task 111: Client/input m_cpi and general mouse parity closure [COMPLETED]
+Parity estimate: **before 96% -> after 100%** (`m_cpi` math was already retail-mapped; this closes the remaining Win32 mouse host/key-number gaps)
+
 ### Task 106: Remaining engine host/support EH-P6 parity gate and evidence closure [COMPLETED]
 Parity estimate: **before 89% -> after 92%**
 

@@ -1206,6 +1206,8 @@ def test_engine_cvar_twentyfirst_renderer_mode_tranche_matches_retail_contracts(
 	assert 'return r_mode->integer;' in tr_init
 	assert 'ri.Printf( PRINT_WARNING, "WARNING: invalid r_mode %d, resetting to 3\\n", r_mode->integer );' in tr_init
 	assert 'ri.Cvar_Set( "r_mode", "3" );' in tr_init
+	assert 'if ( mode < -2 ) {' in tr_init
+	assert 'if ( mode == -2 ) {' in tr_init
 
 	assert 'r_fullscreen = ri.Cvar_Get( "r_fullscreen", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
 	assert 'r_fullscreen = Cvar_Get ("r_fullscreen", "1", CVAR_ARCHIVE | CVAR_LATCH );' in win_wndproc
@@ -1220,19 +1222,26 @@ def test_engine_cvar_twentyfirst_renderer_mode_tranche_matches_retail_contracts(
 	assert 'if ( *width <= 0 || *height <= 0 ) {' not in tr_init
 	assert 'Cvar_SetValue( "r_windowedMode", -1 );' in win_wndproc
 
-	assert 'r_customwidth = ri.Cvar_Get( "r_customwidth", "1600", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_customwidth = ri.Cvar_Get( "r_customWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
 	assert '*width = r_customwidth->integer;' in tr_init
-	assert 'ri.Printf( PRINT_WARNING, "WARNING: invalid r_customwidth %d, resetting to 1600\\n", r_customwidth->integer );' in tr_init
-	assert 'ri.Cvar_Set( "r_customwidth", "1600" );' in tr_init
+	assert 'ri.Printf( PRINT_WARNING, "WARNING: invalid r_customWidth %d, resetting to 1600\\n", r_customwidth->integer );' in tr_init
+	assert 'ri.Cvar_Set( "r_customWidth", "1600" );' in tr_init
 
-	assert 'r_customheight = ri.Cvar_Get( "r_customheight", "1024", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_customheight = ri.Cvar_Get( "r_customHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
 	assert '*height = r_customheight->integer;' in tr_init
-	assert 'ri.Printf( PRINT_WARNING, "WARNING: invalid r_customheight %d, resetting to 1024\\n", r_customheight->integer );' in tr_init
-	assert 'ri.Cvar_Set( "r_customheight", "1024" );' in tr_init
+	assert 'ri.Printf( PRINT_WARNING, "WARNING: invalid r_customHeight %d, resetting to 1024\\n", r_customheight->integer );' in tr_init
+	assert 'ri.Cvar_Set( "r_customHeight", "1024" );' in tr_init
 
 	assert 'r_aspectRatio = ri.Cvar_Get( "r_aspectRatio", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
 	assert 'AssertCvarRange( r_aspectRatio, 0, 3, qtrue );' in tr_init
-	assert 'ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( width, height ) ) );' in win_glimp
+	assert 'int\t\t\taspectRatio;' in tr_init
+	assert '*aspectRatio = R_GetModeAspectRatioPreset( *width, *height );' in tr_init
+	assert '*aspectRatio = vm->aspectRatio;' in tr_init
+	assert '{ "Mode 17: 1280x1024",\t\t1280,\t1024,\t3 },' in tr_init
+	assert 'static qboolean GLW_GetModeInfo( int *width, int *height, int *aspectRatio, int mode, qboolean fullscreen )' in win_glimp
+	assert 'if ( mode != -2 )' in win_glimp
+	assert 'if ( devmode.dmBitsPerPel == 32 && devmode.dmPelsWidth > bestWidth )' in win_glimp
+	assert 'ri.Cvar_Set( "r_aspectRatio", va( "%d", modeAspect ) );' in win_glimp
 
 	assert 'r_windowedWidth = Cvar_Get( "r_windowedWidth", "0", CVAR_ARCHIVE );' in win_wndproc
 	assert 'r_windowedHeight = Cvar_Get( "r_windowedHeight", "0", CVAR_ARCHIVE );' in win_wndproc

@@ -4,6 +4,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WIN_GLIMP = REPO_ROOT / "src/code/win32/win_glimp.c"
 WIN_MAIN = REPO_ROOT / "src/code/win32/win_main.c"
+WIN_MANIFEST = REPO_ROOT / "src/code/win32/quakelive_steam.manifest"
 WIN_SYSCON = REPO_ROOT / "src/code/win32/win_syscon.c"
 WIN_WNDPROC = REPO_ROOT / "src/code/win32/win_wndproc.c"
 
@@ -37,13 +38,32 @@ def test_shared_loading_window_wrappers_and_startup_order_are_present() -> None:
 	assert 'CONSOLE_WINDOW_CLASS,' in win_syscon
 	assert 'LOADING_WINDOW_TITLE,' in win_syscon
 
+	enable_dpi = win_main.index("Sys_EnableDpiAwareness();")
 	create_loading = win_main.index("Sys_CreateLoadingWindow();")
 	create_console = win_main.index("Sys_CreateConsole();")
 	set_error_mode = win_main.index("SetErrorMode( SEM_FAILCRITICALERRORS );")
 	destroy_loading = win_main.index("Sys_DestroyLoadingWindow();")
 	com_init = win_main.index("Com_Init( sys_cmdline );")
 
-	assert create_loading < create_console < set_error_mode < destroy_loading < com_init
+	assert enable_dpi < create_loading < create_console < set_error_mode < destroy_loading < com_init
+
+
+def test_windows_dpi_awareness_is_enabled_before_hwnd_creation() -> None:
+	win_glimp = WIN_GLIMP.read_text()
+	win_main = WIN_MAIN.read_text()
+	win_manifest = WIN_MANIFEST.read_text()
+	win_wndproc = WIN_WNDPROC.read_text()
+
+	assert "DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2" in win_main
+	assert "SetProcessDpiAwarenessContext" in win_main
+	assert "SetProcessDPIAware" in win_main
+	assert win_main.index("Sys_EnableDpiAwareness();") < win_main.index("Sys_CreateLoadingWindow();")
+	assert '<dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>' in win_manifest
+	assert '<dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>' in win_manifest
+	assert "case WM_DPICHANGED:" in win_wndproc
+	assert "SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED" in win_wndproc
+	assert "SWP_FRAMECHANGED | SWP_SHOWWINDOW" in win_glimp
+	assert "SWP_NOSENDCHANGING | SWP_FRAMECHANGED | SWP_SHOWWINDOW" in win_glimp
 
 
 def test_fast_restart_preserves_windowed_maximize_state() -> None:
@@ -66,15 +86,13 @@ def test_windowed_size_cvars_can_expand_existing_windows() -> None:
 def test_mode_switches_publish_retail_aspect_ratio_presets() -> None:
 	win_glimp = WIN_GLIMP.read_text()
 
-	assert "static int GLW_GetModeAspectRatioPreset( int width, int height )" in win_glimp
-	assert "aspectRatio = (float)width / (float)height;" in win_glimp
-	assert "if ( aspectRatio >= 1.77777779f )" in win_glimp
-	assert "if ( aspectRatio >= 1.60000002f )" in win_glimp
-	assert "if ( aspectRatio < 1.33333337f )" in win_glimp
-	assert "return 0;" in win_glimp
+	assert "static qboolean GLW_GetModeInfo( int *width, int *height, int *aspectRatio, int mode, qboolean fullscreen )" in win_glimp
+	assert "if ( mode != -2 )" in win_glimp
+	assert "return R_GetModeInfo( width, height, aspectRatio, mode, fullscreen );" in win_glimp
+	assert "if ( devmode.dmBitsPerPel == 32 && devmode.dmPelsWidth > bestWidth )" in win_glimp
+	assert "*aspectRatio = R_GetModeAspectRatioPreset( *width, *height );" in win_glimp
 	assert 'ri.Cvar_Set( "r_aspectRatio", "0" );' not in win_glimp
-	assert 'ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( width, height ) ) );' in win_glimp
-	assert 'ri.Cvar_Set( "r_aspectRatio", va( "%d", GLW_GetModeAspectRatioPreset( glConfig.vidWidth, glConfig.vidHeight ) ) );' in win_glimp
+	assert 'ri.Cvar_Set( "r_aspectRatio", va( "%d", modeAspect ) );' in win_glimp
 
 
 def test_pfd_auto_select_restores_retail_icd_and_wgl_owner_split() -> None:

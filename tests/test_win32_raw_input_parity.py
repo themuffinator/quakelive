@@ -13,6 +13,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 WIN_INPUT = REPO_ROOT / "src" / "code" / "win32" / "win_input.c"
 WIN_MAIN = REPO_ROOT / "src" / "code" / "win32" / "win_main.c"
 WIN_WNDPROC = REPO_ROOT / "src" / "code" / "win32" / "win_wndproc.c"
+CL_KEYS = REPO_ROOT / "src" / "code" / "client" / "cl_keys.c"
+KEYCODES = REPO_ROOT / "src" / "code" / "ui" / "keycodes.h"
 
 RIDEV_REMOVE = 0x00000001
 
@@ -69,6 +71,27 @@ def _extract_function_block(text: str, signature: str) -> str:
 				return text[start : index + 1]
 
 	raise AssertionError(f"unterminated function block for: {signature}")
+
+
+def _parse_key_enum_values(keycodes: str) -> dict[str, int]:
+	start = keycodes.index("typedef enum {")
+	end = keycodes.index("} keyNum_t;", start)
+	enum_body = keycodes[start:end]
+	values: dict[str, int] = {}
+	value = -1
+
+	for line in enum_body.splitlines():
+		match = re.search(r"\b(K_[A-Z0-9_]+)\s*(?:=\s*(\d+))?\s*,", line)
+		if not match:
+			continue
+
+		if match.group(2) is not None:
+			value = int(match.group(2))
+		else:
+			value += 1
+		values[match.group(1)] = value
+
+	return values
 
 
 @pytest.fixture(scope="session")
@@ -277,6 +300,98 @@ def test_win32_raw_input_source_includes_device_listing_and_wm_input_dispatch() 
 	assert "case WM_INPUT:" in main_wndproc
 	assert "IN_RawInputEvent( wParam, lParam );" in main_wndproc
 	assert "IN_RawInputIsActive()" in main_wndproc
+
+
+def test_retail_mouse_key_range_extends_through_mouse9_before_wheel_and_joy_keys() -> None:
+	keycodes = KEYCODES.read_text(encoding="utf-8")
+	cl_keys = CL_KEYS.read_text(encoding="utf-8")
+	browser_key_block = _extract_function_block(
+		cl_keys, "static void CL_DispatchBrowserKeyEvent( int key, qboolean down ) {"
+	)
+
+	key_order = [
+		"K_MOUSE5",
+		"K_MOUSE6",
+		"K_MOUSE7",
+		"K_MOUSE8",
+		"K_MOUSE9",
+		"K_MWHEELDOWN",
+		"K_MWHEELUP",
+		"K_JOY1",
+	]
+	key_values = _parse_key_enum_values(keycodes)
+	positions = [keycodes.index(key) for key in key_order]
+
+	assert positions == sorted(positions)
+	assert key_values["K_MOUSE1"] == 0xB2
+	assert key_values["K_MOUSE9"] == 0xBA
+	assert key_values["K_MWHEELDOWN"] == 0xBB
+	assert key_values["K_MWHEELUP"] == 0xBC
+	assert key_values["K_JOY1"] == 0xBD
+	for key_name in ("MOUSE6", "MOUSE7", "MOUSE8", "MOUSE9"):
+		assert f'{{"{key_name}", K_{key_name}}},' in cl_keys
+	assert "key >= K_MOUSE1 && key <= K_MOUSE9" in browser_key_block
+
+
+def test_win32_mouse_capture_falls_back_to_absolute_client_coordinates_for_ui_lanes() -> None:
+	win_input = WIN_INPUT.read_text(encoding="utf-8")
+	activate_block = _extract_function_block(win_input, "void IN_ActivateWin32Mouse( void ) {")
+	relative_block = _extract_function_block(win_input, "static qboolean IN_ShouldUseRelativeMouse( void ) {")
+	window_block = _extract_function_block(win_input, "static void IN_WindowMouse( void ) {")
+	mouse_move_block = _extract_function_block(win_input, "void IN_MouseMove ( void ) {")
+	frame_block = _extract_function_block(win_input, "void IN_Frame (void) {")
+
+	assert "SM_CXVIRTUALSCREEN" in activate_block
+	assert "SM_CYVIRTUALSCREEN" in activate_block
+	assert 'Cvar_SetValue( "vid_xpos", (float)window_rect.left );' in activate_block
+	assert 'Cvar_SetValue( "vid_ypos", (float)window_rect.top );' in activate_block
+
+	assert "!s_wmv.mouseActive" in relative_block
+	assert "KEYCATCH_MESSAGE | KEYCATCH_RETAIL_MOUSEPASS" in relative_block
+	assert "in_nograb && in_nograb->integer" in relative_block
+	assert "ScreenToClient( g_wv.hWnd, &current_pos );" in window_block
+	assert "oldCursorX" in window_block
+	assert "oldCursorY" in window_block
+	assert "Sys_QueEvent( 0, SE_MOUSE, current_pos.x, current_pos.y, 0, NULL );" in window_block
+
+	assert "if ( !IN_ShouldUseRelativeMouse() ) {" in mouse_move_block
+	assert "IN_WindowMouse();" in mouse_move_block
+	assert len(re.findall(r"IN_DeactivateMouse\s*\(\s*\);\s*IN_MouseMove\s*\(\s*\);", frame_block)) >= 3
+
+
+def test_directinput_mouse_uses_retail_buffered_event_stream_and_eight_buttons() -> None:
+	win_input = WIN_INPUT.read_text(encoding="utf-8")
+	di_block = _extract_function_block(win_input, "void IN_DIMouse( int *mx, int *my ) {")
+	mouse_event_block = _extract_function_block(win_input, "void IN_MouseEvent (int mstate)\n{")
+
+	assert "#define DINPUT_BUFFERSIZE           0x200" in win_input
+	assert "#define DIMOFS_BUTTON7              (DIMOFS_BUTTON0 + 7)" in win_input
+	assert "bButtonH" in win_input
+	assert "DIDEVICEOBJECTDATA\tod[DINPUT_BUFFERSIZE];" in di_block
+	assert "IDirectInputDevice_GetDeviceData( g_pMouse, sizeof( DIDEVICEOBJECTDATA ), od, &dwElements, 0 );" in di_block
+	assert "DI_BUFFEROVERFLOW" in di_block
+	assert "*mx += (int)od[i].dwData;" in di_block
+	assert "*my += (int)od[i].dwData;" in di_block
+	assert "DIMOFS_BUTTON7" in di_block
+	assert "K_MOUSE1 + (int)( od[i].dwOfs - DIMOFS_BUTTON0 )" in di_block
+	assert "IDirectInputDevice_GetDeviceState" not in di_block
+	assert "i < 8" in mouse_event_block
+
+
+def test_win32_fallback_mouse_messages_include_xbutton_state_bits() -> None:
+	win_wndproc = WIN_WNDPROC.read_text(encoding="utf-8")
+	main_wndproc = _extract_function_block(win_wndproc, "LONG WINAPI MainWndProc (")
+
+	assert "#define WM_XBUTTONDOWN 0x020B" in win_wndproc
+	assert "#define WM_XBUTTONUP 0x020C" in win_wndproc
+	assert "#define MK_XBUTTON1 0x0020" in win_wndproc
+	assert "#define MK_XBUTTON2 0x0040" in win_wndproc
+	assert "case WM_XBUTTONDOWN:" in main_wndproc
+	assert "case WM_XBUTTONUP:" in main_wndproc
+	assert "wParam & MK_XBUTTON1" in main_wndproc
+	assert "temp |= 8;" in main_wndproc
+	assert "wParam & MK_XBUTTON2" in main_wndproc
+	assert "temp |= 16;" in main_wndproc
 
 
 def test_win32_input_restart_command_matches_retail_registration_and_handler() -> None:

@@ -71,8 +71,8 @@ Observed local facts:
 
 1. The helper rejects out-of-range mode indices below `-1` or past the mode table length.
 2. For `mode == -1` it selects either the custom fullscreen pair or the windowed pair based on the final boolean argument.
-3. It computes `windowAspect = width / height` for custom modes.
-4. For table-backed modes it indexes the packed mode records and returns width, height, and aspect using the same `pixelAspect` formula as `tr_init.c`.
+3. It classifies custom dimensions into the same `r_aspectRatio` preset buckets used by the Win32 host (`16:9`, `16:10`, `4:3`, or `5:4`).
+4. For table-backed modes it indexes the packed mode records and returns width, height, and the stored aspect preset from the retail table.
 
 That is the exact video-mode query helper `R_GetModeInfo`.
 
