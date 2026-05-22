@@ -750,7 +750,9 @@ def test_client_connect_and_demo_commands_match_retail_contracts() -> None:
 	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
 
 	record_block = _extract_function_block(cl_main, "void CL_Record_f( void ) {")
+	stop_record_block = _extract_function_block(cl_main, "void CL_StopRecord_f( void ) {")
 	demo_block = _extract_function_block(cl_main, "void CL_PlayDemo_f( void ) {")
+	demo_completed_block = _extract_function_block(cl_main, "void CL_DemoCompleted( void ) {")
 	reconnect_block = _extract_function_block(cl_main, "void CL_Reconnect_f( void ) {")
 	connect_block = _extract_function_block(cl_main, "void CL_Connect_f( void ) {")
 
@@ -759,12 +761,18 @@ def test_client_connect_and_demo_commands_match_retail_contracts() -> None:
 	assert "CL_StopRecord_f();" in record_block
 	assert 'Com_Error( ERR_FATAL, "stoprecord failed" );' in record_block
 	assert 'Com_Printf ("recording to %s.\\n", name);' in record_block
+	assert "CL_WebView_PublishGameDemo( name, name );" in record_block
 	assert 'MSG_WriteByte (&buf, svc_gamestate);' in record_block
+	assert "CL_WebView_PublishGameDemo" not in stop_record_block
 
 	assert 'Com_Printf ("playdemo <demoname>\\n");' in demo_block
 	assert 'SV_Shutdown( "Starting Demo.\\n" );' in demo_block
 	assert 'CL_Disconnect( qfalse );' in demo_block
 	assert 'CL_WalkDemoExt( arg, name, &clc.demofile );' in demo_block
+	assert "CL_Disconnect( qtrue );" in demo_completed_block
+	assert "CL_NextDemo();" in demo_completed_block
+	assert "if ( cl_quitOnDemoCompleted && cl_quitOnDemoCompleted->integer ) {" in demo_completed_block
+	assert 'Cbuf_AddText( "quit\\n" );' in demo_completed_block
 
 	assert 'Com_Printf( "Can\'t reconnect to localhost.\\n" );' in reconnect_block
 	assert 'Cbuf_AddText( va("connect %s\\n", cls.servername ) );' in reconnect_block

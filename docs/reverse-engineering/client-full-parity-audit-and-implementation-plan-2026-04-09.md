@@ -566,7 +566,7 @@ Status: Completed on 2026-04-10
 Completed work:
 
 1. Reconstructed the retained `qz_instance` bridge in `cl_cgame.c`, including `QLJSHandler_BindQzInstance`, compact method lookup, non-returning and returning JS dispatch, bootstrap properties, JSON-returning map or factory or demo or friend or config or cursor helpers, and the recovered `GetNextKeyDown`, file, cvar, favorite-server, and URL-control method surface.
-2. Reconstructed the outbound browser-event lane in `cl_main.c`, `cl_keys.c`, `cvar.c`, and `cl_cgame.c`: `CL_WebView_PublishEvent` now backs `EnginePublish`-style publication for `web.object.ready`, `game.error`, `game.end`, `game.start`, `game.demo`, `game.screenshot`, `game.key`, `bind.changed`, and `cvar.*`, with the client lifecycle now publishing those events from disconnect, first snapshot, demo-stop, key, bind, and cvar owners.
+2. Reconstructed the outbound browser-event lane in `cl_main.c`, `cl_keys.c`, `cvar.c`, and `cl_cgame.c`: `CL_WebView_PublishEvent` now backs `EnginePublish`-style publication for `web.object.ready`, `game.error`, `game.end`, `game.start`, `game.demo`, `game.screenshot`, `game.key`, `bind.changed`, and `cvar.*`, with the client lifecycle now publishing those events from disconnect, first snapshot, demo-open, key, bind, and cvar owners.
 3. Reconstructed `SteamDataSource` request handling and the retained `QLResourceInterceptor` / `Sys_Steam_RequestURL` fallback owner in `cl_steam_resources.c`, including avatar RGBA loading through the platform layer, launcher fallback routing, and in-memory shader registration for URI-backed resources instead of the older cache-file-only compatibility lane.
 4. Extended `tests/test_platform_services.py` so the retained browser-host core, command owners, JS bridge, event-publication hooks, and resource-interceptor/data-source seams are now pinned in the client/platform parity suite.
 
@@ -597,6 +597,41 @@ Validation:
 - `python -m pytest tests/test_platform_services.py tests/test_steamworks_harness.py tests/test_client_config_parity.py tests/test_client_workshop_bootstrap_parity.py tests/test_ui_menu_files.py tests/test_client_full_parity_gate.py -q --tb=no`
 
 Parity uplift delivered: **99% -> 100%**
+
+## 2026-05-22 Demo Parity Addendum
+
+Scope: demo recording, saving/publication, playback completion, and demo-list
+handling against the committed Quake Live Steam HLIL owners.
+
+Evidence applied:
+
+1. `sub_4B82A0` / `CL_WriteDemoMessage` writes only server sequence, payload
+   length, and payload bytes. The writable source no longer emits the inherited
+   `demo: wrote` diagnostic from this hot path.
+2. `sub_4B8430` / `CL_Record_f` opens `demos/%s.dm_91`, publishes
+   `game.demo` through the retained browser event lane immediately after a
+   successful file open, then writes the initial gamestate packet.
+3. `sub_4B8300` / `CL_StopRecord_f` writes the `-1, -1` trailer, closes the
+   handle, clears recording flags, and prints `Stopped demo.` without
+   publishing another `game.demo` event.
+4. `SCR_DrawDemoRecording` now mirrors the retained
+   `cl_demoRecordMessage` modes: mode `1` draws the centered `RECORDING ...`
+   byte-count string at the retail coordinate, while mode `2` draws the
+   `icons/record` shader plus `REC` badge.
+5. `sub_4BB2A0` / `CL_DemoCompleted` now honors
+   `cl_quitOnDemoCompleted` by enqueueing `quit\n` after the retained timedemo,
+   disconnect, and `CL_NextDemo` path.
+6. Demo extension handling remains retail Quake Live Steam only:
+   `PROTOCOL_VERSION == 91`, `demo_protocols[] == { 91, 0 }`, browser
+   `GetDemoList` scans `dm_91`, and the console-completion `.dm_73` scan
+   remains as the documented retail quirk.
+
+Validation:
+
+- `pytest tests/test_engine_command_parity.py tests/test_engine_client_command_parity.py tests/test_engine_cvar_retail_parity.py tests/test_platform_services.py tests/test_engine_netcode_parity.py tests/test_ui_menu_files.py tests/test_client_full_parity_gate.py -q --tb=short`
+- Result: `214 passed, 1 skipped`
+
+Scoped demo-system parity uplift delivered: **94% -> 100%**
 
 ## Recommended Execution Order
 

@@ -64,6 +64,7 @@ def test_engine_cvar_registrations_match_targeted_retail_contracts() -> None:
 	win_input = _read_text(WIN_INPUT)
 	win_wndproc = _read_text(WIN_WNDPROC)
 	cl_main = _read_text(CL_MAIN)
+	cl_scrn = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_scrn.c")
 	cl_console = _read_text(CL_CONSOLE)
 	sv_init = _read_text(SV_INIT)
 	sv_main = _read_text(SV_MAIN)
@@ -97,7 +98,10 @@ def test_engine_cvar_registrations_match_targeted_retail_contracts() -> None:
 	assert 'con.finalFrac = con_height ? Com_Clamp( 0.1f, 1.0f, con_height->value ) : 0.5f;' in cl_console
 
 	assert 'cl_demoRecordMessage = Cvar_Get ("cl_demoRecordMessage", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
-	assert 'if ( cl_demoRecordMessage->integer >= 2 ) {' in cl_main
+	assert 'if ( !cl_demoRecordMessage || !cl_demoRecordMessage->integer ) {' in cl_scrn
+	assert 'if ( cl_demoRecordMessage->integer == 1 ) {' in cl_scrn
+	assert 'else if ( cl_demoRecordMessage->integer == 2 ) {' in cl_scrn
+	assert 'demo: wrote' not in cl_main
 
 	assert 'cl_platform = Cvar_Get ("cl_platform", "1", CVAR_ROM );' in cl_main
 
@@ -351,6 +355,8 @@ def test_engine_cvar_sixth_client_tranche_matches_retail_contracts() -> None:
 
 	assert 'cl_quitOnDemoCompleted = Cvar_Get ("cl_quitOnDemoCompleted", "0", 0 );' in cl_main
 	assert 'cvar_t\t*cl_quitOnDemoCompleted;' in cl_main
+	assert "if ( cl_quitOnDemoCompleted && cl_quitOnDemoCompleted->integer ) {" in cl_main
+	assert 'Cbuf_AddText( "quit\\n" );' in cl_main
 
 	assert 'cl_run = Cvar_Get ("cl_run", "1", CVAR_ARCHIVE);' in cl_main
 	assert 'if ( in_speed.active ^ cl_run->integer ) {' in cl_input

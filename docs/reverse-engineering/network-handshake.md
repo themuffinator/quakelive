@@ -27,6 +27,24 @@ Key entry points:
 
 ## Serialized packet layouts
 
+### Retail Steam protocol constants
+
+The retail Steam host uses protocol `91` (`0x5b`) for the engine handshake,
+server browser filtering, and demo recording path. The supporting evidence is
+consistent across the committed `quakelive_steam.exe` corpus:
+
+- `SV_Init` registers the `protocol` cvar from `va("%i", 0x5b)` with
+  `CVAR_SERVERINFO | CVAR_ROM`.
+- `CL_CheckForResend` writes `protocol=0x5b` into the quoted `connect`
+  userinfo before adding `qport` and `challenge`.
+- `CL_ServerInfoPacket` rejects `infoResponse` packets whose `protocol` value
+  is not `0x5b`.
+- The supported demo protocol list is a single-entry array:
+  `data_5684dc = 0x5b`, followed by `data_5684e0 = 0`.
+- Demo recording and filesystem fallback paths format `.dm_91`; the retained
+  console-completion helper still scans `.dm_73`, matching the separate
+  `Console_CompleteArgument` HLIL quirk.
+
 ### Out-of-band handshake payloads
 
 | Message | Layout | Notes |

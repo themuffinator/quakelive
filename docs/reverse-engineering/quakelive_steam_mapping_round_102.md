@@ -37,12 +37,10 @@ Observed local facts:
    `CL_ChangeReliableCommand` contract.
 2. `sub_4B82A0` writes the server message sequence, then the post-header
    message length, then the payload bytes into `clc.demofile`, matching
-   `CL_WriteDemoMessage`. The retail body does not currently show the writable
-   diagnostic print gated by `cl_demoRecordMessage >= 2`.
+   `CL_WriteDemoMessage`.
 3. `sub_4B8300` closes the active demo file, writes the `-1/-1` terminator,
    clears the demo-recording flags, and prints `"Stopped demo.\n"`. That is the
-   `CL_StopRecord_f` owner, with a small retail body delta around the writable
-   `cl_demoRecordMessage` gate.
+   `CL_StopRecord_f` owner.
 4. `sub_4B8390` is the literal `demo%i%i%i%i` formatter with the `demo9999.tga`
    fallback, which is an exact `CL_DemoFilename` match.
 5. `sub_4B8430` is the retained `CL_Record_f` owner: it validates state,

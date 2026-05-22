@@ -5099,10 +5099,6 @@ void CL_WriteDemoMessage ( msg_t *msg, int headerBytes ) {
 	swlen = LittleLong(len);
 	FS_Write (&swlen, 4, clc.demofile);
 	FS_Write ( msg->data + headerBytes, len, clc.demofile );
-	
-	if ( cl_demoRecordMessage->integer >= 2 ) {
-		Com_DPrintf( "demo: wrote %i bytes from server seq %i\n", len, clc.serverMessageSequence );
-	}
 }
 
 
@@ -5129,9 +5125,6 @@ void CL_StopRecord_f( void ) {
 	clc.demofile = 0;
 	clc.demorecording = qfalse;
 	clc.spDemoRecording = qfalse;
-	if ( clc.demoName[0] ) {
-		CL_WebView_PublishGameDemo( clc.demoName, clc.demoName );
-	}
 	Com_Printf ("Stopped demo.\n");
 }
 
@@ -5225,6 +5218,7 @@ void CL_Record_f( void ) {
 		Com_Printf ("ERROR: couldn't open.\n");
 		return;
 	}
+	CL_WebView_PublishGameDemo( name, name );
 	clc.demorecording = qtrue;
 	if (Cvar_VariableValue("ui_recordSPDemo")) {
 	  clc.spDemoRecording = qtrue;
@@ -5319,6 +5313,9 @@ void CL_DemoCompleted( void ) {
 
 	CL_Disconnect( qtrue );
 	CL_NextDemo();
+	if ( cl_quitOnDemoCompleted && cl_quitOnDemoCompleted->integer ) {
+		Cbuf_AddText( "quit\n" );
+	}
 }
 
 /*
@@ -7132,6 +7129,7 @@ void CL_InitRenderer( void ) {
 		Com_Printf( S_COLOR_YELLOW "WARNING: CL_InitRenderer failed to register charSetShader.\n" );
 	}
 	cls.whiteShader = re.RegisterShader( "white" );
+	cls.recordShader = re.RegisterShaderNoMip( "icons/record" );
 	cls.consoleShader = re.RegisterShaderNoMip( "console" );
 	if ( !cls.consoleShader ) {
 		cls.consoleShader = re.RegisterShaderNoMip( "textures/effects2/console01.png" );

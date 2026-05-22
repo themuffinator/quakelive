@@ -7,6 +7,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CL_MAIN_PATH = REPO_ROOT / "src" / "code" / "client" / "cl_main.c"
 CL_UI_PATH = REPO_ROOT / "src" / "code" / "client" / "cl_ui.c"
 NET_CHAN_PATH = REPO_ROOT / "src" / "code" / "qcommon" / "net_chan.c"
+QCOMMON_H_PATH = REPO_ROOT / "src" / "code" / "qcommon" / "qcommon.h"
+COMMON_C_PATH = REPO_ROOT / "src" / "code" / "qcommon" / "common.c"
 QL_UI_IMPORTS_PATH = REPO_ROOT / "src" / "code" / "client" / "ql_ui_imports.inc"
 NETCODE_AUDIT_PATH = (
 	REPO_ROOT / "docs" / "reverse-engineering" / "engine-netcode-parity-audit-2026-04-16.md"
@@ -77,6 +79,21 @@ def test_cl_serverinfopacket_nettype_matches_recovered_retail_contract() -> None
 		'type = 2;',
 	):
 		assert forbidden not in snippet
+
+
+def test_retail_steam_protocol_version_matches_hlil_constants() -> None:
+	qcommon_h = _read_text(QCOMMON_H_PATH)
+	common_c = _read_text(COMMON_C_PATH)
+	audit_note = _read_text(NETCODE_AUDIT_PATH)
+
+	assert "#define\tPROTOCOL_VERSION\t91" in qcommon_h
+	assert "int demo_protocols[] =\n{ 91, 0 };" in common_c
+	assert "{ 66, 67, 68, 0 }" not in common_c
+
+	assert "0x5b / 91" in audit_note
+	assert "`data_5684dc = 0x5b`" in audit_note
+	assert "`data_5684e0 = 0`" in audit_note
+	assert "`dm_91`" in audit_note
 
 
 def test_ping_helper_lane_does_not_keep_unrecovered_update_wrapper() -> None:

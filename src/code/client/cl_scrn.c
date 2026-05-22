@@ -328,11 +328,19 @@ void SCR_DrawDemoRecording( void ) {
 	if ( clc.spDemoRecording ) {
 		return;
 	}
+	if ( !cl_demoRecordMessage || !cl_demoRecordMessage->integer ) {
+		return;
+	}
 
-	pos = FS_FTell( clc.demofile );
-	sprintf( string, "RECORDING %s: %ik", clc.demoName, pos / 1024 );
+	if ( cl_demoRecordMessage->integer == 1 ) {
+		pos = FS_FTell( clc.demofile );
+		sprintf( string, "RECORDING %s: %ik", clc.demoName, pos / 1024 );
 
-	SCR_DrawStringExt( 320 - strlen( string ) * 4, 20, 8, string, g_color_table[7], qtrue );
+		SCR_DrawStringExt( ( 80 - strlen( string ) ) * 4, 420, 8, string, g_color_table[7], qtrue );
+	} else if ( cl_demoRecordMessage->integer == 2 ) {
+		SCR_DrawPic( 1, 470, 11, 11, cls.recordShader );
+		SCR_DrawStringExt( 9, 477, 8, "REC", g_color_table[7], qtrue );
+	}
 }
 
 

@@ -63,7 +63,7 @@ const qlr_fs_imports_t qlr_fs_imports = {
 };
 
 int demo_protocols[] =
-{ 66, 67, 68, 0 };
+{ 91, 0 };
 
 #define QL_CONFIG_HARDWARE_FILE "qzconfig.cfg"
 #define QL_CONFIG_REPLICATE_FILE "repconfig.cfg"

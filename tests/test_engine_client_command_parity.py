@@ -1269,6 +1269,24 @@ def test_client_parse_screen_ui_mapping_round_280_promotes_hlil_backed_symbols()
 		assert expected in mapping_round
 
 
+def test_demo_recording_overlay_matches_retail_modes() -> None:
+	cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+	cl_scrn = (REPO_ROOT / "src/code/client/cl_scrn.c").read_text(encoding="utf-8")
+	client_h = (REPO_ROOT / "src/code/client/client.h").read_text(encoding="utf-8")
+
+	demo_overlay_block = _extract_function_block(cl_scrn, "void SCR_DrawDemoRecording( void ) {")
+
+	assert "qhandle_t\trecordShader;" in client_h
+	assert 'cls.recordShader = re.RegisterShaderNoMip( "icons/record" );' in cl_main
+	assert "if ( !cl_demoRecordMessage || !cl_demoRecordMessage->integer ) {" in demo_overlay_block
+	assert "if ( cl_demoRecordMessage->integer == 1 ) {" in demo_overlay_block
+	assert 'SCR_DrawStringExt( ( 80 - strlen( string ) ) * 4, 420, 8, string, g_color_table[7], qtrue );' in demo_overlay_block
+	assert "else if ( cl_demoRecordMessage->integer == 2 ) {" in demo_overlay_block
+	assert "SCR_DrawPic( 1, 470, 11, 11, cls.recordShader );" in demo_overlay_block
+	assert 'SCR_DrawStringExt( 9, 477, 8, "REC", g_color_table[7], qtrue );' in demo_overlay_block
+	assert 'SCR_DrawStringExt( 320 - strlen( string ) * 4, 20, 8, string, g_color_table[7], qtrue );' not in demo_overlay_block
+
+
 def test_client_collision_mapping_round_283_promotes_hlil_backed_symbols() -> None:
 	aliases = json.loads(
 		(REPO_ROOT / "references/analysis/quakelive_symbol_aliases.json").read_text(encoding="utf-8")

@@ -74,6 +74,30 @@ Observed strong lanes from this pass:
 
 ## Gaps Found And Closed
 
+### 2026-05-22 addendum: retail Steam protocol constant
+
+Retail evidence:
+
+1. `SV_Init` in the committed `quakelive_steam.exe` HLIL registers the
+   `protocol` cvar through `va("%i", 0x5b)` with the existing
+   `CVAR_SERVERINFO | CVAR_ROM` flag value, so the server advertises protocol
+   `0x5b / 91`.
+2. `CL_CheckForResend` seeds the connect userinfo with the same `0x5b`
+   protocol value before appending `qport` and `challenge`.
+3. `CL_ServerInfoPacket` rejects server-info packets unless the parsed
+   `protocol` is `0x5b`.
+4. The retail demo playback compatibility list is exactly
+   `data_5684dc = 0x5b`, `data_5684e0 = 0`; demo recording and filesystem
+   fallback format `dm_91`. The console completion helper's `.dm_73` scan is a
+   separate retained behavior and remains source-matched in `cl_keys.c`.
+
+Source change:
+
+1. Updated `PROTOCOL_VERSION` from the inherited Quake III `68` to retail
+   Quake Live Steam `91`.
+2. Reduced `demo_protocols[]` from the inherited `66, 67, 68` list to the
+   retail single-entry `91` list.
+
 ### 1. `CL_SetServerInfo` still parsed non-retail fields
 
 Retail evidence:

@@ -229,8 +229,8 @@ PROTOCOL
 ==============================================================
 */
 
-#define	PROTOCOL_VERSION	68
-// 1.31 - 67
+#define	PROTOCOL_VERSION	91
+// retail Quake Live Steam - 91
 
 // maintain a list of compatible protocols for demo playing
 // NOTE: that stuff only works with two digits protocols

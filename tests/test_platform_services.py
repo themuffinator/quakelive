@@ -2303,6 +2303,7 @@ def test_client_browser_event_publication_hooks_reconstruct_runtime_owner() -> N
     )
     disconnect_block = _extract_function_block(cl_main, "void CL_Disconnect( qboolean showMainMenu ) {")
     stop_record_block = _extract_function_block(cl_main, "void CL_StopRecord_f( void ) {")
+    record_block = _extract_function_block(cl_main, "void CL_Record_f( void ) {")
     first_snapshot_block = _extract_function_block(cl_cgame, "void CL_FirstSnapshot( void )")
 
     assert 'Com_DPrintf( "microtxn.authorization callback: appid=%u order=%llu authorized=%d (%s [%s])\\n",' in micro_callback_log_block
@@ -2324,7 +2325,8 @@ def test_client_browser_event_publication_hooks_reconstruct_runtime_owner() -> N
     assert "publishGameEnd = ( cls.state >= CA_CONNECTED || clc.demoplaying || clc.demorecording ) ? qtrue : qfalse;" in disconnect_block
     assert "QL_ClientAuth_CancelSteamTicket();" in disconnect_block
     assert "CL_WebView_PublishGameEnd();" in disconnect_block
-    assert "CL_WebView_PublishGameDemo( clc.demoName, clc.demoName );" in stop_record_block
+    assert "CL_WebView_PublishGameDemo( name, name );" in record_block
+    assert "CL_WebView_PublishGameDemo" not in stop_record_block
     assert "CL_WebView_PublishGameStart();" in first_snapshot_block
 
 
