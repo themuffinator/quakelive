@@ -1004,7 +1004,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_startingArmor, "g_startingArmor", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Armor awarded to players when they spawn." },
 	{ &g_armorTiered, "g_armorTiered", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable retail Quake Live tiered armor behaviour for pickups, regen, and the dedicated HUD settings transport." },
 	{ &g_startingWeapons, "g_startingWeapons", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Bitmask of weapons awarded to players when they spawn." },
-        { &g_flightThrust, "g_flightThrust", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Overrides the upward thrust applied while the Flight powerup is active; 0 keeps the compiled movement behaviour." },
+        { &g_flightThrust, "g_flightThrust", "1200", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Retail Flight thrust cvar retained for factory/cvar parity." },
         { &g_flightRefuelRate, "g_flightRefuelRate", "1.0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Multiplier applied to the duration granted when refuelling the Flight powerup." },
         { &g_battleSuitDampen, "g_battleSuitDampen", "0.5", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Damage scale applied to players protected by the Battlesuit; 0 disables mitigation, 1.0 removes it." },
         { &g_dropDamagedHealth, "g_dropDamagedHealth", "1", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "When disabled, health items dropped by players ignore their damaged counts and always heal for their base amount." },
@@ -1122,7 +1122,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_velocity_rl, "g_velocity_rl", "900", 0, 0, qtrue, qfalse, "Rocket Launcher projectile speed in ups, defaulting to the baked-in 900 ups behaviour." },
 	{ &g_velocity_pg, "g_velocity_pg", "2000", 0, 0, qtrue, qfalse, "Plasmagun bolt speed in ups; aligns with the legacy 2000 ups firing velocity." },
 	{ &g_velocity_bfg, "g_velocity_bfg", "2000", 0, 0, qtrue, qfalse, "BFG projectile speed in ups pulled from the retail DLL defaults." },
-	{ &g_velocity_gh, "g_velocity_gh", "800", 0, 0, qtrue, qfalse, "Grappling Hook projectile speed in ups; 800 preserves the vanilla behaviour." },
+	{ &g_velocity_gh, "g_velocity_gh", "1800", 0, 0, qtrue, qfalse, "Grappling Hook projectile speed in ups; 1800 preserves the retail projectile behaviour." },
 	{ &g_lightningDischarge, "g_lightningDischarge", "0", 0, 0, qtrue, qfalse, "When enabled, lightning gun shots discharge and damage the shooter when fired in hazardous volumes." },
 	{ &g_railJump, "g_railJump", "0", 0, 0, qtrue, qfalse, "Strength of the retail rail jump push applied when a rail shot hits solid geometry within 120 units." },
 	{ &g_gauntletSpeedFactor, "g_gauntletSpeedFactor", "1.0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Gauntlet swing speed multiplier requested by Quake Live factories; 1.0 retains stock timing." },
@@ -1339,7 +1339,7 @@ void G_InitWeaponConfig( void ) {
 	g_weaponConfig.bfgAccelerationFactor = G_ReadWeaponFloatCvarNonNegative( &g_accelFactor_bfg, 1.0f, "g_accelFactor_bfg" );
 	g_weaponConfig.bfgAccelerationRate = G_ReadWeaponCvarNonNegative( &g_accelRate_bfg, 0, "g_accelRate_bfg" );
 	g_weaponConfig.grappleDamage = G_ReadWeaponCvar( &g_damage_gh, 10, "g_damage_gh" );
-	g_weaponConfig.grappleSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_gh, 800, "g_velocity_gh", 1 );
+	g_weaponConfig.grappleSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_gh, 1800, "g_velocity_gh", 1 );
 	g_weaponConfig.gauntletSpeedFactor = G_ReadWeaponFloatCvarNonNegative( &g_gauntletSpeedFactor, 1.0f, "g_gauntletSpeedFactor" );
 	g_weaponConfig.lightningDischargeFlags = G_ReadWeaponCvarNonNegative( &g_lightningDischarge, 0, "g_lightningDischarge" );
 	g_weaponConfig.railgunHeadshotDamage = G_ReadWeaponCvarNonNegative( &g_headShotDamage_rg, 0, "g_headShotDamage_rg" );

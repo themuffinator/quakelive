@@ -12,10 +12,12 @@ QCOMMON_DIR = CODE_DIR / "qcommon"
 
 C_SOURCE = r"""
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include "q_shared.h"
 #include "qcommon.h"
+#include "bg_public.h"
 
 typedef struct qlr_ps_values_s {
 	int		jumpTime;
@@ -27,6 +29,9 @@ typedef struct qlr_ps_values_s {
 	int		forwardmove;
 	int		rightmove;
 	int		upmove;
+	int		playerItemTimeMax;
+	int		playerItemTime;
+	int		playerItemRecharge;
 } qlr_ps_values_t;
 
 typedef struct qlr_usercmd_values_s {
@@ -38,6 +43,27 @@ typedef struct qlr_usercmd_values_s {
 	int		upmove;
 	int		buttons;
 } qlr_usercmd_values_t;
+
+typedef struct qlr_ps_offsets_s {
+	int		externalEvent;
+	int		externalEventParm;
+	int		clientNum;
+	int		location;
+	int		weapon;
+	int		weaponPrimary;
+	int		weaponstate;
+	int		fov;
+	int		generic1;
+	int		loopSound;
+	int		jumppad_ent;
+	int		jumpTime;
+	int		doubleJumped;
+	int		crouchTime;
+	int		crouchSlideTime;
+	int		forwardmove;
+	int		rightmove;
+	int		upmove;
+} qlr_ps_offsets_t;
 
 #ifdef _WIN32
 #define QLR_TEST_EXPORT __declspec(dllexport)
@@ -197,6 +223,64 @@ QLR_TEST_EXPORT void QLR_ReplicateCommandMirrors( qlr_ps_values_t *values ) {
 
 /*
 =============
+QLR_ReplicatePlayerItemStats
+
+Generates the retail progress-backed holdable stat triplet and captures the replicated values.
+=============
+*/
+QLR_TEST_EXPORT void QLR_ReplicatePlayerItemStats( qlr_ps_values_t *values ) {
+	playerState_t from;
+	playerState_t server;
+	playerState_t client;
+
+	Com_Memset( &from, 0, sizeof( from ) );
+	Com_Memset( &server, 0, sizeof( server ) );
+	Com_Memset( &client, 0, sizeof( client ) );
+	Com_Memset( values, 0, sizeof( *values ) );
+
+	server.stats[STAT_PLAYER_ITEM_TIME_MAX] = 10000;
+	server.stats[STAT_PLAYER_ITEM_TIME] = 7500;
+	server.stats[STAT_PLAYER_ITEM_RECHARGE] = 500;
+
+	QLR_WriteAndReadPlayerState( &from, &server, &client );
+
+	values->playerItemTimeMax = client.stats[STAT_PLAYER_ITEM_TIME_MAX];
+	values->playerItemTime = client.stats[STAT_PLAYER_ITEM_TIME];
+	values->playerItemRecharge = client.stats[STAT_PLAYER_ITEM_RECHARGE];
+}
+
+/*
+=============
+QLR_GetPlayerStateOffsets
+
+Returns the retail playerState offsets recovered from the engine netfield table and shared pmove writes.
+=============
+*/
+QLR_TEST_EXPORT void QLR_GetPlayerStateOffsets( qlr_ps_offsets_t *offsets ) {
+	Com_Memset( offsets, 0, sizeof( *offsets ) );
+
+	offsets->externalEvent = (int)offsetof( playerState_t, externalEvent );
+	offsets->externalEventParm = (int)offsetof( playerState_t, externalEventParm );
+	offsets->clientNum = (int)offsetof( playerState_t, clientNum );
+	offsets->location = (int)offsetof( playerState_t, location );
+	offsets->weapon = (int)offsetof( playerState_t, weapon );
+	offsets->weaponPrimary = (int)offsetof( playerState_t, weaponPrimary );
+	offsets->weaponstate = (int)offsetof( playerState_t, weaponstate );
+	offsets->fov = (int)offsetof( playerState_t, fov );
+	offsets->generic1 = (int)offsetof( playerState_t, generic1 );
+	offsets->loopSound = (int)offsetof( playerState_t, loopSound );
+	offsets->jumppad_ent = (int)offsetof( playerState_t, jumppad_ent );
+	offsets->jumpTime = (int)offsetof( playerState_t, jumpTime );
+	offsets->doubleJumped = (int)offsetof( playerState_t, doubleJumped );
+	offsets->crouchTime = (int)offsetof( playerState_t, crouchTime );
+	offsets->crouchSlideTime = (int)offsetof( playerState_t, crouchSlideTime );
+	offsets->forwardmove = (int)offsetof( playerState_t, forwardmove );
+	offsets->rightmove = (int)offsetof( playerState_t, rightmove );
+	offsets->upmove = (int)offsetof( playerState_t, upmove );
+}
+
+/*
+=============
 QLR_RoundTripUsercmd
 
 Encodes a keyed usercmd delta and captures the decoded retail command bytes.
@@ -249,6 +333,9 @@ class PlayerStateReplication(ctypes.Structure):
 		("forwardmove", ctypes.c_int),
 		("rightmove", ctypes.c_int),
 		("upmove", ctypes.c_int),
+		("playerItemTimeMax", ctypes.c_int),
+		("playerItemTime", ctypes.c_int),
+		("playerItemRecharge", ctypes.c_int),
 	]
 
 
@@ -261,6 +348,29 @@ class UsercmdReplication(ctypes.Structure):
 		("rightmove", ctypes.c_int),
 		("upmove", ctypes.c_int),
 		("buttons", ctypes.c_int),
+	]
+
+
+class PlayerStateOffsets(ctypes.Structure):
+	_fields_ = [
+		("externalEvent", ctypes.c_int),
+		("externalEventParm", ctypes.c_int),
+		("clientNum", ctypes.c_int),
+		("location", ctypes.c_int),
+		("weapon", ctypes.c_int),
+		("weaponPrimary", ctypes.c_int),
+		("weaponstate", ctypes.c_int),
+		("fov", ctypes.c_int),
+		("generic1", ctypes.c_int),
+		("loopSound", ctypes.c_int),
+		("jumppad_ent", ctypes.c_int),
+		("jumpTime", ctypes.c_int),
+		("doubleJumped", ctypes.c_int),
+		("crouchTime", ctypes.c_int),
+		("crouchSlideTime", ctypes.c_int),
+		("forwardmove", ctypes.c_int),
+		("rightmove", ctypes.c_int),
+		("upmove", ctypes.c_int),
 	]
 
 
@@ -297,6 +407,10 @@ def _load_library(lib_path: Path) -> ctypes.CDLL:
 	library.QLR_ReplicateCrouchSlide.restype = None
 	library.QLR_ReplicateCommandMirrors.argtypes = [ctypes.POINTER(PlayerStateReplication)]
 	library.QLR_ReplicateCommandMirrors.restype = None
+	library.QLR_ReplicatePlayerItemStats.argtypes = [ctypes.POINTER(PlayerStateReplication)]
+	library.QLR_ReplicatePlayerItemStats.restype = None
+	library.QLR_GetPlayerStateOffsets.argtypes = [ctypes.POINTER(PlayerStateOffsets)]
+	library.QLR_GetPlayerStateOffsets.restype = None
 	library.QLR_RoundTripUsercmd.argtypes = [ctypes.POINTER(UsercmdReplication)]
 	library.QLR_RoundTripUsercmd.restype = None
 	return library
@@ -334,6 +448,41 @@ def test_command_axis_mirrors_round_trip_as_signed_bytes(playerstate_library: ct
 	assert values.forwardmove == -127
 	assert values.rightmove == 64
 	assert values.upmove == -12
+
+
+def test_player_item_timer_stats_round_trip(playerstate_library: ctypes.CDLL) -> None:
+	values = PlayerStateReplication()
+	playerstate_library.QLR_ReplicatePlayerItemStats(ctypes.byref(values))
+
+	assert values.playerItemTimeMax == 10000
+	assert values.playerItemTime == 7500
+	assert values.playerItemRecharge == 500
+
+
+def test_playerstate_retail_offsets_match_netfield_and_pmove_evidence(
+	playerstate_library: ctypes.CDLL,
+) -> None:
+	offsets = PlayerStateOffsets()
+	playerstate_library.QLR_GetPlayerStateOffsets(ctypes.byref(offsets))
+
+	assert offsets.externalEvent == 0x80
+	assert offsets.externalEventParm == 0x84
+	assert offsets.clientNum == 0x88
+	assert offsets.location == 0x8C
+	assert offsets.weapon == 0x90
+	assert offsets.weaponPrimary == 0x94
+	assert offsets.weaponstate == 0x98
+	assert offsets.fov == 0x9C
+	assert offsets.generic1 == 0x1C0
+	assert offsets.loopSound == 0x1C4
+	assert offsets.jumppad_ent == 0x1C8
+	assert offsets.jumpTime == 0x1CC
+	assert offsets.doubleJumped == 0x1D0
+	assert offsets.crouchTime == 0x1D4
+	assert offsets.crouchSlideTime == 0x1D8
+	assert offsets.forwardmove == 0x1DC
+	assert offsets.rightmove == 0x1DD
+	assert offsets.upmove == 0x1DE
 
 
 def test_keyed_usercmd_delta_round_trips_ql_weapon_primary_fov_and_signed_axes(

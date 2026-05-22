@@ -1296,9 +1296,9 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 	for expected in (
 		"value = cg.snap->ps.stats[STAT_HOLDABLE_ITEM];",
 		"BG_HoldableForItemTag( bg_itemlist[ value ].giTag ) == HI_INVULNERABILITY",
-		"cg.snap->ps.playerItemTime > 0",
-		"cg.snap->ps.playerItemTimeMax > 0",
-		"progressPercent = (int)( ( cg.snap->ps.playerItemTime * 100.0f ) / cg.snap->ps.playerItemTimeMax + 0.5f );",
+		"cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME] > 0",
+		"cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME_MAX] > 0",
+		"progressPercent = (int)( ( cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME] * 100.0f ) / cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME_MAX] + 0.5f );",
 		"progressPercent = 0;",
 		"progressPercent = 100;",
 		'Com_sprintf( progressText, sizeof( progressText ), "%d%%", progressPercent );',
@@ -2428,6 +2428,7 @@ def test_cgame_browser_runtime_wrappers_drive_hud_reload_and_score_feeders() -> 
 	main_source = CG_MAIN.read_text(encoding="utf-8")
 	console_source = (REPO_ROOT / "src" / "code" / "cgame" / "cg_consolecmds.c").read_text(encoding="utf-8")
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	ui_shared = UI_SHARED.read_text(encoding="utf-8")
 
 	init_block = _block_from_marker(main_source, "void CG_InitBrowserRuntime")
 	init_overlay_block = _block_from_marker(main_source, "void CG_InitBrowserOverlay")
@@ -2441,6 +2442,12 @@ def test_cgame_browser_runtime_wrappers_drive_hud_reload_and_score_feeders() -> 
 	score_block = _block_from_marker(main_source, "void CG_SetScoreSelection")
 	load_hud_cmd_block = _block_from_marker(console_source, "static void CG_LoadHud_f")
 	cgame_init_block = _block_from_marker(main_source, "void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum )")
+	menu_font_block = _block_from_marker(ui_shared, "qboolean MenuParse_font")
+	menu_keywords_block = _text_between(
+		ui_shared,
+		"keywordHash_t menuParseKeywords[] = {",
+		"keywordHash_t *menuParseKeywordHash[KEYWORDHASH_SIZE];",
+	)
 
 	assert "void CG_InitBrowserRuntime( void );" in local_source
 	assert "void CG_InitBrowserOverlay( void *overlay );" in local_source
@@ -2464,20 +2471,38 @@ def test_cgame_browser_runtime_wrappers_drive_hud_reload_and_score_feeders() -> 
 	assert "Menu_SetupKeywordHash();" in menu_hash_block
 	assert "return Menu_Parse( handle, (menuDef_t *)menu );" in parse_menu_block
 	assert "Menu_SetFeederSelection( (menuDef_t *)overlay, feeder, index, NULL );" in feeder_block
+	assert '{"font", MenuParse_font, NULL}' in menu_keywords_block
+	for expected in (
+		"fontPath = menu->font;",
+		"UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE );",
+		"menu->font = String_Alloc( fontPath );",
+		"if (!DC->Assets.fontRegistered) {",
+		"DC->registerFont( fontPath, pointSize, &DC->Assets.textFont );",
+		"DC->registerFont( QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE, &DC->Assets.smallFont );",
+		"DC->registerFont( QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE, &DC->Assets.bigFont );",
+		"DC->Assets.fontRegistered = qtrue;",
+	):
+		assert expected in menu_font_block
 
 	assert "CG_ResetBrowserOverlayState();" in load_menus_block
 	assert "Menu_Reset();" not in load_menus_block
-	assert "CG_SetBrowserFeederSelection( menu, feeder, cg.selectedScore );" in score_block
+	assert "teamIndex = CG_TeamRowFromScoreIndex( cg.selectedScore, cg.scores[cg.selectedScore].team );" in score_block
+	assert "CG_SetBrowserFeederSelection( menu, feeder, teamIndex );" in score_block
 	assert "CG_SetBrowserFeederSelection( menu, FEEDER_SCOREBOARD, cg.selectedScore );" in score_block
 	assert "Menu_SetFeederSelection(menu, feeder, i, NULL);" not in score_block
 	assert "Menu_SetFeederSelection(menu, FEEDER_SCOREBOARD, cg.selectedScore, NULL);" not in score_block
 
 	assert "CG_InitBrowserRuntime();" in load_hud_cmd_block
+	assert load_hud_cmd_block.index("CG_InitBrowserRuntime();") < load_hud_cmd_block.index("CG_LoadHudMenu();")
 	assert "String_Init();" not in load_hud_cmd_block
 	assert "Menu_Reset();" not in load_hud_cmd_block
 	assert "menuScoreboard = NULL;" not in load_hud_cmd_block
 
 	assert "CG_InitBrowserRuntime();" in cgame_init_block
+	assert cgame_init_block.index("CG_InitDisplayContext();") < cgame_init_block.index("CG_RegisterHudFonts();")
+	assert cgame_init_block.index("CG_RegisterHudFonts();") < cgame_init_block.index("CG_InitBrowserRuntime();")
+	assert cgame_init_block.index("CG_InitBrowserRuntime();") < cgame_init_block.index("CG_AssetCache();")
+	assert cgame_init_block.index("CG_AssetCache();") < cgame_init_block.index("CG_LoadHudMenu();")
 
 
 def test_cgame_browser_overlay_focus_wrappers_restore_retail_direct_owner_slice() -> None:
@@ -3016,7 +3041,8 @@ def test_cgame_menu_parser_and_score_selection_restore_retail_parser_and_cursor_
 
 	for expected in (
 		"if ( cg.selectedScore < 0 || cg.selectedScore >= cg.numScores ) {",
-		"CG_SetBrowserFeederSelection( menu, feeder, cg.selectedScore );",
+		"teamIndex = CG_TeamRowFromScoreIndex( cg.selectedScore, cg.scores[cg.selectedScore].team );",
+		"CG_SetBrowserFeederSelection( menu, feeder, teamIndex );",
 		"CG_SetBrowserFeederSelection( menu, FEEDER_SCOREBOARD, cg.selectedScore );",
 	):
 		assert expected in score_block
@@ -3025,7 +3051,7 @@ def test_cgame_menu_parser_and_score_selection_restore_retail_parser_and_cursor_
 		"CG_BuildHudScoreboard();",
 		"entry = CG_GetHudScoreboardEntry( index, team );",
 		"mappedIndex = CG_FindScoreIndexForClient( entry->clientNum );",
-		"if ( cgs.gametype >= GT_TEAM ) {",
+		"if ( cgs.gametype >= GT_TEAM && ( team == TEAM_RED || team == TEAM_BLUE ) ) {",
 		"for ( i = 0; i < cg.numScores; i++ ) {",
 		"if ( cg.scores[i].team == team ) {",
 		"*scoreIndex = index;",
@@ -3049,9 +3075,10 @@ def test_cgame_menu_parser_and_score_selection_restore_retail_parser_and_cursor_
 
 	for expected in (
 		"if ( index == -1 ) {",
-		"if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {",
-		"selectedClient = cg.scores[cg.selectedScore].client;",
-		"if ( cg.scores[i].client == selectedClient ) {",
+		"if ( cgs.gametype < GT_TEAM || ( !CG_IsTeamListFeeder( feederID ) && !CG_IsTeamStatsFeeder( feederID ) ) ) {",
+		"selectedScoreIndex = CG_ScoreIndexFromTeamRow( index, team );",
+		"cg.selectedScore = selectedScoreIndex;",
+		"selectedIndex = CG_TeamRowFromScoreIndex( cg.selectedScore, team );",
 		"CG_SyncScoreboardTeamListSelection( team, selectedIndex );",
 	):
 		assert expected in selection_block
@@ -3107,6 +3134,7 @@ def test_cgame_scoreboard_feeder_stats_restore_retail_leaf_split() -> None:
 
 	for expected in (
 		"if ( CG_IsTeamStatsFeeder( feederID ) ) {",
+		"if ( CG_IsTeamListFeeder( feederID ) ) {",
 		"return CG_FeederItemTextTDMFreezeStats( team, index, column, handle );",
 		"return CG_FeederItemTextClanArenaStats( team, index, column, handle );",
 		"return CG_FeederItemTextCTFFamilyStats( team, index, column, handle );",
@@ -3115,6 +3143,7 @@ def test_cgame_scoreboard_feeder_stats_restore_retail_leaf_split() -> None:
 	):
 		assert expected in text_block
 
+	assert "if ( CG_IsScoreboardFeeder( feederID ) ) {" not in text_block
 	assert "return CG_FeederItemTextBaseColumns( &row, column, handle );" in scoreboard_block
 	assert "return CG_FeederItemTextScoreboard( index, column, handle );" in race_block
 
@@ -3159,6 +3188,7 @@ def test_cgame_team_list_feeders_restore_retail_family_split() -> None:
 	ctf_block = _block_from_marker(source, "static const char *CG_FeederItemTextCTFFamilyTeamList")
 
 	for expected in (
+		"if ( CG_IsTeamListFeeder( feederID ) ) {",
 		"return CG_FeederItemTextTDMFreezeTeamList( team, index, column, handle );",
 		"return CG_FeederItemTextClanArenaTeamList( team, index, column, handle );",
 		"return CG_FeederItemTextCTFFamilyTeamList( team, index, column, handle );",
@@ -3258,7 +3288,8 @@ def test_cgame_scoreboard_selection_callbacks_restore_cached_team_list_menu_seam
 		assert expected in image_block
 
 	for expected in (
-		"selectedIndex = index;",
+		"selectedScoreIndex = CG_ScoreIndexFromTeamRow( index, team );",
+		"selectedIndex = CG_TeamRowFromScoreIndex( cg.selectedScore, team );",
 		"CG_CacheScoreboardSelectionMenus();",
 		"CG_SyncScoreboardTeamListSelection( team, selectedIndex );",
 	):
@@ -3658,6 +3689,12 @@ def test_cgame_host_text_helpers_honor_retail_font_buckets() -> None:
 	cursor_block = _block_from_marker(main_source, "void CG_Text_PaintWithCursor( float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style )")
 
 	for expected in (
+		'{ &cg_smallFont, "ui_smallFont", "0.25", CVAR_ARCHIVE}',
+		'{ &cg_bigFont, "ui_bigFont", "0.4", CVAR_ARCHIVE}',
+	):
+		assert expected in main_source
+
+	for expected in (
 		"if ( fontIndex != ITEM_FONT_INHERIT ) {",
 		"case FONT_SANS:",
 		"return FONT_SANS;",
@@ -3668,6 +3705,7 @@ def test_cgame_host_text_helpers_honor_retail_font_buckets() -> None:
 		"if ( scale <= cg_smallFont.value ) {",
 	):
 		assert expected in select_block
+	assert "cg_bigFont" not in select_block
 
 	assert "CG_GetHostTextMetrics( text, scale, limit, fontIndex, &width, NULL );" in width_block
 	assert "CG_GetHostTextMetrics( text, scale, limit, fontIndex, NULL, &height );" in height_block
@@ -3683,12 +3721,70 @@ def test_cgame_host_text_helpers_honor_retail_font_buckets() -> None:
 		assert expected in draw_source
 
 
+def test_cgame_host_text_metrics_extents_and_cursor_wrappers_use_retail_traps() -> None:
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	metrics_block = _block_from_marker(draw_source, "static void CG_GetHostTextMetrics")
+	span_block = _block_from_marker(draw_source, "static void CG_DrawHostTextSpan")
+	extents_block = _block_from_marker(draw_source, "static void CG_Text_GetExtents")
+	cursor_ext_block = _block_from_marker(main_source, "static void CG_Text_PaintWithCursorExt")
+	cursor_block = _block_from_marker(main_source, "void CG_Text_PaintWithCursor( float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style )")
+
+	for expected in (
+		"CG_AdjustFrom640( NULL, NULL, &xScale, &yScale );",
+		"limitEnd = CG_GetTextLimitEnd( text, limit );",
+		"packed = trap_QL_MeasureText(",
+		"CG_SelectTextFontHandle( scale, fontIndex ),",
+		"scale * QL_FONT_HOST_POINT_SIZE * yScale,",
+		"CG_UnpackFloatBits64( packed, &width, &height );",
+		"*outWidth = (int)( width / xScale );",
+		"*outHeight = (int)( height / yScale );",
+	):
+		assert expected in metrics_block
+
+	for expected in (
+		"CG_AdjustFrom640( &screenX, &screenY, NULL, &yScale );",
+		"hostScale = scale * QL_FONT_HOST_POINT_SIZE * yScale;",
+		"fontHandle = CG_SelectTextFontHandle( scale, fontIndex );",
+		"shadowOffset = ( style == ITEM_TEXTSTYLE_SHADOWED ) ? 1.0f : 2.0f;",
+		"trap_QL_DrawScaledText( (int)shadowX, (int)shadowY, text, fontHandle, hostScale, 0, NULL, qtrue );",
+		"trap_QL_DrawScaledText( (int)screenX, (int)screenY, text, fontHandle, hostScale, 0, NULL, forceColor );",
+	):
+		assert expected in span_block
+
+	assert "CG_GetHostTextMetrics( text, scale, limit, ITEM_FONT_INHERIT, outWidth, outHeight );" in extents_block
+
+	for expected in (
+		"(void)cursorPos;",
+		"(void)cursor;",
+		"CG_Text_PaintExt( x, y, scale, color, text, 0.0f, limit, style, fontIndex );",
+	):
+		assert expected in cursor_ext_block
+	assert "CG_Text_PaintWithCursorExt( x, y, scale, color, text, cursorPos, cursor, limit, style, ITEM_FONT_INHERIT );" in cursor_block
+
+	assert "CG_Text_PaintChar" not in span_block
+	assert "trap_R_DrawStretchPic" not in span_block
+
+
 def test_cgame_text_paint_limit_reuses_shared_font_selector() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	block = _block_from_marker(source, "static void CG_Text_Paint_Limit")
 
-	assert "fontHandle = CG_SelectTextFontHandle( scale, ITEM_FONT_INHERIT );" in block
+	for expected in (
+		"CG_AdjustFrom640( &screenX, &screenY, NULL, NULL );",
+		"CG_AdjustFrom640( &screenMaxX, NULL, NULL, NULL );",
+		"CG_AdjustFrom640( &xBias, NULL, &xScale, &yScale );",
+		"fontHandle = CG_SelectTextFontHandle( scale, ITEM_FONT_INHERIT );",
+		"trap_QL_DrawScaledText(",
+		"scale * QL_FONT_HOST_POINT_SIZE * yScale,",
+		"(int)screenMaxX,",
+		"&outMaxX,",
+		"*maxX = ( outMaxX - xBias ) / xScale;",
+	):
+		assert expected in block
+
 	assert "fontHandle = ( scale <= cg_smallFont.value ) ? FONT_SANS : FONT_DEFAULT;" not in block
+	assert "trap_R_DrawStretchPic" not in block
 
 
 def test_cgame_host_text_shadow_offsets_stay_in_virtual_space() -> None:
@@ -5050,11 +5146,18 @@ def test_cgame_public_and_local_headers_expose_bridge_imports() -> None:
 	assert "#define CGAME_NATIVE_IMPORT_COUNT\tCG_QL_IMPORT_TOTAL_COUNT" in public_source
 
 	for expected in (
+		"CG_QL_IMPORT_R_REGISTERFONT = 93",
 		"CG_QL_IMPORT_DRAW_SCALED_TEXT = 123",
 		"CG_QL_IMPORT_MEASURE_TEXT = 124",
 		"CG_QL_IMPORT_TOTAL_COUNT",
 	):
 		assert expected in public_source
+
+	assert (
+		public_source.index("CG_QL_IMPORT_R_REGISTERFONT = 93")
+		< public_source.index("CG_QL_IMPORT_DRAW_SCALED_TEXT = 123")
+		< public_source.index("CG_QL_IMPORT_MEASURE_TEXT = 124")
+	)
 
 	for expected in (
 		"CG_KEY_GETBINDINGBUF",
@@ -5081,8 +5184,69 @@ def test_cgame_public_and_local_headers_expose_bridge_imports() -> None:
 		"void\t\ttrap_AdvertisementBridge_ShutdownCGame( void );",
 		"void\t\ttrap_AdvertisementBridge_UpdateLoadingViewParameters( void );",
 		"void\t\ttrap_AdvertisementBridge_SetFrameTime( int frameTime );",
+		"void\t\ttrap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor );",
+		"unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft );",
 	):
 		assert expected in local_source
+
+
+def test_cgame_font_syscall_bridge_uses_native_host_text_imports() -> None:
+	syscalls = CG_SYSCALLS.read_text(encoding="utf-8")
+	draw_block = _block_from_marker(syscalls, "void trap_QL_DrawScaledText")
+	measure_block = _block_from_marker(syscalls, "unsigned long long trap_QL_MeasureText")
+
+	for expected in (
+		"ql_import_f import = CG_GetNativeImportFunction( CG_QL_IMPORT_DRAW_SCALED_TEXT );",
+		"if ( !import ) {",
+		"return;",
+		"((void (QDECL *)( int, int, const char *, int, float, int, float *, int ))import)( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor ? qtrue : qfalse );",
+	):
+		assert expected in draw_block
+
+	for expected in (
+		"ql_import_f import = CG_GetNativeImportFunction( CG_QL_IMPORT_MEASURE_TEXT );",
+		"if ( !import ) {",
+		"return 0;",
+		"return ((unsigned long long (QDECL *)( const char *, const char *, int, float, int, float * ))import)( text, end, fontHandle, scale, maxX, outLeft );",
+	):
+		assert expected in measure_block
+
+	assert "syscall(" not in draw_block
+	assert "syscall(" not in measure_block
+
+
+def test_cgame_q3_vm_font_import_stubs_fail_closed() -> None:
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	draw_stub = _block_from_marker(local_source, "static ID_INLINE void trap_QL_DrawScaledText")
+	measure_stub = _block_from_marker(local_source, "static ID_INLINE unsigned long long trap_QL_MeasureText")
+
+	for expected in (
+		"(void)x;",
+		"(void)y;",
+		"(void)text;",
+		"(void)fontHandle;",
+		"(void)scale;",
+		"(void)maxX;",
+		"if ( outMaxX ) {",
+		"*outMaxX = 0.0f;",
+		"(void)forceColor;",
+	):
+		assert expected in draw_stub
+
+	for expected in (
+		"(void)text;",
+		"(void)end;",
+		"(void)fontHandle;",
+		"(void)scale;",
+		"(void)maxX;",
+		"if ( outLeft ) {",
+		"*outLeft = 0.0f;",
+		"return 0;",
+	):
+		assert expected in measure_stub
+
+	assert "syscall(" not in draw_stub
+	assert "syscall(" not in measure_stub
 
 
 def test_cgame_syscall_bridge_handles_binding_and_execute_ops() -> None:
@@ -5138,8 +5302,12 @@ def test_cgame_syscall_bridge_handles_binding_and_execute_ops() -> None:
 def test_native_import_table_keeps_new_cgame_bridge_callbacks() -> None:
 	imports_source = QL_CGAME_IMPORTS.read_text(encoding="utf-8")
 	client_source = CL_CGAME.read_text(encoding="utf-8")
+	draw_block = _block_from_marker(client_source, "static void QDECL QL_CG_trap_DrawScaledText")
+	measure_block = _block_from_marker(client_source, "static unsigned long long QDECL QL_CG_trap_MeasureText")
 
 	for expected in (
+		"static void QDECL QL_CG_trap_R_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {",
+		"CG_Import_Syscall(CG_R_REGISTERFONT, fontName, pointSize, font );",
 		"static void QDECL QL_CG_trap_Cmd_ExecuteText( int exec_when, const char *text ) {",
 		"CG_Import_Syscall( CG_CMD_EXECUTETEXT, exec_when, text );",
 		"static void QDECL QL_CG_trap_Key_GetBindingBuf( int keynum, char *buf, int buflen ) {",
@@ -5176,10 +5344,25 @@ def test_native_import_table_keeps_new_cgame_bridge_callbacks() -> None:
 		assert expected in client_source
 
 	for expected in (
+		"ql_cgame_imports[CG_QL_IMPORT_R_REGISTERFONT] = (ql_import_f)QL_CG_trap_R_RegisterFont;",
 		"ql_cgame_imports[CG_QL_IMPORT_DRAW_SCALED_TEXT] = (ql_import_f)QL_CG_trap_DrawScaledText;",
 		"ql_cgame_imports[CG_QL_IMPORT_MEASURE_TEXT] = (ql_import_f)QL_CG_trap_MeasureText;",
 	):
 		assert expected in client_source
+
+	assert (
+		client_source.index("ql_cgame_imports[CG_QL_IMPORT_R_REGISTERFONT] = (ql_import_f)QL_CG_trap_R_RegisterFont;")
+		< client_source.index("ql_cgame_imports[CG_QL_IMPORT_DRAW_SCALED_TEXT] = (ql_import_f)QL_CG_trap_DrawScaledText;")
+		< client_source.index("ql_cgame_imports[CG_QL_IMPORT_MEASURE_TEXT] = (ql_import_f)QL_CG_trap_MeasureText;")
+	)
+
+	assert "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor != qfalse ? qtrue : qfalse, ql_cgame_currentColor );" in draw_block
+	assert "float width;" in measure_block
+	assert "float height;" in measure_block
+	assert "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in measure_block
+	assert "return QL_CG_PackFloatBits64( width, height );" in measure_block
+	assert "RE_RegisterFont" not in draw_block
+	assert "RE_RegisterFont" not in measure_block
 
 
 def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None:

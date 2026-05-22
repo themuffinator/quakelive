@@ -212,6 +212,7 @@ if ($ExtraArgs.Count -gt 0) {
 }
 
 $env:QLR_DUMP_PATH = Join-Path $repoRoot "build\win32\$Configuration\dumps"
+$env:QLR_FULL_DUMP = '1'
 $env:QL_DISABLE_STEAMWORKS = '1'
 if ($EnableAwesomium) {
 	Remove-Item Env:QL_DISABLE_EXTERNAL_ECOSYSTEMS -ErrorAction SilentlyContinue

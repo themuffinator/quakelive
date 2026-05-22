@@ -11,6 +11,8 @@ the produced binaries stay aligned with the shipping runtime.【F:src/code/game/
 The checked-in project defaults stay on `v100` for parity, but the build scripts
 also support a `v141` override for contributors on modern Windows hosts who do
 not have a working VS2010-compatible toolchain installed.
+Local build and launch helpers default to `Debug|x86` so runtime debugging,
+PDB loading, crash logs, and dump capture remain available during reconstruction.
 
 For runtime prerequisites and validation steps on WOW64 hosts, see the
 [Windows 32-bit Runtime Guide](../platform/windows-32bit-runtime.md).
@@ -44,20 +46,24 @@ These `/t:` selectors are the switches that route MSBuild toward the
 corresponding pipeline:
 
 ```powershell
-msbuild src\code\quakelive.sln /t:qagamex86;cgamex86;awesomium_process /p:Configuration=Release /p:Platform=x86 /p:PlatformToolset=v100
+msbuild src\code\quakelive.sln /t:qagamex86;cgamex86;awesomium_process /p:Configuration=Debug /p:Platform=x86 /p:PlatformToolset=v100
 ```
 
-The default VS Code build wrapper also emits `build/win32/<Config>/bin/qzeroded.exe`
+The default VS Code build wrapper emits `build/win32/Debug/bin/qzeroded.exe`
 after a successful solution build by copying the reconstructed host binary and
 its matching debug artifacts (`.pdb`, `.map`) to the retail-aligned dedicated
 name.
+VS Code launches set `QLR_DUMP_PATH=build\win32\Debug\dumps` and
+`QLR_FULL_DUMP=1`; unhandled crashes write a timestamped `.dmp` plus a matching
+`.log` file with the exception, register snapshot, dump type, and loaded module
+list.
 
 The original VM builds remain available under the historical target names. For
 example, the following command rebuilds the interpreted modules while leaving
 the native DLLs untouched:
 
 ```powershell
-msbuild src\code\quakelive.sln /t:game;cgame /p:Configuration=Release /p:Platform=x86
+msbuild src\code\quakelive.sln /t:game;cgame /p:Configuration=Debug /p:Platform=x86
 ```
 
 ## Modern compatibility override
@@ -69,7 +75,7 @@ optional `v141` toolset and pass it on the command line:
 ```powershell
 pwsh tools\ci\install-vs-toolset.ps1 -PlatformToolset v141
 pwsh tools\ci\verify-vs-toolchain.ps1 -PlatformToolset v141 -RequireToolset
-msbuild src\code\quakelive.sln /t:qagamex86;cgamex86;awesomium_process /p:Configuration=Release /p:Platform=x86 /p:PlatformToolset=v141
+msbuild src\code\quakelive.sln /t:qagamex86;cgamex86;awesomium_process /p:Configuration=Debug /p:Platform=x86 /p:PlatformToolset=v141
 ```
 
 This path is a deliberate compatibility exception. It improves buildability on
@@ -83,7 +89,7 @@ offline-safe stub that exits cleanly without loading `awesomium.dll`. Set
 Awesomium child-process entry point:
 
 ```powershell
-msbuild src\code\awesomium_process.vcxproj /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v100 /p:QLBuildOnlineServices=1
+msbuild src\code\awesomium_process.vcxproj /p:Configuration=Debug /p:Platform=Win32 /p:PlatformToolset=v100 /p:QLBuildOnlineServices=1
 ```
 
 For a parity-oriented rebuild of the helper, keep `QLBuildOnlineServices=1` and

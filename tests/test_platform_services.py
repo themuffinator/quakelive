@@ -581,6 +581,54 @@ def _extract_function_block(text: str, signature: str) -> str:
     raise AssertionError(f"unterminated function block for: {signature}")
 
 
+def test_legacy_q3_online_service_endpoints_are_policy_gated_by_default() -> None:
+    platform_config = (REPO_ROOT / "src/common/platform/platform_config.h").read_text(encoding="utf-8")
+    qcommon = (REPO_ROOT / "src/code/qcommon/qcommon.h").read_text(encoding="utf-8")
+    cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    sv_client = (REPO_ROOT / "src/code/server/sv_client.c").read_text(encoding="utf-8")
+    sv_ccmds = (REPO_ROOT / "src/code/server/sv_ccmds.c").read_text(encoding="utf-8")
+    sv_init = (REPO_ROOT / "src/code/server/sv_init.c").read_text(encoding="utf-8")
+    sv_main = (REPO_ROOT / "src/code/server/sv_main.c").read_text(encoding="utf-8")
+
+    request_motd = _extract_function_block(cl_main, "void CL_RequestMotd( void ) {")
+    request_authorization = _extract_function_block(cl_main, "void CL_RequestAuthorization( void ) {")
+    request_global = _extract_function_block(
+        cl_main, "static void CL_RequestGlobalServers( int masterNum, const char *protocol, const char *keywords ) {"
+    )
+    get_challenge = _extract_function_block(sv_client, "void SV_GetChallenge( netadr_t from ) {")
+    authorize_packet = _extract_function_block(sv_client, "void SV_AuthorizeIpPacket( netadr_t from ) {")
+    ban_user = _extract_function_block(sv_ccmds, "static void SV_Ban_f( void ) {")
+    ban_client = _extract_function_block(sv_ccmds, "static void SV_BanNum_f( void ) {")
+    sv_init_block = _extract_function_block(sv_init, "void SV_Init (void) {")
+    steam_masters = _extract_function_block(sv_init, "static qboolean SV_SteamServerHasConfiguredMasters( void )")
+    master_heartbeat = _extract_function_block(sv_main, "void SV_MasterHeartbeat( void ) {")
+
+    assert "#define QL_ENABLE_LEGACY_Q3_SERVICES 0" in platform_config
+    assert "#undef QL_ENABLE_LEGACY_Q3_SERVICES" in platform_config
+    assert "#if QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES" in qcommon
+    assert '#define\tUPDATE_SERVER_NAME\t"update.quake3arena.com"' in qcommon
+    assert '#define MASTER_SERVER_NAME\t"master.quake3arena.com"' in qcommon
+    assert '#define\tAUTHORIZE_SERVER_NAME\t"authorize.quake3arena.com"' in qcommon
+    assert "#define\tPORT_SERVER\t\t\t27960" in qcommon
+
+    for block in (request_motd, request_authorization, request_global, get_challenge, authorize_packet, ban_user, ban_client):
+        assert "#if !( QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES )" in block
+
+    assert 'CL_LogMatchmakingServiceIgnored( "legacy_motd", "legacy Quake III update server disabled by online-services policy" );' in request_motd
+    assert "legacy authorize request ignored: Quake III authorize server disabled by online-services policy" in request_authorization
+    assert "Legacy Quake III master server queries are disabled by online-services policy." in request_global
+    assert "legacy getIpAuthorize bypassed for %s: Quake III authorize server disabled by online-services policy" in get_challenge
+    assert "SV_AuthorizeIpPacket ignored: Quake III authorize server disabled by online-services policy" in authorize_packet
+    assert "Legacy Quake III authorize bans are disabled by online-services policy." in ban_user
+    assert "Legacy Quake III authorize bans are disabled by online-services policy." in ban_client
+
+    assert 'sv_masterAdvertise = Cvar_Get ("sv_master", "1", CVAR_ARCHIVE );' in sv_init_block
+    assert 'sv_master[0] = Cvar_Get ("sv_master1", "", 0 );' in sv_init_block
+    assert "if ( sv_masterAdvertise && sv_masterAdvertise->integer ) {" in steam_masters
+    assert "#if QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES" in master_heartbeat
+    assert "adr[i].port = BigShort( PORT_MASTER );" in master_heartbeat
+
+
 def test_platform_service_table_tracks_build_flags(tmp_path) -> None:
     build_disabled = {
         "auth": ("Build-disabled (QL_BUILD_ONLINE_SERVICES=0)", "compatibility-disabled (QL_BUILD_ONLINE_SERVICES=0)", False, False),
@@ -4025,6 +4073,7 @@ def test_server_spawn_and_shutdown_reconstruct_retail_steam_identity_and_heartbe
     assert 'Com_DPrintf( "Steam server identity %s via %s [%s]: %s\\n",' in identity_log_block
     assert "SV_GetSteamServerProviderLabel()" in identity_log_block
     assert "SV_GetSteamServerPolicyLabel()" in identity_log_block
+    assert "if ( sv_masterAdvertise && sv_masterAdvertise->integer ) {" in masters_block
     assert "if ( sv_master[i] && sv_master[i]->string[0] ) {" in masters_block
     assert "QL_Steamworks_ServerGetSteamID( &steamIdLow, &steamIdHigh )" in publish_block
     assert 'SV_LogSteamServerIdentityLifecycle( "unavailable", "server steam ID unavailable" );' in publish_block

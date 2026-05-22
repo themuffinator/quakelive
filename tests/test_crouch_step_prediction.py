@@ -146,7 +146,7 @@ def test_step_jump_requires_jump_input(tmp_path: Path) -> None:
         step_jump_velocity,
         ctypes.c_int(0),
     )
-    assert boosted_velocity == pytest.approx(jump_velocity.value + step_jump_velocity.value, rel=1e-6)
+    assert boosted_velocity == pytest.approx(jump_velocity.value, rel=1e-6)
 
     clamped_velocity = library.QLR_ApplyStepJump(
         ctypes.c_int(0),
@@ -160,7 +160,7 @@ def test_step_jump_requires_jump_input(tmp_path: Path) -> None:
         step_jump_velocity,
         ctypes.c_int(0),
     )
-    assert clamped_velocity == pytest.approx(300.0, rel=1e-6)
+    assert clamped_velocity == pytest.approx(jump_velocity.value, rel=1e-6)
 
     disabled_step_velocity = library.QLR_ApplyStepJump(
         ctypes.c_int(0),
@@ -227,7 +227,21 @@ def test_crouch_step_jump_obeys_ducked_gate(tmp_path: Path) -> None:
         step_jump_velocity,
         ctypes.c_int(1),
     )
-    assert crouched_velocity == pytest.approx(jump_velocity.value + step_jump_velocity.value, rel=1e-6)
+    assert crouched_velocity == pytest.approx(jump_velocity.value, rel=1e-6)
+
+    crouched_no_input_velocity = library.QLR_ApplyStepJump(
+        ctypes.c_int(1),
+        ctypes.c_int(0),
+        ctypes.c_int(1),
+        ctypes.c_int(1),
+        ctypes.c_float(12.0),
+        initial_velocity,
+        jump_velocity,
+        jump_velocity_max,
+        step_jump_velocity,
+        ctypes.c_int(1),
+    )
+    assert crouched_no_input_velocity == pytest.approx(jump_velocity.value, rel=1e-6)
 
     disabled_crouch_step_velocity = library.QLR_ApplyStepJump(
         ctypes.c_int(1),

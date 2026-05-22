@@ -98,11 +98,44 @@ Observed facts from the writable source tree:
 - Those same helpers now consume UTF-8 codepoints, treat only `^0`..`^7` as
   host color escapes, and keep the retail `forceColor` behavior where valid
   color escapes are consumed but do not recolor the active draw state.
+- The renderer host helpers are now gate-checked for their core draw/measure
+  contract: face handles fall back through the retained normal/sans faces,
+  requested sizes are rounded and clamped to tenths, max-X clipping happens
+  before drawing the overflowing glyph, `outMaxX` returns `0` on clipping, and
+  measurement preserves bounds/`outLeft` while still reporting the retained
+  font ascent for height.
 - `src/code/client/cl_ui.c` and `src/code/client/cl_cgame.c` now route native
   `DrawScaledText` / `MeasureText` through the shared renderer host-text
   helpers instead of resolving `fontInfo_t` locally.
+- The native UI/cgame font import slots are now parity-gated as a trio:
+  `RegisterFont` remains on the compatibility registration lane, while
+  `DrawScaledText` and `MeasureText` fail closed through the recovered host
+  text import wrappers.
+- The native draw wrappers also preserve the module current-color sidecar and
+  normalize `forceColor` before entering `RE_DrawScaledText`; the measure
+  wrappers return retail-style packed width/height floats after calling
+  `RE_MeasureScaledText`.
+- UI and cgame clipped text helpers now have explicit max-X projection gates:
+  `Text_Paint_Limit` and `CG_Text_Paint_Limit` project both draw coordinates
+  and clip bounds into screen space, draw through host text, then convert the
+  returned `outMaxX` back into 640-space coordinates.
+- UI and cgame host text metrics/span helpers are gated as retained-text
+  consumers too: measurement uses `trap_QL_MeasureText` at
+  `scale * QL_FONT_HOST_POINT_SIZE`, span drawing uses
+  `trap_QL_DrawScaledText`, and UI cursor painting measures the prefix through
+  the same host lane before drawing the cursor glyph.
+- `src/code/client/cl_console.c` now keeps the console prompt, chat prompt,
+  scrollback, and editable field cursor on the retained mono host-text lane.
+  The strict audit checks the UTF-8 cursor windowing, host metrics lookup, and
+  packed console color-cell conversion into host text color escapes.
+- `src/code/client/cl_scrn.c` now routes client screen-overlay helpers such as
+  `SCR_DrawStringExt`, `SCR_DrawBigString`, `SCR_DrawBigStringColor`, and the
+  demo-recording overlay through the same retained mono host-text lane used by
+  retail, instead of the legacy charset glyph loop.
 - `src/code/renderer/tr_backend.c` now exposes the retained atlas through the
   debug draw path guarded by `r_debugFontAtlas`.
+- Renderer advertisement debug labels in `src/code/renderer/tr_world.c` also
+  draw through retained host text at the recovered `16 / 48` debug scale.
 
 ## Interface font helpers and registered sizes
 
@@ -132,8 +165,24 @@ Observed facts from the writable source tree:
     `src/code/ui/ui_quakelive_bridge.c` register `16 / 12 / 20`
 - UI font registration now stays in `Asset_Parse` and `MenuParse_font`, while
   `AssetCache` remains art-only.
+- UI `Asset_Parse` now normalizes the global `font`, `smallFont`, and
+  `bigFont` declarations before registering the retained text, small, and big
+  buckets, while `MenuParse_font` bootstraps that trio once from the resolved
+  menu token.
+- UI item-level `font` stays a retail integer bucket: `ItemParse_font` writes
+  `item->fontIndex`, and the shared item width, height, paint, and cursor
+  wrappers forward that bucket into the extended host-text callbacks.
 - cgame HUD font registration stays in `CG_RegisterHudFonts`, while
   `CG_AssetCache` remains art-only.
+- cgame `CG_Asset_Parse` is now parity-gated for the retail token spelling:
+  `font`, `smallFont`, and lowercase `bigfont` route through
+  `cgDC.registerFont`, while the one-time HUD bootstrap keeps the default
+  text/small/big trio available when scripts omit a bucket.
+- cgame browser/HUD menu parsing is now gated through the shared menu parser:
+  `CG_SetupBrowserMenuKeywordHash` rebuilds the keyword hash containing
+  `font -> MenuParse_font`, `CG_ParseBrowserMenu` enters `Menu_Parse`, and both
+  `CG_Init` and `loadhud` rebuild that parser state before HUD menu font
+  declarations are replayed.
 
 Inference:
 
@@ -171,8 +220,19 @@ Inference:
   - over-permissive caret color parsing in the host draw helper
 - That reopened gap is now reclosed in source, tests, and the strict audit
   script.
-- No confirmed renderer font-stack gap remains after `RG-P11` and the
-  2026-04-17 audit refresh.
+- No confirmed renderer or client screen-overlay font-stack gap remains after
+  `RG-P11`, the 2026-04-17 audit refresh, and the retained mono overlay wiring
+  follow-up.
+- The strict audit also now covers the native UI/cgame font import slot values,
+  import-table assignments, fail-closed trap wrappers, the VM-side
+  `RegisterFont` compatibility wrappers, cgame `Q3_VM` host-text stubs, cgame
+  snapshot/FPS upper-right host text, module current-color/packed-measure bridge semantics,
+  renderer face/scale/color/max-X/out-left core semantics, UI/cgame metrics,
+  cursor, span, and clipped max-X text, renderer advertisement debug labels,
+  console/chat host-text consumers, UI asset/menu parser bootstrap ownership,
+  UI item integer font buckets, UI legacy font alias normalization, cgame
+  lowercase-`bigfont` HUD asset parsing, and cgame browser-menu font parser
+  routing plus HUD reload ordering.
 
 ## Verification
 

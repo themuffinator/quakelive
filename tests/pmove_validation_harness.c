@@ -15,13 +15,24 @@ typedef enum {
 	QLR_TRACE_FLAT_GROUND = 1,
 	QLR_TRACE_FREE_AIR,
 	QLR_TRACE_STEP_UNSUPPORTED,
-	QLR_TRACE_STEP_SUPPORTED
+	QLR_TRACE_STEP_SUPPORTED,
+	QLR_TRACE_CROUCH_STEP_FALLBACK
 } qlr_trace_mode_t;
 
 typedef struct {
 	float	originZ;
 	float	stepUp;
 } qlr_step_result_t;
+
+typedef struct {
+	float	velocityZ;
+	float	originZ;
+	float	stepUp;
+	int	jumpTime;
+	int	upmove;
+	int	pmFlags;
+	int	traceCalls;
+} qlr_crouch_step_result_t;
 
 typedef struct {
 	float	firstJumpVelocity;
@@ -120,7 +131,6 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 	vec3_t	traceEnd;
 	int	callIndex;
 
-	(void)mins;
 	(void)maxs;
 	(void)passEntityNum;
 	(void)contentMask;
@@ -128,6 +138,17 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 	VectorSet( upNormal, 0.0f, 0.0f, 1.0f );
 	VectorSet( wallNormal, 1.0f, 0.0f, 0.0f );
 	callIndex = ++qlr_traceCallCount;
+
+	if ( qlr_traceMode == QLR_TRACE_CROUCH_STEP_FALLBACK && callIndex >= 5 ) {
+		if ( mins[0] > -15.0f ) {
+			VectorCopy( end, traceEnd );
+			QLR_SetTraceResult( results, 1.0f, traceEnd, upNormal, 0, 0, ENTITYNUM_NONE );
+		} else {
+			VectorSet( traceEnd, 5.0f, 0.0f, 10.0f );
+			QLR_SetTraceResult( results, 0.5f, traceEnd, upNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
+		}
+		return;
+	}
 
 	switch ( qlr_traceMode ) {
 	case QLR_TRACE_FLAT_GROUND:
@@ -146,6 +167,7 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 
 	case QLR_TRACE_STEP_UNSUPPORTED:
 	case QLR_TRACE_STEP_SUPPORTED:
+	case QLR_TRACE_CROUCH_STEP_FALLBACK:
 		switch ( callIndex ) {
 		case 1:
 			VectorSet( traceEnd, 5.0f, 0.0f, 5.0f );
@@ -158,13 +180,20 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 			return;
 
 		case 3:
-			VectorSet( traceEnd, 5.0f, 0.0f, 5.0f );
+			if ( qlr_traceMode == QLR_TRACE_CROUCH_STEP_FALLBACK ) {
+				VectorSet( traceEnd, 10.0f, 0.0f, 10.0f );
+			} else {
+				VectorSet( traceEnd, 5.0f, 0.0f, 5.0f );
+			}
 			QLR_SetTraceResult( results, 0.5f, traceEnd, wallNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
 			return;
 
 		case 4:
 			if ( qlr_traceMode == QLR_TRACE_STEP_SUPPORTED ) {
 				VectorSet( traceEnd, 5.0f, 0.0f, -6.0f );
+				QLR_SetTraceResult( results, 0.5f, traceEnd, upNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
+			} else if ( qlr_traceMode == QLR_TRACE_CROUCH_STEP_FALLBACK ) {
+				VectorSet( traceEnd, 10.0f, 0.0f, 10.0f );
 				QLR_SetTraceResult( results, 0.5f, traceEnd, upNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
 			} else {
 				VectorCopy( end, traceEnd );
@@ -173,8 +202,13 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 			return;
 
 		case 5:
-			VectorCopy( end, traceEnd );
-			QLR_SetTraceResult( results, 1.0f, traceEnd, upNormal, 0, 0, ENTITYNUM_NONE );
+			if ( qlr_traceMode == QLR_TRACE_CROUCH_STEP_FALLBACK ) {
+				VectorSet( traceEnd, 5.0f, 0.0f, 10.0f );
+				QLR_SetTraceResult( results, 0.5f, traceEnd, upNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
+			} else {
+				VectorCopy( end, traceEnd );
+				QLR_SetTraceResult( results, 1.0f, traceEnd, upNormal, 0, 0, ENTITYNUM_NONE );
+			}
 			return;
 
 		case 6:
@@ -263,6 +297,7 @@ QLR_EXPORT float QLR_RunCircleStrafeFrictionScenario( int diagonalInput ) {
 	localSettings.walkAccel = 0.0f;
 	localSettings.walkFriction = 6.0f;
 	localSettings.circleStrafeFriction = 5.5f;
+	localPS.pm_flags |= PMF_AIR_CONTROL;
 
 	localPM.cmd.serverTime = 16;
 	localPM.cmd.forwardmove = 127;
@@ -333,6 +368,79 @@ QLR_EXPORT void QLR_RunAirStepScenario( int supported, qlr_step_result_t *outRes
 
 /*
 =============
+QLR_RunCrouchStepFallbackScenario
+
+Runs the retail crouch-step fallback after the general step-jump gate clears
+queued upmove and returns the resulting takeoff state.
+=============
+*/
+QLR_EXPORT void QLR_RunCrouchStepFallbackScenario( qlr_crouch_step_result_t *outResult ) {
+	pmove_t		localPM;
+	playerState_t	localPS;
+	pmove_settings_t	localSettings;
+	pmove_t		*previousPM;
+	int		previousAirSteps;
+	float		previousStepHeight;
+
+	if ( !outResult ) {
+		return;
+	}
+
+	memset( outResult, 0, sizeof( *outResult ) );
+	QLR_ResetPmove( &localPM, &localPS, &localSettings );
+	QLR_ResetTraceMode( QLR_TRACE_CROUCH_STEP_FALLBACK );
+
+	VectorSet( localPM.mins, -15.0f, -15.0f, MINS_Z );
+	VectorSet( localPM.maxs, 15.0f, 15.0f, 32.0f );
+
+	localPS.origin[0] = 0.0f;
+	localPS.origin[1] = 0.0f;
+	localPS.origin[2] = 0.0f;
+	localPS.velocity[0] = 100.0f;
+	localPS.velocity[1] = 0.0f;
+	localPS.velocity[2] = 100.0f;
+	localPS.pm_flags = PMF_DUCKED | PMF_JUMP_HELD;
+	localPS.jumpTime = 0;
+
+	localSettings.stepJump = qtrue;
+	localSettings.crouchStepJump = qtrue;
+	localSettings.jumpTimeDeltaMin = 100.0f;
+	localSettings.jumpVelocity = 275.0f;
+	localSettings.jumpVelocityMax = 700.0f;
+	localSettings.stepJumpVelocity = 48.0f;
+
+	localPM.cmd.serverTime = 100;
+	localPM.cmd.upmove = 0;
+
+	pml.frametime = 0.1f;
+	pml.msec = 100;
+	pml.groundPlane = qfalse;
+	pml.walking = qfalse;
+
+	previousPM = pm;
+	pm = &localPM;
+	previousAirSteps = pm_airsteps;
+	previousStepHeight = pm_stepHeight;
+	pm_airsteps = 1;
+	pm_stepHeight = localSettings.stepHeight;
+
+	PM_StepSlideMove( qfalse );
+
+	outResult->velocityZ = localPS.velocity[2];
+	outResult->originZ = localPS.origin[2];
+	outResult->stepUp = pml.stepUp;
+	outResult->jumpTime = localPS.jumpTime;
+	outResult->upmove = localPM.cmd.upmove;
+	outResult->pmFlags = localPS.pm_flags;
+	outResult->traceCalls = qlr_traceCallCount;
+
+	pm = previousPM;
+	pm_airsteps = previousAirSteps;
+	pm_stepHeight = previousStepHeight;
+}
+
+/*
+=============
 QLR_RunAirDoubleJumpSequence
 
 Runs a jump, release, and reuse probe entirely in free air to validate the
@@ -354,26 +462,28 @@ QLR_EXPORT void QLR_RunAirDoubleJumpSequence( qlr_double_jump_result_t *outResul
 
 	localPS.origin[2] = 128.0f;
 	localPS.velocity[2] = 0.0f;
+	localPS.commandTime = 984;
 
 	localSettings.doubleJump = qtrue;
 	localSettings.jumpTimeDeltaMin = 0.0f;
 	localSettings.jumpVelocity = 275.0f;
 	localSettings.jumpVelocityMax = 700.0f;
+	localPS.pm_flags |= PMF_DOUBLE_JUMP;
 
 	localPM.cmd.forwardmove = 0;
 	localPM.cmd.rightmove = 0;
 	localPM.cmd.upmove = 20;
-	localPM.cmd.serverTime = 16;
+	localPM.cmd.serverTime = 1000;
 	PmoveSingle( &localPM );
 
 	outResult->firstJumpVelocity = localPS.velocity[2];
 
 	localPM.cmd.upmove = 0;
-	localPM.cmd.serverTime = 32;
+	localPM.cmd.serverTime = 1016;
 	PmoveSingle( &localPM );
 
 	localPM.cmd.upmove = 20;
-	localPM.cmd.serverTime = 48;
+	localPM.cmd.serverTime = 1032;
 	PmoveSingle( &localPM );
 
 	outResult->reuseJumpVelocity = localPS.velocity[2];

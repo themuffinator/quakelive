@@ -7687,9 +7687,9 @@ static void CG_DrawPlayerItem( rectDef_t *rect, float scale, qboolean draw2D ) {
 		}
 
 		if ( BG_HoldableForItemTag( bg_itemlist[ value ].giTag ) == HI_INVULNERABILITY &&
-			cg.snap->ps.playerItemTime > 0 &&
-			cg.snap->ps.playerItemTimeMax > 0 ) {
-			progressPercent = (int)( ( cg.snap->ps.playerItemTime * 100.0f ) / cg.snap->ps.playerItemTimeMax + 0.5f );
+			cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME] > 0 &&
+			cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME_MAX] > 0 ) {
+			progressPercent = (int)( ( cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME] * 100.0f ) / cg.snap->ps.stats[STAT_PLAYER_ITEM_TIME_MAX] + 0.5f );
 			if ( progressPercent < 0 ) {
 				progressPercent = 0;
 			} else if ( progressPercent > 100 ) {

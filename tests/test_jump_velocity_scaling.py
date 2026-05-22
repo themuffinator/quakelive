@@ -109,25 +109,25 @@ def test_jump_velocity_scaling_threshold(tmp_path: Path) -> None:
         inside_delta = ctypes.c_int(-1)
         inside_scale = library.qlr_jump_scale(
                 1000,
-                1500,
+                1100,
                 ctypes.c_float(500.0),
                 ctypes.c_float(0.6),
                 ctypes.c_float(0.4),
                 ctypes.byref(inside_delta),
         )
 
-        assert inside_delta.value == 500
-        assert inside_scale == pytest.approx(1.4, rel=1e-6)
+        assert inside_delta.value == 100
+        assert inside_scale == pytest.approx(1.32, rel=1e-6)
 
         outside_delta = ctypes.c_int(-1)
         outside_scale = library.qlr_jump_scale(
                 1000,
-                1501,
+                1500,
                 ctypes.c_float(500.0),
                 ctypes.c_float(0.6),
                 ctypes.c_float(0.4),
                 ctypes.byref(outside_delta),
         )
 
-        assert outside_delta.value == 501
+        assert outside_delta.value == 500
         assert outside_scale == pytest.approx(1.0, rel=1e-6)

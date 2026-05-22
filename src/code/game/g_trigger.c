@@ -294,6 +294,8 @@ static void Use_target_push( gentity_t *self, gentity_t *other, gentity_t *activ
 	}
 
 	VectorCopy (self->s.origin2, activator->client->ps.velocity);
+	activator->client->ps.jumppad_ent = self->s.number;
+	activator->client->ps.jumppad_frame = activator->client->ps.pmove_framecount;
 
 	// play fly sound every 1.5 seconds
 	if ( activator->fly_sound_debounce_time < level.time ) {

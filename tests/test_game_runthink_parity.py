@@ -27,3 +27,14 @@ def test_trigger_push_uses_runframe_aim_refresh() -> None:
 	assert "static void AimAtTargetRunFrame( gentity_t *self, float thinktime )" in trigger_c
 	assert "self->runFrame = AimAtTargetRunFrame;" in trigger_c
 	assert "self->think = AimAtTarget;" in trigger_c
+
+
+def test_target_push_marks_launch_latch_for_next_pmove() -> None:
+	trigger_c = _read("src/code/game/g_trigger.c")
+	start = trigger_c.index("static void Use_target_push")
+	end = trigger_c.index("/*QUAKED target_push", start)
+	body = trigger_c[start:end]
+
+	assert "VectorCopy (self->s.origin2, activator->client->ps.velocity);" in body
+	assert "activator->client->ps.jumppad_ent = self->s.number;" in body
+	assert "activator->client->ps.jumppad_frame = activator->client->ps.pmove_framecount;" in body

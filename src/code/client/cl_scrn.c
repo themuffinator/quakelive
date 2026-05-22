@@ -25,6 +25,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 qboolean	scr_initialized;		// ready to draw
 
+#define	SCREEN_OVERLAY_HOST_FONT_MONO	2
+
 cvar_t		*cl_timegraph;
 cvar_t		*cl_debuggraph;
 cvar_t		*cl_graphheight;
@@ -109,44 +111,6 @@ void SCR_DrawPic( float x, float y, float width, float height, qhandle_t hShader
 
 
 /*
-** SCR_DrawChar
-** chars are drawn at 640*480 virtual screen size
-*/
-static void SCR_DrawChar( int x, int y, float size, int ch ) {
-	int row, col;
-	float frow, fcol;
-	float	ax, ay, aw, ah;
-
-	ch &= 255;
-
-	if ( ch == ' ' ) {
-		return;
-	}
-
-	if ( y < -size ) {
-		return;
-	}
-
-	ax = x;
-	ay = y;
-	aw = size;
-	ah = size;
-	SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
-
-	row = ch>>4;
-	col = ch&15;
-
-	frow = row*0.0625;
-	fcol = col*0.0625;
-	size = 0.0625;
-
-	re.DrawStretchPic( ax, ay, aw, ah,
-					   fcol, frow, 
-					   fcol + size, frow + size, 
-					   cls.charSetShader );
-}
-
-/*
 ** SCR_DrawSmallChar
 ** small chars are drawn at native screen resolution
 */
@@ -183,53 +147,29 @@ void SCR_DrawSmallChar( int x, int y, int ch ) {
 ==================
 SCR_DrawBigString[Color]
 
-Draws a multi-colored string with a drop shadow, optionally forcing
-to a fixed color.
+Draws screen-overlay text through the retail host-text mono face, optionally
+forcing to a fixed color.
 
 Coordinates are at 640 by 480 virtual resolution
 ==================
 */
 void SCR_DrawStringExt( int x, int y, float size, const char *string, float *setColor, qboolean forceColor ) {
-	vec4_t		color;
-	const char	*s;
-	int			xx;
+	float	xscale;
+	float	yscale;
+	int		screenX;
+	int		screenY;
 
-	// draw the drop shadow
-	color[0] = color[1] = color[2] = 0;
-	color[3] = setColor[3];
-	re.SetColor( color );
-	s = string;
-	xx = x;
-	while ( *s ) {
-		if ( Q_IsColorString( s ) ) {
-			s += 2;
-			continue;
-		}
-		SCR_DrawChar( xx+2, y+2, size, *s );
-		xx += size;
-		s++;
+	if ( !string || !string[0] ) {
+		return;
 	}
 
+	xscale = cls.glconfig.vidWidth / 640.0f;
+	yscale = cls.glconfig.vidHeight / 480.0f;
+	screenX = (int)( x * xscale );
+	screenY = (int)( y * yscale );
 
-	// draw the colored text
-	s = string;
-	xx = x;
-	re.SetColor( setColor );
-	while ( *s ) {
-		if ( Q_IsColorString( s ) ) {
-			if ( !forceColor ) {
-				Com_Memcpy( color, g_color_table[ColorIndex(*(s+1))], sizeof( color ) );
-				color[3] = setColor[3];
-				re.SetColor( color );
-			}
-			s += 2;
-			continue;
-		}
-		SCR_DrawChar( xx, y, size, *s );
-		xx += size;
-		s++;
-	}
-	re.SetColor( NULL );
+	RE_DrawScaledText( screenX, screenY, string, SCREEN_OVERLAY_HOST_FONT_MONO,
+		size * yscale, -1, NULL, forceColor, setColor );
 }
 
 

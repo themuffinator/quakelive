@@ -517,12 +517,16 @@ void SV_TouchCGame(void) {
 ================
 SV_SteamServerHasConfiguredMasters
 
-Returns qtrue when the retained multi-master source base has at least one
-configured heartbeat target.
+Returns qtrue when the retained Steam heartbeat gate is enabled or the legacy
+multi-master compatibility lane has an explicit target.
 ================
 */
 static qboolean SV_SteamServerHasConfiguredMasters( void ) {
 	int i;
+
+	if ( sv_masterAdvertise && sv_masterAdvertise->integer ) {
+		return qtrue;
+	}
 
 	for ( i = 0; i < MAX_MASTER_SERVERS; ++i ) {
 		if ( sv_master[i] && sv_master[i]->string[0] ) {
@@ -908,7 +912,12 @@ void SV_Init (void) {
 	Cvar_Get ("nextmap", "", CVAR_TEMP );
 
 	sv_allowDownload = Cvar_Get ("sv_allowDownload", "0", CVAR_SERVERINFO);
+	sv_masterAdvertise = Cvar_Get ("sv_master", "1", CVAR_ARCHIVE );
+#if QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES
 	sv_master[0] = Cvar_Get ("sv_master1", MASTER_SERVER_NAME, 0 );
+#else
+	sv_master[0] = Cvar_Get ("sv_master1", "", 0 );
+#endif
 	sv_master[1] = Cvar_Get ("sv_master2", "", CVAR_ARCHIVE );
 	sv_master[2] = Cvar_Get ("sv_master3", "", CVAR_ARCHIVE );
 	sv_master[3] = Cvar_Get ("sv_master4", "", CVAR_ARCHIVE );

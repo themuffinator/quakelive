@@ -20,6 +20,23 @@ def _read_text(path: Path) -> str:
 	return path.read_text(encoding="utf-8")
 
 
+def _block_from_marker(source: str, marker: str) -> str:
+	start = source.index(marker)
+	brace_start = source.index("{", start)
+	depth = 0
+
+	for index in range(brace_start, len(source)):
+		char = source[index]
+		if char == "{":
+			depth += 1
+		elif char == "}":
+			depth -= 1
+			if depth == 0:
+				return source[start:index + 1]
+
+	raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
 def test_renderer_host_text_core_matches_retail_surface() -> None:
 	tr_font = _read_text(TR_FONT_PATH)
 	tr_init = _read_text(TR_INIT_PATH)
@@ -98,6 +115,96 @@ def test_renderer_host_text_core_matches_retail_surface() -> None:
 	assert 'R_InitFontStash: unable to prebuild retained' not in tr_font
 
 
+def test_renderer_host_text_face_scale_color_and_clipping_contract() -> None:
+	tr_font = _read_text(TR_FONT_PATH)
+	scale_block = _block_from_marker(tr_font, "static int R_GetFontStashScaleTenths")
+	color_block = _block_from_marker(tr_font, "static qboolean R_ParseHostTextColorEscape")
+	face_block = _block_from_marker(tr_font, "static rFontStashFace_t *R_GetFontStashFaceForHandle")
+	draw_block = _block_from_marker(tr_font, "void RE_DrawScaledText")
+	measure_block = _block_from_marker(tr_font, "void RE_MeasureScaledText")
+
+	for expected in (
+		"if ( scale <= 0.0f ) {",
+		"scale = R_FONTSTASH_POINT_SIZE;",
+		"scaleTenths = (int)( scale * 10.0f + 0.5f );",
+		"scaleTenths = 2;",
+		"scaleTenths = 0x7fff;",
+	):
+		assert expected in scale_block
+
+	for expected in (
+		"if ( !text || *text != Q_COLOR_ESCAPE ) {",
+		"next = R_DecodeFontStashCodepoint( text + 1, end, &codepoint );",
+		"if ( next <= text + 1 || codepoint < '0' || codepoint > '7' ) {",
+		"*outColorIndex = (int)( codepoint - '0' );",
+		"*outNext = next;",
+	):
+		assert expected in color_block
+	assert "Q_IsColorString" not in color_block
+
+	for expected in (
+		"case R_FONTSTASH_FACE_SANS:",
+		"face = r_fontStash.primarySansFace;",
+		"case R_FONTSTASH_FACE_MONO:",
+		"face = R_GetFontStashFace( R_FONTSTASH_FACE_MONO );",
+		"case R_FONTSTASH_FACE_NORMAL:",
+		"face = R_GetFontStashFace( R_FONTSTASH_FACE_NORMAL );",
+		"if ( !face || !face->loaded ) {",
+		"face = R_GetFontStashFace( R_FONTSTASH_FACE_NORMAL );",
+		"if ( ( !face || !face->loaded ) && r_fontStash.primarySansFace && r_fontStash.primarySansFace->loaded ) {",
+	):
+		assert expected in face_block
+
+	for expected in (
+		"*outMaxX = (float)x;",
+		"currentColor[0] = 1.0f;",
+		"face = R_GetFontStashFaceForHandle( fontHandle );",
+		"hasMaxX = ( maxX > 0 );",
+		"if ( R_ParseHostTextColorEscape( s, end, &colorIndex, &colorNext ) ) {",
+		"if ( !forceColor ) {",
+		"newColor[3] = currentColor[3];",
+		"RE_SetColor( newColor );",
+		"s = colorNext;",
+		"next = R_DecodeFontStashCodepoint( s, end, &codepoint );",
+		"glyphMaxX = penX + advance;",
+		"if ( penX + drawRight > glyphMaxX ) {",
+		"if ( hasMaxX && glyphMaxX > maxXf ) {",
+		"*outMaxX = 0.0f;",
+		"RE_StretchPic(",
+		"penX + drawLeft,",
+		"(float)y - drawTop,",
+		"penX += advance;",
+		"*outMaxX = glyphMaxX;",
+		"RE_SetColor( currentColor );",
+	):
+		assert expected in draw_block
+	assert draw_block.index("if ( hasMaxX && glyphMaxX > maxXf ) {") < draw_block.index("RE_StretchPic(")
+
+	for expected in (
+		"*outWidth = 0.0f;",
+		"*outHeight = 0.0f;",
+		"*outLeft = 0.0f;",
+		"face = R_GetFontStashFaceForHandle( fontHandle );",
+		"hasMaxX = ( maxX > 0 );",
+		"for ( s = text; *s && ( !end || s < end ); ) {",
+		"if ( R_ParseHostTextColorEscape( s, end, &colorIndex, &colorNext ) ) {",
+		"s = colorNext;",
+		"next = R_DecodeFontStashCodepoint( s, end, &codepoint );",
+		"glyphRight = penX + drawRight;",
+		"glyphMaxX = penX + advance;",
+		"if ( glyphRight > glyphMaxX ) {",
+		"if ( hasMaxX && glyphMaxX > maxXf ) {",
+		"break;",
+		"hasBounds = qtrue;",
+		"width = maxRight - minLeft;",
+		"height = maxBottom - minTop;",
+		"height = metricsAscent;",
+		"*outLeft = hasBounds ? minLeft : 0.0f;",
+	):
+		assert expected in measure_block
+	assert measure_block.index("if ( hasMaxX && glyphMaxX > maxXf ) {") < measure_block.index("hasBounds = qtrue;")
+
+
 def test_renderer_host_text_core_docs_track_rg_p8_completion() -> None:
 	renderer_audit = _read_text(RENDERER_AUDIT_PATH)
 	retail_font_stack = _read_text(RETAIL_FONT_STACK_PATH)
@@ -119,4 +226,4 @@ def test_renderer_host_text_core_docs_track_rg_p8_completion() -> None:
 	assert "preserves the previous atlas pixels" in retail_font_stack
 	assert "cached glyph coordinates when `R_fonsErrorCallback` expands" in retail_font_stack
 	assert "texture as a `GL_ALPHA` atlas" in retail_font_stack
-	assert "No confirmed renderer font-stack gap remains after `RG-P11` and the" in retail_font_stack
+	assert "No confirmed renderer or client screen-overlay font-stack gap remains after" in retail_font_stack

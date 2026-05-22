@@ -8,8 +8,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CG_DRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_draw.c"
+CG_EVENT = REPO_ROOT / "src" / "code" / "cgame" / "cg_event.c"
 CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
 CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
+CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 CG_SCREEN = REPO_ROOT / "src" / "code" / "cgame" / "cg_screen.c"
 CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
 HUD_MENU = REPO_ROOT / "src" / "ui" / "hud.menu"
@@ -390,6 +392,20 @@ def test_centerprint_uses_retail_scale_and_race_y_bias() -> None:
 	assert "CG_Text_Paint( x, y + h, scale, color, linebuffer, 0, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );" in draw_block
 
 
+def test_centerprint_callers_use_retail_warmup_anchor() -> None:
+	server_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	event_source = CG_EVENT.read_text(encoding="utf-8")
+	parse_block = _block_from_marker(server_source, "static void CG_ParseCenterPrint")
+	complaint_block = _block_from_marker(server_source, "static void CG_ParseComplaint")
+	obituary_block = _block_from_marker(event_source, "static void CG_Obituary")
+
+	assert "y = ( cg.warmup == 0 ) ? 90 : 144;" in parse_block
+	assert "CG_HasActiveComplaintPrompt()" not in parse_block
+	assert "if ( CG_HasActiveComplaintPrompt() ) {" in complaint_block
+	assert "CG_CenterPrint( s, ( cg.warmup == 0 ) ? 90 : 144, 0.3f );" in obituary_block
+	assert "CG_CenterPrint( s, SCREEN_HEIGHT * 0.30f, 0.3f );" not in obituary_block
+
+
 def test_team_info_overlay_restores_fixed_retail_row_renderer() -> None:
 	source = CG_DRAW.read_text(encoding="utf-8")
 	draw_block = _block_from_marker(source, "static void CG_DrawTeamInfo( void )")
@@ -581,9 +597,9 @@ def test_classic_input_cmd_overlay_restores_retail_follow_and_arrow_icon_path() 
 	assert "CG_DrawPic( x + size, y - 8.0f, 16.0f, 16.0f, rightShader );" in input_block
 	assert "CG_DrawPic( x - size - 16.0f, y - 8.0f, 16.0f, 16.0f, leftShader );" in input_block
 	assert "CG_DrawPic( x + size + 16.0f, y + size, 16.0f, 16.0f, downShader );" in input_block
-	assert "int\t\t\tforwardmove;" in shared
-	assert "int\t\t\trightmove;" in shared
-	assert "int\t\t\tupmove;" in shared
+	assert "signed char\tforwardmove;" in shared
+	assert "signed char\trightmove;" in shared
+	assert "signed char\tupmove;" in shared
 	assert "int\t\t\tweaponPrimary;" in shared
 	assert "int\t\t\tfov;" in shared
 	assert "byte\t\t\tweaponPrimary;" in shared
@@ -591,10 +607,11 @@ def test_classic_input_cmd_overlay_restores_retail_follow_and_arrow_icon_path() 
 	assert "{ PSF(weaponPrimary), 8 }" in msg
 	assert "{ PSF(fov), 8 }" in msg
 	assert msg.index("{ PSF(weapon), 5 }") < msg.index("{ PSF(weaponPrimary), 8 }")
-	assert msg.index("{ PSF(fov), 8 }") < msg.index("{ PSF(forwardmove), -8 }")
-	assert "{ PSF(forwardmove), -8 }" in msg
-	assert "{ PSF(rightmove), -8 }" in msg
-	assert "{ PSF(upmove), -8 }" in msg
+	assert msg.index("{ PSF(fov), 8 }") < msg.index("{ PSF(forwardmove), 8 }")
+	assert "{ PSF(forwardmove), 8 }" in msg
+	assert "{ PSF(rightmove), 8 }" in msg
+	assert "{ PSF(upmove), 8 }" in msg
+	assert "MSG_PlayerStateFieldIsSignedByte" in msg
 	assert "client->ps.forwardmove = ucmd->forwardmove;" in active
 	assert "client->ps.rightmove = ucmd->rightmove;" in active
 	assert "client->ps.upmove = ucmd->upmove;" in active

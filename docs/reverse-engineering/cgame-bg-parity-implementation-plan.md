@@ -155,17 +155,142 @@ The qagame and cgame Ghidra rows for the shared pmove tail remain a one-to-one s
 
 Source now names that shared slot as `STAT_CHAINGUN_SPINUP`; `PM_FinishWeaponChange` resets it, `PM_Weapon` owns the retail 0..1000 spin accumulator and below-cap doubled reload-time path, and `g_weapon.c::FireWeapon` derives chaingun spread from the recovered stat rather than from `weaponTime`. Focused structural and executable coverage lives in [`tests/test_pmove_helper_parity.py`](../../tests/test_pmove_helper_parity.py), [`tests/test_pmove_movement_fixtures.py`](../../tests/test_pmove_movement_fixtures.py), and [`tests/test_game_weapon_parity.py`](../../tests/test_game_weapon_parity.py).
 
-The same round tightened the symbol-map notes for nearby non-weapon edges: `PM_FootstepForSurface` records the noFootsteps plus no-step/metal/snow/wood/default branches, `PM_CrashLand` records the gib-health fall-event gate and double-jump latch clear, `PM_WaterEvents` records the PM_DEAD head-water suppression plus invulnerability clear suppression, and `PmoveSingle` records the command-to-playerState mirrors before the movement dispatch.
+The same round tightened the symbol-map notes for nearby non-weapon edges: `PM_FootstepForSurface` records the noFootsteps plus no-step/metal/snow/wood/default branches, `PM_CrashLand` records the gib-health fall-event gate and double-jump latch clear, `PM_WaterEvents` records the PM_DEAD head-water suppression plus invulnerability clear suppression, and `PmoveSingle` records the command-to-playerState mirrors after the PMF_NO_MOVE early return and before the movement dispatch.
 
 The follow-up symbol pass aligned the cgame step-jump helper names with the qagame/source names: cgame `0x10002790`, `0x10002990`, and `0x100029E0` now map to `PM_ApplyJumpTakeoff`, `PM_CanCrouchStepJump`, and `PM_CanStepJump`, matching qagame `0x1002E2C0`, `0x1002E4C0`, and `0x1002E510`. `PM_Friction` symbol prose now also records the recovered crouch-slide, diagonal circle-strafe, and PM_FREEZE/PMF_SCOREBOARD drop-multiplier branches shared by both binaries.
+
+The step-jump source follow-up rechecked qagame `0x1002EFE0` and cgame `0x100034B0` against the Ghidra `PM_StepSlideMove` decompile. Source now uses the retail `cmd.serverTime - jumpTime >= jumpTimeDeltaMin` delay check for the step-jump gates, rechecks `PM_CanStepJump` only for the general launch, and lets the crouch fallback run through `PM_CanCrouchStepJump` plus the shrunken-box clearance trace even when the general upmove gate rejects the command. The cgame symbol signature was also corrected back to the one-argument `PM_StepSlideMove(qboolean gravity)` boundary shown by HLIL.
+
+The jump-release source follow-up rechecked qagame `0x1002E510` / `0x1002E590` and cgame `0x100029E0` / `0x10002A60` against the compact pmove-setting parse order. Both binaries consult the recovered `autoHop` slot for held-jump release bypasses and do not use the following `bunnyHop` slot for that decision, so the shared source now keeps bunny-hop tuning out of `PM_ShouldRequireJumpRelease` and `PM_ShouldRequireStepJumpRelease`.
+
+The jump-takeoff velocity follow-up rechecked qagame `0x1002E2C0` and cgame
+`0x10002790` against the adjacent step-jump callers. Source now keeps the
+vertical velocity decision inside the shared takeoff preparation: normal chain
+jumps use the retail gradient scaler, PMF_AIR_CONTROL switches to the additive
+chain/step branch keyed by `pmove_JumpVelocityTimeThresholdOffset`, and
+ramp-jump accumulation applies to vertical velocity before the max clamp rather
+than using the old source-only planar boost.
+
+The 2026-05-22 corrective step/chain audit rechecked the same takeoff leaf
+against the `PM_StepSlideMove` latches. The normal step-jump path now feeds the
+step-aware additive branch just like the crouch-step fallback, PMF_AIR_CONTROL
+overrides `pmove_ChainJump` mode `0`, the air-control addend fades across the
+post-offset window to the base threshold, and the max clamp applies after both
+plain additive and ramp-accumulated takeoff velocity.
 
 The air-move follow-up rechecked qagame `0x1002FCB0` and cgame `0x10004180` against the current source and tests. The mode-specific airstop, strafe, and `pm_wishspeed` handling belongs to `PM_AirMove` before the generic `PM_Accelerate` call, while `PM_AirControl`, `PM_StepSlideMove(qtrue)`, `PM_InvulnerabilityMove`, and the trailing `PMF_DOUBLE_JUMP` probe remain in the same tail order in both binaries.
 
 The neighboring walk-move symbols now call out the same retail handoff shape: `PM_WalkMove` owns the early `PM_ShouldUseInvulnerabilityMove` branch through `PM_StepSlideMove(qfalse)` and `PM_InvulnerabilityMove`, then continues through jump handling, crouch-slide timer refresh, duck/wade speed clamps, slick/knockback acceleration selection, and the final grounded step move. The cgame `PM_InvulnerabilityMove` prose was also refreshed to remove the old minimal-stub caveat now that the reconstructed source owns the retail activation/timer/animation behavior.
 
-The 3D movement leaf sweep rechecked water, ladder, fly, and noclip paths against both pmove islands. `PM_WaterMove` now records the shared `PM_BuildWishMove3D` vector builder plus the idle `-60` sink fallback, `PM_LadderMove` records the explicit `0.66 * speed` climb/descent cap, `PM_FlyMove` records the spectator and flight-powerup dispatch into the shared 3D wish-vector path, and `PM_NoclipMove` records the default-viewheight plus 1.5x friction/no-trace integration path.
+The invulnerability timer follow-up rechecked qagame `0x1002FA80` and cgame `0x10003F50` against the committed HLIL. The dispatch gate now preserves the retail exact-zero stale state (`STAT_PLAYER_ITEM_RECHARGE != 0 && STAT_PLAYER_ITEM_TIME == 0`) instead of a broader signed range test, and the holdable slot clear is tied to the timer-collapse block only when the recharge-rate stat is zero. Structural coverage in [`tests/test_invulnerability_move_parity.py`](../../tests/test_invulnerability_move_parity.py) and executable fixture coverage in [`tests/test_pmove_movement_fixtures.py`](../../tests/test_pmove_movement_fixtures.py) pin the three edge cases: exact zero with a recharge rate, negative decay with a recharge rate, and zero with no recharge rate.
 
-The ground-contact and footstep follow-up rechecked qagame `0x10030BE0`/`0x10030DA0`/`0x10030ED0`/`0x10031140`/`0x100314D0` and cgame `0x100050B0`/`0x10005270`/`0x100053A0`/`0x10005610`/`0x100059A0` against the Ghidra/HLIL pmove islands. `PM_CorrectAllSolid` now records the 0.25-unit recovery trace and `groundTraceLatest*` clearing, `PM_GroundTraceMissed` records the 64-unit lift probe plus forward/back jump animation split, `PM_GroundTrace` records the kickoff/steep/land timer/history/touch-entity edges, `PM_SetWaterLevel` records the exact `MASK_WATER` sample heights, and `PM_Footsteps` records the airborne invulnerability, swim, idle-bob, ducked-suppression, and splash/swim event split.
+The 3D movement leaf sweep rechecked water, ladder, fly, and noclip paths against both pmove islands. `PM_WaterMove` now records the shared `PM_BuildWishMove3D` vector builder plus the idle `-60` sink fallback, `PM_LadderMove` records the explicit `0.66 * speed` climb/descent cap, `PM_FlyMove` records the spectator and flight-powerup dispatch into the shared 3D wish-vector path, and `PM_NoclipMove` records the default-viewheight plus 1.5x friction/no-trace integration path. The 2026-05-22 fixture follow-up adds executable coverage for the water-jump solid-lip/clearance sequence, the water idle sink, the `MASK_PLAYERSOLID` + `SURF_LADDER` probe, and the ladder vertical clamp.
+
+The same dispatcher-tail audit rechecked `PM_Weapon`, `PM_Animate`, and the
+`PmoveSingle` tail calls against qagame/cgame evidence. Production source was
+unchanged, but the pmove fixture harness now pins `PM_Animate` directly:
+gesture wins over simultaneous voice buttons, queues `EV_TAUNT`, and uses
+`TIMER_GESTURE`, while voice commands follow the retail
+getflag/guardbase/patrol/followme/affirmative/negative order with the 600 ms
+timer and no predictable event. Active torso timers suppress both paths.
+
+The following torso-idle pass rechecked qagame `0x1002DB80` and cgame
+`0x10002050`. Source stayed unchanged, and executable fixtures now cover
+`PM_TorsoAnimation` restoring `TORSO_STAND2` for a ready gauntlet,
+`TORSO_STAND` for other ready weapons, leaving active torso timers untouched,
+returning for non-ready weapon states, and inheriting the `PM_DEAD` no-start
+gate through `PM_ContinueTorsoAnim` / `PM_StartTorsoAnim`.
+
+The timer-tail pass then rechecked qagame `0x10031E30` and cgame `0x10006300`.
+Source again matched the retail helper, and the fixture harness now covers
+`PM_DropTimers` partial `pm_time` decay, exact/overrun expiry, `PMF_ALL_TIMES`
+clearing without disturbing unrelated flags, independent legs/torso timer
+clamps, and the crouch-slide ground-plane decay gate.
+
+The queue-helper pass rechecked qagame `0x1002DAF0` / `0x1002DB20` and cgame
+`0x10001FC0` / `0x10001FF0`. Source stayed unchanged, and executable fixtures
+now cover `PM_AddEvent` writing zero event parms through the two-slot
+predictable-event wrap plus `PM_AddTouchEnt` skipping `ENTITYNUM_WORLD`,
+deduplicating touched entities, and enforcing the `MAXTOUCH` cap.
+
+The low-level animation pass rechecked qagame `0x1002DB60` /
+`0x1002DBE0` / `0x1002DC20` and cgame `0x10002030` / `0x100020B0` /
+`0x100020F0`. Source stayed unchanged, and executable fixtures now cover
+torso toggle-bit writes, `PM_DEAD` suppression, legs high-priority timer
+no-ops, current-animation no-ops, torso timer no-ops, and the
+`PM_ForceLegsAnim` timer clear before the live/dead start gate.
+
+The command/vector math pass rechecked qagame `0x1002DC50`,
+`0x1002DEF0`, `0x1002E070`, and `0x1002E1F0` against cgame
+`0x10002120`, `0x100023C0`, `0x10002540`, and `0x100026C0`. Source stayed
+unchanged, and executable fixtures now cover `PM_ClipVelocity` inward/outward
+overbounce branches, `PM_Accelerate` clamp and overspeed no-op behavior,
+`PM_CmdScale` zero/axial/2D/3D input scaling, and `PM_SetMovementDir`'s full
+0..7 command ring plus idle side-strafe diagonal snaps.
+
+The ground-contact and footstep follow-up rechecked qagame `0x10030BE0`/`0x10030DA0`/`0x10030ED0`/`0x10031140`/`0x100314D0` and cgame `0x100050B0`/`0x10005270`/`0x100053A0`/`0x10005610`/`0x100059A0` against the Ghidra/HLIL pmove islands. `PM_CorrectAllSolid` now records the 0.25-unit recovery trace and groundEntityNum clearing, `PM_GroundTraceMissed` records the 64-unit lift probe plus forward/back jump animation split, `PM_GroundTrace` records the kickoff/steep/land timer/touch-entity edges without a replicated ground-trace history cache, `PM_SetWaterLevel` records the exact `MASK_WATER` sample heights, and `PM_Footsteps` records the airborne invulnerability, swim, idle-bob, ducked-suppression, and splash/swim event split.
+
+The ground-trace source follow-up rechecked cgame `0x100053A0` and qagame `0x10030ED0` against the surrounding `PM_CheckDuck` offsets. Source now removes the reconstruction-only `groundTraceHistory*` and `groundTraceLatest*` playerState fields plus their delta replication, keeping only the retail `groundEntityNum` playerState store while ramp-jump reconstruction reads the current frame's `pml.groundTrace` normal.
+
+The playerState wiring follow-up rechecked the retail engine netfield table plus qagame `0x10031FA0` and cgame `0x10006470`. Source now keeps `clientNum` at `0x88`, restores the replicated `location` byte at `0x8c`, stores the command mirrors as signed bytes at `0x1dc..0x1de`, and moves local-only sidecars after the retail replicated prefix. The same pass moves the progress-backed holdable timer into `stats[10]`, `stats[11]`, and `stats[12]`, matching the HLIL offsets `+0xe8`, `+0xec`, and `+0xf0`, and adds executable delta-codec coverage for both the byte mirrors and timer stat triplet.
+
+The 2026-05-22 wiring pass closed the remaining pmove-settings transport
+divergence called out by cgame `0x10048F30`. The server now publishes the
+retail compact 33-token pmove core in `CS_PMOVE_SETTINGS`, ordered as the
+Ghidra parser consumes it: air acceleration, air-step friction/steps,
+auto/bunny/chain jump flags, jump timing and velocity terms, no-player-clip,
+ramp/step jump controls, strafe/walk friction and acceleration, water scales,
+weapon raise/drop timing, and wishspeed. The source cgame parses that compact
+form first, keeps a JSON fallback for older reconstruction artifacts, and only
+uses trailing compact extension tokens for source-only prediction knobs such as
+`airControl`, `crouchSlide`, `doubleJump`, and Quad Hog HUD metadata that
+retail did not consume through the compact core. A later `PM_FlyMove` recheck
+confirmed that retail registers `g_flightThrust` with a `1200` default in
+qagame's cvar table but does not feed that cvar into either shared pmove
+flight leaf, so source now keeps the cvar registration for parity while
+removing the old pmove settings transport and movement override.
+
+The pmove cvar reconstruction pass then cross-checked the qagame retail cvar
+table at `0x1008F7C4..0x1008FB20`. Source registration in `g_pmove.c` now keeps
+the recovered defaults and cvar flag groups for all 36 `pmove_*` entries instead
+of registering the split-out reconstruction cvars with flag `0`; the compact
+transport and cgame parser continue to consume the resulting cached settings.
+The subsequent callback/cache recheck walked retail `G_InitPublishedCvarState`
+and `G_UpdateCvars`, confirming the pmove slab's callback-backed mirrors. Source
+now preserves the callback/no-callback split for the profile toggles and clamps
+the published `pmove_velocity_gh`, `pmove_JumpVelocityTimeThreshold`, and
+`pmove_JumpVelocityTimeThresholdOffset` values to the retail `0.001` minimum
+before cgame prediction consumes them.
+The follow-up grapple-speed audit separated the two similarly named hook
+surfaces: retail `PM_GrappleMove` consumes the `pmove_velocity_gh` cache, while
+`g_velocity_gh` defaults to `1800` for the projectile-speed path and custom
+settings. Source now mirrors that split instead of letting `g_velocity_gh`
+mask the dedicated pmove pull speed.
+The subsequent full-name sweep keeps `pmove_fixed` and `pmove_msec` classified
+as legacy fixed-timestep controls rather than QL factory-managed movement
+tuning entries. They remain registered in the game/cgame cvar tables with
+defaults `0` and `8`, the server-side copy carries `CVAR_SYSTEMINFO`, both
+prediction paths clamp `pmove_msec` to `8..33`, and the shared `Pmove` outer
+loop consumes the resulting struct fields to choose `pmove_msec` slices or the
+normal 66 ms chunk cap.
+
+The same evidence round rechecked qagame `ClientSpawn` at `0x1003BC30` and the
+shared `PmoveSingle` entrypoints at qagame `0x10031FA0` / cgame `0x10006470`.
+Retail seeds `PMF_CROUCH_SLIDE`, `PMF_DOUBLE_JUMP`, and `PMF_AIR_CONTROL`
+from the active movement globals during spawn, then `PmoveSingle` consumes
+those replicated profile bits instead of deriving or clearing them from the
+settings block every frame. Source now mirrors that ownership through
+`G_PmoveApplyProfileFlags`, keeps crouch-slide friction keyed by the replicated
+flag, and leaves air double-jump acceptance to the profile flag plus the
+existing `doubleJumped` latch.
+
+The follow-up dispatcher audit rechecked the same shared `PmoveSingle` body at
+qagame `0x10031FA0` / cgame `0x10006470` and closed the dead-player collision
+edge at the top of the frame. Retail clears `CONTENTS_BODY` from the pmove trace
+mask only when `STAT_HEALTH <= 0` and the replicated `PW_INVULNERABILITY` slot
+is clear; invulnerable dead players keep body collision through that early gate.
+Source now mirrors the paired health/powerup condition and has executable
+coverage for both tracemask outcomes.
 
 ### `BG-B` Shared Pickup / Trajectory / Boundary Cleanup
 

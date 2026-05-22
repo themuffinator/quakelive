@@ -1119,7 +1119,8 @@ plyer_state_t communication
 */
 
 // using the stringizing operator to save typing...
-#define	PSF(x) #x,(int)&((playerState_t*)0)->x
+#define	PSF_OFFSET(x) (int)&((playerState_t*)0)->x
+#define	PSF(x) #x,PSF_OFFSET(x)
 
 netField_t	playerStateFields[] = 
 {
@@ -1144,23 +1145,6 @@ netField_t	playerStateFields[] =
 { PSF(events[1]), 8 },
 { PSF(pm_flags), 24 },
 { PSF(groundEntityNum), GENTITYNUM_BITS },
-{ PSF(groundTraceHistoryIndex), 8 },
-{ PSF(groundTraceHistoryCount), 8 },
-{ PSF(groundTraceTimes[0]), 32 },
-{ PSF(groundTraceTimes[1]), 32 },
-{ PSF(groundTraceEntNums[0]), GENTITYNUM_BITS },
-{ PSF(groundTraceEntNums[1]), GENTITYNUM_BITS },
-{ PSF(groundTraceNormals[0][0]), 0 },
-{ PSF(groundTraceNormals[0][1]), 0 },
-{ PSF(groundTraceNormals[0][2]), 0 },
-{ PSF(groundTraceNormals[1][0]), 0 },
-{ PSF(groundTraceNormals[1][1]), 0 },
-{ PSF(groundTraceNormals[1][2]), 0 },
-{ PSF(groundTraceLatestTime), 32 },
-{ PSF(groundTraceLatestEntNum), GENTITYNUM_BITS },
-{ PSF(groundTraceLatestNormal[0]), 0 },
-{ PSF(groundTraceLatestNormal[1]), 0 },
-{ PSF(groundTraceLatestNormal[2]), 0 },
 { PSF(jumpTime), 32 },
 { PSF(doubleJumped), 1 },
 { PSF(weaponstate), 4 },
@@ -1193,14 +1177,67 @@ netField_t	playerStateFields[] =
 { PSF(loopSound), 16 },
 { PSF(crouchTime), 32 },
 { PSF(crouchSlideTime), 32 },
-{ PSF(playerItemTimeMax), 16 },
-{ PSF(playerItemTime), 16 },
-{ PSF(armorTier), 2 },
+{ PSF(location), 8 },
 { PSF(fov), 8 },
-{ PSF(forwardmove), -8 },
-{ PSF(rightmove), -8 },
-{ PSF(upmove), -8 }
+{ PSF(forwardmove), 8 },
+{ PSF(rightmove), 8 },
+{ PSF(upmove), 8 }
 };
+
+/*
+===================
+MSG_PlayerStateFieldIsSignedByte
+===================
+*/
+static qboolean MSG_PlayerStateFieldIsSignedByte( const netField_t *field ) {
+	return (qboolean)(
+		field->offset == PSF_OFFSET(forwardmove) ||
+		field->offset == PSF_OFFSET(rightmove) ||
+		field->offset == PSF_OFFSET(upmove) );
+}
+
+/*
+===================
+MSG_PlayerStateFieldValue
+===================
+*/
+static int MSG_PlayerStateFieldValue( const playerState_t *ps, const netField_t *field ) {
+	if ( MSG_PlayerStateFieldIsSignedByte( field ) ) {
+		return *(const signed char *)( (const byte *)ps + field->offset );
+	}
+
+	return *(const int *)( (const byte *)ps + field->offset );
+}
+
+/*
+===================
+MSG_PlayerStateFieldNetworkValue
+===================
+*/
+static int MSG_PlayerStateFieldNetworkValue( const playerState_t *ps, const netField_t *field ) {
+	int	value;
+
+	value = MSG_PlayerStateFieldValue( ps, field );
+	if ( MSG_PlayerStateFieldIsSignedByte( field ) && field->bits > 0 ) {
+		return (unsigned char)value;
+	}
+
+	return value;
+}
+
+/*
+===================
+MSG_SetPlayerStateFieldValue
+===================
+*/
+static void MSG_SetPlayerStateFieldValue( playerState_t *ps, const netField_t *field, int value ) {
+	if ( MSG_PlayerStateFieldIsSignedByte( field ) ) {
+		*(signed char *)( (byte *)ps + field->offset ) = (signed char)value;
+		return;
+	}
+
+	*(int *)( (byte *)ps + field->offset ) = value;
+}
 
 /*
 =============
@@ -1218,7 +1255,8 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	int				numFields;
 	int				c;
 	netField_t		*field;
-	int				*fromF, *toF;
+	int				*toF;
+	int				fromValue, toValue;
 	float			fullFloat;
 	int				trunc, lc;
 
@@ -1233,9 +1271,9 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 
 	lc = 0;
 	for ( i = 0, field = playerStateFields ; i < numFields ; i++, field++ ) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
-		if ( *fromF != *toF ) {
+		fromValue = MSG_PlayerStateFieldValue( from, field );
+		toValue = MSG_PlayerStateFieldValue( to, field );
+		if ( fromValue != toValue ) {
 			lc = i+1;
 		}
 	}
@@ -1245,10 +1283,10 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 	oldsize += numFields - lc;
 
 	for ( i = 0, field = playerStateFields ; i < lc ; i++, field++ ) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
+		fromValue = MSG_PlayerStateFieldValue( from, field );
+		toValue = MSG_PlayerStateFieldValue( to, field );
 
-		if ( *fromF == *toF ) {
+		if ( fromValue == toValue ) {
 			MSG_WriteBits( msg, 0, 1 );	// no change
 			continue;
 		}
@@ -1258,6 +1296,7 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 
 		if ( field->bits == 0 ) {
 			// float
+			toF = (int *)( (byte *)to + field->offset );
 			fullFloat = *(float *)toF;
 			trunc = (int)fullFloat;
 
@@ -1273,7 +1312,7 @@ void MSG_WriteDeltaPlayerstate( msg_t *msg, struct playerState_s *from, struct p
 			}
 		} else {
 			// integer
-			MSG_WriteBits( msg, *toF, field->bits );
+			MSG_WriteBits( msg, MSG_PlayerStateFieldNetworkValue( to, field ), field->bits );
 		}
 	}
 	c = msg->cursize - c;
@@ -1371,7 +1410,8 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	int			numFields;
 	int			startBit, endBit;
 	int			print;
-	int			*fromF, *toF;
+	int			*toF;
+	int			value;
 	int			trunc;
 	playerState_t	dummy;
 
@@ -1400,15 +1440,13 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 	lc = MSG_ReadByte(msg);
 
 	for ( i = 0, field = playerStateFields ; i < lc ; i++, field++ ) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
-
 		if ( ! MSG_ReadBits( msg, 1 ) ) {
 			// no change
-			*toF = *fromF;
+			MSG_SetPlayerStateFieldValue( to, field, MSG_PlayerStateFieldValue( from, field ) );
 		} else {
 			if ( field->bits == 0 ) {
 				// float
+				toF = (int *)( (byte *)to + field->offset );
 				if ( MSG_ReadBits( msg, 1 ) == 0 ) {
 					// integral float
 					trunc = MSG_ReadBits( msg, FLOAT_INT_BITS );
@@ -1427,18 +1465,17 @@ void MSG_ReadDeltaPlayerstate (msg_t *msg, playerState_t *from, playerState_t *t
 				}
 			} else {
 				// integer
-				*toF = MSG_ReadBits( msg, field->bits );
+				value = MSG_ReadBits( msg, field->bits );
+				MSG_SetPlayerStateFieldValue( to, field, value );
 				if ( print ) {
-					Com_Printf( "%s:%i ", field->name, *toF );
+					Com_Printf( "%s:%i ", field->name, MSG_PlayerStateFieldValue( to, field ) );
 				}
 			}
 		}
 	}
 	for ( i=lc,field = &playerStateFields[lc];i<numFields; i++, field++) {
-		fromF = (int *)( (byte *)from + field->offset );
-		toF = (int *)( (byte *)to + field->offset );
 		// no change
-		*toF = *fromF;
+		MSG_SetPlayerStateFieldValue( to, field, MSG_PlayerStateFieldValue( from, field ) );
 	}
 
 

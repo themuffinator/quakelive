@@ -393,7 +393,7 @@ static void CG_CopyDefaultPmoveSettings( pmove_settings_t *settings ) {
 =============
 CG_SkipPmoveWhitespace
 
-Advances the cursor past JSON whitespace characters.
+Advances the cursor past pmove payload whitespace characters.
 =============
 */
 static void CG_SkipPmoveWhitespace( const char **cursor ) {
@@ -556,6 +556,33 @@ static qboolean CG_ParsePmoveJsonInt( const char **cursor, int *value ) {
 
 /*
 =============
+CG_ParsePmoveJsonIntOrBool
+
+Reads an integer token while accepting legacy JSON booleans as 0/1 aliases.
+=============
+*/
+static qboolean CG_ParsePmoveJsonIntOrBool( const char **cursor, int *value ) {
+	qboolean	boolValue;
+
+	if ( !cursor || !*cursor || !value ) {
+		return qfalse;
+	}
+
+	CG_SkipPmoveWhitespace( cursor );
+	if ( !Q_strnicmp( *cursor, "true", 4 ) || !Q_strnicmp( *cursor, "false", 5 ) ) {
+		if ( !CG_ParsePmoveJsonBool( cursor, &boolValue ) ) {
+			return qfalse;
+		}
+
+		*value = boolValue ? 1 : 0;
+		return qtrue;
+	}
+
+	return CG_ParsePmoveJsonInt( cursor, value );
+}
+
+/*
+=============
 CG_SkipPmoveJsonValue
 
 Skips a JSON value so unknown tokens don't poison the decoder.
@@ -681,12 +708,200 @@ static qboolean CG_ParsePmoveWeaponReloadTimes( const char **cursor, int *reload
 
 /*
 =============
-CG_ParsePmoveSettingsPayload
+CG_HasPmoveCompactToken
 
-Decodes the pmove configstring payload into a settings structure.
+Returns qtrue when another compact pmove token remains.
 =============
 */
-static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_settings_t *settings ) {
+static qboolean CG_HasPmoveCompactToken( const char **cursor ) {
+	if ( !cursor || !*cursor ) {
+		return qfalse;
+	}
+
+	CG_SkipPmoveWhitespace( cursor );
+	return **cursor ? qtrue : qfalse;
+}
+
+/*
+=============
+CG_ParsePmoveCompactBool
+
+Reads one retail compact boolean token.
+=============
+*/
+static qboolean CG_ParsePmoveCompactBool( const char **cursor, qboolean *value ) {
+	int parsed;
+
+	if ( !value ) {
+		return qfalse;
+	}
+
+	if ( !CG_ParsePmoveJsonInt( cursor, &parsed ) ) {
+		return qfalse;
+	}
+
+	*value = parsed ? qtrue : qfalse;
+	return qtrue;
+}
+
+/*
+=============
+CG_ClampPmoveNonNegative
+
+Matches the retail compact parser's clamp for selected tuning floats.
+=============
+*/
+static void CG_ClampPmoveNonNegative( float *value ) {
+	if ( value && *value < 0.0f ) {
+		*value = 0.0f;
+	}
+}
+
+/*
+=============
+CG_ParsePmoveCompactSettingsPayload
+
+Decodes the retail compact pmove configstring. Retail cgame consumes the first
+33 tokens; the current reconstruction accepts a trailing extension for local
+prediction fields that retail either replicated through playerState flags or
+did not expose through this transport.
+=============
+*/
+static qboolean CG_ParsePmoveCompactSettingsPayload( const char *payload, pmove_settings_t *settings ) {
+	pmove_settings_t parsed;
+	const char *cursor;
+	int integerValue;
+
+	if ( !settings ) {
+		return qfalse;
+	}
+
+	CG_CopyDefaultPmoveSettings( &parsed );
+	if ( !payload || !*payload ) {
+		memcpy( settings, &parsed, sizeof( parsed ) );
+		return qfalse;
+	}
+
+	cursor = payload;
+
+#define PMOVE_COMPACT_FLOAT( name ) \
+	if ( !CG_ParsePmoveJsonFloat( &cursor, &parsed.name ) ) { \
+		CG_CopyDefaultPmoveSettings( settings ); \
+		return qfalse; \
+	}
+#define PMOVE_COMPACT_INT( name ) \
+	if ( !CG_ParsePmoveJsonInt( &cursor, &parsed.name ) ) { \
+		CG_CopyDefaultPmoveSettings( settings ); \
+		return qfalse; \
+	}
+#define PMOVE_COMPACT_BOOL( name ) \
+	if ( !CG_ParsePmoveCompactBool( &cursor, &parsed.name ) ) { \
+		CG_CopyDefaultPmoveSettings( settings ); \
+		return qfalse; \
+	}
+
+	PMOVE_COMPACT_FLOAT( airAccel );
+	PMOVE_COMPACT_FLOAT( airStepFriction );
+	PMOVE_COMPACT_INT( airSteps );
+	PMOVE_COMPACT_FLOAT( airStopAccel );
+	PMOVE_COMPACT_BOOL( autoHop );
+	PMOVE_COMPACT_BOOL( bunnyHop );
+	PMOVE_COMPACT_INT( chainJump );
+	if ( !CG_ParsePmoveJsonInt( &cursor, &integerValue ) ) {
+		CG_CopyDefaultPmoveSettings( settings );
+		return qfalse;
+	}
+	parsed.chainJumpVelocity = (float)integerValue;
+	PMOVE_COMPACT_FLOAT( circleStrafeFriction );
+	PMOVE_COMPACT_FLOAT( crouchSlideFriction );
+	PMOVE_COMPACT_INT( crouchSlideTime );
+	PMOVE_COMPACT_BOOL( crouchStepJump );
+	PMOVE_COMPACT_FLOAT( jumpTimeDeltaMin );
+	PMOVE_COMPACT_FLOAT( jumpVelocity );
+	PMOVE_COMPACT_FLOAT( jumpVelocityMax );
+	PMOVE_COMPACT_FLOAT( jumpVelocityScaleAdd );
+	PMOVE_COMPACT_FLOAT( jumpVelocityTimeThreshold );
+	PMOVE_COMPACT_FLOAT( jumpVelocityTimeThresholdOffset );
+	PMOVE_COMPACT_BOOL( noPlayerClip );
+	PMOVE_COMPACT_BOOL( rampJump );
+	PMOVE_COMPACT_FLOAT( rampJumpScale );
+	PMOVE_COMPACT_FLOAT( stepHeight );
+	PMOVE_COMPACT_BOOL( stepJump );
+	PMOVE_COMPACT_FLOAT( stepJumpVelocity );
+	PMOVE_COMPACT_FLOAT( strafeAccel );
+	PMOVE_COMPACT_FLOAT( velocityGh );
+	PMOVE_COMPACT_FLOAT( walkAccel );
+	PMOVE_COMPACT_FLOAT( walkFriction );
+	PMOVE_COMPACT_FLOAT( waterSwimScale );
+	PMOVE_COMPACT_FLOAT( waterWadeScale );
+	PMOVE_COMPACT_INT( weaponDropTime );
+	PMOVE_COMPACT_INT( weaponRaiseTime );
+	PMOVE_COMPACT_FLOAT( wishSpeed );
+
+	CG_ClampPmoveNonNegative( &parsed.jumpVelocityTimeThreshold );
+	CG_ClampPmoveNonNegative( &parsed.jumpVelocityTimeThresholdOffset );
+	CG_ClampPmoveNonNegative( &parsed.velocityGh );
+
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_FLOAT( airControl );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_BOOL( crouchSlide );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_BOOL( doubleJump );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_FLOAT( machinegunIronsightsScale );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_FLOAT( gauntletSpeedFactor );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_INT( midAirMinimumHeight );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_BOOL( nailgunBounceEnabled );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_INT( nailgunBouncePercentage );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_FLOAT( quadDamageMultiplier );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_BOOL( guidedRocketEnabled );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_INT( quadHogEnabled );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_INT( quadHogIdleSeconds );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_INT( quadHogTimeSeconds );
+	}
+	if ( CG_HasPmoveCompactToken( &cursor ) ) {
+		PMOVE_COMPACT_INT( quadHogPingRateSeconds );
+	}
+
+#undef PMOVE_COMPACT_FLOAT
+#undef PMOVE_COMPACT_INT
+#undef PMOVE_COMPACT_BOOL
+
+	memcpy( settings, &parsed, sizeof( parsed ) );
+	return qtrue;
+}
+
+/*
+=============
+CG_ParsePmoveJsonSettingsPayload
+
+Decodes the older reconstruction JSON pmove configstring payload into a
+settings structure.
+=============
+*/
+static qboolean CG_ParsePmoveJsonSettingsPayload( const char *payload, pmove_settings_t *settings ) {
 	pmove_settings_t parsed;
 	const char *cursor;
 	char key[64];
@@ -739,6 +954,10 @@ static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_setting
 			if ( !CG_ParsePmoveWeaponReloadTimes( &cursor, parsed.weaponReloadTimes ) ) {
 				valid = qfalse;
 			}
+		} else if ( !Q_stricmp( key, "chainJump" ) ) {
+			if ( !CG_ParsePmoveJsonIntOrBool( &cursor, &parsed.chainJump ) ) {
+				valid = qfalse;
+			}
 		}
 
 	#define PMOVE_BOOL_FIELD( name ) \
@@ -767,13 +986,11 @@ static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_setting
 		PMOVE_FLOAT_FIELD( airStopAccel )
 		PMOVE_BOOL_FIELD( autoHop )
 		PMOVE_BOOL_FIELD( bunnyHop )
-		PMOVE_BOOL_FIELD( chainJump )
 		PMOVE_FLOAT_FIELD( chainJumpVelocity )
 		PMOVE_FLOAT_FIELD( circleStrafeFriction )
 		PMOVE_BOOL_FIELD( crouchSlide )
 		PMOVE_FLOAT_FIELD( crouchSlideFriction )
 		PMOVE_INT_FIELD( crouchSlideTime )
-		PMOVE_FLOAT_FIELD( flightThrust )
 		PMOVE_BOOL_FIELD( crouchStepJump )
 		PMOVE_BOOL_FIELD( doubleJump )
 		PMOVE_FLOAT_FIELD( jumpTimeDeltaMin )
@@ -842,6 +1059,34 @@ static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_setting
 
 	memcpy( settings, &parsed, sizeof( parsed ) );
 	return valid;
+}
+
+/*
+=============
+CG_ParsePmoveSettingsPayload
+
+Decodes the server broadcast pmove settings into a settings structure.
+=============
+*/
+static qboolean CG_ParsePmoveSettingsPayload( const char *payload, pmove_settings_t *settings ) {
+	const char *cursor;
+
+	if ( !settings ) {
+		return qfalse;
+	}
+
+	if ( !payload || !*payload ) {
+		CG_CopyDefaultPmoveSettings( settings );
+		return qfalse;
+	}
+
+	cursor = payload;
+	CG_SkipPmoveWhitespace( &cursor );
+	if ( *cursor == '{' ) {
+		return CG_ParsePmoveJsonSettingsPayload( cursor, settings );
+	}
+
+	return CG_ParsePmoveCompactSettingsPayload( cursor, settings );
 }
 
 /*
@@ -4542,7 +4787,7 @@ static void CG_ParseCenterPrint( qboolean printToConsole ) {
 	int		y;
 
 	text = CG_Argv( 1 );
-	y = CG_HasActiveComplaintPrompt() ? 144 : 90;
+	y = ( cg.warmup == 0 ) ? 90 : 144;
 	CG_CenterPrint( text, y, 0.4f );
 
 	if ( printToConsole ) {

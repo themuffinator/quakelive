@@ -359,7 +359,10 @@ typedef enum {
 	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
 	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
 	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
-	STAT_CHAINGUN_SPINUP			// retail chaingun spin accumulator, clamped to 0..1000
+	STAT_CHAINGUN_SPINUP,			// retail chaingun spin accumulator, clamped to 0..1000
+	STAT_PLAYER_ITEM_TIME_MAX = 10,	// retail progress-backed holdable maximum at playerState +0xe8
+	STAT_PLAYER_ITEM_TIME,			// retail progress-backed holdable current value at playerState +0xec
+	STAT_PLAYER_ITEM_RECHARGE		// retail progress-backed holdable recharge rate at playerState +0xf0
 } statIndex_t;
 
 
@@ -542,13 +545,12 @@ struct pmove_settings_s {
 	float	airStopAccel;
 	qboolean	autoHop;
 	qboolean	bunnyHop;
-	qboolean	chainJump;
+	int	chainJump;
 	float	chainJumpVelocity;
 	float	circleStrafeFriction;
 	qboolean	crouchSlide;
 	float	crouchSlideFriction;
 	int	crouchSlideTime;
-	float	flightThrust;
 	qboolean	crouchStepJump;
 	qboolean	doubleJump;
 	float	jumpTimeDeltaMin;

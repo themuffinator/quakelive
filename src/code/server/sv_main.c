@@ -327,6 +327,7 @@ cvar_t	*sv_maxclients;
 cvar_t	*sv_privateClients;		// number of clients reserved for password
 cvar_t	*sv_hostname;
 cvar_t	*sv_tags;
+cvar_t	*sv_masterAdvertise;
 cvar_t	*sv_master[MAX_MASTER_SERVERS];		// master server ip address
 cvar_t	*sv_reconnectlimit;		// minimum seconds between connect messages
 cvar_t	*sv_showloss;			// report when usercmds are lost
@@ -637,6 +638,7 @@ but not on every player enter or exit.
 #define HEARTBEAT_MSEC	300*1000
 #define HEARTBEAT_GAME	"QuakeArena-1"
 void SV_MasterHeartbeat( void ) {
+#if QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES
 	static netadr_t	adr[MAX_MASTER_SERVERS];
 	int			i;
 	int			visibleClients;
@@ -654,6 +656,9 @@ void SV_MasterHeartbeat( void ) {
 	}
 	svs.nextHeartbeatTime = svs.time + HEARTBEAT_MSEC;
 
+	if ( sv_masterAdvertise && !sv_masterAdvertise->integer ) {
+		return;
+	}
 
 	SV_ComputeDisplayedCounts( &visibleClients, &reportedBots );
 	serverType = sv_serverType ? sv_serverType->integer : 0;
@@ -695,6 +700,9 @@ void SV_MasterHeartbeat( void ) {
 
 		SV_LogMasterVACHeartbeat( &adr[i], sv_master[i]->string );
 	}
+#else
+	return;
+#endif
 }
 
 /*

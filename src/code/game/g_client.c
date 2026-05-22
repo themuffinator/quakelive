@@ -2589,6 +2589,7 @@ void ClientSpawn(gentity_t *ent) {
 	// increment the spawncount so the client will detect the respawn
 	client->ps.persistant[PERS_SPAWN_COUNT]++;
 	client->ps.persistant[PERS_TEAM] = client->sess.sessionTeam;
+	G_PmoveApplyProfileFlags( &client->ps );
 	if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		client->ps.pm_type = PM_SPECTATOR;
 		if ( client->sess.spectatorState == SPECTATOR_SCOREBOARD ) {

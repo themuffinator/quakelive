@@ -237,6 +237,10 @@ static qboolean PM_CanProbeStepJump( const pmove_settings_t *settings ) {
 		return qfalse;
 	}
 
+	if ( PM_IsJumpPadLaunchActive() ) {
+		return qfalse;
+	}
+
 	if ( !settings->stepJump ) {
 		return qfalse;
 	}
@@ -268,13 +272,9 @@ static qboolean PM_ShouldRequireStepJumpRelease( const pmove_settings_t *setting
 		if ( settings->autoHop ) {
 			return qfalse;
 		}
-
-		if ( settings->bunnyHop ) {
-			return qfalse;
-		}
 	}
 
-	if ( pm_autohop || pm_bunnyhop ) {
+	if ( pm_autohop ) {
 		return qfalse;
 	}
 
@@ -283,14 +283,12 @@ static qboolean PM_ShouldRequireStepJumpRelease( const pmove_settings_t *setting
 
 /*
 ==================
-PM_HasRecentGroundContact
+PM_HasSatisfiedStepJumpDelay
 
-Checks the cached retail ground-contact history window used by the step-jump gates.
+Checks the retail jump-time delay window used by the step-jump gates.
 ==================
 */
-static qboolean PM_HasRecentGroundContact( const pmove_settings_t *settings ) {
-	int		index;
-	int		contactTime;
+static qboolean PM_HasSatisfiedStepJumpDelay( const pmove_settings_t *settings ) {
 	int		timeDelta;
 
 	if ( !pm || !pm->ps || !settings ) {
@@ -301,22 +299,12 @@ static qboolean PM_HasRecentGroundContact( const pmove_settings_t *settings ) {
 		return qtrue;
 	}
 
-	if ( pm->ps->groundTraceHistoryCount <= 0 ) {
+	if ( pm->cmd.serverTime < pm->ps->jumpTime ) {
 		return qfalse;
 	}
 
-	index = pm->ps->groundTraceHistoryIndex;
-	if ( index < 0 || index >= PS_GROUND_TRACE_HISTORY ) {
-		return qfalse;
-	}
-
-	contactTime = pm->ps->groundTraceTimes[index];
-	if ( contactTime <= 0 || pm->cmd.serverTime < contactTime ) {
-		return qfalse;
-	}
-
-	timeDelta = pm->cmd.serverTime - contactTime;
-	return ( (float)timeDelta <= settings->jumpTimeDeltaMin ) ? qtrue : qfalse;
+	timeDelta = pm->cmd.serverTime - pm->ps->jumpTime;
+	return ( (float)timeDelta >= settings->jumpTimeDeltaMin ) ? qtrue : qfalse;
 }
 
 /*
@@ -350,7 +338,7 @@ static qboolean PM_CanStepJump( void ) {
 		return qfalse;
 	}
 
-	if ( !PM_HasRecentGroundContact( settings ) ) {
+	if ( !PM_HasSatisfiedStepJumpDelay( settings ) ) {
 		pm->cmd.upmove = 0;
 		return qfalse;
 	}
@@ -367,32 +355,13 @@ Returns whether the crouch-specific retail step-jump probe should run.
 */
 static qboolean PM_CanCrouchStepJump( void ) {
 	const pmove_settings_t	*settings;
-	qboolean		releaseRequired;
 
 	settings = PM_GetActiveSettings();
 	if ( !PM_CanProbeStepJump( settings ) ) {
 		return qfalse;
 	}
 
-	releaseRequired = PM_ShouldRequireStepJumpRelease( settings );
-
-	if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {
-		return qfalse;
-	}
-
 	if ( !settings->crouchStepJump ) {
-		return qfalse;
-	}
-
-	if ( pm->cmd.upmove < 10 ) {
-		return qfalse;
-	}
-
-	if ( releaseRequired && ( pm->ps->pm_flags & PMF_JUMP_HELD ) ) {
-		return qfalse;
-	}
-
-	if ( !PM_HasRecentGroundContact( settings ) ) {
 		return qfalse;
 	}
 
@@ -405,6 +374,10 @@ static qboolean PM_CanCrouchStepJump( void ) {
 	}
 
 	if ( pm->ps->velocity[2] < 0.0f ) {
+		return qfalse;
+	}
+
+	if ( !PM_HasSatisfiedStepJumpDelay( settings ) ) {
 		return qfalse;
 	}
 
@@ -452,13 +425,19 @@ static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight )
 	vec3_t		jumpProbeStart, jumpProbeEnd;
 	vec3_t		projectedEnd;
 	float		stepSize;
+	qboolean	jumpPadLaunchActive;
 
 	pml.stepUp = 0.0f;
 	VectorCopy (pm->ps->origin, start_o);
 	VectorCopy (pm->ps->velocity, start_v);
+	jumpPadLaunchActive = PM_IsJumpPadLaunchActive();
 
 	if ( PM_SlideMove( gravity ) == 0 ) {
 		return;		// we got exactly where we wanted to go first try	
+	}
+
+	if ( jumpPadLaunchActive && start_v[2] > 0.0f ) {
+		return;
 	}
 
 	if ( pm_airsteps <= 0 ) {
@@ -528,7 +507,6 @@ static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight )
 		float	stepFriction;
 		qboolean	canStepJump;
 		qboolean	canCrouchStepJump;
-		qboolean	useCrouchStepJump;
 
 		delta = pm->ps->origin[2] - start_o[2];
 		if ( delta > 2.0f ) {
@@ -547,7 +525,6 @@ static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight )
 
 		canStepJump = qfalse;
 		canCrouchStepJump = qfalse;
-		useCrouchStepJump = qfalse;
 		if ( delta > 0.0f ) {
 			canStepJump = PM_CanStepJump();
 			canCrouchStepJump = PM_CanCrouchStepJump();
@@ -562,12 +539,10 @@ static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight )
 			pm->trace( &trace, jumpProbeStart, pm->mins, pm->maxs, jumpProbeEnd, pm->ps->clientNum, pm->tracemask );
 
 			if ( !trace.allsolid && trace.fraction < 1.0f && trace.plane.normal[2] >= MIN_WALK_NORMAL ) {
-				if ( canCrouchStepJump && PM_CanPerformCrouchStepJump() ) {
-					useCrouchStepJump = qtrue;
-				}
-
-				if ( ( canStepJump || useCrouchStepJump ) && PM_CanStepJump() ) {
-					PM_ApplyStepJump( delta, useCrouchStepJump );
+				if ( canStepJump && PM_CanStepJump() ) {
+					PM_ApplyStepJump( delta, qfalse );
+				} else if ( canCrouchStepJump && PM_CanCrouchStepJump() && PM_CanPerformCrouchStepJump() ) {
+					PM_ApplyStepJump( delta, qtrue );
 				}
 			}
 		}

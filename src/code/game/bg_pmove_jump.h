@@ -12,7 +12,6 @@ retail jump timestamp and returns the observed time delta.
 static inline float PM_EvaluateJumpVelocityScale( const playerState_t *ps, const pmove_settings_t *settings, int commandTime, int *outTimeDelta ) {
 	int		timeDelta;
 	float		threshold;
-	float		offset;
 	float		scaleAdd;
 
 	if ( outTimeDelta ) {
@@ -24,7 +23,7 @@ static inline float PM_EvaluateJumpVelocityScale( const playerState_t *ps, const
 	}
 
 	timeDelta = -1;
-	if ( ps->jumpTime > 0 && commandTime >= ps->jumpTime ) {
+	if ( commandTime >= ps->jumpTime ) {
 		timeDelta = commandTime - ps->jumpTime;
 	}
 
@@ -37,12 +36,7 @@ static inline float PM_EvaluateJumpVelocityScale( const playerState_t *ps, const
 	}
 
 	threshold = settings->jumpVelocityTimeThreshold;
-	offset = settings->jumpVelocityTimeThresholdOffset;
 	scaleAdd = settings->jumpVelocityScaleAdd;
-
-	if ( offset != 0.0f ) {
-		threshold += offset;
-	}
 
 	if ( threshold <= 0.0f ) {
 		return 1.0f;
@@ -52,11 +46,15 @@ static inline float PM_EvaluateJumpVelocityScale( const playerState_t *ps, const
 		return 1.0f;
 	}
 
-	if ( (float)timeDelta > threshold ) {
+	if ( timeDelta <= 0 ) {
 		return 1.0f;
 	}
 
-	return 1.0f + scaleAdd;
+	if ( (float)timeDelta >= threshold ) {
+		return 1.0f;
+	}
+
+	return 1.0f + ( ( threshold - (float)timeDelta ) / threshold ) * scaleAdd;
 }
 
 #endif // BG_PMOVE_JUMP_H

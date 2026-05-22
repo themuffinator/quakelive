@@ -821,7 +821,7 @@ uint64_t G_ComputeConfigCustomSettingsMask( void ) {
 	if ( g_weaponConfig.grappleDamage != 10 ||
 		 g_weaponReloadConfig.grapplingHook != DEFAULT_WEAPON_RELOAD_GH ||
 		 g_weaponReloadConfig.hook != DEFAULT_WEAPON_RELOAD_HOOK ||
-		 g_weaponConfig.grappleSpeed != 800 ||
+		 g_weaponConfig.grappleSpeed != 1800 ||
 		 G_ConfigFloatDiffersFromDefault( g_knockbackConfig.grapplingHook, DEFAULT_KNOCKBACK_GH ) ||
 		 G_PmoveHasGrappleVelocityCustomSetting() ) {
 		mask |= CUSTOM_SETTING_GRAPPLING_HOOK;

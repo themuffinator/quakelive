@@ -1722,20 +1722,22 @@ void ClientEndFrame( gentity_t *ent ) {
 		invulnerabilityItemNum = invulnerabilityItem ? (int)( invulnerabilityItem - bg_itemlist ) : 0;
 
 		if ( ent->client->holdableInvulnerabilityTime > level.time ) {
-			ent->client->ps.playerItemTimeMax = 10000;
-			ent->client->ps.playerItemTime = ent->client->holdableInvulnerabilityTime - level.time;
+			ent->client->ps.stats[STAT_PLAYER_ITEM_TIME_MAX] = 10000;
+			ent->client->ps.stats[STAT_PLAYER_ITEM_TIME] = ent->client->holdableInvulnerabilityTime - level.time;
+			ent->client->ps.stats[STAT_PLAYER_ITEM_RECHARGE] = 0;
 			if ( invulnerabilityItemNum != 0 && ent->client->ps.stats[STAT_HOLDABLE_ITEM] == 0 ) {
 				ent->client->ps.stats[STAT_HOLDABLE_ITEM] = invulnerabilityItemNum;
 			}
 		} else {
 			if ( invulnerabilityItemNum != 0 &&
 				ent->client->ps.stats[STAT_HOLDABLE_ITEM] == invulnerabilityItemNum &&
-				ent->client->ps.playerItemTimeMax > 0 ) {
+				ent->client->ps.stats[STAT_PLAYER_ITEM_TIME_MAX] > 0 ) {
 				ent->client->ps.stats[STAT_HOLDABLE_ITEM] = 0;
 			}
 			ent->client->holdableInvulnerabilityTime = 0;
-			ent->client->ps.playerItemTimeMax = 0;
-			ent->client->ps.playerItemTime = 0;
+			ent->client->ps.stats[STAT_PLAYER_ITEM_TIME_MAX] = 0;
+			ent->client->ps.stats[STAT_PLAYER_ITEM_TIME] = 0;
+			ent->client->ps.stats[STAT_PLAYER_ITEM_RECHARGE] = 0;
 		}
 	}
 

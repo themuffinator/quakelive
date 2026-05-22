@@ -113,9 +113,8 @@ def test_factory_apply_resets_factory_managed_cvars_before_overrides() -> None:
 	assert "void G_PmoveResetFactoryManagedCvars( void );" in local_h
 	assert "void G_PmoveResetFactoryManagedCvars( void ) {" in pmove_c
 	assert 'trap_Cvar_Set( "pmove_AirControl", "0" );' in pmove_c
-	assert 'trap_Cvar_Set( "g_flightThrust", "0" );' in pmove_c
 	assert 'trap_Cvar_Set( "g_instaGib", "0" );' in pmove_c
-	assert 'trap_Cvar_Set( "g_velocity_gh", "800" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_velocity_gh", "1800" );' in pmove_c
 	assert 'trap_Cvar_Set( "g_ironsights_mg", "1.0" );' in pmove_c
 	assert 'trap_Cvar_Set( "g_quadHogPingRate", "0" );' in pmove_c
 	assert "g_pmove_force_update = qtrue;" in pmove_c
@@ -125,17 +124,37 @@ def test_factory_apply_resets_factory_managed_cvars_before_overrides() -> None:
 
 def test_factory_pmove_reset_tracks_every_nonlocal_pmove_input_surface() -> None:
 	pmove_c = _read("src/code/game/g_pmove.c")
+	g_main = _read("src/code/game/g_main.c")
+	config_c = _read("src/game/g_config.c")
 
-	assert "g_pmoveSettings.flightThrust = ( g_flightThrust.value > 0.0f ) ? g_flightThrust.value : 0.0f;" in pmove_c
 	assert "if ( g_instaGib.integer != 0 ) {" in pmove_c
-	assert "grappleSpeed = ( float )g_weaponConfig.grappleSpeed;" in pmove_c
+	assert "g_pmoveSettings.velocityGh = G_PmoveClampRetailMinPositive( g_pmove_velocityGh_cvar.value );" in pmove_c
+	assert "grappleSpeed = ( float )g_weaponConfig.grappleSpeed;" not in pmove_c
+	assert '{ &g_velocity_gh, "g_velocity_gh", "1800", 0, 0, qtrue, qfalse,' in g_main
+	assert 'g_weaponConfig.grappleSpeed = G_ReadWeaponCvarAtLeast( &g_velocity_gh, 1800, "g_velocity_gh", 1 );' in g_main
+	assert "g_weaponConfig.grappleSpeed != 1800" in config_c
 	assert "machinegunIronsightsScale = g_weaponConfig.machinegunIronsightsScale;" in pmove_c
 	assert "g_pmoveSettings.guidedRocketEnabled = ( g_weaponConfig.guidedRocketEnabled != 0 );" in pmove_c
 	assert "g_pmoveSettings.quadHogPingRateSeconds = g_weaponConfig.quadHogPingRateSeconds;" in pmove_c
-	assert 'trap_Cvar_Set( "g_velocity_gh", "800" );' in pmove_c
+	assert 'trap_Cvar_Set( "g_velocity_gh", "1800" );' in pmove_c
 	assert 'trap_Cvar_Set( "g_gauntletSpeedFactor", "1.0" );' in pmove_c
 	assert 'trap_Cvar_Set( "g_guidedRocket", "0" );' in pmove_c
 	assert 'trap_Cvar_Set( "g_quadHogTime", "0" );' in pmove_c
+
+
+def test_retail_flight_thrust_cvar_is_registered_but_not_a_pmove_input_surface() -> None:
+	bg_public = _read("src/code/game/bg_public.h")
+	bg_pmove = _read("src/code/game/bg_pmove.c")
+	g_main = _read("src/code/game/g_main.c")
+	pmove_c = _read("src/code/game/g_pmove.c")
+
+	assert '{ &g_flightThrust, "g_flightThrust", "1200", CVAR_ARCHIVE | CVAR_NORESTART' in g_main
+	assert "flightThrust" not in bg_public
+	assert "flightThrust" not in pmove_c
+	assert "g_flightThrust" not in pmove_c
+	fly_start = bg_pmove.index("static void PM_FlyMove( void )")
+	fly_end = bg_pmove.index("static void PM_AirMove", fly_start)
+	assert "flightThrust" not in bg_pmove[fly_start:fly_end]
 
 
 def test_factory_runes_are_gated_separately_from_map_powerups() -> None:

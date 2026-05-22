@@ -11,6 +11,7 @@ CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
 CL_MAIN = REPO_ROOT / "src" / "code" / "client" / "cl_main.c"
 CL_CONSOLE = REPO_ROOT / "src" / "code" / "client" / "cl_console.c"
 CL_KEYS = REPO_ROOT / "src" / "code" / "client" / "cl_keys.c"
+CL_SCRN = REPO_ROOT / "src" / "code" / "client" / "cl_scrn.c"
 VM_C = REPO_ROOT / "src" / "code" / "qcommon" / "vm.c"
 
 
@@ -234,6 +235,34 @@ def test_console_cell_geometry_and_alignment_match_retail_engine_scaling() -> No
 	assert "width = (int)( (float)cls.glconfig.vidWidth / ( scale * CONSOLE_CHAR_WIDTH ) - 2.0f );" in resize_block
 	assert "con.xadjust = 0;" in solid_block
 	assert "SCR_AdjustFrom640( &con.xadjust, NULL, NULL, NULL );" not in solid_block
+
+
+def test_screen_overlay_text_uses_retail_host_mono_lane() -> None:
+	source = CL_SCRN.read_text(encoding="utf-8")
+	draw_block = _block_from_marker(source, "void SCR_DrawStringExt")
+	big_block = _block_from_marker(source, "void SCR_DrawBigString( int x, int y, const char *s, float alpha )")
+	big_color_block = _block_from_marker(source, "void SCR_DrawBigStringColor( int x, int y, const char *s, vec4_t color )")
+	demo_block = _block_from_marker(source, "void SCR_DrawDemoRecording")
+
+	assert "#define\tSCREEN_OVERLAY_HOST_FONT_MONO\t2" in source
+	for expected in (
+		"xscale = cls.glconfig.vidWidth / 640.0f;",
+		"yscale = cls.glconfig.vidHeight / 480.0f;",
+		"screenX = (int)( x * xscale );",
+		"screenY = (int)( y * yscale );",
+		"RE_DrawScaledText( screenX, screenY, string, SCREEN_OVERLAY_HOST_FONT_MONO,",
+		"size * yscale, -1, NULL, forceColor, setColor );",
+	):
+		assert expected in draw_block
+
+	assert "SCR_DrawChar(" not in draw_block
+	assert "static void SCR_DrawChar" not in source
+	assert "while ( *s )" not in draw_block
+	assert "re.SetColor" not in draw_block
+	assert "SCR_DrawStringExt( x, y, BIGCHAR_WIDTH, s, color, qfalse );" in big_block
+	assert "SCR_DrawStringExt( x, y, BIGCHAR_WIDTH, s, color, qtrue );" in big_color_block
+	assert 'SCR_DrawStringExt( ( 80 - strlen( string ) ) * 4, 420, 8, string, g_color_table[7], qtrue );' in demo_block
+	assert 'SCR_DrawStringExt( 9, 477, 8, "REC", g_color_table[7], qtrue );' in demo_block
 
 
 def test_console_bootstrap_width_uses_retail_engine_cell_width() -> None:

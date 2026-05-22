@@ -4392,6 +4392,7 @@ void CheckTeamStatus(void) {
 					ent->client->pers.teamState.location = loc->health;
 				else
 					ent->client->pers.teamState.location = 0;
+				ent->client->ps.location = ent->client->pers.teamState.location;
 			}
 		}
 

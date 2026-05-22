@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BG_PMOVE_PATH = REPO_ROOT / "src" / "code" / "game" / "bg_pmove.c"
+G_PMOVE_PATH = REPO_ROOT / "src" / "code" / "game" / "g_pmove.c"
 
 
 def _function_body(pattern: str) -> str:
@@ -129,13 +130,23 @@ def test_jump_takeoff_clears_crouch_slide_timer() -> None:
 	assert "pm->ps->crouchSlideTime = 0;" in body
 
 
-def test_pmove_single_syncs_crouch_slide_feature_flag() -> None:
+def test_spawn_profile_helper_syncs_crouch_slide_feature_flag() -> None:
 	body = _function_body(
 		r"void PmoveSingle \(pmove_t \*pmove\) \s*\{(?P<body>.*?)^\}",
 	)
+	g_pmove = G_PMOVE_PATH.read_text(encoding="utf-8")
+	helper = re.search(
+		r"void G_PmoveApplyProfileFlags\( playerState_t \*ps \)\s*\{(?P<body>.*?)^\}",
+		g_pmove,
+		re.MULTILINE | re.DOTALL,
+	)
 
-	assert "settings = PM_GetActiveSettings();" in body
-	assert "if ( settings->crouchSlide ) {" in body
-	assert "pm->ps->pm_flags |= PMF_CROUCH_SLIDE;" in body
-	assert "pm->ps->pm_flags &= ~PMF_CROUCH_SLIDE;" in body
-	assert "pm->ps->crouchSlideTime = 0;" in body
+	assert helper is not None
+	helper_body = helper.group("body")
+
+	assert "pm->ps->pm_flags |= PMF_CROUCH_SLIDE;" not in body
+	assert "pm->ps->pm_flags &= ~PMF_CROUCH_SLIDE;" not in body
+	assert "if ( g_pmoveSettings.crouchSlide ) {" in helper_body
+	assert "ps->pm_flags |= PMF_CROUCH_SLIDE;" in helper_body
+	assert "ps->pm_flags &= ~( PMF_CROUCH_SLIDE | PMF_DOUBLE_JUMP | PMF_AIR_CONTROL );" in helper_body
+	assert "ps->crouchSlideTime = 0;" in helper_body

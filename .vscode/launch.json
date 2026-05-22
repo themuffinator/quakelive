@@ -43,8 +43,11 @@
 				"0"
 			],
 			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",
+			"console": "integratedTerminal",
+			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
 				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
+				"QLR_FULL_DUMP": "1",
 				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
 				"QL_DISABLE_STEAMWORKS": "1",
 				"QL_DISABLE_AWESOMIUM": "1"
@@ -90,8 +93,11 @@
 				"1"
 			],
 			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",
+			"console": "integratedTerminal",
+			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
-				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps"
+				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
+				"QLR_FULL_DUMP": "1"
 			},
 			"stopAtEntry": false
 		},
@@ -140,8 +146,11 @@
 				"ffa"
 			],
 			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",
+			"console": "integratedTerminal",
+			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
 				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
+				"QLR_FULL_DUMP": "1",
 				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
 				"QL_DISABLE_STEAMWORKS": "1",
 				"QL_DISABLE_AWESOMIUM": "1"
@@ -193,8 +202,11 @@
 				"ffa"
 			],
 			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",
+			"console": "integratedTerminal",
+			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
 				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
+				"QLR_FULL_DUMP": "1",
 				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
 				"QL_DISABLE_STEAMWORKS": "1",
 				"QL_DISABLE_AWESOMIUM": "1"
@@ -243,8 +255,70 @@
 				"ffa"
 			],
 			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",
+			"console": "integratedTerminal",
+			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
-				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps"
+				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
+				"QLR_FULL_DUMP": "1"
+			},
+			"stopAtEntry": false
+		},
+		{
+			"name": "Dedicated Server (Debug)",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}\\build\\win32\\Debug\\bin\\qzeroded.exe",
+			"preLaunchTask": "Build Debug",
+			"args": [
+				"+set",
+				"developer",
+				"1",
+				"+set",
+				"logfile",
+				"2",
+				"+set",
+				"g_logfile",
+				"1",
+				"+set",
+				"com_noErrorInterrupt",
+				"1",
+				"+set",
+				"dedicated",
+				"1",
+				"+set",
+				"fs_basepath",
+				"C:\\PROGRA~2\\Steam\\STEAMA~1\\common\\QUAKEL~1",
+				"+set",
+				"fs_cdpath",
+				"${workspaceFolder}\\build\\ui_bundle\\staging",
+				"+set",
+				"fs_homepath",
+				"${workspaceFolder}\\build\\win32\\Debug\\bin",
+				"+set",
+				"r_fullscreen",
+				"0",
+				"+set",
+				"r_norefresh",
+				"1",
+				"+set",
+				"s_initsound",
+				"0",
+				"+set",
+				"ui_browserAwesomium",
+				"0",
+				"+set",
+				"web_browserActive",
+				"0"
+			],
+			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",
+			"console": "integratedTerminal",
+			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
+			"env": {
+				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
+				"QLR_FULL_DUMP": "1",
+				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
+				"QL_DISABLE_STEAMWORKS": "1",
+				"QL_DISABLE_AWESOMIUM": "1"
 			},
 			"stopAtEntry": false
 		}

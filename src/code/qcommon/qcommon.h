@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/cm_public.h"
 #include "../../common/auth_credentials.h"
+#include "../../common/platform/platform_config.h"
 
 //#define	PRE_RELEASE_DEMO
 
@@ -236,6 +237,12 @@ PROTOCOL
 // NOTE: that stuff only works with two digits protocols
 extern int demo_protocols[];
 
+#define	PORT_SERVER			27960
+#define	NUM_SERVER_PORTS	4		// broadcast scan this many ports after
+									// PORT_SERVER so a single machine can
+									// run multiple servers
+
+#if QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES
 #define	UPDATE_SERVER_NAME	"update.quake3arena.com"
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
@@ -250,10 +257,7 @@ extern int demo_protocols[];
 #ifndef PORT_AUTHORIZE
 #define	PORT_AUTHORIZE		27952
 #endif
-#define	PORT_SERVER			27960
-#define	NUM_SERVER_PORTS	4		// broadcast scan this many ports after
-									// PORT_SERVER so a single machine can
-									// run multiple servers
+#endif
 
 
 // the svc_strings[] array in cl_parse.c should mirror this

@@ -389,7 +389,23 @@ This pass focused on the remaining shared pmove sidecar leaves and the Quake
 Live-only reward telemetry seam under `G_Damage` and the kill/round bonus
 paths. The PMove pair is backed by the previously mapped cgame movement corridor:
 the qagame bodies match the same retail constant-loader and 3D wish-vector
-builder already recovered on the client binary.
+builder already recovered on the client binary. The later dispatcher recheck of
+`PmoveSingle` at `0x10031FA0` also confirms the early dead-player trace-mask
+gate: retail clears `CONTENTS_BODY` only when health is non-positive and
+`PW_INVULNERABILITY` is inactive.
+
+The 2026-05-22 ground-trace source follow-up also rechecked qagame
+`0x10030ED0` and the adjacent `PM_CheckDuck` offset evidence. Retail does not
+replicate a ground-trace history or latest-normal cache in playerState; the
+ground resolver stores only `groundEntityNum`, while frame-local consumers read
+the current `pml.groundTrace`.
+
+The same 2026-05-22 playerState wiring pass rechecked the retail engine
+netfield table against qagame `PmoveSingle` at `0x10031FA0`. Source now matches
+the retail prefix offsets for `clientNum` (`0x88`), `location` (`0x8c`), and
+the signed command mirror bytes (`0x1dc..0x1de`), and the progress-backed
+holdable timer now uses stats offsets `0xe8`, `0xec`, and `0xf0` instead of
+source-only playerState sidecars.
 
 The combat batch closes the next reward transport boundary. HLIL preserves the
 weapon-specific `g_knockback_%s` selector used by `G_Damage`, the local-client
@@ -418,9 +434,93 @@ small helper that increments medal counters while latching the corresponding
 
 This pass focused on the retail-only PMove step-jump split and the adjacent
 Domination capture controller. The PMove trio remains descriptive because the
-current tree expresses the same behavior across `PM_CheckJump` and the newer
+current tree expresses the behavior across `PM_CheckJump` and the
 `PM_ApplyStepJump` wrapper, while the retail binary keeps the step-jump gates
-and jump takeoff body as separate adjacent leaves.
+and jump takeoff body as separate adjacent leaves. A later 2026-05-22 source
+follow-up restored the retail `cmd.serverTime - jumpTime` delay check and the
+separate crouch-step fallback after the general `PM_CanStepJump` recheck fails.
+The same follow-up series confirmed that both `PM_CanStepJump` and
+`PM_CheckJump` use only the compact `autoHop` slot for held-jump release bypass,
+leaving `bunnyHop` as separate movement tuning rather than release-gate wiring.
+A later jump-takeoff source pass rechecked qagame `0x1002E2C0` against the
+HLIL velocity-mode block and moved the reconstructed source away from the
+wrapper-side step-velocity add: normal chain jumps now use the retail gradient
+scaler, PMF_AIR_CONTROL uses the additive chain/step branch, and ramp jumps
+accumulate vertical velocity before the max clamp.
+The corrective 2026-05-22 step/chain audit then restored the missing normal
+step-jump latch into that same shared takeoff path, kept crouch-step on the
+step addend, let PMF_AIR_CONTROL override disabled `pmove_ChainJump` mode `0`,
+and pinned the post-offset air-control fade plus final max clamp with executable
+fixtures.
+The 2026-05-22 transport follow-up also restored `pmove_ChainJump` as an
+integer jump-mode selector rather than a boolean mirror, preserving the disabled
+mode `0`, gradient mode `1`, and additive mode `2` across server cvar caching,
+configstring publication, and cgame prediction parsing.
+The later pmove cvar registration pass walked the qagame cvar-table slab at
+`0x1008F7C4..0x1008FB20` and restored the exact retail default strings plus the
+four observed flag groups used by the `pmove_*` registrations:
+`0x00100000`, `0x00104000`, `0x00140000`, and `0x00144000`. The source keeps
+the split `g_pmove.c` owner, but the registration calls now preserve the retail
+high-bit flags for air-control, physics, no-player-clip, ramp/step jump, weapon
+switching, water scale, and grapple-velocity surfaces before the cached
+`pmove_settings_t` payload is published.
+The follow-up callback pass rechecked retail `G_RegisterCvars` at `0x10054920`,
+`G_InitPublishedCvarState` at `0x100549E0`, and `G_UpdateCvars` at
+`0x10054DD0`. The retail table entry layout is `vmCvar`, name, default, flags,
+modification count, callback; all pmove entries except `pmove_AirControl`,
+`pmove_CrouchSlide`, and `pmove_DoubleJump` have callback leaves. Source now
+mirrors that callback-backed update surface and carries over the three observed
+minimum-positive cache clamps for `pmove_velocity_gh`,
+`pmove_JumpVelocityTimeThreshold`, and
+`pmove_JumpVelocityTimeThresholdOffset`.
+The latest grapple-speed cross-check followed `PM_GrappleMove` at `0x1002FF20`
+back to cached global `data_1008FEC0`, which `G_InitPublishedCvarState` fills
+from the `pmove_velocity_gh` vmCvar with the same `0.001` lower bound. This is
+separate from retail `g_velocity_gh`, whose cvar-table default is `1800` and
+which feeds the hook projectile speed/custom-settings branch rather than the
+pmove pull velocity.
+The follow-up full-name sweep also classified the legacy fixed-timestep
+surfaces separately from the Quake Live pmove tuning slab: `pmove_fixed` and
+`pmove_msec` are not present in the recovered `0x1008F7C4..0x1008FB20`
+factory-managed table. Source keeps their GPL-era game/cgame registrations
+(`0` and `8`, with server-side `CVAR_SYSTEMINFO`), clamps `pmove_msec` into the
+retail-compatible `8..33` range before prediction, and passes the resulting
+fields into the shared `Pmove` loop where fixed moves chunk by `pmove_msec`
+instead of the normal 66 ms cap.
+The same pmove audit round added executable fixtures for the adjacent 3D leaves:
+`PM_CheckWaterJump` now has source-backed probes for the two-deep water,
+solid-lip, and clearance gates; `PM_WaterMove` pins the idle `-60` sink fallback;
+and `PM_CheckLadder` / `PM_LadderMove` pin the `MASK_PLAYERSOLID` ladder trace,
+`SURF_LADDER` latch, and `0.66 * speed` vertical clamp.
+A later dispatcher-tail fixture rechecked `PM_Weapon`, `PM_Animate`, and
+`PmoveSingle` tail ordering. Source stayed unchanged, while executable coverage
+now pins `PM_Animate` gesture priority, `EV_TAUNT` emission, voice-command
+priority order, 600 ms voice timers, and the active-torso-timer suppression
+gate.
+The following `PM_TorsoAnimation` pass rechecked qagame `0x1002DB80` and cgame
+`0x10002050`, then added executable coverage for the ready gauntlet
+`TORSO_STAND2` branch, default ready `TORSO_STAND` branch, torso-timer no-op,
+non-ready weaponstate return, and inherited `PM_DEAD` animation-start
+suppression.
+The next timer pass rechecked qagame `0x10031E30` and cgame `0x10006300`, with
+fixtures now pinning `PM_DropTimers` partial/expired misc-time behavior,
+`PMF_ALL_TIMES` clearing, independent legs/torso timer clamps, and the
+crouch-slide ground-plane decay gate.
+The queue-helper pass rechecked qagame `0x1002DAF0` / `0x1002DB20` and cgame
+`0x10001FC0` / `0x10001FF0`, with fixtures now pinning `PM_AddEvent` two-slot
+event wrapping with zero parms and `PM_AddTouchEnt` world-skip,
+duplicate-suppression, and `MAXTOUCH` cap behavior.
+The following animation-helper pass rechecked qagame `0x1002DB60`,
+`0x1002DBE0`, and `0x1002DC20` against the cgame twins at `0x10002030`,
+`0x100020B0`, and `0x100020F0`. Fixtures now pin torso toggle-bit writes,
+`PM_DEAD` suppression, legs/torso timer no-ops, current-animation no-ops, and
+the forced-legs timer clear before the live/dead start gate.
+The command/vector pass rechecked qagame `0x1002DC50`, `0x1002DEF0`,
+`0x1002E070`, and `0x1002E1F0` against the cgame twins at `0x10002120`,
+`0x100023C0`, `0x10002540`, and `0x100026C0`. Fixtures now pin
+`PM_ClipVelocity` overbounce branches, `PM_Accelerate` clamping and overspeed
+no-op behavior, `PM_CmdScale` zero/axial/2D/3D scaling, and
+`PM_SetMovementDir`'s eight-way ring plus idle side-strafe snaps.
 
 The Domination batch is likewise retail-only boundary recovery. HLIL preserves
 the delayed point activation callback queued by `SP_team_dom_point`, the helper
@@ -925,7 +1025,7 @@ utility helpers outside that widened control surface.
 - `G_CheckClientFlood` at `0x100341E0` is a descriptive retail-only split from the broader `ClientThink_real` path. It shares the same `floodCount` / `floodLastTime` state used by the current source tree, but unlike `g_cmds.c::G_FloodLimited` it drops over-limit clients directly from the active-client path instead of only rate-limiting commands.
 - `ClientThink_real` is a clean retail boundary at `0x10034C90`, and the surrounding `ClientEvents` (`0x10034860`) plus `StuckInOtherClient` (`0x10034B50`) splits are now settled.
 - `G_RunFactoryHealthRegen` at `0x10034260` and `G_RunFactoryArmorRegen` at `0x100342F0` are descriptive retail-only helpers keyed off a shared last-damage timestamp plus separate client-side accumulators/latches. The reconstructed tree now preserves the split helper flow, the retail spawn/damage latch-arming behavior, and the adjacent `ClientTimerActions` client-state names (`factoryRegenLastDamageTime`, `factoryRegenHealthAccumulatorMs`, `factoryRegenArmorAccumulatorMs`, `factoryRegenHealthPending`, `factoryRegenArmorPending`).
-- `ClientSpawn` at `0x1003BC30` is source-faithful on its outer boundary, and the current source now mirrors the recovered spawn-finalizer lane more directly by running the Red Rover override helper ahead of `G_FinalizeSpawnLoadout` while still keeping the broader GPL-shaped spawn bootstrap around that helper chain.
+- `ClientSpawn` at `0x1003BC30` is source-faithful on its outer boundary, and the current source now mirrors the recovered spawn-finalizer lane more directly by running the Red Rover override helper ahead of `G_FinalizeSpawnLoadout`, seeding the retail `PMF_CROUCH_SLIDE` / `PMF_DOUBLE_JUMP` / `PMF_AIR_CONTROL` movement-profile bits during spawn, and still keeping the broader GPL-shaped spawn bootstrap around that helper chain.
 - `DeathmatchScoreboardMessage` at `0x1003CBF0` remains source-faithful on its public role, and the current source now mirrors the retail helper-family split directly: compact fallback, duel, Race, TDM, Clan Arena, shared CTF-style, Freeze, Red Rover, and Overload serializers all feed the scoreboard sender through payload-builder helpers, the intermission-only `tdmstats` / `castats` / `ctfstats` publishers remain sequenced under that sender, and the duel serializer now caches the lower/higher live duel client numbers in `level + 0x1C08/+0x1C0C` instead of keeping that ordering purely local. The `castats` publisher uses the cgame-matched classic weapon order G, MG, SG, GL, RL, LG, RG, PG, BFG, grappling hook, NG, PL, CG, HMG.
 - `G_CAADRespawnAsSpectator` at `0x10035960` and `G_CAADResetClientForRound` at `0x10038160` are descriptive retail-only shared Clan Arena / Attack and Defend helpers. Retail keeps the per-client round reset and dead-player spectator-follow fallback in standalone helpers that the GPL-derived tree does not preserve with these exact boundaries.
 - `G_FinalizeSpawnLoadout` at `0x1003B5A0` is a descriptive retail-only recovery name. The current source now preserves the selected-weapon fallback latch directly through `client->sess.selectedSpawnWeapon`, keeps the shared ammo/weapon-mask seeding under that helper, and leaves the grant-script tail in the adjacent shared spawn helper instead of collapsing the whole path back into one large `ClientSpawn` block.

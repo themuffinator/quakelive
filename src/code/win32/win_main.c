@@ -37,6 +37,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <conio.h>
 #include <dbghelp.h>
 #include <signal.h>
+#include <tlhelp32.h>
 
 #define	CD_BASEDIR	"quake3"
 #define	CD_EXE		"quake3.exe"
@@ -47,6 +48,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 static char		sys_cmdline[MAX_STRING_CHARS];
 static char		sys_dumpPath[MAX_OSPATH];
 static LONG		sys_crashHandled;
+static LPTOP_LEVEL_EXCEPTION_FILTER	sys_previousExceptionFilter;
 
 // define this to use alternate spanking method
 // I found out that the regular way doesn't work on my box for some reason
@@ -1173,15 +1175,263 @@ void Sys_Net_Restart_f( void ) {
 
 /*
 ==================
+Sys_WriteCrashLogText
+==================
+*/
+static void Sys_WriteCrashLogText( HANDLE logFile, const char *text ) {
+	DWORD written;
+
+	if ( logFile == INVALID_HANDLE_VALUE || !text || !text[0] ) {
+		return;
+	}
+
+	WriteFile( logFile, text, (DWORD)strlen( text ), &written, NULL );
+}
+
+/*
+==================
+Sys_WriteCrashLogf
+==================
+*/
+static void QDECL Sys_WriteCrashLogf( HANDLE logFile, const char *fmt, ... ) {
+	va_list argptr;
+	char message[2048];
+
+	if ( logFile == INVALID_HANDLE_VALUE || !fmt ) {
+		return;
+	}
+
+	va_start( argptr, fmt );
+	Q_vsnprintf( message, sizeof( message ), fmt, argptr );
+	va_end( argptr );
+	message[sizeof( message ) - 1] = '\0';
+
+	Sys_WriteCrashLogText( logFile, message );
+}
+
+/*
+==================
+Sys_ExceptionName
+==================
+*/
+static const char *Sys_ExceptionName( DWORD exceptionCode ) {
+	switch ( exceptionCode ) {
+	case EXCEPTION_ACCESS_VIOLATION:
+		return "EXCEPTION_ACCESS_VIOLATION";
+	case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+		return "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+	case EXCEPTION_BREAKPOINT:
+		return "EXCEPTION_BREAKPOINT";
+	case EXCEPTION_DATATYPE_MISALIGNMENT:
+		return "EXCEPTION_DATATYPE_MISALIGNMENT";
+	case EXCEPTION_FLT_DENORMAL_OPERAND:
+		return "EXCEPTION_FLT_DENORMAL_OPERAND";
+	case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+		return "EXCEPTION_FLT_DIVIDE_BY_ZERO";
+	case EXCEPTION_FLT_INEXACT_RESULT:
+		return "EXCEPTION_FLT_INEXACT_RESULT";
+	case EXCEPTION_FLT_INVALID_OPERATION:
+		return "EXCEPTION_FLT_INVALID_OPERATION";
+	case EXCEPTION_FLT_OVERFLOW:
+		return "EXCEPTION_FLT_OVERFLOW";
+	case EXCEPTION_FLT_STACK_CHECK:
+		return "EXCEPTION_FLT_STACK_CHECK";
+	case EXCEPTION_FLT_UNDERFLOW:
+		return "EXCEPTION_FLT_UNDERFLOW";
+	case EXCEPTION_ILLEGAL_INSTRUCTION:
+		return "EXCEPTION_ILLEGAL_INSTRUCTION";
+	case EXCEPTION_IN_PAGE_ERROR:
+		return "EXCEPTION_IN_PAGE_ERROR";
+	case EXCEPTION_INT_DIVIDE_BY_ZERO:
+		return "EXCEPTION_INT_DIVIDE_BY_ZERO";
+	case EXCEPTION_INT_OVERFLOW:
+		return "EXCEPTION_INT_OVERFLOW";
+	case EXCEPTION_INVALID_DISPOSITION:
+		return "EXCEPTION_INVALID_DISPOSITION";
+	case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+		return "EXCEPTION_NONCONTINUABLE_EXCEPTION";
+	case EXCEPTION_PRIV_INSTRUCTION:
+		return "EXCEPTION_PRIV_INSTRUCTION";
+	case EXCEPTION_SINGLE_STEP:
+		return "EXCEPTION_SINGLE_STEP";
+	case EXCEPTION_STACK_OVERFLOW:
+		return "EXCEPTION_STACK_OVERFLOW";
+	case 0xE0000001:
+		return "QL_INVALID_PARAMETER";
+	case 0xE0000002:
+		return "QL_PURECALL";
+	case 0xE0000101:
+		return "QL_SIGABRT";
+	case 0xE0000105:
+		return "QL_SIGTERM";
+	case 0xE00001FF:
+		return "QL_SIGNAL";
+	default:
+		return "UNKNOWN_EXCEPTION";
+	}
+}
+
+/*
+==================
+Sys_GetCrashDumpType
+==================
+*/
+static MINIDUMP_TYPE Sys_GetCrashDumpType( void ) {
+	const char *fullDump;
+	DWORD dumpType;
+
+	dumpType = MiniDumpWithDataSegs
+		| MiniDumpWithHandleData
+		| MiniDumpWithIndirectlyReferencedMemory
+		| MiniDumpScanMemory
+		| MiniDumpWithProcessThreadData
+		| MiniDumpWithThreadInfo
+		| MiniDumpWithUnloadedModules;
+
+	fullDump = getenv( "QLR_FULL_DUMP" );
+	if ( fullDump && fullDump[0] && fullDump[0] != '0' ) {
+		dumpType |= MiniDumpWithFullMemory;
+	}
+
+	return (MINIDUMP_TYPE)dumpType;
+}
+
+/*
+==================
+Sys_WriteCrashModuleList
+==================
+*/
+static void Sys_WriteCrashModuleList( HANDLE logFile ) {
+	HANDLE snapshot;
+	MODULEENTRY32 moduleEntry;
+
+	snapshot = CreateToolhelp32Snapshot( TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, GetCurrentProcessId() );
+	if ( snapshot == INVALID_HANDLE_VALUE ) {
+		Sys_WriteCrashLogf( logFile, "Loaded modules: unavailable (GetLastError=%lu)\r\n", GetLastError() );
+		return;
+	}
+
+	memset( &moduleEntry, 0, sizeof( moduleEntry ) );
+	moduleEntry.dwSize = sizeof( moduleEntry );
+
+	Sys_WriteCrashLogText( logFile, "\r\nLoaded modules:\r\n" );
+	if ( Module32First( snapshot, &moduleEntry ) ) {
+		do {
+			Sys_WriteCrashLogf( logFile, "  %p-%p %s (%s)\r\n",
+				moduleEntry.modBaseAddr,
+				moduleEntry.modBaseAddr + moduleEntry.modBaseSize,
+				moduleEntry.szModule,
+				moduleEntry.szExePath );
+			moduleEntry.dwSize = sizeof( moduleEntry );
+		} while ( Module32Next( snapshot, &moduleEntry ) );
+	}
+
+	CloseHandle( snapshot );
+}
+
+/*
+==================
+Sys_WriteCrashLog
+==================
+*/
+static void Sys_WriteCrashLog( HANDLE logFile, const char *dumpName, MINIDUMP_TYPE dumpType,
+	const EXCEPTION_POINTERS *exceptionInfo ) {
+	SYSTEMTIME localTime;
+	EXCEPTION_RECORD *exceptionRecord;
+	CONTEXT *contextRecord;
+	char exeName[MAX_OSPATH];
+	DWORD exeNameLength;
+	DWORD exceptionCode;
+	int i;
+
+	if ( logFile == INVALID_HANDLE_VALUE ) {
+		return;
+	}
+
+	GetLocalTime( &localTime );
+	exeName[0] = '\0';
+	exeNameLength = GetModuleFileNameA( NULL, exeName, sizeof( exeName ) );
+	if ( exeNameLength >= sizeof( exeName ) ) {
+		exeName[sizeof( exeName ) - 1] = '\0';
+	}
+
+	exceptionRecord = exceptionInfo ? exceptionInfo->ExceptionRecord : NULL;
+	contextRecord = exceptionInfo ? exceptionInfo->ContextRecord : NULL;
+	exceptionCode = exceptionRecord ? exceptionRecord->ExceptionCode : 0;
+
+	Sys_WriteCrashLogText( logFile, "QuakeLive-reverse crash report\r\n" );
+	Sys_WriteCrashLogf( logFile, "Timestamp: %04d-%02d-%02d %02d:%02d:%02d.%03d\r\n",
+		localTime.wYear, localTime.wMonth, localTime.wDay,
+		localTime.wHour, localTime.wMinute, localTime.wSecond, localTime.wMilliseconds );
+	Sys_WriteCrashLogf( logFile, "Executable: %s\r\n", exeName );
+	Sys_WriteCrashLogf( logFile, "Process ID: %lu\r\n", GetCurrentProcessId() );
+	Sys_WriteCrashLogf( logFile, "Thread ID: %lu\r\n", GetCurrentThreadId() );
+	Sys_WriteCrashLogf( logFile, "Debugger attached: %s\r\n", IsDebuggerPresent() ? "yes" : "no" );
+	Sys_WriteCrashLogf( logFile, "Dump path: %s\r\n", dumpName ? dumpName : "(none)" );
+	Sys_WriteCrashLogf( logFile, "Dump type: 0x%08lx\r\n", (unsigned long)dumpType );
+	Sys_WriteCrashLogf( logFile, "Exception: %s (0x%08lx)\r\n", Sys_ExceptionName( exceptionCode ), exceptionCode );
+
+	if ( exceptionRecord ) {
+		Sys_WriteCrashLogf( logFile, "Exception address: %p\r\n", exceptionRecord->ExceptionAddress );
+		Sys_WriteCrashLogf( logFile, "Exception flags: 0x%08lx\r\n", exceptionRecord->ExceptionFlags );
+		Sys_WriteCrashLogf( logFile, "Exception parameters: %lu\r\n", exceptionRecord->NumberParameters );
+		for ( i = 0; i < (int)exceptionRecord->NumberParameters && i < EXCEPTION_MAXIMUM_PARAMETERS; i++ ) {
+			Sys_WriteCrashLogf( logFile, "  Parameter[%d]: 0x%p\r\n", i, (void *)exceptionRecord->ExceptionInformation[i] );
+		}
+		if ( exceptionCode == EXCEPTION_ACCESS_VIOLATION && exceptionRecord->NumberParameters >= 2 ) {
+			const char *operation;
+
+			operation = "read";
+			if ( exceptionRecord->ExceptionInformation[0] == 1 ) {
+				operation = "write";
+			} else if ( exceptionRecord->ExceptionInformation[0] == 8 ) {
+				operation = "execute";
+			}
+			Sys_WriteCrashLogf( logFile, "Access violation: %s at 0x%p\r\n",
+				operation, (void *)exceptionRecord->ExceptionInformation[1] );
+		}
+	}
+
+	if ( contextRecord ) {
+#if defined(_M_IX86)
+		Sys_WriteCrashLogText( logFile, "\r\nRegisters:\r\n" );
+		Sys_WriteCrashLogf( logFile, "  EAX=%08lx EBX=%08lx ECX=%08lx EDX=%08lx\r\n",
+			contextRecord->Eax, contextRecord->Ebx, contextRecord->Ecx, contextRecord->Edx );
+		Sys_WriteCrashLogf( logFile, "  ESI=%08lx EDI=%08lx EBP=%08lx ESP=%08lx\r\n",
+			contextRecord->Esi, contextRecord->Edi, contextRecord->Ebp, contextRecord->Esp );
+		Sys_WriteCrashLogf( logFile, "  EIP=%08lx EFlags=%08lx\r\n",
+			contextRecord->Eip, contextRecord->EFlags );
+#elif defined(_M_X64)
+		Sys_WriteCrashLogText( logFile, "\r\nRegisters:\r\n" );
+		Sys_WriteCrashLogf( logFile, "  RAX=%016llx RBX=%016llx RCX=%016llx RDX=%016llx\r\n",
+			contextRecord->Rax, contextRecord->Rbx, contextRecord->Rcx, contextRecord->Rdx );
+		Sys_WriteCrashLogf( logFile, "  RSI=%016llx RDI=%016llx RBP=%016llx RSP=%016llx\r\n",
+			contextRecord->Rsi, contextRecord->Rdi, contextRecord->Rbp, contextRecord->Rsp );
+		Sys_WriteCrashLogf( logFile, "  RIP=%016llx EFlags=%08lx\r\n",
+			contextRecord->Rip, contextRecord->EFlags );
+#endif
+	}
+
+	Sys_WriteCrashModuleList( logFile );
+}
+
+/*
+==================
 Sys_UnhandledExceptionFilter
 ==================
 */
 static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *exceptionInfo ) {
 	HANDLE dumpFile;
+	HANDLE logFile;
 	SYSTEMTIME localTime;
 	MINIDUMP_EXCEPTION_INFORMATION dumpInfo;
 	MINIDUMP_TYPE dumpType;
+	char crashBaseName[MAX_OSPATH];
 	char dumpName[MAX_OSPATH];
+	char logName[MAX_OSPATH];
+	BOOL dumpWritten;
+	DWORD dumpError;
+	LONG previousAction;
 
 	if ( !sys_dumpPath[0] ) {
 		return EXCEPTION_CONTINUE_SEARCH;
@@ -1192,14 +1442,32 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *exceptionIn
 	}
 
 	GetLocalTime( &localTime );
-	Com_sprintf( dumpName, sizeof( dumpName ),
-		"%s\\quakelive_steam_%04d%02d%02d_%02d%02d%02d_%03d.dmp",
+	Com_sprintf( crashBaseName, sizeof( crashBaseName ),
+		"%s\\quakelive_steam_%04d%02d%02d_%02d%02d%02d_%03d",
 		sys_dumpPath,
 		localTime.wYear, localTime.wMonth, localTime.wDay,
 		localTime.wHour, localTime.wMinute, localTime.wSecond, localTime.wMilliseconds );
+	Com_sprintf( dumpName, sizeof( dumpName ), "%s.dmp", crashBaseName );
+	Com_sprintf( logName, sizeof( logName ), "%s.log", crashBaseName );
+
+	dumpType = Sys_GetCrashDumpType();
+
+	logFile = CreateFileA( logName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
+	Sys_WriteCrashLog( logFile, dumpName, dumpType, exceptionInfo );
 
 	dumpFile = CreateFileA( dumpName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
 	if ( dumpFile == INVALID_HANDLE_VALUE ) {
+		Sys_WriteCrashLogf( logFile, "\r\nMiniDumpWriteDump: failed to create dump file (GetLastError=%lu)\r\n",
+			GetLastError() );
+		if ( logFile != INVALID_HANDLE_VALUE ) {
+			CloseHandle( logFile );
+		}
+		if ( sys_previousExceptionFilter ) {
+			previousAction = sys_previousExceptionFilter( exceptionInfo );
+			if ( previousAction != EXCEPTION_CONTINUE_SEARCH ) {
+				return previousAction;
+			}
+		}
 		return EXCEPTION_CONTINUE_SEARCH;
 	}
 
@@ -1207,9 +1475,25 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *exceptionIn
 	dumpInfo.ExceptionPointers = exceptionInfo;
 	dumpInfo.ClientPointers = FALSE;
 
-	dumpType = (MINIDUMP_TYPE)( MiniDumpWithIndirectlyReferencedMemory | MiniDumpScanMemory );
-	MiniDumpWriteDump( GetCurrentProcess(), GetCurrentProcessId(), dumpFile, dumpType, &dumpInfo, NULL, NULL );
+	dumpWritten = MiniDumpWriteDump( GetCurrentProcess(), GetCurrentProcessId(), dumpFile, dumpType, &dumpInfo, NULL, NULL );
+	dumpError = dumpWritten ? 0 : GetLastError();
 	CloseHandle( dumpFile );
+
+	Sys_WriteCrashLogf( logFile, "\r\nMiniDumpWriteDump: %s", dumpWritten ? "succeeded" : "failed" );
+	if ( !dumpWritten ) {
+		Sys_WriteCrashLogf( logFile, " (GetLastError=%lu)", dumpError );
+	}
+	Sys_WriteCrashLogText( logFile, "\r\n" );
+	if ( logFile != INVALID_HANDLE_VALUE ) {
+		CloseHandle( logFile );
+	}
+
+	if ( sys_previousExceptionFilter ) {
+		previousAction = sys_previousExceptionFilter( exceptionInfo );
+		if ( previousAction != EXCEPTION_CONTINUE_SEARCH ) {
+			return previousAction;
+		}
+	}
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }
@@ -1315,7 +1599,7 @@ static void Sys_InitCrashDumps( void ) {
 		}
 		Sys_Mkdir( sys_dumpPath );
 		sys_crashHandled = 0;
-		SetUnhandledExceptionFilter( Sys_UnhandledExceptionFilter );
+		sys_previousExceptionFilter = SetUnhandledExceptionFilter( Sys_UnhandledExceptionFilter );
 		_set_abort_behavior( 0, _CALL_REPORTFAULT | _WRITE_ABORT_MSG );
 		_set_invalid_parameter_handler( Sys_InvalidParameterHandler );
 		_set_purecall_handler( Sys_PureCallHandler );

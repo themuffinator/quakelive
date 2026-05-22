@@ -23,6 +23,7 @@ def test_crouch_slide_friction_uses_constant_scale() -> None:
 	assert "friction = settings->crouchSlideFriction;" in body
 	assert "pm->cmd.upmove < 0" in body
 	assert "pm->ps->crouchSlideTime > 0" in body
+	assert "&& settings->crouchSlide" not in body
 	assert "frictionScale" not in body
 	assert "targetScale" not in body
 	assert "slideDuration" not in body

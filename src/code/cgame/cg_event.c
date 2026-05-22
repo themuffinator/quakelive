@@ -1466,7 +1466,7 @@ static void CG_Obituary( entityState_t *ent ) {
 			s = va("You fragged %s", targetName );
 		}
 		if (!(cg_singlePlayerActive.integer && cg_cameraOrbit.integer)) {
-			CG_CenterPrint( s, SCREEN_HEIGHT * 0.30f, 0.3f );
+			CG_CenterPrint( s, ( cg.warmup == 0 ) ? 90 : 144, 0.3f );
 		} 
 
 		// print the text message as well

@@ -8,6 +8,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BG_PMOVE_PATH = REPO_ROOT / "src" / "code" / "game" / "bg_pmove.c"
 BG_PUBLIC_PATH = REPO_ROOT / "src" / "code" / "game" / "bg_public.h"
+G_CLIENT_PATH = REPO_ROOT / "src" / "code" / "game" / "g_client.c"
+G_LOCAL_PATH = REPO_ROOT / "src" / "code" / "game" / "g_local.h"
+G_PMOVE_PATH = REPO_ROOT / "src" / "code" / "game" / "g_pmove.c"
+CG_SERVERCMDS_PATH = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 CLEAN_PMOVE_HEADER_PATH = REPO_ROOT / "src-re" / "clean" / "include" / "qlr_game_pmove.h"
 CLEAN_PMOVE_SOURCE_PATH = REPO_ROOT / "src-re" / "clean" / "gameplay" / "pmove.c"
 SYMBOL_MAP_DIR = REPO_ROOT / "references" / "symbol-maps"
@@ -16,7 +20,7 @@ SYMBOL_MAP_DIR = REPO_ROOT / "references" / "symbol-maps"
 def _function_body(signature: str) -> str:
 	source = BG_PMOVE_PATH.read_text(encoding="utf-8")
 	match = re.search(
-		rf"(?:static )?(?:qboolean|void) {re.escape(signature)}\s*\([^)]*\)\s*\{{(?P<body>.*?)^\}}",
+		rf"(?:static )?(?:float|qboolean|void) {re.escape(signature)}\s*\([^)]*\)\s*\{{(?P<body>.*?)^\}}",
 		source,
 		re.MULTILINE | re.DOTALL,
 	)
@@ -32,6 +36,22 @@ def _symbol_comment(map_name: str, normalized_name: str) -> str:
 			return entry["comment"]
 
 	raise AssertionError(f"{normalized_name} missing from {map_name} symbol map")
+
+
+def _body_from_source(path: Path, signature: str) -> str:
+	source = path.read_text(encoding="utf-8")
+	start = source.index(signature)
+	brace = source.index("{", start)
+	depth = 1
+	position = brace + 1
+	while depth > 0:
+		if source[position] == "{":
+			depth += 1
+		elif source[position] == "}":
+			depth -= 1
+		position += 1
+
+	return source[brace + 1 : position - 1]
 
 
 def test_pmove_surface_drops_the_source_only_parameter_block() -> None:
@@ -79,6 +99,8 @@ def test_retail_pmove_flag_bits_match_the_committed_hlil_layout() -> None:
 def test_load_move_tuning_constants_restores_the_retail_air_control_bundles() -> None:
 	source = BG_PMOVE_PATH.read_text(encoding="utf-8")
 	body = _function_body("PM_LoadMoveTuningConstants")
+	mode_body = _function_body("PM_UpdateJumpVelocityMode")
+	takeoff_body = _function_body("PM_EvaluateJumpTakeoffVelocity")
 
 	assert "static const pmove_tuning_constants_t\tpm_retailDefaultTuning" in source
 	assert "static const pmove_tuning_constants_t\tpm_retailAirControlTuning" in source
@@ -91,6 +113,12 @@ def test_load_move_tuning_constants_restores_the_retail_air_control_bundles() ->
 	assert ".airSteps = 3," in source
 	assert ".wishSpeed = 35.0f," in source
 	assert "airControlTuning = ( pm->ps->pm_flags & PMF_AIR_CONTROL ) ? qtrue : qfalse;" in body
+	assert "PM_UpdateJumpVelocityMode( settings );" in body
+	assert "PM_JUMP_VELOCITY_MODE_AIR_CONTROL" in source
+	assert mode_body.index("if ( airControlTuning ) {") < mode_body.index("chainJumpMode = settings->chainJump;")
+	assert "pm_jumpVelocityMode = PM_JUMP_VELOCITY_MODE_AIR_CONTROL;" in mode_body
+	assert "fadeWindow = threshold - offsetThreshold;" in takeoff_body
+	assert "stepJumpActive ? settings->stepJumpVelocity : settings->chainJumpVelocity" in takeoff_body
 	assert "pm_accelerate = PM_LoadMoveTuningFloat(" in body
 	assert "pm_airaccelerate = PM_LoadMoveTuningFloat(" in body
 	assert "pm_aircontrol = PM_LoadMoveTuningFloat(" in body
@@ -101,12 +129,123 @@ def test_load_move_tuning_constants_restores_the_retail_air_control_bundles() ->
 	assert "PM_LoadMoveSettings();" in body
 
 
+def test_pmove_configstring_uses_the_retail_compact_token_order() -> None:
+	serialize_body = _body_from_source(
+		G_PMOVE_PATH,
+		"static qboolean G_PmoveSerializeSettings( const pmove_settings_t *settings, char *buffer, size_t bufferSize )",
+	)
+	parse_body = _body_from_source(
+		CG_SERVERCMDS_PATH,
+		"static qboolean CG_ParsePmoveCompactSettingsPayload( const char *payload, pmove_settings_t *settings )",
+	)
+	cg_servercmds_source = CG_SERVERCMDS_PATH.read_text(encoding="utf-8")
+	required_tokens = [
+		"settings->airAccel",
+		"settings->airStepFriction",
+		"settings->airSteps",
+		"settings->airStopAccel",
+		"settings->autoHop ? 1 : 0",
+		"settings->bunnyHop ? 1 : 0",
+		"settings->chainJump",
+		"(int)settings->chainJumpVelocity",
+		"settings->circleStrafeFriction",
+		"settings->crouchSlideFriction",
+		"settings->crouchSlideTime",
+		"settings->crouchStepJump ? 1 : 0",
+		"settings->jumpTimeDeltaMin",
+		"settings->jumpVelocity",
+		"settings->jumpVelocityMax",
+		"settings->jumpVelocityScaleAdd",
+		"settings->jumpVelocityTimeThreshold",
+		"settings->jumpVelocityTimeThresholdOffset",
+		"settings->noPlayerClip ? 1 : 0",
+		"settings->rampJump ? 1 : 0",
+		"settings->rampJumpScale",
+		"settings->stepHeight",
+		"settings->stepJump ? 1 : 0",
+		"settings->stepJumpVelocity",
+		"settings->strafeAccel",
+		"settings->velocityGh",
+		"settings->walkAccel",
+		"settings->walkFriction",
+		"settings->waterSwimScale",
+		"settings->waterWadeScale",
+		"settings->weaponDropTime",
+		"settings->weaponRaiseTime",
+		"settings->wishSpeed",
+	]
+	parse_tokens = [
+		"PMOVE_COMPACT_FLOAT( airAccel );",
+		"PMOVE_COMPACT_FLOAT( airStepFriction );",
+		"PMOVE_COMPACT_INT( airSteps );",
+		"PMOVE_COMPACT_FLOAT( airStopAccel );",
+		"PMOVE_COMPACT_BOOL( autoHop );",
+		"PMOVE_COMPACT_BOOL( bunnyHop );",
+		"PMOVE_COMPACT_INT( chainJump );",
+		"parsed.chainJumpVelocity = (float)integerValue;",
+		"PMOVE_COMPACT_FLOAT( circleStrafeFriction );",
+		"PMOVE_COMPACT_FLOAT( crouchSlideFriction );",
+		"PMOVE_COMPACT_INT( crouchSlideTime );",
+		"PMOVE_COMPACT_BOOL( crouchStepJump );",
+		"PMOVE_COMPACT_FLOAT( jumpTimeDeltaMin );",
+		"PMOVE_COMPACT_FLOAT( jumpVelocity );",
+		"PMOVE_COMPACT_FLOAT( jumpVelocityMax );",
+		"PMOVE_COMPACT_FLOAT( jumpVelocityScaleAdd );",
+		"PMOVE_COMPACT_FLOAT( jumpVelocityTimeThreshold );",
+		"PMOVE_COMPACT_FLOAT( jumpVelocityTimeThresholdOffset );",
+		"PMOVE_COMPACT_BOOL( noPlayerClip );",
+		"PMOVE_COMPACT_BOOL( rampJump );",
+		"PMOVE_COMPACT_FLOAT( rampJumpScale );",
+		"PMOVE_COMPACT_FLOAT( stepHeight );",
+		"PMOVE_COMPACT_BOOL( stepJump );",
+		"PMOVE_COMPACT_FLOAT( stepJumpVelocity );",
+		"PMOVE_COMPACT_FLOAT( strafeAccel );",
+		"PMOVE_COMPACT_FLOAT( velocityGh );",
+		"PMOVE_COMPACT_FLOAT( walkAccel );",
+		"PMOVE_COMPACT_FLOAT( walkFriction );",
+		"PMOVE_COMPACT_FLOAT( waterSwimScale );",
+		"PMOVE_COMPACT_FLOAT( waterWadeScale );",
+		"PMOVE_COMPACT_INT( weaponDropTime );",
+		"PMOVE_COMPACT_INT( weaponRaiseTime );",
+		"PMOVE_COMPACT_FLOAT( wishSpeed );",
+	]
+	position = -1
+
+	assert "JSON payload" not in serialize_body
+	assert "weaponReloadTimes" not in serialize_body
+	assert "Retail cgame consumes only the first 33 tokens." in serialize_body
+	assert "Retail cgame consumes the first\n33 tokens" in cg_servercmds_source
+	assert "CG_ParsePmoveJsonSettingsPayload" in cg_servercmds_source
+
+	for token in required_tokens:
+		next_position = serialize_body.index(token, position + 1)
+		assert next_position > position
+		position = next_position
+
+	position = -1
+	for token in parse_tokens:
+		next_position = parse_body.index(token, position + 1)
+		assert next_position > position
+		position = next_position
+
+	assert parse_body.index("PMOVE_COMPACT_FLOAT( wishSpeed );") < parse_body.index("PMOVE_COMPACT_FLOAT( airControl );")
+	assert parse_body.index("PMOVE_COMPACT_BOOL( crouchSlide );") < parse_body.index("PMOVE_COMPACT_BOOL( doubleJump );")
+	assert "flightThrust" not in serialize_body
+	assert "flightThrust" not in parse_body
+	assert "CG_ClampPmoveNonNegative( &parsed.jumpVelocityTimeThreshold );" in parse_body
+	assert "CG_ClampPmoveNonNegative( &parsed.jumpVelocityTimeThresholdOffset );" in parse_body
+	assert "CG_ClampPmoveNonNegative( &parsed.velocityGh );" in parse_body
+
+
 def test_jump_release_override_uses_the_recovered_cg_autohop_flag() -> None:
 	body = _function_body("PM_ShouldRequireJumpRelease")
 	prepare_body = _function_body("PM_PrepareJumpTakeoff")
 
 	assert "pm->ps->pm_flags & PMF_REQUIRE_JUMP_RELEASE" in body
 	assert body.index("PMF_REQUIRE_JUMP_RELEASE") < body.index("activeSettings = settings ? settings : PM_GetActiveSettings();")
+	assert "activeSettings->autoHop" in body
+	assert "activeSettings->bunnyHop" not in body
+	assert "pm_bunnyhop" not in body
 	assert "releaseRequired = PM_ShouldRequireJumpRelease( settings );" in prepare_body
 	assert "if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {" in prepare_body
 	assert prepare_body.index("releaseRequired = PM_ShouldRequireJumpRelease( settings );") < prepare_body.index("PMF_RESPAWNED")
@@ -123,9 +262,12 @@ def test_build_wish_move_3d_uses_the_shared_retail_axis_builder() -> None:
 
 def test_3d_move_paths_share_the_retail_wish_builder() -> None:
 	source = BG_PMOVE_PATH.read_text(encoding="utf-8")
+	fly_body = _function_body("PM_FlyMove")
 
 	assert source.count("PM_BuildWishMove3D( wishdir, &wishspeed )") >= 4
 	assert "VectorSet( wishdir, 0.0f, 0.0f, -1.0f );" in source
+	assert "PM_GetActiveSettings" not in fly_body
+	assert "flightThrust" not in fly_body
 
 
 def test_pm_accelerate_stays_on_the_generic_retail_body() -> None:
@@ -138,6 +280,34 @@ def test_pm_accelerate_stays_on_the_generic_retail_body() -> None:
 	assert "pm_airstopaccelerate" not in body
 	assert "pm_strafeaccelerate" not in body
 	assert "airborneMove" not in body
+
+
+def test_command_vector_helpers_keep_retail_math_contracts() -> None:
+	clip_body = _function_body("PM_ClipVelocity")
+	accelerate_body = _function_body("PM_Accelerate")
+	cmdscale_body = _body_from_source(BG_PMOVE_PATH, "static float PM_CmdScale( usercmd_t *cmd )")
+	movement_dir_body = _function_body("PM_SetMovementDir")
+
+	assert "backoff = DotProduct (in, normal);" in clip_body
+	assert "backoff *= overbounce;" in clip_body
+	assert "backoff /= overbounce;" in clip_body
+	assert "out[i] = in[i] - change;" in clip_body
+	assert "accelSpeed = accel * pml.frametime * wishspeed;" in accelerate_body
+	assert "if ( accelSpeed > addSpeed )" in accelerate_body
+	assert "pm->ps->velocity[i] += accelSpeed * wishdir[i];" in accelerate_body
+	assert "max = abs( cmd->forwardmove );" in cmdscale_body
+	assert "total = sqrt( cmd->forwardmove * cmd->forwardmove" in cmdscale_body
+	assert "scale = (float)pm->ps->speed * max / ( 127.0 * total );" in cmdscale_body
+	assert "pm->ps->movementDir = 0;" in movement_dir_body
+	assert "pm->ps->movementDir = 7;" in movement_dir_body
+	assert "if ( pm->ps->movementDir == 2 )" in movement_dir_body
+	assert "pm->ps->movementDir = 1;" in movement_dir_body
+	assert "if ( pm->ps->movementDir == 6 )" in movement_dir_body
+	assert "pm->ps->movementDir = 7;" in movement_dir_body
+
+	for map_name in ("qagame", "cgame"):
+		for symbol in ("PM_ClipVelocity", "PM_Accelerate", "PM_CmdScale", "PM_SetMovementDir"):
+			assert "fixture" in _symbol_comment(map_name, symbol)
 
 
 def test_symbol_maps_record_the_recovered_airmove_accel_edges() -> None:
@@ -208,7 +378,8 @@ def test_symbol_maps_record_the_recovered_ground_contact_edges() -> None:
 		water_level = _symbol_comment(map_name, "PM_SetWaterLevel")
 
 		assert "0.25" in correct_all_solid
-		assert "groundTraceLatest" in correct_all_solid
+		assert "groundEntityNum" in correct_all_solid
+		assert "groundTraceLatest" not in correct_all_solid
 		assert "pml.groundPlane" in correct_all_solid
 		assert "pml.walking" in correct_all_solid
 
@@ -216,15 +387,17 @@ def test_symbol_maps_record_the_recovered_ground_contact_edges() -> None:
 		assert "LEGS_JUMP" in ground_trace_missed
 		assert "LEGS_JUMPB" in ground_trace_missed
 		assert "PMF_BACKWARDS_JUMP" in ground_trace_missed
-		assert "groundTraceLatest" in ground_trace_missed
+		assert "groundEntityNum" in ground_trace_missed
+		assert "groundTraceLatest" not in ground_trace_missed
 
 		assert "0.25" in ground_trace
 		assert "kickoff dot > 10" in ground_trace
-		assert "groundTraceLatest" in ground_trace
+		assert "groundTraceLatest" not in ground_trace
+		assert "pml.groundTrace" in ground_trace
 		assert "PMF_TIME_WATERJUMP" in ground_trace
 		assert "PMF_TIME_LAND" in ground_trace
 		assert "250 ms" in ground_trace
-		assert "PM_RecordGroundContact" in ground_trace
+		assert "PM_RecordGroundContact" not in ground_trace
 		assert "PM_AddTouchEnt" in ground_trace
 
 		assert "MASK_WATER" in water_level
@@ -251,6 +424,7 @@ def test_friction_restores_the_retail_circle_strafe_branch() -> None:
 
 	assert "friction = pm_friction;" in body
 	assert "friction = settings->crouchSlideFriction;" in body
+	assert "&& settings->crouchSlide" not in body
 	assert "pm_aircontrol > 0.0f && pm->cmd.forwardmove && pm->cmd.rightmove" in body
 	assert "pm->ps->movementDir == 1 || pm->ps->movementDir == 3" in body
 	assert "pm->ps->movementDir == 5 || pm->ps->movementDir == 7" in body
@@ -281,7 +455,7 @@ def test_apply_jump_takeoff_restores_the_retail_shared_jump_leaf() -> None:
 	assert "static void PM_ApplyJumpTakeoff( void ) {" in source
 	assert "pm->ps->pm_flags |= PMF_JUMP_HELD;" in body
 	assert "pm->ps->groundEntityNum = ENTITYNUM_NONE;" in body
-	assert "pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;" in body
+	assert "groundTraceLatest" not in body
 	assert "pm->ps->jumpTime = pm->cmd.serverTime;" in body
 	assert "pm->ps->velocity[2] = pm_jumpTakeoffVelocity;" in body
 	assert "PM_AddEvent( EV_JUMP );" in body
@@ -291,11 +465,19 @@ def test_apply_jump_takeoff_restores_the_retail_shared_jump_leaf() -> None:
 
 def test_prepare_jump_takeoff_holds_the_shared_retail_jump_setup() -> None:
 	body = _function_body("PM_PrepareJumpTakeoff")
+	ramp_body = _function_body("PM_ApplyRampJumpVerticalVelocity")
 
-	assert "jumpVelocityScale = PM_EvaluateJumpVelocityScale( pm->ps, settings, pm->cmd.serverTime, &timeDelta );" in body
-	assert "PM_ApplyJumpPlanarVelocity( chainJumpActive, rampJumpActive, settings );" in body
-	assert "pm_jumpTakeoffVelocity = jumpVelocity;" in body
+	assert "jumpVelocity = PM_EvaluateJumpTakeoffVelocity( settings, qfalse, &timeDelta );" in body
+	assert "PM_ApplyRampJumpVerticalVelocity( jumpVelocity, qfalse, settings );" in body
+	assert "velocity = jumpVelocity;" in ramp_body
+	assert "settings && settings->rampJump && !fromCrouchStep" in ramp_body
+	assert "settings && settings->jumpVelocityMax > 0.0f && velocity > settings->jumpVelocityMax" in ramp_body
+	assert "PM_ApplyJumpPlanarVelocity" not in BG_PMOVE_PATH.read_text(encoding="utf-8")
+	assert "pml.groundTrace.plane.normal[2] < 0.999f" not in body
+	assert "groundTraceLatest" not in body
+	assert "pm_jumpTakeoffVelocity = PM_ApplyRampJumpVerticalVelocity( jumpVelocity, qfalse, settings );" in body
 	assert "pm_jumpTakeoffDoubleJumpActive = doubleJumpActive;" in body
+	assert "!settings->doubleJump" not in body
 	assert "pm_jumpTakeoffChainJumpActive" not in body
 	assert "pm_jumpTakeoffRampJumpActive" not in body
 	assert "PM_ApplyJumpTakeoff();" not in body
@@ -313,10 +495,21 @@ def test_check_jump_routes_through_the_shared_takeoff_helper() -> None:
 
 def test_step_jump_routes_through_the_shared_takeoff_helper() -> None:
 	body = _function_body("PM_ApplyStepJump")
+	step_body = _function_body("PM_PrepareStepJumpTakeoff")
+	crouch_body = _function_body("PM_PrepareCrouchStepJumpTakeoff")
 
 	assert "PM_PrepareJumpTakeoff( qfalse )" in body
+	assert "PM_PrepareStepJumpTakeoff( settings )" in body
+	assert "PM_PrepareCrouchStepJumpTakeoff( settings )" in body
+	assert "!fromCrouchSlide && pm->cmd.upmove < 10" in body
 	assert "PM_ApplyJumpTakeoff();" in body
+	assert "settings->stepJumpVelocity" not in body
 	assert "PM_CheckJump( qfalse )" not in body
+	assert "PM_EvaluateJumpTakeoffVelocity( settings, qtrue, NULL );" in step_body
+	assert "pm_jumpTakeoffVelocity = PM_ApplyRampJumpVerticalVelocity( jumpVelocity, qfalse, settings );" in step_body
+	assert "PM_EvaluateJumpTakeoffVelocity( settings, qtrue, NULL );" in crouch_body
+	assert "pm_jumpTakeoffVelocity = PM_ApplyRampJumpVerticalVelocity( jumpVelocity, qtrue, settings );" in crouch_body
+	assert "pm_jumpTakeoffDoubleJumpActive = qfalse;" in crouch_body
 
 
 def test_pm_weapon_owns_the_retail_firing_flag_latch() -> None:
@@ -416,6 +609,78 @@ def test_pm_weapon_preserves_the_retail_no_weapon_sentinel_path() -> None:
 	assert weapon_body.index("if ( pm->ps->weapon == WP_NUM_WEAPONS ) {") < weapon_body.index("if ( ! ( pm->cmd.buttons & BUTTON_ATTACK )")
 
 
+def test_event_and_touch_helpers_keep_the_retail_queue_contracts() -> None:
+	event_body = _function_body("PM_AddEvent")
+	touch_body = _function_body("PM_AddTouchEnt")
+	qagame_event = _symbol_comment("qagame", "PM_AddEvent")
+	cgame_event = _symbol_comment("cgame", "PM_AddEvent")
+	qagame_touch = _symbol_comment("qagame", "PM_AddTouchEnt")
+	cgame_touch = _symbol_comment("cgame", "PM_AddTouchEnt")
+
+	assert "BG_AddPredictableEventToPlayerstate( newEvent, 0, pm->ps );" in event_body
+	assert "entityNum == ENTITYNUM_WORLD" in touch_body
+	assert "pm->numtouch == MAXTOUCH" in touch_body
+	assert "pm->touchents[ i ] == entityNum" in touch_body
+	assert "pm->touchents[pm->numtouch] = entityNum;" in touch_body
+	assert touch_body.index("entityNum == ENTITYNUM_WORLD") < touch_body.index("pm->numtouch == MAXTOUCH")
+	assert touch_body.index("pm->numtouch == MAXTOUCH") < touch_body.index("pm->touchents[ i ] == entityNum")
+	assert touch_body.index("pm->touchents[ i ] == entityNum") < touch_body.index("pm->touchents[pm->numtouch] = entityNum;")
+
+	for comment in (qagame_event, cgame_event):
+		assert "event parm of 0" in comment
+		assert "fixture" in comment
+
+	for comment in (qagame_touch, cgame_touch):
+		assert "ENTITYNUM_WORLD" in comment
+		assert "MAXTOUCH" in comment
+		assert "duplicate" in comment
+		assert "fixture" in comment
+
+
+def test_animation_starter_helpers_keep_retail_timer_and_life_gates() -> None:
+	start_torso = _function_body("PM_StartTorsoAnim")
+	start_legs = _function_body("PM_StartLegsAnim")
+	continue_legs = _function_body("PM_ContinueLegsAnim")
+	continue_torso = _function_body("PM_ContinueTorsoAnim")
+	force_legs = _function_body("PM_ForceLegsAnim")
+	qagame_start_torso = _symbol_comment("qagame", "PM_StartTorsoAnim")
+	cgame_start_torso = _symbol_comment("cgame", "PM_StartTorsoAnim")
+	qagame_continue_legs = _symbol_comment("qagame", "PM_ContinueLegsAnim")
+	cgame_continue_legs = _symbol_comment("cgame", "PM_ContinueLegsAnim")
+	qagame_force_legs = _symbol_comment("qagame", "PM_ForceLegsAnim")
+	cgame_force_legs = _symbol_comment("cgame", "PM_ForceLegsAnim")
+
+	assert "pm->ps->pm_type >= PM_DEAD" in start_torso
+	assert "( pm->ps->torsoAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT" in start_torso
+	assert "pm->ps->pm_type >= PM_DEAD" in start_legs
+	assert "pm->ps->legsTimer > 0" in start_legs
+	assert "( pm->ps->legsAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT" in start_legs
+	assert "( pm->ps->legsAnim & ~ANIM_TOGGLEBIT ) == anim" in continue_legs
+	assert "pm->ps->legsTimer > 0" in continue_legs
+	assert "PM_StartLegsAnim( anim );" in continue_legs
+	assert "( pm->ps->torsoAnim & ~ANIM_TOGGLEBIT ) == anim" in continue_torso
+	assert "pm->ps->torsoTimer > 0" in continue_torso
+	assert "PM_StartTorsoAnim( anim );" in continue_torso
+	assert "pm->ps->legsTimer = 0;" in force_legs
+	assert "PM_StartLegsAnim( anim );" in force_legs
+	assert force_legs.index("pm->ps->legsTimer = 0;") < force_legs.index("PM_StartLegsAnim( anim );")
+
+	for comment in (qagame_start_torso, cgame_start_torso):
+		assert "PM_DEAD" in comment
+		assert "toggle" in comment
+		assert "fixture" in comment
+
+	for comment in (qagame_continue_legs, cgame_continue_legs):
+		assert "legsTimer" in comment
+		assert "current anim" in comment
+		assert "fixture" in comment
+
+	for comment in (qagame_force_legs, cgame_force_legs):
+		assert "clears" in comment
+		assert "legsTimer" in comment
+		assert "fixture" in comment
+
+
 def test_pm_animate_keeps_the_retail_taunt_and_voice_button_priority() -> None:
 	body = _function_body("PM_Animate")
 	markers = [
@@ -439,6 +704,25 @@ def test_pm_animate_keeps_the_retail_taunt_and_voice_button_priority() -> None:
 		next_position = body.index(marker, position + 1)
 		assert next_position > position
 		position = next_position
+
+
+def test_torso_animation_keeps_the_retail_ready_weapon_idle_split() -> None:
+	body = _function_body("PM_TorsoAnimation")
+	qagame_comment = _symbol_comment("qagame", "PM_TorsoAnimation")
+	cgame_comment = _symbol_comment("cgame", "PM_TorsoAnimation")
+
+	assert "pm->ps->weaponstate == WEAPON_READY" in body
+	assert "pm->ps->weapon == WP_GAUNTLET" in body
+	assert "PM_ContinueTorsoAnim( TORSO_STAND2 );" in body
+	assert "PM_ContinueTorsoAnim( TORSO_STAND );" in body
+	assert "PM_StartTorsoAnim" not in body
+	assert body.index("pm->ps->weaponstate == WEAPON_READY") < body.index("pm->ps->weapon == WP_GAUNTLET")
+	assert body.index("PM_ContinueTorsoAnim( TORSO_STAND2 );") < body.index("PM_ContinueTorsoAnim( TORSO_STAND );")
+
+	for comment in (qagame_comment, cgame_comment):
+		assert "ready-state" in comment
+		assert "TORSO_STAND2" in comment
+		assert "torso timer" in comment
 
 
 def test_crash_land_keeps_the_retail_gib_health_event_gate() -> None:
@@ -479,6 +763,27 @@ def test_water_events_keep_the_retail_dead_player_head_event_gate() -> None:
 	assert body.index("pm->ps->powerups[PW_INVULNERABILITY]") < body.index("PM_AddEvent( EV_WATER_CLEAR );")
 
 
+def test_drop_timers_keeps_the_retail_misc_and_animation_timer_order() -> None:
+	body = _function_body("PM_DropTimers")
+	qagame_comment = _symbol_comment("qagame", "PM_DropTimers")
+	cgame_comment = _symbol_comment("cgame", "PM_DropTimers")
+
+	assert "pm->ps->pm_flags &= ~PMF_ALL_TIMES;" in body
+	assert "pm->ps->pm_time = 0;" in body
+	assert "pm->ps->legsTimer -= pml.msec;" in body
+	assert "pm->ps->torsoTimer -= pml.msec;" in body
+	assert "pm->ps->crouchSlideTime -= pml.msec;" in body
+	assert body.index("pm->ps->pm_time") < body.index("pm->ps->legsTimer > 0")
+	assert body.index("pm->ps->legsTimer > 0") < body.index("pm->ps->torsoTimer > 0")
+	assert body.index("pm->ps->torsoTimer > 0") < body.index("pm->ps->pm_flags & PMF_CROUCH_SLIDE")
+
+	for comment in (qagame_comment, cgame_comment):
+		assert "PMF_ALL_TIMES" in comment
+		assert "legsTimer" in comment
+		assert "torsoTimer" in comment
+		assert "fixture" in comment
+
+
 def test_pmove_single_keeps_the_retail_dispatch_order() -> None:
 	body = _function_body("PmoveSingle")
 	post_move_markers = [
@@ -499,11 +804,16 @@ def test_pmove_single_keeps_the_retail_dispatch_order() -> None:
 	assert body.index("c_pmove++;") < body.index("pm->numtouch = 0;")
 	assert body.index("pm->numtouch = 0;") < body.index("pm->watertype = 0;")
 	assert body.index("pm->watertype = 0;") < body.index("pm->waterlevel = 0;")
-	assert body.index("settings = PM_GetActiveSettings();") < body.index("if ( settings->airControl > 0.0f )")
-	assert body.index("if ( settings->airControl > 0.0f )") < body.index("pm->ps->pm_flags |= PMF_AIR_CONTROL;")
-	assert body.index("pm->ps->pm_flags &= ~PMF_AIR_CONTROL;") < body.index("PM_LoadMoveTuningConstants();")
-	assert body.index("if ( settings->doubleJump )") < body.index("pm->ps->pm_flags |= PMF_DOUBLE_JUMP;")
-	assert body.index("pm->ps->pm_flags &= ~PMF_DOUBLE_JUMP;") < body.index("PM_LoadMoveTuningConstants();")
+	assert "pm->ps->stats[STAT_HEALTH] <= 0 && !pm->ps->powerups[PW_INVULNERABILITY]" in body
+	assert body.index("PM_LoadMoveTuningConstants();") < body.index("pm->ps->stats[STAT_HEALTH] <= 0 && !pm->ps->powerups[PW_INVULNERABILITY]")
+	assert body.index("pm->ps->stats[STAT_HEALTH] <= 0 && !pm->ps->powerups[PW_INVULNERABILITY]") < body.index("if ( settings->noPlayerClip )")
+	assert "pm->ps->pm_flags |= PMF_AIR_CONTROL;" not in body
+	assert "pm->ps->pm_flags &= ~PMF_AIR_CONTROL;" not in body
+	assert "pm->ps->pm_flags |= PMF_DOUBLE_JUMP;" not in body
+	assert "pm->ps->pm_flags &= ~PMF_DOUBLE_JUMP;" not in body
+	assert "pm->ps->pm_flags |= PMF_CROUCH_SLIDE;" not in body
+	assert "pm->ps->pm_flags &= ~PMF_CROUCH_SLIDE;" not in body
+	assert body.index("settings = PM_GetActiveSettings();") < body.index("PM_LoadMoveTuningConstants();")
 	assert body.index("pm->waterlevel = 0;") < body.index("PM_LoadMoveTuningConstants();")
 	assert initial_water_level < check_duck
 	assert check_duck < initial_ground_trace
@@ -529,6 +839,28 @@ def test_pmove_single_keeps_the_retail_dispatch_order() -> None:
 		position = next_position
 
 
+def test_spawn_owns_retail_movement_profile_flags() -> None:
+	g_pmove_body = _body_from_source(
+		G_PMOVE_PATH,
+		"void G_PmoveApplyProfileFlags( playerState_t *ps )",
+	)
+	g_client_body = _body_from_source(
+		G_CLIENT_PATH,
+		"void ClientSpawn(gentity_t *ent)",
+	)
+	g_local = G_LOCAL_PATH.read_text(encoding="utf-8")
+
+	assert "void G_PmoveApplyProfileFlags( playerState_t *ps );" in g_local
+	assert "ps->pm_flags &= ~( PMF_CROUCH_SLIDE | PMF_DOUBLE_JUMP | PMF_AIR_CONTROL );" in g_pmove_body
+	assert g_pmove_body.index("if ( g_pmoveSettings.crouchSlide )") < g_pmove_body.index("if ( g_pmoveSettings.doubleJump )")
+	assert g_pmove_body.index("if ( g_pmoveSettings.doubleJump )") < g_pmove_body.index("if ( g_pmoveSettings.airControl > 0.0f )")
+	assert "ps->crouchSlideTime = 0;" in g_pmove_body
+	pers_team_pos = g_client_body.index("client->ps.persistant[PERS_TEAM] = client->sess.sessionTeam;")
+	profile_flags_pos = g_client_body.index("G_PmoveApplyProfileFlags( &client->ps );", pers_team_pos)
+	spectator_pm_pos = g_client_body.index("if ( client->sess.sessionTeam == TEAM_SPECTATOR )", profile_flags_pos)
+	assert pers_team_pos < profile_flags_pos < spectator_pm_pos
+
+
 def test_pmove_replays_long_frames_through_the_retail_chunk_loop() -> None:
 	body = _function_body("Pmove")
 
@@ -544,7 +876,7 @@ def test_pmove_replays_long_frames_through_the_retail_chunk_loop() -> None:
 	assert "if ( pml.stepUp > 0.0f ) {" in body
 	assert "pmove->stepUp += pml.stepUp;" in body
 	assert "pmove->stepUpTime = pmove->cmd.serverTime;" in body
-	assert "if ( ( pmove->ps->pm_flags & PMF_JUMP_HELD ) && originalUpmove >= 10 ) {" in body
+	assert "if ( !PM_IsJumpPadLaunchActive() && ( pmove->ps->pm_flags & PMF_JUMP_HELD ) && originalUpmove >= 10 ) {" in body
 	assert "pmove->cmd.upmove = 20;" in body
 
 

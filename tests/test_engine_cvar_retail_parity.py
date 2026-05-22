@@ -852,6 +852,10 @@ def test_engine_cvar_fifteenth_server_state_tranche_matches_retail_contracts() -
 	assert 'Info_SetValueForKey( infostring, "hostname", sv_hostname->string );' in sv_main
 	assert 'trap_Cvar_VariableStringBuffer( "sv_hostname", hostname, sizeof( hostname ) );' in g_main
 
+	assert 'extern\tcvar_t\t*sv_masterAdvertise;' in server_h
+	assert 'sv_masterAdvertise = Cvar_Get ("sv_master", "1", CVAR_ARCHIVE );' in sv_init
+	assert 'sv_master[0] = Cvar_Get ("sv_master1", "", 0 );' in sv_init
+
 	assert 'sv_mapPoolFile = Cvar_Get ("sv_mapPoolFile", "mappool.txt", CVAR_ARCHIVE );' in sv_init
 	assert 'static const char *fileCvars[] = { "ui_mapPoolFile", "sv_mapPoolFile", NULL };' in ui_gameinfo
 	assert 'UI_LoadMapRotationsFromFile( "mappool.txt" );' in ui_gameinfo

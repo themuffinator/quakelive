@@ -1894,6 +1894,12 @@ void SV_GetChallenge( netadr_t from ) {
 		return;
 	}
 
+#if !( QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES )
+	Com_DPrintf( "legacy getIpAuthorize bypassed for %s: Quake III authorize server disabled by online-services policy\n", NET_AdrToString( from ) );
+	challenge->pingTime = svs.time;
+	NET_OutOfBandPrint( NS_SERVER, from, "challengeResponse %i", challenge->challenge );
+	return;
+#else
 	// look up the authorize server's IP
 	if ( !svs.authorizeAddress.ip[0] && svs.authorizeAddress.type != NA_BAD ) {
 		Com_Printf( "Resolving %s\n", AUTHORIZE_SERVER_NAME );
@@ -1939,6 +1945,7 @@ void SV_GetChallenge( netadr_t from ) {
 			"getIpAuthorize %i %i.%i.%i.%i %s 0 %s",  svs.challenges[i].challenge,
 			from.ip[0], from.ip[1], from.ip[2], from.ip[3], game, sv_strictAuth->string );
 	}
+#endif
 }
 
 /*
@@ -1951,6 +1958,10 @@ challengeResponse to it
 ====================
 */
 void SV_AuthorizeIpPacket( netadr_t from ) {
+#if !( QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES )
+	Com_DPrintf( "SV_AuthorizeIpPacket ignored: Quake III authorize server disabled by online-services policy\n" );
+	return;
+#else
 	int		challenge;
 	int		i;
 	char	*s;
@@ -2019,6 +2030,7 @@ void SV_AuthorizeIpPacket( netadr_t from ) {
 
 	// clear the challenge record so it won't timeout and let them through
 	Com_Memset( &svs.challenges[i], 0, sizeof( svs.challenges[i] ) );
+#endif
 }
 
 /*

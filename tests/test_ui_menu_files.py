@@ -726,6 +726,17 @@ def test_ui_retail_listbox_and_secondary_ownerdraw_flags_parse_cleanly() -> None
 
 def test_ui_native_import_table_matches_recovered_retail_slots() -> None:
     cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
+    ui_public = (REPO_ROOT / "src/code/ui/ui_public.h").read_text(encoding="utf-8")
+    ql_ui_imports = (REPO_ROOT / "src/code/client/ql_ui_imports.inc").read_text(encoding="utf-8")
+
+    assert "UI_QL_IMPORT_R_REGISTERFONT = 70," in ui_public
+    assert "UI_QL_IMPORT_DRAW_SCALED_TEXT = 94," in ui_public
+    assert "UI_QL_IMPORT_MEASURE_TEXT = 95," in ui_public
+    assert (
+        ui_public.index("UI_QL_IMPORT_R_REGISTERFONT = 70,")
+        < ui_public.index("UI_QL_IMPORT_DRAW_SCALED_TEXT = 94,")
+        < ui_public.index("UI_QL_IMPORT_MEASURE_TEXT = 95,")
+    )
 
     for expected in (
         "static qhandle_t QL_UI_RegisterDefaultAdvertCellShader( const char *defaultContent ) {",
@@ -769,9 +780,35 @@ def test_ui_native_import_table_matches_recovered_retail_slots() -> None:
     ):
         assert expected in cl_ui
 
+    for expected in (
+        "static void QDECL QL_UI_trap_R_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {",
+        "UI_Import_Syscall( UI_R_REGISTERFONT, fontName, pointSize, font );",
+    ):
+        assert expected in ql_ui_imports
+
     assert "ql_ui_imports[85] = (ql_import_f)QL_UI_trap_S_StopBackgroundTrack;" not in cl_ui
     assert "UI_QL_IMPORT_MEMORY_REMAINING = 101" not in cl_ui
     assert "UI_QL_IMPORT_R_REMAP_SHADER = 104" not in cl_ui
+
+
+def test_ui_native_host_text_wrappers_preserve_color_force_and_packed_measure_contract() -> None:
+    cl_ui = (REPO_ROOT / "src/code/client/cl_ui.c").read_text(encoding="utf-8")
+    draw_block = _extract_function_block(
+        cl_ui,
+        "static void QDECL QL_UI_trap_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, int forceColor ) {",
+    )
+    measure_block = _extract_function_block(
+        cl_ui,
+        "static unsigned long long QDECL QL_UI_trap_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {",
+    )
+
+    assert "RE_DrawScaledText( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor != qfalse ? qtrue : qfalse, ql_ui_currentColor );" in draw_block
+    assert "float width;" in measure_block
+    assert "float height;" in measure_block
+    assert "RE_MeasureScaledText( text, end, fontHandle, scale, maxX, &width, &height, outLeft );" in measure_block
+    assert "return QL_UI_PackFloatBits64( width, height );" in measure_block
+    assert "RE_RegisterFont" not in draw_block
+    assert "RE_RegisterFont" not in measure_block
 
 
 def test_ui_native_syscall_bridge_matches_recovered_retail_slots() -> None:
@@ -791,6 +828,7 @@ def test_ui_native_syscall_bridge_matches_recovered_retail_slots() -> None:
         "case UI_MEMORY_REMAINING: return UI_QL_IMPORT_MEMORY_REMAINING;",
         "case UI_S_STOPBACKGROUNDTRACK: return UI_QL_IMPORT_S_STOPBACKGROUNDTRACK;",
         "case UI_CIN_SETEXTENTS: return UI_QL_IMPORT_CIN_SETEXTENTS;",
+        "case UI_R_REGISTERFONT: return UI_QL_IMPORT_R_REGISTERFONT;",
         "case UI_R_REMAP_SHADER: return UI_QL_IMPORT_R_REMAP_SHADER;",
         "case UI_VERIFY_CDKEY: return UI_QL_IMPORT_VERIFY_CDKEY;",
         "case UI_SET_PBCLSTATUS: return UI_QL_IMPORT_SET_PBCLSTATUS;",
@@ -829,6 +867,33 @@ def test_ui_native_syscall_bridge_matches_recovered_retail_slots() -> None:
     ):
         assert expected in ui_syscalls
 
+    draw_block = _extract_function_block(
+        ui_syscalls,
+        "void trap_QL_DrawScaledText( int x, int y, const char *text, int fontHandle, float scale, int maxX, float *outMaxX, qboolean forceColor ) {",
+    )
+    measure_block = _extract_function_block(
+        ui_syscalls,
+        "unsigned long long trap_QL_MeasureText( const char *text, const char *end, int fontHandle, float scale, int maxX, float *outLeft ) {",
+    )
+
+    for expected in (
+        "ql_import_f import = UI_GetNativeImportFunction( UI_QL_IMPORT_DRAW_SCALED_TEXT );",
+        "if ( !import ) {",
+        "return;",
+        "((void (QDECL *)( int, int, const char *, int, float, int, float *, int ))import)( x, y, text, fontHandle, scale, maxX, outMaxX, forceColor ? qtrue : qfalse );",
+    ):
+        assert expected in draw_block
+
+    for expected in (
+        "ql_import_f import = UI_GetNativeImportFunction( UI_QL_IMPORT_MEASURE_TEXT );",
+        "if ( !import ) {",
+        "return 0;",
+        "return ((unsigned long long (QDECL *)( const char *, const char *, int, float, int, float * ))import)( text, end, fontHandle, scale, maxX, outLeft );",
+    ):
+        assert expected in measure_block
+
+    assert "syscall(" not in draw_block
+    assert "syscall(" not in measure_block
     assert "case UI_S_STOPBACKGROUNDTRACK: return UI_QL_IMPORT_UNUSED_85;" not in ui_syscalls
 
 
@@ -953,6 +1018,11 @@ def test_ui_retail_item_font_runtime_compatibility_restored() -> None:
     assert "qboolean ItemParse_font( itemDef_t *item, int handle )" in ui_shared
     assert '{"font", ItemParse_font, NULL}' in ui_shared
     assert "item->fontIndex = ITEM_FONT_INHERIT;" in ui_shared
+    assert "if (!PC_Int_Parse(handle, &item->fontIndex)) {" in ui_shared
+    assert "DC->textWidthExt(text, item->textscale, limit, item->fontIndex)" in ui_shared
+    assert "DC->textHeightExt(text, item->textscale, limit, item->fontIndex)" in ui_shared
+    assert "DC->drawTextExt(x, y, item->textscale, color, text, adjust, limit, item->textStyle, item->fontIndex);" in ui_shared
+    assert "DC->drawTextWithCursorExt(x, y, item->textscale, color, text, cursorPos, cursor, limit, item->textStyle, item->fontIndex);" in ui_shared
     assert "Item_DrawText(item, item->textRect.x, item->textRect.y, color, textPtr, 0, 0);" in ui_shared
     assert "Item_DrawTextWithCursor(item, item->textRect.x + item->textRect.w + offset, item->textRect.y, newColor, buff + editPtr->paintOffset, item->cursorPos - editPtr->paintOffset , cursor, editPtr->maxPaintChars);" in ui_shared
 
@@ -966,6 +1036,121 @@ def test_ui_retail_item_font_runtime_compatibility_restored() -> None:
     assert "uiInfo.uiDC.textWidthExt = &Text_WidthExt;" in ui_main
     assert "uiInfo.uiDC.textHeightExt = &Text_HeightExt;" in ui_main
     assert "uiInfo.uiDC.drawTextWithCursorExt = &Text_PaintWithCursorExt;" in ui_main
+
+
+def test_ui_retail_font_cvars_and_scale_buckets_match_retail() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+
+    assert '{ &ui_smallFont, "ui_smallFont", "0.25", CVAR_ARCHIVE}' in ui_main
+    assert '{ &ui_bigFont, "ui_bigFont", "0.4", CVAR_ARCHIVE}' in ui_main
+
+    select_block = _extract_function_block(
+        ui_main,
+        "static fontInfo_t *UI_SelectTextFont(float scale, int fontIndex) {",
+    )
+    small_threshold = select_block.index("if (scale <= ui_smallFont.value) {")
+    big_threshold = select_block.index("if (scale >= ui_bigFont.value) {")
+    text_return = select_block.rindex("return &uiInfo.uiDC.Assets.textFont;")
+
+    assert small_threshold < big_threshold < text_return
+    assert "return &uiInfo.uiDC.Assets.smallFont;" in select_block[small_threshold:big_threshold]
+    assert "return &uiInfo.uiDC.Assets.bigFont;" in select_block[big_threshold:text_return]
+
+    handle_block = _extract_function_block(
+        ui_main,
+        "static int UI_SelectTextFontHandle( float scale, int fontIndex ) {",
+    )
+    for expected in (
+        "case FONT_SANS:",
+        "return FONT_SANS;",
+        "case FONT_MONO:",
+        "return FONT_MONO;",
+        "case FONT_DEFAULT:",
+        "return FONT_DEFAULT;",
+        "font = UI_SelectTextFont( scale, ITEM_FONT_INHERIT );",
+        "if ( font == &uiInfo.uiDC.Assets.smallFont ) {",
+    ):
+        assert expected in handle_block
+    assert "uiInfo.uiDC.Assets.bigFont" not in handle_block
+
+
+def test_ui_text_paint_limit_uses_host_text_max_projection() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    block = _extract_function_block(
+        ui_main,
+        "static void Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t color, const char* text, float adjust, int limit) {",
+    )
+
+    for expected in (
+        "limitEnd = UI_GetTextLimitEnd( text, limit );",
+        "UI_CopyTextSpan( text, limitEnd, limitedText, sizeof( limitedText ) );",
+        "UI_AdjustFrom640( &screenX, &screenY, NULL, NULL );",
+        "UI_AdjustFrom640( &screenMaxX, NULL, NULL, NULL );",
+        "fontHandle = UI_SelectTextFontHandle( scale, ITEM_FONT_INHERIT );",
+        "trap_QL_DrawScaledText(",
+        "scale * QL_FONT_HOST_POINT_SIZE * uiInfo.uiDC.yscale,",
+        "(int)screenMaxX,",
+        "&outMaxX,",
+        "*maxX = ( outMaxX - uiInfo.uiDC.bias ) / uiInfo.uiDC.xscale;",
+    ):
+        assert expected in block
+
+    assert "Text_PaintChar" not in block
+    assert "trap_R_DrawStretchPic" not in block
+
+
+def test_ui_host_text_metrics_span_and_cursor_use_retail_traps() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    metrics_block = _extract_function_block(
+        ui_main,
+        "static void UI_GetHostTextMetrics( const char *text, float scale, int limit, int fontIndex, int *outWidth, int *outHeight ) {",
+    )
+    span_block = _extract_function_block(
+        ui_main,
+        "static void UI_DrawHostTextSpan( float x, float y, float scale, const vec4_t color, const char *text, int fontIndex, int style, qboolean forceColor ) {",
+    )
+    cursor_block = _extract_function_block(
+        ui_main,
+        "static void Text_PaintWithCursorExt(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style, int fontIndex) {",
+    )
+
+    for expected in (
+        "UI_RefreshDisplayContextScale();",
+        "limitEnd = UI_GetTextLimitEnd( text, limit );",
+        "packed = trap_QL_MeasureText(",
+        "UI_SelectTextFontHandle( scale, fontIndex ),",
+        "scale * QL_FONT_HOST_POINT_SIZE * uiInfo.uiDC.yscale,",
+        "UI_UnpackFloatBits64( packed, &width, &height );",
+        "*outWidth = (int)( width / uiInfo.uiDC.xscale );",
+        "*outHeight = (int)( height / uiInfo.uiDC.yscale );",
+    ):
+        assert expected in metrics_block
+
+    for expected in (
+        "UI_AdjustFrom640( &screenX, &screenY, NULL, NULL );",
+        "hostScale = scale * QL_FONT_HOST_POINT_SIZE * uiInfo.uiDC.yscale;",
+        "fontHandle = UI_SelectTextFontHandle( scale, fontIndex );",
+        "ofs = ( style == ITEM_TEXTSTYLE_SHADOWED ) ? 1 : 2;",
+        "trap_QL_DrawScaledText( (int)screenX + ofs, (int)screenY + ofs, text, fontHandle, hostScale, 0, NULL, qtrue );",
+        "trap_QL_DrawScaledText( (int)screenX, (int)screenY, text, fontHandle, hostScale, 0, NULL, forceColor );",
+    ):
+        assert expected in span_block
+
+    for expected in (
+        "UI_DrawHostTextSpan( x, y, scale, color, drawText, fontIndex, style, qfalse );",
+        "cursorEnd = UI_GetCursorTextEnd( text, limitEnd, cursorPos, color, cursorColor );",
+        "UI_AdjustFrom640( &screenX, &screenY, NULL, NULL );",
+        "hostScale = scale * QL_FONT_HOST_POINT_SIZE * uiInfo.uiDC.yscale;",
+        "fontHandle = UI_SelectTextFontHandle( scale, fontIndex );",
+        "UI_UnpackFloatBits64( trap_QL_MeasureText( text, cursorEnd, fontHandle, hostScale, 0, NULL ), &prefixWidth, &unusedHeight );",
+        "trap_QL_DrawScaledText( (int)( screenX + prefixWidth ) + ofs, (int)screenY + ofs, cursorString, fontHandle, hostScale, 0, NULL, qtrue );",
+        "trap_QL_DrawScaledText( (int)( screenX + prefixWidth ), (int)screenY, cursorString, fontHandle, hostScale, 0, NULL, qtrue );",
+    ):
+        assert expected in cursor_block
+
+    for block in (span_block, cursor_block):
+        assert "Text_PaintChar" not in block
+        assert "trap_R_DrawStretchPic" not in block
 
 
 def test_ui_retail_centered_text_helper_keeps_plain_text_style() -> None:
@@ -1001,20 +1186,33 @@ def test_ui_retail_download_info_reads_item_progress_through_native_slot() -> No
 
 def test_ui_menu_font_parser_stores_resolved_font_token() -> None:
     ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
+    block = _extract_function_block(ui_shared, "qboolean MenuParse_font( itemDef_t *item, int handle ) {")
 
     assert "qboolean MenuParse_font( itemDef_t *item, int handle )" in ui_shared
-    assert "UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE );" in ui_shared
-    assert "menu->font = String_Alloc( fontPath );" in ui_shared
+    for expected in (
+        "if (!PC_String_Parse(handle, &menu->font)) {",
+        "fontPath = menu->font;",
+        "UI_NormalizeFontPath( &fontPath, &pointSize, QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE );",
+        "menu->font = String_Alloc( fontPath );",
+        "if (!DC->Assets.fontRegistered) {",
+        "DC->registerFont( fontPath, pointSize, &DC->Assets.textFont );",
+        "DC->registerFont( QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE, &DC->Assets.smallFont );",
+        "DC->registerFont( QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE, &DC->Assets.bigFont );",
+        "DC->Assets.fontRegistered = qtrue;",
+    ):
+        assert expected in block
 
 
 def test_ui_font_cache_ownership_and_registered_font_sizes_match_retail() -> None:
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
     ui_shared_h = (REPO_ROOT / "src/code/ui/ui_shared.h").read_text(encoding="utf-8")
+    ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
     bridge_source = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
     main_menu = (REPO_ROOT / "src/ui/main.menu").read_text(encoding="utf-8")
     hud_menu = (REPO_ROOT / "src/ui/hud.menu").read_text(encoding="utf-8")
     asset_cache_block = _extract_function_block(ui_main, "void AssetCache() {")
     asset_parse_block = _extract_function_block(ui_main, "qboolean Asset_Parse(int handle) {")
+    normalize_block = _extract_function_block(ui_shared, "void UI_NormalizeFontPath( const char **fontName, int *pointSize, const char *defaultFont, int defaultPointSize ) {")
 
     for expected in (
         '#define QL_FONT_NAME_TEXT "fonts/font"',
@@ -1032,6 +1230,24 @@ def test_ui_font_cache_ownership_and_registered_font_sizes_match_retail() -> Non
     assert "trap_R_RegisterFont(fontPath, pointSize, &uiInfo.uiDC.Assets.textFont);" in asset_parse_block
     assert "trap_R_RegisterFont(fontPath, pointSize, &uiInfo.uiDC.Assets.smallFont);" in asset_parse_block
     assert "trap_R_RegisterFont(fontPath, pointSize, &uiInfo.uiDC.Assets.bigFont);" in asset_parse_block
+
+    for expected in (
+        '{ "FONT_DEFAULT", QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE }',
+        '{ "FONT_SANS", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE }',
+        '{ "FONT_MONO", QL_FONT_NAME_MONO, QL_FONT_MONO_POINT_SIZE }',
+        '{ "font2", QL_FONT_NAME_BIG, QL_FONT_BIG_POINT_SIZE }',
+        '{ "fonts/arial.ttf", QL_FONT_NAME_TEXT, QL_FONT_TEXT_POINT_SIZE }',
+        '{ "fonts/verdana.ttf", QL_FONT_NAME_SMALL, QL_FONT_SMALL_POINT_SIZE }',
+    ):
+        assert expected in ui_shared
+
+    for expected in (
+        "*fontName = uiLegacyFontMap[i].fontName;",
+        "*pointSize = uiLegacyFontMap[i].pointSize;",
+        "*fontName = defaultFont;",
+        "*pointSize = defaultPointSize;",
+    ):
+        assert expected in normalize_block
 
     for expected in (
         'font \\"fonts/font\\" 16',

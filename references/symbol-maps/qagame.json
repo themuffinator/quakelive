@@ -3137,7 +3137,7 @@
       "signature": "static void PM_LoadMoveTuningConstants(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail helper at the top of `PmoveSingle`. The body selects one of two small constant bundles based on the current movement flag profile and seeds the shared pmove globals consumed by jump, air, and water movement later in the frame."
+      "comment": "Deliberate synthetic retail helper at the top of `PmoveSingle`. The body selects one of two small constant bundles based on the current movement flag profile, seeds the shared pmove globals consumed by jump, air, and water movement later in the frame, and resolves the jump-takeoff velocity mode; PMF_AIR_CONTROL overrides the integer `pmove_ChainJump` selector and enters the air-control additive branch."
     },
     {
       "address": "0x1002DAF0",
@@ -3147,7 +3147,7 @@
       "signature": "void PM_AddEvent(int newEvent)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact predictable-event wrapper from bg_pmove.c::PM_AddEvent. It appends the supplied event to `pm->ps` with an event parm of 0."
+      "comment": "Exact predictable-event wrapper from bg_pmove.c::PM_AddEvent. It appends the supplied event to `pm->ps` with an event parm of 0; executable fixtures pin the two-slot predictable-event queue wrap and zero-parm behavior."
     },
     {
       "address": "0x1002DB20",
@@ -3157,7 +3157,7 @@
       "signature": "void PM_AddTouchEnt(int entityNum)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact touch-entity accumulator from bg_pmove.c::PM_AddTouchEnt. Retail skips `ENTITYNUM_WORLD`, caps the list at `MAXTOUCH`, and preserves the duplicate-suppression scan before appending a new touched entity."
+      "comment": "Exact touch-entity accumulator from bg_pmove.c::PM_AddTouchEnt. Retail skips `ENTITYNUM_WORLD`, caps the list at `MAXTOUCH`, and preserves the duplicate-suppression scan before appending a new touched entity; executable fixtures pin all three gates."
     },
     {
       "address": "0x1002DB60",
@@ -3167,7 +3167,7 @@
       "signature": "static void PM_StartTorsoAnim(int anim)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact torso-animation starter from bg_pmove.c::PM_StartTorsoAnim. The retail helper only checks `pm_type < PM_DEAD`, then flips the toggle bit and writes the requested torso animation."
+      "comment": "Exact torso-animation starter from bg_pmove.c::PM_StartTorsoAnim. The retail helper only checks `pm_type < PM_DEAD`, then flips the toggle bit and writes the requested torso animation; executable fixtures pin the PM_DEAD no-op and toggle-bit behavior."
     },
     {
       "address": "0x1002DB80",
@@ -3177,7 +3177,7 @@
       "signature": "static void PM_TorsoAnimation(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact ready-weapon torso idler from bg_pmove.c::PM_TorsoAnimation. HLIL shows the ready-state gate, the gauntlet-specific `TORSO_STAND2` selection, and the default `TORSO_STAND` continuation for the remaining weapons."
+      "comment": "Exact ready-weapon torso idler from bg_pmove.c::PM_TorsoAnimation. HLIL shows the ready-state gate, the gauntlet-specific `TORSO_STAND2` selection, the default `TORSO_STAND` continuation for the remaining weapons, and the inherited `PM_ContinueTorsoAnim` torso timer / PM_DEAD suppression gates now pinned by executable fixtures."
     },
     {
       "address": "0x1002DBE0",
@@ -3187,7 +3187,7 @@
       "signature": "static void PM_ContinueLegsAnim(int anim)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact low-priority legs-animation helper from bg_pmove.c::PM_ContinueLegsAnim. Retail returns early when the current legs anim already matches or a legs timer is active, otherwise it toggles into the requested animation."
+      "comment": "Exact low-priority legs-animation helper from bg_pmove.c::PM_ContinueLegsAnim. Retail returns early when the current anim already matches or a legsTimer is active, otherwise it toggles into the requested animation; executable fixtures pin both no-op gates."
     },
     {
       "address": "0x1002DC20",
@@ -3197,7 +3197,7 @@
       "signature": "static void PM_ForceLegsAnim(int anim)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact forced legs-animation helper from bg_pmove.c::PM_ForceLegsAnim. It clears the legs timer and then toggles in the requested legs animation if the player is still below `PM_DEAD`."
+      "comment": "Exact forced legs-animation helper from bg_pmove.c::PM_ForceLegsAnim. It clears the legsTimer and then toggles in the requested legs animation if the player is still below `PM_DEAD`; executable fixtures pin the timer clear before the live/dead start gate."
     },
     {
       "address": "0x1002DC50",
@@ -3207,7 +3207,7 @@
       "signature": "void PM_ClipVelocity(vec3_t in, vec3_t normal, vec3_t out, float overbounce)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact collision-response helper from bg_pmove.c::PM_ClipVelocity. It computes the overbounce-adjusted backoff and subtracts the normal-projected change from each axis of the input velocity."
+      "comment": "Exact collision-response helper from bg_pmove.c::PM_ClipVelocity. It computes the overbounce-adjusted backoff and subtracts the normal-projected change from each axis of the input velocity; executable fixtures pin both inward and outward plane branches."
     },
     {
       "address": "0x1002DCD0",
@@ -3227,7 +3227,7 @@
       "signature": "static void PM_Accelerate(vec3_t wishdir, float wishspeed, float accel)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact acceleration helper from bg_pmove.c::PM_Accelerate. Retail computes current speed along the wish direction, clamps the added speed by the accel and frametime budget, and pushes velocity along the normalized wish direction."
+      "comment": "Exact acceleration helper from bg_pmove.c::PM_Accelerate. Retail computes current speed along the wish direction, clamps the added speed by the accel and frametime budget, and pushes velocity along the normalized wish direction; executable fixtures pin the clamp and overspeed no-op."
     },
     {
       "address": "0x1002E070",
@@ -3237,7 +3237,7 @@
       "signature": "static float PM_CmdScale(usercmd_t *cmd)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact command-scaling helper from bg_pmove.c::PM_CmdScale. It finds the largest axial input component, computes the total movement vector length, and returns the speed-preserving scale factor for the `-127..127` command range."
+      "comment": "Exact command-scaling helper from bg_pmove.c::PM_CmdScale. It finds the largest axial input component, computes the total movement vector length, and returns the speed-preserving scale factor for the `-127..127` command range; executable fixtures pin zero, axial, 2D diagonal, and 3D diagonal inputs."
     },
     {
       "address": "0x1002E110",
@@ -3257,7 +3257,7 @@
       "signature": "static void PM_SetMovementDir(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact legs-facing helper from bg_pmove.c::PM_SetMovementDir. The retail ladder maps forward and strafe combinations to the eight movement directions and snaps idle sideways cases back to the diagonal poses."
+      "comment": "Exact legs-facing helper from bg_pmove.c::PM_SetMovementDir. The retail ladder maps forward and strafe combinations to the eight movement directions and snaps idle sideways cases back to the diagonal poses; executable fixtures pin the full 0..7 ring plus idle 2->1 and 6->7 snaps."
     },
     {
       "address": "0x1002E2C0",
@@ -3267,7 +3267,7 @@
       "signature": "static void PM_ApplyJumpTakeoff(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only jump takeoff body shared by PM_CheckJump and the step-jump seam. HLIL shows it latching the jump flags, deriving the final vertical takeoff velocity from the active jump-mode globals, emitting `EV_JUMP`, selecting the forward or backward legs animation, and refreshing the jump timestamp used by the surrounding gates."
+      "comment": "Descriptive retail-only jump takeoff body shared by PM_CheckJump and the step-jump seam. HLIL shows it latching the jump flags, deriving the final vertical takeoff velocity from the active jump-mode globals, using mode 1's gradient chain-jump scaler, mode 2's additive chain/step branch, or PMF_AIR_CONTROL's additive branch with the post-offset fade; the step-jump latches select `pmove_StepJumpVelocity`, normal jumps select `pmove_ChainJumpVelocity`, and the result is ramp-accumulated then max-clamped before `EV_JUMP` and the forward/back legs animation are emitted."
     },
     {
       "address": "0x1002E4C0",
@@ -3277,7 +3277,7 @@
       "signature": "static qboolean PM_CanCrouchStepJump(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only crouch step-jump gate checked from the PM_StepSlideMove seam. The leaf requires the ducked movement flag, rejects the pending step-jump suppression latch, keeps only non-descending vertical velocity, and reuses the same jump-cooldown timing threshold as the adjacent jump helpers before reporting success."
+      "comment": "Descriptive retail-only crouch step-jump gate checked from the PM_StepSlideMove seam. The leaf requires the ducked movement flag, rejects the pending step-jump suppression latch, keeps only non-descending vertical velocity, and uses the `cmd.serverTime - jumpTime >= jumpTimeDeltaMin` delay check before reporting success; unlike the general gate, it does not require queued upmove or a fresh jump-release state."
     },
     {
       "address": "0x1002E510",
@@ -3287,7 +3287,7 @@
       "signature": "static qboolean PM_CanStepJump(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only step-jump precheck beneath PM_StepSlideMove. It enforces the retail upmove, jump-delay, and jump-held restrictions around the step-jump modes, clearing the queued jump state on rejected attempts before the surrounding movement code decides whether to run the takeoff body."
+      "comment": "Descriptive retail-only step-jump precheck beneath PM_StepSlideMove. It enforces the retail upmove, `cmd.serverTime - jumpTime >= jumpTimeDeltaMin`, and jump-held restrictions around the step-jump modes, with the held-input bypass driven by the compact autoHop slot only; bunnyHop does not suppress the release gate. Rejected general attempts clear queued jump input before the surrounding movement code decides whether to run the general takeoff or fall back to the crouch-step branch."
     },
     {
       "address": "0x1002E590",
@@ -3297,7 +3297,7 @@
       "signature": "static qboolean PM_CheckJump(qboolean allowAirDoubleJump)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact jump gate from bg_pmove.c::PM_CheckJump. The retail helper enforces the jump-held and timing checks, handles the air double-jump allowance, and then dispatches into the adjacent takeoff body when a jump is accepted."
+      "comment": "Exact jump gate from bg_pmove.c::PM_CheckJump. The retail helper enforces the jump-held and timing checks, handles the air double-jump allowance, uses only the compact autoHop slot to bypass the held-release gate, and then dispatches into the adjacent takeoff body when a jump is accepted."
     },
     {
       "address": "0x1002CED0",
@@ -3327,7 +3327,7 @@
       "signature": "void PM_StepSlideMove(qboolean gravity)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail PM_StepSlideMove entry point aligned with bg_slidemove.c::PM_StepSlideMove. The HLIL shows the classic one-argument boundary calling PM_SlideMove, attempting the step-up trace, and printing the stepped / bend can't step diagnostics before clipping velocity on landing; this differs from the current tree's extended step-height signature."
+      "comment": "Retail PM_StepSlideMove entry point aligned with bg_slidemove.c::PM_StepSlideMove. The HLIL shows the classic one-argument boundary calling PM_SlideMove, attempting the step-up trace, rechecking PM_CanStepJump for the general step-jump launch, setting the normal step-jump takeoff latch before the shared jump leaf, then falling back through PM_CanCrouchStepJump plus the shrunken-box clearance trace before setting the crouch-step takeoff latch; the current tree keeps configurable step height behind the private helper while preserving this public boundary."
     },
     {
       "address": "0x1002F6F0",
@@ -3337,7 +3337,7 @@
       "signature": "qboolean PM_CheckWaterJump(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_CheckWaterJump. The retail body checks for the two-deep water case, traces 30 units forward and then 16 units up, and on success seeds the 200/350 takeoff velocity plus the water-jump timer."
+      "comment": "Exact match for bg_pmove.c::PM_CheckWaterJump. The retail body checks for the two-deep water case, traces 30 units forward and then 16 units up, and on success seeds the 200/350 takeoff velocity plus the water-jump timer; executable fixtures now pin the solid-lip and clearance gates."
     },
     {
       "address": "0x1002F840",
@@ -3357,7 +3357,7 @@
       "signature": "void PM_WaterMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_WaterMove. The retail flow begins with PM_CheckWaterJump, otherwise applies PM_Friction, builds the 3D command vector through PM_BuildWishMove3D, falls back to the idle -60 sink vector, clamps wishspeed by the swim scale, accelerates with PM_Accelerate and pm_wateraccelerate, clips against the ground plane when needed, and finishes with PM_SlideMove(qfalse)."
+      "comment": "Exact match for bg_pmove.c::PM_WaterMove. The retail flow begins with PM_CheckWaterJump, otherwise applies PM_Friction, builds the 3D command vector through PM_BuildWishMove3D, falls back to the idle -60 sink vector, clamps wishspeed by the swim scale, accelerates with PM_Accelerate and pm_wateraccelerate, clips against the ground plane when needed, and finishes with PM_SlideMove(qfalse); the idle sink path is fixture-validated."
     },
     {
       "address": "0x1002FA20",
@@ -3367,7 +3367,7 @@
       "signature": "void PM_FlyMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_FlyMove as reached by spectator and flight-powerup dispatch. It applies PM_Friction, builds the full 3D wish vector through PM_BuildWishMove3D, accelerates with PM_Accelerate and pm_flyaccelerate, and then steps through PM_StepSlideMove(qfalse)."
+      "comment": "Exact match for bg_pmove.c::PM_FlyMove as reached by spectator and flight-powerup dispatch. It applies PM_Friction, builds the full 3D wish vector through PM_BuildWishMove3D, accelerates with PM_Accelerate and pm_flyaccelerate, and then steps through PM_StepSlideMove(qfalse); the registered g_flightThrust cvar is not consumed by this pmove leaf."
     },
     {
       "address": "0x1002FA80",
@@ -3377,7 +3377,7 @@
       "signature": "static void PM_InvulnerabilityMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact invulnerability-holdable movement helper from bg_pmove.c. Retail zeroes the command and velocity vectors, applies pitch-driven float or sink while the shield is held or decaying, decrements `playerItemTime`, clears the holdable slot when the timer expires, and forces the holdable legs-animation bits."
+      "comment": "Exact invulnerability-holdable movement helper from bg_pmove.c. Retail enters only when the holdable is armed, the player is not PM_DEAD, and the decay gate is not the exact `stats[STAT_PLAYER_ITEM_RECHARGE] != 0 && stats[STAT_PLAYER_ITEM_TIME] == 0` stale state; once active it zeroes command and velocity vectors, applies pitch-driven float or sink, decrements `stats[STAT_PLAYER_ITEM_TIME]` at playerState +0xec, clears the holdable slot only when the clamped timer collapses with the +0xf0 recharge rate at zero, and forces the holdable legs-animation bits."
     },
     {
       "address": "0x1002FBA0",
@@ -3407,7 +3407,7 @@
       "signature": "void PM_GrappleMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_GrappleMove. It offsets the grapple point by the forward vector, pulls toward that anchor, clamps short pulls to a scaled length and long pulls to the grapple speed, then marks the player off the ground plane."
+      "comment": "Exact match for bg_pmove.c::PM_GrappleMove. It offsets the grapple point by the forward vector, pulls toward that anchor, consumes the cached pmove_velocity_gh pull speed at data_1008FEC0, clamps short pulls to a scaled length and long pulls to that speed, then marks the player off the ground plane. Retail keeps this separate from g_velocity_gh, which defaults to 1800 for the hook projectile path."
     },
     {
       "address": "0x10030120",
@@ -3417,7 +3417,7 @@
       "signature": "static void PM_LadderMove(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact ladder-movement path from bg_pmove.c::PM_LadderMove. Retail applies PM_Friction, builds a full-axis wish direction through PM_BuildWishMove3D, overrides explicit climb/descent input to +/-0.66 * speed, caps total wishspeed to the same 66% limit, accelerates with PM_Accelerate and pm_accelerate, clips against the ground plane when needed, and finishes with PM_SlideMove(qfalse)."
+      "comment": "Exact ladder-movement path from bg_pmove.c::PM_LadderMove. Retail applies PM_Friction, builds a full-axis wish direction through PM_BuildWishMove3D, overrides explicit climb/descent input to +/-0.66 * speed, caps total wishspeed to the same 66% limit, accelerates with PM_Accelerate and pm_accelerate, clips against the ground plane when needed, and finishes with PM_SlideMove(qfalse); fixtures pin the vertical clamp."
     },
     {
       "address": "0x10030360",
@@ -3427,7 +3427,7 @@
       "signature": "static void PM_CheckLadder(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact ladder probe from bg_pmove.c::PM_CheckLadder. Retail normalizes the horizontal forward vector, traces one unit ahead with `MASK_PLAYERSOLID`, and latches the ladder flag when the contacted surface carries `SURF_LADDER`."
+      "comment": "Exact ladder probe from bg_pmove.c::PM_CheckLadder. Retail normalizes the horizontal forward vector, traces one unit ahead with `MASK_PLAYERSOLID`, and latches the ladder flag when the contacted surface carries `SURF_LADDER`; the trace mask and surface gate are fixture-validated."
     },
     {
       "address": "0x10030430",
@@ -3487,7 +3487,7 @@
       "signature": "int PM_CorrectAllSolid(trace_t *trace)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_CorrectAllSolid, anchored by the preserved allsolid debug line. The retail helper jitters the origin across the 3x3x3 probe cube, retraces 0.25 units down into pml.groundTrace on success, and otherwise clears groundEntityNum plus groundTraceLatestEntNum/Time/Normal before dropping pml.groundPlane and pml.walking."
+      "comment": "Exact match for bg_pmove.c::PM_CorrectAllSolid, anchored by the preserved allsolid debug line. The retail helper jitters the origin across the 3x3x3 probe cube, retraces 0.25 units down into pml.groundTrace on success, and otherwise clears groundEntityNum before dropping pml.groundPlane and pml.walking; no replicated ground-trace history or latest-normal cache is present in playerState."
     },
     {
       "address": "0x10030DA0",
@@ -3497,7 +3497,7 @@
       "signature": "void PM_GroundTraceMissed(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_GroundTraceMissed, anchored by the preserved lift debug line. The retail body traces 64 units down when the floor falls away, chooses LEGS_JUMP or LEGS_JUMPB/PMF_BACKWARDS_JUMP from forwardmove, and then clears groundEntityNum, groundTraceLatestEntNum/Time/Normal, pml.groundPlane, and pml.walking."
+      "comment": "Exact match for bg_pmove.c::PM_GroundTraceMissed, anchored by the preserved lift debug line. The retail body traces 64 units down when the floor falls away, chooses LEGS_JUMP or LEGS_JUMPB/PMF_BACKWARDS_JUMP from forwardmove, and then clears groundEntityNum, pml.groundPlane, and pml.walking without touching a replicated ground-trace cache."
     },
     {
       "address": "0x10030ED0",
@@ -3507,7 +3507,7 @@
       "signature": "void PM_GroundTrace(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_GroundTrace. The retail flow traces 0.25 units down, routes allsolid recovery through PM_CorrectAllSolid, handles lift misses, kickoff dot > 10, and steep normals by setting pml.groundPlane without walking, records groundTraceLatestEntNum/Time/Normal on valid ground, clears PMF_TIME_WATERJUMP/PMF_TIME_LAND timers on landing, calls PM_CrashLand, applies the -200 z-velocity PMF_TIME_LAND/250 ms latch, updates PM_RecordGroundContact on fresh or changed ground, and finishes through PM_AddTouchEnt."
+      "comment": "Exact match for bg_pmove.c::PM_GroundTrace. The retail flow traces 0.25 units down into pml.groundTrace, routes allsolid recovery through PM_CorrectAllSolid, handles lift misses, kickoff dot > 10, and steep normals by setting pml.groundPlane without walking, clears PMF_TIME_WATERJUMP/PMF_TIME_LAND timers on landing, calls PM_CrashLand, applies the -200 z-velocity PMF_TIME_LAND/250 ms latch, stores only groundEntityNum in playerState, and finishes through PM_AddTouchEnt."
     },
     {
       "address": "0x10031140",
@@ -3587,7 +3587,7 @@
       "signature": "void PM_Animate(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_Animate. It inspects the gesture and voice-command buttons, starts the matching torso animation when the torso timer is idle, and emits the taunt event on the gesture path."
+      "comment": "Exact match for bg_pmove.c::PM_Animate. It inspects the gesture and voice-command buttons, starts the matching torso animation only when the torso timer is idle, gives gesture priority over voice commands, emits EV_TAUNT only on the gesture path, and uses the short 600 ms timer for the voice-command animations."
     },
     {
       "address": "0x10031E30",
@@ -3597,7 +3597,7 @@
       "signature": "void PM_DropTimers(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PM_DropTimers. The retail helper decrements pm_time, legsTimer, torsoTimer, and the crouch-slide timer while clearing the PMF_ALL_TIMES flags once the misc timer expires."
+      "comment": "Exact match for bg_pmove.c::PM_DropTimers. The retail helper decrements pm_time, legsTimer, torsoTimer, and the crouch-slide timer while clearing the PMF_ALL_TIMES flags once the misc timer expires; executable fixtures pin the partial-decay, expiry, animation-clamp, and crouch-slide gates."
     },
     {
       "address": "0x10031ED0",
@@ -3617,7 +3617,7 @@
       "signature": "void PmoveSingle(pmove_t *pmove)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact match for bg_pmove.c::PmoveSingle. The retail dispatcher seeds the pm globals, clamps msec, updates view angles, mirrors weaponPrimary/fov/forwardmove/rightmove/upmove into playerState, honors PMF_NO_MOVE before movement, branches through noclip/spectator/water/air/walk/grapple movement, then finishes with timers, weapons, footsteps, and final animation events."
+      "comment": "Exact match for bg_pmove.c::PmoveSingle. The retail dispatcher consumes the movement-profile flags already present in playerState, seeds the pm globals, removes body collision for dead players only when PW_INVULNERABILITY is inactive, clamps msec, honors PMF_NO_MOVE after updating commandTime, updates view angles, mirrors weaponPrimary/fov and signed command bytes at playerState +0x1dc/+0x1dd/+0x1de, branches through noclip/spectator/water/air/walk/grapple movement, recharges the progress-backed holdable timer from stats[12] toward stats[10] when the held-use flag is clear, then finishes with timers, weapons, footsteps, and final animation events."
     },
     {
       "address": "0x100323A0",
@@ -4641,7 +4641,7 @@
       "signature": "void ClientSpawn(gentity_t *ent)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Full retail player spawn/bootstrap boundary. It selects the spawn point, preserves the persistent and session state that survive respawn, rebuilds the playerstate and entity defaults for the new life, links the player at the chosen origin, and then fans into the deeper post-spawn loadout and finalization helper."
+      "comment": "Full retail player spawn/bootstrap boundary. It selects the spawn point, preserves the persistent and session state that survive respawn, rebuilds the playerstate and entity defaults for the new life, seeds the PMF_CROUCH_SLIDE / PMF_DOUBLE_JUMP / PMF_AIR_CONTROL profile bits from the active movement globals, links the player at the chosen origin, and then fans into the deeper post-spawn loadout and finalization helper."
     },
     {
       "address": "0x1003C7E0",
@@ -6449,7 +6449,7 @@
         "0x10087710"
       ],
       "relocation_refs": [],
-      "comment": "Initial game cvar-table registration pass that tracks custom settings, clamps gametype, and explicitly registers g_version."
+      "comment": "Initial game cvar-table registration pass that tracks custom settings, clamps gametype, and explicitly registers g_version. The adjacent retail cvar-table slab also owns the `pmove_*` registrations at 0x1008F7C4..0x1008FB20; source reconstruction keeps them in split `g_pmove.c` but now preserves the recovered default strings, 0x00100000/0x00104000/0x00140000/0x00144000 flag groups, and callback/no-callback split."
     },
     {
       "address": "0x100549E0",
@@ -6475,7 +6475,7 @@
         "0x10087318"
       ],
       "relocation_refs": [],
-      "comment": "Main cvar update pass that tracks modification counts, refreshes custom settings state, and fans out follow-on handlers."
+      "comment": "Main cvar update pass that tracks modification counts, invokes per-entry callback leaves, refreshes custom settings state, and fans out follow-on handlers. The pmove slab callbacks update cached movement globals, while `pmove_AirControl`, `pmove_CrouchSlide`, and `pmove_DoubleJump` intentionally have null callback slots."
     },
     {
       "address": "0x10054F00",

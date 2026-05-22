@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-05-20
+Last updated: 2026-05-22
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -40,6 +40,624 @@ disabled, until a documented open replacement path exists.
   snapshots, not current gap ledgers.
 
 ## Recent closure
+
+### Task A30: Restore retail scoreboard feeder dispatch and team-row selection [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_main.c`,
+`tests/test_cgame_displaycontext_parity.py`
+Parity estimate: **before 94% -> after 100%** for scoped scoreboard feeder
+dispatch, feeder-local row mapping, selection cursor synchronization, and
+invalid-row guard behavior; repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked cgame `CG_FeederCount`, `CG_SetScoreSelection`,
+   `CG_InfoFromScoreIndex`, `CG_FeederItemText`, and `CG_FeederSelection`
+   against the Binary Ninja HLIL feeder block and the committed cgame symbol
+   map.
+2. Restored retail text-dispatch ownership: red/blue team-list feeders enter
+   the team-list leaves, red/blue stats feeders enter the rich stats leaves, and
+   all other text feeder requests fall back to the race or normal scoreboard
+   leaf instead of being misrouted through team-list fallbacks.
+3. Restored explicit team-local row mapping for team scoreboard cursors while
+   keeping `cg.selectedScore` as the absolute `cg.scores` row used by cgame.
+4. Hardened score-row lookup so invalid feeder rows return no row context
+   instead of indexing past `cg.scores`.
+5. Updated cgame display-context parity tests and reran the focused scoreboard
+   suite.
+
+### Task A29: Restore retail `pmove_*` cvar registration and callback wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_pmove.c`, `src/code/game/g_main.c`,
+`src/game/g_config.c`, `tools/tests/test_pmove_settings_configstring.py`,
+`tests/test_game_factory_regen_parity.py`,
+`references/symbol-maps/qagame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 92% -> after 100%** for scoped `pmove_*` cvar
+default, flag, callback, cache, and transport wiring; repo-wide remains
+**98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the qagame cvar-table slab at `0x1008F7C4..0x1008FB20`,
+   confirming the 36 retail `pmove_*` names, default strings, and four observed
+   registration flag groups.
+2. Restored those high-bit retail flags in the split `g_pmove.c` registration
+   owner instead of registering every pmove cvar with flag `0`.
+3. Revalidated the surrounding cache, custom-setting, configstring, and cgame
+   compact-parser wiring; no payload order change was needed.
+4. Added structural coverage that pins each `pmove_*` registration's default
+   and flag group against the recovered retail table.
+5. Reconstructed the retail callback-backed update path for the pmove cvar
+   slab: all callback-backed entries now update through named mirrors and the
+   three callback-less profile toggles (`pmove_AirControl`, `pmove_CrouchSlide`,
+   and `pmove_DoubleJump`) remain suppressed just like the retail table.
+6. Restored the cached lower-bound behavior observed in `G_InitPublishedCvarState`
+   and the pmove callbacks: `pmove_velocity_gh`,
+   `pmove_JumpVelocityTimeThreshold`, and
+   `pmove_JumpVelocityTimeThresholdOffset` now clamp to retail's `0.001`
+   minimum before publication.
+7. Rechecked the adjacent grapple-speed ownership: retail `PM_GrappleMove`
+   reads the dedicated `pmove_velocity_gh` cache, while `g_velocity_gh`
+   remains a separate projectile-speed cvar with the recovered `1800` default.
+   Source now keeps those paths decoupled and updates the grappling-hook
+   custom-settings comparison accordingly.
+8. Re-ran the full-name `pmove_*` sweep and classified `pmove_fixed` /
+   `pmove_msec` as legacy fixed-timestep controls outside the 36-entry QL
+   factory-managed tuning slab. Coverage now pins their `0` / `8` defaults,
+   server-side `CVAR_SYSTEMINFO` registration, cgame mirrors, `8..33` clamp,
+   and shared `Pmove` chunking behavior.
+
+### Task A28: Re-audit retail step/crouch-step/chain-jump takeoff wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_pmove.c`,
+`references/symbol-maps/qagame.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_pmove_helper_parity.py`,
+`tests/test_pmove_movement_fixtures.py`
+Parity estimate: **before 91% -> after 100%** for scoped crouch-step,
+step-jump, and chain-jump takeoff wiring; repo-wide remains **98%**
+pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_StepSlideMove` at `0x1002EFE0`, cgame
+   `PM_StepSlideMove` at `0x100034B0`, and the shared qagame/cgame
+   `PM_ApplyJumpTakeoff` leaves at `0x1002E2C0` / `0x10002790`.
+2. Restored the missing normal step-jump takeoff latch so both normal
+   step-jump and crouch-step fallback paths select `pmove_StepJumpVelocity`
+   in the additive retail branches, while normal jumps continue to use
+   `pmove_ChainJumpVelocity`.
+3. Corrected chain-jump mode wiring so PMF_AIR_CONTROL overrides disabled
+   `pmove_ChainJump` mode `0`, the post-offset air-control addend fades to
+   base velocity at `pmove_JumpVelocityTimeThreshold`, and max clamping applies
+   after additive and ramp-accumulated takeoff velocity.
+4. Added executable fixtures that pin mode `0` air-control override,
+   late-window air-control fade, normal step additive takeoff, crouch-step
+   additive takeoff, step-jump scale-mode takeoff, step-jump air-control edge
+   profiles, and non-ramp max clamping.
+
+### Task A27: Pin pmove command/vector math helper contracts [COMPLETED]
+Priority: High
+Primary areas: `tests/test_pmove_movement_fixtures.py`,
+`tests/test_pmove_helper_parity.py`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 95% -> after 100%** for scoped executable evidence
+coverage of the retail `PM_ClipVelocity`, `PM_Accelerate`, `PM_CmdScale`, and
+`PM_SetMovementDir` math helpers; repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_ClipVelocity`, `PM_Accelerate`, `PM_CmdScale`, and
+   `PM_SetMovementDir` against the cgame twins and the shared source helpers
+   reached by walk, air, water, ladder, fly, and noclip movement.
+2. Added executable fixtures for overbounce clip branches, acceleration clamp
+   and overspeed no-op behavior, zero/axial/2D-diagonal/3D-diagonal command
+   scaling, and the full movementDir 0..7 ring plus idle side-strafe snaps.
+3. Updated structural tests, symbol-map comments, and mapping notes so the
+   command/vector layer beneath the movement leaves is source-validated.
+
+### Task A26: Pin low-level pmove animation helper gates [COMPLETED]
+Priority: High
+Primary areas: `tests/test_pmove_movement_fixtures.py`,
+`tests/test_pmove_helper_parity.py`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 96% -> after 100%** for scoped executable evidence
+coverage of the retail low-level pmove animation start/continue/force gates;
+repo-wide remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_StartTorsoAnim`, `PM_ContinueLegsAnim`, and
+   `PM_ForceLegsAnim` against the cgame twins plus the source-local
+   `PM_StartLegsAnim` / `PM_ContinueTorsoAnim` call chain they expose.
+2. Added executable fixtures for torso toggle-bit writes, `PM_DEAD`
+   suppression, legs high-priority timer no-ops, current-animation no-ops,
+   torso high-priority timer no-ops, and the `PM_ForceLegsAnim` timer-clear
+   behavior before the live/dead start gate.
+3. Updated structural tests, symbol-map comments, and mapping notes so the
+   animation helpers beneath jump, footstep, weapon, and gesture paths are
+   source-validated.
+
+### Task A25: Pin PM_AddEvent and PM_AddTouchEnt queue wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/test_pmove_movement_fixtures.py`,
+`tests/test_pmove_helper_parity.py`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 97% -> after 100%** for scoped executable evidence
+coverage of the retail pmove predictable-event and touch-entity queue helpers;
+repo-wide remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_AddEvent` / `PM_AddTouchEnt` at `0x1002DAF0` /
+   `0x1002DB20`, cgame `PM_AddEvent` / `PM_AddTouchEnt` at `0x10001FC0` /
+   `0x10001FF0`, and their downstream use from trace/event leaves.
+2. Added executable pmove fixtures for the predictable-event two-slot wrap with
+   zero event parms and for the touch accumulator's `ENTITYNUM_WORLD`,
+   duplicate-suppression, and `MAXTOUCH` cap gates.
+3. Updated structural tests, symbol-map comments, and mapping notes so the
+   low-level queues behind ground contacts, weapon events, water events, and
+   prediction are source-validated.
+
+### Task A24: Pin PM_DropTimers misc and animation timer decay [COMPLETED]
+Priority: High
+Primary areas: `tests/test_pmove_movement_fixtures.py`,
+`tests/test_pmove_helper_parity.py`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 96% -> after 100%** for scoped executable evidence
+coverage of the retail `PM_DropTimers` misc-time, animation-timer, and
+crouch-slide decay behavior; repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_DropTimers` at `0x10031E30`, cgame `PM_DropTimers` at
+   `0x10006300`, and the `PmoveSingle` spectator/noclip/tail call sites against
+   the committed pmove evidence.
+2. Added executable fixture coverage for partial `pm_time` decay, exact/overrun
+   misc timer expiry, `PMF_ALL_TIMES` clearing while preserving unrelated flags,
+   independent legs/torso animation timer clamps, and the existing crouch-slide
+   ground-plane decay gate.
+3. Updated structural tests, symbol-map comments, and mapping notes so the
+   timer helper is covered as a first-class reconstructed source leaf.
+
+### Task A23: Pin PM_TorsoAnimation ready-idle wiring [COMPLETED]
+Priority: High
+Primary areas: `tests/test_pmove_movement_fixtures.py`,
+`tests/test_pmove_helper_parity.py`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 97% -> after 100%** for scoped executable evidence
+coverage of the retail `PM_TorsoAnimation` ready-state idle split and inherited
+timer/dead-player suppression behavior; repo-wide remains **98%** pending the
+active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_TorsoAnimation` at `0x1002DB80`, cgame
+   `PM_TorsoAnimation` at `0x10002050`, and the surrounding `PmoveSingle` tail
+   calls against the committed Ghidra function lattice.
+2. Added executable pmove fixture coverage for the ready gauntlet
+   `TORSO_STAND2` branch, the default ready `TORSO_STAND` branch, the
+   high-priority torso-timer no-op, the non-ready weaponstate no-op, and the
+   inherited `PM_DEAD` animation-start suppression.
+3. Updated structural tests, symbol-map comments, and pmove mapping notes so
+   the post-weapon torso-idle helper is pinned by source behavior rather than
+   only by normalized names.
+
+### Task A22: Pin PM_Animate command-button source behavior [COMPLETED]
+Priority: High
+Primary areas: `tests/test_pmove_movement_fixtures.py`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 96% -> after 100%** for scoped executable evidence
+coverage of the retail `PM_Animate` command-button priority, torso-timer gate,
+and predictable-event behavior; repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_Weapon`, `PM_Animate`, and `PmoveSingle` tail ordering
+   against the committed qagame/cgame Ghidra evidence and found no
+   production-source mismatch in the dispatcher tail.
+2. Added an executable pmove fixture for the shared `PM_Animate` leaf covering
+   gesture priority over voice commands, the long gesture timer plus `EV_TAUNT`
+   event, the retail voice-command priority order, the 600 ms voice timer, and
+   the existing-torso-timer suppression gate.
+3. Updated the symbol maps and reverse-engineering notes so the mapped
+   animation/timer helper records the tested source behavior instead of relying
+   only on structural matching.
+
+### Task A21: Pin 3D water and ladder pmove leaves with executable fixtures [COMPLETED]
+Priority: High
+Primary areas: `tests/test_pmove_movement_fixtures.py`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 94% -> after 100%** for scoped executable evidence
+coverage of the retail water-jump, water-idle, ladder-probe, and ladder-move
+leaves; repo-wide remains **98%** pending the active portability/runtime-evidence
+gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_CheckDuck`, `PM_Footsteps`, and `PM_Weapon` against the
+   committed qagame/cgame Ghidra decompiles and found no production-source
+   mismatch in that tail corridor.
+2. Extended the pmove movement fixture harness with deterministic trace and
+   pointcontents probes for the adjacent 3D movement leaves.
+3. Added executable coverage for the retail `MASK_PLAYERSOLID` + `SURF_LADDER`
+   ladder probe, the `0.66 * speed` ladder climb/descent clamp, the two-deep
+   water-jump solid-lip/clearance sequence, and the idle `-60` water sink
+   fallback through `PM_WaterMove`.
+
+### Task A20: Rewire pmove_ChainJump as the retail jump velocity mode [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_public.h`,
+`src/code/game/bg_pmove.c`, `src/code/game/g_pmove.c`,
+`src/code/cgame/cg_servercmds.c`,
+`references/symbol-maps/qagame.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`tests/test_pmove_helper_parity.py`,
+`tests/test_pmove_movement_fixtures.py`,
+`tools/tests/test_pmove_settings_configstring.py`
+Parity estimate: **before 97% -> after 100%** for scoped
+`pmove_ChainJump` mode transport and takeoff-branch wiring; repo-wide remains
+**98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the qagame cvar refresh evidence where `pmove_ChainJump`'s
+   integer slot is copied into the cached jump velocity selector, then matched
+   it against the recovered `PM_ApplyJumpTakeoff` velocity-mode branches.
+2. Promoted `pmove_settings_t.chainJump` from a boolean to an integer mode and
+   carried that value through server cvar caching, compact configstring
+   serialization, cgame compact parsing, and the legacy JSON fallback parser.
+3. Updated the shared takeoff selector so mode `0` disables chain-jump timing,
+   mode `1` uses the gradient scaler, mode `2` reaches the additive branch, and
+   PMF_AIR_CONTROL still selects the retail air-control additive branch.
+4. Added executable pmove fixtures that pin the vertical takeoff results for
+   modes `0`, `1`, and `2`, plus the air-control override path.
+
+### Task A19: Restore retail pmove jump-takeoff velocity modes [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_pmove.c`,
+`src/code/game/bg_pmove_jump.h`, `references/symbol-maps/qagame.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_jump_velocity_scaling.py`, `tests/test_pmove_helper_parity.py`,
+`tests/test_pmove_jump_timing_parity.py`,
+`tests/test_crouch_step_prediction.py`,
+`tests/test_pmove_validation_fixtures.py`,
+`tests/pmove_validation_harness.c`
+Parity estimate: **before 96% -> after 100%** for scoped
+`PM_ApplyJumpTakeoff` vertical velocity-mode reconstruction; repo-wide remains
+**98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_ApplyJumpTakeoff` at `0x1002E2C0`, cgame
+   `PM_ApplyJumpTakeoff` at `0x10002790`, and `PM_LoadMoveTuningConstants`
+   against the committed HLIL and Ghidra evidence.
+2. Replaced the source-only wrapper-side `pmove_StepJumpVelocity` addition with
+   the retail takeoff velocity-mode block: normal chain jumps use the gradient
+   scaler, PMF_AIR_CONTROL switches to the additive chain/step branch, and
+   ramp-jump accumulation applies to vertical velocity before the max clamp.
+3. Updated structural, helper, and executable pmove fixtures to pin the
+   gradient `cmd.serverTime - jumpTime` behavior and the crouch-step fallback
+   velocity produced by the shared takeoff leaf.
+
+### Task A18: Align pmove playerState byte mirrors and item timer stats [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/q_shared.h`, `src/code/qcommon/msg.c`,
+`src/code/game/bg_pmove.c`, `src/code/game/bg_public.h`,
+`src/code/game/g_active.c`, `src/code/game/g_team.c`,
+`src/code/cgame/cg_newdraw.c`, `references/symbol-maps/qagame.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_playerstate_replication.py`,
+`tests/test_invulnerability_move_parity.py`,
+`tests/test_pmove_movement_fixtures.py`
+Parity estimate: **before 92% -> after 100%** for scoped pmove
+playerState sidecar layout, command-mirror transport, and progress-backed
+holdable timer wiring; repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the retail engine playerState netfield table plus cgame/qagame
+   `PmoveSingle` decompiles, confirming `clientNum` at `0x88`, `location` at
+   `0x8c`, and signed command mirrors at byte offsets `0x1dc..0x1de`.
+2. Rebuilt the shared `playerState_t` prefix to match those offsets, moved
+   source-only local sidecars after the retail replicated prefix, and taught
+   `MSG_WriteDeltaPlayerstate` / `MSG_ReadDeltaPlayerstate` to encode the
+   command mirrors as one-byte fields without clobbering adjacent bytes.
+3. Reconstructed the progress-backed holdable timer as retail stats slots
+   `STAT_PLAYER_ITEM_TIME_MAX`, `STAT_PLAYER_ITEM_TIME`, and
+   `STAT_PLAYER_ITEM_RECHARGE`, including the PmoveSingle recharge clamp and
+   the invulnerability move stale/clear gates.
+4. Added server location mirroring into `ps.location`, moved the
+   `CG_PLAYER_ITEM` overlay to the stats-backed timer slots, and pinned the
+   recovered offsets and round-trip behavior with executable replication tests.
+
+### Task A17: Remove source-only replicated ground-trace cache [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/q_shared.h`, `src/code/qcommon/msg.c`,
+`src/code/game/bg_pmove.c`, `references/symbol-maps/qagame.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_pmove_helper_parity.py`, `tests/test_pmove_jump_timing_parity.py`
+Parity estimate: **before 99% -> after 100%** for scoped
+playerState ground-trace layout and `PM_GroundTrace` storage parity; repo-wide
+remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked cgame `PM_GroundTrace` at `0x100053A0`, qagame `PM_GroundTrace`
+   at `0x10030ED0`, and the adjacent `PM_CheckDuck` playerState offset evidence
+   against the committed Ghidra decompile.
+2. Removed the reconstruction-only `groundTraceHistory*` and
+   `groundTraceLatest*` playerState fields plus their delta replication, leaving
+   the retail `groundEntityNum` store as the only replicated ground-trace state.
+3. Rewired ramp-jump reconstruction to consult the current frame-local
+   `pml.groundTrace` normal instead of a non-retail playerState cache, and
+   updated symbol-map/docs/tests to pin the layout boundary.
+
+### Task A16: Restore autoHop-only held-jump release wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_pmove.c`,
+`src/code/game/bg_slidemove.c`, `references/symbol-maps/qagame.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_pmove_helper_parity.py`, `tests/test_step_jump_gate_parity.py`,
+`tests/test_pmove_movement_fixtures.py`
+Parity estimate: **before 99% -> after 100%** for scoped
+`PM_CheckJump` / `PM_CanStepJump` held-release parity; repo-wide remains
+**98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_CanStepJump` at `0x1002E510` and `PM_CheckJump` at
+   `0x1002E590`, plus the cgame twins at `0x100029E0` and `0x10002A60`,
+   against the committed HLIL and compact pmove-setting parse order.
+2. Restored the retail release-bypass split: `autoHop` can bypass the held-jump
+   release requirement unless `PMF_REQUIRE_JUMP_RELEASE` is set, while
+   `bunnyHop` remains separate movement tuning and no longer bypasses release.
+3. Added structural and executable fixture coverage so both normal jump and
+   step-jump gates reject held input when only bunny-hop tuning is enabled.
+
+### Task A15: Restore retail step-jump crouch fallback wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_slidemove.c`,
+`src/code/game/bg_pmove.c`, `references/symbol-maps/qagame.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_step_jump_gate_parity.py`,
+`tests/test_pmove_validation_fixtures.py`,
+`tests/pmove_validation_harness.c`,
+`tests/test_crouch_step_prediction.py`,
+`tests/test_pmove_helper_parity.py`
+Parity estimate: **before 98% -> after 100%** for scoped
+`PM_StepSlideMove` step-jump gate and crouch-fallback parity; repo-wide
+remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_StepSlideMove` at `0x1002EFE0`, cgame
+   `PM_StepSlideMove` at `0x100034B0`, and the adjacent
+   `PM_CanStepJump` / `PM_CanCrouchStepJump` leaves against the committed
+   HLIL plus qagame Ghidra decompile.
+2. Replaced the source-only recent-ground-history step-jump delay helper with
+   the retail `cmd.serverTime - jumpTime >= jumpTimeDeltaMin` gate.
+3. Restored the retail branch split where the general `PM_CanStepJump` recheck
+   launches the normal step jump, while the failed-general path can still run
+   the crouch-step fallback through `PM_CanCrouchStepJump` and the shrunken-box
+   clearance trace.
+4. Added direct and executable fixtures for the crouch-step fallback, including
+   the no-upmove case that retail permits after the general gate rejects the
+   command, and corrected the cgame `PM_StepSlideMove` symbol signature back to
+   the one-argument retail boundary.
+
+### Task A14: Restore exact invulnerability pmove timer gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_pmove.c`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_invulnerability_move_parity.py`,
+`tests/test_pmove_movement_fixtures.py`
+Parity estimate: **before 99% -> after 100%** for scoped
+`PM_InvulnerabilityMove` timer-gate and holdable-clear parity; repo-wide
+remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_InvulnerabilityMove` at `0x1002FA80` and cgame
+   `PM_InvulnerabilityMove` at `0x10003F50` against the committed HLIL,
+   focusing on the held-item dispatch predicate and timer-collapse block.
+2. Restored the exact retail stale-timer gate
+   `STAT_PLAYER_ITEM_RECHARGE != 0 && STAT_PLAYER_ITEM_TIME == 0`, allowing
+   negative countdown remnants to enter the active decay path instead of being
+   filtered by a broader signed range test.
+3. Moved the pending holdable-slot clear under the timer clamp and tied it to
+   `STAT_PLAYER_ITEM_RECHARGE == 0`, matching the retail collapse point.
+4. Added structural and executable pmove coverage for exact zero with a max
+   timer, negative decay with a max timer, and zero with no max timer.
+
+### Task A13: Remove source-only flight-thrust pmove override [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_pmove.c`,
+`src/code/game/bg_public.h`, `src/code/game/g_main.c`,
+`src/code/game/g_pmove.c`, `src/code/cgame/cg_servercmds.c`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_pmove_helper_parity.py`,
+`tests/test_game_factory_regen_parity.py`,
+`tools/tests/test_pmove_settings_configstring.py`
+Parity estimate: **before 99% -> after 100%** for scoped `PM_FlyMove`
+and `g_flightThrust` wiring parity; repo-wide remains **98%** pending the
+active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PM_FlyMove` at `0x1002FA20` and cgame `PM_FlyMove` at
+   `0x10003EF0` against the committed HLIL; both retail bodies run
+   `PM_Friction`, `PM_BuildWishMove3D`, `PM_Accelerate(..., 8)`, and
+   `PM_StepSlideMove(qfalse)` without a flight-thrust branch.
+2. Confirmed `g_flightThrust` is still a retail qagame cvar table entry with
+   default `1200`, but its vmCvar storage is not referenced by the shared pmove
+   leaf or pmove settings transport.
+3. Removed the source-only `flightThrust` field from `pmove_settings_t`, the
+   compact/JSON pmove settings payload extension, and `PM_FlyMove`, while
+   keeping the retail cvar registration.
+4. Updated symbol-map/docs evidence and regression tests to pin the
+   no-override movement leaf and cvar registration boundary.
+
+### Task A12: Restore invulnerability-aware dead pmove collision gate [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_pmove.c`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_pmove_helper_parity.py`,
+`tests/test_pmove_movement_fixtures.py`
+Parity estimate: **before 99% -> after 100%** for scoped `PmoveSingle`
+dead-player trace-mask parity; repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `PmoveSingle` at `0x10031FA0` and cgame `PmoveSingle` at
+   `0x10006470` against the committed Ghidra evidence, focusing on the top
+   tracemask gate before command-time handling.
+2. Restored the retail condition that clears `CONTENTS_BODY` from the pmove
+   trace mask only when `STAT_HEALTH <= 0` and `PW_INVULNERABILITY` is not
+   active, preserving body collision for invulnerable dead-player states.
+3. Updated symbol-map and mapping documentation to record the paired
+   health/powerup gate.
+4. Added structural and executable pmove coverage for the dispatcher ordering
+   and both dead-player tracemask outcomes.
+
+### Task A11: Move pmove profile-bit ownership back to spawn wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_client.c`, `src/code/game/g_pmove.c`,
+`src/code/game/bg_pmove.c`, `src/code/game/g_local.h`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_pmove_helper_parity.py`, `tests/test_pmove_crouch_time_parity.py`,
+`tests/test_pmove_crouch_slide_friction_parity.py`,
+`tests/pmove_validation_harness.c`
+Parity estimate: **before 99% -> after 100%** for scoped pmove
+profile-flag ownership and prediction wiring parity; repo-wide remains
+**98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `ClientSpawn` at `0x1003BC30` and shared
+   `PmoveSingle` at qagame `0x10031FA0` / cgame `0x10006470` against the
+   committed Ghidra evidence.
+2. Restored the retail ownership split where spawn seeds
+   `PMF_CROUCH_SLIDE`, `PMF_DOUBLE_JUMP`, and `PMF_AIR_CONTROL` from the
+   active movement profile, while `PmoveSingle` consumes those replicated
+   bits instead of deriving them from settings every frame.
+3. Rewired crouch-slide friction and air double-jump acceptance to respect
+   the profile flags directly, preserving the existing tuning fields for
+   friction strength, jump velocity, and prediction-side settings.
+4. Updated symbol-map/docs evidence and regression fixtures to lock the spawn
+   profile helper, shared pmove dispatcher order, crouch-slide friction gate,
+   and double-jump latch behavior.
+
+### Task A10: Reconstruct compact pmove settings configstring wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_pmove.c`,
+`src/code/cgame/cg_servercmds.c`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`tests/test_pmove_helper_parity.py`,
+`tools/tests/test_pmove_settings_configstring.py`
+Parity estimate: **before 99% -> after 100%** for scoped pmove
+settings transport/source wiring parity; repo-wide remains **98%** pending
+the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked `CG_ParsePmoveConfigString` at `0x10048F30` against the committed
+   cgame Ghidra/HLIL evidence and mapped the retail 33-token compact numeric
+   payload order, including the non-negative clamps on the recovered
+   threshold and velocity fields.
+2. Replaced the reconstruction-only JSON `CS_PMOVE_SETTINGS` server payload
+   with the compact retail token stream from `G_PmoveSerializeSettings`, while
+   retaining current source-only fields as a trailing extension after the
+   retail core.
+3. Rewired cgame parsing so compact payloads take the retail path, JSON remains
+   only as a backward-compatible fallback for older local artifacts, and
+   reload timing stays owned by the dedicated compact reload configstring.
+4. Updated symbol-map/docs evidence and regression tests to pin the recovered
+   token order, clamp behavior, extension boundary, and JSON fallback.
+
+### Task A9: Contain inherited Quake III service endpoints behind the online-services policy [COMPLETED]
+Priority: High
+Primary areas: `src/code/qcommon/qcommon.h`, `src/code/client/cl_main.c`,
+`src/code/server/`, `src/common/platform/platform_config.h`,
+`docs/reverse-engineering/network-handshake.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_73.md`,
+`docs/steam_platform_abstraction.md`, `tests/test_platform_services.py`
+Parity estimate: **before 98% -> after 98%** repo-wide; scoped
+network-service policy parity improves from **82% -> 94%**.
+
+Completed work:
+
+1. Confirmed from the retail Quake Live evidence that the retained game port
+   remains `27960`, while the inherited Quake III update, master, and
+   authorize hostnames are not retail QL Steam service evidence.
+2. Added `QL_ENABLE_LEGACY_Q3_SERVICES`, defaulted it off, and forced it off
+   whenever `QL_BUILD_ONLINE_SERVICES=0`, so default builds no longer resolve
+   the retired `*.quake3arena.com` hosts.
+3. Kept `PORT_SERVER` and the LAN server-port scan range unconditional, while
+   quarantining `UPDATE_SERVER_NAME`, `MASTER_SERVER_NAME`,
+   `AUTHORIZE_SERVER_NAME`, `PORT_MASTER`, `PORT_UPDATE`, and
+   `PORT_AUTHORIZE` behind the legacy-service gate.
+4. Restored the retail `sv_master` heartbeat gate as `sv_masterAdvertise` and
+   left the older `sv_master1` through `sv_master5` array as an explicitly
+   configured compatibility lane.
+5. Replaced default build calls into the legacy Q3 MOTD, master query,
+   authorize, getIpAuthorize, and remote-ban flows with policy-visible stubs
+   or local challenge responses, and covered the boundary with focused tests.
 
 ### Task A8: Re-audit renderer source and host wiring, then remove the non-retail FontStash prebuild [COMPLETED]
 Priority: High
@@ -5521,9 +6139,10 @@ Completed work:
 
 ## Working priority order
 
-1. Resolve the online-service compatibility boundary and evidence story.
-2. Re-baseline the non-Windows portability lanes.
-3. Refresh archived build/runtime evidence on current toolchains.
+1. Re-baseline the non-Windows portability lanes.
+2. Refresh archived build/runtime evidence on current toolchains.
+3. Keep the online-service compatibility boundary explicitly documented if a
+   future open replacement path is introduced.
 
 ## Reference audits for closed surfaces
 

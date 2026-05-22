@@ -13,6 +13,23 @@ def _normalize_whitespace(text: str) -> str:
 	return " ".join(text.split())
 
 
+def _block_from_marker(source: str, marker: str) -> str:
+	start = source.index(marker)
+	brace_start = source.index("{", start)
+	depth = 0
+
+	for index in range(brace_start, len(source)):
+		char = source[index]
+		if char == "{":
+			depth += 1
+		elif char == "}":
+			depth -= 1
+			if depth == 0:
+				return source[start:index + 1]
+
+	raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
 def test_mapping_round_100_records_rg_p5_closure_without_invented_aliases() -> None:
 	mapping_round = _read("docs/reverse-engineering/quakelive_steam_mapping_round_100.md")
 	normalized = _normalize_whitespace(mapping_round)
@@ -72,6 +89,60 @@ def test_representative_rg_g06_helper_seams_remain_present_in_source() -> None:
 	assert "void RB_TestFlare( flare_t *f ) {" in tr_flares
 	assert "static void GLW_StartOpenGL( void )" in win_glimp
 	assert "void GLimp_Init( void )" in win_glimp
+
+
+def test_renderer_advertisement_debug_labels_use_host_text() -> None:
+	tr_world = _read("src/code/renderer/tr_world.c")
+	block = _block_from_marker(tr_world, "static void R_DrawAdvertisementDebugText")
+
+	for expected in (
+		"#define R_DEBUG_ADVERTISEMENT_TEXT_X\t\t25",
+		"#define R_DEBUG_ADVERTISEMENT_TEXT_Y\t\t256",
+		"#define R_DEBUG_ADVERTISEMENT_TEXT_STEP\t16",
+		"#define R_DEBUG_ADVERTISEMENT_TEXT_SCALE\t( 16.0f / 48.0f )",
+		"RE_DrawScaledText( R_DEBUG_ADVERTISEMENT_TEXT_X, y, text,",
+		"0, R_DEBUG_ADVERTISEMENT_TEXT_SCALE, 0, NULL, qtrue, color );",
+	):
+		assert expected in tr_world
+
+	assert "DrawStretchPic" not in block
+	assert "charSetShader" not in block
+
+
+def test_renderer_mapping_round_37_keeps_ambient_and_directed_scaling_retail_parity() -> None:
+	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
+	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt")
+	hlil_part06 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt")
+	ghidra = _read("references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c")
+	tr_init = _read("src/code/renderer/tr_init.c")
+	tr_light = _read("src/code/renderer/tr_light.c")
+	cvar_matrix = _read("docs/renderer_cvar_matrix.md")
+
+	assert aliases["sub_44A810"] == "R_SetupEntityLightingGrid"
+	assert (
+		'data_1740d44("r_ambientScale", &data_52f68c, &data_551624, &data_52f690, 0x81800)'
+		in hlil_part02
+	)
+	assert 'data_1743c14 = data_1740d40("r_directedScale", &data_551624, 0x200)' in hlil_part02
+	assert '0052f67c  char const data_52f67c[0xf] = "r_ambientScale", 0' in hlil_part06
+	assert "0052f68c                                      31 30 00 00" in hlil_part06
+	assert "0052f690                                                  31 30 30 00" in hlil_part06
+	assert '0052f474  char const data_52f474[0x10] = "r_directedScale", 0' in hlil_part06
+
+	for offset in ("0xa4", "0xa8", "0xac"):
+		assert f"*(float *)(param_1 + {offset}) = *(float *)(DAT_01740f88 + 0x2c)" in ghidra
+	for offset in ("0xb4", "0xb8", "0xbc"):
+		assert f"*(float *)(param_1 + {offset}) = *(float *)(DAT_01743c14 + 0x2c)" in ghidra
+
+	assert 'r_ambientScale = ri.Cvar_Get( "r_ambientScale", "10", CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert 'r_directedScale = ri.Cvar_Get( "r_directedScale", "1", CVAR_CHEAT );' in tr_init
+	assert "AssertCvarRange( r_ambientScale, 1, 100, qtrue );" in tr_init
+	assert tr_light.index("VectorScale( ent->ambientLight, totalFactor, ent->ambientLight );") < tr_light.index("VectorScale( ent->ambientLight, r_ambientScale->value, ent->ambientLight );")
+	assert tr_light.index("VectorScale( ent->directedLight, totalFactor, ent->directedLight );") < tr_light.index("VectorScale( ent->directedLight, r_directedScale->value, ent->directedLight );")
+	assert tr_light.index("VectorScale( ent->ambientLight, r_ambientScale->value, ent->ambientLight );") < tr_light.index("VectorScale( ent->directedLight, r_directedScale->value, ent->directedLight );")
+	assert tr_light.index("VectorScale( ent->directedLight, r_directedScale->value, ent->directedLight );") < tr_light.index("VectorNormalize2( direction, ent->lightDir );")
+	assert "`r_ambientScale` | Protected/VM-created/cloud `10`." in cvar_matrix
+	assert "`r_directedScale` | Cheat `1`." in cvar_matrix
 
 
 def test_renderer_mapping_round_278_promotes_tail_postprocess_and_command_symbols() -> None:

@@ -4650,6 +4650,17 @@ static qboolean CG_IsScoreboardFeeder( float feederID ) {
 
 /*
 =============
+CG_IsTeamListFeeder
+
+Returns qtrue when the feeder id targets a retail red or blue team list.
+=============
+*/
+static qboolean CG_IsTeamListFeeder( float feederID ) {
+	return ( feederID == FEEDER_REDTEAM_LIST || feederID == FEEDER_BLUETEAM_LIST ) ? qtrue : qfalse;
+}
+
+/*
+=============
 CG_IsTeamStatsFeeder
 
 Returns qtrue when the feeder id targets one of the rich end-score team stats
@@ -4679,7 +4690,75 @@ static int CG_GetFeederTeam( float feederID ) {
 	return -1;
 }
 
+/*
+=============
+CG_ScoreIndexFromTeamRow
 
+Maps a team-list local row back to the absolute cg.scores row used by cgame.
+=============
+*/
+static int CG_ScoreIndexFromTeamRow( int teamRow, int team ) {
+	int		i;
+	int		count;
+
+	if ( teamRow < 0 ) {
+		return -1;
+	}
+
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return ( teamRow < cg.numScores ) ? teamRow : -1;
+	}
+
+	count = 0;
+	for ( i = 0; i < cg.numScores; i++ ) {
+		if ( cg.scores[i].team != team ) {
+			continue;
+		}
+
+		if ( count == teamRow ) {
+			return i;
+		}
+
+		count++;
+	}
+
+	return -1;
+}
+
+/*
+=============
+CG_TeamRowFromScoreIndex
+
+Maps an absolute cg.scores row to the retail team-list local row.
+=============
+*/
+static int CG_TeamRowFromScoreIndex( int scoreIndex, int team ) {
+	int		i;
+	int		count;
+
+	if ( scoreIndex < 0 || scoreIndex >= cg.numScores ) {
+		return -1;
+	}
+
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return scoreIndex;
+	}
+
+	count = 0;
+	for ( i = 0; i < cg.numScores; i++ ) {
+		if ( cg.scores[i].team != team ) {
+			continue;
+		}
+
+		if ( i == scoreIndex ) {
+			return count;
+		}
+
+		count++;
+	}
+
+	return -1;
+}
 
 /*
 =============
@@ -4757,12 +4836,16 @@ void CG_SetScoreSelection( void *p ) {
 
 	if ( cgs.gametype >= GT_TEAM ) {
 		int feeder = FEEDER_REDTEAM_LIST;
+		int teamIndex;
 
 		if ( cg.scores[cg.selectedScore].team == TEAM_BLUE ) {
 			feeder = FEEDER_BLUETEAM_LIST;
 		}
 
-		CG_SetBrowserFeederSelection( menu, feeder, cg.selectedScore );
+		teamIndex = CG_TeamRowFromScoreIndex( cg.selectedScore, cg.scores[cg.selectedScore].team );
+		if ( teamIndex >= 0 ) {
+			CG_SetBrowserFeederSelection( menu, feeder, teamIndex );
+		}
 	} else {
 		CG_SetBrowserFeederSelection( menu, FEEDER_SCOREBOARD, cg.selectedScore );
 	}
@@ -4974,6 +5057,14 @@ static clientInfo_t *CG_InfoFromScoreIndex( int index, int team, int *scoreIndex
 	int		i;
 	int		count;
 
+	if ( scoreIndex ) {
+		*scoreIndex = -1;
+	}
+
+	if ( index < 0 ) {
+		return NULL;
+	}
+
 	if ( cg.competitiveHudLoaded ) {
 		const cgHudScoreboardEntry_t		*entry;
 		int		mappedIndex;
@@ -4983,25 +5074,36 @@ static clientInfo_t *CG_InfoFromScoreIndex( int index, int team, int *scoreIndex
 		if ( entry ) {
 			mappedIndex = CG_FindScoreIndexForClient( entry->clientNum );
 			if ( mappedIndex >= 0 ) {
-				*scoreIndex = mappedIndex;
+				if ( scoreIndex ) {
+					*scoreIndex = mappedIndex;
+				}
 				return &cgs.clientinfo[entry->clientNum];
 			}
 		}
 	}
 
-	if ( cgs.gametype >= GT_TEAM ) {
+	if ( cgs.gametype >= GT_TEAM && ( team == TEAM_RED || team == TEAM_BLUE ) ) {
 		count = 0;
 		for ( i = 0; i < cg.numScores; i++ ) {
 			if ( cg.scores[i].team == team ) {
 				if ( count == index ) {
-					*scoreIndex = i;
+					if ( scoreIndex ) {
+						*scoreIndex = i;
+					}
 					return &cgs.clientinfo[cg.scores[i].client];
 				}
 				count++;
 			}
 		}
 	}
-	*scoreIndex = index;
+
+	if ( index >= cg.numScores ) {
+		return NULL;
+	}
+
+	if ( scoreIndex ) {
+		*scoreIndex = index;
+	}
 	return &cgs.clientinfo[ cg.scores[index].client ];
 }
 
@@ -5079,6 +5181,10 @@ static qboolean CG_BuildFeederRow( int index, int team, cgFeederRow_t *row ) {
 	row->scoreIndex = -1;
 	row->clientNum = -1;
 	row->info = CG_InfoFromScoreIndex( index, team, &row->scoreIndex );
+
+	if ( !row->info ) {
+		return qfalse;
+	}
 
 	if ( row->scoreIndex >= 0 && row->scoreIndex < cg.numScores ) {
 		row->scoreRow = &cg.scores[row->scoreIndex];
@@ -5708,28 +5814,28 @@ static const char *CG_FeederItemText( float feederID, int index, int column, qha
 		}
 	}
 
-	if ( CG_IsScoreboardFeeder( feederID ) ) {
-		if ( cgs.gametype == GT_RACE ) {
-			return CG_FeederItemTextRaceScoreboard( index, column, handle );
+	if ( CG_IsTeamListFeeder( feederID ) ) {
+		switch ( cgs.gametype ) {
+		case GT_TEAM:
+		case GT_FREEZE:
+			return CG_FeederItemTextTDMFreezeTeamList( team, index, column, handle );
+		case GT_CLAN_ARENA:
+			return CG_FeederItemTextClanArenaTeamList( team, index, column, handle );
+		case GT_CTF:
+		case GT_1FCTF:
+		case GT_HARVESTER:
+		case GT_DOMINATION:
+		case GT_ATTACK_DEFEND:
+			return CG_FeederItemTextCTFFamilyTeamList( team, index, column, handle );
+		default:
+			return CG_FeederItemTextFallbackTeamList( team, index, column, handle );
 		}
-		return CG_FeederItemTextScoreboard( index, column, handle );
 	}
 
-	switch ( cgs.gametype ) {
-	case GT_TEAM:
-	case GT_FREEZE:
-		return CG_FeederItemTextTDMFreezeTeamList( team, index, column, handle );
-	case GT_CLAN_ARENA:
-		return CG_FeederItemTextClanArenaTeamList( team, index, column, handle );
-	case GT_CTF:
-	case GT_1FCTF:
-	case GT_HARVESTER:
-	case GT_DOMINATION:
-	case GT_ATTACK_DEFEND:
-		return CG_FeederItemTextCTFFamilyTeamList( team, index, column, handle );
-	default:
-		return CG_FeederItemTextFallbackTeamList( team, index, column, handle );
+	if ( cgs.gametype == GT_RACE ) {
+		return CG_FeederItemTextRaceScoreboard( index, column, handle );
 	}
+	return CG_FeederItemTextScoreboard( index, column, handle );
 }
 
 
@@ -5757,66 +5863,29 @@ selection into the cached live/end scoreboard menus.
 =============
 */
 static void CG_FeederSelection( float feederID, int index ) {
-	int		i;
-	int		selectedClient;
 	int		selectedIndex;
-	qboolean	foundSelection;
+	int		selectedScoreIndex;
 	team_t	team;
 
 	if ( index == -1 ) {
 		return;
 	}
 
-	if ( cgs.gametype < GT_TEAM ) {
+	if ( cgs.gametype < GT_TEAM || ( !CG_IsTeamListFeeder( feederID ) && !CG_IsTeamStatsFeeder( feederID ) ) ) {
 		cg.selectedScore = index;
 		return;
 	}
 
 	team = ( feederID == FEEDER_REDTEAM_LIST || feederID == FEEDER_REDTEAM_STATS ) ? TEAM_RED : TEAM_BLUE;
-	selectedIndex = index;
-	foundSelection = qfalse;
-
-	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
-		int count;
-
-		count = 0;
-		for ( i = 0; i < cg.numScores; i++ ) {
-			if ( cg.scores[i].team != team ) {
-				continue;
-			}
-
-			if ( index == count ) {
-				cg.selectedScore = i;
-				foundSelection = qtrue;
-				break;
-			}
-
-			count++;
-		}
-	} else {
-		cg.selectedScore = index;
-		foundSelection = ( index >= 0 && index < cg.numScores ) ? qtrue : qfalse;
+	selectedScoreIndex = CG_ScoreIndexFromTeamRow( index, team );
+	if ( selectedScoreIndex < 0 ) {
+		return;
 	}
 
-	if ( foundSelection ) {
-		selectedClient = cg.scores[cg.selectedScore].client;
-		selectedIndex = 0;
-
-		for ( i = 0; i < cg.numScores; i++ ) {
-			if ( cg.scores[i].team != team ) {
-				continue;
-			}
-
-			if ( cg.scores[i].client == selectedClient ) {
-				break;
-			}
-
-			selectedIndex++;
-		}
-
-		if ( i >= cg.numScores ) {
-			selectedIndex = index;
-		}
+	cg.selectedScore = selectedScoreIndex;
+	selectedIndex = CG_TeamRowFromScoreIndex( cg.selectedScore, team );
+	if ( selectedIndex < 0 ) {
+		selectedIndex = index;
 	}
 
 	if ( !cgScoreboardSelectionMenus[0] && !cgScoreboardSelectionMenus[1] ) {

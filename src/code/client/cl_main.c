@@ -5735,6 +5735,11 @@ CL_RequestMotd
 ===================
 */
 void CL_RequestMotd( void ) {
+#if !( QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES )
+	if ( cl_motd && cl_motd->integer ) {
+		CL_LogMatchmakingServiceIgnored( "legacy_motd", "legacy Quake III update server disabled by online-services policy" );
+	}
+#else
 	char		info[MAX_INFO_STRING];
 
 	if ( !cl_motd->integer ) {
@@ -5764,6 +5769,7 @@ void CL_RequestMotd( void ) {
 	Info_SetValueForKey( info, "version", com_version->string );
 
 	NET_OutOfBandPrint( NS_CLIENT, cls.updateServer, "getmotd \"%s\"\n", info );
+#endif
 }
 
 /*
@@ -5805,6 +5811,10 @@ in anyway.
 ===================
 */
 void CL_RequestAuthorization( void ) {
+#if !( QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES )
+	Com_DPrintf( "legacy authorize request ignored: Quake III authorize server disabled by online-services policy (%s [%s])\n",
+		QL_GetOnlineServicesModeLabel(), QL_GetOnlineServicesPolicyLabel() );
+#else
 	char	authorizePayload[64];
 	ql_auth_credential_t	credential;
 
@@ -5833,6 +5843,7 @@ void CL_RequestAuthorization( void ) {
 
 	NET_OutOfBandPrint(NS_CLIENT, cls.authorizeServer,
 		va("getKeyAuthorize %i %s", Cvar_VariableIntegerValue( "cl_anonymous" ), authorizePayload) );
+#endif
 }
 
 /*
@@ -8012,8 +8023,10 @@ CL_RequestGlobalServers
 ==================
 */
 static void CL_RequestGlobalServers( int masterNum, const char *protocol, const char *keywords ) {
+#if QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES
 	netadr_t	to;
 	char		command[1024];
+#endif
 
 	cls.masterNum = masterNum;
 
@@ -8023,15 +8036,18 @@ static void CL_RequestGlobalServers( int masterNum, const char *protocol, const 
 	// -1 is used to distinguish a "no response"
 
 	if( cls.masterNum == 1 ) {
-		NET_StringToAdr( MASTER_SERVER_NAME, &to );
 		cls.nummplayerservers = -1;
 		cls.pingUpdateSource = AS_MPLAYER;
 	}
 	else {
-		NET_StringToAdr( MASTER_SERVER_NAME, &to );
 		cls.numglobalservers = -1;
 		cls.pingUpdateSource = AS_GLOBAL;
 	}
+#if !( QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES )
+	Com_Printf( "Legacy Quake III master server queries are disabled by online-services policy.\n" );
+	return;
+#else
+	NET_StringToAdr( MASTER_SERVER_NAME, &to );
 	to.type = NA_IP;
 	to.port = BigShort(PORT_MASTER);
 
@@ -8048,6 +8064,7 @@ static void CL_RequestGlobalServers( int masterNum, const char *protocol, const 
 	}
 
 	NET_OutOfBandPrint( NS_SERVER, to, command );
+#endif
 }
 
 

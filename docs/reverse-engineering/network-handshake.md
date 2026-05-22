@@ -44,6 +44,10 @@ consistent across the committed `quakelive_steam.exe` corpus:
 - Demo recording and filesystem fallback paths format `.dm_91`; the retained
   console-completion helper still scans `.dm_73`, matching the separate
   `Console_CompleteArgument` HLIL quirk.
+- The retained game port remains `PORT_SERVER == 27960`; the old Quake III
+  update/master/authorize endpoints and service ports are not retail QL Steam
+  evidence and are now quarantined behind `QL_ENABLE_LEGACY_Q3_SERVICES`,
+  which default-disabled builds force off.
 
 ### Out-of-band handshake payloads
 

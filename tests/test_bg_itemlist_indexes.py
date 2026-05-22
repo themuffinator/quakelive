@@ -135,7 +135,10 @@ def test_tiered_armor_metadata_matches_retail():
 		"item_armor_jacket": 3,
 	}
 	assert "int\t\t\tarmorTier;" in Q_SHARED.read_text()
-	assert "{ PSF(armorTier), 2 }" in MSG_C.read_text()
+	assert "{ PSF(armorTier), 2 }" not in MSG_C.read_text()
+	assert "CG_GetArmorTierColor( cg.snap->ps.stats[STAT_ARMOR], color );" in (
+		REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
+	).read_text()
 
 
 def test_item_type_order_matches_retail_dispatch():

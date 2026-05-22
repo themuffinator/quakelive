@@ -4,7 +4,7 @@
 
 This round maps the Quake Live font handling lane across the renderer-owned host text core and the module consumers. The owning retail binary for the retained FontStash implementation is `quakelive_steam.exe`; `uix86.dll` and `cgamex86.dll` are consumer modules that reach the host through import wrappers.
 
-No source behavior changes were needed in this pass. The current source already keeps the retail-shaped lazy atlas, UTF-8 glyph lookup, fallback font chain, `GL_ALPHA` atlas upload, and UI/cgame trap wiring. This round tightens symbol names, records the evidence chain, and identifies follow-up mapping gaps.
+The original mapping pass was evidence-first. Subsequent source follow-ups kept the retail-shaped lazy atlas, UTF-8 glyph lookup, fallback font chain, `GL_ALPHA` atlas upload, UI/cgame trap wiring, and closed the client screen-overlay host-text gap. This note now also records the import-slot, syscall-wrapper, renderer face/scale/color/max-X/out-left core, current-color/packed-measure bridge, metrics/span/cursor, limited-text, renderer-debug-label, console/chat, cgame mono-consumer, VM-stub, UI parser/bootstrap, UI alias normalization, item integer font-bucket, cgame lowercase-`bigfont`, and cgame browser-menu shared parser/reload-order gates that keep the completed font lane from regressing.
 
 ## Evidence Sources
 
@@ -137,7 +137,7 @@ This pass also closes the older screen-text helper gap next to `SCR_DrawDemoReco
 | `0x004BDE80` | `SCR_DrawBigStringExt` | Retail-only 16-point convenience wrapper over `SCR_DrawStringExt`; used by advertisement/debug label overlays with the caller-controlled force-color flag preserved. |
 | `0x004BDEB0` | `SCR_DrawDemoRecording` | Builds the `RECORDING %s: %ik` text or compact `REC` overlay, then draws it through `SCR_DrawStringExt` rather than through the legacy charset glyph loop. |
 
-The committed GPL-derived `cl_scrn.c` still exposes the older `SCR_DrawStringExt` / `SCR_DrawBigStringColor` charset implementation. Retail Quake Live evidence shows this screen-overlay text was migrated onto retained host text, so source parity for this narrow overlay lane remains a small follow-up reconstruction task even though the shared renderer FontStash owner is already recovered.
+The committed GPL-derived `cl_scrn.c` previously exposed the older `SCR_DrawStringExt` / `SCR_DrawBigStringColor` charset implementation. The source follow-up now routes this screen-overlay text through `RE_DrawScaledText` with mono font handle `2`, matching the recovered retail host-text lane while preserving the existing demo-recording call sites.
 
 ## Debug Atlas And Classic Font Boundary
 
@@ -170,7 +170,7 @@ The UI module symbol map already has full text-helper coverage:
 | `0x1001E320` | `ItemParse_font` | Integer item font-bucket parser. |
 | `0x1001F9D0` | `MenuParse_font` | Menu font path normalizer and baked-font registrar. |
 
-The UI HLIL confirms `Asset_Parse` reads `font`, `smallFont`, and `bigFont`. The source wiring routes UI measurement and drawing through `trap_QL_MeasureText` and `trap_QL_DrawScaledText`, then into the host renderer bridge. The important parser correction is that item-level `font` is an integer `item->fontIndex` bucket, not a string asset token.
+The UI HLIL confirms `Asset_Parse` reads `font`, `smallFont`, and `bigFont`. The source wiring routes UI measurement and drawing through `trap_QL_MeasureText` and `trap_QL_DrawScaledText`, then into the host renderer bridge. The important parser correction is that item-level `font` is an integer `item->fontIndex` bucket, not a string asset token; the current gates also verify that the item width, height, paint, and cursor wrappers forward that bucket into the extended host-text callbacks.
 
 ## Cgame Consumer Map
 
@@ -187,7 +187,7 @@ The cgame module symbol map also has full text-helper coverage:
 | `0x10025590` | `CG_Asset_Parse` | Parses `font`, `smallFont`, lowercase `bigfont`, gradient, cursor, fade, and sound assets. |
 | `0x10062900` | `CG_BrowserMenuParseFont` | Browser menu font parser. |
 
-Cgame HLIL confirms `CG_Asset_Parse` checks `font`, `smallFont`, and `bigfont`, while `CG_AssetCache` registers the legacy proportional font shaders. HUD font registration uses the host `R_RegisterFont` import and text drawing/measurement flow uses the host scaled text imports.
+Cgame HLIL confirms `CG_Asset_Parse` checks `font`, `smallFont`, and lowercase `bigfont`, while `CG_AssetCache` stays an art cache. HUD font registration uses the host `R_RegisterFont` import and text drawing/measurement flow uses the host scaled text imports.
 
 ## Consumer Font Ownership
 
@@ -196,11 +196,11 @@ The consumer pass separates font path registration from font bucket selection:
 | Owner | Evidence | Meaning |
 | --- | --- | --- |
 | UI item `font` | `ItemParse_font` at `0x1001E320`; source parses into `item->fontIndex`. | Numeric per-item bucket used by `Text_*Ext` through `UI_SelectTextFontHandle`. |
-| UI menu `font` | `MenuParse_font` at `0x1001F9D0`; source normalizes font aliases and registers text/small/big on first use. | Path-like menu declaration that seeds the display-context font trio. |
+| UI menu `font` | `MenuParse_font` at `0x1001F9D0`; source normalizes font aliases, stores the resolved path token, and registers text/small/big on first use. | Path-like menu declaration that seeds the display-context font trio. |
 | UI `assetGlobalDef` | `Asset_Parse` at `0x100045B0`; HLIL strings include `font`, `smallFont`, and `bigFont`. | Global UI asset block registration through the UI display-context import. |
 | Cgame `assetGlobalDef` | `CG_Asset_Parse` at `0x10025590`; HLIL strings include `font`, `smallFont`, and lowercase `bigfont`. | HUD asset block registration through `cgDC.registerFont`. |
 | Cgame HUD bootstrap | Source `CG_RegisterHudFonts` runs after `CG_InitDisplayContext`. | Ensures the default text/small/big Quake Live font trio exists even when HUD scripts do not provide all global assets. |
-| Cgame browser overlay | `CG_BrowserMenuParseFont` at `0x10062900`. | Browser-menu path parser that lazily registers the baked Quake Live atlas through the display-context font callback. |
+| Cgame browser overlay | `CG_BrowserMenuParseFont` at `0x10062900`; source routes this through `CG_SetupBrowserMenuKeywordHash` and shared `MenuParse_font`. | Browser-menu path parser lane that stores the resolved menu font token and reaches the display-context font callback through `cgDC` when the font trio is not already seeded. |
 
 ## Host Import Bridge
 
@@ -264,12 +264,12 @@ The `SCR_DrawStringExt` alias is source-name aligned from its six-argument publi
 
 ## Source Parity Assessment
 
-Scoped renderer/UI/cgame font ownership was already effectively complete before this round because the source follows the retail retained FontStash model. This round improves evidence confidence and identifies one small client overlay reconstruction follow-up:
+Scoped renderer/UI/cgame font ownership was already effectively complete before this round because the source follows the retail retained FontStash model. The follow-up work closed the small client overlay reconstruction gap and added explicit gates for the UI/cgame native import slots, fail-closed draw/measure traps, renderer face-handle fallback, scale rounding/clamping, digit-only color parsing, max-X/out-left draw/measure semantics, current-color and packed-measure wrapper semantics, `RegisterFont` compatibility lane, metrics/span/cursor helpers, clipped text `maxX` projection, renderer advertisement debug labels, console/chat mono host-text consumers, cgame snapshot/FPS upper-right host text, cgame `Q3_VM` fail-closed stubs, UI parser-owned font bootstrap, UI legacy alias normalization, UI item integer font buckets, cgame lowercase-`bigfont` asset parsing, cgame browser-menu font parser routing, and HUD reload ordering:
 
 | Scope | Before | After | Notes |
 | --- | --- | --- | --- |
-| Font handling source/wiring behavior | 100% | 99.8% | Shared renderer/UI/cgame behavior remains complete; the newly-mapped `SCR_DrawStringExt` overlay lane shows the GPL-derived client screen-string helper still uses the older charset path. |
-| Font handling symbol/evidence coverage | 96% | 99.97% | Renderer callback band, FontStash internal names, shared UI/cgame host text import wrappers, renderer refexport host-text tail, debug-atlas draw wiring, console and screen-overlay mono host text helpers, retained face/cvar globals, and consumer-side font bucket/path ownership are now mapped. |
+| Font handling source/wiring behavior | 99.8% | 100% | Shared renderer/UI/cgame behavior remains complete; the newly-mapped `SCR_DrawStringExt` overlay lane is now wired to retained mono host text instead of the older charset path. |
+| Font handling symbol/evidence coverage | 99.97% | 100% | Renderer callback band, FontStash internal names, shared UI/cgame host text import wrappers, renderer refexport host-text tail, face/scale/color/max-X/out-left draw-measure core, debug-atlas draw wiring, console/chat and screen-overlay mono host text helpers, UI/cgame current-color/packed-measure wrappers, metrics/span/cursor/clipped text, renderer debug-label text, cgame snapshot/FPS mono/default consumers, retained face/cvar globals, consumer-side font bucket/path ownership, UI parser/bootstrap ownership, UI alias normalization, cgame lowercase-`bigfont`, cgame browser-menu parser/reload routing, and import-slot/syscall-wrapper/VM-stub gate coverage are now mapped. |
 | Repo-wide parity estimate | 98% | 98% | Unchanged; stale RW-G04 runtime evidence still needs a future module-runtime refresh. |
 
 ## Validation
@@ -282,5 +282,6 @@ Scoped renderer/UI/cgame font ownership was already effectively complete before 
 - Ran `python -m pytest tests/test_renderer_host_text_core_parity.py tests/test_renderer_host_text_import_parity.py tests/test_renderer_font_exactness_parity.py tests/test_renderer_font_build_lane_parity.py tests/test_cgame_ownerdraw_text_parity.py tests/test_cl_console_cgame_parity.py tests/test_engine_client_command_parity.py -q`: `56 passed`.
 - Ran `tools/ci/audit-retail-font-stack.ps1`: completed with the existing non-fatal cgame locator warnings for `CG_RegisterHudFonts` and `CG_AssetCache`/`CG_Init`.
 - Ran `git diff --check` across the touched font-mapping files: no whitespace errors.
+- Follow-up validation ran the strict font audit plus focused UI, cgame, renderer-export, host-text, console/chat, metrics/span/cursor, clipped-text, renderer debug-label, upper-right debug text, and screen-overlay parity tests; the added gates now fail if the recovered native font slots, fail-closed draw/measure wrappers, renderer face/scale/color/max-X/out-left behavior, current-color/force-color forwarding, packed measurement returns, cgame VM stubs, host text metric/cursor/span projection, max-X clipping projection, mono/default host-text consumers, UI parser/bootstrap ownership, UI legacy alias normalization, UI item integer buckets, cgame lowercase-`bigfont` parsing, or cgame browser-menu parser/reload ordering drift.
 
 No game launch was required for this mapping-only round.

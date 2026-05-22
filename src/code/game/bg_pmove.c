@@ -63,6 +63,13 @@ int		c_pmove = 0;
 static float	pm_jumpTakeoffVelocity;
 static qboolean	pm_jumpTakeoffDoubleJumpActive;
 
+#define PM_JUMP_VELOCITY_MODE_NONE		0
+#define PM_JUMP_VELOCITY_MODE_SCALE		1
+#define PM_JUMP_VELOCITY_MODE_ADDITIVE		2
+#define PM_JUMP_VELOCITY_MODE_AIR_CONTROL	3
+
+static int	pm_jumpVelocityMode = PM_JUMP_VELOCITY_MODE_SCALE;
+
 typedef struct {
 	float	airControl;
 	float	airAccel;
@@ -85,13 +92,12 @@ static const pmove_settings_t	pm_defaultSettings = {
 	.airStopAccel = 1.0f,
 	.autoHop = qtrue,
 	.bunnyHop = qtrue,
-	.chainJump = qtrue,
+	.chainJump = PM_JUMP_VELOCITY_MODE_SCALE,
 	.chainJumpVelocity = 110.0f,
 	.circleStrafeFriction = 6.0f,
 	.crouchSlide = qfalse,
 	.crouchSlideFriction = 0.5f,
 	.crouchSlideTime = 2000,
-	.flightThrust = 0.0f,
 	.crouchStepJump = qtrue,
 	.doubleJump = qfalse,
 	.jumpTimeDeltaMin = 100.0f,
@@ -201,6 +207,44 @@ Returns the compiled fallback pmove tuning block for consumers outside the movem
 */
 const pmove_settings_t *PM_GetDefaultSettings( void ) {
 	return &pm_defaultSettings;
+}
+
+/*
+=============
+PM_IsJumpPadLaunchActive
+
+Returns whether the current playerstate is carrying the short-lived jump-pad
+style launch latch that should not be replaced by player jump input.
+=============
+*/
+qboolean PM_IsJumpPadLaunchActive( void ) {
+	if ( !pm || !pm->ps ) {
+		return qfalse;
+	}
+
+	if ( pm->ps->pm_type != PM_NORMAL ) {
+		return qfalse;
+	}
+
+	return ( pm->ps->jumppad_ent != 0 ) ? qtrue : qfalse;
+}
+
+/*
+=============
+PM_SuppressJumpPadLaunchInput
+
+Clears jump input while a jump-pad style launch is being preserved so later
+movement slices cannot reinterpret the launch as a player jump.
+=============
+*/
+static void PM_SuppressJumpPadLaunchInput( void ) {
+	if ( !PM_IsJumpPadLaunchActive() ) {
+		return;
+	}
+
+	if ( pm->cmd.upmove >= 10 ) {
+		pm->cmd.upmove = 0;
+	}
 }
 
 /*
@@ -355,12 +399,9 @@ static qboolean PM_ShouldRequireJumpRelease( const pmove_settings_t *settings ) 
 		if ( activeSettings->autoHop ) {
 			return qfalse;
 		}
-		if ( activeSettings->bunnyHop ) {
-			return qfalse;
-		}
 	}
 
-	if ( pm_autohop || pm_bunnyhop ) {
+	if ( pm_autohop ) {
 		return qfalse;
 	}
 
@@ -369,7 +410,43 @@ static qboolean PM_ShouldRequireJumpRelease( const pmove_settings_t *settings ) 
 
 static qboolean PM_CheckJump( qboolean allowAirDoubleJump );
 static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump );
+static qboolean PM_PrepareStepJumpTakeoff( const pmove_settings_t *settings );
+static qboolean PM_PrepareCrouchStepJumpTakeoff( const pmove_settings_t *settings );
 static void PM_ApplyJumpTakeoff( void );
+
+/*
+=============
+PM_UpdateJumpVelocityMode
+
+Selects the retail jump-takeoff velocity mode from the active movement profile.
+=============
+*/
+static void PM_UpdateJumpVelocityMode( const pmove_settings_t *settings ) {
+	qboolean	airControlTuning;
+	int		chainJumpMode;
+
+	airControlTuning = ( pm && pm->ps && ( pm->ps->pm_flags & PMF_AIR_CONTROL ) ) ? qtrue : qfalse;
+
+	if ( !settings ) {
+		pm_jumpVelocityMode = airControlTuning ? PM_JUMP_VELOCITY_MODE_AIR_CONTROL : PM_JUMP_VELOCITY_MODE_SCALE;
+		return;
+	}
+
+	if ( airControlTuning ) {
+		pm_jumpVelocityMode = PM_JUMP_VELOCITY_MODE_AIR_CONTROL;
+		return;
+	}
+
+	chainJumpMode = settings->chainJump;
+	if ( chainJumpMode <= PM_JUMP_VELOCITY_MODE_NONE ) {
+		pm_jumpVelocityMode = PM_JUMP_VELOCITY_MODE_NONE;
+		return;
+	}
+
+	pm_jumpVelocityMode = ( chainJumpMode == PM_JUMP_VELOCITY_MODE_ADDITIVE )
+		? PM_JUMP_VELOCITY_MODE_ADDITIVE
+		: PM_JUMP_VELOCITY_MODE_SCALE;
+}
 
 /*
 =============
@@ -384,6 +461,7 @@ static void PM_LoadMoveTuningConstants( void ) {
 
 	settings = PM_GetActiveSettings();
 	airControlTuning = ( pm->ps->pm_flags & PMF_AIR_CONTROL ) ? qtrue : qfalse;
+	PM_UpdateJumpVelocityMode( settings );
 
 	pm_accelerate = PM_LoadMoveTuningFloat(
 		settings->walkAccel,
@@ -454,13 +532,12 @@ static void PM_LoadMoveTuningConstants( void ) {
 =============
 PM_ApplyStepJump
 
-Triggers the retail-style step jump path only when the current command
-would legitimately produce a jump takeoff.
+Triggers the retail-style step jump path. The crouch-step branch mirrors the
+retail fallback that can run after the general upmove gate is rejected.
 =============
 */
 void PM_ApplyStepJump( float stepDelta, qboolean fromCrouchSlide ) {
 	const pmove_settings_t	*settings;
-	float			stepJumpVelocity;
 
 	if ( stepDelta <= 0.0f ) {
 		return;
@@ -481,23 +558,23 @@ void PM_ApplyStepJump( float stepDelta, qboolean fromCrouchSlide ) {
 		}
 	}
 
-	if ( pm->cmd.upmove < 10 ) {
+	if ( !fromCrouchSlide && pm->cmd.upmove < 10 ) {
 		return;
 	}
 
-	if ( !PM_PrepareJumpTakeoff( qfalse ) ) {
-		return;
-	}
-	PM_ApplyJumpTakeoff();
-
-	stepJumpVelocity = settings->stepJumpVelocity;
-	if ( stepJumpVelocity > 0.0f ) {
-		pm->ps->velocity[2] += stepJumpVelocity;
-
-		if ( settings->jumpVelocityMax > 0.0f && pm->ps->velocity[2] > settings->jumpVelocityMax ) {
-			pm->ps->velocity[2] = settings->jumpVelocityMax;
+	if ( fromCrouchSlide ) {
+		if ( !PM_PrepareCrouchStepJumpTakeoff( settings ) ) {
+			return;
+		}
+	} else {
+		if ( !PM_PrepareJumpTakeoff( qfalse ) ) {
+			return;
+		}
+		if ( !PM_PrepareStepJumpTakeoff( settings ) ) {
+			return;
 		}
 	}
+	PM_ApplyJumpTakeoff();
 }
 
 /*
@@ -653,7 +730,7 @@ static void PM_Friction( void ) {
 				control = speed < pm_stopspeed ? pm_stopspeed : speed;
 				friction = pm_friction;
 
-				if ( ( pm->ps->pm_flags & PMF_CROUCH_SLIDE ) && settings->crouchSlide
+				if ( ( pm->ps->pm_flags & PMF_CROUCH_SLIDE )
 					&& pm->cmd.upmove < 0 && pm->ps->crouchSlideTime > 0 ) {
 					friction = settings->crouchSlideFriction;
 
@@ -885,64 +962,146 @@ static void PM_SetMovementDir( void ) {
 
 /*
 =============
-PM_ApplyJumpPlanarVelocity
+PM_EvaluateJumpTakeoffVelocity
 
-Adjusts the player's planar takeoff velocity for chain and ramp jumps
-while maintaining the facing direction.
+Reconstructs the retail vertical jump velocity modes used by the shared
+jump takeoff leaf.
 =============
 */
-static void PM_ApplyJumpPlanarVelocity( qboolean chainJumpActive, qboolean rampJumpActive, const pmove_settings_t *settings ) {
-	vec3_t	planarVelocity;
-	vec3_t	planarDirection;
-	float	planarSpeed;
-	float	targetSpeed;
-	float	rampScale;
+static float PM_EvaluateJumpTakeoffVelocity( const pmove_settings_t *settings, qboolean stepJumpActive, int *outTimeDelta ) {
+	float	jumpVelocity;
+	float	threshold;
+	float	addVelocity;
+	float	offsetThreshold;
+	float	fadeWindow;
+	int	timeDelta;
 
-	if ( !pm || !pm->ps || !settings ) {
-		return;
+	if ( outTimeDelta ) {
+		*outTimeDelta = -1;
 	}
 
-	if ( !chainJumpActive && !rampJumpActive ) {
-		return;
+	if ( !settings ) {
+		return JUMP_VELOCITY;
 	}
 
-	planarVelocity[0] = pm->ps->velocity[0];
-	planarVelocity[1] = pm->ps->velocity[1];
-	planarVelocity[2] = 0.0f;
+	jumpVelocity = ( settings->jumpVelocity > 0.0f ) ? settings->jumpVelocity : JUMP_VELOCITY;
+	if ( !pm || !pm->ps || pm->cmd.serverTime < pm->ps->jumpTime ) {
+		return jumpVelocity;
+	}
 
-	planarSpeed = VectorNormalize2( planarVelocity, planarDirection );
-	targetSpeed = planarSpeed;
+	timeDelta = pm->cmd.serverTime - pm->ps->jumpTime;
+	if ( outTimeDelta ) {
+		*outTimeDelta = timeDelta;
+	}
 
-	if ( planarSpeed <= 0.0f ) {
-		planarDirection[0] = pml.forward[0];
-		planarDirection[1] = pml.forward[1];
-		planarDirection[2] = 0.0f;
+	if ( timeDelta <= 0 ) {
+		return jumpVelocity;
+	}
 
-		if ( planarDirection[0] == 0.0f && planarDirection[1] == 0.0f ) {
-			planarDirection[0] = 1.0f;
-			planarDirection[1] = 0.0f;
-			planarDirection[2] = 0.0f;
+	threshold = settings->jumpVelocityTimeThreshold;
+	if ( threshold <= 0.0f || (float)timeDelta >= threshold ) {
+		return jumpVelocity;
+	}
+
+	PM_UpdateJumpVelocityMode( settings );
+	switch ( pm_jumpVelocityMode ) {
+	case PM_JUMP_VELOCITY_MODE_SCALE:
+		jumpVelocity *= PM_EvaluateJumpVelocityScale( pm->ps, settings, pm->cmd.serverTime, NULL );
+		break;
+	case PM_JUMP_VELOCITY_MODE_ADDITIVE:
+		jumpVelocity += stepJumpActive ? settings->stepJumpVelocity : settings->chainJumpVelocity;
+		break;
+	case PM_JUMP_VELOCITY_MODE_AIR_CONTROL:
+		offsetThreshold = threshold * settings->jumpVelocityTimeThresholdOffset;
+		if ( offsetThreshold <= 0.0f ) {
+			break;
+		}
+
+		addVelocity = stepJumpActive ? settings->stepJumpVelocity : settings->chainJumpVelocity;
+		if ( (float)timeDelta < offsetThreshold ) {
+			jumpVelocity += addVelocity;
 		} else {
-			VectorNormalize( planarDirection );
+			fadeWindow = threshold - offsetThreshold;
+			if ( fadeWindow > 0.0f ) {
+				jumpVelocity += ( ( threshold - (float)timeDelta ) / fadeWindow ) * addVelocity;
+			}
+		}
+		break;
+	default:
+		break;
+	}
+
+	return jumpVelocity;
+}
+
+/*
+=============
+PM_ApplyRampJumpVerticalVelocity
+
+Applies the retail ramp-jump vertical accumulation and max clamp.
+=============
+*/
+static float PM_ApplyRampJumpVerticalVelocity( float jumpVelocity, qboolean fromCrouchStep, const pmove_settings_t *settings ) {
+	float	velocity;
+
+	velocity = jumpVelocity;
+
+	if ( settings && settings->rampJump && !fromCrouchStep && pm && pm->ps ) {
+		velocity = pm->ps->velocity[2] * settings->rampJumpScale + jumpVelocity;
+		if ( velocity < jumpVelocity ) {
+			velocity = jumpVelocity;
 		}
 	}
 
-	if ( chainJumpActive && settings->chainJumpVelocity > 0.0f ) {
-		if ( targetSpeed < settings->chainJumpVelocity ) {
-			targetSpeed = settings->chainJumpVelocity;
-		}
+	if ( settings && settings->jumpVelocityMax > 0.0f && velocity > settings->jumpVelocityMax ) {
+		velocity = settings->jumpVelocityMax;
 	}
 
-	if ( rampJumpActive ) {
-		rampScale = settings->rampJumpScale;
-		if ( rampScale <= 0.0f ) {
-			rampScale = 1.0f;
-		}
-		targetSpeed *= rampScale;
+	return velocity;
+}
+
+/*
+=============
+PM_PrepareStepJumpTakeoff
+
+Prepares the general step-jump takeoff latch before the shared retail jump
+leaf consumes the same step-aware velocity mode as the crouch-step fallback.
+=============
+*/
+static qboolean PM_PrepareStepJumpTakeoff( const pmove_settings_t *settings ) {
+	float			jumpVelocity;
+
+	if ( !settings ) {
+		return qfalse;
 	}
 
-	pm->ps->velocity[0] = planarDirection[0] * targetSpeed;
-	pm->ps->velocity[1] = planarDirection[1] * targetSpeed;
+	jumpVelocity = PM_EvaluateJumpTakeoffVelocity( settings, qtrue, NULL );
+	pm_jumpTakeoffVelocity = PM_ApplyRampJumpVerticalVelocity( jumpVelocity, qfalse, settings );
+	pm_jumpTakeoffDoubleJumpActive = qfalse;
+
+	return qtrue;
+}
+
+/*
+=============
+PM_PrepareCrouchStepJumpTakeoff
+
+Prepares the crouch-step fallback takeoff used when the retail step-jump seam
+falls through the general jump gate but the crouch clearance branch succeeds.
+=============
+*/
+static qboolean PM_PrepareCrouchStepJumpTakeoff( const pmove_settings_t *settings ) {
+	float			jumpVelocity;
+
+	if ( !settings ) {
+		return qfalse;
+	}
+
+	jumpVelocity = PM_EvaluateJumpTakeoffVelocity( settings, qtrue, NULL );
+	pm_jumpTakeoffVelocity = PM_ApplyRampJumpVerticalVelocity( jumpVelocity, qtrue, settings );
+	pm_jumpTakeoffDoubleJumpActive = qfalse;
+
+	return qtrue;
 }
 
 /*
@@ -962,10 +1121,7 @@ static void PM_ApplyJumpTakeoff( void ) {
 	}
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;
-	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
 	pm->ps->jumpTime = pm->cmd.serverTime;
-	VectorClear( pm->ps->groundTraceLatestNormal );
 	pm->ps->velocity[2] = pm_jumpTakeoffVelocity;
 
 	if ( pm_jumpTakeoffDoubleJumpActive ) {
@@ -993,15 +1149,17 @@ the step-jump seam before the final takeoff leaf runs.
 static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump ) {
 	const pmove_settings_t	*settings;
 	float			jumpVelocity;
-	float			jumpVelocityScale;
-	qboolean		chainJumpActive;
 	qboolean		doubleJumpActive;
-	qboolean		rampJumpActive;
 	qboolean		releaseRequired;
 	int			timeDelta;
 
 	settings = PM_GetActiveSettings();
 	releaseRequired = PM_ShouldRequireJumpRelease( settings );
+
+	if ( PM_IsJumpPadLaunchActive() ) {
+		PM_SuppressJumpPadLaunchInput();
+		return qfalse;
+	}
 
 	if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {
 		return qfalse;		// don't allow jump until all buttons are up
@@ -1013,7 +1171,7 @@ static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump ) {
 	}
 
 	if ( allowAirDoubleJump ) {
-		if ( !settings->doubleJump || pm->ps->doubleJumped ) {
+		if ( pm->ps->doubleJumped ) {
 			return qfalse;
 		}
 
@@ -1031,12 +1189,9 @@ static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump ) {
 		}
 	}
 
-	jumpVelocity = ( settings->jumpVelocity > 0.0f ) ? settings->jumpVelocity : JUMP_VELOCITY;
-	jumpVelocityScale = 1.0f;
-	chainJumpActive = qfalse;
 	timeDelta = -1;
 
-	jumpVelocityScale = PM_EvaluateJumpVelocityScale( pm->ps, settings, pm->cmd.serverTime, &timeDelta );
+	jumpVelocity = PM_EvaluateJumpTakeoffVelocity( settings, qfalse, &timeDelta );
 
 	if ( settings->jumpTimeDeltaMin > 0.0f && timeDelta >= 0 ) {
 		if ( (float)timeDelta < settings->jumpTimeDeltaMin ) {
@@ -1045,31 +1200,9 @@ static qboolean PM_PrepareJumpTakeoff( qboolean allowAirDoubleJump ) {
 		}
 	}
 
-	rampJumpActive = qfalse;
 	doubleJumpActive = allowAirDoubleJump;
 
-	if ( !allowAirDoubleJump ) {
-		if ( settings->chainJump && jumpVelocityScale > 1.0f ) {
-			chainJumpActive = qtrue;
-		}
-
-		if ( settings->rampJump && pm->ps->groundTraceLatestEntNum != ENTITYNUM_NONE ) {
-			if ( pm->ps->groundTraceLatestNormal[2] < 0.999f ) {
-				rampJumpActive = qtrue;
-			}
-		}
-	}
-
-	if ( jumpVelocityScale > 1.0f ) {
-		jumpVelocity *= jumpVelocityScale;
-	}
-
-	if ( settings->jumpVelocityMax > 0.0f && jumpVelocity > settings->jumpVelocityMax ) {
-		jumpVelocity = settings->jumpVelocityMax;
-	}
-
-	PM_ApplyJumpPlanarVelocity( chainJumpActive, rampJumpActive, settings );
-	pm_jumpTakeoffVelocity = jumpVelocity;
+	pm_jumpTakeoffVelocity = PM_ApplyRampJumpVerticalVelocity( jumpVelocity, qfalse, settings );
 	pm_jumpTakeoffDoubleJumpActive = doubleJumpActive;
 
 	return qtrue;
@@ -1326,7 +1459,7 @@ static qboolean PM_ShouldUseInvulnerabilityMove( void ) {
 		return qfalse;
 	}
 
-	if ( pm->ps->playerItemTimeMax > 0 && pm->ps->playerItemTime <= 0 ) {
+	if ( pm->ps->stats[STAT_PLAYER_ITEM_RECHARGE] != 0 && pm->ps->stats[STAT_PLAYER_ITEM_TIME] == 0 ) {
 		return qfalse;
 	}
 
@@ -1360,16 +1493,15 @@ static void PM_InvulnerabilityMove( void ) {
 	// Retail drives the shield's float/sink bias from view pitch while the holdable is active.
 	pm->ps->velocity[2] += (int)( -pm->ps->viewangles[PITCH] * pml.frametime );
 
-	if ( pm->ps->playerItemTime <= 32000 ) {
-		pm->ps->playerItemTime -= pml.msec;
-		if ( pm->ps->playerItemTime < 0 ) {
-			pm->ps->playerItemTime = 0;
+	if ( pm->ps->stats[STAT_PLAYER_ITEM_TIME] <= 32000 ) {
+		pm->ps->stats[STAT_PLAYER_ITEM_TIME] -= pml.msec;
+		if ( pm->ps->stats[STAT_PLAYER_ITEM_TIME] <= 0 ) {
+			pm->ps->stats[STAT_PLAYER_ITEM_TIME] = 0;
+			if ( pm->ps->stats[STAT_PLAYER_ITEM_RECHARGE] == 0 && invulnerabilityItemNum != 0 &&
+				pm->ps->stats[STAT_HOLDABLE_ITEM] == invulnerabilityItemNum ) {
+				pm->ps->stats[STAT_HOLDABLE_ITEM] = 0;
+			}
 		}
-	}
-
-	if ( pm->ps->playerItemTime <= 0 && pm->ps->playerItemTimeMax <= 0 && invulnerabilityItemNum != 0 &&
-		pm->ps->stats[STAT_HOLDABLE_ITEM] == invulnerabilityItemNum ) {
-		pm->ps->stats[STAT_HOLDABLE_ITEM] = 0;
 	}
 
 	if ( pm->ps->pm_flags & PMF_DUCKED ) {
@@ -1390,29 +1522,14 @@ static void PM_FlyMove( void ) {
 	vec3_t	wishvel;
 	float	wishspeed;
 	vec3_t	wishdir;
-	const pmove_settings_t	*settings;
-	float	flightThrust;
-	float	upFraction;
 
 	// normal slowdown
 	PM_Friction ();
 
-	settings = PM_GetActiveSettings();
-	flightThrust = ( settings && settings->flightThrust > 0.0f ) ? settings->flightThrust : 0.0f;
 	if ( PM_BuildWishMove3D( wishdir, &wishspeed ) ) {
 		VectorScale( wishdir, wishspeed, wishvel );
 	} else {
 		VectorClear( wishvel );
-	}
-
-	if ( flightThrust > 0.0f ) {
-		upFraction = (float)pm->cmd.upmove / 127.0f;
-		if ( upFraction > 1.0f ) {
-			upFraction = 1.0f;
-		} else if ( upFraction < -1.0f ) {
-			upFraction = -1.0f;
-		}
-		wishvel[2] = upFraction * flightThrust;
 	}
 
 	VectorCopy( wishvel, wishdir );
@@ -1928,47 +2045,12 @@ static int PM_CorrectAllSolid( trace_t *trace ) {
 	}
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;
-	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
-	VectorClear( pm->ps->groundTraceLatestNormal );
 	pml.groundPlane = qfalse;
 	pml.walking = qfalse;
 
 	return qfalse;
 }
 
-
-/*
-=============
-PM_RecordGroundContact
-
-Caches the ground contact history in the persistent player state.
-=============
-*/
-static void PM_RecordGroundContact( const trace_t *trace ) {
-	int		index;
-
-	if ( !pm || !pm->ps || !trace ) {
-		return;
-	}
-
-	if ( pm->ps->groundTraceHistoryCount < 0 ) {
-		pm->ps->groundTraceHistoryCount = 0;
-	}
-
-	if ( pm->ps->groundTraceHistoryCount < PS_GROUND_TRACE_HISTORY ) {
-		index = pm->ps->groundTraceHistoryCount;
-		pm->ps->groundTraceHistoryCount++;
-	} else {
-		index = ( pm->ps->groundTraceHistoryIndex + 1 ) % PS_GROUND_TRACE_HISTORY;
-	}
-
-	pm->ps->groundTraceHistoryIndex = index;
-
-	VectorCopy( trace->plane.normal, pm->ps->groundTraceNormals[index] );
-	pm->ps->groundTraceEntNums[index] = trace->entityNum;
-	pm->ps->groundTraceTimes[index] = pm->cmd.serverTime;
-}
 
 /*
 =============
@@ -2005,9 +2087,6 @@ static void PM_GroundTraceMissed( void ) {
 	}
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->groundTraceLatestEntNum = ENTITYNUM_NONE;
-	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
-	VectorClear( pm->ps->groundTraceLatestNormal );
 	pml.groundPlane = qfalse;
 	pml.walking = qfalse;
 }
@@ -2083,9 +2162,6 @@ static void PM_GroundTrace( void ) {
 
 	pml.groundPlane = qtrue;
 	pml.walking = qtrue;
-	pm->ps->groundTraceLatestTime = pm->cmd.serverTime;
-	pm->ps->groundTraceLatestEntNum = trace.entityNum;
-	VectorCopy( trace.plane.normal, pm->ps->groundTraceLatestNormal );
 
 	// hitting solid ground will end a waterjump
 	if (pm->ps->pm_flags & PMF_TIME_WATERJUMP)
@@ -2110,9 +2186,6 @@ static void PM_GroundTrace( void ) {
 		}
 	}
 
-	if ( justLanded || previousGroundEntityNum != trace.entityNum ) {
-		PM_RecordGroundContact( &trace );
-	}
 	pm->ps->groundEntityNum = trace.entityNum;
 
 	// don't reset the z velocity for slopes
@@ -2823,24 +2896,7 @@ void PmoveSingle (pmove_t *pmove) {
 	pm->waterlevel = 0;
 
 	settings = PM_GetActiveSettings();
-	if ( settings->airControl > 0.0f ) {
-		pm->ps->pm_flags |= PMF_AIR_CONTROL;
-	} else {
-		pm->ps->pm_flags &= ~PMF_AIR_CONTROL;
-	}
-	if ( settings->doubleJump ) {
-		pm->ps->pm_flags |= PMF_DOUBLE_JUMP;
-	} else {
-		pm->ps->pm_flags &= ~PMF_DOUBLE_JUMP;
-	}
 	PM_LoadMoveTuningConstants();
-
-	if ( settings->crouchSlide ) {
-		pm->ps->pm_flags |= PMF_CROUCH_SLIDE;
-	} else {
-		pm->ps->pm_flags &= ~PMF_CROUCH_SLIDE;
-		pm->ps->crouchSlideTime = 0;
-	}
 
 	if ( pm->debugLevel > 1 ) {
 		Com_Printf( "pmove_cfg: wish=%.3f airAccel=%.3f airControl=%.3f airSteps=%d stop=%.3f strafe=%.3f autoHop=%d bunnyHop=%d\n",
@@ -2854,7 +2910,7 @@ void PmoveSingle (pmove_t *pmove) {
 			pm_bunnyhop ? 1 : 0 );
 	}
 
-	if ( pm->ps->stats[STAT_HEALTH] <= 0 ) {
+	if ( pm->ps->stats[STAT_HEALTH] <= 0 && !pm->ps->powerups[PW_INVULNERABILITY] ) {
 		pm->tracemask &= ~CONTENTS_BODY;	// corpses can fly through bodies
 	}
 
@@ -2933,6 +2989,7 @@ void PmoveSingle (pmove_t *pmove) {
 	pm->ps->forwardmove = pm->cmd.forwardmove;
 	pm->ps->rightmove = pm->cmd.rightmove;
 	pm->ps->upmove = pm->cmd.upmove;
+	PM_SuppressJumpPadLaunchInput();
 
 	AngleVectors (pm->ps->viewangles, pml.forward, pml.right, pml.up);
 
@@ -3015,6 +3072,17 @@ void PmoveSingle (pmove_t *pmove) {
 		PM_AirMove();
 	}
 
+	if ( pm->ps->stats[STAT_PLAYER_ITEM_RECHARGE] != 0 && !( pm->ps->pm_flags & PMF_USE_ITEM_HELD ) ) {
+		int	playerItemTime;
+
+		playerItemTime = pm->ps->stats[STAT_PLAYER_ITEM_TIME] +
+			(int)( pm->ps->stats[STAT_PLAYER_ITEM_RECHARGE] * pml.frametime );
+		if ( playerItemTime > pm->ps->stats[STAT_PLAYER_ITEM_TIME_MAX] ) {
+			playerItemTime = pm->ps->stats[STAT_PLAYER_ITEM_TIME_MAX];
+		}
+		pm->ps->stats[STAT_PLAYER_ITEM_TIME] = playerItemTime;
+	}
+
 	PM_Animate();
 
 	// set groundentity, watertype, and waterlevel
@@ -3089,7 +3157,7 @@ void Pmove (pmove_t *pmove) {
 			pmove->stepUpTime = pmove->cmd.serverTime;
 		}
 
-		if ( ( pmove->ps->pm_flags & PMF_JUMP_HELD ) && originalUpmove >= 10 ) {
+		if ( !PM_IsJumpPadLaunchActive() && ( pmove->ps->pm_flags & PMF_JUMP_HELD ) && originalUpmove >= 10 ) {
 			pmove->cmd.upmove = 20;
 		}
 	}

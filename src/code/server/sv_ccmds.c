@@ -2748,6 +2748,10 @@ static void SV_Ban_f( void ) {
 		return;
 	}
 
+#if !( QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES )
+	Com_Printf( "Legacy Quake III authorize bans are disabled by online-services policy.\n" );
+	return;
+#else
 	// look up the authorize server's IP
 	if ( !svs.authorizeAddress.ip[0] && svs.authorizeAddress.type != NA_BAD ) {
 		Com_Printf( "Resolving %s\n", AUTHORIZE_SERVER_NAME );
@@ -2769,6 +2773,7 @@ static void SV_Ban_f( void ) {
 								   cl->netchan.remoteAddress.ip[2], cl->netchan.remoteAddress.ip[3] );
 		Com_Printf("%s was banned from coming back\n", cl->name);
 	}
+#endif
 }
 
 /*
@@ -2802,6 +2807,10 @@ static void SV_BanNum_f( void ) {
 		return;
 	}
 
+#if !( QL_PLATFORM_HAS_ONLINE_SERVICES && QL_ENABLE_LEGACY_Q3_SERVICES )
+	Com_Printf( "Legacy Quake III authorize bans are disabled by online-services policy.\n" );
+	return;
+#else
 	// look up the authorize server's IP
 	if ( !svs.authorizeAddress.ip[0] && svs.authorizeAddress.type != NA_BAD ) {
 		Com_Printf( "Resolving %s\n", AUTHORIZE_SERVER_NAME );
@@ -2823,6 +2832,7 @@ static void SV_BanNum_f( void ) {
 								   cl->netchan.remoteAddress.ip[2], cl->netchan.remoteAddress.ip[3] );
 		Com_Printf("%s was banned from coming back\n", cl->name);
 	}
+#endif
 }
 
 /*

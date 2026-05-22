@@ -32,13 +32,18 @@ def _symbol_entries(map_name: str) -> dict[str, dict[str, object]]:
 def test_step_jump_gate_uses_retail_jump_release_rules() -> None:
 	source = BG_SLIDEMOVE_PATH.read_text(encoding="utf-8")
 	release_body = _function_body("PM_ShouldRequireStepJumpRelease")
+	probe_body = _function_body("PM_CanProbeStepJump")
 	body = _function_body("PM_CanStepJump")
 
 	assert "static qboolean PM_CanStepJump( void ) {" in source
 	assert "PMF_RESPAWNED" in body
+	assert "PM_IsJumpPadLaunchActive()" in probe_body
 	assert "PM_ShouldRequireStepJumpRelease( settings )" in body
 	assert "PMF_JUMP_HELD" in body
 	assert "pm->ps->pm_flags & PMF_REQUIRE_JUMP_RELEASE" in release_body
+	assert "settings->autoHop" in release_body
+	assert "settings->bunnyHop" not in release_body
+	assert "pm_bunnyhop" not in release_body
 	assert "releaseRequired = PM_ShouldRequireStepJumpRelease( settings );" in body
 	assert "if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {" in body
 
@@ -68,15 +73,17 @@ def test_step_jump_gate_clears_queued_jump_state_on_rejected_attempts() -> None:
 
 	assert "pm->cmd.upmove = 0;" in body
 	assert body.index("releaseRequired && ( pm->ps->pm_flags & PMF_JUMP_HELD )") < body.index("pm->cmd.upmove = 0;")
-	assert body.index("!PM_HasRecentGroundContact( settings )") < body.rindex("pm->cmd.upmove = 0;")
+	assert body.index("!PM_HasSatisfiedStepJumpDelay( settings )") < body.rindex("pm->cmd.upmove = 0;")
 
 
-def test_step_jump_gate_uses_recent_ground_contact_window() -> None:
-	body = _function_body("PM_HasRecentGroundContact")
+def test_step_jump_gate_uses_retail_jump_time_delay() -> None:
+	body = _function_body("PM_HasSatisfiedStepJumpDelay")
 
-	assert "pm->ps->groundTraceHistoryCount <= 0" in body
-	assert "index = pm->ps->groundTraceHistoryIndex;" in body
-	assert "contactTime = pm->ps->groundTraceTimes[index];" in body
+	assert "pm->cmd.serverTime < pm->ps->jumpTime" in body
+	assert "timeDelta = pm->cmd.serverTime - pm->ps->jumpTime;" in body
+	assert "(float)timeDelta >= settings->jumpTimeDeltaMin" in body
+	assert "groundTraceHistoryCount" not in body
+	assert "groundTraceTimes" not in body
 	assert "settings->jumpTimeDeltaMin" in body
 
 
@@ -85,30 +92,33 @@ def test_crouch_step_jump_gate_reuses_shared_retail_prechecks() -> None:
 	body = _function_body("PM_CanCrouchStepJump")
 
 	assert "static qboolean PM_CanCrouchStepJump( void ) {" in source
-	assert "PMF_RESPAWNED" in body
-	assert "pm->cmd.upmove < 10" in body
-	assert "PM_ShouldRequireStepJumpRelease( settings )" in body
-	assert "releaseRequired = PM_ShouldRequireStepJumpRelease( settings );" in body
-	assert "if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {" in body
-	assert "PM_HasRecentGroundContact( settings )" in body
+	assert "PM_CanProbeStepJump( settings )" in body
+	assert "pm->cmd.upmove < 10" not in body
+	assert "PM_ShouldRequireStepJumpRelease( settings )" not in body
+	assert "PM_HasSatisfiedStepJumpDelay( settings )" in body
 	assert "PMF_DUCKED" in body
 
 
-def test_crouch_step_jump_gate_consumes_step_jump_suppression_latch() -> None:
+def test_crouch_step_jump_gate_keeps_the_retail_crouch_leaf_shape() -> None:
 	body = _function_body("PM_CanCrouchStepJump")
 
-	assert body.index("releaseRequired = PM_ShouldRequireStepJumpRelease( settings );") < body.index("if ( releaseRequired && ( pm->ps->pm_flags & PMF_RESPAWNED ) ) {")
-	assert body.index("pm->cmd.upmove < 10") < body.index("releaseRequired && ( pm->ps->pm_flags & PMF_JUMP_HELD )")
-	assert body.index("pm->cmd.upmove < 10") < body.index("PMF_DUCKED")
+	assert "PMF_DUCKED" in body
+	assert "pml.groundPlane" in body
+	assert "pm->ps->velocity[2] < 0.0f" in body
+	assert "PM_HasSatisfiedStepJumpDelay( settings )" in body
+	assert "PMF_JUMP_HELD" not in body
+	assert "PMF_RESPAWNED" not in body
 
 
 def test_step_slide_move_restores_retail_public_signature() -> None:
 	slidemove_source = BG_SLIDEMOVE_PATH.read_text(encoding="utf-8")
 	local_source = BG_LOCAL_PATH.read_text(encoding="utf-8")
+	cgame_entries = _symbol_entries("cgame")
 
 	assert "void\t\tPM_StepSlideMove( qboolean gravity );" in local_source
 	assert "void PM_StepSlideMove( qboolean gravity ) {" in slidemove_source
 	assert "PM_StepSlideMoveWithStepHeight( gravity, pm_stepHeight );" in slidemove_source
+	assert cgame_entries["PM_StepSlideMove"]["signature"] == "void PM_StepSlideMove(qboolean gravity)"
 
 
 def test_step_slide_move_call_sites_stop_passing_step_height() -> None:
@@ -135,14 +145,16 @@ def test_step_slide_move_rechecks_the_general_step_jump_gate_before_takeoff() ->
 	source = BG_SLIDEMOVE_PATH.read_text(encoding="utf-8")
 
 	assert source.count("PM_CanStepJump()") >= 2
-	assert "if ( ( canStepJump || useCrouchStepJump ) && PM_CanStepJump() ) {" in source
-	assert source.index("canStepJump = PM_CanStepJump();") < source.index("if ( ( canStepJump || useCrouchStepJump ) && PM_CanStepJump() ) {")
+	assert "jumpPadLaunchActive = PM_IsJumpPadLaunchActive();" in source
+	assert "if ( jumpPadLaunchActive && start_v[2] > 0.0f ) {" in source
+	assert "if ( canStepJump && PM_CanStepJump() ) {" in source
+	assert "else if ( canCrouchStepJump && PM_CanCrouchStepJump() && PM_CanPerformCrouchStepJump() ) {" in source
+	assert source.index("canStepJump = PM_CanStepJump();") < source.index("if ( canStepJump && PM_CanStepJump() ) {")
 
 
 def test_step_slide_move_routes_crouch_step_branch_through_clearance_probe_before_shared_takeoff() -> None:
 	source = BG_SLIDEMOVE_PATH.read_text(encoding="utf-8")
 
-	assert "useCrouchStepJump = qfalse;" in source
-	assert "if ( canCrouchStepJump && PM_CanPerformCrouchStepJump() ) {" in source
-	assert "useCrouchStepJump = qtrue;" in source
-	assert "PM_ApplyStepJump( delta, useCrouchStepJump );" in source
+	assert "useCrouchStepJump" not in source
+	assert "else if ( canCrouchStepJump && PM_CanCrouchStepJump() && PM_CanPerformCrouchStepJump() ) {" in source
+	assert "PM_ApplyStepJump( delta, qtrue );" in source

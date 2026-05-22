@@ -31,6 +31,9 @@ def test_playerstate_uses_retail_jump_time_and_double_jump_latch() -> None:
 	assert "doubleJumpTime" not in source
 	assert "doubleJumpEntNum" not in source
 	assert "doubleJumpNormal" not in source
+	assert "groundTraceHistory" not in source
+	assert "groundTraceLatest" not in source
+	assert source.index("int\t\t\tgroundEntityNum;") < source.index("int\t\t\tlegsTimer;")
 
 
 def test_playerstate_delta_replication_matches_retail_jump_fields() -> None:
@@ -41,14 +44,19 @@ def test_playerstate_delta_replication_matches_retail_jump_fields() -> None:
 	assert "PSF(doubleJumpTime)" not in source
 	assert "PSF(doubleJumpEntNum)" not in source
 	assert "PSF(doubleJumpNormal[0])" not in source
+	assert "PSF(groundTraceHistory" not in source
+	assert "PSF(groundTraceLatest" not in source
+	assert source.index("{ PSF(groundEntityNum), GENTITYNUM_BITS }") < source.index("{ PSF(jumpTime), 32 }")
 
 
 def test_jump_velocity_scaling_uses_previous_jump_time() -> None:
 	source = BG_PMOVE_JUMP_PATH.read_text(encoding="utf-8")
 
-	assert "ps->jumpTime > 0" in source
+	assert "ps->jumpTime > 0" not in source
 	assert "commandTime >= ps->jumpTime" in source
 	assert "timeDelta = commandTime - ps->jumpTime;" in source
+	assert "( threshold - (float)timeDelta ) / threshold" in source
+	assert "jumpVelocityTimeThresholdOffset" not in source
 	assert "groundTraceHistoryCount" not in source
 	assert "groundTraceTimes" not in source
 

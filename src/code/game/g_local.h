@@ -2146,6 +2146,7 @@ void	trap_BotResetWeaponState(int weaponstate);
 
 extern pmove_settings_t g_pmoveSettings;
 
+void G_PmoveApplyProfileFlags( playerState_t *ps );
 void G_PmoveStoreWeaponReloads( const weaponReloadConfig_t *config );
 void G_PmoveResetFactoryManagedCvars( void );
 void G_RegisterPmoveCvars( void );

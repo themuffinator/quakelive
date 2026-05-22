@@ -1173,7 +1173,6 @@ typedef struct {
 
 // playerState_t is the information needed by both the client and server
 // to predict player motion and actions
-#define PS_GROUND_TRACE_HISTORY	2
 // nothing outside of pmove should modify these, or some degree of prediction error
 // will occur
 
@@ -1198,14 +1197,6 @@ typedef struct playerState_s {
 									// changed by spawns, rotating objects, and teleporters
 
 	int			groundEntityNum;// ENTITYNUM_NONE = in air
-	int			groundTraceHistoryIndex;
-	int			groundTraceHistoryCount;
-	int			groundTraceTimes[PS_GROUND_TRACE_HISTORY];
-	int			groundTraceEntNums[PS_GROUND_TRACE_HISTORY];
-	vec3_t		groundTraceNormals[PS_GROUND_TRACE_HISTORY];
-	int			groundTraceLatestTime;
-	int			groundTraceLatestEntNum;
-	vec3_t		groundTraceLatestNormal;
 
 	int			legsTimer;		// don't change low priority animations until this runs out
 	int			legsAnim;		// mask off ANIM_TOGGLEBIT
@@ -1228,9 +1219,9 @@ typedef struct playerState_s {
 
 	int			externalEvent;	// events set on player from another source
 	int			externalEventParm;
-	int			externalEventTime;
 
 	int			clientNum;		// ranges from 0 to MAX_CLIENTS-1
+	int			location;		// retail team location index
 	int			weapon;			// copied to entityState_t->weapon
 	int			weaponPrimary;	// mirrored usercmd byte for retail follow/demo HUD widgets
 	int			weaponstate;
@@ -1259,8 +1250,12 @@ typedef struct playerState_s {
 	int			doubleJumped;
 	int			crouchTime;
 	int			crouchSlideTime;
-	int			playerItemTimeMax;	// retail CG_PLAYER_ITEM progress-backed holdable maximum
-	int			playerItemTime;		// retail CG_PLAYER_ITEM progress-backed holdable current value
+
+	// replicated Quake Live HUD/prediction sidecars
+	signed char	forwardmove;	// mirrored usercmd byte for retail follow/demo HUD widgets
+	signed char	rightmove;		// mirrored usercmd byte for retail follow/demo HUD widgets
+	signed char	upmove;			// mirrored usercmd byte for retail follow/demo HUD widgets
+	signed char	commandMirrorPad;
 
 	// not communicated over the net at all
 	int			ping;			// server to game info for scoreboard
@@ -1268,11 +1263,9 @@ typedef struct playerState_s {
 	int			jumppad_frame;
 	int			entityEventSequence;
 
-	// replicated Quake Live HUD/prediction sidecars
+	// source-only local sidecars appended after the retail replicated prefix
+	int			externalEventTime;
 	int			armorTier;		// retail Quake Live tiered armor state: 0=green, 1=yellow, 2=red
-	int			forwardmove;	// mirrored usercmd byte for retail follow/demo HUD widgets
-	int			rightmove;	// mirrored usercmd byte for retail follow/demo HUD widgets
-	int			upmove;		// mirrored usercmd byte for retail follow/demo HUD widgets
 } playerState_t;
 
 

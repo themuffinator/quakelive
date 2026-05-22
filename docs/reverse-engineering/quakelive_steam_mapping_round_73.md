@@ -61,10 +61,11 @@ host actually uses it:
 2. It enables heartbeats using the current `sv_master` state.
 3. `SV_Shutdown` later disables heartbeats with `0`.
 
-The retail executable uses a single `sv_master` cvar. The retained source base
-still carries Quake III’s multi-master array, so this round reconstructs the
-same intent through `SV_SteamServerHasConfiguredMasters()`, which enables
-Steam heartbeats when at least one configured master target is present.
+The retail executable uses a single `sv_master` cvar. The writable source now
+registers that retained cvar as `sv_masterAdvertise` and lets
+`SV_SteamServerHasConfiguredMasters()` use it as the primary heartbeat gate.
+The older Quake III multi-master array remains only as a compatibility lane for
+explicitly configured legacy targets.
 
 The writable source now mirrors the retail ownership shape in `sv_init.c`:
 
@@ -72,6 +73,14 @@ The writable source now mirrors the retail ownership shape in `sv_init.c`:
 - `SV_SpawnServer()` then calls
   `QL_Steamworks_ServerEnableHeartbeats( SV_SteamServerHasConfiguredMasters() )`
 - `SV_Shutdown()` calls `QL_Steamworks_ServerEnableHeartbeats( qfalse )`
+
+2026-05-22 follow-up: the Quake III hostname endpoints
+`update.quake3arena.com`, `master.quake3arena.com`, and
+`authorize.quake3arena.com` are now isolated behind
+`QL_ENABLE_LEGACY_Q3_SERVICES`, which is forced off whenever
+`QL_BUILD_ONLINE_SERVICES=0`. Default builds keep `PORT_SERVER == 27960` and
+the LAN scan range, but they no longer resolve the retired Q3 update, master,
+or authorize servers.
 
 ## Verification
 

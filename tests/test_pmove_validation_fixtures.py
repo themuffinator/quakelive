@@ -31,6 +31,18 @@ class StepResult(ctypes.Structure):
 	]
 
 
+class CrouchStepResult(ctypes.Structure):
+	_fields_ = [
+		("velocityZ", ctypes.c_float),
+		("originZ", ctypes.c_float),
+		("stepUp", ctypes.c_float),
+		("jumpTime", ctypes.c_int),
+		("upmove", ctypes.c_int),
+		("pmFlags", ctypes.c_int),
+		("traceCalls", ctypes.c_int),
+	]
+
+
 class DoubleJumpResult(ctypes.Structure):
 	_fields_ = [
 		("firstJumpVelocity", ctypes.c_float),
@@ -92,6 +104,8 @@ def pmove_validation_harness(tmp_path_factory: pytest.TempPathFactory) -> ctypes
 	library.QLR_RunCircleStrafeFrictionScenario.restype = ctypes.c_float
 	library.QLR_RunAirStepScenario.argtypes = [ctypes.c_int, ctypes.POINTER(StepResult)]
 	library.QLR_RunAirStepScenario.restype = None
+	library.QLR_RunCrouchStepFallbackScenario.argtypes = [ctypes.POINTER(CrouchStepResult)]
+	library.QLR_RunCrouchStepFallbackScenario.restype = None
 	library.QLR_RunAirDoubleJumpSequence.argtypes = [ctypes.POINTER(DoubleJumpResult)]
 	library.QLR_RunAirDoubleJumpSequence.restype = None
 	library.QLR_RunCommandMirrorScenario.argtypes = [ctypes.POINTER(CommandMirrorResult)]
@@ -121,6 +135,20 @@ def test_air_step_suppression_fixture_requires_projected_support(
 	assert unsupported.stepUp == pytest.approx(0.0, abs=1e-6)
 	assert supported.stepUp == pytest.approx(10.0, rel=1e-5)
 	assert supported.stepUp > unsupported.stepUp
+
+
+def test_crouch_step_fallback_survives_general_jump_gate_rejection(
+	pmove_validation_harness: ctypes.CDLL,
+) -> None:
+	result = CrouchStepResult()
+	pmf_jump_held = 2
+
+	pmove_validation_harness.QLR_RunCrouchStepFallbackScenario(ctypes.byref(result))
+
+	assert result.velocityZ == pytest.approx(363.0, rel=1e-5)
+	assert result.jumpTime == 100
+	assert result.upmove == 0
+	assert result.pmFlags & pmf_jump_held
 
 
 def test_air_double_jump_fixture_blocks_reuse_until_ground_contact(
