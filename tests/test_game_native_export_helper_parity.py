@@ -94,6 +94,7 @@ def test_objective_classifier_covers_retail_flag_and_obelisk_paths() -> None:
 	team_c = _read("src/code/game/g_team.c")
 
 	assert "qboolean G_IsObjectiveEntity( int entNum );" in local_h
+	assert "qboolean G_ItemUsesRespawnTimer( const gitem_t *item );" in local_h
 	assert "static qboolean G_IsObjectiveFlagItemEntity( const gentity_t *ent, qboolean allowNeutralFlag ) {" in team_c
 	assert "static qboolean G_IsOverloadObjectiveEntity( const gentity_t *ent ) {" in team_c
 	assert "static qboolean G_IsQuadHogObjectiveEntity( const gentity_t *ent ) {" in team_c
@@ -107,7 +108,7 @@ def test_objective_classifier_covers_retail_flag_and_obelisk_paths() -> None:
 	assert "if ( level.quadHogEnabled ) {" in team_c
 	assert "ent->item->giType == IT_POWERUP && ent->item->giTag == PW_QUAD" in team_c
 	assert "if ( g_itemTimers.integer == 0 ) {" in team_c
-	assert "return ( ent->item->quantity != 0 ) ? qtrue : qfalse;" in team_c
+	assert "return G_ItemUsesRespawnTimer( ent->item );" in team_c
 	assert "if ( ent->client && ent->target_ent && G_IsObjectiveFlagItemEntity( ent->target_ent, qtrue ) ) {" in team_c
 	assert "if ( G_IsOverloadObjectiveEntity( ent ) ) {" in team_c
 	assert "return G_IsItemTimerObjectiveEntity( ent );" in team_c

@@ -1348,6 +1348,7 @@ void Cmd_Cointoss_f( gentity_t *ent );
 //
 void G_CheckTeamItems( void );
 void G_RunItem( gentity_t *ent );
+qboolean G_ItemUsesRespawnTimer( const gitem_t *item );
 void RespawnItem( gentity_t *ent );
 
 void UseHoldableItem( gentity_t *ent );

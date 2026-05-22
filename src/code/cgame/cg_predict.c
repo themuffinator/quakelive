@@ -525,6 +525,47 @@ static qboolean BG_IsRedBlueFlagItem( const gitem_t *item ) {
 
 /*
 ===================
+CG_ItemSkipsPredictablePickup
+
+Returns qtrue for the retail item family whose pickup events remain
+server-authored instead of being added by client-side item prediction.
+===================
+*/
+static qboolean CG_ItemSkipsPredictablePickup( const gitem_t *item ) {
+	if ( !item ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_ARMOR && item->quantity >= 25 ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {
+		return qtrue;
+	}
+
+	if ( item->giType == IT_POWERUP ) {
+		switch ( item->giTag ) {
+		case PW_QUAD:
+		case PW_BATTLESUIT:
+		case PW_HASTE:
+		case PW_INVIS:
+		case PW_REGEN:
+			return qtrue;
+		default:
+			break;
+		}
+	}
+
+	if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+===================
 CG_TouchItem
 ===================
 */
@@ -549,6 +590,9 @@ static void CG_TouchItem( centity_t *cent ) {
 	}
 
 	item = &bg_itemlist[ cent->currentState.modelindex ];
+	if ( CG_ItemSkipsPredictablePickup( item ) ) {
+		return;
+	}
 
 	// Special case for flags.  
 	// We don't predict touching our own flag

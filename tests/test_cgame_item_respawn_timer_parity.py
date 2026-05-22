@@ -8,6 +8,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CG_DRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_draw.c"
 CG_ENTS = REPO_ROOT / "src" / "code" / "cgame" / "cg_ents.c"
+CG_PREDICT = REPO_ROOT / "src" / "code" / "cgame" / "cg_predict.c"
+G_ITEMS = REPO_ROOT / "src" / "code" / "game" / "g_items.c"
 CG_BG_PLAN = REPO_ROOT / "docs" / "reverse-engineering" / "cgame-bg-parity-implementation-plan.md"
 
 
@@ -35,9 +37,14 @@ def test_item_respawn_timer_fallback_and_icon_boundaries_match_retail_family() -
 	icon_block = _block_from_marker(source, "static qhandle_t CG_ItemRespawnTimerIcon")
 
 	for expected in (
-		"if ( item->giType == IT_ARMOR ) {",
+		"if ( item->giType == IT_ARMOR && item->quantity >= 25 ) {",
 		"if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {",
 		"if ( item->giType == IT_POWERUP ) {",
+		"case PW_QUAD:",
+		"case PW_BATTLESUIT:",
+		"case PW_HASTE:",
+		"case PW_INVIS:",
+		"case PW_REGEN:",
 		"if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {",
 	):
 		assert expected in uses_block
@@ -67,6 +74,7 @@ def test_item_respawn_timer_fallback_and_icon_boundaries_match_retail_family() -
 def test_item_respawn_timer_slice_selection_and_draw_math_match_retail_shape() -> None:
 	source = CG_ENTS.read_text(encoding="utf-8")
 	slices_block = _block_from_marker(source, "static void CG_ItemRespawnTimerSlices")
+	rotation_block = _block_from_marker(source, "static float CG_ItemRespawnTimerSpriteRotation")
 	sprite_block = _block_from_marker(source, "static void CG_DrawItemRespawnTimerSprite")
 	draw_block = _block_from_marker(source, "static void CG_DrawItemRespawnTimer")
 
@@ -82,10 +90,12 @@ def test_item_respawn_timer_slice_selection_and_draw_math_match_retail_shape() -
 	):
 		assert expected in slices_block
 
+	assert "return retailRotation - 180.0f;" in rotation_block
+
 	for expected in (
 		"ent.reType = RT_SPRITE;",
 		"ent.radius = 16.0f;",
-		"ent.rotation = rotation;",
+		"ent.rotation = CG_ItemRespawnTimerSpriteRotation( rotation );",
 		"ent.customShader = shader;",
 		"ent.shaderRGBA[3] = alphaByte;",
 	):
@@ -119,12 +129,76 @@ def test_cg_item_calls_respawn_timer_before_skip_items_and_uses_time2_fallback()
 		"respawnRemaining = es->time - cg.time;",
 		"CG_DrawItemRespawnTimer( item, respawnRemaining, respawnDuration,",
 		"cent->lerpOrigin, 0,",
-		"(qboolean)( ( es->eFlags & EF_NODRAW ) != 0 ) );",
+		"(qboolean)( es->retailEventData != 0 ) );",
 		'trap_Cvar_VariableStringBuffer( "cg_skipItems", skipItems, sizeof( skipItems ) );',
 	):
 		assert expected in item_block
 
 	assert item_block.index("CG_DrawItemRespawnTimer(") < item_block.index('trap_Cvar_VariableStringBuffer( "cg_skipItems"')
+
+
+def test_qagame_item_timer_transport_keeps_forced_hidden_items_snapshot_visible() -> None:
+	source = G_ITEMS.read_text(encoding="utf-8")
+	transport_block = _block_from_marker(source, "static qboolean G_ShouldSendItemRespawnTimerSnapshot")
+	publisher_block = _block_from_marker(source, "static void G_SetItemRespawnTimerState")
+	uses_block = _block_from_marker(source, "qboolean G_ItemUsesRespawnTimer")
+
+	for expected in (
+		"if ( respawnDuration <= 0 ) {",
+		"if ( g_itemTimers.integer == 0 ) {",
+		"if ( !ent || !ent->item || ent->item->quantity == 0 ) {",
+		"return G_ItemUsesRespawnTimer( ent->item );",
+	):
+		assert expected in transport_block
+
+	for expected in (
+		"ent->s.time = markerTime;",
+		"ent->s.time2 = respawnDuration;",
+		"ent->s.retailEventData = ent->team ? 1 : 0;",
+		"if ( G_ShouldSendItemRespawnTimerSnapshot( ent, respawnDuration ) ) {",
+		"ent->r.svFlags &= ~SVF_NOCLIENT;",
+	):
+		assert expected in publisher_block
+
+	assert publisher_block.index("ent->s.time2 = respawnDuration;") < publisher_block.index(
+		"ent->r.svFlags &= ~SVF_NOCLIENT;"
+	)
+
+	for expected in (
+		"if ( item->giType == IT_ARMOR && item->quantity >= 25 ) {",
+		"case PW_QUAD:",
+		"case PW_BATTLESUIT:",
+		"case PW_HASTE:",
+		"case PW_INVIS:",
+		"case PW_REGEN:",
+	):
+		assert expected in uses_block
+
+
+def test_cgame_prediction_skips_retail_item_timer_family() -> None:
+	source = CG_PREDICT.read_text(encoding="utf-8")
+	skip_block = _block_from_marker(source, "static qboolean CG_ItemSkipsPredictablePickup")
+	touch_block = _block_from_marker(source, "static void CG_TouchItem")
+
+	for expected in (
+		"if ( item->giType == IT_ARMOR && item->quantity >= 25 ) {",
+		"if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {",
+		"case PW_QUAD:",
+		"case PW_BATTLESUIT:",
+		"case PW_HASTE:",
+		"case PW_INVIS:",
+		"case PW_REGEN:",
+		"if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {",
+	):
+		assert expected in skip_block
+
+	assert "if ( CG_ItemSkipsPredictablePickup( item ) ) {" in touch_block
+	assert touch_block.index("item = &bg_itemlist[ cent->currentState.modelindex ];") < touch_block.index(
+		"if ( CG_ItemSkipsPredictablePickup( item ) ) {"
+	)
+	assert touch_block.index("if ( CG_ItemSkipsPredictablePickup( item ) ) {") < touch_block.index(
+		"BG_AddPredictableEventToPlayerstate( EV_ITEM_PICKUP"
+	)
 
 
 def test_cg_item_queues_poi_markers_from_raw_item_origin_before_render_offsets() -> None:

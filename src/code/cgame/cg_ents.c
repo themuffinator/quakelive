@@ -551,7 +551,7 @@ static qboolean CG_ItemUsesRespawnTimer( const gitem_t *item ) {
 		return qfalse;
 	}
 
-	if ( item->giType == IT_ARMOR ) {
+	if ( item->giType == IT_ARMOR && item->quantity >= 25 ) {
 		return qtrue;
 	}
 
@@ -560,7 +560,16 @@ static qboolean CG_ItemUsesRespawnTimer( const gitem_t *item ) {
 	}
 
 	if ( item->giType == IT_POWERUP ) {
-		return qtrue;
+		switch ( item->giTag ) {
+		case PW_QUAD:
+		case PW_BATTLESUIT:
+		case PW_HASTE:
+		case PW_INVIS:
+		case PW_REGEN:
+			return qtrue;
+		default:
+			return qfalse;
+		}
 	}
 
 	if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
@@ -585,14 +594,27 @@ static int CG_ItemRespawnTimerDuration( const gitem_t *item ) {
 
 	switch ( item->giType ) {
 	case IT_ARMOR:
-		return 25 * 1000;
+		if ( item->quantity >= 25 ) {
+			return 25 * 1000;
+		}
+		break;
 	case IT_HEALTH:
 		if ( item->quantity >= 100 ) {
 			return 35 * 1000;
 		}
 		break;
 	case IT_POWERUP:
-		return 120 * 1000;
+		switch ( item->giTag ) {
+		case PW_QUAD:
+		case PW_BATTLESUIT:
+		case PW_HASTE:
+		case PW_INVIS:
+		case PW_REGEN:
+			return 120 * 1000;
+		default:
+			break;
+		}
+		break;
 	case IT_HOLDABLE:
 		if ( BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
 			return 60 * 1000;
@@ -654,6 +676,18 @@ static qhandle_t CG_ItemRespawnTimerIcon( const gitem_t *item, qboolean hiddenIt
 	}
 
 	return 0;
+}
+
+/*
+========================
+CG_ItemRespawnTimerSpriteRotation
+
+Converts the retail particle timer angle into this renderer's RT_SPRITE
+rotation space.
+========================
+*/
+static float CG_ItemRespawnTimerSpriteRotation( float retailRotation ) {
+	return retailRotation - 180.0f;
 }
 
 /*
@@ -726,7 +760,7 @@ static void CG_DrawItemRespawnTimerSprite( qhandle_t shader, const vec3_t origin
 	VectorCopy( origin, ent.origin );
 	VectorCopy( origin, ent.oldorigin );
 	ent.radius = 16.0f;
-	ent.rotation = rotation;
+	ent.rotation = CG_ItemRespawnTimerSpriteRotation( rotation );
 	ent.customShader = shader;
 
 	alphaByte = (int)( alpha * 255.0f );
@@ -854,7 +888,7 @@ static void CG_Item( centity_t *cent ) {
 		if ( respawnDuration > 0 ) {
 			respawnRemaining = es->time - cg.time;
 			CG_DrawItemRespawnTimer( item, respawnRemaining, respawnDuration, cent->lerpOrigin, 0,
-				(qboolean)( ( es->eFlags & EF_NODRAW ) != 0 ) );
+				(qboolean)( es->retailEventData != 0 ) );
 		}
 	}
 

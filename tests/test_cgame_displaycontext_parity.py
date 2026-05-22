@@ -4756,7 +4756,7 @@ def test_cgame_item_respawn_timer_helper_restores_retail_world_item_boundary() -
 	icon_block = _block_from_marker(ents_source, "static qhandle_t CG_ItemRespawnTimerIcon")
 	slices_block = _block_from_marker(ents_source, "static void CG_ItemRespawnTimerSlices")
 	timer_block = _block_from_marker(ents_source, "static void CG_DrawItemRespawnTimer")
-	uses_block = _block_from_marker(game_items_source, "static qboolean G_ItemUsesRespawnTimer")
+	uses_block = _block_from_marker(game_items_source, "qboolean G_ItemUsesRespawnTimer")
 	publisher_block = _block_from_marker(game_items_source, "static void G_SetItemRespawnTimerState")
 
 	for expected in (
@@ -4774,9 +4774,14 @@ def test_cgame_item_respawn_timer_helper_restores_retail_world_item_boundary() -
 		assert expected in main_source
 
 	for expected in (
-		"if ( item->giType == IT_ARMOR ) {",
+		"if ( item->giType == IT_ARMOR && item->quantity >= 25 ) {",
 		"if ( item->giType == IT_HEALTH && item->quantity >= 100 ) {",
 		"if ( item->giType == IT_POWERUP ) {",
+		"case PW_QUAD:",
+		"case PW_BATTLESUIT:",
+		"case PW_HASTE:",
+		"case PW_INVIS:",
+		"case PW_REGEN:",
 		"if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {",
 	):
 		assert expected in uses_block
@@ -4784,6 +4789,7 @@ def test_cgame_item_respawn_timer_helper_restores_retail_world_item_boundary() -
 	for expected in (
 		"ent->s.time = markerTime;",
 		"ent->s.time2 = respawnDuration;",
+		"ent->s.retailEventData = ent->team ? 1 : 0;",
 		"G_SetItemRespawnTimerState( ent, level.time, 0 );",
 		"G_SetItemRespawnTimerState( ent, ( respawn > 0 ) ? ent->nextthink : level.time,",
 		"G_SetItemRespawnTimerState( ent, ent->nextthink, (int)( respawn * 1000.0f ) );",
@@ -4816,7 +4822,7 @@ def test_cgame_item_respawn_timer_helper_restores_retail_world_item_boundary() -
 		"respawnDuration = es->time2;",
 		"respawnRemaining = es->time - cg.time;",
 		"CG_DrawItemRespawnTimer( item, respawnRemaining, respawnDuration, cent->lerpOrigin, 0,",
-		"(qboolean)( ( es->eFlags & EF_NODRAW ) != 0 ) );",
+		"(qboolean)( es->retailEventData != 0 ) );",
 	):
 		assert expected in item_block
 

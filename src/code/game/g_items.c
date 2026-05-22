@@ -421,12 +421,12 @@ Returns qtrue when the item mirrors retail respawn-timer transport through
 entityState_t time fields.
 =============
 */
-static qboolean G_ItemUsesRespawnTimer( const gitem_t *item ) {
+qboolean G_ItemUsesRespawnTimer( const gitem_t *item ) {
 	if ( !item ) {
 		return qfalse;
 	}
 
-	if ( item->giType == IT_ARMOR ) {
+	if ( item->giType == IT_ARMOR && item->quantity >= 25 ) {
 		return qtrue;
 	}
 
@@ -435,7 +435,16 @@ static qboolean G_ItemUsesRespawnTimer( const gitem_t *item ) {
 	}
 
 	if ( item->giType == IT_POWERUP ) {
-		return qtrue;
+		switch ( item->giTag ) {
+		case PW_QUAD:
+		case PW_BATTLESUIT:
+		case PW_HASTE:
+		case PW_INVIS:
+		case PW_REGEN:
+			return qtrue;
+		default:
+			return qfalse;
+		}
 	}
 
 	if ( item->giType == IT_HOLDABLE && BG_HoldableForItemTag( item->giTag ) == HI_MEDKIT ) {
@@ -443,6 +452,30 @@ static qboolean G_ItemUsesRespawnTimer( const gitem_t *item ) {
 	}
 
 	return qfalse;
+}
+
+/*
+=============
+G_ShouldSendItemRespawnTimerSnapshot
+
+Returns qtrue when a hidden item timer entity should remain snapshot-visible
+after pickup, matching retail's g_itemTimers-controlled transport.
+=============
+*/
+static qboolean G_ShouldSendItemRespawnTimerSnapshot( const gentity_t *ent, int respawnDuration ) {
+	if ( respawnDuration <= 0 ) {
+		return qfalse;
+	}
+
+	if ( g_itemTimers.integer == 0 ) {
+		return qfalse;
+	}
+
+	if ( !ent || !ent->item || ent->item->quantity == 0 ) {
+		return qfalse;
+	}
+
+	return G_ItemUsesRespawnTimer( ent->item );
 }
 
 /*
@@ -464,6 +497,10 @@ static void G_SetItemRespawnTimerState( gentity_t *ent, int markerTime, int resp
 
 	ent->s.time = markerTime;
 	ent->s.time2 = respawnDuration;
+	ent->s.retailEventData = ent->team ? 1 : 0;
+	if ( G_ShouldSendItemRespawnTimerSnapshot( ent, respawnDuration ) ) {
+		ent->r.svFlags &= ~SVF_NOCLIENT;
+	}
 }
 
 /*

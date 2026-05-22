@@ -2652,7 +2652,7 @@ static qboolean G_IsItemTimerObjectiveEntity( const gentity_t *ent ) {
 		return qfalse;
 	}
 
-	return ( ent->item->quantity != 0 ) ? qtrue : qfalse;
+	return G_ItemUsesRespawnTimer( ent->item );
 }
 
 /*
