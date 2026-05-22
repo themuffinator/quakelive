@@ -202,6 +202,8 @@ def test_browser_input_bridge_wraps_shared_display_dispatch() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	cursor_block = _block_from_marker(source, "static int CG_BrowserDisplayCursorType")
 	move_block = _block_from_marker(source, "static qboolean CG_BrowserDisplayMouseMove")
+	convert_x_block = _block_from_marker(source, "static int CG_ConvertScreenCursorXToVirtual")
+	convert_y_block = _block_from_marker(source, "static int CG_ConvertScreenCursorYToVirtual")
 	text_rect_block = _block_from_marker(source, "static rectDef_t *CG_BrowserCorrectedTextRect")
 	active_block = _block_from_marker(source, "static qboolean CG_BrowserOverActiveItem")
 	focused_block = _block_from_marker(source, "static void *CG_GetFocusedBrowserOverlay")
@@ -226,15 +228,18 @@ def test_browser_input_bridge_wraps_shared_display_dispatch() -> None:
 	assert "cgDC.cursory = y;" in key_block
 	assert "overlay = CG_GetFocusedBrowserOverlay();" in key_block
 	assert "CG_BrowserHandleKey( overlay, key, down, 0 );" in key_block
+	assert "( (float)x - cgs.screenXBias ) / cgs.screenXScale" in convert_x_block
+	assert "(float)x * ( (float)SCREEN_WIDTH / (float)cgs.glconfig.vidWidth )" in convert_x_block
+	assert "(float)y * ( (float)SCREEN_HEIGHT / (float)cgs.glconfig.vidHeight )" in convert_y_block
 
 	assert "cgDC.cursorx = cgs.cursorX;" in mouse_event_block
 	assert "cgDC.cursory = cgs.cursorY;" in mouse_event_block
-	assert "cgs.cursorX += x;" in mouse_event_block
-	assert "cgs.cursorY += y;" in mouse_event_block
+	assert "cgs.cursorX = CG_ConvertScreenCursorXToVirtual( x );" in mouse_event_block
+	assert "cgs.cursorY = CG_ConvertScreenCursorYToVirtual( y );" in mouse_event_block
 	assert "cgs.cursorX = SCREEN_WIDTH;" in mouse_event_block
 	assert "cgs.cursorY = SCREEN_HEIGHT;" in mouse_event_block
-	assert "cgs.cursorX = CG_ConvertScreenCursorXToVirtual( x );" not in mouse_event_block
-	assert "cgs.cursorY = CG_ConvertScreenCursorYToVirtual( y );" not in mouse_event_block
+	assert "cgs.cursorX += x;" not in mouse_event_block
+	assert "cgs.cursorY += y;" not in mouse_event_block
 	assert "n = CG_BrowserDisplayCursorType( cgs.cursorX, cgs.cursorY );" in mouse_event_block
 	assert "CG_BrowserDisplayMouseMove( NULL, cgs.cursorX, cgs.cursorY );" in mouse_event_block
 	assert "cgs.capturedItem" not in mouse_event_block

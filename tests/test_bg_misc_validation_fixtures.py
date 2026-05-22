@@ -262,6 +262,13 @@ def bg_misc_validation_harness(tmp_path_factory: pytest.TempPathFactory) -> ctyp
 		ctypes.c_int,
 	]
 	library.QLR_TouchJumpPadVelocityZ.restype = ctypes.c_int
+	library.QLR_ShouldClearJumpPadLaunch.argtypes = [
+		ctypes.c_int,
+		ctypes.c_int,
+		ctypes.c_float,
+		ctypes.c_int,
+	]
+	library.QLR_ShouldClearJumpPadLaunch.restype = ctypes.c_int
 	library.QLR_ProjectPredictableEventSnapshot.argtypes = [
 		ctypes.c_int,
 		ctypes.c_int,
@@ -545,6 +552,11 @@ def test_predictable_event_and_jump_pad_fixtures_cover_shared_event_transport(
 	) == (0, 0, 0, 7)
 	assert bg_misc_validation_harness.QLR_TouchJumpPadVelocityZ(PM_SPECTATOR, 0, 0) == 0
 	assert bg_misc_validation_harness.QLR_TouchJumpPadVelocityZ(PM_NORMAL, 1, 0) == 0
+	assert bg_misc_validation_harness.QLR_ShouldClearJumpPadLaunch(43, 42, ctypes.c_float(400.0), 7) == 0
+	assert bg_misc_validation_harness.QLR_ShouldClearJumpPadLaunch(43, 43, ctypes.c_float(0.0), 7) == 0
+	assert bg_misc_validation_harness.QLR_ShouldClearJumpPadLaunch(43, 42, ctypes.c_float(0.0), 7) == 1
+	assert bg_misc_validation_harness.QLR_ShouldClearJumpPadLaunch(43, 42, ctypes.c_float(-1.0), 7) == 1
+	assert bg_misc_validation_harness.QLR_ShouldClearJumpPadLaunch(43, 42, ctypes.c_float(400.0), 0) == 0
 
 	assert _packed_event_snapshot(
 		bg_misc_validation_harness.QLR_ProjectPredictableEventSnapshot(0, 1)
@@ -555,6 +567,19 @@ def test_predictable_event_and_jump_pad_fixtures_cover_shared_event_transport(
 	assert _packed_event_snapshot(
 		bg_misc_validation_harness.QLR_ProjectExternalEventSnapshot()
 	) == (0, EV_FALL_FAR, 55, ET_PLAYER)
+
+
+def test_jump_pad_launch_clear_policy_is_shared_by_server_and_prediction() -> None:
+	bg_public = (REPO_ROOT / "src" / "code" / "game" / "bg_public.h").read_text(encoding="utf-8")
+	bg_misc = (REPO_ROOT / "src" / "code" / "game" / "bg_misc.c").read_text(encoding="utf-8")
+	g_active = (REPO_ROOT / "src" / "code" / "game" / "g_active.c").read_text(encoding="utf-8")
+	cg_predict = (REPO_ROOT / "src" / "code" / "cgame" / "cg_predict.c").read_text(encoding="utf-8")
+
+	assert "qboolean BG_ShouldClearJumpPadLaunch( const playerState_t *ps );" in bg_public
+	assert "qboolean BG_ShouldClearJumpPadLaunch( const playerState_t *ps )" in bg_misc
+	assert "if ( ps->velocity[2] > 0.0f ) {" in bg_misc
+	assert "if ( BG_ShouldClearJumpPadLaunch( &ent->client->ps ) ) {" in g_active
+	assert "if ( BG_ShouldClearJumpPadLaunch( &cg.predictedPlayerState ) ) {" in cg_predict
 
 
 def test_playerstate_projection_fixture_covers_visibility_and_replication_fields(

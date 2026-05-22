@@ -2620,7 +2620,7 @@ def test_cgame_browser_overlay_focus_wrappers_restore_retail_direct_owner_slice(
 		"wasVisible = (qboolean)( ( menu->window.flags & WINDOW_VISIBLE ) != 0 );",
 		"if ( !wasVisible ) {",
 		"CG_EnableJoinGameMenuCursor();",
-		"if ( !cg_joinGameMenuCursorActive || catcher != KEYCATCH_CGAME ) {",
+		"if ( !cg_joinGameMenuCursorActive || !( catcher & KEYCATCH_CGAME ) ) {",
 	):
 		assert expected in open_join_block
 
@@ -2633,7 +2633,9 @@ def test_cgame_browser_overlay_focus_wrappers_restore_retail_direct_owner_slice(
 		assert expected in clamp_join_block
 
 	for expected in (
-		"trap_Key_SetCatcher( KEYCATCH_CGAME );",
+		"catcher = trap_Key_GetCatcher();",
+		"if ( !( catcher & KEYCATCH_CGAME ) ) {",
+		"trap_Key_SetCatcher( catcher | KEYCATCH_CGAME );",
 		"CG_ClampJoinGameMenuCursor();",
 		"cgDC.cursorx = cgs.cursorX;",
 		"cgDC.cursory = cgs.cursorY;",

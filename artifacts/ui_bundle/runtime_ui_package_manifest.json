@@ -7,8 +7,8 @@
   "drift_files": [],
   "main_package": {
     "path": "build/win32/Debug/bin/baseq3/pak_uiql.pk3",
-    "size": 83105163,
-    "sha256": "835395458d17e9338191f3fc8e3a17c6e6c94e712cd136c3dd0bbee5562ec130",
+    "size": 83105160,
+    "sha256": "c63454add6198c9542561d964db2efa9116da35eaa4694119d6539647faaa82f",
     "entry_count": 950,
     "required_entries": [
       "default.cfg",

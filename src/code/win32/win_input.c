@@ -350,6 +350,11 @@ static void IN_RawInputAppendSample( const qlr_win32_raw_mouse_sample_t *sample 
 		return;
 	}
 
+	if ( cls.keyCatchers & ~KEYCATCH_RETAIL_MOUSEPASS ) {
+		IN_ClearRawInputSamples();
+		return;
+	}
+
 	if ( s_wri.sampleCount >= MAX_RAW_INPUT_SAMPLES ) {
 		if ( in_debugMouse && in_debugMouse->integer ) {
 			Com_Printf( "Raw Input buffer overflow!\n" );
@@ -399,6 +404,27 @@ qboolean IN_RawInputIsActive( void ) {
 	}
 
 	return ( in_mouse->integer == 2 && s_wmv.mouseActive && s_wri.registered ) ? qtrue : qfalse;
+}
+
+/*
+================
+IN_ShouldProcessWin32MouseButtons
+
+Returns qtrue when the Win32 button-state messages should synthesize mouse
+key events. Retail skips them only for the raw relative gameplay lane, while
+menu and cgame catchers still receive the Win32 button messages.
+================
+*/
+qboolean IN_ShouldProcessWin32MouseButtons( void ) {
+	if ( !IN_RawInputIsActive() ) {
+		return qtrue;
+	}
+
+	if ( !IN_ShouldUseRelativeMouse() ) {
+		return qtrue;
+	}
+
+	return qfalse;
 }
 
 /*

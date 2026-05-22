@@ -41,6 +41,59 @@ disabled, until a documented open replacement path exists.
 
 ## Recent closure
 
+### Task A32: Remove source-only Flight refuel-rate cvar [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_items.c`, `src/code/game/g_main.c`,
+`src/code/game/g_local.h`, `references/symbol-maps/qagame.json`,
+`tests/test_game_factory_regen_parity.py`
+Parity estimate: **before 99% -> after 100%** for scoped Flight powerup
+pickup/fuel timer parity; repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `Pickup_Powerup` at `0x1004DFE0` against the committed
+   Ghidra decompile and the qagame symbol-map evidence.
+2. Confirmed retail keeps `g_flightThrust` registered for cvar/factory
+   parity, but exposes no `g_flightRefuelRate` or Flight-specific pickup
+   multiplier.
+3. Removed the source-only refuel-rate cvar/storage/helper and restored the
+   direct `quantity * 1000` timer addition for Flight fuel/refill.
+4. Added structural coverage so Flight cannot regain a separate refuel-rate
+   branch while `PM_FlyMove` remains free of `g_flightThrust` movement input.
+
+### Task A31: Restore retail spectator follow command and fallback state [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_cmds.c`, `src/code/game/g_active.c`,
+`src/code/game/g_local.h`, `tests/test_game_spectator_connection_parity.py`,
+`docs/reverse-engineering/qagame-spectator-follow-reconstruction-2026-05-22.md`
+Parity estimate: **before 88% -> after 96%** for scoped qagame spectator
+follow/stop-follow command handling, HUD auto-follow command compatibility,
+saved-team restoration, and missing-target fallback; repo-wide remains **98%**
+pending broader runtime and remaining subsystem gaps.
+
+Completed work:
+
+1. Rechecked the qagame symbol map entries for `SpectatorThink`,
+   `SpectatorClientEndFrame`, `StopFollowing`, `Cmd_Follow_f`, and
+   `FollowCycle`, plus the cgame symbol-map evidence for the retail
+   `follow %d%s` HUD auto-follow command shape.
+2. Added a shared qagame spectator fallback helper that preserves the local
+   `g_teamSpecFreeCam` policy while giving stop-follow and missing-target
+   paths a single state transition.
+3. Restored `StopFollowing` to preserve `sess.sessionTeam`, restore
+   `ps.persistant[PERS_TEAM]` from it, reset `sess.spectatorClient` to the
+   caller's own slot, clear `PMF_FOLLOW`, and set scoreboard flags from the
+   fallback state.
+4. Restored `Cmd_Follow_f` support for `follow1` and `follow2`, and made the
+   parser accept cgame's optional powerup suffix tokens without treating them
+   as a no-arg stop-follow command.
+5. Routed unresolved active-player follow targets, removed POIs, and invalid
+   explicit follow targets through `StopFollowing` from
+   `SpectatorClientEndFrame`.
+6. Added focused static parity coverage for the stop-follow, follow-command,
+   and end-frame fallback seams.
+
 ### Task A30: Restore retail scoreboard feeder dispatch and team-row selection [COMPLETED]
 Priority: High
 Primary areas: `src/code/cgame/cg_main.c`,

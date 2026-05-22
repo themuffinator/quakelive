@@ -213,8 +213,8 @@ const pmove_settings_t *PM_GetDefaultSettings( void ) {
 =============
 PM_IsJumpPadLaunchActive
 
-Returns whether the current playerstate is carrying the short-lived jump-pad
-style launch latch that should not be replaced by player jump input.
+Returns whether the current playerstate is carrying the cached jump-pad style
+launch latch that should not be replaced by player jump input or air steps.
 =============
 */
 qboolean PM_IsJumpPadLaunchActive( void ) {

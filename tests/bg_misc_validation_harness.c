@@ -439,6 +439,26 @@ QLR_EXPORT int QLR_TouchJumpPadVelocityZ( int pmType, int flightPowerup, int pre
 
 /*
 =============
+QLR_ShouldClearJumpPadLaunch
+
+Returns the shared jump-pad launch clear decision for a synthetic playerstate.
+=============
+*/
+QLR_EXPORT int QLR_ShouldClearJumpPadLaunch( int currentFrame, int jumpPadFrame, float velocityZ, int jumpPadEnt ) {
+	playerState_t	ps;
+
+	QLR_ResetPlayerState( &ps );
+	ps.pm_type = PM_NORMAL;
+	ps.pmove_framecount = currentFrame;
+	ps.jumppad_frame = jumpPadFrame;
+	ps.jumppad_ent = jumpPadEnt;
+	ps.velocity[2] = velocityZ;
+
+	return BG_ShouldClearJumpPadLaunch( &ps ) ? 1 : 0;
+}
+
+/*
+=============
 QLR_ProjectPredictableEventSnapshot
 
 Projects one playerstate event into entityState event fields.

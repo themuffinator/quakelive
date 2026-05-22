@@ -2806,7 +2806,7 @@ def test_jumppad_launch_latch_blocks_generic_ground_plane_step_retry(
 def test_jumppad_launch_pmove_suppresses_held_jump_across_split_slices(
 	pmove_fixture_harness: ctypes.CDLL,
 ) -> None:
-	pmf_jump_held = 16
+	pmf_jump_held = 2
 	velocity_z = ctypes.c_float(0.0)
 	upmove = ctypes.c_int(0)
 	pm_flags = ctypes.c_int(0)

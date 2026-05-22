@@ -5915,7 +5915,7 @@
       "signature": "int Pickup_Powerup(gentity_t *ent, gentity_t *other)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact powerup pickup helper from g_items.c. Retail rounds timers onto second boundaries, applies the flight refill path, updates the per-powerup hold and pickup stats, fires Quad-specific side effects, and scans nearby opponents for the denied-reward event."
+      "comment": "Exact powerup pickup helper from g_items.c. Retail rounds timers onto second boundaries, adds the resolved quantity directly to the per-powerup timer so Flight fuel/refill uses the same quantity*1000 path as other powerups, updates the per-powerup hold and pickup stats, fires Quad-specific side effects, and scans nearby opponents for the denied-reward event."
     },
     {
       "address": "0x1004E4A0",

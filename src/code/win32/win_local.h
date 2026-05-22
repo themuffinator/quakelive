@@ -39,6 +39,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <wsipx.h>
 
 void	IN_MouseEvent (int mstate);
+qboolean IN_ShouldProcessWin32MouseButtons( void );
 
 void Sys_QueEvent( int time, sysEventType_t type, int value, int value2, int ptrLength, void *ptr );
 

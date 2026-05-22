@@ -2399,6 +2399,34 @@ void BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad ) {
 
 /*
 ========================
+BG_ShouldClearJumpPadLaunch
+
+Returns whether the cached jump-pad launch marker has outlived the current
+upward launch arc and can be cleared.
+========================
+*/
+qboolean BG_ShouldClearJumpPadLaunch( const playerState_t *ps ) {
+	if ( !ps ) {
+		return qfalse;
+	}
+
+	if ( ps->jumppad_ent == 0 ) {
+		return qfalse;
+	}
+
+	if ( ps->jumppad_frame == ps->pmove_framecount ) {
+		return qfalse;
+	}
+
+	if ( ps->velocity[2] > 0.0f ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+========================
 BG_PlayerStateToEntityState
 
 This is done after each set of usercmd_t on the server,

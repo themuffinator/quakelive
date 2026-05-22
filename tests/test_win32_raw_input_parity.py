@@ -11,6 +11,7 @@ from tests.compiler_support import compile_c_binary, find_c_compiler, shared_lib
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WIN_INPUT = REPO_ROOT / "src" / "code" / "win32" / "win_input.c"
+WIN_LOCAL = REPO_ROOT / "src" / "code" / "win32" / "win_local.h"
 WIN_MAIN = REPO_ROOT / "src" / "code" / "win32" / "win_main.c"
 WIN_WNDPROC = REPO_ROOT / "src" / "code" / "win32" / "win_wndproc.c"
 CL_KEYS = REPO_ROOT / "src" / "code" / "client" / "cl_keys.c"
@@ -357,6 +358,28 @@ def test_win32_mouse_capture_falls_back_to_absolute_client_coordinates_for_ui_la
 	assert "if ( !IN_ShouldUseRelativeMouse() ) {" in mouse_move_block
 	assert "IN_WindowMouse();" in mouse_move_block
 	assert len(re.findall(r"IN_DeactivateMouse\s*\(\s*\);\s*IN_MouseMove\s*\(\s*\);", frame_block)) >= 3
+
+
+def test_win32_raw_buttons_fall_back_to_window_messages_for_menu_catchers() -> None:
+	win_input = WIN_INPUT.read_text(encoding="utf-8")
+	win_local = WIN_LOCAL.read_text(encoding="utf-8")
+	win_wndproc = WIN_WNDPROC.read_text(encoding="utf-8")
+	raw_append_block = _extract_function_block(
+		win_input, "static void IN_RawInputAppendSample( const qlr_win32_raw_mouse_sample_t *sample ) {"
+	)
+	button_gate_block = _extract_function_block(
+		win_input, "qboolean IN_ShouldProcessWin32MouseButtons( void ) {"
+	)
+	main_wndproc = _extract_function_block(win_wndproc, "LONG WINAPI MainWndProc (")
+
+	assert "qboolean IN_ShouldProcessWin32MouseButtons( void );" in win_local
+	assert "cls.keyCatchers & ~KEYCATCH_RETAIL_MOUSEPASS" in raw_append_block
+	assert "IN_ClearRawInputSamples();" in raw_append_block
+	assert "if ( !IN_RawInputIsActive() ) {" in button_gate_block
+	assert "if ( !IN_ShouldUseRelativeMouse() ) {" in button_gate_block
+	assert "return qfalse;" in button_gate_block
+	assert "if ( IN_ShouldProcessWin32MouseButtons() )" in main_wndproc
+	assert "IN_MouseEvent (temp);" in main_wndproc
 
 
 def test_directinput_mouse_uses_retail_buffered_event_stream_and_eight_buttons() -> None:

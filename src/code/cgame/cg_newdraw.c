@@ -12857,9 +12857,59 @@ static void CG_BrowserDisplayHandleKey( int key, qboolean down, int x, int y ) {
 
 /*
 =============
+CG_RoundScreenCursorCoord
+=============
+*/
+static int CG_RoundScreenCursorCoord( float value ) {
+	return (int)( value + 0.5f );
+}
+
+/*
+=============
+CG_ConvertScreenCursorXToVirtual
+
+Projects a host screen-space X coordinate into the cgame 640-space cursor.
+=============
+*/
+static int CG_ConvertScreenCursorXToVirtual( int x ) {
+	float	virtualX;
+
+	if ( cgs.screenXBias > 0.0f && cgs.screenXScale > 0.0f ) {
+		virtualX = ( (float)x - cgs.screenXBias ) / cgs.screenXScale;
+		return CG_RoundScreenCursorCoord( virtualX );
+	}
+
+	if ( cgs.glconfig.vidWidth <= 0 ) {
+		return 0;
+	}
+
+	virtualX = (float)x * ( (float)SCREEN_WIDTH / (float)cgs.glconfig.vidWidth );
+	return CG_RoundScreenCursorCoord( virtualX );
+}
+
+/*
+=============
+CG_ConvertScreenCursorYToVirtual
+
+Projects a host screen-space Y coordinate into the cgame 480-space cursor.
+=============
+*/
+static int CG_ConvertScreenCursorYToVirtual( int y ) {
+	float	virtualY;
+
+	if ( cgs.glconfig.vidHeight <= 0 ) {
+		return 0;
+	}
+
+	virtualY = (float)y * ( (float)SCREEN_HEIGHT / (float)cgs.glconfig.vidHeight );
+	return CG_RoundScreenCursorCoord( virtualY );
+}
+
+/*
+=============
 CG_MouseEvent
 
-Routes captured mouse deltas through the HUD when spectator overlays are active.
+Routes captured mouse coordinates through the HUD when spectator overlays are active.
 =============
 */
 void CG_MouseEvent( int x, int y ) {
@@ -12878,8 +12928,8 @@ void CG_MouseEvent( int x, int y ) {
 		return;
 	}
 
-	cgs.cursorX += x;
-	cgs.cursorY += y;
+	cgs.cursorX = CG_ConvertScreenCursorXToVirtual( x );
+	cgs.cursorY = CG_ConvertScreenCursorYToVirtual( y );
 
 	if ( cgs.cursorX < 0 ) {
 		cgs.cursorX = 0;

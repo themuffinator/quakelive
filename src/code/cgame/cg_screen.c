@@ -59,7 +59,13 @@ cursor into the shared display context.
 ================
 */
 static void CG_EnableJoinGameMenuCursor( void ) {
-	trap_Key_SetCatcher( KEYCATCH_CGAME );
+	int		catcher;
+
+	catcher = trap_Key_GetCatcher();
+	if ( !( catcher & KEYCATCH_CGAME ) ) {
+		trap_Key_SetCatcher( catcher | KEYCATCH_CGAME );
+	}
+
 	CG_ClampJoinGameMenuCursor();
 	cgDC.cursorx = cgs.cursorX;
 	cgDC.cursory = cgs.cursorY;
@@ -115,7 +121,7 @@ static menuDef_t *CG_OpenJoinGameMenu( void ) {
 		menu = CG_OpenBrowserOverlayByName( "joingame_menu" );
 	} else {
 		catcher = trap_Key_GetCatcher();
-		if ( !cg_joinGameMenuCursorActive || catcher != KEYCATCH_CGAME ) {
+		if ( !cg_joinGameMenuCursorActive || !( catcher & KEYCATCH_CGAME ) ) {
 			CG_EnableJoinGameMenuCursor();
 		}
 	}

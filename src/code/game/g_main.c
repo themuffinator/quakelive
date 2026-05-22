@@ -798,7 +798,6 @@ vmCvar_t	g_accelRate_bfg;
 vmCvar_t	g_damagePlums;
 vmCvar_t	g_powerupRespawn;
 vmCvar_t	g_flightThrust;
-vmCvar_t	g_flightRefuelRate;
 vmCvar_t	g_battleSuitDampen;
 vmCvar_t	g_dropDamagedHealth;
 vmCvar_t	g_velocity_gl;
@@ -1005,7 +1004,6 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_armorTiered, "g_armorTiered", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable retail Quake Live tiered armor behaviour for pickups, regen, and the dedicated HUD settings transport." },
 	{ &g_startingWeapons, "g_startingWeapons", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Bitmask of weapons awarded to players when they spawn." },
         { &g_flightThrust, "g_flightThrust", "1200", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Retail Flight thrust cvar retained for factory/cvar parity." },
-        { &g_flightRefuelRate, "g_flightRefuelRate", "1.0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Multiplier applied to the duration granted when refuelling the Flight powerup." },
         { &g_battleSuitDampen, "g_battleSuitDampen", "0.5", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Damage scale applied to players protected by the Battlesuit; 0 disables mitigation, 1.0 removes it." },
         { &g_dropDamagedHealth, "g_dropDamagedHealth", "1", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "When disabled, health items dropped by players ignore their damaged counts and always heal for their base amount." },
 	{ &g_kickBadUserinfo, "g_kickBadUserinfo", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Drop clients submitting malformed userinfo when non-zero; 0 only warns and repairs the data." },

@@ -555,6 +555,16 @@ analogue line up cleanly enough to support a stable mapping.
 - `0x10063830` is the exact browser-overlay equivalent of `ui_shared.c::Display_MouseMove`. HLIL shows it fetching the focused browser root through `CG_GetFocusedBrowserOverlay`, checking the popup/root flags, routing mouse motion only through that root when a popup owns focus, and otherwise walking every active browser root and forwarding the cursor through `CG_BrowserHandleMouseMove`.
 - `0x100638E0` is the exact browser-overlay equivalent of `ui_shared.c::Menu_OverActiveItem`. The body requires a visible or forced root, rejects hidden and decoration widgets, tests hover rects through `CG_BrowserRectContainsPoint`, uses `CG_BrowserCorrectedTextRect` for text widgets, and returns whether any active child is actually under the cursor.
 - Source reconstruction in this round keeps the bridge cgame-owned: `cg_newdraw.c::CG_MouseEvent` and `cg_newdraw.c::CG_KeyEvent` now route cursor-type, mouse-motion, and key dispatch through `CG_BrowserDisplayCursorType`, `CG_BrowserDisplayMouseMove`, and `CG_BrowserDisplayHandleKey` instead of calling the shared display helpers directly.
+- Follow-up input parity work keeps the spectator `joingame_menu` usable with
+  the Win32 host's absolute mouse lane: `CG_MouseEvent` projects host
+  client-area coordinates into the shared 640x480 cursor space before routing
+  browser-overlay mouse movement, and `CG_EnableJoinGameMenuCursor` preserves
+  existing catcher bits such as `KEYCATCH_CONSOLE` when adding
+  `KEYCATCH_CGAME`.
+- The matching host-side button path now mirrors retail too: Win32 mouse-button
+  messages remain active while browser/UI/cgame catchers own input, and raw
+  input samples are dropped for those catcher states so the join-game overlay
+  receives `K_MOUSE*` clicks through the same menu key path as the UI VM.
 - Before this round, the current cgame map held `479` named addresses: `386 / 751` committed Ghidra functions (`51.4%`) plus `93` HLIL-only anchors for `479 / 844` combined committed anchors (`56.8%`). After this round, the map holds `481` named addresses: `388 / 751` committed Ghidra functions (`51.7%`) plus the same `93` HLIL-only anchors for `481 / 844` combined committed anchors (`57.0%`).
 
 ### Native Utility / Browser Slider Sweep

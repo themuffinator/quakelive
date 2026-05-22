@@ -694,8 +694,8 @@ static void CG_TouchTriggerPrediction( void ) {
 		}
 	}
 
-	// if we didn't touch a jump pad this pmove frame
-	if ( cg.predictedPlayerState.jumppad_frame != cg.predictedPlayerState.pmove_framecount ) {
+	// if the cached jump-pad launch arc is no longer active
+	if ( BG_ShouldClearJumpPadLaunch( &cg.predictedPlayerState ) ) {
 		cg.predictedPlayerState.jumppad_frame = 0;
 		cg.predictedPlayerState.jumppad_ent = 0;
 	}

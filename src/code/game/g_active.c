@@ -653,8 +653,8 @@ void	G_TouchTriggers( gentity_t *ent ) {
 		}
 	}
 
-	// if we didn't touch a jump pad this pmove frame
-	if ( ent->client->ps.jumppad_frame != ent->client->ps.pmove_framecount ) {
+	// if the cached jump-pad launch arc is no longer active
+	if ( BG_ShouldClearJumpPadLaunch( &ent->client->ps ) ) {
 		ent->client->ps.jumppad_frame = 0;
 		ent->client->ps.jumppad_ent = 0;
 	}
@@ -1611,6 +1611,11 @@ void SpectatorClientEndFrame( gentity_t *ent ) {
 			clientNum = level.follow2;
 		}
 
+		if ( clientNum < 0 && clientNum > -10 ) {
+			StopFollowing( ent );
+			return;
+		}
+
 		if ( clientNum <= -10 ) {
 			// POI following
 			int poiIndex = -(clientNum + 10);
@@ -1626,11 +1631,8 @@ void SpectatorClientEndFrame( gentity_t *ent ) {
 				return;
 			} else {
 				// POI gone?
-				ent->client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
-				ent->client->sess.spectatorClient = -1;
-				if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
-					ClientBegin( ent->client - level.clients );
-				}
+				StopFollowing( ent );
+				return;
 			}
 		} else if ( clientNum >= 0 ) {
 			cl = &level.clients[ clientNum ];
@@ -1643,11 +1645,8 @@ void SpectatorClientEndFrame( gentity_t *ent ) {
 			} else {
 				// drop them to free spectators unless they are dedicated camera followers
 				if ( ent->client->sess.spectatorClient >= 0 ) {
-				ent->client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
-				ent->client->sess.spectatorClient = -1;
-				if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
-					ClientBegin( ent->client - level.clients );
-				}
+					StopFollowing( ent );
+					return;
 				}
 			}
 		}

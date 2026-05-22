@@ -368,38 +368,6 @@ Configures physics bounce behaviour for dropped items.
 
 /*
 =============
-G_GetFlightRefuelMilliseconds
-
-Scales the amount of time granted when refuelling the Flight powerup.
-=============
-*/
-static int G_GetFlightRefuelMilliseconds( int baseMilliseconds ) {
-	float	refuelRate;
-	float	scaled;
-	float	maxMilliseconds;
-
-	if ( baseMilliseconds <= 0 ) {
-		return 0;
-	}
-
-	refuelRate = g_flightRefuelRate.value;
-	if ( refuelRate <= 0.0f ) {
-		return baseMilliseconds;
-	}
-
-	scaled = (float)baseMilliseconds * refuelRate;
-	maxMilliseconds = (float)INT_MAX;
-	if ( scaled < 1.0f ) {
-		scaled = 1.0f;
-	} else if ( scaled > maxMilliseconds ) {
-		scaled = maxMilliseconds;
-	}
-
-	return (int)scaled;
-}
-
-/*
-=============
 G_SetPowerupPOITime
 
 Mirrors the retail item-state timestamp consumed by cgame's incoming powerup POIs.
@@ -1104,14 +1072,7 @@ int Pickup_Powerup( gentity_t *ent, gentity_t *other ) {
 		quantity = ent->item->quantity;
 	}
 
-	if ( ent->item->giTag == PW_FLIGHT ) {
-		int	milliseconds;
-
-		milliseconds = G_GetFlightRefuelMilliseconds( quantity * 1000 );
-		other->client->ps.powerups[ent->item->giTag] += milliseconds;
-	} else {
-		other->client->ps.powerups[ent->item->giTag] += quantity * 1000;
-	}
+	other->client->ps.powerups[ent->item->giTag] += quantity * 1000;
 
 	{
 		teamScoreStatIndex_t holdStatIndex;

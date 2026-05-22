@@ -27,6 +27,15 @@ shape to queue: while capture is active and the catcher mask is clear except
 for message/pass-through bits, it queues relative deltas; when browser/UI/cgame
 capture, `in_nograb`, inactive focus, or the windowed console releases capture,
 it queues `ScreenToClient` client-area coordinates for the absolute cursor lane.
+The cgame-owned join-game overlay projects those host coordinates back into
+the shared 640x480 cursor space and preserves any existing console catcher bit
+when it arms `KEYCATCH_CGAME`, so toggling the console does not immediately
+drop back into the join-menu-only state.
+Mouse buttons follow the same split: raw-input button samples are only retained
+for the relative gameplay lane, while browser/UI/cgame catcher states use the
+Win32 button-state messages to synthesize `K_MOUSE*` key events. That keeps the
+cgame join-game overlay on the same click path as ordinary menus instead of
+dropping clicks whenever raw input is the active mouse backend.
 The retained browser host now produces the same browser catcher bit from the
 frame/hide/reset owners: active browser frames arm `0x20`, and hide/reset paths
 clear it.

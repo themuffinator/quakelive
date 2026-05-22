@@ -3897,6 +3897,17 @@ void SetTeam( gentity_t *ent, char *s ) {
 
 /*
 =================
+G_DefaultSpectatorState
+
+Returns the spectator view mode used when retail clears a follow camera.
+=================
+*/
+spectatorState_t G_DefaultSpectatorState( void ) {
+	return g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
+}
+
+/*
+=================
 StopFollowing
 
 If the client being followed leaves the game, or you just want to drop
@@ -3904,14 +3915,16 @@ to free floating spectator mode
 =================
 */
 void StopFollowing( gentity_t *ent ) {
+	int	clientNum;
+
 	if ( !ent || !ent->client ) {
 		return;
 	}
 
-	ent->client->ps.persistant[ PERS_TEAM ] = TEAM_SPECTATOR;
-	ent->client->sess.sessionTeam = TEAM_SPECTATOR;
-	ent->client->sess.spectatorState = g_teamSpecFreeCam.integer ? SPECTATOR_FREE : SPECTATOR_SCOREBOARD;
-	ent->client->sess.spectatorClient = -1;
+	clientNum = ent - g_entities;
+	ent->client->ps.persistant[ PERS_TEAM ] = ent->client->sess.sessionTeam;
+	ent->client->sess.spectatorState = G_DefaultSpectatorState();
+	ent->client->sess.spectatorClient = clientNum;
 	ent->client->lastKillCommandTime = 0;
 	ent->client->killCommandCooldownExpires = 0;
 	ent->client->friendlyFireComplaints = 0;
@@ -3921,8 +3934,13 @@ void StopFollowing( gentity_t *ent ) {
 	ent->client->teamDamageEventsGiven = 0;
 	ent->client->teamDamageEventsReceived = 0;
 	ent->client->ps.pm_flags &= ~PMF_FOLLOW;
+	if ( ent->client->sess.spectatorState == SPECTATOR_SCOREBOARD ) {
+		ent->client->ps.pm_flags |= PMF_SCOREBOARD;
+	} else {
+		ent->client->ps.pm_flags &= ~PMF_SCOREBOARD;
+	}
 	ent->r.svFlags &= ~SVF_BOT;
-	ent->client->ps.clientNum = ent - g_entities;
+	ent->client->ps.clientNum = clientNum;
 }
 
 /*
@@ -3979,6 +3997,7 @@ Cmd_Follow_f
 */
 void Cmd_Follow_f( gentity_t *ent ) {
 	int			i;
+	int			argc;
 	char	arg[MAX_TOKEN_CHARS];
 
 	if ( !ent || !ent->client ) {
@@ -3993,31 +4012,36 @@ void Cmd_Follow_f( gentity_t *ent ) {
 		return;
 	}
 
-	if ( trap_Argc() != 2 ) {
+	argc = trap_Argc();
+	if ( argc < 2 ) {
 		if ( ent->client->sess.spectatorState == SPECTATOR_FOLLOW ) {
-			if ( g_teamSpecFreeCam.integer ) {
-				StopFollowing( ent );
-			} else {
-				trap_SendServerCommand( ent-g_entities, "print \"Free-flying spectators are disabled while g_teamSpecFreeCam is 0.\n\"" );
-			}
+			StopFollowing( ent );
+		} else if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR && !g_teamSpecFreeCam.integer ) {
+			trap_SendServerCommand( ent-g_entities, "print \"Free-flying spectators are disabled while g_teamSpecFreeCam is 0.\n\"" );
 		}
 		return;
 	}
 
 	trap_Argv( 1, arg, sizeof( arg ) );
-	i = ClientNumberFromString( ent, arg );
-	if ( i == -1 ) {
-		return;
-	}
+	if ( !Q_stricmp( arg, "follow1" ) ) {
+		i = FOLLOW_ACTIVE1;
+	} else if ( !Q_stricmp( arg, "follow2" ) ) {
+		i = FOLLOW_ACTIVE2;
+	} else {
+		i = ClientNumberFromString( ent, arg );
+		if ( i == -1 ) {
+			return;
+		}
 
-	// can't follow self
-	if ( &level.clients[ i ] == ent->client ) {
-		return;
-	}
+		// can't follow self
+		if ( &level.clients[ i ] == ent->client ) {
+			return;
+		}
 
-	// can't follow another spectator
-	if ( level.clients[ i ].sess.sessionTeam == TEAM_SPECTATOR ) {
-		return;
+		// can't follow another spectator
+		if ( level.clients[ i ].sess.sessionTeam == TEAM_SPECTATOR ) {
+			return;
+		}
 	}
 
 	// if they are playing a tournement game, count as a loss

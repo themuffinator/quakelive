@@ -145,16 +145,26 @@ def test_factory_pmove_reset_tracks_every_nonlocal_pmove_input_surface() -> None
 def test_retail_flight_thrust_cvar_is_registered_but_not_a_pmove_input_surface() -> None:
 	bg_public = _read("src/code/game/bg_public.h")
 	bg_pmove = _read("src/code/game/bg_pmove.c")
+	g_items = _read("src/code/game/g_items.c")
 	g_main = _read("src/code/game/g_main.c")
+	local_h = _read("src/code/game/g_local.h")
 	pmove_c = _read("src/code/game/g_pmove.c")
 
 	assert '{ &g_flightThrust, "g_flightThrust", "1200", CVAR_ARCHIVE | CVAR_NORESTART' in g_main
+	assert "g_flightRefuelRate" not in g_main
+	assert "g_flightRefuelRate" not in local_h
+	assert "G_GetFlightRefuelMilliseconds" not in g_items
 	assert "flightThrust" not in bg_public
 	assert "flightThrust" not in pmove_c
 	assert "g_flightThrust" not in pmove_c
 	fly_start = bg_pmove.index("static void PM_FlyMove( void )")
 	fly_end = bg_pmove.index("static void PM_AirMove", fly_start)
 	assert "flightThrust" not in bg_pmove[fly_start:fly_end]
+	pickup_start = g_items.index("int Pickup_Powerup( gentity_t *ent, gentity_t *other )")
+	pickup_end = g_items.index("return RESPAWN_POWERUP;", pickup_start)
+	pickup_body = g_items[pickup_start:pickup_end]
+	assert "ent->item->giTag == PW_FLIGHT" not in pickup_body
+	assert "other->client->ps.powerups[ent->item->giTag] += quantity * 1000;" in pickup_body
 
 
 def test_factory_runes_are_gated_separately_from_map_powerups() -> None:

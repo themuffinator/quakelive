@@ -661,7 +661,7 @@ LONG WINAPI MainWndProc (
 			if (wParam & MK_XBUTTON2)
 				temp |= 16;
 
-			if ( !IN_RawInputIsActive() )
+			if ( IN_ShouldProcessWin32MouseButtons() )
 			{
 				IN_MouseEvent (temp);
 			}
