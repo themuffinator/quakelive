@@ -8,6 +8,23 @@ def _read(rel_path: str) -> str:
 	return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def _block_from_marker(source: str, marker: str) -> str:
+	start = source.rindex(marker)
+	brace_start = source.index("{", start)
+	depth = 0
+
+	for index in range(brace_start, len(source)):
+		char = source[index]
+		if char == "{":
+			depth += 1
+		elif char == "}":
+			depth -= 1
+			if depth == 0:
+				return source[start:index + 1]
+
+	raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
 def test_qagame_uses_retail_team_scoreboard_headers_without_legacy_outer_prefix() -> None:
 	game_cmds = _read("src/code/game/g_cmds.c")
 
@@ -127,7 +144,23 @@ def test_cgame_maps_retail_team_scoreboard_rows_into_score_t_fields() -> None:
 
 def test_selected_player_best_weapon_prefers_retail_scoreboard_row_weapon() -> None:
 	newdraw = _read("src/code/cgame/cg_newdraw.c")
+	best_weapon_block = _block_from_marker(newdraw, "static void CG_DrawSelectedPlayerBestWeapon")
+	resolve_weapon_block = _block_from_marker(newdraw, "static const char *CG_ResolveWeaponName")
 
-	assert "weapon = score->bestWeapon;" in newdraw
-	assert "if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {" in newdraw
-	assert "weapon = cent->currentState.weapon;" in newdraw
+	assert "weapon = score->bestWeapon;" in best_weapon_block
+	assert "weaponName = CG_ResolveWeaponName( weapon );" in best_weapon_block
+	assert "CG_Text_Paint(rect->x, rect->y, scale, color, weaponName, 0, 0, textStyle);" in best_weapon_block
+	assert "weapon = cent->currentState.weapon;" not in best_weapon_block
+	assert '"Unknown"' not in best_weapon_block
+	assert "rect->y + rect->h" not in best_weapon_block
+
+	for expected in (
+		'return "Grenade";',
+		'return "Rail Gun";',
+		'return "BFG";',
+		'return "Nail Gun";',
+		'return "Proximity Mines";',
+		'return "Chain Gun";',
+		'return "Heavy Machinegun";',
+	):
+		assert expected in resolve_weapon_block

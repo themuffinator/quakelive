@@ -2328,6 +2328,7 @@ static void CG_DrawWeaponSelectStrip( void ) {
 		return;
 	}
 	trap_R_SetColor( color );
+	CG_SetAdjustFrom640Mode( WIDESCREEN_CENTER );
 
 	// showing weapon select clears pickup item display, but not the blend blob
 	cg.itemPickupTime = 0;
@@ -2335,7 +2336,7 @@ static void CG_DrawWeaponSelectStrip( void ) {
 	// count the number of weapons owned
 	bits = cg.snap->ps.stats[ STAT_WEAPONS ];
 	count = 0;
-	for ( i = WP_MACHINEGUN ; i < WP_NUM_WEAPONS ; i++ ) {
+	for ( i = WP_GAUNTLET ; i < WP_NUM_WEAPONS ; i++ ) {
 		if ( bits & ( 1 << i ) ) {
 			count++;
 		}
@@ -2344,7 +2345,7 @@ static void CG_DrawWeaponSelectStrip( void ) {
 	x = 320 - count * 20;
 	y = 380;
 
-	for ( i = WP_MACHINEGUN ; i < WP_NUM_WEAPONS ; i++ ) {
+	for ( i = WP_GAUNTLET ; i < WP_NUM_WEAPONS ; i++ ) {
 		if ( !( bits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -2378,6 +2379,7 @@ static void CG_DrawWeaponSelectStrip( void ) {
 	}
 
 	trap_R_SetColor( NULL );
+	CG_SetAdjustFrom640Mode( WIDESCREEN_STRETCH );
 }
 
 /*

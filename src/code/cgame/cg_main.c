@@ -733,7 +733,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_kickScale, "cg_kickScale", "1", CVAR_ARCHIVE },
 	{ &cg_lagometer, "cg_lagometer", "1", CVAR_ARCHIVE },
 	{ &cg_lastmsg, "cg_lastmsg", "0", CVAR_ARCHIVE },
-	{ &cg_levelTimerDirection, "cg_levelTimerDirection", "up", CVAR_ARCHIVE },
+	{ &cg_levelTimerDirection, "cg_levelTimerDirection", "1", CVAR_ARCHIVE },
 	{ &cg_lightningImpact, "cg_lightningImpact", "1", CVAR_ARCHIVE },
 	{ &cg_lightningImpactCap, "cg_lightningImpactCap", "512", CVAR_ARCHIVE },
 	{ &cg_lightningStyle, "cg_lightningStyle", "1", CVAR_ARCHIVE },
@@ -5206,93 +5206,179 @@ static qboolean CG_BuildFeederRow( int index, int team, cgFeederRow_t *row ) {
 
 /*
 =============
-CG_FeederItemTextBaseColumns
+CG_FeederCountryFlagHandle
 
-Formats the shared classic scoreboard columns that retail still reuses across
-the generic scoreboard and basic team-list feeders.
+Returns the already-cached country flag when available, falling back to the
+retail country-code registration path for feeder-only rows.
 =============
 */
-static const char *CG_FeederItemTextBaseColumns( const cgFeederRow_t *row, int column, qhandle_t *handle ) {
+static qhandle_t CG_FeederCountryFlagHandle( const clientInfo_t *ci ) {
+	if ( !ci ) {
+		return 0;
+	}
+
+	if ( ci->countryFlagShader ) {
+		return ci->countryFlagShader;
+	}
+
+	return CG_RegisterCountryFlag( ci->country );
+}
+
+/*
+=============
+CG_FeederPowerupHandle
+
+Finds the first retail scoreboard powerup icon for a row, matching the
+non-neutral powerup scan used by the Quake Live cgame feeder.
+=============
+*/
+static qhandle_t CG_FeederPowerupHandle( int powerups ) {
+	int			powerup;
 	gitem_t		*item;
 
-	if ( !row || !row->info || !row->info->infoValid ) {
-		return "";
+	if ( !powerups ) {
+		return 0;
 	}
 
-	switch ( column ) {
-	case 0:
-		if ( row->info->powerups & ( 1 << PW_NEUTRALFLAG ) ) {
-			item = BG_FindItemForPowerup( PW_NEUTRALFLAG );
-			*handle = cg_items[ ITEM_INDEX( item ) ].icon;
-		} else if ( row->info->powerups & ( 1 << PW_REDFLAG ) ) {
-			item = BG_FindItemForPowerup( PW_REDFLAG );
-			*handle = cg_items[ ITEM_INDEX( item ) ].icon;
-		} else if ( row->info->powerups & ( 1 << PW_BLUEFLAG ) ) {
-			item = BG_FindItemForPowerup( PW_BLUEFLAG );
-			*handle = cg_items[ ITEM_INDEX( item ) ].icon;
-		} else if ( row->info->botSkill > 0 && row->info->botSkill <= 5 ) {
-			*handle = cgs.media.botSkillShaders[ row->info->botSkill - 1 ];
-		} else if ( row->info->handicap < 100 ) {
-			return va( "%i", row->info->handicap );
+	for ( powerup = PW_QUAD; powerup < PW_NUM_POWERUPS; powerup++ ) {
+		if ( powerup == PW_NEUTRALFLAG ) {
+			continue;
 		}
-		break;
-	case 1:
-		if ( row->team == -1 ) {
-			if ( row->socialHandle ) {
-				*handle = row->socialHandle;
-			}
-			return "";
+		if ( !( powerups & ( 1 << powerup ) ) ) {
+			continue;
 		}
 
-		*handle = CG_StatusHandle( row->info->teamTask );
-		if ( *handle <= 0 && row->socialHandle ) {
-			*handle = row->socialHandle;
+		item = BG_FindItemForPowerup( (powerup_t)powerup );
+		if ( item && item->icon ) {
+			return trap_R_RegisterShaderNoMip( item->icon );
 		}
-		break;
-	case 2:
-		if ( row->clientNum >= 0 &&
-			 ( cg.snap->ps.stats[ STAT_CLIENTS_READY ] & ( 1 << row->clientNum ) ) ) {
-			return "Ready";
-		}
-		if ( row->team == -1 ) {
-			if ( cgs.gametype == GT_TOURNAMENT ) {
-				return va( "%i/%i", row->info->wins, row->info->losses );
-			}
-			if ( row->info->team == TEAM_SPECTATOR ) {
-				return "Spectator";
-			}
-			return "";
-		}
-		if ( row->info->teamLeader ) {
-			return "Leader";
-		}
-		break;
-	case 3:
-		return row->info->name;
-	case 4:
-		if ( row->hudEntry ) {
-			return va( "%i", row->hudEntry->score );
-		}
-		return va( "%i", row->info->score );
-	case 5:
-		if ( row->hudEntry ) {
-			return va( "%4i", row->hudEntry->time );
-		}
-		return va( "%4i", row->scoreRow ? row->scoreRow->time : 0 );
-	case 6:
-		if ( row->hudEntry ) {
-			if ( row->hudEntry->ping == -1 ) {
-				return "connecting";
-			}
-			return va( "%4i", row->hudEntry->ping );
-		}
-		if ( row->scoreRow && row->scoreRow->ping == -1 ) {
-			return "connecting";
-		}
-		return va( "%4i", row->scoreRow ? row->scoreRow->ping : 0 );
 	}
 
-	return "";
+	return 0;
+}
+
+/*
+=============
+CG_FeederClientReady
+
+Returns qtrue when the scoreboard row client is marked ready in the snapshot.
+=============
+*/
+static qboolean CG_FeederClientReady( const cgFeederRow_t *row ) {
+	if ( !row || !cg.snap || row->clientNum < 0 || row->clientNum >= MAX_CLIENTS ) {
+		return qfalse;
+	}
+
+	return ( cg.snap->ps.stats[ STAT_CLIENTS_READY ] & ( 1 << row->clientNum ) ) ? qtrue : qfalse;
+}
+
+/*
+=============
+CG_FeederShouldShowReadyIcon
+
+Matches the retail branch that swaps the powerup column for ready-state arrows
+during warmup ready-up or intermission exit voting.
+=============
+*/
+static qboolean CG_FeederShouldShowReadyIcon( void ) {
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		return qtrue;
+	}
+
+	if ( cgs.matchReadyUpDeadline > 0 || cgs.matchWarmupReadyEligible > 0 ||
+		 cgs.intermissionExitStatusLatched ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CG_FeederReadyHandle
+
+Returns the retail green/red ready-state arrow shader for the row.
+=============
+*/
+static qhandle_t CG_FeederReadyHandle( const cgFeederRow_t *row ) {
+	return CG_FeederClientReady( row ) ? cgs.media.scoreArrowGreenShader : cgs.media.scoreArrowRedShader;
+}
+
+/*
+=============
+CG_FeederScoreValue
+
+Formats retail scoreboard scores, including Quake Live's absent/forfeit dash.
+=============
+*/
+static const char *CG_FeederScoreValue( int score ) {
+	if ( score == SCORE_NOT_PRESENT || score == -999 ) {
+		return "-";
+	}
+
+	return va( "%i", score );
+}
+
+/*
+=============
+CG_FeederFormattedDamage
+
+Formats damage with the compact thousands suffix used by retail scoreboards.
+=============
+*/
+static const char *CG_FeederFormattedDamage( int damage ) {
+	if ( damage < 1000 ) {
+		return va( "%i", damage );
+	}
+
+	if ( damage >= 10000 ) {
+		return va( "%2.0fK", (float)damage / 1000.0f );
+	}
+
+	return va( "%1.1fK", (float)damage / 1000.0f );
+}
+
+/*
+=============
+CG_FeederBestWeaponHandle
+
+Returns the best-weapon icon for rows with weapon damage attribution.
+=============
+*/
+static qhandle_t CG_FeederBestWeaponHandle( const score_t *score ) {
+	if ( !score || score->damage <= 0 || score->bestWeapon <= WP_NONE ||
+		 score->bestWeapon >= MAX_WEAPONS ) {
+		return 0;
+	}
+
+	return cg_weapons[ score->bestWeapon ].weaponIcon;
+}
+
+/*
+=============
+CG_FeederFormatRaceTime
+
+Formats the race scoreboard best-time value as Quake Live's mm:ss.mmm text.
+=============
+*/
+static const char *CG_FeederFormatRaceTime( int milliseconds ) {
+	int		minutes;
+	int		seconds;
+	int		millis;
+
+	if ( milliseconds <= 0 ) {
+		return "-";
+	}
+
+	minutes = milliseconds / 60000;
+	seconds = ( milliseconds % 60000 ) / 1000;
+	millis = milliseconds % 1000;
+
+	return va( "%i:%02i.%03i", minutes, seconds, millis );
 }
 
 /*
@@ -5304,12 +5390,85 @@ Formats the retail non-team scoreboard and end-score feeder leaves.
 */
 static const char *CG_FeederItemTextScoreboard( int index, int column, qhandle_t *handle ) {
 	cgFeederRow_t	row;
+	qhandle_t		icon;
+	int				score;
+	int				time;
+	int				ping;
 
 	if ( !CG_BuildFeederRow( index, -1, &row ) ) {
 		return "";
 	}
+	if ( !row.info || !row.info->infoValid || row.info->team == TEAM_SPECTATOR ) {
+		return "";
+	}
 
-	return CG_FeederItemTextBaseColumns( &row, column, handle );
+	switch ( column ) {
+	case 0:
+		*handle = CG_FeederCountryFlagHandle( row.info );
+		return "";
+	case 1:
+		if ( row.socialHandle ) {
+			*handle = row.socialHandle;
+		}
+		return "";
+	case 2:
+		if ( row.info->handicap < 100 ) {
+			return va( "%i", row.info->handicap );
+		}
+		return "";
+	case 3:
+		if ( CG_FeederShouldShowReadyIcon() ) {
+			icon = CG_FeederReadyHandle( &row );
+		} else {
+			icon = CG_FeederPowerupHandle( row.info->powerups );
+		}
+		if ( icon ) {
+			*handle = icon;
+		}
+		return "";
+	case 4:
+		*handle = CG_FeederCountryFlagHandle( row.info );
+		return "";
+	case 5:
+		return row.info->name;
+	case 6:
+		if ( cgs.gametype == GT_TOURNAMENT ) {
+			return va( "%i/%i", row.info->wins, row.info->losses );
+		}
+		return "";
+	case 7:
+		score = row.scoreRow ? row.scoreRow->score : ( row.hudEntry ? row.hudEntry->score : row.info->score );
+		return CG_FeederScoreValue( score );
+	case 8:
+		if ( row.scoreRow ) {
+			return va( "%i/%i", row.scoreRow->kills, row.scoreRow->deaths );
+		}
+		return "";
+	case 9:
+		if ( row.scoreRow ) {
+			return CG_FeederFormattedDamage( row.scoreRow->damage );
+		}
+		return "";
+	case 10:
+		icon = CG_FeederBestWeaponHandle( row.scoreRow );
+		if ( icon ) {
+			*handle = icon;
+		}
+		return "";
+	case 11:
+		if ( row.scoreRow && CG_FeederBestWeaponHandle( row.scoreRow ) ) {
+			return va( "%i%%", row.scoreRow->accuracy );
+		}
+		return "";
+	case 12:
+		time = row.scoreRow ? row.scoreRow->time : ( row.hudEntry ? row.hudEntry->time : 0 );
+		return va( "%4i", time );
+	case 13:
+		ping = row.scoreRow ? row.scoreRow->ping : ( row.hudEntry ? row.hudEntry->ping : 0 );
+		return va( "%4i", ping );
+	}
+
+	return "";
 }
 
 /*
@@ -5320,7 +5479,50 @@ Formats the dedicated retail race scoreboard feeder leaf.
 =============
 */
 static const char *CG_FeederItemTextRaceScoreboard( int index, int column, qhandle_t *handle ) {
-	return CG_FeederItemTextScoreboard( index, column, handle );
+	cgFeederRow_t	row;
+	qhandle_t		icon;
+	int				score;
+	int				time;
+	int				ping;
+
+	if ( !CG_BuildFeederRow( index, -1, &row ) ) {
+		return "";
+	}
+	if ( !row.info || !row.info->infoValid || row.info->team == TEAM_SPECTATOR ) {
+		return "";
+	}
+
+	switch ( column ) {
+	case 0:
+		*handle = CG_FeederCountryFlagHandle( row.info );
+		return "";
+	case 1:
+		if ( row.socialHandle ) {
+			*handle = row.socialHandle;
+		}
+		return "";
+	case 2:
+		if ( CG_FeederShouldShowReadyIcon() ) {
+			icon = CG_FeederReadyHandle( &row );
+			if ( icon ) {
+				*handle = icon;
+			}
+		}
+		return "";
+	case 3:
+		return row.info->name;
+	case 4:
+		score = row.scoreRow ? row.scoreRow->score : ( row.hudEntry ? row.hudEntry->score : row.info->score );
+		return CG_FeederFormatRaceTime( score );
+	case 5:
+		time = row.scoreRow ? row.scoreRow->time : ( row.hudEntry ? row.hudEntry->time : 0 );
+		return va( "%4i", time );
+	case 6:
+		ping = row.scoreRow ? row.scoreRow->ping : ( row.hudEntry ? row.hudEntry->ping : 0 );
+		return va( "%4i", ping );
+	}
+
+	return "";
 }
 
 /*

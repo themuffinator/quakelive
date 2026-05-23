@@ -1847,9 +1847,12 @@ def test_ui_retail_feeder_matrix_matches_menu_consumers_and_callback_ownership()
     assert {name: defines[name] for name in expected_ids} == expected_ids
 
     menu_feeders: set[str] = set()
+    menu_text_by_name: dict[str, str] = {}
     for menu_path in (REPO_ROOT / "src/ui").glob("*.menu"):
+        menu_text = menu_path.read_text(encoding="utf-8")
+        menu_text_by_name[menu_path.name] = menu_text
         menu_feeders.update(
-            re.findall(r"\bfeeder\s+(FEEDER_[A-Z0-9_]+)\b", menu_path.read_text(encoding="utf-8"))
+            re.findall(r"\bfeeder\s+(FEEDER_[A-Z0-9_]+)\b", menu_text)
         )
 
     ui_menu_feeders = {
@@ -1870,6 +1873,41 @@ def test_ui_retail_feeder_matrix_matches_menu_consumers_and_callback_ownership()
     assert menu_feeders == ui_menu_feeders | cgame_menu_feeders
     assert "FEEDER_CLANS" not in menu_feeders
     assert "FEEDER_COUNTRIES" not in menu_feeders
+    assert "FEEDER_ENDSCOREBOARD" not in menu_feeders
+
+    non_team_end_scoreboards = {
+        "end_scoreboard_ffa.menu",
+        "end_scoreboard_race.menu",
+        "end_scoreboard_rr.menu",
+        "endscorenoteam.menu",
+    }
+    for menu_name in non_team_end_scoreboards:
+        menu_text = menu_text_by_name[menu_name]
+        assert "feeder FEEDER_SCOREBOARD" in menu_text
+        assert "FEEDER_ENDSCOREBOARD" not in menu_text
+
+    rich_team_end_scoreboards = {
+        "end_scoreboard_1fctf.menu",
+        "end_scoreboard_ad.menu",
+        "end_scoreboard_ca.menu",
+        "end_scoreboard_ctf.menu",
+        "end_scoreboard_dom.menu",
+        "end_scoreboard_ft.menu",
+        "end_scoreboard_har.menu",
+        "end_scoreboard_tdm.menu",
+    }
+    for menu_name in rich_team_end_scoreboards:
+        menu_text = menu_text_by_name[menu_name]
+        assert "feeder FEEDER_REDTEAM_LIST" in menu_text
+        assert "feeder FEEDER_BLUETEAM_LIST" in menu_text
+        assert "feeder FEEDER_REDTEAM_STATS" in menu_text
+        assert "feeder FEEDER_BLUETEAM_STATS" in menu_text
+        assert "FEEDER_ENDSCOREBOARD" not in menu_text
+
+    legacy_team_end_scoreboard = menu_text_by_name["endscoreteam.menu"]
+    assert "feeder FEEDER_REDTEAM_LIST" in legacy_team_end_scoreboard
+    assert "feeder FEEDER_BLUETEAM_LIST" in legacy_team_end_scoreboard
+    assert "FEEDER_ENDSCOREBOARD" not in legacy_team_end_scoreboard
 
     bridge_feeders = set(re.findall(r"\bfeeder\s+(FEEDER_[A-Z0-9_]+)\b", ui_bridge))
     assert bridge_feeders == {"FEEDER_SERVERS", "FEEDER_SERVERSTATUS"}

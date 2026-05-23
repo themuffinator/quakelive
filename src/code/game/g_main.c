@@ -3502,16 +3502,23 @@ void CalculateRanks( void ) {
 	if ( g_gametype.integer >= GT_TEAM ) {
 		trap_SetConfigstring( CS_SCORES1, va("%i", level.teamScores[TEAM_RED] ) );
 		trap_SetConfigstring( CS_SCORES2, va("%i", level.teamScores[TEAM_BLUE] ) );
+		trap_SetConfigstring( CS_FIRST_PLACE_NAME, "TEAM_RED" );
+		trap_SetConfigstring( CS_SECOND_PLACE_NAME, "TEAM_BLUE" );
 	} else {
-		if ( level.numConnectedClients == 0 ) {
+		if ( level.numPlayingClients < 1 ) {
 			trap_SetConfigstring( CS_SCORES1, va("%i", SCORE_NOT_PRESENT) );
-			trap_SetConfigstring( CS_SCORES2, va("%i", SCORE_NOT_PRESENT) );
-		} else if ( level.numConnectedClients == 1 ) {
-			trap_SetConfigstring( CS_SCORES1, va("%i", level.clients[ level.sortedClients[0] ].ps.persistant[PERS_SCORE] ) );
-			trap_SetConfigstring( CS_SCORES2, va("%i", SCORE_NOT_PRESENT) );
+			trap_SetConfigstring( CS_FIRST_PLACE_NAME, "" );
 		} else {
 			trap_SetConfigstring( CS_SCORES1, va("%i", level.clients[ level.sortedClients[0] ].ps.persistant[PERS_SCORE] ) );
+			trap_SetConfigstring( CS_FIRST_PLACE_NAME, level.clients[ level.sortedClients[0] ].pers.netname );
+		}
+
+		if ( level.numPlayingClients < 2 ) {
+			trap_SetConfigstring( CS_SCORES2, va("%i", SCORE_NOT_PRESENT) );
+			trap_SetConfigstring( CS_SECOND_PLACE_NAME, "" );
+		} else {
 			trap_SetConfigstring( CS_SCORES2, va("%i", level.clients[ level.sortedClients[1] ].ps.persistant[PERS_SCORE] ) );
+			trap_SetConfigstring( CS_SECOND_PLACE_NAME, level.clients[ level.sortedClients[1] ].pers.netname );
 		}
 	}
 

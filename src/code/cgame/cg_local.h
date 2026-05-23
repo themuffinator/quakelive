@@ -1673,6 +1673,8 @@ typedef struct {
 	int				levelStartTime;
 
 	int				scores1, scores2;		// from configstrings
+	char			firstPlaceName[40];		// retail CS_FIRST_PLACE_NAME cache
+	char			secondPlaceName[40];	// retail CS_SECOND_PLACE_NAME cache
 	int				redflag, blueflag;		// flag status from configstrings
 	int				flagStatus;
 	vec3_t			poiObjectiveOrigins[CG_POI_OBJECTIVE_COUNT];

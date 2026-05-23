@@ -2042,7 +2042,7 @@ static float CG_DrawTimer( float y ) {
 		lineHeight = ITEM_TIMER_MAX_HEIGHT;
 	}
 
-	countDown = ( qboolean )( cgs.timelimit > 0 && !Q_stricmp( cg_levelTimerDirection.string, "down" ) );
+	countDown = ( qboolean )( cgs.timelimit > 0 && cg_levelTimerDirection.integer == 1 );
 	msec = cg.time - cgs.levelStartTime;
 	remaining = 0;
 

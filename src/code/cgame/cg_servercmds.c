@@ -3910,6 +3910,8 @@ void CG_SetConfigValues( void ) {
 
 	cgs.scores1 = atoi( CG_ConfigString( CS_SCORES1 ) );
 	cgs.scores2 = atoi( CG_ConfigString( CS_SCORES2 ) );
+	Q_strncpyz( cgs.firstPlaceName, CG_ConfigString( CS_FIRST_PLACE_NAME ), sizeof( cgs.firstPlaceName ) );
+	Q_strncpyz( cgs.secondPlaceName, CG_ConfigString( CS_SECOND_PLACE_NAME ), sizeof( cgs.secondPlaceName ) );
 	cgs.levelStartTime = atoi( CG_ConfigString( CS_LEVEL_START_TIME ) );
 	cgs.voteTime = atoi( CG_ConfigString( CS_VOTE_TIME ) );
 	cgs.voteYes = atoi( CG_ConfigString( CS_VOTE_YES ) );
@@ -4038,6 +4040,10 @@ static void CG_ConfigStringModified( void ) {
 		cgs.scores1 = atoi( str );
 	} else if ( num == CS_SCORES2 ) {
 		cgs.scores2 = atoi( str );
+	} else if ( num == CS_FIRST_PLACE_NAME ) {
+		Q_strncpyz( cgs.firstPlaceName, str, sizeof( cgs.firstPlaceName ) );
+	} else if ( num == CS_SECOND_PLACE_NAME ) {
+		Q_strncpyz( cgs.secondPlaceName, str, sizeof( cgs.secondPlaceName ) );
 	} else if ( num == CS_RED_TEAM_NAME ) {
 		CG_SetTeamNameFromConfigString( TEAM_RED, str );
 	} else if ( num == CS_BLUE_TEAM_NAME ) {

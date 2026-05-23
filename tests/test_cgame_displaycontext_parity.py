@@ -26,6 +26,7 @@ CG_LOCALENTS = REPO_ROOT / "src" / "code" / "cgame" / "cg_localents.c"
 CG_PUBLIC = REPO_ROOT / "src" / "code" / "cgame" / "cg_public.h"
 CG_SCREEN = REPO_ROOT / "src" / "code" / "cgame" / "cg_screen.c"
 CG_SYSCALLS = REPO_ROOT / "src" / "code" / "cgame" / "cg_syscalls.c"
+BG_PUBLIC = REPO_ROOT / "src" / "code" / "game" / "bg_public.h"
 CG_BG_PLAN = REPO_ROOT / "docs" / "reverse-engineering" / "cgame-bg-parity-implementation-plan.md"
 CL_CGAME = REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c"
 G_CLIENT = REPO_ROOT / "src" / "code" / "game" / "g_client.c"
@@ -43,6 +44,14 @@ CGAME_GHIDRA_DECOMPILE = (
 	/ "reverse-engineering"
 	/ "ghidra"
 	/ "cgamex86"
+	/ "decompile_top_functions.c"
+)
+QAGAME_GHIDRA_DECOMPILE = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "qagamex86"
 	/ "decompile_top_functions.c"
 )
 CGAME_HLIL = (
@@ -2193,13 +2202,21 @@ def test_cgame_country_flag_cache_restores_retail_player_configstring_transport(
 
 def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	game_source = G_MAIN.read_text(encoding="utf-8")
+	bg_public_source = BG_PUBLIC.read_text(encoding="utf-8")
+	qagame_ghidra_source = QAGAME_GHIDRA_DECOMPILE.read_text(encoding="utf-8")
 	player_score_block = _block_from_marker(source, "static void CG_DrawPlayerScore")
 	score_value_block = _block_from_marker(source, "static void CG_DrawScoreValue")
 	value_block = _block_from_marker(source, "static qboolean CG_BuildPlacementScoreValue")
 	line_block = _block_from_marker(source, "static void CG_DrawPlacementScoreLine")
+	team_name_block = _block_from_marker(source, "static const char *CG_GetRetailPlacementTeamName")
 	first_score_block = _block_from_marker(source, "static void CG_Draw1stPlaceScore")
 	second_score_block = _block_from_marker(source, "static void CG_Draw2ndPlaceScore")
 	follow_block = _block_from_marker(source, "static void CG_DrawFollowPlayerNameEx")
+	resolve_weapon_block = _block_from_marker(source, "static const char *CG_ResolveWeaponName")
 	selected_score_block = _block_from_marker(source, "score_t *CG_GetSelectedScore")
 	selected_client_block = _block_from_marker(source, "static clientInfo_t *CG_GetSelectedClientInfo")
 	selected_team_color_block = _block_from_marker(source, "static void CG_DrawSelectedPlayerTeamColor")
@@ -2208,7 +2225,16 @@ def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split()
 	match_winner_block = _block_from_marker(source, "static void CG_DrawMatchWinner")
 	endgame_score_block = _block_from_marker(source, "static void CG_DrawEndGameScore")
 	new_chat_block = _block_from_marker(source, "static void CG_DrawNewChatArea")
+	set_config_values_block = _block_from_marker(servercmds_source, "void CG_SetConfigValues( void )")
+	configstring_modified_block = _block_from_marker(servercmds_source, "static void CG_ConfigStringModified")
+	calculate_ranks_block = _block_from_marker(game_source, "void CalculateRanks( void )")
+	retail_calculate_ranks_block = _block_from_marker(qagame_ghidra_source, "void FUN_10056070(void)")
 	constants = _menudef_ownerdraw_constants()
+	retail_best_weapon_block = _text_between(
+		hlil_source,
+		'100345f0    int32_t __convention("regparm") sub_100345f0',
+		"100346e0",
+	)
 
 	assert _retail_cg_ownerdraw_cases_for_target("FUN_100323d0") == {
 		constants["CG_PLAYER_SCORE"],
@@ -2218,6 +2244,9 @@ def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split()
 	assert _retail_cg_ownerdraw_cases_for_target("FUN_1002ff50") == {
 		constants["CG_RED_SCORE"],
 		constants["CG_BLUE_SCORE"],
+	}
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_100345f0") == {
+		constants["CG_PLYR_BEST_WEAPON_NAME"],
 	}
 
 	assert set(_case_labels(score_value_block)) == {
@@ -2252,13 +2281,34 @@ def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split()
 
 	for expected in (
 		"if ( cgs.gametype == GT_RACE ) {",
-		"CG_RaceFormatMilliseconds( value, buffer, bufferSize );",
-		'Q_strncpyz( buffer, "-", bufferSize );',
-		'Com_sprintf( buffer, bufferSize, "%d", value );',
+		"qboolean requirePositiveRaceTime",
+		"requirePositiveRaceTime && value == 0",
+		"CG_RaceFormatMilliseconds( value, valueText, sizeof( valueText ) );",
+		'Q_strncpyz( buffer, leadingSpace ? " -" : "-", bufferSize );',
+		'Com_sprintf( buffer, bufferSize, " %s", valueText );',
+		'Com_sprintf( buffer, bufferSize, leadingSpace ? " %d" : "%d", value );',
 	):
 		assert expected in value_block
+	assert "if ( value == CG_SCORE_FORFEIT ) {" not in value_block
 
 	for expected in (
+		"teamName = cgs.redTeamName;",
+		'return "Red Team";',
+		"teamName = cgs.blueTeamName;",
+		'return "Blue Team";',
+	):
+		assert expected in team_name_block
+	for stale in (
+		"cg_redTeamName",
+		"cg_blueTeamName",
+		"DEFAULT_REDTEAM_NAME",
+		"DEFAULT_BLUETEAM_NAME",
+	):
+		assert stale not in team_name_block
+
+	for expected in (
+		"if ( !valueText || !valueText[0] ) {",
+		"CG_Text_Paint( x, rect->y, scale, color, nameText, 0, 0, textStyle );",
 		"CG_Text_Paint_Limit( &maxX, x, rect->y, scale, color, nameText, 0, 0 );",
 		'CG_Text_Paint( ellipsisX, rect->y, scale, color, "...", 0, 0, textStyle );',
 		"CG_Text_Paint( valueX, rect->y, scale, color, valueText, 0, 0, textStyle );",
@@ -2266,19 +2316,94 @@ def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split()
 		assert expected in line_block
 
 	for expected in (
-		"CG_GetActiveScoreByIndex( 0 );",
+		"CG_GetRetailPlacementTeamName( leaderTeam )",
+		"leaderTeam = TEAM_RED;",
+		"leaderTeam = ( cgs.scores1 < cgs.scores2 ) ? TEAM_BLUE : TEAM_RED;",
+		"CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ), qfalse, qfalse )",
+		"if ( cgs.scores1 == SCORE_NOT_PRESENT ) {",
+		'CG_Text_Paint( rect->x, rect->y, scale, color, "1.", 0, 0, textStyle );',
+		"CG_BuildPlacementScoreValue( cgs.scores1, valueBuffer, sizeof( valueBuffer ), qtrue, qfalse )",
+		"Q_strncpyz( nameBuffer, cgs.firstPlaceName, sizeof( nameBuffer ) );",
 		'CG_DrawPlacementScoreLine( rect, scale, color, textStyle, "1. ", nameBuffer, valueBuffer );',
-		"CG_GetTeamName( leaderTeam )",
 	):
 		assert expected in first_score_block
+	for stale in (
+		"CG_GetActiveScoreByIndex( 0 );",
+		"CG_GetTeamName( leaderTeam )",
+		"Unknown",
+		"^%c%s^7",
+	):
+		assert stale not in first_score_block
 
 	for expected in (
-		"score = CG_GetScoreForClientNum( cg.snap->ps.clientNum );",
-		"score = CG_GetActiveScoreByIndex( 1 );",
+		"CG_GetRetailPlacementTeamName( trailingTeam )",
+		"CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ), qfalse, qfalse )",
+		"cg.snap && cg.snap->ps.pm_type != PM_SPECTATOR && !CG_ShowPlayerIsFirstPlace()",
+		"rank = cg.snap->ps.persistant[PERS_RANK];",
+		"rank &= ~RANK_TIED_FLAG;",
+		"localRank = rank + 1;",
+		"value = ( cgs.gametype == GT_RACE ) ? cgs.clientinfo[clientNum].score : cg.snap->ps.persistant[PERS_SCORE];",
+		"CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ), qtrue, qtrue )",
+		"value = cgs.scores2;",
+		"CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ), qtrue, qtrue )",
+		"localRank = ( cgs.scores1 != cgs.scores2 ) ? 2 : 1;",
+		"Q_strncpyz( nameBuffer, cgs.secondPlaceName, sizeof( nameBuffer ) );",
 		'Com_sprintf( rankBuffer, sizeof( rankBuffer ), "%d. ", localRank );',
 		"CG_DrawPlacementScoreLine( rect, scale, color, textStyle, rankBuffer, nameBuffer, valueBuffer );",
 	):
 		assert expected in second_score_block
+	for stale in (
+		"CG_GetScoreForClientNum( cg.snap->ps.clientNum )",
+		"CG_GetActiveScoreByIndex( 1 )",
+		"CG_GetTeamName( trailingTeam )",
+		"^%c%s^7",
+	):
+		assert stale not in second_score_block
+
+	for expected in (
+		"#define CS_FIRST_PLACE_NAME\t\t0x293",
+		"#define CS_SECOND_PLACE_NAME\t0x294",
+	):
+		assert expected in bg_public_source
+	for expected in (
+		"char\t\t\tfirstPlaceName[40];",
+		"char\t\t\tsecondPlaceName[40];",
+	):
+		assert expected in local_source
+	for expected in (
+		"Q_strncpyz( cgs.firstPlaceName, CG_ConfigString( CS_FIRST_PLACE_NAME ), sizeof( cgs.firstPlaceName ) );",
+		"Q_strncpyz( cgs.secondPlaceName, CG_ConfigString( CS_SECOND_PLACE_NAME ), sizeof( cgs.secondPlaceName ) );",
+	):
+		assert expected in set_config_values_block
+	for expected in (
+		"} else if ( num == CS_FIRST_PLACE_NAME ) {",
+		"Q_strncpyz( cgs.firstPlaceName, str, sizeof( cgs.firstPlaceName ) );",
+		"} else if ( num == CS_SECOND_PLACE_NAME ) {",
+		"Q_strncpyz( cgs.secondPlaceName, str, sizeof( cgs.secondPlaceName ) );",
+	):
+		assert expected in configstring_modified_block
+	for expected in (
+		"trap_SetConfigstring( CS_FIRST_PLACE_NAME, \"TEAM_RED\" );",
+		"trap_SetConfigstring( CS_SECOND_PLACE_NAME, \"TEAM_BLUE\" );",
+		"if ( level.numPlayingClients < 1 ) {",
+		"trap_SetConfigstring( CS_FIRST_PLACE_NAME, level.clients[ level.sortedClients[0] ].pers.netname );",
+		"if ( level.numPlayingClients < 2 ) {",
+		"trap_SetConfigstring( CS_SECOND_PLACE_NAME, level.clients[ level.sortedClients[1] ].pers.netname );",
+	):
+		assert expected in calculate_ranks_block
+	for stale in (
+		"trap_SetConfigstring( CS_FIRST_PLACE_NAME, \"\" );\n\t\ttrap_SetConfigstring( CS_SECOND_PLACE_NAME, \"\" );",
+		"level.numConnectedClients == 0",
+		"level.numConnectedClients == 1",
+	):
+		assert stale not in calculate_ranks_block
+	for expected in (
+		'(**(code **)(DAT_104b13ac + 100))(0x293,"TEAM_RED");',
+		'(**(code **)(DAT_104b13ac + 100))(0x294,"TEAM_BLUE");',
+		"if (DAT_105dce94 < 1) {",
+		"if (DAT_105dce94 < 2) {",
+	):
+		assert expected in retail_calculate_ranks_block
 
 	for expected in (
 		"if ( !rect || !ci ) {",
@@ -2312,9 +2437,49 @@ def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split()
 		assert expected in selected_team_color_block
 
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%i%%", score->accuracy );' in selected_accuracy_block
-	assert "clientNum < 0 || clientNum >= cgs.maxclients || clientNum >= MAX_CLIENTS" in best_weapon_block
+	for expected in (
+		'case WP_GAUNTLET:',
+		'return "Gauntlet";',
+		'case WP_GRENADE_LAUNCHER:',
+		'return "Grenade";',
+		'case WP_RAILGUN:',
+		'return "Rail Gun";',
+		'case WP_BFG:',
+		'return "BFG";',
+		'case WP_NAILGUN:',
+		'return "Nail Gun";',
+		'case WP_PROX_LAUNCHER:',
+		'return "Proximity Mines";',
+		'case WP_CHAINGUN:',
+		'return "Chain Gun";',
+		'case WP_HEAVY_MACHINEGUN:',
+		'return "Heavy Machinegun";',
+	):
+		assert expected in resolve_weapon_block
+	assert "BG_FindItemForWeapon" not in resolve_weapon_block
+
+	for expected in (
+		"(&data_10a9ceac)[data_10a9cdc4 * 0x9a] - 1",
+		'eax_2 = "Gauntlet"',
+		'eax_2 = "Grenade"',
+		'eax_2 = "Rail Gun"',
+		"eax_2 = &data_10065140",
+		'eax_2 = "Nail Gun"',
+		'eax_2 = "Proximity Mines"',
+		'eax_2 = "Chain Gun"',
+		'eax_2 = "Heavy Machinegun"',
+		"sub_10008440(fconvert.s(fconvert.t(*arg3)),",
+		"fconvert.s(fconvert.t(arg3[1]))",
+	):
+		assert expected in retail_best_weapon_block
 	assert "weapon = score->bestWeapon;" in best_weapon_block
 	assert "weaponName = CG_ResolveWeaponName( weapon );" in best_weapon_block
+	assert "if ( !weaponName ) {" in best_weapon_block
+	assert "return;" in best_weapon_block
+	assert "CG_Text_Paint(rect->x, rect->y, scale, color, weaponName, 0, 0, textStyle);" in best_weapon_block
+	assert "weapon = cent->currentState.weapon;" not in best_weapon_block
+	assert '"Unknown"' not in best_weapon_block
+	assert "rect->y + rect->h" not in best_weapon_block
 	assert "if ( !rect || cg_teamChatTime.integer <= 0 ) {" in new_chat_block
 
 	assert "case CG_1ST_PLACE_SCORE:" in source
@@ -2403,6 +2568,7 @@ def test_cgame_objective_ownerdraws_restore_retail_flag_key_and_powerup_seam() -
 
 def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	bar_fraction_block = _block_from_marker(source, "static float CG_BarValueFraction")
 	bar_right_block = _block_from_marker(source, "static void CG_DrawBarFillFromRight")
 	bar_bottom_block = _block_from_marker(source, "static void CG_DrawBarFillFromBottom")
@@ -2419,6 +2585,22 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 	item_block = _block_from_marker(source, "static void CG_DrawPlayerItem")
 	tiered_block = _block_from_marker(source, "static void CG_DrawArmorTieredColorized")
 	team_colorized_block = _block_from_marker(source, "static void CG_DrawTeamColorized")
+	constants = _menudef_ownerdraw_constants()
+	retail_health_block = _text_between(
+		hlil_source,
+		"1002fdf0    void __convention(\"regparm\") sub_1002fdf0",
+		"1002ff50",
+	)
+	retail_armor_value_block = _text_between(
+		hlil_source,
+		"1002e500    void __convention(\"regparm\") sub_1002e500",
+		"1002e660",
+	)
+	retail_ammo_value_block = _text_between(
+		hlil_source,
+		"1002e7c0    int32_t __convention(\"regparm\") sub_1002e7c0",
+		"1002e9b0",
+	)
 
 	assert (
 		"return Com_Clamp( 0.0f, (float)maximum, (float)value ) / (float)maximum;"
@@ -2483,12 +2665,33 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 
 	for expected in (
 		"value = ps->stats[STAT_ARMOR];",
+		"if ( shader ) {",
+		"trap_R_SetColor( color );",
+		"CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );",
+		"trap_R_SetColor( NULL );",
+		'Com_sprintf( num, sizeof( num ), "%i", value );',
 		"x = rect->x;",
 		"y = rect->y + CG_Text_Height( num, scale, 0 );",
 		"CG_AlignTextX( &x, num, scale, align );",
 		"CG_Text_Paint( x, y, scale, color, num, 0, 0, textStyle );",
 	):
 		assert expected in armor_value_block
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_1002e500") == {
+		constants["CG_PLAYER_ARMOR_VALUE"],
+	}
+	for expected in (
+		"int32_t ebp = *(data_10a6f8c4 + 0xfc)",
+		"if (arg1 != 0)",
+		"(*(data_1074cccc + 0x138))(arg6)",
+		"sub_100126a0(fconvert.s(fconvert.t(*ebx)))",
+		"eax_2, ecx_3 = sub_100575e0(&data_100687a8)",
+		"if (arg8 == 1)",
+		"else if (arg8 == 2)",
+		"sub_100082b0(eax_3, 0, eax_3, nullptr, &var_4, 0, fconvert.s(fconvert.t(arg5)))",
+		"var_4 = fconvert.s(fconvert.t(ebx[1]) + float.t(var_4))",
+		"sub_10008440(fconvert.s(fconvert.t(*ebx)), fconvert.s(fconvert.t(var_4)), arg4,",
+	):
+		assert expected in retail_armor_value_block
 
 	for expected in (
 		"weapon = cg.predictedPlayerState.weapon;",
@@ -2499,18 +2702,41 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 	):
 		assert expected in ammo_icon_block
 
-	assert "weapon = cent->currentState.weapon;" in ammo_value_block
-	assert "value = ps->ammo[weapon];" in ammo_value_block
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_1002e7c0") == {
+		constants["CG_PLAYER_AMMO_VALUE"],
+	}
+	for expected in (
+		"int32_t result = *(*(ecx_1 + 0xb4) * 0x2d0 + 0x10abbb90)",
+		"if (result != 0 && result != 1 && result != 0xa)",
+		"int32_t esi_1 = *(ecx_1 + (result << 2) + 0x1ac)",
+		"if (esi_1 s> 0xffffffff)",
+		"if (arg5 != 0)",
+		"sub_100575e0(&data_100687a8)",
+		"if (esi_1 == 0xffffffff)",
+		"if (arg7 == 1)",
+		"else if (arg7 == 2)",
+		"data_10a5f4e8",
+		"arg1[3]",
+	):
+		assert expected in retail_ammo_value_block
+	for expected in (
+		"weapon = cent->currentState.weapon;",
+		"if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {",
+		"if ( weapon == WP_GAUNTLET || weapon == WP_GRAPPLING_HOOK ) {",
+		"value = ps->ammo[weapon];",
+	):
+		assert expected in ammo_value_block
 	for expected in (
 		"if ( value == -1 ) {",
 		"if ( cgs.media.infiniteAmmoShader ) {",
-		"iconSize = ( rect->h > 0.0f ) ? rect->h : rect->w;",
+		"iconSize = rect->w;",
 		"if ( align == ITEM_ALIGN_CENTER ) {",
 		"} else if ( align == ITEM_ALIGN_RIGHT ) {",
 		"CG_DrawPic( iconX, rect->y, iconSize, iconSize, cgs.media.infiniteAmmoShader );",
 		"return;",
 	):
 		assert expected in ammo_value_block
+	assert "iconSize = ( rect->h > 0.0f ) ? rect->h : rect->w;" not in ammo_value_block
 	for expected in (
 		"x = rect->x;",
 		"y = rect->y + CG_Text_Height( num, scale, 0 );",
@@ -2521,11 +2747,33 @@ def test_cgame_classic_player_status_ownerdraws_follow_retail_leaf_split() -> No
 
 	for expected in (
 		"x = rect->x;",
+		"value = ps->stats[STAT_HEALTH];",
+		"if (shader) {",
+		"trap_R_SetColor( color );",
+		"CG_DrawPic(rect->x, rect->y, rect->w, rect->h, shader);",
+		"trap_R_SetColor( NULL );",
+		'Com_sprintf (num, sizeof(num), "%i", value);',
 		"y = rect->y + CG_Text_Height( num, scale, 0 );",
 		"CG_AlignTextX( &x, num, scale, align );",
 		"CG_Text_Paint( x, y, scale, color, num, 0, 0, textStyle );",
 	):
 		assert expected in health_block
+	assert _retail_cg_ownerdraw_cases_for_target("FUN_1002fdf0") == {
+		constants["CG_PLAYER_HEALTH"],
+	}
+	for expected in (
+		"int32_t ebp = *(data_10a6f8c4 + 0xec)",
+		"if (arg1 != 0)",
+		"(*(data_1074cccc + 0x138))(arg6)",
+		"sub_100126a0(fconvert.s(fconvert.t(*ebx)))",
+		"eax_2, ecx_3 = sub_100575e0(&data_100687a8)",
+		"if (arg8 == 1)",
+		"else if (arg8 == 2)",
+		"sub_100082b0(eax_3, 0, eax_3, nullptr, &var_4, 0, fconvert.s(fconvert.t(arg5)))",
+		"var_4 = fconvert.s(fconvert.t(ebx[1]) + float.t(var_4))",
+		"sub_10008440(fconvert.s(fconvert.t(*ebx)), fconvert.s(fconvert.t(var_4)), arg4,",
+	):
+		assert expected in retail_health_block
 
 	assert "CG_DrawHead( x, rect->y, rect->w, rect->h, cg.snap->ps.clientNum, angles );" in head_block
 
@@ -2974,12 +3222,20 @@ def test_cgame_hud_ownerdraw_reconstruction_keeps_retail_medal_spectator_advert_
 	local_source = CG_LOCAL.read_text(encoding="utf-8")
 	public_source = CG_PUBLIC.read_text(encoding="utf-8")
 	client_source = CL_CGAME.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	build_spectator_block = _block_from_marker(main_source, "void CG_BuildSpectatorString()")
 	speedometer_core_block = _block_from_marker(newdraw_source, "static void CG_DrawSpeedometer(rectDef_t")
 	speedometer_block = _block_from_marker(newdraw_source, "static void CG_DrawSpeedometerOwnerDraw")
 	spectator_block = _block_from_marker(newdraw_source, "void CG_DrawTeamSpectators")
 	advert_block = _block_from_marker(newdraw_source, "static void CG_DrawAdvert")
 	medal_block = _block_from_marker(newdraw_source, "void CG_DrawMedal")
+	retail_medal_block = _text_between(
+		hlil_source,
+		'10035340    int32_t __convention("regparm") sub_10035340',
+		"1003550b",
+	)
+	accuracy_start = medal_block.index("if ( ownerDraw == CG_ACCURACY ) {")
+	accuracy_block = medal_block[accuracy_start:medal_block.index("} else {", accuracy_start)]
 	powerup_stack_block = _block_from_marker(newdraw_source, "static void CG_DrawPowerupSpriteStack")
 	area_powerup_block = _block_from_marker(newdraw_source, "static void CG_DrawAreaPowerUp")
 	team_color_block = _block_from_marker(newdraw_source, "static void CG_DrawTeamColor")
@@ -3040,6 +3296,17 @@ def test_cgame_hud_ownerdraw_reconstruction_keeps_retail_medal_spectator_advert_
 		"CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );",
 	):
 		assert expected in medal_block
+
+	for expected in (
+		"case 0x40",
+		"xmm0_1 = float.s(*(eax_2 + 0xac))",
+		'ebp = sub_100575e0("%i%%")',
+		"*(arg6 i+ 0xc) = 0x3f800000",
+	):
+		assert expected in retail_medal_block
+	assert 'text = va( "%i%%", (int)value );' in accuracy_block
+	assert "color[3] = 1.0;" in accuracy_block
+	assert "value > 50" not in accuracy_block
 
 	for stale_medal in ("CG_COMBOKILLS", "CG_RAMPAGES", "CG_MIDAIRS"):
 		assert stale_medal not in medal_block
@@ -4420,6 +4687,10 @@ def test_cgame_scoreboard_feeder_stats_restore_retail_leaf_split() -> None:
 	count_block = _block_from_marker(source, "static int CG_FeederCount")
 	text_block = _block_from_marker(source, "static const char *CG_FeederItemText")
 	image_block = _block_from_marker(source, "static qhandle_t CG_FeederItemImage")
+	powerup_block = _block_from_marker(source, "static qhandle_t CG_FeederPowerupHandle")
+	ready_block = _block_from_marker(source, "static qboolean CG_FeederShouldShowReadyIcon")
+	damage_block = _block_from_marker(source, "static const char *CG_FeederFormattedDamage")
+	race_time_block = _block_from_marker(source, "static const char *CG_FeederFormatRaceTime")
 	scoreboard_block = _block_from_marker(source, "static const char *CG_FeederItemTextScoreboard")
 	race_block = _block_from_marker(source, "static const char *CG_FeederItemTextRaceScoreboard")
 	tdm_block = _block_from_marker(source, "static const char *CG_FeederItemTextTDMFreezeStats")
@@ -4452,8 +4723,80 @@ def test_cgame_scoreboard_feeder_stats_restore_retail_leaf_split() -> None:
 		assert expected in text_block
 
 	assert "if ( CG_IsScoreboardFeeder( feederID ) ) {" not in text_block
-	assert "return CG_FeederItemTextBaseColumns( &row, column, handle );" in scoreboard_block
-	assert "return CG_FeederItemTextScoreboard( index, column, handle );" in race_block
+
+	for expected in (
+		"for ( powerup = PW_QUAD; powerup < PW_NUM_POWERUPS; powerup++ ) {",
+		"if ( powerup == PW_NEUTRALFLAG ) {",
+		"return trap_R_RegisterShaderNoMip( item->icon );",
+	):
+		assert expected in powerup_block
+
+	for expected in (
+		"cg.snap->ps.pm_type == PM_INTERMISSION",
+		"cgs.matchReadyUpDeadline > 0",
+		"cgs.matchWarmupReadyEligible > 0",
+		"cgs.intermissionExitStatusLatched",
+	):
+		assert expected in ready_block
+
+	for expected in (
+		'return va( "%2.0fK", (float)damage / 1000.0f );',
+		'return va( "%1.1fK", (float)damage / 1000.0f );',
+	):
+		assert expected in damage_block
+
+	for expected in (
+		'return "-";',
+		'return va( "%i:%02i.%03i", minutes, seconds, millis );',
+	):
+		assert expected in race_time_block
+
+	for expected in (
+		"row.info->team == TEAM_SPECTATOR",
+		"case 0:",
+		"*handle = CG_FeederCountryFlagHandle( row.info );",
+		"case 1:",
+		"row.socialHandle",
+		"case 3:",
+		"icon = CG_FeederPowerupHandle( row.info->powerups );",
+		"if ( icon ) {",
+		"case 5:",
+		"return row.info->name;",
+		"case 7:",
+		"return CG_FeederScoreValue( score );",
+		"case 8:",
+		'return va( "%i/%i", row.scoreRow->kills, row.scoreRow->deaths );',
+		"case 9:",
+		"return CG_FeederFormattedDamage( row.scoreRow->damage );",
+		"case 10:",
+		"icon = CG_FeederBestWeaponHandle( row.scoreRow );",
+		"case 11:",
+		'return va( "%i%%", row.scoreRow->accuracy );',
+		"case 12:",
+		'return va( "%4i", time );',
+		"case 13:",
+		'return va( "%4i", ping );',
+	):
+		assert expected in scoreboard_block
+
+	for expected in (
+		"case 0:",
+		"*handle = CG_FeederCountryFlagHandle( row.info );",
+		"case 2:",
+		"icon = CG_FeederReadyHandle( &row );",
+		"if ( icon ) {",
+		"case 3:",
+		"return row.info->name;",
+		"case 4:",
+		"return CG_FeederFormatRaceTime( score );",
+		"case 5:",
+		'return va( "%4i", time );',
+		"case 6:",
+		'return va( "%4i", ping );',
+	):
+		assert expected in race_block
+
+	assert "return CG_FeederItemTextScoreboard( index, column, handle );" not in race_block
 
 	for expected in (
 		"stats = &cg.tdmStats[row.scoreIndex];",
@@ -4488,6 +4831,7 @@ def test_cgame_scoreboard_feeder_stats_restore_retail_leaf_split() -> None:
 
 def test_cgame_scoreboard_feeder_matrix_owns_all_retail_scoreboard_feeders() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	scoreboard_predicate = _block_from_marker(source, "static qboolean CG_IsScoreboardFeeder")
 	team_list_predicate = _block_from_marker(source, "static qboolean CG_IsTeamListFeeder")
 	team_stats_predicate = _block_from_marker(source, "static qboolean CG_IsTeamStatsFeeder")
@@ -4496,12 +4840,16 @@ def test_cgame_scoreboard_feeder_matrix_owns_all_retail_scoreboard_feeders() -> 
 	text_block = _block_from_marker(source, "static const char *CG_FeederItemText")
 	selection_block = _block_from_marker(source, "static void CG_FeederSelection")
 	init_block = _block_from_marker(source, "static void CG_InitDisplayContext")
+	retail_count_block = _text_between(hlil_source, "10025e70    int32_t sub_10025e70", "10025f60")
+	retail_text_block = _text_between(hlil_source, "10028830    void* sub_10028830", "10028b10")
+	retail_bootstrap_block = _text_between(hlil_source, "10029210    void* sub_10029210", "10029420")
 
 	for expected in (
 		"FEEDER_SCOREBOARD",
 		"FEEDER_ENDSCOREBOARD",
 	):
 		assert expected in scoreboard_predicate
+	assert "return ( feederID == FEEDER_SCOREBOARD || feederID == FEEDER_ENDSCOREBOARD ) ? qtrue : qfalse;" in scoreboard_predicate
 
 	for expected in (
 		"FEEDER_REDTEAM_LIST",
@@ -4532,11 +4880,22 @@ def test_cgame_scoreboard_feeder_matrix_owns_all_retail_scoreboard_feeders() -> 
 		"return CG_FeederItemTextScoreboard( index, column, handle );",
 	):
 		assert expected in text_block
+	assert "FEEDER_SCOREBOARD" not in text_block
+	assert "FEEDER_ENDSCOREBOARD" not in text_block
+
+	for expected in (
+		"CG_BuildHudScoreboard();",
+		"} else if ( CG_IsScoreboardFeeder( feederID ) ) {",
+		"return hud ? hud->count : 0;",
+		"return cg.numScores;",
+	):
+		assert expected in count_block
 
 	for expected in (
 		"(void)cvar;",
 		"CG_IsTeamListFeeder( feederID )",
 		"CG_IsTeamStatsFeeder( feederID )",
+		"cg.selectedScore = index;",
 		"CG_ScoreIndexFromTeamRow( index, team );",
 		"CG_SyncScoreboardTeamListSelection( team, selectedIndex );",
 	):
@@ -4549,6 +4908,34 @@ def test_cgame_scoreboard_feeder_matrix_owns_all_retail_scoreboard_feeders() -> 
 		"cgDC.feederSelection = &CG_FeederSelection;",
 	):
 		assert expected in init_block
+
+	for expected in (
+		"arg1 - 5f",
+		"float temp1_1 = data_10078fc0",
+		"arg1 - 17f",
+		"arg1 - 18f",
+		"arg1 - 11f",
+		"return data_10a9cdc0",
+	):
+		assert expected in retail_count_block
+
+	for expected in (
+		"arg1 - 5f",
+		"float temp1 = data_10078fc0",
+		"arg1 - 17f",
+		"arg1 - 18f",
+		"return sub_10026160(arg2, arg3, arg4)",
+		"return sub_10027c40(arg4, arg2, arg3)",
+	):
+		assert expected in retail_text_block
+	assert "arg1 - 16f" not in retail_text_block
+
+	for expected in (
+		"data_10a2569c = sub_10025e70",
+		"data_10a256a0 = sub_10028830",
+		"data_10a256a8 = sub_10028b10",
+	):
+		assert expected in retail_bootstrap_block
 
 
 def test_cgame_team_list_feeders_restore_retail_family_split() -> None:
@@ -4876,10 +5263,16 @@ def test_cgame_getvalue_callback_surface_matches_retail_score_stat_leaf() -> Non
 	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
 	main_source = CG_MAIN.read_text(encoding="utf-8")
 	ghidra_source = CGAME_GHIDRA_DECOMPILE.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
 	ui_shared_h = UI_SHARED_H.read_text(encoding="utf-8")
 	value_block = _block_from_marker(newdraw_source, "float CG_GetValue")
 	display_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
 	retail_bootstrap_block = _block_from_marker(ghidra_source, "void FUN_10029210(void)")
+	retail_value_block = _text_between(
+		hlil_source,
+		"10031610    long double sub_10031610",
+		"100316ab",
+	)
 	constants = _menudef_ownerdraw_constants()
 
 	assert {
@@ -4934,6 +5327,15 @@ def test_cgame_getvalue_callback_surface_matches_retail_score_stat_leaf() -> Non
 		"return -1;",
 	):
 		assert expected in value_block
+
+	for expected in (
+		"case 0x31",
+		"int32_t ecx = *(esi + 0xb4)",
+		"int32_t eax_3 = *(ecx * 0x2d0 + 0x10abbb90)",
+		"if (eax_3 != 0)",
+		"return float.t(*(esi + (eax_3 << 2) + 0x1ac))",
+	):
+		assert expected in retail_value_block
 
 	for stale in (
 		"#define CG_SELECTEDPLAYER_ARMOR 350",
@@ -6899,6 +7301,129 @@ def test_cgame_primary_ownerdraw_second_half_flags_are_defined_and_wired() -> No
 		assert expected in players_remaining_block
 
 
+def test_cgame_secondary_ownerdrawflags2_are_defined_and_wired() -> None:
+	menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+	ui_shared_source = UI_SHARED.read_text(encoding="utf-8")
+	ui_shared_header = UI_SHARED_H.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	secondary_block = _block_from_marker(newdraw_source, "static qboolean CG_OwnerDrawSecondaryFlagVisible")
+	slot_match_block = _block_from_marker(newdraw_source, "static qboolean CG_PlacementSlotContainsPredictedPlayer")
+	slot_follow_block = _block_from_marker(newdraw_source, "static qboolean CG_PlacementSlotCanBeFollowed")
+	weapon_fired_block = _block_from_marker(newdraw_source, "static qboolean CG_PlacementWeaponFired")
+	loadout_block = _block_from_marker(newdraw_source, "static qboolean CG_LoadoutsEnabled")
+	visible_block = _block_from_marker(newdraw_source, "qboolean CG_OwnerDrawVisible")
+	flags2 = {
+		"CG_SHOW_IF_PLYR1": "0x00000001",
+		"CG_SHOW_IF_PLYR2": "0x00000002",
+		"CG_SHOW_IF_G_FIRED": "0x00000004",
+		"CG_SHOW_IF_MG_FIRED": "0x00000008",
+		"CG_SHOW_IF_SG_FIRED": "0x00000010",
+		"CG_SHOW_IF_GL_FIRED": "0x00000020",
+		"CG_SHOW_IF_RL_FIRED": "0x00000040",
+		"CG_SHOW_IF_LG_FIRED": "0x00000080",
+		"CG_SHOW_IF_RG_FIRED": "0x00000100",
+		"CG_SHOW_IF_PG_FIRED": "0x00000200",
+		"CG_SHOW_IF_BFG_FIRED": "0x00000400",
+		"CG_SHOW_IF_CG_FIRED": "0x00000800",
+		"CG_SHOW_IF_NG_FIRED": "0x00001000",
+		"CG_SHOW_IF_PL_FIRED": "0x00002000",
+		"CG_SHOW_IF_HMG_FIRED": "0x00004000",
+		"CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC": "0x00008000",
+		"CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC": "0x00010000",
+		"CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC": "0x00020000",
+		"CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC": "0x00040000",
+		"CG_SHOW_IF_LOADOUT_ENABLED": "0x00080000",
+		"CG_SHOW_IF_LOADOUT_DISABLED": "0x00100000",
+		"CG_SHOW_IF_1ST_PLYR_FOLLOWED": "0x00200000",
+		"CG_SHOW_IF_2ND_PLYR_FOLLOWED": "0x00400000",
+	}
+
+	for name, value in flags2.items():
+		assert re.search(rf"#define\s+{name}\s+{value}\b", menudef_source)
+		assert name in secondary_block
+
+	for expected in (
+		"int ownerDrawFlags2;",
+		"qboolean (*ownerDrawVisible) (int flags, int flags2);",
+	):
+		assert expected in ui_shared_header
+
+	for expected in (
+		"item->window.ownerDrawFlags2 |= i;",
+		"menu->window.ownerDrawFlags2 |= i;",
+		"DC->ownerDrawVisible(item->window.ownerDrawFlags, item->window.ownerDrawFlags2)",
+		"!DC->ownerDrawVisible(menu->window.ownerDrawFlags, menu->window.ownerDrawFlags2)) {",
+	):
+		assert expected in ui_shared_source
+
+	for expected in (
+		"if ( !cg.snap ) {",
+		"if ( cg.snap->ps.pm_type == PM_SPECTATOR ) {",
+		"score = CG_GetPlacementScore( slot );",
+		"return ( score->client == cg.snap->ps.clientNum ) ? qtrue : qfalse;",
+	):
+		assert expected in slot_match_block
+
+	for expected in (
+		"score = CG_GetPlacementScore( slot );",
+		"return ( score->client != cg.snap->ps.clientNum ) ? qtrue : qfalse;",
+	):
+		assert expected in slot_follow_block
+
+	assert "return ( cg_loadout.integer != 0 ) ? qtrue : qfalse;" in loadout_block
+
+	for expected in (
+		"for ( i = 0; i < cg.numScores && i < 2; i++ ) {",
+		"score = CG_GetPlacementScore( i );",
+		"stats = CG_GetPlacementScoreStats( score );",
+		"if ( weapon == WP_GAUNTLET ) {",
+		"value = stats->weaponShots[weapon];",
+		"value = stats->weaponDamage[weapon];",
+	):
+		assert expected in weapon_fired_block
+
+	for expected in (
+		"if ( ( flags2 & CG_SHOW_IF_PLYR1 ) && CG_PlacementSlotContainsPredictedPlayer( 0 ) ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR2 ) && CG_PlacementSlotContainsPredictedPlayer( 1 ) ) {",
+		"CG_PlacementWeaponFired( WP_GAUNTLET )",
+		"CG_PlacementWeaponFired( WP_MACHINEGUN )",
+		"CG_PlacementWeaponFired( WP_SHOTGUN )",
+		"CG_PlacementWeaponFired( WP_GRENADE_LAUNCHER )",
+		"CG_PlacementWeaponFired( WP_ROCKET_LAUNCHER )",
+		"CG_PlacementWeaponFired( WP_LIGHTNING )",
+		"CG_PlacementWeaponFired( WP_RAILGUN )",
+		"CG_PlacementWeaponFired( WP_PLASMAGUN )",
+		"CG_PlacementWeaponFired( WP_BFG )",
+		"CG_PlacementWeaponFired( WP_CHAINGUN )",
+		"CG_PlacementWeaponFired( WP_NAILGUN )",
+		"CG_PlacementWeaponFired( WP_PROX_LAUNCHER )",
+		"CG_PlacementWeaponFired( WP_HEAVY_MACHINEGUN )",
+		"if ( ( flags2 & CG_SHOW_IF_LOADOUT_ENABLED ) && loadoutsEnabled ) {",
+		"if ( ( flags2 & CG_SHOW_IF_LOADOUT_DISABLED ) && !loadoutsEnabled ) {",
+		"pmType = PM_NORMAL;",
+		"pmType = cg.snap->ps.pm_type;",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC ) && ( playerTeam == TEAM_RED || pmType == PM_SPECTATOR ) ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC ) && ( playerTeam == TEAM_BLUE || pmType == PM_SPECTATOR ) ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC ) && playerTeam == TEAM_RED && pmType != PM_SPECTATOR ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC ) && playerTeam == TEAM_BLUE && pmType != PM_SPECTATOR ) {",
+		"if ( ( flags2 & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) && CG_PlacementSlotCanBeFollowed( 0 ) ) {",
+		"if ( ( flags2 & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) && CG_PlacementSlotCanBeFollowed( 1 ) ) {",
+	):
+		assert expected in secondary_block
+
+	for stale in (
+		"CG_SpectatorPlayerSlotActive",
+		"CG_SpectatorSlotFollowed( 0 )",
+		"CG_SpectatorSlotFollowed( 1 )",
+		"PMF_FOLLOW",
+		"CG_SHOW_IF_PLYR_IS_ON_RED )",
+		"CG_SHOW_IF_PLYR_IS_ON_BLUE )",
+	):
+		assert stale not in secondary_block
+
+	assert "if ( flags2 && CG_OwnerDrawSecondaryFlagVisible( flags2 ) ) {" in visible_block
+
+
 def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	race_block = _block_from_marker(source, "static void CG_DrawRaceStatusAndTimes")
@@ -7019,9 +7544,15 @@ def test_cgame_round_race_and_flag_ownerdraws_follow_retail_leaf_split() -> None
 		"if ( ( flags & CG_SHOW_INTERMISSION ) &&",
 		"if ( ( flags & CG_SHOW_NOTINTERMISSION ) &&",
 		"static qboolean CG_OwnerDrawSecondaryFlagVisible( int flags2 ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR1 ) && CG_PlacementSlotContainsPredictedPlayer( 0 ) ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR2 ) && CG_PlacementSlotContainsPredictedPlayer( 1 ) ) {",
 		"if ( ( flags2 & CG_SHOW_IF_LOADOUT_ENABLED ) && loadoutsEnabled ) {",
-		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED ) && playerTeam == TEAM_RED ) {",
-		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE ) && playerTeam == TEAM_BLUE ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC ) && ( playerTeam == TEAM_RED || pmType == PM_SPECTATOR ) ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC ) && ( playerTeam == TEAM_BLUE || pmType == PM_SPECTATOR ) ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC ) && playerTeam == TEAM_RED && pmType != PM_SPECTATOR ) {",
+		"if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC ) && playerTeam == TEAM_BLUE && pmType != PM_SPECTATOR ) {",
+		"if ( ( flags2 & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) && CG_PlacementSlotCanBeFollowed( 0 ) ) {",
+		"if ( ( flags2 & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) && CG_PlacementSlotCanBeFollowed( 1 ) ) {",
 		"CG_PlacementWeaponFired( WP_GAUNTLET )",
 		"CG_PlacementWeaponFired( WP_MACHINEGUN )",
 		"CG_PlacementWeaponFired( WP_HEAVY_MACHINEGUN )",

@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
+CG_DRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_draw.c"
 CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
 CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
 CGAME_HLIL = (
@@ -209,10 +210,89 @@ def test_spectator_messages_use_retail_copy_family() -> None:
 
 def test_level_timer_uses_retail_clock_format() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
+    draw_source = CG_DRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    helper_block = _block_from_marker(source, "static qboolean CG_BuildLevelTimerMilliseconds")
     block = _block_from_marker(source, "static void CG_DrawLevelTimer")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    classic_timer_block = _block_from_marker(draw_source, "static float CG_DrawTimer")
+    retail_timer_block = _text_between(
+        hlil_source,
+        "10030c00    void sub_10030c00",
+        "10030d20",
+    )
+    retail_clock_block = _text_between(
+        hlil_source,
+        "10029770    int32_t sub_10029770()",
+        "10029820",
+    )
 
-    assert 'Q_strncpyz( buffer, CG_FormatMinutesSeconds( seconds ), sizeof( buffer ) );' in block
-    assert '%02i:%02i' not in block
+    for expected in (
+        "sub_10029770() == 1",
+        'sub_100575e0("%i:%i%i")',
+        "if (eax_9 == 1)",
+        "else if (eax_9 != 2)",
+        "fconvert.t(eax_12[1])",
+    ):
+        assert expected in retail_timer_block
+
+    for expected in (
+        "int32_t edx = data_10a403e0",
+        "if (edx == 0)",
+        "edx = data_10a9c1ec",
+        "if (data_10ab8f4c != 0)",
+        "data_10ab8f58 == 0",
+        "int32_t ecx_1 = esi * 0xea60",
+        "int32_t eax_7 = ecx_1 - edx + edi",
+        "*ebx = edx - ecx_1 - edi",
+        "if (data_10a6e6ac != 1)",
+        "eax_7 = edx - edi",
+    ):
+        assert expected in retail_clock_block
+
+    for expected in (
+        "timeoutStart = CG_GetMatchTimeoutStartTime();",
+        "currentTime = timeoutStart;",
+        "if ( currentTime == 0 ) {",
+        "currentTime = cg.time;",
+        "if ( cg.warmup != 0 ) {",
+        "if ( !CG_ShowPlayersRemaining() || cgs.matchRoundNumber <= 0 ) {",
+        "return qfalse;",
+        "limitMilliseconds = cgs.timelimit * 60000;",
+        "milliseconds = limitMilliseconds - currentTime + cgs.levelStartTime;",
+        "milliseconds = currentTime - limitMilliseconds - cgs.levelStartTime;",
+        "else if ( cg_levelTimerDirection.integer != 1 ) {",
+        "milliseconds = currentTime - cgs.levelStartTime;",
+        "*millisecondsOut = milliseconds;",
+        "return qtrue;",
+    ):
+        assert expected in helper_block
+
+    for expected in (
+        "CG_BuildLevelTimerMilliseconds( &milliseconds );",
+        "seconds = milliseconds / 1000;",
+        'Q_strncpyz( buffer, CG_FormatMinutesSeconds( seconds ), sizeof( buffer ) );',
+        "x = rect->x;",
+        "CG_AlignTextX( &x, buffer, scale, align );",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
+    ):
+        assert expected in block
+
+    assert "CG_DrawLevelTimer(&rect, scale, color, textStyle, align);" in ownerdraw_block
+    assert '{ &cg_levelTimerDirection, "cg_levelTimerDirection", "1", CVAR_ARCHIVE },' in main_source
+    assert "cg_levelTimerDirection.integer == 1" in classic_timer_block
+
+    for stale in (
+        "CG_GetScoreboardTimerSeconds",
+        "rect->y + rect->h",
+        "( elapsed + 500 ) / 1000",
+        "( milliseconds + 500 ) / 1000",
+        '%02i:%02i',
+        '"up"',
+        '"down"',
+    ):
+        assert stale not in block
 
 
 def test_intro_panel_draws_use_retail_map_panel_shapes() -> None:

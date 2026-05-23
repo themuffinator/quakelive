@@ -89,6 +89,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CS_FLAGSTATUS			23		// string indicating flag status in CTF
 #define CS_SHADERSTATE			24
 #define CS_BOTINFO				25
+#define CS_FIRST_PLACE_NAME		0x293		// retail first-place name/token mirrored for wide placement ownerdraws
+#define CS_SECOND_PLACE_NAME	0x294		// retail second-place name/token mirrored for wide placement ownerdraws
 #define CS_MATCH_STATE				0x295		// timeout/overtime state info payload
 #define CS_ROUND_START_TIME		0x296		// active round start time for CG_ROUNDTIMER
 #define CS_TIMEOUT_START_TIME		0x29D		// active timeout start time, cleared when idle

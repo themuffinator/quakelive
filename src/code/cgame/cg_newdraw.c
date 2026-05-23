@@ -52,6 +52,7 @@ static void CG_DrawVoteShot(rectDef_t *rect, int slot);
 static void CG_AlignTextX( float *x, const char *text, float scale, int align );
 static float CG_AlignTextInRectX( const rectDef_t *rect, float scale, const char *text, int align );
 static void CG_Text_Paint_Limit( float *maxX, float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit );
+static qboolean CG_ShowPlayersRemaining( void );
 
 void Menus_HandleOOBClick( menuDef_t *menu, int key, qboolean down );
 int Menu_ItemsMatchingGroup( menuDef_t *menu, const char *name );
@@ -4584,22 +4585,40 @@ static void CG_DrawTeamAveragePing(rectDef_t *rect, float scale, vec4_t color, i
 =============
 CG_ResolveWeaponName
 
-Translates a weapon index into a localized pickup name.
+Maps a local weapon index to the fixed retail best-weapon ownerdraw label.
 =============
 */
 static const char *CG_ResolveWeaponName( int weapon ) {
-	const gitem_t	*item;
-
-	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+	switch ( weapon ) {
+	case WP_GAUNTLET:
+		return "Gauntlet";
+	case WP_MACHINEGUN:
+		return "Machine Gun";
+	case WP_SHOTGUN:
+		return "Shotgun";
+	case WP_GRENADE_LAUNCHER:
+		return "Grenade";
+	case WP_ROCKET_LAUNCHER:
+		return "Rocket Launcher";
+	case WP_LIGHTNING:
+		return "Lightning Gun";
+	case WP_RAILGUN:
+		return "Rail Gun";
+	case WP_PLASMAGUN:
+		return "Plasma Gun";
+	case WP_BFG:
+		return "BFG";
+	case WP_NAILGUN:
+		return "Nail Gun";
+	case WP_PROX_LAUNCHER:
+		return "Proximity Mines";
+	case WP_CHAINGUN:
+		return "Chain Gun";
+	case WP_HEAVY_MACHINEGUN:
+		return "Heavy Machinegun";
+	default:
 		return NULL;
 	}
-
-	item = BG_FindItemForWeapon( (weapon_t)weapon );
-	if ( !item || !item->pickup_name || !item->pickup_name[0] ) {
-		return NULL;
-	}
-
-	return item->pickup_name;
 }
 
 /*
@@ -4610,11 +4629,8 @@ Prints the best known weapon for the highlighted scoreboard entry.
 =============
 */
 static void CG_DrawSelectedPlayerBestWeapon(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	const clientInfo_t	*ci;
-	const centity_t		*cent;
 	const char			*weaponName;
 	score_t				*score;
-	int					clientNum;
 	int					weapon;
 
 	if ( !rect ) {
@@ -4626,27 +4642,13 @@ static void CG_DrawSelectedPlayerBestWeapon(rectDef_t *rect, float scale, vec4_t
 		return;
 	}
 
-	clientNum = score->client;
-	if ( clientNum < 0 || clientNum >= cgs.maxclients || clientNum >= MAX_CLIENTS ) {
-		return;
-	}
-
-	ci = &cgs.clientinfo[clientNum];
-	if ( !ci->infoValid ) {
-		return;
-	}
-
-	cent = &cg_entities[clientNum];
 	weapon = score->bestWeapon;
-	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
-		weapon = cent->currentState.weapon;
-	}
 	weaponName = CG_ResolveWeaponName( weapon );
 	if ( !weaponName ) {
-		weaponName = "Unknown";
+		return;
 	}
 
-	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, weaponName, 0, 0, textStyle);
+	CG_Text_Paint(rect->x, rect->y, scale, color, weaponName, 0, 0, textStyle);
 }
 
 /*
@@ -7047,21 +7049,75 @@ static void CG_DrawOvertimeBackground(rectDef_t *rect, qhandle_t shader, vec4_t 
 	CG_FillRect(rect->x, rect->y, rect->w, rect->h, modulate);
 }
 
-static void CG_DrawLevelTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+/*
+=============
+CG_BuildLevelTimerMilliseconds
+
+Reconstructs the retail level-clock helper used by CG_LEVELTIMER.
+=============
+*/
+static qboolean CG_BuildLevelTimerMilliseconds( int *millisecondsOut ) {
+	int		currentTime;
+	int		limitMilliseconds;
+	int		milliseconds;
+	int		timeoutStart;
+
+	if ( millisecondsOut ) {
+		*millisecondsOut = 0;
+	}
+	if ( !millisecondsOut ) {
+		return qfalse;
+	}
+
+	timeoutStart = CG_GetMatchTimeoutStartTime();
+	currentTime = timeoutStart;
+	if ( currentTime == 0 ) {
+		currentTime = cg.time;
+	}
+
+	if ( cg.warmup != 0 ) {
+		if ( !CG_ShowPlayersRemaining() || cgs.matchRoundNumber <= 0 ) {
+			return qfalse;
+		}
+	}
+
+	limitMilliseconds = cgs.timelimit * 60000;
+	if ( cgs.timelimit == 0 ) {
+		milliseconds = currentTime - cgs.levelStartTime;
+	} else {
+		milliseconds = limitMilliseconds - currentTime + cgs.levelStartTime;
+		if ( milliseconds < 0 ) {
+			milliseconds = currentTime - limitMilliseconds - cgs.levelStartTime;
+		} else if ( cg_levelTimerDirection.integer != 1 ) {
+			milliseconds = currentTime - cgs.levelStartTime;
+		}
+	}
+
+	*millisecondsOut = milliseconds;
+	return qtrue;
+}
+
+/*
+=============
+CG_DrawLevelTimer
+
+Renders the retail CG_LEVELTIMER ownerdraw clock.
+=============
+*/
+static void CG_DrawLevelTimer(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align) {
+	int		milliseconds;
 	int		seconds;
-	int		width;
 	float	x;
 	char	buffer[32];
 
-	seconds = CG_GetScoreboardTimerSeconds();
-	if ( seconds < 0 ) {
-		seconds = 0;
-	}
+	milliseconds = 0;
+	CG_BuildLevelTimerMilliseconds( &milliseconds );
+	seconds = milliseconds / 1000;
 
 	Q_strncpyz( buffer, CG_FormatMinutesSeconds( seconds ), sizeof( buffer ) );
-	width = CG_Text_Width( buffer, scale, 0 );
-	x = rect->x + ( rect->w - width ) * 0.5f;
-	CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
+	x = rect->x;
+	CG_AlignTextX( &x, buffer, scale, align );
+	CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -7487,11 +7543,14 @@ static void CG_DrawPlayerAmmoValue(rectDef_t *rect, float scale, vec4_t color, q
 	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
 		return;
 	}
+	if ( weapon == WP_GAUNTLET || weapon == WP_GRAPPLING_HOOK ) {
+		return;
+	}
 
 	value = ps->ammo[weapon];
 	if ( value == -1 ) {
 		if ( cgs.media.infiniteAmmoShader ) {
-			iconSize = ( rect->h > 0.0f ) ? rect->h : rect->w;
+			iconSize = rect->w;
 			iconX = rect->x;
 			if ( align == ITEM_ALIGN_CENTER ) {
 				iconX -= iconSize * 0.5f;
@@ -9144,13 +9203,52 @@ float CG_GetValue(int ownerDraw) {
 
 /*
 =============
-CG_SpectatorPlayerSlotActive
+CG_PlacementSlotContainsPredictedPlayer
 
-Returns qtrue when the requested spectator slot has a valid client.
+Checks whether the active predicted player is represented by the requested
+retail placement slot.
 =============
 */
-static qboolean CG_SpectatorPlayerSlotActive( int slot ) {
-	return ( CG_SpectatorClientInfo( slot ) != NULL );
+static qboolean CG_PlacementSlotContainsPredictedPlayer( int slot ) {
+	const score_t	*score;
+
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+
+	if ( cg.snap->ps.pm_type == PM_SPECTATOR ) {
+		return qtrue;
+	}
+
+	score = CG_GetPlacementScore( slot );
+	if ( !score ) {
+		return qfalse;
+	}
+
+	return ( score->client == cg.snap->ps.clientNum ) ? qtrue : qfalse;
+}
+
+/*
+=============
+CG_PlacementSlotCanBeFollowed
+
+Checks whether the requested placement slot points at a client other than the
+active predicted player.
+=============
+*/
+static qboolean CG_PlacementSlotCanBeFollowed( int slot ) {
+	const score_t	*score;
+
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+
+	score = CG_GetPlacementScore( slot );
+	if ( !score ) {
+		return qfalse;
+	}
+
+	return ( score->client != cg.snap->ps.clientNum ) ? qtrue : qfalse;
 }
 
 /*
@@ -9197,24 +9295,11 @@ static qboolean CG_PlacementWeaponFired( weapon_t weapon ) {
 =============
 CG_LoadoutsEnabled
 
-Determines whether the active server advertises g_loadout as enabled.
+Determines whether the retail cg_loadout serverinfo mirror is enabled.
 =============
 */
 static qboolean CG_LoadoutsEnabled( void ) {
-	const char *info;
-	const char *value;
-
-	info = CG_ConfigString( CS_SERVERINFO );
-	if ( !info || !*info ) {
-		return qfalse;
-	}
-
-	value = Info_ValueForKey( info, "g_loadout" );
-	if ( !value || !*value ) {
-		return qfalse;
-	}
-
-	return ( atoi( value ) != 0 );
+	return ( cg_loadout.integer != 0 ) ? qtrue : qfalse;
 }
 
 /*
@@ -9591,14 +9676,14 @@ Evaluates Quake Live's retail secondary ownerdraw visibility flag word.
 */
 static qboolean CG_OwnerDrawSecondaryFlagVisible( int flags2 ) {
 	team_t	playerTeam;
-	qboolean	spectator;
+	int	pmType;
 	qboolean	loadoutsEnabled;
 
-	if ( ( flags2 & CG_SHOW_IF_PLYR1 ) && CG_SpectatorPlayerSlotActive( 0 ) ) {
+	if ( ( flags2 & CG_SHOW_IF_PLYR1 ) && CG_PlacementSlotContainsPredictedPlayer( 0 ) ) {
 		return qtrue;
 	}
 
-	if ( ( flags2 & CG_SHOW_IF_PLYR2 ) && CG_SpectatorPlayerSlotActive( 1 ) ) {
+	if ( ( flags2 & CG_SHOW_IF_PLYR2 ) && CG_PlacementSlotContainsPredictedPlayer( 1 ) ) {
 		return qtrue;
 	}
 
@@ -9664,42 +9749,33 @@ static qboolean CG_OwnerDrawSecondaryFlagVisible( int flags2 ) {
 	}
 
 	playerTeam = TEAM_FREE;
-	spectator = qfalse;
+	pmType = PM_NORMAL;
 	if ( cg.snap ) {
 		playerTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
-		spectator = ( playerTeam == TEAM_SPECTATOR ) || ( cg.snap->ps.pm_type == PM_SPECTATOR ) ||
-			( cg.snap->ps.pm_flags & PMF_FOLLOW );
+		pmType = cg.snap->ps.pm_type;
 	}
 
-	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED ) && playerTeam == TEAM_RED ) {
+	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC ) && ( playerTeam == TEAM_RED || pmType == PM_SPECTATOR ) ) {
 		return qtrue;
 	}
 
-	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE ) && playerTeam == TEAM_BLUE ) {
+	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC ) && ( playerTeam == TEAM_BLUE || pmType == PM_SPECTATOR ) ) {
 		return qtrue;
 	}
 
-	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_OR_SPEC ) && ( playerTeam == TEAM_RED || spectator ) ) {
+	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC ) && playerTeam == TEAM_RED && pmType != PM_SPECTATOR ) {
 		return qtrue;
 	}
 
-	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_OR_SPEC ) && ( playerTeam == TEAM_BLUE || spectator ) ) {
+	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC ) && playerTeam == TEAM_BLUE && pmType != PM_SPECTATOR ) {
 		return qtrue;
 	}
 
-	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_RED_NO_SPEC ) && playerTeam == TEAM_RED && !spectator ) {
+	if ( ( flags2 & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) && CG_PlacementSlotCanBeFollowed( 0 ) ) {
 		return qtrue;
 	}
 
-	if ( ( flags2 & CG_SHOW_IF_PLYR_IS_ON_BLUE_NO_SPEC ) && playerTeam == TEAM_BLUE && !spectator ) {
-		return qtrue;
-	}
-
-	if ( ( flags2 & CG_SHOW_IF_1ST_PLYR_FOLLOWED ) && CG_SpectatorSlotFollowed( 0 ) ) {
-		return qtrue;
-	}
-
-	if ( ( flags2 & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) && CG_SpectatorSlotFollowed( 1 ) ) {
+	if ( ( flags2 & CG_SHOW_IF_2ND_PLYR_FOLLOWED ) && CG_PlacementSlotCanBeFollowed( 1 ) ) {
 		return qtrue;
 	}
 
@@ -9900,13 +9976,43 @@ static void CG_DrawCapFragLimit( rectDef_t *rect, float scale, vec4_t color, int
 
 /*
 =============
+CG_GetRetailPlacementTeamName
+
+Resolves the team label used by the retail wide first/second-place ownerdraws.
+=============
+*/
+static const char *CG_GetRetailPlacementTeamName( team_t team ) {
+	const char	*teamName;
+
+	switch ( team ) {
+	case TEAM_RED:
+		teamName = cgs.redTeamName;
+		if ( teamName && teamName[0] ) {
+			return teamName;
+		}
+		return "Red Team";
+	case TEAM_BLUE:
+		teamName = cgs.blueTeamName;
+		if ( teamName && teamName[0] ) {
+			return teamName;
+		}
+		return "Blue Team";
+	default:
+		return "";
+	}
+}
+
+/*
+=============
 CG_BuildPlacementScoreValue
 
 Formats the live placement value for first/second-place score ownerdraws.
 =============
 */
-static qboolean CG_BuildPlacementScoreValue( int value, char *buffer, size_t bufferSize ) {
-	if ( !buffer || bufferSize <= 0 ) {
+static qboolean CG_BuildPlacementScoreValue( int value, char *buffer, size_t bufferSize, qboolean leadingSpace, qboolean requirePositiveRaceTime ) {
+	char		valueText[32];
+
+	if ( !buffer || bufferSize == 0 ) {
 		return qfalse;
 	}
 
@@ -9916,20 +10022,20 @@ static qboolean CG_BuildPlacementScoreValue( int value, char *buffer, size_t buf
 	}
 
 	if ( cgs.gametype == GT_RACE ) {
-		if ( value == CG_SCORE_FORFEIT || value == 0x7fffffff || value < 0 ) {
-			Q_strncpyz( buffer, "-", bufferSize );
+		if ( value == CG_SCORE_FORFEIT || value == 0x7fffffff || value < 0 || ( requirePositiveRaceTime && value == 0 ) ) {
+			Q_strncpyz( buffer, leadingSpace ? " -" : "-", bufferSize );
 		} else {
-			CG_RaceFormatMilliseconds( value, buffer, bufferSize );
+			CG_RaceFormatMilliseconds( value, valueText, sizeof( valueText ) );
+			if ( leadingSpace ) {
+				Com_sprintf( buffer, bufferSize, " %s", valueText );
+			} else {
+				Q_strncpyz( buffer, valueText, bufferSize );
+			}
 		}
 		return qtrue;
 	}
 
-	if ( value == CG_SCORE_FORFEIT ) {
-		Q_strncpyz( buffer, "-", bufferSize );
-		return qtrue;
-	}
-
-	Com_sprintf( buffer, bufferSize, "%d", value );
+	Com_sprintf( buffer, bufferSize, leadingSpace ? " %d" : "%d", value );
 	return qtrue;
 }
 
@@ -9948,7 +10054,7 @@ static void CG_DrawPlacementScoreLine( rectDef_t *rect, float scale, vec4_t colo
 	float		ellipsisWidth;
 	float		maxX;
 
-	if ( !rect || !valueText || !valueText[0] ) {
+	if ( !rect ) {
 		return;
 	}
 
@@ -9956,6 +10062,13 @@ static void CG_DrawPlacementScoreLine( rectDef_t *rect, float scale, vec4_t colo
 	if ( rankText && rankText[0] ) {
 		CG_Text_Paint( x, rect->y, scale, color, rankText, 0, 0, textStyle );
 		x += CG_Text_Width( rankText, scale, 0 );
+	}
+
+	if ( !valueText || !valueText[0] ) {
+		if ( nameText && nameText[0] ) {
+			CG_Text_Paint( x, rect->y, scale, color, nameText, 0, 0, textStyle );
+		}
+		return;
 	}
 
 	valueX = rect->x + rect->w - CG_Text_Width( valueText, scale, 0 );
@@ -9984,36 +10097,38 @@ Draws the wide retail first-place summary line used by spectator and HUD menus.
 static void CG_Draw1stPlaceScore( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
 	char			nameBuffer[64];
 	char			valueBuffer[32];
-	const score_t		*score;
-	const clientInfo_t	*ci;
 	team_t			leaderTeam;
 	int			value;
 
 	if ( CG_IsTeamWinnerGametype( cgs.gametype ) ) {
-		leaderTeam = ( cgs.scores2 != SCORE_NOT_PRESENT && cgs.scores1 < cgs.scores2 ) ? TEAM_BLUE : TEAM_RED;
-		value = ( leaderTeam == TEAM_RED ) ? cgs.scores1 : cgs.scores2;
-		if ( !CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ) ) ) {
-			return;
+		if ( cgs.scores1 == SCORE_NOT_PRESENT ) {
+			leaderTeam = TEAM_RED;
+			valueBuffer[0] = '\0';
+		} else {
+			leaderTeam = ( cgs.scores1 < cgs.scores2 ) ? TEAM_BLUE : TEAM_RED;
+			value = ( leaderTeam == TEAM_RED ) ? cgs.scores1 : cgs.scores2;
+			if ( !CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ), qfalse, qfalse ) ) {
+				return;
+			}
 		}
 
-		Com_sprintf( nameBuffer, sizeof( nameBuffer ), "^%c%s^7",
-			( leaderTeam == TEAM_RED ) ? '1' : '4', CG_GetTeamName( leaderTeam ) );
+		Q_strncpyz( nameBuffer, CG_GetRetailPlacementTeamName( leaderTeam ), sizeof( nameBuffer ) );
 		CG_DrawPlacementScoreLine( rect, scale, color, textStyle, "      ", nameBuffer, valueBuffer );
 		return;
 	}
 
-	score = CG_GetActiveScoreByIndex( 0 );
-	if ( !score || !CG_BuildPlacementScoreValue( score->score, valueBuffer, sizeof( valueBuffer ) ) ) {
+	if ( cgs.scores1 == SCORE_NOT_PRESENT ) {
+		if ( rect ) {
+			CG_Text_Paint( rect->x, rect->y, scale, color, "1.", 0, 0, textStyle );
+		}
 		return;
 	}
 
-	if ( score->client >= 0 && score->client < cgs.maxclients ) {
-		ci = &cgs.clientinfo[score->client];
-	} else {
-		ci = NULL;
+	if ( !CG_BuildPlacementScoreValue( cgs.scores1, valueBuffer, sizeof( valueBuffer ), qtrue, qfalse ) ) {
+		return;
 	}
 
-	Q_strncpyz( nameBuffer, ( ci && ci->name[0] ) ? ci->name : "Unknown", sizeof( nameBuffer ) );
+	Q_strncpyz( nameBuffer, cgs.firstPlaceName, sizeof( nameBuffer ) );
 	CG_DrawPlacementScoreLine( rect, scale, color, textStyle, "1. ", nameBuffer, valueBuffer );
 }
 
@@ -10029,60 +10144,57 @@ static void CG_Draw2ndPlaceScore( rectDef_t *rect, float scale, vec4_t color, in
 	char			rankBuffer[8];
 	char			nameBuffer[64];
 	char			valueBuffer[32];
-	const score_t		*leader;
-	const score_t		*score;
 	const clientInfo_t	*ci;
 	team_t			trailingTeam;
+	int			clientNum;
 	int			localRank;
+	int			rank;
 	int			value;
 
 	if ( CG_IsTeamWinnerGametype( cgs.gametype ) ) {
 		trailingTeam = ( cgs.scores1 < cgs.scores2 ) ? TEAM_RED : TEAM_BLUE;
 		value = ( trailingTeam == TEAM_RED ) ? cgs.scores1 : cgs.scores2;
-		if ( !CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ) ) ) {
+		if ( value == SCORE_NOT_PRESENT ) {
+			valueBuffer[0] = '\0';
+		} else if ( !CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ), qfalse, qfalse ) ) {
 			return;
 		}
 
-		Com_sprintf( nameBuffer, sizeof( nameBuffer ), "^%c%s^7",
-			( trailingTeam == TEAM_RED ) ? '1' : '4', CG_GetTeamName( trailingTeam ) );
+		Q_strncpyz( nameBuffer, CG_GetRetailPlacementTeamName( trailingTeam ), sizeof( nameBuffer ) );
 		CG_DrawPlacementScoreLine( rect, scale, color, textStyle, "      ", nameBuffer, valueBuffer );
 		return;
 	}
 
-	leader = CG_GetActiveScoreByIndex( 0 );
-	score = NULL;
-	localRank = 2;
+	if ( cg.snap && cg.snap->ps.pm_type != PM_SPECTATOR && !CG_ShowPlayerIsFirstPlace() ) {
+		clientNum = cg.snap->ps.clientNum;
+		if ( clientNum >= 0 && clientNum < cgs.maxclients && clientNum < MAX_CLIENTS ) {
+			rank = cg.snap->ps.persistant[PERS_RANK];
+			if ( rank & RANK_TIED_FLAG ) {
+				rank &= ~RANK_TIED_FLAG;
+			}
 
-	if ( cg.snap && cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR ) {
-		int rank = cg.snap->ps.persistant[PERS_RANK];
+			localRank = rank + 1;
+			value = ( cgs.gametype == GT_RACE ) ? cgs.clientinfo[clientNum].score : cg.snap->ps.persistant[PERS_SCORE];
+			if ( !CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ), qtrue, qtrue ) ) {
+				return;
+			}
 
-		if ( ( rank & RANK_TIED_FLAG ) == 0 && rank != 0 ) {
-			score = CG_GetScoreForClientNum( cg.snap->ps.clientNum );
-			localRank = ( rank & ~RANK_TIED_FLAG ) + 1;
-		}
-	}
-
-	if ( !score ) {
-		score = CG_GetActiveScoreByIndex( 1 );
-		if ( !score ) {
+			ci = &cgs.clientinfo[clientNum];
+			Q_strncpyz( nameBuffer, ( ci->name[0] ) ? ci->name : "Unknown", sizeof( nameBuffer ) );
+			Com_sprintf( rankBuffer, sizeof( rankBuffer ), "%d. ", localRank );
+			CG_DrawPlacementScoreLine( rect, scale, color, textStyle, rankBuffer, nameBuffer, valueBuffer );
 			return;
 		}
-		if ( leader && leader->score == score->score ) {
-			localRank = 1;
-		}
 	}
 
-	if ( !CG_BuildPlacementScoreValue( score->score, valueBuffer, sizeof( valueBuffer ) ) ) {
+	value = cgs.scores2;
+	if ( !CG_BuildPlacementScoreValue( value, valueBuffer, sizeof( valueBuffer ), qtrue, qtrue ) ) {
 		return;
 	}
 
-	if ( score->client >= 0 && score->client < cgs.maxclients ) {
-		ci = &cgs.clientinfo[score->client];
-	} else {
-		ci = NULL;
-	}
+	localRank = ( cgs.scores1 != cgs.scores2 ) ? 2 : 1;
+	Q_strncpyz( nameBuffer, cgs.secondPlaceName, sizeof( nameBuffer ) );
 
-	Q_strncpyz( nameBuffer, ( ci && ci->name[0] ) ? ci->name : "Unknown", sizeof( nameBuffer ) );
 	Com_sprintf( rankBuffer, sizeof( rankBuffer ), "%d. ", localRank );
 	CG_DrawPlacementScoreLine( rect, scale, color, textStyle, rankBuffer, nameBuffer, valueBuffer );
 }
@@ -10558,9 +10670,7 @@ void CG_DrawMedal( int ownerDraw, rectDef_t *rect, float scale, vec4_t color, qh
 		if ( ownerDraw != CG_PERFECT ) {
 			if ( ownerDraw == CG_ACCURACY ) {
 				text = va( "%i%%", (int)value );
-				if ( value > 50 ) {
-					color[3] = 1.0;
-				}
+				color[3] = 1.0;
 			} else {
 				text = va( "%i", (int)value );
 				color[3] = 1.0;
@@ -10692,7 +10802,7 @@ rect.y = y;
 		CG_DrawCapFragLimit( &rect, scale, color, textStyle, align );
 		break;
 	case CG_LEVELTIMER:
-		CG_DrawLevelTimer(&rect, scale, color, textStyle);
+		CG_DrawLevelTimer(&rect, scale, color, textStyle, align);
 		break;
 	case CG_ROUND:
 		if ( CG_ShowPlayersRemaining() ) {
