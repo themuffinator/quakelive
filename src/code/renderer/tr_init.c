@@ -679,7 +679,6 @@ RB_TakeScreenshot
 void RB_TakeScreenshot( int x, int y, int width, int height, char *fileName ) {
 	byte		*buffer;
 	int			i, c, temp;
-	GLint		readBuffer;
 		
 	buffer = ri.Hunk_AllocateTempMemory(glConfig.vidWidth*glConfig.vidHeight*3+18);
 
@@ -691,10 +690,9 @@ void RB_TakeScreenshot( int x, int y, int width, int height, char *fileName ) {
 	buffer[15] = height >> 8;
 	buffer[16] = 24;	// pixel size
 
-	qglGetIntegerv( GL_READ_BUFFER, &readBuffer );
-	qglReadBuffer( GL_FRONT );
+	RB_BeginScreenshotReadback();
 	qglReadPixels( x, y, width, height, GL_RGB, GL_UNSIGNED_BYTE, buffer+18 ); 
-	qglReadBuffer( readBuffer );
+	RB_EndScreenshotReadback();
 
 	// swap rgb to bgr
 	c = 18 + width * height * 3;
@@ -721,14 +719,12 @@ RB_TakeScreenshotJPEG
 */  
 void RB_TakeScreenshotJPEG( int x, int y, int width, int height, char *fileName ) {
 	byte		*buffer;
-	GLint		readBuffer;
 
 	buffer = ri.Hunk_AllocateTempMemory(glConfig.vidWidth*glConfig.vidHeight*4);
 
-	qglGetIntegerv( GL_READ_BUFFER, &readBuffer );
-	qglReadBuffer( GL_FRONT );
+	RB_BeginScreenshotReadback();
 	qglReadPixels( x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer ); 
-	qglReadBuffer( readBuffer );
+	RB_EndScreenshotReadback();
 
 	// gamma correct
 	if ( ( tr.overbrightBits > 0 ) && glConfig.deviceSupportsGamma ) {
@@ -850,7 +846,6 @@ void R_LevelShot( void ) {
 	int			r, g, b;
 	float		xScale, yScale;
 	int			xx, yy;
-	GLint		readBuffer;
 
 	sprintf( checkname, "levelshots/%s.tga", tr.world->baseName );
 
@@ -863,10 +858,7 @@ void R_LevelShot( void ) {
 	buffer[14] = 128;
 	buffer[16] = 24;	// pixel size
 
-	qglGetIntegerv( GL_READ_BUFFER, &readBuffer );
-	qglReadBuffer( GL_FRONT );
 	qglReadPixels( 0, 0, glConfig.vidWidth, glConfig.vidHeight, GL_RGB, GL_UNSIGNED_BYTE, source ); 
-	qglReadBuffer( readBuffer );
 
 	// resample from source
 	xScale = glConfig.vidWidth / 512.0f;

@@ -1768,6 +1768,40 @@ static void RBPP_ReleaseSceneRenderTarget( void ) {
 
 /*
 =============
+RB_BeginScreenshotReadback
+
+Restore the default framebuffer before screenshot readback, matching the
+retail screenshot helpers' release of the post-process scene target.
+=============
+*/
+void RB_BeginScreenshotReadback( void ) {
+	if ( !RB_PostProcessEnabled() || !s_postProcess.sceneTarget.initialized ) {
+		return;
+	}
+
+	RBPP_ReleaseSceneRenderTarget();
+}
+
+
+/*
+=============
+RB_EndScreenshotReadback
+
+Rebind the scene target after screenshot readback when the frame is still being
+rendered through the post-process path.
+=============
+*/
+void RB_EndScreenshotReadback( void ) {
+	if ( !RB_PostProcessEnabled() || !s_postProcess.sceneTarget.initialized ) {
+		return;
+	}
+
+	RBPP_BindSceneRenderTarget();
+}
+
+
+/*
+=============
 RBPP_ResetIfNeeded
 
 Apply any queued post-process restart request after the current frame has been presented.
@@ -3286,9 +3320,6 @@ void RB_ExecuteRenderCommands( const void *data ) {
 		case RC_DRAW_SURFS:
 			data = RB_DrawSurfs( data );
 			break;
-		case RC_ADVERTISEMENT_QUERIES:
-			data = RB_DrawAdvertisementQueries( data );
-			break;
 		case RC_DRAW_BUFFER:
 			data = RB_DrawBuffer( data );
 			break;
@@ -3297,6 +3328,9 @@ void RB_ExecuteRenderCommands( const void *data ) {
 			break;
 		case RC_SCREENSHOT:
 			data = RB_TakeScreenshotCmd( data );
+			break;
+		case RC_ADVERTISEMENT_QUERIES:
+			data = RB_DrawAdvertisementQueries( data );
 			break;
 
 		case RC_END_OF_LIST:

@@ -103,7 +103,7 @@ Observed local facts:
 Observed local facts:
 
 1. The helper allocates `vidWidth * vidHeight * 3 + 18` bytes and writes the same 24-bit TGA header fields used by `tr_init.c`.
-2. It reads back `GL_RGB` pixels from `GL_FRONT` and restores the previous read buffer.
+2. It releases the post-process scene render target when active, reads back `GL_RGB` pixels, then rebinds the scene target.
 3. It swaps RGB to BGR in-place across the captured payload.
 4. It gamma-corrects the payload when overbright and hardware gamma are both active.
 5. It writes the final file and frees the temp buffer.
@@ -115,7 +115,7 @@ That is the exact render-backend screenshot writer `RB_TakeScreenshot`.
 Observed local facts:
 
 1. The helper allocates `vidWidth * vidHeight * 4` bytes.
-2. It reads `GL_RGBA` pixels from `GL_FRONT`, restores the original read buffer, and optionally gamma-corrects the buffer.
+2. It releases the post-process scene render target when active, reads `GL_RGBA` pixels, rebinds the scene target, and optionally gamma-corrects the buffer.
 3. It writes a one-byte placeholder file to create the target path.
 4. It calls the already-mapped `SaveJPG` helper at `0x00446880`.
 

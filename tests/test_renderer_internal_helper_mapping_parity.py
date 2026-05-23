@@ -381,6 +381,55 @@ def test_renderer_mapping_round_281_promotes_backend_command_handlers_and_scene_
 	assert "static void SetViewportAndScissor( void ) {" in tr_backend
 
 
+def test_renderer_screenshot_readback_matches_retail_command_wiring() -> None:
+	hlil_part01 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt").lower()
+	hlil_part02 = _read("references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part02.txt").lower()
+	tr_init = _read("src/code/renderer/tr_init.c")
+	tr_backend = _read("src/code/renderer/tr_backend.c")
+	tr_local = _read("src/code/renderer/tr_local.h")
+	tr_shader = _read("src/code/renderer/tr_shader.c")
+
+	assert "00437b18              eax_3, ecx, edx = sub_4483b0(esi)" in hlil_part01
+	assert "00448215  if (sub_4384a0() != 0)" in hlil_part02
+	assert "00448217      sub_4387d0()" in hlil_part02
+	assert "00448237  data_16e3d74(arg1, arg2, arg3, arg4, 0x1907, 0x1401, &eax_3[0x12])" in hlil_part02
+	assert "00448244  if (sub_4384a0() != 0)" in hlil_part02
+	assert "00448246      sub_438790()" in hlil_part02
+	assert "00448308  if (sub_4384a0() != 0)" in hlil_part02
+	assert "0044832a  data_16e3d74(arg1, arg2, arg3, arg4, 0x1908, 0x1401, eax_4)" in hlil_part02
+	assert "00448978      *eax_14 = 6" in hlil_part02
+	assert "00448b58      *eax_14 = 6" in hlil_part02
+
+	command_enum = tr_local[tr_local.index("typedef enum {"):tr_local.index("} renderCommand_t;")]
+	for earlier, later in (
+		("RC_DRAW_BUFFER", "RC_SWAP_BUFFERS"),
+		("RC_SWAP_BUFFERS", "RC_SCREENSHOT"),
+		("RC_SCREENSHOT", "RC_ADVERTISEMENT_QUERIES"),
+	):
+		assert command_enum.index(earlier) < command_enum.index(later)
+
+	for marker in (
+		"void RB_TakeScreenshot(",
+		"void RB_TakeScreenshotJPEG(",
+	):
+		block = _block_from_marker(tr_init, marker)
+		assert "qglReadBuffer" not in block
+		assert block.index("RB_BeginScreenshotReadback();") < block.index("qglReadPixels")
+		assert block.index("qglReadPixels") < block.index("RB_EndScreenshotReadback();")
+
+	levelshot_block = _block_from_marker(tr_init, "void R_LevelShot( void )")
+	assert "qglReadBuffer" not in levelshot_block
+
+	begin_block = _block_from_marker(tr_backend, "void RB_BeginScreenshotReadback( void )")
+	end_block = _block_from_marker(tr_backend, "void RB_EndScreenshotReadback( void )")
+	assert "RBPP_ReleaseSceneRenderTarget();" in begin_block
+	assert "RBPP_BindSceneRenderTarget();" in end_block
+	assert "case RC_SCREENSHOT:" in tr_backend
+	assert "data = RB_TakeScreenshotCmd( data );" in tr_backend
+	assert "case RC_SCREENSHOT:" in tr_shader
+	assert "const screenshotCommand_t *ss_cmd = (const screenshotCommand_t *)curCmd;" in tr_shader
+
+
 def test_renderer_mapping_round_282_promotes_command_buffer_and_glimp_thread_wiring() -> None:
 	aliases = json.loads(_read("references/analysis/quakelive_symbol_aliases.json"))["quakelive_steam"]
 	functions_csv = _read("references/reverse-engineering/ghidra/quakelive_steam/functions.csv").lower()

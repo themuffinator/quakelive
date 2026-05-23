@@ -1562,6 +1562,8 @@ RENDERER BACK END FUNCTIONS
 
 void RB_RenderThread( void );
 void RB_ExecuteRenderCommands( const void *data );
+void RB_BeginScreenshotReadback( void );
+void RB_EndScreenshotReadback( void );
 
 /*
 =============================================================
@@ -1643,10 +1645,10 @@ typedef enum {
 	RC_SET_COLOR,
 	RC_STRETCH_PIC,
 	RC_DRAW_SURFS,
-	RC_ADVERTISEMENT_QUERIES,
 	RC_DRAW_BUFFER,
 	RC_SWAP_BUFFERS,
-	RC_SCREENSHOT
+	RC_SCREENSHOT,
+	RC_ADVERTISEMENT_QUERIES
 } renderCommand_t;
 
 

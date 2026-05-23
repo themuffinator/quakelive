@@ -1913,12 +1913,6 @@ static void FixRenderCommandList( int newShader ) {
 				curCmd = (const void *)(ds_cmd + 1);
 				break;
 				}
-			case RC_ADVERTISEMENT_QUERIES:
-				{
-				const advertisementQueryCommand_t *aq_cmd = (const advertisementQueryCommand_t *)curCmd;
-				curCmd = (const void *)(aq_cmd + 1);
-				break;
-				}
 			case RC_DRAW_BUFFER:
 				{
 				const drawBufferCommand_t *db_cmd = (const drawBufferCommand_t *)curCmd;
@@ -1929,6 +1923,18 @@ static void FixRenderCommandList( int newShader ) {
 				{
 				const swapBuffersCommand_t *sb_cmd = (const swapBuffersCommand_t *)curCmd;
 				curCmd = (const void *)(sb_cmd + 1);
+				break;
+				}
+			case RC_SCREENSHOT:
+				{
+				const screenshotCommand_t *ss_cmd = (const screenshotCommand_t *)curCmd;
+				curCmd = (const void *)(ss_cmd + 1);
+				break;
+				}
+			case RC_ADVERTISEMENT_QUERIES:
+				{
+				const advertisementQueryCommand_t *aq_cmd = (const advertisementQueryCommand_t *)curCmd;
+				curCmd = (const void *)(aq_cmd + 1);
 				break;
 				}
 			case RC_END_OF_LIST:
