@@ -334,6 +334,8 @@ typedef struct {
 	float		alpha;
 	vec3_t		origin;
 	float		rise;
+	float		screenVelocity[2];
+	float		screenAcceleration[2];
 	float		size;
 	float		textScale;
 	vec4_t		color;
@@ -831,10 +833,6 @@ typedef struct {
 	qboolean	voiceChatIndicatorEnabled;	// caches cg_voiceChatIndicator state
 	qboolean	vignetteEnabled;	// caches cg_vignette state
 	qboolean	intermissionStarted;	// don't play voice rewards, because game will end shortly
-	int			intermissionLetterboxChangeTime;
-	int			intermissionLetterboxDuration;
-	float		intermissionLetterboxStartHeight;
-	float		intermissionLetterboxTargetHeight;
 
 	// there are only one or two snapshot_t that are relevent at a time
 	int			latestSnapshotNum;	// the number of snapshots the client system has received
@@ -1005,7 +1003,7 @@ typedef struct {
 	vec4_t			crosshairHitColor;
 	qboolean	crosshairPulseEnabled;
 	int			crosshairHitStyle;
-	int			crosshairHitTime;
+	float		crosshairHitTime;
 
 	// powerup active flashing
 	int			powerupActive;
@@ -1052,6 +1050,7 @@ typedef struct {
 	// blend blobs
 	float		damageTime;
 	float		damageX, damageY, damageValue;
+	unsigned int	damageBlendColor;
 	damagePlumPreset_t	damagePlumPreset;
 	unsigned int	damagePlumWeaponBits;
 	damagePlumColorStyle_t	damagePlumColorStyle;
@@ -1213,7 +1212,11 @@ typedef struct {
 	qhandle_t	grapplingChainShader;
 
 	qhandle_t	friendShader;
+	qhandle_t	friendHitShader;
+	qhandle_t	friendDeadShader;
 	qhandle_t	frozenPlayerShader;
+	qhandle_t	flagCarrierShader;
+	qhandle_t	flagCarrierHitShader;
 
 	qhandle_t	balloonShader;
 	qhandle_t	connectionShader;
@@ -1274,6 +1277,7 @@ typedef struct {
 	qhandle_t	regenShader;
 	qhandle_t	battleSuitShader;
 	qhandle_t	battleWeaponShader;
+	qhandle_t	ghostWeaponShader;
 	qhandle_t	hastePuffShader;
 	qhandle_t	redKamikazeShader;
 	qhandle_t	blueKamikazeShader;
@@ -1352,6 +1356,16 @@ typedef struct {
 	qhandle_t	scoreboardTime;
 	qhandle_t	scoreboxSpecShader;
 	qhandle_t	scoreboxFollowShader;
+	qhandle_t	scoreFirstPlayerReadyShader;
+	qhandle_t	scoreFirstPlayerNotReadyShader;
+	qhandle_t	scoreFirstPlayerLeadsShader;
+	qhandle_t	scoreFirstPlayerTiedShader;
+	qhandle_t	scoreFirstPlayerTrailsShader;
+	qhandle_t	scoreSecondPlayerReadyShader;
+	qhandle_t	scoreSecondPlayerNotReadyShader;
+	qhandle_t	scoreSecondPlayerLeadsShader;
+	qhandle_t	scoreSecondPlayerTiedShader;
+	qhandle_t	scoreSecondPlayerTrailsShader;
 	qhandle_t	scoreArrowGreenShader;
 	qhandle_t	scoreArrowRedShader;
 	qhandle_t	scoreCAArrowRedShader;
@@ -1692,6 +1706,7 @@ typedef struct {
 	int		matchTimeoutOwner;
 	int		matchTimeoutRemaining[TEAM_NUM_TEAMS];
 	int		matchRoundTransitionTime;
+	int		warmupGametype;
 	int		matchRoundNumber;
 	int		matchRoundTurn;
 	int		matchRoundState;
@@ -1823,6 +1838,7 @@ extern	vmCvar_t		cg_bobroll;
 extern	vmCvar_t		cg_runpitch;
 extern	vmCvar_t		cg_runroll;
 extern	vmCvar_t		cg_brassTime;
+extern	vmCvar_t		cg_bubbleTrail;
 extern	vmCvar_t		cg_buildScript;
 extern	vmCvar_t		cg_cameraMode;
 extern	vmCvar_t		cg_cameraOrbit;
@@ -1912,7 +1928,6 @@ extern	vmCvar_t		cg_teamOverlayUserinfo;
 extern	vmCvar_t		cg_drawTieredArmorAvailability;
 extern	vmCvar_t		cg_enableDust;
 extern	vmCvar_t		cg_enableBreath;
-extern	vmCvar_t		cg_drawCrosshairNames;
 extern	vmCvar_t		cg_enemyCrosshairNames;
 extern	vmCvar_t		cg_enemyCrosshairNamesOpacity;
 extern	vmCvar_t		cg_enemyColors;
@@ -1924,6 +1939,7 @@ extern	vmCvar_t		cg_filter_angles;
 extern	vmCvar_t		cg_followKiller;
 extern	vmCvar_t		cg_followPowerup;
 extern	vmCvar_t		cg_footsteps;
+extern	vmCvar_t		cg_forceDrawCrosshair;
 extern	vmCvar_t		cg_forceModel;
 extern	vmCvar_t		cg_forceEnemyModel;
 extern	vmCvar_t		cg_enemyModel;
@@ -1944,7 +1960,6 @@ extern	vmCvar_t		cg_gametype;
 extern	vmCvar_t		cg_gun_x;
 extern	vmCvar_t		cg_gun_y;
 extern	vmCvar_t		cg_gun_z;
-extern	vmCvar_t		cg_gun_frame;
 extern	vmCvar_t		cg_hudFiles;
 extern	vmCvar_t		cg_ignoreMouseInput;
 extern	vmCvar_t		cg_itemTimers;
@@ -1968,7 +1983,7 @@ extern	vmCvar_t		cg_obituaryRowSize;
 extern	vmCvar_t		cg_overheadNamesWidth;
 extern	vmCvar_t		cg_paused;
 extern	vmCvar_t		cg_preferredStartingWeapons;
-extern	vmCvar_t		cg_oldPlasma;
+extern	vmCvar_t		cg_plasmaStyle;
 extern	vmCvar_t		cg_playerCylinders;
 extern	vmCvar_t		cg_smoothClients;
 extern	vmCvar_t		pmove_fixed;
@@ -1977,14 +1992,13 @@ extern	vmCvar_t		pmove_msec;
 extern	vmCvar_t		cg_predictItems;
 extern	vmCvar_t		cg_predictLocalRailshots;
 extern	vmCvar_t		cg_projectileNudge;
-extern	vmCvar_t		cg_noProjectileTrail;
 extern	vmCvar_t		cg_raceBeep;
 extern	vmCvar_t		cg_railStyle;
 extern	vmCvar_t		cg_railTrailTime;
 extern	vmCvar_t		cg_recordSPDemo;
 extern	vmCvar_t		cg_recordSPDemoName;
 extern	vmCvar_t		cg_redTeamName;
-extern	vmCvar_t		cg_oldRocket;
+extern	vmCvar_t		cg_rocketStyle;
 extern	vmCvar_t		cg_scorePlum;
 extern	vmCvar_t		cg_screenDamage;
 extern	vmCvar_t		cg_screenDamage_Self;
@@ -2201,6 +2215,7 @@ void CG_AddLagometerSnapshotInfo( snapshot_t *snap );
 void CG_CenterPrint( const char *str, int y, float scale );
 void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles );
 void CG_DrawActive( stereoFrame_t stereoView );
+void CG_ResetIntermissionLetterboxState( void );
 void CG_DrawFlagModel( float x, float y, float w, float h, int team, qboolean force2D );
 qhandle_t CG_GetObituaryIcon( int mod );
 void CG_ObituaryColorForIndex( int colorIndex, float alpha, vec4_t color );
@@ -2318,6 +2333,7 @@ void CG_PruneObituaryFeed( void );
 qboolean CG_DamagePlumsEnabled( void );
 qboolean CG_ShouldRenderDamagePlumForWeapon( weapon_t weapon );
 damagePlumColorStyle_t CG_GetDamagePlumColorStyle( void );
+unsigned int CG_DamagePlumBitForWeapon( weapon_t weapon );
 int CG_StartingWeaponIndexFromToken( const char *value );
 
 
@@ -2696,7 +2712,7 @@ int			trap_PC_ReadToken( int handle, pc_token_t *pc_token );
 int			trap_PC_SourceFileAndLine( int handle, char *filename, int *line );
 int			trap_RealTime( qtime_t *qtime );
 #ifdef Q3_VM
-static ID_INLINE void trap_QL_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, float minimumValue, float maximumValue, int flags ) {
+static ID_INLINE void trap_QL_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {
 	(void)minimumValue;
 	(void)maximumValue;
 	trap_Cvar_Register( vmCvar, varName, defaultValue, flags );
@@ -2806,7 +2822,7 @@ static ID_INLINE qhandle_t trap_QL_GetAvatarImageHandle( unsigned int identityLo
 	return 0;
 }
 #else
-void		trap_QL_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, float minimumValue, float maximumValue, int flags );
+void		trap_QL_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags );
 void		trap_QL_Cvar_Reset( const char *varName );
 int			trap_QL_FS_GetFileList( const char *path, const char *extension, char *listbuf, int bufsize );
 void		trap_QL_S_StartSoundVolume( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfx, float volume );

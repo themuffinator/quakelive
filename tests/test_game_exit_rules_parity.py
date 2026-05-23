@@ -35,6 +35,7 @@ def test_check_exit_rules_matches_retail_gate_order_and_limit_owners() -> None:
 	assert "case GT_ATTACK_DEFEND:" in check_block
 	assert "case GT_RED_ROVER:" in check_block
 	assert "case GT_FREEZE:" in check_block
+	assert "if ( g_freezeRoundDelay.integer != 0 ) {" in check_block
 
 	assert "timeLimitMsec = G_BuildExitRuleLimitMsec( g_timelimit.integer, level.overtimeAccumulatedMsec );" in check_block
 	assert "mercyLimitMsec = G_BuildExitRuleLimitMsec( g_mercytime.integer, level.overtimeAccumulatedMsec );" in check_block
@@ -58,11 +59,13 @@ def test_check_exit_rules_matches_retail_gate_order_and_limit_owners() -> None:
 
 def test_overtime_helpers_publish_retail_sudden_death_state() -> None:
 	main_c = _read("src/code/game/g_main.c")
-	build_limit_block = _block_from_marker(main_c, "static int G_BuildExitRuleLimitMsec")
+	local_h = _read("src/code/game/g_local.h")
+	build_limit_block = _block_from_marker(main_c, "int G_BuildExitRuleLimitMsec")
 	start_block = _block_from_marker(main_c, "static qboolean G_StartOrExtendOvertime")
 	stop_block = _block_from_marker(main_c, "static void G_StopOvertime")
 	level_timers_block = _block_from_marker(main_c, "static void LevelCheckTimers")
 
+	assert "int G_BuildExitRuleLimitMsec( int minutes, int bonusMsec );" in local_h
 	assert "totalMsec = (long long)minutes * 60000 + bonusMsec;" in build_limit_block
 	assert "if ( totalMsec > INT_MAX ) {" in build_limit_block
 	assert "return INT_MAX;" in build_limit_block
@@ -93,6 +96,17 @@ def test_overtime_helpers_publish_retail_sudden_death_state() -> None:
 	assert "G_StopOvertime();" in level_timers_block
 	assert "if ( level.overtimeActive ) {" in level_timers_block
 	assert "G_SuddenDeathThink();" in level_timers_block
+
+
+def test_score_is_tied_keeps_red_rover_on_retail_non_team_leader_path() -> None:
+	main_c = _read("src/code/game/g_main.c")
+	score_block = _block_from_marker(main_c, "qboolean ScoreIsTied( void )")
+
+	assert "g_gametype.integer < GT_FFA ||" in score_block
+	assert "( g_gametype.integer > GT_SINGLE_PLAYER && g_gametype.integer != GT_RED_ROVER )" in score_block
+	assert "return level.teamScores[TEAM_RED] == level.teamScores[TEAM_BLUE];" in score_block
+	assert "a = level.clients[level.sortedClients[0]].ps.persistant[PERS_SCORE];" in score_block
+	assert "b = level.clients[level.sortedClients[1]].ps.persistant[PERS_SCORE];" in score_block
 
 
 def test_intermission_exit_flow_uses_retail_fixed_grace_window_and_latch() -> None:

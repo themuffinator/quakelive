@@ -48,6 +48,16 @@ def test_scoreboard_headers_track_local_social_state_and_media() -> None:
 	source = CG_LOCAL.read_text(encoding="utf-8")
 
 	assert "qboolean\t\tclientMuted[MAX_CLIENTS];" in source
+	assert "qhandle_t\tscoreFirstPlayerReadyShader;" in source
+	assert "qhandle_t\tscoreFirstPlayerNotReadyShader;" in source
+	assert "qhandle_t\tscoreFirstPlayerLeadsShader;" in source
+	assert "qhandle_t\tscoreFirstPlayerTiedShader;" in source
+	assert "qhandle_t\tscoreFirstPlayerTrailsShader;" in source
+	assert "qhandle_t\tscoreSecondPlayerReadyShader;" in source
+	assert "qhandle_t\tscoreSecondPlayerNotReadyShader;" in source
+	assert "qhandle_t\tscoreSecondPlayerLeadsShader;" in source
+	assert "qhandle_t\tscoreSecondPlayerTiedShader;" in source
+	assert "qhandle_t\tscoreSecondPlayerTrailsShader;" in source
 	assert "qhandle_t\tscoreArrowGreenShader;" in source
 	assert "qhandle_t\tscoreArrowRedShader;" in source
 	assert "qhandle_t\tscoreCAArrowRedShader;" in source
@@ -61,6 +71,17 @@ def test_score_arrow_media_keeps_retail_ready_and_ca_arrow_assets_registered() -
 	graphics_block = _block_from_marker(source, "static void CG_RegisterGraphics")
 
 	for expected in (
+		'if ( cgs.gametype == GT_TOURNAMENT || cg_buildScript.integer ) {',
+		'cgs.media.scoreFirstPlayerReadyShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_ready.tga" );',
+		'cgs.media.scoreFirstPlayerNotReadyShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_notready.tga" );',
+		'cgs.media.scoreSecondPlayerReadyShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_ready.tga" );',
+		'cgs.media.scoreSecondPlayerNotReadyShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_notready.tga" );',
+		'cgs.media.scoreFirstPlayerLeadsShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_leads.tga" );',
+		'cgs.media.scoreFirstPlayerTiedShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_tied.tga" );',
+		'cgs.media.scoreFirstPlayerTrailsShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_trails.tga" );',
+		'cgs.media.scoreSecondPlayerLeadsShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_leads.tga" );',
+		'cgs.media.scoreSecondPlayerTiedShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_tied.tga" );',
+		'cgs.media.scoreSecondPlayerTrailsShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_trails.tga" );',
 		'cgs.media.scoreArrowGreenShader = trap_R_RegisterShader( "ui/assets/score/arrowg.tga" );',
 		'cgs.media.scoreArrowRedShader = trap_R_RegisterShader( "ui/assets/score/arrowr.tga" );',
 		'if ( cgs.gametype >= GT_TEAM || cg_buildScript.integer ) {',
@@ -68,6 +89,20 @@ def test_score_arrow_media_keeps_retail_ready_and_ca_arrow_assets_registered() -
 		'cgs.media.scoreCAArrowBlueShader = trap_R_RegisterShader( "ui/assets/score/ca_arrow_blue.tga" );',
 	):
 		assert expected in graphics_block
+
+	for expected in (
+		'"ui/assets/score/1st_plyr_ready.tga"',
+		'"ui/assets/score/1st_plyr_notready.tga"',
+		'"ui/assets/score/1st_plyr_leads.tga"',
+		'"ui/assets/score/1st_plyr_tied.tga"',
+		'"ui/assets/score/1st_plyr_trails.tga"',
+		'"ui/assets/score/2nd_plyr_ready.tga"',
+		'"ui/assets/score/2nd_plyr_notready.tga"',
+		'"ui/assets/score/2nd_plyr_leads.tga"',
+		'"ui/assets/score/2nd_plyr_tied.tga"',
+		'"ui/assets/score/2nd_plyr_trails.tga"',
+	):
+		assert expected in source
 
 
 def test_scoreboard_feeders_register_and_return_retail_social_icons() -> None:

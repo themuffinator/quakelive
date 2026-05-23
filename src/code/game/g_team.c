@@ -904,8 +904,7 @@ Evaluates the retail Attack & Defend timelimit, scorelimit, and mercylimit rules
 qboolean G_ADCheckExitRules( qboolean announce ) {
 	int	elapsed;
 	int	scoreDelta;
-	int	mercyWindowMinutes;
-	int	mercyWindowMsec;
+	int	mercyLimitMsec;
 
 	if ( !G_ADModeActive() ) {
 		return qfalse;
@@ -952,17 +951,8 @@ qboolean G_ADCheckExitRules( qboolean announce ) {
 		return qfalse;
 	}
 
-	mercyWindowMinutes = g_mercytime.integer;
-	if ( mercyWindowMinutes < 0 ) {
-		mercyWindowMinutes = 0;
-	}
-	if ( mercyWindowMinutes > 0 && mercyWindowMinutes > INT_MAX / 60000 ) {
-		mercyWindowMsec = INT_MAX;
-	} else {
-		mercyWindowMsec = mercyWindowMinutes * 60000;
-	}
-
-	if ( elapsed < mercyWindowMsec ) {
+	mercyLimitMsec = G_BuildExitRuleLimitMsec( g_mercytime.integer, level.overtimeAccumulatedMsec );
+	if ( elapsed < mercyLimitMsec ) {
 		return qfalse;
 	}
 

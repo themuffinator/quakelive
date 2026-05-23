@@ -32,6 +32,33 @@ static weapon_t G_ModToWeapon( int mod );
 
 /*
 =============
+G_GetRespawnDelayMilliseconds
+
+Returns the retail dead-player minimum delay before manual or automatic respawn
+can occur.
+=============
+*/
+static int G_GetRespawnDelayMilliseconds( void ) {
+	int	delay;
+
+	delay = g_factoryCvarConfig.respawnDelayMinMilliseconds;
+	if ( level.suddenDeathActive && level.overtimeActive && g_suddenDeathRespawn.integer > 0 ) {
+		int suddenDeathDelay;
+
+		suddenDeathDelay = G_GetSuddenDeathRespawnDelay();
+		if ( suddenDeathDelay >= 0 ) {
+			delay = suddenDeathDelay;
+		}
+	}
+	if ( delay < 0 ) {
+		delay = 0;
+	}
+
+	return delay;
+}
+
+/*
+=============
 G_ComplaintResetClient
 
 Clears the complaint bookkeeping attached to a client. When resetCount is true the lifetime
@@ -1238,24 +1265,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	self->r.maxs[2] = -8;
 
-	// don't allow respawn until the death anim is done
-	// g_forcerespawn may force spawning at some later time
-	{
-		int respawnDelay = 1700;
-		if ( level.suddenDeathActive ) {
-			int suddenDeathDelay = G_GetSuddenDeathRespawnDelay();
-			if ( suddenDeathDelay < 0 ) {
-				self->client->respawnTime = INT_MAX;
-			} else {
-				if ( suddenDeathDelay < respawnDelay ) {
-					suddenDeathDelay = respawnDelay;
-				}
-				self->client->respawnTime = level.time + suddenDeathDelay;
-			}
-		} else {
-			self->client->respawnTime = level.time + respawnDelay;
-		}
-	}
+	// don't allow respawn until the retail minimum delay has elapsed
+	self->client->respawnTime = level.time + G_GetRespawnDelayMilliseconds();
 
 	// remove powerups
 	memset( self->client->ps.powerups, 0, sizeof(self->client->ps.powerups) );

@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../common/auth_credentials.h"
 #include "../../common/platform/platform_config.h"
-#include <limits.h>
 
 static vec3_t	playerMins = { -15, -15, -24 };
 static vec3_t	playerMaxs = { 15, 15, 32 };
@@ -467,46 +466,6 @@ static void G_WritePlatformAuthUserinfo( int clientNum, char *userinfo, const ch
 	Info_SetValueForKey( userinfo, QL_AUTH_USERINFO_KEY_MESSAGE, message ? message : "" );
 
 	trap_SetUserinfo( clientNum, userinfo );
-}
-
-/*
-=============
-G_ParseSteamId
-
-Parses a numeric SteamID string into a 64-bit value.
-=============
-*/
-static qboolean G_ParseSteamId( const char *steamId, unsigned long long *outValue ) {
-	unsigned long long	value;
-	const char		*ch;
-
-	if ( !steamId || !steamId[0] || !outValue ) {
-		return qfalse;
-	}
-
-	value = 0ull;
-
-	for ( ch = steamId; *ch; ++ch ) {
-		if ( *ch < '0' || *ch > '9' ) {
-			return qfalse;
-		}
-
-		// Detect overflow before multiplying.
-		if ( value > (ULLONG_MAX / 10ull) ) {
-			return qfalse;
-		}
-
-		value *= 10ull;
-
-		if ( value > (ULLONG_MAX - (unsigned long long)(*ch - '0')) ) {
-			return qfalse;
-		}
-
-		value += (unsigned long long)(*ch - '0');
-	}
-
-	*outValue = value;
-	return qtrue;
 }
 
 /*
@@ -1821,15 +1780,6 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 	trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 
- 	// IP filtering
- 	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=500
- 	// recommanding PB based IP / GUID banning, the builtin system is pretty limited
- 	// check to see if they are on the banned IP list
-	value = Info_ValueForKey (userinfo, "ip");
-	if ( G_FilterPacket( value ) ) {
-		return "You are banned from this server.";
-	}
-
 	connectionPrivilege = G_ResolveConnectionPrivilege( clientNum, userinfo, isBot, &localClient,
 		&connectSteamIdLow, &connectSteamIdHigh, &connectSteamIdValid );
 	if ( connectionPrivilege < PRIV_NONE ) {
@@ -1870,6 +1820,7 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	// read or initialize the session data
 	if ( firstTime || level.newSession ) {
 		G_InitSessionData( client, userinfo );
+		G_RankResetClientStats( client );
 	}
 	G_ReadSessionData( client );
 	runFirstTimeConnectSideEffects = ( firstTime && !level.trainingMapActive ) ? qtrue : qfalse;
@@ -1907,7 +1858,6 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	// get and distribute relevent paramters
 	G_LogPrintf( "ClientConnect: %i\n", clientNum );
 	ClientUserinfoChanged( clientNum );
-	G_RankResetClientStats( client );
 
 	if ( runFirstTimeConnectSideEffects ) {
 		trap_SendServerCommand( clientNum, va( "priv %i", client->sess.privilege ) );
@@ -1917,21 +1867,19 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 			trap_SendServerCommand( -1, va("print \"%s" S_COLOR_WHITE " connected\n\"", client->pers.netname) );
 		}
 
-		if ( !isBot ) {
-			const char *steamId = Info_ValueForKey( userinfo, "steamid" );
+		{
+			unsigned int		printSteamIdLow;
+			unsigned int		printSteamIdHigh;
+			unsigned long long	printSteamIdValue;
 
-			if ( steamId && steamId[0] ) {
-#if (QL_PLATFORM_HAS_STEAMWORKS || QL_PLATFORM_HAS_OPEN_STEAM)
-				unsigned long long parsedId;
-
-				if ( G_ParseSteamId( steamId, &parsedId ) ) {
-					trap_Printf( va( "%s connected with Steam ID %llu\n", client->pers.netname, parsedId ) );
-				} else {
-					trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
+			printSteamIdLow = connectSteamIdLow;
+			printSteamIdHigh = connectSteamIdHigh;
+			if ( trap_GetSteamId( clientNum, &printSteamIdLow, &printSteamIdHigh ) ||
+				connectSteamIdValid ) {
+				printSteamIdValue = ( (unsigned long long)printSteamIdHigh << 32 ) | printSteamIdLow;
+				if ( printSteamIdValue ) {
+					trap_Printf( va( "%s connected with Steam ID %llu\n", client->pers.netname, printSteamIdValue ) );
 				}
-#else
-				trap_Printf( va( "%s connected with Steam ID %s\n", client->pers.netname, steamId ) );
-#endif
 			}
 		}
 
@@ -2438,6 +2386,45 @@ static void G_RRFinalizeSpawnLoadout( gentity_t *ent ) {
 }
 
 /*
+=============
+G_GametypeSkipsSpawnPointTargets
+
+Returns the retail ClientSpawn predicate that suppresses spawn-point target
+firing for gametypes outside the recovered round/race spawn lanes.
+=============
+*/
+static qboolean G_GametypeSkipsSpawnPointTargets( int gametype ) {
+	switch ( gametype ) {
+	case GT_RACE:
+	case GT_CLAN_ARENA:
+	case GT_DOMINATION:
+	case GT_RED_ROVER:
+		return qfalse;
+	default:
+		return qtrue;
+	}
+}
+
+/*
+=============
+G_InitClientSpawnState
+
+Runs the recovered ClientSpawn bootstrap lane between origin seeding and the
+first usercmd pull: Red Rover role finalization, conditional spawn targets, and
+the shared spawn loadout finalizer.
+=============
+*/
+static weapon_t G_InitClientSpawnState( gentity_t *ent, gentity_t *spawnPoint, const factoryCvarConfig_t *factoryConfig ) {
+	G_RRFinalizeSpawnLoadout( ent );
+
+	if ( spawnPoint && !level.intermissiontime && !G_GametypeSkipsSpawnPointTargets( g_gametype.integer ) ) {
+		G_UseTargets( spawnPoint, ent );
+	}
+
+	return G_FinalizeSpawnLoadout( ent, factoryConfig );
+}
+
+/*
 ===========
 ClientSpawn
 
@@ -2571,6 +2558,7 @@ void ClientSpawn(gentity_t *ent) {
 	client->accuracy_hits = accuracy_hits;
 	client->accuracy_shots = accuracy_shots;
 	client->lastkilled_client = -1;
+	client->lasthurt_client = -1;
 	client->lastKillCommandTime = savedLastKillCommandTime;
 	client->killCommandCooldownExpires = savedKillCommandCooldownExpires;
 	client->friendlyFireComplaints = savedFriendlyFireComplaints;
@@ -2673,14 +2661,14 @@ void ClientSpawn(gentity_t *ent) {
 	VectorCopy (playerMaxs, ent->r.maxs);
 
 	client->ps.clientNum = index;
-	G_RRFinalizeSpawnLoadout( ent );
-	spawnWeapon = G_FinalizeSpawnLoadout( ent, factoryConfig );
 
 	G_SetOrigin( ent, spawn_origin );
 	VectorCopy( spawn_origin, client->ps.origin );
 
 	// the respawned flag will be cleared after the attack and jump keys come up
 	client->ps.pm_flags |= PMF_RESPAWNED;
+
+	spawnWeapon = G_InitClientSpawnState( ent, spawnPoint, factoryConfig );
 
 	trap_GetUsercmd( client - level.clients, &ent->client->pers.cmd );
 	SetClientViewAngle( ent, spawn_angles );
@@ -2712,9 +2700,6 @@ void ClientSpawn(gentity_t *ent) {
 	if ( level.intermissiontime ) {
 		MoveClientToIntermission( ent );
 	} else {
-		// fire the targets of the spawn point
-		G_UseTargets( spawnPoint, ent );
-
 		// honor the factory-configured spawn weapon selection.
 		client->ps.weapon = spawnWeapon;
 	}
@@ -2727,6 +2712,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	// positively link the client, even if the command times are weird
 	if ( ent->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		G_GrantConfiguredItems( ent );
 		BG_PlayerStateToEntityState( &client->ps, &ent->s, qtrue );
 		VectorCopy( ent->client->ps.origin, ent->r.currentOrigin );
 		trap_LinkEntity( ent );
@@ -2734,7 +2720,6 @@ void ClientSpawn(gentity_t *ent) {
 
 	// run the presend to set anything else
 	G_GametypeClientSpawn( ent );
-	G_GrantConfiguredItems( ent );
 	G_ClearLagHaxHistory( ent );
 	ClientEndFrame( ent );
 

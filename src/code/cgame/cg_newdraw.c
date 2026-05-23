@@ -51,6 +51,7 @@ static void CG_ParseActiveVoteCommand( char *command, size_t commandSize, char *
 static void CG_DrawVoteShot(rectDef_t *rect, int slot);
 static void CG_AlignTextX( float *x, const char *text, float scale, int align );
 static float CG_AlignTextInRectX( const rectDef_t *rect, float scale, const char *text, int align );
+static void CG_Text_Paint_LimitExt( float *maxX, float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int fontIndex );
 static void CG_Text_Paint_Limit( float *maxX, float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit );
 static qboolean CG_ShowPlayersRemaining( void );
 
@@ -252,6 +253,34 @@ static const char *CG_FormatSignedWholeSeconds( int milliseconds ) {
 	}
 
 	return va( "%s%1.0fs", signPrefix, (double)wholeSeconds );
+}
+
+/*
+=============
+CG_FormatSignedMilliseconds
+
+Formats a signed millisecond delta into the retail `[-]m:ss.mmm` string.
+=============
+*/
+static const char *CG_FormatSignedMilliseconds( int milliseconds ) {
+	unsigned int	absoluteMilliseconds;
+	const char	*signPrefix;
+	const char	*secondPrefix;
+	int		minutes;
+	float		seconds;
+
+	signPrefix = "";
+	absoluteMilliseconds = (unsigned int)milliseconds;
+	if ( milliseconds < 0 ) {
+		signPrefix = "-";
+		absoluteMilliseconds = (unsigned int)( -( milliseconds + 1 ) ) + 1u;
+	}
+
+	minutes = absoluteMilliseconds / 60000u;
+	seconds = ( absoluteMilliseconds % 60000u ) / 1000.0f;
+	secondPrefix = ( seconds < 10.0f ) ? "0" : "";
+
+	return va( "%s%d:%s%.03f", signPrefix, minutes, secondPrefix, seconds );
 }
 
 static void CG_DrawServerSettings(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
@@ -2263,61 +2292,97 @@ void CG_SpectatorFollowCycle( int dir ) {
 
 /*
 =============
-CG_DrawSpectatorPlayerName
+CG_BuildSpectatorPlayerNameText
 
-Renders the tracked spectator player name with an optional backing shader.
+Builds the retail cached spectator scorebox name and applies the fixed
+scorebox truncation threshold.
 =============
 */
-static void CG_DrawSpectatorPlayerName( rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, qhandle_t shader ) {
-	const clientInfo_t *ci = CG_SpectatorClientInfo( slot );
-	vec4_t drawColor;
-	vec4_t modulate;
-	float x;
-	float y;
-	float w;
-	float h;
+static qboolean CG_BuildSpectatorPlayerNameText( int slot, float scale, char *nameBuffer, size_t nameBufferSize ) {
+	char	truncated[40];
+	int	len;
 
-	if ( !rect || !ci ) {
+	if ( !nameBuffer || nameBufferSize == 0 ) {
+		return qfalse;
+	}
+
+	if ( slot == 0 ) {
+		Q_strncpyz( nameBuffer, cgs.firstPlaceName, nameBufferSize );
+	} else if ( slot == 1 ) {
+		Q_strncpyz( nameBuffer, cgs.secondPlaceName, nameBufferSize );
+	} else {
+		nameBuffer[0] = '\0';
+		return qfalse;
+	}
+
+	if ( cgs.gametype == GT_TOURNAMENT && !nameBuffer[0] ) {
+		Q_strncpyz( nameBuffer, "-", nameBufferSize );
+	}
+
+	if ( CG_Text_Width( nameBuffer, scale, 0 ) <= 140 ) {
+		return qtrue;
+	}
+
+	Q_strncpyz( truncated, nameBuffer, sizeof( truncated ) );
+	len = strlen( truncated );
+	while ( len > 0 ) {
+		truncated[len - 1] = '\0';
+		len--;
+		if ( CG_Text_Width( truncated, scale, 0 ) < 132 ) {
+			break;
+		}
+	}
+
+	Com_sprintf( nameBuffer, nameBufferSize, "%s...", truncated );
+	return qtrue;
+}
+
+/*
+=============
+CG_DrawSpectatorPlayerName
+
+Renders the cached retail first/second-player spectator scorebox name.
+=============
+*/
+static void CG_DrawSpectatorPlayerName( rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align ) {
+	char	nameBuffer[40];
+	float	x;
+
+	if ( !rect || !CG_BuildSpectatorPlayerNameText( slot, scale, nameBuffer, sizeof( nameBuffer ) ) ) {
 		return;
 	}
 
-	if ( shader ) {
-		Vector4Set( modulate, 1.0f, 1.0f, 1.0f, 1.0f );
-		x = rect->x;
-		y = rect->y;
-		w = rect->w;
-		h = rect->h;
-		CG_AdjustFrom640( &x, &y, &w, &h );
-		trap_R_SetColor( modulate );
-		trap_R_DrawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, shader );
-		trap_R_SetColor( NULL );
-	}
-
-	Vector4Copy( color, drawColor );
-	if ( CG_SpectatorSlotFollowed( slot ) || CG_SpectatorSlotTracked( slot ) ) {
-		drawColor[3] = 1.0f;
-	}
-
-	CG_Text_Paint( rect->x, rect->y, scale, drawColor, ci->name, 0, 0, textStyle );
+	x = rect->x;
+	CG_AlignTextX( &x, nameBuffer, scale, align );
+	CG_Text_Paint( x, rect->y, scale, color, nameBuffer, 0, 0, textStyle );
 }
 
 /*
 =============
 CG_DrawSpectatorPlayerScore
 
-Draws the tracked spectator player's score value.
+Draws the cached retail first/second-player spectator score value.
 =============
 */
-static void CG_DrawSpectatorPlayerScore( rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot ) {
-	const score_t *score = CG_SpectatorClientScore( slot );
-	char buffer[32];
+static void CG_DrawSpectatorPlayerScore( rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align ) {
+	char	buffer[16];
+	float	x;
+	int	score;
 
-	if ( !rect || !score ) {
+	if ( !rect ) {
 		return;
 	}
 
-	Com_sprintf( buffer, sizeof( buffer ), "%d", score->score );
-	CG_Text_Paint( rect->x, rect->y, scale, color, buffer, 0, 0, textStyle );
+	score = ( slot == 0 ) ? cgs.scores1 : cgs.scores2;
+	if ( score == SCORE_NOT_PRESENT || score == CG_SCORE_FORFEIT ) {
+		Q_strncpyz( buffer, "-", sizeof( buffer ) );
+	} else {
+		Com_sprintf( buffer, sizeof( buffer ), "%d", score );
+	}
+
+	x = rect->x;
+	CG_AlignTextX( &x, buffer, scale, align );
+	CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -2899,7 +2964,7 @@ static int CG_GetConfiguredPlayerCountLimit( void ) {
 	int	playerLimit;
 
 	playerLimit = cgs.maxclients;
-	if ( cgs.gametype == GT_FFA || cgs.gametype == GT_TOURNAMENT || cgs.playerCountTeamSize <= 0 ) {
+	if ( cgs.gametype == GT_TOURNAMENT || cgs.playerCountTeamSize <= 0 ) {
 		return playerLimit;
 	}
 
@@ -2977,63 +3042,6 @@ static unsigned int CG_GetStartingWeaponPreviewMask( void ) {
 	}
 
 	return previewMask;
-}
-
-/*
-=============
-CG_StartingWeaponFromToken
-
-Maps a retail starting-weapon token onto the preview weapon enum.
-=============
-*/
-static weapon_t CG_StartingWeaponFromToken( const char *value ) {
-	if ( !value || !value[0] ) {
-		return WP_NONE;
-	}
-	if ( !Q_stricmp( value, "g" ) || !Q_stricmp( value, "gauntlet" ) ) {
-		return WP_GAUNTLET;
-	}
-	if ( !Q_stricmp( value, "mg" ) || !Q_stricmp( value, "machinegun" ) ) {
-		return WP_MACHINEGUN;
-	}
-	if ( !Q_stricmp( value, "sg" ) || !Q_stricmp( value, "shotgun" ) ) {
-		return WP_SHOTGUN;
-	}
-	if ( !Q_stricmp( value, "gl" ) || !Q_stricmp( value, "grenade_launcher" ) ) {
-		return WP_GRENADE_LAUNCHER;
-	}
-	if ( !Q_stricmp( value, "rl" ) || !Q_stricmp( value, "rocket_launcher" ) ) {
-		return WP_ROCKET_LAUNCHER;
-	}
-	if ( !Q_stricmp( value, "lg" ) || !Q_stricmp( value, "lightning" ) ) {
-		return WP_LIGHTNING;
-	}
-	if ( !Q_stricmp( value, "rg" ) || !Q_stricmp( value, "railgun" ) ) {
-		return WP_RAILGUN;
-	}
-	if ( !Q_stricmp( value, "pg" ) || !Q_stricmp( value, "plasmagun" ) ) {
-		return WP_PLASMAGUN;
-	}
-	if ( !Q_stricmp( value, "bfg" ) ) {
-		return WP_BFG;
-	}
-	if ( !Q_stricmp( value, "gh" ) || !Q_stricmp( value, "grappling_hook" ) ) {
-		return WP_GRAPPLING_HOOK;
-	}
-	if ( !Q_stricmp( value, "ng" ) || !Q_stricmp( value, "nailgun" ) ) {
-		return WP_NAILGUN;
-	}
-	if ( !Q_stricmp( value, "pl" ) || !Q_stricmp( value, "prox_launcher" ) ) {
-		return WP_PROX_LAUNCHER;
-	}
-	if ( !Q_stricmp( value, "cg" ) || !Q_stricmp( value, "chaingun" ) ) {
-		return WP_CHAINGUN;
-	}
-	if ( !Q_stricmp( value, "hmg" ) || !Q_stricmp( value, "heavy_machinegun" ) ) {
-		return WP_HEAVY_MACHINEGUN;
-	}
-
-	return WP_NONE;
 }
 
 /*
@@ -3334,7 +3342,7 @@ Draws the retail icon-strip loadout preview plus the queued primary weapon.
 */
 static void CG_DrawStartingWeapons(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
 	unsigned int	loadoutMask;
-	weapon_t	primaryWeapon;
+	int		primaryIndex;
 	int		i;
 	float		xOffset;
 	float		plusX;
@@ -3367,12 +3375,7 @@ static void CG_DrawStartingWeapons(rectDef_t *rect, float text_x, float text_y, 
 		xOffset += rect->w * 1.5f;
 	}
 
-	primaryWeapon = CG_StartingWeaponFromToken( cg_weaponPrimaryQueued.string );
-	if ( primaryWeapon == WP_NONE && cg_weaponPrimary.integer > WP_NONE && cg_weaponPrimary.integer < WP_NUM_WEAPONS ) {
-		primaryWeapon = (weapon_t)cg_weaponPrimary.integer;
-	}
-
-	if ( !CG_LoadoutsEnabled() || primaryWeapon == WP_NONE ) {
+	if ( !CG_LoadoutsEnabled() ) {
 		return;
 	}
 
@@ -3384,7 +3387,12 @@ static void CG_DrawStartingWeapons(rectDef_t *rect, float text_x, float text_y, 
 	plusY = rect->y + rect->h * 0.5f + CG_Text_Height( "+", scale, 0 ) * 0.5f;
 	CG_Text_Paint( plusX, plusY, scale, color, "+", 0, 0, textStyle );
 
-	shader = CG_GetStartingWeaponIconHandle( primaryWeapon );
+	primaryIndex = cg.weaponPrimary;
+	if ( primaryIndex <= 0 || primaryIndex > CG_STARTING_WEAPON_ICON_COUNT ) {
+		primaryIndex = CG_STARTING_WEAPON_ICON_COUNT;
+	}
+
+	shader = CG_GetStartingWeaponIconHandle( cgStartingWeaponIcons[primaryIndex - 1].weapon );
 	if ( shader == 0 ) {
 		return;
 	}
@@ -3434,7 +3442,7 @@ static void CG_DrawGameLimit( rectDef_t *rect, float scale, vec4_t color, int te
 	if ( align == ITEM_ALIGN_CENTER ) {
 		x -= CG_Text_Width( buffer, scale, 0 ) * 0.5f;
 	}
-	CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );
+	CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -3686,10 +3694,12 @@ Builds the retail phase-plus-status text used by the match-status ownerdraw.
 */
 const char *CG_GetMatchStatusText( void ) {
 	static char	buffer[256];
-	const char	*status;
 	const char	*phase;
+	const char	*leaderName;
+	int		redScore;
+	int		blueScore;
+	int		score;
 
-	phase = CG_GetMatchPhaseText();
 	if ( cg.snap && cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		phase = "MATCH SUMMARY";
 	} else if ( cg.warmup != 0 ) {
@@ -3697,12 +3707,59 @@ const char *CG_GetMatchStatusText( void ) {
 	} else {
 		phase = "MATCH IN PROGRESS";
 	}
-	status = CG_GetGameStatusText();
-	if ( !status || !status[0] ) {
+
+	if ( cgs.scores1 == SCORE_NOT_PRESENT && cgs.scores2 == SCORE_NOT_PRESENT &&
+		( cgs.gametype < GT_TEAM || cgs.gametype == GT_RED_ROVER ) ) {
 		return phase;
 	}
 
-	Com_sprintf( buffer, sizeof( buffer ), "%s - %s", phase, status );
+	if ( cgs.gametype == GT_RACE ) {
+		if ( cgs.scores1 == 0x7fffffff || cgs.scores1 <= 0 ) {
+			return phase;
+		}
+
+		Com_sprintf( buffer, sizeof( buffer ), "%s - %s^7 leads with a score of %s",
+			phase, "", CG_FormatSignedMilliseconds( cgs.scores1 ) );
+		return buffer;
+	}
+
+	if ( cgs.gametype >= GT_TEAM && cgs.gametype != GT_RED_ROVER ) {
+		redScore = cg.teamScores[0];
+		blueScore = cg.teamScores[1];
+
+		if ( redScore == blueScore ) {
+			Com_sprintf( buffer, sizeof( buffer ), "%s - Teams are tied at %i", phase, redScore );
+		} else if ( redScore > blueScore ) {
+			Com_sprintf( buffer, sizeof( buffer ), "%s - ^1Red^7 leads ^4Blue^7, %i to %i",
+				phase, redScore, blueScore );
+		} else {
+			Com_sprintf( buffer, sizeof( buffer ), "%s - ^4Blue^7 leads ^1Red^7, %i to %i",
+				phase, blueScore, redScore );
+		}
+		return buffer;
+	}
+
+	if ( cg.snap && cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
+		if ( cgs.scores1 != SCORE_NOT_PRESENT ) {
+			score = cgs.scores1;
+			leaderName = cgs.firstPlaceName;
+		} else {
+			score = cgs.scores2;
+			leaderName = cgs.secondPlaceName;
+		}
+
+		Com_sprintf( buffer, sizeof( buffer ), "%s - %s leads with %i", phase, leaderName, score );
+		return buffer;
+	}
+
+	if ( !cg.snap ) {
+		return phase;
+	}
+
+	Com_sprintf( buffer, sizeof( buffer ), "%s - %s place with %i",
+		phase,
+		CG_PlaceString( cg.snap->ps.persistant[PERS_RANK] + 1 ),
+		cg.snap->ps.persistant[PERS_SCORE] );
 	return buffer;
 }
 
@@ -5754,12 +5811,28 @@ static int CG_GetPlacementFragCount( const score_t *score ) {
 
 /*
 =============
-CG_ClientReadyOnIntermission
+cgSpectatorStatus_t
 
-Reports whether a client has marked ready during intermission.
+Retail status-image states for the first/second-player duel scorebox slots.
 =============
 */
-static qboolean CG_ClientReadyOnIntermission( int clientNum ) {
+typedef enum {
+	CG_SPECTATOR_STATUS_READY,
+	CG_SPECTATOR_STATUS_NOTREADY,
+	CG_SPECTATOR_STATUS_LEADS,
+	CG_SPECTATOR_STATUS_TIED,
+	CG_SPECTATOR_STATUS_TRAILS
+} cgSpectatorStatus_t;
+
+/*
+=============
+CG_ClientReadyForScoreboxStatus
+
+Reports whether a client is marked ready in the snapshot bitmask consumed by
+warmup and intermission scorebox status ownerdraws.
+=============
+*/
+static qboolean CG_ClientReadyForScoreboxStatus( int clientNum ) {
 	if ( !cg.snap ) {
 		return qfalse;
 	}
@@ -5773,47 +5846,108 @@ static qboolean CG_ClientReadyOnIntermission( int clientNum ) {
 
 /*
 =============
-CG_BuildSpectatorStatusText
+CG_GetSpectatorStatusShader
 
-Builds the retail duel scorebox status text and tint for the requested slot.
+Returns the retail first/second-player status backing image for the requested
+scorebox state.
 =============
 */
-static qboolean CG_BuildSpectatorStatusText( int slot, char *buffer, size_t bufferSize, vec4_t color ) {
-	const score_t	*score;
-	qboolean	liveDuel;
+static qhandle_t CG_GetSpectatorStatusShader( int slot, cgSpectatorStatus_t status ) {
+	if ( slot == 0 ) {
+		switch ( status ) {
+		case CG_SPECTATOR_STATUS_READY:
+			return cgs.media.scoreFirstPlayerReadyShader;
+		case CG_SPECTATOR_STATUS_LEADS:
+			return cgs.media.scoreFirstPlayerLeadsShader;
+		case CG_SPECTATOR_STATUS_TIED:
+			return cgs.media.scoreFirstPlayerTiedShader;
+		case CG_SPECTATOR_STATUS_TRAILS:
+			return cgs.media.scoreFirstPlayerTrailsShader;
+		case CG_SPECTATOR_STATUS_NOTREADY:
+		default:
+			return cgs.media.scoreFirstPlayerNotReadyShader;
+		}
+	}
 
-	if ( !buffer || bufferSize <= 0 || !color ) {
+	if ( slot == 1 ) {
+		switch ( status ) {
+		case CG_SPECTATOR_STATUS_READY:
+			return cgs.media.scoreSecondPlayerReadyShader;
+		case CG_SPECTATOR_STATUS_LEADS:
+			return cgs.media.scoreSecondPlayerLeadsShader;
+		case CG_SPECTATOR_STATUS_TIED:
+			return cgs.media.scoreSecondPlayerTiedShader;
+		case CG_SPECTATOR_STATUS_TRAILS:
+			return cgs.media.scoreSecondPlayerTrailsShader;
+		case CG_SPECTATOR_STATUS_NOTREADY:
+		default:
+			return cgs.media.scoreSecondPlayerNotReadyShader;
+		}
+	}
+
+	return 0;
+}
+
+/*
+=============
+CG_BuildSpectatorStatusText
+
+Builds the retail duel scorebox status text and backing image for the requested
+slot.
+=============
+*/
+static qboolean CG_BuildSpectatorStatusText( int slot, char *buffer, size_t bufferSize, qhandle_t *shader ) {
+	const score_t	*score;
+	cgSpectatorStatus_t	status;
+	qboolean		liveDuel;
+
+	if ( !buffer || bufferSize <= 0 ) {
 		return qfalse;
 	}
 
 	buffer[0] = '\0';
+	status = CG_SPECTATOR_STATUS_NOTREADY;
 	score = CG_SpectatorClientScore( slot );
 	if ( !score ) {
-		return qfalse;
-	}
-
-	liveDuel = ( cgs.gametype == GT_TOURNAMENT && cg.snap && cg.snap->ps.pm_type != PM_INTERMISSION ) ? qtrue : qfalse;
-	if ( liveDuel ) {
-		if ( cgs.scores1 == cgs.scores2 ) {
-			Q_strncpyz( buffer, "TIED", bufferSize );
-			Vector4Set( color, 1.0f, 1.0f, 1.0f, 1.0f );
-		} else if ( ( slot == 0 && cgs.scores1 > cgs.scores2 ) || ( slot == 1 && cgs.scores2 > cgs.scores1 ) ) {
-			Q_strncpyz( buffer, "LEADS", bufferSize );
-			Vector4Set( color, 0.55f, 0.9f, 0.55f, 1.0f );
-		} else {
-			Q_strncpyz( buffer, "TRAILS", bufferSize );
-			Vector4Set( color, 1.0f, 0.45f, 0.45f, 1.0f );
+		if ( cgs.gametype != GT_TOURNAMENT ) {
+			return qfalse;
 		}
-
+		if ( shader ) {
+			*shader = CG_GetSpectatorStatusShader( slot, status );
+		}
 		return qtrue;
 	}
 
-	if ( CG_ClientReadyOnIntermission( score->client ) ) {
+	liveDuel = ( cgs.gametype == GT_TOURNAMENT && cg.warmup == 0 && cg.snap &&
+		cg.snap->ps.pm_type != PM_INTERMISSION ) ? qtrue : qfalse;
+	if ( liveDuel ) {
+		if ( cgs.scores1 == cgs.scores2 ) {
+			Q_strncpyz( buffer, "TIED", bufferSize );
+			status = CG_SPECTATOR_STATUS_TIED;
+		} else if ( ( slot == 0 && cgs.scores1 > cgs.scores2 ) || ( slot == 1 && cgs.scores2 > cgs.scores1 ) ) {
+			Q_strncpyz( buffer, "LEADS", bufferSize );
+			status = CG_SPECTATOR_STATUS_LEADS;
+		} else {
+			Q_strncpyz( buffer, "TRAILS", bufferSize );
+			status = CG_SPECTATOR_STATUS_TRAILS;
+		}
+
+		if ( shader ) {
+			*shader = CG_GetSpectatorStatusShader( slot, status );
+		}
+		return qtrue;
+	}
+
+	if ( CG_ClientReadyForScoreboxStatus( score->client ) ) {
 		Q_strncpyz( buffer, "READY", bufferSize );
-		Vector4Set( color, 0.55f, 0.9f, 0.55f, 1.0f );
+		status = CG_SPECTATOR_STATUS_READY;
 	} else {
 		Q_strncpyz( buffer, "NOT READY", bufferSize );
-		Vector4Set( color, 0.8f, 0.8f, 0.8f, 1.0f );
+		status = CG_SPECTATOR_STATUS_NOTREADY;
+	}
+
+	if ( shader ) {
+		*shader = CG_GetSpectatorStatusShader( slot, status );
 	}
 
 	return qtrue;
@@ -5828,15 +5962,19 @@ Paints the retail duel scorebox status label for the requested tracked slot.
 */
 static void CG_DrawSpectatorStatusLabel( rectDef_t *rect, int slot ) {
 	char	buffer[16];
-	vec4_t	color;
+	qhandle_t	shader;
 	float	x;
 
-	if ( !rect || !CG_BuildSpectatorStatusText( slot, buffer, sizeof( buffer ), color ) ) {
+	if ( !rect || !CG_BuildSpectatorStatusText( slot, buffer, sizeof( buffer ), &shader ) ) {
 		return;
 	}
 
+	if ( shader ) {
+		CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );
+	}
+
 	x = rect->x + ( rect->w - CG_Text_Width( buffer, 0.16f, 0 ) ) * 0.5f;
-	CG_Text_Paint( x, rect->y + rect->h, 0.16f, color, buffer, 0, 0, 3 );
+	CG_Text_Paint( x, rect->y + rect->h, 0.16f, colorWhite, buffer, 0, 0, 3 );
 }
 
 /*
@@ -6787,7 +6925,6 @@ static void CG_DrawFollowPlayerNameEx(rectDef_t *rect, float scale, vec4_t color
 	vec4_t drawColor;
 	char buffer[64];
 	float x;
-	float width;
 
 	if ( !rect || !ci ) {
 		return;
@@ -6806,12 +6943,7 @@ static void CG_DrawFollowPlayerNameEx(rectDef_t *rect, float scale, vec4_t color
 	}
 
 	x = rect->x;
-	width = (float)CG_Text_Width( buffer, scale, 0 );
-	if ( align == ITEM_ALIGN_CENTER ) {
-		x = rect->x + ( rect->w - width ) * 0.5f;
-	} else if ( align == ITEM_ALIGN_RIGHT ) {
-		x = rect->x + rect->w - width;
-	}
+	CG_AlignTextX( &x, buffer, scale, align );
 
 	CG_Text_Paint( x, rect->y, scale, drawColor, buffer, 0, 0, textStyle );
 }
@@ -10060,31 +10192,31 @@ static void CG_DrawPlacementScoreLine( rectDef_t *rect, float scale, vec4_t colo
 
 	x = rect->x;
 	if ( rankText && rankText[0] ) {
-		CG_Text_Paint( x, rect->y, scale, color, rankText, 0, 0, textStyle );
-		x += CG_Text_Width( rankText, scale, 0 );
+		CG_Text_PaintExt( x, rect->y, scale, color, rankText, 0.0f, 0, textStyle, FONT_DEFAULT );
+		x += CG_Text_WidthExt( rankText, scale, 0, FONT_DEFAULT );
 	}
 
 	if ( !valueText || !valueText[0] ) {
 		if ( nameText && nameText[0] ) {
-			CG_Text_Paint( x, rect->y, scale, color, nameText, 0, 0, textStyle );
+			CG_Text_PaintExt( x, rect->y, scale, color, nameText, 0.0f, 0, textStyle, FONT_DEFAULT );
 		}
 		return;
 	}
 
-	valueX = rect->x + rect->w - CG_Text_Width( valueText, scale, 0 );
+	valueX = rect->x + rect->w - CG_Text_WidthExt( valueText, scale, 0, FONT_DEFAULT );
 	if ( nameText && nameText[0] && valueX > x ) {
-		ellipsisWidth = CG_Text_Width( "...", scale, 0 );
-		if ( CG_Text_Width( nameText, scale, 0 ) <= valueX - x ) {
-			CG_Text_Paint( x, rect->y, scale, color, nameText, 0, 0, textStyle );
+		ellipsisWidth = CG_Text_WidthExt( "...", scale, 0, FONT_DEFAULT );
+		if ( CG_Text_WidthExt( nameText, scale, 0, FONT_DEFAULT ) <= valueX - x ) {
+			CG_Text_PaintExt( x, rect->y, scale, color, nameText, 0.0f, 0, textStyle, FONT_DEFAULT );
 		} else if ( valueX - x > ellipsisWidth ) {
 			ellipsisX = valueX - ellipsisWidth;
 			maxX = ellipsisX;
-			CG_Text_Paint_Limit( &maxX, x, rect->y, scale, color, nameText, 0, 0 );
-			CG_Text_Paint( ellipsisX, rect->y, scale, color, "...", 0, 0, textStyle );
+			CG_Text_Paint_LimitExt( &maxX, x, rect->y, scale, color, nameText, 0.0f, 0, FONT_DEFAULT );
+			CG_Text_PaintExt( ellipsisX, rect->y, scale, color, "...", 0.0f, 0, textStyle, FONT_DEFAULT );
 		}
 	}
 
-	CG_Text_Paint( valueX, rect->y, scale, color, valueText, 0, 0, textStyle );
+	CG_Text_PaintExt( valueX, rect->y, scale, color, valueText, 0.0f, 0, textStyle, FONT_DEFAULT );
 }
 
 /*
@@ -10287,12 +10419,12 @@ static void CG_DrawGameType( rectDef_t *rect, float scale, vec4_t color, int tex
 
 /*
 =============
-CG_Text_Paint_Limit
+CG_Text_Paint_LimitExt
 
-Renders text up to a character limit while honoring inline color codes.
+Renders text up to a character limit with an explicit host font bucket.
 =============
 */
-static void CG_Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t color, const char* text, float adjust, int limit) {
+static void CG_Text_Paint_LimitExt( float *maxX, float x, float y, float scale, vec4_t color, const char* text, float adjust, int limit, int fontIndex ) {
 	char limitedText[1024];
 	const char *s;
 	const char *limitEnd;
@@ -10362,7 +10494,7 @@ static void CG_Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4
 	CG_AdjustFrom640( &screenMaxX, NULL, NULL, NULL );
 	CG_AdjustFrom640( &xBias, NULL, &xScale, &yScale );
 
-	fontHandle = CG_SelectTextFontHandle( scale, ITEM_FONT_INHERIT );
+	fontHandle = CG_SelectTextFontHandle( scale, fontIndex );
 
 	trap_R_SetColor( color );
 	trap_QL_DrawScaledText(
@@ -10381,6 +10513,17 @@ static void CG_Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4
 	} else {
 		*maxX = 0.0f;
 	}
+}
+
+/*
+=============
+CG_Text_Paint_Limit
+
+Renders text up to a character limit while honoring inline color codes.
+=============
+*/
+static void CG_Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t color, const char* text, float adjust, int limit) {
+	CG_Text_Paint_LimitExt( maxX, x, y, scale, color, text, adjust, limit, ITEM_FONT_INHERIT );
 }
 
 
@@ -11117,17 +11260,11 @@ rect.y = y;
 		CG_DrawMatchState(&rect, scale, color, textStyle);
 		break;
 	case CG_1ST_PLYR: {
-		qhandle_t nameShader = shader;
-
-		if ( !nameShader && cg.competitiveHudLoaded ) {
-			nameShader = cgs.media.inkFadeLeftShader;
-		}
-
-		CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 0, nameShader);
+		CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 0, align);
 		break;
 	}
 	case CG_1ST_PLYR_SCORE:
-		CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 0);
+		CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 0, align);
 		break;
 	case CG_1ST_PLYR_TIME:
 	case CG_1ST_PLYR_TIMEOUT_COUNT:
@@ -11140,17 +11277,11 @@ rect.y = y;
 		CG_DrawPlacementAvatarOwnerDraw( &rect, 0 );
 		break;
 	case CG_2ND_PLYR: {
-		qhandle_t nameShader = shader;
-
-		if ( !nameShader && cg.competitiveHudLoaded ) {
-			nameShader = cgs.media.inkFadeRightShader;
-		}
-
-		CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 1, nameShader);
+		CG_DrawSpectatorPlayerName(&rect, scale, color, textStyle, 1, align);
 		break;
 	}
 	case CG_2ND_PLYR_SCORE:
-		CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 1);
+		CG_DrawSpectatorPlayerScore(&rect, scale, color, textStyle, 1, align);
 		break;
 	case CG_2ND_PLYR_TIMEOUT_COUNT:
 		/* Retail has no raw ownerdraw 0xcd helper route. */

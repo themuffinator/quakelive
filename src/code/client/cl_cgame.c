@@ -5280,9 +5280,8 @@ qboolean CL_IsSteamIdentityMuted( unsigned int identityLow, unsigned int identit
 QL_CG_trap_Cvar_RegisterRange
 ==============
 */
-static void QDECL QL_CG_trap_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, float minimumValue, float maximumValue, int flags ) {
-	(void)minimumValue;
-	(void)maximumValue;
+static void QDECL QL_CG_trap_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {
+	Cvar_GetBounded( varName, defaultValue, minimumValue, maximumValue, flags );
 	Cvar_Register( vmCvar, varName, defaultValue, flags );
 }
 

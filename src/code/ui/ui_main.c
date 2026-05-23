@@ -4125,46 +4125,6 @@ static int UI_StartingWeaponIndexFromToken( const char *value ) {
 		}
 	}
 
-	if ( !Q_stricmp( token, "gauntlet" ) ) {
-		return 1;
-	}
-	if ( !Q_stricmp( token, "machinegun" ) ) {
-		return 2;
-	}
-	if ( !Q_stricmp( token, "shotgun" ) ) {
-		return 3;
-	}
-	if ( !Q_stricmp( token, "grenade" ) || !Q_stricmp( token, "grenade_launcher" ) ) {
-		return 4;
-	}
-	if ( !Q_stricmp( token, "rocket" ) || !Q_stricmp( token, "rocket_launcher" ) ) {
-		return 5;
-	}
-	if ( !Q_stricmp( token, "lightning" ) ) {
-		return 6;
-	}
-	if ( !Q_stricmp( token, "railgun" ) ) {
-		return 7;
-	}
-	if ( !Q_stricmp( token, "plasma" ) || !Q_stricmp( token, "plasmagun" ) ) {
-		return 8;
-	}
-	if ( !Q_stricmp( token, "grapple" ) || !Q_stricmp( token, "grappling_hook" ) ) {
-		return 10;
-	}
-	if ( !Q_stricmp( token, "nailgun" ) ) {
-		return 11;
-	}
-	if ( !Q_stricmp( token, "prox" ) || !Q_stricmp( token, "proxlauncher" ) || !Q_stricmp( token, "prox_launcher" ) ) {
-		return 12;
-	}
-	if ( !Q_stricmp( token, "chaingun" ) ) {
-		return 13;
-	}
-	if ( !Q_stricmp( token, "heavy_machinegun" ) ) {
-		return 14;
-	}
-
 	return 0;
 }
 

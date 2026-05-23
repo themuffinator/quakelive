@@ -84,6 +84,7 @@ def test_attack_defend_objective_and_damage_paths_call_retail_helpers() -> None:
 	assert "level.adRoundState = AD_ROUNDSTATE_COMPLETE;" in team_c
 	assert "G_ADUpdateScoreHistory();" in team_c
 	assert "G_ADPublishScoreHistory();" in team_c
+	assert "mercyLimitMsec = G_BuildExitRuleLimitMsec( g_mercytime.integer, level.overtimeAccumulatedMsec );" in team_c
 	assert 'trap_SendServerCommand( -1, "print \\"Red hit the scorelimit.\\n\\"" );' in team_c
 	assert 'trap_SendServerCommand( -1, "print \\"Blue hit the mercylimit.\\n\\"" );' in team_c
 

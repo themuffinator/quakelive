@@ -2933,26 +2933,49 @@ void CG_ParseServerinfo( void ) {
 
 /*
 ==================
+CG_WarmupUsesSoloPrepareSound
+==================
+*/
+static qboolean CG_WarmupUsesSoloPrepareSound( int warmupGametype ) {
+	int		gametype;
+
+	if ( warmupGametype >= GT_TEAM ) {
+		return qfalse;
+	}
+
+	gametype = cgs.gametype;
+	return (qboolean)( gametype < GT_TEAM || warmupGametype == GT_TOURNAMENT || gametype == GT_RED_ROVER );
+}
+
+/*
+==================
 CG_ParseWarmup
 ==================
 */
 static void CG_ParseWarmup( void ) {
 	const char	*info;
-	int			warmup;
+	char		*cursor;
+	const char	*token;
+	int		warmup;
+	int		warmupGametype;
 
 	info = CG_ConfigString( CS_WARMUP );
+	cursor = (char *)info;
 
-	warmup = atoi( info );
+	token = COM_Parse( &cursor );
+	warmup = atoi( token );
+	token = COM_Parse( &cursor );
+	warmupGametype = token[0] ? atoi( token ) : -1;
+
+	cgs.warmupGametype = warmupGametype;
+	cgs.matchRoundNumber = 0;
 	cg.warmupCount = -1;
 
-	if ( warmup == 0 && cg.warmup ) {
-
-	} else if ( warmup > 0 && cg.warmup <= 0 ) {
-		if ( cgs.gametype >= GT_CTF ) {
-			trap_S_StartLocalSound( cgs.media.countPrepareTeamSound, CHAN_ANNOUNCER );
-		} else
-		{
+	if ( warmup > 0 && cg.warmup <= 0 ) {
+		if ( CG_WarmupUsesSoloPrepareSound( warmupGametype ) ) {
 			trap_S_StartLocalSound( cgs.media.countPrepareSound, CHAN_ANNOUNCER );
+		} else {
+			trap_S_StartLocalSound( cgs.media.countPrepareTeamSound, CHAN_ANNOUNCER );
 		}
 	}
 
@@ -3933,7 +3956,7 @@ void CG_SetConfigValues( void ) {
 		s = CG_ConfigString( CS_FLAGSTATUS );
 		cgs.flagStatus = s[0] - '0';
 	}
-	cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );
+	CG_ParseWarmup();
 	CG_ParseMatchState();
 	CG_ParseRoundStartTimeConfigString();
 	CG_ParseTimeoutConfigStrings();
@@ -4228,10 +4251,7 @@ static void CG_MapRestart( void ) {
 	cg.attackerTime = 0;
 
 	cg.intermissionStarted = qfalse;
-	cg.intermissionLetterboxChangeTime = 0;
-	cg.intermissionLetterboxDuration = 0;
-	cg.intermissionLetterboxStartHeight = 0.0f;
-	cg.intermissionLetterboxTargetHeight = 0.0f;
+	CG_ResetIntermissionLetterboxState();
 
 	cgs.voteTime = 0;
 	cgs.voteYes = 0;

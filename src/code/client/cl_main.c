@@ -7140,19 +7140,8 @@ void CL_InitRenderer( void ) {
 		Com_Printf( S_COLOR_YELLOW "WARNING: CL_InitRenderer failed to register charSetShader.\n" );
 	}
 	cls.whiteShader = re.RegisterShader( "white" );
+	cls.consoleShader = re.RegisterShader( "console" );
 	cls.recordShader = re.RegisterShaderNoMip( "icons/record" );
-	cls.consoleShader = re.RegisterShaderNoMip( "console" );
-	if ( !cls.consoleShader ) {
-		cls.consoleShader = re.RegisterShaderNoMip( "textures/effects2/console01.png" );
-	}
-	if ( !cls.consoleShader ) {
-		cls.consoleShader = re.RegisterShaderNoMip( "textures/effects2/console01.tga" );
-	}
-	if ( cls.consoleShader ) {
-		Com_Printf( "CL_InitRenderer: loaded consoleShader handle %d\n", cls.consoleShader );
-	} else {
-		Com_Printf( S_COLOR_YELLOW "WARNING: CL_InitRenderer failed to register consoleShader.\n" );
-	}
 	{
 		float consoleScale;
 

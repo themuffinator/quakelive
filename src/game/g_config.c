@@ -8,6 +8,8 @@
 #define ARRAY_LEN( x ) ( sizeof( x ) / sizeof( (x)[0] ) )
 #endif
 
+#define CONFIG_CVAR_FLAG_FACTORY_MANAGED 0x00100000
+
 #define DEFAULT_STARTING_AMMO_BFG           10
 #define DEFAULT_STARTING_AMMO_CG            100
 #define DEFAULT_STARTING_AMMO_G             -1
@@ -87,8 +89,8 @@
 #define DEFAULT_MACHINEGUN_IRONSIGHTS_SCALE 1.0f
 #define DEFAULT_PROX_MINE_TIMEOUT         20000
 
-#define DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS      500
-#define DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS      3500
+#define DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS      2100
+#define DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS      2400
 #define DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS     0
 #define DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS      100
 #define DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS      0
@@ -235,8 +237,8 @@ static configCvarTable_t s_configCvarTable[] = {
 	{ &g_ammoRespawn,          "g_ammoRespawn",          STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ), CVAR_ARCHIVE, "Seconds before ammo entities respawn; Quake Live factories reduce this for faster loops." },
 	{ &g_suddenDeathRespawn,   "g_suddenDeathRespawn",   STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_ARCHIVE, "Allow ammo to continue respawning during sudden death when set to 1." },
 	{ &g_startingHealthBonus,  "g_startingHealthBonus",  STRINGIZE( DEFAULT_STARTING_HEALTH_BONUS ), CVAR_ARCHIVE, "Extra health layered on top of the base value during spawns." },
-	{ &g_respawn_delay_min,    "g_respawn_delay_min",    STRINGIZE( DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS ), CVAR_ARCHIVE, "Minimum respawn delay in milliseconds applied when factories gate staggered spawns." },
-	{ &g_respawn_delay_max,    "g_respawn_delay_max",    STRINGIZE( DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS ), CVAR_ARCHIVE, "Maximum respawn delay in milliseconds enforced by queue-driven factories." },
+	{ &g_respawn_delay_min,    "g_respawn_delay_min",    STRINGIZE( DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS ), CONFIG_CVAR_FLAG_FACTORY_MANAGED, "Minimum delay in milliseconds before a dead player may respawn." },
+	{ &g_respawn_delay_max,    "g_respawn_delay_max",    STRINGIZE( DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS ), CONFIG_CVAR_FLAG_FACTORY_MANAGED, "Post-minimum grace window in milliseconds before dead players auto-respawn." },
 	{ &g_regenHealth,          "g_regenHealth",          STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ), CVAR_ARCHIVE, "Milliseconds after taking damage before factory health regeneration begins." },
 	{ &g_regenHealthRate,      "g_regenHealthRate",      STRINGIZE( DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS ), CVAR_ARCHIVE, "Milliseconds per health point while factory health regeneration is active; Quake Live Domination factories use 133." },
 	{ &g_regenArmor,           "g_regenArmor",           STRINGIZE( DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS ), CVAR_ARCHIVE, "Milliseconds after taking damage before factory armor regeneration begins." },
@@ -337,9 +339,9 @@ void G_Config_UpdateCvars( void ) {
 =============
 G_Config_ResetFactoryManagedCvars
 
-Restores the factory-managed loadout, rune, regen, item spawn, and weapon
-reload toggles to their compiled defaults before a factory selection layers
-overrides.
+Restores the factory-managed loadout, rune, ammo mode, respawn, regen, item
+spawn, and weapon reload toggles to their compiled defaults before a factory
+selection layers overrides.
 =============
 */
 void G_Config_ResetFactoryManagedCvars( void ) {
@@ -360,6 +362,11 @@ void G_Config_ResetFactoryManagedCvars( void ) {
 	trap_Cvar_Set( "weapon_reload_hmg", "0" );
 	trap_Cvar_Set( "g_loadout", STRINGIZE( DEFAULT_FACTORY_LOADOUT ) );
 	trap_Cvar_Set( "g_runes", STRINGIZE( DEFAULT_FACTORY_RUNES ) );
+	trap_Cvar_Set( "g_ammoPack", STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ) );
+	trap_Cvar_Set( "g_ammoPackHack", STRINGIZE( DEFAULT_AMMO_PACK_HACK ) );
+	trap_Cvar_Set( "g_ammoRespawn", STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ) );
+	trap_Cvar_Set( "g_respawn_delay_min", STRINGIZE( DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS ) );
+	trap_Cvar_Set( "g_respawn_delay_max", STRINGIZE( DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS ) );
 	trap_Cvar_Set( "g_regenHealth", STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ) );
 	trap_Cvar_Set( "g_regenHealthRate", STRINGIZE( DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS ) );
 	trap_Cvar_Set( "g_regenArmor", STRINGIZE( DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS ) );
@@ -591,9 +598,6 @@ static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {
         config.complaintLimit = G_ReadFactoryNonNegativeCvar( &g_complaintLimit, DEFAULT_COMPLAINT_LIMIT, "g_complaintLimit" );
         config.respawnDelayMinMilliseconds = G_ReadFactoryNonNegativeCvar( &g_respawn_delay_min, DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS, "g_respawn_delay_min" );
         config.respawnDelayMaxMilliseconds = G_ReadFactoryNonNegativeCvar( &g_respawn_delay_max, DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS, "g_respawn_delay_max" );
-        if ( config.respawnDelayMaxMilliseconds < config.respawnDelayMinMilliseconds ) {
-                config.respawnDelayMaxMilliseconds = config.respawnDelayMinMilliseconds;
-        }
 	config.regenHealthDelayMilliseconds = G_ReadFactoryNonNegativeCvar( &g_regenHealth, DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS, "g_regenHealth" );
 	config.regenHealthRateMilliseconds = G_ReadFactoryNonNegativeCvar( &g_regenHealthRate, DEFAULT_REGEN_HEALTH_RATE_MILLISECONDS, "g_regenHealthRate" );
 	config.regenArmorDelayMilliseconds = G_ReadFactoryNonNegativeCvar( &g_regenArmor, DEFAULT_REGEN_ARMOR_DELAY_MILLISECONDS, "g_regenArmor" );

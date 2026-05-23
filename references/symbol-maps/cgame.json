@@ -2024,7 +2024,7 @@
       "signature": "static void CG_DrawWarmup(void)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Warmup and ready-up banner renderer. HLIL keeps the same waiting-for-players and ready prompt families, including the retail `The wanking will begin` copy, the raw `readyup` bind lookup, the `(readyDeadline - cg.time) / 1000 + 1` prompt countdown, team-size readiness gates, gametype title selection, and final countdown draw path that define `cg_draw.c::CG_DrawWarmup`."
+      "comment": "Warmup and ready-up banner renderer. HLIL keeps the same waiting-for-players and ready prompt families, including the retail `The match will begin` copy, the raw `readyup` bind lookup, the `(readyDeadline - cg.time) / 1000 + 1` prompt countdown, team-size readiness gates, warmup-gametype override selection, and final countdown draw path that define `cg_draw.c::CG_DrawWarmup`."
     },
     {
       "address": "0x1000FAB0",
@@ -2429,7 +2429,7 @@
       "signature": "static void CG_DamagePlum(vec3_t org, int damage, weapon_t weapon)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic name for the retail damage-plum producer reached only from `EV_DAMAGEPLUM`. HLIL shows a local-player gate ahead of the callsite, a damage-plum weapon-bit filter, damage-or-weapon color selection, stringification of the damage value, and randomized origin jitter before the floating text record is queued. Current source now reconstructs that seam through a staged `EV_DAMAGEPLUM` bridge, but it still routes the visible effect through `LE_SCOREPLUM` with a custom tint flag until the retail world-marker queue helpers land cleanly."
+      "comment": "Deliberate synthetic name for the retail damage-plum producer reached only from `EV_DAMAGEPLUM`. HLIL shows a local-player gate ahead of the callsite, a damage-plum weapon-bit filter, damage-or-weapon color selection, stringification of the damage value, seeded origin jitter, and screen-space floating-text motion before the queued world-marker record is drawn. Current source reconstructs that seam through the staged `EV_DAMAGEPLUM` bridge and the recovered queued world-marker slab rather than the GPL `LE_SCOREPLUM` path."
     },
     {
       "address": "0x10013E60",
@@ -4287,7 +4287,7 @@
         "0x100707D8"
       ],
       "relocation_refs": [],
-      "comment": "Active-player counter ownerdraw. HLIL counts valid clientinfo rows, falls back to maxclients for FFA, Tournament, and unset team-size modes, doubles and clamps the team-size cap for team modes, and paints the `%d/%d Players` summary carried by `cg_newdraw.c::CG_DrawPlayerCounts`."
+      "comment": "Active-player counter ownerdraw. HLIL counts valid clientinfo rows, falls back to maxclients for Tournament and unset team-size modes, doubles and clamps the team-size cap for team modes, and paints the `%d/%d Players` summary carried by `cg_newdraw.c::CG_DrawPlayerCounts`."
     },
     {
       "address": "0x10033040",
@@ -4377,7 +4377,7 @@
         "0x10070848"
       ],
       "relocation_refs": [],
-      "comment": "Retail legacy `CG_GAME_LIMIT` ownerdraw that selects one of the exact `Cap Limit`, `Frag Limit`, `Round Limit`, or `Score Limit` formats from cached serverinfo mirrors (`data_10A3FF38`, `data_10A3FF34`, `data_10A3FF48`, `data_10A3FF54`), then applies the center-only width adjustment when the ownerdraw align argument is `ITEM_ALIGN_CENTER`; source now mirrors that narrowed label family and cache dependency directly."
+      "comment": "Retail legacy `CG_GAME_LIMIT` ownerdraw that selects one of the exact `Cap Limit`, `Frag Limit`, `Round Limit`, or `Score Limit` formats from cached serverinfo mirrors (`data_10A3FF38`, `data_10A3FF34`, `data_10A3FF48`, `data_10A3FF54`), then applies the center-only width adjustment when the ownerdraw align argument is `ITEM_ALIGN_CENTER` and paints at the raw rect-y baseline; source now mirrors that narrowed label family, cache dependency, and origin directly."
     },
     {
       "address": "0x10033910",
@@ -4574,11 +4574,15 @@
         "0x10070AC0",
         "0x10070AD0",
         "0x10070AE0",
+        "0x10070C04",
         "0x10070C28",
-        "0x10070C50"
+        "0x10070C3C",
+        "0x10070C50",
+        "0x10070C68",
+        "0x10070C8C"
       ],
       "relocation_refs": [],
-      "comment": "Deliberate synthetic retail name for the match-status text compositor consumed by the HUD draw and width path. HLIL prefixes the current match-phase label and appends the same placement or team-score text family exposed by CG_GetGameStatusText."
+      "comment": "Deliberate synthetic retail name for the match-status text compositor consumed by the HUD draw and width path. HLIL selects the uppercase phase label, returns it alone for absent non-team scores, and otherwise appends the direct retail suffix family for Race best time, spectator non-team leaders, local placement, and team tied/lead states instead of routing through CG_GetGameStatusText."
     },
     {
       "address": "0x10034B30",
@@ -4593,7 +4597,7 @@
         "0x10070D00"
       ],
       "relocation_refs": [],
-      "comment": "Retail status-text helper used by both ownerdraw width and the match-status HUD path; HLIL preserves the free-for-all placement string and the red/blue team-score lead messages."
+      "comment": "Retail status-text helper used by CG_GAME_STATUS and the ownerdraw-width callback; HLIL preserves the free-for-all placement string and the red/blue team-score lead messages while CG_GetMatchStatusText carries its own leading-dash variants."
     },
     {
       "address": "0x10034BD0",
@@ -4765,20 +4769,20 @@
       "raw_name": "FUN_10035bd0",
       "normalized_name": "CG_DrawSpectatorPlayerName",
       "status": "matched",
-      "signature": "static void CG_DrawSpectatorPlayerName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, qhandle_t shader)",
+      "signature": "static void CG_DrawSpectatorPlayerName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail competitive scorebox name drawer reached from the primary and secondary player ownerdraws. HLIL selects the cached slot label, truncates it to fit the scorebox width, appends the same ellipsis fallback, and aligns it like the current spectator-name helper."
+      "comment": "Retail competitive scorebox name drawer reached from the primary and secondary player ownerdraws. HLIL selects the cached first/second-place configstring label, truncates it against the fixed scorebox width thresholds, appends the same ellipsis fallback, applies the tournament '-' fallback for an empty label, and aligns the text from the ownerdraw anchor before painting."
     },
     {
       "address": "0x10035F30",
       "raw_name": "sub_10035f30",
       "normalized_name": "CG_DrawSpectatorPlayerScore",
       "status": "matched",
-      "signature": "static void CG_DrawSpectatorPlayerScore(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot)",
+      "signature": "static void CG_DrawSpectatorPlayerScore(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot, int align)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail competitive scorebox score drawer for the primary and secondary player slots. HLIL selects the cached first or second score value, falls back to the retail unavailable marker, and respects the same alignment modes as the source helper family."
+      "comment": "Retail competitive scorebox score drawer for the primary and secondary player slots. HLIL selects the cached first or second configstring score value, falls back to the retail unavailable marker for SCORE_NOT_PRESENT/forfeit scores, and applies the same anchor alignment before painting."
     },
     {
       "address": "0x10036070",
@@ -5969,7 +5973,7 @@
         "ui_warmup"
       ],
       "relocation_refs": [],
-      "comment": "Warmup configstring parser that resets the countdown latch, starts the prepare announcer when warmup begins, and mirrors the value through ui_warmup exactly like src/code/cgame/cg_servercmds.c::CG_ParseWarmup."
+      "comment": "Warmup configstring parser that tokenizes `CS_WARMUP`, resets the countdown latch and cached round ordinal, stores the optional warmup gametype override, starts the prepare announcer when warmup begins, and mirrors the value through ui_warmup exactly like src/code/cgame/cg_servercmds.c::CG_ParseWarmup."
     },
     {
       "address": "0x10048DF0",
@@ -10616,6 +10620,15 @@
       "status": "matched"
     },
     {
+      "address": "0x10070C04",
+      "value": " - %s^7 leads with a score of %s",
+      "xref_functions": [
+        "0x10034A00"
+      ],
+      "normalized_label": "str_match_status_race_score_suffix",
+      "status": "matched"
+    },
+    {
       "address": "0x10070C28",
       "value": " - %s place with %i",
       "xref_functions": [
@@ -10625,12 +10638,39 @@
       "status": "matched"
     },
     {
+      "address": "0x10070C3C",
+      "value": " - %s leads with %i",
+      "xref_functions": [
+        "0x10034A00"
+      ],
+      "normalized_label": "str_match_status_spectator_leads_suffix",
+      "status": "matched"
+    },
+    {
       "address": "0x10070C50",
       "value": " - Teams are tied at %i",
       "xref_functions": [
         "0x10034A00"
       ],
       "normalized_label": "str_match_status_tied_suffix",
+      "status": "matched"
+    },
+    {
+      "address": "0x10070C68",
+      "value": " - ^1Red^7 leads ^4Blue^7, %i to %i",
+      "xref_functions": [
+        "0x10034A00"
+      ],
+      "normalized_label": "str_match_status_red_leads_suffix",
+      "status": "matched"
+    },
+    {
+      "address": "0x10070C8C",
+      "value": " - ^4Blue^7 leads ^1Red^7, %i to %i",
+      "xref_functions": [
+        "0x10034A00"
+      ],
+      "normalized_label": "str_match_status_blue_leads_suffix",
       "status": "matched"
     },
     {

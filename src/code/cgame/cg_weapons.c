@@ -729,10 +729,6 @@ static void CG_RocketTrail( centity_t *ent, const weaponInfo_t *wi ) {
 	vec3_t	up;
 	localEntity_t	*smoke;
 
-	if ( cg_noProjectileTrail.integer ) {
-		return;
-	}
-
 	up[0] = 0;
 	up[1] = 0;
 	up[2] = 0;
@@ -795,10 +791,6 @@ static void CG_NailTrail( centity_t *ent, const weaponInfo_t *wi ) {
 	entityState_t	*es;
 	vec3_t	up;
 	localEntity_t	*smoke;
-
-	if ( cg_noProjectileTrail.integer ) {
-		return;
-	}
 
 	up[0] = 0;
 	up[1] = 0;
@@ -864,7 +856,7 @@ static void CG_PlasmaTrail( centity_t *cent, const weaponInfo_t *wi ) {
 
 	float	waterScale = 1.0f;
 
-	if ( cg_noProjectileTrail.integer || cg_oldPlasma.integer ) {
+	if ( cg_plasmaStyle.integer != 2 ) {
 		return;
 	}
 
@@ -1346,6 +1338,10 @@ static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 
 	VectorCopy( cg.refdef.vieworg, origin );
 	VectorCopy( cg.refdefViewAngles, angles );
+
+	if ( cg_drawGun.integer != 1 ) {
+		return;
+	}
 
 	// on odd legs, invert some angles
 	if ( cg.bobcycle & 1 ) {
@@ -2003,14 +1999,22 @@ CG_AddWeaponWithPowerups
 */
 static void CG_AddWeaponWithPowerups( const centity_t *cent, refEntity_t *gun ) {
 	int		powerups;
+	qboolean	localViewWeapon;
 
 	powerups = cent->currentState.powerups;
+	localViewWeapon = ( cent->currentState.number == cg.predictedPlayerState.clientNum );
 
 	// add powerup effects
-	if ( powerups & ( 1 << PW_INVIS ) ) {
+	if ( ( powerups & ( 1 << PW_INVIS ) ) && !localViewWeapon ) {
 		gun->customShader = cgs.media.invisShader;
 		trap_R_AddRefEntityToScene( gun );
 	} else {
+		if ( localViewWeapon && cg_drawGun.integer == 3 ) {
+			gun->customShader = cgs.media.ghostWeaponShader;
+			trap_R_AddRefEntityToScene( gun );
+			return;
+		}
+
 		trap_R_AddRefEntityToScene( gun );
 
 		if ( powerups & ( 1 << PW_BATTLESUIT ) ) {
@@ -2051,9 +2055,11 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 
 	CG_RegisterWeapon( weaponNum );
 	weapon = &cg_weapons[weaponNum];
-	// Retail registers cg_muzzleFlash but does not gate the flash path on it.
 	drawFlash = qtrue;
 	continuousFlash = ( weaponNum == WP_LIGHTNING || weaponNum == WP_GAUNTLET || weaponNum == WP_GRAPPLING_HOOK );
+	if ( ps && ( !cg_muzzleFlash.integer || !cg_drawGun.integer ) ) {
+		drawFlash = qfalse;
+	}
 
 	// add the weapon
 	memset( &gun, 0, sizeof( gun ) );
@@ -2151,11 +2157,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		// continuous flash
 	} else {
 		// impulse flash
-		if ( drawFlash ) {
-			if ( cg.time - cent->muzzleFlashTime > MUZZLE_FLASH_TIME && !cent->pe.railgunFlash ) {
-				return;
-			}
-		} else if ( weaponNum != WP_RAILGUN ) {
+		if ( cg.time - cent->muzzleFlashTime > MUZZLE_FLASH_TIME && !cent->pe.railgunFlash ) {
 			return;
 		}
 	}
@@ -2233,8 +2235,7 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 		return;
 	}
 
-	// no gun if in third person view or a camera is active
-	//if ( cg.renderingThirdPerson || cg.cameraMode) {
+	// no gun if in third person view
 	if ( cg.renderingThirdPerson ) {
 		return;
 	}
@@ -2242,14 +2243,6 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 
 	// allow the gun to be completely removed
 	if ( !cg_drawGun.integer ) {
-		vec3_t		origin;
-
-		if ( cg.predictedPlayerState.eFlags & EF_FIRING ) {
-			// special hack for lightning gun...
-			VectorCopy( cg.refdef.vieworg, origin );
-			VectorMA( origin, -8, cg.refdef.viewaxis[2], origin );
-			CG_LightningBolt( &cg_entities[ps->clientNum], origin );
-		}
 		return;
 	}
 
@@ -2276,17 +2269,10 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	AnglesToAxis( angles, hand.axis );
 
 	// map torso animations to weapon animations
-	if ( cg_gun_frame.integer ) {
-		// development tool
-		hand.frame = hand.oldframe = cg_gun_frame.integer;
-		hand.backlerp = 0;
-	} else {
-		// get clientinfo for animation map
-		ci = &cgs.clientinfo[ cent->currentState.clientNum ];
-		hand.frame = CG_MapTorsoToWeaponFrame( ci, cent->pe.torso.frame );
-		hand.oldframe = CG_MapTorsoToWeaponFrame( ci, cent->pe.torso.oldFrame );
-		hand.backlerp = cent->pe.torso.backlerp;
-	}
+	ci = &cgs.clientinfo[ cent->currentState.clientNum ];
+	hand.frame = CG_MapTorsoToWeaponFrame( ci, cent->pe.torso.frame );
+	hand.oldframe = CG_MapTorsoToWeaponFrame( ci, cent->pe.torso.oldFrame );
+	hand.backlerp = cent->pe.torso.backlerp;
 
 	hand.hModel = weapon->handsModel;
 	hand.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON | RF_MINLIGHT;
@@ -3058,7 +3044,7 @@ void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, im
 		lightColor[0] = 1;
 		lightColor[1] = 0.75;
 		lightColor[2] = 0.0;
-		if (cg_oldRocket.integer == 0) {
+		if ( cg_rocketStyle.integer == 2 ) {
 			// explosion sprite animation
 			VectorMA( origin, 24, dir, sprOrg );
 			VectorScale( dir, 64, sprVel );

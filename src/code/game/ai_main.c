@@ -70,6 +70,10 @@ float regularupdate_time;
 //
 int bot_interbreed;
 int bot_interbreedmatchcount;
+static qboolean bot_trainingTrainerQueued;
+static qboolean bot_trainingWarmupMusicStopped;
+static qboolean bot_trainingLoopMusicStarted;
+static qboolean bot_trainingExitMusicPlayed;
 //
 vmCvar_t bot_thinktime;
 vmCvar_t bot_memorydump;
@@ -495,6 +499,280 @@ qboolean BotSetTrainingCvarIfChanged( const char *name, const char *value ) {
 
 	trap_Cvar_Set( name, value );
 	return qtrue;
+}
+
+/*
+==================
+BotResetTrainingRuntimeFlags
+==================
+*/
+static void BotResetTrainingRuntimeFlags( void ) {
+	bot_trainingTrainerQueued = qfalse;
+	bot_trainingWarmupMusicStopped = qfalse;
+	bot_trainingLoopMusicStarted = qfalse;
+	bot_trainingExitMusicPlayed = qfalse;
+}
+
+/*
+==================
+BotSetPredictItemPickupDisabled
+==================
+*/
+static void BotSetPredictItemPickupDisabled( int clientNum, qboolean disabled ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+
+	if ( disabled ) {
+		level.clients[clientNum].ps.eFlags |= EF_AWARD_DENIED;
+	} else {
+		level.clients[clientNum].ps.eFlags &= ~EF_AWARD_DENIED;
+	}
+}
+
+/*
+==================
+BotTrainingSkillBootstrapValue
+==================
+*/
+static float BotTrainingSkillBootstrapValue( void ) {
+	float skill;
+
+	skill = trap_Cvar_VariableValue( "g_spSkill" );
+	if ( skill < 2.0f ) {
+		return 1.0f;
+	}
+	if ( skill == 2.0f ) {
+		return 3.0f;
+	}
+	return 4.0f;
+}
+
+/*
+==================
+BotClampTrainingSkill
+==================
+*/
+static float BotClampTrainingSkill( float skill ) {
+	if ( skill < 1.0f ) {
+		return 1.0f;
+	}
+	if ( skill > 5.0f ) {
+		return 5.0f;
+	}
+	return skill;
+}
+
+/*
+==================
+BotFormatTrainingSkill
+==================
+*/
+static const char *BotFormatTrainingSkill( float skill ) {
+	return va( "%f", skill );
+}
+
+/*
+==================
+BotUpdateItemDelayTime
+==================
+*/
+static void BotUpdateItemDelayTime( void ) {
+	const char	*delayValue;
+	int			elapsedSeconds;
+	float		skill;
+
+	delayValue = "0";
+	skill = trap_Cvar_VariableValue( "g_spSkill" );
+	if ( skill > 3.0f ) {
+		elapsedSeconds = ( level.time - level.startTime ) / 1000;
+		if ( elapsedSeconds > 240 ) {
+			delayValue = "25";
+		} else if ( elapsedSeconds > 180 ) {
+			delayValue = "20";
+		} else if ( elapsedSeconds > 120 ) {
+			delayValue = "15";
+		} else if ( elapsedSeconds > 60 ) {
+			delayValue = "10";
+		}
+	}
+
+	BotSetTrainingCvarIfChanged( "bot_itemDelayTime", delayValue );
+}
+
+/*
+==================
+BotUpdateTrainingBotSkill
+==================
+*/
+static void BotUpdateTrainingBotSkill( int botClient ) {
+	bot_state_t	*bs;
+	float		skill;
+
+	if ( botClient < 0 || botClient >= MAX_CLIENTS ) {
+		return;
+	}
+
+	bs = botstates[botClient];
+	if ( !bs || !bs->inuse ) {
+		return;
+	}
+
+	skill = BotClampTrainingSkill( trap_Cvar_VariableValue( "g_spSkill" ) );
+	if ( bs->settings.skill >= skill ) {
+		return;
+	}
+
+	bs->settings.skill = skill;
+	BotSetTrainingCvarIfChanged( "bot_startingSkill", BotFormatTrainingSkill( skill ) );
+}
+
+/*
+==================
+BotResetInactiveTrainingCvars
+==================
+*/
+static void BotResetInactiveTrainingCvars( void ) {
+	BotSetTrainingCvarIfChanged( "g_training", "0" );
+	BotSetTrainingCvarIfChanged( "bot_training", "0" );
+	BotSetTrainingCvarIfChanged( "bot_dynamicSkill", "0" );
+	BotSetTrainingCvarIfChanged( "bot_followMe", "1" );
+	BotResetTrainingRuntimeFlags();
+}
+
+/*
+==================
+BotSeedTrainingMapCvars
+==================
+*/
+static void BotSeedTrainingMapCvars( void ) {
+	BotSetTrainingCvarIfChanged( "g_training", "1" );
+	BotSetTrainingCvarIfChanged( "bot_followDist", "125" );
+	BotSetTrainingCvarIfChanged( "bot_dynamicSkill", "1" );
+	BotSetTrainingCvarIfChanged( "bot_itemDelayTime", "10" );
+	BotSetTrainingCvarIfChanged( "timelimit", "10" );
+	BotSetTrainingCvarIfChanged( "fraglimit", "10" );
+	BotSetTrainingCvarIfChanged( "bot_startingSkill", "1" );
+	BotSetTrainingCvarIfChanged( "bot_followMe", "1" );
+}
+
+/*
+==================
+BotUpdateTrainingReadyState
+==================
+*/
+static void BotUpdateTrainingReadyState( int localClient, int botClient ) {
+	gclient_t	*client;
+
+	if ( localClient < 0 || localClient >= MAX_CLIENTS ) {
+		return;
+	}
+
+	client = &level.clients[localClient];
+	if ( G_ClientIsReady( client ) ) {
+		if ( botClient >= 0 && botClient < MAX_CLIENTS ) {
+			level.clients[botClient].ps.eFlags &= ~EF_AWARD_DEFEND;
+			BotSetPredictItemPickupDisabled( botClient, qtrue );
+		}
+		BotSetTrainingCvarIfChanged( "bot_training", "0" );
+		BotSetTrainingCvarIfChanged( "bot_dynamicSkill", "1" );
+		BotSetTrainingCvarIfChanged( "bot_followMe", "0" );
+		G_SetClientReadyState( client, qfalse );
+		return;
+	}
+
+	if ( trap_Cvar_VariableIntegerValue( "bot_training" ) == 1 ) {
+		G_SetClientReadyState( client, qtrue );
+	}
+}
+
+/*
+==================
+BotUpdateTrainingMusic
+==================
+*/
+static void BotUpdateTrainingMusic( int localClient ) {
+	if ( localClient < 0 || localClient >= MAX_CLIENTS ) {
+		return;
+	}
+
+	if ( level.warmupTime != 0 && !bot_trainingWarmupMusicStopped ) {
+		trap_SendServerCommand( localClient, "stopMusic" );
+		bot_trainingWarmupMusicStopped = qtrue;
+	}
+
+	if ( trap_Cvar_VariableIntegerValue( "bot_training" ) == 3 && !bot_trainingLoopMusicStarted ) {
+		trap_SendServerCommand( localClient, "playMusic music/fla22k_01_loop" );
+		bot_trainingLoopMusicStarted = qtrue;
+	}
+
+	if ( level.intermissiontime && !bot_trainingExitMusicPlayed ) {
+		bot_trainingExitMusicPlayed = qtrue;
+		if ( level.numConnectedClients > 0 && localClient == level.sortedClients[0] ) {
+			trap_SendServerCommand( localClient, "playMusic music/win" );
+		} else {
+			trap_SendServerCommand( localClient, "playMusic music/loss" );
+		}
+	}
+}
+
+/*
+==================
+BotUpdateTrainingState
+==================
+*/
+static void BotUpdateTrainingState( void ) {
+	int			localClient;
+	int			botClient;
+	gentity_t	*localEnt;
+	float		bootstrapSkill;
+
+	if ( !g_training.integer ) {
+		BotResetTrainingRuntimeFlags();
+		return;
+	}
+
+	if ( !level.trainingMap ) {
+		BotResetInactiveTrainingCvars();
+		return;
+	}
+
+	localClient = BotGetLocalClient();
+	if ( localClient == -1 ) {
+		BotSeedTrainingMapCvars();
+		return;
+	}
+
+	botClient = BotGetFirstBotClient();
+	if ( !bot_trainingWarmupMusicStopped && level.warmupTime != 0 ) {
+		trap_SendServerCommand( localClient, "stopMusic" );
+		bot_trainingWarmupMusicStopped = qtrue;
+	}
+
+	if ( botClient == -1 && !bot_trainingTrainerQueued ) {
+		localEnt = &g_entities[localClient];
+		if ( localEnt->client && localEnt->client->pers.connected == CON_CONNECTED &&
+			localEnt->client->sess.sessionTeam != TEAM_SPECTATOR ) {
+			bootstrapSkill = BotTrainingSkillBootstrapValue();
+			trap_Cvar_Set( "g_spSkill", BotFormatTrainingSkill( bootstrapSkill ) );
+			G_AddTrainerBot();
+			bot_trainingTrainerQueued = qtrue;
+		}
+		return;
+	}
+
+	if ( g_training.integer == 2 && level.warmupTime == 0 ) {
+		BotSetTrainingCvarIfChanged( "g_training", "1" );
+	}
+
+	if ( botClient != -1 && level.warmupTime == 0 ) {
+		BotSetPredictItemPickupDisabled( botClient, qtrue );
+		BotUpdateItemDelayTime();
+		BotUpdateTrainingBotSkill( botClient );
+	}
+
+	BotUpdateTrainingReadyState( localClient, botClient );
+	BotUpdateTrainingMusic( localClient );
 }
 
 /*
@@ -1489,6 +1767,8 @@ int BotAIStartFrame(int time) {
 		trap_BotUserCommand(botstates[i]->client, &botstates[i]->lastucmd);
 	}
 
+	BotUpdateTrainingState();
+
 	if ( !bot_developer.integer || bot_report.integer < 0 ) {
 		trap_SetConfigstring( RETAIL_SELECTED_BOT_INFO_CONFIGSTRING, "" );
 	} else {
@@ -1611,6 +1891,7 @@ int BotAISetup( int restart ) {
 	trap_Cvar_Register(&bot_interbreedbots, "bot_interbreedbots", "10", 0);
 	trap_Cvar_Register(&bot_interbreedcycle, "bot_interbreedcycle", "20", 0);
 	trap_Cvar_Register(&bot_interbreedwrite, "bot_interbreedwrite", "", 0);
+	BotResetTrainingRuntimeFlags();
 
 	//if the game is restarted for a tournament
 	if (restart) {

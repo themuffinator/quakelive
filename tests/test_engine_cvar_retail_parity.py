@@ -120,7 +120,7 @@ def test_engine_cvar_second_tranche_matches_retail_contracts() -> None:
 	cl_cgame = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c")
 
 	assert 'con_opacity = Cvar_GetBounded( "con_opacity", "0.9", "0.1", "1", CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in cl_console
-	assert 'color[3] = con_opacity ? Com_Clamp( 0.1f, 1.0f, con_opacity->value ) : 0.9f;' in cl_console
+	assert cl_console.count( 'color[3] = con_opacity ? con_opacity->value : 0.9f;' ) >= 2
 
 	assert 'con_scale = Cvar_GetBounded( "con_scale", "0.5", "0.5", "1", CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in cl_console
 	assert 'scale = con_scale->value;' in cl_console
@@ -337,7 +337,7 @@ def test_engine_cvar_sixth_client_tranche_matches_retail_contracts() -> None:
 	cmd = _read_text(REPO_ROOT / "src" / "code" / "qcommon" / "cmd.c")
 
 	assert 'con_background = Cvar_GetBounded( "con_background", "0", "0", "1", CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in cl_console
-	assert 'else if ( con_background && con_background->integer > 0 && cls.consoleShader ) {' in cl_console
+	assert 'else if ( con_background && con_background->integer > 0 ) {' in cl_console
 
 	assert 'con_matchlimit = Cvar_Get( "con_matchlimit", "16", 0 );' in cl_console
 	assert 'limit = con_matchlimit ? con_matchlimit->integer : 16;' in cl_console

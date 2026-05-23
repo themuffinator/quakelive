@@ -13,12 +13,31 @@ CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
 CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
 CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 CG_SCREEN = REPO_ROOT / "src" / "code" / "cgame" / "cg_screen.c"
+CG_PLAYERSTATE = REPO_ROOT / "src" / "code" / "cgame" / "cg_playerstate.c"
 CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
+CL_CGAME = REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c"
 HUD_MENU = REPO_ROOT / "src" / "ui" / "hud.menu"
+UI_MAIN = REPO_ROOT / "src" / "code" / "ui" / "ui_main.c"
 UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
 Q_SHARED = REPO_ROOT / "src" / "code" / "game" / "q_shared.h"
 MSG = REPO_ROOT / "src" / "code" / "qcommon" / "msg.c"
 G_ACTIVE = REPO_ROOT / "src" / "code" / "game" / "g_active.c"
+CGAME_HLIL = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "cgamex86.dll"
+	/ "cgamex86.dll_hlil.txt"
+)
+UI_HLIL = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "uix86.all"
+	/ "uix86.dll_hlil.txt"
+)
 
 
 def _block_from_marker(source: str, marker: str) -> str:
@@ -36,6 +55,12 @@ def _block_from_marker(source: str, marker: str) -> str:
 				return source[start:index + 1]
 
 	raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
+def _text_between(source: str, start_marker: str, end_marker: str) -> str:
+	start = source.index(start_marker)
+	end = source.index(end_marker, start)
+	return source[start:end]
 
 
 def _menu_item_keys(source: str) -> set[str]:
@@ -152,11 +177,17 @@ def test_draw2d_calls_teammate_poi_overlay_for_team_games() -> None:
 def test_crosshair_name_overlay_restores_retail_team_health_and_armor_readout() -> None:
 	source = CG_DRAW.read_text(encoding="utf-8")
 	name_block = _block_from_marker(source, "static void CG_DrawCrosshairNames")
+	render_block = _block_from_marker(source, "static qboolean CG_ShouldRenderCrosshairName")
 	vitals_block = _block_from_marker(source, "static void CG_DrawCrosshairTeamVitals")
 	color_block = _block_from_marker(source, "static void CG_GetCrosshairTeamVitalColor")
 
 	assert "static qboolean CG_ShouldDrawCrosshairTeamVitals( const clientInfo_t *ci )" in source
-	assert "cg_drawCrosshairTeamHealth.integer <= 0 || cgs.gametype < GT_TEAM" in source
+	assert "cg_drawCrosshairTeamHealth.value == 0.0f || cgs.gametype < GT_TEAM" in source
+	assert "if ( !cg_drawCrosshairNames.integer )" not in name_block
+	assert "if ( cg_teammateNames.integer ) {" in render_block
+	assert "alpha *= cg_teammateCrosshairNamesOpacity.value;" in render_block
+	assert "alpha *= cg_enemyCrosshairNamesOpacity.value;" in render_block
+	assert "Com_Clamp" not in render_block
 	assert "nameScale = 0.26f;" in name_block
 	assert "CG_DrawCrosshairTeamVitals( ci, color );" in name_block
 	assert 'Com_sprintf( healthText, sizeof( healthText ), "%i ", ci->health );' in vitals_block
@@ -165,16 +196,45 @@ def test_crosshair_name_overlay_restores_retail_team_health_and_armor_readout() 
 	assert "CG_Text_Paint( 320.0f - healthWidth, textY, textScale, healthColor, healthText, 0, 0, ITEM_TEXTSTYLE_SHADOWED );" in vitals_block
 	assert 'CG_Text_Paint( 320.0f, textY, textScale, slashColor, "/", 0, 0, ITEM_TEXTSTYLE_SHADOWED );' in vitals_block
 	assert "CG_Text_Paint( 325.0f, textY, textScale, armorColor, armorText, 0, 0, ITEM_TEXTSTYLE_SHADOWED );" in vitals_block
-	assert "cg_drawCrosshairTeamHealth.integer == 2" in vitals_block
+	assert "cg_drawCrosshairTeamHealth.value == 2.0f" in vitals_block
 	assert "cg.snap->ps.stats[STAT_MAX_HEALTH]" in vitals_block
 	assert "highComponent = (float)value / (float)( maxValue + maxValue );" in color_block
 
 
 def test_crosshair_team_health_default_matches_retail_mode_cvar() -> None:
 	source = CG_MAIN.read_text(encoding="utf-8")
+	local_header = CG_LOCAL.read_text(encoding="utf-8")
+	client_source = CL_CGAME.read_text(encoding="utf-8")
 
-	assert '{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "2", CVAR_ARCHIVE },' in source
-	assert '{ &cg_drawCrosshairTeamHealthSize, "cg_drawCrosshairTeamHealthSize", "0.12", CVAR_ARCHIVE },' in source
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+
+	assert '{ &cg_drawCrosshair, "cg_drawCrosshair", "2", ' + retail_flags + ', "0", "29" },' in source
+	assert '{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1.0", ' + retail_flags + ', "0.0", "1.0" },' in source
+	assert '{ &cg_crosshairColor, "cg_crosshairColor", "25", ' + retail_flags + ', "1", "26" },' in source
+	assert '{ &cg_crosshairHealth, "cg_crosshairHealth", "0", ' + retail_flags + ', "0", "1" },' in source
+	assert '{ &cg_crosshairHitColor, "cg_crosshairHitColor", "1", ' + retail_flags + ', "1", "26" },' in source
+	assert '{ &cg_crosshairHitStyle, "cg_crosshairHitStyle", "1", ' + retail_flags + ', "0", "8" },' in source
+	assert '{ &cg_crosshairHitTime, "cg_crosshairHitTime", "200.0", ' + retail_flags + ', "0.0", "1000.0" },' in source
+	assert '{ &cg_crosshairPulse, "cg_crosshairPulse", "1", ' + retail_flags + ', "0", "1" },' in source
+	assert '{ &cg_crosshairSize, "cg_crosshairSize", "32", ' + retail_flags + ', "0", "320" },' in source
+	assert '{ &cg_crosshairX, "cg_crosshairX", "0", ' + retail_flags + ', "-320", "320" },' in source
+	assert '{ &cg_crosshairY, "cg_crosshairY", "0", ' + retail_flags + ', "-240", "240" },' in source
+	assert '{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "2", ' + retail_flags + ', "0", "2" },' in source
+	assert '{ &cg_drawCrosshairTeamHealthSize, "cg_drawCrosshairTeamHealthSize", "0.12", ' + retail_flags + ', "0.10", "0.26" },' in source
+	assert '{ &cg_enemyCrosshairNames, "cg_enemyCrosshairNames", "1", ' + retail_flags + ', "0", "1" },' in source
+	assert '{ &cg_enemyCrosshairNamesOpacity, "cg_enemyCrosshairNamesOpacity", "0.75", ' + retail_flags + ', "0", "1" },' in source
+	assert '{ &cg_teammateCrosshairNames, "cg_teammateCrosshairNames", "1", ' + retail_flags + ', "0", "1" },' in source
+	assert '{ &cg_teammateCrosshairNamesOpacity, "cg_teammateCrosshairNamesOpacity", "0.75", ' + retail_flags + ', "0", "1" },' in source
+	assert '{ &cg_teammateNames, "cg_teammateNames", "1", ' + retail_flags + ', "0", "2" },' in source
+	assert '{ &cg_forceDrawCrosshair, "cg_forceDrawCrosshair", "0", ' + retail_flags + ', "0", "1" },' in source
+	assert "extern\tvmCvar_t\t\tcg_forceDrawCrosshair;" in local_header
+	assert "float\t\tcrosshairHitTime;" in local_header
+	assert "clampedTime = cg_crosshairHitTime.value;" in source
+	assert "if ( clampedTime > 1000.0f ) {" in source
+	assert "cg_drawCrosshairNames" not in source
+	assert "cg_drawCrosshairNames" not in local_header
+	assert "trap_QL_Cvar_RegisterRange( cv->vmCvar, cv->cvarName," in source
+	assert "Cvar_GetBounded( varName, defaultValue, minimumValue, maximumValue, flags );" in client_source
 
 
 def test_crosshair_draw_uses_retail_vertical_scaler_and_numeric_shader_names() -> None:
@@ -222,6 +282,76 @@ def test_screen_damage_and_vignette_use_registered_retail_media_handles() -> Non
 	assert "CG_DrawPic( 0.0f, 0.0f, 640.0f, 480.0f, cgs.media.vignetteShader );" in vignette_block
 	assert "trap_R_SetColor( NULL );" in vignette_block
 	assert "static qhandle_t\tvignetteShader;" not in vignette_block
+
+
+def test_screen_damage_cvars_and_tint_latch_match_retail_wiring() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	playerstate_source = CG_PLAYERSTATE.read_text(encoding="utf-8")
+	screen_source = CG_SCREEN.read_text(encoding="utf-8")
+	local_header = CG_LOCAL.read_text(encoding="utf-8")
+	ui_source = UI_MAIN.read_text(encoding="utf-8")
+	cgame_hlil = CGAME_HLIL.read_text(encoding="utf-8")
+	ui_hlil = UI_HLIL.read_text(encoding="utf-8")
+	alpha_block = _block_from_marker(main_source, "static void CG_UpdateScreenDamageAlphaFromCvar")
+	damage_feedback_block = _block_from_marker(playerstate_source, "void CG_DamageFeedback")
+	team_block = _block_from_marker(playerstate_source, "static qboolean CG_IsTeamDamageFeedback")
+	latch_block = _block_from_marker(playerstate_source, "static void CG_LatchScreenDamageColor")
+	pack_color_block = _block_from_marker(playerstate_source, "static unsigned int CG_PackScreenDamageColor")
+	replace_alpha_block = _block_from_marker(playerstate_source, "static unsigned int CG_ReplaceDamageBlendAlpha")
+	blend_block = _block_from_marker(screen_source, "void CG_DamageBlendBlob")
+	entity_color_block = _block_from_marker(screen_source, "static void CG_SetScreenDamageEntityColor")
+	retail_cvar_table = _text_between(cgame_hlil, "10077b10  void* data_10077b10", "10077b88")
+
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD"
+	for expected in (
+		f'{{ &cg_screenDamage, "cg_screenDamage", DEFAULT_SCREEN_DAMAGE_COLOR, {retail_flags} }},',
+		f'{{ &cg_screenDamage_Self, "cg_screenDamage_Self", DEFAULT_SCREEN_DAMAGE_SELF_COLOR, {retail_flags} }},',
+		f'{{ &cg_screenDamage_Team, "cg_screenDamage_Team", DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, {retail_flags} }},',
+		f'{{ &cg_screenDamageAlpha, "cg_screenDamageAlpha", DEFAULT_SCREEN_DAMAGE_ALPHA, {retail_flags} }},',
+		f'{{ &cg_screenDamageAlpha_Team, "cg_screenDamageAlpha_Team", DEFAULT_SCREEN_DAMAGE_ALPHA, {retail_flags} }},',
+	):
+		assert expected in main_source
+
+	for expected in (
+		'{"cg_screenDamage"}',
+		'{"cg_screenDamage_Self"}',
+		'{"cg_screenDamage_Team"}',
+		'{"cg_screenDamageAlpha"}',
+		'{"cg_screenDamageAlpha_Team"}',
+	):
+		assert expected in retail_cvar_table
+	assert retail_cvar_table.count("01 08 08 00") >= 5
+
+	assert "unsigned int\tdamageBlendColor;" in local_header
+	assert "10ab8fac  int32_t data_10ab8fac = 0x0" in cgame_hlil
+	assert "alphaByte = (float)( (unsigned int)alphaCvar->integer & 0xff );" in alpha_block
+	assert "Com_Clamp( 0.0f, 200.0f" not in alpha_block
+	assert "CG_LatchScreenDamageColor();" in damage_feedback_block
+	assert "localInfo = &cgs.clientinfo[cg.snap->ps.clientNum];" in team_block
+	assert "return (qboolean)( attackerInfo->team == localInfo->team );" in team_block
+	assert "packedColor = ( (unsigned int)(byte)( Com_Clamp( 0.0f, 1.0f, color[0] ) * 255.0f ) ) << 24;" in pack_color_block
+	assert "return ( packedColor & 0xffffff00U ) | alpha;" in replace_alpha_block
+	for expected in (
+		"selfDamage = (qboolean)( attackerClientNum == cg.snap->ps.clientNum );",
+		"teamDamage = CG_IsTeamDamageFeedback( attackerClientNum );",
+		"screenDamageColor = CG_PackScreenDamageColor( cg.screenDamageColor );",
+		"if ( !screenDamageColor || ( selfDamage && !selfDamageColor ) ||",
+		"cg.damageBlendColor = selfDamageColor;",
+		"cg.damageBlendColor = CG_ReplaceDamageBlendAlpha( teamDamageColor, cg.screenDamageAlphaTeam );",
+		"cg.damageBlendColor = CG_ReplaceDamageBlendAlpha( screenDamageColor, cg.screenDamageAlpha );",
+	):
+		assert expected in latch_block
+	assert "CG_GetScreenDamageColor" not in screen_source
+	assert "CG_SetScreenDamageEntityColor( &ent, cg.damageBlendColor, fade );" in blend_block
+	assert "ent->shaderRGBA[0] = (byte)( ( packedColor >> 24 ) & 0xff );" in entity_color_block
+	assert "alphaByte = (float)( packedColor & 0xff );" in entity_color_block
+
+	assert '{ &ui_screenDamage, "ui_screenDamage", "0", CVAR_ARCHIVE},' in ui_source
+	assert '{ &ui_screenDamage_Team, "ui_screenDamage_Team", "0", CVAR_ARCHIVE},' in ui_source
+	assert 'UI_SyncRetailSliderColorCvar( &ui_screenDamage, "cg_screenDamage" );' in ui_source
+	assert 'UI_SyncRetailSliderColorCvar( &ui_screenDamage_Team, "cg_screenDamage_Team" );' in ui_source
+	assert '"cg_screenDamage", sub_10001900("0x%08x")' in ui_hlil
+	assert '"cg_screenDamage_Team", sub_10001900("0x%08x")' in ui_hlil
 
 
 def test_disconnect_warning_uses_retail_net_icon_callsite() -> None:
@@ -327,13 +457,41 @@ def test_warmup_waiting_status_preserves_retail_begin_copy() -> None:
 	assert "remaining = ( cgs.matchReadyUpDeadline - cg.time ) / 1000 + 1;" in deadline_block
 	assert "( ( cgs.matchReadyUpDeadline - cg.time ) + 1000 ) / 1000" not in deadline_block
 	assert "if ( remaining < 0 ) {" in deadline_block
-	assert 'Q_strncpyz( line1, "The wanking will begin", line1Size );' in waiting_block
-	assert 'Q_strncpyz( line1, "The wanking will begin when", line1Size );' in waiting_block
-	assert '"The match will begin"' not in waiting_block
+	assert 'Q_strncpyz( line1, "The match will begin", line1Size );' in waiting_block
+	assert 'Q_strncpyz( line1, "The match will begin when", line1Size );' in waiting_block
+	assert '"The wanking will begin"' not in waiting_block
 	assert 'Q_strncpyz( line2, "when more players are ready.", line2Size );' in waiting_block
 	assert 'Q_strncpyz( line2, "when more players join.", line2Size );' in waiting_block
 	assert 'Q_strncpyz( line1, "Waiting for more players.", line1Size );' in waiting_block
 	assert 'Com_sprintf( line2, line2Size, "The match requires %i player%s per team."' in waiting_block
+
+
+def test_warmup_parser_and_display_use_retail_configstring_wiring() -> None:
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	server_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	local_header = CG_LOCAL.read_text(encoding="utf-8")
+	parse_block = _block_from_marker(server_source, "static void CG_ParseWarmup( void )")
+	sound_block = _block_from_marker(server_source, "static qboolean CG_WarmupUsesSoloPrepareSound")
+	set_config_block = _block_from_marker(server_source, "void CG_SetConfigValues")
+	draw_warmup_block = _block_from_marker(draw_source, "static void CG_DrawWarmup( void )")
+	status_block = _block_from_marker(draw_source, "static void CG_DrawWarmupStatusText")
+
+	assert "int\t\twarmupGametype;" in local_header
+	assert "cursor = (char *)info;" in parse_block
+	assert "token = COM_Parse( &cursor );" in parse_block
+	assert "warmupGametype = token[0] ? atoi( token ) : -1;" in parse_block
+	assert "cgs.warmupGametype = warmupGametype;" in parse_block
+	assert "cgs.matchRoundNumber = 0;" in parse_block
+	assert "CG_WarmupUsesSoloPrepareSound( warmupGametype )" in parse_block
+	assert "gametype < GT_TEAM || warmupGametype == GT_TOURNAMENT || gametype == GT_RED_ROVER" in sound_block
+	assert "CG_ParseWarmup();" in set_config_block
+	assert "cg.warmup = atoi( CG_ConfigString( CS_WARMUP ) );" not in set_config_block
+	assert "warmupGametype = ( cgs.warmupGametype != -1 ) ? cgs.warmupGametype : cgs.gametype;" in draw_warmup_block
+	assert "CG_DrawWarmupWaitingStatus( warmupGametype, teamCounts, verticalOffset );" in draw_warmup_block
+	assert "CG_DrawWarmupReadyPrompt( cgs.gametype, teamCounts, verticalOffset );" in draw_warmup_block
+	assert "CG_DrawWarmupStatusText( warmupGametype );" in draw_warmup_block
+	assert "title = CG_WarmupGameTypeString( gametype );" in status_block
+	assert "verticalOffset = ( cgs.gametype == GT_RACE ) ? 30.0f : 0.0f;" in status_block
 
 
 def test_proximity_mine_warning_uses_retail_text_paint_lane() -> None:
@@ -467,6 +625,63 @@ def test_join_game_menu_capture_suppresses_menu_hud_and_late_hud_draws() -> None
 	assert draw2d_block.index("CG_DrawJoinGameMenu();") < draw2d_block.index("CG_DrawNetworkStatus();")
 
 
+def test_intermission_letterbox_uses_retail_draw_local_latch_and_sp_wiring() -> None:
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	local_source = CG_LOCAL.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	server_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+
+	draw2d_block = _block_from_marker(draw_source, "static void CG_Draw2D( void )")
+	reset_block = _block_from_marker(draw_source, "void CG_ResetIntermissionLetterboxState")
+	set_block = _block_from_marker(draw_source, "static void CG_SetIntermissionLetterboxState")
+	letterbox_block = _block_from_marker(draw_source, "static void CG_DrawIntermissionLetterbox")
+	init_block = _block_from_marker(main_source, "void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum )")
+	map_restart_block = _block_from_marker(server_source, "static void CG_MapRestart")
+	intermission_latch_block = draw2d_block[
+		draw2d_block.index("if ( cg.intermissionStarted ) {"):
+		draw2d_block.index("if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {")
+	]
+
+	assert "#define CG_INTERMISSION_LETTERBOX_HEIGHT\t\t84.0f" in draw_source
+	assert "#define CG_INTERMISSION_LETTERBOX_TRANSITION\t1000" in draw_source
+	assert "static qboolean\tcg_intermissionLetterboxActive;" in draw_source
+	assert "void CG_ResetIntermissionLetterboxState( void );" in local_source
+	assert "intermissionLetterboxChangeTime" not in local_source
+	assert "intermissionLetterboxDuration" not in local_source
+	assert "intermissionLetterboxStartHeight" not in local_source
+	assert "intermissionLetterboxTargetHeight" not in local_source
+
+	for expected in (
+		"cg_intermissionLetterboxActive = qfalse;",
+		"cg_intermissionLetterboxChangeTime = 0;",
+		"cg_intermissionLetterboxDuration = 0;",
+		"cg_intermissionLetterboxStartHeight = 0.0f;",
+		"cg_intermissionLetterboxTargetHeight = 0.0f;",
+	):
+		assert expected in reset_block
+
+	assert "if ( cg_intermissionLetterboxActive == active ) {" in set_block
+	assert "cg_intermissionLetterboxActive = active;" in set_block
+	assert "targetHeight = cg_intermissionLetterboxActive ? CG_INTERMISSION_LETTERBOX_HEIGHT : 0.0f;" in letterbox_block
+	assert "CG_INTERMISSION_LETTERBOX_TRANSITION" in letterbox_block
+	assert "PM_INTERMISSION" not in letterbox_block
+	assert "cg.intermissionStarted" not in letterbox_block
+
+	assert "CG_DrawIntermissionLetterbox();" in intermission_latch_block
+	assert "if ( cg.snap->ps.pm_type == PM_SPINTERMISSION ) {" in intermission_latch_block
+	assert "CG_DrawPregameJoinGameMenu();" in intermission_latch_block
+	assert "CG_DrawPregamePlacementPrompt();" in intermission_latch_block
+	assert "CG_UpdateSpIntermissionMouseInput();" in intermission_latch_block
+	assert "CG_DrawBrowserCursor();" in intermission_latch_block
+	assert "CG_SetIntermissionLetterboxState( qtrue );" in intermission_latch_block
+	assert "CG_SetIntermissionLetterboxState( qfalse );" in intermission_latch_block
+	assert intermission_latch_block.index("CG_DrawBrowserCursor();") < intermission_latch_block.index("CG_SetIntermissionLetterboxState( qtrue );")
+	assert draw2d_block.index("if ( cg.intermissionStarted ) {") < draw2d_block.index("if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {")
+
+	assert "CG_ResetIntermissionLetterboxState();" in init_block
+	assert "CG_ResetIntermissionLetterboxState();" in map_restart_block
+
+
 def test_lower_right_hud_restores_powerup_popup_and_team_overlay_branch() -> None:
 	source = CG_DRAW.read_text(encoding="utf-8")
 	powerups_block = _block_from_marker(source, "static float CG_DrawPowerups")
@@ -492,9 +707,18 @@ def test_lower_right_hud_restores_powerup_popup_and_team_overlay_branch() -> Non
 
 def test_upper_right_debug_stack_uses_retail_host_text_lanes() -> None:
 	source = CG_DRAW.read_text(encoding="utf-8")
+	attacker_block = _block_from_marker(source, "static float CG_DrawAttacker")
 	snapshot_block = _block_from_marker(source, "static float CG_DrawSnapshot")
 	fps_block = _block_from_marker(source, "static float CG_DrawFPS")
 	upper_right_block = _block_from_marker(source, "static float CG_DrawUpperRightStack")
+
+	assert "size = 36.0f;" in attacker_block
+	assert "CG_DrawHead( 604.0f, y, size, size, clientNum, angles );" in attacker_block
+	assert "w = CG_Text_WidthExt( name, 0.18f, 0, FONT_SANS );" in attacker_block
+	assert "textY = y + size + 10.0f;" in attacker_block
+	assert "CG_Text_PaintExt( 640.0f - ( 10.0f + w ), textY, 0.18f, colorWhite, name, 0.0f, 0, ITEM_TEXTSTYLE_NORMAL, FONT_SANS );" in attacker_block
+	assert "return y + size + 16.0f + 2.0f;" in attacker_block
+	assert "CG_DrawBigString" not in attacker_block
 
 	assert 's = va( "time:%i snap:%i cmd:%i", cg.snap->serverTime,' in snapshot_block
 	assert "w = CG_Text_WidthExt( s, 0.25f, 0, FONT_DEFAULT );" in snapshot_block
@@ -513,6 +737,77 @@ def test_upper_right_debug_stack_uses_retail_host_text_lanes() -> None:
 
 	assert upper_right_block.index( "CG_DrawSnapshot( y )" ) < upper_right_block.index( "CG_DrawFPS( y )" )
 	assert upper_right_block.index( "CG_DrawFPS( y )" ) < upper_right_block.index( "CG_DrawAttacker( y )" )
+
+
+def test_team_overlay_uses_retail_cvars_and_scaled_host_text_lane() -> None:
+	source = CG_DRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	overlay_block = _block_from_marker(source, "static float CG_DrawTeamOverlay")
+
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+
+	assert f'{{ &cg_drawAttacker, "cg_drawAttacker", "1", {retail_flags}, "0", "1" }}' in main_source
+	assert f'{{ &cg_drawFPS, "cg_drawFPS", "0", {retail_flags}, "0", "1" }}' in main_source
+	assert f'{{ &cg_drawSnapshot, "cg_drawSnapshot", "0", {retail_flags}, "0", "2" }}' in main_source
+	assert f'{{ &cg_drawTeamOverlay, "cg_drawTeamOverlay", "1", {retail_flags}, "0", "3" }}' in main_source
+	assert f'{{ &cg_drawTeamOverlayOpacity, "cg_drawTeamOverlayOpacity", "0.75", {retail_flags}, "0", "1" }}' in main_source
+	assert f'{{ &cg_drawTeamOverlaySize, "cg_drawTeamOverlaySize", "0.16", {retail_flags}, "0.12", "0.22" }}' in main_source
+	assert f'{{ &cg_drawTeamOverlayX, "cg_drawTeamOverlayX", "0", {retail_flags}, "-640", "640" }}' in main_source
+	assert f'{{ &cg_drawTeamOverlayY, "cg_drawTeamOverlayY", "0", {retail_flags}, "-480", "480" }}' in main_source
+	assert f'{{ &cg_selfOnTeamOverlay, "cg_selfOnTeamOverlay", "0", {retail_flags}, "0", "1" }}' in main_source
+	assert 'trap_Cvar_Set( "teamoverlay", "1" );' in main_source
+	assert 'trap_Cvar_Set( "teamoverlay", "0" );' in main_source
+	assert "// FIXME E3 HACK" not in main_source
+
+	assert "scale = Com_Clamp( 0.12f, 0.22f, cg_drawTeamOverlaySize.value );" in overlay_block
+	assert "opacity = Com_Clamp( 0.0f, 1.0f, cg_drawTeamOverlayOpacity.value );" in overlay_block
+	assert "xOffset = cg_drawTeamOverlayX.value;" in overlay_block
+	assert "yOffset = cg_drawTeamOverlayY.value;" in overlay_block
+	assert 'textHeight = CG_Text_HeightExt( "O", scale, 0, FONT_SANS );' in overlay_block
+	assert "static int CG_TeamOverlayPlayerPowerups( int clientNum )" in source
+	assert "return cg_entities[clientNum].currentState.powerups;" in source
+	assert "static qboolean CG_TeamOverlayPlayerIsFrozen( int clientNum )" in source
+	assert "CG_CopyHudTextWithLimit( nameText, sizeof( nameText ), ci->name, TEAM_OVERLAY_NAME_PRINT_LIMIT );" in overlay_block
+	assert "Q_strncpyz( retailBuffer, source, sizeof( retailBuffer ) );" in source
+	assert "Q_strncpyz( prefix, retailBuffer, sizeof( prefix ) );" in source
+	assert 'Com_sprintf( retailBuffer, sizeof( retailBuffer ), "%s%s", prefix, "..." );' in source
+	assert "CG_Text_WidthExt( nameText, scale, TEAM_OVERLAY_NAME_PRINT_LIMIT, FONT_SANS );" in overlay_block
+	assert "locationWidth = TEAM_OVERLAY_LOCATION_MAX_PIXELS;" in overlay_block
+	assert "w = nameWidth + locationWidth + (float)textHeight * 13.0f;" in overlay_block
+	assert "x = (float)(int)( 640.0f - w + xOffset );" in overlay_block
+	assert "drawY = y - yOffset;" in overlay_block
+	assert "drawY = y - ( h + yOffset );" in overlay_block
+	assert "hcolor[3] = opacity;" in overlay_block
+	assert "CG_DrawPic( x, drawY, w, h, cgs.media.teamStatusBar );" in overlay_block
+	assert "CG_IsSelfOnTeamOverlay()" in overlay_block
+	assert "CG_Text_PaintExt( textX, textY, scale, textColor, nameText, 0.0f, TEAM_OVERLAY_NAME_PRINT_LIMIT, ITEM_TEXTSTYLE_SHADOWEDMORE, FONT_SANS );" in overlay_block
+	assert "powerups = CG_TeamOverlayPlayerPowerups( clientNum );" in overlay_block
+	assert "health = cg.snap->ps.stats[STAT_HEALTH];" in overlay_block
+	assert "armor = cg.snap->ps.stats[STAT_ARMOR];" in overlay_block
+	assert "weapon = cg.snap->ps.weapon;" in overlay_block
+	assert "CG_TeamOverlayPlayerIsFrozen( clientNum )" in overlay_block
+	assert 'Q_strncpyz( healthText, "FROZEN", sizeof( healthText ) );' in overlay_block
+	assert 'Q_strncpyz( healthText, "DEAD", sizeof( healthText ) );' in overlay_block
+	assert "CG_Text_PaintExt( statusX, textY, scale, textColor, healthText, 0.0f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, FONT_SANS );" in overlay_block
+	assert "CG_Text_PaintExt( armorX, textY, scale, textColor, armorText, 0.0f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, FONT_SANS );" in overlay_block
+	assert "if ( locationWidth > 0.0f ) {" in overlay_block
+	assert "CG_Text_PaintExt( locationX, textY, scale, textColor, p, 0.0f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, FONT_SANS );" in overlay_block
+	assert "if ( powerups & ( 1 << j ) ) {" in overlay_block
+	assert "ci->powerups & TEAM_OVERLAY_FROZEN_BIT" not in overlay_block
+	assert "TINYCHAR_WIDTH" not in overlay_block
+	assert "CG_DrawStringExt" not in overlay_block
+
+
+def test_spectator_item_timer_text_uses_retail_default_font_lane() -> None:
+	source = CG_DRAW.read_text(encoding="utf-8")
+	timer_block = _block_from_marker(source, "static void CG_DrawSpectatorItemPickups")
+
+	assert "size = cg_specItemTimersSize.value * 100.0f;" in timer_block
+	assert "scale = cg_specItemTimersSize.value;" in timer_block
+	assert "CG_DrawPic( drawX, drawY, size, size, icon );" in timer_block
+	assert 'Com_sprintf( timerText, sizeof( timerText ), "%d", seconds );' in timer_block
+	assert "CG_Text_PaintExt( drawX + size + 4.0f, drawY + size - 5.0f, scale, colorWhite," in timer_block
+	assert "timerText, 0.0f, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, FONT_DEFAULT );" in timer_block
 
 
 def test_classic_speedometer_restores_retail_history_ring_and_draw_order() -> None:

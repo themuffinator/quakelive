@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-05-22
+Last updated: 2026-05-23
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -79,6 +79,65 @@ Feeder queue:
   `UI_RunOrdersScript` / `UI_RunVoiceOrdersScript`.
 
 ## Recent closure
+
+### Task A35: Re-audit match exit rules and round-mode wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_main.c`, `src/code/game/g_active.c`,
+`src/code/game/g_team.c`, `src/code/game/g_local.h`,
+`tests/test_game_exit_rules_parity.py`,
+`tests/test_game_round_controller_helper_parity.py`,
+`tests/test_game_attack_defend_parity.py`,
+`references/hlil/quakelive/qagamex86.dll/`,
+`references/symbol-maps/qagame.json`,
+`docs/reverse-engineering/qagame-mapping.md`
+Parity estimate: **before 96% -> after 100%** for scoped match-exit rule,
+intermission, Red Rover tie, Freeze fallback, and A/D plus CA/Freeze mercy
+window wiring; repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked qagame `ScoreIsTied`, `CheckExitRules`, `G_ADCheckExitRules`,
+   `G_CAFZCheckExitRules`, and `G_RRCheckExitRules` against the committed
+   Binary Ninja HLIL and symbol-map entries.
+2. Restored Red Rover to the retail non-team leader-score tie path instead of
+   the red/blue team-score tie path.
+3. Restored the generic Freeze exit-rule fallback gate to use
+   `g_freezeRoundDelay`, matching the retail branch in `CheckExitRules`.
+4. Shared the overtime-adjusted exit-limit helper with the A/D and CA/Freeze
+   mercy checks, and removed the source-only CA/Freeze roundlimit leader guard
+   so the red-first/blue-second threshold order matches retail.
+5. Refreshed focused structural coverage for the match-exit, round-controller,
+   and Attack and Defend helper seams.
+
+### Task A34: Restore retail spectator player-name scorebox wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_newdraw.c`,
+`tests/test_cgame_displaycontext_parity.py`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/cgame-mapping.md`
+Parity estimate: **before 88% -> after 100%** for scoped cgame spectator
+player-name and scorebox score ownerdraw wiring, including follow-name anchor
+alignment, first/second-place configstring label ownership, fixed retail
+truncation thresholds, and missing/forfeit score fallbacks; repo-wide remains
+**98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the cgame ownerdraw corridor against the Binary Ninja HLIL for
+   `0x10033BF0`, `0x10035BD0`, and `0x10035F30`, plus the committed Ghidra
+   switch and symbol-map entries.
+2. Restored retail anchor alignment for `CG_FOLLOW_PLAYER_NAME` and
+   `CG_FOLLOW_PLAYER_NAME_EX` instead of centering inside the authored rect.
+3. Routed `CG_1ST_PLYR` / `CG_2ND_PLYR` through cached
+   `CS_FIRST_PLACE_NAME` / `CS_SECOND_PLACE_NAME` labels, including the
+   tournament `-` fallback and the fixed 140/132-pixel ellipsis truncation
+   thresholds observed in HLIL.
+4. Routed `CG_1ST_PLYR_SCORE` / `CG_2ND_PLYR_SCORE` through cached
+   `CS_SCORES1` / `CS_SCORES2` values with the retail unavailable marker for
+   `SCORE_NOT_PRESENT` and forfeit scores.
+5. Refreshed cgame display-context parity coverage and reran the focused
+   spectator/scorebox suites.
 
 ### Task A32: Remove source-only Flight refuel-rate cvar [COMPLETED]
 Priority: High

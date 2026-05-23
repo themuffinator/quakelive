@@ -29,6 +29,17 @@ def test_public_image_constructor_wraps_target_aware_helper() -> None:
 	assert "qglTexParameterf( glTarget, GL_TEXTURE_WRAP_T, glWrapClampMode );" in tr_image
 
 
+def test_implicit_nomip_shaders_use_retail_edge_clamp() -> None:
+	tr_local = _read("src/code/renderer/tr_local.h")
+	tr_image = _read("src/code/renderer/tr_image.c")
+	tr_shader = _read("src/code/renderer/tr_shader.c")
+
+	assert "#define GL_CLAMP_TO_EDGE 0x812F" in tr_local
+	assert "int\t\t\twrapClampMode;\t\t// GL_CLAMP, GL_CLAMP_TO_EDGE, or GL_REPEAT" in tr_local
+	assert 'case GL_CLAMP_TO_EDGE:\n\t\t\tri.Printf( PRINT_ALL, "edge " );' in tr_image
+	assert "image = R_FindImageFile( fileName, mipRawImage, mipRawImage, mipRawImage ? GL_REPEAT : GL_CLAMP_TO_EDGE );" in tr_shader
+
+
 def test_memory_loader_dispatches_buffer_decoders_and_warns_on_unknown_payloads() -> None:
 	tr_image = _read("src/code/renderer/tr_image.c")
 

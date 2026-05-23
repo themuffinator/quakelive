@@ -1325,20 +1325,20 @@ void Con_DrawSolidConsole( float frac ) {
 	if ( y < 1 ) {
 		y = 0;
 	}
-	else if ( con_background && con_background->integer > 0 && cls.consoleShader ) {
+	else if ( con_background && con_background->integer > 0 ) {
 		SCR_DrawPic( 0, 0, SCREEN_WIDTH, y, cls.consoleShader );
 	} else {
 		color[0] = 0.0f;
 		color[1] = 0.0f;
 		color[2] = 0.0f;
-		color[3] = con_opacity ? Com_Clamp( 0.1f, 1.0f, con_opacity->value ) : 0.9f;
+		color[3] = con_opacity ? con_opacity->value : 0.9f;
 		SCR_FillRect( 0, 0, SCREEN_WIDTH, y, color );
 	}
 
 	color[0] = 1;
 	color[1] = 0;
 	color[2] = 0;
-	color[3] = 1;
+	color[3] = con_opacity ? con_opacity->value : 0.9f;
 	SCR_FillRect( 0, y, SCREEN_WIDTH, 2, color );
 
 

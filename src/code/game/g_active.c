@@ -1526,17 +1526,13 @@ void ClientThink_real( gentity_t *ent ) {
 
 	// check for respawning
 	if ( client->ps.stats[STAT_HEALTH] <= 0 ) {
-		// wait for the attack button to be pressed
-		if ( level.time > client->respawnTime ) {
-			// forcerespawn is to prevent users from waiting out powerups
-			if ( g_forcerespawn.integer > 0 && 
-				( level.time - client->respawnTime ) > g_forcerespawn.integer * 1000 ) {
-				respawn( ent );
-				return;
-			}
-		
-			// pressing attack or use is the normal respawn method
-			if ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE ) ) {
+		// wait for the retail minimum respawn delay
+		if ( level.time >= client->respawnTime ) {
+			int respawnElapsed;
+
+			respawnElapsed = level.time - client->respawnTime;
+			if ( ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE ) )
+				|| respawnElapsed > g_factoryCvarConfig.respawnDelayMaxMilliseconds ) {
 				respawn( ent );
 			}
 		}
@@ -1926,9 +1922,7 @@ Applies the retail tie-aware Clan Arena or Freeze timelimit, roundlimit, and mer
 static qboolean G_CAFZCheckExitRules( qboolean announce ) {
 	int		elapsed;
 	int		scoreDelta;
-	int		mercyWindowMinutes;
-	int		mercyWindowMsec;
-	const char	*leaderName;
+	int		mercyLimitMsec;
 
 	if ( g_gametype.integer != GT_CLAN_ARENA && !G_FreezeGametypeEnabled() ) {
 		return qfalse;
@@ -1948,8 +1942,7 @@ static qboolean G_CAFZCheckExitRules( qboolean announce ) {
 	}
 
 	if ( roundlimit.integer > 0 ) {
-		if ( level.teamScores[TEAM_RED] >= roundlimit.integer
-			&& level.teamScores[TEAM_RED] > level.teamScores[TEAM_BLUE] ) {
+		if ( level.teamScores[TEAM_RED] >= roundlimit.integer ) {
 			if ( announce ) {
 				trap_SendServerCommand( -1, "print \"Red hit the roundlimit.\n\"" );
 				LogExit( "Roundlimit hit." );
@@ -1957,8 +1950,7 @@ static qboolean G_CAFZCheckExitRules( qboolean announce ) {
 			return qtrue;
 		}
 
-		if ( level.teamScores[TEAM_BLUE] >= roundlimit.integer
-			&& level.teamScores[TEAM_BLUE] > level.teamScores[TEAM_RED] ) {
+		if ( level.teamScores[TEAM_BLUE] >= roundlimit.integer ) {
 			if ( announce ) {
 				trap_SendServerCommand( -1, "print \"Blue hit the roundlimit.\n\"" );
 				LogExit( "Roundlimit hit." );
@@ -1971,35 +1963,29 @@ static qboolean G_CAFZCheckExitRules( qboolean announce ) {
 		return qfalse;
 	}
 
-	mercyWindowMinutes = g_mercytime.integer;
-	if ( mercyWindowMinutes < 0 ) {
-		mercyWindowMinutes = 0;
-	}
-	if ( mercyWindowMinutes > 0 && mercyWindowMinutes > INT_MAX / 60000 ) {
-		mercyWindowMsec = INT_MAX;
-	} else {
-		mercyWindowMsec = mercyWindowMinutes * 60000;
-	}
-
-	if ( elapsed < mercyWindowMsec ) {
+	mercyLimitMsec = G_BuildExitRuleLimitMsec( g_mercytime.integer, level.overtimeAccumulatedMsec );
+	if ( elapsed < mercyLimitMsec ) {
 		return qfalse;
 	}
 
 	scoreDelta = level.teamScores[TEAM_RED] - level.teamScores[TEAM_BLUE];
 	if ( scoreDelta >= mercylimit.integer ) {
-		leaderName = "Red";
-	} else if ( -scoreDelta >= mercylimit.integer ) {
-		leaderName = "Blue";
-	} else {
-		return qfalse;
+		if ( announce ) {
+			trap_SendServerCommand( -1, "print \"Red hit the mercylimit.\n\"" );
+			LogExit( "Mercylimit hit." );
+		}
+		return qtrue;
 	}
 
-	if ( announce ) {
-		trap_SendServerCommand( -1, va( "print \"%s hit the mercylimit.\n\"", leaderName ) );
-		LogExit( "Mercylimit hit." );
+	if ( -scoreDelta >= mercylimit.integer ) {
+		if ( announce ) {
+			trap_SendServerCommand( -1, "print \"Blue hit the mercylimit.\n\"" );
+			LogExit( "Mercylimit hit." );
+		}
+		return qtrue;
 	}
 
-	return qtrue;
+	return qfalse;
 }
 
 /*

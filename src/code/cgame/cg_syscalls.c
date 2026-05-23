@@ -310,14 +310,15 @@ static ql_import_f CG_GetNativeImportFunction( int importIndex ) {
 trap_QL_Cvar_RegisterRange
 =================
 */
-void trap_QL_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, float minimumValue, float maximumValue, int flags ) {
+void trap_QL_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {
 	ql_import_f import = CG_GetNativeImportFunction( CG_QL_IMPORT_CVAR_REGISTER_RANGE );
 
 	if ( !import ) {
+		trap_Cvar_Register( vmCvar, varName, defaultValue, flags );
 		return;
 	}
 
-	((void (QDECL *)( vmCvar_t *, const char *, const char *, float, float, int ))import)( vmCvar, varName, defaultValue, minimumValue, maximumValue, flags );
+	((void (QDECL *)( vmCvar_t *, const char *, const char *, const char *, const char *, int ))import)( vmCvar, varName, defaultValue, minimumValue, maximumValue, flags );
 }
 
 /*

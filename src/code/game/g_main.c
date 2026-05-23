@@ -1441,7 +1441,7 @@ static void G_UpdateItemTimerConfig( qboolean forceBroadcast ) {
 static void LevelCheckTimers( void );
 static void G_CheckTimeoutExpired( void );
 void G_UpdateMatchStateConfigString( void );
-static int G_BuildExitRuleLimitMsec( int minutes, int bonusMsec );
+int G_BuildExitRuleLimitMsec( int minutes, int bonusMsec );
 static qboolean G_StartOrExtendOvertime( void );
 static void G_StopOvertime( void );
 static void G_TrackSuddenDeathAnnouncements( void );
@@ -2990,39 +2990,38 @@ G_SyncTournamentQueueTeamTasks
 */
 void G_SyncTournamentQueueTeamTasks( void ) {
 	char		userinfo[MAX_INFO_STRING];
-	qboolean	anyDirty;
+	int		dirtyClients[MAX_CLIENTS];
+	int		dirtyCount;
 	int		i;
 
 	if ( g_gametype.integer != GT_TOURNAMENT ) {
 		return;
 	}
 
-	anyDirty = qfalse;
-	for ( i = 0; i < level.numConnectedClients; i++ ) {
-		gclient_t	*client;
-
-		client = &level.clients[level.sortedClients[i]];
-		if ( client->sess.spectatorQueuePositionDirty ) {
-			client->sess.spectatorQueuePositionDirty = qfalse;
-			anyDirty = qtrue;
-		}
-	}
-
-	if ( !anyDirty ) {
-		return;
-	}
-
+	dirtyCount = 0;
 	for ( i = 0; i < level.numConnectedClients; i++ ) {
 		int		clientNum;
 		gclient_t	*client;
 
 		clientNum = level.sortedClients[i];
 		client = &level.clients[clientNum];
-
-		if ( !G_IsTournamentQueueEligibleClient( client ) ||
-			client->sess.spectatorQueuePosition == 0 ) {
-			continue;
+		if ( client->sess.spectatorQueuePositionDirty ) {
+			client->sess.spectatorQueuePositionDirty = qfalse;
+			dirtyClients[dirtyCount] = clientNum;
+			dirtyCount++;
 		}
+	}
+
+	if ( dirtyCount <= 0 ) {
+		return;
+	}
+
+	for ( i = 0; i < dirtyCount; i++ ) {
+		int		clientNum;
+		gclient_t	*client;
+
+		clientNum = dirtyClients[i];
+		client = &level.clients[clientNum];
 
 		trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 		Info_SetValueForKey( userinfo, "teamtask", va( "%d", client->sess.spectatorQueuePosition ) );
@@ -6886,7 +6885,8 @@ qboolean ScoreIsTied( void ) {
 		return qfalse;
 	}
 	
-	if ( g_gametype.integer >= GT_TEAM ) {
+	if ( g_gametype.integer < GT_FFA ||
+		( g_gametype.integer > GT_SINGLE_PLAYER && g_gametype.integer != GT_RED_ROVER ) ) {
 		return level.teamScores[TEAM_RED] == level.teamScores[TEAM_BLUE];
 	}
 
@@ -6947,7 +6947,7 @@ void CheckExitRules( void ) {
 	case GT_RED_ROVER:
 		return;
 	case GT_FREEZE:
-		if ( level.roundState != ROUNDSTATE_INACTIVE ) {
+		if ( g_freezeRoundDelay.integer != 0 ) {
 			return;
 		}
 		break;
@@ -7564,7 +7564,7 @@ Combines the configured minute limit with the retail overtime accumulator while
 clamping the result into the signed millisecond range.
 =============
 */
-static int G_BuildExitRuleLimitMsec( int minutes, int bonusMsec ) {
+int G_BuildExitRuleLimitMsec( int minutes, int bonusMsec ) {
 	long long	totalMsec;
 
 	if ( minutes < 0 ) {

@@ -74,6 +74,51 @@ def test_factory_config_mirrors_regen_delay_and_rate_milliseconds() -> None:
 	assert "int\t\tregenArmorRateMilliseconds;" in local_h
 
 
+def test_respawn_delay_cvars_match_retail_registration_and_reset() -> None:
+	config_c = _read("src/game/g_config.c")
+
+	assert "#define CONFIG_CVAR_FLAG_FACTORY_MANAGED 0x00100000" in config_c
+	assert "#define DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS      2100" in config_c
+	assert "#define DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS      2400" in config_c
+	assert '{ &g_respawn_delay_min,    "g_respawn_delay_min",    STRINGIZE( DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS ), CONFIG_CVAR_FLAG_FACTORY_MANAGED,' in config_c
+	assert '{ &g_respawn_delay_max,    "g_respawn_delay_max",    STRINGIZE( DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS ), CONFIG_CVAR_FLAG_FACTORY_MANAGED,' in config_c
+	assert 'trap_Cvar_Set( "g_respawn_delay_min", STRINGIZE( DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS ) );' in config_c
+	assert 'trap_Cvar_Set( "g_respawn_delay_max", STRINGIZE( DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS ) );' in config_c
+
+
+def test_respawn_delay_min_and_max_are_independent_retail_fields() -> None:
+	config_c = _read("src/game/g_config.c")
+	load_start = config_c.index("static factoryCvarConfig_t G_LoadFactoryCvarConfig( void ) {")
+	load_end = config_c.index("return config;", load_start)
+	load_block = config_c[load_start:load_end]
+
+	assert 'config.respawnDelayMinMilliseconds = G_ReadFactoryNonNegativeCvar( &g_respawn_delay_min, DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS, "g_respawn_delay_min" );' in load_block
+	assert 'config.respawnDelayMaxMilliseconds = G_ReadFactoryNonNegativeCvar( &g_respawn_delay_max, DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS, "g_respawn_delay_max" );' in load_block
+	assert "respawnDelayMaxMilliseconds < config.respawnDelayMinMilliseconds" not in load_block
+
+
+def test_respawn_delay_wiring_uses_death_minimum_and_active_max_grace() -> None:
+	active_c = _read("src/code/game/g_active.c")
+	combat_c = _read("src/code/game/g_combat.c")
+	spawn_c = _read("src/code/game/g_spawn.c")
+	dead_start = active_c.index("// check for respawning")
+	dead_end = active_c.index("// perform once-a-second actions", dead_start)
+	dead_block = active_c[dead_start:dead_end]
+
+	assert "static int G_GetRespawnDelayMilliseconds( void ) {" in combat_c
+	assert "delay = g_factoryCvarConfig.respawnDelayMinMilliseconds;" in combat_c
+	assert "if ( level.suddenDeathActive && level.overtimeActive && g_suddenDeathRespawn.integer > 0 ) {" in combat_c
+	assert "self->client->respawnTime = level.time + G_GetRespawnDelayMilliseconds();" in combat_c
+	assert "if ( level.time >= client->respawnTime ) {" in dead_block
+	assert "respawnElapsed = level.time - client->respawnTime;" in dead_block
+	assert "respawnElapsed > g_factoryCvarConfig.respawnDelayMaxMilliseconds" in dead_block
+	assert "g_forcerespawn.integer" not in dead_block
+	assert "G_FactoryRespawnWindowActive" not in spawn_c
+	assert "G_FactoryComputeRespawnDelay" not in spawn_c
+	assert "g_factoryCvarConfig.respawnDelayMinMilliseconds" not in spawn_c
+	assert "g_factoryCvarConfig.respawnDelayMaxMilliseconds" not in spawn_c
+
+
 def test_factory_item_spawn_defaults_match_retail_registration() -> None:
 	config_c = _read("src/game/g_config.c")
 
@@ -107,6 +152,9 @@ def test_factory_apply_resets_factory_managed_cvars_before_overrides() -> None:
 	assert 'trap_Cvar_Set( "weapon_reload_hmg", "0" );' in config_c
 	assert 'trap_Cvar_Set( "g_loadout", STRINGIZE( DEFAULT_FACTORY_LOADOUT ) );' in config_c
 	assert 'trap_Cvar_Set( "g_runes", STRINGIZE( DEFAULT_FACTORY_RUNES ) );' in config_c
+	assert 'trap_Cvar_Set( "g_ammoPack", STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ) );' in config_c
+	assert 'trap_Cvar_Set( "g_ammoPackHack", STRINGIZE( DEFAULT_AMMO_PACK_HACK ) );' in config_c
+	assert 'trap_Cvar_Set( "g_ammoRespawn", STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ) );' in config_c
 	assert 'trap_Cvar_Set( "g_regenHealth", STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ) );' in config_c
 	assert 'trap_Cvar_Set( "g_spawnItemPowerup", STRINGIZE( DEFAULT_SPAWN_ITEM_POWERUP ) );' in config_c
 	assert 'trap_Cvar_Set( "g_spawnItemAmmo", STRINGIZE( DEFAULT_SPAWN_ITEM_AMMO ) );' in config_c
@@ -197,6 +245,19 @@ def test_factory_ammo_spawn_gate_switches_between_global_and_weapon_ammo_familie
 
 \t\treturn ( g_factoryCvarConfig.ammoPackEnabled || g_factoryCvarConfig.ammoPackHackEnabled ) ? qfalse : qtrue;""" in items_c
 	assert "Allow the active ammo pickup family to spawn when factories expose either global ammo packs or weapon-specific ammo." in config_c
+
+
+def test_ammo_vote_labels_select_retail_global_and_weapon_modes() -> None:
+	vote_c = _read("src/code/game/g_vote.c")
+
+	global_start = vote_c.index('if ( !Q_stricmp( args, "GLOBAL" ) ) {')
+	weapon_start = vote_c.index('if ( !Q_stricmp( args, "WEAP" ) ) {', global_start)
+	error_start = vote_c.index('trap_SendServerCommand( -1, "print \\"^3Valid loadout options are:', weapon_start)
+	global_block = vote_c[global_start:weapon_start]
+	weapon_block = vote_c[weapon_start:error_start]
+
+	assert 'trap_Cvar_Set( "g_ammoPack", "1" );' in global_block
+	assert 'trap_Cvar_Set( "g_ammoPack", "0" );' in weapon_block
 
 
 def test_factory_selection_falls_back_to_retail_gametype_defaults() -> None:

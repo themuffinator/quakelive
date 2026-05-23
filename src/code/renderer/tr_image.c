@@ -237,6 +237,9 @@ void R_ImageList_f( void ) {
 		case GL_CLAMP:
 			ri.Printf( PRINT_ALL, "clmp " );
 			break;
+		case GL_CLAMP_TO_EDGE:
+			ri.Printf( PRINT_ALL, "edge " );
+			break;
 		default:
 			ri.Printf( PRINT_ALL, "%4i ", image->wrapClampMode );
 			break;

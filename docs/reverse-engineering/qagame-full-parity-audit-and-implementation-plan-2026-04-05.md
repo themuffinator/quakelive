@@ -147,8 +147,8 @@ Freeze behavior is broadly functional, but retail keeps more of the winner-resol
 
 ### Closure summary
 
-- `G_UpdateTournamentQueuePositions`, `G_FindNextTournamentPlayer`, and `G_SyncTournamentQueueTeamTasks` now share the recovered "eligible waiting spectator" filter, so scoreboard spectators, dedicated follow slots, and `spectateOnly` duel opt-outs no longer enter the queue-position lane.
-- `ClientUserinfoChanged` now publishes the retail-side `rp` / `p` / `so` / `pq` slab together, while the queue sidecar still mirrors active queue positions back through `teamtask` for the spectator-strip compatibility path.
+- `G_UpdateTournamentQueuePositions` and `G_FindNextTournamentPlayer` now share the recovered "eligible waiting spectator" filter, so scoreboard spectators, dedicated follow slots, and `spectateOnly` duel opt-outs no longer enter the queue-position lane.
+- `ClientUserinfoChanged` now publishes the retail-side `rp` / `p` / `so` / `pq` slab together, while the queue sidecar mirrors dirty queue positions back through `teamtask` for the spectator-strip compatibility path, including zero clears when clients leave the queue.
 - Focused queue and cgame spectator-strip regressions now pin the helper split, the shared eligibility gate, and the configstring payload shape together.
 
 ## QG-G07 — Spawn/loadout finalizer exactness

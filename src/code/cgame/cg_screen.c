@@ -146,72 +146,19 @@ static qhandle_t CG_GetScreenDamageBlendShader( void ) {
 
 /*
 ================
-CG_GetScreenDamageColor
-
-Selects the retail screen-damage tint variant for the current attacker.
-================
-*/
-static qboolean CG_GetScreenDamageColor( vec4_t color, float *alphaScale ) {
-	int				attackerClientNum;
-	team_t			playerTeam;
-	clientInfo_t	*attackerInfo;
-
-	Vector4Copy( cg.screenDamageColor, color );
-	*alphaScale = cg.screenDamageAlpha;
-
-	if ( !cg.snap ) {
-		return qfalse;
-	}
-
-	attackerClientNum = cg.snap->ps.persistant[PERS_ATTACKER];
-	if ( attackerClientNum == cg.snap->ps.clientNum ) {
-		Vector4Copy( cg.screenDamageSelfColor, color );
-		return qtrue;
-	}
-
-	if ( cgs.gametype < GT_TEAM ) {
-		return qfalse;
-	}
-
-	playerTeam = (team_t)cg.snap->ps.persistant[PERS_TEAM];
-	if ( playerTeam != TEAM_RED && playerTeam != TEAM_BLUE ) {
-		return qfalse;
-	}
-
-	if ( attackerClientNum < 0 || attackerClientNum >= cgs.maxclients ) {
-		return qfalse;
-	}
-
-	attackerInfo = &cgs.clientinfo[attackerClientNum];
-	if ( !attackerInfo->infoValid || attackerInfo->team != playerTeam ) {
-		return qfalse;
-	}
-
-	Vector4Copy( cg.screenDamageTeamColor, color );
-	*alphaScale = cg.screenDamageAlphaTeam;
-	return qfalse;
-}
-
-/*
-================
 CG_SetScreenDamageEntityColor
 
 Applies the retail screen-damage tint to a sprite entity.
 ================
 */
-static void CG_SetScreenDamageEntityColor( refEntity_t *ent, const vec4_t color, float alphaScale, float fade, qboolean useColorAlpha ) {
+static void CG_SetScreenDamageEntityColor( refEntity_t *ent, unsigned int packedColor, float fade ) {
 	float	alphaByte;
 
-	ent->shaderRGBA[0] = (byte)( Com_Clamp( 0.0f, 1.0f, color[0] ) * 255.0f );
-	ent->shaderRGBA[1] = (byte)( Com_Clamp( 0.0f, 1.0f, color[1] ) * 255.0f );
-	ent->shaderRGBA[2] = (byte)( Com_Clamp( 0.0f, 1.0f, color[2] ) * 255.0f );
+	ent->shaderRGBA[0] = (byte)( ( packedColor >> 24 ) & 0xff );
+	ent->shaderRGBA[1] = (byte)( ( packedColor >> 16 ) & 0xff );
+	ent->shaderRGBA[2] = (byte)( ( packedColor >> 8 ) & 0xff );
 
-	if ( useColorAlpha ) {
-		alphaByte = Com_Clamp( 0.0f, 1.0f, color[3] ) * 255.0f;
-	} else {
-		alphaByte = Com_Clamp( 0.0f, 255.0f, alphaScale );
-	}
-
+	alphaByte = (float)( packedColor & 0xff );
 	ent->shaderRGBA[3] = (byte)Com_Clamp( 0.0f, 255.0f, alphaByte * fade );
 }
 
@@ -226,9 +173,6 @@ void CG_DamageBlendBlob( void ) {
 	int			t;
 	int			maxTime;
 	float		fade;
-	float		alphaScale;
-	qboolean	useColorAlpha;
-	vec4_t		color;
 	refEntity_t		ent;
 
 	if ( !cg.damageValue ) {
@@ -258,8 +202,7 @@ void CG_DamageBlendBlob( void ) {
 
 	ent.radius = cg.damageValue * 2.0f;
 
-	useColorAlpha = CG_GetScreenDamageColor( color, &alphaScale );
-	CG_SetScreenDamageEntityColor( &ent, color, alphaScale, fade, useColorAlpha );
+	CG_SetScreenDamageEntityColor( &ent, cg.damageBlendColor, fade );
 
 	if ( cgs.media.viewBloodShader ) {
 		ent.customShader = cgs.media.viewBloodShader;

@@ -106,6 +106,8 @@ def test_key_event_intercepts_retail_hud_binding_commands() -> None:
 def test_duel_scorebox_status_ownerdraws_restore_retail_label_split() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	status_block = _block_from_marker(source, "static qboolean CG_BuildSpectatorStatusText")
+	shader_block = _block_from_marker(source, "static qhandle_t CG_GetSpectatorStatusShader")
+	label_block = _block_from_marker(source, "static void CG_DrawSpectatorStatusLabel")
 	primary_block = _block_from_marker(source, "static void CG_DrawSpectatorPrimaryStatus")
 	secondary_block = _block_from_marker(source, "static void CG_DrawSpectatorSecondaryStatus")
 	metric_block = _block_from_marker(source, "static qboolean CG_BuildPlacementMetricText")
@@ -113,16 +115,34 @@ def test_duel_scorebox_status_ownerdraws_restore_retail_label_split() -> None:
 
 	for expected in (
 		"cgs.gametype == GT_TOURNAMENT",
+		"cg.warmup == 0",
 		"cg.snap->ps.pm_type != PM_INTERMISSION",
 		'Q_strncpyz( buffer, "LEADS", bufferSize );',
 		'Q_strncpyz( buffer, "TRAILS", bufferSize );',
 		'Q_strncpyz( buffer, "TIED", bufferSize );',
 		'Q_strncpyz( buffer, "READY", bufferSize );',
 		'Q_strncpyz( buffer, "NOT READY", bufferSize );',
-		"CG_ClientReadyOnIntermission( score->client )",
+		"CG_ClientReadyForScoreboxStatus( score->client )",
+		"*shader = CG_GetSpectatorStatusShader( slot, status );",
 	):
 		assert expected in status_block
 
+	for expected in (
+		"return cgs.media.scoreFirstPlayerReadyShader;",
+		"return cgs.media.scoreFirstPlayerNotReadyShader;",
+		"return cgs.media.scoreFirstPlayerLeadsShader;",
+		"return cgs.media.scoreFirstPlayerTiedShader;",
+		"return cgs.media.scoreFirstPlayerTrailsShader;",
+		"return cgs.media.scoreSecondPlayerReadyShader;",
+		"return cgs.media.scoreSecondPlayerNotReadyShader;",
+		"return cgs.media.scoreSecondPlayerLeadsShader;",
+		"return cgs.media.scoreSecondPlayerTiedShader;",
+		"return cgs.media.scoreSecondPlayerTrailsShader;",
+	):
+		assert expected in shader_block
+
+	assert "CG_DrawPic( rect->x, rect->y, rect->w, rect->h, shader );" in label_block
+	assert "CG_Text_Paint( x, rect->y + rect->h, 0.16f, colorWhite, buffer, 0, 0, 3 );" in label_block
 	assert "CG_DrawSpectatorStatusLabel( rect, 0 );" in primary_block
 	assert "CG_DrawSpectatorStatusLabel( rect, 1 );" in secondary_block
 	assert "case CG_1ST_PLYR_READY:" in metric_block
@@ -132,6 +152,7 @@ def test_duel_scorebox_status_ownerdraws_restore_retail_label_split() -> None:
 	assert "if ( ownerDraw == CG_2ND_PLYR_READY ) {" in placement_block
 	assert "CG_DrawSpectatorSecondaryStatus( rect );" in placement_block
 	assert 'Q_strncpyz( buffer, CG_ClientReadyOnIntermission( score->client ) ? "Ready" : "-", bufferSize );' not in source
+	assert "Vector4Set( color," not in status_block
 
 
 def test_score_value_wrapper_restores_retail_competitive_score_owner() -> None:

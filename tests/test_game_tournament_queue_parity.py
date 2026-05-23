@@ -39,16 +39,29 @@ def test_duel_queue_helpers_and_dirty_latch_match_retail_surface() -> None:
 	assert "void G_UpdateTournamentQueuePositions( void ) {" in main_c
 	assert "for ( i = 0; i < level.numConnectedClients; i++ ) {" in main_c
 	assert "clientNum = level.sortedClients[i];" in main_c
-	assert main_c.count("G_IsTournamentQueueEligibleClient( client )") >= 3
+	assert main_c.count("G_IsTournamentQueueEligibleClient( client )") >= 2
 	assert "qsort( queuedClients, queuedCount, sizeof( queuedClients[0] ), G_CompareTournamentQueueTimes );" in main_c
 	assert "client->sess.spectatorQueuePosition = queuePosition;" in main_c
 	assert "client->sess.spectatorQueuePositionDirty = qtrue;" in main_c
 	assert "void G_SyncTournamentQueueTeamTasks( void ) {" in main_c
+	assert "int\t\tdirtyClients[MAX_CLIENTS];" in main_c
 	assert "if ( client->sess.spectatorQueuePositionDirty ) {" in main_c
 	assert "client->sess.spectatorQueuePositionDirty = qfalse;" in main_c
+	assert "dirtyClients[dirtyCount] = clientNum;" in main_c
+	assert "for ( i = 0; i < dirtyCount; i++ ) {" in main_c
 	assert 'Info_SetValueForKey( userinfo, "teamtask", va( "%d", client->sess.spectatorQueuePosition ) );' in main_c
 	assert "trap_SetUserinfo( clientNum, userinfo );" in main_c
 	assert "ClientUserinfoChanged( clientNum );" in main_c
+
+
+def test_queue_teamtask_sync_clears_dequeued_spectators() -> None:
+	main_c = _read("src/code/game/g_main.c")
+	block = _extract_block(main_c, "void G_SyncTournamentQueueTeamTasks( void ) {")
+
+	assert "clientNum = dirtyClients[i];" in block
+	assert "client->sess.spectatorQueuePosition == 0" not in block
+	assert "!G_IsTournamentQueueEligibleClient( client )" not in block
+	assert 'Info_SetValueForKey( userinfo, "teamtask", va( "%d", client->sess.spectatorQueuePosition ) );' in block
 
 
 def test_clientuserinfochanged_publishes_queue_surface() -> None:

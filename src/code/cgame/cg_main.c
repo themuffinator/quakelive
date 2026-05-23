@@ -307,6 +307,7 @@ vmCvar_t	cg_bobroll;
 vmCvar_t	cg_runpitch;
 vmCvar_t	cg_runroll;
 vmCvar_t	cg_brassTime;
+vmCvar_t	cg_bubbleTrail;
 vmCvar_t	cg_buildScript;
 vmCvar_t	cg_cameraMode;
 vmCvar_t	cg_cameraOrbit;
@@ -394,7 +395,6 @@ vmCvar_t	cg_teamOverlayUserinfo;
 vmCvar_t	cg_drawTieredArmorAvailability;
 vmCvar_t	cg_enableDust;
 vmCvar_t	cg_enableBreath;
-vmCvar_t	cg_drawCrosshairNames;
 vmCvar_t	cg_enemyCrosshairNames;
 vmCvar_t	cg_enemyCrosshairNamesOpacity;
 vmCvar_t	cg_enemyColors;
@@ -406,6 +406,7 @@ vmCvar_t	cg_filter_angles;
 vmCvar_t	cg_followKiller;
 vmCvar_t	cg_followPowerup;
 vmCvar_t	cg_footsteps;
+vmCvar_t	cg_forceDrawCrosshair;
 vmCvar_t	cg_forceModel;
 vmCvar_t	cg_forceEnemyModel;
 vmCvar_t	cg_enemyModel;
@@ -426,7 +427,6 @@ vmCvar_t	cg_gametype;
 vmCvar_t	cg_gun_x;
 vmCvar_t	cg_gun_y;
 vmCvar_t	cg_gun_z;
-vmCvar_t	cg_gun_frame;
 vmCvar_t	cg_hudFiles;
 vmCvar_t	cg_ignoreMouseInput;
 vmCvar_t	cg_itemTimers;
@@ -450,7 +450,7 @@ vmCvar_t	cg_obituaryRowSize;
 vmCvar_t	cg_overheadNamesWidth;
 vmCvar_t	cg_paused;
 vmCvar_t	cg_preferredStartingWeapons;
-vmCvar_t	cg_oldPlasma;
+vmCvar_t	cg_plasmaStyle;
 vmCvar_t	cg_playerCylinders;
 vmCvar_t	cg_smoothClients;
 vmCvar_t	pmove_fixed;
@@ -459,14 +459,13 @@ vmCvar_t	pmove_msec;
 vmCvar_t	cg_predictItems;
 vmCvar_t	cg_predictLocalRailshots;
 vmCvar_t	cg_projectileNudge;
-vmCvar_t	cg_noProjectileTrail;
 vmCvar_t	cg_raceBeep;
 vmCvar_t	cg_railStyle;
 vmCvar_t	cg_railTrailTime;
 vmCvar_t	cg_recordSPDemo;
 vmCvar_t	cg_recordSPDemoName;
 vmCvar_t	cg_redTeamName;
-vmCvar_t	cg_oldRocket;
+vmCvar_t	cg_rocketStyle;
 vmCvar_t	cg_scorePlum;
 vmCvar_t	cg_screenDamage;
 vmCvar_t	cg_screenDamage_Self;
@@ -565,6 +564,8 @@ typedef struct {
 	const char	*cvarName;
 	const char	*defaultString;
 	int			cvarFlags;
+	const char	*minimumString;
+	const char	*maximumString;
 } cvarTable_t;
 
 int CG_StartingWeaponIndexFromToken( const char *value );
@@ -595,8 +596,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_announcerRewardsVO, "cg_announcerRewardsVO", "1", CVAR_ARCHIVE },
 	{ &cg_autoAction, "cg_autoAction", "0", CVAR_ARCHIVE | CVAR_LATCH },
 	{ &cg_autoHop, "cg_autoHop", "1", CVAR_ARCHIVE | CVAR_LATCH },
-	{ &cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE },
-	{ &cg_autoProjectileNudge, "cg_autoProjectileNudge", "0", CVAR_ARCHIVE | CVAR_LATCH },
+	{ &cg_autoswitch, "cg_autoswitch", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_autoProjectileNudge, "cg_autoProjectileNudge", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_bigFont, "ui_bigFont", "0.4", CVAR_ARCHIVE},
 	{ &cg_blood, "com_blood", "1", CVAR_ARCHIVE },
 	{ &cg_blueTeamName, "g_blueteam", DEFAULT_BLUETEAM_NAME, CVAR_ARCHIVE },
@@ -606,7 +607,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_bobroll, "cg_bobroll", "0.002", CVAR_ARCHIVE },
 	{ &cg_runpitch, "cg_runpitch", "0.002", CVAR_ARCHIVE},
 	{ &cg_runroll, "cg_runroll", "0.005", CVAR_ARCHIVE },
-	{ &cg_brassTime, "cg_brassTime", "2500", CVAR_ARCHIVE },
+	{ &cg_brassTime, "cg_brassTime", "2500", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "10000" },
+	{ &cg_bubbleTrail, "cg_bubbleTrail", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_buildScript, "com_build", "0", 0 },	// force loading of all possible data amd error on failures
 	{ &cg_cameraMode, "com_cameraMode", "0", CVAR_CHEAT},
 	{ &cg_cameraOrbit, "cg_cameraOrbit", "0", CVAR_CHEAT},
@@ -619,16 +621,16 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_complaintWarning, "cg_complaintWarning", "1", CVAR_ARCHIVE },
 	{ &cg_playVoiceChats, "cg_playVoiceChats", "1", CVAR_ARCHIVE },
 	{ &cg_showVoiceText, "cg_showVoiceText", "1", CVAR_ARCHIVE },
-	{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1", CVAR_ARCHIVE },
-	{ &cg_crosshairColor, "cg_crosshairColor", "4", CVAR_ARCHIVE },
-	{ &cg_crosshairHealth, "cg_crosshairHealth", "1", CVAR_ARCHIVE },
-	{ &cg_crosshairHitColor, "cg_crosshairHitColor", "1", CVAR_ARCHIVE },
-	{ &cg_crosshairHitStyle, "cg_crosshairHitStyle", "2", CVAR_ARCHIVE },
-	{ &cg_crosshairHitTime, "cg_crosshairHitTime", "200", CVAR_ARCHIVE },
-	{ &cg_crosshairPulse, "cg_crosshairPulse", "1", CVAR_ARCHIVE },
-	{ &cg_crosshairSize, "cg_crosshairSize", "24", CVAR_ARCHIVE },
-	{ &cg_crosshairX, "cg_crosshairX", "0", CVAR_ARCHIVE },
-	{ &cg_crosshairY, "cg_crosshairY", "0", CVAR_ARCHIVE },
+	{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0.0", "1.0" },
+	{ &cg_crosshairColor, "cg_crosshairColor", "25", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "1", "26" },
+	{ &cg_crosshairHealth, "cg_crosshairHealth", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_crosshairHitColor, "cg_crosshairHitColor", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "1", "26" },
+	{ &cg_crosshairHitStyle, "cg_crosshairHitStyle", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "8" },
+	{ &cg_crosshairHitTime, "cg_crosshairHitTime", "200.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0.0", "1000.0" },
+	{ &cg_crosshairPulse, "cg_crosshairPulse", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_crosshairSize, "cg_crosshairSize", "32", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "320" },
+	{ &cg_crosshairX, "cg_crosshairX", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-320", "320" },
+	{ &cg_crosshairY, "cg_crosshairY", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-240", "240" },
 	{ &cg_currentSelectedPlayer, "cg_currentSelectedPlayer", "0", CVAR_ARCHIVE},
 	{ &cg_currentSelectedPlayerName, "cg_currentSelectedPlayerName", "", CVAR_ARCHIVE},
 	{ &cg_damagePlum, "cg_damagePlum", "g mg sg gl rl lg rg pg bfg gh cg ng pl hmg", CVAR_USERINFO | CVAR_ARCHIVE },
@@ -657,16 +659,16 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_draw2D, "cg_draw2D", "1", CVAR_ARCHIVE  },
 	{ &cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawAmmoWarning, "cg_drawAmmoWarning", "1", CVAR_ARCHIVE  },
-	{ &cg_drawAttacker, "cg_drawAttacker", "1", CVAR_ARCHIVE  },
-	{ &cg_drawCrosshair, "cg_drawCrosshair", "2", CVAR_ARCHIVE },
-	{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "2", CVAR_ARCHIVE },
-	{ &cg_drawCrosshairTeamHealthSize, "cg_drawCrosshairTeamHealthSize", "0.12", CVAR_ARCHIVE },
+	{ &cg_drawAttacker, "cg_drawAttacker", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_drawCrosshair, "cg_drawCrosshair", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "29" },
+	{ &cg_drawCrosshairTeamHealth, "cg_drawCrosshairTeamHealth", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "2" },
+	{ &cg_drawCrosshairTeamHealthSize, "cg_drawCrosshairTeamHealthSize", "0.12", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0.10", "0.26" },
 	{ &cg_drawDeadFriendTime, "cg_drawDeadFriendTime", "3000", CVAR_ARCHIVE },
 	{ &cg_drawDemoHUD, "cg_drawDemoHUD", "1", CVAR_ARCHIVE },
-	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE  },
+	{ &cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_drawFragMessages, "cg_drawFragMessages", "1", CVAR_ARCHIVE },
-	{ &cg_drawFullWeaponBar, "cg_drawFullWeaponBar", "0", CVAR_ARCHIVE },
-	{ &cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE },
+	{ &cg_drawFullWeaponBar, "cg_drawFullWeaponBar", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "3" },
 	{ &cg_drawHitFriendTime, "cg_drawHitFriendTime", "5000", CVAR_ARCHIVE },
 	{ &cg_drawIcons, "cg_drawIcons", "1", CVAR_ARCHIVE  },
 	{ &cg_drawInputCmds, "cg_drawInputCmds", "0", CVAR_ARCHIVE },
@@ -679,24 +681,23 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_drawCheckpointRemaining, "cg_drawCheckpointRemaining", "1", CVAR_ARCHIVE },
 	{ &cg_drawRewards, "cg_drawRewards", "1", CVAR_ARCHIVE },
 	{ &cg_drawRewardsRowSize, "cg_drawRewardsRowSize", "9", CVAR_ARCHIVE },
-	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  },
+	{ &cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "2" },
 	{ &cg_drawTimer, "cg_drawTimer", "0", CVAR_ARCHIVE  },
 	{ &cg_drawSpecMessages, "cg_drawSpecMessages", "1", CVAR_ARCHIVE },
 	{ &cg_drawSprites, "cg_drawSprites", "1", CVAR_ARCHIVE },
 	{ &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", CVAR_ARCHIVE },
 	{ &cg_drawStatus, "cg_drawStatus", "1", CVAR_ARCHIVE  },
-	{ &cg_drawTeamOverlay, "cg_drawTeamOverlay", "0", CVAR_ARCHIVE },
-	{ &cg_drawTeamOverlayOpacity, "cg_drawTeamOverlayOpacity", "0.75", CVAR_ARCHIVE },
-	{ &cg_drawTeamOverlaySize, "cg_drawTeamOverlaySize", "0.16", CVAR_ARCHIVE },
-	{ &cg_drawTeamOverlayX, "cg_drawTeamOverlayX", "-640", CVAR_ARCHIVE },
-	{ &cg_drawTeamOverlayY, "cg_drawTeamOverlayY", "-480", CVAR_ARCHIVE },
+	{ &cg_drawTeamOverlay, "cg_drawTeamOverlay", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "3" },
+	{ &cg_drawTeamOverlayOpacity, "cg_drawTeamOverlayOpacity", "0.75", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_drawTeamOverlaySize, "cg_drawTeamOverlaySize", "0.16", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0.12", "0.22" },
+	{ &cg_drawTeamOverlayX, "cg_drawTeamOverlayX", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-640", "640" },
+	{ &cg_drawTeamOverlayY, "cg_drawTeamOverlayY", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-480", "480" },
 	{ &cg_teamOverlayUserinfo, "teamoverlay", "0", CVAR_ROM | CVAR_USERINFO },
 	{ &cg_drawTieredArmorAvailability, "cg_drawTieredArmorAvailability", "1", CVAR_ARCHIVE },
 	{ &cg_enableDust, "g_enableDust", "0", CVAR_SERVERINFO},
 	{ &cg_enableBreath, "g_enableBreath", "0", CVAR_SERVERINFO},
-	{ &cg_drawCrosshairNames, "cg_drawCrosshairNames", "1", CVAR_ARCHIVE },
-	{ &cg_enemyCrosshairNames, "cg_enemyCrosshairNames", "1", CVAR_ARCHIVE },
-	{ &cg_enemyCrosshairNamesOpacity, "cg_enemyCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
+	{ &cg_enemyCrosshairNames, "cg_enemyCrosshairNames", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_enemyCrosshairNamesOpacity, "cg_enemyCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_enemyColors, "cg_enemyColors", "", CVAR_ARCHIVE },
 	{ &cg_enemyHeadColor, "cg_enemyHeadColor", "", CVAR_ARCHIVE },
 	{ &cg_enemyLowerColor, "cg_enemyLowerColor", "", CVAR_ARCHIVE },
@@ -706,15 +707,16 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_followKiller, "cg_followKiller", "0", CVAR_ARCHIVE },
 	{ &cg_followPowerup, "cg_followPowerup", "0", CVAR_ARCHIVE },
 	{ &cg_footsteps, "cg_footsteps", "1", CVAR_CHEAT },
+	{ &cg_forceDrawCrosshair, "cg_forceDrawCrosshair", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_forceModel, "cg_forceModel", "0", CVAR_ARCHIVE  },
 	{ &cg_forceEnemyModel, "cg_forceEnemyModel", "", CVAR_ARCHIVE },
 	{ &cg_enemyModel, "cg_enemyModel", "", CVAR_ARCHIVE },
 	{ &cg_forceEnemySkin, "cg_forceEnemySkin", "", CVAR_ARCHIVE },
-	{ &cg_forceEnemyWeaponColor, "cg_forceEnemyWeaponColor", "0", CVAR_ARCHIVE },
+	{ &cg_forceEnemyWeaponColor, "cg_forceEnemyWeaponColor", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_forceTeamModel, "cg_forceTeamModel", "", CVAR_ARCHIVE },
 	{ &cg_teamModel, "cg_teamModel", "", CVAR_ARCHIVE },
 	{ &cg_forceTeamSkin, "cg_forceTeamSkin", "", CVAR_ARCHIVE },
-	{ &cg_forceTeamWeaponColor, "cg_forceTeamWeaponColor", "0", CVAR_ARCHIVE },
+	{ &cg_forceTeamWeaponColor, "cg_forceTeamWeaponColor", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_fov, "cg_fov", "90", CVAR_ARCHIVE },
 	{ &cg_gameInfo1, "cg_gameInfo1", "", CVAR_ROM },
 	{ &cg_gameInfo2, "cg_gameInfo2", "", CVAR_ROM },
@@ -723,10 +725,9 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_gameInfo5, "cg_gameInfo5", "", CVAR_ROM },
 	{ &cg_gameInfo6, "cg_gameInfo6", "", CVAR_ROM },
 	{ &cg_gametype, "cg_gametype", "0", CVAR_ROM },
-	{ &cg_gun_x, "cg_gunX", "0", CVAR_CHEAT },
-	{ &cg_gun_y, "cg_gunY", "0", CVAR_CHEAT },
-	{ &cg_gun_z, "cg_gunZ", "0", CVAR_CHEAT },
-	{ &cg_gun_frame, "cg_gun_frame", "0", CVAR_CHEAT },
+	{ &cg_gun_x, "cg_gunX", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-10", "10" },
+	{ &cg_gun_y, "cg_gunY", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-10", "20" },
+	{ &cg_gun_z, "cg_gunZ", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "-8", "0" },
 	{ &cg_hudFiles, "cg_hudFiles", "ui/hud.txt", CVAR_ARCHIVE},
 	{ &cg_ignoreMouseInput, "cg_ignoreMouseInput", "0", CVAR_ARCHIVE },
 	{ &cg_itemTimers, "cg_itemTimers", "1", CVAR_ARCHIVE },
@@ -734,14 +735,14 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_lagometer, "cg_lagometer", "1", CVAR_ARCHIVE },
 	{ &cg_lastmsg, "cg_lastmsg", "0", CVAR_ARCHIVE },
 	{ &cg_levelTimerDirection, "cg_levelTimerDirection", "1", CVAR_ARCHIVE },
-	{ &cg_lightningImpact, "cg_lightningImpact", "1", CVAR_ARCHIVE },
-	{ &cg_lightningImpactCap, "cg_lightningImpactCap", "512", CVAR_ARCHIVE },
-	{ &cg_lightningStyle, "cg_lightningStyle", "1", CVAR_ARCHIVE },
+	{ &cg_lightningImpact, "cg_lightningImpact", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_lightningImpactCap, "cg_lightningImpactCap", "192", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "768" },
+	{ &cg_lightningStyle, "cg_lightningStyle", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "1", "5" },
 	{ &cg_loadout, "cg_loadout", "0", CVAR_ROM },
-	{ &cg_lowAmmoWarningPercentile, "cg_lowAmmoWarningPercentile", "0.20", CVAR_ARCHIVE },
-	{ &cg_lowAmmoWarningSound, "cg_lowAmmoWarningSound", "1", CVAR_ARCHIVE },
-	{ &cg_lowAmmoWeaponBarWarning, "cg_lowAmmoWeaponBarWarning", "2", CVAR_ARCHIVE },
-	{ &cg_muzzleFlash, "cg_muzzleFlash", "1", CVAR_ARCHIVE },
+	{ &cg_lowAmmoWarningPercentile, "cg_lowAmmoWarningPercentile", "0.20", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0.01", "1.00" },
+	{ &cg_lowAmmoWarningSound, "cg_lowAmmoWarningSound", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "2" },
+	{ &cg_lowAmmoWeaponBarWarning, "cg_lowAmmoWeaponBarWarning", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "2" },
+	{ &cg_muzzleFlash, "cg_muzzleFlash", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_noPlayerAnims, "cg_noplayeranims", "0", CVAR_CHEAT },
 	{ &cg_nopredict, "cg_nopredict", "0", 0 },
 	{ &cg_synchronousClients, "g_synchronousClients", "0", 0 },	// communicated by systeminfo
@@ -750,29 +751,28 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_overheadNamesWidth, "cg_overheadNamesWidth", "120", CVAR_ARCHIVE },
 	{ &cg_paused, "cl_paused", "0", CVAR_ROM },
 	{ &cg_preferredStartingWeapons, "cg_preferredStartingWeapons", "", 0x00080801 },
-	{ &cg_oldPlasma, "cg_oldPlasma", "1", CVAR_ARCHIVE},
+	{ &cg_plasmaStyle, "cg_plasmaStyle", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "1", "2" },
 	{ &cg_playerCylinders, "cg_playerCylinders", "0", CVAR_ROM },
 	{ &cg_smoothClients, "cg_smoothClients", "0", CVAR_USERINFO | CVAR_ARCHIVE},
 	{ &pmove_fixed, "pmove_fixed", "0", 0},
 	{ &pmove_msec, "pmove_msec", "8", 0},
 	{ &cg_predictItems, "cg_predictItems", "1", CVAR_ARCHIVE },
-	{ &cg_predictLocalRailshots, "cg_predictLocalRailshots", "0", CVAR_ARCHIVE | CVAR_LATCH },
-	{ &cg_projectileNudge, "cg_projectileNudge", "0", CVAR_ARCHIVE | CVAR_LATCH },
-	{ &cg_noProjectileTrail, "cg_noProjectileTrail", "0", CVAR_ARCHIVE},
+	{ &cg_predictLocalRailshots, "cg_predictLocalRailshots", "1", 0 },
+	{ &cg_projectileNudge, "cg_projectileNudge", "0", CVAR_CHEAT },
 	{ &cg_raceBeep, "cg_raceBeep", "1", CVAR_ARCHIVE },
-	{ &cg_railStyle, "cg_railStyle", "1", CVAR_ARCHIVE},
-	{ &cg_railTrailTime, "cg_railTrailTime", "2000", CVAR_ARCHIVE  },
+	{ &cg_railStyle, "cg_railStyle", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "1", "2" },
+	{ &cg_railTrailTime, "cg_railTrailTime", "2000", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "2000" },
 	{ &cg_recordSPDemo, "ui_recordSPDemo", "0", CVAR_ARCHIVE},
 	{ &cg_recordSPDemoName, "ui_recordSPDemoName", "", CVAR_ARCHIVE},
 	{ &cg_redTeamName, "g_redteam", DEFAULT_REDTEAM_NAME, CVAR_ARCHIVE },
-	{ &cg_oldRocket, "cg_oldRocket", "1", CVAR_ARCHIVE},
+	{ &cg_rocketStyle, "cg_rocketStyle", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "1", "2" },
 	{ &cg_scorePlum, "cg_scorePlums", "1", CVAR_USERINFO | CVAR_ARCHIVE},
-	{ &cg_screenDamage, "cg_screenDamage", DEFAULT_SCREEN_DAMAGE_COLOR, CVAR_ARCHIVE },
-	{ &cg_screenDamage_Self, "cg_screenDamage_Self", DEFAULT_SCREEN_DAMAGE_SELF_COLOR, CVAR_ARCHIVE },
-	{ &cg_screenDamage_Team, "cg_screenDamage_Team", DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, CVAR_ARCHIVE },
-	{ &cg_screenDamageAlpha, "cg_screenDamageAlpha", DEFAULT_SCREEN_DAMAGE_ALPHA, CVAR_ARCHIVE },
-	{ &cg_screenDamageAlpha_Team, "cg_screenDamageAlpha_Team", DEFAULT_SCREEN_DAMAGE_ALPHA, CVAR_ARCHIVE },
-	{ &cg_selfOnTeamOverlay, "cg_selfOnTeamOverlay", "0", CVAR_ARCHIVE },
+	{ &cg_screenDamage, "cg_screenDamage", DEFAULT_SCREEN_DAMAGE_COLOR, CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD },
+	{ &cg_screenDamage_Self, "cg_screenDamage_Self", DEFAULT_SCREEN_DAMAGE_SELF_COLOR, CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD },
+	{ &cg_screenDamage_Team, "cg_screenDamage_Team", DEFAULT_SCREEN_DAMAGE_TEAM_COLOR, CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD },
+	{ &cg_screenDamageAlpha, "cg_screenDamageAlpha", DEFAULT_SCREEN_DAMAGE_ALPHA, CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD },
+	{ &cg_screenDamageAlpha_Team, "cg_screenDamageAlpha_Team", DEFAULT_SCREEN_DAMAGE_ALPHA, CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD },
+	{ &cg_selfOnTeamOverlay, "cg_selfOnTeamOverlay", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_shadows, "cg_shadows", "1", CVAR_ARCHIVE  },
 	{ &cg_showmiss, "cg_showmiss", "0", 0 },
 	{ &cg_simpleItems, "cg_simpleItems", "0", CVAR_ARCHIVE },
@@ -794,8 +794,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_stats, "cg_stats", "0", 0 },
 	{ &cg_stereoSeparation, "cg_stereoSeparation", "0.4", CVAR_ARCHIVE  },
 	{ &cg_swingSpeed, "cg_swingSpeed", "0.3", CVAR_CHEAT },
-	{ &cg_switchOnEmpty, "cg_switchOnEmpty", "1", CVAR_ARCHIVE },
-	{ &cg_switchToEmpty, "cg_switchToEmpty", "1", CVAR_ARCHIVE },
+	{ &cg_switchOnEmpty, "cg_switchOnEmpty", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_switchToEmpty, "cg_switchToEmpty", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_teamChatBeep, "cg_teamChatBeep", "1", CVAR_ARCHIVE },
 	{ &cg_teamChatHeight, "cg_teamChatHeight", "0", CVAR_ARCHIVE  },
 	{ &cg_teamChatsOnly, "cg_teamChatsOnly", "0", CVAR_ARCHIVE },
@@ -804,10 +804,10 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_teamHeadColor, "cg_teamHeadColor", "", CVAR_ARCHIVE },
 	{ &cg_teamLowerColor, "cg_teamLowerColor", "", CVAR_ARCHIVE },
 	{ &cg_teamUpperColor, "cg_teamUpperColor", "", CVAR_ARCHIVE },
-	{ &cg_teammateCrosshairNames, "cg_teammateCrosshairNames", "1", CVAR_ARCHIVE },
-	{ &cg_teammateCrosshairNamesOpacity, "cg_teammateCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE },
+	{ &cg_teammateCrosshairNames, "cg_teammateCrosshairNames", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_teammateCrosshairNamesOpacity, "cg_teammateCrosshairNamesOpacity", "0.75", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_drawFriend, "cg_drawFriend", "1", CVAR_ARCHIVE },
-	{ &cg_teammateNames, "cg_teammateNames", "1", CVAR_ARCHIVE },
+	{ &cg_teammateNames, "cg_teammateNames", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "2" },
 	{ &cg_teammatePOIs, "cg_teammatePOIs", "1", CVAR_ARCHIVE },
 	{ &cg_teammatePOIsMaxWidth, "cg_teammatePOIsMaxWidth", "24.0", CVAR_ARCHIVE },
 	{ &cg_teammatePOIsMinWidth, "cg_teammatePOIsMinWidth", "4.0", CVAR_ARCHIVE },
@@ -826,8 +826,8 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_tracerLength, "cg_tracerlength", "100", CVAR_CHEAT },
 	{ &cg_tracerWidth, "cg_tracerwidth", "1", CVAR_CHEAT },
 	{ &cg_trackPlayer, "cg_trackPlayer", "-1", CVAR_CHEAT },
-	{ &cg_trueLightning, "cg_trueLightning", "0.0", CVAR_ARCHIVE },
-	{ &cg_trueShotgun, "cg_trueShotgun", "1", 0x00081801 },
+	{ &cg_trueLightning, "cg_trueLightning", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
+	{ &cg_trueShotgun, "cg_trueShotgun", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },
 	{ &cg_useItemMessage, "cg_useItemMessage", "1", CVAR_ARCHIVE },
 	{ &cg_useItemWarning, "cg_useItemWarning", "1", CVAR_ARCHIVE },
 	{ &cg_viewsize, "cg_viewsize", "100", CVAR_ARCHIVE },
@@ -836,23 +836,23 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_vignette, "cg_vignette", "0", CVAR_ARCHIVE },
 	{ &cg_voiceChatIndicator, "cg_voiceChatIndicator", "1", CVAR_ARCHIVE },
 	{ &cg_waterWarp, "cg_waterWarp", "1", CVAR_ARCHIVE },
-	{ &cg_weaponBar, "cg_weaponBar", "4", CVAR_ARCHIVE },
-	{ &cg_weaponColor_grenade, "cg_weaponColor_grenade", DEFAULT_WEAPON_BAR_GRENADE_COLOR, CVAR_ARCHIVE },
-	{ &cg_weaponConfig, "cg_weaponConfig", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_g, "cg_weaponConfig_g", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_mg, "cg_weaponConfig_mg", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_sg, "cg_weaponConfig_sg", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_gl, "cg_weaponConfig_gl", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_rl, "cg_weaponConfig_rl", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_lg, "cg_weaponConfig_lg", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_rg, "cg_weaponConfig_rg", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_pg, "cg_weaponConfig_pg", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_bfg, "cg_weaponConfig_bfg", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_gh, "cg_weaponConfig_gh", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_ng, "cg_weaponConfig_ng", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_pl, "cg_weaponConfig_pl", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_cg, "cg_weaponConfig_cg", "", CVAR_ARCHIVE },
-	{ &cg_weaponConfig_hmg, "cg_weaponConfig_hmg", "", CVAR_ARCHIVE },
+	{ &cg_weaponBar, "cg_weaponBar", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "4" },
+	{ &cg_weaponColor_grenade, "cg_weaponColor_grenade", DEFAULT_WEAPON_BAR_GRENADE_COLOR, CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig, "cg_weaponConfig", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_g, "cg_weaponConfig_g", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_mg, "cg_weaponConfig_mg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_sg, "cg_weaponConfig_sg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_gl, "cg_weaponConfig_gl", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_rl, "cg_weaponConfig_rl", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_lg, "cg_weaponConfig_lg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_rg, "cg_weaponConfig_rg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_pg, "cg_weaponConfig_pg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_bfg, "cg_weaponConfig_bfg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_gh, "cg_weaponConfig_gh", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_ng, "cg_weaponConfig_ng", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_pl, "cg_weaponConfig_pl", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_cg, "cg_weaponConfig_cg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
+	{ &cg_weaponConfig_hmg, "cg_weaponConfig_hmg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD },
 	{ &cg_weaponPrimary, "cg_weaponPrimary", "", CVAR_ROM },
 	{ &cg_weaponPrimaryQueued, "cg_weaponPrimaryQueued", "", CVAR_TEMP },
 	{ &cg_zoomFov, "cg_zoomfov", "22.5", CVAR_ARCHIVE },
@@ -863,142 +863,79 @@ static cvarTable_t cvarTable[] = { // bk001129
 	//	{ &cg_pmove_fixed, "cg_pmove_fixed", "0", CVAR_USERINFO | CVAR_ARCHIVE }
 };
 
-#define DAMAGE_PLUM_WEAPON_BIT( weapon ) ( 1u << ( weapon ) )
-#define DAMAGE_PLUM_ALL_WEAPONS_MASK ( \
-	DAMAGE_PLUM_WEAPON_BIT( WP_GAUNTLET ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_MACHINEGUN ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_HEAVY_MACHINEGUN ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_SHOTGUN ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_GRENADE_LAUNCHER ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_ROCKET_LAUNCHER ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_LIGHTNING ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_RAILGUN ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_PLASMAGUN ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_BFG ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_GRAPPLING_HOOK ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_NAILGUN ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_PROX_LAUNCHER ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_CHAINGUN ) )
+#define DAMAGE_PLUM_WEAPON_BIT( index ) ( 1u << ( index ) )
+#define DAMAGE_PLUM_ALL_WEAPONS_MASK	0x7ffeu
 #define DAMAGE_PLUM_AOE_WEAPONS_MASK ( \
-	DAMAGE_PLUM_WEAPON_BIT( WP_SHOTGUN ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_GRENADE_LAUNCHER ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_ROCKET_LAUNCHER ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_PLASMAGUN ) | \
-	DAMAGE_PLUM_WEAPON_BIT( WP_BFG ) )
+	DAMAGE_PLUM_WEAPON_BIT( 3 ) | \
+	DAMAGE_PLUM_WEAPON_BIT( 4 ) | \
+	DAMAGE_PLUM_WEAPON_BIT( 5 ) | \
+	DAMAGE_PLUM_WEAPON_BIT( 8 ) | \
+	DAMAGE_PLUM_WEAPON_BIT( 9 ) )
+#define CG_RETAIL_WEAPON_TOKEN_COUNT	14
 
 typedef struct cgRetailWeaponToken_s {
 	const char		*token;
 	weapon_t	weapon;
+	int		index;
 } cgRetailWeaponToken_t;
 
-static const cgRetailWeaponToken_t cgRetailWeaponTokens[] = {
-	{ "g", WP_GAUNTLET },
-	{ "gauntlet", WP_GAUNTLET },
-	{ "mg", WP_MACHINEGUN },
-	{ "machinegun", WP_MACHINEGUN },
-	{ "hmg", WP_HEAVY_MACHINEGUN },
-	{ "heavy", WP_HEAVY_MACHINEGUN },
-	{ "heavy_machinegun", WP_HEAVY_MACHINEGUN },
-	{ "sg", WP_SHOTGUN },
-	{ "shotgun", WP_SHOTGUN },
-	{ "gl", WP_GRENADE_LAUNCHER },
-	{ "grenade", WP_GRENADE_LAUNCHER },
-	{ "grenade_launcher", WP_GRENADE_LAUNCHER },
-	{ "grenadelauncher", WP_GRENADE_LAUNCHER },
-	{ "rl", WP_ROCKET_LAUNCHER },
-	{ "rocket", WP_ROCKET_LAUNCHER },
-	{ "rocket_launcher", WP_ROCKET_LAUNCHER },
-	{ "rocketlauncher", WP_ROCKET_LAUNCHER },
-	{ "lg", WP_LIGHTNING },
-	{ "lightning", WP_LIGHTNING },
-	{ "rg", WP_RAILGUN },
-	{ "rail", WP_RAILGUN },
-	{ "railgun", WP_RAILGUN },
-	{ "pg", WP_PLASMAGUN },
-	{ "plasma", WP_PLASMAGUN },
-	{ "plasmagun", WP_PLASMAGUN },
-	{ "bfg", WP_BFG },
-	{ "gh", WP_GRAPPLING_HOOK },
-	{ "grapple", WP_GRAPPLING_HOOK },
-	{ "grappling_hook", WP_GRAPPLING_HOOK },
-	{ "hook", WP_GRAPPLING_HOOK },
-	{ "cg", WP_CHAINGUN },
-	{ "chaingun", WP_CHAINGUN },
-	{ "ng", WP_NAILGUN },
-	{ "nailgun", WP_NAILGUN },
-	{ "pl", WP_PROX_LAUNCHER },
-	{ "prox", WP_PROX_LAUNCHER },
-	{ "proxlauncher", WP_PROX_LAUNCHER },
-	{ "prox_launcher", WP_PROX_LAUNCHER },
-	{ "proximity", WP_PROX_LAUNCHER },
-	{ "proximitymine", WP_PROX_LAUNCHER }
+static const cgRetailWeaponToken_t cgRetailWeaponTokens[CG_RETAIL_WEAPON_TOKEN_COUNT] = {
+	{ "g", WP_GAUNTLET, 1 },
+	{ "mg", WP_MACHINEGUN, 2 },
+	{ "sg", WP_SHOTGUN, 3 },
+	{ "gl", WP_GRENADE_LAUNCHER, 4 },
+	{ "rl", WP_ROCKET_LAUNCHER, 5 },
+	{ "lg", WP_LIGHTNING, 6 },
+	{ "rg", WP_RAILGUN, 7 },
+	{ "pg", WP_PLASMAGUN, 8 },
+	{ "bfg", WP_BFG, 9 },
+	{ "gh", WP_GRAPPLING_HOOK, 10 },
+	{ "ng", WP_NAILGUN, 11 },
+	{ "pl", WP_PROX_LAUNCHER, 12 },
+	{ "cg", WP_CHAINGUN, 13 },
+	{ "hmg", WP_HEAVY_MACHINEGUN, 14 }
 };
 
 /*
 =============
-CG_RetailWeaponFromToken
+CG_RetailWeaponTokenForToken
 
-Resolves a retail weapon-token alias into its weapon enum.
+Resolves a retail weapon token against the fixed retail weapon-index table.
 =============
 */
-static weapon_t CG_RetailWeaponFromToken( const char *token ) {
+static const cgRetailWeaponToken_t *CG_RetailWeaponTokenForToken( const char *token ) {
 	int	i;
 
 	if ( !token || !token[0] ) {
-		return WP_NONE;
+		return NULL;
 	}
 
-	for ( i = 0; i < (int)( sizeof( cgRetailWeaponTokens ) / sizeof( cgRetailWeaponTokens[0] ) ); i++ ) {
+	for ( i = 0; i < CG_RETAIL_WEAPON_TOKEN_COUNT; i++ ) {
 		if ( !Q_stricmp( token, cgRetailWeaponTokens[i].token ) ) {
-			return cgRetailWeaponTokens[i].weapon;
+			return &cgRetailWeaponTokens[i];
 		}
 	}
 
-	return WP_NONE;
+	return NULL;
 }
 
 /*
 =============
-CG_StartingWeaponIconIndexForWeapon
+CG_DamagePlumBitForWeapon
 
-Maps a weapon enum onto the retail starting-weapon icon strip order.
+Maps a local weapon enum onto the retail damage-plum weapon-index bit.
 =============
 */
-static int CG_StartingWeaponIconIndexForWeapon( weapon_t weapon ) {
-	switch ( weapon ) {
-	case WP_GAUNTLET:
-		return 1;
-	case WP_MACHINEGUN:
-		return 2;
-	case WP_SHOTGUN:
-		return 3;
-	case WP_GRENADE_LAUNCHER:
-		return 4;
-	case WP_ROCKET_LAUNCHER:
-		return 5;
-	case WP_LIGHTNING:
-		return 6;
-	case WP_RAILGUN:
-		return 7;
-	case WP_PLASMAGUN:
-		return 8;
-	case WP_BFG:
-		return 9;
-	case WP_GRAPPLING_HOOK:
-		return 10;
-	case WP_NAILGUN:
-		return 11;
-	case WP_PROX_LAUNCHER:
-		return 12;
-	case WP_CHAINGUN:
-		return 13;
-	case WP_HEAVY_MACHINEGUN:
-		return 14;
-	default:
-		break;
+unsigned int CG_DamagePlumBitForWeapon( weapon_t weapon ) {
+	int	i;
+
+	for ( i = 0; i < CG_RETAIL_WEAPON_TOKEN_COUNT; i++ ) {
+		if ( cgRetailWeaponTokens[i].weapon == weapon ) {
+			return DAMAGE_PLUM_WEAPON_BIT( cgRetailWeaponTokens[i].index );
+		}
 	}
 
-	return 0;
+	return 0u;
 }
 
 /*
@@ -1012,7 +949,7 @@ int CG_StartingWeaponIndexFromToken( const char *value ) {
 	char		buffer[128];
 	char		*cursor;
 	char		*token;
-	weapon_t	weapon;
+	const cgRetailWeaponToken_t	*weaponToken;
 
 	if ( !value || !value[0] ) {
 		return 0;
@@ -1025,12 +962,12 @@ int CG_StartingWeaponIndexFromToken( const char *value ) {
 		return 0;
 	}
 
-	weapon = CG_RetailWeaponFromToken( token );
-	if ( weapon == WP_NONE ) {
+	weaponToken = CG_RetailWeaponTokenForToken( token );
+	if ( weaponToken == NULL ) {
 		return 0;
 	}
 
-	return CG_StartingWeaponIconIndexForWeapon( weapon );
+	return weaponToken->index;
 }
 
 /*
@@ -1045,51 +982,29 @@ static unsigned int CG_ParseDamagePlumWeaponMask( const char *value ) {
 	char *cursor;
 	char *token;
 	unsigned int mask;
-	qboolean foundToken;
-	weapon_t weapon;
+	int tokenCount;
+	const cgRetailWeaponToken_t *weaponToken;
 
-	if ( !value || !*value || !Q_stricmp( value, "0" ) || !Q_stricmp( value, "off" ) || !Q_stricmp( value, "none" ) ) {
+	if ( !value || !*value ) {
 		return 0u;
-	}
-
-	if ( !Q_stricmp( value, "1" ) || !Q_stricmp( value, "on" ) || !Q_stricmp( value, "all" ) ) {
-		return DAMAGE_PLUM_ALL_WEAPONS_MASK;
-	}
-
-	if ( !Q_stricmp( value, "2" ) || !Q_stricmp( value, "aoe" ) ) {
-		return DAMAGE_PLUM_AOE_WEAPONS_MASK;
 	}
 
 	Q_strncpyz( buffer, value, sizeof( buffer ) );
 	cursor = buffer;
 	mask = 0u;
-	foundToken = qfalse;
+	tokenCount = 0;
 
-	while ( qtrue ) {
+	while ( tokenCount < 16 ) {
 		token = COM_ParseExt( &cursor, qtrue );
 		if ( !token[0] ) {
 			break;
 		}
 
-		if ( !Q_stricmp( token, "all" ) ) {
-			return DAMAGE_PLUM_ALL_WEAPONS_MASK;
+		weaponToken = CG_RetailWeaponTokenForToken( token );
+		if ( weaponToken != NULL ) {
+			mask |= DAMAGE_PLUM_WEAPON_BIT( weaponToken->index );
 		}
-
-		if ( !Q_stricmp( token, "aoe" ) ) {
-			mask |= DAMAGE_PLUM_AOE_WEAPONS_MASK;
-			foundToken = qtrue;
-			continue;
-		}
-
-		weapon = CG_RetailWeaponFromToken( token );
-		if ( weapon != WP_NONE ) {
-			mask |= DAMAGE_PLUM_WEAPON_BIT( weapon );
-			foundToken = qtrue;
-		}
-	}
-
-	if ( !foundToken ) {
-		return 0u;
+		tokenCount++;
 	}
 
 	return mask;
@@ -1398,14 +1313,14 @@ static void CG_UpdateScreenDamageColorFromCvar( vmCvar_t *colorCvar, const char 
 =============
 CG_UpdateScreenDamageAlphaFromCvar
 
-Caches the scalar alpha intensity used by screen damage effects.
+Caches the low alpha byte used by screen damage effects.
 =============
 */
 static void CG_UpdateScreenDamageAlphaFromCvar( vmCvar_t *alphaCvar, float *target, int *modificationCount ) {
-	float	clamped;
+	float	alphaByte;
 
-	clamped = Com_Clamp( 0.0f, 200.0f, alphaCvar->value );
-	*target = clamped;
+	alphaByte = (float)( (unsigned int)alphaCvar->integer & 0xff );
+	*target = alphaByte;
 	*modificationCount = alphaCvar->modificationCount;
 }
 
@@ -1422,8 +1337,13 @@ void CG_RegisterCvars( void ) {
 	char		var[MAX_TOKEN_CHARS];
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
-		trap_Cvar_Register( cv->vmCvar, cv->cvarName,
-			cv->defaultString, cv->cvarFlags );
+		if ( ( cv->cvarFlags & CVAR_VM_CREATED ) && cv->minimumString && cv->maximumString ) {
+			trap_QL_Cvar_RegisterRange( cv->vmCvar, cv->cvarName,
+				cv->defaultString, cv->minimumString, cv->maximumString, cv->cvarFlags );
+		} else {
+			trap_Cvar_Register( cv->vmCvar, cv->cvarName,
+				cv->defaultString, cv->cvarFlags );
+		}
 	}
 
 	// see if we are also running the server on this machine
@@ -1852,19 +1772,19 @@ Synchronizes hit indicator timing, style, and color caches.
 */
 static void CG_UpdateCrosshairHitSettings( void ) {
 	vec4_t	baseColor;
-	int		clampedTime;
+	float	clampedTime;
 
 	if ( crosshairHitStyleModificationCount != cg_crosshairHitStyle.modificationCount ) {
 		cg.crosshairHitStyle = cg_crosshairHitStyle.integer;
 		crosshairHitStyleModificationCount = cg_crosshairHitStyle.modificationCount;
 	}
 	if ( crosshairHitTimeModificationCount != cg_crosshairHitTime.modificationCount ) {
-		clampedTime = cg_crosshairHitTime.integer;
-		if ( clampedTime < 0 ) {
-			clampedTime = 0;
+		clampedTime = cg_crosshairHitTime.value;
+		if ( clampedTime < 0.0f ) {
+			clampedTime = 0.0f;
 		}
-		if ( clampedTime > 2000 ) {
-			clampedTime = 2000;
+		if ( clampedTime > 1000.0f ) {
+			clampedTime = 1000.0f;
 		}
 		cg.crosshairHitTime = clampedTime;
 		crosshairHitTimeModificationCount = cg_crosshairHitTime.modificationCount;
@@ -1908,8 +1828,6 @@ void CG_UpdateCvars( void ) {
 		} else {
 			trap_Cvar_Set( "teamoverlay", "0" );
 		}
-		// FIXME E3 HACK
-		trap_Cvar_Set( "teamoverlay", "1" );
 	}
 
 	refreshClients = qfalse;
@@ -3311,6 +3229,18 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.scoreboardTime = trap_R_RegisterShaderNoMip( "menu/tab/time.tga" );
 	cgs.media.scoreboxSpecShader = trap_R_RegisterShaderNoMip( "ui/assets/score/scorebox_spec.tga" );
 	cgs.media.scoreboxFollowShader = trap_R_RegisterShaderNoMip( "ui/assets/score/scorebox_follow.tga" );
+	if ( cgs.gametype == GT_TOURNAMENT || cg_buildScript.integer ) {
+		cgs.media.scoreFirstPlayerReadyShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_ready.tga" );
+		cgs.media.scoreFirstPlayerNotReadyShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_notready.tga" );
+		cgs.media.scoreSecondPlayerReadyShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_ready.tga" );
+		cgs.media.scoreSecondPlayerNotReadyShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_notready.tga" );
+		cgs.media.scoreFirstPlayerLeadsShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_leads.tga" );
+		cgs.media.scoreFirstPlayerTiedShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_tied.tga" );
+		cgs.media.scoreFirstPlayerTrailsShader = trap_R_RegisterShaderNoMip( "ui/assets/score/1st_plyr_trails.tga" );
+		cgs.media.scoreSecondPlayerLeadsShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_leads.tga" );
+		cgs.media.scoreSecondPlayerTiedShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_tied.tga" );
+		cgs.media.scoreSecondPlayerTrailsShader = trap_R_RegisterShaderNoMip( "ui/assets/score/2nd_plyr_trails.tga" );
+	}
 	cgs.media.scoreArrowGreenShader = trap_R_RegisterShader( "ui/assets/score/arrowg.tga" );
 	cgs.media.scoreArrowRedShader = trap_R_RegisterShader( "ui/assets/score/arrowr.tga" );
 	if ( cgs.gametype >= GT_TEAM || cg_buildScript.integer ) {
@@ -3378,6 +3308,7 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.battleSuitShader = trap_R_RegisterShader("powerups/battleSuit" );
 	cgs.media.battleWeaponShader = trap_R_RegisterShader("powerups/battleWeapon" );
 	cgs.media.invisShader = trap_R_RegisterShader("powerups/invisibility" );
+	cgs.media.ghostWeaponShader = trap_R_RegisterShader("ghostWeaponShader" );
 	cgs.media.regenShader = trap_R_RegisterShader("powerups/regen" );
 	cgs.media.hastePuffShader = trap_R_RegisterShader("hasteSmokePuff" );
 	if ( CG_ShouldRegisterPOIPowerupShaders() ) {
@@ -3396,8 +3327,9 @@ static void CG_RegisterGraphics( void ) {
 	if ( cgs.gametype == GT_FFA || cg_buildScript.integer ) {
 		cgs.media.poiQuadHogShader = trap_R_RegisterShader( "gfx/2d/quad_hog/quadhog" );
 	}
-	cgs.media.poiNeutralFlagCarrierShader = trap_R_RegisterShader( "sprites/neutralflagcarrier" );
-	cgs.media.poiInfectedShader = trap_R_RegisterShader( "gfx/2d/infected/bite" );
+	if ( cgs.gametype == GT_RED_ROVER || cg_buildScript.integer ) {
+		cgs.media.poiInfectedShader = trap_R_RegisterShader( "gfx/2d/infected/bite" );
+	}
 	cgs.media.poiUnavailableShader = trap_R_RegisterShader( "gfx/2d/unavailable" );
 	cgs.media.itemTimerArmorShader = trap_R_RegisterShader( "gfx/2d/timer/armor" );
 	cgs.media.itemTimerBattleSuitShader = trap_R_RegisterShader( "gfx/2d/timer/bs" );
@@ -3517,13 +3449,19 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.dustPuffShader = trap_R_RegisterShader("hasteSmokePuff" );
 
 	if ( cgs.gametype >= GT_TEAM || cg_buildScript.integer ) {
-		cgs.media.friendShader = trap_R_RegisterShader( "sprites/foe" );
-		if ( cgs.gametype == GT_FREEZE || cg_buildScript.integer ) {
-			cgs.media.frozenPlayerShader = trap_R_RegisterShader( "sprites/frozen" );
-		}
+		cgs.media.friendShader = trap_R_RegisterShader( "sprites/friend" );
+		cgs.media.friendHitShader = trap_R_RegisterShader( "sprites/friend_hit" );
+		cgs.media.friendDeadShader = trap_R_RegisterShader( "sprites/friend_dead" );
+		cgs.media.frozenPlayerShader = trap_R_RegisterShader( "sprites/frozen" );
 		cgs.media.redQuadShader = trap_R_RegisterShader("powerups/blueflag" );
-		cgs.media.teamStatusBar = trap_R_RegisterShader( "gfx/2d/colorbar.tga" );
+		cgs.media.teamStatusBar = trap_R_RegisterShader( "gfx/2d/colorbar" );
 		cgs.media.blueKamikazeShader = trap_R_RegisterShader( "models/weaphits/kamikblu" );
+	}
+
+	if ( cgs.gametype == GT_CTF || cgs.gametype == GT_1FCTF || cgs.gametype == GT_ATTACK_DEFEND || cg_buildScript.integer ) {
+		cgs.media.flagCarrierShader = trap_R_RegisterShader( "sprites/flagcarrier" );
+		cgs.media.flagCarrierHitShader = trap_R_RegisterShader( "sprites/flagcarrier_hit" );
+		cgs.media.poiNeutralFlagCarrierShader = trap_R_RegisterShader( "sprites/neutralflagcarrier" );
 	}
 
 	cgs.media.poiAttackShader = trap_R_RegisterShader( "gfx/2d/ad/poi_attack" );
@@ -3594,7 +3532,7 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.medalImpressive = trap_R_RegisterShaderNoMip( "medal_impressive" );
 	cgs.media.medalExcellent = trap_R_RegisterShaderNoMip( "medal_excellent" );
 	cgs.media.medalGauntlet = trap_R_RegisterShaderNoMip( "medal_gauntlet" );
-	cgs.media.medalDefend = trap_R_RegisterShaderNoMip( "medal_defend" );
+	cgs.media.medalDefend = trap_R_RegisterShaderNoMip( "medal_defense" );
 	cgs.media.medalAssist = trap_R_RegisterShaderNoMip( "medal_assist" );
 	cgs.media.medalCapture = trap_R_RegisterShaderNoMip( "medal_capture" );
 	cgs.media.medalAccuracy = trap_R_RegisterShaderNoMip( "medal_accuracy" );
@@ -6408,6 +6346,16 @@ static void CG_RunCinematicFrame( int handle ) {
 }
 
 static const char *cgScoreTextureNames[] = {
+	"ui/assets/score/1st_plyr_leads.tga",
+	"ui/assets/score/1st_plyr_notready.tga",
+	"ui/assets/score/1st_plyr_ready.tga",
+	"ui/assets/score/1st_plyr_tied.tga",
+	"ui/assets/score/1st_plyr_trails.tga",
+	"ui/assets/score/2nd_plyr_leads.tga",
+	"ui/assets/score/2nd_plyr_notready.tga",
+	"ui/assets/score/2nd_plyr_ready.tga",
+	"ui/assets/score/2nd_plyr_tied.tga",
+	"ui/assets/score/2nd_plyr_trails.tga",
 	"ui/assets/score/adbr.tga",
 	"ui/assets/score/adtl.tga",
 	"ui/assets/score/adtm.tga",
@@ -6879,6 +6827,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cgClientSpeakingState, 0, sizeof( cgClientSpeakingState ) );
   
 	CG_ClearAutomationState();
+	CG_ResetIntermissionLetterboxState();
 	cg.spectatorPrimaryClient = -1;
 	cg.spectatorSecondaryClient = -1;
 	cg.spectatorFollowClient = -1;

@@ -94,6 +94,101 @@ void CG_CheckAmmo( void ) {
 
 /*
 ==============
+CG_PackScreenDamageColor
+
+Converts the cached normalized screen-damage color to retail RRGGBBAA form.
+==============
+*/
+static unsigned int CG_PackScreenDamageColor( const vec4_t color ) {
+	unsigned int	packedColor;
+
+	packedColor = ( (unsigned int)(byte)( Com_Clamp( 0.0f, 1.0f, color[0] ) * 255.0f ) ) << 24;
+	packedColor |= ( (unsigned int)(byte)( Com_Clamp( 0.0f, 1.0f, color[1] ) * 255.0f ) ) << 16;
+	packedColor |= ( (unsigned int)(byte)( Com_Clamp( 0.0f, 1.0f, color[2] ) * 255.0f ) ) << 8;
+	packedColor |= (unsigned int)(byte)( Com_Clamp( 0.0f, 1.0f, color[3] ) * 255.0f );
+	return packedColor;
+}
+
+/*
+==============
+CG_IsTeamDamageFeedback
+
+Classifies the retail friendly-fire screen damage tint branch.
+==============
+*/
+static qboolean CG_IsTeamDamageFeedback( int attackerClientNum ) {
+	clientInfo_t	*localInfo;
+	clientInfo_t	*attackerInfo;
+
+	if ( cgs.gametype < GT_TEAM ) {
+		return qfalse;
+	}
+
+	if ( attackerClientNum < 0 || attackerClientNum >= cgs.maxclients ) {
+		return qfalse;
+	}
+
+	localInfo = &cgs.clientinfo[cg.snap->ps.clientNum];
+	attackerInfo = &cgs.clientinfo[attackerClientNum];
+	return (qboolean)( attackerInfo->team == localInfo->team );
+}
+
+/*
+==============
+CG_ReplaceDamageBlendAlpha
+
+Replaces the low byte of the packed retail damage tint.
+==============
+*/
+static unsigned int CG_ReplaceDamageBlendAlpha( unsigned int packedColor, float alphaByte ) {
+	unsigned int	alpha;
+
+	alpha = (unsigned int)(byte)Com_Clamp( 0.0f, 255.0f, alphaByte );
+	return ( packedColor & 0xffffff00U ) | alpha;
+}
+
+/*
+==============
+CG_LatchScreenDamageColor
+
+Snapshots the retail damage tint at the damage-feedback event.
+==============
+*/
+static void CG_LatchScreenDamageColor( void ) {
+	int				attackerClientNum;
+	qboolean		selfDamage;
+	qboolean		teamDamage;
+	unsigned int	screenDamageColor;
+	unsigned int	selfDamageColor;
+	unsigned int	teamDamageColor;
+
+	attackerClientNum = cg.snap->ps.persistant[PERS_ATTACKER];
+	selfDamage = (qboolean)( attackerClientNum == cg.snap->ps.clientNum );
+	teamDamage = CG_IsTeamDamageFeedback( attackerClientNum );
+	screenDamageColor = CG_PackScreenDamageColor( cg.screenDamageColor );
+	selfDamageColor = CG_PackScreenDamageColor( cg.screenDamageSelfColor );
+	teamDamageColor = CG_PackScreenDamageColor( cg.screenDamageTeamColor );
+
+	if ( !screenDamageColor || ( selfDamage && !selfDamageColor ) ||
+		( teamDamage && !teamDamageColor ) ) {
+		return;
+	}
+
+	if ( selfDamage ) {
+		cg.damageBlendColor = selfDamageColor;
+		return;
+	}
+
+	if ( teamDamage ) {
+		cg.damageBlendColor = CG_ReplaceDamageBlendAlpha( teamDamageColor, cg.screenDamageAlphaTeam );
+		return;
+	}
+
+	cg.damageBlendColor = CG_ReplaceDamageBlendAlpha( screenDamageColor, cg.screenDamageAlpha );
+}
+
+/*
+==============
 CG_DamageFeedback
 ==============
 */
@@ -185,6 +280,7 @@ void CG_DamageFeedback( int yawByte, int pitchByte, int damage ) {
 		kick = 10;
 	}
 	cg.damageValue = kick;
+	CG_LatchScreenDamageColor();
 	cg.v_dmg_time = cg.time + DAMAGE_TIME;
 	cg.damageTime = cg.snap->serverTime;
 }
@@ -302,6 +398,8 @@ void CG_Respawn( void ) {
 
 	// display weapons available
 	cg.weaponSelectTime = cg.time;
+
+	trap_Cvar_Set( "cg_weaponPrimary", va( "%i", cg.weaponPrimary ) );
 
 	// prefer the retail primary-weapon list before falling back to the server weapon
 	CG_SelectRespawnWeapon();

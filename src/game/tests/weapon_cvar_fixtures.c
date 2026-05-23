@@ -23,13 +23,13 @@ HLIL defaults referenced by these fixtures
 
 The Quake Live HLIL listings pin the following gameplay baselines:
 - g_powerupRespawn = 120 seconds.
-- g_respawn_delay_min = 500 ms while g_respawn_delay_max = 3500 ms.
+- g_respawn_delay_min = 2100 ms while g_respawn_delay_max = 2400 ms.
 - g_regenHealthRate defaults to 100 milliseconds per health point.
 =================
 */
 
 static qboolean GT_ProxDamageConfigFeedsWeaponCache(void);
-static qboolean GT_FactoryConfigClampsRespawnBounds(void);
+static qboolean GT_FactoryConfigPreservesRespawnBounds(void);
 static qboolean GT_GDamageSchedulesRespawnAndPlum(void);
 static qboolean GT_ClientTimerAppliesRegenPerSecond(void);
 
@@ -166,12 +166,12 @@ static qboolean GT_ProxDamageConfigFeedsWeaponCache(void) {
 
 /*
 =============
-GT_FactoryConfigClampsRespawnBounds
+GT_FactoryConfigPreservesRespawnBounds
 
-Ensures the factory CVar loader honours regen/powerup timings and clamps respawn delays when max < min.
+Ensures the factory CVar loader honours regen/powerup timings while keeping the retail min/max respawn fields independent.
 =============
 */
-static qboolean GT_FactoryConfigClampsRespawnBounds(void) {
+static qboolean GT_FactoryConfigPreservesRespawnBounds(void) {
 	GT_SetVmCvarInt(&g_powerupRespawn, 30);
 	GT_SetVmCvarInt(&g_respawn_delay_min, 2500);
 	GT_SetVmCvarInt(&g_respawn_delay_max, 1000);
@@ -183,10 +183,12 @@ static qboolean GT_FactoryConfigClampsRespawnBounds(void) {
 		return GT_Failf("expected powerup respawn 30, received %d", g_factoryCvarConfig.powerupRespawnSeconds);
 	}
 
-	if (g_factoryCvarConfig.respawnDelayMinMilliseconds != g_factoryCvarConfig.respawnDelayMaxMilliseconds) {
-		return GT_Failf("expected respawn delays to clamp, received min=%d max=%d",
-		g_factoryCvarConfig.respawnDelayMinMilliseconds,
-		g_factoryCvarConfig.respawnDelayMaxMilliseconds);
+	if (g_factoryCvarConfig.respawnDelayMinMilliseconds != 2500) {
+		return GT_Failf("expected respawn min 2500, received %d", g_factoryCvarConfig.respawnDelayMinMilliseconds);
+	}
+
+	if (g_factoryCvarConfig.respawnDelayMaxMilliseconds != 1000) {
+		return GT_Failf("expected respawn max grace 1000, received %d", g_factoryCvarConfig.respawnDelayMaxMilliseconds);
 	}
 
 	if (g_factoryCvarConfig.regenHealthRateMilliseconds != 266) {
@@ -215,10 +217,13 @@ static qboolean GT_GDamageSchedulesRespawnAndPlum(void) {
 	}
 
 	level.time = 3200;
+	g_factoryCvarConfig.respawnDelayMinMilliseconds = 2100;
+	g_factoryCvarConfig.respawnDelayMaxMilliseconds = 2400;
+	g_suddenDeathRespawn.integer = 0;
 	G_Damage(target, attacker, attacker, NULL, NULL, 200, 0, MOD_ROCKET);
 
-	if (target->client->respawnTime != level.time + 1700) {
-		return GT_Failf("expected respawn time %d, received %d", level.time + 1700, target->client->respawnTime);
+	if (target->client->respawnTime != level.time + 2100) {
+		return GT_Failf("expected respawn time %d, received %d", level.time + 2100, target->client->respawnTime);
 	}
 
 	if (target->client->damage_blood <= 0) {
@@ -280,11 +285,11 @@ static const game_fixture_t gt_weapon_cvar_fixtures[] = {
 		"Ensures g_damage_pl and g_quadDamageFactor flow into g_weaponConfig"
 	},
 	{
-		"factory_config_clamps_respawn_bounds",
+		"factory_config_preserves_respawn_bounds",
 		NULL,
-		GT_FactoryConfigClampsRespawnBounds,
+		GT_FactoryConfigPreservesRespawnBounds,
 		NULL,
-		"Validates g_powerupRespawn, g_regenHealthRate, and respawn delay bounds"
+		"Validates g_powerupRespawn, g_regenHealthRate, and independent respawn delay bounds"
 	},
 	{
 		"g_damage_schedules_respawn",

@@ -1277,7 +1277,9 @@ def test_demo_recording_overlay_matches_retail_modes() -> None:
 	demo_overlay_block = _extract_function_block(cl_scrn, "void SCR_DrawDemoRecording( void ) {")
 
 	assert "qhandle_t\trecordShader;" in client_h
+	assert 'cls.consoleShader = re.RegisterShader( "console" );' in cl_main
 	assert 'cls.recordShader = re.RegisterShaderNoMip( "icons/record" );' in cl_main
+	assert 'textures/effects2/console01' not in cl_main
 	assert "if ( !cl_demoRecordMessage || !cl_demoRecordMessage->integer ) {" in demo_overlay_block
 	assert "if ( cl_demoRecordMessage->integer == 1 ) {" in demo_overlay_block
 	assert 'SCR_DrawStringExt( ( 80 - strlen( string ) ) * 4, 420, 8, string, g_color_table[7], qtrue );' in demo_overlay_block

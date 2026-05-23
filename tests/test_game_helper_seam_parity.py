@@ -63,8 +63,11 @@ def test_team_join_guard_and_connect_broadcast_match_retail_flow() -> None:
 	assert 'client->pers.recordingPreferences = atoi( Info_ValueForKey( userinfo, "cg_autoAction" ) );' in game_client
 	assert "if ( firstTime && !isBot ) {" in connect_block
 	assert "if ( !firstTime && !isBot ) {" not in connect_block
+	assert "G_FilterPacket" not in connect_block
 	assert "client->sess.privilege = connectionPrivilege;" not in connect_block
 	assert 'trap_SendServerCommand( clientNum, va( "priv %i", client->sess.privilege ) );' in connect_block
+	assert "trap_GetSteamId( clientNum, &printSteamIdLow, &printSteamIdHigh )" in connect_block
+	assert 'Info_ValueForKey( userinfo, "steamid" )' not in connect_block
 	assert "G_StartAutoRecordForClient( ent );" in connect_block
 	assert 'G_LogPrintf( "ClientMask: %i %s\\n", clientNum, ( ent->r.svFlags & SVF_BOT ) ? "bot" : "human" );' not in connect_block
 	assert "G_AutoAction( AUTOACTION_PLAYER_CONNECT, ent, autoDetail );" not in connect_block
@@ -74,6 +77,9 @@ def test_team_join_guard_and_connect_broadcast_match_retail_flow() -> None:
 	assert connect_block.index("if ( runFirstTimeConnectSideEffects ) {") < connect_block.index("BroadcastTeamChange( client, -1 );")
 	assert connect_block.index("client->pers.steamIdLow = connectSteamIdLow;") < connect_block.index("G_InitSessionData( client, userinfo );")
 	assert connect_block.index("client->pers.steamIdHigh = connectSteamIdHigh;") < connect_block.index("G_InitSessionData( client, userinfo );")
+	assert connect_block.index("G_InitSessionData( client, userinfo );") < connect_block.index("G_RankResetClientStats( client );")
+	assert connect_block.index("G_RankResetClientStats( client );") < connect_block.index("G_ReadSessionData( client );")
+	assert connect_block.index("G_RankResetClientStats( client );") < connect_block.index("ClientUserinfoChanged( clientNum );")
 	assert "G_ReadSessionData( client );" in connect_block
 	assert "G_ReadSessionData( client, firstTime );" not in connect_block
 	assert "if ( client->pers.localClient ) {" in session_block
@@ -159,6 +165,9 @@ def test_client_spawn_uses_recovered_loadout_and_rr_helpers() -> None:
 	game_team = _read("src/code/game/g_team.c")
 	game_local = _read("src/code/game/g_local.h")
 	loadout_block = _block_from_marker(game_client, "static weapon_t G_FinalizeSpawnLoadout")
+	init_spawn_block = _block_from_marker(game_client, "static weapon_t G_InitClientSpawnState")
+	spawn_block = _block_from_marker(game_client, "void ClientSpawn")
+	skip_targets_block = _block_from_marker(game_client, "static qboolean G_GametypeSkipsSpawnPointTargets")
 	warmup_gate_block = _block_from_marker(game_client, "static qboolean G_ShouldGrantWarmupLevelWeapons")
 	warmup_allowed_block = _block_from_marker(game_client, "static qboolean G_WarmupLevelWeaponAllowed")
 	warmup_ammo_block = _block_from_marker(game_client, "static int G_WarmupLevelWeaponAmmo")
@@ -167,7 +176,8 @@ def test_client_spawn_uses_recovered_loadout_and_rr_helpers() -> None:
 	assert "static weapon_t G_FinalizeSpawnLoadout( gentity_t *ent, const factoryCvarConfig_t *factoryConfig ) {" in game_client
 	assert "client->sess.selectedSpawnWeapon = (int)spawnWeapon;" in game_client
 	assert "if ( client->rrInfectionState == RR_STATE_INFECTED ) {" in game_client
-	assert "spawnWeapon = G_FinalizeSpawnLoadout( ent, factoryConfig );" in game_client
+	assert "static weapon_t G_InitClientSpawnState( gentity_t *ent, gentity_t *spawnPoint, const factoryCvarConfig_t *factoryConfig ) {" in game_client
+	assert "spawnWeapon = G_InitClientSpawnState( ent, spawnPoint, factoryConfig );" in spawn_block
 	assert "static qboolean G_ShouldGrantWarmupLevelWeapons( void ) {" in game_client
 	assert "level.warmupTime != 0" in warmup_gate_block
 	assert "!g_training.integer" in warmup_gate_block
@@ -203,8 +213,23 @@ def test_client_spawn_uses_recovered_loadout_and_rr_helpers() -> None:
 	assert "static void G_RRFinalizeSpawnLoadout( gentity_t *ent ) {" in game_client
 	assert "client->ps.stats[STAT_WEAPONS] = 1u << WP_GAUNTLET;" in game_client
 	assert "client->pers.maxHealth = client->ps.stats[STAT_MAX_HEALTH] + g_rrInfectedZombieHealthBonus.integer;" in game_client
-	assert "G_RRFinalizeSpawnLoadout( ent );" in game_client
-	assert game_client.index("G_RRFinalizeSpawnLoadout( ent );") < game_client.index("spawnWeapon = G_FinalizeSpawnLoadout( ent, factoryConfig );")
+	assert "G_RRFinalizeSpawnLoadout( ent );" in init_spawn_block
+	assert "G_UseTargets( spawnPoint, ent );" in init_spawn_block
+	assert "return G_FinalizeSpawnLoadout( ent, factoryConfig );" in init_spawn_block
+	assert init_spawn_block.index("G_RRFinalizeSpawnLoadout( ent );") < init_spawn_block.index("G_UseTargets( spawnPoint, ent );")
+	assert init_spawn_block.index("G_UseTargets( spawnPoint, ent );") < init_spawn_block.index("return G_FinalizeSpawnLoadout( ent, factoryConfig );")
+	assert "static qboolean G_GametypeSkipsSpawnPointTargets( int gametype ) {" in game_client
+	assert "case GT_RACE:" in skip_targets_block
+	assert "case GT_CLAN_ARENA:" in skip_targets_block
+	assert "case GT_DOMINATION:" in skip_targets_block
+	assert "case GT_RED_ROVER:" in skip_targets_block
+	assert "return qfalse;" in skip_targets_block
+	assert "return qtrue;" in skip_targets_block
+	assert spawn_block.index("client->lastkilled_client = -1;") < spawn_block.index("client->lasthurt_client = -1;")
+	assert spawn_block.index("client->ps.pm_flags |= PMF_RESPAWNED;") < spawn_block.index("spawnWeapon = G_InitClientSpawnState( ent, spawnPoint, factoryConfig );")
+	assert spawn_block.index("spawnWeapon = G_InitClientSpawnState( ent, spawnPoint, factoryConfig );") < spawn_block.index("trap_GetUsercmd( client - level.clients, &ent->client->pers.cmd );")
+	assert spawn_block.index("G_GrantConfiguredItems( ent );") < spawn_block.index("BG_PlayerStateToEntityState( &client->ps, &ent->s, qtrue );")
+	assert spawn_block.index("G_GrantConfiguredItems( ent );") < spawn_block.index("G_GametypeClientSpawn( ent );")
 	assert "gentity_t *G_SelectRankedSpawnPoint( gentity_t *spots[], int spotCount, vec3_t origin, vec3_t angles ) {" in game_client
 	assert "static gentity_t *G_SelectClientSpawnPoint( gentity_t *ent, vec3_t origin, vec3_t angles ) {" in game_client
 	assert "spawnPoint = G_SelectClientSpawnPoint( ent, spawn_origin, spawn_angles );" in game_client
@@ -612,7 +637,9 @@ def test_g_initgame_pipeline_matches_recovered_retail_bootstrap_order() -> None:
 def test_console_tail_and_training_bootstrap_helpers_match_recovered_boundaries() -> None:
 	game_svcmds = _read("src/code/game/g_svcmds.c")
 	game_bot = _read("src/code/game/g_bot.c")
+	game_local = _read("src/code/game/g_local.h")
 	init_bots = _block_from_marker(game_bot, "void G_InitBots")
+	addbot_block = _block_from_marker(game_bot, "void Svcmd_AddBot_f")
 
 	assert 'Q_stricmp( cmd, "markstate" ) == 0 ||' in game_svcmds
 	assert 'Q_stricmp( cmd, "diffstate" ) == 0 ||' in game_svcmds
@@ -621,13 +648,47 @@ def test_console_tail_and_training_bootstrap_helpers_match_recovered_boundaries(
 	assert 'if ( Q_stricmp( cmd, "floodstatus" ) == 0 ) {' in game_svcmds
 	assert "Svcmd_FloodStatus_f();" in game_svcmds
 
-	assert "static void G_AddTrainerBot( void ) {" in game_bot
+	assert "void G_AddTrainerBot( void ) {" in game_bot
+	assert "void G_AddTrainerBot( void );" in game_local
 	assert 'G_AddBot( "Trainer", skill, "", 5000, "" );' in game_bot
 	assert 'trap_SendServerCommand( -1, "loaddeferred\\n" );' in game_bot
+	assert 'if ( level.trainingMapActive ) {' in addbot_block
+	assert 'trap_Printf( "Addbot not allowed during training.\\n" );' in addbot_block
+	assert addbot_block.index('trap_Cvar_VariableIntegerValue( "bot_enable" )') < addbot_block.index("if ( level.trainingMapActive )")
+	assert addbot_block.index("if ( level.trainingMapActive )") < addbot_block.index("trap_Argv( 1, name, sizeof( name ) );")
 	assert 'if( Q_stricmp( strValue, "training" ) == 0 ) {' in init_bots
 	assert "G_AddTrainerBot();" in init_bots
 	assert 'G_SpawnBots( Info_ValueForKey( arenainfo, "bots" ), BOT_BEGIN_DELAY_BASE );' in init_bots
 	assert "basedelay += 10000;" not in game_bot
+
+
+def test_bot_training_state_tail_is_wired_to_bot_frame() -> None:
+	ai_main = _read("src/code/game/ai_main.c")
+	training_tail = _block_from_marker(ai_main, "static void BotUpdateTrainingState")
+	start_frame = _block_from_marker(ai_main, "int BotAIStartFrame")
+
+	assert "static void BotSetPredictItemPickupDisabled( int clientNum, qboolean disabled ) {" in ai_main
+	assert "static void BotUpdateItemDelayTime( void ) {" in ai_main
+	assert "static void BotUpdateTrainingBotSkill( int botClient ) {" in ai_main
+	assert "static void BotUpdateTrainingReadyState( int localClient, int botClient ) {" in ai_main
+	assert "static void BotUpdateTrainingMusic( int localClient ) {" in ai_main
+	assert 'BotSetTrainingCvarIfChanged( "g_training", "0" );' in ai_main
+	assert 'BotSetTrainingCvarIfChanged( "bot_training", "0" );' in ai_main
+	assert 'BotSetTrainingCvarIfChanged( "bot_dynamicSkill", "0" );' in ai_main
+	assert 'BotSetTrainingCvarIfChanged( "bot_followMe", "1" );' in ai_main
+	assert 'BotSetTrainingCvarIfChanged( "bot_itemDelayTime", delayValue );' in ai_main
+	assert 'BotSetTrainingCvarIfChanged( "bot_startingSkill", BotFormatTrainingSkill( skill ) );' in ai_main
+	assert "localClient = BotGetLocalClient();" in training_tail
+	assert "botClient = BotGetFirstBotClient();" in training_tail
+	assert 'trap_Cvar_Set( "g_spSkill", BotFormatTrainingSkill( bootstrapSkill ) );' in training_tail
+	assert "G_AddTrainerBot();" in training_tail
+	assert 'trap_SendServerCommand( localClient, "stopMusic" );' in ai_main
+	assert 'trap_SendServerCommand( localClient, "playMusic music/fla22k_01_loop" );' in ai_main
+	assert 'trap_SendServerCommand( localClient, "playMusic music/win" );' in ai_main
+	assert 'trap_SendServerCommand( localClient, "playMusic music/loss" );' in ai_main
+	assert "BotUpdateTrainingState();" in start_frame
+	assert start_frame.index("trap_BotUserCommand(botstates[i]->client, &botstates[i]->lastucmd);") < start_frame.index("BotUpdateTrainingState();")
+	assert start_frame.index("BotUpdateTrainingState();") < start_frame.index("RETAIL_SELECTED_BOT_INFO_CONFIGSTRING")
 
 
 def test_info_string_helpers_keep_room_for_the_terminating_nul() -> None:

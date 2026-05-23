@@ -2861,6 +2861,136 @@ static void CG_PlayerFloatSprite( centity_t *cent, qhandle_t shader ) {
 }
 
 
+/*
+===============
+CG_PlayerRecentlyHit
+
+Tests whether the player's pain timestamp is inside a marker hit window.
+===============
+*/
+static qboolean CG_PlayerRecentlyHit( const centity_t *cent, int msec ) {
+	if ( !cent || msec <= 0 ) {
+		return qfalse;
+	}
+
+	return (qboolean)( cg.time - cent->pe.painTime < msec );
+}
+
+
+/*
+===============
+CG_PlayerHasFlagPowerup
+
+Tests for any player-carried flag powerup bit.
+===============
+*/
+static qboolean CG_PlayerHasFlagPowerup( const centity_t *cent ) {
+	int		powerups;
+
+	if ( !cent ) {
+		return qfalse;
+	}
+
+	powerups = cent->currentState.powerups;
+	return (qboolean)( powerups & ( ( 1 << PW_REDFLAG ) | ( 1 << PW_BLUEFLAG ) | ( 1 << PW_NEUTRALFLAG ) ) );
+}
+
+
+/*
+===============
+CG_ShouldDrawTeamPlayerMarker
+
+Retail only draws teammate float markers when POIs are enabled and name labels are hidden.
+===============
+*/
+static qboolean CG_ShouldDrawTeamPlayerMarker( qboolean sameTeam ) {
+	if ( cgs.gametype < GT_TEAM ) {
+		return qfalse;
+	}
+
+	if ( !sameTeam ) {
+		return qfalse;
+	}
+
+	if ( !cg_teammatePOIs.integer || cg_teammateNames.integer ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+
+/*
+===============
+CG_PlayerSpriteLocalClientTeam
+
+Returns the local client's configstring team, with the snapshot team as a fallback.
+===============
+*/
+static int CG_PlayerSpriteLocalClientTeam( void ) {
+	int		clientNum;
+
+	if ( !cg.snap ) {
+		return TEAM_FREE;
+	}
+
+	clientNum = cg.snap->ps.clientNum;
+	if ( clientNum >= 0 && clientNum < MAX_CLIENTS && cgs.clientinfo[clientNum].infoValid ) {
+		return cgs.clientinfo[clientNum].team;
+	}
+
+	return cg.snap->ps.persistant[PERS_TEAM];
+}
+
+
+/*
+===============
+CG_PlayerSpriteBlockedByInfectedTarget
+
+Retail suppresses talk/duel-style award markers over Red Rover survivor targets.
+===============
+*/
+static qboolean CG_PlayerSpriteBlockedByInfectedTarget( const clientInfo_t *ci, qboolean sameTeam ) {
+	if ( cgs.gametype != GT_RED_ROVER ) {
+		return qfalse;
+	}
+
+	if ( !( cgs.customSettingsMask & CUSTOM_SETTING_INFECTED ) ) {
+		return qfalse;
+	}
+
+	if ( sameTeam || !ci || ci->team != TEAM_BLUE ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+
+/*
+===============
+CG_ShouldDrawInfectedTargetMarker
+
+Tests for the Red Rover infected bite marker over survivor targets.
+===============
+*/
+static qboolean CG_ShouldDrawInfectedTargetMarker( const clientInfo_t *ci ) {
+	if ( cgs.gametype != GT_RED_ROVER ) {
+		return qfalse;
+	}
+
+	if ( !( cgs.customSettingsMask & CUSTOM_SETTING_INFECTED ) ) {
+		return qfalse;
+	}
+
+	if ( !ci || ci->team != TEAM_BLUE ) {
+		return qfalse;
+	}
+
+	return (qboolean)( CG_PlayerSpriteLocalClientTeam() == TEAM_RED );
+}
+
+
 
 /*
 ===============
@@ -2870,29 +3000,73 @@ Float sprites over the player's head
 ===============
 */
 static void CG_PlayerSprites( centity_t *cent ) {
-	int		team;
+	clientInfo_t	*ci;
+	int		clientNum;
+	qboolean	sameTeam;
+	qboolean	redRoverBlocked;
+	qhandle_t	shader;
+
+	if ( !cg.snap || !cent ) {
+		return;
+	}
+
+	clientNum = cent->currentState.clientNum;
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+
+	if ( clientNum == cg.snap->ps.clientNum && !cg.renderingThirdPerson ) {
+		return;
+	}
+
+	ci = &cgs.clientinfo[clientNum];
+	sameTeam = (qboolean)( cgs.gametype >= GT_TEAM && cg.snap->ps.persistant[PERS_TEAM] == ci->team );
+	redRoverBlocked = CG_PlayerSpriteBlockedByInfectedTarget( ci, sameTeam );
 
 	if ( cent->currentState.eFlags & EF_CONNECTION ) {
 		CG_PlayerFloatSprite( cent, cgs.media.connectionShader );
 		return;
 	}
 
-	if ( cent->currentState.eFlags & EF_TALK ) {
+	if ( cgs.gametype == GT_1FCTF && sameTeam &&
+			( cent->currentState.powerups & ( 1 << PW_NEUTRALFLAG ) ) ) {
+		CG_PlayerFloatSprite( cent, cgs.media.poiNeutralFlagCarrierShader );
+		return;
+	}
+
+	if ( CG_ShouldDrawTeamPlayerMarker( sameTeam ) && CG_PlayerHasFlagPowerup( cent ) ) {
+		shader = cgs.media.flagCarrierShader;
+		if ( CG_PlayerRecentlyHit( cent, 1500 ) ) {
+			shader = cgs.media.flagCarrierHitShader;
+		}
+		CG_PlayerFloatSprite( cent, shader );
+		return;
+	}
+
+	if ( cgs.gametype == GT_FREEZE && sameTeam &&
+			( cent->currentState.powerups & ( 1 << PW_NUM_POWERUPS ) ) ) {
+		CG_PlayerFloatSprite( cent, cgs.media.frozenPlayerShader );
+		return;
+	}
+
+	if ( ( cent->currentState.eFlags & EF_TALK ) &&
+			!( cent->currentState.eFlags & EF_DEAD ) &&
+			!redRoverBlocked ) {
 		CG_PlayerFloatSprite( cent, cgs.media.balloonShader );
 		return;
 	}
 
-	if ( cent->currentState.eFlags & EF_AWARD_IMPRESSIVE ) {
+	if ( ( cent->currentState.eFlags & EF_AWARD_IMPRESSIVE ) && !redRoverBlocked ) {
 		CG_PlayerFloatSprite( cent, cgs.media.medalImpressive );
 		return;
 	}
 
-	if ( cent->currentState.eFlags & EF_AWARD_EXCELLENT ) {
+	if ( ( cent->currentState.eFlags & EF_AWARD_EXCELLENT ) && !redRoverBlocked ) {
 		CG_PlayerFloatSprite( cent, cgs.media.medalExcellent );
 		return;
 	}
 
-	if ( cent->currentState.eFlags & EF_AWARD_GAUNTLET ) {
+	if ( ( cent->currentState.eFlags & EF_AWARD_GAUNTLET ) && !redRoverBlocked ) {
 		CG_PlayerFloatSprite( cent, cgs.media.medalGauntlet );
 		return;
 	}
@@ -2912,13 +3086,18 @@ static void CG_PlayerSprites( centity_t *cent ) {
 		return;
 	}
 
-	team = cgs.clientinfo[ cent->currentState.clientNum ].team;
-	if ( !(cent->currentState.eFlags & EF_DEAD) && 
-		cg.snap->ps.persistant[PERS_TEAM] == team &&
-		cgs.gametype >= GT_TEAM) {
-		if (cg_drawFriend.integer) {
-			CG_PlayerFloatSprite( cent, cgs.media.friendShader );
+	if ( CG_ShouldDrawInfectedTargetMarker( ci ) ) {
+		CG_PlayerFloatSprite( cent, cgs.media.poiInfectedShader );
+		return;
+	}
+
+	if ( CG_ShouldDrawTeamPlayerMarker( sameTeam ) &&
+			!( cent->currentState.eFlags & EF_DEAD ) ) {
+		shader = cgs.media.friendHitShader;
+		if ( !CG_PlayerRecentlyHit( cent, cg_drawHitFriendTime.integer ) ) {
+			shader = cgs.media.friendShader;
 		}
+		CG_PlayerFloatSprite( cent, shader );
 		return;
 	}
 }

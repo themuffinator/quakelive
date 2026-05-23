@@ -242,54 +242,55 @@ console commands own this tail.
 | `0x23630` | `damageX` | `float` | Damage direction X component in view space. |
 | `0x23634` | `damageY` | `float` | Damage direction Y component in view space. |
 | `0x23638` | `damageValue` | `float` | Current damage blend intensity. |
-| `0x2363C` | `damagePlumPreset` | `damagePlumPreset_t` | Cached damage-plum preset mode. |
-| `0x23640` | `damagePlumWeaponBits` | `unsigned int` | Cached enabled-weapon mask for damage plums. |
-| `0x23644` | `damagePlumColorStyle` | `damagePlumColorStyle_t` | Cached damage-plum color style. |
-| `0x23648` | `screenDamageColor` | `vec4_t` | Active screen-damage tint used by the `cg_screen.c` first-person damage blend. |
-| `0x23658` | `screenDamageSelfColor` | `vec4_t` | Cached self-damage tint variant, including the packed alpha byte. |
-| `0x23668` | `screenDamageTeamColor` | `vec4_t` | Cached team-damage tint variant. |
-| `0x23678` | `screenDamageAlpha` | `float` | Active non-self screen-damage alpha byte. |
-| `0x2367C` | `screenDamageAlphaTeam` | `float` | Cached team-damage alpha byte. |
-| `0x23680` | `headYaw` | `float` | Legacy head-animation scratch field retained in the layout. |
-| `0x23684` | `headEndPitch` | `float` | Target head pitch for the HUD head wobble animation. |
-| `0x23688` | `headEndYaw` | `float` | Target head yaw for the HUD head wobble animation. |
-| `0x2368C` | `headEndTime` | `int` | End time for the current HUD head wobble segment. |
-| `0x23690` | `headStartPitch` | `float` | Start head pitch for the current HUD head wobble segment. |
-| `0x23694` | `headStartYaw` | `float` | Start head yaw for the current HUD head wobble segment. |
-| `0x23698` | `headStartTime` | `int` | Start time for the current HUD head wobble segment. |
-| `0x2369C` | `v_dmg_time` | `float` | View-kick timer end for damage feedback. |
-| `0x236A0` | `v_dmg_pitch` | `float` | Damage pitch kick amount. |
-| `0x236A4` | `v_dmg_roll` | `float` | Damage roll kick amount. |
-| `0x236A8` | `kickScale` | `float` | Cached `cg_kickScale` value. |
-| `0x236AC` | `bobScale` | `float` | Cached `cg_bob` value. |
-| `0x236B0` | `simpleItemsHeightOffset` | `float` | Cached simple-items height offset. |
-| `0x236B4` | `simpleItemsRadius` | `float` | Cached simple-items radius. |
-| `0x236B8` | `simpleItemsBob` | `float` | Cached simple-items bob amplitude. |
-| `0x236BC` | `kick_angles` | `vec3_t` | Weapon/view kick angles. |
-| `0x236C8` | `kick_origin` | `vec3_t` | Weapon/view kick positional offset. |
-| `0x236D4` | `projectileNudgeCommandTime` | `int` | Command time tied to the last local projectile nudge. |
-| `0x236D8` | `projectileNudgeMsec` | `int` | Effective nudge delta in milliseconds. |
-| `0x236DC` | `projectileNudgeOrigin` | `vec3_t` | Local projectile-nudge origin scratch. |
-| `0x236E8` | `bobfracsin` | `float` | Current bobbing sine factor. |
-| `0x236EC` | `bobcycle` | `int` | Current bob-cycle parity/state. |
-| `0x236F0` | `xyspeed` | `float` | Current horizontal player speed. |
-| `0x236F4` | `speedometerSample` | `float` | Cached speedometer sample for the current frame. |
-| `0x236F8` | `speedometerSampleTime` | `int` | Timestamp for `speedometerSample`. |
-| `0x236FC` | `predictedLocalRailTime` | `int` | Timestamp for the cached predicted rail trace. |
-| `0x23700` | `predictedLocalLightningTime` | `int` | Timestamp for the cached predicted lightning trace. |
-| `0x23704` | `predictedLocalRailValid` | `qboolean` | Validity latch for the cached predicted rail trace. |
-| `0x23708` | `predictedLocalLightningValid` | `qboolean` | Validity latch for the cached predicted lightning trace. |
-| `0x2370C` | `predictedLocalRailHit` | `qboolean` | Cached predicted rail hit-world result. |
-| `0x23710` | `predictedLocalLightningHit` | `qboolean` | Cached predicted lightning hit-world result. |
-| `0x23714` | `predictedLocalRailStart` | `vec3_t` | Cached predicted rail trace start. |
-| `0x23720` | `predictedLocalRailEnd` | `vec3_t` | Cached predicted rail trace end. |
-| `0x2372C` | `predictedLocalLightningStart` | `vec3_t` | Cached predicted lightning trace start. |
-| `0x23738` | `predictedLocalLightningEnd` | `vec3_t` | Cached predicted lightning trace end. |
-| `0x23744` | `nextOrbitTime` | `int` | Next camera-orbit update time. |
-| `0x23748` | `testModelEntity` | `refEntity_t` | Live development test-model entity submitted by the view debug commands. |
-| `0x237D4` | `testModelName` | `char[MAX_QPATH]` | Registered name of the active development test model. |
-| `0x23814` | `testGun` | `qboolean` | Development flag that renders the test model like a gun. |
-| `0x23818` | `rageQuitTime` | `int` | Countdown latch before the queued `quit` command fires. |
+| `0x2363C` | `damageBlendColor` | `unsigned int` | Event-time screen-damage tint latched in retail `RRGGBBAA` form. |
+| `0x23640` | `damagePlumPreset` | `damagePlumPreset_t` | Cached damage-plum preset mode. |
+| `0x23644` | `damagePlumWeaponBits` | `unsigned int` | Cached enabled-weapon mask for damage plums. |
+| `0x23648` | `damagePlumColorStyle` | `damagePlumColorStyle_t` | Cached damage-plum color style. |
+| `0x2364C` | `screenDamageColor` | `vec4_t` | Cached default screen-damage tint customization. |
+| `0x2365C` | `screenDamageSelfColor` | `vec4_t` | Cached self-damage tint variant, including the packed alpha byte. |
+| `0x2366C` | `screenDamageTeamColor` | `vec4_t` | Cached team-damage tint variant. |
+| `0x2367C` | `screenDamageAlpha` | `float` | Active non-self screen-damage alpha byte. |
+| `0x23680` | `screenDamageAlphaTeam` | `float` | Cached team-damage alpha byte. |
+| `0x23684` | `headYaw` | `float` | Legacy head-animation scratch field retained in the layout. |
+| `0x23688` | `headEndPitch` | `float` | Target head pitch for the HUD head wobble animation. |
+| `0x2368C` | `headEndYaw` | `float` | Target head yaw for the HUD head wobble animation. |
+| `0x23690` | `headEndTime` | `int` | End time for the current HUD head wobble segment. |
+| `0x23694` | `headStartPitch` | `float` | Start head pitch for the current HUD head wobble segment. |
+| `0x23698` | `headStartYaw` | `float` | Start head yaw for the current HUD head wobble segment. |
+| `0x2369C` | `headStartTime` | `int` | Start time for the current HUD head wobble segment. |
+| `0x236A0` | `v_dmg_time` | `float` | View-kick timer end for damage feedback. |
+| `0x236A4` | `v_dmg_pitch` | `float` | Damage pitch kick amount. |
+| `0x236A8` | `v_dmg_roll` | `float` | Damage roll kick amount. |
+| `0x236AC` | `kickScale` | `float` | Cached `cg_kickScale` value. |
+| `0x236B0` | `bobScale` | `float` | Cached `cg_bob` value. |
+| `0x236B4` | `simpleItemsHeightOffset` | `float` | Cached simple-items height offset. |
+| `0x236B8` | `simpleItemsRadius` | `float` | Cached simple-items radius. |
+| `0x236BC` | `simpleItemsBob` | `float` | Cached simple-items bob amplitude. |
+| `0x236C0` | `kick_angles` | `vec3_t` | Weapon/view kick angles. |
+| `0x236CC` | `kick_origin` | `vec3_t` | Weapon/view kick positional offset. |
+| `0x236D8` | `projectileNudgeCommandTime` | `int` | Command time tied to the last local projectile nudge. |
+| `0x236DC` | `projectileNudgeMsec` | `int` | Effective nudge delta in milliseconds. |
+| `0x236E0` | `projectileNudgeOrigin` | `vec3_t` | Local projectile-nudge origin scratch. |
+| `0x236EC` | `bobfracsin` | `float` | Current bobbing sine factor. |
+| `0x236F0` | `bobcycle` | `int` | Current bob-cycle parity/state. |
+| `0x236F4` | `xyspeed` | `float` | Current horizontal player speed. |
+| `0x236F8` | `speedometerSample` | `float` | Cached speedometer sample for the current frame. |
+| `0x236FC` | `speedometerSampleTime` | `int` | Timestamp for `speedometerSample`. |
+| `0x23700` | `predictedLocalRailTime` | `int` | Timestamp for the cached predicted rail trace. |
+| `0x23704` | `predictedLocalLightningTime` | `int` | Timestamp for the cached predicted lightning trace. |
+| `0x23708` | `predictedLocalRailValid` | `qboolean` | Validity latch for the cached predicted rail trace. |
+| `0x2370C` | `predictedLocalLightningValid` | `qboolean` | Validity latch for the cached predicted lightning trace. |
+| `0x23710` | `predictedLocalRailHit` | `qboolean` | Cached predicted rail hit-world result. |
+| `0x23714` | `predictedLocalLightningHit` | `qboolean` | Cached predicted lightning hit-world result. |
+| `0x23718` | `predictedLocalRailStart` | `vec3_t` | Cached predicted rail trace start. |
+| `0x23724` | `predictedLocalRailEnd` | `vec3_t` | Cached predicted rail trace end. |
+| `0x23730` | `predictedLocalLightningStart` | `vec3_t` | Cached predicted lightning trace start. |
+| `0x2373C` | `predictedLocalLightningEnd` | `vec3_t` | Cached predicted lightning trace end. |
+| `0x23748` | `nextOrbitTime` | `int` | Next camera-orbit update time. |
+| `0x2374C` | `testModelEntity` | `refEntity_t` | Live development test-model entity submitted by the view debug commands. |
+| `0x237D8` | `testModelName` | `char[MAX_QPATH]` | Registered name of the active development test model. |
+| `0x23818` | `testGun` | `qboolean` | Development flag that renders the test model like a gun. |
+| `0x2381C` | `rageQuitTime` | `int` | Countdown latch before the queued `quit` command fires. |
 
 ## Ownership Notes
 
@@ -357,10 +358,11 @@ console commands own this tail.
   `cg_screen.c::CG_DamageBlendBlob`; the current tree now keeps
   `CG_DrawScreenDamage` empty because there is no second retail 2D damage
   overlay consumer in the committed corpus.
-- The packed-color branch recorded in retail damage feedback uses the self
-  color as full RGBA, but replaces the alpha byte for default or team damage
-  from `screenDamageAlpha` or `screenDamageAlphaTeam` before the blob draw
-  consumes it.
+- The packed-color branch recorded in retail damage feedback latches
+  `damageBlendColor` at the damage event. Self-damage uses the self color as
+  full RGBA, while default or team damage replaces the low alpha byte from
+  `screenDamageAlpha` or `screenDamageAlphaTeam` before the blob draw consumes
+  the packed value.
 - Retail graphics registration only loads `viewBloodBlend` when the
   `dlc_gibs/bloodspray1.tga` asset probe succeeds, so the blob path keys off
   the registered shader handle instead of a live blood cvar.
@@ -400,7 +402,7 @@ The highest-confidence live fields are:
   `rewardCount`, `rewardShader`, `rewardSound`, `soundBuffer*`,
   `voiceChatTime`, `voiceChatBufferIn`, `voiceChatBufferOut`, `warmup`,
   `itemPickupBlendTime`, `damageTime`, `damageX`, `damageY`, `damageValue`,
-  `screenDamageColor`, `screenDamageAlpha`, `v_dmg_*`, `kick_angles`,
+  `damageBlendColor`, `screenDamageColor`, `screenDamageAlpha`, `v_dmg_*`, `kick_angles`,
   `kick_origin`, `bobfracsin`, `bobcycle`, `xyspeed`, and the
   `predictedLocal*` hitscan cache
 
@@ -418,10 +420,9 @@ The highest-confidence live fields are:
   `weaponBarGrenadeColor` remain cached customization fields whose read-side
   consumers are weak or absent in the current tree.
 - `screenDamageSelfColor`, `screenDamageTeamColor`, and
-  `screenDamageAlphaTeam` are now consumed by `cg_screen.c` when the live
-  attacker context identifies self-damage or friendly-fire damage, which lines
-  up with the retail cvar surface recovered from the committed `cgame` and UI
-  HLIL.
+  `screenDamageAlphaTeam` are latched by `CG_DamageFeedback` when the event
+  attacker context identifies self-damage or friendly-fire damage; `cg_screen.c`
+  then consumes only the packed event-time `damageBlendColor`.
 
 ## Open Questions
 

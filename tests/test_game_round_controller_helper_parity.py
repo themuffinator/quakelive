@@ -41,6 +41,9 @@ def test_freeze_round_controller_helpers_match_retail_mapping_surface() -> None:
 	assert "void G_RoundHandleWarmupDelayCvarUpdate( void ) {" in active_c
 	assert "return G_RoundTimeLimitExpired( level.roundStartTime );" in active_c
 	assert "level.roundPendingExit = G_CAFZCheckExitRules( qfalse );" in active_c
+	assert "mercyLimitMsec = G_BuildExitRuleLimitMsec( g_mercytime.integer, level.overtimeAccumulatedMsec );" in active_c
+	assert "if ( level.teamScores[TEAM_RED] >= roundlimit.integer ) {" in active_c
+	assert "&& level.teamScores[TEAM_RED] > level.teamScores[TEAM_BLUE]" not in active_c
 	assert "switch ( level.roundState ) {" in active_c
 	assert "state = G_FreezeResolveRoundState();" in active_c
 	assert active_c.index("G_FreezeRecountLivingClients();") < active_c.index("if ( !G_FreezeShouldCompleteRound( level.freezeLivingCount ) ) {")

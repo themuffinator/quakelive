@@ -9,7 +9,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CG_NEWDRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_newdraw.c"
 CG_DRAW = REPO_ROOT / "src" / "code" / "cgame" / "cg_draw.c"
 CG_MAIN = REPO_ROOT / "src" / "code" / "cgame" / "cg_main.c"
+CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 CG_LOCAL = REPO_ROOT / "src" / "code" / "cgame" / "cg_local.h"
+UI_SHARED = REPO_ROOT / "src" / "code" / "ui" / "ui_shared.c"
+MENUDEF_H = REPO_ROOT / "src" / "ui" / "menudef.h"
+INTRO_MENU = REPO_ROOT / "src" / "ui" / "intro.menu"
+ENDSCORETEAM_MENU = REPO_ROOT / "src" / "ui" / "endscoreteam.menu"
 CGAME_HLIL = (
     REPO_ROOT
     / "references"
@@ -17,6 +22,14 @@ CGAME_HLIL = (
     / "quakelive"
     / "cgamex86.dll"
     / "cgamex86.dll_hlil.txt"
+)
+CGAME_GHIDRA = (
+    REPO_ROOT
+    / "references"
+    / "reverse-engineering"
+    / "ghidra"
+    / "cgamex86"
+    / "decompile_top_functions.c"
 )
 
 
@@ -45,13 +58,26 @@ def _text_between(source: str, start_marker: str, end_marker: str) -> str:
 
 def test_game_limit_uses_retail_limit_strings() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+    ui_shared_source = UI_SHARED.read_text(encoding="utf-8")
+    menudef_source = MENUDEF_H.read_text(encoding="utf-8")
+    intro_menu = INTRO_MENU.read_text(encoding="utf-8")
+    endscoreteam_menu = ENDSCORETEAM_MENU.read_text(encoding="utf-8")
     hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+    ghidra_source = CGAME_GHIDRA.read_text(encoding="utf-8")
     block = _block_from_marker(source, "static void CG_DrawGameLimit")
+    ownerdraw_block = _block_from_marker(source, "void CG_OwnerDraw(")
+    width_block = _block_from_marker(main_source, "static int CG_OwnerDrawWidth")
+    display_context_block = _block_from_marker(main_source, "static void CG_InitDisplayContext")
+    parse_serverinfo_block = _block_from_marker(servercmds_source, "void CG_ParseServerinfo")
+    item_ownerdraw_parse_block = _block_from_marker(ui_shared_source, "qboolean ItemParse_ownerdraw( itemDef_t")
     retail_block = _text_between(
         hlil_source,
         '10033800    int32_t __convention("regparm") sub_10033800',
         "10033910",
     )
+    retail_ownerdraw_block = _block_from_marker(ghidra_source, "void FUN_1003b0f0(")
 
     for expected in (
         '"Cap Limit: %d"',
@@ -65,8 +91,11 @@ def test_game_limit_uses_retail_limit_strings() -> None:
         "if (arg8 == 1)",
         "sub_100082b0(0, 0, result, &var_4, nullptr, 0, fconvert.s(fconvert.t(arg5)))",
         "var_4 = fconvert.s(x87_r7_5 - float.t(var_4))",
+        "fconvert.s(fconvert.t(arg4[1]))",
     ):
         assert expected in retail_block
+
+    assert "arg4[3]" not in retail_block
 
     for expected in (
         "case GT_CTF:",
@@ -84,7 +113,7 @@ def test_game_limit_uses_retail_limit_strings() -> None:
         'Com_sprintf( buffer, sizeof( buffer ), "Frag Limit: %d", cgs.fraglimit );',
         "if ( align == ITEM_ALIGN_CENTER ) {",
         "x -= CG_Text_Width( buffer, scale, 0 ) * 0.5f;",
-        "CG_Text_Paint( x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle );",
+        "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );",
     ):
         assert expected in block
 
@@ -99,8 +128,34 @@ def test_game_limit_uses_retail_limit_strings() -> None:
         "limitValue > 0",
         "CG_GetTextPosition",
         "ITEM_ALIGN_RIGHT",
+        "rect->y + rect->h",
     ):
         assert stale not in block
+
+    start = ownerdraw_block.index("case CG_GAME_LIMIT:")
+    end = ownerdraw_block.index("break;", start)
+    game_limit_case = ownerdraw_block[start:end]
+    assert "CG_DrawGameLimit( &rect, scale, color, textStyle, align );" in game_limit_case
+    assert "FUN_10033800(&local_18,param_13,param_14,param_16,param_10);" in retail_ownerdraw_block
+
+    for expected in (
+        'cgs.fraglimit = atoi( Info_ValueForKey( info, "fraglimit" ) );',
+        'cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );',
+        'cgs.scorelimit = atoi( Info_ValueForKey( info, "g_scorelimit" ) );',
+        'cgs.roundlimit = atoi( Info_ValueForKey( info, "roundlimit" ) );',
+    ):
+        assert expected in parse_serverinfo_block
+
+    assert any(line.split() == ["#define", "CG_GAME_LIMIT", "3"] for line in menudef_source.splitlines())
+    assert '#include "ui/menudef.h"' in intro_menu
+    assert "ownerdraw CG_GAME_LIMIT" in intro_menu
+    assert '#include "ui/menudef.h"' in endscoreteam_menu
+    assert "ownerdraw CG_GAME_LIMIT" in endscoreteam_menu
+    assert "PC_Int_Parse(handle, &item->window.ownerDraw)" in item_ownerdraw_parse_block
+    assert "item->type = ITEM_TYPE_OWNERDRAW;" in item_ownerdraw_parse_block
+    assert "cgDC.ownerDrawItem = &CG_OwnerDraw;" in display_context_block
+    assert "cgDC.ownerDrawWidth = &CG_OwnerDrawWidth;" in display_context_block
+    assert "CG_GAME_LIMIT" not in width_block
 
 
 def test_match_end_condition_uses_retail_condition_strings() -> None:
@@ -435,6 +490,11 @@ def test_match_status_uses_retail_status_text_family() -> None:
         "10034cc0    void sub_10034cc0",
         "10034d70",
     )
+    retail_status_helper = _text_between(
+        hlil_source,
+        "10034a00    char const* const sub_10034a00()",
+        "10034b30",
+    )
 
     assert "case GT_SINGLE_PLAYER:" in status_text
     assert "case GT_RED_ROVER:" in status_text
@@ -449,8 +509,22 @@ def test_match_status_uses_retail_status_text_family() -> None:
     assert 'phase = "MATCH SUMMARY";' in status_helper
     assert 'phase = "MATCH WARMUP";' in status_helper
     assert 'phase = "MATCH IN PROGRESS";' in status_helper
-    assert "if ( !status || !status[0] )" in status_helper
-    assert 'Com_sprintf( buffer, sizeof( buffer ), "%s - %s", phase, status );' in status_helper
+    assert "if ( cgs.scores1 == SCORE_NOT_PRESENT && cgs.scores2 == SCORE_NOT_PRESENT &&" in status_helper
+    assert "( cgs.gametype < GT_TEAM || cgs.gametype == GT_RED_ROVER )" in status_helper
+    assert "if ( cgs.gametype == GT_RACE ) {" in status_helper
+    assert "CG_FormatSignedMilliseconds( cgs.scores1 )" in status_helper
+    assert '"%s - %s^7 leads with a score of %s"' in status_helper
+    assert "if ( cgs.gametype >= GT_TEAM && cgs.gametype != GT_RED_ROVER ) {" in status_helper
+    assert '"%s - Teams are tied at %i"' in status_helper
+    assert '"%s - ^1Red^7 leads ^4Blue^7, %i to %i"' in status_helper
+    assert '"%s - ^4Blue^7 leads ^1Red^7, %i to %i"' in status_helper
+    assert "cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR" in status_helper
+    assert "leaderName = cgs.firstPlaceName;" in status_helper
+    assert "leaderName = cgs.secondPlaceName;" in status_helper
+    assert '"%s - %s leads with %i"' in status_helper
+    assert '"%s - %s place with %i"' in status_helper
+    assert "CG_GetGameStatusText()" not in status_helper
+    assert "if ( !status || !status[0] )" not in status_helper
 
     assert "statusText = CG_GetMatchStatusText();" in draw_match_status
     assert "x = rect->x;" in draw_match_status
@@ -461,6 +535,19 @@ def test_match_status_uses_retail_status_text_family() -> None:
     assert "CG_GetTextPosition" not in draw_match_status
     assert "CG_DrawMatchStatus( &rect, scale, color, textStyle, align );" in ownerdraw_block
     assert "CG_DrawMatchStatus(&rect, text_x, text_y, scale, color, textStyle);" not in ownerdraw_block
+
+    for expected in (
+        "if (esi == edx && esi == 0xffffd8f1 && (eax s< 3 || eax == 0xc))",
+        "if (eax == 2)",
+        'var_18 = " - %s^7 leads with a score of %s"',
+        "else if (eax s>= 3 && eax != 0xc)",
+        'var_18 = " - ^4Blue^7 leads ^1Red^7, %i to',
+        'var_18 = " - ^1Red^7 leads ^4Blue^7, %i to',
+        "if (*(edi + 0x138) == 3)",
+        'var_18 = " - %s leads with %i"',
+        'var_18 = " - %s place with %i"',
+    ):
+        assert expected in retail_status_helper
 
     for expected in (
         "char* eax = sub_10034a00()",
@@ -555,7 +642,9 @@ def test_endgame_summary_uses_retail_message_family() -> None:
 
 def test_starting_weapons_uses_retail_icon_preview_path() -> None:
     source = CG_NEWDRAW.read_text(encoding="utf-8")
-    token_map = _block_from_marker(source, "static weapon_t CG_StartingWeaponFromToken")
+    main_source = CG_MAIN.read_text(encoding="utf-8")
+    token_table = _block_from_marker(main_source, "static const cgRetailWeaponToken_t cgRetailWeaponTokens")
+    token_helper = _block_from_marker(main_source, "int CG_StartingWeaponIndexFromToken")
     preview_mask = _block_from_marker(source, "static unsigned int CG_GetStartingWeaponPreviewMask")
     block = _block_from_marker(source, "static void CG_DrawStartingWeapons")
 
@@ -563,24 +652,36 @@ def test_starting_weapons_uses_retail_icon_preview_path() -> None:
     assert "CG_ConfigString( CS_LOADOUT_MASK )" in preview_mask
     assert '"g_startingWeapons"' in preview_mask
 
-    assert "CG_StartingWeaponFromToken( cg_weaponPrimaryQueued.string )" in block
+    assert "primaryIndex = cg.weaponPrimary;" in block
+    assert "primaryIndex = CG_STARTING_WEAPON_ICON_COUNT;" in block
+    assert "CG_GetStartingWeaponIconHandle( cgStartingWeaponIcons[primaryIndex - 1].weapon )" in block
     assert 'CG_Text_Paint( plusX, plusY, scale, color, "+", 0, 0, textStyle );' in block
     assert "CG_DrawPic( rect->x + xOffset, rect->y, rect->w, rect->h, shader );" in block
     assert "CG_DrawPic( rect->x + xOffset + rect->w, rect->y, rect->w, rect->h, shader );" in block
 
     for expected in (
-        '"gauntlet"',
-        '"rocket_launcher"',
-        '"grappling_hook"',
-        '"heavy_machinegun"',
+        '{ "g", WP_GAUNTLET, 1 }',
+        '{ "mg", WP_MACHINEGUN, 2 }',
+        '{ "sg", WP_SHOTGUN, 3 }',
+        '{ "cg", WP_CHAINGUN, 13 }',
+        '{ "hmg", WP_HEAVY_MACHINEGUN, 14 }',
     ):
-        assert expected in token_map
+        assert expected in token_table
+
+    for expected in (
+        "token = COM_ParseExt( &cursor, qtrue );",
+        "weaponToken = CG_RetailWeaponTokenForToken( token );",
+        "return weaponToken->index;",
+    ):
+        assert expected in token_helper
 
     for stale in (
         "Factory loadouts active",
         "Default loadout",
         "Q_strcat( buffer",
         "CG_ResolveWeaponName( weapon )",
+        "CG_StartingWeaponFromToken",
+        "cg_weaponPrimary.integer",
     ):
         assert stale not in block
 

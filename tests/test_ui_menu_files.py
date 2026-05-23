@@ -612,12 +612,17 @@ def test_ui_retail_ownerdraw_extensions_restored() -> None:
 
 def test_ui_retail_starting_weapons_ownerdraw_restored() -> None:
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    token_block = _extract_function_block(ui_main, "static int UI_StartingWeaponIndexFromToken")
     assert "#define UI_STARTING_WEAPON_ICON_COUNT\t14" in ui_main
     assert "static int UI_StartingWeaponIndexFromToken( const char *value )" in ui_main
+    assert "COM_ParseExt( &cursor, qtrue )" in token_block
+    assert "uiStartingWeaponIcons[i].token" in token_block
     assert 'trap_GetConfigString( CS_LOADOUT_MASK, loadoutMaskText, sizeof( loadoutMaskText ) );' in ui_main
     assert 'UI_Cvar_VariableString( "cg_weaponPrimaryQueued" )' in ui_main
     assert "case UI_STARTING_WEAPONS:" in ui_main
     assert "UI_DrawStartingWeapons(&rect, scale, color, textStyle);" in ui_main
+    for stale in ('"gauntlet"', '"rocket_launcher"', '"grappling_hook"', '"heavy_machinegun"'):
+        assert stale not in token_block
 
 
 def test_ui_retail_advert_runtime_seam_restored() -> None:

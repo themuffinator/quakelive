@@ -816,6 +816,11 @@ void Svcmd_AddBot_f( void ) {
 		return;
 	}
 
+	if ( level.trainingMapActive ) {
+		trap_Printf( "Addbot not allowed during training.\n" );
+		return;
+	}
+
 	// name
 	trap_Argv( 1, name, sizeof( name ) );
 	if ( !name[0] ) {
@@ -897,7 +902,7 @@ void Svcmd_BotList_f( void ) {
 G_AddTrainerBot
 ===============
 */
-static void G_AddTrainerBot( void ) {
+void G_AddTrainerBot( void ) {
 	float		skill;
 
 	skill = trap_Cvar_VariableValue( "g_spSkill" );

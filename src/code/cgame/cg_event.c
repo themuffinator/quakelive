@@ -40,6 +40,10 @@ enum {
 	QL_EV_NEW_HIGH_SCORE = 99
 };
 
+static int damagePlumSeed = 0x92;
+static const vec4_t cg_damagePlumWhite = { 1.0f, 1.0f, 1.0f, 1.0f };
+static const vec4_t cg_damagePlumRed = { 1.0f, 0.0f, 0.0f, 1.0f };
+
 /*
 =============
 CG_DamagePlumsEnabled
@@ -59,11 +63,14 @@ Determines if a specific weapon should show damage plums.
 =============
 */
 qboolean CG_ShouldRenderDamagePlumForWeapon( weapon_t weapon ) {
+	unsigned int	weaponBit;
+
 	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
 		return qfalse;
 	}
 
-	return ( ( cg.damagePlumWeaponBits & ( 1u << weapon ) ) != 0u );
+	weaponBit = CG_DamagePlumBitForWeapon( weapon );
+	return ( weaponBit != 0u && ( cg.damagePlumWeaponBits & weaponBit ) != 0u );
 }
 
 /*
@@ -79,121 +86,94 @@ damagePlumColorStyle_t CG_GetDamagePlumColorStyle( void ) {
 
 /*
 =============
+CG_DamagePlumRandom
+
+Advances the retail damage-plum random stream.
+=============
+*/
+static float CG_DamagePlumRandom( void ) {
+	return Q_random( &damagePlumSeed );
+}
+
+/*
+=============
+CG_LerpDamagePlumColor
+
+Interpolates the retail monochrome damage-plum color lane.
+=============
+*/
+static void CG_LerpDamagePlumColor( vec4_t color, const vec4_t start, const vec4_t end, float frac ) {
+	int	i;
+
+	frac = Com_Clamp( 0.0f, 1.0f, frac );
+	for ( i = 0; i < 4; i++ ) {
+		color[i] = start[i] + ( end[i] - start[i] ) * frac;
+	}
+}
+
+/*
+=============
+CG_GetDamagePlumWeaponColor
+
+Copies the retail weapon-descriptor color lane for weapon-colored plums.
+=============
+*/
+static void CG_GetDamagePlumWeaponColor( weapon_t weapon, vec4_t color ) {
+	const bgWeaponStats_t	*stats;
+
+	Vector4Copy( cg_damagePlumWhite, color );
+
+	stats = BG_GetWeaponStats( weapon );
+	if ( !stats ) {
+		return;
+	}
+
+	color[0] = stats->pickupHandicapScale;
+	color[1] = stats->armorHandicapScale;
+	color[2] = stats->healthHandicapScale;
+	color[3] = stats->respawnHandicapScale;
+}
+
+/*
+=============
 CG_GetDamagePlumColor
 
-Approximates the retail color-style selector for source-side damage-plum
-reconstruction.
+Selects the retail damage-plum color style.
 =============
 */
 static void CG_GetDamagePlumColor( int damage, weapon_t weapon, vec4_t color ) {
-	color[0] = 1.0f;
-	color[1] = 1.0f;
-	color[2] = 1.0f;
-	color[3] = 1.0f;
-
 	switch ( CG_GetDamagePlumColorStyle() ) {
 	case DAMAGE_PLUM_COLOR_STYLE_DAMAGE:
-		if ( damage >= 100 ) {
+		if ( damage > 75 ) {
 			color[0] = 1.0f;
-			color[1] = 0.2f;
-			color[2] = 0.2f;
-		}
-		else if ( damage >= 75 ) {
+			color[1] = 0.0f;
+			color[2] = 0.0f;
+			color[3] = 1.0f;
+		} else if ( damage > 50 ) {
 			color[0] = 1.0f;
-			color[1] = 0.45f;
-			color[2] = 0.15f;
-		}
-		else if ( damage >= 50 ) {
-			color[0] = 1.0f;
-			color[1] = 0.8f;
-			color[2] = 0.15f;
-		}
-		else if ( damage >= 25 ) {
-			color[0] = 0.6f;
-			color[1] = 1.0f;
-			color[2] = 0.2f;
-		}
-		else {
+			color[1] = 0.5f;
+			color[2] = 0.0f;
+			color[3] = 1.0f;
+		} else if ( damage <= 25 ) {
 			color[0] = 0.25f;
+			color[1] = 0.5f;
+			color[2] = 1.0f;
+			color[3] = 1.0f;
+		} else {
+			color[0] = 1.0f;
 			color[1] = 1.0f;
-			color[2] = 0.25f;
+			color[2] = 0.0f;
+			color[3] = 1.0f;
 		}
-		break;
+		return;
 
 	case DAMAGE_PLUM_COLOR_STYLE_WEAPON:
-		switch ( weapon ) {
-		case WP_GAUNTLET:
-			color[0] = 1.0f;
-			color[1] = 0.3f;
-			color[2] = 0.3f;
-			break;
-		case WP_MACHINEGUN:
-			color[0] = 1.0f;
-			color[1] = 0.95f;
-			color[2] = 0.35f;
-			break;
-		case WP_SHOTGUN:
-			color[0] = 1.0f;
-			color[1] = 1.0f;
-			color[2] = 1.0f;
-			break;
-		case WP_GRENADE_LAUNCHER:
-			color[0] = 0.55f;
-			color[1] = 0.9f;
-			color[2] = 0.2f;
-			break;
-		case WP_ROCKET_LAUNCHER:
-			color[0] = 1.0f;
-			color[1] = 0.45f;
-			color[2] = 0.1f;
-			break;
-		case WP_LIGHTNING:
-			color[0] = 0.35f;
-			color[1] = 0.7f;
-			color[2] = 1.0f;
-			break;
-		case WP_RAILGUN:
-			color[0] = 0.2f;
-			color[1] = 1.0f;
-			color[2] = 1.0f;
-			break;
-		case WP_PLASMAGUN:
-			color[0] = 1.0f;
-			color[1] = 0.2f;
-			color[2] = 1.0f;
-			break;
-		case WP_BFG:
-			color[0] = 0.45f;
-			color[1] = 1.0f;
-			color[2] = 0.35f;
-			break;
-		case WP_GRAPPLING_HOOK:
-			color[0] = 0.25f;
-			color[1] = 0.9f;
-			color[2] = 0.8f;
-			break;
-		case WP_NAILGUN:
-			color[0] = 0.6f;
-			color[1] = 0.85f;
-			color[2] = 0.25f;
-			break;
-		case WP_PROX_LAUNCHER:
-			color[0] = 1.0f;
-			color[1] = 0.8f;
-			color[2] = 0.2f;
-			break;
-		case WP_CHAINGUN:
-			color[0] = 1.0f;
-			color[1] = 0.7f;
-			color[2] = 0.15f;
-			break;
-		default:
-			break;
-		}
-		break;
+		CG_GetDamagePlumWeaponColor( weapon, color );
+		return;
 
 	default:
-		break;
+		CG_LerpDamagePlumColor( color, cg_damagePlumWhite, cg_damagePlumRed, (float)damage / 100.0f );
+		return;
 	}
 }
 
@@ -224,13 +204,16 @@ static void CG_DamagePlum( vec3_t org, int damage, weapon_t weapon ) {
 	}
 
 	VectorCopy( org, marker->origin );
-	marker->origin[0] += crandom() * 10.0f;
-	marker->origin[1] += crandom() * 10.0f;
-	marker->origin[2] += crandom() * 10.0f;
-	marker->duration = 2000;
-	marker->fadeDelay = 1000;
-	marker->rise = 100.0f;
-	marker->textScale = 0.18f;
+	marker->origin[0] += CG_DamagePlumRandom() * 20.0f - 10.0f;
+	marker->origin[1] += CG_DamagePlumRandom() * 20.0f - 10.0f;
+	marker->origin[2] += CG_DamagePlumRandom() * 20.0f - 10.0f;
+	marker->duration = 1000;
+	marker->fadeDelay = 600;
+	marker->rise = 0.0f;
+	marker->textScale = 0.15f;
+	marker->screenVelocity[0] = CG_DamagePlumRandom() * 100.0f - 50.0f;
+	marker->screenVelocity[1] = -120.0f - CG_DamagePlumRandom() * 20.0f;
+	marker->screenAcceleration[1] = 150.0f;
 	Vector4Copy( color, marker->color );
 	Com_sprintf( marker->text, sizeof( marker->text ), "%d", damage );
 }

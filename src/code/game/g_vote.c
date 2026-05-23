@@ -348,12 +348,12 @@ qboolean G_TryExecuteVoteString( const char *voteString ) {
 		}
 
 		if ( !Q_stricmp( args, "GLOBAL" ) ) {
-			trap_Cvar_Set( "g_ammoPack", "0" );
+			trap_Cvar_Set( "g_ammoPack", "1" );
 			trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
 			return qtrue;
 		}
 		if ( !Q_stricmp( args, "WEAP" ) ) {
-			trap_Cvar_Set( "g_ammoPack", "1" );
+			trap_Cvar_Set( "g_ammoPack", "0" );
 			trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
 			return qtrue;
 		}
