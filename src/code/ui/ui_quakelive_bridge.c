@@ -59,6 +59,7 @@ static const char *const uiBridgeMainMenu =
 "\n"
 "itemDef {\n"
 "name title\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_TEXT\n"
 "rect 60 40 520 40\n"
 "text \"QUAKE LIVE (BRIDGE)\"\n"
@@ -69,6 +70,7 @@ static const char *const uiBridgeMainMenu =
 "\n"
 "itemDef {\n"
 "name playonline\n"
+"visible MENU_TRUE\n"
 "text \"PLAY ONLINE\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 60 120 200 24\n"
@@ -82,6 +84,7 @@ static const char *const uiBridgeMainMenu =
 "\n"
 "itemDef {\n"
 "name credentials\n"
+"visible MENU_TRUE\n"
 "text \"CREDENTIALS\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 60 160 200 24\n"
@@ -95,6 +98,7 @@ static const char *const uiBridgeMainMenu =
 "\n"
 "itemDef {\n"
 "name options\n"
+"visible MENU_TRUE\n"
 "text \"SETTINGS\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 60 200 200 24\n"
@@ -108,6 +112,7 @@ static const char *const uiBridgeMainMenu =
 "\n"
 "itemDef {\n"
 "name demo\n"
+"visible MENU_TRUE\n"
 "text \"DEMOS\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 60 240 200 24\n"
@@ -121,6 +126,7 @@ static const char *const uiBridgeMainMenu =
 "\n"
 "itemDef {\n"
 "name quit\n"
+"visible MENU_TRUE\n"
 "text \"QUIT\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 60 280 200 24\n"
@@ -158,6 +164,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name title\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_TEXT\n"
 "rect 60 32 520 24\n"
 "text \"SERVER BROWSER (BRIDGE)\"\n"
@@ -167,6 +174,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name source\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_MULTI\n"
 "rect 60 72 240 20\n"
 "text \"Source\"\n"
@@ -181,6 +189,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name showEmpty\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_MULTI\n"
 "rect 320 72 120 20\n"
 "text \"Show Empty\"\n"
@@ -195,6 +204,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name showFull\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_MULTI\n"
 "rect 480 72 120 20\n"
 "text \"Show Full\"\n"
@@ -209,12 +219,13 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name servers\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_LISTBOX\n"
 "style WINDOW_STYLE_FILLED\n"
 "rect 40 110 560 230\n"
 "elementtype LISTBOX_TEXT\n"
 "elementheight 16\n"
-"columns 6 16 32 48 220 120 80\n"
+"columns 5 0 250 36 260 90 16 360 54 8 420 70 12 500 40 6\n"
 "feeder FEEDER_SERVERS\n"
 "forecolor 1 1 1 1\n"
 "border WINDOW_BORDER_FULL\n"
@@ -228,12 +239,13 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name status\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_LISTBOX\n"
 "style WINDOW_STYLE_FILLED\n"
 "rect 40 350 560 90\n"
 "elementtype LISTBOX_TEXT\n"
 "elementheight 14\n"
-"columns 1 12\n"
+"columns 4 0 160 32 170 180 32 360 100 16 470 60 16\n"
 "feeder FEEDER_SERVERSTATUS\n"
 "forecolor 1 1 1 1\n"
 "border WINDOW_BORDER_FULL\n"
@@ -246,6 +258,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name refresh\n"
+"visible MENU_TRUE\n"
 "text \"REFRESH\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 60 452 90 20\n"
@@ -259,6 +272,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name stop\n"
+"visible MENU_TRUE\n"
 "text \"STOP\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 160 452 70 20\n"
@@ -272,6 +286,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name details\n"
+"visible MENU_TRUE\n"
 "text \"DETAILS\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 250 452 80 20\n"
@@ -285,6 +300,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name join\n"
+"visible MENU_TRUE\n"
 "text \"JOIN\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 340 452 70 20\n"
@@ -298,6 +314,7 @@ static const char *const uiBridgeBrowserMenu =
 "\n"
 "itemDef {\n"
 "name back\n"
+"visible MENU_TRUE\n"
 "text \"BACK\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 430 452 70 20\n"
@@ -333,6 +350,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name title\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_TEXT\n"
 "rect 60 40 520 24\n"
 "text \"CD KEY\"\n"
@@ -342,6 +360,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name prompt\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_TEXT\n"
 "rect 60 80 520 18\n"
 "text \"Please enter your CD Key.\"\n"
@@ -351,6 +370,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name credential1\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_EDITFIELD\n"
 "rect 60 120 100 20\n"
 "text \"\"\n"
@@ -361,6 +381,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name credential2\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_EDITFIELD\n"
 "rect 170 120 100 20\n"
 "text \"\"\n"
@@ -371,6 +392,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name credential3\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_EDITFIELD\n"
 "rect 280 120 100 20\n"
 "text \"\"\n"
@@ -381,6 +403,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name credential4\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_EDITFIELD\n"
 "rect 390 120 100 20\n"
 "text \"\"\n"
@@ -391,6 +414,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name status\n"
+"visible MENU_TRUE\n"
 "type ITEM_TYPE_TEXT\n"
 "rect 60 155 520 16\n"
 "text \"${ui_cdkeyvalid}\"\n"
@@ -400,6 +424,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name verify\n"
+"visible MENU_TRUE\n"
 "text \"VERIFY\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 60 185 100 20\n"
@@ -413,6 +438,7 @@ static const char *const uiBridgeCredentialsMenu =
 "\n"
 "itemDef {\n"
 "name back\n"
+"visible MENU_TRUE\n"
 "text \"BACK\"\n"
 "type ITEM_TYPE_BUTTON\n"
 "rect 170 185 100 20\n"
@@ -429,30 +455,6 @@ static const char *const uiBridgeCredentialsMenu =
 static qboolean ui_browserBridgeActive = qfalse;
 static qboolean ui_browserBridgeAvailable = qfalse;
 static qboolean ui_browserBridgeChecked = qfalse;
-
-/*
-=============
-UI_BridgeFileExists
-
-Helper wrapper that checks if a UI script is reachable through the virtual
-filesystem so the bridge can gracefully fall back before init completes.
-=============
-*/
-static qboolean UI_BridgeFileExists(const char *path) {
-	fileHandle_t handle;
-	int length;
-
-	if (!path || !*path) {
-		return qfalse;
-	}
-
-	length = trap_FS_FOpenFile(path, &handle, FS_READ);
-	if (handle) {
-		trap_FS_FCloseFile(handle);
-	}
-
-	return (length > 0);
-}
 
 /*
 =============
@@ -484,31 +486,19 @@ static qboolean UI_WriteBridgeFile(const char *path, const char *data) {
 UI_WriteBridgeScripts
 
 Emit the bridge menu script set on demand, avoiding changes to packaged
-assets while still enabling the menu-based Quake Live flow.
+assets while still enabling the menu-based Quake Live flow. These files are
+generated compatibility assets, so rewrite them to replace stale earlier
+bridge revisions in the writable homepath.
 =============
 */
 static qboolean UI_WriteBridgeScripts(void) {
 	qboolean ok = qtrue;
 
-	if (!UI_BridgeFileExists(UI_MENU_FILE_QUAKELIVE_BRIDGE)) {
-		ok = UI_WriteBridgeFile(UI_MENU_FILE_QUAKELIVE_BRIDGE, uiBridgeMenuSet) && ok;
-	}
-
-	if (!UI_BridgeFileExists(UI_INGAME_FILE_QUAKELIVE_BRIDGE)) {
-		ok = UI_WriteBridgeFile(UI_INGAME_FILE_QUAKELIVE_BRIDGE, uiBridgeIngameMenuSet) && ok;
-	}
-
-	if (!UI_BridgeFileExists("ui/ql_bridge_main.menu")) {
-		ok = UI_WriteBridgeFile("ui/ql_bridge_main.menu", uiBridgeMainMenu) && ok;
-	}
-
-	if (!UI_BridgeFileExists("ui/ql_bridge_browser.menu")) {
-		ok = UI_WriteBridgeFile("ui/ql_bridge_browser.menu", uiBridgeBrowserMenu) && ok;
-	}
-
-	if (!UI_BridgeFileExists("ui/ql_bridge_credentials.menu")) {
-		ok = UI_WriteBridgeFile("ui/ql_bridge_credentials.menu", uiBridgeCredentialsMenu) && ok;
-	}
+	ok = UI_WriteBridgeFile(UI_MENU_FILE_QUAKELIVE_BRIDGE, uiBridgeMenuSet) && ok;
+	ok = UI_WriteBridgeFile(UI_INGAME_FILE_QUAKELIVE_BRIDGE, uiBridgeIngameMenuSet) && ok;
+	ok = UI_WriteBridgeFile("ui/ql_bridge_main.menu", uiBridgeMainMenu) && ok;
+	ok = UI_WriteBridgeFile("ui/ql_bridge_browser.menu", uiBridgeBrowserMenu) && ok;
+	ok = UI_WriteBridgeFile("ui/ql_bridge_credentials.menu", uiBridgeCredentialsMenu) && ok;
 
 	if (!ok) {
 		trap_Print( "UI_WriteBridgeScripts: Failed to write bridge menu files.\n" );

@@ -629,6 +629,30 @@ const char *UI_DefaultIngameFile(void) {
 
 /*
 =============
+UI_ShouldUseResolvedMenuFile
+
+Treat the built-in menu roots as flow-selected defaults instead of letting an
+archived ui_menuFiles value force Quake Live browser menus when the bridge is active.
+=============
+*/
+static qboolean UI_ShouldUseResolvedMenuFile(const char *menuFile) {
+	if (menuFile == NULL || menuFile[0] == '\0') {
+		return qtrue;
+	}
+
+	if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE)) {
+		return qtrue;
+	}
+
+	if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE_BRIDGE)) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
 UI_UpdateActiveMenuFlow
 
 Refresh the menu flow state from the current runtime configuration.
@@ -675,6 +699,32 @@ static menuDef_t *UI_EnsureNamedMenuLoaded( const char *menuName, const char *me
 
 	UI_ParseMenu( menuFile );
 	return Menus_FindByName( menuName );
+}
+
+/*
+=============
+UI_OpenBrowserBridgeMenu
+
+Open the generated native server-browser surface used when no live browser
+overlay is available.
+=============
+*/
+qboolean UI_OpenBrowserBridgeMenu( void ) {
+	menuDef_t *bridgeBrowserMenu;
+
+	if ( !UI_BrowserBridgeAvailable() ) {
+		return qfalse;
+	}
+
+	bridgeBrowserMenu = UI_EnsureNamedMenuLoaded( "ql_bridge_browser", "ui/ql_bridge_browser.menu" );
+	if ( !bridgeBrowserMenu ) {
+		return qfalse;
+	}
+
+	Com_Printf( "UI: browser overlay unavailable; opening bridge server browser.\n" );
+	UI_SetActiveMenuFlow( UI_MENU_FLOW_BRIDGED );
+	Menus_ActivateByName( "ql_bridge_browser" );
+	return qtrue;
 }
 
 /*
@@ -736,7 +786,6 @@ builds stay navigable instead of dispatching into inert browser console stubs.
 qboolean UI_HandleDeferredScriptExec( const itemDef_t *item, const char *commandText ) {
 	menuDef_t *parentMenu;
 	const char *menuName;
-	menuDef_t *bridgeBrowserMenu;
 
 	if ( !commandText || !commandText[0] || UI_BrowserOverlayAvailable() ) {
 		return qfalse;
@@ -746,14 +795,8 @@ qboolean UI_HandleDeferredScriptExec( const itemDef_t *item, const char *command
 	menuName = ( parentMenu && parentMenu->window.name ) ? parentMenu->window.name : "";
 
 	if ( UI_CommandTextMatches( commandText, "web_showBrowser" ) ) {
-		if ( UI_MenuFileEquals( menuName, "main" ) && UI_BrowserBridgeAvailable() ) {
-			bridgeBrowserMenu = UI_EnsureNamedMenuLoaded( "ql_bridge_browser", "ui/ql_bridge_browser.menu" );
-			if ( bridgeBrowserMenu ) {
-				Com_Printf( "UI: browser overlay unavailable; opening bridge server browser.\n" );
-				UI_SetActiveMenuFlow( UI_MENU_FLOW_BRIDGED );
-				Menus_ActivateByName( "ql_bridge_browser" );
-				return qtrue;
-			}
+		if ( UI_MenuFileEquals( menuName, "main" ) && UI_OpenBrowserBridgeMenu() ) {
+			return qtrue;
 		}
 
 		if ( UI_MenuFileEquals( menuName, "main" ) ) {
@@ -2341,7 +2384,7 @@ void UI_Load() {
 		strcpy(lastName, menu->window.name);
 	}
 	UI_UpdateActiveMenuFlow();
-	if (menuSet == NULL || menuSet[0] == '\0') {
+	if (UI_ShouldUseResolvedMenuFile(menuSet)) {
 		menuSet = UI_DefaultMenuFile();
 	}
 
@@ -5841,10 +5884,7 @@ static void UI_RunMenuScript(char **args) {
 
 			overlayAvailable = UI_BrowserOverlayAvailable();
 			if (!overlayAvailable) {
-				if (UI_BrowserBridgeAvailable()) {
-					Com_Printf("UI: browser overlay unavailable; enabling bridge menus for web_showBrowser.\n");
-					UI_ApplyMenuFlowChange(UI_MENU_FLOW_BRIDGED, qtrue);
-				} else {
+				if (!UI_OpenBrowserBridgeMenu()) {
 					Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\n");
 				}
 				return;
@@ -8594,7 +8634,7 @@ void _UI_Init( qboolean inGameLoad ) {
 
         menuSet = UI_Cvar_VariableString("ui_menuFiles");
         UI_UpdateActiveMenuFlow();
-        if (menuSet == NULL || menuSet[0] == '\0') {
+        if (UI_ShouldUseResolvedMenuFile(menuSet)) {
                 menuSet = UI_DefaultMenuFile();
         }
 
@@ -8743,7 +8783,7 @@ void _UI_MouseEvent( int x, int y )
 void UI_LoadNonIngame() {
         const char *menuSet = UI_Cvar_VariableString("ui_menuFiles");
         UI_UpdateActiveMenuFlow();
-        if (menuSet == NULL || menuSet[0] == '\0') {
+        if (UI_ShouldUseResolvedMenuFile(menuSet)) {
                 menuSet = UI_DefaultMenuFile();
         }
         UI_LoadMenus(menuSet, qfalse);

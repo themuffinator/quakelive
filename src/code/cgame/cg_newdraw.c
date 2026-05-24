@@ -4354,7 +4354,7 @@ static const weapon_t cgVerticalAccWeaponOrder[] = {
 =============
 CG_ShouldDrawAccVertical
 
-Mirrors the retail local-accuracy overlay gate and refresh cadence.
+Mirrors the retail accuracy-panel gate and refresh cadence.
 =============
 */
 static qboolean CG_ShouldDrawAccVertical( void ) {
@@ -4379,7 +4379,7 @@ static qboolean CG_ShouldDrawAccVertical( void ) {
 =============
 CG_ShouldDrawAccOverlay
 
-Exports the vertical-accuracy draw gate to legacy callers.
+Exports the accuracy-panel draw gate to legacy callers.
 =============
 */
 qboolean CG_ShouldDrawAccOverlay( void ) {
@@ -4390,13 +4390,13 @@ qboolean CG_ShouldDrawAccOverlay( void ) {
 =============
 CG_DrawWeaponVertical
 
-Draws the retail vertical weapon-icon strip paired with `+acc`.
+Draws the retail vertical weapon-icon strip inside the `+acc` stats panel.
 =============
 */
 static void CG_DrawWeaponVertical( rectDef_t *rect, vec4_t color ) {
 	int i;
 
-	if ( !rect || !CG_ShouldDrawAccVertical() ) {
+	if ( !rect ) {
 		return;
 	}
 
@@ -4419,14 +4419,14 @@ static void CG_DrawWeaponVertical( rectDef_t *rect, vec4_t color ) {
 CG_DrawAccVertical
 
 Draws the retail vertical per-weapon accuracy percentage strip paired with
-`CG_WP_VERTICAL`.
+`CG_WP_VERTICAL` inside the `+acc` stats panel.
 =============
 */
 static void CG_DrawAccVertical( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
 	char buffer[16];
 	int i;
 
-	if ( !rect || !CG_ShouldDrawAccVertical() ) {
+	if ( !rect ) {
 		return;
 	}
 

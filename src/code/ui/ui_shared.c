@@ -1801,10 +1801,36 @@ void Script_SetCvar(itemDef_t *item, char **args) {
 	
 }
 
+/*
+================
+Item_UsesFullscreenCvar
+
+Identifies legacy menu controls that directly toggle the retail fullscreen cvar.
+================
+*/
+static qboolean Item_UsesFullscreenCvar( const itemDef_t *item ) {
+	return ( item && item->cvar && !Q_stricmp( item->cvar, "r_fullscreen" ) ) ? qtrue : qfalse;
+}
+
+/*
+================
+UI_CommandIsVidRestart
+
+Returns qtrue for the bare video-restart command emitted by legacy menu actions.
+================
+*/
+static qboolean UI_CommandIsVidRestart( const char *command ) {
+	return ( command && !Q_stricmp( command, "vid_restart" ) ) ? qtrue : qfalse;
+}
+
 void Script_Exec(itemDef_t *item, char **args) {
 	const char *val;
 	if (String_Parse(args, &val)) {
 #ifndef CGAME
+		if ( Item_UsesFullscreenCvar( item ) && UI_CommandIsVidRestart( val ) ) {
+			DC->executeText( EXEC_APPEND, "vid_restart fast\n" );
+			return;
+		}
 		if ( UI_HandleDeferredScriptExec( item, val ) ) {
 			return;
 		}
@@ -2659,14 +2685,19 @@ qboolean Item_ListBox_HandleKey(itemDef_t *item, int key, qboolean down, qboolea
 
 qboolean Item_YesNo_HandleKey(itemDef_t *item, int key) {
 
-  if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS && item->cvar) {
+	if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS && item->cvar) {
 		if (key == K_MOUSE1 || key == K_ENTER || key == K_MOUSE2 || key == K_MOUSE3) {
-	    DC->setCVar(item->cvar, va("%i", !DC->getCVarValue(item->cvar)));
-		  return qtrue;
+			DC->setCVar(item->cvar, va("%i", !DC->getCVarValue(item->cvar)));
+#ifndef CGAME
+			if ( Item_UsesFullscreenCvar( item ) && ( !item->action || !item->action[0] ) ) {
+				DC->executeText( EXEC_APPEND, "vid_restart fast\n" );
+			}
+#endif
+			return qtrue;
 		}
-  }
+	}
 
-  return qfalse;
+	return qfalse;
 
 }
 

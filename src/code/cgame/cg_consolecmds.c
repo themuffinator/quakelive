@@ -125,8 +125,8 @@ static void CG_ScoresUp_f( void ) {
 =============
 CG_AccDown_f
 
-Mirrors the retail `+acc` command by arming the vertical accuracy overlay and
-issuing an immediate request when the local client is not free-spectating.
+Mirrors the retail `+acc` command by arming the accuracy stats panel and
+refreshing the compact accuracy payload at most once per second.
 =============
 */
 static void CG_AccDown_f( void ) {
@@ -140,8 +140,10 @@ static void CG_AccDown_f( void ) {
 	}
 
 	cg.accRequestActive = qtrue;
-	cg.accRequestTime = 0;
-	trap_SendClientCommand( "acc" );
+	if ( cg.accRequestTime + 1000 < cg.time ) {
+		cg.accRequestTime = cg.time;
+		trap_SendClientCommand( "acc" );
+	}
 }
 
 /*

@@ -459,6 +459,8 @@ def test_awesomium_factory_list_reconstructs_retail_factory_catalog() -> None:
 	assert 'count = FS_GetFileList( "scripts", ".factory", fileList, sizeof( fileList ) );' in build_block
 	assert 'if ( !Q_stricmp( key, "author" ) ) {' in parse_definition_block
 	assert 'if ( !Q_stricmp( key, "description" ) ) {' in parse_definition_block
+	assert 'if ( *state->cursor == \'"\' ) {' in parse_definition_block
+	assert "if ( state->cursor == '\"' ) {" not in parse_definition_block
 	assert 'if ( !Q_stricmp( key, "basegt" ) ) {' in parse_definition_block
 	assert 'if ( !Q_stricmp( key, "cvars" ) ) {' in parse_definition_block
 	assert "qboolean sawTitle;" in parse_definition_block

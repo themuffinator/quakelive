@@ -2034,20 +2034,22 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		G_AddEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );
 	}
 
-	// powerup pickups are global broadcasts
-	if ( ent->item->giType == IT_POWERUP || ent->item->giType == IT_KEY ) {
+	// powerup and team pickups are global broadcasts
+	if ( ent->item->giType == IT_POWERUP || ent->item->giType == IT_TEAM ) {
 		// if we want the global sound to play
 		if (!ent->speed) {
 			gentity_t	*te;
 
 			te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_ITEM_PICKUP );
 			te->s.eventParm = ent->s.modelindex;
+			te->s.groundEntityNum = other->s.number;
 			te->r.svFlags |= SVF_BROADCAST;
 		} else {
 			gentity_t	*te;
 
 			te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_ITEM_PICKUP );
 			te->s.eventParm = ent->s.modelindex;
+			te->s.groundEntityNum = other->s.number;
 			// only send this temp entity to a single client
 			te->r.svFlags |= SVF_SINGLECLIENT;
 			te->r.singleClient = other->s.number;

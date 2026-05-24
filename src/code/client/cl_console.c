@@ -96,18 +96,77 @@ static float Con_GetScale( void ) {
 
 /*
 ================
+Con_GetScreenScale
+================
+*/
+static float Con_GetScreenScale( void ) {
+	if ( cls.glconfig.vidHeight <= 0 ) {
+		return 1.0f;
+	}
+
+	return (float)cls.glconfig.vidHeight / (float)SCREEN_HEIGHT;
+}
+
+/*
+================
 Con_GetPixelScale
 ================
 */
 static float Con_GetPixelScale( void ) {
 	float pixelScale;
 
-	pixelScale = Con_GetScale();
+	pixelScale = Con_GetScale() * Con_GetScreenScale();
 	if ( pixelScale <= 0.0f ) {
 		pixelScale = 1.0f;
 	}
 
 	return pixelScale;
+}
+
+/*
+================
+Con_GetLineWidthForCurrentResolution
+================
+*/
+int Con_GetLineWidthForCurrentResolution( void ) {
+	float	cellWidth;
+	int		width;
+
+	cellWidth = CONSOLE_CHAR_WIDTH * Con_GetPixelScale();
+	if ( cls.glconfig.vidWidth <= 0 || cellWidth <= 0.0f ) {
+		return DEFAULT_CONSOLE_WIDTH;
+	}
+
+	width = (int)( (float)cls.glconfig.vidWidth / cellWidth - 2.0f );
+	if ( width < 1 ) {
+		width = DEFAULT_CONSOLE_WIDTH;
+	}
+
+	return width;
+}
+
+/*
+================
+Con_SetFieldWidth
+================
+*/
+static void Con_SetFieldWidth( int width ) {
+	int i;
+
+	g_console_field_width = width;
+	g_consoleField.widthInChars = g_console_field_width;
+	for ( i = 0 ; i < COMMAND_HISTORY ; i++ ) {
+		historyEditLines[i].widthInChars = g_console_field_width;
+	}
+}
+
+/*
+================
+Con_UpdateFieldWidth
+================
+*/
+void Con_UpdateFieldWidth( void ) {
+	Con_SetFieldWidth( Con_GetLineWidthForCurrentResolution() );
 }
 
 /*
@@ -126,7 +185,7 @@ static int Con_GetScaledSmallCharWidth( void ) {
 	return width;
 }
 
-static void Con_GetHostFontMetrics( int charWidth, int fallbackCharHeight, float *outAscent, float *outLineHeight );
+static void Con_GetHostFontMetrics( int fallbackCharHeight, float *outAscent, float *outLineHeight );
 
 /*
 ================
@@ -142,7 +201,7 @@ static int Con_GetScaledSmallCharHeight( void ) {
 		height = 1;
 	}
 
-	Con_GetHostFontMetrics( Con_GetScaledSmallCharWidth(), height, NULL, &lineHeight );
+	Con_GetHostFontMetrics( height, NULL, &lineHeight );
 	height = (int)( lineHeight + 0.5f );
 	if ( height < 1 ) {
 		height = 1;
@@ -156,8 +215,8 @@ static int Con_GetScaledSmallCharHeight( void ) {
 Con_GetHostTextScale
 ================
 */
-static float Con_GetHostTextScale( int charWidth ) {
-	return (float)charWidth * CONSOLE_HOST_SCALE_MULTIPLIER;
+static float Con_GetHostTextScale( void ) {
+	return CONSOLE_CHAR_WIDTH * Con_GetPixelScale() * CONSOLE_HOST_SCALE_MULTIPLIER;
 }
 
 /*
@@ -165,7 +224,7 @@ static float Con_GetHostTextScale( int charWidth ) {
 Con_GetHostFontMetrics
 ================
 */
-static void Con_GetHostFontMetrics( int charWidth, int fallbackCharHeight, float *outAscent, float *outLineHeight ) {
+static void Con_GetHostFontMetrics( int fallbackCharHeight, float *outAscent, float *outLineHeight ) {
 	float ascent;
 	float descent;
 	float lineHeight;
@@ -174,7 +233,7 @@ static void Con_GetHostFontMetrics( int charWidth, int fallbackCharHeight, float
 	ascent = (float)fallbackCharHeight;
 	descent = 0.0f;
 	lineHeight = (float)fallbackCharHeight;
-	scale = Con_GetHostTextScale( charWidth );
+	scale = Con_GetHostTextScale();
 
 	if ( scale > 0.0f && RE_GetScaledFontMetrics( CONSOLE_HOST_FONT_MONO, scale, &ascent, &descent, &lineHeight ) ) {
 		if ( ascent <= 0.0f ) {
@@ -212,12 +271,12 @@ static void Con_DrawHostText( int x, int y, int charWidth, int charHeight, const
 		return;
 	}
 
-	scale = Con_GetHostTextScale( charWidth );
+	scale = Con_GetHostTextScale();
 	if ( scale <= 0.0f ) {
 		return;
 	}
 
-	Con_GetHostFontMetrics( charWidth, charHeight, &ascent, NULL );
+	Con_GetHostFontMetrics( charHeight, &ascent, NULL );
 	baselineY = y + (int)( ascent + 0.5f );
 	drawColor = color ? color : g_color_table[ColorIndex( COLOR_WHITE )];
 	RE_DrawScaledText( x, baselineY, text, CONSOLE_HOST_FONT_MONO, scale, 0, NULL, forceColor, drawColor );
@@ -369,7 +428,7 @@ static void Con_DrawHostField_helper( field_t *edit, int x, int y, int charWidth
 
 	prefixWidth = 0.0f;
 	if ( prefixBytes > 0 ) {
-		RE_MeasureScaledText( drawText, drawText + prefixBytes, CONSOLE_HOST_FONT_MONO, Con_GetHostTextScale( charWidth ), 0, &prefixWidth, NULL, NULL );
+		RE_MeasureScaledText( drawText, drawText + prefixBytes, CONSOLE_HOST_FONT_MONO, Con_GetHostTextScale(), 0, &prefixWidth, NULL, NULL );
 		if ( drawText[prefixBytes - 1] == ' ' ) {
 			prefixWidth += charWidth;
 		}
@@ -936,12 +995,10 @@ If the line width has changed, reformat the buffer.
 */
 void Con_CheckResize (void)
 {
-	float	scale;
 	int		i, j, width, oldwidth, oldtotallines, numlines, numchars;
 	MAC_STATIC short	tbuf[CON_TEXTSIZE];
 
-	scale = Con_GetScale();
-	width = (int)( (float)cls.glconfig.vidWidth / ( scale * CONSOLE_CHAR_WIDTH ) - 2.0f );
+	width = Con_GetLineWidthForCurrentResolution();
 
 	if (width == con.linewidth)
 		return;
@@ -992,11 +1049,7 @@ void Con_CheckResize (void)
 
 	con.current = con.totallines - 1;
 	con.display = con.current;
-	g_console_field_width = con.linewidth;
-	g_consoleField.widthInChars = g_console_field_width;
-	for ( i = 0 ; i < COMMAND_HISTORY ; i++ ) {
-		historyEditLines[i].widthInChars = g_console_field_width;
-	}
+	Con_SetFieldWidth( con.linewidth );
 }
 
 

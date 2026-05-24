@@ -876,6 +876,7 @@ def test_service_disabled_menu_verb_matrix_stays_explicit() -> None:
     assert 'Com_DPrintf( "%s ignored: %s (%s [%s])\\n",' in overlay_log_block
     assert "CL_GetOverlayServiceProviderLabel()" in overlay_log_block
     assert "CL_GetOverlayServicePolicyLabel()" in overlay_log_block
+    assert show_browser_block.count("UI_GameCommand()") == 2
     assert 'CL_LogOverlayServiceIgnored( "web_showBrowser", "online services disabled by build settings" );' in show_browser_block
     assert 'CL_LogOverlayServiceIgnored( "web_showBrowser", "browser overlay provider unavailable" );' in show_browser_block
     assert 'CL_LogOverlayServiceIgnored( "web_changeHash", "online services disabled by build settings" );' in change_hash_block
@@ -885,7 +886,8 @@ def test_service_disabled_menu_verb_matrix_stays_explicit() -> None:
     assert 'CL_LogOverlayServiceIgnored( "web_stopRefresh", "online services disabled by build settings" );' in stop_refresh_block
     assert 'CL_LogOverlayServiceIgnored( "web_stopRefresh", "browser overlay provider unavailable" );' in stop_refresh_block
 
-    assert 'Com_Printf( "UI: browser overlay unavailable; opening bridge server browser.\\n" );' in deferred_exec_block
+    assert "UI_OpenBrowserBridgeMenu()" in deferred_exec_block
+    assert 'Com_Printf( "UI: browser overlay unavailable; opening bridge server browser.\\n" );' in ui_main
     assert 'Com_Printf( "UI: browser overlay unavailable; keeping native menu fallback for %s.\\n", commandText );' in deferred_exec_block
 
 
@@ -1418,12 +1420,19 @@ def test_launcher_resource_fallbacks_survive_service_disabled_policy() -> None:
 
 def test_awesomium_launch_task_builds_with_in_process_overlay_provider() -> None:
     tasks = json.loads((REPO_ROOT / ".vscode" / "tasks.json").read_text(encoding="utf-8"))
+    launch_script = (REPO_ROOT / ".vscode" / "launch.ps1").read_text(encoding="utf-8")
     awesomium_task = next(task for task in tasks["tasks"] if task["label"] == "Build Debug Awesomium")
     args = awesomium_task["args"]
 
     assert args[args.index("-OnlineServices") + 1] == "1"
     assert args[args.index("-Steamworks") + 1] == "0"
     assert args[args.index("-OpenSteam") + 1] == "1"
+    assert "function Sync-AwesomiumRuntime" in launch_script
+    assert "'awesomium.dll'" in launch_script
+    assert "'web.pak'" in launch_script
+    assert "Sync-AwesomiumRuntime -SourceRoot $steamBasePath -DestinationRoot $runtimeBinDir" in launch_script
+    assert "Remove-Item Env:QL_DISABLE_STEAMWORKS -ErrorAction SilentlyContinue" in launch_script
+    assert "$env:QL_DISABLE_STEAMWORKS = '1'" in launch_script
 
 
 def test_client_auth_ticket_lifetime_reconstructs_retail_disconnect_owner() -> None:

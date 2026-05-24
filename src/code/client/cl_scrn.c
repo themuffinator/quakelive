@@ -444,6 +444,8 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		VM_Call( uivm, UI_REFRESH, cls.realtime );
 	}
 
+	CL_WebHost_DrawBrowserSurface();
+
 	// console draws next
 	Con_DrawConsole ();
 

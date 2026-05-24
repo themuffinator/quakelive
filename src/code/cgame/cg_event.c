@@ -2084,8 +2084,14 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 				trap_S_StartSound (NULL, cg.snap->ps.clientNum, CHAN_AUTO, trap_S_RegisterSound( item->pickup_sound, qfalse ) );
 			}
 
-			if ( ( cgs.customSettingsMask & CUSTOM_SETTING_QUAD_HOG ) == 0 ) {
-				CG_AddItemPickupAnnouncerSound( item );
+			if ( cgs.customSettingsMask & CUSTOM_SETTING_QUAD_HOG ) {
+				break;
+			}
+
+			CG_AddItemPickupAnnouncerSound( item );
+
+			if ( item->giType == IT_POWERUP ) {
+				CG_SpectatorTrackEvent( es->groundEntityNum, CG_SPECTATOR_TRACK_POWERUP );
 			}
 
 			// show icon and name on status bar
@@ -2567,7 +2573,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.quadSound );
-		CG_SpectatorTrackEvent( es->number, CG_SPECTATOR_TRACK_POWERUP );
 		break;
 	case EV_POWERUP_BATTLESUIT:
 		DEBUGNAME("EV_POWERUP_BATTLESUIT");
@@ -2576,7 +2581,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.protectSound );
-		CG_SpectatorTrackEvent( es->number, CG_SPECTATOR_TRACK_POWERUP );
 		break;
 	case EV_POWERUP_REGEN:
 		DEBUGNAME("EV_POWERUP_REGEN");
@@ -2585,7 +2589,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.regenSound );
-		CG_SpectatorTrackEvent( es->number, CG_SPECTATOR_TRACK_POWERUP );
 		break;
 	case EV_POWERUP_ARMORREGEN:
 		DEBUGNAME("EV_POWERUP_ARMORREGEN");
@@ -2594,7 +2597,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound( NULL, es->number, CHAN_ITEM, cgs.media.armorregenSound );
-		CG_SpectatorTrackEvent( es->number, CG_SPECTATOR_TRACK_POWERUP );
 		break;
 
 	case EV_GIB_PLAYER:

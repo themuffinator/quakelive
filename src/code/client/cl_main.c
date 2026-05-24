@@ -6081,7 +6081,6 @@ doesn't know what graphics to reload
 void CL_Vid_Restart_f( void ) {
 #ifdef _WIN32
 	if ( !Cvar_VariableIntegerValue( "r_noFastRestart" ) && Cmd_Argc() > 1 && !Q_stricmp( Cmd_Argv( 1 ), "fast" ) ) {
-		float consoleScale;
 		int vidWidth;
 		int vidHeight;
 		qboolean fullscreen;
@@ -6090,12 +6089,7 @@ void CL_Vid_Restart_f( void ) {
 			cls.glconfig.vidWidth = vidWidth;
 			cls.glconfig.vidHeight = vidHeight;
 			cls.glconfig.isFullscreen = fullscreen;
-			consoleScale = Com_Clamp( 0.5f, 1.0f, Cvar_VariableValue( "con_scale" ) );
-			if ( consoleScale <= 0.0f ) {
-				consoleScale = 0.5f;
-			}
-			g_console_field_width = (int)( (float)cls.glconfig.vidWidth / ( consoleScale * 12.0f ) - 2.0f );
-			g_consoleField.widthInChars = g_console_field_width;
+			Con_UpdateFieldWidth();
 			Cbuf_AddText( "postprocess_restart\n" );
 			if ( cgvm ) {
 				VM_Call( cgvm, CG_EVENT_HANDLING, CGAME_EVENT_REFRESH_DISPLAY_CONTEXT );
@@ -7142,16 +7136,7 @@ void CL_InitRenderer( void ) {
 	cls.whiteShader = re.RegisterShader( "white" );
 	cls.consoleShader = re.RegisterShader( "console" );
 	cls.recordShader = re.RegisterShaderNoMip( "icons/record" );
-	{
-		float consoleScale;
-
-		consoleScale = Com_Clamp( 0.5f, 1.0f, Cvar_VariableValue( "con_scale" ) );
-		if ( consoleScale <= 0.0f ) {
-			consoleScale = 0.5f;
-		}
-		g_console_field_width = (int)( (float)cls.glconfig.vidWidth / ( consoleScale * 12.0f ) - 2.0f );
-	}
-	g_consoleField.widthInChars = g_console_field_width;
+	Con_UpdateFieldWidth();
 }
 
 /*
@@ -7528,6 +7513,7 @@ void CL_Init( void ) {
 	CL_InitRef();
 
 	SCR_Init ();
+	CL_WebHost_BootstrapAwesomiumMenu();
 
 	Cbuf_Execute ();
 
@@ -8056,6 +8042,37 @@ static void CL_RequestGlobalServers( int masterNum, const char *protocol, const 
 #endif
 }
 
+/*
+==================
+CL_LocalServers_f
+==================
+*/
+void CL_LocalServers_f( void ) {
+	CL_RequestLocalServers();
+}
+
+/*
+==================
+CL_GlobalServers_f
+==================
+*/
+void CL_GlobalServers_f( void ) {
+	int argc;
+	int masterNum;
+	const char *protocol;
+	const char *keywords;
+
+	argc = Cmd_Argc();
+	if ( argc < 3 ) {
+		Com_Printf( "usage: globalservers <master# 0-1> <protocol> [keywords]\n" );
+		return;
+	}
+
+	masterNum = atoi( Cmd_Argv( 1 ) );
+	protocol = Cmd_Argv( 2 );
+	keywords = ( argc > 3 ) ? Cmd_ArgsFrom( 3 ) : "";
+	CL_RequestGlobalServers( masterNum, protocol, keywords );
+}
 
 /*
 ==================

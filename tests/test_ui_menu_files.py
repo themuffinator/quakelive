@@ -101,6 +101,26 @@ def test_ui_listbox_columns_consume_full_retail_scoreboard_rows() -> None:
     assert "if (i < MAX_LB_COLUMNS) {" in parse_block
 
 
+def test_ui_bridge_listbox_columns_are_parser_compatible() -> None:
+    ui_bridge = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
+
+    column_lines = re.findall(r'"columns\s+([^"\\]+)\\n"', ui_bridge)
+    assert column_lines
+    for line in column_lines:
+        values = [int(value) for value in line.split()]
+        assert len(values) == 1 + values[0] * 3
+
+
+def test_ui_bridge_generated_items_are_visible() -> None:
+    ui_bridge = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
+
+    string_tokens = re.findall(r'"((?:[^"\\]|\\.)*)"', ui_bridge)
+    menu_text = "".join(token.replace(r"\n", "\n").replace(r"\"", '"') for token in string_tokens)
+    item_blocks = re.findall(r"itemDef\s*\{(.*?)\n\}", menu_text, flags=re.DOTALL)
+    assert item_blocks
+    assert all("visible MENU_TRUE" in block for block in item_blocks)
+
+
 def test_ui_bundle_manifest_stages_runtime_icon_roots_without_baseq3_prefixes() -> None:
     manifest = json.loads((REPO_ROOT / "tools/packaging/ui_bundle_manifest.json").read_text(encoding="utf-8"))
     files = manifest["files"]
@@ -418,9 +438,39 @@ def test_ui_dead_legacy_helper_band_is_removed() -> None:
     assert "UI_BrowserBridgeAvailable()" in resolve_menu_flow_block
     assert "UI_RequestedMenuFlow" not in resolve_menu_flow_block
     assert "static qboolean UI_MenuFlowUsesBrowserOverlay(uiMenuFlow_t flow) {" in ui_main
+    assert "static qboolean UI_ShouldUseResolvedMenuFile(const char *menuFile) {" in ui_main
     assert "UI_SetBrowserActive(flow == UI_MENU_FLOW_QUAKELIVE);" not in ui_main
     assert "UI_SetBrowserActive(ui_activeMenuFlow == UI_MENU_FLOW_QUAKELIVE);" not in ui_main
     assert "UI_SetBrowserActive(UI_MenuFlowUsesBrowserOverlay(ui_activeMenuFlow));" in load_menus_block
+
+
+def test_ui_bridge_flow_uses_generated_menu_roots_when_overlay_is_absent() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_atoms = (REPO_ROOT / "src/code/ui/ui_atoms.c").read_text(encoding="utf-8")
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+    ui_bridge = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
+
+    selector_block = _extract_function_block(
+        ui_main, "static qboolean UI_ShouldUseResolvedMenuFile(const char *menuFile) {"
+    )
+    load_block = _extract_function_block(ui_main, "void UI_Load() {")
+    init_block = _extract_function_block(ui_main, "void _UI_Init( qboolean inGameLoad ) {")
+    noningame_block = _extract_function_block(ui_main, "void UI_LoadNonIngame() {")
+    open_bridge_block = _extract_function_block(ui_main, "qboolean UI_OpenBrowserBridgeMenu( void ) {")
+    console_command_block = _extract_function_block(ui_atoms, "qboolean UI_ConsoleCommand( int realTime ) {")
+    write_scripts_block = _extract_function_block(ui_bridge, "static qboolean UI_WriteBridgeScripts(void) {")
+
+    assert "qboolean UI_OpenBrowserBridgeMenu( void );" in ui_local
+    assert "UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE)" in selector_block
+    assert "UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE_BRIDGE)" in selector_block
+    assert "if (UI_ShouldUseResolvedMenuFile(menuSet)) {\n\t\tmenuSet = UI_DefaultMenuFile();" in load_block
+    assert "if (UI_ShouldUseResolvedMenuFile(menuSet)) {\n                menuSet = UI_DefaultMenuFile();" in init_block
+    assert "if (UI_ShouldUseResolvedMenuFile(menuSet)) {\n                menuSet = UI_DefaultMenuFile();" in noningame_block
+    assert 'UI_EnsureNamedMenuLoaded( "ql_bridge_browser", "ui/ql_bridge_browser.menu" )' in open_bridge_block
+    assert 'Menus_ActivateByName( "ql_bridge_browser" );' in open_bridge_block
+    assert "if (UI_OpenBrowserBridgeMenu()) {\n\t\t\t\treturn qtrue;" in console_command_block
+    assert 'ok = UI_WriteBridgeFile(UI_MENU_FILE_QUAKELIVE_BRIDGE, uiBridgeMenuSet) && ok;' in write_scripts_block
+    assert 'if (!UI_BridgeFileExists(UI_MENU_FILE_QUAKELIVE_BRIDGE))' not in write_scripts_block
 
 
 def test_ui_service_disabled_exec_paths_keep_menu_flow_navigable() -> None:
@@ -444,8 +494,7 @@ def test_ui_service_disabled_exec_paths_keep_menu_flow_navigable() -> None:
     assert "qboolean UI_HandleDeferredScriptExec( const itemDef_t *item, const char *commandText );" in ui_local
     assert 'UI_CommandTextMatches( commandText, "web_showBrowser" )' in deferred_exec_block
     assert 'UI_CommandTextMatches( commandText, "web_changeHash" )' in deferred_exec_block
-    assert 'UI_EnsureNamedMenuLoaded( "ql_bridge_browser", "ui/ql_bridge_browser.menu" )' in deferred_exec_block
-    assert 'Menus_ActivateByName( "ql_bridge_browser" );' in deferred_exec_block
+    assert "UI_OpenBrowserBridgeMenu()" in deferred_exec_block
     assert 'UI_ShowOfflineMenuFallbackError( "Browser overlay unavailable; offline bridge server browser could not be loaded." );' in deferred_exec_block
     assert 'Com_Printf( "UI: browser overlay unavailable; keeping native menu fallback for %s.\\n", commandText );' in deferred_exec_block
 
@@ -1749,6 +1798,28 @@ def test_ui_retail_fullscreen_menu_scripts_match_native_command_surface() -> Non
         assert expected in fullscreen_block
 
     assert fullscreen_block.count('trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart fast\\n" );') == 3
+
+
+def test_ui_legacy_fullscreen_controls_use_fast_vid_restart_bridge() -> None:
+    ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
+    basic_menu = (REPO_ROOT / "src/ui/ingame_options_basic.menu").read_text(encoding="utf-8")
+    advanced_menu = (REPO_ROOT / "src/ui/ingame_options_advanced.menu").read_text(encoding="utf-8")
+
+    script_exec_block = _extract_function_block(ui_shared, "void Script_Exec(itemDef_t *item, char **args) {")
+    yesno_block = _extract_function_block(ui_shared, "qboolean Item_YesNo_HandleKey(itemDef_t *item, int key) {")
+
+    assert "static qboolean Item_UsesFullscreenCvar( const itemDef_t *item ) {" in ui_shared
+    assert "static qboolean UI_CommandIsVidRestart( const char *command ) {" in ui_shared
+    assert 'return ( item && item->cvar && !Q_stricmp( item->cvar, "r_fullscreen" ) ) ? qtrue : qfalse;' in ui_shared
+    assert 'return ( command && !Q_stricmp( command, "vid_restart" ) ) ? qtrue : qfalse;' in ui_shared
+    assert "if ( Item_UsesFullscreenCvar( item ) && UI_CommandIsVidRestart( val ) ) {" in script_exec_block
+    assert 'DC->executeText( EXEC_APPEND, "vid_restart fast\\n" );' in script_exec_block
+    assert "if ( Item_UsesFullscreenCvar( item ) && ( !item->action || !item->action[0] ) ) {" in yesno_block
+    assert 'DC->executeText( EXEC_APPEND, "vid_restart fast\\n" );' in yesno_block
+
+    assert 'cvar "r_fullscreen"' in basic_menu
+    assert 'action { uiScript glCustom ;  exec "vid_restart" ; open ingame_options }' in basic_menu
+    assert 'cvar "r_fullscreen"' in advanced_menu
 
 
 def test_ui_retail_callvote_map_feeder_uses_active_map_slab() -> None:

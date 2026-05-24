@@ -288,6 +288,7 @@ qboolean UI_BrowserBridgeAvailable(void);
 qboolean UI_BrowserBridgeActive(void);
 void UI_BrowserBridge_SetActive(qboolean active);
 void UI_BrowserBridge_Init(void);
+qboolean UI_OpenBrowserBridgeMenu( void );
 qboolean UI_HandleDeferredScriptExec( const itemDef_t *item, const char *commandText );
 const char *UI_BrowserBridgeMenuFile(void);
 const char *UI_BrowserBridgeIngameFile(void);

@@ -696,6 +696,8 @@ def test_client_command_registration_matches_retail_cinematic_network_and_browse
 	assert 'Cmd_AddCommand ("web_showError", CL_Web_ShowError_f );' not in init_block
 	assert 'Cmd_AddCommand ("web_clearCache", CL_Web_ClearCache_f );' not in init_block
 	assert 'Cmd_AddCommand ("web_reload", CL_Web_Reload_f );' not in init_block
+	assert 'Cmd_AddCommand ("localservers", CL_LocalServers_f );' in register_block
+	assert 'Cmd_AddCommand ("globalservers", CL_GlobalServers_f );' in register_block
 	assert 'Cmd_AddCommand ("web_showBrowser", CL_Web_ShowBrowser_f );' in register_block
 	assert 'Cmd_AddCommand ("web_changeHash", CL_Web_ChangeHash_f );' in register_block
 	assert 'Cmd_AddCommand ("web_hideBrowser", CL_Web_HideBrowser_f );' in register_block
@@ -731,8 +733,8 @@ def test_client_command_registration_matches_retail_cinematic_network_and_browse
 	assert 'Cmd_RemoveCommand ("web_browserActive");' not in shutdown_block
 	assert 'Cmd_RemoveCommand ("web_stopRefresh");' not in shutdown_block
 
-	assert "void\tCL_LocalServers_f( void );" not in client_h
-	assert "void\tCL_GlobalServers_f( void );" not in client_h
+	assert "void CL_LocalServers_f( void );" in client_h
+	assert "void CL_GlobalServers_f( void );" in client_h
 	assert "void\tCL_Ping_f( void );" not in client_h
 	assert "void QLWebHost_RegisterCommands( void );" in client_h
 
@@ -777,6 +779,8 @@ def test_client_command_handlers_match_retail_cinematic_network_and_browser_cont
 	play_cinematic_block = _extract_function_block(cl_cin, "void CL_PlayCinematic_f(void) {")
 	request_local_block = _extract_function_block(cl_main, "static void CL_RequestLocalServers( void ) {")
 	request_global_block = _extract_function_block(cl_main, "static void CL_RequestGlobalServers( int masterNum, const char *protocol, const char *keywords ) {")
+	local_servers_block = _extract_function_block(cl_main, "void CL_LocalServers_f( void ) {")
+	global_servers_block = _extract_function_block(cl_main, "void CL_GlobalServers_f( void ) {")
 	request_servers_block = _extract_function_block(cl_main, "qboolean CL_Steam_RequestServers( int requestMode ) {")
 	open_url_block = _extract_function_block(cl_cgame, "static qboolean QLWebHost_OpenURL( const char *url ) {")
 	show_browser_block = _extract_function_block(cl_cgame, "void CL_Web_ShowBrowser_f( void ) {")
@@ -806,10 +810,13 @@ def test_client_command_handlers_match_retail_cinematic_network_and_browser_cont
 	assert 'CL_RequestGlobalServers( masterNum, debugProtocol, "full empty" );' in request_servers_block
 	assert 'CL_RequestGlobalServers( masterNum, va( "%d", protocol ), "full empty" );' in request_servers_block
 	assert "void CL_Rcon_f( void ) {" not in cl_main
-	assert "void CL_LocalServers_f( void ) {" not in cl_main
-	assert "void CL_GlobalServers_f( void ) {" not in cl_main
 	assert "void CL_Ping_f( void ) {" not in cl_main
 	assert "void CL_ServerStatus_f(void) {" not in cl_main
+	assert "CL_RequestLocalServers();" in local_servers_block
+	assert "argc = Cmd_Argc();" in global_servers_block
+	assert "masterNum = atoi( Cmd_Argv( 1 ) );" in global_servers_block
+	assert 'keywords = ( argc > 3 ) ? Cmd_ArgsFrom( 3 ) : "";' in global_servers_block
+	assert "CL_RequestGlobalServers( masterNum, protocol, keywords );" in global_servers_block
 
 	assert 'Cvar_Get ("rconPassword", "", CVAR_TEMP );' not in cl_main
 	assert 'Cvar_Get ("rconAddress", "", 0);' not in cl_main

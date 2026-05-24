@@ -175,6 +175,47 @@ function Sync-RuntimeUiPackages {
 	}
 }
 
+function Sync-AwesomiumRuntime {
+	param(
+		[string]$SourceRoot,
+		[string]$DestinationRoot
+	)
+
+	$requiredFiles = @(
+		'awesomium.dll',
+		'awesomium_process.exe',
+		'web.pak',
+		'icudt.dll',
+		'libEGL.dll',
+		'libGLESv2.dll',
+		'avcodec-53.dll',
+		'avformat-53.dll',
+		'avutil-51.dll',
+		'xinput9_1_0.dll'
+	)
+
+	foreach ($fileName in $requiredFiles) {
+		$sourcePath = Join-Path $SourceRoot $fileName
+		$destinationPath = Join-Path $DestinationRoot $fileName
+
+		if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+			throw "Awesomium runtime dependency was not found: $sourcePath"
+		}
+
+		$shouldCopy = $true
+		if (Test-Path -LiteralPath $destinationPath -PathType Leaf) {
+			$sourceInfo = Get-Item -LiteralPath $sourcePath
+			$destinationInfo = Get-Item -LiteralPath $destinationPath
+			$shouldCopy = $sourceInfo.Length -ne $destinationInfo.Length -or
+				$sourceInfo.LastWriteTimeUtc -gt $destinationInfo.LastWriteTimeUtc
+		}
+
+		if ($shouldCopy) {
+			Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+		}
+	}
+}
+
 if (-not (Test-Path -LiteralPath $runtimeBaseq3)) {
 	New-Item -ItemType Directory -Path $runtimeBaseq3 | Out-Null
 }
@@ -183,6 +224,10 @@ Sync-RuntimeUiPackages -RuntimeBaseq3Dir $runtimeBaseq3
 
 Sync-LaunchModuleArtifact -ModuleName 'cgamex86'
 Sync-LaunchModuleArtifact -ModuleName 'qagamex86'
+
+if ($EnableAwesomium) {
+	Sync-AwesomiumRuntime -SourceRoot $steamBasePath -DestinationRoot $runtimeBinDir
+}
 
 $arguments = @(
 	'+set', 'developer', '1',
@@ -213,11 +258,12 @@ if ($ExtraArgs.Count -gt 0) {
 
 $env:QLR_DUMP_PATH = Join-Path $repoRoot "build\win32\$Configuration\dumps"
 $env:QLR_FULL_DUMP = '1'
-$env:QL_DISABLE_STEAMWORKS = '1'
 if ($EnableAwesomium) {
 	Remove-Item Env:QL_DISABLE_EXTERNAL_ECOSYSTEMS -ErrorAction SilentlyContinue
 	Remove-Item Env:QL_DISABLE_AWESOMIUM -ErrorAction SilentlyContinue
+	Remove-Item Env:QL_DISABLE_STEAMWORKS -ErrorAction SilentlyContinue
 } else {
+	$env:QL_DISABLE_STEAMWORKS = '1'
 	$env:QL_DISABLE_EXTERNAL_ECOSYSTEMS = '1'
 	$env:QL_DISABLE_AWESOMIUM = '1'
 }

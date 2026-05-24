@@ -670,13 +670,12 @@ qboolean UI_ConsoleCommand( int realTime ) {
 
 		overlayAvailable = UI_BrowserOverlayAvailable();
 		if (!overlayAvailable) {
-			if (UI_BrowserBridgeAvailable()) {
-				Com_Printf("UI: browser overlay unavailable; enabling bridge menus for web_showBrowser.\n");
-				UI_ApplyMenuFlowChange(UI_MENU_FLOW_BRIDGED, qtrue);
+			if (UI_OpenBrowserBridgeMenu()) {
+				return qtrue;
 			} else {
 				Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\n");
 			}
-			return qfalse;
+			return qtrue;
 		}
 
 		UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qfalse);

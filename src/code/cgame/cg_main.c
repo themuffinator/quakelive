@@ -2279,9 +2279,6 @@ void QDECL CG_Printf( const char *msg, ... ) {
 	va_end( argptr );
 
 	trap_Print( text );
-	if ( cg_chatbeep.integer && cgs.media.talkSound ) {
-		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
-	}
 }
 
 /*

@@ -549,6 +549,10 @@ if exist "$(PngSdkDir)\bin\*.dll" xcopy /y /d /i "$(PngSdkDir)\bin\*.dll" "$(Out
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='vector|Win32'">MaxSpeed</Optimization>
     </ClCompile>
+    <ClCompile Include="client\cl_awesomium_win32.cpp">
+      <ExcludedFromBuild Condition="'$(QLBuildOnlineServices)'=='0'">true</ExcludedFromBuild>
+      <CompileAs>CompileAsCpp</CompileAs>
+    </ClCompile>
     <ClCompile Include="client\cl_cin.c">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug TA DEMO|Win32'">Disabled</Optimization>
       <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Debug TA DEMO|Win32'">true</BrowseInformation>

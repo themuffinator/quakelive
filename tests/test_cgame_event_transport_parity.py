@@ -325,9 +325,12 @@ def test_freeze_temp_entity_band_uses_explicit_retail_ordinals() -> None:
 
 def test_cgame_powerup_pickups_queue_retail_announcer_voice() -> None:
 	source = CG_EVENT.read_text(encoding="utf-8")
+	g_items_source = (REPO_ROOT / "src" / "code" / "game" / "g_items.c").read_text(encoding="utf-8")
 	resolver_block = _block_from_marker(source, "static sfxHandle_t CG_ItemPickupAnnouncerSound")
 	local_pickup_block = _block_from_marker(source, "case EV_ITEM_PICKUP:")
 	global_pickup_block = _block_from_marker(source, "case EV_GLOBAL_ITEM_PICKUP:")
+	touch_item_block = _block_from_marker(g_items_source, "void Touch_Item")
+	powerup_event_block = source[source.index("case EV_POWERUP_QUAD:"):source.index("case EV_GIB_PLAYER:")]
 
 	for expected in (
 		"case IT_POWERUP:",
@@ -362,5 +365,19 @@ def test_cgame_powerup_pickups_queue_retail_announcer_voice() -> None:
 	assert "cgs.media.ammoregenSound" not in local_pickup_block
 
 	assert "trap_S_RegisterSound( item->pickup_sound, qfalse )" in global_pickup_block
-	assert "if ( ( cgs.customSettingsMask & CUSTOM_SETTING_QUAD_HOG ) == 0 ) {" in global_pickup_block
+	assert "if ( cgs.customSettingsMask & CUSTOM_SETTING_QUAD_HOG ) {\n\t\t\t\tbreak;\n\t\t\t}" in global_pickup_block
 	assert "CG_AddItemPickupAnnouncerSound( item );" in global_pickup_block
+
+	assert "if ( item->giType == IT_POWERUP || item->giType == IT_TEAM)" in local_pickup_block
+	assert "if ( ent->item->giType == IT_POWERUP || ent->item->giType == IT_TEAM ) {" in touch_item_block
+	assert "ent->item->giType == IT_KEY" not in touch_item_block
+	assert touch_item_block.count("te->s.groundEntityNum = other->s.number;") == 2
+	assert "if ( item->giType == IT_POWERUP ) {" in global_pickup_block
+	assert "CG_SpectatorTrackEvent( es->groundEntityNum, CG_SPECTATOR_TRACK_POWERUP );" in global_pickup_block
+	assert global_pickup_block.index("if ( cgs.customSettingsMask & CUSTOM_SETTING_QUAD_HOG ) {") < global_pickup_block.index(
+		"CG_AddItemPickupAnnouncerSound( item );"
+	)
+	assert global_pickup_block.index("CG_AddItemPickupAnnouncerSound( item );") < global_pickup_block.index(
+		"CG_SpectatorTrackEvent( es->groundEntityNum, CG_SPECTATOR_TRACK_POWERUP );"
+	)
+	assert "CG_SpectatorTrackEvent(" not in powerup_event_block

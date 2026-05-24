@@ -145,9 +145,9 @@ typedef struct {
 } rFontStashGlyph_t;
 
 typedef struct {
-	int	ascent;
-	int	descent;
-	int	lineHeight;
+	float	ascent;
+	float	descent;
+	float	lineHeight;
 } rFontStashFaceMetrics_t;
 
 typedef struct {
@@ -1685,6 +1685,43 @@ static qboolean R_FontStashFaceSupportsCodepoint( rFontStashFace_t *face, unsign
 
 /*
 =================
+R_GetFontStashPixelHeightCharSize
+=================
+*/
+static FT_F26Dot6 R_GetFontStashPixelHeightCharSize( rFontStashFace_t *face, int scaleTenths ) {
+	FT_F26Dot6 pixelHeight;
+	int fontHeight;
+	int unitsPerEm;
+	long long adjustedCharSize;
+
+	pixelHeight = ( scaleTenths * 64 + 5 ) / 10;
+	if ( pixelHeight <= 0 ) {
+		pixelHeight = 1;
+	}
+
+	if ( !face || !face->ftFace ) {
+		return pixelHeight;
+	}
+
+	unitsPerEm = face->ftFace->units_per_EM;
+	fontHeight = face->ftFace->ascender - face->ftFace->descender;
+	if ( unitsPerEm <= 0 || fontHeight <= 0 ) {
+		return pixelHeight;
+	}
+
+	adjustedCharSize = ( (long long)pixelHeight * unitsPerEm + fontHeight / 2 ) / fontHeight;
+	if ( adjustedCharSize <= 0 ) {
+		return 1;
+	}
+	if ( adjustedCharSize > 0x7fffffff ) {
+		return (FT_F26Dot6)0x7fffffff;
+	}
+
+	return (FT_F26Dot6)adjustedCharSize;
+}
+
+/*
+=================
 R_SetFontStashFaceSize
 =================
 */
@@ -1695,10 +1732,7 @@ static qboolean R_SetFontStashFaceSize( rFontStashFace_t *face, int scaleTenths 
 		return qfalse;
 	}
 
-	charSize = ( scaleTenths * 64 + 5 ) / 10;
-	if ( charSize <= 0 ) {
-		charSize = 1;
-	}
+	charSize = R_GetFontStashPixelHeightCharSize( face, scaleTenths );
 
 	return ( FT_Set_Char_Size( face->ftFace, 0, charSize, 72, 72 ) == 0 );
 }
@@ -1722,6 +1756,10 @@ R_GetFontStashFaceMetrics
 =================
 */
 static qboolean R_GetFontStashFaceMetrics( rFontStashFace_t *face, int scaleTenths, rFontStashFaceMetrics_t *outMetrics ) {
+	float size;
+	int fontHeight;
+	int lineHeight;
+
 	if ( outMetrics ) {
 		Com_Memset( outMetrics, 0, sizeof( *outMetrics ) );
 	}
@@ -1734,12 +1772,20 @@ static qboolean R_GetFontStashFaceMetrics( rFontStashFace_t *face, int scaleTent
 		return qfalse;
 	}
 
-	outMetrics->ascent = R_RoundFontStashMetric( face->ftFace->size->metrics.ascender );
-	outMetrics->descent = R_RoundFontStashMetric( face->ftFace->size->metrics.descender );
-	outMetrics->lineHeight = R_RoundFontStashMetric( face->ftFace->size->metrics.height );
-	if ( outMetrics->lineHeight <= 0 ) {
-		outMetrics->lineHeight = outMetrics->ascent - outMetrics->descent;
+	fontHeight = face->ftFace->ascender - face->ftFace->descender;
+	if ( fontHeight <= 0 ) {
+		return qfalse;
 	}
+
+	lineHeight = face->ftFace->height;
+	if ( lineHeight <= 0 ) {
+		lineHeight = fontHeight;
+	}
+
+	size = (float)scaleTenths / 10.0f;
+	outMetrics->ascent = size * (float)face->ftFace->ascender / (float)fontHeight;
+	outMetrics->descent = size * (float)face->ftFace->descender / (float)fontHeight;
+	outMetrics->lineHeight = size * (float)lineHeight / (float)fontHeight;
 
 	return qtrue;
 }

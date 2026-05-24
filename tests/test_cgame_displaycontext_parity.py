@@ -748,8 +748,10 @@ def test_cgame_acc_vertical_overlay_reconstruction_uses_retail_acc_parser_and_se
 	assert '"-pstats"' in console_source
 	assert 'trap_AddCommand ("acc");' in console_source
 	assert "cg.accRequestActive = qtrue;" in acc_down_block
-	assert "cg.accRequestTime = 0;" in acc_down_block
+	assert "if ( cg.accRequestTime + 1000 < cg.time ) {" in acc_down_block
+	assert "cg.accRequestTime = cg.time;" in acc_down_block
 	assert 'trap_SendClientCommand( "acc" );' in acc_down_block
+	assert "cg.accRequestTime = 0;" not in acc_down_block
 	assert "cg.accRequestActive = qfalse;" in acc_up_block
 	assert 'trap_SendClientCommand( "pstats" );' in pstats_down_block
 	assert "cg_pstatsRequestActive = qtrue;" in pstats_down_block
@@ -772,6 +774,8 @@ def test_cgame_acc_vertical_overlay_reconstruction_uses_retail_acc_parser_and_se
 	assert "cg.snap->ps.pm_flags & PMF_FOLLOW" in draw_gate_block
 	assert 'trap_SendClientCommand( "acc" );' in draw_gate_block
 
+	assert "CG_ShouldDrawAccVertical()" not in draw_weapon_block
+	assert "CG_ShouldDrawAccVertical()" not in draw_acc_block
 	assert "icon = CG_GetStartingWeaponIconHandle( cgVerticalAccWeaponOrder[i] );" in draw_weapon_block
 	assert "CG_DrawPic( rect->x, rect->y + rect->h * i, rect->w, rect->w, icon );" in draw_weapon_block
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%i%%", cg.weaponAccuracies[weapon] );' in draw_acc_block
@@ -4571,6 +4575,7 @@ def test_cgame_browser_runtime_surface_restores_overlay_draw_and_capture_owners(
 		assert expected in scoreboard_block
 
 	assert 'menuStats = CG_FindBrowserOverlayByName( "stats_menu" );' in stats_block
+	assert "if ( !CG_ShouldDrawAccOverlay() || !menuStats ) {" in stats_block
 	assert "CG_DrawBrowserOverlayTree( menuStats, qtrue );" in stats_block
 	assert "CG_DrawBrowserOverlays();" in draw_2d_block
 	assert "CG_DrawBrowserCursor();" in draw_2d_block

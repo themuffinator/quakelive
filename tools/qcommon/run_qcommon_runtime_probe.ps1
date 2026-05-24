@@ -272,7 +272,7 @@ function Start-ClientProcess {
 		'+set', 'r_windowedMode', '-1',
 		'+set', 'r_windowedWidth', '1280',
 		'+set', 'r_windowedHeight', '720',
-		'+set', 'r_ext_multitexture', '0',
+		'+set', 'r_ext_multitexture', '1',
 		'+set', 'ui_browserAwesomium', '0',
 		'+set', 'web_browserActive', '0',
 		'+set', 's_initsound', '0'

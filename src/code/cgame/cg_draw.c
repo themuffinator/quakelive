@@ -5760,11 +5760,11 @@ static void CG_BuildWarmupWaitingStatus( int gametype, const int teamCounts[TEAM
 CG_DrawWarmupTextLine
 =================
 */
-static void CG_DrawWarmupTextLine( const char *text, float y, float scale ) {
+static void CG_DrawWarmupTextLine( const char *text, float y, float scale, int fontIndex ) {
 	int		w;
 
-	CG_Text_GetExtents( text, scale, 0, ITEM_TEXTSTYLE_SHADOWEDMORE, &w, NULL );
-	CG_Text_PaintNoAdjust( 320 - w / 2, y, scale, colorWhite, text, 0, ITEM_TEXTSTYLE_SHADOWEDMORE );
+	w = CG_Text_WidthExt( text, scale, 0, fontIndex );
+	CG_Text_PaintExt( 320 - w / 2, y, scale, colorWhite, text, 0, 0, ITEM_TEXTSTYLE_NORMAL, fontIndex );
 }
 
 /*
@@ -5782,8 +5782,8 @@ static void CG_DrawWarmupWaitingStatus( int gametype, const int teamCounts[TEAM_
 	}
 
 	CG_BuildWarmupWaitingStatus( gametype, teamCounts, line1, sizeof( line1 ), line2, sizeof( line2 ) );
-	CG_DrawWarmupTextLine( line1, 88.0f + verticalOffset, 0.35f );
-	CG_DrawWarmupTextLine( line2, 108.0f + verticalOffset, 0.35f );
+	CG_DrawWarmupTextLine( line1, 88.0f + verticalOffset, 0.35f, FONT_SANS );
+	CG_DrawWarmupTextLine( line2, 108.0f + verticalOffset, 0.35f, FONT_SANS );
 }
 
 /*
@@ -5838,7 +5838,7 @@ static void CG_DrawWarmupReadyPrompt( int gametype, const int teamCounts[TEAM_NU
 		prompt = va( "Press %s to ready yourself", keyName );
 	}
 
-	CG_DrawWarmupTextLine( prompt, 124.0f + verticalOffset, 0.25f );
+	CG_DrawWarmupTextLine( prompt, 124.0f + verticalOffset, 0.25f, FONT_DEFAULT );
 }
 
 /*

@@ -75,6 +75,15 @@ def test_buffered_chat_writer_updates_ring_and_lastmsg() -> None:
 	assert "CG_PushPrintString( message, SYSTEM_PRINT, 0 );" in replay_block
 
 
+def test_cgame_printf_does_not_play_chat_sound() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	block = _block_from_marker(source, "void QDECL CG_Printf")
+
+	assert "trap_Print( text );" in block
+	assert "trap_S_StartLocalSound" not in block
+	assert "cg_chatbeep" not in block
+
+
 def test_new_chat_area_obeys_history_latch() -> None:
 	source = CG_NEWDRAW.read_text(encoding="utf-8")
 	init_block = _block_from_marker(source, "void CG_InitTeamChat()")

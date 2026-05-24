@@ -64,6 +64,7 @@ def test_renderer_host_text_core_matches_retail_surface() -> None:
 	assert "r_fontStash.windowsFallbackFace = R_GetFontStashFace( R_FONTSTASH_FACE_SANS_WINDOWS_FALLBACK );" in tr_font
 	assert "static qboolean R_EnsureFontStashCompatibilityFont( rFontStashFace_t *face ) {" in tr_font
 	assert "static int R_GetFontStashScaleTenths( float scale ) {" in tr_font
+	assert "static FT_F26Dot6 R_GetFontStashPixelHeightCharSize( rFontStashFace_t *face, int scaleTenths ) {" in tr_font
 	assert "static const char *R_DecodeFontStashCodepoint( const char *text, const char *end, unsigned int *outCodepoint ) {" in tr_font
 	assert "static qboolean R_ParseHostTextColorEscape( const char *text, const char *end, int *outColorIndex, const char **outNext ) {" in tr_font
 	assert "static int R_BuildFontStashFaceChain( rFontStashFace_t *face, rFontStashFace_t **faces, int maxFaces ) {" in tr_font
@@ -118,6 +119,9 @@ def test_renderer_host_text_core_matches_retail_surface() -> None:
 def test_renderer_host_text_face_scale_color_and_clipping_contract() -> None:
 	tr_font = _read_text(TR_FONT_PATH)
 	scale_block = _block_from_marker(tr_font, "static int R_GetFontStashScaleTenths")
+	pixel_height_block = _block_from_marker(tr_font, "static FT_F26Dot6 R_GetFontStashPixelHeightCharSize")
+	set_size_block = _block_from_marker(tr_font, "static qboolean R_SetFontStashFaceSize")
+	metrics_block = _block_from_marker(tr_font, "static qboolean R_GetFontStashFaceMetrics")
 	color_block = _block_from_marker(tr_font, "static qboolean R_ParseHostTextColorEscape")
 	face_block = _block_from_marker(tr_font, "static rFontStashFace_t *R_GetFontStashFaceForHandle")
 	draw_block = _block_from_marker(tr_font, "void RE_DrawScaledText")
@@ -131,6 +135,26 @@ def test_renderer_host_text_face_scale_color_and_clipping_contract() -> None:
 		"scaleTenths = 0x7fff;",
 	):
 		assert expected in scale_block
+
+	for expected in (
+		"pixelHeight = ( scaleTenths * 64 + 5 ) / 10;",
+		"unitsPerEm = face->ftFace->units_per_EM;",
+		"fontHeight = face->ftFace->ascender - face->ftFace->descender;",
+		"adjustedCharSize = ( (long long)pixelHeight * unitsPerEm + fontHeight / 2 ) / fontHeight;",
+	):
+		assert expected in pixel_height_block
+	assert "charSize = R_GetFontStashPixelHeightCharSize( face, scaleTenths );" in set_size_block
+	assert "FT_Set_Char_Size( face->ftFace, 0, charSize, 72, 72 )" in set_size_block
+
+	for expected in (
+		"fontHeight = face->ftFace->ascender - face->ftFace->descender;",
+		"lineHeight = face->ftFace->height;",
+		"size = (float)scaleTenths / 10.0f;",
+		"outMetrics->ascent = size * (float)face->ftFace->ascender / (float)fontHeight;",
+		"outMetrics->descent = size * (float)face->ftFace->descender / (float)fontHeight;",
+		"outMetrics->lineHeight = size * (float)lineHeight / (float)fontHeight;",
+	):
+		assert expected in metrics_block
 
 	for expected in (
 		"if ( !text || *text != Q_COLOR_ESCAPE ) {",

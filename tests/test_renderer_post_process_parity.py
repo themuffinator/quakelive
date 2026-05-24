@@ -24,6 +24,16 @@ def test_renderer_post_process_pipeline_uses_retail_shader_family() -> None:
 	assert 'ri.Printf( PRINT_WARNING, "GL_ARB_Multitexture is either not supported, or is disabled by r_ext_multiTexture. Post processing is disabled.\\n" );' in tr_backend
 
 
+def test_runtime_probes_keep_multitexture_enabled_for_post_process() -> None:
+	client_probe = _read("tools/client/run_client_runtime_probe.ps1")
+	qcommon_probe = _read("tools/qcommon/run_qcommon_runtime_probe.ps1")
+
+	assert "'+set', 'r_ext_multitexture', '1'" in client_probe
+	assert "'+set', 'r_ext_multitexture', '1'" in qcommon_probe
+	assert "'+set', 'r_ext_multitexture', '0'" not in client_probe
+	assert "'+set', 'r_ext_multitexture', '0'" not in qcommon_probe
+
+
 def test_color_correct_is_shader_backed_and_surfaces_retail_controls() -> None:
 	tr_backend = _read("src/code/renderer/tr_backend.c")
 	tr_init = _read("src/code/renderer/tr_init.c")

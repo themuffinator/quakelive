@@ -198,7 +198,7 @@ def test_console_host_field_draw_matches_retail_utf8_cursor_windowing() -> None:
 		"start = Con_PrevUtf8CharStart( edit->buffer, start );",
 		"if ( visibleChars == edit->widthInChars && cursor < start ) {",
 		"end = Con_PrevUtf8CharStart( edit->buffer, end );",
-		"RE_MeasureScaledText( drawText, drawText + prefixBytes, CONSOLE_HOST_FONT_MONO, Con_GetHostTextScale( charWidth ), 0, &prefixWidth, NULL, NULL );",
+		"RE_MeasureScaledText( drawText, drawText + prefixBytes, CONSOLE_HOST_FONT_MONO, Con_GetHostTextScale(), 0, &prefixWidth, NULL, NULL );",
 		"if ( !Key_GetOverstrikeMode() ) {",
 		"cursorX -= charWidth / 2;",
 	):
@@ -212,7 +212,9 @@ def test_console_host_field_draw_matches_retail_utf8_cursor_windowing() -> None:
 
 def test_console_cell_geometry_and_alignment_match_retail_engine_scaling() -> None:
 	source = CL_CONSOLE.read_text(encoding="utf-8")
+	screen_scale_block = _block_from_marker(source, "static float Con_GetScreenScale")
 	scale_block = _block_from_marker(source, "static float Con_GetPixelScale")
+	line_width_block = _block_from_marker(source, "int Con_GetLineWidthForCurrentResolution")
 	width_block = _block_from_marker(source, "static int Con_GetScaledSmallCharWidth")
 	height_block = _block_from_marker(source, "static int Con_GetScaledSmallCharHeight")
 	host_metrics_block = _block_from_marker(source, "static void Con_GetHostFontMetrics")
@@ -222,17 +224,21 @@ def test_console_cell_geometry_and_alignment_match_retail_engine_scaling() -> No
 
 	assert "#define\t\tCONSOLE_CHAR_WIDTH\t12" in source
 	assert "#define\t\tCONSOLE_CHAR_HEIGHT\t24" in source
-	assert "pixelScale = Con_GetScale();" in scale_block
-	assert "cls.glconfig.vidHeight" not in scale_block
+	assert "return (float)cls.glconfig.vidHeight / (float)SCREEN_HEIGHT;" in screen_scale_block
+	assert "pixelScale = Con_GetScale() * Con_GetScreenScale();" in scale_block
+	assert "cellWidth = CONSOLE_CHAR_WIDTH * Con_GetPixelScale();" in line_width_block
+	assert "width = (int)( (float)cls.glconfig.vidWidth / cellWidth - 2.0f );" in line_width_block
 	assert "CONSOLE_CHAR_WIDTH * Con_GetPixelScale()" in width_block
 	assert "CONSOLE_CHAR_HEIGHT * Con_GetPixelScale()" in height_block
-	assert "Con_GetHostFontMetrics( Con_GetScaledSmallCharWidth(), height, NULL, &lineHeight );" in height_block
+	assert "Con_GetHostFontMetrics( height, NULL, &lineHeight );" in height_block
+	assert "return CONSOLE_CHAR_WIDTH * Con_GetPixelScale() * CONSOLE_HOST_SCALE_MULTIPLIER;" in source
 	assert "RE_GetScaledFontMetrics( CONSOLE_HOST_FONT_MONO, scale, &ascent, &descent, &lineHeight )" in host_metrics_block
-	assert "Con_GetHostFontMetrics( charWidth, charHeight, &ascent, NULL );" in draw_host_block
+	assert "Con_GetHostFontMetrics( charHeight, &ascent, NULL );" in draw_host_block
 	assert "baselineY = y + (int)( ascent + 0.5f );" in draw_host_block
 	assert "RE_DrawScaledText( x, baselineY, text, CONSOLE_HOST_FONT_MONO, scale, 0, NULL, forceColor, drawColor );" in draw_host_block
 	assert "y + charHeight" not in draw_host_block
-	assert "width = (int)( (float)cls.glconfig.vidWidth / ( scale * CONSOLE_CHAR_WIDTH ) - 2.0f );" in resize_block
+	assert "width = Con_GetLineWidthForCurrentResolution();" in resize_block
+	assert "Con_SetFieldWidth( con.linewidth );" in resize_block
 	assert "con.xadjust = 0;" in solid_block
 	assert "SCR_AdjustFrom640( &con.xadjust, NULL, NULL, NULL );" not in solid_block
 
@@ -268,6 +274,7 @@ def test_screen_overlay_text_uses_retail_host_mono_lane() -> None:
 def test_console_bootstrap_width_uses_retail_engine_cell_width() -> None:
 	source = CL_MAIN.read_text(encoding="utf-8")
 
-	assert 'consoleScale = Com_Clamp( 0.5f, 1.0f, Cvar_VariableValue( "con_scale" ) );' in source
-	assert 'g_console_field_width = (int)( (float)cls.glconfig.vidWidth / ( consoleScale * 12.0f ) - 2.0f );' in source
+	assert source.count( "Con_UpdateFieldWidth();" ) >= 2
+	assert 'consoleScale = Com_Clamp( 0.5f, 1.0f, Cvar_VariableValue( "con_scale" ) );' not in source
+	assert 'g_console_field_width = (int)( (float)cls.glconfig.vidWidth / ( consoleScale * 12.0f ) - 2.0f );' not in source
 	assert 'g_console_field_width = cls.glconfig.vidWidth / SMALLCHAR_WIDTH - 2;' not in source
