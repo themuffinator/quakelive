@@ -1582,36 +1582,35 @@ void CG_RunQueuedAutoActions( void ) {
 	}
 }
 
-#define QL_CROSSHAIR_COLOR_COUNT	27
+#define QL_CROSSHAIR_COLOR_COUNT	26
 
-static const vec3_t cg_crosshairPalette[QL_CROSSHAIR_COLOR_COUNT] = {
-	{ 1.00f, 1.00f, 1.00f },
-	{ 1.00f, 1.00f, 1.00f },
-	{ 0.90f, 0.90f, 0.90f },
-	{ 0.75f, 0.75f, 0.75f },
-	{ 0.50f, 0.50f, 0.50f },
-	{ 0.25f, 0.25f, 0.25f },
-	{ 0.00f, 0.00f, 0.00f },
-	{ 1.00f, 0.35f, 0.35f },
-	{ 1.00f, 0.00f, 0.00f },
-	{ 0.70f, 0.00f, 0.00f },
-	{ 1.00f, 0.55f, 0.00f },
-	{ 1.00f, 0.80f, 0.00f },
-	{ 1.00f, 1.00f, 0.00f },
-	{ 0.80f, 1.00f, 0.00f },
-	{ 0.55f, 1.00f, 0.00f },
-	{ 0.00f, 1.00f, 0.00f },
-	{ 0.00f, 1.00f, 0.55f },
-	{ 0.00f, 1.00f, 0.80f },
-	{ 0.00f, 1.00f, 1.00f },
-	{ 0.00f, 0.80f, 1.00f },
-	{ 0.00f, 0.55f, 1.00f },
-	{ 0.00f, 0.00f, 1.00f },
-	{ 0.35f, 0.00f, 1.00f },
-	{ 0.55f, 0.00f, 1.00f },
-	{ 0.80f, 0.00f, 1.00f },
-	{ 1.00f, 0.00f, 1.00f },
-	{ 1.00f, 0.00f, 0.55f }
+static const vec4_t cg_crosshairPalette[QL_CROSSHAIR_COLOR_COUNT] = {
+	{ 1.0f, 0.0f, 0.0f, 1.0f },
+	{ 1.0f, 0.2734375f, 0.0f, 1.0f },
+	{ 1.0f, 0.5f, 0.0f, 1.0f },
+	{ 1.0f, 0.734375f, 0.0f, 1.0f },
+	{ 1.0f, 1.0f, 0.0f, 1.0f },
+	{ 0.734375f, 1.0f, 0.0f, 1.0f },
+	{ 0.5f, 1.0f, 0.0f, 1.0f },
+	{ 0.2734375f, 1.0f, 0.0f, 1.0f },
+	{ 0.0f, 1.0f, 0.0f, 1.0f },
+	{ 0.0f, 1.0f, 0.2734375f, 1.0f },
+	{ 0.0f, 1.0f, 0.5f, 1.0f },
+	{ 0.0f, 1.0f, 0.734375f, 1.0f },
+	{ 0.0f, 1.0f, 1.0f, 1.0f },
+	{ 0.0f, 0.734375f, 1.0f, 1.0f },
+	{ 0.0f, 0.5f, 1.0f, 1.0f },
+	{ 0.0f, 0.2734375f, 1.0f, 1.0f },
+	{ 0.0f, 0.0f, 1.0f, 1.0f },
+	{ 0.2734375f, 0.0f, 1.0f, 1.0f },
+	{ 0.5f, 0.0f, 1.0f, 1.0f },
+	{ 0.734375f, 0.0f, 1.0f, 1.0f },
+	{ 1.0f, 0.0f, 1.0f, 1.0f },
+	{ 1.0f, 0.0f, 0.734375f, 1.0f },
+	{ 1.0f, 0.0f, 0.5f, 1.0f },
+	{ 1.0f, 0.0f, 0.2734375f, 1.0f },
+	{ 1.0f, 1.0f, 1.0f, 1.0f },
+	{ 0.5f, 0.5f, 0.5f, 1.0f }
 };
 
 /*
@@ -1636,88 +1635,30 @@ int CG_ColorCharToIndex( char ch ) {
 
 /*
 =============
-CG_ParseCrosshairColorString
-
-Attempts to parse a custom crosshair color string into a vec4_t.
-=============
-*/
-static qboolean CG_ParseCrosshairColorString( const char *value, vec4_t color ) {
-	char		buffer[64];
-	const char	*hex;
-	unsigned int raw;
-	int		len;
-	int		digit;
-	int		i;
-
-	if ( !value || !*value ) {
-		return qfalse;
-	}
-	Q_strncpyz( buffer, value, sizeof( buffer ) );
-	hex = buffer;
-	while ( *hex == ' ' || *hex == '\t' || *hex == '"' ) {
-		hex++;
-	}
-	if ( !Q_stricmp( hex, "NULL" ) ) {
-		return qfalse;
-	}
-	if ( hex[0] == '0' && ( hex[1] == 'x' || hex[1] == 'X' ) ) {
-		hex += 2;
-	} else if ( hex[0] == '#' ) {
-		hex++;
-	}
-	len = strlen( hex );
-	if ( len != 6 && len != 8 ) {
-		return qfalse;
-	}
-	raw = 0u;
-	for ( i = 0 ; i < len ; i++ ) {
-		digit = CG_ColorCharToIndex( hex[i] );
-		if ( digit < 0 || digit > 15 ) { // Strict hex check for hex strings
-			return qfalse;
-		}
-		raw = ( raw << 4 ) | (unsigned int)digit;
-	}
-	if ( len == 6 ) {
-		color[0] = ( ( raw >> 16 ) & 0xFF ) / 255.0f;
-		color[1] = ( ( raw >> 8 ) & 0xFF ) / 255.0f;
-		color[2] = ( raw & 0xFF ) / 255.0f;
-		color[3] = 1.0f;
-	} else {
-		color[0] = ( ( raw >> 24 ) & 0xFF ) / 255.0f;
-		color[1] = ( ( raw >> 16 ) & 0xFF ) / 255.0f;
-		color[2] = ( ( raw >> 8 ) & 0xFF ) / 255.0f;
-		color[3] = ( raw & 0xFF ) / 255.0f;
-	}
-	return qtrue;
-}
-
-/*
-=============
 CG_GetColorForIndex
 
-Populates a color vector using a palette-backed index.
+Populates a color vector using a zero-based retail palette index.
 =============
 */
 void CG_GetColorForIndex( int index, vec4_t color ) {
 	if ( index < 0 || index >= QL_CROSSHAIR_COLOR_COUNT ) {
 		index = 0;
 	}
-	VectorCopy( cg_crosshairPalette[index], color );
-	color[3] = 1.0f;
+	Vector4Copy( cg_crosshairPalette[index], color );
 }
 
 /*
 =============
 CG_SetCrosshairColorFromIndex
 
-Populates a color vector using a palette-backed crosshair index.
+Populates a color vector using the one-based cg_crosshairColor cvar range.
 =============
 */
 static void CG_SetCrosshairColorFromIndex( int index, vec4_t color ) {
-	CG_GetColorForIndex( index, color );
-	if ( index < 1 || index >= QL_CROSSHAIR_COLOR_COUNT ) { // preserve original behavior of defaulting to index 1 for crosshair
-		VectorCopy( cg_crosshairPalette[1], color );
+	if ( index < 1 || index > QL_CROSSHAIR_COLOR_COUNT ) {
+		index = 1;
 	}
+	CG_GetColorForIndex( index - 1, color );
 }
 
 /*
@@ -1736,14 +1677,12 @@ static void CG_UpdateCrosshairColorSettings( void ) {
 		crosshairBrightnessModificationCount == cg_crosshairBrightness.modificationCount ) {
 		return;
 	}
-	if ( !CG_ParseCrosshairColorString( cg_crosshairColor.string, baseColor ) ) {
-		CG_SetCrosshairColorFromIndex( cg_crosshairColor.integer, baseColor );
-	}
-	brightness = Com_Clamp( 0.0f, 2.0f, cg_crosshairBrightness.value );
+	CG_SetCrosshairColorFromIndex( cg_crosshairColor.integer, baseColor );
+	brightness = cg_crosshairBrightness.value;
 	for ( i = 0 ; i < 3 ; i++ ) {
-		cg.crosshairColor[i] = Com_Clamp( 0.0f, 1.0f, baseColor[i] * brightness );
+		cg.crosshairColor[i] = baseColor[i] * brightness;
 	}
-	cg.crosshairColor[3] = Com_Clamp( 0.0f, 1.0f, brightness );
+	cg.crosshairColor[3] = 1.0f;
 	crosshairColorModificationCount = cg_crosshairColor.modificationCount;
 	crosshairBrightnessModificationCount = cg_crosshairBrightness.modificationCount;
 }
@@ -1790,10 +1729,8 @@ static void CG_UpdateCrosshairHitSettings( void ) {
 		crosshairHitTimeModificationCount = cg_crosshairHitTime.modificationCount;
 	}
 	if ( crosshairHitColorModificationCount != cg_crosshairHitColor.modificationCount ) {
-		if ( !CG_ParseCrosshairColorString( cg_crosshairHitColor.string, baseColor ) ) {
-			CG_SetCrosshairColorFromIndex( cg_crosshairHitColor.integer, baseColor );
-		}
-		VectorCopy( baseColor, cg.crosshairHitColor );
+		CG_SetCrosshairColorFromIndex( cg_crosshairHitColor.integer, baseColor );
+		Vector4Copy( baseColor, cg.crosshairHitColor );
 		crosshairHitColorModificationCount = cg_crosshairHitColor.modificationCount;
 	}
 }

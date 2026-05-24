@@ -3544,36 +3544,35 @@ static void UI_DrawRedBlue(rectDef_t *rect, float scale, vec4_t color, int textS
   Text_Paint(rect->x, rect->y, scale, color, (uiInfo.redBlue == 0) ? "Red" : "Blue", 0, 0, textStyle);
 		}
 
-#define UI_CROSSHAIR_COLOR_COUNT	27
+#define UI_CROSSHAIR_COLOR_COUNT	26
 
-static const vec3_t uiCrosshairPalette[UI_CROSSHAIR_COLOR_COUNT] = {
-	{ 1.00f, 1.00f, 1.00f },
-	{ 1.00f, 1.00f, 1.00f },
-	{ 0.90f, 0.90f, 0.90f },
-	{ 0.75f, 0.75f, 0.75f },
-	{ 0.50f, 0.50f, 0.50f },
-	{ 0.25f, 0.25f, 0.25f },
-	{ 0.00f, 0.00f, 0.00f },
-	{ 1.00f, 0.35f, 0.35f },
-	{ 1.00f, 0.00f, 0.00f },
-	{ 0.70f, 0.00f, 0.00f },
-	{ 1.00f, 0.55f, 0.00f },
-	{ 1.00f, 0.80f, 0.00f },
-	{ 1.00f, 1.00f, 0.00f },
-	{ 0.80f, 1.00f, 0.00f },
-	{ 0.55f, 1.00f, 0.00f },
-	{ 0.00f, 1.00f, 0.00f },
-	{ 0.00f, 1.00f, 0.55f },
-	{ 0.00f, 1.00f, 0.80f },
-	{ 0.00f, 1.00f, 1.00f },
-	{ 0.00f, 0.80f, 1.00f },
-	{ 0.00f, 0.55f, 1.00f },
-	{ 0.00f, 0.00f, 1.00f },
-	{ 0.35f, 0.00f, 1.00f },
-	{ 0.55f, 0.00f, 1.00f },
-	{ 0.80f, 0.00f, 1.00f },
-	{ 1.00f, 0.00f, 1.00f },
-	{ 1.00f, 0.00f, 0.55f }
+static const vec4_t uiCrosshairPalette[UI_CROSSHAIR_COLOR_COUNT] = {
+	{ 1.0f, 0.0f, 0.0f, 1.0f },
+	{ 1.0f, 0.2734375f, 0.0f, 1.0f },
+	{ 1.0f, 0.5f, 0.0f, 1.0f },
+	{ 1.0f, 0.734375f, 0.0f, 1.0f },
+	{ 1.0f, 1.0f, 0.0f, 1.0f },
+	{ 0.734375f, 1.0f, 0.0f, 1.0f },
+	{ 0.5f, 1.0f, 0.0f, 1.0f },
+	{ 0.2734375f, 1.0f, 0.0f, 1.0f },
+	{ 0.0f, 1.0f, 0.0f, 1.0f },
+	{ 0.0f, 1.0f, 0.2734375f, 1.0f },
+	{ 0.0f, 1.0f, 0.5f, 1.0f },
+	{ 0.0f, 1.0f, 0.734375f, 1.0f },
+	{ 0.0f, 1.0f, 1.0f, 1.0f },
+	{ 0.0f, 0.734375f, 1.0f, 1.0f },
+	{ 0.0f, 0.5f, 1.0f, 1.0f },
+	{ 0.0f, 0.2734375f, 1.0f, 1.0f },
+	{ 0.0f, 0.0f, 1.0f, 1.0f },
+	{ 0.2734375f, 0.0f, 1.0f, 1.0f },
+	{ 0.5f, 0.0f, 1.0f, 1.0f },
+	{ 0.734375f, 0.0f, 1.0f, 1.0f },
+	{ 1.0f, 0.0f, 1.0f, 1.0f },
+	{ 1.0f, 0.0f, 0.734375f, 1.0f },
+	{ 1.0f, 0.0f, 0.5f, 1.0f },
+	{ 1.0f, 0.0f, 0.2734375f, 1.0f },
+	{ 1.0f, 1.0f, 1.0f, 1.0f },
+	{ 0.5f, 0.5f, 0.5f, 1.0f }
 };
 
 typedef struct {
@@ -3615,7 +3614,7 @@ static int UI_GetCrosshairColorIndex( void ) {
 	int index;
 
 	index = (int)trap_Cvar_VariableValue( "cg_crosshairColor" );
-	if ( index < 1 || index >= UI_CROSSHAIR_COLOR_COUNT ) {
+	if ( index < 1 || index > UI_CROSSHAIR_COLOR_COUNT ) {
 		index = 1;
 	}
 
@@ -3633,17 +3632,16 @@ static void UI_GetCrosshairPreviewColor( const vec4_t baseColor, vec4_t previewC
 	float brightness;
 	int i;
 
-	brightness = Com_Clamp( 0.0f, 2.0f, trap_Cvar_VariableValue( "cg_crosshairBrightness" ) );
+	brightness = trap_Cvar_VariableValue( "cg_crosshairBrightness" );
 	if ( trap_Cvar_VariableValue( "cg_crosshairHealth" ) != 0.0f ) {
-		VectorCopy( baseColor, previewColor );
+		Vector4Copy( baseColor, previewColor );
 	} else {
-		VectorCopy( uiCrosshairPalette[UI_GetCrosshairColorIndex()], previewColor );
+		Vector4Copy( uiCrosshairPalette[UI_GetCrosshairColorIndex() - 1], previewColor );
 	}
 
 	for ( i = 0; i < 3; i++ ) {
-		previewColor[i] = Com_Clamp( 0.0f, 1.0f, previewColor[i] * brightness );
+		previewColor[i] *= brightness;
 	}
-	previewColor[3] = Com_Clamp( 0.0f, 1.0f, brightness );
 }
 
 /*
@@ -3663,7 +3661,7 @@ static void UI_DrawCrosshairColor( rectDef_t *rect ) {
 	int selected;
 
 	selected = UI_GetCrosshairColorIndex() - 1;
-	segmentWidth = rect->w / (float)( UI_CROSSHAIR_COLOR_COUNT - 1 );
+	segmentWidth = rect->w / (float)UI_CROSSHAIR_COLOR_COUNT;
 	if ( segmentWidth <= 0.0f ) {
 		return;
 	}
@@ -3673,8 +3671,8 @@ static void UI_DrawCrosshairColor( rectDef_t *rect ) {
 		top = rect->y - rect->h;
 	}
 
-	for ( i = 1; i < UI_CROSSHAIR_COLOR_COUNT; i++ ) {
-		x = rect->x + ( i - 1 ) * segmentWidth;
+	for ( i = 0; i < UI_CROSSHAIR_COLOR_COUNT; i++ ) {
+		x = rect->x + i * segmentWidth;
 		VectorCopy( uiCrosshairPalette[i], swatchColor );
 		swatchColor[3] = 1.0f;
 		UI_FillRect( x, top + 2.0f, segmentWidth, 8.0f, swatchColor );
@@ -5213,10 +5211,10 @@ static qboolean UI_CrosshairColor_HandleKey(int flags, float *special, int key) 
 		colorIndex++;
 	}
 
-	if (colorIndex >= UI_CROSSHAIR_COLOR_COUNT) {
+	if (colorIndex > UI_CROSSHAIR_COLOR_COUNT) {
 		colorIndex = 1;
 	} else if (colorIndex < 1) {
-		colorIndex = UI_CROSSHAIR_COLOR_COUNT - 1;
+		colorIndex = UI_CROSSHAIR_COLOR_COUNT;
 	}
 
 	trap_Cvar_Set("cg_crosshairColor", va("%d", colorIndex));

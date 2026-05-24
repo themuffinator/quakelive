@@ -63,6 +63,7 @@ typedef struct {
 } clAdvertisementBridgeState_t;
 
 static clAdvertisementBridgeState_t cl_advertisementBridge;
+static qboolean cl_previousBrowserAvailable = qfalse;
 
 #define CL_ADVERTISEMENT_DEBUG_LABEL_COUNT 2
 
@@ -4164,6 +4165,7 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 	cl_advertisementBridge.overlayAvailable = qfalse;
 	cl_advertisementBridge.viewWidth = 0;
 	cl_advertisementBridge.viewHeight = 0;
+	cl_previousBrowserAvailable = qfalse;
 	Cvar_Set( "ui_browserAwesomium", "0" );
 	Cvar_Set( "ui_browserAwesomiumProvider", overlayProvider );
 	Cvar_Set( "ui_browserAwesomiumPolicy", overlayPolicy );
@@ -4194,6 +4196,12 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 	Cvar_Set( "ui_advertisementBridgePolicy", advertPolicy );
 	Cvar_Set( "ui_advertisementBridgeParityScope", parityScope );
 	Cvar_Set( "ui_advertisementBridgeParityReason", parityReason );
+	if ( browserAvailable != cl_previousBrowserAvailable ) {
+		cl_previousBrowserAvailable = browserAvailable;
+		if ( cls.keyCatchers & KEYCATCH_UI ) {
+			Cbuf_ExecuteText( EXEC_APPEND, "ui_load\n" );
+		}
+	}
 	if ( !browserAvailable ) {
 		CL_WebHost_ResetRuntime( qtrue );
 		CL_ResetBrowserOverlayState();

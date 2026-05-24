@@ -78,34 +78,33 @@ static void (*captureFunc) (void *p) = NULL;
 static void *captureData = NULL;
 static itemDef_t *itemCapture = NULL;   // item that has the mouse captured ( if any )
 
-static const vec3_t uiSliderColorPalette[] = {
-	{ 1.00f, 1.00f, 1.00f },
-	{ 1.00f, 1.00f, 1.00f },
-	{ 0.90f, 0.90f, 0.90f },
-	{ 0.75f, 0.75f, 0.75f },
-	{ 0.50f, 0.50f, 0.50f },
-	{ 0.25f, 0.25f, 0.25f },
-	{ 0.00f, 0.00f, 0.00f },
-	{ 1.00f, 0.35f, 0.35f },
-	{ 1.00f, 0.00f, 0.00f },
-	{ 0.70f, 0.00f, 0.00f },
-	{ 1.00f, 0.55f, 0.00f },
-	{ 1.00f, 0.80f, 0.00f },
-	{ 1.00f, 1.00f, 0.00f },
-	{ 0.80f, 1.00f, 0.00f },
-	{ 0.55f, 1.00f, 0.00f },
-	{ 0.00f, 1.00f, 0.00f },
-	{ 0.00f, 1.00f, 0.55f },
-	{ 0.00f, 1.00f, 0.80f },
-	{ 0.00f, 1.00f, 1.00f },
-	{ 0.00f, 0.80f, 1.00f },
-	{ 0.00f, 0.55f, 1.00f },
-	{ 0.00f, 0.00f, 1.00f },
-	{ 0.35f, 0.00f, 1.00f },
-	{ 0.55f, 0.00f, 1.00f },
-	{ 0.80f, 0.00f, 1.00f },
-	{ 1.00f, 0.00f, 1.00f },
-	{ 1.00f, 0.00f, 0.55f }
+static const vec4_t uiSliderColorPalette[] = {
+	{ 1.0f, 0.0f, 0.0f, 1.0f },
+	{ 1.0f, 0.2734375f, 0.0f, 1.0f },
+	{ 1.0f, 0.5f, 0.0f, 1.0f },
+	{ 1.0f, 0.734375f, 0.0f, 1.0f },
+	{ 1.0f, 1.0f, 0.0f, 1.0f },
+	{ 0.734375f, 1.0f, 0.0f, 1.0f },
+	{ 0.5f, 1.0f, 0.0f, 1.0f },
+	{ 0.2734375f, 1.0f, 0.0f, 1.0f },
+	{ 0.0f, 1.0f, 0.0f, 1.0f },
+	{ 0.0f, 1.0f, 0.2734375f, 1.0f },
+	{ 0.0f, 1.0f, 0.5f, 1.0f },
+	{ 0.0f, 1.0f, 0.734375f, 1.0f },
+	{ 0.0f, 1.0f, 1.0f, 1.0f },
+	{ 0.0f, 0.734375f, 1.0f, 1.0f },
+	{ 0.0f, 0.5f, 1.0f, 1.0f },
+	{ 0.0f, 0.2734375f, 1.0f, 1.0f },
+	{ 0.0f, 0.0f, 1.0f, 1.0f },
+	{ 0.2734375f, 0.0f, 1.0f, 1.0f },
+	{ 0.5f, 0.0f, 1.0f, 1.0f },
+	{ 0.734375f, 0.0f, 1.0f, 1.0f },
+	{ 1.0f, 0.0f, 1.0f, 1.0f },
+	{ 1.0f, 0.0f, 0.734375f, 1.0f },
+	{ 1.0f, 0.0f, 0.5f, 1.0f },
+	{ 1.0f, 0.0f, 0.2734375f, 1.0f },
+	{ 1.0f, 1.0f, 1.0f, 1.0f },
+	{ 0.5f, 0.5f, 0.5f, 1.0f }
 };
 
 displayContextDef_t *DC = NULL;
@@ -4098,14 +4097,15 @@ void Item_SliderColor_Paint(itemDef_t *item) {
 
 	colorIndex = (int)ceil(DC->getCVarValue(item->cvar));
 	paletteCount = (int)(sizeof(uiSliderColorPalette) / sizeof(uiSliderColorPalette[0]));
-	if (colorIndex < 1 || colorIndex >= paletteCount) {
+	if (colorIndex < 1 || colorIndex > paletteCount) {
 		colorIndex = 1;
 	}
+	colorIndex--;
 
 	thumbColor[0] = uiSliderColorPalette[colorIndex][0];
 	thumbColor[1] = uiSliderColorPalette[colorIndex][1];
 	thumbColor[2] = uiSliderColorPalette[colorIndex][2];
-	thumbColor[3] = 1.0f;
+	thumbColor[3] = uiSliderColorPalette[colorIndex][3];
 
 	DC->setColor(thumbColor);
 	x = Item_Slider_ThumbPosition(item);

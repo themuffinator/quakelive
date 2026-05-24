@@ -646,7 +646,7 @@ def test_ui_retail_ownerdraw_extensions_restored() -> None:
     asset_cache_block = _extract_function_block(ui_main, "void AssetCache() {")
 
     assert "#define\tNUM_CROSSHAIRS\t\t\t30" in ui_shared_h
-    assert "#define UI_CROSSHAIR_COLOR_COUNT\t27" in ui_main
+    assert "#define UI_CROSSHAIR_COLOR_COUNT\t26" in ui_main
     assert "static void UI_DrawCrosshairColor( rectDef_t *rect )" in ui_main
     assert 'trap_Cvar_VariableValue( "cg_crosshairColor" )' in ui_main
     assert "case UI_CROSSHAIR_COLOR:" in ui_main
@@ -1023,6 +1023,32 @@ def test_ui_retail_crosshair_color_key_handler_respects_health_color_gate() -> N
     )
 
 
+def test_ui_retail_crosshair_color_uses_one_based_palette_indices() -> None:
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    preview_block = _extract_function_block(
+        ui_main, "static void UI_GetCrosshairPreviewColor( const vec4_t baseColor, vec4_t previewColor ) {"
+    )
+    chooser_block = _extract_function_block(ui_main, "static void UI_DrawCrosshairColor( rectDef_t *rect ) {")
+    key_block = _extract_function_block(
+        ui_main, "static qboolean UI_CrosshairColor_HandleKey(int flags, float *special, int key) {"
+    )
+
+    assert "static const vec4_t uiCrosshairPalette[UI_CROSSHAIR_COLOR_COUNT]" in ui_main
+    for expected in (
+        "{ 1.0f, 0.0f, 0.0f, 1.0f }",
+        "{ 1.0f, 1.0f, 1.0f, 1.0f }",
+        "{ 0.5f, 0.5f, 0.5f, 1.0f }",
+    ):
+        assert expected in ui_main
+    assert "Vector4Copy( uiCrosshairPalette[UI_GetCrosshairColorIndex() - 1], previewColor );" in preview_block
+    assert "previewColor[i] *= brightness;" in preview_block
+    assert "selected = UI_GetCrosshairColorIndex() - 1;" in chooser_block
+    assert "segmentWidth = rect->w / (float)UI_CROSSHAIR_COLOR_COUNT;" in chooser_block
+    assert "for ( i = 0; i < UI_CROSSHAIR_COLOR_COUNT; i++ ) {" in chooser_block
+    assert "if (colorIndex > UI_CROSSHAIR_COLOR_COUNT) {" in key_block
+    assert "colorIndex = UI_CROSSHAIR_COLOR_COUNT;" in key_block
+
+
 def test_ui_retail_toggle_script_command_restored() -> None:
     ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
     assert "static void Script_Toggle(itemDef_t *item, char **args)" in ui_shared
@@ -1360,6 +1386,10 @@ def test_ui_retail_preset_and_precision_runtime_restored() -> None:
     assert "qboolean Item_PresetList_HandleKey(itemDef_t *item, int key)" in ui_shared
     assert "void Item_PresetList_Paint(itemDef_t *item)" in ui_shared
     assert "void Item_SliderColor_Paint(itemDef_t *item)" in ui_shared
+    slider_color_block = _extract_function_block(ui_shared, "void Item_SliderColor_Paint(itemDef_t *item) {")
+    assert "static const vec4_t uiSliderColorPalette[]" in ui_shared
+    assert "colorIndex--;" in slider_color_block
+    assert "thumbColor[3] = uiSliderColorPalette[colorIndex][3];" in slider_color_block
     assert "case ITEM_TYPE_PRESETLIST:" in ui_shared
     assert "case ITEM_TYPE_SLIDER_COLOR:" in ui_shared
     assert "Menu_UpdatePresetLists(menu);" in ui_shared

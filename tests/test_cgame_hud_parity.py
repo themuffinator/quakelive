@@ -237,6 +237,52 @@ def test_crosshair_team_health_default_matches_retail_mode_cvar() -> None:
 	assert "Cvar_GetBounded( varName, defaultValue, minimumValue, maximumValue, flags );" in client_source
 
 
+def test_crosshair_color_palette_and_brightness_match_retail_draw_path() -> None:
+	source = CG_MAIN.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	retail_crosshair_block = _text_between(
+		hlil_source,
+		"1000c2a0    int32_t sub_1000c2a0",
+		"1000c4d2",
+	)
+	retail_hit_block = _text_between(
+		hlil_source,
+		"1000c0a0    void sub_1000c0a0",
+		"1000c277",
+	)
+	update_block = _block_from_marker(source, "static void CG_UpdateCrosshairColorSettings")
+	hit_update_block = _block_from_marker(source, "static void CG_UpdateCrosshairHitSettings")
+
+	for expected in (
+		"int32_t eax_8 = eax_7 - 1",
+		"if (eax_7 - 1 s< 0 || eax_8 s> 0x19)",
+		"eax_8 = 0",
+		"0x10075fe0",
+		"data_10b71b6c",
+		"data_10abb1c8",
+	):
+		assert expected in retail_crosshair_block
+	assert "int32_t eax_7 = eax_6 - 1" in retail_hit_block
+	assert "0x10075fe0" in retail_hit_block
+
+	assert "#define QL_CROSSHAIR_COLOR_COUNT\t26" in source
+	assert "static const vec4_t cg_crosshairPalette[QL_CROSSHAIR_COLOR_COUNT]" in source
+	for expected in (
+		"{ 1.0f, 0.0f, 0.0f, 1.0f }",
+		"{ 1.0f, 1.0f, 1.0f, 1.0f }",
+		"{ 0.5f, 0.5f, 0.5f, 1.0f }",
+	):
+		assert expected in source
+
+	assert "CG_GetColorForIndex( index - 1, color );" in source
+	assert "CG_ParseCrosshairColorString" not in source
+	assert "brightness = cg_crosshairBrightness.value;" in update_block
+	assert "cg.crosshairColor[i] = baseColor[i] * brightness;" in update_block
+	assert "cg.crosshairColor[3] = 1.0f;" in update_block
+	assert "Com_Clamp" not in update_block
+	assert "Vector4Copy( baseColor, cg.crosshairHitColor );" in hit_update_block
+
+
 def test_crosshair_draw_uses_retail_vertical_scaler_and_numeric_shader_names() -> None:
 	draw_source = CG_DRAW.read_text(encoding="utf-8")
 	main_source = CG_MAIN.read_text(encoding="utf-8")

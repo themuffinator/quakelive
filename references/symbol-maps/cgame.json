@@ -2312,12 +2312,12 @@
     {
       "address": "0x10012B50",
       "raw_name": "FUN_10012b50",
-      "normalized_name": "CG_GetColorForIndex",
-      "status": "matched",
-      "signature": "void CG_GetColorForIndex(int index, vec4_t color)",
+      "normalized_name": "CG_CrosshairTargetTeamColor",
+      "status": "inferred",
+      "signature": "float *CG_CrosshairTargetTeamColor(int team)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Exact crosshair-palette lookup helper from `cg_main.c::CG_GetColorForIndex`. HLIL clamps out-of-range indices back to zero, returns a pointer to the selected four-float palette row, and leaves the callers to stamp alpha to `1.0f`, matching the source split."
+      "comment": "Corrected from an older crosshair-palette label. HLIL shows a compact team-id color resolver used by the crosshair target path; actual `cg_crosshairColor` handling is inline in `CG_DrawCrosshair` / hit feedback through the 26-row table at `0x10075FE0`."
     },
     {
       "address": "0x10012B90",
