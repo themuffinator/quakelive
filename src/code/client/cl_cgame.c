@@ -1496,6 +1496,33 @@ static void QLWebView_RebuildSurfaceImage( void ) {
 
 /*
 =============
+QLWebView_SurfaceHasVisiblePixels
+=============
+*/
+static qboolean QLWebView_SurfaceHasVisiblePixels( const byte *pixels, int length ) {
+	int pixelCount;
+	int step;
+	int i;
+
+	if ( !pixels || length < 4 ) {
+		return qfalse;
+	}
+
+	pixelCount = length / 4;
+	step = pixelCount > 4096 ? pixelCount / 4096 : 1;
+	for ( i = 0; i < pixelCount; i += step ) {
+		int offset = i * 4;
+
+		if ( pixels[offset + 0] || pixels[offset + 1] || pixels[offset + 2] ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=============
 QLWebView_WriteSurfacePixels
 =============
 */
@@ -1503,11 +1530,13 @@ static void QLWebView_WriteSurfacePixels( void ) {
 	int requiredLength;
 	int pixelCount;
 	int i;
+	qboolean liveBlackSurface;
 	byte red;
 	byte green;
 	byte blue;
 	byte alpha;
 
+	liveBlackSurface = qfalse;
 	requiredLength = cl_webHost.surfaceWidth * cl_webHost.surfaceHeight * 4;
 	if ( cl_webHost.surfaceWidth <= 0 || cl_webHost.surfaceHeight <= 0 || requiredLength <= 0 ) {
 		CL_WebHost_ClearSurfaceImage();
@@ -1526,7 +1555,11 @@ static void QLWebView_WriteSurfacePixels( void ) {
 #if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
 	if ( cl_webHost.liveAwesomium
 		&& CL_Awesomium_CopySurface( cl_webHost.surfaceBuffer, cl_webHost.surfaceWidth, cl_webHost.surfaceHeight, cl_webHost.surfaceWidth * 4 ) ) {
-		return;
+		if ( QLWebView_SurfaceHasVisiblePixels( cl_webHost.surfaceBuffer, requiredLength ) ) {
+			return;
+		}
+
+		liveBlackSurface = qtrue;
 	}
 #endif
 
@@ -1539,7 +1572,7 @@ static void QLWebView_WriteSurfacePixels( void ) {
 		red = 0x6a;
 		green = 0x12;
 		blue = 0x12;
-	} else if ( cl_webHost.loadingDocument ) {
+	} else if ( liveBlackSurface || cl_webHost.loadingDocument ) {
 		red = 0x12;
 		green = 0x24;
 		blue = 0x68;
@@ -1806,6 +1839,9 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 	if ( !overlayAvailable && !awesomiumAllowed ) {
 		return qfalse;
 	}
+	if ( cl_webHost.loadFailed && !overlayAvailable ) {
+		return qfalse;
+	}
 
 	(void)QLViewHandler_OnAddConsoleMessage;
 	(void)QLDialogHandler_OnShowFileChooser;
@@ -1838,10 +1874,12 @@ static qboolean QLWebHost_EnsureRuntime( void ) {
 				QLWebView_Resize( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
 				QLWebView_RebuildSurfaceImage();
 				Com_Printf( "Awesomium WebCore live view initialised from %s\n", homePath );
+				CL_RefreshOnlineServicesBridgeState();
 				return qtrue;
 			}
 			Com_Printf( "Awesomium WebCore initialisation failed: %s\n", CL_Awesomium_LastError() );
 			cl_webHost.loadFailed = qtrue;
+			CL_RefreshOnlineServicesBridgeState();
 			if ( !overlayAvailable ) {
 				return qfalse;
 			}
@@ -3961,8 +3999,22 @@ static void CL_ResetBrowserOverlayState( void ) {
 	cl_webHost.browserVisible = qfalse;
 	cl_webHost.browserActive = qfalse;
 	cl_webHost.focused = qfalse;
+	cls.keyCatchers &= ~KEYCATCH_BROWSER;
 	CL_WebHost_ClearCursorOverride();
 	Cvar_Set( "web_browserActive", "0" );
+}
+
+/*
+=============
+CL_WebHost_MarkBrowserUnavailable
+
+Clears transient browser visibility after a failed live-browser bootstrap while
+preserving the loadFailed latch so the UI VM can fall back to bridge menus.
+=============
+*/
+static void CL_WebHost_MarkBrowserUnavailable( void ) {
+	CL_ResetBrowserOverlayState();
+	CL_RefreshOnlineServicesBridgeState();
 }
 
 /*
@@ -4180,16 +4232,32 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 #else
 	const ql_platform_feature_descriptor *overlay = CL_GetOverlayServiceDescriptor();
 	qboolean overlayAvailable = CL_OverlayServiceAvailable();
-	qboolean browserAvailable = overlayAvailable || awesomiumAllowed;
+	qboolean browserAvailable = overlayAvailable || cl_webHost.liveAwesomium;
+	const char *browserProvider;
+	const char *browserPolicy;
 
 	cl_advertisementBridge.overlayCompiled = ( overlay && overlay->compiled );
 	cl_advertisementBridge.overlayAvailable = overlayAvailable;
 	cl_advertisementBridge.viewWidth = cls.glconfig.vidWidth;
 	cl_advertisementBridge.viewHeight = cls.glconfig.vidHeight;
 
+	if ( cl_webHost.liveAwesomium ) {
+		browserProvider = "Awesomium WebCore";
+		browserPolicy = "runtime-opt-in live";
+	} else if ( overlayAvailable ) {
+		browserProvider = overlayProvider;
+		browserPolicy = overlayPolicy;
+	} else if ( awesomiumAllowed ) {
+		browserProvider = "Awesomium WebCore";
+		browserPolicy = cl_webHost.loadFailed ? "runtime-opt-in failed" : "runtime-opt-in pending";
+	} else {
+		browserProvider = overlayProvider;
+		browserPolicy = overlayPolicy;
+	}
+
 	Cvar_Set( "ui_browserAwesomium", browserAvailable ? "1" : "0" );
-	Cvar_Set( "ui_browserAwesomiumProvider", awesomiumAllowed ? "Awesomium WebCore" : overlayProvider );
-	Cvar_Set( "ui_browserAwesomiumPolicy", awesomiumAllowed ? "runtime-opt-in" : overlayPolicy );
+	Cvar_Set( "ui_browserAwesomiumProvider", browserProvider );
+	Cvar_Set( "ui_browserAwesomiumPolicy", browserPolicy );
 	Cvar_Set( "ui_browserAwesomiumParityScope", parityScope );
 	Cvar_Set( "ui_browserAwesomiumParityReason", parityReason );
 	Cvar_Set( "ui_advertisementBridgeProvider", advertProvider );
@@ -4886,7 +4954,9 @@ void CL_Web_ShowBrowser_f( void ) {
 	} else {
 		cl_webBrowserHash[0] = '\0';
 	}
-	QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+	if ( !QLWebHost_NavigateOrOpen( cl_webBrowserHash ) ) {
+		CL_WebHost_MarkBrowserUnavailable();
+	}
 #endif
 }
 
@@ -4912,7 +4982,9 @@ void CL_Web_ChangeHash_f( void ) {
 	const char *hash = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
 	CL_WebHost_NormalizeHash( hash, cl_webBrowserHash, sizeof( cl_webBrowserHash ) );
 	cl_webBrowserVisible = qtrue;
-	QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+	if ( !QLWebHost_NavigateOrOpen( cl_webBrowserHash ) ) {
+		CL_WebHost_MarkBrowserUnavailable();
+	}
 #endif
 }
 
@@ -4939,7 +5011,10 @@ void CL_Web_BrowserActive_f( void ) {
 
 	cl_webBrowserVisible = active;
 	if ( active ) {
-		QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+		if ( !QLWebHost_NavigateOrOpen( cl_webBrowserHash ) ) {
+			CL_WebHost_MarkBrowserUnavailable();
+			return;
+		}
 	} else {
 		QLWebHost_HideBrowser();
 	}
@@ -5139,7 +5214,9 @@ void CL_WebHost_BootstrapAwesomiumMenu( void ) {
 
 	cl_webBrowserVisible = qtrue;
 	cl_webBrowserHash[0] = '\0';
-	QLWebHost_OpenURL( CL_WEB_DEFAULT_URL );
+	if ( !QLWebHost_OpenURL( CL_WEB_DEFAULT_URL ) ) {
+		CL_WebHost_MarkBrowserUnavailable();
+	}
 #endif
 }
 
@@ -5169,12 +5246,21 @@ void CL_WebHost_Frame( void ) {
 		CL_WebHost_BuildCurrentURL( cl_webBrowserHash, expectedUrl, sizeof( expectedUrl ) );
 		if ( !cl_webHost.viewInitialised ) {
 			if ( cl_webBrowserHash[0] ) {
-				QLWebHost_OpenRelativeURL( cl_webBrowserHash );
+				if ( !QLWebHost_OpenRelativeURL( cl_webBrowserHash ) ) {
+					CL_WebHost_MarkBrowserUnavailable();
+					return;
+				}
 			} else {
-				QLWebHost_OpenURL( CL_WEB_DEFAULT_URL );
+				if ( !QLWebHost_OpenURL( CL_WEB_DEFAULT_URL ) ) {
+					CL_WebHost_MarkBrowserUnavailable();
+					return;
+				}
 			}
 		} else if ( Q_stricmp( cl_webHost.currentUrl, expectedUrl ) ) {
-			QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+			if ( !QLWebHost_NavigateOrOpen( cl_webBrowserHash ) ) {
+				CL_WebHost_MarkBrowserUnavailable();
+				return;
+			}
 		} else {
 			cl_webHost.browserVisible = qtrue;
 			cl_webHost.browserActive = qtrue;
@@ -5204,12 +5290,15 @@ void CL_WebHost_DrawBrowserSurface( void ) {
 	float s1;
 	float t1;
 
-	if ( !cl_webHost.viewInitialised || !cl_webHost.browserActive || !cl_webHost.surfaceShader ) {
+	if ( !cl_webHost.viewInitialised || !cl_webHost.browserActive ) {
 		return;
 	}
 
-	if ( cl_webHost.surfaceDirty ) {
+	if ( !cl_webHost.surfaceShader || cl_webHost.surfaceDirty ) {
 		QLWebView_UploadSurfaceImage();
+	}
+	if ( !cl_webHost.surfaceShader ) {
+		return;
 	}
 
 	if ( cl_webHost.surfaceWidth <= 0 || cl_webHost.surfaceHeight <= 0 ) {
@@ -6350,8 +6439,7 @@ QL_CG_trap_Cvar_RegisterRange
 ==============
 */
 static void QDECL QL_CG_trap_Cvar_RegisterRange( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {
-	Cvar_GetBounded( varName, defaultValue, minimumValue, maximumValue, flags );
-	Cvar_Register( vmCvar, varName, defaultValue, flags );
+	Cvar_RegisterBounded( vmCvar, varName, defaultValue, minimumValue, maximumValue, flags );
 }
 
 /*

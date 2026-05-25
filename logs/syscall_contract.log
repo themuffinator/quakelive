@@ -1,7 +1,0 @@
-# Syscall contract capture placeholder.
-# Modules with volatile transitions can be filtered via validate_syscall_contract.py
-# Use --module shim-ui to focus on UI-only syscalls or --module shim-game to limit to game module.
-# For pointer-heavy transitions from shim-ui scoreboard updates, override arguments with --wildcard shim-ui:5,6.
-# Example entries (origin module arg0 arg1 ...):
-# vm-interpreted shim-ui 0000002A 00000000
-# shim-ui shim-native 0000002A 00000000 00000001

@@ -49,6 +49,19 @@ typedef struct {
 	int	upmove;
 } qlr_command_mirror_result_t;
 
+typedef struct {
+	int	commandTime;
+	int	weaponPrimary;
+	int	fov;
+	int	forwardmove;
+	int	rightmove;
+	int	upmove;
+	float	yaw;
+	float	originX;
+	float	velocityX;
+	int	traceCalls;
+} qlr_no_move_result_t;
+
 static qlr_trace_mode_t	qlr_traceMode;
 static int		qlr_traceCallCount;
 
@@ -525,4 +538,56 @@ QLR_EXPORT void QLR_RunCommandMirrorScenario( qlr_command_mirror_result_t *outRe
 	outResult->forwardmove = localPS.forwardmove;
 	outResult->rightmove = localPS.rightmove;
 	outResult->upmove = localPS.upmove;
+}
+
+/*
+=============
+QLR_RunNoMoveCommandGateScenario
+
+Runs one pmove frame through the retail PMF_NO_MOVE early return.
+=============
+*/
+QLR_EXPORT void QLR_RunNoMoveCommandGateScenario( qlr_no_move_result_t *outResult ) {
+	pmove_t		localPM;
+	playerState_t	localPS;
+	pmove_settings_t	localSettings;
+
+	if ( !outResult ) {
+		return;
+	}
+
+	memset( outResult, 0, sizeof( *outResult ) );
+	QLR_ResetPmove( &localPM, &localPS, &localSettings );
+	QLR_ResetTraceMode( QLR_TRACE_FREE_AIR );
+
+	localPS.pm_flags = PMF_NO_MOVE;
+	localPS.commandTime = 900;
+	localPS.weaponPrimary = WP_MACHINEGUN;
+	localPS.fov = 90;
+	localPS.forwardmove = 7;
+	localPS.rightmove = 8;
+	localPS.upmove = 9;
+	localPS.origin[0] = 42.0f;
+	localPS.velocity[0] = 100.0f;
+
+	localPM.cmd.weaponPrimary = WP_HEAVY_MACHINEGUN;
+	localPM.cmd.fov = 110;
+	localPM.cmd.forwardmove = -127;
+	localPM.cmd.rightmove = 64;
+	localPM.cmd.upmove = -12;
+	localPM.cmd.angles[YAW] = ANGLE2SHORT( 90.0f );
+	localPM.cmd.serverTime = 1000;
+
+	PmoveSingle( &localPM );
+
+	outResult->commandTime = localPS.commandTime;
+	outResult->weaponPrimary = localPS.weaponPrimary;
+	outResult->fov = localPS.fov;
+	outResult->forwardmove = localPS.forwardmove;
+	outResult->rightmove = localPS.rightmove;
+	outResult->upmove = localPS.upmove;
+	outResult->yaw = localPS.viewangles[YAW];
+	outResult->originX = localPS.origin[0];
+	outResult->velocityX = localPS.velocity[0];
+	outResult->traceCalls = qlr_traceCallCount;
 }

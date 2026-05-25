@@ -594,6 +594,7 @@ qboolean CL_Awesomium_Resize( int width, int height );
 int CL_Awesomium_SurfaceWidth( void );
 int CL_Awesomium_SurfaceHeight( void );
 qboolean CL_Awesomium_SurfaceDirty( void );
+qboolean CL_Awesomium_ExecuteJavascript( const char *script, const char *frame );
 qboolean CL_Awesomium_CopySurface( byte *destination, int width, int height, int rowSpan );
 void CL_Awesomium_InjectMouseMove( int x, int y );
 void CL_Awesomium_InjectMouseDown( int button );

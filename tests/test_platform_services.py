@@ -1103,9 +1103,11 @@ def test_steam_resource_bridge_reconstructs_avatar_url_fetches() -> None:
 
 def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycle() -> None:
     cl_main = (REPO_ROOT / "src/code/client/cl_main.c").read_text(encoding="utf-8")
+    common = (REPO_ROOT / "src/code/qcommon/common.c").read_text(encoding="utf-8")
 
     frame_block = _extract_function_block(cl_main, "void CL_Frame ( int msec ) {")
-    steam_frame_block = _extract_function_block(cl_main, "static void SteamClient_Frame( void )")
+    common_frame_block = _extract_function_block(common, "void Com_Frame( void )")
+    steam_frame_block = _extract_function_block(cl_main, "void SteamClient_Frame( void )")
     init_block = _extract_function_block(cl_main, "void CL_Init( void ) {")
     shutdown_block = _extract_function_block(cl_main, "void CL_Shutdown( void ) {")
     steam_callbacks_init_block = _extract_function_block(cl_main, "static qboolean SteamCallbacks_Init( void ) {")
@@ -1122,10 +1124,12 @@ def test_client_steam_callback_owner_reconstructs_retail_frame_pump_and_lifecycl
     stats_gate_block = _extract_function_block(cl_main, "static qboolean CL_Steam_ShouldRegisterStatsClear( void ) {")
     stats_clear_block = _extract_function_block(cl_main, "static void CL_Steam_ClearStats_f( void )")
 
-    assert "SteamClient_Frame();" in frame_block
-    assert frame_block.index("SteamClient_Frame();") < frame_block.index("CL_CheckForResend();")
-    assert "CL_WebHost_Frame();" in frame_block
-    assert frame_block.index("CL_WebHost_Frame();") < frame_block.index("CL_CheckForResend();")
+    assert "SteamClient_Frame();" not in frame_block
+    assert "CL_WebHost_Frame();" not in frame_block
+    assert "CL_WebHost_Frame();" in common_frame_block
+    assert "SteamClient_Frame();" in common_frame_block
+    assert common_frame_block.index("CL_WebHost_Frame();") < common_frame_block.index("SteamClient_Frame();")
+    assert common_frame_block.index("SteamClient_Frame();") < common_frame_block.index("CL_Frame( msec );")
     assert "CL_Steam_ProcessStatsReportPackets();" in steam_frame_block
 
     assert "static const ql_platform_feature_descriptor *CL_GetMatchmakingServiceDescriptor( void ) {" in cl_main

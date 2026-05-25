@@ -63,6 +63,7 @@ class _QlrClientStaticShadow(ctypes.Structure):
         ("realtime", ctypes.c_int),
         ("frametime", ctypes.c_int),
         ("realFrametime", ctypes.c_int),
+        ("framecount", ctypes.c_int),
     ]
 
 
@@ -119,6 +120,10 @@ class _QlrClientConnectionShadow(ctypes.Structure):
 
 _ClientVoidHook = ctypes.CFUNCTYPE(None)
 _ClientMenuHook = ctypes.CFUNCTYPE(None, ctypes.c_int)
+_ClientDebugGraphHook = ctypes.CFUNCTYPE(None, ctypes.c_float, ctypes.c_int)
+_ClientTextHook = ctypes.CFUNCTYPE(None, ctypes.c_char_p)
+_ClientIntHook = ctypes.CFUNCTYPE(ctypes.c_int)
+_ClientFloatHook = ctypes.CFUNCTYPE(ctypes.c_float)
 _ClientTimeoutHook = ctypes.CFUNCTYPE(
     None,
     ctypes.POINTER(_QlrClientConnectionShadow),
@@ -130,8 +135,12 @@ _ClientTimeoutHook = ctypes.CFUNCTYPE(
 class _QlrClientFrameCvars(ctypes.Structure):
     _fields_ = [
         ("com_cl_running", ctypes.POINTER(_QlrCvarShadow)),
+        ("cl_avidemo_latch", ctypes.POINTER(_QlrCvarShadow)),
+        ("cl_avidemo_mintime", ctypes.POINTER(_QlrCvarShadow)),
+        ("cl_avidemo_maxtime", ctypes.POINTER(_QlrCvarShadow)),
         ("cl_avidemo", ctypes.POINTER(_QlrCvarShadow)),
         ("cl_forceavidemo", ctypes.POINTER(_QlrCvarShadow)),
+        ("cl_timegraph", ctypes.POINTER(_QlrCvarShadow)),
         ("com_timescale", ctypes.POINTER(_QlrCvarShadow)),
         ("cl_timeNudge", ctypes.POINTER(_QlrCvarShadow)),
         ("cl_paused", ctypes.POINTER(_QlrCvarShadow)),
@@ -148,19 +157,23 @@ class _QlrClientFrameHooks(ctypes.Structure):
     _fields_ = [
         ("stopAllSounds", _ClientVoidHook),
         ("setActiveMenu", _ClientMenuHook),
-        ("writeDemoMessage", _ClientVoidHook),
+        ("debugGraph", _ClientDebugGraphHook),
+        ("executeText", _ClientTextHook),
+        ("disconnect", _ClientVoidHook),
+        ("monkeyShouldBeSpanked", _ClientIntHook),
+        ("randomFloat", _ClientFloatHook),
+        ("changeReliableCommand", _ClientVoidHook),
         ("checkTimeout", _ClientTimeoutHook),
         ("checkUserinfo", _ClientVoidHook),
-        ("readPackets", _ClientVoidHook),
+        ("workshopFrame", _ClientVoidHook),
         ("sendCmd", _ClientVoidHook),
-        ("predictMovement", _ClientVoidHook),
+        ("steamBrowserFrame", _ClientVoidHook),
+        ("checkForResend", _ClientVoidHook),
         ("runConsole", _ClientVoidHook),
         ("updateScreen", _ClientVoidHook),
         ("soundUpdate", _ClientVoidHook),
         ("runCinematic", _ClientVoidHook),
         ("setCGameTime", _ClientVoidHook),
-        ("firstSnapshot", _ClientVoidHook),
-        ("beginProfiling", _ClientVoidHook),
     ]
 
 
@@ -256,11 +269,12 @@ def _initialise_client_context(registry: _CallbackRegistry) -> _QlrClientFrameCo
         soundRegistered=True,
         uiStarted=True,
         cddialog=True,
-        state=5,
+        state=8,
         keyCatchers=0,
         realtime=1234,
         frametime=0,
         realFrametime=0,
+        framecount=0,
     )
     cl = _QlrClientActiveShadow()
     cl.timing.serverTime = 100
@@ -274,8 +288,12 @@ def _initialise_client_context(registry: _CallbackRegistry) -> _QlrClientFrameCo
         return registry.keep(_QlrCvarShadow(integer=integer, value=value, string=None))  # type: ignore[arg-type]
 
     com_cl_running = _cvar(1, 1.0)
+    cl_avidemo_latch = _cvar(0, 0.0)
+    cl_avidemo_mintime = _cvar(0, 0.0)
+    cl_avidemo_maxtime = _cvar(0, 0.0)
     cl_avidemo = _cvar(30, 30.0)
     cl_forceavidemo = _cvar(0, 0.0)
+    cl_timegraph = _cvar(1, 1.0)
     com_timescale = _cvar(1, 1.0)
     cl_paused = _cvar(1, 1.0)
     sv_paused = _cvar(1, 1.0)
@@ -299,6 +317,16 @@ def _initialise_client_context(registry: _CallbackRegistry) -> _QlrClientFrameCo
         hooks_called.append(f"menu:{menu_id}")
 
     @registry.register
+    @_ClientDebugGraphHook
+    def _debug_graph_hook(value: float, color: int) -> None:
+        hooks_called.append(f"debug:{value:.2f}:{color}")
+
+    @registry.register
+    @_ClientTextHook
+    def _text_hook(text: bytes | None) -> None:
+        hooks_called.append(f"text:{(text or b'').decode('utf-8', errors='replace')}")
+
+    @registry.register
     @_ClientTimeoutHook
     def _timeout_hook(clc_ptr, cls_ptr, cl_ptr) -> None:
         hooks_called.append('timeout')
@@ -306,28 +334,47 @@ def _initialise_client_context(registry: _CallbackRegistry) -> _QlrClientFrameCo
             cl_ptr.contents.timeoutcount += 1
 
     @registry.register
+    @_ClientIntHook
+    def _monkey_hook() -> int:
+        hooks_called.append('monkey')
+        return 1
+
+    @registry.register
+    @_ClientFloatHook
+    def _random_hook() -> float:
+        hooks_called.append('random')
+        return 0.5
+
+    @registry.register
     @_ClientVoidHook
     def _sound_hook() -> None:
         hooks_called.append('sound')
+
+    @registry.register
+    @_ClientVoidHook
     def _cinematic_hook() -> None:
         hooks_called.append('cinematic')
 
     hooks = _QlrClientFrameHooks(
         stopAllSounds=_void_hook,
         setActiveMenu=_menu_hook,
-        writeDemoMessage=_void_hook,
+        debugGraph=_debug_graph_hook,
+        executeText=_text_hook,
+        disconnect=_void_hook,
+        monkeyShouldBeSpanked=_monkey_hook,
+        randomFloat=_random_hook,
+        changeReliableCommand=_void_hook,
         checkTimeout=_timeout_hook,
         checkUserinfo=_void_hook,
-        readPackets=_void_hook,
+        workshopFrame=_void_hook,
         sendCmd=_void_hook,
-        predictMovement=_void_hook,
+        steamBrowserFrame=_void_hook,
+        checkForResend=_void_hook,
         runConsole=_void_hook,
         updateScreen=_void_hook,
         soundUpdate=_sound_hook,
         runCinematic=_cinematic_hook,
         setCGameTime=_void_hook,
-        firstSnapshot=_void_hook,
-        beginProfiling=_void_hook,
     )
 
     context = _QlrClientFrameContext()
@@ -336,8 +383,12 @@ def _initialise_client_context(registry: _CallbackRegistry) -> _QlrClientFrameCo
     context.clc = ctypes.pointer(registry.keep(clc))  # type: ignore[arg-type]
     context.cvars = _QlrClientFrameCvars(
         com_cl_running=ctypes.pointer(com_cl_running),
+        cl_avidemo_latch=ctypes.pointer(cl_avidemo_latch),
+        cl_avidemo_mintime=ctypes.pointer(cl_avidemo_mintime),
+        cl_avidemo_maxtime=ctypes.pointer(cl_avidemo_maxtime),
         cl_avidemo=ctypes.pointer(cl_avidemo),
         cl_forceavidemo=ctypes.pointer(cl_forceavidemo),
+        cl_timegraph=ctypes.pointer(cl_timegraph),
         com_timescale=ctypes.pointer(com_timescale),
         cl_timeNudge=ctypes.pointer(cl_timeNudge),
         cl_paused=ctypes.pointer(cl_paused),

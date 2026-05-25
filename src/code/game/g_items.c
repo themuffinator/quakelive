@@ -1396,39 +1396,6 @@ static int G_GetAmmoPackMaxStack( weapon_t weapon, int fallbackPack ) {
 
 /*
 =============
-G_ResolveAmmoPickupAmount
-
-Determines how much ammo an entity should grant, taking server overrides into
-account.
-=============
-*/
-static int G_ResolveAmmoPickupAmount( const gentity_t *ent ) {
-	int	fallback;
-	weapon_t	weapon;
-
-	if ( !ent || !ent->item ) {
-		return 0;
-	}
-
-	if ( ent->count < 0 ) {
-		return 0;
-	}
-
-	if ( ent->count > 0 ) {
-		return ent->count;
-	}
-
-	weapon = BG_WeaponForItemTag( ent->item->giTag );
-	fallback = ent->item->quantity;
-	if ( fallback <= 0 ) {
-		fallback = BG_GetWeaponAmmoPackSize( weapon );
-	}
-
-	return G_GetAmmoPackPickupCount( weapon, fallback );
-}
-
-/*
-=============
 Add_Ammo
 
 Adds ammo to the supplied client while clamping to the configured maximum.
@@ -1436,15 +1403,34 @@ Adds ammo to the supplied client while clamping to the configured maximum.
 */
 void Add_Ammo (gentity_t *ent, int weapon, int count)
 {
-	weapon_t weaponIndex;
-	int maxStack;
-	int defaultPack;
+	weapon_t	weaponIndex;
+	int		maxStack;
+	int		defaultPack;
+	int		ammoPackCount;
+	int		ownedWeapon;
 
 	if ( !ent || !ent->client ) {
 		return;
 	}
 
 	weaponIndex = (weapon_t)weapon;
+	if ( weaponIndex == WP_NUM_WEAPONS ) {
+		for ( ownedWeapon = WP_MACHINEGUN; ownedWeapon < WP_NUM_WEAPONS; ownedWeapon++ ) {
+			if ( !( ent->client->ps.stats[STAT_WEAPONS] & ( 1 << ownedWeapon ) ) ) {
+				continue;
+			}
+
+			ammoPackCount = G_GetAmmoPackPickupCount( (weapon_t)ownedWeapon, 0 );
+			if ( ammoPackCount <= 0 ) {
+				continue;
+			}
+
+			Add_Ammo( ent, ownedWeapon, ammoPackCount );
+		}
+
+		return;
+	}
+
 	if ( weaponIndex <= WP_NONE || weaponIndex >= WP_NUM_WEAPONS ) {
 		return;
 	}
@@ -1474,40 +1460,13 @@ int Pickup_Ammo (gentity_t *ent, gentity_t *other)
 {
 	int			quantity;
 	int			respawn;
-	int			weapon;
 
-	if ( ent && ent->item && ent->item->giTag == WP_NUM_WEAPONS ) {
-		int fallback;
-
-		if ( ent->count < 0 ) {
-			fallback = 0;
-		} else if ( ent->count > 0 ) {
-			fallback = ent->count;
-		} else {
-			fallback = 0;
-		}
-
-		for ( weapon = WP_MACHINEGUN; weapon < WP_NUM_WEAPONS; weapon++ ) {
-			if ( !( other->client->ps.stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
-				continue;
-			}
-
-			quantity = G_GetAmmoPackPickupCount( (weapon_t)weapon, fallback );
-			if ( quantity <= 0 ) {
-				continue;
-			}
-
-			Add_Ammo( other, weapon, quantity );
-		}
-	} else {
-		quantity = G_ResolveAmmoPickupAmount( ent );
-
-		if ( quantity < 0 ) {
-			quantity = 0;
-		}
-
-		Add_Ammo( other, BG_WeaponForItemTag( ent->item->giTag ), quantity );
+	quantity = ent->count;
+	if ( quantity == 0 ) {
+		quantity = ent->item->quantity;
 	}
+
+	Add_Ammo( other, BG_WeaponForItemTag( ent->item->giTag ), quantity );
 
 	respawn = G_GetConfiguredAmmoRespawnSeconds();
 	if ( respawn <= 0 ) {
@@ -2124,9 +2083,58 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 
 /*
 =================
+G_DroppedPowerupTouchCaptureZone
+
+Routes dropped powerup capture-zone contacts through the retail flag capture
+path when a client-backed owner is available.
+=================
+*/
+static int G_DroppedPowerupTouchCaptureZone( gentity_t *trigger, gentity_t *ent ) {
+	const char	*flagClassname;
+	int		team;
+	gentity_t	*other;
+	gentity_t	*flag;
+
+	if ( !trigger || !ent || !trigger->team ) {
+		return 0;
+	}
+
+	if ( !Q_stricmp( trigger->team, "red" ) ) {
+		team = TEAM_RED;
+		flagClassname = "team_CTF_redflag";
+	} else if ( !Q_stricmp( trigger->team, "blue" ) ) {
+		team = TEAM_BLUE;
+		flagClassname = "team_CTF_blueflag";
+	} else {
+		return 0;
+	}
+
+	other = ent;
+	if ( !other->client && other->parent && other->parent->client ) {
+		other = other->parent;
+	}
+	if ( !other->client ) {
+		return 0;
+	}
+
+	flag = NULL;
+	while ( ( flag = G_Find( flag, FOFS( classname ), flagClassname ) ) != NULL ) {
+		if ( flag->flags & FL_DROPPED_ITEM ) {
+			continue;
+		}
+
+		return Team_TouchOurFlag( flag, other, team );
+	}
+
+	return 0;
+}
+
+/*
+=================
 G_DroppedPowerupRunFrame
 
-Mirrors the retail dropped-powerup trigger bridge for jump pads and teleporters.
+Mirrors the retail dropped-powerup trigger bridge for jump pads, teleporters,
+and capture zones.
 =================
 */
 static void G_DroppedPowerupRunFrame( gentity_t *ent, float thinktime ) {
@@ -2199,6 +2207,10 @@ static void G_DroppedPowerupRunFrame( gentity_t *ent, float thinktime ) {
 
 			te = G_TempEntity( ent->r.currentOrigin, EV_GENERAL_SOUND );
 			te->s.eventParm = G_SoundIndex( "sound/world/telein.ogg" );
+		}
+
+		if ( !Q_stricmp( trigger->classname, "trigger_capturezone" ) ) {
+			G_DroppedPowerupTouchCaptureZone( trigger, ent );
 		}
 	}
 }

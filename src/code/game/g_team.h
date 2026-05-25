@@ -74,5 +74,6 @@ qboolean Team_GetLocationMsg(gentity_t *ent, char *loc, int loclen);
 void TeamplayInfoMessage( gentity_t *ent );
 void CheckTeamStatus(void);
 
+int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team );
 int Pickup_Team( gentity_t *ent, gentity_t *other );
 void G_ADAwardBonus( gentity_t *player, const vec3_t origin, int bonus, const char *label );

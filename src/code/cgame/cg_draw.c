@@ -60,7 +60,6 @@ static float	cg_speedometerHistory[CG_SPEEDOMETER_HISTORY_SAMPLES];
 static int	cg_speedometerHistoryCount;
 static int	cg_speedometerHistoryHead = -1;
 static int	cg_speedometerHistoryTime;
-static float	cg_spectatorItemPickupBaseY;
 static int	cg_drawActiveMilliseconds;
 
 static float CG_DrawSnapshot( float y );
@@ -2761,14 +2760,7 @@ static void CG_DrawSpectatorItemPickups( void ) {
 	}
 
 	x = cg_specItemTimersX.value;
-	if ( x == 0.0f ) {
-		x = 640.0f - size - 4.0f;
-	}
-
 	y = cg_specItemTimersY.value;
-	if ( y == 0.0f ) {
-		y = cg_spectatorItemPickupBaseY;
-	}
 
 	leftIndex = 0;
 	rightIndex = 0;
@@ -2848,7 +2840,7 @@ CG_DrawUpperRight
 =====================
 */
 static void CG_DrawUpperRight( void ) {
-	cg_spectatorItemPickupBaseY = CG_DrawUpperRightStack( 0.0f );
+	CG_DrawUpperRightStack( 0.0f );
 }
 
 /*
@@ -6444,8 +6436,6 @@ static void CG_Draw2D( void ) {
 	canShowStatus = ( qboolean )( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 );
 	menuScoreboardHandled = qfalse;
 	joinGameCaptureActive = CG_IsJoinGameMenuCaptureActive();
-	cg_spectatorItemPickupBaseY = 0.0f;
-
 	if ( !cg.demoPlayback || freezeDemo == 0 ) {
 		CG_DrawQueuedWorldMarkers();
 	}
@@ -6595,7 +6585,7 @@ void CG_DrawActive( stereoFrame_t stereoView ) {
 	CG_TileClear();
 
 	pmType = cg.predictedPlayerState.pm_type;
-	if ( ( ( pmType == PM_DEAD || pmType == PM_FREEZE ) && cg.renderingThirdPerson )
+	if ( ( ( pmType == PM_DEAD || pmType == PM_FREEZE ) && cg.zoomOutOnDeath )
 		|| pmType == PM_INTERMISSION ) {
 		cg.zoomed = qfalse;
 	}

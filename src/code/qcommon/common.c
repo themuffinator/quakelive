@@ -4759,6 +4759,10 @@ void Com_Frame( void ) {
 		Com_EventLoop();
 		Cbuf_Execute ();
 
+		// Retail pumps browser core state and Steam callbacks after the
+		// second event loop, before entering the client frame owner.
+		CL_WebHost_Frame();
+		SteamClient_Frame();
 
 		//
 		// client side

@@ -406,6 +406,13 @@ the retail prefix offsets for `clientNum` (`0x88`), `location` (`0x8c`), and
 the signed command mirror bytes (`0x1dc..0x1de`), and the progress-backed
 holdable timer now uses stats offsets `0xe8`, `0xec`, and `0xf0` instead of
 source-only playerState sidecars.
+The 2026-05-25 playerState command-gate fixture pass then pinned the
+`PMF_NO_MOVE` early return with executable evidence: `PmoveSingle` still
+advances `commandTime` from the current command, but it returns before
+`PM_UpdateViewAngles`, the `weaponPrimary`/`fov`/signed command-axis mirrors,
+trace dispatch, and origin/velocity movement side effects. This keeps the
+source aligned with the retail qagame/cgame symbol comments for the no-move
+gate instead of relying on structural order checks alone.
 
 The combat batch closes the next reward transport boundary. HLIL preserves the
 weapon-specific `g_knockback_%s` selector used by `G_Damage`, the local-client
@@ -464,6 +471,28 @@ the split `g_pmove.c` owner, but the registration calls now preserve the retail
 high-bit flags for air-control, physics, no-player-clip, ramp/step jump, weapon
 switching, water scale, and grapple-velocity surfaces before the cached
 `pmove_settings_t` payload is published.
+The 2026-05-25 selected-cvar mapping sentinel added a cross-VM evidence chain
+for representative movement knobs (`pmove_AirAccel`, `pmove_AirControl`,
+`pmove_AirStopAccel`, `pmove_AutoHop`, `pmove_ChainJump`,
+`pmove_CircleStrafeFriction`, `pmove_StrafeAccel`, `pmove_WalkAccel`,
+`pmove_WalkFriction`, and `pmove_WishSpeed`). It checks retail registration
+defaults/flags, factory reset defaults, refresh callback ownership, cached
+`pmove_settings_t` assignments, compact and JSON cgame parsers, default shared
+movement constants, active `bg_pmove.c` consumers, and the committed qagame
+symbol-map prose in one test lane.
+The 2026-05-25 profile/utility pmove cvar mapping sentinel then covered the
+remaining movement-profile and utility fields: `pmove_AirStepFriction`,
+`pmove_AirSteps`, `pmove_BunnyHop`, `pmove_CrouchSlide`,
+`pmove_CrouchSlideFriction`, `pmove_CrouchSlideTime`,
+`pmove_CrouchStepJump`, `pmove_DoubleJump`, `pmove_noPlayerClip`,
+`pmove_StepHeight`, `pmove_StepJump`, `pmove_velocity_gh`,
+`pmove_WaterSwimScale`, `pmove_WaterWadeScale`, `pmove_WeaponDropTime`, and
+`pmove_WeaponRaiseTime`. The test lane ties those names through the same
+retail registration/reset/refresh/cache/transport chain, then pins the active
+consumers: spawn-time `PMF_CROUCH_SLIDE` / `PMF_DOUBLE_JUMP` /
+`PMF_AIR_CONTROL` seeding, crouch-slide friction and timer use, no-player-clip
+tracemask clearing, step/crouch-step gates, water scale and step-height globals,
+grapple pull speed, weapon raise/drop timers, and the custom-settings masks.
 The follow-up callback pass rechecked retail `G_RegisterCvars` at `0x10054920`,
 `G_InitPublishedCvarState` at `0x100549E0`, and `G_UpdateCvars` at
 `0x10054DD0`. The retail table entry layout is `vmCvar`, name, default, flags,
@@ -1026,6 +1055,7 @@ utility helpers outside that widened control surface.
 - `ClientThink_real` is a clean retail boundary at `0x10034C90`, and the surrounding `ClientEvents` (`0x10034860`) plus `StuckInOtherClient` (`0x10034B50`) splits are now settled.
 - `G_RunFactoryHealthRegen` at `0x10034260` and `G_RunFactoryArmorRegen` at `0x100342F0` are descriptive retail-only helpers keyed off a shared last-damage timestamp plus separate client-side accumulators/latches. The reconstructed tree now preserves the split helper flow, the retail spawn/damage latch-arming behavior, and the adjacent `ClientTimerActions` client-state names (`factoryRegenLastDamageTime`, `factoryRegenHealthAccumulatorMs`, `factoryRegenArmorAccumulatorMs`, `factoryRegenHealthPending`, `factoryRegenArmorPending`).
 - `ClientSpawn` at `0x1003BC30` is source-faithful on its outer boundary, and the current source now mirrors the recovered spawn-finalizer lane more directly by running the Red Rover override helper ahead of `G_FinalizeSpawnLoadout`, seeding the retail `PMF_CROUCH_SLIDE` / `PMF_DOUBLE_JUMP` / `PMF_AIR_CONTROL` movement-profile bits during spawn, and still keeping the broader GPL-shaped spawn bootstrap around that helper chain.
+- The 2026-05-25 active-client pmove wiring sweep tightened the `G_RunFrame` edge around that same boundary: source now runs client-slot scheduled thinks inline in the frame entity loop and dispatches bot/synchronous clients directly to `ClientThink_real`, matching the recovered retail shape instead of routing the frame loop through the classic source `G_RunClient` wrapper. The new structural sentinel follows that call-site into `ClientThink_real` and pins command-time clamping, pmove setup, playerState-to-entityState projection, predictable-event flushing, trigger touch, client impacts, respawn checks, and timer actions.
 - `DeathmatchScoreboardMessage` at `0x1003CBF0` remains source-faithful on its public role, and the current source now mirrors the retail helper-family split directly: compact fallback, duel, Race, TDM, Clan Arena, shared CTF-style, Freeze, Red Rover, and Overload serializers all feed the scoreboard sender through payload-builder helpers, the intermission-only `tdmstats` / `castats` / `ctfstats` publishers remain sequenced under that sender, and the duel serializer now caches the lower/higher live duel client numbers in `level + 0x1C08/+0x1C0C` instead of keeping that ordering purely local. The `castats` publisher uses the cgame-matched classic weapon order G, MG, SG, GL, RL, LG, RG, PG, BFG, grappling hook, NG, PL, CG, HMG.
 - `G_CAADRespawnAsSpectator` at `0x10035960` and `G_CAADResetClientForRound` at `0x10038160` are descriptive retail-only shared Clan Arena / Attack and Defend helpers. Retail keeps the per-client round reset and dead-player spectator-follow fallback in standalone helpers that the GPL-derived tree does not preserve with these exact boundaries.
 - `G_FinalizeSpawnLoadout` at `0x1003B5A0` is a descriptive retail-only recovery name. The current source now preserves the selected-weapon fallback latch directly through `client->sess.selectedSpawnWeapon`, keeps the shared ammo/weapon-mask seeding under that helper, and leaves the grant-script tail in the adjacent shared spawn helper instead of collapsing the whole path back into one large `ClientSpawn` block.

@@ -130,6 +130,12 @@ Observed local facts:
 1. `sub_4B0150` is a pure tailcall to `sub_4AF570`.
 2. `sub_4AF570` matches `CL_GetSnapshot`: it bounds against the current message number, checks the packet ring age, validates the snapshot slot, copies the playerstate/areamask/entity list, and truncates to `0x180` entities with the `CL_GetSnapshot: truncated %i entities to %i` message.
 3. Retail cgame calls `(*(data_1074CCCC + 0x15C))(snapshotNumber, snapshotOut)`.
+4. The 2026-05-25 snapshot playerState transport re-audit keeps that import
+   path source-pinned: `CL_ParseSnapshot` reads areamask, `MSG_ReadDeltaPlayerstate`,
+   and packet entities before accepting the frame, stores valid frames in the
+   client snapshot ring, derives ping from `cl.snap.ps.commandTime`, and
+   `CL_GetSnapshot` copies the playerState into the cgame-visible snapshot that
+   `trap_GetSnapshot` retrieves.
 
 This is the native `GetSnapshot` wrapper.
 

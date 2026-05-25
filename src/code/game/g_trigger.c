@@ -143,9 +143,18 @@ trigger_push
 ==============================================================================
 */
 
-static void trigger_push_touch (gentity_t *self, gentity_t *other, trace_t *trace ) {
+/*
+=================
+trigger_push_touch
 
+Applies a predicted jump-pad push to eligible clients.
+=================
+*/
+static void trigger_push_touch (gentity_t *self, gentity_t *other, trace_t *trace ) {
 	if ( !other->client ) {
+		return;
+	}
+	if ( other->client->hook ) {
 		return;
 	}
 
@@ -281,6 +290,13 @@ void SP_trigger_capturezone( gentity_t *ent ) {
 }
 
 
+/*
+=================
+Use_target_push
+
+Applies the target_push velocity when used by an eligible activator.
+=================
+*/
 static void Use_target_push( gentity_t *self, gentity_t *other, gentity_t *activator ) {
 	if ( !activator->client ) {
 		return;
@@ -292,10 +308,11 @@ static void Use_target_push( gentity_t *self, gentity_t *other, gentity_t *activ
 	if ( activator->client->ps.powerups[PW_FLIGHT] ) {
 		return;
 	}
+	if ( activator->client->hook ) {
+		return;
+	}
 
 	VectorCopy (self->s.origin2, activator->client->ps.velocity);
-	activator->client->ps.jumppad_ent = self->s.number;
-	activator->client->ps.jumppad_frame = activator->client->ps.pmove_framecount;
 
 	// play fly sound every 1.5 seconds
 	if ( activator->fly_sound_debounce_time < level.time ) {
@@ -307,7 +324,7 @@ static void Use_target_push( gentity_t *self, gentity_t *other, gentity_t *activ
 /*QUAKED target_push (.5 .5 .5) (-8 -8 -8) (8 8 8) bouncepad
 Pushes the activator in the direction.of angle, or towards a target apex.
 "speed"		defaults to 1000
-if "bouncepad", play bounce noise instead of windfly
+if "bouncepad", play the bounce noise
 */
 void SP_target_push( gentity_t *self ) {
 	if (!self->speed) {
@@ -318,8 +335,6 @@ void SP_target_push( gentity_t *self ) {
 
 	if ( self->spawnflags & 1 ) {
 		self->noise_index = G_SoundIndex("sound/world/jumppad.wav");
-	} else {
-		self->noise_index = G_SoundIndex("sound/misc/windfly.wav");
 	}
 	if ( self->target ) {
 		VectorCopy( self->s.origin, self->r.absmin );
@@ -462,9 +477,7 @@ void SP_trigger_hurt( gentity_t *self ) {
 
 	self->r.contents = CONTENTS_TRIGGER;
 
-	if ( self->spawnflags & 2 ) {
-		self->use = hurt_use;
-	}
+	self->use = hurt_use;
 
 	// link in to the world if starting active
 	if ( ! (self->spawnflags & 1) ) {

@@ -980,6 +980,7 @@ default values.
 #define CVAR_BOUNDED_DISCRETE	0x2000	// Retail bounded-cvar flag: values between min/max snap to an endpoint string
 #define CVAR_NORESTART		1024	// do not clear when a cvar_restart is issued
 #define CVAR_CLOUD		0x80000 // Quake Live cloud/profile persisted cvars
+#define CVAR_GAMERULE	0x100000	// refuse client initialization-time console set commands
 
 // nothing outside the Cvar_*() functions should modify these fields!
 typedef struct cvar_s {
@@ -994,7 +995,7 @@ typedef struct cvar_s {
 	qboolean	validate;			// bounded numeric cvar
 	int			modificationCount;	// incremented each time the cvar is changed
 	float		value;				// atof( string )
-	int			integer;			// atoi( string )
+	int			integer;			// parsed integer cache
 	float		min;
 	float		max;
 	struct cvar_s *next;
@@ -1012,6 +1013,7 @@ typedef struct {
 	int			modificationCount;
 	float		value;
 	int			integer;
+	int			flags;
 	char		string[MAX_CVAR_VALUE_STRING];
 } vmCvar_t;
 

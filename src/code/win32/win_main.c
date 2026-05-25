@@ -269,6 +269,42 @@ char *Sys_DefaultBasePath( void ) {
 }
 
 /*
+==============
+Sys_PathHasReleaseMarker
+
+Checks whether a release-marker file exists in a root path.
+==============
+*/
+static qboolean Sys_PathHasReleaseMarker( const char *directory, const char *markerName ) {
+	char		path[MAX_OSPATH];
+	struct _stat	fileInfo;
+
+	if ( !directory || !directory[0] || !markerName || !markerName[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( path, sizeof( path ), "%s\\%s", directory, markerName );
+	return _stat( path, &fileInfo ) == 0 ? qtrue : qfalse;
+}
+
+/*
+==============
+Sys_MonkeyShouldBeSpanked
+==============
+*/
+int Sys_MonkeyShouldBeSpanked( void ) {
+	if ( Sys_PathHasReleaseMarker( Sys_Cwd(), "q3monkeyid" ) ) {
+		return qtrue;
+	}
+
+	if ( Sys_PathHasReleaseMarker( Sys_DefaultInstallPath(), "q3monkeyid" ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
 ==============================================================
 
 DIRECTORY SCANNING

@@ -4,14 +4,16 @@
 #include "qlr_recon_shared.h"
 
 typedef enum {
-    QLR_CLIENT_STATE_UNINITIALIZED = -1,
-    QLR_CLIENT_STATE_DISCONNECTED = 0,
-    QLR_CLIENT_STATE_CONNECTING = 1,
-    QLR_CLIENT_STATE_CHALLENGING = 2,
-    QLR_CLIENT_STATE_CONNECTED = 3,
-    QLR_CLIENT_STATE_PRIMED = 4,
-    QLR_CLIENT_STATE_ACTIVE = 5,
-    QLR_CLIENT_STATE_CINEMATIC = 6
+	QLR_CLIENT_STATE_UNINITIALIZED = 0,
+	QLR_CLIENT_STATE_DISCONNECTED = 1,
+	QLR_CLIENT_STATE_AUTHORIZING = 2,
+	QLR_CLIENT_STATE_CONNECTING = 3,
+	QLR_CLIENT_STATE_CHALLENGING = 4,
+	QLR_CLIENT_STATE_CONNECTED = 5,
+	QLR_CLIENT_STATE_LOADING = 6,
+	QLR_CLIENT_STATE_PRIMED = 7,
+	QLR_CLIENT_STATE_ACTIVE = 8,
+	QLR_CLIENT_STATE_CINEMATIC = 9
 } qlr_client_state_t;
 
 typedef struct qlr_client_static_s {
@@ -23,6 +25,8 @@ typedef struct qlr_client_static_s {
     qlr_client_state_t state;
     int key_catchers;
     qlr_recon_timer_t clock;
+    int real_frametime;
+    int frame_count;
 } qlr_client_static_t;
 
 typedef struct qlr_client_active_s {
@@ -40,29 +44,40 @@ typedef struct qlr_client_connection_s {
 } qlr_client_connection_t;
 
 typedef struct qlr_client_frame_cvars_s {
-    qlr_recon_cvar_t *com_cl_running;
-    qlr_recon_cvar_t *cl_avidemo;
-    qlr_recon_cvar_t *cl_forceavidemo;
-    qlr_recon_cvar_t *com_timescale;
-    qlr_recon_cvar_t *cl_paused;
-    qlr_recon_cvar_t *sv_paused;
-    qlr_recon_cvar_t *com_sv_running;
+	qlr_recon_cvar_t *com_cl_running;
+	qlr_recon_cvar_t *cl_avidemo_latch;
+	qlr_recon_cvar_t *cl_avidemo_mintime;
+	qlr_recon_cvar_t *cl_avidemo_maxtime;
+	qlr_recon_cvar_t *cl_avidemo;
+	qlr_recon_cvar_t *cl_forceavidemo;
+	qlr_recon_cvar_t *cl_timegraph;
+	qlr_recon_cvar_t *cl_freezeDemo;
+	qlr_recon_cvar_t *com_timescale;
+	qlr_recon_cvar_t *cl_paused;
+	qlr_recon_cvar_t *sv_paused;
+	qlr_recon_cvar_t *com_sv_running;
 } qlr_client_frame_cvars_t;
 
 typedef struct qlr_client_frame_hooks_s {
-void (*stop_all_sounds)(void);
-void (*set_active_menu)(int menu_id);
-void (*check_timeout)(qlr_client_connection_t *clc, qlr_client_static_t *cls, qlr_client_active_t *cl);
-void (*check_userinfo)(void);
-void (*read_packets)(void);
-void (*send_cmd)(void);
-void (*check_for_resend)(void);
-void (*predict_movement)(void);
-void (*run_console)(void);
-void (*update_screen)(void);
-void (*sound_update)(void);
-void (*set_cgame_time)(void);
-void (*begin_profiling)(void);
+	void (*stop_all_sounds)(void);
+	void (*set_active_menu)(int menu_id);
+	void (*debug_graph)(float value, int color);
+	void (*execute_text)(const char *text);
+	void (*disconnect)(void);
+	int (*monkey_should_be_spanked)(void);
+	float (*random_float)(void);
+	void (*change_reliable_command)(void);
+	void (*check_timeout)(qlr_client_connection_t *clc, qlr_client_static_t *cls, qlr_client_active_t *cl);
+	void (*check_userinfo)(void);
+	void (*workshop_frame)(void);
+	void (*send_cmd)(void);
+	void (*steam_browser_frame)(void);
+	void (*check_for_resend)(void);
+	void (*run_console)(void);
+	void (*update_screen)(void);
+	void (*sound_update)(void);
+	void (*set_cgame_time)(void);
+	void (*run_cinematic)(void);
 } qlr_client_frame_hooks_t;
 
 typedef struct qlr_client_frame_context_s {

@@ -134,14 +134,14 @@ def test_renderer_mapping_round_37_keeps_ambient_and_directed_scaling_retail_par
 	for offset in ("0xb4", "0xb8", "0xbc"):
 		assert f"*(float *)(param_1 + {offset}) = *(float *)(DAT_01743c14 + 0x2c)" in ghidra
 
-	assert 'r_ambientScale = ri.Cvar_Get( "r_ambientScale", "10", CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert 'r_ambientScale = ri.Cvar_GetBounded( "r_ambientScale", "10", "1", "100", CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
 	assert 'r_directedScale = ri.Cvar_Get( "r_directedScale", "1", CVAR_CHEAT );' in tr_init
 	assert "AssertCvarRange( r_ambientScale, 1, 100, qtrue );" in tr_init
 	assert tr_light.index("VectorScale( ent->ambientLight, totalFactor, ent->ambientLight );") < tr_light.index("VectorScale( ent->ambientLight, r_ambientScale->value, ent->ambientLight );")
 	assert tr_light.index("VectorScale( ent->directedLight, totalFactor, ent->directedLight );") < tr_light.index("VectorScale( ent->directedLight, r_directedScale->value, ent->directedLight );")
 	assert tr_light.index("VectorScale( ent->ambientLight, r_ambientScale->value, ent->ambientLight );") < tr_light.index("VectorScale( ent->directedLight, r_directedScale->value, ent->directedLight );")
 	assert tr_light.index("VectorScale( ent->directedLight, r_directedScale->value, ent->directedLight );") < tr_light.index("VectorNormalize2( direction, ent->lightDir );")
-	assert "`r_ambientScale` | Protected/VM-created/cloud `10`." in cvar_matrix
+	assert "`r_ambientScale` | Bounded protected/VM-created/cloud `10`." in cvar_matrix
 	assert "`r_directedScale` | Cheat `1`." in cvar_matrix
 
 

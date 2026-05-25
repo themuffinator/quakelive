@@ -11,7 +11,9 @@ WIN_NET = REPO_ROOT / "src" / "code" / "win32" / "win_net.c"
 WIN_WNDPROC = REPO_ROOT / "src" / "code" / "win32" / "win_wndproc.c"
 CL_MAIN = REPO_ROOT / "src" / "code" / "client" / "cl_main.c"
 CL_CONSOLE = REPO_ROOT / "src" / "code" / "client" / "cl_console.c"
+CL_KEYS = REPO_ROOT / "src" / "code" / "client" / "cl_keys.c"
 CL_CIN = REPO_ROOT / "src" / "code" / "client" / "cl_cin.c"
+CL_UI = REPO_ROOT / "src" / "code" / "client" / "cl_ui.c"
 SND_DMA = REPO_ROOT / "src" / "code" / "client" / "snd_dma.c"
 SND_MIX = REPO_ROOT / "src" / "code" / "client" / "snd_mix.c"
 SV_INIT = REPO_ROOT / "src" / "code" / "server" / "sv_init.c"
@@ -26,11 +28,73 @@ TR_INIT = REPO_ROOT / "src" / "code" / "renderer" / "tr_init.c"
 QCOMMON_CVAR = REPO_ROOT / "src" / "code" / "qcommon" / "cvar.c"
 FILES = REPO_ROOT / "src" / "code" / "qcommon" / "files.c"
 NET_CHAN = REPO_ROOT / "src" / "code" / "qcommon" / "net_chan.c"
+UI_MAIN = REPO_ROOT / "src" / "code" / "ui" / "ui_main.c"
 AI_MAIN = REPO_ROOT / "src" / "code" / "game" / "ai_main.c"
 BE_AAS_FILE = REPO_ROOT / "src" / "code" / "botlib" / "be_aas_file.c"
 SERVER_H = REPO_ROOT / "src" / "code" / "server" / "server.h"
 CG_VIEW = REPO_ROOT / "src" / "code" / "cgame" / "cg_view.c"
 CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
+QL_STEAM_HLIL_PART01 = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "quakelive_steam.exe"
+	/ "quakelive_steam.exe_hlil_split"
+	/ "quakelive_steam.exe_hlil_part01.txt"
+)
+QL_STEAM_HLIL_PART04 = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "quakelive_steam.exe"
+	/ "quakelive_steam.exe_hlil_split"
+	/ "quakelive_steam.exe_hlil_part04.txt"
+)
+QL_STEAM_HLIL_PART02 = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "quakelive_steam.exe"
+	/ "quakelive_steam.exe_hlil_split"
+	/ "quakelive_steam.exe_hlil_part02.txt"
+)
+QL_STEAM_HLIL_PART06 = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "quakelive_steam.exe"
+	/ "quakelive_steam.exe_hlil_split"
+	/ "quakelive_steam.exe_hlil_part06.txt"
+)
+QL_STEAM_GHIDRA_DECOMPILE = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "quakelive_steam"
+	/ "decompile_top_functions.c"
+)
+QL_UI_HLIL_PART01 = (
+	REPO_ROOT
+	/ "references"
+	/ "hlil"
+	/ "quakelive"
+	/ "uix86.all"
+	/ "uix86.dll_hlil_split"
+	/ "uix86.dll_hlil_part01.txt"
+)
+QL_UI_GHIDRA_DECOMPILE = (
+	REPO_ROOT
+	/ "references"
+	/ "reverse-engineering"
+	/ "ghidra"
+	/ "uix86"
+	/ "decompile_top_functions.c"
+)
 
 
 def _read_text(path: Path) -> str:
@@ -554,7 +618,7 @@ def test_engine_cvar_tenth_client_userinfo_tranche_matches_retail_contracts() ->
 	assert 's = Info_ValueForKey( userinfo, "cg_predictItems" );' in g_client
 
 	assert 'Cvar_Get ("cg_viewsize", "100", CVAR_ARCHIVE | CVAR_CLOUD );' in cl_main
-	assert '{ &cg_viewsize, "cg_viewsize", "100", CVAR_ARCHIVE },' in cg_main
+	assert '{ &cg_viewsize, "cg_viewsize", "100", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "30", "100" },' in cg_main
 	assert 'if (cg_viewsize.integer < 30) {' in cg_view
 	assert 'trap_Cvar_Set("cg_viewsize", va("%i",(int)(cg_viewsize.integer+10)));' in cg_consolecmds
 
@@ -823,6 +887,437 @@ def test_engine_cvar_fourteenth_core_timing_tranche_matches_retail_contracts() -
 	assert 'trap_Cvar_Set("g_gametype", va("%i", cgs.gametype));' in cg_servercmds
 
 
+def test_engine_cvar_thirtyfourth_client_cl_tranche_matches_retail_contracts() -> None:
+	cl_main = _read_text(CL_MAIN)
+	cl_keys = _read_text(CL_KEYS)
+	cl_input = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_input.c")
+	cl_cgame = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c")
+	cl_scrn = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_scrn.c")
+	retail_hlil = _read_text(QL_STEAM_HLIL_PART04)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+
+	assert 'DAT_01647ef4 = FUN_004ce0d0("cl_allowConsoleChat",&DAT_0054ffe0,0x80801);' in retail_ghidra
+	assert 'cl_allowConsoleChat = Cvar_Get ("cl_allowConsoleChat", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
+	assert 'if ( ( !cl_allowConsoleChat || !cl_allowConsoleChat->integer )' in cl_keys
+	assert 'Cbuf_AddText ("cmd say ");' in cl_keys
+
+	assert 'DAT_015ee394 = FUN_004ce0d0("cl_demoRecordMessage",&DAT_0052f5d8,0x80801);' in retail_ghidra
+	assert 'cl_demoRecordMessage = Cvar_Get ("cl_demoRecordMessage", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
+	assert 'if ( cl_demoRecordMessage->integer == 1 ) {' in cl_scrn
+	assert 'else if ( cl_demoRecordMessage->integer == 2 ) {' in cl_scrn
+
+	assert 'data_1627c50 = sub_4ce0d0(x87_r5, "cl_freezeDemo", U"0", 0x100)' in retail_hlil
+	assert 'cl_freezeDemo = Cvar_Get ("cl_freezeDemo", "0", CVAR_TEMP );' in cl_main
+	assert 'if ( clc.demoplaying && cl_freezeDemo->integer ) {' in cl_cgame
+	assert 'Cbuf_ExecuteText( EXEC_APPEND, "toggle cl_freezeDemo\\n" );' in cl_keys
+
+	assert 'data_1627c3c = sub_4ce0d0(x87_r5, "cl_maxpackets", "125", 0x200)' in retail_hlil
+	assert 'cl_maxpackets = Cvar_Get ("cl_maxpackets", "125", CVAR_CHEAT );' in cl_main
+	assert 'Cvar_Set( "cl_maxpackets", "15" );' in cl_input
+	assert 'Cvar_Set( "cl_maxpackets", "125" );' in cl_input
+	assert 'if ( delta < 1000 / cl_maxpackets->integer ) {' in cl_input
+
+	assert 'data_15f672c = sub_4ce0d0(x87_r1, "cl_packetdup", U"1", 0x80001)' in retail_hlil
+	assert 'cl_packetdup = Cvar_Get ("cl_packetdup", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in cl_main
+	assert 'Cvar_Set( "cl_packetdup", "0" );' in cl_input
+	assert 'Cvar_Set( "cl_packetdup", "5" );' in cl_input
+	assert 'oldPacketNum = (clc.netchan.outgoingSequence - 1 - cl_packetdup->integer) & PACKET_MASK;' in cl_input
+
+	assert '"cl_timeNudge", U"0", "-20", U"0", 0x1801)' in retail_hlil
+	assert 'cl_timeNudge = Cvar_GetBounded( "cl_timeNudge", "0", "-20", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED );' in cl_main
+	assert 'tn = cl_timeNudge->integer;' in cl_cgame
+
+	assert '"cl_autoTimeNudge", U"0", U"0", U"1", 0x1801)' in retail_hlil
+	assert 'cl_autoTimeNudge = Cvar_GetBounded( "cl_autoTimeNudge", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED );' in cl_main
+	assert '} else if ( !cl_autoTimeNudge->integer ) {' in cl_cgame
+	assert 'tn = (int)( (float)cl.snap.ping * -0.5f );' in cl_cgame
+	assert 'static int CL_ClampTimeNudge( int tn ) {' in cl_cgame
+	assert 'tn = CL_ClampTimeNudge( tn );' in cl_cgame
+
+	assert 'data_1647ee8 = sub_4ce0d0(x87_r5, "cl_quitOnDemoCompleted", U"0", 0)' in retail_hlil
+	assert 'cl_quitOnDemoCompleted = Cvar_Get ("cl_quitOnDemoCompleted", "0", 0 );' in cl_main
+	assert 'if ( cl_quitOnDemoCompleted && cl_quitOnDemoCompleted->integer ) {' in cl_main
+	assert 'Cbuf_AddText( "quit\\n" );' in cl_main
+
+	assert 'data_1647ef8 = sub_4ce0d0(x87_r3, "cl_serverStatusResendTime", "750", 0)' in retail_hlil
+	assert 'cl_serverStatusResendTime = Cvar_Get ("cl_serverStatusResendTime", "750", 0);' in cl_main
+	assert 'serverStatus->startTime < Com_Milliseconds() - cl_serverStatusResendTime->integer' in cl_main
+
+	assert 'data_1627c58 = sub_4ce0d0(x87_r1, "cl_showTimeDelta", U"0", 0x100)' in retail_hlil
+	assert 'cl_showTimeDelta = Cvar_Get ("cl_showTimeDelta", "0", CVAR_TEMP );' in cl_main
+	assert 'if ( cl_showTimeDelta->integer ) {' in cl_cgame
+
+
+def test_engine_cvar_thirtyfifth_client_demo_input_tranche_matches_retail_contracts() -> None:
+	cl_main = _read_text(CL_MAIN)
+	cl_input = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_input.c")
+	retail_hlil = _read_text(QL_STEAM_HLIL_PART04)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+
+	assert 'DAT_0146cc4c = FUN_004ce0d0("cl_avidemo",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'DAT_01627c44 = FUN_004ce0d0("cl_avidemo_latch",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'DAT_015f6734 = FUN_004ce0d0("cl_avidemo_mintime",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'DAT_01647efc = FUN_004ce0d0("cl_avidemo_maxtime",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'DAT_01528b78 = FUN_004ce0d0("cl_forceavidemo",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'cl_avidemo = Cvar_Get ("cl_avidemo", "0", 0);' in cl_main
+	assert 'cl_avidemo_latch = Cvar_Get ("cl_avidemo_latch", "0", 0 );' in cl_main
+	assert 'cl_avidemo_mintime = Cvar_Get ("cl_avidemo_mintime", "0", 0 );' in cl_main
+	assert 'cl_avidemo_maxtime = Cvar_Get ("cl_avidemo_maxtime", "0", 0 );' in cl_main
+	assert 'cl_forceavidemo = Cvar_Get ("cl_forceavidemo", "0", 0);' in cl_main
+	assert 'if ( cl_avidemo_latch->integer ) {' in cl_main
+	assert 'if ( !cl_avidemo_mintime->integer || cl.serverTime > cl_avidemo_mintime->integer ) {' in cl_main
+	assert 'Cvar_SetValue( "cl_avidemo", cl_avidemo_latch->integer );' in cl_main
+	assert 'Cvar_Set( "cl_avidemo_latch", "0" );' in cl_main
+	assert 'if ( cl_avidemo->integer && msec) {' in cl_main
+	assert 'if ( cls.state == CA_ACTIVE || cl_forceavidemo->integer) {' in cl_main
+	assert 'if ( cl_avidemo_maxtime->integer && cl.serverTime > cl_avidemo_maxtime->integer ) {' in cl_main
+	assert 'CL_Disconnect_f();' in cl_main
+	assert 'Cbuf_ExecuteText( EXEC_NOW, "screenshot silent\\n" );' in cl_main
+	assert 'msec = (1000 / cl_avidemo->integer) * com_timescale->value;' in cl_main
+	assert 'sub_4cd250("cl_avidemo", sub_4d9220(&data_52d9b4))' in retail_hlil
+	assert 'sub_4cd250("cl_avidemo_latch", U"0")' in retail_hlil
+	assert 'sub_4c8900(ecx_2, "screenshot silent\\n")' in retail_hlil
+	assert 'divs.dp.d(0x3e8, *(data_146cc4c + 0x30))' in retail_hlil
+
+	assert 'DAT_0165d5f8 = FUN_004ce0d0("cl_anglespeedkey",&DAT_0053f200,0x200);' in retail_ghidra
+	assert 'DAT_0164b0f8 = FUN_004ce0d0("cl_yawspeed",&DAT_0053f0d8,0x200);' in retail_ghidra
+	assert 'DAT_0165d5b8 = FUN_004ce0d0("cl_pitchspeed",&DAT_0053f0d8,0x200);' in retail_ghidra
+	assert 'cl_anglespeedkey = Cvar_Get ("cl_anglespeedkey", "1.5", CVAR_CHEAT );' in cl_main
+	assert 'cl_yawspeed = Cvar_Get ("cl_yawspeed", "140", CVAR_CHEAT );' in cl_main
+	assert 'cl_pitchspeed = Cvar_Get ("cl_pitchspeed", "140", CVAR_CHEAT );' in cl_main
+	assert 'speed = 0.001 * cls.frametime * cl_anglespeedkey->value;' in cl_input
+	assert 'cl.viewangles[YAW] -= speed*cl_yawspeed->value*CL_KeyState (&in_right);' in cl_input
+	assert 'cl.viewangles[YAW] += speed*cl_yawspeed->value*CL_KeyState (&in_left);' in cl_input
+	assert 'cl.viewangles[PITCH] -= speed*cl_pitchspeed->value * CL_KeyState (&in_lookup);' in cl_input
+	assert 'cl.viewangles[PITCH] += speed*cl_pitchspeed->value * CL_KeyState (&in_lookdown);' in cl_input
+	assert 'anglespeed = 0.001 * cls.frametime * cl_anglespeedkey->value;' in cl_input
+	assert 'cl.viewangles[YAW] += anglespeed * cl_yawspeed->value * cl.joystickAxis[AXIS_SIDE];' in cl_input
+	assert 'cl.viewangles[PITCH] += anglespeed * cl_pitchspeed->value * cl.joystickAxis[AXIS_FORWARD];' in cl_input
+	assert 'x87_r7_1 = x87_r7_1 * fconvert.t(*(data_165d5f8 + 0x2c))' in retail_hlil
+	assert 'void* esi_1 = data_164b0f8' in retail_hlil
+	assert 'void* esi_2 = data_165d5b8' in retail_hlil
+
+	assert 'DAT_0165d5d8 = FUN_004ce0d0("cl_run",&DAT_00551624,1);' in retail_ghidra
+	assert 'cl_run = Cvar_Get ("cl_run", "1", CVAR_ARCHIVE);' in cl_main
+	assert cl_input.count( 'if ( in_speed.active ^ cl_run->integer ) {' ) >= 2
+	assert 'movespeed = 127;' in cl_input
+	assert 'movespeed = 64;' in cl_input
+	assert 'movespeed = 2;' in cl_input
+	assert 'movespeed = 1;' in cl_input
+	assert 'if (*(data_165d5d8 + 0x30) == data_165d5b0)' in retail_hlil
+
+	assert 'DAT_01647f10 = FUN_004ce0d0("cl_freelook",&DAT_00551624,0x80801);' in retail_ghidra
+	assert 'cl_freelook = Cvar_Get( "cl_freelook", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
+	assert 'if ( !cl_freelook->integer ) {' in cl_input
+	assert 'if ( (in_mlooking || cl_freelook->integer) && !in_strafe.active ) {' in cl_input
+	assert 'if ((data_165d59c == 0 && *(data_1647f10 + 0x30) == 0) || data_165d590 != 0)' in retail_hlil
+	assert 'if (*(result + 0x30) == 0)' in retail_hlil
+
+
+def test_engine_cvar_thirtysixth_client_debug_identity_tranche_matches_retail_contracts() -> None:
+	cl_main = _read_text(CL_MAIN)
+	cl_input = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_input.c")
+	cl_parse = _read_text(CL_PARSE)
+	msg = _read_text(REPO_ROOT / "src" / "code" / "qcommon" / "msg.c")
+	retail_hlil = _read_text(QL_STEAM_HLIL_PART04)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+
+	assert 'DAT_01528b8c = FUN_004ce0d0("cl_shownet",&DAT_0054ffe0,0x100);' in retail_ghidra
+	assert 'cl_shownet = Cvar_Get ("cl_shownet", "0", CVAR_TEMP );' in cl_main
+	assert 'if ( cl_shownet->integer >= 2)' in cl_parse
+	assert 'if ( cl_shownet->integer == 3 ) {' in cl_parse
+	assert 'cl_shownet->integer == 4' in msg
+	assert 'cl_shownet->integer >= 2 || cl_shownet->integer == -1' in msg
+	assert 'cl_shownet->integer >= 2 || cl_shownet->integer == -2' in msg
+	assert 'data_1528b8c = sub_4ce0d0(x87_r5, "cl_shownet", U"0", 0x100)' in retail_hlil
+	assert 'if (*(data_1528b8c + 0x30) == 3)' in retail_hlil
+	assert 'if (*(data_1528b8c + 0x30) s>= 2)' in retail_hlil
+	assert 'if (*(data_1528b8c + 0x30) == 4)' in retail_hlil
+
+	assert 'DAT_0146cc40 = FUN_004ce0d0("cl_showSend",&DAT_0054ffe0,0x100);' in retail_ghidra
+	assert 'cl_showSend = Cvar_Get ("cl_showSend", "0", CVAR_TEMP );' in cl_main
+	assert 'if ( cl_showSend->integer ) {' in cl_input
+	assert 'data_146cc40 = sub_4ce0d0(x87_r7, "cl_showSend", U"0", 0x100)' in retail_hlil
+	assert 'if (*(data_146cc40 + 0x30) != 0)' in retail_hlil
+
+	assert 'FUN_004ce0d0("cl_anonymous",&DAT_0054ffe0,3);' in retail_ghidra
+	assert 'Cvar_Get ("cl_anonymous", "0", CVAR_USERINFO | CVAR_ARCHIVE );' in cl_main
+	assert 'Cvar_VariableIntegerValue( "cl_anonymous" )' in cl_main
+	assert 'sub_4ce0d0(x87_r2, "cl_anonymous", U"0", 3)' in retail_hlil
+
+	assert 'FUN_004ce0d0("cl_platform",&DAT_00551624,0x40);' in retail_ghidra
+	assert 'cl_platform = Cvar_Get ("cl_platform", "1", CVAR_ROM );' in cl_main
+	assert 'sub_4ce0d0(x87_r4, "cl_platform", U"1", 0x40)' in retail_hlil
+
+	assert 'FUN_004ce0d0("cl_maxPing",&DAT_00539fc0,1);' in retail_ghidra
+	assert 'Cvar_Get( "cl_maxPing", "800", CVAR_ARCHIVE );' in cl_main
+	assert 'maxPing = Cvar_VariableIntegerValue( "cl_maxPing" );' in cl_main
+	assert 'if( maxPing < 100 ) {' in cl_main
+	assert 'if (time < maxPing)' in cl_main
+	assert 'sub_4ce0d0(x87_r6, "cl_maxPing", "800", 1)' in retail_hlil
+	assert 'eax_2, ecx_4 = sub_4ccd80("cl_maxPing")' in retail_hlil
+	assert 'if (eax_2 s< 0x64)' in retail_hlil
+
+	assert 'DAT_015f6730 = FUN_004ce0d0("cl_mouseAccel",&DAT_0054ffe0,0x80801);' in retail_ghidra
+	assert 'DAT_015f6724 = FUN_004ce0d0("cl_mouseAccelDebug",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'DAT_0146cd00 = FUN_004ce0d0("cl_mouseAccelOffset",&DAT_0054ffe0,0x80801);' in retail_ghidra
+	assert 'DAT_0146cc3c = FUN_004ce0d0("cl_mouseAccelPower",&DAT_0052f5d8,0x80801);' in retail_ghidra
+	assert 'DAT_01647ee4 = FUN_004ce0d0("cl_mouseSensCap",&DAT_0054ffe0,0x80001);' in retail_ghidra
+	assert 'cl_mouseAccel = Cvar_Get ("cl_mouseAccel", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
+	assert 'cl_mouseAccelDebug = Cvar_Get ("cl_mouseAccelDebug", "0", 0 );' in cl_main
+	assert 'cl_mouseAccelOffset = Cvar_Get ("cl_mouseAccelOffset", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
+	assert 'cl_mouseAccelPower = Cvar_Get ("cl_mouseAccelPower", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in cl_main
+	assert 'cl_mouseSensCap = Cvar_Get ("cl_mouseSensCap", "0", CVAR_ARCHIVE | CVAR_CLOUD );' in cl_main
+	assert 'if ( cl_mouseAccel->value != 0.0f ) {' in cl_input
+	assert 'rate -= cl_mouseAccelOffset->value;' in cl_input
+	assert 'power = cl_mouseAccelPower->value - 1.0f;' in cl_input
+	assert 'accelRate = fabsf( cl_mouseAccel->value ) * rate;' in cl_input
+	assert 'if ( cl_mouseAccel->value <= 0.0f ) {' in cl_input
+	assert 'if ( cl_mouseSensCap->value > 0.0f && cl_mouseSensCap->value < sensitivity ) {' in cl_input
+	assert 'if ( !cl_mouseAccelDebug || !cl_mouseAccelDebug->integer ) {' in cl_input
+	assert 'path = FS_BuildOSPath( homepath, "", "mouse.log" );' in cl_input
+	assert 'fprintf( cl_mouseAccelDebugLog, "mx my frame_msec rate power\\n" );' in cl_input
+	assert 'data_15f6730 = sub_4ce0d0(x87_r3, "cl_mouseAccel", U"0", 0x80801)' in retail_hlil
+	assert 'data_15f6724 = sub_4ce0d0(x87_r5, "cl_mouseAccelDebug", U"0", 0)' in retail_hlil
+	assert 'data_146cd00 = sub_4ce0d0(x87_r7, "cl_mouseAccelOffset", U"0", 0x80801)' in retail_hlil
+	assert 'data_146cc3c = sub_4ce0d0(x87_r1, "cl_mouseAccelPower", U"2", 0x80801)' in retail_hlil
+	assert 'data_1647ee4 = sub_4ce0d0(x87_r3, "cl_mouseSensCap", U"0", 0x80001)' in retail_hlil
+	assert 'void* edi_1 = data_15f6730' in retail_hlil
+	assert 'void* ecx_2 = data_146cd00' in retail_hlil
+	assert 'fconvert.t(*(data_146cc3c + 0x2c)) - fconvert.t(1.0)' in retail_hlil
+	assert 'long double temp2_1 = fconvert.t(*(data_1647ee4 + 0x2c))' in retail_hlil
+
+
+def test_engine_cvar_thirtyseventh_client_lifecycle_workshop_tranche_matches_retail_contracts() -> None:
+	cl_main = _read_text(CL_MAIN)
+	cl_input = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_input.c")
+	cl_scrn = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_scrn.c")
+	cl_cgame = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_cgame.c")
+	cl_parse = _read_text(CL_PARSE)
+	cl_ui = _read_text(CL_UI)
+	common = _read_text(COMMON)
+	cmd = _read_text(REPO_ROOT / "src" / "code" / "qcommon" / "cmd.c")
+	ui_main = _read_text(UI_MAIN)
+	retail_hlil = _read_text(QL_STEAM_HLIL_PART04)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+	ui_hlil = _read_text(QL_UI_HLIL_PART01)
+	ui_ghidra = _read_text(QL_UI_GHIDRA_DECOMPILE)
+
+	assert '_DAT_01627c40 = FUN_004ce0d0("cl_motd",&DAT_00551624,0);' in retail_ghidra
+	assert 'cl_motd = Cvar_Get ("cl_motd", "1", 0);' in cl_main
+	assert 'if ( cl_motd && cl_motd->integer ) {' in cl_main
+	assert 'if ( !cl_motd->integer ) {' in cl_main
+	assert 'data_1627c40 = sub_4ce0d0(x87_r7, "cl_motd", U"1", 0)' in retail_hlil
+
+	assert '_DAT_01627c4c = FUN_004ce0d0("cl_motdString",&DAT_0054f9da,0x40);' in retail_ghidra
+	assert 'cl_motdString = Cvar_Get( "cl_motdString", "", CVAR_ROM );' in cl_main
+	assert 'Cvar_Set( "cl_motdString", challenge );' in cl_main
+	assert 'trap_Cvar_VariableStringBuffer( "cl_motdString", uiInfo.serverStatus.motd, sizeof(uiInfo.serverStatus.motd) );' in ui_main
+	assert 'data_1627c4c = sub_4ce0d0(x87_r1, "cl_motdString", &data_54f9da, 0x40)' in retail_hlil
+	assert '(*(data_106b40a8 + 0x24))("cl_motdString", &data_107644d0, 0x400)' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x24))("cl_motdString",&DAT_107644d0,0x400);' in ui_ghidra
+
+	assert 'DAT_01528b7c = FUN_004ce0d0("cl_timeout",&DAT_0052f2e4,0);' in retail_ghidra
+	assert 'cl_timeout = Cvar_Get ("cl_timeout", "40", 0);' in cl_main
+	assert 'cls.realtime - clc.lastPacketTime > cl_timeout->value*1000' in cl_main
+	assert 'data_1528b7c = sub_4ce0d0(x87_r2, "cl_timeout", "40", 0)' in retail_hlil
+
+	assert 'cl_nodelta = Cvar_Get ("cl_nodelta", "0", 0);' in cl_input
+	assert 'if ( cl_nodelta->integer || !cl.snap.valid || clc.demowaiting' in cl_input
+	assert 'data_146ccfc = sub_4ce0d0(x87_r0, "cl_nodelta", U"0", 0)' in retail_hlil
+
+	assert 'cl_debugMove = Cvar_Get ("cl_debugMove", "0", 0);' in cl_input
+	assert 'if ( cl_debugMove->integer ) {' in cl_input
+	assert 'if ( cl_debugMove->integer == 1 ) {' in cl_input
+	assert 'if ( cl_debugMove->integer == 2 ) {' in cl_input
+	assert 'if ( cl_debuggraph->integer || cl_timegraph->integer || cl_debugMove->integer ) {' in cl_scrn
+	assert 'void** result = sub_4ce0d0(x87_r2, "cl_debugMove", U"0", 0)' in retail_hlil
+
+	assert 'DAT_0145b95c = FUN_004ce0d0("cl_paused",&DAT_0054ffe0,0x40);' in retail_ghidra
+	assert 'cl_paused = Cvar_Get ("cl_paused", "0", CVAR_ROM);' in common
+	assert 'Cvar_Set( "cl_paused", "0" );' in cl_main
+	assert 'Cvar_Set( "cl_paused", "0" );' in cl_parse
+	assert 'if ( com_sv_running->integer && sv_paused->integer && cl_paused->integer ) {' in cl_input
+	assert 'if ( sv_paused->integer && cl_paused->integer && com_sv_running->integer ) {' in cl_cgame
+	assert 'data_145b95c = sub_4ce0d0(x87_r1, "cl_paused", U"0", 0x40)' in retail_hlil
+	assert 'sub_4cd250("cl_paused", U"0")' in retail_hlil
+
+	assert 'DAT_01205e30 = FUN_004ce0d0("cl_running",&DAT_0054ffe0,0x40);' in retail_ghidra
+	assert 'com_cl_running = Cvar_Get ("cl_running", "0", CVAR_ROM);' in common
+	assert 'Cvar_Set( "cl_running", "1" );' in cl_main
+	assert 'Cvar_Set( "cl_running", "0" );' in cl_main
+	assert 'if ( com_cl_running && com_cl_running->integer && CL_GameCommand() ) {' in cmd
+	assert 'if ( com_cl_running && com_cl_running->integer && UI_GameCommand() ) {' in cmd
+	assert 'data_1205e30 = sub_4ce0d0(x87_r7, "cl_running", U"0", 0x40)' in retail_hlil
+	assert 'sub_4cd250("cl_running", U"1")' in retail_hlil
+
+	assert 'Cvar_Get( "cl_downloadItem", "", CVAR_TEMP );' in cl_main
+	assert 'Cvar_Set( "cl_downloadItem", itemString );' in cl_main
+	assert '(*(data_106b40a8 + 0x24))("cl_downloadItem", &var_d0, 0x40)' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x24))("cl_downloadItem",local_d0,0x40);' in ui_ghidra
+	assert 'sub_4cd250("cl_downloadItem", sub_4d9220(&data_52d0f4))' in retail_hlil
+
+	assert 'Cvar_Get( "cl_downloadName", "", CVAR_TEMP );' in cl_main
+	assert 'Cvar_Set( "cl_downloadName", "" );' in cl_main
+	assert 'Cvar_Set( "cl_downloadName", downloadName );' in cl_main
+	assert 'trap_Cvar_VariableStringBuffer( "cl_downloadName", downloadName, sizeof(downloadName) );' in ui_main
+	assert '(*(data_106b40a8 + 0x24))("cl_downloadName", &arg_110c, 0x400)' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x24))("cl_downloadName",acStack_404,0x400);' in ui_ghidra
+	assert 'sub_4cd250("cl_downloadName", &data_54f9da)' in retail_hlil
+	assert 'sub_4cd250("cl_downloadName", sub_4d9220("Workshop item %i of %i"))' in retail_hlil
+
+	assert 'Cvar_Get( "cl_downloadTime", "0", CVAR_TEMP );' in cl_main
+	assert 'Cvar_SetValue( "cl_downloadTime", cls.realtime );' in cl_main
+	assert 'CL_GetWorkshopDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total )' in cl_ui
+	assert 'QL_Steamworks_GetItemDownloadInfo( itemIdLow, itemIdHigh, &downloaded, &total );' in cl_ui
+	assert '(*(data_106b40a8 + 0x28))("cl_downloadTime")' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x28))("cl_downloadTime");' in ui_ghidra
+	assert 'sub_4cd270("cl_downloadTime", fconvert.s(float.t(data_1528cc8)))' in retail_hlil
+
+
+def test_engine_cvar_thirtyeighth_client_native_ui_bridge_tranche_matches_retail_contracts() -> None:
+	cl_main = _read_text(CL_MAIN)
+	cl_input = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_input.c")
+	cl_parse = _read_text(CL_PARSE)
+	ui_main = _read_text(UI_MAIN)
+	retail_hlil = _read_text(QL_STEAM_HLIL_PART04)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+	ui_hlil = _read_text(QL_UI_HLIL_PART01)
+	ui_ghidra = _read_text(QL_UI_GHIDRA_DECOMPILE)
+
+	assert 'DAT_01627c3c = FUN_004ce0d0("cl_maxpackets",&DAT_0053d9f8,0x200);' in retail_ghidra
+	assert 'cl_maxpackets = Cvar_Get ("cl_maxpackets", "125", CVAR_CHEAT );' in cl_main
+	assert 'if ( cl_maxpackets->integer < 15 ) {' in cl_input
+	assert 'Cvar_Set( "cl_maxpackets", "125" );' in cl_input
+	assert 'if ( delta < 1000 / cl_maxpackets->integer ) {' in cl_input
+	assert 'trap_Cvar_Set("cl_maxpackets", "30");' in ui_main
+	assert 'trap_Cvar_Set("cl_maxpackets", "15");' in ui_main
+	assert 'data_1627c3c = sub_4ce0d0(x87_r5, "cl_maxpackets", "125", 0x200)' in retail_hlil
+	assert '(*(data_106b40a8 + 0x1c))("cl_maxpackets", &data_1002648c)' in ui_hlil
+	assert '(*(data_106b40a8 + 0x1c))("cl_maxpackets", &data_10026480)' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x1c))("cl_maxpackets",&DAT_1002648c);' in ui_ghidra
+
+	assert 'DAT_015f672c = FUN_004ce0d0("cl_packetdup",&DAT_00551624,0x80001);' in retail_ghidra
+	assert 'cl_packetdup = Cvar_Get ("cl_packetdup", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in cl_main
+	assert 'if ( cl_packetdup->integer < 0 ) {' in cl_input
+	assert 'Cvar_Set( "cl_packetdup", "5" );' in cl_input
+	assert 'oldPacketNum = (clc.netchan.outgoingSequence - 1 - cl_packetdup->integer) & PACKET_MASK;' in cl_input
+	assert 'trap_Cvar_Set("cl_packetdup", "1");' in ui_main
+	assert 'trap_Cvar_Set("cl_packetdup", "2");' in ui_main
+	assert 'data_15f672c = sub_4ce0d0(x87_r1, "cl_packetdup", U"1", 0x80001)' in retail_hlil
+	assert '(*(data_106b40a8 + 0x1c))("cl_packetdup", &data_1002729c)' in ui_hlil
+	assert '(*(data_106b40a8 + 0x1c))("cl_packetdup", &data_100272b0)' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x1c))("cl_packetdup",&DAT_1002729c);' in ui_ghidra
+
+	assert 'DAT_01647ef8 = FUN_004ce0d0("cl_serverStatusResendTime",&DAT_0053f098,0);' in retail_ghidra
+	assert 'cl_serverStatusResendTime = Cvar_Get ("cl_serverStatusResendTime", "750", 0);' in cl_main
+	assert 'serverStatus->startTime < Com_Milliseconds() - cl_serverStatusResendTime->integer' in cl_main
+	assert 'trap_Cvar_Set("cl_serverStatusResendTime", va("%d", resend));' in ui_main
+	assert 'data_1647ef8 = sub_4ce0d0(x87_r3, "cl_serverStatusResendTime", "750", 0)' in retail_hlil
+	assert '(*(data_106b40a8 + 0x1c))("cl_serverStatusResendTime",' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x1c))("cl_serverStatusResendTime",uVar3);' in ui_ghidra
+
+	assert 'FUN_004ce0d0("cl_maxPing",&DAT_00539fc0,1);' in retail_ghidra
+	assert 'Cvar_Get( "cl_maxPing", "800", CVAR_ARCHIVE );' in cl_main
+	assert 'maxPing = Cvar_VariableIntegerValue( "cl_maxPing" );' in cl_main
+	assert 'if( maxPing < 100 ) {' in cl_main
+	assert 'if (time < maxPing)' in cl_main
+	assert 'trap_Cvar_VariableValue("cl_maxPing")' in ui_main
+	assert 'sub_4ce0d0(x87_r6, "cl_maxPing", "800", 1)' in retail_hlil
+	assert '(*(data_106b40a8 + 0x28))("cl_maxPing")' in ui_hlil
+
+	assert '_DAT_01627c4c = FUN_004ce0d0("cl_motdString",&DAT_0054f9da,0x40);' in retail_ghidra
+	assert 'cl_motdString = Cvar_Get( "cl_motdString", "", CVAR_ROM );' in cl_main
+	assert 'Cvar_Set( "cl_motdString", challenge );' in cl_main
+	assert 'trap_Cvar_VariableStringBuffer( "cl_motdString", uiInfo.serverStatus.motd, sizeof(uiInfo.serverStatus.motd) );' in ui_main
+	assert 'data_1627c4c = sub_4ce0d0(x87_r1, "cl_motdString", &data_54f9da, 0x40)' in retail_hlil
+	assert '(*(data_106b40a8 + 0x24))("cl_motdString", &data_107644d0, 0x400)' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x24))("cl_motdString",&DAT_107644d0,0x400);' in ui_ghidra
+
+	assert 'Cvar_Get( "cl_downloadItem", "", CVAR_TEMP );' in cl_main
+	assert 'Cvar_Set( "cl_downloadItem", "" );' in cl_main
+	assert 'Cvar_Set( "cl_downloadItem", itemString );' in cl_main
+	assert 'trap_Cvar_VariableStringBuffer( "cl_downloadItem", downloadItem, sizeof( downloadItem ) );' in ui_main
+	assert '(*(data_106b40a8 + 0x24))("cl_downloadItem", &var_d0, 0x40)' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x24))("cl_downloadItem",local_d0,0x40);' in ui_ghidra
+	assert 'sub_4cd250("cl_downloadItem", sub_4d9220(&data_52d0f4))' in retail_hlil
+
+	assert 'Cvar_Get( "cl_downloadName", "", CVAR_TEMP );' in cl_main
+	assert 'Cvar_Set( "cl_downloadName", "" );' in cl_main
+	assert 'Cvar_Set( "cl_downloadName", remoteName );' in cl_main
+	assert 'Cvar_Set( "cl_downloadName", downloadName );' in cl_main
+	assert 'trap_Cvar_VariableStringBuffer( "cl_downloadName", downloadName, sizeof(downloadName) );' in ui_main
+	assert '(*(data_106b40a8 + 0x24))("cl_downloadName", &arg_110c, 0x400)' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x24))("cl_downloadName",acStack_404,0x400);' in ui_ghidra
+	assert 'sub_4cd250("cl_downloadName", &data_54f9da)' in retail_hlil
+	assert 'sub_4cd250("cl_downloadName", sub_4d9220("Workshop item %i of %i"))' in retail_hlil
+
+	assert 'Cvar_Get( "cl_downloadTime", "0", CVAR_TEMP );' in cl_main
+	assert 'Cvar_SetValue( "cl_downloadTime", cls.realtime );' in cl_main
+	assert 'downloadTime = trap_Cvar_VariableValue( "cl_downloadTime" );' in ui_main
+	assert '(*(data_106b40a8 + 0x28))("cl_downloadTime")' in ui_hlil
+	assert '(**(code **)(DAT_106b40a8 + 0x28))("cl_downloadTime");' in ui_ghidra
+	assert 'sub_4cd270("cl_downloadTime", fconvert.s(float.t(data_1528cc8)))' in retail_hlil
+
+	assert 'Cvar_Get( "cl_downloadCount", "0", CVAR_TEMP );' in cl_main
+	assert 'Cvar_Set( "cl_downloadCount", "0" );' in cl_main
+	assert 'Cvar_Set( "cl_downloadCount", downloaded );' in cl_main
+	assert 'Cvar_SetValue( "cl_downloadCount", clc.downloadCount );' in cl_parse
+	assert 'downloadCount = (unsigned long long)(int)trap_Cvar_VariableValue( "cl_downloadCount" );' in ui_main
+
+	assert 'Cvar_Get( "cl_downloadSize", "0", CVAR_TEMP );' in cl_main
+	assert 'Cvar_Set( "cl_downloadSize", "0" );' in cl_main
+	assert 'Cvar_Set( "cl_downloadSize", total );' in cl_main
+	assert 'Cvar_SetValue( "cl_downloadSize", clc.downloadSize );' in cl_parse
+	assert 'downloadSize = (unsigned long long)(int)trap_Cvar_VariableValue( "cl_downloadSize" );' in ui_main
+
+	native_progress_start = ui_hlil.index('(*(data_106b40a8 + 0x24))("cl_downloadItem", &var_d0, 0x40)')
+	native_progress_block = ui_hlil[native_progress_start:native_progress_start + 700]
+	assert "cl_downloadCount" not in native_progress_block
+	assert "cl_downloadSize" not in native_progress_block
+	assert '(*(data_106b40a8 + 0x180))(var_14c, var_148, &var_15c, &var_164)' in native_progress_block
+
+
+def test_engine_cvar_thirtyninth_client_service_disclosure_tranche_matches_guarded_retail_divergence_contracts() -> None:
+	cl_main = _read_text(CL_MAIN)
+	platform_services = _read_text(REPO_ROOT / "src" / "common" / "platform" / "platform_services.c")
+	retail_hlil = _read_text(QL_STEAM_HLIL_PART04)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+
+	service_cvars = [
+		("cl_onlineServicesMode", "Unavailable", "QL_GetOnlineServicesModeLabel()"),
+		("cl_onlineServicesPolicy", "compatibility-unavailable", "QL_GetOnlineServicesPolicyLabel()"),
+		("cl_onlineServicesParityScope", "unclassified", "QL_GetOnlineServicesParityScopeLabel()"),
+		("cl_onlineServicesParityReason", "unclassified", "QL_GetOnlineServicesParityReasonLabel()"),
+		("cl_identityBootstrapMode", "Unavailable", "CL_GetIdentityBootstrapModeLabel()"),
+		("cl_identityBootstrapPolicy", "compatibility-unavailable", "CL_GetIdentityBootstrapPolicyLabel()"),
+		("cl_voiceServiceMode", "Unavailable", "CL_GetVoiceServiceModeLabel()"),
+		("cl_voiceServicePolicy", "compatibility-unavailable", "CL_GetVoiceServicePolicyLabel()"),
+		("cl_workshopProvider", "Unavailable", "CL_GetWorkshopServiceProviderLabel()"),
+		("cl_workshopPolicy", "compatibility-unavailable", "CL_GetWorkshopServicePolicyLabel()"),
+	]
+
+	for name, default, provider in service_cvars:
+		assert f'Cvar_Get ("{name}", "{default}", CVAR_ROM );' in cl_main
+		assert f'Cvar_Set( "{name}", {provider} );' in cl_main
+		assert f'"{name}"' not in retail_hlil
+		assert f'"{name}"' not in retail_ghidra
+
+	assert "static void CL_RefreshPlatformServiceCvars( void ) {" in cl_main
+	assert cl_main.count("CL_RefreshPlatformServiceCvars();") >= 2
+	assert 'return "Build-disabled default (QL_BUILD_ONLINE_SERVICES=0)";' in platform_services
+	assert 'return "compatibility-unavailable";' in platform_services
+	assert 'return "permanent-bounded-divergence";' in platform_services
+	assert 'return "default builds keep Quake Live online services disabled until a documented open replacement exists";' in platform_services
+	assert 'static const char *CL_GetIdentityBootstrapModeLabel( void ) {' in cl_main
+	assert 'static const char *CL_GetVoiceServiceModeLabel( void ) {' in cl_main
+	assert 'return QL_GetOnlineServicesModeLabel();' in cl_main
+	assert 'return QL_GetOnlineServicesPolicyLabel();' in cl_main
+	assert 'static const char *CL_GetWorkshopServiceProviderLabel( void ) {' in cl_main
+	assert 'return QL_DescribePlatformFeaturePolicy( CL_GetWorkshopServiceDescriptor() );' in cl_main
+	assert 'Workshop %s via %s [%s]: %s\\n' in cl_main
+
+
 def test_engine_cvar_fifteenth_server_state_tranche_matches_retail_contracts() -> None:
 	common = _read_text(COMMON)
 	sv_init = _read_text(SV_INIT)
@@ -1049,6 +1544,28 @@ def test_engine_cvar_eighteenth_sound_tranche_matches_retail_contracts() -> None
 	cg_view = _read_text(CG_VIEW)
 	cg_servercmds = _read_text(CG_SERVERCMDS)
 
+	init_start = snd_dma.index("void S_Init( void ) {")
+	init_end = snd_dma.index("\tif ( !cv->integer ) {", init_start)
+	init_registrations = [
+		line.strip()
+		for line in snd_dma[init_start:init_end].splitlines()
+		if "Cvar_Get" in line and '"s_' in line
+	]
+	assert init_registrations == [
+		's_announcerVolume = Cvar_GetBounded( "s_announcerVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );',
+		's_doppler = Cvar_Get( "s_doppler", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );',
+		'cv = Cvar_Get ("s_initsound", "1", 0);',
+		's_mixahead = Cvar_Get( "s_mixahead", "0.140", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );',
+		's_mixPreStep = Cvar_Get( "s_mixPreStep", "0.05", CVAR_ARCHIVE | CVAR_PROTECTED );',
+		's_musicVolume = Cvar_GetBounded( "s_musicvolume", "0.5", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );',
+		's_pvs = Cvar_GetBounded( "s_pvs", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );',
+		's_voiceVolume = Cvar_GetBounded( "s_voiceVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );',
+		's_voiceStep = Cvar_Get( "s_voiceStep", "0.02", CVAR_ARCHIVE | CVAR_PROTECTED );',
+		's_show = Cvar_Get ("s_show", "0", CVAR_CHEAT);',
+		's_testsound = Cvar_Get ("s_testsound", "0", CVAR_CHEAT);',
+		's_volume = Cvar_GetBounded( "s_volume", "0.8", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );',
+	]
+
 	assert 's_announcerVolume = Cvar_GetBounded( "s_announcerVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
 	assert 'if ( entchannel == CHAN_ANNOUNCER && s_announcerVolume ) {' in snd_dma
 	assert 'trap_S_StartLocalSound( sfx, CHAN_ANNOUNCER );' in cg_view
@@ -1060,14 +1577,24 @@ def test_engine_cvar_eighteenth_sound_tranche_matches_retail_contracts() -> None
 	assert 'if ( !cv->integer ) {' in snd_dma
 	assert 'Com_Printf ("not initializing.\\n");' in snd_dma
 
+	update_start = snd_dma.index("void S_Update_(void) {")
+	update_end = snd_dma.index("console functions", update_start)
+	update_block = snd_dma[update_start:update_end]
+
 	assert 's_mixahead = Cvar_Get( "s_mixahead", "0.140", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in snd_dma
-	assert 'ma = s_mixahead->value * dma.speed;' in snd_dma
+	assert 'ma = s_mixahead->value * dma.speed;' in update_block
+	assert 'endtime = s_soundtime + ma;' in update_block
+	assert 'op = s_mixPreStep->value + sane*dma.speed*0.01;' not in update_block
+	assert 'lastTime' not in update_block
 
 	assert 's_mixPreStep = Cvar_Get( "s_mixPreStep", "0.05", CVAR_ARCHIVE | CVAR_PROTECTED );' in snd_dma
 	assert 's_paintedtime = s_soundtime + s_mixPreStep->value * dma.speed;' in snd_dma
 
 	assert 's_musicVolume = Cvar_GetBounded( "s_musicvolume", "0.5", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
 	assert 'musicVolume = (musicVolume + (s_musicVolume->value * 2))/4.0f;' in snd_dma
+
+	assert 's_pvs = Cvar_GetBounded( "s_pvs", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
+	assert 'if ( s_pvs && s_pvs->integer && !S_OriginInPVS( listener_origin, origin ) ) {' in snd_dma
 
 	assert 's_show = Cvar_Get ("s_show", "0", CVAR_CHEAT);' in snd_dma
 	assert 'if ( s_show->integer == 1 ) {' in snd_dma
@@ -1079,6 +1606,9 @@ def test_engine_cvar_eighteenth_sound_tranche_matches_retail_contracts() -> None
 	assert 's_voiceVolume = Cvar_GetBounded( "s_voiceVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
 	assert 'else if ( entchannel == CHAN_VOICE && s_voiceVolume ) {' in snd_dma
 	assert 'trap_S_StartLocalSound( vchat->snd, CHAN_VOICE);' in cg_servercmds
+
+	assert 's_voiceStep = Cvar_Get( "s_voiceStep", "0.02", CVAR_ARCHIVE | CVAR_PROTECTED );' in snd_dma
+	assert 'startSample += (int)( s_voiceStep->value * dma.speed );' in snd_dma
 
 	assert 's_volume = Cvar_GetBounded( "s_volume", "0.8", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in snd_dma
 	assert 'snd_vol = s_volume->value*255;' in snd_mix
@@ -1192,20 +1722,21 @@ def test_engine_cvar_twentyfirst_renderer_mode_tranche_matches_retail_contracts(
 
 	assert 'if (!Q_stricmp(var_name, var->name)) {' in cvar
 
-	assert 'r_texturebits = ri.Cvar_Get( "r_texturebits", "32", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_texturebits = ri.Cvar_Get( "r_textureBits", "32", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_texturebits = ri.Cvar_Get( "r_texturebits", "32", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' not in tr_init
 	assert 'ri.Printf( PRINT_ALL, "texture bits: %d\\n", r_texturebits->integer );' in tr_init
 
-	assert 'r_colorbits = ri.Cvar_Get( "r_colorbits", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_colorbits = ri.Cvar_Get( "r_colorBits", "32", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
 	assert 'dm.dmBitsPerPel = r_colorbits->integer;' in win_glimp
 
-	assert 'r_stencilbits = ri.Cvar_Get( "r_stencilbits", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
-	assert 'r_stencilbits = ri.Cvar_Get( "r_stencilbits", "8", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_stencilbits = ri.Cvar_Get( "r_stencilBits", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_stencilbits = ri.Cvar_Get( "r_stencilbits", "8", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' not in tr_init
 	assert 'stencilbits = r_stencilbits->integer;' in win_glimp
 
-	assert 'r_depthbits = ri.Cvar_Get( "r_depthbits", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_depthbits = ri.Cvar_Get( "r_depthBits", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
 	assert 'depthbits = r_depthbits->integer;' in win_glimp
 
-	assert 'r_mode = ri.Cvar_Get( "r_mode", "3", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_mode = ri.Cvar_Get( "r_mode", "-2", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
 	assert 'return r_mode->integer;' in tr_init
 	assert 'ri.Printf( PRINT_WARNING, "WARNING: invalid r_mode %d, resetting to 3\\n", r_mode->integer );' in tr_init
 	assert 'ri.Cvar_Set( "r_mode", "3" );' in tr_init
@@ -1319,12 +1850,12 @@ def test_engine_cvar_twentythird_renderer_runtime_tuning_tranche_matches_retail_
 	tr_surface = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_surface.c")
 	win_glimp = _read_text(WIN_GLIMP)
 
-	assert 'r_fastsky = ri.Cvar_Get( "r_fastsky", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
+	assert 'r_fastsky = ri.Cvar_Get( "r_fastSky", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
 	assert 'if ( r_noportals->integer || (r_fastsky->integer == 1) ) {' in tr_main
 	assert 'if ( r_fastsky->integer ) {' in tr_sky
 	assert 'if ( r_fastsky->integer && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) )' in tr_backend
 
-	assert 'r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'r_dynamiclight = ri.Cvar_Get( "r_dynamicLight", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
 	assert 'if ( r_dynamiclight->integer == 0 ||' in tr_scene
 
 	assert 'r_teleporterFlash = ri.Cvar_Get( "r_teleporterFlash", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
@@ -1340,8 +1871,8 @@ def test_engine_cvar_twentythird_renderer_runtime_tuning_tranche_matches_retail_
 	assert 'if ( r_swapInterval->modified ) {' in win_glimp
 	assert 'qwglSwapIntervalEXT( r_swapInterval->integer );' in win_glimp
 
-	assert 'r_gamma = ri.Cvar_Get( "r_gamma", "1.2", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
 	assert 'r_gamma = ri.Cvar_Get( "r_gamma", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'r_gamma = ri.Cvar_Get( "r_gamma", "1.2", CVAR_ARCHIVE | CVAR_CLOUD );' not in tr_init
 	assert 'ri.Cvar_Set( "r_gamma", "0.5" );' in tr_image
 	assert 'web_browserActive = ri.Cvar_Get( "web_browserActive", "0", CVAR_ROM );' in tr_init
 	assert 'if ( ( !web_browserActive || !web_browserActive->integer ) && r_gamma && r_gamma->value > 0.0f ) {' in tr_backend
@@ -1359,6 +1890,436 @@ def test_engine_cvar_twentythird_renderer_runtime_tuning_tranche_matches_retail_
 
 	assert 'r_railSegmentLength = ri.Cvar_Get( "r_railSegmentLength", "32", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
 	assert 'numSegs = ( len ) / r_railSegmentLength->value;' in tr_surface
+
+
+def test_engine_cvar_thirtyeighth_renderer_image_quality_tranche_matches_retail_contracts() -> None:
+	tr_init = _read_text(TR_INIT)
+	tr_local = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_local.h")
+	tr_image = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_image.c")
+	tr_bsp = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_bsp.c")
+	tr_shader = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shader.c")
+	tr_scene = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_scene.c")
+	tr_shade = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shade.c")
+	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
+	win_glimp = _read_text(WIN_GLIMP)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+
+	assert 'DAT_01740d98 = (*DAT_01740d40)("r_picmip",&DAT_0054ffe0,0x80821);' in retail_ghidra
+	assert 'r_picmip = ri.Cvar_Get ("r_picmip", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_picmip, 0, 16, qtrue );' in tr_init
+	assert 'scaled_width >>= r_picmip->integer;' in tr_image
+	assert 'scaled_height >>= r_picmip->integer;' in tr_image
+
+	assert 'DAT_01740f68 = (*DAT_01740d40)("r_roundImagesDown",&DAT_00551624,0x21);' in retail_ghidra
+	assert 'r_roundImagesDown = ri.Cvar_Get ("r_roundImagesDown", "1", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'if ( r_roundImagesDown->integer && scaled_width > width )' in tr_image
+	assert 'if ( r_roundImagesDown->integer && scaled_height > height )' in tr_image
+
+	assert 'DAT_01740dbc = (*DAT_01740d40)("r_colorMipLevels",&DAT_0054ffe0,0x20);' in retail_ghidra
+	assert 'r_colorMipLevels = ri.Cvar_Get ("r_colorMipLevels", "0", CVAR_LATCH );' in tr_init
+	assert 'if ( r_colorMipLevels->integer ) {' in tr_image
+	assert 'R_BlendOverTexture' in tr_image
+
+	assert 'DAT_01743c1c = (*DAT_01740d40)("r_detailtextures",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_detailTextures = ri.Cvar_Get( "r_detailtextures", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'if ( pStage->isDetail && !r_detailTextures->integer ) {' in tr_shader
+
+	assert 'DAT_01740f98 = (*DAT_01740d40)("r_simpleMipMaps",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_simpleMipMaps = ri.Cvar_Get( "r_simpleMipMaps", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'if ( !r_simpleMipMaps->integer ) {' in tr_image
+	assert 'R_MipMap2( (unsigned *)in, width, height );' in tr_image
+
+	assert 'DAT_01740ec4 = (*DAT_01740d40)("r_vertexLight",&DAT_0054ffe0,0x80821);' in retail_ghidra
+	assert 'r_vertexLight = ri.Cvar_Get( "r_vertexLight", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
+	assert 'if ( r_vertexLight->integer || glConfig.hardwareType == GLHW_PERMEDIA2 ) {' in tr_bsp
+	assert 'if ( pStage->bundle[0].vertexLightmap && ( (r_vertexLight->integer && !r_uiFullScreen->integer) || glConfig.hardwareType == GLHW_PERMEDIA2 ) && r_lightmap->integer )' in tr_shade
+	assert 'r_vertexLight->integer == 1 ||' in tr_scene
+
+	assert 'DAT_01740f00 = (*DAT_01740d40)("r_overBrightBits",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_overBrightBits = ri.Cvar_Get ("r_overBrightBits", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'tr.overbrightBits = r_overBrightBits->integer;' in tr_image
+	assert 'overbright = 2.0f * r_overBrightBits->integer;' in tr_backend
+
+	assert 'DAT_01740ebc = (*DAT_01740d40)("r_mapOverBrightBits",&DAT_0052f5d8,0x80021);' in retail_ghidra
+	assert 'r_mapOverBrightBits = ri.Cvar_Get ("r_mapOverBrightBits", "2", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'shift = r_mapOverBrightBits->integer - tr.overbrightBits;' in tr_bsp
+
+	assert '("r_mapOverBrightCap",&DAT_0052f17c,&DAT_0054ffe0,&DAT_0052f17c,' in retail_ghidra
+	assert 'r_mapOverBrightCap = ri.Cvar_GetBounded( "r_mapOverBrightCap", "255", "0", "255", CVAR_ARCHIVE | CVAR_LATCH | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert "extern\tcvar_t\t*r_mapOverBrightCap;" in tr_local
+	assert 'cap = r_mapOverBrightCap ? r_mapOverBrightCap->integer : 255;' in tr_bsp
+	assert 'r = r * cap / max;' in tr_bsp
+
+	assert 'DAT_01740ddc = (*DAT_01740d40)("r_gamma",&DAT_00551624,0x80001);' in retail_ghidra
+	assert 'r_gamma = ri.Cvar_Get( "r_gamma", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'r_gamma = ri.Cvar_Get( "r_gamma", "1.2", CVAR_ARCHIVE | CVAR_CLOUD );' not in tr_init
+	assert 'ri.Cvar_Set( "r_gamma", "0.5" );' in tr_image
+	assert 'if ( ( !web_browserActive || !web_browserActive->integer ) && r_gamma && r_gamma->value > 0.0f ) {' in tr_backend
+
+
+def test_engine_cvar_thirtyninth_renderer_misc_runtime_tranche_matches_retail_contracts() -> None:
+	tr_init = _read_text(TR_INIT)
+	tr_local = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_local.h")
+	tr_shader = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shader.c")
+	tr_scene = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_scene.c")
+	tr_cmds = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_cmds.c")
+	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
+	tr_curve = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_curve.c")
+	tr_surface = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_surface.c")
+	tr_font = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_font.c")
+	tr_image = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_image.c")
+	tr_shade = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shade.c")
+	common = _read_text(COMMON)
+	cl_main = _read_text(CL_MAIN)
+	qcommon_cvar = _read_text(QCOMMON_CVAR)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+	retail_hlil_part06 = _read_text(QL_STEAM_HLIL_PART06)
+
+	assert 'DAT_01740e8c = (*DAT_01740d40)("r_uifullscreen",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'r_uiFullScreen = ri.Cvar_Get( "r_uifullscreen", "0", 0);' in tr_init
+	assert 'r_uiFullScreen = ri.Cvar_Get( "r_uiFullScreen", "0", 0);' not in tr_init
+	assert 'Cvar_Set("r_uiFullScreen", "1");' in common
+	assert 'Cvar_Set("r_uiFullScreen", "1");' in cl_main
+	assert 'Cvar_Set("r_uiFullScreen", "0");' in cl_main
+	assert 'if (!Q_stricmp(var_name, var->name)) {' in qcommon_cvar
+	assert 'if ( pStage->bundle[0].vertexLightmap && ( (r_vertexLight->integer && !r_uiFullScreen->integer) || glConfig.hardwareType == GLHW_PERMEDIA2 ) && r_lightmap->integer )' in tr_shade
+
+	assert 'DAT_01740f9c = (*DAT_01740d40)("r_subdivisions",&DAT_0052ef24,0x40);' in retail_ghidra
+	assert '0052ef24  data_52ef24:' in retail_hlil_part06
+	assert 'r_subdivisions = ri.Cvar_Get ("r_subdivisions", "4", CVAR_ROM);' in tr_init
+	assert 'if ( maxLen <= r_subdivisions->value ) {' in tr_curve
+
+	assert 'DAT_01740f90 = (*DAT_01740d40)("r_smp",&DAT_0054ffe0,0x40);' in retail_ghidra
+	assert 'r_smp = ri.Cvar_Get( "r_smp", "0", CVAR_ROM );' in tr_init
+	assert 'if ( r_smp->integer ) {' in tr_scene
+	assert 'if ( !r_smp->integer ) {' in tr_cmds
+	assert 'if ( !r_smp->integer || data == backEndData[0]->commands.cmds ) {' in tr_backend
+	assert 'if (r_smp->integer) {' in tr_shader
+
+	assert 'DAT_01740ee4 = (*DAT_01740d40)("r_ignoreFastPath",&DAT_00551624,0x21);' in retail_ghidra
+	assert 'r_ignoreFastPath = ri.Cvar_Get( "r_ignoreFastPath", "1", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'if ( r_ignoreFastPath->integer )' in tr_shader
+
+	assert 'DAT_01740f4c = (*DAT_01740d40)("r_ignoreGLErrors",&DAT_00551624,1);' in retail_ghidra
+	assert 'r_ignoreGLErrors = ri.Cvar_Get( "r_ignoreGLErrors", "1", CVAR_ARCHIVE );' in tr_init
+	assert 'if ( !r_ignoreGLErrors->integer ) {' in tr_cmds
+
+	assert '_DAT_01740e10 = (*DAT_01740d40)("r_ignore",&DAT_00551624,0x200);' in retail_ghidra
+	assert 'r_ignore = ri.Cvar_Get( "r_ignore", "1", CVAR_CHEAT );' in tr_init
+	assert 'VectorMA( origin, r_ignore->value, dir, origin );' in tr_surface
+	assert 'left[0] = r_ignore->value;' in tr_surface
+	assert 'up[1] = r_ignore->value;' in tr_surface
+
+	assert 'DAT_01740dac = (*DAT_01740d40)("r_intensity",&DAT_00551624,0x21);' in retail_ghidra
+	assert 'r_intensity = ri.Cvar_Get ("r_intensity", "1", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'if ( r_intensity->value <= 1 ) {' in tr_image
+	assert 'ri.Cvar_Set( "r_intensity", "1" );' in tr_image
+	assert 'j = i * r_intensity->value;' in tr_image
+
+	assert '_DAT_01740f10 = (*DAT_01740d40)("r_saveFontData",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'r_saveFontData = ri.Cvar_Get( "r_saveFontData", "0", 0 );' in tr_init
+	assert 'if ( r_saveFontData->integer ) {' in tr_font
+	assert 'WriteTGA( pageName, imageBuff, R_FONT_ATLAS_SIZE, R_FONT_ATLAS_SIZE );' in tr_font
+	assert 'ri.FS_WriteFile( cacheName, font, sizeof( fontInfo_t ) );' in tr_font
+
+	assert 'uVar1 = FUN_004d9220(&DAT_0052d9b4,600,0);' in retail_ghidra
+	assert 'DAT_01740f60 = (*DAT_01740d40)("r_maxPolys",uVar1);' in retail_ghidra
+	assert 'r_maxpolys = ri.Cvar_Get( "r_maxPolys", va("%d", MAX_POLYS), 0);' in tr_init
+	assert 'r_maxpolys = ri.Cvar_Get( "r_maxpolys", va("%d", MAX_POLYS), 0);' not in tr_init
+	assert '#define\tMAX_POLYS\t\t600' in tr_local
+	assert 'max_polys = r_maxpolys->integer;' in tr_init
+	assert 'if (max_polys < MAX_POLYS)' in tr_init
+	assert 'max_polys = MAX_POLYS;' in tr_init
+
+	assert 'uVar1 = FUN_004d9220(&DAT_0052d9b4,3000,0);' in retail_ghidra
+	assert 'DAT_01740eec = (*DAT_01740d40)("r_maxPolyVerts",uVar1);' in retail_ghidra
+	assert 'r_maxpolyverts = ri.Cvar_Get( "r_maxPolyVerts", va("%d", MAX_POLYVERTS), 0);' in tr_init
+	assert 'r_maxpolyverts = ri.Cvar_Get( "r_maxpolyverts", va("%d", MAX_POLYVERTS), 0);' not in tr_init
+	assert '#define\tMAX_POLYVERTS\t3000' in tr_local
+	assert 'max_polyverts = r_maxpolyverts->integer;' in tr_init
+	assert 'if (max_polyverts < MAX_POLYVERTS)' in tr_init
+	assert 'max_polyverts = MAX_POLYVERTS;' in tr_init
+
+
+def test_engine_cvar_fortieth_renderer_status_sky_batch_tranche_matches_retail_contracts() -> None:
+	tr_init = _read_text(TR_INIT)
+	tr_local = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_local.h")
+	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
+	tr_sky = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_sky.c")
+	tr_shade = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shade.c")
+	win_glimp = _read_text(WIN_GLIMP)
+	cl_main = _read_text(CL_MAIN)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+	retail_hlil = _read_text(QL_STEAM_HLIL_PART02)
+
+	assert 'DAT_01740eb4 = (*DAT_01740d40)("r_fastSkyColor","0x000000",0x80801);' in retail_ghidra
+	assert 'r_fastSkyColor = ri.Cvar_Get( "r_fastSkyColor", "0x000000", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
+	assert 'extern cvar_t\t*r_fastSkyColor;' in tr_local
+	assert 'static void RB_GetFastSkyClearColor( vec3_t color ) {' in tr_backend
+	assert 'rgb = strtoul( string, &end, 0 );' in tr_backend
+	assert 'qglClearColor( fastSkyColor[0], fastSkyColor[1], fastSkyColor[2], 1.0f );' in tr_backend
+
+	assert 'DAT_01740ee8 = (*DAT_01740d40)("r_forceMergeEntities",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_forceMergeEntities = ri.Cvar_Get( "r_forceMergeEntities", "0", CVAR_CHEAT );' in tr_init
+	assert 'extern\tcvar_t\t*r_forceMergeEntities;' in tr_local
+	assert '|| ( entityNum != oldEntityNum && !r_forceMergeEntities->integer && !shader->entityMergable ) ) {' in tr_backend
+
+	assert '_DAT_01740efc = (*DAT_01740d40)("r_gl_vendor",&DAT_0052f284,0x840);' in retail_ghidra
+	assert 'r_glVendor = ri.Cvar_Get( "r_gl_vendor", "None", CVAR_ROM | CVAR_PROTECTED );' in tr_init
+	assert 'ri.Cvar_Set( "r_gl_vendor", glConfig.vendor_string );' in win_glimp
+
+	assert '_DAT_01743c04 = (*DAT_01740d40)("r_gl_renderer",&DAT_0052f284,0x840);' in retail_ghidra
+	assert 'r_glRenderer = ri.Cvar_Get( "r_gl_renderer", "None", CVAR_ROM | CVAR_PROTECTED );' in tr_init
+	assert 'ri.Cvar_Set( "r_gl_renderer", glConfig.renderer_string );' in win_glimp
+
+	assert '_DAT_01740e08 = (*DAT_01740d40)("r_gl_reserved",&DAT_0054ffe0,0x840);' in retail_ghidra
+	assert 'r_glReserved = ri.Cvar_Get( "r_gl_reserved", "0", CVAR_ROM | CVAR_PROTECTED );' in tr_init
+	assert '(*DAT_01740d48)("r_gl_reserved",&DAT_00551624);' in retail_ghidra
+	assert 'ri.Cvar_Set( "r_gl_reserved", "1" );' in win_glimp
+	assert 'if ( qglGenQueriesARB && qglDeleteQueriesARB && qglIsQueryARB &&' in win_glimp
+
+	assert 'DAT_01740e74 = (*DAT_01740d40)("r_stereo",&DAT_0054ffe0,0x21);' in retail_ghidra
+	assert 'r_stereo = ri.Cvar_Get( "r_stereo", "0", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'GLW_CreatePFD( &pfd, colorbits, depthbits, stencilbits, r_stereo->integer );' in win_glimp
+	assert 'if ( !( pfd.dwFlags & PFD_STEREO ) && ( r_stereo->integer != 0 ) )' in win_glimp
+
+	assert 'DAT_01740e20 = (*DAT_01740d40)("r_drawSkyFloor",&DAT_00551624,0x80001);' in retail_ghidra
+	assert 'if (*(data_1740e20 + 0x30) != 0 || j != 5)' in retail_hlil
+	assert 'r_drawSkyFloor = ri.Cvar_Get( "r_drawSkyFloor", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_drawSkyFloor, 0, 1, qtrue );' in tr_init
+	assert 'if ( i == 5 && ( !r_drawSkyFloor || !r_drawSkyFloor->integer ) )' in tr_sky
+
+	assert '_DAT_01740e18 = (*DAT_01740d40)("r_noFastRestart",&DAT_0054ffe0,1);' in retail_ghidra
+	assert 'r_noFastRestart = ri.Cvar_Get( "r_noFastRestart", "0", CVAR_ARCHIVE );' in tr_init
+	assert 'AssertCvarRange( r_noFastRestart, 0, 1, qtrue );' in tr_init
+	assert 'if ( !Cvar_VariableIntegerValue( "r_noFastRestart" ) && Cmd_Argc() > 1 && !Q_stricmp( Cmd_Argv( 1 ), "fast" ) ) {' in cl_main
+
+	assert 'DAT_01740ea4 = (*DAT_01740d40)("r_skipSmallBatches",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_skipSmallBatches = ri.Cvar_Get( "r_skipSmallBatches", "0", CVAR_CHEAT );' in tr_init
+	assert 'AssertCvarRange( r_skipSmallBatches, 0, 1, qtrue );' in tr_init
+	assert 'if ( r_skipSmallBatches && r_skipSmallBatches->integer && numIndexes > 0 && numIndexes <= SMALL_BATCH_INDEX_THRESHOLD ) {' in tr_shade
+
+	assert 'DAT_01740f84 = (*DAT_01740d40)("r_teleporterFlash",&DAT_00551624,0x80801);' in retail_ghidra
+	assert 'r_teleporterFlash = ri.Cvar_Get( "r_teleporterFlash", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_teleporterFlash, 0, 1, qtrue );' in tr_init
+	assert 'if ( !r_teleporterFlash || !r_teleporterFlash->integer ) {' in tr_backend
+	assert 'ri.Printf( PRINT_DEVELOPER, "QA: r_teleporterFlash overlay active\\n" );' in tr_backend
+
+
+def test_engine_cvar_fortyfirst_renderer_platform_scene_tranche_matches_retail_contracts() -> None:
+	tr_init = _read_text(TR_INIT)
+	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
+	tr_cmds = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_cmds.c")
+	tr_main = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_main.c")
+	tr_surface = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_surface.c")
+	win_glimp = _read_text(WIN_GLIMP)
+	cl_main = _read_text(CL_MAIN)
+	cl_cin = _read_text(REPO_ROOT / "src" / "code" / "client" / "cl_cin.c")
+	ui_main = _read_text(UI_MAIN)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+	retail_hlil = _read_text(QL_STEAM_HLIL_PART02)
+
+	assert '0046c2ff  data_1740d40("r_lastValidRenderer", "(uninitialized)", 1)' in retail_hlil
+	assert 'cvar_t *lastValidRenderer = ri.Cvar_Get( "r_lastValidRenderer", "(uninitialized)", CVAR_ARCHIVE );' in win_glimp
+	assert 'if ( Q_stricmp( lastValidRenderer->string, glConfig.renderer_string ) )' in win_glimp
+	assert 'ri.Cvar_Set( "r_lastValidRenderer", glConfig.renderer_string );' in win_glimp
+
+	assert '0046c396  data_16e40ec = data_1740d40("r_allowSoftwareGL", &data_54ffe0, 0x20)' in retail_hlil
+	assert 'r_allowSoftwareGL = ri.Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );' in win_glimp
+	assert 'if ( !r_allowSoftwareGL->integer )' in win_glimp
+	assert 'ri.Printf( PRINT_ALL, "...using software emulation\\n" );' in win_glimp
+
+	assert '_DAT_01740f54 = (*DAT_01740d40)("r_inGameVideo",&DAT_00551624,1);' in retail_ghidra
+	assert 'DAT_01647eec = FUN_004ce0d0("r_inGameVideo",&DAT_00551624,1);' in retail_ghidra
+	assert 'r_inGameVideo = ri.Cvar_Get( "r_inGameVideo", "1", CVAR_ARCHIVE );' in tr_init
+	assert 'cl_inGameVideo = Cvar_Get ("r_inGameVideo", "1", CVAR_ARCHIVE);' in cl_main
+	assert 'cinTable[currentHandle].playonwalls = cl_inGameVideo->integer;' in cl_cin
+	assert 'if (cl_inGameVideo->integer == 0 && cinTable[handle].playonwalls == 1) {' in cl_cin
+	assert 'trap_Cvar_SetValue( "r_inGameVideo", 1 );' in ui_main
+	assert 'trap_Cvar_SetValue( "r_inGameVideo", 0 );' in ui_main
+
+	assert 'DAT_01740e40 = (*DAT_01740d40)("r_contrast",&DAT_00551620,0x80001);' in retail_ghidra
+	assert 'r_contrast = ri.Cvar_Get( "r_contrast", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'if ( r_contrast && r_contrast->modified ) {' in tr_init
+	assert 'contrast = r_contrast->value;' in tr_backend
+
+	assert 'DAT_01740edc = (*DAT_01740d40)("r_railWidth",&DAT_0052f040,0x80001);' in retail_ghidra
+	assert 'r_railWidth = ri.Cvar_Get( "r_railWidth", "16", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'int\t\tspanWidth = r_railWidth->integer;' in tr_surface
+
+	assert 'DAT_01740e60 = (*DAT_01740d40)("r_railCoreWidth",&DAT_0052f068,0x80001);' in retail_ghidra
+	assert 'r_railCoreWidth = ri.Cvar_Get( "r_railCoreWidth", "6", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'DoRailCore( start, end, right, len, r_railCoreWidth->integer );' in tr_surface
+
+	assert 'DAT_01740e4c = (*DAT_01740d40)("r_railSegmentLength",&DAT_0052f574,0x80001);' in retail_ghidra
+	assert 'r_railSegmentLength = ri.Cvar_Get( "r_railSegmentLength", "32", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'numSegs = ( len ) / r_railSegmentLength->value;' in tr_surface
+	assert 'VectorScale( vec, r_railSegmentLength->value, vec );' in tr_surface
+
+	assert 'DAT_01740de0 = (*DAT_01740d40)("r_portalOnly",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_portalOnly = ri.Cvar_Get ("r_portalOnly", "0", CVAR_CHEAT );' in tr_init
+	assert 'if ( r_portalOnly->integer ) {' in tr_main
+
+	assert 'DAT_01740f6c = (*DAT_01740d40)("r_speeds",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_speeds = ri.Cvar_Get ("r_speeds", "0", CVAR_CHEAT);' in tr_init
+	assert 'if ( !r_speeds->integer ) {' in tr_cmds
+	assert 'else if ( r_speeds->integer == 6 )' in tr_cmds
+	assert 'if ( r_speeds->integer ) {' in tr_backend
+
+	assert 'DAT_01740de4 = (*DAT_01740d40)("r_textureMode","GL_LINEAR_MIPMAP_LINEAR",0x80001);' in retail_ghidra
+	assert 'r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'GL_TextureMode( r_textureMode->string );' in tr_cmds
+	assert 'ri.Cvar_Set( "r_textureMode", "GL_LINEAR_MIPMAP_NEAREST" );' in win_glimp
+
+
+def test_engine_cvar_fortysecond_renderer_postprocess_state_tranche_matches_retail_contracts() -> None:
+	tr_init = _read_text(TR_INIT)
+	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+	retail_hlil_part01 = _read_text(QL_STEAM_HLIL_PART01)
+	retail_hlil_part02 = _read_text(QL_STEAM_HLIL_PART02)
+
+	assert 'DAT_01740ed4 = (*DAT_01740d40)("r_enablePostProcess",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_enablePostProcess = ri.Cvar_Get( "r_enablePostProcess", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_enablePostProcess, 0, 1, qtrue );' in tr_init
+	assert 'triggerReset = (qboolean)(r_enablePostProcess && r_enablePostProcess->modified);' in tr_init
+	assert 'wantPostProcess = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer);' in tr_backend
+	assert 'if ( !wantPostProcess ) {' in tr_backend
+
+	assert 'DAT_01740e38 = (*DAT_01740d40)("r_enableBloom",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_enableBloom = ri.Cvar_Get( "r_enableBloom", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_enableBloom, 0, 2, qtrue );' in tr_init
+	assert 'triggerReset = (qboolean)(triggerReset || (r_enableBloom && r_enableBloom->modified));' in tr_init
+	assert 'static int RBPP_GetBloomMode( void ) {' in tr_backend
+	assert 'if ( r_enableBloom->integer == 1 ) {' in tr_backend
+	assert 'if ( bloomMode == 2 &&' in tr_backend
+
+	assert 'DAT_01740f04 = (*DAT_01740d40)("r_enableColorCorrect",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_enableColorCorrect = ri.Cvar_Get( "r_enableColorCorrect", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_enableColorCorrect, 0, 1, qtrue );' in tr_init
+	assert 'colorCorrectEnabled = (qboolean)(r_enablePostProcess && r_enablePostProcess->integer &&' in tr_init
+	assert 'wantColorCorrect = (qboolean)(wantPostProcess && r_enableColorCorrect && r_enableColorCorrect->integer);' in tr_backend
+	assert 'backEnd.colorCorrectActive = RBPP_InitColorCorrectResources();' in tr_backend
+
+	assert 'DAT_01740e58 = (*DAT_01740d40)("r_postProcessActive",&DAT_0054ffe0,0x140);' in retail_ghidra
+	assert 'r_postProcessActive = ri.Cvar_Get( "r_postProcessActive", "0", CVAR_TEMP | CVAR_ROM );' in tr_init
+	assert 'data_1740d48("r_postProcessActive", sub_4d9220(&data_52d9b4))' in retail_hlil_part02
+	assert 'ri.Cvar_Set( "r_postProcessActive", backEnd.postProcessActive ? "1" : "0" );' in tr_backend
+	assert 'return backEnd.postProcessActive;' in tr_backend
+
+	assert 'DAT_01740eb8 = (*DAT_01740d40)("r_bloomActive",&DAT_0054ffe0,0x80140);' in retail_ghidra
+	assert 'r_bloomActive = ri.Cvar_Get( "r_bloomActive", "0", CVAR_TEMP | CVAR_ROM | CVAR_CLOUD );' in tr_init
+	assert 'data_1740d48("r_bloomActive", &data_54ffe0)' in retail_hlil_part01
+	assert 'data_1740d48("r_bloomActive", &data_551624, var_8_5)' in retail_hlil_part01
+	assert 'ri.Cvar_Set( "r_bloomActive", backEnd.bloomActive ? "1" : "0" );' in tr_backend
+	assert 'if ( !backEnd.bloomActive || !s_postProcess.sceneTarget.initialized ||' in tr_backend
+
+	assert 'DAT_01740d90 = (*DAT_01740d40)("r_colorCorrectActive",&DAT_0054ffe0,0x140);' in retail_ghidra
+	assert 'r_colorCorrectActive = ri.Cvar_Get( "r_colorCorrectActive", "0", CVAR_TEMP | CVAR_ROM );' in tr_init
+	assert 'data_1740d48("r_colorCorrectActive", sub_4d9220(&data_52d9b4))' in retail_hlil_part02
+	assert 'ri.Cvar_Set( "r_colorCorrectActive", backEnd.colorCorrectActive ? "1" : "0" );' in tr_backend
+	assert 'if ( !backEnd.colorCorrectActive || !s_postProcess.colorCorrectTexture || !s_postProcess.colorCorrectProgram.programObject ) {' in tr_backend
+
+	assert '_DAT_01740f78 = (*DAT_01740d44)("r_bloomPasses",&DAT_00551624,&DAT_00551624,&DAT_0052f5d8,0x82821)' in retail_ghidra
+	assert 'r_bloomPasses = ri.Cvar_GetBounded( "r_bloomPasses", "1", "1", "2", CVAR_ARCHIVE | CVAR_LATCH | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_BOUNDED_DISCRETE | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_bloomPasses, 1, 2, qtrue );' in tr_init
+	assert 'r_bloomPasses' not in tr_backend
+
+	assert 'DAT_01743c10 = (*DAT_01740d44)("r_bloomIntensity",&DAT_0052e590,&DAT_0052f660,&DAT_0052f5f0,' in retail_ghidra
+	assert 'r_bloomIntensity = ri.Cvar_GetBounded( "r_bloomIntensity", "0.5", "0.0", "10.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_bloomIntensity, 0.0f, 10.0f, qfalse );' in tr_init
+	assert 'if ( r_bloomIntensity && r_bloomIntensity->modified ) {' in tr_init
+	assert 'bloomIntensity = r_bloomIntensity ? r_bloomIntensity->value : 0.5f;' in tr_backend
+	assert 's_postProcess.procs.qglUniform1fARBFunc( s_postProcess.combineProgram.bloomIntensityUniform, bloomIntensity );' in tr_backend
+
+	assert 'DAT_01740e84 = (*DAT_01740d44)("r_bloomBrightThreshold",&DAT_0052f610,&DAT_0052f660,&DAT_00551620,' in retail_ghidra
+	assert 'r_bloomBrightThreshold = ri.Cvar_GetBounded( "r_bloomBrightThreshold", "0.25", "0.0", "1.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_bloomBrightThreshold, 0.0f, 1.0f, qfalse );' in tr_init
+	assert 'if ( r_bloomBrightThreshold && r_bloomBrightThreshold->modified ) {' in tr_init
+	assert 'brightThreshold = r_bloomBrightThreshold ? r_bloomBrightThreshold->value : 0.25f;' in tr_backend
+	assert 's_postProcess.procs.qglUniform1fARBFunc( s_postProcess.brightPassProgram.brightThresholdUniform, brightThreshold );' in tr_backend
+
+	assert '_DAT_01740dc8 =' in retail_ghidra
+	assert '(*DAT_01740d44)("r_bloomBlurScale",&DAT_0052f660,&DAT_00551620,&DAT_0052f62c,0x81801);' in retail_ghidra
+	assert 'r_bloomBlurScale = ri.Cvar_GetBounded( "r_bloomBlurScale", "0.0", "1.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert 'AssertCvarRange( r_bloomBlurScale, 1.0f, 2.0f, qfalse );' in tr_init
+	assert 'r_bloomBlurScale' not in tr_backend
+	assert '"p_blurScale"' not in tr_backend
+
+
+def test_engine_cvar_fortythird_renderer_backend_drawstate_tranche_matches_retail_contracts() -> None:
+	tr_init = _read_text(TR_INIT)
+	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
+	tr_bsp = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_bsp.c")
+	tr_cmds = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_cmds.c")
+	tr_shade = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shade.c")
+	win_glimp = _read_text(WIN_GLIMP)
+	win_qgl = _read_text(REPO_ROOT / "src" / "code" / "win32" / "win_qgl.c")
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+	retail_hlil_part02 = _read_text(QL_STEAM_HLIL_PART02)
+
+	assert 'DAT_01740e98 = (*DAT_01740d40)("r_clear",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_clear = ri.Cvar_Get ("r_clear", "0", CVAR_CHEAT);' in tr_init
+	assert 'if ( r_clear->integer ) {' in tr_backend
+	assert 'qglClearColor( 1, 0, 0.5, 1 );' in tr_backend
+	assert 'qglClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );' in tr_backend
+
+	assert 'DAT_01740e94 = (*DAT_01740d40)("r_drawBuffer","GL_BACK",0x200);' in retail_ghidra
+	assert 'r_drawBuffer = ri.Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );' in tr_init
+	assert 'if ( !Q_stricmp( r_drawBuffer->string, "GL_FRONT" ) ) {' in tr_cmds
+	assert 'cmd->buffer = (int)GL_FRONT;' in tr_cmds
+	assert 'cmd->buffer = (int)GL_BACK;' in tr_cmds
+	assert 'if ( Q_stricmp( r_drawBuffer->string, "GL_FRONT" ) != 0 )' in win_glimp
+
+	assert 'DAT_01740f80 = (*DAT_01740d40)("r_logFile",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_logFile = ri.Cvar_Get( "r_logFile", "0", CVAR_CHEAT );' in tr_init
+	assert 'result = data_1740d48("r_logFile", sub_4d9220(&data_52d9b4))' in retail_hlil_part02
+	assert 'QGL_EnableLogging( r_logFile->integer );' in win_glimp
+	assert 'QGL_EnableLogging( r_logFile->integer );' in win_qgl
+	assert 'ri.Cvar_Set( "r_logFile", va("%d", r_logFile->integer - 1 ) );' in win_qgl
+	assert 'if ( r_logFile->integer )' in tr_shade
+
+	assert 'DAT_01740da8 = (*DAT_01740d40)("r_lightmap",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'r_lightmap = ri.Cvar_Get ("r_lightmap", "0", 0 );' in tr_init
+	assert 'if ( r_lightmap->integer == 2 )' in tr_bsp
+	assert 'if ( r_lightmap->integer ) {' in tr_shade
+	assert 'if ( r_lightmap->integer && ( pStage->bundle[0].isLightmap || pStage->bundle[1].isLightmap || pStage->bundle[0].vertexLightmap ) )' in tr_shade
+
+	assert 'DAT_01740dd0 = (*DAT_01740d40)("r_measureOverdraw",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_measureOverdraw = ri.Cvar_Get( "r_measureOverdraw", "0", CVAR_CHEAT );' in tr_init
+	assert 'data_1740d48("r_measureOverdraw", &data_54ffe0)' in retail_hlil_part02
+	assert 'if ( r_measureOverdraw->integer )' in tr_cmds
+	assert 'ri.Cvar_Set( "r_measureOverdraw", "0" );' in tr_cmds
+	assert 'qglEnable( GL_STENCIL_TEST );' in tr_cmds
+	assert 'if ( r_measureOverdraw->integer || r_shadows->integer == 2 )' in tr_backend
+	assert 'qglReadPixels( 0, 0, glConfig.vidWidth, glConfig.vidHeight, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, stencilReadback );' in tr_backend
+
+	assert 'DAT_01740e50 = (*DAT_01740d40)("r_offsetfactor",&DAT_0052f0f4,0x200);' in retail_ghidra
+	assert 'r_offsetFactor = ri.Cvar_Get( "r_offsetfactor", "-1", CVAR_CHEAT );' in tr_init
+	assert 'qglPolygonOffset( r_offsetFactor->value, r_offsetUnits->value );' in tr_shade
+
+	assert 'DAT_01740ed0 = (*DAT_01740d40)("r_offsetunits",&DAT_0052f1dc,0x200);' in retail_ghidra
+	assert 'r_offsetUnits = ri.Cvar_Get( "r_offsetunits", "-2", CVAR_CHEAT );' in tr_init
+	assert 'if ( input->shader->polygonOffset )' in tr_shade
+
+	assert 'DAT_01740f58 = (*DAT_01740d40)("r_primitives",&DAT_0054ffe0,1);' in retail_ghidra
+	assert 'r_primitives = ri.Cvar_Get( "r_primitives", "0", CVAR_ARCHIVE );' in tr_init
+	assert 'primitives = r_primitives->integer;' in tr_init
+	assert 'primitives = r_primitives->integer;' in tr_shade
+	assert 'if ( primitives == 0 ) {' in tr_shade
+
+	assert 'DAT_01740f74 = (*DAT_01740d40)("r_swapInterval",&DAT_0054ffe0,0x80001);' in retail_ghidra
+	assert 'r_swapInterval = ri.Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
+	assert 'r_swapInterval->modified = qtrue;\t// force a set next frame' in win_glimp
+	assert 'if ( r_swapInterval->modified ) {' in win_glimp
+	assert 'qwglSwapIntervalEXT( r_swapInterval->integer );' in win_glimp
+
+	assert 'DAT_01740d94 = (*DAT_01740d40)("r_verbose",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_verbose = ri.Cvar_Get( "r_verbose", "0", CVAR_CHEAT );' in tr_init
+	assert 'if ( r_verbose->integer )' in win_glimp
+	assert 'ri.Printf( PRINT_ALL, "...PFD %d rejected, software acceleration\\n", i );' in win_glimp
+	assert 'ri.Printf( PRINT_ALL, "...PFD %d rejected, not RGBA\\n", i );' in win_glimp
+	assert 'ri.Printf( PRINT_ALL, "...PFD %d rejected, improper flags (%x instead of %x)\\n", i, pfds[i].dwFlags, pPFD->dwFlags );' in win_glimp
 
 
 def test_engine_cvar_twentyfourth_renderer_lighting_quality_tranche_matches_retail_contracts() -> None:
@@ -1470,6 +2431,71 @@ def test_engine_cvar_twentyfifth_renderer_debug_execution_tranche_matches_retail
 	assert 'if ( r_measureOverdraw->integer || r_shadows->integer == 2 )' in tr_backend
 
 
+def test_engine_cvar_thirtysixth_renderer_debug_overlay_tranche_matches_retail_contracts() -> None:
+	tr_init = _read_text(TR_INIT)
+	tr_bsp = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_bsp.c")
+	tr_shader = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shader.c")
+	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
+	tr_cmds = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_cmds.c")
+	tr_light = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_light.c")
+	tr_world = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_world.c")
+	tr_main = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_main.c")
+	tr_shade = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shade.c")
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+
+	assert 'DAT_01740e80 = (*DAT_01740d40)("r_fullbright",&DAT_0054ffe0,0x80821);' in retail_ghidra
+	assert 'r_fullbright = ri.Cvar_Get ("r_fullbright", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
+	assert 'if ( r_fullbright->integer ) {' in tr_bsp
+	assert 'lightmapNum = LIGHTMAP_WHITEIMAGE;' in tr_bsp
+
+	assert 'DAT_01740f14 = (*DAT_01740d40)("r_singleShader",&DAT_0054ffe0,0x220);' in retail_ghidra
+	assert 'r_singleShader = ri.Cvar_Get ("r_singleShader", "0", CVAR_CHEAT | CVAR_LATCH );' in tr_init
+	assert 'if ( r_singleShader->integer && !surf->shader->isSky ) {' in tr_bsp
+	assert 'surf->shader = tr.defaultShader;' in tr_bsp
+
+	assert 'DAT_01740dc4 = (*DAT_01740d40)("r_printShaders",&DAT_0054ffe0,0);' in retail_ghidra
+	assert 'r_printShaders = ri.Cvar_Get( "r_printShaders", "0", 0 );' in tr_init
+	assert 'if ( r_printShaders->integer ) {' in tr_shader
+	assert 'ri.Printf( PRINT_ALL, "*SHADER* %s\\n", name );' in tr_shader
+
+	assert 'DAT_01740d9c = (*DAT_01740d40)("r_showImages",&DAT_0054ffe0,0x100);' in retail_ghidra
+	assert 'r_showImages = ri.Cvar_Get( "r_showImages", "0", CVAR_TEMP );' in tr_init
+	assert 'if ( r_showImages->integer == 2 ) {' in tr_backend
+	assert 'if ( r_showImages->integer ) {' in tr_backend
+
+	assert 'DAT_01740f50 = (*DAT_01740d40)("r_showSmp",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_showSmp = ri.Cvar_Get ("r_showSmp", "0", CVAR_CHEAT);' in tr_init
+	assert 'if ( r_showSmp->integer ) {' in tr_cmds
+	assert 'ri.Printf( PRINT_ALL, "R" );' in tr_cmds
+	assert 'ri.Printf( PRINT_ALL, "." );' in tr_cmds
+
+	assert 'DAT_01740ef4 = (*DAT_01740d40)("r_skipBackEnd",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_skipBackEnd = ri.Cvar_Get ("r_skipBackEnd", "0", CVAR_CHEAT);' in tr_init
+	assert 'if ( !r_skipBackEnd->integer ) {' in tr_cmds
+
+	assert 'DAT_01740dfc = (*DAT_01740d40)("r_skipLargeBatches",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_skipLargeBatches = ri.Cvar_Get( "r_skipLargeBatches", "0", CVAR_CHEAT );' in tr_init
+	assert 'AssertCvarRange( r_skipLargeBatches, 0, 1, qtrue );' in tr_init
+	assert 'if ( r_skipLargeBatches && r_skipLargeBatches->integer && numIndexes >= LARGE_BATCH_INDEX_THRESHOLD ) {' in tr_shade
+
+	assert 'DAT_01740e3c = (*DAT_01740d40)("r_debuglight",&DAT_0054ffe0,0x100);' in retail_ghidra
+	assert 'r_debugLight = ri.Cvar_Get( "r_debuglight", "0", CVAR_TEMP );' in tr_init
+	assert 'if ( r_debugLight->integer ) {' in tr_light
+	assert 'LogLight( ent );' in tr_light
+
+	assert 'DAT_01740d8c = (*DAT_01740d40)("r_debugFontAtlas",&DAT_0054ffe0,0x100);' in retail_ghidra
+	assert 'r_debugFontAtlas = ri.Cvar_Get( "r_debugFontAtlas", "0", CVAR_TEMP );' in tr_init
+	assert 'if ( r_debugFontAtlas->integer ) {' in tr_backend
+	assert 'RB_ShowFontAtlas();' in tr_backend
+
+	assert 'DAT_01740f7c = (*DAT_01740d40)("r_debugAds",&DAT_0054ffe0,0x100);' in retail_ghidra
+	assert 'r_debugAds = ri.Cvar_Get( "r_debugAds", "0", CVAR_TEMP );' in tr_init
+	assert 'r_debugAds = ri.Cvar_Get( "r_debugAds", "0", CVAR_CHEAT );' not in tr_init
+	assert 'R_DebugAdvertisements();' in tr_main
+	assert 'if ( !r_debugAds || !r_debugAds->integer || tr.viewParms.frameSceneNum != 1 ) {' in tr_world
+	assert 'ri.AdvertisementBridge_GetCellLabel( advertisement->cellId, buffer, sizeof( buffer ) );' in tr_world
+
+
 def test_engine_cvar_twentysixth_renderer_visibility_debug_tranche_matches_retail_contracts() -> None:
 	tr_init = _read_text(TR_INIT)
 	tr_world = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_world.c")
@@ -1481,14 +2507,19 @@ def test_engine_cvar_twentysixth_renderer_visibility_debug_tranche_matches_retai
 	tr_shader = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_shader.c")
 	win_glimp = _read_text(WIN_GLIMP)
 	win_qgl = _read_text(REPO_ROOT / "src" / "code" / "win32" / "win_qgl.c")
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
 
-	assert 'r_nocull = ri.Cvar_Get ("r_nocull", "0", CVAR_CHEAT);' in tr_init
+	assert 'DAT_01740e90 = (*DAT_01740d40)("r_noCull",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_nocull = ri.Cvar_Get ("r_noCull", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_nocull = ri.Cvar_Get ("r_nocull", "0", CVAR_CHEAT);' not in tr_init
 	assert 'if ( r_nocull->integer ) {' in tr_world
 
-	assert 'r_novis = ri.Cvar_Get ("r_novis", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_novis = ri.Cvar_Get ("r_noVis", "0", CVAR_CHEAT);' in tr_init
 	assert 'if ( r_novis->integer || tr.viewCluster == -1 ) {' in tr_world
 
-	assert 'r_showcluster = ri.Cvar_Get ("r_showcluster", "0", CVAR_CHEAT);' in tr_init
+	assert 'DAT_01740db4 = (*DAT_01740d40)("r_showCluster",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_showcluster = ri.Cvar_Get ("r_showCluster", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_showcluster = ri.Cvar_Get ("r_showcluster", "0", CVAR_CHEAT);' not in tr_init
 	assert 'if ( r_showcluster->modified || r_showcluster->integer ) {' in tr_world
 	assert 'ri.Printf( PRINT_ALL, "cluster:%i  area:%i\\n", cluster, leaf->area );' in tr_world
 
@@ -1509,19 +2540,27 @@ def test_engine_cvar_twentysixth_renderer_visibility_debug_tranche_matches_retai
 	assert 'if ( r_logFile->integer ) {' in tr_shade
 	assert 'GLimp_LogComment( va("--- RB_StageIteratorLightmappedMultitexture( %s ) ---\\n", tess.shader->name) );' in tr_shade
 
-	assert 'r_showtris = ri.Cvar_Get ("r_showtris", "0", CVAR_CHEAT);' in tr_init
+	assert 'DAT_01740e88 = (*DAT_01740d40)("r_showTris",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_showtris = ri.Cvar_Get ("r_showTris", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_showtris = ri.Cvar_Get ("r_showtris", "0", CVAR_CHEAT);' not in tr_init
 	assert 'if ( r_showtris->integer ) {' in tr_shade
 	assert 'DrawTris (input);' in tr_shade
 
-	assert 'r_showsky = ri.Cvar_Get ("r_showsky", "0", CVAR_CHEAT);' in tr_init
+	assert 'DAT_01740f64 = (*DAT_01740d40)("r_showSky",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_showsky = ri.Cvar_Get ("r_showSky", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_showsky = ri.Cvar_Get ("r_showsky", "0", CVAR_CHEAT);' not in tr_init
 	assert 'if ( r_showsky->integer ) {' in tr_sky
 	assert 'qglDepthRange( 0.0, 0.0 );' in tr_sky
 
-	assert 'r_shownormals = ri.Cvar_Get ("r_shownormals", "0", CVAR_CHEAT);' in tr_init
+	assert 'DAT_01740dec = (*DAT_01740d40)("r_showNormals",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_shownormals = ri.Cvar_Get ("r_showNormals", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_shownormals = ri.Cvar_Get ("r_shownormals", "0", CVAR_CHEAT);' not in tr_init
 	assert 'if ( r_shownormals->integer ) {' in tr_shade
 	assert 'DrawNormals (input);' in tr_shade
 
-	assert 'r_noportals = ri.Cvar_Get ("r_noportals", "0", CVAR_CHEAT);' in tr_init
+	assert 'DAT_01743c0c = (*DAT_01740d40)("r_noPortals",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_noportals = ri.Cvar_Get ("r_noPortals", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_noportals = ri.Cvar_Get ("r_noportals", "0", CVAR_CHEAT);' not in tr_init
 	assert 'if ( r_noportals->integer || (r_fastsky->integer == 1) ) {' in tr_main
 
 
@@ -1535,25 +2574,30 @@ def test_engine_cvar_twentyseventh_renderer_world_override_tranche_matches_retai
 	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
 	tr_cmds = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_cmds.c")
 	win_glimp = _read_text(WIN_GLIMP)
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
 
-	assert 'r_norefresh = ri.Cvar_Get ("r_norefresh", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_norefresh = ri.Cvar_Get ("r_noRefresh", "0", CVAR_CHEAT);' in tr_init
 	assert 'if ( r_norefresh->integer ) {' in tr_scene
 
-	assert 'r_drawentities = ri.Cvar_Get ("r_drawentities", "1", CVAR_CHEAT );' in tr_init
+	assert 'r_drawentities = ri.Cvar_Get ("r_drawEntities", "1", CVAR_CHEAT );' in tr_init
 	assert 'if ( !r_drawentities->integer ) {' in tr_main
 
-	assert 'r_nocurves = ri.Cvar_Get ("r_nocurves", "0", CVAR_CHEAT );' in tr_init
+	assert 'DAT_01740dcc = (*DAT_01740d40)("r_noCurves",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_nocurves = ri.Cvar_Get ("r_noCurves", "0", CVAR_CHEAT );' in tr_init
+	assert 'r_nocurves = ri.Cvar_Get ("r_nocurves", "0", CVAR_CHEAT );' not in tr_init
 	assert 'if ( r_nocurves->integer ) {' in tr_world
 	assert 'return qtrue;' in tr_world
 
-	assert 'r_drawworld = ri.Cvar_Get ("r_drawworld", "1", CVAR_CHEAT );' in tr_init
+	assert 'r_drawworld = ri.Cvar_Get ("r_drawWorld", "1", CVAR_CHEAT );' in tr_init
 	assert 'if ( !r_drawworld->integer ) {' in tr_world
 
 	assert 'r_lightmap = ri.Cvar_Get ("r_lightmap", "0", 0 );' in tr_init
 	assert 'if ( r_lightmap->integer == 2 )' in tr_bsp
 	assert 'if ( r_lightmap->integer ) {' in tr_shade
 
-	assert 'r_nobind = ri.Cvar_Get ("r_nobind", "0", CVAR_CHEAT);' in tr_init
+	assert 'DAT_01740e6c = (*DAT_01740d40)("r_noBind",&DAT_0054ffe0,0x200);' in retail_ghidra
+	assert 'r_nobind = ri.Cvar_Get ("r_noBind", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_nobind = ri.Cvar_Get ("r_nobind", "0", CVAR_CHEAT);' not in tr_init
 	assert 'if ( r_nobind->integer && tr.dlightImage ) {' in tr_backend
 
 	assert 'r_clear = ri.Cvar_Get ("r_clear", "0", CVAR_CHEAT);' in tr_init
@@ -1567,7 +2611,7 @@ def test_engine_cvar_twentyseventh_renderer_world_override_tranche_matches_retai
 	assert 'cmd->buffer = (int)GL_BACK;' in tr_cmds
 	assert 'if ( Q_stricmp( r_drawBuffer->string, "GL_FRONT" ) != 0 )' in win_glimp
 
-	assert 'r_lockpvs = ri.Cvar_Get ("r_lockpvs", "0", CVAR_CHEAT);' in tr_init
+	assert 'r_lockpvs = ri.Cvar_Get ("r_lockPVS", "0", CVAR_CHEAT);' in tr_init
 	assert 'if ( r_lockpvs->integer ) {' in tr_world
 
 	assert 'r_portalOnly = ri.Cvar_Get ("r_portalOnly", "0", CVAR_CHEAT );' in tr_init
@@ -1583,6 +2627,7 @@ def test_engine_cvar_twentyeighth_renderer_diagnostics_tranche_matches_retail_co
 	tr_surface = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_surface.c")
 	tr_font = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_font.c")
 	cm_patch = _read_text(REPO_ROOT / "src" / "code" / "qcommon" / "cm_patch.c")
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
 
 	assert 'r_directedScale = ri.Cvar_Get( "r_directedScale", "1", CVAR_CHEAT );' in tr_init
 	assert 'VectorScale( ent->directedLight, r_directedScale->value, ent->directedLight );' in tr_light
@@ -1595,9 +2640,11 @@ def test_engine_cvar_twentyeighth_renderer_diagnostics_tranche_matches_retail_co
 	assert 'if ( r_debugFontAtlas->integer ) {' in tr_backend
 	assert 'RB_ShowFontAtlas();' in tr_backend
 
+	assert 'DAT_01740f48 = (*DAT_01740d40)("r_debugSort",&DAT_0054ffe0,0x200);' in retail_ghidra
 	assert 'r_debugSort = ri.Cvar_Get( "r_debugSort", "0", CVAR_CHEAT );' in tr_init
 	assert 'if ( r_debugSort->integer && r_debugSort->integer < tess.shader->sort ) {' in tr_shade
 
+	assert 'DAT_01743c00 = (*DAT_01740d40)("r_debugSurface",&DAT_0054ffe0,0x200);' in retail_ghidra
 	assert 'r_debugSurface = ri.Cvar_Get ("r_debugSurface", "0", CVAR_CHEAT);' in tr_init
 	assert 'if ( !r_debugSurface->integer ) {' in tr_main
 	assert 'ri.CM_DrawDebugSurface( R_DebugPolygon );' in tr_main
@@ -1672,6 +2719,66 @@ def test_engine_cvar_twentyninth_renderer_postprocess_extension_tranche_matches_
 	assert 'if ( r_ext_compiled_vertex_array->integer )' in win_glimp
 
 
+def test_engine_cvar_thirtyseventh_renderer_extension_startup_tranche_matches_retail_contracts() -> None:
+	tr_init = _read_text(TR_INIT)
+	win_glimp = _read_text(WIN_GLIMP)
+	win_input = _read_text(WIN_INPUT)
+	tr_backend = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_backend.c")
+	retail_ghidra = _read_text(QL_STEAM_GHIDRA_DECOMPILE)
+	retail_hlil_part02 = _read_text(QL_STEAM_HLIL_PART02)
+
+	assert 'DAT_01740e64 = (*DAT_01740d40)("r_glDriver","opengl32",0x21);' in retail_ghidra
+	assert 'r_glDriver = ri.Cvar_Get( "r_glDriver", OPENGL_DRIVER_NAME, CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'if ( !GLW_LoadOpenGL( r_glDriver->string ) )' in win_glimp
+	assert 'if ( !Q_stricmp( r_glDriver->string, OPENGL_DRIVER_NAME ) )' in win_glimp
+	assert 'else if ( !Q_stricmp( r_glDriver->string, _3DFX_DRIVER_NAME ) )' in win_glimp
+	assert '&& strcmp( Cvar_VariableString("r_glDriver"), _3DFX_DRIVER_NAME) )' in win_input
+
+	assert 'DAT_01740dd4 = (*DAT_01740d40)("r_allowExtensions",&DAT_00551624,0x21);' in retail_ghidra
+	assert 'r_allowExtensions = ri.Cvar_Get( "r_allowExtensions", "1", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'if ( !r_allowExtensions->integer )' in win_glimp
+
+	assert 'DAT_01740ef0 = (*DAT_01740d40)("r_ext_compressed_textures",&DAT_0054ffe0,0x80021);' in retail_ghidra
+	assert 'r_ext_compressed_textures = ri.Cvar_Get( "r_ext_compressed_textures", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'if ( r_ext_compressed_textures->integer )' in win_glimp
+	assert 'glConfig.textureCompression = TC_S3TC;' in win_glimp
+
+	assert 'DAT_01740f18 = (*DAT_01740d40)("r_ext_gamma_control",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_ext_gamma_control = ri.Cvar_Get( "r_ext_gamma_control", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'if ( !r_ignorehwgamma->integer && r_ext_gamma_control->integer )' in win_glimp
+	assert 'qwglGetDeviceGammaRamp3DFX = ( BOOL ( WINAPI * )( HDC, LPVOID ) ) qwglGetProcAddress( "wglGetDeviceGammaRamp3DFX" );' in win_glimp
+
+	assert 'DAT_01740db0 = (*DAT_01740d40)("r_ext_multitexture",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_ext_multitexture = ri.Cvar_Get( "r_ext_multitexture", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'if ( r_ext_multitexture->integer )' in win_glimp
+	assert 'qglActiveTextureARB = ( PFNGLACTIVETEXTUREARBPROC ) qwglGetProcAddress( "glActiveTextureARB" );' in win_glimp
+
+	assert 'DAT_01743c18 = (*DAT_01740d40)("r_ext_compiled_vertex_array",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_ext_compiled_vertex_array = ri.Cvar_Get( "r_ext_compiled_vertex_array", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'if ( r_ext_compiled_vertex_array->integer )' in win_glimp
+	assert 'qglLockArraysEXT = ( void ( APIENTRY * )( int, int ) ) qwglGetProcAddress( "glLockArraysEXT" );' in win_glimp
+
+	assert 'DAT_01743c08 = (*DAT_01740d40)("r_ext_texture_env_add",&DAT_00551624,0x80021);' in retail_ghidra
+	assert 'r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' not in tr_init
+	assert 'if ( r_ext_texture_env_add->integer )' in win_glimp
+	assert 'glConfig.textureEnvAddAvailable = qtrue;' in win_glimp
+
+	assert 'DAT_01740f08 = (*DAT_01740d40)("r_ignoreHWGamma",&DAT_0054ffe0,0x21);' in retail_ghidra
+	assert 'r_ignorehwgamma = ri.Cvar_Get( "r_ignoreHWGamma", "0", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'if ( !r_ignorehwgamma->integer && r_ext_gamma_control->integer )' in win_glimp
+
+	assert 'DAT_01740f70 = (*DAT_01740d40)("r_floatingPointFBOs",&DAT_0054ffe0,0x21);' in retail_ghidra
+	assert 'r_floatingPointFBOs = ri.Cvar_Get( "r_floatingPointFBOs", "0", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'if ( r_floatingPointFBOs && r_floatingPointFBOs->integer ) {' in tr_backend
+	assert 'internalFormat = GL_RGBA16;' in tr_backend
+	assert 'pixelType = GL_FLOAT;' in tr_backend
+
+	assert 'data_16e40e4 = data_1740d40("r_maskMinidriver", &data_54ffe0, 0x20)' in retail_hlil_part02
+	assert 'r_maskMinidriver = ri.Cvar_Get( "r_maskMinidriver", "0", CVAR_LATCH );' in win_glimp
+	assert 'if ( strstr( buffer, "opengl32" ) != 0 || r_maskMinidriver->integer )' in win_glimp
+
+
 def test_engine_cvar_thirtieth_renderer_lod_auxiliary_tranche_matches_retail_contracts() -> None:
 	tr_init = _read_text(TR_INIT)
 	tr_light = _read_text(REPO_ROOT / "src" / "code" / "renderer" / "tr_light.c")
@@ -1684,7 +2791,7 @@ def test_engine_cvar_thirtieth_renderer_lod_auxiliary_tranche_matches_retail_con
 	cl_main = _read_text(CL_MAIN)
 	win_glimp = _read_text(WIN_GLIMP)
 
-	assert 'r_ambientScale = ri.Cvar_Get( "r_ambientScale", "10", CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert 'r_ambientScale = ri.Cvar_GetBounded( "r_ambientScale", "10", "1", "100", CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
 	assert 'AssertCvarRange( r_ambientScale, 1, 100, qtrue );' in tr_init
 	assert 'VectorScale( ent->ambientLight, r_ambientScale->value, ent->ambientLight );' in tr_light
 
@@ -1692,16 +2799,16 @@ def test_engine_cvar_thirtieth_renderer_lod_auxiliary_tranche_matches_retail_con
 	assert 'if ( r_lodCurveError->value < 0 ) {' in tr_surface
 	assert 'return r_lodCurveError->value / d;' in tr_surface
 
-	assert 'r_lodbias = ri.Cvar_Get( "r_lodBias", "-2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert 'r_lodbias = ri.Cvar_GetBounded( "r_lodBias", "-2", "-2", "2", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
 	assert 'AssertCvarRange( r_lodbias, -2, 2, qtrue );' in tr_init
 	assert 'lod += r_lodbias->integer;' in tr_mesh
 
-	assert 'r_lodscale = ri.Cvar_Get( "r_lodScale", "10", CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
+	assert 'r_lodscale = ri.Cvar_GetBounded( "r_lodScale", "10", "1", "50", CVAR_VM_CREATED | CVAR_CLOUD );' in tr_init
 	assert 'AssertCvarRange( r_lodscale, 1, 50, qtrue );' in tr_init
 	assert 'lodscale = r_lodscale->value;' in tr_mesh
 
-	assert 'r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
 	assert 'r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' in tr_init
+	assert 'r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_CLOUD );' not in tr_init
 	assert 'if ( r_ext_texture_env_add->integer )' in win_glimp
 
 	assert 'r_ignorehwgamma = ri.Cvar_Get( "r_ignoreHWGamma", "0", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
@@ -1719,7 +2826,7 @@ def test_engine_cvar_thirtieth_renderer_lod_auxiliary_tranche_matches_retail_con
 	assert 'r_drawSkyFloor = ri.Cvar_Get( "r_drawSkyFloor", "1", CVAR_ARCHIVE | CVAR_CLOUD );' in tr_init
 	assert 'AssertCvarRange( r_drawSkyFloor, 0, 1, qtrue );' in tr_init
 
-	assert 'r_uiFullScreen = ri.Cvar_Get( "r_uiFullScreen", "0", 0);' in tr_init
+	assert 'r_uiFullScreen = ri.Cvar_Get( "r_uifullscreen", "0", 0);' in tr_init
 	assert 'Cvar_Set("r_uiFullScreen", "1");' in common
 	assert 'Cvar_Set("r_uiFullScreen", "1");' in cl_main
 	assert 'Cvar_Set("r_uiFullScreen", "0");' in cl_main
@@ -1852,7 +2959,7 @@ def test_engine_cvar_thirtysecond_renderer_bloom_picmip_tranche_matches_retail_c
 	assert 'sceneSaturation = r_bloomSceneSaturation ? r_bloomSceneSaturation->value : 1.0f;' in tr_backend
 	assert 's_postProcess.procs.qglUniform1fARBFunc( s_postProcess.combineProgram.sceneSaturationUniform, sceneSaturation );' in tr_backend
 
-	assert 'r_picmip = ri.Cvar_Get ("r_picmip", "0", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
+	assert 'r_picmip = ri.Cvar_Get ("r_picmip", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_PROTECTED | CVAR_CLOUD );' in tr_init
 	assert 'AssertCvarRange( r_picmip, 0, 16, qtrue );' in tr_init
 	assert 'ri.Printf( PRINT_ALL, "picmip: %d\\n", r_picmip->integer );' in tr_init
 	assert 'scaled_width >>= r_picmip->integer;' in tr_image

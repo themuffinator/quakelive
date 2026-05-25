@@ -342,6 +342,15 @@ char *Sys_DefaultInstallPath( void ) {
 
 /*
 ==================
+Sys_MonkeyShouldBeSpanked
+==================
+*/
+int Sys_MonkeyShouldBeSpanked( void ) {
+	return qfalse;
+}
+
+/*
+==================
 Sys_SetDefaultHomePath
 ==================
 */

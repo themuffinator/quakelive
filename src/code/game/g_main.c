@@ -707,6 +707,7 @@ vmCvar_t	g_filterBan;
 vmCvar_t	g_instaGib;
 vmCvar_t	g_itemTimers;
 vmCvar_t	g_itemHeight;
+vmCvar_t	g_specItemTimers;
 vmCvar_t	g_forceSmallScoreboardMessage;
 vmCvar_t	g_forceSendConfigstring;
 vmCvar_t	g_forceAtmosphericEffects;
@@ -801,6 +802,7 @@ vmCvar_t	g_accelRate_bfg;
 vmCvar_t	g_damagePlums;
 vmCvar_t	g_powerupRespawn;
 vmCvar_t	g_flightThrust;
+vmCvar_t	g_flightRefuelRate;
 vmCvar_t	g_battleSuitDampen;
 vmCvar_t	g_dropDamagedHealth;
 vmCvar_t	g_velocity_gl;
@@ -903,7 +905,7 @@ static cvarTable_t		gameCvarTable[] = {
 
 	// latched vars
 	{ &g_gametype, "g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH, 0, qfalse  },
-	{ &g_customSettings, "g_customSettings", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse, "Digest of flagged gameplay overrides published to CS_SERVERINFO.", qfalse },
+	{ &g_customSettings, "g_customSettings", "0", CVAR_SERVERINFO, 0, qfalse, qfalse, "Digest of flagged gameplay overrides published to CS_SERVERINFO.", qfalse },
 	{ &g_ruleset, "g_ruleset", "standard", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Active competitive ruleset advertised to clients and feeds the custom-settings digest.", qtrue },
 
 	{ &g_maxclients, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
@@ -987,12 +989,13 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_banIPs, "g_banIPs", "", CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_filterBan, "g_filterBan", "1", CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_instaGib, "g_instaGib", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
-{ &g_itemTimers, "g_itemTimers", "1", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Force server-controlled item timers to display for all clients when non-zero." },
-{ &g_itemHeight, "g_itemHeight", "20", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Vertical offset in units applied to enforced item timer indicators." },
-        { &g_forceSmallScoreboardMessage, "g_forceSmallScoreboardMessage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Prefer the compact scoreboard centerprint even with small player counts." },
-        { &g_forceSendConfigstring, "g_forceSendConfigstring", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Resend all configstrings to clients on map load when enabled to debug sync issues." },
-        { &g_forceAtmosphericEffects, "g_forceAtmosphericEffects", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enable atmospheric map effects such as snow or rain regardless of client preference." },
-        { &g_forceDmgThroughSurface, "g_forceDmgThroughSurface", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow splash damage to pass through non-solid surfaces for testing when set." },
+	{ &g_itemTimers, "g_itemTimers", "1", CVAR_SERVERINFO | CVAR_GAMERULE, 0, qfalse, qfalse, "Force server-controlled item timers to display for all clients when non-zero." },
+	{ &g_itemHeight, "g_itemHeight", "35", CVAR_SERVERINFO | CVAR_GAMERULE, 0, qfalse, qfalse, "Vertical offset in units applied to enforced item timer indicators." },
+	{ &g_forceSmallScoreboardMessage, "g_forceSmallScoreboardMessage", "0", 0, 0, qfalse, qfalse, "Prefer the compact scoreboard centerprint even with small player counts." },
+	{ &g_forceSendConfigstring, "g_forceSendConfigstring", "0", 0, 0, qfalse, qfalse, "Resend all configstrings to clients on map load when enabled to debug sync issues." },
+	{ &g_forceAtmosphericEffects, "g_forceAtmosphericEffects", "", CVAR_GAMERULE, 0, qfalse, qfalse, "Enable atmospheric map effects such as snow or rain regardless of client preference." },
+	{ &g_forceDmgThroughSurface, "g_forceDmgThroughSurface", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Allow splash damage to pass through non-solid surfaces for testing when set." },
+	{ &g_specItemTimers, "g_specItemTimers", "1", 0, 0, qfalse },
         { &g_grantItemOnSpawn, "g_grantItemOnSpawn", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Whitespace or comma separated list of `give` tokens handed to every spawn, mirroring Quake Live's server-only spawn grants." },
         { &g_disableLoadout, "g_disableLoadout", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Additional loadout restrictions expressed as a whitespace or comma separated list of weapon tokens (g, mg, sg, gl, rl, lg, rg, pg, bfg, gh, ng, pl, cg, hmg) or a numeric bitmask." },
 	{ &g_playermodelOverride, "g_playermodelOverride", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional model path used to override every player's model selection server-wide." },
@@ -1006,13 +1009,14 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_floodprot_maxcount, "g_floodprot_maxcount", "8", CVAR_ARCHIVE, 0, qfalse, qfalse, "Maximum chat or command bursts allowed before flood protection engages; 0 disables the limiter." },
 	{ &g_floodprot_decay, "g_floodprot_decay", "1000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Milliseconds required before a flood point decays back off the counter." },
 	{ &g_floodprot_penalty, "g_floodprot_penalty", "4000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Legacy compatibility knob retained for configs; retail flood protection drops clients on overflow instead of muting commands." },
-	{ &g_startingHealth, "g_startingHealth", "100", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Health awarded to players when they spawn." },
-	{ &g_startingArmor, "g_startingArmor", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Armor awarded to players when they spawn." },
+	{ &g_startingHealth, "g_startingHealth", "100", CVAR_SERVERINFO | CVAR_GAMERULE, 0, qfalse, qfalse, "Health awarded to players when they spawn." },
+	{ &g_startingArmor, "g_startingArmor", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Armor awarded to players when they spawn." },
 	{ &g_armorTiered, "g_armorTiered", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Enable retail Quake Live tiered armor behaviour for pickups, regen, and the dedicated HUD settings transport." },
-	{ &g_startingWeapons, "g_startingWeapons", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Bitmask of weapons awarded to players when they spawn." },
-        { &g_flightThrust, "g_flightThrust", "1200", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Retail Flight thrust cvar retained for factory/cvar parity." },
-        { &g_battleSuitDampen, "g_battleSuitDampen", "0.5", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Damage scale applied to players protected by the Battlesuit; 0 disables mitigation, 1.0 removes it." },
-        { &g_dropDamagedHealth, "g_dropDamagedHealth", "1", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "When disabled, health items dropped by players ignore their damaged counts and always heal for their base amount." },
+	{ &g_startingWeapons, "g_startingWeapons", "3", CVAR_GAMERULE, 0, qfalse, qfalse, "Bitmask of weapons awarded to players when they spawn." },
+	{ &g_flightThrust, "g_flightThrust", "1200", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Retail Flight thrust cvar retained for factory/cvar parity." },
+	{ &g_flightRefuelRate, "g_flightRefuelRate", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Retail Flight refuel-rate cvar retained for factory/cvar parity without source-side pickup scaling." },
+	{ &g_battleSuitDampen, "g_battleSuitDampen", "0.25", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "Retail damage multiplier applied to non-falling damage while Battlesuit is active." },
+	{ &g_dropDamagedHealth, "g_dropDamagedHealth", "1", CVAR_ARCHIVE | CVAR_NORESTART, 0, qfalse, qfalse, "When disabled, health items dropped by players ignore their damaged counts and always heal for their base amount." },
 	{ &g_kickBadUserinfo, "g_kickBadUserinfo", "1", CVAR_ARCHIVE, 0, qfalse, qfalse, "Drop clients submitting malformed userinfo when non-zero; 0 only warns and repairs the data." },
 	{ &g_botsFile, "g_botsFile", "", CVAR_INIT | CVAR_ROM, 0, qfalse, qfalse, "Override bot definition list with a custom script when specified." },
 	{ &g_botSpawnList, "g_botSpawnList", "", 0, 0, qfalse, qfalse, "Space-separated bot names automatically spawned on map start when set." },
@@ -1055,8 +1059,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_allowSpecVote, "g_allowSpecVote", "0", 0, 0, qfalse },
 	{ &g_allowVote, "g_allowVote", "1", CVAR_ARCHIVE, 0, qfalse },
 	{ &g_allowVoteMidGame, "g_allowVoteMidGame", "0", 0, 0, qfalse },
-	{ &g_allowForfeit, "g_allowForfeit", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Enables the forfeit console command when non-zero so duel and CA leagues can permit early surrenders." },
-	{ &g_allowKill, "g_allowKill", "1000", CVAR_ARCHIVE, 0, qfalse, qfalse, "Minimum milliseconds between kill commands; 0 restores instant suicides." },
+	{ &g_allowForfeit, "g_allowForfeit", "1", CVAR_GAMERULE, 0, qfalse, qfalse, "Enables the forfeit console command when non-zero so duel and CA leagues can permit early surrenders." },
+	{ &g_allowKill, "g_allowKill", "1000", CVAR_GAMERULE, 0, qfalse, qfalse, "Minimum milliseconds between kill commands; 0 restores instant suicides." },
 	{ &g_complaintLimit, "g_complaintLimit", "5", CVAR_ARCHIVE, 0, qfalse, qfalse, "Maximum complaints before a player is automatically kicked; 0 disables kicking." },
 	{ &g_complaintDamageThreshold, "g_complaintDamageThreshold", "400", CVAR_ARCHIVE, 0, qfalse, qfalse, "Minimum damage from a teammate required to present the complaint prompt." },
 	{ &g_voteFlags, "g_voteFlags", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse },
@@ -1072,7 +1076,7 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_forcedAtmosphere, "g_forcedAtmosphere", "", CVAR_ARCHIVE, 0, qfalse, qfalse, "Optional atmosphere effect applied when a map lacks an atmosphere worldspawn key." },
 	{ &g_listEntity, "g_listEntity", "0", 0, 0, qfalse },
 	{ &g_overtime, "g_overtime", "120", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Overtime period length in seconds once regulation ends tied; 0 keeps sudden death active until the tie is broken." },
-	{ &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
+	{ &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_GAMERULE, 0, qfalse, qfalse, "Allow ammo to continue respawning during sudden death when set to 1." },
 	{ &g_timeoutLen, "g_timeoutLen", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Timeout duration in seconds for each team pause." },
 	{ &g_timeoutCount, "g_timeoutCount", "3", CVAR_SERVERINFO | CVAR_NORESTART, 0, qfalse, qfalse, "Number of timeouts each team may call per match." },
 	{ &g_pauseAudio, "g_pauseAudio", "0", 0, 0, qfalse, qfalse, "Audio behavior during pauses." },
@@ -1084,11 +1088,11 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_factoryAllowItemBounce, "g_factoryAllowItemBounce", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Controls whether dropped items bounce before coming to rest when factories disable the behaviour." },
 	{ &g_maxDeferredSpawns, "g_maxDeferredSpawns", "4", 0, 0, qfalse, qfalse, "Maximum simultaneous delayed spawns the queue may hold before new respawns execute immediately." },
 	{ &g_vampiricDamage, "g_vampiricDamage", "0", CVAR_ARCHIVE, 0, qfalse, qfalse, "Fraction of dealt health damage returned to the attacker as healing." },
-	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_NORESTART, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
-	{ &g_suddenDeathRespawnTick, "g_suddenDeathRespawnTick", "60", CVAR_NORESTART, 0, qfalse, qfalse, "Interval in seconds after which sudden-death respawn delays are increased." },
-	{ &g_suddenDeathRespawnMax, "g_suddenDeathRespawnMax", "10", CVAR_NORESTART, 0, qfalse, qfalse, "Maximum sudden-death respawn delay in seconds." },
-	{ &g_suddenDeathRespawnIncrement, "g_suddenDeathRespawnIncrement", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Seconds added to the sudden-death respawn delay at each tick." },
-	{ &g_suddenDeathRespawnPrint, "g_suddenDeathRespawnPrint", "1", CVAR_NORESTART, 0, qfalse, qfalse, "Print announcements when sudden-death respawn delays change." },
+	{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_GAMERULE, 0, qfalse, qfalse, "Initial sudden-death respawn delay in seconds when respawns are enabled." },
+	{ &g_suddenDeathRespawnTick, "g_suddenDeathRespawnTick", "60", CVAR_GAMERULE, 0, qfalse, qfalse, "Interval in seconds after which sudden-death respawn delays are increased." },
+	{ &g_suddenDeathRespawnMax, "g_suddenDeathRespawnMax", "10", CVAR_GAMERULE, 0, qfalse, qfalse, "Maximum sudden-death respawn delay in seconds." },
+	{ &g_suddenDeathRespawnIncrement, "g_suddenDeathRespawnIncrement", "1", CVAR_GAMERULE, 0, qfalse, qfalse, "Seconds added to the sudden-death respawn delay at each tick." },
+	{ &g_suddenDeathRespawnPrint, "g_suddenDeathRespawnPrint", "1", CVAR_GAMERULE, 0, qfalse, qfalse, "Print announcements when sudden-death respawn delays change." },
 	{ &g_damage_cg, "g_damage_cg", "8", 0, 0, qtrue, qfalse, "Chaingun bullet damage per hit; 8 mirrors the Quake Live HLIL defaults." },
 	{ &g_damage_g, "g_damage_g", "50", 0, 0, qtrue },
 	{ &g_damage_gh, "g_damage_gh", "10", 0, 0, qtrue, qfalse, "Grappling Hook projectile impact damage; 10 matches the retail DLL export." },
@@ -8327,7 +8331,13 @@ static void G_StepEntities( qlr_game_frame_context_t *ctx ) {
 		}
 
 		if ( i < MAX_CLIENTS ) {
-			G_RunClient( ent );
+			G_RunThink( ent );
+			if ( ent->inuse && ent->client ) {
+				if ( ( ent->r.svFlags & SVF_BOT ) || g_synchronousClients.integer ) {
+					ent->client->pers.cmd.serverTime = level.time;
+					ClientThink_real( ent );
+				}
+			}
 
 			if ( ctx ) {
 				if ( ctx->hooks.physics_step && ent->inuse ) {

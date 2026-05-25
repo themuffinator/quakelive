@@ -1462,6 +1462,7 @@ static void GLW_InitExtensions( void )
 			qglBeginQueryARB && qglEndQueryARB && qglGetQueryivARB &&
 			qglGetQueryObjectivARB && qglGetQueryObjectuivARB ) {
 			ri.Printf( PRINT_ALL, "...using GL_ARB_occlusion_query\n" );
+			ri.Cvar_Set( "r_gl_reserved", "1" );
 		} else {
 			qglGenQueriesARB = NULL;
 			qglDeleteQueriesARB = NULL;
@@ -1778,6 +1779,8 @@ void GLimp_Init( void )
 	Q_strncpyz( glConfig.renderer_string, qglGetString (GL_RENDERER), sizeof( glConfig.renderer_string ) );
 	Q_strncpyz( glConfig.version_string, qglGetString (GL_VERSION), sizeof( glConfig.version_string ) );
 	Q_strncpyz( glConfig.extensions_string, qglGetString (GL_EXTENSIONS), sizeof( glConfig.extensions_string ) );
+	ri.Cvar_Set( "r_gl_vendor", glConfig.vendor_string );
+	ri.Cvar_Set( "r_gl_renderer", glConfig.renderer_string );
 
 	//
 	// chipset specific configuration

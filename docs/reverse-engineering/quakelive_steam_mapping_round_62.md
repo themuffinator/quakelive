@@ -107,7 +107,14 @@ Observed facts:
    `cmdCount < 1\n`,
    `cmdCount > MAX_PACKET_USERCMDS\n`, and
    `WARNING: bad command byte for client %i\n`.
-6. `sub_4E0750` is the retained `SV_DirectConnect` owner: it parses the
+6. The 2026-05-25 usercmd movement-transport re-audit keeps the retained
+   `SV_UserMove` / `SV_ClientThink` lane pinned beyond strings: server-side
+   source now pins the same command replay shape recovered in HLIL, including
+   delta-message selection, checksum-feed/user-command hash keys,
+   `MSG_ReadDeltaUsercmdKey`, pure-client gates, first-command
+   `SV_ClientEnterWorld`, stale-command suppression, `lastUsercmd`, and
+   `GAME_CLIENT_THINK` dispatch into qagame.
+7. `sub_4E0750` is the retained `SV_DirectConnect` owner: it parses the
    `connect` userinfo blob, validates protocol and challenge state, searches
    for reconnect or free client slots, and sends `connectResponse` on success.
    The Quake Live host adds VAC / Steam-oriented policy checks around the same

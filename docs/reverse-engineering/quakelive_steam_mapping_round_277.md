@@ -122,6 +122,12 @@ Updated `references/analysis/quakelive_symbol_aliases.json`:
   `ListInputDevices`, `cl_nodelta`, and `cl_debugMove`. The current source
   retains additional higher button registrations for compatibility; this pass
   records the recovered retail surface without removing those extensions.
+- The 2026-05-25 usercmd movement-transport re-audit follows this lane into
+  the network packet writer: client-side source now pins that command stream
+  through `CL_WritePacket`, including the `cl_packetdup` resend window,
+  `clc_move` / `clc_moveNoDelta` selection, checksum-feed plus server-command
+  hash key, ordered `MSG_WriteDeltaUsercmdKey` loop, and `outPackets`
+  bookkeeping used later for ping calculation.
 
 ## Still Open
 

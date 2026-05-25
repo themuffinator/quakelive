@@ -8,6 +8,187 @@ def _read(rel_path: str) -> str:
 	return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
+def _function_body(source: str, signature: str) -> str:
+	definition = f"{signature} {{"
+	start = source.index(definition)
+	brace = start + len(definition) - 1
+	depth = 1
+	index = brace + 1
+
+	while depth > 0:
+		if source[index] == "{":
+			depth += 1
+		elif source[index] == "}":
+			depth -= 1
+		index += 1
+
+	return source[brace + 1 : index - 1]
+
+
+def test_spawn_and_sudden_death_cvar_table_matches_retail_defaults_and_flags() -> None:
+	g_main = _read("src/code/game/g_main.c")
+	g_config = _read("src/game/g_config.c")
+	q_shared = _read("src/code/game/q_shared.h")
+	qagame_hlil = _read(
+		"references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt"
+	)
+	qagame_strings = _read(
+		"references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt"
+	)
+
+	assert "#define CVAR_GAMERULE\t0x100000" in q_shared
+	for expected in (
+		'{ &g_startingHealth, "g_startingHealth", "100", CVAR_SERVERINFO | CVAR_GAMERULE, 0, qfalse',
+		'{ &g_startingArmor, "g_startingArmor", "0", CVAR_GAMERULE, 0, qfalse',
+		'{ &g_startingWeapons, "g_startingWeapons", "3", CVAR_GAMERULE, 0, qfalse',
+		'{ &g_suddenDeathRespawn, "g_suddenDeathRespawn", "0", CVAR_GAMERULE, 0, qfalse',
+		'{ &g_suddenDeathRespawnStart, "g_suddenDeathRespawnStart", "3", CVAR_GAMERULE, 0, qfalse',
+		'{ &g_suddenDeathRespawnTick, "g_suddenDeathRespawnTick", "60", CVAR_GAMERULE, 0, qfalse',
+		'{ &g_suddenDeathRespawnMax, "g_suddenDeathRespawnMax", "10", CVAR_GAMERULE, 0, qfalse',
+		'{ &g_suddenDeathRespawnIncrement, "g_suddenDeathRespawnIncrement", "1", CVAR_GAMERULE, 0, qfalse',
+		'{ &g_suddenDeathRespawnPrint, "g_suddenDeathRespawnPrint", "1", CVAR_GAMERULE, 0, qfalse',
+	):
+		assert expected in g_main
+	assert '{ &g_startingHealthBonus,  "g_startingHealthBonus",  STRINGIZE( DEFAULT_STARTING_HEALTH_BONUS ), CVAR_GAMERULE,' in g_config
+	assert '{ &g_suddenDeathRespawn,   "g_suddenDeathRespawn",   STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_GAMERULE,' in g_config
+
+	for expected in (
+		'1008f3f4  char const (* data_1008f3f4)[0x10] = data_1008603c {"g_startingArmor"}',
+		'1008f3f8  void* data_1008f3f8 = data_1007d0a8',
+		'1008f3fc                                                                                      00 00 10 00',
+		'1008f40c  char const (* data_1008f40c)[0x11] = data_10086028 {"g_startingHealth"}',
+		'1008f410  void* data_1008f410 = data_1007e154',
+		'1008f414                                                              04 00 10 00',
+		'1008f424  char const (* data_1008f424)[0x16] = data_10086010 {"g_startingHealthBonus"}',
+		'1008f428  void* data_1008f428 = data_1007e1dc',
+		'1008f42c                                      00 00 10 00',
+		'1008f43c  char const (* data_1008f43c)[0x12] = data_10085ffc {"g_startingWeapons"}',
+		'1008f440  void* data_1008f440 = 0x100874e0',
+		'1008f444              00 00 10 00',
+		'1008f454  char const (* data_1008f454)[0x15] = data_10085fe4 {"g_suddenDeathRespawn"}',
+		'1008f458  void* data_1008f458 = data_1007d0a8',
+		'1008f45c                                                                                      00 00 10 00',
+		'1008f46c  char const (* data_1008f46c)[0x1e] = data_10085fc4 {"g_suddenDeathRespawnIncrement"}',
+		'1008f470  void* data_1008f470 = data_1007d1d8',
+		'1008f474                                                              00 00 10 00',
+		'1008f484  char const (* data_1008f484)[0x18] = data_10085fac {"g_suddenDeathRespawnMax"}',
+		'1008f488  void* data_1008f488 = data_1007e194',
+		'1008f48c                                      00 00 10 00',
+		'1008f49c  char const (* data_1008f49c)[0x1a] = data_10085f90 {"g_suddenDeathRespawnPrint"}',
+		'1008f4a0  void* data_1008f4a0 = data_1007d1d8',
+		'1008f4a4              00 00 10 00',
+		'1008f4b4  char const (* data_1008f4b4)[0x1a] = data_10085f74 {"g_suddenDeathRespawnStart"}',
+		'1008f4b8  void* data_1008f4b8 = 0x100874e0',
+		'1008f4bc                                                                                      00 00 10 00',
+		'1008f4cc  char const (* data_1008f4cc)[0x19] = data_10085f58 {"g_suddenDeathRespawnTick"}',
+		'1008f4d0  void* data_1008f4d0 = 0x1008674c',
+		'1008f4d4                                                              00 00 10 00',
+	):
+		assert expected in qagame_hlil
+
+	for expected in (
+		"1007d0a8                          30 00 00 00                                                                      0...",
+		"1007d1d8                                                                          31 00 00 00                                      1...",
+		"1007e154                                                              31 30 30 00                                              100.",
+		"1007e194                                                              31 30 00 00                                              10..",
+		"1007e1dc                                                                                      32 35 00 00                              25..",
+		"1008674b                                   00 36 30 00 00                                                             .60..",
+		'10085f58  char const data_10085f58[0x19] = "g_suddenDeathRespawnTick", 0',
+		'10085f74  char const data_10085f74[0x1a] = "g_suddenDeathRespawnStart", 0',
+		'10085f90  char const data_10085f90[0x1a] = "g_suddenDeathRespawnPrint", 0',
+		'10085fac  char const data_10085fac[0x18] = "g_suddenDeathRespawnMax", 0',
+		'10085fc4  char const data_10085fc4[0x1e] = "g_suddenDeathRespawnIncrement", 0',
+		'10085fe4  char const data_10085fe4[0x15] = "g_suddenDeathRespawn", 0',
+		'10085ffc  char const data_10085ffc[0x12] = "g_startingWeapons", 0',
+		'10086010  char const data_10086010[0x16] = "g_startingHealthBonus", 0',
+		'10086028  char const data_10086028[0x11] = "g_startingHealth", 0',
+		'1008603c  char const data_1008603c[0x10] = "g_startingArmor", 0',
+		"100874e0  33 00 00 00                                                                                      3...",
+	):
+		assert expected in qagame_strings
+
+
+def test_spawn_and_sudden_death_cvars_keep_retail_behavioral_wiring() -> None:
+	config_c = _read("src/game/g_config.c")
+	match_config_c = _read("src/game/g_match_config.c")
+	game_client = _read("src/code/game/g_client.c")
+	game_main = _read("src/code/game/g_main.c")
+	game_combat = _read("src/code/game/g_combat.c")
+	game_items = _read("src/code/game/g_items.c")
+	match_state_c = _read("src/code/game/g_match_state.c")
+
+	for expected in (
+		'config.startingWeaponsMask = G_ReadStartingWeaponsMaskCvar( &g_startingWeapons, DEFAULT_STARTING_WEAPONS_MASK, "g_startingWeapons" );',
+		"config.startingWeaponsStatMask = G_ComputeStartingWeaponsStatMask( config.startingWeaponsMask );",
+		"config.startingWeaponsMask = DEFAULT_STARTING_WEAPONS_MASK;",
+		'config.suddenDeathRespawn = G_ReadFactoryBoolCvar( &g_suddenDeathRespawn, DEFAULT_SUDDEN_DEATH_RESPAWN, "g_suddenDeathRespawn" );',
+		'config.startingHealth = G_ReadFactoryPositiveCvar( &g_startingHealth, DEFAULT_STARTING_HEALTH, "g_startingHealth" );',
+		'config.startingHealthBonus = G_ReadFactoryNonNegativeCvar( &g_startingHealthBonus, DEFAULT_STARTING_HEALTH_BONUS, "g_startingHealthBonus" );',
+		'config.startingArmor = G_ReadFactoryNonNegativeCvar( &g_startingArmor, DEFAULT_STARTING_ARMOR, "g_startingArmor" );',
+	):
+		assert expected in config_c
+
+	for expected in (
+		"static qboolean G_WarmupLevelWeaponAllowed( weapon_t weapon, unsigned int startingWeaponsMask ) {",
+		"startingWeaponsMask & ( 1u << ( weaponTag - 1 ) )",
+		"startingMask = factoryConfig->startingWeaponsStatMask;",
+		"G_WarmupLevelWeaponAllowed( weapon, factoryConfig->startingWeaponsMask )",
+		"G_SeedConfiguredSpawnAmmo( &client->ps, weapon, startingAmmoTable[weapon] );",
+		"G_ApplySpawnHealth( ent, factoryConfig );",
+		"if ( g_startingArmor.integer > 0 ) {",
+		"client->ps.stats[STAT_ARMOR] = g_startingArmor.integer;",
+		"else if ( factoryConfig->startingArmor > 0 ) {",
+		"client->ps.stats[STAT_ARMOR] = factoryConfig->startingArmor;",
+		"if ( g_startingHealth.integer > 0 ) {",
+		"baseHealth = g_startingHealth.integer;",
+		"baseHealth = factoryConfig->startingHealth;",
+	):
+		assert expected in game_client
+
+	for expected in (
+		'config.suddenDeathRespawnsEnabled = G_MatchConfig_ReadBoolCvar( &g_suddenDeathRespawn, DEFAULT_SUDDEN_DEATH_RESPAWN ? qtrue : qfalse, "g_suddenDeathRespawn" );',
+		'config.suddenDeathStartSeconds = G_MatchConfig_ReadNonNegativeCvar( &g_suddenDeathRespawnStart, DEFAULT_SUDDEN_DEATH_START_SECONDS, "g_suddenDeathRespawnStart" );',
+		'config.suddenDeathTickSeconds = G_MatchConfig_ReadPositiveCvar( &g_suddenDeathRespawnTick, DEFAULT_SUDDEN_DEATH_TICK_SECONDS, "g_suddenDeathRespawnTick" );',
+		'config.suddenDeathMaxSeconds = G_MatchConfig_ReadNonNegativeCvar( &g_suddenDeathRespawnMax, DEFAULT_SUDDEN_DEATH_MAX_SECONDS, "g_suddenDeathRespawnMax" );',
+		"if ( config.suddenDeathMaxSeconds < config.suddenDeathStartSeconds ) {",
+		'config.suddenDeathIncrementSeconds = G_MatchConfig_ReadNonNegativeCvar( &g_suddenDeathRespawnIncrement, DEFAULT_SUDDEN_DEATH_INCREMENT_SECONDS, "g_suddenDeathRespawnIncrement" );',
+		'config.suddenDeathPrintAnnouncements = G_MatchConfig_ReadBoolCvar( &g_suddenDeathRespawnPrint, DEFAULT_SUDDEN_DEATH_PRINT ? qtrue : qfalse, "g_suddenDeathRespawnPrint" );',
+		"config.suddenDeathSpawnDelayActive = ( config.suddenDeathRespawnsEnabled && ( config.suddenDeathStartSeconds > 0 || config.suddenDeathIncrementSeconds > 0 ) ) ? qtrue : qfalse;",
+		"FACTORY_FLAG_SUDDEN_DEATH_ENABLED",
+		"FACTORY_FLAG_SUDDEN_DEATH_START",
+		"FACTORY_FLAG_SUDDEN_DEATH_TICK",
+		"FACTORY_FLAG_SUDDEN_DEATH_MAX",
+		"FACTORY_FLAG_SUDDEN_DEATH_INCREMENT",
+		"FACTORY_FLAG_SUDDEN_DEATH_PRINT",
+	):
+		assert expected in match_config_c
+
+	for expected in (
+		"int G_GetSuddenDeathRespawnDelay( void ) {",
+		"if ( !config->suddenDeathRespawnsEnabled ) {",
+		"int baseDelay = config->suddenDeathStartSeconds;",
+		"int tick = config->suddenDeathTickSeconds;",
+		"int increment = config->suddenDeathIncrementSeconds;",
+		"int maxDelay = config->suddenDeathMaxSeconds;",
+		"int steps = elapsed / tick;",
+		"int delaySeconds = baseDelay + steps * increment;",
+		"return delaySeconds * 1000;",
+		"level.suddenDeathLastDelay = -1;",
+		"previousConfig.suddenDeathRespawnsEnabled != config->suddenDeathRespawnsEnabled",
+		"static void G_TrackSuddenDeathAnnouncements( void ) {",
+		'trap_SendServerCommand( -1, "cp \\"Sudden-death respawns disabled\\n\\"" );',
+		'trap_SendServerCommand( -1, va( "cp \\"Sudden-death respawns available in %i seconds\\n\\"", delay / 1000 ) );',
+		'trap_SendServerCommand( -1, "cp \\"Sudden-death respawns available now\\n\\"" );',
+		"G_TrackSuddenDeathAnnouncements();",
+	):
+		assert expected in game_main
+
+	assert "if ( level.suddenDeathActive && level.overtimeActive && g_suddenDeathRespawn.integer > 0 ) {" in game_combat
+	assert "if ( level.suddenDeathActive && !g_factoryCvarConfig.suddenDeathRespawn ) {" in game_items
+	assert "G_SetMatchStateInt( info, MATCH_STATE_KEY_SUDDEN_RESPAWNS, config->suddenDeathRespawnsEnabled ? 1 : 0 );" in match_state_c
+	assert 'trap_SetConfigstring( CS_SUDDENDEATH_STATUS, level.suddenDeathActive ? "1" : "0" );' in match_state_c
+
+
 def test_factory_regen_uses_retail_delay_and_tick_helpers() -> None:
 	active_c = _read("src/code/game/g_active.c")
 
@@ -170,6 +351,63 @@ def test_factory_apply_resets_factory_managed_cvars_before_overrides() -> None:
 	assert factory_c.count("G_PmoveResetFactoryManagedCvars();") == 2
 
 
+def test_factory_apply_refreshes_pmove_after_retail_factory_override_sequence() -> None:
+	factory_c = _read("src/code/game/g_factory.c")
+	config_c = _read("src/game/g_config.c")
+	apply_body = _function_body(
+		factory_c, "qboolean Factory_Apply( const factoryDefinition_t *factory, qboolean forceReapply )"
+	)
+	refresh_body = _function_body(factory_c, "static void Factory_RefreshMatchConfig( void )")
+	reload_body = _function_body(config_c, "void G_UpdateWeaponReloadConfig( void )")
+
+	null_sequence = [
+		"G_Config_ResetFactoryManagedCvars();",
+		"G_PmoveResetFactoryManagedCvars();",
+		'trap_Cvar_Set( "g_factoryTitle", "" );',
+		"G_RefreshAllCvars();",
+		"G_Config_UpdateCvars();",
+		"Factory_RefreshMatchConfig();",
+	]
+	position = -1
+	for statement in null_sequence:
+		next_position = apply_body.index(statement, position + 1)
+		assert next_position > position
+		position = next_position
+
+	active_sequence = [
+		"G_Config_ResetFactoryManagedCvars();",
+		"G_PmoveResetFactoryManagedCvars();",
+		"for ( override = factory->overrides; override; override = override->next ) {",
+		'trap_Cvar_Set( "g_gametype", gametypeBuffer );',
+		"G_RefreshAllCvars();",
+		"G_Config_UpdateCvars();",
+		"Factory_RefreshMatchConfig();",
+	]
+	position = apply_body.index("s_activeFactory = factory;")
+	for statement in active_sequence:
+		next_position = apply_body.index(statement, position + 1)
+		assert next_position > position
+		position = next_position
+
+	refresh_sequence = [
+		"G_UpdateWeaponConfig();",
+		"G_UpdateWeaponReloadConfig();",
+		"G_UpdateKnockbackConfig();",
+		"G_UpdateStartingAmmoConfig();",
+		"G_UpdateAmmoPackConfig();",
+		"G_UpdateFactoryCvarConfig();",
+		"G_UpdateMatchFactoryConfig();",
+		"G_SyncMatchFactoryConfigToLevel();",
+	]
+	position = -1
+	for statement in refresh_sequence:
+		next_position = refresh_body.index(statement, position + 1)
+		assert next_position > position
+		position = next_position
+
+	assert reload_body.index("G_InitWeaponReloadConfig();") < reload_body.index("G_RefreshPmoveSettings();")
+
+
 def test_factory_pmove_reset_tracks_every_nonlocal_pmove_input_surface() -> None:
 	pmove_c = _read("src/code/game/g_pmove.c")
 	g_main = _read("src/code/game/g_main.c")
@@ -190,7 +428,7 @@ def test_factory_pmove_reset_tracks_every_nonlocal_pmove_input_surface() -> None
 	assert 'trap_Cvar_Set( "g_quadHogTime", "0" );' in pmove_c
 
 
-def test_retail_flight_thrust_cvar_is_registered_but_not_a_pmove_input_surface() -> None:
+def test_retail_flight_cvars_are_registered_but_not_movement_or_pickup_inputs() -> None:
 	bg_public = _read("src/code/game/bg_public.h")
 	bg_pmove = _read("src/code/game/bg_pmove.c")
 	g_items = _read("src/code/game/g_items.c")
@@ -199,19 +437,22 @@ def test_retail_flight_thrust_cvar_is_registered_but_not_a_pmove_input_surface()
 	pmove_c = _read("src/code/game/g_pmove.c")
 
 	assert '{ &g_flightThrust, "g_flightThrust", "1200", CVAR_ARCHIVE | CVAR_NORESTART' in g_main
-	assert "g_flightRefuelRate" not in g_main
-	assert "g_flightRefuelRate" not in local_h
+	assert '{ &g_flightRefuelRate, "g_flightRefuelRate", "0", CVAR_ARCHIVE | CVAR_NORESTART' in g_main
+	assert "extern vmCvar_t g_flightRefuelRate;" in local_h
 	assert "G_GetFlightRefuelMilliseconds" not in g_items
 	assert "flightThrust" not in bg_public
 	assert "flightThrust" not in pmove_c
 	assert "g_flightThrust" not in pmove_c
+	assert "g_flightRefuelRate" not in pmove_c
 	fly_start = bg_pmove.index("static void PM_FlyMove( void )")
 	fly_end = bg_pmove.index("static void PM_AirMove", fly_start)
 	assert "flightThrust" not in bg_pmove[fly_start:fly_end]
+	assert "g_flightRefuelRate" not in bg_pmove[fly_start:fly_end]
 	pickup_start = g_items.index("int Pickup_Powerup( gentity_t *ent, gentity_t *other )")
 	pickup_end = g_items.index("return RESPAWN_POWERUP;", pickup_start)
 	pickup_body = g_items[pickup_start:pickup_end]
 	assert "ent->item->giTag == PW_FLIGHT" not in pickup_body
+	assert "g_flightRefuelRate" not in pickup_body
 	assert "other->client->ps.powerups[ent->item->giTag] += quantity * 1000;" in pickup_body
 
 
@@ -222,7 +463,7 @@ def test_factory_runes_are_gated_separately_from_map_powerups() -> None:
 
 	assert "extern vmCvar_t g_loadout;" in local_h
 	assert "extern vmCvar_t g_runes;" in local_h
-	assert '{ &g_loadout,              "g_loadout",              STRINGIZE( DEFAULT_FACTORY_LOADOUT ), CVAR_SERVERINFO,' in config_c
+	assert '{ &g_loadout,              "g_loadout",              STRINGIZE( DEFAULT_FACTORY_LOADOUT ), CVAR_SERVERINFO | CVAR_GAMERULE,' in config_c
 	assert '{ &g_runes,                "g_runes",                STRINGIZE( DEFAULT_FACTORY_RUNES ), 0,' in config_c
 	assert """\tcase IT_PERSISTANT_POWERUP:
 \t\treturn g_runes.integer ? qtrue : qfalse;""" in items_c

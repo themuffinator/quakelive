@@ -1,6 +1,6 @@
 # Quake Live Parity Audit
 
-Last updated: 2026-05-20
+Last updated: 2026-05-25
 
 This file is the current cross-subsystem ledger for the repository. Detailed
 reconstruction history belongs in the dedicated subsystem audits under
@@ -29,6 +29,46 @@ The current audited state, with the aggregate pytest sweep refreshed on
   Awesomium/browser-host audits.
 - The focused gameplay validation sweep remains closed on the current worktree
   through dedicated Race, gametype-lifecycle, ready-up, and `pmove` fixtures.
+- The 2026-05-25 movement/playerState re-audit keeps the shared pmove,
+  playerState replication, pmove settings transport, and prediction wiring
+  surface at **100%** for the scoped retail source reconstruction; no source
+  patch was required.
+- The 2026-05-25 pmove factory wiring re-audit keeps the retail `pmove_*`
+  factory cvar table, reset/apply ordering, reload-to-pmove refresh handoff,
+  custom-settings mask grouping, and cgame/UI publication wiring at **100%**;
+  the pass added a focused regression guard for the factory apply sequence.
+- The 2026-05-25 deep pmove/playerState mapping sweep keeps the shared
+  qagame/cgame movement island at **100%** while adding executable coverage
+  for the `PMF_NO_MOVE` command gate and validating selected `pmove_*` cvars
+  from retail registration through cgame parse and active movement consumers.
+- The follow-up 2026-05-25 profile/utility pmove/playerState wiring sweep keeps
+  that same scoped surface at **100%** while pinning the remaining profile and
+  utility cvars through registration, cache/transport, playerState profile
+  flags, movement consumers, and custom-settings mask wiring.
+- The 2026-05-25 active-client pmove/playerState wiring reconstruction closes
+  the qagame frame-step-to-`ClientThink_real` source mismatch by dispatching
+  bot/synchronous client movement frames inline from the entity loop, matching
+  the recovered retail `G_RunFrame` shape while keeping the scoped movement
+  wiring estimate at **100%**.
+- The 2026-05-25 cgame prediction pmove replay re-audit keeps the local
+  prediction/playerState handoff at **100%** while pinning `CG_PredictPlayerState`
+  through local `pmove_t` setup, command replay, item/trigger prediction,
+  mover adjustment, step smoothing, predictable-event handoff, and committed
+  cgame symbol evidence.
+- The 2026-05-25 qcommon playerState delta-codec re-audit keeps the snapshot
+  replication bridge at **100%** while pinning the Quake Live scalar netfield
+  table, signed movement command mirrors, and the `stats[]`, `persistant[]`,
+  `ammo[]`, and `powerups[]` array-mask round trips that feed cgame prediction.
+- The 2026-05-25 server/client snapshot playerState transport re-audit keeps
+  the live server-to-cgame bridge at **100%** while pinning
+  `SV_BuildClientSnapshot`, `SV_WriteSnapshotToClient`, `CL_ParseSnapshot`,
+  `CL_GetSnapshot`, and `trap_GetSnapshot` ordering around playerState,
+  areamask, packet entities, and `ps.commandTime` ping derivation.
+- The 2026-05-25 client/server usercmd movement-transport re-audit keeps the
+  command side of the movement bridge at **100%** while pinning client
+  `CL_CreateCmd` / `CL_WritePacket`, qcommon keyed usercmd deltas, server
+  `SV_UserMove` / `SV_ClientThink`, qagame `G_GET_USERCMD`, and cgame
+  `trap_GetUserCmd` prediction access.
 - The strict-retail Windows replacement target remains defensible at
   **100%** on the current worktree.
 - Repo-wide parity is not **100%** once the deliberate compatibility-only
@@ -79,6 +119,26 @@ Verified directly:
 - `pytest tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py -q` -> `7 passed`
 - `pytest tests/test_racepoint_commands.py -q` -> `1 passed`
 - `pytest tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q` -> `14 passed`
+- `python -m pytest tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py -q --tb=short` -> `145 passed, 107 subtests passed`
+- `python -m pytest tools/tests/test_pmove_settings_configstring.py tests/test_game_factory_regen_parity.py tests/test_game_weapon_parity.py::test_grappling_hook_full_server_and_cgame_wiring_matches_retail tests/test_ui_menu_files.py::test_ui_retail_server_settings_ownerdraw_restored tests/test_ui_menu_files.py::test_game_retail_weapon_reload_configstring_restored tests/test_cgame_displaycontext_parity.py::test_cgame_weapon_reload_configstring_bridge_restored tests/test_cgame_displaycontext_parity.py::test_cgame_server_settings_panel_reconstruction_uses_retail_custom_setting_configstrings -q --tb=short` -> `32 passed, 107 subtests passed`
+- `python -m pytest tests/test_pmove_selected_cvar_parity.py -q --tb=short` -> `12 passed`
+- `python -m pytest tests/test_game_active_pmove_wiring_parity.py -q --tb=short` -> `4 passed`
+- `python -m pytest tests/test_game_active_pmove_wiring_parity.py tests/test_game_helper_seam_parity.py tests/test_game_spectator_connection_parity.py -q --tb=short` -> `30 passed`
+- `python -m pytest tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short` -> `158 passed, 107 subtests passed`
+- `python -m pytest tests/test_game_active_pmove_wiring_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short` -> `162 passed, 107 subtests passed`
+- `python -m pytest tests/test_cgame_snapshot_parity.py -q --tb=short` -> `11 passed`
+- `python -m pytest tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py -q --tb=short` -> `23 passed`
+- `python -m pytest tests/test_game_active_pmove_wiring_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short` -> `180 passed, 107 subtests passed`
+- `python -m pytest tests/test_playerstate_replication.py -q --tb=short` -> `10 passed`
+- `python -m pytest tests/test_playerstate_replication.py -q --tb=short` -> `14 passed`
+- `python -m pytest tests/test_playerstate_replication.py tests/test_game_active_pmove_wiring_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short` -> `184 passed, 107 subtests passed`
+- `python -m pytest tests/test_playerstate_replication.py tests/test_game_active_pmove_wiring_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py tests/test_game_native_export_helper_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short` -> `194 passed, 107 subtests passed`
+- `python -m pytest tests/test_usercmd_movement_transport_parity.py -q --tb=short` -> `5 passed`
+- `python -m pytest tests/test_usercmd_movement_transport_parity.py tests/test_engine_client_command_parity.py::test_usercmd_cgame_bridge_matches_retail_weapon_primary_and_fov_bytes tests/test_engine_client_command_parity.py::test_client_input_mapping_round_277_promotes_console_input_and_usercmd_symbols -q --tb=short` -> `7 passed`
+- `python -m pytest tests/test_usercmd_movement_transport_parity.py tests/test_playerstate_replication.py tests/test_game_active_pmove_wiring_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py tests/test_game_native_export_helper_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short` -> `199 passed, 107 subtests passed`
+- `python -m pytest tests/test_bg_misc_validation_fixtures.py tests/test_bg_misc_runtime_parity.py tests/test_bg_misc_helper_parity.py -q --tb=short` -> `39 passed`
+- `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py -q --tb=short` -> `4 passed, 2 skipped`
+- `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_client_full_parity_gate.py -q --tb=short` -> `6 passed, 3 skipped`
 - `pytest tests/test_non_windows_portability.py tests/test_retail_dependency_runtime_audit.py tests/test_ui_src_panel_parity.py tests/test_ui_full_parity_gate.py tests/test_client_full_parity_gate.py tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_renderer_full_parity_gate.py tests/test_server_full_parity_gate.py tests/test_engine_host_support_full_parity_gate.py tests/test_gametype_lifecycle.py tests/test_game_readyup_parity.py tests/test_game_team_count_parity.py tests/test_racepoint_commands.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py -q --tb=no` -> `72 passed, 7 skipped`
 
 Audited by source/doc inspection:

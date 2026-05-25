@@ -335,7 +335,7 @@ def test_level_timer_uses_retail_clock_format() -> None:
         assert expected in block
 
     assert "CG_DrawLevelTimer(&rect, scale, color, textStyle, align);" in ownerdraw_block
-    assert '{ &cg_levelTimerDirection, "cg_levelTimerDirection", "1", CVAR_ARCHIVE },' in main_source
+    assert '{ &cg_levelTimerDirection, "cg_levelTimerDirection", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },' in main_source
     assert "cg_levelTimerDirection.integer == 1" in classic_timer_block
 
     for stale in (

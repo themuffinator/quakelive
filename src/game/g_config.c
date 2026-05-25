@@ -104,8 +104,8 @@
 #define DEFAULT_SPAWN_ITEM_AMMO                     1
 
 #define DEFAULT_ALLOW_KILL_DELAY_MILLISECONDS      1000
-#define DEFAULT_COMPLAINT_DAMAGE_THRESHOLD        1
-#define DEFAULT_COMPLAINT_LIMIT                   1
+#define DEFAULT_COMPLAINT_DAMAGE_THRESHOLD        400
+#define DEFAULT_COMPLAINT_LIMIT                   5
 
 weaponReloadConfig_t    g_weaponReloadConfig;
 knockbackConfig_t       g_knockbackConfig;
@@ -229,14 +229,14 @@ static configCvarTable_t s_configCvarTable[] = {
         { &weapon_reload_cg,       "weapon_reload_cg",       "0", 0, "Chaingun refire delay override in milliseconds." },
         { &weapon_reload_hmg,      "weapon_reload_hmg",      "0", 0, "Heavy Machinegun refire delay override in milliseconds." },
 
-	{ &g_loadout,              "g_loadout",              STRINGIZE( DEFAULT_FACTORY_LOADOUT ), CVAR_SERVERINFO, "Advertise whether the active factory grants Quake Live loadouts." },
+	{ &g_loadout,              "g_loadout",              STRINGIZE( DEFAULT_FACTORY_LOADOUT ), CVAR_SERVERINFO | CVAR_GAMERULE, "Advertise whether the active factory grants Quake Live loadouts." },
 	{ &g_runes,                "g_runes",                STRINGIZE( DEFAULT_FACTORY_RUNES ), 0, "Enable the retail random persistent powerup spawn lane for rune factories." },
-        { &g_infiniteAmmo,         "g_infiniteAmmo",         STRINGIZE( DEFAULT_INFINITE_AMMO ), CVAR_ARCHIVE, "When non-zero, spawn loadouts grant infinite ammunition mirroring Quake Live practice factories." },
+	{ &g_infiniteAmmo,         "g_infiniteAmmo",         STRINGIZE( DEFAULT_INFINITE_AMMO ), CVAR_GAMERULE, "When non-zero, spawn loadouts grant infinite ammunition mirroring Quake Live practice factories." },
         { &g_ammoPack,             "g_ammoPack",             STRINGIZE( DEFAULT_AMMO_PACK_TOGGLE ), CVAR_ARCHIVE, "Enable Quake Live ammo pack sizing so pickups follow factory scripts instead of compiled defaults." },
         { &g_ammoPackHack,         "g_ammoPackHack",         STRINGIZE( DEFAULT_AMMO_PACK_HACK ), CVAR_ARCHIVE, "Legacy Quake Live ammo pack override used by classic map factories." },
 	{ &g_ammoRespawn,          "g_ammoRespawn",          STRINGIZE( DEFAULT_AMMO_RESPAWN_SECONDS ), CVAR_ARCHIVE, "Seconds before ammo entities respawn; Quake Live factories reduce this for faster loops." },
-	{ &g_suddenDeathRespawn,   "g_suddenDeathRespawn",   STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_ARCHIVE, "Allow ammo to continue respawning during sudden death when set to 1." },
-	{ &g_startingHealthBonus,  "g_startingHealthBonus",  STRINGIZE( DEFAULT_STARTING_HEALTH_BONUS ), CVAR_ARCHIVE, "Extra health layered on top of the base value during spawns." },
+	{ &g_suddenDeathRespawn,   "g_suddenDeathRespawn",   STRINGIZE( DEFAULT_SUDDEN_DEATH_RESPAWN ), CVAR_GAMERULE, "Allow ammo to continue respawning during sudden death when set to 1." },
+	{ &g_startingHealthBonus,  "g_startingHealthBonus",  STRINGIZE( DEFAULT_STARTING_HEALTH_BONUS ), CVAR_GAMERULE, "Extra health layered on top of the base value during spawns." },
 	{ &g_respawn_delay_min,    "g_respawn_delay_min",    STRINGIZE( DEFAULT_RESPAWN_DELAY_MIN_MILLISECONDS ), CONFIG_CVAR_FLAG_FACTORY_MANAGED, "Minimum delay in milliseconds before a dead player may respawn." },
 	{ &g_respawn_delay_max,    "g_respawn_delay_max",    STRINGIZE( DEFAULT_RESPAWN_DELAY_MAX_MILLISECONDS ), CONFIG_CVAR_FLAG_FACTORY_MANAGED, "Post-minimum grace window in milliseconds before dead players auto-respawn." },
 	{ &g_regenHealth,          "g_regenHealth",          STRINGIZE( DEFAULT_REGEN_HEALTH_DELAY_MILLISECONDS ), CVAR_ARCHIVE, "Milliseconds after taking damage before factory health regeneration begins." },

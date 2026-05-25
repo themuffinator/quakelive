@@ -1281,6 +1281,28 @@ void Touch_Button(gentity_t *ent, gentity_t *other, trace_t *trace ) {
 	}
 }
 
+/*
+==============
+Touch_ButtonKeyed
+
+===============
+*/
+static void Touch_ButtonKeyed( gentity_t *ent, gentity_t *other, trace_t *trace ) {
+	if ( !other->client ) {
+		return;
+	}
+
+	if ( ent->moverState != MOVER_POS1 ) {
+		return;
+	}
+
+	if ( ( ent->spawnflags & 16 ) && ( other->keyMask & ( KEY_FLAG_SILVER | KEY_FLAG_MASTER ) ) ) {
+		Use_BinaryMover( ent, other, other );
+	} else if ( ( ent->spawnflags & 32 ) && ( other->keyMask & ( KEY_FLAG_GOLD | KEY_FLAG_MASTER ) ) ) {
+		Use_BinaryMover( ent, other, other );
+	}
+}
+
 
 /*QUAKED func_button (0 .5 .8) ?
 When a button is touched, it moves some distance in the direction of it's angle, triggers all of it's targets, waits some time, then returns to it's original position where it can be triggered again.
@@ -1328,7 +1350,9 @@ void SP_func_button( gentity_t *ent ) {
 	distance = abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2] - lip;
 	VectorMA (ent->pos1, distance, ent->movedir, ent->pos2);
 
-	if (ent->health) {
+	if ( ent->spawnflags & ( 16 | 32 ) ) {
+		ent->touch = Touch_ButtonKeyed;
+	} else if (ent->health) {
 		// shootable button
 		ent->takedamage = qtrue;
 	} else {

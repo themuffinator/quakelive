@@ -97,6 +97,13 @@ Observed facts:
    `svs.nextSnapshotEntities wrapped` check from the stock snapshot build path.
 6. `sub_4E5900`, `sub_4E5AC0`, and `sub_4E5B90` preserve the retained rate
    control, snapshot emit, fragment-drain, and per-client send loop.
+7. The 2026-05-25 snapshot playerState transport re-audit keeps the source
+   bridge pinned across the same path. `SV_BuildClientSnapshot` copies the live
+   `SV_GameClientNum` playerState into `frame->ps`, suppresses the client's own
+   entity because cgame regenerates it from playerState, derives the viewpoint
+   from `ps->origin + viewheight`, and gathers snapshot entities before
+   `SV_WriteSnapshotToClient` writes the area mask, `MSG_WriteDeltaPlayerstate`,
+   and `SV_EmitPacketEntities` in retail order.
 
 ## Retained `sv_world.c` World-Sector Closures
 

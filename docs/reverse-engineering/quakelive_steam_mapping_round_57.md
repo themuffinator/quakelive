@@ -34,9 +34,10 @@ Observed facts:
    falling back to a full `32`-bit write.
 2. The helper preserves the stock "no change" fast path, including the
    `oldsize += 7` accounting side effect before returning.
-3. The body then XORs the key with `to->serverTime` and serializes the exact
-   Quake III field set with keyed deltas: `angles[3]`, `forwardmove`,
-   `rightmove`, `upmove`, `buttons`, and `weapon`.
+3. The body then XORs the key with `to->serverTime` and serializes the retained
+   Quake III movement core plus the Quake Live command tail: `angles[3]`,
+   `forwardmove`, `rightmove`, `upmove`, `buttons`, `weapon`,
+   `weaponPrimary`, and `fov`.
 4. `sub_4D54A0` mirrors the same layout on read, reconstructing either the
    copied-from baseline or the keyed deltas depending on the change bit.
 
@@ -66,6 +67,19 @@ Observed facts:
    and control flow remain the Quake III `MSG_WriteDeltaPlayerstate` and
    `MSG_ReadDeltaPlayerstate` implementations, including the `PS_STATS`,
    `PS_PERSISTANT`, `PS_AMMO`, and `PS_POWERUPS` array-mask sections.
+5. The 2026-05-25 playerState delta-codec re-audit keeps that closure pinned
+   in source: `msg.c::playerStateFields` preserves the Quake Live scalar order
+   through the movement-critical command-time, origin/velocity/viewangle,
+   jump/crouch, weapon-primary, location, fov, and command-axis mirror fields;
+   the signed `forwardmove`, `rightmove`, and `upmove` tail fields are compared
+   as signed bytes, serialized as byte payloads, and restored through the same
+   scalar helper path; and the four array-mask sections now have executable
+   round-trip coverage in `tests/test_playerstate_replication.py`.
+6. The 2026-05-25 usercmd movement-transport re-audit keeps the keyed usercmd
+   pair pinned against source and HLIL offsets. Quake Live extends the keyed
+   usercmd tail with `weaponPrimary` and `fov`, so the focused guard now checks
+   those two bytes alongside the signed movement axes in both the changed-field
+   and copied-from-baseline read paths.
 
 The `MSG_ReportChangeVectors_f` helper is an HLIL-backed closure rather than a
 standalone `functions.csv` start, but its role is still unambiguous from the

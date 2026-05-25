@@ -62,6 +62,21 @@ class CommandMirrorResult(ctypes.Structure):
 	]
 
 
+class NoMoveResult(ctypes.Structure):
+	_fields_ = [
+		("commandTime", ctypes.c_int),
+		("weaponPrimary", ctypes.c_int),
+		("fov", ctypes.c_int),
+		("forwardmove", ctypes.c_int),
+		("rightmove", ctypes.c_int),
+		("upmove", ctypes.c_int),
+		("yaw", ctypes.c_float),
+		("originX", ctypes.c_float),
+		("velocityX", ctypes.c_float),
+		("traceCalls", ctypes.c_int),
+	]
+
+
 def _find_c_compiler() -> str:
 	compiler = shutil.which("gcc") or shutil.which("clang") or shutil.which("cc")
 	if not compiler:
@@ -110,6 +125,8 @@ def pmove_validation_harness(tmp_path_factory: pytest.TempPathFactory) -> ctypes
 	library.QLR_RunAirDoubleJumpSequence.restype = None
 	library.QLR_RunCommandMirrorScenario.argtypes = [ctypes.POINTER(CommandMirrorResult)]
 	library.QLR_RunCommandMirrorScenario.restype = None
+	library.QLR_RunNoMoveCommandGateScenario.argtypes = [ctypes.POINTER(NoMoveResult)]
+	library.QLR_RunNoMoveCommandGateScenario.restype = None
 	return library
 
 
@@ -176,3 +193,22 @@ def test_pmove_single_mirrors_signed_command_axes_for_retail_hud_state(
 	assert result.forwardmove == -127
 	assert result.rightmove == 64
 	assert result.upmove == -12
+
+
+def test_pmove_single_no_move_advances_command_time_without_state_mirrors(
+	pmove_validation_harness: ctypes.CDLL,
+) -> None:
+	result = NoMoveResult()
+
+	pmove_validation_harness.QLR_RunNoMoveCommandGateScenario(ctypes.byref(result))
+
+	assert result.commandTime == 1000
+	assert result.weaponPrimary == 2
+	assert result.fov == 90
+	assert result.forwardmove == 7
+	assert result.rightmove == 8
+	assert result.upmove == 9
+	assert result.yaw == pytest.approx(0.0, abs=1e-6)
+	assert result.originX == pytest.approx(42.0, abs=1e-6)
+	assert result.velocityX == pytest.approx(100.0, abs=1e-6)
+	assert result.traceCalls == 0

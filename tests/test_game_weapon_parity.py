@@ -709,7 +709,7 @@ def test_hmg_full_server_and_cgame_wiring_matches_retail() -> None:
     for expected in (
         'vmCvar_t\tcg_disableLoadout_hmg;',
         'vmCvar_t\tcg_weaponConfig_hmg;',
-        '{ &cg_damagePlum, "cg_damagePlum", "g mg sg gl rl lg rg pg bfg gh cg ng pl hmg", CVAR_USERINFO | CVAR_ARCHIVE }',
+        '{ &cg_damagePlum, "cg_damagePlum", "g mg sg gl rl lg rg pg bfg gh cg ng pl hmg", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD }',
         '{ &cg_disableLoadout_hmg, "cg_disableLoadout_hmg", "0", CVAR_ROM }',
         '{ &cg_weaponConfig_hmg, "cg_weaponConfig_hmg", "", CVAR_ARCHIVE | CVAR_VM_CREATED | CVAR_CLOUD }',
         '{ "hmg", WP_HEAVY_MACHINEGUN, 14 }',

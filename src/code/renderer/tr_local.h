@@ -1051,6 +1051,7 @@ extern cvar_t	*r_primitives;			// "0" = based on compiled vertex array existance
 
 extern cvar_t	*r_inGameVideo;				// controls whether in game video should be draw
 extern cvar_t	*r_fastsky;				// controls whether sky should be cleared or drawn
+extern cvar_t	*r_fastSkyColor;			// packed RGB clear color for fast sky
 extern cvar_t	*r_drawSun;				// controls drawing of sun quad
 extern cvar_t	*r_dynamiclight;		// dynamic lights enabled/disabled
 extern cvar_t	*r_dlightBacks;			// dlight non-facing surfaces for continuity
@@ -1070,6 +1071,9 @@ extern cvar_t	*r_mode;				// video mode
 extern cvar_t	*r_fullscreen;
 extern cvar_t	*r_gamma;
 extern cvar_t	*r_contrast;
+extern cvar_t	*r_glVendor;
+extern cvar_t	*r_glRenderer;
+extern cvar_t	*r_glReserved;
 extern cvar_t	*r_floatingPointFBOs;
 extern cvar_t	*r_displayRefresh;		// optional display refresh option
 extern cvar_t	*r_ignorehwgamma;		// overrides hardware gamma capabilities
@@ -1125,6 +1129,7 @@ extern	cvar_t	*r_ignoreGLErrors;
 
 extern	cvar_t	*r_overBrightBits;
 extern	cvar_t	*r_mapOverBrightBits;
+extern	cvar_t	*r_mapOverBrightCap;
 
 extern	cvar_t	*r_debugSurface;
 extern	cvar_t	*r_simpleMipMaps;
@@ -1135,6 +1140,7 @@ extern	cvar_t	*r_debugSort;
 
 extern	cvar_t	*r_printShaders;
 extern	cvar_t	*r_saveFontData;
+extern	cvar_t	*r_forceMergeEntities;
 
 extern	cvar_t	*r_ambientScale;
 extern	cvar_t	*r_aspectRatio;

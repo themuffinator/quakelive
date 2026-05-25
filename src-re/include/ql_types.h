@@ -15,26 +15,30 @@
  */
 
 /*
- * Client state enumerants lifted from clientx86.dll::CL_Frame (0x004AEB30).
+ * Client state enumerants lifted from quakelive_steam.exe::CL_Frame
+ * (0x004BC3E0).
  * Validation: values compared against retail Steam build state transitions
  * captured 2024-05-05.
  */
 typedef enum {
-    QLR_CA_UNINITIALIZED = -1,
-    QLR_CA_DISCONNECTED = 0,
-    QLR_CA_CONNECTING = 1,
-    QLR_CA_CHALLENGING = 2,
-    QLR_CA_CONNECTED = 3,
-    QLR_CA_PRIMED = 4,
-    QLR_CA_ACTIVE = 5,
-    QLR_CA_CINEMATIC = 6,
+	QLR_CA_UNINITIALIZED = 0,
+	QLR_CA_DISCONNECTED = 1,
+	QLR_CA_AUTHORIZING = 2,
+	QLR_CA_CONNECTING = 3,
+	QLR_CA_CHALLENGING = 4,
+	QLR_CA_CONNECTED = 5,
+	QLR_CA_LOADING = 6,
+	QLR_CA_PRIMED = 7,
+	QLR_CA_ACTIVE = 8,
+	QLR_CA_CINEMATIC = 9,
 } qlr_client_state_t;
 
 /* Snapshot flag masks recovered from clientx86.dll::CL_FirstSnapshot (0x004AFE70). */
 #define QLR_SNAPFLAG_NOT_ACTIVE 0x0001
 
 /*
- * Lightweight cvar mirror extracted from clientx86.dll::CL_Frame (0x004AEB30).
+ * Lightweight cvar mirror extracted from quakelive_steam.exe::CL_Frame
+ * (0x004BC3E0).
  * Validation: checked against debugger dumps of cvar_t in the Steam build
  * (2024-05-05).
  */
@@ -45,7 +49,8 @@ typedef struct {
 } qlr_cvar_shadow_t;
 
 /*
- * Partial cls_t snapshot taken from clientx86.dll::CL_Frame (0x004AEB30).
+ * Partial cls_t snapshot taken from quakelive_steam.exe::CL_Frame
+ * (0x004BC3E0).
  * Validation: structure size and boolean packing confirmed with live process
  * inspection (Steam build, 2024-05-05).
  */
@@ -60,6 +65,7 @@ typedef struct {
     int realtime;
     int frametime;
     int realFrametime;
+    int framecount;
 } qlr_client_static_shadow_t;
 
 /*
@@ -123,8 +129,12 @@ typedef struct {
 /* Shadowed cvar pointers wired up by CL_Frame. */
 typedef struct {
     qlr_cvar_shadow_t *com_cl_running;
+    qlr_cvar_shadow_t *cl_avidemo_latch;
+    qlr_cvar_shadow_t *cl_avidemo_mintime;
+    qlr_cvar_shadow_t *cl_avidemo_maxtime;
     qlr_cvar_shadow_t *cl_avidemo;
     qlr_cvar_shadow_t *cl_forceavidemo;
+    qlr_cvar_shadow_t *cl_timegraph;
     qlr_cvar_shadow_t *com_timescale;
     qlr_cvar_shadow_t *cl_timeNudge;
     qlr_cvar_shadow_t *cl_paused;
@@ -138,24 +148,27 @@ typedef struct {
 
 /* Hook table used when bridging CL_Frame into prototype harnesses. */
 typedef struct {
-void (*stopAllSounds)(void);
-void (*setActiveMenu)(int menuId);
-void (*writeDemoMessage)(void *msg, int header);
-void (*checkTimeout)(qlr_client_connection_shadow_t *clc,
-                     qlr_client_static_shadow_t *cls,
-                     qlr_client_active_shadow_t *cl);
-void (*checkUserinfo)(void);
-void (*readPackets)(void);
-void (*sendCmd)(void);
-void (*checkForResend)(void);
-void (*predictMovement)(void);
-void (*runConsole)(void);
-void (*updateScreen)(void);
-void (*soundUpdate)(void);
+	void (*stopAllSounds)(void);
+	void (*setActiveMenu)(int menuId);
+	void (*debugGraph)(float value, int color);
+	void (*executeText)(const char *text);
+	void (*disconnect)(void);
+	int (*monkeyShouldBeSpanked)(void);
+	float (*randomFloat)(void);
+	void (*changeReliableCommand)(void);
+	void (*checkTimeout)(qlr_client_connection_shadow_t *clc,
+			     qlr_client_static_shadow_t *cls,
+			     qlr_client_active_shadow_t *cl);
+	void (*checkUserinfo)(void);
+	void (*workshopFrame)(void);
+	void (*sendCmd)(void);
+	void (*steamBrowserFrame)(void);
+	void (*checkForResend)(void);
+	void (*runConsole)(void);
+	void (*updateScreen)(void);
+	void (*soundUpdate)(void);
 	void (*runCinematic)(void);
-void (*setCGameTime)(void);
-void (*firstSnapshot)(void);
-    void (*beginProfiling)(void);
+	void (*setCGameTime)(void);
 } qlr_client_frame_hooks_t;
 
 /* Aggregated context passed into the CL_Frame shim. */

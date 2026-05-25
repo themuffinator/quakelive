@@ -92,7 +92,7 @@ Purpose: supplement [IMPLEMENTATION_PLAN.md](../../IMPLEMENTATION_PLAN.md) with 
 | `CG-C2a` | `CG-C` | Validation | [`bg_public.h`](../../src/code/game/bg_public.h), [`g_client.c`](../../src/code/game/g_client.c), [`g_freeze.c`](../../src/code/game/g_freeze.c), [`cg_event.c`](../../src/code/cgame/cg_event.c), [`tests/test_game_native_export_helper_parity.py`](../../tests/test_game_native_export_helper_parity.py), [`tests/test_cgame_event_transport_parity.py`](../../tests/test_cgame_event_transport_parity.py), [`docs/reverse-engineering/cgame-mapping.md`](../../docs/reverse-engineering/cgame-mapping.md), [`docs/reverse-engineering/qagame-mapping.md`](../../docs/reverse-engineering/qagame-mapping.md) | Closed on `2026-04-05`. Freeze thaw-progress visibility now guards the live `ET_EVENTS + EV_THAW_TICK` temp-entity band, qagame emits thaw-complete and thaw-progress through `EV_THAW_PLAYER` / `EV_THAW_TICK`, and cgame consumes those cases directly in `CG_EntityEvent` without the older synthetic thaw-alias compatibility path. |
 | `CG-C2` | `CG-C` | Validation | [`g_client.c`](../../src/code/game/g_client.c), [`cg_event.c`](../../src/code/cgame/cg_event.c), [`tests/test_cgame_event_transport_parity.py`](../../tests/test_cgame_event_transport_parity.py), [`docs/reverse-engineering/cgame-mapping.md`](../../docs/reverse-engineering/cgame-mapping.md), [`docs/reverse-engineering/qagame-mapping.md`](../../docs/reverse-engineering/qagame-mapping.md), `references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt:72298-72304` | Closed on `2026-04-05`. `G_RRApplySurvivalBonus` now emits the retail Red Rover survival-bonus broadcast through `G_BroadcastGlobalTeamSound( vec3_origin, GTS_SURVIVOR_WARNING, -1, TEAM_BLUE, 0 )`, and the existing `EV_GLOBAL_TEAM_SOUND` consumer already gates `GTS_SURVIVOR_WARNING` on the local team before queuing `survivorWarningSound`. |
 | `CG-C3a` | `CG-C` | Validation | [`cg_predict.c`](../../src/code/cgame/cg_predict.c), [`cg_snapshot.c`](../../src/code/cgame/cg_snapshot.c), [`cg_servercmds.c`](../../src/code/cgame/cg_servercmds.c), [`tests/test_cgame_snapshot_parity.py`](../../tests/test_cgame_snapshot_parity.py), [`docs/reverse-engineering/cgame-mapping.md`](../../docs/reverse-engineering/cgame-mapping.md) | Closed on `2026-04-05`. Prediction now tracks follow and team context through `CG_UpdateClientInfoContext`, local `CS_PLAYERS + cg.clientNum` updates queue the same refresh before `CG_NewClientInfo`, and snapshot handoff re-enters only `CG_ApplyModelOverrides` plus `CG_LoadDeferredPlayers` instead of rebuilding clientinfo inline or forcing immediate refresh from the servercmd path. |
-| `CG-C3` | `CG-C` | Validation | [`cg_predict.c`](../../src/code/cgame/cg_predict.c), [`cg_playerstate.c`](../../src/code/cgame/cg_playerstate.c), [`cg_snapshot.c`](../../src/code/cgame/cg_snapshot.c), [`tests/test_cgame_snapshot_parity.py`](../../tests/test_cgame_snapshot_parity.py), [`docs/reverse-engineering/cgame-mapping.md`](../../docs/reverse-engineering/cgame-mapping.md) | Closed on `2026-04-05`. Focused structural coverage now locks the remaining retail transition chain after the event-payload cleanup: `CG_PredictPlayerState` keeps the demo/follow and no-predict interpolation fallbacks ahead of local pmove, `CG_TransitionSnapshot` only replays playerstate transitions on non-predicted paths, `CG_RecordCrosshairHitFeedback` preserves the `( armor >> 6 ) + 1` bucket clamp, and `CG_TransitionPlayerState`, `CG_CheckLocalSounds`, and `CG_CheckPlayerstateEvents` keep the follow-reset, reward, event, and duck-smoothing order. |
+| `CG-C3` | `CG-C` | Validation | [`cg_predict.c`](../../src/code/cgame/cg_predict.c), [`cg_playerstate.c`](../../src/code/cgame/cg_playerstate.c), [`cg_snapshot.c`](../../src/code/cgame/cg_snapshot.c), [`tests/test_cgame_snapshot_parity.py`](../../tests/test_cgame_snapshot_parity.py), [`docs/reverse-engineering/cgame-mapping.md`](../../docs/reverse-engineering/cgame-mapping.md) | Closed on `2026-04-05`; re-audited on `2026-05-25`. Focused structural coverage now locks the retail prediction and transition seam: `CG_PredictPlayerState` keeps the demo/follow and no-predict interpolation fallbacks ahead of local pmove, then the replay path preserves the local `pmove_t` setup, command guards, rail replay, `Pmove`, step smoothing, projectile nudge, trigger/item prediction, mover adjustment, and `CG_TransitionPlayerState`; `CG_TransitionSnapshot` only replays playerstate transitions on non-predicted paths, and `CG_TransitionPlayerState`, `CG_CheckLocalSounds`, and `CG_CheckPlayerstateEvents` keep the follow-reset, reward, event, and duck-smoothing order. |
 | `CG-A3a` | `CG-A` | Boundary-only | [`cg_main.c`](../../src/code/cgame/cg_main.c), [`cg_newdraw.c`](../../src/code/cgame/cg_newdraw.c), [`cg_screen.c`](../../src/code/cgame/cg_screen.c), [`cg_local.h`](../../src/code/cgame/cg_local.h), [`tests/test_cgame_displaycontext_parity.py`](../../tests/test_cgame_displaycontext_parity.py), [`docs/reverse-engineering/cgame-mapping.md`](../../docs/reverse-engineering/cgame-mapping.md) | Closed on `2026-04-05`. Cgame now owns the next browser direct-owner boundary slice for overlay lookup/open/close, preset-label refresh, widget-position refresh, focus clear/set, hover enter/leave, mouse-over state, mouse-move dispatch, and cursor walking, and the live scoreboard-cache plus spectator `joingame_menu` seams route through those owners while the verified shared `ui_shared.c` runtime remains underneath. |
 | `CG-A3b` | `CG-A` | Boundary-only | [`cg_newdraw.c`](../../src/code/cgame/cg_newdraw.c), [`tests/test_cgame_displaycontext_parity.py`](../../tests/test_cgame_displaycontext_parity.py), [`docs/reverse-engineering/cgame-mapping.md`](../../docs/reverse-engineering/cgame-mapping.md) | Closed on `2026-04-05`. `cg_newdraw.c` now owns the adjacent browser runtime-state and simple script-owner slice for rect hit tests, name or group lookup, widget lookup, script dispatch, enable/show cvar gating, show or hide item groups, and the `show` / `hide` / `open` / `conditionalopen` / `close` / `toggle` / `setfocus` verb wrappers, while the focus and hover bodies route through those cgame-owned helpers instead of thin `Item_*` pass-throughs. |
 
@@ -121,7 +121,7 @@ Purpose: supplement [IMPLEMENTATION_PLAN.md](../../IMPLEMENTATION_PLAN.md) with 
 | --- | --- | --- | --- | --- | --- |
 | `CG-C1` | Completed 2026-04-05 | Transport | [`q_shared.h`](../../src/code/game/q_shared.h), [`msg.c`](../../src/code/qcommon/msg.c), [`g_utils.c`](../../src/code/game/g_utils.c), [`g_combat.c`](../../src/code/game/g_combat.c), [`g_client.c`](../../src/code/game/g_client.c), [`g_main.c`](../../src/code/game/g_main.c), [`g_team.c`](../../src/code/game/g_team.c), [`g_weapon.c`](../../src/code/game/g_weapon.c), [`cg_event.c`](../../src/code/cgame/cg_event.c), [`tests/test_cgame_event_transport_parity.py`](../../tests/test_cgame_event_transport_parity.py) | The shared entity-state seam now mirrors the recovered retail payload slots directly for single-recipient temp entities plus global-team-sound transport, including the restored `0xE0` event-data slot and the retail award/infected qagame emitters. | Completed. |
 | `CG-C2` | Completed 2026-04-05 | Validation | [`g_client.c`](../../src/code/game/g_client.c), [`cg_event.c`](../../src/code/cgame/cg_event.c), [`tests/test_cgame_event_transport_parity.py`](../../tests/test_cgame_event_transport_parity.py), [`docs/reverse-engineering/cgame-mapping.md`](../../docs/reverse-engineering/cgame-mapping.md), [`docs/reverse-engineering/qagame-mapping.md`](../../docs/reverse-engineering/qagame-mapping.md) | The remaining Red Rover event-band seam is now closed: qagame emits the survival-bonus broadcast through the retail `EV_GLOBAL_TEAM_SOUND` / `GTS_SURVIVOR_WARNING` `TEAM_BLUE` payload, and cgame already consumes that path directly through the recovered global-team-sound slots. | Completed. |
-| `CG-C3` | Completed 2026-04-05 | Validation | [`cg_predict.c`](../../src/code/cgame/cg_predict.c), [`cg_playerstate.c`](../../src/code/cgame/cg_playerstate.c), [`cg_snapshot.c`](../../src/code/cgame/cg_snapshot.c), [`tests/test_cgame_snapshot_parity.py`](../../tests/test_cgame_snapshot_parity.py) | Focused structural coverage now re-validates the remaining retail prediction and transition seam after the direct event-transport cleanup, including the snapshot-only non-predicted handoff into `CG_TransitionPlayerState`, the prediction interpolation fallbacks, reward ordering, crosshair-hit latching, and the final ammo/event/duck transition order. | Completed. |
+| `CG-C3` | Completed 2026-04-05; re-audited 2026-05-25 | Validation | [`cg_predict.c`](../../src/code/cgame/cg_predict.c), [`cg_playerstate.c`](../../src/code/cgame/cg_playerstate.c), [`cg_snapshot.c`](../../src/code/cgame/cg_snapshot.c), [`tests/test_cgame_snapshot_parity.py`](../../tests/test_cgame_snapshot_parity.py) | Focused structural coverage now re-validates the retail prediction and transition seam after the direct event-transport cleanup and the later movement replay audit, including the snapshot-only non-predicted handoff into `CG_TransitionPlayerState`, prediction interpolation fallbacks, local `pmove_t` setup, command replay guards, `Pmove`/step/trigger/item side effects, reward ordering, crosshair-hit latching, and the final ammo/event/duck transition order. | Completed. |
 
 ### `CG-D` Draw / POI / World-Marker / Effects Exactness
 
@@ -234,6 +234,14 @@ The ground-trace source follow-up rechecked cgame `0x100053A0` and qagame `0x100
 
 The playerState wiring follow-up rechecked the retail engine netfield table plus qagame `0x10031FA0` and cgame `0x10006470`. Source now keeps `clientNum` at `0x88`, restores the replicated `location` byte at `0x8c`, stores the command mirrors as signed bytes at `0x1dc..0x1de`, and moves local-only sidecars after the retail replicated prefix. The same pass moves the progress-backed holdable timer into `stats[10]`, `stats[11]`, and `stats[12]`, matching the HLIL offsets `+0xe8`, `+0xec`, and `+0xf0`, and adds executable delta-codec coverage for both the byte mirrors and timer stat triplet.
 
+The 2026-05-25 no-move command-gate fixture pass added an executable
+`PmoveSingle` probe for the retail `PMF_NO_MOVE` path. The source now has
+runtime coverage showing that the frame still advances `commandTime`, then
+returns before view-angle mutation, `weaponPrimary`/`fov` updates, signed
+command-axis mirrors, trace dispatch, and origin/velocity integration. This
+pins the qagame/cgame symbol-map claim with a behavior fixture rather than only
+the structural ordering checks in `tests/test_pmove_helper_parity.py`.
+
 The 2026-05-22 wiring pass closed the remaining pmove-settings transport
 divergence called out by cgame `0x10048F30`. The server now publishes the
 retail compact 33-token pmove core in `CS_PMOVE_SETTINGS`, ordered as the
@@ -244,17 +252,36 @@ weapon raise/drop timing, and wishspeed. The source cgame parses that compact
 form first, keeps a JSON fallback for older reconstruction artifacts, and only
 uses trailing compact extension tokens for source-only prediction knobs such as
 `airControl`, `crouchSlide`, `doubleJump`, and Quad Hog HUD metadata that
-retail did not consume through the compact core. A later `PM_FlyMove` recheck
-confirmed that retail registers `g_flightThrust` with a `1200` default in
-qagame's cvar table but does not feed that cvar into either shared pmove
-flight leaf, so source now keeps the cvar registration for parity while
-removing the old pmove settings transport and movement override.
+retail did not consume through the compact core. A later Flight recheck
+confirmed that retail registers `g_flightThrust` with a `1200` default and
+`g_flightRefuelRate` with a `0` default in qagame's cvar table but does not
+feed either cvar into shared pmove or Flight pickup math, so source now keeps
+the cvar registrations for parity while removing the old pmove settings
+transport and movement override.
 
 The pmove cvar reconstruction pass then cross-checked the qagame retail cvar
 table at `0x1008F7C4..0x1008FB20`. Source registration in `g_pmove.c` now keeps
 the recovered defaults and cvar flag groups for all 36 `pmove_*` entries instead
 of registering the split-out reconstruction cvars with flag `0`; the compact
 transport and cgame parser continue to consume the resulting cached settings.
+The 2026-05-25 selected-cvar mapping sentinel now ties a representative
+movement-cvar set all the way through the current code: qagame registration,
+factory reset, refresh callback/no-callback ownership, `g_pmoveSettings`
+caching, compact transport ordering, JSON fallback parsing, default shared
+movement constants, and the active `PM_LoadMoveTuningConstants`,
+`PM_AirMove`, `PM_Friction`, `PM_WalkMove`, and jump-release consumers.
+The 2026-05-25 profile/utility pmove cvar mapping sentinel extends that lane
+to the remaining profile and utility fields: `pmove_AirStepFriction`,
+`pmove_AirSteps`, `pmove_BunnyHop`, `pmove_CrouchSlide`,
+`pmove_CrouchSlideFriction`, `pmove_CrouchSlideTime`,
+`pmove_CrouchStepJump`, `pmove_DoubleJump`, `pmove_noPlayerClip`,
+`pmove_StepHeight`, `pmove_StepJump`, `pmove_velocity_gh`,
+`pmove_WaterSwimScale`, `pmove_WaterWadeScale`, `pmove_WeaponDropTime`, and
+`pmove_WeaponRaiseTime`. Coverage now follows these fields from qagame
+registration and refresh through compact/JSON cgame parsing into the shared
+consumers that use playerState profile flags, no-player-clip tracemask removal,
+water/step globals, crouch-slide friction/timers, grapple pull velocity, and
+weapon raise/drop timings.
 The subsequent callback/cache recheck walked retail `G_InitPublishedCvarState`
 and `G_UpdateCvars`, confirming the pmove slab's callback-backed mirrors. Source
 now preserves the callback/no-callback split for the profile toggles and clamps

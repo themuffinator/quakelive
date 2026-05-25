@@ -122,6 +122,14 @@ void CL_Frame ( int msec ) {
 
 /*
 ================
+SteamClient_Frame
+================
+*/
+void SteamClient_Frame( void ) {
+}
+
+/*
+================
 CL_PacketEvent
 ================
 */

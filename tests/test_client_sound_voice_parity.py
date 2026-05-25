@@ -147,7 +147,7 @@ def test_client_steam_voice_frame_reconstructs_retail_transport_path() -> None:
 		cl_main,
 		"static void CL_Steam_Client_OnP2PSessionRequest( void *context, const ql_steam_p2p_session_request_t *event )",
 	)
-	frame_block = _extract_function_block(cl_main, "static void SteamClient_Frame( void )")
+	frame_block = _extract_function_block(cl_main, "void SteamClient_Frame( void )")
 
 	assert "#define CL_STEAM_STATS_REPORT_CHANNEL 0" in cl_main
 	assert "QL_Steamworks_StartVoiceRecording();" in start_block

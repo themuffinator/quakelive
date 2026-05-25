@@ -698,8 +698,9 @@ void Console_Key (int key) {
 
 	// enter finishes the line
 	if ( key == K_ENTER || key == K_KP_ENTER ) {
-		// if not in the game explicitly prepent a slash if needed
-		if ( cls.state != CA_ACTIVE && g_consoleField.buffer[0] != '\\' 
+		// if console chat is not explicitly allowed, force bare text to commands
+		if ( ( !cl_allowConsoleChat || !cl_allowConsoleChat->integer )
+			&& g_consoleField.buffer[0] != '\\'
 			&& g_consoleField.buffer[0] != '/' ) {
 			char	temp[MAX_STRING_CHARS];
 

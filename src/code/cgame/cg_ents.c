@@ -318,6 +318,36 @@ static qhandle_t CG_ItemPOIPowerupLiveShader( const gitem_t *item ) {
 }
 
 /*
+================================
+CG_ItemPOIPowerupIncomingShader
+
+Resolves the retail incoming-spawn powerup POI sprite for a world item.
+================================
+*/
+static qhandle_t CG_ItemPOIPowerupIncomingShader( const gitem_t *item ) {
+	if ( !item ) {
+		return 0;
+	}
+
+	switch ( item->giTag ) {
+	case PW_QUAD:
+		return cgs.media.poiPowerupQuadIncomingShader;
+	case PW_BATTLESUIT:
+		return cgs.media.poiPowerupBattleSuitIncomingShader;
+	case PW_HASTE:
+		return cgs.media.poiPowerupHasteIncomingShader;
+	case PW_INVIS:
+		return cgs.media.poiPowerupInvisIncomingShader;
+	case PW_REGEN:
+		return cgs.media.poiPowerupRegenIncomingShader;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/*
 ========================
 CG_ItemPOIIsQuadHogWorldQuad
 
@@ -357,6 +387,7 @@ static qboolean CG_ItemPOIPowerupMarker( const centity_t *cent, const gitem_t *i
 	vec3_t		distanceOrigin;
 	qboolean	quadHogWorldQuad;
 	qboolean	incoming;
+	qhandle_t	incomingShader;
 
 	if ( !shader || !alpha ) {
 		return qfalse;
@@ -392,11 +423,12 @@ static qboolean CG_ItemPOIPowerupMarker( const centity_t *cent, const gitem_t *i
 	}
 
 	if ( incoming ) {
-		if ( !cgs.media.poiPowerupIncomingShader ) {
+		incomingShader = CG_ItemPOIPowerupIncomingShader( item );
+		if ( !incomingShader ) {
 			return qfalse;
 		}
 
-		*shader = cgs.media.poiPowerupIncomingShader;
+		*shader = incomingShader;
 	}
 
 	VectorCopy( origin, distanceOrigin );
@@ -434,7 +466,7 @@ CG_ItemPOITeamShader
 Resolves the retail team-objective POI sprite for a flag item.
 =====================
 */
-static qhandle_t CG_ItemPOITeamShader( const gitem_t *item ) {
+static qhandle_t CG_ItemPOITeamShader( const gitem_t *item, vec4_t color ) {
 	team_t	localTeam;
 
 	if ( !item ) {
@@ -445,23 +477,47 @@ static qhandle_t CG_ItemPOITeamShader( const gitem_t *item ) {
 	switch ( item->giTag ) {
 	case PW_REDFLAG:
 		if ( localTeam == TEAM_RED ) {
+			if ( color ) {
+				color[0] = 1.0f;
+				color[1] = 0.2f;
+				color[2] = 0.2f;
+				color[3] = 1.0f;
+			}
 			return cgs.media.poiDefendShader;
 		}
 		if ( localTeam == TEAM_BLUE ) {
+			if ( color ) {
+				color[0] = 1.0f;
+				color[1] = 0.2f;
+				color[2] = 0.2f;
+				color[3] = 1.0f;
+			}
 			return cgs.media.poiAttackShader;
 		}
-		if ( cgs.redflag == FLAG_DROPPED && cgs.media.poiFlagDroppedRedShader ) {
+		if ( cgs.media.poiFlagDroppedRedShader ) {
 			return cgs.media.poiFlagDroppedRedShader;
 		}
 		return cg_items[ITEM_INDEX( item )].icon;
 	case PW_BLUEFLAG:
 		if ( localTeam == TEAM_BLUE ) {
+			if ( color ) {
+				color[0] = 0.2f;
+				color[1] = 0.6f;
+				color[2] = 1.0f;
+				color[3] = 1.0f;
+			}
 			return cgs.media.poiDefendShader;
 		}
 		if ( localTeam == TEAM_RED ) {
+			if ( color ) {
+				color[0] = 0.2f;
+				color[1] = 0.6f;
+				color[2] = 1.0f;
+				color[3] = 1.0f;
+			}
 			return cgs.media.poiAttackShader;
 		}
-		if ( cgs.blueflag == FLAG_DROPPED && cgs.media.poiFlagDroppedBlueShader ) {
+		if ( cgs.media.poiFlagDroppedBlueShader ) {
 			return cgs.media.poiFlagDroppedBlueShader;
 		}
 		return cg_items[ITEM_INDEX( item )].icon;
@@ -469,7 +525,7 @@ static qhandle_t CG_ItemPOITeamShader( const gitem_t *item ) {
 		if ( localTeam == TEAM_RED || localTeam == TEAM_BLUE ) {
 			return cgs.media.poiCaptureShader;
 		}
-		if ( cgs.flagStatus == FLAG_DROPPED && cgs.media.poiFlagDroppedNeutralShader ) {
+		if ( cgs.media.poiFlagDroppedNeutralShader ) {
 			return cgs.media.poiFlagDroppedNeutralShader;
 		}
 		return cg_items[ITEM_INDEX( item )].icon;
@@ -492,6 +548,7 @@ static void CG_QueueItemPOIMarker( centity_t *cent, const gitem_t *item, const v
 	qhandle_t		shader;
 	float			alpha;
 	float			zOffset;
+	vec4_t			color;
 
 	if ( !cent || !item ) {
 		return;
@@ -500,6 +557,10 @@ static void CG_QueueItemPOIMarker( centity_t *cent, const gitem_t *item, const v
 	shader = 0;
 	alpha = 1.0f;
 	zOffset = 24.0f;
+	color[0] = 1.0f;
+	color[1] = 1.0f;
+	color[2] = 1.0f;
+	color[3] = 1.0f;
 	switch ( item->giType ) {
 	case IT_POWERUP:
 		if ( !CG_ShouldDrawPOIMarkerMode( cg_powerupPOIs.integer, origin ) ) {
@@ -514,7 +575,7 @@ static void CG_QueueItemPOIMarker( centity_t *cent, const gitem_t *item, const v
 		if ( !cg_flagPOIs.integer ) {
 			return;
 		}
-		shader = CG_ItemPOITeamShader( item );
+		shader = CG_ItemPOITeamShader( item, color );
 		break;
 	default:
 		return;
@@ -535,7 +596,8 @@ static void CG_QueueItemPOIMarker( centity_t *cent, const gitem_t *item, const v
 	marker->fadeDelay = 200;
 	marker->size = CG_POIMarkerSizeForOrigin( marker->origin );
 	marker->shader = shader;
-	marker->color[3] = alpha;
+	Vector4Copy( color, marker->color );
+	marker->color[3] *= alpha;
 }
 
 /*
@@ -1529,29 +1591,27 @@ static qhandle_t CG_DominationSelectShader( qboolean capture, qboolean distress,
 =============
 CG_DominationAddBillboard
 
-Adds a sprite overlay for Domination control points.
+Queues the Domination point overlay through the shared retail marker slab.
 =============
 */
 static void CG_DominationAddBillboard( const centity_t *cent, qhandle_t shader, float height, float radius ) {
-	refEntity_t ent;
+	cgQueuedWorldMarker_t	*marker;
 
-	if ( !shader ) {
+	if ( !cent || !shader ) {
 		return;
 	}
 
-	memset( &ent, 0, sizeof( ent ) );
-	ent.reType = RT_SPRITE;
-	ent.customShader = shader;
-	ent.radius = radius;
-	ent.rotation = 0.0f;
-	ent.shaderRGBA[0] = 0xff;
-	ent.shaderRGBA[1] = 0xff;
-	ent.shaderRGBA[2] = 0xff;
-	ent.shaderRGBA[3] = 0xff;
-	VectorCopy( cent->lerpOrigin, ent.origin );
-	ent.origin[2] += height;
+	marker = CG_AllocQueuedWorldMarkerForKey( CG_QUEUED_MARKER_KIND_DOMINATION_POINT, cent->currentState.number );
+	if ( !marker ) {
+		return;
+	}
 
-	trap_R_AddRefEntityToScene( &ent );
+	VectorCopy( cent->lerpOrigin, marker->origin );
+	marker->origin[2] += height;
+	marker->duration = 200;
+	marker->fadeDelay = 200;
+	marker->size = radius;
+	marker->shader = shader;
 }
 
 /*

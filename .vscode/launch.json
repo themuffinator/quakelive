@@ -33,20 +33,14 @@
 				"0",
 				"+set",
 				"ui_browserAwesomium",
-				"0",
-				"+set",
-				"web_browserActive",
-				"0"
+				"1"
 			],
 			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",
 			"console": "integratedTerminal",
 			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
 				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
-				"QLR_FULL_DUMP": "1",
-				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
-				"QL_DISABLE_STEAMWORKS": "1",
-				"QL_DISABLE_AWESOMIUM": "1"
+				"QLR_FULL_DUMP": "1"
 			},
 			"stopAtEntry": false
 		},
@@ -83,9 +77,6 @@
 				"+set",
 				"ui_browserAwesomium",
 				"0",
-				"+set",
-				"web_browserActive",
-				"0",
 				"+devmap",
 				"campgrounds",
 				"ffa"
@@ -95,10 +86,7 @@
 			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
 				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
-				"QLR_FULL_DUMP": "1",
-				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
-				"QL_DISABLE_STEAMWORKS": "1",
-				"QL_DISABLE_AWESOMIUM": "1"
+				"QLR_FULL_DUMP": "1"
 			},
 			"stopAtEntry": false
 		},
@@ -135,9 +123,6 @@
 				"+set",
 				"ui_browserAwesomium",
 				"0",
-				"+set",
-				"web_browserActive",
-				"0",
 				"+devmap",
 				"purgatory",
 				"ffa"
@@ -147,10 +132,7 @@
 			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
 				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
-				"QLR_FULL_DUMP": "1",
-				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
-				"QL_DISABLE_STEAMWORKS": "1",
-				"QL_DISABLE_AWESOMIUM": "1"
+				"QLR_FULL_DUMP": "1"
 			},
 			"stopAtEntry": false
 		},
@@ -187,9 +169,6 @@
 				"+set",
 				"ui_browserAwesomium",
 				"0",
-				"+set",
-				"web_browserActive",
-				"0",
 				"+devmap",
 				"bloodrun",
 				"ffa"
@@ -199,10 +178,7 @@
 			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
 				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
-				"QLR_FULL_DUMP": "1",
-				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
-				"QL_DISABLE_STEAMWORKS": "1",
-				"QL_DISABLE_AWESOMIUM": "1"
+				"QLR_FULL_DUMP": "1"
 			},
 			"stopAtEntry": false
 		},
@@ -248,9 +224,6 @@
 				"0",
 				"+set",
 				"ui_browserAwesomium",
-				"0",
-				"+set",
-				"web_browserActive",
 				"0"
 			],
 			"cwd": "${workspaceFolder}\\build\\win32\\Debug\\bin",
@@ -258,10 +231,7 @@
 			"symbolSearchPath": "${workspaceFolder}\\build\\win32\\Debug\\bin;${workspaceFolder}\\build\\win32\\Debug\\bin\\baseq3;${workspaceFolder}\\build\\win32\\Debug\\modules\\cgamex86;${workspaceFolder}\\build\\win32\\Debug\\modules\\qagamex86",
 			"env": {
 				"QLR_DUMP_PATH": "${workspaceFolder}\\build\\win32\\Debug\\dumps",
-				"QLR_FULL_DUMP": "1",
-				"QL_DISABLE_EXTERNAL_ECOSYSTEMS": "1",
-				"QL_DISABLE_STEAMWORKS": "1",
-				"QL_DISABLE_AWESOMIUM": "1"
+				"QLR_FULL_DUMP": "1"
 			},
 			"stopAtEntry": false
 		}

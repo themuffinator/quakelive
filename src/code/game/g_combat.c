@@ -507,20 +507,11 @@ static weapon_t G_ModToWeapon( int mod ) {
 =============
 G_BattleSuitDamageScale
 
-Returns the active damage scale applied when the Battlesuit powerup is running.
+Returns the active retail damage scale applied when the Battlesuit powerup is running.
 =============
 */
 static float G_BattleSuitDamageScale( void ) {
-	float	scale;
-
-	scale = g_battleSuitDampen.value;
-	if ( scale <= 0.0f ) {
-		scale = 0.5f;
-	} else if ( scale > 1.0f ) {
-		scale = 1.0f;
-	}
-
-	return scale;
+	return g_battleSuitDampen.value;
 }
 
 
@@ -1875,14 +1866,12 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		}
 	}
 
-	// battlesuit protects from all radius damage (but takes knockback)
-	// and protects 50% against all damage
+	// battlesuit dampens damage in retail QL, but falling keeps its full value
 	if ( client && client->ps.powerups[PW_BATTLESUIT] ) {
 		G_AddEvent( targ, EV_POWERUP_BATTLESUIT, 0 );
-		if ( ( dflags & DAMAGE_RADIUS ) || ( mod == MOD_FALLING ) ) {
-			return;
+		if ( mod != MOD_FALLING ) {
+			damage *= G_BattleSuitDamageScale();
 		}
-		damage *= G_BattleSuitDamageScale();
 	}
 
 	// add to the attacker's hit counter (if the target isn't a general entity like a prox mine)

@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-05-23
+Last updated: 2026-05-25
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -40,6 +40,861 @@ disabled, until a documented open replacement path exists.
   snapshots, not current gap ledgers.
 
 ## Active work
+
+### Task A58: Re-audit client/server usercmd movement transport [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/cl_input.c`,
+`src/code/client/cl_cgame.c`, `src/code/cgame/cg_predict.c`,
+`src/code/cgame/cg_syscalls.c`, `src/code/qcommon/msg.c`,
+`src/code/server/sv_client.c`, `src/code/server/sv_game.c`,
+`tests/test_usercmd_movement_transport_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_17.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_57.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_62.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_126.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_277.md`,
+`references/analysis/quakelive_symbol_aliases.json`
+Parity estimate: **before 100% -> after 100%** for the scoped usercmd
+movement transport seam: client command creation, packet packing, keyed
+qcommon deltas, server replay into qagame, and cgame prediction access to the
+host command ring. No production source patch was required.
+
+Completed work:
+
+1. Rechecked the retained retail mappings for `CL_CreateCmd`,
+   `CL_CreateNewCommands`, `CL_ReadyToSendPacket`, `CL_WritePacket`,
+   `CL_SendCmd`, `MSG_WriteDeltaUsercmdKey`, `MSG_ReadDeltaUsercmdKey`,
+   `SV_ClientThink`, `SV_UserMove`, `SV_ExecuteClientMessage`,
+   `QLCGImport_GetCurrentCmdNumber`, and `QLCGImport_GetUserCmd`.
+2. Added a focused end-to-end sentinel for the client command path, including
+   final `weapon` / `weaponPrimary` / `fov` storage, `serverTime` and view-angle
+   capture, primed command generation, packet throttle checks, `cl_packetdup`
+   resend window, `clc_move` versus `clc_moveNoDelta`, checksum-feed keying,
+   ordered `MSG_WriteDeltaUsercmdKey`, and `outPackets` bookkeeping.
+3. Pinned the qcommon keyed usercmd delta pair against Quake Live extensions:
+   `weaponPrimary` and `fov` now stay covered alongside the signed
+   `forwardmove`, `rightmove`, and `upmove` bytes in both changed-field and
+   copied-baseline read paths.
+4. Added server replay coverage for `SV_UserMove` and `SV_ClientThink`,
+   including delta-message selection, command-count guards, keyed decode,
+   message-ack ping timestamping, pure-client gates, first-command
+   `SV_ClientEnterWorld`, stale-command suppression, `lastUsercmd`, qagame
+   `G_GET_USERCMD`, bot `BOTLIB_USER_COMMAND`, and `GAME_CLIENT_THINK`.
+5. Added cgame import coverage proving prediction pulls commands through
+   `trap_GetCurrentCmdNumber` / `trap_GetUserCmd`, while host-side
+   `CL_GetUserCmd` still rejects future and overwritten command numbers before
+   copying from the command ring.
+6. Verification:
+   `python -m pytest tests/test_usercmd_movement_transport_parity.py -q --tb=short`
+   -> `5 passed`;
+   `python -m pytest tests/test_usercmd_movement_transport_parity.py tests/test_engine_client_command_parity.py::test_usercmd_cgame_bridge_matches_retail_weapon_primary_and_fov_bytes tests/test_engine_client_command_parity.py::test_client_input_mapping_round_277_promotes_console_input_and_usercmd_symbols -q --tb=short`
+   -> `7 passed`;
+   `python -m pytest tests/test_usercmd_movement_transport_parity.py tests/test_playerstate_replication.py tests/test_game_active_pmove_wiring_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py tests/test_game_native_export_helper_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short`
+   -> `199 passed, 107 subtests passed`;
+   `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_client_full_parity_gate.py -q --tb=short`
+   -> `6 passed, 3 skipped`.
+
+### Task A57: Restore retail parity for spawn and sudden-death `g_*` CVars [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_main.c`, `src/game/g_config.c`,
+`src/code/game/g_client.c`, `src/code/game/g_combat.c`,
+`src/code/game/g_items.c`, `src/game/g_match_config.c`,
+`docs/gameplay/cvars.md`, `tests/test_game_factory_regen_parity.py`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt`
+Parity estimate: **before 74% -> after 100%** for the selected ten-cvar
+surface: `g_startingWeapons`, `g_startingHealth`,
+`g_startingHealthBonus`, `g_startingArmor`, `g_suddenDeathRespawn`,
+`g_suddenDeathRespawnStart`, `g_suddenDeathRespawnTick`,
+`g_suddenDeathRespawnMax`, `g_suddenDeathRespawnIncrement`, and
+`g_suddenDeathRespawnPrint`. Repo-wide remains **98%** pending the active
+compatibility-only and runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the qagame HLIL registration rows and string/default data for the
+   selected spawn and sudden-death cvars, including the retail
+   `g_startingWeapons` default mask (`3`) and the shared `CVAR_GAMERULE` flag
+   across the sudden-death controller.
+2. Corrected `g_startingHealth` to the retail `CVAR_SERVERINFO |
+   CVAR_GAMERULE` row, corrected `g_startingArmor` and
+   `g_startingWeapons` to `CVAR_GAMERULE`, and changed
+   `g_startingWeapons` from source-local `0` to retail `3`.
+3. Corrected `g_startingHealthBonus` and `g_suddenDeathRespawn` in the config
+   cvar registration layer so duplicate registration preserves the recovered
+   `CVAR_GAMERULE` flags.
+4. Corrected `g_suddenDeathRespawnStart`, `g_suddenDeathRespawnTick`,
+   `g_suddenDeathRespawnMax`, `g_suddenDeathRespawnIncrement`, and
+   `g_suddenDeathRespawnPrint` to their retail `CVAR_GAMERULE` rows.
+5. Revalidated wiring for spawn loadout masks, starting health/armor fallback,
+   factory config caching, sudden-death match config caching, respawn-delay
+   calculation, centerprint announcements, item respawn suppression, and match
+   state publication.
+6. Verification:
+   `python -m pytest tests/test_game_factory_regen_parity.py -q --tb=short`
+   -> `23 passed`;
+   `python -m pytest tests/test_game_factory_regen_parity.py tests/test_match_state_configstring.py tests/test_gametype_lifecycle.py tests/test_game_helper_seam_parity.py tests/test_cvar_console_write_parity.py tests/test_game_module_retail_parity_gate.py -q --tb=short`
+   -> `61 passed, 6 skipped`.
+
+### Task A56: Re-audit server/client snapshot playerState transport [COMPLETED]
+Priority: High
+Primary areas: `src/code/server/sv_snapshot.c`,
+`src/code/client/cl_parse.c`, `src/code/client/cl_cgame.c`,
+`src/code/cgame/cg_syscalls.c`, `tests/test_playerstate_replication.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_17.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_65.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_127.md`,
+`references/analysis/quakelive_symbol_aliases.json`
+Parity estimate: **before 100% -> after 100%** for the scoped snapshot
+playerState transport seam: server snapshot playerState build/write, client
+snapshot parse/ring storage, `CL_GetSnapshot` exposure, and cgame syscall
+retrieval. No production source patch was required.
+
+Completed work:
+
+1. Rechecked the retained retail mappings for `SV_BuildClientSnapshot`,
+   `SV_WriteSnapshotToClient`, `SV_SendClientSnapshot`, `CL_ParseSnapshot`,
+   `QLCGImport_GetCurrentSnapshotNumber`, and `QLCGImport_GetSnapshot`
+   against mapping rounds 17, 65, 127, and the committed alias ledger.
+2. Expanded `tests/test_playerstate_replication.py` so the server-side
+   snapshot path now pins `SV_GameClientNum` copying into `frame->ps`, own
+   client suppression, view-origin selection, visible-entity gathering,
+   `svc_snapshot` field order, area-mask write, playerState delta write, and
+   packet-entity emission order.
+3. Added client-side snapshot parse coverage for `serverCommandSequence`,
+   server time, delta metadata, snap flags, areamask, `MSG_ReadDeltaPlayerstate`,
+   packet-entity parsing, invalid-frame discard, ping calculation from
+   `ps.commandTime`, backup-ring storage, and `cl.newSnapshots`.
+4. Added cgame import coverage showing `trap_GetSnapshot` reaches
+   `CL_GetSnapshot`, which validates the ring entry and copies areamask,
+   playerState, and bounded packet entities into the cgame-visible snapshot.
+5. Verification:
+   `python -m pytest tests/test_playerstate_replication.py -q --tb=short`
+   -> `14 passed`;
+   `python -m pytest tests/test_playerstate_replication.py tests/test_game_active_pmove_wiring_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py tests/test_game_native_export_helper_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short`
+   -> `194 passed, 107 subtests passed`;
+   `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py tests/test_client_full_parity_gate.py -q --tb=short`
+   -> `6 passed, 3 skipped`. The full server parity gate still reports the
+   unrelated retained `SV-G01` Steam GameServer lifecycle/callback/auth
+   artifact lane as failing.
+
+### Task A55: Restore retail parity for cosmetic, item-timer, and loadout `g_*` CVars [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_main.c`, `src/code/game/g_local.h`,
+`src/game/g_config.c`, `docs/gameplay/cvars.md`,
+`tests/test_game_callvote_option_parity.py`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt`
+Parity estimate: **before 82% -> after 100%** for the selected ten-cvar
+surface: `g_customSettings`, `g_itemTimers`, `g_itemHeight`,
+`g_forceSmallScoreboardMessage`, `g_forceSendConfigstring`,
+`g_forceAtmosphericEffects`, `g_forceDmgThroughSurface`,
+`g_specItemTimers`, `g_loadout`, and `g_infiniteAmmo`. Repo-wide remains
+**98%** pending the active compatibility-only and runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the qagame HLIL registration rows and string/default data for the
+   selected ten `g_*` CVars, including the recovered `CVAR_GAMERULE` bit and
+   the `g_itemHeight` retail default string at `10086c34` (`35`).
+2. Aligned source registration defaults and flags: `g_customSettings` now
+   registers as default `0` with `CVAR_SERVERINFO`; `g_itemTimers` and
+   `g_itemHeight` use `CVAR_SERVERINFO | CVAR_GAMERULE`; the forced cosmetics
+   cvars use their retail no-flag or `CVAR_GAMERULE` rows; `g_loadout` and
+   `g_infiniteAmmo` use their retail game-rule surfaces.
+3. Added the missing retail `g_specItemTimers` registration as a plain
+   qagame cvar, matching the recovered table's default `1` and no-flag row.
+4. Revalidated wiring for the selected cvars: custom-settings digest rebuilds,
+   item timer broadcasts and late-join sync, forced-cosmetics configstring
+   updates, loadout vote/cgame mirroring, and infinite-ammo factory/spawn/weapon
+   paths.
+5. Updated gameplay cvar notes so the documented defaults/flags distinguish the
+   retail `g_itemHeight` default (`35`) from the local invalid-height fallback.
+6. Verification:
+   `python -m pytest tests/test_game_callvote_option_parity.py -q --tb=short`
+   -> `9 passed`;
+   `python -m pytest tests/test_cvar_console_write_parity.py tests/test_game_callvote_option_parity.py tests/test_game_factory_regen_parity.py tests/test_game_forfeit_parity.py tests/test_game_module_retail_parity_gate.py tests/test_game_helper_seam_parity.py tests/test_game_native_export_helper_parity.py tests/test_game_compact_scoreboard_parity.py -q --tb=short`
+   -> `74 passed, 1 skipped`.
+
+### Task A54: Re-audit qcommon playerState delta-codec wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/qcommon/msg.c`, `src/code/game/q_shared.h`,
+`tests/test_playerstate_replication.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_57.md`,
+`docs/reverse-engineering/qcommon-full-parity-audit-and-implementation-plan-2026-04-10.md`,
+`references/analysis/quakelive_symbol_aliases.json`
+Parity estimate: **before 100% -> after 100%** for the scoped qcommon
+playerState snapshot replication bridge: the Quake Live-expanded scalar
+netfield table, signed command-axis mirrors, stats/persistant/ammo/powerup
+array-mask sections, and server-to-cgame delta round trips. No production
+source patch was required.
+
+Completed work:
+
+1. Rechecked the retained retail mapping for `sub_4D5D50 ->
+   MSG_WriteDeltaPlayerstate` and `sub_4D66C0 -> MSG_ReadDeltaPlayerstate`
+   against the committed alias ledger and mapping round 57.
+2. Expanded `tests/test_playerstate_replication.py` with executable coverage
+   for all four playerState array-mask sections, proving changed
+   `stats[]`, `persistant[]`, `ammo[]`, and `powerups[]` slots round-trip
+   while unchanged baseline slots survive the delta copy.
+3. Added structural coverage for the full Quake Live scalar `playerStateFields`
+   order and bit widths, including the movement-critical command-time,
+   origin/velocity/viewangle, jump/crouch, weapon-primary, location, fov, and
+   signed `forwardmove` / `rightmove` / `upmove` tail fields.
+4. Pinned the signed-byte codec helpers so command-axis mirrors are compared
+   as signed bytes, serialized as unsigned byte payloads, and restored through
+   `MSG_SetPlayerStateFieldValue` on both changed and copied-from-baseline
+   scalar fields.
+5. Verification:
+   `python -m pytest tests/test_playerstate_replication.py -q --tb=short`
+   -> `10 passed`;
+   `python -m pytest tests/test_playerstate_replication.py tests/test_game_active_pmove_wiring_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short`
+   -> `184 passed, 107 subtests passed`;
+   `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py -q --tb=short`
+   -> `4 passed, 2 skipped`.
+
+### Task A53: Restore retail `ammo_pack` item sentinel wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_misc.c`, `src/code/game/g_items.c`,
+`src/game/g_config.c`, `tests/test_game_ammopack_parity.py`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt`,
+`references/symbol-maps/qagame.json`
+Parity estimate: **before 96% -> after 100%** for scoped `ammo_pack`
+metadata, grab eligibility, factory-family gating, `Pickup_Ammo` forwarding,
+and `Add_Ammo` sentinel fan-out. Repo-wide remains **98%** pending the active
+compatibility-only and runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the qagame item table and symbol-map evidence for `ammo_pack`,
+   `Pickup_Ammo`, `Add_Ammo`, `g_ammoPack`, `g_ammoPackHack`, and
+   `g_ammoRespawn`.
+2. Kept the shared item metadata aligned with retail: `ammo_pack` remains an
+   `IT_AMMO` item tagged with the `WP_NUM_WEAPONS` sentinel and the recovered
+   pickup sound, model, icon, pickup name, and quantity.
+3. Reshaped game-side ammo pickup wiring so `Pickup_Ammo` resolves the entity
+   count/item quantity and forwards the item tag once, while `Add_Ammo` owns
+   the retail `WP_NUM_WEAPONS` sentinel path that scans owned weapons and adds
+   per-weapon ammo-pack quantities.
+4. Confirmed the existing shared grab rule still scans owned weapons below
+   their maximum ammo, and the factory gate still switches between global
+   ammo-pack and weapon-specific ammo families via `g_ammoPack` /
+   `g_ammoPackHack`.
+5. Added focused regression coverage for the retail evidence, source metadata,
+   grab rule, `Add_Ammo` sentinel fan-out, `Pickup_Ammo` forwarding, and
+   factory-family gate.
+6. Verification:
+   `python -m pytest tests/test_game_ammopack_parity.py -q --tb=short`
+   -> `4 passed`;
+   `python -m pytest tests/test_bg_misc_validation_fixtures.py tests/test_bg_misc_helper_parity.py tests/test_bg_itemlist_indexes.py tests/test_bg_itemlist_retail_metadata.py -q --tb=short`
+   -> `47 passed`;
+   `python -m pytest tests/test_game_factory_regen_parity.py tests/test_game_weapon_parity.py -q --tb=short`
+   -> `38 passed`;
+   `python -m pytest tests/test_game_ammopack_parity.py tests/test_bg_misc_validation_fixtures.py tests/test_bg_misc_helper_parity.py tests/test_bg_itemlist_indexes.py tests/test_bg_itemlist_retail_metadata.py -q --tb=short`
+   -> `51 passed`.
+
+### Task A52: Re-audit cgame prediction pmove replay wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/cgame/cg_predict.c`,
+`src/code/cgame/cg_playerstate.c`, `src/code/cgame/cg_snapshot.c`,
+`tests/test_cgame_snapshot_parity.py`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`,
+`references/symbol-maps/cgame.json`
+Parity estimate: **before 100% -> after 100%** for the scoped cgame
+prediction/playerState replay seam: local `pmove_t` setup, usercmd replay,
+trigger/item prediction, mover correction, step smoothing, predictable-event
+handoff, and committed retail symbol evidence. No production source patch was
+required.
+
+Completed work:
+
+1. Rechecked the retail cgame prediction map for `CG_PredictPlayerState`,
+   `CG_TouchItem`, `CG_TouchTriggerPrediction`, `CG_UpdateStepChange`,
+   `CG_UpdatePredictedRailFire`, and `CG_TransitionPlayerState` against the
+   committed symbol map and existing source reconstruction.
+2. Expanded the cgame snapshot parity sentinel so the full prediction replay
+   pipeline is pinned: projectile-nudge reset, local `pmove_settings_t` copy,
+   trace/pointcontents callbacks, tracemask/body handling, command overflow
+   guard, latest-command rail replay, next-snapshot seed selection,
+   `pmove_msec` clamp, fixed-move view-angle update, `Pmove`, step smoothing,
+   local projectile nudge, trigger prediction, final mover adjustment, and
+   transition handoff.
+3. Added structural coverage for item and trigger prediction sidecars,
+   including retail server-authored pickup skips, grab/event/NODRAW/ammo side
+   effects, no-predict and double-touch guards, box-trace trigger collision,
+   teleport hyperspace, jump-pad activation, and jump-pad cache clearing.
+4. Added a committed-evidence sentinel tying the source wiring back to
+   `references/symbol-maps/cgame.json` and the cgame mapping ledgers.
+5. Verification:
+   `python -m pytest tests/test_cgame_snapshot_parity.py -q --tb=short`
+   -> `11 passed`;
+   `python -m pytest tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py -q --tb=short`
+   -> `23 passed`;
+   `python -m pytest tests/test_game_active_pmove_wiring_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_cgame_item_respawn_timer_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short`
+   -> `180 passed, 107 subtests passed`;
+   `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py -q --tb=short`
+   -> `4 passed, 2 skipped`.
+
+### Task A51: Reconstruct VM bounded cvar registration and integer cache wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/qcommon/cvar.c`, `src/code/qcommon/qcommon.h`,
+`src/code/game/q_shared.h`, `src/code/client/cl_cgame.c`,
+`tests/test_cvar_console_write_parity.py`, `tests/test_cgame_hud_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_294.md`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt`
+Parity estimate: **before 97% -> after 98%** for scoped core cvar
+handling/management, VM cvar shadows, and bounded range registration. Repo-wide
+remains **98%** pending the active compatibility-only and runtime-evidence
+gaps.
+
+Completed work:
+
+1. Rechecked the retail `sub_4CCCC0`, `sub_4CDD30`, `sub_4CE400`, and
+   `sub_4CE460` evidence for hex integer parsing, bounded cvar metadata,
+   VM cvar shadow flags, and ranged VM registration.
+2. Added `Cvar_ParseInteger()` and routed cvar creation/mutation integer-cache
+   updates through the retail `"0x"` / `"0x%08x"` fallback path.
+3. Reconstructed bounded-cvar registration metadata by forcing
+   `CVAR_VM_CREATED` in `Cvar_GetBounded()` and adding `Cvar_RegisterBounded()`
+   for the native cgame range-register import.
+4. Added the retail `vmCvar_t.flags` shadow field and copied cvar flags during
+   VM registration.
+5. Updated cgame range registration to call the recovered qcommon wrapper and
+   refreshed focused cvar/HUD parity tests for that source-visible path.
+6. Verification:
+   `python -m pytest tests/test_cvar_console_write_parity.py -q --tb=short`
+   -> `6 passed`;
+   `python -m pytest tests/test_cvar_console_write_parity.py tests/test_cgame_displaycontext_parity.py::test_register_cvars_publishes_retail_version_and_vote_reset tests/test_cgame_hud_parity.py::test_crosshair_team_health_default_matches_retail_mode_cvar tests/test_qcommon_full_parity_gate.py -q --tb=short`
+   -> `10 passed, 1 skipped`;
+   `python -m pytest tests/test_cvar_alias_console.py -q --tb=short`
+   -> `1 passed`.
+
+### Task A50: Re-audit focused retail `g_*` vote and complaint cvar parity tranche [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/game/g_main.c`, `src/game/g_config.c`,
+`docs/gameplay/cvars.md`, `tests/test_game_callvote_option_parity.py`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part03.txt`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil_split/qagamex86.dll.bndb_hlil_part02.txt`
+Parity estimate: **before 80% -> after 100%** for the scoped ten-cvar
+vote/complaint tranche: `g_allowSpecVote`, `g_allowVote`,
+`g_allowVoteMidGame`, `g_allowForfeit`, `g_allowKill`,
+`g_complaintLimit`, `g_complaintDamageThreshold`, `g_voteFlags`,
+`g_voteDelay`, and `g_voteLimit`. Repo-wide remains **98%** pending the
+active compatibility-only and runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the selected qagame registration rows against the committed HLIL
+   cvar slab and string/default evidence.
+2. Corrected `g_allowForfeit` to the retail `1` default and recovered
+   `CVAR_GAMERULE` flag, and corrected `g_allowKill` to the retail
+   `CVAR_GAMERULE` flag.
+3. Corrected the factory fallback constants for
+   `g_complaintDamageThreshold` and `g_complaintLimit` to retail `400` and
+   `5`, matching the main registration table.
+4. Confirmed the existing callvote, spectator vote, mid-game vote,
+   vote-delay, vote-limit, vote-flag, forfeit, self-kill, complaint, and
+   endvote wiring remains attached to the selected cvars.
+5. Refreshed gameplay cvar notes and added focused regression coverage for
+   the selected defaults, flags, retail evidence, and behavioral wiring.
+6. Verification:
+   `python -m pytest tests/test_game_callvote_option_parity.py -q --tb=short`
+   -> `7 passed`;
+   `python -m pytest tests/test_game_callvote_option_parity.py tests/test_game_forfeit_parity.py tests/test_game_factory_regen_parity.py tests/test_game_module_retail_parity_gate.py -q --tb=short`
+   -> `35 passed, 1 skipped`;
+   `python -m pytest tests/test_cvar_console_write_parity.py tests/test_game_callvote_option_parity.py tests/test_game_forfeit_parity.py tests/test_game_factory_regen_parity.py tests/test_game_module_retail_parity_gate.py -q --tb=short`
+   -> `39 passed, 1 skipped`.
+
+### Task A49: Restore retail key item mover wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_misc.c`, `src/code/game/g_items.c`,
+`src/code/game/g_mover.c`, `src/code/game/g_target.c`,
+`src/code/cgame/cg_newdraw.c`, `tests/test_game_key_item_parity.py`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`
+Parity estimate: **before 96% -> after 100%** for scoped silver/gold/master
+key item pickup, reset, keyed mover, remove-keys target, and HUD icon wiring;
+repo-wide remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the retail qagame key item records, `G_ResetKeyItem`,
+   `Touch_DoorTriggerKeyed`, `Touch_ButtonKeyed`, and
+   `Use_Target_RemoveKeys` evidence against the committed HLIL and symbol maps.
+2. Restored the missing keyed-button touch path: silver-key buttons now accept
+   silver or master keys, gold-key buttons accept gold or master keys, and
+   keyed buttons only fire from `MOVER_POS1`.
+3. Kept the existing retail-aligned key pickup/reset surface: key pickup sets
+   the carried mask/stat and does not auto-respawn, dropped copies are freed
+   when keys are reset, and `target_remove_keys` clears carried keys through
+   the reset helper.
+4. Added structural coverage for key item metadata, pickup/reset/drop,
+   keyed-door/keyed-button gates, and the `CG_PLAYER_HASKEY` ownerdraw path.
+
+### Task A48: Reconstruct core cvar handling and management wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/qcommon/cvar.c`, `src/code/game/q_shared.h`,
+`tests/test_cvar_console_write_parity.py`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_293.md`,
+`references/analysis/quakelive_symbol_aliases.json`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part06.txt`
+Parity estimate: **before 92% -> after 97%** for scoped core cvar
+handling/management and source-visible WebView cvar-change wiring. Repo-wide
+remains **98%** pending the active compatibility-only and runtime-evidence
+gaps.
+
+Completed work:
+
+1. Rechecked retail `Cvar_Set2`, `Cvar_Get`, `Cvar_GetBounded`, and
+   `QLWebView_PublishCvarChange` ownership against the committed alias ledger
+   and HLIL/string evidence.
+2. Restored the retail `2048` static cvar slot cap, added the recovered
+   `CVAR_GAMERULE` flag, and reconstructed the initialization-time GAMERULE
+   console `set` refusal gate.
+3. Added retail cvar flag conflict cleanup for `CVAR_CHEAT` combined with
+   archive or replicated/protected flags, including the recovered warning
+   strings.
+4. Reconstructed the missing `Cvar_Set2` publish call sites for user-created
+   cvars and latched values while preserving the retail console write guard
+   surface of ROM, INIT, LATCH, and CHEAT only.
+5. Added mapping round 293 and focused regression coverage for the cvar core
+   wiring, while leaving the repo-owned `sets`, `setu`, and `setcloud`
+   compatibility helpers intact.
+6. Verification:
+   `python -m pytest tests/test_cvar_console_write_parity.py tests/test_client_config_parity.py tests/test_engine_command_parity.py -q --tb=short`
+   -> `24 passed`;
+   `python -m pytest tests/test_qcommon_full_parity_gate.py -q --tb=short`
+   -> `2 passed, 1 skipped`. A broader
+   `tests/test_engine_cvar_retail_parity.py tests/test_qcommon_full_parity_gate.py`
+   run reached this cvar work but still failed two unrelated existing
+   platform/Steam-service string checks.
+
+### Task A47: Active-client pmove and playerState wiring reconstruction [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_main.c`, `src/code/game/g_active.c`,
+`src/code/game/g_local.h`, `tests/test_game_active_pmove_wiring_parity.py`,
+`docs/reverse-engineering/qagame-mapping.md`
+Parity estimate: **before 99% -> after 100%** for the scoped qagame
+frame-step-to-`ClientThink_real` movement wiring edge. The broader shared
+pmove/playerState reconstruction remains **100%** after this source-level
+call-site realignment and guard expansion.
+
+Completed work:
+
+1. Rechecked qagame mappings for `G_RunFrame`, `ClientThink_real`,
+   `SpectatorThink`, `ClientImpacts`, `G_TouchTriggers`,
+   `SendPendingPredictableEvents`, and related active-client movement wiring.
+2. Reconstructed the frame entity-loop client slot so bot/synchronous client
+   frames run scheduled thinks inline and dispatch directly to
+   `ClientThink_real`, matching the recovered retail `G_RunFrame` shape instead
+   of routing that call-site through the classic source `G_RunClient` wrapper.
+3. Added `ClientThink_real` to the game-local prototype surface so the recovered
+   direct frame-loop dispatch is explicit and compile-visible.
+4. Added focused structural coverage for the full active-client pmove wiring:
+   command-time clamping, spectator scoreboard `PMF_NO_MOVE`, pmove setup,
+   tracemask selection, fixed-move transport, playerState-to-entityState
+   projection, predictable-event flushing, trigger touch, client impacts,
+   respawn checks, timer actions, and committed symbol-map evidence.
+5. Verification:
+   `python -m pytest tests/test_game_active_pmove_wiring_parity.py -q --tb=short`
+   -> `4 passed`;
+   `python -m pytest tests/test_game_active_pmove_wiring_parity.py tests/test_game_helper_seam_parity.py tests/test_game_spectator_connection_parity.py -q --tb=short`
+   -> `30 passed`;
+   `python -m pytest tests/test_game_active_pmove_wiring_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short`
+   -> `162 passed, 107 subtests passed`;
+   `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py -q --tb=short`
+   -> `4 passed, 2 skipped`.
+
+### Task A46: Re-audit sixth focused retail `cl_*` cvar parity tranche [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/client/cl_main.c`,
+`src/common/platform/platform_services.c`,
+`tests/test_engine_cvar_retail_parity.py`, `docs/client_cvars.md`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`,
+`references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c`
+Parity estimate: **before 100% -> after 100%** for the scoped ten-cvar
+service-disclosure tranche: `cl_onlineServicesMode`,
+`cl_onlineServicesPolicy`, `cl_onlineServicesParityScope`,
+`cl_onlineServicesParityReason`, `cl_identityBootstrapMode`,
+`cl_identityBootstrapPolicy`, `cl_voiceServiceMode`,
+`cl_voiceServicePolicy`, `cl_workshopProvider`, and `cl_workshopPolicy`.
+These are intentional non-retail ROM diagnostics for the documented
+online-services divergence; no production source patch was required. Repo-wide
+remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked the selected `cl_*` service-disclosure cvars against the
+   repository's online-services divergence policy: default disabled or
+   unclassified values, `CVAR_ROM` flags, and refresh through
+   `CL_RefreshPlatformServiceCvars`.
+2. Confirmed the active labels are sourced from the platform-services
+   descriptor helpers and workshop descriptor helpers rather than being
+   hardcoded as live-service state.
+3. Confirmed no selected disclosure cvar appears in the recovered retail
+   `CL_Init` HLIL/Ghidra evidence, keeping this compatibility surface outside
+   the strict retail cvar slab.
+4. Added a focused regression test that pins the defaults, flags, refresh
+   wiring, descriptor ownership, and retail-evidence absence for all ten cvars.
+5. Refreshed `docs/client_cvars.md` with the sixth focused cvar-tranche note.
+6. Verification:
+   `python -m pytest tests/test_engine_cvar_retail_parity.py::test_engine_cvar_thirtyninth_client_service_disclosure_tranche_matches_guarded_retail_divergence_contracts -q`
+   -> `1 passed`.
+
+### Task A45: Re-audit fifth focused retail `cl_*` cvar parity tranche [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/client/cl_main.c`, `src/code/client/cl_input.c`,
+`src/code/client/cl_parse.c`, `src/code/ui/ui_main.c`,
+`tests/test_engine_cvar_retail_parity.py`, `docs/client_cvars.md`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`,
+`references/hlil/quakelive/uix86.all/uix86.dll_hlil_split/uix86.dll_hlil_part01.txt`,
+`references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c`,
+`references/reverse-engineering/ghidra/uix86/decompile_top_functions.c`
+Parity estimate: **before 100% -> after 100%** for the scoped ten-cvar
+native-UI bridge tranche: `cl_maxpackets`, `cl_packetdup`,
+`cl_serverStatusResendTime`, `cl_maxPing`, `cl_motdString`,
+`cl_downloadItem`, `cl_downloadName`, `cl_downloadTime`,
+`cl_downloadCount`, and `cl_downloadSize`. No production source patch was
+required; this pass refreshed and pinned the retail/native UI evidence.
+Repo-wide remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked retail registration/default/flag evidence for the selected
+   engine-owned cvars against the committed Quake Live HLIL/Ghidra corpus.
+2. Confirmed native `uix86` bridge behavior for network preset writes,
+   server-status resend publication, max-ping filtering reads, MOTD reads, and
+   workshop progress reads.
+3. Confirmed `cl_downloadCount` / `cl_downloadSize` remain UI-facing temp
+   fallbacks for legacy download/QVM paths while the recovered native progress
+   bridge stays keyed by `cl_downloadItem` plus `GetItemDownloadInfo` and
+   `cl_downloadTime`.
+4. Added a focused regression test that pins the retail evidence,
+   source-visible registrations, flags, and wiring for all ten cvars.
+5. Refreshed `docs/client_cvars.md` with the fifth focused cvar-tranche note.
+6. Verification:
+   `python -m pytest tests/test_engine_cvar_retail_parity.py::test_engine_cvar_sixth_client_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_thirtyfourth_client_cl_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_thirtyseventh_client_lifecycle_workshop_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_thirtyeighth_client_native_ui_bridge_tranche_matches_retail_contracts tests/test_ui_menu_files.py::test_ui_retail_download_info_reads_item_progress_through_native_slot -q`
+   -> `5 passed`. Broader workshop/platform-service verification was not
+   runnable in this worktree because `tests/test_client_workshop_bootstrap_parity.py`
+   and `tests/test_platform_services.py` currently fail collection on unrelated
+   indentation errors before the selected tests can execute.
+
+### Task A44: Profile and utility pmove/playerState wiring sweep [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_pmove.c`, `src/code/game/bg_pmove.c`,
+`src/code/cgame/cg_servercmds.c`, `src/game/g_config.c`,
+`src/code/game/g_main.c`, `tests/test_pmove_selected_cvar_parity.py`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 100% -> after 100%** for scoped shared pmove,
+playerState profile flag ownership, utility cvar transport, and
+custom-settings wiring. Production source was already aligned with the
+committed retail evidence; this pass added regression coverage for the
+remaining profile/utility movement slab.
+
+Completed work:
+
+1. Rechecked the remaining profile and utility `pmove_*` fields against the
+   retail qagame cvar slab and shared cgame/qagame movement consumers:
+   `pmove_AirStepFriction`, `pmove_AirSteps`, `pmove_BunnyHop`,
+   `pmove_CrouchSlide`, `pmove_CrouchSlideFriction`,
+   `pmove_CrouchSlideTime`, `pmove_CrouchStepJump`, `pmove_DoubleJump`,
+   `pmove_noPlayerClip`, `pmove_StepHeight`, `pmove_StepJump`,
+   `pmove_velocity_gh`, `pmove_WaterSwimScale`, `pmove_WaterWadeScale`,
+   `pmove_WeaponDropTime`, and `pmove_WeaponRaiseTime`.
+2. Expanded `tests/test_pmove_selected_cvar_parity.py` so this cvar group is
+   pinned from retail registration defaults/flags through factory reset,
+   refresh callback/no-callback ownership, `g_pmoveSettings` cache assignment,
+   compact and JSON cgame parsing, default shared movement constants, and
+   active movement consumers.
+3. Added coverage for the linked playerState and wiring edges: spawn-time
+   `PMF_CROUCH_SLIDE` / `PMF_DOUBLE_JUMP` / `PMF_AIR_CONTROL` seeding,
+   crouch-slide friction/timer consumption, no-player-clip tracemask removal,
+   step/crouch-step gates, water/step globals, grapple pull speed,
+   weapon raise/drop timings, and custom-settings mask participation.
+4. Refreshed the qagame and cgame/bg mapping notes with the new evidence lane.
+5. Verification:
+   `python -m pytest tests/test_pmove_selected_cvar_parity.py -q --tb=short`
+   -> `12 passed`;
+   `python -m pytest tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short`
+   -> `158 passed, 107 subtests passed`;
+   `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py -q --tb=short`
+   -> `4 passed, 2 skipped`.
+
+### Task A43: Re-audit fourth focused retail `cl_*` cvar parity tranche [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/client/cl_main.c`, `src/code/client/cl_input.c`,
+`src/code/client/cl_parse.c`, `src/code/client/cl_cgame.c`,
+`src/code/client/cl_scrn.c`, `src/code/client/cl_ui.c`,
+`src/code/qcommon/common.c`, `src/code/qcommon/cmd.c`,
+`src/code/ui/ui_main.c`, `tests/test_engine_cvar_retail_parity.py`,
+`docs/client_cvars.md`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`,
+`references/hlil/quakelive/uix86.all/uix86.dll_hlil_split/uix86.dll_hlil_part01.txt`,
+`references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c`,
+`references/reverse-engineering/ghidra/uix86/decompile_top_functions.c`
+Parity estimate: **before 100% -> after 100%** for the scoped ten-cvar
+lifecycle/MOTD/workshop tranche: `cl_motd`, `cl_motdString`,
+`cl_timeout`, `cl_nodelta`, `cl_debugMove`, `cl_paused`, `cl_running`,
+`cl_downloadItem`, `cl_downloadName`, and `cl_downloadTime`. The selected
+cvar registrations and source-visible owners were already aligned; the
+expanded workshop verification found and fixed one adjacent callback diagnostic
+string drift, bringing the scoped workshop handoff evidence from **99% -> 100%**.
+Repo-wide remains **98%** pending the active portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked retail registration/default/flag evidence for the selected
+   `CL_Init`, `CL_InitInput`, and common runtime `cl_*` cvars against the
+   committed HLIL/Ghidra corpus.
+2. Confirmed source-visible owners already match retail: MOTD enable/ROM
+   string publication, timeout disconnect checks, delta suppression, movement
+   diagnostics, paused/running ROM state and command routing.
+3. Confirmed the retained workshop request cvars stay aligned with the
+   recovered retail/uix86 handoff: `cl_downloadItem`, `cl_downloadName`, and
+   `cl_downloadTime` are seeded from the request owner and consumed by the
+   native UI progress bridge.
+4. Restored the retail `ItemInstalled_t` invalid-app diagnostic string, which
+   reuses the recovered `OnDownloadItemResult skip, invalid app id %d` text.
+5. Added a focused regression test that pins the retail evidence, source
+   registrations, and source-visible wiring for all ten cvars.
+6. Refreshed `docs/client_cvars.md` with the fourth focused cvar-tranche note.
+7. Verification:
+   `python -m pytest tests/test_engine_cvar_retail_parity.py::test_engine_cvar_sixth_client_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_seventh_client_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_twentieth_client_debug_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_thirtyseventh_client_lifecycle_workshop_tranche_matches_retail_contracts tests/test_client_workshop_bootstrap_parity.py -q`
+   -> `8 passed`.
+
+### Task A42: Deep pmove/playerState mapping sweep [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_pmove.c`, `src/code/game/g_pmove.c`,
+`src/code/cgame/cg_servercmds.c`, `src/code/game/bg_public.h`,
+`tests/pmove_validation_harness.c`,
+`tests/test_pmove_validation_fixtures.py`,
+`tests/test_pmove_selected_cvar_parity.py`,
+`tests/test_pmove_helper_parity.py`, `tests/test_playerstate_replication.py`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 100% -> after 100%** for scoped shared pmove,
+playerState command-gate management, pmove cvar transport, and qagame/cgame
+prediction wiring. No production source patch was required; this pass added
+retail-backed fixture and mapping coverage for the fragile remaining edges.
+
+Completed work:
+
+1. Rechecked qagame/cgame `PmoveSingle` symbol evidence for the playerState
+   command gate: command time advances before `PMF_NO_MOVE`, while view-angle
+   updates, command mirrors, trace dispatch, and movement side effects remain
+   behind the no-move return.
+2. Added an executable `PMF_NO_MOVE` fixture in
+   `tests/pmove_validation_harness.c` and
+   `tests/test_pmove_validation_fixtures.py` to pin that runtime behavior.
+3. Validated the selected pmove cvar mapping sentinel, covering representative
+   `pmove_*` retail names across registration defaults/flags, factory reset,
+   refresh callback ownership, cached settings, compact/JSON cgame parsing,
+   default shared movement constants, active `bg_pmove.c` consumers, and
+   committed symbol-map evidence.
+4. Re-ran the broad movement/playerState suite:
+   `python -m pytest tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py tests/test_pmove_selected_cvar_parity.py -q --tb=short`
+   -> `154 passed, 107 subtests passed`.
+
+### Task A41: Re-audit third focused retail `cl_*` cvar parity tranche [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/client/cl_main.c`, `src/code/client/cl_input.c`,
+`src/code/client/cl_parse.c`, `src/code/qcommon/msg.c`,
+`tests/test_engine_cvar_retail_parity.py`, `docs/client_cvars.md`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`,
+`references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c`
+Parity estimate: **before 100% -> after 100%** for the scoped ten-cvar
+debug/identity/mouse tranche: `cl_shownet`, `cl_showSend`,
+`cl_anonymous`, `cl_platform`, `cl_maxPing`, `cl_mouseAccel`,
+`cl_mouseAccelDebug`, `cl_mouseAccelOffset`, `cl_mouseAccelPower`, and
+`cl_mouseSensCap`. No source patch was required; this pass refreshed and
+pinned the retail evidence. Repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked retail `CL_Init` default values and flags against the committed
+   HLIL/Ghidra evidence for the ten selected client cvars.
+2. Confirmed the current source already matches the source-visible retail
+   owners: network/message debug printing, packet-send diagnostics, anonymous
+   auth userinfo, platform ROM marker publication, max-ping timeout filtering,
+   mouse acceleration math, mouse acceleration debug logging, and sensitivity
+   cap behavior.
+3. Added a focused regression test that pins the retail evidence, source
+   registrations, and source-visible wiring for all ten cvars.
+4. Refreshed `docs/client_cvars.md` with the third focused cvar-tranche note.
+5. Verification:
+   `python -m pytest tests/test_engine_cvar_retail_parity.py::test_engine_cvar_thirtysixth_client_debug_identity_tranche_matches_retail_contracts -q`
+   -> `1 passed`.
+
+### Task A40: Re-audit second focused retail `cl_*` cvar parity tranche [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/client/cl_main.c`, `src/code/client/cl_input.c`,
+`tests/test_engine_cvar_retail_parity.py`, `docs/client_cvars.md`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`,
+`references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c`
+Parity estimate: **before 100% -> after 100%** for the scoped ten-cvar
+demo/input tranche: `cl_avidemo`, `cl_avidemo_latch`,
+`cl_avidemo_mintime`, `cl_avidemo_maxtime`, `cl_forceavidemo`,
+`cl_anglespeedkey`, `cl_yawspeed`, `cl_pitchspeed`, `cl_run`, and
+`cl_freelook`. No source patch was required; this pass refreshed and pinned
+the retail evidence. Repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked retail `CL_Init` default values and flags against the committed
+   HLIL/Ghidra evidence for the ten selected client demo/input cvars.
+2. Confirmed the current source already matches the source-visible retail
+   owners: avidemo latch/start/stop/screenshot/fixed-msec handling, keyboard
+   and joystick angle-speed scaling, run/walk move-speed selection, and
+   freelook center-view/mouse-pitch gating.
+3. Added a focused regression test that pins the retail evidence, source
+   registrations, and source-visible wiring for all ten cvars.
+4. Refreshed `docs/client_cvars.md` with the second focused cvar-tranche note.
+5. Verification:
+   `python -m pytest tests/test_engine_cvar_retail_parity.py::test_engine_cvar_thirtyfifth_client_demo_input_tranche_matches_retail_contracts -q`
+   -> `1 passed`.
+
+### Task A39: Re-audit focused retail `s_*` sound cvar parity tranche [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/client/snd_dma.c`,
+`tests/test_engine_cvar_retail_parity.py`,
+`tests/test_client_sound_voice_parity.py`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`
+Parity estimate: **before 98% -> after 100%** for the scoped ten-cvar tranche:
+`s_announcerVolume`, `s_doppler`, `s_initsound`, `s_mixahead`,
+`s_mixPreStep`, `s_musicvolume`, `s_pvs`, `s_voiceVolume`, `s_voiceStep`,
+and `s_volume`. Repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked retail `S_Init` default values, flags, and registration order
+   against the committed HLIL evidence for the selected sound cvars.
+2. Realigned the retail sound-registration cluster so `s_show`, `s_testsound`,
+   and `s_volume` match the recovered order, while the legacy source-only
+   `s_separation`/`s_khz` compatibility cvars now sit outside the retail
+   early `s_initsound` gate.
+3. Restored the retail `S_Update_` mix-ahead owner for `s_mixahead` by removing
+   the older source-only `sane`/`op` cap; `s_mixPreStep` remains wired through
+   `S_GetSoundtime` and the voice-buffer scheduler.
+4. Expanded the focused regression guard so default value, flag set,
+   registration order, and source-visible wiring are pinned for the selected
+   cvars, including `s_pvs` spatial culling and `s_voiceStep` voice scheduling.
+5. Verification:
+   `python -m pytest tests/test_client_sound_voice_parity.py tests/test_engine_cvar_retail_parity.py::test_engine_cvar_eighteenth_sound_tranche_matches_retail_contracts -q --tb=short`
+   -> `9 passed`.
+
+### Task A38: Re-audit focused retail `cl_*` cvar parity tranche [COMPLETED]
+Priority: Medium
+Primary areas: `src/code/client/cl_keys.c`, `src/code/client/cl_main.c`,
+`src/code/client/cl_input.c`, `src/code/client/cl_cgame.c`,
+`src/code/client/cl_scrn.c`, `tests/test_engine_cvar_retail_parity.py`,
+`docs/client_cvars.md`,
+`references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt`,
+`references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c`
+Parity estimate: **before 96% -> after 100%** for the scoped ten-cvar tranche:
+`cl_allowConsoleChat`, `cl_demoRecordMessage`, `cl_freezeDemo`,
+`cl_maxpackets`, `cl_packetdup`, `cl_timeNudge`, `cl_autoTimeNudge`,
+`cl_quitOnDemoCompleted`, `cl_serverStatusResendTime`, and
+`cl_showTimeDelta`. Repo-wide remains **98%** pending the active
+portability/runtime-evidence gaps.
+
+Completed work:
+
+1. Rechecked retail `CL_Init` default values and flags against the committed
+   HLIL/Ghidra evidence for the ten selected client cvars.
+2. Restored the retail `cl_allowConsoleChat` console-enter owner so bare
+   console text is forced to command form unless that cvar explicitly enables
+   console chat.
+3. Added a focused regression test that pins the retail evidence, source
+   registrations, and source-visible wiring for all ten cvars.
+4. Refreshed `docs/client_cvars.md` with the scoped cvar-tranche evidence note.
+5. Verification:
+   `python -m pytest tests/test_engine_cvar_retail_parity.py::test_engine_cvar_second_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_sixth_client_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_seventh_client_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_eighth_client_input_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_ninth_client_misc_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_twentieth_client_debug_tranche_matches_retail_contracts tests/test_engine_cvar_retail_parity.py::test_engine_cvar_thirtyfourth_client_cl_tranche_matches_retail_contracts -q`
+   -> `7 passed`.
+
+### Task A37: Re-audit pmove factory wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/g_pmove.c`, `src/code/game/g_factory.c`,
+`src/game/g_config.c`, `src/code/game/g_main.c`,
+`src/code/cgame/cg_servercmds.c`,
+`tools/tests/test_pmove_settings_configstring.py`,
+`tests/test_game_factory_regen_parity.py`,
+`tests/test_game_weapon_parity.py`, `tests/test_ui_menu_files.py`,
+`tests/test_cgame_displaycontext_parity.py`,
+`references/hlil/quakelive/qagamex86.dll/qagamex86.dll.bndb_hlil.txt`,
+`references/symbol-maps/qagame.json`,
+`docs/reverse-engineering/qagame-mapping.md`
+Parity estimate: **before 100% -> after 100%** for scoped pmove factory
+cvar registration, factory reset/apply ordering, cached movement-settings
+refresh, custom-settings mask participation, and cgame/UI publication wiring.
+
+Completed work:
+
+1. Rechecked the 36-entry retail `pmove_*` cvar slab at
+   `0x1008F7C4..0x1008FB20` against the current split `g_pmove.c` owner:
+   default strings, flag groups, callback/no-callback slots, reset defaults,
+   cache fields, and minimum-positive clamps still match the committed HLIL
+   and symbol-map evidence.
+2. Rechecked factory selection flow: `Factory_Apply` resets gameplay config
+   and pmove-owned factory surfaces before overrides, refreshes all VM cvars,
+   updates config mirrors, and only then rebuilds weapon/reload/knockback/ammo
+   and match-factory mirrors. `G_UpdateWeaponReloadConfig` still pushes reload
+   overrides into the pmove cache and forces a pmove settings refresh.
+3. Rechecked custom-settings ownership: air-control, ramp-jump, physics,
+   weapon-switching, no-player-clip, instagib, quad-hog, and grappling-hook
+   bits still mirror the retail `G_UpdateCustomSettingsMaskForCvar` grouping
+   while `pmove_velocity_gh` remains distinct from projectile `g_velocity_gh`.
+4. Added a focused regression guard in
+   `tests/test_game_factory_regen_parity.py` to pin the factory null/active
+   reset sequence, post-override refresh order, and reload-to-pmove handoff.
+5. Re-ran the focused wiring suite:
+   `python -m pytest tools/tests/test_pmove_settings_configstring.py tests/test_game_factory_regen_parity.py tests/test_game_weapon_parity.py::test_grappling_hook_full_server_and_cgame_wiring_matches_retail tests/test_ui_menu_files.py::test_ui_retail_server_settings_ownerdraw_restored tests/test_ui_menu_files.py::test_game_retail_weapon_reload_configstring_restored tests/test_cgame_displaycontext_parity.py::test_cgame_weapon_reload_configstring_bridge_restored tests/test_cgame_displaycontext_parity.py::test_cgame_server_settings_panel_reconstruction_uses_retail_custom_setting_configstrings -q --tb=short`
+   -> `32 passed, 107 subtests passed`.
+
+### Task A36: Re-audit player movement, player states, and shared wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_pmove.c`, `src/code/game/bg_slidemove.c`,
+`src/code/game/q_shared.h`, `src/code/qcommon/msg.c`,
+`src/code/game/g_pmove.c`, `src/code/cgame/cg_servercmds.c`,
+`tests/test_pmove_*.py`, `tests/test_playerstate_replication.py`,
+`references/symbol-maps/qagame.json`,
+`references/symbol-maps/cgame.json`,
+`docs/reverse-engineering/cgame-bg-parity-implementation-plan.md`
+Parity estimate: **before 100% -> after 100%** for scoped player movement,
+playerState layout/replication, pmove settings transport, and cgame/qagame
+prediction wiring. No source patch was required; this pass refreshed the
+evidence that the existing retail reconstruction remains intact.
+
+Completed work:
+
+1. Rechecked the current source against the committed pmove/playerState mapping
+   notes and symbol-map evidence for the shared qagame/cgame movement island.
+2. Confirmed the retail playerState prefix remains intact, including
+   `clientNum` at `0x88`, `location` at `0x8c`, `weaponPrimary`, `fov`,
+   `crouchSlideTime`, and the signed command-byte mirrors at `0x1dc..0x1de`.
+3. Confirmed qcommon still delta-replicates the playerState command mirrors,
+   holdable timer stats, movement flags, and jump/crouch timing fields used by
+   retail prediction and demo/HUD consumers.
+4. Confirmed qagame still publishes the compact retail pmove settings stream,
+   cgame parses the 33-token retail core plus bounded reconstruction extension,
+   and `PmoveSingle` consumes the server-seeded movement-profile flags rather
+   than mutating them locally.
+5. Re-ran the focused movement/playerState suites:
+   `python -m pytest tests/test_pmove_validation_fixtures.py tests/test_pmove_air_control_runtime_parity.py tests/test_pmove_jump_timing_parity.py tests/test_pmove_movement_fixtures.py tests/test_pmove_helper_parity.py tests/test_pmove_acceleration_scope_parity.py tests/test_pmove_crouch_time_parity.py tests/test_pmove_crouch_slide_friction_parity.py tests/test_pmove_reload_fallback_parity.py tests/test_pmove_water_scale_parity.py tests/test_bg_playerstate_bridge_parity.py tests/test_cgame_playerstate_transition_parity.py tests/test_playerstate_replication.py tools/tests/test_pmove_settings_configstring.py -q --tb=short`
+   -> `145 passed, 107 subtests passed`.
+6. Re-ran the shared projection and strict gate sentinels:
+   `python -m pytest tests/test_bg_misc_validation_fixtures.py tests/test_bg_misc_runtime_parity.py tests/test_bg_misc_helper_parity.py -q --tb=short`
+   -> `39 passed`;
+   `python -m pytest tests/test_game_module_retail_parity_gate.py tests/test_qcommon_full_parity_gate.py -q --tb=short`
+   -> `4 passed, 2 skipped`.
 
 ### Task A33: Audit retail UI feeder parity and wiring [COMPLETED]
 Priority: High
@@ -139,7 +994,7 @@ Completed work:
 5. Refreshed cgame display-context parity coverage and reran the focused
    spectator/scorebox suites.
 
-### Task A32: Remove source-only Flight refuel-rate cvar [COMPLETED]
+### Task A32: Restore retail Flight refuel-rate registration boundary [COMPLETED]
 Priority: High
 Primary areas: `src/code/game/g_items.c`, `src/code/game/g_main.c`,
 `src/code/game/g_local.h`, `references/symbol-maps/qagame.json`,
@@ -152,13 +1007,13 @@ Completed work:
 
 1. Rechecked qagame `Pickup_Powerup` at `0x1004DFE0` against the committed
    Ghidra decompile and the qagame symbol-map evidence.
-2. Confirmed retail keeps `g_flightThrust` registered for cvar/factory
-   parity, but exposes no `g_flightRefuelRate` or Flight-specific pickup
+2. Confirmed retail keeps `g_flightThrust` and `g_flightRefuelRate`
+   registered for cvar/factory parity, but exposes no Flight-specific pickup
    multiplier.
-3. Removed the source-only refuel-rate cvar/storage/helper and restored the
+3. Restored the registered `g_flightRefuelRate` storage/default while keeping
    direct `quantity * 1000` timer addition for Flight fuel/refill.
-4. Added structural coverage so Flight cannot regain a separate refuel-rate
-   branch while `PM_FlyMove` remains free of `g_flightThrust` movement input.
+4. Added structural coverage so Flight cannot gain a separate refuel-rate
+   consumer while `PM_FlyMove` remains free of `g_flightThrust` movement input.
 
 ### Task A31: Restore retail spectator follow command and fallback state [COMPLETED]
 Priority: High

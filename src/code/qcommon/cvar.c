@@ -26,11 +26,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 void CL_WebView_PublishCvarChange( const char *name, const char *value, qboolean replicate );
 
+extern qboolean	com_fullyInitialized;
+
 cvar_t		*cvar_vars;
 cvar_t		*cvar_cheats;
 int			cvar_modifiedFlags;
 
-#define	MAX_CVARS	4096
+#define	MAX_CVARS	2048
 cvar_t		cvar_indexes[MAX_CVARS];
 int			cvar_numIndexes;
 
@@ -124,6 +126,98 @@ static void Cvar_UpdateValidation( cvar_t *var, const char *minValue, const char
 	var->min = (float)atof( minValue );
 	var->max = (float)atof( maxValue );
 	var->validate = qtrue;
+}
+
+/*
+================
+Cvar_ParseInteger
+
+Parses the integer cache value with the retail cvar hex-string fallback.
+================
+*/
+static int Cvar_ParseInteger( const char *value ) {
+	int integerValue;
+
+	if ( !value ) {
+		return 0;
+	}
+
+	if ( strstr( value, "0x" ) ) {
+		integerValue = 0;
+		sscanf( value, "0x%08x", &integerValue );
+		return integerValue;
+	}
+
+	return atoi( value );
+}
+
+/*
+================
+Cvar_ShouldReplicateChange
+
+Returns whether a changed cvar should be marked as replicated for the Quake Live
+WebView cvar event bridge.
+================
+*/
+static qboolean Cvar_ShouldReplicateChange( const cvar_t *var ) {
+	if ( !var ) {
+		return qfalse;
+	}
+
+	if ( var->flags & ( CVAR_PROTECTED | CVAR_USER_CREATED ) ) {
+		return qtrue;
+	}
+
+	if ( (unsigned int)var->flags & 0x80000000u ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+================
+Cvar_PublishChange
+
+Publishes a cvar change using the latched value when retail would expose one.
+================
+*/
+static void Cvar_PublishChange( const cvar_t *var ) {
+	const char	*value;
+
+	if ( !var ) {
+		return;
+	}
+
+	value = var->string ? var->string : "";
+	if ( ( var->flags & CVAR_LATCH ) && var->latchedString ) {
+		value = var->latchedString;
+	}
+
+	CL_WebView_PublishCvarChange( var->name, value, Cvar_ShouldReplicateChange( var ) );
+}
+
+/*
+================
+Cvar_UpdateFlagConflicts
+
+Applies the retail cvar flag cleanup for combinations the engine refuses.
+================
+*/
+static void Cvar_UpdateFlagConflicts( cvar_t *var ) {
+	if ( !var || !( var->flags & CVAR_CHEAT ) ) {
+		return;
+	}
+
+	if ( var->flags & CVAR_ARCHIVE ) {
+		Com_Printf( "Warning: cvar \"%s\" cannot be both CVAR_CHEAT and CVAR_ARCHIVE - dropping CVAR_ARCHIVE\n", var->name );
+		var->flags &= ~CVAR_ARCHIVE;
+	}
+
+	if ( var->flags & CVAR_PROTECTED ) {
+		Com_Printf( "Warning: cvar \"%s\" cannot be both CVAR_CHEAT and CVAR_REPLICATED - dropping CVAR_REPLICATED\n", var->name );
+		var->flags &= ~CVAR_PROTECTED;
+	}
 }
 
 void Cvar_BootstrapExpandedDefaults( void ) {
@@ -342,6 +436,10 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 
 	var = Cvar_FindVar (var_name);
 	if ( var ) {
+		if ( ( var->flags & CVAR_PROTECTED ) && !( flags & CVAR_PROTECTED ) ) {
+			var->flags &= ~CVAR_PROTECTED;
+		}
+
 		// if the C code is now specifying a variable that the user already
 		// set a value for, take the new value as the reset value
 		if ( ( var->flags & CVAR_USER_CREATED ) && !( flags & CVAR_USER_CREATED )
@@ -356,6 +454,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		}
 
 		var->flags |= flags;
+		Cvar_UpdateFlagConflicts( var );
 		// only allow one non-empty reset string without a warning
 		if ( !var->resetString[0] ) {
 			// we don't have a reset string yet
@@ -398,7 +497,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 	var->modified = qtrue;
 	var->modificationCount = 1;
 	var->value = atof (var->string);
-	var->integer = atoi(var->string);
+	var->integer = Cvar_ParseInteger( var->string );
 	var->resetString = CopyString( var_value );
 
 	// link the variable in
@@ -406,6 +505,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 	cvar_vars = var;
 
 	var->flags = flags;
+	Cvar_UpdateFlagConflicts( var );
 
 	hash = generateHashValue(var_name);
 	var->hashNext = hashTable[hash];
@@ -425,8 +525,10 @@ cvar_t *Cvar_GetBounded( const char *var_name, const char *var_value, const char
 	cvar_t	*var;
 
 	if ( !var_name || !var_value || !minValue || !maxValue ) {
-		Com_Error( ERR_FATAL, "Cvar_GetBounded: NULL parameter" );
+		Com_Error( ERR_FATAL, "Cvar_Get: NULL parameter" );
 	}
+
+	flags |= CVAR_VM_CREATED;
 
 	var = Cvar_Get( var_name, var_value, flags );
 	Cvar_UpdateValidation( var, minValue, maxValue );
@@ -447,6 +549,8 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	cvar_t	*var;
 	char	validatedValue[MAX_CVAR_VALUE_STRING];
 
+	Com_DPrintf( "Cvar_Set2: %s (%s)\n", var_name ? var_name : "(null)", value ? value : "(null)" );
+
 	if ( !Cvar_ValidateString( var_name ) ) {
 		Com_Printf("invalid cvar name string: %s\n", var_name );
 		var_name = "BADNAME";
@@ -464,10 +568,15 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		if ( !value ) {
 			return NULL;
 		}
-		Com_DPrintf( "Cvar_Set2: %s %s\n", var_name, value );
 		// create it
 		if ( !force ) {
-			return Cvar_Get( var_name, value, CVAR_USER_CREATED );
+			var = Cvar_Get( var_name, value, CVAR_USER_CREATED );
+			if ( var ) {
+				var->flags |= CVAR_PROTECTED;
+				Cvar_UpdateFlagConflicts( var );
+				Cvar_PublishChange( var );
+			}
+			return var;
 		} else {
 			return Cvar_Get (var_name, value, 0);
 		}
@@ -482,7 +591,6 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	if (!strcmp(value,var->string)) {
 		return var;
 	}
-	Com_DPrintf( "Cvar_Set2: %s %s\n", var_name, value );
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
 	cvar_modifiedFlags |= var->flags;
 
@@ -516,10 +624,11 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 					return var;
 			}
 
-			Com_Printf ("%s will be changed upon restarting.\n", var_name);
+			Com_Printf ("%s will be changed to %s upon restarting.\n", var_name, value);
 			var->latchedString = CopyString(value);
 			var->modified = qtrue;
 			var->modificationCount++;
+			Cvar_PublishChange( var );
 			return var;
 		}
 
@@ -549,8 +658,8 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	
 	var->string = CopyString(value);
 	var->value = atof (var->string);
-	var->integer = atoi (var->string);
-	CL_WebView_PublishCvarChange( var->name, var->string, ( ( var->flags & CVAR_PROTECTED ) || ( (unsigned int)var->flags & 0x80000000u ) ) ? qtrue : qfalse );
+	var->integer = Cvar_ParseInteger( var->string );
+	Cvar_PublishChange( var );
 
 	return var;
 }
@@ -714,6 +823,7 @@ weren't declared in C code.
 */
 void Cvar_Set_f( void ) {
 	int		i, c, l, len;
+	cvar_t	*v;
 	char	combined[MAX_STRING_TOKENS];
 
 	c = Cmd_Argc();
@@ -735,6 +845,15 @@ void Cvar_Set_f( void ) {
 		}
 		l += len;
 	}
+
+	if ( !com_fullyInitialized && !Cvar_VariableIntegerValue( "dedicated" ) ) {
+		v = Cvar_FindVar( Cmd_Argv( 1 ) );
+		if ( v && ( v->flags & CVAR_GAMERULE ) ) {
+			Com_Printf( "Refusing to set %s during initialization due to CVAR_GAMERULE\n", Cmd_Argv( 1 ) );
+			return;
+		}
+	}
+
 	Cvar_Set2 (Cmd_Argv(1), combined, qfalse);
 }
 
@@ -802,6 +921,7 @@ void Cvar_SetA_f( void ) {
 		return;
 	}
 	v->flags |= CVAR_ARCHIVE;
+	Cvar_UpdateFlagConflicts( v );
 }
 
 /*
@@ -1281,13 +1401,36 @@ void	Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultVa
 	}
 	vmCvar->handle = cv - cvar_indexes;
 	vmCvar->modificationCount = -1;
+	vmCvar->flags = cv->flags;
 	Cvar_Update( vmCvar );
 }
 
 
 /*
 =====================
-Cvar_Register
+Cvar_RegisterBounded
+
+Registers a bounded cvar for an interpreted module and forces the retail
+CVAR_VM_CREATED metadata bit.
+=====================
+*/
+void	Cvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags ) {
+	cvar_t	*cv;
+
+	cv = Cvar_GetBounded( varName, defaultValue, minimumValue, maximumValue, flags | CVAR_VM_CREATED );
+	if ( !vmCvar ) {
+		return;
+	}
+	vmCvar->handle = cv - cvar_indexes;
+	vmCvar->modificationCount = -1;
+	vmCvar->flags = cv->flags;
+	Cvar_Update( vmCvar );
+}
+
+
+/*
+=====================
+Cvar_Update
 
 updates an interpreted modules' version of a cvar
 =====================

@@ -2256,6 +2256,60 @@ static image_t *R_FindLoadedImage( const char *name, qboolean mipmap, qboolean a
 }
 
 /*
+================
+R_UpdateImage
+
+Refreshes an existing dynamic image without changing its shader handle.
+================
+*/
+image_t *R_UpdateImage( const char *name, const byte *pic, int width, int height, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode ) {
+	image_t	*image;
+
+	if ( !name || !pic || width <= 0 || height <= 0 ) {
+		return NULL;
+	}
+
+	image = R_FindLoadedImage( name, mipmap, allowPicmip, glWrapClampMode );
+	if ( !image ) {
+		return NULL;
+	}
+
+	if ( r_smp->integer ) {
+		R_SyncRenderThread();
+	}
+
+	image->mipmap = mipmap;
+	image->allowPicmip = allowPicmip;
+	image->width = width;
+	image->height = height;
+	image->wrapClampMode = glWrapClampMode;
+
+	if ( qglActiveTextureARB ) {
+		GL_SelectTexture( image->TMU );
+	}
+
+	GL_Bind( image );
+	Upload32( (unsigned *)pic, image->width, image->height,
+		image->mipmap,
+		allowPicmip,
+		qfalse,
+		GL_TEXTURE_2D,
+		&image->internalFormat,
+		&image->uploadWidth,
+		&image->uploadHeight );
+
+	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, glWrapClampMode );
+	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, glWrapClampMode );
+	qglBindTexture( GL_TEXTURE_2D, 0 );
+
+	if ( image->TMU == 1 ) {
+		GL_SelectTexture( 0 );
+	}
+
+	return image;
+}
+
+/*
 ==========================
 R_DetectImageTypeFromMemory
 ==========================

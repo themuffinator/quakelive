@@ -2,6 +2,64 @@
 
 The client registration table now mirrors the Quake Live HLIL defaults:
 
+## Focused CL CVar Parity Tranche
+
+The 2026-05-25 pass rechecked these ten client-owned `cl_*` CVars against
+retail `CL_Init` evidence plus their source-visible owners: `cl_allowConsoleChat`,
+`cl_demoRecordMessage`, `cl_freezeDemo`, `cl_maxpackets`, `cl_packetdup`,
+`cl_timeNudge`, `cl_autoTimeNudge`, `cl_quitOnDemoCompleted`,
+`cl_serverStatusResendTime`, and `cl_showTimeDelta`.
+
+- `cl_allowConsoleChat` keeps the retail default `0` and
+  archive/protected/cloud flags; the console enter path now uses it as the
+  owner for deciding whether bare console text may become `cmd say`.
+- The demo/network timing CVars keep the recovered defaults, flags, clamps, and
+  local wiring: demo recording overlay modes, demo freeze shortcuts and cgame
+  time freeze, `cl_maxpackets`/`cl_packetdup` runtime clamps, bounded
+  time-nudge selection, demo-complete quit, server-status resend cadence, and
+  time-delta diagnostics.
+- A second 2026-05-25 pass rechecked the demo/input cvar tranche:
+  `cl_avidemo`, `cl_avidemo_latch`, `cl_avidemo_mintime`,
+  `cl_avidemo_maxtime`, `cl_forceavidemo`, `cl_anglespeedkey`,
+  `cl_yawspeed`, `cl_pitchspeed`, `cl_run`, and `cl_freelook`.
+  The existing source already matched the retail default values, flags, and
+  source-visible owners: avidemo latch/start/stop/screenshot/fixed-msec
+  handling, keyboard and joystick angle speed scaling, run/walk move-speed
+  selection, and freelook center-view/mouse pitch gating.
+- A third 2026-05-25 pass rechecked the debug/identity/mouse tranche:
+  `cl_shownet`, `cl_showSend`, `cl_anonymous`, `cl_platform`, `cl_maxPing`,
+  `cl_mouseAccel`, `cl_mouseAccelDebug`, `cl_mouseAccelOffset`,
+  `cl_mouseAccelPower`, and `cl_mouseSensCap`. The current source already
+  matched retail defaults, flags, and wiring: network/message debug prints,
+  packet-send diagnostics, anonymous-auth userinfo, the Steam platform ROM
+  marker, ping timeout filtering, retail mouse acceleration math, debug
+  `mouse.log` lifecycle, and sensitivity capping.
+- A fourth 2026-05-25 pass rechecked the lifecycle/MOTD/workshop tranche:
+  `cl_motd`, `cl_motdString`, `cl_timeout`, `cl_nodelta`, `cl_debugMove`,
+  `cl_paused`, `cl_running`, `cl_downloadItem`, `cl_downloadName`, and
+  `cl_downloadTime`. The current source already matched the recovered defaults,
+  flags, and wiring: MOTD enable/ROM publication, timeout disconnect checks,
+  delta suppression and movement diagnostics, paused/running ROM state, command
+  routing, and the retained workshop request surface consumed by the native UI
+  bridge.
+- A fifth 2026-05-25 pass rechecked the native-UI bridge tranche:
+  `cl_maxpackets`, `cl_packetdup`, `cl_serverStatusResendTime`, `cl_maxPing`,
+  `cl_motdString`, `cl_downloadItem`, `cl_downloadName`, `cl_downloadTime`,
+  `cl_downloadCount`, and `cl_downloadSize`. The current source already matched
+  the recovered defaults, flags, and bridge behavior: network preset writes,
+  packet clamps, server-browser resend/max-ping filtering, MOTD display, native
+  workshop progress reads, and the legacy QVM byte-count fallback kept
+  non-authoritative.
+- A sixth 2026-05-25 pass rechecked the service-disclosure tranche:
+  `cl_onlineServicesMode`, `cl_onlineServicesPolicy`,
+  `cl_onlineServicesParityScope`, `cl_onlineServicesParityReason`,
+  `cl_identityBootstrapMode`, `cl_identityBootstrapPolicy`,
+  `cl_voiceServiceMode`, `cl_voiceServicePolicy`, `cl_workshopProvider`, and
+  `cl_workshopPolicy`. These are intentional non-retail ROM diagnostics for
+  the bounded online-services divergence: their defaults stay disabled or
+  unclassified, their refresh owner publishes the active compatibility labels,
+  and no matching registration appears in the recovered retail client cvar slab.
+
 - Networking and input
   - `cl_maxpackets` defaults to 125 and is marked cheat-protected, while `cl_timeout` is tightened to 40s and `cl_timeNudge` is clamped server-side to the HLIL [-20, 0] window.
   - `cl_autoTimeNudge` follows the recovered `CL_SetCGameTime` gate: spectators and LAN/local servers force a zero nudge, disabled auto mode uses `cl_timeNudge`, and enabled auto mode derives a negative half-ping nudge while preserving the previous nonzero value before the same [-20, 0] clamp.

@@ -319,6 +319,7 @@ typedef struct {
 #define CG_QUEUED_MARKER_KIND_ITEM_POI	1
 #define CG_QUEUED_MARKER_KIND_PLAYER_POI	2
 #define CG_QUEUED_MARKER_KIND_EVENT_POI	3
+#define CG_QUEUED_MARKER_KIND_DOMINATION_POINT	4
 #define CG_POI_OBJECTIVE_RED	0
 #define CG_POI_OBJECTIVE_BLUE	1
 #define CG_POI_OBJECTIVE_NEUTRAL	2
@@ -1094,15 +1095,10 @@ typedef struct {
 	float		speedometerSample;
 	int		speedometerSampleTime;
 	int		predictedLocalRailTime;
-	int		predictedLocalLightningTime;
 	qboolean		predictedLocalRailValid;
-	qboolean		predictedLocalLightningValid;
 	qboolean		predictedLocalRailHit;
-	qboolean		predictedLocalLightningHit;
 	vec3_t		predictedLocalRailStart;
 	vec3_t		predictedLocalRailEnd;
-	vec3_t		predictedLocalLightningStart;
-	vec3_t		predictedLocalLightningEnd;
 	int     nextOrbitTime;
 
 	//qboolean cameraMode;		// if rendering from a loaded camera
@@ -1286,10 +1282,24 @@ typedef struct {
 	qhandle_t	poiPowerupHasteShader;
 	qhandle_t	poiPowerupInvisShader;
 	qhandle_t	poiPowerupRegenShader;
-	qhandle_t	poiPowerupIncomingShader;
+	qhandle_t	poiPowerupQuadIncomingShader;
+	qhandle_t	poiPowerupBattleSuitIncomingShader;
+	qhandle_t	poiPowerupHasteIncomingShader;
+	qhandle_t	poiPowerupInvisIncomingShader;
+	qhandle_t	poiPowerupRegenIncomingShader;
+	qhandle_t	poiFlagAtBaseNeutralShader;
+	qhandle_t	poiFlagTakenNeutralShader;
 	qhandle_t	poiFlagDroppedNeutralShader;
+	qhandle_t	poiFlagStolenNeutralShader;
+	qhandle_t	poiFlagAtBaseRedShader;
+	qhandle_t	poiFlagTakenRedShader;
 	qhandle_t	poiFlagDroppedRedShader;
+	qhandle_t	poiFlagStolenRedShader;
+	qhandle_t	poiFlagAtBaseBlueShader;
+	qhandle_t	poiFlagTakenBlueShader;
 	qhandle_t	poiFlagDroppedBlueShader;
+	qhandle_t	poiFlagStolenBlueShader;
+	qhandle_t	poiFlagTrackPointerShader;
 	qhandle_t	poiQuadHogShader;
 	qhandle_t	poiHarvesterCaptureShader;
 	qhandle_t	poiNeutralFlagCarrierShader;
@@ -2378,8 +2388,6 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 void CG_DrawWeaponSelect( void );
 qboolean CG_BuildPredictedRailForPlayerState( const playerState_t *ps, int clientNum,
 	vec3_t start, vec3_t end, vec3_t impactDir, qboolean *addImpact );
-qboolean CG_BuildPredictedBeamForPlayerState( const playerState_t *ps, int clientNum, weapon_t weapon,
-	vec3_t start, vec3_t end, qboolean *hitWorld );
 
 void CG_SelectHighestWeaponExcluding( weapon_t excludedWeapon );
 void CG_OutOfAmmoChange( void );	// should this be in pmove?

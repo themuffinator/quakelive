@@ -14,7 +14,7 @@ _Static_assert(_Alignof(qlr_client_timing_window_t) == 4,
 _Static_assert(offsetof(qlr_client_timing_window_t, serverTimeDelta) == 0x1C0,
                "serverTimeDelta offset");
 
-_Static_assert(sizeof(qlr_client_static_shadow_t) == 28,
+_Static_assert(sizeof(qlr_client_static_shadow_t) == 32,
                "client_static_shadow size drift");
 _Static_assert(_Alignof(qlr_client_static_shadow_t) == 4,
                "client_static_shadow alignment");
@@ -27,7 +27,7 @@ _Static_assert(_Alignof(qlr_client_connection_shadow_t) == 4,
                "client_connection_shadow alignment");
 
 _Static_assert(sizeof(qlr_client_frame_cvars_t) ==
-                   12 * sizeof(qlr_cvar_shadow_t *),
+                   16 * sizeof(qlr_cvar_shadow_t *),
                "client_frame_cvars pointer packing");
 
 _Static_assert(offsetof(qlr_client_frame_context_t, hooks) ==

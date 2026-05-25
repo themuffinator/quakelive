@@ -1,17 +1,24 @@
-[client] BindContext: ctx=0xPTR state=5
-[client] CL_Frame: start msec=16 state=5 catchers=0xPTR
+[client] BindContext: ctx=0xPTR state=8
+[client] CL_Frame: start msec=16 state=8 catchers=0xPTR
 [client] CL_Frame: clearing-cddialog
 [client] hook: setActiveMenu(3)
-[client] CL_Frame: avidemo-screenshot
-[client] hook: checkTimeout(timeoutcount=2 serverTime=100)
+[client] hook: executeText(screenshot silent)
+[client] hook: monkeyShouldBeSpanked()
+[client] hook: randomFloat() -> 0.50
+[client] hook: changeReliableCommand()
+[client] hook: debugGraph(8.25,0)
 [client] hook: checkUserinfo()
-[client] hook: readPackets()
+[client] hook: checkTimeout(timeoutcount=2 serverTime=100)
+[client] hook: workshopFrame()
+[client] hook: sendCmd()
+[client] hook: steamBrowserFrame()
+[client] hook: checkForResend()
 [client] hook: setCGameTime()
-[client] CL_Frame: auto-paused
 [client] hook: updateScreen()
 [client] hook: soundUpdate()
-[client] hook: beginProfiling()
-[client] CL_Frame: end realtime=1267 frametime=33
+[client] hook: runCinematic()
+[client] hook: runConsole()
+[client] CL_Frame: end realtime=1267 frametime=33 framecount=1
 [client] UnbindContext: ctx=0xPTR
 [game] BindContext: ctx=0xPTR
 [game] G_RunFrame: start levelTime=160 previous=64 -> msec=96

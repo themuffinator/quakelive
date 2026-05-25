@@ -196,17 +196,17 @@ void S_Init( void ) {
 	s_pvs = Cvar_GetBounded( "s_pvs", "0", "0", "1", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
 	s_voiceVolume = Cvar_GetBounded( "s_voiceVolume", "1.0", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
 	s_voiceStep = Cvar_Get( "s_voiceStep", "0.02", CVAR_ARCHIVE | CVAR_PROTECTED );
-	s_volume = Cvar_GetBounded( "s_volume", "0.8", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
-
-	s_separation = Cvar_Get ("s_separation", "0.5", CVAR_ARCHIVE);
-	s_khz = Cvar_Get ("s_khz", "22", CVAR_ARCHIVE);
 	s_show = Cvar_Get ("s_show", "0", CVAR_CHEAT);
 	s_testsound = Cvar_Get ("s_testsound", "0", CVAR_CHEAT);
+	s_volume = Cvar_GetBounded( "s_volume", "0.8", "0.0", "2.0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD );
 	if ( !cv->integer ) {
 		Com_Printf ("not initializing.\n");
 		Com_Printf("------------------------------------\n");
 		return;
 	}
+
+	s_separation = Cvar_Get ("s_separation", "0.5", CVAR_ARCHIVE);
+	s_khz = Cvar_Get ("s_khz", "22", CVAR_ARCHIVE);
 
 	Cmd_AddCommand("play", S_Play_f);
 	Cmd_AddCommand("music", S_Music_f);
@@ -1445,16 +1445,12 @@ void S_GetSoundtime(void)
 void S_Update_(void) {
 	unsigned        endtime;
 	int				samps;
-	static			float	lastTime = 0.0f;
-	float			ma, op;
-	float			thisTime, sane;
+	float			ma;
 	static			int ot = -1;
 
 	if ( !s_soundStarted || s_soundMuted ) {
 		return;
 	}
-
-	thisTime = Com_Milliseconds();
 
 	// Updates s_soundtime
 	S_GetSoundtime();
@@ -1468,17 +1464,7 @@ void S_Update_(void) {
 	// and start any new sounds
 	S_ScanChannelStarts();
 
-	sane = thisTime - lastTime;
-	if (sane<11) {
-		sane = 11;			// 85hz
-	}
-
 	ma = s_mixahead->value * dma.speed;
-	op = s_mixPreStep->value + sane*dma.speed*0.01;
-
-	if (op < ma) {
-		ma = op;
-	}
 
 	// mix ahead of current position
 	endtime = s_soundtime + ma;
@@ -1499,8 +1485,6 @@ void S_Update_(void) {
 	S_PaintChannels (endtime);
 
 	SNDDMA_Submit ();
-
-	lastTime = thisTime;
 }
 
 /*

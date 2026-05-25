@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
@@ -10,6 +11,9 @@ CG_PREDICT = REPO_ROOT / "src" / "code" / "cgame" / "cg_predict.c"
 CG_PLAYERSTATE = REPO_ROOT / "src" / "code" / "cgame" / "cg_playerstate.c"
 CG_SERVERCMDS = REPO_ROOT / "src" / "code" / "cgame" / "cg_servercmds.c"
 CG_SNAPSHOT = REPO_ROOT / "src" / "code" / "cgame" / "cg_snapshot.c"
+CGAME_MAPPING = REPO_ROOT / "docs" / "reverse-engineering" / "cgame-mapping.md"
+CGAME_BG_PLAN = REPO_ROOT / "docs" / "reverse-engineering" / "cgame-bg-parity-implementation-plan.md"
+CGAME_SYMBOL_MAP = REPO_ROOT / "references" / "symbol-maps" / "cgame.json"
 
 
 def _block_from_marker(source: str, marker: str) -> str:
@@ -27,6 +31,17 @@ def _block_from_marker(source: str, marker: str) -> str:
                 return source[start:index + 1]
 
     raise AssertionError(f"Unbalanced block for marker: {marker}")
+
+
+def _cgame_symbol(normalized_name: str) -> dict[str, object]:
+    data = json.loads(CGAME_SYMBOL_MAP.read_text(encoding="utf-8"))
+    matches = [
+        entry
+        for entry in data["functions"]
+        if entry.get("normalized_name") == normalized_name
+    ]
+    assert len(matches) == 1, normalized_name
+    return matches[0]
 
 
 def test_snapshot_refresh_queue_consumes_retail_model_override_path() -> None:
@@ -89,6 +104,175 @@ def test_predict_and_snapshot_paths_keep_retail_interpolate_and_transition_gates
     assert "if ( cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)" in transition_block
     assert "|| cg_nopredict.integer || cg_synchronousClients.integer ) {" in transition_block
     assert "CG_TransitionPlayerState( ps, ops );" in transition_block
+
+
+def test_predict_player_state_replays_commands_through_retail_pmove_pipeline() -> None:
+    source = CG_PREDICT.read_text(encoding="utf-8")
+    predict_block = _block_from_marker(source, "void CG_PredictPlayerState")
+
+    for expected in (
+        "cg.hyperspace = qfalse;",
+        "cg.projectileNudgeActive = qfalse;",
+        "cg.projectileNudgeMsec = 0;",
+        "cg.projectileNudgeCommandTime = 0;",
+        "VectorClear( cg.projectileNudgeOrigin );",
+        "cg_pmove.ps = &cg.predictedPlayerState;",
+        "memcpy( &localPmoveSettings, &cg_pmoveSettings, sizeof( localPmoveSettings ) );",
+        "cg_pmove.pmoveSettings = &localPmoveSettings;",
+        "cg_pmove.trace = CG_Trace;",
+        "cg_pmove.pointcontents = CG_PointContents;",
+        "cg_pmove.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;",
+        "cg_pmove.tracemask = MASK_PLAYERSOLID;",
+        "cg_pmove.tracemask &= ~CONTENTS_BODY;",
+        "cg_pmove.noFootsteps = ( cgs.dmflags & DF_NO_FOOTSTEPS ) > 0;",
+        "trap_GetUserCmd( cmdNum, &oldestCmd );",
+        "oldestCmd.serverTime > cg.snap->ps.commandTime",
+        "trap_GetUserCmd( current, &latestCmd );",
+        "CG_UpdatePredictedRailFire( &latestCmd );",
+        "if ( cg.nextSnap && !cg.nextFrameTeleport && !cg.thisFrameTeleport ) {",
+        "trap_Cvar_Set(\"pmove_msec\", \"8\");",
+        "trap_Cvar_Set(\"pmove_msec\", \"33\");",
+        "cg_pmove.pmove_fixed = pmove_fixed.integer;// | cg_pmove_fixed.integer;",
+        "cg_pmove.pmove_msec = pmove_msec.integer;",
+        "trap_GetUserCmd( cmdNum, &cg_pmove.cmd );",
+        "PM_UpdateViewAngles( cg_pmove.ps, &cg_pmove.cmd );",
+        "cg_pmove.cmd.serverTime <= cg.predictedPlayerState.commandTime",
+        "cg_pmove.cmd.serverTime > latestCmd.serverTime",
+        "cg_pmove.gauntletHit = qfalse;",
+        "cg_pmove.cmd.serverTime = ((cg_pmove.cmd.serverTime + pmove_msec.integer-1) / pmove_msec.integer) * pmove_msec.integer;",
+        "Pmove (&cg_pmove);",
+        "CG_UpdateStepChange();",
+        "CG_LocalProjectileNudge( nudgedOrigin, &nudgedTime );",
+        "moved = qtrue;",
+        "CG_TouchTriggerPrediction();",
+        "//CG_CheckChangedPredictableEvents(&cg.predictedPlayerState);",
+        'CG_Printf( "not moved\\n" );',
+        "CG_TransitionPlayerState( &cg.predictedPlayerState, &oldPlayerState );",
+    ):
+        assert expected in predict_block
+
+    assert predict_block.index("CG_UpdatePredictedRailFire( &latestCmd );") < predict_block.index(
+        "if ( cg.nextSnap && !cg.nextFrameTeleport && !cg.thisFrameTeleport ) {"
+    )
+    assert predict_block.index('trap_Cvar_Set("pmove_msec", "8");') < predict_block.index(
+        "cg_pmove.pmove_fixed = pmove_fixed.integer;// | cg_pmove_fixed.integer;"
+    )
+    assert predict_block.index("trap_GetUserCmd( cmdNum, &cg_pmove.cmd );") < predict_block.index(
+        "PM_UpdateViewAngles( cg_pmove.ps, &cg_pmove.cmd );"
+    )
+    assert predict_block.index("PM_UpdateViewAngles( cg_pmove.ps, &cg_pmove.cmd );") < predict_block.index(
+        "cg_pmove.cmd.serverTime <= cg.predictedPlayerState.commandTime"
+    )
+    assert predict_block.index("cg_pmove.cmd.serverTime <= cg.predictedPlayerState.commandTime") < predict_block.index(
+        "cg_pmove.cmd.serverTime > latestCmd.serverTime"
+    )
+    assert predict_block.index("cg_pmove.gauntletHit = qfalse;") < predict_block.index("Pmove (&cg_pmove);")
+    assert predict_block.index("Pmove (&cg_pmove);") < predict_block.index("CG_UpdateStepChange();")
+    assert predict_block.index("CG_UpdateStepChange();") < predict_block.index(
+        "CG_LocalProjectileNudge( nudgedOrigin, &nudgedTime );"
+    )
+    assert predict_block.index("CG_LocalProjectileNudge( nudgedOrigin, &nudgedTime );") < predict_block.index(
+        "moved = qtrue;"
+    )
+    assert predict_block.index("moved = qtrue;") < predict_block.index("CG_TouchTriggerPrediction();")
+    assert predict_block.index("if ( !moved ) {") < predict_block.rindex(
+        "CG_AdjustPositionForMover( cg.predictedPlayerState.origin,"
+    )
+    assert predict_block.rindex("CG_AdjustPositionForMover( cg.predictedPlayerState.origin,") < predict_block.index(
+        "CG_TransitionPlayerState( &cg.predictedPlayerState, &oldPlayerState );"
+    )
+
+
+def test_touch_item_prediction_keeps_retail_grab_event_and_weapon_side_effects() -> None:
+    source = CG_PREDICT.read_text(encoding="utf-8")
+    touch_block = _block_from_marker(source, "static void CG_TouchItem")
+
+    for expected in (
+        "if ( !cg_predictItems.integer ) {",
+        "if ( !BG_PlayerTouchesItem( &cg.predictedPlayerState, &cent->currentState, cg.time ) ) {",
+        "if ( cent->miscTime == cg.time ) {",
+        "if ( !BG_CanItemBeGrabbed( cgs.gametype, cg.time, &cent->currentState, &cg.predictedPlayerState ) ) {",
+        "item = &bg_itemlist[ cent->currentState.modelindex ];",
+        "if ( CG_ItemSkipsPredictablePickup( item ) ) {",
+        "if( cgs.gametype == GT_1FCTF ) {",
+        "if( ( cgs.gametype == GT_CTF || cgs.gametype == GT_HARVESTER ) && BG_IsRedBlueFlagItem( item ) ) {",
+        "BG_AddPredictableEventToPlayerstate( EV_ITEM_PICKUP, cent->currentState.modelindex , &cg.predictedPlayerState);",
+        "cent->currentState.eFlags |= EF_NODRAW;",
+        "cent->miscTime = cg.time;",
+        "if ( item->giType == IT_WEAPON ) {",
+        "weapon = BG_WeaponForItemTag( item->giTag );",
+        "cg.predictedPlayerState.stats[ STAT_WEAPONS ] |= 1 << weapon;",
+        "cg.predictedPlayerState.ammo[ weapon ] = 1;",
+    ):
+        assert expected in touch_block
+
+    assert touch_block.index("if ( !cg_predictItems.integer ) {") < touch_block.index(
+        "if ( !BG_PlayerTouchesItem( &cg.predictedPlayerState, &cent->currentState, cg.time ) ) {"
+    )
+    assert touch_block.index("if ( !BG_PlayerTouchesItem(") < touch_block.index("if ( cent->miscTime == cg.time ) {")
+    assert touch_block.index("if ( cent->miscTime == cg.time ) {") < touch_block.index(
+        "if ( !BG_CanItemBeGrabbed("
+    )
+    assert touch_block.index("item = &bg_itemlist[ cent->currentState.modelindex ];") < touch_block.index(
+        "if ( CG_ItemSkipsPredictablePickup( item ) ) {"
+    )
+    assert touch_block.index("if ( CG_ItemSkipsPredictablePickup( item ) ) {") < touch_block.index(
+        "BG_AddPredictableEventToPlayerstate( EV_ITEM_PICKUP"
+    )
+    assert touch_block.index("BG_AddPredictableEventToPlayerstate( EV_ITEM_PICKUP") < touch_block.index(
+        "cent->currentState.eFlags |= EF_NODRAW;"
+    )
+    assert touch_block.index("cent->currentState.eFlags |= EF_NODRAW;") < touch_block.index(
+        "cent->miscTime = cg.time;"
+    )
+    assert touch_block.index("cent->miscTime = cg.time;") < touch_block.index("if ( item->giType == IT_WEAPON ) {")
+
+
+def test_touch_trigger_prediction_matches_retail_prediction_filters_and_box_trace() -> None:
+    source = CG_PREDICT.read_text(encoding="utf-8")
+    trigger_block = _block_from_marker(source, "static void CG_TouchTriggerPrediction")
+
+    for expected in (
+        "if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {",
+        "cg.predictedPlayerState.pm_type == PM_NOCLIP",
+        "cg.predictedPlayerState.pm_type == PM_SPECTATOR",
+        "cg.predictedPlayerState.pm_type == PM_DEAD",
+        "cg.predictedPlayerState.pm_type == PM_INTERMISSION",
+        "cg.predictedPlayerState.pm_type == PM_SPINTERMISSION",
+        "if ( ent->eType == ET_ITEM ) {",
+        "CG_TouchItem( cent );",
+        "if ( ent->solid != SOLID_BMODEL ) {",
+        "cmodel = trap_CM_InlineModel( ent->modelindex );",
+        "trap_CM_BoxTrace( &trace, cg.predictedPlayerState.origin, cg.predictedPlayerState.origin,",
+        "cg_pmove.mins, cg_pmove.maxs, cmodel, -1 );",
+        "if ( ent->eType == ET_TELEPORT_TRIGGER ) {",
+        "cg.hyperspace = qtrue;",
+        "BG_TouchJumpPad( &cg.predictedPlayerState, ent );",
+        "if ( cg.predictedPlayerState.jumppad_frame != cg.predictedPlayerState.pmove_framecount ) {",
+        "cg.predictedPlayerState.jumppad_frame = 0;",
+        "cg.predictedPlayerState.jumppad_ent = 0;",
+    ):
+        assert expected in trigger_block
+
+    assert "cg.predictedPlayerState.pm_type == PM_FREEZE" not in trigger_block
+    assert "CG_Trace(" not in trigger_block
+    assert trigger_block.index("if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {") < trigger_block.index(
+        "cg.predictedPlayerState.pm_type == PM_NOCLIP"
+    )
+    assert trigger_block.index("if ( ent->eType == ET_ITEM ) {") < trigger_block.index("CG_TouchItem( cent );")
+    assert trigger_block.index("CG_TouchItem( cent );") < trigger_block.index("if ( ent->solid != SOLID_BMODEL ) {")
+    assert trigger_block.index("cmodel = trap_CM_InlineModel( ent->modelindex );") < trigger_block.index(
+        "trap_CM_BoxTrace( &trace, cg.predictedPlayerState.origin, cg.predictedPlayerState.origin,"
+    )
+    assert trigger_block.index("trap_CM_BoxTrace( &trace, cg.predictedPlayerState.origin") < trigger_block.index(
+        "if ( !trace.startsolid ) {"
+    )
+    assert trigger_block.index("if ( !trace.startsolid ) {") < trigger_block.index(
+        "if ( ent->eType == ET_TELEPORT_TRIGGER ) {"
+    )
+    assert trigger_block.index("if ( cg.predictedPlayerState.jumppad_frame") > trigger_block.index(
+        "for ( i = 0 ; i < cg_numTriggerEntities ; i++ ) {"
+    )
 
 
 def test_transition_player_state_keeps_retail_follow_reset_and_intermission_flow() -> None:
@@ -162,3 +346,32 @@ def test_local_player_configstring_update_reuses_client_info_context_queue() -> 
     assert "CG_QueueClientInfoContextRefresh();" in players_block
     assert "CG_NewClientInfo( num - CS_PLAYERS );" in players_block
     assert players_block.index("CG_QueueClientInfoContextRefresh();") < players_block.index("CG_NewClientInfo( num - CS_PLAYERS );")
+
+
+def test_cgame_prediction_pmove_wiring_is_backed_by_committed_retail_evidence() -> None:
+    mapping = CGAME_MAPPING.read_text(encoding="utf-8")
+    plan = CGAME_BG_PLAN.read_text(encoding="utf-8")
+
+    expected_symbols = {
+        "CG_PredictPlayerState": ("0x100446E0", "Prediction loop"),
+        "CG_TouchItem": ("0x100443C0", "Retail item-touch prediction helper"),
+        "CG_TouchTriggerPrediction": ("0x100444D0", "Retail trigger-touch predictor"),
+        "CG_UpdateStepChange": ("0x10044620", "Retail stair-step smoothing helper"),
+        "CG_UpdatePredictedRailFire": ("0x10044CE0", "Retail predicted-rail replay helper"),
+        "CG_TransitionPlayerState": ("0x10043B60", "Shared playerstate-transition helper"),
+    }
+
+    for name, (address, comment_token) in expected_symbols.items():
+        entry = _cgame_symbol(name)
+        assert entry["address"] == address
+        assert entry["status"] == "matched"
+        assert comment_token in entry["comment"]
+        assert name in mapping
+
+    for expected in (
+        "The prediction seam now lines up cleanly from source to retail binary",
+        "CG-C3",
+        "prediction and transition seam",
+        "Focused structural coverage",
+    ):
+        assert expected in mapping or expected in plan

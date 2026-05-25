@@ -661,6 +661,8 @@ cvar_t *Cvar_GetBounded( const char *var_name, const char *value, const char *mi
 
 void	Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, int flags );
 // basically a slightly modified Cvar_Get for the interpreted modules
+void	Cvar_RegisterBounded( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, const char *minimumValue, const char *maximumValue, int flags );
+// retail Quake Live ranged cvar registration for interpreted modules
 
 void	Cvar_Update( vmCvar_t *vmCvar );
 // updates an interpreted modules' version of a cvar
@@ -1087,9 +1089,11 @@ void CL_InitKeyCommands( void );
 
 void CL_Init( void );
 void SteamClient_Init( void );
+void SteamClient_Frame( void );
 void CL_Disconnect( qboolean showMainMenu );
 void CL_Shutdown( void );
 void CL_Frame( int msec );
+void CL_WebHost_Frame( void );
 qboolean CL_GameCommand( void );
 void CL_KeyEvent (int key, qboolean down, unsigned time);
 

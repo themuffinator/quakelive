@@ -74,7 +74,7 @@ def test_client_workshop_bootstrap_reconstructs_retail_join_and_completion_owner
     assert "CL_Workshop_ClearBootstrapState( qtrue );" in init_block
     assert "if ( CL_Workshop_BeginBootstrap() ) {" in init_block
     assert "CL_Workshop_Frame();" in frame_block
-    assert frame_block.index("SteamClient_Frame();") < frame_block.index("CL_Workshop_Frame();")
+    assert frame_block.index("CL_Workshop_Frame();") < frame_block.index("CL_SendCmd();")
     assert frame_block.index("CL_Workshop_Frame();") < frame_block.index("CL_CheckForResend();")
     assert 'CL_LogWorkshopLifecycle( "request-download", detail );' in request_download_block
     assert '"Workshop item %llu: in cache."' in request_download_block

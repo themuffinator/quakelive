@@ -133,9 +133,22 @@ def test_teammate_poi_overlay_uses_retail_projection_and_status_markers() -> Non
 	assert "case GT_OBELISK:" in flag_status_gate_block
 	assert "case GT_DOMINATION:" in flag_status_gate_block
 	assert "case GT_ATTACK_DEFEND:" in flag_status_gate_block
-	assert 'cgs.media.poiFlagDroppedNeutralShader = trap_R_RegisterShader( "gfx/2d/flag_status/flag_dropped" );' in register_block
-	assert 'cgs.media.poiFlagDroppedRedShader = trap_R_RegisterShader( "gfx/2d/flag_status/red_flag_dropped" );' in register_block
-	assert 'cgs.media.poiFlagDroppedBlueShader = trap_R_RegisterShader( "gfx/2d/flag_status/blue_flag_dropped" );' in register_block
+	for registration in (
+		'cgs.media.poiFlagAtBaseNeutralShader = trap_R_RegisterShader( "gfx/2d/flag_status/flag_at_base.tga" );',
+		'cgs.media.poiFlagTakenNeutralShader = trap_R_RegisterShader( "gfx/2d/flag_status/flag_taken.tga" );',
+		'cgs.media.poiFlagDroppedNeutralShader = trap_R_RegisterShader( "gfx/2d/flag_status/flag_dropped.tga" );',
+		'cgs.media.poiFlagStolenNeutralShader = trap_R_RegisterShader( "gfx/2d/flag_status/flag_stolen.tga" );',
+		'cgs.media.poiFlagAtBaseRedShader = trap_R_RegisterShader( "gfx/2d/flag_status/red_flag_at_base.tga" );',
+		'cgs.media.poiFlagTakenRedShader = trap_R_RegisterShader( "gfx/2d/flag_status/red_flag_taken.tga" );',
+		'cgs.media.poiFlagDroppedRedShader = trap_R_RegisterShader( "gfx/2d/flag_status/red_flag_dropped.tga" );',
+		'cgs.media.poiFlagStolenRedShader = trap_R_RegisterShader( "gfx/2d/flag_status/red_flag_stolen.tga" );',
+		'cgs.media.poiFlagAtBaseBlueShader = trap_R_RegisterShader( "gfx/2d/flag_status/blue_flag_at_base.tga" );',
+		'cgs.media.poiFlagTakenBlueShader = trap_R_RegisterShader( "gfx/2d/flag_status/blue_flag_taken.tga" );',
+		'cgs.media.poiFlagDroppedBlueShader = trap_R_RegisterShader( "gfx/2d/flag_status/blue_flag_dropped.tga" );',
+		'cgs.media.poiFlagStolenBlueShader = trap_R_RegisterShader( "gfx/2d/flag_status/blue_flag_stolen.tga" );',
+		'cgs.media.poiFlagTrackPointerShader = trap_R_RegisterShader( "gfx/2d/flag_status/track_pointer.tga" );',
+	):
+		assert registration in register_block
 	assert "if ( cgs.gametype == GT_FFA || cg_buildScript.integer )" in register_block
 	assert 'cgs.media.poiQuadHogShader = trap_R_RegisterShader( "gfx/2d/quad_hog/quadhog" );' in register_block
 	assert "cg_teammatePOIsMinWidth.value * SMALLCHAR_WIDTH" in draw_block
@@ -234,7 +247,7 @@ def test_crosshair_team_health_default_matches_retail_mode_cvar() -> None:
 	assert "cg_drawCrosshairNames" not in source
 	assert "cg_drawCrosshairNames" not in local_header
 	assert "trap_QL_Cvar_RegisterRange( cv->vmCvar, cv->cvarName," in source
-	assert "Cvar_GetBounded( varName, defaultValue, minimumValue, maximumValue, flags );" in client_source
+	assert "Cvar_RegisterBounded( vmCvar, varName, defaultValue, minimumValue, maximumValue, flags );" in client_source
 
 
 def test_crosshair_color_palette_and_brightness_match_retail_draw_path() -> None:
@@ -316,7 +329,7 @@ def test_screen_damage_and_vignette_use_registered_retail_media_handles() -> Non
 
 	assert "qhandle_t\tviewDamageBlendShader;" in local_header
 	assert "qhandle_t\tvignetteShader;" in local_header
-	assert '{ &cg_vignette, "cg_vignette", "0", CVAR_ARCHIVE },' in main_source
+	assert '{ &cg_vignette, "cg_vignette", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "1" },' in main_source
 	assert 'cgs.media.viewDamageBlendShader = trap_R_RegisterShader( "viewDamageBlend" );' in register_block
 	assert 'cgs.media.vignetteShader = trap_R_RegisterShader( "gfx/misc/vignette" );' in register_block
 	assert "cgs.media.viewDamageBlendShader = trap_R_RegisterShader( \"viewDamageBlend\" );" in damage_shader_block
@@ -846,10 +859,18 @@ def test_team_overlay_uses_retail_cvars_and_scaled_host_text_lane() -> None:
 
 def test_spectator_item_timer_text_uses_retail_default_font_lane() -> None:
 	source = CG_DRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
 	timer_block = _block_from_marker(source, "static void CG_DrawSpectatorItemPickups")
 
+	assert '{ &cg_specItemTimers, "cg_specItemTimers", "7", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "15" },' in main_source
+	assert '{ &cg_specItemTimersSize, "cg_specItemTimersSize", "0.24", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0.12", "0.35" },' in main_source
+	assert '{ &cg_specItemTimersX, "cg_specItemTimersX", "10", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "640" },' in main_source
+	assert '{ &cg_specItemTimersY, "cg_specItemTimersY", "200", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "480" },' in main_source
 	assert "size = cg_specItemTimersSize.value * 100.0f;" in timer_block
 	assert "scale = cg_specItemTimersSize.value;" in timer_block
+	assert "x = cg_specItemTimersX.value;" in timer_block
+	assert "y = cg_specItemTimersY.value;" in timer_block
+	assert "cg_spectatorItemPickupBaseY" not in source
 	assert "CG_DrawPic( drawX, drawY, size, size, icon );" in timer_block
 	assert 'Com_sprintf( timerText, sizeof( timerText ), "%d", seconds );' in timer_block
 	assert "CG_Text_PaintExt( drawX + size + 4.0f, drawY + size - 5.0f, scale, colorWhite," in timer_block
@@ -858,10 +879,12 @@ def test_spectator_item_timer_text_uses_retail_default_font_lane() -> None:
 
 def test_classic_speedometer_restores_retail_history_ring_and_draw_order() -> None:
 	source = CG_DRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
 	speedometer_block = _block_from_marker(source, "static void CG_DrawSpeedometer( void )")
 	record_block = _block_from_marker(source, "static void CG_RecordSpeedometerSample( void )")
 	draw2d_block = _block_from_marker(source, "static void CG_Draw2D( void )")
 
+	assert '{ &cg_speedometer, "cg_speedometer", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "4" },' in main_source
 	assert "#define CG_SPEEDOMETER_HISTORY_SAMPLES\t128" in source
 	assert "#define CG_SPEEDOMETER_RANGE\t\t\t960.0f" in source
 	assert "static float CG_SampleLegacySpeedometer( void )" in source
@@ -908,6 +931,10 @@ def test_classic_input_cmd_overlay_restores_retail_follow_and_arrow_icon_path() 
 	):
 		assert expected in graphics_block
 
+	assert '{ &cg_drawInputCmds, "cg_drawInputCmds", "0", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "2" },' in main_source
+	assert '{ &cg_drawInputCmdsSize, "cg_drawInputCmdsSize", "24", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "16", "200" },' in main_source
+	assert '{ &cg_drawInputCmdsX, "cg_drawInputCmdsX", "320", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "640" },' in main_source
+	assert '{ &cg_drawInputCmdsY, "cg_drawInputCmdsY", "240", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD, "0", "480" },' in main_source
 	for expected in (
 		'cgs.media.raceCommandUpShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_up" );',
 		'cgs.media.raceCommandDownShader = trap_R_RegisterShaderNoMip( "gfx/2d/race/cmd_down" );',
@@ -959,6 +986,50 @@ def test_classic_input_cmd_overlay_restores_retail_follow_and_arrow_icon_path() 
 	assert "CG_DrawInputCmds();" in draw2d_block
 	assert draw2d_block.index( "CG_DrawInputCmds();" ) < draw2d_block.index( "CG_DrawSpeedometer();" )
 	assert draw2d_block.index( "CG_DrawSpeedometer();" ) < draw2d_block.index( "CG_DrawLowerRight();" )
+
+
+def test_cgame_classic_overlay_cvars_match_retail_table_and_runtime_wiring() -> None:
+	source = CG_DRAW.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+	model_block = _block_from_marker(source, "void CG_Draw3DModel")
+	head_block = _block_from_marker(source, "void CG_DrawHead")
+	pickup_block = _block_from_marker(source, "static int CG_DrawPickupItem")
+	reward_block = _block_from_marker(source, "static void CG_DrawReward")
+	sprite_self_block = _block_from_marker(source, "qboolean CG_ShouldDrawSpriteSelf")
+	area_powerup_block = _block_from_marker(newdraw_source, "static void CG_DrawAreaPowerUp")
+	crosshair_names_block = _block_from_marker(source, "static void CG_DrawCrosshairNames")
+
+	for expected in (
+		f'{{ &cg_drawIcons, "cg_drawIcons", "1", {retail_flags}, "0", "1" }},',
+		f'{{ &cg_drawItemPickups, "cg_drawItemPickups", "3", {retail_flags}, "0", "7" }},',
+		f'{{ &cg_drawRewards, "cg_drawRewards", "1", {retail_flags}, "0", "1" }},',
+		f'{{ &cg_drawRewardsRowSize, "cg_drawRewardsRowSize", "1", {retail_flags}, "1", "9" }},',
+		f'{{ &cg_drawSprites, "cg_drawSprites", "1", {retail_flags}, "0", "1" }},',
+		f'{{ &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", {retail_flags}, "0", "1" }},',
+		f'{{ &cg_overheadNamesWidth, "cg_overheadNamesWidth", "75", {retail_flags}, "50", "100" }},',
+	):
+		assert expected in main_source
+
+	assert "if ( !cg_draw3dIcons.integer || !cg_drawIcons.integer ) {" in model_block
+	assert "} else if ( cg_drawIcons.integer ) {" in head_block
+
+	assert "if ( cg_drawItemPickups.integer <= 0 ) {" in pickup_block
+	assert "drawIcon = (qboolean)( ( cg_drawItemPickups.integer & 1 ) != 0 );" in pickup_block
+	assert "drawText = (qboolean)( ( cg_drawItemPickups.integer & 2 ) != 0 );" in pickup_block
+	assert "drawTimestamp = (qboolean)( ( cg_drawItemPickups.integer & 4 ) != 0 );" in pickup_block
+
+	assert "if ( !cg_drawRewards.integer ) {" in reward_block
+	assert "int rowSize = cg_drawRewardsRowSize.integer;" in reward_block
+	assert "rowSize = Com_Clamp(1, MAX_REWARDSTACK, rowSize);" in reward_block
+
+	assert "return ( qboolean )( cg_drawSpriteSelf.integer != 0 );" in sprite_self_block
+	assert "if ( !rect || !cg.snap || !cg_drawSprites.integer ) {" in area_powerup_block
+	assert "if ( !CG_ShouldDrawSpriteSelf() && !( cg.snap->ps.pm_flags & PMF_FOLLOW ) && cg.snap->ps.clientNum == cg.clientNum ) {" in area_powerup_block
+
+	assert "if ( cg_overheadNamesWidth.value > 0.0f && w > cg_overheadNamesWidth.value ) {" in crosshair_names_block
+	assert "float clampedScale = cg_overheadNamesWidth.value / w;" in crosshair_names_block
 
 
 def test_default_hud_item_keywords_are_backed_by_item_parsers() -> None:

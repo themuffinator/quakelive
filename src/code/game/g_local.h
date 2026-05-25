@@ -404,6 +404,7 @@ extern vmCvar_t g_powerupRespawn;
 extern vmCvar_t g_loadout;
 extern vmCvar_t g_runes;
 extern vmCvar_t g_flightThrust;
+extern vmCvar_t g_flightRefuelRate;
 extern vmCvar_t g_battleSuitDampen;
 extern vmCvar_t g_dropDamagedHealth;
 extern vmCvar_t g_regenHealth;
@@ -1648,6 +1649,7 @@ void G_SetWorldspawnAtmosphere( const char *atmosphere );
 // g_active.c
 //
 void ClientThink( int clientNum );
+void ClientThink_real( gentity_t *ent );
 void G_Frame_BeginRoundWarmup( void );
 void G_Frame_UpdateRoundController( void );
 void G_SetClientRatingModifiers( gclient_t *client, float damageScale, float scoreScale );
@@ -1862,6 +1864,7 @@ extern	vmCvar_t	g_filterBan;
 extern	vmCvar_t	g_instaGib;
 extern	vmCvar_t	g_itemTimers;
 extern	vmCvar_t	g_itemHeight;
+extern	vmCvar_t	g_specItemTimers;
 extern	vmCvar_t	g_forceSmallScoreboardMessage;
 extern	vmCvar_t	g_forceSendConfigstring;
 extern	vmCvar_t	g_forceAtmosphericEffects;

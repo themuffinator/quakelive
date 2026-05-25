@@ -3655,6 +3655,8 @@ def test_register_cvars_publishes_retail_version_and_vote_reset() -> None:
 	retail_cvar_table = _text_between(hlil_source, "10076ad8  void* data_10076ad8", "10076da4")
 	retail_force_cvar_table = _text_between(hlil_source, "10077468  void* data_10077468", "10077498")
 	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+	retail_cloud_flags = "CVAR_VM_CREATED | CVAR_CLOUD"
+	retail_protected_cloud_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD"
 
 	assert "const char\t*cvarName;" in table_decl
 	assert "const char\t*defaultString;" in table_decl
@@ -3665,6 +3667,7 @@ def test_register_cvars_publishes_retail_version_and_vote_reset() -> None:
 		'{ &cg_autoAction, "cg_autoAction", "0", CVAR_ARCHIVE | CVAR_LATCH },',
 		'{ &cg_autoHop, "cg_autoHop", "1", CVAR_ARCHIVE | CVAR_LATCH },',
 		'{ &cg_autoProjectileNudge, "cg_autoProjectileNudge", "0", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_bob, "cg_bob", "0.25", ' + retail_flags + ', "0.0", "1.0" },',
 		'{ &cg_predictLocalRailshots, "cg_predictLocalRailshots", "1", 0 },',
 		'{ &cg_projectileNudge, "cg_projectileNudge", "0", CVAR_CHEAT },',
 		'{ &cg_crosshairBrightness, "cg_crosshairBrightness", "1.0", ' + retail_flags + ', "0.0", "1.0" },',
@@ -3677,7 +3680,86 @@ def test_register_cvars_publishes_retail_version_and_vote_reset() -> None:
 		'{ &cg_crosshairSize, "cg_crosshairSize", "32", ' + retail_flags + ', "0", "320" },',
 		'{ &cg_crosshairX, "cg_crosshairX", "0", ' + retail_flags + ', "-320", "320" },',
 		'{ &cg_crosshairY, "cg_crosshairY", "0", ' + retail_flags + ', "-240", "240" },',
+		'{ &cg_damagePlum, "cg_damagePlum", "g mg sg gl rl lg rg pg bfg gh cg ng pl hmg", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_damagePlumColorStyle, "cg_damagePlumColorStyle", "1", ' + retail_flags + ', "1", "3" },',
+		'{ &cg_deadBodyColor, "cg_deadBodyColor", "0x101010FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_deadBodyDarken, "cg_deadBodyDarken", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_deferPlayers, "cg_deferPlayers", "0", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_draw2D, "cg_draw2D", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_draw3dIcons, "cg_draw3dIcons", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawAmmoWarning, "cg_drawAmmoWarning", "2", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_drawDeadFriendTime, "cg_drawDeadFriendTime", "3000.0", ' + retail_flags + ', "0.0", "5000.0" },',
+		'{ &cg_drawDemoHUD, "cg_drawDemoHUD", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawFragMessages, "cg_drawFragMessages", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawHitFriendTime, "cg_drawHitFriendTime", "100", ' + retail_flags + ', "0", "5000" },',
+		'{ &cg_drawIcons, "cg_drawIcons", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawInputCmds, "cg_drawInputCmds", "0", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_drawInputCmdsSize, "cg_drawInputCmdsSize", "24", ' + retail_flags + ', "16", "200" },',
+		'{ &cg_drawInputCmdsX, "cg_drawInputCmdsX", "320", ' + retail_flags + ', "0", "640" },',
+		'{ &cg_drawInputCmdsY, "cg_drawInputCmdsY", "240", ' + retail_flags + ', "0", "480" },',
+		'{ &cg_drawItemPickups, "cg_drawItemPickups", "3", ' + retail_flags + ', "0", "7" },',
+		'{ &cg_drawPregameMessages, "cg_drawPregameMessages", "1", ' + retail_cloud_flags + ', "0", "1" },',
+		'{ &cg_drawProfileImages, "cg_drawProfileImages", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawCheckpointRemaining, "cg_drawCheckpointRemaining", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawRewards, "cg_drawRewards", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawRewardsRowSize, "cg_drawRewardsRowSize", "1", ' + retail_flags + ', "1", "9" },',
+		'{ &cg_drawSpecMessages, "cg_drawSpecMessages", "1", ' + retail_cloud_flags + ', "0", "1" },',
+		'{ &cg_drawSprites, "cg_drawSprites", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawSpriteSelf, "cg_drawSpriteSelf", "0", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawStatus, "cg_drawStatus", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawTieredArmorAvailability, "cg_drawTieredArmorAvailability", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_enemyHeadColor, "cg_enemyHeadColor", "0x2a8000FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_enemyLowerColor, "cg_enemyLowerColor", "0x2a8000FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_enemyUpperColor, "cg_enemyUpperColor", "0x2a8000FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_errorDecay, "cg_errordecay", "100", ' + retail_cloud_flags + ', "0", "100" },',
+		'{ &cg_filter_angles, "cg_filter_angles", "0", 0 },',
+		'{ &cg_followKiller, "cg_followKiller", "0", CVAR_VM_CREATED, "0", "1" },',
+		'{ &cg_followPowerup, "cg_followPowerup", "0", CVAR_VM_CREATED, "0", "2" },',
+		'{ &cg_forceEnemyModel, "cg_forceEnemyModel", "", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_forceEnemySkin, "cg_forceEnemySkin", "", ' + retail_protected_cloud_flags + ' },',
 		'{ &cg_forceDrawCrosshair, "cg_forceDrawCrosshair", "0", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_forceTeamModel, "cg_forceTeamModel", "", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_forceTeamSkin, "cg_forceTeamSkin", "", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_fov, "cg_fov", "100", ' + retail_flags + ', "10", "130" },',
+		'{ &cg_flagPOIs, "cg_flagPOIs", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_itemTimers, "cg_itemTimers", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_kickScale, "cg_kickScale", "0.25", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_lagometer, "cg_lagometer", "0", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_levelTimerDirection, "cg_levelTimerDirection", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_obituaryRowSize, "cg_obituaryRowSize", "5", CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED, "0", "5" },',
+		'{ &cg_overheadNamesWidth, "cg_overheadNamesWidth", "75", ' + retail_flags + ', "50", "100" },',
+		'{ &cg_poiMinWidth, "cg_poiMinWidth", "16.0", ' + retail_flags + ', "2.0", "16.0" },',
+		'{ &cg_poiMaxWidth, "cg_poiMaxWidth", "32.0", ' + retail_flags + ', "16.0", "32.0" },',
+		'{ &cg_powerupPOIs, "cg_powerupPOIs", "2", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_simpleItems, "cg_simpleItems", "0", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_simpleItemsBob, "cg_simpleItemsBob", "2", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_simpleItemsHeightOffset, "cg_simpleItemsHeightOffset", "8", ' + retail_flags + ', "0", "18" },',
+		'{ &cg_simpleItemsRadius, "cg_simpleItemsRadius", "15", ' + retail_flags + ', "8", "24" },',
+		'{ &cg_specItemTimers, "cg_specItemTimers", "7", ' + retail_flags + ', "0", "15" },',
+		'{ &cg_specItemTimersSize, "cg_specItemTimersSize", "0.24", ' + retail_flags + ', "0.12", "0.35" },',
+		'{ &cg_specItemTimersX, "cg_specItemTimersX", "10", ' + retail_flags + ', "0", "640" },',
+		'{ &cg_specItemTimersY, "cg_specItemTimersY", "200", ' + retail_flags + ', "0", "480" },',
+		'{ &cg_speedometer, "cg_speedometer", "0", ' + retail_flags + ', "0", "4" },',
+		'{ &cg_teamChatBeep, "cg_teamChatBeep", "0", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_teamChatsOnly, "cg_teamChatsOnly", "0", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_teamChatTime, "cg_teamChatTime", "3000", ' + retail_flags + ', "0", "5000" },',
+		'{ &cg_teamHeadColor, "cg_teamHeadColor", "0x808080FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_teamLowerColor, "cg_teamLowerColor", "0x808080FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_teamUpperColor, "cg_teamUpperColor", "0x808080FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_teammatePOIs, "cg_teammatePOIs", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_teammatePOIsMaxWidth, "cg_teammatePOIsMaxWidth", "24.0", ' + retail_flags + ', "16.0", "32.0" },',
+		'{ &cg_teammatePOIsMinWidth, "cg_teammatePOIsMinWidth", "4.0", ' + retail_flags + ', "2.0", "16.0" },',
+		'{ &cg_useItemMessage, "cg_useItemMessage", "1", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_useItemWarning, "cg_useItemWarning", "1", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_viewsize, "cg_viewsize", "100", ' + retail_flags + ', "30", "100" },',
+		'{ &cg_vignette, "cg_vignette", "0", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_voiceChatIndicator, "cg_voiceChatIndicator", "1", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_waterWarp, "cg_waterWarp", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_zoomFov, "cg_zoomfov", "30", ' + retail_flags + ', "10", "130" },',
+		'{ &cg_zoomOutOnDeath, "cg_zoomOutOnDeath", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_zoomScaling, "cg_zoomScaling", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_zoomSensitivity, "cg_zoomSensitivity", "1", ' + retail_flags + ', "0", "10" },',
+		'{ &cg_zoomToggle, "cg_zoomToggle", "0", ' + retail_flags + ', "0", "1" },',
 	):
 		assert expected in cvar_table
 	assert 'if ( ( cv->cvarFlags & CVAR_VM_CREATED ) && cv->minimumString && cv->maximumString ) {' in block
@@ -3733,6 +3815,315 @@ def test_register_cvars_publishes_retail_version_and_vote_reset() -> None:
 	):
 		assert expected in retail_cvar_table
 	assert '{"cg_forceDrawCrosshair"}' in retail_force_cvar_table
+
+
+def test_cgame_damage_body_icon_and_view_cvars_match_retail_wiring() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	players_source = CG_PLAYERS.read_text(encoding="utf-8")
+	view_source = CG_VIEW.read_text(encoding="utf-8")
+	hlil_source = CGAME_HLIL.read_text(encoding="utf-8")
+	cvar_table = main_source[
+		main_source.index("static cvarTable_t cvarTable[]"):
+		main_source.index("static int  cvarTableSize")
+	]
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+	retail_protected_cloud_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD"
+	register_block = _block_from_marker(main_source, "void CG_RegisterCvars")
+	update_block = _block_from_marker(main_source, "void CG_UpdateCvars")
+	color_style_block = _block_from_marker(main_source, "static damagePlumColorStyle_t CG_ParseDamagePlumColorStyleValue")
+	dead_body_block = _block_from_marker(main_source, "static void CG_UpdateDeadBodyPalette")
+	armor_gate_block = _block_from_marker(draw_source, "qboolean CG_ShouldDrawTieredArmor")
+	model_block = _block_from_marker(draw_source, "void CG_Draw3DModel")
+	head_block = _block_from_marker(draw_source, "void CG_DrawHead")
+	draw2d_block = _block_from_marker(draw_source, "static void CG_Draw2D( void )")
+	filter_block = _block_from_marker(view_source, "static void CG_FilterViewAngles")
+	view_values_block = _block_from_marker(view_source, "static int CG_CalcViewValues")
+	dead_tint_block = _block_from_marker(players_source, "static qboolean CG_ShouldTintDeadBody")
+	apply_dead_body_block = _block_from_marker(players_source, "static void CG_ApplyDeadBodyTint")
+	client_info_block = _block_from_marker(players_source, "void CG_NewClientInfo")
+
+	for expected in (
+		'{ &cg_damagePlum, "cg_damagePlum", "g mg sg gl rl lg rg pg bfg gh cg ng pl hmg", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_damagePlumColorStyle, "cg_damagePlumColorStyle", "1", ' + retail_flags + ', "1", "3" },',
+		'{ &cg_deadBodyColor, "cg_deadBodyColor", "0x101010FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_deadBodyDarken, "cg_deadBodyDarken", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_deferPlayers, "cg_deferPlayers", "0", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_draw2D, "cg_draw2D", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_draw3dIcons, "cg_draw3dIcons", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawDeadFriendTime, "cg_drawDeadFriendTime", "3000.0", ' + retail_flags + ', "0.0", "5000.0" },',
+		'{ &cg_drawTieredArmorAvailability, "cg_drawTieredArmorAvailability", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_filter_angles, "cg_filter_angles", "0", 0 },',
+	):
+		assert expected in cvar_table
+
+	assert "CG_UpdateDamagePlumSettings();" in register_block
+	assert "CG_UpdateDamagePlumSettings();" in update_block
+	assert "case DAMAGE_PLUM_COLOR_STYLE_DAMAGE:" in color_style_block
+	assert "case DAMAGE_PLUM_COLOR_STYLE_WEAPON:" in color_style_block
+	assert "return DAMAGE_PLUM_COLOR_STYLE_MONOCHROME;" in color_style_block
+	assert "static const vec4_t cg_defaultDeadBodyColor = { 16.0f / 255.0f, 16.0f / 255.0f, 16.0f / 255.0f, 1.0f };" in main_source
+	assert "cg.deadBodyDarken = (qboolean)( cg_deadBodyDarken.integer != 0 );" in dead_body_block
+	assert "CG_ParseDeadBodyColor( cg_deadBodyColor.string, cg.deadBodyColor )" in dead_body_block
+	assert "Vector4Copy( cg_defaultDeadBodyColor, cg.deadBodyColor );" in dead_body_block
+	assert "deadBodyDarkenModificationCount = cg_deadBodyDarken.modificationCount;" in register_block
+	assert "deadBodyColorModificationCount = cg_deadBodyColor.modificationCount;" in register_block
+	assert "refreshDeadBodyPalette = qtrue;" in update_block
+	assert "if ( !cg.deadBodyDarken ) {" in dead_tint_block
+	assert "CG_SetScaledShaderRGBA( re->shaderRGBA, cg.deadBodyColor, colorScale );" in apply_dead_body_block
+	assert "forceDefer || (cg_deferPlayers.integer && !cg_buildScript.integer && !cg.loading )" in client_info_block
+	assert "if ( cg_draw2D.integer == 0 || cg_paused.integer ) {" in draw2d_block
+	assert "if ( !cg_draw3dIcons.integer || !cg_drawIcons.integer ) {" in model_block
+	assert "if ( cg_draw3dIcons.integer ) {" in head_block
+	assert "return ( qboolean )( cg_drawTieredArmorAvailability.integer != 0 );" in armor_gate_block
+	assert "if ( sampleLimit < 0 ) {" in filter_block
+	assert 'trap_Cvar_Set( "cg_filter_angles", "0" );' in filter_block
+	assert "if ( sampleLimit > CG_VIEW_FILTER_MAX_CVAR_SAMPLES ) {" in filter_block
+	assert "CG_ResetViewAngleFilter( angles );" in filter_block
+	assert "if ( cg_filter_angles.integer != 0 ) {" in view_values_block
+	assert "CG_FilterViewAngles( cg.refdefViewAngles );" in view_values_block
+	assert 'char const data_1006ba3c[0x16] = "cg_drawDeadFriendTime", 0' in hlil_source
+	assert 'char const (* data_10077094)[0x16] = data_1006ba3c {"cg_drawDeadFriendTime"}' in hlil_source
+	assert "cg_drawDeadFriendTime" not in draw_source
+	assert "cg_drawDeadFriendTime" not in players_source
+	assert "cg_drawDeadFriendTime" not in view_source
+
+
+def test_cgame_draw_status_pregame_and_race_cvars_match_retail_wiring() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	cvar_table = main_source[
+		main_source.index("static cvarTable_t cvarTable[]"):
+		main_source.index("static int  cvarTableSize")
+	]
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+	retail_cloud_flags = "CVAR_VM_CREATED | CVAR_CLOUD"
+	warmup_block = _block_from_marker(draw_source, "static void CG_DrawWarmupWaitingStatus")
+	pregame_block = _block_from_marker(newdraw_source, "static qboolean CG_DrawPregameCoach")
+	race_status_block = _block_from_marker(newdraw_source, "static qboolean CG_RaceBuildStatusString")
+	draw2d_block = _block_from_marker(draw_source, "static void CG_Draw2D( void )")
+	armor_icon_block = _block_from_marker(newdraw_source, "static void CG_DrawPlayerArmorIcon")
+	ownerdraw_block = _block_from_marker(newdraw_source, "void CG_OwnerDraw(")
+
+	for expected in (
+		'{ &cg_drawPregameMessages, "cg_drawPregameMessages", "1", ' + retail_cloud_flags + ', "0", "1" },',
+		'{ &cg_drawCheckpointRemaining, "cg_drawCheckpointRemaining", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawStatus, "cg_drawStatus", "1", ' + retail_flags + ', "0", "1" },',
+	):
+		assert expected in cvar_table
+
+	assert "if ( !cg_drawPregameMessages.integer ) {" in warmup_block
+	assert "if (!cg_drawPregameMessages.integer || !cg.snap) {" in pregame_block
+	assert "} else if ( cg_drawCheckpointRemaining.integer && progress &&" in race_status_block
+	assert "Com_sprintf( buffer, bufferSize, \"Lap %i  %i CPs left\", lap, remaining );" in race_status_block
+	assert "if ( menuHudActive && cg_drawStatus.integer && ( spectator || canShowStatus ) ) {" in draw2d_block
+	assert "if ( cg_drawStatus.integer == 0 ) {" in armor_icon_block
+	assert "if ( cg_drawStatus.integer == 0 ) {" in ownerdraw_block
+
+
+def test_cgame_enemy_override_error_decay_and_fov_cvars_match_retail_wiring() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	players_source = CG_PLAYERS.read_text(encoding="utf-8")
+	predict_source = CG_PREDICT.read_text(encoding="utf-8")
+	view_source = CG_VIEW.read_text(encoding="utf-8")
+	weapons_source = CG_WEAPONS.read_text(encoding="utf-8")
+	cvar_table = main_source[
+		main_source.index("static cvarTable_t cvarTable[]"):
+		main_source.index("static int  cvarTableSize")
+	]
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+	retail_cloud_flags = "CVAR_VM_CREATED | CVAR_CLOUD"
+	retail_protected_cloud_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD"
+	register_block = _block_from_marker(main_source, "void CG_RegisterCvars")
+	update_block = _block_from_marker(main_source, "void CG_UpdateCvars")
+	model_override_block = _block_from_marker(players_source, "static void CG_ApplyClientModelOverrides")
+	color_override_block = _block_from_marker(players_source, "static void CG_ApplyClientColorOverrides")
+	predict_block = _block_from_marker(predict_source, "void CG_PredictPlayerState")
+	trace_block = _block_from_marker(view_source, "static float CG_CalcSmartCameraTraceRange")
+	fov_block = _block_from_marker(view_source, "static int CG_CalcFov")
+	view_values_block = _block_from_marker(view_source, "static int CG_CalcViewValues")
+	weapon_fov_block = _block_from_marker(weapons_source, "static float CG_GetViewWeaponFovOffset")
+
+	for expected in (
+		'{ &cg_enemyHeadColor, "cg_enemyHeadColor", "0x2a8000FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_enemyLowerColor, "cg_enemyLowerColor", "0x2a8000FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_enemyUpperColor, "cg_enemyUpperColor", "0x2a8000FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_errorDecay, "cg_errordecay", "100", ' + retail_cloud_flags + ', "0", "100" },',
+		'{ &cg_forceEnemyModel, "cg_forceEnemyModel", "", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_forceEnemySkin, "cg_forceEnemySkin", "", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_fov, "cg_fov", "100", ' + retail_flags + ', "10", "130" },',
+	):
+		assert expected in cvar_table
+
+	for expected in (
+		"forceEnemyModelModificationCount = cg_forceEnemyModel.modificationCount;",
+		"forceEnemySkinModificationCount = cg_forceEnemySkin.modificationCount;",
+		"enemyHeadColorModificationCount = cg_enemyHeadColor.modificationCount;",
+		"enemyUpperColorModificationCount = cg_enemyUpperColor.modificationCount;",
+		"enemyLowerColorModificationCount = cg_enemyLowerColor.modificationCount;",
+	):
+		assert expected in register_block
+		assert expected in update_block
+
+	assert "( cg_forceEnemyModel.string[0] ? cg_forceEnemyModel.string : cg_enemyModel.string );" in model_override_block
+	assert "skinValue = useTeam ? cg_forceTeamSkin.string : cg_forceEnemySkin.string;" in model_override_block
+	assert "value = useTeam ? cg_teamHeadColor.string : cg_enemyHeadColor.string;" in color_override_block
+	assert "value = useTeam ? cg_teamUpperColor.string : cg_enemyUpperColor.string;" in color_override_block
+	assert "value = useTeam ? cg_teamLowerColor.string : cg_enemyLowerColor.string;" in color_override_block
+	assert "refreshClients = qtrue;" in update_block
+
+	assert "if ( cg_errorDecay.integer ) {" in predict_block
+	assert "f = ( cg_errorDecay.value - t ) / cg_errorDecay.value;" in predict_block
+	assert "if ( cg_errorDecay.value > 0 ) {" in view_values_block
+	assert "f = ( cg_errorDecay.value - t ) / cg_errorDecay.value;" in view_values_block
+	assert "x = 640.0f / tan( cg_fov.value / 360.0f * M_PI );" in trace_block
+	assert "fov_x = cg_fov.value;" in fov_block
+	assert "if ( fov_x < 1 ) {" in fov_block
+	assert "} else if ( fov_x > 130 ) {" in fov_block
+	assert "if ( cg_fov.integer > 90 ) {" in weapon_fov_block
+	assert "return -0.2f * ( cg_fov.integer - 90 );" in weapon_fov_block
+
+
+def test_cgame_team_override_and_poi_cvars_match_retail_wiring() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	players_source = CG_PLAYERS.read_text(encoding="utf-8")
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	ents_source = CG_ENTS.read_text(encoding="utf-8")
+	cvar_table = main_source[
+		main_source.index("static cvarTable_t cvarTable[]"):
+		main_source.index("static int  cvarTableSize")
+	]
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+	retail_protected_cloud_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_CLOUD"
+	register_block = _block_from_marker(main_source, "void CG_RegisterCvars")
+	update_block = _block_from_marker(main_source, "void CG_UpdateCvars")
+	model_override_block = _block_from_marker(players_source, "static void CG_ApplyClientModelOverrides")
+	color_override_block = _block_from_marker(players_source, "static void CG_ApplyClientColorOverrides")
+	team_marker_block = _block_from_marker(players_source, "static qboolean CG_ShouldDrawTeamPlayerMarker")
+	teammate_gate_block = _block_from_marker(draw_source, "static qboolean CG_ShouldDrawTeammatePOIs")
+	teammate_label_block = _block_from_marker(draw_source, "static void CG_BuildTeammatePOILabel")
+	teammate_draw_block = _block_from_marker(draw_source, "static void CG_DrawTeammatePOIs")
+	marker_mode_block = _block_from_marker(draw_source, "qboolean CG_ShouldDrawPOIMarkerMode")
+	item_poi_block = _block_from_marker(ents_source, "static void CG_QueueItemPOIMarker")
+
+	for expected in (
+		'{ &cg_forceTeamModel, "cg_forceTeamModel", "", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_forceTeamSkin, "cg_forceTeamSkin", "", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_teamHeadColor, "cg_teamHeadColor", "0x808080FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_teamLowerColor, "cg_teamLowerColor", "0x808080FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_teamUpperColor, "cg_teamUpperColor", "0x808080FF", ' + retail_protected_cloud_flags + ' },',
+		'{ &cg_teammatePOIs, "cg_teammatePOIs", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_teammatePOIsMaxWidth, "cg_teammatePOIsMaxWidth", "24.0", ' + retail_flags + ', "16.0", "32.0" },',
+		'{ &cg_teammatePOIsMinWidth, "cg_teammatePOIsMinWidth", "4.0", ' + retail_flags + ', "2.0", "16.0" },',
+		'{ &cg_flagPOIs, "cg_flagPOIs", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_powerupPOIs, "cg_powerupPOIs", "2", ' + retail_flags + ', "0", "2" },',
+	):
+		assert expected in cvar_table
+
+	for expected in (
+		"forceTeamModelModificationCount = cg_forceTeamModel.modificationCount;",
+		"forceTeamSkinModificationCount = cg_forceTeamSkin.modificationCount;",
+		"teamHeadColorModificationCount = cg_teamHeadColor.modificationCount;",
+		"teamUpperColorModificationCount = cg_teamUpperColor.modificationCount;",
+		"teamLowerColorModificationCount = cg_teamLowerColor.modificationCount;",
+	):
+		assert expected in register_block
+		assert expected in update_block
+
+	assert "( cg_forceTeamModel.string[0] ? cg_forceTeamModel.string : cg_teamModel.string ) :" in model_override_block
+	assert "skinValue = useTeam ? cg_forceTeamSkin.string : cg_forceEnemySkin.string;" in model_override_block
+	assert "const char *colorStr = useTeam ? cg_teamColors.string : cg_enemyColors.string;" in color_override_block
+	assert "value = useTeam ? cg_teamHeadColor.string : cg_enemyHeadColor.string;" in color_override_block
+	assert "value = useTeam ? cg_teamUpperColor.string : cg_enemyUpperColor.string;" in color_override_block
+	assert "value = useTeam ? cg_teamLowerColor.string : cg_enemyLowerColor.string;" in color_override_block
+	assert "refreshClients = qtrue;" in update_block
+
+	assert "cg_teammateNames.integer == 0 && cg_teammatePOIs.integer == 0" in teammate_gate_block
+	assert "maxWidth = cg_teammatePOIsMaxWidth.value * SMALLCHAR_WIDTH;" in teammate_label_block
+	assert "minWidth = cg_teammatePOIsMinWidth.value * SMALLCHAR_WIDTH;" in teammate_draw_block
+	assert "if ( !cg_teammatePOIs.integer || cg_teammateNames.integer ) {" in team_marker_block
+	assert "if ( !CG_ShouldDrawPOIMarkerMode( cg_powerupPOIs.integer, origin ) ) {" in item_poi_block
+	assert "if ( !cg_flagPOIs.integer ) {" in item_poi_block
+	assert "if ( mode <= 0 ) {" in marker_mode_block
+	assert "if ( mode >= 2 ) {" in marker_mode_block
+	assert "CG_Trace( &trace, cg.refdef.vieworg, vec3_origin, vec3_origin, origin, skipNum, MASK_OPAQUE );" in marker_mode_block
+
+
+def test_cgame_bob_message_timer_and_poi_cvars_match_retail_wiring() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
+	ents_source = CG_ENTS.read_text(encoding="utf-8")
+	event_source = CG_EVENT.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	players_source = CG_PLAYERS.read_text(encoding="utf-8")
+	view_source = CG_VIEW.read_text(encoding="utf-8")
+	cvar_table = main_source[
+		main_source.index("static cvarTable_t cvarTable[]"):
+		main_source.index("static int  cvarTableSize")
+	]
+	retail_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED | CVAR_CLOUD"
+	retail_no_cloud_flags = "CVAR_ARCHIVE | CVAR_PROTECTED | CVAR_VM_CREATED"
+	register_block = _block_from_marker(main_source, "void CG_RegisterCvars")
+	update_block = _block_from_marker(main_source, "void CG_UpdateCvars")
+	view_block = _block_from_marker(view_source, "static void CG_OffsetFirstPersonView")
+	ammo_warning_block = _block_from_marker(draw_source, "static void CG_DrawAmmoWarning")
+	obituary_draw_block = _block_from_marker(draw_source, "static float CG_DrawObituaries")
+	ownerdraw_obituary_block = _block_from_marker(newdraw_source, "static void CG_DrawPlayerObituary")
+	player_sprites_block = _block_from_marker(players_source, "static void CG_PlayerSprites")
+	item_timer_block = _block_from_marker(ents_source, "static void CG_DrawItemRespawnTimer")
+	level_timer_block = _block_from_marker(newdraw_source, "static qboolean CG_BuildLevelTimerMilliseconds")
+	poi_width_block = _block_from_marker(draw_source, "float CG_POIMarkerSizeForOrigin")
+	obituary_limit_block = _block_from_marker(event_source, "static int CG_ObituaryFeedLimit")
+
+	for expected in (
+		'{ &cg_bob, "cg_bob", "0.25", ' + retail_flags + ', "0.0", "1.0" },',
+		'{ &cg_drawAmmoWarning, "cg_drawAmmoWarning", "2", ' + retail_flags + ', "0", "2" },',
+		'{ &cg_drawFragMessages, "cg_drawFragMessages", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_drawHitFriendTime, "cg_drawHitFriendTime", "100", ' + retail_flags + ', "0", "5000" },',
+		'{ &cg_itemTimers, "cg_itemTimers", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_kickScale, "cg_kickScale", "0.25", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_levelTimerDirection, "cg_levelTimerDirection", "1", ' + retail_flags + ', "0", "1" },',
+		'{ &cg_obituaryRowSize, "cg_obituaryRowSize", "5", ' + retail_no_cloud_flags + ', "0", "5" },',
+		'{ &cg_poiMinWidth, "cg_poiMinWidth", "16.0", ' + retail_flags + ', "2.0", "16.0" },',
+		'{ &cg_poiMaxWidth, "cg_poiMaxWidth", "32.0", ' + retail_flags + ', "16.0", "32.0" },',
+	):
+		assert expected in cvar_table
+
+	for expected in (
+		"cg.kickScale = cg_kickScale.value;",
+		"cg.bobScale = cg_bob.value;",
+	):
+		assert expected in register_block
+		assert expected in update_block
+
+	for expected in (
+		"kickScale = cg.kickScale;",
+		"bobScale = cg.bobScale;",
+		"angles[PITCH] += ratio * cg.v_dmg_pitch * kickScale;",
+		"angles[ROLL] += ratio * cg.v_dmg_roll * kickScale;",
+		"angles[PITCH] += delta * cg_runpitch.value * bobScale;",
+		"angles[ROLL] -= delta * cg_runroll.value * bobScale;",
+		"delta = cg.bobfracsin * cg_bobpitch.value * speed * bobScale;",
+		"bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value * bobScale;",
+	):
+		assert expected in view_block
+
+	assert "if ( cg_drawAmmoWarning.integer == 0 ) {" in ammo_warning_block
+	assert "if ( cg_drawAmmoWarning.integer == 1 ) {" in ammo_warning_block
+	assert 's = "OUT OF AMMO";' in ammo_warning_block
+	assert 's = "LOW AMMO WARNING";' in ammo_warning_block
+	assert "if ( cg_drawFragMessages.integer == 0 ) {" in obituary_draw_block
+	assert "if ( !cg_drawFragMessages.integer ) {" in ownerdraw_obituary_block
+	assert "CG_PlayerRecentlyHit( cent, cg_drawHitFriendTime.integer )" in player_sprites_block
+	assert "if ( !item || !origin || !cg_itemTimers.integer ) {" in item_timer_block
+	assert "else if ( cg_levelTimerDirection.integer != 1 ) {" in level_timer_block
+	assert "limit = cg_obituaryRowSize.integer;" in obituary_limit_block
+	assert "if ( limit < 1 ) {" in obituary_limit_block
+	assert "if ( limit > MAX_OBITUARIES ) {" in obituary_limit_block
+	assert "maxWidth = ( cg_poiMaxWidth.value > 0.0f ) ? cg_poiMaxWidth.value : 32.0f;" in poi_width_block
+	assert "minWidth = ( cg_poiMinWidth.value > 0.0f ) ? cg_poiMinWidth.value : 16.0f;" in poi_width_block
+	assert "if ( minWidth > maxWidth ) {" in poi_width_block
 
 
 def test_cgame_weapon_settings_match_retail_cvar_table_and_style_wiring() -> None:
@@ -6098,17 +6489,73 @@ def test_cgame_view_keeps_retail_aspect_ratio_fallback_and_horplus_helpers() -> 
 
 def test_cgame_view_keeps_retail_fov_order_for_horplus_and_zoom_trace() -> None:
 	view_source = CG_VIEW.read_text(encoding="utf-8")
+	draw_source = CG_DRAW.read_text(encoding="utf-8")
 	fov_block = _block_from_marker(view_source, "static int CG_CalcFov")
+	zoom_down_block = _block_from_marker(view_source, "void CG_ZoomDown_f")
+	zoom_up_block = _block_from_marker(view_source, "void CG_ZoomUp_f")
+	draw_active_block = _block_from_marker(draw_source, "void CG_DrawActive")
 	trace_block = _block_from_marker(view_source, "static float CG_CalcSmartCameraTraceRange")
 
+	assert "if ( cg.zoomToggle ) {" in zoom_down_block
+	assert "CG_SetZoomState( cg.zoomed ? qfalse : qtrue );" in zoom_down_block
+	assert "if ( cg.zoomToggle ) {" in zoom_up_block
+	assert "return;" in zoom_up_block
+	assert "zoomFov = cg_zoomFov.value;" in fov_block
+	assert "zoomScaling = (qboolean)( cg_zoomScaling.integer != 0 );" in fov_block
 	assert "fov_x = CG_CalcHorPlusFov( fov_x );" in fov_block
 	assert "x = cg.refdef.width / tan( fov_x / 360 * M_PI );" in fov_block
 	assert "fov_y = atan2( cg.refdef.height, x );" in fov_block
 	assert "fov_y = fov_y * 360 / M_PI;" in fov_block
+	assert "if ( cg_waterWarp.integer ) {" in fov_block
 	assert "fov_x += v;" in fov_block
 	assert "fov_y -= v;" in fov_block
+	assert "CG_CalcZoomSensitivityScale( cg.refdef.fov_y, baseFovX ) * cg_zoomSensitivity.value" in fov_block
+	assert "( ( pmType == PM_DEAD || pmType == PM_FREEZE ) && cg.zoomOutOnDeath )" in draw_active_block
 	assert "fovY = atan2( 480.0f, x ) * 360.0f / M_PI;" in trace_block
 	assert "fovX = CG_CalcAspectAdjustedFovFromVertical( fovY );" in trace_block
+
+
+def test_cgame_use_item_and_voice_indicator_cvars_keep_retail_runtime_wiring() -> None:
+	event_source = CG_EVENT.read_text(encoding="utf-8")
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	scale_block = _block_from_marker(event_source, "static float CG_UseItemCenterPrintScale")
+	use_item_block = _block_from_marker(event_source, "static void CG_UseItem")
+	voice_block = _block_from_marker(main_source, "qboolean CG_ShouldDisplayVoiceIndicator")
+
+	assert "if ( mode == 2 ) {" in scale_block
+	assert "return 0.25f;" in scale_block
+	assert "return 0.5f;" in scale_block
+	assert "if ( cg_useItemWarning.integer ) {" in use_item_block
+	assert 'CG_CenterPrint( "No item to use", SCREEN_HEIGHT * 0.30f,' in use_item_block
+	assert "CG_UseItemCenterPrintScale( cg_useItemWarning.integer )" in use_item_block
+	assert "} else if ( cg_useItemMessage.integer ) {" in use_item_block
+	assert 'CG_CenterPrint( va( "Use %s", item->pickup_name ), SCREEN_HEIGHT * 0.30f,' in use_item_block
+	assert "CG_UseItemCenterPrintScale( cg_useItemMessage.integer )" in use_item_block
+	assert "cg.voiceChatIndicatorEnabled = (qboolean)( cg_voiceChatIndicator.integer != 0 );" in main_source
+	assert "if ( !cg.voiceChatIndicatorEnabled ) {" in voice_block
+	assert "if ( !cg_playVoiceChats.integer && !cg_showVoiceText.integer ) {" in voice_block
+	assert "return qtrue;" in voice_block
+
+
+def test_cgame_team_chat_cvars_keep_retail_runtime_wiring() -> None:
+	main_source = CG_MAIN.read_text(encoding="utf-8")
+	servercmds_source = CG_SERVERCMDS.read_text(encoding="utf-8")
+	newdraw_source = CG_NEWDRAW.read_text(encoding="utf-8")
+	add_team_chat_block = _block_from_marker(servercmds_source, "static void CG_AddToTeamChat")
+	voice_chat_local_block = _block_from_marker(servercmds_source, "void CG_VoiceChatLocal")
+	parse_chat_block = _block_from_marker(servercmds_source, "static void CG_ParseChat")
+	push_print_block = _block_from_marker(main_source, "void CG_PushPrintString")
+	new_chat_block = _block_from_marker(newdraw_source, "static void CG_DrawNewChatArea")
+
+	assert "if ( cg_teamChatBeep.integer && cgs.media.talkSound ) {" in add_team_chat_block
+	assert "trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );" in add_team_chat_block
+	assert "if ( mode == SAY_TEAM || !cg_teamChatsOnly.integer ) {" in voice_chat_local_block
+	assert "if ( cg_teamChatsOnly.integer ) {" in parse_chat_block
+	assert "return;" in parse_chat_block
+	assert "if ( chatHeight <= 0 || cg_teamChatTime.integer <= 0 ) {" in push_print_block
+	assert "if ( !rect || cg_teamChatTime.integer <= 0 ) {" in new_chat_block
+	assert "if (elapsed >= cg_teamChatTime.integer || !cgs.teamChatMsgs[index][0]) {" in new_chat_block
+	assert "lineColor[3] *= 1.0f - (float)elapsed / (float)cg_teamChatTime.integer;" in new_chat_block
 
 
 def test_cgame_event_reconstruction_keeps_retail_overtime_gameover_and_race_handlers() -> None:

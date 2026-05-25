@@ -682,6 +682,7 @@ typedef struct image_s image_t;
 
 void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font );
 image_t *R_CreateImage( const char *name, const byte *pic, int width, int height, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode );
+image_t *R_UpdateImage( const char *name, const byte *pic, int width, int height, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode );
 image_t *R_LoadImageFromMemory( const char *name, const byte *buffer, int bufferLength, qboolean mipmap, qboolean allowPicmip, int glWrapClampMode );
 qhandle_t RE_RegisterShaderFromImage( const char *name, int lightmapIndex, image_t *image, qboolean mipRawImage );
 
@@ -4800,7 +4801,7 @@ static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_ite
 
 	appId = QL_Steamworks_GetAppID();
 	if ( appId != 0u && event->appId != appId ) {
-		Com_sprintf( detail, sizeof( detail ), "OnItemInstalled skip, invalid app id %d", (int)event->appId );
+		Com_sprintf( detail, sizeof( detail ), "OnDownloadItemResult skip, invalid app id %d", (int)event->appId );
 		CL_LogWorkshopLifecycle( "callback-item-installed", detail );
 		return;
 	}
@@ -5028,7 +5029,7 @@ static void CL_Steam_ProcessStatsReportPackets( void ) {
 SteamClient_Frame
 =============
 */
-static void SteamClient_Frame( void ) {
+void SteamClient_Frame( void ) {
 	if ( !CL_SteamServicesEnabled() || !QL_Steamworks_Init() ) {
 		return;
 	}
@@ -7362,9 +7363,20 @@ void CL_Frame ( int msec ) {
 			msec = 1;
 		}
 	}
+
+	if ( Sys_MonkeyShouldBeSpanked() && cls.framecount == 0 ) {
+		if ( random() >= 0.1f ) {
+			CL_ChangeReliableCommand();
+		}
+	}
 	
 	// save the msec before checking pause
 	cls.realFrametime = msec;
+
+	// cl_freezeDemo preserves graph/input timing while holding demo simulation time
+	if ( clc.demoplaying && cl_freezeDemo->integer ) {
+		msec = 0;
+	}
 
 	// decide the simulation time
 	cls.frametime = msec;
@@ -7382,13 +7394,12 @@ void CL_Frame ( int msec ) {
 	// drop the connection
 	CL_CheckTimeout();
 
+	CL_Workshop_Frame();
+
 	// send intentions now
 	CL_SendCmd();
 
-	SteamClient_Frame();
 	CL_SteamBrowser_Frame();
-	CL_Workshop_Frame();
-	CL_WebHost_Frame();
 
 	// resend a connection request if necessary
 	CL_CheckForResend();
@@ -7557,7 +7568,10 @@ qhandle_t CL_RegisterShaderFromRGBA( const char *name, const byte *pic, int widt
 		return 0;
 	}
 
-	image = R_CreateImage( name, pic, width, height, mipRawImage, mipRawImage, mipRawImage ? GL_REPEAT : GL_CLAMP );
+	image = R_UpdateImage( name, pic, width, height, mipRawImage, mipRawImage, mipRawImage ? GL_REPEAT : GL_CLAMP );
+	if ( !image ) {
+		image = R_CreateImage( name, pic, width, height, mipRawImage, mipRawImage, mipRawImage ? GL_REPEAT : GL_CLAMP );
+	}
 	if ( !image ) {
 		return 0;
 	}

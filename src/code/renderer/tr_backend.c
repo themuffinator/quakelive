@@ -2502,6 +2502,30 @@ static void SetViewportAndScissor( void ) {
 }
 
 /*
+=============
+RB_GetFastSkyClearColor
+=============
+*/
+static void RB_GetFastSkyClearColor( vec3_t color ) {
+	const char		*string;
+	char			*end;
+	unsigned long	rgb;
+
+	rgb = 0;
+	string = r_fastSkyColor ? r_fastSkyColor->string : NULL;
+	if ( string && string[0] ) {
+		rgb = strtoul( string, &end, 0 );
+		if ( end == string ) {
+			rgb = (unsigned long)r_fastSkyColor->integer;
+		}
+	}
+
+	color[0] = ( ( rgb >> 16 ) & 0xff ) / 255.0f;
+	color[1] = ( ( rgb >> 8 ) & 0xff ) / 255.0f;
+	color[2] = ( rgb & 0xff ) / 255.0f;
+}
+
+/*
 =================
 RB_BeginDrawingView
 
@@ -2511,6 +2535,7 @@ to actually render the visible surfaces for this view
 */
 void RB_BeginDrawingView (void) {
 	int clearBits = 0;
+	vec3_t fastSkyColor;
 
 	// sync with gl if needed
 	if ( r_finish->integer == 1 && !glState.finishCalled ) {
@@ -2542,11 +2567,8 @@ void RB_BeginDrawingView (void) {
 	if ( r_fastsky->integer && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) )
 	{
 		clearBits |= GL_COLOR_BUFFER_BIT;	// FIXME: only if sky shaders have been used
-#ifdef _DEBUG
-		qglClearColor( 0.8f, 0.7f, 0.4f, 1.0f );	// FIXME: get color of sky
-#else
-		qglClearColor( 0.0f, 0.0f, 0.0f, 1.0f );	// FIXME: get color of sky
-#endif
+		RB_GetFastSkyClearColor( fastSkyColor );
+		qglClearColor( fastSkyColor[0], fastSkyColor[1], fastSkyColor[2], 1.0f );
 	}
 	qglClear( clearBits );
 
@@ -2649,7 +2671,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		// a "entityMergable" shader is a shader that can have surfaces from seperate
 		// entities merged into a single batch, like smoke and blood puff sprites
 		if (shader != oldShader || fogNum != oldFogNum || dlighted != oldDlighted 
-			|| ( entityNum != oldEntityNum && !shader->entityMergable ) ) {
+			|| ( entityNum != oldEntityNum && !r_forceMergeEntities->integer && !shader->entityMergable ) ) {
 			if (oldShader != NULL) {
 #ifdef __MACOS__	// crutch up the mac's limited buffer queue size
 				int		t;
