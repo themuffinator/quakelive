@@ -4795,6 +4795,9 @@ static void CL_Steam_Workshop_OnItemInstalled( void *context, const ql_steam_ite
 
 	appId = QL_Steamworks_GetAppID();
 	if ( appId != 0u && event->appId != appId ) {
+		Com_sprintf( detail, sizeof( detail ), "OnItemInstalled skip, invalid app id %d", (int)event->appId );
+		CL_LogWorkshopLifecycle( "callback-item-installed", detail );
+
 		Com_sprintf( detail, sizeof( detail ), "OnDownloadItemResult skip, invalid app id %d", (int)event->appId );
 		CL_LogWorkshopLifecycle( "callback-item-installed", detail );
 		return;

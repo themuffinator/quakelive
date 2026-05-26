@@ -2017,7 +2017,7 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 	cl_webHost.browserActive = qtrue;
 	cl_webHost.refreshStopped = qfalse;
 	cl_webHost.focused = qtrue;
-	Cvar_Set( "web_browserActive", cl_webHost.surfacePresented ? "1" : "0" );
+	Cvar_Set( "web_browserActive", "1" );
 
 #if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
 	if ( cl_webHost.liveAwesomium ) {
@@ -4355,33 +4355,17 @@ void CL_RefreshOnlineServicesBridgeState( void ) {
 #else
 	const ql_platform_feature_descriptor *overlay = CL_GetOverlayServiceDescriptor();
 	qboolean overlayAvailable = CL_OverlayServiceAvailable();
-	qboolean browserAvailable = overlayAvailable || cl_webHost.liveAwesomium;
-	const char *browserProvider;
-	const char *browserPolicy;
+	qboolean browserAvailable = overlayAvailable || awesomiumAllowed;
 
 	cl_advertisementBridge.overlayCompiled = ( overlay && overlay->compiled );
 	cl_advertisementBridge.overlayAvailable = overlayAvailable;
 	cl_advertisementBridge.viewWidth = cls.glconfig.vidWidth;
 	cl_advertisementBridge.viewHeight = cls.glconfig.vidHeight;
 
-	if ( cl_webHost.liveAwesomium ) {
-		browserProvider = "Awesomium WebCore";
-		browserPolicy = "runtime-opt-in live";
-	} else if ( overlayAvailable ) {
-		browserProvider = overlayProvider;
-		browserPolicy = overlayPolicy;
-	} else if ( awesomiumAllowed ) {
-		browserProvider = "Awesomium WebCore";
-		browserPolicy = cl_webHost.loadFailed ? "runtime-opt-in failed" : "runtime-opt-in pending";
-	} else {
-		browserProvider = overlayProvider;
-		browserPolicy = overlayPolicy;
-	}
-
 	Cvar_Set( "ui_browserAwesomium", browserAvailable ? "1" : "0" );
 	Cvar_Set( "ui_browserAwesomiumPending", ( awesomiumAllowed && !cl_webHost.loadFailed ) ? "1" : "0" );
-	Cvar_Set( "ui_browserAwesomiumProvider", browserProvider );
-	Cvar_Set( "ui_browserAwesomiumPolicy", browserPolicy );
+	Cvar_Set( "ui_browserAwesomiumProvider", awesomiumAllowed ? "Awesomium WebCore" : overlayProvider );
+	Cvar_Set( "ui_browserAwesomiumPolicy", awesomiumAllowed ? "runtime-opt-in" : overlayPolicy );
 	Cvar_Set( "ui_browserAwesomiumParityScope", parityScope );
 	Cvar_Set( "ui_browserAwesomiumParityReason", parityReason );
 	Cvar_Set( "ui_advertisementBridgeProvider", advertProvider );
@@ -5078,7 +5062,8 @@ void CL_Web_ShowBrowser_f( void ) {
 	} else {
 		cl_webBrowserHash[0] = '\0';
 	}
-	if ( !QLWebHost_NavigateOrOpen( cl_webBrowserHash ) ) {
+	qboolean browserOpened = QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+	if ( !browserOpened ) {
 		CL_WebHost_MarkBrowserUnavailable();
 	}
 #endif
@@ -5106,7 +5091,8 @@ void CL_Web_ChangeHash_f( void ) {
 	const char *hash = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
 	CL_WebHost_NormalizeHash( hash, cl_webBrowserHash, sizeof( cl_webBrowserHash ) );
 	cl_webBrowserVisible = qtrue;
-	if ( !QLWebHost_NavigateOrOpen( cl_webBrowserHash ) ) {
+	qboolean hashOpened = QLWebHost_NavigateOrOpen( cl_webBrowserHash );
+	if ( !hashOpened ) {
 		CL_WebHost_MarkBrowserUnavailable();
 	}
 #endif
