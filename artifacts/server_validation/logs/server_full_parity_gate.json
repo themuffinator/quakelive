@@ -16,8 +16,8 @@
   "tranches": {
     "SV-G01": {
       "gap_id": "SV-G01",
-      "status": "fail",
-      "summary": "The Steam GameServer lifecycle/callback/auth lane is no longer fully pinned.",
+      "status": "pass",
+      "summary": "The Steam GameServer lifecycle, callback bundle, and auth-session owner remain source-backed and validated.",
       "details": {
         "plan_marks_closed": true,
         "bootstrap_owner_present": true,
@@ -101,13 +101,11 @@
       }
     }
   },
-  "overall_status": "fail",
-  "non_passing_gap_ids": [
-    "SV-G01"
-  ],
+  "overall_status": "pass",
+  "non_passing_gap_ids": [],
   "summary": {
-    "passing_count": 5,
+    "passing_count": 6,
     "blocked_count": 0,
-    "failing_count": 1
+    "failing_count": 0
   }
 }

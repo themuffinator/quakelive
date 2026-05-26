@@ -748,6 +748,15 @@ uint32_t QL_Steamworks_GetNumSubscribedItems( void ) {
 
 /*
 =============
+QL_Steamworks_HasUGCInterface
+=============
+*/
+qboolean QL_Steamworks_HasUGCInterface( void ) {
+	return qfalse;
+}
+
+/*
+=============
 QL_Steamworks_GetSubscribedItems
 =============
 */

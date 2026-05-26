@@ -2014,7 +2014,7 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 	CL_WebHost_RefreshBootstrapProperties();
 	Q_strncpyz( cl_webHost.currentUrl, url ? url : CL_WEB_DEFAULT_URL, sizeof( cl_webHost.currentUrl ) );
 	cl_webHost.browserVisible = qtrue;
-	cl_webHost.browserActive = qtrue;
+	cl_webHost.browserActive = qfalse;
 	cl_webHost.refreshStopped = qfalse;
 	cl_webHost.focused = qtrue;
 	Cvar_Set( "web_browserActive", "1" );
@@ -2024,6 +2024,7 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 		if ( !CL_Awesomium_OpenURL( cl_webHost.currentUrl ) ) {
 			Com_Printf( "Awesomium WebView failed to load %s: %s\n", cl_webHost.currentUrl, CL_Awesomium_LastError() );
 			QLLoadHandler_OnFailLoadingFrame( cl_webHost.currentUrl );
+			cl_webHost.browserActive = qfalse;
 			return qfalse;
 		}
 		cl_webHost.zoomPercent = Cvar_VariableIntegerValue( "web_zoom" );
@@ -2032,6 +2033,7 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 		QLLoadHandler_OnFinishLoadingFrame();
 		QLLoadHandler_OnDocumentReady();
 		QLWebView_RebuildSurfaceImage();
+		cl_webHost.browserActive = qtrue;
 		return qtrue;
 	}
 #endif
@@ -2043,6 +2045,7 @@ static qboolean QLWebHost_OpenURL( const char *url ) {
 	} else {
 		QLLoadHandler_OnFailLoadingFrame( cl_webHost.currentUrl );
 	}
+	cl_webHost.browserActive = qtrue;
 
 	return qtrue;
 }
@@ -5359,7 +5362,8 @@ void CL_WebHost_Frame( void ) {
 					return;
 				}
 			} else {
-				if ( !QLWebHost_OpenURL( CL_WEB_DEFAULT_URL ) ) {
+				QLWebHost_OpenURL( CL_WEB_DEFAULT_URL );
+				if ( !cl_webHost.browserActive ) {
 					CL_WebHost_MarkBrowserUnavailable();
 					return;
 				}

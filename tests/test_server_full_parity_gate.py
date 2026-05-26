@@ -156,7 +156,7 @@ def _build_server_full_parity_gate_report() -> dict[str, Any]:
 	sv_g01_ok = (
 		sv_g01_closed
 		and "void Com_InitSteamGameServer( void ) {" in common
-		and "QL_Steamworks_ServerInit( steamIp" in common
+		and "QL_Steamworks_ServerInitWithVersion( steamIp" in common
 		and "QL_Steamworks_ServerShutdown();" in sv_init
 		and "void SV_SteamServerInitCallbacks( void ) {" in sv_client
 		and "qboolean QL_Steamworks_RegisterServerCallbacks( const ql_steam_server_callback_bindings_t *bindings ) {" in platform_steamworks

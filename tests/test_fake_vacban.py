@@ -87,6 +87,10 @@ def test_fake_vacban_telemetry_payload(tmp_path: Path) -> None:
 	#include "src/code/server/server.h"
 	#include "src/code/qcommon/net_chan.c"
 
+	qboolean NET_ProtocolUsesNetchanClientQport( void ) {
+		return qtrue;
+	}
+
 	short ShortSwap( short l ) { return l; }
 
 	void Com_Printf( const char *fmt, ... ) {
