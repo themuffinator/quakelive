@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path,
-    [string]$PlatformToolset = 'v141',
+    [string]$PlatformToolset = 'v143',
     [string]$ProjectToolset = 'v141',
     [ValidateSet('retail', 'modern')]
     [string]$RuntimeProfile = 'modern',

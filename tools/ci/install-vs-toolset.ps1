@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('v100', 'v141')]
-    [string]$PlatformToolset = 'v141'
+    [ValidateSet('v100', 'v141', 'v143')]
+    [string]$PlatformToolset = 'v143'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,6 +29,7 @@ function Get-ToolsetComponentId {
     switch ($RequestedToolset) {
         'v100' { return 'Microsoft.VisualStudio.Component.VC.v100.x86.x64' }
         'v141' { return 'Microsoft.VisualStudio.Component.VC.v141.x86.x64' }
+        'v143' { return 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' }
     }
 
     throw "Unsupported PlatformToolset '$RequestedToolset'."

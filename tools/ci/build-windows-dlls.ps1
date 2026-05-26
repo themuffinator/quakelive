@@ -4,7 +4,7 @@ param(
     [string]$Solution = 'src/code/quakelive.sln',
     [string]$Configuration = 'Release',
     [string]$Platform = 'Win32',
-    [string]$PlatformToolset = 'v141',
+    [string]$PlatformToolset = 'v143',
     [string]$WindowsTargetPlatformVersion = ''
 )
 
@@ -121,6 +121,7 @@ function Get-DeveloperCommand {
 
     $requiredComponent = switch ($RequestedToolset) {
         'v141' { 'Microsoft.VisualStudio.Component.VC.v141.x86.x64' }
+        'v143' { 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' }
         default { 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' }
     }
 
@@ -180,10 +181,10 @@ if (-not $msbuild) {
     throw 'msbuild.exe was not found. Install Visual Studio Build Tools or ensure MSBuild is available.'
 }
 
-if (-not $WindowsTargetPlatformVersion -and $PlatformToolset -eq 'v141') {
+if (-not $WindowsTargetPlatformVersion -and $PlatformToolset -in @('v141', 'v143')) {
     $WindowsTargetPlatformVersion = Get-LatestWindowsSdkVersion
     if (-not $WindowsTargetPlatformVersion) {
-        throw 'Unable to locate an installed Windows 10/11 SDK for the v141 build.'
+        throw "Unable to locate an installed Windows 10/11 SDK for the $PlatformToolset build."
     }
 }
 

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('v100', 'v141')]
-    [string]$PlatformToolset = 'v141',
+    [ValidateSet('v100', 'v141', 'v143')]
+    [string]$PlatformToolset = 'v143',
     [switch]$RequireToolset,
     [switch]$RequireV100
 )
@@ -43,6 +43,13 @@ function Get-ToolsetSpec {
             return @{
                 ComponentId = 'Microsoft.VisualStudio.Component.VC.v141.x86.x64'
                 DisplayName = 'Visual Studio 2017 (v141)'
+                LegacyRoots = @()
+            }
+        }
+        'v143' {
+            return @{
+                ComponentId = 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+                DisplayName = 'Visual Studio 2022 (v143)'
                 LegacyRoots = @()
             }
         }

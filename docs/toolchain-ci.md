@@ -30,12 +30,11 @@ The native DLL validation path runs locally on Windows before it executes the sh
 
 ## Optional modern-host path
 
-Local contributors can validate the hosted-compatible `v141` lane on current
+Local contributors can validate the hosted-compatible `v143` lane on current
 Windows hosts:
 
-1. Install the Visual Studio 2017 `v141` component with `pwsh tools/ci/install-vs-toolset.ps1 -PlatformToolset v141`.
-2. Verify that the toolset and `dumpbin.exe` are available with `pwsh tools/ci/verify-vs-toolchain.ps1 -PlatformToolset v141 -RequireToolset`.
-3. Run `pwsh tools/ci/validate-windows-native.ps1 -PlatformToolset v141 -RuntimeProfile modern`, which validates the launcher payload plus modern CRT availability, builds the native targets with the hosted-compatible toolset, and checks the rebuilt gameplay DLL export manifest without claiming a strict retail runtime stage.
+1. Verify the Visual Studio 2022 `v143` component with `pwsh tools/ci/verify-vs-toolchain.ps1 -PlatformToolset v143 -RequireToolset`.
+2. Run `pwsh tools/ci/validate-windows-native.ps1 -PlatformToolset v143 -RuntimeProfile modern`, which validates the launcher payload plus modern CRT availability, builds the native targets with the hosted-compatible toolset, and checks the rebuilt gameplay DLL export manifest without claiming a strict retail runtime stage.
 
 ## Push verification
 
@@ -55,7 +54,7 @@ the subsystem gates.
 ## Versioned nightly builds
 
 The `Nightly Build` workflow runs daily at `03:17 UTC` and can also be started
-manually for `Release` or `Debug`. It uses the hosted-compatible `v141` toolset
+manually for `Release` or `Debug`. It uses the hosted-compatible `v143` toolset
 and the `modern` runtime profile, then packages only rebuilt outputs:
 
 - `quakelive_steam.exe`
@@ -77,6 +76,6 @@ audits.
 
 - Re-run the QVM prerequisite guard locally with `tools/ci/verify-qvm-toolchain.sh`.
 - Re-run the native DLL guard locally with `pwsh tools/ci/install-vs-v100.ps1`, `pwsh tools/ci/verify-vs-toolchain.ps1 -RequireV100`, and `pwsh tools/ci/validate-windows-native.ps1 -PlatformToolset v100 -RuntimeProfile retail`.
-- Re-run the modern-host compatibility guard locally with `pwsh tools/ci/install-vs-toolset.ps1 -PlatformToolset v141`, `pwsh tools/ci/verify-vs-toolchain.ps1 -PlatformToolset v141 -RequireToolset`, and `pwsh tools/ci/validate-windows-native.ps1 -PlatformToolset v141 -RuntimeProfile modern`.
+- Re-run the modern-host compatibility guard locally with `pwsh tools/ci/verify-vs-toolchain.ps1 -PlatformToolset v143 -RequireToolset` and `pwsh tools/ci/validate-windows-native.ps1 -PlatformToolset v143 -RuntimeProfile modern`.
 - Re-run the shared harness bundle with `python tests/run_harnesses.py --target qvm` or `python tests/run_harnesses.py --target dll` after the prerequisite steps above.
 - Preview a nightly version locally with `python tools/ci/nightly_build.py version --output artifacts/nightly/version.json`.

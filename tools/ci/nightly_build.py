@@ -348,7 +348,7 @@ def build_parser() -> argparse.ArgumentParser:
     package.add_argument("--manifest", type=Path, required=True)
     package.add_argument("--output-root", type=Path, default=Path("artifacts/nightly"))
     package.add_argument("--runtime-profile", default="modern")
-    package.add_argument("--toolset", default="v141")
+    package.add_argument("--toolset", default="v143")
     package.set_defaults(func=package_build)
 
     return parser

@@ -12,6 +12,11 @@ WINDOWS_BUILD_DOC_PATH = REPO_ROOT / "docs" / "build" / "windows.md"
 WINDOWS_NATIVE_PIPELINE_PATH = REPO_ROOT / "docs" / "windows-native-pipeline.md"
 WINDOWS_RUNTIME_GUIDE_PATH = REPO_ROOT / "docs" / "platform" / "windows-32bit-runtime.md"
 TOOLCHAIN_CI_PATH = REPO_ROOT / "docs" / "toolchain-ci.md"
+NIGHTLY_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "nightly-build.yml"
+INSTALL_TOOLSET_SCRIPT_PATH = REPO_ROOT / "tools" / "ci" / "install-vs-toolset.ps1"
+VERIFY_TOOLSET_SCRIPT_PATH = REPO_ROOT / "tools" / "ci" / "verify-vs-toolchain.ps1"
+BUILD_WINDOWS_DLLS_SCRIPT_PATH = REPO_ROOT / "tools" / "ci" / "build-windows-dlls.ps1"
+NIGHTLY_BUILD_SCRIPT_PATH = REPO_ROOT / "tools" / "ci" / "nightly_build.py"
 IMPLEMENTATION_PLAN_PATH = REPO_ROOT / "IMPLEMENTATION_PLAN.md"
 AUDIT_PATH = REPO_ROOT / "AUDIT.md"
 REPO_WIDE_AUDIT_PATH = (
@@ -74,3 +79,30 @@ def test_retail_dependency_runtime_stage_is_wired_and_documented() -> None:
 	assert "### Task A6f: Add a strict staged retail-runtime DLL audit for native Windows validation [COMPLETED]" in implementation_plan
 	assert "The retail native validation lane now also stages" in audit
 	assert "The retail native validation lane now also stages" in repo_wide_audit
+
+
+def test_hosted_nightly_uses_preinstalled_vs2022_toolset() -> None:
+	nightly_workflow = _read_text(NIGHTLY_WORKFLOW_PATH)
+	install_toolset = _read_text(INSTALL_TOOLSET_SCRIPT_PATH)
+	verify_toolset = _read_text(VERIFY_TOOLSET_SCRIPT_PATH)
+	validate_script = _read_text(VALIDATE_SCRIPT_PATH)
+	build_windows_dlls = _read_text(BUILD_WINDOWS_DLLS_SCRIPT_PATH)
+	nightly_build = _read_text(NIGHTLY_BUILD_SCRIPT_PATH)
+	toolchain_ci = _read_text(TOOLCHAIN_CI_PATH)
+
+	assert "NIGHTLY_PLATFORM_TOOLSET: v143" in nightly_workflow
+	assert "Microsoft.VisualStudio.Component.VC.Tools.x86.x64" in install_toolset
+	assert "[ValidateSet('v100', 'v141', 'v143')]" in install_toolset
+	assert "'v143' { return 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' }" in install_toolset
+
+	assert "[ValidateSet('v100', 'v141', 'v143')]" in verify_toolset
+	assert "DisplayName = 'Visual Studio 2022 (v143)'" in verify_toolset
+	assert "'v143' {" in verify_toolset
+	assert "ComponentId = 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'" in verify_toolset
+
+	assert "[string]$PlatformToolset = 'v143'" in validate_script
+	assert "[string]$ProjectToolset = 'v141'" in validate_script
+	assert "'v143' { 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' }" in build_windows_dlls
+	assert "$PlatformToolset -in @('v141', 'v143')" in build_windows_dlls
+	assert 'package.add_argument("--toolset", default="v143")' in nightly_build
+	assert "hosted-compatible `v143` toolset" in toolchain_ci

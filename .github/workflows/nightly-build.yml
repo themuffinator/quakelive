@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 120
     env:
       NIGHTLY_CONFIGURATION: ${{ inputs.configuration || 'Release' }}
-      NIGHTLY_PLATFORM_TOOLSET: v141
+      NIGHTLY_PLATFORM_TOOLSET: v143
       NIGHTLY_RUNTIME_PROFILE: modern
 
     steps:

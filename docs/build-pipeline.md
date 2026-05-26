@@ -175,7 +175,7 @@ The current hosted layer starts with two repo-wide workflows:
 - `Push Verification` runs the focused subsystem parity lanes on direct pushes,
   publishes the existing validation roots as artifacts, and avoids runtime game
   launches or live online-service use.
-- `Nightly Build` runs a scheduled Windows `v141` modern compatibility build,
+- `Nightly Build` runs a scheduled Windows `v143` modern compatibility build,
   generates `artifacts/nightly/version.json`, and packages rebuilt outputs into
   a versioned artifact named from the nightly date, run number, and commit SHA.
   This artifact carries manifests and checksums but intentionally excludes

@@ -12,7 +12,7 @@ validation surface: bytecode, native, and reverse-engineered targets.
   server, and engine host/support parity gates. It uploads the existing
   subsystem evidence roots with a 14-day retention window.
 - **Nightly Build** – `.github/workflows/nightly-build.yml` runs daily at
-  `03:17 UTC`, builds the Windows modern compatibility profile, generates a
+  `03:17 UTC`, builds the Windows `v143` modern compatibility profile, generates a
   manifest version like `nightly-YYYYMMDD.<run>-g<shortsha>`, packages rebuilt
   binaries only, and uploads the package, checksum, and manifests for 30 days.
   The package excludes retail pk3 files, retail launcher DLL payloads, and any
