@@ -54,16 +54,33 @@ jobs:
           pytest tests/test_platform_services.py -k "test_online_service_bridge_only_hard_stubs_when_build_disabled or test_service_disabled_menu_verb_matrix_stays_explicit or test_launcher_resource_fallbacks_survive_service_disabled_policy" -q
           pytest tests/test_fs_search_paths.py tests/test_vote_ui_throttle.py -q
 
+      - name: Check retail UI corpus
+        id: retail-ui-corpus
+        run: |
+          if python3 scripts/ui/check_retail_ui_corpus.py --inventory-out "${{ env.UI_ARTIFACT_ROOT }}/ui_retail_inventory.json" --strict; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build UI bundle
+        if: steps.retail-ui-corpus.outputs.available == 'true'
         run: tools/build_ui_bundle.sh
 
       - name: Run headless UI validation
+        if: steps.retail-ui-corpus.outputs.available == 'true'
         run: >-
           python3 tests/run_ui_validation.py
           --log-dir "${{ env.UI_VALIDATION_ROOT }}/logs"
 
       - name: Run unified UI parity gate
-        run: UI_FULL_PARITY_GATE_ENFORCE=1 pytest tests/test_ui_full_parity_gate.py -q
+        run: |
+          if [ "${{ steps.retail-ui-corpus.outputs.available }}" = "true" ]; then
+            UI_FULL_PARITY_GATE_ENFORCE=1 pytest tests/test_ui_full_parity_gate.py -q
+          else
+            echo "Retail UI corpus unavailable; running non-enforced UI parity gate only."
+            pytest tests/test_ui_full_parity_gate.py -q
+          fi
 
       - name: Upload UI artefacts
         if: always()

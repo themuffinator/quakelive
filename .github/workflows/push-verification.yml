@@ -50,9 +50,14 @@ jobs:
               pytest tests/test_ui_src_panel_parity.py tests/test_ui_menu_files.py -q
               pytest tests/test_platform_services.py -k "test_online_service_bridge_only_hard_stubs_when_build_disabled or test_service_disabled_menu_verb_matrix_stays_explicit or test_launcher_resource_fallbacks_survive_service_disabled_policy" -q
               pytest tests/test_fs_search_paths.py tests/test_vote_ui_throttle.py -q
-              tools/build_ui_bundle.sh
-              python3 tests/run_ui_validation.py --log-dir artifacts/ui_validation/logs
-              UI_FULL_PARITY_GATE_ENFORCE=1 pytest tests/test_ui_full_parity_gate.py -q
+              if python3 scripts/ui/check_retail_ui_corpus.py --inventory-out artifacts/ui_bundle/ui_retail_inventory.json --strict; then
+                tools/build_ui_bundle.sh
+                python3 tests/run_ui_validation.py --log-dir artifacts/ui_validation/logs
+                UI_FULL_PARITY_GATE_ENFORCE=1 pytest tests/test_ui_full_parity_gate.py -q
+              else
+                echo "Retail UI corpus unavailable; running non-enforced UI parity gate only."
+                pytest tests/test_ui_full_parity_gate.py -q
+              fi
           - name: CI Tooling Validation
             artifact_name: ci-tooling
             artifact_path: artifacts/nightly/**

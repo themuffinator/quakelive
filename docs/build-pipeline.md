@@ -32,12 +32,16 @@ Quake Live's streamlined menu flow now depends on the embedded browser bridge. T
 The dedicated `UI Validation` workflow now also runs a unified parity gate after
 the bundle build and headless panel validation. That gate is implemented in
 `tests/test_ui_full_parity_gate.py`, writes
-`artifacts/ui_validation/logs/ui_full_parity_gate.json`, and the workflow now
-executes it in enforced release mode with `UI_FULL_PARITY_GATE_ENFORCE=1`, so
-CI publishes one authoritative pass/fail summary across the current UI gap
-register (`UI-G01`..`UI-G06`) instead of leaving reviewers to reconcile
-multiple independent UI logs by hand. The final windowed runtime confirmation
-evidence for the current parity milestone is tracked separately in
+`artifacts/ui_validation/logs/ui_full_parity_gate.json`, and the workflow
+executes it in enforced release mode with `UI_FULL_PARITY_GATE_ENFORCE=1` when
+the proprietary retail UI corpus is staged. Hosted runners that do not have
+those retail inputs still write the inventory and gate report, but skip the
+strict bundle/headless pass so CI reports the environment limitation instead of
+failing on undistributable assets. This publishes one authoritative pass/fail
+summary across the current UI gap register (`UI-G01`..`UI-G06`) instead of
+leaving reviewers to reconcile multiple independent UI logs by hand. The final
+windowed runtime confirmation evidence for the current parity milestone is
+tracked separately in
 `artifacts/ui_validation/logs/ui_runtime_evidence_20260406.json`.
 
 The dedicated `Renderer Validation` workflow now does the equivalent for the renderer stack. It runs the focused renderer tranche tests together with `tests/test_renderer_full_parity_gate.py`, which writes `artifacts/renderer_validation/logs/renderer_full_parity_gate.json` so the current renderer gap register (`RG-G01`..`RG-G09`) is machine-readable instead of living only in prose. The tracked windowed runtime evidence for the final renderer text-closure milestone now lives at the stable alias `artifacts/renderer_validation/logs/renderer_runtime_evidence_latest.json`; the probe only promotes that alias when a rerun remains sufficient, and the current alias was refreshed on 2026-04-21 from the clean `renderer_runtime_evidence_20260421.json` bundle. Contributors can refresh it locally with `tools/renderer/run_renderer_runtime_probe.ps1`.
