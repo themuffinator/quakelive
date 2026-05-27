@@ -10,7 +10,7 @@ At the **literal source-file** level, however, the picture is more nuanced. My e
 | --- | ---: | ---: | --- |
 | `cgame` local files | `100%` | `~97/100` | High-quality runtime closure, but file boundaries and helper ownership are sometimes merged or re-split versus retail. |
 | `game` local files | `100%` | `~90/100` across all physical files; `~95/100` across active runtime-relevant files | Most active gameplay files are strong, but several low-parity/stub/legacy files remain in the tree and are not convincing retail-owned translation units. |
-| `ui` local files | `100%` | `~88/100` physical; `~95/100` for core runtime files excluding bridge/compat wrappers | The core menu/runtime logic is strong, but bridge-driven compatibility files stand in for the retail Awesomium/browser-host stack. |
+| `ui` local files | `100%` | `~91/100` physical; `~95/100` for core runtime files with disabled-service stubs | The core menu/runtime logic is strong, and the generated bridge menu replacement has been removed; the remaining delta is mostly proprietary browser/account-host behavior outside the UI DLL. |
 | Combined `cgame` + `game` + `ui` physical trees | n/a | `~92/100` | A small set of wrappers, placeholders, and compatibility splits distorts file-by-file parity even where runtime behavior is effectively closed. |
 
 Those conclusions are consistent with the repo’s own distinction between a **strict-retail Windows replacement target** and a broader **repo-wide parity** view. The repo-wide audit still carries online-services divergence, non-Windows portability debt, and evidence-freshness limitations outside the core module-runtime claim. fileciteturn30file0L1-L1
@@ -22,7 +22,7 @@ The clearest source-file outliers are:
 - `src/code/game/g_entity.c`, which is effectively an empty placeholder and has no persuasive standalone retail analogue in its current state. fileciteturn32file0L1-L1
 - `src/code/game/g_rr.c`, which is a skeletal Red Rover stub and does not reflect the much richer Red Rover controller logic described elsewhere in the repo’s qagame parity notes. fileciteturn42file0L1-L1turn29file0L1-L1
 - `src/code/game/g_rankings.c`, which is a legacy ranking/reporting lane that looks closer to an older external-service integration surface than to a current, fully closed retail game-module TU. fileciteturn43file0L1-L1turn30file0L1-L1
-- `src/code/ui/ui_quakelive_bridge.c` and `src/code/ui/ui_cdkey.c`, which are compatibility/bridge files that keep menu flows functional when the retail browser host is unavailable, but are not literal retail-source reproductions of the original Awesomium-driven UI stack. fileciteturn40file0L1-L1turn39file0L1-L1turn28file0L1-L1
+- `src/code/ui/ui_cdkey.c`, which remains a compatibility command wrapper for a native UI build path rather than a literal retail-source reproduction of the original account/browser stack. The generated `ui_quakelive_bridge.c` menu replacement has since been removed so the runtime uses the retail `ui/menus.txt` root.
 
 Officially, retail Quake Live is still presented as an online, stats-focused successor to Quake III Arena on Steam, while the official open-source release on id’s GitHub is Quake III Arena rather than Quake Live. That absence of an official Quake Live source release is why this audit necessarily relies on binaries, symbol maps, and reverse-engineering notes rather than direct source-vs-source comparison. citeturn5search0turn5search2
 
@@ -34,7 +34,7 @@ This report focuses on the three requested component trees:
 - `src/code/game/*`
 - `src/code/ui/*`
 
-I also considered component-adjacent shared units when they materially affect parity, especially the `bg_*`, `q_math.c`, `q_shared.c`, and `ui_shared.c` seams that connect multiple modules. The repo’s own source-file campaign tracks `22` `cgame` files, `45` `game` files, and `9` `ui` files inside the audited runtime/module surface. fileciteturn24file0L1-L1turn25file0L1-L1
+I also considered component-adjacent shared units when they materially affect parity, especially the `bg_*`, `q_math.c`, `q_shared.c`, and `ui_shared.c` seams that connect multiple modules. The repo’s own source-file campaign tracks `22` `cgame` files, `45` `game` files, and `8` `ui` files inside the audited runtime/module surface.
 
 The evidence hierarchy I used was:
 
@@ -42,11 +42,11 @@ The evidence hierarchy I used was:
    - module parity audits for `cgame`, `qagame`, and `ui`; fileciteturn19file0L1-L1turn20file0L1-L1turn28file0L1-L1turn29file0L1-L1
    - the source-file parity ledger and campaign plan; fileciteturn24file0L1-L1turn25file0L1-L1
    - the repo’s reference-mapping document showing retail DLLs, HLIL dumps, and the absence of a public retail engine source tree; fileciteturn18file0L1-L1
-   - direct inspection of special/high-risk files such as `g_entity.c`, `g_rr.c`, `g_rankings.c`, `g_autoshuffle.c`, `ui_quakelive_bridge.c`, `ui_cdkey.c`, `g_match_state.c`, and `g_vote.c`. fileciteturn32file0L1-L1turn41file0L1-L1turn42file0L1-L1turn43file0L1-L1turn44file0L1-L1turn45file0L1-L1turn39file0L1-L1turn40file0L1-L1
+   - direct inspection of special/high-risk files such as `g_entity.c`, `g_rr.c`, `g_rankings.c`, `g_autoshuffle.c`, `ui_cdkey.c`, `g_match_state.c`, and `g_vote.c`.
 
 2. **Build-surface inventory evidence**
    - `cgame.vcxproj.filters`, which cleanly lists the `cgame` local TUs plus shared linked units; fileciteturn36file0L1-L1
-   - `ui.vcxproj.filters`, which likewise lists the `ui` local TUs, including the bridge and CD-key compatibility files. fileciteturn35file0L1-L1
+   - `ui.vcxproj.filters`, which likewise lists the `ui` local TUs, including the CD-key compatibility file while omitting generated bridge-menu sources. fileciteturn35file0L1-L1
 
 3. **Official external references**
    - the official Steam page for Quake Live; citeturn5search0
@@ -85,15 +85,8 @@ void G_RRHandlePlayerDeath( gentity_t *victim, gentity_t *attacker ) {
 
 That excerpt from `src/code/game/g_rr.c` is unmistakably a stub compared with the repo’s own qagame parity documentation, which describes a much richer Red Rover controller state machine and death-path interface as already recovered in retail equivalence terms. fileciteturn42file0L1-L1turn29file0L1-L1
 
-```c
-static qboolean UI_WriteBridgeScripts(void) {
-    if (!UI_BridgeFileExists("ui/ql_bridge_main.menu")) {
-        ok = UI_WriteBridgeFile("ui/ql_bridge_main.menu", uiBridgeMainMenu) && ok;
-    }
-}
-```
+The previously generated `ui_quakelive_bridge.c` menu replacement has been retired. That keeps the offline-service path honest: missing Awesomium/browser functionality is now handled as a disabled host surface while the UI module still loads retail `ui/menus.txt` and `ui/main.menu`.
 
-`src/code/ui/ui_quakelive_bridge.c` is likewise explicit that the repo is generating writable bridge menus to replace or bypass the retail browser host path. That is a clever and practical reconstruction tactic, but it is not the same thing as a literal retail UI-source file match. fileciteturn40file0L1-L1
 
 The component relationships that drove the parity assessment are best understood as follows:
 
@@ -119,7 +112,7 @@ graph TD
     Host --> C
     Host --> G
     Host --> U
-    Browser -. bounded divergence / compatibility replacement .-> U
+    Browser -. bounded divergence / disabled-service stubs .-> U
 ```
 
 That model is exactly what the repo’s reference mapping and module audits describe: shared runtime contracts between qagame and cgame are strong, UI logic is partly shared and partly host-driven, and the proprietary launcher/browser stack sits outside the strict module closure story. fileciteturn18file0L1-L1turn20file0L1-L1turn28file0L1-L1turn30file0L1-L1turn46file0L1-L1
@@ -130,8 +123,8 @@ The summary scorecard is therefore:
 | --- | ---: | ---: | ---: | --- | ---: |
 | `cgame` | 22 | ~97 | ~97 | `cg_main.c`, `cg_newdraw.c`, `cg_draw.c`, `cg_servercmds.c`, `cg_syscalls.c` | 35–55 h |
 | `game` | 45 | ~90 | ~95 for runtime-relevant files | `g_entity.c`, `g_rr.c`, `g_rankings.c`, `g_autoshuffle.c` | 85–120 h |
-| `ui` | 9 | ~88 | ~95 for core runtime files excluding bridge-compat wrappers | `ui_quakelive_bridge.c`, `ui_cdkey.c` | 30–45 h |
-| Combined modules | 76 | ~92 | ~95 | same as above | 150–220 h |
+| `ui` | 8 | ~91 | ~95 for core runtime files with disabled-service browser stubs | `ui_cdkey.c` | 20–35 h |
+| Combined modules | 75 | ~92 | ~95 | same as above | 140–205 h |
 
 Those hours are for **file-level closure and hardening**, not for reproducing the entire proprietary product stack. Recreating launcher/browser/online-service parity would add substantial work outside these trees. fileciteturn30file0L1-L1turn18file0L1-L1
 
@@ -238,18 +231,17 @@ All rows in this section inherit the same baseline evidence unless explicitly ma
 | Repo file | Retail mapping | Functionality | Comparison summary | Compile / symbol / runtime notes | Parity | Effort |
 | --- | --- | --- | --- | --- | ---: | ---: |
 | `src/code/ui/ui_atoms.c` | Probable retail `ui_atoms.c` | menu/UI primitive helpers | Classic same-family UI support file | Low-risk, high-confidence | 96 | 1–2 h |
-| `src/code/ui/ui_cdkey.c` | **No good standalone retail TU match**; closest analogue is a credentials flow under bridge/host ownership | compatibility CD-key menu and fallback bridge opener | The file comment explicitly says it keeps classic entry points as compatibility helpers and prefers the bridge-generated Quake Live credentials screen when available. That is practical, but not literal retail-source parity. fileciteturn39file0L1-L1 | 60 | 6–10 h |
+| `src/code/ui/ui_cdkey.c` | **No good standalone retail TU match**; closest analogue is a credentials/account flow under host ownership | compatibility CD-key command wrapper | The file now avoids generated menu assets and keeps native UI builds on an explicit unavailable-command stub while retaining the legacy QVM-style popup path. That is bounded compatibility, not literal retail-source parity. | 65 | 4-8 h |
 | `src/code/ui/ui_gameinfo.c` | Probable retail `ui_gameinfo.c` | arena/game/factory metadata for UI | Strong same-family mapping | Low-risk | 95 | 1–2 h |
 | `src/code/ui/ui_main.c` | Probable retail `ui_main.c` | UI init/dispatcher/menu-level control flow | Strong runtime parity, but exact file ownership is affected by the missing retail browser host source | Good core parity; host boundary remains the caveat | 93 | 3–5 h |
 | `src/code/ui/ui_players.c` | Probable retail `ui_players.c` | 3D player preview/model rendering in UI | Same-family, high-confidence | Stable seam | 95 | 1–2 h |
-| `src/code/ui/ui_quakelive_bridge.c` | **No standalone retail equivalent**; closest analogue is the combined retail UI script dispatcher plus proprietary browser host | generates writable bridge menus and browser fallback UI | This file is openly a compatibility scaffold: it writes local bridge menu scripts so the repo can preserve workflow without patching packaged retail assets or reproducing Awesomium. That is useful engineering, but it is not a literal retail-source reconstruction. fileciteturn40file0L1-L1turn28file0L1-L1turn30file0L1-L1 | 70 | 8–14 h |
 | `src/code/ui/ui_shared.c` | Probable retail `ui_shared.c` or direct qmenu/widget-core helper family | shared menu parser/runtime/widget logic | The UI audit explicitly treats some inner widget-core uncertainty as bounded and no longer an active runtime gap; file-level identity is therefore strong but not perfect | Runtime very strong; exact leaf ownership still slightly inferential | 95 | 2–4 h |
 | `src/code/ui/ui_syscalls.c` | Probable retail `ui_syscalls.c` | UI trap/import wrappers | ABI seam looks strong; like `cg_syscalls.c`, exact import-table fidelity matters more than file-body complexity | High runtime confidence | 96 | 2–3 h |
 | `src/code/ui/ui_util.c` | Probable retail `ui_util.c` | assorted UI helper routines | Classic same-family support file | Low-risk, stable | 95 | 1–2 h |
 
 ### UI conclusion
 
-The core UI runtime looks strong according to the repo’s own audits, but **the UI tree is not a literal retail-source mirror**. The repo’s own documents concede that broader browser-host reconstruction belongs to the native client-host plan rather than the `ui` module gap register, and the two most visibly non-literal files are exactly the bridge/compatibility files I scored lower. fileciteturn28file0L1-L1turn30file0L1-L1turn40file0L1-L1turn39file0L1-L1
+The core UI runtime looks strong according to the repo’s own audits, but **the UI tree is not a literal retail-source mirror**. The repo’s own documents concede that broader browser-host reconstruction belongs to the native client-host plan rather than the `ui` module gap register, and the remaining non-literal UI source is now primarily the bounded CD-key compatibility command wrapper.
 
 ## Gaps, legal constraints, and remediation
 
@@ -297,8 +289,8 @@ The best next sequence is:
 2. **Lock down `cgame` hotspot file proofs.**  
    Focus on `cg_main.c`, `cg_newdraw.c`, `cg_draw.c`, `cg_servercmds.c`, and `cg_syscalls.c` with explicit per-file note packs and retail-owner traceability rather than more broad “module green” claims. fileciteturn19file0L1-L1turn20file0L1-L1turn46file0L1-L1
 
-3. **Reframe `ui` bridge files as compatibility layers, not retail file matches.**  
-   `ui_quakelive_bridge.c` and `ui_cdkey.c` should carry explicit status labeling: “functional replacement/compatibility wrapper,” not “retail-equivalent source file.” That makes the tree more honest without reducing practical usability. fileciteturn39file0L1-L1turn40file0L1-L1
+3. **Keep `ui` disabled-service stubs visibly bounded.**
+   The generated bridge menu replacement has been removed; `ui_cdkey.c` should remain explicitly labeled as a native compatibility command wrapper, not a retail-equivalent account/browser source file.
 
 4. **Separate module-source parity from product parity in top-level docs.**  
    The repo already distinguishes strict-module parity from repo-wide parity, but the distinction should be made front-and-center in any future audit headline. That would prevent readers from interpreting a module-runtime 100% claim as a literal source-file or product-stack 100% claim. fileciteturn20file0L1-L1turn24file0L1-L1turn30file0L1-L1
@@ -316,7 +308,7 @@ gantt
     section Source-file closure
     Rationalize low-parity game files           :crit, a1, 2026-05-04, 6d
     Cgame hotspot proof packs                   :a2, 2026-05-04, 5d
-    UI bridge/CD-key status reconciliation      :crit, a3, 2026-05-10, 6d
+    UI CD-key compatibility labeling           :crit, a3, 2026-05-10, 4d
     Shared build/documentation cleanup          :a4, 2026-05-12, 3d
 
     section Outside requested module files

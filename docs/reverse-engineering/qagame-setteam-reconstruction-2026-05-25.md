@@ -23,13 +23,17 @@
 
 - The spectator timestamp path now uses `(int)time( NULL )` when the queue position is clear, matching the existing session serializer/init convention and the decompiled inner helper.
 - The recovered helper syncs spectator item states as soon as the session team becomes spectator, then republishes userinfo and re-enters `ClientBegin`.
+- Follow-up 2026-05-27: the previously deferred `ps.eFlags |= 0x4000`
+  spectator write is now modeled as `EF_SPECTATOR_RESPAWN`, an intentional alias
+  of the GPL `EF_VOTED` bit value. `G_ApplyTeamChange` sets/clears it with the
+  resolved team, and `ClientSpawn` repeats the same rule before the respawn
+  teleport toggle so cgame can send `specresp` from `CG_Respawn`.
 - Red Rover live team changes suppress the generic team-change broadcast and rank-stat teardown path unless the destination is spectator, reflecting the special-case branches visible around the retail inner helper.
 - The rank switch-team event is emitted after `ClientBegin`, matching the observed retail executor ordering more closely than the previous monolithic source tail.
 - `gclient_t` now carries the reconstructed `revengeKillStreaks[MAX_CLIENTS]` matrix. The death path increments `attacker[victim]`, awards the `REVENGE` player event/rank medal when the reverse counter reaches the retail threshold, and clears `victim[attacker]`; `ClientSpawn` preserves the matrix across respawn memset, while `ClientDisconnect` clears the departing slot from the connected clients.
 
 ## Open Questions
 
-- The decompile shows a retail write to `ps.eFlags |= 0x4000` when becoming spectator. In the GPL headers that bit is `EF_VOTED`, so this round did not force the write without a stronger Quake Live semantic label.
 - The retail helper has a Red Rover direct `ClientSpawn`/loadout path when the round controller is already in a live state. Current source routes Red Rover through `ClientBegin` and `G_RRResetClientForRound`; this remains intentionally deferred until that controller state can be cross-checked in a focused Red Rover runtime/static pass.
 - The outer `SetTeam` decompile exposes a team-size cap diagnostic distinct from `g_maxGameClients`. Current source still relies on the existing `g_maxGameClients` and balance gates until the cvar ownership for that cap is pinned down.
 

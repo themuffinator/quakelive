@@ -151,7 +151,6 @@ UI_SOURCES=(
 	"${REPO_ROOT}/src/code/game/q_shared.c"
 	"${REPO_ROOT}/src/code/ui/ui_atoms.c"
 	"${REPO_ROOT}/src/code/ui/ui_cdkey.c"
-	"${REPO_ROOT}/src/code/ui/ui_quakelive_bridge.c"
 	"${REPO_ROOT}/src/code/ui/ui_gameinfo.c"
 	"${REPO_ROOT}/src/code/ui/ui_main.c"
 	"${REPO_ROOT}/src/code/ui/ui_players.c"

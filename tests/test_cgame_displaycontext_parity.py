@@ -2525,11 +2525,15 @@ def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split()
 		"switch ( ci->team ) {",
 		"Vector4Set( fill, 1.0f, 0.0f, 0.0f, 0.45f );",
 		"Vector4Set( fill, 0.2f, 0.35f, 1.0f, 0.45f );",
-		"Vector4Set( fill, 1.0f, 1.0f, 1.0f, 0.25f );",
+		"if ( color ) {",
+		"fill[0] = color[0];",
+		"Vector4Set( fill, 1.0f, 0.6f, 0.0f, 0.4f );",
 	):
 		assert expected in selected_team_color_block
 
 	assert 'Com_sprintf( buffer, sizeof( buffer ), "%i%%", score->accuracy );' in selected_accuracy_block
+	assert "CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);" in selected_accuracy_block
+	assert "rect->y + rect->h" not in selected_accuracy_block
 	for expected in (
 		'case WP_GAUNTLET:',
 		'return "Gauntlet";',
@@ -2589,7 +2593,7 @@ def test_cgame_live_placement_and_follow_ownerdraws_follow_retail_helper_split()
 	assert "case CG_FOLLOW_PLAYER_NAME_EX:" in source
 	for expected in (
 		"case CG_SELECTED_PLYR_TEAM_COLOR:",
-		"CG_DrawSelectedPlayerTeamColor(&rect);",
+		"CG_DrawSelectedPlayerTeamColor(&rect, color);",
 		"case CG_SELECTED_PLYR_ACCURACY:",
 		"CG_DrawSelectedPlayerAccuracy(&rect, scale, color, textStyle);",
 		"case CG_PLYR_BEST_WEAPON_NAME:",

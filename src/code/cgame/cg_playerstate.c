@@ -408,9 +408,9 @@ void CG_Respawn( void ) {
 		trap_SendClientCommand( "raceinit" );
 	}
 
-	// Retail `CG_Respawn` preserves this exact `specresp` gate on the
-	// recovered `0x00004000` player eFlags bit.
-	if ( cg.predictedPlayerState.eFlags & 0x00004000 ) {
+	// Quake Live reuses the GPL EF_VOTED bit as the spectator respawn
+	// resync cue; CG_Respawn answers it with "specresp".
+	if ( cg.predictedPlayerState.eFlags & EF_SPECTATOR_RESPAWN ) {
 		trap_SendClientCommand( "specresp" );
 	}
 }

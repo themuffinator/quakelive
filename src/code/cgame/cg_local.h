@@ -2320,7 +2320,7 @@ void CG_DrawNewTeamInfo(rectDef_t *rect, float text_x, float text_y, float scale
 =============
 CG_DrawTeamSpectators
 
-Displays the primary and secondary spectator targets on the new HUD.
+Draws the paged retail spectator list strip on the new HUD.
 =============
 */
 void CG_DrawTeamSpectators(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader);

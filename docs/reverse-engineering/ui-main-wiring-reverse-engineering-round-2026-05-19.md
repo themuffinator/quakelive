@@ -116,7 +116,7 @@ default build:
 - Browser overlay flow: `UI_BrowserOverlayAvailable`,
   `UI_ResolveMenuFlowInternal`, `UI_SetBrowserActive`, and
   `UI_HandleDeferredScriptExec` keep retail `web_browserActive` semantics visible
-  while falling back to bridge menus when the Awesomium-style overlay is absent.
+  while keeping the retail menu root active when the Awesomium-style overlay is absent.
 - Advertisement bridge: UI script and ownerdraw plumbing is mapped, but the host
   default path falls back to registered default shaders and null/compatibility
   bridge behavior unless online services are explicitly enabled.

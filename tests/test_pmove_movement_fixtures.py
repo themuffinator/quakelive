@@ -121,6 +121,13 @@ static void QLR_TestTrace( trace_t *trace, const vec3_t start, const vec3_t mins
 		case 2:
 			VectorCopy( end, trace->endpos );
 			break;
+		case 4:
+			trace->fraction = 0.5f;
+			trace->endpos[0] = start[0] + ( end[0] - start[0] ) * trace->fraction;
+			trace->endpos[1] = start[1] + ( end[1] - start[1] ) * trace->fraction;
+			trace->endpos[2] = start[2] + ( end[2] - start[2] ) * trace->fraction;
+			VectorSet( trace->plane.normal, 0.0f, 0.0f, 1.0f );
+			break;
 		default:
 			break;
 		}
@@ -145,6 +152,13 @@ static void QLR_TestTrace( trace_t *trace, const vec3_t start, const vec3_t mins
 			VectorSet( trace->plane.normal, 0.0f, 0.0f, 1.0f );
 			break;
 		case 5:
+			trace->fraction = 0.5f;
+			trace->endpos[0] = start[0] + ( end[0] - start[0] ) * trace->fraction;
+			trace->endpos[1] = start[1] + ( end[1] - start[1] ) * trace->fraction;
+			trace->endpos[2] = start[2] + ( end[2] - start[2] ) * trace->fraction;
+			VectorSet( trace->plane.normal, 0.0f, 0.0f, 1.0f );
+			break;
+		case 6:
 			trace->fraction = 0.5f;
 			trace->endpos[0] = start[0] + ( end[0] - start[0] ) * trace->fraction;
 			trace->endpos[1] = start[1] + ( end[1] - start[1] ) * trace->fraction;
@@ -2938,7 +2952,7 @@ def test_jumppad_cache_does_not_block_air_step_ledge_retry(
 		ctypes.byref(velocity_z),
 	)
 
-	assert trace_calls == 4
+	assert trace_calls == 5
 	assert origin_z.value == pytest.approx(40.0, rel=1e-6)
 	assert step_up.value == pytest.approx(40.0, rel=1e-6)
 	assert velocity_z.value == pytest.approx(400.0, rel=1e-6)
@@ -2957,7 +2971,7 @@ def test_jumppad_cache_does_not_block_generic_ground_plane_step_retry(
 		ctypes.byref(velocity_z),
 	)
 
-	assert trace_calls == 5
+	assert trace_calls == 6
 	assert origin_z.value > 0.0
 	assert step_up.value > 0.0
 	assert velocity_z.value >= 0.0
@@ -2979,7 +2993,7 @@ def test_jumppad_cache_still_allows_explicit_step_jump(
 		ctypes.byref(jump_time),
 	)
 
-	assert trace_calls == 6
+	assert trace_calls == 7
 	assert origin_z.value > 0.0
 	assert step_up.value > 0.0
 	assert velocity_z.value == pytest.approx(275.0, rel=1e-6)
@@ -3027,7 +3041,7 @@ def test_jumppad_cache_still_allows_crouch_stepjump_fallback(
 		ctypes.byref(jump_time),
 	)
 
-	assert trace_calls == 7
+	assert trace_calls == 8
 	assert origin_z.value > 0.0
 	assert step_up.value > 0.0
 	assert velocity_z.value == pytest.approx(275.0, rel=1e-6)

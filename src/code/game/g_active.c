@@ -1625,7 +1625,8 @@ void SpectatorClientEndFrame( gentity_t *ent ) {
 		if ( clientNum >= 0 ) {
 			cl = &level.clients[ clientNum ];
 			if ( cl->pers.connected == CON_CONNECTED && cl->ps.pm_type != PM_SPECTATOR ) {
-				flags = (cl->ps.eFlags & ~(EF_VOTED | EF_TEAMVOTED)) | (ent->client->ps.eFlags & (EF_VOTED | EF_TEAMVOTED));
+				flags = ( cl->ps.eFlags & ~( EF_SPECTATOR_RESPAWN | EF_TEAMVOTED ) ) |
+					( ent->client->ps.eFlags & ( EF_SPECTATOR_RESPAWN | EF_TEAMVOTED ) );
 				ent->client->ps = cl->ps;
 				ent->client->ps.pm_type = PM_SPECTATOR;
 				ent->client->ps.pm_flags |= PMF_FOLLOW;

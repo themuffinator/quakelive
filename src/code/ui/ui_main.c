@@ -507,19 +507,11 @@ qboolean UI_BrowserOverlayAvailable(void) {
 =============
 UI_ResolveMenuFlowInternal
 
-Resolve which menu flow should be active, preferring the browser overlay and
-falling back to bridge scripts when the overlay is unavailable.
+Resolve which menu script root should be active. Retail `uix86.dll` always
+loads the Quake Live menu root; browser availability is handled separately.
 =============
 */
 static uiMenuFlow_t UI_ResolveMenuFlowInternal(void) {
-	if (UI_BrowserOverlayAvailable()) {
-		return UI_MENU_FLOW_QUAKELIVE;
-	}
-
-	if (UI_BrowserBridgeAvailable()) {
-		return UI_MENU_FLOW_BRIDGED;
-	}
-
 	return UI_MENU_FLOW_QUAKELIVE;
 }
 
@@ -562,7 +554,6 @@ static void UI_SetActiveMenuFlow(uiMenuFlow_t flow) {
 	ui_activeMenuFlow = flow;
 	ui_new.integer = (flow != UI_MENU_FLOW_LEGACY);
 	UI_SetBrowserActive(UI_MenuFlowUsesBrowserOverlay(flow));
-	UI_BrowserBridge_SetActive(flow == UI_MENU_FLOW_BRIDGED);
 }
 
 /*
@@ -573,7 +564,7 @@ Determine if the native server browser should remain enabled.
 =============
 */
 static qboolean UI_ServerBrowserEnabled(void) {
-	return (ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED);
+	return qfalse;
 }
 
 /*
@@ -586,8 +577,6 @@ Update the active menu flow based on which menu file set is being loaded.
 static void UI_UpdateActiveMenuFlowForFile(const char *menuFile) {
 	if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_QUAKELIVE)) {
 		UI_SetActiveMenuFlow(UI_MENU_FLOW_QUAKELIVE);
-	} else if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE_BRIDGE) || UI_MenuFileEquals(menuFile, UI_INGAME_FILE_QUAKELIVE_BRIDGE)) {
-		UI_SetActiveMenuFlow(UI_MENU_FLOW_BRIDGED);
 	}
 }
 
@@ -602,9 +591,6 @@ const char *UI_DefaultMenuFile(void) {
 	const char *menuFile;
 
 	menuFile = (ui_activeMenuFlow == UI_MENU_FLOW_LEGACY) ? UI_MENU_FILE_LEGACY : UI_MENU_FILE_QUAKELIVE;
-	if (ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED) {
-		menuFile = UI_MENU_FILE_QUAKELIVE_BRIDGE;
-	}
 
 	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_MENU_FILE_QUAKELIVE;
 }
@@ -620,9 +606,6 @@ const char *UI_DefaultIngameFile(void) {
 	const char *menuFile;
 
 	menuFile = (ui_activeMenuFlow == UI_MENU_FLOW_LEGACY) ? UI_INGAME_FILE_LEGACY : UI_INGAME_FILE_QUAKELIVE;
-	if (ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED) {
-		menuFile = UI_INGAME_FILE_QUAKELIVE_BRIDGE;
-	}
 
 	return (UI_MenuFileExists(menuFile)) ? menuFile : UI_INGAME_FILE_QUAKELIVE;
 }
@@ -632,7 +615,7 @@ const char *UI_DefaultIngameFile(void) {
 UI_ShouldUseResolvedMenuFile
 
 Treat the built-in menu roots as flow-selected defaults instead of letting an
-archived ui_menuFiles value force Quake Live browser menus when the bridge is active.
+archived ui_menuFiles value override the retail Quake Live menu root.
 =============
 */
 static qboolean UI_ShouldUseResolvedMenuFile(const char *menuFile) {
@@ -641,10 +624,6 @@ static qboolean UI_ShouldUseResolvedMenuFile(const char *menuFile) {
 	}
 
 	if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE)) {
-		return qtrue;
-	}
-
-	if (UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE_BRIDGE)) {
 		return qtrue;
 	}
 
@@ -703,36 +682,10 @@ static menuDef_t *UI_EnsureNamedMenuLoaded( const char *menuName, const char *me
 
 /*
 =============
-UI_OpenBrowserBridgeMenu
-
-Open the generated native server-browser surface used when no live browser
-overlay is available.
-=============
-*/
-qboolean UI_OpenBrowserBridgeMenu( void ) {
-	menuDef_t *bridgeBrowserMenu;
-
-	if ( !UI_BrowserBridgeAvailable() ) {
-		return qfalse;
-	}
-
-	bridgeBrowserMenu = UI_EnsureNamedMenuLoaded( "ql_bridge_browser", "ui/ql_bridge_browser.menu" );
-	if ( !bridgeBrowserMenu ) {
-		return qfalse;
-	}
-
-	Com_Printf( "UI: browser overlay unavailable; opening bridge server browser.\n" );
-	UI_SetActiveMenuFlow( UI_MENU_FLOW_BRIDGED );
-	Menus_ActivateByName( "ql_bridge_browser" );
-	return qtrue;
-}
-
-/*
-=============
 UI_ShowOfflineMenuFallbackError
 
-Publishes a native error popup when an offline browser fallback cannot open a
-local bridge surface.
+Publishes a native error popup when an offline browser command has no retail
+host surface available.
 =============
 */
 static void UI_ShowOfflineMenuFallbackError( const char *message ) {
@@ -795,21 +748,17 @@ qboolean UI_HandleDeferredScriptExec( const itemDef_t *item, const char *command
 	menuName = ( parentMenu && parentMenu->window.name ) ? parentMenu->window.name : "";
 
 	if ( UI_CommandTextMatches( commandText, "web_showBrowser" ) ) {
-		if ( UI_MenuFileEquals( menuName, "main" ) && UI_OpenBrowserBridgeMenu() ) {
-			return qtrue;
-		}
-
 		if ( UI_MenuFileEquals( menuName, "main" ) ) {
-			UI_ShowOfflineMenuFallbackError( "Browser overlay unavailable; offline bridge server browser could not be loaded." );
+			UI_ShowOfflineMenuFallbackError( "Browser overlay unavailable; retail menu remains active." );
 		} else {
-			Com_Printf( "UI: browser overlay unavailable; keeping native menu fallback for %s.\n", commandText );
+			Com_Printf( "UI: browser overlay unavailable; keeping retail menu fallback for %s.\n", commandText );
 		}
 
 		return qtrue;
 	}
 
 	if ( UI_CommandTextMatches( commandText, "web_changeHash" ) ) {
-		Com_Printf( "UI: browser overlay unavailable; keeping native menu fallback for %s.\n", commandText );
+		Com_Printf( "UI: browser overlay unavailable; keeping retail menu fallback for %s.\n", commandText );
 		return qtrue;
 	}
 
@@ -2316,7 +2265,6 @@ int start;
 
 	UI_UpdateActiveMenuFlowForFile(menuFile);
 	UI_SetBrowserActive(UI_MenuFlowUsesBrowserOverlay(ui_activeMenuFlow));
-	UI_BrowserBridge_SetActive(ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED);
 
 	if (reset) {
 		Menu_Reset();
@@ -5803,9 +5751,7 @@ static void UI_RunMenuScript(char **args) {
 
 			overlayAvailable = UI_BrowserOverlayAvailable();
 			if (!overlayAvailable) {
-				if (!UI_OpenBrowserBridgeMenu()) {
-					Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\n");
-				}
+				Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\n");
 				return;
 			}
 
@@ -8570,7 +8516,6 @@ void _UI_Init( qboolean inGameLoad ) {
 	
 	Menus_CloseAll();
 	UI_SetBrowserActive( qfalse );
-	UI_BrowserBridge_SetActive( qfalse );
 
 	trap_LAN_LoadCachedServers();
 	UI_LoadBestScores(uiInfo.mapList[ui_currentMap.integer].mapLoadName, uiInfo.gameTypes[ui_gameType.integer].gtEnum);
@@ -8721,7 +8666,6 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 	  switch ( menu ) {
 	  case UIMENU_NONE:
 			UI_SetBrowserActive( qfalse );
-			UI_BrowserBridge_SetActive( qfalse );
 			trap_Key_SetCatcher( trap_Key_GetCatcher() & ~KEYCATCH_UI );
 			trap_Key_ClearStates();
 			trap_Cvar_Set( "cl_paused", "0" );
@@ -8730,7 +8674,6 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		  return;
 	  case UIMENU_MAIN:
 			UI_SetBrowserActive( UI_MenuFlowUsesBrowserOverlay( ui_activeMenuFlow ) );
-			UI_BrowserBridge_SetActive( ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED );
 			//trap_Cvar_Set( "sv_killserver", "1" );
 			trap_Key_SetCatcher( KEYCATCH_UI );
 			UI_SyncMenuStateFromCvars();
@@ -8751,13 +8694,11 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		  return;
 	  case UIMENU_TEAM:
 			UI_SetBrowserActive( qfalse );
-			UI_BrowserBridge_SetActive( qfalse );
 			trap_Key_SetCatcher( KEYCATCH_UI );
 			Menus_ActivateByName("joingame_menu");
 		  return;
 	  case UIMENU_NEED_CD:
 			UI_SetBrowserActive( qfalse );
-			UI_BrowserBridge_SetActive( qfalse );
 			// no cd check in TA
 			//trap_Key_SetCatcher( KEYCATCH_UI );
       //Menus_ActivateByName("needcd");
@@ -8765,7 +8706,6 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		  return;
 	  case UIMENU_BAD_CD_KEY:
 			UI_SetBrowserActive( qfalse );
-			UI_BrowserBridge_SetActive( qfalse );
 			// no cd check in TA
 			//trap_Key_SetCatcher( KEYCATCH_UI );
       //Menus_ActivateByName("badcd");
@@ -8773,7 +8713,6 @@ void _UI_SetActiveMenu( uiMenuCommand_t menu ) {
 		  return;
 	  case UIMENU_INGAME:
 			UI_SetBrowserActive( qfalse );
-			UI_BrowserBridge_SetActive( qfalse );
 		  trap_Cvar_Set( "cl_paused", "1" );
 			UI_SyncMenuStateFromCvars();
 			// Retail resets the ingame callvote filter each time the menu is reopened.

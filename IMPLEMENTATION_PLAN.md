@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-05-26
+Last updated: 2026-05-27
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -40,6 +40,123 @@ disabled, until a documented open replacement path exists.
   snapshots, not current gap ledgers.
 
 ## Active work
+
+### Task A112: Retire generated UI bridge menu assets [COMPLETED]
+Priority: High
+Primary areas: `src/code/ui/ui_main.c`, `src/code/ui/ui_atoms.c`,
+`src/code/ui/ui_cdkey.c`, `src/code/ui/ui_local.h`,
+`src/code/ui/ui.vcxproj`, `src/code/ui/Conscript`,
+`tests/test_ui_menu_files.py`, `tests/test_platform_services.py`,
+`docs/ui/scripting-guide.md`
+Parity estimate: **before 99.90% -> after 99.96%** for the scoped
+retail UI menu-root purity lane. The strict-retail Windows module target
+remains **100%** and the repo-wide parity estimate remains **98%**.
+
+Completed work:
+
+1. Rechecked retail `uix86.dll` evidence: HLIL/Ghidra both show the default
+   menu root opening `ui/menus.txt`, and the checked-in `src/ui/menus.txt`
+   loads retail `ui/main.menu`.
+2. Removed the generated `ql_bridge_*` menu-script owner and its build entries
+   so offline browser-service handling no longer writes replacement menu
+   assets into the homepath.
+3. Kept disabled browser verbs policy-compliant by swallowing unavailable
+   `web_showBrowser` / `web_changeHash` paths while the existing retail menu
+   tree remains active.
+4. Reframed the native CD-key command as an explicit unavailable-command stub
+   in native UI builds instead of preferring generated credentials menus.
+5. Updated parity tests, platform-service tests, docs, and CI font/build
+   references to assert that retail menu files are used directly.
+
+Verification:
+
+- `python -m pytest tests/test_ui_menu_files.py tests/test_platform_services.py tests/test_non_windows_portability.py tests/test_ui_full_parity_gate.py -q --tb=short`
+  - Result: `165 passed, 1 skipped`.
+
+### Task A111: Reconstruct spectator client-state resync wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_public.h`, `src/code/game/g_cmds.c`,
+`src/code/game/g_client.c`, `src/code/game/g_active.c`,
+`src/code/cgame/cg_playerstate.c`, `src/code/cgame/cg_local.h`,
+`tests/test_spectator_client_state_wiring_parity.py`,
+`docs/reverse-engineering/spectator-client-state-wiring-reconstruction-2026-05-27.md`,
+`docs/reverse-engineering/qagame-mapping.md`,
+`docs/reverse-engineering/cgame-mapping.md`,
+`references/symbol-maps/qagame.json`, `references/symbol-maps/cgame.json`
+Parity estimate: **before 99.90% -> after 99.97%** for the scoped
+spectator client-state and item-state resync lane. The repo-wide parity
+estimate remains **98%**.
+
+Completed work:
+
+1. Rechecked qagame `G_ApplyTeamChange @ 0x10040440` and
+   `ClientSpawn @ 0x1003BC30` against Binary Ninja HLIL/Ghidra for the retail
+   `0x4000` spectator client-state eFlag writes.
+2. Added `EF_SPECTATOR_RESPAWN` as the Quake Live alias for that network bit,
+   intentionally sharing the GPL `EF_VOTED` value because retail uses the same
+   bit as the cgame `specresp` cue.
+3. Reconstructed qagame set/clear wiring in `G_ApplyTeamChange` and
+   `ClientSpawn`, and preserved the observer bit when `SpectatorClientEndFrame`
+   copies followed-player snapshots.
+4. Replaced the raw cgame `0x00004000` `CG_Respawn` check with
+   `EF_SPECTATOR_RESPAWN`, keeping the retail `specresp` command handoff.
+5. Mapped the surrounding spectator item-state responder: `specresp` and
+   spectator team entry call `G_SyncSpectatorItemStatesForClient`, while item
+   pickup broadcast still packs `EV_ITEM_PICKUP_SPEC` for the cgame cache.
+6. Added cross-binary static coverage plus qagame/cgame mapping and symbol-map
+   notes for the eFlag, command, event payload, cache decoder, and overlay
+   update/draw path.
+
+Verification:
+
+- `python -m pytest tests/test_spectator_client_state_wiring_parity.py -q --tb=short`
+  - Result: `8 passed`.
+- `python -m pytest tests/test_spectator_client_state_wiring_parity.py tests/test_game_spectator_connection_parity.py tests/test_game_active_pmove_wiring_parity.py tests/test_game_helper_seam_parity.py tests/test_cgame_spectator_parity.py tests/test_cgame_snapshot_parity.py tests/test_cgame_event_transport_parity.py tests/test_cgame_hud_parity.py::test_spectator_item_timer_text_uses_retail_default_font_lane tests/test_game_vote_clear_parity.py -q --tb=short`
+  - Result: `111 passed, 1 skipped`.
+- `git diff --check`
+  - Result: clean; only Git line-ending normalization warnings were reported.
+- Broader context: the full `tests/test_cgame_hud_parity.py` file still has
+  an unrelated `test_team_info_overlay_restores_fixed_retail_row_renderer`
+  assertion failure outside this spectator client-state lane.
+
+### Task A110: Reconstruct StepSlideMove down-clip and wiring map [COMPLETED]
+Priority: High
+Primary areas: `src/code/game/bg_slidemove.c`, `src/code/game/bg_pmove.c`,
+`src/code/game/g_pmove.c`, `src/code/cgame/cg_servercmds.c`,
+`src/code/cgame/cg_predict.c`, `tests/pmove_validation_harness.c`,
+`tests/test_pmove_validation_fixtures.py`,
+`tests/test_step_jump_gate_parity.py`,
+`docs/reverse-engineering/pmove-stepslidemove-wiring-reconstruction-2026-05-27.md`
+Parity estimate: **before 98.8% -> after 99.9%** for the scoped
+StepSlideMove lane. The repo-wide parity estimate remains **98%**.
+
+Completed work:
+
+1. Rechecked qagame `PM_StepSlideMove @ 0x1002EFE0` and cgame
+   `PM_StepSlideMove @ 0x100034B0` against Binary Ninja HLIL, with Ghidra
+   companion confirmation for the matching helper call graph.
+2. Tightened the down-trace clip guard to the retail dot-product epsilon:
+   `DotProduct(velocity, plane.normal) < 0.0f || fabs(dot) < 0.001f`.
+3. Preserved the retail direct reachability trace before recording step side
+   effects, plus the `startsolid` rejection on the projected step-jump support
+   probe.
+4. Documented the full movement call matrix, step-jump latch split, and cgame
+   prediction smoothing handoff.
+5. Added executable and structural parity coverage for the down-clip guard,
+   call-site wiring, normal/crouch takeoff latches, and `pmove_t::stepUp`
+   prediction export.
+6. Pinned the `pmove_AirStepFriction`, `pmove_AirSteps`, and
+   `pmove_StepHeight` server-to-cgame tuning transport that feeds the private
+   step-move globals.
+
+Verification:
+
+- `python -m pytest tests/test_step_jump_gate_parity.py tests/test_pmove_validation_fixtures.py -q --tb=short`
+  - Result: `22 passed`.
+- `python -m pytest tests/test_step_jump_gate_parity.py tests/test_pmove_helper_parity.py tests/test_pmove_validation_fixtures.py tests/test_pmove_movement_fixtures.py tests/test_pmove_selected_cvar_parity.py tools/tests/test_pmove_settings_configstring.py -q --tb=short`
+  - Result: `134 passed, 107 subtests passed`.
+- `git diff --check`
+  - Result: clean; only Git line-ending normalization warnings were reported.
 
 ### Task A109: Reconstruct CA/A-D spectator respawn handoff [COMPLETED]
 Priority: High

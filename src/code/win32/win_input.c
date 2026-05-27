@@ -1139,11 +1139,7 @@ between a deactivate and an activate.
 */
 void IN_Activate (qboolean active) {
 	in_appactive = active;
-
-	if ( !active )
-	{
-		IN_DeactivateMouse();
-	}
+	IN_DeactivateMouse();
 }
 
 
@@ -1168,25 +1164,19 @@ void IN_Frame (void) {
 		return;
 	}
 
-	if ( cls.keyCatchers & KEYCATCH_CONSOLE ) {
-		// temporarily deactivate if not in the game and
-		// running on the desktop
-		// voodoo always counts as full screen
-		if (Cvar_VariableValue ("r_fullscreen") == 0
-			&& strcmp( Cvar_VariableString("r_glDriver"), _3DFX_DRIVER_NAME) )	{
-			IN_DeactivateMouse ();
-			IN_MouseMove();
-			return;
-		}
-	}
-
-	if ( !in_appactive ) {
-		IN_DeactivateMouse ();
+	if ( cls.keyCatchers & ~( KEYCATCH_MESSAGE | KEYCATCH_RETAIL_MOUSEPASS ) ) {
+		IN_DeactivateMouse();
 		IN_MouseMove();
 		return;
 	}
 
 	if ( in_nograb && in_nograb->integer ) {
+		IN_DeactivateMouse();
+		IN_MouseMove();
+		return;
+	}
+
+	if ( !in_appactive ) {
 		IN_DeactivateMouse();
 		IN_MouseMove();
 		return;

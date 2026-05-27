@@ -121,6 +121,8 @@ def pmove_validation_harness(tmp_path_factory: pytest.TempPathFactory) -> ctypes
 	library.QLR_RunAirStepScenario.restype = None
 	library.QLR_RunCrouchStepFallbackScenario.argtypes = [ctypes.POINTER(CrouchStepResult)]
 	library.QLR_RunCrouchStepFallbackScenario.restype = None
+	library.QLR_RunDownTraceClipGuardScenario.argtypes = [ctypes.POINTER(CrouchStepResult)]
+	library.QLR_RunDownTraceClipGuardScenario.restype = None
 	library.QLR_RunAirDoubleJumpSequence.argtypes = [ctypes.POINTER(DoubleJumpResult)]
 	library.QLR_RunAirDoubleJumpSequence.restype = None
 	library.QLR_RunCommandMirrorScenario.argtypes = [ctypes.POINTER(CommandMirrorResult)]
@@ -166,6 +168,19 @@ def test_crouch_step_fallback_survives_general_jump_gate_rejection(
 	assert result.jumpTime == 100
 	assert result.upmove == 0
 	assert result.pmFlags & pmf_jump_held
+
+
+def test_step_down_trace_clip_guard_keeps_upward_velocity(
+	pmove_validation_harness: ctypes.CDLL,
+) -> None:
+	result = CrouchStepResult()
+
+	pmove_validation_harness.QLR_RunDownTraceClipGuardScenario(ctypes.byref(result))
+
+	assert result.velocityZ == pytest.approx(0.05, rel=1e-5)
+	assert result.originZ == pytest.approx(10.0, rel=1e-5)
+	assert result.stepUp == pytest.approx(0.0, abs=1e-6)
+	assert result.traceCalls == 6
 
 
 def test_air_double_jump_fixture_blocks_reuse_until_ground_contact(

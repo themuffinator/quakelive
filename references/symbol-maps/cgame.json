@@ -427,7 +427,7 @@
       "signature": "void PM_StepSlideMove(qboolean gravity)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail stepped movement wrapper over `PM_SlideMove`; HLIL preserves the one-argument gravity boundary, up-trace/down-trace retry, the `\"%i:bend can't step\\n\"` diagnostic, final velocity/origin selection, general PM_CanStepJump recheck and normal step-jump takeoff latch, plus the separate PM_CanCrouchStepJump and shrunken-box clearance fallback before the crouch-step takeoff latch."
+      "comment": "Retail stepped movement wrapper over `PM_SlideMove`; HLIL preserves the one-argument gravity boundary, up-trace/down-trace retry, the `\"%i:bend can't step\\n\"` diagnostic, guarded post-step down-trace velocity clipping, the direct trace that gates step side effects, final velocity/origin selection, general PM_CanStepJump recheck and normal step-jump takeoff latch, plus the separate PM_CanCrouchStepJump and shrunken-box clearance fallback before the crouch-step takeoff latch."
     },
     {
       "address": "0x10003BC0",
@@ -5576,7 +5576,7 @@
         "specresp"
       ],
       "relocation_refs": [],
-      "comment": "Retail respawn handler that marks the frame as a teleport, reselects the primary weapon state, resets the respawn-side HUD / reward state, and triggers the same race and spectator side effects carried by the current Quake Live respawn path."
+      "comment": "Retail respawn handler that marks the frame as a teleport, reselects the primary weapon state, resets the respawn-side HUD / reward state, sends `raceinit` in Race, and sends `specresp` when the recovered 0x4000 spectator-respawn eFlag is present."
     },
     {
       "address": "0x100434B0",

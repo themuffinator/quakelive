@@ -161,8 +161,7 @@ Observed facts from the writable source tree:
 - UI menu asset globals use two retail size tiers:
   - gameplay and HUD menus such as `src/ui/hud.menu` register
     `24 / 16 / 48`
-  - `src/ui/main.menu` and the bridge fallback in
-    `src/code/ui/ui_quakelive_bridge.c` register `16 / 12 / 20`
+  - `src/ui/main.menu` registers `16 / 12 / 20`
 - UI font registration now stays in `Asset_Parse` and `MenuParse_font`, while
   `AssetCache` remains art-only.
 - UI `Asset_Parse` now normalizes the global `font`, `smallFont`, and

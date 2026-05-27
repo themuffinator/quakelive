@@ -4134,7 +4134,7 @@ static void CL_ResetBrowserOverlayState( void ) {
 CL_WebHost_MarkBrowserUnavailable
 
 Clears transient browser visibility after a failed live-browser bootstrap while
-preserving the loadFailed latch so the UI VM can fall back to bridge menus.
+preserving the loadFailed latch so the UI VM keeps the retail menu root active.
 =============
 */
 static void CL_WebHost_MarkBrowserUnavailable( void ) {

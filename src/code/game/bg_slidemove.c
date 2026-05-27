@@ -414,13 +414,13 @@ PM_StepSlideMoveWithStepHeight
 */
 static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight ) {
 	vec3_t		start_o, start_v;
-	vec3_t		down_o, down_v;
 	trace_t		trace;
 	vec3_t		up, down;
 	vec3_t		end;
 	vec3_t		jumpProbeStart, jumpProbeEnd;
 	vec3_t		projectedEnd;
 	float		stepSize;
+	float		velocityDot;
 
 	pml.stepUp = 0.0f;
 	VectorCopy (pm->ps->origin, start_o);
@@ -445,9 +445,6 @@ static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight )
 			return;
 		}
 	}
-
-	VectorCopy (pm->ps->origin, down_o);
-	VectorCopy (pm->ps->velocity, down_v);
 
 	VectorCopy (start_o, up);
 	up[2] += stepHeight;
@@ -475,24 +472,16 @@ static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight )
 	if ( !trace.allsolid ) {
 		VectorCopy (trace.endpos, pm->ps->origin);
 	}
-	if ( trace.fraction < 1.0 ) {
-		PM_ClipVelocity( pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP );
+	if ( trace.fraction < 1.0f ) {
+		velocityDot = DotProduct( pm->ps->velocity, trace.plane.normal );
+		if ( velocityDot < 0.0f || Q_fabs( velocityDot ) < 0.001f ) {
+			PM_ClipVelocity( pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP );
+		}
 	}
 
-#if 0
-	// if the down trace can trace back to the original position directly, don't step
-	pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, start_o, pm->ps->clientNum, pm->tracemask);
-	if ( trace.fraction == 1.0 ) {
-		// use the original move
-		VectorCopy (down_o, pm->ps->origin);
-		VectorCopy (down_v, pm->ps->velocity);
-		if ( pm->debugLevel ) {
-			Com_Printf("%i:bend\n", c_pmove);
-		}
-	} else 
-#endif
-	{
-		// use the step move
+	// Retail only records step side effects when the stepped endpoint is not directly reachable.
+	pm->trace( &trace, start_o, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
+	if ( trace.fraction < 1.0f ) {
 		float	delta;
 		float	stepFriction;
 		qboolean	canStepJump;
@@ -528,7 +517,7 @@ static void PM_StepSlideMoveWithStepHeight( qboolean gravity, float stepHeight )
 			jumpProbeEnd[2] -= stepHeight;
 			pm->trace( &trace, jumpProbeStart, pm->mins, pm->maxs, jumpProbeEnd, pm->ps->clientNum, pm->tracemask );
 
-			if ( !trace.allsolid && trace.fraction < 1.0f && trace.plane.normal[2] >= MIN_WALK_NORMAL ) {
+			if ( !trace.startsolid && !trace.allsolid && trace.fraction < 1.0f && trace.plane.normal[2] >= MIN_WALK_NORMAL ) {
 				if ( canStepJump && PM_CanStepJump() ) {
 					PM_ApplyStepJump( delta, qfalse );
 				} else if ( canCrouchStepJump && PM_CanCrouchStepJump() && PM_CanPerformCrouchStepJump() ) {

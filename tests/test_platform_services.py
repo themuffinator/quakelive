@@ -978,9 +978,9 @@ def test_service_disabled_menu_verb_matrix_stays_explicit() -> None:
     assert 'CL_LogOverlayServiceIgnored( "web_stopRefresh", "online services disabled by build settings" );' in stop_refresh_block
     assert 'CL_LogOverlayServiceIgnored( "web_stopRefresh", "browser overlay provider unavailable" );' in stop_refresh_block
 
-    assert "UI_OpenBrowserBridgeMenu()" in deferred_exec_block
-    assert 'Com_Printf( "UI: browser overlay unavailable; opening bridge server browser.\\n" );' in ui_main
-    assert 'Com_Printf( "UI: browser overlay unavailable; keeping native menu fallback for %s.\\n", commandText );' in deferred_exec_block
+    assert "UI_OpenBrowserBridgeMenu()" not in deferred_exec_block
+    assert "ql_bridge_browser" not in ui_main
+    assert 'Com_Printf( "UI: browser overlay unavailable; keeping retail menu fallback for %s.\\n", commandText );' in deferred_exec_block
 
 
 def test_awesomium_menu_flow_clears_browser_overlay_for_gameplay() -> None:
@@ -991,7 +991,7 @@ def test_awesomium_menu_flow_clears_browser_overlay_for_gameplay() -> None:
 
     assert "Menus_CloseAll();" in init_block
     assert "UI_SetBrowserActive( qfalse );" in init_block
-    assert "UI_BrowserBridge_SetActive( qfalse );" in init_block
+    assert "UI_BrowserBridge_SetActive" not in init_block
 
     main_case = re.search(r"case UIMENU_MAIN:(.*?)return;", set_active_menu_block, re.DOTALL)
     none_case = re.search(r"case UIMENU_NONE:(.*?)return;", set_active_menu_block, re.DOTALL)
@@ -1004,11 +1004,11 @@ def test_awesomium_menu_flow_clears_browser_overlay_for_gameplay() -> None:
     assert "static qboolean UI_MenuFlowUsesBrowserOverlay(uiMenuFlow_t flow) {" in ui_main
     assert "flow == UI_MENU_FLOW_QUAKELIVE && UI_BrowserOverlayAvailable()" in ui_main
     assert "UI_SetBrowserActive( UI_MenuFlowUsesBrowserOverlay( ui_activeMenuFlow ) );" in main_case.group(1)
-    assert "UI_BrowserBridge_SetActive( ui_activeMenuFlow == UI_MENU_FLOW_BRIDGED );" in main_case.group(1)
+    assert "UI_BrowserBridge_SetActive" not in main_case.group(1)
     assert "UI_SetBrowserActive( qfalse );" in none_case.group(1)
-    assert "UI_BrowserBridge_SetActive( qfalse );" in none_case.group(1)
+    assert "UI_BrowserBridge_SetActive" not in none_case.group(1)
     assert "UI_SetBrowserActive( qfalse );" in ingame_case.group(1)
-    assert "UI_BrowserBridge_SetActive( qfalse );" in ingame_case.group(1)
+    assert "UI_BrowserBridge_SetActive" not in ingame_case.group(1)
 
 
 def test_disabled_online_services_no_longer_force_console_fallback() -> None:

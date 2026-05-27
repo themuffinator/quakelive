@@ -3847,10 +3847,12 @@ static void G_ApplyTeamChange( gentity_t *ent, team_t team, spectatorState_t spe
 		if ( client->sess.spectatorQueuePosition == 0 ) {
 			client->sess.spectatorTime = (int)time( NULL );
 		}
+		client->ps.eFlags |= EF_SPECTATOR_RESPAWN;
 	} else {
 		client->sess.spectatorQueuePosition = 0;
 		client->sess.spectatorQueuePositionDirty = qfalse;
 		client->sess.spectatorTime = 0;
+		client->ps.eFlags &= ~EF_SPECTATOR_RESPAWN;
 	}
 
 	client->sess.sessionTeam = team;

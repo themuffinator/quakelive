@@ -4766,6 +4766,7 @@ void Item_ListBox_Paint(itemDef_t *item) {
 				// which may overdraw the box if it is too small for the element
 
 				if ( i == item->cursorPos ) {
+					DC->fillRect( x + 2, y + 2, item->window.rect.w - SCROLLBAR_SIZE - 4, listPtr->elementHeight, item->window.outlineColor );
 					if ( listPtr->selectedColorSet ) {
 						memcpy( textColor, listPtr->selectedColor, sizeof( textColor ) );
 					} else {
@@ -4800,10 +4801,6 @@ void Item_ListBox_Paint(itemDef_t *item) {
 					} else if (text) {
 						Item_DrawText(item, x + 4, y + listPtr->elementHeight, textColor, text, 0, 0);
 					}
-				}
-
-				if (i == item->cursorPos) {
-					DC->fillRect(x + 2, y + 2, item->window.rect.w - SCROLLBAR_SIZE - 4, listPtr->elementHeight, item->window.outlineColor);
 				}
 
 				size -= listPtr->elementHeight;
@@ -5227,7 +5224,7 @@ menuDef_t *Menus_ActivateByName(const char *p) {
 
 void Item_Init(itemDef_t *item) {
 	memset(item, 0, sizeof(itemDef_t));
-	item->fontIndex = ITEM_FONT_INHERIT;
+	item->fontIndex = FONT_DEFAULT;
 	item->textscale = 0.55f;
 	item->widescreen = WIDESCREEN_STRETCH;
 	item->widescreenSet = qfalse;

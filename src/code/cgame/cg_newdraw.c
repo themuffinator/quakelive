@@ -27,6 +27,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 extern displayContextDef_t cgDC;
 
+#define CG_ARENA_LOOKUP_TEXT_SIZE		( 128 * 1024 )
+#define CG_ARENA_LOOKUP_FILE_LIST_SIZE		8192
+
 typedef enum cgVoteSlotField_e {
 	CG_VOTE_FIELD_GAMETYPE,
 	CG_VOTE_FIELD_MAP,
@@ -294,7 +297,7 @@ static void CG_DrawMatchDetails( rectDef_t *rect, float scale, vec4_t color, int
 static void CG_DrawMatchEndCondition( rectDef_t *rect, float scale, vec4_t color, int textStyle );
 static void CG_DrawMatchStatus( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
 static void CG_DrawRoundLabel( rectDef_t *rect, float scale, vec4_t color, int textStyle, int align );
-static void CG_DrawLocalTime(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle);
+static void CG_DrawLocalTime(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align);
 static void CG_DrawVoteGametype(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot);
 static void CG_DrawVoteName(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot);
 static void CG_DrawVoteMapSlot(rectDef_t *rect, float scale, vec4_t color, int textStyle, int slot);
@@ -2954,15 +2957,183 @@ static void CG_BuildCleanMapName( char *buffer, size_t bufferSize ) {
 
 /*
 =============
+CG_FindArenaLongNameInData
+
+Searches parsed arena info blocks for the long display name of the supplied map.
+=============
+*/
+static qboolean CG_FindArenaLongNameInData( char *data, const char *mapName, char *buffer, size_t bufferSize ) {
+	char	*cursor;
+	char	*token;
+	char	key[MAX_TOKEN_CHARS];
+	char	info[MAX_INFO_STRING];
+
+	if ( !data || !mapName || !*mapName || !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	cursor = data;
+	while ( 1 ) {
+		token = COM_Parse( &cursor );
+		if ( !token[0] ) {
+			break;
+		}
+		if ( strcmp( token, "{" ) ) {
+			break;
+		}
+
+		info[0] = '\0';
+		while ( 1 ) {
+			token = COM_ParseExt( &cursor, qtrue );
+			if ( !token[0] ) {
+				break;
+			}
+			if ( !strcmp( token, "}" ) ) {
+				break;
+			}
+
+			Q_strncpyz( key, token, sizeof( key ) );
+			token = COM_ParseExt( &cursor, qfalse );
+			Info_SetValueForKey( info, key, token[0] ? token : "<NULL>" );
+		}
+
+		if ( !Q_stricmp( Info_ValueForKey( info, ARENA_INFO_KEY_MAP ), mapName ) ) {
+			const char	*longName;
+
+			longName = Info_ValueForKey( info, ARENA_INFO_KEY_LONGNAME );
+			if ( longName && *longName ) {
+				Q_strncpyz( buffer, longName, bufferSize );
+				return qtrue;
+			}
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CG_FindArenaLongNameInFile
+
+Loads an arena metadata file and searches it for a retail long map name.
+=============
+*/
+static qboolean CG_FindArenaLongNameInFile( const char *filename, const char *mapName, char *buffer, size_t bufferSize ) {
+	static char	arenaText[CG_ARENA_LOOKUP_TEXT_SIZE];
+	fileHandle_t	file;
+	int		length;
+
+	if ( !filename || !*filename ) {
+		return qfalse;
+	}
+
+	file = 0;
+	length = trap_FS_FOpenFile( filename, &file, FS_READ );
+	if ( length <= 0 || !file ) {
+		return qfalse;
+	}
+	if ( length >= (int)sizeof( arenaText ) ) {
+		trap_FS_FCloseFile( file );
+		return qfalse;
+	}
+
+	trap_FS_Read( arenaText, length, file );
+	arenaText[length] = '\0';
+	trap_FS_FCloseFile( file );
+
+	return CG_FindArenaLongNameInData( arenaText, mapName, buffer, bufferSize );
+}
+
+/*
+=============
+CG_FindArenaLongName
+
+Looks up a map's arena longname using the retail arena metadata search paths.
+=============
+*/
+static qboolean CG_FindArenaLongName( const char *mapName, char *buffer, size_t bufferSize ) {
+	char	fileList[CG_ARENA_LOOKUP_FILE_LIST_SIZE];
+	char	*cursor;
+	int	count;
+	int	index;
+
+	if ( !mapName || !*mapName || !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	if ( CG_FindArenaLongNameInFile( "scripts/arenas.txt", mapName, buffer, bufferSize ) ) {
+		return qtrue;
+	}
+
+	fileList[0] = '\0';
+	count = trap_QL_FS_GetFileList( "scripts", ".arena", fileList, sizeof( fileList ) );
+	cursor = fileList;
+	for ( index = 0; index < count; index++ ) {
+		char	path[MAX_QPATH];
+		int	length;
+
+		length = strlen( cursor );
+		if ( length <= 0 ) {
+			cursor++;
+			continue;
+		}
+
+		Com_sprintf( path, sizeof( path ), "scripts/%s", cursor );
+		if ( CG_FindArenaLongNameInFile( path, mapName, buffer, bufferSize ) ) {
+			return qtrue;
+		}
+		cursor += length + 1;
+	}
+
+	return qfalse;
+}
+
+/*
+=============
+CG_BuildMapDisplayName
+
+Resolves the scoreboard map label to the arena longname when retail metadata is available.
+=============
+*/
+static void CG_BuildMapDisplayName( char *buffer, size_t bufferSize ) {
+	static char	cachedMap[MAX_QPATH];
+	static char	cachedTitle[MAX_INFO_VALUE];
+	char		mapName[MAX_QPATH];
+
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	buffer[0] = '\0';
+	CG_BuildCleanMapName( mapName, sizeof( mapName ) );
+	if ( !mapName[0] ) {
+		return;
+	}
+
+	if ( cachedMap[0] && !Q_stricmp( cachedMap, mapName ) ) {
+		Q_strncpyz( buffer, cachedTitle, bufferSize );
+		return;
+	}
+
+	Q_strncpyz( cachedMap, mapName, sizeof( cachedMap ) );
+	if ( !CG_FindArenaLongName( mapName, cachedTitle, sizeof( cachedTitle ) ) ) {
+		Q_strncpyz( cachedTitle, mapName, sizeof( cachedTitle ) );
+	}
+
+	Q_strncpyz( buffer, cachedTitle, bufferSize );
+}
+
+/*
+=============
 CG_DrawMapName
 
-Prints the current map name stripped of file path information.
+Prints the current retail map display name.
 =============
 */
 static void CG_DrawMapName(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	char		nameBuffer[MAX_QPATH];
+	char		nameBuffer[MAX_INFO_VALUE];
 
-	CG_BuildCleanMapName( nameBuffer, sizeof( nameBuffer ) );
+	CG_BuildMapDisplayName( nameBuffer, sizeof( nameBuffer ) );
 	CG_Text_Paint(rect->x, rect->y, scale, color, nameBuffer, 0, 0, textStyle);
 }
 
@@ -2995,11 +3166,11 @@ static void CG_GetServerInfoValue( const char *info, const char *key, char *buff
 =============
 CG_GetMapDisplayName
 
-Returns the same clean map label used by the standalone map-name ownerdraw.
+Returns the same arena longname label used by the standalone map-name ownerdraw.
 =============
 */
 static void CG_GetMapDisplayName( char *buffer, size_t bufferSize ) {
-	CG_BuildCleanMapName( buffer, bufferSize );
+	CG_BuildMapDisplayName( buffer, bufferSize );
 }
 
 /*
@@ -3013,7 +3184,7 @@ static int CG_GetConfiguredPlayerCountLimit( void ) {
 	int	playerLimit;
 
 	playerLimit = cgs.maxclients;
-	if ( cgs.gametype == GT_TOURNAMENT || cgs.playerCountTeamSize <= 0 ) {
+	if ( cgs.gametype == GT_FFA || cgs.gametype == GT_TOURNAMENT || cgs.playerCountTeamSize <= 0 ) {
 		return playerLimit;
 	}
 
@@ -3154,7 +3325,7 @@ Builds the shared retail location/map detail string for intro panel ownerdraws.
 =============
 */
 static void CG_BuildIntroPanelDetailString( char *buffer, size_t bufferSize ) {
-	char	mapName[MAX_QPATH];
+	char	mapName[MAX_INFO_VALUE];
 	char	location[MAX_INFO_VALUE];
 
 	if ( !buffer || bufferSize <= 0 ) {
@@ -4128,12 +4299,11 @@ CG_DrawLocalTime
 Paints the client's local date/time label using the retail HUD format.
 =============
 */
-static void CG_DrawLocalTime(rectDef_t *rect, float text_x, float text_y, float scale, vec4_t color, int textStyle) {
+static void CG_DrawLocalTime(rectDef_t *rect, float scale, vec4_t color, int textStyle, int align) {
 	qtime_t		qt;
 	const char	*monthLabel;
 	char		buffer[64];
 	float		x;
-	float		y;
 
 	trap_RealTime( &qt );
 	if ( qt.tm_mon >= 0 && qt.tm_mon < (int)( sizeof( cgMonthAbbrev ) / sizeof( cgMonthAbbrev[0] ) ) ) {
@@ -4145,8 +4315,9 @@ static void CG_DrawLocalTime(rectDef_t *rect, float text_x, float text_y, float 
 	Com_sprintf( buffer, sizeof( buffer ), "%02d:%02d (%s %02d, %d)",
 		qt.tm_hour, qt.tm_min, monthLabel, qt.tm_mday, 1900 + qt.tm_year );
 
-	CG_GetTextPosition( rect, text_x, text_y, &x, &y );
-	CG_Text_Paint( x, y, scale, color, buffer, 0, 0, textStyle );
+	x = rect->x;
+	CG_AlignTextX( &x, buffer, scale, align );
+	CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );
 }
 
 /*
@@ -4328,10 +4499,10 @@ static void CG_DrawVoteTimer(rectDef_t *rect, float scale, vec4_t color, int tex
 =============
 CG_DrawSelectedPlayerTeamColor
 
-Fills the provided rectangle using the selected player's team color.
+Fills the provided rectangle using the selected player's retail scoreboard color.
 =============
 */
-static void CG_DrawSelectedPlayerTeamColor(rectDef_t *rect) {
+static void CG_DrawSelectedPlayerTeamColor(rectDef_t *rect, vec4_t color) {
 	clientInfo_t	*ci;
 	vec4_t			fill;
 
@@ -4352,7 +4523,14 @@ static void CG_DrawSelectedPlayerTeamColor(rectDef_t *rect) {
 		Vector4Set( fill, 0.2f, 0.35f, 1.0f, 0.45f );
 		break;
 	default:
-		Vector4Set( fill, 1.0f, 1.0f, 1.0f, 0.25f );
+		if ( color ) {
+			fill[0] = color[0];
+			fill[1] = color[1];
+			fill[2] = color[2];
+			fill[3] = color[3];
+		} else {
+			Vector4Set( fill, 1.0f, 0.6f, 0.0f, 0.4f );
+		}
 		break;
 	}
 
@@ -4380,7 +4558,7 @@ static void CG_DrawSelectedPlayerAccuracy(rectDef_t *rect, float scale, vec4_t c
 	}
 
 	Com_sprintf( buffer, sizeof( buffer ), "%i%%", score->accuracy );
-	CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, buffer, 0, 0, textStyle);
+	CG_Text_Paint(rect->x, rect->y, scale, color, buffer, 0, 0, textStyle);
 }
 
 static const weapon_t cgVerticalAccWeaponOrder[] = {
@@ -11016,7 +11194,7 @@ rect.y = y;
 			/* Retail maps raw ownerdraw 0x163 to the common no-op return target. */
 			return;
 	case CG_LOCALTIME:
-		CG_DrawLocalTime(&rect, text_x, text_y, scale, color, textStyle);
+		CG_DrawLocalTime(&rect, scale, color, textStyle, align);
 		break;
 	case CG_PLAYER_COUNTS:
 		CG_DrawPlayerCounts(&rect, scale, color, textStyle, align);
@@ -11264,7 +11442,7 @@ rect.y = y;
 		CG_DrawAdvert( &rect, color, shader );
 		break;
   case CG_SELECTED_PLYR_TEAM_COLOR:
-		CG_DrawSelectedPlayerTeamColor(&rect);
+		CG_DrawSelectedPlayerTeamColor(&rect, color);
 		break;
   case CG_SELECTED_PLYR_ACCURACY:
 		CG_DrawSelectedPlayerAccuracy(&rect, scale, color, textStyle);

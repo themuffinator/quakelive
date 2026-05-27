@@ -24,7 +24,6 @@ CFLAGS => $BASE_CFLAGS . '-fPIC',
 @FILES = qw(
   ui_main.c
   ui_atoms.c
-  ui_quakelive_bridge.c
   ui_gameinfo.c
   ui_players.c
   ui_util.c

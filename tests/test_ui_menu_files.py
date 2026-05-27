@@ -101,24 +101,28 @@ def test_ui_listbox_columns_consume_full_retail_scoreboard_rows() -> None:
     assert "if (i < MAX_LB_COLUMNS) {" in parse_block
 
 
-def test_ui_bridge_listbox_columns_are_parser_compatible() -> None:
-    ui_bridge = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
+def test_ui_does_not_generate_bridge_menu_assets() -> None:
+    assert not (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").exists()
 
-    column_lines = re.findall(r'"columns\s+([^"\\]+)\\n"', ui_bridge)
-    assert column_lines
-    for line in column_lines:
-        values = [int(value) for value in line.split()]
-        assert len(values) == 1 + values[0] * 3
+    ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
+    ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
+    ui_atoms = (REPO_ROOT / "src/code/ui/ui_atoms.c").read_text(encoding="utf-8")
+    ui_cdkey = (REPO_ROOT / "src/code/ui/ui_cdkey.c").read_text(encoding="utf-8")
+    combined = "\n".join((ui_local, ui_main, ui_atoms, ui_cdkey))
 
-
-def test_ui_bridge_generated_items_are_visible() -> None:
-    ui_bridge = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
-
-    string_tokens = re.findall(r'"((?:[^"\\]|\\.)*)"', ui_bridge)
-    menu_text = "".join(token.replace(r"\n", "\n").replace(r"\"", '"') for token in string_tokens)
-    item_blocks = re.findall(r"itemDef\s*\{(.*?)\n\}", menu_text, flags=re.DOTALL)
-    assert item_blocks
-    assert all("visible MENU_TRUE" in block for block in item_blocks)
+    for removed in (
+        "UI_MENU_FILE_QUAKELIVE_BRIDGE",
+        "UI_INGAME_FILE_QUAKELIVE_BRIDGE",
+        "UI_MENU_FLOW_BRIDGED",
+        "UI_WriteBridgeFile",
+        "UI_WriteBridgeScripts",
+        "UI_OpenBrowserBridgeMenu",
+        "UI_BrowserBridgeAvailable",
+        "ql_bridge_",
+        "menus_quakelive_bridge.auto.txt",
+        "ingame_quakelive_bridge.auto.txt",
+    ):
+        assert removed not in combined
 
 
 def test_ui_bundle_manifest_stages_runtime_icon_roots_without_baseq3_prefixes() -> None:
@@ -224,7 +228,6 @@ def test_ui_extended_native_exports_match_retail_bridge_surface() -> None:
         "..\\game\\q_shared.c",
         "ui_atoms.c",
         "ui_cdkey.c",
-        "ui_quakelive_bridge.c",
         "ui_gameinfo.c",
         "ui_main.c",
         "ui_players.c",
@@ -238,8 +241,9 @@ def test_ui_extended_native_exports_match_retail_bridge_surface() -> None:
 
 def test_ui_cdkey_runtime_wrapper_restored() -> None:
     ui_cdkey = (REPO_ROOT / "src/code/ui/ui_cdkey.c").read_text(encoding="utf-8")
-    assert "UI_CDKeyMenu_OpenBridge" in ui_cdkey
-    assert 'Menus_ActivateByName( "ql_bridge_credentials" );' in ui_cdkey
+    assert "UI_CDKeyMenu_OpenBridge" not in ui_cdkey
+    assert 'Menus_ActivateByName( "ql_bridge_credentials" );' not in ui_cdkey
+    assert "native CD-key popup fallback is not linked" in ui_cdkey
     assert "UI_PushMenu( &cdkeyMenuInfo.menu );" in ui_cdkey
     assert "void UI_CDKeyMenu_f( void ) {" in ui_cdkey
 
@@ -434,8 +438,8 @@ def test_ui_dead_legacy_helper_band_is_removed() -> None:
     load_menus_block = _extract_function_block(
         ui_main, "void UI_LoadMenus(const char *menuFile, qboolean reset) {"
     )
-    assert "UI_BrowserOverlayAvailable()" in resolve_menu_flow_block
-    assert "UI_BrowserBridgeAvailable()" in resolve_menu_flow_block
+    assert "return UI_MENU_FLOW_QUAKELIVE;" in resolve_menu_flow_block
+    assert "UI_BrowserBridgeAvailable()" not in resolve_menu_flow_block
     assert "UI_RequestedMenuFlow" not in resolve_menu_flow_block
     assert "static qboolean UI_MenuFlowUsesBrowserOverlay(uiMenuFlow_t flow) {" in ui_main
     assert "static qboolean UI_ShouldUseResolvedMenuFile(const char *menuFile) {" in ui_main
@@ -444,11 +448,10 @@ def test_ui_dead_legacy_helper_band_is_removed() -> None:
     assert "UI_SetBrowserActive(UI_MenuFlowUsesBrowserOverlay(ui_activeMenuFlow));" in load_menus_block
 
 
-def test_ui_bridge_flow_uses_generated_menu_roots_when_overlay_is_absent() -> None:
+def test_ui_menu_flow_uses_retail_roots_when_overlay_is_absent() -> None:
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
     ui_atoms = (REPO_ROOT / "src/code/ui/ui_atoms.c").read_text(encoding="utf-8")
     ui_local = (REPO_ROOT / "src/code/ui/ui_local.h").read_text(encoding="utf-8")
-    ui_bridge = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
 
     selector_block = _extract_function_block(
         ui_main, "static qboolean UI_ShouldUseResolvedMenuFile(const char *menuFile) {"
@@ -456,21 +459,16 @@ def test_ui_bridge_flow_uses_generated_menu_roots_when_overlay_is_absent() -> No
     load_block = _extract_function_block(ui_main, "void UI_Load() {")
     init_block = _extract_function_block(ui_main, "void _UI_Init( qboolean inGameLoad ) {")
     noningame_block = _extract_function_block(ui_main, "void UI_LoadNonIngame() {")
-    open_bridge_block = _extract_function_block(ui_main, "qboolean UI_OpenBrowserBridgeMenu( void ) {")
     console_command_block = _extract_function_block(ui_atoms, "qboolean UI_ConsoleCommand( int realTime ) {")
-    write_scripts_block = _extract_function_block(ui_bridge, "static qboolean UI_WriteBridgeScripts(void) {")
 
-    assert "qboolean UI_OpenBrowserBridgeMenu( void );" in ui_local
+    assert "qboolean UI_OpenBrowserBridgeMenu( void );" not in ui_local
+    assert "UI_MENU_FILE_QUAKELIVE_BRIDGE" not in ui_local
     assert "UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE)" in selector_block
-    assert "UI_MenuFileEquals(menuFile, UI_MENU_FILE_QUAKELIVE_BRIDGE)" in selector_block
+    assert "UI_MENU_FILE_QUAKELIVE_BRIDGE" not in selector_block
     assert "if (UI_ShouldUseResolvedMenuFile(menuSet)) {\n\t\tmenuSet = UI_DefaultMenuFile();" in load_block
     assert "if (UI_ShouldUseResolvedMenuFile(menuSet)) {\n                menuSet = UI_DefaultMenuFile();" in init_block
     assert "if (UI_ShouldUseResolvedMenuFile(menuSet)) {\n                menuSet = UI_DefaultMenuFile();" in noningame_block
-    assert 'UI_EnsureNamedMenuLoaded( "ql_bridge_browser", "ui/ql_bridge_browser.menu" )' in open_bridge_block
-    assert 'Menus_ActivateByName( "ql_bridge_browser" );' in open_bridge_block
-    assert "if (UI_OpenBrowserBridgeMenu()) {\n\t\t\t\treturn qtrue;" in console_command_block
-    assert 'ok = UI_WriteBridgeFile(UI_MENU_FILE_QUAKELIVE_BRIDGE, uiBridgeMenuSet) && ok;' in write_scripts_block
-    assert 'if (!UI_BridgeFileExists(UI_MENU_FILE_QUAKELIVE_BRIDGE))' not in write_scripts_block
+    assert 'Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\\n");' in console_command_block
 
 
 def test_ui_service_disabled_exec_paths_keep_menu_flow_navigable() -> None:
@@ -494,9 +492,9 @@ def test_ui_service_disabled_exec_paths_keep_menu_flow_navigable() -> None:
     assert "qboolean UI_HandleDeferredScriptExec( const itemDef_t *item, const char *commandText );" in ui_local
     assert 'UI_CommandTextMatches( commandText, "web_showBrowser" )' in deferred_exec_block
     assert 'UI_CommandTextMatches( commandText, "web_changeHash" )' in deferred_exec_block
-    assert "UI_OpenBrowserBridgeMenu()" in deferred_exec_block
-    assert 'UI_ShowOfflineMenuFallbackError( "Browser overlay unavailable; offline bridge server browser could not be loaded." );' in deferred_exec_block
-    assert 'Com_Printf( "UI: browser overlay unavailable; keeping native menu fallback for %s.\\n", commandText );' in deferred_exec_block
+    assert "UI_OpenBrowserBridgeMenu()" not in deferred_exec_block
+    assert 'UI_ShowOfflineMenuFallbackError( "Browser overlay unavailable; retail menu remains active." );' in deferred_exec_block
+    assert 'Com_Printf( "UI: browser overlay unavailable; keeping retail menu fallback for %s.\\n", commandText );' in deferred_exec_block
 
     assert "#ifndef CGAME" in script_exec_block
     assert "if ( UI_HandleDeferredScriptExec( item, val ) ) {" in script_exec_block
@@ -782,6 +780,7 @@ def test_ui_retail_listbox_and_secondary_ownerdraw_flags_parse_cleanly() -> None
         "((listBoxDef_t *)item->typeData)->elementColor[3] = 1.0f;",
         "((listBoxDef_t *)item->typeData)->selectedColor[0] = 1.0f;",
         "((listBoxDef_t *)item->typeData)->selectedColor[3] = 1.0f;",
+        "if ( i == item->cursorPos ) {\n\t\t\t\t\tDC->fillRect( x + 2, y + 2, item->window.rect.w - SCROLLBAR_SIZE - 4, listPtr->elementHeight, item->window.outlineColor );",
         "if ( listPtr->altRowColorSet && ( ( (int)i - listPtr->startPos ) & 1 ) ) {",
         "Item_DrawText(item, x + 4, y + listPtr->elementHeight, textColor, text, 0, 0);",
     ):
@@ -1109,7 +1108,7 @@ def test_ui_retail_item_font_runtime_compatibility_restored() -> None:
     ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
     assert "qboolean ItemParse_font( itemDef_t *item, int handle )" in ui_shared
     assert '{"font", ItemParse_font, NULL}' in ui_shared
-    assert "item->fontIndex = ITEM_FONT_INHERIT;" in ui_shared
+    assert "item->fontIndex = FONT_DEFAULT;" in ui_shared
     assert "if (!PC_Int_Parse(handle, &item->fontIndex)) {" in ui_shared
     assert "DC->textWidthExt(text, item->textscale, limit, item->fontIndex)" in ui_shared
     assert "DC->textHeightExt(text, item->textscale, limit, item->fontIndex)" in ui_shared
@@ -1299,7 +1298,6 @@ def test_ui_font_cache_ownership_and_registered_font_sizes_match_retail() -> Non
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
     ui_shared_h = (REPO_ROOT / "src/code/ui/ui_shared.h").read_text(encoding="utf-8")
     ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
-    bridge_source = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
     main_menu = (REPO_ROOT / "src/ui/main.menu").read_text(encoding="utf-8")
     hud_menu = (REPO_ROOT / "src/ui/hud.menu").read_text(encoding="utf-8")
     asset_cache_block = _extract_function_block(ui_main, "void AssetCache() {")
@@ -1340,13 +1338,6 @@ def test_ui_font_cache_ownership_and_registered_font_sizes_match_retail() -> Non
         "*pointSize = defaultPointSize;",
     ):
         assert expected in normalize_block
-
-    for expected in (
-        'font \\"fonts/font\\" 16',
-        'smallFont \\"fonts/smallfont\\" 12',
-        'bigFont \\"fonts/bigfont\\" 20',
-    ):
-        assert expected in bridge_source
 
     for expected in (
         'font "fonts/font" 16',
@@ -1927,7 +1918,6 @@ def test_ui_retail_feeder_matrix_matches_menu_consumers_and_callback_ownership()
     ui_main = (REPO_ROOT / "src/code/ui/ui_main.c").read_text(encoding="utf-8")
     ui_shared = (REPO_ROOT / "src/code/ui/ui_shared.c").read_text(encoding="utf-8")
     ui_shared_h = (REPO_ROOT / "src/code/ui/ui_shared.h").read_text(encoding="utf-8")
-    ui_bridge = (REPO_ROOT / "src/code/ui/ui_quakelive_bridge.c").read_text(encoding="utf-8")
     defines = _extract_numeric_defines(menudef, "FEEDER_")
 
     expected_ids = {
@@ -2016,9 +2006,6 @@ def test_ui_retail_feeder_matrix_matches_menu_consumers_and_callback_ownership()
     assert "feeder FEEDER_REDTEAM_LIST" in legacy_team_end_scoreboard
     assert "feeder FEEDER_BLUETEAM_LIST" in legacy_team_end_scoreboard
     assert "FEEDER_ENDSCOREBOARD" not in legacy_team_end_scoreboard
-
-    bridge_feeders = set(re.findall(r"\bfeeder\s+(FEEDER_[A-Z0-9_]+)\b", ui_bridge))
-    assert bridge_feeders == {"FEEDER_SERVERS", "FEEDER_SERVERSTATUS"}
 
     feeder_count_block = _extract_function_block(ui_main, "static int UI_FeederCount(float feederID) {")
     feeder_text_block = _extract_function_block(

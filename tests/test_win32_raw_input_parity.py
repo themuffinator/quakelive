@@ -11,6 +11,7 @@ from tests.compiler_support import compile_c_binary, find_c_compiler, shared_lib
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WIN_INPUT = REPO_ROOT / "src" / "code" / "win32" / "win_input.c"
+WIN_GLIMP = REPO_ROOT / "src" / "code" / "win32" / "win_glimp.c"
 WIN_LOCAL = REPO_ROOT / "src" / "code" / "win32" / "win_local.h"
 WIN_MAIN = REPO_ROOT / "src" / "code" / "win32" / "win_main.c"
 WIN_WNDPROC = REPO_ROOT / "src" / "code" / "win32" / "win_wndproc.c"
@@ -355,9 +356,39 @@ def test_win32_mouse_capture_falls_back_to_absolute_client_coordinates_for_ui_la
 	assert "oldCursorY" in window_block
 	assert "Sys_QueEvent( 0, SE_MOUSE, current_pos.x, current_pos.y, 0, NULL );" in window_block
 
+	assert "cls.keyCatchers & ~( KEYCATCH_MESSAGE | KEYCATCH_RETAIL_MOUSEPASS )" in frame_block
+	assert "Cvar_VariableValue (\"r_fullscreen\")" not in frame_block
+	assert 'Cvar_VariableString("r_glDriver")' not in frame_block
+	assert frame_block.index(
+		"cls.keyCatchers & ~( KEYCATCH_MESSAGE | KEYCATCH_RETAIL_MOUSEPASS )"
+	) < frame_block.index("in_nograb && in_nograb->integer")
+	assert frame_block.index("in_nograb && in_nograb->integer") < frame_block.index(
+		"!in_appactive"
+	)
 	assert "if ( !IN_ShouldUseRelativeMouse() ) {" in mouse_move_block
 	assert "IN_WindowMouse();" in mouse_move_block
 	assert len(re.findall(r"IN_DeactivateMouse\s*\(\s*\);\s*IN_MouseMove\s*\(\s*\);", frame_block)) >= 3
+
+
+def test_fast_vid_restart_deactivates_mouse_without_flipping_appactive_state() -> None:
+	win_input = WIN_INPUT.read_text(encoding="utf-8")
+	win_glimp = WIN_GLIMP.read_text(encoding="utf-8")
+	win_local = WIN_LOCAL.read_text(encoding="utf-8")
+	activate_block = _extract_function_block(win_input, "void IN_Activate (qboolean active) {")
+	fast_restart_block = _extract_function_block(
+		win_glimp, "qboolean WIN_FastVidRestart( int *width, int *height, qboolean *fullscreen )"
+	)
+
+	assert "void\tIN_DeactivateMouse( void );" in win_local
+	assert "in_appactive = active;" in activate_block
+	assert "IN_DeactivateMouse();" in activate_block
+	assert "if ( !active )" not in activate_block
+
+	assert "IN_DeactivateMouse();" in fast_restart_block
+	assert "IN_Activate( qfalse );" not in fast_restart_block
+	assert fast_restart_block.index("IN_DeactivateMouse();") < fast_restart_block.index(
+		"GLW_ChangeWindowMode()"
+	)
 
 
 def test_win32_raw_buttons_fall_back_to_window_messages_for_menu_catchers() -> None:

@@ -2766,9 +2766,13 @@ void ClientSpawn(gentity_t *ent) {
 	// always clear the kamikaze flag
 	ent->s.eFlags &= ~EF_KAMIKAZE;
 
-	// toggle the teleport bit so the client knows to not lerp
-	// and never clear the voted flag
-	flags = ent->client->ps.eFlags & (EF_TELEPORT_BIT | EF_VOTED | EF_TEAMVOTED);
+	// Retail updates the spectator-respawn cue before toggling teleport.
+	if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		client->ps.eFlags |= EF_SPECTATOR_RESPAWN;
+	} else {
+		client->ps.eFlags &= ~EF_SPECTATOR_RESPAWN;
+	}
+	flags = client->ps.eFlags & ( EF_TELEPORT_BIT | EF_SPECTATOR_RESPAWN | EF_TEAMVOTED );
 	flags ^= EF_TELEPORT_BIT;
 
 	G_FlushExpiredClientTeamHoldStats( client, level.time );

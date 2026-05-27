@@ -161,6 +161,13 @@ The follow-up symbol pass aligned the cgame step-jump helper names with the qaga
 
 The step-jump source follow-up rechecked qagame `0x1002EFE0` and cgame `0x100034B0` against the Ghidra `PM_StepSlideMove` decompile. Source now uses the retail `cmd.serverTime - jumpTime >= jumpTimeDeltaMin` delay check for the step-jump gates, rechecks `PM_CanStepJump` only for the general launch, and lets the crouch fallback run through `PM_CanCrouchStepJump` plus the shrunken-box clearance trace even when the general upmove gate rejects the command. The cgame symbol signature was also corrected back to the one-argument `PM_StepSlideMove(qboolean gravity)` boundary shown by HLIL.
 
+The 2026-05-27 step-move wrapper follow-up rechecked the same qagame/cgame
+pair against the full Ghidra decompile and closed the remaining trace-level
+wrapper differences. Source now preserves the guarded post-step down-trace
+velocity clip, runs the direct trace from the original origin to the stepped
+endpoint before recording step side effects, and rejects `startsolid` support
+traces before either step-jump takeoff branch can run.
+
 The jump-release source follow-up rechecked qagame `0x1002E510` / `0x1002E590` and cgame `0x100029E0` / `0x10002A60` against the compact pmove-setting parse order. Both binaries consult the recovered `autoHop` slot for held-jump release bypasses and do not use the following `bunnyHop` slot for that decision, so the shared source now keeps bunny-hop tuning out of `PM_ShouldRequireJumpRelease` and `PM_ShouldRequireStepJumpRelease`.
 
 The jump-takeoff velocity follow-up rechecked qagame `0x1002E2C0` and cgame

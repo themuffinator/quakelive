@@ -11,6 +11,28 @@ behavior and source analogue align cleanly.
 
 ## Latest Source Reconstruction Pass
 
+- Scope: spectator client-state resync across `G_ApplyTeamChange`,
+  `ClientSpawn`, `SpectatorClientEndFrame`, `G_SyncSpectatorItemStatesForClient`,
+  and the cgame `CG_Respawn` `specresp` handoff.
+- Coverage delta: `+0` curated symbol-map entries; the owning functions were
+  already mapped, but the source still left the retail `0x4000` spectator
+  eFlag write unresolved as a GPL `EF_VOTED` collision.
+- Source delta: `EF_SPECTATOR_RESPAWN` now aliases the retail `0x4000`
+  playerstate bit. `G_ApplyTeamChange` and `ClientSpawn` set it for
+  `TEAM_SPECTATOR` snapshots and clear it for non-spectator snapshots before
+  the cgame `CG_Respawn` path answers with `specresp`. `SpectatorClientEndFrame`
+  now preserves that observer bit when copying followed-player snapshots, and
+  the existing item-state resync/broadcast path remains the server-side
+  responder for both `specresp` and direct spectator entry.
+- Evidence note: qagame HLIL/Ghidra at `0x10040440` and `0x1003BC30` both show
+  the `0x4000` set/clear around spectator team state. cgame HLIL at
+  `0x100433D0` reads the same bit before sending `"specresp"`, and qagame
+  `0x100462D9` routes that command back into `0x1004ED70`.
+- Reconstruction note:
+  `docs/reverse-engineering/spectator-client-state-wiring-reconstruction-2026-05-27.md`.
+
+## Previous Source Reconstruction Pass
+
 - Scope: spectator state and movement across `SpectatorThink`,
   `G_TouchTriggers`, `SpectatorClientEndFrame`, `StopFollowing`,
   `Cmd_Follow_f`, `Cmd_FollowCycle_f`, shared qagame/cgame `PM_FlyMove`, and
@@ -664,6 +686,13 @@ The corrective 2026-05-26 step/chain audit then split the two retail
 ramp accumulation. PMF_AIR_CONTROL still overrides disabled `pmove_ChainJump`
 mode `0`, and the offset-threshold air-control denominator plus final max clamp
 are pinned with executable fixtures.
+The 2026-05-27 step-move wrapper pass rechecked qagame `0x1002EFE0` against the
+cgame twin and restored the remaining trace-level details in source: the
+post-step down trace only clips velocity when the velocity/plane dot is
+negative or within the retail `0.001` near-parallel threshold, the direct trace
+from the original origin to the stepped endpoint gates `pml.stepUp`, air-step
+friction, debug logging, and step-jump probes, and the projected support trace
+now rejects both `startsolid` and `allsolid`.
 The 2026-05-22 transport follow-up also restored `pmove_ChainJump` as an
 integer jump-mode selector rather than a boolean mirror, preserving the disabled
 mode `0`, gradient mode `1`, and additive mode `2` across server cvar caching,

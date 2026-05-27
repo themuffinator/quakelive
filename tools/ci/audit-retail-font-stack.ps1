@@ -113,9 +113,6 @@ Assert-FileContains -RelativePath 'src/code/ui/ui_shared.c' -Pattern 'menu->font
 Assert-FileContains -RelativePath 'docs/reverse-engineering/ui-display-context-struct-layouts.md' -Pattern 'Seeded by the asset-global `font` directive or the retail `MenuParse_font` registration path' -Description 'UI display-context doc for parser-owned primary font registration'
 Assert-FileContains -RelativePath 'docs/reverse-engineering/ui-display-context-struct-layouts.md' -Pattern 'Font registration hook used by the asset-global parser and the retail menu-font normalization/bootstrap path' -Description 'UI display-context doc for parser-owned font hook'
 Assert-FileContains -RelativePath 'docs/reverse-engineering/ui-display-context-struct-layouts.md' -Pattern 'AssetCache` now owns the fixed Quake Live-compatible shared textures only' -Description 'UI display-context doc for art-only AssetCache ownership'
-Assert-FileContains -RelativePath 'src/code/ui/ui_quakelive_bridge.c' -Pattern 'font \\"fonts/font\\" 16' -Description 'bridge main-menu text-font size override'
-Assert-FileContains -RelativePath 'src/code/ui/ui_quakelive_bridge.c' -Pattern 'smallFont \\"fonts/smallfont\\" 12' -Description 'bridge main-menu small-font size override'
-Assert-FileContains -RelativePath 'src/code/ui/ui_quakelive_bridge.c' -Pattern 'bigFont \\"fonts/bigfont\\" 20' -Description 'bridge main-menu big-font size override'
 Assert-FileContains -RelativePath 'src/ui/main.menu' -Pattern 'font\s+"fonts/font"\s+16' -Description 'main menu text-font size override'
 Assert-FileContains -RelativePath 'src/ui/main.menu' -Pattern 'smallFont\s+"fonts/smallfont"\s+12' -Description 'main menu small-font size override'
 Assert-FileContains -RelativePath 'src/ui/main.menu' -Pattern 'bigFont\s+"fonts/bigfont"\s+20' -Description 'main menu big-font size override'
@@ -387,7 +384,7 @@ else {
 if ( $uiItemInitStart -ge 0 -and $uiMenuHandleMouseMoveStart -gt $uiItemInitStart -and $uiItemParseFontStart -ge 0 -and $uiItemParseTextScaleStart -gt $uiItemParseFontStart ) {
 	$uiItemInitBlock = $uiSharedSource.Substring( $uiItemInitStart, $uiMenuHandleMouseMoveStart - $uiItemInitStart )
 	$uiItemParseFontBlock = $uiSharedSource.Substring( $uiItemParseFontStart, $uiItemParseTextScaleStart - $uiItemParseFontStart )
-	if ( $uiItemInitBlock -match 'item->fontIndex = ITEM_FONT_INHERIT;' -and
+	if ( $uiItemInitBlock -match 'item->fontIndex = FONT_DEFAULT;' -and
 		$uiItemParseFontBlock -match 'PC_Int_Parse\(handle, &item->fontIndex\)' -and
 		$uiItemParseFontBlock -notmatch 'PC_String_Parse' -and
 		$uiItemParseFontBlock -notmatch 'String_Alloc' ) {

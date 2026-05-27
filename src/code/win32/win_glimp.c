@@ -1030,7 +1030,7 @@ WIN_FastVidRestart
 */
 qboolean WIN_FastVidRestart( int *width, int *height, qboolean *fullscreen )
 {
-	IN_Activate( qfalse );
+	IN_DeactivateMouse();
 
 	if ( !GLW_ChangeWindowMode() )
 	{

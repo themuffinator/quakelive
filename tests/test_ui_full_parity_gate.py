@@ -253,7 +253,7 @@ def _build_ui_full_parity_gate_report(
 	service_routing_ok = "qboolean UI_HandleDeferredScriptExec( const itemDef_t *item, const char *commandText ) {" in ui_main
 	service_routing_ok = service_routing_ok and 'UI_CommandTextMatches( commandText, "web_showBrowser" )' in ui_main
 	service_routing_ok = service_routing_ok and 'UI_CommandTextMatches( commandText, "web_changeHash" )' in ui_main
-	service_routing_ok = service_routing_ok and 'Menus_ActivateByName( "ql_bridge_browser" );' in ui_main
+	service_routing_ok = service_routing_ok and 'UI_ShowOfflineMenuFallbackError( "Browser overlay unavailable; retail menu remains active." );' in ui_main
 	service_routing_ok = service_routing_ok and "if ( UI_HandleDeferredScriptExec( item, val ) ) {" in ui_shared
 	service_routing_ok = service_routing_ok and "test_online_service_bridge_only_hard_stubs_when_build_disabled" in platform_tests
 	service_routing_ok = service_routing_ok and "test_service_disabled_menu_verb_matrix_stays_explicit" in platform_tests

@@ -28,8 +28,8 @@ CD KEY MENU
 The current reconstruction keeps the classic UI_CDKeyMenu entry points as
 compatibility helpers, but the committed retail Quake Live menu-script and
 dispatcher surface does not currently revalidate them as standalone owners.
-When available, the reconstructed menu flow prefers the writable bridge-driven
-CD-key screen.
+Native UI builds keep the command as an explicit offline-service stub rather
+than generating replacement menu assets.
 
 =======================================================================
 */
@@ -61,39 +61,6 @@ typedef struct {
 
 static cdkeyMenuInfo_t	cdkeyMenuInfo;
 #endif
-
-/*
-===============
-UI_CDKeyMenu_OpenBridge
-
-Prefer the bridge-generated Quake Live CD-key menu when the writable
-bridge scripts are available. This keeps the restored compatibility entry
-points aligned with the reconstructed retail script flow.
-===============
-*/
-static qboolean UI_CDKeyMenu_OpenBridge( void ) {
-	menuDef_t *menu;
-
-	if ( !UI_BrowserBridgeAvailable() ) {
-		return qfalse;
-	}
-
-	menu = Menus_FindByName( "ql_bridge_credentials" );
-	if ( !menu ) {
-		UI_ParseMenu( "ui/ql_bridge_credentials.menu" );
-		menu = Menus_FindByName( "ql_bridge_credentials" );
-	}
-
-	if ( !menu ) {
-		return qfalse;
-	}
-
-	trap_Cvar_Set( "cl_paused", "1" );
-	trap_Key_SetCatcher( KEYCATCH_UI );
-	Menus_CloseAll();
-	Menus_ActivateByName( "ql_bridge_credentials" );
-	return qtrue;
-}
 
 /*
 ===============
@@ -222,8 +189,8 @@ static void UI_CDKeyMenu_DrawKey( void *self ) {
 ===============
 UI_CDKeyMenu_Init
 
-Fallback initialization for environments where the bridge-generated Quake Live
-CD-key menu cannot be emitted.
+Fallback initialization for legacy QVM-style builds that still link the
+classic CD-key popup.
 ===============
 */
 #if !defined( UI_EXPORTS )
@@ -303,7 +270,6 @@ UI_CDKeyMenu_Cache
 =================
 */
 void UI_CDKeyMenu_Cache( void ) {
-	UI_BrowserBridgeAvailable();
 #if !defined( UI_EXPORTS )
 	trap_R_RegisterShaderNoMip( ART_ACCEPT0 );
 	trap_R_RegisterShaderNoMip( ART_ACCEPT1 );
@@ -319,14 +285,10 @@ UI_CDKeyMenu
 ===============
 */
 void UI_CDKeyMenu( void ) {
-	if ( UI_CDKeyMenu_OpenBridge() ) {
-		return;
-	}
-
 #if defined( UI_EXPORTS )
 	trap_Cvar_Set( "ui_cdkeychecked", "1" );
 	trap_Cvar_Set( "ui_cdkeyvalid", "CD key menu unavailable in native UI build." );
-	Com_Printf( "UI: ql_bridge_credentials missing; native CD-key popup fallback not linked.\n" );
+	Com_Printf( "UI: native CD-key popup fallback is not linked.\n" );
 #else
 	UI_CDKeyMenu_Init();
 	UI_PushMenu( &cdkeyMenuInfo.menu );

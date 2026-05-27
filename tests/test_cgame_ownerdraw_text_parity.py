@@ -236,6 +236,10 @@ def test_local_time_uses_retail_date_format() -> None:
 
     assert "static const char *cgMonthAbbrev[12]" in source
     assert '%02d:%02d (%s %02d, %d)' in block
+    assert "x = rect->x;" in block
+    assert "CG_AlignTextX( &x, buffer, scale, align );" in block
+    assert "CG_Text_Paint( x, rect->y, scale, color, buffer, 0, 0, textStyle );" in block
+    assert "CG_GetTextPosition" not in block
     assert '%02i:%02i' not in block
 
 
@@ -827,6 +831,9 @@ def test_first_twenty_limit_count_map_and_vote_draws_match_retail_origins() -> N
     assert "CG_DrawPlayerCounts(&rect, scale, color, textStyle, align);" in ownerdraw_block
 
     assert "fconvert.s(fconvert.t(arg1[1]))" in retail_map_name
+    assert "CG_BuildMapDisplayName( nameBuffer, sizeof( nameBuffer ) );" in map_name_block
+    assert "ARENA_INFO_KEY_LONGNAME" in source
+    assert 'CG_FindArenaLongNameInFile( "scripts/arenas.txt", mapName, buffer, bufferSize )' in source
     assert "CG_Text_Paint(rect->x, rect->y, scale, color, nameBuffer, 0, 0, textStyle);" in map_name_block
     assert "rect->y + rect->h" not in map_name_block
 

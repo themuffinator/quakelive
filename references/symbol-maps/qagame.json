@@ -3327,7 +3327,7 @@
       "signature": "void PM_StepSlideMove(qboolean gravity)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Retail PM_StepSlideMove entry point aligned with bg_slidemove.c::PM_StepSlideMove. The HLIL shows the classic one-argument boundary calling PM_SlideMove, attempting the step-up trace, rechecking PM_CanStepJump for the general step-jump launch, setting the normal step-jump takeoff latch before the shared jump leaf, then falling back through PM_CanCrouchStepJump plus the shrunken-box clearance trace before setting the crouch-step takeoff latch; the current tree keeps configurable step height behind the private helper while preserving this public boundary."
+      "comment": "Retail PM_StepSlideMove entry point aligned with bg_slidemove.c::PM_StepSlideMove. The HLIL shows the classic one-argument boundary calling PM_SlideMove, attempting the step-up trace, guarding the post-step down-trace clip with the velocity/plane dot threshold, running the direct-path trace before step side effects, rechecking PM_CanStepJump for the general launch, setting the normal step-jump takeoff latch before the shared jump leaf, then falling back through PM_CanCrouchStepJump plus the shrunken-box clearance trace before setting the crouch-step takeoff latch; the current tree keeps configurable step height behind the private helper while preserving this public boundary."
     },
     {
       "address": "0x1002F6F0",
@@ -4641,7 +4641,7 @@
       "signature": "void ClientSpawn(gentity_t *ent)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Full retail player spawn/bootstrap boundary. It selects active or spectator spawn placement from the incoming PM_SPECTATOR state, preserves the persistent and session state that survive respawn, rebuilds the playerstate and entity defaults for the new life, seeds the PMF_CROUCH_SLIDE / PMF_DOUBLE_JUMP / PMF_AIR_CONTROL profile bits from the active movement globals, links non-spectator players at the chosen origin, and then fans into the deeper post-spawn loadout and finalization helper."
+      "comment": "Full retail player spawn/bootstrap boundary. It selects active or spectator spawn placement from the incoming PM_SPECTATOR state, sets or clears the retail 0x4000 spectator-respawn eFlag from sess.sessionTeam before toggling teleport, preserves the persistent and session state that survive respawn, rebuilds the playerstate and entity defaults for the new life, seeds the PMF_CROUCH_SLIDE / PMF_DOUBLE_JUMP / PMF_AIR_CONTROL profile bits from the active movement globals, links non-spectator players at the chosen origin, and then fans into the deeper post-spawn loadout and finalization helper."
     },
     {
       "address": "0x1003C7E0",
@@ -4961,7 +4961,7 @@
       "signature": "void G_ApplyTeamChange(gentity_t *ent, team_t team, spectatorState_t specState, int specClient)",
       "string_refs": [],
       "relocation_refs": [],
-      "comment": "Descriptive retail-only inner `SetTeam` executor. Reached after the outer parser resolves the requested team and spectator mode, it handles the death/body-queue transition, mutates the client session fields, repairs team leadership, republishes userinfo, and re-enters the client through ClientBegin."
+      "comment": "Descriptive retail-only inner `SetTeam` executor. Reached after the outer parser resolves the requested team and spectator mode, it handles the death/body-queue transition, sets or clears the retail 0x4000 spectator-respawn eFlag, mutates the client session fields, resyncs spectator item state on observer entry, repairs team leadership, republishes userinfo, and re-enters the client through ClientBegin."
     },
     {
       "address": "0x100400F0",

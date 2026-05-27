@@ -611,7 +611,7 @@ def test_posix_native_builds_cover_linux_and_macos_ci() -> None:
 	assert "src/code/cgame/cg_newdraw.c" in native_build_script
 	assert "src/code/game/g_match_state.c" in native_build_script
 	assert "src/game/g_match_config.c" in native_build_script
-	assert "src/code/ui/ui_quakelive_bridge.c" in native_build_script
+	assert "src/code/ui/ui_quakelive_bridge.c" not in native_build_script
 	assert "${BUILD_ROOT}/${MAKE_PLATFORM}q3ded" in native_build_script
 	assert "quakelive-${PLATFORM_NAME}-${HOST_ARCH}-native.tar.gz" in native_build_script
 	assert "package_sha256=" in native_build_script

@@ -62,6 +62,7 @@ void	IN_Move (usercmd_t *cmd);
 // add additional non keyboard / non mouse movement on top of the keyboard move cmd
 
 void	IN_DeactivateWin32Mouse( void);
+void	IN_DeactivateMouse( void );
 void	IN_RawInputEvent( WPARAM wParam, LPARAM lParam );
 qboolean IN_RawInputIsActive( void );
 

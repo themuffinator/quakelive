@@ -39,7 +39,7 @@ Breakdown:
 3. The retail UI corpus is now materialized from the local Steam install into `build/ui_retail_corpus_cache/baseq3`, and `artifacts/ui_bundle/ui_retail_inventory.json` tracks the validated input set used by bundle generation and parity tests.
 4. The UI bundle pipeline now stages retail runtime roots exactly as the live menus request them (`icons/`, `menu/icons/`, `levelshots/`, `ui/assets/`) and reproduces `pak_uiql.pk3` cleanly from the tracked manifest plus baked font outputs.
 5. Final runtime evidence is now tracked in `artifacts/ui_validation/logs/ui_runtime_evidence_20260406.json`, which records the current main-menu, ingame, spectator, scoreboard, vote, and ingame-menu capture set together with the clean parser/script outcome for the audited UI flows.
-6. The combined strict-retail module audit now also treats the audited offline UI launcher/resource slice as closed: local bridge menus and launcher-compatible fallback assets remain available without the missing retail Awesomium host, while any broader browser-host reconstruction still belongs to the native client host plan rather than to the UI module gap register.
+6. The combined strict-retail module audit now also treats the audited offline UI launcher/resource slice as closed: the retail `ui/menus.txt` root remains active when the missing Awesomium host is unavailable, launcher-compatible fallback assets remain available, and any broader browser-host reconstruction still belongs to the native client host plan rather than to the UI module gap register.
 
 ## Parity Gap Register
 

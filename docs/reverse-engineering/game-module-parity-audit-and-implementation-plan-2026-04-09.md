@@ -138,7 +138,7 @@ expectations:
 | --- | ---: | --- |
 | `cgame` | `100%` | Mapping is saturated, the direct suite is green, the retail host now loads/unloads `cgamex86.dll`, the recovered `pstats` transport now survives round-trip retail-style handling, the retail post-`tag_head` world transform is mirrored in writable source, and no audited offline module flow still depends on missing launcher ownership. |
 | `qagame` | `100%` | The retail host now loads, runs, and unloads `qagamex86.dll`, and no active qagame-owned behavior or host-contract gap remains in the combined module register; the remaining visual shortfall is explicitly bounded to the renderer lane, outside module ownership. |
-| `ui` | `100%` | The retail host now loads `uix86.dll` in both menu and map probes, the service-disabled bridge menus stay navigable, local launcher-compatible resource fallbacks stay available offline, and no audited UI path still depends on missing launcher ownership to reach parity. |
+| `ui` | `100%` | The retail host now loads `uix86.dll` in both menu and map probes, service-disabled browser verbs keep the retail menu root navigable without generated menu assets, local launcher-compatible resource fallbacks stay available offline, and no audited UI path still depends on missing launcher ownership to reach parity. |
 
 Weighted by committed Ghidra function counts (`751`, `1027`, `348`):
 

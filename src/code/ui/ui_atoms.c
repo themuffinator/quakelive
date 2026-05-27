@@ -670,11 +670,7 @@ qboolean UI_ConsoleCommand( int realTime ) {
 
 		overlayAvailable = UI_BrowserOverlayAvailable();
 		if (!overlayAvailable) {
-			if (UI_OpenBrowserBridgeMenu()) {
-				return qtrue;
-			} else {
-				Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\n");
-			}
+			Com_Printf("UI: browser overlay unavailable; web_showBrowser stubbed.\n");
 			return qtrue;
 		}
 
@@ -690,8 +686,8 @@ qboolean UI_ConsoleCommand( int realTime ) {
 	}
 
 	if ( Q_stricmp(cmd, "ui_useQuakeLiveMenus") == 0 ) {
-		if (!UI_BrowserOverlayAvailable() && !UI_BrowserBridgeAvailable()) {
-			Com_Printf("UI: browser overlay unavailable and no bridge scripts detected; loading Quake Live menus without web integration.\n");
+		if (!UI_BrowserOverlayAvailable()) {
+			Com_Printf("UI: browser overlay unavailable; loading retail Quake Live menus without web integration.\n");
 		}
 
 		UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qtrue);
@@ -699,8 +695,8 @@ qboolean UI_ConsoleCommand( int realTime ) {
 	}
 
 	if ( Q_stricmp(cmd, "ui_toggleMenuFlow") == 0 ) {
-		if (!UI_BrowserOverlayAvailable() && UI_BrowserBridgeAvailable()) {
-			Com_Printf("UI: activating bridge-driven Quake Live menus; browser overlay unavailable.\n");
+		if (!UI_BrowserOverlayAvailable()) {
+			Com_Printf("UI: retail Quake Live menus already active; browser overlay unavailable.\n");
 		}
 
 		UI_ApplyMenuFlowChange(UI_MENU_FLOW_QUAKELIVE, qtrue);

@@ -2377,7 +2377,7 @@ def test_engine_cvar_twentysecond_renderer_startup_tranche_matches_retail_contra
 	assert 'if ( !GLW_LoadOpenGL( r_glDriver->string ) )' in win_glimp
 	assert 'if ( !Q_stricmp( r_glDriver->string, OPENGL_DRIVER_NAME ) )' in win_glimp
 	assert 'else if ( !Q_stricmp( r_glDriver->string, _3DFX_DRIVER_NAME ) )' in win_glimp
-	assert '&& strcmp( Cvar_VariableString("r_glDriver"), _3DFX_DRIVER_NAME) )' in win_input
+	assert 'cls.keyCatchers & ~( KEYCATCH_MESSAGE | KEYCATCH_RETAIL_MOUSEPASS )' in win_input
 
 	assert 'r_allowExtensions = ri.Cvar_Get( "r_allowExtensions", "1", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init
 	assert 'if ( !r_allowExtensions->integer )' in win_glimp
@@ -3332,7 +3332,7 @@ def test_engine_cvar_thirtyseventh_renderer_extension_startup_tranche_matches_re
 	assert 'if ( !GLW_LoadOpenGL( r_glDriver->string ) )' in win_glimp
 	assert 'if ( !Q_stricmp( r_glDriver->string, OPENGL_DRIVER_NAME ) )' in win_glimp
 	assert 'else if ( !Q_stricmp( r_glDriver->string, _3DFX_DRIVER_NAME ) )' in win_glimp
-	assert '&& strcmp( Cvar_VariableString("r_glDriver"), _3DFX_DRIVER_NAME) )' in win_input
+	assert 'cls.keyCatchers & ~( KEYCATCH_MESSAGE | KEYCATCH_RETAIL_MOUSEPASS )' in win_input
 
 	assert 'DAT_01740dd4 = (*DAT_01740d40)("r_allowExtensions",&DAT_00551624,0x21);' in retail_ghidra
 	assert 'r_allowExtensions = ri.Cvar_Get( "r_allowExtensions", "1", CVAR_ARCHIVE | CVAR_LATCH );' in tr_init

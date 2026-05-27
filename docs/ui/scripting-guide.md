@@ -13,7 +13,7 @@ This guide documents how to stage Quake Live HUD and menu assets inside the GPL 
 - If `src/ui` drift reappears, generate retail-correct replacements with `scripts/ui/write_retail_ui_overrides.py` instead of patching files in place.
 - Treat the generated overlay manifest as the default drift report, not as a default runtime package: `src/ui` stays the read-only baseline, normal contributor runs keep retail runtime PK3s unmaterialized, and the current manifest records an empty `drift_files` set on the clean worktree.
 - The supported exception is an explicit runtime-refresh or probe flow that calls `tools/build_ui_bundle.py --runtime-root <writable baseq3>`, emits `pak_uiql.pk3`, emits the bounded `pak_ui_src_retail_overlay.pk3` only when `drift_files` is non-empty, and records `artifacts/ui_bundle/runtime_ui_package_manifest.json` as the verification contract.
-- Do not leave repo-generated retail replacement PK3s in `fs_homepath` by default. Outside the explicit runtime-refresh/probe path above, the only files that should appear there are locally built DLLs, configs, logs, screenshots, and bridge files that do not duplicate retail distributables.
+- Do not leave repo-generated retail replacement PK3s in `fs_homepath` by default. Outside the explicit runtime-refresh/probe path above, the only files that should appear there are locally built DLLs, configs, logs, and screenshots.
 - Keep GPL-only helpers (`credential.menu`, `ingame_quakelive.txt`, `menus_quakelive.txt`) but reconcile their dependencies so they reference the restored assets instead of temporary fallbacks.
 - Diff the staged files against upstream Quake Live revisions before shipping changes to maintain behavioural parity, and record any future drift in the overlay manifest plus the audit docs/tests.
 
@@ -47,10 +47,10 @@ This guide documents how to stage Quake Live HUD and menu assets inside the GPL 
 
 ## Service-Disabled Menu Routing
 - Treat the retail browser verbs reachable from menu scripts as an explicit routing matrix when `QL_BUILD_ONLINE_SERVICES=0` or no overlay provider is initialised.
-- `exec web_showBrowser`: if invoked from the retail main menu, the writable runtime now opens the generated `ql_bridge_browser` surface instead of dispatching into the inert host stub; if the bridge cannot be loaded, the UI raises `error_popmenu` with a native fallback message.
+- `exec web_showBrowser`: when the browser overlay is unavailable, the UI swallows the command locally and keeps the retail menu tree active; from the retail main menu it raises the existing `error_popmenu` with a native fallback message instead of generating replacement menu assets.
 - `exec web_showBrowser` from in-game lower-nav panels and `exec web_changeHash ...` from `intro.menu` or `ingame.menu` are swallowed locally when the overlay is unavailable, leaving the companion native menus (`ingame_about`, join controls, settings panels) active instead of hard-stopping on dead service commands.
 - `uiScript stopRefresh` always stops the native server refresh path. The overlay-specific `web_stopRefresh` console command is only forwarded when the browser layer exists; otherwise the UI logs the offline-native fallback and keeps the browser list usable.
-- Launcher-compatible local resource loads stay available even when live online services are disabled: the retained owner chain still checks `web.pak`, the mapped `fs_webpath` / `screenshots` fallback roots, and the non-Steam URI bridge before reporting a resource miss, so offline bridge menus and default advert content do not depend on the missing retail launcher host.
+- Launcher-compatible local resource loads stay available even when live online services are disabled: the retained owner chain still checks `web.pak`, the mapped `fs_webpath` / `screenshots` fallback roots, and the non-Steam URI bridge before reporting a resource miss, so default advert content does not depend on the missing retail launcher host.
 - `activateAdvert` stays implemented in offline builds through the advert shader fallback path and the advertisement wait-screen text export, so advert panels and wait states remain drawable even with online services disabled.
 
 ## Accessibility Considerations

@@ -16,7 +16,8 @@ typedef enum {
 	QLR_TRACE_FREE_AIR,
 	QLR_TRACE_STEP_UNSUPPORTED,
 	QLR_TRACE_STEP_SUPPORTED,
-	QLR_TRACE_CROUCH_STEP_FALLBACK
+	QLR_TRACE_CROUCH_STEP_FALLBACK,
+	QLR_TRACE_DOWN_CLIP_GUARD
 } qlr_trace_mode_t;
 
 typedef struct {
@@ -181,6 +182,7 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 	case QLR_TRACE_STEP_UNSUPPORTED:
 	case QLR_TRACE_STEP_SUPPORTED:
 	case QLR_TRACE_CROUCH_STEP_FALLBACK:
+	case QLR_TRACE_DOWN_CLIP_GUARD:
 		switch ( callIndex ) {
 		case 1:
 			VectorSet( traceEnd, 5.0f, 0.0f, 5.0f );
@@ -193,6 +195,11 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 			return;
 
 		case 3:
+			if ( qlr_traceMode == QLR_TRACE_DOWN_CLIP_GUARD ) {
+				VectorCopy( end, traceEnd );
+				QLR_SetTraceResult( results, 1.0f, traceEnd, upNormal, 0, 0, ENTITYNUM_NONE );
+				return;
+			}
 			if ( qlr_traceMode == QLR_TRACE_CROUCH_STEP_FALLBACK ) {
 				VectorSet( traceEnd, 10.0f, 0.0f, 10.0f );
 			} else {
@@ -202,6 +209,11 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 			return;
 
 		case 4:
+			if ( qlr_traceMode == QLR_TRACE_DOWN_CLIP_GUARD ) {
+				VectorCopy( end, traceEnd );
+				QLR_SetTraceResult( results, 1.0f, traceEnd, upNormal, 0, 0, ENTITYNUM_NONE );
+				return;
+			}
 			if ( qlr_traceMode == QLR_TRACE_STEP_SUPPORTED ) {
 				VectorSet( traceEnd, 5.0f, 0.0f, -6.0f );
 				QLR_SetTraceResult( results, 0.5f, traceEnd, upNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
@@ -215,6 +227,11 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 			return;
 
 		case 5:
+			if ( qlr_traceMode == QLR_TRACE_DOWN_CLIP_GUARD ) {
+				VectorSet( traceEnd, end[0], end[1], 10.0f );
+				QLR_SetTraceResult( results, 0.5f, traceEnd, upNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
+				return;
+			}
 			if ( qlr_traceMode == QLR_TRACE_CROUCH_STEP_FALLBACK ) {
 				VectorSet( traceEnd, 5.0f, 0.0f, 10.0f );
 				QLR_SetTraceResult( results, 0.5f, traceEnd, upNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
@@ -231,6 +248,16 @@ static void QLR_TestTrace( trace_t *results, const vec3_t start, const vec3_t mi
 
 		case 7:
 			VectorSet( traceEnd, 10.0f, 0.0f, 10.0f );
+			QLR_SetTraceResult( results, 1.0f, traceEnd, upNormal, 0, 0, ENTITYNUM_NONE );
+			return;
+
+		case 8:
+			if ( qlr_traceMode == QLR_TRACE_STEP_SUPPORTED ) {
+				VectorSet( traceEnd, 5.0f, 0.0f, 5.0f );
+				QLR_SetTraceResult( results, 0.5f, traceEnd, upNormal, 0, CONTENTS_SOLID, ENTITYNUM_WORLD );
+				return;
+			}
+			VectorCopy( end, traceEnd );
 			QLR_SetTraceResult( results, 1.0f, traceEnd, upNormal, 0, 0, ENTITYNUM_NONE );
 			return;
 
@@ -445,6 +472,69 @@ QLR_EXPORT void QLR_RunCrouchStepFallbackScenario( qlr_crouch_step_result_t *out
 	outResult->jumpTime = localPS.jumpTime;
 	outResult->upmove = localPM.cmd.upmove;
 	outResult->pmFlags = localPS.pm_flags;
+	outResult->traceCalls = qlr_traceCallCount;
+
+	pm = previousPM;
+	pm_airsteps = previousAirSteps;
+	pm_stepHeight = previousStepHeight;
+}
+
+/*
+=============
+QLR_RunDownTraceClipGuardScenario
+
+Runs a step-down collision where retail keeps upward velocity because the
+post-step down trace plane is not opposing movement.
+=============
+*/
+QLR_EXPORT void QLR_RunDownTraceClipGuardScenario( qlr_crouch_step_result_t *outResult ) {
+	pmove_t		localPM;
+	playerState_t	localPS;
+	pmove_settings_t	localSettings;
+	pmove_t		*previousPM;
+	int		previousAirSteps;
+	float		previousStepHeight;
+
+	if ( !outResult ) {
+		return;
+	}
+
+	memset( outResult, 0, sizeof( *outResult ) );
+	QLR_ResetPmove( &localPM, &localPS, &localSettings );
+	QLR_ResetTraceMode( QLR_TRACE_DOWN_CLIP_GUARD );
+
+	VectorSet( localPM.mins, -15.0f, -15.0f, MINS_Z );
+	VectorSet( localPM.maxs, 15.0f, 15.0f, 32.0f );
+
+	localPS.origin[0] = 0.0f;
+	localPS.origin[1] = 0.0f;
+	localPS.origin[2] = 0.0f;
+	localPS.velocity[0] = 100.0f;
+	localPS.velocity[1] = 0.0f;
+	localPS.velocity[2] = 0.05f;
+
+	localSettings.stepJump = qfalse;
+
+	localPM.cmd.serverTime = 100;
+	localPM.cmd.upmove = 0;
+
+	pml.frametime = 0.1f;
+	pml.msec = 100;
+	pml.groundPlane = qfalse;
+	pml.walking = qfalse;
+
+	previousPM = pm;
+	pm = &localPM;
+	previousAirSteps = pm_airsteps;
+	previousStepHeight = pm_stepHeight;
+	pm_airsteps = 1;
+	pm_stepHeight = localSettings.stepHeight;
+
+	PM_StepSlideMove( qfalse );
+
+	outResult->velocityZ = localPS.velocity[2];
+	outResult->originZ = localPS.origin[2];
+	outResult->stepUp = pml.stepUp;
 	outResult->traceCalls = qlr_traceCallCount;
 
 	pm = previousPM;

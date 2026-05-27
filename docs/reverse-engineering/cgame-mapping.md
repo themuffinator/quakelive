@@ -9,6 +9,27 @@ Observed facts come from exports, function inventories, strings, and call flow.
 Inferred names are only used where the retail behavior and the Quake Live source
 analogue line up cleanly enough to support a stable mapping.
 
+## Latest Source Reconstruction Pass
+
+- Scope: spectator client-state resync across `CG_Respawn`,
+  `CG_RecordSpectatorItemPickup`, `CG_UpdateSpectatorItemPickups`, and the
+  qagame-produced `EV_ITEM_PICKUP_SPEC` transport.
+- Coverage delta: `+0` curated symbol-map entries; the owning cgame functions
+  were already mapped, but source still used a raw `0x00004000` literal for the
+  `specresp` cue.
+- Source delta: `CG_Respawn` now names that retail bit as
+  `EF_SPECTATOR_RESPAWN`, matching the qagame `G_ApplyTeamChange` and
+  `ClientSpawn` producers that set/clear the same network bit for spectator
+  respawn item-state resync. The cgame spectator-list prototype comment now
+  reflects the paged spectator strip rather than the primary/secondary target
+  labels.
+- Evidence note: cgame HLIL at `0x100433D0` checks the recovered `0x4000`
+  eFlag and sends `"specresp"`, while qagame `0x100462D9` handles that command
+  by calling the spectator item-state resync helper. The item-state payload is
+  pinned by qagame `0x1004EAC0` and cgame `0x10019D90`.
+- Reconstruction note:
+  `docs/reverse-engineering/spectator-client-state-wiring-reconstruction-2026-05-27.md`.
+
 ## Recovered Function Map
 
 | Retail address | Recovered name | Closest source analogue | Evidence summary | Confidence |
@@ -1007,6 +1028,7 @@ analogue line up cleanly enough to support a stable mapping.
 - The 2026-05-22 jump-release follow-up also checked `0x100029E0` and `0x10002A60` against the compact pmove-setting parse order. Both cgame leaves read the recovered `autoHop` slot for held-jump release bypasses and leave the adjacent `bunnyHop` slot out of that decision, matching qagame `0x1002E510` and `0x1002E590`.
 - The later jump-takeoff source follow-up tightened `0x10002790` / qagame `0x1002E2C0`: the reconstructed source now uses the retail gradient chain-jump scaler, the PMF_AIR_CONTROL additive chain/step branch keyed by `pmove_JumpVelocityTimeThresholdOffset`, and the vertical ramp-jump accumulation plus max clamp, instead of the earlier wrapper-side `pmove_StepJumpVelocity` addition and source-only planar ramp boost.
 - The corrective 2026-05-26 step/chain audit split the two `PM_StepSlideMove` latches in the shared takeoff path: the normal step-jump latch selects the `pmove_StepJumpVelocity` addend, while the crouch-step fallback keeps the chain-jump addend and uses its separate latch only to suppress ramp accumulation. PMF_AIR_CONTROL still overrides disabled `pmove_ChainJump` mode `0`, and the offset-threshold air-control denominator plus final max clamp are pinned with executable fixtures.
+- The 2026-05-27 step-move wrapper pass rechecked cgame `0x100034B0` against qagame `0x1002EFE0` and restored the remaining trace-level source details: guarded post-step down-trace velocity clipping, the direct-path trace that gates `pml.stepUp`/air-step friction/step-jump probes, and the `!startsolid && !allsolid` projected support acceptance gate.
 - The 2026-05-22 transport follow-up keeps `pmove_ChainJump` as the recovered integer jump-mode selector instead of a boolean mirror. Server publication, cgame compact parsing, and the legacy JSON fallback now preserve mode `0`/`1`/`2`, so the shared `PM_ApplyJumpTakeoff` leaf can reach the disabled, gradient, and additive branches that the retail mode global exposes.
 - The last two starts close the remaining sidecar utility leaves around that seam. `0x100050B0` is exact `PM_CorrectAllSolid`, anchored by the `\"%i:allsolid\\n\"` diagnostic and the same 3x3x3 jitter probe used by the public source. `0x10001EC0` and `0x100025E0` remain deliberate synthetic names, but their roles are stable: the first seeds one of two retail move-constant bundles right at the top of `PmoveSingle`, and the second builds and normalizes the shared 3D wish-move vector consumed by the water/fly/ladder corridor.
 - Before this round, the current cgame map held `715` named addresses: `615 / 751` committed Ghidra functions (`81.9%`) plus `100` HLIL-only anchors for `715 / 851` combined committed anchors (`84.0%`). After this round, the map holds `722` named addresses: `622 / 751` committed Ghidra functions (`82.8%`) plus the same `100` HLIL-only anchors for `722 / 851` combined committed anchors (`84.8%`).

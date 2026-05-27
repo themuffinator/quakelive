@@ -43,6 +43,18 @@ does the classic step-up retry, down trace, final velocity/origin selection,
 and only then checks step-jump launch eligibility when the final vertical delta
 is positive.
 
+The retail down-trace collision clip is not unconditional. After the step retry
+is pushed back down, qagame and cgame both compute `velocity dot plane.normal`
+and only call `PM_ClipVelocity` when the player is moving into the plane or is
+within the small `0.001` near-parallel threshold. A positive separating dot above
+that threshold keeps the stepped velocity intact.
+
+Retail also runs a direct trace from the original origin to the stepped endpoint
+after the down trace. The stepped origin remains in use either way, but the
+trace result gates the step side effects: `pml.stepUp`, air-step friction,
+debug `stepped` logging, and the step-jump/crouch-step probes only run when the
+direct path is obstructed (`fraction < 1.0`).
+
 The retail public step-slide boundary has one argument, `gravity`. The
 reconstructed source keeps `PM_StepSlideMove( qboolean gravity )` public and
 keeps the configurable `pm_stepHeight` indirection private inside
@@ -53,6 +65,11 @@ The general step-jump gate is checked twice. Retail first calls
 immediately before the shared takeoff leaf. If the second general check fails,
 the crouch branch can still run through `PM_CanCrouchStepJump` and the extra
 shrunken-box clearance trace.
+
+The projected support trace beneath the step-jump launch checks both
+`!startsolid` and `!allsolid` before accepting a walkable normal. The old source
+only tested `allsolid`; the 2026-05-27 step-move reconstruction restored the
+paired retail gate.
 
 The general gate uses the compact `autoHop` tuning slot for the held-jump
 release bypass. It does not use `bunnyHop`. If the release gate rejects a held
@@ -119,7 +136,9 @@ The current source keeps the retail leaves split where it matters:
 - `bg_slidemove.c::PM_CanPerformCrouchStepJump` owns the 1-unit shrunken-box,
   64-unit downward clearance trace.
 - `bg_slidemove.c::PM_StepSlideMoveWithStepHeight` reconstructs the retail
-  step-up/down trace seam while preserving the public one-argument wrapper.
+  step-up/down trace seam, including the guarded down-trace clip, the final
+  direct-path side-effect gate, and the projected-support `startsolid` reject,
+  while preserving the public one-argument wrapper.
 - `bg_pmove.c::PM_PrepareStepJumpTakeoff` sets the normal step velocity path.
 - `bg_pmove.c::PM_PrepareCrouchStepJumpTakeoff` uses the chain velocity path
   and suppresses ramp accumulation.
