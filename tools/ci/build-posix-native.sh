@@ -259,7 +259,11 @@ hash_file() {
 }
 
 manifest_path="${DIST_ROOT}/native-build-manifest.txt"
+package_version="${QL_POSIX_PACKAGE_VERSION:-}"
 {
+	if [[ -n "${package_version}" ]]; then
+		echo "artifact_version=${package_version}"
+	fi
 	echo "platform=${PLATFORM_NAME}"
 	echo "make_platform=${MAKE_PLATFORM}"
 	echo "arch=${HOST_ARCH}"
@@ -286,7 +290,11 @@ done
 
 cp "${manifest_path}" "${PACKAGE_ROOT}/native-build-manifest.txt"
 
-package_name="quakelive-${PLATFORM_NAME}-${HOST_ARCH}-native.tar.gz"
+if [[ -n "${package_version}" ]]; then
+	package_name="QuakeLive-reverse-${package_version}-${PLATFORM_NAME}-${HOST_ARCH}-native.tar.gz"
+else
+	package_name="quakelive-${PLATFORM_NAME}-${HOST_ARCH}-native.tar.gz"
+fi
 tar -czf "${DIST_ROOT}/${package_name}" -C "${PACKAGE_ROOT}" .
 printf "package_sha256=%s  %s\n" "$(hash_file "${DIST_ROOT}/${package_name}")" "${package_name}" >> "${manifest_path}"
 

@@ -5,7 +5,9 @@ param(
     [string]$Configuration = 'Release',
     [string]$Platform = 'Win32',
     [string]$PlatformToolset = 'v143',
-    [string]$WindowsTargetPlatformVersion = ''
+    [string]$WindowsTargetPlatformVersion = '',
+    [string]$BuildLogRoot = '',
+    [switch]$DisableOptionalCodecs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -192,6 +194,7 @@ Write-Host "Building '$Solution' ($Configuration|$msbuildPlatform) with toolset 
 $arguments = @(
     $solutionPath,
     '/m',
+    '/nologo',
     "/p:Configuration=$Configuration",
     "/p:Platform=$msbuildPlatform",
     "/p:PlatformToolset=$PlatformToolset",
@@ -202,12 +205,39 @@ if ($WindowsTargetPlatformVersion) {
     $arguments += "/p:WindowsTargetPlatformVersion=$WindowsTargetPlatformVersion"
 }
 
-$process = Start-Process -FilePath $msbuild -ArgumentList $arguments -Wait -PassThru
-if ($process.ExitCode -ne 0) {
-    throw "msbuild.exe failed with exit code $($process.ExitCode)."
+if ($DisableOptionalCodecs) {
+    $arguments += @(
+        '/p:QLEnableOgg=0',
+        '/p:QLEnablePng=0',
+        '/p:QLEnableFreeType=0'
+    )
 }
 
-Write-Host 'Native Windows solution build completed successfully.'
+if (-not $BuildLogRoot) {
+    $BuildLogRoot = Join-Path $RepoRoot 'artifacts\build-logs'
+}
+
+New-Item -ItemType Directory -Force -Path $BuildLogRoot | Out-Null
+$safeConfiguration = $Configuration -replace '[^A-Za-z0-9_.-]', '-'
+$safePlatform = $msbuildPlatform -replace '[^A-Za-z0-9_.-]', '-'
+$safeToolset = $PlatformToolset -replace '[^A-Za-z0-9_.-]', '-'
+$msbuildLog = Join-Path $BuildLogRoot "msbuild-${safeConfiguration}-${safePlatform}-${safeToolset}.log"
+$arguments += @(
+    '/clp:Summary;Verbosity=minimal',
+    "/flp:logfile=$msbuildLog;verbosity=normal;encoding=UTF-8"
+)
+
+$process = Start-Process -FilePath $msbuild -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+if ($process.ExitCode -ne 0) {
+    if (Test-Path $msbuildLog) {
+        Write-Error "msbuild.exe failed with exit code $($process.ExitCode). Last 160 log lines from '$msbuildLog':"
+        Get-Content -Path $msbuildLog -Tail 160 | ForEach-Object { Write-Error $_ }
+    }
+
+    throw "msbuild.exe failed with exit code $($process.ExitCode). See '$msbuildLog'."
+}
+
+Write-Host "Native Windows solution build completed successfully. MSBuild log: $msbuildLog"
 
 $cl = Get-CLPath
 if (-not $cl) {

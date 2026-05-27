@@ -28,6 +28,45 @@ OPTIONAL_WINDOWS_OUTPUTS = (
     ("build/win32/{configuration}/bin/qzeroded.exe", "qzeroded.exe"),
 )
 
+PROJECT_NAME = "QuakeLive-reverse"
+
+SKIP_ARTIFACT_DIR_NAMES = {
+    ".git",
+    ".github",
+    ".pytest_cache",
+    ".tmp",
+    ".vs",
+    ".vscode",
+    "__pycache__",
+    "Debug",
+    "Release",
+    "build",
+}
+
+SKIP_ARTIFACT_FILE_NAMES = {
+    ".DS_Store",
+    "Thumbs.db",
+    "desktop.ini",
+}
+
+SKIP_ARTIFACT_SUFFIXES = {
+    ".exp",
+    ".ilk",
+    ".lastbuildstate",
+    ".lib",
+    ".log",
+    ".obj",
+    ".pdb",
+    ".pyc",
+    ".pyo",
+    ".tmp",
+    ".tlog",
+}
+
+SKIP_ARTIFACT_DIR_NAMES_LOWER = {name.lower() for name in SKIP_ARTIFACT_DIR_NAMES}
+SKIP_ARTIFACT_FILE_NAMES_LOWER = {name.lower() for name in SKIP_ARTIFACT_FILE_NAMES}
+SKIP_ARTIFACT_SUFFIXES_LOWER = {suffix.lower() for suffix in SKIP_ARTIFACT_SUFFIXES}
+
 
 def run_git(repo_root: Path, *args: str) -> str:
     return subprocess.check_output(
@@ -90,6 +129,10 @@ def utc_build_date(explicit_date: str | None) -> str:
     return dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d")
 
 
+def iso_build_date(build_date: str) -> str:
+    return dt.datetime.strptime(build_date, "%Y%m%d").date().isoformat()
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -119,6 +162,33 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def should_skip_artifact_path(relative_path: Path, *, is_dir: bool) -> bool:
+    if any(part.lower() in SKIP_ARTIFACT_DIR_NAMES_LOWER for part in relative_path.parts):
+        return True
+
+    name = relative_path.name
+    if is_dir:
+        return False
+
+    if name.lower() in SKIP_ARTIFACT_FILE_NAMES_LOWER:
+        return True
+
+    suffixes = {suffix.lower() for suffix in relative_path.suffixes}
+    return bool(suffixes.intersection(SKIP_ARTIFACT_SUFFIXES_LOWER))
+
+
+def validate_stage_tree(stage_root: Path) -> None:
+    offenders: list[str] = []
+    for item in sorted(stage_root.rglob("*")):
+        relative = item.relative_to(stage_root)
+        if should_skip_artifact_path(relative, is_dir=item.is_dir()):
+            offenders.append(relative.as_posix())
+
+    if offenders:
+        sample = "\n".join(f"  - {item}" for item in offenders[:12])
+        raise SystemExit(f"Nightly package contains filtered build byproducts:\n{sample}")
+
+
 def build_version(args: argparse.Namespace) -> int:
     repo_root = args.repo_root.resolve()
     sha = normalise_sha(repo_root, args.sha)
@@ -131,17 +201,25 @@ def build_version(args: argparse.Namespace) -> int:
     version = f"0.0.0-{args.channel}.{build_date}.{run_number}+g{short_sha}"
     artifact_version = f"{args.channel}-{build_date}.{run_number}-g{short_sha}"
     generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+    build_date_iso = iso_build_date(build_date)
+    archive_prefix = f"{PROJECT_NAME}-{artifact_version}"
 
     payload = {
         "artifactVersion": artifact_version,
+        "archivePrefix": archive_prefix,
         "buildDateUtc": build_date,
+        "buildDate": build_date_iso,
         "channel": args.channel,
         "generatedAtUtc": generated_at,
+        "project": PROJECT_NAME,
+        "releaseTag": artifact_version,
+        "releaseTitle": f"{PROJECT_NAME} nightly {build_date_iso} ({short_sha})",
         "runAttempt": run_attempt,
         "runNumber": run_number,
         "semver": version,
         "sourceRef": ref_name,
         "sourceSha": sha,
+        "versionLabel": f"{artifact_version}+{run_attempt}",
     }
 
     output_path = repo_relative_path(repo_root, args.output)
@@ -153,6 +231,8 @@ def build_version(args: argparse.Namespace) -> int:
             "build_date_utc": build_date,
             "semver": version,
             "short_sha": short_sha,
+            "source_ref": ref_name,
+            "source_sha": sha,
         },
     )
 
@@ -251,6 +331,8 @@ def build_package_manifest(
     package_hash = sha256_file(package_path)
     return {
         "artifactVersion": manifest["artifactVersion"],
+        "buildDate": manifest.get("buildDate"),
+        "channel": manifest.get("channel"),
         "configuration": configuration,
         "files": list(files),
         "package": {
@@ -258,11 +340,49 @@ def build_package_manifest(
             "sha256": package_hash,
             "size": package_path.stat().st_size,
         },
+        "project": manifest.get("project", PROJECT_NAME),
+        "releaseTitle": manifest.get("releaseTitle"),
         "runtimeProfile": runtime_profile,
         "sourceRef": manifest["sourceRef"],
         "sourceSha": manifest["sourceSha"],
         "toolset": toolset,
+        "versionLabel": manifest.get("versionLabel"),
     }
+
+
+def artifact_record(path: Path, root: Path) -> dict:
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "sha256": sha256_file(path),
+        "size": path.stat().st_size,
+    }
+
+
+def build_nightly_release_manifest(manifest: dict, archives: list[dict], skipped: list[str] | None = None) -> dict:
+    return {
+        "project": manifest.get("project", PROJECT_NAME),
+        "channel": manifest.get("channel", "nightly"),
+        "version": manifest["artifactVersion"],
+        "versionLabel": manifest.get("versionLabel"),
+        "semver": manifest["semver"],
+        "releaseTag": manifest.get("releaseTag", manifest["artifactVersion"]),
+        "releaseTitle": manifest.get("releaseTitle"),
+        "buildDate": manifest.get("buildDate"),
+        "buildDateUtc": manifest.get("buildDateUtc"),
+        "sourceRef": manifest["sourceRef"],
+        "sourceSha": manifest["sourceSha"],
+        "archives": archives,
+        "skippedArtifactFileCount": len(skipped or []),
+        "skippedArtifactFileExamples": (skipped or [])[:12],
+    }
+
+
+def write_sha256s(path: Path, archives: Iterable[dict]) -> None:
+    lines = [
+        f"{archive['sha256']}  {archive['path']}"
+        for archive in archives
+    ]
+    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
 def package_build(args: argparse.Namespace) -> int:
@@ -289,6 +409,7 @@ def package_build(args: argparse.Namespace) -> int:
         }
     )
     files.append(write_readme(stage_root, manifest, args.runtime_profile, args.toolset))
+    validate_stage_tree(stage_root)
 
     package_name = f"QuakeLive-reverse-{artifact_version}-windows-{args.runtime_profile}.zip"
     package_path = output_root / package_name
@@ -305,11 +426,18 @@ def package_build(args: argparse.Namespace) -> int:
     package_manifest_path = output_root / f"{artifact_version}-package-manifest.json"
     write_json(package_manifest_path, package_manifest)
 
-    checksum_path = output_root / "checksums.sha256"
-    checksum_path.write_text(
-        f"{package_manifest['package']['sha256']}  {package_name}\n",
-        encoding="utf-8",
-    )
+    release_archives = [
+        {
+            "archive": package_path.name,
+            "path": package_path.relative_to(output_root).as_posix(),
+            "sha256": package_manifest["package"]["sha256"],
+            "size": package_path.stat().st_size,
+        }
+    ]
+    write_json(output_root / "nightly-release-manifest.json", build_nightly_release_manifest(manifest, release_archives))
+
+    checksum_path = output_root / "SHA256SUMS.txt"
+    write_sha256s(checksum_path, release_archives)
 
     append_github_outputs(
         github_output_path(args.github_output),
@@ -322,6 +450,43 @@ def package_build(args: argparse.Namespace) -> int:
 
     print(f"Nightly package: {package_path}")
     print(f"SHA256: {package_manifest['package']['sha256']}")
+    return 0
+
+
+def release_manifest(args: argparse.Namespace) -> int:
+    repo_root = args.repo_root.resolve()
+    output_root = ensure_path_under(repo_relative_path(repo_root, args.output_root), repo_root)
+    artifact_root = repo_relative_path(repo_root, args.artifact_root).resolve()
+    manifest_path = repo_relative_path(repo_root, args.manifest)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    if not artifact_root.exists():
+        raise SystemExit(f"Artifact root does not exist: {artifact_root}")
+
+    output_root.mkdir(parents=True, exist_ok=True)
+    archives: list[dict] = []
+    skipped: list[str] = []
+
+    for path in sorted(artifact_root.rglob("*")):
+        if not path.is_file():
+            continue
+
+        relative = path.relative_to(artifact_root)
+        if should_skip_artifact_path(relative, is_dir=False):
+            skipped.append(relative.as_posix())
+            continue
+
+        record = artifact_record(path, artifact_root)
+        record["artifactDir"] = relative.parts[0] if relative.parts else ""
+        record["archive"] = path.name
+        archives.append(record)
+
+    write_json(
+        output_root / "nightly-release-manifest.json",
+        build_nightly_release_manifest(manifest, archives, skipped),
+    )
+    write_sha256s(output_root / "SHA256SUMS.txt", archives)
+    print(f"Nightly release manifest: {output_root / 'nightly-release-manifest.json'}")
     return 0
 
 
@@ -350,6 +515,13 @@ def build_parser() -> argparse.ArgumentParser:
     package.add_argument("--runtime-profile", default="modern")
     package.add_argument("--toolset", default="v143")
     package.set_defaults(func=package_build)
+
+    release_index = subparsers.add_parser("release-manifest", help="write a release-style manifest for downloaded nightly artifacts")
+    release_index.add_argument("--repo-root", type=Path, default=Path("."))
+    release_index.add_argument("--artifact-root", type=Path, required=True)
+    release_index.add_argument("--manifest", type=Path, required=True)
+    release_index.add_argument("--output-root", type=Path, default=Path("artifacts/nightly"))
+    release_index.set_defaults(func=release_manifest)
 
     return parser
 

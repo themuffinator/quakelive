@@ -13,12 +13,12 @@ validation surface: bytecode, native, and reverse-engineered targets.
   source builds. It uploads the existing subsystem evidence roots and build outputs
   with a 14-day retention window.
 - **Nightly Build** – `.github/workflows/nightly-build.yml` runs daily at
-  `03:17 UTC`, builds Linux/macOS native outputs, builds the Windows `v143`
-  modern compatibility profile, generates a manifest version like
-  `nightly-YYYYMMDD.<run>-g<shortsha>`, packages rebuilt Windows binaries only,
-  and uploads the package, checksum, manifests, and POSIX build outputs for 30
-  days. The package excludes retail pk3 files, retail launcher DLL payloads, and
-  any live-service credentials.
+  `03:17 UTC`, resolves shared version metadata up front, builds Linux/macOS
+  native outputs, builds the Windows `v143` modern compatibility profile,
+  generates a manifest version like `nightly-YYYYMMDD.<run>-g<shortsha>`, and
+  uploads versioned packages plus a release-style nightly manifest and
+  `SHA256SUMS.txt` for 30 days. The package excludes retail pk3 files, retail
+  launcher DLL payloads, and any live-service credentials.
 
 ## Matrix jobs
 

@@ -7,7 +7,9 @@ param(
     [string]$RuntimeProfile = 'modern',
     [string]$Configuration = 'Release',
     [string]$Platform = 'Win32',
-    [string]$WindowsTargetPlatformVersion = ''
+    [string]$WindowsTargetPlatformVersion = '',
+    [string]$BuildLogRoot = '',
+    [switch]$DisableOptionalCodecs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -293,7 +295,14 @@ else {
 }
 
 $builder = Join-Path $PSScriptRoot 'build-windows-dlls.ps1'
-& $builder -RepoRoot $RepoRoot -Configuration $Configuration -Platform $Platform -PlatformToolset $PlatformToolset -WindowsTargetPlatformVersion $WindowsTargetPlatformVersion
+& $builder `
+    -RepoRoot $RepoRoot `
+    -Configuration $Configuration `
+    -Platform $Platform `
+    -PlatformToolset $PlatformToolset `
+    -WindowsTargetPlatformVersion $WindowsTargetPlatformVersion `
+    -BuildLogRoot $BuildLogRoot `
+    -DisableOptionalCodecs:$DisableOptionalCodecs
 
 $awesomiumProcessPath = Join-Path $RepoRoot "build\win32\$Configuration\bin\awesomium_process.exe"
 if (-not (Test-Path $awesomiumProcessPath)) {
