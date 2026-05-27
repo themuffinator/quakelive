@@ -43,7 +43,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <errno.h>
 #ifdef __linux__ // rb010123
   #include <mntent.h>
+  #define EV_NONE QL_LINK_EV_NONE
   #include <link.h>
+  #undef EV_NONE
 #endif
 #include <dlfcn.h>
 
@@ -795,7 +797,7 @@ char *Sys_ConsoleInput(void)
         if (key == '\t')
         {
           tty_Hide();
-          Field_CompleteCommand( &tty_con );
+	  Field_CompleteCommand( &tty_con, NULL );
           // Field_CompleteCommand does weird things to the string, do a cleanup
           //   it adds a '\' at the beginning of the string
           //   cursor doesn't reflect actual length of the string that's sent back
@@ -969,6 +971,11 @@ void *Sys_LoadDll( const char *name, char *fqpath,
 	int   searchCount;
 	int   i;
 	const char*  err = NULL;
+#if defined __APPLE__
+	const char *dllExtension = "dylib";
+#else
+	const char *dllExtension = "so";
+#endif
 	
 	*fqpath = 0;
 	*entryPoint = NULL;
@@ -981,13 +988,17 @@ void *Sys_LoadDll( const char *name, char *fqpath,
 
 	getcwd(curpath, sizeof(curpath));
 #if defined __i386__
-	snprintf (fname, sizeof(fname), "%si386.so", name);
+	snprintf (fname, sizeof(fname), "%si386.%s", name, dllExtension);
+#elif defined __x86_64__
+	snprintf (fname, sizeof(fname), "%sx86_64.%s", name, dllExtension);
 #elif defined __powerpc__   //rcg010207 - PPC support.
-	snprintf (fname, sizeof(fname), "%sppc.so", name);
+	snprintf (fname, sizeof(fname), "%sppc.%s", name, dllExtension);
+#elif defined __aarch64__
+	snprintf (fname, sizeof(fname), "%sarm64.%s", name, dllExtension);
 #elif defined __axp__
-	snprintf (fname, sizeof(fname), "%saxp.so", name);
+	snprintf (fname, sizeof(fname), "%saxp.%s", name, dllExtension);
 #elif defined __mips__
-	snprintf (fname, sizeof(fname), "%smips.so", name);
+	snprintf (fname, sizeof(fname), "%smips.%s", name, dllExtension);
 #else
 #error Unknown arch
 #endif

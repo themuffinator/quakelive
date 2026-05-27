@@ -52,6 +52,7 @@ CDIR=$(MOUNT_DIR)/client
 SDIR=$(MOUNT_DIR)/server
 RDIR=$(MOUNT_DIR)/renderer
 CMDIR=$(MOUNT_DIR)/qcommon
+COMMONDIR=$(MOUNT_DIR)/../common
 UDIR=$(MOUNT_DIR)/unix
 GDIR=$(MOUNT_DIR)/game
 CGDIR=$(MOUNT_DIR)/cgame
@@ -85,13 +86,14 @@ QL_BUILD_OPEN_STEAM ?= 0
 QL_ENABLE_OGG ?= 1
 QL_ENABLE_FREETYPE ?= 0
 QL_ENABLE_GPROF ?= 0
+QL_ENABLE_RANKINGS ?= 0
 
 ifeq ($(QL_BUILD_ONLINE_SERVICES),0)
 override QL_BUILD_STEAMWORKS := 0
 override QL_BUILD_OPEN_STEAM := 0
 endif
 
-PLATFORM_BACKEND_DEFS = -DQL_BUILD_ONLINE_SERVICES=$(QL_BUILD_ONLINE_SERVICES) -DQL_BUILD_STEAMWORKS=$(QL_BUILD_STEAMWORKS) -DQL_BUILD_OPEN_STEAM=$(QL_BUILD_OPEN_STEAM) -DQL_ENABLE_OGG=$(QL_ENABLE_OGG)
+PLATFORM_BACKEND_DEFS = -DQL_BUILD_ONLINE_SERVICES=$(QL_BUILD_ONLINE_SERVICES) -DQL_BUILD_STEAMWORKS=$(QL_BUILD_STEAMWORKS) -DQL_BUILD_OPEN_STEAM=$(QL_BUILD_OPEN_STEAM) -DQL_ENABLE_OGG=$(QL_ENABLE_OGG) -DQL_ENABLE_RANKINGS=$(QL_ENABLE_RANKINGS)
 
 ifeq ($(QL_BUILD_STEAMWORKS),1)
   STEAMWORKS_SDK_DIR ?= $(MOUNT_DIR)/../steamworks
@@ -716,10 +718,10 @@ $(B)/client/cl_steam_resources.o : $(CDIR)/cl_steam_resources.c; $(DO_CC)
 $(B)/client/cl_ui.o : $(CDIR)/cl_ui.c; $(DO_CC)
 $(B)/client/cl_webpak.o : $(CDIR)/cl_webpak.c; $(DO_CC)
 $(B)/client/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC)
-$(B)/client/platform_services.o : $(MOUNT_DIR)/common/platform/platform_services.c; $(DO_CC)
-$(B)/client/platform_backend_open_steam.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_open_steam.c; $(DO_CC)
-$(B)/client/platform_backend_steamworks.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_steamworks.c; $(DO_CC)
-$(B)/client/platform_steamworks.o : $(MOUNT_DIR)/common/platform/platform_steamworks.c; $(DO_CC)
+$(B)/client/platform_services.o : $(COMMONDIR)/platform/platform_services.c; $(DO_CC)
+$(B)/client/platform_backend_open_steam.o : $(COMMONDIR)/platform/backends/platform_backend_open_steam.c; $(DO_CC)
+$(B)/client/platform_backend_steamworks.o : $(COMMONDIR)/platform/backends/platform_backend_steamworks.c; $(DO_CC)
+$(B)/client/platform_steamworks.o : $(COMMONDIR)/platform/platform_steamworks.c; $(DO_CC)
 $(B)/client/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC)
 $(B)/client/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC)
 $(B)/client/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC)
@@ -904,6 +906,7 @@ Q3DOBJ = \
 	$(B)/ded/sv_zmq.o \
 	$(B)/ded/sv_net_chan.o \
 	$(B)/ded/sv_snapshot.o \
+	$(B)/ded/sv_rankings.o \
 	$(B)/ded/sv_world.o \
 	\
 	$(B)/ded/cm_load.o \
@@ -919,6 +922,7 @@ Q3DOBJ = \
 	$(B)/ded/msg.o \
 	$(B)/ded/net_chan.o \
 	$(B)/ded/huffman.o \
+	$(B)/ded/platform_services.o \
 	\
 	$(B)/ded/q_math.o \
 	$(B)/ded/q_shared.o \
@@ -957,6 +961,7 @@ Q3DOBJ = \
 	$(B)/ded/l_struct.o \
 	\
 	$(B)/ded/linux_common.o \
+	$(B)/ded/linux_signals.o \
 	$(B)/ded/unix_main.o \
 	$(B)/ded/unix_net.o \
 	$(B)/ded/unix_shared.o \
@@ -967,6 +972,12 @@ Q3DOBJ = \
 
 ifeq ($(ARCH),i386)
   Q3DOBJ += $(B)/ded/vm_x86.o $(B)/ded/ftol.o $(B)/ded/snapvector.o
+endif
+
+ifneq ($(ARCH),i386)
+  ifneq ($(ARCH),ppc)
+    Q3DOBJ += $(B)/ded/unix_vm_x86.o
+  endif
 endif
 
 ifeq ($(ARCH),ppc)
@@ -987,6 +998,7 @@ $(B)/ded/sv_main.o : $(SDIR)/sv_main.c; $(DO_DED_CC)
 $(B)/ded/sv_zmq.o : $(SDIR)/sv_zmq.c; $(DO_DED_CC)
 $(B)/ded/sv_net_chan.o : $(SDIR)/sv_net_chan.c; $(DO_DED_CC) 
 $(B)/ded/sv_snapshot.o : $(SDIR)/sv_snapshot.c; $(DO_DED_CC) 
+$(B)/ded/sv_rankings.o : $(SDIR)/sv_rankings.c; $(DO_DED_CC) 
 $(B)/ded/sv_world.o : $(SDIR)/sv_world.c; $(DO_DED_CC) 
 $(B)/ded/cm_load.o : $(CMDIR)/cm_load.c; $(DO_DED_CC) 
 $(B)/ded/cm_polylib.o : $(CMDIR)/cm_polylib.c; $(DO_DED_CC) 
@@ -1001,6 +1013,7 @@ $(B)/ded/md4.o : $(CMDIR)/md4.c; $(DO_DED_CC)
 $(B)/ded/msg.o : $(CMDIR)/msg.c; $(DO_DED_CC) 
 $(B)/ded/net_chan.o : $(CMDIR)/net_chan.c; $(DO_DED_CC)
 $(B)/ded/huffman.o : $(CMDIR)/huffman.c; $(DO_DED_CC)
+$(B)/ded/platform_services.o : $(COMMONDIR)/platform/platform_services.c; $(DO_DED_CC)
 $(B)/ded/q_shared.o : $(GDIR)/q_shared.c; $(DO_DED_CC) 
 $(B)/ded/q_math.o : $(GDIR)/q_math.c; $(DO_DED_CC) 
 
@@ -1034,6 +1047,7 @@ $(B)/ded/l_script.o : $(BLIBDIR)/l_script.c; $(DO_BOT_CC)
 $(B)/ded/l_struct.o : $(BLIBDIR)/l_struct.c; $(DO_BOT_CC) 
 
 $(B)/ded/linux_common.o : $(UDIR)/linux_common.c; $(DO_CC)
+$(B)/ded/linux_signals.o : $(UDIR)/linux_signals.c; $(DO_DED_CC)
 $(B)/ded/unix_main.o : $(UDIR)/unix_main.c; $(DO_DED_CC) 
 $(B)/ded/unix_net.o : $(UDIR)/unix_net.c; $(DO_DED_CC) 
 $(B)/ded/unix_shared.o : $(UDIR)/unix_shared.c; $(DO_DED_CC) 
@@ -1043,6 +1057,7 @@ $(B)/ded/null_snddma.o : $(NDIR)/null_snddma.c; $(DO_DED_CC)
 $(B)/ded/unzip.o : $(CMDIR)/unzip.c; $(DO_DED_CC) 
 $(B)/ded/vm.o : $(CMDIR)/vm.c; $(DO_DED_CC) 
 $(B)/ded/vm_interpreted.o : $(CMDIR)/vm_interpreted.c; $(DO_DED_CC) 
+$(B)/ded/unix_vm_x86.o : $(UDIR)/vm_x86.c; $(DO_DED_CC)
 
 ifeq ($(ARCH),i386)
 $(B)/ded/vm_x86.o : $(CMDIR)/vm_x86.c; $(DO_DED_CC) 
@@ -1704,10 +1719,10 @@ $(B)/q3static/cl_steam_resources.o : $(CDIR)/cl_steam_resources.c; $(DO_CC) -DQ3
 $(B)/q3static/cl_ui.o : $(CDIR)/cl_ui.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/cl_webpak.o : $(CDIR)/cl_webpak.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/ql_auth.o : $(CDIR)/ql_auth.c; $(DO_CC) -DQ3_STATIC
-$(B)/q3static/platform_services.o : $(MOUNT_DIR)/common/platform/platform_services.c; $(DO_CC) -DQ3_STATIC
-$(B)/q3static/platform_backend_open_steam.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_open_steam.c; $(DO_CC) -DQ3_STATIC
-$(B)/q3static/platform_backend_steamworks.o : $(MOUNT_DIR)/common/platform/backends/platform_backend_steamworks.c; $(DO_CC) -DQ3_STATIC
-$(B)/q3static/platform_steamworks.o : $(MOUNT_DIR)/common/platform/platform_steamworks.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/platform_services.o : $(COMMONDIR)/platform/platform_services.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/platform_backend_open_steam.o : $(COMMONDIR)/platform/backends/platform_backend_open_steam.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/platform_backend_steamworks.o : $(COMMONDIR)/platform/backends/platform_backend_steamworks.c; $(DO_CC) -DQ3_STATIC
+$(B)/q3static/platform_steamworks.o : $(COMMONDIR)/platform/platform_steamworks.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_adpcm.o : $(CDIR)/snd_adpcm.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_dma.o : $(CDIR)/snd_dma.c; $(DO_CC) -DQ3_STATIC
 $(B)/q3static/snd_mem.o : $(CDIR)/snd_mem.c; $(DO_CC) -DQ3_STATIC

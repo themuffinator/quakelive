@@ -578,6 +578,10 @@ def test_null_runtime_shims_track_current_qcommon_contracts() -> None:
 def test_posix_native_builds_cover_linux_and_macos_ci() -> None:
 	native_build_script = _read_text(BUILD_POSIX_NATIVE_SCRIPT_PATH)
 	cleanroom_build_script = _read_text(BUILD_CLEANROOM_SCRIPT_PATH)
+	unix_makefile = _read_text(UNIX_MAKEFILE_PATH)
+	unix_main = _read_text(UNIX_MAIN_PATH)
+	unix_shared = _read_text(REPO_ROOT / "src" / "code" / "unix" / "unix_shared.c")
+	null_client = _read_text(NULL_CLIENT_PATH)
 	run_harnesses = _read_text(RUN_HARNESSES_PATH)
 	re_trace_harness = _read_text(RE_TRACE_HARNESS_PATH)
 	push_workflow = _read_text(PUSH_WORKFLOW_PATH)
@@ -591,6 +595,8 @@ def test_posix_native_builds_cover_linux_and_macos_ci() -> None:
 	assert "MAKE_PLATFORM=\"darwin\"" in native_build_script
 	assert "SHLIB_EXT=\"so\"" in native_build_script
 	assert "SHLIB_EXT=\"dylib\"" in native_build_script
+	assert "HOST_ARCH_RAW=" in native_build_script
+	assert "HOST_ARCH=\"arm64\"" in native_build_script
 	assert "SHLIB_LDFLAGS_DEFAULT=\"-shared\"" in native_build_script
 	assert "SHLIB_LDFLAGS_DEFAULT=\"-dynamiclib -Wl,-undefined,dynamic_lookup\"" in native_build_script
 	assert "build/posix/${PLATFORM_NAME}" in native_build_script
@@ -607,6 +613,23 @@ def test_posix_native_builds_cover_linux_and_macos_ci() -> None:
 	assert "package_sha256=" in native_build_script
 	assert "QL_BUILD_ONLINE_SERVICES=0" in native_build_script
 	assert "QL_ENABLE_OGG=0" in native_build_script
+	assert "QL_ENABLE_RANKINGS=0" in native_build_script
+
+	assert "COMMONDIR=$(MOUNT_DIR)/../common" in unix_makefile
+	assert "QL_ENABLE_RANKINGS ?= 0" in unix_makefile
+	assert "$(B)/ded/sv_rankings.o" in unix_makefile
+	assert "$(B)/ded/platform_services.o" in unix_makefile
+	assert "$(B)/ded/linux_signals.o" in unix_makefile
+	assert "$(B)/ded/unix_vm_x86.o" in unix_makefile
+	assert "$(COMMONDIR)/platform/platform_services.c" in unix_makefile
+	assert "$(UDIR)/vm_x86.c" in unix_makefile
+
+	assert 'const char *dllExtension = "dylib";' in unix_main
+	assert 'const char *dllExtension = "so";' in unix_main
+	assert '"%sx86_64.%s"' in unix_main
+	assert '"%sarm64.%s"' in unix_main
+	assert "defined __x86_64__ || defined __aarch64__" in unix_shared
+	assert "void SteamClient_Init( void ) {" in null_client
 
 	assert "PLATFORM_NAME=\"linux\"" in cleanroom_build_script
 	assert "PLATFORM_NAME=\"macos\"" in cleanroom_build_script

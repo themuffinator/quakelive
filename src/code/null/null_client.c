@@ -122,6 +122,14 @@ void CL_Frame ( int msec ) {
 
 /*
 ================
+SteamClient_Init
+================
+*/
+void SteamClient_Init( void ) {
+}
+
+/*
+================
 SteamClient_Frame
 ================
 */
