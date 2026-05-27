@@ -5,6 +5,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 UNIX_MAIN_PATH = REPO_ROOT / "src" / "code" / "unix" / "unix_main.c"
+UNIX_NET_PATH = REPO_ROOT / "src" / "code" / "unix" / "unix_net.c"
 LINUX_GLIMP_PATH = REPO_ROOT / "src" / "code" / "unix" / "linux_glimp.c"
 LINUX_JOYSTICK_PATH = REPO_ROOT / "src" / "code" / "unix" / "linux_joystick.c"
 NULL_MAIN_PATH = REPO_ROOT / "src" / "code" / "null" / "null_main.c"
@@ -580,6 +581,7 @@ def test_posix_native_builds_cover_linux_and_macos_ci() -> None:
 	cleanroom_build_script = _read_text(BUILD_CLEANROOM_SCRIPT_PATH)
 	unix_makefile = _read_text(UNIX_MAKEFILE_PATH)
 	unix_main = _read_text(UNIX_MAIN_PATH)
+	unix_net = _read_text(UNIX_NET_PATH)
 	unix_shared = _read_text(REPO_ROOT / "src" / "code" / "unix" / "unix_shared.c")
 	null_client = _read_text(NULL_CLIENT_PATH)
 	run_harnesses = _read_text(RUN_HARNESSES_PATH)
@@ -628,6 +630,8 @@ def test_posix_native_builds_cover_linux_and_macos_ci() -> None:
 	assert 'const char *dllExtension = "so";' in unix_main
 	assert '"%sx86_64.%s"' in unix_main
 	assert '"%sarm64.%s"' in unix_main
+	assert "#define OSIOCGIFADDR SIOCGIFADDR" in unix_net
+	assert "socklen_t\tfromlen;" in unix_net
 	assert "defined __x86_64__ || defined __aarch64__" in unix_shared
 	assert "void SteamClient_Init( void ) {" in null_client
 

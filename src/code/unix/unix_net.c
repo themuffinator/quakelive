@@ -43,6 +43,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #import <arpa/inet.h>         // for inet_ntoa()
 #import <net/if_dl.h>         // for 'struct sockaddr_dl'
+
+#ifndef OSIOCGIFADDR
+#define OSIOCGIFADDR SIOCGIFADDR
+#endif
 #endif
 
 static cvar_t	*noudp;
@@ -159,7 +163,7 @@ qboolean	Sys_GetPacket (netadr_t *net_from, msg_t *net_message)
 {
 	int 	ret;
 	struct sockaddr_in	from;
-	int		fromlen;
+	socklen_t	fromlen;
 	int		net_socket;
 	int		protocol;
 	int		err;
