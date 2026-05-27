@@ -95,9 +95,17 @@ def test_hosted_nightly_uses_preinstalled_vs2022_toolset() -> None:
 	assert "QL_POSIX_PACKAGE_VERSION" in nightly_workflow
 	assert "-DisableOptionalCodecs" in nightly_workflow
 	assert "Publish Windows build logs" in nightly_workflow
-	assert "Assemble nightly release manifest" in nightly_workflow
+	assert "Publish nightly GitHub release" in nightly_workflow
+	assert "contents: write" in nightly_workflow
+	assert "release_tag: ${{ steps.version.outputs.release_tag }}" in nightly_workflow
+	assert "release_title: ${{ steps.version.outputs.release_title }}" in nightly_workflow
+	assert "--asset-output-root artifacts/nightly/release-assets" in nightly_workflow
+	assert "gh release create" in nightly_workflow
+	assert "gh release upload" in nightly_workflow
+	assert "--prerelease" in nightly_workflow
 	assert "nightly-release-manifest.json" in nightly_workflow
 	assert "SHA256SUMS.txt" in nightly_workflow
+	assert "release-notes.md" in nightly_workflow
 	assert "Microsoft.VisualStudio.Component.VC.Tools.x86.x64" in install_toolset
 	assert "[ValidateSet('v100', 'v141', 'v143')]" in install_toolset
 	assert "'v143' { return 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' }" in install_toolset
@@ -120,6 +128,10 @@ def test_hosted_nightly_uses_preinstalled_vs2022_toolset() -> None:
 	assert "msbuild-${safeConfiguration}-${safePlatform}-${safeToolset}.log" in build_windows_dlls
 	assert 'package.add_argument("--toolset", default="v143")' in nightly_build
 	assert 'subparsers.add_parser("release-manifest"' in nightly_build
+	assert 'subparsers.add_parser("release-notes"' in nightly_build
+	assert "RELEASE_PACKAGE_SUFFIXES" in nightly_build
+	assert "def is_release_package" in nightly_build
+	assert "def stage_release_asset" in nightly_build
 	assert '"nightly-release-manifest.json"' in nightly_build
 	assert '"SHA256SUMS.txt"' in nightly_build
 	assert "hosted-compatible `v143` toolset" in toolchain_ci

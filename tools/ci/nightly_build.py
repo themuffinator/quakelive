@@ -29,6 +29,11 @@ OPTIONAL_WINDOWS_OUTPUTS = (
 )
 
 PROJECT_NAME = "QuakeLive-reverse"
+RELEASE_PACKAGE_SUFFIXES = (
+    ".tar.gz",
+    ".tgz",
+    ".zip",
+)
 
 SKIP_ARTIFACT_DIR_NAMES = {
     ".git",
@@ -229,6 +234,8 @@ def build_version(args: argparse.Namespace) -> int:
         {
             "artifact_version": artifact_version,
             "build_date_utc": build_date,
+            "release_tag": payload["releaseTag"],
+            "release_title": payload["releaseTitle"],
             "semver": version,
             "short_sha": short_sha,
             "source_ref": ref_name,
@@ -385,6 +392,22 @@ def write_sha256s(path: Path, archives: Iterable[dict]) -> None:
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
+def is_release_package(path: Path) -> bool:
+    lower_name = path.name.lower()
+    return any(lower_name.endswith(suffix) for suffix in RELEASE_PACKAGE_SUFFIXES)
+
+
+def stage_release_asset(source: Path, asset_root: Path, staged_names: set[str]) -> Path:
+    asset_root.mkdir(parents=True, exist_ok=True)
+    if source.name in staged_names:
+        raise SystemExit(f"Release asset name collision: {source.name}")
+
+    destination = asset_root / source.name
+    shutil.copy2(source, destination)
+    staged_names.add(source.name)
+    return destination
+
+
 def package_build(args: argparse.Namespace) -> int:
     repo_root = args.repo_root.resolve()
     output_root = ensure_path_under(repo_relative_path(repo_root, args.output_root), repo_root)
@@ -457,6 +480,9 @@ def release_manifest(args: argparse.Namespace) -> int:
     repo_root = args.repo_root.resolve()
     output_root = ensure_path_under(repo_relative_path(repo_root, args.output_root), repo_root)
     artifact_root = repo_relative_path(repo_root, args.artifact_root).resolve()
+    asset_root = None
+    if args.asset_output_root is not None:
+        asset_root = ensure_path_under(repo_relative_path(repo_root, args.asset_output_root), repo_root)
     manifest_path = repo_relative_path(repo_root, args.manifest)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -464,8 +490,14 @@ def release_manifest(args: argparse.Namespace) -> int:
         raise SystemExit(f"Artifact root does not exist: {artifact_root}")
 
     output_root.mkdir(parents=True, exist_ok=True)
+    if asset_root is not None:
+        if asset_root.exists():
+            shutil.rmtree(asset_root)
+        asset_root.mkdir(parents=True)
+
     archives: list[dict] = []
     skipped: list[str] = []
+    staged_names: set[str] = set()
 
     for path in sorted(artifact_root.rglob("*")):
         if not path.is_file():
@@ -476,17 +508,77 @@ def release_manifest(args: argparse.Namespace) -> int:
             skipped.append(relative.as_posix())
             continue
 
+        if not is_release_package(path):
+            skipped.append(relative.as_posix())
+            continue
+
         record = artifact_record(path, artifact_root)
         record["artifactDir"] = relative.parts[0] if relative.parts else ""
         record["archive"] = path.name
+        if asset_root is not None:
+            stage_release_asset(path, asset_root, staged_names)
+            record["sourceArtifactPath"] = record["path"]
+            record["path"] = path.name
         archives.append(record)
 
-    write_json(
-        output_root / "nightly-release-manifest.json",
-        build_nightly_release_manifest(manifest, archives, skipped),
+    if not archives:
+        raise SystemExit(f"No nightly release packages found under {artifact_root}")
+
+    release_manifest_path = output_root / "nightly-release-manifest.json"
+    checksum_path = output_root / "SHA256SUMS.txt"
+    write_json(release_manifest_path, build_nightly_release_manifest(manifest, archives, skipped))
+    write_sha256s(checksum_path, archives)
+
+    if asset_root is not None:
+        stage_release_asset(release_manifest_path, asset_root, staged_names)
+        stage_release_asset(checksum_path, asset_root, staged_names)
+        stage_release_asset(manifest_path, asset_root, staged_names)
+
+    print(f"Nightly release manifest: {release_manifest_path}")
+    return 0
+
+
+def release_notes(args: argparse.Namespace) -> int:
+    repo_root = args.repo_root.resolve()
+    manifest_path = repo_relative_path(repo_root, args.manifest)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    archives = sorted(manifest.get("archives", []), key=lambda item: str(item.get("archive", "")))
+    title = manifest.get("releaseTitle") or f"{PROJECT_NAME} nightly"
+    source_sha = manifest.get("sourceSha", "")
+    source_ref = manifest.get("sourceRef", "")
+
+    lines = [
+        f"# {title}",
+        "",
+        f"Nightly build for `{source_sha}` from `{source_ref}`.",
+        "",
+        f"- Version: `{manifest.get('version', '')}`",
+        f"- SemVer: `{manifest.get('semver', '')}`",
+        f"- Build date: `{manifest.get('buildDate', '')}`",
+    ]
+    if args.run_url:
+        lines.append(f"- Workflow run: {args.run_url}")
+
+    lines.extend(["", "## Packages"])
+    for archive in archives:
+        archive_name = archive.get("archive", "")
+        size = int(archive.get("size", 0))
+        sha256 = archive.get("sha256", "")
+        lines.append(f"- `{archive_name}` ({size} bytes, SHA256 `{sha256}`)")
+
+    lines.extend(
+        [
+            "",
+            "## Notes",
+            "",
+            "These packages contain rebuilt project outputs only. They do not include retail pk3 files, proprietary launcher DLL payloads, Steam credentials, or live-service material.",
+        ]
     )
-    write_sha256s(output_root / "SHA256SUMS.txt", archives)
-    print(f"Nightly release manifest: {output_root / 'nightly-release-manifest.json'}")
+
+    output_path = repo_relative_path(repo_root, args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Nightly release notes: {output_path}")
     return 0
 
 
@@ -519,9 +611,17 @@ def build_parser() -> argparse.ArgumentParser:
     release_index = subparsers.add_parser("release-manifest", help="write a release-style manifest for downloaded nightly artifacts")
     release_index.add_argument("--repo-root", type=Path, default=Path("."))
     release_index.add_argument("--artifact-root", type=Path, required=True)
+    release_index.add_argument("--asset-output-root", type=Path)
     release_index.add_argument("--manifest", type=Path, required=True)
     release_index.add_argument("--output-root", type=Path, default=Path("artifacts/nightly"))
     release_index.set_defaults(func=release_manifest)
+
+    notes = subparsers.add_parser("release-notes", help="write Markdown release notes for a nightly manifest")
+    notes.add_argument("--repo-root", type=Path, default=Path("."))
+    notes.add_argument("--manifest", type=Path, required=True)
+    notes.add_argument("--output", type=Path, required=True)
+    notes.add_argument("--run-url")
+    notes.set_defaults(func=release_notes)
 
     return parser
 

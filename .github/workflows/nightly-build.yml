@@ -15,6 +15,7 @@ on:
     - cron: '17 3 * * *'
 
 permissions:
+  actions: read
   contents: read
 
 env:
@@ -31,8 +32,11 @@ jobs:
     outputs:
       artifact_version: ${{ steps.version.outputs.artifact_version }}
       build_date_utc: ${{ steps.version.outputs.build_date_utc }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+      release_title: ${{ steps.version.outputs.release_title }}
       semver: ${{ steps.version.outputs.semver }}
       short_sha: ${{ steps.version.outputs.short_sha }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
 
     steps:
       - uses: actions/checkout@v4
@@ -174,10 +178,13 @@ jobs:
           retention-days: 30
 
   assemble-nightly:
-    name: Assemble nightly release manifest
+    name: Publish nightly GitHub release
     needs: [prepare, posix-native, windows-modern]
     if: ${{ always() && needs.posix-native.result == 'success' && needs.windows-modern.result == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -203,7 +210,47 @@ jobs:
           --repo-root .
           --manifest artifacts/nightly/version.json
           --artifact-root artifacts/downloaded
+          --asset-output-root artifacts/nightly/release-assets
           --output-root artifacts/nightly
+
+      - name: Write nightly release notes
+        run: |
+          python tools/ci/nightly_build.py release-notes \
+            --repo-root . \
+            --manifest artifacts/nightly/nightly-release-manifest.json \
+            --output artifacts/nightly/release-notes.md \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          cp artifacts/nightly/release-notes.md artifacts/nightly/release-assets/release-notes.md
+
+      - name: Publish nightly GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          RELEASE_TITLE: ${{ needs.prepare.outputs.release_title }}
+          RELEASE_TARGET: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find artifacts/nightly/release-assets -maxdepth 1 -type f | sort)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No nightly release assets were staged." >&2
+            exit 1
+          fi
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_TAG}" \
+              --target "${RELEASE_TARGET}" \
+              --title "${RELEASE_TITLE}" \
+              --notes-file artifacts/nightly/release-notes.md \
+              --prerelease
+            gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
+          else
+            gh release create "${RELEASE_TAG}" "${assets[@]}" \
+              --target "${RELEASE_TARGET}" \
+              --title "${RELEASE_TITLE}" \
+              --notes-file artifacts/nightly/release-notes.md \
+              --prerelease \
+              --latest=false
+          fi
 
       - name: Publish nightly release manifest
         uses: actions/upload-artifact@v4
@@ -213,5 +260,6 @@ jobs:
             artifacts/nightly/nightly-release-manifest.json
             artifacts/nightly/SHA256SUMS.txt
             artifacts/nightly/version.json
+            artifacts/nightly/release-notes.md
           if-no-files-found: error
           retention-days: 30
