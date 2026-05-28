@@ -9,6 +9,9 @@ This note records the current retail mapping for the Quake Live Awesomium browse
 - `references/hlil/quakelive_steam.exe/00_12d640/part06.txt:22491` maps `QLResourceInterceptor` request behavior.
 - `references/hlil/quakelive_steam.exe/00_12d640/part06.txt:35571` maps the Awesomium-facing vtables for `QLResourceInterceptor`, dialog/view/load handlers, `QLJSHandler`, `DataPakSource`, and `SteamDataSource`.
 - `references/hlil/quakelive_steam.exe/00_12d640/part06.txt:49745` lists the Awesomium imports used by the retail executable, including JS object/value helpers, WebCore initialization, WebView calls, BitmapSurface copy, DataSource send response, and Steam API symbols.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15728` maps `web_clearCache` to WebSession slot `0x1c`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15739` maps `web_reload` to WebSession slot `0x1c` followed by WebView slot `0x78`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15747` maps shutdown to WebView destroy plus `WebCore::Shutdown`, with no WebSession slot `0x1c` call.
 - `references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c:36881` is the structured companion decompile for the WebCore/WebView bootstrap.
 - `references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c:45532` is the structured companion decompile for the resource interceptor.
 
@@ -19,7 +22,7 @@ This note records the current retail mapping for the Quake Live Awesomium browse
 | 1 | Gate browser startup on platform/service state, then request `asset://ql/index.html`. | `src/code/client/cl_main.c`, `src/code/client/cl_awesomium_win32.cpp` |
 | 2 | Construct `Awesomium::WebConfig` and call `Awesomium::WebCore::Initialize`. | `CL_Awesomium_Startup` |
 | 3 | Construct `Awesomium::WebPreferences`. Retail sets two observed local preference bytes before WebSession creation. | Partially reconstructed in `CL_Awesomium_Startup`; exact preference field names remain open. |
-| 4 | Create a WebSession using `fs_homepath`. | `CL_Awesomium_CreateSession` |
+| 4 | Create a WebSession using `fs_homepath`, then call WebSession slot `0x18`. | `CL_Awesomium_CreateSession` |
 | 5 | Construct `DataPakSource("web.pak")` and add it under source host `QL`. | `CL_Awesomium_CreateSession`, `src/code/client/cl_webpak.c` |
 | 6 | Construct `SteamDataSource` and add it under source host `steam`. | Offline-safe avatar/resource bridge in `src/code/client/cl_steam_resources.c`; not yet attached as a native live Awesomium data source. |
 | 7 | Construct `QLResourceInterceptor` and set it on WebCore. | Request behavior reconstructed in `src/code/client/cl_steam_resources.c`; live native interceptor object is still a compatibility seam. |
@@ -34,6 +37,8 @@ This note records the current retail mapping for the Quake Live Awesomium browse
 
 | Retail object/API | Evidence | Source reconstruction status |
 | --- | --- | --- |
+| `WebSession` bootstrap slot `0x18` | HLIL bootstrap calls slot `0x18` immediately after `WebCore::CreateWebSession`. | Reconstructed through optional `_Awe_WebSession_Initialize@4` and retail vtable fallback. |
+| `WebSession` cache-clear slot `0x1c` | HLIL `web_clearCache` calls slot `0x1c`; `web_reload` calls the same slot before WebView reload. | Reconstructed as `CL_Awesomium_ClearCache`; also used by `CL_Web_ClearSessionState` before source-side Steam/resource cache clear. |
 | `WebView::LoadURL` slot `0x64` | HLIL bootstrap and Awesomium import list | Reconstructed through `_Awe_WebView_LoadURL@8` and retail vtable fallback. |
 | `WebView::Stop` slot `0x74` | HLIL/import surface | Reconstructed through retail vtable fallback. |
 | `WebView::surface` slot `0x84` | BitmapSurface copy path | Reconstructed and used by `CL_Awesomium_CopySurface`. |
@@ -69,7 +74,8 @@ This note records the current retail mapping for the Quake Live Awesomium browse
 Implemented or source-reconstructed:
 
 - WebCore initialization and shutdown behind `QL_BUILD_ONLINE_SERVICES`.
-- WebSession creation rooted in `fs_homepath`.
+- WebSession creation rooted in `fs_homepath`, including the post-create slot `0x18` initialization call.
+- WebSession cache clearing for `web_clearCache`/reload through retail slot `0x1c`; shutdown no longer treats that slot as a session release path.
 - `web.pak` mounting and deterministic package-path behavior for `asset://ql/index.html`.
 - WebView creation, resize, URL load, render resume, focus, surface copy, dirty tracking, visible-surface gating, and dynamic texture upload.
 - Retail vtable fallback for the core WebView calls needed by the menu path.
@@ -102,6 +108,32 @@ Confidence notes:
 2. Add a source-side native resource interceptor object only if live Awesomium still needs it after the `web.pak` and startup script path are stable.
 3. Cross-check WebPreferences field writes against Awesomium SDK headers or a focused retail object-layout pass before naming the fields.
 4. Keep Steam-backed data source behavior offline-first unless a documented open replacement path is chosen.
+
+## 2026-05-28 WebSession lifecycle and cache correction
+
+Retail evidence:
+
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15728` shows `sub_4f2a10` loading `data_12d3044` and tail-calling WebSession slot `0x1c`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15739` shows `sub_4f2a30` calling WebSession slot `0x1c` before WebView slot `0x78` with `1`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15747` shows shutdown destroying the WebView and then calling `Awesomium::WebCore::Shutdown`; it does not call the WebSession `0x1c` slot.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15868` shows the WebSession created from `fs_homepath` and then immediately dispatched through slot `0x18`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:16532` shows `web_showError` forwarding `sub_4c7ee0(1)`, the full command tail after the command name.
+
+Source divergence found:
+
+- The source adapter named WebSession slot `0x1c` as a release path and called it during shutdown.
+- Live `web_clearCache`/reload cleared only source-side resource caches and did not dispatch to the live Awesomium WebSession cache slot.
+- The post-create WebSession slot `0x18` call was documented as an object-lifetime boundary rather than reconstructed.
+- `web_showError` consumed only the first token after the command name.
+- Live navigation ignored an `CL_Awesomium_OpenURL` failure return, so the host could remain marked active after a failed URL dispatch.
+
+Fix implemented:
+
+- Added optional `_Awe_WebSession_Initialize@4` binding plus retail vtable fallback for WebSession slot `0x18`.
+- Reclassified `_Awe_WebSession_Release@4` as the adapter's historical name for WebSession slot `0x1c` cache clearing, exposed through `CL_Awesomium_ClearCache`.
+- Routed `CL_Web_ClearSessionState` through `CL_Awesomium_ClearCache` before source-side resource cache clearing when live Awesomium is active.
+- Removed the WebSession slot `0x1c` call from shutdown, matching retail WebView destroy plus `WebCore::Shutdown`.
+- Switched `web_showError` to `Cmd_ArgsFrom( 1 )` and made live navigation failure publish the load-failure path.
 
 ## 2026-05-25 update/pump parity audit
 
@@ -270,7 +302,7 @@ Observed source failure mode:
 - When the live surface was black or empty, the fallback path synthesized a full-screen diagnostic texture and `CL_WebHost_DrawBrowserSurface` still drew it while `browserActive` was set.
 - Because the browser surface is drawn as a full-screen overlay, promoting an empty/black live surface could make the UI appear black, hide the console, or make the world look incorrectly bright or washed depending on draw order and the current 2D state.
 
-Source reconstruction:
+Source reconstruction at the time:
 
 - `QLWebView_WriteSurfacePixels` now returns whether a drawable surface was produced.
 - Live Awesomium surfaces are drawable only after `CL_Awesomium_CopySurface` succeeds and `QLWebView_SurfaceHasVisiblePixels` finds non-zero RGB data.
@@ -281,3 +313,52 @@ Expected effect:
 
 - Awesomium can continue updating in the background while black/empty paints are ignored, rather than corrupting or covering the rest of the renderer.
 - If the browser page still fails to paint, the normal Quake UI, console, and world render should remain visible instead of being replaced by the browser overlay.
+
+## 2026-05-28 runtime/update parity correction
+
+Retail evidence:
+
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15969` shows `DataPakSource::DataPakSource` receiving the literal `"web.pak"` before the source is added under `"QL"`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part05.txt:15804` maps the browser draw/update helper: it recreates the browser image when dimensions change, uploads the Awesomium `BitmapSurface` only when dirty, clears the dirty bit, then draws the browser shader without an RGB-visibility gate.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part04.txt:33128` shows `QLWebCore_Update` called from the main frame loop before Steam callbacks and the client frame; surface upload/draw remains in the renderer-facing helper.
+
+Source divergence found:
+
+- `CL_Awesomium_CreateSession` verified `web.pak` under the selected runtime/base root, but then passed the absolute path into `DataPakSource` instead of the retail `"web.pak"` package member name. With `WebConfig::package_path` already pointing at the root, this could prevent `asset://ql/...` loads from resolving.
+- The live surface path treated all-black copied surfaces as non-drawable. Retail treats a copied `BitmapSurface` as the drawable browser texture and lets page content, including dark startup frames, present normally.
+- `QLWebCore_Update` still forced the live browser surface dirty every active frame. Retail dirty handling is driven by `BitmapSurface::IsDirty` plus dimension changes.
+
+Fix implemented:
+
+- `CL_Awesomium_CreateSession` now constructs the data source with `DataPakSource("web.pak")` after verifying the file exists in the selected root.
+- A successful live `BitmapSurface` copy now produces an uploadable browser shader even when sampled RGB values are zero; the visible-pixel check is retained only as a diagnostic.
+- Live Awesomium no longer forces `surfaceDirty` every active frame after `WebCore::Update`; dirty uploads now follow `BitmapSurface::IsDirty` and size rebuilds, matching the retail update cadence.
+
+## 2026-05-28 qz_instance return-flag correction
+
+Retail evidence:
+
+- `references/reverse-engineering/ghidra/quakelive_steam/functions.csv:366`, `:1121`, `:1308`, and `:1549` retain the owning retail functions at `0x00431A10`, `0x004328B0`, `0x00431E50`, and `0x00431570`.
+- `references/reverse-engineering/ghidra/quakelive_steam/analysis_symbols.txt:3372` identifies the `QLJSHandler::vftable` at `0x00548010`, while `references/reverse-engineering/ghidra/quakelive_steam/decompile_top_functions.c:45616` shows retail installing that handler on the WebView before the ten-try browser-helper bind loop.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt:44299` shows `QLJSHandler_LookupMethodId` walking `data_55c008` to `0x55c1a0` in 12-byte rows.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt:44571-44577` shows `QLJSHandler_BindQzInstance` passing the third table field to `Awesomium::JSObject::SetCustomMethod`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part07.txt:1559-1698` maps the 34-entry qz method table. The `SetCvar` row at `0x0055C044` and `ResetCvar` row at `0x0055C050` both have return flag `1`; the final `NoOp` row is at `0x0055C194`, after `SetFavoriteServer`.
+- `references/hlil/quakelive/quakelive_steam.exe/quakelive_steam.exe_hlil_split/quakelive_steam.exe_hlil_part01.txt:45282` maps `QLJSHandler_OnMethodCallWithReturnValue`, and the adjacent switch cases reconstruct return-valued cvar set/reset behavior.
+
+Source divergence found:
+
+- The source-visible qz method binding table did not preserve the retail data-table address for each row, making row-order regressions hard to catch.
+- `SetCvar` and `ResetCvar` were treated like void/no-op browser helpers in the injected startup bridge even though retail registers them as return-valued custom methods.
+- The compact startup method group placed `NoOp` before the late UGC/key/favorite rows, which did not match the retail table's final-row ordering.
+
+Fix implemented:
+
+- Added retail qz table bounds and per-row table addresses to `cl_webMethodBindings`.
+- Marked `SetCvar` and `ResetCvar` as return-valued rows, routed them through `QLJSHandler_OnMethodCallWithReturnValue`, and made them return boolean success/failure strings to Awesomium.
+- Updated the injected `qz_instance` bridge so local `SetCvar` and `ResetCvar` helpers normalize cvar names and return `true`, matching the browser-visible return contract.
+- Reordered the startup no-op method group so `NoOp` remains the last retail method row after `GetAllUGC`, `GetNextKeyDown`, and `SetFavoriteServer`.
+
+Expected effect:
+
+- Menu JavaScript that checks the result of `qz_instance.SetCvar(...)` or `qz_instance.ResetCvar(...)` should now see the same truthy return behavior retail exposes.
+- Future reconstruction work has source-visible anchors for the exact `data_55c008` table span and row addresses, reducing the chance of silently drifting from the retail qz method surface.

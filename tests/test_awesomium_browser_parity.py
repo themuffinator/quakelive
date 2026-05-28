@@ -141,10 +141,12 @@ def test_awesomium_load_failure_hides_host_and_suppresses_error_publish_until_re
 	)
 	show_browser_block = _extract_function_block(cl_cgame, "void CL_Web_ShowBrowser_f( void ) {")
 	change_hash_block = _extract_function_block(cl_cgame, "void CL_Web_ChangeHash_f( void ) {")
+	navigate_block = _extract_function_block(cl_cgame, "static qboolean QLWebHost_NavigateOrOpen( const char *hash ) {")
 	hide_browser_block = _extract_function_block(cl_cgame, "static void QLWebHost_HideBrowser( void ) {")
 	update_block = _extract_function_block(cl_cgame, "static void QLWebCore_Update( void ) {")
 	show_error_block = _extract_function_block(cl_cgame, "void CL_Web_ShowError_f( void ) {")
 	clear_cache_block = _extract_function_block(cl_cgame, "void CL_Web_ClearCache_f( void ) {")
+	clear_session_block = _extract_function_block(cl_cgame, "static void CL_Web_ClearSessionState( void ) {")
 	reload_view_block = _extract_function_block(cl_cgame, "static void QLWebHost_ReloadView( qboolean ignoreCache ) {")
 	reload_block = _extract_function_block(cl_cgame, "void CL_Web_Reload_f( void ) {")
 	frame_block = _extract_function_block(cl_cgame, "void CL_WebHost_Frame( void ) {")
@@ -162,14 +164,17 @@ def test_awesomium_load_failure_hides_host_and_suppresses_error_publish_until_re
 	assert "if ( cl_webHost.browserActive && !( cls.keyCatchers & KEYCATCH_BROWSER ) ) {" in update_block
 	assert "cls.keyCatchers |= KEYCATCH_BROWSER;" in update_block
 	assert "VM_Call( cgvm, CG_EVENT_HANDLING, CGAME_EVENT_CLOSECOMMANDOVERLAY );" in hide_browser_block
+	assert "if ( !CL_Awesomium_OpenURL( cl_webHost.currentUrl ) ) {" in navigate_block
+	assert "QLLoadHandler_OnFailLoadingFrame( cl_webHost.currentUrl );" in navigate_block
 
 	assert 'Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );' not in show_browser_block
 	assert 'Cvar_Set( "web_browserActive", cl_webHost.browserActive ? "1" : "0" );' not in change_hash_block
-	assert 'const char *message = ( Cmd_Argc() > 1 ) ? Cmd_Argv( 1 ) : "";' in show_error_block
+	assert 'const char *message = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";' in show_error_block
 	assert "CL_WebView_PublishGameError( message );" in show_error_block
 	assert "QLWebHost_NavigateOrOpen( cl_webBrowserHash );" not in show_error_block
 	assert 'if ( !cl_webHost.sessionInitialised ) {' in clear_cache_block
 	assert "CL_Web_ClearSessionState();" in clear_cache_block
+	assert "CL_Awesomium_ClearCache();" in clear_session_block
 	assert 'cl_webHost.refreshStopped = qfalse;' in reload_view_block
 	assert "(void)ignoreCache;" in reload_view_block
 	assert "CL_WebHost_PrimeLauncherDocument( cl_webHost.currentUrl )" in reload_view_block
@@ -214,6 +219,7 @@ def test_awesomium_direct_input_helpers_reconstruct_browser_runtime_injection_su
 	disconnect_block = _extract_function_block(cl_main, "void CL_Disconnect( qboolean showMainMenu ) {")
 
 	assert "void CL_WebView_OnMouseMove( int x, int y );" in client_h
+	assert "void CL_Awesomium_ClearCache( void );" in client_h
 	assert "qboolean CL_AdvertisementBridge_IsDelayElapsed( void );" in client_h
 	assert "void CL_AdvertisementBridge_ClearDelay( void );" in client_h
 	assert "#define KEYCATCH_RETAIL_MOUSEPASS\t0x0010" in client_h
@@ -330,6 +336,9 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	shutdown_block = _extract_function_block(
 		cl_awesomium, 'extern "C" void CL_Awesomium_Shutdown( void ) {'
 	)
+	clear_cache_live_block = _extract_function_block(
+		cl_awesomium, 'extern "C" void CL_Awesomium_ClearCache( void ) {'
+	)
 
 	for expected in (
 		'#define CL_AWE_RETAIL_ABI_SCOPE_C_EXPORT "bounded C-export substitution"',
@@ -371,11 +380,12 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 		'{ 0x004F2D30u, 0x0052C6A0u, "WebCore::Initialize", "CL_Awesomium_Startup", "_Awe_WebCore_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x0052C698u, "WebPreferences::WebPreferences", "CL_Awesomium_PreparePreferences", "_Awe_new_WebPreferences@0", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x00000000u, "WebCore::CreateWebSession slot 0x00", "CL_Awesomium_CreateSession", "_Awe_WebCore_CreateWebSession@12", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
-		'{ 0x004F2D30u, 0x00000018u, "WebSession bootstrap slot 0x18", "CL_Awesomium_CreateSession", "session initialisation boundary", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_OBJECT_LIFETIME },',
+		'{ 0x004F2D30u, 0x00000018u, "WebSession bootstrap slot 0x18", "CL_Awesomium_CreateSession", "_Awe_WebSession_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x0052C694u, "DataPakSource::DataPakSource", "CL_Awesomium_CreateSession", "_Awe_new_DataPakSource@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x00548068u, "QL data-source name", "CL_Awesomium_CreateSession", "\\"QL\\"", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_SOURCE_LITERAL },',
 		'{ 0x004F2D30u, 0x00548070u, "DataPakSource::vftable", "CL_Awesomium_CreateSession", "Awesomium built-in DataPakSource", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_OBJECT_LIFETIME },',
 		'{ 0x004F2D30u, 0x00000010u, "WebSession::AddDataSource slot 0x10", "CL_Awesomium_CreateSession", "_Awe_WebSession_AddDataSource@12", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
+		'{ 0x004F2A10u, 0x0000001Cu, "WebSession::ClearCache slot 0x1C", "CL_Awesomium_ClearCache", "_Awe_WebSession_Release@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x00000004u, "WebCore::CreateWebView slot 0x04", "CL_Awesomium_Startup", "_Awe_WebCore_CreateWebView_0@20", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x000000A0u, "WebView::set_transparent slot 0xA0", "CL_Awesomium_Startup", "_Awe_WebView_set_transparent@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
 		'{ 0x004F2D30u, 0x00000064u, "WebView::LoadURL slot 0x64", "CL_Awesomium_OpenURL", "_Awe_WebView_LoadURL@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },',
@@ -403,6 +413,8 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 		'CL_AWE_IMPORT( webConfigPackagePathSet, "_Awe_WebConfig_package_path_set@8" );',
 		'CL_AWE_IMPORT( newDataPakSource, "_Awe_new_DataPakSource@4" );',
 		'CL_AWE_IMPORT( webSessionAddDataSource, "_Awe_WebSession_AddDataSource@12" );',
+		'cl_awe.webSessionInitialize = reinterpret_cast<awe_websession_void_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebSession_Initialize@4" ) );',
+		'CL_AWE_IMPORT( webSessionClearCache, "_Awe_WebSession_Release@4" );',
 		'CL_AWE_IMPORT( webViewDestroy, "_Awe_WebView_Destroy@4" );',
 		'CL_AWE_IMPORT( webViewLoadURL, "_Awe_WebView_LoadURL@8" );',
 		'CL_AWE_IMPORT( webViewFocus, "_Awe_WebView_Focus@4" );',
@@ -450,10 +462,11 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	assert "(void)playerName;" not in prepare_config_block
 
 	assert 'cl_awesomium.webSession = cl_awe.webCoreCreateWebSession( cl_awesomium.webCore, dataPath, cl_awesomium.webPreferences );' in create_session_block
+	assert "cl_awe.webSessionInitialize( cl_awesomium.webSession );" in create_session_block
 	assert "assetsPath = basePath && basePath[0] ? basePath : runtimePath;" in create_session_block
 	assert 'CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), assetsPath, "web.pak" );' in create_session_block
 	assert 'CL_Awesomium_AppendPath( pakPath, sizeof( pakPath ), sessionPath, "web.pak" );' in create_session_block
-	assert 'pakName = CL_Awesomium_AllocWideString( pakPath );' in create_session_block
+	assert 'pakName = CL_Awesomium_AllocWideString( "web.pak" );' in create_session_block
 	assert "cl_awesomium.dataPakSource = cl_awe.newDataPakSource( pakName );" in create_session_block
 	assert 'sourceName = CL_Awesomium_AllocWideString( "QL" );' in create_session_block
 	assert "cl_awe.webSessionAddDataSource( cl_awesomium.webSession, sourceName, cl_awesomium.dataPakSource );" in create_session_block
@@ -469,8 +482,10 @@ def test_awesomium_win32_backend_documents_retail_slot_to_export_substitution() 
 	assert "cl_awe.webViewInjectMouseDown( cl_awesomium.webView, button );" in mouse_down_block
 	assert "cl_awe.webViewInjectMouseUp( cl_awesomium.webView, button );" in mouse_up_block
 	assert "cl_awe.webViewInjectMouseWheel( cl_awesomium.webView, 0, direction * 30 );" in wheel_block
+	assert "cl_awe.webSessionClearCache( cl_awesomium.webSession );" in clear_cache_live_block
 	assert "cl_awe.webViewDestroy( cl_awesomium.webView );" in shutdown_block
 	assert "cl_awe.webCoreShutdown();" in shutdown_block
+	assert "webSessionClearCache" not in shutdown_block
 
 
 def test_awesomium_null_host_browser_lane_is_explicit_compatibility_scope() -> None:
@@ -557,6 +572,9 @@ def test_awesomium_browser_host_verifier_covers_closed_gap_anchors() -> None:
 		"cl_webListenerCallbackMappings",
 		"0x00547FA8u",
 		"0x00431640u",
+		"CL_WEB_QZ_METHOD_TABLE_RETAIL_BEGIN 0x0055C008u",
+		'{ "SetCvar", 0x0055C044u, CL_WEB_METHOD_SET_CVAR, qtrue },',
+		'{ "ResetCvar", 0x0055C050u, CL_WEB_METHOD_RESET_CVAR, qtrue },',
 		"CG_QL_IMPORT_PUBLISH_TAGGED_INFO_STRING = 116",
 		"QL_CG_trap_PublishTaggedInfoString",
 		"CL_WebView_PublishTaggedInfoString",
@@ -598,6 +616,7 @@ def test_awesomium_browser_host_verifier_covers_closed_gap_anchors() -> None:
 		"ResponseThread::vftable.+0x00532B44",
 		"ResponseThread::vftable.+0x00532B44.+image/png.+request_%i",
 		"WebCore::Initialize.+WebSession::AddDataSource.+WebView::LoadURL.+WebCore::Shutdown",
+		"data_55c008.+SetCustomMethod.+SetCvar.+0x0055C044.+ResetCvar.+0x0055C050.+NoOp.+0x0055C194",
 	):
 		assert expected in verifier
 
@@ -774,6 +793,54 @@ def test_awesomium_listener_vtable_wiring_is_source_visible() -> None:
 	assert "cl_webHost.viewHandlerInstalled = qtrue;" in install_block
 	assert "cl_webHost.loadHandlerInstalled = qtrue;" in install_block
 	assert "(void)QLDialogHandler_OnShowFileChooser;" in runtime_block
+
+
+def test_awesomium_qz_method_table_preserves_retail_return_flags() -> None:
+	cl_cgame = _read_text(CL_CGAME_PATH)
+	cl_awesomium = _read_text(CL_AWESOMIUM_WIN32_PATH)
+
+	method_call_block = _extract_function_block(
+		cl_cgame, "static qboolean QLJSHandler_OnMethodCall( const char *methodName, const char **arguments, int argumentCount ) {"
+	)
+	return_call_block = _extract_function_block(
+		cl_cgame,
+		"static qboolean QLJSHandler_OnMethodCallWithReturnValue( const char *methodName, const char **arguments, int argumentCount, char *outValue, size_t outValueSize ) {",
+	)
+	startup_script_block = _extract_function_block(
+		cl_awesomium,
+		"static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const char *playerName, unsigned int appId, unsigned int steamIdLow, unsigned int steamIdHigh ) {",
+	)
+
+	for expected in (
+		"#define CL_WEB_QZ_METHOD_TABLE_RETAIL_BEGIN 0x0055C008u",
+		"#define CL_WEB_QZ_METHOD_TABLE_RETAIL_END 0x0055C1A0u",
+		"#define CL_WEB_QZ_METHOD_TABLE_ENTRY_BYTES 0x0Cu",
+		"retailTableAddress;",
+		'{ "SetCvar", 0x0055C044u, CL_WEB_METHOD_SET_CVAR, qtrue },',
+		'{ "ResetCvar", 0x0055C050u, CL_WEB_METHOD_RESET_CVAR, qtrue },',
+		'{ "GetAllUGC", 0x0055C170u, CL_WEB_METHOD_GET_ALL_UGC, qfalse },',
+		'{ "SetFavoriteServer", 0x0055C188u, CL_WEB_METHOD_SET_FAVORITE_SERVER, qfalse },',
+		'{ "NoOp", 0x0055C194u, CL_WEB_METHOD_NO_OP, qfalse },',
+	):
+		assert expected in cl_cgame
+
+	assert "case CL_WEB_METHOD_SET_CVAR:" not in method_call_block
+	assert "case CL_WEB_METHOD_RESET_CVAR:" not in method_call_block
+	assert "case CL_WEB_METHOD_SET_CVAR:" in return_call_block
+	assert 'Cvar_Set( arguments[0], arguments[1] ? arguments[1] : "" );' in return_call_block
+	assert 'Q_strncpyz( outValue, "1", outValueSize );' in return_call_block
+	assert "case CL_WEB_METHOD_RESET_CVAR:" in return_call_block
+	assert "Cvar_Reset( arguments[0] );" in return_call_block
+
+	for expected in (
+		"SetCvar:function(name,value){config.cvars[(name||'').toLowerCase()]=String(value);return true;}",
+		"ResetCvar:function(name){delete config.cvars[(name||'').toLowerCase()];return true;}",
+		"Invite GetAllUGC GetNextKeyDown SetFavoriteServer NoOp",
+		"bind('GetCvar',function(n){return config.cvars[(n||'').toLowerCase()]||'';});",
+		"bind('SetCvar',function(n,v){config.cvars[(n||'').toLowerCase()]=String(v||'');return true;});",
+		"bind('ResetCvar',function(n){delete config.cvars[(n||'').toLowerCase()];return true;});",
+	):
+		assert expected in startup_script_block
 
 
 def test_awesomium_tagged_info_string_comm_notice_wiring_matches_retail_slot() -> None:
@@ -1016,11 +1083,23 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	upload_surface_block = _extract_function_block(
 		cl_cgame, "static qboolean QLWebView_UploadSurfaceImage( void ) {"
 	)
+	write_surface_block = _extract_function_block(
+		cl_cgame, "static qboolean QLWebView_WriteSurfacePixels( void ) {"
+	)
+	update_block = _extract_function_block(
+		cl_cgame, "static void QLWebCore_Update( void ) {"
+	)
 	runtime_block = _extract_function_block(
 		cl_cgame, "static qboolean QLWebHost_EnsureRuntime( void ) {"
 	)
 	pump_block = _extract_function_block(
 		cl_cgame, "static void QLWebHost_PumpFrame( void ) {"
+	)
+	draw_block = _extract_function_block(
+		cl_cgame, "void CL_WebHost_DrawBrowserSurface( void ) {"
+	)
+	drawable_block = _extract_function_block(
+		cl_cgame, "qboolean CL_WebHost_HasDrawableSurface( void ) {"
 	)
 	live_view_block = _extract_function_block(
 		cl_cgame, "qboolean CL_WebHost_HasLiveView( void ) {"
@@ -1051,9 +1130,19 @@ def test_awesomium_runtime_bootstrap_and_surface_pump_reconstruct_retail_host_co
 	assert "cl_webHost.surfaceUploadHeight = cl_webHost.surfaceHeight;" in upload_surface_block
 	assert "cl_webHost.surfaceImageInitialised = qtrue;" in upload_surface_block
 	assert "cl_webHost.surfaceDirty = qfalse;" in upload_surface_block
+	assert "if ( copied ) {" in write_surface_block
+	assert "cl_webHost.surfaceHasVisiblePixels = visible;" in write_surface_block
+	assert "return qtrue;" in write_surface_block
+	assert "if ( cl_webHost.liveAwesomium ) {" in update_block
+	assert "if ( CL_Awesomium_SurfaceDirty() ) {" in update_block
+	assert "return;" in update_block
 	assert "if ( !cl_webHost.surfaceImageInitialised ) {" in pump_block
 	assert "if ( cl_webHost.surfaceUploadWidth != cl_webHost.surfaceWidth || cl_webHost.surfaceUploadHeight != cl_webHost.surfaceHeight ) {" in pump_block
 	assert "if ( cl_webHost.surfaceDirty ) {" in pump_block
+	assert "if ( !cl_webHost.surfaceShader || cl_webHost.surfaceDirty ) {" in draw_block
+	assert "if ( !cl_webHost.surfaceShader ) {" in draw_block
+	assert "if ( !cl_webHost.surfaceShader ) {" in drawable_block
+	assert "surfaceHasVisiblePixels" not in drawable_block
 	assert "return cl_webHost.viewInitialised && cl_webHost.bootstrapReady;" in live_view_block
 
 

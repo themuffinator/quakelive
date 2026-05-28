@@ -69,6 +69,9 @@ static qboolean cl_previousBrowserAvailable = qfalse;
 
 #define CL_WEB_FRIEND_FLAGS 4
 #define CL_WEB_MAX_QZ_METHODS 35
+#define CL_WEB_QZ_METHOD_TABLE_RETAIL_BEGIN 0x0055C008u
+#define CL_WEB_QZ_METHOD_TABLE_RETAIL_END 0x0055C1A0u
+#define CL_WEB_QZ_METHOD_TABLE_ENTRY_BYTES 0x0Cu
 #define CL_WEB_JSON_BUFFER_SIZE 32768
 #define CL_WEB_LAUNCHER_SCRIPT_LIST_BUFFER 4096
 #define CL_WEB_DEFAULT_URL "asset://ql/index.html"
@@ -117,6 +120,7 @@ typedef enum {
 
 typedef struct {
 	const char	*name;
+	unsigned int	retailTableAddress;
 	int			methodId;
 	qboolean	returnsValue;
 } clWebMethodBinding_t;
@@ -410,41 +414,41 @@ void CL_Web_StopRefresh_f( void );
 void CL_Steam_FormatFriendSummaryJson( const ql_steam_friend_summary_t *summary, char *buffer, size_t bufferSize );
 
 static const clWebMethodBinding_t cl_webMethodBindings[CL_WEB_MAX_QZ_METHODS] = {
-	{ "IsPakFilePresent", CL_WEB_METHOD_IS_PAK_FILE_PRESENT, qtrue },
-	{ "IsGameRunning", CL_WEB_METHOD_IS_GAME_RUNNING, qtrue },
-	{ "SendGameCommand", CL_WEB_METHOD_SEND_GAME_COMMAND, qfalse },
-	{ "WriteTextFile", CL_WEB_METHOD_WRITE_TEXT_FILE, qfalse },
-	{ "GetCvar", CL_WEB_METHOD_GET_CVAR, qtrue },
-	{ "SetCvar", CL_WEB_METHOD_SET_CVAR, qfalse },
-	{ "ResetCvar", CL_WEB_METHOD_RESET_CVAR, qfalse },
-	{ "GetMapList", CL_WEB_METHOD_GET_MAP_LIST, qtrue },
-	{ "GetFactoryList", CL_WEB_METHOD_GET_FACTORY_LIST, qtrue },
-	{ "GetDemoList", CL_WEB_METHOD_GET_DEMO_LIST, qtrue },
-	{ "OpenURL", CL_WEB_METHOD_OPEN_URL, qfalse },
-	{ "OpenSteamOverlayURL", CL_WEB_METHOD_OPEN_STEAM_OVERLAY_URL, qfalse },
-	{ "GetClipboardText", CL_WEB_METHOD_GET_CLIPBOARD_TEXT, qtrue },
-	{ "SetClipboardText", CL_WEB_METHOD_SET_CLIPBOARD_TEXT, qfalse },
-	{ "RequestServers", CL_WEB_METHOD_REQUEST_SERVERS, qfalse },
-	{ "RequestServerDetails", CL_WEB_METHOD_REQUEST_SERVER_DETAILS, qfalse },
-	{ "RefreshList", CL_WEB_METHOD_REFRESH_LIST, qfalse },
-	{ "CreateLobby", CL_WEB_METHOD_CREATE_LOBBY, qfalse },
-	{ "LeaveLobby", CL_WEB_METHOD_LEAVE_LOBBY, qfalse },
-	{ "JoinLobby", CL_WEB_METHOD_JOIN_LOBBY, qfalse },
-	{ "SetLobbyServer", CL_WEB_METHOD_SET_LOBBY_SERVER, qfalse },
-	{ "ShowInviteOverlay", CL_WEB_METHOD_SHOW_INVITE_OVERLAY, qfalse },
-	{ "SayLobby", CL_WEB_METHOD_SAY_LOBBY, qfalse },
-	{ "RequestUserStats", CL_WEB_METHOD_REQUEST_USER_STATS, qfalse },
-	{ "GetFriendList", CL_WEB_METHOD_GET_FRIEND_LIST, qtrue },
-	{ "ActivateGameOverlayToUser", CL_WEB_METHOD_ACTIVATE_GAME_OVERLAY_TO_USER, qfalse },
-	{ "Invite", CL_WEB_METHOD_INVITE, qfalse },
-	{ "FileExists", CL_WEB_METHOD_FILE_EXISTS, qtrue },
-	{ "GetConfig", CL_WEB_METHOD_GET_CONFIG, qtrue },
-	{ "GetCursorPosition", CL_WEB_METHOD_GET_CURSOR_POSITION, qtrue },
-	{ "NoOp", CL_WEB_METHOD_NO_OP, qfalse },
-	{ "GetAllUGC", CL_WEB_METHOD_GET_ALL_UGC, qfalse },
-	{ "GetNextKeyDown", CL_WEB_METHOD_GET_NEXT_KEY_DOWN, qfalse },
-	{ "SetFavoriteServer", CL_WEB_METHOD_SET_FAVORITE_SERVER, qfalse },
-	{ NULL, 0, qfalse }
+	{ "IsPakFilePresent", 0x0055C008u, CL_WEB_METHOD_IS_PAK_FILE_PRESENT, qtrue },
+	{ "IsGameRunning", 0x0055C014u, CL_WEB_METHOD_IS_GAME_RUNNING, qtrue },
+	{ "SendGameCommand", 0x0055C020u, CL_WEB_METHOD_SEND_GAME_COMMAND, qfalse },
+	{ "WriteTextFile", 0x0055C02Cu, CL_WEB_METHOD_WRITE_TEXT_FILE, qfalse },
+	{ "GetCvar", 0x0055C038u, CL_WEB_METHOD_GET_CVAR, qtrue },
+	{ "SetCvar", 0x0055C044u, CL_WEB_METHOD_SET_CVAR, qtrue },
+	{ "ResetCvar", 0x0055C050u, CL_WEB_METHOD_RESET_CVAR, qtrue },
+	{ "GetMapList", 0x0055C05Cu, CL_WEB_METHOD_GET_MAP_LIST, qtrue },
+	{ "GetFactoryList", 0x0055C068u, CL_WEB_METHOD_GET_FACTORY_LIST, qtrue },
+	{ "GetDemoList", 0x0055C074u, CL_WEB_METHOD_GET_DEMO_LIST, qtrue },
+	{ "OpenURL", 0x0055C080u, CL_WEB_METHOD_OPEN_URL, qfalse },
+	{ "OpenSteamOverlayURL", 0x0055C08Cu, CL_WEB_METHOD_OPEN_STEAM_OVERLAY_URL, qfalse },
+	{ "GetClipboardText", 0x0055C098u, CL_WEB_METHOD_GET_CLIPBOARD_TEXT, qtrue },
+	{ "SetClipboardText", 0x0055C0A4u, CL_WEB_METHOD_SET_CLIPBOARD_TEXT, qfalse },
+	{ "RequestServers", 0x0055C0B0u, CL_WEB_METHOD_REQUEST_SERVERS, qfalse },
+	{ "RequestServerDetails", 0x0055C0BCu, CL_WEB_METHOD_REQUEST_SERVER_DETAILS, qfalse },
+	{ "RefreshList", 0x0055C0C8u, CL_WEB_METHOD_REFRESH_LIST, qfalse },
+	{ "CreateLobby", 0x0055C0D4u, CL_WEB_METHOD_CREATE_LOBBY, qfalse },
+	{ "LeaveLobby", 0x0055C0E0u, CL_WEB_METHOD_LEAVE_LOBBY, qfalse },
+	{ "JoinLobby", 0x0055C0ECu, CL_WEB_METHOD_JOIN_LOBBY, qfalse },
+	{ "SetLobbyServer", 0x0055C0F8u, CL_WEB_METHOD_SET_LOBBY_SERVER, qfalse },
+	{ "ShowInviteOverlay", 0x0055C104u, CL_WEB_METHOD_SHOW_INVITE_OVERLAY, qfalse },
+	{ "SayLobby", 0x0055C110u, CL_WEB_METHOD_SAY_LOBBY, qfalse },
+	{ "RequestUserStats", 0x0055C11Cu, CL_WEB_METHOD_REQUEST_USER_STATS, qfalse },
+	{ "GetFriendList", 0x0055C128u, CL_WEB_METHOD_GET_FRIEND_LIST, qtrue },
+	{ "ActivateGameOverlayToUser", 0x0055C134u, CL_WEB_METHOD_ACTIVATE_GAME_OVERLAY_TO_USER, qfalse },
+	{ "Invite", 0x0055C140u, CL_WEB_METHOD_INVITE, qfalse },
+	{ "FileExists", 0x0055C14Cu, CL_WEB_METHOD_FILE_EXISTS, qtrue },
+	{ "GetConfig", 0x0055C158u, CL_WEB_METHOD_GET_CONFIG, qtrue },
+	{ "GetCursorPosition", 0x0055C164u, CL_WEB_METHOD_GET_CURSOR_POSITION, qtrue },
+	{ "GetAllUGC", 0x0055C170u, CL_WEB_METHOD_GET_ALL_UGC, qfalse },
+	{ "GetNextKeyDown", 0x0055C17Cu, CL_WEB_METHOD_GET_NEXT_KEY_DOWN, qfalse },
+	{ "SetFavoriteServer", 0x0055C188u, CL_WEB_METHOD_SET_FAVORITE_SERVER, qfalse },
+	{ "NoOp", 0x0055C194u, CL_WEB_METHOD_NO_OP, qfalse },
+	{ NULL, 0u, 0, qfalse }
 };
 
 #define CL_WEB_LISTENER_SCOPE_SOURCE_CALLBACK "source callback"
@@ -1569,18 +1573,10 @@ static qboolean QLWebView_WriteSurfacePixels( void ) {
 	int requiredLength;
 	int pixelCount;
 	int i;
-	int midOffset;
-	qboolean copied;
-	qboolean visible;
-	qboolean dirty;
-	qboolean loading;
-	qboolean crashed;
-	int lastError;
 	byte red;
 	byte green;
 	byte blue;
 	byte alpha;
-	static int liveSurfaceLogCounter;
 
 	requiredLength = cl_webHost.surfaceWidth * cl_webHost.surfaceHeight * 4;
 	if ( cl_webHost.surfaceWidth <= 0 || cl_webHost.surfaceHeight <= 0 || requiredLength <= 0 ) {
@@ -1599,6 +1595,15 @@ static qboolean QLWebView_WriteSurfacePixels( void ) {
 
 #if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
 	if ( cl_webHost.liveAwesomium ) {
+		int midOffset;
+		qboolean copied;
+		qboolean visible;
+		qboolean dirty;
+		qboolean loading;
+		qboolean crashed;
+		int lastError;
+		static int liveSurfaceLogCounter;
+
 		dirty = CL_Awesomium_SurfaceDirty();
 		copied = CL_Awesomium_CopySurface( cl_webHost.surfaceBuffer, cl_webHost.surfaceWidth, cl_webHost.surfaceHeight, cl_webHost.surfaceWidth * 4 );
 		if ( copied ) {
@@ -1608,12 +1613,12 @@ static qboolean QLWebView_WriteSurfacePixels( void ) {
 		loading = CL_Awesomium_IsLoading();
 		crashed = CL_Awesomium_IsCrashed();
 		lastError = CL_Awesomium_LastErrorCode();
-		if ( visible ) {
-			if ( !cl_webHost.surfaceHasVisiblePixels ) {
+		if ( copied ) {
+			if ( !cl_webHost.surfaceHasVisiblePixels && visible ) {
 				Com_Printf( "Awesomium surface became visible: copy=%d dirty=%d size=%dx%d view=%dx%d\n",
 					copied, dirty, cl_webHost.surfaceWidth, cl_webHost.surfaceHeight, cl_webHost.viewWidth, cl_webHost.viewHeight );
 			}
-			cl_webHost.surfaceHasVisiblePixels = qtrue;
+			cl_webHost.surfaceHasVisiblePixels = visible;
 			return qtrue;
 		}
 
@@ -2077,7 +2082,11 @@ static qboolean QLWebHost_NavigateOrOpen( const char *hash ) {
 			CL_WebHost_NormalizeHash( hash, cl_webHost.pendingHash, sizeof( cl_webHost.pendingHash ) );
 			CL_WebHost_BuildCurrentURL( hash, url, sizeof( url ) );
 			Q_strncpyz( cl_webHost.currentUrl, url, sizeof( cl_webHost.currentUrl ) );
-			CL_Awesomium_OpenURL( cl_webHost.currentUrl );
+			if ( !CL_Awesomium_OpenURL( cl_webHost.currentUrl ) ) {
+				Com_Printf( "Awesomium WebView failed to load %s: %s\n", cl_webHost.currentUrl, CL_Awesomium_LastError() );
+				QLLoadHandler_OnFailLoadingFrame( cl_webHost.currentUrl );
+				return qfalse;
+			}
 			cl_webHost.zoomPercent = Cvar_VariableIntegerValue( "web_zoom" );
 			CL_Awesomium_SetZoom( cl_webHost.zoomPercent );
 			cl_webHost.browserVisible = qtrue;
@@ -2213,6 +2222,11 @@ static void QLWebCore_Update( void ) {
 
 	cl_webHost.frameSequence++;
 	if ( cl_webHost.viewInitialised && ( cl_webHost.browserVisible || cl_webHost.browserActive || cl_webHost.loadingDocument ) ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+		if ( cl_webHost.liveAwesomium ) {
+			return;
+		}
+#endif
 		cl_webHost.surfaceDirty = qtrue;
 	}
 }
@@ -3885,20 +3899,6 @@ static qboolean QLJSHandler_OnMethodCall( const char *methodName, const char **a
 			}
 			return CL_WebHost_WriteTextFile( arguments[0], arguments[1] );
 
-		case CL_WEB_METHOD_SET_CVAR:
-			if ( argumentCount < 2 || !arguments[0] || !arguments[0][0] ) {
-				return qfalse;
-			}
-			Cvar_Set( arguments[0], arguments[1] ? arguments[1] : "" );
-			return qtrue;
-
-		case CL_WEB_METHOD_RESET_CVAR:
-			if ( argumentCount < 1 || !arguments[0] || !arguments[0][0] ) {
-				return qfalse;
-			}
-			Cvar_Reset( arguments[0] );
-			return qtrue;
-
 		case CL_WEB_METHOD_OPEN_URL:
 			if ( argumentCount < 1 || !arguments[0] || !arguments[0][0] ) {
 				return qfalse;
@@ -4058,6 +4058,24 @@ static qboolean QLJSHandler_OnMethodCallWithReturnValue( const char *methodName,
 				return qfalse;
 			}
 			Cvar_VariableStringBuffer( arguments[0], outValue, (int)outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_SET_CVAR:
+			if ( argumentCount < 2 || !arguments[0] || !arguments[0][0] ) {
+				Q_strncpyz( outValue, "0", outValueSize );
+				return qtrue;
+			}
+			Cvar_Set( arguments[0], arguments[1] ? arguments[1] : "" );
+			Q_strncpyz( outValue, "1", outValueSize );
+			return qtrue;
+
+		case CL_WEB_METHOD_RESET_CVAR:
+			if ( argumentCount < 1 || !arguments[0] || !arguments[0][0] ) {
+				Q_strncpyz( outValue, "0", outValueSize );
+				return qtrue;
+			}
+			Cvar_Reset( arguments[0] );
+			Q_strncpyz( outValue, "1", outValueSize );
 			return qtrue;
 
 		case CL_WEB_METHOD_GET_MAP_LIST:
@@ -5156,6 +5174,11 @@ session cache.
 =============
 */
 static void CL_Web_ClearSessionState( void ) {
+#if defined( _WIN32 ) && QL_PLATFORM_HAS_ONLINE_SERVICES
+	if ( cl_webHost.liveAwesomium ) {
+		CL_Awesomium_ClearCache();
+	}
+#endif
 	CL_ClearSteamResourceCache( qtrue );
 }
 
@@ -5167,7 +5190,7 @@ Publishes a browser error through the fallback error state when no live host bri
 =============
 */
 void CL_Web_ShowError_f( void ) {
-	const char *message = ( Cmd_Argc() > 1 ) ? Cmd_Argv( 1 ) : "";
+	const char *message = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";
 
 	if ( !message ) {
 		message = "";
@@ -5405,12 +5428,12 @@ void CL_WebHost_DrawBrowserSurface( void ) {
 		return;
 	}
 
-	if ( !cl_webHost.surfaceShader || cl_webHost.surfaceDirty || !cl_webHost.surfaceHasVisiblePixels ) {
+	if ( !cl_webHost.surfaceShader || cl_webHost.surfaceDirty ) {
 		if ( !QLWebView_UploadSurfaceImage() ) {
 			return;
 		}
 	}
-	if ( !cl_webHost.surfaceShader || !cl_webHost.surfaceHasVisiblePixels ) {
+	if ( !cl_webHost.surfaceShader ) {
 		return;
 	}
 
@@ -5491,7 +5514,7 @@ qboolean CL_WebHost_HasDrawableSurface( void ) {
 		return qfalse;
 	}
 
-	if ( !cl_webHost.surfaceShader || !cl_webHost.surfaceHasVisiblePixels ) {
+	if ( !cl_webHost.surfaceShader ) {
 		return qfalse;
 	}
 

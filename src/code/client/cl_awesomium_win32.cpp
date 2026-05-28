@@ -53,8 +53,8 @@ typedef void *(__stdcall *awe_webcore_create_view_fn)( void *core, int width, in
 typedef void (__stdcall *awe_webcore_set_string_fn)( void *object, const unsigned short *value );
 typedef void (__stdcall *awe_webprefs_set_bool_fn)( void *preferences, bool value );
 typedef void *(__stdcall *awe_new_datapak_source_fn)( const unsigned short *pakPath );
+typedef void (__stdcall *awe_websession_void_fn)( void *session );
 typedef void (__stdcall *awe_websession_add_source_fn)( void *session, const unsigned short *sourceName, void *dataSource );
-typedef void (__stdcall *awe_websession_release_fn)( void *session );
 typedef void *(__stdcall *awe_new_weburl_fn)( const unsigned short *url );
 typedef void (__stdcall *awe_webview_destroy_fn)( void *view );
 typedef void (__stdcall *awe_webview_load_url_fn)( void *view, void *url );
@@ -86,7 +86,8 @@ typedef void (__stdcall *awe_bitmap_set_bool_fn)( void *surface, bool value );
 #define CL_AWE_WEBCORE_CREATE_VIEW_SLOT 0x04
 #define CL_AWE_WEBCORE_UPDATE_SLOT 0x18
 #define CL_AWE_WEBSESSION_ADD_SOURCE_SLOT 0x10
-#define CL_AWE_WEBSESSION_RELEASE_SLOT 0x1c
+#define CL_AWE_WEBSESSION_INITIALIZE_SLOT 0x18
+#define CL_AWE_WEBSESSION_CLEAR_CACHE_SLOT 0x1c
 #define CL_AWE_WEBVIEW_DESTROY_SLOT 0x00
 #define CL_AWE_WEBVIEW_LOAD_URL_SLOT 0x64
 #define CL_AWE_WEBVIEW_EXECUTE_JAVASCRIPT_SLOT 0x124
@@ -124,7 +125,7 @@ typedef void *(__thiscall *awe_webcore_create_session_method_fn)( void *core, co
 typedef void *(__thiscall *awe_webcore_create_view_method_fn)( void *core, int width, int height, void *session, int type );
 typedef void (__thiscall *awe_webcore_update_method_fn)( void *core );
 typedef void (__thiscall *awe_websession_add_source_method_fn)( void *session, const void *sourceName, void *source );
-typedef void (__thiscall *awe_websession_release_method_fn)( void *session );
+typedef void (__thiscall *awe_websession_void_method_fn)( void *session );
 typedef void (__thiscall *awe_webview_void_method_fn)( void *view );
 typedef void (__thiscall *awe_webview_load_url_method_fn)( void *view, void *url );
 typedef void (__thiscall *awe_webview_execute_javascript_method_fn)( void *view, const void *script, const void *frame );
@@ -198,8 +199,9 @@ typedef struct {
 	awe_delete_object_fn			deleteDataPakSource;
 	awe_new_weburl_fn				newWebURL;
 	awe_delete_object_fn			deleteWebURL;
+	awe_websession_void_fn			webSessionInitialize;
 	awe_websession_add_source_fn		webSessionAddDataSource;
-	awe_websession_release_fn		webSessionRelease;
+	awe_websession_void_fn			webSessionClearCache;
 	awe_webview_destroy_fn			webViewDestroy;
 	awe_webview_load_url_fn			webViewLoadURL;
 	awe_webview_execute_javascript_fn	webViewExecuteJavascript;
@@ -289,11 +291,12 @@ static const clAwesomiumBootstrapRetailMapping_t cl_aweBootstrapRetailMappings[]
 	{ 0x004F2D30u, 0x0052C6A0u, "WebCore::Initialize", "CL_Awesomium_Startup", "_Awe_WebCore_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x0052C698u, "WebPreferences::WebPreferences", "CL_Awesomium_PreparePreferences", "_Awe_new_WebPreferences@0", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x00000000u, "WebCore::CreateWebSession slot 0x00", "CL_Awesomium_CreateSession", "_Awe_WebCore_CreateWebSession@12", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
-	{ 0x004F2D30u, 0x00000018u, "WebSession bootstrap slot 0x18", "CL_Awesomium_CreateSession", "session initialisation boundary", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_OBJECT_LIFETIME },
+	{ 0x004F2D30u, 0x00000018u, "WebSession bootstrap slot 0x18", "CL_Awesomium_CreateSession", "_Awe_WebSession_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x0052C694u, "DataPakSource::DataPakSource", "CL_Awesomium_CreateSession", "_Awe_new_DataPakSource@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x00548068u, "QL data-source name", "CL_Awesomium_CreateSession", "\"QL\"", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_SOURCE_LITERAL },
 	{ 0x004F2D30u, 0x00548070u, "DataPakSource::vftable", "CL_Awesomium_CreateSession", "Awesomium built-in DataPakSource", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_OBJECT_LIFETIME },
 	{ 0x004F2D30u, 0x00000010u, "WebSession::AddDataSource slot 0x10", "CL_Awesomium_CreateSession", "_Awe_WebSession_AddDataSource@12", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
+	{ 0x004F2A10u, 0x0000001Cu, "WebSession::ClearCache slot 0x1C", "CL_Awesomium_ClearCache", "_Awe_WebSession_Release@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x00000004u, "WebCore::CreateWebView slot 0x04", "CL_Awesomium_Startup", "_Awe_WebCore_CreateWebView_0@20", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x000000A0u, "WebView::set_transparent slot 0xA0", "CL_Awesomium_Startup", "_Awe_WebView_set_transparent@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
 	{ 0x004F2D30u, 0x00000064u, "WebView::LoadURL slot 0x64", "CL_Awesomium_OpenURL", "_Awe_WebView_LoadURL@8", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },
@@ -680,15 +683,29 @@ static void __stdcall CL_Awesomium_RetailWebSessionAddDataSource( void *session,
 
 /*
 =============
-CL_Awesomium_RetailWebSessionRelease
+CL_Awesomium_RetailWebSessionInitialize
 =============
 */
-static void __stdcall CL_Awesomium_RetailWebSessionRelease( void *session ) {
-	awe_websession_release_method_fn release;
+static void __stdcall CL_Awesomium_RetailWebSessionInitialize( void *session ) {
+	awe_websession_void_method_fn initialize;
 
-	release = reinterpret_cast<awe_websession_release_method_fn>( CL_Awesomium_VTableMethod( session, CL_AWE_WEBSESSION_RELEASE_SLOT ) );
-	if ( release ) {
-		release( session );
+	initialize = reinterpret_cast<awe_websession_void_method_fn>( CL_Awesomium_VTableMethod( session, CL_AWE_WEBSESSION_INITIALIZE_SLOT ) );
+	if ( initialize ) {
+		initialize( session );
+	}
+}
+
+/*
+=============
+CL_Awesomium_RetailWebSessionClearCache
+=============
+*/
+static void __stdcall CL_Awesomium_RetailWebSessionClearCache( void *session ) {
+	awe_websession_void_method_fn clearCache;
+
+	clearCache = reinterpret_cast<awe_websession_void_method_fn>( CL_Awesomium_VTableMethod( session, CL_AWE_WEBSESSION_CLEAR_CACHE_SLOT ) );
+	if ( clearCache ) {
+		clearCache( session );
 	}
 }
 
@@ -1206,8 +1223,14 @@ static FARPROC CL_Awesomium_RetailAdapterForImport( const char *name ) {
 	if ( strstr( name, "WebSession_AddDataSource" ) ) {
 		return reinterpret_cast<FARPROC>( CL_Awesomium_RetailWebSessionAddDataSource );
 	}
+	if ( strstr( name, "WebSession_Initialize" ) || strstr( name, "WebSession_Initialise" ) ) {
+		return reinterpret_cast<FARPROC>( CL_Awesomium_RetailWebSessionInitialize );
+	}
+	if ( strstr( name, "WebSession_ClearCache" ) ) {
+		return reinterpret_cast<FARPROC>( CL_Awesomium_RetailWebSessionClearCache );
+	}
 	if ( strstr( name, "WebSession_Release" ) ) {
-		return reinterpret_cast<FARPROC>( CL_Awesomium_RetailWebSessionRelease );
+		return reinterpret_cast<FARPROC>( CL_Awesomium_RetailWebSessionClearCache );
 	}
 	if ( strstr( name, "new_WebURL" ) ) {
 		return reinterpret_cast<FARPROC>( CL_Awesomium_RetailNewWebURL );
@@ -1312,6 +1335,22 @@ static qboolean CL_Awesomium_ResolveImport( FARPROC *target, const char *name ) 
 
 /*
 =============
+CL_Awesomium_ResolveOptionalImport
+=============
+*/
+static FARPROC CL_Awesomium_ResolveOptionalImport( const char *name ) {
+	FARPROC proc;
+
+	proc = GetProcAddress( cl_awesomium.module, name );
+	if ( !proc ) {
+		proc = CL_Awesomium_RetailAdapterForImport( name );
+	}
+
+	return proc;
+}
+
+/*
+=============
 CL_Awesomium_LoadLibraryCandidate
 =============
 */
@@ -1410,7 +1449,8 @@ static qboolean CL_Awesomium_LoadImports( const char *runtimePath, const char *b
 	CL_AWE_IMPORT( newWebURL, "_Awe_new_WebURL_1@4" );
 	CL_AWE_IMPORT( deleteWebURL, "_Awe_delete_WebURL@4" );
 	CL_AWE_IMPORT( webSessionAddDataSource, "_Awe_WebSession_AddDataSource@12" );
-	CL_AWE_IMPORT( webSessionRelease, "_Awe_WebSession_Release@4" );
+	cl_awe.webSessionInitialize = reinterpret_cast<awe_websession_void_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebSession_Initialize@4" ) );
+	CL_AWE_IMPORT( webSessionClearCache, "_Awe_WebSession_Release@4" );
 	CL_AWE_IMPORT( webViewDestroy, "_Awe_WebView_Destroy@4" );
 	CL_AWE_IMPORT( webViewLoadURL, "_Awe_WebView_LoadURL@8" );
 	CL_AWE_IMPORT( webViewExecuteJavascript, "_Awe_WebView_ExecuteJavascript@12" );
@@ -1625,7 +1665,7 @@ static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const
 		"GetNextKeyDown:noop,SetFavoriteServer:noop,"
 		"IsPakFilePresent:function(){return true;},IsGameRunning:function(){return false;},"
 		"FileExists:function(){return false;},GetCvar:function(name){return config.cvars[(name||'').toLowerCase()]||'';},"
-		"SetCvar:function(name,value){config.cvars[(name||'').toLowerCase()]=String(value);},ResetCvar:noop,"
+		"SetCvar:function(name,value){config.cvars[(name||'').toLowerCase()]=String(value);return true;},ResetCvar:function(name){delete config.cvars[(name||'').toLowerCase()];return true;},"
 		"GetMapList:function(){return maps;},GetFactoryList:function(){return factories;},GetDemoList:empty,"
 		"GetFriendList:empty,GetConfig:function(){return config;},GetCursorPosition:function(){return {x:0,y:0};}};"
 		"var loading=function(){try{var show=function(){if(document.getElementById('__qlr_menu_loading')){return;}"
@@ -1640,9 +1680,9 @@ static void CL_Awesomium_BuildUserScript( char *buffer, size_t bufferSize, const
 		"if(document.body){show();}else{document.addEventListener('DOMContentLoaded',show,false);}}catch(e){}};loading();"
 		"var ret=function(v){return function(){return v;};};var bind=function(n,f){if(typeof qz[n]==='undefined'){qz[n]=f;}};"
 		"var fm='IsPakFilePresent IsGameRunning FileExists'.split(' ');for(var i=0;i<fm.length;i++){bind(fm[i],ret(false));}"
-		"var nm='WriteTextFile OpenURL OpenSteamOverlayURL SetClipboardText RequestServers RequestServerDetails RefreshList CreateLobby LeaveLobby JoinLobby SetLobbyServer ShowInviteOverlay SayLobby RequestUserStats ActivateGameOverlayToUser Invite NoOp GetAllUGC GetNextKeyDown SetFavoriteServer'.split(' ');for(i=0;i<nm.length;i++){bind(nm[i],noop);}"
+		"var nm='WriteTextFile OpenURL OpenSteamOverlayURL SetClipboardText RequestServers RequestServerDetails RefreshList CreateLobby LeaveLobby JoinLobby SetLobbyServer ShowInviteOverlay SayLobby RequestUserStats ActivateGameOverlayToUser Invite GetAllUGC GetNextKeyDown SetFavoriteServer NoOp'.split(' ');for(i=0;i<nm.length;i++){bind(nm[i],noop);}"
 		"var em='GetDemoList GetFriendList'.split(' ');for(i=0;i<em.length;i++){bind(em[i],empty);}"
-		"bind('GetCvar',function(n){return config.cvars[n]||'';});bind('SetCvar',function(n,v){config.cvars[n]=String(v||'');});bind('ResetCvar',function(n){delete config.cvars[n];});"
+		"bind('GetCvar',function(n){return config.cvars[(n||'').toLowerCase()]||'';});bind('SetCvar',function(n,v){config.cvars[(n||'').toLowerCase()]=String(v||'');return true;});bind('ResetCvar',function(n){delete config.cvars[(n||'').toLowerCase()];return true;});"
 		"bind('GetMapList',function(){return maps;});bind('GetFactoryList',function(){return factories;});bind('GetClipboardText',ret(''));bind('GetConfig',function(){return config;});bind('GetCursorPosition',function(){return {x:0,y:0};});"
 		"if(!window.FakeClient){window.FakeClient={};}if(!window.FakeClient.qz_instance){window.FakeClient.qz_instance={};}"
 		"window.qz_instance=qz;window.main_hook_v2=function(){var f=window.FakeClient&&window.FakeClient.qz_instance;"
@@ -1770,6 +1810,10 @@ static qboolean CL_Awesomium_CreateSession( const char *runtimePath, const char 
 		CL_Awesomium_SetError( "could not create Awesomium WebSession" );
 		return qfalse;
 	}
+	if ( cl_awe.webSessionInitialize ) {
+		Com_Printf( "Awesomium startup phase: initializing WebSession\n" );
+		cl_awe.webSessionInitialize( cl_awesomium.webSession );
+	}
 
 	sessionPath = runtimePath;
 	assetsPath = basePath && basePath[0] ? basePath : runtimePath;
@@ -1782,7 +1826,7 @@ static qboolean CL_Awesomium_CreateSession( const char *runtimePath, const char 
 		return qfalse;
 	}
 
-	pakName = CL_Awesomium_AllocWideString( pakPath );
+	pakName = CL_Awesomium_AllocWideString( "web.pak" );
 	if ( !pakName ) {
 		CL_Awesomium_SetError( "could not convert web.pak path for Awesomium" );
 		return qfalse;
@@ -2222,6 +2266,17 @@ extern "C" void CL_Awesomium_Stop( void ) {
 
 /*
 =============
+CL_Awesomium_ClearCache
+=============
+*/
+extern "C" void CL_Awesomium_ClearCache( void ) {
+	if ( cl_awesomium.started && cl_awesomium.webSession && cl_awe.webSessionClearCache ) {
+		cl_awe.webSessionClearCache( cl_awesomium.webSession );
+	}
+}
+
+/*
+=============
 CL_Awesomium_Reload
 =============
 */
@@ -2242,9 +2297,6 @@ extern "C" void CL_Awesomium_Shutdown( void ) {
 	}
 	cl_awesomium.webView = NULL;
 
-	if ( cl_awesomium.webSession && cl_awe.webSessionRelease ) {
-		cl_awe.webSessionRelease( cl_awesomium.webSession );
-	}
 	cl_awesomium.webSession = NULL;
 	cl_awesomium.dataPakSource = NULL;
 
@@ -2481,6 +2533,14 @@ CL_Awesomium_Stop
 =============
 */
 extern "C" void CL_Awesomium_Stop( void ) {
+}
+
+/*
+=============
+CL_Awesomium_ClearCache
+=============
+*/
+extern "C" void CL_Awesomium_ClearCache( void ) {
 }
 
 /*

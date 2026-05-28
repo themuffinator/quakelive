@@ -2077,28 +2077,30 @@ def test_client_browser_js_bridge_reconstructs_qz_instance_contract() -> None:
     assert "CL_WEB_METHOD_ACTIVATE_GAME_OVERLAY_TO_USER = 25," in cl_cgame
     assert "CL_WEB_METHOD_NO_OP = 30," in cl_cgame
     assert "CL_WEB_METHOD_SET_FAVORITE_SERVER = 33" in cl_cgame
-    assert '{ "GetClipboardText", CL_WEB_METHOD_GET_CLIPBOARD_TEXT, qtrue }' in cl_cgame
-    assert '{ "OpenSteamOverlayURL", CL_WEB_METHOD_OPEN_STEAM_OVERLAY_URL, qfalse }' in cl_cgame
-    assert '{ "SetClipboardText", CL_WEB_METHOD_SET_CLIPBOARD_TEXT, qfalse }' in cl_cgame
-    assert '{ "RequestServers", CL_WEB_METHOD_REQUEST_SERVERS, qfalse }' in cl_cgame
-    assert '{ "RequestServerDetails", CL_WEB_METHOD_REQUEST_SERVER_DETAILS, qfalse }' in cl_cgame
-    assert '{ "RefreshList", CL_WEB_METHOD_REFRESH_LIST, qfalse }' in cl_cgame
-    assert '{ "CreateLobby", CL_WEB_METHOD_CREATE_LOBBY, qfalse }' in cl_cgame
-    assert '{ "LeaveLobby", CL_WEB_METHOD_LEAVE_LOBBY, qfalse }' in cl_cgame
-    assert '{ "JoinLobby", CL_WEB_METHOD_JOIN_LOBBY, qfalse }' in cl_cgame
-    assert '{ "SetLobbyServer", CL_WEB_METHOD_SET_LOBBY_SERVER, qfalse }' in cl_cgame
-    assert '{ "ShowInviteOverlay", CL_WEB_METHOD_SHOW_INVITE_OVERLAY, qfalse }' in cl_cgame
-    assert '{ "SayLobby", CL_WEB_METHOD_SAY_LOBBY, qfalse }' in cl_cgame
-    assert '{ "RequestUserStats", CL_WEB_METHOD_REQUEST_USER_STATS, qfalse }' in cl_cgame
-    assert '{ "GetFriendList", CL_WEB_METHOD_GET_FRIEND_LIST, qtrue }' in cl_cgame
-    assert '{ "ActivateGameOverlayToUser", CL_WEB_METHOD_ACTIVATE_GAME_OVERLAY_TO_USER, qfalse }' in cl_cgame
-    assert '{ "Invite", CL_WEB_METHOD_INVITE, qfalse }' in cl_cgame
-    assert '{ "FileExists", CL_WEB_METHOD_FILE_EXISTS, qtrue }' in cl_cgame
-    assert '{ "GetConfig", CL_WEB_METHOD_GET_CONFIG, qtrue }' in cl_cgame
-    assert '{ "GetCursorPosition", CL_WEB_METHOD_GET_CURSOR_POSITION, qtrue }' in cl_cgame
-    assert '{ "NoOp", CL_WEB_METHOD_NO_OP, qfalse }' in cl_cgame
-    assert '{ "GetAllUGC", CL_WEB_METHOD_GET_ALL_UGC, qfalse }' in cl_cgame
-    assert '{ "GetNextKeyDown", CL_WEB_METHOD_GET_NEXT_KEY_DOWN, qfalse }' in cl_cgame
+    assert '{ "GetClipboardText", 0x0055C098u, CL_WEB_METHOD_GET_CLIPBOARD_TEXT, qtrue }' in cl_cgame
+    assert '{ "OpenSteamOverlayURL", 0x0055C08Cu, CL_WEB_METHOD_OPEN_STEAM_OVERLAY_URL, qfalse }' in cl_cgame
+    assert '{ "SetCvar", 0x0055C044u, CL_WEB_METHOD_SET_CVAR, qtrue }' in cl_cgame
+    assert '{ "ResetCvar", 0x0055C050u, CL_WEB_METHOD_RESET_CVAR, qtrue }' in cl_cgame
+    assert '{ "SetClipboardText", 0x0055C0A4u, CL_WEB_METHOD_SET_CLIPBOARD_TEXT, qfalse }' in cl_cgame
+    assert '{ "RequestServers", 0x0055C0B0u, CL_WEB_METHOD_REQUEST_SERVERS, qfalse }' in cl_cgame
+    assert '{ "RequestServerDetails", 0x0055C0BCu, CL_WEB_METHOD_REQUEST_SERVER_DETAILS, qfalse }' in cl_cgame
+    assert '{ "RefreshList", 0x0055C0C8u, CL_WEB_METHOD_REFRESH_LIST, qfalse }' in cl_cgame
+    assert '{ "CreateLobby", 0x0055C0D4u, CL_WEB_METHOD_CREATE_LOBBY, qfalse }' in cl_cgame
+    assert '{ "LeaveLobby", 0x0055C0E0u, CL_WEB_METHOD_LEAVE_LOBBY, qfalse }' in cl_cgame
+    assert '{ "JoinLobby", 0x0055C0ECu, CL_WEB_METHOD_JOIN_LOBBY, qfalse }' in cl_cgame
+    assert '{ "SetLobbyServer", 0x0055C0F8u, CL_WEB_METHOD_SET_LOBBY_SERVER, qfalse }' in cl_cgame
+    assert '{ "ShowInviteOverlay", 0x0055C104u, CL_WEB_METHOD_SHOW_INVITE_OVERLAY, qfalse }' in cl_cgame
+    assert '{ "SayLobby", 0x0055C110u, CL_WEB_METHOD_SAY_LOBBY, qfalse }' in cl_cgame
+    assert '{ "RequestUserStats", 0x0055C11Cu, CL_WEB_METHOD_REQUEST_USER_STATS, qfalse }' in cl_cgame
+    assert '{ "GetFriendList", 0x0055C128u, CL_WEB_METHOD_GET_FRIEND_LIST, qtrue }' in cl_cgame
+    assert '{ "ActivateGameOverlayToUser", 0x0055C134u, CL_WEB_METHOD_ACTIVATE_GAME_OVERLAY_TO_USER, qfalse }' in cl_cgame
+    assert '{ "Invite", 0x0055C140u, CL_WEB_METHOD_INVITE, qfalse }' in cl_cgame
+    assert '{ "FileExists", 0x0055C14Cu, CL_WEB_METHOD_FILE_EXISTS, qtrue }' in cl_cgame
+    assert '{ "GetConfig", 0x0055C158u, CL_WEB_METHOD_GET_CONFIG, qtrue }' in cl_cgame
+    assert '{ "GetCursorPosition", 0x0055C164u, CL_WEB_METHOD_GET_CURSOR_POSITION, qtrue }' in cl_cgame
+    assert '{ "GetAllUGC", 0x0055C170u, CL_WEB_METHOD_GET_ALL_UGC, qfalse }' in cl_cgame
+    assert '{ "GetNextKeyDown", 0x0055C17Cu, CL_WEB_METHOD_GET_NEXT_KEY_DOWN, qfalse }' in cl_cgame
+    assert '{ "NoOp", 0x0055C194u, CL_WEB_METHOD_NO_OP, qfalse }' in cl_cgame
 
     assert "cl_webHost.qzInstanceBound = qtrue;" in bind_block
     assert "cl_webHost.windowObjectBound = qtrue;" in bind_block
@@ -2178,6 +2180,10 @@ def test_client_browser_js_bridge_reconstructs_qz_instance_contract() -> None:
     assert "CL_WebHost_RequestCursorPosition( &x, &y );" in return_block
     assert "case CL_WEB_METHOD_GET_CLIPBOARD_TEXT:" in return_block
     assert "Sys_GetClipboardData();" in return_block
+    assert "case CL_WEB_METHOD_SET_CVAR:" in return_block
+    assert 'Cvar_Set( arguments[0], arguments[1] ? arguments[1] : "" );' in return_block
+    assert "case CL_WEB_METHOD_RESET_CVAR:" in return_block
+    assert "Cvar_Reset( arguments[0] );" in return_block
 
     assert "QLWebView_InjectMappedMouseMove(" in mouse_block
     assert "QLWebView_MapCursorCoordinate( x, cl_webHost.viewWidth, cl_webHost.surfaceWidth )" in mouse_block

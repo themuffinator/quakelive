@@ -603,6 +603,7 @@ void CL_Awesomium_InjectMouseUp( int button );
 void CL_Awesomium_InjectMouseWheel( int direction );
 void CL_Awesomium_InjectKeyboardEvent( unsigned int eventType, unsigned int virtualKeyCode, long nativeKeyCode );
 void CL_Awesomium_Stop( void );
+void CL_Awesomium_ClearCache( void );
 void CL_Awesomium_Reload( qboolean ignoreCache );
 void CL_Awesomium_Shutdown( void );
 const char *CL_Awesomium_LastError( void );

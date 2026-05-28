@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Last updated: 2026-05-27
+Last updated: 2026-05-28
 
 This file now tracks only active repo-level work. Detailed closure narratives
 live in the dedicated subsystem audits under `docs/reverse-engineering/`.
@@ -40,6 +40,82 @@ disabled, until a documented open replacement path exists.
   snapshots, not current gap ledgers.
 
 ## Active work
+
+### Task A115: Reconstruct Awesomium qz method table return flags [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/cl_cgame.c`,
+`src/code/client/cl_awesomium_win32.cpp`,
+`tests/test_awesomium_browser_parity.py`,
+`tests/test_platform_services.py`,
+`tools/ci/verify-awesomium-browser-host-parity.ps1`,
+`docs/reverse-engineering/awesomium-browser-wiring.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_331.md`
+Parity estimate: **before 97% -> after 99.4%** for the focused
+Awesomium qz method-table/return-flag lane. Overall Awesomium WebUI wiring is
+estimated at **98.9% -> 99.0%**; repo-wide parity remains **98%**.
+
+Completed work:
+
+1. Rechecked `QLJSHandler_LookupMethodId`, `QLJSHandler_BindQzInstance`,
+   `QLJSHandler_OnMethodCall`, and `QLJSHandler_OnMethodCallWithReturnValue`
+   against HLIL with Ghidra function/vtable ownership support.
+2. Added source-visible retail bounds and row addresses for the `data_55c008`
+   qz method table.
+3. Corrected `SetCvar` and `ResetCvar` to follow the retail return-valued
+   method lane and return boolean success/failure values.
+4. Updated the injected startup `qz_instance` bridge so local cvar set/reset
+   helpers normalize cvar names and return truthy values.
+5. Added parity coverage and CI verifier anchors for the qz method table,
+   return flags, startup bridge behavior, and mapping-round evidence.
+
+Verification:
+
+- `python -m pytest tests/test_awesomium_browser_parity.py tests/test_platform_services.py -q --tb=short`
+  - Result: `102 passed`.
+- `powershell -ExecutionPolicy Bypass -File tools\ci\verify-awesomium-browser-host-parity.ps1 -RepoRoot E:\Repositories\QuakeLive-reverse`
+  - Result: all Awesomium browser host parity anchors present.
+- `git diff --check -- src/code/client/cl_awesomium_win32.cpp src/code/client/cl_cgame.c src/code/client/client.h tests/test_awesomium_browser_parity.py tests/test_platform_services.py tools/ci/verify-awesomium-browser-host-parity.ps1 docs/reverse-engineering/awesomium-browser-wiring.md docs/reverse-engineering/quakelive_steam_mapping_round_330.md docs/reverse-engineering/quakelive_steam_mapping_round_331.md IMPLEMENTATION_PLAN.md`
+  - Result: clean; only Git line-ending normalization warnings were reported.
+- `powershell -ExecutionPolicy Bypass -File tools\ci\build-windows-dlls.ps1 -RepoRoot E:\Repositories\QuakeLive-reverse -Solution src/code/quakelive.sln -Configuration Debug -Platform Win32 -PlatformToolset v143 -DisableOptionalCodecs`
+  - Result: build succeeded with `0` warnings and `0` errors.
+
+### Task A114: Reconstruct Awesomium WebSession lifecycle/cache wiring [COMPLETED]
+Priority: High
+Primary areas: `src/code/client/cl_awesomium_win32.cpp`,
+`src/code/client/cl_cgame.c`, `src/code/client/client.h`,
+`tests/test_awesomium_browser_parity.py`,
+`tools/ci/verify-awesomium-browser-host-parity.ps1`,
+`docs/reverse-engineering/awesomium-browser-wiring.md`,
+`docs/reverse-engineering/quakelive_steam_mapping_round_330.md`
+Parity estimate: **before 96% -> after 99%** for the focused
+Awesomium WebSession lifecycle/cache lane. Overall Awesomium WebUI wiring is
+estimated at **98.4% -> 98.9%**; repo-wide parity remains **98%**.
+
+Completed work:
+
+1. Rechecked `sub_4F2A10`, `sub_4F2A30`, `sub_4F2A60`,
+   `sub_4F2D30`, `sub_4F3CB0`, and `sub_4F3CD0` against HLIL with
+   Ghidra metadata and symbol-alias support.
+2. Reconstructed WebSession slot `0x18` initialization immediately after
+   `WebCore::CreateWebSession`.
+3. Reclassified WebSession slot `0x1c` as cache clear for `web_clearCache`
+   and reload, removed it from shutdown, and routed live clear-cache through
+   `CL_Awesomium_ClearCache`.
+4. Matched retail command-tail behavior for `web_showError` and made live
+   navigation failures enter the mapped load-failure handler.
+5. Updated Awesomium wiring notes, mapping-round evidence, pytest coverage,
+   and the browser-host parity verifier.
+
+Verification:
+
+- `python -m pytest tests/test_awesomium_browser_parity.py tests/test_platform_services.py -q --tb=short`
+  - Result: `101 passed`.
+- `powershell -ExecutionPolicy Bypass -File tools\ci\verify-awesomium-browser-host-parity.ps1 -RepoRoot E:\Repositories\QuakeLive-reverse`
+  - Result: all Awesomium browser host parity anchors present.
+- `git diff --check -- src/code/client/cl_awesomium_win32.cpp src/code/client/cl_cgame.c src/code/client/client.h docs/reverse-engineering/awesomium-browser-wiring.md docs/reverse-engineering/quakelive_steam_mapping_round_330.md tests/test_awesomium_browser_parity.py tools/ci/verify-awesomium-browser-host-parity.ps1`
+  - Result: clean; only Git line-ending normalization warnings were reported.
+- `powershell -ExecutionPolicy Bypass -File tools\ci\build-windows-dlls.ps1 -RepoRoot E:\Repositories\QuakeLive-reverse -Solution src/code/quakelive.sln -Configuration Debug -Platform Win32 -PlatformToolset v143 -DisableOptionalCodecs`
+  - Result: build succeeded; existing UI/game config warnings were reported.
 
 ### Task A113: Reconstruct application initialization host wiring [COMPLETED]
 Priority: High

@@ -89,6 +89,41 @@ $sourceAnchors = @(
 		Description = 'listener mapping count recorded during listener installation'
 	},
 	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = '#define CL_WEB_QZ_METHOD_TABLE_RETAIL_BEGIN 0x0055C008u'
+		Description = 'retail qz_instance method table start address'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = '#define CL_WEB_QZ_METHOD_TABLE_RETAIL_END 0x0055C1A0u'
+		Description = 'retail qz_instance method table end address'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'unsigned int	retailTableAddress;'
+		Description = 'source-visible qz method table address field'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = '{ "SetCvar", 0x0055C044u, CL_WEB_METHOD_SET_CVAR, qtrue },'
+		Description = 'SetCvar preserved as return-valued qz method'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = '{ "ResetCvar", 0x0055C050u, CL_WEB_METHOD_RESET_CVAR, qtrue },'
+		Description = 'ResetCvar preserved as return-valued qz method'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'Cvar_Set( arguments[0], arguments[1] ? arguments[1] : "" );'
+		Description = 'return-valued SetCvar handler implementation'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'Cvar_Reset( arguments[0] );'
+		Description = 'return-valued ResetCvar handler implementation'
+	},
+	@{
 		Path = 'src/code/cgame/cg_public.h'
 		Literal = 'CG_QL_IMPORT_PUBLISH_TAGGED_INFO_STRING = 116,'
 		Description = 'native cgame tagged info-string import slot'
@@ -327,8 +362,18 @@ $adapterAnchors = @(
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = '{ 0x004F2D30u, 0x00000018u, "WebSession bootstrap slot 0x18", "CL_Awesomium_CreateSession", "_Awe_WebSession_Initialize@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },'
+		Description = 'WebSession bootstrap initialize substitution'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
 		Literal = '{ 0x004F2D30u, 0x00000010u, "WebSession::AddDataSource slot 0x10", "CL_Awesomium_CreateSession", "_Awe_WebSession_AddDataSource@12", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },'
 		Description = 'WebSession AddDataSource bootstrap substitution'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = '{ 0x004F2A10u, 0x0000001Cu, "WebSession::ClearCache slot 0x1C", "CL_Awesomium_ClearCache", "_Awe_WebSession_Release@4", CL_AWE_RETAIL_BOOTSTRAP_SCOPE_C_EXPORT },'
+		Description = 'WebSession cache-clear command substitution'
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
@@ -377,6 +422,26 @@ $adapterAnchors = @(
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'cl_awe.webSessionInitialize = reinterpret_cast<awe_websession_void_fn>( CL_Awesomium_ResolveOptionalImport( "_Awe_WebSession_Initialize@4" ) );'
+		Description = 'optional WebSession initialize adapter import'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'CL_AWE_IMPORT( webSessionClearCache, "_Awe_WebSession_Release@4" );'
+		Description = 'WebSession cache-clear adapter import'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'cl_awe.webSessionInitialize( cl_awesomium.webSession );'
+		Description = 'WebSession initialize after create'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'extern "C" void CL_Awesomium_ClearCache( void ) {'
+		Description = 'live WebSession cache-clear API'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
 		Literal = 'CL_AWE_IMPORT( bitmapCopyTo, "_Awe_BitmapSurface_CopyTo@24" );'
 		Description = 'Bitmap surface copy adapter import'
 	},
@@ -402,8 +467,43 @@ $adapterAnchors = @(
 	},
 	@{
 		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = "SetCvar:function(name,value){config.cvars[(name||'').toLowerCase()]=String(value);return true;}"
+		Description = 'startup qz_instance SetCvar return-valued projection'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = "ResetCvar:function(name){delete config.cvars[(name||'').toLowerCase()];return true;}"
+		Description = 'startup qz_instance ResetCvar return-valued projection'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
 		Literal = '!CL_Awesomium_SetConfigString( cl_awe.webConfigPackagePathSet, cl_awesomium.webConfig, packageRoot )'
 		Description = 'Awesomium package path configured on WebConfig'
+	},
+	@{
+		Path = 'src/code/client/cl_awesomium_win32.cpp'
+		Literal = 'pakName = CL_Awesomium_AllocWideString( "web.pak" );'
+		Description = 'retail web.pak DataPakSource literal'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'if ( !cl_webHost.surfaceShader || cl_webHost.surfaceDirty ) {'
+		Description = 'browser draw uploads on shader absence or dirty surface'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'cl_webHost.surfaceHasVisiblePixels = visible;'
+		Description = 'browser surface visibility kept diagnostic rather than draw-gating'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'CL_Awesomium_ClearCache();'
+		Description = 'clear-cache command reaches live Awesomium session cache'
+	},
+	@{
+		Path = 'src/code/client/cl_cgame.c'
+		Literal = 'const char *message = ( Cmd_Argc() > 1 ) ? Cmd_ArgsFrom( 1 ) : "";'
+		Description = 'web_showError consumes full command tail'
 	}
 )
 
@@ -578,6 +678,11 @@ $mappingAnchors = @(
 		Path = 'docs/reverse-engineering/quakelive_steam_mapping_round_291.md'
 		Pattern = '(?s)WebCore::Initialize.+WebSession::AddDataSource.+WebView::LoadURL.+WebCore::Shutdown'
 		Description = 'round 291 Awesomium bootstrap lifecycle source-visible wiring evidence'
+	},
+	@{
+		Path = 'docs/reverse-engineering/quakelive_steam_mapping_round_331.md'
+		Pattern = '(?s)data_55c008.+SetCustomMethod.+SetCvar.+0x0055C044.+ResetCvar.+0x0055C050.+NoOp.+0x0055C194'
+		Description = 'round 331 qz method table return-flag evidence'
 	},
 	@{
 		Path = 'docs/reverse-engineering/quakelive_steam_mapping_round_285.md'
